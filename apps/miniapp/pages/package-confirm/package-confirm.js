@@ -811,6 +811,19 @@ Page({
     idem.ensureKey(account, fingerprint)
       .then((record) => {
         attempt.key = record.key
+        // **出门之前先在本机把这个键标成"已提交"，标不住就一个 POST 都不发。**
+        //
+        // 本机那张表要淘汰"铸出来但从没用过"的键（不淘汰的话，一次失败的提交会把未落定
+        // 名额永久占住），而"从没用过"只能由本机自己记下来——服务端不会告诉我们这件事，
+        // 它那一侧的 (endUserId, key) 是永久的。标记落住之后这条记录就退出按本机时间的
+        // 淘汰：设备时钟往前跳、或恰好卡在 7 天边界上，都不会再把一个**可能已经到过
+        // 服务端**的键忘掉。忘掉它的代价很具体：下一次同参数提交铸新键，服务端按新键
+        // 正常建第二张订单、再收一次钱。
+        //
+        // 标不住时停在这里（用户重试一次）比发出去（可能第二张订单）便宜得多。
+        if (!idem.markSubmitted(account, fingerprint, record.key)) {
+          throw new Error(idem.SUBMIT_MARK_FAILED_MESSAGE)
+        }
         return api.createPackageOrder(payload, { idempotencyKey: record.key })
       })
       .then((order) => {

@@ -183,6 +183,86 @@ const httpError = (statusCode, code, message) => Object.assign(new Error(message
 // A. 指纹：与服务端 fingerprintPackageOrderPayload 同一组字段、同一套归一
 // ══════════════════════════════════════════════════════════════════════
 
+/**
+ * 服务端 `fingerprintPackageOrderPayload` 里那个被 hash 的对象字面量，**按源码解析**
+ * 出它的字段名与顺序。
+ *
+ * 为什么要解析而不是照抄一份常量：照抄的那一份改不改全凭人自觉，正是这次要消灭的
+ * 那种"没有任何东西在维持的不变量"。这里的解析是确定性的：从函数声明处找到
+ * `JSON.stringify({`，按括号深度只收第一层的 `key:`。深度一进内层（`dto.files.map(...)`
+ * 那样的调用、数组、嵌套对象）就不再计入，所以 `canonicalizePackagePageRange(...)`
+ * 这种带括号的值不会被误当成字段。
+ *
+ * **不比较 hash 字节**：服务端算的是 sha256(JSON)，本地是带长度前缀的分段串，两者
+ * 本来就不该相等（也不需要相等）。要守的是"字段集 + 顺序 + 归一口径"这份契约 ——
+ * 少一项 → 用户改了那一项本地却以为是同一单 → 复用旧键 → 服务端 409，重试无用；
+ * 多一项 → 服务端认为没变而本地换了新键 → 第二张订单、第二笔钱。
+ */
+function parseApiFingerprintFields(src) {
+  const at = src.indexOf('export function fingerprintPackageOrderPayload(')
+  assert.ok(at >= 0, '服务端 fingerprintPackageOrderPayload 不见了（改名 / 挪走都要同步本地字段表）')
+  const objAt = src.indexOf('JSON.stringify(', at)
+  assert.ok(objAt > at, 'fingerprintPackageOrderPayload 里找不到被 hash 的那个对象字面量')
+  const fields = []
+  let depth = 0
+  let token = ''
+  for (let i = objAt + 'JSON.stringify'.length; i < src.length; i += 1) {
+    const ch = src[i]
+    if (ch === '(' || ch === '{' || ch === '[') { depth += 1; token = ''; continue }
+    if (ch === ')' || ch === '}' || ch === ']') { depth -= 1; token = ''; if (depth === 0) break; continue }
+    // depth 2 = `JSON.stringify(` 的括号 + 对象的 `{`，也就是对象的第一层。
+    if (depth === 2 && /[A-Za-z0-9_$]/.test(ch)) { token += ch; continue }
+    if (depth === 2 && ch === ':' && token) { fields.push(token); token = ''; continue }
+    token = ''
+  }
+  return fields
+}
+
+test('指纹字段契约：本地这一组与服务端 fingerprintPackageOrderPayload 逐项同名同序', () => {
+  const apiSrc = fs.readFileSync(
+    path.join(MINIAPP, '../../services/api/src/member-print-orders/package-order.service.ts'), 'utf8')
+  const serverFields = parseApiFingerprintFields(apiSrc)
+  // 阳性对照：解析器真的解析出东西了。读数为 0 有两种可能（真没有 / 根本没测到），
+  // 少了这一条，解析器一旦失灵就会和一个同样为空的本地表"对上"，断言恒真。
+  assert.ok(serverFields.length >= 5, `解析器没取到服务端字段（拿到 ${JSON.stringify(serverFields)}）`)
+  assert.deepEqual(serverFields, idem.FINGERPRINT_FIELDS,
+    '两端字段集/顺序必须逐项相同：少一项 = 同键不同参 409，多一项 = 白铸新键 = 第二张订单')
+
+  // 归一口径同样是契约的一部分（字段名对上、归一不同，照样两端算出不同的"是不是同一单"）。
+  // 这三条在服务端都有唯一写法，逐字核对；本地那三条由 fingerprintOf 的真执行守住（下面几条）。
+  assert.match(apiSrc, /colorMode: dto\.params\.colorMode === 'bw' \? 'black_white' : dto\.params\.colorMode/,
+    '服务端仍把 bw 归一成 black_white')
+  assert.match(apiSrc, /duplex: dto\.params\.duplex === 'single' \? 'simplex' : dto\.params\.duplex/,
+    '服务端仍把 single 归一成 simplex')
+  assert.match(apiSrc, /function canonicalizePackagePageRange\([\s\S]{0,200}pageRange \? pageRange : null/,
+    '服务端 pageRange 仍按 truthiness 归一（缺失 / 空串同为一档）')
+})
+
+test('指纹：声明的字段表就是运行期真值（多一项 / 少一项都立刻改变行为，不是一行注释）', () => {
+  const fields = idem.FINGERPRINT_FIELDS
+  const base = idem.fingerprintOf(PAYLOAD)
+  // 指纹**逐段**对应声明表：段数必须等于字段数。此前 fingerprintOf 里另写了一组硬编码
+  // 字段，这条断言在那一版上同样会过，但那时它证明不了两者一致 —— 所以下面那条
+  // "声明了没有归一规则的字段 → fail-closed" 才是真正把两者绑在一起的那一条。
+  assert.equal(base.split('|').length, fields.length)
+
+  const original = fields.slice()
+  try {
+    fields.push('quoteId')  // 声明一个没有归一规则的字段
+    assert.equal(idem.fingerprintOf(PAYLOAD), '',
+      '声明表里多出一个没有归一规则的字段 → 算不出指纹（fail-closed），而不是悄悄少看一项')
+    fields.length = 0
+    fields.push('terminalId', 'copies')
+    const narrowed = idem.fingerprintOf(PAYLOAD)
+    assert.equal(narrowed.split('|').length, 2, '砍掉字段立刻改变运行期产物')
+    assert.notEqual(narrowed, base)
+  } finally {
+    fields.length = 0
+    for (const f of original) fields.push(f)
+    assert.equal(idem.fingerprintOf(PAYLOAD), base, '恢复原表后指纹逐字回到原值')
+  }
+})
+
 test('指纹：bw/single 与 black_white/simplex 是同一个槽位（别名不归一 = 一次重试白铸新键）', () => {
   const canonical = idem.fingerprintOf(PAYLOAD)
   const aliased = idem.fingerprintOf({ ...PAYLOAD, params: { colorMode: 'bw', duplex: 'single', copies: 1 } })
@@ -1323,4 +1403,187 @@ test('单件链同一套：大写未落定不复用、大写已落定 fail-close
   const after = wx.storage.get(KEY)
   assert.equal(after.find((r) => r.fingerprint === 'fp-keep').orderId, 'ord-1')
   assert.ok(after.find((r) => r.fingerprint === 'fp-upper-settled'), '已落定的那条仍然留着')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// G. 键的寿命：本机的 TTL 不得比服务端的键先失忆
+//
+// 服务端那一侧的 `(endUserId, idempotencyKey)` 是**永久**挂在 Order 行上的
+// （`@@unique`，没有任何过期清理）。本机记录此前一律活 7 天，于是有一整档记录会在
+// 服务端仍然认得那个键的时候被本机忘掉：`orderId` 还空着、而 POST 可能已经到过服务端
+// 的那一格（响应丢在路上、进程被杀在 POST 与响应之间）。忘掉它之后，用户带同一份
+// 材料包再提交铸的是**新键**，服务端按新键正常建**第二张**订单、再收一次钱。
+// 而且不必真等满 7 天：设备时钟往前跳一下、或恰好卡在边界那一毫秒就到了。
+//
+// 现在的判据是 `wasSubmitted`（只看落盘字段，进程重启后照样成立）：
+//   - 已落定 / 已被 markSubmitted 标过 / 旧版本没有这个标记的 → **永不因本机时间淘汰**；
+//   - 只有"本版写下、且 markSubmitted 还没成功过"的那一格才按 TTL 过期 ——
+//     它证明得了自己一个 POST 都没发过，留着只会白占未落定名额。
+// ══════════════════════════════════════════════════════════════════════
+
+const DAY = 24 * 60 * 60 * 1000
+const KEY_A = '11111111-1111-4111-8111-111111111111'
+
+/** 直接往盘上写一条记录（含做旧的时间戳）。默认是"已标记提交、尚未落定"那一格。 */
+function seedRow(wx, patch) {
+  const at = Date.now() - 30 * DAY
+  const row = Object.assign(
+    { account: 'u:A', fingerprint: 'fp-1', key: KEY_A, orderId: '', createdAt: at, submittedAt: at },
+    patch || {},
+  )
+  wx.storage.set(STORE_KEY, [row])
+  return row
+}
+
+test('寿命：本机时钟走过 7 天，已提交而未落定的那条记录必须还在，且复用的还是同一个键', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  seedRow(wx)
+  assert.equal(idem.findRecord('u:A', 'fp-1').key, KEY_A, '30 天前那次"响应丢在路上"的提交不许被忘掉')
+  const again = await idem.ensureKey('u:A', 'fp-1')
+  assert.equal(again.key, KEY_A, '同参数再提交必须复用旧键（换新键 = 服务端再建一张订单）')
+  assert.equal(wx.calls.random, 0, '一个新键都不许铸')
+})
+
+test('寿命：已落定的、以及旧版本没有 submittedAt 标记的，同样不因本机时间被淘汰', async () => {
+  const settledWx = createWx(); ACTIVE_WX = settledWx
+  seedRow(settledWx, { orderId: 'ord-9' })
+  assert.equal(idem.findRecord('u:A', 'fp-1').orderId, 'ord-9',
+    '服务端那张单还在（键永久），本机不许先忘掉指回它的唯一线索')
+
+  // 旧版本写下的记录没有 submittedAt 这个字段。旧代码是"铸完立刻 POST"——
+  // 证明不了它没发过，只能按发过处理（fail-closed）。
+  const legacyWx = createWx(); ACTIVE_WX = legacyWx
+  const at = Date.now() - 30 * DAY
+  legacyWx.storage.set(STORE_KEY, [{ account: 'u:A', fingerprint: 'fp-1', key: KEY_A, orderId: '', createdAt: at }])
+  assert.equal(idem.findRecord('u:A', 'fp-1').key, KEY_A, '没有标记 ≠ 证明了没发过')
+  const again = await idem.ensureKey('u:A', 'fp-1')
+  assert.equal(again.key, KEY_A)
+  assert.equal(legacyWx.calls.random, 0)
+
+  // 形状被改坏的标记（字符串 / NaN）同样落在"当作发过"这一档。
+  const oddWx = createWx(); ACTIVE_WX = oddWx
+  oddWx.storage.set(STORE_KEY, [{ account: 'u:A', fingerprint: 'fp-1', key: KEY_A, orderId: '', createdAt: at, submittedAt: 'x' }])
+  assert.ok(idem.findRecord('u:A', 'fp-1'), '读不懂的标记不得被解释成"这个键没出过门"')
+})
+
+test('寿命：铸出来却一个 POST 都没发过的键，过了 TTL 才作废（否则名额被永久占住）', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  // 未到期：一样不许丢（它可能正要被这一次提交用上）。
+  seedRow(wx, { createdAt: Date.now() - (idem.TTL_MS - 60 * 1000), submittedAt: 0 })
+  assert.equal(idem.findRecord('u:A', 'fp-1').key, KEY_A, 'TTL 之内的未提交键仍然复用')
+
+  // 到期：这一档**证明得了**自己没出过门（本版写下、markSubmitted 从没成功过），可以作废。
+  seedRow(wx, { createdAt: Date.now() - (idem.TTL_MS + 60 * 1000), submittedAt: 0 })
+  assert.equal(idem.findRecord('u:A', 'fp-1'), null)
+  const fresh = await idem.ensureKey('u:A', 'fp-1')
+  assert.notEqual(fresh.key, KEY_A, '从没发出去过的键过期之后铸新的（服务端那边根本没有这个键）')
+  assert.match(fresh.key, idem.KEY_RE)
+  assert.equal(fresh.submittedAt, 0, '新铸的键同样先标成"还没发过"')
+})
+
+test('markSubmitted：标住之后退出 TTL 淘汰；键对不上 / 这一格不在盘上 / 身份不可用一律 false', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  const record = await idem.ensureKey('u:A', 'fp-1')
+  assert.equal(wx.storage.get(STORE_KEY)[0].submittedAt, 0)
+
+  assert.equal(idem.markSubmitted('u:A', 'fp-none', record.key), false, '这一格根本不在盘上：那个键没落住，不许出门')
+  assert.equal(idem.markSubmitted('u:A', 'fp-1', KEY_A), false, '盘上是另一个键：要发出去的这个并没有落住')
+  assert.equal(idem.markSubmitted('', 'fp-1', record.key), false)
+  assert.equal(idem.markSubmitted('u:A', 'fp-1', 'not-a-uuid'), false)
+  assert.equal(wx.storage.get(STORE_KEY)[0].submittedAt, 0, '以上每一条都不许顺手改盘上的东西')
+
+  assert.equal(idem.markSubmitted('u:A', 'fp-1', record.key), true)
+  assert.ok(wx.storage.get(STORE_KEY)[0].submittedAt > 0)
+
+  // 已经标过的再标一次：直接 true，不写盘（所以存储此刻坏着也不影响）。
+  wx.control.writeSilentlyDrops = true
+  assert.equal(idem.markSubmitted('u:A', 'fp-1', record.key), true)
+  wx.control.writeSilentlyDrops = false
+
+  // 做旧 30 天：标住的那条不再因本机时间被淘汰。
+  const rows = wx.storage.get(STORE_KEY)
+  rows[0].createdAt = Date.now() - 30 * DAY
+  wx.storage.set(STORE_KEY, rows)
+  assert.equal(idem.findRecord('u:A', 'fp-1').key, record.key)
+})
+
+test('页面：标记落不住就一个 POST 都不发（订单没建成，键原样留着，也不显示成标住了）', async () => {
+  const wx = createWx(); seedDraft(wx)
+  const { api, calls } = createApi(wx)
+  const page = await openReadyPage(wx, api, createAuth('A'))
+  // 上一次在 markSubmitted 之前就失败了：盘上留着一条已落住、但还没标过的键。
+  const record = await idem.ensureKey('u:A', idem.fingerprintOf(PAYLOAD))
+  assert.equal(wx.storage.get(STORE_KEY)[0].submittedAt, 0)
+
+  wx.control.writeSilentlyDrops = true   // 不抛异常、也没写进去（存储被系统回收 / 隐私策略）
+  page.submitOrder(); await flush()
+  assert.equal(calls.create.length, 0, '标不住 = 这个键出门之后本机会忘掉它 = 下一次是第二张订单')
+  assert.equal(page.data.submitting, false, '停下来之后按钮必须放开，让用户能重试')
+  assert.match(page.data.submitErrorText, /没能记下这次提交/)
+  wx.control.writeSilentlyDrops = false
+  const after = wx.storage.get(STORE_KEY)
+  assert.equal(after.length, 1)
+  assert.equal(after[0].key, record.key, '键原样留着：不清、不换')
+  assert.equal(after[0].submittedAt, 0, '没标住就不许在盘上显示成标住了')
+
+  // 存储恢复之后再点一次：这一回标得住，发的是**同一个键**。
+  page.submitOrder(); await flush()
+  assert.equal(calls.create.length, 1)
+  assert.equal(calls.create[0].opts.idempotencyKey, record.key)
+  assert.ok(wx.storage.get(STORE_KEY)[0].submittedAt > 0)
+})
+
+test('页面：响应丢在路上 + 进程被杀 + 过了 30 天再回来 —— 仍然是同一个键，服务端回放原单', async () => {
+  const wx = createWx(); seedDraft(wx)
+  const first = createApi(wx)
+  const page = await openReadyPage(wx, first.api, createAuth('A'))
+  page.submitOrder(); await flush()
+  assert.equal(first.calls.create.length, 1)
+  const sentKey = first.calls.create[0].opts.idempotencyKey
+  assert.ok(first.calls.create[0].storageAtCall[0].submittedAt > 0,
+    'POST 发出的那一刻，盘上这一格已经标成"这个键出门了"')
+  // 这一发永远不回来（响应丢在路上），小程序随后被杀掉。
+
+  // 30 天后重进（或设备时钟往前跳了 30 天）。本机记录里 orderId 还空着。
+  const rows = wx.storage.get(STORE_KEY)
+  rows[0].createdAt = Date.now() - 30 * DAY
+  rows[0].submittedAt = Date.now() - 30 * DAY
+  wx.storage.set(STORE_KEY, rows)
+
+  const second = createApi(wx)
+  const page2 = await openReadyPage(wx, second.api, createAuth('A'))
+  assert.equal(second.calls.get.length, 0, 'orderId 还空着，没有订单可核对')
+  page2.submitOrder(); await flush()
+  assert.equal(second.calls.create.length, 1)
+  assert.equal(second.calls.create[0].opts.idempotencyKey, sentKey,
+    '带的必须还是那个键——换新键就是服务端第二张订单、第二笔钱')
+  // 服务端按同键回放原单。
+  second.calls.create[0].resolve({ orderId: 'ord-replay' })
+  await flush()
+  assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-replay'])
+})
+
+test('页面：跳转失败先锁住、服务端 404 再解锁之后，那一次点击必须真的发出去（不被"上一发没落定"吞掉）', async () => {
+  const wx = createWx(); seedDraft(wx); wx.control.navFail = true
+  const { api, calls } = createApi(wx)
+  const page = await openReadyPage(wx, api, createAuth('A'))
+  page.submitOrder(); await flush()
+  const key = calls.create[0].opts.idempotencyKey
+  calls.create[0].resolve({ orderId: 'ord-1' }); await flush()
+  assert.equal(wx.calls.redirectTo.length, 1)
+  assert.equal(page.data.submitting, false, '跳转失败不许把"提交中…"永远留在屏幕上')
+
+  // 用户回到第一步、重新选了**同一份**材料包再进来（草稿在上一次成功建单时已被消费掉，
+  // 所以这一步必须真的重新有一份草稿）。指纹相同 → 本机那条记着 ord-1 的记录命中，
+  // 页面先锁再核。服务端 requireOwned 明确说本人没有这张订单。
+  seedDraft(wx)
+  const page2 = await openReadyPage(wx, api, createAuth('A'))
+  await flush()
+  assert.equal(calls.get.length, 1)
+  calls.get[0].reject(httpError(404, 'PACKAGE_ORDER_NOT_FOUND'))
+  await flush(); await flush()
+  assert.equal(page2.data.quoteState, 'ready', '404 之后重新核价，按钮回到可按')
+  page2.submitOrder(); await flush()
+  assert.equal(calls.create.length, 2, '解锁之后这一次点击必须真的发出去')
+  assert.equal(calls.create[1].opts.idempotencyKey, key, '仍然是同一个键（404 不清键）')
 })

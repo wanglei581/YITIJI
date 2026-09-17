@@ -79,9 +79,14 @@
             <view class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{quoteRecover}}" role="button">
               {{quoteRecover === 'login' ? '去登录' : quoteRecover === 'reorder' ? '重新下单' : quoteRecover === 'store' ? '换一个服务点' : quoteRecover === 'files' || quoteRecover === 'privacy' ? '回到选择文件' : quoteRecover === 'orders' ? '去我的打印订单' : '重新核价'}}
             </view>
-            <!-- 服务端已证明原单走到终态时，另给一条「去看看原来那张」——「重新下单」占了
-                 主恢复位，但用户常常先想确认一下上一张到底怎么了。只在那一态出现。 -->
-            <view wx:if="{{canStartNewOrder}}" class="state-d">原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。</view>
+            <!-- 这里此前还画了一句「原来那张订单仍可在「我的 · 打印订单」的材料包分区里
+                 查看。」，条件是 canStartNewOrder。它是**确定的重复**：canStartNewOrder
+                 只由 _lockAfterCreatedTerminal 一处打开，而那一处写进 quoteErrorText 的
+                 句子就以这句话逐字结尾；此后唯一会改写 quoteErrorText 又不关掉这个开关的
+                 路径（startNewOrder 清不掉本机记录那一支）也自带同一条指引。也就是说这行
+                 每次出现都紧挨着同一句话，没有它单独承载信息的那一态。
+                 删掉的是重复，不是信息，也不是那条规则：「重新下单」仍然只由服务端证明原单
+                 终态的那一处点亮，startNewOrder 第一行仍会再判一次 canStartNewOrder。 -->
           </view>
 
           <view wx:elif="{{quoteState === 'ready'}}" class="price-rows">

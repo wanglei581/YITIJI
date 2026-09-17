@@ -271,6 +271,12 @@ for (const code of [
   'PRINT_FILE_PURPOSE_UNSUPPORTED',
   'PACKAGE_FILE_DUPLICATED',
   'PACKAGE_ORDER_NOT_FOUND',
+  // 打印机这一个部件出不了纸：服务端 terminals/printer-availability.ts 在报价与建单
+  // 同口径 fail-closed（无心跳 / 心跳过期 / printerStatus ∈ offline|error|paper_empty）。
+  // 缺这条映射时用户只看到「操作未完成 / 请稍后重试」，而缺纸、卡纸现场工作人员当场
+  // 就能处理、处理完重新核价就能过 —— 那条唯一有用的下一步被藏起来了。
+  // 文案与 recover 取值由 scripts/tests/package-order.test.mjs 真跑一遍断言。
+  'PRINTER_UNAVAILABLE',
 ]) {
   assert(helper.includes(code), `package-order.js 为 ${code} 准备了用户可执行的说明`)
 }
@@ -886,11 +892,71 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
       '解锁后重新向服务端要一次报价（沿用上一张订单的金额就是拿一个可能已经变了的价去下单）')
   }
 
+  // 「键出门之前先在本机标住」：本机这张表要淘汰"铸出来但从没用过"的键，而"从没用过"
+  // 只能由本机自己记下来 —— 服务端那一侧的 (endUserId, key) 是永久的，它不会告诉我们
+  // 这件事。标记必须排在 POST **之前**，而且标不住就一个 POST 都不发：标不住 = 这个键
+  // 出门之后本机会在 TTL 到点时忘掉它 = 下一次同参数提交铸新键 = 第二张订单、第二笔钱。
+  {
+    const at = confirmCode.indexOf('idem.ensureKey(account, fingerprint)')
+    const chain = at >= 0 ? confirmCode.slice(at, at + 900) : ''
+    const markAt = chain.indexOf('idem.markSubmitted(account, fingerprint, record.key)')
+    const postAt = chain.indexOf('api.createPackageOrder(')
+    assert(markAt > 0 && postAt > markAt,
+      '标记排在 POST 之前（排在后面等于没标：响应丢了的那一格照样会被 TTL 忘掉）')
+    assert(/if \(!idem\.markSubmitted\(account, fingerprint, record\.key\)\) \{[\s\S]{0,160}throw new Error\(idem\.SUBMIT_MARK_FAILED_MESSAGE\)/.test(chain),
+      '标不住就抛出去，一个 POST 都不发（不看返回值等于这道闸不存在）')
+  }
+
+  // 本机记录的寿命判据：**不许只按时间淘汰**。服务端那一侧的键是永久的，
+  // 本机先失忆就等于下一次铸新键、服务端再建一张订单。只有"证明得了从来没发出去过"
+  // 的那一档（本版写下、markSubmitted 从没成功过）才允许过期。
+  {
+    const idemPkg = stripComments(read('utils/package-order-idempotency.js'))
+    assert(/function wasSubmitted\(row\) \{[\s\S]{0,200}row\.orderId \|\| row\.submittedAt !== 0/.test(idemPkg),
+      '「可能已经出门过」的判据只看落盘字段（内存标记在小程序被杀掉重进之后一个都不剩）')
+    // 只有一处写 TTL 比较，而且那一处必须带着 wasSubmitted 这个前置放行。
+    // 退回成光秃秃的 `now - row.createdAt < TTL_MS)` 会让下面这条正向断言当场转红。
+    assert(/&& \(wasSubmitted\(row\) \|\| now - row\.createdAt < TTL_MS\)\)/.test(idemPkg)
+      && idemPkg.split('now - row.createdAt < TTL_MS').length - 1 === 1,
+    'TTL 只淘汰"证明得了没发出去过"的那一档，已提交 / 已落定 / 旧版本无标记的一律不因本机时间淘汰')
+    assert(/submittedAt: 0 \}/.test(idemPkg),
+      '新铸的键先落成 submittedAt: 0（那是"还没发过"唯一可证明的形态）')
+    assert(/wasSubmitted\(row\) === wasSubmitted\(verify\)\)/.test(idemPkg),
+      'persist 的读回核对把这个标记也核上（不核 = "没标住"会被当成标住了）')
+    const markAt = idemPkg.indexOf('function markSubmitted(account, fingerprint, key) {')
+    const markFn = markAt < 0 ? '' : idemPkg.slice(markAt, idemPkg.indexOf('\n}', markAt))
+    assert(!!markFn, '取不到 markSubmitted 的函数体')
+    assert(/return !!persist\(rows, record\)/.test(markFn),
+      'markSubmitted 经 persist 落盘并读回核对，不是调一次 storage.set 就当标住了')
+    assert(/if \(!rows\) return false/.test(markFn) && /if \(at < 0\) return false/.test(markFn)
+      && /if \(rows\[at\]\.key !== key\) return false/.test(markFn),
+    'markSubmitted 的每条失败路径都返回 false（读不到 / 这一格不在 / 盘上是另一个键，都不许放 POST 出去）')
+  }
+
+  // 建单成功那一支：`_createdOrderId` 一设上就必须**紧接着**结清这一发。
+  // 两行之间插进任何会抛的东西，抛出来之后 catch 里那条
+  // `if (this._createdOrderId) { this._lockAfterCreated(...); return }` 就会带着一个
+  // **未落定**的 _submitAttempt 退出 —— 之后即使别的路径解了锁（例如核对拿到 404），
+  // `if (this._submitAttempt && !this._submitAttempt.settled) return` 仍会把每一次点击
+  // 原样吞掉：报价是 ready、按钮看着能按，按下去什么都不发生。
+  assert(/this\._createdOrderId = orderId\n\s*attempt\.settled = true/.test(confirmCode),
+    '订单锁与这一发的结清紧挨着（中间插入可抛代码会让失败路径留下一个永远吞点击的未落定尝试）')
+
   // 模板必须真的把这个动作接出去，而且材料包**没有取消端点**，不许凭空造一个。
   assert(/quoteRecover === 'reorder' \? '重新下单'/.test(confirmWxml),
     '模板给 reorder 这一态画了按钮文案（只写进 data 不渲染等于没写）')
   assert(/if \(target === 'reorder'\) return this\.startNewOrder\(\)/.test(confirmCode),
     'recover 把 reorder 接到 startNewOrder 上')
+  // 终态那句指引只渲染**一次**。此前模板另画了一行 `wx:if="{{canStartNewOrder}}"`，
+  // 而点亮这个开关的唯一一处（_lockAfterCreatedTerminal）写进 quoteErrorText 的句子就以
+  // 同一句话逐字结尾 —— 于是它每次出现都是紧挨着重复的两遍。这里钉的是"只有一份"，
+  // 不是"删掉它"：文案仍在 quoteErrorText 里，下面那条断言守住它没被一起删掉。
+  // 剥掉 <!-- --> 再数：解释"为什么删掉它"的那段注释里逐字引着这句话。
+  const confirmMarkup = confirmWxml.replace(/<!--[\s\S]*?-->/g, '')
+  assert(confirmMarkup.split('原来那张订单仍可在').length - 1 === 0,
+    '模板不再单独重复终态那句指引（它是 quoteErrorText 的结尾，画两遍是确定的重复）')
+  assert(/_lockAfterCreatedTerminal\(orderId, reason\) \{[\s\S]{0,700}原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。/.test(confirmCode),
+    '那句指引本身仍在（它是用户找回旧订单的唯一线索，删重复不等于删信息）')
   // 材料包**没有取消端点**：PackageOrdersController 只有 @Post() / @Get() / @Get(':id')。
   // 上面 ③ 已经钉住「api.js 里不许再出现 cancelPackageOrder 这个方法」；这里补的是按
   // URL 走的那一种（绕开方法名直接拼路径）。单件云打印那条链确实有 /cancel，别顺手抄

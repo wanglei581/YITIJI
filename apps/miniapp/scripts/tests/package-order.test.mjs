@@ -16,6 +16,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -254,6 +255,9 @@ test('错误码 → 可执行的下一步：每条都不是「请稍后重试」
     // 真机验过后把 color_print / duplex_print 配成 available，所以恢复动作是换服务点。
     ['PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL', 'store'],
     ['PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL', 'store'],
+    // 打印机这一个部件出不了纸（离线 / 缺纸 / 故障）。与上面三类都不是一回事，
+    // 见下一条测试对 recover 取值的说明。
+    ['PRINTER_UNAVAILABLE', 'retry'],
   ]
   for (const [code, recover] of cases) {
     const shown = pkg.describePackageError({ code, statusCode: 400, message: '' }, '兜底句')
@@ -278,6 +282,35 @@ test('错误码：彩色/双面未在该机验过，必须说清是「这台机�
     assert.ok(shown.text.includes('服务点'), `${code} 的说明必须指向「换一个服务点」这个按钮真正会做的事`)
     assert.notEqual(shown.title, '操作未完成', `${code} 不得落到未知码兜底`)
   }
+})
+
+test('错误码：打印机出不了纸时说的是「可以处理完再来」，不是「请稍后重试」，也不吐机器码', () => {
+  // 服务端 terminals/printer-availability.ts 在报价与建单同口径 fail-closed：
+  // 最近 5 分钟没心跳 / 从未上报 / 心跳里的 printerStatus ∈ {offline, error, paper_empty}
+  // → 400 PRINTER_UNAVAILABLE。这个码此前在本表里**没有映射**，于是用户看到的是
+  // describePackageError 末尾那句「操作未完成 / 请稍后重试」——而三种成因里有两种
+  // （缺纸、卡纸故障）是现场工作人员当场就能处理的，处理完回来重新核价就能过。
+  const shown = pkg.describePackageError({ code: 'PRINTER_UNAVAILABLE', statusCode: 400, message: '' }, '创建订单失败，请稍后重试。')
+  assert.notEqual(shown.title, '操作未完成', '不得落到未知码兜底')
+  assert.notEqual(shown.text, '创建订单失败，请稍后重试。')
+  // recover 是 'retry'（按钮就在本页，文案「重新核价」），不是 'store'：
+  // CAPABILITY_* 要管理员登记、PRINT_TERMINAL_OFFLINE 是整台终端联系不上，那两类用户等不来；
+  // 这一条是终端在线、只是打印机此刻出不了纸，**可能**当场恢复。
+  assert.equal(shown.recover, 'retry')
+  assert.match(shown.text, /工作人员/, '必须说出那条唯一可执行的下一步')
+  assert.match(shown.text, /服务点/, '也要留一条走得通的退路（它也可能是真的坏了）')
+  // 不把机器码摊到用户脸上（user-error.js 的 fail-closed 只管服务端 message，
+  // 本表自己的中文同样不许夹带）。
+  assert.ok(!shown.title.includes('PRINTER_UNAVAILABLE') && !shown.text.includes('PRINTER_UNAVAILABLE'))
+
+  // 这个码**必须**真的是服务端会抛的那一个，且不在 message 透传白名单里 ——
+  // 服务端那句原文写的是「本机打印机…」，那是写给站在一体机前的人的；
+  // 透传到手机上，「本机」会被读成用户自己的手机。
+  const apiSrc = fs.readFileSync(path.join(MINIAPP, '../../services/api/src/terminals/printer-availability.ts'), 'utf8')
+  assert.match(apiSrc, /code: 'PRINTER_UNAVAILABLE'/, '服务端仍然抛这个码（改名了本表要跟着改）')
+  const userError = requireMiniapp('./user-error.js')
+  assert.ok(!userError.PASSTHROUGH_MESSAGE_CODES.includes('PRINTER_UNAVAILABLE'),
+    '不透传服务端原文（它面向一体机现场，「本机」在手机上会被读成用户自己的手机）')
 })
 
 test('错误码：401 单独成一类，去登录而不是重试', () => {

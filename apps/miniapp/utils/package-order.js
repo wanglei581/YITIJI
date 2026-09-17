@@ -355,6 +355,23 @@ const PACKAGE_ERROR_COPY = {
   //  文案里说出来，按钮仍与 recover 一致。）
   PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL: { title: '该服务点未验过彩色打印', text: '这台一体机的彩色打印还没在真机上验过，服务端不会受理彩色材料包。请换一个服务点；也可以回到第一步改成黑白再下单。', recover: 'store' },
   PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL: { title: '该服务点未验过自动双面', text: '这台一体机的自动双面还没在真机上验过，服务端不会受理双面材料包。请换一个服务点；也可以回到第一步改成单面再下单。', recover: 'store' },
+  // 打印机本身出不了纸：服务端 `terminals/printer-availability.ts` 在报价与建单两处
+  // 同口径 fail-closed（最近 5 分钟没心跳 / 从未上报 / 心跳里的 printerStatus 落在
+  // offline | error | paper_empty）。缺了这条映射，用户看到的是末尾那句「操作未完成 /
+  // 请稍后重试」——而这三种里有两种（缺纸、卡纸故障）现场工作人员当场就能处理，
+  // 处理完再点一次就能过，"请稍后重试"把这条唯一有用的下一步藏起来了。
+  //
+  // 与上面 CAPABILITY_* / PRINT_TERMINAL_* 三类的区别，也是 recover 为什么不是 'store'：
+  //   - CAPABILITY_* 说的是「这台机器没登记这项能力」——只有管理员后台能放行，用户等不来；
+  //   - PRINT_TERMINAL_OFFLINE 说的是「整台终端没心跳」——机器本身联系不上；
+  //   - 这一条说的是「终端在线，打印机这一个部件此刻出不了纸」——**可能**当场恢复。
+  // 所以给 'retry'（按钮是「重新核价」，就在本页）：人处理完缺纸 / 卡纸，重新核一次价
+  // 就能继续。文案同时写出"也可以换一个服务点"，因为它也可能是真的坏了。
+  //
+  // 不说机器码、不说心跳时间戳：服务端那句原文说的是「本机打印机」，那是写给站在一体机
+  // 前的人的；用户此刻在手机上，"本机"会被读成他的手机。该码不在 user-error.js 的
+  // PASSTHROUGH 白名单里，request.js 会把 message 清空，于是这里这句中文真正生效。
+  PRINTER_UNAVAILABLE: { title: '该服务点打印机暂时出不了纸', text: '这台一体机的打印机当前离线、缺纸或故障，服务端不会受理材料包。缺纸或卡纸现场工作人员处理后，回到这一页重新核价就能继续；也可以换一个服务点。', recover: 'retry' },
   PRICE_CONFIG_UNAVAILABLE: { title: '打印价目未配置', text: '服务端还没有配置打印价目，无法核定金额，因此不能下单。这需要运营方在后台配置，请稍后再试。', recover: 'none' },
   PRINT_PII_SCAN_REQUIRED: { title: '请先完成隐私检查', text: '材料包里有文件还没做完打印隐私检查。回到上一步逐个完成后再下单。', recover: 'privacy' },
   PII_SCAN_STALE: { title: '文件在检查后又变了', text: '有文件在隐私检查之后被改动过，需要重新检查一次。', recover: 'privacy' },
