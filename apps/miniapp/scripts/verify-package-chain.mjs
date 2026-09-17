@@ -724,6 +724,33 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     '建单成功后**先判身份再清草稿**（换人时不得删掉当前这位的草稿）')
   assert(/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(confirmCode),
     'redirectTo 失败有兜底（不接住的话页面永远停在「提交中…」，而订单其实已经建好了）')
+  // 建单那一发 200 回来的**不一定是刚建成的订单**：服务端那个键是永久挂在 Order 行上的
+  // （@@unique(endUserId, idempotencyKey)，没有过期清理），而本机这一格只要还没落定
+  // orderId（响应丢在路上、进程被杀在 POST 与响应之间、rememberOrderId 写失败过一次），
+  // 下一次提交就带着**同一个键**过去，服务端按同键回放原单 —— 而那张原单可能早已打完 /
+  // 打印失败 / 被终止 / 被取消 / 到机码过期（到机码窗口取 min(now+7天, 文件有效期)，
+  // 比本机记录的 7 天 TTL 更窄）。所以这条链和 _verifyCreatedOrder 那条一样，必须
+  // **看状态再决定去哪**，判据也必须是同一个 pkg.terminalPackageReason。
+  {
+    const submitAt = confirmCode.indexOf('submitOrder() {')
+    const thenAt = submitAt >= 0 ? confirmCode.indexOf('.then((order) => {', submitAt) : -1
+    const catchAt = thenAt >= 0 ? confirmCode.indexOf('.catch((err) => {', thenAt) : -1
+    const thenBody = catchAt > thenAt && thenAt > 0 ? confirmCode.slice(thenAt, catchAt) : ''
+    assert(!!thenBody, '取不到 submitOrder 的成功分支（拿不到 order 本体就谈不上看状态）')
+    assert(/const terminalReason = recoveryUnsaved \? '' : pkg\.terminalPackageReason\(order\)/.test(thenBody),
+      '建单成功分支也按服务端下发的状态判终态，判据是 pkg.terminalPackageReason（页面不自己认字段）')
+    const terminalAt = thenBody.indexOf('this._lockAfterCreatedTerminal(')
+    const dropAt = thenBody.indexOf("removeStorageSync('temp_package_data')")
+    const redirectAt = thenBody.indexOf('wx.redirectTo(')
+    assert(terminalAt > 0 && dropAt > terminalAt && redirectAt > terminalAt,
+      '终态那一支排在删草稿与跳转**之前**（排在后面等于草稿和幂等记录都没了才发现它是终态）')
+    // recoveryUnsaved 说的是"本机连这张订单的 orderId 都没存住"，而终态那一支要交付的
+    // 恰恰是"草稿与记录都留着、由用户自己按重新下单"。前提对不上时只能走更保守的那一个：
+    // 不在存储正在失败的时候点亮一个会铸新键的按钮。
+    const unsavedAt = thenBody.indexOf('if (recoveryUnsaved)')
+    assert(unsavedAt > 0 && redirectAt > unsavedAt,
+      'recoveryUnsaved 那一支仍排在 redirectTo 之前（排在后面就等于没有）')
+  }
   assert(/_lockAfterCreated\(orderId\)\s*\{[\s\S]{0,700}submitting: false/.test(confirmCode),
     '兜底状态解开 submitting')
   assert(/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(confirmCode),

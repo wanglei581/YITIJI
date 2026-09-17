@@ -742,6 +742,31 @@ async function openRestoredPage(orderId) {
 
 const LIVE_ORDER = { pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'unpaid' }
 
+/**
+ * 服务端真实会写出来的每一种**终态**（判据见 utils/package-order.js 的
+ * terminalPackageReason）。恢复路径（D2：GET 核对）与建单回放路径（D3：POST 同键回放）
+ * 共用这一张表 —— 两处各写一份，改的人只会改一边，于是"核对时认得出、回放时认不出"
+ * 就成了一个只在其中一条路径上复现的缺陷，而那正是这两节要防的同一件事。
+ */
+const TERMINAL_STATUSES = [
+  { taskStatus: 'completed', pickupStatus: 'used' },        // 纸已经出完
+  { taskStatus: 'failed', pickupStatus: 'used' },           // 出纸失败
+  { taskStatus: 'abandoned', pickupStatus: 'used' },        // 管理端终止
+  { taskStatus: 'cancelled', pickupStatus: 'cancelled' },   // 已取消
+  { taskStatus: 'expired', pickupStatus: 'expired' },       // 到机码过期
+  { taskStatus: 'pending_release', pickupStatus: 'expired' }, // 只有取件侧到期
+]
+
+/** 还活着 / 正在履约 / 将来才会有的状态。这几档每一档放开重新下单，都是同一份材料包打两遍、收两次钱。 */
+const ALIVE_STATUSES = [
+  { pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'unpaid' },      // 待到机
+  { pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'unpaid' },     // 一体机领走了，正在付款
+  { pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'closed' },     // 付款关了，码会被退回 pending
+  { pickupStatus: 'used', taskStatus: 'pending', payStatus: 'paid' },                   // 已付款，任务刚进队列
+  { pickupStatus: 'used', taskStatus: 'printing', payStatus: 'paid' },                  // 正在出纸
+  { pickupStatus: 'quantum', taskStatus: 'schrodinger', payStatus: 'maybe' },           // 将来新增的状态：fail-closed
+]
+
 test('页面：核对的 200 回来时会话已经静默失效 —— 不跳转、不泄露订单数据、释放核对守卫，登录回来自动重核', async () => {
   const { wx, calls, auth, page, fp, key } = await openRestoredPage('ord-live')
 
@@ -831,16 +856,8 @@ test('页面：核对的失败回来时已经换成了 B —— 同样什么都�
 })
 
 test('页面：服务端说这张订单已经走到终态 —— 不跳转、不删草稿、不动记录，只点亮一个由用户自己按的「重新下单」', async () => {
-  // 服务端真实会写出来的每一种终态，逐一走一遍整页。
-  const TERMINALS = [
-    { taskStatus: 'completed', pickupStatus: 'used' },        // 纸已经出完
-    { taskStatus: 'failed', pickupStatus: 'used' },           // 出纸失败
-    { taskStatus: 'abandoned', pickupStatus: 'used' },        // 管理端终止
-    { taskStatus: 'cancelled', pickupStatus: 'cancelled' },   // 已取消
-    { taskStatus: 'expired', pickupStatus: 'expired' },       // 到机码过期
-    { taskStatus: 'pending_release', pickupStatus: 'expired' }, // 只有取件侧到期
-  ]
-  for (const status of TERMINALS) {
+  // 服务端真实会写出来的每一种终态，逐一走一遍整页（表见 TERMINAL_STATUSES）。
+  for (const status of TERMINAL_STATUSES) {
     const label = `${status.pickupStatus}/${status.taskStatus}`
     const { wx, calls, page, fp, key } = await openRestoredPage('ord-dead')
     calls.get[0].resolve({ orderId: 'ord-dead', payStatus: 'closed', ...status })
@@ -862,16 +879,8 @@ test('页面：服务端说这张订单已经走到终态 —— 不跳转、不
 })
 
 test('页面：还活着 / 正在履约 / 看不懂的状态 —— 一律送到机码页，绝不点亮「重新下单」', async () => {
-  // 这三档每一档放开重新下单，都是同一份材料包打两遍、收两次钱。
-  const LIVE = [
-    { pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'unpaid' },      // 待到机
-    { pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'unpaid' },     // 一体机领走了，正在付款
-    { pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'closed' },     // 付款关了，码会被退回 pending
-    { pickupStatus: 'used', taskStatus: 'pending', payStatus: 'paid' },                   // 已付款，任务刚进队列
-    { pickupStatus: 'used', taskStatus: 'printing', payStatus: 'paid' },                  // 正在出纸
-    { pickupStatus: 'quantum', taskStatus: 'schrodinger', payStatus: 'maybe' },           // 将来新增的状态：fail-closed
-  ]
-  for (const status of LIVE) {
+  // 这几档每一档放开重新下单，都是同一份材料包打两遍、收两次钱（表见 ALIVE_STATUSES）。
+  for (const status of ALIVE_STATUSES) {
     const label = `${status.pickupStatus}/${status.taskStatus}`
     const { wx, calls, page, fp } = await openRestoredPage('ord-live')
     calls.get[0].resolve({ orderId: 'ord-live', ...status })
@@ -1018,6 +1027,131 @@ test('页面：提交在途时换了人，B 不继承 A 的锁，也不复用 A 
   assert.equal(rows[0].orderId, 'ord-A')
   // B 的草稿归属对不上，页面进入 missing；就算它在，B 也只会铸自己的键（见账号隔离那条）。
   assert.equal(page.data.draftState, 'missing')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// D3. 建单那一发 200 回来的**不一定是刚建成的订单**
+//
+// 服务端那个键是**永久**挂在 Order 行上的，而本机这一格只要还没落定 orderId
+// （上一次响应丢在路上、进程被杀在 POST 与响应之间、rememberOrderId 写失败过一次），
+// 下一次提交就带着**同一个键**过去，服务端按同键回放原单。到机码窗口取
+// `min(now + 7 天, 文件有效期)`，比本机记录的 7 天 TTL 更窄 —— 于是"本机的键还在、
+// 服务端那张订单已经作废"这一格是真的走得到的。
+//
+// 不看状态就跳的代价：用户落在一张打不出东西的到机码页上，而跳转那一路顺手删了草稿、
+// 跳转成功的回调又清掉了本机记录 —— 他既没有旧订单的线索，也没有那份材料包了。
+// 判据必须与恢复路径（D2）共用同一个 pkg.terminalPackageReason。
+// ══════════════════════════════════════════════════════════════════════
+
+/** 走到「POST 已经发出去、响应还没回来」那一刻 —— 服务端要回放的正是这个键。 */
+async function openSubmittedPage() {
+  const wx = createWx(); seedDraft(wx)
+  const { api, calls } = createApi(wx)
+  const auth = createAuth('A')
+  const page = await openReadyPage(wx, api, auth)
+  page.submitOrder(); await flush()
+  const fp = idem.fingerprintOf(PAYLOAD)
+  assert.equal(calls.create.length, 1, '一次提交只发一个 POST')
+  assert.equal(idem.findRecord('u:A', fp).orderId, '',
+    '响应还没回来：这一格是"未落定"，下一次同参数提交复用的就是它 —— 回放由此发生')
+  return { wx, api, calls, auth, page, fp, key: calls.create[0].opts.idempotencyKey }
+}
+
+test('页面：建单 200 回放的是一张已经走到终态的旧订单 —— 不跳转、不删草稿、不动记录，只点亮由用户自己按的「重新下单」', async () => {
+  for (const status of TERMINAL_STATUSES) {
+    const label = `${status.pickupStatus}/${status.taskStatus}`
+    const { wx, calls, page, fp, key } = await openSubmittedPage()
+    calls.create[0].resolve({ orderId: 'ord-replayed', payStatus: 'closed', ...status })
+    await flush()
+
+    assert.equal(wx.calls.redirectTo.length, 0, `${label}: 不许把人送去一张打不出东西的到机码页`)
+    assert.equal(page.data.quoteState, 'error', label)
+    assert.equal(page.data.quoteRecover, 'reorder', label)
+    assert.equal(page.data.canStartNewOrder, true, `${label}: 服务端已经证明它走到头了`)
+    assert.ok(page.data.quoteErrorTitle, `${label}: 要把"为什么"写在屏幕上`)
+    assert.equal(page.data.submitting, false, `${label}: 解开按钮锁，页面不许停在「提交中…」`)
+    // 草稿是他重新下单要用的东西（删了就只能回第一步重选文件）；记录里那个 orderId
+    // 是他回「我的 · 打印订单」核对旧单的线索。两样都必须留着。
+    assert.equal(wx.storage.has('temp_package_data'), true, `${label}: 草稿不许删`)
+    assert.equal(wx.storage.has('temp_selected_store'), true, `${label}: 服务点也不许删`)
+    assert.equal(idem.findRecord('u:A', fp).key, key, `${label}: 页面自己绝不换键`)
+    assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-replayed',
+      `${label}: orderId 照常落住 —— 那是重进本页时认得出这张旧单的线索`)
+    // 点亮按钮 ≠ 已经重新下单：一个 POST 都还没补发。
+    assert.equal(calls.create.length, 1, `${label}: 换键必须由用户自己按下去`)
+    // 锁上之后即使再调一次 submitOrder（模板里这一刻按钮是 disabled 的，这里走的是
+    // 代码里那道守卫）：同键回放只会把同一张作废订单再取一遍，所以一个 POST 都不许发。
+    page.submitOrder(); await flush()
+    assert.equal(calls.create.length, 1, `${label}: 已经锁住的页面不许再 POST`)
+    assert.equal(wx.calls.redirectTo.length, 0, label)
+  }
+})
+
+test('页面：建单 200 回来的是还活着 / 正在履约 / 看不懂的状态 —— 照旧送到机码页，绝不点亮「重新下单」', async () => {
+  for (const status of ALIVE_STATUSES) {
+    const label = `${status.pickupStatus}/${status.taskStatus}`
+    const { wx, calls, page, fp } = await openSubmittedPage()
+    calls.create[0].resolve({ orderId: 'ord-live', ...status })
+    await flush()
+    assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-live'],
+      `${label}: 送到机码页，那里会忠实显示服务端给的状态`)
+    assert.equal(page.data.canStartNewOrder, false, `${label}: 绝不放开第二张订单`)
+    assert.equal(calls.create.length, 1, label)
+    // 确实跳走了，草稿与记录才随之清掉（既有口径，本轮不改）。
+    assert.equal(wx.storage.has('temp_package_data'), false, label)
+    assert.equal(wx.storage.has('temp_selected_store'), false, label)
+    assert.equal(idem.findRecord('u:A', fp), null, label)
+  }
+})
+
+test('页面：回放到终态之后，换键只能由用户自己按 —— 一按就是新键、只补一个 POST，别人那几格不动', async () => {
+  const { wx, calls, page, fp, key } = await openSubmittedPage()
+  // 另一格（同账号另一份材料包）的在途记录：全程必须原封不动。
+  const otherKey = await idem.ensureKey('u:A', 'fp-other-package')
+
+  calls.create[0].resolve({ orderId: 'ord-replayed', pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' })
+  await flush()
+  assert.equal(page.data.canStartNewOrder, true)
+  assert.equal(calls.create.length, 1, '页面自己不会补发第二个 POST')
+
+  page.startNewOrder(); await flush()
+  assert.equal(idem.findRecord('u:A', fp), null, '这一格清掉了，下一次提交才会铸新键')
+  assert.equal(idem.findRecord('u:A', 'fp-other-package').key, otherKey.key,
+    '只清 (当前账号, 当前指纹) 那一格：别的那几格都可能正绑着一次在途提交')
+  assert.equal(page.data.quoteState, 'ready', '解锁后重新向服务端要一次报价，不沿用旧订单的金额')
+  assert.equal(calls.create.length, 1, '解锁本身不下单')
+
+  page.submitOrder(); await flush()
+  assert.equal(calls.create.length, 2, '用户自己按下去才补这一个 POST')
+  const fresh = calls.create[1].opts.idempotencyKey
+  assert.notEqual(fresh, key, '必须是新键 —— 复用旧键只会让服务端再回放那张作废的订单')
+  assert.match(fresh, idem.KEY_RE)
+  assert.equal(idem.findRecord('u:A', fp).key, fresh, '新键在 POST 发出之前就已经落住')
+
+  calls.create[1].resolve({ orderId: 'ord-new', ...LIVE_ORDER })
+  await flush()
+  assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-new'])
+})
+
+test('页面：回放到终态、而 orderId 又没能落进本机 —— 走更保守的那一支，不点亮「重新下单」', async () => {
+  const { wx, calls, page, fp, key } = await openSubmittedPage()
+  // 存储这一刻写不进去（存满 / 被系统回收 / 被隐私策略拦截）：setStorageSync 不抛异常、
+  // 也没写进去，只有 rememberOrderId 的读回核对发现得了。
+  wx.control.writeSilentlyDrops = true
+  calls.create[0].resolve({ orderId: 'ord-replayed', pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' })
+  await flush()
+  wx.control.writeSilentlyDrops = false
+
+  // 这一支的前提是"本机连 orderId 都没存住"，而终态那一支要交付的恰恰是"草稿与记录都
+  // 留着、由用户自己按重新下单"。前提对不上时只能走更保守的那一个：行为逐字保持原样。
+  assert.equal(wx.calls.redirectTo.length, 0, '没落住就不跳转（跳转成功的回调会把仅剩的那个键也清掉）')
+  assert.match(page.data.quoteErrorText, /没能把它记下来/, '说的是真正发生的那件事，不是「只是没能自动跳转」')
+  assert.equal(page.data.canStartNewOrder, false, '存储正在失败的时候，不许点亮一个会铸新键的按钮')
+  assert.equal(idem.findRecord('u:A', fp).key, key,
+    '那个键必须原样留着：它是唯一还能让服务端回放同一张订单的东西')
+  assert.equal(idem.findRecord('u:A', fp).orderId, '', '这一次确实一个字节都没写进去')
+  page.submitOrder(); await flush()
+  assert.equal(calls.create.length, 1, '已经建成的订单不许再 POST 一次')
 })
 
 // ══════════════════════════════════════════════════════════════════════

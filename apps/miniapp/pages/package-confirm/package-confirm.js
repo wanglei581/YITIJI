@@ -840,6 +840,26 @@ Page({
         // 放在 redirectTo 之前，是为了让下面 catch 里那条「跳转同步抛」的兜底能认出它。
         this._createdOrderId = orderId
         attempt.settled = true
+        // **这一发回来的不一定是"刚建成"的订单。** 同一个键在服务端是永久挂在那张 Order
+        // 行上的（`@@unique(endUserId, idempotencyKey)`，没有过期清理），而本机这一格只要
+        // 还没落定 orderId（上一次的响应丢在路上、进程被杀在 POST 与响应之间、或
+        // rememberOrderId 写失败过一次），下一次提交就会带着**同一个键**过去，服务端按
+        // 同键回放原单。那张原单完全可能早已打完 / 打印失败 / 被终止 / 被取消，或者到机码
+        // 已经过期 —— 到机码窗口取 `min(now + 7 天, 文件有效期)`，比本机记录的 7 天 TTL
+        // 更窄，所以"本机的键还在、服务端那张订单已经作废"这一格是真的走得到的。
+        //
+        // 判据与恢复路径（_verifyCreatedOrder）共用**同一个** pkg.terminalPackageReason，
+        // 不在这里另认一套状态字段（两份状态表只会改一边）。位置也必须和那边一致：
+        // **排在删草稿与跳转之前**。排在后面等于草稿和幂等记录都已经没了才发现它是终态 ——
+        // 用户落在一张打不出东西的到机码页上，手里那份材料包也一起没了。
+        //
+        // `recoveryUnsaved` 仍然优先（下面那一支）：它说的是"本机连这张订单的 orderId 都
+        // 没存住"，而终态这一支要交付的恰恰是"草稿与记录都留着、由用户自己按重新下单"。
+        // 前提已经不成立时只能走更保守的那一个，不在存储正在失败的时候点亮一个会铸新键的按钮。
+        const terminalReason = recoveryUnsaved ? '' : pkg.terminalPackageReason(order)
+        // 终态：草稿**不删**、记录**不清**、一步都不跳，只把原因写在屏幕上，并点亮一个由
+        // 用户自己按的「重新下单」—— 换键是一次下单决定，页面不替他做。
+        if (terminalReason) { this._lockAfterCreatedTerminal(orderId, terminalReason); return }
         // 同一个人：这份草稿已被这张订单消费掉，清干净。
         // 清理放在跳转**之前**：原先放在 redirectTo 的 success 回调里，跳转一旦没触发
         // （异常路径、页面已被替换），草稿就永远留在本机，下一位打开确认页还能看到。
