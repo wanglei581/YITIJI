@@ -1,6 +1,6 @@
 # Gate 0k — SMB 面板扫描现场验收包
 
-> 最后更新：2026-07-27  
+> 最后更新：2026-09-17
 > 授权包名建议：`GATE_0K_SMB_SCAN`  
 > 终端：`t_ksk_001` / `KSK-001`  
 > 前置：Kiosk B1 诚实化已预发（[PR #413](https://github.com/wanglei581/YITIJI/pull/413)，bundle `index-DeG21wry.js`）  
@@ -12,6 +12,10 @@
 - 总清单：`docs/device/production-deployment-and-windows-host-checklist.md` §5.7
 - 打印现场旁证样板：`docs/device/windows-field-recheck-phase-f-runbook.md`
 - B1 规格：`docs/superpowers/specs/2026-07-27-kiosk-scan-ux-honesty-design.md`
+
+> 2026-09-17 复核边界：下方 2026-07-27 回执是历史旁证，不能替代当前主干
+> `50483cd28096780c5e6c4260dde86dec36e7d99f` 的现场验收。当前协议新增 Kiosk delivery ACK、
+> 一次性安全重扫授权、Agent 输入锁死遥测与同文件身份隔离；现场必须按本页新增步骤重跑。
 
 ---
 
@@ -129,6 +133,11 @@ scan-watcher: scanWatchFolder 未配置，跳过扫描监听
 
 把脱敏日志片段存到 `$EvidenceRoot\W3-watcher.log`。
 
+同时在本机状态页或脱敏心跳证据中确认扫描输入状态为 `healthy`。若为 `locked_out` /
+`restart_required`，记录原因与时间并 **STOP**；只能重启 Agent 后重新验收，不能现场放宽隐私闸门。
+若 Windows / SMB 文件身份不可证明（例如观测到 `ino === 0` / identity unavailable），应 fail-closed，
+本轮不得写扫描通过。优先使用本机 NTFS 接收目录，由奔图 SMB 落盘到该目录。
+
 ### W4. 打印机面板指向同一目录
 
 在奔图操作面板：
@@ -141,10 +150,12 @@ scan-watcher: scanWatchFolder 未配置，跳过扫描监听
 
 1. 一体机浏览器打开 `https://zyidai.cn/scan`（或现场全屏 Kiosk）
 2. 选类型（建议先 `document`）→ 创建会话
-3. 屏幕应显示服务端 `instructions`（含「扫描到网络 / SMB（本机已配置的接收目录）」）
-4. 在打印机面板按「开始」扫描
-5. 回到一体机等待自动识别；**勿关闭页面**
-6. 期望：会话匹配 → 完成 → 可「前往我的文档 / 登录后管理文件」
+3. 等 Kiosk 完成 delivery ACK。只有出现「扫描指引」/「扫描任务已创建」后才继续；
+   若显示「正在确认投递授权」或「投递授权未确认」，点「再确认一次」，ACK 成功前禁止面板扫描
+4. 屏幕显示服务端 `instructions`（含「扫描到网络 / SMB（本机已配置的接收目录）」）
+5. 在打印机面板按「开始」扫描
+6. 回到一体机等待自动识别；**勿关闭页面**
+7. 期望：会话匹配 → 完成 → 可「前往我的文档 / 登录后管理文件」
 
 旁证（远程或 Admin，脱敏）：
 
@@ -156,11 +167,21 @@ scan-watcher: scanWatchFolder 未配置，跳过扫描监听
 | 现象 | 排查 |
 |------|------|
 | 建会话失败 `SCAN_TERMINAL_NOT_ACTIVE` | 远程再确认 lifecycle=`active` |
+| 「投递授权未确认」 | 先点「再确认一次」；确认网络/API，ACK 成功前不要面板扫描 |
 | 一直 waiting | watcher 未启动 / 面板扫到别的目录 / 文件扩展名非 pdf/jpg/png |
 | deliver 失败 | 看 Agent 日志；文件可能留在目录或进 `_unclaimed` |
 | 页面超时 | 会话过期；重新建会话，勿多开会话（同终端同时只能 1 个 waiting/matched） |
 
 ### W6. 通过标准（全部勾上才可写「Gate 0k SMB 扫描现场通过」）
+
+当前 SHA 还必须补齐以下负例；历史 completed 记录不能替代：
+
+- [ ] ACK 成功前面板扫描不会交付给任务，文件进入隔离或明确 fail-closed
+- [ ] A 创建并 ACK 后取消/超时，B 建新会话；A 的旧文件绝不交付给 B
+- [ ] A 创建并 ACK 后关闭/杀死 Kiosk，再由 B 操作面板；不得静默完成到 A 或 B，结果须明确隔离/阻断
+- [ ] Agent 重启前目录已有旧文件；启动积压进入 `_unclaimed`，新生成的不同文件仍可正常交付
+- [ ] 目录身份变化、watcher error、`ino === 0` / identity unavailable 时锁死可见，重启恢复有记录
+- [ ] 长驻 watcher 连续运行与断网恢复已验，不只依赖 Mac/CI 的一次性脚本
 
 - [~] Agent 日志有 `scan-watcher: watching …`（**未入仓原文**；由下方 completed deliver 旁证 watcher 已工作）
 - [x] 面板扫描文件出现在 watch 目录后被 Agent 消费（源文件删除或等价成功路径）— 预发库 `ScanTask.completed` + `FileObject` PDF
@@ -169,7 +190,8 @@ scan-watcher: scanWatchFolder 未配置，跳过扫描监听
 - [x] Kiosk 未出现「扫描仪就绪」等假硬件态（B1 #413 已预发）
 - [x] 证据：任务 id / fileId / purpose / mime 已写入 `docs/progress/current-progress.md`（无 token、无路径明文）
 
-**2026-07-27 判定**：Gate 0k SMB **交付闭环旁证成立**（预发库）；不等于 U 盘导入、TWAIN 或全量 Windows 主机清单全部勾完。
+**历史判定（2026-07-27）**：当时 Gate 0k SMB 有交付闭环旁证；该证据早于当前 ACK / 重扫 /
+输入锁死协议，不能写成 2026-09-17 当前 SHA 的设备通过。当前判定保持 **DEVICE NO-GO**，直到上述负例重跑。
 
 ### W7. 验收后可选（另授）
 

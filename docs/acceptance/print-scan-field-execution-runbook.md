@@ -55,6 +55,9 @@ git rev-parse --short HEAD | tee "$EVIDENCE_ROOT/PS-G0/git-head.log"
 git status --short --branch | tee "$EVIDENCE_ROOT/PS-G0/git-status.log"
 
 pnpm --filter @ai-job-print/api typecheck 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/api-typecheck.log"
+# typecheck 会执行 prisma generate；如果拆开或跳过 typecheck，必须先显式生成客户端，
+# 否则 verify:print-jobs 的模块缺失不是业务失败。
+pnpm --filter @ai-job-print/api exec prisma generate 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/prisma-generate.log"
 pnpm --filter @ai-job-print/api verify:print-scan-first-release 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/verify-print-scan-first-release.log"
 pnpm --filter @ai-job-print/api verify:print-jobs 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/verify-print-jobs.log"
 pnpm --filter terminal-agent typecheck 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/terminal-agent-typecheck.log"

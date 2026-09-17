@@ -1,5 +1,77 @@
 # 当前开发进度
 
+2026-09-17 **Windows / 奔图现场验收前 R3 候选已进入 PR #1039；旧 head 的必需 CI 首轮失败，修复后的新 head CI 待运行，尚未合并、上 Windows、部署或操作硬件。**
+集成基线为 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，分支
+`codex/windows-pantum-field-readiness-r3-20260917`，已验证的代码 / 手册锚点为
+`d71d022545d9ff56da155615710ce99851130753`。该锚点无冲突地汇入 7 个提交：小程序 / Kiosk
+`f8f46b6d2`、`69efe47a2`、`5fd69d56b`，Terminal Agent `5097a89d5`、`78d4ec054`，进度与
+现场手册 `0d08f7c72`、`d71d02254`。来源分支最终锚点分别为前端
+`0ac3b4ab04a77dcf32995d87d930d79a136f7b7f`、Agent
+`f21c5246a9ab38670759027973dc8de975105337`；根 checkout 的脏状态和冲突未被修改。分支已推送为
+PR #1039，首个包含测试装置隔离与官方 DeepSeek 复审跟进的 head 为
+`6e56a17d7d4f1b78c2418f16dc8eab1b8c366770`。后续 head
+`3bf53a61ff974391363de41d696fcdd0fb58a1bf` 的 run `35229230129` 已完成：
+`postgres-readiness`、`kiosk-browser-smoke` 全绿，`release-bundle` 按 PR 条件跳过；同 head 的
+`windows-agent-installer` run `35229230120` 中 `unsigned-exe-upgrade`、`unsigned-msi-candidate` 全绿；
+`build-and-verify` 在 `Verify suites` 的 288 条串行命令中通过 287 条，唯一失败为
+`verify:print-scan-first-release` 仍要求验收索引保留“文字助手模式不豁免”映射。当前候选已把该句补到
+新的运行时终端身份口径中，定向门禁本地重新全绿；修复后的新 head 必需 CI 未完成前不得写成
+`CI: GO`。
+
+- **小程序 / Kiosk：** 订单详情在换人、登出、隐藏、卸载、迟到响应时清理详情与到机码；发出时
+  身份未知的 200 不直接渲染，必须经一条带确定账号的服务端确认请求；取消成功后会使更早的详情
+  响应失效，不能复活已作废到机码。`PAPER_EMPTY` 不再承诺“加纸后自动继续”，只说明订单与已付
+  金额保留、联系工作人员，并仅在真实按钮出现时引导重打。
+- **Terminal Agent：** 实例锁改为原子 `wx` 创建；空、损坏、短写或发布失败的 PID 锁一律
+  fail-closed，不按路径删除归属不明或后继锁；释放前同时核 inode 与 PID。获锁后、SQLite / claim
+  前只清理 Agent temp 根目录中符合 `task_<taskId>.<supported-ext>` 的普通文件，symlink、目录与无关
+  文件保留，删除失败则拒绝启动。
+- **本地验证：** miniapp `verify:static` 全通过，生命周期测试 **166/166**；Kiosk typecheck 通过，
+  `print-fulfill-qx.spec.ts` **5/5** 通过；Agent typecheck、`verify:print-scan-agent`、
+  `verify:task-reliability`、并发子进程 / 启动残留清理 / 反向变异通过，lint 为 **0 errors / 3 条既有
+  unused-disable warnings**。仓库完整性、CI 门禁覆盖、部署门禁同步、图谱一致性和 `git diff --check`
+  均通过。Playwright 使用全新 `/tmp` 输出目录；此前旧输出目录的 WorkBuddy safe-delete 超时不属于
+  业务用例失败。
+- **复审：** Claude 完成前端实现与最终确认；Grok 的 Agent 实现由 Codex 独立复跑门禁；Hermes
+  Nous（`nous/upstage/solar-pro4:free`，session `20260917_204744_ea012f`）结论为 `PARTIAL`，未提出
+  新的明确 P0 / P1 代码缺陷，主要要求保留 Windows、真机与后端证据边界。其提出的两个测试疑问已由
+  R12-D 和 Kiosk “真实 taskId / payment session 重试”用例覆盖；`PARTIAL` 不等于代码 `NO-GO`。
+- **官方 DeepSeek 复审与跟进：** Hermes 使用官方 `provider=deepseek`、
+  `model=deepseek-v4-flash`、`reasoning=xhigh`（session `20260917_211325_74213a`）复审
+  `5baea09e4`，结论为源码 / 本地候选 `GO`，未发现 P0 / P1。其 P2-1 指出两份正式进度文档中的
+  `d71d02254` 完整 SHA 写错，已更正为可解析的
+  `d71d022545d9ff56da155615710ce99851130753`；P2-2 指出 Agent 反向变异测试会原地改写受控源码，
+  已改为只在 `agent-lock-mutation-*` 临时镜像中写入变异版 `instance-lock.ts`。可靠性门禁继续判杀六条
+  反向变异，受控源码测试前后 SHA-256 一致；Hermes 对修复 diff 再复核为 `GO`，无新增 P0 / P1 / P2。
+  该锚点仍表示运行时代码 / 现场手册；其上的跟进只改测试装置、进度文档和设计文案真值。
+- **CI 首轮失败与最小修复：** GitHub 日志确认失败不是 Fast Refresh warning 造成的（Lint 步骤以
+  0 error 通过；日志中的 17 条 Fast Refresh warning 不构成失败），也不是 Kiosk browser smoke；
+  唯一决定性失败是验收索引把旧的构建期 `VITE_TERMINAL_ID` 门禁改成 Agent 运行时 identity 后，漏迁移
+  “文字助手模式不豁免”这条 Task 11 映射。只在
+  `docs/device/print-scan-first-release-acceptance.md` 的运行时身份行补回该约束，未改运行时代码、构建
+  门禁或硬件协议；`pnpm --filter @ai-job-print/api verify:print-scan-first-release` 已重新全绿。
+- **证据边界：`SOURCE / LOCAL: GO`；`CI: NO-GO (OLD HEAD FAILED / NEW HEAD PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+  macOS / 本地 CI 形态的 watcher、锁和清理测试不能证明 Windows `tasklist` CSV、NTFS `wx` 与删除
+  共享、reparse point、`ProgramData` 路径、真实双进程启动或奔图物理结果。ACK 后任务存活协议、
+  `lastAttemptHash` 作为采集归属、微信真机、生产部署与商业闭环也未在本候选中证明。
+
+2026-09-17 **扫描隐私 R3 与小程序跨端 R11 已进入当前主干；代码 / CI 证据已闭合，设备、生产与商业仍为 NO-GO。**
+当前 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`。扫描候选 PR #1036 已于
+2026-09-15 合入：最终 head `a3db5f4165725f8f1a2365dfe7e1ce34a3e928dd`，merge commit
+`ddef936def46e9220a25e44ffe33dcc3458ed00b`；`build-and-verify`、`postgres-readiness`、
+`kiosk-browser-smoke`、`unsigned-exe-upgrade`、`unsigned-msi-candidate` 全部成功。随后 PR #1037
+以 head `7d070c22f3bf0c9f7406fa39f351795478a5228c` 合入当前 main，补齐小程序跨端身份 / 幂等收口及
+扫描迁移升级夹具隔离；该 head 的 `build-and-verify`、`postgres-readiness`、
+`kiosk-browser-smoke` 全部成功。`merge-base --is-ancestor` 已确认两个最终 head 均为当前 main 祖先。
+
+扫描链的软件结论限定为 **SOURCE / CI: GO**：一次性安全重扫授权、任务 / owner / terminal / scan type /
+状态 / 过期 / replay 约束、Kiosk 持久 ACK、Agent delivery lease、同 inode single-flight、锁死遥测和
+反向变异已进入主干。不得把这些结果写成当前 Windows / 奔图已通过：Windows SMB 上
+`ino === 0` / identity unavailable、长驻 chokidar、面板扫描、连续多用户、断网 / 重启恢复、真实出纸、
+扫码枪、真实支付退款、生产迁移部署、小程序正式发布、授权内容与客户 UAT 均未在当前 main SHA 上完成。
+因此 **DEVICE / PRODUCTION / COMMERCIAL: NO-GO**，下一步转入精确 SHA 的现场与发布验收，不再继续复活
+已删除远端分支或沿用 PR 合并前 worktree 作为交付源。
+
 2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
 失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
 `34984568841`。`postgres-readiness / Core verify suites on PG` 与
