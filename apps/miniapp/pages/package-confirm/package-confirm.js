@@ -372,7 +372,15 @@ Page({
         })
       })
       .catch((err) => {
-        if (!this._sameIdentity(token) || this._createdOrderId !== orderId) return
+        // **不能只按 `_sameIdentity` 判**。这一发本身就是 `needAuth:true`：401 时
+        // `utils/request.js` 会先试静默补签，补签失败才把 401 抛回来 ——
+        // 而抛回来之前它已经调过 `auth.logout()`，身份从 `'u:<id>'` 掉成 `''`。
+        // 这不是"换了人接管了页面"，是这一发自己的失败把登录状态弄没了，
+        // 仍然属于发起它的那一位，只是这台设备现在退出了登录。真正"换了人"
+        // （对方登录成一个不同的、可用的身份）才必须原样退出，半个字都不写。
+        const stillOurs = this._createdOrderId === orderId
+          && (this._sameIdentity(token) || !this._identityUsable())
+        if (!stillOurs) return
         this._verifyingOrderId = ''
         if (err && err.statusCode === 404 && err.code === 'PACKAGE_ORDER_NOT_FOUND') {
           // **本机那条记录里的键留着不动。** 它现在没有绑住任何订单，下一次同参数提交
@@ -381,8 +389,30 @@ Page({
           this._createdOrderId = null
           this._serverLostOrder = true
           this._loadQuote()
+          return
         }
-        // 其余一律保持锁定：_lockAfterCreated 已经把「订单已创建」写在屏幕上了。
+        if (err && err.statusCode === 401) {
+          // 订单锁与幂等键原样保留：核对不了不代表订单不存在，只是这台设备现在登录
+          // 不了了。不能让用户永远停在「订单已创建，请不要重复下单」——那条文案的
+          // 恢复动作是去订单列表，而订单列表同样需要登录。给一条走得通的路：去登录；
+          // 登录回来 onShow 会走身份变化那条分支（_resetForIdentity → _loadOrderData
+          // → _restoreCreatedOrder），重新锁住并重新核对这张订单。
+          //
+          // `quoteState` 一起写死成 error：本页现有的两个调用点都先 _lockAfterCreated
+          // 才 _verifyCreatedOrder（那里已经把它打成 error），但这一支的文案要真的显示
+          // 出来，靠的正是 quoteState === 'error' 那个分支 —— 让这条出口自己写全，
+          // 才不会在将来多一个"不先锁就核对"的调用点时变成一段看不见的文案。
+          this.setData({
+            quoteState: 'error',
+            quoteErrorTitle: '登录已失效',
+            quoteErrorText: '订单可能已经建好，但当前登录状态已过期，无法核对。请重新登录后再查看。',
+            quoteRecover: 'login',
+          })
+          return
+        }
+        // 其余（网络 / 5xx）一律保持锁定：_lockAfterCreated 已经把「订单已创建」
+        // 写在屏幕上了；_verifyingOrderId 已经释放，后续显式重试或身份变化触发的
+        // 重新核对不会被"上一次还没结束"挡住。
       })
   },
 
@@ -544,6 +574,38 @@ Page({
     })
   },
 
+  /**
+   * 这一发的回调回来时，页面上的身份已经不是发起它的那一位了：收尾**这一次提交尝试**
+   * 本地的两把锁，然后什么都不做。
+   *
+   * 触发它的不只是"真的换了人"。更常见的是**同一位的会话在 POST 在途期间到点**：
+   * enduser JWT 只签 30 分钟，`auth.getToken()` 过期时会先 `clearSession()` 再返回
+   * null，于是 `_identityKey()` 从 `'u:A'` 静默掉成 `''` —— 全程没有任何生命周期回调
+   * （补签失败时 `utils/request.js` 调的 `auth.logout()` 同样没有）。
+   *
+   * 只结清本地这一发的状态：`attempt.settled` 与（若它还是"当前这一次"）`submitting`
+   * 按钮锁。**绝不碰订单数据、绝不跳转、绝不清幂等记录** —— 那条记录要么已经落进了
+   * 发起者自己的账号名下（`rememberOrderId` 认的是 `attempt.account`，不是"当前页面
+   * 现在是谁"），要么这一发根本没建成任何订单。两种情况下它都必须原样留着：那是
+   * "响应可能丢在路上"时唯一还能避免第二张订单的东西。
+   *
+   * 不结清的代价很具体：`submitting` 留 `true`，屏幕就永远停在「提交中…」，而没有
+   * 任何请求在跑 —— `submitOrder()` 第一行 `if (this.data.submitting) return` 会把
+   * 之后每一次点击原样吞掉，页面再也走不动。`attempt.settled` 留 `false` 则是第二道
+   * 同样的死结：即使别的路径把 `submitting` 写回 false，
+   * `if (this._submitAttempt && !this._submitAttempt.settled) return` 仍会吞掉点击。
+   *
+   * 只在 `attempt` 仍是"当前这一次"时才动 `_submitAttempt` / `submitting`：
+   * 如果它已经被后面某次调用替换掉，说明按钮早就不归它管了，这里不能覆盖新状态。
+   */
+  _releaseStaleAttempt(attempt) {
+    attempt.settled = true
+    if (this._submitAttempt === attempt) {
+      this._submitAttempt = null
+      this.setData({ submitting: false })
+    }
+  },
+
   submitOrder() {
     if (this.data.submitting) return
     // 已经建过单：不再发第二次 POST，直接把人送去找那张订单。
@@ -635,7 +697,11 @@ Page({
         // ① B 的页面被 A 的订单永久锁死（见 _resetForIdentity 里对这个字段的说明）；
         // ② 下面那两个 removeStorageSync 会删掉 B 自己刚做好的草稿。
         // 上一位的订单不会丢：它已落库，本人可从「我的 · 打印订单」材料包分区找回。
-        if (!this._sameIdentity(token)) return
+        //
+        // **结清而不是原样 return**：原样 return 会把 `submitting` 永久留成 true，
+        // 屏幕停在「提交中…」且再也按不动（见 _releaseStaleAttempt）。结清只松开
+        // 本地这两把锁，一个字节的订单数据都不写。
+        if (!this._sameIdentity(token)) { this._releaseStaleAttempt(attempt); return }
         // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
         // 放在 redirectTo 之前，是为了让下面 catch 里那条「跳转同步抛」的兜底能认出它。
         this._createdOrderId = orderId
@@ -668,7 +734,9 @@ Page({
         // **先判身份再谈锁**。顺序反过来就是一个新缺陷：换了人之后迟到的那条失败
         // （或"订单已建成但跳转抛错"）会把 `_lockAfterCreated` 打在 B 的页面上，
         // 让 B 看到一张他没下过的订单，并且再也下不了自己的单。
-        if (!this._sameIdentity(token)) return
+        //
+        // 同上一处：结清而不是原样 return，否则「提交中…」会永远留在屏幕上。
+        if (!this._sameIdentity(token)) { this._releaseStaleAttempt(attempt); return }
         // 订单已经建成、只是后续动作抛错（例如 redirectTo 同步抛）：
         // 同样不能当成"下单失败"让用户重来。
         if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }

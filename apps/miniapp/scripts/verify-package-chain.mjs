@@ -48,6 +48,24 @@ const stripComments = (src) => src
   .filter((line) => !/^\s*(\/\/|\*)/.test(line))
   .join('\n')
 
+/**
+ * package-confirm 建单回调里那道「回调回来时页面已经不是发起这一发的那位了」守卫，**逐字**。
+ *
+ * 下面几条「先判身份再动 X」的顺序断言都拿它当锚点。锚点必须是整行，不能只判
+ * `_sameIdentity(token)`：那三个字在本文件里还出现在 `_verifyCreatedOrder` 的
+ * 成功分支与 `stillOurs` 里，按片段匹配会命中别的位置，顺序断言就变成恒真。
+ *
+ * 守卫体此前是一个光秃秃的 `return`。原样退出会把 `submitting` 永久留成 true——
+ * 屏幕停在「提交中…」、没有任何请求在跑，而 `submitOrder()` 第一行
+ * `if (this.data.submitting) return` 会吞掉之后每一次点击。所以退出之前必须先
+ * `_releaseStaleAttempt(attempt)` 结清本地这一发（只松开两把锁，不碰订单数据、
+ * 不跳转、不清幂等记录）。锚点写成整行，这两件事就一起被钉住了。
+ */
+const CONFIRM_IDENTITY_GUARD = 'if (!this._sameIdentity(token)) { this._releaseStaleAttempt(attempt); return }'
+
+/** 把一段源码原文当成正则里的字面量用。 */
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 let failed = 0
 const assert = (cond, msg) => { if (cond) console.log(`  PASS  ${msg}`); else { failed++; console.log(`  FAIL  ${msg}`) } }
 
@@ -589,7 +607,7 @@ console.log('\n⑩ 打印参数取值与服务端 DTO 白名单一致')
     assert(/idem\.rememberOrderId\(attempt\.account/.test(confirmCode),
       '拿到 orderId 先落进发起这次提交的那位的记录（换人时也要落，否则那张订单再也找不回来）')
     const rememberIdx = confirmCode.indexOf('idem.rememberOrderId(')
-    const identityIdx = confirmCode.indexOf('if (!this._sameIdentity(token)) return')
+    const identityIdx = confirmCode.indexOf(CONFIRM_IDENTITY_GUARD)
     assert(rememberIdx > 0 && identityIdx > rememberIdx,
       'orderId 落盘排在身份判定之前（记录属于发起时那一位，页面此刻可能已经换人）')
     // 取 submitOrder 的函数体来判，而不是全文件：`_forgetIdempotencyRecord` 里那次
@@ -700,7 +718,7 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
   assert(/docLoadingMore && !this\._guard\.accepts\(this\._docsToken\)/.test(createCode),
     '切后台作废翻页请求后，回前台要解开 docLoadingMore（否则「加载更多」永远点不动）')
 
-  const sameIdIdx = confirmCode.indexOf('if (!this._sameIdentity(token)) return')
+  const sameIdIdx = confirmCode.indexOf(CONFIRM_IDENTITY_GUARD)
   const afterSameId = sameIdIdx >= 0 ? confirmCode.slice(sameIdIdx, sameIdIdx + 400) : ''
   assert(sameIdIdx >= 0 && afterSameId.includes("removeStorageSync('temp_package_data')"),
     '建单成功后**先判身份再清草稿**（换人时不得删掉当前这位的草稿）')
@@ -714,6 +732,48 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     '建单之后不再核价（再变 ready 等于把「确认下单」重新点亮）')
   assert(/quoteState === 'loading'\s*\n\s*&& !this\._guard\.accepts\(this\._quoteToken\)/.test(confirmCode),
     'onShow 只在「在途报价确已作废」时才重发（只看 quoteState 会让首次进入连报两次价）')
+
+  // 「那张已建成的订单还在不在」核不上时的分流。三条出口各自对应一种真实处境，
+  // 混成一条就必然错一头：要么把用户永久停在一个走不通的出口上，要么在证明不了
+  // 任何事的时候放开按钮 —— 后者的代价是同一份材料包的第二张订单、第二笔钱。
+  {
+    const verifyAt = confirmCode.indexOf('_verifyCreatedOrder(orderId) {')
+    const verifyBody = verifyAt >= 0
+      ? confirmCode.slice(verifyAt, confirmCode.indexOf('\n  },', verifyAt))
+      : ''
+    assert(!!verifyBody, '取不到 package-confirm 的 _verifyCreatedOrder 函数体')
+    const catchAt = verifyBody.indexOf('.catch((err) => {')
+    const catchBody = catchAt >= 0 ? verifyBody.slice(catchAt) : ''
+    assert(!!catchBody, '取不到 _verifyCreatedOrder 的失败分支')
+
+    // ① 核对守卫必须在分流**之前**释放。不释放的话，这一发失败之后
+    //    `_verifyingOrderId` 仍旧钉着这个 orderId，后续任何一次重新核对
+    //    （显式重试、或登录回来 onShow 触发的那一次）都会在函数第一行被挡掉，
+    //    页面于是永久停在「订单已创建」且再也核不了第二次。
+    const releaseAt = catchBody.indexOf("this._verifyingOrderId = ''")
+    const notFoundAt = catchBody.indexOf('PACKAGE_ORDER_NOT_FOUND')
+    assert(releaseAt > 0 && notFoundAt > releaseAt,
+      '核对失败时先释放 _verifyingOrderId 再分流（不释放 = 后续重试在入口就被吞掉）')
+
+    // ② 401：登录状态没了，核对不了 —— 但核不上**证明不了订单不存在**。
+    //    锁与键原样保留，只把恢复动作换成一条走得通的路（默认那条是「去我的打印订单」，
+    //    而订单列表同样需要登录，等于把人堵死在一个进不去的出口上）。
+    assert(/if \(err && err\.statusCode === 401\) \{[\s\S]{0,600}quoteRecover: 'login'/.test(catchBody),
+      '核对遇到 401 时给出「去登录」这条走得通的恢复动作')
+    assert(/if \(err && err\.statusCode === 401\) \{[\s\S]{0,600}quoteState: 'error'/.test(catchBody),
+      "401 那一支自己写全 quoteState（模板只在 error 分支渲染这段文案，不写就是一段看不见的话）")
+
+    // ③ 整条失败分支一个字节的幂等记录都不许清。那个键此刻可能正绑着一张已经建成、
+    //    只是核不上的订单；清掉它，下一次同参数提交会铸新键、服务端再建一张。
+    assert(!catchBody.includes('idem.clearRecord('),
+      '核对失败的任何一支都不清幂等记录（清掉 = 下一次铸新键 = 第二张订单）')
+    // ④ 只有服务端 requireOwned 明确的 404 才算「它真的没了」，才可以解锁重来。
+    assert(/statusCode === 404 && err\.code === 'PACKAGE_ORDER_NOT_FOUND'/.test(catchBody),
+      "解锁的判据是 404 + PACKAGE_ORDER_NOT_FOUND 两项俱全，不是任意一个失败")
+    const unlockAt = catchBody.indexOf('this._createdOrderId = null')
+    assert(unlockAt > notFoundAt && notFoundAt > 0,
+      '解锁排在那个判据之后（顺序反过来等于任何一次核不上都解锁）')
+  }
 
   assert(/_sameIdentity\(token\)/.test(stripComments(ordersJs)),
     'orders 的取消链按身份判定（用 active 判定会把这一行锁死在「取消中…」）')
@@ -838,12 +898,32 @@ console.log('\n⑫ R4 身份 / 代次收口')
   // 按全文件判会永远命中它，断言就变成恒真（那是一条测不出任何东西的门禁）。
   const createIdx = confirmCode.indexOf('api.createPackageOrder(')
   const chain = createIdx >= 0 ? confirmCode.slice(createIdx, createIdx + 1200) : ''
-  const guardIdx = chain.indexOf('if (!this._sameIdentity(token)) return')
+  const guardIdx = chain.indexOf(CONFIRM_IDENTITY_GUARD)
   const assignIdx = chain.indexOf('this._createdOrderId = orderId')
   assert(createIdx >= 0 && guardIdx > 0 && assignIdx > guardIdx,
     '建单成功回调里 `_createdOrderId = orderId` 排在身份判定之后（换人时一个字节都不写）')
-  assert(/catch\(\(err\) => \{[\s\S]{0,400}if \(!this\._sameIdentity\(token\)\) return[\s\S]{0,200}if \(this\._createdOrderId\)/.test(confirmCode),
+  assert(new RegExp(`catch\\(\\(err\\) => \\{[\\s\\S]{0,400}${escapeRe(CONFIRM_IDENTITY_GUARD)}[\\s\\S]{0,200}if \\(this\\._createdOrderId\\)`).test(confirmCode),
     '建单失败回调同样先判身份再谈锁（迟到的失败不得锁死新用户）')
+  // ③ 成功与失败**两条**迟到路径都必须结清这一发，一条漏了就是一个永远停在
+  //    「提交中…」的页面。数出现次数，而不是"文件里有这么一行"——只在 then 里写、
+  //    catch 里仍然光秃秃 return，按"存在"判会照样绿。
+  assert(confirmCode.split(CONFIRM_IDENTITY_GUARD).length - 1 === 2,
+    '建单的 then / catch 两条迟到路径都在退出前结清了这一次提交尝试（写一处等于漏一条）')
+  assert(/_releaseStaleAttempt\(attempt\) \{\s*\n\s*attempt\.settled = true\s*\n\s*if \(this\._submitAttempt === attempt\) \{[\s\S]{0,160}submitting: false/.test(confirmCode),
+    '结清只动本地两把锁：落定这一发 + 松开按钮，且只在它仍是"当前这一次"时才动按钮')
+  {
+    // 结清路径**一个字节的订单数据都不许写**：它跑的时候页面上的身份已经不是发起
+    // 这一发的那一位了。写 _createdOrderId 会把 B 的页面永久锁成「订单已创建」；
+    // clearRecord 会删掉发起者唯一还能找回那张订单的线索（那正是第二张订单的来源）。
+    const releaseAt = confirmCode.indexOf('_releaseStaleAttempt(attempt) {')
+    const releaseBody = releaseAt >= 0
+      ? confirmCode.slice(releaseAt, confirmCode.indexOf('\n  },', releaseAt))
+      : ''
+    assert(!!releaseBody, '取不到 _releaseStaleAttempt 的函数体')
+    for (const forbidden of ['_createdOrderId', 'clearRecord', 'redirectTo', 'removeStorageSync', '_lockAfterCreated']) {
+      assert(!releaseBody.includes(forbidden), `结清旧尝试时不得出现 ${forbidden}（那是把上一位的东西写到当前这位身上）`)
+    }
+  }
   assert(/_resetForIdentity\(\)\s*\{[\s\S]{0,200}this\._createdOrderId = null[\s\S]{0,200}submitting: false[\s\S]{0,120}agreedToTerms: false/.test(confirmCode),
     '身份切换时建单锁 / 提交锁 / 协议同意一起复位（协议同意是本人行为，不得继承）')
   assert(/setIdentity\(this\._identityKey\(\)\)\) \{[\s\S]{0,200}this\._resetForIdentity\(\)/.test(confirmCode),

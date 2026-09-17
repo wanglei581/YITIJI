@@ -348,6 +348,72 @@ test('缺键 / 形状不对：本地直接 reject，一个请求都不发', asyn
   assert.equal(requests.length, 0)
 })
 
+/**
+ * 这一条测的是 utils/request.js 的 401 静默补签重试，**不是页面**。
+ *
+ * 为什么它必须存在：建单这一发是 `needAuth: true`，而 enduser JWT 只签 30 分钟。
+ * 「键落住了 → POST 出去 → 服务端说 401 → 补签成功 → 自动重试」是这条链上最常走的
+ * 一次重试，而它整个发生在 request.js 内部，页面一无所知：页面拿到的只有最终那个
+ * resolve。于是"重试时带的还是不是同一个幂等键"这件事，在页面层根本看不见 ——
+ * 只有把替身下沉到 wx.request 才验得了。
+ *
+ * 带错了的代价是具体的：`Order` 的 `@@unique(endUserId, idempotencyKey)` 认的是键。
+ * 重试若换一个新键，服务端不会回放原单 —— 它会**再建一张**，而第一发那个 401 完全
+ * 可能只是补签之前的一次拒绝，那张单本来是能回放回来的。两张订单、两笔钱。
+ *
+ * 所以这里同时钉两件事：幂等键**逐字不变**，Authorization **必须换成补签后的新
+ * token**。少了后一条，一个"401 之后原样重发一次、根本没补签"的实现也能让第一条绿。
+ */
+test('createPackageOrder：401 静默补签成功后自动重试 —— 换的是 Authorization，幂等键逐字不变', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  wx.login = (opts) => opts.success({ code: 'wx-code-1' })
+  const auth = requireMiniapp('../utils/auth.js')
+  const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  // exp 不同 → token 字符串不同，于是"重试带的是新 token 还是旧 token"分得开。
+  const makeFakeJwt = (expSeconds) =>
+    [b64url({ alg: 'none' }), b64url({ exp: Math.floor(Date.now() / 1000) + expSeconds }), 'sig'].join('.')
+  const staleToken = makeFakeJwt(1800)
+  const freshToken = makeFakeJwt(3600)
+  assert.notEqual(staleToken, freshToken, '两个 token 必须真的不同，否则下面那条断言是恒真的')
+  auth.saveSession({ token: staleToken, user: { id: 'A' } })
+
+  const requests = []
+  wx.request = (opts) => {
+    requests.push(opts)
+    if (opts.url.endsWith('/orders/package')) {
+      const isRetry = requests.filter((r) => r.url.endsWith('/orders/package')).length > 1
+      // 第一发 401：真机上这是"JWT 在用户填表那几分钟里到点了"，服务端拒绝一次。
+      if (!isRetry) { opts.success({ statusCode: 401, data: {} }); return }
+      opts.success({ statusCode: 200, data: { data: { orderId: 'ord-1' } } })
+      return
+    }
+    if (opts.url.endsWith('/member/auth/wx-resignin')) {
+      opts.success({ statusCode: 200, data: { data: { token: freshToken, user: { id: 'A' } } } })
+      return
+    }
+    opts.fail && opts.fail({ errMsg: `unexpected request ${opts.url}` })
+  }
+
+  const api = requireMiniapp('../utils/api.js')
+  const key = '11111111-2222-4333-8444-555555555555'
+  const result = await api.createPackageOrder(PAYLOAD, { idempotencyKey: key })
+  assert.equal(result.orderId, 'ord-1')
+
+  const packageRequests = requests.filter((r) => r.url.endsWith('/orders/package'))
+  assert.equal(packageRequests.length, 2, '第一次 401，静默补签成功后必须自动重试一次')
+  assert.ok(requests.some((r) => r.url.endsWith('/member/auth/wx-resignin')), '中间确实补了一次签')
+  assert.equal(packageRequests[0].header['idempotency-key'], key)
+  assert.equal(packageRequests[1].header['idempotency-key'], key, '重试带的必须是同一个幂等键，不是重新铸一个')
+  assert.equal(packageRequests[0].header.Authorization, `Bearer ${staleToken}`)
+  assert.equal(packageRequests[1].header.Authorization, `Bearer ${freshToken}`,
+    '重试必须带补签后的新 token —— 否则这只是一次原样重发，401 会原样再来一次')
+  // Header 是每一发现造的对象，不是同一个引用被改了一个字段。
+  assert.notEqual(packageRequests[0].header, packageRequests[1].header)
+  // 键一个字节都不许进 body：白名单 DTO 见到多出来的字段会整单 400。
+  for (const r of packageRequests) assert.ok(!JSON.stringify(r.data).includes(key))
+})
+
 // ══════════════════════════════════════════════════════════════════════
 // D. 页面：真跑一次提交，看发了几个 POST、带的是不是同一个键
 // ══════════════════════════════════════════════════════════════════════
@@ -453,6 +519,191 @@ test('页面：核对不上（网络 / 5xx）继续锁着；服务端明确 404 
   assert.equal(second.calls.create.length, 1)
   assert.equal(second.calls.create[0].opts.idempotencyKey, minted2.key,
     '那个键没有绑住任何订单，复用它服务端会正常建一张新单；换新键才会多出第二张')
+})
+
+test('页面：核对收到 401（补签失败已自动登出）——暴露去登录出口，订单锁与幂等键原样保留', async () => {
+  const wx = createWx(); seedDraft(wx); ACTIVE_WX = wx
+  const fp = idem.fingerprintOf(PAYLOAD)
+  const minted = await idem.ensureKey('u:A', fp)
+  idem.rememberOrderId('u:A', fp, minted.key, 'ord-x')
+
+  const { api, calls } = createApi(wx)
+  const auth = createAuth('A')
+  const page = makePage(wx, { api, auth })
+  page.onLoad(); await flush()
+  assert.equal(page.data.quoteRecover, 'orders', '核对回来之前先是默认的"订单已创建"锁定文案')
+
+  // 真实 request.js 在 needAuth:true 的请求上遇到 401 会先试静默补签，补签失败才把
+  // 原始 401 抛回来 —— 而抛回来之前它已经调过 auth.logout()，身份从 'u:A' 掉成 ''。
+  // 这里的 auth.setUser(null) 就是在模拟"回调这一刻，登出已经先一步发生了"。
+  auth.setUser(null)
+  calls.get[0].reject(httpError(401, ''))
+  await flush()
+
+  assert.equal(page.data.quoteRecover, 'login', '不能永远停在"订单已创建，请不要重复下单"')
+  assert.equal(page.data.quoteState, 'error', '模板只在 error 分支渲染这段文案，不打成 error 就是一段看不见的话')
+  assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-x', '订单锁与幂等键不因 401 被清掉')
+  assert.equal(calls.create.length, 0, '核不上的这一路，一个 POST 都不许发')
+
+  // 「去登录」必须真的走得通：这条出口的价值全在它回来之后能重新核一次。
+  // 真机路径是 navigateTo 登录页（本页 onHide）→ 登录成功 → 返回（onShow，身份从
+  // '' 变回 'u:A'）→ 身份变化分支重新解析草稿 → _restoreCreatedOrder 重新锁 + 重核。
+  page.onHide()
+  page.onShow()                   // 仍未登录：这一跳只是把身份登记成 ''
+  auth.setUser('A')               // 登录回来了
+  page.onShow()
+  await flush()
+  assert.equal(calls.get.length, 2, '登录回来之后必须重新核对这张订单，而不是停在原地')
+  assert.equal(calls.create.length, 0, '重新核对期间仍然一个 POST 都不发')
+  calls.get[1].resolve({ orderId: 'ord-x', pickupStatus: 'pending' })
+  await flush()
+  assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-x'],
+    '核上了就把人送到到机码页 —— 这才是这条恢复动作真正的终点')
+})
+
+test('页面：核对遇到网络 / 5xx 会释放 _verifyingOrderId，后续显式重试可以再核一次；订单锁与键原样保留', async () => {
+  const wx = createWx(); seedDraft(wx); ACTIVE_WX = wx
+  const fp = idem.fingerprintOf(PAYLOAD)
+  const minted = await idem.ensureKey('u:A', fp)
+  idem.rememberOrderId('u:A', fp, minted.key, 'ord-x')
+
+  const { api, calls } = createApi(wx)
+  const page = makePage(wx, { api, auth: createAuth('A') })
+  page.onLoad(); await flush()
+  assert.equal(calls.get.length, 1)
+
+  calls.get[0].reject(httpError(500, 'INTERNAL_ERROR'))
+  await flush()
+  assert.equal(page.data.quoteRecover, 'orders', '网络 / 5xx 不给登录出口，仍是默认锁定文案')
+  assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-x')
+
+  // 显式重试同一个 orderId：如果 _verifyingOrderId 没被释放，这一发在入口就会被挡掉。
+  page._verifyCreatedOrder('ord-x')
+  await flush()
+  assert.equal(calls.get.length, 2, '5xx 之后必须能再核一次，而不是被 _verifyingOrderId 卡死')
+  calls.get[1].resolve({ orderId: 'ord-x', pickupStatus: 'pending' })
+  await flush()
+  assert.equal(wx.calls.redirectTo.length, 1)
+})
+
+/**
+ * 提交在途时身份**静默**变了 —— 一个 onHide / onShow 都没有。
+ *
+ * 真机上这不是罕见路径，而是最常走的那一条：enduser JWT 只签 30 分钟，
+ * `auth.getToken()` 到点时会先 `clearSession()` 再返回 null，于是 `_identityKey()`
+ * 从 `'u:A'` 掉成 `''`，全程没有任何生命周期回调（`utils/request.js` 补签失败时调的
+ * `auth.logout()` 同样没有）。页面还停在前台，而它发出去的那一发的回调正要回来。
+ *
+ * 此前这里是一个光秃秃的 `return`：订单在服务端建成了，页面却把 `submitting` 永久
+ * 留成 true —— 屏幕停在「提交中…」，没有任何请求在跑，`submitOrder()` 第一行
+ * `if (this.data.submitting) return` 吞掉之后每一次点击。用户唯一的出路是杀掉小程序。
+ */
+test('页面：提交在途时会话静默失效（无生命周期回调）——迟到的成功/失败都结清这一发，登录回来还能把那张订单救回来', async () => {
+  const fp = idem.fingerprintOf(PAYLOAD)
+
+  // ① 迟到的成功（200）：订单**已经建成**，而页面上的身份已经不是发起它的那一位。
+  {
+    const wx = createWx(); seedDraft(wx)
+    const { api, calls } = createApi(wx)
+    const auth = createAuth('A')
+    const page = await openReadyPage(wx, api, auth)
+    page.submitOrder(); await flush()
+    assert.equal(page.data.submitting, true)
+
+    auth.setUser(null)                                   // 会话到点：'u:A' → ''
+    calls.create[0].resolve({ orderId: 'ord-A' })
+    await flush()
+
+    assert.equal(wx.calls.redirectTo.length, 0, '身份已经不是发起这一发的那位，不许跳转')
+    assert.equal(page.data.quoteErrorTitle, '', '这条路径一个字节的订单状态都不写到屏幕上')
+    assert.equal(page.data.submitting, false, '不结清就永远停在「提交中…」，而没有任何请求在跑')
+    assert.equal(page._submitAttempt, null, '尝试锁也要松开，否则第二道闸会继续吞掉点击')
+    assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-A',
+      '订单线索必须留在发起者名下 —— 它是这张已建成的订单唯一还能被找回来的东西')
+
+    // 登录回来。页面自己不会察觉这一跳 —— 守卫的身份快照从没见过中间那个 ''
+    //（'u:A' → '' → 'u:A' 全程没有 onShow，回到前台时它和快照逐字相同），
+    // 所以按钮照旧是亮的。**这不要紧，因为再点一次也建不出第二张订单**：
+    // submitOrder 第一道同步闸读的就是本机那条记录，它带着 orderId，于是一个 POST
+    // 都不发，改去核对那一张。这正是那条记录存在的全部理由。
+    page.onHide(); auth.setUser('A'); page.onShow(); await flush()
+    page.submitOrder(); await flush()
+    assert.equal(calls.create.length, 1, '已经建成的那张订单不许再 POST 一次')
+    assert.equal(calls.get.length, 1, '改去核对那一张')
+    calls.get[0].resolve({ orderId: 'ord-A', pickupStatus: 'pending' })
+    await flush()
+    assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-A'])
+  }
+
+  // ② 迟到的失败（网络错误）：这一发**可能建成了也可能没有**，所以那条未落定的记录
+  //    一个字节都不能动 —— 它是"再点一次仍然复用同一个键"的唯一依据。
+  {
+    const wx = createWx(); seedDraft(wx)
+    const { api, calls } = createApi(wx)
+    const auth = createAuth('A')
+    const page = await openReadyPage(wx, api, auth)
+    page.submitOrder(); await flush()
+    const firstKey = calls.create[0].opts.idempotencyKey
+
+    auth.setUser(null)
+    calls.create[0].reject(httpError(-1, 'NETWORK_ERROR'))
+    await flush()
+
+    assert.equal(wx.calls.redirectTo.length, 0)
+    assert.equal(page.data.submitting, false, '失败那一路同样不许把页面焊在「提交中…」上')
+    assert.equal(page._submitAttempt, null)
+    const kept = idem.findRecord('u:A', fp)
+    assert.equal(kept.key, firstKey, '未落定的那条记录一个字节都不许动')
+    assert.equal(kept.orderId, '', '它就是"提交出去了、但不知道建没建成"的那一种')
+
+    // 登录回来再点一次：必须还是同一个键。换新键 = 上一发万一建成了就变成两张订单。
+    page.onHide(); auth.setUser('A'); page.onShow(); await flush()
+    page.toggleAgreement({ detail: { value: ['agreed'] } })
+    page.submitOrder(); await flush()
+    assert.equal(calls.create.length, 2)
+    assert.equal(calls.create[1].opts.idempotencyKey, firstKey, '重试复用同一个键，服务端才会回放而不是再建一张')
+  }
+
+  // ③ 真的换了人（A → B，同样没有任何生命周期回调）：B 的屏幕上不许出现 A 的任何东西，
+  //    A 的记录不许被动，而 B 自己的材料包必须能照常下单 —— 用 B 自己的键。
+  {
+    const wx = createWx(); seedDraft(wx)
+    const { api, calls } = createApi(wx)
+    const auth = createAuth('A')
+    const page = await openReadyPage(wx, api, auth)
+    page.submitOrder(); await flush()
+    const aKey = calls.create[0].opts.idempotencyKey
+
+    auth.setUser('B')
+    calls.create[0].resolve({ orderId: 'ord-A' })
+    await flush()
+
+    assert.equal(wx.calls.redirectTo.length, 0, 'A 的订单不许把 B 带去别人的到机码页')
+    assert.equal(page.data.quoteErrorTitle, '', 'A 的锁定文案不许写到 B 的屏幕上')
+    assert.equal(page.data.submitting, false)
+    assert.equal(page._submitAttempt, null)
+    const aRow = idem.findRecord('u:A', fp)
+    assert.equal(aRow.key, aKey)
+    assert.equal(aRow.orderId, 'ord-A', 'A 的订单线索原样保留（A 重新登录回来还要找得回）')
+
+    // B 换上自己的草稿，走真机上必然会走的那一跳（离页再回来 → onShow 重新核归属）。
+    const bDraft = { ...DRAFT, ownerKey: 'u:B', draftId: 'd-b', files: [{ fileId: 'bf1', name: 'B的简历.pdf' }] }
+    wx.storage.set('temp_package_data', JSON.parse(JSON.stringify(bDraft)))
+    wx.storage.set('temp_selected_store', { id: 't-9', ownerKey: 'u:B', draftId: 'd-b', name: '九号服务点', address: '某路 9 号' })
+    page.onHide(); page.onShow(); await flush()
+    page.toggleAgreement({ detail: { value: ['agreed'] } })
+    page.submitOrder(); await flush()
+
+    assert.equal(calls.create.length, 2, 'B 的点击不能被上一位那次尝试的锁挡住')
+    assert.equal(calls.create[1].data.terminalId, 't-9', 'B 发出去的是 B 自己那份材料包')
+    // 逐字段比，不用 deepEqual：载荷是沙箱里造的对象，跨 realm 的 deepStrictEqual 恒不相等。
+    assert.equal(calls.create[1].data.files.length, 1)
+    assert.equal(calls.create[1].data.files[0].fileId, 'bf1')
+    const bKey = calls.create[1].opts.idempotencyKey
+    assert.notEqual(bKey, aKey, '同一台设备、不同账号，必须是两个键')
+    assert.match(bKey, idem.KEY_RE)
+    assert.equal(idem.findRecord('u:A', fp).key, aKey, '全程 A 的那一格一个字节都没被动过')
+  }
 })
 
 test('页面：409 IDEMPOTENCY_KEY_REUSED 不重试旧键；换新键必须由用户再按一次，且先清掉旧记录', async () => {
