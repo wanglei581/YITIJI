@@ -9,6 +9,7 @@ import { readFileSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { AuditService } from '../src/audit/audit.service'
 import { encryptSecret } from '../src/common/crypto/secret-cipher'
+import type { RedisService } from '../src/common/redis/redis.service'
 import { hashPickupCode, randomPickupCode } from '../src/common/pickup-code'
 import {
   assertMemberPrintOrderIdempotencyKey,
@@ -17,9 +18,10 @@ import {
   MemberPrintOrderCreateService,
 } from '../src/member-print-orders/member-print-order-create.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
-import { OrderStatusService } from '../src/payment/order-status.service'
+import { isPickupWindowClosed, OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
@@ -46,9 +48,23 @@ function fail(message: string): never { throw new Error(message) }
 
 function codeOf(error: unknown): string {
   const ex = error as { getResponse?: () => unknown; response?: unknown; message?: string }
-  const response = (typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response) as
-    | { error?: { code?: string }; message?: string } | undefined
-  return response?.error?.code ?? response?.message ?? ex.message ?? 'UNKNOWN'
+  const response = typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response
+  if (typeof response === 'string' && response) return response
+  const body = response as { error?: { code?: string }; message?: string } | undefined
+  return body?.error?.code ?? body?.message ?? ex.message ?? 'UNKNOWN'
+}
+
+class FakeRedis {
+  private readonly values = new Map<string, string>()
+
+  async get(key: string): Promise<string | null> { return this.values.get(key) ?? null }
+  async setEx(key: string, _ttl: number, value: string): Promise<void> { this.values.set(key, value) }
+  async del(key: string): Promise<number> { return this.values.delete(key) ? 1 : 0 }
+  async incrWithTtl(key: string, _ttl: number): Promise<number> {
+    const value = Number(this.values.get(key) ?? '0') + 1
+    this.values.set(key, String(value))
+    return value
+  }
 }
 
 async function capture(action: () => Promise<unknown>): Promise<{
@@ -169,6 +185,7 @@ async function main(): Promise<void> {
   const pricing = new PricingService(prisma)
   const quote = new OrderQuoteService(pageCount, pricing, capabilities, prisma)
   const memberOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
+  const pickup = new PickupOrderService(prisma, capabilities, audit, new FakeRedis() as unknown as RedisService, storage)
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const userA = `eu_idem_a_${suffix}`
   const userB = `eu_idem_b_${suffix}`
@@ -258,6 +275,8 @@ async function main(): Promise<void> {
     paymentSource?: string | null
     paidAt?: Date | null
     pickupStatus?: string
+    pickupClaimedAt?: Date | null
+    taskStatus?: string
     printTaskId?: string | null
     pickupCodeHash?: string
   }): Promise<void> {
@@ -284,6 +303,8 @@ async function main(): Promise<void> {
         pickupCodeCreatedAt: new Date(),
         pickupCodeExpiresAt: opts.expiresAt,
         pickupStatus: opts.pickupStatus ?? 'pending',
+        pickupClaimedAt: opts.pickupClaimedAt ?? null,
+        taskStatus: opts.taskStatus ?? 'pending_release',
         printTaskId: opts.printTaskId ?? null,
         idempotencyKey: opts.key,
         idempotencyPayloadHash: fingerprintMemberPrintOrderPayload(dtoA),
@@ -415,23 +436,96 @@ async function main(): Promise<void> {
     if (await prisma.order.count({ where: { idempotencyKey: lateKey } }) !== 1) fail('截止后半完成不得第二张单')
     pass('T8b 截止后免费半完成 → expired/closed，无支付副作用、无新码')
 
+    const unclaimedList = await memberOrders.listCloud(userA)
+    const unclaimedListed = unclaimedList.find((row) => row.id === lateId)
+    if (!unclaimedListed) fail('未认领过期单必须仍能在 listCloud 找回')
+    if (unclaimedListed.pickupStatus !== 'expired' || unclaimedListed.payStatus !== 'closed' || unclaimedListed.pickupCode) {
+      fail(`listCloud 未认领过期必须 expired/closed/无码，实际 ${unclaimedListed.pickupStatus}/${unclaimedListed.payStatus}`)
+    }
+    const unclaimedDetail = await memberOrders.detail(userA, lateId)
+    if (unclaimedDetail.pickupStatus !== 'expired' || unclaimedDetail.payStatus !== 'closed' || unclaimedDetail.pickupCode) {
+      fail('detail 未认领过期必须 expired/closed/无码')
+    }
+
+    const claimedAt = new Date(Date.now() - 30 * 1000)
     const claimedKey = randomUUID()
     const claimedCode = randomPickupCode()
     const claimedId = `ord_claimed_${suffix}`
     await insertCloudOrder({
       id: claimedId, orderNo: `ORD-CLAIMED-${suffix}`, key: claimedKey, code: claimedCode,
-      expiresAt: pastExpiry(), pickupStatus: 'claimed',
+      expiresAt: pastExpiry(), pickupStatus: 'claimed', pickupClaimedAt: claimedAt,
+      taskStatus: 'awaiting_payment', amountCents: 80,
     })
     const claimedReplay = await capture(() => memberOrders.create(userA, dtoA, claimedKey))
-    if (claimedReplay.thrown) fail(`过期 claimed 半完成不得抛错: ${JSON.stringify(claimedReplay)}`)
+    if (claimedReplay.thrown) fail(`已认领过期窗口回放不得抛错: ${JSON.stringify(claimedReplay)}`)
     const claimedView = claimedReplay.body as { id: string; pickupStatus: string; payStatus: string; pickupCode: string | null }
-    if (claimedView.id !== claimedId) fail('过期 claimed 必须回放原单')
-    if (claimedView.pickupStatus !== 'expired' || claimedView.payStatus !== 'closed') {
-      fail(`过期 claimed 应为 expired/closed，实际 ${claimedView.pickupStatus}/${claimedView.payStatus}`)
+    if (claimedView.id !== claimedId) fail('已认领过期窗口必须回放原单')
+    if (claimedView.pickupStatus !== 'claimed' || claimedView.payStatus !== 'unpaid') {
+      fail(`已认领租约必须仍是 claimed/unpaid，实际 ${claimedView.pickupStatus}/${claimedView.payStatus}`)
     }
-    if (claimedView.pickupCode) fail('过期 claimed 不得再露出到机码')
-    if (await markPaidAuditCount(claimedId) !== 0) fail('过期 claimed 不得 markPaid')
-    pass('T8c pending/claimed 过期窗口走 expireIfNeeded，不 markPaid')
+    if (claimedView.pickupCode) fail('已认领回放不得再露出到机码')
+    if (await markPaidAuditCount(claimedId) !== 0) fail('已认领回放不得由手机 markPaid')
+    const claimedRow = await prisma.order.findUniqueOrThrow({ where: { id: claimedId } })
+    if (isPickupWindowClosed(claimedRow)) fail('claimed 活租约不得判定窗口关闭')
+    if (claimedRow.printTaskId) fail('已认领回放不得预建 PrintTask')
+    const claimedDetail = await memberOrders.detail(userA, claimedId)
+    if (claimedDetail.pickupStatus !== 'claimed' || claimedDetail.payStatus !== 'unpaid' || claimedDetail.pickupCode) {
+      fail('detail 不得把活租约过期或露出到机码')
+    }
+    const claimedListed = (await memberOrders.listCloud(userA)).find((row) => row.id === claimedId)
+    if (!claimedListed) fail('已认领过期窗口订单必须仍能在 listCloud 找回')
+    if (claimedListed.pickupStatus !== 'claimed' || claimedListed.payStatus !== 'unpaid' || claimedListed.pickupCode) {
+      fail('listCloud 不得把活租约过期或露出到机码')
+    }
+
+    const liveCodeKey = randomUUID()
+    const liveCode = randomPickupCode()
+    const liveCodeId = `ord_claimed_livecode_${suffix}`
+    await insertCloudOrder({
+      id: liveCodeId, orderNo: `ORD-CLAIMED-LIVE-${suffix}`, key: liveCodeKey, code: liveCode,
+      expiresAt: futureExpiry(), pickupStatus: 'claimed', pickupClaimedAt: claimedAt,
+      taskStatus: 'awaiting_payment', amountCents: 80,
+    })
+    const liveCodeView = await memberOrders.create(userA, dtoA, liveCodeKey)
+    if (liveCodeView.pickupStatus !== 'claimed' || liveCodeView.pickupCode) {
+      fail(`窗口未到的 claimed 也不得把到机码回给手机，实际 status=${liveCodeView.pickupStatus} code=${liveCodeView.pickupCode}`)
+    }
+
+    const reclaimUnpaid = await pickup.claim(claimedCode, terminalId)
+    if (reclaimUnpaid.released !== false || reclaimUnpaid.orderId !== claimedId || !reclaimUnpaid.paymentSessionToken) {
+      fail('已认领过期窗口同机再 claim 必须走幂等租约并仍给付款令牌')
+    }
+    const afterReclaim = await prisma.order.findUniqueOrThrow({ where: { id: claimedId } })
+    if (afterReclaim.pickupStatus !== 'claimed' || afterReclaim.payStatus !== 'unpaid') {
+      fail(`再 claim 不得拆租约，实际 ${afterReclaim.pickupStatus}/${afterReclaim.payStatus}`)
+    }
+    const claimedPaid = await orderStatus.markPaid(claimedId, { paymentSource: 'offline', operatorId: 'verify-t8c' })
+    if (claimedPaid.payStatus !== 'paid' || claimedPaid.pickupStatus !== 'claimed') {
+      fail(`已认领过期窗口必须能线下入账且保持 claimed，实际 ${claimedPaid.payStatus}/${claimedPaid.pickupStatus}`)
+    }
+    const releasedClaimed = await pickup.release(claimedId, terminalId, reclaimUnpaid.paymentSessionToken)
+    if (!releasedClaimed.taskId) fail('已认领过期窗口入账后必须能 release')
+    const releasedClaimedRow = await prisma.order.findUniqueOrThrow({ where: { id: claimedId } })
+    if (releasedClaimedRow.pickupStatus !== 'used' || releasedClaimedRow.printTaskId !== releasedClaimed.taskId) {
+      fail(`release 后必须 used，实际 ${releasedClaimedRow.pickupStatus}/${releasedClaimedRow.printTaskId}`)
+    }
+
+    const claimedPaidKey = randomUUID()
+    const claimedPaidCode = randomPickupCode()
+    const claimedPaidId = `ord_claimed_paid_${suffix}`
+    await insertCloudOrder({
+      id: claimedPaidId, orderNo: `ORD-CLAIMED-PAID-${suffix}`, key: claimedPaidKey, code: claimedPaidCode,
+      expiresAt: pastExpiry(), pickupStatus: 'claimed', pickupClaimedAt: claimedAt,
+      taskStatus: 'awaiting_payment', amountCents: 80,
+      payStatus: 'paid', paymentSource: 'offline', paidAt: new Date(),
+    })
+    const claimedPaidView = await memberOrders.create(userA, dtoA, claimedPaidKey)
+    if (claimedPaidView.pickupStatus !== 'claimed' || claimedPaidView.payStatus !== 'paid' || claimedPaidView.pickupCode) {
+      fail(`已认领已付过期窗口必须保持 claimed/paid/无码，实际 ${claimedPaidView.pickupStatus}/${claimedPaidView.payStatus}`)
+    }
+    const paidReclaim = await pickup.claim(claimedPaidCode, terminalId)
+    if (!paidReclaim.released || !paidReclaim.taskId) fail('已认领已付过期窗口同机再 claim 必须直接 release')
+    pass('T8c claimed 活租约不被手机过期；无码；同机可 markPaid/release；未认领过期仍收敛')
 
     const paidKey = randomUUID()
     const paidCode = randomPickupCode()
@@ -590,9 +684,14 @@ async function main(): Promise<void> {
       where: { endUserId: { in: [userA, userB] } },
       select: { id: true },
     })).map((row) => row.id)
-    if (orderIds.length) await prisma.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
+    if (orderIds.length) {
+      await prisma.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
+      await prisma.order.updateMany({ where: { id: { in: orderIds } }, data: { printTaskId: null } })
+    }
+    await prisma.printTask.deleteMany({
+      where: { OR: [{ id: { in: extraPrintTaskIds } }, { endUserId: { in: [userA, userB] } }] },
+    })
     await prisma.order.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
-    if (extraPrintTaskIds.length) await prisma.printTask.deleteMany({ where: { id: { in: extraPrintTaskIds } } })
     await prisma.piiFinding.deleteMany({ where: { task: { endUserId: { in: [userA, userB] } } } })
     await prisma.documentProcessTask.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
     await prisma.fileObject.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
