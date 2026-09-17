@@ -23,6 +23,12 @@ function mustContain(source, needles, message) {
   else fail(`${message}, missing: ${missing.join(' | ')}`)
 }
 
+function mustNotContain(source, needles, message) {
+  const present = needles.filter((needle) => source.includes(needle))
+  if (present.length === 0) pass(message)
+  else fail(`${message}, unexpectedly present: ${present.join(' | ')}`)
+}
+
 console.log('\n=== terminal-agent print-scan safety verification ===')
 
 const db = read('src/agent/db.ts')
@@ -30,6 +36,8 @@ const taskRunner = read('src/agent/task-runner.ts')
 const heartbeat = read('src/agent/heartbeat.ts')
 const types = read('src/agent/types.ts')
 const index = read('src/index.ts')
+const instanceLock = read('src/agent/instance-lock.ts')
+const tempCleanup = read('src/agent/print-task-temp-cleanup.ts')
 
 mustContain(
   db,
@@ -60,6 +68,41 @@ mustContain(
   ['isDatabaseAvailable(db)', 'localTaskDatabaseAvailable'],
   'agent entrypoint must wire db availability into heartbeat',
 )
+
+mustContain(
+  instanceLock,
+  ["openSync(pidFile, 'wx'", 'TASKLIST_FAIL_CLOSED', 'SUCCESSOR_PID_GUARD', 'OWNED_INODE_STILL_AT_PATH'],
+  'instance lock must exclusive-create, fail-closed on tasklist, and never release a successor',
+)
+
+mustContain(
+  tempCleanup,
+  ['lstatSync', 'task_[A-Za-z0-9_-]', 'PrintTaskTempCleanupError'],
+  'print-task temp cleanup must lstat eligible task_* files and fail closed on removal errors',
+)
+
+if (/\bstatSync\s*\(/.test(tempCleanup)) {
+  fail('print-task temp cleanup must not follow symlinks via statSync')
+} else {
+  pass('print-task temp cleanup must not follow symlinks via statSync')
+}
+
+mustNotContain(
+  taskRunner,
+  ['cleanupCrashLeftoverPrintTaskTemps'],
+  'claim/print loop must not sweep temp files (would delete in-flight downloads)',
+)
+
+{
+  const acquire = index.indexOf('acquireLock()')
+  const cleanup = index.indexOf('cleanupCrashLeftoverPrintTaskTemps()')
+  const runner = index.indexOf('startTaskRunner(')
+  if (acquire >= 0 && cleanup > acquire && runner > cleanup) {
+    pass('startup must acquire lock, then clean leftovers, then start claim/print')
+  } else {
+    fail('startup order must be acquireLock → leftover cleanup → startTaskRunner')
+  }
+}
 
 if (failed > 0) {
   console.error(`\nverify-print-scan-agent failed: ${failed} issue(s)`)
