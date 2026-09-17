@@ -15,9 +15,15 @@ run `35229197747` 已通过：默认 API 目录、PM2 进程名、回环健康�
   健康后立即退出；运行目录同步时额外排除 `apps/{kiosk,admin,partner}/dist`，因此不删除或替换
   前端产物副本，也不覆盖 Kiosk/Admin/Partner nginx 目录、不重载 nginx、不回写静态
   `latest-deployed.txt`。
-- **当前证据边界：** 本条仅是源码候选，尚未 push、PR、合并或生产执行；
-  `DEPLOY_API_ENABLED=false` 未打开。完成本地验证和 PR CI 后，才允许短时打开门禁，以
-  `ci_run_id=34992685756`、`deploy_scope=api-only` 部署精确 `50483cd...`，随后立即关闭门禁。
+- **控制面复核：** 首轮控制面 PR #1040 已于 2026-09-17 合并为 `3d35759ee`，PR CI run
+  `35232660410` 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 全部通过。
+  合并后、打开生产闸门前发现第二层 fail-closed 缺口：服务器检出旧目标 `50483cd...` 后原本会执行
+  该旧提交内尚不认识 `DEPLOY_SCOPE` 的 helper，导致 API-only 保护失效。当前后继候选改为由
+  GitHub Runner 从工作流自身提交打包 helper，传入服务器后做 SHA-256 校验并从 `/tmp` 执行；目标
+  提交只提供待部署应用源码，不再反向决定发布控制面版本。
+- **当前证据边界：** `DEPLOY_API_ENABLED=false` 始终未打开，生产未发生写入。后继控制面候选完成
+  本地验证、独立复审和 PR CI 后，才允许短时打开门禁，以 `ci_run_id=34992685756`、
+  `deploy_scope=api-only` 部署精确 `50483cd...`，随后立即关闭门禁。
 
 2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
 失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run

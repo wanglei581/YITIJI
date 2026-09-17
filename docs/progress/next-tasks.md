@@ -1,5 +1,19 @@
 # 下一步任务
 
+## 2026-09-17：生产 API-only 发布 `50483cd...`
+
+**当前唯一发布阻塞：** 首轮控制面 PR #1040 已合并且三项 CI 全绿，但合并后复核发现旧目标提交会
+携带旧版发布 helper。后继控制面候选必须完成本地门禁、Hermes 官方
+`deepseek/deepseek-v4-flash` `xhigh` 复审、PR 三项 CI 和合并，确保 helper 来自工作流自身提交，
+经 SHA-256 校验后从服务器临时文件执行，并在任何生产写入前比对目标生产闸门键。
+
+**随后按已授权窗口执行：** 短时设置 `DEPLOY_API_ENABLED=true`，手动派发
+`ci_run_id=34992685756`、`deploy_scope=api-only`，确认发布 job 已启动后立即恢复 `false`；仅允许
+备份、additive migration、API 构建、PM2 重启与健康检查。发布后验证 `DEPLOY_SOURCE.txt` 精确等于
+`50483cd28096780c5e6c4260dde86dec36e7d99f`、迁移 `20260913210000_add_scan_input_lockout_telemetry`
+已应用、DTO 含 `scanInputHealth`、公网/回环健康为 200、三端前端资产未变。Windows Agent 保持停止，
+不得执行打印或扫描。
+
 ## 2026-09-15 R11：PR #1037 只剩新 head CI 与合并闭环
 
 **已关闭的问题：** run `34984568841` 的 `postgres-readiness` 与 `build-and-verify` 都在

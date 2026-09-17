@@ -193,6 +193,55 @@ if (deploySource.includes('--force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GA
     staticMarkers.every((marker) => deployWorkflow.indexOf(marker) > apiOnlyExitAt)
   if (staticAfterExit) pass('API-only 在 nginx/static/latest-deployed 操作之前退出')
   else fail('API-only 必须在所有 nginx/static/latest-deployed 操作之前 exit 0')
+
+  const packagedHelper =
+    deployWorkflow.includes('sparse-checkout: .github/scripts/deploy-api-release.sh') &&
+    deployWorkflow.includes('sparse-checkout-cone-mode: false') &&
+    deployWorkflow.includes('payload=$(gzip -c "$HELPER" | base64 -w 0)') &&
+    deployWorkflow.includes('CONTROL_PLANE_DEPLOY_HELPER_SHA256')
+  if (packagedHelper) pass('工作流从自身提交打包 API 发布 helper，并携带 SHA-256')
+  else fail('工作流必须打包当前控制面 helper；不能在检出旧目标后读取目标提交里的旧脚本')
+
+  const controlPlaneRef =
+    /ref:\s*\$\{\{\s*github\.sha\s*\}\}/.test(deployWorkflow) &&
+    !/ref:\s*\$\{\{\s*steps\.target\.outputs\.sha\s*\}\}/.test(deployWorkflow)
+  if (controlPlaneRef) pass('控制面 helper 固定取自工作流自身提交，而非待部署目标提交')
+  else fail('打包 helper 的 checkout 必须固定 ref: github.sha，且不得改为目标 SHA')
+
+  const verifiedHelper =
+    deployWorkflow.includes(
+      'printf \'%s\' "$CONTROL_PLANE_DEPLOY_HELPER_B64" | base64 --decode | gzip -d'
+    ) &&
+    deployWorkflow.includes('sha256sum -c -') &&
+    deployWorkflow.includes('bash "$CONTROL_PLANE_HELPER"') &&
+    !deployWorkflow.includes('bash .github/scripts/deploy-api-release.sh')
+  if (verifiedHelper) pass('远端校验并执行控制面 helper，不执行目标提交内的旧 helper')
+  else fail('远端必须校验并执行控制面临时 helper，禁止执行目标提交内的发布脚本')
+
+  if (
+    deploySource.includes(
+      ': "${CONTROL_PLANE_DEPLOY_HELPER_SHA256:?CONTROL_PLANE_DEPLOY_HELPER_SHA256 is required}"'
+    ) &&
+    deploySource.includes('control_plane_helper_sha256=$CONTROL_PLANE_DEPLOY_HELPER_SHA256')
+  ) {
+    pass('DEPLOY_SOURCE 同时记录目标应用 SHA 与控制面 helper SHA-256')
+  } else {
+    fail('发布脚本必须要求并记录控制面 helper SHA-256，供生产追溯')
+  }
+
+  const targetGateCheckAt = deploySource.indexOf('=== 0a. 控制面生产闸门必须被目标提交认识 ===')
+  const targetBuildAt = deploySource.indexOf('pnpm install --frozen-lockfile')
+  const targetBackupAt = deploySource.indexOf('pg_dump "$DBURL"')
+  if (
+    targetGateCheckAt >= 0 &&
+    targetGateCheckAt < targetBuildAt &&
+    targetGateCheckAt < targetBackupAt &&
+    deploySource.includes('for GATE_KEY in "${REQUIRED_PRODUCTION_GATES[@]}"')
+  ) {
+    pass('控制面与旧目标的生产闸门键在构建、备份和迁移前完成比对')
+  } else {
+    fail('发布 helper 必须在目标构建和生产写入前比对控制面与目标的生产闸门键')
+  }
 }
 
 // ── 前端版的同一形态：部署脚本传 VITE_API_MODE=http，前端必须在没传时炸掉 ──────

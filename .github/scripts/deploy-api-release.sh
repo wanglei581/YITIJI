@@ -16,6 +16,7 @@ fi
 : "${CI_RUN:?CI_RUN is required}"
 : "${DEPLOY_PATH:?DEPLOY_PATH is required}"
 : "${DEPLOY_SCOPE:?DEPLOY_SCOPE is required}"
+: "${CONTROL_PLANE_DEPLOY_HELPER_SHA256:?CONTROL_PLANE_DEPLOY_HELPER_SHA256 is required}"
 
 case "$DEPLOY_SCOPE" in
   api-only | full) ;;
@@ -38,6 +39,15 @@ HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3010/api/v1/health}"
 API_DIR="$RUNTIME_ROOT/services/api"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_PREFIX="$BACKUP_ROOT/pre-$TARGET_SHA-$TS"
+
+# 这里的键必须与目标提交 services/api/src/config/production-runtime-gates.ts 里
+# NODE_ENV=production 时 fail-closed 要求显式为 true 的 env 一一对应。
+# 0a 先确认目标至少认识控制面将持久化的每个键；3c 再用目标构建产物拦截目标额外要求、
+# 但控制面尚未认识的键。两边都必须在备份、迁移和运行目录写入之前失败。
+REQUIRED_PRODUCTION_GATES=(
+  PRINT_REQUIRE_PII_SCAN
+  PRINT_REQUIRE_PRINTER_ONLINE
+)
 
 # 备份保留策略：按发布分组保留最近 N 组，其余删除。
 #
@@ -120,6 +130,20 @@ prune_old_backups() {
 echo "=== 0. 校验源码位于目标提交 ==="
 test "$(git -C "$DEPLOY_PATH" rev-parse HEAD)" = "$TARGET_SHA"
 
+echo "=== 0a. 控制面生产闸门必须被目标提交认识 ==="
+TARGET_GATES_SOURCE="$DEPLOY_PATH/services/api/src/config/production-runtime-gates.ts"
+test -f "$TARGET_GATES_SOURCE"
+MISSING_TARGET_GATES=""
+for GATE_KEY in "${REQUIRED_PRODUCTION_GATES[@]}"; do
+  if ! grep -Eq "(^|[^A-Z_])${GATE_KEY}([^A-Z_]|$)" "$TARGET_GATES_SOURCE"; then
+    MISSING_TARGET_GATES="$MISSING_TARGET_GATES $GATE_KEY"
+  fi
+done
+if [ -n "$MISSING_TARGET_GATES" ]; then
+  echo "::error::目标提交不认识控制面要求的生产闸门键：$MISSING_TARGET_GATES" >&2
+  exit 1
+fi
+
 echo "=== 0b. 磁盘空间闸门（必须在任何写操作之前）==="
 # 为什么放在这里：步骤 2 的 pg_dump 是本脚本第一次写盘。
 # 2026-08-09 真实事故是备份把 40GB 根分区撑到 100%，此时正在运行的 API 与
@@ -159,21 +183,10 @@ if [ -z "$DBURL" ]; then
   exit 1
 fi
 
-# 这里的键必须与 services/api/src/config/production-runtime-gates.ts 里
-# NODE_ENV=production 时 fail-closed 要求显式为 true 的 env 一一对应。
-# 3c 预检把它们视为即将写入；3b 再持久化进运行目录 .env。
-# 少一个，新 API 在 PM2 重启后就拒绝启动 —— 而那时备份、迁移、rsync 都已经做完了。
-#
 # 2026-09-06 实测：#790 加了 PRINT_REQUIRE_PRINTER_ONLINE 闸门，这里没跟着加，
 # 结果 35af2263b 发布走完全部步骤后健康检查失败，pm2 崩溃循环 17 次，线上 API
 # 中断到手工补 .env 为止。verify:deploy-gates-in-sync 门禁现在会在 CI 里对这张
 # 清单和 production-runtime-gates.ts 做集合比对，两边不一致直接红。
-#
-# 必须在 3c 之前定义：预检 --force-true 引用本数组。
-REQUIRED_PRODUCTION_GATES=(
-  PRINT_REQUIRE_PII_SCAN
-  PRINT_REQUIRE_PRINTER_ONLINE
-)
 
 echo "=== 1b. 在源码检出内构建 API（不写运行目录，供 3c 预检使用目标提交闸门）==="
 # 只写 DEPLOY_PATH（git 检出），不碰 RUNTIME_ROOT。失败时线上未动。
@@ -289,6 +302,7 @@ cat > "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" <<EOF
 source=origin/main@$TARGET_SHA
 deployed_at=$(date -Is)
 ci_run=$CI_RUN
+control_plane_helper_sha256=$CONTROL_PLANE_DEPLOY_HELPER_SHA256
 backup=$BACKUP_PREFIX.dump
 runtime_backup=$BACKUP_PREFIX.runtime
 rollback=restore $BACKUP_PREFIX.runtime then if migration rollback required restore $BACKUP_PREFIX.dump
