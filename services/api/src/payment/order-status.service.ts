@@ -67,6 +67,36 @@ export const CLAIMED_UNPAID_LEASE_EXPIRE_DATA = {
   payStatus: 'closed',
 } as const
 
+/**
+ * 线上入账 updateMany 的履约窗口：必须在**写入时**仍可出纸。
+ * 快照判断不够 —— sweeper 可能在 findUnique 与 CAS 之间把单写成 expired+closed，
+ * 而 late 回调的 fromStatuses 含 closed，会把已无法履约的单重新写成 paid。
+ *
+ * - 非 claimed（含默认 none、pending）：无截止（一体机现场单）或 pickupCodeExpiresAt 仍在未来；
+ * - claimed：pickupClaimedAt 必须存在且仍在 payment-session TTL 内（精确边界与 isLive 一致：gt）；
+ * - expired/cancelled 一律排除。
+ */
+export function fulfillablePickupWindowWhere(now: Date = new Date()) {
+  const leaseStartedAfter = new Date(now.getTime() - paymentSessionTtlMs())
+  return {
+    pickupStatus: { notIn: ['expired', 'cancelled'] },
+    OR: [
+      {
+        pickupStatus: { not: 'claimed' },
+        OR: [
+          { pickupCodeExpiresAt: null },
+          { pickupCodeExpiresAt: { gt: now } },
+        ],
+      },
+      {
+        pickupStatus: 'claimed',
+        printTaskId: null,
+        pickupClaimedAt: { gt: leaseStartedAfter },
+      },
+    ],
+  }
+}
+
 /** 取件窗口已关。claimed 只看履约租约本身，过期后不再退回原 pickupCodeExpiresAt。 */
 export function isPickupWindowClosed(
   order: {
@@ -285,7 +315,11 @@ export class OrderStatusService {
       let res: { count: number }
       try {
         res = await this.prisma.order.updateMany({
-          where: { id: orderId, payStatus: { in: fromStatuses } }, // compare-and-set
+          where: {
+            id: orderId,
+            payStatus: { in: fromStatuses },
+            ...fulfillablePickupWindowWhere(),
+          },
           data: {
             payStatus: 'paid',
             paymentSource: channel,
@@ -302,9 +336,12 @@ export class OrderStatusService {
       if (res.count === 0) {
         const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
         if (fresh?.payStatus === 'paid' && fresh.paymentSource === channel) return fresh
-        throw new BadRequestException(
-          fresh?.payStatus === 'paid' ? 'ORDER_ALREADY_PAID' : 'ORDER_INVALID_TRANSITION',
-        )
+        if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+        if (fresh && isPickupWindowClosed(fresh)) {
+          await this.recordOnlinePaidPendingRefund(fresh, { channel, attemptId, channelTxnNo, late })
+          throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
+        }
+        throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
       settled = true
       break
