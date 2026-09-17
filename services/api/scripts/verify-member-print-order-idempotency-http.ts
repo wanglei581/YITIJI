@@ -253,6 +253,12 @@ async function main(): Promise<void> {
       fail(`非法 header 应为 400 IDEMPOTENCY_KEY_INVALID，实际 ${JSON.stringify(invalid)}`)
     }
     if (await prisma.order.count({ where: { endUserId: userA } }) !== 0) fail('缺/空白/非法 key 不得建单')
+    const upperMissing = randomUUID().toUpperCase()
+    const upperCreate = await request({ headers: { 'idempotency-key': upperMissing } })
+    if (upperCreate.status !== 400 || errorCode(upperCreate) !== 'IDEMPOTENCY_KEY_INVALID') {
+      fail(`大写 UUID 应为 400 IDEMPOTENCY_KEY_INVALID，实际 ${JSON.stringify(upperCreate)}`)
+    }
+    if (await prisma.order.count({ where: { endUserId: userA } }) !== 0) fail('大写 key 不得建单')
     pass('H1 缺/空白/非法 Idempotency-Key → 400，零行 Order')
 
     const bodyOnlyKey = randomUUID()

@@ -6,7 +6,7 @@ import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService } from '../payment/order-quote.service'
 import { createPaymentSessionToken } from '../payment/payment-session-token'
-import { OrderStatusService } from '../payment/order-status.service'
+import { isPickupWindowClosed, OrderStatusService } from '../payment/order-status.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
@@ -267,11 +267,30 @@ export class PackageOrderService {
         error: { code: 'IDEMPOTENCY_KEY_REUSED', message: '该请求标识已用于另一次打印参数，请更换标识后重试' },
       })
     }
-    if (row.amountCents === 0 && row.payStatus === 'unpaid') {
-      await this.orderStatus.markPaid(row.id, { paymentSource: 'free' })
+    await this.expireIfNeeded(row)
+    let order = await this.requireOwned(endUserId, row.id)
+    if (order.amountCents === 0 && order.payStatus === 'unpaid' && !isPickupWindowClosed(order)) {
+      await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
+      order = await this.requireOwned(endUserId, row.id)
     }
-    const order = await this.requireOwned(endUserId, row.id)
     return this.toView(order, this.visibleCode(order))
+  }
+
+  private async expireIfNeeded(order: {
+    id: string
+    pickupStatus: string
+    pickupCodeExpiresAt: Date | null
+    payStatus: string
+  }): Promise<void> {
+    if (!['pending', 'claimed'].includes(order.pickupStatus) || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
+    await this.prisma.order.updateMany({
+      where: { id: order.id, pickupStatus: { in: ['pending', 'claimed'] }, printTaskId: null },
+      data: {
+        pickupStatus: 'expired',
+        taskStatus: 'expired',
+        payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
+      },
+    })
   }
 
   private async requireOwned(endUserId: string, orderId: string) {

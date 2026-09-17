@@ -278,6 +278,12 @@ async function main(): Promise<void> {
       fail(`非法 header 应为 400 IDEMPOTENCY_KEY_INVALID，实际 ${JSON.stringify(invalid)}`)
     }
     if (await prisma.order.count({ where: { endUserId: userA } }) !== 0) fail('缺/空白/非法 key 不得建单')
+    const upperMissing = randomUUID().toUpperCase()
+    const upperCreate = await request({ headers: { 'idempotency-key': upperMissing } })
+    if (upperCreate.status !== 400 || errorCode(upperCreate) !== 'IDEMPOTENCY_KEY_INVALID') {
+      fail(`大写 UUID 应为 400 IDEMPOTENCY_KEY_INVALID，实际 ${JSON.stringify(upperCreate)}`)
+    }
+    if (await prisma.order.count({ where: { endUserId: userA } }) !== 0) fail('大写 key 不得建单')
     pass('H1 缺/空白/非法 Idempotency-Key → 400，零行 Order')
 
     const bodyOnlyKey = randomUUID()
@@ -311,6 +317,19 @@ async function main(): Promise<void> {
     }
     if (await prisma.order.count({ where: { endUserId: userA } }) !== 1) fail('混合大小写回放不得第二张单')
     pass('H3 Idempotency-Key / IDEMPOTENCY-KEY / idempotency-key 都到达 controller')
+
+    const caseKey = randomUUID()
+    const caseCreated = await request({ headers: { 'idempotency-key': caseKey } })
+    if (caseCreated.status !== 200 && caseCreated.status !== 201) fail(`小写 key 应建单，实际 ${JSON.stringify(caseCreated)}`)
+    const caseUpper = await request({ headers: { 'idempotency-key': caseKey.toUpperCase() } })
+    if (caseUpper.status !== 400 || errorCode(caseUpper) !== 'IDEMPOTENCY_KEY_INVALID') {
+      fail(`已有小写 key 后再打大写应为 400 INVALID，实际 ${JSON.stringify(caseUpper)}`)
+    }
+    if (await prisma.order.count({ where: { idempotencyKey: caseKey } }) !== 1) fail('大写重试不得改小写那一行')
+    if (await prisma.order.count({ where: { idempotencyKey: caseKey.toUpperCase() } }) !== 0) {
+      fail('大写 UUID 不得另建一行')
+    }
+    pass('H3b 大写 UUID 值拒绝且零额外 Order（header 名大小写仍不敏感）')
 
     const lostKey = randomUUID()
     const lost = await request({ headers: { 'idempotency-key': lostKey } })
