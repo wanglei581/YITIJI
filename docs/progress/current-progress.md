@@ -1,5 +1,52 @@
 # 当前开发进度
 
+2026-09-17 **R12：材料包 `POST /orders/package` 的丢响应重复建单已完成源码与本地收口，候选尚未进入 PR。**
+本轮从干净 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f` 建立隔离分支
+`codex/package-order-idempotency-r12-20260917`。运行时代码锚点为
+`f9a48684b201bb6746b2ee46261aeee1a1c3edff`；该锚点包含四个提交：后端耐久幂等
+`dd1434d89`、小程序持久键接线 `646fc5f6d`、对抗复审修复 `daa1f5484`、前端小写键契约
+`f9a48684b`。未新增 Prisma 字段或迁移，复用现有 `Order.idempotencyKey`、
+`idempotencyPayloadHash` 与 `(endUserId, idempotencyKey)` 唯一约束。
+
+- **后端闭环：** `POST /orders/package` 强制小写 UUID 形态的 `Idempotency-Key`；同会员、同键、
+  同 payload 回放原订单与原到机码，同键改文件顺序、`pageRange`、份数、色彩或单双面返回
+  `409 IDEMPOTENCY_KEY_REUSED`，跨会员同键互不复用。并发首次请求由数据库唯一约束收敛，
+  任意 `P2002` 只按 `(endUserId,key)` 做一次本人 scoped lookup；没有本人行就原样抛出。
+  免费半完成单在过期回放时先收敛为 `expired/closed`，不再调用 `markPaid` 抛
+  `ORDER_PICKUP_WINDOW_CLOSED`。
+- **小程序闭环：** 材料包确认页在 POST 前用 `wx.getRandomValues` 铸造并读回核验小写 UUID，
+  按会员 + 有序文件/参数指纹持久化；丢 200、401 补签、普通网络失败、页面重进继续复用原键，
+  收到 `orderId` 先落盘再跳转。单件打印与材料包两个 API 入口都会在 `wx.request` 前拒绝大写或
+  畸形键。存储中不可复用的未落定键可被就地替换；已带 `orderId` 的旧键保留并 fail-closed，
+  不抹掉唯一的订单找回线索。现有材料包用户路径仍是**整份文件打印**：草稿、报价、建单只传
+  `fileId`；后端预留的逐文件 `pageRange` 尚无前端选择入口，不得写成已开放能力。
+- **对抗复审修复：** Grok 首轮在 `646fc5f6d` 上发现一条 P1：服务端 UUID 正则带 `/i`，而
+  数据库 TEXT 唯一区分大小写，同一 UUID 改成大写可建第二张单；另发现过期免费单回放异常。
+  两条均由 `daa1f5484` 修复并加 service/HTTP 回归。Claude 随后在 `f9a48684b` 对齐两个
+  小程序幂等模块与两个建单入口。最终只读复审：Grok `GO`（session
+  `afe981b8-e8ae-4b53-ab6d-0f5a1098204e`）、Agy `GO`（session
+  `085e86cc-ea50-4d69-88ab-2f21768ec134`）；Claude 是前端 writer，不作为独立批准；Hermes
+  DeepSeek V4 Flash xhigh 连续上游 `502`，状态为 **FAILED**，不得算五家一致通过。
+- **本机证据：** 小程序 `verify:static` 全链通过（含 25 条材料包幂等测试、148 条生命周期测试）；
+  API `verify:package-order-fulfillment`、材料包 service/HTTP 幂等、单件 service/HTTP 幂等全部
+  `ALL PASS`；根 `pnpm typecheck` 十个 workspace 通过；`verify:repository-integrity`、
+  `verify:ci-gate-coverage`（468 个门禁脚本）、`verify:deploy-gates-in-sync`、`graph:check`、
+  `git diff --check` 均退出 `0`。新增关键断言均做反向变异并按退出码判红。
+- **基线与安装包证据：** 基线 main CI run `34992685756` 在精确 SHA `50483cd28` 的四个 job
+  全绿；Windows installer workflow run `35002676954` 生成 `0.4.11` unsigned EXE/MSI，来源 SHA
+  与 staging manifest 均为 `50483cd28`。它只可作为受控真机验收候选，未安装、未签名，且不是
+  本 R12 新 tip 的发布证据。
+- **证据边界：** `SOURCE / LOCAL: GO`；独立复审为 Grok/Agy `GO`、Hermes `FAILED`；
+  `PR / CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。本分支未 push、未开 PR、未合并；
+  未进微信开发者工具、未接真实 API/账号跑材料包、未安装 Windows 候选、未操作奔图、未部署。
+
+**已知非阻塞遗留：** `terminalId` 的 UUID/terminalCode 别名与 `pageRange` 前后空白没有做语义
+归一，同键但改写等价文本会 409；当前唯一小程序调用方固定传终端 UUID 且不传 `pageRange`，
+所以不是当前用户路径缺陷。建单 200 后若 `redirectTo` 失败并立即杀进程，草稿已清，用户需从
+「我的 · 打印订单」找回或重选同一组文件触发恢复；不会自动再 POST。`print-order-idempotency.js`
+与 `package-order-idempotency.js` 已分别为 642 / 516 行，本轮是资金安全修复未拆分；下一次再加
+能力前必须先评估抽取共享的存储/铸键内核，不能继续堆叠。
+
 2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
 失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
 `34984568841`。`postgres-readiness / Core verify suites on PG` 与
