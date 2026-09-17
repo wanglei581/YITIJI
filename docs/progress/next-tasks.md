@@ -1,11 +1,36 @@
 # 下一步任务
 
+## 2026-09-17 小程序与一体机跨端联动商业收口顺序
+
+当前唯一代码候选是 `d30d2f965`（分支
+`codex/material-package-idempotency-closeout-20260917`，基线
+`origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`，含 PR #1040 / #1041）。当前只达到
+`SOURCE / LOCAL: GO`；不得写成已上线、已发布、已真机或已商用。
+
+| 顺序 | 门禁 | 必做事项 | 达标证据 |
+|---|---|---|---|
+| 1 | 候选进入主线 | 经动作时授权后 push，并只维护一个集成 PR；PR 必须指向 `d30d2f965` 或其仅含文档收尾的直接后继 SHA，不能继续合并旧 tip `d9d79f268`。等待 final-head 必需 CI 全绿后再合并 | PR final head、全部 required checks、合并提交；`git merge-base --is-ancestor <final-head> origin/main` 退出 0 |
+| 2 | 生产发布准备 | 选择具名维护窗口；核对服务器当前 `DEPLOY_SOURCE.txt`、PM2、nginx Web Root、Node/pnpm、磁盘与容量；确认生产 PostgreSQL 已应用 `20260915170000_add_member_print_order_idempotency`，唯一索引与历史数据无冲突；迁移前备份，准备 API/数据库/前端回滚命令 | 维护窗口、精确部署 SHA、备份校验、迁移状态、容量检查、回滚演练记录。未授权不得部署、重启或迁移 |
+| 3 | API / Worker / 数据依赖上线 | API、Worker、Redis、PostgreSQL、对象存储、签名 URL、生产域名与 TLS 使用同一 release identity；材料包读路径过期写、`claimed` 租约、`used` 队列状态和逐份任务派生必须保持一致；监控 400/409、P2002 回放、`expired+paid`、打印失败与回流延迟 | 生产 provenance、健康/ready、迁移与索引、日志/指标/告警、只读冒烟和回滚后复核。HTTP 200 单独不构成 GO |
+| 4 | 微信开发者工具与 Trial | 用唯一发布源 `apps/miniapp/` 打开正确 AppID 项目；编译、包体/分包、Console/WXSS/Network；发布 Trial，使用 A/B 两账号走弱网丢响应、杀进程重进、401 补签、存储读写失败、终态重新下单、`claimed`/`used` 不误放行 | DevTools 项目路径、编译日志、Trial 版本号、逐页截图/录屏、网络请求与 A/B 隔离证据。完成前不提审、不写真机 GO |
+| 5 | 小程序合规与发布 | 核对业务域名、隐私保护指引、用户协议、类目、备案、客服入口、本地存储字段说明；完成体验版验收后再提审与发布 | 微信平台受理/审核/发布结果与线上版本号。上传、填表或点击下一步不等于审核通过 |
+| 6 | Windows Agent / 奔图真机 | 在目标 Windows 与配置项 `printerName` 指向的 `Pantum CM2800ADN Series` 上，以合入并部署的精确 SHA 走：建单→到机码→现场支付→claim→逐份出纸→失败/缺纸恢复→状态回传→小程序订单沉淀；同时验证临时文件删除与跨用户隔离 | 订单/任务/文件 hash、Agent 日志、打印机队列、实物出纸、状态回流、清理证据。不得假设 A3、云端扫描或未确认的彩色 API 值 |
+| 7 | 支付、退款与对账 | 材料包小程序内无 `wx.requestPayment`，费用在一体机现场支付；用真实渠道最小金额走支付通知、重复通知、失败/超时、部分打印失败、退款/冲正、渠道账单 diff，明确 `expired+paid` 运营处置 | 商户侧交易号、系统订单、回调验签、退款结果、账单对账与审计一致。未获授权不得真实扣款或退款 |
+| 8 | 运维与商业验收 | 建立监控、日志脱敏、备份恢复、值班/客服 SOP、存储满/旧码/错机/打印失败话术、隐私与留存删除核对、故障演练；由产品/运营/现场人员完成生产等价 UAT 并签字 | G4 发布就绪证据、G5 业务验收记录、G6 交接清单；责任人、SLA、已知限制和残余 backlog 明确 |
+
+必须按门禁逐级升级结论：主线和 CI 完成只能写 `SOURCE / CI: GO`；Trial 和手机真机完成后才能写
+`WECHAT DEVICE: GO`；Windows/奔图完整实物链路完成后才能写 `HARDWARE: GO`；服务器精确 SHA、生产健康、
+真实支付、回滚与 UAT 全部完成并获授权签字后，才允许写 `COMMERCIAL: GO`。
+
+当前已登记但不阻塞源码合入的后续治理：`package-confirm.js` 超过 900 行，新增能力前先拆分评估；
+GET 列表/详情会触发材料包过期 CAS 写，生产容量与只读副本策略需验证；客户端记录 TTL 与服务端永久键的
+边界依赖终端故障处置和客服 SOP；回放命中、P2002 兜底、`expired+paid` 尚无专用生产指标。
+
 ## 2026-09-17：生产 API-only 发布 `50483cd...`
 
-**当前唯一发布阻塞：** 首轮控制面 PR #1040 已合并且三项 CI 全绿，但合并后复核发现旧目标提交会
-携带旧版发布 helper。后继控制面候选必须完成本地门禁、Hermes 官方
-`deepseek/deepseek-v4-flash` `xhigh` 复审、PR 三项 CI 和合并，确保 helper 来自工作流自身提交，
-经 SHA-256 校验后从服务器临时文件执行，并在任何生产写入前比对目标生产闸门键。
+**当前生产发布阻塞：** 首轮控制面 PR #1040 已合入 `3d35759ee`，后继 helper 固定 PR #1041 已合入
+`origin/main@eb0f20341`。helper 来自工作流自身提交，经 SHA-256 校验后从服务器临时文件执行，
+并在任何生产写入前比对目标生产闸门键。这只证明控制面代码在 `main`，不代表生产已执行。
 
 **随后按已授权窗口执行：** 短时设置 `DEPLOY_API_ENABLED=true`，手动派发
 `ci_run_id=34992685756`、`deploy_scope=api-only`，确认发布 job 已启动后立即恢复 `false`；仅允许
