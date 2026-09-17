@@ -557,10 +557,51 @@ console.log('\n⑩ 打印参数取值与服务端 DTO 白名单一致')
   const quoteBlock = quoteIdx >= 0 ? confirmCode.slice(quoteIdx, confirmCode.indexOf('\n}', quoteIdx)) : ''
   assert(quoteBlock.includes('pkg.toWireDuplex(') && quoteBlock.includes('pkg.toWireColorMode('),
     '报价参数经同一对 wire 映射函数出去')
-  const createIdx = confirmCode.indexOf('api.createPackageOrder(')
-  const createBlock = createIdx >= 0 ? confirmCode.slice(createIdx, createIdx + 700) : ''
+  // 建单载荷现在由 `_orderPayload()` **单点构造**：幂等指纹算的和 POST 发出去的必须是
+  // 同一个对象，两处各拼一份迟早会分叉成「按一种参数算指纹、按另一种参数下单」——
+  // 本地以为没变而服务端算出另一个指纹就是 409，反过来则是白铸一个新键、第二张订单。
+  // 所以锚点从调用点挪到那个构造函数；验的仍是同一件事。
+  const payloadIdx = confirmCode.indexOf('_orderPayload() {')
+  const createBlock = payloadIdx >= 0 ? confirmCode.slice(payloadIdx, confirmCode.indexOf('\n  },', payloadIdx)) : ''
   assert(createBlock.includes('pkg.toWireDuplex(') && createBlock.includes('pkg.toWireColorMode('),
     '建单参数经**同一对**函数出去（与报价逐字同源）')
+  assert(/api\.createPackageOrder\(payload, \{ idempotencyKey:/.test(confirmCode),
+    'POST 发的就是 _orderPayload() 造出来的那一个对象，并带上幂等键')
+  assert(!/idempotenc/i.test(createBlock),
+    '幂等键不进 body（服务端从 Header 取，白名单 DTO 见到这个字段会整单 400）')
+  {
+    // 幂等键只走 Header，而且这条断言必须钉在 createPackageOrder 自己的函数体里：
+    // 同一个文件里 createCloudPrintOrder 也有一模一样的一行，按全文件判会恒真。
+    const at = api.indexOf('createPackageOrder(data, opts) {')
+    const body = at >= 0 ? api.slice(at, at + 700) : ''
+    assert(!!body, 'createPackageOrder 收 opts（缺了幂等键的调用必须在本地就被挡下来）')
+    assert(/header: \{ 'idempotency-key': idempotencyKey \}/.test(body),
+      'createPackageOrder 把幂等键放 Header（放 body 服务端读不到，照样 400）')
+    assert(/return Promise\.reject\(new Error\('创建材料包订单必须携带幂等键'\)\)/.test(body),
+      '缺键在本地就 reject（发出去只会得到一句被翻译成「请稍后重试」的 400）')
+  }
+  // 顺序：键先落住，**然后**才 POST。反过来等于把"响应丢在路上"原样留着 —— 那正是
+  // 幂等键唯一要防的那件事。用文件内位置判定：ensureKey 必须出现在建单调用之前。
+  {
+    const ensureIdx = confirmCode.indexOf('idem.ensureKey(')
+    const postIdx = confirmCode.indexOf('api.createPackageOrder(')
+    assert(ensureIdx > 0 && postIdx > ensureIdx, '先 ensureKey 落住幂等键，再 POST 建单')
+    assert(/idem\.rememberOrderId\(attempt\.account/.test(confirmCode),
+      '拿到 orderId 先落进发起这次提交的那位的记录（换人时也要落，否则那张订单再也找不回来）')
+    const rememberIdx = confirmCode.indexOf('idem.rememberOrderId(')
+    const identityIdx = confirmCode.indexOf('if (!this._sameIdentity(token)) return')
+    assert(rememberIdx > 0 && identityIdx > rememberIdx,
+      'orderId 落盘排在身份判定之前（记录属于发起时那一位，页面此刻可能已经换人）')
+    // 取 submitOrder 的函数体来判，而不是全文件：`_forgetIdempotencyRecord` 里那次
+    // clearRecord 是"确实跳走了"之后的正当清理，按全文件判会把它误伤成一条失败路径。
+    const submitAt = confirmCode.indexOf('submitOrder() {')
+    const submitBody = submitAt >= 0 ? confirmCode.slice(submitAt, confirmCode.indexOf('\n  goBack()', submitAt)) : ''
+    const catchAt = submitBody.indexOf('.catch((err) => {')
+    assert(catchAt > 0 && !submitBody.slice(catchAt).includes('idem.clearRecord('),
+      '请求失败的 catch 里一个 clearRecord 都没有（那个键可能正绑着一张已建成、只是响应丢了的订单）')
+    assert(/if \(this\._needsFreshKey\) \{[\s\S]{0,120}if \(!idem\.clearRecord\(account, fingerprint\)\) \{/.test(submitBody),
+      '409 之后换新键必须先清掉旧记录、并按 clearRecord 的返回值判成没清掉就不发 POST')
+  }
 
   // 正面禁令：四页的代码里不许再出现把 UI 取值直接当 wire 值发的写法。
   for (const page of CHAIN_PAGES) {
