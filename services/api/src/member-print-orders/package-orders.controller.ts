@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { CreatePackageOrderDto } from './dto/create-package-order.dto'
+import { assertMemberPrintOrderIdempotencyKey } from './member-print-order-create.service'
 import { PackageOrderService } from './package-order.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 
@@ -13,8 +14,13 @@ export class PackageOrdersController {
   constructor(private readonly packages: PackageOrderService) {}
 
   @Post()
-  async create(@CurrentEndUser() user: AuthedEndUser, @Body() dto: CreatePackageOrderDto) {
-    return ApiResponse.ok(await this.packages.create(user.endUserId, dto))
+  async create(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Body() dto: CreatePackageOrderDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    assertMemberPrintOrderIdempotencyKey(idempotencyKey)
+    return ApiResponse.ok(await this.packages.create(user.endUserId, dto, idempotencyKey))
   }
 
   /**
