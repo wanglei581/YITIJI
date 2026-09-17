@@ -28,7 +28,7 @@
 | F3 缺粉 / 墨量低 | 低墨明确不阻塞、耗材不上报、一体机禁止「墨粉不足」 | **是** |
 | F4 断电 / 拔 USB | `WorkOffline` → `PRINTER_OFFLINE`；生产拦新单 | 否 |
 | F5 拔网线 | Agent 离线队列重试 PATCH；心跳超时后拦新单 | 否 |
-| F6 杀掉 Agent | WinSW 崩溃重启 + 本地库对账，不自动重印 | 否 |
+| F6 杀掉 Agent | WinSW 可能尝试拉起；外来死 PID 锁 fail-closed，不自动接管 | 否 |
 | F7 已付款未出纸 | 打印任务会 fail-closed；**退款不会自动出款** | **是（资金侧）** |
 
 ---
@@ -56,7 +56,7 @@
 | 一体机进度轮询 | 每 3 秒；连续 5 次读失败才判失败；客户端 10 分钟查不到终态走「查询超时」 | `PrintProgressPage.tsx:124-126,331-332,452-501` |
 | 一体机设备状态刷新 | 60 秒 | `useTerminalDeviceStatus.ts:54` |
 | 离线 PATCH 重试 | 每 60 秒，指数退避，最多 10 次 | `offline-queue.ts:35-38` |
-| Agent 崩溃重启 | 第一次 60 秒后重启，第二次 300 秒，第三次不再自动拉起 | `apps/terminal-agent/installer/bootstrap/aijobprintagent.xml:9-11` |
+| Agent 崩溃重启 | WinSW 第一次 60 秒后尝试重启，第二次 300 秒，第三次不再自动拉起。**这不等于锁被接管或服务必然回到 Running。** 外来死 PID 锁返回 `stale_lock_requires_operator`。 | `apps/terminal-agent/installer/bootstrap/aijobprintagent.xml:9-11`；`instance-lock.ts` `failClosedOnLock` |
 
 管理员告警页写的是「终端离线（心跳超 3 分钟）」（`apps/admin/src/routes/alerts/index.tsx:153`）。**以代码 5 分钟为准**；现场不要用那句 3 分钟去判定系统对不对。
 
@@ -440,17 +440,18 @@ taskkill /F /PID <Agent的PID>
 
 做两拍：
 
-1. **空闲杀**：无打印任务时 `taskkill`。等 60 秒看服务是否回到 Running。
-2. **打印中杀**：进度页到「正在打印」后立刻杀。看重启后该任务是补报 completed、还是 `PRINT_JOB_UNCONFIRMED`、有没有第二份纸。
+1. **空闲杀**：无打印任务时 `taskkill /F`。不要假设 30 秒或 60 秒后服务自然 Running。记录 WinSW/SCM 是否尝试拉起、新进程是否因 `stale_lock_requires_operator` 立刻退出、`last-startup-diagnostic.json` 的 code/reason。
+2. **打印中杀**：进度页到「正在打印」后立刻杀。看重启后该任务是补报 completed、还是 `PRINT_JOB_UNCONFIRMED`、有没有第二份纸；若 Agent 因锁 fail-closed 没起来，先走人工清锁，再看任务终态。
 
-不要同时删 `%ProgramData%\AIJobPrintAgent\agent.db`（那会丢掉防重印依据）。
+不要同时删 `%ProgramData%\AIJobPrintAgent\agent.db`（那会丢掉防重印依据）。**不要先删除** `agent.pid`。
 
-若现场用 `Stop-Service`：**当前无自动拉起**，需人工 `Start-Service`。把这种做法记成「干净停止」，不要记成崩溃恢复通过。
+若现场用 `Stop-Service`：**当前无自动拉起**，需人工 `Start-Service`。把这种做法记成「干净停止」，不要记成崩溃恢复通过。干净停止会不会留下 `agent.pid` 是条件 P0，必须在 Windows 实测，不得用 macOS 推断。
 
 ### ② 系统应该怎么反应
 
-- WinSW：第一次失败 60 秒后重启，第二次 300 秒，第三次不再自动重启；失败计数 1 天重置（`aijobprintagent.xml:9-12`）。安装脚本对 SCM 写入同类策略（`install-production-agent.ps1:246-248`）。
-- 单实例 PID 锁：活进程在则拒绝第二份 Agent（`instance-lock.ts:5-17`）。崩溃后 PID 失效，新进程可以接管。
+- WinSW：第一次失败 60 秒后**尝试**重启，第二次 300 秒，第三次不再自动重启；失败计数 1 天重置（`aijobprintagent.xml:9-12`）。安装脚本对 SCM 写入同类策略（`install-production-agent.ps1`）。尝试拉起 ≠ 已经 Running。
+- 单实例 PID 锁（`instance-lock.ts` `tryAcquireLock` / `failClosedOnLock`）：活外来 PID → `DUPLICATE_INSTANCE`；严格解析但已死亡的外来 PID → `stale_lock_requires_operator`，不删除、重命名、截断或覆盖。**不要先删除。** 先核验服务/进程，运行 `diagnose-production-agent.ps1`。目录 / junction / symlink 占用锁路径时保持不动并升级。
+- 安全人工处理顺序：① `diagnose-production-agent.ps1`（只读）→ ② 确认服务 `Stopped` → ③ 锁路径是普通文件 → ④ 严格 PID 可解析 → ⑤ `tasklist /FI "PID eq <pid>" /FO CSV /NH` 退出码 0 且 PID 不在结果中（tasklist 失败不得当成可删）→ ⑥ 仅删除精确 `agent.pid` 叶子。非叶子路径保持不动。
 - 重启后本地库对账（`task-runner.ts:331-363`），**不会自动再调用打印机**：
   - 本地 `spooled` / `dispatching` → `failed` + `PRINT_JOB_UNCONFIRMED`，文案「打印派发已开始，但无法确认是否已进入队列或完成出纸，请工作人员现场核查」
   - 本地 `completed` / `failed` → 只补报终态
@@ -471,19 +472,20 @@ taskkill /F /PID <Agent的PID>
 
 ### ④ 恢复后状态，以及钱和纸
 
-| 杀死时机 | 自动重启后 | 钱 | 纸 |
+| 杀死时机 | 实际恢复（不得写成自动接管） | 钱 | 纸 |
 |----------|------------|----|----|
-| 空闲 | 服务 Running，心跳恢复，可再下单。 | 无。 | 无。 |
+| 空闲 | SCM 可能拉起新进程；若留下外来死 PID 锁，新进程 fail-closed，服务不会自然 Running。人工核验后才能再启动。 | 无。 | 无。 |
 | 已派发（`dispatching`/`spooled`） | UNCONFIRMED，**禁止重提、禁止自动再打**。必须看出口（F7）。 | 已付则核查前两边都可能欠。 | 可能 0、可能已出完、可能还在队列里被 Windows 自己打完。 |
 | 本地已 completed，PATCH 未发出 | 补报 completed。 | 已付已出 → 两清。 | 已出。 |
 | claim 后、派发前 | 等租约到期 UNCONFIRMED，或任务一直 claimed 直到 5/10 分钟。 | 已付未出 → 平台欠履约/退款。 | 0（除非队列里另有人打）。 |
 
 现场恢复后**先看出纸口和 Get-PrintJob**，再决定 Admin 核查。切勿一看失败就重打。
 
-- [ ] 空闲 `taskkill` 后约 60 秒内服务回到 Running：____
+- [ ] 空闲 `taskkill /F` 后：WinSW 是否尝试拉起：____ 是否因 `stale_lock_requires_operator` 仍未 Running：____ 诊断 code/reason：________（不得把“自然 Running / 30 秒恢复”写成已验收）
 - [ ] 打印中杀：任务终态 / `errorCode`：________ 实出纸：____ 张
 - [ ] 有无第二份重复出纸（预期：无）：____
-- [ ] 若用了 Stop-Service：已注明「非崩溃路径」：____
+- [ ] 若用了 Stop-Service：已注明「非崩溃路径」，并记录停止后 `agent.pid` 是否仍在：____
+- [ ] `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯均须在 Windows 实测；本单 **DEVICE 仍 NO-GO**，直到该阶梯留下服务状态、锁 PID、tasklist CSV 与清锁时间。
 
 ---
 

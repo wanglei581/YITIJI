@@ -31,9 +31,15 @@ import path from 'path'
 import os from 'os'
 import { spawnSync } from 'child_process'
 import { log, err } from '../logger'
+import {
+  writeStartupDiagnosticSafely,
+  type StartupLockDiagnosticDetails,
+} from './startup-diagnostics'
 
 const MAX_ACQUIRE_ATTEMPTS = 8
 const STALE_RETRY_DELAY_MS = 20
+const LOCK_OPERATOR_DO_NOT_DELETE_FIRST = '不要先删除'
+const LOCK_OPERATOR_DIAGNOSE_SCRIPT = 'diagnose-production-agent.ps1'
 
 export interface InstanceLockTestHooks {
   pid?: number
@@ -289,28 +295,74 @@ export function tryAcquireLock(): LockAcquireResult {
   return { status: 'unavailable', lockPath: pidFile, reason: 'acquire_attempts_exhausted' }
 }
 
+function collectLockDiagnosticDetails(
+  lockPath: string,
+  reason: string,
+): StartupLockDiagnosticDetails {
+  const fallback: StartupLockDiagnosticDetails = {
+    reason,
+    pathPresent: false,
+    pathKind: 'unavailable',
+    pidParsed: false,
+  }
+  try {
+    const st = fs.lstatSync(lockPath)
+    if (st.isSymbolicLink()) {
+      return { reason, pathPresent: true, pathKind: 'symlink', pidParsed: false }
+    }
+    if (st.isDirectory()) {
+      return { reason, pathPresent: true, pathKind: 'directory', pidParsed: false }
+    }
+    if (!st.isFile()) {
+      return { reason, pathPresent: true, pathKind: 'not_regular', pidParsed: false }
+    }
+    const existing = inspectLockFile(lockPath)
+    return {
+      reason,
+      pathPresent: true,
+      pathKind: 'regular_file',
+      pidParsed: existing.kind === 'file' && existing.pid !== null,
+    }
+  } catch (e: unknown) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { reason, pathPresent: false, pathKind: 'missing', pidParsed: false }
+    }
+    return fallback
+  }
+}
+
+function failClosedOnLock(result: Exclude<LockAcquireResult, { status: 'acquired' }>): never {
+  const reason = result.status === 'duplicate' ? 'duplicate' : result.reason
+  const code = result.status === 'duplicate' ? 'DUPLICATE_INSTANCE' : 'INSTANCE_LOCK_UNAVAILABLE'
+  writeStartupDiagnosticSafely(code, {
+    details: collectLockDiagnosticDetails(result.lockPath, reason),
+    onFailure: () => {
+      err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.')
+    },
+  })
+  const existingPid = result.status === 'duplicate' ? ` existingPid=${result.existingPid}.` : ''
+  const nextStep =
+    reason === 'lock_path_not_regular_file'
+      ? 'If the lock path is a directory, junction, or symlink, leave it untouched and escalate.'
+      : reason === 'stale_lock_requires_operator'
+        ? 'After the service is stopped and the lock PID is confirmed absent, an operator may remove only the exact agent.pid leaf.'
+        : 'First verify the Agent service and processes; a live instance is not a stale lock.'
+  err(
+    `${code}: reason=${reason} lockPath=${result.lockPath}. ` +
+      `Do not delete first / ${LOCK_OPERATOR_DO_NOT_DELETE_FIRST}. ` +
+      `First verify the Agent service and lock PID, then run ${LOCK_OPERATOR_DIAGNOSE_SCRIPT}. ` +
+      `${nextStep}${existingPid}`,
+  )
+  process.exit(1)
+}
+
 export function acquireLock(): void {
   const result = tryAcquireLock()
   if (result.status === 'acquired') {
     log(`instance-lock: acquired (pid=${currentPid()})`)
     return
   }
-  if (result.status === 'duplicate') {
-    err(
-      `DUPLICATE_INSTANCE: agent already running (pid=${result.existingPid}). ` +
-        `If this is incorrect, delete ${result.lockPath} and restart.`,
-    )
-    process.exit(1)
-  }
-  if (result.reason === 'stale_lock_requires_operator') {
-    err(
-      `INSTANCE_LOCK_UNAVAILABLE: stale_lock_requires_operator. ` +
-        `Refusing to start. First verify no agent process is running, then delete ${result.lockPath} and restart.`,
-    )
-    process.exit(1)
-  }
-  err(`INSTANCE_LOCK_UNAVAILABLE: ${result.reason}`)
-  process.exit(1)
+  failClosedOnLock(result)
 }
 
 export function releaseLock(): void {

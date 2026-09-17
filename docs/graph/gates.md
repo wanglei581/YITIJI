@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1468 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1470 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1086,7 +1086,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `docs/acceptance/print-scan-field-execution-runbook.md` | `verify-print-scan-first-release.ts` |
+| `docs/acceptance/print-scan-field-execution-runbook.md` | `verify-print-scan-agent.mjs`<br/>`verify-print-scan-first-release.ts` |
 
 </details>
 
@@ -1336,6 +1336,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>docs/device/onsite-failure-recovery-runsheet-2026-09.md/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `docs/device/onsite-failure-recovery-runsheet-2026-09.md` | `verify-print-scan-agent.mjs` |
+
+</details>
+
+<details>
 <summary><code>docs/device/postgres-load-hardening-runbook.md/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
@@ -1368,6 +1377,15 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `docs/device/production-deployment-runbook.md` | `verify-cos-lifecycle-policy.ts` |
+
+</details>
+
+<details>
+<summary><code>docs/device/windows-host-acceptance-runbook.md/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `docs/device/windows-host-acceptance-runbook.md` | `verify-print-scan-agent.mjs` |
 
 </details>
 

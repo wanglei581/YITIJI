@@ -119,10 +119,11 @@ agent-ctl status | start | stop | restart | logs
 ```
 
 验收（checklist §5.3）：
-- [ ] 服务安装成功，可开机自启（重启机器后 30s 内 Running）
-- [ ] 崩溃自动重启（失败操作：30s→60s→120s，设计文档 §8.3）
-- [ ] **单实例保护**：同时启两个实例，第二个写 `DUPLICATE_INSTANCE` 后 exit 1（设计文档 §8.8）
+- [ ] 服务安装成功，可开机自启。重启机器后是否 Running、以及是否留下 `agent.pid`，必须在 **Windows 实测**；不得把设计文档里的 30s 写成已验收。
+- [ ] 崩溃恢复是 fail-closed：活外来 PID → `DUPLICATE_INSTANCE`；死外来 PID → `stale_lock_requires_operator`，**不要先删除**锁。先跑 `diagnose-production-agent.ps1`，确认服务已停且 `tasklist` 证明锁内 PID 不存在后，才允许人工删除精确 `agent.pid` 叶子。目录 / junction / symlink 保持不动并升级。SCM 失败操作会尝试拉起，**不等于**锁被接管或服务自然 Running。
+- [ ] **单实例保护**：同时启两个实例，第二个写 `DUPLICATE_INSTANCE` 后 exit 1（设计文档 §8.8）；不得诱导“如果不正确就删除锁”。
 - [ ] 日志路径固定 `%ProgramData%\AIJobPrintAgent\logs\`，**不含用户文件正文 / 密钥**（§7.5）
+- [ ] `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须在 Windows 实测。干净停止是否留锁是条件 P0，不得在 macOS 推断。在该阶梯留下证据前，本机 **DEVICE 仍 NO-GO**。
 
 ---
 

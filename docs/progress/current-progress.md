@@ -1,5 +1,28 @@
 # 当前开发进度
 
+2026-09-18 **Hermes 对 fb8ae44 / 85f39ebb 提出的 5 个运维 P1 已在本工作树软件侧关闭；Windows DEVICE 仍为 NO-GO。**
+锁实现锚点仍是 `6243fab25`：外来死亡 PID 必须 `stale_lock_requires_operator` fail-closed，不恢复自动
+stale unlink / rename / takeover。same-PID reclaim 与 owner `releaseLock()` 未改。本轮只改 Terminal
+Agent 锁文案 / 启动诊断 / 只读 diagnose 与现场采集、现场手册和对应门禁，未改 `apps/miniapp/**`、
+`apps/kiosk/**`，未 push、未部署、未操作 Windows / 奔图。
+
+- **P1 A 文案：** 所有 lock `unavailable` / `duplicate` 分支现在都带 `lockPath`、`reason`、明确
+  `不要先删除`、先核验服务/进程、再运行 `diagnose-production-agent.ps1`。已删除
+  “If this is incorrect, delete …” 诱导清锁。stale 仍要求人工核验后才能动精确 `agent.pid` 叶子。
+- **P1 B 诊断：** `acquireLock()` 失败写入 `last-startup-diagnostic.json`，复用
+  `writeStartupDiagnosticSafely`；只写机器码 / 原因 / 路径存在性与类型 / PID 是否严格可解析。
+  诊断写失败不得改变 fail-closed 退出。
+- **P1 C / D 脚本：** `diagnose-production-agent.ps1` 只读输出锁路径类型、严格 PID、tasklist /
+  服务 / 相关进程、是否可进入人工清锁评估；`tasklist` 失败不是可删。`collect-field-evidence.ps1`
+  采集脱敏的服务状态、锁存在/类型、严格 PID、mtime、ACL 摘要、tasklist 退出码/结果和采集时间。
+  两份脚本都不自动删锁，不采 token / 配置密钥。
+- **P1 E 手册：** 现场恢复单、换机验收手册、打印扫描执行清单和 Agent 设计文档不再宣称崩溃后自动
+  接管、30 秒恢复或 `taskkill` 后自然 Running。给出安全人工顺序；非叶子路径保持不动并升级。
+  `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须 Windows
+  实测。干净停止是否留锁只登记为条件 P0，不在 macOS 推断。
+- **证据边界：`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。** 本轮软件门禁不能证明 Windows
+  `tasklist` CSV、NTFS、ProgramData ACL、服务异常退出后的人工清锁或奔图出纸。
+
 2026-09-18 **当前 `main` 已在本地合入 PR #1039 分支，并关闭实例锁与订单详情粘性拒绝 P1；新合并树尚未推送或跑 CI，未上 Windows、未部署、未操作硬件。**
 当前 `origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7` 已由合并提交
 `145fde67d` 纳入分支 `codex/windows-pantum-field-readiness-r3-20260917`，安全修复代码锚点为

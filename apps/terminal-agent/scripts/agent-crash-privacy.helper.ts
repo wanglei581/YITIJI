@@ -47,6 +47,7 @@ const agentRoot = join(__dirname, '..')
 const helperPath = join(__dirname, 'agent-crash-privacy.helper.ts')
 const lockSourcePath = join(__dirname, '../src/agent/instance-lock.ts')
 const loggerSourcePath = join(__dirname, '../src/logger.ts')
+const startupDiagnosticsSourcePath = join(__dirname, '../src/agent/startup-diagnostics.ts')
 const indexSourcePath = join(__dirname, '../src/index.ts')
 const taskRunnerSourcePath = join(__dirname, '../src/agent/task-runner.ts')
 const cleanupSourcePath = join(__dirname, '../src/agent/print-task-temp-cleanup.ts')
@@ -98,6 +99,18 @@ const STALE_OPERATOR = `      // STALE_LOCK_REQUIRES_OPERATOR: never auto-remove
 const STALE_OPERATOR_MUTATED = `      // STALE_LOCK_REQUIRES_OPERATOR: never auto-remove a foreign dead pid file.
       try { fs.unlinkSync(pidFile) } catch { /* ignore */ }
       continue`
+const LOCK_OPERATOR_HINT = "const LOCK_OPERATOR_DO_NOT_DELETE_FIRST = '不要先删除'"
+const LOCK_OPERATOR_HINT_MUTATED = "const LOCK_OPERATOR_DO_NOT_DELETE_FIRST = 'ok to delete now'"
+const LOCK_DIAGNOSTIC_WRITE = `  writeStartupDiagnosticSafely(code, {
+    details: collectLockDiagnosticDetails(result.lockPath, reason),
+    onFailure: () => {
+      err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.')
+    },
+  })`
+const LOCK_DIAGNOSTIC_WRITE_MUTATED = `  void code
+  void result`
+const FAIL_CLOSED_ERR = `      \`Do not delete first / \${LOCK_OPERATOR_DO_NOT_DELETE_FIRST}. \` +`
+const FAIL_CLOSED_ERR_MUTATED = `      \`If this is incorrect, delete \${result.lockPath} and restart. \` +`
 
 function sleepSync(ms: number): void {
   if (ms <= 0) return
@@ -328,26 +341,155 @@ function verifyOperatorCleanupThenAcquire(): void {
   })
 }
 
+function withCapturedExit(fn: () => void): string {
+  const originalExit = process.exit
+  return captureStdio(() => {
+    process.exit = ((code?: number) => {
+      throw new Error(`exit:${code ?? 0}`)
+    }) as typeof process.exit
+    try {
+      fn()
+    } finally {
+      process.exit = originalExit
+    }
+  })
+}
+
+function assertOperatorFailClosedLogs(logs: string, lockPath: string, reason: string, code: string): void {
+  const escapedPath = lockPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedReason = reason.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  assert.match(logs, new RegExp(code))
+  assert.match(logs, new RegExp(escapedReason))
+  assert.match(logs, new RegExp(escapedPath))
+  assert.match(logs, /不要先删除/)
+  assert.match(logs, /diagnose-production-agent\.ps1/)
+  assert.doesNotMatch(logs, /If this is incorrect, delete/)
+}
+
+function readLockDiagnostic(root: string): { text: string; json: Record<string, unknown> } {
+  const diagnosticPath = join(root, 'AIJobPrintAgent', 'last-startup-diagnostic.json')
+  assert.equal(existsSync(diagnosticPath), true, 'lock fail-closed must write last-startup-diagnostic.json')
+  const text = readFileSync(diagnosticPath, 'utf8')
+  return { text, json: JSON.parse(text) as Record<string, unknown> }
+}
+
+function assertSafeLockDiagnostic(
+  text: string,
+  json: Record<string, unknown>,
+  expected: { code: string; reason: string; pathKind?: string; pidParsed?: boolean },
+  secrets: string[],
+): void {
+  assert.equal(json.schemaVersion, 1)
+  assert.equal(json.state, 'failed')
+  assert.equal(json.code, expected.code)
+  const lock = json.lock as Record<string, unknown> | undefined
+  assert.equal(lock !== undefined, true, 'lock diagnostic details must be present')
+  assert.equal(lock?.reason, expected.reason)
+  if (expected.pathKind !== undefined) assert.equal(lock?.pathKind, expected.pathKind)
+  if (expected.pidParsed !== undefined) assert.equal(lock?.pidParsed, expected.pidParsed)
+  assert.equal('token' in json, false)
+  assert.equal(Object.prototype.hasOwnProperty.call(lock, 'contents'), false)
+  for (const secret of secrets) {
+    assert.equal(text.includes(secret), false, `diagnostic must not persist ${secret}`)
+  }
+  assert.equal(text.includes('agentToken'), false)
+  assert.equal(text.includes('adminSecret'), false)
+  assert.equal(text.includes('bindCode'), false)
+}
+
 function verifyStaleOperatorMessage(): void {
+  withIsolatedLock((root, lockPath) => {
+    mkdirSync(join(root, 'AIJobPrintAgent'), { recursive: true })
+    writeFileSync(lockPath, '999999\n')
+    const logs = withCapturedExit(() => {
+      assert.throws(() => acquireLock(), /exit:1/)
+    })
+    assertOperatorFailClosedLogs(logs, lockPath, 'stale_lock_requires_operator', 'INSTANCE_LOCK_UNAVAILABLE')
+    assert.equal(readFileSync(lockPath, 'utf8'), '999999\n', 'acquireLock must not auto-clean a foreign stale lock')
+    const { text, json } = readLockDiagnostic(root)
+    assertSafeLockDiagnostic(
+      text,
+      json,
+      {
+        code: 'INSTANCE_LOCK_UNAVAILABLE',
+        reason: 'stale_lock_requires_operator',
+        pathKind: 'regular_file',
+        pidParsed: true,
+      },
+      [],
+    )
+  })
+}
+
+function verifyFailClosedAcquireLockMessagesAndDiagnostic(): void {
+  withIsolatedLock((root, lockPath) => {
+    const secret = 'SENSITIVE_LOCK_BYTES_XYZ_TOKEN'
+    mkdirSync(join(root, 'AIJobPrintAgent'), { recursive: true })
+    writeFileSync(lockPath, `${secret}\n`)
+    writeFileSync(join(root, 'AIJobPrintAgent', 'agent.token'), 'super-secret-token-value')
+    const logs = withCapturedExit(() => {
+      assert.throws(() => acquireLock(), /exit:1/)
+    })
+    assertOperatorFailClosedLogs(logs, lockPath, 'lock_pid_unproven', 'INSTANCE_LOCK_UNAVAILABLE')
+    const { text, json } = readLockDiagnostic(root)
+    assertSafeLockDiagnostic(
+      text,
+      json,
+      {
+        code: 'INSTANCE_LOCK_UNAVAILABLE',
+        reason: 'lock_pid_unproven',
+        pathKind: 'regular_file',
+        pidParsed: false,
+      },
+      [secret, 'super-secret-token-value'],
+    )
+  })
+
   withIsolatedLock((_root, lockPath) => {
     mkdirSync(join(_root, 'AIJobPrintAgent'), { recursive: true })
-    writeFileSync(lockPath, '999999\n')
-    const originalExit = process.exit
-    const logs = captureStdio(() => {
-      process.exit = ((code?: number) => {
-        throw new Error(`exit:${code ?? 0}`)
-      }) as typeof process.exit
-      try {
+    const sleeper = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' })
+    try {
+      assert.ok(sleeper.pid, 'sleeper must have a pid')
+      writeFileSync(lockPath, `${sleeper.pid}\n`)
+      const logs = withCapturedExit(() => {
         assert.throws(() => acquireLock(), /exit:1/)
-      } finally {
-        process.exit = originalExit
-      }
+      })
+      assertOperatorFailClosedLogs(logs, lockPath, 'duplicate', 'DUPLICATE_INSTANCE')
+      assert.match(logs, new RegExp(`existingPid=${sleeper.pid}`))
+      const { text, json } = readLockDiagnostic(_root)
+      assertSafeLockDiagnostic(
+        text,
+        json,
+        { code: 'DUPLICATE_INSTANCE', reason: 'duplicate', pathKind: 'regular_file', pidParsed: true },
+        [],
+      )
+    } finally {
+      sleeper.kill('SIGKILL')
+    }
+  })
+
+  withIsolatedLock((root, lockPath) => {
+    mkdirSync(lockPath, { recursive: true })
+    const logs = withCapturedExit(() => {
+      assert.throws(() => acquireLock(), /exit:1/)
     })
-    assert.match(logs, /stale_lock_requires_operator/)
-    assert.match(logs, /verify no agent process is running/)
-    assert.match(logs, /delete /)
-    assert.match(logs, new RegExp(lockPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-    assert.equal(readFileSync(lockPath, 'utf8'), '999999\n', 'acquireLock must not auto-clean a foreign stale lock')
+    assertOperatorFailClosedLogs(logs, lockPath, 'lock_path_not_regular_file', 'INSTANCE_LOCK_UNAVAILABLE')
+    assert.match(logs, /leave it untouched and escalate/)
+    assert.equal(lstatSync(lockPath).isDirectory(), true, 'must not remove a directory occupying the lock path')
+    const { json } = readLockDiagnostic(root)
+    assert.equal((json.lock as { pathKind: string }).pathKind, 'directory')
+  })
+
+  withIsolatedLock((root, lockPath) => {
+    mkdirSync(join(root, 'AIJobPrintAgent'), { recursive: true })
+    writeFileSync(lockPath, '999999\n')
+    mkdirSync(join(root, 'AIJobPrintAgent', 'last-startup-diagnostic.json'))
+    const logs = withCapturedExit(() => {
+      assert.throws(() => acquireLock(), /exit:1/)
+    })
+    assertOperatorFailClosedLogs(logs, lockPath, 'stale_lock_requires_operator', 'INSTANCE_LOCK_UNAVAILABLE')
+    assert.match(logs, /AGENT_DIAGNOSTIC_UNAVAILABLE/)
+    assert.equal(readFileSync(lockPath, 'utf8'), '999999\n')
   })
 }
 
@@ -542,10 +684,18 @@ function mutateAndRun(label: string, original: string, mutated: string, flag: st
   const mutationLockPath = join(mutationAgent, 'instance-lock.ts')
   try {
     mkdirSync(mutationAgent, { recursive: true })
-    // instance-lock.ts currently has one relative dependency: ../logger.
+    // instance-lock.ts currently depends on ../logger and ./startup-diagnostics.
     // A future dependency change should fail loudly until this mirror is extended.
     writeFileSync(mutationLockPath, next)
     writeFileSync(join(mutationSrc, 'logger.ts'), readFileSync(loggerSourcePath))
+    writeFileSync(
+      join(mutationAgent, 'startup-diagnostics.ts'),
+      readFileSync(startupDiagnosticsSourcePath),
+    )
+    writeFileSync(
+      join(mutationAgent, 'config-manager.ts'),
+      'export type AgentStartupErrorCode = string\n',
+    )
     const child = spawnSync(
       process.execPath,
       ['-r', 'ts-node/register', helperPath, flag],
@@ -623,6 +773,27 @@ function verifyReverseMutations(): void {
     '--publication-failure',
     /publication failure must not delete an unproven path|successor content must survive publication-failure cleanup/,
   )
+  mutateAndRun(
+    'drop-do-not-delete-hint',
+    LOCK_OPERATOR_HINT,
+    LOCK_OPERATOR_HINT_MUTATED,
+    '--lock-operator-message',
+    /不要先删除/,
+  )
+  mutateAndRun(
+    'duplicate-induce-delete',
+    FAIL_CLOSED_ERR,
+    FAIL_CLOSED_ERR_MUTATED,
+    '--lock-operator-message',
+    /If this is incorrect, delete/,
+  )
+  mutateAndRun(
+    'skip-lock-diagnostic',
+    LOCK_DIAGNOSTIC_WRITE,
+    LOCK_DIAGNOSTIC_WRITE_MUTATED,
+    '--lock-diagnostic',
+    /lock fail-closed must write last-startup-diagnostic.json/,
+  )
 }
 
 function verifyStartupOrderingSource(): void {
@@ -651,6 +822,10 @@ function verifyStartupOrderingSource(): void {
   assert.equal(lockSource.includes('COMPLETE_PID_WRITE'), true)
   assert.equal(lockSource.includes('STALE_LOCK_REQUIRES_OPERATOR'), true)
   assert.equal(lockSource.includes("reason: 'stale_lock_requires_operator'"), true)
+  assert.equal(lockSource.includes('writeStartupDiagnosticSafely'), true)
+  assert.equal(lockSource.includes('不要先删除'), true)
+  assert.equal(lockSource.includes('diagnose-production-agent.ps1'), true)
+  assert.equal(lockSource.includes('If this is incorrect, delete'), false)
   assert.equal(lockSource.includes('beforeProvenUnlink'), false)
   assert.equal(lockSource.includes('PROVEN_UNLINK_SANDWICH'), false)
   assert.equal(
@@ -843,6 +1018,7 @@ export function runInstanceLockHardeningTests(): void {
   verifyConcurrentForeignStaleDoesNotAcquire()
   verifyOperatorCleanupThenAcquire()
   verifyStaleOperatorMessage()
+  verifyFailClosedAcquireLockMessagesAndDiagnostic()
   verifyReverseMutations()
   console.log('PASS instance-lock hardening')
 }
@@ -910,6 +1086,23 @@ if (process.argv.includes('--lock-claim-worker')) {
 } else if (process.argv.includes('--publication-failure')) {
   try {
     verifyPublicationFailureDoesNotUnlinkSuccessor()
+    process.exit(0)
+  } catch (error) {
+    console.error(error)
+    process.exit(1)
+  }
+} else if (process.argv.includes('--lock-operator-message')) {
+  try {
+    verifyStaleOperatorMessage()
+    verifyFailClosedAcquireLockMessagesAndDiagnostic()
+    process.exit(0)
+  } catch (error) {
+    console.error(error)
+    process.exit(1)
+  }
+} else if (process.argv.includes('--lock-diagnostic')) {
+  try {
+    verifyStaleOperatorMessage()
     process.exit(0)
   } catch (error) {
     console.error(error)

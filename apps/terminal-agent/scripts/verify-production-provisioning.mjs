@@ -133,6 +133,36 @@ assert.match(
   /WorkOffline/,
   'field evidence collector must capture Win32 WorkOffline',
 )
+assert.match(
+  fieldEvidence,
+  /5\.3-11L/,
+  'field evidence collector must capture instance-lock evidence',
+)
+assert.match(
+  fieldEvidence,
+  /不要先删除/,
+  'field evidence collector must tell the operator not to delete the lock first',
+)
+assert.match(
+  fieldEvidence,
+  /tasklist\.exe/,
+  'field evidence collector must record tasklist result for the lock PID',
+)
+assert.match(
+  fieldEvidence,
+  /Get-StrictLockPidParse/,
+  'field evidence collector must strictly parse the lock PID',
+)
+assert.match(
+  fieldEvidence,
+  /Get-LockPathKind/,
+  'field evidence collector must record lock path kind',
+)
+assert.doesNotMatch(
+  fieldEvidence,
+  /Remove-Item|\bUnlink(?:-Item)?\b|\bdel\s+-/i,
+  'field evidence collector must not auto-delete the instance lock',
+)
 
 // 闭合准入：配置字段只能逐个白名单回显（见 5.3-8 的 $parts 列表），
 // 任何形式的整对象序列化都会把 localApiBridgeToken 一并打出来。
