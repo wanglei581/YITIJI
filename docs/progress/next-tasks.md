@@ -1,31 +1,24 @@
 # 下一步任务
 
-## 2026-09-17 Windows / 奔图现场候选 R3 本地收口后的唯一推进顺序
+## 2026-09-18 Windows / 奔图现场候选 R3 当前推进顺序
 
-**当前候选判定：** 基线 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，已验证代码 / 手册
-锚点 `d71d022545d9ff56da155615710ce99851130753`。`SOURCE / LOCAL: GO`；
-`CI: NO-GO (OLD HEAD FAILED / NEW HEAD PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。当前已 push 并创建 PR，但未合并、
-未部署，也未执行 Windows / 奔图动作。PR #1039 已于 2026-09-17 创建，首个包含测试装置隔离修复的 head 为
-`6e56a17d7d4f1b78c2418f16dc8eab1b8c366770`。旧 head
-`3bf53a61ff974391363de41d696fcdd0fb58a1bf` 的 run `35229230129` 已完成，除
-`build-and-verify / verify:print-scan-first-release` 外，该 run 的 `postgres-readiness`、
-`kiosk-browser-smoke` 成功，`release-bundle` 按 PR 条件跳过；同 head 的 `windows-agent-installer` run
-`35229230120` 两个 job 均成功。288 条串行门禁中仅该一条失败，
-根因是 Task 11 验收索引在切换到 Agent 运行时 identity 口径时漏写“文字助手模式不豁免”。当前候选已只补
-该文档映射且定向门禁全绿；新 head CI 未完成前继续保持 `CI: NO-GO`。
-下表优先于后面的历史推进表；后续 main 若前进，所有现场和生产证据都要
-重新绑定实际候选或部署 SHA。
+**当前候选判定：** `origin/main@3d35759ee2ae810716d08734752f0a3d1d9d7a66` 已在本地通过
+`145fde67d` 合入，安全修复代码锚点为 `6243fab25`。`SOURCE / LOCAL / REVIEW: GO`；
+`CI: NO-GO (CURRENT MERGED TREE NOT RUN)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+PR #1039 的远端仍停在旧 head；`792a9f987` 的绿 CI 绑定旧 merge ref，不能复用。当前本地提交尚未
+推送；未获得行动时授权前不 push、不合并、不部署、不操作 Windows / 奔图。
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|
-| 1 | Codex 集成 + reviewer 复核 | 等待 PR #1039 最终 head 的必需 CI；若失败只处理新日志第一条决定性失败。CI 全绿后复核 exact head，未获得单独合并授权前不得合并 | final head 无新增 P0 / P1；必需 CI 全绿后才可写 `CI: GO`。若之后获准合并，必须以 `merge-base --is-ancestor` 证明进入 main |
-| 2 | Windows / 奔图专用任务 | 在隔离目录冻结精确候选 / main SHA，先验 Agent 实例锁与临时文件清理，再走面板扫描、真实出纸、扫码枪、长驻 watcher、断网、Agent / 浏览器重启和连续多用户 | 覆盖 `tasklist` CSV、NTFS `wx` / 删除共享、reparse point、`ProgramData`、真实双进程启动；记录 Agent 版本、终端、打印机 / 扫描设备、任务 / 订单 / 文件 hash、状态回传和临时文件删除。`ino === 0` / identity unavailable、锁归属不明、清理失败均须 fail-closed |
+| 1 | Codex 集成 + reviewer 复核 | 完成本地进度提交；获得 push 授权后更新 PR #1039，并只认新 exact head 的必需 CI。失败时只处理新日志第一条决定性失败 | final head 无新增 P0 / P1；`build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 与 Windows installer 必需 job 全绿后才可写 `CI: GO`。未获单独合并授权不得合并 |
+| 2 | Windows / 奔图专用任务 | 冻结获准的精确候选 / main SHA；先验活实例重复启动、异常终止留下的 `stale_lock_requires_operator`、人工清锁与临时文件清理，再走面板扫描、真实出纸、扫码枪、长驻 watcher、断网、Agent / 浏览器重启和连续多用户 | 覆盖真实 `tasklist` CSV、NTFS `wx`、ProgramData ACL、服务停止 + 锁内 PID 不存在双确认、只启动一个 Agent；记录服务状态、锁 PID、清锁时间、Agent 版本、任务 / 订单 / 文件 hash、状态回传和临时文件删除。不得把自动删除陈旧锁重新加回来 |
 | 3 | 微信小程序 / 跨端真机 | 用已发布或明确标注为 Trial 的版本验证订单详情换人 / 登出 / 401 / 取消乱序、材料包找回、到机码和弱网补签确认 | 发出时身份未知的首个 200 不显示详情；本人经确认请求恢复，非本人被服务端拒绝；慢网双往返文案可用；不得用开发者工具截图或 mock 代替真机 |
 | 4 | 运维 / 生产 | 在具名维护窗口按精确 SHA 做备份、迁移、部署、PM2 / nginx / Web Root / provenance / 健康 / 监控 / 回滚 | 生产版本一致；真实支付、退款、对账与对象存储生命周期可核；无明确授权不得执行 |
 | 5 | 产品负责人 / 运营 / 客户 | 完成微信提审发布、授权内容冷启动和真实用户 UAT | 真实用户走通建单 -> 支付 -> claim -> 下载 -> 奔图出纸 / 扫描 -> 状态回流 -> 订单沉淀并签字，之后才能评估商业 GO |
 
 执行边界：不修改 ACK 后任务存活协议；不把 `lastAttemptHash` 当采集归属证明；不把本地锁 / watcher
-测试、HTTP 200、截图或源码检查写成 Windows、奔图、微信真机、生产或商业验收。
+测试、HTTP 200、截图或源码检查写成 Windows、奔图、微信真机、生产或商业验收。人工清锁必须先证明
+服务已停且锁内 PID 不存在，不能仅凭“看起来离线”删除 `agent.pid`。
 
 ## 2026-09-17 PR #1036 / #1037 合入后的唯一推进顺序
 

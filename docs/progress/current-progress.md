@@ -1,59 +1,34 @@
 # 当前开发进度
 
-2026-09-17 **Windows / 奔图现场验收前 R3 候选已进入 PR #1039；旧 head 的必需 CI 首轮失败，修复后的新 head CI 待运行，尚未合并、上 Windows、部署或操作硬件。**
-集成基线为 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，分支
-`codex/windows-pantum-field-readiness-r3-20260917`，已验证的代码 / 手册锚点为
-`d71d022545d9ff56da155615710ce99851130753`。该锚点无冲突地汇入 7 个提交：小程序 / Kiosk
-`f8f46b6d2`、`69efe47a2`、`5fd69d56b`，Terminal Agent `5097a89d5`、`78d4ec054`，进度与
-现场手册 `0d08f7c72`、`d71d02254`。来源分支最终锚点分别为前端
-`0ac3b4ab04a77dcf32995d87d930d79a136f7b7f`、Agent
-`f21c5246a9ab38670759027973dc8de975105337`；根 checkout 的脏状态和冲突未被修改。分支已推送为
-PR #1039，首个包含测试装置隔离与官方 DeepSeek 复审跟进的 head 为
-`6e56a17d7d4f1b78c2418f16dc8eab1b8c366770`。后续 head
-`3bf53a61ff974391363de41d696fcdd0fb58a1bf` 的 run `35229230129` 已完成：
-`postgres-readiness`、`kiosk-browser-smoke` 全绿，`release-bundle` 按 PR 条件跳过；同 head 的
-`windows-agent-installer` run `35229230120` 中 `unsigned-exe-upgrade`、`unsigned-msi-candidate` 全绿；
-`build-and-verify` 在 `Verify suites` 的 288 条串行命令中通过 287 条，唯一失败为
-`verify:print-scan-first-release` 仍要求验收索引保留“文字助手模式不豁免”映射。当前候选已把该句补到
-新的运行时终端身份口径中，定向门禁本地重新全绿；修复后的新 head 必需 CI 未完成前不得写成
-`CI: GO`。
+2026-09-18 **PR #1039 已在本地合入当前 `main` 并关闭实例锁 P1；新合并树尚未推送或跑 CI，未上 Windows、未部署、未操作硬件。**
+当前 `origin/main@3d35759ee2ae810716d08734752f0a3d1d9d7a66` 已由合并提交
+`145fde67d` 纳入分支 `codex/windows-pantum-field-readiness-r3-20260917`，安全修复代码锚点为
+`6243fab25`。`main` 新增的 API-only 发布控制面治理完整保留；本轮没有打开生产闸门。
 
-- **小程序 / Kiosk：** 订单详情在换人、登出、隐藏、卸载、迟到响应时清理详情与到机码；发出时
-  身份未知的 200 不直接渲染，必须经一条带确定账号的服务端确认请求；取消成功后会使更早的详情
-  响应失效，不能复活已作废到机码。`PAPER_EMPTY` 不再承诺“加纸后自动继续”，只说明订单与已付
-  金额保留、联系工作人员，并仅在真实按钮出现时引导重打。
-- **Terminal Agent：** 实例锁改为原子 `wx` 创建；空、损坏、短写或发布失败的 PID 锁一律
-  fail-closed，不按路径删除归属不明或后继锁；释放前同时核 inode 与 PID。获锁后、SQLite / claim
-  前只清理 Agent temp 根目录中符合 `task_<taskId>.<supported-ext>` 的普通文件，symlink、目录与无关
-  文件保留，删除失败则拒绝启动。
-- **本地验证：** miniapp `verify:static` 全通过，生命周期测试 **166/166**；Kiosk typecheck 通过，
-  `print-fulfill-qx.spec.ts` **5/5** 通过；Agent typecheck、`verify:print-scan-agent`、
-  `verify:task-reliability`、并发子进程 / 启动残留清理 / 反向变异通过，lint 为 **0 errors / 3 条既有
-  unused-disable warnings**。仓库完整性、CI 门禁覆盖、部署门禁同步、图谱一致性和 `git diff --check`
-  均通过。Playwright 使用全新 `/tmp` 输出目录；此前旧输出目录的 WorkBuddy safe-delete 超时不属于
-  业务用例失败。
-- **复审：** Claude 完成前端实现与最终确认；Grok 的 Agent 实现由 Codex 独立复跑门禁；Hermes
-  Nous（`nous/upstage/solar-pro4:free`，session `20260917_204744_ea012f`）结论为 `PARTIAL`，未提出
-  新的明确 P0 / P1 代码缺陷，主要要求保留 Windows、真机与后端证据边界。其提出的两个测试疑问已由
-  R12-D 和 Kiosk “真实 taskId / payment session 重试”用例覆盖；`PARTIAL` 不等于代码 `NO-GO`。
-- **官方 DeepSeek 复审与跟进：** Hermes 使用官方 `provider=deepseek`、
-  `model=deepseek-v4-flash`、`reasoning=xhigh`（session `20260917_211325_74213a`）复审
-  `5baea09e4`，结论为源码 / 本地候选 `GO`，未发现 P0 / P1。其 P2-1 指出两份正式进度文档中的
-  `d71d02254` 完整 SHA 写错，已更正为可解析的
-  `d71d022545d9ff56da155615710ce99851130753`；P2-2 指出 Agent 反向变异测试会原地改写受控源码，
-  已改为只在 `agent-lock-mutation-*` 临时镜像中写入变异版 `instance-lock.ts`。可靠性门禁继续判杀六条
-  反向变异，受控源码测试前后 SHA-256 一致；Hermes 对修复 diff 再复核为 `GO`，无新增 P0 / P1 / P2。
-  该锚点仍表示运行时代码 / 现场手册；其上的跟进只改测试装置、进度文档和设计文案真值。
-- **CI 首轮失败与最小修复：** GitHub 日志确认失败不是 Fast Refresh warning 造成的（Lint 步骤以
-  0 error 通过；日志中的 17 条 Fast Refresh warning 不构成失败），也不是 Kiosk browser smoke；
-  唯一决定性失败是验收索引把旧的构建期 `VITE_TERMINAL_ID` 门禁改成 Agent 运行时 identity 后，漏迁移
-  “文字助手模式不豁免”这条 Task 11 映射。只在
-  `docs/device/print-scan-first-release-acceptance.md` 的运行时身份行补回该约束，未改运行时代码、构建
-  门禁或硬件协议；`pnpm --filter @ai-job-print/api verify:print-scan-first-release` 已重新全绿。
-- **证据边界：`SOURCE / LOCAL: GO`；`CI: NO-GO (OLD HEAD FAILED / NEW HEAD PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
-  macOS / 本地 CI 形态的 watcher、锁和清理测试不能证明 Windows `tasklist` CSV、NTFS `wx` 与删除
-  共享、reparse point、`ProgramData` 路径、真实双进程启动或奔图物理结果。ACK 后任务存活协议、
-  `lastAttemptHash` 作为采集归属、微信真机、生产部署与商业闭环也未在本候选中证明。
+- **旧 CI 只作历史证据：** `792a9f987af84a795431747248e546bf2f1abbb6` 的 CI run
+  `35235786133` 已完成 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 全绿，
+  288/288 verify 通过；installer run `35235786159` 两个 job 全绿。但该结果绑定 GitHub merge ref
+  `792a9f987 × main@50483cd28`，不能外推到当前 `main@3d35759ee` 的本地合并树。
+- **实例锁 P1：** 复审确认旧实现的“检查 inode/PID 后再按路径 unlink”存在真实 TOCTOU；Grok 首版
+  只增加二次检查仍未关闭窗口，Agy 判 `NO-GO`，官方 DeepSeek Hermes 在注入抢占下 4/4 复现两个
+  进程同时 `acquired`。最终方案删除外来陈旧锁的自动接管：活外来 PID 返回 `duplicate`；严格解析但
+  已死亡的外来 PID 返回 `stale_lock_requires_operator`，不删除、重命名、截断或覆盖。操作者必须先
+  确认服务停止且锁内 PID 不存在，再删除精确 `agent.pid`；设计与现场手册已同步该可用性代价。
+- **小程序 R12-F/H：** 服务端已接受的取消结果跨 hide/show 保存，并使更早详情响应失效；后台到达
+  不写屏，回前台也不能复活到机码；A 的取消不能修改 B 的页面。服务端已按归属拒绝的账号会粘性
+  停止重复确认请求。生命周期测试由 166 增至 **170/170**。
+- **现场文档：** 两份验收文档的 Agent 运行时身份端点已从不存在的 `/local/identity` 更正为
+  `/local/terminal-identity`；“文字助手模式不豁免”约束继续保留。
+- **本地验证：** Agent typecheck、`verify:print-scan-agent`、`verify:task-reliability`；miniapp
+  `verify:static`（含 170/170）；API `verify:print-scan-first-release`；仓库完整性、CI 门禁覆盖、部署
+  门禁同步、图谱一致性与 `git diff --check` 全部通过。
+- **独立复审：** Grok 完成实现；Agy 对最终 fail-closed 方案为本地集成 `GO`；Hermes 使用官方
+  `provider=deepseek`、`model=deepseek-v4-flash`、`reasoning=xhigh`（session
+  `20260918_003747_5a4be4`）确认原 P1 已结构性不可达、代码 `GO`；Claude Haiku 仅复核订单详情
+  两个前端文件（session `aaa48843-f010-4ad1-85f9-ca6e09889171`），结论 `GO`、170/170。
+- **证据边界：`SOURCE / LOCAL / REVIEW: GO`；`CI: NO-GO (CURRENT MERGED TREE NOT RUN)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+  macOS / 本地探针不能证明 Windows `tasklist` CSV、NTFS、ProgramData ACL、服务异常退出后的人工清锁、
+  真实双进程、奔图出纸/扫描或微信真机。ACK 后任务存活协议与 `lastAttemptHash` 归属口径未修改。
 
 2026-09-17 **扫描隐私 R3 与小程序跨端 R11 已进入当前主干；代码 / CI 证据已闭合，设备、生产与商业仍为 NO-GO。**
 当前 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`。扫描候选 PR #1036 已于
