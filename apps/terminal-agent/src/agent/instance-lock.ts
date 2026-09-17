@@ -5,7 +5,8 @@
  *
  * acquireLock() creates the PID file with wx (O_CREAT|O_EXCL). Concurrent
  * starters cannot both succeed. A stale file is unlinked only after a
- * bounded re-check that the observed dead pid still owns that inode.
+ * bounded re-check that a strictly parsed dead pid still owns that inode.
+ * Empty, prefix, or corrupt PID bytes are unproven and are never auto-removed.
  *
  * Windows: `tasklist /FI "PID eq <pid>"` is authoritative. If tasklist
  * errors or exits nonzero, the pid is treated as alive (fail-closed).
@@ -34,6 +35,8 @@ export interface InstanceLockTestHooks {
   lockPath?: string
   spawnSync?: typeof spawnSync
   sleep?: (ms: number) => void
+  writeSync?: (fd: number, data: string) => number
+  fsyncSync?: (fd: number) => void
 }
 
 interface OwnedLock {
@@ -123,6 +126,20 @@ type LockInspection =
   | { kind: 'not-regular' }
   | { kind: 'file'; pid: number | null; dev: number; ino: number }
 
+function parseStrictLockPid(raw: string): number | null {
+  // STRICT_PID_PARSE: the whole file is one decimal pid, optional one trailing newline.
+  const match = /^([1-9][0-9]{0,9})\n?$/.exec(raw)
+  if (!match || match[1] === undefined) return null
+  const pid = Number(match[1])
+  if (!Number.isSafeInteger(pid) || pid <= 0) return null
+  return pid
+}
+
+function hasProvenRemovablePid(pid: number | null): pid is number {
+  // UNPROVEN_PID_FAIL_CLOSED: empty/corrupt/prefix pid is not a dead owner.
+  return pid !== null
+}
+
 function inspectLockFile(pidFile: string): LockInspection {
   let stat: fs.Stats
   try {
@@ -139,10 +156,8 @@ function inspectLockFile(pidFile: string): LockInspection {
     fd = fs.openSync(pidFile, fs.constants.O_RDONLY | nofollow)
     const opened = fs.fstatSync(fd)
     if (!opened.isFile()) return { kind: 'not-regular' }
-    const raw = fs.readFileSync(fd, 'utf8').trim()
-    const parsed = parseInt(raw, 10)
-    const pid = Number.isInteger(parsed) && parsed > 0 ? parsed : null
-    return { kind: 'file', pid, dev: opened.dev, ino: opened.ino }
+    const raw = fs.readFileSync(fd, 'utf8')
+    return { kind: 'file', pid: parseStrictLockPid(raw), dev: opened.dev, ino: opened.ino }
   } catch (e: unknown) {
     const code = (e as NodeJS.ErrnoException).code
     if (code === 'ENOENT') return { kind: 'missing' }
@@ -153,14 +168,21 @@ function inspectLockFile(pidFile: string): LockInspection {
   }
 }
 
-function tryExclusiveCreate(pidFile: string, pid: number): OwnedLock | 'exists' {
+function tryExclusiveCreate(pidFile: string, pid: number): OwnedLock | 'exists' | 'publication-failed' {
   let fd: number | undefined
-  let created = false
   try {
     fd = fs.openSync(pidFile, 'wx', 0o600)
-    created = true
-    fs.writeSync(fd, `${pid}\n`)
-    fs.fsyncSync(fd)
+    const writeSync = testHooks?.writeSync ?? ((handle: number, data: string) => fs.writeSync(handle, data))
+    const fsyncSync = testHooks?.fsyncSync ?? ((handle: number) => fs.fsyncSync(handle))
+    const payload = `${pid}\n`
+    const written = writeSync(fd, payload)
+    // COMPLETE_PID_WRITE: a short write is publication failure, never a stale owner.
+    if (written !== Buffer.byteLength(payload, 'utf8')) {
+      const incomplete = new Error('incomplete pid write') as NodeJS.ErrnoException
+      incomplete.code = 'EIO'
+      throw incomplete
+    }
+    fsyncSync(fd)
     const st = fs.fstatSync(fd)
     const owned: OwnedLock = { path: pidFile, pid, fd, dev: st.dev, ino: st.ino }
     fd = undefined
@@ -173,16 +195,10 @@ function tryExclusiveCreate(pidFile: string, pid: number): OwnedLock | 'exists' 
         // ignore
       }
     }
-    if (created) {
-      try {
-        fs.unlinkSync(pidFile)
-      } catch {
-        // ignore
-      }
-    }
+    // PUBLICATION_FAIL_NO_UNLINK: never path-unlink an unproven entry.
     const code = (e as NodeJS.ErrnoException).code
     if (code === 'EEXIST' || code === 'EISDIR') return 'exists'
-    throw e
+    return 'publication-failed'
   }
 }
 
@@ -194,9 +210,10 @@ function tryRemoveStale(
   if (again.kind === 'missing') return true
   if (again.kind !== 'file') return false
   if (again.dev !== observed.dev || again.ino !== observed.ino) return false
+  if (!hasProvenRemovablePid(observed.pid) || !hasProvenRemovablePid(again.pid)) return false
   if (again.pid !== observed.pid) return false
   const selfPid = currentPid()
-  if (again.pid !== null && again.pid !== selfPid && isProcessAlive(again.pid)) return false
+  if (typeof again.pid === 'number' && again.pid !== selfPid && isProcessAlive(again.pid)) return false
   try {
     fs.unlinkSync(pidFile)
     return true
@@ -221,6 +238,9 @@ export function tryAcquireLock(): LockAcquireResult {
 
   for (let attempt = 0; attempt < MAX_ACQUIRE_ATTEMPTS; attempt++) {
     const created = tryExclusiveCreate(pidFile, pid)
+    if (created === 'publication-failed') {
+      return { status: 'unavailable', lockPath: pidFile, reason: 'lock_publication_failed' }
+    }
     if (created !== 'exists') {
       // OWNED_INODE_STILL_AT_PATH: a concurrent stale-unlinker may have replaced
       // the directory entry after wx succeeded. Only publish ownership if the
@@ -256,6 +276,9 @@ export function tryAcquireLock(): LockAcquireResult {
     }
     if (existing.pid !== null && existing.pid !== pid && isProcessAlive(existing.pid)) {
       return { status: 'duplicate', lockPath: pidFile, existingPid: existing.pid }
+    }
+    if (!hasProvenRemovablePid(existing.pid)) {
+      return { status: 'unavailable', lockPath: pidFile, reason: 'lock_pid_unproven' }
     }
 
     if (attempt === 0) {

@@ -41,6 +41,37 @@ const TASKLIST_FAIL_OPEN = `    if (result.error || result.status !== 0) {
       // TASKLIST_FAIL_CLOSED: unavailable tasklist must never look like a dead pid.
       return false
     }`
+const UNPROVEN_PID = `function hasProvenRemovablePid(pid: number | null): pid is number {
+  // UNPROVEN_PID_FAIL_CLOSED: empty/corrupt/prefix pid is not a dead owner.
+  return pid !== null
+}`
+const UNPROVEN_PID_MUTATED = `function hasProvenRemovablePid(pid: number | null): pid is number {
+  // UNPROVEN_PID_FAIL_CLOSED: empty/corrupt/prefix pid is not a dead owner.
+  return true
+}`
+const STRICT_PID_PARSE = `function parseStrictLockPid(raw: string): number | null {
+  // STRICT_PID_PARSE: the whole file is one decimal pid, optional one trailing newline.
+  const match = /^([1-9][0-9]{0,9})\\n?$/.exec(raw)
+  if (!match || match[1] === undefined) return null
+  const pid = Number(match[1])
+  if (!Number.isSafeInteger(pid) || pid <= 0) return null
+  return pid
+}`
+const STRICT_PID_PARSE_MUTATED = `function parseStrictLockPid(raw: string): number | null {
+  // STRICT_PID_PARSE: the whole file is one decimal pid, optional one trailing newline.
+  const parsed = parseInt(raw.trim(), 10)
+  const pid = Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  return pid
+}`
+const PUBLICATION_FAIL_NO_UNLINK = `    // PUBLICATION_FAIL_NO_UNLINK: never path-unlink an unproven entry.
+    const code = (e as NodeJS.ErrnoException).code
+    if (code === 'EEXIST' || code === 'EISDIR') return 'exists'
+    return 'publication-failed'`
+const PUBLICATION_FAIL_UNLINK = `    // PUBLICATION_FAIL_NO_UNLINK: never path-unlink an unproven entry.
+    try { fs.unlinkSync(pidFile) } catch { /* ignore */ }
+    const code = (e as NodeJS.ErrnoException).code
+    if (code === 'EEXIST' || code === 'EISDIR') return 'exists'
+    return 'publication-failed'`
 
 function sha256(filePath: string): string {
   return createHash('sha256').update(readFileSync(filePath)).digest('hex')
@@ -284,6 +315,108 @@ function verifyReentrantAcquire(): void {
   })
 }
 
+function verifyUnprovenEmptyLock(): void {
+  withIsolatedLock((_root, lockPath) => {
+    mkdirSync(join(_root, 'AIJobPrintAgent'), { recursive: true })
+    writeFileSync(lockPath, '')
+    const result = tryAcquireLock()
+    assert.equal(existsSync(lockPath), true, 'empty lock must not be unlinked')
+    assert.equal(readFileSync(lockPath, 'utf8'), '', 'empty lock bytes must be unchanged')
+    assert.equal(result.status, 'unavailable', 'empty lock must not be taken over')
+    if (result.status === 'unavailable') {
+      assert.equal(result.reason, 'lock_pid_unproven')
+    }
+  })
+}
+
+function verifyUnprovenCorruptLock(): void {
+  withIsolatedLock((_root, lockPath) => {
+    mkdirSync(join(_root, 'AIJobPrintAgent'), { recursive: true })
+    const corrupt = '123x\n'
+    writeFileSync(lockPath, corrupt)
+    const result = tryAcquireLock()
+    assert.equal(result.status, 'unavailable', 'prefix/corrupt pid must not be taken over')
+    if (result.status === 'unavailable') {
+      assert.equal(result.reason, 'lock_pid_unproven')
+    }
+    assert.equal(existsSync(lockPath), true, 'corrupt lock must not be unlinked')
+    assert.equal(readFileSync(lockPath, 'utf8'), corrupt, 'corrupt lock bytes must be unchanged')
+  })
+}
+
+function verifyUnprovenWhitespaceLock(): void {
+  withIsolatedLock((_root, lockPath) => {
+    mkdirSync(join(_root, 'AIJobPrintAgent'), { recursive: true })
+    const corrupt = '123 \n'
+    writeFileSync(lockPath, corrupt)
+    const result = tryAcquireLock()
+    assert.equal(existsSync(lockPath), true, 'whitespace-corrupt lock must not be unlinked')
+    assert.equal(readFileSync(lockPath, 'utf8'), corrupt, 'whitespace-corrupt lock bytes must be unchanged')
+    assert.equal(result.status, 'unavailable', 'whitespace-corrupt pid must not be taken over')
+    if (result.status === 'unavailable') {
+      assert.equal(result.reason, 'lock_pid_unproven')
+    }
+  })
+}
+
+function verifyPartialWriteDoesNotUnlink(): void {
+  withIsolatedLock((_root, lockPath) => {
+    __setInstanceLockHooksForTests({
+      writeSync: () => 1,
+    })
+    const result = tryAcquireLock()
+    assert.equal(result.status, 'unavailable', 'partial pid write must fail closed')
+    if (result.status === 'unavailable') {
+      assert.equal(result.reason, 'lock_publication_failed')
+    }
+    assert.equal(existsSync(lockPath), true, 'partial pid write must not unlink the wx path')
+  })
+}
+
+function verifyPublicationFailureDoesNotUnlinkSuccessor(): void {
+  withIsolatedLock((_root, lockPath) => {
+    __setInstanceLockHooksForTests({
+      writeSync: () => {
+        try {
+          unlinkSync(lockPath)
+        } catch {
+          // the wx inode may still be open
+        }
+        writeFileSync(lockPath, '1\n')
+        const error = new Error('ENOSPC') as NodeJS.ErrnoException
+        error.code = 'ENOSPC'
+        throw error
+      },
+    })
+    const result = tryAcquireLock()
+    assert.notEqual(result.status, 'acquired', 'publication failure must not report ownership')
+    assert.equal(existsSync(lockPath), true, 'publication failure must not delete an unproven path')
+    assert.equal(
+      readFileSync(lockPath, 'utf8'),
+      '1\n',
+      'successor content must survive publication-failure cleanup',
+    )
+  })
+}
+
+function verifyFsyncFailureDoesNotUnlink(): void {
+  withIsolatedLock((_root, lockPath) => {
+    __setInstanceLockHooksForTests({
+      fsyncSync: () => {
+        const error = new Error('EIO') as NodeJS.ErrnoException
+        error.code = 'EIO'
+        throw error
+      },
+    })
+    const result = tryAcquireLock()
+    assert.equal(result.status, 'unavailable', 'fsync failure must fail closed')
+    if (result.status === 'unavailable') {
+      assert.equal(result.reason, 'lock_publication_failed')
+    }
+    assert.equal(existsSync(lockPath), true, 'fsync failure must not path-unlink the wx file')
+  })
+}
+
 function verifyConcurrentClaimants(): void {
   assertExactlyOneAcquirer()
   assertExactlyOneAcquirer()
@@ -342,6 +475,27 @@ function verifyReverseMutations(): void {
     '--tasklist-fail-closed',
     /tasklist failure must treat the existing pid as alive/,
   )
+  mutateAndRun(
+    'unproven-pid-removable',
+    UNPROVEN_PID,
+    UNPROVEN_PID_MUTATED,
+    '--unproven-pid',
+    /empty lock bytes must be unchanged|empty lock must not be unlinked/,
+  )
+  mutateAndRun(
+    'strict-pid-parseint',
+    STRICT_PID_PARSE,
+    STRICT_PID_PARSE_MUTATED,
+    '--corrupt-pid',
+    /prefix\/corrupt pid must not be taken over/,
+  )
+  mutateAndRun(
+    'publication-fail-unlink',
+    PUBLICATION_FAIL_NO_UNLINK,
+    PUBLICATION_FAIL_UNLINK,
+    '--publication-failure',
+    /publication failure must not delete an unproven path|successor content must survive publication-failure cleanup/,
+  )
 }
 
 function verifyStartupOrderingSource(): void {
@@ -364,6 +518,10 @@ function verifyStartupOrderingSource(): void {
   assert.equal(lockSource.includes(WX_OPEN), true, 'lock create must use wx exclusive create')
   assert.equal(lockSource.includes('TASKLIST_FAIL_CLOSED'), true)
   assert.equal(lockSource.includes('SUCCESSOR_PID_GUARD'), true)
+  assert.equal(lockSource.includes('UNPROVEN_PID_FAIL_CLOSED'), true)
+  assert.equal(lockSource.includes('STRICT_PID_PARSE'), true)
+  assert.equal(lockSource.includes('PUBLICATION_FAIL_NO_UNLINK'), true)
+  assert.equal(lockSource.includes('COMPLETE_PID_WRITE'), true)
   const cleanupSource = readFileSync(cleanupSourcePath, 'utf8')
   assert.match(cleanupSource, /\blstatSync\s*\(/, 'cleanup must lstat and not follow links')
   assert.doesNotMatch(
@@ -538,6 +696,12 @@ export function runInstanceLockHardeningTests(): void {
   verifyTasklistFailClosed()
   verifyLockPathNotRegular()
   verifyReentrantAcquire()
+  verifyUnprovenEmptyLock()
+  verifyUnprovenCorruptLock()
+  verifyUnprovenWhitespaceLock()
+  verifyPartialWriteDoesNotUnlink()
+  verifyPublicationFailureDoesNotUnlinkSuccessor()
+  verifyFsyncFailureDoesNotUnlink()
   verifyConcurrentClaimants()
   verifyConcurrentStaleTakeover()
   verifyReverseMutations()
@@ -575,6 +739,30 @@ if (process.argv.includes('--lock-claim-worker')) {
 } else if (process.argv.includes('--tasklist-fail-closed')) {
   try {
     verifyTasklistFailClosed()
+    process.exit(0)
+  } catch (error) {
+    console.error(error)
+    process.exit(1)
+  }
+} else if (process.argv.includes('--unproven-pid')) {
+  try {
+    verifyUnprovenEmptyLock()
+    process.exit(0)
+  } catch (error) {
+    console.error(error)
+    process.exit(1)
+  }
+} else if (process.argv.includes('--corrupt-pid')) {
+  try {
+    verifyUnprovenCorruptLock()
+    process.exit(0)
+  } catch (error) {
+    console.error(error)
+    process.exit(1)
+  }
+} else if (process.argv.includes('--publication-failure')) {
+  try {
+    verifyPublicationFailureDoesNotUnlinkSuccessor()
     process.exit(0)
   } catch (error) {
     console.error(error)

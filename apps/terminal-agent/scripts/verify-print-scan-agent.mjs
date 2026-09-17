@@ -71,8 +71,17 @@ mustContain(
 
 mustContain(
   instanceLock,
-  ["openSync(pidFile, 'wx'", 'TASKLIST_FAIL_CLOSED', 'SUCCESSOR_PID_GUARD', 'OWNED_INODE_STILL_AT_PATH'],
-  'instance lock must exclusive-create, fail-closed on tasklist, and never release a successor',
+  [
+    "openSync(pidFile, 'wx'",
+    'TASKLIST_FAIL_CLOSED',
+    'SUCCESSOR_PID_GUARD',
+    'OWNED_INODE_STILL_AT_PATH',
+    'UNPROVEN_PID_FAIL_CLOSED',
+    'STRICT_PID_PARSE',
+    'PUBLICATION_FAIL_NO_UNLINK',
+    'COMPLETE_PID_WRITE',
+  ],
+  'instance lock must exclusive-create, fail-closed on unproven pid/publication, and never release a successor',
 )
 
 mustContain(
