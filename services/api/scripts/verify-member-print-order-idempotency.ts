@@ -297,7 +297,6 @@ async function main(): Promise<void> {
         payStatus: opts.payStatus ?? 'unpaid',
         paymentSource: opts.paymentSource ?? null,
         paidAt: opts.paidAt ?? null,
-        taskStatus: 'pending_release',
         pickupCodeHash: opts.pickupCodeHash ?? hashPickupCode(opts.code),
         pickupCodeEnc: encryptSecret(opts.code),
         pickupCodeCreatedAt: new Date(),
