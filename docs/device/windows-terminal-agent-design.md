@@ -208,12 +208,15 @@ Agent 首次启动时向后端注册本终端，获取 `terminalId` 和 `agentTo
 
 ### 2.12 单实例锁
 
-Agent 启动时创建 **Windows 全局 Mutex**（`Global\AIJobPrintAgentSingleton`）：
+当前实现使用 `%ProgramData%\AIJobPrintAgent\agent.pid` PID 文件锁，并以 `wx`
+独占创建目录项：
 
-- Mutex 创建成功：继续启动流程
-- Mutex 已存在（另一实例正在运行）：写日志 `DUPLICATE_INSTANCE_DETECTED`，`process.exit(1)`
-- 无论正常退出还是崩溃，Windows 自动释放 Mutex，下次启动可重新创建
-- Windows 服务的"崩溃自动重启"机制天然保证 Mutex 释放后重启不会死锁
+- 创建成功且路径仍指向本进程持有的文件：继续启动。
+- 文件记录的是仍存活的外来 PID：写 `DUPLICATE_INSTANCE` 并退出。
+- 文件记录的是已死亡的外来 PID：返回 `stale_lock_requires_operator`，不自动删除、重命名、
+  截断或覆盖；操作者必须先确认服务已停止且该 PID 不存在，再删除精确锁路径并重启。
+- 空、损坏、符号链接、目录或无法确认的 PID 一律 fail-closed。
+- 正常退出只在 fd、路径 inode 与 PID 均仍属于本进程时释放；异常终止可能留下需要人工清理的锁。
 
 ---
 
@@ -889,14 +892,17 @@ Agent 内部捕获 `uncaughtException` / `unhandledRejection`，写日志后 `pr
 ### 8.8 单实例锁
 
 ```
-Agent 启动 → CreateMutex("Global\AIJobPrintAgentSingleton")
+Agent 启动 → open(%ProgramData%\AIJobPrintAgent\agent.pid, "wx")
     │
-    ├─ 成功（首个实例）→ 继续启动
-    │
-    └─ 失败（已有实例）→ 写日志 DUPLICATE_INSTANCE_DETECTED → process.exit(1)
+    ├─ 独占创建成功且路径仍指向自有 inode → 继续启动
+    ├─ 外来 PID 存活 → DUPLICATE_INSTANCE → process.exit(1)
+    ├─ 外来 PID 已死亡 → stale_lock_requires_operator → process.exit(1)
+    └─ PID / 文件类型 / 发布状态不可证明 → fail-closed → process.exit(1)
 ```
 
-Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后续重启可正常创建。Windows 服务的自动重启机制与 Mutex 释放天然衔接，不会死锁。
+不再自动接管外来陈旧锁。这样牺牲异常退出后的自动恢复，换取不让两个并发启动者通过
+`inspect(path) -> unlink(path)` 竞态同时获得所有权。正常退出会释放自有锁；强杀、断电、系统崩溃或
+原生崩溃后，按现场手册核实进程与服务状态，再人工删除 `agent.pid`。
 
 ---
 
@@ -922,7 +928,7 @@ Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后�
 | V12 | **PDF 合并性能（50 页 ADF 扫描）** | 生成 50 张 A4 JPEG，合并为 PDF，记录耗时 | ≤ 10 秒 |
 | V13 | **磁盘 ACL 验证** | 以普通用户账号尝试读写 `%ProgramData%\AIJobPrintAgent\temp\` | 普通用户收到拒绝访问错误 |
 | V14 | **断网重连幂等** | 断网时完成打印，网络恢复后观察 PATCH 行为 | completed 只上报一次，不重复计费 |
-| V15 | **单实例 Mutex** | 同时启动两个 Agent 实例 | 第二个实例立即退出并写日志 |
+| V15 | **单实例 PID 锁** | 同时启动两个 Agent；再模拟异常退出留下外来死 PID 锁 | 第二个实例立即退出；死 PID 锁拒绝自动接管并给出人工清理提示 |
 
 ### Phase 8.1 — MVP（技术验证通过后实现）
 
@@ -931,7 +937,7 @@ Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后�
 | 能力 | 说明 | 状态 |
 |------|------|------|
 | 终端注册 | 注册获取 terminalId + agentToken（`POST /auth/terminal/register`） | ✅ Phase 8.1B |
-| 单实例锁 | PID 文件锁（`%ProgramData%\AIJobPrintAgent\agent.pid`），ESRCH 僵尸锁检测，重复启动 exit 1 | ✅ Phase 8.1C |
+| 单实例锁 | PID 文件锁（`%ProgramData%\AIJobPrintAgent\agent.pid`）；活外来 PID 重复启动 exit 1，死外来 PID `stale_lock_requires_operator` 且不自动删除 | ✅ Phase 8.1C；新 Windows 主机需复验人工恢复 |
 | 心跳上报 | 每 30s（`PUT /terminals/:id/heartbeat`） | ✅ Phase 8.1B |
 | 打印任务 Claim | `POST /terminals/:id/tasks/claim`，5s 轮询 | ✅ Phase 8.1B |
 | 打印任务执行 | 下载 → MD5 校验 → pdf-to-printer/SumatraPDF → 状态回传 | ✅ Phase 8.1B |
@@ -943,7 +949,7 @@ Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后�
 | 临时文件清理 | try/finally 任务结束立即删除临时 PDF | ✅ Phase 8.1B |
 | image-to-pdf 路由 | pdfkit 将 JPG/PNG 转为临时 PDF → Method B | ✅ Phase 8.1A |
 | 断网重试专项验证 | 真机断网条件下验证 pending_patches 入队与自动重试 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
-| 单实例锁专项验证 | 同时启动两个 Agent 进程，验证 DUPLICATE_INSTANCE exit 1 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
+| 单实例锁专项验证 | 同时启动两个 Agent 验证 DUPLICATE_INSTANCE；异常终止后验证死 PID 锁 fail-closed 与人工恢复 | ✅ Phase 8.2C 双启动基线完成；死锁人工恢复需在新 Windows 主机复验 |
 | Windows 服务专项验证 | 安装→重启自启→心跳持续→卸载全流程 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
 | local-api-server | 127.0.0.1:9527，localAuthToken + actionToken 全部鉴权 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
 | actionToken HMAC | HMAC-SHA256 签名校验 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |

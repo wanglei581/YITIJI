@@ -15,7 +15,7 @@
 | P2 | **手上有桥接令牌的值** | 取自设置 GitHub secret `KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN` 时用的同一来源（**secret 写进去读不回来**） | 扫码登录与 U 盘导入会静默降级为「未配置」，手机号登录仍可用但两条链路验不了 |
 | P3 | **绑定码不要提前生成** | 见 B5b：默认有效期只有 10 分钟，到现场必过期 | 一次性码作废，只能回后台重开 |
 | P4 | **生产已部署到要验的那个提交** | 对照 `~/deploy-baseline-*.txt` 的 bundle 哈希与 4xx 机器码 | 验的是旧版本，现场结论对不上代码 |
-| P5 | **Kiosk 是生产构建且运行时身份可取** | 构建必须 `VITE_API_MODE=http`；浏览器从本机 Agent `http://127.0.0.1:9527/local/identity` 取得终端身份 | dev/preview 或 mock 模式不能作为生产验收；禁止用 `VITE_TERMINAL_ID` 给克隆机器硬编码身份 |
+| P5 | **Kiosk 是生产构建且运行时身份可取** | 构建必须 `VITE_API_MODE=http`；浏览器从本机 Agent `http://127.0.0.1:9527/local/terminal-identity` 取得终端身份 | dev/preview 或 mock 模式不能作为生产验收；禁止用 `VITE_TERMINAL_ID` 给克隆机器硬编码身份 |
 
 > P1 为什么只能人去查：`createPayAttempt` 里**订单查询排在渠道检查之前**
 > （`services/api/src/payment/online-payment.service.ts` 第 189–190 行 `findUnique` → `ORDER_NOT_FOUND`），

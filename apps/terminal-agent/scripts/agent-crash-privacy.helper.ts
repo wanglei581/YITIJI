@@ -37,6 +37,7 @@ if (instanceLockOverride) {
 const {
   __resetInstanceLockForTests,
   __setInstanceLockHooksForTests,
+  acquireLock,
   getLockPath,
   releaseLock,
   tryAcquireLock,
@@ -92,6 +93,11 @@ const PUBLICATION_FAIL_UNLINK = `    // PUBLICATION_FAIL_NO_UNLINK: never path-u
     const code = (e as NodeJS.ErrnoException).code
     if (code === 'EEXIST' || code === 'EISDIR') return 'exists'
     return 'publication-failed'`
+const STALE_OPERATOR = `      // STALE_LOCK_REQUIRES_OPERATOR: never auto-remove a foreign dead pid file.
+      return { status: 'unavailable', lockPath: pidFile, reason: 'stale_lock_requires_operator' }`
+const STALE_OPERATOR_MUTATED = `      // STALE_LOCK_REQUIRES_OPERATOR: never auto-remove a foreign dead pid file.
+      try { fs.unlinkSync(pidFile) } catch { /* ignore */ }
+      continue`
 
 function sleepSync(ms: number): void {
   if (ms <= 0) return
@@ -267,12 +273,31 @@ function verifyExclusiveCreateAndLiveDuplicate(): void {
   })
 }
 
-function verifyStaleTakeover(): void {
+function verifyForeignStaleRequiresOperator(): void {
   withIsolatedLock((_root, lockPath) => {
     mkdirSync(join(_root, 'AIJobPrintAgent'), { recursive: true })
-    writeFileSync(lockPath, '999999\n')
+    const stale = '999999\n'
+    writeFileSync(lockPath, stale)
+    const before = lstatSync(lockPath)
     const result = tryAcquireLock()
-    assert.equal(result.status, 'acquired', 'a dead pid must be take-overable')
+    assert.equal(result.status, 'unavailable', 'dead foreign stale must not be auto-reclaimed')
+    if (result.status === 'unavailable') {
+      assert.equal(result.reason, 'stale_lock_requires_operator')
+    }
+    assert.equal(existsSync(lockPath), true, 'dead foreign stale must remain for the operator')
+    assert.equal(readFileSync(lockPath, 'utf8'), stale, 'dead foreign stale bytes must be unchanged')
+    const after = lstatSync(lockPath)
+    assert.equal(after.dev, before.dev, 'dead foreign stale inode must be unchanged')
+    assert.equal(after.ino, before.ino, 'dead foreign stale inode must be unchanged')
+  })
+}
+
+function verifyOwnPidLeftoverIsReclaimable(): void {
+  withIsolatedLock((_root, lockPath) => {
+    mkdirSync(join(_root, 'AIJobPrintAgent'), { recursive: true })
+    writeFileSync(lockPath, `${process.pid}\n`)
+    const result = tryAcquireLock()
+    assert.equal(result.status, 'acquired', 'a leftover whose pid equals currentPid may be reclaimed')
     assert.equal(readFileSync(lockPath, 'utf8').trim(), String(process.pid))
   })
 }
@@ -284,6 +309,45 @@ function verifySuccessorSafeRelease(): void {
     releaseLock()
     assert.equal(existsSync(lockPath), true, 'successor-owned pid file must survive predecessor release')
     assert.equal(readFileSync(lockPath, 'utf8').trim(), '1')
+  })
+}
+
+function verifyOperatorCleanupThenAcquire(): void {
+  withIsolatedLock((_root, lockPath) => {
+    mkdirSync(join(_root, 'AIJobPrintAgent'), { recursive: true })
+    writeFileSync(lockPath, '999999\n')
+    const blocked = tryAcquireLock()
+    assert.equal(blocked.status, 'unavailable')
+    if (blocked.status === 'unavailable') {
+      assert.equal(blocked.reason, 'stale_lock_requires_operator')
+    }
+    unlinkSync(lockPath)
+    const result = tryAcquireLock()
+    assert.equal(result.status, 'acquired', 'operator cleanup followed by one fresh acquire must work')
+    assert.equal(readFileSync(lockPath, 'utf8').trim(), String(process.pid))
+  })
+}
+
+function verifyStaleOperatorMessage(): void {
+  withIsolatedLock((_root, lockPath) => {
+    mkdirSync(join(_root, 'AIJobPrintAgent'), { recursive: true })
+    writeFileSync(lockPath, '999999\n')
+    const originalExit = process.exit
+    const logs = captureStdio(() => {
+      process.exit = ((code?: number) => {
+        throw new Error(`exit:${code ?? 0}`)
+      }) as typeof process.exit
+      try {
+        assert.throws(() => acquireLock(), /exit:1/)
+      } finally {
+        process.exit = originalExit
+      }
+    })
+    assert.match(logs, /stale_lock_requires_operator/)
+    assert.match(logs, /verify no agent process is running/)
+    assert.match(logs, /delete /)
+    assert.match(logs, new RegExp(lockPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    assert.equal(readFileSync(lockPath, 'utf8'), '999999\n', 'acquireLock must not auto-clean a foreign stale lock')
   })
 }
 
@@ -340,7 +404,7 @@ function verifyUnprovenEmptyLock(): void {
     assert.equal(readFileSync(lockPath, 'utf8'), '', 'empty lock bytes must be unchanged')
     assert.equal(result.status, 'unavailable', 'empty lock must not be taken over')
     if (result.status === 'unavailable') {
-      assert.equal(result.reason, 'lock_pid_unproven')
+      assert.equal(result.reason, 'lock_pid_unproven', 'empty lock must not be unlinked')
     }
   })
 }
@@ -353,7 +417,7 @@ function verifyUnprovenCorruptLock(): void {
     const result = tryAcquireLock()
     assert.equal(result.status, 'unavailable', 'prefix/corrupt pid must not be taken over')
     if (result.status === 'unavailable') {
-      assert.equal(result.reason, 'lock_pid_unproven')
+      assert.equal(result.reason, 'lock_pid_unproven', 'prefix/corrupt pid must not be taken over')
     }
     assert.equal(existsSync(lockPath), true, 'corrupt lock must not be unlinked')
     assert.equal(readFileSync(lockPath, 'utf8'), corrupt, 'corrupt lock bytes must be unchanged')
@@ -438,8 +502,33 @@ function verifyConcurrentClaimants(): void {
   assertExactlyOneAcquirer()
 }
 
-function verifyConcurrentStaleTakeover(): void {
-  assertExactlyOneAcquirer(999999)
+function verifyConcurrentForeignStaleDoesNotAcquire(): void {
+  const root = isolatedRoot()
+  try {
+    mkdirSync(join(root, 'AIJobPrintAgent'), { recursive: true })
+    const lockPath = join(root, 'AIJobPrintAgent', 'agent.pid')
+    const stale = '999999\n'
+    writeFileSync(lockPath, stale)
+    const before = lstatSync(lockPath)
+    const { parsed } = spawnClaimWorkers(root, 999999)
+    const acquired = parsed.filter((row) => row.status === 'acquired')
+    assert.equal(
+      acquired.length,
+      0,
+      `two concurrent claimants cannot acquire a foreign stale lock, got ${JSON.stringify(parsed)}`,
+    )
+    assert.equal(
+      parsed.every((row) => row.status === 'unavailable'),
+      true,
+      `both claimants must be unavailable, got ${JSON.stringify(parsed)}`,
+    )
+    assert.equal(readFileSync(lockPath, 'utf8'), stale, 'dead foreign stale bytes must be unchanged')
+    const after = lstatSync(lockPath)
+    assert.equal(after.dev, before.dev, 'dead foreign stale inode must be unchanged')
+    assert.equal(after.ino, before.ino, 'dead foreign stale inode must be unchanged')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 }
 
 function mutateAndRun(label: string, original: string, mutated: string, flag: string, mustFailOn: RegExp): void {
@@ -500,6 +589,13 @@ function verifyReverseMutations(): void {
     /successor-owned pid file must survive predecessor release/,
   )
   mutateAndRun(
+    'stale-auto-unlink',
+    STALE_OPERATOR,
+    STALE_OPERATOR_MUTATED,
+    '--foreign-stale',
+    /dead foreign stale must not be auto-reclaimed|dead foreign stale bytes must be unchanged/,
+  )
+  mutateAndRun(
     'tasklist-fail-open',
     TASKLIST_FAIL_CLOSED,
     TASKLIST_FAIL_OPEN,
@@ -511,7 +607,7 @@ function verifyReverseMutations(): void {
     UNPROVEN_PID,
     UNPROVEN_PID_MUTATED,
     '--unproven-pid',
-    /empty lock bytes must be unchanged|empty lock must not be unlinked/,
+    /empty lock bytes must be unchanged|empty lock must not be unlinked|empty lock must not be taken over/,
   )
   mutateAndRun(
     'strict-pid-parseint',
@@ -553,6 +649,15 @@ function verifyStartupOrderingSource(): void {
   assert.equal(lockSource.includes('STRICT_PID_PARSE'), true)
   assert.equal(lockSource.includes('PUBLICATION_FAIL_NO_UNLINK'), true)
   assert.equal(lockSource.includes('COMPLETE_PID_WRITE'), true)
+  assert.equal(lockSource.includes('STALE_LOCK_REQUIRES_OPERATOR'), true)
+  assert.equal(lockSource.includes("reason: 'stale_lock_requires_operator'"), true)
+  assert.equal(lockSource.includes('beforeProvenUnlink'), false)
+  assert.equal(lockSource.includes('PROVEN_UNLINK_SANDWICH'), false)
+  assert.equal(
+    /\brenameSync\s*\(/.test(lockSource),
+    false,
+    'instance lock must not rename-over a path that may already name a successor',
+  )
   const cleanupSource = readFileSync(cleanupSourcePath, 'utf8')
   assert.match(cleanupSource, /\blstatSync\s*\(/, 'cleanup must lstat and not follow links')
   assert.doesNotMatch(
@@ -722,7 +827,8 @@ function verifyMissingTempDirIsOk(): void {
 
 export function runInstanceLockHardeningTests(): void {
   verifyExclusiveCreateAndLiveDuplicate()
-  verifyStaleTakeover()
+  verifyForeignStaleRequiresOperator()
+  verifyOwnPidLeftoverIsReclaimable()
   verifySuccessorSafeRelease()
   verifyTasklistFailClosed()
   verifyLockPathNotRegular()
@@ -734,7 +840,9 @@ export function runInstanceLockHardeningTests(): void {
   verifyPublicationFailureDoesNotUnlinkSuccessor()
   verifyFsyncFailureDoesNotUnlink()
   verifyConcurrentClaimants()
-  verifyConcurrentStaleTakeover()
+  verifyConcurrentForeignStaleDoesNotAcquire()
+  verifyOperatorCleanupThenAcquire()
+  verifyStaleOperatorMessage()
   verifyReverseMutations()
   console.log('PASS instance-lock hardening')
 }
@@ -762,6 +870,14 @@ if (process.argv.includes('--lock-claim-worker')) {
 } else if (process.argv.includes('--successor-release')) {
   try {
     verifySuccessorSafeRelease()
+    process.exit(0)
+  } catch (error) {
+    console.error(error)
+    process.exit(1)
+  }
+} else if (process.argv.includes('--foreign-stale')) {
+  try {
+    verifyForeignStaleRequiresOperator()
     process.exit(0)
   } catch (error) {
     console.error(error)

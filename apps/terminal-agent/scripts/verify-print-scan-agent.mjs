@@ -80,8 +80,9 @@ mustContain(
     'STRICT_PID_PARSE',
     'PUBLICATION_FAIL_NO_UNLINK',
     'COMPLETE_PID_WRITE',
+    'STALE_LOCK_REQUIRES_OPERATOR',
   ],
-  'instance lock must exclusive-create, fail-closed on unproven pid/publication, and never release a successor',
+  'instance lock must exclusive-create, fail-closed on unproven/foreign-stale pid, and never release a successor',
 )
 
 mustContain(

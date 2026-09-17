@@ -117,6 +117,12 @@ Page({
     // 开页那位（不随清场销毁）与「已经换给别人了」的粘性标记。见 _resolveAccount。
     this._openerAccount = ''
     this._foreignBlocked = false
+    // 服务端已经拒绝为哪个账号确认归属（requireOwned 404）。hide/show 会 +1 代次，
+    // 但不能让被拒的那位每回到前台就再刷一次服务端。
+    this._ownerDeniedFor = ''
+    // 取消已在服务端生效、但写屏可能被 hide/show 代次挡掉。只对本单 + 发出时那个账号
+    // 有效，换人必须丢掉，否则 A 的取消会改 B 的页面。
+    this._cancelCommitted = null
     // 取消链的去重锁。必须显式初始化：留成 undefined 不影响判断，但显式写出来才能
     // 和 _clearSensitive 里的释放对上。
     this._cancelLock = false
@@ -163,6 +169,7 @@ Page({
     if (foreign || resolved.state === 'changed') {
       if (foreign) this._foreignBlocked = true
       this._account = ''
+      this._cancelCommitted = null
       // 身份一变，在途那一发就不再属于本页任何状态：setIdentity('') +1 代次，
       // 把上一位在途的详情 / 取消请求一并作废。只清 data 不作废请求的话，
       // 那几个迟到的响应会把上一位的到机码原样写回来。
@@ -180,6 +187,7 @@ Page({
     // 保持已经写好的说明，一个请求都不发。
     if (this._foreignBlocked) {
       this._account = ''
+      this._cancelCommitted = null
       return 'changed'
     }
 
@@ -294,6 +302,67 @@ Page({
     })
   },
 
+  _isOwnerDeniedError(err) {
+    return !!(err && (Number(err.statusCode) === 404 || err.code === 'PRINT_ORDER_NOT_FOUND'))
+  },
+
+  _denyOwner(account) {
+    if (isMemberIdentity(account)) this._ownerDeniedFor = account
+    this._clearSensitive({
+      loading: false,
+      errorTitle: ERROR_TITLE_DEFAULT,
+      error: '订单不存在或无权访问',
+    })
+  },
+
+  /**
+   * 取消 200 属于发出时那个账号、且仍是这一张订单。hide/show 只 +1 代次，
+   * 不是换人 —— 代次对不上也要把「已经作废」记下，否则回前台那一发旧详情
+   * 会把到机码写回来。换人则一律不碰屏幕。
+   */
+  _sameOwnerCancel(token) {
+    if (!token || token.channel !== 'cancel') return false
+    if (!isMemberIdentity(token.identity)) return false
+    if (token.orderId && token.orderId !== this._orderId) return false
+    const state = this._resolveAccount()
+    if (state === 'changed' || state === 'unusable') return false
+    if (this._foreignBlocked) return false
+    if (!sameAccount(token.identity, this._account)) return false
+    if (this._openerAccount && this._openerAccount !== this._account) return false
+    return true
+  },
+
+  _commitCancelSuccess(token, raw) {
+    if (!this._sameOwnerCancel(token)) return false
+    this._cancelCommitted = {
+      orderId: this._orderId,
+      account: token.identity,
+      raw,
+    }
+    // 跨通道因果：作废所有更早的详情响应，含 hide/show 之后已经发出的那一发 GET。
+    this._guard.issue('detail')
+    if (!this._guard.isActive()) return false
+    this.setData({
+      loading: false,
+      cancelling: false,
+      error: '',
+      errorTitle: ERROR_TITLE_DEFAULT,
+      detail: toDetail(raw),
+    })
+    return true
+  },
+
+  _detailAfterCancelCommit(raw) {
+    const committed = this._cancelCommitted
+    if (!committed) return raw
+    if (committed.orderId !== this._orderId) return raw
+    if (committed.account !== this._account) return raw
+    if (canCancelCloudOrder(raw)) return committed.raw
+    const pickupRaw = (!raw.status && raw.pickupStatus === 'pending') ? (raw.pickupCode || '') : ''
+    if (pickupRaw) return committed.raw
+    return raw
+  },
+
   onShow() {
     this._guard.activate()
     // 回前台必须重新核一次账号并重新取数：用户完全可能在本页停留期间被静默登出，
@@ -332,7 +401,14 @@ Page({
       this.setData({ loading: false, errorTitle: '无法打开订单', error: '订单 ID 缺失' })
       return
     }
-    const token = this._guard.issue('detail', { orderId: this._orderId })
+    const confirming = !this._openerAccount && isMemberIdentity(this._account)
+    // 服务端已经拒绝过这个账号：别拿同一个账号再问一遍。守卫必须在发请求这一处，
+    // 每一次 onShow 都会走到这里。
+    if (confirming && this._ownerDeniedFor === this._account) {
+      this._denyOwner(this._account)
+      return
+    }
+    const token = this._guard.issue('detail', { orderId: this._orderId, confirming })
     this.setData({ loading: true, error: '', errorTitle: ERROR_TITLE_DEFAULT })
     api.getCloudPrintOrder(this._orderId)
       .then((raw) => {
@@ -346,7 +422,7 @@ Page({
         this.setData({
           loading: false,
           cancelling: false,
-          detail: toDetail(raw),
+          detail: toDetail(this._detailAfterCancelCommit(raw)),
         })
       })
       .catch((err) => {
@@ -357,7 +433,14 @@ Page({
         // 失败**不追确认请求、也不建立归属**：确认请求是为"归属未定那一发成功了、
         // 但证明不了归属"准备的。失败时既没有归属可证，也没有内容可写；照追就会在
         // 服务端持续 404（B 拿着 A 的 orderId）时变成一个打不完的循环。
+        if (token.confirming && this._isOwnerDeniedError(err) && isMemberIdentity(token.identity)) {
+          this._ownerDeniedFor = token.identity
+        }
         if (!this._verifyChannel(token)) return
+        if (token.confirming && this._ownerDeniedFor === this._account) {
+          this._denyOwner(this._account)
+          return
+        }
         this.setData({
           loading: false,
           errorTitle: ERROR_TITLE_DEFAULT,
@@ -409,20 +492,7 @@ Page({
     this.setData({ cancelling: true })
     api.cancelCloudPrintOrder(this._orderId)
       .then((raw) => {
-        if (this._verify(token) !== 'accept') return
-        // **跨通道因果**：取消成功意味着服务端此刻已经把到机码作废了（本页自己那句
-        // 「取消后到机码立即失效，且不能恢复」说的就是这件事）。而**更早发出、
-        // 仍在途**的那一发详情带着取消之前的 pending + 到机码，它在自己通道上还是
-        // "最新一次"，逐通道 latest-wins 拦不住它 —— 落地就是把一张已经失效的码
-        // 重新画回屏幕，连「取消订单」按钮都会跟着解开。
-        //
-        // 在 detail 通道上空领一个序号（不发请求）：latest-wins 随即把所有更早的
-        // 详情响应判成过期。用的是守卫本来就有的那套判据，不另起一个状态。
-        this._guard.issue('detail')
-        this.setData({
-          cancelling: false,
-          detail: toDetail(raw),
-        })
+        this._commitCancelSuccess(token, raw)
       })
       .catch((err) => {
         if (!this._verifyChannel(token)) return

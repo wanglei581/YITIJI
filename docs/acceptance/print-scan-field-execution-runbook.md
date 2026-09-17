@@ -418,7 +418,34 @@ pnpm --filter terminal-agent agent 2>&1 | Tee-Object (Join-Path $EvidenceRoot "P
 
 恢复：
 
-先在窗口 B 中按 `Ctrl+C` 停止降级 Agent，确认该进程退出后再执行恢复。否则恢复后启动的新 Agent 会因为 `agent.pid` 实例锁仍存在而退出。
+先在窗口 B 中按 `Ctrl+C` 停止降级 Agent，确认该进程退出后再执行恢复。正常退出应自行释放
+`agent.pid`；强杀、断电或崩溃可能留下外来死 PID 锁，新 Agent 会以
+`stale_lock_requires_operator` 拒绝启动。只有在服务已停止且锁内 PID 确认不存在时，才允许人工清锁：
+
+```powershell
+$AgentDataDir = Join-Path $env:PROGRAMDATA "AIJobPrintAgent"
+$AgentPidPath = Join-Path $AgentDataDir "agent.pid"
+$Services = Get-CimInstance Win32_Service | Where-Object {
+  $_.Name -in @("AIJobPrintAgent", "aijobprintagent.exe") -or $_.DisplayName -eq "AIJobPrintAgent"
+}
+if ($Services | Where-Object { $_.State -ne "Stopped" }) {
+  throw "Stop every AIJobPrintAgent service before removing $AgentPidPath"
+}
+if (Test-Path $AgentPidPath -PathType Leaf) {
+  $LockPidRaw = (Get-Content -LiteralPath $AgentPidPath -Raw).Trim()
+  if ($LockPidRaw -notmatch '^[1-9][0-9]{0,9}$') {
+    throw "Lock PID is not strictly valid; preserve the file and escalate: $AgentPidPath"
+  }
+  $LockPid = [int64]$LockPidRaw
+  if (Get-Process -Id $LockPid -ErrorAction SilentlyContinue) {
+    throw "PID $LockPid still exists; do not remove $AgentPidPath"
+  }
+  Remove-Item -LiteralPath $AgentPidPath
+}
+```
+
+不得同时删除 `agent.db`、`agent.token` 或配置文件；清锁后只启动一个 Agent，并保存服务状态、锁内
+PID、清锁时间和重启日志作为现场证据。
 
 ```powershell
 $AgentDataDir = Join-Path $env:PROGRAMDATA "AIJobPrintAgent"

@@ -4,16 +4,22 @@
  * Single-instance guarantee using a PID file lock.
  *
  * acquireLock() creates the PID file with wx (O_CREAT|O_EXCL). Concurrent
- * starters cannot both succeed. A stale file is unlinked only after a
- * bounded re-check that a strictly parsed dead pid still owns that inode.
- * Empty, prefix, or corrupt PID bytes are unproven and are never auto-removed.
+ * starters cannot both succeed. A live foreign pid is duplicate. A strictly
+ * parsed dead foreign pid is fail-closed (`stale_lock_requires_operator`):
+ * this process never unlinks, renames, truncates, overwrites, or retry-deletes
+ * that directory entry. Empty, prefix, or corrupt PID bytes are unproven and
+ * are never auto-removed. A leftover whose pid equals currentPid may be
+ * reclaimed: one OS pid cannot name two live processes.
  *
  * Windows: `tasklist /FI "PID eq <pid>"` is authoritative. If tasklist
  * errors or exits nonzero, the pid is treated as alive (fail-closed).
  *
  * releaseLock() unlinks only when the path still names this process's
- * inode and pid. A successor that has taken over the same path is left
- * untouched, including from process.on('exit') during a dying predecessor.
+ * inode and pid. Foreign starters no longer delete a live entry to republish,
+ * so owner release stays a guarded path unlink. A pid overwrite at the same
+ * inode is still refused (SUCCESSOR_PID_GUARD).
+ *
+ * macOS/Linux tests do not prove Windows NTFS, share-delete, or inode uniqueness.
  *
  * Lock file paths:
  *   Windows: %ProgramData%\AIJobPrintAgent\agent.pid
@@ -202,18 +208,10 @@ function tryExclusiveCreate(pidFile: string, pid: number): OwnedLock | 'exists' 
   }
 }
 
-function tryRemoveStale(
-  pidFile: string,
-  observed: { pid: number | null; dev: number; ino: number },
-): boolean {
+function tryRemoveOwnLock(pidFile: string, pid: number): boolean {
   const again = inspectLockFile(pidFile)
   if (again.kind === 'missing') return true
-  if (again.kind !== 'file') return false
-  if (again.dev !== observed.dev || again.ino !== observed.ino) return false
-  if (!hasProvenRemovablePid(observed.pid) || !hasProvenRemovablePid(again.pid)) return false
-  if (again.pid !== observed.pid) return false
-  const selfPid = currentPid()
-  if (typeof again.pid === 'number' && again.pid !== selfPid && isProcessAlive(again.pid)) return false
+  if (again.kind !== 'file' || again.pid !== pid) return false
   try {
     fs.unlinkSync(pidFile)
     return true
@@ -242,9 +240,8 @@ export function tryAcquireLock(): LockAcquireResult {
       return { status: 'unavailable', lockPath: pidFile, reason: 'lock_publication_failed' }
     }
     if (created !== 'exists') {
-      // OWNED_INODE_STILL_AT_PATH: a concurrent stale-unlinker may have replaced
-      // the directory entry after wx succeeded. Only publish ownership if the
-      // path still names the inode we hold open.
+      // OWNED_INODE_STILL_AT_PATH: only publish ownership if the path still
+      // names the inode we hold open after wx succeeded.
       let disk: fs.Stats | undefined
       try {
         disk = fs.lstatSync(pidFile)
@@ -274,17 +271,18 @@ export function tryAcquireLock(): LockAcquireResult {
     if (existing.kind === 'not-regular') {
       return { status: 'unavailable', lockPath: pidFile, reason: 'lock_path_not_regular_file' }
     }
-    if (existing.pid !== null && existing.pid !== pid && isProcessAlive(existing.pid)) {
-      return { status: 'duplicate', lockPath: pidFile, existingPid: existing.pid }
-    }
     if (!hasProvenRemovablePid(existing.pid)) {
       return { status: 'unavailable', lockPath: pidFile, reason: 'lock_pid_unproven' }
     }
-
-    if (attempt === 0) {
-      log('instance-lock: stale lock detected, taking over')
+    if (existing.pid !== pid && isProcessAlive(existing.pid)) {
+      return { status: 'duplicate', lockPath: pidFile, existingPid: existing.pid }
     }
-    tryRemoveStale(pidFile, existing)
+    if (existing.pid !== pid) {
+      // STALE_LOCK_REQUIRES_OPERATOR: never auto-remove a foreign dead pid file.
+      return { status: 'unavailable', lockPath: pidFile, reason: 'stale_lock_requires_operator' }
+    }
+
+    tryRemoveOwnLock(pidFile, pid)
     sleepSync(STALE_RETRY_DELAY_MS)
   }
 
@@ -301,6 +299,13 @@ export function acquireLock(): void {
     err(
       `DUPLICATE_INSTANCE: agent already running (pid=${result.existingPid}). ` +
         `If this is incorrect, delete ${result.lockPath} and restart.`,
+    )
+    process.exit(1)
+  }
+  if (result.reason === 'stale_lock_requires_operator') {
+    err(
+      `INSTANCE_LOCK_UNAVAILABLE: stale_lock_requires_operator. ` +
+        `Refusing to start. First verify no agent process is running, then delete ${result.lockPath} and restart.`,
     )
     process.exit(1)
   }

@@ -4884,3 +4884,123 @@ test('R12-E order-detail：确认被拒不得把这一页认成拒绝者的 —�
   await flush()
   assert.equal(page.data.detail.pickup, '12-34-56-78', '本人不该被永久挡在自己的订单外面')
 })
+
+test('R12-F order-detail：取消 200 在 hide/show 代次变化后到达，更早的详情不得复活到机码', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.canCancel, true)
+
+  page._submitCancel()
+  page.onHide()
+  page.onShow()
+  assert.equal(pending.length, 2, '回前台必须再取一次详情')
+
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  pending[1].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail.statusLabel, '已取消', 'hide/show 不得把已接受的取消结果丢掉')
+  assert.equal(page.data.detail.pickup, '', '更早的详情 200 不得复活到机码')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.detail.canCancel, false)
+  assert.equal(page._cancelLock, false)
+})
+
+test('R12-F2 order-detail：取消 200 在后台到达不得写屏，回前台的 pending 详情仍不得复活到机码', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  page._submitCancel()
+  page.onHide()
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  assert.equal(page.data.detail, null, '后台到达的取消结果不得写进 data')
+  assert.equal(page._cancelLock, false)
+
+  page.onShow()
+  assert.equal(pending.length, 2)
+  pending[1].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail.statusLabel, '已取消')
+  assert.equal(page.data.detail.pickup, '')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R12-G order-detail：A 的取消 200 不得在换人后写进 B 的页面', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  page._submitCancel()
+  switchAccount('B')
+  page.onShow()
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+
+  assert.equal(page.data.detail, null, 'A 的取消不得画到 B 的屏幕上')
+  assert.ok(!JSON.stringify(page.data).includes('A的简历'))
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.errorTitle, '账号已切换')
+  assert.equal(pending.length, 1, '不得代表 B 去请求 A 的订单')
+  assert.equal(page._cancelLock, false)
+})
+
+test('R12-H order-detail：过期开页确认被拒后，hide/show 不得再替被拒账号刷服务端', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2, '前提：确认请求已经发出')
+
+  pending[1].reject(notOwnedError())
+  await flush()
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+
+  page.onHide()
+  page.onShow()
+  page.onShow()
+  assert.equal(pending.length, 2, '被拒过的账号不得因 hide/show 反复问服务端')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
