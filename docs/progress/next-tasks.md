@@ -2,14 +2,12 @@
 
 ## 2026-09-17 当前唯一集成顺序
 
-1. **数据大屏 Nest DI P0 与三条 P2 已在本分支修完，接着跑完整本地总门禁。**
-   复现锚点 `55f19899eecf557556e1b24e40ea2ee03367f8c8`。`verify:console-screen-snapshot`
-   现为 80/80（含 class provider 实构、gov 不拉告警、趋势 cap+1、敏感值/机队隔离）。
-   下一步仍是 CI gate coverage、deploy gate sync、compliance copy、Admin / Partner
-   build 和大屏专项浏览器门禁。只处理第一条真实失败，不弱化门禁。不得把
-   `55f19899` 的 70/70 再写成 SOURCE/LOCAL GO。
-2. **单一 PR，不拆多条。** 本地总门禁通过后，再申请一次 push / 开 PR 授权；PR只承载数据大屏
-   运行时提交及图谱/进度收尾。final-head CI 全绿后才能合并，合并后用
+1. **数据大屏完整本地总门禁已通过，冻结 `93eed6c6`。** `verify:console-screen-snapshot`
+   80/80、Admin screen 40/40、Partner screen 18/18、两端生产构建、CI/deploy/合规/图谱门禁
+   均退出 0；Agy 判 `GO`，官方 DeepSeek Hermes 判“可开 PR、不可直接部署”。不得把本地证据
+   写成 CI、合并或生产证据。
+2. **取得即时授权后只开一个数据大屏 PR，不拆多条。** PR 只承载数据大屏运行时提交及
+   图谱/进度收尾。final-head CI 全绿，且 PostgreSQL job 实际应用新增索引后才能合并；合并后用
    `git merge-base --is-ancestor <final-head> origin/main` 留证。当前不得写成已合并或已上线。
 3. **PR #1038 单独完成合并闭环。** 材料包幂等候选
    `d9d79f2689dddd0614a76b71a2252a96d7468a69` 的 CI run `35206540195` 已成功；合并仍需即时授权。

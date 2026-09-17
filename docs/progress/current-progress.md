@@ -1,5 +1,26 @@
 # 当前开发进度
 
+2026-09-17 **Admin / Partner 数据大屏冻结到 `93eed6c6`，完整本地总门禁已通过。**
+候选分支 `codex/console-data-screen-r2-20260917` 基于
+`origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，当前 tip 为
+`93eed6c6120a94b245c9ac9e50f33f45175be29d`，工作树干净，未 push、未开 PR、未合并、未部署。
+
+- **API / 仓库门禁：** `verify:console-screen-snapshot` **80/80**；真实 Nest class provider
+  构造、API build、`verify:repository-integrity`、`graph:check`、`verify:ci-gate-coverage`、
+  `verify:deploy-gates-in-sync`、`verify:compliance-copy` 均退出 0。
+- **前端构建与浏览器：** 使用生产口径
+  `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 后 Admin / Partner build 均退出 0；
+  Admin screen Playwright **40/40**、Partner screen Playwright **18/18**；
+  `verify:console-screen-ui` 为 0 条未通过。缺少 `VITE_API_MODE=http` 的首次构建按设计被
+  Vite 生产门禁拒绝，不是代码失败。
+- **独立冷审：** Agy `6f63f5ec-4456-4c0e-887b-991b024ef27c` 判 `GO`，未发现阻塞 PR 的
+  P0/P1/P2；官方 DeepSeek Hermes `20260917_222548_fa7a4a` 判 `PARTIAL`，结论是可开单一 PR、
+  但 PostgreSQL 索引锁、AI 累计全表计数、打印趋势排序和生产规模基线仍是部署前验证项。
+  最后两笔修复没有改 `apps/**` 或 `packages/**`，Claude 已确认的前端实现与公共契约未漂移。
+- **证据边界：** `SOURCE / LOCAL: GO`；`INDEPENDENT REVIEW: GO for PR`；
+  `CI / MERGE: PENDING`；`PRODUCTION / COMMERCIAL: NO-GO`。下一步只允许一个数据大屏 PR；
+  final-head CI 与 PostgreSQL job 全绿后再申请合并，生产另走维护窗口。
+
 2026-09-17 **数据大屏三条 P2：gov 告警热路径、趋势溢出、快照敏感值。**
 父提交 `63bda793a275700a16f508d2cda81498e1494cc4`。只改 API 大屏聚合与
 `verify:console-screen-snapshot`（图谱：该门禁是这几个文件的唯一 CI 断言）。
