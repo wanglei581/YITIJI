@@ -64,7 +64,7 @@ pnpm --filter terminal-agent verify:local-qr-proxy
 | 关闭 OCR | API 启动门禁 | `PRODUCTION_OCR_PROVIDER_NOT_BAIDU` / `PRODUCTION_BAIDU_OCR_CONFIG_MISSING` |
 | 缺 Redis | API 启动门禁 | `PRODUCTION_REDIS_URL_MISSING` |
 | 缺 COS | API 启动门禁 | `PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS` |
-| 缺终端 ID | Kiosk 构建期硬门禁（vite.config，直接 vite build 也无法绕过；文字助手模式不豁免）+ 构建后 A4 复核 | `VITE_TERMINAL_ID` 必填 |
+| 缺运行时终端身份 | Kiosk 必须通过本机 Agent `http://127.0.0.1:9527/local/identity` 取得身份；生产构建禁止读取或回退到 `VITE_TERMINAL_ID`，避免克隆机器共用终端号 | `verify:runtime-terminal-identity` 通过；本机 identity 返回已绑定终端 |
 | 缺 print-scan feature gate 配置 | API 启动门禁 | `PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED`（必须显式 `PRINT_SCAN_CAPABILITY_MODE=managed|strict`） |
 
 `PRINT_SCAN_CAPABILITY_MODE` 语义（真相源：`terminal-capabilities.service.ts` 的进程内单次解析）：
