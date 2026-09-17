@@ -1,34 +1,41 @@
 # 下一步任务
 
-## 2026-09-17 小程序与一体机跨端联动商业收口顺序
+## 2026-09-18 小程序与一体机跨端联动商业收口顺序
 
-当前唯一代码候选是 `d30d2f965`（分支
+当前唯一代码候选是 `33751df4af9eae0cbfc912e4ad123a07e83031cd`（分支
 `codex/material-package-idempotency-closeout-20260917`，基线
-`origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`，含 PR #1040 / #1041）。当前只达到
-`SOURCE / LOCAL: GO`；不得写成已上线、已发布、已真机或已商用。
+`origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`，17 提交 / 31 文件 / `+6124/-229`）。
+当前只达到 `SOURCE / LOCAL: GO`；不得写成已上线、已发布、已真机或已商用。
+旧 tip `d30d2f965` / `d9d79f268` 都不是现冻结点。下面的 `50483cd` API-only 任务是**另一条**
+生产控制面历史，**不能代表、也不能用来部署本候选**（本候选含 API + miniapp 耦合，必须用
+final merged SHA 和协调发布顺序）。
 
 | 顺序 | 门禁 | 必做事项 | 达标证据 |
 |---|---|---|---|
-| 1 | 候选进入主线 | 经动作时授权后 push，并只维护一个集成 PR；PR 必须指向 `d30d2f965` 或其仅含文档收尾的直接后继 SHA，不能继续合并旧 tip `d9d79f268`。等待 final-head 必需 CI 全绿后再合并 | PR final head、全部 required checks、合并提交；`git merge-base --is-ancestor <final-head> origin/main` 退出 0 |
-| 2 | 生产发布准备 | 选择具名维护窗口；核对服务器当前 `DEPLOY_SOURCE.txt`、PM2、nginx Web Root、Node/pnpm、磁盘与容量；确认生产 PostgreSQL 已应用 `20260915170000_add_member_print_order_idempotency`，唯一索引与历史数据无冲突；迁移前备份，准备 API/数据库/前端回滚命令 | 维护窗口、精确部署 SHA、备份校验、迁移状态、容量检查、回滚演练记录。未授权不得部署、重启或迁移 |
-| 3 | API / Worker / 数据依赖上线 | API、Worker、Redis、PostgreSQL、对象存储、签名 URL、生产域名与 TLS 使用同一 release identity；材料包读路径过期写、`claimed` 租约、`used` 队列状态和逐份任务派生必须保持一致；监控 400/409、P2002 回放、`expired+paid`、打印失败与回流延迟 | 生产 provenance、健康/ready、迁移与索引、日志/指标/告警、只读冒烟和回滚后复核。HTTP 200 单独不构成 GO |
-| 4 | 微信开发者工具与 Trial | 用唯一发布源 `apps/miniapp/` 打开正确 AppID 项目；编译、包体/分包、Console/WXSS/Network；发布 Trial，使用 A/B 两账号走弱网丢响应、杀进程重进、401 补签、存储读写失败、终态重新下单、`claimed`/`used` 不误放行 | DevTools 项目路径、编译日志、Trial 版本号、逐页截图/录屏、网络请求与 A/B 隔离证据。完成前不提审、不写真机 GO |
-| 5 | 小程序合规与发布 | 核对业务域名、隐私保护指引、用户协议、类目、备案、客服入口、本地存储字段说明；完成体验版验收后再提审与发布 | 微信平台受理/审核/发布结果与线上版本号。上传、填表或点击下一步不等于审核通过 |
-| 6 | Windows Agent / 奔图真机 | 在目标 Windows 与配置项 `printerName` 指向的 `Pantum CM2800ADN Series` 上，以合入并部署的精确 SHA 走：建单→到机码→现场支付→claim→逐份出纸→失败/缺纸恢复→状态回传→小程序订单沉淀；同时验证临时文件删除与跨用户隔离 | 订单/任务/文件 hash、Agent 日志、打印机队列、实物出纸、状态回流、清理证据。不得假设 A3、云端扫描或未确认的彩色 API 值 |
-| 7 | 支付、退款与对账 | 材料包小程序内无 `wx.requestPayment`，费用在一体机现场支付；用真实渠道最小金额走支付通知、重复通知、失败/超时、部分打印失败、退款/冲正、渠道账单 diff，明确 `expired+paid` 运营处置 | 商户侧交易号、系统订单、回调验签、退款结果、账单对账与审计一致。未获授权不得真实扣款或退款 |
-| 8 | 运维与商业验收 | 建立监控、日志脱敏、备份恢复、值班/客服 SOP、存储满/旧码/错机/打印失败话术、隐私与留存删除核对、故障演练；由产品/运营/现场人员完成生产等价 UAT 并签字 | G4 发布就绪证据、G5 业务验收记录、G6 交接清单；责任人、SLA、已知限制和残余 backlog 明确 |
+| 1 | 候选进入主线 | 经动作时授权后 push，只维护一个集成 PR；PR 必须指向 `33751df4a` 或其仅含文档收尾的直接后继。等待 final-head 的 GitHub CI（含 `postgres-readiness`）全绿后再合并 | PR final head、全部 required checks、合并提交；`git merge-base --is-ancestor <final-head> origin/main` 退出 0 |
+| 2 | 服务器只读预检 | 具名维护窗口前**实时**核对：`DEPLOY_SOURCE.txt` 现存冲突记载（历史 `a8a521cb...` vs `771d53e2`，二者都是旧记录，不得沿用为当前生产事实）、PM2、nginx Web Root、Node/pnpm、PostgreSQL、Redis、对象存储、TLS、磁盘与备份、回滚命令。未授权不得部署、重启或迁移 | 当场截取的 provenance、进程、健康、容量、备份校验；写明与历史文档的差集 |
+| 3 | 同 identity 发布 | 确认生产 PostgreSQL 已应用本候选所需 additive 迁移与唯一索引（含 `20260915170000_add_member_print_order_idempotency`），历史数据无冲突；API、Worker、Redis、对象存储、签名 URL、生产域名与 TLS、小程序发布包使用**同一个 final merged SHA**。旧 `50483cd` API-only 窗口不能部署本候选 | 精确部署 SHA、迁移状态、前后端 identity 一致、备份与回滚演练。HTTP 200 单独不构成 GO |
+| 4 | 微信开发者工具与 Trial | 用唯一发布源 `apps/miniapp/` 打开正确 AppID；编译、包体/分包、Console/WXSS/Network；发布 Trial。A/B 两账号走弱网丢响应、杀进程重进、401 补签、存储读写失败、TTL 已提交未落定复用、`MAX_PENDING_RECORDS` 占满、隐私存储键说明、终态重新下单、`claimed`/`used` 不误放行 | DevTools 路径、编译日志、Trial 版本号、逐页截图/录屏、网络与 A/B 隔离。完成前不提审、不写真机 GO |
+| 5 | 小程序合规与发布 | 核对业务域名、隐私保护指引、用户协议、类目、备案、客服入口、本地存储字段说明；体验版验收后再提审与发布 | 微信平台受理/审核/发布结果与线上版本号。上传或填表不等于审核通过 |
+| 6 | Windows Agent / 奔图真机 | 在目标 Windows 与配置项 `printerName` 指向的 `Pantum CM2800ADN Series` 上，以合入并部署的精确 SHA 走：建单→到机码→现场支付→claim→逐份出纸→失败/缺纸恢复→状态回传→小程序订单沉淀；验证临时文件删除与跨用户隔离 | 订单/任务/文件 hash、Agent 日志、打印机队列、实物出纸、状态回流、清理证据。不得假设 A3、云端扫描或未确认的彩色 API 值 |
+| 7 | 支付、退款与对账 | 材料包小程序内无 `wx.requestPayment`，费用在一体机现场支付。真实渠道最小金额走：支付通知、迟到回调 `ONLINE_PAID_PENDING_REFUND`、重复通知、失败/超时、部分打印失败的人工/产品 SOP、退款/冲正、渠道账单 diff | 商户侧交易号、系统订单、回调验签、退款结果、账单对账与审计一致。未获授权不得真实扣款或退款 |
+| 8 | 运维、监控与商业验收 | 监控：幂等回放、P2002、409、pending-refund、租约过期、打印回流。再加备份恢复、回滚演练、客服 SLA、隐私法务、故障话术；产品/运营/现场完成生产等价 UAT 并签字交接 | G4 发布就绪、G5 业务验收、G6 交接清单；责任人、SLA、已知限制和残余 backlog 明确 |
 
 必须按门禁逐级升级结论：主线和 CI 完成只能写 `SOURCE / CI: GO`；Trial 和手机真机完成后才能写
 `WECHAT DEVICE: GO`；Windows/奔图完整实物链路完成后才能写 `HARDWARE: GO`；服务器精确 SHA、生产健康、
 真实支付、回滚与 UAT 全部完成并获授权签字后，才允许写 `COMMERCIAL: GO`。
 
-当前已登记但不阻塞源码合入的后续治理：`package-confirm.js` 超过 900 行，新增能力前先拆分评估；
-GET 列表/详情会触发材料包过期 CAS 写，生产容量与只读副本策略需验证；客户端记录 TTL 与服务端永久键的
-边界依赖终端故障处置和客服 SOP；回放命中、P2002 兜底、`expired+paid` 尚无专用生产指标。
+**不阻塞源码合入、但商业发布必须处理：** GET 列表/详情会触发过期 CAS 写主库，不能路由到只读副本；
+`MAX_PENDING_RECORDS=20` 永久占位需要客服/恢复 SOP；`package-confirm.js` 与 `print-pay.js` 体积债，
+新增能力前先拆分评估；材料包无在线取消；部分履约无自动部分退款；`PAYMENT_SESSION_TTL_SECONDS`
+同时决定现场付款窗口，发布 runbook 必须写明取值；回放命中、P2002、pending-refund、租约过期尚无专用生产指标。
 
-## 2026-09-17：生产 API-only 发布 `50483cd...`
+## 2026-09-17：生产 API-only 发布 `50483cd...`（另一条历史任务，不能部署本候选）
 
-**当前生产发布阻塞：** 首轮控制面 PR #1040 已合入 `3d35759ee`，后继 helper 固定 PR #1041 已合入
+**这条是旧目标 `50483cd28096780c5e6c4260dde86dec36e7d99f` 的 API-only 控制面窗口，不是
+`33751df4a` 跨端候选。** 本候选含 API + miniapp 耦合，不得用这条窗口发布。
+
+**控制面代码在 main，生产仍未执行：** 首轮控制面 PR #1040 已合入 `3d35759ee`，后继 helper 固定 PR #1041 已合入
 `origin/main@eb0f20341`。helper 来自工作流自身提交，经 SHA-256 校验后从服务器临时文件执行，
 并在任何生产写入前比对目标生产闸门键。这只证明控制面代码在 `main`，不代表生产已执行。
 

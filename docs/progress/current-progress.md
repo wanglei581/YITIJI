@@ -1,12 +1,28 @@
 # 当前开发进度
 
-2026-09-17 **小程序与一体机跨端联动收口：材料包耐久幂等候选已到 `SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。**
+2026-09-18 **小程序与一体机跨端联动收口：源码冻结 `33751df4a`，`SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。**
 
-- **冻结候选：** 分支 `codex/material-package-idempotency-closeout-20260917`，代码冻结点
-  `d30d2f965`，当前基线
+- **冻结候选：** 分支 `codex/material-package-idempotency-closeout-20260917`，源码冻结点
+  `33751df4af9eae0cbfc912e4ad123a07e83031cd`，基线
+  `origin/main=eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`（含 PR #1040 merge `3d35759ee` 与
+  PR #1041 merge `eb0f20341`）。相对该基线 **17 个提交、31 个文件、`+6124/-229`**。工作树干净；
+  未 push、未开 PR、未合并、未部署、未发布小程序、未做硬件操作、未走真实支付。旧冻结点
+  `d30d2f965` 只是 rebase 前的历史锚，**不是**当前 tip。
+- **本轮关闭的真实问题：**
+  1. 材料包 `POST /orders/package` 与单件云打印 `POST /me/print-orders` 都使用按会员与载荷指纹绑定的持久 `Idempotency-Key`；本机 `submittedAt` / `markSubmitted` 在 POST 前落盘并读回，**可能已经发出**的键（已有 `orderId`、`submittedAt !== 0`、或旧记录缺该字段）**不因本机 7 天 TTL 淘汰**，只有能证明从未发送的 `submittedAt === 0` 才按 TTL 过期。
+  2. 一体机 `claimed` 履约租约绑定 `PAYMENT_SESSION_TTL_SECONDS`（默认 30 分钟，时钟只看 `pickupClaimedAt`，不看手机新签 token）。租约内即使原到机码截止已过，未付仍可同机 reclaim / markPaid / release；租约外未付 CAS 收敛 `expired/closed`；`claimed+paid` 跨租约仍允许 release。缺 `pickupClaimedAt` 不得永久豁免。
+  3. `markPaidOnline` 转 `paid` 的 `updateMany` 写入时必须仍可履约（非 claimed 无截止或截止未到；claimed 租约仍在 TTL 内）。sweeper 在快照后写成 `expired+closed` 时 CAS 0，落 `ONLINE_PAID_PENDING_REFUND`，不把迟到回调重新写成 paid。
+- **最终本地证据（冻结 SHA `33751df4a`）：** 小程序 `verify:static` 基础静态 **136 PASS / 0 FAIL**（64 注册页）；页面生命周期 **155/155**；材料包幂等专项 **49/49**。API `verify:payment-flow` **85 PASS**（不要把过程中的 84 写成最终值）；单件/材料包幂等 service 与 HTTP、`verify:package-order-fulfillment`、`verify:miniapp-cloud-print-m2` 全部退出 0。根 `pnpm typecheck`、`verify:repository-integrity`、`verify:ci-gate-coverage`、`verify:deploy-gates-in-sync`、`pnpm graph` / `graph:check`、`git diff --check` 本地全绿。
+- **多模型记录：** Grok 主修并提交本冻结 SHA。Claude 只对小程序增量 `92b67fe84` 最终确认 `GO`，未对后续 API 租约/CAS 增量做前端终审。Agy / Hermes 对 `fecd64d65`（claimed 租约 TTL）与 `33751df4a`（late-callback CAS）增量 `GO`。Codex 协调核验。商业发布仍 `NO-GO`。
+- **证据矩阵：** `SOURCE / LOCAL: GO`。下列一律 `NO-GO`：`CI`、`MAIN`、微信开发者工具、Trial、微信真机、Windows / 奔图真机、production / server、真实支付 / 退款 / 对账、业务 UAT。本地绿、HTTP 200、历史设备记录和多模型同意都不能替代这些证据。
+
+2026-09-17 **小程序与一体机跨端联动收口（历史快照）：当时代码冻结点是 rebase 前的 `d30d2f965`，本地材料包耐久幂等已到 `SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。当前冻结点已前移到 2026-09-18 的 `33751df4a`，不要把本节 SHA 当成现 tip。**
+
+- **当时冻结候选：** 分支 `codex/material-package-idempotency-closeout-20260917`，代码冻结点
+  `d30d2f965`，当时基线
   `origin/main=eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`（含 PR #1040 merge `3d35759ee` 与
   PR #1041 merge `eb0f20341`）。代码冻结点相对原基线 `3d35759ee` 共 9 个提交、23 个文件，
-  约 `+4398/-118`；当前分支只在其后追加本节正式文档收口。工作树干净；未 push、未改 PR、未合并、
+  约 `+4398/-118`。工作树干净；未 push、未改 PR、未合并、
   未部署、未发布小程序。该候选 rebase 到精确 `eb0f20341` 后，证据边界不变。
 - **本轮关闭的真实问题：** `POST /orders/package` 在响应丢失、并发提交、进程重启、账号切换、
   存储写入/读回失败、401 补签、404/5xx 核对、到机码过期以及 `claimed` / `used` 履约状态下，
