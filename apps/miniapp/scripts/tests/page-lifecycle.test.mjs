@@ -4386,3 +4386,296 @@ test('R10-f 本机确实没有这张表（key 不存在）：照常铸键落盘�
   assert.equal(idem.clearRecord('u:A', print), true)
   assert.equal(idem.findRecord('u:A', print), null)
 })
+
+// ══════════════════════════════════════════════════════════════════════
+// R11. order-detail：这一页此前**一条身份生命周期都没有**。
+//
+// 它和 print-pickup、orders 一样会把到机码画在屏幕上（pickupStatus==='pending' 时
+// GET /me/print-orders/:orderId 会带回 pickupCode），但整页只有 onLoad 里的一发请求：
+// 没有 onShow / onHide / onUnload，没有身份判定，没有代次，也没有逐通道序号。
+// 于是这一批门禁在别的页上挨个修过的形态，在这一页原样全部成立：
+//   A 换人 / 前台静默登出之后，上一位的到机码、文件名（常常就写着本人姓名）、金额
+//     原样留在屏幕上等着下一位看 —— request.js 补签失败时调 auth.logout()，
+//     全程没有任何生命周期回调，页面还停在前台；
+//   B 切后台 / 离开本页时在途的那一发回来照样写进 data，把刚清掉的码原样写回去；
+//   C 重复进入 / 重试时两发乱序返回，旧的那发盖掉新的；
+//   D 而修这四条时最容易顺手做错的，是把"同一个人的 30 分钟 JWT 自然到点"也判成换人：
+//     那会当场清掉一张服务端仍然认的码、且**一个请求都不发**，request.js 的 401
+//     静默补签永远没机会跑。R5 在取件页上修的就是这一半，这里不能再犯一次。
+// ══════════════════════════════════════════════════════════════════════
+
+/** 取消成功之后服务端回的那一份：终态，且不再下发到机码。 */
+const A_ORDER_CANCELLED = {
+  id: 'ord-A', orderNo: 'NO-A', status: 'cancelled', payStatus: 'cancelled',
+  pickupStatus: 'expired', amountCents: 100, fileName: 'A的简历.pdf',
+}
+
+/** 每条用例都用真 auth 跑：自然过期那一步（getToken 先 clearSession）只有它有。 */
+function makeOrderDetail(wx, pending) {
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  return makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+}
+
+test('R11-A order-detail：A 的详情已经渲染出来，换成 B —— 到机码与详情必须当场清掉', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '前提：A 的到机码确实渲染出来了')
+
+  switchAccount('B')
+  page.onShow()
+
+  assert.equal(page.data.detail, null, '换人之后不得继续显示上一位的订单详情')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'), '到机码一个字节都不许留在 data 里')
+  assert.ok(!JSON.stringify(page.data).includes('A的简历'), '文件名常常写着本人姓名，同样属于上一位')
+  assert.equal(pending.length, 1, '不得拿 B 的登录态去请求开页那位的订单（服务端 requireOwned 必然 404）')
+  assert.ok(String(page.data.error).includes('账号'), page.data.error)
+  assert.equal(page.data.errorTitle, '账号已切换', '标题不能还写着「加载失败，点此重试」')
+})
+
+test('R11-A2 order-detail：A 的请求在途时切到 B，A 的响应一个字都不许写进 data', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+
+  switchAccount('B')
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail, null, 'A 的迟到响应不得画到 B 的屏幕上')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R11-B order-detail：请求在途时 onHide，迟到的响应不得把到机码写回来', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+
+  page.onHide()
+  assert.equal(page.data.detail, null, 'onHide 必须当场把凭证从 data 里清掉，不是只丢弃响应')
+
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail, null, '切后台期间到达的响应不得复活凭证')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R11-B2 order-detail：已渲染后 onUnload，迟到的响应同样不得复活凭证', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '前提：码确实渲染出来了')
+
+  page.retry()
+  page.onUnload()
+  assert.equal(page.data.detail, null, 'onUnload 必须当场清掉凭证')
+
+  pending[1].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail, null, '离页之后到达的响应不得把码写回来')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R11-C order-detail：两次加载乱序返回，终态由最新一次决定（latest-wins）', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  page.retry()
+  assert.equal(pending.length, 2, '前提：确实有两发在飞')
+
+  // 后发的先回来，先发的后回来 —— 旧值不得把新值顶掉。
+  pending[1].resolve({ ...A_ORDER, pickupCode: '87654321' })
+  await flush()
+  assert.equal(page.data.detail.pickup, '87-65-43-21')
+
+  pending[0].resolve({ ...A_ORDER, pickupCode: '12345678' })
+  await flush()
+  assert.equal(page.data.detail.pickup, '87-65-43-21', '旧响应晚到不得回滚终态')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R11-D order-detail：同一位账号回到本页必须重新取数，而不是拿上一次的残留顶着', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78')
+
+  page.onHide()
+  page.onShow()
+  assert.equal(pending.length, 2, '回前台必须重新核一次：订单状态与到机码有效性都可能已经变了')
+
+  pending[1].resolve({ ...A_ORDER, pickupCode: '87654321' })
+  await flush()
+  assert.equal(page.data.detail.pickup, '87-65-43-21', '写回来的必须是重新取到的那一份')
+  assert.equal(page.data.loading, false)
+  assert.equal(page.data.error, '')
+})
+
+test('R11-D2 order-detail：JWT 自然过期不是换人 —— 必须放行请求，详情不得被误清', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78')
+
+  // 早上下单、下午回来看详情：30 分钟的 enduser JWT 已经到点，但**没有任何人登出**。
+  expireNaturally(wx)
+  page.onHide()
+  page.onShow()
+
+  assert.equal(pending.length, 2, '自然过期必须放行一次真实请求 —— 补签只能由 request.js 在 401 上做')
+  assert.ok(!String(page.data.error).includes('登录已失效'), page.data.error)
+  assert.notEqual(page.data.errorTitle, '账号已切换', '自然过期不是换人')
+
+  // request.js 静默补签成功 → 写回同一位的新会话 → 这条响应必须能落地。
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  pending[1].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '被补签救回来的响应必须能写进来')
+  assert.equal(page.data.error, '')
+})
+
+test('R11-E order-detail：在途期间被静默登出（没有任何生命周期回调）—— 响应不落地且详情当场清掉', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78')
+
+  page.retry()
+  // request.js 续签失败时就是这么做的：auth.logout()，页面还停在前台。
+  realAuth.logout()
+  pending[1].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail, null, '主动登出后屏幕上那张码必须当场清掉')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(realAuth.canSilentResignin(), false, '登出必须撤销补签资格，否则共用设备上会被自动登回')
+  assert.ok(String(page.data.error).includes('登录已失效'), page.data.error)
+  assert.equal(page.data.loading, false, '不能停在「正在加载订单详情…」上转圈')
+})
+
+test('R11-F order-detail：登录着却拿不到会员 id —— fail-closed，不发请求也不显示到机码', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/order-detail/order-detail.js', { auth, api, wx })
+  auth.setIdlessSession()
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+
+  assert.equal(pending.length, 0, '认不出人的会话不得拿去要本人订单')
+  assert.equal(page.data.detail, null)
+  assert.equal(page.data.loading, false, '不能停在 loading 上转圈')
+  assert.ok(String(page.data.error).includes('登录'), page.data.error)
+})
+
+test('R11-G order-detail：本人取消订单照常生效，去重锁必须交还', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.canCancel, true, '前提：这是一张可取消的未付款订单')
+
+  page._submitCancel()
+  assert.equal(page.data.cancelling, true)
+
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  assert.equal(page.data.cancelling, false)
+  assert.equal(page.data.detail.statusLabel, '已取消', '取消结果必须落地')
+  assert.equal(page.data.detail.pickup, '', '终态不再下发到机码')
+  assert.equal(page._cancelLock, false, '去重锁必须交还，否则「再试一次」是个按不动的按钮')
+})
+
+test('R11-G2 order-detail：取消在途时切后台 —— 详情不得被迟到的取消结果写回来，锁照常交还', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  page._submitCancel()
+  page.onHide()
+  assert.equal(page.data.cancelling, false, '清场必须把「正在取消…」的遮罩一起收起')
+
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  assert.equal(page.data.detail, null, '切后台之后到达的取消结果同样不得写进 data')
+  assert.equal(page._cancelLock, false, '被守卫丢弃的那一发也必须放锁')
+})
+
+test('R11-G3 order-detail：详情刷新不得让在途的取消失效（两条链各占一个通道）', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  page._submitCancel()
+  // 取消还在飞的时候用户又点了一次重试 —— 详情通道的重发不该把取消判成"过期的那一次"。
+  page.retry()
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+
+  assert.equal(page.data.detail.statusLabel, '已取消', '取消与详情是两条独立的链，不该互相作废')
+  assert.equal(page._cancelLock, false)
+})
