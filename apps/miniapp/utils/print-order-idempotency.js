@@ -16,7 +16,7 @@
 // 本地指纹**不是**服务端那个 sha256，也不需要是：它只用来回答"这还是不是上次那一单"。
 // 刻意不引第三方 hash —— 字段集一致就够了，而字段集本身由下面这行常量钉住。
 //
-// 存什么、不存什么：只存 `{account, fingerprint, key, orderId, createdAt}`。
+// 存什么、不存什么：只存 `{account, fingerprint, key, orderId, createdAt, submittedAt}`。
 // **不存到机码、不存文件名、不存金额** —— 那三样分别是取件凭证、常含本人姓名的
 // 求职材料标题、本人订单状态，落在本机存储里就是共用设备上的下一位能读到的东西
 //（CLAUDE.md §11）。恢复一张订单只需要 orderId，页面会自己带登录态去服务端回读。
@@ -93,7 +93,24 @@ const { isMemberIdentity } = require('./page-guard')
  */
 const STORE_KEY = 'zyd_print_order_idem'
 
-/** 记录寿命。服务端的到机码有效期远短于此，这里只保证不无限期堆在用户手机上。 */
+/**
+ * **只有"证明得了从来没发出去过"的那一档记录**才按这个寿命过期，7 天。
+ *
+ * 这个数此前管的是**全部**记录，那是错的。服务端那一侧的
+ * `@@unique(endUserId, idempotencyKey)` 是**永久**挂在 Order 行上的，没有任何过期
+ * 清理；本机记录一到 7 天就整条消失，于是「POST 已经出门、响应丢在路上、orderId
+ * 还没落定」的那一格会在服务端仍然认得那个键的时候被本机忘掉 —— 用户带同一组参数
+ * 再提交，铸的是**新键**，服务端按新键正常建**第二张**订单、再扣一笔钱。
+ * 而且不需要真的等满 7 天：设备时钟往前跳一下（手动改时间、NTP 校正），或者恰好
+ * 卡在边界上的那一毫秒，就立刻走到这一格。
+ *
+ * 现在的判据是 `wasSubmitted`：一条记录只要**可能**已经出门过 —— 已经落定
+ *（有 orderId）、`markSubmitted` 已经把它标成"即将 POST"、或者它是旧版本写下的、
+ * 根本没有这个标记的记录 —— 就**永远不因本机时间被淘汰**。
+ *
+ * 剩下的那一档（铸出来、落住了，但 `markSubmitted` 之前就失败、一个 POST 都没发过）
+ * 才按这个 TTL 过期：它证明得了自己没出过门，留着只会把未落定名额白白占住。
+ */
 const TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
@@ -138,6 +155,14 @@ const RANDOM_TIMEOUT_MS = 8000
  */
 const STORE_UNREADABLE_MESSAGE = '读不到本机的下单记录，为避免重复下单已中止提交。请稍后重试，或先到「我的 · 打印订单」确认之前的提交结果'
 
+/**
+ * 键已经落住了，但"这个键即将出门"这件事没能记进本机（见 `markSubmitted`）。
+ *
+ * 这一句对应的是一个**没有发生过的 POST**：标记落不住就意味着这个键一旦出门，
+ * 本机会在 7 天后把它忘掉 —— 到那时用户再提交就是第二张订单。所以宁可在这里停住。
+ */
+const SUBMIT_MARK_FAILED_MESSAGE = '本机没能记下这次提交，为避免重复下单已中止提交。请稍后重试，或先到「我的 · 打印订单」确认之前的提交结果'
+
 /** 未落定名额用尽。见 MAX_PENDING_RECORDS。 */
 const PENDING_FULL_MESSAGE = '本机还有太多没有落定的下单记录，为避免重复下单已中止提交。请先到「我的 · 打印订单」确认之前几次提交的结果'
 
@@ -175,6 +200,28 @@ const KEY_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 /** 这个键还能不能拿去 POST（服务端只认小写）。 */
 function isReusableKey(key) {
   return typeof key === 'string' && KEY_RE.test(key)
+}
+
+/**
+ * 这条记录**可能已经出门过**吗 —— 也就是"这个键有没有可能已经到过服务端"。
+ *
+ * 这是 TTL 的唯一开关（见 `TTL_MS`）：返回 true 的记录**永远不因本机时间被淘汰**，
+ * 因为服务端那一侧的 `(endUserId, idempotencyKey)` 是永久的，本机先忘掉就等于
+ * 下一次同参数提交铸新键、服务端再建一张订单、再扣一笔钱。
+ *
+ * 三种都算"出过门"，判据全部只看落盘的字段（内存里的任何标记在小程序被杀掉重进
+ * 之后一个都不剩，而那正是最需要它的时刻）：
+ *   ① `orderId` 非空 —— 服务端确实回过一张订单；
+ *   ② `submittedAt !== 0` —— `markSubmitted` 在 POST **之前**同步标过它；
+ *   ③ **没有**这个字段（`undefined !== 0`）—— 旧版本写下的记录。旧代码是"铸完立刻
+ *      POST"，证明不了它没发过，只能按发过处理。形状被改坏的取值（字符串 / NaN）
+ *      同样落在这一档：`!== 0` 成立，保守地当作出过门。
+ *
+ * 唯一返回 false 的是本版写下、且 `markSubmitted` 还没成功过的那一格 —— 只有它
+ * 证明得了自己一个 POST 都没发过，也只有它允许按 TTL 过期。
+ */
+function wasSubmitted(row) {
+  return !!(row && (row.orderId || row.submittedAt !== 0))
 }
 
 /**
@@ -350,7 +397,10 @@ function loadAll() {
     && (isReusableKey(row.key) || !!row.orderId)
     && typeof row.fingerprint === 'string' && row.fingerprint !== ''
     && typeof row.createdAt === 'number' && Number.isFinite(row.createdAt)
-    && now - row.createdAt < TTL_MS)
+    // **过期只淘汰"证明得了从来没发出去过"的那一档**（见 TTL_MS / wasSubmitted）。
+    // 已落定的、已标记过即将出门的、以及旧版本留下的没有标记的，一律不因本机时间被淘汰：
+    // 服务端认那个键是永久的，本机先忘掉就是下一次铸新键、服务端再建一张订单。
+    && (wasSubmitted(row) || now - row.createdAt < TTL_MS))
 }
 
 /**
@@ -420,10 +470,11 @@ function slotAbsent(account, fingerprint) {
  * 从返回值上完全看不出来。这条链的全部价值就在于键**真的还在**，所以判据只能是
  * 「再读一遍，那条记录逐字还在」。
  *
- * **四项都核，`orderId` 不能漏。** 只核 account/fingerprint/key 时，
+ * **五项都核，`orderId` 和 `submittedAt` 都不能漏。** 只核 account/fingerprint/key 时，
  * `rememberOrderId` 那一次写入要落的恰恰是第四项：写没写进去，前三项照样核得上。
  * 于是"orderId 没存住"会被当成存住了 —— 页面照常跳走，跳转成功回调又把整条记录清掉，
- * 用户回到这一页时既没有锁也没有键。
+ * 用户回到这一页时既没有锁也没有键。第五项是 `markSubmitted` 要落的：不核的话
+ * "标记没写进去"会被当成写进去了 —— 而那一格正是"键出门之后本机还会在 7 天后忘掉它"。
  *
  * @param {Array} rows 要保存的全量记录
  * @param {?{account:string, fingerprint:string, key:string, orderId:string}} verify 必须能读回来的那条
@@ -443,7 +494,10 @@ function persist(rows, verify) {
     && row.account === verify.account
     && row.fingerprint === verify.fingerprint
     && row.key === verify.key
-    && String(row.orderId || '') === String(verify.orderId || ''))
+    && String(row.orderId || '') === String(verify.orderId || '')
+    // 第五项：`markSubmitted` 那一次写入要落的恰恰是它。不核的话"标记没写进去"会被
+    // 当成写进去了 —— 而那一格正是"键出门之后本机还会在 7 天后忘掉它"的那一格。
+    && wasSubmitted(row) === wasSubmitted(verify))
   return hit ? kept : null
 }
 
@@ -542,7 +596,10 @@ function ensureKey(account, fingerprint) {
     if (pendingCount(base) >= MAX_PENDING_RECORDS) {
       throw new Error(PENDING_FULL_MESSAGE)
     }
-    const record = { account, fingerprint, key, orderId: '', createdAt: Date.now() }
+    // `submittedAt: 0` 是"键铸出来了，但一个 POST 都还没发过"的**可证明**标记 ——
+    // 只有带着它的记录允许按 TTL 过期。调用方在 POST 之前必须先 `markSubmitted`
+    // 把它改掉，否则这个键出门之后本机会在 7 天后忘记它（= 第二张订单）。
+    const record = { account, fingerprint, key, orderId: '', createdAt: Date.now(), submittedAt: 0 }
     if (!persist(base.concat([record]), record)) {
       throw new Error('订单标识没能保存到本机，为避免重复下单已中止提交，请重试一次')
     }
@@ -556,6 +613,43 @@ function ensureKey(account, fingerprint) {
   )
   minting.set(slot, guarded)
   return guarded
+}
+
+/**
+ * 在 POST **发出去之前**同步把这一格标成"这个键即将出门"，并**读回来核对**。
+ *
+ * 为什么必须有这一步：本机这张表要淘汰"铸出来但从没用过"的键（否则一次失败的提交
+ * 会把未落定名额永久占住），而"从没用过"只能由本机自己记下来 —— 服务端那一侧的
+ * `(endUserId, idempotencyKey)` 是永久的，它不会告诉我们"这个键你没发过"。
+ * 标记一旦落住，这条记录就退出 TTL 淘汰，哪怕设备时钟往前跳了一年也还在
+ *（见 `TTL_MS` / `wasSubmitted`）。
+ *
+ * **落不住就一个 POST 都不许发**（调用方按返回值 fail-closed）。理由是这两条代价
+ * 完全不对称：不发的代价是用户重试一次；发了而标记没落住的代价是这个键在 7 天后
+ * 被本机忘掉，用户带同一组参数再提交就铸新键、服务端再建一张订单、再扣一笔钱。
+ *
+ * **键必须逐字对上盘上那一格**：对不上说明这一格已经被别的路径换过键了，此刻要发
+ * 出去的那个键并没有落住 —— 那正是"订单建成了却再也找不回来"的那一种。
+ *
+ * 已经算出过门的记录（已落定 / 已标过 / 旧版本没有这个字段）直接返回 true，不写盘：
+ * 它们本来就已经退出 TTL 淘汰，再写一次只会白白多一次可能失败的存储操作。
+ *
+ * @returns {boolean} true = 盘上确认这一格已经标住；false = 没标住，调用方**不许 POST**
+ */
+function markSubmitted(account, fingerprint, key) {
+  if (!isMemberIdentity(account) || !fingerprint) return false
+  if (typeof key !== 'string' || !KEY_RE.test(key)) return false
+  const rows = loadAll()
+  // 读不到就一个字节都不写：这里写回去的是**全量**（见 persist），以一个假的空数组
+  // 为基底写回去会抹掉盘上别人那条在飞的记录。读不到也证明不了这一格标住了。
+  if (!rows) return false
+  const at = rows.findIndex((row) => row.account === account && row.fingerprint === fingerprint)
+  if (at < 0) return false
+  if (rows[at].key !== key) return false
+  if (wasSubmitted(rows[at])) return true
+  const record = Object.assign({}, rows[at], { submittedAt: Date.now() })
+  rows[at] = record
+  return !!persist(rows, record)
 }
 
 /**
@@ -633,9 +727,14 @@ module.exports = {
   MAX_SETTLED_RECORDS,
   RANDOM_TIMEOUT_MS,
   STORE_KEY,
+  PENDING_FULL_MESSAGE,
+  STORE_UNREADABLE_MESSAGE,
+  SUBMIT_MARK_FAILED_MESSAGE,
+  wasSubmitted,
   fingerprintOf,
   findRecord,
   ensureKey,
+  markSubmitted,
   rememberOrderId,
   clearRecord,
   formatUuidV4,

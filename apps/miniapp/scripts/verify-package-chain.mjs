@@ -1157,9 +1157,10 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     && /row\.account === verify\.account/.test(idem)
     && /row\.fingerprint === verify\.fingerprint/.test(idem)
     && /row\.key === verify\.key/.test(idem)
-    && /String\(row\.orderId \|\| ''\) === String\(verify\.orderId \|\| ''\)/.test(idem),
-  'persist 写完把记录读回来逐字核对 account/fingerprint/key/**orderId**（漏掉 orderId 那一项，'
-  + 'rememberOrderId 那次写入要落的恰恰就是它：没写进去也照样核得上）')
+    && /String\(row\.orderId \|\| ''\) === String\(verify\.orderId \|\| ''\)/.test(idem)
+    && /wasSubmitted\(row\) === wasSubmitted\(verify\)/.test(idem),
+  'persist 写完把记录读回来逐字核对 account/fingerprint/key/orderId/**submittedAt**（漏掉 orderId '
+  + '那一项，rememberOrderId 要落的恰恰就是它；漏掉 submittedAt，"没标住"会被当成标住了）')
   assert(/if \(!persist\(base\.concat\(\[record\]\), record\)\) \{[\s\S]{0,200}throw new Error/.test(idem),
     'ensureKey 落不住就 reject —— 调用方一个 POST 都不许发（那张订单建成就再也找不回来）')
   // R9：写回全量的**基底**必须是真的读出来的那一份。`loadAll()` 在读失败时返回 null，
@@ -1208,8 +1209,27 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   //     的证据。形状不对的 createdAt 仍然一律作废（那是坏数据，不是时钟问题）。
   assert(!/now - row\.createdAt >= 0/.test(idem),
     '未来时间戳不得再被当成无效（设备时钟回跳会让本机自己写的键当场作废）')
-  assert(/Number\.isFinite\(row\.createdAt\)/.test(idem) && /now - row\.createdAt < TTL_MS/.test(idem),
-    '形状不对的 createdAt 仍然作废，真正过期的仍然过期（放宽的只有未来那一侧）')
+  assert(/Number\.isFinite\(row\.createdAt\)/.test(idem),
+    '形状不对的 createdAt 仍然作废（那是坏数据，不是时钟问题）')
+  assert(/function wasSubmitted\(row\) \{[\s\S]{0,200}row\.orderId \|\| row\.submittedAt !== 0/.test(idem),
+    '「可能已经出门过」的判据只看落盘字段（内存标记在小程序被杀掉重进之后一个都不剩）')
+  assert(/&& \(wasSubmitted\(row\) \|\| now - row\.createdAt < TTL_MS\)\)/.test(idem)
+    && idem.split('now - row.createdAt < TTL_MS').length - 1 === 1,
+    'TTL 只淘汰"证明得了没发出去过"的那一档，已提交 / 已落定 / 旧版本无标记的一律不因本机时间淘汰')
+  assert(/submittedAt: 0 \}/.test(idem),
+    '新铸的键先落成 submittedAt: 0（那是"还没发过"唯一可证明的形态）')
+  assert(/wasSubmitted\(row\) === wasSubmitted\(verify\)\)/.test(idem),
+    'persist 的读回核对把这个标记也核上（不核 = "没标住"会被当成标住了）')
+  {
+    const markAt = idem.indexOf('function markSubmitted(account, fingerprint, key) {')
+    const markFn = markAt < 0 ? '' : idem.slice(markAt, idem.indexOf('\n}', markAt))
+    assert(!!markFn, '取不到 markSubmitted 的函数体')
+    assert(/return !!persist\(rows, record\)/.test(markFn),
+      'markSubmitted 经 persist 落盘并读回核对，不是调一次 storage.set 就当标住了')
+    assert(/if \(!rows\) return false/.test(markFn) && /if \(at < 0\) return false/.test(markFn)
+      && /if \(rows\[at\]\.key !== key\) return false/.test(markFn),
+    'markSubmitted 的每条失败路径都返回 false（读不到 / 这一格不在 / 盘上是另一个键，都不许放 POST 出去）')
+  }
 
   // ③'' clearRecord 必须**读回来证明那一格不在了**，并把结论返回给调用方。
   //     上一版只调一次 saveAll 就当清掉了、什么都不返回；而 storage.set 在"没抛异常也
@@ -1264,6 +1284,8 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
       '读不到就返回 null（调用方按"没存住"锁页指路，那正是正确处置）'],
     ['clearRecord', /const rows = loadAll\(\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!rows\) return false/,
       '读不到就返回 false（它写回去的是全量，读不到时会把整张表清空）'],
+    ['markSubmitted', /const rows = loadAll\(\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!rows\) return false/,
+      '读不到就返回 false（标不住不许 POST；写回全量会抹掉别人在飞的键）'],
   ]) {
     const at = idem.indexOf(`function ${fn}(`)
     const body = at < 0 ? '' : idem.slice(at, at + 1400)
@@ -1326,6 +1348,12 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     const flow = /continueFlow\(\) \{[\s\S]*?\n  \},/.exec(pay)
     assert(!!flow && flow[0].indexOf('if (recoveryUnsaved)') < flow[0].indexOf('wx.redirectTo('),
       '这一支必须排在 redirectTo 之前（排在后面就等于没有）')
+    const markAt = flow[0].indexOf('idem.markSubmitted(attempt.account, fingerprint, record.key)')
+    const postAt = flow[0].indexOf('api.createCloudPrintOrder(')
+    assert(markAt > 0 && postAt > markAt,
+      '单件链标记排在 POST 之前（排在后面等于没标：响应丢了的那一格照样会被 TTL 忘掉）')
+    assert(/if \(!idem\.markSubmitted\(attempt\.account, fingerprint, record\.key\)\) \{[\s\S]{0,160}throw new Error\(idem\.SUBMIT_MARK_FAILED_MESSAGE\)/.test(flow[0]),
+      '单件链标不住就抛出去，一个 POST 都不发（不看返回值等于这道闸不存在）')
   }
 
   // ⑥ "还活着"是一个会到期的结论，不能缓存成永久判定。缓存它的代价：用户照着提示去
