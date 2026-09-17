@@ -1,5 +1,37 @@
 # 当前开发进度
 
+2026-09-17 **Windows / 奔图现场验收前 R3 候选已在独立集成分支完成本地收口；尚未 push、开 PR、跑候选 CI、上 Windows 或操作硬件。**
+集成基线为 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，分支
+`codex/windows-pantum-field-readiness-r3-20260917`，已验证的代码 / 手册锚点为
+`d71d0225483991f945f11e5b25c8dba0253c3697`。该锚点无冲突地汇入 7 个提交：小程序 / Kiosk
+`f8f46b6d2`、`69efe47a2`、`5fd69d56b`，Terminal Agent `5097a89d5`、`78d4ec054`，进度与
+现场手册 `0d08f7c72`、`d71d02254`。来源分支最终锚点分别为前端
+`0ac3b4ab04a77dcf32995d87d930d79a136f7b7f`、Agent
+`f21c5246a9ab38670759027973dc8de975105337`；根 checkout 的脏状态和冲突未被修改。
+
+- **小程序 / Kiosk：** 订单详情在换人、登出、隐藏、卸载、迟到响应时清理详情与到机码；发出时
+  身份未知的 200 不直接渲染，必须经一条带确定账号的服务端确认请求；取消成功后会使更早的详情
+  响应失效，不能复活已作废到机码。`PAPER_EMPTY` 不再承诺“加纸后自动继续”，只说明订单与已付
+  金额保留、联系工作人员，并仅在真实按钮出现时引导重打。
+- **Terminal Agent：** 实例锁改为原子 `wx` 创建；空、损坏、短写或发布失败的 PID 锁一律
+  fail-closed，不按路径删除归属不明或后继锁；释放前同时核 inode 与 PID。获锁后、SQLite / claim
+  前只清理 Agent temp 根目录中符合 `task_<taskId>.<supported-ext>` 的普通文件，symlink、目录与无关
+  文件保留，删除失败则拒绝启动。
+- **本地验证：** miniapp `verify:static` 全通过，生命周期测试 **166/166**；Kiosk typecheck 通过，
+  `print-fulfill-qx.spec.ts` **5/5** 通过；Agent typecheck、`verify:print-scan-agent`、
+  `verify:task-reliability`、并发子进程 / 启动残留清理 / 反向变异通过，lint 为 **0 errors / 3 条既有
+  unused-disable warnings**。仓库完整性、CI 门禁覆盖、部署门禁同步、图谱一致性和 `git diff --check`
+  均通过。Playwright 使用全新 `/tmp` 输出目录；此前旧输出目录的 WorkBuddy safe-delete 超时不属于
+  业务用例失败。
+- **复审：** Claude 完成前端实现与最终确认；Grok 的 Agent 实现由 Codex 独立复跑门禁；Hermes
+  Nous（`nous/upstage/solar-pro4:free`，session `20260917_204744_ea012f`）结论为 `PARTIAL`，未提出
+  新的明确 P0 / P1 代码缺陷，主要要求保留 Windows、真机与后端证据边界。其提出的两个测试疑问已由
+  R12-D 和 Kiosk “真实 taskId / payment session 重试”用例覆盖；`PARTIAL` 不等于代码 `NO-GO`。
+- **证据边界：`SOURCE / LOCAL: GO`；`CI: NO-GO (PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+  macOS / 本地 CI 形态的 watcher、锁和清理测试不能证明 Windows `tasklist` CSV、NTFS `wx` 与删除
+  共享、reparse point、`ProgramData` 路径、真实双进程启动或奔图物理结果。ACK 后任务存活协议、
+  `lastAttemptHash` 作为采集归属、微信真机、生产部署与商业闭环也未在本候选中证明。
+
 2026-09-17 **扫描隐私 R3 与小程序跨端 R11 已进入当前主干；代码 / CI 证据已闭合，设备、生产与商业仍为 NO-GO。**
 当前 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`。扫描候选 PR #1036 已于
 2026-09-15 合入：最终 head `a3db5f4165725f8f1a2365dfe7e1ce34a3e928dd`，merge commit

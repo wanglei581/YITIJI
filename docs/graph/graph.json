@@ -19139,6 +19139,9 @@
     "apps/terminal-agent/installer/verify-installer-inputs.mjs": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
+    "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
+      "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
     "apps/terminal-agent/scripts/diagnose-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
     ],
@@ -19186,12 +19189,18 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
+    "apps/terminal-agent/src/agent/instance-lock.ts": [
+      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
+    ],
     "apps/terminal-agent/src/agent/network-diagnostics.ts": [
       "apps/terminal-agent/scripts/verify-network-diagnostics.ts"
     ],
     "apps/terminal-agent/src/agent/offline-queue.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
+      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
     ],
     "apps/terminal-agent/src/agent/profile-guard.ts": [
       "apps/terminal-agent/scripts/verify-agent-profile-guard.mjs"
@@ -27287,6 +27296,8 @@
         "files": [
           "apps/terminal-agent/src/agent/db.ts",
           "apps/terminal-agent/src/agent/heartbeat.ts",
+          "apps/terminal-agent/src/agent/instance-lock.ts",
+          "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/index.ts"
@@ -27468,6 +27479,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts",
           "apps/terminal-agent/src/agent/auth-state.ts",
           "apps/terminal-agent/src/agent/claim-rate-limit.ts",
           "apps/terminal-agent/src/agent/db.ts",
