@@ -9,6 +9,12 @@ const mock = require('./mock-data');
 const N = require('./normalize');
 const uploadNames = require('./upload-name');
 const auth = require('./auth');
+// 幂等键的形状各由**铸它的那个模块**定义（两份都与服务端 IDEMPOTENCY_KEY_RE 同形：
+// 只认小写，因为 Order 的唯一键区分大小写）。这里只借来做本地校验，不在本文件再抄一份
+// 正则 —— 抄一份就会有一天对不上，而对不上的表现是一个必然 400 的请求被发出去，
+// 页面把它显示成一句「请稍后重试」，用户重试多少次都一样。
+const { KEY_RE: PRINT_ORDER_IDEMPOTENCY_KEY_RE } = require('./print-order-idempotency');
+const { KEY_RE: PACKAGE_IDEMPOTENCY_KEY_RE } = require('./package-order-idempotency');
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -1459,16 +1465,20 @@ const api = {
    *
    * `opts.idempotencyKey` **必填**，且只走 Header `idempotency-key`：
    * 服务端 `assertMemberPrintOrderIdempotencyKey` 从 Header 取，缺了就 400
-   * `IDEMPOTENCY_KEY_REQUIRED`。放进 body 有两个后果：服务端根本读不到（照样 400），
+   * `IDEMPOTENCY_KEY_REQUIRED`、形状不对（含**大写**）400 `IDEMPOTENCY_KEY_INVALID`。
+   * 放进 body 有两个后果：服务端根本读不到（照样 400），
    * 而 `CreateMemberPrintOrderDto` 又会把这个多出来的字段判成非法参数。
    * 键从哪来、什么时候复用，见 utils/print-order-idempotency.js。
    */
   createCloudPrintOrder(data, opts) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('云打印预提交'));
     const idempotencyKey = opts && opts.idempotencyKey;
-    if (typeof idempotencyKey !== 'string' || !idempotencyKey) {
+    if (typeof idempotencyKey !== 'string' || !PRINT_ORDER_IDEMPOTENCY_KEY_RE.test(idempotencyKey)) {
       // 本地就挡下来，不把一个必然 400 的请求发出去 —— 那会让页面把
       // 「你少带了一个 Header」显示成「下单失败，请稍后重试」。
+      // 形状也一起判（判据就是铸键那个模块的 KEY_RE，不另抄一份）：大写 UUID 在服务端
+      // 是**另一个键**，它不会回放原单，只会 400；发出去等于把一次可解释的失败
+      // 换成一句「请稍后重试」。
       return Promise.reject(new Error('创建打印订单必须携带幂等键'));
     }
     return request('/me/print-orders', {
@@ -1532,14 +1542,35 @@ const api = {
    * **不要传 filename / pageCount / totalAmount** —— DTO 注释写明「页数、金额与
    * 文件名全部由服务端查证，前端传值不作为事实」，让前端报页数报金额本身就是错的。
    *
+   * `opts.idempotencyKey` **必填**，且只走 Header `idempotency-key`：服务端
+   * `assertMemberPrintOrderIdempotencyKey` 从 Header 取，缺了就 400
+   * `IDEMPOTENCY_KEY_REQUIRED`、形状不对 400 `IDEMPOTENCY_KEY_INVALID`。放进 body 有
+   * 两个后果：服务端根本读不到（照样 400），而白名单 DTO 又会把这个多出来的字段判成
+   * 非法参数。同键 + 同指纹回放原单原码，同键 + 不同参数 409 `IDEMPOTENCY_KEY_REUSED`。
+   * 键从哪来、什么时候复用，见 utils/package-order-idempotency.js。
+   *
    * @param {object} data { terminalId, files: [{ fileId, pageRange? }], params: { colorMode, duplex, copies } }
+   * @param {{idempotencyKey:string}} opts
    * @returns {Promise<{ orderId, orderNo, pickupCode, expiresAt, amountCents, payStatus,
    *                     pickupStatus, taskStatus, paymentSessionToken, items }>}
    *          注意没有 qrCodeUrl：服务端从不下发该字段，旧注释是错的。
    */
-  createPackageOrder(data) {
+  createPackageOrder(data, opts) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('材料包订单'));
-    return request('/orders/package', { method: 'POST', data, needAuth: true });
+    const idempotencyKey = opts && opts.idempotencyKey;
+    if (typeof idempotencyKey !== 'string' || !PACKAGE_IDEMPOTENCY_KEY_RE.test(idempotencyKey)) {
+      // 本地就挡下来，不把一个必然 400 的请求发出去 —— 那会让页面把
+      // 「你少带了一个 Header」显示成「创建订单失败，请稍后重试」。
+      // 形状也一起判：服务端对形状不对的键回 400 IDEMPOTENCY_KEY_INVALID，
+      // 而那同样只会被翻译成一句「请稍后重试」，用户重试多少次都一样。
+      return Promise.reject(new Error('创建材料包订单必须携带幂等键'));
+    }
+    return request('/orders/package', {
+      method: 'POST',
+      data,
+      needAuth: true,
+      header: { 'idempotency-key': idempotencyKey },
+    });
   },
 
   /**

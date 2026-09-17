@@ -141,8 +141,41 @@ const STORE_UNREADABLE_MESSAGE = '读不到本机的下单记录，为避免重�
 /** 未落定名额用尽。见 MAX_PENDING_RECORDS。 */
 const PENDING_FULL_MESSAGE = '本机还有太多没有落定的下单记录，为避免重复下单已中止提交。请先到「我的 · 打印订单」确认之前几次提交的结果'
 
-/** 与服务端 assertMemberPrintOrderIdempotencyKey 的 IDEMPOTENCY_KEY_RE 同形。 */
-const KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+/**
+ * 盘上这一格的键**服务端已经不接受了**（大写 / 形状被改坏），而它已经带着 orderId。
+ *
+ * 这一种只能 fail-closed：那个键换不回原单（400），而铸一个新键就是第二张订单、
+ * 第二笔钱。记录**不清**（orderId 还指得回那张真实存在的订单），页面照它锁住并指路。
+ */
+const STALE_KEY_SETTLED_MESSAGE = '本机这一单的下单标识已经不是服务端接受的形态，但它对应的订单可能已经建好了。为避免重复下单已中止提交，请到「我的 · 打印订单」确认后再操作'
+
+/**
+ * 服务端接受的键形态：**只认小写十六进制**。
+ *
+ * 2026-09-17 `daa1f5484` 把服务端的 `IDEMPOTENCY_KEY_RE` 去掉了 `/i`，理由是
+ * **大小写不在唯一键里**：`Order` 的 `@@unique(endUserId, idempotencyKey)` 是
+ * 区分大小写的 TEXT，于是同一个 UUID 的大写写法在服务端是**另一个键** —— 它不会
+ * 回放原单，会再建一张、再收一次钱。服务端选择直接 400 `IDEMPOTENCY_KEY_INVALID`
+ * 而**不** `toLowerCase()`（悄悄改写请求会让"我发的键"和"服务端记的键"不是一个东西）。
+ * 本地这一份必须跟着收紧到同一形态，否则大写键会一路走到 wx.request，
+ * 用户看到的只是一句被翻译过的「请稍后重试」，重试多少次都一样。
+ */
+const KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+/**
+ * 「这一格看起来是本模块写下的一条记录」的**宽**判据（大小写不敏感）。
+ *
+ * 它只决定一件事：这条记录**要不要留在盘上**。不决定那个键还能不能拿去 POST ——
+ * 那个判据是上面的 `KEY_RE`。两者必须分开：只用 `KEY_RE` 过滤的话，一条键形态不合
+ * （大写 / 被改坏）但**已经带着 orderId** 的记录会在下一次读-改-写回全量时被整条抹掉，
+ * 而它恰恰是唯一还指得回那张真实订单的线索 —— 抹掉它，用户同参数再提交一次就是第二张单。
+ */
+const KEY_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** 这个键还能不能拿去 POST（服务端只认小写）。 */
+function isReusableKey(key) {
+  return typeof key === 'string' && KEY_RE.test(key)
+}
 
 /**
  * 参与指纹的字段，**与服务端 fingerprintMemberPrintOrderPayload 逐字同一组**。
@@ -249,7 +282,13 @@ function randomUuidV4() {
   })
 }
 
-/** ArrayBuffer(16) → `xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx`。 */
+/**
+ * ArrayBuffer(16) → `xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx`。
+ *
+ * **产物一定是小写**：`Number.prototype.toString(16)` 只吐小写十六进制，而服务端的
+ * 唯一键区分大小写（见 KEY_RE）。铸完还会被 `KEY_RE.test()` 再核一遍 —— 那一道既挡
+ * 形状，也挡大小写，所以这条性质不是靠注释维持的。
+ */
 function formatUuidV4(randomValues) {
   const bytes = new Uint8Array(randomValues)
   if (bytes.length < 16) throw new Error('安全随机数长度不足')
@@ -304,7 +343,11 @@ function loadAll() {
   return raw.filter((row) => row
     && typeof row === 'object'
     && isMemberIdentity(row.account)
-    && typeof row.key === 'string' && KEY_RE.test(row.key)
+    // 键形态按**宽**判据留，按**严**判据用（见 KEY_SHAPE_RE）。
+    // 唯一被当场丢掉的是「键已经不可用、而且还没落定」那一种：它既复用不了
+    // （服务端 400），也没有 orderId 可指 —— 留着只会把这一格永久堵死。
+    && typeof row.key === 'string' && KEY_SHAPE_RE.test(row.key)
+    && (isReusableKey(row.key) || !!row.orderId)
     && typeof row.fingerprint === 'string' && row.fingerprint !== ''
     && typeof row.createdAt === 'number' && Number.isFinite(row.createdAt)
     && now - row.createdAt < TTL_MS)
@@ -461,7 +504,11 @@ function ensureKey(account, fingerprint) {
   const rows = loadAll()
   if (!rows) return Promise.reject(new Error(STORE_UNREADABLE_MESSAGE))
   const hit = rows.find((row) => row.account === account && row.fingerprint === fingerprint)
-  if (hit) return Promise.resolve(hit)
+  if (hit && isReusableKey(hit.key)) return Promise.resolve(hit)
+  // 走到这里只有一种可能：这一格已经落定（有 orderId），而它的键是服务端已经不接受的
+  // 形态 —— loadAll 只让这一种活下来（键不可用且未落定的那一种当场就丢掉了，见那里）。
+  // 不复用（400 换不回原单），也不铸新键（那是第二张订单），更不清记录（orderId 还有用）。
+  if (hit) return Promise.reject(new Error(STALE_KEY_SETTLED_MESSAGE))
   // 未落定的名额满了：**拒绝铸新键**，一条既有记录都不删。
   //
   // 这是本模块唯一一处"宁可不让用户下单"的地方，因为另一条路更贵：腾名额只能从
@@ -487,7 +534,9 @@ function ensureKey(account, fingerprint) {
     // 取随机数这段时间里，别的路径完全可能已经把这一格写好了（例如一次失败重试的
     // 回退路径）。真有就用它，不覆盖 —— 覆盖等于换一个键。
     const settled = base.find((row) => row.account === account && row.fingerprint === fingerprint)
-    if (settled) return settled
+    if (settled && isReusableKey(settled.key)) return settled
+    // 同上：这段时间里冒出来的那一格若带着一个服务端不接受的键，一样只能 fail-closed。
+    if (settled) throw new Error(STALE_KEY_SETTLED_MESSAGE)
     // 取随机数期间别的**槽位**也可能把名额占满（不同参数、另一个页面实例）。
     // 再判一次：这一步的代价只是白铸一个键，而放行的代价是挤掉一条在飞的记录。
     if (pendingCount(base) >= MAX_PENDING_RECORDS) {
@@ -576,6 +625,9 @@ function clearRecord(account, fingerprint) {
 module.exports = {
   FINGERPRINT_FIELDS,
   KEY_RE,
+  KEY_SHAPE_RE,
+  isReusableKey,
+  STALE_KEY_SETTLED_MESSAGE,
   TTL_MS,
   MAX_PENDING_RECORDS,
   MAX_SETTLED_RECORDS,

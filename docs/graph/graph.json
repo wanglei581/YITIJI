@@ -20135,6 +20135,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -20150,6 +20152,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -20883,6 +20887,8 @@
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-edit.ts",
@@ -21051,6 +21057,7 @@
     "services/api/src/common/crypto/secret-cipher.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts"
     ],
     "services/api/src/common/crypto/webhook-secret-strength.ts": [
@@ -21105,6 +21112,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -21123,6 +21131,7 @@
       "services/api/scripts/verify-member-favorites-benefits.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
     "services/api/src/common/guards/jwt-auth.guard.ts": [
@@ -21178,7 +21187,8 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
-      "services/api/scripts/verify-order.ts"
+      "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts"
     ],
     "services/api/src/common/pii/llm-input-mask.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
@@ -21218,6 +21228,7 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
@@ -22051,6 +22062,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "services/api/src/member-print-orders/member-print-orders.controller.ts": [
@@ -22068,7 +22080,12 @@
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "services/api/src/member-print-orders/package-order.service.ts": [
-      "services/api/scripts/verify-package-order-fulfillment.ts"
+      "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts"
+    ],
+    "services/api/src/member-print-orders/package-orders.controller.ts": [
+      "services/api/scripts/verify-package-order-idempotency-http.ts"
     ],
     "services/api/src/member-privacy/admin-member-privacy.controller.ts": [
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -22260,6 +22277,8 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
@@ -22275,6 +22294,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -22351,6 +22372,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pricing.ts",
@@ -22375,6 +22398,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pricing.ts",
@@ -22544,6 +22569,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -22677,6 +22704,8 @@
       "services/api/scripts/verify-offline-agencies-contract.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-edit.ts",
@@ -22830,6 +22859,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pii-redaction.ts",
@@ -22860,6 +22891,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
@@ -22934,6 +22967,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
@@ -32577,6 +32612,73 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:package-order-fulfillment"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/member-print-orders/package-orders.controller.ts",
+          "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.interface.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:package-order-idempotency-http"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/secret-cipher.ts",
+          "services/api/src/common/pickup-code.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.interface.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-package-order-idempotency.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:package-order-idempotency"
       ],
       "wired": true
     },
