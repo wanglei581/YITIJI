@@ -18,6 +18,11 @@ import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CreatePackageOrderDto } from './dto/create-package-order.dto'
 import { assertMemberPrintOrderIdempotencyKey } from './member-print-order-create.service'
+import {
+  acquireOrderSubmissionLease,
+  completeOrderSubmission,
+  releaseOrderSubmissionLease,
+} from './order-submission-ledger'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
@@ -71,8 +76,13 @@ export function fingerprintPackageOrderPayload(dto: CreatePackageOrderDto): stri
   })).digest('hex')
 }
 
-function isPrismaUniqueConflict(error: unknown): error is object & { code: 'P2002' } {
-  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'P2002')
+function prismaUniqueConflict(error: unknown): object & { code: 'P2002' } | null {
+  let current: unknown = error
+  for (let i = 0; i < 6 && current && typeof current === 'object'; i += 1) {
+    if ((current as { code?: unknown }).code === 'P2002') return current as object & { code: 'P2002' }
+    current = (current as { cause?: unknown }).cause
+  }
+  return null
 }
 
 @Injectable()
@@ -88,9 +98,20 @@ export class PackageOrderService {
   async create(endUserId: string, dto: CreatePackageOrderDto, idempotencyKey?: string | null) {
     const key = assertMemberPrintOrderIdempotencyKey(idempotencyKey)
     const fingerprint = fingerprintPackageOrderPayload(dto)
-    const existing = await this.findOwnedByIdempotencyKey(endUserId, key)
-    if (existing) return this.replayOwned(endUserId, existing, fingerprint)
-
+    const acquired = await acquireOrderSubmissionLease(this.prisma, {
+      endUserId,
+      idempotencyKey: key,
+      orderKind: 'package',
+      payloadHash: fingerprint,
+    })
+    if (acquired.type === 'replay') {
+      const existing = await this.findOwnedByIdempotencyKey(endUserId, key)
+      if (!existing) throw new NotFoundException({ error: { code: 'PACKAGE_ORDER_NOT_FOUND', message: '材料包订单不存在' } })
+      return this.replayOwned(endUserId, existing, fingerprint)
+    }
+    const leaseToken = acquired.leaseToken
+    let completed = false
+    try {
     const now = new Date()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: dto.terminalId }, { terminalCode: dto.terminalId }] },
@@ -147,49 +168,64 @@ export class PackageOrderService {
     const code = randomPickupCode()
     let order
     try {
-      order = await this.prisma.order.create({
-        data: {
-          orderNo: makeOrderNo(),
-          type: 'print',
-          channel: 'miniapp_cloud',
-          endUserId,
-          terminalId: terminal.id,
-          amountCents,
-          billablePages: items.reduce((total, item) => total + item.billablePages, 0),
-          billingPageSource: items.every((item) => item.billingPageSource === items[0]?.billingPageSource) ? items[0]?.billingPageSource : 'mixed',
-          payStatus: 'unpaid',
-          taskStatus: 'pending_release',
-          pickupCodeHash: hashPickupCode(code),
-          pickupCodeEnc: encryptSecret(code),
-          pickupCodeCreatedAt: now,
-          pickupCodeExpiresAt: expiresAt,
-          pickupStatus: 'pending',
-          idempotencyKey: key,
-          idempotencyPayloadHash: fingerprint,
-          orderItems: {
-            create: items.map((item, seq) => ({
-              seq,
-              fileId: item.fileId,
-              colorMode: params.colorMode,
-              duplex: params.duplex,
-              copies: params.copies,
-              pageRange: item.pageRange,
-              billablePages: item.billablePages,
-              amountCents: item.amountCents,
-            })),
+      order = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            orderNo: makeOrderNo(),
+            type: 'print',
+            channel: 'miniapp_cloud',
+            endUserId,
+            terminalId: terminal.id,
+            amountCents,
+            billablePages: items.reduce((total, item) => total + item.billablePages, 0),
+            billingPageSource: items.every((item) => item.billingPageSource === items[0]?.billingPageSource) ? items[0]?.billingPageSource : 'mixed',
+            payStatus: 'unpaid',
+            taskStatus: 'pending_release',
+            pickupCodeHash: hashPickupCode(code),
+            pickupCodeEnc: encryptSecret(code),
+            pickupCodeCreatedAt: now,
+            pickupCodeExpiresAt: expiresAt,
+            pickupStatus: 'pending',
+            idempotencyKey: key,
+            idempotencyPayloadHash: fingerprint,
+            orderItems: {
+              create: items.map((item, seq) => ({
+                seq,
+                fileId: item.fileId,
+                colorMode: params.colorMode,
+                duplex: params.duplex,
+                copies: params.copies,
+                pageRange: item.pageRange,
+                billablePages: item.billablePages,
+                amountCents: item.amountCents,
+              })),
+            },
           },
-        },
-        include: { orderItems: { orderBy: { seq: 'asc' } } },
+          include: { orderItems: { orderBy: { seq: 'asc' } } },
+        })
+        await completeOrderSubmission(tx, { endUserId, idempotencyKey: key, leaseToken, orderId: created.id })
+        return created
       })
     } catch (error) {
       // Any P2002: one scoped lookup by (endUserId, key). Replay only that
       // member's row. No row → rethrow. Never replay another member.
-      if (isPrismaUniqueConflict(error)) {
+      const unique = prismaUniqueConflict(error)
+      if (unique) {
         const raced = await this.findOwnedByIdempotencyKey(endUserId, key)
-        if (raced) return this.replayOwned(endUserId, raced, fingerprint)
+        if (raced) {
+          completed = true
+          try {
+            await completeOrderSubmission(this.prisma, { endUserId, idempotencyKey: key, leaseToken, orderId: raced.id })
+          } catch {
+            /* already succeeded or fenced; owned row is still the replay source */
+          }
+          return this.replayOwned(endUserId, raced, fingerprint)
+        }
+        throw unique
       }
       throw error
     }
+    completed = true
     if (amountCents === 0) await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
     const settled = amountCents === 0
       ? await this.prisma.order.findUniqueOrThrow({
@@ -206,6 +242,11 @@ export class PackageOrderService {
       payload: { terminalId: terminal.id, itemCount: order.orderItems.length, amountCents },
     })
     return this.toView(settled, code)
+    } finally {
+      if (!completed) {
+        await releaseOrderSubmissionLease(this.prisma, { endUserId, idempotencyKey: key, leaseToken })
+      }
+    }
   }
 
   async detail(endUserId: string, orderId: string) {
@@ -231,7 +272,7 @@ export class PackageOrderService {
    *   2. **不返回逐文件明细**（items）。列表只回条目数，明细进详情页拿。
    *
    * 到机码照常返回：找回它正是本端点存在的理由，且判据与 detail 完全一致
-   * （visibleCode：pending 且未过期才给），不另开一套口径。
+   * （visibleCode：pending + unpaid/paying/paid 且未过期才给），不另开一套口径。
    */
   async list(endUserId: string, page: MemberPageQuery) {
     await this.expireExpiredForUser(endUserId)
@@ -370,16 +411,19 @@ export class PackageOrderService {
   }
 
   /**
-   * 到机码在**未支付时也必须可见**：材料包是「手机组包拿码 → 到机器 → 现场付款 → 出纸」，
-   * 码就是去机器的凭证。`pickup-order.service.ts:100-101` 明确接受 unpaid / paying 并回一个
-   * 支付令牌，`:133` 才在出纸前硬卡 `payStatus !== 'paid'`。因此这里**不**套用单文件路径的
-   * `pickupCodeVisibleFor`（那条线是先线上付款后出码，口径本就不同）。
-   * （Antigravity 第 17 轮复审阻塞项 1 建议加 payStatus 判断 —— 核实后判定为误报：
-   *  照它改会让整条现场付款链走不通。）
+   * 到机码在 unpaid/paying/paid 时可见：材料包是「手机组包拿码 → 到机器 → 现场付款 → 出纸」。
+   * closed / refund* / failed 必须隐藏，避免过期关单或退款后仍把码画给用户。
+   * 不套用单文件 `pickupCodeVisibleFor`（那条线只在 paid 后出码）。
    */
-  private visibleCode(order: { pickupStatus: string; pickupCodeExpiresAt: Date | null; pickupCodeEnc: string | null }): string | null {
-    if (order.pickupStatus !== 'pending' || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date()) return null
-    if (!order.pickupCodeEnc) return null
+  private visibleCode(order: {
+    pickupStatus: string
+    payStatus: string
+    pickupCodeExpiresAt: Date | null
+    pickupCodeEnc: string | null
+  }): string | null {
+    if (order.pickupStatus !== 'pending') return null
+    if (!['unpaid', 'paying', 'paid'].includes(order.payStatus)) return null
+    if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date() || !order.pickupCodeEnc) return null
     try { return decryptSecret(order.pickupCodeEnc) } catch { return null }
   }
 

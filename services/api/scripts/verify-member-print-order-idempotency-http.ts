@@ -20,7 +20,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { EndUserAuthGuard, memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { RedisService } from '../src/common/redis/redis.service'
-import { MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
+import { fingerprintMemberPrintOrderPayload, MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
 import { MemberPrintOrdersController } from '../src/member-print-orders/member-print-orders.controller'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
@@ -317,11 +317,79 @@ async function main(): Promise<void> {
     if (originalView.pickupCode && leaked.includes(originalView.pickupCode)) fail('409 不得泄露到机码')
     if (await prisma.order.count({ where: { idempotencyKey: mismatchKey } }) !== 1) fail('payload 冲突不得第二张单')
     pass('H5 同 header 不同 payload → 409，不泄露 id/code')
+
+    async function resolveRequest(init: {
+      token?: string
+      body?: unknown
+    }): Promise<HttpResult> {
+      const response = await fetch(`${base}/me/print-orders/submissions/resolve`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${init.token ?? accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(init.body ?? { keys: [] }),
+      })
+      return { status: response.status, json: (await response.json().catch(() => ({}))) as Json }
+    }
+
+    const createdKey = mixedKey
+    const createdResolve = await resolveRequest({ body: { keys: [createdKey] } })
+    if (createdResolve.status !== 200) fail(`已建单 resolve 应为 200，实际 ${JSON.stringify(createdResolve)}`)
+    const createdItems = envelopeData<{ items: Array<{ key: string; outcome: string; orderId?: string; orderKind?: string }> }>(createdResolve).items
+    if (createdItems[0]?.outcome !== 'created' || createdItems[0].orderId !== createdView.id || createdItems[0].orderKind !== 'print') {
+      fail(`已建单 resolve 必须 created/print，实际 ${JSON.stringify(createdResolve.json)}`)
+    }
+    pass('H6 resolve 已建单 → created + orderKind=print')
+
+    const tombHttpKey = randomUUID()
+    const tombHttp = await resolveRequest({ body: { keys: [tombHttpKey] } })
+    const tombItems = envelopeData<{ items: Array<{ outcome: string; orderId?: string }> }>(tombHttp).items
+    if (tombHttp.status !== 200 || tombItems[0]?.outcome !== 'not_created' || tombItems[0].orderId) {
+      fail(`未知 key resolve 必须 not_created，实际 ${JSON.stringify(tombHttp)}`)
+    }
+    const lateHttp = await request({ headers: { 'idempotency-key': tombHttpKey } })
+    if (lateHttp.status !== 409 || errorCode(lateHttp) !== 'IDEMPOTENCY_KEY_ABANDONED') {
+      fail(`墓碑后 POST 必须 409 ABANDONED，实际 ${JSON.stringify(lateHttp)}`)
+    }
+    if (await prisma.order.count({ where: { idempotencyKey: tombHttpKey } }) !== 0) fail('HTTP 墓碑后不得建单')
+    pass('H7 resolve 墓碑后迟到 POST → 409 ABANDONED')
+
+    const procHttpKey = randomUUID()
+    await prisma.orderSubmissionLedger.create({
+      data: {
+        endUserId: userA,
+        idempotencyKey: procHttpKey,
+        orderKind: 'print',
+        payloadHash: fingerprintMemberPrintOrderPayload(dto),
+        status: 'processing',
+        leaseToken: randomUUID(),
+        leaseExpiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    const procHttp = await request({ headers: { 'idempotency-key': procHttpKey } })
+    if (procHttp.status !== 409 || errorCode(procHttp) !== 'IDEMPOTENCY_IN_PROGRESS') {
+      fail(`活租约 POST 必须 409 IN_PROGRESS，实际 ${JSON.stringify(procHttp)}`)
+    }
+    const procResolveHttp = await resolveRequest({ body: { keys: [procHttpKey] } })
+    const procItems = envelopeData<{ items: Array<{ outcome: string }> }>(procResolveHttp).items
+    if (procItems[0]?.outcome !== 'processing') fail(`活租约 resolve 必须 processing，实际 ${JSON.stringify(procResolveHttp)}`)
+    const procLedger = await prisma.orderSubmissionLedger.findFirst({ where: { endUserId: userA, idempotencyKey: procHttpKey } })
+    if (!procLedger || procLedger.status !== 'processing') fail('活租约 resolve 不得把 processing 清成 abandoned')
+    pass('H8 活租约 POST IN_PROGRESS，resolve=processing 且不清键')
+
+    const oversize = await resolveRequest({ body: { keys: Array.from({ length: 21 }, () => randomUUID()) } })
+    if (oversize.status !== 400 || errorCode(oversize) !== 'VALIDATION_FAILED') {
+      fail(`21 个 key 必须 400 VALIDATION_FAILED，实际 ${JSON.stringify(oversize)}`)
+    }
+    pass('H9 resolve 最多 20 个 key')
   } finally {
     setPrintScanCapabilityModeForTest(null)
     await app.close()
     const orderIds = (await prisma.order.findMany({ where: { endUserId: userA }, select: { id: true } })).map((row) => row.id)
     if (orderIds.length) await prisma.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
+    await prisma.orderSubmissionLedger.deleteMany({ where: { endUserId: userA } })
     await prisma.order.deleteMany({ where: { endUserId: userA } })
     await prisma.piiFinding.deleteMany({ where: { task: { endUserId: userA } } })
     await prisma.documentProcessTask.deleteMany({ where: { endUserId: userA } })

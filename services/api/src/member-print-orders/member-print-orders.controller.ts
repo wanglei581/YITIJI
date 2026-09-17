@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Headers, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Header, Headers, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common'
 import type { MemberPendingTaskItem, MemberPrintOrderItem } from './member-print-orders.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
@@ -7,6 +7,7 @@ import { MemberPrintOrdersService } from './member-print-orders.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
+import { ResolveOrderSubmissionsDto } from './dto/resolve-order-submissions.dto'
 import { assertMemberPrintOrderIdempotencyKey, MemberPrintOrderCreateService } from './member-print-order-create.service'
 
 /**
@@ -48,6 +49,20 @@ export class MemberPrintOrdersController {
   ) {
     assertMemberPrintOrderIdempotencyKey(idempotencyKey)
     return ApiResponse.ok(await this.cloudOrders.create(user.endUserId, dto, idempotencyKey))
+  }
+
+  /**
+   * Owner-scoped batch resolve for print and package Idempotency-Key values.
+   * Static path must stay beside POST / so Nest does not treat `submissions` as an orderId.
+   */
+  @Post('submissions/resolve')
+  @HttpCode(200)
+  async resolveSubmissions(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Body() dto: ResolveOrderSubmissionsDto,
+  ) {
+    for (const key of dto.keys) assertMemberPrintOrderIdempotencyKey(key)
+    return ApiResponse.ok(await this.cloudOrders.resolveSubmissions(user.endUserId, dto.keys))
   }
 
   /** 小程序专用 Order-only 列表；与历史 PrintTask-first 列表分开，避免游标契约漂移。 */

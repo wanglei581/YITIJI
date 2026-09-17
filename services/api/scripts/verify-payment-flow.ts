@@ -1095,6 +1095,63 @@ async function main(): Promise<void> {
       )
     }
 
+    async function withOfflinePaidWriteRace(orderId: string, mutate: () => Promise<void>): Promise<boolean> {
+      const originalUpdateMany = orderMut.updateMany.bind(prisma.order) as UpdateMany
+      let raced = false
+      orderMut.updateMany = (async (args: Parameters<UpdateMany>[0]) => {
+        const data = args?.data as { payStatus?: string } | undefined
+        const where = args?.where as { id?: string } | undefined
+        if (!raced && where?.id === orderId && data?.payStatus === 'paid') {
+          raced = true
+          await mutate()
+        }
+        return originalUpdateMany(args)
+      }) as UpdateMany
+      try {
+        await expectCode(
+          `offline markPaid CAS 0 after race on ${orderId} (ORDER_PICKUP_WINDOW_CLOSED)`,
+          'ORDER_PICKUP_WINDOW_CLOSED',
+          () => orderStatus.markPaid(orderId, { paymentSource: 'offline', operatorId: 'verify-offline-race' }),
+        )
+        return raced
+      } finally {
+        orderMut.updateMany = originalUpdateMany
+      }
+    }
+
+    const offlineRaceId = await makeOrder(155, 'unpaid')
+    await prisma.order.update({
+      where: { id: offlineRaceId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: `hash_offline_race_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    const racedOffline = await withOfflinePaidWriteRace(offlineRaceId, async () => {
+      await prisma.order.update({
+        where: { id: offlineRaceId },
+        data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
+      })
+    })
+    if (!racedOffline) fail('offline sweeper race must intercept the paid write, not skip it')
+    const offlineRaceRow = await prisma.order.findUnique({ where: { id: offlineRaceId } })
+    const offlinePendingRefund = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: offlineRaceId },
+    })
+    if (
+      offlineRaceRow?.payStatus === 'closed'
+      && offlineRaceRow.pickupStatus === 'expired'
+      && offlineRaceRow.paidAt == null
+      && !offlinePendingRefund
+    ) {
+      pass('offline markPaid snapshot-open then sweeper expired+closed: CAS 0, stays closed, no pending-refund')
+    } else {
+      fail(
+        `offline sweeper race mismatch: pay=${offlineRaceRow?.payStatus} pickup=${offlineRaceRow?.pickupStatus} paidAt=${offlineRaceRow?.paidAt?.toISOString() ?? 'null'} refundAudit=${Boolean(offlinePendingRefund)}`,
+      )
+    }
+
     // ── (14) API-08：关单后 claimed 回滚 pending，不再卡死 ──────────────────
     const claimedCloseId = await makeOrder(300, 'paying')
     await prisma.order.update({

@@ -448,6 +448,25 @@ async function main(): Promise<void> {
     }
     pass('未付款 Order-only 可取消且不会创建 PrintTask')
 
+    const closedPending = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
+    if (!closedPending.pickupCode) fail('closed-pending 用例需要先拿到到机码')
+    await prisma.order.update({
+      where: { id: closedPending.id },
+      data: { payStatus: 'closed', pickupStatus: 'pending' },
+    })
+    await expectCode(
+      () => pickup.claim(closedPending.pickupCode, terminalId),
+      'ORDER_PAYMENT_UNAVAILABLE',
+      'closed pending 认领必须在改 claimed 之前拒绝',
+    )
+    const closedPendingRow = await prisma.order.findUnique({ where: { id: closedPending.id } })
+    if (closedPendingRow?.pickupStatus !== 'pending' || closedPendingRow.payStatus !== 'closed') {
+      fail(`closed pending 被拒后必须仍 pending/closed，实际 ${closedPendingRow?.pickupStatus}/${closedPendingRow?.payStatus}`)
+    }
+    const closedCancelled = await memberOrders.cancel(userId, closedPending.id, { reason: 'closed pending still cancellable' })
+    if (closedCancelled.pickupStatus !== 'cancelled') fail('closed pending 被拒后必须仍可取消')
+    pass('closed pending 认领不改 claimed，仍可取消')
+
     // ── 预言机合并 ────────────────────────────────────────────────────────
     // 「码有效但不在这台机器」与「码根本不存在」必须**完全无法区分**。
     // 判据刻意不是「有没有抛错」（两者本来就都抛），而是逐字段比对真实响应：

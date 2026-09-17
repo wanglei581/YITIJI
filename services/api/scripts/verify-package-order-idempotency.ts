@@ -16,6 +16,9 @@ import {
   fingerprintPackageOrderPayload,
   PackageOrderService,
 } from '../src/member-print-orders/package-order.service'
+import {
+  resolveOrderSubmissions,
+} from '../src/member-print-orders/order-submission-ledger'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { isLiveKioskPickupLease, isPickupWindowClosed, OrderStatusService } from '../src/payment/order-status.service'
 import { paymentSessionTtlMs } from '../src/payment/payment-session-token'
@@ -232,25 +235,47 @@ async function main(): Promise<void> {
     run: () => Promise<T>,
   ): Promise<T> {
     const original: OrderMut = { create: orderMut.create, findFirst: orderMut.findFirst, updateMany: orderMut.updateMany }
+    const prismaAny = prisma as unknown as { $transaction: PrismaService['$transaction'] }
+    const originalTx = prismaAny.$transaction.bind(prisma)
     try {
       apply(orderMut, original)
+      prismaAny.$transaction = (async (arg: unknown, options?: unknown) => {
+        if (typeof arg !== 'function') return originalTx(arg as never, options as never)
+        return originalTx(async (tx: { order: OrderMut }) => {
+          apply(tx.order, {
+            create: tx.order.create.bind(tx.order) as typeof prisma.order.create,
+            findFirst: tx.order.findFirst.bind(tx.order) as typeof prisma.order.findFirst,
+            updateMany: tx.order.updateMany.bind(tx.order) as typeof prisma.order.updateMany,
+          })
+          return (arg as (client: unknown) => Promise<unknown>)(tx)
+        }, options as never)
+      }) as PrismaService['$transaction']
       return await run()
     } finally {
       orderMut.create = original.create
       orderMut.findFirst = original.findFirst
+      orderMut.updateMany = original.updateMany
+      prismaAny.$transaction = originalTx
     }
   }
 
-  function skipIdempotencyLookupOnce(key: string, original: OrderMut): void {
+  /**
+   * Skip the first (endUserId, key) lookup so acquire races the unique.
+   * Shared `skipped` + patch `delegate` (not the root client): `$transaction`
+   * re-applies this hook on `tx.order` and must not hide the post-P2002 replay lookup.
+   */
+  function skipIdempotencyLookupOnce(key: string): (delegate: OrderMut, original: OrderMut) => void {
     let skipped = false
-    orderMut.findFirst = ((args?: Parameters<typeof prisma.order.findFirst>[0]) => {
-      const where = args?.where as { idempotencyKey?: string } | undefined
-      if (!skipped && where?.idempotencyKey === key) {
-        skipped = true
-        return Promise.resolve(null)
-      }
-      return original.findFirst(args)
-    }) as typeof prisma.order.findFirst
+    return (delegate, original) => {
+      delegate.findFirst = ((args?: Parameters<typeof prisma.order.findFirst>[0]) => {
+        const where = args?.where as { idempotencyKey?: string } | undefined
+        if (!skipped && where?.idempotencyKey === key) {
+          skipped = true
+          return Promise.resolve(null)
+        }
+        return original.findFirst(args)
+      }) as typeof prisma.order.findFirst
+    }
   }
 
   async function seedUser(id: string): Promise<void> {
@@ -407,17 +432,28 @@ async function main(): Promise<void> {
     pass('T2b 大写 UUID 拒绝且零额外 Order')
 
     const keyConcurrent = randomUUID()
-    const raced = await Promise.all([
+    const raced = await Promise.allSettled([
       packages.create(userA, dtoA, keyConcurrent) as Promise<PackageView>,
       packages.create(userA, dtoA, keyConcurrent) as Promise<PackageView>,
     ])
-    if (raced[0].orderId !== raced[1].orderId || raced[0].pickupCode !== raced[1].pickupCode) {
-      fail(`并发必须收敛到同一订单: ${raced[0].orderId} vs ${raced[1].orderId}`)
+    const concurrentOk = raced
+      .filter((item): item is PromiseFulfilledResult<PackageView> => item.status === 'fulfilled')
+      .map((item) => item.value)
+    for (const item of raced) {
+      if (item.status === 'rejected' && codeOf(item.reason) !== 'IDEMPOTENCY_IN_PROGRESS') {
+        fail(`并发输家只允许 IN_PROGRESS，实际 ${codeOf(item.reason)}`)
+      }
+    }
+    if (concurrentOk.length === 0) fail('并发至少一方必须建成或回放')
+    if (concurrentOk.length === 2 && (concurrentOk[0].orderId !== concurrentOk[1].orderId || concurrentOk[0].pickupCode !== concurrentOk[1].pickupCode)) {
+      fail(`并发成功双方必须同一订单: ${concurrentOk[0].orderId} vs ${concurrentOk[1].orderId}`)
     }
     if (await prisma.order.count({ where: { idempotencyKey: keyConcurrent } }) !== 1) fail('并发不得两行')
-    if (await prisma.orderItem.count({ where: { orderId: raced[0].orderId } }) !== 2) fail('并发不得复制行')
-    if (await createAuditCount(raced[0].orderId) !== 1) fail('并发 loser 回放不得再写 create 审计')
-    pass('T3 Promise.all 同 key 收敛到一行且审计 1')
+    if (await prisma.orderItem.count({ where: { orderId: concurrentOk[0].orderId } }) !== 2) fail('并发不得复制行')
+    const concurrentReplay = await packages.create(userA, dtoA, keyConcurrent) as PackageView
+    if (concurrentReplay.orderId !== concurrentOk[0].orderId) fail('并发结束后回放必须拿到原单')
+    if (await createAuditCount(concurrentOk[0].orderId) !== 1) fail('并发 loser 回放不得再写 create 审计')
+    pass('T3 Promise.allSettled 同 key 收敛到一行且审计 1')
 
     const keyLost = randomUUID()
     const lost = await packages.create(userA, dtoA, keyLost) as PackageView
@@ -874,6 +910,72 @@ async function main(): Promise<void> {
     if (await prisma.order.count({ where: { idempotencyKey: usedKey } }) !== 1) fail('used 回放不得第二张单')
     pass('T8g used 回放原单、无第二张、无活码')
 
+    const vis = await packages.create(userA, dtoA, randomUUID()) as PackageView
+    if (!vis.pickupCode) fail('unpaid 材料包必须露出到机码')
+    for (const hide of ['closed', 'failed', 'refunded', 'refunding', 'partial_refunded']) {
+      await prisma.order.update({ where: { id: vis.orderId }, data: { payStatus: hide, pickupStatus: 'pending' } })
+      const hidden = await packages.detail(userA, vis.orderId)
+      if (hidden.pickupCode) fail(`payStatus=${hide} 不得露出到机码`)
+      const listedHidden = (await packages.list(userA, { cursor: null, pageSize: 20 })).items.find((row) => row.orderId === vis.orderId)
+      if (listedHidden?.pickupCode) fail(`列表 payStatus=${hide} 不得露出到机码`)
+    }
+    await prisma.order.update({ where: { id: vis.orderId }, data: { payStatus: 'paying', pickupStatus: 'pending' } })
+    if (!(await packages.detail(userA, vis.orderId)).pickupCode) fail('paying 必须仍露出到机码')
+    await prisma.order.update({ where: { id: vis.orderId }, data: { payStatus: 'paid', pickupStatus: 'pending' } })
+    if (!(await packages.detail(userA, vis.orderId)).pickupCode) fail('paid 必须仍露出到机码')
+    pass('P-vis 材料包到机码隐藏 closed/refund/failed，保留 unpaid/paying/paid')
+
+    const closedClaim = await packages.create(userA, dtoA, randomUUID()) as PackageView
+    await prisma.order.update({
+      where: { id: closedClaim.orderId },
+      data: { payStatus: 'closed', pickupStatus: 'pending' },
+    })
+    const closedClaimed = await capture(() => pickup.claim(closedClaim.pickupCode!, terminalId))
+    if (!closedClaimed.thrown || closedClaimed.code !== 'ORDER_PAYMENT_UNAVAILABLE') {
+      fail(`closed pending claim 必须拒绝，实际 ${JSON.stringify(closedClaimed)}`)
+    }
+    const closedRow = await prisma.order.findUniqueOrThrow({ where: { id: closedClaim.orderId } })
+    if (closedRow.pickupStatus !== 'pending' || closedRow.payStatus !== 'closed') {
+      fail(`closed pending 被拒后必须仍 pending/closed，实际 ${closedRow.pickupStatus}/${closedRow.payStatus}`)
+    }
+    pass('P-claim closed pending 不得改成 claimed，保持 pending')
+
+    const laterFile = await packages.create(userA, dtoA, randomUUID()) as PackageView
+    await prisma.fileObject.update({
+      where: { id: fileA2 },
+      data: { status: 'deleted', deletedAt: new Date(), expiresAt: new Date(Date.now() - 1000) },
+    })
+    const laterClaim = await capture(() => pickup.claim(laterFile.pickupCode!, terminalId))
+    if (!laterClaim.thrown || laterClaim.code !== 'PRINT_FILE_EXPIRED') {
+      fail(`后序文件失效 claim 必须 PRINT_FILE_EXPIRED，实际 ${JSON.stringify(laterClaim)}`)
+    }
+    const laterRow = await prisma.order.findUniqueOrThrow({ where: { id: laterFile.orderId } })
+    if (laterRow.pickupStatus !== 'pending' || laterRow.payStatus !== 'unpaid') {
+      fail(`后序文件失效不得认领/收款，实际 ${laterRow.pickupStatus}/${laterRow.payStatus}`)
+    }
+    await prisma.fileObject.update({
+      where: { id: fileA2 },
+      data: { status: 'active', deletedAt: null, expiresAt: new Date(Date.now() + 30 * 60 * 60 * 1000) },
+    })
+    pass('P-all-items 后序文件失效：claim 拒绝，订单仍 pending/unpaid')
+
+    const pkgTombKey = randomUUID()
+    const pkgTomb = await resolveOrderSubmissions(prisma, userA, [pkgTombKey])
+    if (pkgTomb.items[0].outcome !== 'not_created') fail('材料包未知 key resolve 必须 not_created')
+    const pkgLate = await capture(() => packages.create(userA, dtoA, pkgTombKey))
+    if (!pkgLate.thrown || pkgLate.code !== 'IDEMPOTENCY_KEY_ABANDONED') {
+      fail(`材料包墓碑后 POST 必须 ABANDONED，实际 ${JSON.stringify(pkgLate)}`)
+    }
+    if (await prisma.order.count({ where: { idempotencyKey: pkgTombKey } }) !== 0) fail('材料包墓碑后不得建单')
+    const mixedCreated = await packages.create(userA, dtoA, randomUUID()) as PackageView
+    const mixedKey = (await prisma.order.findUniqueOrThrow({ where: { id: mixedCreated.orderId } })).idempotencyKey
+    if (!mixedKey) fail('材料包必须写下 idempotencyKey')
+    const mixedResolve = await resolveOrderSubmissions(prisma, userA, [mixedKey])
+    if (mixedResolve.items[0].outcome !== 'created' || mixedResolve.items[0].orderKind !== 'package' || mixedResolve.items[0].orderId !== mixedCreated.orderId) {
+      fail(`材料包 resolve 必须 created/package，实际 ${JSON.stringify(mixedResolve)}`)
+    }
+    pass('P-ledger 材料包 tombstone + resolve kind=package')
+
     const collideKey = randomUUID()
     const collideCode = randomPickupCode()
     const collideId = `ord_pkg_collide_${suffix}`
@@ -882,8 +984,9 @@ async function main(): Promise<void> {
       ownerId: userA, dto: dtoA,
     })
     let seenSqliteP2002: { code?: string; meta?: unknown } | null = null
+    const skipCollide = skipIdempotencyLookupOnce(collideKey)
     const collideView = await withOrderMutations((delegate, original) => {
-      skipIdempotencyLookupOnce(collideKey, original)
+      skipCollide(delegate, original)
       delegate.create = (async (args: Parameters<typeof prisma.order.create>[0]) => {
         try {
           return await original.create(args)
@@ -909,8 +1012,9 @@ async function main(): Promise<void> {
       ownerId: userA, dto: dtoA,
     })
     let missingMetaCreateCalls = 0
+    const skipMeta = skipIdempotencyLookupOnce(metaKey)
     const metaView = await withOrderMutations((delegate, original) => {
-      skipIdempotencyLookupOnce(metaKey, original)
+      skipMeta(delegate, original)
       delegate.create = (async () => {
         missingMetaCreateCalls += 1
         throw { code: 'P2002' }
@@ -928,8 +1032,9 @@ async function main(): Promise<void> {
       ownerId: userB, dto: { terminalId, files: [{ fileId: fileB1 }], params: dtoA.params },
     })
     let foreignCreateCalls = 0
+    const skipForeign = skipIdempotencyLookupOnce(foreignKey)
     const foreignRace = await withOrderMutations((delegate, original) => {
-      skipIdempotencyLookupOnce(foreignKey, original)
+      skipForeign(delegate, original)
       delegate.create = (async () => {
         foreignCreateCalls += 1
         throw { code: 'P2002' }
@@ -979,6 +1084,7 @@ async function main(): Promise<void> {
       await prisma.printTaskStatusLog.deleteMany({ where: { task: { endUserId: { in: [userA, userB] } } } }).catch(() => undefined)
       await prisma.printTask.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
     }
+    await prisma.orderSubmissionLedger.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
     await prisma.order.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
     await prisma.piiFinding.deleteMany({ where: { task: { endUserId: { in: [userA, userB] } } } })
     await prisma.documentProcessTask.deleteMany({ where: { endUserId: { in: [userA, userB] } } })

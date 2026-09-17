@@ -219,7 +219,7 @@ export class OrderStatusService {
       let res: { count: number }
       try {
         res = await this.prisma.order.updateMany({
-          where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set：只在仍为 unpaid 时命中
+          where: { id: orderId, payStatus: 'unpaid', ...fulfillablePickupWindowWhere() },
           data: {
             payStatus: 'paid',
             paymentSource,
@@ -239,6 +239,7 @@ export class OrderStatusService {
         const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
         if (fresh?.payStatus === 'paid' && fresh.paymentSource === paymentSource) return fresh
         if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+        if (fresh && isPickupWindowClosed(fresh)) throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
         throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
       settled = true

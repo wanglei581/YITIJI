@@ -20,6 +20,12 @@ import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import type { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
+import {
+  acquireOrderSubmissionLease,
+  completeOrderSubmission,
+  releaseOrderSubmissionLease,
+  resolveOrderSubmissions,
+} from './order-submission-ledger'
 
 /**
  * 取件码有效期上限：7 天（产品裁决 2026-08-18 方案 A，原 24 小时）。
@@ -163,7 +169,16 @@ export function isMemberPrintOrderIdempotencyConflict(error: unknown): boolean {
 }
 
 function isPrismaUniqueConflict(error: unknown): error is object & { code: 'P2002' } {
-  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'P2002')
+  return prismaUniqueConflict(error) != null
+}
+
+function prismaUniqueConflict(error: unknown): object & { code: 'P2002' } | null {
+  let current: unknown = error
+  for (let i = 0; i < 6 && current && typeof current === 'object'; i += 1) {
+    if ((current as { code?: unknown }).code === 'P2002') return current as object & { code: 'P2002' }
+    current = (current as { cause?: unknown }).cause
+  }
+  return null
 }
 
 @Injectable()
@@ -176,12 +191,27 @@ export class MemberPrintOrderCreateService {
     private readonly audit: AuditService,
   ) {}
 
+  async resolveSubmissions(endUserId: string, keys: string[]) {
+    return resolveOrderSubmissions(this.prisma, endUserId, keys)
+  }
+
   async create(endUserId: string, dto: CreateMemberPrintOrderDto, idempotencyKey?: string | null) {
     const key = assertMemberPrintOrderIdempotencyKey(idempotencyKey)
     const fingerprint = fingerprintMemberPrintOrderPayload(dto)
-    const existing = await this.findOwnedByIdempotencyKey(endUserId, key)
-    if (existing) return this.replayOwned(endUserId, existing, fingerprint)
-
+    const acquired = await acquireOrderSubmissionLease(this.prisma, {
+      endUserId,
+      idempotencyKey: key,
+      orderKind: 'print',
+      payloadHash: fingerprint,
+    })
+    if (acquired.type === 'replay') {
+      const existing = await this.findOwnedByIdempotencyKey(endUserId, key)
+      if (!existing) throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
+      return this.replayOwned(endUserId, existing, fingerprint)
+    }
+    const leaseToken = acquired.leaseToken
+    let completed = false
+    try {
     const now = new Date()
     const file = await this.prisma.fileObject.findFirst({
       where: { id: dto.fileId, endUserId, deletedAt: null },
@@ -231,44 +261,59 @@ export class MemberPrintOrderCreateService {
     const expiresAt = new Date(Math.min(pickupDeadline, file.expiresAt?.getTime() ?? pickupDeadline))
     let order
     try {
-      order = await this.prisma.order.create({
-        data: {
-          orderNo: makeOrderNo(),
-          type: 'print',
-          // channel: 小程序云打印（到店取件）。小程序建单请求体不含该字段——
-          // 由服务端硬编，前端零改动（见 M1 任务卡事实 B/D/E）。
-          channel: 'miniapp_cloud',
-          endUserId,
-          terminalId: terminal.id,
-          sourceFileId: file.id,
-          sourceFileSha256: file.sha256,
-          sourceFileName: file.filename,
-          printParamsJson: JSON.stringify({ ...params, fileName: file.filename }),
-          amountCents: quote.amountCents,
-          billablePages: quote.billablePages,
-          billingPageSource: quote.billingPageSource,
-          itemsJson: JSON.stringify(quote.lines),
-          payStatus: 'unpaid',
-          taskStatus: 'pending_release',
-          pickupCodeHash: hashPickupCode(code),
-          pickupCodeEnc: encryptSecret(code),
-          pickupCodeCreatedAt: now,
-          pickupCodeExpiresAt: expiresAt,
-          pickupStatus: 'pending',
-          idempotencyKey: key,
-          idempotencyPayloadHash: fingerprint,
-        },
+      order = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            orderNo: makeOrderNo(),
+            type: 'print',
+            // channel: 小程序云打印（到店取件）。小程序建单请求体不含该字段——
+            // 由服务端硬编，前端零改动（见 M1 任务卡事实 B/D/E）。
+            channel: 'miniapp_cloud',
+            endUserId,
+            terminalId: terminal.id,
+            sourceFileId: file.id,
+            sourceFileSha256: file.sha256,
+            sourceFileName: file.filename,
+            printParamsJson: JSON.stringify({ ...params, fileName: file.filename }),
+            amountCents: quote.amountCents,
+            billablePages: quote.billablePages,
+            billingPageSource: quote.billingPageSource,
+            itemsJson: JSON.stringify(quote.lines),
+            payStatus: 'unpaid',
+            taskStatus: 'pending_release',
+            pickupCodeHash: hashPickupCode(code),
+            pickupCodeEnc: encryptSecret(code),
+            pickupCodeCreatedAt: now,
+            pickupCodeExpiresAt: expiresAt,
+            pickupStatus: 'pending',
+            idempotencyKey: key,
+            idempotencyPayloadHash: fingerprint,
+          },
+        })
+        await completeOrderSubmission(tx, { endUserId, idempotencyKey: key, leaseToken, orderId: created.id })
+        return created
       })
     } catch (error) {
       // Any P2002: one scoped lookup by (endUserId, key). Replay only when that
       // row exists (fingerprint checked in replayOwned). No row → rethrow the
       // exact original error. Do not classify solely by provider meta tokens.
-      if (isPrismaUniqueConflict(error)) {
+      const unique = prismaUniqueConflict(error)
+      if (unique) {
         const raced = await this.findOwnedByIdempotencyKey(endUserId, key)
-        if (raced) return this.replayOwned(endUserId, raced, fingerprint)
+        if (raced) {
+          completed = true
+          try {
+            await completeOrderSubmission(this.prisma, { endUserId, idempotencyKey: key, leaseToken, orderId: raced.id })
+          } catch {
+            /* already succeeded or fenced; owned row is still the replay source */
+          }
+          return this.replayOwned(endUserId, raced, fingerprint)
+        }
+        throw unique
       }
       throw error
     }
+    completed = true
     const settled = quote.amountCents === 0
       ? await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
       : order
@@ -282,6 +327,11 @@ export class MemberPrintOrderCreateService {
       payload: { terminalId: terminal.id, fileId: file.id, amountCents: quote.amountCents, billablePages: quote.billablePages },
     })
     return this.toView(settled, this.visibleCode(settled) ?? code, terminal)
+    } finally {
+      if (!completed) {
+        await releaseOrderSubmissionLease(this.prisma, { endUserId, idempotencyKey: key, leaseToken })
+      }
+    }
   }
 
   async listCloud(endUserId: string) {

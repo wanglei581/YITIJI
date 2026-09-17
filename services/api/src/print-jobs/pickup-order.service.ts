@@ -27,6 +27,7 @@ import {
  * 发起后到成功之间是 'refunding'，部分退款是 'partial_refunded'。
  */
 const REFUNDED_PAY_STATUSES = new Set(['refunding', 'partial_refunded', 'refunded'])
+const CLAIMABLE_PAY_STATUSES = ['unpaid', 'paying', 'paid'] as const
 
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -119,17 +120,36 @@ export class PickupOrderService {
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })
     }
-    const firstItem = !order.sourceFileId
-      ? await this.prisma.orderItem.findFirst({ where: { orderId: order.id, seq: 0 }, orderBy: { seq: 'asc' } })
-      : null
-    await this.assertOrderFileReady(order, firstItem?.fileId)
+    this.assertPayStatusClaimable(order.payStatus)
+    const packageItems = !order.sourceFileId
+      ? await this.prisma.orderItem.findMany({ where: { orderId: order.id }, orderBy: { seq: 'asc' } })
+      : []
+    if (!order.sourceFileId && packageItems.length === 0) throw new BadRequestException('PRINT_FILE_NOT_FOUND')
+    if (order.sourceFileId) {
+      await this.assertOrderFileReady(order)
+    } else {
+      for (const item of packageItems) {
+        await this.assertOrderFileReady(order, item.fileId)
+      }
+    }
+    const firstItem = packageItems[0] ?? null
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'document_print')
 
     if (order.pickupStatus === 'pending') {
-      await this.prisma.order.updateMany({
-        where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
+      const claimed = await this.prisma.order.updateMany({
+        where: {
+          id: order.id,
+          pickupStatus: 'pending',
+          printTaskId: null,
+          payStatus: { in: [...CLAIMABLE_PAY_STATUSES] },
+        },
         data: { pickupStatus: 'claimed', pickupClaimedAt: new Date(), taskStatus: 'awaiting_payment' },
       })
+      if (claimed.count !== 1) {
+        const raced = await this.prisma.order.findUnique({ where: { id: order.id } })
+        if (!raced) throw new NotFoundException('ORDER_NOT_FOUND')
+        if (raced.pickupStatus === 'pending') this.assertPayStatusClaimable(raced.payStatus)
+      }
     }
     const fresh = await this.prisma.order.findUnique({ where: { id: order.id } })
     if (!fresh) throw new NotFoundException('ORDER_NOT_FOUND')
@@ -288,6 +308,19 @@ export class PickupOrderService {
     }
     if (latest.localTaskDatabaseAvailable === false) throw new ForbiddenException('PRINT_TERMINAL_DEGRADED')
     return terminal
+  }
+
+  private assertPayStatusClaimable(payStatus: string): void {
+    if ((CLAIMABLE_PAY_STATUSES as readonly string[]).includes(payStatus)) return
+    if (REFUNDED_PAY_STATUSES.has(payStatus)) {
+      throw new BadRequestException({
+        error: {
+          code: 'ORDER_REFUNDED',
+          message: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度。',
+        },
+      })
+    }
+    throw new BadRequestException({ error: { code: 'ORDER_PAYMENT_UNAVAILABLE', message: '订单当前无法付款' } })
   }
 
   private async assertOrderFileReady(order: { sourceFileId: string | null; endUserId: string | null }, itemFileId?: string) {
