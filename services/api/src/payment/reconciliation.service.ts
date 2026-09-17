@@ -14,10 +14,12 @@
  * - ORDER_REFUNDED_WITHOUT_REFUND_ROW：payStatus=refunded 但无 success Refund 记录。
  * - REFUND_SUCCESS_ORDER_NOT_REFUNDED：存在 success Refund 但订单未处于 refunded。
  * - STUCK_REFUNDING：订单停留 refunding（退款受理中/半态），超龄需人工跟进（W-B 自动收敛前的人工兜底）。
+ * - ONLINE_COLLECTED_PENDING_REFUND：渠道已收款但订单未转 paid（取件窗口已关），须走 canonical 退款。
  * - LATE_PAID / RECONCILED：迟到入账 / 主动查单入账专项清单（非错误，运营需知晓复核）。
  */
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { isOnlineCollectedPendingRefund, ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
 
 /** 线上资金通道（有 PaymentAttempt 台账的入账来源）。 */
 const ONLINE_CHANNELS = new Set(['sandbox', 'wechat', 'alipay'])
@@ -61,11 +63,14 @@ export class ReconciliationService {
     const createdAt =
       fromDate || toDate ? { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } : undefined
 
-    // 只取涉及资金/退款态的订单（unpaid/paying/closed 无资金流，排除以聚焦对账）。
+    // 资金/退款态，外加「渠道已收款但未转 paid」的迟到回调待退（不得因 payStatus 非 paid 而隐身）。
     const orders = await this.prisma.order.findMany({
       where: {
         ...(createdAt ? { createdAt } : {}),
-        payStatus: { in: ['paid', 'refunding', 'partial_refunded', 'refunded'] },
+        OR: [
+          { payStatus: { in: ['paid', 'refunding', 'partial_refunded', 'refunded'] } },
+          { refundReason: ONLINE_PAID_PENDING_REFUND_REASON },
+        ],
       },
       orderBy: { createdAt: 'asc' },
     })
@@ -150,6 +155,14 @@ export class ReconciliationService {
         if (ageMs > STUCK_REFUNDING_MS) {
           push(discrepancies, 'STUCK_REFUNDING', o, { payStatus: o.payStatus, ageMinutes: Math.floor(ageMs / 60000) })
         }
+      } else if (isOnlineCollectedPendingRefund(o)) {
+        // 渠道实收已在，但不把 payStatus 伪装成 paid。金额计入 gross，差异清单供运营退款。
+        grossPaidCents += netCaptured
+        push(discrepancies, 'ONLINE_COLLECTED_PENDING_REFUND', o, {
+          payStatus: o.payStatus,
+          amountCents: netCaptured,
+          successAttempts: successAttemptByOrder.get(o.id) ?? 0,
+        })
       }
 
       if (lateOrderIds.has(o.id)) push(latePaid, 'LATE_PAID', o, { paymentSource: o.paymentSource, amountCents: netCaptured })

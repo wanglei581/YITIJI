@@ -89,6 +89,17 @@ async function main(): Promise<void> {
     const stuck = await mk('stuck', { amountCents: 60, payStatus: 'refunding', paymentSource: 'wechat', payChannel: 'wechat', paidAt: new Date() })
     await prisma.order.update({ where: { id: stuck }, data: { updatedAt: new Date(Date.now() - 60 * 60 * 1000) } })
 
+    // 渠道已收款、订单未转 paid（迟到回调待退）必须进入对账，不得因 closed 被排除
+    const collected = await mk('coll', {
+      amountCents: 330,
+      payStatus: 'closed',
+      refundReason: 'ONLINE_PAID_PENDING_REFUND',
+      pickupStatus: 'expired',
+    })
+    await prisma.paymentAttempt.create({
+      data: { orderId: collected, channel: 'wechat', amountCents: 330, status: 'success', channelTxnNo: `wx_${suffix}_c` },
+    })
+
     // 专项：LATE_PAID（healthy 单加 late 审计）+ RECONCILED（refundedOk 单加 reconcile 审计）
     await prisma.auditLog.create({ data: { actorRole: 'system', action: 'order.mark_paid_online', targetType: 'order', targetId: healthy, payloadJson: JSON.stringify({ late: true, channel: 'wechat' }) } })
     await prisma.auditLog.create({ data: { actorRole: 'system', action: 'payment.reconciled', targetType: 'order', targetId: refundedOk, payloadJson: JSON.stringify({ channel: 'alipay' }) } })
@@ -128,6 +139,11 @@ async function main(): Promise<void> {
     else fail('missed REFUND_SUCCESS_ORDER_NOT_REFUNDED')
     if (find(disc, 'STUCK_REFUNDING', stuck)) pass('检出 STUCK_REFUNDING（超龄退款中单）')
     else fail('missed STUCK_REFUNDING')
+    if (find(disc, 'ONLINE_COLLECTED_PENDING_REFUND', collected) && rep.summary.grossPaidCents >= 200 + 100 + 90 + 330) {
+      pass('检出 ONLINE_COLLECTED_PENDING_REFUND，金额计入 gross（不伪装 payStatus=paid）')
+    } else {
+      fail(`missed ONLINE_COLLECTED_PENDING_REFUND: ${JSON.stringify(disc)} summary=${JSON.stringify(rep.summary)}`)
+    }
 
     if (find(mine(rep.attention.latePaid), 'LATE_PAID', healthy)) pass('LATE_PAID 进 attention 专项')
     else fail('missed LATE_PAID attention')

@@ -90,12 +90,13 @@ export class AdminOrdersReadonlyController {
   ) {
     const refundRequired = pickRefundRequired(refundRequiredRaw)
     const resolvedPayStatus = pickFilter('payStatus', payStatus, VALID_PAY_STATUS)
-    if (refundRequired === true && resolvedPayStatus && resolvedPayStatus !== 'paid') {
+    const refundRequiredPayStatuses = new Set(['paid', 'unpaid', 'paying', 'closed'])
+    if (refundRequired === true && resolvedPayStatus && !refundRequiredPayStatuses.has(resolvedPayStatus)) {
       throw new BadRequestException({
         error: {
           code: 'INVALID_FILTER_VALUE',
-          message: '待退款筛选仅适用于已支付订单',
-          details: ['refundRequired=true 时 payStatus 只能是 paid 或省略'],
+          message: '待退款筛选仅适用于已支付或渠道已收款待退订单',
+          details: ['refundRequired=true 时 payStatus 只能是 paid、unpaid、paying、closed 或省略'],
         },
       })
     }

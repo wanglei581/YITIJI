@@ -1,5 +1,18 @@
 # 当前开发进度
 
+2026-09-18 **P0：迟到线上回调待退单补上 canonical 退款路径（本地候选，未 push / 未部署）。**
+实现基线 `3d35759ee`，已 rebase 到 `origin/main@eb0f20341`（含 PR #1040/#1041）。渠道在取件窗口关闭后仍收款时，订单保持 `closed/unpaid/paying` +
+`refundReason=ONLINE_PAID_PENDING_REFUND` + 唯一 success `PaymentAttempt`，不得转 paid、不得铸取件码。
+此前 `RefundService` 只收 `payStatus=paid`，对账与 Admin `refundRequired` 也看不见该态，渠道已收款无出款路径。
+
+- **退款：** 复用 canonical `RefundService`。渠道与金额只来自该单唯一 success 尝试；0 条 / 多条 /
+  金额不一致 / 不支持通道 / 已核查出纸 / 明文取件码一律 fail-closed。失败回滚 `closed` 而非 `paid`。
+  重复请求幂等；明确拒绝后同号可重试。
+- **可见性：** 对账差异 `ONLINE_COLLECTED_PENDING_REFUND`（金额计入 gross，不伪装 paid）；
+  Admin `refundRequired` / `refundEligible` 覆盖该态。
+- **证据边界：** `SOURCE / LOCAL` 以本机 verify 为准；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+  未 push、未开 PR、未合并、未跑真实支付。
+
 2026-09-17 **生产 API-only 发布控制面候选：阻止 API 修复连带覆盖三端前端。** Windows Agent
 `0.4.11` 在精确候选 `50483cd28096780c5e6c4260dde86dec36e7d99f` 上安装后，心跳因生产 API
 仍缺少 `55c32296f` 新增的 `scanInput*` DTO 白名单字段而返回
