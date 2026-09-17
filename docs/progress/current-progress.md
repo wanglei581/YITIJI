@@ -1,5 +1,45 @@
 # 当前开发进度
 
+2026-09-17 **Admin / Partner 数据大屏 R2 已完成本地集成，等待完整门禁与单一 PR。**
+候选分支 `codex/console-data-screen-r2-20260917` 基于
+`origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，运行时代码 tip 为
+`3fa8152dc39280c500f807bfe822f422eef8f69a`，未 push、未开 PR、未合并、未部署。
+
+- **后端口径与隔离：** `1957fadd4a8ce934c7b15f0a81bd934a02f12fb9` 将累计指标收口为当前
+  `payStatus='paid'` 的 `billablePages` 内容页（不乘 `copies`），14 日趋势按 `paidAt` 落入
+  Asia/Shanghai 自然日；今日失败改按 `PrintTaskStatusLog.toStatus='failed'` 的事件时间统计。
+  Admin / Partner 机队改为 `count + take=200`，Partner 空白或非法 `orgId` 全链路 fail-closed。
+  SQLite / PostgreSQL 同步增加两条查询索引及对应迁移。
+- **前端口径与测试隔离：** `6623e5b43f38fc3c9c83116caca7b57f601c7c3c` 由 Claude 完成 Admin
+  大屏文案、source 夹具、机队抽样提示及默认 Playwright 对 `screen/**` 的排除；新增截断态几何测试。
+  当前截图覆盖 1920x1080 与 1440x900，未发现裁剪、重叠或过小字号。
+- **语义标题修复：** Claude 随后发现 Partner 默认 E2E 的 `/screen` 同页两个 `h1`。Claude完成
+  `ScreenHeader` 的受限标题层级实现，Codex在 Claude连续超时未提交后仅执行集成提交
+  `3fa8152dc39280c500f807bfe822f422eef8f69a`：嵌入后台时内部标题为 `h2`，全屏演示时为 `h1`，
+  没有放宽 route-sweep 或用 CSS 隐藏重复标题。
+- **本机证据：** API `verify:console-screen-snapshot` 70/70、`db:pg:sync:check`、typecheck、build；
+  UI 静态门禁、UI/Admin/Partner typecheck、Admin/Partner production build；Admin screen 40/40、
+  Partner screen 18/18、Admin 默认 E2E 75/75、Partner 默认 E2E 41/41 均退出 0。Grok 对六个关键
+  条件做反向变异均判红。repository-integrity、CI gate coverage、deploy gate sync、compliance copy
+  和 `pnpm graph:check` 均退出 0。
+- **独立回执：** Grok writer `a200d120-f1c5-4cfb-8645-49235df1eae4` 为 `GO`；Agy
+  `77168b91-2c5d-4127-aa39-09f5e58e2775` 为 `PARTIAL`，其前端 P0/P1/P2 已由 Claude本轮关闭；
+  Claude session `e356389c-256d-4cb8-bdca-3d6a0aa10e7b` 完成前端代码和专项验证，但多次达到工具时限，
+  最终提交由 Codex在不改前端代码的前提下完成。
+- **证据边界：** `SOURCE / LOCAL: GO`；`CI / MERGE: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+
+2026-09-17 **并行收口任务状态。** PR #1038 的材料包幂等候选
+`d9d79f2689dddd0614a76b71a2252a96d7468a69` 已通过 GitHub Actions run `35206540195` 的
+`build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke`，但尚未合并；Windows / 奔图和
+扫描收口专用任务仍在运行。旧“小程序与一体机跨端联动收口”任务因供应商 403 锁死，已新建
+“小程序与一体机跨端联动收口 R2”，禁止再向旧任务重试或注入消息。
+
+服务器只读审计确认生产仍为 `NO-GO`：当前生产 `a8a521cb1be0be7ddbdf9eafd1223936ecfe643d`
+落后 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f` 89 个提交、6 个 PostgreSQL 迁移；
+仍有 root 密码 SSH、无异地/自动备份与恢复演练、PM2 dump 陈旧、历史 dump 权限、证书续期、
+静态安全头及云安全组/IAM/生命周期未核验等阻塞。本轮没有部署、重启、迁移或生产写入。
+
 2026-09-17 **生产 API-only 发布控制面候选：阻止 API 修复连带覆盖三端前端。** Windows Agent
 `0.4.11` 在精确候选 `50483cd28096780c5e6c4260dde86dec36e7d99f` 上安装后，心跳因生产 API
 仍缺少 `55c32296f` 新增的 `scanInput*` DTO 白名单字段而返回
@@ -18,6 +58,7 @@ run `35229197747` 已通过：默认 API 目录、PM2 进程名、回环健康�
 - **当前证据边界：** 本条仅是源码候选，尚未 push、PR、合并或生产执行；
   `DEPLOY_API_ENABLED=false` 未打开。完成本地验证和 PR CI 后，才允许短时打开门禁，以
   `ci_run_id=34992685756`、`deploy_scope=api-only` 部署精确 `50483cd...`，随后立即关闭门禁。
+
 
 2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
 失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
