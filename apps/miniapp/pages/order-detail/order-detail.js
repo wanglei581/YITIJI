@@ -303,7 +303,7 @@ Page({
   },
 
   _isOwnerDeniedError(err) {
-    return !!(err && (Number(err.statusCode) === 404 || err.code === 'PRINT_ORDER_NOT_FOUND'))
+    return !!(err && Number(err.statusCode) === 404 && err.code === 'PRINT_ORDER_NOT_FOUND')
   },
 
   _denyOwner(account) {
@@ -426,19 +426,16 @@ Page({
         })
       })
       .catch((err) => {
-        // 401 走到这里说明 request.js 连静默续签都没救回来（它续签失败时会 auth.logout()）。
-        // 那一刻起页面上的到机码属于一个已经不存在的会话 —— _verify 里的账号判定
-        // 会当场把它清掉，不必等用户离开本页再回来。
-        //
         // 失败**不追确认请求、也不建立归属**：确认请求是为"归属未定那一发成功了、
         // 但证明不了归属"准备的。失败时既没有归属可证，也没有内容可写；照追就会在
         // 服务端持续 404（B 拿着 A 的 orderId）时变成一个打不完的循环。
-        if (token.confirming && this._isOwnerDeniedError(err) && isMemberIdentity(token.identity)) {
-          this._ownerDeniedFor = token.identity
-        }
+        //
+        // 粘性拒绝只能在这一发**仍然属于当前通道**之后记下。hidden / 代次作废 /
+        // 换人 的回调证明不了"服务端按当前这位拒绝了这张订单"，提前盖章会把本人锁在
+        // 这一页上，而重试按钮再也不会打到网络。
         if (!this._verifyChannel(token)) return
-        if (token.confirming && this._ownerDeniedFor === this._account) {
-          this._denyOwner(this._account)
+        if (token.confirming && this._isOwnerDeniedError(err) && isMemberIdentity(token.identity)) {
+          this._denyOwner(token.identity)
           return
         }
         this.setData({

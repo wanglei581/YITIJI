@@ -4996,6 +4996,7 @@ test('R12-H order-detail：过期开页确认被拒后，hide/show 不得再替�
   await flush()
   assert.equal(page.data.detail, null)
   assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page._ownerDeniedFor, 'u:B', '前台、当前通道上的 requireOwned 404 必须按发出时那个账号粘住')
 
   page.onHide()
   page.onShow()
@@ -5003,4 +5004,102 @@ test('R12-H order-detail：过期开页确认被拒后，hide/show 不得再替�
   assert.equal(pending.length, 2, '被拒过的账号不得因 hide/show 反复问服务端')
   assert.equal(page.data.detail, null)
   assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R12-I order-detail：只有 404、没有 PRINT_ORDER_NOT_FOUND —— 不得粘性拒绝，回前台仍可再问', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2)
+
+  pending[1].reject(Object.assign(new Error('not found'), { statusCode: 404 }))
+  await flush()
+  assert.equal(page._ownerDeniedFor, '', '网关 404 不是 requireOwned，不得把这位粘死')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+
+  page.onHide()
+  page.onShow()
+  assert.equal(pending.length, 3, '404-only 之后下一次 onShow 必须还能发确认请求')
+})
+
+test('R12-J order-detail：只有 PRINT_ORDER_NOT_FOUND、没有 404 —— 不得粘性拒绝', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2)
+
+  pending[1].reject(Object.assign(new Error('not found'), { code: 'PRINT_ORDER_NOT_FOUND' }))
+  await flush()
+  assert.equal(page._ownerDeniedFor, '', '缺 404 的业务码不是 requireOwned')
+  assert.equal(page.data.detail, null)
+
+  page.onHide()
+  page.onShow()
+  assert.equal(pending.length, 3, 'code-only 之后下一次 onShow 必须还能发确认请求')
+})
+
+test('R12-K order-detail：精确 404+code 在 onHide 之后到达 —— 不得盖章，回前台仍可再问', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2)
+
+  page.onHide()
+  pending[1].reject(notOwnedError())
+  await flush()
+  assert.equal(page._ownerDeniedFor, '', '被代次作废的确认失败不得记下拒绝账号')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+
+  page.onShow()
+  assert.equal(pending.length, 3, 'hide 期间到达的 404 不得挡住下一次前台确认请求')
+})
+
+test('R12-L order-detail：精确 404+code 在换人之后到达 —— 不得盖上一位的章，也不得替 B 去要 A 的订单', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2, '前提：确认请求带着 A 发出')
+
+  switchAccount('B')
+  page.onShow()
+  assert.equal(pending.length, 2, '换人清场不得再发一发代表 B 的请求')
+
+  pending[1].reject(notOwnedError())
+  await flush()
+  assert.notEqual(page._ownerDeniedFor, 'u:A', '换人之后到达的拒绝不得盖在 A 头上')
+  assert.equal(page._ownerDeniedFor, '', '也不得把 B 记成被拒（那一发不是 B 发出的）')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.ok(!JSON.stringify(page.data).includes('A的简历'))
+  assert.equal(pending.length, 2, '迟到的拒绝回调不得替 B 去要 A 的订单')
 })
