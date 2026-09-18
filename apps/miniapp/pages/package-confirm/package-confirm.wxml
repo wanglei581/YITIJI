@@ -118,8 +118,10 @@
         <view class="section-card" wx:if="{{submitErrorTitle}}">
           <view class="state-t">{{submitErrorTitle}}</view>
           <view class="state-d">{{submitErrorText}}</view>
-          <view class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{submitRecover}}" role="button">
-            {{submitRecover === 'login' ? '去登录' : submitRecover === 'store' ? '换一个服务点' : submitRecover === 'files' || submitRecover === 'privacy' ? '回到选择文件' : submitRecover === 'orders' ? '去我的打印订单' : '重新核价'}}
+          <!-- submitRecover 为空 = 这一刻没有可执行的下一步（核对正在进行中）。
+               画一个按钮出来只会是一个按下去什么都不做的主动作。 -->
+          <view wx:if="{{submitRecover}}" class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{submitRecover}}" role="button">
+            {{submitRecover === 'login' ? '去登录' : submitRecover === 'reconcile' ? '重新核对下单记录' : submitRecover === 'resubmit' ? '确认下单' : submitRecover === 'store' ? '换一个服务点' : submitRecover === 'files' || submitRecover === 'privacy' ? '回到选择文件' : submitRecover === 'orders' ? '去我的打印订单' : '重新核价'}}
           </view>
         </view>
 

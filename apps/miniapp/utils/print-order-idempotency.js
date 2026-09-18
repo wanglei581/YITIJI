@@ -86,6 +86,7 @@
 
 const storage = require('./storage')
 const { isMemberIdentity } = require('./page-guard')
+const reconcileEngine = require('./order-submission-reconcile')
 
 /**
  * 本机存储键。**不进 utils/storage.js 的 KEYS 表**：那张表是"跨页共享的业务状态"，
@@ -646,10 +647,14 @@ function markSubmitted(account, fingerprint, key) {
   const at = rows.findIndex((row) => row.account === account && row.fingerprint === fingerprint)
   if (at < 0) return false
   if (rows[at].key !== key) return false
-  if (wasSubmitted(rows[at])) return true
+  // 这个键**即将出门**：登记进在途表，核对引擎在保护期内不会去问服务端要它的结论。
+  // 少了这一步，一次正常提交可能在请求还在路上时被自己立了墓碑（见 INFLIGHT_GUARD_MS）。
+  if (wasSubmitted(rows[at])) { submissionPort.noteInFlight(key); return true }
   const record = Object.assign({}, rows[at], { submittedAt: Date.now() })
   rows[at] = record
-  return !!persist(rows, record)
+  if (!persist(rows, record)) return false
+  submissionPort.noteInFlight(key)
+  return true
 }
 
 /**
@@ -684,6 +689,8 @@ function rememberOrderId(account, fingerprint, key, orderId) {
   // persist 现在连 orderId 一起核回来。核不上就返回 null —— 调用方必须当"没存住"处理：
   // 服务端那张订单是真的（它刚刚返回了 orderId），但本机已经指不回它了。
   if (!persist(rows, record)) return null
+  // 落定了就不再是"在途"：留着只会让这一格白白躲开核对（它已经有 orderId，本来也不该被核）。
+  submissionPort.forgetInFlight(key)
   return record
 }
 
@@ -711,10 +718,34 @@ function clearRecord(account, fingerprint) {
   // 所有在飞的幂等键一起没了。返回 false（"证不出它不在"）让调用方保持锁定，
   // 读恢复之后同一个按钮能真的把它清掉。
   if (!rows) return false
+  const dropped = rows.filter((row) => row.account === account && row.fingerprint === fingerprint)
   const kept = rows.filter((row) => !(row.account === account && row.fingerprint === fingerprint))
   if (storage.set(STORE_KEY, retain(kept, Date.now(), null)) !== true) return false
-  return slotAbsent(account, fingerprint)
+  if (!slotAbsent(account, fingerprint)) return false
+  // 这一格真的没了，它那个键也就不在途了。漏掉这一步只会让在途表留一条到期自清的垃圾，
+  // 不影响正确性；但留着它会让**新铸的**同名键（理论上）多等一个保护期才被核对。
+  for (const row of dropped) submissionPort.forgetInFlight(row.key)
+  return true
 }
+
+/**
+ * 给 utils/order-submission-reconcile.js 用的存储口子。
+ *
+ * **本机这张表唯一的"腾名额"入口就在这里**，而且它自己不做任何判断：什么时候清、清哪
+ * 一格，全部由服务端的墓碑（resolve 的 `not_created` / 409 `IDEMPOTENCY_KEY_ABANDONED`）
+ * 决定。本机的时间、记录年龄、4xx、5xx、任何"宽限期"都不是证据 —— 清错一条的代价是
+ * 用户被收两次钱，留着一条的代价只是这台设备上少一个名额。
+ *
+ * 判断逻辑只有 `createSubmissionPort` 那一份（两条链共用），这里只把本表的原语交进去。
+ */
+const submissionPort = reconcileEngine.createSubmissionPort({
+  namespace: STORE_KEY,
+  loadAll,
+  persist,
+  isMemberIdentity,
+  wasSubmitted,
+  isReusableKey,
+})
 
 module.exports = {
   FINGERPRINT_FIELDS,
@@ -738,4 +769,5 @@ module.exports = {
   rememberOrderId,
   clearRecord,
   formatUuidV4,
+  submissionPort,
 }

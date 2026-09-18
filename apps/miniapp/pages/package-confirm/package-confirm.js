@@ -32,6 +32,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
 const idem = require('../../utils/package-order-idempotency')
+const reconcileEngine = require('../../utils/order-submission-reconcile')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 /**
@@ -211,6 +212,7 @@ Page({
     this._verifyingOrderId = ''
     this._needsFreshKey = false
     this._serverLostOrder = false
+    this._reconciling = false
     this.setData({ submitting: false, agreedToTerms: false, canStartNewOrder: false })
   },
 
@@ -465,6 +467,56 @@ Page({
   },
 
   /**
+   * 向服务端核对本机留下的那些下单记录 —— **「名额满了」那条死路唯一的出口**。
+   *
+   * 本机那张表拒绝按任何本地依据淘汰未落定的记录（清错一条 = 用户被收两次钱），于是
+   * 20 条攒满之后这台设备就再也下不了单，而那 20 条里绝大多数其实根本没在服务端建成
+   * 任何订单。能推翻这一点的只有服务端：它会**先立墓碑再回答** `not_created`，
+   * 此后带着那个键的 POST 一律 409，再也建不出订单 —— 只有这一档准清。
+   * 判据、哪一档准清、怎么写回本机，全在 utils/order-submission-reconcile.js。
+   *
+   * 这一发一律 `force: true`：用户刚按过「确认下单」并且被拦住了，必须给他当下的真值，
+   * 不能因为 30 秒冷却就回一句「暂时没有可核对的提交」。
+   */
+  _reconcileSubmissions() {
+    const account = this._identityKey()
+    if (!isMemberIdentity(account)) { this.toLogin(); return }
+    if (this._reconciling) return
+    this._reconciling = true
+    this.setData({
+      submitting: false,
+      submitErrorTitle: '正在核对本机的下单记录…',
+      submitErrorText: '正在向服务端逐个确认之前那几次提交到底有没有建成订单。这一步不会创建任何新订单。',
+      submitRecover: '',
+    })
+    const payload = this._orderPayload()
+    const fingerprint = payload ? idem.fingerprintOf(payload) : ''
+    reconcileEngine
+      .reconcile(idem.submissionPort, account, (keys) => api.resolveOrderSubmissions(keys), { force: true })
+      .then((result) => {
+        this._reconciling = false
+        // 换人了就什么都不写：这批记录属于发起这一发的那位，而屏幕此刻可能已经是另一位的。
+        if (this._identityKey() !== account) return
+        // 服务端说**这一份材料包**的那次提交其实已经建成了订单：把本页锁到那张订单上，
+        // 走既有的「查一次原单」路径。**必须逐字比指纹** —— orders 里完全可能是别的
+        // 材料包那几格，拿它锁本页就是把一张不相干的订单说成这一单。
+        const mine = (result.orders || []).find((row) => row.adopted && row.fingerprint === fingerprint)
+        if (mine) {
+          this._createdOrderId = mine.orderId
+          this._lockAfterCreated(mine.orderId)
+          this._verifyCreatedOrder(mine.orderId)
+          return
+        }
+        const shown = reconcileEngine.describeReconcileResult(result, { submitLabel: '确认下单' })
+        this.setData({
+          submitErrorTitle: shown.title,
+          submitErrorText: shown.text,
+          submitRecover: shown.recover,
+        })
+      })
+  },
+
+  /**
    * 服务端报价。**这一步就是建单前的 fail-closed 关口**：价目未配置
    * （PRICE_CONFIG_UNAVAILABLE）、彩色/双面未在该机验过（CAPABILITY_*）、
    * 打印机离线、文件已失效，都会在这里先暴露，而不是等用户按下「确认下单」。
@@ -558,6 +610,14 @@ Page({
   recover(e) {
     const target = e.currentTarget.dataset.recover
     if (target === 'reorder') return this.startNewOrder()
+    // 再核对一次（服务端还在处理 / 上一次没问成）。
+    if (target === 'reconcile') return this._reconcileSubmissions()
+    // 名额已经腾出来了，下一步就是再提交一次 —— 而那必须是用户自己按下去的动作，
+    // 所以这个按钮写着「确认下单」，做的也正是「确认下单」那件事。
+    if (target === 'resubmit') {
+      this.setData({ submitErrorTitle: '', submitErrorText: '', submitRecover: '' })
+      return this.submitOrder()
+    }
     if (target === 'login') return this.toLogin()
     if (target === 'files' || target === 'privacy') return this.backToFiles()
     if (target === 'store') return this.backToStore()
@@ -912,6 +972,29 @@ Page({
         // 只是响应丢在路上的订单，清掉它下一次就会铸新键、再建一张。
         attempt.settled = true
         this._submitAttempt = null
+        // 本机未落定名额满了（ensureKey 的 fail-closed，一个 POST 都没发出去）。
+        // 这不是一条该让用户读的错误 —— 它唯一的解法就是去问服务端那几个键落成了什么，
+        // 所以直接把那一步做掉，而不是把死路原样显示给他。
+        if (err && err.message === idem.PENDING_FULL_MESSAGE) { this._reconcileSubmissions(); return }
+        // 409 有三种成因，处置完全相反（见 classifySubmitConflict）。
+        const conflict = reconcileEngine.classifySubmitConflict(err)
+        if (conflict === reconcileEngine.CONFLICT_ABANDONED) {
+          // 服务端已经给这个键立了墓碑：它再也建不出订单，所以本机这一格可以安全地换掉。
+          // **换键这件事仍然走既有的 `_needsFreshKey` 那条路** —— 它会在下一次提交前
+          // 先 `clearRecord` 并**读回来确认真的清掉了**，清不掉就不发 POST。
+          // 在这里直接清一遍等于把那段已经收口过的判断再写一份，两份迟早分叉。
+          this._needsFreshKey = true
+          const shown = reconcileEngine.describeSubmitConflict(conflict, { submitLabel: '确认下单' })
+          this.setData({ submitting: false, submitErrorTitle: shown.title, submitErrorText: shown.text, submitRecover: shown.recover })
+          return
+        }
+        if (conflict === reconcileEngine.CONFLICT_IN_PROGRESS) {
+          // 那次提交正在服务端跑，它完全可能马上就建成一张订单。此刻换键就是第二张订单、
+          // 第二笔钱 —— 记录、键、`_needsFreshKey` 一个字节都不动，只让用户稍后再核对。
+          const shown = reconcileEngine.describeSubmitConflict(conflict, { submitLabel: '确认下单' })
+          this.setData({ submitting: false, submitErrorTitle: shown.title, submitErrorText: shown.text, submitRecover: shown.recover })
+          return
+        }
         // 服务端说这个键配的是另一组参数（同键不同指纹）。**绝不拿旧键重试** ——
         // 重试一万次都是同一个 409。也不自动换新键：换键就是再建一张订单，那必须由
         // 用户自己按下「确认下单」才算数。这里只把状态摆好并说清下一步。

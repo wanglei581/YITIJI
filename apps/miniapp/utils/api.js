@@ -1620,6 +1620,41 @@ const api = {
   },
 
   /**
+   * 核对一批本机留下的幂等键，在服务端那边到底落成了什么。
+   *
+   * **这是「未落定记录永不淘汰」那条规则唯一的出口。** 两条建单链都拒绝按本机的时间 /
+   * 年龄 / 4xx 去清一条未落定记录（清错一条 = 用户被收两次钱），于是名额攒满之后这台
+   * 设备就再也下不了单。服务端为此提供了一个按**本人**范围逐键作答的端点，答案只有三种：
+   * `created`（确有其单，带 orderId）、`processing`（处理租约还活着）、
+   * `not_created`（服务端**先立墓碑再回答**，此后带这个键的 POST 一律 409
+   * `IDEMPOTENCY_KEY_ABANDONED`，再也建不出订单）。
+   *
+   * 「先立墓碑再回答」这半句是整条链的安全前提：没有它，一个还在路上的 POST 会在
+   * 本机清掉记录之后才到达服务端，于是建出一张谁都不知道的订单。
+   *
+   * 一次最多 20 个键（服务端 DTO 是 `@ArrayMaxSize(20)`，超了整批 400）。
+   * 单件与材料包共用这一个端点，服务端按 ledger 里的 orderKind 分辨，前端不必分流。
+   * 键从哪来、哪一档才准清，见 utils/order-submission-reconcile.js。
+   *
+   * @param {Array<string>} keys 1..20 个幂等键
+   * @returns {Promise<{items: Array<{key, outcome, orderId?, orderKind?,
+   *          pickupStatus?, payStatus?, taskStatus?}>}>}
+   */
+  resolveOrderSubmissions(keys) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('下单记录核对'));
+    const list = Array.isArray(keys) ? keys.filter((k) => typeof k === 'string' && k) : [];
+    // 本地就挡下来：空批与超额都是必然 400，而页面只会把它显示成一句「请稍后重试」。
+    if (!list.length || list.length > 20) {
+      return Promise.reject(new Error('核对下单记录的数量不合法'));
+    }
+    return request('/me/print-orders/submissions/resolve', {
+      method: 'POST',
+      data: { keys: list },
+      needAuth: true,
+    });
+  },
+
+  /**
    * 我的材料包订单列表（本人，游标分页）。
    *
    * 为什么必须走这个独立端点：材料包订单在既有的会员订单列表里**一条都看不到**。

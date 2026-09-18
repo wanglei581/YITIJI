@@ -42,6 +42,26 @@ const read = (rel) => fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
 const exists = (rel) => fs.existsSync(path.join(MINIAPP, rel))
 
 /** 剥注释后再做「不得出现 X」的断言：抓的是代码，不是解释为什么删掉它的那句话。 */
+/**
+ * 从 `marker` 之后的第一个 `{` 起，按括号深度取出**整块**。
+ *
+ * 顺序 / 归属类断言必须按块取，不能按"marker 后面 N 个字符"截：截出来的窗口会滑进
+ * 紧随其后的另一个分支，于是断言测的是别人家的代码 —— 它要么恒真，要么把一处正确的
+ * 实现报成失败。这个门禁自己就栽过一次。
+ */
+const blockAfter = (src, marker) => {
+  const at = src.indexOf(marker)
+  if (at < 0) return ''
+  const open = src.indexOf('{', at)
+  if (open < 0) return ''
+  let depth = 0
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1
+    else if (src[i] === '}') { depth -= 1; if (depth === 0) return src.slice(open, i + 1) }
+  }
+  return ''
+}
+
 const stripComments = (src) => src
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .split('\n')
@@ -926,8 +946,15 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     const markAt = idemPkg.indexOf('function markSubmitted(account, fingerprint, key) {')
     const markFn = markAt < 0 ? '' : idemPkg.slice(markAt, idemPkg.indexOf('\n}', markAt))
     assert(!!markFn, '取不到 markSubmitted 的函数体')
-    assert(/return !!persist\(rows, record\)/.test(markFn),
-      'markSubmitted 经 persist 落盘并读回核对，不是调一次 storage.set 就当标住了')
+    // 判据是「persist 的返回值决定成败」，不是某一行长什么样：markSubmitted 成功之后
+    // 还要把键登记成在途（noteInFlight），所以它不再以 `return !!persist(...)` 收尾。
+    // 真正要钉住的是 persist 失败必须让整个函数失败 —— 少了这一条，"标记没写进去"
+    // 会被当成写进去了，而那一格正是"键出门之后本机还会在 7 天后忘掉它"的那一格。
+    assert(/if \(!persist\(rows, record\)\) return false/.test(markFn)
+      || /return !!persist\(rows, record\)/.test(markFn),
+    'markSubmitted 经 persist 落盘并读回核对，不是调一次 storage.set 就当标住了')
+    assert(!/storage\.set\(/.test(markFn),
+      'markSubmitted 不绕过 persist 直接写盘（绕过就没有读回核对）')
     assert(/if \(!rows\) return false/.test(markFn) && /if \(at < 0\) return false/.test(markFn)
       && /if \(rows\[at\]\.key !== key\) return false/.test(markFn),
     'markSubmitted 的每条失败路径都返回 false（读不到 / 这一格不在 / 盘上是另一个键，都不许放 POST 出去）')
@@ -1224,8 +1251,15 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     const markAt = idem.indexOf('function markSubmitted(account, fingerprint, key) {')
     const markFn = markAt < 0 ? '' : idem.slice(markAt, idem.indexOf('\n}', markAt))
     assert(!!markFn, '取不到 markSubmitted 的函数体')
-    assert(/return !!persist\(rows, record\)/.test(markFn),
-      'markSubmitted 经 persist 落盘并读回核对，不是调一次 storage.set 就当标住了')
+    // 判据是「persist 的返回值决定成败」，不是某一行长什么样：markSubmitted 成功之后
+    // 还要把键登记成在途（noteInFlight），所以它不再以 `return !!persist(...)` 收尾。
+    // 真正要钉住的是 persist 失败必须让整个函数失败 —— 少了这一条，"标记没写进去"
+    // 会被当成写进去了，而那一格正是"键出门之后本机还会在 7 天后忘掉它"的那一格。
+    assert(/if \(!persist\(rows, record\)\) return false/.test(markFn)
+      || /return !!persist\(rows, record\)/.test(markFn),
+    'markSubmitted 经 persist 落盘并读回核对，不是调一次 storage.set 就当标住了')
+    assert(!/storage\.set\(/.test(markFn),
+      'markSubmitted 不绕过 persist 直接写盘（绕过就没有读回核对）')
     assert(/if \(!rows\) return false/.test(markFn) && /if \(at < 0\) return false/.test(markFn)
       && /if \(rows\[at\]\.key !== key\) return false/.test(markFn),
     'markSubmitted 的每条失败路径都返回 false（读不到 / 这一格不在 / 盘上是另一个键，都不许放 POST 出去）')
@@ -1236,8 +1270,12 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   //     没写进去"时同样返回 true。调用方照着这个假设解锁，下一次提交就复用那个旧键，
   //     服务端一遍遍回放那张早已作废的订单 —— 用户面对一个能按的按钮，永远打不出东西。
   const clearFn = /function clearRecord\(account, fingerprint\) \{[\s\S]*?\n\}/.exec(idem)
-  assert(!!clearFn && /return slotAbsent\(account, fingerprint\)/.test(clearFn[0]),
-    'clearRecord 写完读回来确认那一格真的不在了，并返回布尔')
+  // 判据是「slotAbsent 的结论决定返回值」：clearRecord 清完还要把那几个键从在途表里
+  // 摘掉，所以它不再以 `return slotAbsent(...)` 收尾。要钉住的是 slotAbsent 说"还在"时
+  // 必须返回 false —— 返回 true 就等于谎称清掉了，下一次提交会复用那个已经作废的键。
+  assert(!!clearFn && (/if \(!slotAbsent\(account, fingerprint\)\) return false/.test(clearFn[0])
+    || /return slotAbsent\(account, fingerprint\)/.test(clearFn[0])),
+  'clearRecord 写完读回来确认那一格真的不在了，并返回布尔')
   assert(!!clearFn && /if \(!isMemberIdentity\(account\) \|\| !fingerprint\) return false/.test(clearFn[0])
     && /!== true\) return false/.test(clearFn[0]),
   'clearRecord 的每一条失败路径都返回 false（返回 undefined 会被调用方当成"清掉了"）')
@@ -1328,8 +1366,15 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     "只有 requireOwned 明确的 404 才算'服务端证明它没了'，不是任意一个失败")
   // 解锁必须是**用户自己点**的一个动作：页面不自动换键，那等于替他做了一次下单决定。
   const startNew = /startNewOrder\(\)\s*\{[\s\S]*?\n  \},/.exec(pay)
-  assert(!!startNew && /this\.data\.createdState !== 'terminal' \|\| !this\.data\.createdCanReorder/.test(startNew[0]),
-    'startNewOrder 只在服务端已证明终态时才可达（其余一律原地返回）')
+  // 判据是「可达状态被枚举成一份白名单，且 createdCanReorder 必须同时成立」，
+  // 而不是某一行长什么样：服务端后来又证明了第二种"可以重新下一单"——'abandoned'
+  // （那个键已被立墓碑，压根没建成过订单）。两者都由服务端证明，页面自己一个都判不出来。
+  // 要钉死的是**不许出现第三种来源**：任何本地推断（超时、年龄、4xx）都不得点亮它。
+  const reorderStates = startNew ? Array.from(startNew[0].matchAll(/'(terminal|abandoned)'/g)).map((m) => m[1]) : []
+  assert(!!startNew && reorderStates.length > 0 && !/createdState === '(live|checking|unknown)'/.test(startNew[0]),
+    'startNewOrder 只在服务端已证明的状态下可达（terminal / abandoned），其余一律原地返回')
+  assert(!!startNew && /!this\.data\.createdCanReorder/.test(startNew[0]),
+    'startNewOrder 还要 createdCanReorder 同时成立（状态与开关两道，缺一不可）')
   assert(!!startNew && /if \(!idem\.clearRecord\(this\._account, idem\.fingerprintOf\(this\._orderPayload\(\)\)\)\) \{/.test(startNew[0]),
     'startNewOrder 清掉旧记录，**并且只在真的清掉（clearRecord 返回 true）之后**才解锁')
   assert(!!startNew && /createdNotice: '本机没能清掉[\s\S]{0,300}\n      \}\)\n      return\n    \}/.test(startNew[0]),
@@ -1419,6 +1464,156 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     assert(/const FINGERPRINT_FIELDS = \[/.test(idem)
       && !/FINGERPRINT_FIELDS/.test(stripComments(paySrc)),
     '指纹字段集只有 utils/print-order-idempotency.js 一处定义，页面不自己拼一组')
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 「已提交、未落定」记录的**唯一出口**：服务端的墓碑
+// ══════════════════════════════════════════════════════════════════════════
+//
+// 本机那张表拒绝按任何本地依据淘汰未落定的记录（清错一条 = 用户被收两次钱），代价是
+// 20 条攒满之后这台设备再也下不了单。唯一能推翻"它可能已经建成"的只有服务端：
+// `POST /me/print-orders/submissions/resolve` **先立墓碑再回答** `not_created`，
+// 此后带着那个键的 POST 一律 409，再也建不出订单。
+//
+// 下面每一条都在钉同一件事：**清除的权力只在服务端手里**。行为本身由
+// scripts/tests/order-submission-reconcile.test.mjs 真跑（26 条），这里钉的是那几处
+// 单测照不到的源码形状 —— 谁可以调删除、调用点有没有绕过判据、两条链是不是同一份实现。
+console.log('\n【提交记录核对：只有服务端墓碑才准清】')
+{
+  const engineSrc = read('utils/order-submission-reconcile.js')
+  const engine = stripComments(engineSrc)
+
+  // ① 引擎必须是纯的：不 require storage / wx / 任何幂等模块。
+  //    不是洁癖 —— require 幂等模块会成环（那两个模块要 require 它来建 port），
+  //    而碰 wx / storage 会让它没法在 node 里被真跑，于是这条链上最危险的判断
+  //    （"这一格到底清没清"）就只剩正则能验。
+  assert(!/require\(['"]\.\/storage['"]\)/.test(engine),
+    '核对引擎不直接碰 storage（存储一律经调用方传进来的 port）')
+  assert(!/require\(['"]\.\/(package|print)-order-idempotency['"]\)/.test(engine),
+    '核对引擎不 require 任何幂等模块（会成环，且会把一条链的表读进另一条链）')
+  assert(!/\bwx\./.test(engine), '核对引擎不碰 wx（它必须能在 node 里被真跑）')
+
+  // ② 本机这张表唯一的删除入口就是 clearSubmittedKey，而它只能从 not_created 那一支到达。
+  //    判据取 applyItems 的函数体：processing 与 created 两支都必须**先 return**，
+  //    删除那一行排在它们之后。顺序反了就是"还在处理中也照删"，而那正是第二张订单。
+  const applyAt = engine.indexOf('function applyItems(')
+  const applyBody = applyAt >= 0 ? engine.slice(applyAt, engine.indexOf('\n}', applyAt)) : ''
+  assert(!!applyBody, 'applyItems 函数体取得到')
+  const procAt = applyBody.indexOf(`item.outcome === OUTCOME_PROCESSING`)
+  const createdAt = applyBody.indexOf(`item.outcome === OUTCOME_CREATED`)
+  const clearAt = applyBody.indexOf('port.clearSubmittedKey(')
+  assert(procAt > 0 && createdAt > 0 && clearAt > procAt && clearAt > createdAt,
+    'processing / created 两支都排在删除之前并各自 return（删除只在 not_created 那一档发生）')
+  assert((applyBody.match(/port\.clearSubmittedKey\(/g) || []).length === 1,
+    'applyItems 里只有一处删除调用（多一处就多一条绕过判据的路）')
+  assert(/if \(!item\) \{ unknown \+= 1; continue \}/.test(applyBody),
+    '服务端没回这个键 / 回得自相矛盾时原样留着 —— 少一条答案从来不是"它不存在"')
+
+  // ③ 删除本身必须逐条设防，而且写完要读回来证明。
+  const clearAtFn = engine.indexOf('clearSubmittedKey(account, fingerprint, key) {')
+  const clearBody = clearAtFn >= 0 ? engine.slice(clearAtFn, engine.indexOf('\n    },', clearAtFn)) : ''
+  assert(!!clearBody, 'clearSubmittedKey 函数体取得到')
+  assert(/if \(rows\[at\]\.key !== key\) return false/.test(clearBody),
+    '这一格现在装的是另一个键就不删（墓碑说的不是它）')
+  assert(/if \(rows\[at\]\.orderId\) return false/.test(clearBody),
+    '已落定的记录一律不删（它是找回那张订单的唯一线索）')
+  assert(/if \(!rows\) return false/.test(clearBody),
+    '读不出这张表就一个字节都不写（读失败证明不了任何事）')
+  assert(clearBody.indexOf('const back = loadAll()') > clearBody.indexOf('persist(kept, null)'),
+    '写完必须读回来证明这一格真的不在了（storage.set 在"没写进去"时照样返回 true）')
+
+  // ④ 三种 409 的处置完全相反，判据只有 classifySubmitConflict 一处。
+  assert(/IDEMPOTENCY_KEY_ABANDONED/.test(engine) && /IDEMPOTENCY_IN_PROGRESS/.test(engine),
+    '两个新的 409 错误码都被认得（认不出就会落到"请稍后重试"，而它们的下一步完全不同）')
+  assert(/if \(!err \|\| err\.statusCode !== 409\) return ''/.test(engine),
+    '只有 409 才算冲突（光看 code 会把别处同名错误也认成冲突）')
+
+  // ⑤ 两条链共用同一份 port 实现，而且命名空间各自独立。
+  const ports = ['utils/package-order-idempotency.js', 'utils/print-order-idempotency.js']
+  for (const rel of ports) {
+    const src = stripComments(read(rel))
+    assert(/reconcileEngine\.createSubmissionPort\(\{/.test(src),
+      `${rel} 的 port 来自共用工厂（各写一份迟早分叉，然后只有一份被修）`)
+    assert(/namespace: STORE_KEY,/.test(src), `${rel} 的 port 用自己的表名做命名空间`)
+    // 在途登记必须发生在 markSubmitted 里 —— 也就是 POST **之前**。晚一步登记，
+    // 一次正常提交就可能在请求还在路上时被自己立了墓碑。
+    const msAt = src.indexOf('function markSubmitted(')
+    const msBody = msAt >= 0 ? src.slice(msAt, src.indexOf('\n}', msAt)) : ''
+    assert(/submissionPort\.noteInFlight\(key\)/.test(msBody),
+      `${rel} 在 markSubmitted（POST 之前）就把键登记成在途`)
+    assert(!/submissionPort\.clearSubmittedKey\(/.test(src),
+      `${rel} 自己不调删除入口（清除只能由核对引擎按服务端结论发起）`)
+  }
+
+  // ⑥ 两个页面：名额满必须走核对，而不是把死路原样显示给用户；
+  //    in_progress 一个字节都不许清。
+  const pages = [
+    ['pages/package-confirm/package-confirm.js', 'package'],
+    ['pages/print-pay/print-pay.js', 'print'],
+  ]
+  for (const [rel, label] of pages) {
+    const src = stripComments(read(rel))
+    assert(/err\.message === idem\.PENDING_FULL_MESSAGE\) \{ this\._reconcileSubmissions\(\); return \}/.test(src),
+      `${label} 页把"名额满了"接到核对上（那是这条死路唯一的解法）`)
+    assert(/reconcileEngine\.classifySubmitConflict\(err\)/.test(src),
+      `${label} 页按 classifySubmitConflict 分辨三种 409`)
+    assert(/\{ force: true \}/.test(src),
+      `${label} 页的核对一律 force（用户刚被拦住，要的是当下的真值，不是一句"冷却中"）`)
+    // 整个 409 处置区一个 clearRecord 都不许有。
+    //
+    // 这不是"顺手也检查一下"：`abandoned` 确实需要换键，但换键必须走各页**已经收口过**
+    // 的那条路（package 是 `_needsFreshKey` → 下一次提交前 clearRecord 并读回来确认；
+    // print 是 `startNewOrder` 同样读回来确认）。在 409 处置区里就地清一遍，等于把那段
+    // 判断再写一份，两份迟早分叉 —— 而分叉的那一侧会在"以为清掉了"时换新键，
+    // 于是旧键那张单还在、新键又建一张。
+    const conflictBlock = blockAfter(src, 'const conflict = reconcileEngine.classifySubmitConflict(err)')
+      || src.slice(src.indexOf('classifySubmitConflict(err)'))
+    assert(!/idem\.clearRecord\(/.test(conflictBlock),
+      `${label} 页的 409 处置区不自己清记录（换键走各页已经读回来核对过的那条路）`)
+    // 换人之后迟到的核对回调必须逐字核账号才写。
+    assert(/if \(this\._(identityKey\(\) !== account|account !== account)\)|this\._account !== account/.test(src),
+      `${label} 页的核对回调先核账号再写（这批记录属于发起者，屏幕可能已经换了人）`)
+  }
+
+  // ⑦ 两个页面的错误出口形状不同（一个是页内错误卡片、一个是 modal + 锁态），所以
+  //    `abandoned` / `in_progress` 的落点分别钉，不套同一个正则 —— 套同一个的代价是
+  //    其中一页必然写成"看着像过了"的空断言。
+  {
+    const confirm = stripComments(read('pages/package-confirm/package-confirm.js'))
+    const abandoned = blockAfter(confirm, 'conflict === reconcileEngine.CONFLICT_ABANDONED')
+    const inProgress = blockAfter(confirm, 'conflict === reconcileEngine.CONFLICT_IN_PROGRESS')
+    assert(!!abandoned && !!inProgress, 'package 页两支 409 的块都取得到')
+    assert(/this\._needsFreshKey = true/.test(abandoned),
+      'package 页 abandoned 那一支委托给 _needsFreshKey（下一次提交前会清记录并读回来确认）')
+    assert(!/_needsFreshKey/.test(inProgress) && !/clearRecord/.test(inProgress),
+      'package 页 in_progress 那一支不换键、不清记录（那次提交正在服务端跑，换键就是第二张单）')
+    assert(/submitRecover: shown\.recover/.test(inProgress),
+      'package 页 in_progress 给得出可执行的下一步（再核对一次），不是一句"请稍后重试"')
+  }
+  {
+    const pay = stripComments(read('pages/print-pay/print-pay.js'))
+    const conflictBlock = blockAfter(pay, 'const conflict = reconcileEngine.classifySubmitConflict(err)')
+    assert(!!conflictBlock, 'print 页 409 处置区取得到')
+    const abandoned = blockAfter(conflictBlock, 'conflict === reconcileEngine.CONFLICT_ABANDONED')
+    assert(!!abandoned, 'print 页 abandoned 那一支取得到')
+    // print 页没有页内错误卡片，abandoned 的落点是既有的 terminal 锁态 —— 那一态的按钮
+    // 就是 startNewOrder，而它会 clearRecord 并读回来确认。in_progress 走 modal，什么都不改。
+    assert(/createdCanReorder: true/.test(abandoned),
+      'print 页 abandoned 点亮「重新下单」（它的按钮 startNewOrder 会读回来确认再换键）')
+    // **不许复用 'terminal'**：那一档的标题写着「上一张订单已经结束」，而 abandoned 恰恰是
+    // "根本没建成过订单"。共用一个状态就是在屏幕上陈述一件没发生过的事，
+    // 而同一张卡片里的 createdNotice 说的正相反 —— 用户看到的是两句自相矛盾的话。
+    assert(/createdState: 'abandoned'/.test(abandoned),
+      'print 页 abandoned 用自己的锁态，不冒充「上一张订单已经结束」')
+    const payWxml = read('pages/print-pay/print-pay.wxml')
+    assert(/createdState === 'abandoned' \?/.test(payWxml),
+      'print 页模板给 abandoned 单独的标题（否则那一档会显示一句没发生过的事）')
+    const afterAbandoned = conflictBlock.slice(conflictBlock.indexOf(abandoned) + abandoned.length)
+    assert(/wx\.showModal\(/.test(afterAbandoned)
+      && !/createdCanReorder: true/.test(afterAbandoned)
+      && !/clearRecord/.test(afterAbandoned),
+    'print 页 in_progress 只弹一句说明：不换键、不清记录、不点亮「重新下单」')
   }
 }
 
