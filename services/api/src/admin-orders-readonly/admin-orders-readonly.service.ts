@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import {
-  isPaidUnfulfilledRefundRequired,
+  isAdminRefundRequired,
+  isOnlineCollectedPendingRefund,
+  ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES,
+  ONLINE_PAID_PENDING_REFUND_REASON,
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
 } from '../payment/pending-refund-signal'
 import type {
@@ -72,11 +75,12 @@ function deriveAftercare(row: OrderRow): Pick<
   return {
     printOutcome,
     aftercareStatus: manualCheckRequired ? 'manual_check_required' : null,
-    // 已确认出纸禁止退款；RefundService 仍是最终写入门禁。
-    refundEligible: row.payStatus === 'paid' && printOutcome !== 'printed',
+    // 已确认出纸禁止退款；RefundService 仍是最终写入门禁。迟到回调待退未转 paid，但可退。
+    refundEligible:
+      (row.payStatus === 'paid' || isOnlineCollectedPendingRefund(row)) && printOutcome !== 'printed',
     // 未确认历史原因仍在时禁止重打，核查后同样禁止。
     retryForbidden: unconfirmedFailure,
-    refundRequired: isPaidUnfulfilledRefundRequired(row),
+    refundRequired: isAdminRefundRequired(row),
   }
 }
 
@@ -87,7 +91,7 @@ export interface ListAdminOrdersReadonlyParams {
   channel?: string
   pickupStatus?: string
   search?: string
-  /** true = 只看已付款且已落待退款信号的单（不会自动出款）。 */
+  /** true = 只看待退款信号单（已付款未出纸，或渠道已收款未转 paid）。不会自动出款。 */
   refundRequired?: boolean
   page: number
   pageSize: number
@@ -147,8 +151,26 @@ export class AdminOrdersReadonlyService {
     if (params.pickupStatus) where['pickupStatus'] = params.pickupStatus
     if (params.search && params.search.trim()) where['orderNo'] = { contains: params.search.trim() }
     if (params.refundRequired === true) {
-      where['payStatus'] = 'paid'
-      where['refundReason'] = PAID_UNFULFILLED_PENDING_REFUND_REASON
+      const collected = {
+        payStatus: { in: [...ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES] },
+        refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+      }
+      const paidUnfulfilled = {
+        payStatus: 'paid',
+        refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON,
+      }
+      if (params.payStatus === 'paid') {
+        where['refundReason'] = PAID_UNFULFILLED_PENDING_REFUND_REASON
+      } else if (
+        params.payStatus &&
+        (ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES as readonly string[]).includes(params.payStatus)
+      ) {
+        where['refundReason'] = ONLINE_PAID_PENDING_REFUND_REASON
+      } else if (!params.payStatus) {
+        where['OR'] = [paidUnfulfilled, collected]
+      } else {
+        where['id'] = { in: [] }
+      }
     }
 
     const [rows, total] = await Promise.all([

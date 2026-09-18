@@ -341,6 +341,38 @@ async function main(): Promise<void> {
     }
     pass('refundRequired 筛选返回已标记待退款的已付款未出纸单')
 
+    const collectedOrderId = `ord_aor_coll_${suffix}`
+    const collectedOrderNo = `ORD-READ-C-${suffix.toUpperCase()}`
+    await prisma.order.create({
+      data: {
+        id: collectedOrderId,
+        orderNo: collectedOrderNo,
+        type: 'print',
+        terminalId,
+        amountCents: 330,
+        currency: 'CNY',
+        payStatus: 'closed',
+        taskStatus: 'expired',
+        pickupStatus: 'expired',
+        refundReason: 'ONLINE_PAID_PENDING_REFUND',
+        discountCents: 0,
+      },
+    })
+    const collectedItem = (await service.list({ search: collectedOrderNo, page: 1, pageSize: 10 })).items[0]
+    if (
+      collectedItem?.id !== collectedOrderId ||
+      collectedItem.payStatus !== 'closed' ||
+      collectedItem.refundRequired !== true ||
+      collectedItem.refundEligible !== true
+    ) {
+      fail(`迟到回调待退必须 refundRequired 且 payStatus 仍是 closed：${JSON.stringify(collectedItem)}`)
+    }
+    const collectedPage = await service.list({ refundRequired: true, search: collectedOrderNo, page: 1, pageSize: 10 })
+    if (collectedPage.pagination.total !== 1 || collectedPage.items[0]?.id !== collectedOrderId) {
+      fail(`refundRequired 筛选必须包含迟到回调待退单：${JSON.stringify(collectedPage)}`)
+    }
+    pass('refundRequired 筛选包含渠道已收款未转 paid 的待退单，且不伪装 payStatus=paid')
+
     const detail = await service.getById(orderId)
     if (
       detail.id === orderId &&

@@ -5,7 +5,10 @@ import { AuditService } from '../audit/audit.service'
 import { randomPickupCode } from '../common/pickup-code'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { paymentSessionTtlMs } from './payment-session-token'
+import { ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { ONLINE_PAYMENT_CHANNELS, P0A_ALLOWED_PAYMENT_SOURCES, type PaymentChannel } from './payment.types'
+
+export { ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
 
 /** Order 行类型（从 prisma delegate 推导，避免直接 import 生成 client 类型）。 */
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -20,9 +23,6 @@ type OrderClient = Pick<PrismaTransactionClient, 'order'>
  * `common/pickup-code.ts` 里的长期问题说明。
  */
 const PICKUP_MAX_ATTEMPTS = 6
-
-/** 线上入账时取件窗口已关：渠道钱已到、本单无法出纸，记待退而不转 paid。 */
-export const ONLINE_PAID_PENDING_REFUND_REASON = 'ONLINE_PAID_PENDING_REFUND'
 
 /**
  * 一体机现场履约租约：pending→claimed 时写下 `pickupClaimedAt`。

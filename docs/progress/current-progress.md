@@ -252,6 +252,75 @@ Agent 锁文案 / 启动诊断 / 只读 diagnose 与现场采集、现场手册�
   PRODUCTION / REAL PAYMENT / BUSINESS ACCEPTANCE: NO-GO`。本地测试、HTTP 200、历史设备记录和多模型
   同意都不能替代生产或商业证据。
 
+2026-09-18 **M-2：Admin 订单页「待退款」入口接上迟到回调待退单（本地候选，未 push / 未部署）。**
+锚点 `4983d58ea` 的直接子提交，基线仍是 `origin/main@eb0f20341`。**本轮只改 `apps/admin`，
+`services/**` 一行未动。** 上一条（同分支）已经把服务端 `refundRequired=true` 做成两支 OR，
+但 Admin 前端的入口把它又关回去了一半。
+
+- **缺口：** 订单页「待退款」chip 在 `setRefundRequiredFilter(true)` 的同一发里
+  `setPayStatus('paid')`。服务端 `refundRequired=true` 覆盖
+  ① `payStatus=paid` + `PAID_UNFULFILLED_PENDING_REFUND` 与
+  ② `payStatus∈{closed,unpaid,paying}` + `ONLINE_PAID_PENDING_REFUND` 两支；② 永远不是 paid，
+  于是后端只查 ①。**「渠道已经收了钱、却没有出款路径」的那一整类在管理端查不到，而且不报错。**
+  chip 改为清空 `payStatus`，由后端走 OR 两支；其余状态/支付状态筛选行为未改。
+- **顺带收口（都是这类单变成可达之后运营才会看到的）：** 详情「退款原因」不再裸渲染
+  `refundReason` 机器码，经 `REFUND_REASON_LABELS` 映射，未命中回落原值（管理员手填的中文原因
+  不被吞）；待退款红条与退款入口说明按 `refundReason` 分支，不再对 `payStatus≠paid` 的单写
+  「已付款」；计费页补 `ONLINE_COLLECTED_PENDING_REFUND` / `ORDER_EXTRA_COLLECTION_AFTER_REFUND`
+  两个差异码的中文。
+- **回归加在既有门禁/测试里，未新建脚本：** `verify:admin-orders-readonly-ui` 整行匹配 chip
+  handler（不得含 `setPayStatus('paid')`、必须清空），并钉住 `payStatus: payStatus || undefined`
+  （空串要从查询串消失）；`verify:admin-billing-ui` **从 `reconciliation.service.ts` 反解**
+  `push(discrepancies,'CODE')` 的全部取值逐个要求中文，门禁内不重抄码表 —— 后端新增差异码而前端
+  漏配会自己转红。Playwright `orders.spec.ts` 增一条不读源码的行为回归：点击后高亮的必须是
+  「全部支付状态」而不是「已支付」，那正是 `payStatus` 被清空的可观察后果。
+- **变异验证（8 条，全部先红后绿）：** chip 退回 `setPayStatus('paid')` / chip 不碰 payStatus /
+  请求装配不丢空串 / 退款原因退回裸码 / 红条退回统一「已付款」/ 计费页删掉一个中文标签 /
+  后端新增一个未配中文的差异码（反向变异）→ 对应门禁各自判红；Playwright 那条也在第一个变异下
+  判红且失败断言恰是 `已支付` 不得高亮。恢复后全部复绿。
+- **本机证据：** `verify:admin-orders-readonly-ui`、`verify:admin-billing-ui`、
+  `verify:no-raw-error-render`、`verify:price-single-source`、`verify:profile-print-orders-inkpaper`、
+  `verify:api20-manual-refund`、`verify:admin-orders-readonly`、`verify:admin-orders-refund`、
+  `verify:admin-order-filters`、Admin `lint` / `typecheck` / `tsc -b` / 生产 `vite build`、
+  Admin Playwright `orders.spec.ts` + `billing.spec.ts`（3 passed）、`pnpm graph` + `graph:check`、
+  `verify:repository-integrity`、`verify:ci-gate-coverage`、`verify:deploy-gates-in-sync` 均为 0。
+  图谱新增一条跨包边：`reconciliation.service.ts ← verify-admin-billing-ui.mjs`。
+- **视觉确认（边界写清楚）：** 1280×800 mock 口径真实浏览器截图 + 几何探针：chip 两两无重叠
+  （`OVERLAPS []`）、无文案截断（`TRUNCATED []`，全部 `scrollWidth-clientWidth=0`）、
+  高亮集恰为 `全部 / 全部支付状态 / 待退款（已收款未出纸）`；待退款 chip 稳定态计算样式
+  `bg rgb(31,158,134)` + 白字，与其他激活 chip 同一 token（首帧偏浅是 `transition-colors`
+  过渡中，非最终态）。**计费页差异码中文未能做浏览器视觉确认** —— mock 适配器
+  `discrepancies: []`，页面只渲染空态；`adminBilling.ts` 不在本轮文件预算内，未改 mock 造数。
+  中文已确认进入生产产物，`StatusBadge` 为 `whitespace-nowrap` 且无 `truncate`/`max-w`，
+  不会省略号截断，但**最长标签在真实差异行里的实际排版仍未看过**。
+- **证据边界：** `SOURCE / LOCAL: GO`；`CI / MERGE / PRODUCTION / COMMERCIAL: NO-GO`。
+  未 push、未开 PR、未合并、未部署、未跑真实退款。
+
+2026-09-18 **P0：迟到线上回调待退单补上 canonical 退款路径（本地候选，未 push / 未部署）。**
+实现基线 `3d35759ee`，已 rebase 到 `origin/main@eb0f20341`（含 PR #1040/#1041）。渠道在取件窗口关闭后仍收款时，订单保持 `closed/unpaid/paying` +
+`refundReason=ONLINE_PAID_PENDING_REFUND` + 唯一 success `PaymentAttempt`，不得转 paid、不得铸取件码。
+此前 `RefundService` 只收 `payStatus=paid`，对账与 Admin `refundRequired` 也看不见该态，渠道已收款无出款路径。
+
+- **退款：** 复用 canonical `RefundService`。渠道与金额只来自该单唯一 success 尝试；0 条 / 多条 /
+  金额不一致 / 不支持通道 / 已核查出纸 / 明文取件码一律 fail-closed。失败回滚 `closed` 而非 `paid`。
+  重复请求幂等；明确拒绝后同号可重试。
+- **可见性：** API/对账可见（`ONLINE_COLLECTED_PENDING_REFUND`、Admin 只读 `refundRequired` /
+  `refundEligible`，不伪装 paid）。订单页直接筛选入口当时待 Claude、那一轮不改 `apps/admin`；
+  **已由同分支下一条（M-2，2026-09-18）闭合，不要再按「待 Claude」重复开发。**
+- **复审 Medium：** M-1 collected 失败回滚 `closed` 后，微信 SUCCESS 退款通知把同一 `refundNo`
+  从 failed 收敛 success、订单 closed→refunded，不抛 `ORDER_INVALID_TRANSITION`、不打第二笔渠道。
+  M-3 检测面：对账 `ORDER_EXTRA_COLLECTION_AFTER_REFUND`（按成功尝试金额计入 gross）；已 success
+  的 `refund()` 遇到额外成功尝试 `REFUND_PATH_EXHAUSTED`。不实现自动逐笔退款或已退款回调入账。
+  M-2 当时不改 `apps/admin`，已在同分支下一条闭合。
+- **rebase 后本机复跑：** `verify:admin-orders-refund`（含 `verify:api20-manual-refund`）、
+  `verify:reconciliation`、`verify:admin-orders-readonly`、`verify:refund-real-channels`（36）、
+  `verify:payment-flow`、`verify:refund-idempotent`（31）、`verify:wechat-refund-notify`（17）、
+  `verify:refund-convergence`（6）、API `typecheck` / `build`、`verify:repository-integrity`、
+  `verify:ci-gate-coverage`、`verify:deploy-gates-in-sync`、`git diff --check`、`pnpm graph` +
+  `graph:check` 均为 0。M-1 回归放在已接线的 `verify:wechat-refund-notify`（通知路径，无第二套引擎）。
+- **证据边界：** `SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+  未 push、未开 PR、未合并、未跑真实支付。
+
 2026-09-17 **生产 API-only 发布控制面候选：阻止 API 修复连带覆盖三端前端。** Windows Agent
 `0.4.11` 在精确候选 `50483cd28096780c5e6c4260dde86dec36e7d99f` 上安装后，心跳因生产 API
 仍缺少 `55c32296f` 新增的 `scanInput*` DTO 白名单字段而返回

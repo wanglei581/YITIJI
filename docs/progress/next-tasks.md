@@ -44,6 +44,42 @@ R11，SOURCE / CI: GO；DEVICE / PRODUCTION / COMMERCIAL: NO-GO。** PR #1036 �
 第 4 项前不宣称商用收口。后续 main 若继续前进，现场和生产证据必须重新绑定实际部署 SHA，不能把
 `50483cd28` 的代码 / CI 证据自动外推到新提交。
 
+## 2026-09-18：迟到线上回调待退单的 canonical 退款（本候选）
+
+**问题：** 取件窗口关闭后的有效线上回调会把 `PaymentAttempt` 打成 success，订单却保持
+closed/unpaid + `ONLINE_PAID_PENDING_REFUND`，`RefundService` / 对账 / Admin 只读
+`refundRequired` 都看不见，渠道已收款没有出款路径。
+
+**本轮范围：** 只改 `services/api/src/payment/**`、必要的 Admin 订单只读路径、对应 verify 与两份进度文档。
+不改 schema / 前端 / CI / 部署 / 真实支付。本候选已 rebase 到 `origin/main@eb0f20341`（含 PR #1040/#1041）。
+
+**本候选当前状态：** 已 rebase 到 `origin/main@eb0f20341`，图谱已按标准命令刷新，聚焦支付门禁与仓库/CI/deploy/graph 门禁本机全 0。仍只是本地候选。
+
+### M-2 已闭合（2026-09-18，只改 `apps/admin`）
+
+上面写的「订单页直接筛选入口待 Claude」**已经做完，不要重复开发**。订单页「待退款」chip 原本在
+`setRefundRequiredFilter(true)` 的同一发里 `setPayStatus('paid')`，把服务端两支 OR 关回了一支，
+「渠道已收款未转 paid」那一整类在管理端查不到且不报错；chip 已改为清空 `payStatus`。
+同时收口了三处会被运营看到的表达：详情「退款原因」不再裸码、待退款提示不再对 `payStatus≠paid`
+的单写「已付款」、计费页补两个差异码中文。
+
+回归加在既有门禁里（`verify:admin-orders-readonly-ui` 整行匹配 chip handler +
+`verify:admin-billing-ui` 从 `reconciliation.service.ts` 反解差异码逐个要中文 +
+Playwright `orders.spec.ts` 行为回归），8 条变异全部先红后绿。细节与验证清单见
+`current-progress.md` 顶部同日条目。
+
+**M-2 遗留（不阻塞，但不得当成已解决）：** 计费页差异码中文**没有做过浏览器视觉确认** ——
+mock 适配器 `discrepancies: []`，页面只渲染空态，本轮文件预算不含 `adminBilling.ts` 故未造数据。
+要看真实排版，要么给 mock 加一条差异样例，要么在接真后端的环境里看一次。
+
+**已知缺口（本轮不实现，登记 SOP）：**
+- 第二条成功 `PaymentAttempt` 不会自动逐笔退款。已 success 的同一 `refundNo` 再遇到额外成功尝试会
+  `REFUND_PATH_EXHAUSTED`；对账出 `ORDER_EXTRA_COLLECTION_AFTER_REFUND`，gross 按成功尝试金额合计。
+- 已退款订单的迟到支付回调仍不自动入账或再退；只靠对账差异留痕。运营需人工核对渠道账单后再处置。
+
+**下一阶段（本轮之后才做）：** 独立只读复审 → 如需再开 PR；CI 全绿前不得合入；合入前不得部署或跑真实退款。
+本条是支付候选自己的下一步，不替代下面生产 API-only 发布阻塞。
+
 ## 2026-09-17：生产 API-only 发布 `50483cd...`
 
 ## 2026-09-17 小程序与一体机跨端联动商业收口顺序
