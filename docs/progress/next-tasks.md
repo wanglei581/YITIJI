@@ -1,5 +1,21 @@
 # 下一步任务
 
+## 2026-09-18：前端全量统一主线（覆盖旧“约 60 条 / 0/51”口径）
+
+**产品完成定义不变：一体机所有活路由最终只能使用青序流光新前端，不允许新旧页面交替。**
+当前集成 HEAD `a15a26c89fccb11da42f183c38d21a0a276715af` 的机器清单为：109 条生产路由模式，18 条兼容重定向 + 3 条生产默认关闭的 contract-review 重定向，88 条实际页面落点；其中 44 条已是 Qx/青序流光，44 条仍为旧 Fusion/V6/未统一表现。剩余工作约合并为 22–26 个真实页面/工作台，不再使用“约 60 条仍待迁移”或历史 `0/51` 作为排期分母。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| F0 | Codex + Claude 前端 owner | 冻结 route→component→视觉真值台账；把 44 条旧壳路由按共享工作台合并为 22–26 个施工项。Codex 不写前端；直接 Claude 无额度时使用 Hermes `provider=yuren-claude model=claude-opus-5 reasoning=xhigh` | 每个活路由有唯一归属：Qx 已完成 / 本批施工 / 兼容重定向 / capability-off；不存在重复认领和“只改壳不改页面” |
+| F1 | Claude lane A | 招聘会 8 路由 + 五个服务台统一；保留来源、合规、空态、错误态和打印材料能力 | 逐路由浏览器状态覆盖；不得把招聘会资料事务状态误当成 8 个可删除页面；不得新增平台投递 |
+| F2 | Claude lane B | 简历次级能力：source/parse/templates/materials、job-fit/actions、career-plan、自我探索 4→1 | 文件预览、AI 结果、保存/打印/错误/权限状态完整；共享数据契约不改写 |
+| F3 | Claude lane C | 会员订单/文档/settings、政策、校园/智能校园、百宝箱、assistant/help/legal、手机中继 | 公共终端隐私、返回/清场、不可用原因、长文、手机小屏和 capability fail-closed 均可用 |
+| F4 | Codex 集成 + Grok 反证 | 串行合流三个前端 lane，删除有证据的旧壳和死 CSS；不得并发改同一文件 | `project-graph-query`、route manifest、repository integrity、typecheck/build、visual unity、fusion、route sweep、目标 Playwright 与反向变异均通过；删除项有零引用证据 |
+| F5 | Claude 最终视觉确认 | 在 1080×1920 逐路由比较运行时与 `docs/design/kiosk-redesign-2026-08/`；Admin/Partner 大屏和小程序分别按各自设计体系验收 | 活路由无旧壳交替；加载/空/错/权限/弱网/恢复态无溢出遮挡；截图/录屏绑定 final HEAD |
+
+**边界：** 当前打印→支付→扫描→取件主链已是新 UI，可用于后续受控试运营验证；但在 F0–F5 完成前，项目只能写“关键链前端 GO / 全站视觉统一 NO-GO”，不得把它升级为产品负责人要求的完整商业收口。完整前端统一估算 33–55 人日；三条无冲突 Claude lane 轮班推进并留足集成/视觉复核，现实日历约 2–4 周。
+
 ## 2026-09-18：单一商业集成候选（本分支）当前推进顺序
 
 **当前代码候选：** 分支 `codex/commercial-integration-20260918-r1`，基线

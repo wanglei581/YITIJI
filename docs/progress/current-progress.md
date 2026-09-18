@@ -1,5 +1,17 @@
 # 当前开发进度
 
+2026-09-18 **前端全量统一口径复核：试运营主链已是青序流光，但全站仍未完成“禁止新旧交替”。**
+绑定集成 HEAD `a15a26c89fccb11da42f183c38d21a0a276715af`，工作树复核前干净。本条只更新正式进度事实，未改前端、API、schema、workflow，未 push、未开 PR、未部署、未操作真机。
+
+- **当前路由事实：** `apps/kiosk/tests/visual/route-manifest.ts` 登记 **109** 条生产路由模式；其中 **18** 条是兼容重定向，另有 **3** 条 contract-review 在生产默认关闭时 fail-closed 重定向，因此实际页面落点为 **88** 条。按 `KioskRoot.tsx` 壳层注册与页面实现双重核对，**44 条已使用青序流光/Qx 新前端，44 条仍是旧 Fusion/V6/未统一表现**。旧报告的“约 60 条仍待迁移”把重定向和工作台子路由重复计数，已过时；历史 `0/51` 同样失真。
+- **页面工作量不是 44 个独立新页面：** 自我探索 4→1、五个服务台 5→1、智能校园 4→1、校园 3→1、扫描/面试/打印台均已合并工作台。剩余 44 条旧壳活路由约对应 **22–26 个实际设计页面/工作台**；主要集中在招聘会、简历次级能力、五个服务台、校园/智能校园/百宝箱、会员文档与订单、政策、人机助手、帮助/法务和手机中继。
+- **产品口径：** 打印/支付/扫描/取件试运营主链已经全部落在新前端，故“关键链受控试运营”不因旧壳页面本身阻塞；但产品负责人已明确要求**所有旧页面退出、禁止新旧页面交替**，所以剩余 44 条活路由在“完整产品商业收口”口径下仍是必须完成的前端阻塞，不得用试运营口径降级目标。
+- **Admin / Partner：** 两端 `/screen` 数据大屏已经在本集成树中实现；既有本机浏览器证据为 Admin **44/44**、Partner **24/24**。它们使用独立 Inkpaper / ops-screen 设计体系，不属于 Kiosk 青序流光 51/52 页迁移数量。
+- **小程序：** `apps/miniapp/` 是独立原生微信前端，不计入 Kiosk 路由迁移；其跨端材料包、订单、到机码与身份候选仍须 DevTools / Trial / 双账号 / 弱网真机验收。
+- **本轮本机检查：** `verify:kiosk-visual-unity`、`verify:fusion-shell`、`verify:fusion-w6`、`verify:kiosk-frontend-debt` 均退出 0；`test:browser:route-sweep --reporter=dot` **110/110 passed**。这些证明路由可渲染、壳层和合同未漂移，**不证明剩余旧壳已迁移，也不证明逐页视觉与真机通过**。`verify:qingxu-proto-geometry` 进程已结束，但原始会话退出码未被当前执行器保留，本条不把它登记为通过。
+- **独立审查：** Grok 4.6 xhigh session `6763a21b-ce94-44eb-8588-cc18ec4a234a` 与 Hermes-Claude Opus 5 xhigh session `20260918_162152_33d7e7` 均绑定本 HEAD，确认“约 60 条待迁移”已过时、全量统一仍未完成。直接 Claude Code Opus 5 因周额度耗尽失败（2026-09-20 05:00 Asia/Shanghai 重置），不计入批准；Agy 返回的是旧 HEAD `b38c4f541`，不计入本次前端结论。
+- **工期口径修正：** 仓库旧估算“约 47 个前端工作日”不能用于试运营主链；但按剩余 22–26 个复杂页面/工作台估算，完整视觉统一仍约 **33–55 人日**。单写入者约 7–11 周；三条互不冲突的 Claude 前端 lane 加集中集成、浏览器和视觉复核，按 24 小时轮班的现实日历时间约 **2–4 周**，不含微信审核、Windows/奔图、生产和试运营观察期。
+
 2026-09-18 **前端收口 GO（SOURCE/LOCAL）：大屏 stale 身份提示、Admin opsAttention 接线、Kiosk 请勿重新支付。**
 冻结基线 HEAD `f5d9f36ca`，本条落地 SHA 以提交为准。分支 `codex/commercial-integration-20260918-r1`。本轮只改 `apps/admin` / `apps/partner` / `apps/kiosk` 前端与其测试/verify 脚本，**未碰 services/、Prisma、workflow、CI 配置**。未 push、未开 PR、未部署、未连生产、未支付、未动硬件。Claude 大屏测试资产 `apps/admin/tests/e2e/screen/states.spec.ts`（SHA-256 `6b2e4bcb…0223b905`）原文保留未弱化，其两条新增用例由红转绿。
 
