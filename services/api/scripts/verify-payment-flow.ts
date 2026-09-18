@@ -28,7 +28,7 @@ import { AdminOrderActionsController } from '../src/payment/admin-order-actions.
 import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { ONLINE_PAID_PENDING_REFUND_REASON, OrderStatusService } from '../src/payment/order-status.service'
-import { createPaymentSessionToken } from '../src/payment/payment-session-token'
+import { createPaymentSessionToken, paymentSessionTtlMs } from '../src/payment/payment-session-token'
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
@@ -870,6 +870,87 @@ async function main(): Promise<void> {
       )
     }
 
+    const pendingClockClosedId = await makeOrder(210, 'unpaid')
+    await prisma.order.update({
+      where: { id: pendingClockClosedId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: `hash_pending_clock_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+      },
+    })
+    await expectCode(
+      'markPaidOnline refuses unclaimed clock-expired pickup (ORDER_PICKUP_WINDOW_CLOSED)',
+      'ORDER_PICKUP_WINDOW_CLOSED',
+      () =>
+        orderStatus.markPaidOnline(pendingClockClosedId, {
+          channel: CHANNEL,
+          attemptId: 'pa_pending_clock',
+          channelTxnNo: `txn_pending_clock_${suffix}`,
+          late: false,
+        }),
+    )
+
+    const claimedLeaseId = await makeOrder(200, 'unpaid')
+    await prisma.order.update({
+      where: { id: claimedLeaseId },
+      data: {
+        pickupStatus: 'claimed',
+        pickupClaimedAt: new Date(),
+        pickupCodeHash: `hash_claimed_lease_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        taskStatus: 'awaiting_payment',
+      },
+    })
+    const claimedLeasePaid = await orderStatus.markPaidOnline(claimedLeaseId, {
+      channel: CHANNEL,
+      attemptId: 'pa_claimed_lease',
+      channelTxnNo: `txn_claimed_lease_${suffix}`,
+      late: false,
+    })
+    if (claimedLeasePaid.payStatus !== 'paid' || claimedLeasePaid.paymentSource !== CHANNEL || claimedLeasePaid.pickupStatus !== 'claimed') {
+      fail(`claimed lease must still accept online payment: pay=${claimedLeasePaid.payStatus} source=${claimedLeasePaid.paymentSource} pickup=${claimedLeasePaid.pickupStatus}`)
+    }
+    pass('markPaidOnline accepts claimed kiosk lease after pickupCodeExpiresAt')
+
+    const expiredClaimedId = await makeOrder(190, 'unpaid')
+    await prisma.order.update({
+      where: { id: expiredClaimedId },
+      data: {
+        pickupStatus: 'claimed',
+        pickupClaimedAt: new Date(Date.now() - paymentSessionTtlMs() - 1000),
+        pickupCodeHash: `hash_claimed_expired_lease_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        taskStatus: 'awaiting_payment',
+      },
+    })
+    await expectCode(
+      'markPaidOnline refuses claimed unpaid after kiosk lease TTL (ORDER_PICKUP_WINDOW_CLOSED)',
+      'ORDER_PICKUP_WINDOW_CLOSED',
+      () =>
+        orderStatus.markPaidOnline(expiredClaimedId, {
+          channel: CHANNEL,
+          attemptId: 'pa_claimed_expired_lease',
+          channelTxnNo: `txn_claimed_expired_lease_${suffix}`,
+          late: true,
+        }),
+    )
+    const expiredClaimed = await prisma.order.findUnique({ where: { id: expiredClaimedId } })
+    const expiredClaimedRefundAudit = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: expiredClaimedId },
+    })
+    if (
+      expiredClaimed?.payStatus === 'unpaid'
+      && expiredClaimed.refundReason === ONLINE_PAID_PENDING_REFUND_REASON
+      && expiredClaimedRefundAudit
+    ) {
+      pass('claimed unpaid past lease online late payment records ONLINE_PAID_PENDING_REFUND, does not turn paid')
+    } else {
+      fail(
+        `claimed-lease pending-refund mismatch: pay=${expiredClaimed?.payStatus} reason=${expiredClaimed?.refundReason} audit=${expiredClaimedRefundAudit?.payloadJson}`,
+      )
+    }
+
     const cancelledCloudId = await makeOrder(180, 'unpaid')
     await prisma.order.update({
       where: { id: cancelledCloudId },
@@ -902,6 +983,173 @@ async function main(): Promise<void> {
       pass('cloud print markPaidOnline does not mint a ghost plaintext pickupCode')
     } else {
       fail(`ghost pickupCode minted: pay=${hashedPaid.payStatus} code=${hashedPaid.pickupCode}`)
+    }
+    const hashedReplay = await orderStatus.markPaidOnline(hashedCloudId, {
+      channel: CHANNEL,
+      attemptId: 'pa_hashed_replay',
+      channelTxnNo: `txn_hashed_replay_${suffix}`,
+      late: true,
+    })
+    if (hashedReplay.payStatus !== 'paid' || hashedReplay.paymentSource !== CHANNEL) {
+      fail(`same-channel replay must stay paid: pay=${hashedReplay.payStatus} source=${hashedReplay.paymentSource}`)
+    }
+    pass('repeat markPaidOnline on a live paid order is idempotent')
+
+    type UpdateMany = typeof prisma.order.updateMany
+    const orderMut = prisma.order as unknown as { updateMany: UpdateMany }
+    async function withPaidWriteRace(orderId: string, mutate: () => Promise<void>): Promise<boolean> {
+      const originalUpdateMany = orderMut.updateMany.bind(prisma.order) as UpdateMany
+      let raced = false
+      orderMut.updateMany = (async (args: Parameters<UpdateMany>[0]) => {
+        const data = args?.data as { payStatus?: string } | undefined
+        const where = args?.where as { id?: string } | undefined
+        if (!raced && where?.id === orderId && data?.payStatus === 'paid') {
+          raced = true
+          await mutate()
+        }
+        return originalUpdateMany(args)
+      }) as UpdateMany
+      try {
+        await expectCode(
+          `markPaidOnline CAS 0 after race on ${orderId} (ORDER_PICKUP_WINDOW_CLOSED)`,
+          'ORDER_PICKUP_WINDOW_CLOSED',
+          () =>
+            orderStatus.markPaidOnline(orderId, {
+              channel: CHANNEL,
+              attemptId: `pa_race_${orderId.slice(-8)}`,
+              channelTxnNo: `txn_race_${orderId.slice(-8)}`,
+              late: true,
+            }),
+        )
+        return raced
+      } finally {
+        orderMut.updateMany = originalUpdateMany
+      }
+    }
+
+    const raceClosedId = await makeOrder(175, 'unpaid')
+    await prisma.order.update({
+      where: { id: raceClosedId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: `hash_race_closed_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    const racedClosed = await withPaidWriteRace(raceClosedId, async () => {
+      await prisma.order.update({
+        where: { id: raceClosedId },
+        data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
+      })
+    })
+    if (!racedClosed) fail('sweeper race must intercept the paid write, not skip it')
+    const raceClosedRow = await prisma.order.findUnique({ where: { id: raceClosedId } })
+    const raceClosedAudit = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: raceClosedId },
+    })
+    if (
+      raceClosedRow?.payStatus === 'closed'
+      && raceClosedRow.pickupStatus === 'expired'
+      && raceClosedRow.refundReason === ONLINE_PAID_PENDING_REFUND_REASON
+      && raceClosedAudit
+    ) {
+      pass('snapshot-open then sweeper expired+closed: CAS 0, does not turn paid, pending-refund')
+    } else {
+      fail(
+        `sweeper race mismatch: pay=${raceClosedRow?.payStatus} pickup=${raceClosedRow?.pickupStatus} reason=${raceClosedRow?.refundReason}`,
+      )
+    }
+
+    const raceLeaseId = await makeOrder(165, 'unpaid')
+    await prisma.order.update({
+      where: { id: raceLeaseId },
+      data: {
+        pickupStatus: 'claimed',
+        pickupClaimedAt: new Date(),
+        pickupCodeHash: `hash_race_lease_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        taskStatus: 'awaiting_payment',
+      },
+    })
+    const racedLease = await withPaidWriteRace(raceLeaseId, async () => {
+      await prisma.order.update({
+        where: { id: raceLeaseId },
+        data: { pickupClaimedAt: new Date(Date.now() - paymentSessionTtlMs() - 1000) },
+      })
+    })
+    if (!racedLease) fail('claimed-lease TTL race must intercept the paid write')
+    const raceLeaseRow = await prisma.order.findUnique({ where: { id: raceLeaseId } })
+    const raceLeaseAudit = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: raceLeaseId },
+    })
+    if (
+      raceLeaseRow?.payStatus === 'unpaid'
+      && raceLeaseRow.pickupStatus === 'claimed'
+      && raceLeaseRow.refundReason === ONLINE_PAID_PENDING_REFUND_REASON
+      && raceLeaseAudit
+    ) {
+      pass('snapshot-live claimed then lease crosses TTL: CAS 0, not paid, pending-refund')
+    } else {
+      fail(
+        `lease TTL race mismatch: pay=${raceLeaseRow?.payStatus} pickup=${raceLeaseRow?.pickupStatus} reason=${raceLeaseRow?.refundReason}`,
+      )
+    }
+
+    async function withOfflinePaidWriteRace(orderId: string, mutate: () => Promise<void>): Promise<boolean> {
+      const originalUpdateMany = orderMut.updateMany.bind(prisma.order) as UpdateMany
+      let raced = false
+      orderMut.updateMany = (async (args: Parameters<UpdateMany>[0]) => {
+        const data = args?.data as { payStatus?: string } | undefined
+        const where = args?.where as { id?: string } | undefined
+        if (!raced && where?.id === orderId && data?.payStatus === 'paid') {
+          raced = true
+          await mutate()
+        }
+        return originalUpdateMany(args)
+      }) as UpdateMany
+      try {
+        await expectCode(
+          `offline markPaid CAS 0 after race on ${orderId} (ORDER_PICKUP_WINDOW_CLOSED)`,
+          'ORDER_PICKUP_WINDOW_CLOSED',
+          () => orderStatus.markPaid(orderId, { paymentSource: 'offline', operatorId: 'verify-offline-race' }),
+        )
+        return raced
+      } finally {
+        orderMut.updateMany = originalUpdateMany
+      }
+    }
+
+    const offlineRaceId = await makeOrder(155, 'unpaid')
+    await prisma.order.update({
+      where: { id: offlineRaceId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: `hash_offline_race_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    const racedOffline = await withOfflinePaidWriteRace(offlineRaceId, async () => {
+      await prisma.order.update({
+        where: { id: offlineRaceId },
+        data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
+      })
+    })
+    if (!racedOffline) fail('offline sweeper race must intercept the paid write, not skip it')
+    const offlineRaceRow = await prisma.order.findUnique({ where: { id: offlineRaceId } })
+    const offlinePendingRefund = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: offlineRaceId },
+    })
+    if (
+      offlineRaceRow?.payStatus === 'closed'
+      && offlineRaceRow.pickupStatus === 'expired'
+      && offlineRaceRow.paidAt == null
+      && !offlinePendingRefund
+    ) {
+      pass('offline markPaid snapshot-open then sweeper expired+closed: CAS 0, stays closed, no pending-refund')
+    } else {
+      fail(
+        `offline sweeper race mismatch: pay=${offlineRaceRow?.payStatus} pickup=${offlineRaceRow?.pickupStatus} paidAt=${offlineRaceRow?.paidAt?.toISOString() ?? 'null'} refundAudit=${Boolean(offlinePendingRefund)}`,
+      )
     }
 
     // ── (14) API-08：关单后 claimed 回滚 pending，不再卡死 ──────────────────

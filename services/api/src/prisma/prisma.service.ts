@@ -152,6 +152,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.orderItem
   }
 
+  get orderSubmissionLedger() {
+    return this.client.orderSubmissionLedger
+  }
+
   // ── P0a payment foundation ─────────────────────────────────────────────────
 
   get priceConfig() {

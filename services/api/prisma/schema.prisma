@@ -542,6 +542,29 @@ model OrderItem {
   @@index([printTaskId])
 }
 
+/// Owner-scoped idempotency ledger for POST /me/print-orders and POST /orders/package.
+/// Not a second order system. Unique is (endUserId, idempotencyKey). No secrets or PII.
+/// status: processing | succeeded | abandoned | terminal_failed
+/// orderKind: print | package | unknown (unknown only on resolver tombstones)
+model OrderSubmissionLedger {
+  id             String    @id @default(cuid())
+  endUserId      String
+  idempotencyKey String
+  orderKind      String
+  payloadHash    String
+  status         String
+  leaseToken     String?
+  leaseExpiresAt DateTime?
+  orderId        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([endUserId, idempotencyKey], map: "OrderSubmissionLedger_endUserId_idempotencyKey_key")
+  @@index([status, leaseExpiresAt])
+  @@index([orderId])
+  @@index([endUserId])
+}
+
 /// 服务端价目 SSOT（P0a 支付域）。首批仅开发默认价 seed，不对外宣称最终定价；
 /// Admin 价格 CRUD 与正式定价另批。金额整数「分」，绝不用浮点。
 model PriceConfig {

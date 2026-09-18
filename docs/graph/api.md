@@ -648,6 +648,7 @@
 | GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/me/print-orders/cloud` | MemberPrintOrdersController.listCloud | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/me/print-orders/submissions/resolve` | MemberPrintOrdersController.resolveSubmissions | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/member-print-orders/package-orders.controller.ts`
 

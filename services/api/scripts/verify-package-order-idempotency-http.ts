@@ -1,6 +1,6 @@
 /**
- * POST /me/print-orders Idempotency-Key HTTP 契约：进程内 Nest + 隔离 SQLite。
- * 不连生产。由 verify:miniapp-cloud-print-m2 串行拉起。
+ * POST /orders/package Idempotency-Key HTTP 契约：进程内 Nest + 隔离 SQLite。
+ * 不连生产。由 verify:package-order-fulfillment 串行拉起。
  */
 import 'reflect-metadata'
 import 'dotenv/config'
@@ -20,9 +20,8 @@ import { AuditService } from '../src/audit/audit.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { EndUserAuthGuard, memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { RedisService } from '../src/common/redis/redis.service'
-import { fingerprintMemberPrintOrderPayload, MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
-import { MemberPrintOrdersController } from '../src/member-print-orders/member-print-orders.controller'
-import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
+import { PackageOrderService } from '../src/member-print-orders/package-order.service'
+import { PackageOrdersController } from '../src/member-print-orders/package-orders.controller'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -36,8 +35,7 @@ import { assertIsolatedVerificationDatabase } from './support/isolated-verificat
 import { buildRealPdf } from './support/minimal-pdf'
 
 const apiRoot = path.resolve(__dirname, '..')
-const dbName = `verify-print-order-idem-http-${randomUUID().slice(0, 8)}.db`
-const dbPath = path.join('/tmp', dbName)
+const dbPath = path.join('/tmp', `verify-package-order-idem-http-${randomUUID().slice(0, 8)}.db`)
 process.env['DATABASE_URL'] = `file:${dbPath}`
 process.env['VERIFICATION_DATABASE_TARGET'] = 'isolated'
 process.env['NODE_ENV'] = 'test'
@@ -47,10 +45,21 @@ process.env['PAYMENT_SESSION_SECRET'] = 'verify-payment-session-secret-012345678
 process.env['SECRET_ENCRYPTION_KEY'] = 'verify-secret-encryption-key-0123456789abcdef'
 process.env['TERMINAL_ADMIN_SECRET'] = 'verify-terminal-admin-secret-0123456789abcdef'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] = 'verify-terminal-action-token-secret-0123456789abcdef'
-process.env['JWT_SECRET'] ||= 'verify-idem-http-jwt-secret-32chars!!'
+process.env['JWT_SECRET'] ||= 'verify-pkg-idem-http-jwt-secret-32chars!!'
 
 type Json = Record<string, unknown>
 interface HttpResult { status: number; json: Json }
+type PackageDto = {
+  terminalId: string
+  files: Array<{ fileId: string; pageRange?: string }>
+  params: { copies: number; colorMode: string; duplex: string }
+}
+type PackageView = {
+  orderId: string
+  orderNo: string
+  pickupCode: string | null
+  items: Array<{ fileId: string; pageRange: string | null }>
+}
 
 function pass(message: string): void { console.log(`  PASS ${message}`) }
 function fail(message: string): never { throw new Error(message) }
@@ -97,7 +106,7 @@ function prepareDb(): void {
   }
 }
 
-let cloudOrdersRef: MemberPrintOrderCreateService | null = null
+let packageOrdersRef: PackageOrderService | null = null
 let prismaRef: PrismaService | null = null
 const sessionStore = new Map<string, string>()
 const redisStub = {
@@ -113,16 +122,15 @@ const redisStub = {
       signOptions: { expiresIn: '30m', audience: 'enduser' },
     }),
   ],
-  controllers: [MemberPrintOrdersController],
+  controllers: [PackageOrdersController],
   providers: [
     {
-      provide: MemberPrintOrderCreateService,
+      provide: PackageOrderService,
       useFactory: () => {
-        if (!cloudOrdersRef) throw new Error('cloudOrdersRef missing')
-        return cloudOrdersRef
+        if (!packageOrdersRef) throw new Error('packageOrdersRef missing')
+        return packageOrdersRef
       },
     },
-    { provide: MemberPrintOrdersService, useValue: { list: async () => ({ items: [], nextCursor: null, total: 0 }) } },
     {
       provide: PrismaService,
       useFactory: () => {
@@ -134,10 +142,10 @@ const redisStub = {
     EndUserAuthGuard,
   ],
 })
-class IdempotencyHttpModule {}
+class PackageIdempotencyHttpModule {}
 
 async function main(): Promise<void> {
-  console.log('\n=== POST /me/print-orders Idempotency-Key HTTP 契约 ===')
+  console.log('\n=== POST /orders/package Idempotency-Key HTTP 契约 ===')
   cleanupDb()
   prepareDb()
   const prisma = new PrismaService()
@@ -146,27 +154,36 @@ async function main(): Promise<void> {
   const audit = new AuditService(prisma)
   const capabilities = new TerminalCapabilitiesService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
-  const pageCount = new PrintPageCountService(prisma, storage)
-  const pricing = new PricingService(prisma)
-  const quote = new OrderQuoteService(pageCount, pricing, capabilities, prisma)
-  const cloudOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
-  cloudOrdersRef = cloudOrders
+  const quotes = new OrderQuoteService(new PrintPageCountService(prisma, storage), new PricingService(prisma), capabilities, prisma)
+  const packageOrders = new PackageOrderService(prisma, quotes, capabilities, audit, orderStatus)
+  packageOrdersRef = packageOrders
   prismaRef = prisma
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
-  const userA = `eu_idem_http_${suffix}`
-  const terminalId = `terminal_idem_http_${suffix}`
-  const fileA = `file_idem_http_${suffix}`
+  const userA = `eu_pkg_http_a_${suffix}`
+  const userB = `eu_pkg_http_b_${suffix}`
+  const terminalId = `terminal_pkg_http_${suffix}`
+  const fileA1 = `file_pkg_http_a1_${suffix}`
+  const fileA2 = `file_pkg_http_a2_${suffix}`
+  const fileB1 = `file_pkg_http_b1_${suffix}`
   const storageKeys: string[] = []
-  const dto = { fileId: fileA, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }
+  const dtoA: PackageDto = {
+    terminalId,
+    files: [{ fileId: fileA1 }, { fileId: fileA2 }],
+    params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+  }
   const jwt = new JwtService({
     secret: process.env['JWT_SECRET'],
     signOptions: { expiresIn: '30m', audience: 'enduser' },
   })
-  const sessionId = randomUUID()
-  const accessToken = jwt.sign({ sub: userA }, { jwtid: sessionId, audience: 'enduser' })
-  sessionStore.set(memberSessionKey(sessionId), userA)
+  function tokenFor(userId: string): string {
+    const sessionId = randomUUID()
+    sessionStore.set(memberSessionKey(sessionId), userId)
+    return jwt.sign({ sub: userId }, { jwtid: sessionId, audience: 'enduser' })
+  }
+  const tokenA = tokenFor(userA)
+  const tokenB = tokenFor(userB)
 
-  const app = await NestFactory.create(IdempotencyHttpModule, { logger: false })
+  const app = await NestFactory.create(PackageIdempotencyHttpModule, { logger: false })
   app.setGlobalPrefix('api/v1')
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
@@ -186,18 +203,19 @@ async function main(): Promise<void> {
   const base = `http://127.0.0.1:${address.port}/api/v1`
 
   async function request(init: {
+    token?: string
     headers?: Record<string, string>
     body?: unknown
   }): Promise<HttpResult> {
-    const response = await fetch(`${base}/me/print-orders`, {
+    const response = await fetch(`${base}/orders/package`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${init.token ?? tokenA}`,
         'Content-Type': 'application/json',
         ...(init.headers ?? {}),
       },
-      body: JSON.stringify(init.body ?? dto),
+      body: JSON.stringify(init.body ?? dtoA),
     })
     return { status: response.status, json: (await response.json().catch(() => ({}))) as Json }
   }
@@ -205,10 +223,11 @@ async function main(): Promise<void> {
   try {
     setPrintScanCapabilityModeForTest('strict')
     await prisma.endUser.create({ data: { id: userA, phoneHash: `hash-${userA}`, phoneEnc: `enc-${userA}` } })
+    await prisma.endUser.create({ data: { id: userB, phoneHash: `hash-${userB}`, phoneEnc: `enc-${userB}` } })
     await prisma.terminal.create({
       data: {
-        id: terminalId, terminalCode: `IDEMH-${suffix}`, agentToken: `token-${terminalId}`,
-        deviceFingerprint: `fp-${terminalId}`, displayName: '幂等HTTP终端', locationLabel: '验证点',
+        id: terminalId, terminalCode: `PKGHTTP-${suffix}`, agentToken: `token-${terminalId}`,
+        deviceFingerprint: `fp-${terminalId}`, displayName: '材料包幂等HTTP终端', locationLabel: '验证点',
       },
     })
     await prisma.terminalHeartbeat.create({
@@ -218,26 +237,32 @@ async function main(): Promise<void> {
       data: { terminalId, capabilityKey: 'document_print', status: 'available' },
     })
     await seedDevDefaultPriceConfig(prisma)
-    const storageKey = `verify/print-idem-http/${fileA}.pdf`
-    const pdf = buildRealPdf(2)
-    await storage.putObject(storageKey, pdf, 'application/pdf', LOCAL_BUCKET_SENTINEL)
-    storageKeys.push(storageKey)
-    await prisma.fileObject.create({
-      data: {
-        id: fileA, storageKey, bucket: LOCAL_BUCKET_SENTINEL, region: 'local', filename: 'A简历.pdf',
-        mimeType: 'application/pdf', sizeBytes: pdf.length,
-        sha256: createHash('sha256').update(pdf).digest('hex'), endUserId: userA, ownerType: 'user', ownerId: userA,
-        purpose: 'print_doc', status: 'active', expiresAt: new Date(Date.now() + 30 * 60 * 60 * 1000),
-      },
-    })
-    const task = await prisma.documentProcessTask.create({
-      data: {
-        kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: fileA,
-        endUserId: userA, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        paramsJson: JSON.stringify({ sourceSha256: createHash('sha256').update(pdf).digest('hex') }),
-      },
-    })
-    await prisma.piiFinding.create({ data: { taskId: task.id, type: 'phone', label: '手机号', action: 'keep' } })
+    for (const [fileId, ownerId, label] of [
+      [fileA1, userA, 'A简历'],
+      [fileA2, userA, 'A附件'],
+      [fileB1, userB, 'B简历'],
+    ] as const) {
+      const storageKey = `verify/package-idem-http/${fileId}.pdf`
+      const pdf = buildRealPdf(2)
+      await storage.putObject(storageKey, pdf, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+      storageKeys.push(storageKey)
+      await prisma.fileObject.create({
+        data: {
+          id: fileId, storageKey, bucket: LOCAL_BUCKET_SENTINEL, region: 'local', filename: `${label}.pdf`,
+          mimeType: 'application/pdf', sizeBytes: pdf.length,
+          sha256: createHash('sha256').update(pdf).digest('hex'), endUserId: ownerId, ownerType: 'user', ownerId,
+          purpose: 'print_doc', status: 'active', expiresAt: new Date(Date.now() + 30 * 60 * 60 * 1000),
+        },
+      })
+      const task = await prisma.documentProcessTask.create({
+        data: {
+          kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: fileId,
+          endUserId: ownerId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          paramsJson: JSON.stringify({ sourceSha256: createHash('sha256').update(pdf).digest('hex') }),
+        },
+      })
+      await prisma.piiFinding.create({ data: { taskId: task.id, type: 'phone', label: '手机号', action: 'keep' } })
+    }
     pass('隔离库与 HTTP 夹具已建立')
 
     const missing = await request({})
@@ -262,7 +287,7 @@ async function main(): Promise<void> {
     pass('H1 缺/空白/非法 Idempotency-Key → 400，零行 Order')
 
     const bodyOnlyKey = randomUUID()
-    const bodyOnly = await request({ body: { ...dto, idempotencyKey: bodyOnlyKey } })
+    const bodyOnly = await request({ body: { ...dtoA, idempotencyKey: bodyOnlyKey } })
     if (bodyOnly.status !== 400 || errorCode(bodyOnly) !== 'VALIDATION_FAILED') {
       fail(`body-only key 应为 VALIDATION_FAILED，实际 ${JSON.stringify(bodyOnly)}`)
     }
@@ -278,25 +303,40 @@ async function main(): Promise<void> {
     const mixedKey = randomUUID()
     const created = await request({ headers: { 'Idempotency-Key': mixedKey } })
     if (created.status !== 200 && created.status !== 201) fail(`混合大小写 header 应建单，实际 ${JSON.stringify(created)}`)
-    const createdView = envelopeData<{ id: string; pickupCode: string | null }>(created)
-    if (!createdView.id || !createdView.pickupCode) fail('建单必须返回 id 与到机码')
+    const createdView = envelopeData<PackageView>(created)
+    if (!createdView.orderId || !createdView.pickupCode) fail('建单必须返回 orderId 与到机码')
     const replayUpper = await request({ headers: { 'IDEMPOTENCY-KEY': mixedKey } })
     const replayLower = await request({ headers: { 'idempotency-key': mixedKey } })
-    const upperView = envelopeData<{ id: string; pickupCode: string | null }>(replayUpper)
-    const lowerView = envelopeData<{ id: string; pickupCode: string | null }>(replayLower)
-    if (upperView.id !== createdView.id || lowerView.id !== createdView.id) fail('混合大小写必须打到同一张单')
+    const upperView = envelopeData<PackageView>(replayUpper)
+    const lowerView = envelopeData<PackageView>(replayLower)
+    if (upperView.orderId !== createdView.orderId || lowerView.orderId !== createdView.orderId) {
+      fail('混合大小写必须打到同一张单')
+    }
     if (upperView.pickupCode !== createdView.pickupCode || lowerView.pickupCode !== createdView.pickupCode) {
       fail('混合大小写回放必须同一到机码')
     }
     if (await prisma.order.count({ where: { endUserId: userA } }) !== 1) fail('混合大小写回放不得第二张单')
     pass('H3 Idempotency-Key / IDEMPOTENCY-KEY / idempotency-key 都到达 controller')
 
+    const caseKey = randomUUID()
+    const caseCreated = await request({ headers: { 'idempotency-key': caseKey } })
+    if (caseCreated.status !== 200 && caseCreated.status !== 201) fail(`小写 key 应建单，实际 ${JSON.stringify(caseCreated)}`)
+    const caseUpper = await request({ headers: { 'idempotency-key': caseKey.toUpperCase() } })
+    if (caseUpper.status !== 400 || errorCode(caseUpper) !== 'IDEMPOTENCY_KEY_INVALID') {
+      fail(`已有小写 key 后再打大写应为 400 INVALID，实际 ${JSON.stringify(caseUpper)}`)
+    }
+    if (await prisma.order.count({ where: { idempotencyKey: caseKey } }) !== 1) fail('大写重试不得改小写那一行')
+    if (await prisma.order.count({ where: { idempotencyKey: caseKey.toUpperCase() } }) !== 0) {
+      fail('大写 UUID 不得另建一行')
+    }
+    pass('H3b 大写 UUID 值拒绝且零额外 Order（header 名大小写仍不敏感）')
+
     const lostKey = randomUUID()
     const lost = await request({ headers: { 'idempotency-key': lostKey } })
-    const lostView = envelopeData<{ id: string; pickupCode: string | null }>(lost)
+    const lostView = envelopeData<PackageView>(lost)
     const recovered = await request({ headers: { 'idempotency-key': lostKey } })
-    const recoveredView = envelopeData<{ id: string; pickupCode: string | null }>(recovered)
-    if (recoveredView.id !== lostView.id || recoveredView.pickupCode !== lostView.pickupCode) {
+    const recoveredView = envelopeData<PackageView>(recovered)
+    if (recoveredView.orderId !== lostView.orderId || recoveredView.pickupCode !== lostView.pickupCode) {
       fail('响应丢失重试必须回放原单原码')
     }
     if (await prisma.order.count({ where: { idempotencyKey: lostKey } }) !== 1) fail('丢失重试不得新增行')
@@ -304,97 +344,76 @@ async function main(): Promise<void> {
 
     const mismatchKey = randomUUID()
     const original = await request({ headers: { 'idempotency-key': mismatchKey } })
-    const originalView = envelopeData<{ id: string; pickupCode: string | null }>(original)
+    const originalView = envelopeData<PackageView>(original)
     const mismatch = await request({
       headers: { 'idempotency-key': mismatchKey },
-      body: { ...dto, copies: 2 },
+      body: { ...dtoA, params: { ...dtoA.params, copies: 2 } },
     })
     if (mismatch.status !== 409 || errorCode(mismatch) !== 'IDEMPOTENCY_KEY_REUSED') {
       fail(`同 key 不同 payload 应为 409 IDEMPOTENCY_KEY_REUSED，实际 ${JSON.stringify(mismatch)}`)
     }
     const leaked = JSON.stringify(mismatch.json)
-    if (originalView.id && leaked.includes(originalView.id)) fail('409 不得泄露 order id')
+    if (originalView.orderId && leaked.includes(originalView.orderId)) fail('409 不得泄露 order id')
     if (originalView.pickupCode && leaked.includes(originalView.pickupCode)) fail('409 不得泄露到机码')
     if (await prisma.order.count({ where: { idempotencyKey: mismatchKey } }) !== 1) fail('payload 冲突不得第二张单')
     pass('H5 同 header 不同 payload → 409，不泄露 id/code')
 
-    async function resolveRequest(init: {
-      token?: string
-      body?: unknown
-    }): Promise<HttpResult> {
-      const response = await fetch(`${base}/me/print-orders/submissions/resolve`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${init.token ?? accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(init.body ?? { keys: [] }),
-      })
-      return { status: response.status, json: (await response.json().catch(() => ({}))) as Json }
+    const rangeKey = randomUUID()
+    const rangedBody = {
+      ...dtoA,
+      files: [{ fileId: fileA1, pageRange: '1' }, { fileId: fileA2 }],
     }
-
-    const createdKey = mixedKey
-    const createdResolve = await resolveRequest({ body: { keys: [createdKey] } })
-    if (createdResolve.status !== 200) fail(`已建单 resolve 应为 200，实际 ${JSON.stringify(createdResolve)}`)
-    const createdItems = envelopeData<{ items: Array<{ key: string; outcome: string; orderId?: string; orderKind?: string }> }>(createdResolve).items
-    if (createdItems[0]?.outcome !== 'created' || createdItems[0].orderId !== createdView.id || createdItems[0].orderKind !== 'print') {
-      fail(`已建单 resolve 必须 created/print，实际 ${JSON.stringify(createdResolve.json)}`)
+    const ranged = await request({ headers: { 'idempotency-key': rangeKey }, body: rangedBody })
+    const rangedView = envelopeData<PackageView>(ranged)
+    const rangedReplay = await request({ headers: { 'idempotency-key': rangeKey }, body: rangedBody })
+    const rangedReplayView = envelopeData<PackageView>(rangedReplay)
+    if (rangedReplayView.orderId !== rangedView.orderId || rangedReplayView.pickupCode !== rangedView.pickupCode) {
+      fail('同 pageRange 必须回放原单原码')
     }
-    pass('H6 resolve 已建单 → created + orderKind=print')
-
-    const tombHttpKey = randomUUID()
-    const tombHttp = await resolveRequest({ body: { keys: [tombHttpKey] } })
-    const tombItems = envelopeData<{ items: Array<{ outcome: string; orderId?: string }> }>(tombHttp).items
-    if (tombHttp.status !== 200 || tombItems[0]?.outcome !== 'not_created' || tombItems[0].orderId) {
-      fail(`未知 key resolve 必须 not_created，实际 ${JSON.stringify(tombHttp)}`)
-    }
-    const lateHttp = await request({ headers: { 'idempotency-key': tombHttpKey } })
-    if (lateHttp.status !== 409 || errorCode(lateHttp) !== 'IDEMPOTENCY_KEY_ABANDONED') {
-      fail(`墓碑后 POST 必须 409 ABANDONED，实际 ${JSON.stringify(lateHttp)}`)
-    }
-    if (await prisma.order.count({ where: { idempotencyKey: tombHttpKey } }) !== 0) fail('HTTP 墓碑后不得建单')
-    pass('H7 resolve 墓碑后迟到 POST → 409 ABANDONED')
-
-    const procHttpKey = randomUUID()
-    await prisma.orderSubmissionLedger.create({
-      data: {
-        endUserId: userA,
-        idempotencyKey: procHttpKey,
-        orderKind: 'print',
-        payloadHash: fingerprintMemberPrintOrderPayload(dto),
-        status: 'processing',
-        leaseToken: randomUUID(),
-        leaseExpiresAt: new Date(Date.now() + 60_000),
-      },
+    if (rangedView.items[0]?.pageRange !== '1') fail('HTTP 建单必须落下 pageRange=1')
+    const rangeMismatch = await request({
+      headers: { 'idempotency-key': rangeKey },
+      body: { ...dtoA, files: [{ fileId: fileA1, pageRange: '1-2' }, { fileId: fileA2 }] },
     })
-    const procHttp = await request({ headers: { 'idempotency-key': procHttpKey } })
-    if (procHttp.status !== 409 || errorCode(procHttp) !== 'IDEMPOTENCY_IN_PROGRESS') {
-      fail(`活租约 POST 必须 409 IN_PROGRESS，实际 ${JSON.stringify(procHttp)}`)
+    if (rangeMismatch.status !== 409 || errorCode(rangeMismatch) !== 'IDEMPOTENCY_KEY_REUSED') {
+      fail(`同 key 不同 pageRange 应为 409，实际 ${JSON.stringify(rangeMismatch)}`)
     }
-    const procResolveHttp = await resolveRequest({ body: { keys: [procHttpKey] } })
-    const procItems = envelopeData<{ items: Array<{ outcome: string }> }>(procResolveHttp).items
-    if (procItems[0]?.outcome !== 'processing') fail(`活租约 resolve 必须 processing，实际 ${JSON.stringify(procResolveHttp)}`)
-    const procLedger = await prisma.orderSubmissionLedger.findFirst({ where: { endUserId: userA, idempotencyKey: procHttpKey } })
-    if (!procLedger || procLedger.status !== 'processing') fail('活租约 resolve 不得把 processing 清成 abandoned')
-    pass('H8 活租约 POST IN_PROGRESS，resolve=processing 且不清键')
+    const rangeOmitted = await request({ headers: { 'idempotency-key': rangeKey }, body: dtoA })
+    if (rangeOmitted.status !== 409 || errorCode(rangeOmitted) !== 'IDEMPOTENCY_KEY_REUSED') {
+      fail(`同 key 省略 pageRange 应为 409，实际 ${JSON.stringify(rangeOmitted)}`)
+    }
+    if (await prisma.order.count({ where: { idempotencyKey: rangeKey } }) !== 1) fail('pageRange 冲突不得第二张单')
+    pass('H5b 同 header 改 pageRange → 409；精确 replay 仍是原单')
 
-    const oversize = await resolveRequest({ body: { keys: Array.from({ length: 21 }, () => randomUUID()) } })
-    if (oversize.status !== 400 || errorCode(oversize) !== 'VALIDATION_FAILED') {
-      fail(`21 个 key 必须 400 VALIDATION_FAILED，实际 ${JSON.stringify(oversize)}`)
-    }
-    pass('H9 resolve 最多 20 个 key')
+    const sharedKey = randomUUID()
+    const aCreated = await request({ headers: { 'idempotency-key': sharedKey } })
+    const aView = envelopeData<PackageView>(aCreated)
+    const bCreated = await request({
+      token: tokenB,
+      headers: { 'idempotency-key': sharedKey },
+      body: { terminalId, files: [{ fileId: fileB1 }], params: dtoA.params },
+    })
+    const bView = envelopeData<PackageView>(bCreated)
+    if (bView.orderId === aView.orderId) fail('HTTP 不同用户同 key 不得同一张单')
+    if (bView.pickupCode === aView.pickupCode) fail('HTTP B 不得拿到 A 的到机码')
+    if (await prisma.order.count({ where: { idempotencyKey: sharedKey } }) !== 2) fail('HTTP 不同用户同 key 应各有一行')
+    pass('H6 不同用户同 header → 各建各的')
   } finally {
     setPrintScanCapabilityModeForTest(null)
     await app.close()
-    const orderIds = (await prisma.order.findMany({ where: { endUserId: userA }, select: { id: true } })).map((row) => row.id)
-    if (orderIds.length) await prisma.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
-    await prisma.orderSubmissionLedger.deleteMany({ where: { endUserId: userA } })
-    await prisma.order.deleteMany({ where: { endUserId: userA } })
-    await prisma.piiFinding.deleteMany({ where: { task: { endUserId: userA } } })
-    await prisma.documentProcessTask.deleteMany({ where: { endUserId: userA } })
-    await prisma.fileObject.deleteMany({ where: { endUserId: userA } })
-    await prisma.endUser.deleteMany({ where: { id: userA } })
+    const orderIds = (await prisma.order.findMany({
+      where: { endUserId: { in: [userA, userB] } },
+      select: { id: true },
+    })).map((row) => row.id)
+    if (orderIds.length) {
+      await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } })
+      await prisma.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
+    }
+    await prisma.order.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
+    await prisma.piiFinding.deleteMany({ where: { task: { endUserId: { in: [userA, userB] } } } })
+    await prisma.documentProcessTask.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
+    await prisma.fileObject.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
+    await prisma.endUser.deleteMany({ where: { id: { in: [userA, userB] } } })
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.terminalCapability.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })

@@ -11,14 +11,28 @@
 //   ② 「合计 待确认」这种占位金额。金额现在来自服务端多行报价（POST /orders/quote
 //      的 lines 契约），前端不做任何单价乘法。
 //
-// 提交载荷仍然只有 fileId / pageRange：服务端 CreatePackageOrderDto 是白名单校验
-// （forbidNonWhitelisted），多带一个 filename / pageCount / totalAmount 就整单 400。
-// 这不是接口疏漏而是刻意的 —— DTO 注释写明「页数、金额与文件名全部由服务端查证，
-// 前端传值不作为事实」，让前端报页数报金额本身就是错的（那会成为计费口径被前端左右的入口）。
+// 提交载荷**当前只有 fileId**。`pageRange` 是服务端 `CreatePackageOrderDto` 预留的
+// 可选字段（后端已按有序 pageRange 计费并入幂等指纹），但这条链上还没有任何一处让用户
+// 选页码 —— 所以现在发出去的每一个 file 都只带 fileId，`pageRange` 属于将来才会用上的
+// 契约，不是本页此刻的行为。（此处旧注释写的是「只有 fileId / pageRange」，会被读成
+// 本页已经在传页码；本轮只更正这句话，不为此新增任何页码 UI 或行为。）
+//
+// 载荷之所以这么窄：服务端 DTO 是白名单校验（forbidNonWhitelisted），多带一个
+// filename / pageCount / totalAmount 就整单 400。这不是接口疏漏而是刻意的 ——
+// DTO 注释写明「页数、金额与文件名全部由服务端查证，前端传值不作为事实」，
+// 让前端报页数报金额本身就是错的（那会成为计费口径被前端左右的入口）。
+//
+// 2026-09-17：这一页此前**一个幂等键都不带**。服务端 `POST /orders/package` 补上
+// Idempotency-Key 之后（dd1434d89），不带就是 400；补上之前，它的代价是"响应丢在路上、
+// 用户再点一次"必然多出第二张订单和第二次收款。键的铸造、落盘与复用见
+// utils/package-order-idempotency.js；本页只负责三件事：**先落住键再 POST**、
+// **拿到 orderId 先落盘再跳转**、以及重进本页时**先核对再决定要不要放开按钮**。
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
+const idem = require('../../utils/package-order-idempotency')
+const reconcileEngine = require('../../utils/order-submission-reconcile')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 /**
@@ -71,6 +85,10 @@ Page({
     quoteErrorTitle: '',
     quoteErrorText: '',
     quoteRecover: '',
+    // 「重新下单」这一个动作的总开关。与 quoteRecover 分成两个字段，是为了让模板不必
+    // 去解析状态语义，也让"能不能重新下单"只有一个出口（startNewOrder 自己再判一次）。
+    // 默认 false，且只由 _lockAfterCreatedTerminal 一处打开 —— 服务端证明原单终态之后。
+    canStartNewOrder: false,
 
     submitErrorTitle: '',
     submitErrorText: '',
@@ -140,6 +158,20 @@ Page({
       return
     }
     this.setData({ isLoggedIn: loggedIn })
+    // 已经锁在一张已建成的订单上：每次回到前台都**重新核一次它现在什么状态**。
+    //
+    // 这一条不能并进上面那个「身份变了」分支里，因为最需要它的那一跳恰恰不算身份变化：
+    // JWT 到点时 `_identityKey()` 会静默掉成 `''`，而守卫的快照**从没见过**这一跳
+    // （它是在读取那一刻才发生的，没有任何生命周期回调）。用户按了「去登录」、登录成功、
+    // 返回本页 —— 身份回到 `'u:A'`，与守卫快照逐字相同，`setIdentity` 返回 false。
+    // 少了这一条，他会看到那句「登录已失效」原地不动：他已经做完了我们要求的事，
+    // 页面却不再核对，也不再有任何出口。
+    //
+    // 顺带也覆盖另外两种回到前台：上一次核对卡在网络 / 5xx（锁着但状态未知），
+    // 以及已经判过终态（再问一遍是同一个答案，代价只是一发 GET）。
+    // 「这张订单还活着」本来就是一个会到期的结论，只能每次回来重新问。
+    // 同一张订单在途时由 `_verifyingOrderId` 挡住，不会连打两发。
+    if (this._createdOrderId && this._identityUsable()) this._verifyCreatedOrder(this._createdOrderId)
     // 切后台会作废在途的报价。回来后若还停在「正在核价」**且那次确实已经作废**，
     // 才重发；否则页面会永远显示核价中，而其实一个请求都没有在跑。
     //
@@ -176,7 +208,12 @@ Page({
    */
   _resetForIdentity() {
     this._createdOrderId = null
-    this.setData({ submitting: false, agreedToTerms: false })
+    this._submitAttempt = null
+    this._verifyingOrderId = ''
+    this._needsFreshKey = false
+    this._serverLostOrder = false
+    this._reconciling = false
+    this.setData({ submitting: false, agreedToTerms: false, canStartNewOrder: false })
   },
 
   /**
@@ -196,6 +233,7 @@ Page({
       quoteAmountText: '',
       quotePages: 0,
       quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '',
+      canStartNewOrder: false,
       submitErrorTitle: '', submitErrorText: '', submitRecover: '',
       submitting: false,
     })
@@ -261,7 +299,221 @@ Page({
         duplexLabel: packageData.duplex === 'double' ? '双面' : '单面',
       },
     })
+    // 先看本机记不记得这一份材料包已经建成过一张单，再决定要不要核价。
+    // 顺序不能反：`_loadQuote()` 一旦把 quoteState 打成 ready，「确认下单」就亮了，
+    // 而此刻我们还不知道服务端那边是不是已经有一张同样的订单。
+    this._restoreCreatedOrder()
     this._loadQuote()
+  },
+
+  /**
+   * 建单载荷。**这是它唯一的构造点** —— 幂等指纹算的和 POST 发出去的必须是同一个对象。
+   * 两处各拼一份，迟早会分叉成「按一种参数算指纹、按另一种参数下单」：本地以为没变而
+   * 服务端算出另一个指纹 → 409；或者反过来白铸一个新键 → 第二张订单。
+   *
+   * 载荷形状仍然只有 fileId：服务端 `CreatePackageOrderDto` 是白名单校验，多一个字段
+   * 整单 400；页数与金额由服务端查证，前端传值不作为事实。
+   */
+  _orderPayload() {
+    const packageData = this._packageData
+    const storeData = this._storeData
+    if (!packageData || !storeData || !storeData.id) return null
+    const files = this.data.files.map((f) => ({ fileId: f.fileId }))
+    if (!files.length || files.some((f) => !f.fileId)) return null
+    return {
+      terminalId: storeData.id,
+      files,
+      // **与报价逐字同源**：同一对 pkg.toWire* 函数。两条链各写一份映射，
+      // 迟早会出现"按一种参数报价、按另一种参数计价"。
+      params: {
+        colorMode: pkg.toWireColorMode(packageData.colorMode),
+        duplex: pkg.toWireDuplex(packageData.duplex),
+        copies: packageData.copies || 1,
+      },
+    }
+  },
+
+  /**
+   * 重进本页时恢复「这一单已经建成」。
+   *
+   * 触发它的是三种真实处境：上一次 200 回来时跳转失败、小程序被系统回收后重进、
+   * 以及扫码 / 分享跳走再回来。三种的共同点是**服务端那张订单已经存在**，而页面自己
+   * 什么都不记得了 —— 不恢复就会再提交一次，而那一次带着同一个键过去只会回放原单，
+   * 用户却会一直停在一个"看起来没下成"的页面上反复点。
+   *
+   * 只读**当前这位**的记录：findRecord 要求账号逐字相等且是确定的会员键。
+   */
+  _restoreCreatedOrder() {
+    if (this._createdOrderId || this._serverLostOrder) return
+    const account = this._identityKey()
+    if (!isMemberIdentity(account)) return
+    const payload = this._orderPayload()
+    if (!payload) return
+    const record = idem.findRecord(account, idem.fingerprintOf(payload))
+    if (!record || !record.orderId) return
+    // **先锁再核**：核对期间一次 POST 都不许发 —— 这一刻我们恰恰还不知道那张订单
+    // 是不是活的，放开按钮就是在不确定时多建一张。
+    this._createdOrderId = record.orderId
+    this._lockAfterCreated(record.orderId)
+    this._verifyCreatedOrder(record.orderId)
+  },
+
+  /**
+   * 这一发核对的回调，还归不归**发起它的那一位**管。成功与失败两条回调共用它 ——
+   * 两边各写一套判据，迟早会分叉成"失败认得出会话过期、成功认不出"。
+   *
+   * **不能只按 `_sameIdentity` 判**。这一发是 `needAuth:true`，而 enduser JWT 只签
+   * 30 分钟：`auth.getToken()` 到点时先 `clearSession()` 再返回 null，身份于是从
+   * `'u:<id>'` 静默掉成 `''`（`utils/request.js` 补签失败时调的 `auth.logout()` 也一样），
+   * 全程没有任何生命周期回调。这不是"换了人接管了页面"，是这台设备自己退出了登录，
+   * 这一发仍然属于发起它的那一位。真正"换了人"（对方登录成一个**不同且可用**的会员
+   * 身份）才必须原样退出，半个字都不写、一步都不跳。
+   *
+   * `_createdOrderId !== orderId` 那一条管的是另一件事：本页当前锁的已经不是这张订单了
+   *（被 404 解锁、被 startNewOrder 放掉、或被换人复位），这条响应已经没有归属。
+   */
+  _ownsVerify(token, orderId) {
+    if (this._createdOrderId !== orderId) return false
+    return this._sameIdentity(token) || !this._identityUsable()
+  },
+
+  /**
+   * 向服务端核一次「那张已建成的订单**现在**怎么样了」，判据只认服务端。
+   *
+   * 走既有的 `GET /orders/package/:id`（requireOwned：非本人 404、未登录 401），
+   * **不信任任何经 URL 传进来的到机码或金额** —— 那条路一张构造出来的链接就能伪造。
+   *
+   * 200 回来之后**必须看状态再决定去哪**，不能一律跳到机码页。本机那条记录活 7 天，
+   * 而服务端的幂等键是**永久**挂在那张 Order 行上的（`@@unique(endUserId, idempotencyKey)`，
+   * 没有过期清理）。这 7 天里那张订单完全可能已经打完、打印失败、被终止、被取消，
+   * 或者到机码已经过期 —— 继续拿同一个键去 POST 只会一遍遍回放那张作废的订单。
+   * 上一版无条件 `redirectTo` 还会顺手做两件更糟的事：把草稿删掉、并在跳转成功回调里
+   * 把本机记录一起清掉，于是用户落在一张打不出东西的到机码页上，材料包也没了。
+   *
+   *   - **终态**（服务端已证明它再也不会出纸，判据见 pkg.terminalPackageReason）
+   *     → 不跳转、不删草稿、不动记录，把原因写在屏幕上，并给出一个**由用户自己按**的
+   *       「重新下单」；页面自己绝不换键（那等于替用户做了一次下单决定）。
+   *   - **还活着 / 正在履约**（待到机、已核销、排队出纸，以及任何还看不懂的状态）
+   *     → 送到机码页，那里会忠实显示服务端给的状态；**不再 POST 第二次**。
+   *   - 服务端明确说本人没有这张订单（404） → 那个 orderId 再也换不出东西，解开锁，
+   *     让用户可以用**同一个键**重新提交（服务端查不到该键就会正常建一张新单）。
+   *   - 查不出来（网络 / 401 / 5xx） → **继续锁着**。查询失败证明不了任何事，
+   *     而这里只要放开一格，代价就是同一份材料包的第二张订单、第二次收款。
+   */
+  _verifyCreatedOrder(orderId) {
+    if (!orderId || this._verifyingOrderId === orderId) return
+    // 账号与指纹在**发起这一发之前**取定：回调那一刻页面可能已经换人，而这条记录
+    // 属于发起时的那一位。拿回调时的身份去清记录，清掉的会是另一个人的那一格。
+    const account = this._identityKey()
+    const payload = this._orderPayload()
+    const fingerprint = payload ? idem.fingerprintOf(payload) : ''
+    this._verifyingOrderId = orderId
+    const token = this._guard.issue('restore')
+    api.getPackageOrder(orderId)
+      .then((order) => {
+        // **无论这条响应归谁，这一发都已经落地了**：`_verifyingOrderId` 记的是
+        // "这张订单有一发在飞"，那件事此刻已经不成立。放在归属判定之前无条件释放，
+        // 否则换人 / 会话过期那两条路会把它永久钉在这个 orderId 上，之后每一次
+        // 重新核对（显式重试、登录回来、onShow 复位后重建）都会在函数第一行被吞掉。
+        if (this._verifyingOrderId === orderId) this._verifyingOrderId = ''
+        if (!this._ownsVerify(token, orderId)) return
+        // 归属还是我们，但这台设备已经登录不了了：**不跳转**。到机码页同样要登录，
+        // 跳过去只会得到一页 401；而这一刻屏幕上还挂着上一位的订单锁。
+        if (!this._identityUsable()) { this._lockAfterCreatedLoginExpired(); return }
+        const terminalReason = pkg.terminalPackageReason(order)
+        if (terminalReason) { this._lockAfterCreatedTerminal(orderId, terminalReason); return }
+        // 草稿已被这张订单消费掉，清干净再跳：留着它，用户从到机码页回到本页还能
+        // 再下一单，而那一单是真的第二张（记录已随跳转成功清掉，键也换新了）。
+        wx.removeStorageSync('temp_package_data')
+        wx.removeStorageSync('temp_selected_store')
+        wx.redirectTo({
+          url: '/pages/package-code/package-code?orderId=' + encodeURIComponent(orderId),
+          success: () => this._forgetIdempotencyRecord(account, fingerprint),
+          fail: () => this._lockAfterCreated(orderId),
+        })
+      })
+      .catch((err) => {
+        // 与成功那一路**逐字同一套顺序**：先无条件释放在途标记，再判归属。
+        if (this._verifyingOrderId === orderId) this._verifyingOrderId = ''
+        if (!this._ownsVerify(token, orderId)) return
+        if (err && err.statusCode === 404 && err.code === 'PACKAGE_ORDER_NOT_FOUND') {
+          // **本机那条记录里的键留着不动。** 它现在没有绑住任何订单，下一次同参数提交
+          // 带着它过去，服务端按 (endUserId, key) 查不到就会正常建一张新单 —— 而不是
+          // 回放。清掉键才会多出第二张（新键 + 服务端那张万一还在）。
+          this._createdOrderId = null
+          this._serverLostOrder = true
+          this._loadQuote()
+          return
+        }
+        if ((err && err.statusCode === 401) || !this._identityUsable()) {
+          this._lockAfterCreatedLoginExpired()
+          return
+        }
+        // 其余（网络 / 5xx）一律保持锁定：_lockAfterCreated 已经把「订单已创建」
+        // 写在屏幕上了；_verifyingOrderId 已经释放，后续显式重试或身份变化触发的
+        // 重新核对不会被"上一次还没结束"挡住。
+      })
+  },
+
+  /**
+   * 跳走之后丢掉本机那条幂等记录。**刻意不看返回值**：到这一行页面已经在跳走了，
+   * 写任何错误态都只是写给一个看不见的页面。清不掉的后果也已经被别处兜住 ——
+   * 那条记录里的 orderId 指向一张真实存在的订单，用户带同一份材料包回来时会被
+   * `_restoreCreatedOrder` 锁住并向服务端核一次，只多一次核对，不会多一张订单。
+   */
+  _forgetIdempotencyRecord(account, fingerprint) {
+    if (!isMemberIdentity(account) || !fingerprint) return
+    idem.clearRecord(account, fingerprint)
+  },
+
+  /**
+   * 向服务端核对本机留下的那些下单记录 —— **「名额满了」那条死路唯一的出口**。
+   *
+   * 本机那张表拒绝按任何本地依据淘汰未落定的记录（清错一条 = 用户被收两次钱），于是
+   * 20 条攒满之后这台设备就再也下不了单，而那 20 条里绝大多数其实根本没在服务端建成
+   * 任何订单。能推翻这一点的只有服务端：它会**先立墓碑再回答** `not_created`，
+   * 此后带着那个键的 POST 一律 409，再也建不出订单 —— 只有这一档准清。
+   * 判据、哪一档准清、怎么写回本机，全在 utils/order-submission-reconcile.js。
+   *
+   * 这一发一律 `force: true`：用户刚按过「确认下单」并且被拦住了，必须给他当下的真值，
+   * 不能因为 30 秒冷却就回一句「暂时没有可核对的提交」。
+   */
+  _reconcileSubmissions() {
+    const account = this._identityKey()
+    if (!isMemberIdentity(account)) { this.toLogin(); return }
+    if (this._reconciling) return
+    this._reconciling = true
+    this.setData({
+      submitting: false,
+      submitErrorTitle: '正在核对本机的下单记录…',
+      submitErrorText: '正在向服务端逐个确认之前那几次提交到底有没有建成订单。这一步不会创建任何新订单。',
+      submitRecover: '',
+    })
+    const payload = this._orderPayload()
+    const fingerprint = payload ? idem.fingerprintOf(payload) : ''
+    reconcileEngine
+      .reconcile(idem.submissionPort, account, (keys) => api.resolveOrderSubmissions(keys), { force: true })
+      .then((result) => {
+        this._reconciling = false
+        // 换人了就什么都不写：这批记录属于发起这一发的那位，而屏幕此刻可能已经是另一位的。
+        if (this._identityKey() !== account) return
+        // 服务端说**这一份材料包**的那次提交其实已经建成了订单：把本页锁到那张订单上，
+        // 走既有的「查一次原单」路径。**必须逐字比指纹** —— orders 里完全可能是别的
+        // 材料包那几格，拿它锁本页就是把一张不相干的订单说成这一单。
+        const mine = (result.orders || []).find((row) => row.adopted && row.fingerprint === fingerprint)
+        if (mine) {
+          this._createdOrderId = mine.orderId
+          this._lockAfterCreated(mine.orderId)
+          this._verifyCreatedOrder(mine.orderId)
+          return
+        }
+        const shown = reconcileEngine.describeReconcileResult(result, { submitLabel: '确认下单' })
+        this.setData({
+          submitErrorTitle: shown.title,
+          submitErrorText: shown.text,
+          submitRecover: shown.recover,
+        })
+      })
   },
 
   /**
@@ -271,7 +523,8 @@ Page({
    */
   _loadQuote() {
     // 订单已经建出来了就不再核价：留着一条会重新变 ready 的路径，等于把
-    // 「确认下单」按钮再点亮一次，而再点一次就是第二张订单（服务端没有幂等键）。
+    // 「确认下单」按钮再点亮一次。服务端同键会回放原单，但本页会把一张已存在的
+    // 订单说成刚建成。
     if (this._createdOrderId) return
     if (!this._identityUsable()) {
       this.setData({
@@ -288,7 +541,7 @@ Page({
     const token = this._guard.issue('quote')
     // 留痕给 onShow 判「这次报价是不是已经作废」，避免首次进入重复报价。
     this._quoteToken = token
-    this.setData({ quoteState: 'loading', quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '' })
+    this.setData({ quoteState: 'loading', quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '', canStartNewOrder: false })
     api.quotePackageOrder({
       terminalId: storeData.id,
       files: this.data.files.map((f) => ({ fileId: f.fileId })),
@@ -356,6 +609,15 @@ Page({
   /** 报价 / 提交失败后的恢复动作，按服务端错误码分流，不给「请重试」一条死路。 */
   recover(e) {
     const target = e.currentTarget.dataset.recover
+    if (target === 'reorder') return this.startNewOrder()
+    // 再核对一次（服务端还在处理 / 上一次没问成）。
+    if (target === 'reconcile') return this._reconcileSubmissions()
+    // 名额已经腾出来了，下一步就是再提交一次 —— 而那必须是用户自己按下去的动作，
+    // 所以这个按钮写着「确认下单」，做的也正是「确认下单」那件事。
+    if (target === 'resubmit') {
+      this.setData({ submitErrorTitle: '', submitErrorText: '', submitRecover: '' })
+      return this.submitOrder()
+    }
     if (target === 'login') return this.toLogin()
     if (target === 'files' || target === 'privacy') return this.backToFiles()
     if (target === 'store') return this.backToStore()
@@ -374,8 +636,8 @@ Page({
   /**
    * 订单已经建出来之后的统一出口。
    *
-   * 这条路径存在的唯一理由：**再 POST 一次就是第二张订单**（服务端 CreatePackageOrder
-   * 没有幂等键）。所以一旦拿到 orderId，本页就不再是一个可以下单的页面 ——
+   * 这条路径存在的唯一理由：再 POST 一次会按同键回放原单，页面却会把一张已存在的
+   * 订单说成刚建成。所以一旦拿到 orderId，本页就不再是一个可以下单的页面 ——
    * 把报价打成 error（按钮随之变灰），并把恢复动作指到「我的 · 打印订单」，
    * 那里的材料包分区能找回这张订单、点进去就是到机码页。
    */
@@ -387,10 +649,155 @@ Page({
       quoteErrorTitle: '订单已创建，请不要重复下单',
       quoteErrorText: '材料包订单已经建好了，只是这一步没能自动跳转。到「我的 · 打印订单」的材料包分区就能找回它，点进去即是到机码。',
       quoteRecover: 'orders',
+      // 默认关掉「重新下单」。所有换文案的锁都从这条出口走，于是这个开关有且只有一个
+      // 默认值：**关**。只有服务端已经证明原单走到终态的那一支才会把它打开。
+      canStartNewOrder: false,
       submitErrorTitle: '',
       submitErrorText: '',
       submitRecover: '',
     })
+  },
+
+  /**
+   * 同一把锁，只换一句解释：订单建成了，但 orderId 没能落进本机记录。
+   *
+   * 为什么不给 `_lockAfterCreated` 加一个参数：那条出口是这一页最要紧的一处不变量，
+   * 门禁按 `_lockAfterCreated(orderId)` 的形状钉着它。这里复用它再改两行文案，
+   * 锁的语义就只有一个来源，不会出现"两条锁路径其中一条忘了设 _createdOrderId"。
+   *
+   * 文案必须说实话：默认那句写的是"只是没能自动跳转"，而这一支真正发生的是
+   * **本机存不下这张订单的线索**，用户在这台手机上再也找不回它 —— 只能去订单列表。
+   */
+  _lockAfterCreatedUnsaved(orderId) {
+    this._lockAfterCreated(orderId)
+    this.setData({
+      quoteErrorText: '材料包订单已经建好了，但这台手机没能把它记下来（存储可能已满或被系统清理），所以没有自动跳转。请到「我的 · 打印订单」的材料包分区找回这张订单，点进去即是到机码；不要重复提交。',
+    })
+  },
+
+  /**
+   * 同一把锁，只换一句解释：核对不了，因为这台设备的登录状态没了。
+   *
+   * 订单锁与幂等键**原样保留** —— 核不上证明不了订单不存在。不能让用户停在默认那句
+   *「订单已创建，请不要重复下单」：它的恢复动作是去订单列表，而订单列表同样需要登录，
+   * 等于把人堵死在一个进不去的出口上。这里给一条走得通的：去登录。登录回来 onShow
+   * 会走身份变化那条分支（_resetForIdentity → _loadOrderData → _restoreCreatedOrder），
+   * 重新锁住并重新核对这张订单。
+   *
+   * **不传 orderId、也不动 `_createdOrderId`**：这一支唯一确定的事实就是"现在核不了"，
+   * 而 `_createdOrderId` 此刻已经是对的（`_ownsVerify` 刚刚逐字核过它等于这张订单）。
+   */
+  _lockAfterCreatedLoginExpired() {
+    this.setData({
+      submitting: false,
+      quoteState: 'error',
+      quoteErrorTitle: '登录已失效',
+      quoteErrorText: '订单可能已经建好，但当前登录状态已过期，无法核对。请重新登录后再查看。',
+      quoteRecover: 'login',
+      canStartNewOrder: false,
+    })
+  },
+
+  /**
+   * 服务端已经证明那张订单**再也不会出纸了**（打完 / 打印失败 / 已终止 / 已取消 /
+   * 到机码已过期，判据见 pkg.terminalPackageReason）。
+   *
+   * 这是本页唯一一条会把「重新下单」点亮的路径，而它仍然**只是点亮按钮**：
+   * 换键、清记录、重新报价一律等用户自己按下去（startNewOrder）。页面不自动换键 ——
+   * 那等于替用户做了一次下单决定，而他完全可能只是想回头找那张旧订单。
+   *
+   * 草稿**不删**、记录**不清**、一步都不跳：草稿是他重新下单要用的东西，记录里那个
+   * orderId 是他回「我的 · 打印订单」核对旧单的线索。上一版无条件跳到机码页，恰好
+   * 把这两样一起弄没了。
+   */
+  _lockAfterCreatedTerminal(orderId, reason) {
+    this._lockAfterCreated(orderId)
+    this.setData({
+      quoteErrorTitle: reason,
+      quoteErrorText: '这一份材料包可以重新下一单：点下面的「重新下单」，本机会换一个新的下单标识重新报价。原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。',
+      quoteRecover: 'reorder',
+      canStartNewOrder: true,
+    })
+  },
+
+  /**
+   * 重新下一单。**只有服务端已经证明原单走到终态时才可达**（canStartNewOrder）。
+   *
+   * 做的事只有一件：把本机那条**恰好这一格**的恢复记录丢掉，于是下一次 submitOrder
+   * 的 `ensureKey` 会铸一个新的幂等键 —— 服务端因此认得出这是一次**新的下单意图**，
+   * 而不是上一次的重试（同一个键只会一遍遍回放那张已经作废的订单）。
+   *
+   * **而"丢掉了"必须由 clearRecord 读回来证明，不能假设。** `storage.set` 在"没抛异常
+   * 也没写进去"（存储满 / 被系统回收 / 被隐私策略拦截）时同样返回 true；照着"清掉了"
+   * 的假设解锁，下一次 `ensureKey` 会命中那条还在的记录、复用**旧键**，服务端按
+   * `(endUserId, key)` 回放的正是那张作废的订单。用户面对一个能按的按钮、一句
+   *「订单已创建」，而他要的那份材料永远打不出来。清不掉就保持锁定，并把"为什么"和
+   * "能做什么"一起写在屏幕上；按钮留着（canStartNewOrder 不动）—— 存储压力常是一过性的，
+   * "再点一次"正是这条错误对应的可执行下一步。
+   *
+   * 清的是 `(当前账号, 当前载荷指纹)` 这一格，不是整张表：别的材料包、别的账号那几格
+   * 每一条都可能正绑着一次"响应丢在路上"的提交（见 package-order-idempotency.js 顶部
+   * 那条不变量）。
+   */
+  startNewOrder() {
+    if (!this.data.canStartNewOrder) return
+    const account = this._identityKey()
+    if (!isMemberIdentity(account)) { this.toLogin(); return }
+    const payload = this._orderPayload()
+    const fingerprint = payload ? idem.fingerprintOf(payload) : ''
+    // 草稿没了就没有"这一份材料包"可言，也算不出该清哪一格：回第一步，不碰记录。
+    if (!fingerprint) { this._clearDraftView(); return }
+    if (!idem.clearRecord(account, fingerprint)) {
+      this.setData({
+        quoteErrorText: '本机没能清掉上一张订单的下单标识（手机存储可能已满或被系统清理），为避免重复下单，这一步先锁着。请清理一些存储空间后再点一次「重新下单」；原来那张订单仍可在「我的 · 打印订单」里查看。',
+      })
+      return
+    }
+    this._createdOrderId = null
+    this._submitAttempt = null
+    this._verifyingOrderId = ''
+    this._serverLostOrder = false
+    this._needsFreshKey = false
+    this.setData({
+      submitting: false,
+      canStartNewOrder: false,
+      quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '',
+      submitErrorTitle: '', submitErrorText: '', submitRecover: '',
+    })
+    // 重新报价：金额与页数一律现问服务端，不沿用上一张订单的任何数字。
+    this._loadQuote()
+  },
+
+  /**
+   * 这一发的回调回来时，页面上的身份已经不是发起它的那一位了：收尾**这一次提交尝试**
+   * 本地的两把锁，然后什么都不做。
+   *
+   * 触发它的不只是"真的换了人"。更常见的是**同一位的会话在 POST 在途期间到点**：
+   * enduser JWT 只签 30 分钟，`auth.getToken()` 过期时会先 `clearSession()` 再返回
+   * null，于是 `_identityKey()` 从 `'u:A'` 静默掉成 `''` —— 全程没有任何生命周期回调
+   * （补签失败时 `utils/request.js` 调的 `auth.logout()` 同样没有）。
+   *
+   * 只结清本地这一发的状态：`attempt.settled` 与（若它还是"当前这一次"）`submitting`
+   * 按钮锁。**绝不碰订单数据、绝不跳转、绝不清幂等记录** —— 那条记录要么已经落进了
+   * 发起者自己的账号名下（`rememberOrderId` 认的是 `attempt.account`，不是"当前页面
+   * 现在是谁"），要么这一发根本没建成任何订单。两种情况下它都必须原样留着：那是
+   * "响应可能丢在路上"时唯一还能避免第二张订单的东西。
+   *
+   * 不结清的代价很具体：`submitting` 留 `true`，屏幕就永远停在「提交中…」，而没有
+   * 任何请求在跑 —— `submitOrder()` 第一行 `if (this.data.submitting) return` 会把
+   * 之后每一次点击原样吞掉，页面再也走不动。`attempt.settled` 留 `false` 则是第二道
+   * 同样的死结：即使别的路径把 `submitting` 写回 false，
+   * `if (this._submitAttempt && !this._submitAttempt.settled) return` 仍会吞掉点击。
+   *
+   * 只在 `attempt` 仍是"当前这一次"时才动 `_submitAttempt` / `submitting`：
+   * 如果它已经被后面某次调用替换掉，说明按钮早就不归它管了，这里不能覆盖新状态。
+   */
+  _releaseStaleAttempt(attempt) {
+    attempt.settled = true
+    if (this._submitAttempt === attempt) {
+      this._submitAttempt = null
+      this.setData({ submitting: false })
+    }
   },
 
   submitOrder() {
@@ -415,29 +822,81 @@ Page({
       return
     }
 
-    const files = this.data.files.map((f) => ({ fileId: f.fileId }))
-    if (!files.length || files.some((f) => !f.fileId)) {
+    const payload = this._orderPayload()
+    const account = this._identityKey()
+    const fingerprint = payload ? idem.fingerprintOf(payload) : ''
+    if (!payload || !fingerprint) {
       this.setData({ draftState: 'missing' })
       return
     }
+    // 本机已经记着这一份材料包建成过一张单：**一个 POST 都不发**，改去核对那一张。
+    // 这一条排在最前面（且是同步读），因为再 POST 一次的代价不是"多一个请求"——
+    // 服务端会按同一个键回放，而页面会在用户眼前把一张旧订单说成刚建成的。
+    const known = idem.findRecord(account, fingerprint)
+    if (known && known.orderId && !this._serverLostOrder) {
+      this._createdOrderId = known.orderId
+      this._lockAfterCreated(known.orderId)
+      this._verifyCreatedOrder(known.orderId)
+      return
+    }
+    // 服务端说过这个键配的是另一组参数（409 IDEMPOTENCY_KEY_REUSED）。**换新键之前
+    // 必须先把旧记录清掉，而且读回来确认真的清掉了** —— 清不掉就会复用旧键，
+    // 下一次仍然 409；而"以为清掉了就换新键"更糟：旧键那张单还在，新键又建一张。
+    if (this._needsFreshKey) {
+      if (!idem.clearRecord(account, fingerprint)) {
+        this.setData({
+          submitting: false,
+          submitErrorTitle: '本机没能清掉上一次的下单标识',
+          submitErrorText: '手机存储可能已满或被系统清理。为避免重复下单，这一步先锁着。请清理一些存储空间后再点一次「确认下单」；已经建成的订单可到「我的 · 打印订单」查看。',
+          submitRecover: 'orders',
+        })
+        return
+      }
+      this._needsFreshKey = false
+    }
+    // 上一次尝试还没落定：POST 可能已经到了服务端。这一条不能只靠 data.submitting ——
+    // 它是 setData 出去的，任何一条路径把它写回 false 按钮就又能按了。
+    if (this._submitAttempt && !this._submitAttempt.settled) return
 
     const token = this._guard.issue('submit')
+    // 尝试锁必须**同步**设上：铸幂等键要等 wx.getRandomValues 的回调，
+    // 这中间用户完全来得及再点一次；锁排在异步之后就等于没锁。
+    const attempt = { account, fingerprint, key: '', settled: false }
+    this._submitAttempt = attempt
     this.setData({ submitting: true, submitErrorTitle: '', submitErrorText: '', submitRecover: '' })
     wx.showLoading({ title: '创建订单中…', mask: true })
-    api.createPackageOrder({
-      terminalId: this._storeData.id,
-      files,
-      // **与报价逐字同源**：同一对 pkg.toWire* 函数。两条链各写一份映射，
-      // 迟早会出现"按一种参数报价、按另一种参数计价"。
-      params: {
-        colorMode: pkg.toWireColorMode(this._packageData.colorMode),
-        duplex: pkg.toWireDuplex(this._packageData.duplex),
-        copies: this._packageData.copies || 1,
-      },
-    })
+    // **先拿键、先落盘，然后才 POST。** 顺序反过来（先发请求、成功了再记键）会把
+    // "响应丢在路上"这一种原样留着，而那正是最需要幂等键的时刻。落不住就 reject，
+    // 一个 POST 都不发 —— 键没落住的订单一旦建成就再也找不回来了。
+    idem.ensureKey(account, fingerprint)
+      .then((record) => {
+        attempt.key = record.key
+        // **出门之前先在本机把这个键标成"已提交"，标不住就一个 POST 都不发。**
+        //
+        // 本机那张表要淘汰"铸出来但从没用过"的键（不淘汰的话，一次失败的提交会把未落定
+        // 名额永久占住），而"从没用过"只能由本机自己记下来——服务端不会告诉我们这件事，
+        // 它那一侧的 (endUserId, key) 是永久的。标记落住之后这条记录就退出按本机时间的
+        // 淘汰：设备时钟往前跳、或恰好卡在 7 天边界上，都不会再把一个**可能已经到过
+        // 服务端**的键忘掉。忘掉它的代价很具体：下一次同参数提交铸新键，服务端按新键
+        // 正常建第二张订单、再收一次钱。
+        //
+        // 标不住时停在这里（用户重试一次）比发出去（可能第二张订单）便宜得多。
+        if (!idem.markSubmitted(account, fingerprint, record.key)) {
+          throw new Error(idem.SUBMIT_MARK_FAILED_MESSAGE)
+        }
+        return api.createPackageOrder(payload, { idempotencyKey: record.key })
+      })
       .then((order) => {
         wx.hideLoading()
         const orderId = (order && order.orderId) || ''
+        // **先把 orderId 落进"发起这次提交的那位"的记录，再判当前页面还接不接收它。**
+        // 两件事的对象根本不同：记录属于 attempt.account，而页面此刻可能已经换人了。
+        // 先判页面再落盘的话，"A 的回调晚于换人"会直接 return —— 服务端那张订单已经
+        // 建成，A 手上却一条线索都没有，A 回来只会再提交一次。
+        // **落盘失败必须当真**：rememberOrderId 写完把 orderId 一起读回来核对，
+        // 核不上返回 null —— 那时订单是真的，而本机已经指不回它了。
+        const recoveryUnsaved = !!orderId
+          && !idem.rememberOrderId(attempt.account, attempt.fingerprint, attempt.key, orderId)
         if (!orderId) throw new Error('服务端未返回订单号')
         // 换了人：**不碰当前这位的任何东西** —— storage 不动，`_createdOrderId` 也不设。
         //
@@ -445,15 +904,44 @@ Page({
         // ① B 的页面被 A 的订单永久锁死（见 _resetForIdentity 里对这个字段的说明）；
         // ② 下面那两个 removeStorageSync 会删掉 B 自己刚做好的草稿。
         // 上一位的订单不会丢：它已落库，本人可从「我的 · 打印订单」材料包分区找回。
-        if (!this._sameIdentity(token)) return
+        //
+        // **结清而不是原样 return**：原样 return 会把 `submitting` 永久留成 true，
+        // 屏幕停在「提交中…」且再也按不动（见 _releaseStaleAttempt）。结清只松开
+        // 本地这两把锁，一个字节的订单数据都不写。
+        if (!this._sameIdentity(token)) { this._releaseStaleAttempt(attempt); return }
         // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
         // 放在 redirectTo 之前，是为了让下面 catch 里那条「跳转同步抛」的兜底能认出它。
         this._createdOrderId = orderId
+        attempt.settled = true
+        // **这一发回来的不一定是"刚建成"的订单。** 同一个键在服务端是永久挂在那张 Order
+        // 行上的（`@@unique(endUserId, idempotencyKey)`，没有过期清理），而本机这一格只要
+        // 还没落定 orderId（上一次的响应丢在路上、进程被杀在 POST 与响应之间、或
+        // rememberOrderId 写失败过一次），下一次提交就会带着**同一个键**过去，服务端按
+        // 同键回放原单。那张原单完全可能早已打完 / 打印失败 / 被终止 / 被取消，或者到机码
+        // 已经过期 —— 到机码窗口取 `min(now + 7 天, 文件有效期)`，比本机记录的 7 天 TTL
+        // 更窄，所以"本机的键还在、服务端那张订单已经作废"这一格是真的走得到的。
+        //
+        // 判据与恢复路径（_verifyCreatedOrder）共用**同一个** pkg.terminalPackageReason，
+        // 不在这里另认一套状态字段（两份状态表只会改一边）。位置也必须和那边一致：
+        // **排在删草稿与跳转之前**。排在后面等于草稿和幂等记录都已经没了才发现它是终态 ——
+        // 用户落在一张打不出东西的到机码页上，手里那份材料包也一起没了。
+        //
+        // `recoveryUnsaved` 仍然优先（下面那一支）：它说的是"本机连这张订单的 orderId 都
+        // 没存住"，而终态这一支要交付的恰恰是"草稿与记录都留着、由用户自己按重新下单"。
+        // 前提已经不成立时只能走更保守的那一个，不在存储正在失败的时候点亮一个会铸新键的按钮。
+        const terminalReason = recoveryUnsaved ? '' : pkg.terminalPackageReason(order)
+        // 终态：草稿**不删**、记录**不清**、一步都不跳，只把原因写在屏幕上，并点亮一个由
+        // 用户自己按的「重新下单」—— 换键是一次下单决定，页面不替他做。
+        if (terminalReason) { this._lockAfterCreatedTerminal(orderId, terminalReason); return }
         // 同一个人：这份草稿已被这张订单消费掉，清干净。
         // 清理放在跳转**之前**：原先放在 redirectTo 的 success 回调里，跳转一旦没触发
         // （异常路径、页面已被替换），草稿就永远留在本机，下一位打开确认页还能看到。
         wx.removeStorageSync('temp_package_data')
         wx.removeStorageSync('temp_selected_store')
+        // orderId 没能落进本机记录。**这一支不跳转、不解锁、不重试**：跳转成功的回调会
+        // 把整条记录清掉，而此刻记录里剩下的正是唯一还有用的东西 —— 那个幂等键。
+        // 清掉它，用户带同一份材料包回来时会铸一个新键，服务端于是再建一张、再收一次钱。
+        if (recoveryUnsaved) { this._lockAfterCreatedUnsaved(orderId); return }
         // 只把 orderId 交给下一页。到机码 / 金额 / 有效期一律由 package-code 自己带登录态
         // 向服务端查（GET /orders/package/:id 有 requireOwned 归属校验），不经 URL 传递 ——
         // 否则一条构造出来的链接或一张转发出去的卡片就能渲染出一张带到机码的「创建成功」页。
@@ -462,6 +950,9 @@ Page({
         // 用户只会以为没下成，然后再点一次。
         wx.redirectTo({
           url: '/pages/package-code/package-code?orderId=' + encodeURIComponent(orderId),
+          // **确实跳走了才清记录。** 拿到 200 就清的话，跳转失败会把唯一能找回这张
+          // 订单的线索一起丢掉，而页面还留在原地 —— 用户只会再点一次。
+          success: () => this._forgetIdempotencyRecord(attempt.account, attempt.fingerprint),
           fail: () => this._lockAfterCreated(orderId),
         })
       })
@@ -470,10 +961,53 @@ Page({
         // **先判身份再谈锁**。顺序反过来就是一个新缺陷：换了人之后迟到的那条失败
         // （或"订单已建成但跳转抛错"）会把 `_lockAfterCreated` 打在 B 的页面上，
         // 让 B 看到一张他没下过的订单，并且再也下不了自己的单。
-        if (!this._sameIdentity(token)) return
+        //
+        // 同上一处：结清而不是原样 return，否则「提交中…」会永远留在屏幕上。
+        if (!this._sameIdentity(token)) { this._releaseStaleAttempt(attempt); return }
         // 订单已经建成、只是后续动作抛错（例如 redirectTo 同步抛）：
         // 同样不能当成"下单失败"让用户重来。
         if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }
+        // 这一次确实没建成：解开尝试锁，让用户可以重试 —— **带着同一个键**。
+        // 网络失败 / 5xx / 补签失败一律不清记录：那个键此刻可能正绑着一张已经建成、
+        // 只是响应丢在路上的订单，清掉它下一次就会铸新键、再建一张。
+        attempt.settled = true
+        this._submitAttempt = null
+        // 本机未落定名额满了（ensureKey 的 fail-closed，一个 POST 都没发出去）。
+        // 这不是一条该让用户读的错误 —— 它唯一的解法就是去问服务端那几个键落成了什么，
+        // 所以直接把那一步做掉，而不是把死路原样显示给他。
+        if (err && err.message === idem.PENDING_FULL_MESSAGE) { this._reconcileSubmissions(); return }
+        // 409 有三种成因，处置完全相反（见 classifySubmitConflict）。
+        const conflict = reconcileEngine.classifySubmitConflict(err)
+        if (conflict === reconcileEngine.CONFLICT_ABANDONED) {
+          // 服务端已经给这个键立了墓碑：它再也建不出订单，所以本机这一格可以安全地换掉。
+          // **换键这件事仍然走既有的 `_needsFreshKey` 那条路** —— 它会在下一次提交前
+          // 先 `clearRecord` 并**读回来确认真的清掉了**，清不掉就不发 POST。
+          // 在这里直接清一遍等于把那段已经收口过的判断再写一份，两份迟早分叉。
+          this._needsFreshKey = true
+          const shown = reconcileEngine.describeSubmitConflict(conflict, { submitLabel: '确认下单' })
+          this.setData({ submitting: false, submitErrorTitle: shown.title, submitErrorText: shown.text, submitRecover: shown.recover })
+          return
+        }
+        if (conflict === reconcileEngine.CONFLICT_IN_PROGRESS) {
+          // 那次提交正在服务端跑，它完全可能马上就建成一张订单。此刻换键就是第二张订单、
+          // 第二笔钱 —— 记录、键、`_needsFreshKey` 一个字节都不动，只让用户稍后再核对。
+          const shown = reconcileEngine.describeSubmitConflict(conflict, { submitLabel: '确认下单' })
+          this.setData({ submitting: false, submitErrorTitle: shown.title, submitErrorText: shown.text, submitRecover: shown.recover })
+          return
+        }
+        // 服务端说这个键配的是另一组参数（同键不同指纹）。**绝不拿旧键重试** ——
+        // 重试一万次都是同一个 409。也不自动换新键：换键就是再建一张订单，那必须由
+        // 用户自己按下「确认下单」才算数。这里只把状态摆好并说清下一步。
+        if (err && err.statusCode === 409 && err.code === 'IDEMPOTENCY_KEY_REUSED') {
+          this._needsFreshKey = true
+          this.setData({
+            submitting: false,
+            submitErrorTitle: '这次提交的打印参数和上一次对不上',
+            submitErrorText: '本机留着的下单标识是上一次那组参数的，服务端因此拒绝了这次提交（它不会重复建单）。再点一次「确认下单」会换一个新标识重新提交；上一次那张订单如果建成了，可到「我的 · 打印订单」查看。',
+            submitRecover: 'orders',
+          })
+          return
+        }
         const shown = pkg.describePackageError(err, '创建订单失败，请稍后重试。')
         this.setData({
           submitting: false,

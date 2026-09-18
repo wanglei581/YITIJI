@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service'
 // member-print-orders/member-print-order-create.service.ts 各写一份 PICKUP_CODE_LEN=10。
 import { randomPickupCode } from '../common/pickup-code'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
+import { paymentSessionTtlMs } from './payment-session-token'
 import { ONLINE_PAYMENT_CHANNELS, P0A_ALLOWED_PAYMENT_SOURCES, type PaymentChannel } from './payment.types'
 
 /** Order 行类型（从 prisma delegate 推导，避免直接 import 生成 client 类型）。 */
@@ -23,13 +24,94 @@ const PICKUP_MAX_ATTEMPTS = 6
 /** 线上入账时取件窗口已关：渠道钱已到、本单无法出纸，记待退而不转 paid。 */
 export const ONLINE_PAID_PENDING_REFUND_REASON = 'ONLINE_PAID_PENDING_REFUND'
 
-/** 取件窗口已关：过期截止已到，或到机码已被标 expired/cancelled。 */
-export function isPickupWindowClosed(order: {
-  pickupCodeExpiresAt: Date | null
-  pickupStatus: string
-}): boolean {
-  if (order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= new Date()) return true
-  return order.pickupStatus === 'expired' || order.pickupStatus === 'cancelled'
+/**
+ * 一体机现场履约租约：pending→claimed 时写下 `pickupClaimedAt`。
+ * 时钟只看该时间戳，不看新签的 payment-session token（手机 detail 会刷新 token）。
+ *
+ * - claimed + 无任务 + paid：始终 live，允许 release（钱已收，不能靠状态机自动关掉）。
+ * - unpaid/paying：仅当 pickupClaimedAt 存在且仍在 payment-session TTL 内才 live。
+ * - 缺 pickupClaimedAt：不得永久豁免。
+ */
+export function isLiveKioskPickupLease(
+  order: {
+    pickupStatus: string
+    printTaskId?: string | null
+    payStatus?: string | null
+    pickupClaimedAt?: Date | null
+  },
+  now: Date = new Date(),
+): boolean {
+  if (order.pickupStatus !== 'claimed' || order.printTaskId) return false
+  if (order.payStatus === 'paid') return true
+  if (order.payStatus !== 'unpaid' && order.payStatus !== 'paying') return false
+  if (!order.pickupClaimedAt) return false
+  return now.getTime() - order.pickupClaimedAt.getTime() < paymentSessionTtlMs()
+}
+
+/** CAS 条件：claimed 未付/支付中，且租约已过期或从未写下 pickupClaimedAt。 */
+export function claimedUnpaidExpiredLeaseWhere(now: Date = new Date()) {
+  return {
+    pickupStatus: 'claimed' as const,
+    printTaskId: null,
+    payStatus: { in: ['unpaid', 'paying'] },
+    OR: [
+      { pickupClaimedAt: null },
+      { pickupClaimedAt: { lte: new Date(now.getTime() - paymentSessionTtlMs()) } },
+    ],
+  }
+}
+
+export const CLAIMED_UNPAID_LEASE_EXPIRE_DATA = {
+  pickupStatus: 'expired',
+  taskStatus: 'expired',
+  payStatus: 'closed',
+} as const
+
+/**
+ * 线上入账 updateMany 的履约窗口：必须在**写入时**仍可出纸。
+ * 快照判断不够 —— sweeper 可能在 findUnique 与 CAS 之间把单写成 expired+closed，
+ * 而 late 回调的 fromStatuses 含 closed，会把已无法履约的单重新写成 paid。
+ *
+ * - 非 claimed（含默认 none、pending）：无截止（一体机现场单）或 pickupCodeExpiresAt 仍在未来；
+ * - claimed：pickupClaimedAt 必须存在且仍在 payment-session TTL 内（精确边界与 isLive 一致：gt）；
+ * - expired/cancelled 一律排除。
+ */
+export function fulfillablePickupWindowWhere(now: Date = new Date()) {
+  const leaseStartedAfter = new Date(now.getTime() - paymentSessionTtlMs())
+  return {
+    pickupStatus: { notIn: ['expired', 'cancelled'] },
+    OR: [
+      {
+        pickupStatus: { not: 'claimed' },
+        OR: [
+          { pickupCodeExpiresAt: null },
+          { pickupCodeExpiresAt: { gt: now } },
+        ],
+      },
+      {
+        pickupStatus: 'claimed',
+        printTaskId: null,
+        pickupClaimedAt: { gt: leaseStartedAfter },
+      },
+    ],
+  }
+}
+
+/** 取件窗口已关。claimed 只看履约租约本身，过期后不再退回原 pickupCodeExpiresAt。 */
+export function isPickupWindowClosed(
+  order: {
+    pickupCodeExpiresAt: Date | null
+    pickupStatus: string
+    printTaskId?: string | null
+    payStatus?: string | null
+    pickupClaimedAt?: Date | null
+  },
+  now: Date = new Date(),
+): boolean {
+  if (order.pickupStatus === 'expired' || order.pickupStatus === 'cancelled') return true
+  if (isLiveKioskPickupLease(order, now)) return false
+  if (order.pickupStatus === 'claimed') return true
+  return Boolean(order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= now)
 }
 
 /** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。markPaid 的 update data 中唯一带唯一索引的列即 pickupCode。 */
@@ -95,18 +177,20 @@ export class OrderStatusService {
     // 只允许 unpaid → paid；refunded / failed 不可再转 paid。
     if (order.payStatus !== 'unpaid') throw new BadRequestException('ORDER_INVALID_TRANSITION')
 
-    // 取件窗口已关的单不得入账 —— 这是一条资损防线，不是状态洁癖。
+    // 取件窗口已关的**未认领**单不得入账 —— 这是一条资损防线，不是状态洁癖。
     //
     // 场景（2026-09-03 对抗性审查实证）：小程序云打印单 pickupCodeExpiresAt 过期后，
     // 惰性关单只在会员 listCloud 时跑，Admin 订单列表不跑它，于是该单在后台仍显示
     // unpaid、仍出现「确认收款」。现场收了现金标记已付后，用户到机认领时
-    // pickup-order.service.ts:69 判过期，而那里的 payStatus 写的是
-    // `=== 'unpaid' ? 'closed' : payStatus` —— 已 paid 的单保持 paid，同时
+    // pickup-order.service.ts 判过期，而那里的 payStatus 写的是
+    // `unpaid/paying → closed` —— 已 paid 的单保持 paid，同时
     // pickupStatus 变 expired 且 printTaskId 仍为 null，Agent 的 claimableWhere
     // 永远看不到它。结果是钱记下了、纸永远出不来，只能退款重下单。
     //
     // 只拒「有截止时间且已过」：一体机现场单不写 pickupCodeExpiresAt（为 null），
     // 按 null 也拒会误伤现场收款这条主链路。
+    // claimed 短租约除外：认领发生在原到机码截止之前，TTL 内必须还能收款/出纸。
+    // 租约过期的未付 claimed 与未认领过期一样拒绝，避免文件失效很久后仍能入账。
     if (isPickupWindowClosed(order)) {
       throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
     }
@@ -135,7 +219,7 @@ export class OrderStatusService {
       let res: { count: number }
       try {
         res = await this.prisma.order.updateMany({
-          where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set：只在仍为 unpaid 时命中
+          where: { id: orderId, payStatus: 'unpaid', ...fulfillablePickupWindowWhere() },
           data: {
             payStatus: 'paid',
             paymentSource,
@@ -155,6 +239,7 @@ export class OrderStatusService {
         const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
         if (fresh?.payStatus === 'paid' && fresh.paymentSource === paymentSource) return fresh
         if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+        if (fresh && isPickupWindowClosed(fresh)) throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
         throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
       settled = true
@@ -209,7 +294,8 @@ export class OrderStatusService {
       if (order.paymentSource === channel) return order
       throw new BadRequestException('ORDER_ALREADY_PAID')
     }
-    // 取件窗口已关：渠道钱可能已入账，但本单无法出纸。拒绝转 paid，记「已收款待退」。
+    // 取件窗口已关（未认领过期 / expired / cancelled）：渠道钱可能已入账，但本单无法出纸。
+    // 拒绝转 paid，记「已收款待退」。claimed 租约除外，与 markPaid 同一条判据。
     // 迟到回调仍走这条：closed 且窗口仍开才能入账履约；过期/已取消的云打印单不能再铸幽灵码。
     if (isPickupWindowClosed(order)) {
       await this.recordOnlinePaidPendingRefund(order, opts)
@@ -230,7 +316,11 @@ export class OrderStatusService {
       let res: { count: number }
       try {
         res = await this.prisma.order.updateMany({
-          where: { id: orderId, payStatus: { in: fromStatuses } }, // compare-and-set
+          where: {
+            id: orderId,
+            payStatus: { in: fromStatuses },
+            ...fulfillablePickupWindowWhere(),
+          },
           data: {
             payStatus: 'paid',
             paymentSource: channel,
@@ -247,9 +337,12 @@ export class OrderStatusService {
       if (res.count === 0) {
         const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
         if (fresh?.payStatus === 'paid' && fresh.paymentSource === channel) return fresh
-        throw new BadRequestException(
-          fresh?.payStatus === 'paid' ? 'ORDER_ALREADY_PAID' : 'ORDER_INVALID_TRANSITION',
-        )
+        if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+        if (fresh && isPickupWindowClosed(fresh)) {
+          await this.recordOnlinePaidPendingRefund(fresh, { channel, attemptId, channelTxnNo, late })
+          throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
+        }
+        throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
       settled = true
       break

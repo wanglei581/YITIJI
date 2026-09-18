@@ -985,7 +985,7 @@ test('P1-4 跳转失败：不得卡在「提交中」，也不得让已创建的
   assert.equal(page.data.quoteRecover, 'orders', '必须给出找回这张订单的出口')
   assert.notEqual(page.data.quoteState, 'ready', '「确认下单」必须变灰，防止再下一单')
 
-  // 再点一次「确认下单」：绝不许再 POST（服务端没有幂等键，那就是第二张订单）
+  // 再点一次「确认下单」：绝不许再 POST（同键会回放原单，页面不得把旧单说成新单）
   page.submitOrder()
   await flush()
   assert.equal(creates, 1, '跳转失败后重复点击不得再次建单')
@@ -1955,7 +1955,7 @@ test('R4-4 同一个人建单成功：锁照常生效，再点一次不得发第
 
   page.submitOrder()
   await flush()
-  assert.equal(posts, 1, '已建过单就不许再 POST（服务端没有幂等键，第二次就是第二张订单）')
+  assert.equal(posts, 1, '已建过单就不许再 POST（同键会回放原单，页面不得把旧单说成新单）')
   assert.equal(page.data.submitting, false)
 })
 
@@ -2829,7 +2829,7 @@ test('R6-2 幂等键是 UUID v4 形态，且不存到机码 / 文件名 / 金额
   for (const forbidden of ['12345678', '张三', 'pickupCode', 'amountCents', 'filename']) {
     assert.ok(!raw.includes(forbidden), `本机存储里不得出现 ${forbidden}：${raw}`)
   }
-  assert.deepEqual(Object.keys(JSON.parse(raw)[0]).sort(), ['account', 'createdAt', 'fingerprint', 'key', 'orderId'])
+  assert.deepEqual(Object.keys(JSON.parse(raw)[0]).sort(), ['account', 'createdAt', 'fingerprint', 'key', 'orderId', 'submittedAt'])
 })
 
 test('R6-3 A 的 200 晚于换人：orderId 落进 A 的恢复记录，但一个字都不写进 B 的页面', async () => {
@@ -3788,9 +3788,21 @@ test('R8-F 设备时钟往回拨：未来时间戳的记录仍然有效，不得
   wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, { createdAt: '昨天' })))
   assert.equal(idem.findRecord('u:A', print), null, '非数字时间戳同样作废')
 
-  // 真正过期的（7 天以上）照常淘汰 —— 放宽的只有未来那一侧。
-  wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, { createdAt: Date.now() - idem.TTL_MS - 1000 })))
-  assert.equal(idem.findRecord('u:A', print), null, '真的过期了还是要过期')
+  // 真正过期、且**证明得了从没发出去**（本版写下、submittedAt === 0）才淘汰。
+  wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, {
+    createdAt: Date.now() - idem.TTL_MS - 1000,
+    submittedAt: 0,
+  })))
+  assert.equal(idem.findRecord('u:A', print), null, '从没发出去过的键过期之后必须作废')
+
+  // 已经标过即将出门的，即使 createdAt 过了 7 天也必须还在 —— 忘掉它就是第二张订单。
+  wx.storage.set(idem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: first.key, orderId: '',
+    createdAt: Date.now() - idem.TTL_MS - 1000,
+    submittedAt: Date.now() - idem.TTL_MS - 1000,
+  }])
+  assert.equal(idem.findRecord('u:A', print).key, first.key,
+    '已提交未落定的记录不得因本机 TTL 被忘掉')
 })
 
 test('R8-B3 取件页 _ownsResponse 的放行条件：三条缺一不可，其余一律 fail-closed', async () => {
@@ -4337,9 +4349,9 @@ test('R10-d 旧响应不得解锁、也不得掀掉正在飞的那发确认请�
   assert.equal(page.data.codeRaw, '12345678')
 })
 
-test('R10-e 本机存储读出来不是这张表：三个写入口一个字节都不许写', async () => {
+test('R10-e 本机存储读出来不是这张表：四个写入口一个字节都不许写', async () => {
   // null / {} / 字符串 / 数字：**都不是**"本机没有记录"的证据。上一版把它们和
-  // "key 不存在"一起折进 `return []`，于是三个读-改-写回全量的入口照样写回去，
+  // "key 不存在"一起折进 `return []`，于是读-改-写回全量的入口照样写回去，
   // 盘上那条未落定的记录（POST 可能已经到了服务端）被一次读异常抹掉。
   for (const corrupt of [null, {}, 'bad', 42]) {
     const label = JSON.stringify(corrupt)
@@ -4359,6 +4371,7 @@ test('R10-e 本机存储读出来不是这张表：三个写入口一个字节�
     await assert.rejects(() => idem.ensureKey('u:A', 'other-fp'), /读不到|没能保存/, `${label}: ensureKey 必须拒绝`)
     assert.equal(idem.rememberOrderId('u:A', 'other-fp', fakeKey(9), 'ord-x'), null, `${label}: rememberOrderId 必须返回 null`)
     assert.equal(idem.clearRecord('u:A', 'other-fp'), false, `${label}: clearRecord 必须返回 false`)
+    assert.equal(idem.markSubmitted('u:A', print, flying.key), false, `${label}: markSubmitted 必须返回 false`)
     assert.equal(writes, 0, `${label}: 读出来不是这张表时，一个 setStorageSync 都不许发生`)
 
     wx.setStorageSync = realSet
@@ -5102,4 +5115,203 @@ test('R12-L order-detail：精确 404+code 在换人之后到达 —— 不得�
   assert.ok(!JSON.stringify(page.data).includes('12345678'))
   assert.ok(!JSON.stringify(page.data).includes('A的简历'))
   assert.equal(pending.length, 2, '迟到的拒绝回调不得替 B 去要 A 的订单')
+
+// R11. 单件云打印幂等键 TTL：本机不得比服务端先失忆
+//
+// 材料包链（25158d95b）已经用 submittedAt / markSubmitted 收口过同一条洞。
+// 单件链此前仍按 createdAt+7 天一律淘汰：POST 已出门、响应永久丢失的那一格
+// 会被忘掉，之后重新铸键 = 第二张订单、第二笔钱。
+// ══════════════════════════════════════════════════════════════════════
+
+const PRINT_TTL_KEY = '11111111-1111-4111-8111-111111111111'
+const PRINT_TTL_DAY = 24 * 60 * 60 * 1000
+
+test('R11-1 本机时钟走过 7 天：已提交未落定的记录必须还在，且复用同一个键', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  const at = Date.now() - 30 * PRINT_TTL_DAY
+  wx.storage.set(idem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '',
+    createdAt: at, submittedAt: at,
+  }])
+  assert.equal(idem.findRecord('u:A', print).key, PRINT_TTL_KEY,
+    '30 天前那次"响应丢在路上"的提交不许被忘掉')
+  const randomsBefore = wx.calls.getRandomValues.length
+  const again = await idem.ensureKey('u:A', print)
+  assert.equal(again.key, PRINT_TTL_KEY, '同参数再提交必须复用旧键（换新键 = 第二张订单）')
+  assert.equal(wx.calls.getRandomValues.length, randomsBefore, '一个新键都不许铸')
+})
+
+test('R11-2 模块重载后，超过 TTL 的已提交未落定记录仍然复用', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const first = freshIdem()
+  const print = first.fingerprintOf(PAY_PAYLOAD)
+  const at = Date.now() - 30 * PRINT_TTL_DAY
+  wx.storage.set(first.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '',
+    createdAt: at, submittedAt: at,
+  }])
+  const reloaded = freshIdem()
+  assert.notEqual(reloaded, first, '前提：确实拿到了一份全新的模块实例')
+  assert.equal(reloaded.findRecord('u:A', print).key, PRINT_TTL_KEY)
+  const again = await reloaded.ensureKey('u:A', print)
+  assert.equal(again.key, PRINT_TTL_KEY, '进程重启后判据只能看落盘字段')
+})
+
+test('R11-3 已落定的、以及旧版本没有 submittedAt 的记录，不因本机时间被淘汰', async () => {
+  const settledWx = createWx()
+  useRealAuth(settledWx, 'A')
+  const settledIdem = freshIdem()
+  const print = settledIdem.fingerprintOf(PAY_PAYLOAD)
+  const at = Date.now() - 30 * PRINT_TTL_DAY
+  settledWx.storage.set(settledIdem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: 'ord-9', createdAt: at,
+  }])
+  assert.equal(settledIdem.findRecord('u:A', print).orderId, 'ord-9',
+    '服务端那张单还在（键永久），本机不许先忘掉指回它的唯一线索')
+
+  const legacyWx = createWx()
+  useRealAuth(legacyWx, 'A')
+  const legacyIdem = freshIdem()
+  legacyWx.storage.set(legacyIdem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '', createdAt: at,
+  }])
+  assert.equal(legacyIdem.findRecord('u:A', print).key, PRINT_TTL_KEY, '没有标记 ≠ 证明了没发过')
+  const again = await legacyIdem.ensureKey('u:A', print)
+  assert.equal(again.key, PRINT_TTL_KEY)
+  assert.equal(legacyWx.calls.getRandomValues.length, 0)
+
+  const oddWx = createWx()
+  useRealAuth(oddWx, 'A')
+  const oddIdem = freshIdem()
+  oddWx.storage.set(oddIdem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '', createdAt: at, submittedAt: 'x',
+  }])
+  assert.ok(oddIdem.findRecord('u:A', print), '读不懂的标记不得被解释成"这个键没出过门"')
+})
+
+test('R11-4 铸出来却一个 POST 都没发过的键，过了 TTL 才作废', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  wx.storage.set(idem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '',
+    createdAt: Date.now() - (idem.TTL_MS - 60 * 1000), submittedAt: 0,
+  }])
+  assert.equal(idem.findRecord('u:A', print).key, PRINT_TTL_KEY, 'TTL 之内的未提交键仍然复用')
+
+  wx.storage.set(idem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '',
+    createdAt: Date.now() - (idem.TTL_MS + 60 * 1000), submittedAt: 0,
+  }])
+  assert.equal(idem.findRecord('u:A', print), null)
+  const fresh = await idem.ensureKey('u:A', print)
+  assert.notEqual(fresh.key, PRINT_TTL_KEY, '从没发出去过的键过期之后铸新的')
+  assert.match(fresh.key, idem.KEY_RE)
+  assert.equal(fresh.submittedAt, 0, '新铸的键同样先标成"还没发过"')
+})
+
+test('R11-5 markSubmitted：标住之后退出 TTL；键对不上 / 这一格不在 / 身份不可用一律 false', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  const record = await idem.ensureKey('u:A', print)
+  assert.equal(wx.storage.get(idem.STORE_KEY)[0].submittedAt, 0)
+
+  assert.equal(idem.markSubmitted('u:A', 'fp-none', record.key), false)
+  assert.equal(idem.markSubmitted('u:A', print, PRINT_TTL_KEY), false)
+  assert.equal(idem.markSubmitted('', print, record.key), false)
+  assert.equal(idem.markSubmitted('u:A', print, 'not-a-uuid'), false)
+  assert.equal(wx.storage.get(idem.STORE_KEY)[0].submittedAt, 0, '失败路径不许顺手改盘上的东西')
+
+  assert.equal(idem.markSubmitted('u:A', print, record.key), true)
+  assert.ok(wx.storage.get(idem.STORE_KEY)[0].submittedAt > 0)
+
+  const rows = wx.storage.get(idem.STORE_KEY)
+  rows[0].createdAt = Date.now() - 30 * PRINT_TTL_DAY
+  wx.storage.set(idem.STORE_KEY, rows)
+  assert.equal(idem.findRecord('u:A', print).key, record.key)
+})
+
+test('R11-6 页面：markSubmitted 写失败 / 静默写失败 / 读失败均 0 POST，键原样留着', async () => {
+  async function runOnce(breakWrite) {
+    const wx = createWx()
+    useRealAuth(wx, 'A')
+    const idem = freshIdem()
+    const fingerprint = idem.fingerprintOf(PAY_PAYLOAD)
+    const record = await idem.ensureKey('u:A', fingerprint)
+    assert.equal(wx.storage.get(idem.STORE_KEY)[0].submittedAt, 0)
+    const { page, creates } = payPage(wx)
+    page.onLoad(PAY_QUERY)
+    await flush()
+
+    const realSet = wx.setStorageSync
+    const realGet = wx.getStorageSync
+    if (breakWrite === 'throw') {
+      wx.setStorageSync = () => { throw new Error('setStorageSync failed') }
+    } else if (breakWrite === 'silent') {
+      wx.setStorageSync = () => {}
+    } else if (breakWrite === 'read') {
+      wx.getStorageSync = (k) => { if (k === idem.STORE_KEY) throw new Error('getStorageSync failed'); return realGet(k) }
+    }
+
+    page.continueFlow()
+    await flush(); await flush()
+    assert.equal(creates.length, 0, `${breakWrite}: 标不住不许发 POST`)
+    assert.equal(page.data.submitting, false, `${breakWrite}: 停下来之后按钮必须放开`)
+    assert.match(wx.calls.showModal[wx.calls.showModal.length - 1].content, /没能记下这次提交|读不到本机/)
+
+    wx.setStorageSync = realSet
+    wx.getStorageSync = realGet
+    const after = wx.storage.get(idem.STORE_KEY)
+    assert.equal(after.length, 1, `${breakWrite}: 键原样留着`)
+    assert.equal(after[0].key, record.key)
+    assert.equal(after[0].submittedAt, 0, `${breakWrite}: 没标住就不许在盘上显示成标住了`)
+  }
+
+  await runOnce('throw')
+  await runOnce('silent')
+  await runOnce('read')
+})
+
+test('R11-7 页面：成功路径严格先落盘再 POST；账号/指纹隔离不退化', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  let storageAtCall = null
+  const creates = []
+  const sentKeys = []
+  const api = {
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 150, billablePages: 3 }),
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    createCloudPrintOrder: (data, opts) => {
+      storageAtCall = JSON.parse(JSON.stringify(wx.storage.get(idem.STORE_KEY)))
+      sentKeys.push(opts && opts.idempotencyKey)
+      const d = deferred(); creates.push(d); return d.promise
+    },
+    getCloudPrintOrder: () => deferred().promise,
+  }
+  const page = makePage('pages/print-pay/print-pay.js', { auth: realAuth, api, wx })
+  page.onLoad(PAY_QUERY)
+  await flush()
+  page.continueFlow()
+  await flush(); await flush()
+  assert.equal(creates.length, 1)
+  assert.ok(Array.isArray(storageAtCall) && storageAtCall.length === 1)
+  assert.equal(storageAtCall[0].key, sentKeys[0], 'POST 发出的那一刻，盘上已经是这个键')
+  assert.ok(storageAtCall[0].submittedAt > 0, 'POST 发出的那一刻，盘上这一格已经标成"这个键出门了"')
+  assert.equal(storageAtCall[0].account, 'u:A')
+  assert.equal(storageAtCall[0].fingerprint, print)
+
+  const bKey = await idem.ensureKey('u:B', print)
+  assert.notEqual(bKey.key, sentKeys[0], 'B 不得复用 A 的幂等键')
+  assert.equal(idem.findRecord('u:A', print).key, sentKeys[0], 'B 的写入不得动 A 的记录')
+  const other = await idem.ensureKey('u:A', idem.fingerprintOf({ ...PAY_PAYLOAD, copies: 3 }))
+  assert.notEqual(other.key, sentKeys[0], '参数变了必须换键')
 })

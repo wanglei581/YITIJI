@@ -14,6 +14,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 const idem = require('../../utils/print-order-idempotency')
+const reconcileEngine = require('../../utils/order-submission-reconcile')
 
 // MP-07 改法 (a)：标签只显示即将建单的真实参数，不从 query 猜彩色/双面。
 // 与 print-upload.verifiedPrintParams 锁死同一组（verify-miniapp-static 抽取字面量）。
@@ -100,7 +101,9 @@ Page({
     // 订单已建成后的锁。服务端会按幂等键回放同一张单，所以这把锁不再是「防重复扣款」
     // 的最后一道 —— 它现在的职责是**把这件事告诉用户**：订单已经在了，去找它，别再提交。
     createdLocked: false,
-    // 那张已建成的订单**现在**是什么状态，取值 '' | 'checking' | 'live' | 'unknown' | 'terminal'。
+    // 那张已建成的订单**现在**是什么状态，
+    // 取值 '' | 'checking' | 'live' | 'unknown' | 'terminal' | 'abandoned'。
+    // 'abandoned' 是唯一一档"压根没有订单"的锁态：服务端已给那个键立墓碑，可以换键重来。
     // 只有 'terminal' 是"服务端证明它已经走到头了"，也只有它才允许重新下一单。
     // 'unknown' 是查不出来（网络 / 401 / 5xx）：fail-closed，继续锁着。
     createdState: '',
@@ -261,9 +264,18 @@ Page({
       })
   },
 
-  /** 'unknown' 态的可执行下一步：再核一次。核不上就还是 'unknown'，不会假装好了。 */
+  /**
+   * 'unknown' 态的可执行下一步：再核一次。核不上就还是 'unknown'，不会假装好了。
+   *
+   * **两种 'unknown' 走两条不同的核对。** 一种是"有一张已知的订单，但查不出它现在的
+   * 状态"（`_createdOrderId` 有值）→ 再查那张订单；另一种是"本机那几条提交记录还没有
+   * 确定结论"（_reconcileSubmissions 之后，没有任何 orderId）→ 再核对一次那批记录。
+   * 少了后面这一条，那个按钮在第二种情形下按下去什么都不做 —— 一个看起来能用、
+   * 按下去却不动的主动作，正是本页别处反复避免的那件事。
+   */
   retryCreatedCheck() {
-    if (this.data.createdState !== 'unknown' || !this._createdOrderId) return
+    if (this.data.createdState !== 'unknown') return
+    if (!this._createdOrderId) { this._reconcileSubmissions(); return }
     this._verifyingOrderId = ''
     this._verifiedOrderId = ''
     this._verifyCreatedOrder(this._createdOrderId)
@@ -284,7 +296,10 @@ Page({
    * 并且把"为什么"和"能做什么"一起写在屏幕上。
    */
   startNewOrder() {
-    if (this.data.createdState !== 'terminal' || !this.data.createdCanReorder) return
+    // 'abandoned'（服务端已给那个键立墓碑，压根没建成过订单）与 'terminal'（原单已走到
+    // 终态）都可以重新下单，而且走的是同一条路：clearRecord 读回来确认真的清掉了，
+    // 清不掉就保持锁定。两者都由**服务端**证明，页面自己一个都判不出来。
+    if (!['terminal', 'abandoned'].includes(this.data.createdState) || !this.data.createdCanReorder) return
     if (this._resolveAccount() !== 'ok') return
     if (!idem.clearRecord(this._account, idem.fingerprintOf(this._orderPayload()))) {
       // 保持锁定、保留旧键、一个 POST 都不发。按钮留着（createdCanReorder 不动），
@@ -359,6 +374,9 @@ Page({
     // 「已取消，可以重新下单」，或者更糟 —— 带着一个对 B 毫无意义的「重新下单」按钮。
     this._verifyingOrderId = ''
     this._verifiedOrderId = ''
+    // 上一位那一发核对的回调仍会回来，但它自己会逐字核账号后原样退出；这里把闸放开，
+    // 免得 B 的页面因为 A 那一发还没回来而再也发不出自己的核对。
+    this._reconciling = false
     this.setData({
       submitting: false,
       createdLocked: false,
@@ -606,6 +624,58 @@ Page({
     wx.navigateTo({ url: '/pages/orders/orders', fail() { wx.switchTab({ url: '/pages/home/home' }) } })
   },
 
+  /**
+   * 向服务端核对本机留下的那些下单记录 —— **「名额满了」那条死路唯一的出口**。
+   *
+   * 与材料包那一页同一条判据、同一个引擎（utils/order-submission-reconcile.js）：
+   * 本机不按任何本地依据清未落定的记录，只认服务端**先立墓碑再回答**的 `not_created`。
+   * 结论用本页既有的 createdState 三态渲染，不新增一套状态字段。
+   */
+  _reconcileSubmissions() {
+    if (this._resolveAccount() !== 'ok') return
+    if (this._reconciling) return
+    const account = this._account
+    this._reconciling = true
+    this.setData({
+      submitting: false,
+      createdLocked: true,
+      createdState: 'checking',
+      createdNotice: '正在向服务端逐个确认之前那几次提交到底有没有建成订单。这一步不会创建任何新订单。',
+      createdCanReorder: false,
+    })
+    const fingerprint = idem.fingerprintOf(this._orderPayload())
+    reconcileEngine
+      .reconcile(idem.submissionPort, account, (keys) => api.resolveOrderSubmissions(keys), { force: true })
+      .then((result) => {
+        this._reconciling = false
+        // 换人了就什么都不写：这批记录属于发起这一发的那位。
+        if (this._account !== account || this._resolveAccount() !== 'ok') return
+        // 服务端说**这一组参数**那次提交其实已经建成了订单：锁到那张订单上，走既有的
+        // 「查一次原单」路径。必须逐字比指纹 —— orders 里可能是别的文件那几格。
+        const mine = (result.orders || []).find((row) => row.adopted && row.fingerprint === fingerprint)
+        if (mine) {
+          this._createdOrderId = mine.orderId
+          this._lockAfterCreated(mine.orderId)
+          this._verifyCreatedOrder(mine.orderId)
+          return
+        }
+        const shown = reconcileEngine.describeReconcileResult(result, { submitLabel: '确认支付并打印' })
+        // 'resubmit' = 名额腾出来了，下一步是用户自己再提交一次；本页把锁整个解开，
+        // 主按钮随之回到可按状态。其余几档都还没有确定结论，继续锁着并给出重新核对。
+        if (shown.recover === 'resubmit') {
+          this.setData({ createdLocked: false, createdState: '', createdNotice: '', createdCanReorder: false })
+          wx.showModal({ title: shown.title, content: shown.text, showCancel: false })
+          return
+        }
+        this.setData({
+          createdLocked: true,
+          createdState: 'unknown',
+          createdNotice: `${shown.title}。${shown.text}`,
+          createdCanReorder: false,
+        })
+      })
+  },
+
   continueFlow() {
     const q = this.data.q
     if (this.data.submitting) return
@@ -656,6 +726,19 @@ Page({
     // 否则同键不同参数在服务端是 409 IDEMPOTENCY_KEY_REUSED。
     idem.ensureKey(attempt.account, fingerprint).then((record) => {
       attempt.key = record.key
+      // **出门之前先在本机把这个键标成"已提交"，标不住就一个 POST 都不发。**
+      //
+      // 本机那张表要淘汰"铸出来但从没用过"的键（不淘汰的话，一次失败的提交会把未落定
+      // 名额永久占住），而"从没用过"只能由本机自己记下来——服务端不会告诉我们这件事，
+      // 它那一侧的 (endUserId, key) 是永久的。标记落住之后这条记录就退出按本机时间的
+      // 淘汰：设备时钟往前跳、或恰好卡在 7 天边界上，都不会再把一个**可能已经到过
+      // 服务端**的键忘掉。忘掉它的代价很具体：下一次同参数提交铸新键，服务端按新键
+      // 正常建第二张订单、再扣一笔钱。
+      //
+      // 标不住时停在这里（用户重试一次）比发出去（可能第二张订单）便宜得多。
+      if (!idem.markSubmitted(attempt.account, fingerprint, record.key)) {
+        throw new Error(idem.SUBMIT_MARK_FAILED_MESSAGE)
+      }
       return api.createCloudPrintOrder(payload, { idempotencyKey: record.key })
     }).then(order => {
       const orderId = (order && order.id) || ''
@@ -737,6 +820,31 @@ Page({
       attempt.settled = true
       this._createAttempt = null
       this.setData({ submitting: false })
+      // 本机未落定名额满了（ensureKey 的 fail-closed，一个 POST 都没发出去）。
+      // 把死路原样弹给用户没有意义 —— 它唯一的解法就是去问服务端那几个键落成了什么。
+      if (err && err.message === idem.PENDING_FULL_MESSAGE) { this._reconcileSubmissions(); return }
+      // 409 有三种成因，处置完全相反（见 classifySubmitConflict）。
+      const conflict = reconcileEngine.classifySubmitConflict(err)
+      if (conflict) {
+        const shown = reconcileEngine.describeSubmitConflict(conflict, { submitLabel: '确认支付并打印' })
+        // `abandoned` 是服务端亲口证明的 not_created：这个键再也建不出订单，本机这一格
+        // 可以安全地换掉。**换键走 startNewOrder 那条已经收口过的路** —— 它会先
+        // clearRecord 并读回来确认真的清掉了，清不掉就保持锁定。这里只负责把状态摆好。
+        if (conflict === reconcileEngine.CONFLICT_ABANDONED) {
+          // **不复用 'terminal'**：那一档的标题是「上一张订单已经结束」，而这一支恰恰是
+          // "根本没建成过订单"。共用一个状态就等于在屏幕上写下一件没发生过的事。
+          this.setData({
+            createdLocked: true,
+            createdState: 'abandoned',
+            createdNotice: shown ? shown.text : '',
+            createdCanReorder: true,
+          })
+          return
+        }
+        // `in_progress`：那次提交正在服务端跑，现在换键就是第二张订单。一个字节都不动。
+        wx.showModal({ title: shown.title, content: shown.text, showCancel: false })
+        return
+      }
       wx.showModal({ title: '提交失败', content: (err && err.message) || '请稍后重试', showCancel: false })
     })
   },

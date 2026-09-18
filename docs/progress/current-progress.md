@@ -202,6 +202,56 @@ Agent 锁文案 / 启动诊断 / 只读 diagnose 与现场采集、现场手册�
 因此 **DEVICE / PRODUCTION / COMMERCIAL: NO-GO**，下一步转入精确 SHA 的现场与发布验收，不再继续复活
 已删除远端分支或沿用 PR 合并前 worktree 作为交付源。
 
+2026-09-17 **小程序与一体机跨端联动收口：源码冻结 `33751df4a`，`SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。**
+
+- **冻结候选：** 分支 `codex/material-package-idempotency-closeout-20260917`，源码冻结点
+  `33751df4af9eae0cbfc912e4ad123a07e83031cd`，基线
+  `origin/main=eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`（含 PR #1040 merge `3d35759ee` 与
+  PR #1041 merge `eb0f20341`）。相对该基线 **17 个提交、31 个文件、`+6124/-229`**。工作树干净；
+  未 push、未开 PR、未合并、未部署、未发布小程序、未做硬件操作、未走真实支付。旧冻结点
+  `d30d2f965` 只是 rebase 前的历史锚，**不是**当前 tip。
+- **本轮关闭的真实问题：**
+  1. 材料包 `POST /orders/package` 与单件云打印 `POST /me/print-orders` 都使用按会员与载荷指纹绑定的持久 `Idempotency-Key`；本机 `submittedAt` / `markSubmitted` 在 POST 前落盘并读回，**可能已经发出**的键（已有 `orderId`、`submittedAt !== 0`、或旧记录缺该字段）**不因本机 7 天 TTL 淘汰**，只有能证明从未发送的 `submittedAt === 0` 才按 TTL 过期。
+  2. 一体机 `claimed` 履约租约绑定 `PAYMENT_SESSION_TTL_SECONDS`（默认 30 分钟，时钟只看 `pickupClaimedAt`，不看手机新签 token）。租约内即使原到机码截止已过，未付仍可同机 reclaim / markPaid / release；租约外未付 CAS 收敛 `expired/closed`；`claimed+paid` 跨租约仍允许 release。缺 `pickupClaimedAt` 不得永久豁免。
+  3. `markPaidOnline` 转 `paid` 的 `updateMany` 写入时必须仍可履约（非 claimed 无截止或截止未到；claimed 租约仍在 TTL 内）。sweeper 在快照后写成 `expired+closed` 时 CAS 0，落 `ONLINE_PAID_PENDING_REFUND`，不把迟到回调重新写成 paid。
+- **最终本地证据（冻结 SHA `33751df4a`）：** 小程序 `verify:static` 基础静态 **136 PASS / 0 FAIL**（64 注册页）；页面生命周期 **155/155**；材料包幂等专项 **49/49**。API `verify:payment-flow` **85 PASS**（不要把过程中的 84 写成最终值）；单件/材料包幂等 service 与 HTTP、`verify:package-order-fulfillment`、`verify:miniapp-cloud-print-m2` 全部退出 0。根 `pnpm typecheck`、`verify:repository-integrity`、`verify:ci-gate-coverage`、`verify:deploy-gates-in-sync`、`pnpm graph` / `graph:check`、`git diff --check` 本地全绿。
+- **多模型记录：** Grok 主修并提交本冻结 SHA。Claude 只对小程序增量 `92b67fe84` 最终确认 `GO`，未对后续 API 租约/CAS 增量做前端终审。Agy / Hermes 对 `fecd64d65`（claimed 租约 TTL）与 `33751df4a`（late-callback CAS）增量 `GO`。Codex 协调核验。商业发布仍 `NO-GO`。
+- **证据矩阵：** `SOURCE / LOCAL: GO`。下列一律 `NO-GO`：`CI`、`MAIN`、微信开发者工具、Trial、微信真机、Windows / 奔图真机、production / server、真实支付 / 退款 / 对账、业务 UAT。本地绿、HTTP 200、历史设备记录和多模型同意都不能替代这些证据。
+
+2026-09-17 **小程序与一体机跨端联动收口（历史快照）：当时代码冻结点是 rebase 前的 `d30d2f965`，本地材料包耐久幂等已到 `SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。当前冻结点已前移到 2026-09-17 的 `33751df4a`，不要把本节 SHA 当成现 tip。**
+
+- **当时冻结候选：** 分支 `codex/material-package-idempotency-closeout-20260917`，代码冻结点
+  `d30d2f965`，当时基线
+  `origin/main=eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`（含 PR #1040 merge `3d35759ee` 与
+  PR #1041 merge `eb0f20341`）。代码冻结点相对原基线 `3d35759ee` 共 9 个提交、23 个文件，
+  约 `+4398/-118`。工作树干净；未 push、未改 PR、未合并、
+  未部署、未发布小程序。该候选 rebase 到精确 `eb0f20341` 后，证据边界不变。
+- **本轮关闭的真实问题：** `POST /orders/package` 在响应丢失、并发提交、进程重启、账号切换、
+  存储写入/读回失败、401 补签、404/5xx 核对、到机码过期以及 `claimed` / `used` 履约状态下，
+  现在使用按会员与载荷指纹绑定的持久 `Idempotency-Key`，服务端按
+  `(endUserId, idempotencyKey)` 耐久回放；同键不同载荷返回 409，跨会员不回放、不泄露。
+  手机侧读取不会把一体机已经 `claimed` 的租约误过期；列表、详情、回放的终态口径已收敛。
+- **最终前端收口：** Claude Opus 5 对应的重放后代码提交 `d30d2f965` 让直接 POST 回放与恢复查询共用
+  `terminalPackageReason`：真正终态保留草稿与恢复记录，只点亮用户主动的「重新下单」；
+  `pending`、`claimed`、`used`、打印中及未知状态继续 fail-closed，不自动换键、不产生第二次 POST。
+  `utils/package-feature.js` 已删除，材料包四页的硬编码 `guardPackageChain()` 已移除；当前关闭能力依赖
+  服务端运行期错误码，不再靠前端假守卫。`package-confirm.js` 已约 930 行，下次新增能力前必须拆分评估，
+  本轮不顺手重构状态机。
+- **最终本地证据（同一 SHA 独立重跑）：** 小程序 `verify:static` 全通过（基础静态
+  `136 PASS / 0 FAIL`；材料包幂等专项 40/40，页面生命周期 148/148）；API 材料包逐份履约、
+  service 幂等 T1-T13d、HTTP H1-H6 全部通过；全仓 `pnpm typecheck`、
+  `verify:repository-integrity`、`verify:ci-gate-coverage`、`verify:deploy-gates-in-sync`、
+  `graph:check`、`git diff --check origin/main...HEAD` 全部退出 0。首次串行重跑时 HTTP verifier 因
+  本机生成的 Prisma Client 缺失中断；执行标准 `prisma generate` 后同一命令与完整后续门禁全部通过，
+  判定为本地生成产物问题，不是业务断言失败。
+- **五模型记录：** Codex 独立验收 `GO`；Claude 对最终前端源码 `GO` 并完成最后一处 P2 修复；
+  Agy 对最终增量 `GO`；Hermes 对最终增量 `GO`、对商业发布仍判 `PARTIAL`。Grok 两次只读冷审均超时，
+  没有可用最终输出，记 `TIMEOUT / UNREVIEWED`，不得算批准。Hermes 曾声称材料包仍被硬守卫关闭，
+  已由源码、删除文件事实和两条门禁反证为误报，不进入阻塞清单。
+- **证据边界：** `SOURCE / LOCAL: GO`；`CI / WECHAT DEVTOOLS / WECHAT DEVICE / WINDOWS-PANTUM /
+  PRODUCTION / REAL PAYMENT / BUSINESS ACCEPTANCE: NO-GO`。本地测试、HTTP 200、历史设备记录和多模型
+  同意都不能替代生产或商业证据。
+
 2026-09-17 **生产 API-only 发布控制面候选：阻止 API 修复连带覆盖三端前端。** Windows Agent
 `0.4.11` 在精确候选 `50483cd28096780c5e6c4260dde86dec36e7d99f` 上安装后，心跳因生产 API
 仍缺少 `55c32296f` 新增的 `scanInput*` DTO 白名单字段而返回
@@ -222,10 +272,11 @@ run `35229197747` 已通过：默认 API 目录、PM2 进程名、回环健康�
   合并后、打开生产闸门前发现第二层 fail-closed 缺口：服务器检出旧目标 `50483cd...` 后原本会执行
   该旧提交内尚不认识 `DEPLOY_SCOPE` 的 helper，导致 API-only 保护失效。当前后继候选改为由
   GitHub Runner 从工作流自身提交打包 helper，传入服务器后做 SHA-256 校验并从 `/tmp` 执行；目标
-  提交只提供待部署应用源码，不再反向决定发布控制面版本。
-- **当前证据边界：** `DEPLOY_API_ENABLED=false` 始终未打开，生产未发生写入。后继控制面候选完成
-  本地验证、独立复审和 PR CI 后，才允许短时打开门禁，以 `ci_run_id=34992685756`、
-  `deploy_scope=api-only` 部署精确 `50483cd...`，随后立即关闭门禁。
+  提交只提供待部署应用源码，不再反向决定发布控制面版本。PR #1041 已合入
+  `origin/main@eb0f20341`。
+- **当前证据边界：** `DEPLOY_API_ENABLED=false` 始终未打开，生产未发生写入。代码进入主线只证明
+  发布控制面在 `main`，不代表生产执行。短时打开门禁仍须动作时授权，以
+  `ci_run_id=34992685756`、`deploy_scope=api-only` 部署精确 `50483cd...`，随后立即关闭门禁。
 
 2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
 失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
