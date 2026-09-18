@@ -76,6 +76,111 @@ test.describe('partner data screen states', () => {
     expect(digits).toEqual([])
   })
 
+  /**
+   * 会话是在**已经有数据之后**过期的 —— 挂在机构办公室墙上的那台屏的常态。
+   *
+   * consoleScreen.ts 第 4 条口径写死了 401 不自动跳登录（大屏可能无人看管，硬跳
+   * 会把墙上变成一张登录表单）。代价是页面必须自己说清原因并给动作。那句承诺
+   * 此前只在 `!data` 一支兑现；取成功过一次后 data 永不为空（failPolicy: 'keep-last'），
+   * 之后任何 401 都只剩一句通用的「最近一次刷新失败」。
+   *
+   * 两件事必须同时成立：上次成功的数字不许被清成 0（不伪造），
+   * 且必须说得出是登录过期并给出动作（不含糊）。
+   */
+  test('会话在取数成功之后过期：保留上次数值，同时说清是登录过期并给动作', async ({ page }) => {
+    let authed = true
+    await page.route('**/partner/screen/snapshot*', async (route) => {
+      if (authed) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(partnerFull()),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: { code: 'AUTH_TOKEN_INVALID', message: 'Token 无效或已过期' } }),
+      })
+    })
+    await open(page, '/screen')
+    const shelf = page.locator('.ops-card').filter({ hasText: '本机构在架岗位' })
+    await expect(shelf.locator('.ops-n')).toHaveText('328条')
+
+    authed = false
+    await page.getByRole('button', { name: '刷新' }).click()
+
+    // ① 不伪造：上次成功的数字仍在，没有被清成 0 或空
+    await expect(shelf.locator('.ops-n')).toHaveText('328条')
+    await expect(page.locator('.ops-stamp.is-stale')).toBeVisible()
+    // ② 不含糊：说得出是登录过期，而不是只说「刷新失败」
+    await expect(page.getByText(/登录已过期/)).toBeVisible()
+    // ③ 给得出动作，且点之前不跳转
+    await expect(page.getByRole('button', { name: '重新登录' })).toBeVisible()
+    await expect(page).toHaveURL(/\/screen/)
+  })
+
+  /** 角色被撤之后数字同样会冻住，屏上必须说清是权限，不能混成网络故障。 */
+  test('权限在取数成功之后被撤：保留上次数值，同时说清是权限问题', async ({ page }) => {
+    let allowed = true
+    await page.route('**/partner/screen/snapshot*', async (route) => {
+      if (allowed) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(partnerFull()) })
+        return
+      }
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: { code: 'AUTH_ROLE_FORBIDDEN', message: '当前角色无权访问' } }),
+      })
+    })
+    await open(page, '/screen')
+    const shelf = page.locator('.ops-card').filter({ hasText: '本机构在架岗位' })
+    await expect(shelf.locator('.ops-n')).toHaveText('328条')
+
+    allowed = false
+    await page.getByRole('button', { name: '刷新' }).click()
+
+    await expect(shelf.locator('.ops-n')).toHaveText('328条')
+    await expect(page.getByText(/已无权查看本大屏/)).toBeVisible()
+    await expect(page.getByText(/当前账号没有查看机构数据大屏的权限/)).toBeVisible()
+  })
+
+  /**
+   * ORG_REQUIRED 在有数据之后发生（机构归属被解绑）：与「角色不符」必须分开说。
+   * 机构管理员看到「无权限」会去找平台开权限，而真实动作是让平台重新绑定机构。
+   */
+  test('机构归属在取数成功之后被解绑：保留上次数值，且与角色不符分开提示', async ({ page }) => {
+    let bound = true
+    await page.route('**/partner/screen/snapshot*', async (route) => {
+      if (bound) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(partnerFull()) })
+        return
+      }
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' } }),
+      })
+    })
+    await open(page, '/screen')
+    const shelf = page.locator('.ops-card').filter({ hasText: '本机构在架岗位' })
+    await expect(shelf.locator('.ops-n')).toHaveText('328条')
+
+    bound = false
+    await page.getByRole('button', { name: '刷新' }).click()
+
+    // 旧数据保留，不清空、不伪造 0
+    await expect(shelf.locator('.ops-n')).toHaveText('328条')
+    await expect(page.locator('.ops-stamp.is-stale')).toBeVisible()
+    // 诚实文案：说的是机构归属，不是权限没开
+    await expect(page.getByText(/当前账号未绑定机构/)).toBeVisible()
+    await expect(page.getByText(/请联系平台侧为该账号绑定机构/)).toBeVisible()
+    // 且不得把它混成「无权查看」
+    await expect(page.getByText(/已无权查看本大屏/)).toHaveCount(0)
+  })
+
   test('标题层级：嵌入态全页唯一 h1，全屏演示态大屏标题升为 h1', async ({ page }) => {
     await serveJson(page, partnerFull())
     await open(page, '/screen')

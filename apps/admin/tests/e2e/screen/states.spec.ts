@@ -135,6 +135,81 @@ test.describe('admin data screen states', () => {
     await expect(page.locator('.ops-stamp.is-stale')).toBeVisible()
   })
 
+  /**
+   * 会话是在**已经有数据之后**过期的 —— 这才是挂在墙上的那台机器的常态。
+   *
+   * consoleScreen.ts 的文件头把这条口径写死了：401 之所以**不**自动跳登录页，
+   * 是因为「大屏常年挂在无人看管的机器上，JWT 过期后硬跳会把墙上变成一张登录表单」，
+   * 代价是**由页面显示「登录已过期 + 重新登录」**。那句承诺此前只在
+   * `!data` 那一支兑现；一旦取成功过一次，data 就永远非空，之后任何 401 都只剩
+   * 一句通用的「最近一次刷新失败」。数字停在几小时前，屏上却没有一个字说得清
+   * 为什么、也没有一个可点的地方 —— 正是这条口径想避免的那种墙。
+   *
+   * 所以这里断言两件事同时成立：上次成功的数字**不许**被清成 0（不伪造），
+   * 且必须说得出是登录过期并给出动作（不含糊）。
+   */
+  test('会话在取数成功之后过期：保留上次数值，同时说清是登录过期并给动作', async ({ page }) => {
+    let authed = true
+    await page.route('**/admin/screen/snapshot*', async (route) => {
+      if (authed) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: govFull() }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: { code: 'AUTH_TOKEN_INVALID', message: 'Token 无效或已过期' } }),
+      })
+    })
+    await open(page, '/screen?profile=gov')
+    await expect(page.getByText('128,431')).toBeVisible()
+
+    authed = false
+    await page.getByRole('button', { name: '刷新' }).click()
+
+    // ① 不伪造：上次成功的数字仍在，没有被清成 0 或空
+    await expect(page.getByText('128,431')).toBeVisible()
+    await expect(page.locator('.ops-stamp.is-stale')).toBeVisible()
+    // ② 不含糊：说得出是登录过期，而不是只说「刷新失败」
+    await expect(page.getByText(/登录已过期/)).toBeVisible()
+    // ③ 给得出动作，且点之前不跳转
+    await expect(page.getByRole('button', { name: '重新登录' })).toBeVisible()
+    await expect(page).toHaveURL(/\/screen/)
+  })
+
+  /** 403 同理：角色被撤之后数字同样会冻住，屏上必须说清是权限，不能混成网络故障。 */
+  test('权限在取数成功之后被撤：保留上次数值，同时说清是权限问题', async ({ page }) => {
+    let allowed = true
+    await page.route('**/admin/screen/snapshot*', async (route) => {
+      if (allowed) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: govFull() }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: { code: 'AUTH_ROLE_FORBIDDEN', message: '当前角色无权访问 (需要: admin)' } }),
+      })
+    })
+    await open(page, '/screen?profile=gov')
+    await expect(page.getByText('128,431')).toBeVisible()
+
+    allowed = false
+    await page.getByRole('button', { name: '刷新' }).click()
+
+    await expect(page.getByText('128,431')).toBeVisible()
+    await expect(page.getByText(/已无权查看本大屏/)).toBeVisible()
+    await expect(page.getByText('当前账号没有查看管理员数据大屏的权限')).toBeVisible()
+  })
+
   test('列表截断如实说明；freshness 与访问口径上屏', async ({ page }) => {
     await serveByProfile(page, { gov: govFull(), ops: opsFull() })
     await open(page, '/screen?profile=ops')

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 const root = process.cwd()
 const pagePath = join(root, 'src/routes/orders/index.tsx')
 const servicePath = join(root, 'src/services/api/adminOrdersReadonly.ts')
+const honestyCopyPath = join(root, 'src/routes/orders/orderHonestyCopy.ts')
 
 function pass(message) {
   console.log(`  PASS ${message}`)
@@ -19,6 +20,7 @@ console.log('\n=== Admin orders read-only UI verification ===')
 if (!existsSync(servicePath)) fail('adminOrdersReadonly service is missing')
 const page = readFileSync(pagePath, 'utf8')
 const service = readFileSync(servicePath, 'utf8')
+const honestyCopy = readFileSync(honestyCopyPath, 'utf8')
 
 if (page.includes('adminOrdersReadonlyService') && !page.includes('listPrintTasks')) {
   pass('orders page uses the read-only order service, not print task fallback')
@@ -229,6 +231,73 @@ if (
   pass('渠道已收款未转 paid 的待退款单不被写成「已付款」')
 } else {
   fail('待退款提示必须按 refundReason 区分，不得对未转 paid 的单宣称已付款')
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// API-20b（2026-09-18）：运营关注三支信号（opsAttention / opsAttentionCode）。
+//
+// 后端只读视图早已返回三类互斥信号：refund_required / refunding /
+// channel_accepted_unconfirmed（含渠道已受理但本地回填失败——渠道可能已扣款）。
+// 管理端此前只接了 refundRequired 一支，「退款中」与「渠道已受理未确认」
+// 在列表上完全不可见，运营只能人肉翻页。接线必须同时满足四点：
+//   a. 前端类型与后端字段同名同取值，不新增第四类；
+//   b. 请求装配能发出 opsAttention=true；
+//   c. 「需运营关注」chip 清空 payStatus 与 statusFilter —— 与 M-2 同一类坑：
+//      channel_accepted_unconfirmed 的 payStatus 是 paying/closed 而不是 paid，
+//      钉任何状态都会把最该被看见的那一类静默挡在筛选外；
+//   d. 后端不返回新字段时列表降级到既有 refundRequired 角标，绝不伪造。
+// ────────────────────────────────────────────────────────────────────────────
+if (
+  service.includes('opsAttention?: boolean') &&
+  service.includes('opsAttentionCode?:') &&
+  service.includes("'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null") &&
+  service.includes("opsAttention: params.opsAttention ? 'true' : undefined")
+) {
+  pass('admin orders service carries opsAttention/opsAttentionCode fields and query mapping')
+} else {
+  fail('admin orders service must expose opsAttention/opsAttentionCode with server-identical values and opsAttention query mapping')
+}
+
+if (!page.includes("setOpsAttentionFilter(true)") || !page.includes('需运营关注')) {
+  fail('需运营关注筛选入口缺失（setOpsAttentionFilter / chip 文案）')
+} else {
+  const opsChipHandlers = page
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.includes('setOpsAttentionFilter(true)'))
+  if (opsChipHandlers.length !== 1) {
+    fail(`需运营关注入口必须唯一（找到 ${opsChipHandlers.length} 处 setOpsAttentionFilter(true)）`)
+  } else if (!/setPayStatus\(\s*''\s*\)/.test(opsChipHandlers[0])) {
+    fail(`需运营关注入口必须显式清空 payStatus：${opsChipHandlers[0]}`)
+  } else if (!/setStatusFilter\(\s*''\s*\)/.test(opsChipHandlers[0])) {
+    fail(`需运营关注入口必须显式清空 statusFilter：${opsChipHandlers[0]}`)
+  } else if (/setPayStatus\(\s*'(?:paid|unpaid|paying|closed)'\s*\)/.test(opsChipHandlers[0])) {
+    fail(`需运营关注入口不得钉死任何 payStatus：${opsChipHandlers[0]}`)
+  } else {
+    pass('需运营关注入口发 opsAttention=true 且不携带 payStatus/status 限制（整行匹配）')
+  }
+}
+
+if (
+  page.includes('opsAttentionText(order.opsAttentionCode)') &&
+  /order\.opsAttentionCode === undefined && order\.refundRequired/.test(page)
+) {
+  pass('列表角标读 opsAttentionCode，后端未返回字段时降级 refundRequired 角标（不伪造）')
+} else {
+  fail('列表角标必须读 opsAttentionCode，并在字段缺失时降级而不伪造')
+}
+
+if (
+  honestyCopy.includes("'refund_required'") &&
+  honestyCopy.includes("'refunding'") &&
+  honestyCopy.includes("'channel_accepted_unconfirmed'") &&
+  honestyCopy.includes("return '待退款'") &&
+  honestyCopy.includes("return '退款中'") &&
+  honestyCopy.includes("return '渠道已受理未确认'")
+) {
+  pass('opsAttentionText covers all three server codes with Chinese labels and returns null otherwise')
+} else {
+  fail('opsAttentionText must map refund_required/refunding/channel_accepted_unconfirmed to Chinese and null for unknown')
 }
 
 // API-20 人工发起退款：待退款信号单必须二次确认后才走 canonical refundOrder。

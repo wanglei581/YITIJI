@@ -257,6 +257,8 @@ export default function AdminScreenPage() {
         pollSeconds={meta.pollSeconds}
         stale={Boolean(failure)}
         offline={offlineHint}
+        failure={failure}
+        onRelogin={() => redirectToLogin()}
         actions={actions}
       >
         {profile === 'ops' ? <OpsGrid metrics={data.metrics} /> : <GovGrid metrics={data.metrics} />}

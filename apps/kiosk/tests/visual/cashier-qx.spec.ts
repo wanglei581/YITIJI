@@ -94,6 +94,48 @@ test('cashier renders real channels and sends the selected channel in the pay pa
   expect(payPayload).toEqual({ channel: 'alipay' })
 })
 
+test('channel accepted but local confirm unconfirmed must say do-not-repay, never plain retry @w2', async ({ page, api }) => {
+  // 资金安全回归：POST /orders/:id/pay 回 503 + PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED。
+  // 此刻渠道**可能已经扣款**。屏上必须固定说「请勿重新支付，请联系现场工作人员
+  // 核对渠道订单」；绝不能落到 5xx 通用兜底「服务暂时不可用，请稍后重试」——
+  // 那句话在可能已扣款的时刻是在教用户再付一次。
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+  await routeExactJson(page, 'POST', `/api/v1/orders/${W2_ORDER.orderId}/pay`, async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: {
+          code: 'PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED',
+          message: '支付通道已受理，本地确认未完成。请勿重新支付，请联系工作人员核对渠道订单。',
+        },
+      }),
+    })
+  })
+
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
+  // 单通道会被服务端唯一事实直接采用，页面落在 channel-selected 而不是 pending
+  // （多通道才需要用户先选通道）。
+  await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
+  await page.getByRole('button', { name: '手机扫屏幕上的码' }).click()
+
+  const alert = page.getByRole('alert')
+  await expect(alert).toBeVisible()
+  const alertText = (await alert.innerText()).replace(/\s+/g, '')
+  // ① 必须说出「请勿重新支付」并指向工作人员 —— 这正是资金安全的全部要点
+  expect(alertText, '渠道已受理未确认时必须明说请勿重新支付').toContain('请勿重新支付')
+  expect(alertText, '必须指向现场工作人员核对渠道订单').toMatch(/现场工作人员|工作人员/)
+  // ② 必须不出现「请稍后重试」类措辞 —— 那是在可能已扣款的时刻教用户再付一次
+  expect(alertText, '渠道已受理未确认时不得出现通用重试话术').not.toContain('请稍后重试')
+  // ③ 整页同口径：任何位置都不得诱导重试（含通用 5xx 兜底句）
+  const pageText = (await page.locator('[data-w2-page="print-cashier"]').innerText()).replace(/\s+/g, '')
+  expect(pageText, '收银页任何位置都不得出现「请稍后重试」').not.toContain('请稍后重试')
+})
+
 test('cashier exposes a failed channel request and retries the real endpoint @w2', async ({ page, api }) => {
   registerShell(api)
   api.respondWith('GET', '/api/v1/payment/channels', (requestNumber: number) => requestNumber === 1

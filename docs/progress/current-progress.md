@@ -1,5 +1,15 @@
 # 当前开发进度
 
+2026-09-18 **前端收口 GO（SOURCE/LOCAL）：大屏 stale 身份提示、Admin opsAttention 接线、Kiosk 请勿重新支付。**
+冻结基线 HEAD `f5d9f36ca`，本条落地 SHA 以提交为准。分支 `codex/commercial-integration-20260918-r1`。本轮只改 `apps/admin` / `apps/partner` / `apps/kiosk` 前端与其测试/verify 脚本，**未碰 services/、Prisma、workflow、CI 配置**。未 push、未开 PR、未部署、未连生产、未支付、未动硬件。Claude 大屏测试资产 `apps/admin/tests/e2e/screen/states.spec.ts`（SHA-256 `6b2e4bcb…0223b905`）原文保留未弱化，其两条新增用例由红转绿。
+
+- **A. Admin/Partner 大屏取数成功后 401/403：** `screenView.tsx` 增 `failure`/`onRelogin` 传参，keep-last 数据不动、stale 标记保留，新增身份/权限横幅：401 →「登录已过期 + 重新登录」按钮（点击才跳）；403 →「已无权查看本大屏 + 原因」。Partner 额外区分 `ORG_REQUIRED`（「当前账号未绑定机构」）。旧数据不清空、不伪造 0。
+- **B. Admin opsAttention/opsAttentionCode 接线：** 前端类型补齐两个可选字段（后端未返回时降级到既有 refundRequired 角标，绝不伪造）；`opsAttention=true` 查询映射；新增「需运营关注」筛选 chip，**清空 payStatus 与 statusFilter**（channel_accepted_unconfirmed 的 payStatus 是 paying/closed，钉死会静默漏掉整类）；三类中文角标：待退款 / 退款中 / 渠道已受理未确认。
+- **C. Kiosk 资金安全文案：** `userErrorMessage.ts` 白名单新增 `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED` 固定文案「…请勿重新支付，请联系现场工作人员核对渠道订单」，不再落 5xx 通用「请稍后重试」。
+- **验证（全部退出 0）：** admin/partner/kiosk `typecheck`；`verify:console-screen-ui`；`verify:admin-orders-readonly-ui`（含新增 opsAttention 断言块）；admin screen e2e 44/44（原两条 Claude 用例由 4 红转绿）；partner screen e2e 24/24（新增 401/403/ORG_REQUIRED keep-last 三条）；admin orders e2e 3/3（新增「需运营关注」chip 用例）；kiosk `cashier-qx` W2 e2e 6/6（新增 503+ACCEPTANCE_UNCONFIRMED 用例）。
+- **反向变异（均已恢复）：** Admin 大屏把 `failure` 改传 `null`，目标 Playwright **2/2 红、退出 1**，恢复后 **2/2 绿、退出 0**；「需运营关注」把 `payStatus` 钉成 `paid`，`verify:admin-orders-readonly-ui` **退出 1**，恢复后 **退出 0**；删除 Kiosk `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED` 映射，目标 W2 用例落入「请稍后重试」并 **退出 1**，恢复后 **退出 0**。
+- **证据边界：** `SOURCE / LOCAL: GO`（前端源码 + 本机 e2e/verify）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。GitHub CI 尚未对 final-head 跑 `build-and-verify` / `postgres-readiness` / `kiosk-browser-smoke`。
+
 2026-09-18 **LOCAL postgres-readiness rehearsal GO；GitHub CI 仍 NO-GO。**
 绑定 HEAD `cd19fb47a64f90b14b6475e6d1dd3b442fca751a`（源码父 `b38c4f541`）。本条只收口证据文档，未改源码 / 测试 / 前端。未 push、未开 PR、未部署。Claude 未提交大屏测试 **未改、未暂存**（工作区 SHA-256 `6b2e4bcbb8f341edba53b92e6df74234e7152c49d07652340c9d144c0223b905`）。
 

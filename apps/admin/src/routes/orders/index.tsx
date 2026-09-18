@@ -20,6 +20,7 @@ import {
   copiesText,
   duplexText,
   NET_PAID_UNRECORDED,
+  opsAttentionText,
   pageRangeText,
   recordedCentsText,
 } from './orderHonestyCopy'
@@ -158,6 +159,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [payStatus, setPayStatus] = useState('')
   const [refundRequiredFilter, setRefundRequiredFilter] = useState(false)
+  const [opsAttentionFilter, setOpsAttentionFilter] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -184,7 +186,7 @@ export default function OrdersPage() {
   const [verifyConfirm, setVerifyConfirm] = useState('')
   const [verifySubmitting, setVerifySubmitting] = useState(false)
   const [verifyError, setVerifyError] = useState<string | null>(null)
-  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${refundRequiredFilter}:${search}:${page}:${pageSize}`
+  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${refundRequiredFilter}:${opsAttentionFilter}:${search}:${page}:${pageSize}`
 
   const {
     data: orderPage,
@@ -197,6 +199,7 @@ export default function OrdersPage() {
       payStatus: payStatus || undefined,
       search: search || undefined,
       refundRequired: refundRequiredFilter || undefined,
+      opsAttention: opsAttentionFilter || undefined,
       page,
       pageSize,
     }),
@@ -399,7 +402,7 @@ export default function OrdersPage() {
                 key={f.label}
                 active={statusFilter === f.value}
                 label={f.label}
-                onClick={() => { setStatusFilter(f.value); setRefundRequiredFilter(false); setPage(1) }}
+                onClick={() => { setStatusFilter(f.value); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
               />
             ))}
           </div>
@@ -410,13 +413,13 @@ export default function OrdersPage() {
                 key={f.label}
                 active={payStatus === f.value}
                 label={f.label}
-                onClick={() => { setPayStatus(f.value); setRefundRequiredFilter(false); setPage(1) }}
+                onClick={() => { setPayStatus(f.value); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
               />
             ))}
             <FilterChip
-              active={statusFilter === 'failed' && payStatus === 'paid' && !refundRequiredFilter}
+              active={statusFilter === 'failed' && payStatus === 'paid' && !refundRequiredFilter && !opsAttentionFilter}
               label="已支付失败待核查"
-              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setRefundRequiredFilter(false); setPage(1) }}
+              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
             />
             {/*
               待退款覆盖**两类**信号单（服务端 refundRequired 的 OR 两支）：
@@ -430,7 +433,21 @@ export default function OrdersPage() {
             <FilterChip
               active={refundRequiredFilter}
               label="待退款（已收款未出纸）"
-              onClick={() => { setRefundRequiredFilter(true); setPayStatus(''); setStatusFilter(''); setPage(1) }}
+              onClick={() => { setRefundRequiredFilter(true); setOpsAttentionFilter(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
+            />
+            {/*
+              需运营关注 = 服务端 opsAttention 的**三支 OR**：待退款、退款中、
+              渠道已受理但本地确认未落地。后两支在本页此前完全没有入口。
+
+              与上面那条同一个坑，必须再说一遍：这里**不能**顺手补 payStatus。
+              `channel_accepted_unconfirmed` 的 payStatus 是 paying / closed ——
+              渠道收了钱、本地没转成已支付。钉任何 payStatus 都会把这一类
+              整体挡在筛选外，而页面不会报错，只是查不到；那正是最该被看见的一类。
+            */}
+            <FilterChip
+              active={opsAttentionFilter}
+              label="需运营关注"
+              onClick={() => { setOpsAttentionFilter(true); setRefundRequiredFilter(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
             />
           </div>
         </div>
@@ -477,7 +494,17 @@ export default function OrdersPage() {
                           <td className={`${TD_CLS} tabular-nums text-neutral-700`}>{amountText(order.amountCents, order.currency)}</td>
                           <td className={TD_CLS}>
                             <StatusBadge dot status={pay.badge} label={pay.label} />
-                            {order.refundRequired ? (
+                            {/*
+                              角标读 opsAttentionCode 而不是 refundRequired：后者只覆盖三类里的一类，
+                              「退款中」「渠道已受理未确认」此前在列表上完全不可见。
+                              后端未返回该字段时 opsAttentionText 回 null —— 保留既有 refundRequired
+                              角标作为降级，不知道就不说，绝不默认「无异常」。
+                            */}
+                            {opsAttentionText(order.opsAttentionCode) ? (
+                              <span className="ml-1 text-[11px] font-bold text-warning-fg">
+                                {opsAttentionText(order.opsAttentionCode)}
+                              </span>
+                            ) : order.opsAttentionCode === undefined && order.refundRequired ? (
                               <span className="ml-1 text-[11px] font-bold text-warning-fg">待退款</span>
                             ) : null}
                           </td>

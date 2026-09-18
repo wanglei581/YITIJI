@@ -16498,6 +16498,7 @@
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
     "apps/admin/src/routes/orders/orderHonestyCopy.ts": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "apps/admin/src/routes/partners/OrgContentTrustPanel.tsx": [
@@ -23609,6 +23610,7 @@
         "dirs": [],
         "files": [
           "apps/admin/src/routes/orders/index.tsx",
+          "apps/admin/src/routes/orders/orderHonestyCopy.ts",
           "apps/admin/src/services/api/adminOrdersReadonly.ts",
           "apps/admin/src/services/api/adminPrintJobs.ts"
         ],

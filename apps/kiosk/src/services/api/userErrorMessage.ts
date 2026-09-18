@@ -73,6 +73,10 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_SCAN_SESSION: '扫描任务未创建成功，请返回重试',
   PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED: '检测到上一笔支付待核实，请先等待自动确认或点击核实',
   PAYMENT_ATTEMPT_PENDING: '已有支付正在处理中，请勿重复扫码',
+  // 渠道已受理、本地回填失败（503）。落通用 5xx 兜底「服务暂时不可用，请稍后重试」
+  // 会在渠道**可能已经扣款**的时刻教用户再付一次 —— 那不是文案问题，是资金风险。
+  // 用固定文案而非透传：透传依赖后端措辞和 60 字长度闸门，这条不能随后端改词漂移。
+  PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED: '支付通道已受理，本地确认未完成。请勿重新支付，请联系现场工作人员核对渠道订单',
   RECONCILE_TOO_FREQUENT: '核实过于频繁，请稍候几秒再试',
   RECONCILE_UNSUPPORTED: '当前通道不支持主动核实，请继续等待支付结果',
   LOCAL_AGENT_UNREACHABLE: '无法连接本机终端服务，请确认设备正常后重试',

@@ -219,6 +219,8 @@ export default function PartnerScreenPage() {
         pollSeconds={POLL_SECONDS}
         stale={Boolean(failure)}
         offline={offlineHint}
+        failure={failure}
+        onRelogin={() => redirectToLogin()}
         actions={actions}
       >
         <PartnerGrid metrics={data.metrics} />

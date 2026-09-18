@@ -12,6 +12,7 @@
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|
+| 0 | 本写入者（Hermes-Claude Opus 5） | **已完成（本轮）**：大屏 stale 态 401/403 身份与权限提示（Admin/Partner，Partner 含 ORG_REQUIRED）；Admin `opsAttention`/`opsAttentionCode` 三类中文标识 + 「需运营关注」筛选（不钉 payStatus）；Kiosk `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED` 固定「请勿重新支付」文案。验证与退出码见 `current-progress.md` 顶部新条目 | 大屏 stale 态须保留旧数据并给身份提示与动作；opsAttention 筛选不得带 payStatus/status 限制；收银页 503 未确认态不得出现「请稍后重试」 |
 | 1 | 本写入者（Grok） | ~~隔离 SQLite 门禁~~ **已完成**；~~空库 migrate~~ **已完成**；~~本机完整 `postgres-readiness` 预演~~ **已完成**（103/103，绑定 `cd19fb47a`）。命令与退出码见 `current-progress.md` 顶部。page-lifecycle 拼接缺 `})` 已补回 `4ba8a7786` | 不得把 LOCAL 预演写成 GitHub CI 绿 |
 | 2 | Claude | 确认合流后的前端仍是各候选提交的原意：小程序材料包/支付/订单详情/page-lifecycle 测试拼接（含补回的两行）、Kiosk `PrintDonePage`、Admin 订单待退款筛选与计费文案、Admin/Partner 数据大屏与 `packages/ui` screen | 不发明新 UI；若拼接测试改变了生命周期契约，只许在新分支修，不得在本合流上继续堆前端 |
 | 3 | 独立复审 | 对合流 HEAD 做支付租约 CAS × 待退款信号、Agent 陈旧锁 fail-closed、大屏 fail-closed 快照的只读复审 | 不得沿用 `33751df4a` / `09ecc76f1` / `6940ba257` / `dbd28905e` 各自的绿灯 |
