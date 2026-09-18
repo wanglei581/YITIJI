@@ -5115,7 +5115,9 @@ test('R12-L order-detail：精确 404+code 在换人之后到达 —— 不得�
   assert.ok(!JSON.stringify(page.data).includes('12345678'))
   assert.ok(!JSON.stringify(page.data).includes('A的简历'))
   assert.equal(pending.length, 2, '迟到的拒绝回调不得替 B 去要 A 的订单')
+})
 
+// ══════════════════════════════════════════════════════════════════════
 // R11. 单件云打印幂等键 TTL：本机不得比服务端先失忆
 //
 // 材料包链（25158d95b）已经用 submittedAt / markSubmitted 收口过同一条洞。
