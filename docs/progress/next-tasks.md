@@ -7,13 +7,13 @@
 （A `a677bde84`、B `09ecc76f1`、C `6940ba257`、D `dbd28905e`）。未 push、未开 PR、未部署。
 精确 SHA 以本分支 `HEAD` 为准，见 `current-progress.md` 顶部。
 
-**总判定：`SOURCE: GO`；`LOCAL:` 待本轮隔离门禁跑完；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
-不得把任一来源候选的旧 CI 绿或旧现场证据外推到本合流树。
+**总判定：`SOURCE: GO`；`LOCAL: GO`（隔离 SQLite 套件，见 `current-progress.md` 顶部）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+不得把任一来源候选的旧 CI 绿或旧现场证据外推到本合流树。本机无 PostgreSQL，PG migrate 应用证据留给 CI。
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|
-| 1 | 本写入者（Grok） | 在隔离临时库跑最小集成门禁：`git diff --check origin/main...HEAD`、`verify:repository-integrity`、`verify:ci-gate-coverage`、`graph:check`、根 typecheck；再按改动跑支付、材料包幂等、扫描、Agent、Admin/Partner 大屏已有专项 | 命令与退出码写入进度；全超时则只报已跑结果，不得虚报通过 |
-| 2 | Claude | 确认合流后的前端仍是各候选提交的原意：小程序材料包/支付/订单详情/page-lifecycle 测试拼接、Kiosk `PrintDonePage`、Admin 订单待退款筛选与计费文案、Admin/Partner 数据大屏与 `packages/ui` screen | 不发明新 UI；若拼接测试改变了生命周期契约，只许在新分支修，不得在本合流上继续堆前端 |
+| 1 | 本写入者（Grok） | ~~隔离门禁~~ **已完成**（命令与退出码见 `current-progress.md` 2026-09-18 验证条）。page-lifecycle 拼接缺 `})` 已补回 `4ba8a7786` | 不得把该 LOCAL 绿写成 CI 绿 |
+| 2 | Claude | 确认合流后的前端仍是各候选提交的原意：小程序材料包/支付/订单详情/page-lifecycle 测试拼接（含补回的两行）、Kiosk `PrintDonePage`、Admin 订单待退款筛选与计费文案、Admin/Partner 数据大屏与 `packages/ui` screen | 不发明新 UI；若拼接测试改变了生命周期契约，只许在新分支修，不得在本合流上继续堆前端 |
 | 3 | 独立复审 | 对合流 HEAD 做支付租约 CAS × 待退款信号、Agent 陈旧锁 fail-closed、大屏 fail-closed 快照的只读复审 | 不得沿用 `33751df4a` / `09ecc76f1` / `6940ba257` / `dbd28905e` 各自的绿灯 |
 | 4 | CI | 获得 push/PR 授权后只认本 HEAD 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke`；PostgreSQL job 必须实际应用 `20260917120000` 与 `20260918120000` | 旧 run（含 `34992685756`、`35206540195`、`35235786133`）一律作废 |
 | 5 | Windows / 奔图专用任务 | 冻结本合流精确 SHA；先验活实例重复启动与 `stale_lock_requires_operator`，再面板扫描 / 出纸 / 扫码枪 | `DEVICE` 完成前保持 NO-GO；不要先删除锁 |
