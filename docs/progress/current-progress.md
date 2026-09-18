@@ -1,5 +1,13 @@
 # 当前开发进度
 
+2026-09-18 **收费恢复 P0 收口：legacy `expired`+空标识互斥 + code-pay 真实回填失败注入。**
+HEAD 以其落地 SHA 为准。未 push。Claude 大屏测试文件未改。
+
+- 历史 `PaymentAttempt status=expired` 且三标识全空：QR / code-pay 现一并 fail-closed（`PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED`），不再调 provider。
+- code-pay 故障注入同时打断 identifier 回填与 `markPaidOnline`，断言保持 `paying`，禁止 `ORDER_ALREADY_PAID` 逃掉。
+- Admin 全表模糊行（无显式 failReason）回看 90 天；`CHANNEL_ACCEPTED_UNCONFIRMED` 永久可见。更早的空标识见 `next-tasks.md` 一次性查库 SQL。
+- 补 `payment.channel_accepted_unconfirmed` 审计断言。
+
 2026-09-18 **收费恢复 P0：渠道已受理、本地 identifier 回填失败不再隐身。**
 分支 `codex/commercial-integration-20260918-r1`，本条落地 SHA 以提交为准。未 push、未开 PR、未部署、未连生产、未真实支付。无 schema/migration。招聘闭环闸门未动。Claude 未提交大屏测试 `apps/admin/tests/e2e/screen/states.spec.ts` **未改、未暂存**。
 

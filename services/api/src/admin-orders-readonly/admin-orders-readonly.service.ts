@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   channelAcceptedUnconfirmedWhere,
+  EMPTY_IDENTIFIER_LOOKBACK_MS,
   isChannelAcceptedUnconfirmedAttempt,
 } from '../payment/channel-accepted-signal'
 import {
@@ -316,7 +317,7 @@ export class AdminOrdersReadonlyService {
 
   private async unconfirmedAttemptOrderIds(): Promise<string[]> {
     const rows = await this.prisma.paymentAttempt.findMany({
-      where: channelAcceptedUnconfirmedWhere(),
+      where: channelAcceptedUnconfirmedWhere(new Date(), { fuzzyLookbackMs: EMPTY_IDENTIFIER_LOOKBACK_MS }),
       select: {
         orderId: true,
         status: true,

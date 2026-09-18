@@ -22526,6 +22526,10 @@
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-payment-flow.ts"
     ],
+    "services/api/src/payment/channel-accepted-signal.ts": [
+      "services/api/scripts/verify-payment-flow.ts",
+      "services/api/scripts/verify-reconciliation.ts"
+    ],
     "services/api/src/payment/code-payment-convergence.task.ts": [
       "services/api/scripts/verify-payment-codepay.ts"
     ],
@@ -33462,6 +33466,7 @@
           "services/api/src/config/production-runtime-gates.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/admin-order-actions.controller.ts",
+          "services/api/src/payment/channel-accepted-signal.ts",
           "services/api/src/payment/dto/order-action.dto.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
@@ -34056,6 +34061,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/payment/channel-accepted-signal.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],

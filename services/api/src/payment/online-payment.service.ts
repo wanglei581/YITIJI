@@ -212,13 +212,14 @@ export class OnlinePaymentService {
           { status: { in: ['created', 'pending'] }, expiresAt: { gt: new Date(now) } },
           // 付款码过期不代表渠道绝对未扣款。必须先查单收敛，不能改发二维码造成双扣。
           { status: 'expired', qrCodeContent: null, prepayId: { not: null } },
-          // 渠道已受理但本地标识未落地：即使动态码 TTL 已过，也不得再向渠道下第二单。
+          // 渠道已受理但本地标识未落地：即使动态码 TTL 已过、status 已被写成 expired，
+          // 也不得再向渠道下第二单。历史惰性过期会留下 expired + 空标识。
           {
-            status: { in: ['created', 'pending'] },
+            status: { in: ['created', 'pending', 'expired'] },
             failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
           },
           {
-            status: { in: ['created', 'pending'] },
+            status: { in: ['created', 'pending', 'expired'] },
             prepayId: null,
             qrCodeContent: null,
             channelTxnNo: null,
@@ -340,6 +341,16 @@ export class OnlinePaymentService {
           // 付款码过期不代表渠道绝对未扣款，必须先查单；屏上二维码只有在
           // convergeExpiredScreenQrAttempt 已获渠道关单确认后才会退出此互斥集合。
           { status: 'expired', qrCodeContent: null, prepayId: { not: null } },
+          {
+            status: { in: ['created', 'pending', 'expired'] },
+            failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+          },
+          {
+            status: { in: ['created', 'pending', 'expired'] },
+            prepayId: null,
+            qrCodeContent: null,
+            channelTxnNo: null,
+          },
         ],
       },
       orderBy: { createdAt: 'desc' },

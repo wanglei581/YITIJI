@@ -22,6 +22,21 @@
 
 执行边界：不弱化招聘闭环闸门与发布授权闸门；不把本地门禁写成 CI/设备/生产/商业 GO；不把「渠道已收款未转 paid」伪装成 `payStatus=paid`。
 
+**生产一次性查库（历史 `expired` + 空标识）：** Admin `opsAttention` 全表扫描对无 `failReason` 的模糊行只回看 90 天；显式 `CHANNEL_ACCEPTED_UNCONFIRMED` 永久可见。上线前对生产库跑一次：
+
+```sql
+SELECT o.id, o."orderNo", o."payStatus", a.id AS attempt_id, a.status, a."failReason", a."createdAt"
+FROM "PaymentAttempt" a
+JOIN "Order" o ON o.id = a."orderId"
+WHERE a.status IN ('created', 'pending', 'expired')
+  AND a."prepayId" IS NULL AND a."qrCodeContent" IS NULL AND a."channelTxnNo" IS NULL
+  AND (a."failReason" IS NULL OR a."failReason" <> 'CHANNEL_ACCEPTED_UNCONFIRMED')
+  AND a."createdAt" < NOW() - INTERVAL '90 days'
+ORDER BY a."createdAt";
+```
+
+命中行按 `attempt.id` 查渠道账本，不要重新出码。不得把该清单当成已自动清掉。
+
 ## 2026-09-18 Windows / 奔图现场候选 R3 当前推进顺序
 
 **当前候选判定：** `origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7` 已在本地通过

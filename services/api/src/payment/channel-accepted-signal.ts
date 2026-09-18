@@ -22,6 +22,9 @@ export const CHANNEL_ACCEPTED_UNCONFIRMED_REASON = 'CHANNEL_ACCEPTED_UNCONFIRMED
 /** 空标识尚未钉 failReason 时，对账/Admin 的可见宽限。互斥不采用此宽限。 */
 export const EMPTY_IDENTIFIER_VISIBLE_AFTER_MS = 30_000
 
+/** Admin 全表模糊行（无显式 failReason）的回看窗口。显式 CHANNEL_ACCEPTED_UNCONFIRMED 不受此限。 */
+export const EMPTY_IDENTIFIER_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000
+
 export const CHANNEL_ACCEPTED_UNCONFIRMED_NEXT_STEP =
   '按商户订单号（PaymentAttempt.id = 渠道 out_trade_no）查渠道账本。已收款则走 reconcile 入账或待退；渠道无单则保持互斥锁，不要重新出码或付款码。'
 
@@ -53,19 +56,31 @@ export function isChannelAcceptedUnconfirmedAttempt(
   return nowMs - attempt.createdAt.getTime() >= EMPTY_IDENTIFIER_VISIBLE_AFTER_MS
 }
 
-export function channelAcceptedUnconfirmedWhere(now: Date = new Date()): {
+export function channelAcceptedUnconfirmedWhere(
+  now: Date = new Date(),
+  opts?: { fuzzyLookbackMs?: number },
+): {
   status: { in: string[] }
   OR: Array<
     | { failReason: string }
-    | { prepayId: null; qrCodeContent: null; channelTxnNo: null; createdAt: { lte: Date } }
+    | {
+        prepayId: null
+        qrCodeContent: null
+        channelTxnNo: null
+        createdAt: { lte: Date; gte?: Date }
+      }
   >
 } {
   const visibleBefore = new Date(now.getTime() - EMPTY_IDENTIFIER_VISIBLE_AFTER_MS)
+  const emptyCreatedAt: { lte: Date; gte?: Date } = { lte: visibleBefore }
+  if (opts?.fuzzyLookbackMs != null) {
+    emptyCreatedAt.gte = new Date(now.getTime() - opts.fuzzyLookbackMs)
+  }
   return {
     status: { in: ['created', 'pending', 'expired'] },
     OR: [
       { failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON },
-      { prepayId: null, qrCodeContent: null, channelTxnNo: null, createdAt: { lte: visibleBefore } },
+      { prepayId: null, qrCodeContent: null, channelTxnNo: null, createdAt: emptyCreatedAt },
     ],
   }
 }

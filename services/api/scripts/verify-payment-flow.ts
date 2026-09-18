@@ -1298,6 +1298,18 @@ async function main(): Promise<void> {
       } else {
         fail(`recon missed unconfirmed collection: ${JSON.stringify(reconReport.attention.unconfirmedCollections)}`)
       }
+      const unconfirmedAudit = await prisma.auditLog.findFirst({
+        where: {
+          action: 'payment.channel_accepted_unconfirmed',
+          targetType: 'payment_attempt',
+          targetId: unconfirmedAttempt!.id,
+        },
+      })
+      if (unconfirmedAudit) {
+        pass('QR finalize failure writes payment.channel_accepted_unconfirmed audit')
+      } else {
+        fail('missing payment.channel_accepted_unconfirmed audit after QR finalize failure')
+      }
       const adminHit = (await adminOrders.list({
         opsAttention: true,
         search: unconfirmedOrder?.orderNo,
@@ -1379,6 +1391,10 @@ async function main(): Promise<void> {
       codePayCalls += 1
       return originalCreateCode(input)
     }
+    const orderDelegate = prisma.order as unknown as {
+      updateMany: (...args: unknown[]) => Promise<unknown>
+    }
+    const originalOrderUpdateMany = orderDelegate.updateMany.bind(orderDelegate)
     attemptDelegate.update = async (...args: unknown[]) => {
       const data = (args[0] as { data?: { prepayId?: string; qrCodeContent?: string; status?: string } } | undefined)?.data
       if (data?.status === 'pending' && data.prepayId && !data.qrCodeContent) {
@@ -1387,11 +1403,20 @@ async function main(): Promise<void> {
       return originalAttemptUpdate(...args)
     }
     attemptDelegate.updateMany = async (...args: unknown[]) => {
-      const data = (args[0] as { data?: { prepayId?: string; qrCodeContent?: string; status?: string } } | undefined)?.data
-      if (data?.prepayId || data?.qrCodeContent) {
+      const data = (args[0] as {
+        data?: { prepayId?: string; qrCodeContent?: string; status?: string; channelTxnNo?: string }
+      } | undefined)?.data
+      if (data?.prepayId || data?.qrCodeContent || data?.status === 'success' || data?.channelTxnNo) {
         throw new Error('VERIFY_FORCED_CODEPAY_IDENTIFIER_WRITE_FAILURE')
       }
       return originalAttemptUpdateMany(...args)
+    }
+    orderDelegate.updateMany = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { payStatus?: string; paymentSource?: string } } | undefined)?.data
+      if (data?.payStatus === 'paid' || data?.paymentSource) {
+        throw new Error('VERIFY_FORCED_MARK_PAID_FAILURE')
+      }
+      return originalOrderUpdateMany(...args)
     }
     try {
       const codePayResult = await payment.createCodePayAttempt(
@@ -1405,34 +1430,137 @@ async function main(): Promise<void> {
         orderBy: { createdAt: 'desc' },
       })
       if (
-        (codePayResult.status === 'success' || codePayResult.status === 'paying') &&
-        codePayOrder?.payStatus !== 'unpaid' &&
+        codePayResult.status === 'paying' &&
+        codePayOrder?.payStatus === 'paying' &&
         codePayAttempt &&
-        codePayAttempt.status !== 'failed'
+        codePayAttempt.status !== 'failed' &&
+        codePayAttempt.status !== 'success' &&
+        (codePayAttempt.failReason === CHANNEL_ACCEPTED_UNCONFIRMED_REASON
+          || (!codePayAttempt.prepayId && !codePayAttempt.qrCodeContent && !codePayAttempt.channelTxnNo))
       ) {
-        pass('code-pay channel success survives local identifier write failure without releasing unpaid')
+        pass('code-pay channel success + local settle failure keeps paying and a durable unconfirmed signal')
       } else {
         fail(
           `code-pay unconfirmed mismatch: result=${JSON.stringify(codePayResult)} pay=${codePayOrder?.payStatus} attempt=${JSON.stringify(codePayAttempt)}`,
         )
       }
       const codePayAttempts = await prisma.paymentAttempt.count({ where: { orderId: codePayUnconfirmedId } })
-      const retryCode = codePayOrder?.payStatus === 'paid' ? 'ORDER_ALREADY_PAID' : 'PAYMENT_ATTEMPT_PENDING'
       await expectCode(
-        `code-pay unconfirmed blocks a second charge (${retryCode})`,
-        retryCode,
+        'code-pay unconfirmed blocks a second charge (PAYMENT_ATTEMPT_PENDING)',
+        'PAYMENT_ATTEMPT_PENDING',
         () => payment.createCodePayAttempt(codePayUnconfirmedId, codePayUnconfirmedSession, '123456789012345678'),
       )
       const codePayAttemptsAfter = await prisma.paymentAttempt.count({ where: { orderId: codePayUnconfirmedId } })
       if (codePayAttempts === 1 && codePayAttemptsAfter === 1 && codePayCalls === 1) {
-        pass('code-pay retry after finalize failure does not create a second attempt or call the provider again')
+        pass('code-pay retry after settle failure does not create a second attempt or call the provider again')
       } else {
         fail(`code-pay second attempt: before=${codePayAttempts} after=${codePayAttemptsAfter} calls=${codePayCalls}`)
+      }
+      const codePayAudit = await prisma.auditLog.findFirst({
+        where: {
+          action: 'payment.channel_accepted_unconfirmed',
+          targetType: 'payment_attempt',
+          targetId: codePayAttempt!.id,
+        },
+      })
+      if (codePayAudit) {
+        pass('code-pay settle failure writes payment.channel_accepted_unconfirmed audit')
+      } else {
+        fail('missing payment.channel_accepted_unconfirmed audit after code-pay settle failure')
+      }
+      const codePayAdmin = (await adminOrders.list({
+        opsAttention: true,
+        search: codePayOrder?.orderNo,
+        page: 1,
+        pageSize: 10,
+      })).items[0]
+      if (
+        codePayAdmin?.id === codePayUnconfirmedId &&
+        codePayAdmin.opsAttentionCode === 'channel_accepted_unconfirmed' &&
+        codePayAdmin.payStatus === 'paying'
+      ) {
+        pass('admin opsAttention lists code-pay unconfirmed without faking paid')
+      } else {
+        fail(`admin missed code-pay unconfirmed: ${JSON.stringify(codePayAdmin)}`)
       }
     } finally {
       attemptDelegate.update = originalAttemptUpdate
       attemptDelegate.updateMany = originalAttemptUpdateMany
+      orderDelegate.updateMany = originalOrderUpdateMany
       provider.createCodePayment = originalCreateCode
+    }
+
+    // ── (17) 历史 expired + 空标识：不得再向渠道下第二单 ────────────────
+    const legacyQrId = await makeOrder(90, 'unpaid')
+    const legacyQrSession = await paymentSessionFor(legacyQrId)
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: legacyQrId,
+        channel: CHANNEL,
+        amountCents: 90,
+        status: 'expired',
+        prepayId: null,
+        qrCodeContent: null,
+        channelTxnNo: null,
+        createdAt: new Date(Date.now() - 86_400_000),
+      },
+    })
+    let legacyQrCalls = 0
+    const originalCreateQrLegacy = provider.createQrPayment.bind(provider)
+    provider.createQrPayment = async (input) => {
+      legacyQrCalls += 1
+      return originalCreateQrLegacy(input)
+    }
+    try {
+      await expectCode(
+        'legacy expired empty-identifier QR attempt blocks a second channel create (PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED)',
+        'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED',
+        () => payment.createPayAttempt(legacyQrId, legacyQrSession),
+      )
+      const legacyQrAttempts = await prisma.paymentAttempt.count({ where: { orderId: legacyQrId } })
+      if (legacyQrAttempts === 1 && legacyQrCalls === 0) {
+        pass('legacy expired empty QR lock does not call the provider or mint a second attempt')
+      } else {
+        fail(`legacy QR second charge: attempts=${legacyQrAttempts} providerCalls=${legacyQrCalls}`)
+      }
+    } finally {
+      provider.createQrPayment = originalCreateQrLegacy
+    }
+
+    const legacyCodeId = await makeOrder(95, 'unpaid')
+    const legacyCodeSession = await paymentSessionFor(legacyCodeId)
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: legacyCodeId,
+        channel: CHANNEL,
+        amountCents: 95,
+        status: 'expired',
+        prepayId: null,
+        qrCodeContent: null,
+        channelTxnNo: null,
+        createdAt: new Date(Date.now() - 86_400_000),
+      },
+    })
+    let legacyCodeCalls = 0
+    const originalCreateCodeLegacy = provider.createCodePayment!.bind(provider)
+    provider.createCodePayment = async (input) => {
+      legacyCodeCalls += 1
+      return originalCreateCodeLegacy(input)
+    }
+    try {
+      await expectCode(
+        'legacy expired empty-identifier code-pay attempt blocks a second channel create (PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED)',
+        'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED',
+        () => payment.createCodePayAttempt(legacyCodeId, legacyCodeSession, '123456789012345678'),
+      )
+      const legacyCodeAttempts = await prisma.paymentAttempt.count({ where: { orderId: legacyCodeId } })
+      if (legacyCodeAttempts === 1 && legacyCodeCalls === 0) {
+        pass('legacy expired empty code-pay lock does not call the provider or mint a second attempt')
+      } else {
+        fail(`legacy code-pay second charge: attempts=${legacyCodeAttempts} providerCalls=${legacyCodeCalls}`)
+      }
+    } finally {
+      provider.createCodePayment = originalCreateCodeLegacy
     }
 
     console.log('\nAll payment-flow assertions passed.\n')
