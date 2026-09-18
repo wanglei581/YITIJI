@@ -22527,6 +22527,7 @@
       "services/api/scripts/verify-payment-flow.ts"
     ],
     "services/api/src/payment/channel-accepted-signal.ts": [
+      "services/api/scripts/verify-payment-codepay.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-reconciliation.ts"
     ],
@@ -33432,6 +33433,7 @@
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/cashierStatus.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
+          "services/api/src/payment/channel-accepted-signal.ts",
           "services/api/src/payment/code-payment-convergence.task.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/payment-provider.factory.ts",

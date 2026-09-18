@@ -2,6 +2,7 @@
 import { generateKeyPairSync, randomUUID } from 'crypto'
 import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from '../src/payment/channel-accepted-signal'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
@@ -55,6 +56,72 @@ async function expectCode(label: string, code: string, action: () => Promise<unk
   }
 }
 
+/**
+ * Prisma 标量过滤：`field: value` 是严格相等，`field: null` 是 IS NULL。
+ * `{ not: null }` 是 IS NOT NULL；`{ not: 'x' }` 不匹配 null（与 Prisma `<>` 一致）。
+ * 忽略 failReason 会让 status=expired + failReason=null 误中 CHANNEL_ACCEPTED_UNCONFIRMED 分支。
+ */
+function matchesPrismaScalar(actual: unknown, expected: unknown): boolean {
+  if (expected === undefined) return true
+  if (expected === null) return actual === null
+  if (typeof expected === 'string' || typeof expected === 'number' || typeof expected === 'boolean') {
+    return actual === expected
+  }
+  if (typeof expected === 'object' && expected !== null) {
+    const rec = expected as { not?: unknown; in?: unknown[] }
+    if (Array.isArray(rec.in)) return rec.in.includes(actual)
+    if (Object.prototype.hasOwnProperty.call(rec, 'not')) {
+      if (rec.not === null) return actual !== null
+      return actual !== null && actual !== rec.not
+    }
+  }
+  return true
+}
+
+function matchesAttemptWhere(attempt: Attempt, where: Record<string, unknown>): boolean {
+  const matchesClause = (clause: Record<string, unknown>): boolean => {
+    if (!matchesPrismaScalar(attempt.orderId, clause['orderId'])) return false
+    if (!matchesPrismaScalar(attempt.channel, clause['channel'])) return false
+    if (!matchesPrismaScalar(attempt.channelTxnNo, clause['channelTxnNo'])) return false
+    if (!matchesPrismaScalar(attempt.id, clause['id'])) return false
+    if (!matchesPrismaScalar(attempt.status, clause['status'])) return false
+    if (!matchesPrismaScalar(attempt.qrCodeContent, clause['qrCodeContent'])) return false
+    if (!matchesPrismaScalar(attempt.prepayId, clause['prepayId'])) return false
+    if (!matchesPrismaScalar(attempt.failReason, clause['failReason'])) return false
+
+    const expiresAt = clause['expiresAt'] as { lt?: Date; gt?: Date } | undefined
+    if (expiresAt?.lt && attempt.expiresAt >= expiresAt.lt) return false
+    if (expiresAt?.gt && attempt.expiresAt <= expiresAt.gt) return false
+    return true
+  }
+
+  const { OR: alternatives, ...base } = where
+  if (!matchesClause(base)) return false
+  if (!Array.isArray(alternatives)) return true
+  return alternatives.some((alternative) => matchesClause(alternative as Record<string, unknown>))
+}
+
+/** 与 online-payment.service.ts createCodePayAttempt 的 existing 互斥 OR 同形。 */
+function codePayExistingMutexWhere(orderId: string): Record<string, unknown> {
+  return {
+    orderId,
+    OR: [
+      { status: { in: ['created', 'pending'] } },
+      { status: 'expired', qrCodeContent: null, prepayId: { not: null } },
+      {
+        status: { in: ['created', 'pending', 'expired'] },
+        failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+      },
+      {
+        status: { in: ['created', 'pending', 'expired'] },
+        prepayId: null,
+        qrCodeContent: null,
+        channelTxnNo: null,
+      },
+    ],
+  }
+}
+
 function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
   payment: OnlinePaymentService
   makeOrder: (amountCents: number) => { order: Order; token: string }
@@ -66,41 +133,6 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
   const attempts = new Map<string, Attempt>()
   const audits: Array<Record<string, unknown>> = []
   const findManyCalls: Array<Record<string, unknown>> = []
-
-  const matchesAttemptWhere = (attempt: Attempt, where: Record<string, unknown>): boolean => {
-    const matchesClause = (clause: Record<string, unknown>): boolean => {
-      if (typeof clause['orderId'] === 'string' && attempt.orderId !== clause['orderId']) return false
-      if (typeof clause['channel'] === 'string' && attempt.channel !== clause['channel']) return false
-      if (clause['channel']?.['not'] === 'sandbox' && attempt.channel === 'sandbox') return false
-      if (typeof clause['channelTxnNo'] === 'string' && attempt.channelTxnNo !== clause['channelTxnNo']) return false
-
-      const id = clause['id'] as { not?: string } | string | undefined
-      if (typeof id === 'string' && attempt.id !== id) return false
-      if (id && typeof id !== 'string' && id.not && attempt.id === id.not) return false
-
-      const status = clause['status'] as { in?: string[] } | string | undefined
-      if (typeof status === 'string' && attempt.status !== status) return false
-      if (status && typeof status !== 'string' && status.in && !status.in.includes(attempt.status)) return false
-
-      const qrCodeContent = clause['qrCodeContent'] as { not?: string | null } | string | null | undefined
-      if (qrCodeContent === null && attempt.qrCodeContent !== null) return false
-      if (qrCodeContent && typeof qrCodeContent === 'object' && qrCodeContent.not === null && attempt.qrCodeContent === null) return false
-
-      const prepayId = clause['prepayId'] as { not?: string | null } | string | null | undefined
-      if (prepayId === null && attempt.prepayId !== null) return false
-      if (prepayId && typeof prepayId === 'object' && prepayId.not === null && attempt.prepayId === null) return false
-
-      const expiresAt = clause['expiresAt'] as { lt?: Date; gt?: Date } | undefined
-      if (expiresAt?.lt && attempt.expiresAt >= expiresAt.lt) return false
-      if (expiresAt?.gt && attempt.expiresAt <= expiresAt.gt) return false
-      return true
-    }
-
-    const { OR: alternatives, ...base } = where
-    if (!matchesClause(base)) return false
-    if (!Array.isArray(alternatives)) return true
-    return alternatives.some((alternative) => matchesClause(alternative as Record<string, unknown>))
-  }
 
   const prisma = {
     order: {
@@ -428,6 +460,49 @@ async function main(): Promise<void> {
   const priorSecret = process.env['PAYMENT_SESSION_SECRET']
   process.env['PAYMENT_SESSION_SECRET'] = SESSION_SECRET
   try {
+    const closedQr: Attempt = {
+      id: 'pa_closed_qr',
+      orderId: 'ord_closed_qr',
+      channel: 'sandbox',
+      amountCents: 100,
+      status: 'expired',
+      expiresAt: new Date(Date.now() - 1_000),
+      prepayId: 'sbx_prepay_closed',
+      qrCodeContent: 'sandboxpay://qr?attempt=pa_closed_qr',
+      channelTxnNo: null,
+      failReason: null,
+    }
+    const mutexWhere = codePayExistingMutexWhere(closedQr.orderId)
+    if (matchesAttemptWhere(closedQr, mutexWhere)) {
+      fail('expired QR with failReason=null must not match CHANNEL_ACCEPTED_UNCONFIRMED mutex branch')
+    }
+    pass('Prisma stub: expired+failReason=null does not equal CHANNEL_ACCEPTED_UNCONFIRMED')
+
+    const unconfirmed: Attempt = {
+      ...closedQr,
+      id: 'pa_unconfirmed',
+      prepayId: null,
+      qrCodeContent: null,
+      failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+    }
+    if (!matchesAttemptWhere(unconfirmed, mutexWhere)) {
+      fail('explicit CHANNEL_ACCEPTED_UNCONFIRMED must still match the mutex')
+    }
+    pass('Prisma stub: explicit CHANNEL_ACCEPTED_UNCONFIRMED still matches mutex')
+
+    const emptyExpired: Attempt = {
+      ...closedQr,
+      id: 'pa_empty_expired',
+      prepayId: null,
+      qrCodeContent: null,
+      channelTxnNo: null,
+      failReason: null,
+    }
+    if (!matchesAttemptWhere(emptyExpired, mutexWhere)) {
+      fail('expired empty identifiers must still match the empty-identifier mutex branch')
+    }
+    pass('Prisma stub: expired empty identifiers still match mutex')
+
     const { payment, makeOrder, attempts, audits } = createFixture()
     const valid = makeOrder(100)
     await expectCode('missing payment session is rejected', 'PAYMENT_SESSION_REQUIRED', () =>

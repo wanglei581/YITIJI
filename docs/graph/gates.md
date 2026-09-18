@@ -2305,7 +2305,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/admin-billing.controller.ts` | `verify-admin-billing.ts` |
 | `services/api/src/payment/admin-billing.service.ts` | `verify-admin-billing.ts` |
 | `services/api/src/payment/admin-order-actions.controller.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-api20-manual-refund.ts`<br/>`verify-order.ts`<br/>`verify-payment-flow.ts` |
-| `services/api/src/payment/channel-accepted-signal.ts` | `verify-payment-flow.ts`<br/>`verify-reconciliation.ts` |
+| `services/api/src/payment/channel-accepted-signal.ts` | `verify-payment-codepay.ts`<br/>`verify-payment-flow.ts`<br/>`verify-reconciliation.ts` |
 | `services/api/src/payment/code-payment-convergence.task.ts` | `verify-payment-codepay.ts` |
 | `services/api/src/payment/dto/admin-billing.dto.ts` | `verify-admin-billing.ts` |
 | `services/api/src/payment/dto/order-action.dto.ts` | `verify-order.ts`<br/>`verify-payment-flow.ts` |

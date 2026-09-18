@@ -1,5 +1,12 @@
 # 当前开发进度
 
+2026-09-18 **CI 阻断：`verify:payment-codepay` 内存桩未实现 Prisma `failReason` 相等。**
+HEAD 以其落地 SHA 为准。未 push。未改生产支付实现。Claude 大屏测试文件未改。
+
+- **根因：** `matchesClause` 忽略 `failReason`。渠道关单后的 QR 是 `status=expired` + `failReason=null`，被误判命中 `{ status in expired, failReason: CHANNEL_ACCEPTED_UNCONFIRMED }`，抛 `PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED`。生产互斥未削弱。
+- **修复：** 桩按 Prisma 标量语义：`null` = IS NULL，字符串严格相等，`{ not: null }` = IS NOT NULL。回归：忽略 failReason 的旧桩必红。
+- **反向变异：** 去掉 failReason 匹配后 `verify:payment-codepay` 退出码 **1**；恢复后 **0**。
+
 2026-09-18 **收费恢复 P0 收口：legacy `expired`+空标识互斥 + code-pay 真实回填失败注入。**
 HEAD 以其落地 SHA 为准。未 push。Claude 大屏测试文件未改。
 
