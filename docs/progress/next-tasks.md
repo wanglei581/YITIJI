@@ -1,5 +1,48 @@
 # 下一步任务
 
+## 2026-09-18 Windows / 奔图现场候选 R3 当前推进顺序
+
+**当前候选判定：** `origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7` 已在本地通过
+`145fde67d` 合入 PR 分支。锁运维 P1 收口后，以本分支新 tip 为代码锚点。`SOURCE / LOCAL` 以
+本轮提交后的门禁为准；`REVIEW: PARTIAL`（自 PID / release 遭外部路径替换的 P2 分歧待 Windows
+证据）；`CI: NO-GO (CURRENT MERGED TREE NOT RUN)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+PR #1039 的远端仍停在旧 head；`792a9f987` 的绿 CI 绑定旧 merge ref，不能复用。当前本地提交尚未
+推送；未获得行动时授权前不 push、不合并、不部署、不操作 Windows / 奔图。Hermes 提出的 5 个运维
+P1 已在软件侧关闭（锁失败文案、启动诊断、只读 diagnose/collect、现场手册 fail-closed），但
+**不得假装 Windows DEVICE 已验收**。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| 1 | Codex 集成 + reviewer 复核 | 完成本地进度提交；获得 push 授权后更新 PR #1039，并只认新 exact head 的必需 CI。失败时只处理新日志第一条决定性失败 | final head 无新增 P0 / P1；`build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 与 Windows installer 必需 job 全绿后才可写 `CI: GO`。未获单独合并授权不得合并 |
+| 2 | Windows / 奔图专用任务 | 冻结获准的精确候选 / main SHA；先验活实例重复启动、异常终止留下的 `stale_lock_requires_operator`、`diagnose-production-agent.ps1` 只读锁证据、人工清锁与临时文件清理，再走面板扫描、真实出纸、扫码枪、长驻 watcher、断网、Agent / 浏览器重启和连续多用户 | 覆盖真实 `tasklist` CSV、NTFS `wx`、ProgramData ACL、服务停止 + 锁内 PID 不存在双确认、只启动一个 Agent；记录服务状态、锁 PID、清锁时间、Agent 版本、任务 / 订单 / 文件 hash、状态回传和临时文件删除。`Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须实测。干净停止是否留锁是条件 P0，不得在 macOS 推断。不要先删除锁；不得把自动删除陈旧锁重新加回来。DEVICE 在该阶梯完成前保持 NO-GO |
+| 3 | 微信小程序 / 跨端真机 | 用已发布或明确标注为 Trial 的版本验证订单详情换人 / 登出 / 401 / 取消乱序、材料包找回、到机码和弱网补签确认 | 发出时身份未知的首个 200 不显示详情；本人经确认请求恢复，非本人被服务端拒绝；慢网双往返文案可用；不得用开发者工具截图或 mock 代替真机 |
+| 4 | 运维 / 生产 | 在具名维护窗口按精确 SHA 做备份、迁移、部署、PM2 / nginx / Web Root / provenance / 健康 / 监控 / 回滚 | 生产版本一致；真实支付、退款、对账与对象存储生命周期可核；无明确授权不得执行 |
+| 5 | 产品负责人 / 运营 / 客户 | 完成微信提审发布、授权内容冷启动和真实用户 UAT | 真实用户走通建单 -> 支付 -> claim -> 下载 -> 奔图出纸 / 扫描 -> 状态回流 -> 订单沉淀并签字，之后才能评估商业 GO |
+
+执行边界：不修改 ACK 后任务存活协议；不把 `lastAttemptHash` 当采集归属证明；不把本地锁 / watcher
+测试、HTTP 200、截图或源码检查写成 Windows、奔图、微信真机、生产或商业验收。人工清锁必须先运行
+`diagnose-production-agent.ps1`，证明服务已停、锁路径是普通文件、且 `tasklist` 显示锁内 PID 不存在；
+`tasklist` 失败或路径为目录 / junction / symlink 时保持不动并升级。不能仅凭“看起来离线”删除
+`agent.pid`。
+
+## 2026-09-17 PR #1036 / #1037 合入后的唯一推进顺序
+
+**当前总判定：`origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f` 已包含扫描 R3 与小程序跨端
+R11，SOURCE / CI: GO；DEVICE / PRODUCTION / COMMERCIAL: NO-GO。** PR #1036 最终 head
+`a3db5f4165725f8f1a2365dfe7e1ce34a3e928dd` 与 PR #1037 最终 head
+`7d070c22f3bf0c9f7406fa39f351795478a5228c` 均已通过各自必需 CI，并由祖先关系证明进入当前 main。
+下表取代后续“等待 #1036 / #1037 合并”的旧表述；历史段保留用于追溯，不再作为当前待办。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| 1 | Windows / 奔图专用任务 | 先冻结现场实际安装的精确 main SHA；完成面板扫描、真实出纸、扫码枪、长驻 watcher、断网重连、Agent / 浏览器重启和连续多用户操作 | 记录 SHA、Agent 版本、任务 / 订单 / 文件 hash、状态回传与临时文件删除；重点证明 Windows / SMB `ino === 0` 或 identity unavailable 时仍 fail-closed，旧文件不归属后来用户，锁死与重启恢复可观察 |
+| 2 | 小程序 / 跨端真机 | 用已发布或明确标注为 Trial 的微信版本走本人身份、材料包订单、到机码找回、支付后认领与状态回流 | 不使用 mock 或开发者工具截图替代真机；本人订单可恢复，换人 / 过期 / 401 / 重放均不泄露上一用户数据；未正式发布时只记 Trial，不写 production |
+| 3 | 运维 / 生产 | 在具名维护窗口按精确 SHA 做备份、迁移、整体部署、PM2 / nginx / Web Root / `DEPLOY_SOURCE.txt` / 健康 / 监控 / 回滚 | 生产版本一致；PostgreSQL 迁移与对象存储生命周期可核；真实小额支付、退款、对账通过；暴露过的凭证完成轮换；无授权不得执行 |
+| 4 | 产品负责人 / 运营 / 客户 | 完成微信提审发布、授权内容冷启动和真实用户 UAT | 岗位 / 招聘会 / 政策均为真实授权且无演示或过期数据；客户走通建单 -> 支付 -> 到机 -> 打印 / 扫描 -> 状态回流 -> 记录沉淀并签字 |
+
+执行边界：第 1 项前不宣称真机通过，第 2 项前不宣称小程序正式可用，第 3 项前不宣称生产已部署，
+第 4 项前不宣称商用收口。后续 main 若继续前进，现场和生产证据必须重新绑定实际部署 SHA，不能把
+`50483cd28` 的代码 / CI 证据自动外推到新提交。
 ## 2026-09-17：生产 API-only 发布 `50483cd...`
 
 **当前唯一发布阻塞：** 首轮控制面 PR #1040 已合并且三项 CI 全绿，但合并后复核发现旧目标提交会

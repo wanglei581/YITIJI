@@ -1351,6 +1351,56 @@ const PACKAGE_CHAIN_PAGES = [
   else bad('取件页不得把本人的有效码当成过期清掉，也不得把它画给一个认不出的会话', misses.join('；'))
 }
 
+// order-detail 与取件页同一条 requireOwned 拒绝契约：必须 404 **且** PRINT_ORDER_NOT_FOUND，
+// 而且只能在通道守卫放行之后盖章。OR 或先盖章再守卫会把网关 404 / hide 期间的失败
+// 写成粘性拒绝，本人被锁在这一页上，重试也不再打网络。
+{
+  const misses = []
+  const bare = stripComments(orderDetailJs)
+  const denied = methodBody(bare, '_isOwnerDeniedError')
+  if (!denied) {
+    misses.push('缺 _isOwnerDeniedError')
+  } else {
+    if (!/Number\(err\.statusCode\) === 404 && err\.code === 'PRINT_ORDER_NOT_FOUND'/.test(denied)) {
+      misses.push('确认拒绝必须同时要求 Number(statusCode)===404 与 PRINT_ORDER_NOT_FOUND')
+    }
+    if (/\|\|/.test(denied)) {
+      misses.push('_isOwnerDeniedError 又用了 OR（网关 404 会把本人粘住）')
+    }
+  }
+  const load = methodBody(bare, '_load')
+  const catches = promiseCallbackBodies(load, 'catch')
+  if (catches.length !== 1) {
+    misses.push('_load 的失败回调不是恰好一个 catch（' + catches.length + '）')
+  } else {
+    const fail = catches[0]
+    const verifyIdx = fail.indexOf('_verifyChannel(token)')
+    const stampIdx = fail.search(/_ownerDeniedFor\s*=/)
+    const denyIdx = fail.indexOf('_denyOwner(')
+    if (verifyIdx < 0) {
+      misses.push('失败回调没有先走 _verifyChannel')
+    } else {
+      if (stampIdx >= 0 && stampIdx < verifyIdx) {
+        misses.push('失败回调在通道守卫之前就给 _ownerDeniedFor 赋值')
+      }
+      if (denyIdx >= 0 && denyIdx < verifyIdx) {
+        misses.push('失败回调在通道守卫之前就 _denyOwner')
+      }
+      if (denyIdx < 0) {
+        misses.push('前台确认失败没有走 _denyOwner（粘性拒绝必须经这一处）')
+      }
+    }
+    if (/_ownerDeniedFor\s*=/.test(fail.slice(0, Math.max(verifyIdx, 0)))) {
+      misses.push('通道守卫之前出现了 _ownerDeniedFor 赋值')
+    }
+  }
+  if (!/if \(confirming && this\._ownerDeniedFor === this\._account\) \{\s*this\._denyOwner\(this\._account\)\s*;?\s*return\s*;?\s*\}/.test(bare)) {
+    misses.push('被拒过的账号仍会在下一次 onShow 再问一遍服务端')
+  }
+  if (!misses.length) ok('订单详情：requireOwned 拒绝是 404 且 PRINT_ORDER_NOT_FOUND，且先过通道守卫再盖章')
+  else bad('订单详情确认拒绝不得在守卫之前盖章，也不得把网关 404 当成归属拒绝', misses.join('；'))
+}
+
 // R9 收口：取件页画码的 **exec 回调**必须重新确认码 / 归属 / 代次。
 //
 // `wx.createSelectorQuery().exec()` 的回调跨帧才回来，中间这张码完全可能已经被换掉

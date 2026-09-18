@@ -127,6 +127,81 @@ PR #1040 / API-only 发布控制面记录原文保留（与 `origin/main` 该段
 仍有 root 密码 SSH、无异地/自动备份与恢复演练、PM2 dump 陈旧、历史 dump 权限、证书续期、
 静态安全头及云安全组/IAM/生命周期未核验等阻塞。本轮没有部署、重启、迁移或生产写入。
 
+2026-09-18 **Hermes 对 fb8ae44 / 85f39ebb 提出的 5 个运维 P1 已在本工作树软件侧关闭；Windows DEVICE 仍为 NO-GO。**
+锁实现锚点仍是 `6243fab25`：外来死亡 PID 必须 `stale_lock_requires_operator` fail-closed，不恢复自动
+stale unlink / rename / takeover。same-PID reclaim 与 owner `releaseLock()` 未改。本轮只改 Terminal
+Agent 锁文案 / 启动诊断 / 只读 diagnose 与现场采集、现场手册和对应门禁，未改 `apps/miniapp/**`、
+`apps/kiosk/**`，未 push、未部署、未操作 Windows / 奔图。
+
+- **P1 A 文案：** 所有 lock `unavailable` / `duplicate` 分支现在都带 `lockPath`、`reason`、明确
+  `不要先删除`、先核验服务/进程、再运行 `diagnose-production-agent.ps1`。已删除
+  “If this is incorrect, delete …” 诱导清锁。stale 仍要求人工核验后才能动精确 `agent.pid` 叶子。
+- **P1 B 诊断：** `acquireLock()` 失败写入 `last-startup-diagnostic.json`，复用
+  `writeStartupDiagnosticSafely`；只写机器码 / 原因 / 路径存在性与类型 / PID 是否严格可解析。
+  诊断写失败不得改变 fail-closed 退出。
+- **P1 C / D 脚本：** `diagnose-production-agent.ps1` 只读输出锁路径类型、严格 PID、tasklist /
+  服务 / 相关进程、是否可进入人工清锁评估；`tasklist` 失败不是可删。`collect-field-evidence.ps1`
+  采集脱敏的服务状态、锁存在/类型、严格 PID、mtime、ACL 摘要、tasklist 退出码/结果和采集时间。
+  两份脚本都不自动删锁，不采 token / 配置密钥。
+- **P1 E 手册：** 现场恢复单、换机验收手册、打印扫描执行清单和 Agent 设计文档不再宣称崩溃后自动
+  接管、30 秒恢复或 `taskkill` 后自然 Running。给出安全人工顺序；非叶子路径保持不动并升级。
+  `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须 Windows
+  实测。干净停止是否留锁只登记为条件 P0，不在 macOS 推断。
+- **证据边界：`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。** 本轮软件门禁不能证明 Windows
+  `tasklist` CSV、NTFS、ProgramData ACL、服务异常退出后的人工清锁或奔图出纸。
+
+2026-09-18 **当前 `main` 已在本地合入 PR #1039 分支，并关闭实例锁与订单详情粘性拒绝 P1；新合并树尚未推送或跑 CI，未上 Windows、未部署、未操作硬件。**
+当前 `origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7` 已由合并提交
+`145fde67d` 纳入分支 `codex/windows-pantum-field-readiness-r3-20260917`，安全修复代码锚点为
+`8542b0973`。`main` 中 PR #1041 的 API-only 发布 helper 固定与 SHA-256 校验治理完整保留；本轮没有
+打开生产闸门。
+
+- **旧 CI 只作历史证据：** `792a9f987af84a795431747248e546bf2f1abbb6` 的 CI run
+  `35235786133` 已完成 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 全绿，
+  288/288 verify 通过；installer run `35235786159` 两个 job 全绿。但该结果绑定 GitHub merge ref
+  `792a9f987 × main@50483cd28`，不能外推到当前 `main@eb0f20341` 的本地合并树。
+- **实例锁 P1：** 复审确认旧实现的“检查 inode/PID 后再按路径 unlink”存在真实 TOCTOU；Grok 首版
+  只增加二次检查仍未关闭窗口，Agy 判 `NO-GO`，官方 DeepSeek Hermes 在注入抢占下 4/4 复现两个
+  进程同时 `acquired`。最终方案删除外来陈旧锁的自动接管：活外来 PID 返回 `duplicate`；严格解析但
+  已死亡的外来 PID 返回 `stale_lock_requires_operator`，不删除、重命名、截断或覆盖。操作者必须先
+  确认服务停止且锁内 PID 不存在，再删除精确 `agent.pid`；设计与现场手册已同步该可用性代价。
+- **小程序 R12-F/L：** 服务端已接受的取消结果跨 hide/show 保存，并使更早详情响应失效；后台到达
+  不写屏，回前台也不能复活到机码；A 的取消不能修改 B 的页面。服务端已按归属拒绝的账号会粘性
+  停止重复确认请求，但只接受同时满足 `404 + PRINT_ORDER_NOT_FOUND` 的当前通道响应；网关 404、
+  缺状态码的业务码、hide 后或换人后迟到的拒绝都不能盖章。生命周期测试由 166 增至 **174/174**。
+- **现场文档：** 两份验收文档的 Agent 运行时身份端点已从不存在的 `/local/identity` 更正为
+  `/local/terminal-identity`；“文字助手模式不豁免”约束继续保留。
+- **本地验证：** Agent typecheck、`verify:print-scan-agent`、`verify:task-reliability`；miniapp
+  `verify:static`（静态门禁 **137/137**、生命周期 **174/174**）；API `verify:print-scan-first-release`；仓库完整性、CI 门禁覆盖、部署
+  门禁同步、图谱一致性与 `git diff --check` 全部通过。
+- **独立复审：** Grok 完成实现；Agy 对最终 fail-closed 方案为本地集成 `GO`；Hermes 使用官方
+  `provider=deepseek`、`model=deepseek-v4-flash`、`reasoning=xhigh`（session
+  `20260918_003747_5a4be4`）确认原锁 P1 已结构性不可达、代码 `GO`。Grok 对合并树总审又发现
+  order-detail 的 OR 条件与守卫前盖章 P1，已由 `8542b0973` 修复并补四条判红用例及静态门禁。
+  Claude Haiku 对该最终前端修复（session `534d2397-0e17-4392-a4b2-f563b6f8f7f6`）结论为通过。
+  Grok 仍把“自 PID 回收 / 正常释放时路径被外部删除并替换”的窗口列为 P2；Agy / Hermes 认为在
+  外来启动者不再自动删锁的协议内可本地集成。该分歧留到 Windows 现场验证，不压成一致批准。
+- **证据边界：`SOURCE / LOCAL: GO`；`REVIEW: PARTIAL`；`CI: NO-GO (CURRENT MERGED TREE NOT RUN)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+  macOS / 本地探针不能证明 Windows `tasklist` CSV、NTFS、ProgramData ACL、服务异常退出后的人工清锁、
+  真实双进程、奔图出纸/扫描或微信真机。ACK 后任务存活协议与 `lastAttemptHash` 归属口径未修改。
+
+2026-09-17 **扫描隐私 R3 与小程序跨端 R11 已进入当前主干；代码 / CI 证据已闭合，设备、生产与商业仍为 NO-GO。**
+当前 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`。扫描候选 PR #1036 已于
+2026-09-15 合入：最终 head `a3db5f4165725f8f1a2365dfe7e1ce34a3e928dd`，merge commit
+`ddef936def46e9220a25e44ffe33dcc3458ed00b`；`build-and-verify`、`postgres-readiness`、
+`kiosk-browser-smoke`、`unsigned-exe-upgrade`、`unsigned-msi-candidate` 全部成功。随后 PR #1037
+以 head `7d070c22f3bf0c9f7406fa39f351795478a5228c` 合入当前 main，补齐小程序跨端身份 / 幂等收口及
+扫描迁移升级夹具隔离；该 head 的 `build-and-verify`、`postgres-readiness`、
+`kiosk-browser-smoke` 全部成功。`merge-base --is-ancestor` 已确认两个最终 head 均为当前 main 祖先。
+
+扫描链的软件结论限定为 **SOURCE / CI: GO**：一次性安全重扫授权、任务 / owner / terminal / scan type /
+状态 / 过期 / replay 约束、Kiosk 持久 ACK、Agent delivery lease、同 inode single-flight、锁死遥测和
+反向变异已进入主干。不得把这些结果写成当前 Windows / 奔图已通过：Windows SMB 上
+`ino === 0` / identity unavailable、长驻 chokidar、面板扫描、连续多用户、断网 / 重启恢复、真实出纸、
+扫码枪、真实支付退款、生产迁移部署、小程序正式发布、授权内容与客户 UAT 均未在当前 main SHA 上完成。
+因此 **DEVICE / PRODUCTION / COMMERCIAL: NO-GO**，下一步转入精确 SHA 的现场与发布验收，不再继续复活
+已删除远端分支或沿用 PR 合并前 worktree 作为交付源。
+
 2026-09-17 **生产 API-only 发布控制面候选：阻止 API 修复连带覆盖三端前端。** Windows Agent
 `0.4.11` 在精确候选 `50483cd28096780c5e6c4260dde86dec36e7d99f` 上安装后，心跳因生产 API
 仍缺少 `55c32296f` 新增的 `scanInput*` DTO 白名单字段而返回

@@ -19275,6 +19275,9 @@
     "apps/terminal-agent/installer/verify-installer-inputs.mjs": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
+    "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
+      "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
     "apps/terminal-agent/scripts/diagnose-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
     ],
@@ -19322,12 +19325,18 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
+    "apps/terminal-agent/src/agent/instance-lock.ts": [
+      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
+    ],
     "apps/terminal-agent/src/agent/network-diagnostics.ts": [
       "apps/terminal-agent/scripts/verify-network-diagnostics.ts"
     ],
     "apps/terminal-agent/src/agent/offline-queue.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
+      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
     ],
     "apps/terminal-agent/src/agent/profile-guard.ts": [
       "apps/terminal-agent/scripts/verify-agent-profile-guard.mjs"
@@ -19449,6 +19458,7 @@
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs"
     ],
     "docs/acceptance/print-scan-field-execution-runbook.md": [
+      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts"
     ],
     "docs/acceptance/print-scan-first-release-acceptance-package.md": [
@@ -19544,6 +19554,9 @@
     "docs/device/f1-d2-same-host-dual-port-runbook.md": [
       "services/api/scripts/d2-same-host/verify-contract.mjs"
     ],
+    "docs/device/onsite-failure-recovery-runsheet-2026-09.md": [
+      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
+    ],
     "docs/device/postgres-load-hardening-runbook.md": [
       "services/api/scripts/verify-db-load-indexes.ts"
     ],
@@ -19556,6 +19569,9 @@
     ],
     "docs/device/production-deployment-runbook.md": [
       "services/api/scripts/verify-cos-lifecycle-policy.ts"
+    ],
+    "docs/device/windows-host-acceptance-runbook.md": [
+      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
     ],
     "docs/graph/graph.json": [
       "scripts/verify-repository-integrity.mjs"
@@ -27537,9 +27553,14 @@
         "files": [
           "apps/terminal-agent/src/agent/db.ts",
           "apps/terminal-agent/src/agent/heartbeat.ts",
+          "apps/terminal-agent/src/agent/instance-lock.ts",
+          "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts",
-          "apps/terminal-agent/src/index.ts"
+          "apps/terminal-agent/src/index.ts",
+          "docs/acceptance/print-scan-field-execution-runbook.md",
+          "docs/device/onsite-failure-recovery-runsheet-2026-09.md",
+          "docs/device/windows-host-acceptance-runbook.md"
         ],
         "missing": []
       },
@@ -27718,6 +27739,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts",
           "apps/terminal-agent/src/agent/auth-state.ts",
           "apps/terminal-agent/src/agent/claim-rate-limit.ts",
           "apps/terminal-agent/src/agent/db.ts",

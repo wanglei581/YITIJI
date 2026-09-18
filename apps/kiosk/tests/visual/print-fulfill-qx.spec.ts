@@ -107,6 +107,29 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   await expect(page.getByText('打印机缺纸，当前无法打印，请联系工作人员补纸后重试', { exact: true })).toBeVisible()
   await expect(page.getByText('agent stack must stay hidden')).toHaveCount(0)
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+
+  // 缺纸页不得承诺「补纸之后这次打印会自己接着打」。服务端没有这条链路：
+  // PrintTask 已是 failed 终态，唯一的重来是 POST /print/jobs/:taskId/retry，
+  // 它要服务端先给出 canRetry，而且重打整份文件、不是"剩下没打的部分"。
+  // 本用例的 takeaway-url 故意回 404 → canRetry 拿不到 →「重新提交打印」按钮根本不存在，
+  // 正是"页面没给出重试出口"的那一态：此时更不能让用户以为补个纸就能等到结果。
+  const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
+  await expect(outOfPaper).toContainText('不会在加纸后自动继续')
+  await expect(outOfPaper).toContainText('联系现场工作人员')
+  await expect(outOfPaper).toContainText('订单和已付金额都保留着')
+  // 「只有出现按钮时才能自己重打」——重试必须被说成有条件的，不是无条件可用。
+  await expect(outOfPaper).toContainText('只有本页出现「重新提交打印」按钮时')
+  await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
+
+  // 旧文案的四种说法一句都不许回来（含「不需要重新下单」这种把重试说成理所当然的兜底）。
+  for (const banned of [
+    '加纸后可以继续',
+    '加纸后可继续打印',
+    '剩下没打的部分会在加纸后继续',
+    '不需要重新下单',
+  ]) {
+    await expect(outOfPaper, `缺纸页不得再出现「${banned}」`).not.toContainText(banned)
+  }
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-out-of-paper.png'), fullPage: true })
   expect(errors).toEqual([])
