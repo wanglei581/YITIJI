@@ -8,6 +8,7 @@
 - **C. Kiosk 资金安全文案：** `userErrorMessage.ts` 白名单新增 `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED` 固定文案「…请勿重新支付，请联系现场工作人员核对渠道订单」，不再落 5xx 通用「请稍后重试」。
 - **验证（全部退出 0）：** admin/partner/kiosk `typecheck`；`verify:console-screen-ui`；`verify:admin-orders-readonly-ui`（含新增 opsAttention 断言块）；admin screen e2e 44/44（原两条 Claude 用例由 4 红转绿）；partner screen e2e 24/24（新增 401/403/ORG_REQUIRED keep-last 三条）；admin orders e2e 3/3（新增「需运营关注」chip 用例）；kiosk `cashier-qx` W2 e2e 6/6（新增 503+ACCEPTANCE_UNCONFIRMED 用例）。
 - **反向变异（均已恢复）：** Admin 大屏把 `failure` 改传 `null`，目标 Playwright **2/2 红、退出 1**，恢复后 **2/2 绿、退出 0**；「需运营关注」把 `payStatus` 钉成 `paid`，`verify:admin-orders-readonly-ui` **退出 1**，恢复后 **退出 0**；删除 Kiosk `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED` 映射，目标 W2 用例落入「请稍后重试」并 **退出 1**，恢复后 **退出 0**。
+- **独立只读复审：** Grok 4.6 xhigh session `3ec3bd81-29a2-4279-acf7-de4bf537b7f0` 只审 `f5d9f36ca..03fe1605a` 及相关调用链，结论 `GO`、`FINDINGS: NONE`。它未重跑 e2e / verify / 反向变异，因此独立审查只证明未发现源码级 P0/P1/P2，运行证据仍以上述本机命令为准。Agy / Hermes DeepSeek 本轮分别超时与上游 502，严格记为 `TIMEOUT` / `FAILED`，不计入批准。
 - **证据边界：** `SOURCE / LOCAL: GO`（前端源码 + 本机 e2e/verify）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。GitHub CI 尚未对 final-head 跑 `build-and-verify` / `postgres-readiness` / `kiosk-browser-smoke`。
 
 2026-09-18 **LOCAL postgres-readiness rehearsal GO；GitHub CI 仍 NO-GO。**
