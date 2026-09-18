@@ -120,9 +120,9 @@ flowchart TD
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineJob** | 22 | Job、OfflineAgency | 1 个文件<br/>`offline-agencies/offline-agencies.service.ts` |
 | **OnlinePlatformDirectory** | 33 | FileObject、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
-| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 20 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
+| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 21 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **OrderItem** | 15 | Order | 3 个文件<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`print-jobs/pickup-order.service.ts`<br/>`terminals/terminals-agent.service.ts` |
-| **OrderSubmissionLedger** | 11 | — | **无代码读写** |
+| **OrderSubmissionLedger** | 11 | — | 1 个文件<br/>`member-print-orders/order-submission-ledger.ts` |
 | **Organization** | 26 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 16 个文件<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>`auth/partner-phone-rebind.service.ts`<br/>… |
 | **PaymentAttempt** | 13 | Order | 3 个文件<br/>`payment/online-payment.service.ts`<br/>`payment/reconciliation.service.ts`<br/>`payment/refund.service.ts` |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`print-jobs/pii-scan-gate.ts` |
@@ -160,7 +160,7 @@ flowchart TD
 | **UserDataRequest** | 22 | EndUser | 6 个文件<br/>`member-privacy/member-data-export-download.service.ts`<br/>`member-privacy/member-data-export-reconciler.service.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserNotification** | 10 | — | **无代码读写** |
 
-## 没有任何代码读写的模型（11）
+## 没有任何代码读写的模型（10）
 
 > 注意：这里的判定只看 \`this.prisma.<model>.<op>\` 形式的调用。
 > 通过关系字段级联读写、raw SQL 或迁移脚本访问的模型不会被计入，**不能据此删表**。
@@ -171,7 +171,6 @@ flowchart TD
 - `HelpItem`
 - `KioskActivity`
 - `KioskSession`
-- `OrderSubmissionLedger`
 - `PrintMaterialPack`
 - `ReviewDecision`
 - `ScreensaverContent`

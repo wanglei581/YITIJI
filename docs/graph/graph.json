@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 531,
+    "endpointCount": 532,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -7070,6 +7070,7 @@
           "AuditLog",
           "FileObject",
           "Order",
+          "OrderSubmissionLedger",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7090,6 +7091,7 @@
           "AuditLog",
           "FileObject",
           "Order",
+          "OrderSubmissionLedger",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7110,6 +7112,7 @@
           "AuditLog",
           "FileObject",
           "Order",
+          "OrderSubmissionLedger",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7130,6 +7133,7 @@
           "AuditLog",
           "FileObject",
           "Order",
+          "OrderSubmissionLedger",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7150,6 +7154,7 @@
           "AuditLog",
           "FileObject",
           "Order",
+          "OrderSubmissionLedger",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7864,6 +7869,7 @@
           "AuditLog",
           "FileObject",
           "Order",
+          "OrderSubmissionLedger",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7884,6 +7890,7 @@
           "AuditLog",
           "FileObject",
           "Order",
+          "OrderSubmissionLedger",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7904,6 +7911,7 @@
           "AuditLog",
           "FileObject",
           "Order",
+          "OrderSubmissionLedger",
           "Terminal",
           "TerminalCapability"
         ],
@@ -15753,6 +15761,7 @@
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/order-submission-ledger.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
@@ -15785,7 +15794,9 @@
         "fieldCount": 11,
         "name": "OrderSubmissionLedger",
         "relations": [],
-        "usedBy": []
+        "usedBy": [
+          "services/api/src/member-print-orders/order-submission-ledger.ts"
+        ]
       },
       {
         "fieldCount": 26,
@@ -19143,6 +19154,9 @@
     "apps/miniapp/utils/normalize.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/utils/order-submission-reconcile.js": [
+      "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
     "apps/miniapp/utils/package-order-idempotency.js": [
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
@@ -22333,6 +22347,10 @@
     ],
     "services/api/src/member-print-orders/member-print-orders.types.ts": [
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "services/api/src/member-print-orders/order-submission-ledger.ts": [
+      "services/api/scripts/verify-member-print-order-idempotency.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts"
     ],
     "services/api/src/member-print-orders/package-order.service.ts": [
       "services/api/scripts/verify-package-order-fulfillment.ts",
@@ -27216,6 +27234,7 @@
           "apps/miniapp/pages/store-select/store-select.js",
           "apps/miniapp/scripts/tests/page-lifecycle.test.mjs",
           "apps/miniapp/utils/api.js",
+          "apps/miniapp/utils/order-submission-reconcile.js",
           "apps/miniapp/utils/package-order-idempotency.js",
           "apps/miniapp/utils/package-order.js",
           "apps/miniapp/utils/page-guard.js",
@@ -32527,6 +32546,7 @@
           "services/api/src/common/pickup-code.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/order-submission-ledger.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/payment-session-token.ts",
@@ -32539,9 +32559,7 @@
           "services/api/src/storage/storage.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ],
-        "missing": [
-          "src/member-print-orders/order-submission-ledger.ts"
-        ]
+        "missing": []
       },
       "file": "services/api/scripts/verify-member-print-order-idempotency.ts",
       "helper": false,
@@ -33018,6 +33036,7 @@
           "services/api/src/common/pickup-code.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/order-submission-ledger.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/payment/order-status.service.ts",

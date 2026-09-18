@@ -1,5 +1,28 @@
 # 当前开发进度
 
+2026-09-18 **单一商业集成候选：A/B/C/D 四个未进 main 的候选已 `--no-ff` 合流到本分支。**
+写入者唯一，分支 `codex/commercial-integration-20260918-r1`，基线
+`origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`（PR #1041）。未 push、未开 PR、
+未部署、未连生产、未支付、未操作硬件。
+
+| 候选 | 分支 | tip | 合流 |
+|---|---|---|---|
+| A 跨端/材料包幂等 | `codex/material-package-idempotency-closeout-20260917` | `a677bde844a0ccb46f9ac1d5642a346dc82a2289` | 已合，merge `1b818d5c5` |
+| B 迟到线上收款待退 | `fix/online-paid-pending-refund-closeout-20260918` | `09ecc76f11aa8452349229d9e4a17e40122654f8` | 已合，merge `ac2eec424` |
+| C Windows/奔图现场 r3 | `codex/windows-pantum-field-readiness-r3-20260917` | `6940ba257ddf5ccf2ec7978a50a062d7b0df6bce` | 已合，merge `c51f902b4` |
+| D Admin/Partner 数据大屏 | `codex/console-data-screen-r2-20260917` | `dbd28905e2ae06f0528d05bb5f9cc68d189837a7` | 已合，merge `3defc3b17` |
+
+- **只读冲突矩阵：** 四候选无共享 commit、无跨候选 duplicate patch-id。A/B/C 的 merge-base 就是当前 main；D 落后一提交（#1041），仅 `docs/progress/next-tasks.md` 与 main 冲突。关键重叠：A∩B `order-status.service.ts`；A∩C `apps/miniapp/scripts/tests/page-lifecycle.test.mjs`；A∩D Prisma schema / `package.json`（git 自动合并，模型+索引并存）；四候选都改进度文档与图谱。
+- **合流顺序：** D → C → A → B。D 先合是因为它基于 `3d35759ee`、迁移时间戳更早（`20260917120000`）；B 后合是因为它只把 `ONLINE_PAID_PENDING_REFUND_REASON` 抽到 `pending-refund-signal.ts`，必须叠在 A 的履约租约 CAS 上。
+- **手工解决（允许路径）：**
+  - `order-status.service.ts`：保留 A 的 `isLiveKioskPickupLease` / `fulfillablePickupWindowWhere` / claimed 租约 `isPickupWindowClosed`，同时采用 B 的常量抽取与 re-export。禁止再在本文件定义同名常量。
+  - 进度文档：并集保留各候选顶部记录，本条为当前快照。
+  - `docs/graph/*`：merge 时暂留一侧，合流后 `pnpm graph` 重生成（断言文件 1504）。
+  - `page-lifecycle.test.mjs`：双方都在文件末尾**追加互不覆盖的测试**（C：order-detail R11/R12；A：单件幂等键 TTL R11）。机械拼接两端追加块，没有改页面源码、没有选 ours/theirs 丢掉任何用例。仍须 Claude 确认这不是语义改写。
+- **迁移：** additive、时间戳唯一。`20260917120000_add_console_screen_query_indexes`（D，sqlite+pg 各一）+ `20260918120000_add_order_submission_ledger`（A，sqlite+pg 各一）。`OrderSubmissionLedger` 在 sqlite/postgres schema 中归一。`20260816180000` 双目录是历史既有（advisor_work_session / policy_eligibility_rules），不是本轮引入。
+- **未弱化：** `recruitment-capability.ts`、发布授权闸门、`deploy.yml` 相对 main 无 diff。D 的 CI 改动只**新增**大屏 verify / Playwright，没有删既有 job。
+- **证据边界：** `SOURCE: GO`（四 tip 均为当前 HEAD 祖先）。`LOCAL:` 以本提交之后跑的隔离门禁为准，未跑完前不得写成 GO。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。不得把四候选各自的旧 CI 绿、旧 Windows 证据或 `33751df4a` 写成已进 main / 已部署。
+
 2026-09-17 **数据大屏候选已机械 rebase 到 `origin/main@3d35759`（PR #1040），本地总门禁重跑通过。**
 候选分支 `codex/console-data-screen-r2-20260917` 现为
 `origin/main@3d35759ee2ae810716d08734752f0a3d1d9d7a66` 的后代；rebase 前 tip
