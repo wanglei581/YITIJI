@@ -7,8 +7,8 @@
 （A `a677bde84`、B `09ecc76f1`、C `6940ba257`、D `dbd28905e`）。未 push、未开 PR、未部署。
 精确 SHA 以本分支 `HEAD` 为准，见 `current-progress.md` 顶部。
 
-**总判定：`SOURCE: GO`；`LOCAL: GO`（隔离 SQLite 套件，见 `current-progress.md` 顶部）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
-不得把任一来源候选的旧 CI 绿或旧现场证据外推到本合流树。本机无 PostgreSQL，PG migrate 应用证据留给 CI。
+**总判定：`SOURCE: GO`；`LOCAL: GO`（隔离 SQLite 套件，见 `current-progress.md` 顶部，含 2026-09-18 渠道受理未确认 P0）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+不得把任一来源候选的旧 CI 绿或旧现场证据外推到本合流树。本机无 PostgreSQL，PG migrate 应用证据留给 CI。渠道已受理但本地回填失败的订单，运营走 Admin `opsAttention` / 对账 `attention.unconfirmedCollections`，按 `PaymentAttempt.id` 查渠道账本；不要重新出码。
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|

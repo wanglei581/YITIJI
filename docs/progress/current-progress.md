@@ -1,5 +1,14 @@
 # 当前开发进度
 
+2026-09-18 **收费恢复 P0：渠道已受理、本地 identifier 回填失败不再隐身。**
+分支 `codex/commercial-integration-20260918-r1`，本条落地 SHA 以提交为准。未 push、未开 PR、未部署、未连生产、未真实支付。无 schema/migration。招聘闭环闸门未动。Claude 未提交大屏测试 `apps/admin/tests/e2e/screen/states.spec.ts` **未改、未暂存**。
+
+- **旧洞：** `createPayAttempt` / `createCodePayAttempt` 在事务外渠道成功后，`paymentAttempt.update` 回填 `prepayId`/`qrCodeContent` 失败会留下 `created` + 空标识。回调要求本地 `prepayId`，对账只扫 paid/refunding/待退，Admin 待退款看不到 paying。惰性过期还会把空标识 created 放成 unpaid，放出第二笔渠道单。
+- **修复（现有字段）：** 回填失败尽最大努力钉 `failReason=CHANNEL_ACCEPTED_UNCONFIRMED`。Provider 抛错仍走 failed+unpaid，可重新出码。进行中的 created+空标识立刻互斥拦住第二扣，但对账/Admin 等 30s 宽限才告警（避免把正常出码窗口当故障）。连信号都写不上且已过宽限：与「渠道调用前崩溃」不可分，人工按 attempt.id 查渠道，代码不自动放第二扣、不假装 paid/refunded。验签通过且 attemptId/channel/orderId/金额齐全后，才允许把签名里的 `prepayId` 补回；本地已有 prepayId 必须逐字相等，不重绑。
+- **可见性：** 对账 `attention.unconfirmedCollections`（不进 `discrepancies` 以免计费页中文表漏配）；Admin 只读 `opsAttention` / `opsAttentionCode`。Hermes F3：`payStatus=refunding` 进入同一 opsAttention（`refunding`），不新增退款动作，收敛仍走既有 `convergeStalePendingRefunds`。
+- **隔离验证：** `verify:payment-flow`（含 QR/code-pay 回填失败、金额不符不绑标识、合法回调收敛）、`verify:reconciliation`、`verify:admin-orders-readonly`、`verify:admin-orders-refund`、`verify:refund-real-channels`、`verify:wechat-refund-notify`、`verify:admin-order-filters`、`verify:payment-codepay`。反向变异：恢复「本地必须已有 prepayId」→ 未确认回调 `CALLBACK_FIELD_MISMATCH` 红；恢复后绿。
+- **证据边界：** 相对该 P0，`SOURCE / LOCAL: GO`（隔离 SQLite）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+
 2026-09-18 **单一商业集成候选完成本地隔离门禁；PostgreSQL CI 与设备/生产仍为 NO-GO。**
 源码/集成冻结点：四候选 merge 顶 `ac2eec424`，图谱刷新 `772012b73`，page-lifecycle 收尾补回
 `4ba8a7786`。本条为后继 docs 提交，HEAD 以其落地 SHA 为准。未 push、未开 PR、未部署、未连生产、

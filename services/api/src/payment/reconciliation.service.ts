@@ -21,6 +21,12 @@
  */
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import {
+  CHANNEL_ACCEPTED_UNCONFIRMED_NEXT_STEP,
+  CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+  channelAcceptedUnconfirmedWhere,
+  isChannelAcceptedUnconfirmedAttempt,
+} from './channel-accepted-signal'
 import { isOnlineCollectedPendingRefund, ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
 
 /** 线上资金通道（有 PaymentAttempt 台账的入账来源）。 */
@@ -47,10 +53,19 @@ export interface ReconciliationReport {
     refundingCount: number
     lateePaidCount: number
     reconciledCount: number
+    unconfirmedCollectionCount: number
   }
   discrepancies: ReconciliationDiscrepancy[]
-  /** 迟到入账 / reconcile 入账专项（非错误，复核用）。 */
-  attention: { latePaid: ReconciliationDiscrepancy[]; reconciled: ReconciliationDiscrepancy[] }
+  /**
+   * 专项复核：迟到入账 / reconcile 入账 / 渠道已受理本地未确认 / 退款中（含未超龄）。
+   * 不把未确认受理写成 paid。下一步见各条 detail.nextStep。
+   */
+  attention: {
+    latePaid: ReconciliationDiscrepancy[]
+    reconciled: ReconciliationDiscrepancy[]
+    unconfirmedCollections: ReconciliationDiscrepancy[]
+    refundingInProgress: ReconciliationDiscrepancy[]
+  }
 }
 
 type OrderRow = NonNullable<Awaited<ReturnType<PrismaService['order']['findFirst']>>>
@@ -78,12 +93,33 @@ export class ReconciliationService {
       fromDate || toDate ? { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } : undefined
 
     // 资金/退款态，外加「渠道已收款但未转 paid」的迟到回调待退（不得因 payStatus 非 paid 而隐身）。
+    const unconfirmedAttempts = await this.prisma.paymentAttempt.findMany({
+      where: {
+        ...channelAcceptedUnconfirmedWhere(new Date(params.nowMs)),
+        ...(createdAt ? { order: { createdAt } } : {}),
+      },
+      select: {
+        id: true,
+        orderId: true,
+        status: true,
+        channel: true,
+        amountCents: true,
+        failReason: true,
+        prepayId: true,
+        qrCodeContent: true,
+        channelTxnNo: true,
+        createdAt: true,
+      },
+    })
+    const unconfirmedOrderIds = [...new Set(unconfirmedAttempts.map((row) => row.orderId))]
+
     const orders = await this.prisma.order.findMany({
       where: {
         ...(createdAt ? { createdAt } : {}),
         OR: [
           { payStatus: { in: ['paid', 'refunding', 'partial_refunded', 'refunded'] } },
           { refundReason: ONLINE_PAID_PENDING_REFUND_REASON },
+          ...(unconfirmedOrderIds.length > 0 ? [{ id: { in: unconfirmedOrderIds } }] : []),
         ],
       },
       orderBy: { createdAt: 'asc' },
@@ -128,9 +164,16 @@ export class ReconciliationService {
       }
     }
 
+    const unconfirmedByOrder = new Map<string, (typeof unconfirmedAttempts)[number]>()
+    for (const row of unconfirmedAttempts) {
+      if (isChannelAcceptedUnconfirmedAttempt(row, params.nowMs)) unconfirmedByOrder.set(row.orderId, row)
+    }
+
     const discrepancies: ReconciliationDiscrepancy[] = []
     const latePaid: ReconciliationDiscrepancy[] = []
     const reconciled: ReconciliationDiscrepancy[] = []
+    const unconfirmedCollections: ReconciliationDiscrepancy[] = []
+    const refundingInProgress: ReconciliationDiscrepancy[] = []
     let grossPaidCents = 0
     let paidOrderCount = 0
     let refundedCents = 0
@@ -198,6 +241,23 @@ export class ReconciliationService {
 
       if (lateOrderIds.has(o.id)) push(latePaid, 'LATE_PAID', o, { paymentSource: o.paymentSource, amountCents: netCaptured })
       if (reconciledOrderIds.has(o.id)) push(reconciled, 'RECONCILED', o, { paymentSource: o.paymentSource, amountCents: netCaptured })
+
+      const unconfirmed = unconfirmedByOrder.get(o.id)
+      if (unconfirmed) {
+        push(unconfirmedCollections, CHANNEL_ACCEPTED_UNCONFIRMED_REASON, o, {
+          attemptId: unconfirmed.id,
+          attemptStatus: unconfirmed.status,
+          channel: unconfirmed.channel,
+          payStatus: o.payStatus,
+          nextStep: CHANNEL_ACCEPTED_UNCONFIRMED_NEXT_STEP,
+        })
+      }
+      if (o.payStatus === 'refunding') {
+        push(refundingInProgress, 'REFUNDING_IN_PROGRESS', o, {
+          payStatus: o.payStatus,
+          nextStep: '只读可见。等待渠道退款通知，或由既有 convergeStalePendingRefunds 同号查证；不要换 refundNo 再发起一笔。',
+        })
+      }
     }
 
     return {
@@ -211,9 +271,10 @@ export class ReconciliationService {
         refundingCount,
         lateePaidCount: latePaid.length,
         reconciledCount: reconciled.length,
+        unconfirmedCollectionCount: unconfirmedCollections.length,
       },
       discrepancies,
-      attention: { latePaid, reconciled },
+      attention: { latePaid, reconciled, unconfirmedCollections, refundingInProgress },
     }
   }
 }

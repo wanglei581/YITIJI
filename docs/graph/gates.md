@@ -1955,7 +1955,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/admin-ops/derived-alerts.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-admin-order-filters.ts` |
-| `services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts` |
+| `services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-payment-flow.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts` | `verify-profile-print-orders-inkpaper.mjs` |
 | `services/api/src/admin-print-scan/admin-print-scan.service.ts` | `verify-admin-print-scan.ts`<br/>`verify-refund-idempotent.ts` |
 | `services/api/src/admin-users/admin-users.controller.ts` | `verify-admin-users.ts` |
@@ -2324,7 +2324,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/providers/sandbox-payment.provider.ts` | `verify-admin-print-scan.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-payment-codepay.ts`<br/>`verify-payment-flow.ts`<br/>`verify-refund-idempotent.ts` |
 | `services/api/src/payment/providers/wechat-pay.provider.ts` | `verify-payment-codepay.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/payment/qr-payment-expiry.task.ts` | `verify-payment-codepay.ts` |
-| `services/api/src/payment/reconciliation.service.ts` | `verify-admin-billing-ui.mjs`<br/>`verify-reconciliation.ts`<br/>`verify-wechat-refund-regression.ts` |
+| `services/api/src/payment/reconciliation.service.ts` | `verify-admin-billing-ui.mjs`<br/>`verify-payment-flow.ts`<br/>`verify-reconciliation.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/payment/refund-convergence.task.ts` | `verify-api20-manual-refund.ts`<br/>`verify-refund-convergence.ts` |
 | `services/api/src/payment/refund.service.ts` | `verify-admin-orders-refund.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-order.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/policies/dto/policy.dto.ts` | `verify-policies.ts`<br/>`verify-policy-eligibility.ts` |

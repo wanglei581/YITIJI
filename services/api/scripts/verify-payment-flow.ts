@@ -17,6 +17,8 @@
  *   Admin 端点拒绝 sandbox；markPaidOnline 拒绝非白名单渠道；支付回调不改 PrintTask.status。
  * - fail-closed：sandbox 缺密钥 / 生产配 sandbox / 未知 Provider → 启动即拒绝；
  *   Provider 未配置 → ONLINE_PAYMENT_DISABLED，不伪装可支付。
+ * - 渠道已受理但本地回填失败：留下 CHANNEL_ACCEPTED_UNCONFIRMED / created+空标识，
+ *   禁止第二笔出码，对账与 Admin opsAttention 可见；金额不对的签名回调不得补写 prepayId。
  */
 import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
@@ -24,9 +26,12 @@ import { AuditService } from '../src/audit/audit.service'
 import { BenefitRedemptionService } from '../src/benefit-redemption/benefit-redemption.service'
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
 import { signFileUrl } from '../src/files/signing'
+import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-orders-readonly.service'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
+import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from '../src/payment/channel-accepted-signal'
 import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
+import { ReconciliationService } from '../src/payment/reconciliation.service'
 import { ONLINE_PAID_PENDING_REFUND_REASON, OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken, paymentSessionTtlMs } from '../src/payment/payment-session-token'
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
@@ -1208,6 +1213,226 @@ async function main(): Promise<void> {
       }
     } finally {
       provider.createQrPayment = originalCreateQr
+    }
+
+    // ── (16) 渠道已受理、本地回填失败：不得第二笔扣款，对账/Admin/回调必须看见 ─
+    const recon = new ReconciliationService(prisma)
+    const adminOrders = new AdminOrdersReadonlyService(prisma)
+    const attemptDelegate = prisma.paymentAttempt as unknown as {
+      update: (...args: unknown[]) => Promise<unknown>
+      updateMany: (...args: unknown[]) => Promise<unknown>
+    }
+    const originalAttemptUpdate = attemptDelegate.update.bind(attemptDelegate)
+    const originalAttemptUpdateMany = attemptDelegate.updateMany.bind(attemptDelegate)
+
+    const finalizeUnconfirmedId = await makeOrder(160, 'unpaid')
+    const finalizeUnconfirmedSession = await paymentSessionFor(finalizeUnconfirmedId)
+    let issuedQr: { prepayId: string; qrCodeContent: string } | null = null
+    let qrCreateCalls = 0
+    const originalCreateQrForUnconfirmed = provider.createQrPayment.bind(provider)
+    provider.createQrPayment = async (input) => {
+      qrCreateCalls += 1
+      issuedQr = await originalCreateQrForUnconfirmed(input)
+      return issuedQr
+    }
+    attemptDelegate.update = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { qrCodeContent?: string; status?: string } } | undefined)?.data
+      if (data?.qrCodeContent && data.status === 'pending') {
+        throw new Error('VERIFY_FORCED_FINALIZE_FAILURE')
+      }
+      return originalAttemptUpdate(...args)
+    }
+    attemptDelegate.updateMany = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { prepayId?: string; qrCodeContent?: string } } | undefined)?.data
+      if (data?.prepayId || data?.qrCodeContent) {
+        throw new Error('VERIFY_FORCED_IDENTIFIER_WRITE_FAILURE')
+      }
+      return originalAttemptUpdateMany(...args)
+    }
+    try {
+      let unconfirmedCode = 'RESOLVED'
+      try {
+        await payment.createPayAttempt(finalizeUnconfirmedId, finalizeUnconfirmedSession)
+      } catch (error) {
+        unconfirmedCode = errorCode(error)
+      }
+      const unconfirmedOrder = await prisma.order.findUnique({ where: { id: finalizeUnconfirmedId } })
+      const unconfirmedAttempt = await prisma.paymentAttempt.findFirst({
+        where: { orderId: finalizeUnconfirmedId },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (
+        unconfirmedCode.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+        unconfirmedOrder?.payStatus === 'paying' &&
+        unconfirmedAttempt &&
+        unconfirmedAttempt.status !== 'failed' &&
+        unconfirmedAttempt.status !== 'success' &&
+        (unconfirmedAttempt.failReason === CHANNEL_ACCEPTED_UNCONFIRMED_REASON
+          || (!unconfirmedAttempt.prepayId && !unconfirmedAttempt.qrCodeContent && !unconfirmedAttempt.channelTxnNo))
+      ) {
+        pass('QR channel success + local finalize failure keeps paying and a durable unconfirmed signal')
+      } else {
+        fail(
+          `unconfirmed QR mismatch: code=${unconfirmedCode} pay=${unconfirmedOrder?.payStatus} attempt=${JSON.stringify(unconfirmedAttempt)}`,
+        )
+      }
+      const attemptsBeforeRetry = await prisma.paymentAttempt.count({ where: { orderId: finalizeUnconfirmedId } })
+      await expectCode(
+        'unconfirmed QR blocks a second channel create (PAYMENT_ATTEMPT_PENDING)',
+        'PAYMENT_ATTEMPT_PENDING',
+        () => payment.createPayAttempt(finalizeUnconfirmedId, finalizeUnconfirmedSession),
+      )
+      const attemptsAfterRetry = await prisma.paymentAttempt.count({ where: { orderId: finalizeUnconfirmedId } })
+      if (attemptsBeforeRetry === 1 && attemptsAfterRetry === 1 && qrCreateCalls === 1) {
+        pass('retry after unconfirmed finalize does not create a second PaymentAttempt or call the provider again')
+      } else {
+        fail(`second attempt/provider: before=${attemptsBeforeRetry} after=${attemptsAfterRetry} qrCalls=${qrCreateCalls}`)
+      }
+
+      const reconReport = await recon.report({ nowMs: Date.now() })
+      const unconfirmedHit = reconReport.attention.unconfirmedCollections.some(
+        (row) => row.orderId === finalizeUnconfirmedId && row.code === CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+      )
+      if (unconfirmedHit && reconReport.summary.unconfirmedCollectionCount >= 1) {
+        pass('reconciliation attention lists CHANNEL_ACCEPTED_UNCONFIRMED (not paid)')
+      } else {
+        fail(`recon missed unconfirmed collection: ${JSON.stringify(reconReport.attention.unconfirmedCollections)}`)
+      }
+      const adminHit = (await adminOrders.list({
+        opsAttention: true,
+        search: unconfirmedOrder?.orderNo,
+        page: 1,
+        pageSize: 10,
+      })).items[0]
+      if (
+        adminHit?.id === finalizeUnconfirmedId &&
+        adminHit.opsAttention === true &&
+        adminHit.opsAttentionCode === 'channel_accepted_unconfirmed' &&
+        adminHit.payStatus === 'paying' &&
+        adminHit.refundRequired === false
+      ) {
+        pass('admin opsAttention lists channel-accepted-unconfirmed without faking paid/refund')
+      } else {
+        fail(`admin missed unconfirmed: ${JSON.stringify(adminHit)}`)
+      }
+
+      attemptDelegate.update = originalAttemptUpdate
+      attemptDelegate.updateMany = originalAttemptUpdateMany
+
+      if (!issuedQr) fail('provider createQrPayment did not return identifiers')
+      const cbBadAmount = buildCallback({
+        payload: {
+          channel: CHANNEL,
+          attemptId: unconfirmedAttempt!.id,
+          prepayId: issuedQr.prepayId,
+          orderId: finalizeUnconfirmedId,
+          amountCents: 1,
+          result: 'success',
+          channelTxnNo: `sbx_txn_${suffix}_badamt`,
+        },
+      })
+      await expectCode(
+        'signed callback with wrong amount is rejected before binding prepayId (CALLBACK_AMOUNT_MISMATCH)',
+        'CALLBACK_AMOUNT_MISMATCH',
+        () => payment.processCallback(CHANNEL, cbBadAmount.rawBody, cbBadAmount.headers),
+      )
+      const afterBadAmount = await prisma.paymentAttempt.findUnique({ where: { id: unconfirmedAttempt!.id } })
+      if (afterBadAmount?.prepayId || afterBadAmount?.channelTxnNo) {
+        fail(`amount-mismatch callback must not bind identifiers: ${JSON.stringify(afterBadAmount)}`)
+      } else {
+        pass('amount-mismatch signed callback does not persist prepayId/channelTxnNo')
+      }
+      const cbUnconfirmed = buildCallback({
+        payload: {
+          channel: CHANNEL,
+          attemptId: unconfirmedAttempt!.id,
+          prepayId: issuedQr.prepayId,
+          orderId: finalizeUnconfirmedId,
+          amountCents: 160,
+          result: 'success',
+          channelTxnNo: `sbx_txn_${suffix}_unconfirmed`,
+        },
+      })
+      let resUnconfirmed: { ok: true; idempotent?: boolean }
+      try {
+        resUnconfirmed = await payment.processCallback(CHANNEL, cbUnconfirmed.rawBody, cbUnconfirmed.headers)
+      } catch (error) {
+        fail(`unconfirmed signed callback threw: ${errorCode(error)} ${(error as Error).message}`)
+      }
+      const paidUnconfirmed = await prisma.order.findUnique({ where: { id: finalizeUnconfirmedId } })
+      if (resUnconfirmed.ok && paidUnconfirmed?.payStatus === 'paid' && paidUnconfirmed.paymentSource === 'sandbox') {
+        pass('signed callback binds merchant order id when local prepayId was missing, then marks paid')
+      } else {
+        fail(`unconfirmed callback mismatch: ok=${resUnconfirmed.ok} pay=${paidUnconfirmed?.payStatus}`)
+      }
+    } finally {
+      attemptDelegate.update = originalAttemptUpdate
+      attemptDelegate.updateMany = originalAttemptUpdateMany
+      provider.createQrPayment = originalCreateQrForUnconfirmed
+    }
+
+    const codePayUnconfirmedId = await makeOrder(180, 'unpaid')
+    const codePayUnconfirmedSession = await paymentSessionFor(codePayUnconfirmedId)
+    let codePayCalls = 0
+    const originalCreateCode = provider.createCodePayment!.bind(provider)
+    provider.createCodePayment = async (input) => {
+      codePayCalls += 1
+      return originalCreateCode(input)
+    }
+    attemptDelegate.update = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { prepayId?: string; qrCodeContent?: string; status?: string } } | undefined)?.data
+      if (data?.status === 'pending' && data.prepayId && !data.qrCodeContent) {
+        throw new Error('VERIFY_FORCED_CODEPAY_FINALIZE_FAILURE')
+      }
+      return originalAttemptUpdate(...args)
+    }
+    attemptDelegate.updateMany = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { prepayId?: string; qrCodeContent?: string; status?: string } } | undefined)?.data
+      if (data?.prepayId || data?.qrCodeContent) {
+        throw new Error('VERIFY_FORCED_CODEPAY_IDENTIFIER_WRITE_FAILURE')
+      }
+      return originalAttemptUpdateMany(...args)
+    }
+    try {
+      const codePayResult = await payment.createCodePayAttempt(
+        codePayUnconfirmedId,
+        codePayUnconfirmedSession,
+        '123456789012345678',
+      )
+      const codePayOrder = await prisma.order.findUnique({ where: { id: codePayUnconfirmedId } })
+      const codePayAttempt = await prisma.paymentAttempt.findFirst({
+        where: { orderId: codePayUnconfirmedId },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (
+        (codePayResult.status === 'success' || codePayResult.status === 'paying') &&
+        codePayOrder?.payStatus !== 'unpaid' &&
+        codePayAttempt &&
+        codePayAttempt.status !== 'failed'
+      ) {
+        pass('code-pay channel success survives local identifier write failure without releasing unpaid')
+      } else {
+        fail(
+          `code-pay unconfirmed mismatch: result=${JSON.stringify(codePayResult)} pay=${codePayOrder?.payStatus} attempt=${JSON.stringify(codePayAttempt)}`,
+        )
+      }
+      const codePayAttempts = await prisma.paymentAttempt.count({ where: { orderId: codePayUnconfirmedId } })
+      const retryCode = codePayOrder?.payStatus === 'paid' ? 'ORDER_ALREADY_PAID' : 'PAYMENT_ATTEMPT_PENDING'
+      await expectCode(
+        `code-pay unconfirmed blocks a second charge (${retryCode})`,
+        retryCode,
+        () => payment.createCodePayAttempt(codePayUnconfirmedId, codePayUnconfirmedSession, '123456789012345678'),
+      )
+      const codePayAttemptsAfter = await prisma.paymentAttempt.count({ where: { orderId: codePayUnconfirmedId } })
+      if (codePayAttempts === 1 && codePayAttemptsAfter === 1 && codePayCalls === 1) {
+        pass('code-pay retry after finalize failure does not create a second attempt or call the provider again')
+      } else {
+        fail(`code-pay second attempt: before=${codePayAttempts} after=${codePayAttemptsAfter} calls=${codePayCalls}`)
+      }
+    } finally {
+      attemptDelegate.update = originalAttemptUpdate
+      attemptDelegate.updateMany = originalAttemptUpdateMany
+      provider.createCodePayment = originalCreateCode
     }
 
     console.log('\nAll payment-flow assertions passed.\n')

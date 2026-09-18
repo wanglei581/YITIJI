@@ -2477,6 +2477,7 @@
         "models": [
           "EndUser",
           "Order",
+          "PaymentAttempt",
           "PrintTaskStatusLog",
           "Terminal"
         ],
@@ -2498,6 +2499,7 @@
         "models": [
           "EndUser",
           "Order",
+          "PaymentAttempt",
           "PrintTaskStatusLog",
           "Terminal"
         ],
@@ -15840,6 +15842,7 @@
           "Order"
         ],
         "usedBy": [
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund.service.ts"
@@ -20607,7 +20610,8 @@
       "services/api/scripts/verify-admin-orders-readonly.ts",
       "services/api/scripts/verify-admin-pending-dispose.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
-      "services/api/scripts/verify-api20-manual-refund.ts"
+      "services/api/scripts/verify-api20-manual-refund.ts",
+      "services/api/scripts/verify-payment-flow.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts": [
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
@@ -22711,6 +22715,7 @@
     ],
     "services/api/src/payment/reconciliation.service.ts": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
+      "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-reconciliation.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -33451,6 +33456,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/config/production-runtime-gates.ts",
@@ -33465,6 +33471,7 @@
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/providers/sandbox-payment.provider.ts",
+          "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",

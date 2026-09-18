@@ -124,7 +124,7 @@ flowchart TD
 | **OrderItem** | 15 | Order | 3 个文件<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`print-jobs/pickup-order.service.ts`<br/>`terminals/terminals-agent.service.ts` |
 | **OrderSubmissionLedger** | 11 | — | 1 个文件<br/>`member-print-orders/order-submission-ledger.ts` |
 | **Organization** | 26 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 16 个文件<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>`auth/partner-phone-rebind.service.ts`<br/>… |
-| **PaymentAttempt** | 13 | Order | 3 个文件<br/>`payment/online-payment.service.ts`<br/>`payment/reconciliation.service.ts`<br/>`payment/refund.service.ts` |
+| **PaymentAttempt** | 13 | Order | 4 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`payment/online-payment.service.ts`<br/>`payment/reconciliation.service.ts`<br/>… |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`print-jobs/pii-scan-gate.ts` |
 | **PlatformQualification** | 19 | FileObject | 1 个文件<br/>`common/recruitment-capability.ts` |
 | **PolicyEligibilityRule** | 10 | PolicyPost | 1 个文件<br/>`policies/policy-eligibility.service.ts` |

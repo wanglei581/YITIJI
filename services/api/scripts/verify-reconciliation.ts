@@ -12,6 +12,7 @@
  */
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
+import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from '../src/payment/channel-accepted-signal'
 import { ReconciliationService } from '../src/payment/reconciliation.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 
@@ -175,6 +176,39 @@ async function main(): Promise<void> {
     await prisma.auditLog.create({ data: { actorRole: 'system', action: 'order.mark_paid_online', targetType: 'order', targetId: healthy, payloadJson: JSON.stringify({ late: true, channel: 'wechat' }) } })
     await prisma.auditLog.create({ data: { actorRole: 'system', action: 'payment.reconciled', targetType: 'order', targetId: refundedOk, payloadJson: JSON.stringify({ channel: 'alipay' }) } })
 
+    const unconfirmed = await mk('uncf', { amountCents: 210, payStatus: 'paying' })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: unconfirmed,
+        channel: 'wechat',
+        amountCents: 210,
+        status: 'created',
+        createdAt: new Date(Date.now() - 60_000),
+      },
+    })
+    const inFlight = await mk('inflt', { amountCents: 40, payStatus: 'paying' })
+    await prisma.paymentAttempt.create({
+      data: { orderId: inFlight, channel: 'wechat', amountCents: 40, status: 'created' },
+    })
+    const livePaying = await mk('livep', { amountCents: 70, payStatus: 'paying' })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: livePaying,
+        channel: 'wechat',
+        amountCents: 70,
+        status: 'pending',
+        prepayId: `prepay_${suffix}_live`,
+        qrCodeContent: 'weixin://wxpay/bizpayurl?pr=live',
+      },
+    })
+    const youngRefunding = await mk('yrf', {
+      amountCents: 55,
+      payStatus: 'refunding',
+      paymentSource: 'wechat',
+      payChannel: 'wechat',
+      paidAt: new Date(),
+    })
+
     const ordersBefore = await prisma.order.count({ where: { terminalId } })
     const refundsBefore = await prisma.refund.count({ where: { order: { is: { terminalId } } } })
 
@@ -228,6 +262,26 @@ async function main(): Promise<void> {
       pass('额外成功尝试按实收合计计入 gross')
     } else {
       fail(`extra collection gross missing: ${JSON.stringify(rep.summary)}`)
+    }
+
+    if (
+      find(mine(rep.attention.unconfirmedCollections), CHANNEL_ACCEPTED_UNCONFIRMED_REASON, unconfirmed)
+      && !find(mine(rep.attention.unconfirmedCollections), CHANNEL_ACCEPTED_UNCONFIRMED_REASON, livePaying)
+      && !find(mine(rep.attention.unconfirmedCollections), CHANNEL_ACCEPTED_UNCONFIRMED_REASON, inFlight)
+      && !disc.some((d) => d.orderId === unconfirmed)
+    ) {
+      pass('超龄 created+空标识进 attention；在飞 created 与已出码 pending 不误报；不进 discrepancies 当 paid')
+    } else {
+      fail(`unconfirmed attention mismatch: ${JSON.stringify(rep.attention.unconfirmedCollections)}`)
+    }
+    if (
+      find(mine(rep.attention.refundingInProgress), 'REFUNDING_IN_PROGRESS', youngRefunding)
+      && find(mine(rep.attention.refundingInProgress), 'REFUNDING_IN_PROGRESS', stuck)
+      && !find(disc, 'STUCK_REFUNDING', youngRefunding)
+    ) {
+      pass('refunding 全部进入 attention.refundingInProgress；未超龄不进 STUCK_REFUNDING')
+    } else {
+      fail(`refunding attention mismatch: ${JSON.stringify(rep.attention.refundingInProgress)}`)
     }
 
     if (find(mine(rep.attention.latePaid), 'LATE_PAID', healthy)) pass('LATE_PAID 进 attention 专项')

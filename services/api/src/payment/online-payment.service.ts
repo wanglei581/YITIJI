@@ -19,6 +19,7 @@ import { randomBytes } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
+import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from './channel-accepted-signal'
 import { OrderStatusService, pickupCodeVisibleFor } from './order-status.service'
 import { verifyPaymentSessionToken } from './payment-session-token'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
@@ -211,6 +212,17 @@ export class OnlinePaymentService {
           { status: { in: ['created', 'pending'] }, expiresAt: { gt: new Date(now) } },
           // 付款码过期不代表渠道绝对未扣款。必须先查单收敛，不能改发二维码造成双扣。
           { status: 'expired', qrCodeContent: null, prepayId: { not: null } },
+          // 渠道已受理但本地标识未落地：即使动态码 TTL 已过，也不得再向渠道下第二单。
+          {
+            status: { in: ['created', 'pending'] },
+            failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+          },
+          {
+            status: { in: ['created', 'pending'] },
+            prepayId: null,
+            qrCodeContent: null,
+            channelTxnNo: null,
+          },
         ],
       },
       orderBy: { createdAt: 'desc' },
@@ -265,10 +277,18 @@ export class OnlinePaymentService {
         },
       })
     }
-    const pendingAttempt = await this.prisma.paymentAttempt.update({
-      where: { id: attempt.id },
-      data: { status: 'pending', prepayId: qr.prepayId, qrCodeContent: qr.qrCodeContent },
+    const pendingAttempt = await this.persistChannelAcceptance(attempt.id, {
+      prepayId: qr.prepayId,
+      qrCodeContent: qr.qrCodeContent,
     })
+    if (!pendingAttempt || !pendingAttempt.prepayId || !pendingAttempt.qrCodeContent) {
+      throw new ServiceUnavailableException({
+        error: {
+          code: 'PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED',
+          message: '支付通道已受理，本地确认未完成。请勿重新支付，请联系工作人员核对渠道订单。',
+        },
+      })
+    }
 
     const freshOrder = await this.requireOrder(order.id)
 
@@ -374,9 +394,8 @@ export class OnlinePaymentService {
     }
 
     if (result.status === 'success' && result.channelTxnNo && result.amountCents === order.amountCents) {
-      await this.prisma.paymentAttempt.update({
-        where: { id: attempt.id },
-        data: { status: 'pending', prepayId: result.prepayId ?? attempt.id, failReason: null },
+      await this.persistChannelAcceptance(attempt.id, {
+        prepayId: result.prepayId ?? attempt.id,
       })
       try {
         await this.handleSuccess(provider.channel, attempt, freshOrder, { channelTxnNo: result.channelTxnNo })
@@ -390,13 +409,9 @@ export class OnlinePaymentService {
     const successIncomplete =
       result.status === 'success' && (result.channelTxnNo === null || result.amountCents !== order.amountCents)
     if (result.status === 'paying' || successIncomplete) {
-      await this.prisma.paymentAttempt.update({
-        where: { id: attempt.id },
-        data: {
-          status: 'pending',
-          prepayId: result.prepayId ?? attempt.id,
-          ...(successIncomplete ? { failReason: '支付结果校验失败，请联系工作人员' } : {}),
-        },
+      await this.persistChannelAcceptance(attempt.id, {
+        prepayId: result.prepayId ?? attempt.id,
+        failReason: successIncomplete ? '支付结果校验失败，请联系工作人员' : null,
       })
       if (successIncomplete) {
         await this.audit.write({
@@ -412,8 +427,8 @@ export class OnlinePaymentService {
     }
 
     const failReason = result.failReason ?? SAFE_FAIL_TEXT
-    await this.prisma.paymentAttempt.update({
-      where: { id: attempt.id },
+    await this.prisma.paymentAttempt.updateMany({
+      where: { id: attempt.id, status: { in: ['created', 'pending'] } },
       data: { status: 'failed', prepayId: result.prepayId ?? attempt.id, failReason },
     })
     await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
@@ -510,8 +525,7 @@ export class OnlinePaymentService {
       where: {
         channel: { not: 'sandbox' },
         qrCodeContent: null,
-        prepayId: { not: null },
-        status: { in: ['pending', 'expired'] },
+        status: { in: ['created', 'pending', 'expired'] },
       },
       select: { orderId: true },
       orderBy: { createdAt: 'asc' },
@@ -617,12 +631,14 @@ export class OnlinePaymentService {
     })
     if (!attempt) throw new BadRequestException('CALLBACK_ATTEMPT_NOT_FOUND')
     if (attempt.channel !== channel) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
-    if (!attempt.prepayId || attempt.prepayId !== event.prepayId) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
     if (attempt.orderId !== event.orderId) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
+    if (event.attemptId !== attempt.id) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
     // 金额一致性双重比对：回调金额 = 尝试快照 = 订单应付，防篡改。
+    // 必须在补写 prepayId 之前完成，避免金额不对的签名报文先污染标识。
     if (attempt.amountCents !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
     const order = attempt.order
     if (order.amountCents !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
+    await this.bindCallbackIdentifiersIfMissing(attempt, event.prepayId)
 
     if (event.result === 'success') {
       const res = await this.handleSuccess(channel as PaymentChannel, attempt, order, {
@@ -648,13 +664,13 @@ export class OnlinePaymentService {
 
     const attempt = await this.prisma.paymentAttempt.findUnique({ where: { id: input.attemptId } })
     if (!attempt) throw new NotFoundException('PAYMENT_ATTEMPT_NOT_FOUND')
-    if (!attempt.prepayId) throw new BadRequestException('PAYMENT_ATTEMPT_NOT_READY')
+    const simulatedPrepayId = attempt.prepayId ?? attempt.id
 
     const path = buildPaymentCallbackPath(provider.channel)
     const callback = provider.buildSimulatedCallback({
       path,
       attemptId: attempt.id,
-      prepayId: attempt.prepayId,
+      prepayId: simulatedPrepayId,
       orderId: attempt.orderId,
       amountCents: attempt.amountCents,
       result: input.result,
@@ -747,7 +763,12 @@ export class OnlinePaymentService {
     // 无其它可用尝试时订单回 unpaid，允许重新出码（订单超时关单仍由 expiresAt 惰性判定）。
     const now = new Date()
     const stillPending = await this.prisma.paymentAttempt.count({
-      where: { orderId: order.id, status: 'pending', expiresAt: { gt: now }, id: { not: attempt.id } },
+      where: {
+        orderId: order.id,
+        status: { in: ['created', 'pending'] },
+        expiresAt: { gt: now },
+        id: { not: attempt.id },
+      },
     })
     if (stillPending === 0) {
       await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
@@ -767,8 +788,8 @@ export class OnlinePaymentService {
   /**
    * 过期收敛（请求路径惰性调用）：
    * 1) 已有渠道受理标识的过期付款码尝试 → expired；已有屏上二维码必须由
-   *    convergeExpiredScreenQrAttempt 查单/关单确认后才可过期；未取得二维码的 created
-   *    尝试不可能被顾客扫描，可在本地到期后安全释放；
+   *    convergeExpiredScreenQrAttempt 查单/关单确认后才可过期。created 且三个标识
+   *    都空的尝试可能已经在渠道下过单，回填失败，不得按「顾客扫不到码」自动释放；
    * 2) 订单超时（expiresAt 已过且仍 unpaid/paying）→ closed；
    * 3) paying 但已无任何 created/pending 尝试 → 回 unpaid（可重新出码）。
    */
@@ -779,13 +800,11 @@ export class OnlinePaymentService {
         orderId: order.id,
         status: { in: ['created', 'pending'] },
         expiresAt: { lt: now },
-        OR: [
-          // 付款码已有渠道受理标识，仍须由主动查单路径确认。
-          { qrCodeContent: null, prepayId: { not: null } },
-          // 屏上码预下单抛错且没有拿到二维码：顾客没有可扫码内容，渠道 time_expire 已限制，
-          // 到本地有效期后可以安全解除本地锁，避免滞留到订单 15 分钟超时。
-          { status: 'created', qrCodeContent: null, prepayId: null },
-        ],
+        // 三个标识都空的 created 可能已经在渠道下过单，回填失败。不得按「顾客扫不到码」
+        // 自动 expired 再 unpaid —— 那会放出第二笔渠道单。只过期已拿到渠道标识的付款码，
+        // 仍须查单收敛。
+        qrCodeContent: null,
+        prepayId: { not: null },
       },
       data: { status: 'expired' },
     })
@@ -972,7 +991,7 @@ export class OnlinePaymentService {
     opts: { rejectAmountMismatch?: boolean } = {},
   ): Promise<'paid' | 'released' | 'pending' | 'skipped'> {
     const attempt = await this.prisma.paymentAttempt.findFirst({
-      where: { orderId: order.id, prepayId: { not: null }, status: { in: ['pending', 'expired', 'success'] } },
+      where: { orderId: order.id, status: { in: ['created', 'pending', 'expired', 'success'] } },
       orderBy: { createdAt: 'desc' },
     })
     if (!attempt || attempt.status === 'success') return 'skipped'
@@ -1021,11 +1040,16 @@ export class OnlinePaymentService {
     }
     if (queried.status === 'closed' || queried.status === 'failed') {
       await this.prisma.paymentAttempt.updateMany({
-        where: { id: attempt.id, status: { in: ['pending', 'expired'] } },
+        where: { id: attempt.id, status: { in: ['created', 'pending', 'expired'] } },
         data: { status: 'failed', failReason: SAFE_FAIL_TEXT },
       })
       const stillPending = await this.prisma.paymentAttempt.count({
-        where: { orderId: order.id, status: 'pending', expiresAt: { gt: new Date() }, id: { not: attempt.id } },
+        where: {
+          orderId: order.id,
+          status: { in: ['created', 'pending'] },
+          expiresAt: { gt: new Date() },
+          id: { not: attempt.id },
+        },
       })
       if (stillPending === 0) {
         await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
@@ -1041,6 +1065,92 @@ export class OnlinePaymentService {
       return 'released'
     }
     return 'pending'
+  }
+
+  /**
+   * 渠道已返回受理结果后的本地回填。主路径用 update；失败则 updateMany 补标识。
+   * 两条都失败时只尽最大努力钉 failReason，绝不 unpaid / failed（渠道可能已扣款或已出码）。
+   */
+  private async persistChannelAcceptance(
+    attemptId: string,
+    data: { prepayId: string; qrCodeContent?: string; failReason?: string | null },
+  ): Promise<AttemptRecord | null> {
+    const pendingData = {
+      status: 'pending' as const,
+      prepayId: data.prepayId,
+      ...(data.qrCodeContent !== undefined ? { qrCodeContent: data.qrCodeContent } : {}),
+      failReason: data.failReason === undefined ? null : data.failReason,
+    }
+    try {
+      return await this.prisma.paymentAttempt.update({
+        where: { id: attemptId },
+        data: pendingData,
+      })
+    } catch {
+      /* 主回填失败：下面用更小的 CAS 再试，失败也不回滚渠道。 */
+    }
+    try {
+      await this.prisma.paymentAttempt.updateMany({
+        where: { id: attemptId, status: { in: ['created', 'pending'] } },
+        data: pendingData,
+      })
+    } catch {
+      /* 标识回填失败：再试只钉信号。 */
+    }
+    const recovered = await this.prisma.paymentAttempt.findUnique({ where: { id: attemptId } })
+    if (recovered && recovered.prepayId) return recovered
+    await this.markChannelAcceptedUnconfirmed(attemptId)
+    return this.prisma.paymentAttempt.findUnique({ where: { id: attemptId } })
+  }
+
+  private async markChannelAcceptedUnconfirmed(attemptId: string): Promise<void> {
+    try {
+      await this.prisma.paymentAttempt.updateMany({
+        where: { id: attemptId, status: { in: ['created', 'pending', 'expired'] } },
+        data: { failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON },
+      })
+    } catch {
+      /* 连信号都写不上：created + 空标识本身就是 fail-closed 信号。 */
+    }
+    const row = await this.prisma.paymentAttempt.findUnique({
+      where: { id: attemptId },
+      select: { orderId: true, channel: true },
+    })
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'payment.channel_accepted_unconfirmed',
+      targetType: 'payment_attempt',
+      targetId: attemptId,
+      payload: {
+        orderId: row?.orderId ?? null,
+        channel: row?.channel ?? null,
+        reason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+      },
+    })
+  }
+
+  /**
+   * 回填失败的尝试：验签后的回调仍带商户订单号 (= attemptId)。
+   * 调用方必须已经核对 channel / orderId / attemptId / 金额。
+   * 本地已有 prepayId 则必须与签名报文逐字相等；本地为空才补写签名里的 prepayId。
+   */
+  private async bindCallbackIdentifiersIfMissing(
+    attempt: AttemptRecord,
+    eventPrepayId: string,
+  ): Promise<void> {
+    if (!eventPrepayId) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
+    if (attempt.prepayId) {
+      if (attempt.prepayId !== eventPrepayId) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
+      return
+    }
+    await this.prisma.paymentAttempt.updateMany({
+      where: { id: attempt.id, prepayId: null },
+      data: {
+        prepayId: eventPrepayId,
+        ...(attempt.failReason === CHANNEL_ACCEPTED_UNCONFIRMED_REASON ? { failReason: null } : {}),
+      },
+    })
   }
 
   private toAttemptView(attempt: AttemptRecord, order: OrderRecord): PayAttemptView {
