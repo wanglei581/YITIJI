@@ -1,5 +1,18 @@
 # 当前开发进度
 
+2026-09-18 **本机 PostgreSQL 空库 migrate GO；GitHub `postgres-readiness` 仍 NO-GO。**
+绑定源码 HEAD `b38c4f541d7216c39219311ec2206af4fdab1d36`。本条只收口证据文档，未改源码 / 测试 / 前端。未 push、未开 PR、未部署。Claude 未提交大屏测试 `apps/admin/tests/e2e/screen/states.spec.ts` **未改、未暂存**。
+
+- **环境：** 本机 Homebrew PostgreSQL **16.15**，临时 `127.0.0.1:65364`，空库。不是 GitHub `postgres:16` 容器，不是升级库，不是生产库。
+- **空库 migrate（退出码均为 0）：** `pnpm db:pg:sync:check`、`npx prisma generate`、`pnpm db:pg:generate`、`pnpm db:pg:deploy`（**75/75**）、`prisma migrate status`、`prisma migrate diff --exit-code`、`prisma validate`。
+- **目标迁移：** `20260917120000_add_console_screen_query_indexes` 与 `20260918120000_add_order_submission_ledger` 均为 `finished=true`、`rolled_back_at=null`。
+- **目标索引存在：** `PrintTaskStatusLog_toStatus_createdAt_idx`、`ExternalJumpLog_createdAt_sourceName_idx`、`OrderSubmissionLedger_endUserId_idempotencyKey_key`、`OrderSubmissionLedger_status_leaseExpiresAt_idx`（另有 ledger `orderId` / `endUserId` 索引）。
+- **唯一约束反证：** 同 `(endUserId, idempotencyKey)` 重复插入退出 **3**（`OrderSubmissionLedger_endUserId_idempotencyKey_key`）；连接恢复后新 key 插入成功。
+- **目标最小验证：** `verify:console-screen-snapshot` **80/80**、`verify:member-print-order-idempotency` **0**、`verify:package-order-idempotency` **0**。这些脚本自建 SQLite `file:/tmp/verify-*.db`，**不是**本轮临时 PG 运行时。
+- **清理：** 临时 PG 已 `pg_ctl stop`，端口 65364 无响应，数据目录已删除。
+- **未跑：** GitHub `postgres-readiness` 尚未对当前 HEAD 完整跑过；升级库、招聘 PG、seed、后半套件未跑。
+- **证据边界：** `LOCAL PG EMPTY-DB MIGRATION: GO`；`LOCAL SQLite` 此前已绿；`CI: NO-GO`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。不得把本机空库 migrate 写成 CI、生产或升级库 GO。
+
 2026-09-18 **CI 阻断：`verify:payment-codepay` 内存桩未实现 Prisma `failReason` 相等。**
 HEAD 以其落地 SHA 为准。未 push。未改生产支付实现。Claude 大屏测试文件未改。
 

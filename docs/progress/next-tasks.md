@@ -7,12 +7,12 @@
 （A `a677bde84`、B `09ecc76f1`、C `6940ba257`、D `dbd28905e`）。未 push、未开 PR、未部署。
 精确 SHA 以本分支 `HEAD` 为准，见 `current-progress.md` 顶部。
 
-**总判定：`SOURCE: GO`；`LOCAL: GO`（隔离 SQLite 套件，见 `current-progress.md` 顶部，含 2026-09-18 渠道受理未确认 P0）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
-不得把任一来源候选的旧 CI 绿或旧现场证据外推到本合流树。本机无 PostgreSQL，PG migrate 应用证据留给 CI。渠道已受理但本地回填失败的订单，运营走 Admin `opsAttention` / 对账 `attention.unconfirmedCollections`，按 `PaymentAttempt.id` 查渠道账本；不要重新出码。
+**总判定：`SOURCE: GO`；`LOCAL: GO`（隔离 SQLite 套件 + 本机 Homebrew PostgreSQL 16.15 空库 migrate，绑定 HEAD `b38c4f541`，见 `current-progress.md` 顶部）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+不得把任一来源候选的旧 CI 绿或旧现场证据外推到本合流树。本机空库已对 `b38c4f541` 应用 75/75 迁移（含 `20260917120000` 与 `20260918120000`），这只是 `LOCAL PG EMPTY-DB MIGRATION: GO`，不能替代 GitHub `postgres-readiness`。CI 待办仍要求对 **final-head** 完整跑 `postgres-readiness`（含升级库 / 招聘 PG / seed / 后半套件）。渠道已受理但本地回填失败的订单，运营走 Admin `opsAttention` / 对账 `attention.unconfirmedCollections`，按 `PaymentAttempt.id` 查渠道账本；不要重新出码。
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|
-| 1 | 本写入者（Grok） | ~~隔离门禁~~ **已完成**（命令与退出码见 `current-progress.md` 2026-09-18 验证条）。page-lifecycle 拼接缺 `})` 已补回 `4ba8a7786` | 不得把该 LOCAL 绿写成 CI 绿 |
+| 1 | 本写入者（Grok） | ~~隔离 SQLite 门禁~~ **已完成**；~~本机 Homebrew PostgreSQL 16.15 空库 migrate~~ **已完成**（75/75，含 `20260917120000` / `20260918120000`）。命令与退出码见 `current-progress.md` 顶部。page-lifecycle 拼接缺 `})` 已补回 `4ba8a7786` | 不得把 LOCAL SQLite 或 LOCAL 空库 migrate 写成 GitHub CI 绿 |
 | 2 | Claude | 确认合流后的前端仍是各候选提交的原意：小程序材料包/支付/订单详情/page-lifecycle 测试拼接（含补回的两行）、Kiosk `PrintDonePage`、Admin 订单待退款筛选与计费文案、Admin/Partner 数据大屏与 `packages/ui` screen | 不发明新 UI；若拼接测试改变了生命周期契约，只许在新分支修，不得在本合流上继续堆前端 |
 | 3 | 独立复审 | 对合流 HEAD 做支付租约 CAS × 待退款信号、Agent 陈旧锁 fail-closed、大屏 fail-closed 快照的只读复审 | 不得沿用 `33751df4a` / `09ecc76f1` / `6940ba257` / `dbd28905e` 各自的绿灯 |
 | 4 | CI | 获得 push/PR 授权后只认本 HEAD 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke`；PostgreSQL job 必须实际应用 `20260917120000` 与 `20260918120000` | 旧 run（含 `34992685756`、`35206540195`、`35235786133`）一律作废 |
