@@ -1,5 +1,17 @@
 # 当前开发进度
 
+2026-09-18 **LOCAL postgres-readiness rehearsal GO；GitHub CI 仍 NO-GO。**
+绑定 HEAD `cd19fb47a64f90b14b6475e6d1dd3b442fca751a`（源码父 `b38c4f541`）。本条只收口证据文档，未改源码 / 测试 / 前端。未 push、未开 PR、未部署。Claude 未提交大屏测试 **未改、未暂存**（工作区 SHA-256 `6b2e4bcbb8f341edba53b92e6df74234e7152c49d07652340c9d144c0223b905`）。
+
+- **环境：** 本机 Homebrew PostgreSQL **16.15**，临时 `127.0.0.1:57741`；隔离 Redis `57742`；`5432` 仅临时转发到 57741。不是 GitHub `postgres:16` / `redis:7`，不是生产库。
+- **按 `postgres-readiness` 顺序（均为 0）：** `db:pg:sync:check`、`verify:recruitment-p1-schema:postgres-upgrade`、`prisma generate`、`db:pg:generate`、`db:pg:deploy`、`migrate status`（CI 无名额外步骤）、`verify-recruitment-wave2-postgres-ci.sh`、`migrate diff --exit-code`、`verify:recruitment-p1-preflight`、`verify:first-admin-bootstrap:postgres`、`seed.ts`、`seed-fairs.ts`。
+- **后半串行：** 从本 job 抽出 103 条，`ran 103 / passed 103 / failed 0 / skipped 0`，末条 `verify:kiosk-frontend-debt`。总耗时 **327s**（串行 312s）。
+- **本机跳过的 GitHub 环境步：** checkout、setup-node/pnpm、`pnpm install --frozen-lockfile`、`apt-get` 安装 `fonts-noto-cjk`/sqlite3/redis-server。既有 `node_modules`、macOS CJK 字体、Homebrew Redis 8 不得写成 CI 等价。
+- **未纳入结果：** `/tmp` harness 两次误跑（PATH 裁掉 node；抽成 SQLite job 的 290 条）均在正确预演前停止，不是产品失败。
+- **清理：** 临时 PG / 隔离 Redis / 5432 均无监听；`pg-readiness` 临时目录与报告副本已精确清理。
+- **未跑：** GitHub `postgres-readiness`、`build-and-verify`、`kiosk-browser-smoke`。
+- **证据边界：** `LOCAL postgres-readiness rehearsal: GO`；前一条空库 migrate 仍成立；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+
 2026-09-18 **本机 PostgreSQL 空库 migrate GO；GitHub `postgres-readiness` 仍 NO-GO。**
 绑定源码 HEAD `b38c4f541d7216c39219311ec2206af4fdab1d36`。本条只收口证据文档，未改源码 / 测试 / 前端。未 push、未开 PR、未部署。Claude 未提交大屏测试 `apps/admin/tests/e2e/screen/states.spec.ts` **未改、未暂存**。
 
