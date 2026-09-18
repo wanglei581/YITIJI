@@ -7,5 +7,6 @@ import { DeviceFleetService } from './device-fleet.service'
   imports: [AuthModule],
   controllers: [DeviceFleetController],
   providers: [DeviceFleetService],
+  exports: [DeviceFleetService],
 })
 export class DeviceFleetModule {}

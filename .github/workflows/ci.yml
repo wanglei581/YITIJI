@@ -475,6 +475,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:data-request-ui
           pnpm --filter @ai-job-print/admin verify:admin-users-ui
           pnpm --filter @ai-job-print/admin verify:honest-placeholders
+          pnpm --filter @ai-job-print/admin verify:console-screen-ui
           pnpm --filter @ai-job-print/api verify:admin-users
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
@@ -571,6 +572,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
+          pnpm --filter @ai-job-print/api verify:console-screen-snapshot
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:isolated-verification-database
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
@@ -1136,6 +1138,15 @@ jobs:
       - name: Run Admin browser E2E
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs
+
+      - name: Run Admin data-screen browser E2E
+        # 大屏专用 config：VITE_API_MODE=http 构建 + page.route 供快照夹具，
+        # 与既有 mock 包的 27 条用例互不影响（另起端口、另起 webServer）。
+        working-directory: apps/admin
+        run: node scripts/run-e2e.mjs --config=playwright.screen.config.ts
+
+      - name: Run Partner data-screen browser E2E
+        run: pnpm --filter @ai-job-print/partner test:e2e:screen
 
       - name: Run Partner browser E2E (mock)
         # 合作机构后台此前 0 条浏览器用例。mock 模式预览包（vite --mode development），

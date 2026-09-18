@@ -3,6 +3,7 @@ import { PartnerLayoutWrapper } from '../layouts/PartnerLayoutWrapper'
 import LoginPage from './login'
 
 import DashboardPage from './dashboard'
+import ScreenPage from './screen'
 import ProfilePage from './profile'
 import JobsPage from './jobs'
 import CompaniesPage from './companies'
@@ -22,6 +23,7 @@ export const partnerRouter = createBrowserRouter([
     element: <PartnerLayoutWrapper />,
     children: [
       { index: true,        element: <DashboardPage /> },
+      { path: 'screen',     element: <ScreenPage /> },
       { path: 'profile',    element: <ProfilePage /> },
       { path: 'jobs',       element: <JobsPage /> },
       { path: 'companies',  element: <CompaniesPage /> },

@@ -3,6 +3,7 @@ import { AdminLayoutWrapper } from '../layouts/AdminLayoutWrapper'
 import LoginPage from './login'
 
 import DashboardPage from './dashboard'
+import ScreenPage from './screen'
 import DevicesPage from './devices'
 import OrdersPage from './orders'
 import PrintScanOpsPage from './print-scan'
@@ -44,6 +45,7 @@ export const adminRouter = createBrowserRouter([
     element: <AdminLayoutWrapper />,
     children: [
       { index: true,          element: <DashboardPage /> },
+      { path: 'screen',       element: <ScreenPage /> },
       { path: 'devices',      element: <DevicesPage /> },
       // 历史路径重定向到合并后的设备管理 Tab
       { path: 'terminals',    element: <Navigate to="/devices?tab=terminals"   replace /> },

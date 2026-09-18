@@ -8,7 +8,7 @@ import {
 } from './helpers'
 
 /**
- * 从 `apps/partner/src/routes/index.tsx` 读出的全部 13 条路由。
+ * 从 `apps/partner/src/routes/index.tsx` 读出的全部 14 条路由。
  * 每条：不是白屏、有 h1/页头、无 console error、无未捕获 rejection、无英文技术串。
  */
 const AUTHED_ROUTES: Array<{ path: string; title: string | RegExp }> = [
@@ -20,6 +20,7 @@ const AUTHED_ROUTES: Array<{ path: string; title: string | RegExp }> = [
   { path: '/smart-campus', title: '智慧校园' },
   { path: '/policy', title: '政策公告' },
   { path: '/terminals', title: '终端数据' },
+  { path: '/screen', title: '数据大屏' },
   { path: '/stats', title: '数据统计' },
   { path: '/sources', title: '数据源管理' },
   { path: '/sync-logs', title: '同步日志' },

@@ -34,7 +34,7 @@ _（空）_
 
 | 门禁脚本 | 脚本名 |
 | --- | --- |
-| `apps/admin/scripts/run-e2e.mjs` | `@ai-job-print/admin::test:e2e` |
+| `apps/admin/scripts/run-e2e.mjs` | `@ai-job-print/admin::test:e2e`<br/>`@ai-job-print/admin::test:e2e:screen` |
 | `apps/kiosk/scripts/probe-activity-favorites-44.mjs` | `@ai-job-print/kiosk::verify:probe-activity-favorites-44` |
 | `apps/kiosk/scripts/probe-ai-failure-honesty-45.mjs` | `@ai-job-print/kiosk::verify:probe-ai-failure-honesty-45` |
 | `apps/kiosk/scripts/probe-ai-resume-closure-42.mjs` | `@ai-job-print/kiosk::verify:probe-ai-resume-closure-42` |
@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1465 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1495 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -96,7 +96,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/ci.yml` | `verify-browser-spec-coverage.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-mic-capability-truth.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-service-desk-foundation.mjs`<br/>`gates.mjs`<br/>`verify-ci-gate-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-release-bundle.mjs`<br/>`verify-contract-review-preprod-readiness.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-info-ai-real-acceptance.ts`<br/>`verify-partner-excel-template.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-profile-commercial-first-batch-acceptance.ts` |
+| `.github/workflows/ci.yml` | `verify-browser-spec-coverage.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-mic-capability-truth.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-service-desk-foundation.mjs`<br/>`gates.mjs`<br/>`verify-ci-gate-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-release-bundle.mjs`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-contract-review-preprod-readiness.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-info-ai-real-acceptance.ts`<br/>`verify-partner-excel-template.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-profile-commercial-first-batch-acceptance.ts` |
 
 </details>
 
@@ -132,12 +132,12 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 86 个文件</summary>
+<summary><code>apps/admin/src/</code> — 90 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/admin/src/UnhandledRejectionBanner.tsx` | `verify-no-raw-error-render.mjs` |
-| `apps/admin/src/layouts/AdminLayoutWrapper.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-content-trust-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-legal-doc-version.ts` |
+| `apps/admin/src/layouts/AdminLayoutWrapper.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-content-trust-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/admin/src/main.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/account-settings/AdminInitialPhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/AdminPhoneTransferCard.tsx` | `verify-admin-phone-transfer-ui.mjs` |
@@ -155,7 +155,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/fairs/components/ZonesTab.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/files/index.tsx` | `verify-profile-documents-inkpaper.mjs` |
 | `apps/admin/src/routes/import-batches/index.tsx` | `verify-source-publish-actions.mjs` |
-| `apps/admin/src/routes/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`frontend.mjs` |
+| `apps/admin/src/routes/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`frontend.mjs` |
 | `apps/admin/src/routes/job-materials/index.tsx` | `verify-admin-job-materials-ui.mjs` |
 | `apps/admin/src/routes/job-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-job-content-screening.ts` |
 | `apps/admin/src/routes/legal-docs/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-legal-doc-version.ts` |
@@ -179,6 +179,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/printers/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-data-request-ui.mjs` |
+| `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screensaver/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/sync-sources/index.tsx` | `verify-no-raw-error-render.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
@@ -208,6 +211,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/aiUsage.ts` | `verify-job-ai-ops-dashboard-ui.mjs` |
 | `apps/admin/src/services/api/client.ts` | `verify-toolbox-review-ui.mjs`<br/>`verify-deploy-gates-in-sync.mjs` |
 | `apps/admin/src/services/api/companiesAdmin.ts` | `verify-companies.ts` |
+| `apps/admin/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/services/api/devices.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/services/api/files.ts` | `verify-admin-file-lifecycle.mjs` |
 | `apps/admin/src/services/api/jobMaterials.ts` | `verify-admin-job-materials-ui.mjs` |
@@ -917,23 +921,27 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 29 个文件</summary>
+<summary><code>apps/partner/src/</code> — 34 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `apps/partner/src/layouts/PartnerLayoutWrapper.tsx` | `verify-service-desk-jobs-ui.mjs` |
-| `apps/partner/src/routes/Page.tsx` | `verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/layouts/PartnerLayoutWrapper.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
+| `apps/partner/src/routes/Page.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/account/index.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/companies/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-companies.ts` |
 | `apps/partner/src/routes/dashboard/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/fairs/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-jobfair-checkin.ts` |
-| `apps/partner/src/routes/index.tsx` | `frontend.mjs` |
+| `apps/partner/src/routes/index.tsx` | `verify-console-screen-ui.mjs`<br/>`frontend.mjs` |
 | `apps/partner/src/routes/jobs/components/JobQualitySummaryPanel.tsx` | `verify-job-quality-dashboard-ui.mjs` |
 | `apps/partner/src/routes/jobs/index.tsx` | `verify-job-quality-dashboard-ui.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
 | `apps/partner/src/routes/login/LegalDocsModal.tsx` | `verify-legal-doc-version.ts` |
 | `apps/partner/src/routes/login/index.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/profile/index.tsx` | `verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/screen/PartnerGrid.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/metricLabels.ts` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/smart-campus/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/sources/ExcelImportModal.tsx` | `verify-profile-documents-inkpaper.mjs`<br/>`verify-excel-template-download-ui.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-job-headcount.ts`<br/>`verify-partner-excel-import.ts` |
 | `apps/partner/src/routes/sources/RotateCredentialDrawer.tsx` | `verify-backend-p0-contracts.mjs` |
@@ -943,6 +951,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/sync-logs/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/terminals/index.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/services/api/client.ts` | `verify-partner-relative-api-url.mjs`<br/>`verify-deploy-gates-in-sync.mjs` |
+| `apps/partner/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/services/api/partnerCompanies.ts` | `verify-companies.ts` |
 | `apps/partner/src/services/api/partnerContent.ts` | `verify-excel-template-download-ui.mjs` |
 | `apps/partner/src/services/api/partnerHttpAdapter.ts` | `verify-excel-template-download-ui.mjs`<br/>`verify-job-quality-dashboard-ui.mjs`<br/>`verify-partner-relative-api-url.mjs` |
@@ -1542,7 +1551,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/shared/src/</code> — 32 个文件</summary>
+<summary><code>packages/shared/src/</code> — 33 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1555,6 +1564,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/campusRecruitmentStats.ts` | `verify-campus-recruitment-stats.ts` |
 | `packages/shared/src/types/company.ts` | `verify-companies.ts` |
 | `packages/shared/src/types/complianceCopy.ts` | `verify-legal-retention-copy.mjs`<br/>`verify-pii-redaction-contract.mjs`<br/>`verify-compliance-copy.mjs` |
+| `packages/shared/src/types/consoleScreen.ts` | `verify-console-screen-ui.mjs`<br/>`verify-console-screen-snapshot.ts` |
 | `packages/shared/src/types/contractReview.ts` | `verify-contract-review-contract.ts` |
 | `packages/shared/src/types/device.ts` | `verify-terminal-device-config.ts` |
 | `packages/shared/src/types/fairDto.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-fair-stats-truth.ts` |
@@ -1582,7 +1592,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/ui/src/</code> — 12 个文件</summary>
+<summary><code>packages/ui/src/</code> — 19 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1593,9 +1603,16 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/layouts/AdminLayout.tsx` | `verify-service-desk-foundation.mjs` |
 | `packages/ui/src/layouts/KioskLayout.tsx` | `verify-fusion-shell.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-service-desk-foundation.mjs` |
 | `packages/ui/src/layouts/PartnerLayout.tsx` | `verify-service-desk-foundation.mjs` |
+| `packages/ui/src/screen/ScreenFleetWall.tsx` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/ScreenFrame.tsx` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/ScreenPrimitives.tsx` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/screenCopy.ts` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/fusion-youth.css` | `verify-kiosk-visual-unity.mjs`<br/>`verify-fusion-youth-foundation.mjs` |
 | `packages/ui/src/styles/kiosk-components.css` | `verify-kiosk-visual-unity.mjs` |
 | `packages/ui/src/styles/kiosk-shell.css` | `verify-kiosk-visual-unity.mjs` |
+| `packages/ui/src/styles/ops-screen-blocks.css` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/styles/ops-screen-scale.css` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/styles/ops-screen.css` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/service-desk.css` | `verify-service-desk-foundation.mjs` |
 | `packages/ui/src/theme/visualTheme.ts` | `verify-fusion-youth-foundation.mjs`<br/>`verify-service-desk-foundation.mjs` |
 
@@ -1764,7 +1781,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/prisma/</code> — 32 个文件</summary>
+<summary><code>services/api/prisma/</code> — 34 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1783,6 +1800,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/prisma/migrations/20260718143000_add_partner_password_proof_state/migration.sql` | `verify-admin-orgs-delete-schema.ts`<br/>`verify-partner-account-action-schema.ts` |
 | `services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql` | `verify-release-observation-contract.mjs` |
 | `services/api/prisma/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql` | `verify-scan-input-lockout-telemetry.ts` |
+| `services/api/prisma/migrations/20260917120000_add_console_screen_query_indexes/migration.sql` | `verify-console-screen-snapshot.ts` |
 | `services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql` | `verify-toolbox-launch-events.ts` |
 | `services/api/prisma/postgres/migrations/20260702002000_add_toolbox_governance/migration.sql` | `verify-toolbox-review-workflow.ts` |
 | `services/api/prisma/postgres/migrations/20260706070000_add_db_load_indexes/migration.sql` | `verify-db-load-indexes.ts` |
@@ -1796,8 +1814,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/prisma/postgres/migrations/20260724165000_repair_terminal_bind_code/migration.sql` | `verify-terminal-bind-code.ts` |
 | `services/api/prisma/postgres/migrations/20260901090000_add_agent_release_observation/migration.sql` | `verify-release-observation-contract.mjs` |
 | `services/api/prisma/postgres/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql` | `verify-scan-input-lockout-telemetry.ts` |
-| `services/api/prisma/postgres/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
-| `services/api/prisma/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
+| `services/api/prisma/postgres/migrations/20260917120000_add_console_screen_query_indexes/migration.sql` | `verify-console-screen-snapshot.ts` |
+| `services/api/prisma/postgres/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
+| `services/api/prisma/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
 | `services/api/prisma/seed-guard.ts` | `verify-demo-seed-guard.ts` |
 | `services/api/prisma/seed.ts` | `verify-partner-account-action-schema.ts` |
 
@@ -1845,7 +1864,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/content-pipeline-harness.ts` | `verify-content-pipeline-e2e.ts` |
 | `services/api/scripts/support/inmemory-redis-server.ts` | `verify-upload-scene.ts` |
 | `services/api/scripts/support/internal-auth-verify-harness.ts` | `verify-admin-phone-transfer.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-partner-account-action.ts` |
-| `services/api/scripts/support/isolated-verification-database.ts` | `verify-admin-order-filters.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-file-cleanup-cas-ledger.ts`<br/>`verify-isolated-verification-database.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-upload-sessions.ts` |
+| `services/api/scripts/support/isolated-verification-database.ts` | `verify-admin-order-filters.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-file-cleanup-cas-ledger.ts`<br/>`verify-isolated-verification-database.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/scripts/support/minimal-pdf.ts` | `verify-kiosk-cashier-ui.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/scripts/support/partner-account-action-static-contract.ts` | `verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts` |
 | `services/api/scripts/support/recruitment-wave2-full-inventory.ts` | `verify-recruitment-wave2-full-inventory.ts` |
@@ -1899,7 +1918,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 466 个文件</summary>
+<summary><code>services/api/src/</code> — 477 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1910,7 +1929,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/activity/me-activity.controller.ts` | `verify-activity-logs.ts` |
 | `services/api/src/admin-ops/admin-alert-actions.service.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.controller.ts` | `verify-admin-ops.ts` |
-| `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts` |
+| `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/admin-ops/derived-alerts.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-admin-order-filters.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts` |
@@ -2034,12 +2053,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/crypto/webhook-secret-strength.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-partner-source-capabilities.ts` |
 | `services/api/src/common/decorators/current-user.decorator.ts` | `verify-admin-fairs.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-users.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-excel-import.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-publish-expiry-completeness.ts` |
 | `services/api/src/common/decorators/roles.decorator.ts` | `verify-admin-users.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-change-password.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-member-benefits-admin.ts` |
-| `services/api/src/common/filters/http-exception.filter.ts` | `verify-profile-documents-inkpaper.mjs`<br/>`verify-admin-ops.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-contract-review-http.ts`<br/>`verify-error-observability.ts`<br/>`verify-http-exception-filter.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-upload-sessions-http.ts`<br/>`verify-upload-sessions.ts` |
+| `services/api/src/common/filters/http-exception.filter.ts` | `verify-profile-documents-inkpaper.mjs`<br/>`verify-admin-ops.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-contract-review-http.ts`<br/>`verify-error-observability.ts`<br/>`verify-http-exception-filter.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-upload-sessions-http.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/src/common/guards/end-user-auth.guard.ts` | `verify-benefit-activities.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-content-pipeline-e2e.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-assets.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-favorites-benefits.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-upload-sessions-http.ts` |
-| `services/api/src/common/guards/jwt-auth.guard.ts` | `verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-users.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-change-password.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redis-degradation-truth.ts` |
+| `services/api/src/common/guards/jwt-auth.guard.ts` | `verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-users.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-change-password.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redis-degradation-truth.ts` |
 | `services/api/src/common/guards/member-closure-receipt.guard.ts` | `verify-member-account-status.ts` |
 | `services/api/src/common/guards/optional-end-user-auth.guard.ts` | `verify-benefit-activities.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-auth.ts` |
-| `services/api/src/common/guards/roles.guard.ts` | `verify-admin-ops.ts`<br/>`verify-admin-users.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts` |
+| `services/api/src/common/guards/roles.guard.ts` | `verify-admin-ops.ts`<br/>`verify-admin-users.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts` |
 | `services/api/src/common/health.controller.ts` | `verify-cjk-font.ts` |
 | `services/api/src/common/jwt-verifier.module.ts` | `verify-production-runtime-gates.ts`<br/>`verify-upload-sessions-http.ts` |
 | `services/api/src/common/middleware/request-id.middleware.ts` | `verify-error-observability.ts` |
@@ -2052,7 +2071,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/redis/member-data-export-redis.service.ts` | `verify-member-data-export-download.ts` |
 | `services/api/src/common/redis/partner-account-action-redis.service.ts` | `verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-redis.ts`<br/>`verify-partner-account-action.ts` |
 | `services/api/src/common/redis/redis-degradation.ts` | `verify-admin-orgs.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-redis-degradation-truth.ts` |
-| `services/api/src/common/redis/redis.service.ts` | `verify-activity-logs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-change-password.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-upload-scene.ts` |
+| `services/api/src/common/redis/redis.service.ts` | `verify-activity-logs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-change-password.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-upload-scene.ts` |
 | `services/api/src/common/throttler/terminal-throttle.ts` | `verify-ai-throttle-dimension.ts`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-throttle-dimension.ts` |
 | `services/api/src/community/community.controller.ts` | `verify-community-daily-brief.ts` |
 | `services/api/src/community/community.service.ts` | `verify-community-daily-brief.ts` |
@@ -2062,6 +2081,17 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/config/body-parsers.ts` | `verify-payment-real-channels.ts` |
 | `services/api/src/config/production-runtime-gates.ts` | `verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-cjk-font.ts`<br/>`verify-payment-flow.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-production-real-services.ts`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/config/trust-proxy.ts` | `verify-trust-proxy.ts` |
+| `services/api/src/console-screen/console-screen.admin.controller.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.assemble.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.cache.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.dto.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.metric.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.module.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.org.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.partner.controller.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.queries.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.service.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.types.ts` | `verify-console-screen-snapshot.ts` |
 | `services/api/src/content/content-signing.ts` | `verify-ad-asset-range.ts`<br/>`verify-screensaver-content.ts` |
 | `services/api/src/content/content.controller.ts` | `verify-ad-asset-range.ts`<br/>`verify-multipart-field-nesting.ts` |
 | `services/api/src/content/content.service.ts` | `verify-ad-asset-range.ts`<br/>`verify-external-video-e2e.ts`<br/>`verify-screensaver-content.ts` |
@@ -2302,7 +2332,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/print-sign/print-sign.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-print-sign.ts` |
 | `services/api/src/print-sign/print-sign.types.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-print-sign.ts` |
 | `services/api/src/prisma/create-client.ts` | `verify-production-db-guard.ts`<br/>`verify-scan-tasks.ts` |
-| `services/api/src/prisma/prisma.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-activity-logs.ts`<br/>`verify-admin-billing.ts`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-orders-refund.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-admin-users.ts`<br/>`verify-advisor-work.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-result-ownership.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-audit-logs.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-benefit-redemption.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts`<br/>`verify-change-password.ts`<br/>`verify-closed-pending-print-task-disposition.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-companies.ts`<br/>`verify-content-pipeline-e2e.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-cos-files.ts`<br/>`verify-deploy-data-safety-gate.ts`<br/>`verify-end-user-asset-ownership.ts`<br/>`verify-external-video-e2e.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-file-cleanup-cas-ledger.ts`<br/>`verify-first-admin-bootstrap-postgres.ts`<br/>`verify-first-admin-bootstrap.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-job-fit.ts`<br/>`verify-job-headcount.ts`<br/>`verify-job-materials.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-job-validity-expiry.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-materials-processing.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-assets.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-member-data-request-truth.ts`<br/>`verify-member-favorites-benefits.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-mock-interview.ts`<br/>`verify-offline-agencies-contract.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-partner-stats-contract.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-pricing.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-reconciliation.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redemption-audit.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-screensaver-content.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-test-print-seed-guard.ts`<br/>`verify-toolbox-review-workflow.ts`<br/>`verify-upload-sessions-http.ts`<br/>`verify-upload-sessions.ts`<br/>`verify-wave3-print-aftercare.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
+| `services/api/src/prisma/prisma.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-activity-logs.ts`<br/>`verify-admin-billing.ts`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-orders-refund.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-admin-users.ts`<br/>`verify-advisor-work.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-result-ownership.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-audit-logs.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-benefit-redemption.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts`<br/>`verify-change-password.ts`<br/>`verify-closed-pending-print-task-disposition.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-companies.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-content-pipeline-e2e.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-cos-files.ts`<br/>`verify-deploy-data-safety-gate.ts`<br/>`verify-end-user-asset-ownership.ts`<br/>`verify-external-video-e2e.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-file-cleanup-cas-ledger.ts`<br/>`verify-first-admin-bootstrap-postgres.ts`<br/>`verify-first-admin-bootstrap.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-job-fit.ts`<br/>`verify-job-headcount.ts`<br/>`verify-job-materials.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-job-validity-expiry.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-materials-processing.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-assets.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-member-data-request-truth.ts`<br/>`verify-member-favorites-benefits.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-mock-interview.ts`<br/>`verify-offline-agencies-contract.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-partner-stats-contract.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-pricing.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-reconciliation.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redemption-audit.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-screensaver-content.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-test-print-seed-guard.ts`<br/>`verify-toolbox-review-workflow.ts`<br/>`verify-upload-sessions-http.ts`<br/>`verify-upload-sessions.ts`<br/>`verify-wave3-print-aftercare.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/recruitment-content/admin-recruitment-content.controller.ts` | `verify-recruitment-content-http.ts` |
 | `services/api/src/recruitment-content/recruitment-content-read.service.ts` | `verify-recruitment-content-http.ts` |
 | `services/api/src/recruitment-content/recruitment-content-verify-target.ts` | `verify-recruitment-content-http.ts` |

@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 529,
+    "endpointCount": 531,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3485,6 +3485,39 @@
         ],
         "services": [
           "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/console-screen/console-screen.admin.controller.ts",
+        "handler": "AdminScreenController.getAdminSnapshot",
+        "method": "GET",
+        "models": [
+          "AiServiceLog",
+          "AlertDisposition",
+          "CompanyProfile",
+          "ExternalJumpLog",
+          "FairCompany",
+          "FairMaterial",
+          "FairZone",
+          "Job",
+          "JobFair",
+          "Order",
+          "PolicyPost",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "SyncLog",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/screen/snapshot",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/console-screen/console-screen.service.ts"
+        ],
+        "services": [
+          "ConsoleScreenService"
         ]
       },
       {
@@ -9131,6 +9164,39 @@
         ]
       },
       {
+        "controller": "services/api/src/console-screen/console-screen.partner.controller.ts",
+        "handler": "PartnerScreenController.getPartnerSnapshot",
+        "method": "GET",
+        "models": [
+          "AiServiceLog",
+          "AlertDisposition",
+          "CompanyProfile",
+          "ExternalJumpLog",
+          "FairCompany",
+          "FairMaterial",
+          "FairZone",
+          "Job",
+          "JobFair",
+          "Order",
+          "PolicyPost",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "SyncLog",
+          "Terminal"
+        ],
+        "path": "/api/v1/partner/screen/snapshot",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/console-screen/console-screen.service.ts"
+        ],
+        "services": [
+          "ConsoleScreenService"
+        ]
+      },
+      {
         "controller": "services/api/src/smart-campus/smart-campus.controller.ts",
         "handler": "SmartCampusController.listPartnerTerminals",
         "method": "GET",
@@ -10961,7 +11027,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 145,
+      "reachableFileCount": 152,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -11543,6 +11609,17 @@
           "wrappers": []
         },
         {
+          "component": "ScreenPage",
+          "endpoints": [],
+          "file": "apps/admin/src/routes/screen/index.tsx",
+          "layout": [
+            "AdminLayoutWrapper"
+          ],
+          "path": "/screen",
+          "styles": [],
+          "wrappers": []
+        },
+        {
           "component": "ScreensaverPage",
           "endpoints": [
             "DELETE /admin/ad-assets/:param",
@@ -11645,7 +11722,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 150
+      "sourceFileCount": 157
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -14447,7 +14524,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 49,
+      "reachableFileCount": 55,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -14645,6 +14722,17 @@
           "wrappers": []
         },
         {
+          "component": "ScreenPage",
+          "endpoints": [],
+          "file": "apps/partner/src/routes/screen/index.tsx",
+          "layout": [
+            "PartnerLayoutWrapper"
+          ],
+          "path": "/screen",
+          "styles": [],
+          "wrappers": []
+        },
+        {
           "component": "SmartCampusPage",
           "endpoints": [
             "GET /partner/data-sources",
@@ -14766,7 +14854,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 50
+      "sourceFileCount": 56
     }
   },
   "dataModel": {
@@ -14916,7 +15004,8 @@
         ],
         "usedBy": [
           "services/api/src/ai/ai-log.service.ts",
-          "services/api/src/ai/ai-result.cleanup.task.ts"
+          "services/api/src/ai/ai-result.cleanup.task.ts",
+          "services/api/src/console-screen/console-screen.queries.ts"
         ]
       },
       {
@@ -15026,6 +15115,7 @@
         "usedBy": [
           "services/api/src/activity/activity.service.ts",
           "services/api/src/companies/companies.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/orgs/partner-stats.service.ts"
         ]
       },
@@ -15110,6 +15200,7 @@
           "services/api/src/activity/activity.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
@@ -15124,6 +15215,7 @@
         "usedBy": [
           "services/api/src/activity/activity.service.ts",
           "services/api/src/companies/companies.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/jobs/admin-fairs.service.ts",
           "services/api/src/jobs/fair-company-print.service.ts",
           "services/api/src/jobs/fair-company-zone.service.ts",
@@ -15153,6 +15245,7 @@
           "JobFair"
         ],
         "usedBy": [
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/jobs/admin-fairs.service.ts",
           "services/api/src/jobs/fair-material-print-bridge.service.ts",
           "services/api/src/jobs/fair-material.service.ts"
@@ -15220,6 +15313,7 @@
           "JobFair"
         ],
         "usedBy": [
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/jobs/admin-fairs.service.ts",
           "services/api/src/jobs/fair-company-zone.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts"
@@ -15365,6 +15459,7 @@
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/companies/companies.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/job-ai/job-context.service.ts",
           "services/api/src/job-ai/job-quality.service.ts",
@@ -15446,6 +15541,7 @@
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/bulk-publish/bulk-publish.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/job-sync/job-sync.service.ts",
           "services/api/src/jobs/admin-fairs.service.ts",
           "services/api/src/jobs/campus-recruitment-stats.service.ts",
@@ -15635,6 +15731,7 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
@@ -15754,6 +15851,7 @@
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/community/community.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
           "services/api/src/member-favorites/member-favorites.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
@@ -15793,6 +15891,7 @@
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/contract-review/contract-review-report.service.ts",
           "services/api/src/contract-review/contract-review.cleanup.task.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
@@ -15823,6 +15922,7 @@
         "usedBy": [
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
@@ -15881,6 +15981,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/scan-tasks/scan-task-reaper.task.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
@@ -15900,6 +16001,7 @@
           "JobSource"
         ],
         "usedBy": [
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/job-sync/job-sync.service.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
@@ -15939,6 +16041,7 @@
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/content/content.service.ts",
           "services/api/src/device-fleet/device-fleet.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
@@ -16206,6 +16309,7 @@
       "scripts/verify-ci-gate-coverage.mjs",
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-release-bundle.mjs",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -16253,6 +16357,7 @@
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
@@ -16319,6 +16424,7 @@
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "scripts/project-graph/frontend.mjs"
     ],
@@ -16401,6 +16507,15 @@
     ],
     "apps/admin/src/routes/privacy-requests/index.tsx": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
+    ],
+    "apps/admin/src/routes/screen/GovGrid.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/admin/src/routes/screen/index.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/admin/src/routes/screen/screenMeta.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/routes/screensaver/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
@@ -16504,6 +16619,9 @@
     ],
     "apps/admin/src/services/api/companiesAdmin.ts": [
       "services/api/scripts/verify-companies.ts"
+    ],
+    "apps/admin/src/services/api/consoleScreen.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/services/api/devices.ts": [
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
@@ -19024,9 +19142,11 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/partner/src/layouts/PartnerLayoutWrapper.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
     ],
     "apps/partner/src/routes/Page.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/account/index.tsx": [
@@ -19047,6 +19167,7 @@
       "services/api/scripts/verify-jobfair-checkin.ts"
     ],
     "apps/partner/src/routes/index.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
       "scripts/project-graph/frontend.mjs"
     ],
     "apps/partner/src/routes/jobs/components/JobQualitySummaryPanel.tsx": [
@@ -19068,6 +19189,18 @@
     ],
     "apps/partner/src/routes/profile/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
+    ],
+    "apps/partner/src/routes/screen/PartnerGrid.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/partner/src/routes/screen/index.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/partner/src/routes/screen/metricLabels.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/partner/src/routes/screen/screenMeta.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/partner/src/routes/smart-campus/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
@@ -19106,6 +19239,9 @@
     "apps/partner/src/services/api/client.ts": [
       "apps/partner/scripts/verify-partner-relative-api-url.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs"
+    ],
+    "apps/partner/src/services/api/consoleScreen.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/partner/src/services/api/partnerCompanies.ts": [
       "services/api/scripts/verify-companies.ts"
@@ -19595,6 +19731,10 @@
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
       "scripts/verify-compliance-copy.mjs"
     ],
+    "packages/shared/src/types/consoleScreen.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
     "packages/shared/src/types/contractReview.ts": [
       "services/api/scripts/verify-contract-review-contract.ts"
     ],
@@ -19718,6 +19858,18 @@
     "packages/ui/src/layouts/PartnerLayout.tsx": [
       "packages/ui/scripts/verify-service-desk-foundation.mjs"
     ],
+    "packages/ui/src/screen/ScreenFleetWall.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/screen/ScreenFrame.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/screen/ScreenPrimitives.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/screen/screenCopy.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
     "packages/ui/src/styles/fusion-youth.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs"
@@ -19727,6 +19879,15 @@
     ],
     "packages/ui/src/styles/kiosk-shell.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+    ],
+    "packages/ui/src/styles/ops-screen-blocks.css": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/styles/ops-screen-scale.css": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/styles/ops-screen.css": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "packages/ui/src/styles/service-desk.css": [
       "packages/ui/scripts/verify-service-desk-foundation.mjs"
@@ -19863,6 +20024,9 @@
     "services/api/prisma/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql": [
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
+    "services/api/prisma/migrations/20260917120000_add_console_screen_query_indexes/migration.sql": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
@@ -19904,10 +20068,14 @@
     "services/api/prisma/postgres/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql": [
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
+    "services/api/prisma/postgres/migrations/20260917120000_add_console_screen_query_indexes/migration.sql": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-job-ai.ts",
       "services/api/scripts/verify-job-application-track.ts",
@@ -19934,6 +20102,7 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-job-ai.ts",
       "services/api/scripts/verify-job-application-track.ts",
@@ -20125,6 +20294,7 @@
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
@@ -20358,7 +20528,8 @@
     ],
     "services/api/src/admin-ops/admin-ops.service.ts": [
       "services/api/scripts/verify-admin-ops.ts",
-      "services/api/scripts/verify-admin-print-outcome.ts"
+      "services/api/scripts/verify-admin-print-outcome.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -21096,6 +21267,7 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-error-observability.ts",
       "services/api/scripts/verify-http-exception-filter.ts",
@@ -21132,6 +21304,7 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -21153,6 +21326,7 @@
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
@@ -21210,6 +21384,7 @@
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -21266,6 +21441,39 @@
     ],
     "services/api/src/config/trust-proxy.ts": [
       "services/api/scripts/verify-trust-proxy.ts"
+    ],
+    "services/api/src/console-screen/console-screen.admin.controller.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.assemble.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.cache.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.dto.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.metric.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.module.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.org.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.partner.controller.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.queries.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.service.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.types.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/content/content-signing.ts": [
       "services/api/scripts/verify-ad-asset-range.ts",
@@ -22626,6 +22834,7 @@
       "services/api/scripts/verify-closed-pending-print-task-disposition.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-companies.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
@@ -23114,7 +23323,8 @@
       "inCi": false,
       "package": "@ai-job-print/admin",
       "scriptNames": [
-        "@ai-job-print/admin::test:e2e"
+        "@ai-job-print/admin::test:e2e",
+        "@ai-job-print/admin::test:e2e:screen"
       ],
       "wired": true
     },
@@ -23405,6 +23615,45 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:admin-users-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/routes/index.tsx",
+          "apps/admin/src/routes/screen/GovGrid.tsx",
+          "apps/admin/src/routes/screen/index.tsx",
+          "apps/admin/src/routes/screen/screenMeta.ts",
+          "apps/admin/src/services/api/consoleScreen.ts",
+          "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/routes/Page.tsx",
+          "apps/partner/src/routes/index.tsx",
+          "apps/partner/src/routes/screen/PartnerGrid.tsx",
+          "apps/partner/src/routes/screen/index.tsx",
+          "apps/partner/src/routes/screen/metricLabels.ts",
+          "apps/partner/src/routes/screen/screenMeta.ts",
+          "apps/partner/src/services/api/consoleScreen.ts",
+          "packages/shared/src/types/consoleScreen.ts",
+          "packages/ui/src/screen/ScreenFleetWall.tsx",
+          "packages/ui/src/screen/ScreenFrame.tsx",
+          "packages/ui/src/screen/ScreenPrimitives.tsx",
+          "packages/ui/src/screen/screenCopy.ts",
+          "packages/ui/src/styles/ops-screen-blocks.css",
+          "packages/ui/src/styles/ops-screen-scale.css",
+          "packages/ui/src/styles/ops-screen.css"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-console-screen-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:console-screen-ui"
       ],
       "wired": true
     },
@@ -26941,7 +27190,8 @@
       "inCi": true,
       "package": "@ai-job-print/partner",
       "scriptNames": [
-        "@ai-job-print/partner::test:e2e"
+        "@ai-job-print/partner::test:e2e",
+        "@ai-job-print/partner::test:e2e:screen"
       ],
       "wired": true
     },
@@ -29850,6 +30100,47 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:compliance"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          "packages/shared/src/types/consoleScreen.ts",
+          "services/api/prisma/migrations/20260917120000_add_console_screen_query_indexes/migration.sql",
+          "services/api/prisma/postgres/migrations/20260917120000_add_console_screen_query_indexes/migration.sql",
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/console-screen/console-screen.admin.controller.ts",
+          "services/api/src/console-screen/console-screen.assemble.ts",
+          "services/api/src/console-screen/console-screen.cache.ts",
+          "services/api/src/console-screen/console-screen.dto.ts",
+          "services/api/src/console-screen/console-screen.metric.ts",
+          "services/api/src/console-screen/console-screen.module.ts",
+          "services/api/src/console-screen/console-screen.org.ts",
+          "services/api/src/console-screen/console-screen.partner.controller.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.service.ts",
+          "services/api/src/console-screen/console-screen.types.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-console-screen-snapshot.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:console-screen-snapshot"
       ],
       "wired": true
     },

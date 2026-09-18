@@ -199,6 +199,7 @@
     "verify:content-pipeline-e2e": "node -r @swc-node/register scripts/verify-content-pipeline-e2e.ts",
     "maintenance:backfill-org-content-trust": "node -r @swc-node/register scripts/backfill-org-content-trust.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
+    "verify:console-screen-snapshot": "node -r @swc-node/register scripts/verify-console-screen-snapshot.ts",
     "verify:admin-print-scan": "node -r @swc-node/register scripts/verify-admin-print-scan.ts",
     "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts",
     "verify:resume-export-formats": "node -r @swc-node/register scripts/verify-resume-export-formats.ts && pnpm run verify:resume-draft-versions",

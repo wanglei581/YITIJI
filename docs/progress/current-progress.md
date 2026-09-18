@@ -1,5 +1,132 @@
 # 当前开发进度
 
+2026-09-17 **数据大屏候选已机械 rebase 到 `origin/main@3d35759`（PR #1040），本地总门禁重跑通过。**
+候选分支 `codex/console-data-screen-r2-20260917` 现为
+`origin/main@3d35759ee2ae810716d08734752f0a3d1d9d7a66` 的后代；rebase 前 tip
+`5a4cbfdbe0082573ff3a152fc1598f29de39fddd`，13 个未推送提交全部 replay。仅
+`docs/progress/current-progress.md` 一处内容冲突：数据大屏既有记录保留，主线
+PR #1040 / API-only 发布控制面记录原文保留（与 `origin/main` 该段逐字节相同），
+未改写、未删除。`apps/admin` / `apps/partner` / `packages/ui` 树哈希与 rebase 前
+一致（`fa1e679d6fca6ab652e01c3e947afabeac1e3884` /
+`b28256f6ce241dbf36c5fd2465b3513380761e2f` /
+`de68adb1efb206f0b02e7b361f90258b916f3c8d`）。未改前端、未新增功能、未 push、
+未开 PR、未合并、未部署。
+
+- **本机重跑：** `verify:console-screen-snapshot` **80/80**；Admin screen Playwright
+  **40/40**；Partner screen Playwright **18/18**；`verify:console-screen-ui` 0 条未通过；
+  `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 的 Admin / Partner production build、
+  API `build`、`verify:repository-integrity`、`verify:deploy-gates-in-sync`、
+  `verify:compliance-copy`、`graph:check`、`verify:ci-gate-coverage`、
+  `git diff --check origin/main...HEAD` 均退出 0。
+- **证据边界：** 相对本轮机械同步，`SOURCE / LOCAL: GO`；`CI / MERGE: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。rebase 前冻结 SHA `93eed6c6` 不得再
+  写成当前 tip。下一步仍只允许一个数据大屏 PR。
+
+2026-09-17 **Admin / Partner 数据大屏冻结到 `93eed6c6`，完整本地总门禁已通过。**
+候选分支 `codex/console-data-screen-r2-20260917` 基于
+`origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，当前 tip 为
+`93eed6c6120a94b245c9ac9e50f33f45175be29d`，工作树干净，未 push、未开 PR、未合并、未部署。
+
+- **API / 仓库门禁：** `verify:console-screen-snapshot` **80/80**；真实 Nest class provider
+  构造、API build、`verify:repository-integrity`、`graph:check`、`verify:ci-gate-coverage`、
+  `verify:deploy-gates-in-sync`、`verify:compliance-copy` 均退出 0。
+- **前端构建与浏览器：** 使用生产口径
+  `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 后 Admin / Partner build 均退出 0；
+  Admin screen Playwright **40/40**、Partner screen Playwright **18/18**；
+  `verify:console-screen-ui` 为 0 条未通过。缺少 `VITE_API_MODE=http` 的首次构建按设计被
+  Vite 生产门禁拒绝，不是代码失败。
+- **独立冷审：** Agy `6f63f5ec-4456-4c0e-887b-991b024ef27c` 判 `GO`，未发现阻塞 PR 的
+  P0/P1/P2；官方 DeepSeek Hermes `20260917_222548_fa7a4a` 判 `PARTIAL`，结论是可开单一 PR、
+  但 PostgreSQL 索引锁、AI 累计全表计数、打印趋势排序和生产规模基线仍是部署前验证项。
+  最后两笔修复没有改 `apps/**` 或 `packages/**`，Claude 已确认的前端实现与公共契约未漂移。
+- **证据边界：** `SOURCE / LOCAL: GO`；`INDEPENDENT REVIEW: GO for PR`；
+  `CI / MERGE: PENDING`；`PRODUCTION / COMMERCIAL: NO-GO`。下一步只允许一个数据大屏 PR；
+  final-head CI 与 PostgreSQL job 全绿后再申请合并，生产另走维护窗口。
+
+2026-09-17 **数据大屏三条 P2：gov 告警热路径、趋势溢出、快照敏感值。**
+父提交 `63bda793a275700a16f508d2cda81498e1494cc4`。只改 API 大屏聚合与
+`verify:console-screen-snapshot`（图谱：该门禁是这几个文件的唯一 CI 断言）。
+
+- **gov 不跑 `listDerivedAlerts`。** `admin:realtime` 只缓存机队+打印活数据，
+  `admin:alerts` 仅 `profile=ops` 加载。gov 状态不因未使用的告警源失败而
+  `degraded`，返回里没有假告警数字。
+- **14 日趋势 `take=cap+1` + `paidAt,id` 排序。** 溢出返回既有 `capped` /
+  `window_row_cap_exceeded`；累计页数口径不变。
+- **快照序列化禁敏感种子值；Partner A 机队 matchedCount 不含 B。**
+- **本机：** `verify:console-screen-snapshot` **80/80**。反向：gov 强制加载告警
+  → 1q/3a2/3v 红；`take=cap` → 1g/3h6 红；机队去 org 过滤 + 把内部 URL 写进
+  未接入 source → 3d2/3j2 红。均已恢复。`build`、`verify:repository-integrity`、
+  `graph:check`、`git diff --check` 退出 0。
+- **未动：** `AiServiceLog.count()` 全表、PG `CONCURRENTLY`、未绑定 partner 的
+  401 vs `ORG_REQUIRED`、`DeviceFleetModule` 多余 export、缓存 LRU。
+- **证据边界：** 相对这三条 P2，`SOURCE / LOCAL: GO`；`CI / MERGE: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。未 push、未开 PR。
+
+2026-09-17 **数据大屏 P0：Nest 无法构造 `ScreenSnapshotCache`，已修。**
+独立复审在 `55f19899eecf557556e1b24e40ea2ee03367f8c8` 复现：
+`NestFactory.createApplicationContext({ providers: [ScreenSnapshotCache] })`
+因 `emitDecoratorMetadata` 把 constructor 的 `clock` / `maxKeys` 标成
+`Function` / `Number` 而抛 `UnknownDependenciesException`。当时
+`verify:console-screen-snapshot` 70/70 是假绿——HTTP 夹具用 `useValue`
+绕过了真实 class provider。那一笔不得再写成 `SOURCE / LOCAL: GO`。
+
+- **修复：** constructor 不再接收可被 Nest 注入的参数。生产用字段默认值
+  （`Date.now()` / 256）。单测走 `ScreenSnapshotCache.forTest(clock, maxKeys)`。
+  `ConsoleScreenModule` 仍是 `providers: [ConsoleScreenService, ScreenSnapshotCache]`，
+  没有改成 `useFactory` / `useValue`。
+- **门禁：** 新增 `1p`（源码禁止 constructor 注入 + 禁止模块用 factory 绕过）
+  和 `2o`（`createApplicationContext` 实构 class provider，禁止 `Function`/`Number`
+  token）。本机 `verify:console-screen-snapshot` **72/72**；`tsc` 产物
+  `design:paramtypes` 为 `undefined`，dist 上 Nest 实构 `getOrLoad` 成功。
+  `pnpm --filter @ai-job-print/api build`、`verify:repository-integrity`、
+  `pnpm graph:check`、`git diff --check` 均退出 0。
+- **未修（复审留下的 P2/P3，本轮故意不动）：** gov realtime 仍会跑无界
+  `listDerivedAlerts`；14 日趋势 `count` 后再无序 `findMany`；`AiServiceLog.count()`
+  全表；`3j` 只禁 JSON 键名；未绑定 partner HTTP 是 401 不是 403 `ORG_REQUIRED`。
+- **证据边界：** 相对该 P0，`SOURCE / LOCAL: GO`；`CI / MERGE: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。未 push、未开 PR、未合并、未部署。
+
+2026-09-17 **Admin / Partner 数据大屏 R2 已完成本地集成，等待完整门禁与单一 PR。**
+候选分支 `codex/console-data-screen-r2-20260917` 基于
+`origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，运行时代码 tip 为
+`3fa8152dc39280c500f807bfe822f422eef8f69a`，未 push、未开 PR、未合并、未部署。
+上一笔把 `55f19899` 写成 `SOURCE / LOCAL: GO` 不成立，见本节顶部 P0 修正。
+
+- **后端口径与隔离：** `1957fadd4a8ce934c7b15f0a81bd934a02f12fb9` 将累计指标收口为当前
+  `payStatus='paid'` 的 `billablePages` 内容页（不乘 `copies`），14 日趋势按 `paidAt` 落入
+  Asia/Shanghai 自然日；今日失败改按 `PrintTaskStatusLog.toStatus='failed'` 的事件时间统计。
+  Admin / Partner 机队改为 `count + take=200`，Partner 空白或非法 `orgId` 全链路 fail-closed。
+  SQLite / PostgreSQL 同步增加两条查询索引及对应迁移。
+- **前端口径与测试隔离：** `6623e5b43f38fc3c9c83116caca7b57f601c7c3c` 由 Claude 完成 Admin
+  大屏文案、source 夹具、机队抽样提示及默认 Playwright 对 `screen/**` 的排除；新增截断态几何测试。
+  当前截图覆盖 1920x1080 与 1440x900，未发现裁剪、重叠或过小字号。
+- **语义标题修复：** Claude 随后发现 Partner 默认 E2E 的 `/screen` 同页两个 `h1`。Claude完成
+  `ScreenHeader` 的受限标题层级实现，Codex在 Claude连续超时未提交后仅执行集成提交
+  `3fa8152dc39280c500f807bfe822f422eef8f69a`：嵌入后台时内部标题为 `h2`，全屏演示时为 `h1`，
+  没有放宽 route-sweep 或用 CSS 隐藏重复标题。
+- **本机证据：** API `verify:console-screen-snapshot` 70/70、`db:pg:sync:check`、typecheck、build；
+  UI 静态门禁、UI/Admin/Partner typecheck、Admin/Partner production build；Admin screen 40/40、
+  Partner screen 18/18、Admin 默认 E2E 75/75、Partner 默认 E2E 41/41 均退出 0。Grok 对六个关键
+  条件做反向变异均判红。repository-integrity、CI gate coverage、deploy gate sync、compliance copy
+  和 `pnpm graph:check` 均退出 0。
+- **独立回执：** Grok writer `a200d120-f1c5-4cfb-8645-49235df1eae4` 为 `GO`；Agy
+  `77168b91-2c5d-4127-aa39-09f5e58e2775` 为 `PARTIAL`，其前端 P0/P1/P2 已由 Claude本轮关闭；
+  Claude session `e356389c-256d-4cb8-bdca-3d6a0aa10e7b` 完成前端代码和专项验证，但多次达到工具时限，
+  最终提交由 Codex在不改前端代码的前提下完成。
+- **证据边界：** `SOURCE / LOCAL: GO`；`CI / MERGE: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+
+2026-09-17 **并行收口任务状态。** PR #1038 的材料包幂等候选
+`d9d79f2689dddd0614a76b71a2252a96d7468a69` 已通过 GitHub Actions run `35206540195` 的
+`build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke`，但尚未合并；Windows / 奔图和
+扫描收口专用任务仍在运行。旧“小程序与一体机跨端联动收口”任务因供应商 403 锁死，已新建
+“小程序与一体机跨端联动收口 R2”，禁止再向旧任务重试或注入消息。
+
+服务器只读审计确认生产仍为 `NO-GO`：当前生产 `a8a521cb1be0be7ddbdf9eafd1223936ecfe643d`
+落后 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f` 89 个提交、6 个 PostgreSQL 迁移；
+仍有 root 密码 SSH、无异地/自动备份与恢复演练、PM2 dump 陈旧、历史 dump 权限、证书续期、
+静态安全头及云安全组/IAM/生命周期未核验等阻塞。本轮没有部署、重启、迁移或生产写入。
+
 2026-09-17 **生产 API-only 发布控制面候选：阻止 API 修复连带覆盖三端前端。** Windows Agent
 `0.4.11` 在精确候选 `50483cd28096780c5e6c4260dde86dec36e7d99f` 上安装后，心跳因生产 API
 仍缺少 `55c32296f` 新增的 `scanInput*` DTO 白名单字段而返回

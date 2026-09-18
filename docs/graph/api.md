@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`529` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`531` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -272,6 +272,18 @@
 | PATCH | `/api/v1/partner/companies/:id` | CompaniesController.partnerUpdate | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
 | PATCH | `/api/v1/partner/companies/:id/publish` | CompaniesController.partnerUnpublish | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
 | POST | `/api/v1/partner/companies/import` | CompaniesController.partnerImport | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+
+## `services/api/src/console-screen/console-screen.admin.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/screen/snapshot` | AdminScreenController.getAdminSnapshot | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
+
+## `services/api/src/console-screen/console-screen.partner.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/partner/screen/snapshot` | PartnerScreenController.getPartnerSnapshot | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
 
 ## `services/api/src/content/ai-poster.controller.ts`
 

@@ -14,6 +14,30 @@
 已应用、DTO 含 `scanInputHealth`、公网/回环健康为 200、三端前端资产未变。Windows Agent 保持停止，
 不得执行打印或扫描。
 
+## 2026-09-17 数据大屏候选已进入本集成分支
+
+1. **数据大屏已机械同步到 `origin/main@3d35759`（PR #1040），本地总门禁曾重跑通过。**
+   不得把 rebase 前冻结 SHA `93eed6c6` 当成当前 tip。`verify:console-screen-snapshot`
+   80/80、Admin screen 40/40、Partner screen 18/18、两端生产 http 构建、CI/deploy/合规/图谱
+   门禁均退出 0；Agy 判 `GO`，官方 DeepSeek Hermes 判“可开 PR、不可直接部署”。不得把本地
+   证据写成 CI、合并或生产证据。未 push、未开 PR。
+2. **取得即时授权后只开一个数据大屏 PR，不拆多条。** PR 只承载数据大屏运行时提交及
+   图谱/进度收尾。final-head CI 全绿，且 PostgreSQL job 实际应用新增索引后才能合并；合并后用
+   `git merge-base --is-ancestor <final-head> origin/main` 留证。当前不得写成已合并或已上线。
+3. **PR #1038 单独完成合并闭环。** 材料包幂等候选
+   `d9d79f2689dddd0614a76b71a2252a96d7468a69` 的 CI run `35206540195` 已成功；合并仍需即时授权。
+   合并后必须验证祖先关系和 main 的 `release-bundle`，不得用 PR 事件中的 skipped job 代替。
+4. **并行等待专用任务结果。** Windows / 奔图任务只做 UU 真机与硬件证据；扫描任务继续现有
+   integration 候选，不另开第二个 writer；新的“小程序与一体机跨端联动收口 R2”从干净 main
+   盘点材料包、claim、支付、扫描归属和订单沉淀。三条线都必须返回精确 SHA、测试、真机/微信边界。
+5. **生产维护窗口排在主线合并之后。** 生产当前 `NO-GO`。最终 SHA 和 CI 冻结后，先完成异地备份
+   与 PG16 恢复验证、root 密码 SSH 收口、dump 权限、证书续期、安全头、云安全组和 BOS/COS IAM /
+   生命周期复核，再按一次性窗口部署、迁移、健康检查和 `pm2 save`。未经单独批准不得执行。
+
+达标线：数据大屏先达到 `SOURCE / LOCAL / CI / MERGE: GO`；Windows、微信真机和生产分别取得当前
+精确 SHA 的证据后，才允许把对应层升级为 `DEVICE / PRODUCTION: GO`。运营内容、真实用户 UAT 与
+客户签字未完成前，商业结论仍为 `NO-GO`。
+
 ## 2026-09-15 R11：PR #1037 只剩新 head CI 与合并闭环
 
 **已关闭的问题：** run `34984568841` 的 `postgres-readiness` 与 `build-and-verify` 都在
