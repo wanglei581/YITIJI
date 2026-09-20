@@ -15,18 +15,34 @@ const PRINTER_STATUS = '/api/v1/terminals/KSK-001/printer-status'
 
 type Mode = 'ready' | 'down' | 'checking'
 
+/**
+ * 打印机状态：给定值即立即应答；`'pending'` 表示把应答压住不给。
+ *
+ * `useTerminalDeviceStatus` 的 `loading` 只在首拉在途时为 true，而且**没有超时**——
+ * 它不像 useApiReadiness 那样 4s 后自己翻成 unavailable。所以「正在确认本机设备」
+ * 这一档要靠压住应答来稳定复现，而不是抢时间窗。
+ */
+type PrinterMode = { isOnline: boolean; printerStatus: string } | 'pending'
+
 function registerShell(
   api: ApiRouter,
-  { api: apiMode, printer }: { api: Mode; printer: { isOnline: boolean; printerStatus: string } },
+  { api: apiMode, printer }: { api: Mode; printer: PrinterMode },
 ): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
     status: 200,
     json: { enabled: false, idleTimeoutSec: 180, items: [] },
   })
-  api.respond('GET', PRINTER_STATUS, {
-    status: 200,
-    json: { isOnline: printer.isOnline, printerStatus: printer.printerStatus, paperLevel: 'sufficient' },
-  })
+  if (printer === 'pending') {
+    api.respondWith('GET', PRINTER_STATUS, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30_000))
+      return { status: 200, json: { isOnline: true, printerStatus: 'ready', paperLevel: 'sufficient' } }
+    })
+  } else {
+    api.respond('GET', PRINTER_STATUS, {
+      status: 200,
+      json: { isOnline: printer.isOnline, printerStatus: printer.printerStatus, paperLevel: 'sufficient' },
+    })
+  }
   if (apiMode === 'down') {
     api.respond('GET', '/api/v1/health', { status: 503, json: { error: 'unavailable' } })
     return
@@ -55,6 +71,9 @@ interface HubSnapshot {
   probe: string | null
   readiness: string | null
   pill: string
+  /** 提示条正文的粗体首句。它和 pill / readiness / 图标必须说同一件事。 */
+  noticeTitle: string
+  noticeDetail: string
   cards: HubEntry[]
   goals: HubEntry[]
   quick: HubEntry[]
@@ -79,10 +98,13 @@ async function readHub(page: Page): Promise<HubSnapshot> {
       const title = (el.querySelector(titleSel) ?? el).textContent?.trim() ?? ''
       return { title, clickable, reason: clickable ? null : el.querySelector(reasonSel)?.textContent?.trim() ?? null }
     }
+    const notice = document.querySelector('.qx-hub-notice-copy')
     return {
       probe: hub.getAttribute('data-hub-device-probe'),
       readiness: document.querySelector('.qx-hub-notice')?.getAttribute('data-readiness') ?? null,
       pill: document.querySelector('.qx-pill')?.textContent?.trim() ?? '',
+      noticeTitle: notice?.querySelector('b')?.textContent?.trim() ?? '',
+      noticeDetail: notice?.querySelector('b + span')?.textContent?.trim() ?? '',
       cards: [...hub.querySelectorAll('.qx-hub-grid > *')].map((el) => entry(el, 'h3', '.qx-hub-why')),
       goals: [...hub.querySelectorAll('.qx-hub-goal')].map((el) => ({
         title: el.textContent?.trim() ?? '',
@@ -201,4 +223,97 @@ test('在线服务「正在确认」同样不放行，白名单不受影响 @kio
   )
   // 政策服务台没有设备能力：即使在线服务还没确认，也不该顺带播报本机设备。
   expect(hub.probe).toBe('off')
+})
+
+test('本机设备「正在确认」时提示条不说就绪态的话 @kiosk', async ({ page, api }) => {
+  // 后端已就绪，只有本机打印机状态还没回来——这是简历服务台每次进入都要经过的那几百毫秒。
+  registerShell(api, { api: 'ready', printer: 'pending' })
+
+  await page.goto('/resume-service')
+  const hub = await readHub(page)
+
+  // 四个信号必须同口径。修复前前三个都对，只有正文说的是就绪态的话，
+  // 而用户读的正是那行字：顶栏转着圈说「正在确认」，正文却说「进入具体服务后再确认实时能力」。
+  expect(hub.probe).toBe('on')
+  expect(hub.readiness).toBe('checking')
+  expect(hub.pill).toBe('正在确认本机设备')
+  expect(hub.noticeTitle).toBe('正在确认本机设备。')
+  expect(hub.noticeDetail).toContain('涉及出纸或扫描的入口暂不开放')
+  // 就绪态那两句一个字都不能出现在这一档。
+  expect(hub.noticeTitle).not.toBe('进入具体服务后再确认实时能力。')
+  expect(hub.noticeDetail).not.toContain('本页只负责分流')
+  // 也不能借用 device-off 的「请稍后再试」：那已经是结论了，此刻还没有结论。
+  expect(hub.noticeDetail).not.toContain('请稍后再试')
+
+  // 卡片那一层的 fail-closed 一字未动，这里一并钉住：只有设备类被拦，其余照常可进。
+  const print = byTitle(hub.cards, '简历打印')
+  expect(print.clickable).toBe(false)
+  expect(print.reason).toBe('正在确认本机设备状态')
+  expect(hub.cards.filter((card) => !card.clickable).map((card) => card.title)).toEqual(['简历打印'])
+  expect(hub.quick.filter((link) => !link.clickable)).toEqual([])
+})
+
+test('在线服务 503：面试技巧可读，但不能从技巧页绕进模拟面试 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'down', printer: { isOnline: true, printerStatus: 'ready' } })
+
+  await page.goto('/interview-service')
+  const hub = await readHub(page)
+
+  // 这两条一起才构成「绕过」的前提：正门被拦、侧门开着。
+  expect(byTitle(hub.cards, '开始模拟面试')).toEqual({
+    title: '开始模拟面试',
+    clickable: false,
+    reason: 'AI能力当前不可用',
+  })
+  expect(byTitle(hub.cards, '面试技巧').clickable).toBe(true)
+
+  // 走用户真正会走的那条路：点服务台上的「面试技巧」。
+  await page.getByTestId('hub-interview-grid-面试技巧').click()
+  await page.waitForURL((url) => url.searchParams.get('stage') === 'tips')
+
+  // 白名单的用意是「断网也有东西可读」，所以本地内容必须一条不少。
+  await expect(page.getByRole('heading', { name: '面试前准备清单' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '高频问题应对' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /STAR/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '自我介绍结构建议' })).toBeVisible()
+
+  // 出口则必须关上：它要 POST /mock-interviews，不是本地内容。
+  const start = page.getByTestId('interview-primary')
+  await expect(start).toHaveAttribute('aria-disabled', 'true')
+  await expect(start).toHaveAttribute('data-disabled-reason', 'api:unavailable')
+  const why = page.locator('#interview-tips-start-why')
+  await expect(why).toContainText('在线服务当前不可用')
+  await expect(why).toContainText('可以继续看')
+
+  // 渲染层：Playwright 的可操作性检查把 aria-disabled 读成「不可用」并拒绝点击。
+  // 这条断言把那个事实写下来——普通触控走不到 onClick。
+  await expect(start).toBeDisabled()
+
+  // 行为层：但 aria-disabled 拦不住合成事件，也拦不住别处代码直接调 onClick。
+  // 所以绕过渲染层真派发一次，证明 goSetup 自己的 `if (gate) return` 也在。
+  // 「看起来点不动」和「点了不会发生」必须是同一件事。
+  await start.dispatchEvent('click')
+  await start.click({ force: true })
+  await expect(page.locator('[data-interview-workbench]')).toHaveAttribute('data-interview-stage', 'tips')
+  expect(new URL(page.url()).searchParams.get('stage')).toBe('tips')
+  // 「重新检测」仍在：不能让用户在这一页只剩退出去一条路。
+  await expect(page.getByTestId('interview-tips-recheck')).toBeVisible()
+})
+
+test('阳性对照：在线服务就绪时，同一个按钮真的会进入 setup @kiosk', async ({ page, api }) => {
+  // 没有这一条，上面那条「点了没跳」可能只是因为这个按钮本来就从不跳。
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+
+  await page.goto('/interview/tips')
+  await page.waitForURL((url) => url.searchParams.get('stage') === 'tips')
+
+  const start = page.getByTestId('interview-primary')
+  await expect(start).not.toHaveAttribute('aria-disabled', 'true')
+  await start.click()
+  await page.waitForURL((url) => url.searchParams.get('stage') === 'setup')
+  await expect(page.locator('[data-interview-workbench]')).toHaveAttribute('data-interview-stage', 'setup')
 })

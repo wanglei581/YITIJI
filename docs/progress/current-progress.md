@@ -1,5 +1,21 @@
 # 当前开发进度
 
+2026-09-20 **服务台 P2：deviceChecking 诚实播报、面试技巧出口闸门、政策 AI 记录文案。**
+Claude 实现，Grok 验收（session `1135623b-34b6-4254-af70-20a4c560d808`）。
+父 HEAD `07b21b3062c56d2fcd39ed488f784d5ec8c6a1e1`；落地 SHA 以本 docs 提交为准。
+本轮只改 Kiosk 前端、其 verify / Playwright、稿 16 政策 quick 文案与两份进度文档，**未碰 services/、Prisma、workflow、CI 配置、小程序、硬件**。未 push、未开 PR、未部署。
+**本批不是路由迁移，49/39 分母不变。**
+
+- **三项：**
+  1. **deviceChecking 提示条。** `/resume-service` 在后端已就绪、本机打印机状态还没回来时，顶栏胶囊、`data-readiness` 和图标早已说「正在确认」；提示条正文此前掉进就绪态「进入具体服务后再确认实时能力」。现 `noticeCopy` 为 `deviceChecking` 单独出话（「正在确认本机设备。」/「涉及出纸或扫描的入口暂不开放」），排在 deviceOff 之后。卡片 fail-closed 未改。
+  2. **面试技巧出口闸门。** `/health` 503 下 `/interview/tips` 本地四块内容仍可读；「开始模拟面试」`aria-disabled` 且 `goSetup` 以 `if (gate) return` 拦住程序化点击，不能从「先看技巧」绕进 setup。checking 与 unavailable 都不放行。就绪时同一按钮仍进 setup（阳性对照）。
+  3. **政策 AI 记录文案。** 政策服务台「我的」入口由「AI问答记录 / 查看本人政策问答」改为「AI服务记录 / 本人AI服务记录，不含顾问问答」——`/me/ai-records` 不保存顾问问答。稿 16 与 `serviceHubSpecs.ts` 同步，抽取逐字节对账。
+- **验证（本机，退出码均为 0）：** kiosk `typecheck`；`verify:service-entry-readiness`（**72** 条 `  PASS ` 行，不以摘要行 `ALL PASS` 计入）；`verify:kiosk-frontend-debt`、`verify:visible-actions-truth`、`verify:fusion-shell`、`verify:fusion-w6`、`verify:kiosk-visual-unity`、`verify:kiosk-browser-spec-coverage`、`verify:fusion-w3`、`verify:lightflow-k2c-interview`；根 `verify:compliance-copy`、`verify:repository-integrity`、`git diff --check`。
+- **Playwright：** `test:browser:truth` **74 passed**（含 service-hub-qx 7 条：原 4 条故障态 + deviceChecking 提示条 + 503 技巧不可绕进 setup + 就绪阳性对照）；`test:browser:route-sweep` **110 passed**；`test:browser:privacy` **36 passed**；`test:browser:warning` **27 passed**；fusion-w6 仅 `/interview/tips` 与 `/interview-service` **2 passed**。
+- **反向变异（已恢复）：** 临时删除 `goSetup` 的 `if (gate) return`。`verify:service-entry-readiness` 退出 **1**（闸门那条 FAIL）；目标 Playwright 退出 **1**（force click 后 `data-interview-stage` 变成 `setup`）。从快照完整恢复后两门均为 **0**；8 个 `apps/kiosk` + `docs/design` 文件哈希回到变异前。
+- **证据边界：** `SOURCE / LOCAL: GO`（本机 typecheck / verify / Playwright / 反向变异）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`——未 push，GitHub 未对本 HEAD 跑过任何 job。
+- **剩余前端统计：本批不重算。** 仍以 `35d02eb96` 条目的 **49** 条 Qx / **39** 条旧壳为准。
+
 2026-09-20 **五个服务台迁入青序流光（稿 16）+ 合入前定向修复。**
 绑定代码 HEAD `35d02eb96ab1bb7866f3ae2ac1449258bef42be5`（父提交 `5f432b72b` 迁移本体）。本条计数已按该 HEAD 重算；下文「44/44 不变」是错的，已改正。落地文档 SHA 以本 docs 提交为准。
 本轮只改 Kiosk 前端、其 verify / Playwright、抽取脚本与设计真值 HTML，**未碰 services/、Prisma、workflow、CI 配置、小程序**。未 push、未开 PR、未部署、未连生产、未动硬件。

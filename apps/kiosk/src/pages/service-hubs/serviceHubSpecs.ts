@@ -159,7 +159,7 @@ export const SERVICE_HUB_SPECS: Record<ServiceHubKey, ServiceHubSpec> = {
     ],
     quickLinks: [
       { title: '浏览记录', description: '查看最近浏览的政策', route: '/me/activity', kind: 'account', icon: 'user' },
-      { title: 'AI问答记录', description: '查看本人政策问答', route: '/me/ai-records', kind: 'account', icon: 'bot' },
+      { title: 'AI服务记录', description: '本人AI服务记录，不含顾问问答', route: '/me/ai-records', kind: 'account', icon: 'bot' },
       { title: '全部服务', description: '返回服务目录', route: '/', kind: 'info', icon: 'external' },
     ],
     truthTitle: '政策内容以来源发布为准。',

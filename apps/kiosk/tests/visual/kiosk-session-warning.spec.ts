@@ -36,6 +36,10 @@ function registerKioskShell(api: ApiRouter, options: KioskShellOptions = {}): vo
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
   })
+  // 2026-09-20：本套件反复落在 /interview/tips 上。该页挂载时探测在线服务，决定
+  // 「开始模拟面试」这个出口放不放行（出口要 POST /mock-interviews，不是本地内容）。
+  // 这里按可达应答：本套件测的是清场与隐私，不是降级态。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,

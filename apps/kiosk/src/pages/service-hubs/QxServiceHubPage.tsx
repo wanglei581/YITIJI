@@ -112,11 +112,19 @@ function statusPill(state: HubAvailability): { tone: 'ok' | 'warn' | 'bad' | 'un
 }
 
 /**
- * 分流提示条，四种状态各有各的话——照稿逐字，别合并成一句「服务异常」。
+ * 分流提示条，五种状态各有各的话——照稿逐字，别合并成一句「服务异常」。
  *
- * 判序必须是 apiDown → apiChecking → deviceOff。稿的 device-off 文案会声称
+ * 判序必须是 apiDown → apiChecking → deviceOff → deviceChecking。稿的 device-off 文案会声称
  * 「信息浏览和AI服务仍可进入」；如果探测还没出结果就先说这句话，等于用「还不知道」
  * 冒充「AI 能用」。checking 不能误放行。
+ *
+ * deviceChecking 这一档是 2026-09-20 补的，稿里没有。在此之前它落进最后那句 default，
+ * 于是 `/resume-service` 在后端已就绪、本机打印机状态还没回来的那几百毫秒里，
+ * 顶栏胶囊写「正在确认本机设备」、提示条 data-readiness 是 checking、图标转着圈，
+ * 而提示条正文却说「进入具体服务后再确认实时能力」——那是**就绪态**的话术。
+ * 同一条提示条上的三个信号给出两种结论，读到文字的人会以为设备已经确认过了。
+ * 卡片那一层从来没错（unavailableReason 的 device + deviceChecking 一直 fail-closed），
+ * 错的只有这句播报，所以这里只补文案，不动任何放行判据。
  *
  * default 那句是稿的原文，它本身就是一条诚实性声明：**本页不预报**在线、名额、
  * 价格或办理结果。把它省掉，页面就变回「看起来什么都能办」。
@@ -141,6 +149,12 @@ function noticeCopy(state: HubAvailability): { title: string; detail: string } {
     return {
       title: '本机设备当前不可用。',
       detail: '当前入口中的信息浏览和AI服务仍可进入；涉及出纸或扫描的具体步骤请稍后再试。',
+    }
+  }
+  if (state.deviceChecking) {
+    return {
+      title: '正在确认本机设备。',
+      detail: '检查完成前，涉及出纸或扫描的入口暂不开放；信息浏览和AI服务不受影响。',
     }
   }
   return { title: '进入具体服务后再确认实时能力。', detail: '本页只负责分流，不预报在线、名额、价格或办理结果。' }

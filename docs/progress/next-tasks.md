@@ -1,5 +1,12 @@
 # 下一步任务
 
+## 2026-09-20：服务台 P2 已验收（诚实播报 / 技巧出口 / 政策文案）
+
+Claude 实现、Grok 验收已合入本分支（父 `07b21b306`，落地 SHA 见 `current-progress.md` 顶部）。三项都不是新路由：deviceChecking 提示条、`/health` 503 下面试技巧可读但不能进 setup、政策「我的」入口不再声称不存在的问答历史。
+**49/39 分母不变。** F1 仍只剩「招聘会 8 路由」。
+
+残留（不在本批断言范围，给下一个前端 owner）：`OFFLINE_CAPABLE_ROUTES` 另外三条白名单页也有通往需要后端的页面的出口（`/jobs/online-platforms` → `/jobs` 与 `/assistant`；`/renshi?tab=social|register` → `/assistant`）。那些落点是只读页，进去看到空态或错误态，用户没有先填表。本批只钉了会 POST `/mock-interviews` 的技巧页出口。
+
 ## 2026-09-20：五个服务台已完成，F1 剩招聘会 8 路由
 
 稿 16-service-hubs 的五条路由（`/resume-service` `/jobs-service` `/fairs-service` `/interview-service`

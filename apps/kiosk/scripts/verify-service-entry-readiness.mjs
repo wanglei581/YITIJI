@@ -125,6 +125,87 @@ check(
   ),
   '离线可进是白名单制：未登记的路由一律按需要后端（fail-closed）'
 )
+
+// ── 白名单页自己的出口不得成为绕过口 ────────────────────────────────────────
+//
+// OFFLINE_CAPABLE_ROUTES 说的是「不联网也能**读**这一页」，不是「这一页上的每个
+// 按钮都不需要后端」。四条白名单页各自都有通往需要后端的页面的出口
+// （`/jobs/online-platforms` → `/jobs` 与 `/assistant`；`/renshi` → `/assistant`），
+// 但那些落点都是**只读页**，进去看到的是空态或错误态，用户没有付出任何填写。
+// `/interview/tips` 不同，它是唯一一条出口会**在服务端建会话**的：底部
+// 「开始模拟面试」走 setup → POST /mock-interviews，用户要先选岗位、面试官和时长，
+// 填完才在最后一步撞上错误。所以本段只钉这一条；另外三条属于同类但更轻的缺口，
+// 已登记在 `docs/progress/next-tasks.md`，不在本段断言范围内（写清楚是为了
+// 下一个读这段的人不会以为它们已经被这条门禁覆盖了）。
+//
+// 缺这条断言时的实际走法：后端断开 → 面试服务台把「模拟练习」卡 fail-closed →
+// 用户改点同一个服务台上的「先看技巧」（白名单，允许进）→ 在技巧页点「开始模拟面试」
+// → 进 setup。服务台那条判据被整条绕过，用户最后停在一个填完表才报错的设置页。
+//
+// 判据必须与服务台同源：checking 与 unavailable 都不放行。只拦 unavailable，
+// 等于在探测的那几秒里留一扇门。
+{
+  const tips = read('src/pages/interview/InterviewTipsPage.tsx')
+  const tipsCode = codeOf(tips)
+  check(tips.includes('useApiReadiness'), '面试技巧页按入口级在线服务探测判断能否开始练习')
+  check(
+    /function startGate\(status: 'checking' \| 'ready' \| 'unavailable'\)/.test(tips) &&
+      /if \(status === 'unavailable'\)/.test(tips) &&
+      /if \(status === 'checking'\)/.test(tips),
+    '面试技巧页出口闸门对 unavailable 与 checking 都给出原因（两半都 fail-closed）'
+  )
+  // 渲染层与行为层都要挡。aria-disabled 的按钮仍可被程序化点击，
+  // 只改外观等于「看起来点不动」而实际仍然导航。
+  // 位置也要断言：闸门必须排在写 session 与 navigate 之前，写完再 return 拦不住任何东西。
+  {
+    const body = tipsCode.slice(tipsCode.indexOf('const goSetup = () => {'))
+    const gateAt = body.indexOf('if (gate) return')
+    const patchAt = body.indexOf('patchInterviewWorkbenchSession(')
+    const navAt = body.indexOf("navigate('/interview/setup')")
+    check(
+      gateAt > 0 && patchAt > gateAt && navAt > gateAt,
+      '面试技巧页 goSetup 先看闸门再写 session / 导航（aria-disabled 拦不住程序化点击）'
+    )
+  }
+  check(
+    /aria-disabled="true"[\s\S]{0,320}?data-testid="interview-primary"/.test(tips) &&
+      /aria-describedby="interview-tips-start-why"/.test(tips),
+    '不可用时「开始模拟面试」不是可点控件，且用 aria-describedby 指向具体原因'
+  )
+  // 本地技巧内容一条都不许因此消失：拦的是出口，不是这一页。
+  // 白名单当初把它登记进来，就是为了后端断开时还有东西可读。
+  for (const local of ['面试前准备清单', '高频问题应对', 'STAR', '自我介绍结构建议']) {
+    check(tips.includes(local), `在线服务不可用不影响本地技巧内容「${local}」仍然渲染`)
+  }
+  check(
+    /className="qx-btn"[\s\S]{0,200}?onClick=\{retryApi\}/.test(tips),
+    '面试技巧页在线服务不可用时保留「重新检测」，不让用户只能退出去'
+  )
+}
+
+// 政策服务台的「我的」入口不得声称一份系统并不保存的历史。
+//
+// 稿 16 原写的是 `['AI问答记录','查看本人政策问答', … '/me/ai-records']`，
+// 但 /me/ai-records 的内容由 MemberAiRecordKind 决定，它只有
+// parse / optimize / generate / job_fit / career_plan / fair_visit_plan / self_assessment
+// 七类，外加岗位 AI 会话与模拟面试记录——**没有一类是政策问答**。
+// 政策服务台的 AI 能力是「打开AI顾问」（/assistant），而顾问对话根本不落库。
+// 于是这条入口承诺了一份点进去必然为空、且永远不会有内容的历史。
+// 稿与规格已一并改为真实能力（title/description 都改），这里钉住不许改回去。
+check(
+  !hubSpecs.includes('查看本人政策问答') && !hubSpecs.includes('AI问答记录'),
+  '政策服务台不再声称「AI问答记录 / 查看本人政策问答」（/me/ai-records 不保存政策问答）'
+)
+{
+  const draft = fs.readFileSync(
+    path.join(root, '..', '..', 'docs/design/kiosk-redesign-2026-08/16-service-hubs.html'),
+    'utf8',
+  )
+  check(
+    !draft.includes('查看本人政策问答') && !draft.includes('AI问答记录'),
+    '设计真值 16-service-hubs.html 与规格同步改掉政策问答历史（稿是抽取源，只改代码会被下次抽取覆盖回去）'
+  )
+}
 // 判据要真的作用在每张卡上：unavailableReason 必须拿到该卡的 route，
 // 否则白名单写得再对也落不到界面上。
 check(
@@ -142,9 +223,25 @@ check(
   const apiDownAt = noticeFn.indexOf('if (state.apiDown)')
   const apiCheckingAt = noticeFn.indexOf('if (state.apiChecking)')
   const deviceOffAt = noticeFn.indexOf('if (state.deviceOff)')
+  const deviceCheckingAt = noticeFn.indexOf('if (state.deviceChecking)')
   check(
     apiDownAt >= 0 && apiCheckingAt > apiDownAt && deviceOffAt > apiCheckingAt,
     '分流提示条：apiDown / apiChecking 优先于 deviceOff（device-off 文案会声称 AI 仍可进入）'
+  )
+  // 提示条必须覆盖 deviceChecking，而不是让它掉进末尾的就绪态 default。
+  //
+  // 为什么这条该存在（不是照当前行为反写）：`data-readiness` 在 deviceChecking 时是
+  // 'checking'、顶栏胶囊是「正在确认本机设备」、图标是转圈的 LoaderCircle——三个信号
+  // 都说「还在确认」，正文却说「进入具体服务后再确认实时能力 / 本页只负责分流」，
+  // 那是就绪态的话术。同一条提示条自相矛盾时，用户信的是文字。
+  // CLAUDE.md §9「不伪造能力」：没拿到结论就不能用就绪口径播报。
+  check(
+    deviceCheckingAt > deviceOffAt && deviceOffAt >= 0,
+    '分流提示条为 deviceChecking 单独出话术，排在 deviceOff 之后（不得落进就绪态 default）'
+  )
+  check(
+    noticeFn.includes('正在确认本机设备。'),
+    '设备探测未出结果时提示条正文说「正在确认本机设备」，不说就绪态的「进入具体服务后再确认」'
   )
 }
 check(

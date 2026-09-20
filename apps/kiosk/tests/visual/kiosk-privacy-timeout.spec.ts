@@ -39,6 +39,16 @@ function registerKioskShell(api: ApiRouter): void {
     status: 200,
     json: { capabilities: [] },
   })
+  // 本套件有用例会落在 /interview?stage=tips（forward-history 与 storage-failure 两条）。
+  // 该页挂载时探测 `/health`，决定底部「开始模拟面试」这个出口放不放行——它要
+  // POST /mock-interviews 创建会话，不是本地内容。不注册的话 ApiRouter 会 fail-closed
+  // 地 abort 并在收尾抛 Unhandled API，把隐私用例连坐判红。
+  // 这里按可达应答：本套件测的是清场与历史边界，不是降级态；
+  // 这是一条不含身份信息的公开就绪探针，注册它不削弱任何隐私断言。
+  api.respond('GET', '/api/v1/health', {
+    status: 200,
+    json: { success: true, data: { status: 'ok' } },
+  })
   api.respond('GET', '/api/v1/terminals/KSK-001/smart-campus', {
     status: 200,
     json: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
