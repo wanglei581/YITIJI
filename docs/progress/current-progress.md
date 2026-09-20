@@ -1,7 +1,7 @@
 # 当前开发进度
 
 2026-09-20 **五个服务台迁入青序流光（稿 16）+ 合入前定向修复。**
-绑定基线 HEAD `5f432b72ba0b426bf67a91a95ec275ee0e136cf7`（迁移提交），本条对应其后的追加修复提交，落地 SHA 以提交为准。
+绑定代码 HEAD `35d02eb96ab1bb7866f3ae2ac1449258bef42be5`（父提交 `5f432b72b` 迁移本体）。本条计数已按该 HEAD 重算；下文「44/44 不变」是错的，已改正。落地文档 SHA 以本 docs 提交为准。
 本轮只改 Kiosk 前端、其 verify / Playwright、抽取脚本与设计真值 HTML，**未碰 services/、Prisma、workflow、CI 配置、小程序**。未 push、未开 PR、未部署、未连生产、未动硬件。
 
 - **迁移本体（`5f432b72b`）：** `/resume-service` `/jobs-service` `/fairs-service` `/interview-service` `/policy-service` 五条共用一份
@@ -31,21 +31,28 @@
 - **设计真值同步：** `16-service-hubs.html` 的 policy `hint` 由「六个入口」改为「七个入口」（该 hub 实为 7 张卡），
   规格由抽取脚本重新生成，逐字节门禁保持有效；未手改生成文件。
 - **验证（本机，退出码均为 0）：** kiosk `typecheck`、`eslint src/`（0 error / 17 既有 warning）；
-  `verify:service-entry-readiness`（60 PASS，其中 13 条为本轮新增）、`verify:kiosk-frontend-debt`、
-  `verify:visible-actions-truth`、`verify:fusion-shell`、`verify:fusion-w6`、`verify:kiosk-visual-unity`、
-  `verify:browser-spec-coverage`、根 `verify:compliance-copy`。
+  `verify:service-entry-readiness`（**59** 条 `  PASS ` 行，其中 13 条为本轮新增；把摘要行 `ALL PASS` 算进去会得到 60，不以 60 登记）、
+  `verify:kiosk-frontend-debt`、`verify:visible-actions-truth`（脚本文件是 `verify-kiosk-visible-actions-truth.mjs`，
+  `apps/kiosk/package.json` 的 key 是 `verify:visible-actions-truth`，没有 `verify:kiosk-visible-actions-truth`）、
+  `verify:fusion-shell`、`verify:fusion-w6`、`verify:kiosk-visual-unity`、
+  `verify:kiosk-browser-spec-coverage`（**不是** `verify:browser-spec-coverage`）、根 `verify:compliance-copy`。
 - **新增 Playwright：** `apps/kiosk/tests/visual/service-hub-qx.spec.ts` 4 条动态故障态用例
   （非设备服务台不探测不播报且探测计数 1 vs 3；resume device-off 只拦简历打印；503 下仅白名单可点且真能走通；
-  「正在确认」同样 fail-closed）。已挂进 `test:browser:truth`（CI 已调用该脚本），`verify:browser-spec-coverage` 由红转绿。
-- **1080×1920 视觉复截：** `/tmp/qx-hub-visual-r2`，五路由 default + checking + api-down + device-off 共 13 张。
+  「正在确认」同样 fail-closed）。已挂进 `test:browser:truth`（CI 已调用该脚本），因此 `verify:kiosk-browser-spec-coverage` 覆盖到该 spec。
+- **1080×1920 视觉复截：** `/tmp/qx-hub-visual-r2` **20** 张 PNG（五路由 × default/checking/api-down/device-off）。
+  SHA-256 去重后 **16** 张：fairs / interview / jobs / policy 的 `device-off` 与各自 `default` 逐字节相同（这四页无设备能力，离线打印机不改画面）；
+  仅 `resume-device-off.png` 与 default 不同。不以「13 张」登记。
   六卡页死白消失（`scrollHeight - clientHeight = 0`，合规声明与底部导航之间恒为 28px）；图标逐张与稿一致；
   jobs 在打印机离线时 `data-hub-device-probe="off"`、状态胶囊仍是「能力与设备状态以办理时确认为准」。
 - **证据边界：** `SOURCE / LOCAL: GO`（本机 typecheck / verify / Playwright / 截图）；
   `CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`——本轮未 push，GitHub 未对该 HEAD 跑过任何 job。
-- **剩余前端统计（口径同 2026-09-18 条，本批完成后更新）：** 109 条生产路由模式 = 18 条兼容重定向
-  + 3 条 contract-review fail-closed 重定向 + 88 条实际页面落点。五个服务台此前已计入「已迁移」那 44 条
-  （它们在 `5f432b72b` 就已切到青序流光），**本轮是修复而非新增迁移，所以 44 / 44 的分母分子都不变**；
-  仍有 **44 条**旧 Fusion/V6 活路由待迁移，合并后约 **22–26 个**实际页面/工作台。
+- **剩余前端统计（2026-09-20 对照 `35d02eb96` 重算，不是沿用 2026-09-18 的 44/44）：**
+  `route-manifest.ts` 仍是 **109** 条生产路由模式；`compatibilityRedirects` **18** 条（不含合同审查）；
+  `/contract-review` 三兄弟在 109 之内、不在这 18 条里，生产默认 `VITE_ENABLE_CONTRACT_REVIEW !== 'true'` 时 `Navigate` 回 `/`，故实际页面落点仍是 **88**（109−18−3）。
+  判 Qx 的方法：对 88 条落点取样路径，走 `KioskRoot.isQxMigratedPath`（精确集合 48 条含五个服务台 + 4 条前缀 + 3 条带参正则）。
+  结果：**49** 条已 Qx / **39** 条仍旧 Fusion/V6。2026-09-18 的 44/44 是五服务台仍挂 V6 时的快照；
+  `5f432b72b` 把五条从 `V6_SHELL_ROUTES` 移入 `QX_MIGRATED_ROUTES` 后是 44+5=49，**不是**「已计入那 44 所以分子分母不变」。
+  剩余工作台：2026-09-18 把当时 44 条旧壳估成 22–26 个页面/工作台，其中「五个服务台 5→1」已完成，故约 **21–25** 个。
 
 2026-09-18 **前端全量统一口径复核：试运营主链已是青序流光，但全站仍未完成“禁止新旧交替”。**
 绑定集成 HEAD `a15a26c89fccb11da42f183c38d21a0a276715af`，工作树复核前干净。本条只更新正式进度事实，未改前端、API、schema、workflow，未 push、未开 PR、未部署、未操作真机。
