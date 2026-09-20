@@ -1,22 +1,23 @@
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangleIcon,
+  BarChart3Icon,
   BotIcon,
-  BriefcaseBusinessIcon,
+  BriefcaseIcon,
   BuildingIcon,
-  CalendarDaysIcon,
+  CalendarIcon,
   CheckCircle2Icon,
   ChevronRightIcon,
   ExternalLinkIcon,
-  FileTextIcon,
-  LandmarkIcon,
+  FileIcon,
   LoaderCircleIcon,
   MapIcon,
   MicIcon,
+  PencilLineIcon,
   PrinterIcon,
   RefreshCwIcon,
   SearchIcon,
-  ShieldCheckIcon,
+  ShieldIcon,
   UserRoundIcon,
 } from 'lucide-react'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
@@ -26,47 +27,51 @@ import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { SERVICE_HUB_SPECS } from './serviceHubSpecs'
 import {
   capabilityKindFor,
+  hubUsesDevice,
   unavailableReason,
-  type CapabilityKind,
   type HubAvailability,
   type HubCapability,
+  type HubIconKey,
   type ServiceHubKey,
 } from './serviceHubModel'
 import './styles/service-hub-qx.css'
 
-const KIND_ICON: Record<CapabilityKind, typeof BotIcon> = {
-  ai: BotIcon,
-  device: PrinterIcon,
-  info: FileTextIcon,
-  account: UserRoundIcon,
-}
-
 /**
- * 按能力标题挑更贴切的图标；挑不到就退回按 kind 分。
+ * 稿 16 的图标键 → lucide 组件。**一对一显式映射，不按标题猜。**
  *
- * 顺序即优先级，**先具体后笼统**：「求职材料」若先撞上 /材料/ → 打印机图标，
- * 会让人以为它是出纸入口（第一版就是这样，看截图才发现）。所以 /材料/ 只在
- * 明确的打印扫描语境里用，简历侧的材料走公文包。
+ * 上一版这里是一张 `TITLE_ICON` 正则表（/校招/、/岗位/…按标题挑图标），
+ * 原因是抽取脚本把稿里的 `icon` 字段丢了。代价在截图里看得见：
+ * 「校园招聘」（稿 building）落到文档图标，「岗位匹配参考」（稿 chart）落到公文包，
+ * 「AI简历优化」（稿 edit）落到文档。正则永远只能猜标题，稿里的键才是设计意图。
+ *
+ * 选型口径：同名优先，同名不存在时选**画法最接近稿里那段 path** 的一个，并在此注明：
+ *   · file     → FileIcon        稿画的是带折角的空白文件（不是带横线的 FileText）
+ *   · edit     → PencilLineIcon  稿是 feather edit-3：铅笔 + 底部横线
+ *   · brief    → BriefcaseIcon   稿是公文包（矩形 + 提手）
+ *   · chart    → BarChart3Icon   稿是三根竖条 + 基线的柱状图
+ *   · user     → UserRoundIcon   稿是圆头 + 圆肩（不是方肩的 User）
+ *   · calendar → CalendarIcon    稿是无日期点的空月历（不是 CalendarDays）
+ *   · building → BuildingIcon    同名
+ * 其余（search / map / mic / shield / bot / printer / external）均为同名直取。
+ *
+ * 类型是 Record<HubIconKey, …>：稿新增图标键而这里没登记，typecheck 当场红，
+ * 不会静默退回某个兜底图标（兜底就是另一种猜）。
  */
-const TITLE_ICON: Array<[RegExp, typeof BotIcon]> = [
-  [/打印|扫描/, PrinterIcon],
-  [/诊断|体检/, SearchIcon],
-  [/优化|改写|生成简历|简历生成/, FileTextIcon],
-  [/招聘会|场次/, CalendarDaysIcon],
-  [/岗位|职位|全职|实习|兼职|校招|求职材料/, BriefcaseBusinessIcon],
-  [/企业|机构/, BuildingIcon],
-  [/面试|模拟/, MicIcon],
-  [/政策|社保|档案|登记/, LandmarkIcon],
-  [/线上|平台|跳转/, ExternalLinkIcon],
-  [/收藏|记录|本人|我的/, UserRoundIcon],
-  [/搜索|查找|筛选|全部/, SearchIcon],
-  [/条件|核对|资格|风险/, ShieldCheckIcon],
-  [/规划|导览|到场|指引|探索/, MapIcon],
-  [/素材库|模板|技巧/, FileTextIcon],
-]
-
-function iconFor(title: string, kind: CapabilityKind) {
-  return TITLE_ICON.find(([re]) => re.test(title))?.[1] ?? KIND_ICON[kind]
+const HUB_ICON: Record<HubIconKey, typeof BotIcon> = {
+  file: FileIcon,
+  search: SearchIcon,
+  edit: PencilLineIcon,
+  brief: BriefcaseIcon,
+  building: BuildingIcon,
+  calendar: CalendarIcon,
+  map: MapIcon,
+  mic: MicIcon,
+  chart: BarChart3Icon,
+  shield: ShieldIcon,
+  bot: BotIcon,
+  printer: PrinterIcon,
+  user: UserRoundIcon,
+  external: ExternalLinkIcon,
 }
 
 /**
@@ -84,6 +89,8 @@ const CONTRACT_REVIEW_CAPABILITY: HubCapability = {
   badge: 'AI · 仅供参考',
   route: '/contract-review',
   kind: 'ai',
+  // 稿里没有这张卡，所以图标也得在这里显式指定；shield 对应「风险提示」。
+  icon: 'shield',
 }
 
 /**
@@ -94,6 +101,9 @@ const CONTRACT_REVIEW_CAPABILITY: HubCapability = {
  * 岗位浏览、台账这些还能用。同理见 noticeCopy 与 serviceHubModel.needsBackend。
  */
 function statusPill(state: HubAvailability): { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string } {
+  // 注意：deviceOff / deviceChecking 在「本服务台没有设备能力」时恒为 false
+  // （见 QxServiceHubPage 的 deviceAware），所以岗位 / 招聘会 / 面试 / 政策
+  // 永远走不到下面两条设备分支——它们不该替打印机播报。
   if (state.apiDown) return { tone: 'bad', label: '在线服务不可用' }
   if (state.apiChecking) return { tone: 'unknown', label: '正在确认在线服务' }
   if (state.deviceOff) return { tone: 'warn', label: '本机设备不可用' }
@@ -147,7 +157,20 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   const navigate = useNavigate()
   const spec = SERVICE_HUB_SPECS[hub]
   const { status: apiStatus, retry: retryApi } = useApiReadiness()
-  const device = useTerminalDeviceStatus()
+
+  // 只有真有设备能力的服务台才探测本机设备。
+  //
+  // `useTerminalDeviceStatus(false)` 是 hook 自带的停用档：effect 直接 return，
+  // 既不发 `/terminals/:id/printer-status`，也不挂 60s 轮询定时器。
+  // hook 调用本身仍然无条件执行（React hooks 规则：不能条件调用），
+  // 变的只是它要不要干活。
+  //
+  // 停用时 hook 的返回值停在初始态（terminalId 存在时 loading=true）。
+  // 那个 loading **不是**「正在探测」——根本没在探测——所以下面的 availability
+  // 必须先乘上 deviceAware，否则岗位 / 招聘会 / 面试 / 政策会永久显示
+  // 「正在确认本机设备」，而那句话在这四页上永远不会有下文。
+  const deviceAware = hubUsesDevice(spec)
+  const device = useTerminalDeviceStatus(deviceAware)
 
   // 降级判据分开取：AI / 在线台账看后端就绪，设备看终端设备状态。
   // 稿把这两类分开说，笼统灰掉等于让用户猜「是这台机器坏了还是这个功能没了」。
@@ -159,8 +182,8 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
     apiChecking: apiStatus === 'checking',
     // hook 初次拉取期间 loading=true；拉完仍是 unknown 表示「测不出来」而非「坏了」，
     // 那种情况不拦设备卡（见 serviceHubModel.unavailableReason 的说明）。
-    deviceOff: device.kind === 'offline' || device.kind === 'error',
-    deviceChecking: device.loading,
+    deviceOff: deviceAware && (device.kind === 'offline' || device.kind === 'error'),
+    deviceChecking: deviceAware && device.loading,
   }
   const apiBlocked = apiStatus !== 'ready'
   const notice = noticeCopy(availability)
@@ -170,7 +193,7 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
 
   const renderCard = (cap: HubCapability, slot: 'grid' | 'contract') => {
     const reason = unavailableReason(cap.kind, cap.route, availability)
-    const Icon = iconFor(cap.title, cap.kind)
+    const Icon = HUB_ICON[cap.icon]
     const head = (
       <>
         <span className="qx-hub-card-icon" aria-hidden="true">
@@ -194,6 +217,9 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
           data-disabled-reason={`capability:${cap.kind}`}
         >
           {head}
+          {/* 不可用态的原因独占一行（见 service-hub-qx.css 的 is-unavailable 规则）：
+              和徽标挤同一行时「正在确认AI能力状态」会折成「…能力状」+「态」，
+              一体机上站着读一个孤字特别刺眼。 */}
           <span className="qx-hub-card-foot">
             <span className="qx-hub-badge">{cap.badge}</span>
             <span className="qx-hub-why">{reason}</span>
@@ -249,7 +275,11 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
         data-qx-page="service-hub"
         data-hub={hub}
         data-hub-api-blocked={apiBlocked ? 'true' : 'false'}
+        data-hub-device-probe={deviceAware ? 'on' : 'off'}
       >
+        {/* 域标识（稿的 eyebrow）。稿把它放在主标题上方；这里放在标题行下方独立一行，
+            用小字 + 字距做成标签，不与 h1 竞争视线，也不混进 h1 的可及名称。 */}
+        <p className="qx-hub-eyebrow">{spec.eyebrow}</p>
         {/* 稿里的 hero-note：原件/结果归属的一句话，紧跟在标题说明之后。 */}
         <p className="qx-hub-hero-note">
           <b>{spec.noteTitle}</b>
@@ -259,7 +289,10 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
         <section className="qx-hub-goals" aria-label="先告诉我你现在最想完成什么">
           <div className="qx-hub-goals-copy">
             <b>先告诉我你现在最想完成什么</b>
-            <span>{spec.sectionHint}；选择后直接进入对应服务，不会替你提交或生成结果。</span>
+            {/* 稿的固定说明，逐字取自 16-service-hubs.html 的 first-copy。
+                这里曾拼进 spec.sectionHint，于是同一句「六个入口，覆盖会前与现场准备」
+                在目标分段和下方分区标题里各出现一次，读起来像页面卡住重复了。 */}
+            <span>选择后直接进入对应服务；不会替你提交或生成结果。</span>
           </div>
           <div className="qx-hub-goals-row">
             {spec.goals.map((goal) => {
@@ -298,12 +331,18 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
             不说「已连接」。 */}
         <div
           className="qx-hub-notice"
+          /* 三档分别对应顶栏状态胶囊的 bad / warn / unknown，**严重度必须一致**：
+             device-off 时胶囊是琥珀色的 warn（本机设备不可用，信息与AI仍可进），
+             提示条此前却用朱砂红的 unavailable，同一页上两处对同一件事给出两种严重度。
+             现在 unavailable 只留给 apiDown（整个后端不可达）。 */
           data-readiness={
-            availability.apiDown || availability.deviceOff
+            availability.apiDown
               ? 'unavailable'
-              : availability.apiChecking || availability.deviceChecking
-                ? 'checking'
-                : 'ready'
+              : availability.deviceOff
+                ? 'degraded'
+                : availability.apiChecking || availability.deviceChecking
+                  ? 'checking'
+                  : 'ready'
           }
           role="status"
           aria-live="polite"
@@ -321,7 +360,11 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
           ) : null}
         </div>
 
-        <section className="qx-hub-board" aria-labelledby="qx-hub-section-title">
+        {/* qx-hub-board--primary 是**显式**的主能力板标记：整页的竖向余量交给它吸收。
+            这里原本写的是 CSS 选择器 `.qx-hub-board:first-of-type`，而 `:first-of-type`
+            按标签名算——`.qx-hub` 里第一个 <section> 是上面的目标分段，不是本板，
+            于是那条规则一次都没命中：六卡页（招聘会 / 面试）底部留下约 400px 死白。 */}
+        <section className="qx-hub-board qx-hub-board--primary" aria-labelledby="qx-hub-section-title">
           <div className="qx-hub-section-head">
             <h2 id="qx-hub-section-title">{spec.sectionTitle}</h2>
             <span>{spec.sectionHint}</span>
@@ -352,7 +395,7 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
           <div className="qx-hub-quick">
             {spec.quickLinks.map((link) => {
               const reason = unavailableReason(link.kind, link.route, availability)
-              const Icon = iconFor(link.title, link.kind)
+              const Icon = HUB_ICON[link.icon]
               if (reason) {
                 return (
                   <div

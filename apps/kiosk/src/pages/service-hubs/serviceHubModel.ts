@@ -26,6 +26,30 @@ export type ServiceHubKey = 'resume' | 'jobs' | 'fairs' | 'interview' | 'policy'
  */
 export type CapabilityKind = 'ai' | 'device' | 'info' | 'account'
 
+/**
+ * 稿 16 给每张卡 / 每条常用入口标的图标键（`cards` 与 `quick` 的第 3 位）。
+ *
+ * 这一族键是**稿里的事实**，由抽取脚本机械带出，页面按 `HUB_ICON` 显式映射到 lucide。
+ * 2026-09-20 修复前抽取丢了这个字段，页面改用「按标题正则猜图标」补位——
+ * 于是「校园招聘」猜成文档（稿是 building）、「岗位匹配参考」猜成公文包（稿是 chart）。
+ * 正则是猜，稿里的键是事实；不要再退回猜。
+ */
+export type HubIconKey =
+  | 'file'
+  | 'search'
+  | 'edit'
+  | 'brief'
+  | 'building'
+  | 'calendar'
+  | 'map'
+  | 'mic'
+  | 'chart'
+  | 'shield'
+  | 'bot'
+  | 'printer'
+  | 'user'
+  | 'external'
+
 export interface HubCapability {
   title: string
   description: string
@@ -33,6 +57,8 @@ export interface HubCapability {
   badge: string
   route: string
   kind: CapabilityKind
+  /** 稿里标的图标键。不是按标题猜出来的。 */
+  icon: HubIconKey
 }
 
 export interface HubGoal {
@@ -46,6 +72,8 @@ export interface HubQuickLink {
   description: string
   route: string
   kind: CapabilityKind
+  /** 稿里标的图标键。不是按标题猜出来的。 */
+  icon: HubIconKey
 }
 
 export interface ServiceHubSpec {
@@ -126,6 +154,24 @@ export function capabilityKindFor(spec: ServiceHubSpec, route: string): Capabili
     spec.capabilities.find((item) => item.route === route)?.kind ??
     spec.quickLinks.find((item) => item.route === route)?.kind ??
     'info'
+  )
+}
+
+/**
+ * 这个服务台里是否真有依赖本机打印 / 扫描设备的入口。
+ *
+ * 判据取自规格本身（稿标的 `kind: 'device'`），不写死 hub 名字：稿以后给别的服务台
+ * 加一张设备卡，这里自动跟上；反之删掉也自动收回。
+ *
+ * 为什么必须有这一条：`useTerminalDeviceStatus` 的探测结果会被服务台翻译成
+ * 「本机设备不可用 / 正在确认本机设备」。岗位、招聘会、面试、政策四个服务台
+ * 一张设备卡都没有，却照样把打印机离线播报在顶栏和提示条上——那是在报告一件
+ * 与本页无关的事，用户只会以为「这一页坏了」。没有设备能力就不探测、不播报。
+ */
+export function hubUsesDevice(spec: ServiceHubSpec): boolean {
+  return (
+    spec.capabilities.some((item) => item.kind === 'device') ||
+    spec.quickLinks.some((item) => item.kind === 'device')
   )
 }
 

@@ -16,6 +16,24 @@
   padding-bottom: 28px;
 }
 
+/* 域标识（稿的 eyebrow）。小字 + 字距，做成一枚安静的标签：
+   它负责回答「我现在在哪个服务域」，不与主标题争视线，所以不加粗不放大。 */
+.qx-hub-eyebrow {
+  align-self: flex-start;
+  margin-bottom: -8px;
+  padding: 0 12px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--qx-teal-line);
+  border-radius: 999px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 3px;
+}
+
 /* 稿的 hero-note：原件归属那一句 */
 .qx-hub-hero-note {
   display: flex;
@@ -116,6 +134,18 @@
 .qx-hub-notice[data-readiness='unavailable'] > svg {
   color: var(--qx-cinnabar);
 }
+/* degraded = 本机设备不可用。严重度对齐顶栏状态胶囊的 warn（琥珀），
+   不要用 unavailable 的朱砂红——那一档留给整个后端不可达。 */
+.qx-hub-notice[data-readiness='degraded'] {
+  /* 令牌表里没有 --qx-wheat-line（朱砂有、麦色没有）。这里用 color-mix 就地调一条
+     与 --qx-cinnabar-line 视觉轻重相当的麦色描边，不新增共享令牌，也不写裸 hex
+     （本目录的裸 hex 会被 verify:kiosk-visual-unity 打红——连注释里的也算）。 */
+  border-color: color-mix(in srgb, var(--qx-wheat) 42%, var(--qx-wheat-soft));
+  background: var(--qx-wheat-soft);
+}
+.qx-hub-notice[data-readiness='degraded'] > svg {
+  color: var(--qx-wheat-d);
+}
 .qx-hub-notice[data-readiness='checking'] > svg {
   color: var(--qx-wheat);
 }
@@ -157,9 +187,17 @@
   flex-direction: column;
   gap: 14px;
 }
-.qx-hub-board:first-of-type {
-  flex: 1;
-  min-height: 0;
+/* 主能力板吸收整页余量。
+   判据必须是**显式类名**：此前写的是 `.qx-hub-board:first-of-type`，而 `:first-of-type`
+   按标签名算——`.qx-hub` 里第一个 <section> 是「先告诉我你现在最想完成什么」那块，
+   本板是第二个，于是这条规则一次都没命中。后果在 1080×1920 上直接可见：
+   六卡页（招聘会 / 面试）只排两行 236px，底部留下约 400px 死白。
+
+   `flex: 1 0 auto`（而不是 `flex: 1`）：可以长，但**不许缩**。
+   `.qx-hub` 是滚动容器，允许收缩会让九卡页的网格被压进比 grid 最小行高还矮的盒子里，
+   内容溢出后压到下面的「常用入口」上。 */
+.qx-hub-board--primary {
+  flex: 1 0 auto;
 }
 .qx-hub-section-head {
   display: flex;
@@ -183,8 +221,7 @@
 
 /* 稿是三列。九张卡正好 3×3；八张时最后一张跨两列，不留孤儿。 */
 .qx-hub-grid {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-auto-rows: minmax(236px, 1fr);
@@ -297,14 +334,29 @@
   background: var(--qx-muted-line);
   color: var(--qx-muted-ink);
 }
+/* 不可用卡的纵向间距收紧一档。
+   下面让原因独占一行，每张卡因此多出约 14px；八卡 / 七卡页在降级态会被顶出 1920
+   （实测溢出 39px，底部的合规声明被裁掉 12px）。这里收回同样的量，换来
+   「原因完整成行 + 整页仍然一屏放下」。收紧只发生在不可用态，可点卡片一点没动。 */
+.qx-hub-card.is-unavailable {
+  gap: 6px;
+}
+.qx-hub-card.is-unavailable .qx-hub-card-foot {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding-top: 4px;
+}
+/* 不可用原因独占一行（flex-basis 100% 把它挤到徽标下一行）。
+   和徽标同行时可用宽度只剩约 140px，「正在确认AI能力状态」会折成
+   「正在确认AI能力状」+「态」——一体机上站着读，那个孤字格外刺眼。
+   给它整行（约 280px）后，这一族原因文案都能一行放下。 */
 .qx-hub-why {
-  flex: 1;
+  flex: 1 0 100%;
   min-width: 0;
-  margin-left: auto;
   color: var(--qx-wheat-d);
   font-size: 17px;
   font-weight: 700;
-  text-align: right;
+  text-align: left;
 }
 
 /* 常用入口：稿的 quick 区，三列虚线卡，通向「我的」台账与邻域服务台。 */
@@ -414,7 +466,7 @@
   }
   /* 窄屏是单列纵向滚动，没有「整页余量」可吸收；再让行高按 1fr 拉伸会把每张卡
      撑成一屏高。恢复内容高度。 */
-  .qx-hub-board:first-of-type,
+  .qx-hub-board--primary,
   .qx-hub-grid {
     flex: none;
   }

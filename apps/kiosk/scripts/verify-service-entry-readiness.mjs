@@ -42,6 +42,21 @@ const hubPage = read('src/pages/service-hubs/QxServiceHubPage.tsx')
 const hubModel = read('src/pages/service-hubs/serviceHubModel.ts')
 const hubSpecs = read('src/pages/service-hubs/serviceHubSpecs.ts')
 
+// 抽取脚本既是生成器也是对账基准，两处判据都要用它，所以在这里一次性载入。
+const SERVICE_HUB_EXTRACT = await import('./extract-service-hub-specs.mjs')
+const SERVICE_HUB_SPECS_COUNTS_PRELOAD = SERVICE_HUB_EXTRACT.SERVICE_HUB_SPECS_COUNTS
+
+/**
+ * 去掉 /* ... *​/ 块注释后的代码面。
+ *
+ * 「这段代码里不许再出现 X」这类反向断言必须只看代码：本文件下面几条钉的是
+ * 「不许再按标题正则猜图标」「不许再用 :first-of-type 命中主板」，而把 X 写进
+ * 「为什么不该这么写」的注释里恰恰是**最该鼓励**的行为。不剥注释，就等于
+ * 谁解释得越清楚谁越红，解释会被删掉，教训也跟着没了。
+ */
+const codeOf = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '')
+const hubPageCode = codeOf(hubPage)
+
 // 状态条的三态诚实话术随组件一起搬进服务台自己的提示条（旧 ServiceReadinessStrip
 // 组件已随五页删除）。这条判据一字未改，只是钉到了真正渲染它的地方。
 check(!/AI.*已连接/.test(hubPage), '健康检查不扩大声明为 AI 能力已连接')
@@ -139,13 +154,95 @@ check(
   '需要后端的入口在 unavailable / checking 下都给出原因（两半都 fail-closed）'
 )
 
+// ── 2026-09-20 定向修复的四条不变量 ─────────────────────────────────────────
+// 每条都对应一个已经在 1080×1920 截图里看得见的缺陷，不是预防性装饰。
+
+// 1) 图标取自稿的 `icon` 键，不是按标题猜。
+//    修复前这里是一张 TITLE_ICON 正则表（抽取丢了稿的 icon 字段），代价：
+//    「校园招聘」稿 building 却渲染成文档，「岗位匹配参考」稿 chart 却渲染成公文包。
+check(!/TITLE_ICON/.test(hubPageCode), '服务台不按标题正则猜图标（TITLE_ICON 已删除）')
+check(
+  /const HUB_ICON: Record<HubIconKey, typeof BotIcon> = \{/.test(hubPage),
+  '服务台图标是 HubIconKey → lucide 的**全量**显式映射（漏登记会 typecheck 红，不会静默兜底）'
+)
+check(
+  /const Icon = HUB_ICON\[cap\.icon\]/.test(hubPage) && /const Icon = HUB_ICON\[link\.icon\]/.test(hubPage),
+  '能力卡与常用入口都按稿里那张卡自己的 icon 键取图标'
+)
+{
+  const iconed = hubSpecs.match(/icon: '[a-z]+'/g) ?? []
+  check(
+    iconed.length === SERVICE_HUB_SPECS_COUNTS_PRELOAD.cards + SERVICE_HUB_SPECS_COUNTS_PRELOAD.quick,
+    `规格表里 36 张卡 + 15 条常用入口各自带稿的 icon 键（实得 ${iconed.length}）`
+  )
+}
+
+// 2) 没有设备能力的服务台不探测、也不播报本机设备。
+//    修复前岗位 / 招聘会 / 面试 / 政策四页都在替打印机说话：顶栏「正在确认本机设备」
+//    永远不会有下文（hook 停用档的 loading 停在初始 true），用户只会以为这页坏了。
+check(
+  /export function hubUsesDevice/.test(hubModel),
+  '是否有设备能力由规格自身判定（稿标的 kind: device），不写死 hub 名字'
+)
+check(
+  /const deviceAware = hubUsesDevice\(spec\)/.test(hubPage) &&
+    /useTerminalDeviceStatus\(deviceAware\)/.test(hubPage),
+  '服务台按 deviceAware 决定要不要探测本机设备'
+)
+check(
+  /deviceOff: deviceAware && \(/.test(hubPage) && /deviceChecking: deviceAware &&/.test(hubPage),
+  '无设备能力的服务台，设备降级判据恒为 false（不播报打印机离线 / 探测中）'
+)
+{
+  // hook 的停用档必须真的停掉副作用：`if (!enabled) return` 要排在 fetch 与轮询定时器之前。
+  const hook = read('src/hooks/useTerminalDeviceStatus.ts')
+  const guardAt = hook.indexOf('if (!enabled) return')
+  const fetchAt = hook.indexOf('await fetch(')
+  const timerAt = hook.indexOf('window.setInterval')
+  check(
+    guardAt > 0 && fetchAt > guardAt && timerAt > guardAt,
+    'useTerminalDeviceStatus(false) 在发请求与挂 60s 轮询之前就 return（停用即不占用后端与定时器）'
+  )
+}
+
+// 3) 主能力板吸收整页余量的判据必须是显式类名。
+//    修复前写的是 `.qx-hub-board:first-of-type`——`:first-of-type` 按标签名算，
+//    `.qx-hub` 里第一个 <section> 是目标分段，这条规则一次都没命中：
+//    六卡页（招聘会 / 面试）底部留下约 400px 死白。
+{
+  const hubCss = read('src/pages/service-hubs/styles/service-hub-qx.css')
+  check(
+    !/\.qx-hub-board:first-of-type/.test(codeOf(hubCss)),
+    '主能力板不靠 :first-of-type 命中（它按标签名算，第一个 <section> 是目标分段）'
+  )
+  check(
+    /\.qx-hub-board--primary\s*\{[^}]*flex: 1 0 auto/.test(hubCss) &&
+      /className="qx-hub-board qx-hub-board--primary"/.test(hubPage),
+    '主能力板由显式类名 qx-hub-board--primary 吸收余量（可长不可缩）'
+  )
+}
+
+// 4) 同一件事在页面上只能有一个严重度。
+//    device-off 时顶栏胶囊是琥珀 warn，提示条此前却用朱砂红的 unavailable。
+check(
+  /availability\.apiDown\s*\?\s*'unavailable'/.test(hubPage) &&
+    /availability\.deviceOff\s*\?\s*'degraded'/.test(hubPage),
+  '提示条 unavailable 只留给 apiDown；deviceOff 走 degraded，与顶栏 warn 同一严重度'
+)
+
+// 5) 域标识与目标分段说明。
+check(/\{spec\.eyebrow\}/.test(hubPage), '服务台渲染稿的 eyebrow（域标识，回答「我在哪个服务域」）')
+check(
+  !/\{spec\.sectionHint\}；/.test(hubPage) &&
+    hubPage.includes('选择后直接进入对应服务；不会替你提交或生成结果。'),
+  '目标分段用稿的固定说明，不再拼 sectionHint（那会让同一句话在一屏里出现两次）'
+)
+
 // 规格表 ↔ 稿 16-service-hubs.html 的转录对账。
 // 这份 36 张卡 / 17 个目标 / 15 条常用入口的规格是机械抽取产物；2026-09-10 那版
 // 漏掉稿里的 quick，15 条通往「我的」台账的入口静默消失过一次。手改 specs、
 // 或改了稿没重跑抽取，在这里当场变红。
-const { SERVICE_HUB_SPECS_TEXT, SERVICE_HUB_SPECS_COUNTS } = await import(
-  './extract-service-hub-specs.mjs'
-)
+const { SERVICE_HUB_SPECS_TEXT, SERVICE_HUB_SPECS_COUNTS } = SERVICE_HUB_EXTRACT
 check(
   hubSpecs === SERVICE_HUB_SPECS_TEXT,
   `serviceHubSpecs.ts 与稿 16-service-hubs.html 逐字节一致（hubs=${SERVICE_HUB_SPECS_COUNTS.hubs} cards=${SERVICE_HUB_SPECS_COUNTS.cards} goals=${SERVICE_HUB_SPECS_COUNTS.goals} quick=${SERVICE_HUB_SPECS_COUNTS.quick}）；不一致请跑 node scripts/extract-service-hub-specs.mjs 而不是手改`

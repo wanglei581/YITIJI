@@ -16985,7 +16985,8 @@
     "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
+      "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/hooks/useToolboxConfig.ts": [
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
@@ -18569,6 +18570,9 @@
     "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts": [
       "apps/kiosk/scripts/extract-service-hub-specs.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
+    "apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/session-guard/SessionGuardView.tsx": [
@@ -26992,12 +26996,14 @@
         "files": [
           "apps/kiosk/scripts/extract-service-hub-specs.mjs",
           "apps/kiosk/src/hooks/useApiReadiness.ts",
+          "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
           "apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx",
           "apps/kiosk/src/pages/service-hubs/serviceHubModel.ts",
           "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts",
+          "apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css",
           "apps/kiosk/src/services/api/printScanCapabilities.ts"
         ],
         "missing": []
