@@ -15,7 +15,13 @@ import { AUDIENCE_CHIPS, type AudienceKey, type TabKey } from './shared'
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 // 来源链接二维码弹层：承载政策事项提交的外部链接；info-only。
-// 2026-08-11：不再称「官方入口」——系统未核验该链接的官方性（见 PolicyServiceHubPage 文件头）。
+// 2026-08-11：不再称「官方入口」——系统未核验该链接的官方性。后端 policy.dto.ts 只把
+// 合作机构自填的链接当普通字符串收下，policies.service.ts 没有官方域名、发布主体或证据核验，
+// 所以本链一律写「来源链接 / 由来源机构提交并经平台审核后展示」；「以官方发布为准」这类
+// **让用户自己去核实**的免责表述是诚实的，予以保留。
+// 恢复条件：externalUrl 接入官方域名白名单核验（建议与线上平台目录共用一套）。
+// （此前这段判据写在 PolicyServiceHubPage 文件头，该页 2026-09-20 迁入青序流光后删除，
+//   判据移到真正渲染来源链接的这里，避免指向已不存在的文件。）
 // 打开即记一条 external_open 跳转记录（仅记录打开入口动作，不记录办理结果）。
 export function OfficialEntryQrOverlay({ title, url, onClose }: { title: string; url: string; onClose: () => void }) {
   return (

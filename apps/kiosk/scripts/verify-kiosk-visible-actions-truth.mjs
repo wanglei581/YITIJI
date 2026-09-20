@@ -17,7 +17,8 @@ const sourceMeta = read('src/pages/jobs/components/W4Presentation.tsx')
 const contractResult = read('src/pages/contract-review/ContractReviewResultPage.tsx')
 const contractProcessing = read('src/pages/contract-review/ContractReviewProcessingPage.tsx')
 const contractApi = read('src/services/api/contractReview.ts')
-const resumeHub = read('src/pages/resume/ResumeServiceHubPage.tsx')
+// 五个服务台共用的青序流光实现（/resume-service 等五条的活面）。
+const resumeHub = read('src/pages/service-hubs/QxServiceHubPage.tsx')
 
 assert.match(agencies, /type="search"/)
 assert.match(agencies, /const \[searchInput, setSearchInput\] = useState\(''\)/)
@@ -71,9 +72,25 @@ assert.match(contractApi, /if \(_mockStep !== 2 \|\| _mockConfirmed\)/)
 assert.match(contractApi, /_mockConfirmed = true/)
 assert.doesNotMatch(contractApi, /call\(`\/contract-reviews\/\$\{id\}`,[\s\S]{0,100}?\.catch\(\(\) => undefined\)/)
 
+// 2026-09-20：/resume-service 迁入青序流光（稿 16），旧壳 ResumeServiceHubPage 已从
+// 路由摘掉，五个服务台共用 QxServiceHubPage。合同审查入口随之搬进新页——
+// 它是稿没画、代码长出来的能力，**迁移时最容易整条丢掉**，所以锚点必须跟到活面。
+// 四条判据一字未改：默认关闭的开关、分组标题、入口名、落点路由。
 assert.match(resumeHub, /VITE_ENABLE_CONTRACT_REVIEW === 'true'/)
 assert.match(resumeHub, /签约与权益/)
 assert.match(resumeHub, /AI签约风险提示/)
-assert.match(resumeHub, /navigate\('\/contract-review'\)/)
+assert.match(resumeHub, /route: '\/contract-review'/)
+// 默认关闭的边界：开关之外不得有第二条通往 /contract-review 的入口，
+// 也不得把它塞进无条件渲染的能力网格。
+assert.match(
+  resumeHub,
+  /const showContractReview = hub === 'resume' && contractReviewEnabled/,
+  'QxServiceHubPage: 合同审查入口必须同时受 hub 与默认关闭开关约束',
+)
+assert.match(
+  resumeHub,
+  /\{showContractReview \? \(/,
+  'QxServiceHubPage: 合同审查分区必须由 showContractReview 条件渲染',
+)
 
 console.log('PASS kiosk visible actions truth contract')

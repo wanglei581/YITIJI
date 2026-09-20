@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1505 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1504 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -248,10 +248,11 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/scripts/</code> — 38 个文件</summary>
+<summary><code>apps/kiosk/scripts/</code> — 39 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
+| `apps/kiosk/scripts/extract-service-hub-specs.mjs` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/scripts/lib/fusion-baseline-contract.mjs` | `verify-fusion-baseline.mjs` |
 | `apps/kiosk/scripts/lib/shell-chrome-contract.mjs` | `verify-fusion-shell.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-visual-unity.mjs` |
 | `apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -294,7 +295,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 471 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 468 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -316,7 +317,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/components/FilePreviewDialog.tsx` | `verify-profile-documents-inkpaper.mjs`<br/>`verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | `verify-device-status-honest.mjs` |
 | `apps/kiosk/src/components/KioskFeedbackDialog.tsx` | `verify-kiosk-feedback-entry.mjs` |
-| `apps/kiosk/src/components/ServiceReadinessStrip.tsx` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/components/hid-guard/KioskHidScanGuard.tsx` | `verify-scan-input-safety.mjs` |
 | `apps/kiosk/src/components/hid-guard/hidBurstDetector.ts` | `verify-scan-input-safety.mjs` |
 | `apps/kiosk/src/components/kiosk-shell/KioskAppTopbar.tsx` | `verify-runtime-terminal-identity.mjs` |
@@ -405,7 +405,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/home/styles/home-qx.css` | `verify-fusion-home.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewReportPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewReportsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
-| `apps/kiosk/src/pages/interview/InterviewServiceHubPage.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewSessionPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewSetupPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewShell.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
@@ -425,7 +424,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs` |
 | `apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs` |
-| `apps/kiosk/src/pages/job-fairs/FairsServiceHubPage.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx` | `verify-jobfair-checkin.mjs` |
 | `apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-checkin.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-page-size.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx` | `verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-jobfairs-terminal-priority.mjs`<br/>`verify-activity-logs.ts` |
@@ -438,7 +436,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/jobs-fairs-prototype.css` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/pages/jobs/JobDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-info-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/jobs/JobsPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-info-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs` |
-| `apps/kiosk/src/pages/jobs/JobsServiceHubPage.tsx` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/jobs/components/JobAiConsentModal.tsx` | `verify-job-ai-ui.mjs` |
 | `apps/kiosk/src/pages/jobs/components/JobAiResultPanel.tsx` | `verify-job-ai-ui.mjs` |
@@ -459,7 +456,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/placeholders/MeActivityDetailPage.tsx` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/placeholders/NotificationsPage.tsx` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-qx-session-lifecycle.mjs` |
-| `apps/kiosk/src/pages/policy/PolicyServiceHubPage.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-print-confirm-honest.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs` |
@@ -589,7 +585,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeParsePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
-| `apps/kiosk/src/pages/resume/ResumeServiceHubPage.tsx` | `verify-kiosk-visible-actions-truth.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-compliance.ts` |
@@ -682,6 +677,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/screensaver/StandbyView.tsx` | `verify-qx-session-lifecycle.mjs`<br/>`verify-screensaver-empty-shell.mjs` |
 | `apps/kiosk/src/pages/screensaver/screensaver-service-desk.css` | `verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/screensaver/standbyModel.ts` | `verify-qx-session-lifecycle.mjs` |
+| `apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-service-entry-readiness.mjs` |
+| `apps/kiosk/src/pages/service-hubs/serviceHubModel.ts` | `verify-service-entry-readiness.mjs` |
+| `apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts` | `extract-service-hub-specs.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/session-guard/SessionGuardView.tsx` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-guard/sessionGuardModel.ts` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-guard/styles/session-guard-qx.css` | `verify-qx-session-lifecycle.mjs` |
@@ -1327,11 +1325,12 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>docs/design/kiosk-redesign-2026-08/</code> — 3 个文件</summary>
+<summary><code>docs/design/kiosk-redesign-2026-08/</code> — 4 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `docs/design/kiosk-redesign-2026-08/10-print-hub.html` | `verify-p39-print-hub-fidelity.mjs` |
+| `docs/design/kiosk-redesign-2026-08/16-service-hubs.html` | `extract-service-hub-specs.mjs` |
 | `docs/design/kiosk-redesign-2026-08/assets/bg-hero.jpg` | `verify-repository-integrity.mjs` |
 | `docs/design/kiosk-redesign-2026-08/assets/bg-standby.jpg` | `verify-repository-integrity.mjs` |
 

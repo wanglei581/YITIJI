@@ -302,24 +302,39 @@ export const kioskRouter = createBrowserRouter([
       },
       {
         path: 'resume-service',
-        lazy: async () => ({ Component: (await import('../pages/resume/ResumeServiceHubPage')).ResumeServiceHubPage }),
+        lazy: async () => {
+          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+          return { Component: () => <QxServiceHubPage hub="resume" /> }
+        },
       },
       {
         path: 'jobs-service',
-        lazy: async () => ({ Component: (await import('../pages/jobs/JobsServiceHubPage')).JobsServiceHubPage }),
+        lazy: async () => {
+          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+          return { Component: () => <QxServiceHubPage hub="jobs" /> }
+        },
       },
       {
         path: 'fairs-service',
-        lazy: async () => ({ Component: (await import('../pages/job-fairs/FairsServiceHubPage')).FairsServiceHubPage }),
+        lazy: async () => {
+          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+          return { Component: () => <QxServiceHubPage hub="fairs" /> }
+        },
       },
       { path: 'interview', element: <InterviewWorkbenchPage /> },
       {
         path: 'interview-service',
-        lazy: async () => ({ Component: (await import('../pages/interview/InterviewServiceHubPage')).InterviewServiceHubPage }),
+        lazy: async () => {
+          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+          return { Component: () => <QxServiceHubPage hub="interview" /> }
+        },
       },
       {
         path: 'policy-service',
-        lazy: async () => ({ Component: (await import('../pages/policy/PolicyServiceHubPage')).PolicyServiceHubPage }),
+        lazy: async () => {
+          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+          return { Component: () => <QxServiceHubPage hub="policy" /> }
+        },
       },
         ],
       },

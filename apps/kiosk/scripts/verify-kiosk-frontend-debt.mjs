@@ -70,20 +70,53 @@ const assert = (condition, message) => { if (!condition) failures.push(message) 
     'LoginPage.tsx: hint 不得从 query 取（可被外部构造，成为登录页文案注入点）',
   )
 
-  // `/assistant` 只认 `?intent=`，从不读 location.state。
-  const topicWriters = ['src/pages/policy/PolicyServiceHubPage.tsx', 'src/pages/interview/InterviewServiceHubPage.tsx', 'src/pages/job-fairs/FairsServiceHubPage.tsx']
-  for (const f of topicWriters) {
-    assert(!/state:\s*\{\s*topic:/.test(read(f)), `${f}: 不得向 /assistant 传 state.topic（该页不读 location.state）`)
-  }
+  // 2026-09-20：政策 / 面试 / 招聘会三个服务台迁入青序流光，三份旧壳页面已从路由摘掉，
+  // 五个服务台共用 src/pages/service-hubs/。下面三条锚点随之改钉活面——
+  // 判据一字未改，只是换了它该看的文件。
+  const hubPage = read('src/pages/service-hubs/QxServiceHubPage.tsx')
+  const hubSpecs = read('src/pages/service-hubs/serviceHubSpecs.ts')
 
-  // `/renshi` 的 tab 白名单是 policy|social|register|notice，subsidy 会被静默丢弃。
+  // `/assistant` 只认 `?intent=`，从不读 location.state。
+  for (const f of [
+    ['src/pages/service-hubs/QxServiceHubPage.tsx', hubPage],
+    ['src/pages/service-hubs/serviceHubSpecs.ts', hubSpecs],
+  ]) {
+    assert(!/state:\s*\{\s*topic:/.test(f[1]), `${f[0]}: 不得向 /assistant 传 state.topic（该页不读 location.state）`)
+  }
+  // 更强的一条：服务台的所有跳转都是 navigate(route) 单参形式，根本没有 state 通道，
+  // 所以「传了会被静默丢弃」这类 bug 在这一页结构上不成立。
   assert(
-    !/\/renshi\?tab=subsidy/.test(read('src/pages/policy/PolicyServiceHubPage.tsx')),
-    'PolicyServiceHubPage.tsx: 不得链接 /renshi?tab=subsidy（不在 tab 白名单，会被静默回落到 policy）',
+    !/navigate\([^)]*,\s*\{\s*state:/.test(hubPage),
+    'QxServiceHubPage.tsx: 服务台跳转不得携带 location.state（下游页面没有消费点）',
+  )
+
+  // `/renshi` 的 tab 白名单是 policy|eligibility|social|register|notice，subsidy 会被静默丢弃。
+  assert(
+    !/\/renshi\?tab=subsidy/.test(hubSpecs),
+    'serviceHubSpecs.ts: 不得链接 /renshi?tab=subsidy（不在 tab 白名单，会被静默回落到 policy）',
   )
   assert(
-    /key: 'policy-fav'[\s\S]*?to: '\/me\/favorites\?tab=policy'/.test(read('src/pages/policy/PolicyServiceHubPage.tsx')),
-    'PolicyServiceHubPage.tsx: 政策收藏必须落到 /me/favorites?tab=policy，不得再进 AI 记录',
+    /title: '政策收藏'[\s\S]*?route: '\/me\/favorites\?tab=policy'/.test(hubSpecs),
+    'serviceHubSpecs.ts: 政策收藏必须落到 /me/favorites?tab=policy，不得再进 AI 记录',
+  )
+
+  // 稿 16 的「常用入口」（quick）是五个服务台通往「我的」台账的唯一入口。
+  // 2026-09-10 那版迁移的抽取脚本漏了 quick，15 条真实入口静默消失过一次；
+  // 这条钉住它们还在，一条都不许少。
+  for (const route of ['/me/resumes', '/me/ai-records', '/me/activity', '/me/activity?tab=jump', '/interview/reports']) {
+    assert(
+      hubSpecs.includes(`route: '${route}'`),
+      `serviceHubSpecs.ts: 服务台必须保留通往「我的」台账的入口 ${route}`,
+    )
+  }
+  assert(
+    /title: '校园招聘岗位'[\s\S]*?route: '\/jobs\?category=campus'/.test(hubSpecs),
+    'serviceHubSpecs.ts: 岗位服务台必须保留校招分类入口 /jobs?category=campus',
+  )
+  assert(
+    /title: '招聘会'[\s\S]*?route: '\/fairs-service'/.test(hubSpecs) &&
+      /title: '岗位信息'[\s\S]*?route: '\/jobs-service'/.test(hubSpecs),
+    'serviceHubSpecs.ts: 岗位与招聘会服务台必须互为跨域快捷入口',
   )
 
   // `/print/upload` 的 source 取自 query 且只认 resume|document；jobId/jobTitle 无消费点。

@@ -27,41 +27,129 @@ for (const marker of [
   check(readinessHook.includes(marker), `在线服务探测保留 ${marker}`)
 }
 
-const readinessStrip = read('src/components/ServiceReadinessStrip.tsx')
-for (const copy of ['正在确认在线服务', '在线服务已连接', '在线服务暂不可用', '重新检测']) {
-  check(readinessStrip.includes(copy), `状态条包含「${copy}」`)
-}
-check(!/AI.*已连接/.test(readinessStrip), '健康检查不扩大声明为 AI 能力已连接')
 
-const hubs = [
-  'src/pages/resume/ResumeServiceHubPage.tsx',
-  'src/pages/jobs/JobsServiceHubPage.tsx',
-  'src/pages/job-fairs/FairsServiceHubPage.tsx',
-  'src/pages/interview/InterviewServiceHubPage.tsx',
-  'src/pages/policy/PolicyServiceHubPage.tsx',
-]
-for (const hub of hubs) {
-  const source = read(hub)
-  check(source.includes('useApiReadiness'), `${hub} 使用入口级在线服务探测`)
-  check(source.includes('ServiceReadinessStrip'), `${hub} 展示真实检查状态`)
-  check(source.includes("apiStatus !== 'ready'"), `${hub} 检查中和不可用均 fail-closed`)
-  check(/disabled=\{(?:apiBlocked|blocked)\}/.test(source), `${hub} 在线工作流有 disabled 门禁`)
-}
+// 2026-09-20：五个服务台（/resume-service /jobs-service /fairs-service
+// /interview-service /policy-service）迁入青序流光，五份旧壳页面已从路由摘掉，
+// 共用 src/pages/service-hubs/QxServiceHubPage.tsx 一份实现。
+//
+// 断言改钉**活面**而不是那五个不再渲染的文件——门禁钉在死代码上就是只剩形式。
+// 不变量一条没放宽，只是换了它该看的地方：
+//   · 入口级在线服务探测仍在；
+//   · checking 与 unavailable 都 fail-closed（不是只拦 unavailable）；
+//   · 被拦的能力不得仍是可点控件，且必须说得出原因；
+//   · 旧壳 `requiresApi: false` 的四个入口仍然离线可进，其余仍然 fail-closed。
+const hubPage = read('src/pages/service-hubs/QxServiceHubPage.tsx')
+const hubModel = read('src/pages/service-hubs/serviceHubModel.ts')
+const hubSpecs = read('src/pages/service-hubs/serviceHubSpecs.ts')
 
-const jobsHub = read('src/pages/jobs/JobsServiceHubPage.tsx')
-const interviewHub = read('src/pages/interview/InterviewServiceHubPage.tsx')
-const policyHub = read('src/pages/policy/PolicyServiceHubPage.tsx')
+// 状态条的三态诚实话术随组件一起搬进服务台自己的提示条（旧 ServiceReadinessStrip
+// 组件已随五页删除）。这条判据一字未改，只是钉到了真正渲染它的地方。
+check(!/AI.*已连接/.test(hubPage), '健康检查不扩大声明为 AI 能力已连接')
+// ready 态也必须出声。公共终端上「什么都没显示」会被读成「一切正常」，
+// 所以就绪时说的是「进入后再确认」，而不是替下游页面承诺能办。
 check(
-  /key: 'online-platforms'[\s\S]*?requiresApi: false/.test(jobsHub),
-  '线上招聘平台保留离线二维码入口'
+  hubPage.includes('本页只负责分流，不预报在线、名额、价格或办理结果'),
+  '服务台就绪态不预报在线 / 名额 / 价格 / 办理结果'
 )
-check(/key: 'tips'[\s\S]*?requiresApi: false/.test(interviewHub), '面试技巧保留离线阅读入口')
-for (const key of ['social-insurance', 'archive']) {
+
+check(hubPage.includes('useApiReadiness'), '服务台使用入口级在线服务探测')
+check(hubPage.includes('useTerminalDeviceStatus'), '服务台设备类能力看真实终端设备状态')
+// 「检查中」与「不可用」都必须算 blocked。只拦 unavailable 等于用「还不知道」冒充「可以用」。
+check(
+  /apiChecking:\s*apiStatus === 'checking'/.test(hubPage) &&
+    /apiDown:\s*apiStatus === 'unavailable'/.test(hubPage),
+  '服务台把 checking 与 unavailable 分开取，两者都进降级判据'
+)
+check(
+  /const apiBlocked = apiStatus !== 'ready'/.test(hubPage),
+  '服务台 apiBlocked 覆盖 checking 与 unavailable（fail-closed）'
+)
+check(
+  /if \(state\.apiChecking\) return/.test(hubModel) &&
+    /if \(state\.deviceChecking\) return/.test(hubModel),
+  '降级判据在「正在确认」阶段同样返回不可用原因（不得放行）'
+)
+// 被拦时不是「灰掉的按钮」而是一张说明原因的非可点卡片：CLAUDE.md §9「不伪造能力」，
+// 点不动必须说得出为什么。
+check(
+  /className="qx-hub-card is-unavailable"[\s\S]*?role="group"[\s\S]*?aria-disabled="true"/.test(hubPage),
+  '不可用能力不再是可点控件（role=group + aria-disabled）'
+)
+check(
+  /data-disabled-reason=\{`capability:\$\{cap\.kind\}`\}/.test(hubPage),
+  '不可用能力带 data-disabled-reason，原因可被走查取证'
+)
+for (const copy of ['正在确认在线服务', '在线服务暂不可用', '重新检测']) {
+  check(hubPage.includes(copy), `服务台展示真实检查状态「${copy}」`)
+}
+check(/onClick=\{retryApi\}/.test(hubPage), '服务台保留在线服务重新检测入口')
+
+// 旧壳五页把「后端不可达也能进」写成 `requiresApi: false`，**默认 true**；
+// 迁移必须原样保住这条 fail-closed，不能因为稿把浏览类标成 `kind: 'info'`
+// 就让 /jobs、/job-fairs、/me/* 在后端断开时仍写着「进入 →」。
+// 青序流光把它收进 serviceHubModel 的 needsBackend()：白名单登记即可离线进，
+// 未登记一律按需要后端。下面两族断言分别钉「白名单里有什么」和「默认是拒绝」。
+const OFFLINE_ENTRIES = [
+  ['/jobs/online-platforms', '线上招聘平台保留离线二维码入口'],
+  ['/interview/tips', '面试技巧保留离线阅读入口'],
+  ['/renshi?tab=social', '社保指南保留离线指引入口'],
+  ['/renshi?tab=register', '档案与登记保留离线指引入口'],
+]
+for (const [route, label] of OFFLINE_ENTRIES) {
   check(
-    new RegExp(`key: '${key}'[\\s\\S]*?requiresApi: false`).test(policyHub),
-    `${key} 保留离线指引入口`
+    new RegExp(`route: '${route.replace(/[?]/g, '\\$&')}',\\s*kind: 'info'`).test(hubSpecs) &&
+      new RegExp(`'${route.replace(/[?]/g, '\\$&')}',`).test(
+        hubModel.slice(hubModel.indexOf('OFFLINE_CAPABLE_ROUTES')),
+      ),
+    label
   )
 }
+check(
+  /export function needsBackend\(route: string\): boolean \{\s*return !OFFLINE_CAPABLE_ROUTES\.has\(route\)/.test(
+    hubModel,
+  ),
+  '离线可进是白名单制：未登记的路由一律按需要后端（fail-closed）'
+)
+// 判据要真的作用在每张卡上：unavailableReason 必须拿到该卡的 route，
+// 否则白名单写得再对也落不到界面上。
+check(
+  /unavailableReason\(cap\.kind, cap\.route, availability\)/.test(hubPage) &&
+    /unavailableReason\(link\.kind, link\.route, availability\)/.test(hubPage),
+  '能力卡与常用入口都按各自 route 判定是否可进'
+)
+check(
+  /unavailableReason\(kind, goal\.route, availability\)/.test(hubPage) &&
+    /capabilityKindFor\(spec, goal\.route\)/.test(hubPage),
+  '目标分段与能力卡共用同一条 fail-closed 判据，不得另开一条可点通道'
+)
+{
+  const noticeFn = hubPage.slice(hubPage.indexOf('function noticeCopy'), hubPage.indexOf('export function QxServiceHubPage'))
+  const apiDownAt = noticeFn.indexOf('if (state.apiDown)')
+  const apiCheckingAt = noticeFn.indexOf('if (state.apiChecking)')
+  const deviceOffAt = noticeFn.indexOf('if (state.deviceOff)')
+  check(
+    apiDownAt >= 0 && apiCheckingAt > apiDownAt && deviceOffAt > apiCheckingAt,
+    '分流提示条：apiDown / apiChecking 优先于 deviceOff（device-off 文案会声称 AI 仍可进入）'
+  )
+}
+check(
+  /if \(!needsBackend\(route\)\) return null/.test(hubModel) &&
+    /if \(state\.apiDown\) return '在线服务当前不可用'/.test(hubModel) &&
+    /if \(state\.apiChecking\) return '正在确认在线服务'/.test(hubModel),
+  '需要后端的入口在 unavailable / checking 下都给出原因（两半都 fail-closed）'
+)
+
+// 规格表 ↔ 稿 16-service-hubs.html 的转录对账。
+// 这份 36 张卡 / 17 个目标 / 15 条常用入口的规格是机械抽取产物；2026-09-10 那版
+// 漏掉稿里的 quick，15 条通往「我的」台账的入口静默消失过一次。手改 specs、
+// 或改了稿没重跑抽取，在这里当场变红。
+const { SERVICE_HUB_SPECS_TEXT, SERVICE_HUB_SPECS_COUNTS } = await import(
+  './extract-service-hub-specs.mjs'
+)
+check(
+  hubSpecs === SERVICE_HUB_SPECS_TEXT,
+  `serviceHubSpecs.ts 与稿 16-service-hubs.html 逐字节一致（hubs=${SERVICE_HUB_SPECS_COUNTS.hubs} cards=${SERVICE_HUB_SPECS_COUNTS.cards} goals=${SERVICE_HUB_SPECS_COUNTS.goals} quick=${SERVICE_HUB_SPECS_COUNTS.quick}）；不一致请跑 node scripts/extract-service-hub-specs.mjs 而不是手改`
+)
 
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 check(printScanHome.includes('loadConfiguredCapabilities'), '打印扫描首页保留能力加载状态')

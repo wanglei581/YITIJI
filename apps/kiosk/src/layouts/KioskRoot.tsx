@@ -81,11 +81,9 @@ interface V6ShellRoute {
  * fusion-w6-routes.spec.ts:32 会拿它和实际壳归属对账，留着就是自相矛盾。
  * 2026-09-08 移出：'/'（首页迁入青序流光）、'/print-scan'（早已迁入，本次一并清理）。 */
 const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
-  ['/resume-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/jobs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/fairs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/interview-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/policy-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
+  /* 2026-09-20 移出最后五条（五个服务台）：它们迁入青序流光，见下方 QX_MIGRATED_ROUTES。
+   * 这张表现在是空的——V6 壳在运行时已无路由使用。表本身保留：verify:fusion-shell
+   * 用它和 fusion-w6 的 V6_SHELL_ROUTE_PATTERNS 对账，删表会让那条不变量失去锚点。 */
 ])
 
 /**
@@ -104,6 +102,13 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
  * （`isQxMigratedPath(pathname)` 是壳层契约允许的具名谓词形态）。
  */
 const QX_MIGRATED_ROUTES = new Set<string>([
+  /* 五个服务台（稿 16-service-hubs，共用 QxServiceHubPage）。它们是首页进任何业务域的
+   * **第一跳**：首页早已是青序，点进去掉回旧壳正是「新旧页面交替」的来源。 */
+  '/resume-service',
+  '/jobs-service',
+  '/fairs-service',
+  '/interview-service',
+  '/policy-service',
   '/',
   '/print/pickup-claim',
   '/print/cashier',

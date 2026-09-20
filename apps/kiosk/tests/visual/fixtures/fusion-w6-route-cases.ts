@@ -156,7 +156,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/export', url: '/resume/export', expectedPath: compatibilityRedirects['/resume/export'], marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
   { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
   { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },
-  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("AI简历服务")', featureText: 'AI简历服务' },
+  // 五个服务台迁入青序流光（稿 16）后，栏目名「AI简历服务」等降为 eyebrow，h1 换成稿里的主标题。
+  // featureText 顺势从栏目名改钉那五句**合规诚实性声明**——钉合规边界比钉栏目名有判别力：
+  // 迁移里最容易丢的就是这几句，钉住它们，漏抄当场变红。
+  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("把简历这件事，做得更清楚")', featureText: '系统不代投、不替企业筛选或邀约。' },
   { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/settings', url: '/scan/settings', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
@@ -164,7 +167,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
 
   { pattern: '/jobs', url: '/jobs', marker: qx, featureText: '岗位信息' },
-  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("岗位信息")', featureText: '岗位信息' },
+  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("看清来源，再决定去哪里投")', featureText: '投递在来源平台完成。' },
   { pattern: '/jobs/:id', url: '/jobs/job-001', marker: qx, featureText: '前端工程师' },
   { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: qx, featureText: '线下机构岗位' },
   { pattern: '/offline-agencies', url: '/offline-agencies', marker: qx, featureText: '线下招聘机构' },
@@ -173,7 +176,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/companies', url: '/companies', marker: qx, featureText: '找企业' },
   { pattern: '/companies/:id', url: '/companies/company-001', marker: qx, featureText: '青岛示例制造有限公司' },
   { pattern: '/job-fairs', url: '/job-fairs', marker: w4, featureText: '招聘会' },
-  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("招聘会信息")', featureText: '招聘会信息' },
+  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("先看场次，再准备到场")', featureText: '本机不代收简历，也不承诺外部活动结果。' },
   { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: w4, featureText: '来源平台入场入口' },
   { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: w4, featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: w4, featureText: '参展企业' },
@@ -186,12 +189,12 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
-  { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("AI面试训练")', featureText: 'AI面试训练' },
+  { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("把表达练熟，不替你下结论")', featureText: '不进行录用判断，不向企业推荐候选人。' },
   // 合同审查 production_default=false；默认构建直接访问也必须安全回首页。
   { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
-  { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
+  { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("看来源、查条件、备材料")', featureText: 'AI顾问不替主管部门作资格判断。' },
 ] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
@@ -215,12 +218,14 @@ export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
    *
    * 2026-09-09 再移出 '/profile'：同样口径。#931 把它加进 QX_MIGRATED_ROUTES
    * 却漏了这两张表，main 的 kiosk-browser-smoke 因此连红两次合并
-   * （run 34263887180：「同时出现在两张表里：/profile」）。 */
-  '/resume-service',
-  '/jobs-service',
-  '/fairs-service',
-  '/interview-service',
-  '/policy-service',
+   * （run 34263887180：「同时出现在两张表里：/profile」）。
+   *
+   * 2026-09-20 移出最后五条（/resume-service /jobs-service /fairs-service
+   * /interview-service /policy-service）：稿 16-service-hubs 迁入青序流光，
+   * 五条同时从 KioskRoot 的 V6_SHELL_ROUTES 移出。契约一字未改——表内仍要求真的
+   * 挂 V6 壳、表外仍要求不得被误伤染成 V6；这五条只是从表内挪到表外。
+   * 上面那段「从首页点进任何一个服务域，第一跳就掉回旧壳」说的正是这五条，
+   * 现在它们不再掉回去，所以表空了。 */
 ])
 
 const actualPatterns = w6RouteCases.map(({ pattern }) => pattern)
