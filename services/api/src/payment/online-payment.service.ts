@@ -13,14 +13,20 @@
  *   （回调成功 / reconcile 渠道账本确认两条路径，均复用同一幂等入账）；线下三路径不经过本服务。
  * - 支付状态只改支付域（Order.payStatus / PaymentAttempt），绝不改 PrintTask.status。
  * - 出码/轮询/查单必须携带打印建单时服务端签发的短期 payment session token；orderId 不能单独授权。
+ * - 待退款（refundReason=ONLINE_PAID_PENDING_REFUND）或已有 success PaymentAttempt 的
+ *   unpaid/paying/closed 单禁止再出码：不调渠道、不铸第二码。paid 仍走 ORDER_ALREADY_PAID。
  */
 import { BadRequestException, Inject, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
 import { randomBytes } from 'crypto'
 import { AuditService } from '../audit/audit.service'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
 import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from './channel-accepted-signal'
 import { OrderStatusService, pickupCodeVisibleFor } from './order-status.service'
+import {
+  ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES,
+  ONLINE_PAID_PENDING_REFUND_REASON,
+} from './pending-refund-signal'
 import { verifyPaymentSessionToken } from './payment-session-token'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
 import {
@@ -178,6 +184,40 @@ export class OnlinePaymentService {
     return provider
   }
 
+  /**
+   * 渠道已收款但订单未转 paid：禁止再向渠道下单。
+   * 覆盖 refundReason=ONLINE_PAID_PENDING_REFUND，以及尚未写上该标记的 success 尝试。
+   * paid 由调用方先抛 ORDER_ALREADY_PAID；refunded/failed 不在此集合，走既有迁移错误。
+   */
+  private async rejectIfSettledChannelCollection(
+    db: { paymentAttempt: PrismaTransactionClient['paymentAttempt'] },
+    order: Pick<OrderRecord, 'id' | 'payStatus' | 'refundReason'>,
+  ): Promise<void> {
+    if (!(ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES as readonly string[]).includes(order.payStatus)) return
+    if (order.refundReason === ONLINE_PAID_PENDING_REFUND_REASON) {
+      throw new BadRequestException('PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED')
+    }
+    const successAttempt = await db.paymentAttempt.findFirst({
+      where: { orderId: order.id, status: 'success' },
+      select: { id: true },
+    })
+    if (successAttempt) {
+      throw new BadRequestException('PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED')
+    }
+  }
+
+  /** 出码预留：unpaid 且不是待退款。NULL 必须显式放行，SQL `NOT (refundReason = x)` 对 NULL 为 unknown。 */
+  private unpaidReservationWhere(orderId: string) {
+    return {
+      id: orderId,
+      payStatus: 'unpaid' as const,
+      OR: [
+        { refundReason: null },
+        { refundReason: { not: ONLINE_PAID_PENDING_REFUND_REASON } },
+      ],
+    }
+  }
+
   /** 出码：为付费订单创建（或复用未过期的）支付尝试，返回屏上动态码内容。 */
   async createPayAttempt(
     orderId: string,
@@ -197,6 +237,7 @@ export class OnlinePaymentService {
     const qrExpiry = await this.convergeExpiredScreenQrAttempt(order)
     order = qrExpiry.order
     if (order.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+    await this.rejectIfSettledChannelCollection(this.prisma, order)
     if (order.payStatus === 'closed') throw new BadRequestException('ORDER_CLOSED')
     if (order.payStatus !== 'unpaid' && order.payStatus !== 'paying') {
       throw new BadRequestException('ORDER_INVALID_TRANSITION') // refunded / failed
@@ -242,11 +283,16 @@ export class OnlinePaymentService {
     if (order.payStatus === 'paying') throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
     const attemptExpiresAt = new Date(now + this.qrTtlSeconds * 1000)
     const attempt = await this.prisma.$transaction(async (tx) => {
+      await this.rejectIfSettledChannelCollection(tx, await this.requireTxOrder(tx, order.id))
       const reserved = await tx.order.updateMany({
-        where: { id: order.id, payStatus: 'unpaid' },
+        where: this.unpaidReservationWhere(order.id),
         data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
       })
-      if (reserved.count !== 1) throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+      if (reserved.count !== 1) {
+        await this.rejectIfSettledChannelCollection(tx, await this.requireTxOrder(tx, order.id))
+        throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+      }
+      await this.rejectIfSettledChannelCollection(tx, { ...order, payStatus: 'paying' })
 
       // 先建行（status=created，占位）再向渠道出码，最后回填 pending + 码内容；
       // 本地建行失败时由事务回滚 CAS 预留；渠道出码抛错则尝试 failed、订单回 unpaid。
@@ -329,6 +375,7 @@ export class OnlinePaymentService {
     const qrExpiry = await this.convergeExpiredScreenQrAttempt(order)
     order = qrExpiry.order
     if (order.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+    await this.rejectIfSettledChannelCollection(this.prisma, order)
     if (order.payStatus === 'closed') throw new BadRequestException('ORDER_CLOSED')
     if (order.payStatus !== 'unpaid' && order.payStatus !== 'paying') throw new BadRequestException('ORDER_INVALID_TRANSITION')
 
@@ -363,11 +410,16 @@ export class OnlinePaymentService {
     // 外部付款码渠道调用严格在事务外，不能拉长数据库锁。
     if (order.payStatus === 'paying') throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
     const attempt = await this.prisma.$transaction(async (tx) => {
+      await this.rejectIfSettledChannelCollection(tx, await this.requireTxOrder(tx, order.id))
       const reserved = await tx.order.updateMany({
-        where: { id: order.id, payStatus: 'unpaid' },
+        where: this.unpaidReservationWhere(order.id),
         data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
       })
-      if (reserved.count !== 1) throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+      if (reserved.count !== 1) {
+        await this.rejectIfSettledChannelCollection(tx, await this.requireTxOrder(tx, order.id))
+        throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+      }
+      await this.rejectIfSettledChannelCollection(tx, { ...order, payStatus: 'paying' })
 
       return tx.paymentAttempt.create({
         data: {
@@ -977,6 +1029,12 @@ export class OnlinePaymentService {
 
   private async requireOrder(orderId: string): Promise<OrderRecord> {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
+    return order
+  }
+
+  private async requireTxOrder(tx: PrismaTransactionClient, orderId: string): Promise<OrderRecord> {
+    const order = await tx.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
     return order
   }
