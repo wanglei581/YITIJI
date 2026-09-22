@@ -20490,6 +20490,9 @@
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts"
     ],
+    "services/api/scripts/support/payment-callback-race-cases.ts": [
+      "services/api/scripts/verify-payment-flow.ts"
+    ],
     "services/api/scripts/support/recruitment-wave2-full-inventory.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
     ],
@@ -33600,6 +33603,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/payment-callback-race-cases.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
