@@ -1,0 +1,347 @@
+/* 自我探索 · 倾向参考 —— 青序流光样式。
+ *
+ * 视觉真值：docs/design/kiosk-redesign-2026-08/34-self-assessment.html
+ * （intro / questions / review / result / history + fail-closed recover 面）。
+ *
+ * 口径三条，改之前先读：
+ * 1. 令牌只用 var(--qx-*)。verify:kiosk-visual-unity 对 src 下非 token 定义文件扫裸 hex，
+ *    写一个 #xxxxxx 就红。稿里的字面色值已经逐值落在 src/styles/qingxu/tokens.css。
+ * 2. 尺寸抄稿，不「顺手优化」。稿是 1080×1920 定高舞台上实测出来的；
+ *    这里每个 px 都能在 34-self-assessment.html 的 <style> 里找到对应行。
+ * 3. 可点元素最小边 ≥48px（CLAUDE.md §9 与 fusion-w6 expectTouchTargets 双重约束）。
+ *    题号格 52px、快捷键 56px、选项 90px、勾选块 84px —— 都不要往下调。
+ */
+
+/* 页头标题仍留在 DOM（fusion-w6 的 featureText 与读屏都要它），但稿上这一行由
+   下方小青横幅承担，两条并排会互相竞争。用 clip-path 隐藏而不是 margin:-1px：
+   负 margin 会让元素 left=-1，撞 fusion-w6 的「不得越过视口边界」。 */
+.qx-stage:has(.sa-qx) .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+}
+
+.sa-qx {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 0 8px;
+  overflow: hidden;
+}
+
+/* ── 小青横幅（稿 .hero） ─────────────────────────────────────── */
+.sa-xq {
+  flex: none;
+  position: relative;
+  overflow: hidden;
+  padding: 26px 38px;
+  border-radius: 34px;
+  background: linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep) 68%);
+  color: var(--qx-paper);
+}
+.sa-xq::after {
+  content: '';
+  position: absolute;
+  right: -140px;
+  top: -140px;
+  width: 410px;
+  height: 410px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--qx-emerald) 16%, transparent), transparent 65%);
+}
+.sa-xq-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 24px; }
+.sa-xq-face {
+  flex: none;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid color-mix(in srgb, var(--qx-emerald) 42%, transparent);
+  background: color-mix(in srgb, var(--qx-emerald) 10%, transparent);
+  color: var(--qx-emerald);
+  font-family: var(--qx-serif);
+  font-size: 40px;
+}
+.sa-xq-eyebrow {
+  margin-bottom: 7px;
+  font-size: 17px;
+  letter-spacing: 5px;
+  color: color-mix(in srgb, var(--qx-paper) 55%, transparent);
+}
+.sa-xq-ask { margin: 0; font-family: var(--qx-serif); font-size: 35px; line-height: 1.28; font-weight: 800; }
+.sa-xq-ask em { font-style: normal; color: var(--qx-emerald); }
+.sa-xq-doing { margin: 9px 0 0; font-size: 19px; line-height: 1.46; color: color-mix(in srgb, var(--qx-paper) 74%, transparent); }
+.sa-xq-doing b { color: var(--qx-paper); font-weight: 700; }
+
+/* ── 卡片内的小标题（稿 .hd / .sub） ───────────────────────────── */
+.sa-hd { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 25px; font-weight: 700; }
+.sa-hd span { font-size: 17px; font-weight: 700; color: var(--qx-ink-3); }
+.sa-sub { margin: 8px 0 0; font-size: 18px; line-height: 1.5; color: var(--qx-ink-3); }
+.sa-card[data-tone='lead'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.sa-card[data-tone='lead'] .sa-hd { color: var(--qx-teal-d); }
+.sa-card[data-tone='down'] { border-color: var(--qx-cinnabar-line); background: var(--qx-cinnabar-soft); }
+.sa-card[data-tone='down'] .sa-hd { color: var(--qx-cinnabar-d); }
+/* 余量吸收（primitives.css 的 .qx-grow 口径；父级是 SaFrame 里那个 flex 列 .qx-scroll，
+   .qx-card 的 flex:none 被这条更高优先级的选择器盖掉）。1080×1920 是定高屏，内容不足
+   时底部会留死白，本轮 1080×1920 实测：提交前确认页余 197px（复核格 102→142px 吸掉），
+   记录页余 500px 上下（出口卡 120→243px 吸掉）。按 .qx-grow 那份文档的优先级，
+   只让**主操作区或真实列表**长高，不去撑说明文字。
+   余量过大的屏反而不指定吸收块：fail-closed 面与结果空态只有两张卡，700px 摊到四个
+   出口上每个会变成 467px 的空盒子（实测），比死白更难看 —— 那两屏不加 data-grow。
+   用 1 0 auto 不用 .qx-grow 的 1 1 auto：这张卡在可滚动列里，允许收缩会把复核格压穿。
+   用显式 data-grow 而不是 :first-of-type / :last-child ——
+   2026-09-20 服务台那次 400px 死白就是 `:first-of-type` 按标签名算、一次都没命中。 */
+.sa-card[data-grow='true'] { flex: 1 0 auto; display: flex; flex-direction: column; }
+.sa-card[data-grow='true'] > .sa-picks { flex: 1 0 auto; grid-auto-rows: minmax(112px, 1fr); }
+.sa-card[data-grow='true'] > .sa-map { flex: 1 0 auto; grid-auto-rows: minmax(100px, 1fr); }
+
+/* ── 事实胶囊（稿 .task） ─────────────────────────────────────── */
+.sa-chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; padding: 0; }
+.sa-chips > li {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 16px;
+  border: 1px solid var(--qx-line);
+  border-radius: 16px;
+  background: var(--qx-paper);
+  color: var(--qx-ink-2);
+  font-size: 18px; font-weight: 700;
+}
+.sa-chips > li::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--qx-teal); }
+.sa-chips > li[data-tone='warn'] { border-color: var(--qx-cinnabar-line); color: var(--qx-cinnabar-d); }
+.sa-chips > li[data-tone='warn']::before { background: var(--qx-cinnabar); }
+.sa-chips b { color: var(--qx-ink); font-weight: 800; }
+.sa-chips > li[data-tone='warn'] b { color: var(--qx-cinnabar-d); }
+
+/* ── 三步说明（稿 .flow-grid） ────────────────────────────────── */
+/* 列数随项目数走（稿给的是三格，两格时不留空位）。 */
+.sa-flow { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 14px; margin-top: 15px; }
+.sa-flow > div { padding: 18px; border: 1px solid var(--qx-line); border-radius: 22px; background: var(--qx-surface); }
+.sa-flow > div[data-current='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.sa-flow small { display: block; font-size: 17px; font-weight: 700; color: var(--qx-ink-3); }
+.sa-flow > div[data-current='true'] small { color: var(--qx-teal-d); }
+.sa-flow b { display: block; margin-top: 8px; font-size: 21px; }
+.sa-flow p { margin: 7px 0 0; font-size: 17px; line-height: 1.44; color: var(--qx-ink-2); }
+
+/* ── 知情同意（稿 .consent-list / .cbox） ─────────────────────── */
+.sa-consent { display: flex; flex-direction: column; gap: 9px; margin: 13px 0 0; padding: 0; }
+.sa-consent li {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 12px 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 18px;
+  background: var(--qx-paper);
+  color: var(--qx-ink-2);
+  font-size: 18px; line-height: 1.44;
+}
+.sa-consent em {
+  flex: none; display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 10px;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d);
+  font-style: normal; font-size: 16px; font-weight: 800;
+}
+.sa-cbox {
+  display: flex; align-items: center; gap: 18px;
+  width: 100%; min-height: 84px; margin-top: 14px; padding: 12px 24px;
+  border: 1.5px solid var(--qx-line-2); border-radius: 22px;
+  background: var(--qx-paper); color: var(--qx-ink);
+  font-family: var(--qx-sans); font-size: 21px; font-weight: 700;
+  text-align: left; cursor: pointer;
+}
+.sa-cbox[aria-checked='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.sa-cbox .sa-box {
+  flex: none; display: grid; place-items: center;
+  width: 38px; height: 38px; border: 2px solid var(--qx-line-2); border-radius: 11px;
+  color: transparent; font-size: 22px; font-weight: 800;
+}
+.sa-cbox[aria-checked='true'] .sa-box { border-color: var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); }
+.sa-cbox small { display: block; margin-top: 5px; font-size: 17px; font-weight: 400; color: var(--qx-ink-3); }
+.sa-cbox:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+
+/* ── 闸门条（稿 .gate）：为什么现在还不能前进 ────────────────── */
+.sa-gate {
+  flex: none;
+  display: flex; gap: 14px; align-items: center;
+  min-height: 76px; padding: 13px 24px;
+  border: 1px solid var(--qx-line); border-radius: 20px;
+  background: var(--qx-surface); color: var(--qx-ink-2);
+  font-size: 18px; line-height: 1.44;
+}
+.sa-gate i {
+  flex: none; display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d);
+  font-style: normal; font-weight: 800;
+}
+.sa-gate b { color: var(--qx-ink); font-weight: 800; }
+.sa-gate[data-tone='warn'] { border-color: var(--qx-cinnabar-line); background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
+.sa-gate[data-tone='warn'] i { background: color-mix(in srgb, var(--qx-cinnabar) 18%, transparent); color: var(--qx-cinnabar-d); }
+.sa-gate[data-tone='warn'] b { color: var(--qx-cinnabar-d); }
+
+/* ── 答题（稿 .progress / .question / .answers） ──────────────── */
+.sa-prow { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 24px; font-weight: 800; }
+.sa-prow span { font-size: 19px; font-weight: 700; color: var(--qx-teal-d); }
+.sa-bar { height: 12px; overflow: hidden; margin-top: 12px; border-radius: 6px; background: var(--qx-line); }
+.sa-bar i { display: block; height: 100%; border-radius: 6px; background: var(--qx-teal); }
+.sa-qnum { display: flex; align-items: center; gap: 12px; font-size: 19px; font-weight: 800; color: var(--qx-ink-3); }
+.sa-qnum em { padding: 5px 12px; border-radius: 12px; background: var(--qx-teal-soft); color: var(--qx-teal-d); font-style: normal; font-size: 17px; }
+.sa-question { margin: 11px 0 0; font-size: 30px; line-height: 1.34; font-weight: 800; }
+.sa-qhint { margin: 8px 0 0; font-size: 17px; line-height: 1.42; color: var(--qx-ink-3); }
+.sa-answers { display: flex; flex-direction: column; gap: 11px; margin-top: 15px; }
+.sa-answer {
+  display: flex; align-items: center; gap: 16px;
+  min-height: 90px; padding: 14px 24px;
+  border: 1.5px solid var(--qx-line); border-radius: 22px;
+  background: var(--qx-paper); color: var(--qx-ink);
+  font-family: var(--qx-sans); font-size: 22px; line-height: 1.42; text-align: left;
+  cursor: pointer;
+}
+.sa-answer[aria-checked='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.sa-answer:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.sa-radio { flex: none; width: 30px; height: 30px; border: 2px solid var(--qx-line-2); border-radius: 50%; }
+.sa-answer[aria-checked='true'] .sa-radio { border: 9px solid var(--qx-teal); }
+
+/* ── 题号地图（稿 .dimgrid / .qcell） ─────────────────────────── */
+.sa-map { display: grid; grid-template-columns: 148px repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.sa-map-label { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 2px; }
+.sa-map-label b { font-size: 18px; font-weight: 800; white-space: nowrap; }
+.sa-map-label em { font-style: normal; font-size: 16px; font-weight: 800; color: var(--qx-ink-3); }
+.sa-map-label[data-current='true'] b { color: var(--qx-teal-d); }
+.sa-map-label[data-full='true'] em { color: var(--qx-teal-d); }
+.sa-cell {
+  display: grid; place-items: center;
+  min-height: 52px;
+  border: 1.5px solid var(--qx-line); border-radius: 16px;
+  background: var(--qx-paper); color: var(--qx-ink-3);
+  font-family: var(--qx-sans); font-size: 21px; font-weight: 800;
+  cursor: pointer;
+}
+.sa-cell[data-cell='done'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.sa-cell[data-cell='current'] { border-color: var(--qx-deep); background: var(--qx-deep); color: var(--qx-emerald); }
+.sa-cell[data-cell='locked'] { border-style: dashed; color: var(--qx-muted-ink); background: var(--qx-muted-bg); cursor: not-allowed; }
+.sa-cell:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
+
+.sa-quickrow { display: flex; gap: 14px; margin-top: 13px; }
+.sa-quick {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 56px;
+  border: 1.5px solid var(--qx-line-2); border-radius: 18px;
+  background: var(--qx-paper); color: var(--qx-ink-2);
+  font-family: var(--qx-sans); font-size: 19px; font-weight: 800;
+  cursor: pointer;
+}
+.sa-quick:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+
+/* ── 提交前复核（稿 .rv） ────────────────────────────────────── */
+.sa-rv {
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: 100px; padding: 13px 14px;
+  border: 1.5px solid var(--qx-line); border-radius: 18px;
+  background: var(--qx-paper); color: var(--qx-ink);
+  font-family: var(--qx-sans); text-align: left; cursor: pointer;
+}
+.sa-rv small { display: block; font-size: 15px; font-weight: 800; color: var(--qx-teal-d); }
+.sa-rv b { display: block; margin-top: 7px; font-size: 16px; line-height: 1.4; font-weight: 700; }
+.sa-rv:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
+
+/* ── 结果：维度强度（稿 .cov + 运行时真实 strength / 依据题号） ─── */
+.sa-dims { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 15px; }
+.sa-dim { padding: 18px 20px; border: 1px solid var(--qx-line); border-radius: 20px; background: var(--qx-paper); }
+.sa-dim-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sa-dim-h h3 { margin: 0; font-size: 21px; font-weight: 800; }
+.sa-strength { font-family: var(--qx-mono); font-size: 18px; font-weight: 800; color: var(--qx-teal-d); font-variant-numeric: tabular-nums; }
+.sa-dim p { margin: 9px 0 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.sa-dim footer { margin-top: 10px; font-size: 15px; line-height: 1.44; color: var(--qx-ink-3); }
+.sa-muted { color: var(--qx-ink-3); }
+
+/* ── 记录 / 结果的键值表（稿 .mini） ─────────────────────────── */
+.sa-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 15px 0 0; }
+.sa-meta > div { padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: 20px; background: var(--qx-paper); }
+.sa-meta dt { font-size: 16px; font-weight: 800; color: var(--qx-teal-d); }
+.sa-meta dd { margin: 7px 0 0; font-size: 17px; line-height: 1.44; color: var(--qx-ink-2); overflow-wrap: anywhere; }
+.sa-mono { font-family: var(--qx-mono); font-variant-numeric: tabular-nums; }
+
+/* ── 出口卡（稿 .picks） ─────────────────────────────────────── */
+.sa-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 15px; }
+.sa-picks[data-cols='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sa-pick {
+  display: flex; gap: 15px; align-items: flex-start;
+  min-height: 112px; padding: 17px 20px;
+  border: 1.5px solid var(--qx-line); border-radius: 22px;
+  background: var(--qx-paper); color: var(--qx-ink);
+  font-family: var(--qx-sans); text-align: left; cursor: pointer;
+}
+.sa-pick i {
+  flex: none; display: grid; place-items: center;
+  width: 46px; height: 46px; border-radius: 15px;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d);
+  font-style: normal; font-size: 20px; font-weight: 800;
+}
+.sa-pick b { display: block; font-size: 20px; }
+.sa-pick p { margin: 6px 0 0; font-size: 17px; line-height: 1.42; color: var(--qx-ink-2); }
+.sa-pick[data-lead='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.sa-pick:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+
+/* ── 说明条与底部 truth（稿 .notice / .rail） ─────────────────── */
+.sa-notice {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 17px 22px; border: 1px solid var(--qx-line); border-radius: 20px;
+  background: var(--qx-paper); color: var(--qx-ink-2);
+  font-size: 18px; line-height: 1.5;
+}
+.sa-notice i {
+  flex: none; display: grid; place-items: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d);
+  font-style: normal; font-weight: 800;
+}
+.sa-notice b { color: var(--qx-ink); }
+.sa-rail {
+  flex: none;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 28px;
+  margin: 0; padding: 12px 24px;
+  border: 1px dashed var(--qx-line-2); border-radius: 18px;
+  background: color-mix(in srgb, var(--qx-deep) 3%, transparent);
+  color: var(--qx-ink-3); font-size: 17px;
+}
+.sa-rail span::before { content: '·'; margin-right: 8px; color: var(--qx-teal-d); font-weight: 800; }
+
+/* ── 置灰原因：常驻可见，不进 tooltip ────────────────────────── */
+.sa-guarded { display: inline-flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.sa-guarded > .qx-btn[aria-disabled='true'] { background: var(--qx-muted-bg); border-color: var(--qx-muted-line); color: var(--qx-muted-ink); cursor: not-allowed; }
+.sa-guarded > .qx-btn[data-variant='primary'][aria-disabled='true'] { background: var(--qx-muted-line); border-color: var(--qx-muted-line); color: var(--qx-muted-ink); }
+.sa-blocked-reason { max-width: 420px; font-size: 15px; line-height: 1.35; color: var(--qx-cinnabar-d); }
+
+/* ── AI 解读区：只给间距，四态样式仍由 ai-primitives.css 负责 ─── */
+.sa-ai-region { display: block; }
+
+/* ── 页内二次确认（SES-06：公共终端不用浏览器原生 confirm） ─────
+   原来这里挂的是 packages/ui 的 KioskModal，它带暖褐 kiosk-shell 令牌，
+   压在青序流光页面上就是两套色系。改成本页自己的青序遮罩，行为不变：
+   仍是页内 role="dialog" + aria-modal，仍不调 window.confirm。 */
+.sa-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px;
+  background: color-mix(in srgb, var(--qx-deep) 55%, transparent);
+}
+.sa-dialog {
+  width: min(760px, 100%);
+  padding: 32px 36px;
+  border: 1px solid var(--qx-line);
+  border-radius: 28px;
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+}
+.sa-dialog h2 { margin: 0; font-family: var(--qx-serif); font-size: 32px; font-weight: 800; }
+.sa-dialog p { margin: 14px 0 0; font-size: 20px; line-height: 1.5; color: var(--qx-ink-2); }
+.sa-dialog-actions { display: flex; gap: 16px; margin-top: 26px; }
+.sa-dialog-actions > * { flex: 1; }
