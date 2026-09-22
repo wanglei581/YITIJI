@@ -670,14 +670,16 @@ async function main(): Promise<void> {
     }
 
     class FailedQrCreateSandboxProvider extends SandboxPaymentProvider {
+      calls = 0
       override async createQrPayment(): Promise<never> {
-        throw new Error('SIMULATED_QR_PRECREATE_FAILURE')
+        this.calls += 1
+        throw new Error('ALIPAY_CHANNEL_ERROR: 40004 ACQ.INVALID_PARAMETER')
       }
     }
-    const failedQrCreateFixture = createFixture(new FailedQrCreateSandboxProvider(SESSION_SECRET))
+    const failedQrProvider = new FailedQrCreateSandboxProvider(SESSION_SECRET)
+    const failedQrCreateFixture = createFixture(failedQrProvider)
     const failedQrCreateOrder = failedQrCreateFixture.makeOrder(100)
-    // 渠道出码抛错不得把渠道原始错误透给收银台，也不得把订单卡在 paying 等本地过期。
-    // 契约：立刻把尝试置 failed（不可扫）、订单回 unpaid（可立即重试）、对外只给 PAY_CHANNEL_UNAVAILABLE。
+    // 现有 provider 只抛普通 Error。看起来像 40004 也不能当成明确拒绝再出第二码。
     let qrCreateRejection: unknown
     try {
       await failedQrCreateFixture.payment.createPayAttempt(failedQrCreateOrder.order.id, failedQrCreateOrder.token, 'sandbox')
@@ -691,12 +693,16 @@ async function main(): Promise<void> {
         : qrCreateRejection,
     )
     const rejectionStatus = (qrCreateRejection as { status?: number } | undefined)?.status
-    if (rejectionText.includes('PAY_CHANNEL_UNAVAILABLE') && rejectionStatus === 503) {
-      pass('QR precreate failure surfaces as PAY_CHANNEL_UNAVAILABLE (503), not the raw channel error')
+    if (
+      rejectionText.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+      rejectionText.includes('支付结果尚未确认') &&
+      rejectionStatus === 503
+    ) {
+      pass('QR precreate throw surfaces as PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED (503), not a releasable failure')
     } else {
-      fail(`QR precreate failure must surface as PAY_CHANNEL_UNAVAILABLE 503, got: ${rejectionText} status=${String(rejectionStatus)}`)
+      fail(`QR precreate failure must stay unconfirmed 503, got: ${rejectionText} status=${String(rejectionStatus)}`)
     }
-    if (!rejectionText.includes('SIMULATED_QR_PRECREATE_FAILURE')) {
+    if (!rejectionText.includes('ACQ.INVALID_PARAMETER') && !rejectionText.includes('40004') && !rejectionText.includes('已受理')) {
       pass('raw channel error text never reaches the cashier response')
     } else {
       fail(`raw channel error leaked to the cashier: ${rejectionText}`)
@@ -708,21 +714,77 @@ async function main(): Promise<void> {
       failedQrCreateOrder.token,
     )
     if (
-      failedQrAttempt.status === 'failed' &&
+      failedQrAttempt.status !== 'failed' &&
+      failedQrAttempt.status !== 'success' &&
       failedQrAttempt.qrCodeContent === null &&
-      failedQrAttempt.prepayId === null &&
-      failedQrCreateOrder.order.payStatus === 'unpaid' &&
-      recoveredFromFailedQrCreate.payStatus === 'unpaid'
+      failedQrCreateOrder.order.payStatus === 'paying' &&
+      recoveredFromFailedQrCreate.payStatus === 'paying'
     ) {
-      pass('failed QR precreate is released immediately: attempt not scannable, order back to unpaid without waiting for expiry')
+      pass('plain QR error that looks like 40004 stays locked instead of returning the order to unpaid')
     } else {
       fail(
-        `failed QR precreate must release immediately: ${JSON.stringify({
+        `40004-like QR throw must stay locked: ${JSON.stringify({
           attempt: failedQrAttempt,
           order: failedQrCreateOrder.order,
           status: recoveredFromFailedQrCreate,
         })}`,
       )
+    }
+    await expectCode('40004-like QR throw blocks a second code (PAYMENT_ATTEMPT_PENDING)', 'PAYMENT_ATTEMPT_PENDING', () =>
+      failedQrCreateFixture.payment.createPayAttempt(failedQrCreateOrder.order.id, failedQrCreateOrder.token, 'sandbox'),
+    )
+    if (failedQrProvider.calls === 1 && failedQrCreateFixture.attempts.size === 1) {
+      pass('40004-like QR throw calls the provider once and does not mint a second attempt')
+    } else {
+      fail(`40004-like QR provider calls=${failedQrProvider.calls} attempts=${failedQrCreateFixture.attempts.size}`)
+    }
+
+    class UnknownQrCreateSandboxProvider extends SandboxPaymentProvider {
+      calls = 0
+      override async createQrPayment(): Promise<never> {
+        this.calls += 1
+        throw new Error('ALIPAY_CHANNEL_ERROR: 20000')
+      }
+    }
+    const unknownQrProvider = new UnknownQrCreateSandboxProvider(SESSION_SECRET)
+    const unknownQrFixture = createFixture(unknownQrProvider)
+    const unknownQrOrder = unknownQrFixture.makeOrder(100)
+    let unknownQrRejection: unknown
+    try {
+      await unknownQrFixture.payment.createPayAttempt(unknownQrOrder.order.id, unknownQrOrder.token, 'sandbox')
+      fail('unknown QR precreate should reject')
+    } catch (error) {
+      unknownQrRejection = error
+    }
+    const unknownQrText = JSON.stringify(
+      unknownQrRejection instanceof Error
+        ? { message: unknownQrRejection.message, response: (unknownQrRejection as { response?: unknown }).response }
+        : unknownQrRejection,
+    )
+    const unknownQrStatus = (unknownQrRejection as { status?: number } | undefined)?.status
+    const unknownQrAttempt = [...unknownQrFixture.attempts.values()][0]
+    if (!unknownQrAttempt) fail('missing unknown QR precreate attempt fixture')
+    if (
+      unknownQrText.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+      unknownQrStatus === 503 &&
+      !unknownQrText.includes('20000') &&
+      unknownQrAttempt.status !== 'failed' &&
+      unknownQrAttempt.status !== 'success' &&
+      unknownQrOrder.order.payStatus === 'paying'
+    ) {
+      pass('unknown QR precreate stays unconfirmed: 503, no raw channel text, order remains paying')
+    } else {
+      fail(
+        `unknown QR precreate mismatch: status=${String(unknownQrStatus)} body=${unknownQrText} attempt=${JSON.stringify(unknownQrAttempt)} pay=${unknownQrOrder.order.payStatus}`,
+      )
+    }
+    await expectCode('unknown QR precreate blocks a second code (PAYMENT_ATTEMPT_PENDING)', 'PAYMENT_ATTEMPT_PENDING', () =>
+      unknownQrFixture.payment.createPayAttempt(unknownQrOrder.order.id, unknownQrOrder.token, 'sandbox'),
+    )
+    if (unknownQrProvider.calls === 1 && unknownQrFixture.attempts.size === 1) {
+      pass('unknown QR precreate calls the provider once and does not mint a second attempt')
+    } else {
+      fail(`unknown QR provider calls=${unknownQrProvider.calls} attempts=${unknownQrFixture.attempts.size}`)
     }
 
     class MismatchedAmountSandboxProvider extends SandboxPaymentProvider {

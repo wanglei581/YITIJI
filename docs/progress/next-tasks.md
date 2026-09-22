@@ -26,6 +26,9 @@ Agy 本轮跨端调用超时为 `UNREVIEWED`。需要确认任务在执行时，
 `read_thread` 未展示 `functions.exec` 内嵌套调用不等于未调用，必须向负责窗口核实句柄后再判断。
 不再为相同范围新增等待窗口；已派任务按单一写入者继续。其余全站新 UI、后台、微信 Trial、
 Windows/Pantum、当前 SHA 的 CI/生产/支付对账/UAT 范围保持不变，均待对应验收证据。
+## 2026-09-22：支付回调竞态已本地提交，待集成
+
+Codex 已完成最小验收，范围只限本次 API 资金安全的 SOURCE / LOCAL。提交在分支 `grok/payment-callback-race-20260922` 的 HEAD，基线 `55893b515904fac32375eacb429e651b8d7de6fa`。出码 provider 的任何 throw 都保持未知互斥。恢复只走现有 `queryPayment` 的结构化 `paid` / `closed` / `failed`。支付宝查无此单和微信 404 仍是 `unknown`，要人工核对，生产运维恢复尚未验收。API 未知文案是「支付结果尚未确认，请勿重复支付」。一体机仍把该错误码固定显示成「已受理」，本 lane 未修，由主窗口 Claude 负责。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。集成前不要 push、开 PR、合并、部署、真实支付退款或操作硬件。
 
 ## 2026-09-22：外部审查结论不能替代 exact-SHA 验证
 

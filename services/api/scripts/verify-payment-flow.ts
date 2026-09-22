@@ -17,6 +17,9 @@
  *   Admin 端点拒绝 sandbox；markPaidOnline 拒绝非白名单渠道；支付回调不改 PrintTask.status。
  * - fail-closed：sandbox 缺密钥 / 生产配 sandbox / 未知 Provider → 启动即拒绝；
  *   Provider 未配置 → ONLINE_PAYMENT_DISABLED，不伪装可支付。
+ * - createQrPayment 的任何 throw，包括看起来像 40004 的普通 Error，都保持互斥。
+ *   只有 queryPayment 的结构化 paid/closed/failed 才收敛。本轮场景在
+ *   scripts/support/payment-callback-race-cases.ts。
  * - 渠道已受理但本地回填失败：留下 CHANNEL_ACCEPTED_UNCONFIRMED / created+空标识，
  *   禁止第二笔出码，对账与 Admin opsAttention 可见；金额不对的签名回调不得补写 prepayId。
  * - 待退款（refundReason=ONLINE_PAID_PENDING_REFUND）或已有 success PaymentAttempt 的
@@ -31,6 +34,7 @@ import { signFileUrl } from '../src/files/signing'
 import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-orders-readonly.service'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
 import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from '../src/payment/channel-accepted-signal'
+import { verifyPaymentCallbackRace } from './support/payment-callback-race-cases'
 import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { ReconciliationService } from '../src/payment/reconciliation.service'
@@ -220,6 +224,7 @@ async function main(): Promise<void> {
     await prisma.auditLog.deleteMany({ where: { targetType: 'payment_attempt', targetId: { in: attempts.map((a) => a.id) } } })
     await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: allOrderIds } } })
     await prisma.auditLog.deleteMany({ where: { targetId: { in: taskIds }, action: 'print_job.create' } })
+    await prisma.refund.deleteMany({ where: { orderId: { in: allOrderIds } } })
     await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: allOrderIds } } })
     await prisma.redemptionRecord.deleteMany({ where: { OR: [{ orderId: { in: allOrderIds } }, { endUserId }] } })
     await prisma.order.deleteMany({ where: { id: { in: allOrderIds } } })
@@ -1183,19 +1188,24 @@ async function main(): Promise<void> {
       )
     }
 
-    // ── (15) API-09：渠道出码抛错 → 尝试 failed、订单回 unpaid、503 ────────
+    // ── (15) 出码 throw 即使文案像 40004，也不能据此再出第二码 ──────────
     const qrFailId = await makeOrder(140, 'unpaid')
     const qrFailSession = await paymentSessionFor(qrFailId)
     const originalCreateQr = provider.createQrPayment.bind(provider)
+    let explicitQrCalls = 0
     provider.createQrPayment = async () => {
-      throw new Error('channel 5xx')
+      explicitQrCalls += 1
+      throw new Error('ALIPAY_CHANNEL_ERROR: 40004 ACQ.INVALID_PARAMETER')
     }
     try {
       let qrFailCode = 'RESOLVED'
+      let qrFailBody = ''
       try {
         await payment.createPayAttempt(qrFailId, qrFailSession)
       } catch (error) {
         qrFailCode = errorCode(error)
+        const exception = error as { getResponse?: () => unknown }
+        qrFailBody = JSON.stringify(typeof exception.getResponse === 'function' ? exception.getResponse() : error)
       }
       const qrFailOrder = await prisma.order.findUnique({ where: { id: qrFailId } })
       const qrFailAttempt = await prisma.paymentAttempt.findFirst({
@@ -1203,15 +1213,33 @@ async function main(): Promise<void> {
         orderBy: { createdAt: 'desc' },
       })
       if (
-        qrFailCode.includes('PAY_CHANNEL_UNAVAILABLE') &&
-        qrFailOrder?.payStatus === 'unpaid' &&
-        qrFailAttempt?.status === 'failed'
+        qrFailCode.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+        qrFailBody.includes('支付结果尚未确认') &&
+        qrFailBody.includes('请勿重复支付') &&
+        !qrFailBody.includes('已受理') &&
+        !qrFailBody.includes('40004') &&
+        !qrFailBody.includes('ACQ.INVALID_PARAMETER') &&
+        qrFailOrder?.payStatus === 'paying' &&
+        qrFailAttempt &&
+        qrFailAttempt.status !== 'failed' &&
+        qrFailAttempt.status !== 'success'
       ) {
-        pass('channel QR throw marks attempt failed, order unpaid, and returns PAY_CHANNEL_UNAVAILABLE')
+        pass('plain QR error that looks like 40004 stays locked and does not claim the channel accepted')
       } else {
         fail(
-          `QR throw mismatch: code=${qrFailCode} pay=${qrFailOrder?.payStatus} attempt=${qrFailAttempt?.status}`,
+          `QR throw mismatch: code=${qrFailCode} body=${qrFailBody} pay=${qrFailOrder?.payStatus} attempt=${qrFailAttempt?.status}`,
         )
+      }
+      await expectCode(
+        'plain 40004-like QR error blocks a second QR (PAYMENT_ATTEMPT_PENDING)',
+        'PAYMENT_ATTEMPT_PENDING',
+        () => payment.createPayAttempt(qrFailId, qrFailSession),
+      )
+      const explicitAttempts = await prisma.paymentAttempt.count({ where: { orderId: qrFailId } })
+      if (explicitQrCalls === 1 && explicitAttempts === 1) {
+        pass('plain 40004-like QR error calls the provider once only')
+      } else {
+        fail(`plain 40004-like QR retry mismatch: calls=${explicitQrCalls} attempts=${explicitAttempts}`)
       }
     } finally {
       provider.createQrPayment = originalCreateQr
@@ -1253,10 +1281,13 @@ async function main(): Promise<void> {
     }
     try {
       let unconfirmedCode = 'RESOLVED'
+      let unconfirmedBody = ''
       try {
         await payment.createPayAttempt(finalizeUnconfirmedId, finalizeUnconfirmedSession)
       } catch (error) {
         unconfirmedCode = errorCode(error)
+        const exception = error as { getResponse?: () => unknown }
+        unconfirmedBody = JSON.stringify(typeof exception.getResponse === 'function' ? exception.getResponse() : error)
       }
       const unconfirmedOrder = await prisma.order.findUnique({ where: { id: finalizeUnconfirmedId } })
       const unconfirmedAttempt = await prisma.paymentAttempt.findFirst({
@@ -1265,6 +1296,8 @@ async function main(): Promise<void> {
       })
       if (
         unconfirmedCode.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+        unconfirmedBody.includes('支付通道已受理') &&
+        !unconfirmedBody.includes('支付结果尚未确认') &&
         unconfirmedOrder?.payStatus === 'paying' &&
         unconfirmedAttempt &&
         unconfirmedAttempt.status !== 'failed' &&
@@ -1275,7 +1308,7 @@ async function main(): Promise<void> {
         pass('QR channel success + local finalize failure keeps paying and a durable unconfirmed signal')
       } else {
         fail(
-          `unconfirmed QR mismatch: code=${unconfirmedCode} pay=${unconfirmedOrder?.payStatus} attempt=${JSON.stringify(unconfirmedAttempt)}`,
+          `unconfirmed QR mismatch: code=${unconfirmedCode} body=${unconfirmedBody} pay=${unconfirmedOrder?.payStatus} attempt=${JSON.stringify(unconfirmedAttempt)}`,
         )
       }
       const attemptsBeforeRetry = await prisma.paymentAttempt.count({ where: { orderId: finalizeUnconfirmedId } })
@@ -1880,6 +1913,21 @@ async function main(): Promise<void> {
       provider.createQrPayment = originalCreateQrBlock
       provider.createCodePayment = originalCreateCodeBlock
     }
+
+    await verifyPaymentCallbackRace({
+      prisma,
+      payment,
+      provider,
+      audit,
+      suffix,
+      channel: CHANNEL,
+      makeOrder,
+      paymentSessionFor,
+      buildCallback,
+      pass,
+      fail,
+      expectCode,
+    })
 
     console.log('\nAll payment-flow assertions passed.\n')
   } finally {

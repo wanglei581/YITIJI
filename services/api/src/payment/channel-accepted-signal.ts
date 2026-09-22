@@ -10,12 +10,21 @@
  * 区分（用现有 status / failReason / createdAt，不加列）：
  * - Provider 尚在执行：created + 空标识、createdAt 很新。出码互斥立刻拦住第二扣
  *   （不得自动放行），但对账/Admin **等宽限期** 才告警，避免把正常出码窗口当故障。
- * - Provider 明确抛错：failQrCreateAttempt 写成 failed + unpaid，本信号不命中，可重新出码。
- * - finalize 失败：有 CHANNEL_ACCEPTED_UNCONFIRMED 或空标识已过宽限期 → fail-closed，
- *   不自动 unpaid、不假装 paid/refunded、不自动退款。人工按 PaymentAttempt.id 查渠道。
+ * - createQrPayment 只抛普通 Error，没有「操作 + 可信响应 + 明确拒绝」的结构化契约。
+ *   因此任何出码 throw，哪怕文案像 40004 / ACQ.INVALID_PARAMETER，都钉上本信号
+ *   （或留下 created + 空标识），订单保持 paying，不能从这次 throw 再出第二码。
+ * - 渠道已返回二维码但本地回填失败：同样钉本信号。用户文案可以说已受理；
+ *   出码 throw 的结果尚未确认，不能说已受理。
+ * - 收敛只走现有 queryPayment 的结构化结果：paid 且金额流水匹配则入账或待退；
+ *   closed/failed 且订单仍可支付则释放并允许新出码；pending/unknown 保持互斥。
+ *   支付宝 TRADE_NOT_EXIST、微信 404/ORDER_NOT_EXIST 在 queryPayment 里仍是 unknown，
+ *   不会在这里被当成关单。查不到时要人工按 PaymentAttempt.id 核对。
+ *   生产运维恢复尚未验收。这不是一条已经闭环的自动解锁。
+ * - 有本信号或空标识已过宽限期 → 对账/Admin 可见，不自动 unpaid、不假装 paid/refunded、
+ *   不自动退款。
  *
- * 短暂误报：宽限期内的空标识不会进对账/Admin。永久锁死的是「可能已向渠道下单」
- * 的互斥，不是误报；渠道无单时由运营查账后处理，代码不放第二扣。
+ * 短暂误报：宽限期内的空标识不会进对账/Admin。互斥一直保持到结构化查单或验签回调
+ * 给出终态；unknown 不会自行放行。
  */
 export const CHANNEL_ACCEPTED_UNCONFIRMED_REASON = 'CHANNEL_ACCEPTED_UNCONFIRMED'
 

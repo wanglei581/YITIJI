@@ -47,6 +47,18 @@ const DEFAULT_QR_TTL_SECONDS = 300
 const DEFAULT_ORDER_TTL_SECONDS = 900
 /** 用户可见的失败安全文案 —— 渠道原始错误只进审计，绝不透传。 */
 const SAFE_FAIL_TEXT = '支付未完成，请重新发起支付'
+/**
+ * 验签后的成功可以落到这些状态上。failed 必须能升成 success：
+ * 本地曾把不确定结果误记失败时，迟到的已验签成功仍要留下可退款流水。
+ */
+const CHANNEL_SUCCESS_FROM_STATUSES = ['created', 'pending', 'expired', 'failed'] as const
+
+/** 出码抛错还不知道有没有送到渠道。不能写成「已经受理」，也不能据此再出第二码。 */
+const QR_RESULT_UNCONFIRMED_TEXT = '支付结果尚未确认，请勿重复支付。请联系工作人员核对。'
+
+/** 渠道已经返回二维码，只是本地回填失败。这句才能说已受理。 */
+const QR_CHANNEL_ACCEPTED_LOCAL_UNCONFIRMED_TEXT =
+  '支付通道已受理，本地确认未完成。请勿重新支付，请联系工作人员核对渠道订单。'
 
 function isPickupWindowClosedError(error: unknown): boolean {
   const exception = error as { getResponse?: () => unknown; message?: string }
@@ -294,8 +306,9 @@ export class OnlinePaymentService {
       }
       await this.rejectIfSettledChannelCollection(tx, { ...order, payStatus: 'paying' })
 
-      // 先建行（status=created，占位）再向渠道出码，最后回填 pending + 码内容；
-      // 本地建行失败时由事务回滚 CAS 预留；渠道出码抛错则尝试 failed、订单回 unpaid。
+      // 先建行（status=created，占位）再向渠道出码，最后回填 pending + 码内容。
+      // 本地建行失败时由事务回滚 CAS 预留。provider 出码抛错一律保持 created + paying：
+      // 现有实现只抛普通 Error，没有可证明「渠道明确拒绝且未建单」的结构化结果。
       return tx.paymentAttempt.create({
         data: {
           orderId: order.id,
@@ -316,11 +329,16 @@ export class OnlinePaymentService {
         expiresAt: attemptExpiresAt,
       })
     } catch (error) {
-      await this.failQrCreateAttempt(attempt.id, order.id, provider.channel, error)
+      // 普通 Error 不能区分「渠道拒绝」和「请求已送达但响应丢失」。一律保持互斥。
+      // 后续只认 queryPayment 的结构化 paid / closed / failed，不从这次 throw 释放。
+      await this.markChannelAcceptedUnconfirmed(
+        attempt.id,
+        error instanceof Error ? error.message : 'qr_create_unknown',
+      )
       throw new ServiceUnavailableException({
         error: {
-          code: 'PAY_CHANNEL_UNAVAILABLE',
-          message: '支付通道暂时不可用，请稍后重试',
+          code: 'PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED',
+          message: QR_RESULT_UNCONFIRMED_TEXT,
         },
       })
     }
@@ -332,7 +350,7 @@ export class OnlinePaymentService {
       throw new ServiceUnavailableException({
         error: {
           code: 'PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED',
-          message: '支付通道已受理，本地确认未完成。请勿重新支付，请联系工作人员核对渠道订单。',
+          message: QR_CHANNEL_ACCEPTED_LOCAL_UNCONFIRMED_TEXT,
         },
       })
     }
@@ -548,8 +566,9 @@ export class OnlinePaymentService {
    * 主动查单兜底（C5-6）：回调丢失/延迟时按渠道账本核实，**复用与回调完全相同的幂等入账路径**。
    *
    * - 鉴权与轮询同口径（payment session token）；有最小间隔限流，防高频打渠道 API。
-   * - 只信渠道账本：channel 返回 paid 且流水号/金额齐备、金额与服务端快照一致才入账；
-   *   pending/closed/failed/unknown 一律不改支付状态（惰性过期仍由 applyLazyExpiry 处理）。
+   * - 只信 queryPayment 的结构化结果：paid 且流水号/金额齐备、金额与服务端快照一致才入账
+   *   （取件窗口已关则记待退，不转 paid）；closed/failed 在订单仍可支付时释放互斥。
+   *   pending/unknown 不改状态。出码 throw 不能走到这里。
    * - sandbox 无外部账本（不实现 queryPayment）→ RECONCILE_UNSUPPORTED，不伪造能力。
    */
   async reconcilePayment(orderId: string, paymentSessionToken: string | undefined): Promise<PayStatusView> {
@@ -579,8 +598,12 @@ export class OnlinePaymentService {
   }
 
   /**
-   * 付款码自动收敛：只处理没有屏上二维码的真实渠道尝试。即使 Kiosk 已退出或尝试过期，
-   * 仍以渠道账本为准终态化；不经 payment-session token，不能暴露为 HTTP 入口。
+   * 真实渠道、没有屏上码内容、状态仍是 created/pending/expired 的尝试。
+   * 付款码走这里；出码 provider 抛错、二维码没落地的尝试也同样满足条件，因此会被选中。
+   * 只有 queryPayment 返回的结构化 paid/closed/failed 才收敛。
+   * 支付宝 TRADE_NOT_EXIST、微信 404/ORDER_NOT_EXIST 在各自 queryPayment 里仍是 unknown，
+   * 本方法不释放；那种单要人工按 PaymentAttempt.id 核对。生产运维恢复尚未验收。
+   * 不经 payment-session token，不能暴露为 HTTP 入口。
    */
   async convergeStaleCodePayments({ limit }: { limit: number }): Promise<CodePaymentConvergenceResult> {
     const boundedLimit = Math.max(1, Math.min(limit, 100))
@@ -779,7 +802,8 @@ export class OnlinePaymentService {
 
     // 先订单入账（CAS 幂等，线上通道 paymentSource 的唯一写入路径），再回填尝试；
     // 若回填前崩溃，渠道重试回调会再次幂等走到这里补齐。
-    // 取件窗口已关：markPaidOnline 拒绝 paid 并记待退；渠道钱已到，尝试仍须 success，避免回调重试死循环。
+    // 取件窗口已关：markPaidOnline 拒绝 paid 并记待退；渠道钱已到，尝试仍须 success
+    //（含本地曾标 failed），避免 ACK 之后没有可退款流水。写不进 success 必须抛错。
     try {
       await this.orderStatus.markPaidOnline(order.id, { channel, attemptId: attempt.id, channelTxnNo, late })
     } catch (error) {
@@ -791,7 +815,7 @@ export class OnlinePaymentService {
     let res: { count: number }
     try {
       res = await this.prisma.paymentAttempt.updateMany({
-        where: { id: attempt.id, status: { in: ['created', 'pending', 'expired'] } },
+        where: { id: attempt.id, status: { in: [...CHANNEL_SUCCESS_FROM_STATUSES] } },
         data: { status: 'success', channelTxnNo, failReason: null },
       })
     } catch (e) {
@@ -984,43 +1008,16 @@ export class OnlinePaymentService {
     return { order: settledOrder, outcome: 'skipped' }
   }
 
-  private async failQrCreateAttempt(
-    attemptId: string,
-    orderId: string,
-    channel: string,
-    error: unknown,
-  ): Promise<void> {
-    await this.prisma.paymentAttempt.updateMany({
-      where: { id: attemptId, status: 'created' },
-      data: { status: 'failed', failReason: SAFE_FAIL_TEXT },
-    })
-    await this.prisma.order.updateMany({
-      where: { id: orderId, payStatus: 'paying' },
-      data: { payStatus: 'unpaid' },
-    })
-    await this.audit.write({
-      actorId: null,
-      actorRole: 'system',
-      action: 'payment.attempt_failed',
-      targetType: 'payment_attempt',
-      targetId: attemptId,
-      payload: {
-        orderId,
-        channel,
-        reasonRaw: error instanceof Error ? error.message : 'qr_create_failed',
-      },
-    })
-  }
-
   private async markAttemptChannelSuccess(attemptId: string, channelTxnNo: string): Promise<void> {
     try {
       const res = await this.prisma.paymentAttempt.updateMany({
-        where: { id: attemptId, status: { in: ['created', 'pending', 'expired'] } },
+        where: { id: attemptId, status: { in: [...CHANNEL_SUCCESS_FROM_STATUSES] } },
         data: { status: 'success', channelTxnNo, failReason: null },
       })
       if (res.count !== 0) return
       const fresh = await this.prisma.paymentAttempt.findUnique({ where: { id: attemptId } })
       if (fresh?.status === 'success' && fresh.channelTxnNo === channelTxnNo) return
+      throw new BadRequestException('CALLBACK_STATE_CONFLICT')
     } catch (e) {
       if ((e as { code?: string })?.code === 'P2002') throw new BadRequestException('CALLBACK_TXN_ALREADY_USED')
       throw e
@@ -1137,8 +1134,9 @@ export class OnlinePaymentService {
   }
 
   /**
-   * 渠道已返回受理结果后的本地回填。主路径用 update；失败则 updateMany 补标识。
-   * 两条都失败时只尽最大努力钉 failReason，绝不 unpaid / failed（渠道可能已扣款或已出码）。
+   * 渠道已返回受理结果后的本地回填。只把 created/pending CAS 成 pending。
+   * 回调若已写成 success，禁止按 id 无条件降回 pending；只补空着的标识。
+   * 回填失败时只钉 failReason，绝不 unpaid / failed（渠道可能已扣款或已出码）。
    */
   private async persistChannelAcceptance(
     attemptId: string,
@@ -1151,28 +1149,38 @@ export class OnlinePaymentService {
       failReason: data.failReason === undefined ? null : data.failReason,
     }
     try {
-      return await this.prisma.paymentAttempt.update({
-        where: { id: attemptId },
-        data: pendingData,
-      })
-    } catch {
-      /* 主回填失败：下面用更小的 CAS 再试，失败也不回滚渠道。 */
-    }
-    try {
-      await this.prisma.paymentAttempt.updateMany({
+      const cas = await this.prisma.paymentAttempt.updateMany({
         where: { id: attemptId, status: { in: ['created', 'pending'] } },
         data: pendingData,
       })
+      if (cas.count > 0) {
+        return await this.prisma.paymentAttempt.findUnique({ where: { id: attemptId } })
+      }
     } catch {
-      /* 标识回填失败：再试只钉信号。 */
+      /* 主回填失败：下面只补 success 上的空标识，或钉不确定信号。 */
+    }
+    try {
+      await this.prisma.paymentAttempt.updateMany({
+        where: { id: attemptId, status: 'success', prepayId: null },
+        data: { prepayId: data.prepayId },
+      })
+      if (data.qrCodeContent !== undefined) {
+        await this.prisma.paymentAttempt.updateMany({
+          where: { id: attemptId, status: 'success', qrCodeContent: null },
+          data: { qrCodeContent: data.qrCodeContent },
+        })
+      }
+    } catch {
+      /* success 已在；标识补不上也不降级。 */
     }
     const recovered = await this.prisma.paymentAttempt.findUnique({ where: { id: attemptId } })
-    if (recovered && recovered.prepayId) return recovered
+    if (recovered?.status === 'success') return recovered
+    if (recovered && recovered.prepayId && recovered.status !== 'failed') return recovered
     await this.markChannelAcceptedUnconfirmed(attemptId)
     return this.prisma.paymentAttempt.findUnique({ where: { id: attemptId } })
   }
 
-  private async markChannelAcceptedUnconfirmed(attemptId: string): Promise<void> {
+  private async markChannelAcceptedUnconfirmed(attemptId: string, reasonRaw?: string): Promise<void> {
     try {
       await this.prisma.paymentAttempt.updateMany({
         where: { id: attemptId, status: { in: ['created', 'pending', 'expired'] } },
@@ -1195,6 +1203,7 @@ export class OnlinePaymentService {
         orderId: row?.orderId ?? null,
         channel: row?.channel ?? null,
         reason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+        ...(reasonRaw ? { reasonRaw } : {}),
       },
     })
   }
