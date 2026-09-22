@@ -119,6 +119,10 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/print/preview',
   '/print/progress',
   '/print/done',
+  /* 稿 21-resume-triage 同一工作台的两条 route：取件与方向、解析等待与失败。
+   * /resume/materials（稿 25）不在本批，仍走旧壳。 */
+  '/resume/source',
+  '/resume/parse',
   '/resume/report',
   '/resume/optimize',
   '/resume/optimize/compare',

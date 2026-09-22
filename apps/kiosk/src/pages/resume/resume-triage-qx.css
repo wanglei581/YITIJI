@@ -1,0 +1,196 @@
+/* 简历取件与诊断方向 / 解析等待 · 青序流光。
+   视觉真值：docs/design/kiosk-redesign-2026-08/21-resume-triage.html（同一工作台含 /resume/parse 的等待与失败段）。
+   地基按钮/卡片/操作条在 styles/qingxu；这里只写本工作台的小青任务头、四步轨、来源卡、双栏与解析等待卡。 */
+
+/* 页面唯一的 h1 由 QxPageFrame 的宋体页头承担；下面的小青任务头只说小青的话 + 四步轨，不再另起标题。 */
+.qx-stage:has(.qx-resume-triage) .qx-ctabar > .qx-btn[data-variant='primary'] { flex: 1.5; }
+.qx-stage:has(.qx-resume-triage) .qx-ctabar > .qx-btn { flex: 1; }
+
+.qx-resume-triage {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-top: 18px;
+  color: var(--qx-ink);
+}
+
+/* ── 小青任务头 + 四步轨 ─────────────────────────────────────── */
+.qx-resume-triage .qx-rt-xq {
+  flex: none; position: relative; overflow: hidden;
+  padding: 22px 34px 18px; border-radius: 34px;
+  background: linear-gradient(158deg, var(--qx-deep-2) 0%, var(--qx-deep) 68%);
+  color: var(--qx-paper);
+}
+.qx-resume-triage .qx-rt-xq::after {
+  content: ''; position: absolute; right: -140px; top: -140px;
+  width: 420px; height: 420px; border-radius: 50%;
+  background: radial-gradient(circle, rgb(46 230 168 / .16), transparent 65%);
+  pointer-events: none;
+}
+.qx-resume-triage .qx-rt-xq-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 22px; }
+.qx-resume-triage .qx-rt-face {
+  flex: none; width: 84px; height: 84px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--qx-serif); font-size: 38px; color: var(--qx-emerald);
+  background: rgb(46 230 168 / .1); border: 1.5px solid rgb(46 230 168 / .4);
+}
+.qx-resume-triage .qx-rt-xq-main { flex: 1; min-width: 0; }
+.qx-resume-triage .qx-rt-eyebrow { margin: 0; font-size: 17px; letter-spacing: 5px; color: rgb(242 239 228 / .5); }
+.qx-resume-triage .qx-rt-title {
+  margin: 7px 0 0; font-family: var(--qx-serif); font-size: 36px; line-height: 1.26;
+  font-weight: 700; letter-spacing: 1px;
+}
+.qx-resume-triage .qx-rt-title em { font-style: normal; color: var(--qx-emerald); }
+.qx-resume-triage .qx-rt-doing { margin: 8px 0 0; font-size: 20px; line-height: 1.5; color: rgb(242 239 228 / .72); }
+.qx-resume-triage .qx-rt-flag {
+  flex: none; display: flex; align-items: center; min-height: var(--qx-tap-min); padding: 0 18px;
+  border-radius: 24px; font-size: 17px; font-weight: 700; letter-spacing: 1px;
+  background: rgb(46 230 168 / .14); border: 1px solid rgb(46 230 168 / .42); color: var(--qx-emerald);
+}
+.qx-resume-triage .qx-rt-flag[data-tone='warn'] { background: rgb(255 255 255 / .1); border-color: rgb(242 239 228 / .4); color: var(--qx-paper); }
+.qx-resume-triage .qx-rt-rail {
+  position: relative; z-index: 1; list-style: none;
+  margin: 15px 0 0; padding: 13px 0 0; border-top: 1px solid rgb(242 239 228 / .16);
+  display: flex; align-items: center;
+}
+.qx-resume-triage .qx-rt-rail li { flex: none; display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; color: rgb(242 239 228 / .6); white-space: nowrap; }
+.qx-resume-triage .qx-rt-rail li + li::before { content: ''; width: 36px; height: 1px; margin-right: 4px; background: rgb(242 239 228 / .18); }
+.qx-resume-triage .qx-rt-rail li:not(:last-child) { flex: 1; }
+.qx-resume-triage .qx-rt-rail i {
+  flex: none; width: 32px; height: 32px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-style: normal; font-size: 16px; font-weight: 800;
+  background: rgb(242 239 228 / .1); border: 1px solid rgb(242 239 228 / .22);
+}
+.qx-resume-triage .qx-rt-rail li[aria-current='step'] { color: var(--qx-paper); font-weight: 700; }
+.qx-resume-triage .qx-rt-rail li[aria-current='step'] i { background: var(--qx-emerald); border-color: var(--qx-emerald); color: var(--qx-deep); }
+.qx-resume-triage .qx-rt-rail li[data-done='1'] { color: rgb(242 239 228 / .82); }
+.qx-resume-triage .qx-rt-rail li[data-done='1'] i { background: rgb(46 230 168 / .22); border-color: rgb(46 230 168 / .42); color: var(--qx-emerald); }
+
+/* ── 说明条（本机原件 / 隐私 / 不编造） ───────────────────────── */
+.qx-resume-triage .qx-rt-note {
+  margin: 0; padding: 12px 18px; border-radius: 18px;
+  background: var(--qx-surface); border: 1px solid var(--qx-line);
+  font-size: 17px; line-height: 1.5; color: var(--qx-ink-2);
+}
+.qx-resume-triage .qx-rt-note b { color: var(--qx-teal-d); font-weight: 700; margin-right: 6px; }
+.qx-resume-triage .qx-rt-note[data-tone='warn'] { background: var(--qx-wheat-soft); border-color: var(--qx-line-2); color: var(--qx-wheat-d); }
+.qx-resume-triage .qx-rt-note[data-tone='error'] { background: var(--qx-cinnabar-soft); border-color: var(--qx-cinnabar-line); color: var(--qx-cinnabar-d); font-weight: 700; }
+
+/* ── 上传工作台（自己滚，主 CTA 固定在 ctabar） ──────────────── */
+.qx-resume-triage .qx-rt-scroll { padding-top: 0; gap: 14px; }
+.qx-resume-triage .qx-rt-intro h2 { margin: 0; font-size: 23px; font-weight: 700; }
+.qx-resume-triage .qx-rt-intro p { margin: 6px 0 0; font-size: 17px; line-height: 1.5; color: var(--qx-ink-2); }
+.qx-resume-triage .qx-rt-chain { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding: 0; list-style: none; }
+.qx-resume-triage .qx-rt-chain li { padding: 6px 12px; border-radius: 999px; background: var(--qx-teal-soft); color: var(--qx-teal-d); font-size: 16px; font-weight: 700; }
+.qx-resume-triage .qx-rt-alt {
+  flex: none; width: 100%; min-height: 76px; display: flex; align-items: center; gap: 16px;
+  padding: 12px 20px; border-radius: 22px; text-align: left; cursor: pointer;
+  border: 1.5px dashed var(--qx-teal); background: var(--qx-surface); color: var(--qx-ink);
+}
+.qx-resume-triage .qx-rt-alt strong { display: block; font-size: 21px; }
+.qx-resume-triage .qx-rt-alt small { display: block; margin-top: 2px; font-size: 16px; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-alt .go { margin-left: auto; flex: none; font-size: 17px; font-weight: 700; color: var(--qx-teal-d); }
+
+.qx-resume-triage .qx-rt-srcs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 14px; }
+.qx-resume-triage .qx-rt-src {
+  min-height: 148px; display: flex; flex-direction: column; gap: 9px;
+  padding: 18px; border-radius: 22px; text-align: left; cursor: pointer;
+  border: 1.5px solid var(--qx-line); background: var(--qx-surface); color: var(--qx-ink);
+  box-shadow: 0 3px 12px rgb(16 48 43 / .05);
+}
+.qx-resume-triage .qx-rt-src:disabled { cursor: not-allowed; opacity: .6; }
+.qx-resume-triage .qx-rt-src[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.qx-resume-triage .qx-rt-src .ico {
+  width: 58px; height: 58px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d);
+}
+.qx-resume-triage .qx-rt-src[aria-pressed='true'] .ico { background: var(--qx-surface); }
+.qx-resume-triage .qx-rt-src .n { font-size: 23px; font-weight: 700; }
+.qx-resume-triage .qx-rt-src .d { font-size: 17px; line-height: 1.42; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-src .go { margin-top: auto; font-size: 16px; font-weight: 700; color: var(--qx-teal-d); }
+
+.qx-resume-triage .qx-rt-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(440px, 0.9fr); gap: 18px; min-width: 0; }
+.qx-resume-triage .qx-rt-main { display: flex; flex-direction: column; min-width: 0; gap: 10px; }
+.qx-resume-triage .qx-rt-side { display: flex; flex-direction: column; min-width: 440px; }
+.qx-resume-triage .qx-rt-direction { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.qx-resume-triage .qx-rt-direction h2 { white-space: nowrap; }
+.qx-resume-triage .qx-rt-dropzone {
+  flex: 1; min-height: 214px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 26px 20px; border-radius: 26px; text-align: center; cursor: pointer;
+  border: 2px dashed var(--qx-line-2); background: var(--qx-surface); color: var(--qx-ink);
+}
+.qx-resume-triage .qx-rt-dropzone[data-staged='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.qx-resume-triage .qx-rt-dropzone:disabled { cursor: not-allowed; opacity: .7; }
+.qx-resume-triage .qx-rt-dropzone .ico { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-dropzone strong { margin-top: 14px; font-size: 26px; font-weight: 800; overflow-wrap: anywhere; }
+.qx-resume-triage .qx-rt-dropzone span { margin-top: 8px; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.qx-resume-triage .qx-rt-fmts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+.qx-resume-triage .qx-rt-fmts em { font-style: normal; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--qx-line); background: var(--qx-paper); font-size: 15px; font-weight: 700; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-hint { margin: 0; font-size: 16px; line-height: 1.5; color: var(--qx-ink-3); }
+
+.qx-resume-triage .qx-rt-dims summary {
+  min-height: var(--qx-tap-min); display: flex; align-items: center; gap: 10px;
+  cursor: pointer; list-style: none; font-size: 20px; font-weight: 700;
+}
+.qx-resume-triage .qx-rt-dims summary::-webkit-details-marker { display: none; }
+.qx-resume-triage .qx-rt-dims summary small { margin-left: auto; font-size: 16px; font-weight: 600; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-dim-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.qx-resume-triage .qx-rt-dim {
+  min-height: var(--qx-tap-min); display: flex; align-items: center; justify-content: center;
+  padding: 6px 10px; border-radius: 16px; text-align: center; font-size: 16px; font-weight: 700;
+  background: var(--qx-paper); border: 1px solid var(--qx-line); color: var(--qx-ink-2);
+}
+.qx-resume-triage .qx-rt-dim[data-extra='true'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
+
+/* ── 解析等待 / 失败 / 缺文件 ─────────────────────────────── */
+.qx-resume-triage .qx-rt-wait { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; scrollbar-width: none; }
+.qx-resume-triage .qx-rt-wait-card { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 28px 30px; text-align: center; }
+.qx-resume-triage .qx-rt-ring {
+  width: 132px; height: 132px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  border: 10px solid var(--qx-teal-soft); color: var(--qx-teal-d);
+}
+.qx-resume-triage .qx-rt-ring[data-tone='bad'] { border-color: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
+.qx-resume-triage .qx-rt-wait-t { margin: 0; font-family: var(--qx-serif); font-size: 32px; font-weight: 700; }
+.qx-resume-triage .qx-rt-wait-d { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.qx-resume-triage .qx-rt-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.qx-resume-triage .qx-rt-chips span { padding: 6px 14px; border-radius: 999px; background: var(--qx-paper); border: 1px solid var(--qx-line); font-size: 16px; font-weight: 700; color: var(--qx-ink-2); overflow-wrap: anywhere; }
+.qx-resume-triage .qx-rt-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.qx-resume-triage .qx-rt-steps li { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 4px 12px; padding: 12px 16px; border-radius: 18px; background: var(--qx-paper); border: 1px solid var(--qx-line); text-align: left; }
+.qx-resume-triage .qx-rt-steps i { grid-row: span 2; width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-style: normal; font-weight: 800; background: var(--qx-muted-bg); color: var(--qx-muted-ink); }
+.qx-resume-triage .qx-rt-steps strong { font-size: 18px; }
+.qx-resume-triage .qx-rt-steps em { grid-column: 2; font-style: normal; font-size: 15px; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-steps span { grid-row: 1 / span 2; grid-column: 3; font-size: 14px; font-weight: 700; color: var(--qx-muted-ink); }
+.qx-resume-triage .qx-rt-dev { position: absolute; right: var(--qx-gutter); bottom: 150px; min-height: var(--qx-tap-min); padding: 0 14px; border-radius: 12px; border: 1px dashed var(--qx-cinnabar); background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); font-size: 14px; }
+
+/* 手机宽度：KioskRoot 内路由不做舞台缩放，按真实 390 宽排。整块工作台一起滚，
+   小青头去掉头像与旗标、四步轨换成两列，避免逐字折行和压到底部操作条。 */
+@media (max-width: 640px) {
+  .qx-resume-triage { overflow-y: auto; scrollbar-width: none; }
+  .qx-resume-triage .qx-rt-scroll,
+  .qx-resume-triage .qx-rt-wait { flex: none; overflow: visible; }
+  .qx-resume-triage .qx-rt-xq { padding: 16px 18px 14px; border-radius: 24px; }
+  .qx-resume-triage .qx-rt-face,
+  .qx-resume-triage .qx-rt-flag { display: none; }
+  .qx-resume-triage .qx-rt-eyebrow { font-size: 13px; letter-spacing: 3px; }
+  .qx-resume-triage .qx-rt-title { font-size: 24px; }
+  .qx-resume-triage .qx-rt-doing { font-size: 16px; }
+  .qx-resume-triage .qx-rt-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .qx-resume-triage .qx-rt-rail li,
+  .qx-resume-triage .qx-rt-rail li:not(:last-child) { flex: none; font-size: 15px; white-space: normal; }
+  .qx-resume-triage .qx-rt-rail li + li::before { display: none; }
+  .qx-resume-triage .qx-rt-srcs,
+  .qx-resume-triage .qx-rt-split,
+  .qx-resume-triage .qx-rt-steps { grid-template-columns: minmax(0, 1fr); }
+  .qx-resume-triage .qx-rt-dim-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qx-resume-triage .qx-rt-side { min-width: 0; }
+  .qx-resume-triage .qx-rt-direction h2 { white-space: normal; }
+  .qx-stage:has(.qx-resume-triage) .qx-ctabar { flex-wrap: wrap; gap: 10px; padding-top: 12px; padding-bottom: 12px; }
+  .qx-stage:has(.qx-resume-triage) .qx-ctabar .why { flex: 1 1 100%; font-size: 14px; }
+  .qx-stage:has(.qx-resume-triage) .qx-ctabar > .qx-btn { font-size: 19px; padding: 0 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qx-resume-triage *,
+  .qx-resume-triage *::before,
+  .qx-resume-triage *::after { animation: none !important; transition: none !important; }
+}

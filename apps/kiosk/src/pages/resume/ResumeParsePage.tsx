@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   CheckIcon,
@@ -7,8 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { KioskPageFrame, Stepper } from '@ai-job-print/ui'
-import type { StepperStep } from '@ai-job-print/ui'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { submitResumeParse } from '../../services/api'
 import { aiErrorMessageOf } from '../../ai'
 import { saveAiResumeSession } from './aiResumeSession'
@@ -19,16 +18,10 @@ import {
   type ResumeScoringDimensionKey,
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
-import './resume-diagnosis-lightflow.css'
-import './resume-diagnosis-ext.css'
-import './resume-fusion-youth.css'
+import './resume-triage-qx.css'
 
-const RESUME_FLOW_STEPS: StepperStep[] = [
-  { title: '上传与方向' },
-  { title: 'AI 解析' },
-  { title: '诊断报告' },
-  { title: '优化打印' },
-]
+/** 稿 21 小青任务头的四步轨；本页是第 2 步。 */
+const RESUME_FLOW_STEPS = ['上传与方向', 'AI 解析', '诊断报告', '优化打印']
 
 const STEPS = [
   { key: 'reading',    label: '读取上传文件',    hint: '校验格式与页数' },
@@ -138,21 +131,56 @@ export function ResumeParsePage() {
   const source = typeof state?.source === 'string' ? state.source : 'upload'
   const sourceLabel = source === 'scan' ? '扫描件' : source === 'manual' ? '手动填写' : '云端上传'
 
-  /* ── 顶部流程步骤条：与上传/报告/优化页共用 Stepper ── */
+  // 顶栏返回回到上传页时带上真实 intent，优化链路不会被悄悄改成诊断。
+  const sourceRoute = state?.intent === 'optimize' ? '/resume/source?intent=optimize' : '/resume/source'
+
+  /* ── 稿 21 同一工作台的 /resume/parse 段：小青任务头 + 四步轨（当前第 2 步） ── */
+  const frameStatus = consent.checking || consent.needsPrompt
+    ? { tone: 'unknown' as const, label: '确认授权中' }
+    : !fileId
+      ? { tone: 'unknown' as const, label: '未找到文件' }
+      : failed
+        ? { tone: 'bad' as const, label: '解析失败' }
+        : { tone: 'warn' as const, label: '等待解析结果' }
+
+  const renderFrame = (body: ReactNode, ctabar?: ReactNode) => (
+    <QxPageFrame
+      title="AI 解析"
+      subtitle="等待服务端返回真实解析结果"
+      status={frameStatus}
+      terminalLabel="AI 简历服务"
+      back={{ label: '返回简历来源', onBack: () => { cancelRef.current = true; navigate(sourceRoute) } }}
+      ctabar={ctabar}
+    >
+      <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="qx-resume-triage">
+        <header className="qx-rt-xq">
+          <div className="qx-rt-xq-row">
+            <span className="qx-rt-face" aria-hidden="true">青</span>
+            <div className="qx-rt-xq-main">
+              <p className="qx-rt-eyebrow">AI RESUME PARSE</p>
+              <p className="qx-rt-title">文件收到了，<em>等真实解析结果</em>。</p>
+              <p className="qx-rt-doing">结果以服务端真实返回为准，不拿计时动画冒充进度。</p>
+            </div>
+          </div>
+          <ol className="qx-rt-rail" aria-label="简历服务流程：上传与方向、AI 解析、诊断报告、优化打印">
+            {RESUME_FLOW_STEPS.map((step, i) => (
+              <li key={step} aria-current={i === 1 ? 'step' : undefined} data-done={i < 1 ? '1' : undefined}><i>{i + 1}</i>{step}</li>
+            ))}
+          </ol>
+        </header>
+        {body}
+      </section>
+    </QxPageFrame>
+  )
 
   if (consent.checking || consent.needsPrompt) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-        <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow flex h-full flex-col p-6">
-          <div className="resume-lightflow__stepper">
-            <Stepper steps={RESUME_FLOW_STEPS} currentIndex={1} />
-          </div>
-          <div className="rp-center">
-            <p className="text-base text-neutral-500">
-              {consent.checking ? '正在确认授权状态…' : '使用简历 AI 前需要先确认授权'}
-            </p>
-          </div>
-        </section>
+      <>
+        {renderFrame(
+          <p className="qx-rt-note" role="status">
+            {consent.checking ? '正在确认授权状态…' : '使用简历 AI 前需要先确认授权'}
+          </p>,
+        )}
         {consent.needsPrompt && (
           <ResumeAiConsentDialog
             busy={consent.busy}
@@ -162,152 +190,103 @@ export function ResumeParsePage() {
             onConfirm={() => { void consent.confirm() }}
           />
         )}
-      </KioskPageFrame>
+      </>
     )
   }
 
   if (!fileId) {
-    return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-        <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow flex h-full flex-col p-6">
-          <div className="resume-lightflow__stepper">
-            <Stepper steps={RESUME_FLOW_STEPS} currentIndex={1} />
-          </div>
-          <div className="rp-center">
-            <section className="rp-card text-center">
-              <div className="rp-ring-box" aria-hidden="true">
-                <span className="rp-ring-num">
-                  <XCircleIcon style={{ width: 44, height: 44 }} />
-                </span>
-              </div>
-              <h1 className="rp-title">未找到简历文件</h1>
-              <p className="mt-3 text-base text-neutral-600">请从上传简历页面选择文件后，再开始 AI 诊断。</p>
-              <button
-                type="button"
-                className="rp-cancel mt-6 min-h-[56px] px-8"
-                onClick={() => navigate('/resume/source')}
-              >
-                返回上传简历
-              </button>
-            </section>
-          </div>
+    return renderFrame(
+      <div className="qx-rt-wait">
+        <section className="qx-card qx-rt-wait-card">
+          <span className="qx-rt-ring" data-tone="bad" aria-hidden="true"><XCircleIcon size={44} /></span>
+          <h2 className="qx-rt-wait-t">未找到简历文件</h2>
+          <p className="qx-rt-wait-d">请从上传简历页面选择文件后，再开始 AI 诊断。</p>
         </section>
-      </KioskPageFrame>
+      </div>,
+      <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/resume/source')}>
+        返回上传简历
+      </button>,
     )
   }
 
-  return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow flex h-full flex-col p-6">
-      <div className="resume-lightflow__stepper">
-        <Stepper steps={RESUME_FLOW_STEPS} currentIndex={1} />
-      </div>
-
-      {/* 中心卡片 */}
-      <div className="rp-center">
-        <section className="rp-card">
-
+  return renderFrame(
+    <>
+      <div className="qx-rt-wait">
+        <section className="qx-card qx-rt-wait-card" data-live={failed ? undefined : 'true'}>
           {/* 装饰性处理标识：不表达百分比或服务端阶段 */}
-          <div className="rp-ring-box" aria-hidden="true">
-            <svg viewBox="0 0 200 200" width="200" height="200">
-              <circle cx="100" cy="100" r="88" fill="none" stroke="var(--fy-line)" strokeWidth="13" />
-              <circle
-                cx="100" cy="100" r="88" fill="none"
-                stroke={failed ? 'var(--fy-error)' : 'var(--fy-teal)'}
-                strokeWidth="13" strokeLinecap="round"
-              />
-            </svg>
-            <span className="rp-ring-num">
-              {failed
-                ? <XCircleIcon style={{ width: 44, height: 44 }} />
-                : <SparklesIcon style={{ width: 44, height: 44 }} />}
-            </span>
-          </div>
-
-          <div className="rp-title" role="status" aria-live="polite">
+          <span className="qx-rt-ring" data-tone={failed ? 'bad' : undefined} aria-hidden="true">
+            {failed ? <XCircleIcon size={44} /> : <SparklesIcon size={44} />}
+          </span>
+          <h2 className="qx-rt-wait-t" role="status" aria-live="polite">
             {failed ? '解析出错' : '正在等待真实解析结果…'}
-          </div>
-
+          </h2>
           {/* 文件信息 chips */}
           {!failed && (
-            <div className="rp-chips">
-              <span className="rp-chip">{fileName}</span>
-              {fileSize && <span className="rp-chip">{fileSize} · {sourceLabel}</span>}
-              <span className="rp-chip">处理内容说明 · 非实时阶段</span>
+            <div className="qx-rt-chips">
+              <span>{fileName}</span>
+              {fileSize && <span>{fileSize} · {sourceLabel}</span>}
+              <span>处理内容说明 · 非实时阶段</span>
             </div>
           )}
-
-          <div className="rp-notice" role="note">
-            <SparklesIcon style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
-            当前服务仅返回最终解析结果。以下为本次处理内容说明，不代表服务端实时阶段。
-          </div>
-          {consent.guestNotice && (
-            <div className="rp-notice" role="note" data-testid="resume-ai-guest-notice">
-              未登录使用简历 AI：本次结果只在本机会话内可见，离场即清，不进入任何账号；AI 建议仅供参考，不替你投递。
-            </div>
-          )}
-
-          {/* 处理内容说明：API 不提供分阶段状态，不渲染完成/进行中 */}
-          <div className="rp-steps">
-            {STEPS.map((step, idx) => {
-              return (
-                <div key={step.key} className="rp-step rp-step--todo">
-                  <span className="rp-step__dot" aria-hidden="true">{idx + 1}</span>
-                  <strong className="rp-step__label">{step.label}</strong>
-                  <em className="rp-step__hint">{step.hint}</em>
-                  <span className="rp-step__state">处理内容</span>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* 结果维度说明：不冒充实时准备进度 */}
-          {!failed && (
-            <div className="rp-dims">
-              <p className="rp-dims__title">报告将评估的维度</p>
-              <div className="rp-dims__grid">
-                {DIMENSIONS.map((item) => (
-                  <span key={item} className="rp-dim">{item}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="rp-notice">
-            <SparklesIcon style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
-            解析通常在 90 秒内完成；若格式不支持、识别失败或服务不可用，将如实提示失败原因，可重试或重新上传。诊断结果由 AI 生成，仅供参考。
-          </div>
         </section>
-      </div>
 
-      {/* 底部行动条 */}
-      <div className="rp-actionbar">
-        <div className="rp-actionbar__notice">
-          <CheckIcon style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
-          返回仅停止本机等待，不会撤回已提交的服务请求；简历原文不会发送给企业，也不进入平台候选人简历库。
-        </div>
-        <button
-          type="button"
-          className="rp-cancel"
-          onClick={() => { cancelRef.current = true; navigate(-1) }}
-        >
-          <XCircleIcon style={{ width: 20, height: 20 }} aria-hidden="true" />
-          返回上一步
-        </button>
+        <p className="qx-rt-note" role="note">
+          <b>说明</b>当前服务仅返回最终解析结果。以下为本次处理内容说明，不代表服务端实时阶段。
+        </p>
+        {consent.guestNotice && (
+          <p className="qx-rt-note" role="note" data-testid="resume-ai-guest-notice">
+            未登录使用简历 AI：本次结果只在本机会话内可见，离场即清，不进入任何账号；AI 建议仅供参考，不替你投递。
+          </p>
+        )}
+
+        {/* 处理内容说明：API 不提供分阶段状态，不渲染完成/进行中 */}
+        <ol className="qx-rt-steps" aria-label="本次处理内容说明">
+          {STEPS.map((step, idx) => (
+            <li key={step.key}>
+              <i aria-hidden="true">{idx + 1}</i>
+              <strong>{step.label}</strong>
+              <em>{step.hint}</em>
+              <span>处理内容</span>
+            </li>
+          ))}
+        </ol>
+
+        {/* 结果维度说明：不冒充实时准备进度 */}
+        {!failed && (
+          <section className="qx-card">
+            <p className="qx-rt-wait-d"><b>报告将评估的维度</b></p>
+            <div className="qx-rt-dim-grid">
+              {DIMENSIONS.map((item) => <span key={item} className="qx-rt-dim">{item}</span>)}
+            </div>
+          </section>
+        )}
+
+        <p className="qx-rt-note" data-tone="warn">
+          解析通常在 90 秒内完成；若格式不支持、识别失败或服务不可用，将如实提示失败原因，可重试或重新上传。诊断结果由 AI 生成，仅供参考。
+        </p>
       </div>
 
       {/* DEV 专用 */}
       {import.meta.env.DEV && Boolean(fileId) && !failed && (
-        <div className="absolute bottom-24 right-6">
-          <button
-            onClick={handleDevFail}
-            className="resume-parse-dev rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
-          >
-            [DEV] 模拟失败
-          </button>
-        </div>
+        <button type="button" onClick={handleDevFail} className="qx-rt-dev resume-parse-dev">
+          [DEV] 模拟失败
+        </button>
       )}
-    </section>
-    </KioskPageFrame>
+    </>,
+    <>
+      <p className="why">
+        <CheckIcon size={18} aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: '-3px' }} />
+        返回仅停止本机等待，不会撤回已提交的服务请求；简历原文不会发送给企业，也不进入平台候选人简历库。
+      </p>
+      <button
+        type="button"
+        className="qx-btn"
+        data-variant="ghost"
+        onClick={() => { cancelRef.current = true; navigate(-1) }}
+      >
+        <XCircleIcon size={20} aria-hidden="true" />
+        返回上一步
+      </button>
+    </>,
   )
 }

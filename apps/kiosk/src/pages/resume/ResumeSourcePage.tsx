@@ -3,14 +3,11 @@ import { isTerminalKiosk } from '../../services/api/screensaver'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
-import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { FileContentPreview } from '../../components/FileContentPreview'
-import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
-import type { StepperStep } from '@ai-job-print/ui'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
-  CheckCircleIcon,
   CloudUploadIcon,
   FileTextIcon,
   ShieldCheckIcon,
@@ -36,9 +33,7 @@ import { clearAiResumeSession } from './aiResumeSession'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
 import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
-import './resume-diagnosis-lightflow.css'
-import './resume-diagnosis-ext.css'
-import './resume-fusion-youth.css'
+import './resume-triage-qx.css'
 
 type UploadChannel = 'usb' | 'cloud' | 'phone'
 
@@ -120,12 +115,8 @@ const BASE_SUPPORTED_FORMATS = ['PDF', 'JPG', 'PNG', 'WEBP']
 const BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
 const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
-const RESUME_FLOW_STEPS: StepperStep[] = [
-  { title: '上传与方向' },
-  { title: 'AI 解析' },
-  { title: '诊断报告' },
-  { title: '优化打印' },
-]
+/** 稿 21 小青任务头的四步轨；本页是第 1 步。 */
+const RESUME_FLOW_STEPS = ['上传与方向', 'AI 解析', '诊断报告', '优化打印']
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -330,31 +321,76 @@ export function ResumeSourcePage() {
     })
   }
 
+  // 顶栏状态胶囊只报本机真实可知的状态：忙碌 / 文件已就绪 / 还没有文件。拿不到的一律不报「正常」。
+  const frameStatus = sourceBusy
+    ? { tone: 'warn' as const, label: uploading ? '上传中' : '接收中' }
+    : uploadedFile
+      ? { tone: 'ok' as const, label: '文件已就绪' }
+      : { tone: 'unknown' as const, label: '等待简历文件' }
+  const channelLabel = (channel: UploadChannel) =>
+    channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : '云端上传'
+
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" className="resume-lightflow resume-source-lightflow flex h-full flex-col p-6">
-      <KioskPageHeader
-        title={copy.title}
-        description={copy.subtitle}
-        onBack={() => navigate('/')}
-        backLabel="返回首页"
-      />
+    <QxPageFrame
+      title={copy.title}
+      subtitle={copy.subtitle}
+      status={frameStatus}
+      terminalLabel="AI 简历服务"
+      back={{ label: '返回 AI 简历服务', onBack: () => navigate('/resume-service') }}
+      ctabar={(
+        <>
+          {uploadedFile ? (
+            <button
+              type="button"
+              className="qx-btn resume-change-file"
+              data-variant="ghost"
+              disabled={sourceBusy}
+              onClick={() => {
+                setUploadedFile(null)
+                setError(null)
+                if (fileInputRef.current) fileInputRef.current.value = ''
+                handleUploadBoxClick()
+              }}
+            >
+              更换文件
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="qx-btn resume-primary-action"
+            data-variant="primary"
+            disabled={!uploadedFile || sourceBusy}
+            onClick={handleStartDiagnosis}
+          >
+            {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
+          </button>
+        </>
+      )}
+    >
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} className="qx-resume-triage">
+      {/* 稿 21 小青任务头：AI 驱动层在这里表达（✦ 旗标 + 小青的话），四步轨当前在第 1 步。
+          页面 h1 仍是 QxPageFrame 页头的 copy.title，这里不再另起标题。 */}
+      <header className="qx-rt-xq">
+        <div className="qx-rt-xq-row">
+          <span className="qx-rt-face" aria-hidden="true">青</span>
+          <div className="qx-rt-xq-main">
+            <p className="qx-rt-eyebrow">{intent === 'optimize' ? 'AI RESUME OPTIMIZE' : 'AI RESUME DIAGNOSE'}</p>
+            <p className="qx-rt-title">简历这趟，先<em>把文件交给我</em>。</p>
+            <p className="qx-rt-doing">选一种来源把简历送进来，方向和背景都点选完成；上传后 AI 自动解析结构、识别问题。</p>
+          </div>
+          <span className="qx-rt-flag">✦ AI 驱动</span>
+        </div>
+        <ol className="qx-rt-rail" aria-label="简历服务流程：上传与方向、AI 解析、诊断报告、优化打印">
+          {RESUME_FLOW_STEPS.map((step, i) => (
+            <li key={step} aria-current={i === 0 ? 'step' : undefined}><i>{i + 1}</i>{step}</li>
+          ))}
+        </ol>
+      </header>
 
-      <p className="mt-3 text-sm leading-relaxed text-neutral-600" role="note">
-        {KIOSK_DEVICE_ORIGINAL_NOTICE}
+      <p className="qx-rt-note" role="note">{KIOSK_DEVICE_ORIGINAL_NOTICE}</p>
+      <p className="qx-rt-note resume-source-privacy" role="note">
+        <b>隐私保护</b>{copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}
       </p>
-
-      <AiDriverBanner feature="AI简历诊断" description="上传后自动解析结构、识别问题" />
-
-      <div className="resume-source-privacy mt-3">
-        <ComplianceBanner tone="success" title="隐私保护">
-          {copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}
-        </ComplianceBanner>
-      </div>
-
-      <div className="resume-lightflow__stepper mt-3">
-        <Stepper steps={RESUME_FLOW_STEPS} currentIndex={0} />
-      </div>
 
       <input
         ref={fileInputRef}
@@ -365,84 +401,53 @@ export function ResumeSourcePage() {
         onChange={handleFileChosen}
       />
 
-      <div className="resume-source-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-1">
-        <Card className="resume-source-intro border-primary-100 bg-primary-50/50 p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm">
-              <SparklesIcon className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold text-neutral-900">{copy.infoTitle}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-neutral-600">{copy.infoBody}</p>
-              {intent === 'optimize' && (
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  {OPTIMIZE_FLOW_STEPS.map((step, i) => (
-                    <span key={step} className="flex items-center gap-1.5">
-                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-primary-700 shadow-sm">{step}</span>
-                      {i < OPTIMIZE_FLOW_STEPS.length - 1 && <span className="text-xs text-primary-300">→</span>}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
+      <div className="qx-scroll qx-rt-scroll">
+        <section className="qx-card qx-rt-intro">
+          <h2>{copy.infoTitle}</h2>
+          <p>{copy.infoBody}</p>
+          {intent === 'optimize' && (
+            <ol className="qx-rt-chain" aria-label="优化链路">
+              {OPTIMIZE_FLOW_STEPS.map((step) => <li key={step}>{step}</li>)}
+            </ol>
+          )}
+        </section>
 
         {/* 阶段2A:没有电子简历的用户 → AI 简历生成(引导式表单,只润色不编造) */}
-        <button
-          type="button"
-          onClick={() => navigate('/resume/generate')}
-          className="resume-source-alternative flex min-h-[72px] w-full items-center gap-4 rounded-2xl border-2 border-dashed border-primary-200 bg-white px-5 py-3 text-left transition-colors hover:border-primary-400 hover:bg-primary-50/40 active:bg-primary-50"
-        >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white">
-            <SparklesIcon className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <div className="flex-1">
-            <p className="text-lg font-bold text-neutral-900">没有电子简历？AI 帮你生成一份</p>
-            <p className="mt-0.5 text-sm text-neutral-500">填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</p>
-          </div>
-          <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">去生成</span>
+        <button type="button" onClick={() => navigate('/resume/generate')} className="qx-rt-alt">
+          <SparklesIcon size={30} aria-hidden="true" />
+          <span>
+            <strong>没有电子简历？AI 帮你生成一份</strong>
+            <small>填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</small>
+          </span>
+          <span className="go">去生成</span>
         </button>
 
-        <div className="resume-source-split grid min-w-0 grid-cols-1 gap-5">
-          <div className="resume-source-main flex min-w-0 flex-1 flex-col">
-            <div className="resume-source-methods grid grid-cols-1 gap-4 md:grid-cols-3">
-              {UPLOAD_OPTIONS.filter((option) => option.type !== 'cloud' || !isTerminalKiosk()).map((option) => {
-              const isSelected = selected === option.type
-              const Icon = option.icon
-              const disabled = sourceBusy
-              return (
-                <button
-                  type="button"
-                  key={option.type}
-                  onClick={() => !disabled && handleSelect(option)}
-                  disabled={disabled}
-                  className={[
-                    'flex min-h-[148px] w-full flex-col justify-between rounded-2xl border-2 px-5 py-5 text-left shadow-sm transition-colors',
-                    'disabled:cursor-not-allowed disabled:opacity-60',
-                    isSelected
-                      ? 'border-primary-500 bg-white ring-4 ring-primary-100'
-                      : 'border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50/30 active:bg-primary-50',
-                  ].join(' ')}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={['flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl', isSelected ? 'bg-primary-100' : 'bg-neutral-100'].join(' ')}>
-                      <Icon className={['h-8 w-8', isSelected ? 'text-primary-600' : 'text-neutral-500'].join(' ')} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={['text-xl font-bold', isSelected ? 'text-primary-700' : 'text-neutral-900'].join(' ')}>{option.label}</p>
-                      <p className="mt-1 text-sm font-medium text-neutral-600">{option.description}</p>
-                    </div>
-                    {isSelected && <CheckCircleIcon className="h-6 w-6 shrink-0 text-primary-600" aria-hidden="true" />}
-                  </div>
-                  <p className="mt-4 text-xs leading-relaxed text-neutral-400">{option.helper}</p>
-                </button>
-              )
-              })}
-            </div>
+        <div className="qx-rt-srcs" role="group" aria-label="选择简历来源">
+          {UPLOAD_OPTIONS.filter((option) => option.type !== 'cloud' || !isTerminalKiosk()).map((option) => {
+            const isSelected = selected === option.type
+            const Icon = option.icon
+            return (
+              <button
+                type="button"
+                key={option.type}
+                className="qx-rt-src"
+                aria-pressed={isSelected}
+                onClick={() => !sourceBusy && handleSelect(option)}
+                disabled={sourceBusy}
+              >
+                <span className="ico"><Icon className="h-8 w-8" /></span>
+                <span className="n">{option.label}</span>
+                <span className="d">{option.description}</span>
+                <span className="go">{option.helper}</span>
+              </button>
+            )
+          })}
+        </div>
 
+        <div className="qx-rt-split">
+          <div className="qx-rt-main">
             {selected === 'phone' ? (
-              <div className="resume-source-phone-session flex-1">
+              <div className="resume-source-phone-session">
                 <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
               </div>
             ) : selected === 'usb' ? (
@@ -452,39 +457,26 @@ export function ResumeSourcePage() {
                 type="button"
                 disabled={sourceBusy}
                 onClick={handleUploadBoxClick}
-                className={[
-                  'resume-source-dropzone flex flex-1 min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
-                  uploadedFile
-                    ? 'border-primary-300 bg-primary-50/35'
-                    : 'border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
-                  uploading ? 'cursor-not-allowed opacity-70' : '',
-                ].join(' ')}
+                className="qx-rt-dropzone"
+                data-staged={uploadedFile ? 'true' : undefined}
               >
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+                <span className="ico">
                   {uploadedFile ? <FileTextIcon className="h-8 w-8" aria-hidden="true" /> : <UploadCloudIcon className="h-8 w-8" aria-hidden="true" />}
-                </div>
-                <p className="mt-4 text-2xl font-extrabold text-neutral-900">
-                  {uploadedFile ? uploadedFile.name : '点击上传文件'}
-                </p>
-                <p className="mt-2 text-base font-medium text-neutral-500">
+                </span>
+                <strong>{uploadedFile ? uploadedFile.name : '点击上传文件'}</strong>
+                <span>
                   {uploadedFile
-                    ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
-                      uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
-                    } · 已就绪`
+                    ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${channelLabel(uploadedFile.channel)} · 已就绪`
                     : wordConversionAvailable
                       ? '支持 PDF、DOC、DOCX 和图片格式，单个文件最大 10MB'
                       : `${WORD_CONVERSION_UNAVAILABLE_COPY}；支持 PDF / 图片格式，单个文件最大 10MB`}
-                </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-2">
-                  {supportedFormats.map((format) => (
-                    <span key={format} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
-                      {format}
-                    </span>
-                  ))}
-                </div>
+                </span>
+                <span className="qx-rt-fmts">
+                  {supportedFormats.map((format) => <em key={format}>{format}</em>)}
+                </span>
               </button>
             )}
-            <p className="resume-source-upload-hint mt-2 text-sm leading-relaxed text-neutral-500">
+            <p className="qx-rt-hint">
               再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
               <span
                 aria-disabled={!wordConversionAvailable || undefined}
@@ -496,14 +488,13 @@ export function ResumeSourcePage() {
               </span>
             </p>
             {!wordConversionAvailable && (
-              <p id="resume-word-conversion-reason" className="mt-1 text-xs leading-5 text-neutral-400">
+              <p id="resume-word-conversion-reason" className="qx-rt-hint">
                 {conversionCapabilities.reason || '转换引擎未就绪；服务恢复并通过能力探测后会自动开放。'}
               </p>
             )}
             {uploadedFile && (
               <FileContentPreview
                 compact
-                className="mt-4"
                 fileUrl={uploadedFile.fileUrl}
                 fileName={uploadedFile.name}
                 mimeType={uploadedFile.mimeType}
@@ -514,8 +505,8 @@ export function ResumeSourcePage() {
             )}
           </div>
 
-          <aside className="resume-source-side flex min-w-0 w-full flex-col">
-            <div className="resume-source-direction flex min-h-0 flex-1 flex-col">
+          <aside className="qx-rt-side">
+            <div className="qx-rt-direction">
               <DiagnosisDirectionForm
                 genericDiagnosis={genericDiagnosis}
                 selectedDimensions={selectedDimensions}
@@ -539,90 +530,41 @@ export function ResumeSourcePage() {
         </div>
 
         {/*
-          维度清单默认收起（R5）。
-          事故原样：56px 的主 CTA「开始 AI 诊断」在 1080×1920 首屏只露 21px ——
-          内容 1903px 挤进 1844px 可视区。一体机没有滚动条，用户看到的就是一条
-          被切坏的按钮，以为传失败了。复验还发现两处更糟的：`?intent=optimize`
-          与「上传失败横幅在屏」时该按钮 0px 可见，完全看不到。
-          这张卡是页面上最高的一块非必需内容（291px），收起后四种情形全部归零溢出。
+          维度清单默认收起（R5）：主 CTA 现在固定在 ctabar，但这张卡仍是页面上最高的
+          非必需内容，收起后工作台不必为它滚一整屏。
           注意只收清单本身；下面那句「不会编造无法验证的结论」是合规声明，常驻可见。
         */}
-        <Card className="resume-source-evidence p-4">
-          <details className="resume-source-dimensions">
-            <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-2 text-base font-bold text-neutral-900">
-              <ShieldCheckIcon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
-              <span className="flex-1">
-                {intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}
-              </span>
-              <span className="text-sm font-medium text-neutral-500">
-                {DIAGNOSIS_DIMENSIONS.length} 项 · 点击展开
-              </span>
+        <section className="qx-card qx-rt-dims">
+          <details>
+            <summary>
+              <ShieldCheckIcon size={22} aria-hidden="true" />
+              <span>{intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}</span>
+              <small>{DIAGNOSIS_DIMENSIONS.length} 项 · 点击展开</small>
             </summary>
-            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-              {DIAGNOSIS_DIMENSIONS.map((item, idx) => {
+            <div className="qx-rt-dim-grid">
+              {DIAGNOSIS_DIMENSIONS.map((item, idx) => (
                 // 最后两项（风险表述提醒、修改优先级建议）为扩展维度，用 wheat 色区分
-                const isExtra = idx >= DIAGNOSIS_DIMENSIONS.length - 2
-                return (
-                  <div
-                    key={item}
-                    className={[
-                      'flex min-h-[64px] items-center justify-center rounded-2xl border px-3 text-center text-sm font-semibold',
-                      isExtra
-                        ? 'fy-inc-extra border-amber-200 bg-amber-50 text-amber-800'
-                        : 'border-neutral-200 bg-neutral-50 text-neutral-700',
-                    ].join(' ')}
-                  >
-                    {item}
-                  </div>
-                )
-              })}
+                <span key={item} className="qx-rt-dim" data-extra={idx >= DIAGNOSIS_DIMENSIONS.length - 2 ? 'true' : undefined}>
+                  {item}
+                </span>
+              ))}
             </div>
           </details>
-          <div className="mt-3 flex items-start gap-2 rounded-2xl bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
-            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <p>诊断维度以当前后端 AI 报告结构为准。系统不会编造「超过多少人」「必然提分」等无法验证的结论。</p>
-          </div>
-        </Card>
+          <p className="qx-rt-note" data-tone="warn">
+            <AlertCircleIcon size={18} aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: '-3px' }} />
+            诊断维度以当前后端 AI 报告结构为准。系统不会编造「超过多少人」「必然提分」等无法验证的结论。
+          </p>
+        </section>
       </div>
 
       {error && (
-        <div className="resume-source-error mt-4 rounded-md border border-error-bg/60 bg-error-bg/40 px-4 py-3 text-sm text-error-fg">
-          {error}
-        </div>
+        <p className="qx-rt-note resume-source-error" data-tone="error" role="alert">{error}</p>
       )}
 
       {uploading && (
-        <div className="resume-source-status mt-4 text-center text-sm font-medium text-primary-700">上传中，请稍候…</div>
+        <p className="qx-rt-note resume-source-status" role="status">上传中，请稍候…</p>
       )}
-
-      <KioskActionBar className="resume-source-actions mt-4">
-        {uploadedFile ? (
-          <Button
-            size="lg"
-            variant="outline"
-            className="resume-change-file min-h-[64px] min-w-[200px] text-lg"
-            disabled={sourceBusy}
-            onClick={() => {
-              setUploadedFile(null)
-              setError(null)
-              if (fileInputRef.current) fileInputRef.current.value = ''
-              handleUploadBoxClick()
-            }}
-          >
-            更换文件
-          </Button>
-        ) : null}
-        <span className="flex-1" aria-hidden="true" />
-        <Button
-          size="lg"
-          className="resume-primary-action min-h-[64px] min-w-[280px] flex-1 text-lg sm:flex-none sm:min-w-[460px]"
-          disabled={!uploadedFile || sourceBusy}
-          onClick={handleStartDiagnosis}
-        >
-          {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
-        </Button>
-      </KioskActionBar>
     </section>
-    </KioskPageFrame>
+    </QxPageFrame>
   )
 }

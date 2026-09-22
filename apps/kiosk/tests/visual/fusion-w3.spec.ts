@@ -322,6 +322,68 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   expect(runtimeErrors).toEqual([])
 })
 
+test('resume source Qingxu frame keeps intent, the 10MB limit and an honest upload failure @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  let uploadCalls = 0
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  await page.route('**/api/v1/files/kiosk-upload', async (route) => {
+    uploadCalls += 1
+    await route.abort('internetdisconnected')
+  })
+  await page.goto('/resume/source?intent=optimize')
+  await expect(page.locator('[data-qx-frame="true"] [data-kiosk-screen="resume-source"]')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'AI 简历优化' })).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="resume-source"] .qx-rt-rail li[aria-current="step"]')).toHaveText(/上传与方向/)
+  const primary = page.getByRole('button', { name: '请先上传简历文件' })
+  await expect(primary).toBeDisabled()
+  const input = page.getByLabel('选择本机简历文件')
+  await input.setInputFiles({ name: 'too-big.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) })
+  await expect(page.locator('.resume-source-error')).toContainText('文件超过 10MB')
+  expect(uploadCalls).toBe(0)
+  await input.setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await expect(page.locator('.resume-source-error')).toContainText('文件没能传到服务器')
+  await expect(page.locator('.resume-source-error')).not.toContainText('Failed to fetch')
+  expect(uploadCalls).toBe(1)
+  await expect(primary).toBeDisabled()
+  await assertNoHorizontalOverflow(page)
+  await page.getByRole('button', { name: '返回 AI 简历服务' }).click()
+  await page.waitForURL('/resume-service')
+  expect(runtimeErrors).toEqual([])
+})
+
+test('resume parse: a result arriving after leaving never hijacks navigation @w3-kiosk', async ({ page, api }) => {
+  let parseCalls = 0
+  let release: () => void = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    parseCalls += 1
+    await held
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) }).catch(() => undefined)
+  })
+  await page.goto('/resume/source')
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.waitForURL('/resume/parse')
+  await expect(page.locator('[data-qx-frame="true"] [data-kiosk-screen="resume-parse"]')).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: '正在等待真实解析结果' })).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="resume-parse"] .qx-rt-rail li[aria-current="step"]')).toHaveText(/AI 解析/)
+  await expect(page.getByText('返回仅停止本机等待，不会撤回已提交的服务请求', { exact: false })).toBeVisible()
+  await expect.poll(() => parseCalls).toBe(1)
+  await page.getByRole('button', { name: '返回上一步' }).click()
+  await page.waitForURL('/resume/source')
+  // 放行迟到的结果并等它真正送达页面，再多走两帧让 React 处理完——不用固定等待时长。
+  const lateResponse = page.waitForResponse('**/api/v1/resume/parse')
+  release()
+  await lateResponse
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  await expect(page).toHaveURL(/\/resume\/source$/)
+  await expect(page.locator('[data-kiosk-screen="resume-report"]')).toHaveCount(0)
+  expect(parseCalls).toBe(1)
+})
+
 test('assistant filters actions and survives service failure @w3-kiosk', async ({ page, api }) => {
   const runtimeErrors: string[] = []
   page.on('pageerror', (error) => runtimeErrors.push(error.message))

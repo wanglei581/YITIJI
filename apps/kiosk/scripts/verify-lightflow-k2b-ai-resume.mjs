@@ -90,8 +90,9 @@ expectNotIncludes(kioskShell, 'SERVICE_DESK_EXACT_ROUTES', 'Kiosk shell removes 
 expectNotIncludes(kioskShell, "startsWith('/resume')", 'Kiosk shell never broad-matches resume routes')
 
 for (const [page, sourceCode, rootClass, cssPath] of [
-  ['source', source, 'resume-source-lightflow', './resume-diagnosis-lightflow.css'],
-  ['parse', parse, 'resume-parse-lightflow', './resume-diagnosis-lightflow.css'],
+  // 稿 21-resume-triage 迁入青序流光（2026-09-23）：两页共用本工作台的 Qx 根类与样式。
+  ['source', source, 'qx-resume-triage', './resume-triage-qx.css'],
+  ['parse', parse, 'qx-resume-triage', './resume-triage-qx.css'],
   ['generate', generate, 'qx-resume-generate', './resume-generate-qx.css'],
   ['generate preview', preview, 'qx-resume-generate', './resume-generate-qx.css'],
   ['optimize', optimize, 'qx-resume-optimize', './resume-optimize-qx.css'],
@@ -106,6 +107,12 @@ for (const [page, sourceCode, rootClass, cssPath] of [
   }
 }
 
+for (const [page, sourceCode, route] of [['source', source, '/resume/source'], ['parse', parse, '/resume/parse']]) {
+  expectIncludes(sourceCode, 'QxPageFrame', `${page} uses Qingxu page frame (21-resume-triage migration)`)
+  expectIncludes(kioskShell, `'${route}'`, `${page} is registered in QX_MIGRATED_ROUTES`)
+  expectNotIncludes(sourceCode, 'KioskPageFrame', `${page} no longer mounts the old LightFlow page frame`)
+  expectNotIncludes(sourceCode, 'resume-lightflow', `${page} no longer mixes the LightFlow namespace into the Qingxu frame`)
+}
 expectIncludes(report, "import './resume-report-qx.css'", 'report imports Qingxu page CSS')
 expectIncludes(report, 'QxPageFrame', 'report uses Qingxu page frame (22-resume-report migration)')
 expectIncludes(kioskShell, "'/resume/report'", 'report is registered in QX_MIGRATED_ROUTES')
@@ -127,6 +134,7 @@ expectCssContract('src/pages/resume/resume-authoring-lightflow.css', [
 for (const [path, rootClass] of [
   ['src/pages/resume/resume-optimize-qx.css', 'qx-resume-optimize'],
   ['src/pages/resume/resume-generate-qx.css', 'qx-resume-generate'],
+  ['src/pages/resume/resume-triage-qx.css', 'qx-resume-triage'],
 ]) {
   const source = read(path)
   expect(source.length > 0, `${path} exists`)

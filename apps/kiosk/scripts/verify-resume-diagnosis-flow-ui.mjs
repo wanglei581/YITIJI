@@ -270,8 +270,12 @@ assertIncludes(diagnosisForm, 'targetDegree', 'diagnosis form receives degree pr
 assertNotIncludes(source, '补充方向（可选）', 'source page no longer uses orphan context card that creates L-shaped void')
 assertNotIncludes(source, 'resume-source-context', 'source page removes separate context card class')
 assertIncludes(source, '更换文件', 'source action bar exposes change-file when a resume is staged')
-assertIncludes(source, 'resume-source-dropzone flex flex-1', 'upload dropzone stretches to balance the direction column')
-assertIncludes(source, 'resume-source-main flex min-w-0 flex-1 flex-col', 'upload column stays a stretch column')
+// 2026-09-23 迁入青序流光（稿 21）：两条拉伸断言从 Tailwind 类串改锚到本页 Qx 样式，判据不变。
+const triageCss = read('src/pages/resume/resume-triage-qx.css')
+assertIncludes(source, 'className="qx-rt-dropzone"', 'upload dropzone stretches to balance the direction column')
+assertIncludes(triageCss, '.qx-resume-triage .qx-rt-dropzone {\n  flex: 1;', 'upload dropzone stretches to balance the direction column (css)')
+assertIncludes(source, 'className="qx-rt-main"', 'upload column stays a stretch column')
+assertIncludes(triageCss, '.qx-resume-triage .qx-rt-main { display: flex; flex-direction: column; min-width: 0;', 'upload column stays a stretch column (css)')
 
 assertIncludes(report, "navigate('/resume/optimize'", 'report page navigates to optimize page')
 assertIncludes(report, 'targetContext: state.targetContext', 'report page forwards targetContext into optimize navigate state')
