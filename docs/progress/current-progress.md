@@ -8,6 +8,23 @@ Claude Code 固定 `claude-opus-5-5` / `xhigh`，独占前端实现和最终视�
 集成树修复并完整 38/38 退出 0，仍待新 HEAD 远端 CI。Windows internal validation 被取消，MSI
 因此被阻断；根因由独立窗口继续分析，不能写成 Windows CI 或安装包通过。
 
+2026-09-23 **Windows 内部签名信任阶段标记，仅本地源码/静态诊断候选。** 分支
+`codex/windows-signing-trust-diagnostics-20260923`，父提交 `e064d99b8`。
+`install-internal-code-signing-trust.ps1` 在证书链 `X509Chain.Build`、Root `Import-Certificate`、
+TrustedPublisher `Import-Certificate` 三个调用的紧前和紧后各写一行阶段标记。行内只有 phase、
+store scope、start/pass，调用前刷新输出；标记不包含证书路径、指纹、主题或私钥。
+`status=pass` 写在该调用返回之后，只说明这一步已经返回。安装成功仍只有末尾的
+`INTERNAL_SIGNING_TRUST_INSTALLED`，并且仍在指纹校验之后。CurrentUser 仍是默认范围。
+LocalMachine 仍必须显式 `-AcknowledgeEphemeralNonProductionHost`，缺少该开关时在任何阶段标记和
+导入之前失败。指纹校验、导入失败时的部分回滚，以及原始异常重抛都保持原样。信任 API 未替换，
+没有加入超时，也没有改成 LocalMachine。
+
+状态：local source/static diagnostic candidate only。静态契约只核对这些标记的原文和相对调用的顺序，
+并写明自己的 static-only 边界。no runtime Windows proof。does not fix interactive trust。
+签名挂起没有被记为已修复。signed job `internal-signing-validation` 与 dependent MSI
+`unsigned-msi-candidate` remain NO-GO。unsigned EXE job `unsigned-exe-upgrade` result separate，
+不能把未签名 EXE 的结果当成签名结论。未跑 Windows，未触碰证书库，未安装证书，未部署，未使用真机。
+
 2026-09-23 **#1042 扫描历史用例夹具竞态已本地修复（仅测试）。** `aa46be8f0` 的 CI 唯一失败
 `browser history cannot return to a completed scan left by documents` 断在前置锚点 `/print-scan$`
 （实得 `/print-scan?stage=start`），未走到历史/隐私断言：登录回跳只等 pathname，`ScanWorkbenchPage`

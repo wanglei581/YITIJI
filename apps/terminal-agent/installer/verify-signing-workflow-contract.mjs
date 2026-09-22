@@ -16,6 +16,9 @@ const certificateCleanup = read(
 )
 const signingTools = read('apps/terminal-agent/installer/signing-tools.ps1')
 const pipelineTest = read('apps/terminal-agent/installer/test-internal-signing-pipeline.ps1')
+const trustInstall = read(
+  'apps/terminal-agent/installer/install-internal-code-signing-trust.ps1',
+).replaceAll('\r\n', '\n')
 
 assert.equal(
   packageJson.scripts['verify:signing-workflow-contract'],
@@ -113,4 +116,140 @@ for (const expectedReason of [
   )
 }
 
+// Static source order only. This script does not open a certificate store,
+// call Import-Certificate, or show that an interactive trust prompt returned.
+const localMachineGuard = [
+  'if ($StoreScope -eq "LocalMachine" -and -not $AcknowledgeEphemeralNonProductionHost) {',
+  '  Fail "LocalMachine trust requires -AcknowledgeEphemeralNonProductionHost. Never install this root on a production kiosk."',
+  '}',
+].join('\n')
+assert.ok(
+  trustInstall.includes(localMachineGuard),
+  'LocalMachine trust requires the explicit ephemeral-host acknowledgement guard',
+)
+
+const acknowledgementStart = pipelineTest.indexOf(
+  'Expect-Failure "local-machine-trust-requires-acknowledgement"',
+)
+const acknowledgementEnd = pipelineTest.indexOf('} "LocalMachine trust requires"', acknowledgementStart)
+assert.ok(acknowledgementStart >= 0 && acknowledgementEnd > acknowledgementStart)
+const acknowledgementTest = pipelineTest.slice(acknowledgementStart, acknowledgementEnd)
+assert.match(acknowledgementTest, /-StoreScope LocalMachine/)
+assert.equal(
+  acknowledgementTest.includes('AcknowledgeEphemeralNonProductionHost'),
+  false,
+  'LocalMachine negative test must invoke install without the acknowledgement switch',
+)
+
+function assertImmediateSequence(source, parts, label) {
+  let searchFrom = 0
+  let previousEnd = -1
+  for (const part of parts) {
+    const at = source.indexOf(part, searchFrom)
+    if (at < 0) {
+      const earlier = source.indexOf(part)
+      assert.fail(
+        earlier >= 0
+          ? `${label} is out of order; a required marker was moved after its operation: ${part}`
+          : `${label} missing exact marker or operation: ${part}`,
+      )
+    }
+    assert.equal(
+      source.indexOf(part, at + part.length),
+      -1,
+      `${label} duplicate marker or operation: ${part}`,
+    )
+    if (previousEnd >= 0) {
+      const gap = source.slice(previousEnd, at)
+      assert.match(
+        gap,
+        /^\n[ \t]*$/,
+        `${label} marker moved away from its operation: ${JSON.stringify(gap)}`,
+      )
+    }
+    previousEnd = at + part.length
+    searchFrom = previousEnd
+  }
+}
+
+const markerLiteral =
+  'INTERNAL_SIGNING_TRUST_PHASE phase=$Phase scope=$($script:StoreScope) status=$Status'
+assert.equal(trustInstall.split(markerLiteral).length, 2, 'phase marker format must be emitted once')
+assert.doesNotMatch(
+  markerLiteral,
+  /Certificate|Thumbprint|FilePath|Password|PFX|Private|Subject|NotAfter/i,
+  'phase markers must stay free of certificate material',
+)
+assertImmediateSequence(
+  trustInstall,
+  [
+    'function Write-TrustInstallPhase([string]$Phase, [string]$Status) {',
+    `[Console]::Out.WriteLine("${markerLiteral}")`,
+    '[Console]::Out.Flush()',
+  ],
+  'trust phase marker writer',
+)
+
+const phaseBlocks = [
+  [
+    'Write-TrustInstallPhase -Phase "chain-validation" -Status "start"',
+    '$chainBuilt = $chain.Build($signer)',
+    'Write-TrustInstallPhase -Phase "chain-validation" -Status "pass"',
+  ],
+  [
+    'Write-TrustInstallPhase -Phase "root-import" -Status "start"',
+    'Import-Certificate -FilePath $RootCertificatePath -CertStoreLocation $rootStore | Out-Null',
+    'Write-TrustInstallPhase -Phase "root-import" -Status "pass"',
+  ],
+  [
+    'Write-TrustInstallPhase -Phase "trusted-publisher-import" -Status "start"',
+    'Import-Certificate -FilePath $SignerCertificatePath -CertStoreLocation $publisherStore | Out-Null',
+    'Write-TrustInstallPhase -Phase "trusted-publisher-import" -Status "pass"',
+  ],
+]
+
+let phaseCursor = trustInstall.indexOf(localMachineGuard)
+assert.ok(phaseCursor >= 0)
+for (const block of phaseBlocks) {
+  const startAt = trustInstall.indexOf(block[0])
+  assert.ok(
+    startAt > phaseCursor,
+    `${block[0]} must follow the LocalMachine guard and the previous phase`,
+  )
+  assertImmediateSequence(trustInstall, block, block[0])
+  phaseCursor = trustInstall.indexOf(block[2])
+}
+assert.equal(trustInstall.match(/Write-TrustInstallPhase\b/g).length, 7)
+
+const tryAt = trustInstall.indexOf('try {')
+const catchAt = trustInstall.indexOf('} catch {')
+assert.ok(trustInstall.indexOf(phaseBlocks[0][2]) < tryAt, 'chain validation stays outside import rollback')
+assert.ok(tryAt < trustInstall.indexOf(phaseBlocks[1][0]) && phaseCursor < catchAt)
+assert.ok(
+  trustInstall.includes(
+    [
+      '} catch {',
+      '  foreach ($target in @($publisherTarget, $rootTarget)) {',
+      '    if (Test-Path -LiteralPath $target) {',
+      '      Remove-Item -LiteralPath $target -Force',
+      '    }',
+      '  }',
+      '  throw',
+      '}',
+    ].join('\n'),
+  ),
+  'import failures must keep partial rollback and the original exception',
+)
+
+const thumbprintGuardAt = trustInstall.indexOf(
+  'Trust import did not create both expected thumbprint entries.',
+)
+const installedAt = trustInstall.indexOf('INTERNAL_SIGNING_TRUST_INSTALLED')
+assert.ok(phaseCursor < thumbprintGuardAt, 'thumbprint verification must stay after both imports return')
+assert.ok(thumbprintGuardAt < installedAt, 'install success must stay after thumbprint verification')
+assert.equal(trustInstall.split('INTERNAL_SIGNING_TRUST_INSTALLED').length, 2)
+
+console.log(
+  'SIGNING_WORKFLOW_CONTRACT_STATIC_ONLY: local source marker order only; no Windows trust runtime; interactive trust is not fixed',
+)
 console.log('SIGNING_WORKFLOW_CONTRACT_PASS')

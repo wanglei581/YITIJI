@@ -12,6 +12,12 @@ function Fail([string]$Message) {
   throw "INTERNAL_SIGNING_TRUST_INSTALL_FAILED: $Message"
 }
 
+# status=pass means that candidate returned. It is not trust installation success.
+function Write-TrustInstallPhase([string]$Phase, [string]$Status) {
+  [Console]::Out.WriteLine("INTERNAL_SIGNING_TRUST_PHASE phase=$Phase scope=$($script:StoreScope) status=$Status")
+  [Console]::Out.Flush()
+}
+
 if ($StoreScope -eq "LocalMachine" -and -not $AcknowledgeEphemeralNonProductionHost) {
   Fail "LocalMachine trust requires -AcknowledgeEphemeralNonProductionHost. Never install this root on a production kiosk."
 }
@@ -63,7 +69,9 @@ $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
 $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
 $chain.ChainPolicy.VerificationFlags = [System.Security.Cryptography.X509Certificates.X509VerificationFlags]::AllowUnknownCertificateAuthority
 $chain.ChainPolicy.ExtraStore.Add($root) | Out-Null
+Write-TrustInstallPhase -Phase "chain-validation" -Status "start"
 $chainBuilt = $chain.Build($signer)
+Write-TrustInstallPhase -Phase "chain-validation" -Status "pass"
 if (-not $chainBuilt) {
   Fail "The signer certificate chain failed cryptographic validation."
 }
@@ -99,8 +107,12 @@ foreach ($target in @($rootTarget, $publisherTarget)) {
   }
 }
 try {
+  Write-TrustInstallPhase -Phase "root-import" -Status "start"
   Import-Certificate -FilePath $RootCertificatePath -CertStoreLocation $rootStore | Out-Null
+  Write-TrustInstallPhase -Phase "root-import" -Status "pass"
+  Write-TrustInstallPhase -Phase "trusted-publisher-import" -Status "start"
   Import-Certificate -FilePath $SignerCertificatePath -CertStoreLocation $publisherStore | Out-Null
+  Write-TrustInstallPhase -Phase "trusted-publisher-import" -Status "pass"
 } catch {
   foreach ($target in @($publisherTarget, $rootTarget)) {
     if (Test-Path -LiteralPath $target) {

@@ -1,5 +1,15 @@
 # 下一步任务
 
+## 2026-09-23：内部签名信任只有静态诊断标记，签名 job 仍 NO-GO
+
+`install-internal-code-signing-trust.ps1` 现在会在链验证、Root 导入、TrustedPublisher 导入的调用前后
+打出 phase / store scope / start/pass。这是 local source/static diagnostic candidate only，用来在以后
+一次单独批准的 Windows 日志里定位下一次沉默。no runtime Windows proof。does not fix interactive trust。
+signed job `internal-signing-validation` 与 dependent MSI `unsigned-msi-candidate` remain NO-GO。
+unsigned EXE job `unsigned-exe-upgrade` result separate。不要把本提交当成挂起已修复，不要替换信任 API，
+不要加假超时，不要把默认存储改成 LocalMachine。未得到单独批准前，不要在临时 GitHub Windows runner 上
+实施 LocalMachine 信任。
+
 小程序补签与冷启动身份修复已合入 `9d7170d32`，合流完整 `verify:static` 退出 0。
 不要重复修复下方历史“未合入/待修冷启动”事项；下一步为最终 SHA CI、DevTools 和双账号真机验收。
 协作固定为：Codex 仅决策、串行整合与验收；Claude `claude-opus-5-5` / `xhigh` 独占前端实现与
