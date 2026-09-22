@@ -30,13 +30,20 @@ F2 已整合 `/resume/job-fit` 单路由候选，先验证合流后 W3 与相关
 其 `aa46be8f0` 的 `build-and-verify` 与 `postgres-readiness` 已通过；scan-safety documents 历史用例
 失败已判为夹具竞态并在本地集成树修复（仅 spec，完整 38/38），待新 HEAD 远端 CI 确认，勿改生产扫描源码
 或放宽 `/print-scan$` 锚点。Windows internal validation 被取消并阻断 MSI；根因由独立窗口分析，当前仍非 Windows GO。
-打印改价二次确认已落本地集成树；下一步只做精确新 SHA 的定向验证与远端 CI，不重复开发。
+打印改价二次确认已落本地集成树；一体机服务端与确认页不要重复开发。
+小程序会员单和材料包的服务端金额断言已在 `codex/member-package-price-confirmation-20260923` 完成本地实现，不要重写；Claude 仍须接确认页。
+
+## 2026-09-23：小程序建单价格再确认的服务端已本地完成，前端未接
+
+`POST /me/print-orders` 与 `POST /orders/package` 已接受可选 `quotedAmountCents`。旧客户端不传该字段仍按服务端现价建单。409 `PRICE_CHANGED` 释放临时租约，不要求更换 Idempotency-Key；已建成订单回放冻结金额。
+下一步只由 Claude 做小程序确认页：提交屏上确认金额，409 后展示服务端现价并等用户再次确认，沿用原键，不自动重试。本分支未改前端、未推送、未开 PR。
+真机、真实支付、生产与商业放行仍为 NO-GO。
 
 ## 2026-09-23：打印改价二次确认已本地集成，待最终 SHA CI
 
-来源 `f50938b845` 已合入并刷新项目图谱，不要重复实现 409 `PRICE_CHANGED` 与确认页再确认。
+来源 `f50938b845` 已合入并刷新项目图谱，不要重复实现一体机 409 `PRICE_CHANGED` 与确认页再确认。
 下一步：在最终 SHA 跑定向本地门禁与远端 CI（含 `verify:print-jobs`、`test:browser:truth`）；
-补合并版 409、金额卡来源文案；小程序建单是否需要同样的金额断言另行评估。
+补合并版 409、金额卡来源文案。小程序建单的服务端金额断言见上方本节，不再标成未评估。
 真机、真实支付渠道与生产验收仍为 NO-GO。
 
 ## 2026-09-23：支付本地验收完成，签名进入 Windows 实跑准备

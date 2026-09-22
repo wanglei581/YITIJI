@@ -6,7 +6,7 @@ import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
 // 各写一份 PICKUP_CODE_LEN=10，两处不同步即「按一种长度发码、按另一种长度收码」。
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
-import { OrderQuoteService } from '../payment/order-quote.service'
+import { OrderQuoteService, priceChanged } from '../payment/order-quote.service'
 import {
   CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
   claimedUnpaidExpiredLeaseWhere,
@@ -105,6 +105,7 @@ export function assertMemberPrintOrderIdempotencyKey(raw: unknown): string {
 }
 
 export function fingerprintMemberPrintOrderPayload(dto: Pick<CreateMemberPrintOrderDto, 'fileId' | 'terminalId' | 'copies' | 'colorMode' | 'duplex'>): string {
+  // quotedAmountCents 不进指纹：价格再确认必须沿用原来的 Idempotency-Key。
   return crypto.createHash('sha256').update(JSON.stringify({
     fileId: dto.fileId,
     terminalId: dto.terminalId,
@@ -259,6 +260,10 @@ export class MemberPrintOrderCreateService {
     // 到机码绝不能活得比源文件更久；否则用户会拿到“码仍有效、文件已清理”的假承诺。
     const pickupDeadline = now.getTime() + PICKUP_TTL_MS
     const expiresAt = new Date(Math.min(pickupDeadline, file.expiresAt?.getTime() ?? pickupDeadline))
+    // 只在新租约上、写库前比对。回放已建订单走上面的 replay，不在这里重算。
+    if (dto.quotedAmountCents !== undefined && dto.quotedAmountCents !== quote.amountCents) {
+      throw priceChanged(quote)
+    }
     let order
     try {
       order = await this.prisma.$transaction(async (tx) => {

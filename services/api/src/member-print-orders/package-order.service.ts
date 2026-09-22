@@ -4,7 +4,8 @@ import { AuditService } from '../audit/audit.service'
 import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
-import { OrderQuoteService } from '../payment/order-quote.service'
+import { aggregatePrintPriceQuotes, OrderQuoteService, priceChanged } from '../payment/order-quote.service'
+import type { PrintPriceQuote } from '../payment/payment.types'
 import { createPaymentSessionToken } from '../payment/payment-session-token'
 import {
   CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
@@ -59,6 +60,8 @@ function normalizeParams(dto: CreatePackageOrderDto): PrintJobParamsDto {
  * pageRange changes billed pages, so it must 409 on the same key.
  * colorMode/duplex aliases (bw/single) are normalized so a lost-response
  * retry with the other alias still replays.
+ * quotedAmountCents is not part of the fingerprint: a later price
+ * reconfirmation must reuse the original Idempotency-Key.
  */
 function canonicalizePackagePageRange(pageRange: string | undefined | null): string | null {
   return pageRange ? pageRange : null
@@ -139,6 +142,7 @@ export class PackageOrderService {
     if (files.length !== fileIds.length) throw new NotFoundException({ error: { code: 'PRINT_FILE_NOT_FOUND', message: '材料包中存在不存在或无权访问的文件' } })
     const fileById = new Map(files.map((file) => [file.id, file]))
     const items: Array<{ fileId: string; pageRange?: string; billablePages: number; amountCents: number; billingPageSource: string }> = []
+    const lineQuotes: PrintPriceQuote[] = []
     let expiresAt = new Date(now.getTime() + PICKUP_TTL_MS)
     for (const entry of dto.files) {
       const file = fileById.get(entry.fileId)!
@@ -155,6 +159,7 @@ export class PackageOrderService {
         terminalId: terminal.id,
         params: { ...params, ...(entry.pageRange ? { pageRange: entry.pageRange } : {}) },
       })
+      lineQuotes.push(quote)
       items.push({
         fileId: file.id,
         pageRange: entry.pageRange,
@@ -164,7 +169,14 @@ export class PackageOrderService {
       })
     }
 
-    const amountCents = items.reduce((total, item) => total + item.amountCents, 0)
+    const priced = lineQuotes.length > 0 ? aggregatePrintPriceQuotes(lineQuotes) : null
+    const amountCents = priced?.amountCents ?? items.reduce((total, item) => total + item.amountCents, 0)
+    if (dto.quotedAmountCents !== undefined && dto.quotedAmountCents !== amountCents) {
+      if (!priced) {
+        throw new BadRequestException({ error: { code: 'PRINT_FILE_REQUIRED', message: '缺少打印文件' } })
+      }
+      throw priceChanged(priced)
+    }
     const code = randomPickupCode()
     let order
     try {
@@ -177,7 +189,7 @@ export class PackageOrderService {
             endUserId,
             terminalId: terminal.id,
             amountCents,
-            billablePages: items.reduce((total, item) => total + item.billablePages, 0),
+            billablePages: priced?.billablePages ?? items.reduce((total, item) => total + item.billablePages, 0),
             billingPageSource: items.every((item) => item.billingPageSource === items[0]?.billingPageSource) ? items[0]?.billingPageSource : 'mixed',
             payStatus: 'unpaid',
             taskStatus: 'pending_release',

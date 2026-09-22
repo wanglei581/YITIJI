@@ -20,7 +20,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { EndUserAuthGuard, memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { RedisService } from '../src/common/redis/redis.service'
-import { PackageOrderService } from '../src/member-print-orders/package-order.service'
+import { fingerprintPackageOrderPayload, PackageOrderService } from '../src/member-print-orders/package-order.service'
 import { PackageOrdersController } from '../src/member-print-orders/package-orders.controller'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
@@ -398,6 +398,219 @@ async function main(): Promise<void> {
     if (bView.pickupCode === aView.pickupCode) fail('HTTP B 不得拿到 A 的到机码')
     if (await prisma.order.count({ where: { idempotencyKey: sharedKey } }) !== 2) fail('HTTP 不同用户同 key 应各有一行')
     pass('H6 不同用户同 header → 各建各的')
+
+    const packageLiveKey = randomUUID()
+    await prisma.orderSubmissionLedger.create({
+      data: {
+        endUserId: userA,
+        idempotencyKey: packageLiveKey,
+        orderKind: 'package',
+        payloadHash: fingerprintPackageOrderPayload(dtoA),
+        status: 'processing',
+        leaseToken: randomUUID(),
+        leaseExpiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    const packageLive = await request({
+      headers: { 'idempotency-key': packageLiveKey },
+      body: { ...dtoA, quotedAmountCents: 1 },
+    })
+    const packageLiveLedger = await prisma.orderSubmissionLedger.findFirst({ where: { endUserId: userA, idempotencyKey: packageLiveKey } })
+    if (packageLive.status !== 409 || errorCode(packageLive) !== 'IDEMPOTENCY_IN_PROGRESS') {
+      fail(`材料包活租约即使报价不一致也必须 IN_PROGRESS，实际 ${JSON.stringify(packageLive)}`)
+    }
+    if (!packageLiveLedger || packageLiveLedger.status !== 'processing') fail('材料包价格拒绝不得改写活租约')
+    if (await prisma.order.count({ where: { idempotencyKey: packageLiveKey } }) !== 0) fail('材料包活租约不得建单')
+    pass('H7 活租约优先于报价比对')
+
+    const packageAbandonedKey = randomUUID()
+    await prisma.orderSubmissionLedger.create({
+      data: {
+        endUserId: userA,
+        idempotencyKey: packageAbandonedKey,
+        orderKind: 'package',
+        payloadHash: fingerprintPackageOrderPayload(dtoA),
+        status: 'abandoned',
+      },
+    })
+    const packageAbandoned = await request({
+      headers: { 'idempotency-key': packageAbandonedKey },
+      body: { ...dtoA, quotedAmountCents: 1 },
+    })
+    if (packageAbandoned.status !== 409 || errorCode(packageAbandoned) !== 'IDEMPOTENCY_KEY_ABANDONED') {
+      fail(`材料包废弃键即使报价不一致也必须 ABANDONED，实际 ${JSON.stringify(packageAbandoned)}`)
+    }
+    pass('H8 废弃键优先于报价比对')
+
+    type PackagePriceView = PackageView & { amountCents: number; payStatus: string; paymentSessionToken?: string }
+    async function packageFootprint(): Promise<string> {
+      const [orders, items, tasks, attempts, audits, ledgers] = await Promise.all([
+        prisma.order.count(),
+        prisma.orderItem.count(),
+        prisma.printTask.count(),
+        prisma.paymentAttempt.count(),
+        prisma.auditLog.count({ where: { action: 'member.package_order.create' } }),
+        prisma.orderSubmissionLedger.count(),
+      ])
+      return JSON.stringify({ orders, items, tasks, attempts, audits, ledgers })
+    }
+    const setBw = (unitCents: number) => prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents } })
+    const seedBw = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
+    if (seedBw.unitCents !== 20) fail(`夹具黑白单价应为 20 分，实际 ${seedBw.unitCents}`)
+    const packageLine = (unitCents: number) => `line=print_bw_page:${unitCents}:2:${unitCents * 2}`
+    function assertPackageDetails(result: HttpResult, current: number, pages: number, lines: string[]): void {
+      const raw = (result.json['error'] as { details?: unknown } | undefined)?.details
+      if (!Array.isArray(raw) || raw.some((item) => typeof item !== 'string')) {
+        fail(`PRICE_CHANGED details 必须是 string[]，实际 ${JSON.stringify(result.json)}`)
+      }
+      const details = raw as string[]
+      const body = JSON.stringify(result.json)
+      const lineOk = lines.every((line) => details.filter((item) => item === line).length === lines.filter((item) => item === line).length)
+      if (
+        result.status !== 409 || result.json['success'] !== false || errorCode(result) !== 'PRICE_CHANGED'
+        || !details.includes(`currentAmountCents=${current}`) || !details.includes(`billablePages=${pages}`)
+        || !lineOk || body.includes('paymentSessionToken') || body.includes('更换标识')
+      ) {
+        fail(`期望 409 PRICE_CHANGED current=${current} lines=${lines.join(',')}，实际 ${body}`)
+      }
+    }
+    async function expectPackagePriceChanged(
+      label: string,
+      body: unknown,
+      current: number,
+      pages: number,
+      lines: string[],
+    ): Promise<void> {
+      const before = await packageFootprint()
+      const key = randomUUID()
+      const result = await request({ headers: { 'idempotency-key': key }, body })
+      assertPackageDetails(result, current, pages, lines)
+      if (await packageFootprint() !== before) fail(`${label} 产生了订单、明细、支付令牌或审计`)
+      if (await prisma.orderSubmissionLedger.findFirst({ where: { endUserId: userA, idempotencyKey: key } })) {
+        fail(`${label} 必须释放临时租约，不能墓碑`)
+      }
+      pass(label)
+    }
+
+    await expectPackagePriceChanged('H9 0→付费：确认 0、两份文件现价 80 分 → 409，明细不合并', { ...dtoA, quotedAmountCents: 0 }, 80, 4, [packageLine(20), packageLine(20)])
+    const priceRangedBody = {
+      ...dtoA,
+      files: [{ fileId: fileA1, pageRange: '1' }, { fileId: fileA2 }],
+      quotedAmountCents: 1,
+    }
+    await expectPackagePriceChanged(
+      'H10 页码范围按 /orders/quote 逐行展开：1 页 + 2 页 = 60 分',
+      priceRangedBody,
+      60,
+      3,
+      ['line=print_bw_page:20:1:20', 'line=print_bw_page:20:2:40'],
+    )
+    const packageReuseKey = randomUUID()
+    const packageReuseReject = await request({ headers: { 'idempotency-key': packageReuseKey }, body: { ...dtoA, quotedAmountCents: 0 } })
+    assertPackageDetails(packageReuseReject, 80, 4, [packageLine(20), packageLine(20)])
+    const packageReuseOk = await request({ headers: { 'idempotency-key': packageReuseKey }, body: { ...dtoA, quotedAmountCents: 80 } })
+    const packageReuseView = envelopeData<PackagePriceView>(packageReuseOk)
+    const packageReuseItems = await prisma.orderItem.count({ where: { orderId: packageReuseView.orderId } })
+    if (
+      packageReuseView.amountCents !== 80 || packageReuseView.payStatus !== 'unpaid'
+      || typeof packageReuseView.paymentSessionToken !== 'string' || packageReuseItems !== 2
+    ) {
+      fail(`409 后原键按现价再确认应建成 80 分材料包，实际 ${JSON.stringify(packageReuseView)}`)
+    }
+    pass('H11 409 释放租约后，原键可以按现价建成材料包')
+
+    await setBw(30)
+    await expectPackagePriceChanged('H12 涨价：确认 80、现价 120 → 409', { ...dtoA, quotedAmountCents: 80 }, 120, 4, [packageLine(30), packageLine(30)])
+    await setBw(10)
+    await expectPackagePriceChanged('H13 降价：确认 80、现价 40 → 409', { ...dtoA, quotedAmountCents: 80 }, 40, 4, [packageLine(10), packageLine(10)])
+    await setBw(0)
+    await expectPackagePriceChanged('H14 付费→0：确认 80、现价 0 → 409，不免费落单', { ...dtoA, quotedAmountCents: 80 }, 0, 4, [packageLine(0), packageLine(0)])
+    const packageFreeKey = randomUUID()
+    const packageFree = await request({ headers: { 'idempotency-key': packageFreeKey }, body: { ...dtoA, quotedAmountCents: 0 } })
+    const packageFreeView = envelopeData<PackagePriceView>(packageFree)
+    const packageFreeRow = await prisma.order.findUnique({ where: { id: packageFreeView.orderId } })
+    if (packageFreeView.amountCents !== 0 || packageFreeView.payStatus !== 'paid' || packageFreeRow?.paymentSource !== 'free') {
+      fail(`材料包确认 0 且现价 0 必须 paid+free，实际 ${JSON.stringify({ packageFreeView, packageFreeRow })}`)
+    }
+    const packageLegacyFree = await request({ headers: { 'idempotency-key': randomUUID() } })
+    const packageLegacyFreeView = envelopeData<PackagePriceView>(packageLegacyFree)
+    const packageLegacyFreeRow = await prisma.order.findUnique({ where: { id: packageLegacyFreeView.orderId } })
+    if (packageLegacyFreeView.amountCents !== 0 || packageLegacyFreeView.payStatus !== 'paid' || packageLegacyFreeRow?.paymentSource !== 'free') {
+      fail(`材料包旧客户端在现价 0 时仍应免费建单，实际 ${JSON.stringify({ packageLegacyFreeView, packageLegacyFreeRow })}`)
+    }
+    pass('H15 材料包现价 0：确认 0 与缺省字段都是 paid+free')
+
+    await setBw(20)
+    const packageLegacy = await request({ headers: { 'idempotency-key': randomUUID() } })
+    const packageLegacyView = envelopeData<PackagePriceView>(packageLegacy)
+    if (packageLegacyView.amountCents !== 80 || packageLegacyView.payStatus !== 'unpaid' || typeof packageLegacyView.paymentSessionToken !== 'string') {
+      fail(`材料包旧客户端应按 80 分建未支付单并给出支付令牌，实际 ${JSON.stringify(packageLegacyView)}`)
+    }
+    const packageMatchedKey = randomUUID()
+    const packageMatched = await request({ headers: { 'idempotency-key': packageMatchedKey }, body: { ...dtoA, quotedAmountCents: 80 } })
+    const packageMatchedView = envelopeData<PackagePriceView>(packageMatched)
+    if (packageMatchedView.amountCents !== 80 || packageMatchedView.payStatus !== 'unpaid') {
+      fail(`材料包报价一致应建成 80 分，实际 ${JSON.stringify(packageMatchedView)}`)
+    }
+    pass('H16 材料包缺省字段与报价一致都按服务端 80 分建单')
+
+    await setBw(50)
+    const packageFrozenNew = await request({ headers: { 'idempotency-key': packageMatchedKey }, body: { ...dtoA, quotedAmountCents: 200 } })
+    const packageFrozenOld = await request({ headers: { 'idempotency-key': packageMatchedKey }, body: { ...dtoA, quotedAmountCents: 1 } })
+    const packageFrozenNewView = envelopeData<PackagePriceView>(packageFrozenNew)
+    const packageFrozenOldView = envelopeData<PackagePriceView>(packageFrozenOld)
+    const packageFrozenRow = await prisma.order.findUnique({ where: { id: packageMatchedView.orderId } })
+    if (
+      packageFrozenNewView.orderId !== packageMatchedView.orderId || packageFrozenOldView.orderId !== packageMatchedView.orderId
+      || packageFrozenNewView.amountCents !== 80 || packageFrozenOldView.amountCents !== 80
+      || packageFrozenRow?.amountCents !== 80
+      || await prisma.order.count({ where: { idempotencyKey: packageMatchedKey } }) !== 1
+    ) {
+      fail(`已建材料包必须回放冻结的 80 分，实际 ${JSON.stringify({ packageFrozenNewView, packageFrozenOldView, packageFrozenRow })}`)
+    }
+    const packageFreshStale = await request({ headers: { 'idempotency-key': randomUUID() }, body: { ...dtoA, quotedAmountCents: 80 } })
+    assertPackageDetails(packageFreshStale, 200, 4, [packageLine(50), packageLine(50)])
+    const packageRepricedKey = randomUUID()
+    const packageRepriced = await request({ headers: { 'idempotency-key': packageRepricedKey }, body: { ...dtoA, quotedAmountCents: 200 } })
+    const packageRepricedView = envelopeData<PackagePriceView>(packageRepriced)
+    const packageRepricedReplay = await request({ headers: { 'idempotency-key': packageRepricedKey }, body: { ...dtoA, quotedAmountCents: 80 } })
+    const packageRepricedReplayView = envelopeData<PackagePriceView>(packageRepricedReplay)
+    if (packageRepricedView.amountCents !== 200 || packageRepricedReplayView.orderId !== packageRepricedView.orderId || packageRepricedReplayView.amountCents !== 200) {
+      fail(`材料包新价建单后换确认金额仍应回放 200 分原单，实际 ${JSON.stringify({ packageRepricedView, packageRepricedReplayView })}`)
+    }
+    pass('H17 已建材料包不因后续改价或确认金额变化而重算')
+
+    const packagePayloadKey = randomUUID()
+    const packagePayloadCreated = await request({
+      headers: { 'idempotency-key': packagePayloadKey },
+      body: { ...dtoA, quotedAmountCents: 200 },
+    })
+    if (packagePayloadCreated.status !== 200 && packagePayloadCreated.status !== 201) {
+      fail(`材料包同价确认应建单，实际 ${JSON.stringify(packagePayloadCreated)}`)
+    }
+    const packagePayloadConflict = await request({
+      headers: { 'idempotency-key': packagePayloadKey },
+      body: { ...dtoA, params: { ...dtoA.params, copies: 2 }, quotedAmountCents: 400 },
+    })
+    if (packagePayloadConflict.status !== 409 || errorCode(packagePayloadConflict) !== 'IDEMPOTENCY_KEY_REUSED') {
+      fail(`材料包同键改份数必须 IDEMPOTENCY_KEY_REUSED，实际 ${JSON.stringify(packagePayloadConflict)}`)
+    }
+    if (await prisma.order.count({ where: { idempotencyKey: packagePayloadKey } }) !== 1) fail('材料包参数冲突不得第二张单')
+    pass('H18 材料包同键改业务参数仍是 IDEMPOTENCY_KEY_REUSED，确认金额不进指纹')
+
+    const beforePackageInvalid = await packageFootprint()
+    for (const bad of [-1, 1.5, '80', null, 100_000_001]) {
+      const result = await request({
+        headers: { 'idempotency-key': randomUUID() },
+        body: { ...dtoA, quotedAmountCents: bad },
+      })
+      if (result.status !== 400 || errorCode(result) !== 'VALIDATION_FAILED') {
+        fail(`材料包 quotedAmountCents=${JSON.stringify(bad)} 应 400 VALIDATION_FAILED，实际 ${JSON.stringify(result)}`)
+      }
+    }
+    if (await packageFootprint() !== beforePackageInvalid) fail('材料包非法 quotedAmountCents 不得建单或留下租约')
+    pass('H19 quotedAmountCents 为负数 / 小数 / 字符串 / null / 超上限 → 400，零副作用')
+    await setBw(20)
   } finally {
     setPrintScanCapabilityModeForTest(null)
     await app.close()

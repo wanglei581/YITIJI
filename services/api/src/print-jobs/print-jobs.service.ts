@@ -11,8 +11,9 @@ import {
   createPaymentSessionToken,
   verifyPaymentSessionToken,
 } from '../payment/payment-session-token'
+import { priceChanged } from '../payment/order-quote.service'
 import { PricingService } from '../payment/pricing.service'
-import type { OrderPayStatus, PrintPriceLine, PrintPriceQuote } from '../payment/payment.types'
+import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { PrintPageCountService } from './print-page-count.service'
@@ -137,26 +138,6 @@ function parseStoredPrintFileId(fileUrl: string): string | null {
   } catch {
     return null
   }
-}
-
-/**
- * 409 PRICE_CHANGED：用户确认过的金额与服务端按最终文件重算的金额不一致。
- * 全局 HttpExceptionFilter 只透传 error.code / message / details(string[])，所以当前报价
- * 以固定 `key=value` 串放进 details，不带 description 等运营自由文本：
- *   currentAmountCents=<分>、billablePages=<页>、line=<serviceKey>:<unitCents>:<quantity>:<subtotalCents>
- */
-function priceChanged(quote: PrintPriceQuote): ConflictException {
-  return new ConflictException({
-    error: {
-      code: 'PRICE_CHANGED',
-      message: `价格已更新，当前应付 ${(quote.amountCents / 100).toFixed(2)} 元。本次未建单、未扣款，请核对新价格后再确认。`,
-      details: [
-        `currentAmountCents=${quote.amountCents}`,
-        `billablePages=${quote.billablePages}`,
-        ...quote.lines.map((l) => `line=${l.serviceKey}:${l.unitCents}:${l.quantity}:${l.subtotalCents}`),
-      ],
-    },
-  })
 }
 
 function printTaskNotFound(): never {
