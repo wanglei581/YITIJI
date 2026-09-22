@@ -312,20 +312,39 @@ jobs:
             -ProductVersion "0.4.11" `
             -EvidenceRoot "$env:RUNNER_TEMP\ai-job-print-internal-signing-evidence" `
             -WixToolPath $wix `
-            -ExerciseLifecycle
+            -ExerciseLifecycle `
+            -UseEphemeralGitHubHostedLocalMachineTrust
 
       - name: Ensure internal test trust and private certificates are removed
         if: always()
         shell: powershell
         run: |
           $metadataPath = "$env:RUNNER_TEMP\ai-job-print-internal-signing-evidence\certificates\internal-signing-certificate.json"
-          if (Test-Path -LiteralPath $metadataPath -PathType Leaf) {
-            $metadata = Get-Content -Raw -Encoding UTF8 -LiteralPath $metadataPath | ConvertFrom-Json
-            powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/remove-internal-code-signing-trust.ps1 `
-              -RootThumbprint $metadata.root.thumbprint `
-              -SignerThumbprint $metadata.signer.thumbprint `
-              -RemovePrivateCertificates
+          $ownershipPath = "$env:RUNNER_TEMP\ai-job-print-internal-signing-evidence\run-ownership.marker"
+          if (-not (Test-Path -LiteralPath $metadataPath -PathType Leaf)) {
+            Write-Host "INTERNAL_SIGNING_WORKFLOW_CLEANUP_SKIPPED reason=no-metadata"
+            exit 0
           }
+          if (-not (Test-Path -LiteralPath $ownershipPath -PathType Leaf)) {
+            Write-Host "INTERNAL_SIGNING_WORKFLOW_CLEANUP_SKIPPED reason=no-ownership"
+            exit 0
+          }
+          $metadata = Get-Content -Raw -Encoding UTF8 -LiteralPath $metadataPath | ConvertFrom-Json
+          $rootThumbprint = [string]$metadata.root.thumbprint
+          $signerThumbprint = [string]$metadata.signer.thumbprint
+          if ($rootThumbprint -notmatch '^[0-9A-Fa-f]{40}$' -or $signerThumbprint -notmatch '^[0-9A-Fa-f]{40}$') {
+            throw "INTERNAL_SIGNING_WORKFLOW_CLEANUP_FAILED: metadata thumbprints are invalid."
+          }
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/remove-internal-code-signing-trust.ps1 `
+            -RootThumbprint $rootThumbprint `
+            -SignerThumbprint $signerThumbprint `
+            -StoreScope LocalMachine `
+            -PrivateKeyStoreScope CurrentUser `
+            -RemovePrivateCertificates `
+            -AcknowledgeEphemeralNonProductionHost `
+            -RunOwnershipMarkerPath "$ownershipPath"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "INTERNAL_SIGNING_WORKFLOW_CLEANUP_PASS"
 
       - name: Upload complete internal signing evidence only (NOT FOR DEPLOYMENT)
         if: success()
@@ -333,7 +352,6 @@ jobs:
         with:
           name: terminal-agent-internal-signing-test-evidence-NOT-FOR-DEPLOYMENT
           path: |
-            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/certificates/internal-signing-certificate.json
             ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/staging-manifest.json
             ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/unsigned-candidate-identity.json
             ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/signed-release-identity.json
@@ -349,7 +367,6 @@ jobs:
         with:
           name: terminal-agent-internal-signing-failure-evidence-NOT-FOR-DEPLOYMENT
           path: |
-            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/certificates/internal-signing-certificate.json
             ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/signed-release-identity.json
             ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/signed-release-identity.p7s
             ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-exe-lifecycle-logs/

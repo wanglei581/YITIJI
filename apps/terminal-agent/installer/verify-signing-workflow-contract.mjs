@@ -15,7 +15,14 @@ const certificateCleanup = read(
   'apps/terminal-agent/installer/remove-internal-code-signing-trust.ps1',
 )
 const signingTools = read('apps/terminal-agent/installer/signing-tools.ps1')
-const pipelineTest = read('apps/terminal-agent/installer/test-internal-signing-pipeline.ps1')
+const pipelineTest = read('apps/terminal-agent/installer/test-internal-signing-pipeline.ps1').replaceAll(
+  '\r\n',
+  '\n',
+)
+const trustRemoval = read('apps/terminal-agent/installer/remove-internal-code-signing-trust.ps1').replaceAll(
+  '\r\n',
+  '\n',
+)
 const trustInstall = read(
   'apps/terminal-agent/installer/install-internal-code-signing-trust.ps1',
 ).replaceAll('\r\n', '\n')
@@ -89,6 +96,7 @@ assert.match(pipelineTest, /reattach the signed engine for the unsigned embedded
 assert.match(pipelineTest, /Assert-UnsignedAuthenticode \$unsignedEnginePath/)
 for (const expectedFailure of [
   'local-machine-trust-requires-acknowledgement',
+  'local-machine-trust-requires-github-hosted-runner',
   'release-mode-requires-timestamp',
   'tampered-signed-msi',
   'tampered-signed-release-identity',
@@ -219,10 +227,23 @@ for (const block of phaseBlocks) {
   assertImmediateSequence(trustInstall, block, block[0])
   phaseCursor = trustInstall.indexOf(block[2])
 }
-assert.equal(trustInstall.match(/Write-TrustInstallPhase\b/g).length, 7)
+assert.deepEqual(
+  trustInstall.match(/Write-TrustInstallPhase -Phase "[^"]+" -Status "[^"]+"/g),
+  [
+    'Write-TrustInstallPhase -Phase "runner-guard" -Status "pass"',
+    'Write-TrustInstallPhase -Phase "chain-validation" -Status "start"',
+    'Write-TrustInstallPhase -Phase "chain-validation" -Status "pass"',
+    'Write-TrustInstallPhase -Phase "root-import" -Status "start"',
+    'Write-TrustInstallPhase -Phase "root-import" -Status "pass"',
+    'Write-TrustInstallPhase -Phase "trusted-publisher-import" -Status "start"',
+    'Write-TrustInstallPhase -Phase "trusted-publisher-import" -Status "pass"',
+  ],
+)
 
-const tryAt = trustInstall.indexOf('try {')
-const catchAt = trustInstall.indexOf('} catch {')
+const tryAt = trustInstall.indexOf(
+  'try {\n  Write-TrustInstallPhase -Phase "root-import" -Status "start"',
+)
+const catchAt = trustInstall.indexOf('} catch {\n  foreach ($target in @($publisherTarget, $rootTarget))')
 assert.ok(trustInstall.indexOf(phaseBlocks[0][2]) < tryAt, 'chain validation stays outside import rollback')
 assert.ok(tryAt < trustInstall.indexOf(phaseBlocks[1][0]) && phaseCursor < catchAt)
 assert.ok(
@@ -248,6 +269,136 @@ const installedAt = trustInstall.indexOf('INTERNAL_SIGNING_TRUST_INSTALLED')
 assert.ok(phaseCursor < thumbprintGuardAt, 'thumbprint verification must stay after both imports return')
 assert.ok(thumbprintGuardAt < installedAt, 'install success must stay after thumbprint verification')
 assert.equal(trustInstall.split('INTERNAL_SIGNING_TRUST_INSTALLED').length, 2)
+
+const envGuardAt = trustInstall.indexOf(
+  '$env:GITHUB_ACTIONS -ne "true" -or $env:RUNNER_OS -ne "Windows" -or $env:RUNNER_ENVIRONMENT -ne "github-hosted"',
+)
+const runnerPassAt = trustInstall.indexOf('Write-TrustInstallPhase -Phase "runner-guard" -Status "pass"')
+const chainStartAt = trustInstall.indexOf('Write-TrustInstallPhase -Phase "chain-validation" -Status "start"')
+const bindingCallAt = trustInstall.indexOf('\n  Assert-LocalMachineCertificateBinding\n')
+const refusalAt = trustInstall.indexOf("Refusing to overwrite existing trust entry")
+const createNewAt = trustInstall.indexOf('[System.IO.FileMode]::CreateNew')
+const rootImportAt = trustInstall.indexOf(
+  'Import-Certificate -FilePath $RootCertificatePath -CertStoreLocation $rootStore | Out-Null',
+)
+assert.match(trustInstall, /spoofable accident protection, not attestation/)
+assert.doesNotMatch(trustInstall, /^\s*\$StoreScope\s*=\s*"CurrentUser"/m)
+assert.ok(
+  trustInstall.indexOf('Never install this root on a production kiosk.') < envGuardAt &&
+    envGuardAt < runnerPassAt &&
+    runnerPassAt < chainStartAt &&
+    chainStartAt < bindingCallAt &&
+    bindingCallAt < refusalAt &&
+    refusalAt < createNewAt &&
+    createNewAt < rootImportAt,
+  'LocalMachine guard, binding, preexisting refusal, and ownership marker must stay before import',
+)
+const bindingStart = trustInstall.indexOf('function Assert-LocalMachineCertificateBinding')
+const bindingEnd = trustInstall.indexOf('\n}\n', bindingStart)
+const bindingBody = trustInstall.slice(bindingStart, bindingEnd)
+assert.doesNotMatch(bindingBody, /Write-Host|Write-Error|\$_/)
+for (const required of [
+  'schemaVersion',
+  'internal-test-only',
+  'not-for-production-or-fleet-deployment',
+  'storeScope',
+  'CurrentUser',
+  'certificateFile',
+  'sha256',
+  'thumbprint',
+  'GetFullPath',
+  'LocalMachine trust certificate binding failed.',
+]) {
+  assert.ok(bindingBody.includes(required), `binding check missing: ${required}`)
+}
+assert.ok(
+  trustInstall.includes(
+    [
+      'foreach ($target in @($rootTarget, $publisherTarget)) {',
+      '  if (Test-Path -LiteralPath $target) {',
+      '    Fail "Refusing to overwrite existing trust entry \'$target\'. Remove or reuse it deliberately."',
+      '  }',
+      '}',
+    ].join('\n'),
+  ),
+)
+
+const forbidAt = trustRemoval.indexOf(
+  'LocalMachine trust and private-key scopes together are forbidden',
+)
+const ownershipAt = trustRemoval.indexOf(
+  'LocalMachine cleanup requires an existing run ownership marker',
+)
+const firstDeleteAt = trustRemoval.indexOf('Remove-Item')
+assert.ok(forbidAt >= 0 && ownershipAt >= 0 && forbidAt < firstDeleteAt && ownershipAt < firstDeleteAt)
+assert.match(trustRemoval, /\$privateScope = \$PrivateKeyStoreScope/)
+assert.match(trustRemoval, /Cert:\\\$privateScope\\My/)
+
+const ackNegativeAt = pipelineTest.indexOf('local-machine-trust-requires-acknowledgement')
+const runnerNegativeAt = pipelineTest.indexOf('local-machine-trust-requires-github-hosted-runner')
+const refusedInstallAt = pipelineTest.indexOf('LocalMachine trust entry exists after a refused install')
+const optInAt = pipelineTest.indexOf('if ($UseEphemeralGitHubHostedLocalMachineTrust)')
+assert.ok(ackNegativeAt >= 0 && ackNegativeAt < runnerNegativeAt && runnerNegativeAt < refusedInstallAt && refusedInstallAt < optInAt)
+assert.match(pipelineTest, /\[switch\]\$UseEphemeralGitHubHostedLocalMachineTrust/)
+assert.match(pipelineTest, /Remove-Item -Path "Env:\$name"/)
+assert.match(
+  pipelineTest,
+  /\} else \{\n\s+& \(Join-Path \$PSScriptRoot "install-internal-code-signing-trust\.ps1"\) `\n\s+-RootCertificatePath \(Join-Path \$certificateRoot \$certificateMetadata\.root\.certificateFile\) `\n\s+-SignerCertificatePath \(Join-Path \$certificateRoot \$certificateMetadata\.signer\.certificateFile\)\n\s+\}/,
+)
+assert.match(pipelineTest, /-StoreScope LocalMachine `\n\s+-PrivateKeyStoreScope CurrentUser `\n\s+-RemovePrivateCertificates `\n\s+-AcknowledgeEphemeralNonProductionHost `\n\s+-RunOwnershipMarkerPath \$ownershipMarkerPath/)
+assert.doesNotMatch(pipelineTest, /-PrivateKeyStoreScope LocalMachine/)
+assert.match(pipelineTest, /INTERNAL_SIGNING_PIPELINE_RESULT original=\$originalStatus cleanup=\$cleanupStatus/)
+assert.match(pipelineTest, /original pipeline failure followed by cleanup failure/)
+assert.match(pipelineTest, /cleanup failed after the pipeline body returned/)
+assert.match(pipelineTest, /skipped-no-ownership/)
+assert.match(pipelineTest, /throw \$pipelineFailure/)
+
+assert.match(signingJob, /timeout-minutes:\s*55/)
+assert.match(signingJob, /-UseEphemeralGitHubHostedLocalMachineTrust/)
+assert.doesNotMatch(signingJob, /continue-on-error/)
+assert.doesNotMatch(signingJob, /WINDOWS_LOCALMACHINE_NONINTERACTIVE_PROVEN|certutil/i)
+for (const jobName of ['unsigned-msi-candidate', 'unsigned-exe-upgrade']) {
+  const job = workflowJob(workflow, jobName)
+  assert.doesNotMatch(job, /UseEphemeralGitHubHostedLocalMachineTrust/)
+  assert.doesNotMatch(job, /AcknowledgeEphemeralNonProductionHost/)
+  assert.doesNotMatch(job, /StoreScope LocalMachine/)
+  assert.doesNotMatch(job, /certutil/i)
+}
+const cleanupStart = signingJob.indexOf(
+  '- name: Ensure internal test trust and private certificates are removed',
+)
+const cleanupEnd = signingJob.indexOf('\n      - name:', cleanupStart + 10)
+assert.ok(cleanupStart >= 0 && cleanupEnd > cleanupStart)
+const cleanupStep = signingJob.slice(cleanupStart, cleanupEnd)
+assert.match(cleanupStep, /if: always\(\)/)
+assert.doesNotMatch(cleanupStep, /continue-on-error|\bcatch\b/)
+assert.match(cleanupStep, /reason=no-metadata/)
+assert.match(cleanupStep, /reason=no-ownership/)
+const workflowRemoveAt = cleanupStep.indexOf('remove-internal-code-signing-trust.ps1')
+const workflowExitAt = cleanupStep.indexOf('if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }')
+const workflowPassAt = cleanupStep.indexOf('INTERNAL_SIGNING_WORKFLOW_CLEANUP_PASS')
+assert.ok(
+  cleanupStep.indexOf('reason=no-metadata') < workflowRemoveAt &&
+    cleanupStep.indexOf('reason=no-ownership') < workflowRemoveAt &&
+    workflowRemoveAt < workflowExitAt &&
+    workflowExitAt < workflowPassAt,
+)
+assert.match(cleanupStep, /-StoreScope LocalMachine/)
+assert.match(cleanupStep, /-PrivateKeyStoreScope CurrentUser/)
+assert.match(cleanupStep, /-AcknowledgeEphemeralNonProductionHost/)
+assert.match(cleanupStep, /-RunOwnershipMarkerPath/)
+assert.doesNotMatch(cleanupStep, /-PrivateKeyStoreScope LocalMachine/)
+const uploadBlocks = [...signingJob.matchAll(/uses: actions\/upload-artifact@v4[\s\S]*?retention-days: \d+/g)]
+assert.ok(uploadBlocks.length >= 2)
+for (const block of uploadBlocks) {
+  assert.doesNotMatch(
+    block[0],
+    /internal-signing-certificate\.json|\.cer|\.pfx|run-ownership\.marker/,
+  )
+}
+assert.doesNotMatch(trustInstall, /certutil/i)
+assert.doesNotMatch(trustRemoval, /certutil/i)
+assert.doesNotMatch(pipelineTest, /certutil/i)
 
 console.log(
   'SIGNING_WORKFLOW_CONTRACT_STATIC_ONLY: local source marker order only; no Windows trust runtime; interactive trust is not fixed',

@@ -1,14 +1,16 @@
 # 下一步任务
 
-## 2026-09-23：内部签名信任只有静态诊断标记，签名 job 仍 NO-GO
+## 2026-09-23：内部签名 LocalMachine 只有源码/静态契约，签名 job 仍 NO-GO
 
-`install-internal-code-signing-trust.ps1` 现在会在链验证、Root 导入、TrustedPublisher 导入的调用前后
-打出 phase / store scope / start/pass。这是 local source/static diagnostic candidate only，用来在以后
-一次单独批准的 Windows 日志里定位下一次沉默。no runtime Windows proof。does not fix interactive trust。
-signed job `internal-signing-validation` 与 dependent MSI `unsigned-msi-candidate` remain NO-GO。
-unsigned EXE job `unsigned-exe-upgrade` result separate。不要把本提交当成挂起已修复，不要替换信任 API，
-不要加假超时，不要把默认存储改成 LocalMachine。未得到单独批准前，不要在临时 GitHub Windows runner 上
-实施 LocalMachine 信任。
+受控路径已经写进 `internal-signing-validation` 的 opt-in。默认仍是 CurrentUser。环境三项
+`GITHUB_ACTIONS` / `RUNNER_OS` / `RUNNER_ENVIRONMENT` 只是可伪造的意外防护，不是证明。
+`run-ownership.marker` 在预检通过后才创建；没有标记就不得删除信任项。这是 SOURCE/STATIC candidate only。
+Windows LocalMachine 导入是否非交互返回，以及清理是否删净，都未验证。signed job
+`internal-signing-validation` 与 dependent MSI `unsigned-msi-candidate` remain NO-GO，直到一次
+github-hosted Windows 日志按顺序出现 `runner-guard`、chain、root-import、trusted-publisher-import 的
+`scope=LocalMachine` start/pass，并且 pipeline 与 `if: always()` 清理都成功。unsigned EXE job
+`unsigned-exe-upgrade` result separate。不要把静态契约当成非交互信任已修复，不要加假超时，不要 `certutil`，
+不要在失败时退回 CurrentUser。未签名 job 不得接收 opt-in、acknowledgement 或 LocalMachine 信任。
 
 小程序补签与冷启动身份修复已合入 `9d7170d32`，合流完整 `verify:static` 退出 0。
 不要重复修复下方历史“未合入/待修冷启动”事项；下一步为最终 SHA CI、DevTools 和双账号真机验收。

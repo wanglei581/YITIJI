@@ -5,6 +5,7 @@ param(
   [Parameter(Mandatory)][ValidatePattern("^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")][string]$ProductVersion,
   [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$EvidenceRoot,
   [switch]$ExerciseLifecycle,
+  [switch]$UseEphemeralGitHubHostedLocalMachineTrust,
   [string]$SignToolPath,
   [string]$WixToolPath
 )
@@ -71,6 +72,8 @@ $unsignedEngineRoot = Join-Path $resolvedEvidence "outer-signed-unsigned-engine"
 $missingTimestampRoot = Join-Path $resolvedEvidence "release-mode-missing-timestamp"
 $rootThumbprint = $null
 $signerThumbprint = $null
+$pipelineFailure = $null
+$ownershipMarkerPath = Join-Path $resolvedEvidence "run-ownership.marker"
 
 try {
   & (Join-Path $PSScriptRoot "new-internal-code-signing-certificates.ps1") `
@@ -89,9 +92,57 @@ try {
       -StoreScope LocalMachine
   } "LocalMachine trust requires"
 
-  & (Join-Path $PSScriptRoot "install-internal-code-signing-trust.ps1") `
-    -RootCertificatePath (Join-Path $certificateRoot $certificateMetadata.root.certificateFile) `
-    -SignerCertificatePath (Join-Path $certificateRoot $certificateMetadata.signer.certificateFile)
+  Expect-Failure "local-machine-trust-requires-github-hosted-runner" {
+    $savedRunnerEnvironment = @{
+      GITHUB_ACTIONS = $env:GITHUB_ACTIONS
+      RUNNER_OS = $env:RUNNER_OS
+      RUNNER_ENVIRONMENT = $env:RUNNER_ENVIRONMENT
+    }
+    try {
+      foreach ($name in @("GITHUB_ACTIONS", "RUNNER_OS", "RUNNER_ENVIRONMENT")) {
+        Remove-Item -Path "Env:$name" -ErrorAction SilentlyContinue
+      }
+      & (Join-Path $PSScriptRoot "install-internal-code-signing-trust.ps1") `
+        -RootCertificatePath (Join-Path $certificateRoot $certificateMetadata.root.certificateFile) `
+        -SignerCertificatePath (Join-Path $certificateRoot $certificateMetadata.signer.certificateFile) `
+        -StoreScope LocalMachine `
+        -AcknowledgeEphemeralNonProductionHost `
+        -CertificateMetadataPath $certificateMetadataPath `
+        -RunOwnershipMarkerPath $ownershipMarkerPath
+    } finally {
+      foreach ($name in @("GITHUB_ACTIONS", "RUNNER_OS", "RUNNER_ENVIRONMENT")) {
+        if ($null -eq $savedRunnerEnvironment[$name]) {
+          Remove-Item -Path "Env:$name" -ErrorAction SilentlyContinue
+        } else {
+          Set-Item -Path "Env:$name" -Value $savedRunnerEnvironment[$name]
+        }
+      }
+    }
+  } "github-hosted Windows Actions runner"
+  foreach ($storeName in @("Root", "TrustedPublisher")) {
+    foreach ($thumbprint in @($rootThumbprint, $signerThumbprint)) {
+      if (Test-Path -LiteralPath "Cert:\LocalMachine\$storeName\$thumbprint") {
+        throw "INTERNAL_SIGNING_PIPELINE_TEST_FAILED: LocalMachine trust entry exists after a refused install."
+      }
+    }
+  }
+  if (Test-Path -LiteralPath $ownershipMarkerPath) {
+    throw "INTERNAL_SIGNING_PIPELINE_TEST_FAILED: Run ownership marker exists after a refused install."
+  }
+
+  if ($UseEphemeralGitHubHostedLocalMachineTrust) {
+    & (Join-Path $PSScriptRoot "install-internal-code-signing-trust.ps1") `
+      -RootCertificatePath (Join-Path $certificateRoot $certificateMetadata.root.certificateFile) `
+      -SignerCertificatePath (Join-Path $certificateRoot $certificateMetadata.signer.certificateFile) `
+      -StoreScope LocalMachine `
+      -AcknowledgeEphemeralNonProductionHost `
+      -CertificateMetadataPath $certificateMetadataPath `
+      -RunOwnershipMarkerPath $ownershipMarkerPath
+  } else {
+    & (Join-Path $PSScriptRoot "install-internal-code-signing-trust.ps1") `
+      -RootCertificatePath (Join-Path $certificateRoot $certificateMetadata.root.certificateFile) `
+      -SignerCertificatePath (Join-Path $certificateRoot $certificateMetadata.signer.certificateFile)
+  }
 
   Expect-Failure "release-mode-requires-timestamp" {
     & (Join-Path $PSScriptRoot "sign-windows-installer-release.ps1") `
@@ -326,11 +377,54 @@ try {
   }
 
   Write-Host "INTERNAL_SIGNING_PIPELINE_PASS releaseRoot=$releaseRoot signer=$signerThumbprint"
+} catch {
+  $pipelineFailure = $_
 } finally {
-  if (-not [string]::IsNullOrWhiteSpace($rootThumbprint) -and -not [string]::IsNullOrWhiteSpace($signerThumbprint)) {
-    & (Join-Path $PSScriptRoot "remove-internal-code-signing-trust.ps1") `
-      -RootThumbprint $rootThumbprint `
-      -SignerThumbprint $signerThumbprint `
-      -RemovePrivateCertificates
+  $cleanupFailure = $null
+  $cleanupStatus = "passed"
+  try {
+    if (-not [string]::IsNullOrWhiteSpace($rootThumbprint) -and -not [string]::IsNullOrWhiteSpace($signerThumbprint)) {
+      if ($UseEphemeralGitHubHostedLocalMachineTrust) {
+        if (-not (Test-Path -LiteralPath $ownershipMarkerPath -PathType Leaf)) {
+          if ($null -eq $pipelineFailure) {
+            throw "INTERNAL_SIGNING_TRUST_REMOVE_FAILED: LocalMachine cleanup requires an existing run ownership marker."
+          }
+          $cleanupStatus = "skipped-no-ownership"
+        } else {
+          & (Join-Path $PSScriptRoot "remove-internal-code-signing-trust.ps1") `
+            -RootThumbprint $rootThumbprint `
+            -SignerThumbprint $signerThumbprint `
+            -StoreScope LocalMachine `
+            -PrivateKeyStoreScope CurrentUser `
+            -RemovePrivateCertificates `
+            -AcknowledgeEphemeralNonProductionHost `
+            -RunOwnershipMarkerPath $ownershipMarkerPath
+        }
+      } else {
+        & (Join-Path $PSScriptRoot "remove-internal-code-signing-trust.ps1") `
+          -RootThumbprint $rootThumbprint `
+          -SignerThumbprint $signerThumbprint `
+          -RemovePrivateCertificates
+      }
+    }
+  } catch {
+    $cleanupFailure = $_
+    $cleanupStatus = "failed"
   }
+}
+$originalStatus = "passed"
+if ($null -ne $pipelineFailure) {
+  $originalStatus = "failed"
+}
+Write-Host "INTERNAL_SIGNING_PIPELINE_RESULT original=$originalStatus cleanup=$cleanupStatus"
+if ($null -ne $cleanupFailure -and $null -ne $pipelineFailure) {
+  Write-Host "INTERNAL_SIGNING_PIPELINE_ORIGINAL_FAILURE"
+  Write-Host $pipelineFailure.Exception.Message
+  throw "INTERNAL_SIGNING_PIPELINE_TEST_FAILED: original pipeline failure followed by cleanup failure."
+}
+if ($null -ne $cleanupFailure) {
+  throw "INTERNAL_SIGNING_PIPELINE_TEST_FAILED: cleanup failed after the pipeline body returned."
+}
+if ($null -ne $pipelineFailure) {
+  throw $pipelineFailure
 }

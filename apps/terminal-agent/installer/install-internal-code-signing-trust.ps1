@@ -3,7 +3,9 @@ param(
   [Parameter(Mandatory)][ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })][string]$RootCertificatePath,
   [Parameter(Mandatory)][ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })][string]$SignerCertificatePath,
   [ValidateSet("CurrentUser", "LocalMachine")][string]$StoreScope = "CurrentUser",
-  [switch]$AcknowledgeEphemeralNonProductionHost
+  [switch]$AcknowledgeEphemeralNonProductionHost,
+  [string]$CertificateMetadataPath,
+  [string]$RunOwnershipMarkerPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,8 +20,52 @@ function Write-TrustInstallPhase([string]$Phase, [string]$Status) {
   [Console]::Out.Flush()
 }
 
+function Assert-LocalMachineCertificateBinding {
+  try {
+    if ([string]::IsNullOrWhiteSpace($script:CertificateMetadataPath) -or -not (Test-Path -LiteralPath $script:CertificateMetadataPath -PathType Leaf)) {
+      throw "binding"
+    }
+    $metadata = Get-Content -Raw -Encoding UTF8 -LiteralPath $script:CertificateMetadataPath | ConvertFrom-Json
+    if ([int]$metadata.schemaVersion -ne 1) { throw "binding" }
+    if ([string]$metadata.signingScope -ne "internal-test-only") { throw "binding" }
+    if ([string]$metadata.deploymentEligibility -ne "not-for-production-or-fleet-deployment") { throw "binding" }
+    if ([string]$metadata.storeScope -ne "CurrentUser") { throw "binding" }
+    $rootFileName = [string]$metadata.root.certificateFile
+    $signerFileName = [string]$metadata.signer.certificateFile
+    if ($rootFileName -notmatch '^[A-Za-z0-9._-]+\.cer$' -or $signerFileName -notmatch '^[A-Za-z0-9._-]+\.cer$') {
+      throw "binding"
+    }
+    $suppliedRootName = [System.IO.Path]::GetFileName($script:RootCertificatePath)
+    $suppliedSignerName = [System.IO.Path]::GetFileName($script:SignerCertificatePath)
+    if (-not $suppliedRootName.Equals($rootFileName, [System.StringComparison]::OrdinalIgnoreCase)) { throw "binding" }
+    if (-not $suppliedSignerName.Equals($signerFileName, [System.StringComparison]::OrdinalIgnoreCase)) { throw "binding" }
+    $metadataDirectory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($script:CertificateMetadataPath))
+    $boundRoot = [System.IO.Path]::GetFullPath((Join-Path $metadataDirectory $rootFileName))
+    $boundSigner = [System.IO.Path]::GetFullPath((Join-Path $metadataDirectory $signerFileName))
+    $fullRoot = [System.IO.Path]::GetFullPath($script:RootCertificatePath)
+    $fullSigner = [System.IO.Path]::GetFullPath($script:SignerCertificatePath)
+    if (-not $fullRoot.Equals($boundRoot, [System.StringComparison]::OrdinalIgnoreCase)) { throw "binding" }
+    if (-not $fullSigner.Equals($boundSigner, [System.StringComparison]::OrdinalIgnoreCase)) { throw "binding" }
+    $rootHash = (Get-FileHash -LiteralPath $script:RootCertificatePath -Algorithm SHA256).Hash
+    $signerHash = (Get-FileHash -LiteralPath $script:SignerCertificatePath -Algorithm SHA256).Hash
+    if (-not $rootHash.Equals([string]$metadata.root.sha256, [System.StringComparison]::OrdinalIgnoreCase)) { throw "binding" }
+    if (-not $signerHash.Equals([string]$metadata.signer.sha256, [System.StringComparison]::OrdinalIgnoreCase)) { throw "binding" }
+    if (-not $script:root.Thumbprint.Equals([string]$metadata.root.thumbprint, [System.StringComparison]::OrdinalIgnoreCase)) { throw "binding" }
+    if (-not $script:signer.Thumbprint.Equals([string]$metadata.signer.thumbprint, [System.StringComparison]::OrdinalIgnoreCase)) { throw "binding" }
+  } catch {
+    Fail "LocalMachine trust certificate binding failed."
+  }
+}
+
 if ($StoreScope -eq "LocalMachine" -and -not $AcknowledgeEphemeralNonProductionHost) {
   Fail "LocalMachine trust requires -AcknowledgeEphemeralNonProductionHost. Never install this root on a production kiosk."
+}
+# GITHUB_ACTIONS + RUNNER_OS + RUNNER_ENVIRONMENT is spoofable accident protection, not attestation.
+if ($StoreScope -eq "LocalMachine") {
+  if ($env:GITHUB_ACTIONS -ne "true" -or $env:RUNNER_OS -ne "Windows" -or $env:RUNNER_ENVIRONMENT -ne "github-hosted") {
+    Fail "LocalMachine trust requires a github-hosted Windows Actions runner."
+  }
+  Write-TrustInstallPhase -Phase "runner-guard" -Status "pass"
 }
 foreach ($path in @($RootCertificatePath, $SignerCertificatePath)) {
   if ([System.IO.Path]::GetExtension($path) -ine ".cer") {
@@ -101,9 +147,36 @@ $rootStore = "Cert:\$StoreScope\Root"
 $publisherStore = "Cert:\$StoreScope\TrustedPublisher"
 $rootTarget = Join-Path $rootStore $root.Thumbprint
 $publisherTarget = Join-Path $publisherStore $signer.Thumbprint
+if ($StoreScope -eq "LocalMachine") {
+  Assert-LocalMachineCertificateBinding
+}
 foreach ($target in @($rootTarget, $publisherTarget)) {
   if (Test-Path -LiteralPath $target) {
     Fail "Refusing to overwrite existing trust entry '$target'. Remove or reuse it deliberately."
+  }
+}
+if ($StoreScope -eq "LocalMachine") {
+  if ([string]::IsNullOrWhiteSpace($RunOwnershipMarkerPath)) {
+    Fail "LocalMachine trust requires a run ownership marker path."
+  }
+  $markerDirectory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($RunOwnershipMarkerPath))
+  if ([string]::IsNullOrWhiteSpace($markerDirectory) -or -not (Test-Path -LiteralPath $markerDirectory -PathType Container)) {
+    Fail "LocalMachine trust requires a run ownership marker directory."
+  }
+  # Zero-byte marker, only after both preexisting thumbprint checks have passed.
+  $ownershipStream = $null
+  try {
+    $ownershipStream = [System.IO.File]::Open(
+      $RunOwnershipMarkerPath,
+      [System.IO.FileMode]::CreateNew,
+      [System.IO.FileAccess]::Write,
+      [System.IO.FileShare]::None)
+  } catch {
+    Fail "LocalMachine trust could not create a new run ownership marker."
+  } finally {
+    if ($null -ne $ownershipStream) {
+      $ownershipStream.Dispose()
+    }
   }
 }
 try {

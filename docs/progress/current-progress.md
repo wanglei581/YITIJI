@@ -8,6 +8,26 @@ Claude Code 固定 `claude-opus-5-5` / `xhigh`，独占前端实现和最终视�
 集成树修复并完整 38/38 退出 0，仍待新 HEAD 远端 CI。Windows internal validation 被取消，MSI
 因此被阻断；根因由独立窗口继续分析，不能写成 Windows CI 或安装包通过。
 
+2026-09-23 **Windows 内部签名 LocalMachine 路径只完成源码/静态契约。** 父提交 `20c6acb41`。
+只有 `internal-signing-validation` 传入 `-UseEphemeralGitHubHostedLocalMachineTrust`。该分支显式
+`-StoreScope LocalMachine` 且必须带已有的 `-AcknowledgeEphemeralNonProductionHost`。默认调用仍是
+CurrentUser，不会继承这条例外。安装前要同时满足 `GITHUB_ACTIONS=true`、`RUNNER_OS=Windows`、
+`RUNNER_ENVIRONMENT=github-hosted`。这三项是可伪造的意外防护，不是 runner 证明，也不是非交互证明。
+LocalMachine 分支复用现有证书 metadata：绑定公开 CER 的文件名、路径、SHA256、指纹、
+`internal-test-only` / `not-for-production-or-fleet-deployment`，以及私钥仍在 CurrentUser 的 `storeScope`。
+绑定失败不记录主题、路径、哈希、指纹或私钥。已存在的同一 Root / TrustedPublisher 指纹在任何写入前拒绝，
+该拒绝路径不删除证书。两项预检都通过后、第一次导入前，才在本次 evidence 目录原子创建零字节
+`run-ownership.marker`。没有这个标记时，pipeline `finally` 和 workflow `if: always()` 都不删除信任项，
+因此预检拒绝不能删掉别人的证书；本轮生成的 CurrentUser 私钥也只在标记已建立时由清理删除。
+信任库存 Root 与 TrustedPublisher，私钥清理范围是 CurrentUser\My。两个范围都是 LocalMachine 时直接失败。
+清理按 metadata 指纹删除并复核不存在；失败继续抛出。workflow 在没有 metadata 或没有所有权标记时跳过删除并写明原因，
+不用 `continue-on-error`。成功和失败制品都不再上传 `internal-signing-certificate.json`、CER、PFX 或所有权标记。
+阶段标记和 55 分钟超时保留。没有改信任 API，没有加超时，没有 `certutil`，没有重写安装生命周期。
+
+状态：SOURCE/STATIC candidate only。Windows 上 LocalMachine 导入是否非交互返回，以及清理是否真的删净，都还没有运行时证明。
+signed job `internal-signing-validation` 与 dependent MSI `unsigned-msi-candidate` remain NO-GO，直到上述 CI 日志出现。
+unsigned EXE job `unsigned-exe-upgrade` result separate。本机没有 PowerShell，安装/清理/pipeline 脚本没有解析或执行。
+
 2026-09-23 **Windows 内部签名信任阶段标记，仅本地源码/静态诊断候选。** 分支
 `codex/windows-signing-trust-diagnostics-20260923`，父提交 `e064d99b8`。
 `install-internal-code-signing-trust.ps1` 在证书链 `X509Chain.Build`、Root `Import-Certificate`、
