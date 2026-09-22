@@ -1,5 +1,24 @@
 # 当前开发进度
 
+2026-09-23 **`/resume/source` 与 `/resume/parse` 迁入青序流光（稿 21-resume-triage），本地候选，未合并未部署。**
+Claude 独立 worktree（session `a4074904-cf6f-47f5-860a-18a351d01506`，基线 `ccb2e8715`）。两页从
+`KioskPageFrame` / LightFlow 改为 `QxPageFrame` + 小青任务头与四步轨，登记进 `KioskRoot` 的
+`QX_MIGRATED_ROUTES`。首页 → 简历服务台 → 取件 → 解析 → 报告这一段不再新旧交替。
+`/resume/materials`（稿 25）不在本批，仍走旧壳。
+业务逻辑没有改动：intent 查询、本机上传 10MB 前置拒收、U 盘一次性 safeId、手机扫码面板（冻结文件未改）、
+busy lock、切换文件清会话、授权弹窗、缺文件 fail-closed、迟到结果不劫持导航、非实时阶段声明、隐私与不外发声明都保留。
+新增一个样式文件 `resume-triage-qx.css`（196 行）。三条门禁的旧视觉锚点改锚到新样式，断言条数不减：
+`verify:fusion-w3`、`verify:lightflow-k2b-ai-resume`、`verify:resume-diagnosis-flow-ui`。
+W3 另加两条浏览器用例：取件页的 intent、10MB、断网文案与返回，以及解析页迟到结果；后者去掉取消判断的变异下会转红。
+本地退出码：kiosk typecheck 0、改动文件 eslint 0、14 条相关门禁 0、W3 35/35、W6 112/112、
+route-sweep 110/110、visible-actions-truth 9/9、W2 扫描→解析 1/1。
+1080×1920 与 390×844 已截图目检。尚缺三项：稿 21 的 50 个状态没有逐一复刻，目标方向工作台、扫描交接态、
+upload/parse unknown 复查态仍用现有组件与现有状态；子组件 `DiagnosisDirectionForm`、`ResumeUsbImportPanel` 与
+冻结的 `UploadSessionQrPanel` 没有换成青序样式；`tests/interaction/ai-resume-journey` 没跑（需要真实后端）。
+迁移后 `resume-diagnosis-ext.css` 与 `resume-diagnosis-lightflow.css` 已无 import，待另起清理；
+后者仍被 k2b 门禁断言，删除前需同步门禁。390 下 `QxPageFrame` 顶栏品牌与胶囊逐字折行，这是所有青序路由的既有问题
+（`/resume/report` 同样），不属本批。
+
 2026-09-23 **集成 HEAD F2 身份闸与规模收口已本地合流，商业仍 NO-GO。** Claude 候选
 `7cfd1d1db` 作为 `f1c6309cb` 合入唯一集成分支：两页复用独立身份 hook，
 职业规划页 796 行、行动清单页 714 行，未增路由、API 或业务入口。图谱只更新现有

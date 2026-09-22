@@ -1,5 +1,16 @@
 # 下一步任务
 
+## 2026-09-23：`/resume/source` 与 `/resume/parse` 青序迁移候选待集成
+
+本地候选（Claude session `a4074904-cf6f-47f5-860a-18a351d01506`，基线 `ccb2e8715`）已把两页迁入稿 21 的青序工作台，
+没有 push、PR、合并或部署。集成方要做四件事：
+1. 在集成分支重跑 kiosk typecheck/build、全量 W3/W6、route-sweep，以及 `graph:check`（图谱已随本批重生成）。
+2. 补跑 `tests/interaction/ai-resume-journey.spec.ts`，它需要真实后端。
+3. 另起一条清理：`resume-diagnosis-ext.css` 与 `resume-diagnosis-lightflow.css` 已成孤儿。
+4. 稿 21 的细分状态（目标方向工作台、扫描交接、upload/parse 结果未知与复查）和两个子面板的青序化，另开任务按稿补齐；
+   `UploadSessionQrPanel` 仍按冻结契约处理。
+`/resume/materials`（稿 25）仍是旧壳，是简历域剩下的一处新旧交替。
+
 ## 2026-09-23：Burn 嵌入 MSI 提取命名已本地修正，Windows 实跑仍 NO-GO
 
 run [35777521091](https://github.com/wanglei581/YITIJI/actions/runs/35777521091) job `106917619898`
