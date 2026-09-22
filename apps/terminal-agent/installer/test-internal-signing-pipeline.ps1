@@ -420,9 +420,11 @@ Write-Host "INTERNAL_SIGNING_PIPELINE_RESULT original=$originalStatus cleanup=$c
 if ($null -ne $cleanupFailure -and $null -ne $pipelineFailure) {
   Write-Host "INTERNAL_SIGNING_PIPELINE_ORIGINAL_FAILURE"
   Write-Host $pipelineFailure.Exception.Message
+  Write-Host "INTERNAL_SIGNING_PIPELINE_CLEANUP_FAILURE $($cleanupFailure.Exception.Message)"
   throw "INTERNAL_SIGNING_PIPELINE_TEST_FAILED: original pipeline failure followed by cleanup failure."
 }
 if ($null -ne $cleanupFailure) {
+  Write-Host "INTERNAL_SIGNING_PIPELINE_CLEANUP_FAILURE $($cleanupFailure.Exception.Message)"
   throw "INTERNAL_SIGNING_PIPELINE_TEST_FAILED: cleanup failed after the pipeline body returned."
 }
 if ($null -ne $pipelineFailure) {

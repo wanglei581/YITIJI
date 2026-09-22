@@ -11,6 +11,7 @@ github-hosted Windows 日志按顺序出现 `runner-guard`、chain、root-import
 `scope=LocalMachine` start/pass，并且 pipeline 与 `if: always()` 清理都成功。unsigned EXE job
 `unsigned-exe-upgrade` result separate。不要把静态契约当成非交互信任已修复，不要加假超时，不要 `certutil`，
 不要在失败时退回 CurrentUser。未签名 job 不得接收 opt-in、acknowledgement 或 LocalMachine 信任。
+metadata 写出前被硬杀时无法做精确清理，只依赖一次性 GitHub-hosted VM 销毁；禁止 self-hosted runner 和真实一体机。Windows 仍为 NO-GO。
 
 小程序补签与冷启动身份修复已合入 `9d7170d32`，合流完整 `verify:static` 退出 0。
 不要重复修复下方历史“未合入/待修冷启动”事项；下一步为最终 SHA CI、DevTools 和双账号真机验收。

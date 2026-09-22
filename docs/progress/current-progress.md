@@ -25,6 +25,7 @@ metadata 里的指纹来自本轮生成的证书，所以没有标记时仍按�
 清理失败继续抛出。不用 `continue-on-error`。成功和失败制品都不再上传 `internal-signing-certificate.json`、CER、PFX 或所有权标记。
 阶段标记和 55 分钟超时保留。没有改信任 API，没有加超时，没有 `certutil`，没有重写安装生命周期。
 
+进程在写出 metadata 之前被硬杀时，精确清理不可能进行。那只依赖一次性 GitHub-hosted VM 销毁，禁止用在 self-hosted runner 和真实一体机上。
 状态：SOURCE/STATIC candidate only。Windows 上 LocalMachine 导入是否非交互返回，以及清理是否真的删净，都还没有运行时证明。
 signed job `internal-signing-validation` 与 dependent MSI `unsigned-msi-candidate` remain NO-GO，直到上述 CI 日志出现。
 unsigned EXE job `unsigned-exe-upgrade` result separate。本机没有 PowerShell，安装/清理/pipeline 脚本没有解析或执行。
