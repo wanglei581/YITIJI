@@ -135,6 +135,8 @@ for (const [path, rootClass] of [
   ['src/pages/resume/resume-optimize-qx.css', 'qx-resume-optimize'],
   ['src/pages/resume/resume-generate-qx.css', 'qx-resume-generate'],
   ['src/pages/resume/resume-triage-qx.css', 'qx-resume-triage'],
+  // 稿 21 子面板换装（诊断方向 / U 盘 / 手机扫码 / 预览 / 扫描交接），同一作用域根。
+  ['src/pages/resume/resume-triage-panels-qx.css', 'qx-resume-triage'],
 ]) {
   const source = read(path)
   expect(source.length > 0, `${path} exists`)

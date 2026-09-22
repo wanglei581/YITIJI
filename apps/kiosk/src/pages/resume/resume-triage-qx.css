@@ -65,6 +65,15 @@
 .qx-resume-triage .qx-rt-rail li[aria-current='step'] i { background: var(--qx-emerald); border-color: var(--qx-emerald); color: var(--qx-deep); }
 .qx-resume-triage .qx-rt-rail li[data-done='1'] { color: rgb(242 239 228 / .82); }
 .qx-resume-triage .qx-rt-rail li[data-done='1'] i { background: rgb(46 230 168 / .22); border-color: rgb(46 230 168 / .42); color: var(--qx-emerald); }
+/* 暂停（等授权 / 结果未知）与未完成（解析失败）：都不是「当前正在进行」，不能借翡翠色。 */
+.qx-resume-triage .qx-rt-rail li[data-mark='wait'] i { border-style: dashed; border-color: rgb(242 239 228 / .55); }
+.qx-resume-triage .qx-rt-rail li[data-mark='bad'] { color: var(--qx-on-deep-bad); }
+.qx-resume-triage .qx-rt-rail li[data-mark='bad'] i { background: rgb(178 58 46 / .28); border-color: var(--qx-on-deep-bad); color: var(--qx-on-deep-bad); }
+/* 读屏补充（不用 margin:-1px，那会把元素推出视口左界、红 fusion-w6 越界断言）。 */
+.qx-resume-triage .sr-only-qx {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden;
+  clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
 
 /* ── 说明条（本机原件 / 隐私 / 不编造） ───────────────────────── */
 .qx-resume-triage .qx-rt-note {
@@ -78,6 +87,9 @@
 
 /* ── 上传工作台（自己滚，主 CTA 固定在 ctabar） ──────────────── */
 .qx-resume-triage .qx-rt-scroll { padding-top: 0; gap: 14px; }
+.qx-resume-triage .qx-rt-pick { display: flex; flex-direction: column; gap: 11px; }
+.qx-resume-triage .qx-rt-sec-h { margin: 0; font-size: 24px; font-weight: 700; }
+.qx-resume-triage .qx-rt-sec-h small { margin-left: 12px; font-size: 17px; font-weight: 500; color: var(--qx-ink-3); }
 .qx-resume-triage .qx-rt-intro h2 { margin: 0; font-size: 23px; font-weight: 700; }
 .qx-resume-triage .qx-rt-intro p { margin: 6px 0 0; font-size: 17px; line-height: 1.5; color: var(--qx-ink-2); }
 .qx-resume-triage .qx-rt-chain { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding: 0; list-style: none; }
@@ -134,10 +146,10 @@
 }
 .qx-resume-triage .qx-rt-dims summary::-webkit-details-marker { display: none; }
 .qx-resume-triage .qx-rt-dims summary small { margin-left: auto; font-size: 16px; font-weight: 600; color: var(--qx-ink-3); }
-.qx-resume-triage .qx-rt-dim-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.qx-resume-triage .qx-rt-dim-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .qx-resume-triage .qx-rt-dim {
   min-height: var(--qx-tap-min); display: flex; align-items: center; justify-content: center;
-  padding: 6px 10px; border-radius: 16px; text-align: center; font-size: 16px; font-weight: 700;
+  padding: 6px 16px; border-radius: 16px; text-align: center; font-size: 16px; font-weight: 700; white-space: nowrap;
   background: var(--qx-paper); border: 1px solid var(--qx-line); color: var(--qx-ink-2);
 }
 .qx-resume-triage .qx-rt-dim[data-extra='true'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
@@ -150,6 +162,13 @@
   border: 10px solid var(--qx-teal-soft); color: var(--qx-teal-d);
 }
 .qx-resume-triage .qx-rt-ring[data-tone='bad'] { border-color: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
+.qx-resume-triage .qx-rt-ring[data-tone='warn'] { border-color: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
+/* 稿 21 `.fail`：失败 / 阻断说明块。warn 用麦色（阻断，不是出错）。 */
+.qx-resume-triage .qx-rt-fail { padding: 20px 26px; border-radius: 28px; background: var(--qx-cinnabar-soft); border: 1.5px solid var(--qx-cinnabar); }
+.qx-resume-triage .qx-rt-fail[data-tone='warn'] { background: var(--qx-wheat-soft); border-color: var(--qx-wheat); }
+.qx-resume-triage .qx-rt-fail-t { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 25px; font-weight: 800; color: var(--qx-cinnabar-d); }
+.qx-resume-triage .qx-rt-fail[data-tone='warn'] .qx-rt-fail-t { color: var(--qx-wheat-d); }
+.qx-resume-triage .qx-rt-fail p { margin: 8px 0 0; font-size: 19px; line-height: 1.6; color: var(--qx-ink-2); }
 .qx-resume-triage .qx-rt-wait-t { margin: 0; font-family: var(--qx-serif); font-size: 32px; font-weight: 700; }
 .qx-resume-triage .qx-rt-wait-d { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
 .qx-resume-triage .qx-rt-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
@@ -161,6 +180,12 @@
 .qx-resume-triage .qx-rt-steps em { grid-column: 2; font-style: normal; font-size: 15px; color: var(--qx-ink-3); }
 .qx-resume-triage .qx-rt-steps span { grid-row: 1 / span 2; grid-column: 3; font-size: 14px; font-weight: 700; color: var(--qx-muted-ink); }
 .qx-resume-triage .qx-rt-dev { position: absolute; right: var(--qx-gutter); bottom: 150px; min-height: var(--qx-tap-min); padding: 0 14px; border-radius: 12px; border: 1px dashed var(--qx-cinnabar); background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); font-size: 14px; }
+
+/* 稿 21 `.truth`：格式 / 用途 / 留存，常驻页底。 */
+.qx-resume-triage .qx-rt-truth { flex: none; display: flex; gap: 22px; padding: 12px 0 2px; border-top: 1px solid var(--qx-line); }
+.qx-resume-triage .qx-rt-truth p { flex: .9; margin: 0; font-size: 15px; line-height: 1.5; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-truth p:nth-child(2) { flex: 1.5; }
+.qx-resume-triage .qx-rt-truth b { margin-right: 6px; font-weight: 700; color: var(--qx-ink-2); }
 
 /* 手机宽度：KioskRoot 内路由不做舞台缩放，按真实 390 宽排。整块工作台一起滚，
    小青头去掉头像与旗标、四步轨换成两列，避免逐字折行和压到底部操作条。 */
@@ -181,7 +206,12 @@
   .qx-resume-triage .qx-rt-srcs,
   .qx-resume-triage .qx-rt-split,
   .qx-resume-triage .qx-rt-steps { grid-template-columns: minmax(0, 1fr); }
-  .qx-resume-triage .qx-rt-dim-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qx-resume-triage .qx-rt-sec-h small { display: block; margin: 4px 0 0; font-size: 15px; }
+  .qx-resume-triage .qx-rt-src { min-height: 0; padding: 14px 16px; }
+  .qx-resume-triage .qx-rt-truth { flex-direction: column; gap: 8px; }
+  .qx-resume-triage .qx-rt-truth p { font-size: 15px; }
+  .qx-resume-triage .qx-rt-fail { padding: 16px 18px; }
+  .qx-resume-triage .qx-rt-fail-t { font-size: 21px; }
   .qx-resume-triage .qx-rt-side { min-width: 0; }
   .qx-resume-triage .qx-rt-direction h2 { white-space: normal; }
   .qx-stage:has(.qx-resume-triage) .qx-ctabar { flex-wrap: wrap; gap: 10px; padding-top: 12px; padding-bottom: 12px; }

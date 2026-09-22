@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
@@ -22,6 +23,54 @@ function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
 }
 
+/** 解析页此刻的真实态：一次性读完（失败 / 未知态 700ms 后就会转去报告页，分多次断言会追不上）。 */
+async function parseViewSnapshot(page: Page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-kiosk-screen="resume-parse"]')
+    const text = document.body.innerText
+    return {
+      state: root?.getAttribute('data-state') ?? null,
+      current: root?.querySelector('.qx-rt-rail li[aria-current="step"]')?.textContent?.replace(/^\d/, '').trim() ?? null,
+      bad: root?.querySelector('.qx-rt-rail li[data-mark="bad"]')?.textContent?.replace(/^\d/, '').replace(/（.*）$/, '').trim() ?? null,
+      wait: root?.querySelector('.qx-rt-rail li[data-mark="wait"]')?.textContent?.replace(/^\d/, '').replace(/（.*）$/, '').trim() ?? null,
+      pill: document.querySelector('.qx-pill')?.textContent?.trim() ?? null,
+      saysReceived: text.includes('文件收到了'),
+      saysError: text.includes('解析出错'),
+    }
+  })
+}
+
+/** 青序顶栏几何：文字折成几行、胶囊有没有被裁、返回键多大。只量 CSS 像素（舞台缩放关闭时 = 屏幕像素）。 */
+async function qxTopbarMetrics(page: Page) {
+  await expect(page.locator('.qx-topbar')).toBeVisible()
+  return page.evaluate(() => {
+    const lineCount = (el: Element | null) => {
+      if (!el) return 0
+      const node = Array.from(el.childNodes).reverse().find((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())
+      if (!node) return 0
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      return new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size
+    }
+    const bar = document.querySelector('.qx-topbar') as HTMLElement
+    const pill = document.querySelector('.qx-pill') as HTMLElement
+    const back = document.querySelector('.qx-topbar-back') as HTMLElement | null
+    const sub = document.querySelector('.qx-topbar-sub')
+    return {
+      height: bar.offsetHeight,
+      brandLines: lineCount(document.querySelector('.qx-topbar-brand')),
+      pillLines: lineCount(pill),
+      pillClipped: pill.scrollWidth > pill.clientWidth + 1 || pill.getBoundingClientRect().right > window.innerWidth + 0.5,
+      pillText: pill.textContent?.trim() ?? '',
+      pillW: Math.round(pill.getBoundingClientRect().width),
+      pillRight: Math.round(pill.getBoundingClientRect().right),
+      backW: back?.offsetWidth ?? 0,
+      subShown: Boolean(sub && getComputedStyle(sub).display !== 'none'),
+      stageFit: document.querySelector('[data-kiosk-stage-fit]')?.getAttribute('data-kiosk-stage-fit') ?? null,
+    }
+  })
+}
+
 test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) => {
   const runtimeErrors: string[] = []
   let previewLoaded = false
@@ -36,7 +85,9 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   )
   terminalBaseline(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  const parseBodies: Array<{ targetContext?: Record<string, unknown> }> = []
   await page.route('**/api/v1/resume/parse', async (route) => {
+    parseBodies.push(route.request().postDataJSON() as { targetContext?: Record<string, unknown> })
     await new Promise((resolve) => setTimeout(resolve, 700))
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) })
   })
@@ -48,8 +99,14 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   await assertDialogWithinViewport(page)
   await diagnosisIndustryDialog.getByRole('button', { name: '制造业', exact: true }).click()
   await diagnosisIndustryDialog.getByRole('button', { name: '完成' }).click()
-  await page.getByLabel('经验级别').selectOption('1年以内')
-  await page.getByLabel('学历（选填）').selectOption('本科')
+  // 稿 21：经验 / 学历是点选组（同一组枚举），学历在「专业与学历」选填抽屉里。
+  const experience = page.getByRole('group', { name: '经验级别' })
+  await experience.getByRole('button', { name: '1年以内', exact: true }).click()
+  await expect(experience.getByRole('button', { name: '1年以内', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: /专业与学历/ }).click()
+  const degree = page.getByRole('group', { name: '学历（选填）' })
+  await degree.getByRole('button', { name: '本科', exact: true }).click()
+  await expect(degree.getByRole('button', { name: '本科', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   const preview = page.locator('[data-file-preview-kind="pdf"]')
   await expect(preview).toBeVisible()
@@ -61,6 +118,7 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   await expect(page.getByText(/进行中…|已完成|逐项点亮/)).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
   await page.waitForURL('/resume/report')
+  expect(parseBodies[0]?.targetContext).toMatchObject({ industry: '制造业', experience: '1年以内', degree: '本科', skipped: false })
   await expect(page.locator('[data-kiosk-screen="resume-report"]')).toBeVisible()
   await expect(page.getByText('部分图片文字需要本人复核')).toBeVisible()
   for (const section of diagnosis.report.sections) await expect(page.getByText(section.label, { exact: true }).first()).toBeVisible()
@@ -283,10 +341,14 @@ test('direct resume parse stays fail-closed without fake stages @w3-kiosk', asyn
   terminalBaseline(api)
   await page.goto('/resume/parse')
   await expect(page.getByText('未找到简历文件', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '返回上传简历' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '回到来源选择' })).toBeVisible()
   await expect(page.getByText(/正在识别|正在提取|已完成|进行中…/)).toHaveCount(0)
   await expect(page).toHaveURL(/\/resume\/parse$/)
+  // 缺文件不是「解析中」：四步轨停在第 1 步，不说「文件收到了」，胶囊说这一步没有文件。
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'missing-file', current: '上传与方向', pill: '这一步没有文件', saysReceived: false })
   await assertNoHorizontalOverflow(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await page.waitForURL('/resume/source')
   expect(runtimeErrors).toEqual([])
 })
 
@@ -316,7 +378,8 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   await expect(preview.locator('iframe')).toHaveAttribute('src', '/w3-fixtures/resume.pdf')
   await expect.poll(() => previewLoaded).toBe(true)
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
-  await expect(page.getByText('解析出错', { exact: true })).toBeVisible()
+  await expect(page.getByText('没等到解析结果', { exact: true })).toBeVisible()
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'unknown', current: null, pill: '解析结果未知', saysReceived: false, saysError: false })
   await expect(page.getByRole('button', { name: /重试|重新/ })).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
@@ -382,6 +445,101 @@ test('resume parse: a result arriving after leaving never hijacks navigation @w3
   await expect(page).toHaveURL(/\/resume\/source$/)
   await expect(page.locator('[data-kiosk-screen="resume-report"]')).toHaveCount(0)
   expect(parseCalls).toBe(1)
+})
+
+test('resume parse server failure is labelled failed, never as the running step @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  api.respond('POST', '/api/v1/resume/parse', { status: 503, json: { success: false, error: { code: 'AI_PROVIDER_ERROR', message: 'upstream' } } })
+  await page.goto('/resume/source')
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await expect(page.getByText('解析出错', { exact: true })).toBeVisible()
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'failed', current: null, bad: 'AI 解析', pill: '解析失败 · 可重试', saysReceived: false })
+  await expect(page.getByRole('button', { name: /重试|重新/ })).toBeVisible()
+})
+
+test('resume parse consent gate pauses the rail and sends nothing until granted @w3-kiosk', async ({ page, api }) => {
+  let parseCalls = 0
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', { status: 200, json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } } })
+  api.respond('POST', '/api/v1/member/auth/login', { status: 200, json: { success: true, data: { token: 'w3-consent-member', user: { id: 'w3-consent', phoneMasked: '138****8000', nickname: '授权闸会员' } } } })
+  api.respond('GET', '/api/v1/me/ai-consents/status', { status: 200, json: { success: true, data: [{ scope: 'resume_ai', granted: false }] } })
+  // 登录后会员壳层会顺手读一次收藏（与本用例无关，给空列表）。
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    parseCalls += 1
+    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'AI_PROVIDER_ERROR', message: 'x' } }) })
+  })
+  await page.goto(`/login?from=${encodeURIComponent('/resume/source')}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/resume/source')
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.waitForURL('/resume/parse')
+  await expect(page.getByRole('dialog')).toBeVisible()
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'consent-needed', current: null, wait: 'AI 解析', pill: '等待授权', saysReceived: false })
+  expect(parseCalls).toBe(0)
+  await page.getByRole('button', { name: '暂不使用' }).click()
+  await page.waitForURL((url) => url.pathname === '/resume/source')
+  expect(parseCalls).toBe(0)
+})
+
+test('Qingxu topbar stays on one line at 390 and 1080 keeps its full layout @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  // 简历服务台会探一次后端健康（相邻青序页，只为量它的顶栏）。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.goto('/resume/source')
+  // 1080：窄屏规则一条都不许吃到（顶栏 104、返回键 64、副标题在）。
+  expect(await qxTopbarMetrics(page)).toMatchObject({ height: 104, backW: 64, subShown: true, brandLines: 1, pillLines: 1, pillClipped: false })
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  // 本批两页 + 相邻的已迁青序页（报告页在 KioskRoot 内、岗位匹配是整屏路由），都走同一条共用顶栏规则。
+  // 报告页的返回键在它自己的深底页头里（不走顶栏），所以只对有顶栏返回键的页量尺寸。
+  // 岗位匹配页不在这里量：它有自己页内的手机顶栏规则（.jfq-root，胶囊按设计省略号截断），不走这条共用规则。
+  for (const [route, hasTopbarBack] of [['/resume/source', true], ['/resume/parse', true], ['/resume/report', false], ['/resume-service', null]] as const) {
+    await page.goto(route)
+    const metrics = await qxTopbarMetrics(page)
+    expect(metrics.stageFit, route).toBe('off')
+    expect(metrics, route).toMatchObject({ height: 72, brandLines: 1, pillClipped: false, subShown: false })
+    // 状态胶囊允许收窄折两行（服务台那句整句说明），但不许逐字竖排：每行至少四个字，最多两行。
+    expect(metrics.pillLines, `${route} 「${metrics.pillText}」`).toBeLessThanOrEqual(Math.min(2, Math.ceil(metrics.pillText.length / 4)))
+    if (hasTopbarBack === true) expect(metrics.backW, route).toBeGreaterThanOrEqual(48)
+    else if (hasTopbarBack === false) expect(metrics.backW, route).toBe(0)
+    else expect(metrics.backW === 0 || metrics.backW >= 48, `${route} back ${metrics.backW}`).toBe(true)
+  }
+
+  // 390 下来源选择要一眼可见；隐私说明字号可读、滚到时不被底部操作条压住；维度块不把最后一个字挤下行。
+  await page.goto('/resume/source')
+  await expect(page.getByRole('group', { name: '选择简历来源' })).toBeInViewport()
+  const privacy = page.locator('.resume-source-privacy')
+  await privacy.scrollIntoViewIfNeeded()
+  const legible = await privacy.evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    const bar = document.querySelector('.qx-ctabar')!.getBoundingClientRect()
+    return { font: parseFloat(getComputedStyle(el).fontSize), bottom: rect.bottom, barTop: bar.top }
+  })
+  expect(legible.font).toBeGreaterThanOrEqual(14)
+  expect(legible.bottom).toBeLessThanOrEqual(legible.barTop + 0.5)
+  await page.getByText('点击展开', { exact: false }).click()
+  const brokenChips = await page.locator('.qx-rt-dim, .qx-rt-dimchip .tx').evaluateAll((els) => els
+    .map((el) => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      return { text: el.textContent ?? '', lines: new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size }
+    })
+    .filter((item) => item.lines > 1))
+  expect(brokenChips).toEqual([])
+  await assertNoHorizontalOverflow(page)
 })
 
 test('assistant filters actions and survives service failure @w3-kiosk', async ({ page, api }) => {

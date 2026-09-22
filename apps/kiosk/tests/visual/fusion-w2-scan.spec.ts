@@ -470,6 +470,57 @@ test('successful resume scan can continue to AI parsing @w2', async ({ page, api
   await expectHealthy(page, errors)
 })
 
+test('resume scan return keeps the same scanned file and a late parse result never hijacks it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  registerShell(api)
+  const parseBodies: Array<{ fileId?: string; source?: string }> = []
+  let releaseFirst: () => void = () => {}
+  const firstHeld = new Promise<void>((resolve) => { releaseFirst = resolve })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    parseBodies.push(route.request().postDataJSON() as { fileId?: string; source?: string })
+    if (parseBodies.length === 1) {
+      await firstHeld
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'W2_LATE', message: 'late' } }) }).catch(() => undefined)
+      return
+    }
+    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'W2_STOP_AFTER_NAV', message: 'synthetic stop' } }) })
+  })
+
+  await seedScanResult(page, resultState)
+  await page.goto('/scan?stage=result')
+  await expectPdfCompleted(binary)
+  await page.getByRole('button', { name: /AI 简历识别/ }).click()
+  await page.waitForURL('**/resume/parse')
+  await expect.poll(() => parseBodies.length).toBe(1)
+  expect(parseBodies[0]).toMatchObject({ fileId: 'w2-scan-file', source: 'scan' })
+
+  // 扫描工作台是 replace 交接的：顶栏返回必须把同一份扫描件带回来源页（稿 21 scan-ready），不能丢。
+  await page.getByRole('button', { name: '返回简历来源' }).click()
+  await page.waitForURL((url) => url.pathname === '/resume/source')
+  const scanBlock = page.getByRole('region', { name: '扫描件交接' })
+  await expect(scanBlock).toBeVisible()
+  await expect(scanBlock.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
+  await expect(scanBlock.getByText('扫描原件 · 由扫描工作台交接')).toBeVisible()
+  await expect(page.locator('.qx-pill')).toHaveText('扫描件已交接 · 待确认')
+
+  // 晚到的第一次结果放行后，页面仍停在来源页 —— 不被带去报告页。
+  const late = page.waitForResponse('**/api/v1/resume/parse')
+  releaseFirst()
+  await late
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  await expect(page).toHaveURL(/\/resume\/source$/)
+  await expect(scanBlock).toBeVisible()
+
+  // 再次开始：仍按扫描件、同一个文件身份提交。
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.waitForURL('**/resume/parse')
+  await expect.poll(() => parseBodies.length).toBe(2)
+  expect(parseBodies[1]).toMatchObject({ fileId: 'w2-scan-file', source: 'scan' })
+  await expectHealthy(page, errors)
+})
+
 test('successful scan tells a guest the file will not reach 我的文档 @w2', async ({ page, api }) => {
   // 本用例全程未登录。原版断言按钮是「登录后管理文件」并点进 /login——
   // 那句承诺是假的：游客扫描件 ownerType='system'，没有认领机制，登录后

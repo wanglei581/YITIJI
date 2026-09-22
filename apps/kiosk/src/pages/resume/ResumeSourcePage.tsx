@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 import { isTerminalKiosk } from '../../services/api/screensaver'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { FileContentPreview } from '../../components/FileContentPreview'
@@ -33,9 +33,15 @@ import { clearAiResumeSession } from './aiResumeSession'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
 import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
+import { ResumeTriageHero } from './components/ResumeTriageHero'
+import { ResumeScanReady } from './components/ResumeScanReady'
+import { readScanHandoff, type ScanHandoff } from './resumeScanHandoff'
 import './resume-triage-qx.css'
+import './resume-triage-panels-qx.css'
 
 type UploadChannel = 'usb' | 'cloud' | 'phone'
+/** 已拿到的文件来自哪条通道；'scan' 只来自扫描工作台的交接（经解析页返回），不是本页可选的通道。 */
+type FileChannel = UploadChannel | 'scan'
 
 interface UploadOption {
   type: UploadChannel
@@ -55,7 +61,8 @@ const UPLOAD_OPTIONS: UploadOption[] = [
   },
   {
     type: 'cloud',
-    label: '云端上传',
+    // 稿 21：它打开的是本机文件选择，不是云盘账号登录，所以用户可见名不叫「云端上传」。
+    label: '本机文件 / 云盘下载目录',
     description: '选择云盘同步目录或本机下载目录中的简历文件',
     helper: '适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。',
     icon: CloudUploadIcon,
@@ -115,8 +122,17 @@ const BASE_SUPPORTED_FORMATS = ['PDF', 'JPG', 'PNG', 'WEBP']
 const BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
 const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
-/** 稿 21 小青任务头的四步轨；本页是第 1 步。 */
-const RESUME_FLOW_STEPS = ['上传与方向', 'AI 解析', '诊断报告', '优化打印']
+/** 稿 21 小青任务头随本页真实状态换话（每条都对应一个能被用户看到的事实，不预告结果）。 */
+type SourceHeroKey = 'source' | 'usb' | 'phone' | 'uploading' | 'upload-failed' | 'staged' | 'scan-ready'
+const SOURCE_HERO: Record<SourceHeroKey, { ask: ReactNode; doing: string; flag: string; warn: boolean }> = {
+  source: { ask: <>简历这趟，先<em>把文件交给我</em>。</>, doing: '选一种来源把简历送进来，方向和背景在旁边点选；上传后 AI 自动解析结构、识别问题。', flag: '原件只读不改', warn: false },
+  usb: { ask: <>从 U 盘里<em>挑一份简历</em>。</>, doing: '插好后文件列表会自动出现；只列 10MB 以内的 PDF / JPG / PNG，要用哪一份由你来点。', flag: 'U 盘', warn: false },
+  phone: { ask: <>用手机<em>扫码上传</em>。</>, doing: '二维码有效期以服务端返回为准；手机传完，回到这台机器确认后才继续。', flag: '手机扫码', warn: false },
+  uploading: { ask: <>正在把这一份<em>送到服务端</em>。</>, doing: '一次性上传，没有实时百分比，也没有中止入口；成功或失败都会明确告诉你。', flag: '上传中', warn: false },
+  'upload-failed': { ask: <>这一份<em>没能送进来</em>。</>, doing: '原件还在你手里，可以重试，或者换一种来源。', flag: '未送达', warn: true },
+  staged: { ask: <>服务端<em>已经确认收到</em>。</>, doing: '下面这份文件名和大小是服务端回给本机的结果，不是本机自己记的。', flag: '已收到', warn: false },
+  'scan-ready': { ask: <>扫描好的这一份<em>已经接到这一步</em>。</>, doing: '它是从扫描工作台交接过来的，不是本页去扫的；身份一路不变。', flag: '已交接', warn: false },
+}
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -127,7 +143,7 @@ interface UploadedResumeFile {
   fileId: string
   fileUrl?: string
   mimeType?: string
-  channel: UploadChannel
+  channel: FileChannel
 }
 
 function inferFormat(mimeOrName: string): string {
@@ -138,6 +154,21 @@ function inferFormat(mimeOrName: string): string {
   if (m.includes('jpeg') || m.includes('jpg')) return 'jpg'
   if (m.includes('webp')) return 'webp'
   return 'unknown'
+}
+
+/** 解析页带回来的扫描件交接 → 本页的「已拿到的文件」。只搬已有字段，不补造。 */
+function scanFileFrom(handoff: ScanHandoff | null): UploadedResumeFile | null {
+  if (!handoff) return null
+  const { fileId, file } = handoff
+  return {
+    name: file.name,
+    size: typeof file.size === 'number' ? formatSize(file.size) : file.size ?? '大小未知',
+    format: inferFormat(file.format || file.mimeType || file.name),
+    fileId,
+    fileUrl: file.fileUrl,
+    mimeType: file.mimeType,
+    channel: 'scan',
+  }
 }
 
 function formatSize(bytes: number): string {
@@ -169,6 +200,7 @@ function uploadErrorMessage(err: unknown): string {
 
 export function ResumeSourcePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const intent: ResumeIntent = searchParams.get('intent') === 'optimize' ? 'optimize' : 'diagnose'
   const copy = INTENT_COPY[intent]
@@ -181,7 +213,8 @@ export function ResumeSourcePage() {
   const accept = wordConversionAvailable ? `${BASE_ACCEPT},${WORD_ACCEPT}` : BASE_ACCEPT
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<UploadChannel>('cloud')
-  const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(null)
+  // 从解析页带着扫描件交接回来时，直接落在稿 21 的 scan-ready：同一份文件，不用重扫。
+  const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(() => scanFileFrom(readScanHandoff(location.state)))
   const [uploading, setUploading] = useState(false)
   const [phoneBusy, setPhoneBusy] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
@@ -303,7 +336,8 @@ export function ResumeSourcePage() {
     navigate('/resume/parse', {
       state: {
         intent,
-        source: 'upload',
+        // 扫描工作台交接来的仍按扫描件提交（服务端合同本来就接受 'scan'）。
+        source: uploadedFile.channel === 'scan' ? 'scan' : 'upload',
         // fileUrl / mimeType 一起透传:诊断失败时报告页要凭它们把**原件**送进打印链路。
         // 原来只带 name/size/format,于是 AI 一挂,文件明明还在服务端,用户却一张纸也拿不走。
         // 这是 kiosk-upload 下发的 HMAC content URL(30 分钟 TTL),与 PrintUploadPage 同一条路径。
@@ -321,14 +355,37 @@ export function ResumeSourcePage() {
     })
   }
 
+  const scanReady = uploadedFile?.channel === 'scan'
+  const heroKey: SourceHeroKey = scanReady
+    ? 'scan-ready'
+    : uploading
+      ? 'uploading'
+      : error
+        ? 'upload-failed'
+        : uploadedFile
+          ? 'staged'
+          : selected === 'usb' ? 'usb' : selected === 'phone' ? 'phone' : 'source'
+  const hero = SOURCE_HERO[heroKey]
+
   // 顶栏状态胶囊只报本机真实可知的状态：忙碌 / 文件已就绪 / 还没有文件。拿不到的一律不报「正常」。
   const frameStatus = sourceBusy
     ? { tone: 'warn' as const, label: uploading ? '上传中' : '接收中' }
-    : uploadedFile
-      ? { tone: 'ok' as const, label: '文件已就绪' }
-      : { tone: 'unknown' as const, label: '等待简历文件' }
-  const channelLabel = (channel: UploadChannel) =>
-    channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : '云端上传'
+    : scanReady
+      ? { tone: 'ok' as const, label: '扫描件已交接 · 待确认' }
+      : uploadedFile
+        ? { tone: 'ok' as const, label: '文件已就绪' }
+        : error
+          ? { tone: 'warn' as const, label: '上传未完成' }
+          : { tone: 'unknown' as const, label: '等待简历文件' }
+  const channelLabel = (channel: FileChannel) =>
+    channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : channel === 'scan' ? '扫描工作台交接' : '本机文件'
+
+  /** 「换一种来源」：放下交接来的扫描件，并把这条历史里的交接一起清掉，免得返回时又冒出来。 */
+  const dropScanHandoff = () => {
+    setUploadedFile(null)
+    setError(null)
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+  }
 
   return (
     <QxPageFrame
@@ -339,7 +396,7 @@ export function ResumeSourcePage() {
       back={{ label: '返回 AI 简历服务', onBack: () => navigate('/resume-service') }}
       ctabar={(
         <>
-          {uploadedFile ? (
+          {uploadedFile && !scanReady ? (
             <button
               type="button"
               className="qx-btn resume-change-file"
@@ -367,30 +424,16 @@ export function ResumeSourcePage() {
         </>
       )}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} className="qx-resume-triage">
-      {/* 稿 21 小青任务头：AI 驱动层在这里表达（✦ 旗标 + 小青的话），四步轨当前在第 1 步。
-          页面 h1 仍是 QxPageFrame 页头的 copy.title，这里不再另起标题。 */}
-      <header className="qx-rt-xq">
-        <div className="qx-rt-xq-row">
-          <span className="qx-rt-face" aria-hidden="true">青</span>
-          <div className="qx-rt-xq-main">
-            <p className="qx-rt-eyebrow">{intent === 'optimize' ? 'AI RESUME OPTIMIZE' : 'AI RESUME DIAGNOSE'}</p>
-            <p className="qx-rt-title">简历这趟，先<em>把文件交给我</em>。</p>
-            <p className="qx-rt-doing">选一种来源把简历送进来，方向和背景都点选完成；上传后 AI 自动解析结构、识别问题。</p>
-          </div>
-          <span className="qx-rt-flag">✦ AI 驱动</span>
-        </div>
-        <ol className="qx-rt-rail" aria-label="简历服务流程：上传与方向、AI 解析、诊断报告、优化打印">
-          {RESUME_FLOW_STEPS.map((step, i) => (
-            <li key={step} aria-current={i === 0 ? 'step' : undefined}><i>{i + 1}</i>{step}</li>
-          ))}
-        </ol>
-      </header>
-
-      <p className="qx-rt-note" role="note">{KIOSK_DEVICE_ORIGINAL_NOTICE}</p>
-      <p className="qx-rt-note resume-source-privacy" role="note">
-        <b>隐私保护</b>{copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}
-      </p>
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} className="qx-resume-triage">
+      {/* 稿 21 小青任务头：随真实状态换话，四步轨当前在第 1 步。页面 h1 仍是 QxPageFrame 页头。 */}
+      <ResumeTriageHero
+        eyebrow={intent === 'optimize' ? 'AI RESUME OPTIMIZE' : 'AI RESUME DIAGNOSE'}
+        ask={hero.ask}
+        doing={hero.doing}
+        flag={hero.flag}
+        warn={hero.warn}
+        rail={['current', 'todo', 'todo', 'todo']}
+      />
 
       <input
         ref={fileInputRef}
@@ -402,56 +445,51 @@ export function ResumeSourcePage() {
       />
 
       <div className="qx-scroll qx-rt-scroll">
-        <section className="qx-card qx-rt-intro">
-          <h2>{copy.infoTitle}</h2>
-          <p>{copy.infoBody}</p>
-          {intent === 'optimize' && (
-            <ol className="qx-rt-chain" aria-label="优化链路">
-              {OPTIMIZE_FLOW_STEPS.map((step) => <li key={step}>{step}</li>)}
-            </ol>
-          )}
-        </section>
-
-        {/* 阶段2A:没有电子简历的用户 → AI 简历生成(引导式表单,只润色不编造) */}
-        <button type="button" onClick={() => navigate('/resume/generate')} className="qx-rt-alt">
-          <SparklesIcon size={30} aria-hidden="true" />
-          <span>
-            <strong>没有电子简历？AI 帮你生成一份</strong>
-            <small>填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</small>
-          </span>
-          <span className="go">去生成</span>
-        </button>
-
-        <div className="qx-rt-srcs" role="group" aria-label="选择简历来源">
-          {UPLOAD_OPTIONS.filter((option) => option.type !== 'cloud' || !isTerminalKiosk()).map((option) => {
-            const isSelected = selected === option.type
-            const Icon = option.icon
-            return (
-              <button
-                type="button"
-                key={option.type}
-                className="qx-rt-src"
-                aria-pressed={isSelected}
-                onClick={() => !sourceBusy && handleSelect(option)}
-                disabled={sourceBusy}
-              >
-                <span className="ico"><Icon className="h-8 w-8" /></span>
-                <span className="n">{option.label}</span>
-                <span className="d">{option.description}</span>
-                <span className="go">{option.helper}</span>
-              </button>
-            )
-          })}
-        </div>
+        {scanReady && uploadedFile ? (
+          <ResumeScanReady
+            name={uploadedFile.name}
+            size={uploadedFile.size}
+            format={uploadedFile.format}
+            onDrop={dropScanHandoff}
+            onRescan={() => navigate('/scan')}
+          />
+        ) : (
+          <section className="qx-rt-pick" aria-labelledby="qx-rt-pick-h">
+            <h2 className="qx-rt-sec-h" id="qx-rt-pick-h">简历文件从哪儿来 <small>点一下直接进这条通道</small></h2>
+            <div className="qx-rt-srcs" role="group" aria-label="选择简历来源">
+              {UPLOAD_OPTIONS.filter((option) => option.type !== 'cloud' || !isTerminalKiosk()).map((option) => {
+                const isSelected = selected === option.type
+                const Icon = option.icon
+                return (
+                  <button
+                    type="button"
+                    key={option.type}
+                    className="qx-rt-src"
+                    aria-pressed={isSelected}
+                    onClick={() => !sourceBusy && handleSelect(option)}
+                    disabled={sourceBusy}
+                  >
+                    <span className="ico"><Icon className="h-8 w-8" /></span>
+                    <span className="n">{option.label}</span>
+                    <span className="d">{option.description}</span>
+                    <span className="go">{option.helper}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         <div className="qx-rt-split">
           <div className="qx-rt-main">
-            {selected === 'phone' ? (
-              <div className="resume-source-phone-session">
+            {scanReady ? null : selected === 'phone' ? (
+              <div className="resume-source-phone-session qx-rt-phone">
                 <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
               </div>
             ) : selected === 'usb' ? (
-              <ResumeUsbImportPanel onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
+              <div className="qx-rt-usb">
+                <ResumeUsbImportPanel onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
+              </div>
             ) : (
               <button
                 type="button"
@@ -476,32 +514,44 @@ export function ResumeSourcePage() {
                 </span>
               </button>
             )}
-            <p className="qx-rt-hint">
-              再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
-              <span
-                aria-disabled={!wordConversionAvailable || undefined}
-                aria-describedby={!wordConversionAvailable ? 'resume-word-conversion-reason' : undefined}
-              >
-                {wordConversionAvailable
-                  ? ` Word ${WORD_CONVERSION_DISCLOSURE}。`
-                  : ` ${WORD_CONVERSION_UNAVAILABLE_COPY}。`}
-              </span>
-            </p>
-            {!wordConversionAvailable && (
+
+            {error && (
+              <p className="qx-rt-note resume-source-error" data-tone="error" role="alert">{error}</p>
+            )}
+            {uploading && (
+              <p className="qx-rt-note resume-source-status" role="status">上传中，请稍候…</p>
+            )}
+
+            {scanReady ? null : (
+              <p className="qx-rt-hint">
+                再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
+                <span
+                  aria-disabled={!wordConversionAvailable || undefined}
+                  aria-describedby={!wordConversionAvailable ? 'resume-word-conversion-reason' : undefined}
+                >
+                  {wordConversionAvailable
+                    ? ` Word ${WORD_CONVERSION_DISCLOSURE}。`
+                    : ` ${WORD_CONVERSION_UNAVAILABLE_COPY}。`}
+                </span>
+              </p>
+            )}
+            {!wordConversionAvailable && !scanReady && (
               <p id="resume-word-conversion-reason" className="qx-rt-hint">
                 {conversionCapabilities.reason || '转换引擎未就绪；服务恢复并通过能力探测后会自动开放。'}
               </p>
             )}
             {uploadedFile && (
-              <FileContentPreview
-                compact
-                fileUrl={uploadedFile.fileUrl}
-                fileName={uploadedFile.name}
-                mimeType={uploadedFile.mimeType}
-                format={uploadedFile.format}
-                fileId={uploadedFile.fileId}
-                token={getToken()}
-              />
+              <div className="qx-rt-preview">
+                <FileContentPreview
+                  compact
+                  fileUrl={uploadedFile.fileUrl}
+                  fileName={uploadedFile.name}
+                  mimeType={uploadedFile.mimeType}
+                  format={uploadedFile.format}
+                  fileId={uploadedFile.fileId}
+                  token={getToken()}
+                />
+              </div>
             )}
           </div>
 
@@ -529,8 +579,28 @@ export function ResumeSourcePage() {
           </aside>
         </div>
 
+        <section className="qx-card qx-rt-intro">
+          <h2>{copy.infoTitle}</h2>
+          <p>{copy.infoBody}</p>
+          {intent === 'optimize' && (
+            <ol className="qx-rt-chain" aria-label="优化链路">
+              {OPTIMIZE_FLOW_STEPS.map((step) => <li key={step}>{step}</li>)}
+            </ol>
+          )}
+        </section>
+
+        {/* 阶段2A:没有电子简历的用户 → AI 简历生成(引导式表单,只润色不编造) */}
+        <button type="button" onClick={() => navigate('/resume/generate')} className="qx-rt-alt">
+          <SparklesIcon size={30} aria-hidden="true" />
+          <span>
+            <strong>没有电子简历？AI 帮你生成一份</strong>
+            <small>填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</small>
+          </span>
+          <span className="go">去生成</span>
+        </button>
+
         {/*
-          维度清单默认收起（R5）：主 CTA 现在固定在 ctabar，但这张卡仍是页面上最高的
+          维度清单默认收起（R5）：主 CTA 固定在 ctabar，但这张卡仍是页面上最高的
           非必需内容，收起后工作台不必为它滚一整屏。
           注意只收清单本身；下面那句「不会编造无法验证的结论」是合规声明，常驻可见。
         */}
@@ -557,13 +627,12 @@ export function ResumeSourcePage() {
         </section>
       </div>
 
-      {error && (
-        <p className="qx-rt-note resume-source-error" data-tone="error" role="alert">{error}</p>
-      )}
-
-      {uploading && (
-        <p className="qx-rt-note resume-source-status" role="status">上传中，请稍候…</p>
-      )}
+      {/* 稿 21 `.truth`：格式 / 用途 / 留存三栏，常驻页底，不随滚动走开。 */}
+      <footer className="qx-rt-truth">
+        <p><b>格式</b>只收 {supportedFormats.join(' / ')}，单份不超过 10MB；U 盘通道只列 PDF / JPG / PNG。</p>
+        <p className="resume-source-privacy"><b>用途 · 隐私</b>{copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}</p>
+        <p><b>留存</b>{KIOSK_DEVICE_ORIGINAL_NOTICE}</p>
+      </footer>
     </section>
     </QxPageFrame>
   )

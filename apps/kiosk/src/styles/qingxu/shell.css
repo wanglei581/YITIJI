@@ -122,3 +122,22 @@
   cursor: pointer;
 }
 .qx-topbar-back:active { background: var(--qx-line); }
+
+/* ── 手机宽度下的顶栏 ─────────────────────────────────────────
+ * 只作用于**不缩放**的舞台（KioskStageFit 的 data-kiosk-stage-fit="off"，即 KioskRoot
+ * 在窄屏下按真实宽度排版）。缩放舞台里 .qx-topbar 永远是 1080 宽，媒体查询却按真实
+ * 视口求值——不加这层限定，390 下被缩放的整屏路由也会误吃到窄屏规则。
+ *
+ * 事故原样（2026-09-23 截图复核）：390 宽时顶栏按 1080 的尺寸排，「职易达」、服务名
+ * 与状态胶囊被挤成逐字竖排，胶囊文字被裁。修法：品牌不折行、副标题让位、返回键收到触控
+ * 下限 48px；状态胶囊**保留**（公共终端上"没显示"会被读成"一切正常"），可收窄折成两行。 */
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .qx-topbar { height: 72px; gap: 10px; padding: 0 14px; }
+  [data-kiosk-stage-fit='off'] .qx-topbar-back { width: var(--qx-tap-min); height: var(--qx-tap-min); margin-right: 0; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-topbar-brand { flex: none; gap: 8px; font-size: 20px; white-space: nowrap; }
+  [data-kiosk-stage-fit='off'] .qx-topbar-mark { width: 36px; height: 36px; font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .qx-topbar-sub,
+  [data-kiosk-stage-fit='off'] .qx-topbar-clock { display: none; }
+  /* 胶囊可以收窄、最多折成两行（服务台那种整句说明也放得下），但绝不被裁、不逐字竖排。 */
+  [data-kiosk-stage-fit='off'] .qx-pill { flex: 0 1 auto; min-width: 0; min-height: 40px; padding: 4px 12px; gap: 6px; font-size: 14px; line-height: 1.25; }
+}

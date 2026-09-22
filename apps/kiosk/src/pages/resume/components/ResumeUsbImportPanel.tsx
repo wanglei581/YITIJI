@@ -140,14 +140,14 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
   }
 
   return (
-    <section className="flex min-h-[214px] flex-1 flex-col rounded-lg border border-neutral-200 bg-white p-5" aria-label="U盘简历文件">
-      <div className="flex items-center gap-3">
-        <span className="grid h-12 w-12 place-items-center rounded-lg bg-primary-50 text-primary-700">
+    <section className="resume-usb-panel flex min-h-[214px] flex-1 flex-col rounded-lg border border-neutral-200 bg-white p-5" aria-label="U盘简历文件" data-usb-state={importingId ? 'importing' : error ? 'error' : status?.present ? (files && files.length > 0 ? 'list' : 'empty') : 'wait'}>
+      <div className="resume-usb-panel__head flex items-center gap-3">
+        <span className="resume-usb-panel__icon grid h-12 w-12 place-items-center rounded-lg bg-primary-50 text-primary-700">
           <UsbIcon className="h-6 w-6" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-neutral-900">{status?.present ? status.driveLabel || '已检测到U盘' : '等待插入U盘'}</h2>
-          <p className="mt-1 text-sm text-neutral-500">仅显示 10MB 以内的 PDF、JPG、PNG 文件</p>
+          <p className="resume-usb-panel__hint mt-1 text-sm text-neutral-500">仅显示 10MB 以内的 PDF、JPG、PNG 文件</p>
         </div>
         {loading && <LoaderIcon className="h-5 w-5 animate-spin text-primary-600" aria-label="正在读取U盘" />}
       </div>
@@ -159,28 +159,28 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       )}
 
       {!error && !status?.present && !loading && (
-        <div className="grid flex-1 place-items-center py-6 text-center text-sm text-neutral-500">插入U盘后，文件列表会自动刷新</div>
+        <div className="resume-usb-panel__empty grid flex-1 place-items-center py-6 text-center text-sm text-neutral-500">插入U盘后，文件列表会自动刷新</div>
       )}
 
       {files && files.length > 0 && (
-        <div className="mt-4 grid max-h-[290px] gap-2 overflow-y-auto pr-1">
+        <div className="resume-usb-panel__list mt-4 grid max-h-[290px] gap-2 overflow-y-auto pr-1">
           {files.map((item) => (
             <button
               key={item.safeId}
               type="button"
               disabled={importingId !== null}
               onClick={() => void importFile(item)}
-              className="flex min-h-14 items-center gap-3 rounded-lg border border-neutral-200 px-3 text-left hover:border-primary-300 hover:bg-primary-50 disabled:opacity-60"
+              className="resume-usb-panel__row flex min-h-14 items-center gap-3 rounded-lg border border-neutral-200 px-3 text-left hover:border-primary-300 hover:bg-primary-50 disabled:opacity-60"
             >
               {importingId === item.safeId ? <LoaderIcon className="h-5 w-5 animate-spin text-primary-600" /> : <FileTextIcon className="h-5 w-5 text-primary-600" />}
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-800">{item.filename}</span>
-              <span className="shrink-0 text-xs text-neutral-500">{formatBytes(item.sizeBytes)}</span>
+              <span className="resume-usb-panel__name min-w-0 flex-1 truncate text-sm font-semibold text-neutral-800">{item.filename}</span>
+              <span className="resume-usb-panel__size shrink-0 text-xs text-neutral-500">{formatBytes(item.sizeBytes)}</span>
             </button>
           ))}
         </div>
       )}
 
-      <div className="mt-4 flex justify-end">
+      <div className="resume-usb-panel__actions mt-4 flex justify-end">
         <Button size="sm" variant="secondary" disabled={loading || importingId !== null} onClick={() => { setStatus(null); setFiles(null); setError(null) }}>
           <RefreshCwIcon className="h-4 w-4" aria-hidden="true" />
           重新检测

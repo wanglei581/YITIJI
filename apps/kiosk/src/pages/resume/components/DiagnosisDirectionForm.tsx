@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Card } from '@ai-job-print/ui'
 import {
   EDUCATION_LEVEL_OPTIONS,
   EMPLOYMENT_INDUSTRY_SECTORS,
@@ -9,7 +8,7 @@ import {
   type ResumeScoringDimensionKey,
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
-import { ListFilterIcon, TargetIcon } from 'lucide-react'
+import { CheckIcon, ListFilterIcon, TargetIcon } from 'lucide-react'
 import { KioskFilterPickerModal } from '../../../components/KioskFilterPickerModal'
 
 interface DiagnosisDirectionFormProps {
@@ -51,6 +50,9 @@ export function DiagnosisDirectionForm({
 }: DiagnosisDirectionFormProps) {
   const [showIndustryPicker, setShowIndustryPicker] = useState(false)
 
+  // 专业与学历是选填抽屉（稿 21 target-context）；已经填过的人回来时抽屉保持展开，不把值藏起来。
+  const [showMore, setShowMore] = useState(() => Boolean(targetMajor || targetDegree))
+
   return (
     <>
       <KioskFilterPickerModal
@@ -68,135 +70,158 @@ export function DiagnosisDirectionForm({
         onClear={() => onTargetIndustryChange('')}
         onClose={() => setShowIndustryPicker(false)}
       />
-      <Card className="flex h-full flex-col p-5">
-      <div className="mb-4 flex items-center gap-4">
-        <span
-          className="fy-g-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600"
-          aria-hidden="true"
-        >
-          <TargetIcon className="h-8 w-8" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-bold text-neutral-900">诊断方向设置</h2>
-          <p className="mt-0.5 text-sm text-neutral-500">只影响建议关注顺序，报告仍固定输出 6 个维度</p>
+      <section className="qx-rt-target" aria-labelledby="qx-rt-target-h">
+        <header className="qx-rt-blk-h">
+          <span className="qx-rt-blk-ic" aria-hidden="true"><TargetIcon size={26} /></span>
+          <span>
+            <h2 id="qx-rt-target-h">诊断方向设置</h2>
+            <small>只影响建议关注顺序，报告仍固定输出 6 个维度</small>
+          </span>
+        </header>
+
+        {/* 稿 21 target 的 .seg：定向 / 通用二选一，比单个「切换」按钮更说得清现在是哪一种。 */}
+        <div className="qx-rt-seg" role="group" aria-label="诊断范围">
+          <button type="button" aria-pressed={!genericDiagnosis} onClick={() => onGenericDiagnosisChange(false)}>
+            <b>定向诊断</b>
+            <small>按你选的重点排建议顺序</small>
+          </button>
+          <button type="button" aria-pressed={genericDiagnosis} onClick={() => onGenericDiagnosisChange(true)}>
+            <b>通用诊断</b>
+            <small>不设方向，下面各项都不参与</small>
+          </button>
         </div>
-        <button
-          type="button"
-          aria-pressed={genericDiagnosis}
-          onClick={() => onGenericDiagnosisChange(!genericDiagnosis)}
-          className={[
-            'min-h-[48px] shrink-0 rounded-full border px-5 text-sm font-semibold transition-colors active:scale-[0.98]',
-            genericDiagnosis
-              ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-neutral-200 bg-white text-neutral-600',
-          ].join(' ')}
-        >
-          切换为通用诊断
-        </button>
-      </div>
 
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <p className="text-sm font-semibold text-neutral-700">
-          重点关注维度 <span className="font-medium text-neutral-400">(默认 3 项，可增减)</span>
-        </p>
-      </div>
+        <div className="qx-rt-grp" role="group" aria-labelledby="qx-rt-dims-lb">
+          <span className="lb" id="qx-rt-dims-lb">重点关注维度 <small>默认 3 项，可增减</small></span>
+          <div className="qx-rt-dimchips">
+            {RESUME_SCORING_DIMENSIONS.map((item) => {
+              const checked = !genericDiagnosis && selectedDimensions.includes(item.key)
+              return (
+                <button
+                  type="button"
+                  key={item.key}
+                  className="qx-rt-dimchip"
+                  aria-pressed={checked}
+                  disabled={genericDiagnosis}
+                  onClick={() => onToggleDimension(item.key)}
+                >
+                  <span className="mk" aria-hidden="true">{checked ? <CheckIcon size={18} strokeWidth={3} /> : null}</span>
+                  <span className="tx">{item.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        {RESUME_SCORING_DIMENSIONS.map((item) => {
-          const checked = !genericDiagnosis && selectedDimensions.includes(item.key)
-          return (
-            <button
-              type="button"
-              key={item.key}
-              aria-pressed={checked}
-              disabled={genericDiagnosis}
-              onClick={() => onToggleDimension(item.key)}
-              className={[
-                'fy-dim-chip min-h-[58px] rounded-2xl border px-3 text-sm font-semibold transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
-                checked ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
-              ].join(' ')}
-            >
-              {item.label}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="mt-4 grid flex-1 content-start gap-3 md:grid-cols-2">
-        <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-neutral-700">目标岗位</span>
+        <label className="qx-rt-field">
+          <span className="lb">目标岗位</span>
           <input
             value={targetJob}
             disabled={genericDiagnosis}
             onChange={(e) => onTargetJobChange(e.target.value.slice(0, 80))}
             placeholder="例如：前端工程师、财务助理"
-            className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
           />
         </label>
-        <div className="block">
-          <span className="mb-2 block text-sm font-semibold text-neutral-700">行业方向</span>
+
+        <div className="qx-rt-field">
+          <span className="lb">行业方向</span>
           <button
             type="button"
             disabled={genericDiagnosis}
             aria-haspopup="dialog"
             aria-label="选择行业方向"
             onClick={() => setShowIndustryPicker(true)}
-            className="flex h-16 w-full items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 text-left text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
           >
-            <span className="min-w-0 truncate">{targetIndustry || '暂不指定'}</span>
-            <ListFilterIcon className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
+            <span className="val">{targetIndustry || '暂不指定'}</span>
+            <span className="go">全部 20 个门类 <ListFilterIcon size={18} aria-hidden="true" /></span>
           </button>
         </div>
-        <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-neutral-700">经验级别</span>
-          <select
-            value={targetExperience}
-            disabled={genericDiagnosis}
-            onChange={(e) => onTargetExperienceChange(e.target.value as ResumeTargetContext['experience'])}
-            className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-          >
-            {RESUME_TARGET_EXPERIENCE_OPTIONS.map((item) => <option key={item}>{item}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-neutral-700">求职场景</span>
-          <select
-            value={targetScene}
-            disabled={genericDiagnosis}
-            onChange={(e) => onTargetSceneChange(e.target.value as ResumeTargetContext['scene'])}
-            className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-          >
-            {RESUME_TARGET_SCENE_OPTIONS.map((item) => <option key={item}>{item}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-neutral-700">专业（选填）</span>
-          <input
-            value={targetMajor}
-            disabled={genericDiagnosis}
-            onChange={(e) => onTargetMajorChange(e.target.value.slice(0, 60))}
-            placeholder="例如：计算机科学与技术"
-            className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-neutral-700">学历（选填）</span>
-          <select
-            value={targetDegree}
-            disabled={genericDiagnosis}
-            onChange={(e) => onTargetDegreeChange(e.target.value)}
-            className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-          >
-            <option value="">不填写</option>
-            {EDUCATION_LEVEL_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </label>
-      </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-        专业与学历仅用于本人简历表达的诊断重点参考，不影响是否可以诊断。
-      </p>
-      </Card>
+        <ChipGroup
+          id="qx-rt-exp"
+          label="经验级别"
+          disabled={genericDiagnosis}
+          options={RESUME_TARGET_EXPERIENCE_OPTIONS.map((item) => ({ value: item, label: item }))}
+          value={targetExperience}
+          onChange={(value) => onTargetExperienceChange(value as ResumeTargetContext['experience'])}
+        />
+        <ChipGroup
+          id="qx-rt-scene"
+          label="求职场景"
+          disabled={genericDiagnosis}
+          options={RESUME_TARGET_SCENE_OPTIONS.map((item) => ({ value: item, label: item }))}
+          value={targetScene}
+          onChange={(value) => onTargetSceneChange(value as ResumeTargetContext['scene'])}
+        />
+
+        <button
+          type="button"
+          className="qx-rt-drawer"
+          aria-expanded={showMore}
+          aria-controls="qx-rt-more"
+          onClick={() => setShowMore((open) => !open)}
+        >
+          <b>专业与学历</b>
+          <small>选填 · 不填也能诊断</small>
+          <span className="go">{showMore ? '收起 ↑' : '展开填写 ↓'}</span>
+        </button>
+        {showMore ? (
+          <div id="qx-rt-more" className="qx-rt-more">
+            <label className="qx-rt-field">
+              <span className="lb">专业（选填）</span>
+              <input
+                value={targetMajor}
+                disabled={genericDiagnosis}
+                onChange={(e) => onTargetMajorChange(e.target.value.slice(0, 60))}
+                placeholder="例如：计算机科学与技术"
+              />
+            </label>
+            <ChipGroup
+              id="qx-rt-degree"
+              label="学历（选填）"
+              disabled={genericDiagnosis}
+              options={[{ value: '', label: '不填写' }, ...EDUCATION_LEVEL_OPTIONS.map((item) => ({ value: item, label: item }))]}
+              value={targetDegree}
+              onChange={onTargetDegreeChange}
+            />
+          </div>
+        ) : null}
+
+        <p className="qx-rt-hint">
+          专业与学历仅用于本人简历表达的诊断重点参考，不影响是否可以诊断。
+        </p>
+      </section>
     </>
+  )
+}
+
+/** 稿 21 `.grp > .ops > .chip`：单选点选组。按钮带 aria-pressed，整组以标签命名。 */
+function ChipGroup({ id, label, options, value, disabled, onChange }: {
+  id: string
+  label: string
+  options: Array<{ value: string; label: string }>
+  value: string | undefined
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="qx-rt-grp" role="group" aria-labelledby={`${id}-lb`}>
+      <span className="lb" id={`${id}-lb`}>{label}</span>
+      <div className="ops">
+        {options.map((item) => (
+          <button
+            type="button"
+            key={item.value || 'none'}
+            className="qx-rt-chip"
+            data-mute={item.value === '' ? 'true' : undefined}
+            aria-pressed={value === item.value}
+            disabled={disabled}
+            onClick={() => onChange(item.value)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
