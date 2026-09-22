@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1510 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1512 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -295,7 +295,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 472 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 474 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -632,12 +632,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/job-fit-qx.css` | `verify-job-fit-m1-5-ui.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit-inkpaper.css` | `verify-fusion-w3.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx` | `verify-job-fit-m1-5-ui.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx` | `verify-job-fit-m1-5-ui.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx` | `verify-job-fit-m1-5-ui.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx` | `verify-job-fit-m1-5-ui.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
 | `apps/kiosk/src/pages/resume/jobMaterialDraft.ts` | `verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs` |

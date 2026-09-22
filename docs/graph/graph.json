@@ -11756,7 +11756,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 557,
+      "reachableFileCount": 561,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13849,14 +13849,11 @@
           ],
           "path": "/resume/job-fit",
           "styles": [
-            "apps/kiosk/src/pages/resume/jobFit-inkpaper-ext.css",
-            "apps/kiosk/src/pages/resume/jobFit-inkpaper.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-job-fit.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css"
+            "apps/kiosk/src/pages/resume/job-fit-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14622,7 +14619,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 611
+      "sourceFileCount": 615
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18477,6 +18474,9 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/job-fit-qx.css": [
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/jobFit-inkpaper.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
@@ -18499,6 +18499,9 @@
     "apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx": [
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx": [
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx": [
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
@@ -24998,12 +25001,14 @@
           "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitPage.tsx",
+          "apps/kiosk/src/pages/resume/job-fit-qx.css",
           "apps/kiosk/src/pages/resume/jobFit-inkpaper.css",
           "apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx",
           "apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx",
           "apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx",
           "apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx",
           "apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx",
           "apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx",
           "apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx",
           "apps/kiosk/src/services/api/jobFit.ts",
