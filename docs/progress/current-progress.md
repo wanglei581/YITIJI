@@ -1,5 +1,25 @@
 # 当前开发进度
 
+2026-09-23 **唯一集成候选 `831506deafe4d9a1856dd4813c6e68aca422b64f`：简历取件/解析页已本地合流，商业仍 NO-GO。**
+`/resume/source`、`/resume/parse` 已从 Claude 隔离候选进入 `codex/commercial-integration-20260918-r1`；
+`831506dea` 还把解析页返回来源页改为替换历史，避免浏览器后退再次进入自动提交的解析页。
+这只是本地分支：比 PR #1042 的远端分支超前 15 个提交，未推送、未合并 `main`、未部署。
+在该 HEAD 上已实跑 kiosk typecheck、W2 99/99、W3 40/40、W6 112/112、route-sweep 110/110、
+`graph:check`、`verify:fusion-w2`、`verify:fusion-w3`、`verify:lightflow-k2b-ai-resume`、
+`verify:resume-diagnosis-flow-ui`，均退出 0。解析页返回逻辑与 390px 顶栏胶囊各做一次反向变异，
+目标浏览器测试均以退出码 1 判红；逐字节恢复后目标测试以退出码 0 判绿。
+本轮另跑 `verify:repository-integrity` 与 `git diff --check`，均退出 0；原有 `.gitignore` 未提交改动保持不动。
+`/resume/materials` 和其他旧壳路由仍待 Claude 迁移；390px 扫描结果页按钮被覆盖、稿 21 细分状态与预览工具条
+仍待处理。以上本地浏览器测试不证明 API 真实后端、微信、Windows/Pantum、支付或生产可用。
+
+2026-09-23 **收费简历导出候选 `b3085bb7b` 尚不满足完整关闭条件，未合流。** Grok 只读审查
+session `ab7c73c6-ec40-48fe-bc4f-5cc649ac68d8`：该提交的 catch 补偿可隐藏正常异常返回的失败文件，
+但 `FilesService.upload` 先创建 `active` 文件、再核销权益；若进程在两步之间退出，失败路文件没有
+核销记录却仍可从本人文档访问。核销已成功而后续草稿持久化失败时，删除文件也不会退还已扣权益。
+这两条是当前控制流反例，不以本地并发绿测覆盖。下一步须设计不可见暂存与可恢复的核销/发布状态，
+并验证崩溃重启、重试、对象存储清理及扣费一致性；不得直接把该部分修复记为商用完成。
+`SOURCE / LOCAL` 仅覆盖已验证子链；`FINAL-HEAD CI / DEVICE / PRODUCTION / PAYMENT / COMMERCIAL: NO-GO`。
+
 2026-09-23 **稿 21 scan-ready 在 390×844 下交接标题被挤成竖排，已修（本地候选，未 push、未合并、未部署）。**
 基线 `f356a6b26`（稿 21 取件/解析 P1 收口），修复提交 `5fcb1e1ad`。现象：390 下 `.qx-rt-track` 标题
 「扫描原件 · 由扫描工作台交接」被「换一种来源」挤成两字一列，共 7 行。根因是标题 `.tx` 用了 `flex:1`，基准为 0。

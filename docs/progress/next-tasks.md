@@ -1,9 +1,22 @@
 # 下一步任务
 
-## 2026-09-23：`/resume/source` 与 `/resume/parse` 青序迁移候选待集成
+## 2026-09-23：以 `831506dea` 为当前唯一集成候选继续收口
 
-本地候选（Claude session `a4074904-cf6f-47f5-860a-18a351d01506`，基线 `ccb2e8715`）已把两页迁入稿 21 的青序工作台，
-没有 push、PR、合并或部署。集成方要做四件事：
+1. **Claude 前端：** `/resume/source` 与 `/resume/parse` 已本地合流，不再重做；先补 `/resume/materials`
+   旧壳及 390px `/scan?stage=result` 的「AI 简历识别」按钮覆盖，再按稿 21 逐项验收来源异常态、
+   预览工具条和真实后端交接。前端只能由 Claude 修改；孤儿 CSS 要有零引用与门禁证据后才能删除。
+2. **Grok 后端：** `b3085bb7b` 只能遮蔽可捕获异常下的失败导出，不合入作为完整修复。
+   收费 `resume_export` 须使未核销文件不可见，并使核销、发布、失败恢复有可审计状态；覆盖上传后
+   进程退出、核销后持久化失败、并发不同内容、同内容重试和对象存储删除失败，验证权益与本人资产一致。
+3. **集成与发布：** 保持 #1042 为唯一草稿 PR；本地候选测试不能替代最终推送 SHA 的完整 CI、
+   PostgreSQL readiness 和 Windows 签名安装包运行。未获当次授权不推送、合并、部署或操作真机。
+4. **真实验收：** 微信 DevTools/Trial、双受控账号隔离（目前只有一个）、Windows/Pantum 出纸与 ADF
+   扫描、真实小额支付退款对账、生产存储/备份/回滚、内容授权与 UAT/试运营仍未关闭。
+
+## 2026-09-23：`/resume/source` 与 `/resume/parse` 隔离候选历史记录（已本地合流）
+
+下列是 Claude 隔离候选（session `a4074904-cf6f-47f5-860a-18a351d01506`，基线 `ccb2e8715`）
+当时的待办；两页现已合入本地唯一集成分支，以下第 1 项已在 `831506dea` 完成，第 2-4 项仍按当前证据核验：
 1. 在集成分支重跑 kiosk typecheck/build、全量 W3/W6、route-sweep，以及 `graph:check`（图谱已随本批重生成）。
 2. 补跑 `tests/interaction/ai-resume-journey.spec.ts`，它需要真实后端。
 3. 另起一条清理：`resume-diagnosis-ext.css` 与 `resume-diagnosis-lightflow.css` 已成孤儿。
