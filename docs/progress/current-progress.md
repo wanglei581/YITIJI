@@ -1,5 +1,9 @@
 # 当前开发进度
 
+2026-09-22 **独立审查边界（绑定 `ad154ac1a`）。** Agy（`gemini-3.8-flash-high`）只读核对确认自我探索/招聘会批次未修改 `services/api`、Prisma 或业务 DTO；小程序 136 个调用端点与后端路由对账无已知缺口，terminal identity、订单幂等、文件归属、支付/退款、打印/扫描归属、状态回放和本人资产契约在源码/本地层为 GO 或 PARTIAL。Agy同时确认真实 Windows/Pantum、生产通道和商业支付证据缺失，均为 NO-GO。Agy报告中把“CI具备运行条件”写成 GO，但没有当前 SHA 的 GitHub run，本项目按严格证据口径仍记 `CI: NO-GO`。
+
+Grok（`grok-4.7-build-fast xhigh`）绑定同一 SHA，因本轮未读完实现、未运行验证，明确将招聘会、自我探索和所有层级标为 `UNREVIEWED`，不构成批准，也没有发现可确认的 P0/P1/P2。该结果不否定本地已执行的门禁/Playwright，只说明外部审查不能替代命令证据。
+
 2026-09-22 **招聘会八条活路由迁入青序流光并完成语义收口。** Claude 在隔离 worktree 完成并提交
 `1857d61e9`，随后对来源阻断原因做最小修复并提交 `a66760734`；Codex 按顺序合入本候选，当前代码
 落地为 `8feaadfac`、`a856aa7aa`，项目图谱更新为 `c7297adfd`。八条入口是 `/job-fairs`、
