@@ -1,6 +1,18 @@
 # 当前开发进度
 
-2026-09-23 **小程序会员单与材料包建单可选价格再确认已合入本地集成候选，未推送。** 来源
+2026-09-23 **活动快照：#1042 仍是唯一草稿 PR，商业判定 NO-GO。** `fb21261c9` 的
+[主 CI 35772995192](https://github.com/wanglei581/YITIJI/actions/runs/35772995192) 已完成：
+PostgreSQL readiness、build-and-verify、Kiosk/Admin/Partner 浏览器及路由扫测全部成功。
+[Windows run 35772995250](https://github.com/wanglei581/YITIJI/actions/runs/35772995250)
+的 unsigned EXE 升级成功，内部签名失败，依赖它的 MSI 按门禁拒绝继续。临时签名证书在
+LocalMachine 信任安装阶段已解出 Code Signing EKU；签名前的另一条读取路径误判其缺失。
+Grok 隔离提交 `464a07067` 已作为本地集成提交 `f0157c7f8` 修正读取路径并保持缺失 EKU
+仍拒绝；静态签名契约、仓库完整性及 diff check 均退出 0。该修复尚无新 SHA 的 Windows
+运行时结果，不算签名、MSI 或设备验收通过。小程序确认页、F2 身份清场和权益活动候选均在
+独立审查/修复中，未合入；CI 绿的 `fb21261c9` 不是最终发布 SHA。`DEVICE / PAYMENT /
+PRODUCTION / COMMERCIAL: NO-GO`。
+
+2026-09-23 **小程序会员单与材料包建单可选价格再确认已合入集成候选。** 来源
 `d8a30e589`（父提交 `7c8b5f675`）已落为 `39bb2d404`。
 `POST /me/print-orders` 与 `POST /orders/package` 增加可选 `quotedAmountCents`，只断言一致性；金额仍由既有 `OrderQuoteService` 按文件、页数、份数与当前价目重算。材料包总额、计费页和逐行 `line=` 与 `POST /orders/quote` 的 `aggregatePrintPriceQuotes` 相同。
 幂等获取、回放、键复用、处理中和已废弃都先于报价比对。已建成的订单回放落库金额，不因之后改价或重试时的确认金额重算；`quotedAmountCents` 不进业务指纹。只有新租约会在写事务前比对，不一致为 409 `PRICE_CHANGED`，details 是 `currentAmountCents` / `billablePages` / `line=serviceKey:unitCents:quantity:subtotalCents` 字符串。临时租约在 finally 释放，不墓碑，同一 Idempotency-Key 可按现价再确认。不新建 Order、OrderItem、PrintTask、PaymentAttempt、支付令牌或建单审计。缺省字段仍按服务端现价建单；null、负数、小数、字符串和超过 100000000 为 HTTP 400。只有权威报价也是 0 才走免费 `markPaid`。
