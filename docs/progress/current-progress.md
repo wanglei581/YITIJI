@@ -1,5 +1,13 @@
 # 当前开发进度
 
+2026-09-23 **支付未知结果提示修复（父候选 `ce4c7f96f`）。** Claude 直接调用
+`opus/xhigh`（session `91d2ebfb-4dd0-46cc-b40b-4afb4e863476`）仅修改现有
+`userErrorMessage.ts` 和 `cashier-qx.spec.ts`，没有新增文件。未确认支付不再声称渠道已受理，
+保留勿重复支付、账单核实与工作人员指引。Claude 报告收银页 6/6、typecheck、两项错误展示门禁退出 0；
+旧文案反向变异退出 1、恢复退出 0，Codex 已抽核原始日志，并在最终注释整理后重跑目标浏览器用例
+1/1，退出 0（含构建）。这只关闭前端误导文案缺口；下方支付后端、小程序竞态仍待候选验收与合流，
+`SOURCE / LOCAL: PARTIAL`，`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO` 不变。
+
 2026-09-22 **当前阻塞快照：支付回调与小程序补签竞态，绑定 `55893b515904fac32375eacb429e651b8d7de6fa`。**
 本条覆盖下方历史审查的全局放行口径：`SOURCE / LOCAL: PARTIAL`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
 Grok `grok-4.7-build-fast xhigh` 已返回实质只读报告（session `4725a056-2152-469f-add1-a5ae9348f407`），

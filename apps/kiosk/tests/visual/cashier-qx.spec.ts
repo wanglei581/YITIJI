@@ -94,11 +94,10 @@ test('cashier renders real channels and sends the selected channel in the pay pa
   expect(payPayload).toEqual({ channel: 'alipay' })
 })
 
-test('channel accepted but local confirm unconfirmed must say do-not-repay, never plain retry @w2', async ({ page, api }) => {
+test('channel outcome unconfirmed must say do-not-repay, never claim acceptance or plain retry @w2', async ({ page, api }) => {
   // 资金安全回归：POST /orders/:id/pay 回 503 + PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED。
-  // 此刻渠道**可能已经扣款**。屏上必须固定说「请勿重新支付，请联系现场工作人员
-  // 核对渠道订单」；绝不能落到 5xx 通用兜底「服务暂时不可用，请稍后重试」——
-  // 那句话在可能已扣款的时刻是在教用户再付一次。
+  // 该码含受理未知/回填失败两支，可能已扣款也可能没受理。屏上必须说结果未确认 + 请勿重复
+  // 支付 + 怎么核实；落 5xx 兜底「请稍后重试」等于在可能已扣款时教用户再付一次。
   registerShell(api)
   api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
   api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
@@ -126,12 +125,16 @@ test('channel accepted but local confirm unconfirmed must say do-not-repay, neve
   const alert = page.getByRole('alert')
   await expect(alert).toBeVisible()
   const alertText = (await alert.innerText()).replace(/\s+/g, '')
-  // ① 必须说出「请勿重新支付」并指向工作人员 —— 这正是资金安全的全部要点
-  expect(alertText, '渠道已受理未确认时必须明说请勿重新支付').toContain('请勿重新支付')
-  expect(alertText, '必须指向现场工作人员核对渠道订单').toMatch(/现场工作人员|工作人员/)
-  // ② 必须不出现「请稍后重试」类措辞 —— 那是在可能已扣款的时刻教用户再付一次
-  expect(alertText, '渠道已受理未确认时不得出现通用重试话术').not.toContain('请稍后重试')
-  // ③ 整页同口径：任何位置都不得诱导重试（含通用 5xx 兜底句）
+  // ① 说出请勿重复/重新支付并指向核实路径 —— 资金安全的全部要点
+  expect(alertText, '结果未确认时必须明说不要再付一次').toMatch(/请勿(重复|重新)支付/)
+  expect(alertText, '必须给出核实路径（现场工作人员 / 自查支付账单）').toMatch(/工作人员|支付账单/)
+  // ② 不得出现「请稍后重试」类措辞
+  expect(alertText, '结果未确认时不得出现通用重试话术').not.toContain('请稍后重试')
+  // ③ 不得断言「已受理」：本例 503 body 里正写着这句，页面照抄即红（固定文案不得漂移成透传）
+  expect(alertText, '结果未知时不得声称渠道已受理/已支付').not.toMatch(/已受理|已支付/)
+  // ④ 如实说出「未确认」这个状态，而不是只给动作
+  expect(alertText, '必须说清支付结果尚未确认').toMatch(/未确认|无法确认|结果未知/)
+  // ⑤ 整页同口径：任何位置都不得诱导重试（含通用 5xx 兜底句）
   const pageText = (await page.locator('[data-w2-page="print-cashier"]').innerText()).replace(/\s+/g, '')
   expect(pageText, '收银页任何位置都不得出现「请稍后重试」').not.toContain('请稍后重试')
 })
