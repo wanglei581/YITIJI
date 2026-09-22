@@ -93,6 +93,7 @@ export async function verifyPaymentCallbackRace(deps: PaymentCallbackRaceDeps): 
   }
   try {
     await verifyUnknownQrDoesNotRelease(deps, originalCreateQr)
+    await verifyAuxiliaryAttemptReadDoesNotHideUnknownQr(deps)
     await verifyStructuredQueryRecovery(deps)
     await verifyClosedWindowSuccessIsRefundable(deps)
     await verifyBlockedSuccessWriteRetries(deps)
@@ -305,6 +306,98 @@ async function lockThrownQr(
     )
   }
   return { orderId, session, attemptId: attempt.id, orderNo: order.orderNo }
+}
+
+async function verifyAuxiliaryAttemptReadDoesNotHideUnknownQr(deps: PaymentCallbackRaceDeps): Promise<void> {
+  const orderId = await deps.makeOrder(151, 'unpaid')
+  const session = await deps.paymentSessionFor(orderId)
+  let calls = 0
+  const originalCreateQr = deps.provider.createQrPayment.bind(deps.provider)
+  deps.provider.createQrPayment = async () => {
+    calls += 1
+    throw new Error('ALIPAY_CHANNEL_ERROR: 40004 ACQ.INVALID_PARAMETER')
+  }
+  const attemptReads = deps.prisma.paymentAttempt as unknown as {
+    findUnique: (args: { select?: Record<string, boolean> }) => Promise<{ orderId?: string; channel?: string } | null>
+  }
+  const originalFindUnique = attemptReads.findUnique.bind(deps.prisma.paymentAttempt)
+  attemptReads.findUnique = async (args) => {
+    const select = args?.select
+    const keys = select ? Object.keys(select) : []
+    if (select?.orderId === true && select?.channel === true && keys.length === 2) {
+      throw new Error('VERIFY_AUX_FINDUNIQUE_DB_FAULT')
+    }
+    return originalFindUnique(args)
+  }
+  let failure = ''
+  try {
+    let code = 'RESOLVED'
+    let body = ''
+    try {
+      await deps.payment.createPayAttempt(orderId, session)
+    } catch (error) {
+      code = errorCodeOf(error)
+      body = responseText(error)
+    }
+    const order = await deps.prisma.order.findUnique({ where: { id: orderId } })
+    const attempt = await deps.prisma.paymentAttempt.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+    })
+    const audit = attempt
+      ? await deps.prisma.auditLog.findFirst({
+          where: {
+            action: 'payment.channel_accepted_unconfirmed',
+            targetType: 'payment_attempt',
+            targetId: attempt.id,
+          },
+        })
+      : null
+    let payload: { orderId?: string | null; channel?: string | null; reason?: string } = {}
+    try {
+      payload = JSON.parse((audit as { payloadJson?: string } | null)?.payloadJson ?? '{}') as typeof payload
+    } catch {
+      payload = {}
+    }
+    const reserved =
+      order?.payStatus === 'paying' &&
+      attempt != null &&
+      attempt.status !== 'failed' &&
+      attempt.status !== 'success' &&
+      attempt.failReason === CHANNEL_ACCEPTED_UNCONFIRMED_REASON
+    if (
+      code.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+      body.includes('支付结果尚未确认') &&
+      body.includes('请勿重复支付') &&
+      !body.includes('VERIFY_AUX_FINDUNIQUE_DB_FAULT') &&
+      !body.includes('已受理') &&
+      reserved &&
+      audit != null &&
+      payload.reason === CHANNEL_ACCEPTED_UNCONFIRMED_REASON &&
+      payload.orderId == null &&
+      payload.channel == null
+    ) {
+      deps.pass('auxiliary attempt read failure still returns the unknown QR code and audits the attempt id')
+    } else {
+      failure =
+        `auxiliary read mismatch: code=${code} body=${body} pay=${order?.payStatus} attempt=${JSON.stringify(attempt)} audit=${JSON.stringify(audit)} payload=${JSON.stringify(payload)}`
+    }
+  } finally {
+    attemptReads.findUnique = originalFindUnique
+  }
+  if (failure) deps.fail(failure)
+  await deps.expectCode(
+    'retry after the auxiliary read recovers stays locked (PAYMENT_ATTEMPT_PENDING)',
+    'PAYMENT_ATTEMPT_PENDING',
+    () => deps.payment.createPayAttempt(orderId, session),
+  )
+  const attempts = await deps.prisma.paymentAttempt.count({ where: { orderId } })
+  if (calls === 1 && attempts === 1) {
+    deps.pass('retry after the auxiliary read recovers does not call the provider again')
+  } else {
+    deps.fail(`auxiliary read retry leaked a second QR: calls=${calls} attempts=${attempts}`)
+  }
+  deps.provider.createQrPayment = originalCreateQr
 }
 
 async function verifyStructuredQueryRecovery(deps: PaymentCallbackRaceDeps): Promise<void> {

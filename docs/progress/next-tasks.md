@@ -1,5 +1,12 @@
 # 下一步任务
 
+## 2026-09-23：支付前后端已整合，先验最终候选
+
+前端来源 `b4a1bb42d`、后端来源 `9e9b5988b` 与 `c13f8ea37` 已整合。
+下一步在当前 SHA 验证 API 支付门禁与收银页，再关闭本批 SOURCE/LOCAL 阻塞；
+不得把下方来源分支“待集成/前端待修”历史描述当成重复施工指令。
+真实渠道未知订单的人工核对、退款与对账仍需生产验收。
+
 ## 2026-09-23：前端支付提示已修复，后端与跨端验收继续
 
 未知支付结果的误导提示已由 Claude 修复，目标浏览器用例经 Codex 最终文件复跑退出 0；
@@ -26,9 +33,9 @@ Agy 本轮跨端调用超时为 `UNREVIEWED`。需要确认任务在执行时，
 `read_thread` 未展示 `functions.exec` 内嵌套调用不等于未调用，必须向负责窗口核实句柄后再判断。
 不再为相同范围新增等待窗口；已派任务按单一写入者继续。其余全站新 UI、后台、微信 Trial、
 Windows/Pantum、当前 SHA 的 CI/生产/支付对账/UAT 范围保持不变，均待对应验收证据。
-## 2026-09-22：支付回调竞态已本地提交，待集成
+## 2026-09-22：支付回调竞态本地 API 反例已关闭，待主窗口集成
 
-Codex 已完成最小验收，范围只限本次 API 资金安全的 SOURCE / LOCAL。提交在分支 `grok/payment-callback-race-20260922` 的 HEAD，基线 `55893b515904fac32375eacb429e651b8d7de6fa`。出码 provider 的任何 throw 都保持未知互斥。恢复只走现有 `queryPayment` 的结构化 `paid` / `closed` / `failed`。支付宝查无此单和微信 404 仍是 `unknown`，要人工核对，生产运维恢复尚未验收。API 未知文案是「支付结果尚未确认，请勿重复支付」。一体机仍把该错误码固定显示成「已受理」，本 lane 未修，由主窗口 Claude 负责。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。集成前不要 push、开 PR、合并、部署、真实支付退款或操作硬件。
+追加提交见分支 `grok/payment-callback-race-20260922` 的 HEAD，父提交 `9e9b5988b8cda7e12cad1f3941065ec6ab14ffe4` 不 amend。未知出码后的审计辅助读取失败不再盖住 `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED`。这只是本地 API 范围，不是全链 GO。支付宝查无此单和微信 404 仍是 `unknown`，要人工核对，生产运维恢复尚未验收。一体机固定「已受理」文案在主窗口候选 `b4a1bb42d`，本 lane 未合入。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。不要 push、开 PR、合并、部署、真实支付退款或操作硬件。
 
 ## 2026-09-22：外部审查结论不能替代 exact-SHA 验证
 

@@ -1,5 +1,10 @@
 # 当前开发进度
 
+2026-09-23 **支付前后端候选合流。** 前端 `b4a1bb42d` 与后端来源 `9e9b5988b`、
+`c13f8ea37` 已按序整合；业务文件无冲突，仅合并以下历史进度记录。下方“待主窗口集成”及
+“前端剩余”是来源分支当时状态，不再代表当前集成树。当前 SHA 的合流后验证待执行，
+小程序与全站 UI 仍未完成；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+
 2026-09-23 **支付未知结果提示修复（父候选 `ce4c7f96f`）。** Claude 直接调用
 `opus/xhigh`（session `91d2ebfb-4dd0-46cc-b40b-4afb4e863476`）仅修改现有
 `userErrorMessage.ts` 和 `cashier-qx.spec.ts`，没有新增文件。未确认支付不再声称渠道已受理，
@@ -33,8 +38,9 @@ Grok `grok-4.7-build-fast xhigh` 已返回实质只读报告（session `4725a056
   另外只读核对 Windows 签名候选：`windows-agent-signing-gate-20260917@50483cd28` 仍有15个WIP文件，
   当前集成树尚无其内部签名/信任脚本；该资产待审查提取，未清理或覆盖。远程 `main` 实查仍为 `eb0f20341`。
 2026-09-22 **支付回调竞态修复已由 Codex 做最小验收，本地候选待集成。** 分支 `grok/payment-callback-race-20260922`，基线 `55893b515904fac32375eacb429e651b8d7de6fa`，提交见本分支 HEAD。验收范围只覆盖本次 API 资金安全的 SOURCE / LOCAL。最终口径：现有 `createQrPayment` 只抛普通 Error，没有可证明的明确拒绝契约，因此任何出码 throw 都保持未知互斥。字符串白名单已删除，`failQrCreateAttempt` 已无引用并删除。`refund.service.ts`、`apps/**`、Prisma、锁文件没改。本轮场景在 `services/api/scripts/support/payment-callback-race-cases.ts`。
+2026-09-22 **支付回调竞态辅助读取反例已在本地 API 范围关闭，待主窗口集成。** 父提交 `9e9b5988b8cda7e12cad1f3941065ec6ab14ffe4` 不 amend；追加提交见本分支 HEAD。Codex 已抽核这次 `findUnique` 故障：修复前与去掉保护的变异都退出 1，恢复后 `verify-payment-flow` 217 条通过。辅助读取失败时仍返回 `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED` 和「支付结果尚未确认，请勿重复支付」，审计按已知 `attemptId` 记录。这只关闭本地 API 的这一反例，不是全链 GO。前端固定「已受理」文案在主窗口候选 `b4a1bb42d`，本 lane 未合入。`CI / DEVICE / PRODUCTION` 与真实渠道、设备仍未验收。
 
-- **文件预算：** 共 7 个文件。`online-payment.service.ts` 1239→1248（净 +9），`verify-payment-flow.ts` 1894→1942（净 +48），`verify-payment-codepay.ts` 847→909（净 +62），`channel-accepted-signal.ts` 86→95（注释 +9）。唯一新文件是 824 行的 helper，承接本轮 5 组场景，由既有 `verify-payment-flow` 调用并复用现有真实服务，不新增门禁入口、业务模型或依赖。服务文件原已超过 1000 行，本轮只做缺陷修复。helper 未到 1500 行拆分阈值，保持单一主题。
+- **文件预算：** 候选提交仍是那 7 个文件。本修正只动 `online-payment.service.ts`（现 1256 行）和既有 helper（现 917 行，追加一个辅助读取故障场景），外加两份进度文档。没有新脚本、门禁入口、业务模型或依赖。服务文件原已超过 1000 行，只补这一处读取保护。helper 仍低于 1500 行，保持单一主题。
 
 - **出码 throw：** 包括文案像 `40004 ACQ.INVALID_PARAMETER` 的普通 Error，都保持 `created` + `paying`，错误码 `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED`，正文「支付结果尚未确认，请勿重复支付。请联系工作人员核对。」不说已受理。重试、过期后的二维码和付款码都不再调用 provider。渠道已经返回二维码、只是本地回填失败时，仍用「支付通道已受理，本地确认未完成……」。
 - **查单恢复：** 不从 throw 释放。现有 `convergeStaleCodePayments` 会选中真实渠道、`qrCodeContent` 为空、状态为 created/pending/expired 的尝试，因此能覆盖这种未知出码。mock `queryPayment`：`unknown` 保持互斥，并对账与 Admin `opsAttention` 可见；`closed` / `failed` 在订单仍可支付时释放，并允许再调用一次 provider；金额和流水匹配的 `paid` 在窗口开时入账，窗口关时记 `ONLINE_PAID_PENDING_REFUND` 且不转 paid。支付宝 `TRADE_NOT_EXIST`、微信 `404` / `ORDER_NOT_EXIST` 在现有 `queryPayment` 里仍是 `unknown`，要人工按 `PaymentAttempt.id` 核对。生产运维恢复尚未验收。这不是自动解锁闭环。
@@ -42,7 +48,8 @@ Grok `grok-4.7-build-fast xhigh` 已返回实质只读报告（session `4725a056
 - **前端剩余：** `apps/kiosk/src/services/api/userErrorMessage.ts` 仍把 `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED` 固定显示成「已受理」。本 lane 未改 `apps/**`。这段固定文案由主窗口 Claude 负责，不能把用户端文案说成已经改完。
 - **本轮命令（合成密钥，`DOTENV_CONFIG_PATH=/dev/null`，隔离 SQLite，日志在 `.codex-tmp/payment-callback-race/`）：** `verify-payment-flow.ts` 退出 0（214 条 `  PASS `，`flow-restored-round3.log`）；`verify-payment-codepay.ts` 退出 0（41 条 `PASS:`，`codepay-round3.log`）；`verify-payment-real-channels.ts` 退出 0（70 checks，`real-channels-round3.log`）；`verify-refund-idempotent.ts` 退出 0（31 checks，`refund-idempotent-round3.log`）；`verify-refund-real-channels.ts` 退出 0（36 checks，`refund-real-round3.log`）；`verify-reconciliation.ts` 退出 0（17 checks，`reconciliation-round3.log`）；`pnpm typecheck`（`prisma generate && tsc --noEmit`）退出 0（`typecheck-round3.log`）；`verify-repository-integrity.mjs` 退出 0；`verify-ci-gate-coverage.mjs` 退出 0；`git diff --check` 退出 0。
 - **反向变异：** 把出码 catch 改成所有 throw 直接 `failed` + `unpaid` 并返回 `PAY_CHANNEL_UNAVAILABLE`。`verify-payment-flow.ts` 退出 1（`flow-mutated-round3.log`），失败行是看似 40004 的普通 Error 被放成 `failed` + `unpaid`。服务文件 SHA `5da2d5e9d6020f83759bc71c4890f6226d19c1e56ca0577c1964f99b8a8f3b38` 字节恢复后退出 0。
-- **证据边界：** Codex 最小验收只覆盖本次 API 资金安全的 SOURCE / LOCAL。查单恢复用的是 mock 结构化结果，不是真实微信/支付宝响应。真实渠道查不到仍须人工按 `PaymentAttempt.id` 核对，生产运维恢复尚未验收。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。本提交未 push、未开 PR、未合并、未部署、未打真实支付或退款、未操作硬件。
+- **辅助读取反例：** 修复前 `verify-payment-flow.ts` 退出 1（`.codex-tmp/payment-callback-race/flow-aux-before.log`），响应码被 `VERIFY_AUX_FINDUNIQUE_DB_FAULT` 盖住，审计为空，尝试仍是 `created`、订单仍是 `paying`。修复后退出 0，217 条 `  PASS `（`flow-aux-restored.log`）。反向变异去掉辅助读保护后退出 1（`flow-aux-mutated.log`）。服务文件 SHA `a0b8d99af71b23d334cbbd22446bc2adf03a600b2084089ae1db967b15be478d` 与备份逐字节一致后退出 0。`verify-payment-codepay.ts` 退出 0（41 条 `PASS:`，`codepay-aux.log`）；`pnpm typecheck` 退出 0（`typecheck-aux.log`）；`git diff --check` 与 `verify-repository-integrity` 退出 0。
+- **证据边界：** 新反例只在本地 API 范围关闭。查单恢复仍是 mock 结构化结果。真实渠道查不到仍须人工按 `PaymentAttempt.id` 核对，生产运维恢复尚未验收。一体机固定「已受理」文案的主窗口候选是 `b4a1bb42d`，本 lane 未合入。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。未 push、未开 PR、未合并、未部署、未打真实支付或退款、未操作硬件。
 
 2026-09-22 **独立审查边界（绑定 `ad154ac1a`）。** Agy（`gemini-3.8-flash-high`）只读核对确认自我探索/招聘会批次未修改 `services/api`、Prisma 或业务 DTO；小程序 136 个调用端点与后端路由对账无已知缺口，terminal identity、订单幂等、文件归属、支付/退款、打印/扫描归属、状态回放和本人资产契约在源码/本地层为 GO 或 PARTIAL。Agy同时确认真实 Windows/Pantum、生产通道和商业支付证据缺失，均为 NO-GO。Agy报告中把“CI具备运行条件”写成 GO，但没有当前 SHA 的 GitHub run，本项目按严格证据口径仍记 `CI: NO-GO`。
 

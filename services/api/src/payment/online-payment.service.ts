@@ -1189,10 +1189,18 @@ export class OnlinePaymentService {
     } catch {
       /* 连信号都写不上：created + 空标识本身就是 fail-closed 信号。 */
     }
-    const row = await this.prisma.paymentAttempt.findUnique({
-      where: { id: attemptId },
-      select: { orderId: true, channel: true },
-    })
+    let orderId: string | null = null
+    let channel: string | null = null
+    try {
+      const row = await this.prisma.paymentAttempt.findUnique({
+        where: { id: attemptId },
+        select: { orderId: true, channel: true },
+      })
+      orderId = row?.orderId ?? null
+      channel = row?.channel ?? null
+    } catch {
+      // 辅助读取只为审计补订单号和渠道。失败不得盖住未知出码的安全错误码，也不把数据库原文写进响应或审计。
+    }
     await this.audit.write({
       actorId: null,
       actorRole: 'system',
@@ -1200,8 +1208,8 @@ export class OnlinePaymentService {
       targetType: 'payment_attempt',
       targetId: attemptId,
       payload: {
-        orderId: row?.orderId ?? null,
-        channel: row?.channel ?? null,
+        orderId,
+        channel,
         reason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
         ...(reasonRaw ? { reasonRaw } : {}),
       },
