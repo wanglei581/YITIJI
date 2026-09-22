@@ -1,5 +1,15 @@
 # 当前开发进度
 
+2026-09-23 **小程序双批修复已整合并复验。** 来源 `9ec68f58c` / `c0bc70b50`，
+合流 `043613e87` / `9d7170d32`；合流后完整 `pnpm --filter @ai-job-print/miniapp verify:static`
+退出 0，含会话时序与变异 57/57。下方来源记录中的“未合入”仅描述历史状态。
+未新增身份系统、存储键或依赖；仍需微信 DevTools、真机、最终 SHA CI 与生产验收。
+后台三个接口的 `/tmp/dash-iso/proof.ts` 经 Codex 在本地 Nest HTTP + 内存替身实际执行，
+退出 0、FAILURES 0；覆盖角色拒绝、伪造机构参数、跨机构缓存与 Partner 禁用。
+该脚本也确认直接修改模拟 admin 行后旧会话缓存仍可返回 200，此断言是行为记录，非安全批准；
+未定位实际内部 admin 禁用入口，不将其误报为已确认漏洞。真实数据库及生产隔离仍未验收。
+用户最新要求统一 Claude Opus 5.5 xhigh；MCP 尚无可验证的 5.5 ID，暂不发起旧配置新调用。
+
 2026-09-23 **F2 岗位匹配单路由合流。** 来源 `ed681ecdb`，Claude `opus/xhigh` session
 `8dfdf834-5a63-493f-a0f9-071fad8d16e6`。仅 `/resume/job-fit` 迁入稿 46 青序流光；
 `/resume/job-fit/actions`、`/resume/career-plan`、`/resume/templates` 仍待迁，不重复计算完成。
