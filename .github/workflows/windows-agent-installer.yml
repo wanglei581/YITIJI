@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   unsigned-msi-candidate:
-    needs: unsigned-exe-upgrade
+    needs: [unsigned-exe-upgrade, internal-signing-validation]
     if: ${{ always() }}
     runs-on: windows-2022
     timeout-minutes: 45
@@ -24,6 +24,9 @@ jobs:
         run: |
           if ("${{ needs.unsigned-exe-upgrade.result }}" -ne "success") {
             throw "Isolated EXE upgrade lifecycle did not pass"
+          }
+          if ("${{ needs.internal-signing-validation.result }}" -ne "success") {
+            throw "Internal signing validation did not pass"
           }
 
       - uses: actions/checkout@v4
@@ -37,7 +40,9 @@ jobs:
 
       - name: Verify installer source contract
         shell: pwsh
-        run: node apps/terminal-agent/installer/verify-installer-inputs.mjs
+        run: |
+          node apps/terminal-agent/installer/verify-installer-inputs.mjs
+          node apps/terminal-agent/installer/verify-signing-workflow-contract.mjs
 
       - name: Download exact upgrade-tested candidate
         uses: actions/download-artifact@v4
@@ -153,7 +158,9 @@ jobs:
 
       - name: Verify installer source contract
         shell: pwsh
-        run: node apps/terminal-agent/installer/verify-installer-inputs.mjs
+        run: |
+          node apps/terminal-agent/installer/verify-installer-inputs.mjs
+          node apps/terminal-agent/installer/verify-signing-workflow-contract.mjs
 
       - name: Build candidate upgrade fixture
         shell: powershell
@@ -249,3 +256,99 @@ jobs:
             apps/terminal-agent/installer/artifacts/candidate/candidate-identity.json
           if-no-files-found: warn
           retention-days: 7
+
+  internal-signing-validation:
+    name: Internal signing validation (NOT FOR DEPLOYMENT)
+    needs: unsigned-exe-upgrade
+    runs-on: windows-2022
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Verify signing workflow contract
+        shell: pwsh
+        run: node apps/terminal-agent/installer/verify-signing-workflow-contract.mjs
+
+      - name: Install exact WiX CLI used for Burn signing operations
+        shell: pwsh
+        run: dotnet tool install --global wix --version 4.0.6
+
+      - name: Download exact upgrade-tested unsigned candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: terminal-agent-unsigned-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: apps/terminal-agent/installer/artifacts/candidate
+
+      - name: Re-verify unsigned candidate identity
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/candidate-identity.ps1 `
+            -Mode Verify `
+            -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
+            -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
+            -ProductVersion "0.4.11"
+
+      - name: Exercise internal signing pipeline and signed installer lifecycles
+        shell: powershell
+        run: |
+          $wix = Join-Path $env:USERPROFILE ".dotnet\tools\wix.exe"
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-internal-signing-pipeline.ps1 `
+            -UnsignedCandidateRoot apps/terminal-agent/installer/artifacts/candidate `
+            -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
+            -ProductVersion "0.4.11" `
+            -EvidenceRoot "$env:RUNNER_TEMP\ai-job-print-internal-signing-evidence" `
+            -WixToolPath $wix `
+            -ExerciseLifecycle
+
+      - name: Ensure internal test trust and private certificates are removed
+        if: always()
+        shell: powershell
+        run: |
+          $metadataPath = "$env:RUNNER_TEMP\ai-job-print-internal-signing-evidence\certificates\internal-signing-certificate.json"
+          if (Test-Path -LiteralPath $metadataPath -PathType Leaf) {
+            $metadata = Get-Content -Raw -Encoding UTF8 -LiteralPath $metadataPath | ConvertFrom-Json
+            powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/remove-internal-code-signing-trust.ps1 `
+              -RootThumbprint $metadata.root.thumbprint `
+              -SignerThumbprint $metadata.signer.thumbprint `
+              -RemovePrivateCertificates
+          }
+
+      - name: Upload complete internal signing evidence only (NOT FOR DEPLOYMENT)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-agent-internal-signing-test-evidence-NOT-FOR-DEPLOYMENT
+          path: |
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/certificates/internal-signing-certificate.json
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/staging-manifest.json
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/unsigned-candidate-identity.json
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/signed-release-identity.json
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/signed-release-identity.p7s
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-exe-lifecycle-logs/
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-msi-lifecycle-logs/
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload partial internal signing failure evidence (NOT FOR DEPLOYMENT)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-agent-internal-signing-failure-evidence-NOT-FOR-DEPLOYMENT
+          path: |
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/certificates/internal-signing-certificate.json
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/signed-release-identity.json
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-release-NOT-FOR-DEPLOYMENT/signed-release-identity.p7s
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-exe-lifecycle-logs/
+            ${{ runner.temp }}/ai-job-print-internal-signing-evidence/signed-msi-lifecycle-logs/
+          if-no-files-found: warn
+          retention-days: 3

@@ -399,13 +399,18 @@ assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Wi
 assert.match(workflow, /unsigned-exe-upgrade:/, 'run upgrade lifecycle on an isolated Windows runner')
 assert.match(
   workflow,
-  /unsigned-msi-candidate:\s*needs: unsigned-exe-upgrade\s*if: \$\{\{ always\(\) \}\}/,
-  'the existing required Windows job must depend on the isolated upgrade lifecycle',
+  /unsigned-msi-candidate:\s*needs: \[unsigned-exe-upgrade, internal-signing-validation\]\s*if: \$\{\{ always\(\) \}\}/,
+  'the existing required Windows job must depend on the isolated upgrade lifecycle and internal signing validation',
 )
 assert.match(
   workflow,
   /if \("\$\{\{ needs\.unsigned-exe-upgrade\.result \}\}" -ne "success"\) \{\s*throw "Isolated EXE upgrade lifecycle did not pass"/,
   'the existing required Windows job must fail rather than skip when the isolated upgrade job fails',
+)
+assert.match(
+  workflow,
+  /if \("\$\{\{ needs\.internal-signing-validation\.result \}\}" -ne "success"\) \{\s*throw "Internal signing validation did not pass"/,
+  'the existing required Windows job must fail rather than skip when internal signing validation fails',
 )
 assert.match(
   workflow,
