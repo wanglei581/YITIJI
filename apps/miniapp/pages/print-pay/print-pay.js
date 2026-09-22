@@ -15,6 +15,7 @@ const auth = require('../../utils/auth')
 const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 const idem = require('../../utils/print-order-idempotency')
 const reconcileEngine = require('../../utils/order-submission-reconcile')
+const priceConfirm = require('../../utils/price-confirmation')
 
 // MP-07 改法 (a)：标签只显示即将建单的真实参数，不从 query 猜彩色/双面。
 // 与 print-upload.verifiedPrintParams 锁死同一组（verify-miniapp-static 抽取字面量）。
@@ -51,6 +52,11 @@ function duplexLabelOf(duplex) {
 /** 分 → 元字符串。0 分是真的免费（试运营价目），不是「未知」，两者必须分开。 */
 function formatYuan(amountCents) {
   return (amountCents / 100).toFixed(2)
+}
+
+/** 给「价格已更新」那句话用的完整金额串。 */
+function amountTextOf(amountCents) {
+  return amountCents === 0 ? '免费' : '¥' + formatYuan(amountCents)
 }
 
 /**
@@ -111,6 +117,10 @@ Page({
     // 「重新下单」按钮的开关。与 createdState 分开一个字段，是为了让模板不必再解析
     // 状态语义，也让"能不能重新下单"这件事只有一个出口（startNewOrder 自己再判一次）。
     createdCanReorder: false,
+    // 价格再确认（见 utils/price-confirmation.js）。两者都非空 = 服务端拒绝了按旧金额建单
+    //（没建单、没扣款），屏幕已换成服务端当前金额，等用户**自己再点一次**按新金额确认。
+    priceChangeText: '',
+    priceConfirmLabel: '',
   },
 
   onLoad(opts) {
@@ -126,6 +136,8 @@ Page({
     // 「那张已建成的订单核过了吗」。只放内存：换人 / 重进都必须重新核一次。
     this._verifyingOrderId = ''
     this._verifiedOrderId = ''
+    // 屏幕上那个金额的快照（price-confirmation.bindQuote）。**只放内存**：退出重进一律重新核价。
+    this._quote = null
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       q,
@@ -135,11 +147,13 @@ Page({
       duplexLabel: duplexLabelOf(ORDER_DUPLEX),
       copiesLabel: copies,
     })
+    // 进页面就先看一眼：这一组参数在本机有没有一张**已经建成**的订单。
+    // 有就直接进恢复态，连第一次提交都不该发生。**必须排在核价之前**：锁住之后 _loadQuote
+    // 不再核价 —— 否则一份与那张订单无关的现价会写上屏，甚至绑成之后可提交的金额。
+    this._resolveAccount()
+    this._restoreCreatedOrder()
     this._loadQuote()
     this._loadFileName()
-    // 进页面就先看一眼：这一组参数在本机有没有一张**已经建成**的订单。
-    // 有就直接进恢复态，连第一次提交都不该发生。
-    this._restoreCreatedOrder()
   },
 
   /** 本次下单的 payload。指纹与幂等键都按它算，发给服务端的也是它。 */
@@ -216,6 +230,9 @@ Page({
       .then((order) => {
         if (!this._accepts(token) || this._createdOrderId !== orderId) return
         this._verifyingOrderId = ''
+        // 屏幕只认这张订单自己落库的金额。它不是报价：不绑快照，不能拿去下单。
+        this._quote = null
+        if (priceConfirm.isQuotableAmount(order && order.amountCents)) this._showAmount(order.amountCents)
         const reason = terminalReasonOf(order)
         if (reason) {
           // **终态才缓存。** 取消 / 过期 / 完成 / 失败 / 终止都是不可逆的：再问一百次
@@ -315,13 +332,22 @@ Page({
     this._createAttempt = null
     this._verifyingOrderId = ''
     this._verifiedOrderId = ''
+    this._quote = null
     this.setData({
       submitting: false,
       createdLocked: false,
       createdState: '',
       createdNotice: '',
       createdCanReorder: false,
+      // 屏幕上那个是原单的金额，不是报价：撤掉，重新核一次价，核出来之前提交按不动。
+      isFreeOrder: false,
+      pageCountLabel: '待服务端核定',
+      'fee.total': '—',
+      'files[0].price': '—',
+      priceChangeText: '',
+      priceConfirmLabel: '',
     })
+    this._loadQuote()
   },
 
   /**
@@ -377,12 +403,16 @@ Page({
     // 上一位那一发核对的回调仍会回来，但它自己会逐字核账号后原样退出；这里把闸放开，
     // 免得 B 的页面因为 A 那一发还没回来而再也发不出自己的核对。
     this._reconciling = false
+    // 上一位的报价快照不许留给下一位：金额绑的是 A 的账号，B 提交前必须自己核一次价。
+    this._quote = null
     this.setData({
       submitting: false,
       createdLocked: false,
       createdState: '',
       createdNotice: '',
       createdCanReorder: false,
+      priceChangeText: '',
+      priceConfirmLabel: '',
       isFreeOrder: false,
       pageCountLabel: '待服务端核定',
       'fee.total': '—',
@@ -476,10 +506,15 @@ Page({
   /**
    * 服务端报价。金额与页数的**唯一来源**。
    *
-   * 报价失败不挡下单：建单时服务端会自己计价，挡住等于用一次展示失败取消一次真实能力。
-   * 但页面绝不本地补一个数字顶上 —— 只如实写「待服务端核定」（CLAUDE.md §9 不伪造能力）。
+   * 报价拿不到时页面绝不本地补一个数字顶上 —— 只如实写「待服务端核定」（CLAUDE.md §9 不伪造能力）。
+   * 而且**拿不到就不能提交**：建单要带上用户在屏幕上确认过的金额（quotedAmountCents），
+   * 没有这个数就没有「用户确认过的价格」可言。重新核价按钮一直在，所以这不是死路。
    */
   _loadQuote() {
+    // 已经锁在一张建成的订单上：屏幕只认那张订单自己的金额（_verifyCreatedOrder 取回），不再核价。
+    if (this._createdOrderId) return
+    // 一开始重新核价，屏幕上那个金额就不再算数了（它会被「正在核定」替换掉）。
+    this._quote = null
     const { fileId } = this.data.q
     if (!fileId) {
       this.setData({ quoteState: 'error', quoteError: '这条链接没有带文件，请返回重新选择。' })
@@ -506,33 +541,31 @@ Page({
     // 令牌是 R5 补上的第二层：此前这条链只比对身份，同一位用户连点两次「重新核价」
     // 时，先发的那次若后回来就会把后发那次的金额盖掉（服务端识别页数的耗时并不固定）。
     const token = this._guard.issue('quote')
-    this.setData({ quoteState: 'loading', quoteError: '', quoteRecover: '' })
+    // 发起这一刻是谁、按哪一组参数问的：回来时对不上就不许变成可提交的金额。
+    const quoteCtx = priceConfirm.beginQuote(this._account, idem.fingerprintOf(this._orderPayload()))
+    this.setData({ quoteState: 'loading', quoteError: '', quoteRecover: '', priceChangeText: '', priceConfirmLabel: '' })
     api.quoteMyPrintOrder(fileId, quoteParams(this.data.copiesLabel))
       .then((quote) => {
         if (!this._accepts(token)) return
+        if (this._createdOrderId) { this._settleLateQuote(); return }
         const amountCents = Number(quote && quote.amountCents)
         const billablePages = Number(quote && quote.billablePages)
         if (!Number.isSafeInteger(amountCents) || amountCents < 0
           || !Number.isSafeInteger(billablePages) || billablePages < 1) {
           throw new Error('服务端报价缺少有效页数或金额')
         }
-        const isFreeOrder = amountCents === 0
-        const total = isFreeOrder ? '免费' : formatYuan(amountCents)
-        this.setData({
-          quoteState: 'ready',
-          quoteError: '',
-          quoteRecover: '',
-          isFreeOrder,
-          pageCountLabel: `${billablePages} 页`,
-          'fee.total': total,
-          'files[0].price': total,
-        })
+        const snapshot = priceConfirm.bindQuote(quoteCtx, this._account,
+          idem.fingerprintOf(this._orderPayload()), amountCents, billablePages)
+        if (!snapshot) throw new Error('这次报价已不对应当前账号或打印参数，请重新核价。')
+        this._quote = snapshot
+        this._showAmount(amountCents, billablePages)
       })
       .catch((err) => {
         if (!this._accepts(token)) return
+        if (this._createdOrderId) { this._settleLateQuote(); return }
         this.setData({
           quoteState: 'error',
-          quoteError: (err && err.message) || '暂时取不到服务端报价，金额将在到机时以服务端核定为准。',
+          quoteError: (err && err.message) || '暂时取不到服务端报价。金额由服务端核定之后才能提交，请稍后重新核价。',
           // 普通失败（网络 / 服务端）重试是有意义的，这里不给登录出口。
           quoteRecover: 'retry',
         })
@@ -541,6 +574,66 @@ Page({
 
   retryQuote() {
     if (this.data.quoteState !== 'loading') this._loadQuote()
+  },
+
+  /**
+   * 报价在途时本页锁到了一张已建成的订单上：这份报价作废（不绑快照、不写金额），
+   * 只把「正在核定」收起来 —— 金额由那张订单自己的 GET 写上屏。
+   */
+  _settleLateQuote() {
+    if (this.data.quoteState === 'loading') this.setData({ quoteState: 'idle' })
+  },
+
+  /** 把一个**服务端给的**金额写到屏幕上（报价、价格变化、回放的原单共用）。页数不给就不动。 */
+  _showAmount(amountCents, billablePages) {
+    const isFreeOrder = amountCents === 0
+    const total = isFreeOrder ? '免费' : formatYuan(amountCents)
+    const patch = { quoteState: 'ready', quoteError: '', quoteRecover: '', isFreeOrder, 'fee.total': total, 'files[0].price': total }
+    if (billablePages) patch.pageCountLabel = `${billablePages} 页`
+    this.setData(patch)
+  },
+
+  /**
+   * 服务端拒绝了按旧金额建单（409 PRICE_CHANGED，已被 classifyCreateError 证明：没建单、没扣款）。
+   *
+   * 读得懂新价格 → 屏幕换成服务端当前金额，按钮改成「按新金额确认提交」，**一个 POST
+   * 都不自动发**：只有用户自己再点一次才提交，而且沿用原来那个幂等键（本页一个键都不动）。
+   * 读不懂 → 撤掉金额，要求重新核价。两条都不把金额落盘：退出重进一律重新核价。
+   */
+  _showPriceChange(decision, attempt) {
+    this._quote = decision.kind === priceConfirm.CHANGED
+      ? priceConfirm.bindQuote(attempt, this._account, idem.fingerprintOf(this._orderPayload()),
+        decision.amountCents, decision.billablePages)
+      : null
+    if (!this._quote) { this._dropQuote(priceConfirm.describePriceChange({ kind: priceConfirm.UNREADABLE }).text); return }
+    const shown = priceConfirm.describePriceChange(decision, {
+      fromText: amountTextOf(attempt.quotedAmountCents),
+      toText: amountTextOf(decision.amountCents),
+      submitLabel: '确认提交',
+    })
+    this._showAmount(decision.amountCents, decision.billablePages)
+    this.setData({ priceChangeText: shown.text, priceConfirmLabel: shown.button })
+  },
+
+  /** 撤掉屏幕上的金额与快照，要求重新核价。 */
+  _dropQuote(message) {
+    this._quote = null
+    this.setData({
+      quoteState: 'error', quoteError: message, quoteRecover: 'retry', isFreeOrder: false,
+      pageCountLabel: '待服务端核定', 'fee.total': '—', 'files[0].price': '—', priceChangeText: '', priceConfirmLabel: '',
+    })
+  },
+
+  /** 没有一个属于当前账号、当前参数的服务端金额：不提交，说清下一步。 */
+  _requireQuote() {
+    if (this.data.quoteState === 'ready') this._dropQuote('金额需要重新核定后才能提交。')
+    wx.showModal({
+      title: '还不能提交',
+      content: this.data.quoteState === 'loading'
+        ? '正在向服务端核定金额，请稍候。'
+        : '金额还没有由服务端核定。请先按页面上的提示重新核价，再提交。',
+      showCancel: false,
+    })
   },
 
   /**
@@ -711,9 +804,12 @@ Page({
     // 绑在尝试上的账号是发出那一刻的真值，过期清不掉它。
     const payload = this._orderPayload()
     const fingerprint = idem.fingerprintOf(payload)
+    // 只带**屏幕上那个、属于当前账号与当前参数**的服务端金额出门；没有就不提交。
+    const quotedAmountCents = priceConfirm.quotedAmount(this._quote, this._account, fingerprint)
+    if (quotedAmountCents === null) { this._requireQuote(); return }
     // 尝试锁必须**同步**设上。取幂等键要等 wx.getRandomValues 的回调，
     // 这中间用户完全来得及再点一次；锁排在异步之后就等于没锁。
-    const attempt = { account: this._account, fingerprint, key: '', settled: false, loading: true }
+    const attempt = { account: this._account, fingerprint, key: '', settled: false, loading: true, quotedAmountCents }
     this._createAttempt = attempt
     this.setData({ submitting: true })
     wx.showLoading({ title: '正在提交…', mask: true })
@@ -739,7 +835,8 @@ Page({
       if (!idem.markSubmitted(attempt.account, fingerprint, record.key)) {
         throw new Error(idem.SUBMIT_MARK_FAILED_MESSAGE)
       }
-      return api.createCloudPrintOrder(payload, { idempotencyKey: record.key })
+      // 金额走 opts，由 api 层追加在 body 副本上：payload 本身仍是指纹来源，不含金额。
+      return api.createCloudPrintOrder(payload, { idempotencyKey: record.key, quotedAmountCents: attempt.quotedAmountCents })
     }).then(order => {
       const orderId = (order && order.id) || ''
       // **先把 orderId 落进"发起这次提交的那位"的恢复记录，再判当前页面还接不接收它。**
@@ -768,6 +865,12 @@ Page({
       // 不设锁的话用户只会以为没下成，然后再点一次，于是多出一张订单和一笔钱。
       this._createdOrderId = orderId
       attempt.settled = true
+      // 服务端可能回放的是**早先建成的原单**（同键回放排在价格检查之前）：屏幕只认它自己
+      // 落库的金额，不认之后任何一次报价。报价快照随之作废 —— 之后若经「重新下单」再提交，
+      // 那是一次新的下单意图，必须重新核价，不能带着屏幕上已经不是报价的数字出门。
+      this._quote = null
+      if (priceConfirm.isQuotableAmount(order.amountCents)) this._showAmount(order.amountCents)
+      this.setData({ priceChangeText: '', priceConfirmLabel: '' })
       if (recoveryUnsaved) {
         // orderId 没能落进本机恢复记录。**这一支不跳转**，而且不解锁、不重试。
         //
@@ -823,6 +926,10 @@ Page({
       // 本机未落定名额满了（ensureKey 的 fail-closed，一个 POST 都没发出去）。
       // 把死路原样弹给用户没有意义 —— 它唯一的解法就是去问服务端那几个键落成了什么。
       if (err && err.message === idem.PENDING_FULL_MESSAGE) { this._reconcileSubmissions(); return }
+      // 只有「409 + PRICE_CHANGED」两样都在才算价格变化（证明没建单）；网络失败 / 5xx /
+      // 缺状态码一律留在下面原有那条路，键与 submittedAt 原样不动。
+      const priceChange = priceConfirm.classifyCreateError(err, attempt.quotedAmountCents)
+      if (priceChange) { this._showPriceChange(priceChange, attempt); return }
       // 409 有三种成因，处置完全相反（见 classifySubmitConflict）。
       const conflict = reconcileEngine.classifySubmitConflict(err)
       if (conflict) {

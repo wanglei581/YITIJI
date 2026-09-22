@@ -4,14 +4,16 @@
 
 `fb21261c9` 的主 CI 35772995192 已全绿；同 SHA 的 Windows run 35772995250 中
 unsigned EXE 升级通过，但 internal signing 因 EKU 读取误判失败，MSI 依赖门禁正确拒绝。
-本地集成提交 `f0157c7f8` 只修签名前的 EKU 解码，保留无 EKU、私钥、有效期、链与
-清理等 fail-closed 检查；静态验证通过不替代 Windows 实跑。下一步在唯一草稿 PR #1042
-的更新 SHA 上复跑 Windows internal signing、MSI 与完整 CI，确认签名和清理日志均成功。
-小程序价格确认候选的旧订单恢复与迟到报价竞态仍待 Claude 修复和 Grok 复核。
-F2 的 401 历史残留和权益空额度已本地合流，需最终 SHA CI；F2 两页超过 800 行的
-规模收口另由 Claude 窄范围处理，不用已通过的旧绿测抵消新反例。
+本地集成提交 `f0157c7f8` 修正 EKU 读取，保留原 fail-closed 检查；PR HEAD `755fa5a53`
+的 Windows run 35777521091 已通过签名/验签和信任清理，随后重建 EXE 报“预期一个内嵌
+MSI，实得 0”，dependent MSI 仍拒绝。Grok 在独立树追根因并保留 exactly-one 门禁；
+修复后再于更新 SHA 重跑 Windows 和完整 CI。
+小程序价格确认的旧订单恢复竞态已由 Claude 修复、Grok 复验并本地合流；仍需集成门禁与
+微信隔离环境验收。F2 的 401 历史残留和权益空额度已本地合流，需最终 SHA CI；F2 两页及
+小程序两页超过 800 行的规模收口另由 Claude 窄范围处理，不用旧绿测抵消新反例。
 最终发布还须微信隔离环境与双账号（目前仅一个受控测试账号）、Pantum/扫描真机、生产存储与
 备份回滚、真实支付退款对账、内容授权、法务 UAT/试运营证据；未取得前 COMMERCIAL NO-GO。
+
 ## 2026-09-23：可核销活动空额度在创建、编辑、发布和领取时关闭
 
 coupon / free_quota / package_entitlement 的新建、编辑、草稿发布，以及已发布历史行的领取，都必须带 1..9999 的整数 `quantityTotal`。`subsidy_eligibility_hint` 仍只能是 null 或未提供，领取也保持 null。空额度领取在事务内拒绝，不改活动、库存、已有权益、领取记录或 claim 审计。Admin 活动页已经显示后端 `error.message`。空额度输入仍会提交 null，类型切换会把空值填回 1；提交前拦截是可选的 Claude 批次。
@@ -61,13 +63,15 @@ F2 已整合 `/resume/job-fit` 单路由候选，先验证合流后 W3 与相关
 失败已判为夹具竞态并在本地集成树修复（仅 spec，完整 38/38），待新 HEAD 远端 CI 确认，勿改生产扫描源码
 或放宽 `/print-scan$` 锚点。Windows internal validation 被取消并阻断 MSI；根因由独立窗口分析，当前仍非 Windows GO。
 打印改价二次确认已落本地集成树；一体机服务端与确认页不要重复开发。
-小程序会员单和材料包的服务端金额断言来源 `d8a30e589` 已落为本地集成提交 `39bb2d404`，不要重写；Claude 仍须接确认页。
+小程序会员单和材料包的服务端金额断言已在 `codex/member-package-price-confirmation-20260923` 完成本地实现，不要重写；
+确认页已在 `codex/miniapp-price-confirmation-20260923` 本地接上（Claude），同样不要重写；Grok 复核的一条 Medium 已在后续提交修复，待串行整合。
 
-## 2026-09-23：小程序建单价格再确认的服务端已本地完成，前端未接
+## 2026-09-23：小程序建单价格再确认的服务端与确认页均已本地完成
 
-`POST /me/print-orders` 与 `POST /orders/package` 已接受可选 `quotedAmountCents`。旧客户端不传该字段仍按服务端现价建单。409 `PRICE_CHANGED` 释放临时租约，不要求更换 Idempotency-Key；已建成订单回放冻结金额。集成树的 API typecheck、会员 HTTP H1-H21、材料包 HTTP H1-H19、隔离 SQLite `verify:print-jobs` 53 项均退出 0。
-下一步只由 Claude 做小程序确认页：提交屏上确认金额，409 后展示服务端现价并等用户再次确认，沿用原键，不自动重试。本地集成候选未改前端、未推送、未开新 PR。
-真机、真实支付、生产与商业放行仍为 NO-GO。
+`POST /me/print-orders` 与 `POST /orders/package` 已接受可选 `quotedAmountCents`。旧客户端不传该字段仍按服务端现价建单。409 `PRICE_CHANGED` 释放临时租约，不要求更换 Idempotency-Key；已建成订单回放冻结金额。
+print-pay / package-confirm 已在 `codex/miniapp-price-confirmation-20260923`（父 `d8a30e589`）本地接上：无有效报价不提交，带屏上金额，409 后换服务端现价、等用户再点一次，沿用原键，不自动重试；判读集中在 `utils/price-confirmation.js`。未推送、未开 PR。
+下一步：① Grok 复核（`15ce85ae-4cd0-4d3c-8eec-4b7f9a8b280f`）的 Medium「重进后迟到现价写上屏并在重新下单时提交」已修，可复跑其复现与变异确认；② Codex 串行整合并取得最终 SHA CI；③ 隔离 API 下的开发者工具验收与受控账号真机验收。`package-confirm.js`（1087 行）拆分仍排在后续清单。
+开发者工具、真机、CI、真实支付、生产与商业放行仍为 NO-GO。
 
 ## 2026-09-23：打印改价二次确认已本地集成，待最终 SHA CI
 

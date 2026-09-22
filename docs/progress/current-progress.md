@@ -4,15 +4,13 @@
 [主 CI 35772995192](https://github.com/wanglei581/YITIJI/actions/runs/35772995192) 已完成：
 PostgreSQL readiness、build-and-verify、Kiosk/Admin/Partner 浏览器及路由扫测全部成功。
 [Windows run 35772995250](https://github.com/wanglei581/YITIJI/actions/runs/35772995250)
-的 unsigned EXE 升级成功，内部签名失败，依赖它的 MSI 按门禁拒绝继续。临时签名证书在
-LocalMachine 信任安装阶段已解出 Code Signing EKU；签名前的另一条读取路径误判其缺失。
-Grok 隔离提交 `464a07067` 已作为本地集成提交 `f0157c7f8` 修正读取路径并保持缺失 EKU
-仍拒绝；静态签名契约、仓库完整性及 diff check 均退出 0。该修复尚无新 SHA 的 Windows
-运行时结果，不算签名、MSI 或设备验收通过。F2 三路迁移、身份清场及可核销权益空额度保护
-已合入本地候选，W3 33/33、相关静态门禁与图谱检查通过；小程序价格确认页仍在修恢复竞态。
-`fb21261c9` 的 CI 绿不是最终发布 SHA；更新后的 PR HEAD `755fa5a53` 正在远端 CI。
-`DEVICE / PAYMENT /
-PRODUCTION / COMMERCIAL: NO-GO`。
+的 unsigned EXE 升级成功，内部签名被 EKU 读取误判挡住。Grok 修复 `f0157c7f8` 后，
+PR HEAD `755fa5a53` 的 [Windows run 35777521091](https://github.com/wanglei581/YITIJI/actions/runs/35777521091)
+已通过 EKU 读取、MSI 签名与验签及信任清理，但重建 EXE 时因“预期一个内嵌 MSI，实得 0”失败；
+dependent MSI 仍被门禁挡住。Grok 正隔离追查，Windows/设备仍 NO-GO。
+F2 三路迁移、身份清场、权益空额度保护及小程序价格确认页已合入本地候选；F2 W3 33/33、
+权益活动目标门禁通过，小程序本地集成测试待完成。`755fa5a53` 的主 CI 仍在跑；
+`fb21261c9` 的绿灯不是最终发布 SHA。`DEVICE / PAYMENT / PRODUCTION / COMMERCIAL: NO-GO`。
 
 2026-09-23 **可核销权益活动必须带 1 到 9999 的整数额度（本地合流）。** 来源分支 `codex/benefit-activity-quantity-guard-20260923`，起点 `fb21261c9f0135d8e45222b9f2a6ecd6cc97a76c`。`REDEEMABLE_BENEFIT_TYPES`（coupon / free_quota / package_entitlement）在 create、update，以及既有 `validateStoredActivity` 的草稿发布上，缺省、null、0、负数、小数、超过 9999 和非数字都是 400 `BENEFIT_ACTIVITY_QUANTITY_REQUIRED`，文案「可核销权益必须填写 1 到 9999 的整数额度」。写入仍用调用方给出的整数，拒绝后活动行和已有 BenefitGrant 保持原值。`subsidy_eligibility_hint` 继续只接受 null 或未提供，带额度仍是 `BENEFIT_ACTIVITY_QUANTITY_FORBIDDEN`，其领取仍可得到 null 额度。DTO 维持 `@IsOptional` 加 1..9999 整数形状校验：HTTP 上 null 和缺省穿过 ValidationPipe，由 service 返回上述业务码；0 仍是 `VALIDATION_FAILED`。已发布的历史空额度活动在 `claim` 事务内、创建 BenefitGrant 之前走同一个 `assertBenefitQuantity`，返回 `BENEFIT_ACTIVITY_QUANTITY_REQUIRED`；活动行、库存、已有 BenefitGrant、BenefitClaim 和 claim 审计都保持原样。Admin `benefitActivitiesAdmin.ts` 已把 `error.message` 放进 `ApiHttpError`，活动页保存/发布/下架用 `setMessage(error.message)` 展示，这句错误不需要另开 Claude 前端批次。空额度输入仍会提交 null，类型切换时表单会把空值填回 1；那是可见的表单默认值，可选的提交前拦截留给 Claude。
 
@@ -26,6 +24,34 @@ PRODUCTION / COMMERCIAL: NO-GO`。
 幂等获取、回放、键复用、处理中和已废弃都先于报价比对。已建成的订单回放落库金额，不因之后改价或重试时的确认金额重算；`quotedAmountCents` 不进业务指纹。只有新租约会在写事务前比对，不一致为 409 `PRICE_CHANGED`，details 是 `currentAmountCents` / `billablePages` / `line=serviceKey:unitCents:quantity:subtotalCents` 字符串。临时租约在 finally 释放，不墓碑，同一 Idempotency-Key 可按现价再确认。不新建 Order、OrderItem、PrintTask、PaymentAttempt、支付令牌或建单审计。缺省字段仍按服务端现价建单；null、负数、小数、字符串和超过 100000000 为 HTTP 400。只有权威报价也是 0 才走免费 `markPaid`。
 409 助手从 `PrintJobsService` 移到 `order-quote.service.ts`。会员单和材料包已经引用报价服务；若改为直接引用 `pricing.service.ts`，会把 `PriceConfig` 加进这些端点的图谱闭包，本变更不改生成图谱。
 来源证据在 `/tmp/member-price-*.log`、`/tmp/package-price-*.log`、`/tmp/mut-*.log`（隔离 SQLite，`DOTENV_CONFIG_PATH=/dev/null`）：两条 HTTP 契约最终退出 0；会员/材料包 service 幂等、`verify:print-jobs`、`verify:pricing`、API `tsc --noEmit`、改动文件 eslint、`graph:check`、`verify:repository-integrity`、`git diff --check` 均退出 0。反向变异四次均非 0（绕过会员比对、绕过材料包比对、把确认金额写入指纹、`ValidateIf` 改成 `IsOptional`），按 sha256 逐字节恢复后两条 HTTP 再退出 0。集成树 `39bb2d404` 另行实跑：项目图谱检查、签名静态契约、仓库完整性、API typecheck、会员 HTTP H1-H21、材料包 HTTP H1-H19、隔离 SQLite `verify:print-jobs` 53 项全部退出 0。小程序确认页仍待 Claude 发送该字段并在 409 后沿用原键。`CI / DEVICE / PAYMENT / PRODUCTION / COMMERCIAL: NO-GO`。
+2026-09-23 **小程序确认页接上建单价格再确认（本地合流）。** 来源分支 `codex/miniapp-price-confirmation-20260923`，
+父提交 `d8a30e589`（服务端已接受 `quotedAmountCents`）；Claude `claude-opus-5-5` / xhigh，session `fd6f0a5b-21e2-494a-a449-45443235a857`。
+print-pay 与 package-confirm 只在拿到属于**当前账号 + 当前业务指纹**的服务端报价后才允许提交（print-pay 此前报价失败也放行，现已挡住；
+缺省字段只是服务端对旧客户端的兼容）。屏上金额经 `api.js` 的 `orderBody` 追加到 body 副本作 `quotedAmountCents`；`_orderPayload()`
+与幂等指纹不含金额，键仍只在 Header。只有 HTTP 409 + `PRICE_CHANGED` 同时成立才算价格变化：details 严格解析通过 → 屏幕换成服务端现价，
+「价格已更新」写明新旧金额与「没有建单、没有扣款」，主按钮改为「按新金额确认提交 / 确认下单」，不自动重发，用户再点才提交，
+沿用同一 Idempotency-Key 与 submittedAt；details 缺失或畸形 → 说明没建单、撤掉金额、要求「重新核价」，键不变。断网、5xx、
+状态码或 code 不足以证明的一律留在原有「结果未知」路径，不标价格变化、不动键。金额只放内存：退出重进重新核价，原键不变。
+换账号后上一位的报价与 409 回调不写新页面。服务端回放已建成原单走原有 orderId 路径，print-pay 屏上改显原单落库金额并作废报价快照
+（之后经「重新下单」再提交须重新核价，新键）。按钮不带金额：两页底栏按钮 nowrap，带金额在 320pt 溢出；金额就在按钮左侧与说明里。
+新增 `apps/miniapp/utils/price-confirmation.js`（纯解析 + 内存快照 + 文案，无存储 / wx / 接口 / 计价 / 幂等）、
+`scripts/tests/price-confirmation.test.mjs`（23 条，`verify:price-confirmation` 串进 `verify:static`）、`scripts/tests/page-sandbox.mjs`
+（page-lifecycle 的页面加载器 / deferred / flush / 带路径 setData **原样抽出**，两测共用；page-lifecycle 删掉的是这几段定义本身）。
+`request.js` 只在 `error.details` 整份为 string[] 时原样搬运。page-lifecycle 181 条用例与全部断言保留：R4-7、R5-3×2、R5-6 原先在没有报价时提交，
+只各补「先核一次价」一步。`package-confirm.js` 1087 行、`print-pay.js` 934 行，仍在后续拆分清单；复杂度集中在共享模块，页面只接线。
+验证（Node 22.23.2）：focused 23/23、page-lifecycle 181/181、package-order-idempotency 49、order-submission-reconcile 26、session-generation 57、
+package-chain、api-contract、完整 `verify:static` 均退出 0；本 SHA 上 API `verify:member-print-order-idempotency-http`、
+`verify:package-order-idempotency-http` ALL PASS；`graph:check`、`verify:repository-integrity`、`git diff --check` 退出 0。
+真实 `priceChanged()` 输出（材料包重复行、付费→0）经小程序解析器读出正确金额。自测变异 22 个杀死 21 个；存活的「换账号复位不清快照」
+由快照的账号绑定兜住。
+Grok 复核（session `15ce85ae-4cd0-4d3c-8eec-4b7f9a8b280f`，基于 `af4b03ba0`）报一条 Medium：print-pay 重进时先核价、后恢复原单锁，
+迟到的现价会写上屏并绑成快照，原单转终态后「重新下单」会带着它提交。已在 `af4b03ba0` 之上的后续提交修复（同一 Claude session）：
+onLoad 先认账号、先恢复原单锁再核价；锁定期间 `_loadQuote` 不核价，在途报价回来直接作废（不写屏、不成快照，「正在核定」收起）；
+原单 GET 给出落库金额时只显示、不成快照；「重新下单」先撤掉原单金额并当场重新核价，新报价回来之前不能提交。材料包（Low）：
+建单回放 / GET 给出的原单金额写进既有锁定说明，不进快照、不让页面就绪。focused 增至 26 条（3 条新回归）；page-lifecycle R7-6
+只补一次 `await flush()`；`verify-package-chain` 一处位置窗口 400→460（判身份之后多一行记原单金额，断言本身不变）。
+Grok 复现脚本修后退出 0，针对性变异 10/10 被杀；`print-pay.js` 960 行、`package-confirm.js` 1105 行。
+`MINIAPP DEVTOOLS / DEVICE / CI / REAL PAYMENT / PRODUCTION / COMMERCIAL: NO-GO`（只做了代码与测试层确认，未开开发者工具、未上真机）。
 
 2026-09-23 **当前协作与 #1042 远端证据边界。** Codex 只负责范围决策、串行整合与验收；
 Claude Code 固定 `claude-opus-5-5` / `xhigh`，独占前端实现和最终视觉确认；Grok 固定

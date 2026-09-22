@@ -319,13 +319,20 @@ function makeServerError(serverMessage, statusCode, code) {
 }
 
 /**
- * 后端错误体形如 { error: { code, message } }(NestJS HttpException 约定),
+ * 后端错误体形如 { error: { code, message, details? } }(NestJS HttpException 约定),
  * 校验失败也可能是 { message: [...] }。抽出可展示文案与业务错误码。
+ *
+ * `details` 只原样搬运、不解释(解释归各业务模块,例如 utils/price-confirmation.js)。
+ * 而且只在**整份**都是 string[] 时才带上:混进一个非字符串就整份不要,
+ * 不把半合法的数组筛成一份"看起来合法"的。
  */
 function extractError(body, statusCode) {
   if (body && typeof body === 'object') {
     if (body.error && typeof body.error === 'object') {
-      return makeServerError(body.error.message, statusCode, body.error.code);
+      const e = makeServerError(body.error.message, statusCode, body.error.code);
+      const details = body.error.details;
+      if (Array.isArray(details) && details.every((d) => typeof d === 'string')) e.details = details.slice();
+      return e;
     }
     if (Array.isArray(body.message)) {
       return makeServerError(body.message[0], statusCode);

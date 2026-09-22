@@ -33,6 +33,7 @@ const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
 const idem = require('../../utils/package-order-idempotency')
 const reconcileEngine = require('../../utils/order-submission-reconcile')
+const priceConfirm = require('../../utils/price-confirmation')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 /**
@@ -93,6 +94,9 @@ Page({
     submitErrorTitle: '',
     submitErrorText: '',
     submitRecover: '',
+    // 价格再确认（utils/price-confirmation.js）：服务端拒绝了按旧金额建单之后，主按钮写成
+    // 「按新金额确认下单」，等用户自己再点一次。平时为空，按钮就是「确认下单」。
+    priceConfirmLabel: '',
 
     onsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
     noCancelNotice: pkg.PACKAGE_NO_CANCEL_NOTICE,
@@ -207,13 +211,14 @@ Page({
    *      保留这个勾选，等于替他声明「我已阅读并同意」——与本页默认不勾选同一条理由。
    */
   _resetForIdentity() {
+    this._quote = null
     this._createdOrderId = null
     this._submitAttempt = null
     this._verifyingOrderId = ''
     this._needsFreshKey = false
     this._serverLostOrder = false
     this._reconciling = false
-    this.setData({ submitting: false, agreedToTerms: false, canStartNewOrder: false })
+    this.setData({ submitting: false, agreedToTerms: false, canStartNewOrder: false, priceConfirmLabel: '' })
   },
 
   /**
@@ -223,6 +228,7 @@ Page({
   _clearDraftView() {
     this._packageData = null
     this._storeData = null
+    this._quote = null
     this.setData({
       draftState: 'missing',
       quoteState: 'idle',
@@ -236,6 +242,7 @@ Page({
       canStartNewOrder: false,
       submitErrorTitle: '', submitErrorText: '', submitRecover: '',
       submitting: false,
+      priceConfirmLabel: '',
     })
   },
 
@@ -420,6 +427,7 @@ Page({
         // 归属还是我们，但这台设备已经登录不了了：**不跳转**。到机码页同样要登录，
         // 跳过去只会得到一页 401；而这一刻屏幕上还挂着上一位的订单锁。
         if (!this._identityUsable()) { this._lockAfterCreatedLoginExpired(); return }
+        this._rememberStoredAmount(orderId, order)
         const terminalReason = pkg.terminalPackageReason(order)
         if (terminalReason) { this._lockAfterCreatedTerminal(orderId, terminalReason); return }
         // 草稿已被这张订单消费掉，清干净再跳：留着它，用户从到机码页回到本页还能
@@ -526,6 +534,8 @@ Page({
     // 「确认下单」按钮再点亮一次。服务端同键会回放原单，但本页会把一张已存在的
     // 订单说成刚建成。
     if (this._createdOrderId) return
+    // 一开始重新核价，屏幕上那个金额就不再算数了（快照只放内存，绑账号与参数）。
+    this._quote = null
     if (!this._identityUsable()) {
       this.setData({
         quoteState: 'error',
@@ -541,7 +551,8 @@ Page({
     const token = this._guard.issue('quote')
     // 留痕给 onShow 判「这次报价是不是已经作废」，避免首次进入重复报价。
     this._quoteToken = token
-    this.setData({ quoteState: 'loading', quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '', canStartNewOrder: false })
+    const quoteCtx = priceConfirm.beginQuote(this._identityKey(), this._payloadFingerprint())
+    this.setData({ quoteState: 'loading', quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '', canStartNewOrder: false, priceConfirmLabel: '' })
     api.quotePackageOrder({
       terminalId: storeData.id,
       files: this.data.files.map((f) => ({ fileId: f.fileId })),
@@ -556,6 +567,8 @@ Page({
         if (amountCents === null || !Number.isSafeInteger(billablePages) || billablePages < 1) {
           throw new Error('服务端报价缺少有效页数或金额')
         }
+        this._quote = priceConfirm.bindQuote(quoteCtx, this._identityKey(), this._payloadFingerprint(), amountCents, billablePages)
+        if (!this._quote) throw new Error('这次报价已不对应当前账号或材料，请重新核价。')
         this.setData({
           quoteState: 'ready',
           quoteAmountText: pkg.formatAmount(amountCents),
@@ -576,6 +589,45 @@ Page({
 
   retryQuote() {
     this._loadQuote()
+  },
+
+  /** 当前载荷的幂等指纹；没有草稿时为空串（price-confirmation 会拒绝空指纹）。 */
+  _payloadFingerprint() {
+    const payload = this._orderPayload()
+    return payload ? idem.fingerprintOf(payload) : ''
+  },
+
+  /**
+   * 服务端拒绝了按旧金额建单（409 PRICE_CHANGED，已被 classifyCreateError 证明：没建单、没扣款）。
+   *
+   * 读得懂新价格 → 金额换成服务端当前价格，主按钮改成「按新金额确认下单」，**一个 POST
+   * 都不自动发**；用户再点一次时沿用原来那个幂等键（本页一个键都不动）。
+   * 读不懂 → 撤掉金额，要求重新核价。两条都不把金额落盘：退出重进一律重新核价。
+   */
+  _showPriceChange(decision, attempt) {
+    this._quote = decision.kind === priceConfirm.CHANGED
+      ? priceConfirm.bindQuote(attempt, this._identityKey(), this._payloadFingerprint(), decision.amountCents, decision.billablePages)
+      : null
+    if (!this._quote) {
+      const shown = priceConfirm.describePriceChange({ kind: priceConfirm.UNREADABLE })
+      this._dropQuote(shown.title, shown.text)
+      return
+    }
+    const shown = priceConfirm.describePriceChange(decision, {
+      fromText: pkg.formatAmount(attempt.quotedAmountCents),
+      toText: pkg.formatAmount(decision.amountCents),
+      submitLabel: '确认下单',
+    })
+    this.setData({
+      submitting: false, quoteState: 'ready', quoteAmountText: pkg.formatAmount(decision.amountCents), quotePages: decision.billablePages,
+      submitErrorTitle: shown.title, submitErrorText: shown.text, submitRecover: '', priceConfirmLabel: shown.button,
+    })
+  },
+
+  /** 撤掉屏幕上的金额与快照，要求重新核价（按钮随报价态变灰）。 */
+  _dropQuote(title, text) {
+    this._quote = null
+    this.setData({ submitting: false, quoteState: 'error', quoteErrorTitle: title, quoteErrorText: text, quoteRecover: 'retry', priceConfirmLabel: '' })
   },
 
   /**
@@ -647,7 +699,7 @@ Page({
       submitting: false,
       quoteState: 'error',
       quoteErrorTitle: '订单已创建，请不要重复下单',
-      quoteErrorText: '材料包订单已经建好了，只是这一步没能自动跳转。到「我的 · 打印订单」的材料包分区就能找回它，点进去即是到机码。',
+      quoteErrorText: '材料包订单已经建好了，只是这一步没能自动跳转。到「我的 · 打印订单」的材料包分区就能找回它，点进去即是到机码。' + this._storedAmountNote(),
       quoteRecover: 'orders',
       // 默认关掉「重新下单」。所有换文案的锁都从这条出口走，于是这个开关有且只有一个
       // 默认值：**关**。只有服务端已经证明原单走到终态的那一支才会把它打开。
@@ -655,7 +707,24 @@ Page({
       submitErrorTitle: '',
       submitErrorText: '',
       submitRecover: '',
+      priceConfirmLabel: '',
     })
+  },
+
+  /**
+   * 记下这张已建成订单**自己落库的金额**（建单回放 / GET 核对给的），只为写进锁定说明。
+   * 它不是报价：不进 `_quote`、不让页面变成可提交。按 orderId 认领，换了订单就不再作数。
+   */
+  _rememberStoredAmount(orderId, order) {
+    const amountCents = pkg.parseAmountCents(order && order.amountCents)
+    this._storedAmount = amountCents === null ? null : { orderId, amountCents }
+  },
+
+  /** 锁定说明末尾那句原单金额；不知道就不说（不补一个数）。 */
+  _storedAmountNote() {
+    const stored = this._storedAmount
+    if (!stored || stored.orderId !== this._createdOrderId) return ''
+    return `原订单金额：${pkg.formatAmount(stored.amountCents)}（下单时由服务端定下，之后改价不影响它）。`
   },
 
   /**
@@ -671,7 +740,7 @@ Page({
   _lockAfterCreatedUnsaved(orderId) {
     this._lockAfterCreated(orderId)
     this.setData({
-      quoteErrorText: '材料包订单已经建好了，但这台手机没能把它记下来（存储可能已满或被系统清理），所以没有自动跳转。请到「我的 · 打印订单」的材料包分区找回这张订单，点进去即是到机码；不要重复提交。',
+      quoteErrorText: '材料包订单已经建好了，但这台手机没能把它记下来（存储可能已满或被系统清理），所以没有自动跳转。请到「我的 · 打印订单」的材料包分区找回这张订单，点进去即是到机码；不要重复提交。' + this._storedAmountNote(),
     })
   },
 
@@ -714,7 +783,7 @@ Page({
     this._lockAfterCreated(orderId)
     this.setData({
       quoteErrorTitle: reason,
-      quoteErrorText: '这一份材料包可以重新下一单：点下面的「重新下单」，本机会换一个新的下单标识重新报价。原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。',
+      quoteErrorText: '这一份材料包可以重新下一单：点下面的「重新下单」，本机会换一个新的下单标识重新报价。原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。' + this._storedAmountNote(),
       quoteRecover: 'reorder',
       canStartNewOrder: true,
     })
@@ -839,6 +908,10 @@ Page({
       this._verifyCreatedOrder(known.orderId)
       return
     }
+    // 只带**屏幕上那个、属于当前账号与当前材料**的服务端金额出门；没有就不提交，
+    // 排在任何清记录 / 换键之前（挡住的提交一个字节都不该动本机记录）。
+    const quotedAmountCents = priceConfirm.quotedAmount(this._quote, account, fingerprint)
+    if (quotedAmountCents === null) { this._dropQuote('需要重新核价', '金额需要按当前账号与材料重新核定后才能下单。'); return }
     // 服务端说过这个键配的是另一组参数（409 IDEMPOTENCY_KEY_REUSED）。**换新键之前
     // 必须先把旧记录清掉，而且读回来确认真的清掉了** —— 清不掉就会复用旧键，
     // 下一次仍然 409；而"以为清掉了就换新键"更糟：旧键那张单还在，新键又建一张。
@@ -861,7 +934,7 @@ Page({
     const token = this._guard.issue('submit')
     // 尝试锁必须**同步**设上：铸幂等键要等 wx.getRandomValues 的回调，
     // 这中间用户完全来得及再点一次；锁排在异步之后就等于没锁。
-    const attempt = { account, fingerprint, key: '', settled: false }
+    const attempt = { account, fingerprint, key: '', settled: false, quotedAmountCents }
     this._submitAttempt = attempt
     this.setData({ submitting: true, submitErrorTitle: '', submitErrorText: '', submitRecover: '' })
     wx.showLoading({ title: '创建订单中…', mask: true })
@@ -884,7 +957,8 @@ Page({
         if (!idem.markSubmitted(account, fingerprint, record.key)) {
           throw new Error(idem.SUBMIT_MARK_FAILED_MESSAGE)
         }
-        return api.createPackageOrder(payload, { idempotencyKey: record.key })
+        // 金额走 opts，由 api 层追加在 body 副本上：payload 本身仍是指纹来源，不含金额。
+        return api.createPackageOrder(payload, { idempotencyKey: record.key, quotedAmountCents: attempt.quotedAmountCents })
       })
       .then((order) => {
         wx.hideLoading()
@@ -913,6 +987,7 @@ Page({
         // 放在 redirectTo 之前，是为了让下面 catch 里那条「跳转同步抛」的兜底能认出它。
         this._createdOrderId = orderId
         attempt.settled = true
+        this._rememberStoredAmount(orderId, order)
         // **这一发回来的不一定是"刚建成"的订单。** 同一个键在服务端是永久挂在那张 Order
         // 行上的（`@@unique(endUserId, idempotencyKey)`，没有过期清理），而本机这一格只要
         // 还没落定 orderId（上一次的响应丢在路上、进程被杀在 POST 与响应之间、或
@@ -976,6 +1051,10 @@ Page({
         // 这不是一条该让用户读的错误 —— 它唯一的解法就是去问服务端那几个键落成了什么，
         // 所以直接把那一步做掉，而不是把死路原样显示给他。
         if (err && err.message === idem.PENDING_FULL_MESSAGE) { this._reconcileSubmissions(); return }
+        // 只有「409 + PRICE_CHANGED」两样都在才算价格变化（证明没建单）；网络失败 / 5xx /
+        // 缺状态码一律留在下面原有那条路，键与 submittedAt 原样不动。
+        const priceChange = priceConfirm.classifyCreateError(err, attempt.quotedAmountCents)
+        if (priceChange) { this._showPriceChange(priceChange, attempt); return }
         // 409 有三种成因，处置完全相反（见 classifySubmitConflict）。
         const conflict = reconcileEngine.classifySubmitConflict(err)
         if (conflict === reconcileEngine.CONFLICT_ABANDONED) {

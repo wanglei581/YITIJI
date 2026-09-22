@@ -22,9 +22,9 @@ import test, { mock } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
@@ -34,18 +34,9 @@ const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
 // ⚠ vm.createContext 建的是**另一个 realm**：沙箱里造出来的数组 / 对象不是宿主
 //   Array、Object 的实例。所以断言一律用 length / 字段比较，不要用 deepStrictEqual
 //   去比 `[]` —— 那会因为原型不同而恒红，看起来像被测代码有问题。
-
-/** 可控 Promise：测试自己决定什么时候、按什么顺序完成它。 */
-function deferred() {
-  const d = {}
-  d.promise = new Promise((resolve, reject) => { d.resolve = resolve; d.reject = reject })
-  // 未处理的 rejection 不该让整个测试进程炸掉 —— 被守卫丢弃的响应正是这种形态。
-  d.promise.catch(() => {})
-  return d
-}
-
-/** 让所有已 resolve 的微任务跑完（页面回调是链在 Promise 上的）。 */
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+//
+// 可控 Promise（deferred）、flush、页面加载器（loadPageDefinition）与带路径的 setData
+//（instantiate）在 ./page-sandbox.mjs：price-confirmation.test.mjs 也用同一份。
 
 /** 假 canvas：让画码的 exec 回调能真的走到最后那句 `qrStatus: 'ready'`。 */
 function fakeCanvasNode() {
@@ -192,74 +183,6 @@ function switchAccount(id) {
   realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, id), user: { id } })
 }
 
-/**
- * 在沙箱里真实执行一个页面源码，返回 Page() 收到的配置对象。
- * @param {string} relPath 相对 apps/miniapp 的路径
- */
-function loadPageDefinition(relPath, { wx, modules, timers = [] }) {
-  const src = fs.readFileSync(path.join(MINIAPP, relPath), 'utf8')
-  let pageDef = null
-  const sandbox = {
-    console,
-    wx,
-    Page: (def) => { pageDef = def },
-    getApp: () => ({ globalData: { statusBarHeight: 20 } }),
-    require: (id) => {
-      const name = id.replace(/^.*\//, '').replace(/\.js$/, '')
-      if (Object.prototype.hasOwnProperty.call(modules, name)) return modules[name]
-      // 其余一律用真实实现（它们都是无 wx 依赖的纯模块）。
-      return requireMiniapp(`../utils/${name}.js`)
-    },
-    module: { exports: {} },
-    exports: {},
-    // 沙箱里的定时器**只登记不触发**。print-pickup 会每 3 秒轮询一次订单状态，
-    // 用真的 setTimeout 会让这条链一直排下去，node:test 永远等不到事件循环清空
-    // （实测：整个测试文件挂死，2 分钟超时）。测试要验的是回调里的判定，
-    // 不是定时器本身，需要时由测试自己调 timers.run()。
-    setTimeout: (fn) => { timers.push(fn); return timers.length },
-    clearTimeout: () => {},
-    setInterval: (fn) => { timers.push(fn); return timers.length },
-    clearInterval: () => {},
-  }
-  sandbox.globalThis = sandbox
-  vm.createContext(sandbox)
-  vm.runInContext(src, sandbox, { filename: relPath })
-  assert.ok(pageDef, `${relPath} 没有调用 Page()`)
-  return pageDef
-}
-
-/**
- * 写一个带路径的 setData 键，例如 `'fee.total'` / `'files[0].name'`。
- * 真机 setData 支持这种写法；替身若只做 Object.assign，就会在 data 上造出一个
- * **名字里带点的普通键**，页面读 `data.fee.total` 永远是旧值 —— 测试会把一个
- * 好端端的实现判成"金额没写进去"。
- */
-function setByPath(target, path, value) {
-  const keys = String(path).replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean)
-  let cursor = target
-  for (let i = 0; i < keys.length - 1; i += 1) {
-    const key = keys[i]
-    if (cursor[key] === null || typeof cursor[key] !== 'object') {
-      cursor[key] = /^\d+$/.test(keys[i + 1]) ? [] : {}
-    }
-    cursor = cursor[key]
-  }
-  cursor[keys[keys.length - 1]] = value
-}
-
-/** Page 配置 → 可调用的页面实例（带一个真会合并的 setData）。 */
-function instantiate(def) {
-  const page = Object.assign(Object.create(null), def)
-  page.data = JSON.parse(JSON.stringify(def.data || {}))
-  page.setData = function setData(patch, callback) {
-    for (const key of Object.keys(patch || {})) {
-      if (key.indexOf('.') >= 0 || key.indexOf('[') >= 0) setByPath(this.data, key, patch[key])
-      else this.data[key] = patch[key]
-    }
-    if (typeof callback === 'function') callback()
-  }
-  return page
-}
 
 function makePage(relPath, { auth, api, wx }) {
   // 真机上只有**一个**全局 wx，页面和 utils 共用它。替身必须照做：
@@ -2024,6 +1947,10 @@ test('R4-7 print-pay 报价失败：不本地补一个金额，也不把下单�
   assert.equal(page.data.isFreeOrder, false, '取不到报价不等于免费')
   assert.equal(page.data.files[0].name, '本人文件', '取不到文件名时用中性标签，不回显 URL 里的值')
 
+  // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
+  api.quoteMyPrintOrder = () => Promise.resolve({ amountCents: 150, billablePages: 3 })
+  page.retryQuote()
+  await flush()
   page.continueFlow()
   await flush()
   await flush()
@@ -2432,6 +2359,9 @@ test('R5-3 确认支付页：建单在途时真的换了人 —— 不跳 A 的�
 
   // B 自己的那一次：必须是一次**新的** POST，并且跳的是 B 自己的订单。
   const before = wx.calls.redirectTo.length
+  // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
+  page.retryQuote()
+  await flush()
   page.continueFlow()
   await flush()
   assert.equal(creates.length, 2, 'B 必须能安全地发起自己的建单')
@@ -2468,6 +2398,9 @@ test('R5-3 确认支付页：建单锁定后换账号回到本页 —— onShow 
   // 而且 B 点提交发的是 B 自己的那一次，不是被带去 A 的订单。
   wx.control.navFail = false
   const before = wx.calls.redirectTo.length
+  // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
+  page.retryQuote()
+  await flush()
   page.continueFlow()
   await flush()
   assert.equal(creates.length, 2)
@@ -2719,6 +2652,9 @@ test('R5-6 确认支付页：A 的迟到建单回调不得掀掉 B 正在进行�
   page.onShow()                             // B 回到本页：A 的一切被复位
   assert.equal(wx.loading.visible, false, '换人复位时不该把上一位的遮罩留在屏幕上')
 
+  // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
+  page.retryQuote()
+  await flush()
   page.continueFlow()                       // B 自己提交，遮罩再次挂上
   await flush()
   assert.equal(creates.length, 2, 'B 必须能发起自己的那一次')
@@ -3385,6 +3321,8 @@ test('R7-6 恢复出来的那张订单已取消：服务端证明之后才解锁
   assert.equal(page.data.createdLocked, false, '点过之后「提交」必须真的能按了')
   assert.equal(idem.findRecord('u:A', print), null, '旧记录必须清掉，否则下一次还是复用那个键')
 
+  // 价格再确认（2026-09-23）：「重新下单」当场重新核价，等新报价回来才能提交。
+  await flush()
   page.continueFlow()
   await flush()
   await flush()

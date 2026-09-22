@@ -15,6 +15,7 @@ const auth = require('./auth');
 // 页面把它显示成一句「请稍后重试」，用户重试多少次都一样。
 const { KEY_RE: PRINT_ORDER_IDEMPOTENCY_KEY_RE } = require('./print-order-idempotency');
 const { KEY_RE: PACKAGE_IDEMPOTENCY_KEY_RE } = require('./package-order-idempotency');
+const { withQuotedAmount } = require('./price-confirmation');
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -103,6 +104,22 @@ function mockUnavailable(what) {
   const e = new Error(`${what}需连接真实后端,当前为本地演示数据模式`);
   e.statusCode = 501;
   return e;
+}
+
+/**
+ * 建单 body:业务载荷 + 用户在屏幕上确认过的 quotedAmountCents(价格再确认,见
+ * utils/price-confirmation.js)。`opts.quotedAmountCents` 缺省 = 旧调用,body 原样。
+ * 追加在**副本**上:调用方那一份同时是幂等指纹的来源,指纹刻意不含金额。
+ *
+ * 给了却不是可提交的金额 → **同步抛出**,请求根本不发(不把一个必然 400 的金额送出去)。
+ * 这只可能是调用方的编程错误:两页都只从 price-confirmation.quotedAmount() 取值,
+ * 且都在 ensureKey().then 里调用,抛出会变成那条链上的一次普通失败,幂等键原样留着。
+ */
+function orderBody(data, opts) {
+  if (!opts || opts.quotedAmountCents === undefined) return data;
+  const body = withQuotedAmount(data, opts.quotedAmountCents);
+  if (!body) throw new Error('确认金额无效,请重新核价后再提交');
+  return body;
 }
 
 /** 简历类任务的匿名读取凭证 */
@@ -1469,6 +1486,8 @@ const api = {
    * 放进 body 有两个后果：服务端根本读不到（照样 400），
    * 而 `CreateMemberPrintOrderDto` 又会把这个多出来的字段判成非法参数。
    * 键从哪来、什么时候复用，见 utils/print-order-idempotency.js。
+   * `opts.quotedAmountCents`：屏幕上确认过的金额，进 body 副本（见 orderBody）；
+   * 与服务端重算对不上时 409 PRICE_CHANGED、不建单，判读见 utils/price-confirmation.js。
    */
   createCloudPrintOrder(data, opts) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('云打印预提交'));
@@ -1483,7 +1502,7 @@ const api = {
     }
     return request('/me/print-orders', {
       method: 'POST',
-      data,
+      data: orderBody(data, opts),
       needAuth: true,
       header: { 'idempotency-key': idempotencyKey },
     });
@@ -1550,7 +1569,7 @@ const api = {
    * 键从哪来、什么时候复用，见 utils/package-order-idempotency.js。
    *
    * @param {object} data { terminalId, files: [{ fileId, pageRange? }], params: { colorMode, duplex, copies } }
-   * @param {{idempotencyKey:string}} opts
+   * @param {{idempotencyKey:string, quotedAmountCents?:number}} opts quotedAmountCents 见 orderBody
    * @returns {Promise<{ orderId, orderNo, pickupCode, expiresAt, amountCents, payStatus,
    *                     pickupStatus, taskStatus, paymentSessionToken, items }>}
    *          注意没有 qrCodeUrl：服务端从不下发该字段，旧注释是错的。
@@ -1567,7 +1586,7 @@ const api = {
     }
     return request('/orders/package', {
       method: 'POST',
-      data,
+      data: orderBody(data, opts),
       needAuth: true,
       header: { 'idempotency-key': idempotencyKey },
     });

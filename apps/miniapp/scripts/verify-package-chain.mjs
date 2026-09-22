@@ -745,7 +745,8 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     '切后台作废翻页请求后，回前台要解开 docLoadingMore（否则「加载更多」永远点不动）')
 
   const sameIdIdx = confirmCode.indexOf(CONFIRM_IDENTITY_GUARD)
-  const afterSameId = sameIdIdx >= 0 ? confirmCode.slice(sameIdIdx, sameIdIdx + 400) : ''
+  // 窗口 460：判身份之后、清草稿之前多了一行记原单落库金额（价格再确认，写进锁定说明用）。
+  const afterSameId = sameIdIdx >= 0 ? confirmCode.slice(sameIdIdx, sameIdIdx + 460) : ''
   assert(sameIdIdx >= 0 && afterSameId.includes("removeStorageSync('temp_package_data')"),
     '建单成功后**先判身份再清草稿**（换人时不得删掉当前这位的草稿）')
   assert(/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(confirmCode),
