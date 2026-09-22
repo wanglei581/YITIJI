@@ -389,6 +389,16 @@ if (
   !/appSecret\s*[:=]/.test(apiJs)
 ) ok('登录实现无密钥残留')
 else bad('登录实现无密钥残留', '检查 api.js 的 wx.login 与敏感字段')
+// 登录成功回调必须认 auth.saveSession 的返回值:存不下的会话等于没有会话,
+// 这时提示「登录成功」并跳转,用户会在下一页当场撞 401。微信 / 短信两条入口都要认。
+if (
+  (loginJs.match(/const saved = auth\.saveSession\(res\)/g) || []).length === 2 &&
+  (loginJs.match(/if \(!saved\)/g) || []).length === 2 &&
+  // 总数也必须是 2：多出来的那一次就是没接返回值的漏网调用。
+  (loginJs.match(/auth\.saveSession\(/g) || []).length === 2
+) ok('登录成功回调认 saveSession 返回值（微信 / 短信两条入口）')
+else bad('登录成功回调认 saveSession 返回值', '会话没存下仍提示登录成功并跳转,下一页当场 401')
+
 if (meWxml.includes('bindtap="tapLogin"') && meWxml.includes('未登录') && settingsWxml.includes('退出登录') && settingsJs.includes('api.logout()') && (settingsJs.includes('auth.logout()') || settingsJs.includes('auth.clearSession()'))) ok('登录与真实退出入口完整')
 else bad('登录与真实退出入口完整', '缺少登录按钮、服务端 logout 或本地会话清理')
 
@@ -409,13 +419,45 @@ else bad('401 补签准入与 token 存在性解耦', '补签不得以 auth.getT
 const uploadFileIdx = requestJs.indexOf('function uploadFile(')
 const uploadFileSource = uploadFileIdx >= 0 ? requestJs.slice(uploadFileIdx) : ''
 if (
-  requestJs.includes('function silentResignin()') &&
+  /function silentResignin\s*\(/.test(requestJs) &&
   /function uploadFile\s*\(/.test(requestJs) &&
-  uploadFileSource.includes('silentResignin()') &&
+  /silentResignin\(/.test(uploadFileSource) &&
   /statusCode === 401[\s\S]*extractError\(body,\s*401\)/.test(uploadFileSource) &&
   !requestJs.includes("reject(makeError('登录已失效,请重新登录', 401))")
 ) ok('uploadFile 401 走 silentResignin 且保留 error.code')
 else bad('uploadFile 401 静默补签', '必须复用 silentResignin、401 走 extractError(body, 401)，不得用丢掉 code 的 makeError')
+
+// 会话代际：补签 / 重放 / 失败清理都要认出「我出发时是谁」。
+// 这里只断言防护在位；它们是否真的挡得住晚到的回调，由
+// scripts/tests/session-generation.test.mjs 真跑时序（含源码变异）验证。
+//
+// 代际必须是**进程内**计数，且不得再落存储：落盘会把「推进代际」变成一次可能失败的写，
+// setStorageSync 抛异常或安静丢写时代际原地不动，用户已经点了退出，晚到的补签比对
+// expectGeneration 仍判同代，把账号原样写回来。撤销补签资格同理——storage.remove
+// 可能抛、也可能安静没删，所以必须另有一个内存旗子，不能只依赖盘上的资格标记。
+if (
+  !/SESSION_GENERATION|zyd_session_gen/.test(storageJs + authJs) &&
+  /\blet generation = 1;/.test(authJs) &&
+  /function sessionGeneration\(\)\s*\{\s*return generation;\s*\}/.test(authJs) &&
+  /\blet sessionRevoked = false;/.test(authJs) &&
+  /function getToken\(\)[\s\S]{0,160}?if \(sessionRevoked\) return null;/.test(authJs) &&
+  /function getUser\(\)\s*\{\s*\n\s*if \(sessionRevoked\) return null;/.test(authJs) &&
+  /function canSilentResignin\(\)[\s\S]{0,240}?if \(sessionRevoked\) return false;/.test(authJs) &&
+  /function logout\(\)[\s\S]{0,320}?bumpSessionGeneration\(\);\s*\n\s*sessionRevoked = true;/.test(authJs) &&
+  authJs.includes('function isSameSession(') &&
+  authJs.includes('function logoutIfSameSession(') &&
+  !/function clearSession\(\)[\s\S]{0,200}bumpSessionGeneration\(\)/.test(authJs) &&
+  /if \(!isResignin\) \{\s*\n[\s\S]{0,400}?bumpSessionGeneration\(\);\s*\n\s*sessionRevoked = true;/.test(authJs) &&
+  /const usable = !!data\.token && storage\.get\(storage\.KEYS\.TOKEN\) === data\.token/.test(authJs) &&
+  /if \(!usable\) return false;\s*\n\s*if \(!isResignin\) sessionRevoked = false;/.test(authJs) &&
+  /expectGeneration/.test(authJs) &&
+  /silentResignin\(generation\)/.test(requestJs) &&
+  /expectGeneration:\s*generation/.test(requestJs) &&
+  /resigninInflight\.generation === generation/.test(requestJs) &&
+  /auth\.logoutIfSameSession\(generation\)/.test(requestJs) &&
+  !/\bauth\.logout\(\)/.test(requestJs)
+) ok('401 补签带会话代际（进程内），晚到回调不复活/不覆盖/不误登出')
+else bad('401 补签会话代际防护', '代际必须是进程内计数(不落存储)；登出/显式登录先推进代际并置内存撤销位，撤销位要管住 getToken/getUser/canSilentResignin；新会话写完读回一致才解除撤销；补签与重放按出发代际校验；clearSession 不推进；request.js 不得无条件 auth.logout()')
 
 const membershipJs = read('pages/membership/membership.js')
 const notificationsJs = read('pages/notifications/notifications.js')
@@ -456,7 +498,7 @@ try {
   const active = loadAuthForVerify(fakeMemberToken(nowSeconds + 3600))
   const expiredCleared = !expired.auth.isLoggedIn() && !expired.state.zyd_token && !expired.state.zyd_user
   const activeKept = active.auth.isLoggedIn() && Boolean(active.state.zyd_token)
-  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && (requestJs.includes('auth.logout()') || requestJs.includes('auth.clearSession()'))) {
+  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && /auth\.(logout|logoutIfSameSession|clearSession)\(/.test(requestJs)) {
     ok('过期会员令牌会在展示与请求前主动清理')
   } else {
     bad('过期会员令牌会在展示与请求前主动清理', '登录态或请求层仍可能复用过期 token')

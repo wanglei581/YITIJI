@@ -7,7 +7,7 @@
     "node": ">=22.13 <23"
   },
   "scripts": {
-    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale && pnpm run verify:user-error && pnpm run verify:package-chain && pnpm run verify:package-order-idempotency && pnpm run verify:order-submission-reconcile && pnpm run verify:package-helpers && pnpm run verify:page-lifecycle && pnpm run verify:empty-state",
+    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale && pnpm run verify:user-error && pnpm run verify:package-chain && pnpm run verify:package-order-idempotency && pnpm run verify:order-submission-reconcile && pnpm run verify:package-helpers && pnpm run verify:page-lifecycle && pnpm run verify:session-generation && pnpm run verify:empty-state",
     "verify:api-contract": "node scripts/verify-miniapp-api-contract.mjs",
     "contract:update": "node scripts/verify-miniapp-api-contract.mjs --write",
     "verify:visual-scale": "node scripts/verify-miniapp-visual-scale.mjs",
@@ -17,7 +17,8 @@
     "verify:package-order-idempotency": "node --test scripts/tests/package-order-idempotency.test.mjs",
     "verify:order-submission-reconcile": "node --test scripts/tests/order-submission-reconcile.test.mjs",
     "verify:package-helpers": "node --test scripts/tests/package-order.test.mjs",
-    "verify:page-lifecycle": "node --test scripts/tests/page-lifecycle.test.mjs"
+    "verify:page-lifecycle": "node --test scripts/tests/page-lifecycle.test.mjs",
+    "verify:session-generation": "node --test scripts/tests/session-generation.test.mjs"
   },
   "main": "app.js",
   "keywords": [],

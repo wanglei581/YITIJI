@@ -65,8 +65,13 @@ Page({
     wx.showLoading({ title: '登录中', mask: true })
     api.loginByPhone(d.code)
       .then(res => {
-        auth.saveSession(res)
+        const saved = auth.saveSession(res)
         wx.hideLoading()
+        // 存不下的会话等于没有会话:这时跳走,用户以为登录了,下一页当场 401。
+        if (!saved) {
+          wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })
+          return
+        }
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._afterLogin(), 600)
       })
@@ -150,9 +155,15 @@ Page({
     wx.showLoading({ title: '登录中', mask: true })
     api.loginBySms(phone, this.data.code)
       .then(res => {
-        auth.saveSession(res)
+        const saved = auth.saveSession(res)
         wx.hideLoading()
         this.setData({ submitting: false })
+        // 与微信入口同一条判据:没存下就留在本页,不提示成功、不跳转。
+        if (!saved) {
+          this.setData({ code: '', otp: ['','','','','',''] })
+          wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })
+          return
+        }
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._afterLogin(), 600)
       })

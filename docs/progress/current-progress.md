@@ -70,6 +70,47 @@ Grok `grok-4.7-build-fast xhigh` 已返回实质只读报告（session `4725a056
 - **反向变异：** 把出码 catch 改成所有 throw 直接 `failed` + `unpaid` 并返回 `PAY_CHANNEL_UNAVAILABLE`。`verify-payment-flow.ts` 退出 1（`flow-mutated-round3.log`），失败行是看似 40004 的普通 Error 被放成 `failed` + `unpaid`。服务文件 SHA `5da2d5e9d6020f83759bc71c4890f6226d19c1e56ca0577c1964f99b8a8f3b38` 字节恢复后退出 0。
 - **辅助读取反例：** 修复前 `verify-payment-flow.ts` 退出 1（`.codex-tmp/payment-callback-race/flow-aux-before.log`），响应码被 `VERIFY_AUX_FINDUNIQUE_DB_FAULT` 盖住，审计为空，尝试仍是 `created`、订单仍是 `paying`。修复后退出 0，217 条 `  PASS `（`flow-aux-restored.log`）。反向变异去掉辅助读保护后退出 1（`flow-aux-mutated.log`）。服务文件 SHA `a0b8d99af71b23d334cbbd22446bc2adf03a600b2084089ae1db967b15be478d` 与备份逐字节一致后退出 0。`verify-payment-codepay.ts` 退出 0（41 条 `PASS:`，`codepay-aux.log`）；`pnpm typecheck` 退出 0（`typecheck-aux.log`）；`git diff --check` 与 `verify-repository-integrity` 退出 0。
 - **证据边界：** 新反例只在本地 API 范围关闭。查单恢复仍是 mock 结构化结果。真实渠道查不到仍须人工按 `PaymentAttempt.id` 核对，生产运维恢复尚未验收。一体机固定「已受理」文案的主窗口候选是 `b4a1bb42d`，本 lane 未合入。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。未 push、未开 PR、未合并、未部署、未打真实支付或退款、未操作硬件。
+2026-09-23 **小程序 401 静默补签的会话时序收口 + 登录保存失败的真实反馈（本地候选，Codex 已完成最小验收）。**
+分支 `claude/miniapp-resignin-logout-20260922`，基线 `55893b515`。补签要走 wx.login + 一次网络往返，
+其间用户可能登出、甚至换号；此前晚到的回调分不出「我出发时是谁」，会复活已登出的账号、覆盖新账号的
+token，或用旧账号的失败把新账号踢下线。
+
+- **判据改为进程内会话代际（`utils/auth.js`）。** 模块级单调计数 `generation` 标记「现在是谁」：
+  `logout()` 与显式 `saveSession()`（登录/换号）先同步推进；补签保存（`expectGeneration`）不推进；
+  `clearSession()`（JWT 自然过期）也不推进。代际**不落存储、不新增任何键**——它作废的只是在途
+  Promise，重启即消失；落盘会把「推进代际」变成一次可能失败的写，写丢时用户已点退出、晚到的补签却
+  仍判自己同代。上一轮 WIP 里的 `SESSION_GENERATION` 键已删除，`utils/storage.js` 本轮**与基线逐字节一致**
+  （不扩大所有 storage 调用方的语义，本进程安全由 auth 的内存撤销位负责）。
+- **内存撤销位 `sessionRevoked` 管住真实读接口。** 登出、或新会话没能「写进去再读回来」时置起，期间
+  `getToken` / `getUser` / `isLoggedIn` / `canSilentResignin` 一律按未登录处理（`storage.remove` 可能抛、
+  也可能安静没删，只清存储挡不住旧身份被读回）。显式登录改为「先失效 → 写入 → 读回一致才解除」，
+  写失败/静默丢写时保持 fail-closed，上一个账号同样读不回来；重新登录成功即解除。
+- **request / uploadFile 共用同一套代际校验：** 401 准入、wx.login 回来、补签保存、重放前、补签失败登出
+  五个落点各自比对出发代际；single-flight 按代际绑定，飞行清理只清自己那一次。
+- **登录页真实反馈（`pages/launch/launch.js`）。** 微信一键与短信两个成功回调此前都忽略
+  `auth.saveSession` 的返回值，存不下会话也照样提示「登录成功」并跳转，用户在下一页当场撞 401。
+  现改为两条入口都取返回值：为 false 时提示「登录状态未能保存，请重试」、留在本页、不跳转、保持未登录
+  （短信入口同时复位 `submitting` 与验证码框）。正常成功路径不变。新增静态门禁
+  「登录成功回调认 saveSession 返回值（微信 / 短信两条入口）」，并做过阴性对照：摘掉 `const saved =`
+  后该门禁退出码 1，恢复后 139 PASS / 0 FAIL。
+- **验证（本轮亲自重跑，退出码均为 0）：** `node --check` 五个改动文件；
+  `node --test apps/miniapp/scripts/tests/session-generation.test.mjs` **47 pass / 0 fail**；
+  `pnpm --dir apps/miniapp verify:static` 全链通过（静态门禁 139 PASS / 0 FAIL，新套件已串在链内）。
+  测试真跑 auth / request / storage 与**真实登录页**（只有 wx、utils/api 是替身）：request 与 uploadFile
+  两条链各跑自然过期、主动登出、换号、初始 401 晚到、wx.login 晚到、补签成功/失败晚到、同代
+  single-flight、旧飞行不清新飞行、重放前换号、MEMBER_LEGAL_VERSION_STALE 保留，外加 `storage.set`
+  抛异常/静默丢写与 `remove` 失败（删不掉也写不进）三类存储故障，以及登录页两入口的写失败/静默丢写与
+  正常成功回归。断言覆盖 `getToken` / `getUser` / `isLoggedIn` / `canSilentResignin`、Authorization 头、
+  补签请求计数、重放计数、toast 文案与跳转次数。**11 条反向变异**（只在内存改写源码，磁盘生产源不动）
+  摘掉核心防护后必须判红，且要求红在 ERR_ASSERTION 而非把代码改崩。
+- **验收分工与证据边界：** Grok 负责主验证，其工具调用 900s 超时、整体报告记 `UNREVIEWED`；但其回收日志
+  可用，绑定的是**本轮收尾之前**那一版（`/tmp/miniapp-node-check.log` 各 0、`miniapp-session-test.log`
+  40/40、`miniapp-verify-static.log` 138 PASS 全链到底、`miniapp-mutation-audit.log` 10 条变异全部
+  ERR_ASSERTION —— 其中 AUDIT_BAD1 只是审计脚本期望中文 message 而原 assert 未写 message，不是变异没红）。
+  当前这一版的数字（47 tests / 139 PASS）来自 Claude 本轮重跑；Codex 已复核最终 diff，独立重跑 47 条时序/变异/登录页测试，退出码 0，日志 `/tmp/miniapp-final-target-codex.log`。本候选随本次本地提交保存。
+  **仅本地提交，未 push、未开 PR、未部署；没有微信开发者工具 / 真机、没有 CI run、没有生产验证**，
+  `CI / DEVICE / PRODUCTION: NO-GO` 不变。Grok 提到的 cold-start torn-write 混合身份属于原基线已有的
+  持久化机制风险，已作为商业收口阻塞登记在 next-tasks 顶部。本任务只解决进程内在途竞态，未扩展持久化 auth 体系、未新增键，不能据此声明身份全链 GO。小程序无 typecheck 脚本，本轮 typecheck 不适用。
 
 2026-09-22 **独立审查边界（绑定 `ad154ac1a`）。** Agy（`gemini-3.8-flash-high`）只读核对确认自我探索/招聘会批次未修改 `services/api`、Prisma 或业务 DTO；小程序 136 个调用端点与后端路由对账无已知缺口，terminal identity、订单幂等、文件归属、支付/退款、打印/扫描归属、状态回放和本人资产契约在源码/本地层为 GO 或 PARTIAL。Agy同时确认真实 Windows/Pantum、生产通道和商业支付证据缺失，均为 NO-GO。Agy报告中把“CI具备运行条件”写成 GO，但没有当前 SHA 的 GitHub run，本项目按严格证据口径仍记 `CI: NO-GO`。
 

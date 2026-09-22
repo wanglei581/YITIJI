@@ -26,33 +26,53 @@ const { displayableServerMessage, SHARED_USER_MESSAGES } = require('./user-error
  */
 let resigninInflight = null;
 
-function silentResignin() {
-  // single-flight:并发 401 只触发一次 wx.login。
-  // 微信的 code 是一次性的,并发换取会互相作废。
-  if (resigninInflight) return resigninInflight;
+/** 会话已在补签途中被登出/换号 —— 这次补签的成果不属于现在屏幕前的人。 */
+function staleSessionError() {
+  return makeError('会话已变更,已放弃本次补签', -1);
+}
 
-  const done = () => { resigninInflight = null; };
-  resigninInflight = new Promise((resolve, reject) => {
+/**
+ * @param {number} generation 发起这次补签的请求**出发时**的会话代际:
+ *   带着它走完全程,才能在每个落点上认出「这还是同一个人吗」。
+ */
+function silentResignin(generation) {
+  // single-flight **按代际绑定**:同代并发 401 只触发一次 wx.login(微信 code 一次性,
+  // 并发换取会互相作废);换人之后必须另起一次飞行。
+  if (resigninInflight && resigninInflight.generation === generation) return resigninInflight.promise;
+
+  const flight = { generation, promise: null };
+  // 只清自己那一次:旧飞行晚到时若无条件清空,会把之后新建的飞行一起抹掉。
+  const done = () => { if (resigninInflight === flight) resigninInflight = null; };
+  flight.promise = new Promise((resolve, reject) => {
     wx.login({
       success: (r) => (r && r.code ? resolve(r.code) : reject(makeError('wx.login 未返回 code', -1))),
       fail: () => reject(makeError('wx.login 调用失败', -1)),
     });
   })
-    .then((code) => rawRequest('/member/auth/wx-resignin', {
-      method: 'POST',
-      data: { code },
-      needAuth: false,
-    }))
+    .then((code) => {
+      // wx.login 本身可能很慢:已经换人了就别再拿这个 code 去换旧账号的 token。
+      if (!auth.isSameSession(generation)) throw staleSessionError();
+      return rawRequest('/member/auth/wx-resignin', {
+        method: 'POST',
+        data: { code },
+        needAuth: false,
+      });
+    })
     .then((res) => {
       const token = res && res.token;
       if (!token) throw makeError('续签未返回 token', -1);
-      auth.saveSession({ token, user: res.user });
+      // 代际校验在 saveSession 内部与写入一起完成(先查后写会留下一个窗口)。
+      // 返回 false = 换人了,或没能写进去再读回来,两种都按补签失败处理。
+      if (!auth.saveSession({ token, user: res.user }, { expectGeneration: generation })) {
+        throw staleSessionError();
+      }
       done();
       return token;
     })
     .catch((e) => { done(); throw e; });
 
-  return resigninInflight;
+  resigninInflight = flight;
+  return flight.promise;
 }
 
 /**
@@ -60,6 +80,8 @@ function silentResignin() {
  * 只重试一次;补签失败则清理本地会话并抛出原始 401,让页面走登录引导。
  */
 function request(path, options = {}) {
+  // 出发时是谁,全程以此为准(见 utils/auth.js 的 sessionGeneration)。
+  const generation = auth.sessionGeneration();
   return rawRequest(path, options).catch((err) => {
     // 准入依据是「曾登录过且未主动登出」，不是「当前有没有 token」。
     // 后者会二选一地出错：getToken() 在 JWT 过期时先 clearSession
@@ -69,13 +91,21 @@ function request(path, options = {}) {
     const retriable = err && err.statusCode === 401
       && options.needAuth !== false
       && !options._retried
-      && auth.canSilentResignin();
+      && auth.canSilentResignin()
+      // 出发时那个会话还在吗:换号会让资格旗子重新点亮,只看 canSilentResignin
+      // 认不出这次 401 属于上一个人。
+      && auth.isSameSession(generation);
     if (!retriable) throw err;
 
-    return silentResignin().then(
-      () => rawRequest(path, Object.assign({}, options, { _retried: true })),
+    return silentResignin(generation).then(
+      () => {
+        // 补签成功后仍可能已经换人:重放会拿新账号的 token 去跑旧账号的请求。
+        if (!auth.isSameSession(generation)) throw err;
+        return rawRequest(path, Object.assign({}, options, { _retried: true }));
+      },
       (resignErr) => {
-        auth.logout();
+        // 只登出自己那一代:晚到的失败不得把之后登录的新账号踢下线。
+        auth.logoutIfSameSession(generation);
         // 补签自身若带业务码(如 MEMBER_LEGAL_VERSION_STALE),优先抛它:
         // 原始 401 只表示「这次请求没通过」,补签错误才说明「为什么补不上」。
         throw (resignErr && resignErr.code) ? resignErr : err;
@@ -184,17 +214,23 @@ function unwrapEnvelope(body) {
  * JWT 30 分钟过期后若不补签,用户会直接看到「登录已失效」且丢失 error.code。
  */
 function uploadFile(path, filePath, options = {}) {
+  // 与 request() 同一套代际校验:上传同样会在途中被登出/换号。
+  const generation = auth.sessionGeneration();
   return rawUploadFile(path, filePath, options).catch((err) => {
     const retriable = err && err.statusCode === 401
       && options.needAuth !== false
       && !options._retried
-      && auth.canSilentResignin();
+      && auth.canSilentResignin()
+      && auth.isSameSession(generation);
     if (!retriable) throw err;
 
-    return silentResignin().then(
-      () => rawUploadFile(path, filePath, Object.assign({}, options, { _retried: true })),
+    return silentResignin(generation).then(
+      () => {
+        if (!auth.isSameSession(generation)) throw err;
+        return rawUploadFile(path, filePath, Object.assign({}, options, { _retried: true }));
+      },
       (resignErr) => {
-        auth.logout();
+        auth.logoutIfSameSession(generation);
         throw (resignErr && resignErr.code) ? resignErr : err;
       },
     );
