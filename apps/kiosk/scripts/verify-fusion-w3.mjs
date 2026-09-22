@@ -188,6 +188,9 @@ const screens = new Map([
   ['src/pages/ai-plan/AiPlanPage.tsx', 'advisor-artifact'],
 ])
 const qxScreens = new Set([
+  // 2026-09-22 迁入青序流光（稿 46-resume-decision-workspace.html?screen=job-fit）。
+  // 同宿主的 actions / career-plan / templates 三条 route 尚未迁，仍在 KioskPageFrame。
+  'src/pages/resume/JobFitPage.tsx',
   'src/pages/resume/ResumeReportPage.tsx',
   'src/pages/resume/ResumeGeneratePage.tsx',
   'src/pages/resume/ResumeGeneratePreviewPage.tsx',
@@ -219,8 +222,13 @@ includes('src/routes/index.tsx', '<Navigate to="/interview?stage=reports" replac
 const fullscreenShell = read('src/components/kiosk-shell/KioskFullscreenShell.tsx')
 check(fullscreenShell.includes('KioskStageFit'), 'fullscreen kiosk chrome uses the fixed 1080x1920 stage')
 check(/viewport\s*===\s*['"]kiosk['"]/.test(fullscreenShell), 'stage-fit is limited to the kiosk viewport')
+// /resume/job-fit 仍是 KioskRoot 之外的整屏路由（fusion-w6 的 expectedFullScreen 钉着 depth=2），
+// 所以迁进青序流光之后舞台缩放必须自己挂 KioskStageFit —— QxPageFrame 本身不缩放，
+// 少挂这一层，1080×1920 的稿在别的分辨率上会直接溢出屏幕。
+includes('src/pages/resume/JobFitPage.tsx', 'KioskStageFit', 'job-fit keeps the fixed 1080x1920 stage after the Qingxu migration')
+check(!read('src/pages/resume/JobFitPage.tsx').includes('KioskFullscreenShell'), 'job-fit has left the V6 fullscreen chrome')
+includes('src/pages/resume/CareerPlanPage.tsx', 'KioskFullscreenShell', 'career plan still uses fullscreen prototype chrome')
 for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerPlanPage.tsx']) {
-  includes(path, 'KioskFullscreenShell', `${path} uses fullscreen prototype chrome`)
   check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
 }
 

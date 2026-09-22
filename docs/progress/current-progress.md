@@ -1,5 +1,15 @@
 # 当前开发进度
 
+2026-09-23 **F2 岗位匹配单路由合流。** 来源 `ed681ecdb`，Claude `opus/xhigh` session
+`8dfdf834-5a63-493f-a0f9-071fad8d16e6`。仅 `/resume/job-fit` 迁入稿 46 青序流光；
+`/resume/job-fit/actions`、`/resume/career-plan`、`/resume/templates` 仍待迁，不重复计算完成。
+13 个实现/验证文件，新增四个有实际引用的局部样式、状态屏、呈现件及文案表；编排页 768 行，
+保留授权、撤回、打印、取消及迟到结果隔离。手机返回键 48px、主按钮 52px，使用流式布局；
+Claude 检查三视口长内容和授权弹窗，Codex 抽看截图并核对日志。修复无依据扣费/任务有效断言及完成空态。
+来源完整 W3 浏览器 20/20、定向 4/4、typecheck/lint 和相关门禁通过；旧文案反向变异 2 红、恢复 4 绿。
+来源门禁首次错误脚本名退出 1 不算通过，正确 `verify:kiosk-*` 重跑退出 0。最终主树仍需合流后验证。
+这些是本地夹具证据，不是全站 UI 完成、真实后端、真机或生产验收。
+
 2026-09-23 **远端验证入口：** 已推送集成分支并建立唯一草稿 PR [#1042](https://github.com/wanglei581/YITIJI/pull/1042)，
 起始 HEAD `aa46be8f0`。仅用于当前候选 CI/Windows runner 验证，未合并 main、未部署；下方历史“未 push/未开 PR”不再代表当前状态。
 

@@ -1,5 +1,9 @@
 # 下一步任务
 
+F2 已整合 `/resume/job-fit` 单路由候选，先验证合流后 W3 与相关门禁；通过后继续同稿的
+`/resume/job-fit/actions`、`/resume/career-plan`、`/resume/templates`，不得重做已完成结果页。
+共享组件迁移须核对仍在旧壳的使用者；全站统一及真实文件/打印流程仍需后续完整验收。
+
 当前统一 PR 为草稿 [#1042](https://github.com/wanglei581/YITIJI/pull/1042)，不得重复开集成 PR。
 优先取得其最终 HEAD 的 CI 与 Windows 行为结果；失败按实际 job 处理，不将 draft 自动合并或部署。
 定价链 Agy 窄审仅确认源码已有权限/缺配置拒绝/服务端重算机制；HTTP 越权、改价后的用户确认体验仍待验证。

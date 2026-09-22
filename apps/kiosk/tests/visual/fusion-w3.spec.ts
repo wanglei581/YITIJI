@@ -617,3 +617,89 @@ test('advisor artifact print waits for the server receipt @w3-kiosk', async ({ p
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
 })
+
+// ── 岗位匹配参考（/resume/job-fit）──────────────────────────────────────────
+// 这一组只断言「页面说的话有没有依据」和「取消之后还会不会被翻盘」，不比像素。
+const JOB_FIT_JOB = { id: 'j1', title: '前端开发工程师', company: '示例来源企业', sourceName: '来源平台', externalId: 'X-1' }
+
+function jobFitBaseline(api: ApiRouter): void {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [JOB_FIT_JOB], pagination: { page: 1, pageSize: 8, total: 1, totalPages: 1 } } })
+  // 解析还在、只是没做过匹配 → 放行到选岗屏（AI_TASK_NOT_FOUND 是另一条路）。
+  api.respond('GET', '/api/v1/resume/job-fit/t-w3', { status: 404, json: { error: { code: 'JOB_FIT_NOT_FOUND', message: '尚未匹配' } } })
+}
+
+async function submitJobFit(page: Parameters<typeof assertNoHorizontalOverflow>[0]): Promise<void> {
+  await page.getByText('前端开发工程师').first().click()
+  await page.getByRole('button', { name: '继续并确认授权' }).click()
+}
+
+test('job fit keeps touch targets usable on a narrow screen @w3-kiosk', async ({ page, api }) => {
+  jobFitBaseline(api)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/resume/job-fit?taskId=t-w3')
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'pick')
+  // 手机上必须关掉 1080 舞台缩放，否则整张稿被缩到 0.36，按钮量出来只有 35px。
+  await expect(page.locator('.jfq-root')).toHaveAttribute('data-jfq-layout', 'phone')
+  await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
+  for (const target of [page.locator('.qx-topbar-back'), page.getByRole('button', { name: '继续并确认授权' })]) {
+    const box = await target.boundingBox()
+    expect(box, '可点区域必须可见').not.toBeNull()
+    expect(box!.width).toBeGreaterThanOrEqual(48)
+    expect(box!.height).toBeGreaterThanOrEqual(48)
+  }
+  await assertNoHorizontalOverflow(page)
+})
+
+test('job fit cancellation is not overturned by a late result @w3-kiosk', async ({ page, api }) => {
+  jobFitBaseline(api)
+  let releaseAnalyze: (() => void) | null = null
+  const analyzeHeld = new Promise<void>((resolve) => { releaseAnalyze = resolve })
+  api.respondWith('POST', '/api/v1/resume/job-fit', async () => {
+    await analyzeHeld
+    return { status: 200, json: { taskId: 't-w3', status: 'completed', fitLevel: 'reference_high', summary: '迟到的结果', job: JOB_FIT_JOB, matchPoints: [], gapPoints: [], targetedSuggestions: [] } }
+  })
+
+  await page.goto('/resume/job-fit?taskId=t-w3')
+  await submitJobFit(page)
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'analyzing')
+  await page.getByRole('button', { name: '返回目标选择' }).click()
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'pick')
+
+  releaseAnalyze!()
+  // 请求没有取消端点，所以真正要守的是：晚到的返回不许把用户从选岗屏翻回结果屏。
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'pick')
+  await expect(page.getByText('迟到的结果')).toHaveCount(0)
+})
+
+test('job fit outage and failure screens claim only what is provable @w3-kiosk', async ({ page, api }) => {
+  jobFitBaseline(api)
+  api.respond('POST', '/api/v1/resume/job-fit', { status: 503, json: { error: { code: 'AI_NOT_CONFIGURED', message: 'AI 能力未配置' } } })
+  await page.goto('/resume/job-fit?taskId=t-w3')
+  await submitJobFit(page)
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'ai-down')
+  // 本页确实没有任何支付调用；但配额回滚是 best-effort，「未产生任何扣费」没有服务端证明。
+  await expect(page.getByText('本页没有发起支付')).toBeVisible()
+  await expect(page.getByText('未产生任何扣费')).toHaveCount(0)
+
+  api.respond('POST', '/api/v1/resume/job-fit', { status: 500, json: { error: { code: 'SERVER_ERROR', message: '分析失败' } } })
+  await page.goto('/resume/job-fit?taskId=t-w3')
+  await submitJobFit(page)
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'failed')
+  // 500 证明不了简历任务还在；能证明的只是「这次返回的不是任务失效」。
+  await expect(page.getByText('这次失败没有指向简历任务')).toBeVisible()
+  for (const claim of ['简历任务仍然可用', '任务本身没有失效']) {
+    await expect(page.getByText(claim)).toHaveCount(0)
+  }
+})
+
+test('job fit completed-but-empty result says未提供 rather than尚未返回 @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [JOB_FIT_JOB], pagination: { page: 1, pageSize: 8, total: 1, totalPages: 1 } } })
+  // completed 且各数组为空：结果已经返回了，只是这次没给出匹配点。
+  api.respond('GET', '/api/v1/resume/job-fit/t-empty', { status: 200, json: { taskId: 't-empty', status: 'completed', fitLevel: 'reference_medium', summary: '', matchPoints: [], gapPoints: [], targetedSuggestions: [] } })
+  await page.goto('/resume/job-fit?taskId=t-empty')
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'result-mid')
+  await expect(page.getByText('本次未提供')).toBeVisible()
+  await expect(page.getByText('尚未返回')).toHaveCount(0)
+})
