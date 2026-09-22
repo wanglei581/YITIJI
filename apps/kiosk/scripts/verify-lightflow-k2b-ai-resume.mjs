@@ -95,12 +95,13 @@ for (const [page, sourceCode, rootClass, cssPath] of [
   ['generate', generate, 'qx-resume-generate', './resume-generate-qx.css'],
   ['generate preview', preview, 'qx-resume-generate', './resume-generate-qx.css'],
   ['optimize', optimize, 'qx-resume-optimize', './resume-optimize-qx.css'],
-  ['templates', templates, 'resume-templates-lightflow', './resume-library-lightflow.css'],
+  // 2026-09-23 版式参考迁入青序流光（稿 46 ?screen=templates），根作用域换成宿主 46 的 .rdq- 样式。
+  ['templates', templates, 'rdq-tpl-grid', './resume-decision-qx.css'],
   ['materials', materials, 'resume-materials-lightflow', './resume-library-lightflow.css'],
 ]) {
   expectIncludes(sourceCode, `import '${cssPath}'`, `${page} imports its local LightFlow CSS`)
   expectIncludes(sourceCode, rootClass, `${page} uses its route-specific LightFlow root`)
-  if (!rootClass.startsWith('qx-')) {
+  if (!rootClass.startsWith('qx-') && !rootClass.startsWith('rdq-')) {
     expectIncludes(sourceCode, 'resume-lightflow', `${page} uses shared local LightFlow namespace`)
   }
 }
@@ -108,6 +109,10 @@ for (const [page, sourceCode, rootClass, cssPath] of [
 expectIncludes(report, "import './resume-report-qx.css'", 'report imports Qingxu page CSS')
 expectIncludes(report, 'QxPageFrame', 'report uses Qingxu page frame (22-resume-report migration)')
 expectIncludes(kioskShell, "'/resume/report'", 'report is registered in QX_MIGRATED_ROUTES')
+expectIncludes(templates, 'QxPageFrame', 'templates uses Qingxu page frame (46-resume-decision-workspace migration)')
+expectIncludes(kioskShell, "'/resume/templates'", 'templates is registered in QX_MIGRATED_ROUTES')
+expectNotIncludes(templates, 'KioskStageFit', 'templates stays inside the KioskRoot stage instead of scaling twice')
+expectNotIncludes(templates, 'resume-lightflow', 'templates no longer mixes the LightFlow namespace into the Qingxu frame')
 
 expectCssContract('src/pages/resume/resume-diagnosis-lightflow.css', [
   'resume-source-lightflow',

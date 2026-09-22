@@ -98,6 +98,22 @@ sha256 逐字节恢复后退出 0。1080×1920 与 390×844 截图已人工核�
 合流后已刷新既有 `docs/graph` 生成索引。限制：金额卡来源文案仍写 `POST /orders/quote`；
 合并版上的 409 与参数变化迟到响应无专门浏览器用例；Word 转换在报价前执行，409 时可能留下派生 PDF。
 本次新 HEAD 尚未 push/PR/CI，未碰生产、真实支付或硬件；`CI / DEVICE / PRODUCTION / PAYMENT / COMMERCIAL: NO-GO`。
+2026-09-23 **F2 简历决策工作台其余三条路由迁入青序流光（本地候选，基线 `c6c1df925`）。**
+Claude `claude-opus-5-5` session `abcd29ff-ebf3-4138-806d-4c2bf1a1a817`（中途 MCP 超时后原会话续做）。
+`/resume/job-fit/actions`、`/resume/career-plan`、`/resume/templates` 按稿 46 迁入，复用 job-fit 的
+`JobFitStage`（仅加 export）、`jobFitQxKit` 与 `.jfq-root` 窄屏壳；templates 在 KioskRoot 内，只登记
+`QX_MIGRATED_ROUTES`。唯一新源文件 `resume-decision-qx.css`（`.rdq-` 自作用域，无裸 hex）；12 个实现/验证文件。
+保留读取/生成/打印/降级版确认/匿名与会员材料边界/来源岗位「查看岗位」；新增打印代次守卫
+（离开页面后迟到的打印结果不再跳打印确认），模板不再自动选中、失败可真重读。职业规划页 790 行
+（三栏正文与 ai-down 自查移入既有 `CareerPlanSection.tsx`）；W3 spec 升到 910 行，拆分需改 W3 配置，留待后续。
+证据（本地夹具、fail-closed ApiRouter）：typecheck/eslint 退出 0；W3 全套 25/25（新增 5 条，含三视口
+1080×1920/390×844/1440×900 几何与 ≥48px 触控断言）；career-plan-materials 2/2（首次因他人占用 4177 端口退出 1，
+重跑 0）；W6 目标路由 5/5；k2a/k2b/fusion-w3 按青序改锚点（业务/AI/打印断言未删），连同其余 26 条 kiosk 相关门禁、
+no-raw-error-render、compliance-copy 均退出 0，壳层/W3 节点契约测试 16/16。
+四处反向变异（去掉迟到打印守卫、绕过降级确认、恢复自动选中、打印按钮被 AI 门控）均退出 1，逐字节恢复后退出 0。
+截图与日志在 `/tmp/f2dw-evidence/`。旧 LightFlow/InkPaper 样式与 `GapActionCards`/`ResumeRewriteCard` 已无页面引用，
+仍被门禁读取，未删除。未 push、未开 PR、未部署、未碰硬件与支付；项目图谱未刷新。
+`SOURCE / LOCAL: PARTIAL`（仅三条路由）；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
 
 2026-09-23 **小程序双批修复已整合并复验。** 来源 `9ec68f58c` / `c0bc70b50`，
 合流 `043613e87` / `9d7170d32`；合流后完整 `pnpm --filter @ai-job-print/miniapp verify:static`

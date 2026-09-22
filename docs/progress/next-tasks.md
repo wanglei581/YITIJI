@@ -26,6 +26,10 @@ github-hosted Windows 日志按顺序出现 `runner-guard`、chain、root-import
 `unsigned-exe-upgrade` result separate。不要把静态契约当成非交互信任已修复，不要加假超时，不要 `certutil`，
 不要在失败时退回 CurrentUser。未签名 job 不得接收 opt-in、acknowledgement 或 LocalMachine 信任。
 metadata 写出前被硬杀时无法做精确清理，只依赖一次性 GitHub-hosted VM 销毁；禁止 self-hosted runner 和真实一体机。Windows 仍为 NO-GO。
+F2 稿 46 宿主四条路由已全部有本地迁移候选（job-fit 已合流；actions / career-plan / templates 本地提交，
+证据见 current-progress 顶部）。下一步：Codex 合流后在集成 SHA 重跑 W3/W6 与 k2a/k2b/fusion-w3；
+刷新项目图谱（门禁读取边已变）；视情况把宿主 46 浏览器用例从 fusion-w3.spec.ts 拆出（需同步 W3 配置与门禁）；
+旧 LightFlow/InkPaper 样式及 GapActionCards/ResumeRewriteCard 须先改门禁再按证据删除。全站新 UI 仍未完成。
 
 小程序补签与冷启动身份修复已合入 `9d7170d32`，合流完整 `verify:static` 退出 0。
 不要重复修复下方历史“未合入/待修冷启动”事项；下一步为最终 SHA CI、DevTools 和双账号真机验收。

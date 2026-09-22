@@ -703,3 +703,212 @@ test('job fit completed-but-empty result says未提供 rather than尚未返回 @
   await expect(page.getByText('本次未提供')).toBeVisible()
   await expect(page.getByText('尚未返回')).toHaveCount(0)
 })
+
+// ── 简历决策工作台其余三条 route（稿 46：actions / career-plan / templates）────────
+// 夹具逐条 respond，未登记的请求照常被 ApiRouter 中止并在收尾报错（fail-closed）。
+// 三个视口都要量：1080×1920 一体机舞台、390×844 手机（关缩放走流式）、1440×900 横屏电脑。
+const DECISION_VIEWPORTS = [
+  { width: 1080, height: 1920 },
+  { width: 390, height: 844 },
+  { width: 1440, height: 900 },
+] as const
+const ACTIONS_JOB = { id: 'j-act', title: '行政专员', company: '示例来源企业', sourceName: '来源平台', externalId: 'X-ACT' }
+const ACTIONS_RESULT = {
+  taskId: 't-act', status: 'completed', fitLevel: 'reference_medium', summary: '有可补的地方', job: ACTIONS_JOB,
+  matchPoints: [],
+  gapPoints: [{ gap: '缺少 Excel 数据整理经历', suggestion: '把做过的报表整理写成一条经历' }],
+  targetedSuggestions: ['把「协助行政」改写成具体做过的三件事'],
+}
+const CAREER_PLAN_READY = {
+  taskId: 't-cp', status: 'completed',
+  basedOn: { resume: true, jobFit: null, interview: null },
+  summary: '经历偏执行落地，适合先从运营助理起步。',
+  currentSnapshot: [{ point: '有活动执行经历', evidence: '负责过校园活动报名统计' }],
+  directions: [{ title: '运营助理', why: '经历贴近落地执行', firstStep: '把活动结果写成数字' }],
+  skillPlan: [{ skill: '表格整理', action: '补一门表格入门课', timeframe: '30 天' }],
+  actionChecklist: ['把简历结果量化'],
+}
+const RESUME_TEMPLATE = {
+  id: 'tpl-clean', type: 'resume_template', title: '清爽通用简历模板', description: '单栏清爽版式，突出个人总结、经历与技能。',
+  tags: ['简历模板', '通用'], status: 'published', recommendedFor: '现场打印前版式参考', outputFilename: 'resume.pdf', fields: [],
+  resumeLayoutPreset: { style: 'clean', defaultLayout: { columns: 1 }, sectionOrder: ['header', 'summary', 'experience', 'skills'] },
+}
+
+async function captureDecisionViewports(page: Parameters<typeof assertNoHorizontalOverflow>[0], name: string): Promise<void> {
+  for (const size of DECISION_VIEWPORTS) {
+    await page.setViewportSize(size)
+    // 固定操作条不得压住滚动区，也不得掉出视口；返回键与主操作在真实像素上 ≥48px（手机不再被舞台缩成 23px）。
+    // 换视口后舞台缩放开关要等一次 resize 渲染，几何量用轮询等它落定，不用固定等待。
+    await expect.poll(async () => {
+      const scroll = await page.locator('.qx-scroll').boundingBox()
+      const ctabar = await page.locator('.qx-ctabar').boundingBox()
+      if (!scroll || !ctabar) return 'missing'
+      if (scroll.y + scroll.height > ctabar.y + 0.5) return `scroll overlaps ctabar ${scroll.y + scroll.height} > ${ctabar.y}`
+      if (ctabar.y + ctabar.height > size.height + 0.5) return `ctabar leaves viewport ${ctabar.y + ctabar.height}`
+      return 'ok'
+    }, { message: `${name} ${size.width}x${size.height} 操作条与滚动区` }).toBe('ok')
+    await assertNoHorizontalOverflow(page)
+    for (const target of [page.locator('.qx-topbar-back'), page.locator('.qx-ctabar .qx-btn').last()]) {
+      const box = await target.boundingBox()
+      expect(box, '可点区域必须可见').not.toBeNull()
+      expect(box!.height, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
+      expect(box!.width).toBeGreaterThanOrEqual(48)
+    }
+    await page.screenshot({ path: test.info().outputPath(`${name}-${size.width}x${size.height}.png`) })
+  }
+  await page.setViewportSize({ width: 1080, height: 1920 })
+}
+
+/** 用路由 state 带任务号进页（与页面间真实跳转同一通道），不碰浏览器存储。 */
+async function openWithRouteState(page: Parameters<typeof assertNoHorizontalOverflow>[0], path: string, state: Record<string, string>): Promise<void> {
+  await page.goto(path)
+  await page.evaluate(([target, usr]) => {
+    window.history.replaceState({ usr, key: 'w3-decision', idx: 0 }, '', target)
+  }, [path, state] as const)
+  await page.reload()
+}
+
+test('job fit actions lists only returned items and keeps print honest @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/resume/job-fit/actions')
+  const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
+  await expect(screen).toHaveAttribute('data-state', 'missing-task')
+  await expect(page.getByText('请先完成一次岗位匹配参考').first()).toBeVisible()
+  await captureDecisionViewports(page, 'actions-missing-task')
+
+  api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 200, json: ACTIONS_RESULT })
+  await page.goto('/resume/job-fit/actions?taskId=t-act')
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  await expect(page.getByText('缺少 Excel 数据整理经历')).toBeVisible()
+  await expect(page.getByText('把「协助行政」改写成具体做过的三件事')).toBeVisible()
+  await expect(page.getByText('本平台不提供投递功能', { exact: false }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看岗位' })).toBeVisible()
+  for (const forbidden of ['一键投递', '立即投递', '平台投递']) await expect(page.getByText(forbidden)).toHaveCount(0)
+  await captureDecisionViewports(page, 'actions-ready')
+
+  api.respond('POST', '/api/v1/resume/job-fit/t-act/print', { status: 500, json: { error: { code: 'SERVER_ERROR', message: '生成失败' } } })
+  await page.locator('.qx-ctabar').getByRole('button', { name: '生成打印版' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'print-failed')
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(page.getByText('已打印')).toHaveCount(0)
+  await captureDecisionViewports(page, 'actions-print-failed')
+  await page.getByRole('button', { name: '返回行动清单' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  expect(page.url()).not.toContain('/print/confirm')
+})
+
+test('job fit actions: a print result arriving after leaving does not hijack navigation @w3-kiosk', async ({ page, api }) => {
+  jobFitBaseline(api)
+  api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 200, json: ACTIONS_RESULT })
+  let releasePrint: (() => void) | null = null
+  const printHeld = new Promise<void>((resolve) => { releasePrint = resolve })
+  api.respondWith('POST', '/api/v1/resume/job-fit/t-act/print', async () => {
+    await printHeld
+    return { status: 200, json: { fileId: 'f-late', filename: '行动清单.pdf', sizeBytes: 2048, pageCount: 1, printFileUrl: '/api/v1/files/f-late/content?sig=late' } }
+  })
+  await page.goto('/resume/job-fit/actions?taskId=t-act')
+  const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  await page.locator('.qx-ctabar').getByRole('button', { name: '生成打印版' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'print-pending')
+  await expect(page.getByText('本页没有发起支付')).toBeVisible()
+  await captureDecisionViewports(page, 'actions-print-pending')
+  await page.locator('.qx-ctabar').getByRole('button', { name: '返回比对结果' }).click()
+  await expect(page).toHaveURL(/\/resume\/job-fit$/)
+  releasePrint!()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/resume/job-fit/t-act/print')).toBe(1)
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]').first()).toBeVisible()
+  await expect(page).toHaveURL(/\/resume\/job-fit$/)
+})
+
+test('career plan guide, ai-down and generated result keep print available @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/resume/career-plan')
+  const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+  await expect(screen).toHaveAttribute('data-state', 'missing-task')
+  await captureDecisionViewports(page, 'career-missing-task')
+
+  api.respond('GET', '/api/v1/resume/career-plan/t-cp', { status: 404, json: { error: { code: 'CAREER_PLAN_NOT_FOUND', message: '尚未生成' } } })
+  await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+  await expect(screen).toHaveAttribute('data-state', 'guide')
+  await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeVisible()
+  await captureDecisionViewports(page, 'career-guide')
+
+  api.respond('POST', '/api/v1/resume/career-plan/t-cp', { status: 503, json: { error: { code: 'AI_NOT_CONFIGURED', message: 'AI 能力未配置' } } })
+  await page.getByRole('button', { name: '生成求职方案' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'ai-down')
+  await expect(page.getByText('这三条是通用建议，不是针对你这份简历的', { exact: false })).toBeVisible()
+  await expect(page.getByText('AI 能力未配置')).toBeVisible()
+  // 出纸不依赖 AI：ai-down 时打印按钮仍在，生成钮也仍可重试（不被 canStart 藏掉）。
+  await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeVisible()
+  await captureDecisionViewports(page, 'career-ai-down')
+
+  api.respond('POST', '/api/v1/resume/career-plan/t-cp', { status: 200, json: CAREER_PLAN_READY })
+  await page.getByRole('button', { name: '重试生成求职方案' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  await expect(page.getByRole('heading', { name: '目标与方向' })).toBeVisible()
+  await expect(page.locator('.rdq-direction h3')).toContainText('运营助理')
+  await expect(page.getByText('未登录 · 本次结果不进入「我的」记录', { exact: false })).toBeVisible()
+  await expect(page.locator('[data-career-plan-column="materials"]')).toContainText('登录后可看到你已保存的材料')
+  expect(api.requestCount('GET', '/api/v1/me/resumes')).toBe(0)
+  await captureDecisionViewports(page, 'career-ready')
+})
+
+test('career plan print failure and expired-plan degraded print both stop before print confirm @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/resume/career-plan/t-cp', { status: 200, json: CAREER_PLAN_READY })
+  api.respond('POST', '/api/v1/resume/career-plan/t-cp/print', { status: 500, json: { error: { code: 'SERVER_ERROR', message: '生成失败' } } })
+  await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+  const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  await page.getByRole('button', { name: '打印建议单' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'print-failed')
+  await expect(page.getByRole('alert').first()).toBeVisible()
+  await captureDecisionViewports(page, 'career-print-failed')
+  await page.getByRole('button', { name: '返回求职方案' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+
+  api.respond('POST', '/api/v1/resume/career-plan/t-cp/print', {
+    status: 200,
+    json: { fileId: 'f-cp', filename: '求职参考单.pdf', sizeBytes: 4096, pageCount: 2, signedUrl: 'https://files.invalid/f-cp', expiresAt: '2099-01-01T00:00:00.000Z', printFileUrl: '/api/v1/files/f-cp/content?sig=cp', variant: 'degraded' },
+  })
+  await page.getByRole('button', { name: '打印建议单' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'print-degraded')
+  await expect(page.getByText('没有', { exact: true })).toBeVisible()
+  await captureDecisionViewports(page, 'career-print-degraded')
+  await page.getByRole('button', { name: '先不打印' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  expect(page.url()).not.toContain('/print/confirm')
+})
+
+test('resume templates: empty, error with real retry, and selection that saves nothing @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/resume/templates')
+  const screen = page.locator('[data-kiosk-screen="resume-templates"]')
+  // ApiRouter 基线对模板列表应答空数组：读取成功但为空，不是故障。
+  await expect(screen).toHaveAttribute('data-state', 'empty')
+  await expect(page.getByRole('heading', { name: '当前没有已发布的简历模板' })).toBeVisible()
+  await captureDecisionViewports(page, 'templates-empty')
+
+  api.respond('GET', '/api/v1/job-materials/templates', { status: 500, json: { error: { code: 'SERVER_ERROR', message: 'fixture template failure' } } })
+  await page.goto('/resume/templates')
+  await expect(screen).toHaveAttribute('data-state', 'error')
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(page.getByText('fixture template failure')).toHaveCount(0)
+  await captureDecisionViewports(page, 'templates-error')
+
+  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [RESUME_TEMPLATE] } })
+  await page.locator('.qx-ctabar').getByRole('button', { name: '重新读取模板' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'list')
+  const card = page.getByTestId('resume-templates-template-tpl-clean')
+  await expect(card).toHaveAttribute('aria-pressed', 'false')
+  await captureDecisionViewports(page, 'templates-list')
+  await card.click()
+  await expect(screen).toHaveAttribute('data-state', 'selected')
+  await expect(card).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.rdq-sections li')).toHaveText(['基本信息', '个人总结', '工作 / 实习经历', '技能'])
+  await captureDecisionViewports(page, 'templates-selected')
+  await page.getByRole('button', { name: '换一个版式' }).click()
+  await expect(screen).toHaveAttribute('data-state', 'list')
+  expect(api.requestCount('GET', '/api/v1/job-materials/templates')).toBeGreaterThanOrEqual(2)
+})

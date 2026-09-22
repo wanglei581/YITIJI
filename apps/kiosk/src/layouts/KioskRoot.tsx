@@ -124,6 +124,9 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/resume/optimize/compare',
   '/resume/generate',
   '/resume/generate/preview',
+  /* 稿 46 宿主的第四条 route（版式参考）。另外两条 /resume/job-fit/actions、
+   * /resume/career-plan 是 KioskRoot 之外的整屏路由，自挂 JobFitStage，不登记在这里。 */
+  '/resume/templates',
   '/print-scan',
   '/print-scan/sign',
   '/print-scan/convert',

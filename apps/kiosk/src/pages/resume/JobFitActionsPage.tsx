@@ -7,43 +7,92 @@
 //   返回 —— 回比对结果页。
 //   判据 —— 比对页专心做「差在哪」，行动页专心做「怎么办」。
 //
+// 视觉真值（2026-09-23 迁入青序流光）：
+//   docs/design/kiosk-redesign-2026-08/46-resume-decision-workspace.html?screen=actions
+// 与 /resume/job-fit 同一宿主：舞台（JobFitStage）、呈现件（jobFitQxKit）与窄屏壳层样式
+// （job-fit-qx.css 的 .jfq-root 段）共用，本页独有的分组清单样式在 resume-decision-qx.css。
+//
 // 合规（CLAUDE.md §2 / compliance-boundary §4）：
 //   本页只做「改简历、备材料、打印」三件本机能做的事。
 //   **不出现任何投递动作** —— 岗位只是第三方来源信息，投递一律回来源平台完成。
-//   底部来源卡的 CTA 用白名单里的「查看岗位」，跳回岗位详情页，由那里承载来源平台入口；
+//   来源卡的 CTA 用白名单里的「查看岗位」，跳回岗位详情页，由那里承载来源平台入口；
 //   本页不自建第二个外跳入口，也不复述投递类文案。
 // ============================================================
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import type { JobFitResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
-import { AlertCircleIcon, Loader2Icon, PencilLineIcon, PrinterIcon } from 'lucide-react'
+import { BriefcaseIcon, FileTextIcon, ListIcon, PenLineIcon, PrinterIcon, UserIcon } from 'lucide-react'
 import {
   AiDisclaimerLine,
   AigcMark,
-  AiTaskRegion,
+  EvidenceBadge,
   EvidenceLegend,
   aiErrorMessageOf,
   deriveAiAvailability,
   isAiOutage,
   useAiTask,
-  type AiTaskFallback,
 } from '../../ai'
 import { getLatestJobFit, printJobFit } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { readAiResumeSession } from './aiResumeSession'
-import { GapActionCards } from './jobFit/GapActionCards'
-import { ResumeRewriteCard } from './jobFit/ResumeRewriteCard'
-import './jobFit-inkpaper.css'
-import './jobFit-inkpaper-ext.css'
-import './resume-fusion-youth.css'
-import './job-fit-actions.css'
+import { JobFitStage } from './JobFitPage'
+import {
+  Checks,
+  CtaNote,
+  Ghosts,
+  Guardline,
+  KitRows,
+  Nots,
+  RouteCards,
+  Sec,
+  Slots,
+  Steps,
+  Trace,
+  Verdict,
+  Waiting,
+} from './jobFit/jobFitQxKit'
+import './job-fit-qx.css'
+import './resume-decision-qx.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const JOB_FIT_ROUTE = '/resume/job-fit'
+
+type ActionsScreen =
+  | 'missing-task'
+  | 'loading'
+  | 'unknown'
+  | 'ai-down'
+  | 'failed'
+  | 'ready'
+  | 'print-pending'
+  | 'print-failed'
+
+interface ScreenView {
+  title: string
+  subtitle: string
+  pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+  body: ReactNode
+  cta: ReactNode
+}
+
+function QxAction({ label, variant, onClick, icon }: {
+  label: string
+  variant: 'ghost' | 'primary' | 'teal'
+  onClick: () => void
+  icon?: ReactNode
+}) {
+  return (
+    <button type="button" className="qx-btn" data-variant={variant} onClick={onClick}>
+      {icon}
+      {label}
+    </button>
+  )
+}
 
 export function JobFitActionsPage() {
   const navigate = useNavigate()
@@ -73,8 +122,15 @@ export function JobFitActionsPage() {
   const [failReason, setFailReason] = useState<string | null>(null)
   const [printing, setPrinting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * 打印这一跳的代次。离开本页（打印等待屏的两个出口都会离开）时作废，
+   * 晚到的返回既不许把用户拽回打印确认页，也不许在别的页面上报错。
+   */
+  const printRunRef = useRef(0)
 
   useBusyLock(printing)
+
+  useEffect(() => () => { printRunRef.current += 1 }, [])
 
   useEffect(() => {
     if (!taskId) {
@@ -115,8 +171,9 @@ export function JobFitActionsPage() {
 
   const availability = deriveAiAvailability({ outage: aiOutage, probed })
 
-  const hasActions =
-    (result?.gapPoints ?? []).length > 0 || (result?.targetedSuggestions ?? []).length > 0
+  const gapPoints = result?.gapPoints ?? []
+  const rewrites = result?.targetedSuggestions ?? []
+  const hasActions = gapPoints.length > 0 || rewrites.length > 0
 
   const task = useAiTask({
     availability,
@@ -127,7 +184,11 @@ export function JobFitActionsPage() {
 
   const backToCompare = () =>
     navigate(JOB_FIT_ROUTE, { state: taskId ? { taskId, accessToken } : undefined })
-
+  const goResumeHub = () => navigate('/resume-service')
+  const goTriage = () => navigate('/resume/source?intent=diagnose')
+  const goJobs = () => navigate('/jobs')
+  const goPrintHub = () => navigate('/print-scan')
+  const goMaterials = () => navigate('/resume/materials')
   const goResumeOptimize = () =>
     navigate('/resume/optimize', { state: taskId ? { taskId, accessToken } : undefined })
 
@@ -137,11 +198,13 @@ export function JobFitActionsPage() {
    * `printFileUrl` 缺失时诚实报错，不静默跳转到一个打不出东西的确认页。
    */
   const handlePrint = async () => {
-    if (!taskId) return
+    if (!taskId || printing) return
+    const run = ++printRunRef.current
     setPrinting(true)
     setError(null)
     try {
       const file = await printJobFit(taskId, { token: getToken(), accessToken })
+      if (run !== printRunRef.current) return
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
       navigate('/print/confirm', {
         state: {
@@ -160,6 +223,7 @@ export function JobFitActionsPage() {
         },
       })
     } catch (err) {
+      if (run !== printRunRef.current) return
       setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
@@ -167,202 +231,446 @@ export function JobFitActionsPage() {
   }
 
   /**
-   * 降级两类：
-   *  blocked            差距清单由 AI 生成，本页有「重新读取」入口 → 置灰 + 常显原因。
-   *  result-unavailable 服务通了但这次没出清单 → 结果区说清这次没有，保留返回入口。
+   * 两类降级（原 AiTaskRegion 的 blocked / result-unavailable，文案原样保留）：
+   *  ai-down  差距清单由 AI 生成，这次读不到 → 常显原因，列出仍然可用的非 AI 去处。
+   *  failed   服务通了但这次没出清单（含「完成但两组都为空」）→ 说清这次没有，保留返回入口。
    *
    * 两类都保证「AI 挂了仍拿得到东西」：岗位原文照常可看，简历原文照常可打印，
    * 简历优化编辑区照常能改。这不是安慰话 —— 那三条都不经过本页这条 AI 链路。
    */
-  const fallback: AiTaskFallback = aiOutage
-    ? {
-        mode: 'blocked',
-        reason: `${aiOutage} —— 差距与准备建议由 AI 生成，这次生成不了。`,
-        blockedActionLabel: '重新读取差距清单',
-        stillAvailable:
-          '岗位原文与来源信息照常可看；你的简历原文照常可打印；简历优化编辑区也照常能改。想投递请回岗位详情页，从来源平台入口走。',
-        action: { label: '返回比对结果', onClick: backToCompare },
+  const screen: ActionsScreen = !taskId
+    ? 'missing-task'
+    : loading
+      ? 'loading'
+      : task.isFailed
+        ? (aiOutage ? 'ai-down' : 'failed')
+        : !task.isDone
+          ? 'unknown'
+          : printing
+            ? 'print-pending'
+            : error
+              ? 'print-failed'
+              : 'ready'
+
+  const jobLabel = result?.job?.title
+    ? `${result.job.title}${result.job.company ? ` · ${result.job.company}` : ''}`
+    : '这次匹配的目标岗位'
+
+  function buildView(): ScreenView {
+    if (screen === 'missing-task') {
+      return {
+        title: '还没有可用的匹配结果',
+        subtitle: '请先完成一次岗位匹配参考，再看差距行动清单。行动清单必须来自真实的匹配结果，没有结果就不生成空模板。',
+        pill: { tone: 'warn', label: '缺少可用的岗位匹配结果' },
+        body: (
+          <>
+            <Sec no="01" title="清单依赖的三项输入" hint="缺一项就不生成">
+              <Slots items={[
+                { label: '本人简历任务', value: '尚未确认' },
+                { label: '目标岗位', value: '尚未选择' },
+                { label: '匹配结果', value: '尚未生成' },
+              ]} />
+            </Sec>
+            <Sec no="02" title="拿到清单的四步" hint="顺序固定，不能跳过" copy="每一步都在既有流程里完成，本页不会替你跳过其中任何一步。" grow>
+              <Steps items={[
+                { title: '准备本人简历任务', desc: '上传 PDF 或扫描纸质简历，等待解析成功。' },
+                { title: '选择目标岗位', desc: '从已发布岗位中选择，或只填一个目标岗位名称。' },
+                { title: '确认本人授权', desc: '确认之后，简历才会用于这次岗位匹配分析。' },
+                { title: '等待匹配结果返回', desc: '结果返回后，差距与建议才会变成可执行的行动项。' },
+              ]} />
+            </Sec>
+            <Sec no="03" title="现在就能开始的两条路" hint="按你手上有什么来选">
+              <RouteCards items={[
+                { title: '去做岗位匹配', desc: '选择目标岗位并确认授权，走完才会有行动清单。', action: '去岗位匹配', onClick: () => navigate(JOB_FIT_ROUTE) },
+                { title: '先看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对要求。', action: '去岗位信息', onClick: goJobs },
+              ]} />
+            </Sec>
+          </>
+        ),
+        cta: (
+          <>
+            <CtaNote>没有真实结果时，不生成也不打印任何清单。</CtaNote>
+            <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
+            <QxAction label="去准备简历材料" variant="primary" onClick={goTriage} />
+          </>
+        ),
       }
-    : {
-        mode: 'result-unavailable',
-        reason: failReason
+    }
+
+    if (screen === 'loading') {
+      return {
+        title: '正在读取，清单还没到',
+        subtitle: '读取请求已提交。只有服务端确认存在真实差距与建议，才会出现行动项。',
+        pill: { tone: 'unknown', label: '正在读取行动清单' },
+        body: (
+          <>
+            <Sec title="正在读取本人的行动清单" hint="无进度条 · 无预计时间">
+              <Waiting
+                icon={<ListIcon size={34} />}
+                title="读取请求已提交，等待服务端返回"
+                desc="清单内容全部来自这次匹配结果。读取失败或没有内容会直接说明，不补造行动项。"
+                tag="整体等待中，没有百分比"
+              />
+            </Sec>
+            <Sec title="这次读取用到的条件" hint="每一项都可核对" grow>
+              <Checks items={[
+                { tone: 'ok', icon: <UserIcon size={24} />, title: '本人凭证', desc: '请求带着本机当前会话的凭证，服务端据此只返回属于你本人的清单。', chip: '已提交' },
+                { tone: 'wait', icon: <FileTextIcon size={24} />, title: '匹配结果', desc: '按这次匹配的任务读取；任务失效或不属于你时会直接说明。', chip: '等待返回' },
+                { tone: 'wait', icon: <ListIcon size={24} />, title: '行动项内容', desc: '差距与准备建议由服务端逐条给出。', chip: '等待返回' },
+                { tone: 'wait', icon: <PrinterIcon size={24} />, title: '打印版文件', desc: '清单可读之后才谈打印，本页现在不生成任何文件。', chip: '未开始' },
+              ]} />
+            </Sec>
+            <Sec title="还没有返回的内容" hint="返回前一律留空">
+              <Ghosts items={[
+                { title: '差距与依据', desc: '每条行动项对应的岗位要求与准备建议，返回后才显示。', tag: '等待返回' },
+                { title: '可执行动作', desc: '优化、材料准备还是打印，按真实建议再决定。', tag: '等待返回' },
+              ]} />
+            </Sec>
+          </>
+        ),
+        cta: (
+          <>
+            <CtaNote>读取期间不放开打印，也不提前显示清单内容。</CtaNote>
+            <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
+            <QxAction label="取消读取，返回匹配参考" variant="primary" onClick={backToCompare} />
+          </>
+        ),
+      }
+    }
+
+    if (screen === 'ai-down') {
+      return {
+        title: '差距清单这次读不到',
+        subtitle: `${aiOutage ?? 'AI 服务当前不可用'} —— 差距与准备建议由 AI 生成，这次生成不了。`,
+        pill: { tone: 'bad', label: 'AI 差距清单当前不可用' },
+        body: (
+          <>
+            <Sec title="当前判定" hint="只写已经确认的事实">
+              <Verdict items={[
+                { tone: 'bad', label: 'AI 差距与准备建议', value: '当前不可用' },
+                { tone: 'ok', label: '岗位原文与来源信息', value: '照常可看' },
+                { tone: 'ok', label: '简历原文与打印', value: '不经过这条 AI' },
+              ]} />
+              <p className="jfq-sec-copy">
+                岗位原文与来源信息照常可看；你的简历原文照常可打印；简历优化编辑区也照常能改。想投递请回岗位详情页，从来源平台入口走。
+              </p>
+            </Sec>
+            <Sec title="现在能用的非 AI 入口" hint="都是既有流程" grow>
+              <KitRows items={[
+                { icon: <PenLineIcon size={22} />, title: '自己改简历', desc: '简历优化编辑区照常能改', onClick: goResumeOptimize },
+                { icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息', onClick: goJobs },
+                { icon: <PrinterIcon size={22} />, title: '打印现有简历', desc: '走既有打印流程，不依赖 AI', onClick: goPrintHub },
+              ]} />
+            </Sec>
+          </>
+        ),
+        cta: (
+          <>
+            <CtaNote>服务不可用时不显示任何清单内容，也不承诺恢复时间。</CtaNote>
+            <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
+            <QxAction label="返回比对结果" variant="primary" onClick={backToCompare} />
+          </>
+        ),
+      }
+    }
+
+    if (screen === 'failed') {
+      return {
+        title: '这次没有可执行的差距清单',
+        subtitle: failReason
           ? `本次没有可执行的差距清单：${failReason}`
           : '本次没有可执行的差距清单。',
-        retryHint:
-          '这不是你的操作问题。可以回比对结果页重新分析一次；若这个岗位的要求写得很笼统，通常就抽不出可执行的差距项。',
-        action: { label: '返回比对结果', onClick: backToCompare },
+        pill: { tone: 'warn', label: '本次没有返回行动项' },
+        body: (
+          <>
+            <Sec title="这次的结果" hint="只写事实，不补内容">
+              <Verdict items={[
+                { tone: 'warn', label: '差距清单', value: '这次没有' },
+                { tone: 'ok', label: '匹配参考', value: '回比对页查看' },
+              ]} />
+              <p className="jfq-sec-copy">
+                这不是你的操作问题。可以回比对结果页重新分析一次；若这个岗位的要求写得很笼统，通常就抽不出可执行的差距项。
+              </p>
+            </Sec>
+            <Sec title="接下来" hint="都进入既有流程" grow>
+              <RouteCards items={[
+                { title: '回比对结果', desc: '重新分析一次，或换一个更具体的目标岗位。', action: '返回比对结果', onClick: backToCompare },
+                { title: '先自己改简历', desc: '按目标岗位调整内容重点，不依赖这份清单。', action: '去简历优化', onClick: goResumeOptimize },
+                { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己逐条比对。', action: '去岗位信息', onClick: goJobs },
+              ]} />
+            </Sec>
+          </>
+        ),
+        cta: (
+          <>
+            <CtaNote>没有返回的内容不会先填上凑数。</CtaNote>
+            <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
+            <QxAction label="返回比对结果" variant="primary" onClick={backToCompare} />
+          </>
+        ),
       }
+    }
 
-  if (!taskId) {
-    return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-        <main
-          data-kiosk-domain="resume"
-          data-kiosk-screen="resume-job-fit-actions"
-          className="service-desk job-fit-inkpaper job-fit-actions flex h-full flex-col items-center justify-center gap-4 px-6"
-          data-visual-theme="service-desk"
-          data-ux-density="touch"
-        >
-          <div className="job-fit-state-card" role="alert">
-            <AlertCircleIcon className="h-10 w-10 text-primary-600" aria-hidden="true" />
-            <p className="text-base text-neutral-500">请先完成一次岗位匹配参考，再看差距行动清单</p>
-            <Button size="lg" className="job-fit-primary-action" onClick={() => navigate(JOB_FIT_ROUTE)}>
-              去做岗位匹配参考
-            </Button>
-          </div>
-        </main>
-      </KioskPageFrame>
-    )
-  }
+    if (screen === 'unknown') {
+      return {
+        title: '还没有确认服务状态',
+        subtitle: '还没有确认 AI 服务状态，本页暂不展示差距清单 —— 状态不明时不假装能算。',
+        pill: { tone: 'unknown', label: '服务状态未确认' },
+        body: (
+          <Sec title="现在能做的" hint="回到比对页会重新读取" grow>
+            <RouteCards items={[
+              { title: '回比对结果', desc: '比对页会重新读取这次的匹配结果。', action: '返回比对结果', onClick: backToCompare },
+              { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息。', action: '去岗位信息', onClick: goJobs },
+            ]} />
+          </Sec>
+        ),
+        cta: (
+          <>
+            <CtaNote>状态不明时不显示任何清单内容。</CtaNote>
+            <QxAction label="返回比对结果" variant="primary" onClick={backToCompare} />
+          </>
+        ),
+      }
+    }
 
-  return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-      <main
-        data-kiosk-domain="resume"
-        data-kiosk-screen="resume-job-fit-actions"
-        className="service-desk job-fit-inkpaper job-fit-actions flex h-full flex-col px-6 pt-6"
-        data-visual-theme="service-desk"
-        data-ux-density="touch"
-      >
-        <div className="job-fit-header">
-          <KioskPageHeader
-            title="差距行动清单"
-            description={
-              result?.job?.title
-                ? `目标岗位：${result.job.title}${result.job.company ? ` · ${result.job.company}` : ''}`
-                : '要补什么、怎么补、本机能不能补'
-            }
-            onBack={backToCompare}
-            backLabel="返回比对结果"
-          />
-        </div>
+    if (screen === 'print-pending') {
+      return {
+        title: '打印版还没有生成',
+        subtitle: '文件正在等待服务端生成。生成成功才进入既有打印确认流程；本页不代表已打印或已出纸。',
+        pill: { tone: 'unknown', label: '等待服务端生成打印版文件' },
+        body: (
+          <>
+            <Sec title="已提交生成打印版" hint="生成 ≠ 打印">
+              <Waiting
+                icon={<PrinterIcon size={34} />}
+                title="请求已提交，等待文件生成"
+                desc="行动清单可读，不等于打印文件已经存在。文件真实生成后，才会进入既有的打印确认与取件流程。"
+                tag="等待生成，没有进度和预计时间"
+              />
+            </Sec>
+            <Sec title="打印这件事现在到哪一步" hint="只标位置，不画进度">
+              <Trace items={[
+                { phase: '第一步', title: '清单已可读', desc: '行动项来自这次真实的匹配结果。' },
+                { phase: '第二步', title: '等待生成文件', desc: '服务端生成文件之前不进入打印。', now: true },
+                { phase: '第三步', title: '进入打印确认', desc: '份数、单双面与费用在确认页由你决定。' },
+              ]} />
+            </Sec>
+            <Sec title="现在还没有发生的事" hint="不提前写成已完成" grow>
+              <Nots items={[
+                '没有发送到打印机，也没有开始出纸',
+                '没有产生取件码或订单号',
+                '本页没有发起支付',
+                '还没有拿到可预览的打印版文件',
+                '没有把清单内容提供给企业或第三方',
+              ]} />
+            </Sec>
+          </>
+        ),
+        cta: (
+          <>
+            <CtaNote>离开本页后，这次生成的结果不会再把你带去打印确认页。</CtaNote>
+            <QxAction label="返回比对结果" variant="ghost" onClick={backToCompare} />
+            <QxAction label="改用现有文件打印" variant="primary" onClick={goPrintHub} />
+          </>
+        ),
+      }
+    }
 
-        <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
-          <ComplianceBanner tone="info">
-            以下内容仅为帮助你修改简历与准备材料的参考，不代表任何招聘结果；本平台不提供投递功能，投递请前往岗位来源平台。
-          </ComplianceBanner>
+    if (screen === 'print-failed') {
+      return {
+        title: '打印版没有生成成功',
+        subtitle: '文件生成失败。系统不会把失败写成已发送打印。',
+        pill: { tone: 'bad', label: '打印版文件生成失败' },
+        body: (
+          <>
+            <Sec title="这次的结果" hint="只写已确认的事实">
+              <Verdict items={[
+                { tone: 'bad', label: '打印版文件', value: '未生成' },
+                { tone: 'ok', label: '行动清单', value: '仍可查看' },
+                { tone: 'ok', label: '打印机', value: '未收到任务' },
+              ]} />
+              {error && (
+                <p className="jfq-alert" role="alert">{error}</p>
+              )}
+            </Sec>
+            <Sec title="接下来" hint="两条都进入既有流程" grow>
+              <RouteCards items={[
+                { title: '重新生成打印版', desc: '沿用当前清单再试一次，不重新跑匹配分析。', action: '重新生成', onClick: () => void handlePrint() },
+                { title: '改用现有文件打印', desc: '手上已有可用文件或纸质件时，直接走既有打印流程。', action: '去打印服务', onClick: goPrintHub },
+              ]} />
+            </Sec>
+          </>
+        ),
+        cta: (
+          <>
+            <CtaNote>失败就是失败，不写成已发送到打印机。</CtaNote>
+            <QxAction label="返回行动清单" variant="ghost" onClick={() => setError(null)} />
+            <QxAction label="重新生成打印版" variant="primary" onClick={() => void handlePrint()} />
+          </>
+        ),
+      }
+    }
 
-          <AiTaskRegion
-            task={task}
-            label="AI 差距与准备建议"
-            className="job-fit-actions__region"
-            running={
-              <div className="job-fit-state-card" role="status" aria-live="polite">
-                <Loader2Icon
-                  className="h-10 w-10 animate-spin text-primary-600"
-                  aria-hidden="true"
-                  data-ai-progress="spinner"
-                />
-                <p className="text-base text-neutral-500">正在读取差距清单…</p>
-              </div>
-            }
-            /*
-              同 `ResumeOptimizeComparePage`：availability 为 unknown 时状态恒为 idle，
-              首次往返完成前也落在这里。读取中必须说「在读取」，
-              不能把一次正常加载写成「服务状态未确认」。
-            */
-            idle={
-              loading ? (
-                <div className="job-fit-state-card" role="status" aria-live="polite">
-                  <Loader2Icon
-                    className="h-10 w-10 animate-spin text-primary-600"
-                    aria-hidden="true"
-                  />
-                  <p className="text-base text-neutral-500">正在读取差距清单…</p>
+    return {
+      title: '清单来了，一件一件来',
+      subtitle: '每条准备事项都来自这次的匹配结果。没有返回的条目留空，不先填内容凑数。',
+      pill: { tone: 'ok', label: '行动建议以真实匹配结果为准' },
+      body: (
+        <>
+          <Sec title="你的准备清单" hint="按这次返回的内容分组" grow>
+            <Slots items={[
+              { label: '目标岗位', value: jobLabel },
+              { label: '清单归属', value: '仅本人准备使用', fixed: true },
+            ]} />
+            <div className="rdq-ai">
+              <AiDisclaimerLine>
+                以下差距与准备建议由 AI 依据你的简历与该岗位公开要求生成，仅供参考，不代表任何招聘结果。
+              </AiDisclaimerLine>
+            </div>
+            <div className="rdq-groups">
+              <section className="rdq-group" data-tone="urgent" aria-label="差距与准备建议">
+                <div className="rdq-group-top">
+                  <span className="rdq-group-no" aria-hidden="true">1</span>
+                  <b>差距与准备建议</b>
+                  <span className="rdq-group-chip">{gapPoints.length > 0 ? `${gapPoints.length} 项` : '本次未提供'}</span>
                 </div>
-              ) : (
-                <div className="job-fit-state-card" role="status">
-                  <p className="text-base text-neutral-500">
-                    还没有确认 AI 服务状态，本页暂不展示差距清单 —— 状态不明时不假装能算。
-                  </p>
-                  <Button size="lg" className="job-fit-primary-action" onClick={backToCompare}>
-                    返回比对结果
-                  </Button>
+                <p className="rdq-group-desc">岗位要求里有、简历里还看不到的部分，以及每一项怎么补。</p>
+                {gapPoints.length > 0 ? (
+                  <ul className="rdq-items">
+                    {gapPoints.map((point, index) => (
+                      <li key={`${point.gap.slice(0, 24)}-${index}`} className="rdq-item">
+                        <b><EvidenceBadge level="E3" />{point.gap}</b>
+                        <p>{point.suggestion}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rdq-muted">这次返回的结果里没有差距项。</p>
+                )}
+              </section>
+              <section className="rdq-group" data-tone="week" aria-label="简历定向优化建议">
+                <div className="rdq-group-top">
+                  <span className="rdq-group-no" aria-hidden="true">2</span>
+                  <b>简历定向优化建议</b>
+                  <span className="rdq-group-chip">{rewrites.length > 0 ? `${rewrites.length} 条` : '本次未提供'}</span>
                 </div>
-              )
-            }
-            fallback={fallback}
-          >
-            <AiDisclaimerLine>
-              以下差距与准备建议由 AI 依据你的简历与该岗位公开要求生成，仅供参考，不代表任何招聘结果。
-            </AiDisclaimerLine>
+                <p className="rdq-group-desc">照着改的是你自己的简历，本页不会自动改写或保存任何内容。</p>
+                {rewrites.length > 0 ? (
+                  <ul className="rdq-items">
+                    {rewrites.map((item, index) => (
+                      <li key={`${item.slice(0, 24)}-${index}`} className="rdq-item">
+                        <b><EvidenceBadge level="E3" />{item}</b>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rdq-muted">这次返回的结果里没有改写建议。</p>
+                )}
+              </section>
+              <section className="rdq-group" data-tone="print" aria-label="材料与打印">
+                <div className="rdq-group-top">
+                  <span className="rdq-group-no" aria-hidden="true">3</span>
+                  <b>材料与打印</b>
+                  <span className="rdq-group-chip">由你决定</span>
+                </div>
+                <p className="rdq-group-desc">需要纸质件时，先生成打印版，再在打印确认页决定份数与单双面。</p>
+                <div className="rdq-fields">
+                  <div className="rdq-field"><small>打印版文件</small><span>尚未生成</span></div>
+                  <div className="rdq-field"><small>要不要纸质件</small><span>由你在打印流程里确认</span></div>
+                </div>
+              </section>
+            </div>
+            <div className="rdq-ai">
+              <EvidenceLegend />
+              <AigcMark />
+            </div>
+          </Sec>
 
-            <GapActionCards gapPoints={result?.gapPoints ?? []} />
-            <ResumeRewriteCard items={result?.targetedSuggestions ?? []} />
-
-            {/* 本机能做什么：三件事都是真实存在的路径，不列做不到的。 */}
-            <Card className="job-fit-card job-fit-actions__do p-5">
-              <h2 className="job-fit-actions__do-title">本机现在能帮你做的</h2>
-              <div className="job-fit-actions__do-grid">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="job-fit-actions__do-btn"
-                  onClick={goResumeOptimize}
-                >
-                  <PencilLineIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-                  按建议改简历
-                </Button>
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="job-fit-actions__do-btn"
-                  onClick={() => navigate('/resume/materials')}
-                >
-                  准备求职材料
-                </Button>
-                <Button
-                  size="lg"
-                  className="job-fit-actions__do-btn"
-                  disabled={printing}
-                  aria-busy={printing}
-                  onClick={() => void handlePrint()}
-                >
-                  <PrinterIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-                  {printing ? '正在生成打印版…' : '打印这份清单'}
-                </Button>
-              </div>
-            </Card>
-
-            <EvidenceLegend className="job-fit-actions__legend" />
-            <AigcMark className="job-fit-actions__aigc" />
-          </AiTaskRegion>
+          <Sec title="准备路径" hint="确认后再进入既有流程">
+            <RouteCards items={[
+              { title: '按建议改简历', desc: '按你确认的方向修改内容，不自动改写简历。', action: '去简历优化', onClick: goResumeOptimize },
+              { title: '准备求职材料', desc: '按目标岗位补齐成果、证书这类可出示材料。', action: '去材料工坊', onClick: goMaterials },
+              { title: '生成打印版', desc: '文件生成成功后才进入打印确认，生成前不表示已打印。', action: '生成打印版', onClick: () => void handlePrint() },
+            ]} />
+            <Guardline
+              head="清单只供本人准备"
+              body="以下内容仅为帮助你修改简历与准备材料的参考，不代表任何招聘结果；本平台不提供投递功能，投递请前往岗位来源平台。"
+            />
+          </Sec>
 
           {result?.job?.sourceName && (
-            <Card className="job-fit-card job-fit-source p-5">
-              <p className="text-xs text-neutral-400">
-                岗位来源：{result.job.sourceName}
-                {result.job.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
-              </p>
-              <p className="mt-1 text-sm text-neutral-600">
-                准备好之后，请前往来源平台完成投递。
-              </p>
-              {result.job.id && (
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="job-fit-actions__source-btn mt-3"
-                  onClick={() => navigate(`/jobs/${result.job?.id ?? ''}`)}
-                >
-                  查看岗位
-                </Button>
-              )}
-            </Card>
+            <Sec title="岗位来源" hint="以来源平台公示为准">
+              <div className="qx-card jfq-consent-card">
+                <p>
+                  岗位来源：{result.job.sourceName}
+                  {result.job.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
+                </p>
+                <p>准备好之后，请前往来源平台完成投递。</p>
+                {result.job.id && (
+                  <div className="rdq-actions">
+                    <QxAction
+                      label="查看岗位"
+                      variant="teal"
+                      icon={<BriefcaseIcon size={22} aria-hidden="true" />}
+                      onClick={() => navigate(`/jobs/${result.job?.id ?? ''}`)}
+                    />
+                  </div>
+                )}
+              </div>
+            </Sec>
           )}
 
           {isAnonymous && (
-            <p className="job-fit-actions__anon-note">
-              未登录时，本次结果只保留在这台机器的当前会话里，离场即清。
-            </p>
+            <Guardline head="本机会话" body="未登录时，本次结果只保留在这台机器的当前会话里，离场即清。" />
           )}
+        </>
+      ),
+      cta: (
+        <>
+          <CtaNote>没有返回的条目会一直留空，不会先填内容凑数。</CtaNote>
+          <QxAction label="返回比对结果" variant="ghost" onClick={backToCompare} />
+          <QxAction
+            label="生成打印版"
+            variant="primary"
+            icon={<PrinterIcon size={22} aria-hidden="true" />}
+            onClick={() => void handlePrint()}
+          />
+        </>
+      ),
+    }
+  }
 
-          {error && (
-            <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-      </main>
-    </KioskPageFrame>
+  const view = buildView()
+
+  return (
+    <JobFitStage>
+      <QxPageFrame
+        title={view.title}
+        subtitle={view.subtitle}
+        status={view.pill}
+        back={taskId
+          ? { label: '返回比对结果', onBack: backToCompare }
+          : { label: '返回简历服务', onBack: goResumeHub }}
+        ctabar={view.cta}
+        navbar={(
+          <QxAppNavbar
+            onHome={() => navigate('/')}
+            onAdvisor={() => navigate('/assistant')}
+            onProfile={() => navigate('/profile')}
+          />
+        )}
+      >
+        <main
+          className="qx-scroll"
+          data-kiosk-domain="resume"
+          data-kiosk-screen="resume-job-fit-actions"
+          data-state={screen}
+          data-testid={`resume-job-fit-actions-state-${screen}`}
+          {...task.containerProps}
+        >
+          {view.body}
+        </main>
+      </QxPageFrame>
+    </JobFitStage>
   )
 }

@@ -188,9 +188,11 @@ const screens = new Map([
   ['src/pages/ai-plan/AiPlanPage.tsx', 'advisor-artifact'],
 ])
 const qxScreens = new Set([
-  // 2026-09-22 迁入青序流光（稿 46-resume-decision-workspace.html?screen=job-fit）。
-  // 同宿主的 actions / career-plan / templates 三条 route 尚未迁，仍在 KioskPageFrame。
+  // 稿 46-resume-decision-workspace.html 宿主的四条 route：job-fit 2026-09-22 迁入，
+  // career-plan / templates 2026-09-23 迁入（actions 不在 W3 20 条清单内，下方单独断言）。
   'src/pages/resume/JobFitPage.tsx',
+  'src/pages/resume/CareerPlanPage.tsx',
+  'src/pages/resume/ResumeTemplateLibraryPage.tsx',
   'src/pages/resume/ResumeReportPage.tsx',
   'src/pages/resume/ResumeGeneratePage.tsx',
   'src/pages/resume/ResumeGeneratePreviewPage.tsx',
@@ -227,7 +229,16 @@ check(/viewport\s*===\s*['"]kiosk['"]/.test(fullscreenShell), 'stage-fit is limi
 // 少挂这一层，1080×1920 的稿在别的分辨率上会直接溢出屏幕。
 includes('src/pages/resume/JobFitPage.tsx', 'KioskStageFit', 'job-fit keeps the fixed 1080x1920 stage after the Qingxu migration')
 check(!read('src/pages/resume/JobFitPage.tsx').includes('KioskFullscreenShell'), 'job-fit has left the V6 fullscreen chrome')
-includes('src/pages/resume/CareerPlanPage.tsx', 'KioskFullscreenShell', 'career plan still uses fullscreen prototype chrome')
+// 宿主 46 的另外两条整屏 route 复用 JobFitPage 导出的同一个舞台（缩放判据只有一份）；
+// /resume/templates 在 KioskRoot 之内，舞台由 KioskRoot 负责，页面不得再挂第二层缩放。
+for (const path of ['src/pages/resume/CareerPlanPage.tsx', 'src/pages/resume/JobFitActionsPage.tsx']) {
+  includes(path, '<JobFitStage>', `${path} keeps the fixed 1080x1920 host stage after the Qingxu migration`)
+  includes(path, 'QxPageFrame', `${path} uses the Qingxu page frame`)
+  check(!/KioskFullscreenShell|KioskPageFrame|job-fit-inkpaper|service-desk/.test(read(path)), `${path} has left the V6/LightFlow chrome`)
+}
+includes('src/pages/resume/JobFitActionsPage.tsx', 'data-kiosk-screen="resume-job-fit-actions"', 'resume-job-fit-actions exposes its stable landmark')
+includes('src/layouts/KioskRoot.tsx', "'/resume/templates'", 'templates route is registered as Qingxu-migrated')
+check(!read('src/pages/resume/ResumeTemplateLibraryPage.tsx').includes('KioskStageFit'), 'templates does not scale the stage a second time inside KioskRoot')
 for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerPlanPage.tsx']) {
   check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
 }

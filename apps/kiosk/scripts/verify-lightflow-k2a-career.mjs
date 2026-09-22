@@ -23,20 +23,23 @@ function readRequired(path) {
 const page = readRequired('src/pages/resume/CareerPlanPage.tsx')
 const materials = readRequired('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')
 const section = readRequired('src/pages/resume/components/career-plan/CareerPlanSection.tsx')
-const css = readRequired('src/pages/resume/careerPlan-lightflow.css')
+// 2026-09-23 迁入青序流光（稿 46-resume-decision-workspace.html?screen=career-plan）。
+// 视觉锚点从 LightFlow 根作用域改钉宿主 46 的青序壳；下面的业务 / AI 接线 / 打印合同一条未删。
+const css = readRequired('src/pages/resume/resume-decision-qx.css')
+const kit = readRequired('src/pages/resume/jobFit/jobFitQxKit.tsx')
 const careerUi = `${page}\n${materials}\n${section}`
 
-check(page.includes("import './careerPlan-lightflow.css'"), '职业规划页必须导入 LightFlow 局部样式')
-check(!page.includes('careerPlan-inkpaper.css'), '职业规划页不得导入 InkPaper 样式')
-check(
-  (page.match(/className="service-desk career-plan-lightflow/g) ?? []).length >= 4,
-  '职业规划的前置、加载、引导和结果状态必须都有 LightFlow 根作用域',
-)
-check(page.includes('data-visual-theme="service-desk"'), '职业规划根节点必须声明 service-desk 视觉主题')
-check(page.includes('data-ux-density="touch"'), '职业规划根节点必须声明 touch 密度')
-check(page.includes('role="status"'), '职业规划加载或生成中必须提供状态播报')
+check(page.includes("import './job-fit-qx.css'"), '职业规划页必须导入宿主 46 的共用青序样式')
+check(page.includes("import './resume-decision-qx.css'"), '职业规划页必须导入宿主 46 的四栏样式')
+check(!/careerPlan-(?:inkpaper|lightflow)\.css/.test(page), '职业规划页不得再导入 InkPaper / LightFlow 样式')
+check(!/KioskFullscreenShell|KioskPageFrame|service-desk/.test(page), '职业规划页不再混入旧壳与旧色系')
+check(page.includes('<JobFitStage>'), '职业规划页挂宿主 46 的共用舞台（1080×1920 定高 + 手机/横屏流式）')
+check((page.match(/<QxPageFrame/g) ?? []).length === 1, '全部状态共用一层 QxPageFrame，不按屏各挂一个壳')
+check(page.includes('data-kiosk-screen="resume-career-plan"'), '职业规划保留稳定 landmark')
+check(page.includes('data-state={screen}'), '职业规划把当前状态铺到 DOM 上供断言')
+check(page.includes('<Waiting') && kit.includes('role="status" aria-live="polite"'), '职业规划读取与生成中必须提供状态播报（Waiting 自带 status + polite）')
 check(page.includes('role="alert"'), '职业规划错误必须提供告警语义')
-check(page.includes('aria-live="polite"'), '职业规划异步状态必须提供温和播报')
+check(page.includes('className="qx-scroll"') && page.includes('ctabar={view.cta}'), '内容区独立滚动，出口按钮留在滚动区之外的操作条上')
 
 for (const token of [
   'getLatestCareerPlan(taskId, { token: getToken(), accessToken })',
@@ -88,10 +91,11 @@ check(
 )
 
 check(page.includes('<CareerPlanExistingMaterials'), '求职方案结果必须挂上已有材料栏，不得新开路由')
-check(page.includes('title="求职方案"'), '页头必须把这一页收口为求职方案')
-check(page.includes('title="目标与方向"'), '四栏必须包含目标与方向')
-check(page.includes('title="尚需准备"'), '四栏必须包含尚需准备')
-check(page.includes('title="执行计划"'), '四栏必须包含执行计划')
+check(page.includes("title: '求职方案'"), '页头必须把这一页收口为求职方案')
+check(page.includes('<CareerPlanColumns plan={plan} />'), '结果屏必须挂上三栏正文（呈现件在 CareerPlanSection.tsx）')
+check(section.includes('title="目标与方向"'), '四栏必须包含目标与方向')
+check(section.includes('title="尚需准备"'), '四栏必须包含尚需准备')
+check(section.includes('title="执行计划"'), '四栏必须包含执行计划')
 check(page.includes('依据：本人简历'), 'basedOn 依据文案必须保留，不得与已有材料混写')
 check(materials.includes('getMyResumes('), '已有材料必须复用 getMyResumes，不得新写 fetch')
 check(materials.includes('getMyDocuments('), '已有材料必须复用 getMyDocuments，不得新写 fetch')
@@ -117,14 +121,14 @@ check((page.match(/aria-disabled=/g) ?? []).length >= 2, '打印与生成两个�
 
 // 6) 非 AI 能力在 AI 挂掉时保持可用：打印只受打印自身状态影响。
 check(
-  /className="career-plan-lightflow__print-action" aria-disabled=\{printing\}/.test(page),
+  /data-career-plan-print="true" aria-disabled=\{printing\}/.test(page),
   '打印按钮不得被 AI 可用性门控（出纸不依赖 AI）',
 )
 
 // 7) 证据分级与 AIGC 标识（矩阵实测 P22 连「仅供参考」都没有）。
 check((page.match(/<AigcMark/g) ?? []).length === 1, 'AIGC 可见标识必须每页恰好一次')
-check(page.includes('EvidenceBadge level="E3"'), 'AI 结论必须标 E3')
-check(page.includes('EvidenceBadge level="E1"'), '简历原文依据必须标 E1')
+check(careerUi.includes('EvidenceBadge level="E3"'), 'AI 结论必须标 E3')
+check(careerUi.includes('EvidenceBadge level="E1"'), '简历原文依据必须标 E1')
 check(page.includes('<EvidenceLegend'), '带 AI 结论的页面必须给三档证据图例')
 check(page.includes('<AiConclusion'), '规划结论必须走统一 E3 结论组件')
 
@@ -132,32 +136,32 @@ check(page.includes('<AiConclusion'), '规划结论必须走统一 E3 结论组�
 check(page.includes('不预测薪资'), '必须保留「不预测前景 / 不预测薪资」边界声明')
 check(page.includes('由你自己决定'), '必须保留「是否转方向、是否考证由你自己决定」边界声明')
 check(
-  page.includes('这三条是通用建议，不是针对你这份简历的'),
+  section.includes('这三条是通用建议，不是针对你这份简历的'),
   'ai-down 自查三条必须如实说明它不是针对本人简历的结论',
 )
+check(/aiOutage \? 'ai-down'/.test(page) && page.includes('<CareerPlanSelfCheck />'), 'ai-down 自查三条只在真的 ai-down 屏出现')
 
-check(css.length > 0, '职业规划 LightFlow CSS 不得为空')
-check(lineCount(css) < 300, `职业规划 LightFlow CSS 必须少于 300 行（当前 ${lineCount(css)}）`)
-check(/\.career-plan-lightflow(?:[\s.{:#\[]|$)/.test(css), 'CSS 必须以 career-plan-lightflow 根作用域限定')
-check(css.includes('var(--sd-color-canvas)'), 'CSS 必须复用冰蓝画布 token')
-check(css.includes('var(--sd-color-surface)'), 'CSS 必须复用白色表面 token')
-check(css.includes('var(--sd-color-text-strong)'), 'CSS 必须复用深海军蓝文本 token')
-check(css.includes('var(--sd-color-primary)'), 'CSS 必须复用主蓝操作 token')
-check(css.includes('var(--sd-control-min, 48px)'), 'CSS 必须绑定 48px 普通触控目标')
-check(css.includes('var(--sd-primary-control-min, 56px)'), 'CSS 必须绑定 56px 主操作触控目标')
-check(/@media[^{}]*1080px[^{}]*1920px/.test(css), 'CSS 必须覆盖 1080x1920')
-check(/@media[^{}]*390px[^{}]*844px/.test(css), 'CSS 必须覆盖 390x844')
-check(/@media[^{}]*390px[^{}]*700px/.test(css), 'CSS 必须覆盖 390x700')
-check(/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(css), 'CSS 必须支持 prefers-reduced-motion')
-check(!/(?:#f7f3e9|#fffdf8|#1e4c4d|Songti|SimSun|paper-texture)/i.test(css), 'CSS 不得混入 InkPaper 颜色、衬线或纸纹')
-check(/\.career-plan-lightflow--guide,[\s\S]*?\.career-plan-lightflow--result\s*\{[\s\S]*?block-size:\s*100dvh[\s\S]*?overflow:\s*hidden/.test(css), '结果和引导页必须锁定视口，使内容区可独立滚动')
-check(/\.career-plan-lightflow__content\s*\{[\s\S]*?overflow-y:\s*auto[\s\S]*?padding-bottom:\s*48px/.test(css), '内容区必须可滚动且为末项预留底部空间')
-check(/\.career-plan-lightflow__action-bar\s*\{[\s\S]*?position:\s*sticky[\s\S]*?bottom:\s*0/.test(css), '底部生成或打印操作栏必须 sticky 且始终可达')
-check(/@keyframes career-plan-lightflow-sweep/.test(css), '生成中进度动效必须定义在本页作用域内')
-check(/\[aria-disabled='true'\]/.test(css), 'aria-disabled 置灰必须自己画禁用外观（原生 disabled 的样式不会生效）')
+check(css.length > 0, '宿主 46 四栏样式不得为空')
+check(lineCount(css) < 300, `宿主 46 四栏样式必须少于 300 行（当前 ${lineCount(css)}）`)
+{
+  // 自作用域：每条规则的选择器都必须以 .rdq- 开头，否则会外溢到 51 页共用的青序壳层。
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const selectors = [...bare.matchAll(/^\s*([^@\s{}][^{}]*)\{/gm)]
+    .flatMap((match) => match[1].split(',').map((selector) => selector.trim()))
+    .filter((selector) => selector && !/^(?:to|from|\d+%)$/.test(selector))
+  const escaped = selectors.filter((selector) => !selector.startsWith('.rdq-'))
+  check(escaped.length === 0, `宿主 46 四栏样式全部自作用域（外溢：${escaped.join(' / ') || '无'}）`)
+}
+check(!/#[0-9a-f]{3,8}\b/i.test(css), '宿主 46 四栏样式不写死色值，一律取 --qx-* 令牌')
+check(css.includes('var(--qx-'), '宿主 46 四栏样式消费青序令牌')
+check(!/(^|\n)\s*(?:html|body)\s*\{/.test(css), '宿主 46 四栏样式不污染全局页面')
+check(css.includes('min-height: var(--qx-tap-min)'), '新增可点控件绑定 48px 触控下限令牌')
+check(/@media\s*\(max-width:\s*760px\)/.test(css), '宿主 46 四栏样式覆盖手机真实视口')
+check(/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(css), '宿主 46 四栏样式支持 prefers-reduced-motion')
+check(/\.rdq-aria-btn\[aria-disabled='true'\]/.test(css), 'aria-disabled 置灰必须自己画禁用外观（原生 disabled 的样式不会生效）')
 check(
-  /\.career-plan-lightflow \.kiosk-ev\s*\{[^}]*display:\s*inline-flex/.test(css),
-  '证据徽章不得被本页的 span 块级规则压成块级，否则 E1/E3 标记会撑断卡片排版',
+  !/\.rdq-(?:item|direction|col)\s+span\s*\{/.test(css),
+  '证据徽章所在容器不得有后代 span 规则，否则 E1/E3 标记会被压成块级撑断排版',
 )
 
 if (failures.length > 0) {

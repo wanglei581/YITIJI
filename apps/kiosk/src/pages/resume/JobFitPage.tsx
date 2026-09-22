@@ -74,8 +74,11 @@ function useJobFitStage(): { enabled: boolean; layout: 'kiosk' | 'phone' | 'desk
  * 本页三个视图（静态屏 / 结果 / 选岗）共用的舞台外壳。
  * 保留 KioskStageFit 的 host/scaler/stage DOM，只切 enabled —— 与 KioskRoot 同样的做法，
  * 避免旋转屏幕时整个布局根被替换。
+ *
+ * 导出给宿主 46 的另外两条整屏 route（/resume/job-fit/actions、/resume/career-plan）：
+ * 它们同样在 KioskRoot 之外，缩放判据必须是同一份，不能各抄一遍。
  */
-function JobFitStage({ children }: { children: ReactNode }) {
+export function JobFitStage({ children }: { children: ReactNode }) {
   const { enabled, layout } = useJobFitStage()
   return (
     <KioskStageFit enabled={enabled}>
