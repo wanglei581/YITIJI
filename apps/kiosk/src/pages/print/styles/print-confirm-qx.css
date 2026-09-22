@@ -486,3 +486,13 @@
 @media (prefers-reduced-motion: reduce) {
   .pcf-breathe { animation: none !important; }
 }
+
+/* 窄屏（手机兼容，断点同 print-desk）：底部操作条换行 —— 说明独占一行、两个按钮平分一行。
+ * 不换行时说明与两个按钮挤成一字一行，操作条吃掉大半屏，价格变更提示与新金额被挡在后面。
+ * 1080 宽一体机不进这条规则。 */
+@media (max-width: 760px) {
+  .qx-stage:has([data-w2-page='print-confirm']) .qx-ctabar { flex-wrap: wrap; gap: 10px 12px; padding-block: 12px; }
+  .qx-stage:has([data-w2-page='print-confirm']) .qx-ctabar .why { flex: 1 1 100%; font-size: 15px; }
+  .qx-stage:has([data-w2-page='print-confirm']) .qx-ctabar .qx-btn { flex: 1 1 0; min-width: 0; padding-inline: 14px; font-size: 20px; white-space: normal; }
+  .qx-stage:has([data-w2-page='print-confirm']) .qx-ctabar .qx-btn[data-variant='primary'] { flex-grow: 1.7; }
+}

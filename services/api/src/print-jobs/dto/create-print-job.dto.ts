@@ -7,6 +7,7 @@ import {
   Max,
   IsIn,
   ValidateNested,
+  ValidateIf,
   Matches,
   MaxLength,
 } from 'class-validator'
@@ -93,4 +94,18 @@ export class CreatePrintJobDto {
   @ValidateNested()
   @Type(() => PrintJobParamsDto)
   params?: PrintJobParamsDto
+
+  /**
+   * 用户在确认页看到并确认的应付金额（分）。**只作一致性断言，绝不作为计价 / 扣款来源**：
+   * 服务端照旧按最终打印文件、服务端识别页数、份数 / 色彩与当前 active 价目重算，
+   * 与重算结果不一致 → 409 PRICE_CHANGED，不建单（见 PrintJobsService.create）。
+   *
+   * 只有「字段缺省」算旧客户端（兼容，按服务端计价建单）；显式传 null / 字符串 / 负数 / 小数
+   * 用 ValidateIf 而不是 IsOptional 拦成 400 —— IsOptional 会把 null 当缺省放过去。
+   */
+  @ValidateIf((dto: CreatePrintJobDto) => dto.quotedAmountCents !== undefined)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  quotedAmountCents?: number
 }

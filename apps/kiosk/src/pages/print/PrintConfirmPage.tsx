@@ -19,7 +19,12 @@ import {
   resolvePrintBenefitState,
 } from '../../services/api/benefits'
 import { fetchPrintPriceConfig, unitCentsFor } from '../../services/print/priceConfigApi'
-import { createPrintJob, quotePrintOrder } from '../../services/print/printJobsApi'
+import {
+  createPrintJob,
+  PrintPriceChangedError,
+  quotePrintOrder,
+  type PrintPriceChangedQuote,
+} from '../../services/print/printJobsApi'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
@@ -91,6 +96,23 @@ type PriceCfgView =
   | { status: 'ready'; unitCents: number | null }
   | { status: 'error' }
 
+/** 报价接口与 409 PRICE_CHANGED 带回的现价共用同一换算，两处展示口径一致。 */
+function readyQuoteView(q: PrintPriceChangedQuote, copies: number): QuoteView {
+  const line = q.priceLines[0]
+  return {
+    status: 'ready',
+    amountCents: q.amountCents,
+    billablePages: q.billablePages,
+    unitCents: line?.unitCents ?? 0,
+    quantity: line?.quantity ?? q.billablePages * copies,
+  }
+}
+
+/** 报价键：最终出纸文件 + 全部打印参数。 */
+function quoteKeyOf(fileUrl: string | null | undefined, params: PrintJobParams): string {
+  return `${fileUrl ?? ''}|${JSON.stringify(params)}`
+}
+
 const DEFAULT_PARAMS: PrintJobParams = {
   copies: 1,
   colorMode: 'black_white',
@@ -159,40 +181,43 @@ export function PrintConfirmPage() {
     (file.mimeType === undefined || file.mimeType === 'application/pdf')
 
   useEffect(() => subscribeTerminalSession(setTerminalSession), [])
-  const [quote, setQuote] = useState<QuoteView>(
-    API_MODE === 'http' ? { status: 'loading' } : { status: 'demo' },
+  // 自我探索合并版只生成一次；二次确认复用同一份材料，不重复生成。
+  const [mergedMaterial, setMergedMaterial] = useState<{ printFileUrl: string; name: string } | null>(null)
+  const mergedFileUrl = appendEligible ? mergedMaterial?.printFileUrl ?? null : null
+  // 报价只对「最终出纸文件 + 这组参数」有效：键一变，旧报价与迟到的响应都不算数。
+  const quoteKey = quoteKeyOf(mergedFileUrl ?? file.fileUrl, params)
+  const [quoteState, setQuoteState] = useState<{ key: string; view: QuoteView } | null>(null)
+  const quote = useMemo<QuoteView>(
+    () => (API_MODE !== 'http' ? { status: 'demo' } : quoteState?.key === quoteKey ? quoteState.view : { status: 'loading' }),
+    [quoteState, quoteKey],
   )
+  const [priceNotice, setPriceNotice] = useState<{ key: string; text: string } | null>(null)
+  const activeNotice = priceNotice?.key === quoteKey ? priceNotice.text : null
+  const inFlightRef = useRef(false)
   const hasFileContext = Boolean(state?.file ?? restoredSession?.file)
   const benefitCardEnabled = API_MODE === 'http' && hasFileContext && !queryInvalid && !paramsWereRestricted
   const [benefits, setBenefits] = useState<BenefitsView>({ status: 'loading' })
   const [priceCfg, setPriceCfg] = useState<PriceCfgView>({ status: 'loading' })
 
   useEffect(() => {
-    if (API_MODE !== 'http') {
-      setQuote({ status: 'demo' })
-      return
-    }
+    if (API_MODE !== 'http') return
     if (paramsWereRestricted) {
-      setQuote({ status: 'unavailable', reason: '参数已按本机已验证能力收口' })
+      setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason: '参数已按本机已验证能力收口' } })
       return
     }
     if (!file.fileUrl) {
-      setQuote({ status: 'unavailable', reason: '打印文件尚未就绪，无法报价' })
+      setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason: '打印文件尚未就绪，无法报价' } })
       return
     }
     let cancelled = false
-    setQuote({ status: 'loading' })
-    void quotePrintOrder({ fileUrl: file.fileUrl, params, terminalId: getTerminalId() || undefined })
+    setQuoteState({ key: quoteKey, view: { status: 'loading' } })
+    // 合并版才是最终出纸文件：已生成时报的是合并后那一份的价。
+    const request = mergedFileUrl
+      ? quotePrintOrder({ fileUrl: mergedFileUrl, params, terminalId: getTerminalId() || undefined })
+      : quotePrintOrder({ fileUrl: file.fileUrl, params, terminalId: getTerminalId() || undefined })
+    void request
       .then((q) => {
-        if (cancelled) return
-        const line = q.priceLines[0]
-        setQuote({
-          status: 'ready',
-          amountCents: q.amountCents,
-          billablePages: q.billablePages,
-          unitCents: line?.unitCents ?? 0,
-          quantity: line?.quantity ?? q.billablePages * params.copies,
-        })
+        if (!cancelled) setQuoteState({ key: quoteKey, view: readyQuoteView(q, params.copies) })
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -200,26 +225,13 @@ export function PrintConfirmPage() {
           errorCodeOf(err) === 'PRINTER_UNAVAILABLE'
             ? userMessageOf(err, '本机打印机当前不可用，请联系现场工作人员')
             : '页数待服务端确认，以最终计费为准'
-        setQuote({ status: 'unavailable', reason })
+        setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason } })
       })
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional field-level deps
-  }, [
-    file.fileUrl,
-    params.copies,
-    params.colorMode,
-    params.pageRange,
-    params.pagesPerSheet,
-    params.duplex,
-    params.orientation,
-    params.quality,
-    params.scale,
-    params.paperSize,
-    paramsWereRestricted,
-    quoteNonce,
-  ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- quoteKey 已编码最终文件与全部打印参数
+  }, [quoteKey, paramsWereRestricted, quoteNonce])
 
   useEffect(() => {
     if (!benefitCardEnabled) return
@@ -235,7 +247,8 @@ export function PrintConfirmPage() {
     return () => {
       cancelled = true
     }
-  }, [benefitCardEnabled, params.colorMode])
+    // 价格变更提示一出现就重读公示价：否则权益卡拿开页时的旧价比新报价，会误报「本屏报价已不是现价」。
+  }, [benefitCardEnabled, params.colorMode, priceNotice])
 
   useEffect(() => {
     if (!benefitCardEnabled) return
@@ -351,21 +364,38 @@ export function PrintConfirmPage() {
         setSubmitError('当前文件不支持「附加自我探索」合并，请先在简历页生成可合并的简历 PDF 后再试。')
         return
       }
+      // 同一帧里的连点在按钮变灰之前就会进来，只能靠同步 ref 挡住第二次建单。
+      if (inFlightRef.current) return
+      inFlightRef.current = true
       setSubmitting(true)
       setSubmitError(null)
+      let leaving = false
       try {
         let printFileUrl = file.fileUrl
         let printFileName = file.name
         let printFileMd5: string | undefined = file.fileMd5
         if (appendEligible && selfAssessmentSnapshot?.taskId && file.fileId) {
-          const authToken = getToken()
-          const merged = await appendSelfAssessmentToResume(
-            selfAssessmentSnapshot.taskId,
-            file.fileId,
-            { token: authToken, accessToken: selfAssessmentSnapshot.accessToken ?? null },
-          )
-          printFileUrl = merged.printFileUrl ?? ''
-          printFileName = merged.filename || `${file.name.replace(/\.pdf$/i, '')}-self-assessment.pdf`
+          if (!mergedMaterial) {
+            const merged = await appendSelfAssessmentToResume(
+              selfAssessmentSnapshot.taskId,
+              file.fileId,
+              { token: getToken(), accessToken: selfAssessmentSnapshot.accessToken ?? null },
+            )
+            if (!merged.printFileUrl) {
+              setSubmitError('合并版文件还没有就绪，本次没有建单。请稍后再试。')
+              return
+            }
+            // 合并版页数与原文件不同：先按合并后的最终文件重新报价，停在这里等用户再确认一次。
+            const next = { printFileUrl: merged.printFileUrl, name: merged.filename || `${file.name.replace(/\.pdf$/i, '')}-self-assessment.pdf` }
+            setMergedMaterial(next)
+            setPriceNotice({
+              key: quoteKeyOf(next.printFileUrl, params),
+              text: '已生成合并版（简历+自我探索），费用已按合并后的最终文件重新报价。本次还没有建单，请核对新金额后再点确认。',
+            })
+            return
+          }
+          printFileUrl = mergedMaterial.printFileUrl
+          printFileName = mergedMaterial.name
           printFileMd5 = undefined
         }
         const created = await createPrintJob({
@@ -373,8 +403,10 @@ export function PrintConfirmPage() {
           fileMd5:  printFileMd5,
           fileName: printFileName,
           params,
+          quotedAmountCents: quote.amountCents,
           token:    getToken(),
         })
+        leaving = true
         clearPrintMaterialSession()
         const nextState = {
           ...(isContractReport ? {} : location.state),
@@ -395,8 +427,25 @@ export function PrintConfirmPage() {
           navigate('/print/progress', { state: nextState })
         }
       } catch (err) {
-        setSubmitError(userMessageOf(err, '提交失败，请稍后重试或联系现场工作人员'))
-        setSubmitting(false)
+        if (err instanceof PrintPriceChangedError) {
+          // 不自动重试建单：把服务端按最终文件重算的现价换上屏，等用户再点一次确认。
+          const current = err.currentQuote
+          if (current) setQuoteState({ key: quoteKey, view: readyQuoteView(current, params.copies) })
+          else setQuoteNonce((n) => n + 1)
+          setPriceNotice({
+            key: quoteKey,
+            text: current
+              ? `价格已更新：你确认的是 ${formatCents(quote.amountCents)}，现在应付 ${formatCents(current.amountCents)}。本次没有建单，也没有扣款；请核对新金额后再点确认。`
+              : '价格已更新，本次没有建单，也没有扣款。正在重新获取报价，请核对新金额后再确认。',
+          })
+        } else {
+          setSubmitError(userMessageOf(err, '提交失败，请稍后重试或联系现场工作人员'))
+        }
+      } finally {
+        if (!leaving) {
+          inFlightRef.current = false
+          setSubmitting(false)
+        }
       }
       return
     }
@@ -425,6 +474,11 @@ export function PrintConfirmPage() {
     ? { tone: 'unknown' as const, label: '状态未知' }
     : pill
 
+  // 金额变了（服务端 409 或生成了合并版）：按钮写明新金额，用户再点的就是这一笔。
+  const reconfirmLabel = activeNotice && quote.status === 'ready'
+    ? `按新金额 ${formatCents(quote.amountCents)} 确认${appendEligible ? '（合并版）' : ''}`
+    : null
+
   const primaryLabel = terminalSession === 'checking'
     ? '安全校验中…'
     : terminalSession === 'failed'
@@ -435,7 +489,9 @@ export function PrintConfirmPage() {
           ? '设备检测中…'
           : !printerReady
             ? '打印机不可用'
-            : isContractReport
+            : reconfirmLabel
+              ? reconfirmLabel
+              : isContractReport
               ? '按以上设置打印风险提示报告'
               : appendEligible
                 ? '打印合并版（简历+自我探索）'
@@ -443,11 +499,11 @@ export function PrintConfirmPage() {
                   ? '确认并建单'
                   : '确认并去付款'
 
-  const primaryAccessible = isContractReport
+  const primaryAccessible = reconfirmLabel ?? (isContractReport
     ? '按以上设置打印风险提示报告'
     : appendEligible
       ? '打印合并版（简历+自我探索）'
-      : '确认并去付款 · 按以上设置打印原文件'
+      : '确认并去付款 · 按以上设置打印原文件')
 
   const ctabar = (() => {
     if (screen === 'missing-context') {
@@ -531,7 +587,7 @@ export function PrintConfirmPage() {
             onClick={() => void handleConfirm()}
           >
             {submitting ? <LoaderIcon size={24} aria-hidden="true" /> : <PrinterIcon size={24} aria-hidden="true" />}
-            按实际原价继续
+            {reconfirmLabel ?? '按实际原价继续'}
           </button>
         </>
       )
@@ -539,7 +595,9 @@ export function PrintConfirmPage() {
     return (
       <>
         <p className="why">
-          {screen === 'zero-amount'
+          {activeNotice
+            ? '金额已按最终文件重新计算：本次没有建单，也没有扣款。核对新金额后再点确认。'
+            : screen === 'zero-amount'
             ? '零元单确认后仍会先建单，再进入打印。不存在不建单直接出纸。'
             : '确认后创建订单并进入付款。金额以服务端返回为准。'}
         </p>
@@ -585,7 +643,7 @@ export function PrintConfirmPage() {
               type="checkbox"
               checked={appendSelfAssessment}
               onChange={(e) => setAppendSelfAssessment(e.target.checked)}
-              disabled={!file.fileId || file.mimeType === 'image/jpeg' || file.mimeType === 'image/png'}
+              disabled={submitting || !file.fileId || file.mimeType === 'image/jpeg' || file.mimeType === 'image/png'}
             />
             <span>附加自我探索 · 倾向参考摘要</span>
           </label>
@@ -653,7 +711,7 @@ export function PrintConfirmPage() {
         terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, '终端安全校验失败，请联系现场工作人员')}
         paramsWereRestricted={paramsWereRestricted}
         selfAssessment={selfAssessment}
-        submitError={submitError}
+        submitError={submitError ?? activeNotice}
         onLogin={() => navigate(loginPathForCurrentLocation())}
       />
     </QxPageFrame>

@@ -12,6 +12,25 @@
 `ScanResultPage.tsx:243` `replace: true`→`false`：三变体全红于后退第 ② 步（期望 `/print-scan`、实得 `/scan`），
 恢复后哈希一致、15/15 绿。远端 CI、合并、生产与真机均未验证。
 
+2026-09-23 **打印改价二次确认：本地源码层完成，未推送。** 分支 `codex/print-price-confirmation-20260923`，
+基线 `c6c1df925`，Claude `claude-opus-5-5` xhigh，session `89f2c64d-3aa6-4741-aa93-f6ce2b4abe28`。
+`POST /print/jobs` 新增可选 `quotedAmountCents`，只作一致性断言；金额仍按最终文件、服务端页数、份数/色彩与当前价目重算。
+不一致即 409 `PRICE_CHANGED`，在建 Order/PrintTask/支付会话之前拒绝；details 以 `key=value` 串带回现价
+（全局过滤器只透传字符串 details）。缺省视为旧客户端照旧建单；null/负数/小数/字符串/超上限为 400。
+确认页建单带屏上报价；409 后换上服务端现价、按钮写明新金额，不自动重试；同步在途锁防连点；
+报价按「最终文件+参数」键控，迟到响应作废；自我探索合并版只生成一次，先按合并文件报价并停下待确认。
+409 后重读公示价，避免权益卡误报「不是现价」；≤760px 底部操作条换行。无 schema/迁移/依赖/新价目体系，7 个文件无新增。
+证据（`~/.cache/price-confirm-20260923/`，合成 env、隔离 SQLite、`DOTENV_CONFIG_PATH=/dev/null`）：
+`verify-print-jobs` 53 PASS 退出 0，新增 12 条覆盖 0→付费/涨/降/伪造低价 409 零副作用、二次确认、历史冻结、旧客户端、免费单，
+及进程内 Nest（真实 controller + ValidationPipe + HttpExceptionFilter）的 409/400/201。API tsc、`verify-payment-flow` 217、
+order/pricing/cashier-ui/color-duplex/parameter-capability/document-conversion/wave3-aftercare 均退出 0。
+浏览器 `test:browser:truth` 124、`test:browser:w2` 95、route-sweep 110 通过；kiosk typecheck/eslint 与 16 条相关静态门禁退出 0。
+反向变异（删服务端校验、`ValidateIf`→`IsOptional`、删在途锁、409 后自动重点、删公示价重读）定向用例均退出 1，
+sha256 逐字节恢复后退出 0。1080×1920 与 390×844 截图已人工核对：提示、新金额与再确认按钮可见；390 下页头挤压为既有问题。
+限制：`docs/graph` 因验证脚本新增引用过期（`graph:check` 退出 1，受文件预算未重生成）；金额卡来源文案仍写 `POST /orders/quote`；
+合并版上的 409 与参数变化迟到响应无专门浏览器用例；Word 转换在报价前执行，409 时可能留下派生 PDF。
+未 push/PR/CI，未碰生产、真实支付或硬件；`CI / DEVICE / PRODUCTION / PAYMENT / COMMERCIAL: NO-GO`。
+
 2026-09-23 **小程序双批修复已整合并复验。** 来源 `9ec68f58c` / `c0bc70b50`，
 合流 `043613e87` / `9d7170d32`；合流后完整 `pnpm --filter @ai-job-print/miniapp verify:static`
 退出 0，含会话时序与变异 57/57。下方来源记录中的“未合入”仅描述历史状态。

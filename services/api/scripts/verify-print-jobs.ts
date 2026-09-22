@@ -8,12 +8,18 @@
  *   4. 状态回传：claimed → printing → completed（含 completedAt）。
  *   5. 终态幂等：只允许重复回传相同终态；不同终态或回退到 printing 必须拒绝且不重写 DB。
  *   6. 状态查询：getStatus 反映终态；不存在任务 → 404 PRINT_TASK_NOT_FOUND。
+ *   9. 动态价格二次确认：quotedAmountCents 与服务端重算不一致 → 409 PRICE_CHANGED 且零建单副作用。
  *
- * service 直调真库（prisma），不起 HTTP server——确定性、CI 友好，与现有 verify 一致。
+ * 1–8 与 9 的 service 段直调真库（prisma），不起 HTTP server——确定性、CI 友好。
+ * 9 的 HTTP 段另起进程内 Nest：真实 PrintJobsController + main.ts 同款 ValidationPipe
+ * + 真实 HttpExceptionFilter，只替换终端会话 / Redis / JWT 等与计价无关的依赖。
  * 运行：pnpm --filter ./services/api verify:print-jobs
  */
 import 'dotenv/config'
 import { createHash, randomBytes } from 'crypto'
+import { BadRequestException, Module, UnauthorizedException, ValidationPipe, type ValidationError } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
+import { JwtService } from '@nestjs/jwt'
 
 // terminals.service 在模块加载期 requireEnv 这两项；signing 在调用期读 FILE_SIGNING_SECRET。
 // 测试兜底（||= 不覆盖外部已设值；CI 已注入这些测试值）。须在动态 import terminals.service 之前设好。
@@ -59,6 +65,74 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
     if (c === code) pass(label)
     else fail(`${label} — 期望 ${code}，实际: ${c ?? (e as Error).message}`)
   }
+}
+
+/** 与 main.ts 的 flattenValidationErrors 同口径（main.ts 有启动副作用，不能直接 import）。 */
+function flattenValidation(errors: ValidationError[], parent = ''): string[] {
+  const out: string[] = []
+  for (const error of errors) {
+    const label = parent ? `${parent}.${error.property}` : error.property
+    if (error.constraints) out.push(...Object.values(error.constraints).map((m) => `${label}: ${m}`))
+    if (error.children?.length) out.push(...flattenValidation(error.children, label))
+  }
+  return out
+}
+
+interface HttpResult { status: number; json: { error?: { code?: string; details?: string[] }; [key: string]: unknown } }
+
+/**
+ * 进程内 Nest：真实 PrintJobsController / CreatePrintJobDto / ValidationPipe / HttpExceptionFilter。
+ * 控制器依赖在 env 兜底之后再动态加载（同 terminals.service 的处理）。
+ */
+async function startPrintJobsHttp(printJobs: PrintJobsService, prisma: PrismaService, terminalId: string, sessionToken: string) {
+  const { PrintJobsController } = await import('../src/print-jobs/print-jobs.controller')
+  const { PickupOrderService } = await import('../src/print-jobs/pickup-order.service')
+  const { TerminalSessionService } = await import('../src/terminals/terminal-session.service')
+  const { RedisService } = await import('../src/common/redis/redis.service')
+  const { HttpExceptionFilter } = await import('../src/common/filters/http-exception.filter')
+  class PrintJobsHttpModule {}
+  Module({
+    controllers: [PrintJobsController],
+    providers: [
+      { provide: PrintJobsService, useValue: printJobs },
+      { provide: PrismaService, useValue: prisma },
+      { provide: JwtService, useValue: new JwtService({ secret: 'verify-print-jobs-http-jwt-unused-0123456789' }) },
+      { provide: RedisService, useValue: {} },
+      { provide: PickupOrderService, useValue: {} },
+      {
+        provide: TerminalSessionService,
+        useValue: {
+          validate: async (id?: string, token?: string) => {
+            if (id !== terminalId || token !== sessionToken) throw new UnauthorizedException()
+          },
+        },
+      },
+    ],
+  })(PrintJobsHttpModule)
+  const app = await NestFactory.create(PrintJobsHttpModule, { logger: false })
+  app.setGlobalPrefix('api/v1')
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    exceptionFactory: (errors) => {
+      const details = flattenValidation(errors)
+      return new BadRequestException({ error: { code: 'VALIDATION_FAILED', message: details[0] ?? '请求参数校验失败', details } })
+    },
+  }))
+  app.useGlobalFilters(new HttpExceptionFilter())
+  await app.listen(0, '127.0.0.1')
+  const address = app.getHttpServer().address()
+  if (!address || typeof address === 'string') fail('9-http 无法取得监听地址')
+  const post = async (body: unknown): Promise<HttpResult> => {
+    const res = await fetch(`http://127.0.0.1:${address.port}/api/v1/print/jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken },
+      body: JSON.stringify(body),
+    })
+    return { status: res.status, json: (await res.json().catch(() => ({}))) as HttpResult['json'] }
+  }
+  return { post, close: () => app.close() }
 }
 
 async function main() {
@@ -657,6 +731,135 @@ async function main() {
       'PRINT_RETRY_NOT_PAID',
       '8h. 未支付失败单不能重新提交',
     )
+
+    // ── 9. 动态价格二次确认 ────────────────────────────────────────────
+    // 夹具文件 1 页 × 2 份黑白 → 应付 = 单价 × 2。quotedAmountCents 只作一致性断言：
+    // 不一致必须 409 PRICE_CHANGED、带回当前报价，且 Order / PrintTask / 支付尝试 / 建单审计全部零新增。
+    const priceParams = {
+      copies: 2, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4',
+      orientation: 'auto', quality: 'standard', scale: 'fit', pagesPerSheet: 1,
+    } as const
+    const priceDto = (extra: Record<string, unknown> = {}) => ({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileMd5: 'sha256-vpj-price',
+      fileName: '价格确认.pdf',
+      params: { ...priceParams },
+      ...extra,
+    })
+    const setBwUnit = (unitCents: number) =>
+      prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents } })
+    const sideEffects = async () => JSON.stringify({
+      orders: await prisma.order.count({ where: { terminalId } }),
+      tasks: await prisma.printTask.count({ where: { terminalId } }),
+      attempts: await prisma.paymentAttempt.count({ where: { order: { terminalId } } }),
+      createAudits: await prisma.auditLog.count({ where: { action: 'print_job.create' } }),
+    })
+    const priceChangedShape = (details: string[] | undefined, current: number) =>
+      Boolean(details?.includes(`currentAmountCents=${current}`))
+      && Boolean(details?.includes('billablePages=1'))
+      && Boolean(details?.includes(`line=print_bw_page:${current / 2}:2:${current}`))
+
+    async function expectPriceChanged(label: string, quotedAmountCents: unknown, current: number): Promise<void> {
+      const before = await sideEffects()
+      let thrown: unknown = null
+      try {
+        const created = await printJobs.create(priceDto({ quotedAmountCents }) as CreatePrintJobDto, { terminalId })
+        createdTaskIds.push(created.taskId)
+      } catch (e) {
+        thrown = e
+      }
+      const ex = thrown as { getStatus?: () => number; getResponse?: () => unknown } | null
+      const resp = ex?.getResponse?.() as { error?: { code?: string; details?: string[] } } | undefined
+      if (ex?.getStatus?.() !== 409 || resp?.error?.code !== 'PRICE_CHANGED' || !priceChangedShape(resp.error.details, current)) {
+        fail(`${label} — 期望 409 PRICE_CHANGED 且带回当前报价 ${current}，实际: ${thrown ? JSON.stringify(resp ?? String(thrown)) : '建单成功'}`)
+      }
+      const after = await sideEffects()
+      if (after !== before) fail(`${label} — 409 后仍有建单副作用: before=${before} after=${after}`)
+      pass(label)
+    }
+
+    await setBwUnit(30)
+    await expectPriceChanged('9a. 0 → 付费：用户确认 0 元、现价 0.60 元 → 409 且带回 60 分，零建单副作用', 0, 60)
+    await setBwUnit(45)
+    await expectPriceChanged('9b. 涨价：用户确认 60 分、现价 90 分 → 409 且带回 90 分，零建单副作用', 60, 90)
+    await setBwUnit(10)
+    await expectPriceChanged('9c. 降价：用户确认 90 分、现价 20 分 → 409 且带回 20 分，零建单副作用', 90, 20)
+    await setBwUnit(30)
+    await expectPriceChanged('9d. 伪造低价：quotedAmountCents=1 → 409 带回真实 60 分，拿不到低价单', 1, 60)
+
+    // 9e：按 409 带回的新价格二次确认 → 建单，金额取服务端重算值。
+    const reconfirmed = await printJobs.create(priceDto({ quotedAmountCents: 60 }) as CreatePrintJobDto, { terminalId })
+    createdTaskIds.push(reconfirmed.taskId)
+    const reconfirmedOrder = await prisma.order.findUnique({ where: { id: reconfirmed.orderId } })
+    if (
+      reconfirmed.amountCents === 60 && reconfirmed.payStatus === 'unpaid' && Boolean(reconfirmed.paymentSessionToken)
+      && reconfirmedOrder?.amountCents === 60 && reconfirmedOrder.payStatus === 'unpaid'
+    ) {
+      pass('9e. 按新价格二次确认（quoted=current=60）→ 建付费单 unpaid，金额 60 分')
+    } else fail(`9e. 二次确认建单异常: ${JSON.stringify({ reconfirmed, reconfirmedOrder })}`)
+
+    // 9f：已建订单价格冻结，后续改价不影响历史单。
+    await setBwUnit(45)
+    const frozen = await prisma.order.findUnique({ where: { id: reconfirmed.orderId } })
+    const frozenLines = JSON.parse(frozen?.itemsJson ?? '[]') as Array<{ unitCents?: number }>
+    if (frozen?.amountCents === 60 && frozenLines[0]?.unitCents === 30) pass('9f. 建单后改价 → 历史订单金额与明细快照不变')
+    else fail(`9f. 历史订单价格被改价影响: ${JSON.stringify(frozen)}`)
+
+    // 9g：旧客户端不带 quotedAmountCents → 兼容，照旧按服务端现价（90 分）建单。
+    const legacy = await printJobs.create(priceDto() as CreatePrintJobDto, { terminalId })
+    createdTaskIds.push(legacy.taskId)
+    if (legacy.amountCents === 90 && legacy.payStatus === 'unpaid') pass('9g. 旧客户端缺省 quotedAmountCents → 兼容建单，按服务端现价 90 分')
+    else fail(`9g. 旧客户端建单异常: ${JSON.stringify(legacy)}`)
+
+    // 9h：免费路径保持：确认 0 元且现价 0 → 建单即 paid + free。
+    await setBwUnit(0)
+    const free = await printJobs.create(priceDto({ quotedAmountCents: 0 }) as CreatePrintJobDto, { terminalId })
+    createdTaskIds.push(free.taskId)
+    const freeOrder = await prisma.order.findUnique({ where: { id: free.orderId } })
+    if (free.amountCents === 0 && free.payStatus === 'paid' && freeOrder?.payStatus === 'paid' && freeOrder.paymentSource === 'free') {
+      pass('9h. 免费单确认 0 元且现价 0 → paid + free 路径不变')
+    } else fail(`9h. 免费单路径异常: ${JSON.stringify({ free, freeOrder })}`)
+
+    // 9-http：同一规则穿过真实 HTTP 管线（DTO 校验 + 全局过滤器），证明 409 体与 400 校验在线上形状下成立。
+    await setBwUnit(30)
+    const http = await startPrintJobsHttp(printJobs, prisma, terminalId, `vpj-http-session-${suffix}`)
+    try {
+      const beforeHttp = await sideEffects()
+      const stale = await http.post(priceDto({ quotedAmountCents: 20 }))
+      if (
+        stale.status === 409 && stale.json['success'] === false && stale.json.error?.code === 'PRICE_CHANGED'
+        && priceChangedShape(stale.json.error.details, 60)
+        && !('orderId' in stale.json) && !('paymentSessionToken' in stale.json) && !('taskId' in stale.json)
+      ) {
+        pass('9-http-a. POST /api/v1/print/jobs 旧报价 → HTTP 409 PRICE_CHANGED，details 带 currentAmountCents=60 与计价行，无订单/支付会话字段')
+      } else fail(`9-http-a. 409 形状异常: ${JSON.stringify(stale)}`)
+
+      for (const bad of [-1, 1.5, '60', null, 100_000_001]) {
+        const res = await http.post(priceDto({ quotedAmountCents: bad }))
+        if (res.status !== 400 || res.json.error?.code !== 'VALIDATION_FAILED') {
+          fail(`9-http-b. quotedAmountCents=${JSON.stringify(bad)} 应 400 VALIDATION_FAILED，实际 ${JSON.stringify(res)}`)
+        }
+      }
+      pass('9-http-b. quotedAmountCents 为负数 / 小数 / 字符串 / null / 超上限 → 400 VALIDATION_FAILED')
+      const afterRejects = await sideEffects()
+      if (afterRejects === beforeHttp) pass('9-http-c. 409 与 400 全部零 Order / PrintTask / 支付尝试 / 建单审计')
+      else fail(`9-http-c. HTTP 拒绝后仍有建单副作用: before=${beforeHttp} after=${afterRejects}`)
+
+      const legacyHttp = await http.post(priceDto())
+      const matchedHttp = await http.post(priceDto({ quotedAmountCents: 60 }))
+      for (const res of [legacyHttp, matchedHttp]) {
+        if (typeof res.json['taskId'] === 'string') createdTaskIds.push(res.json['taskId'])
+      }
+      if (
+        legacyHttp.status === 201 && legacyHttp.json['amountCents'] === 60
+        && matchedHttp.status === 201 && matchedHttp.json['amountCents'] === 60
+        && typeof matchedHttp.json['paymentSessionToken'] === 'string'
+      ) {
+        pass('9-http-d. HTTP 缺省字段（旧客户端）与报价一致（新客户端）均 201 建单，金额取服务端 60 分')
+      } else fail(`9-http-d. HTTP 建单异常: ${JSON.stringify({ legacyHttp, matchedHttp })}`)
+    } finally {
+      await http.close()
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
