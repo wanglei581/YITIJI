@@ -106,7 +106,10 @@ test('场馆导览只进入既有可打印材料页 @kiosk', async ({ page, api 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
   await materialsButton.click()
   await expect(page).toHaveURL(/\/job-fairs\/fair-001\/materials$/)
-  await expect(page.getByText('暂无可用活动资料')).toBeVisible()
+  // 2026-09-20 迁入青序流光后空态文案取自稿 28 的 materials:empty。
+  // 断言的能力没变：从「没有展位图」的那一屏点出纸出口，落到一个**诚实的空态**，
+  // 而不是一个伪造的资料列表。
+  await expect(page.getByTestId('fair-materials-empty')).toContainText('这场还没有可下载的物料')
 })
 
 test('场馆导览加载失败后可原页重试并进入诚实空态 @kiosk', async ({ page, api }) => {
@@ -114,13 +117,17 @@ test('场馆导览加载失败后可原页重试并进入诚实空态 @kiosk', a
   api.abort('GET', '/api/v1/job-fairs/fair-001/map', 'internetdisconnected')
 
   await page.goto('/job-fairs/fair-001/map')
-  await expect(page.getByText('加载失败，请稍后重试')).toBeVisible()
+  // 迁移后错误态改用稿 28 的 map:error 文案，重试键叫「重新加载」（原「重试」）。
+  // 能力不变且更严：错误态必须明说「这不代表主办方没有提供」，且出纸出口仍在底栏。
+  await expect(page.getByTestId('fair-map-error')).toContainText('展位信息没取到')
+  await expect(page.getByTestId('fair-map-error')).toContainText('不代表主办方没有提供展位图')
+  await expect(page.getByRole('button', { name: '查看可打印导览资料' })).toBeVisible()
 
   api.respond('GET', '/api/v1/job-fairs/fair-001/map', {
     status: 200,
     json: { success: true, data: { mapImageUrl: null, zones: [], booths: [] } },
   })
-  await page.getByRole('button', { name: '重试' }).click()
+  await page.getByRole('button', { name: '重新加载' }).click()
   await expect(page.getByText('暂无场馆导览数据')).toBeVisible()
 })
 

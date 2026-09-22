@@ -59,15 +59,15 @@ flowchart LR
 | `/interview/session` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/setup` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/tips` | Navigate | — _(重定向)_ | 0 | — |
-| `/job-fairs` | JobFairsPage | `apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx` | 33 | — |
-| `/job-fairs/:id` | JobFairDetailPage | `apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx` | 33 | — |
-| `/job-fairs/:id/companies` | FairCompaniesPage | `apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx` | 33 | — |
+| `/job-fairs` | JobFairsPage | `apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx` | 33 | 6 |
+| `/job-fairs/:id` | JobFairDetailPage | `apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx` | 33 | 6 |
+| `/job-fairs/:id/companies` | FairCompaniesPage | `apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx` | 33 | 6 |
 | `/job-fairs/:id/companies/:companyId` | FairCompanyDetailPage | `apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx` | 33 | 5 |
-| `/job-fairs/:id/map` | FairMapPage | `apps/kiosk/src/pages/job-fairs/FairMapPage.tsx` | 33 | — |
-| `/job-fairs/:id/materials` | FairMaterialsPage | `apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx` | 33 | — |
-| `/job-fairs/:id/stats` | FairStatsPage | `apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx` | 33 | — |
-| `/job-fairs/:id/visit-plan` | FairVisitPlanPage | `apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx` | 11 | — |
-| `/job-fairs/checkin` | JobFairCheckinPage | `apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx` | 33 | — |
+| `/job-fairs/:id/map` | FairMapPage | `apps/kiosk/src/pages/job-fairs/FairMapPage.tsx` | 33 | 6 |
+| `/job-fairs/:id/materials` | FairMaterialsPage | `apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx` | 33 | 6 |
+| `/job-fairs/:id/stats` | FairStatsPage | `apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx` | 33 | 6 |
+| `/job-fairs/:id/visit-plan` | FairVisitPlanPage | `apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx` | 11 | 6 |
+| `/job-fairs/checkin` | JobFairCheckinPage | `apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx` | 33 | 6 |
 | `/jobs` | JobsPage | `apps/kiosk/src/pages/jobs/JobsPage.tsx` | 33 | 5 |
 | `/jobs/:id` | JobDetailPage | `apps/kiosk/src/pages/jobs/JobDetailPage.tsx` | 33 | 5 |
 | `/legal/:doc` | LegalDocPage | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | 33 | 1 |
@@ -115,10 +115,10 @@ flowchart LR
 | `/resume/optimize/compare` | ResumeOptimizeComparePage | `apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx` | 33 | 6 |
 | `/resume/parse` | ResumeParsePage | `apps/kiosk/src/pages/resume/ResumeParsePage.tsx` | 33 | 8 |
 | `/resume/report` | ResumeReportPage | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | 34 | 6 |
-| `/resume/self-assessment/history` | SelfAssessmentHistoryPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 2 |
-| `/resume/self-assessment/intro` | SelfAssessmentIntroPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 2 |
-| `/resume/self-assessment/questions` | SelfAssessmentQuizPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 2 |
-| `/resume/self-assessment/result` | SelfAssessmentResultPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 2 |
+| `/resume/self-assessment/history` | SelfAssessmentHistoryPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 6 |
+| `/resume/self-assessment/intro` | SelfAssessmentIntroPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 6 |
+| `/resume/self-assessment/questions` | SelfAssessmentQuizPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 6 |
+| `/resume/self-assessment/result` | SelfAssessmentResultPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 6 |
 | `/resume/source` | ResumeSourcePage | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | 33 | 7 |
 | `/resume/templates` | ResumeTemplateLibraryPage | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | 10 | 7 |
 | `/resume/upload` | Navigate | — _(重定向)_ | 0 | — |

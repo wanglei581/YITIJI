@@ -41,7 +41,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 35 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 36 |
 | **medium** | 只被文档或其它文件提及 | 13 |
 | **low** | 全仓零提及 | 90 |
 
@@ -215,7 +215,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（35）
+## high — 仍被 CI / 门禁 / 包脚本引用（36）
 
 ### 页面/组件（12）
 
@@ -234,7 +234,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
 | `apps/kiosk/src/pages/profile/profileEntries.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 
-### 样式（22）
+### 样式（23）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -258,6 +258,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/profile/profile-lightflow-shell.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
 | `apps/kiosk/src/pages/profile/profile-lightflow-state.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
 | `apps/kiosk/src/pages/resume/resume-authoring-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
+| `apps/kiosk/src/pages/resume/self-assessment-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：services/api/scripts/verify-compliance.ts |
 | `apps/kiosk/src/pages/scan/styles/scan-fusion.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 

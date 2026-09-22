@@ -418,8 +418,14 @@ test('/job-fairs 预约离开平台且 mock 统计为空 @w4', async ({ page, ap
   await expect(page.getByRole('button', { name: /扫码预约|去来源平台预约/ }).first()).toBeVisible()
   await expect(page.locator('iframe[src*="openstreetmap"]')).toHaveCount(0)
   await expect(page.getByText('暂无地图，请以场馆地址为准')).toBeVisible()
-  await page.getByRole('button', { name: '数据大屏' }).click()
-  await expect(page.getByText(/暂无真实统计/)).toBeVisible()
+  // 2026-09-20：详情页的「数据大屏」Tab 随四 Tab 壳退休，统计成了独立路由。
+  // 入口从 Tab 变成 subnav 的一行，但**判据不变**：夹具 isMockData=true，
+  // 这一路走完必须落到诚实空态，而不是把演示数字端上来。
+  const statsRow = page.getByTestId('fair-detail-stats')
+  await expect(statsRow).toContainText('主办方还没有回传统计')
+  await statsRow.click()
+  await expect(page).toHaveURL(/\/job-fairs\/fair-001\/stats$/)
+  await expect(page.getByTestId('fair-stats-empty')).toContainText('真实数据正在接入')
   await expect(page.getByText(/签到成功|确认签到/)).toHaveCount(0)
   await verifyPage(page, errors)
 })

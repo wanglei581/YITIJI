@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1505 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1509 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -295,7 +295,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 469 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 472 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -408,7 +408,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/interview/InterviewSessionPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewSetupPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewShell.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
-| `apps/kiosk/src/pages/interview/InterviewTipsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
+| `apps/kiosk/src/pages/interview/InterviewTipsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/interview-service-desk.css` | `verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx` | `verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
@@ -427,12 +427,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx` | `verify-jobfair-checkin.mjs` |
 | `apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-checkin.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-page-size.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx` | `verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-jobfairs-terminal-priority.mjs`<br/>`verify-activity-logs.ts` |
+| `apps/kiosk/src/pages/job-fairs/QxFairWorkbench.tsx` | `verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/pages/job-fairs/components/FairCalendarPopover.tsx` | `verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/pages/job-fairs/components/FairCompanyDetailSections.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-kiosk-frontend-debt.mjs` |
-| `apps/kiosk/src/pages/job-fairs/components/FairDataScreen.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs` |
-| `apps/kiosk/src/pages/job-fairs/components/JobFairDetailTabs.tsx` | `verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
+| `apps/kiosk/src/pages/job-fairs/components/FairDetailSections.tsx` | `verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
+| `apps/kiosk/src/pages/job-fairs/components/FairVisitPlanSections.tsx` | `verify-jobfair-ui.mjs` |
+| `apps/kiosk/src/pages/job-fairs/components/FairWorkbenchBits.tsx` | `verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/pages/job-fairs/components/MapBlock.tsx` | `verify-jobfair-ui.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
 | `apps/kiosk/src/pages/job-fairs/components/RegionPicker.tsx` | `verify-jobfair-ui.mjs` |
+| `apps/kiosk/src/pages/job-fairs/fairWorkbenchSpecs.ts` | `verify-fair-workbench-qx.mjs`<br/>`verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/pages/jobs-fairs-prototype.css` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/pages/jobs/JobDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-info-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/jobs/JobsPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-info-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs` |
@@ -1326,12 +1329,13 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>docs/design/kiosk-redesign-2026-08/</code> — 4 个文件</summary>
+<summary><code>docs/design/kiosk-redesign-2026-08/</code> — 5 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `docs/design/kiosk-redesign-2026-08/10-print-hub.html` | `verify-p39-print-hub-fidelity.mjs` |
-| `docs/design/kiosk-redesign-2026-08/16-service-hubs.html` | `extract-service-hub-specs.mjs` |
+| `docs/design/kiosk-redesign-2026-08/16-service-hubs.html` | `extract-service-hub-specs.mjs`<br/>`verify-service-entry-readiness.mjs` |
+| `docs/design/kiosk-redesign-2026-08/28-jobfair-enhanced.html` | `verify-fair-workbench-qx.mjs` |
 | `docs/design/kiosk-redesign-2026-08/assets/bg-hero.jpg` | `verify-repository-integrity.mjs` |
 | `docs/design/kiosk-redesign-2026-08/assets/bg-standby.jpg` | `verify-repository-integrity.mjs` |
 

@@ -11756,7 +11756,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 551,
+      "reachableFileCount": 557,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -12214,7 +12214,14 @@
             "Outlet"
           ],
           "path": "/job-fairs",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -12261,7 +12268,14 @@
             "Outlet"
           ],
           "path": "/job-fairs/:id",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -12308,7 +12322,14 @@
             "Outlet"
           ],
           "path": "/job-fairs/:id/companies",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -12408,7 +12429,14 @@
             "Outlet"
           ],
           "path": "/job-fairs/:id/map",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -12455,7 +12483,14 @@
             "Outlet"
           ],
           "path": "/job-fairs/:id/materials",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -12502,7 +12537,14 @@
             "Outlet"
           ],
           "path": "/job-fairs/:id/stats",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -12527,7 +12569,14 @@
             "Outlet"
           ],
           "path": "/job-fairs/:id/visit-plan",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -12574,7 +12623,14 @@
             "Outlet"
           ],
           "path": "/job-fairs/checkin",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -14118,8 +14174,12 @@
           ],
           "path": "/resume/self-assessment/history",
           "styles": [
-            "apps/kiosk/src/pages/resume/self-assessment-lightflow.css",
-            "apps/kiosk/src/styles/ai-primitives.css"
+            "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14147,8 +14207,12 @@
           ],
           "path": "/resume/self-assessment/intro",
           "styles": [
-            "apps/kiosk/src/pages/resume/self-assessment-lightflow.css",
-            "apps/kiosk/src/styles/ai-primitives.css"
+            "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14176,8 +14240,12 @@
           ],
           "path": "/resume/self-assessment/questions",
           "styles": [
-            "apps/kiosk/src/pages/resume/self-assessment-lightflow.css",
-            "apps/kiosk/src/styles/ai-primitives.css"
+            "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14205,8 +14273,12 @@
           ],
           "path": "/resume/self-assessment/result",
           "styles": [
-            "apps/kiosk/src/pages/resume/self-assessment-lightflow.css",
-            "apps/kiosk/src/styles/ai-primitives.css"
+            "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14550,7 +14622,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 604
+      "sourceFileCount": 611
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17344,7 +17416,8 @@
     ],
     "apps/kiosk/src/pages/interview/InterviewTipsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
-      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -17436,6 +17509,10 @@
       "apps/kiosk/scripts/verify-jobfairs-terminal-priority.mjs",
       "services/api/scripts/verify-activity-logs.ts"
     ],
+    "apps/kiosk/src/pages/job-fairs/QxFairWorkbench.tsx": [
+      "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs"
+    ],
     "apps/kiosk/src/pages/job-fairs/components/FairCalendarPopover.tsx": [
       "apps/kiosk/scripts/verify-jobfair-ui.mjs"
     ],
@@ -17444,21 +17521,27 @@
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs"
     ],
-    "apps/kiosk/src/pages/job-fairs/components/FairDataScreen.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w4.mjs",
-      "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
-      "apps/kiosk/scripts/verify-jobfair-ui.mjs"
-    ],
-    "apps/kiosk/src/pages/job-fairs/components/JobFairDetailTabs.tsx": [
+    "apps/kiosk/src/pages/job-fairs/components/FairDetailSections.tsx": [
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/job-fairs/components/FairVisitPlanSections.tsx": [
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/job-fairs/components/FairWorkbenchBits.tsx": [
+      "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/components/MapBlock.tsx": [
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/components/RegionPicker.tsx": [
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/job-fairs/fairWorkbenchSpecs.ts": [
+      "apps/kiosk/scripts/verify-fair-workbench-qx.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs"
     ],
     "apps/kiosk/src/pages/jobs-fairs-prototype.css": [
@@ -19591,7 +19674,11 @@
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
     "docs/design/kiosk-redesign-2026-08/16-service-hubs.html": [
-      "apps/kiosk/scripts/extract-service-hub-specs.mjs"
+      "apps/kiosk/scripts/extract-service-hub-specs.mjs",
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
+    "docs/design/kiosk-redesign-2026-08/28-jobfair-enhanced.html": [
+      "apps/kiosk/scripts/verify-fair-workbench-qx.mjs"
     ],
     "docs/design/kiosk-redesign-2026-08/assets/bg-hero.jpg": [
       "scripts/verify-repository-integrity.mjs"
@@ -24326,6 +24413,27 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "apps/kiosk/src/pages/job-fairs"
+        ],
+        "files": [
+          "apps/kiosk/src/pages/job-fairs/fairWorkbenchSpecs.ts",
+          "docs/design/kiosk-redesign-2026-08/28-jobfair-enhanced.html"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-fair-workbench-qx.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:fair-workbench-qx"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/kiosk/src/lib/fileName.ts",
@@ -24606,7 +24714,6 @@
           "apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/components/FairCompanyDetailSections.tsx",
-          "apps/kiosk/src/pages/job-fairs/components/FairDataScreen.tsx",
           "apps/kiosk/src/pages/jobs-fairs-prototype.css",
           "apps/kiosk/src/pages/jobs/JobDetailPage.tsx",
           "apps/kiosk/src/pages/jobs/JobsPage.tsx",
@@ -24997,9 +25104,10 @@
           "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/QxFairWorkbench.tsx",
           "apps/kiosk/src/pages/job-fairs/components/FairCompanyDetailSections.tsx",
-          "apps/kiosk/src/pages/job-fairs/components/FairDataScreen.tsx",
-          "apps/kiosk/src/pages/job-fairs/components/JobFairDetailTabs.tsx",
+          "apps/kiosk/src/pages/job-fairs/components/FairDetailSections.tsx",
+          "apps/kiosk/src/pages/job-fairs/components/FairWorkbenchBits.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/api/fairVisitPlan.ts"
         ],
@@ -25049,11 +25157,14 @@
           "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/QxFairWorkbench.tsx",
           "apps/kiosk/src/pages/job-fairs/components/FairCalendarPopover.tsx",
-          "apps/kiosk/src/pages/job-fairs/components/FairDataScreen.tsx",
-          "apps/kiosk/src/pages/job-fairs/components/JobFairDetailTabs.tsx",
+          "apps/kiosk/src/pages/job-fairs/components/FairDetailSections.tsx",
+          "apps/kiosk/src/pages/job-fairs/components/FairVisitPlanSections.tsx",
+          "apps/kiosk/src/pages/job-fairs/components/FairWorkbenchBits.tsx",
           "apps/kiosk/src/pages/job-fairs/components/MapBlock.tsx",
           "apps/kiosk/src/pages/job-fairs/components/RegionPicker.tsx",
+          "apps/kiosk/src/pages/job-fairs/fairWorkbenchSpecs.ts",
           "apps/kiosk/src/pages/jobs-fairs-prototype.css",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/api/httpAdapter.ts"
@@ -25248,7 +25359,7 @@
           "apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMapPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx",
-          "apps/kiosk/src/pages/job-fairs/components/JobFairDetailTabs.tsx",
+          "apps/kiosk/src/pages/job-fairs/components/FairDetailSections.tsx",
           "apps/kiosk/src/pages/job-fairs/components/MapBlock.tsx",
           "apps/kiosk/src/pages/jobs/components/W4Presentation.tsx",
           "apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx",
@@ -26998,13 +27109,15 @@
           "apps/kiosk/src/hooks/useApiReadiness.ts",
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
           "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/src/pages/interview/InterviewTipsPage.tsx",
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
           "apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx",
           "apps/kiosk/src/pages/service-hubs/serviceHubModel.ts",
           "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts",
           "apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css",
-          "apps/kiosk/src/services/api/printScanCapabilities.ts"
+          "apps/kiosk/src/services/api/printScanCapabilities.ts",
+          "docs/design/kiosk-redesign-2026-08/16-service-hubs.html"
         ],
         "missing": []
       },
@@ -36292,6 +36405,18 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/resume/self-assessment-lightflow.css",
+        "kind": "style",
+        "mentions": [
+          "docs/acceptance/self-assessment-acceptance-package.md",
+          "services/api/scripts/verify-compliance.ts"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：services/api/scripts/verify-compliance.ts"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

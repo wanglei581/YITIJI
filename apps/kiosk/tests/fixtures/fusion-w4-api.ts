@@ -214,6 +214,14 @@ export function registerW4Api(api: ApiRouter, options: W4ApiOptions = {}): void 
   respond('/api/v1/job-fairs/fair-001/companies', { success: true, data: [fairCompany], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } })
   respond('/api/v1/job-fairs/fair-001/companies/fair-company-001', { success: true, data: fairCompany })
   respond('/api/v1/job-fairs/fair-001/zones', { success: true, data: [fairZone] })
+  // 2026-09-20 八屏迁入青序流光后新增的三条消费面：
+  //   · 详情页 subnav 要先问「这一项到底有没有数据」→ /materials
+  //   · 展位分布页（旧「场馆导览」Tab 的落点）→ /map + /venue-guide
+  // 夹具是 fail-closed 的（未登记的请求一律 abort 并在用例收尾时抛错），
+  // 所以少登记一条 = 用例红，而不是静默放过。
+  respond('/api/v1/job-fairs/fair-001/materials', { success: true, data: [], pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 } })
+  respond('/api/v1/job-fairs/fair-001/map', { success: true, data: { zones: [fairZone], booths: [] } })
+  respond('/api/v1/job-fairs/fair-001/venue-guide', { success: true, data: null })
   respond('/api/v1/job-fairs/fair-001/stats', { success: true, data: { fairId: 'fair-001', fairName: fair.name, totalCompanies: 1, checkedInCompanies: 0, totalPositions: 1, totalHeadcount: 2, browseCount: 0, scanCount: 0, printCount: 0, checkinCount: 0, zoneBreakdown: [], lastUpdated: '2026-07-24T08:00:00.000Z', seekerIntent: [], industryDistribution: [], dataSourceLabel: '来源数据 · 非实时', isMockData: true } })
   respond('/api/v1/terminals/KSK-001/config', w4TerminalConfig(options))
   respond('/api/v1/terminals/KSK-001/screensaver', { enabled: false, idleTimeoutSec: 180, items: [] })

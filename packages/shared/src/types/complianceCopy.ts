@@ -202,6 +202,21 @@ export const COMPLIANCE_PII_REDACTION_FORBIDDEN_PATTERNS: readonly RegExp[] = [
  * OUTBOUND —— 指向第三方 / 官方来源平台的站外引导,是合规白名单文案本身。
  *
  * 以上两类按**前向回看窗口**判定(见 COMPLIANCE_EXEMPTION_LOOKBEHIND)。
+ *
+ * NEGATED_ADJACENT —— 否定前缀**紧贴**命中词(命中位置之前的文本以它结尾),不走回看窗口。
+ *
+ * 为什么要第三类:回看窗口对两字否定词一律不安全,而真实的边界声明句偏偏需要它们。
+ * 2026-09-20 的实例是稿 28-jobfair-enhanced.html 的参展企业边界原话
+ * 「本机不代收简历,也不在平台内投递」—— 否定词是「不在」,窗口式判定要么接不住这句话
+ * (于是一条如实的否定声明被判违规),要么把「不在」收进 NEGATED 而顺带放行
+ * 「不在校学生也能平台内投递」这类句式。
+ *
+ * 紧贴判定同时解决两边:否定词必须**直接管住**那个短语,中间插一个字都不再豁免。
+ * 反例对照钉在 scripts/verify-compliance-copy.mjs 的 probe 里长期跑:
+ * 「不在乎学历门槛,一键投递到企业」「不在校学生也能平台内投递」都必须判违规。
+ *
+ * 新增本类条目前先问一句:这个前缀紧贴禁词时,有没有可能构成一句**承诺**?
+ * 能想出反例就不要加,改用整句改写。
  */
 export const COMPLIANCE_EXEMPTION_MARKERS = {
   NEGATED: [
@@ -218,6 +233,7 @@ export const COMPLIANCE_EXEMPTION_MARKERS = {
     '禁止',
     '未取得',
   ],
+  NEGATED_ADJACENT: ['不在'],
   OUTBOUND: ['来源', '外部', '第三方', '官方', '站外'],
 } as const
 

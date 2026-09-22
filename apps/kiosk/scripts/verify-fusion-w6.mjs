@@ -346,9 +346,16 @@ function visibleStrings(path) {
 
 check('compliance copy', () => {
   const forbidden = [/一键投递/, /立即投递/, /平台内投递/, /投递简历/, /企业收简历/, /候选人管理/]
+  // 已登记的**否定式**边界声明：这几句是在告诉用户「本机不做这件事」，
+  // 与 CLAUDE.md §2 禁止的承诺式文案语义相反，先剥离再查禁词。
+  // 新增一条必须同时满足：① 以「不」开头；② 是完整否定短语，不能只剥离半句。
   const approvedBoundaryCopy = [
     '不提供平台内投递',
     '不会提供平台内投递',
+    // 2026-09-20 招聘会八屏迁入青序流光：稿 28-jobfair-enhanced.html 的参展企业
+    // 边界原话是「本机不代收简历，也不在平台内投递」。登记这一条而不是改写文案，
+    // 是为了让生产页与已签字的稿逐字一致。
+    '不在平台内投递',
   ]
   const violations = []
   for (const path of productionFiles) {
