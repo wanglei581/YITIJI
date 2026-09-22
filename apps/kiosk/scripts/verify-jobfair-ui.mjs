@@ -404,6 +404,84 @@ mustContain(
   }
 }
 
+// ---------- K. 招聘会不得自称「岗位 / 职位」 ----------
+//
+// 2026-09-22：八条路由迁进青序流光后，场次列表 / 详情 / 到场指引三页复用了
+// sourceTrustReason，而那句话当时只有一套「岗位」措辞 —— 一体机会对着一场双选会说
+// 「无法核对**这条岗位**的来源……可到来源平台自行查询**该职位**」。招聘会是活动不是
+// 职位，那是一句会上公共终端的假话（CLAUDE.md §9「不伪造能力」同源：不许替来源方
+// 下它没下过的结论，也不许把 A 类对象说成 B 类）。
+//
+// 三层断言，缺一层都能让缺陷从另一侧回来：
+//   K-1 措辞表本身分岗位 / 招聘会两套，且招聘会那套一个「岗位 / 职位」都不许有；
+//   K-2 默认值仍是 'job' 且岗位措辞逐字不变 —— 这是「不动既有文案」的防回退闸门；
+//   K-3 三页确实传了 'job_fair'，且不再传岗位口径的 SOURCE_APPLY_UNAVAILABLE_REASON
+//       （那条常量里同样写着「投递链接 / 该职位」，只改函数是修不干净的）。
+{
+  const trustRel = 'src/pages/jobs/utils/sourceTrust.ts'
+  const reasonsRel = 'src/lib/capabilityReasons.ts'
+  const trustSrc = read(trustRel)
+  const reasonsSrc = read(reasonsRel)
+
+  if (trustSrc === null || reasonsSrc === null) {
+    fail(`K. 文件缺失: ${trustRel} / ${reasonsRel}`)
+  } else {
+    // K-1 招聘会措辞里不得出现岗位类名词。
+    const wording = trustSrc.match(/SOURCE_ENTITY_WORDING[^=]*=\s*\{([\s\S]*?)\n\}/)
+    if (!wording) {
+      fail(`K-1. ${trustRel} 找不到 SOURCE_ENTITY_WORDING 措辞表 —— 实体语义参数可能被回退掉了`)
+    } else {
+      const fairLine = wording[1].split('\n').find((line) => /job_fair\s*:/.test(line)) ?? ''
+      const jobLine = wording[1].split('\n').find((line) => /^\s*job\s*:/.test(line)) ?? ''
+      if (!fairLine) fail(`K-1. ${trustRel} 的 SOURCE_ENTITY_WORDING 缺 job_fair 一档`)
+      else if (/岗位|职位/.test(fairLine)) fail(`K-1. 招聘会措辞里仍写着岗位/职位: ${fairLine.trim()}`)
+      else pass(`K-1. 招聘会措辞不含岗位/职位（${fairLine.trim()}）`)
+
+      // K-2 岗位措辞逐字不变：本次修复**不得**顺手改动岗位 / 企业既有文案。
+      if (jobLine.includes("subject: '这条岗位'") && jobLine.includes("lookup: '该职位'")) {
+        pass('K-2a. 岗位措辞逐字保持原样（这条岗位 / 该职位）')
+      } else {
+        fail(`K-2a. ${trustRel} 岗位措辞被改动，岗位/企业页文案会跟着变: ${jobLine.trim()}`)
+      }
+    }
+
+    // K-2b 默认值必须是 'job'：漏传第三个参数的既有调用方要继续拿到岗位措辞。
+    if (/entity:\s*SourceEntityKind\s*=\s*'job'/.test(trustSrc)) {
+      pass("K-2b. sourceTrustReason 的实体参数默认 'job'（既有调用方零改动）")
+    } else {
+      fail(`K-2b. ${trustRel} 的 entity 参数必须默认 'job'，否则岗位/企业页会静默改文案`)
+    }
+
+    // K-3 三页各自传 'job_fair' + 招聘会口径的链接常量。
+    const fairPages = [
+      ['src/pages/job-fairs/JobFairsPage.tsx', 'FAIR_BOOKING_LINK_UNAVAILABLE_REASON'],
+      ['src/pages/job-fairs/JobFairDetailPage.tsx', 'FAIR_BOOKING_LINK_UNAVAILABLE_REASON'],
+      ['src/pages/job-fairs/JobFairCheckinPage.tsx', 'FAIR_CHECKIN_LINK_UNAVAILABLE_REASON'],
+    ]
+    for (const [rel, constName] of fairPages) {
+      const src = read(rel)
+      if (src === null) { fail(`K-3. 文件缺失: ${rel}`); continue }
+      const call = new RegExp(`sourceTrustReason\\([^)]*${constName}[^)]*,\\s*'job_fair'\\)`)
+      if (!call.test(src)) {
+        fail(`K-3. ${rel} 必须以 sourceTrustReason(trust, ${constName}, 'job_fair') 调用`)
+      } else if (/SOURCE_APPLY_UNAVAILABLE_REASON/.test(src)) {
+        // 那条常量写着「未提供可用的投递链接…查询该职位」，招聘会页用它同样是假话。
+        fail(`K-3. ${rel} 不得再使用岗位口径的 SOURCE_APPLY_UNAVAILABLE_REASON`)
+      } else {
+        pass(`K-3. ${rel} 使用招聘会口径（${constName} + 'job_fair'）`)
+      }
+    }
+
+    // K-4 两条招聘会常量本身也不许含岗位类名词。
+    for (const name of ['FAIR_BOOKING_LINK_UNAVAILABLE_REASON', 'FAIR_CHECKIN_LINK_UNAVAILABLE_REASON']) {
+      const m = reasonsSrc.match(new RegExp(`${name}\\s*=\\s*'([^']+)'`))
+      if (!m) fail(`K-4. ${reasonsRel} 缺常量 ${name}`)
+      else if (/岗位|职位|投递/.test(m[1])) fail(`K-4. ${name} 仍含岗位/职位/投递字样: ${m[1]}`)
+      else pass(`K-4. ${name} 为招聘会口径（${m[1]}）`)
+    }
+  }
+}
+
 if (failed > 0) {
   console.error(`\n=== FAILED (${failed} 项) — 招聘会/校园招聘 UI 疑似回退,合入前必须修复 ===`)
   process.exit(1)

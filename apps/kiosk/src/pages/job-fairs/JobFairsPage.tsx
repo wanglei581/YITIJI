@@ -28,7 +28,7 @@ import { RegionPicker } from './components/RegionPicker'
 import { matchesRegion, type RegionSelection } from '../../lib/regions'
 import { fairDateKey } from './fairFormat'
 import { evaluateJobSourceTrust, sourceTrustReason } from '../jobs/utils/sourceTrust'
-import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
+import { FAIR_BOOKING_LINK_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { FairBookingQr, FairListCard, FairSkeletonList } from './components/FairWorkbenchBits'
 import { DirState, DirStrip, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
@@ -64,7 +64,7 @@ export function JobFairsPage() {
    */
   const bookBlockedReasonOf = (fair: ExternalJobFairDTO): string => {
     const trust = evaluateJobSourceTrust(fair)
-    return trust.ok ? '' : sourceTrustReason(trust, SOURCE_APPLY_UNAVAILABLE_REASON)
+    return trust.ok ? '' : sourceTrustReason(trust, FAIR_BOOKING_LINK_UNAVAILABLE_REASON, 'job_fair')
   }
 
   const openBookingQr = (fair: ExternalJobFairDTO) => {

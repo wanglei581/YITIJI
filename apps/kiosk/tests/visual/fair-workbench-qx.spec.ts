@@ -576,6 +576,31 @@ test('参会清单 load-failed：5xx 不许伪装成「还没生成」 @kiosk', 
 
 // ───────────────────────── 来源不可信时 fail-closed ─────────────────────────
 
+/**
+ * 阻断原因必须把这一条说成「招聘会 / 场次」，不能说成「岗位 / 职位」。
+ *
+ * 八条路由迁进来时这三页复用了 jobs 的 sourceTrustReason，于是一体机会对着一场
+ * 双选会说「无法核对这条岗位的来源……自行查询该职位」。招聘会是活动不是职位，
+ * 那是一句会上公共终端的假话。静态那一半由 verify:jobfair-ui 的 K 段守（措辞表、
+ * 默认值、三页调用点）；这里守的是**真渲染出来的那句话**——常量换了但页面没跟、
+ * 或者哪天又有人把 SOURCE_APPLY_UNAVAILABLE_REASON 传回来，静态断言可能绕过去，
+ * 用户眼睛看到的这行字不会。
+ *
+ * 断言只锚在阻断说明那一个元素上，不做整页扫描：场次卡的 meta 里本来就有
+ * 「3 个岗位」这种**正确**的岗位字样，整页查「岗位」会把对的判成错的。
+ */
+async function expectFairWordedBlockReason(
+  page: import('@playwright/test').Page,
+  selector: string,
+): Promise<void> {
+  const reason = page.locator(selector).first()
+  await expect(reason).toBeVisible()
+  const text = (await reason.textContent()) ?? ''
+  expect(text).toMatch(/招聘会|场次/)
+  expect(text).not.toMatch(/岗位|职位/)
+}
+
+
 test('来源要素缺项：列表「扫码预约」不出码、不记录、常显原因 @kiosk', async ({ page, api }) => {
   // 缺同步时间 + 外部编号：四要素不全，本机没有能力核对这个链接是不是这场的。
   registerFairApi(api, { fair: { syncTime: null, externalId: '' } })
@@ -583,6 +608,8 @@ test('来源要素缺项：列表「扫码预约」不出码、不记录、常�
   const book = page.getByRole('button', { name: '扫码预约' })
   await expect(book).toHaveAttribute('aria-disabled', 'true')
   await expect(page.getByText(/来源要素缺/).first()).toBeVisible()
+  // 多要素缺失走措辞表那一支：这里必须是「这场招聘会 / 该场次」。
+  await expectFairWordedBlockReason(page, '.qxfw-blocked')
   // 卡片上那两格不能是空白标签：阻断说明点名的就是它们，两边要对得上号。
   await expect(page.getByTestId('fair-list')).toContainText('同步 来源平台未提供')
   await expect(page.getByTestId('fair-list')).toContainText('外部编号 来源平台未提供')
@@ -600,6 +627,9 @@ test('来源要素缺项：详情「扫码预约」同样 fail-closed @kiosk', a
   await expectQxWorkbench(page, 'detail', 'detail')
   const book = page.getByRole('button', { name: '扫码预约' })
   await expect(book).toHaveAttribute('aria-disabled', 'true')
+  // 只缺 sourceUrl → 走的是调用方传进去的链接常量那一支（不是措辞表），
+  // 所以这一条覆盖的是 FAIR_BOOKING_LINK_UNAVAILABLE_REASON 而非 'job_fair' 参数。
+  await expectFairWordedBlockReason(page, 'p.why')
   await book.click({ force: true })
   await expect(page.getByRole('dialog', { name: '扫码前往来源平台预约' })).toHaveCount(0)
   await shot(page, 'qx-fair-detail-source-blocked')
@@ -610,6 +640,7 @@ test('来源要素缺项：到场指引「扫码签到」不出码 @kiosk', asyn
   await page.goto('/job-fairs/checkin')
   const checkin = page.getByRole('button', { name: '扫码签到' })
   await expect(checkin).toHaveAttribute('aria-disabled', 'true')
+  await expectFairWordedBlockReason(page, '.qxfw-blocked')
   await checkin.click({ force: true })
   await expect(page.getByRole('dialog', { name: '扫码前往来源平台签到' })).toHaveCount(0)
   await shot(page, 'qx-fair-checkin-source-blocked')

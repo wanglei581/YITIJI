@@ -20,6 +20,23 @@
  */
 export const SOURCE_APPLY_UNAVAILABLE_REASON = '该来源未提供可用的投递链接，请到来源平台查询该职位'
 
+/**
+ * 招聘会场次的来源**预约**链接不可用（`sourceUrl` 缺失或非法）。
+ *
+ * 为什么不复用 SOURCE_APPLY_UNAVAILABLE_REASON：那条说的是「投递链接 / 该职位」，
+ * 对着一场双选会说这两个词是假的 —— 招聘会既不收简历也没有「职位」可查。
+ * 同一理由见 sourceTrustReason 的 SourceEntityKind。
+ */
+export const FAIR_BOOKING_LINK_UNAVAILABLE_REASON = '该来源未提供可用的预约链接，请到来源平台查询该场次'
+
+/**
+ * 招聘会场次的来源**签到**入口不可用（`checkinUrl` 缺失或非法）。
+ *
+ * 与预约分开：到场指引页判的是 checkinUrl，两者在来源侧是两条独立链接，
+ * 合成一句会让用户以为「预约没了」而其实只是签到码没下发。
+ */
+export const FAIR_CHECKIN_LINK_UNAVAILABLE_REASON = '该来源未提供可用的签到入口，请到来源平台查询该场次'
+
 /** 企业当前没有在招岗位（不是「查不到」，是确实为 0）。 */
 export const COMPANY_NO_OPEN_JOBS_REASON = '该企业当前没有在招岗位'
 

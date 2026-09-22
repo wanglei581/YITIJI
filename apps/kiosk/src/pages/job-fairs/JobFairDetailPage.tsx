@@ -27,7 +27,7 @@ import { buildNavUrl } from '../../lib/url'
 import { useFavorites } from '../../favorites/useFavorites'
 import { useAuth } from '../../auth/useAuth'
 import { evaluateJobSourceTrust, sourceTrustReason } from '../jobs/utils/sourceTrust'
-import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
+import { FAIR_BOOKING_LINK_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { FAIR_NOTICE_RULES } from './fairWorkbenchSpecs'
 import { FairQrOverlay, FairSkeletonList } from './components/FairWorkbenchBits'
@@ -157,7 +157,7 @@ export function JobFairDetailPage() {
   }
 
   const isEnded = fair?.status === 'ended'
-  const blockedReason = bookTrust.ok ? '' : sourceTrustReason(bookTrust, SOURCE_APPLY_UNAVAILABLE_REASON)
+  const blockedReason = bookTrust.ok ? '' : sourceTrustReason(bookTrust, FAIR_BOOKING_LINK_UNAVAILABLE_REASON, 'job_fair')
   const isUnpublished = Boolean(fair && fair.publishStatus && fair.publishStatus !== 'published')
   const uiState = loading
     ? 'loading'

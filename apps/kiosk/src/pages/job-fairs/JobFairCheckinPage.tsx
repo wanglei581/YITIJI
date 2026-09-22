@@ -27,7 +27,7 @@ import { getJobFairs, getTerminalId } from '../../services/api'
 import { recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { SOURCE_ELEMENT_MISSING_TEXT, evaluateJobSourceTrust, sourceTrustReason } from '../jobs/utils/sourceTrust'
-import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
+import { FAIR_CHECKIN_LINK_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { FAIR_NOTICE_RULES } from './fairWorkbenchSpecs'
 import { FairQrOverlay, FairSkeletonList } from './components/FairWorkbenchBits'
@@ -58,7 +58,7 @@ function CheckinEntryCard({
   onDetail: () => void
 }) {
   const trust = checkinTrustOf(fair)
-  const blockedReason = trust.ok ? '' : sourceTrustReason(trust, SOURCE_APPLY_UNAVAILABLE_REASON)
+  const blockedReason = trust.ok ? '' : sourceTrustReason(trust, FAIR_CHECKIN_LINK_UNAVAILABLE_REASON, 'job_fair')
   return (
     <article className="qxfw-fair" data-testid={`fair-checkin-card-${fair.id}`}>
       <span className="qxfw-fair-ic"><QrCodeIcon size={28} aria-hidden /></span>
