@@ -29,9 +29,7 @@ import {
 import {
   AiConclusion,
   AI_OUTAGE_CODES,
-  AiDisclaimerLine,
   AigcMark,
-  AiTaskRegion,
   EvidenceLegend,
   useAiTask,
   type AiAvailability,
@@ -50,9 +48,9 @@ import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { JobFitStage } from './JobFitPage'
-import { useRouteIdentityGuard } from './JobFitActionsPage'
+import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import { CareerPlanExistingMaterials } from './components/career-plan/CareerPlanExistingMaterials'
-import { CareerPlanColumns, CareerPlanSelfCheck } from './components/career-plan/CareerPlanSection'
+import { CareerPlanColumns, CareerPlanGenerateRegion, CareerPlanSelfCheck } from './components/career-plan/CareerPlanSection'
 import {
   CtaNote, Ghosts, Guardline, KitRows, ListRows, Nots, RouteCards, Sec, Slots, Steps, Verdict, Waiting,
 } from './jobFit/jobFitQxKit'
@@ -244,15 +242,6 @@ export function CareerPlanPage() {
         action: { label: '先做一次自我探索', onClick: goSelfAssessment },
       }
 
-  const runningBlock = (
-    <Waiting
-      icon={<BotIcon size={34} />}
-      title="生成请求已提交给服务端"
-      desc="正在读你的简历，整理方向与缺口。进度由后端任务状态决定，本页不会自己把它走完。"
-      tag="整体等待中，没有百分比"
-    />
-  )
-
   const handleGenerate = async () => {
     // 这里刻意**不看** aiTask.canStart：首屏读取只要撞上一次能力级错误，`aiOutage` 就被
     // 写死、canStart 恒 false，生成钮一旦被它包住就再也回不来（AI 恢复了也只能退出重进）。
@@ -368,7 +357,6 @@ export function CareerPlanPage() {
       icon={generating ? null : <ArrowRightIcon size={22} aria-hidden="true" />}
     />
   )
-  const generateError = error ? <p className="jfq-alert" role="alert">{error}</p> : null
 
   function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; body: ReactNode; cta: ReactNode } {
     if (screen === 'missing-task') return {
@@ -619,12 +607,7 @@ export function CareerPlanPage() {
             让它从屏幕上消失（否则打印这条非 AI 能力跟着一起没了）。所以本区域只治理
             「再生成一次」这个 AI 任务面，规划正文渲染在它之外。
           */}
-          <div className="rdq-ai">
-            <AiTaskRegion task={aiTask} label="重新生成求职方案" running={runningBlock} fallback={fallback}>
-              <p className="rdq-muted">这份规划已经生成并存好，打印不依赖 AI；简历更新之后可以回来重新生成一次。</p>
-            </AiTaskRegion>
-            {generateError}
-          </div>
+          <CareerPlanGenerateRegion task={aiTask} fallback={fallback} error={error} regenerate />
 
           <Sec title="继续下一步" hint="都是既有流程">
             <KitRows items={[
@@ -647,30 +630,8 @@ export function CareerPlanPage() {
     }
 
     // 以下四屏都没有已生成的 plan：guide（idle）/ generating（running）/ ai-down / failed。
-    // 同一个 AiTaskRegion 按 data-aitask 四态渲染，屏与屏之间只换外围的说明与出口。
-    const generationRegion = (
-      <div className="rdq-ai">
-        <AiTaskRegion
-          task={aiTask}
-          label="AI 生成求职方案"
-          running={runningBlock}
-          fallback={fallback}
-          idle={(
-            <>
-              <ul className="rdq-guide-list">
-                <li>已有材料：来自你已保存的简历与文档，不经过模型。</li>
-                <li>目标与方向：提供 1–3 个建议及可开始的第一步。</li>
-                <li>尚需准备：按阶段整理技能缺口。</li>
-                <li>执行计划：近期可动手的清单。</li>
-              </ul>
-              <AiDisclaimerLine>方向、缺口和行动清单都由 AI 判断，仅供参考；硬门槛（证书等）与「简历漏写」会分开写，不混成一句「你不行」。</AiDisclaimerLine>
-              <p className="rdq-muted">岗位匹配或模拟面试已完成时，会在真实数据可用的范围内帮助建议更具体；没有也能直接生成。</p>
-            </>
-          )}
-        />
-        {generateError}
-      </div>
-    )
+    // 同一个生成任务面（CareerPlanGenerateRegion 里的 AiTaskRegion）按 data-aitask 四态渲染，屏与屏之间只换外围的说明与出口。
+    const generationRegion = <CareerPlanGenerateRegion task={aiTask} fallback={fallback} error={error} />
 
     if (screen === 'generating') return {
       title: '已提交生成，等待返回',

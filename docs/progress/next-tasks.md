@@ -48,7 +48,10 @@ F2 career-plan / actions 身份闸（含 401 后浏览器返回的跨挂载补�
 （见 current-progress 顶部），不要重做。合流后在集成 SHA 跑 W3 全套（含新 `resume-decision-identity-fusion-w3.spec.ts`）
 与 job-fit/k2a 门禁，再刷新项目图谱；Windows 一体机（Edge/Chrome Kiosk）上两条 401→回登录页→返回链路仍需真机复验。
 其他路由更早历史记录里的 state、401 出口 `from` 带任务号需由 401 出口 / 隐私边界统一处理，另立项。
-职业规划页 835 行、行动清单页 805 行，均超 800 行，需评估把身份闸 hook 拆成独立文件。模板预览体验另行处理，不并入本项。
+两页超 800 行已有本地收口候选（身份闸 hook 独立为 `apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts`，
+职业规划页 796 行、行动清单页 714 行，见 current-progress 顶部「代码规模收口」），不要重做；与身份闸候选一并合流后再刷新项目图谱。
+本地 W3 全套有 2 条 USB 简历用例（`/resume/source`）在基线 `fa60349ac` 构建上即失败，合流后在集成 SHA 复跑并定位。
+模板预览体验另行处理，不并入本项。
 
 F2 稿 46 宿主四条路由已全部有本地迁移候选（job-fit 已合流；actions / career-plan / templates 本地提交，
 证据见 current-progress 顶部）。下一步：Codex 合流后在集成 SHA 重跑 W3/W6 与 k2a/k2b/fusion-w3；

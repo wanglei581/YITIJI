@@ -160,6 +160,34 @@ sha256 逐字节恢复后退出 0。1080×1920 与 390×844 截图已人工核�
 合流后已刷新既有 `docs/graph` 生成索引。限制：金额卡来源文案仍写 `POST /orders/quote`；
 合并版上的 409 与参数变化迟到响应无专门浏览器用例；Word 转换在报价前执行，409 时可能留下派生 PDF。
 本次新 HEAD 尚未 push/PR/CI，未碰生产、真实支付或硬件；`CI / DEVICE / PRODUCTION / PAYMENT / COMMERCIAL: NO-GO`。
+2026-09-23 **F2 决策工作台代码规模收口（本地候选，基线 `fa60349ac`）。**
+Claude `claude-opus-5-5` session `8c1f0b47-5794-4688-a211-0c133aa6ed76`；只收口行数与依赖方向，不改功能。
+`useRouteIdentityGuard`（连同 `scrubRouteHistoryEntry`、`aiResumeSessionKey` 与生成/打印独占类型）原样搬到新文件
+`apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts`，两页各自引用；职业规划页不再从 `JobFitActionsPage` 引入，页面到页面的依赖已消除。
+与原代码块逐行 diff 只差两处：文档首行「本页」改成两条路由名；`.ts` 文件里不生效的 react-refresh eslint-disable 删掉（原因说明已在文档里）。
+职业规划页原有两处重复的生成任务面（首次生成的 idle 四栏说明、已有规划时的「重新生成」，两处共用的等待块和生成错误告警）
+合并为 `components/career-plan/CareerPlanSection.tsx` 新增的纯展示件 `CareerPlanGenerateRegion`（用 `regenerate` 区分两种，
+fallback 仍由页面派生）。行数：CareerPlanPage 835→796，JobFitActionsPage 805→714，CareerPlanSection 101→149，新 hook 97 行；
+除上述失效的 eslint-disable 外没有删注释，也没有压空行；路由、CSS、API、测试文件未改。
+验证：pnpm 仍被依赖结构守卫拒绝，因此改用本地二进制；构建只写 `/tmp/f2-size-20260923/`，Playwright 用 /tmp 临时配置在 4297 端口起 vite preview，收尾时端口已释放。
+tsc --noEmit、tsc -b、eslint apps/kiosk/src（0 error，改动文件 0 warning）、3 份 vite build 均退出 0。图谱关联的 9 条门禁
+（ai-artifact-print-url-contract、ai-down-fallbacks、fusion-w3、kiosk-frontend-debt、lightflow-k2a-career 77 checks、
+profile-commercial-first-batch、profile-documents-inkpaper、job-fit-m1-5-ui、kiosk-runtime-error-boundary）和 W3 节点契约 4/4 均退出 0；
+kiosk 可在本机运行的 `verify:*` 90 条全部退出 0（另有 7 条依赖环境，未跑：prod-build-config、qingxu-proto-geometry、5 条 probe）；
+repository-integrity 与合规/诚实性 4 条也退出 0。
+浏览器：W3 身份 8 条 + 相邻岗位匹配/决策工作台 8 条共 16/16；career-plan-materials 2/2；W6 两条路由几何 3/3
+（1080 route surface ×2、career-plan 390 断点）。
+DOM 等价：用 /tmp 探针分别对基线 HEAD 构建和本构建抓 11 个状态（职业规划 missing / guide / guide 生成错误 / generating /
+ai-down / failed / ready / ready 重新生成中 / ready 重新生成错误，行动清单 missing / ready），每个状态各抓 1080×1920 和 390×844 两种视口；
+`main` 与操作条 outerHTML、全部元素盒 22/22 逐字节相同。
+阳性对照：去掉「重新生成」完成态文案后，探针恰好报 4 条 ready 记录不同；去掉 hook 里 401 同步清理后，身份第 8 条变红、
+其余 7 条仍绿（与上次消融一致）。这说明被测构建走的确实是新模块。
+W3 全套 33 条中 31 条通过；2 条 USB 简历用例（`/resume/source`）失败，在基线 HEAD 构建上同样失败，与本改动无关，未处理。
+项目图谱：已提交的 `docs/graph` 在基线就已过期（`--check` 退出 1），且不在本任务写入预算内，所以未刷新。在 /tmp 镜像里对基线和本改动各自重新生成，
+差异只有 kiosk 源文件 616→617、可达 555→556；没有门禁直接断言新 hook；两条路由的 route 查询结果基线与本改动一致。
+界限：仅本地提交候选，未 push、开 PR 或部署；未跑 W6 全套与 CI；Windows 一体机真机与生产均未验证；图谱待合流后刷新。
+`SOURCE / LOCAL`：本任务范围本地通过；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+
 2026-09-23 **F2 决策工作台两条路由身份闸（本地候选，基线 `fb2f305b2`）。**
 Claude `claude-opus-5-5` session `c00c485f-2a16-4e5b-90e3-a2a6a7ca398d`；冷审并接手两次超时会话留下的
 未提交在制品（未丢弃）。`/resume/career-plan`、`/resume/job-fit/actions` 挂载时绑定会员 id + 令牌与本机
