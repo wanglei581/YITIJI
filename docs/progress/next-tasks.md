@@ -2,7 +2,9 @@
 
 小程序补签与冷启动身份修复已合入 `9d7170d32`，合流完整 `verify:static` 退出 0。
 不要重复修复下方历史“未合入/待修冷启动”事项；下一步为最终 SHA CI、DevTools 和双账号真机验收。
-新模型调用等待 Claude Opus 5.5 的可验证 ID；现有 CI 与验收证据整理继续，不能用 opus 别名冒充。
+外部执行统一显式 `claude-opus-5-5` / `xhigh`（已实测可调用），不因模型切换重做已完成工作。
+小程序验收先确认隔离 API/数据库/Redis 与项目权限，不直接使用默认生产 API；目前只有一个
+微信测试账号，真实跨账号验收待第二个受控账号，不能用模拟身份或两台设备冒充。
 
 F2 已整合 `/resume/job-fit` 单路由候选，先验证合流后 W3 与相关门禁；通过后继续同稿的
 `/resume/job-fit/actions`、`/resume/career-plan`、`/resume/templates`，不得重做已完成结果页。
