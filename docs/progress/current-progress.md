@@ -1,5 +1,17 @@
 # 当前开发进度
 
+2026-09-23 **#1042 扫描历史用例夹具竞态已本地修复（仅测试）。** `aa46be8f0` 的 CI 唯一失败
+`browser history cannot return to a completed scan left by documents` 断在前置锚点 `/print-scan$`
+（实得 `/print-scan?stage=start`），未走到历史/隐私断言：登录回跳只等 pathname，`ScanWorkbenchPage`
+随后异步把裸 `/scan` 补成 `?stage=start`，用例抢先 pushState 使补写贴上锚点。属用例准备竞态，
+非 CI 基础设施、非不变量失守。仅改 `kiosk-scan-safety.spec.ts`：新增 `settleOnScanStart`
+（规范 URL + 选类型屏可见），历史组与同根的「离开完成态清登记」组共用；未改生产源码、未放宽断言、无固定等待。
+本机无节流 40/40 复现不出；临时 CDP 8× CPU 节流下原码 documents 历史 12/15 红、清登记组 5/10 红
+（后者 CI 未报，节流下同根暴露），修后同节流 60/60 绿，探针已删。无节流历史三变体 ×20 为 60/60，
+`pnpm --filter @ai-job-print/kiosk test:browser:scan-safety` 38/38，均退出 0。反向变异
+`ScanResultPage.tsx:243` `replace: true`→`false`：三变体全红于后退第 ② 步（期望 `/print-scan`、实得 `/scan`），
+恢复后哈希一致、15/15 绿。远端 CI、合并、生产与真机均未验证。
+
 2026-09-23 **小程序双批修复已整合并复验。** 来源 `9ec68f58c` / `c0bc70b50`，
 合流 `043613e87` / `9d7170d32`；合流后完整 `pnpm --filter @ai-job-print/miniapp verify:static`
 退出 0，含会话时序与变异 57/57。下方来源记录中的“未合入”仅描述历史状态。
