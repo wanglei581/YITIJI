@@ -144,6 +144,9 @@
   .qx-resume-triage .qx-rt-dimchip { font-size: 15px; gap: 8px; padding: 0 10px; }
   .qx-resume-triage .qx-rt-phone .grid { grid-template-columns: minmax(0, 1fr); }
   .qx-resume-triage .qx-rt-track { flex-wrap: wrap; }
+  /* 标题的 flex:1 基准是 0，flex-wrap 永远不换行，按钮就把标题挤成两字一列；
+     让标题占满图标（54px + 间距 14px）右侧整行，「换一种来源」自然落到第二行。 */
+  .qx-resume-triage .qx-rt-track .tx { flex-basis: calc(100% - 68px); }
   .qx-resume-triage .qx-rt-filecard { padding: 16px; }
   .qx-resume-triage .qx-rt-filecard b { font-size: 20px; }
   .qx-resume-triage .qx-rt-kv { padding: 2px 16px; }

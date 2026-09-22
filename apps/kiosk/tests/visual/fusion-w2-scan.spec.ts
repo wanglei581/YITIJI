@@ -521,6 +521,53 @@ test('resume scan return keeps the same scanned file and a late parse result nev
   await expectHealthy(page, errors)
 })
 
+test('resume scan-ready track title stays horizontal at 390x844 @w2', async ({ page, api }, testInfo) => {
+  // 2026-09-23 实拍：390 下「换一种来源」把交接标题挤成两字一列（7 行竖排）。
+  // 交接链路按 1080 真走一遍（扫描工作台是 1080 舞台，不在本用例范围），回到来源页后再切 390 量。
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  registerShell(api)
+  api.respond('POST', '/api/v1/resume/parse', {
+    status: 503,
+    json: { success: false, error: { code: 'W2_STOP_AFTER_NAV', message: 'synthetic stop' } },
+  })
+
+  await seedScanResult(page, resultState)
+  await page.goto('/scan?stage=result')
+  await expectPdfCompleted(binary)
+  await page.getByRole('button', { name: /AI 简历识别/ }).click()
+  await page.waitForURL('**/resume/parse')
+  await page.getByRole('button', { name: '返回简历来源' }).click()
+  await page.waitForURL((url) => url.pathname === '/resume/source')
+  await expect(page.getByRole('region', { name: '扫描件交接' })).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
+
+  const track = page.getByRole('region', { name: '扫描件交接' }).locator('.qx-rt-track')
+  const title = track.getByText('扫描原件 · 由扫描工作台交接', { exact: true })
+  const swap = track.getByRole('button', { name: '换一种来源' })
+  await expect(title).toBeVisible()
+  await track.scrollIntoViewIfNeeded()
+  const lines = await title.evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    return new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size
+  })
+  // 与 W3 顶栏胶囊同一口径：允许折两行，不许逐字竖排（每行至少四个字，最多两行）。
+  expect(lines, '交接标题不得被按钮挤成竖排').toBeLessThanOrEqual(2)
+  const titleBox = await title.boundingBox()
+  const swapBox = await swap.boundingBox()
+  expect(titleBox && swapBox, '标题与按钮都必须有包围盒').toBeTruthy()
+  const overlaps = titleBox!.x < swapBox!.x + swapBox!.width && swapBox!.x < titleBox!.x + titleBox!.width
+    && titleBox!.y < swapBox!.y + swapBox!.height && swapBox!.y < titleBox!.y + titleBox!.height
+  expect(overlaps, '「换一种来源」不得与标题重叠').toBe(false)
+  expect(swapBox!.height).toBeGreaterThanOrEqual(48)
+  expect(swapBox!.width).toBeGreaterThanOrEqual(48)
+  await page.screenshot({ path: testInfo.outputPath('qx-resume-scan-ready-390.png'), fullPage: false })
+  await expectHealthy(page, errors)
+})
+
 test('successful scan tells a guest the file will not reach 我的文档 @w2', async ({ page, api }) => {
   // 本用例全程未登录。原版断言按钮是「登录后管理文件」并点进 /login——
   // 那句承诺是假的：游客扫描件 ownerType='system'，没有认领机制，登录后
