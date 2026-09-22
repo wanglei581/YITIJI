@@ -1,5 +1,22 @@
 # 当前开发进度
 
+2026-09-22 **自我探索四路由迁入青序流光并完成主候选合流。** Claude 前端批次已由
+`6a7a7e94a` 产出，Codex 在确认主线同名 Qx 文件不存在、完成图谱核对后合入本候选，落地提交
+`1c3f9daf6`。本轮只改 `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx`、
+`components/self-assessment/SelfAssessmentQxKit.tsx` 和 `self-assessment-qx.css`，没有新增路由，
+没有改 `apps/miniapp/`、services、Prisma、workflow、Windows Agent 或生产配置。
+
+- **行为收口：** `/resume/self-assessment/{intro,questions,result,history}` 共用青序流光壳；恢复登录
+  后的 `from` 返回上下文；答题页 fail-closed 不再回到当前答题页；门禁说明移出滚动区；历史页按
+  实际内容吸收余量，避免空态大块死白。Qx 组件和样式文件是本批迁移所需的真实实现，不是占位文件。
+- **本机证据（绑定 `1c3f9daf6`）：** `kiosk typecheck` 退出 0；`verify:kiosk-frontend-debt`、
+  `verify:ai-artifact-print-url-contract`、`verify:resume-phone-upload-ui` 退出 0；既有
+  `fusion-self-assessment-flow.spec.ts` 在 `kiosk-1080x1920` 下 **3/3 passed**；`git diff --check`
+  和 `git show --check` 退出 0。仓库没有 `verify:self-assessment-qx` 脚本，因此不把该名称登记为通过。
+- **证据边界：** `SOURCE / LOCAL: GO` 仅代表本地源码和目标流程已验证；`CI / DEVICE / PRODUCTION /
+  COMMERCIAL: NO-GO` 仍成立。当前候选未 push、未开集成 PR、未部署、未操作 Windows/Pantum、未执行
+  真实支付或退款。全站仍有旧壳活路由，不能把本批四路由迁移写成全站视觉统一完成。
+
 2026-09-20 **服务台 P2：deviceChecking 诚实播报、面试技巧出口闸门、政策 AI 记录文案。**
 Claude 实现，Grok 验收（session `1135623b-34b6-4254-af70-20a4c560d808`）。
 父 HEAD `07b21b3062c56d2fcd39ed488f784d5ec8c6a1e1`；落地 SHA 以本 docs 提交为准。

@@ -1,5 +1,25 @@
 # 下一步任务
 
+## 2026-09-22：先验收自我探索批次，再进入下一组前端施工
+
+提交 `1c3f9daf6` 已进入唯一集成候选，完成自我探索四路由的青序流光迁移和出口/门禁修复。
+本批本地证据为 typecheck、三项相关 verify 和 `fusion-self-assessment-flow.spec.ts` **3/3**；
+不存在名为 `verify:self-assessment-qx` 的仓库脚本，不能将其列为验证项。下一阶段不得重复改这三份文件，
+除非新证据证明回归。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| 0 | Codex | 保持 `1c3f9daf6` 为候选锚点，核对工作树和提交差异，不把本地绿灯外推到 CI/设备/生产 | 主候选只保留一个；`.gitignore` 既有未提交改动不回滚；无重复自评实现 |
+| 1 | Claude | 只认下一组不与自评文件重叠的旧壳页面，按视觉真值逐组迁移；先提交施工范围和文件预算 | 每个批次明确路由、复用组件、API/权限/空错态；不新增重复入口、不制造假数据 |
+| 2 | Grok `grok-4.7-build-fast xhigh` | 对 `1c3f9daf6` 做短、可复核的对抗审查，可派不重叠只读子代理；优先查路由退出、API 契约、隐私和反向变异 | 返回绑定 SHA、发现项、命令与退出码；超时或沉默不算 GO，不重复实现前端 |
+| 3 | Agy | 只读复核 miniapp↔kiosk 身份、订单、文件、支付、打印/扫描状态契约与候选 SHA | 输出 SOURCE/LOCAL/CI/DEVICE/PRODUCTION 分层结论；未有真机证据保持 NO-GO |
+| 4 | 合流后门禁 | 依次执行 route manifest、visual unity、fusion、browser route sweep、repository integrity、目标 Playwright 和反向变异 | 全部绑定同一候选 SHA；删除旧代码前必须有零引用/零测试/零部署依赖证据 |
+| 5 | 后置收口 | CI、Windows/Pantum、小程序 Trial/真机、生产备份迁移回滚、真实支付退款对账、UAT | 未经对应授权与真实证据，不得标记 CI/DEVICE/PRODUCTION/COMMERCIAL GO |
+
+全局前端收口仍以正式台账为准：所有活路由必须最终只使用青序流光；本批只完成 4 条路由，不能
+改变全站旧壳剩余统计。小程序、后台大屏、设备和生产任务继续并行审查，但每个 worktree 只允许一个
+写入者，先审查后写入，避免重复修复和代码堆积。
+
 ## 2026-09-20：服务台 P2 已验收（诚实播报 / 技巧出口 / 政策文案）
 
 Claude 实现、Grok 验收已合入本分支（父 `07b21b306`，落地 SHA 见 `current-progress.md` 顶部）。三项都不是新路由：deviceChecking 提示条、`/health` 503 下面试技巧可读但不能进 setup、政策「我的」入口不再声称不存在的问答历史。
