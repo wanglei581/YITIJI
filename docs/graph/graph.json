@@ -17098,6 +17098,7 @@
       "apps/kiosk/scripts/verify-scan-input-safety.mjs"
     ],
     "apps/kiosk/src/lib/capabilityReasons.ts": [
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs"
     ],
     "apps/kiosk/src/lib/fileName.ts": [
@@ -17493,7 +17494,8 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx": [
-      "apps/kiosk/scripts/verify-jobfair-checkin.mjs"
+      "apps/kiosk/scripts/verify-jobfair-checkin.mjs",
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -17594,6 +17596,7 @@
       "apps/kiosk/scripts/verify-job-info-ui.mjs"
     ],
     "apps/kiosk/src/pages/jobs/utils/sourceTrust.ts": [
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/kiosk/src/pages/legal/LegalDocPage.tsx": [
@@ -25148,6 +25151,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/lib/capabilityReasons.ts",
           "apps/kiosk/src/lib/regions.ts",
           "apps/kiosk/src/lib/url.ts",
           "apps/kiosk/src/pages/campus/CampusPage.tsx",
@@ -25155,6 +25159,7 @@
           "apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMapPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx",
           "apps/kiosk/src/pages/job-fairs/QxFairWorkbench.tsx",
@@ -25166,6 +25171,7 @@
           "apps/kiosk/src/pages/job-fairs/components/RegionPicker.tsx",
           "apps/kiosk/src/pages/job-fairs/fairWorkbenchSpecs.ts",
           "apps/kiosk/src/pages/jobs-fairs-prototype.css",
+          "apps/kiosk/src/pages/jobs/utils/sourceTrust.ts",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/api/httpAdapter.ts"
         ],
