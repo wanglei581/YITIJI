@@ -2,7 +2,9 @@
 
 小程序补签与冷启动身份修复已合入 `9d7170d32`，合流完整 `verify:static` 退出 0。
 不要重复修复下方历史“未合入/待修冷启动”事项；下一步为最终 SHA CI、DevTools 和双账号真机验收。
-外部执行统一显式 `claude-opus-5-5` / `xhigh`（已实测可调用），不因模型切换重做已完成工作。
+协作固定为：Codex 仅决策、串行整合与验收；Claude `claude-opus-5-5` / `xhigh` 独占前端实现与
+最终视觉确认；Grok `grok-4.7-build-fast` / `xhigh` 承担主要后端、测试与反证；Agy 做架构/契约，
+Hermes 暂停。每个 worktree 仍只有一个 writer，不因模型切换重做已完成工作。
 小程序验收先确认隔离 API/数据库/Redis 与项目权限，不直接使用默认生产 API；目前只有一个
 微信测试账号，真实跨账号验收待第二个受控账号，不能用模拟身份或两台设备冒充。
 
@@ -12,14 +14,15 @@ F2 已整合 `/resume/job-fit` 单路由候选，先验证合流后 W3 与相关
 
 当前统一 PR 为草稿 [#1042](https://github.com/wanglei581/YITIJI/pull/1042)，不得重复开集成 PR。
 优先取得其最终 HEAD 的 CI 与 Windows 行为结果；失败按实际 job 处理，不将 draft 自动合并或部署。
-其 `aa46be8f0` 的 scan-safety documents 历史用例失败已判为用例夹具竞态并本地修复（仅 spec，38/38）；
-待新 HEAD 远端 CI 确认，勿为此改生产扫描源码或放宽 `/print-scan$` 锚点。
-定价链 Agy 窄审仅确认源码已有权限/缺配置拒绝/服务端重算机制；HTTP 越权、改价后的用户确认体验仍待验证。
+其 `aa46be8f0` 的 `build-and-verify` 与 `postgres-readiness` 已通过；scan-safety documents 历史用例
+失败已判为夹具竞态并在本地集成树修复（仅 spec，完整 38/38），待新 HEAD 远端 CI 确认，勿改生产扫描源码
+或放宽 `/print-scan$` 锚点。Windows internal validation 被取消并阻断 MSI；根因由独立窗口分析，当前仍非 Windows GO。
+打印改价二次确认已落本地集成树；下一步只做精确新 SHA 的定向验证与远端 CI，不重复开发。
 
-## 2026-09-23：打印改价二次确认待集成
+## 2026-09-23：打印改价二次确认已本地集成，待最终 SHA CI
 
-本地分支 `codex/print-price-confirmation-20260923` 已实现 409 `PRICE_CHANGED` 与确认页再确认，不要重复实现。
-下一步：集成方合入后运行 `pnpm graph` 同步图谱，并在最终 SHA 跑 CI（含 `verify:print-jobs`、`test:browser:truth`）；
+来源 `f50938b845` 已合入并刷新项目图谱，不要重复实现 409 `PRICE_CHANGED` 与确认页再确认。
+下一步：在最终 SHA 跑定向本地门禁与远端 CI（含 `verify:print-jobs`、`test:browser:truth`）；
 补合并版 409、金额卡来源文案；小程序建单是否需要同样的金额断言另行评估。
 真机、真实支付渠道与生产验收仍为 NO-GO。
 

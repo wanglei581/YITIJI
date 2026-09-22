@@ -21446,6 +21446,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -21570,6 +21571,7 @@
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -22911,10 +22913,12 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
-      "services/api/scripts/verify-package-order-idempotency.ts"
+      "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
@@ -23386,6 +23390,7 @@
       "services/api/scripts/verify-terminal-identity.ts"
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
+      "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-terminal-identity.ts"
     ],
     "services/api/src/terminals/terminal-toolbox.service.ts": [
@@ -33886,18 +33891,23 @@
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/payment-session-token.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/print-jobs/dto/create-print-job.dto.ts",
+          "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/print-jobs.controller.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts",

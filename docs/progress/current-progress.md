@@ -1,5 +1,13 @@
 # 当前开发进度
 
+2026-09-23 **当前协作与 #1042 远端证据边界。** Codex 只负责范围决策、串行整合与验收；
+Claude Code 固定 `claude-opus-5-5` / `xhigh`，独占前端实现和最终视觉确认；Grok 固定
+`grok-4.7-build-fast` / `xhigh`，承担主要后端、测试与反证；Agy 只做架构/契约审查；Hermes 暂停使用。
+一个 worktree 仍只有一个 writer，不因模型切换重复已经通过的施工或测试。草稿 PR #1042 的
+`aa46be8f0` 已确认 `build-and-verify` 与 `postgres-readiness` 通过；scan-safety 旧夹具失败已在本地
+集成树修复并完整 38/38 退出 0，仍待新 HEAD 远端 CI。Windows internal validation 被取消，MSI
+因此被阻断；根因由独立窗口继续分析，不能写成 Windows CI 或安装包通过。
+
 2026-09-23 **#1042 扫描历史用例夹具竞态已本地修复（仅测试）。** `aa46be8f0` 的 CI 唯一失败
 `browser history cannot return to a completed scan left by documents` 断在前置锚点 `/print-scan$`
 （实得 `/print-scan?stage=start`），未走到历史/隐私断言：登录回跳只等 pathname，`ScanWorkbenchPage`
@@ -12,8 +20,8 @@
 `ScanResultPage.tsx:243` `replace: true`→`false`：三变体全红于后退第 ② 步（期望 `/print-scan`、实得 `/scan`），
 恢复后哈希一致、15/15 绿。远端 CI、合并、生产与真机均未验证。
 
-2026-09-23 **打印改价二次确认：本地源码层完成，未推送。** 分支 `codex/print-price-confirmation-20260923`，
-基线 `c6c1df925`，Claude `claude-opus-5-5` xhigh，session `89f2c64d-3aa6-4741-aa93-f6ce2b4abe28`。
+2026-09-23 **打印改价二次确认已合入本地集成候选。** 来源 `f50938b845` 已落为 `004bbbef4`；
+来源基线 `c6c1df925`，Claude `claude-opus-5-5` xhigh，session `89f2c64d-3aa6-4741-aa93-f6ce2b4abe28`。
 `POST /print/jobs` 新增可选 `quotedAmountCents`，只作一致性断言；金额仍按最终文件、服务端页数、份数/色彩与当前价目重算。
 不一致即 409 `PRICE_CHANGED`，在建 Order/PrintTask/支付会话之前拒绝；details 以 `key=value` 串带回现价
 （全局过滤器只透传字符串 details）。缺省视为旧客户端照旧建单；null/负数/小数/字符串/超上限为 400。
@@ -27,9 +35,9 @@ order/pricing/cashier-ui/color-duplex/parameter-capability/document-conversion/w
 浏览器 `test:browser:truth` 124、`test:browser:w2` 95、route-sweep 110 通过；kiosk typecheck/eslint 与 16 条相关静态门禁退出 0。
 反向变异（删服务端校验、`ValidateIf`→`IsOptional`、删在途锁、409 后自动重点、删公示价重读）定向用例均退出 1，
 sha256 逐字节恢复后退出 0。1080×1920 与 390×844 截图已人工核对：提示、新金额与再确认按钮可见；390 下页头挤压为既有问题。
-限制：`docs/graph` 因验证脚本新增引用过期（`graph:check` 退出 1，受文件预算未重生成）；金额卡来源文案仍写 `POST /orders/quote`；
+合流后已刷新既有 `docs/graph` 生成索引。限制：金额卡来源文案仍写 `POST /orders/quote`；
 合并版上的 409 与参数变化迟到响应无专门浏览器用例；Word 转换在报价前执行，409 时可能留下派生 PDF。
-未 push/PR/CI，未碰生产、真实支付或硬件；`CI / DEVICE / PRODUCTION / PAYMENT / COMMERCIAL: NO-GO`。
+本次新 HEAD 尚未 push/PR/CI，未碰生产、真实支付或硬件；`CI / DEVICE / PRODUCTION / PAYMENT / COMMERCIAL: NO-GO`。
 
 2026-09-23 **小程序双批修复已整合并复验。** 来源 `9ec68f58c` / `c0bc70b50`，
 合流 `043613e87` / `9d7170d32`；合流后完整 `pnpm --filter @ai-job-print/miniapp verify:static`
@@ -39,8 +47,8 @@ sha256 逐字节恢复后退出 0。1080×1920 与 390×844 截图已人工核�
 退出 0、FAILURES 0；覆盖角色拒绝、伪造机构参数、跨机构缓存与 Partner 禁用。
 该脚本也确认直接修改模拟 admin 行后旧会话缓存仍可返回 200，此断言是行为记录，非安全批准；
 未定位实际内部 admin 禁用入口，不将其误报为已确认漏洞。真实数据库及生产隔离仍未验收。
-外部代理统一 `claude-opus-5-5` / `xhigh`，MCP 显式调用已成功（探针 session
-`04f5c574-d746-4a53-b9fc-820525c2a499`）；models 列表滞后，不再把通用 opus 别名当型号证明。
+当前外部代理分工见本文件顶部：Claude `claude-opus-5-5` / `xhigh` 负责前端与视觉，
+Grok `grok-4.7-build-fast` / `xhigh` 负责主要后端、测试与反证；不再使用“外部统一 Claude”旧口径。
 小程序 DevTools 已安装且 IDE 登录，但当前打开其他项目，未切换或编译本候选。
 开发配置默认指向生产 API，隔离 API/资源尚未确认，不能直接开始账号验收。
 用户确认仅一个微信测试账号：单账号验收可分阶段推进，真实 A/B 隔离仍待第二个受控账号；
