@@ -1,5 +1,16 @@
 # 当前开发进度
 
+2026-09-23 **集成 HEAD F2 身份闸与规模收口已本地合流，商业仍 NO-GO。** Claude 候选
+`7cfd1d1db` 作为 `f1c6309cb` 合入唯一集成分支：两页复用独立身份 hook，
+职业规划页 796 行、行动清单页 714 行，未增路由、API 或业务入口。图谱只更新现有
+`docs/graph/README.md` 与 `graph.json` 的 kiosk 源文件 616→617、可达 555→556。
+在该集成 HEAD 上，kiosk typecheck、fusion-w3、lightflow-k2a-career、job-fit-m1-5-ui、
+`graph:check`、仓库完整性、`git diff --check` 均退出 0；W3 浏览器全套 33/33 通过，
+包括隔离分支上曾失败的两条 `/resume/source` USB 用例。`755fa5a53` 的主 CI
+目前 build-and-verify 与 PostgreSQL readiness 成功，kiosk-browser-smoke 仍在运行；
+该远端 SHA 不包含本地 F2、价格确认、权益额度或 Burn 修复。Windows 仍等新 SHA 实跑，
+未合并、未部署、未做 Pantum/微信真机或真实支付验收。
+
 2026-09-23 **Windows 内部签名把 Burn 附加容器成员 `a0` 当成 0 个嵌入 MSI。** 来源
 [run 35777521091](https://github.com/wanglei581/YITIJI/actions/runs/35777521091) job `106917619898`，
 基线 `755fa5a53465e999cc4505e1f6f9f31d803576f4`，session `223e8203-92c3-4a64-8e21-1adb284134a2`。

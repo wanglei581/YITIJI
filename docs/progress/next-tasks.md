@@ -44,13 +44,13 @@ github-hosted Windows 日志按顺序出现 `runner-guard`、chain、root-import
 `unsigned-exe-upgrade` result separate。不要把静态契约当成非交互信任已修复，不要加假超时，不要 `certutil`，
 不要在失败时退回 CurrentUser。未签名 job 不得接收 opt-in、acknowledgement 或 LocalMachine 信任。
 metadata 写出前被硬杀时无法做精确清理，只依赖一次性 GitHub-hosted VM 销毁；禁止 self-hosted runner 和真实一体机。Windows 仍为 NO-GO。
-F2 career-plan / actions 身份闸（含 401 后浏览器返回的跨挂载补修：有扫描按住与无扫描立即跳转两条路径）已有本地候选
-（见 current-progress 顶部），不要重做。合流后在集成 SHA 跑 W3 全套（含新 `resume-decision-identity-fusion-w3.spec.ts`）
-与 job-fit/k2a 门禁，再刷新项目图谱；Windows 一体机（Edge/Chrome Kiosk）上两条 401→回登录页→返回链路仍需真机复验。
+F2 career-plan / actions 身份闸（含 401 后浏览器返回的跨挂载补修：有扫描按住与无扫描立即跳转两条路径）
+及两页规模收口已合流至集成分支。集成 SHA 的 W3 全套 33/33、job-fit/k2a 与图谱检查均通过，
+此前隔离分支的两条 USB 简历失败在本集成树未复现，不再作为当前阻塞；不要重做。
+Windows 一体机（Edge/Chrome Kiosk）上两条 401→回登录页→返回链路仍需真机复验。
 其他路由更早历史记录里的 state、401 出口 `from` 带任务号需由 401 出口 / 隐私边界统一处理，另立项。
-两页超 800 行已有本地收口候选（身份闸 hook 独立为 `apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts`，
-职业规划页 796 行、行动清单页 714 行，见 current-progress 顶部「代码规模收口」），不要重做；与身份闸候选一并合流后再刷新项目图谱。
-本地 W3 全套有 2 条 USB 简历用例（`/resume/source`）在基线 `fa60349ac` 构建上即失败，合流后在集成 SHA 复跑并定位。
+身份闸 hook 已独立为 `apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts`；
+职业规划页 796 行、行动清单页 714 行，规模收口已完成本地集成。
 模板预览体验另行处理，不并入本项。
 
 F2 稿 46 宿主四条路由已全部有本地迁移候选（job-fit 已合流；actions / career-plan / templates 本地提交，
