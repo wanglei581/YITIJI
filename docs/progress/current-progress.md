@@ -1,5 +1,24 @@
 # 当前开发进度
 
+2026-09-22 **招聘会八条活路由迁入青序流光并完成语义收口。** Claude 在隔离 worktree 完成并提交
+`1857d61e9`，随后对来源阻断原因做最小修复并提交 `a66760734`；Codex 按顺序合入本候选，当前代码
+落地为 `8feaadfac`、`a856aa7aa`，项目图谱更新为 `c7297adfd`。八条入口是 `/job-fairs`、
+`/job-fairs/checkin`、`/job-fairs/:id` 及其 `companies`、`map`、`materials`、`visit-plan`、`stats`。
+
+- **实现范围：** 八条路由共用 `QxFairWorkbench` 与拆分后的详情/参会材料组件；旧的
+  `FairDataScreen`、`JobFairDetailTabs` 在零引用证据下删除。保留来源可信度、预约/签到 fail-closed、
+  材料预览/打印、加载/空/错误态、终端清场与合规边界。招聘会场次不再复用岗位措辞，来源阻断显示
+  「这场 / 该场次」；岗位默认「这条岗位 / 该职位」有静态阳性对照。
+- **本地证据（绑定当前候选）：** Claude 报告并在其 worktree 执行了 264 条真值/融合 Playwright；
+  语义修复后目标招聘会 Playwright **42 passed**、真值套件 **116 passed**；相关 typecheck、eslint、
+  `verify:jobfair-ui`、`verify:fair-workbench-qx`、`verify:jobfair-checkin`、`verify:jobfair-commercial-closure`、
+  `verify:jobfairs-terminal-priority`、`verify:kiosk-frontend-debt`、`verify:visible-actions-truth`、
+  `verify:fusion-w4` 和合规/原始错误门禁均退出 0；两次文案反向变异均退出 1 后恢复。图谱仅新增预期
+  gate 边，已提交 `c7297adfd`。
+- **证据边界：** `SOURCE / LOCAL: GO` 仅覆盖本地代码和夹具流程；`CI / DEVICE / PRODUCTION /
+  COMMERCIAL: NO-GO` 仍成立。当前候选未 push、未开 PR、未部署、未操作 Windows/Pantum、未执行真实
+  支付/退款。真实招聘会数据、现场统计后端和真机触控仍未验收；全站仍有旧壳活路由。
+
 2026-09-22 **自我探索四路由迁入青序流光并完成主候选合流。** Claude 前端批次已由
 `6a7a7e94a` 产出，Codex 在确认主线同名 Qx 文件不存在、完成图谱核对后合入本候选，落地提交
 `1c3f9daf6`。本轮只改 `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx`、
