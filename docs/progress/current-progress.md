@@ -8,9 +8,17 @@ PostgreSQL readiness、build-and-verify、Kiosk/Admin/Partner 浏览器及路由
 LocalMachine 信任安装阶段已解出 Code Signing EKU；签名前的另一条读取路径误判其缺失。
 Grok 隔离提交 `464a07067` 已作为本地集成提交 `f0157c7f8` 修正读取路径并保持缺失 EKU
 仍拒绝；静态签名契约、仓库完整性及 diff check 均退出 0。该修复尚无新 SHA 的 Windows
-运行时结果，不算签名、MSI 或设备验收通过。小程序确认页、F2 身份清场和权益活动候选均在
-独立审查/修复中，未合入；CI 绿的 `fb21261c9` 不是最终发布 SHA。`DEVICE / PAYMENT /
+运行时结果，不算签名、MSI 或设备验收通过。F2 三路迁移、身份清场及可核销权益空额度保护
+已合入本地候选，W3 33/33、相关静态门禁与图谱检查通过；小程序价格确认页仍在修恢复竞态。
+`fb21261c9` 的 CI 绿不是最终发布 SHA；更新后的 PR HEAD `755fa5a53` 正在远端 CI。
+`DEVICE / PAYMENT /
 PRODUCTION / COMMERCIAL: NO-GO`。
+
+2026-09-23 **可核销权益活动必须带 1 到 9999 的整数额度（本地合流）。** 来源分支 `codex/benefit-activity-quantity-guard-20260923`，起点 `fb21261c9f0135d8e45222b9f2a6ecd6cc97a76c`。`REDEEMABLE_BENEFIT_TYPES`（coupon / free_quota / package_entitlement）在 create、update，以及既有 `validateStoredActivity` 的草稿发布上，缺省、null、0、负数、小数、超过 9999 和非数字都是 400 `BENEFIT_ACTIVITY_QUANTITY_REQUIRED`，文案「可核销权益必须填写 1 到 9999 的整数额度」。写入仍用调用方给出的整数，拒绝后活动行和已有 BenefitGrant 保持原值。`subsidy_eligibility_hint` 继续只接受 null 或未提供，带额度仍是 `BENEFIT_ACTIVITY_QUANTITY_FORBIDDEN`，其领取仍可得到 null 额度。DTO 维持 `@IsOptional` 加 1..9999 整数形状校验：HTTP 上 null 和缺省穿过 ValidationPipe，由 service 返回上述业务码；0 仍是 `VALIDATION_FAILED`。已发布的历史空额度活动在 `claim` 事务内、创建 BenefitGrant 之前走同一个 `assertBenefitQuantity`，返回 `BENEFIT_ACTIVITY_QUANTITY_REQUIRED`；活动行、库存、已有 BenefitGrant、BenefitClaim 和 claim 审计都保持原样。Admin `benefitActivitiesAdmin.ts` 已把 `error.message` 放进 `ApiHttpError`，活动页保存/发布/下架用 `setMessage(error.message)` 展示，这句错误不需要另开 Claude 前端批次。空额度输入仍会提交 null，类型切换时表单会把空值填回 1；那是可见的表单默认值，可选的提交前拦截留给 Claude。
+
+证据在 `/tmp/benefit-quantity-guard/`（隔离 SQLite，`DOTENV_CONFIG_PATH=/dev/null`）：`verify-claim.log` 与恢复后的 `verify-restored.log` 均 `ALL PASS`，`pnpm --filter @ai-job-print/api verify:benefit-activities` 退出 0。把 `assertBenefitQuantity` 的可核销分支改成 `if (true || …) return` 后同一门禁退出 1，失败行是「coupon create 缺省 — expected BENEFIT_ACTIVITY_QUANTITY_REQUIRED, got success」（`verify-mutated.log`）。服务文件 sha256 `eb1c2d3d4b148adc7371a06955966683532963cc6d3c770f20f39e62911f6b31` 逐字节恢复后退出 0。验证脚本 721 行；coupon、free_quota、package_entitlement 的 service create 与 update 都覆盖缺省和 null，拒绝时活动、权益、领取和 AuditLog 计数不变。API typecheck、改动文件 eslint、`graph --check`、`verify:repository-integrity`、`git diff --check` 均退出 0。未改 Admin UI、DTO、Prisma、图谱、会员存量权益、价格、支付或生产。`CI / DEVICE / PAYMENT / PRODUCTION / COMMERCIAL: NO-GO`。
+
+同一窗口只读复现收费 `resume_export` 剩 1 次、两个不同 contentHash：两路 `assertExportAllowed` 都是 `charged` 且 `alreadyPaid=false`，commit 前 `quantityRemaining` 仍为 1；并发 commit 只成功一路，失败路是 `ConflictException` / `BENEFIT_NOT_ACTIVE`（SQLite 把两个写事务串行化，赢家先把权益标成 `used_up`）。失败路 FileObject 仍是 `active`、`endUserId` 属于该会员，本地对象还在，并出现在 `MemberAssetsService.listDocuments`。`serviceRefId` 含 contentHash，`@@unique([serviceType, serviceRefId])` 不约束不同内容。`catch` 后调用 `systemDelete` 只覆盖进程仍在且这次删除调用成功。upload 之后进程崩溃则没有 catch。墓碑写入后对象删除失败会记 `storageDeletePendingAt` 并留给对账重试。墓碑已经写完、pending 尚未写入时进程崩溃，对象可能留下，而现有对账不捞 pending 为空的行。完整修复要另设计可恢复的导出意图或对会员不可见的暂存，本批不实施。证据 `/tmp/resume-export-race/result.json`，`node /tmp/resume-export-race/repro.cjs` 退出 0。
 
 2026-09-23 **小程序会员单与材料包建单可选价格再确认已合入集成候选。** 来源
 `d8a30e589`（父提交 `7c8b5f675`）已落为 `39bb2d404`。

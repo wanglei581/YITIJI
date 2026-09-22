@@ -7,10 +7,16 @@ unsigned EXE 升级通过，但 internal signing 因 EKU 读取误判失败，MS
 本地集成提交 `f0157c7f8` 只修签名前的 EKU 解码，保留无 EKU、私钥、有效期、链与
 清理等 fail-closed 检查；静态验证通过不替代 Windows 实跑。下一步在唯一草稿 PR #1042
 的更新 SHA 上复跑 Windows internal signing、MSI 与完整 CI，确认签名和清理日志均成功。
-小程序价格确认候选有旧订单恢复与迟到报价竞态，F2 有 401 立即跳转后历史残留反例，
-权益空额度候选初审未过；三者由原独立作者修复、验收后再串行合流，不用旧绿测抵消新反例。
+小程序价格确认候选的旧订单恢复与迟到报价竞态仍待 Claude 修复和 Grok 复核。
+F2 的 401 历史残留和权益空额度已本地合流，需最终 SHA CI；F2 两页超过 800 行的
+规模收口另由 Claude 窄范围处理，不用已通过的旧绿测抵消新反例。
 最终发布还须微信隔离环境与双账号（目前仅一个受控测试账号）、Pantum/扫描真机、生产存储与
 备份回滚、真实支付退款对账、内容授权、法务 UAT/试运营证据；未取得前 COMMERCIAL NO-GO。
+## 2026-09-23：可核销活动空额度在创建、编辑、发布和领取时关闭
+
+coupon / free_quota / package_entitlement 的新建、编辑、草稿发布，以及已发布历史行的领取，都必须带 1..9999 的整数 `quantityTotal`。`subsidy_eligibility_hint` 仍只能是 null 或未提供，领取也保持 null。空额度领取在事务内拒绝，不改活动、库存、已有权益、领取记录或 claim 审计。Admin 活动页已经显示后端 `error.message`。空额度输入仍会提交 null，类型切换会把空值填回 1；提交前拦截是可选的 Claude 批次。
+
+收费简历导出剩 1 次、两个不同 contentHash 并发时，失败路文件会留在该会员的「我的文档」。这是已确认的反例，本批不修。catch 后调用 `systemDelete` 只缓解进程仍在且删除成功的窗口，不覆盖 upload 后崩溃，也不覆盖墓碑与对象不一致。完整方案需要另行设计可恢复的导出意图或对会员不可见的暂存。`CI / DEVICE / PAYMENT / PRODUCTION / COMMERCIAL: NO-GO`。
 
 ## 2026-09-23：内部签名 LocalMachine 只有源码/静态契约，签名 job 仍 NO-GO
 
