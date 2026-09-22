@@ -206,12 +206,16 @@ export function ResumeParsePage() {
    * （稿 21 scan-ready），否则一按返回文件就丢了；history back 也回不到扫描结果。
    * 上传来的照旧：顶栏回来源页、底栏「返回上一步」走浏览器历史。
    * 带上真实 intent，优化链路不会被悄悄改成诊断。
+   *
+   * 必须用 replace 把解析页这条历史换掉（顶栏返回、授权取消、扫描件的「返回上一步」都走这里）：
+   * push 会把解析页留在来源页底下，浏览器 / 系统后退一按，解析页带着原来的路由 state 重新挂载，
+   * 用同一个 fileId 和签名链接再提交一次解析，还把这份文件重新摆到屏幕上。
    */
   const scanHandoff = source === 'scan' ? buildScanHandoff(state) : null
   const sourceRoute = state?.intent === 'optimize' ? '/resume/source?intent=optimize' : '/resume/source'
   const leaveToSource = () => {
     cancelRef.current = true
-    navigate(sourceRoute, scanHandoff ? { state: { scanHandoff } } : undefined)
+    navigate(sourceRoute, scanHandoff ? { replace: true, state: { scanHandoff } } : { replace: true })
   }
 
   const view: ParseView = !fileId

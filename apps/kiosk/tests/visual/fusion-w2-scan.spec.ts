@@ -1,7 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
-import { assertNoHorizontalOverflow } from './assert-layout'
+import { assertNoHorizontalOverflow, assertQxPillReadable } from './assert-layout'
 import { setReactRouterState, writeScanWorkbenchSession, SCAN_WORKBENCH_SESSION_KEY, W2_FILE } from './fixtures/fusion-w2-state'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 
@@ -521,6 +521,60 @@ test('resume scan return keeps the same scanned file and a late parse result nev
   await expectHealthy(page, errors)
 })
 
+/*
+ * 顶栏返回把解析页这条历史换成来源页（replace）。浏览器 / 系统后退不能再把解析页翻回来——
+ * 那会让它带着原来的路由 state 重新挂载，用同一个 fileId、同一条签名链接再提交一次解析。
+ * 扫描件交接本身要保住：回到来源页仍落在 scan-ready、仍是同一份文件。
+ * 扫描工作台在 390 下的点击另有遮挡问题（见下一条用例的注释），所以交接按 1080 走，到解析页后再切视口。
+ */
+for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844 }]) {
+  test(`resume scan top back leaves no parse entry so browser back never re-posts (${viewport.width}x${viewport.height}) @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+    const binary = new FusionW2BinaryRoute(page)
+    await binary.install()
+    registerShell(api)
+    const parseBodies: Array<{ fileId?: string; source?: string }> = []
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => { release = resolve })
+    await page.route('**/api/v1/resume/parse', async (route) => {
+      parseBodies.push(route.request().postDataJSON() as { fileId?: string; source?: string })
+      await held
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'W2_LATE', message: 'late' } }) }).catch(() => undefined)
+    })
+
+    await seedScanResult(page, resultState)
+    await page.goto('/scan?stage=result')
+    await expectPdfCompleted(binary)
+    await page.getByRole('button', { name: /AI 简历识别/ }).click()
+    await page.waitForURL('**/resume/parse')
+    await expect.poll(() => parseBodies.length).toBe(1)
+    expect(parseBodies[0]).toMatchObject({ fileId: 'w2-scan-file', source: 'scan' })
+    await page.setViewportSize(viewport)
+    const historyBefore = await page.evaluate(() => window.history.length)
+
+    await page.getByRole('button', { name: '返回简历来源' }).click()
+    await page.waitForURL((url) => url.pathname === '/resume/source')
+    // 换掉而不是压栈：历史条目数不变；同一份扫描件原样落在 scan-ready。
+    expect(await page.evaluate(() => window.history.length)).toBe(historyBefore)
+    const scanBlock = page.getByRole('region', { name: '扫描件交接' })
+    await expect(scanBlock.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
+    await expectHealthy(page, errors)
+
+    await page.goBack()
+    // 后退不再落回解析页：它不重新挂载、不再提交，也不把这份扫描件重新摆出来。
+    await expect(page).not.toHaveURL(/\/resume\/parse/)
+    await expect(page.locator('[data-kiosk-screen="resume-parse"]')).toHaveCount(0)
+    await expect(page.getByText('w2-scan.pdf', { exact: true })).toHaveCount(0)
+
+    // 放行第一次请求的迟到结果后，仍然只有这一次提交。
+    release()
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+    await expect(page.locator('[data-kiosk-screen="resume-parse"]')).toHaveCount(0)
+    expect(parseBodies).toHaveLength(1)
+    expect(errors).toEqual([])
+  })
+}
+
 test('resume scan-ready track title stays horizontal at 390x844 @w2', async ({ page, api }, testInfo) => {
   // 2026-09-23 实拍：390 下「换一种来源」把交接标题挤成两字一列（7 行竖排）。
   // 交接链路按 1080 真走一遍（扫描工作台是 1080 舞台，不在本用例范围），回到来源页后再切 390 量。
@@ -564,6 +618,9 @@ test('resume scan-ready track title stays horizontal at 390x844 @w2', async ({ p
   expect(overlaps, '「换一种来源」不得与标题重叠').toBe(false)
   expect(swapBox!.height).toBeGreaterThanOrEqual(48)
   expect(swapBox!.width).toBeGreaterThanOrEqual(48)
+  // 顶栏胶囊在 390 下折两行：原先逐字断行，第二行只剩一个「认」。现在只在「 · 」处断，不裁字、不藏字。
+  await expect(page.locator('.qx-pill')).toHaveText('扫描件已交接 · 待确认')
+  await assertQxPillReadable(page, '/resume/source scan-ready 390')
   await page.screenshot({ path: testInfo.outputPath('qx-resume-scan-ready-390.png'), fullPage: false })
   await expectHealthy(page, errors)
 })

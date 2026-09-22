@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
-import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
+import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
@@ -491,7 +491,67 @@ test('resume parse consent gate pauses the rail and sends nothing until granted 
   await page.getByRole('button', { name: '暂不使用' }).click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
   expect(parseCalls).toBe(0)
+  // 取消授权同样换掉解析页那条历史：浏览器后退回到交文件之前的来源页，不会把解析页连同授权弹窗翻回来。
+  await page.goBack()
+  await expect(page).toHaveURL((url) => url.pathname === '/resume/source')
+  await expect(page.locator('[data-kiosk-screen="resume-parse"]')).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(parseCalls).toBe(0)
 })
+
+/*
+ * 顶栏返回必须把解析页这条历史换掉（replace），不能压在来源页底下：否则浏览器 / 系统后退会让解析页
+ * 带着原来的路由 state 重新挂载，用同一个 fileId、同一条签名链接再提交一次解析，文件名也重新摆回屏幕。
+ * 1080 与 390（舞台不缩放，顶栏返回键与胶囊走窄屏规则）各走一遍；优化 intent 要原样带回来源页。
+ */
+for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844 }]) {
+  test(`resume parse top back replaces the parse entry so browser back never re-posts (${viewport.width}x${viewport.height}) @w3-kiosk`, async ({ page, api }) => {
+    const runtimeErrors: string[] = []
+    page.on('pageerror', (error) => runtimeErrors.push(error.message))
+    await page.setViewportSize(viewport)
+    terminalBaseline(api)
+    api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+    const parseBodies: Array<{ fileId?: string; source?: string }> = []
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => { release = resolve })
+    await page.route('**/api/v1/resume/parse', async (route) => {
+      parseBodies.push(route.request().postDataJSON() as { fileId?: string; source?: string })
+      await held
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) }).catch(() => undefined)
+    })
+    await page.goto('/resume/source?intent=optimize')
+    await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+    await page.getByRole('button', { name: '上传并生成优化建议' }).click()
+    await page.waitForURL('/resume/parse')
+    await expect.poll(() => parseBodies.length).toBe(1)
+    expect(parseBodies[0]).toMatchObject({ fileId: uploadedResume.data.fileId, source: 'upload' })
+    await expect(page.getByText('求职简历.pdf', { exact: true })).toBeVisible()
+    await expect(page.locator('.qx-pill')).toHaveText('正在解析 · 一次性出结果')
+    await assertQxPillReadable(page, `/resume/parse ${viewport.width}`)
+    const historyBefore = await page.evaluate(() => window.history.length)
+
+    await page.getByRole('button', { name: '返回简历来源' }).click()
+    await page.waitForURL((url) => url.pathname === '/resume/source' && url.search === '?intent=optimize')
+    // 换掉而不是压栈：历史条目数不变。
+    expect(await page.evaluate(() => window.history.length)).toBe(historyBefore)
+
+    await page.goBack()
+    // 后退落在交文件之前的那条来源页，解析页不再挂载，也不再把这份文件摆出来。
+    await expect(page).toHaveURL((url) => url.pathname === '/resume/source' && url.search === '?intent=optimize')
+    await expect(page.locator('[data-kiosk-screen="resume-parse"]')).toHaveCount(0)
+    await expect(page.getByText('求职简历.pdf', { exact: true })).toHaveCount(0)
+
+    // 放行第一次请求的迟到结果：既不把人带去报告页，也始终只有这一次提交。
+    const late = page.waitForResponse('**/api/v1/resume/parse')
+    release()
+    await late
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+    await expect(page).toHaveURL((url) => url.pathname === '/resume/source')
+    await expect(page.locator('[data-kiosk-screen="resume-report"]')).toHaveCount(0)
+    expect(parseBodies).toHaveLength(1)
+    expect(runtimeErrors).toEqual([])
+  })
+}
 
 test('Qingxu topbar stays on one line at 390 and 1080 keeps its full layout @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
@@ -501,6 +561,7 @@ test('Qingxu topbar stays on one line at 390 and 1080 keeps its full layout @w3-
   await page.goto('/resume/source')
   // 1080：窄屏规则一条都不许吃到（顶栏 104、返回键 64、副标题在）。
   expect(await qxTopbarMetrics(page)).toMatchObject({ height: 104, backW: 64, subShown: true, brandLines: 1, pillLines: 1, pillClipped: false })
+  await assertQxPillReadable(page, '/resume/source 1080')
 
   await page.setViewportSize({ width: 390, height: 844 })
   // 本批两页 + 相邻的已迁青序页（报告页在 KioskRoot 内、岗位匹配是整屏路由），都走同一条共用顶栏规则。
@@ -513,6 +574,8 @@ test('Qingxu topbar stays on one line at 390 and 1080 keeps its full layout @w3-
     expect(metrics, route).toMatchObject({ height: 72, brandLines: 1, pillClipped: false, subShown: false })
     // 状态胶囊允许收窄折两行（服务台那句整句说明），但不许逐字竖排：每行至少四个字，最多两行。
     expect(metrics.pillLines, `${route} 「${metrics.pillText}」`).toBeLessThanOrEqual(Math.min(2, Math.ceil(metrics.pillText.length / 4)))
+    // 折两行时按词组断：不许最后一个字单独掉到第二行，带「 · 」的标签不许把短语拆开。
+    await assertQxPillReadable(page, route)
     if (hasTopbarBack === true) expect(metrics.backW, route).toBeGreaterThanOrEqual(48)
     else if (hasTopbarBack === false) expect(metrics.backW, route).toBe(0)
     else expect(metrics.backW === 0 || metrics.backW >= 48, `${route} back ${metrics.backW}`).toBe(true)

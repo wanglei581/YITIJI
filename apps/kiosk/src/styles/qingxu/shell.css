@@ -138,6 +138,8 @@
   [data-kiosk-stage-fit='off'] .qx-topbar-mark { width: 36px; height: 36px; font-size: 19px; }
   [data-kiosk-stage-fit='off'] .qx-topbar-sub,
   [data-kiosk-stage-fit='off'] .qx-topbar-clock { display: none; }
-  /* 胶囊可以收窄、最多折成两行（服务台那种整句说明也放得下），但绝不被裁、不逐字竖排。 */
-  [data-kiosk-stage-fit='off'] .qx-pill { flex: 0 1 auto; min-width: 0; min-height: 40px; padding: 4px 12px; gap: 6px; font-size: 14px; line-height: 1.25; }
+  /* 胶囊可以收窄、最多折成两行（服务台那种整句说明也放得下），但绝不被裁、不逐字竖排。
+   * 折行按词组断（keep-all）：默认的逐字断行会把「扫描件已交接 · 待确认」折成第二行只剩一个「认」。
+   * keep-all 只在空格、标点处断；一段没有空格、单行又放不下的长句才由 anywhere 兜底拆开，不溢出不裁字。 */
+  [data-kiosk-stage-fit='off'] .qx-pill { flex: 0 1 auto; min-width: 0; min-height: 40px; padding: 4px 12px; gap: 6px; font-size: 14px; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; }
 }
