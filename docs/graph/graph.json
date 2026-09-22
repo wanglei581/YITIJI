@@ -11756,7 +11756,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 555,
+      "reachableFileCount": 559,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14369,6 +14369,7 @@
           ],
           "path": "/resume/source",
           "styles": [
+            "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css",
             "apps/kiosk/src/pages/resume/resume-triage-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -14661,7 +14662,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 618
+      "sourceFileCount": 622
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18586,6 +18587,9 @@
     ],
     "apps/kiosk/src/pages/resume/resume-report-qx.css": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-triage-qx.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -25628,6 +25632,7 @@
           "apps/kiosk/src/pages/resume/resume-generate-qx.css",
           "apps/kiosk/src/pages/resume/resume-library-lightflow.css",
           "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
+          "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css",
           "apps/kiosk/src/pages/resume/resume-triage-qx.css",
           "apps/kiosk/src/routes/index.tsx"
         ],

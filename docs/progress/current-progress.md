@@ -1,5 +1,31 @@
 # 当前开发进度
 
+2026-09-23 **稿 21 scan-ready 在 390×844 下交接标题被挤成竖排，已修（本地候选，未 push、未合并、未部署）。**
+基线 `f356a6b26`（稿 21 取件/解析 P1 收口），修复提交 `5fcb1e1ad`。现象：390 下 `.qx-rt-track` 标题
+「扫描原件 · 由扫描工作台交接」被「换一种来源」挤成两字一列，共 7 行。根因是标题 `.tx` 用了 `flex:1`，基准为 0。
+≤640px 虽然开了 `flex-wrap`，但按这个基准算一行永远放得下，按钮就不换行。修法只在现有 `resume-triage-panels-qx.css`
+的 ≤640px 媒体查询里加一条 `.qx-rt-track .tx { flex-basis: calc(100% - 68px) }`（图标 54px 加间距 14px），
+让按钮落到第二行。没有隐藏文字，也没改字号，1080 不受影响。
+W2 在 `fusion-w2-scan.spec.ts` 新增用例「resume scan-ready track title stays horizontal at 390x844」。它先按 1080 真走
+扫描结果 → AI 简历识别 → 解析页顶栏返回，回到 `/resume/source` 后切到 390（舞台缩放为 off），断言三件事：
+标题不超过 2 行、按钮不与标题重叠、按钮宽高都不小于 48px。
+反向变异删掉这条规则后，用例退出码 1，实测 7 行；恢复后退出码 0。
+本地退出码：W2 全套 97/97 为 0，W3 全套 38/38 为 0，kiosk typecheck 为 0。下列门禁也都是 0：
+`verify:lightflow-k2b-ai-resume`、`fusion-w3`、`fusion-w6`、`profile-documents-inkpaper`、`resume-diagnosis-flow-ui`，
+以及 `verify:repository-integrity` 和 `git diff --check`。
+`graph:check` 在基线上已经是红的：`f356a6b26` 新增 4 个源文件后没有重生成图谱。本批只刷新已有的
+`docs/graph/{README,routes,gates}.md` 与 `graph.json`：kiosk 源文件 618→622，可达 555→559，被断言文件 1514→1515。
+刷新后 `graph:check` 为 0。W6 与 route-sweep 没有重跑，因为二者都不在 ≤640px 下覆盖 `/resume/source`。
+390 截图仅供本机目检：`/tmp/rt-shots/scan-ready-390-fixed.png`（/tmp 会被清）。
+稿 21 在 `/resume/source` 与 `/resume/parse` 上仍有以下缺口：
+- `parse-rechecking` 与 `upload-rechecking` 没有后端再查合同，页面只如实报告结果未知。
+- 来源页没有单列 `upload-unknown`，也没有 `scan-expired`、`scan-failed`、`scan-unavailable` 三态，扫描件只有 scan-ready 一态。
+- 整屏预览查看器工具条（`rs-pv-fit-page`、`fit-width`、`prev`、`next`）还没做。
+- `UploadSessionQrPanel` 按冻结契约只做了外层换装。
+- 390 下顶栏胶囊「扫描件已交接 · 待确认」第二行只剩一个「认」字。现有 W3 规则允许折两行，所以不红，属观感问题。
+- 本用例在 390 下直接点 `/scan?stage=result` 的「AI 简历识别」时，点击被 `.sw-xq` / `.sw-truth` 层拦截而超时。
+  扫描工作台不在本任务范围，已观察到但未深查，所以用例改为先按 1080 走完交接。
+
 2026-09-23 **`/resume/source` 与 `/resume/parse` 迁入青序流光（稿 21-resume-triage），本地候选，未合并未部署。**
 Claude 独立 worktree（session `a4074904-cf6f-47f5-860a-18a351d01506`，基线 `ccb2e8715`）。两页从
 `KioskPageFrame` / LightFlow 改为 `QxPageFrame` + 小青任务头与四步轨，登记进 `KioskRoot` 的

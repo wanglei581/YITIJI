@@ -11,6 +11,16 @@
    `UploadSessionQrPanel` 仍按冻结契约处理。
 `/resume/materials`（稿 25）仍是旧壳，是简历域剩下的一处新旧交替。
 
+2026-09-23 追加：候选 HEAD 现为 `5fcb1e1ad`，在 `f356a6b26` 之上修了 390 下 scan-ready 交接标题竖排的问题，
+新增 W2 390 用例，已做反向变异（删规则退出码 1，恢复退出码 0）。本地 W2 97/97、W3 38/38、typecheck 均为 0，
+`graph:check` 刷新已有图谱后为 0。集成方除重跑上面第 1 项外，W2 也要全套重跑。
+稿 21 剩余缺口：
+- `parse-rechecking` 与 `upload-rechecking` 没有后端再查合同，需要先定合同再做页面。
+- 来源页的 `upload-unknown`，以及 `scan-expired`、`scan-failed`、`scan-unavailable` 三态还没单列。
+- 整屏预览查看器工具条（`rs-pv-*`）还没做。
+- 390 下顶栏胶囊折行后第二行只剩一个字。
+- 390 下 `/scan?stage=result` 的「AI 简历识别」点击被 `.sw-xq` / `.sw-truth` 层拦截，属扫描工作台，需要另开任务核实。
+
 ## 2026-09-23：Burn 嵌入 MSI 提取命名已本地修正，Windows 实跑仍 NO-GO
 
 run [35777521091](https://github.com/wanglei581/YITIJI/actions/runs/35777521091) job `106917619898`
