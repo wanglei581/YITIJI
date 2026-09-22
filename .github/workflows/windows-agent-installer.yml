@@ -42,7 +42,9 @@ jobs:
         shell: pwsh
         run: |
           node apps/terminal-agent/installer/verify-installer-inputs.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node apps/terminal-agent/installer/verify-signing-workflow-contract.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Download exact upgrade-tested candidate
         uses: actions/download-artifact@v4
@@ -160,7 +162,9 @@ jobs:
         shell: pwsh
         run: |
           node apps/terminal-agent/installer/verify-installer-inputs.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node apps/terminal-agent/installer/verify-signing-workflow-contract.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build candidate upgrade fixture
         shell: powershell

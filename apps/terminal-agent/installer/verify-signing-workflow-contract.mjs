@@ -43,6 +43,33 @@ assert.doesNotMatch(
   /signed-release-NOT-FOR-DEPLOYMENT\/(?:AIJobPrintAgent\.msi|AIJobPrintTerminalSetup\.exe)/,
   'internal signed binaries must not be uploaded as workflow artifacts',
 )
+
+function workflowJob(haystack, name) {
+  const marker = `  ${name}:`
+  const start = haystack.indexOf(`${marker}\n`)
+  assert.ok(start >= 0, `missing workflow job: ${name}`)
+  const remainder = haystack.slice(start + marker.length)
+  const nextJob = /^  [A-Za-z0-9_-]+:\s*$/m.exec(remainder)
+  const end = nextJob ? start + marker.length + nextJob.index : haystack.length
+  return haystack.slice(start, end)
+}
+
+const nativeExitGuard = 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+for (const jobName of ['unsigned-msi-candidate', 'unsigned-exe-upgrade']) {
+  const job = workflowJob(workflow, jobName)
+  assert.ok(
+    job.includes(
+      `node apps/terminal-agent/installer/verify-installer-inputs.mjs\n          ${nativeExitGuard}\n`,
+    ),
+    `${jobName} Verify installer source contract must exit when verify-installer-inputs fails`,
+  )
+  assert.ok(
+    job.includes(
+      `node apps/terminal-agent/installer/verify-signing-workflow-contract.mjs\n          ${nativeExitGuard}\n`,
+    ),
+    `${jobName} Verify installer source contract must exit when verify-signing-workflow-contract fails`,
+  )
+}
 assert.match(certificateSetup, /\$RootValidityDays = 30/)
 assert.match(certificateSetup, /\$SigningValidityDays = 7/)
 assert.doesNotMatch(certificateSetup, /ValidityYears|AddYears/)
