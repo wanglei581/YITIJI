@@ -451,8 +451,9 @@ test('createPackageOrder：401 静默补签成功后自动重试 —— 换的�
   const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   // exp 不同 → token 字符串不同，于是"重试带的是新 token 还是旧 token"分得开。
+  // sub 必须等于本机 user.id：后端按 user.id 签 sub，utils/auth.js 会比对这两者。
   const makeFakeJwt = (expSeconds) =>
-    [b64url({ alg: 'none' }), b64url({ exp: Math.floor(Date.now() / 1000) + expSeconds }), 'sig'].join('.')
+    [b64url({ alg: 'none' }), b64url({ sub: 'A', exp: Math.floor(Date.now() / 1000) + expSeconds }), 'sig'].join('.')
   const staleToken = makeFakeJwt(1800)
   const freshToken = makeFakeJwt(3600)
   assert.notEqual(staleToken, freshToken, '两个 token 必须真的不同，否则下面那条断言是恒真的')

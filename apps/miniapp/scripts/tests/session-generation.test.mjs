@@ -51,10 +51,18 @@ function fakeToken(sub, ttlSeconds = 3600) {
   return `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc({ sub, exp })}.sig`
 }
 
+/** 没有 sub 的 JWT：证明不了持有者是谁。 */
+function tokenWithoutSubject(ttlSeconds = 3600) {
+  const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
+  return `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc({ exp: Math.floor(Date.now() / 1000) + ttlSeconds })}.sig`
+}
+
+// sub 必须等于 user.id —— 后端 member-auth.service.ts 按 user.id 签 sub。
+// 补签拿到的是同一个人的新 token，所以只换 exp 不换 sub。
 const TOKEN_A = fakeToken('A')
-const TOKEN_A2 = fakeToken('A-resigned')
+const TOKEN_A2 = fakeToken('A', 7200)
 const TOKEN_B = fakeToken('B')
-const TOKEN_B2 = fakeToken('B-resigned')
+const TOKEN_B2 = fakeToken('B', 7200)
 const USER_A = { id: 'A', maskedPhone: '183****0001' }
 const USER_B = { id: 'B', maskedPhone: '183****0002' }
 
@@ -63,9 +71,11 @@ const USER_B = { id: 'B', maskedPhone: '183****0002' }
 //   'throw'  → 接口抛异常（storage.js 会捕获）
 //   'silent' → 不抛，但什么也没写/没删（**返回值盖不住的那一种**）
 
-function createWx() {
-  const store = new Map()
-  const faults = { set: null, remove: null }
+function createWx(seed) {
+  // seed = 冷启动：换一个进程，但盘上的内容原样还在。
+  const store = seed instanceof Map ? seed : new Map()
+  // faults.key/keyMode 只让**某一格**写失败 —— 换号时的 torn write 就是这个形状。
+  const faults = { set: null, remove: null, key: null, keyMode: null }
   const calls = { login: [], request: [], upload: [], toast: [], nav: [], loading: [] }
   const clone = (v) => {
     try {
@@ -82,8 +92,9 @@ function createWx() {
       return store.has(key) ? store.get(key) : ''
     },
     setStorageSync(key, value) {
-      if (faults.set === 'throw') throw new Error('setStorageSync failed')
-      if (faults.set === 'silent') return
+      const mode = faults.key === key ? faults.keyMode : faults.set
+      if (mode === 'throw') throw new Error('setStorageSync failed')
+      if (mode === 'silent') return
       store.set(key, clone(value))
     },
     removeStorageSync(key) {
@@ -111,8 +122,8 @@ function createWx() {
  * 真实模块装进一个只有 wx 替身的沙箱。
  * mutate(name, source) 可在**内存里**改写源码（磁盘上的生产源不动）。
  */
-function createRuntime({ mutate } = {}) {
-  const wx = createWx()
+function createRuntime({ mutate, store } = {}) {
+  const wx = createWx(store)
   // 计时器由测试自己推进：launch.js 的「登录成功 → 600ms 后跳转」不能真等。
   // （vm 的新 realm 本来就没有 setTimeout，必须注入。）
   const timers = []
@@ -616,6 +627,116 @@ for (const mode of ['throw', 'silent']) {
   })
 }
 
+// ── 冷启动：盘上两格分属两个人 ────────────────────────────────────────────
+// 成因是换号时只有一格写成功。本次运行内有内存撤销位兜着，冷启动后它没了，只剩这两格：
+// 页面显示 A 的资料、请求却带着 B 的 token。
+
+const subjectOf = (token) => JSON.parse(
+  Buffer.from(String(token).split('.')[1], 'base64url').toString('utf8'),
+).sub
+
+/** 造一份撕裂的存储：A 已登录，换 B 时只有 failingKey 这一格写失败。 */
+function tornStore(failingKey, mode) {
+  const warm = createRuntime()
+  loginAs(warm, TOKEN_A, USER_A)
+  warm.wx.faults.key = failingKey
+  warm.wx.faults.keyMode = mode
+  assert.equal(warm.auth.saveSession({ token: TOKEN_B, user: USER_B }), false, '写不全的会话不能报成功')
+  warm.wx.faults.key = null
+  warm.wx.faults.keyMode = null
+  assert.equal(warm.auth.isLoggedIn(), false, '本次运行内由内存撤销位兜住')
+
+  const store = warm.wx.store
+  const token = store.get('zyd_token')
+  const user = store.get('zyd_user')
+  assert.ok(token && user, '前提：两格都还有值')
+  assert.notEqual(subjectOf(token), String(user.id), '前提：盘上两格分属两个人')
+  assert.equal(store.get('resignin_eligible'), 1, '前提：补签资格仍在')
+  return store
+}
+
+for (const failingKey of ['zyd_user', 'zyd_token']) {
+  for (const mode of ['throw', 'silent']) {
+    test(`冷启动[${failingKey}/${mode}]：撕裂的两格不得拼成一个会话`, async () => {
+      const torn = tornStore(failingKey, mode)
+
+      // 每次冷启动各用一份拷贝：第一次读就会 clearSession，会改动那份存储。
+      const userFirst = createRuntime({ store: new Map(torn) })
+      assert.equal(userFirst.auth.getUser(), null, 'getUser 先被调用时也必须关着')
+
+      const cold = createRuntime({ store: new Map(torn) })
+      assert.equal(cold.auth.getToken(), null)
+      assert.equal(cold.auth.getUser(), null)
+      assert.equal(cold.auth.isLoggedIn(), false)
+
+      const pending = settle(cold.net.request('/member/print-orders'))
+      await flush()
+      assert.equal(authHeader(cold.wx.calls.request[0]), null, '不得带上任何一方的 token')
+      cold.wx.calls.request[0].success({ statusCode: 401, data: {} })
+      await flush()
+
+      // 补签资格还在，所以能自己修好：补签写回成对的一份会话。
+      assert.equal(cold.wx.calls.login.length, 1)
+      cold.wx.calls.login[0].success({ code: 'CODE-COLD' })
+      await flush()
+      cold.resigninCalls()[0].success({ statusCode: 200, data: { token: TOKEN_B, user: USER_B } })
+      await flush()
+      const replay = cold.wx.calls.request.filter((c) => !c.url.includes('/wx-resignin'))[1]
+      assert.ok(replay, '补签成功后要重放')
+      assert.equal(authHeader(replay), `Bearer ${TOKEN_B}`)
+      replay.success({ statusCode: 200, data: { data: { ok: 1 } } })
+      assert.equal((await pending).ok, true)
+      assert.equal(cold.auth.getUser().id, 'B', '修好之后两格是同一个人')
+    })
+  }
+}
+
+test('冷启动：只有 token、没有 user —— 证明不了是谁就不算登录', () => {
+  const warm = createRuntime()
+  loginAs(warm, TOKEN_A, USER_A)
+  const store = new Map(warm.wx.store)
+  store.delete('zyd_user')
+  const cold = createRuntime({ store })
+  assert.equal(cold.auth.getToken(), null)
+  assert.equal(cold.auth.getUser(), null)
+  assert.equal(cold.auth.isLoggedIn(), false)
+})
+
+test('冷启动：JWT 没有 sub —— 同样证明不了', () => {
+  const warm = createRuntime()
+  loginAs(warm, TOKEN_A, USER_A)
+  const store = new Map(warm.wx.store)
+  store.set('zyd_token', tokenWithoutSubject())
+  const cold = createRuntime({ store })
+  assert.equal(cold.auth.getToken(), null)
+  assert.equal(cold.auth.getUser(), null)
+})
+
+test('冷启动：两格成对时照常恢复登录并带 token', async () => {
+  const warm = createRuntime()
+  loginAs(warm, TOKEN_A, USER_A)
+  const cold = createRuntime({ store: new Map(warm.wx.store) })
+  assert.equal(cold.auth.getToken(), TOKEN_A)
+  assert.equal(cold.auth.getUser().id, 'A')
+  assert.equal(cold.auth.isLoggedIn(), true)
+  assert.equal(cold.auth.canSilentResignin(), true)
+
+  const pending = settle(cold.net.request('/member/print-orders'))
+  await flush()
+  assert.equal(authHeader(cold.wx.calls.request[0]), `Bearer ${TOKEN_A}`)
+  cold.wx.calls.request[0].success({ statusCode: 200, data: { data: { ok: 1 } } })
+  assert.equal((await pending).ok, true)
+})
+
+test('撕裂 + 删除失败：每一次读都还是关着的', () => {
+  const cold = createRuntime({ store: new Map(tornStore('zyd_user', 'silent')) })
+  cold.wx.faults.remove = 'throw'
+  assert.equal(cold.auth.getToken(), null)
+  assert.equal(cold.auth.getUser(), null)
+  assert.equal(cold.auth.getToken(), null, '清不掉不要紧：下一次读现算，仍然关着')
+  assert.equal(cold.auth.isLoggedIn(), false)
+})
+
 // ── 登录页：会话没存下来就不是登录成功 ──────────────────────────────────────
 // 这一段跑的是**真实页面 + 真实 auth**，只有 utils/api 是替身（它是网络边界，和 wx 同类）。
 // 防的是：`auth.saveSession` 返回 false（写不进去 / 安静丢写）时页面照样提示「登录成功」
@@ -736,7 +857,7 @@ const MUTATIONS = [
   {
     name: '新会话不做写完读回',
     build: () => mutator('auth', [[
-      '  const usable = !!data.token && storage.get(storage.KEYS.TOKEN) === data.token\n    && (!data.user || sameJson(storage.get(storage.KEYS.USER, null), data.user));',
+      '  const usable = !!data.token && storage.get(storage.KEYS.TOKEN) === data.token\n    && (!data.user || sameJson(storage.get(storage.KEYS.USER, null), data.user))\n    && identityProven(data.token);',
       '  const usable = !!data.token;',
     ]]),
     scenario: async (opts) => {
@@ -772,6 +893,23 @@ const MUTATIONS = [
     name: '401 准入不再校验代际',
     build: () => mutator('request', [['&& auth.isSameSession(generation);', '&& true;']]),
     scenario: (opts) => switchAccountBeforeInitial401(TRANSPORTS[0], opts),
+  },
+  {
+    name: 'getToken 不再校验 token 与 user 是否同一个人',
+    build: () => mutator('auth', [['if (isTokenExpired(token) || !identityProven(token)) {', 'if (isTokenExpired(token)) {']]),
+    scenario: async (opts) => {
+      const cold = createRuntime({ store: new Map(tornStore('zyd_user', 'silent')), ...opts })
+      assert.equal(cold.auth.getToken(), null)
+      assert.equal(cold.auth.isLoggedIn(), false)
+    },
+  },
+  {
+    name: 'getUser 不再校验 token 与 user 是否同一个人',
+    build: () => mutator('auth', [['  if (!identityProven(storage.get(storage.KEYS.TOKEN))) {\n    clearSession();\n    return null;\n  }\n', '']]),
+    scenario: async (opts) => {
+      const cold = createRuntime({ store: new Map(tornStore('zyd_token', 'throw')), ...opts })
+      assert.equal(cold.auth.getUser(), null)
+    },
   },
   {
     name: '登录页忽略 saveSession 的返回值',

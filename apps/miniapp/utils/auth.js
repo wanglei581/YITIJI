@@ -46,12 +46,40 @@ function isTokenExpired(token, nowMs = Date.now()) {
   return !expiresAt || expiresAt <= nowMs + EXPIRY_SAFETY_MS;
 }
 
+/** JWT 的 sub。后端 member-auth.service.ts 用 user.id 签发。 */
+function tokenSubject(token) {
+  if (typeof token !== 'string') return '';
+  const parts = token.split('.');
+  if (parts.length !== 3) return '';
+  try {
+    const payload = JSON.parse(decodeBase64Url(parts[1]));
+    return payload && payload.sub != null ? String(payload.sub) : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/**
+ * token 与 user 是不是同一个人。
+ *
+ * 两格是两次独立的写：其中一次失败或被安静丢掉，盘上就会一格留着 A、另一格换成 B。
+ * 本次运行内有撤销位兜着，但**冷启动后撤销位没了**，只剩这两格——页面显示 A 的资料，
+ * 请求却带着 B 的 token。证明不了同一个人就当没有会话（每次读都现算，
+ * 因此即使 clearSession 的删除失败，下一次读仍然是关着的）。
+ */
+function identityProven(token) {
+  const subject = tokenSubject(token);
+  const user = storage.get(storage.KEYS.USER, null);
+  const id = user && user.id != null ? String(user.id) : '';
+  return !!subject && subject === id;
+}
+
 function getToken() {
   // 撤销位在存储之前:登出/换号没落盘干净时,旧身份不得再被读出来。
   if (sessionRevoked) return null;
   const token = storage.get(storage.KEYS.TOKEN);
   if (!token) return null;
-  if (isTokenExpired(token)) {
+  if (isTokenExpired(token) || !identityProven(token)) {
     clearSession();
     return null;
   }
@@ -64,6 +92,10 @@ function isLoggedIn() {
 
 function getUser() {
   if (sessionRevoked) return null;
+  if (!identityProven(storage.get(storage.KEYS.TOKEN))) {
+    clearSession();
+    return null;
+  }
   return storage.get(storage.KEYS.USER, null);
 }
 
@@ -137,7 +169,8 @@ function saveSession(data = {}, options = {}) {
   // 写完读回：存不下的会话等于没有会话，对不上就维持 fail-closed
   // （显式登录保持撤销位，补签由调用方按失败处理）。
   const usable = !!data.token && storage.get(storage.KEYS.TOKEN) === data.token
-    && (!data.user || sameJson(storage.get(storage.KEYS.USER, null), data.user));
+    && (!data.user || sameJson(storage.get(storage.KEYS.USER, null), data.user))
+    && identityProven(data.token);
   if (!usable) return false;
   if (!isResignin) sessionRevoked = false;
   return true;

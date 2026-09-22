@@ -459,6 +459,18 @@ if (
 ) ok('401 补签带会话代际（进程内），晚到回调不复活/不覆盖/不误登出')
 else bad('401 补签会话代际防护', '代际必须是进程内计数(不落存储)；登出/显式登录先推进代际并置内存撤销位，撤销位要管住 getToken/getUser/canSilentResignin；新会话写完读回一致才解除撤销；补签与重放按出发代际校验；clearSession 不推进；request.js 不得无条件 auth.logout()')
 
+// 冷启动时内存撤销位已经没了，盘上只剩 token 与 user 两格；它们是两次独立的写，
+// 换号时一格失败就会分属两个人。读接口必须现算一致性（JWT sub === 本机 user.id，
+// 后端 member-auth.service.ts 按 user.id 签 sub），证明不了就按没有会话处理 ——
+// 每次读都现算，所以 clearSession 删不掉也不要紧。
+if (
+  /function identityProven\(/.test(authJs) &&
+  /payload && payload\.sub/.test(authJs) &&
+  /function getToken\(\)[\s\S]{0,320}?\|\| !identityProven\(token\)\) \{\s*\n\s*clearSession\(\);/.test(authJs) &&
+  /function getUser\(\)[\s\S]{0,200}?if \(!identityProven\(storage\.get\(storage\.KEYS\.TOKEN\)\)\) \{\s*\n\s*clearSession\(\);/.test(authJs)
+) ok('token 与 user 必须同一个人（冷启动撕裂写不得拼成会话）')
+else bad('冷启动身份一致性', 'getToken / getUser 必须现算 JWT sub 与本机 user.id 是否一致，不一致按没有会话处理')
+
 const membershipJs = read('pages/membership/membership.js')
 const notificationsJs = read('pages/notifications/notifications.js')
 const loginReturnPages = [documentsJs, membershipJs, notificationsJs]
@@ -476,7 +488,8 @@ function fakeMemberToken(exp) {
 }
 
 function loadAuthForVerify(token) {
-  const state = { zyd_token: token, zyd_user: { maskedPhone: '183****1921' } }
+  // zyd_user.id 必须等于 token 的 sub：auth.js 比对这两者（后端按 user.id 签 sub）。
+  const state = { zyd_token: token, zyd_user: { id: 'verify-user', maskedPhone: '183****1921' } }
   const mockStorage = {
     KEYS: { TOKEN: 'zyd_token', USER: 'zyd_user' },
     get(key, fallback = null) { return Object.prototype.hasOwnProperty.call(state, key) ? state[key] : fallback },

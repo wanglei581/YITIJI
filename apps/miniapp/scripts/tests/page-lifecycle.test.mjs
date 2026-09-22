@@ -157,9 +157,12 @@ const realStorage = requireMiniapp('../utils/storage.js')
 const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 
-/** 一张只有 exp 有意义的 JWT —— utils/auth.js 只解 payload.exp。 */
-function jwt(expiresAtMs) {
-  return `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: 'member', exp: Math.floor(expiresAtMs / 1000) })}.sig`
+/**
+ * 一张 exp 与 sub 有意义的 JWT。sub 必须等于本机 user.id ——
+ * 后端 member-auth.service.ts 就是用 user.id 签 sub 的，utils/auth.js 会比对这两者。
+ */
+function jwt(expiresAtMs, subject) {
+  return `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: subject, exp: Math.floor(expiresAtMs / 1000) })}.sig`
 }
 
 /** enduser JWT 的真实时长：member-print-orders.module.ts 签发 expiresIn:'30m'。 */
@@ -169,7 +172,7 @@ const JWT_TTL_MS = 30 * 60 * 1000
 function useRealAuth(wx, id) {
   ACTIVE_WX = wx
   wx.storage.clear()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, id), user: { id } })
   return realAuth
 }
 
@@ -179,13 +182,14 @@ function useRealAuth(wx, id) {
  * 与 `realAuth.logout()`（主动登出，连补签资格一起撤销）是两件完全不同的事。
  */
 function expireNaturally(wx) {
-  wx.storage.set(realStorage.KEYS.TOKEN, jwt(Date.now() - 60 * 1000))
+  const current = wx.storage.get(realStorage.KEYS.USER) || {}
+  wx.storage.set(realStorage.KEYS.TOKEN, jwt(Date.now() - 60 * 1000, current.id))
 }
 
 /** 真实的换账号：先登出（撤销补签资格），再登一个别人。 */
 function switchAccount(id) {
   realAuth.logout()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, id), user: { id } })
 }
 
 /**
@@ -2157,7 +2161,7 @@ test('R5-1 取件页：码已显示后 JWT 自然过期 —— 必须放行恰�
   assert.ok(!String(page.data.errorMsg).includes('登录已失效'), page.data.errorMsg)
 
   // request.js 静默补签成功 → auth.saveSession 写回带 id 的新会话 → 重发拿到响应。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[1].d.resolve(PICKUP_ORDER)
   await flush()
   assert.equal(page.data.state, 'ready', '被补签救回来的响应必须能写进来')
@@ -2230,7 +2234,7 @@ test('R5-2 材料包码页：切后台期间 JWT 自然过期 —— 回来要�
   assert.equal(pending[1].id, 'pkg-A')
   assert.notEqual(page.data.loadRecover, 'login', '没有人登出，不该把它说成「登录已失效」')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[1].d.resolve(A_PACKAGE)
   await flush()
   assert.equal(page.data.ready, true, '被补签救回来的响应必须能写进来，不得停在 loading')
@@ -2253,7 +2257,7 @@ test('R5-2 材料包码页：打开时 JWT 已经过期 —— 照常发请求�
   // request.js 补签成功 → auth.saveSession 写回带 id 的会话 → 重发拿到响应。
   // 这一跳是 `'' → 'u:A'`：**不是换人**，代次不许 +1，账号比对也不许把它判成换人 ——
   // 作废掉的恰好是那条刚刚被救回来的响应，页面就停在一页转不完的 loading 上。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].d.resolve(A_PACKAGE)
   await flush()
 
@@ -2990,7 +2994,7 @@ test('R6-6 材料包码页显式登出后同一位 A 重新登录：仍能恢复
   assert.equal(page.data.loadRecover, 'login')
 
   // 同一位 A 重新登录 —— 这不是换人，不该被粘性封锁挡住。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   page.onShow()
   assert.equal(pending.length, before + 1, '同一位重新登录必须能恢复加载')
   pending[before].resolve(A_PACKAGE)
@@ -3282,7 +3286,7 @@ test('R7-5 材料包码页 A → 登出 → B 登录：一个 getPackageOrder �
   page.onShow()
   assert.equal(pending.length, before, '登出之后不发请求')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   page.onShow()
   assert.equal(pending.length, before, 'B 的 token 不得拿去要 A 的 orderId（服务端 requireOwned 必然 404）')
   assert.equal(page.data.loadErrorTitle, '账号已切换')
@@ -3296,7 +3300,7 @@ test('R7-5 材料包码页 A → 登出 → B 登录：一个 getPackageOrder �
   assert.equal(page.data.loadErrorTitle, '账号已切换', '说明不许被 loading 覆盖')
 
   // 开页那位自己回来：必须解除封锁。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   page.onShow()
   assert.equal(pending.length, before + 1, '开页那位回来必须能再取一次')
   pending[before].resolve(A_PACKAGE)
@@ -3320,7 +3324,7 @@ test('R7-5 取件页 A → 登出 → B 登录：一个 getCloudPrintOrder 都�
   page.onShow()
   assert.equal(pending.length, before, '登出之后不发请求')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   page.onShow()
   assert.equal(pending.length, before, 'B 的 token 不得拿去要 A 的 orderId')
   assert.equal(page.data.errorAction, 'orders', 'B 的落点是「我的 · 打印订单」')
@@ -3332,7 +3336,7 @@ test('R7-5 取件页 A → 登出 → B 登录：一个 getCloudPrintOrder 都�
   page.onShow()
   assert.equal(pending.length, before, '之后每一次 onShow 都一样')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   page.onShow()
   assert.equal(pending.length, before + 1, '开页那位回来必须能再取一次')
   pending[before].resolve(PICKUP_ORDER)
@@ -3531,7 +3535,7 @@ test('R8-A 取件页：码已显示 + 轮询在飞 → A 登出 → B 登录 →
 
   // 共用设备上的真实一跳：A 登出、B 登录、回到本页。全程没有任何 onHide。
   realAuth.logout()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   page.onShow()
 
   // 这一刻屏幕上就必须是干净的。**不能等那发请求落定**：什么时候落定是网络说了算，
@@ -3986,7 +3990,7 @@ test('R9-A3 取件页：开页时已过期、补签成功 —— 经一次确认
 
   // request.js 拿到 401 静默补签成功：写回**同一位 A** 的会话，然后重发拿到响应。
   // 这是取件链最常见的一条路，不能被 fail-closed 误伤。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].resolve(PICKUP_ORDER)
   await flush()
 
@@ -4296,7 +4300,7 @@ test('R10-c 确认请求认下的是**发出时那个已知账号**，不是回�
   page.onReady()
 
   // 补签回来的是 A，于是本页发出一发**带着 u:A** 的确认请求。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].resolve(PICKUP_ORDER)
   await flush()
   assert.equal(pending.length, 2, '前提：确认请求已经发出去了')
@@ -4326,7 +4330,7 @@ test('R10-d 旧响应不得解锁、也不得掀掉正在飞的那发确认请�
   page.onReady()
   const staleToken = page._inflight           // 第一发（归属未定）那一发的令牌
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].resolve(PICKUP_ORDER)
   await flush()
   const confirmToken = page._inflight
@@ -4486,7 +4490,7 @@ test('R11-A3 order-detail：A 登出 → B 登录 → 回到本页，不得拿 B
   page.onShow()
   assert.equal(page.data.detail, null, '登出这一跳就该清场')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   page.onShow()
 
   assert.equal(pending.length, 1, '不得代表 B 去请求 A 的订单（服务端 requireOwned 必然 404，但请求已经发出去了）')
@@ -4603,7 +4607,7 @@ test('R11-D2 order-detail：JWT 自然过期不是换人 —— 必须放行请�
   assert.notEqual(page.data.errorTitle, '账号已切换', '自然过期不是换人')
 
   // request.js 静默补签成功 → 写回同一位的新会话 → 这条响应必须能落地。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[1].resolve(A_ORDER)
   await flush()
   assert.equal(page.data.detail.pickup, '12-34-56-78', '被补签救回来的响应必须能写进来')
@@ -4767,7 +4771,7 @@ test('R12-A order-detail：过期开页 → 在途期间 B 静默登录 → 归�
   assert.equal(pending.length, 1, '仍有补签资格，必须放行这一发（它负责把 401 静默补签触发出来）')
 
   // 在途期间 B 登录。saveSession 不需要任何生命周期回调 —— 没有 onHide，也没有 onShow。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
 
   // 「发出时归属未定」那一发的 200 回来了。
   pending[0].resolve(A_ORDER)
@@ -4790,7 +4794,7 @@ test('R12-B order-detail：过期开页 → 补签回同一位 —— 确认请�
   assert.equal(pending.length, 1)
 
   // request.js 静默补签成功，写回**同一位** A 的新会话。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].resolve(A_ORDER)
   await flush()
 
@@ -4813,7 +4817,7 @@ test('R12-C order-detail：B 的确认请求被服务端按归属拒掉 —— �
   const page = makeOrderDetail(wx, pending)
   page.onLoad({ orderId: 'ord-A' })
   page.onShow()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   pending[0].resolve(A_ORDER)
   await flush()
   assert.equal(pending.length, 2, '前提：确认请求已经发出')
@@ -4876,7 +4880,7 @@ test('R12-E order-detail：确认被拒不得把这一页认成拒绝者的 —�
   const page = makeOrderDetail(wx, pending)
   page.onLoad({ orderId: 'ord-A' })
   page.onShow()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   pending[0].resolve(A_ORDER)
   await flush()
   assert.equal(pending.length, 2, '前提：确认请求已经发出')
@@ -5000,7 +5004,7 @@ test('R12-H order-detail：过期开页确认被拒后，hide/show 不得再替�
   const page = makeOrderDetail(wx, pending)
   page.onLoad({ orderId: 'ord-A' })
   page.onShow()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   pending[0].resolve(A_ORDER)
   await flush()
   assert.equal(pending.length, 2, '前提：确认请求已经发出')
@@ -5027,7 +5031,7 @@ test('R12-I order-detail：只有 404、没有 PRINT_ORDER_NOT_FOUND —— 不�
   const page = makeOrderDetail(wx, pending)
   page.onLoad({ orderId: 'ord-A' })
   page.onShow()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   pending[0].resolve(A_ORDER)
   await flush()
   assert.equal(pending.length, 2)
@@ -5051,7 +5055,7 @@ test('R12-J order-detail：只有 PRINT_ORDER_NOT_FOUND、没有 404 —— 不�
   const page = makeOrderDetail(wx, pending)
   page.onLoad({ orderId: 'ord-A' })
   page.onShow()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   pending[0].resolve(A_ORDER)
   await flush()
   assert.equal(pending.length, 2)
@@ -5074,7 +5078,7 @@ test('R12-K order-detail：精确 404+code 在 onHide 之后到达 —— 不得
   const page = makeOrderDetail(wx, pending)
   page.onLoad({ orderId: 'ord-A' })
   page.onShow()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   pending[0].resolve(A_ORDER)
   await flush()
   assert.equal(pending.length, 2)
@@ -5098,7 +5102,7 @@ test('R12-L order-detail：精确 404+code 在换人之后到达 —— 不得�
   const page = makeOrderDetail(wx, pending)
   page.onLoad({ orderId: 'ord-A' })
   page.onShow()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].resolve(A_ORDER)
   await flush()
   assert.equal(pending.length, 2, '前提：确认请求带着 A 发出')

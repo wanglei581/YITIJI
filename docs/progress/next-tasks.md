@@ -47,28 +47,36 @@ Windows/Pantum、当前 SHA 的 CI/生产/支付对账/UAT 范围保持不变，
 ## 2026-09-22：支付回调竞态本地 API 反例已关闭，待主窗口集成
 
 追加提交见分支 `grok/payment-callback-race-20260922` 的 HEAD，父提交 `9e9b5988b8cda7e12cad1f3941065ec6ab14ffe4` 不 amend。未知出码后的审计辅助读取失败不再盖住 `PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED`。这只是本地 API 范围，不是全链 GO。支付宝查无此单和微信 404 仍是 `unknown`，要人工核对，生产运维恢复尚未验收。一体机固定「已受理」文案在主窗口候选 `b4a1bb42d`，本 lane 未合入。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。不要 push、开 PR、合并、部署、真实支付退款或操作硬件。
-## 2026-09-23：小程序补签时序本地验收完成，身份持久化与真机仍阻塞
+## 2026-09-23：小程序补签时序本地验收完成，冷启动身份门通过本地验收，真机仍阻塞
 
 分支 `claude/miniapp-resignin-logout-20260922`（基线 `55893b515`）的改动已完成 Claude 实现与 Codex 最小验收，随本次本地提交保存，**未合入主候选**。
 落地内容与证据见 `current-progress.md` 顶部。
 
 | 顺序 | 负责人 | 必做事项 | 达标判据 |
 |---|---|---|---|
-| 1 | Codex | 最小验收：复核 `utils/auth.js` / `utils/request.js` / `pages/launch/launch.js` diff 与新测试，确认无第二套 auth、无新依赖、无新增存储键、范围只在 `apps/miniapp/` | 已复核 diff 并独立执行时序套件 47/47（含 11 变异），退出码 0；完整 verify:static 使用 Claude 最终退出码 0 的证据，不重复跑全套 |
-| 2 | Grok | 主验证（上一轮工具 900s 超时，整体记 `UNREVIEWED`，只回收到日志） | 对最终 SHA 重新绑定；`UNREVIEWED` 不等于通过，也不等于发现问题 |
+| 1 | Codex | 最小验收：复核 `utils/auth.js` / `utils/request.js` / `pages/launch/launch.js` diff 与新测试，确认无第二套 auth、无新依赖、无新增存储键、范围只在 `apps/miniapp/` | 已复核首批 47/47；冷启动追加补丁核验 Grok 57/57、定向冷启动证明退出码 0 和匹配 diff 指纹；完整 verify:static 使用 Claude 最终退出码 0 的证据，不重复跑全套 |
+| 2 | Grok | 冷启动定向独立验收已 GO，57/57 和修复后证明均退出 0；证据指纹见 current-progress 顶部 | 主集成时确认代码与已审补丁一致；先前泛审查超时仍记 UNREVIEWED，不外推全系统 GO |
 | 3 | 后置 | 微信开发者工具 / Trial / 真机回归 | 本轮全部是本地 node 侧真执行证据；补签路径涉及 `wx.login`、登录页涉及 `getPhoneNumber`，上真机前不得宣称已验 |
 
 说明：`utils/storage.js` 已恢复成与基线逐字节一致，本进程的登出/换号安全由 `utils/auth.js` 的内存撤销位
 承担，不再改动共享存储原语的语义。`saveSession` 返回值语义（写不进去再读回来就不算登录）唯一的显式
-调用方是 `pages/launch/launch.js`，本轮已两条入口同时接住。冷启动 torn-write 造成的混合身份是基线
-持久化机制的既有风险，**本批未关闭，不能声明身份全链或商业 GO**。
+调用方是 `pages/launch/launch.js`，本轮已两条入口同时接住。冷启动 torn-write 造成的混合身份
+**已有本地修复候选**（下一节已更新），但未经真机复验，仍不能声明身份全链或商业 GO。
 
-### 商业收口阻塞：冷启动部分写入导致混合身份（待独立最小修复）
+### 商业收口阻塞：冷启动部分写入导致混合身份（本地修复与定向独立验收完成，待真机）
 
 - **复现条件：** 先持久化 A 会话；显式登录 B 时仅 TOKEN 静默丢写、USER 写入成功，或 TOKEN 写入成功而 USER 写入抛错；本进程会拒绝读身份，但保持同一存储重新加载 auth 模块后，撤销位重置，可能读到 A token + B 用户资料，或 B token + A 用户资料。Grok 的 `/tmp/miniapp-counterexamples.mjs` 与日志有这两条实测观察；该临时脚本后续因未捕获 401 中止，不能记为完整断言套件通过。
 - **风险：** 页面身份/资产归属判断与 Authorization 不一致，存在跨用户隐私和误操作风险；基线已有不构成豁免。
 - **验收要求：** Claude 在同一 auth 实现内做最小持久化一致性修复，不另起认证系统；真实 storage 替身按单键注入抛错、静默丢写及清理失败，保留存储冷启动后断言 token/user/补签资格一致或全部拒绝；核验真实认证 Header 与用户资产归属，完成反向变异及登录/补签回归。DevTools/真机复验后才能关闭相应商业阻塞。
-- **本批边界：** 本次只关闭进程内补签晚到响应与保存失败的错误成功反馈；此项未实现、未验收，须继续列入上线前阻塞。
+- **本地修复（2026-09-23，追加提交在 `9ec68f58c` 之上）：** `utils/auth.js` 内
+  `getToken` / `getUser` 共用一道身份一致性门 —— 用已有 base64url 解析取 JWT `sub`（后端按 `user.id`
+  签发）与本机 `user.id` 比对，都存在且相等才暴露身份/带 token，否则复用 `clearSession()` 返回空；
+  每次读现算，清理失败也不影响下一次读仍然关着。未新增 schema / 存储键 / 第二套 auth，未改
+  `utils/storage.js` 与后端。证据：`session-generation.test.mjs` 57/57（含单键 throw/silent、缺 user、
+  缺 sub、成对冷恢复、撕裂叠加 remove 失败，2 条只针对该门的反向变异）、`page-lifecycle` 181、
+  `package-order-idempotency` 49、verify:static 全链 140 PASS（该门禁有阴性对照）。Grok 定向独立检查同补丁并执行 57/57、修复后冷启动证明，退出码均 0，给出本批 GO；日志与 diff 指纹见 current-progress 顶部。
+- **仍未关闭的部分：** DevTools / 真机 / CI / 生产**全部未验收**，商业阻塞状态由「未实现」改为
+  **「本地修复候选，待真机复验」**，真机复验通过前不得从上线前阻塞清单移除。
 
 ## 2026-09-22：外部审查结论不能替代 exact-SHA 验证
 

@@ -70,6 +70,45 @@ Grok `grok-4.7-build-fast xhigh` 已返回实质只读报告（session `4725a056
 - **反向变异：** 把出码 catch 改成所有 throw 直接 `failed` + `unpaid` 并返回 `PAY_CHANNEL_UNAVAILABLE`。`verify-payment-flow.ts` 退出 1（`flow-mutated-round3.log`），失败行是看似 40004 的普通 Error 被放成 `failed` + `unpaid`。服务文件 SHA `5da2d5e9d6020f83759bc71c4890f6226d19c1e56ca0577c1964f99b8a8f3b38` 字节恢复后退出 0。
 - **辅助读取反例：** 修复前 `verify-payment-flow.ts` 退出 1（`.codex-tmp/payment-callback-race/flow-aux-before.log`），响应码被 `VERIFY_AUX_FINDUNIQUE_DB_FAULT` 盖住，审计为空，尝试仍是 `created`、订单仍是 `paying`。修复后退出 0，217 条 `  PASS `（`flow-aux-restored.log`）。反向变异去掉辅助读保护后退出 1（`flow-aux-mutated.log`）。服务文件 SHA `a0b8d99af71b23d334cbbd22446bc2adf03a600b2084089ae1db967b15be478d` 与备份逐字节一致后退出 0。`verify-payment-codepay.ts` 退出 0（41 条 `PASS:`，`codepay-aux.log`）；`pnpm typecheck` 退出 0（`typecheck-aux.log`）；`git diff --check` 与 `verify-repository-integrity` 退出 0。
 - **证据边界：** 新反例只在本地 API 范围关闭。查单恢复仍是 mock 结构化结果。真实渠道查不到仍须人工按 `PaymentAttempt.id` 核对，生产运维恢复尚未验收。一体机固定「已受理」文案的主窗口候选是 `b4a1bb42d`，本 lane 未合入。`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。未 push、未开 PR、未合并、未部署、未打真实支付或退款、未操作硬件。
+2026-09-23 **小程序冷启动混合身份（torn write）本地修复已通过定向独立验收（追加在 `9ec68f58c` 之上）。**
+Grok 以真实断言复现并退出 0（`/tmp/miniapp-cold-start-proof.mjs` / `.log`，会话
+`44f358e8-c063-4ec0-bc2e-898ae6bf945b`）：A 已登录、换 B 时只有一格写成功，本次运行内由内存撤销位兜住
+（fail-closed），但**冷启动后撤销位没了**，盘上两格分属两个人 —— 仅 USER 写失败时
+`tokenSub=B / userId=A / loggedIn=true / Authorization=B`；仅 TOKEN 写失败时
+`tokenSub=A / userId=B / Authorization=A`；四例都保留补签资格。页面显示的是一个人，请求带的是另一个人。
+
+- **修法（`utils/auth.js`，Codex 批准的最小方案）：** 复用已有的 base64url 解析取 JWT `payload.sub`
+  （后端 `member-auth.service.ts:303` 按 `user.id` 签发），与本机 `user.id` 比对；`getToken` / `getUser`
+  各自**现算**一次，只有两者都存在且相等才暴露身份、才带 token，否则复用现有 `clearSession()` 返回空。
+  每次读都现算，所以 `clearSession` 删不掉也不影响下一次读仍然关着。`saveSession` 的「可用」判据同步
+  加上这一条，避免「报登录成功、却读不出身份」。没有新 schema、没有新存储键、没有第二套 auth，
+  未改 `utils/storage.js`、未改后端、未动登录页已验逻辑。
+- **保留不变：** 自然过期与补签资格仍然解耦（`clearSession` 不撤销资格、不推进代际），合法的自然过期 →
+  补签恢复不受影响；主动登出的代际推进与内存撤销位不变。撕裂会话冷启动后仍可凭补签资格自愈 ——
+  补签写回成对的一份会话，测试跑到「重放拿到 200、两格是同一个人」为止。
+- **夹具对齐真实契约：** 既有测试的合成 JWT 此前 `sub` 与 `user.id` 不是同一个人
+  （`page-lifecycle.test.mjs` 固定 `sub:'member'`、`package-order-idempotency.test.mjs` 没有 `sub`、
+  `verify-miniapp-static.mjs` 只读夹具的 `zyd_user` 没有 `id`）。按后端 `sub = user.id` 契约最小对齐，
+  断言一条没有弱化。
+- **验证（本轮亲自重跑，退出码均为 0）：** `node --check` 改动文件；
+  `node --test scripts/tests/session-generation.test.mjs` **57 pass / 0 fail**（+10：四例冷启动撕裂
+  ×（throw/silent）、缺 user、缺 sub、成对时正常冷恢复、撕裂叠加 remove 失败时每次读仍关着，以及
+  **2 条只针对一致性门的反向变异** —— 分别摘掉 `getToken` 与 `getUser` 的判据，必须判红）；
+  `page-lifecycle` 181 pass、`package-order-idempotency` 49 pass；
+  `pnpm --dir apps/miniapp verify:static` 全链通过（静态门禁 **140 PASS / 0 FAIL**，新增
+  「token 与 user 必须同一个人（冷启动撕裂写不得拼成会话）」，并做过阴性对照：摘掉 `getToken` 的判据后
+  该门禁退出码 1，恢复后 140 PASS）。
+- **定向独立验收：** Grok 会话 `44f358e8-c063-4ec0-bc2e-898ae6bf945b` 对 `9ec68f58c` 上的补丁
+  `sha256:6f48e1f40988f00836b844b99a4a465ca919c7d022b63ffcaba33c10491c2d5d` 给出本批 GO。
+  `/tmp/miniapp-cold-start-fixed-proof.log` 绑定上述 HEAD/diff：四例单键失败、先读 getUser、清理失败重复读取、
+  缺字段/主体错配、正常成对会话和自然过期均有实际断言及 Authorization 检查，退出码 0；
+  `/tmp/miniapp-session-generation-57.log` 57/57、退出码 0，含新增两条身份门反向变异。
+  Codex 核对日志、补丁指纹及关键 diff，无代码二次写入；验收后仅补本文档记录并追加本地提交。
+  此 GO 只覆盖本批源码/本地断言，不把先前超时的泛审查改记为通过。
+- **边界：** 仅追加本地提交，未 push / PR / merge / deploy；
+  没有微信开发者工具 / 真机、没有 CI run、没有生产验证 —— 该商业阻塞由「文档搁置」改为**本地修复候选**，
+  `CI / DEVICE / PRODUCTION` 仍为 NO-GO，未经真机复验不得关闭。typecheck 不适用（小程序无该脚本）。
+
 2026-09-23 **小程序 401 静默补签的会话时序收口 + 登录保存失败的真实反馈（本地候选，Codex 已完成最小验收）。**
 分支 `claude/miniapp-resignin-logout-20260922`，基线 `55893b515`。补签要走 wx.login + 一次网络往返，
 其间用户可能登出、甚至换号；此前晚到的回调分不出「我出发时是谁」，会复活已登出的账号、覆盖新账号的
@@ -109,8 +148,9 @@ token，或用旧账号的失败把新账号踢下线。
   ERR_ASSERTION —— 其中 AUDIT_BAD1 只是审计脚本期望中文 message 而原 assert 未写 message，不是变异没红）。
   当前这一版的数字（47 tests / 139 PASS）来自 Claude 本轮重跑；Codex 已复核最终 diff，独立重跑 47 条时序/变异/登录页测试，退出码 0，日志 `/tmp/miniapp-final-target-codex.log`。本候选随本次本地提交保存。
   **仅本地提交，未 push、未开 PR、未部署；没有微信开发者工具 / 真机、没有 CI run、没有生产验证**，
-  `CI / DEVICE / PRODUCTION: NO-GO` 不变。Grok 提到的 cold-start torn-write 混合身份属于原基线已有的
-  持久化机制风险，已作为商业收口阻塞登记在 next-tasks 顶部。本任务只解决进程内在途竞态，未扩展持久化 auth 体系、未新增键，不能据此声明身份全链 GO。小程序无 typecheck 脚本，本轮 typecheck 不适用。
+  `CI / DEVICE / PRODUCTION: NO-GO` 不变。该批只解决进程内在途竞态，不能据此声明身份全链 GO。
+  小程序无 typecheck 脚本，本轮 typecheck 不适用。**其中「cold-start torn-write 留作已知风险」已作废
+  —— 见本文件上一条，该阻塞已有本地修复候选。**
 
 2026-09-22 **独立审查边界（绑定 `ad154ac1a`）。** Agy（`gemini-3.8-flash-high`）只读核对确认自我探索/招聘会批次未修改 `services/api`、Prisma 或业务 DTO；小程序 136 个调用端点与后端路由对账无已知缺口，terminal identity、订单幂等、文件归属、支付/退款、打印/扫描归属、状态回放和本人资产契约在源码/本地层为 GO 或 PARTIAL。Agy同时确认真实 Windows/Pantum、生产通道和商业支付证据缺失，均为 NO-GO。Agy报告中把“CI具备运行条件”写成 GO，但没有当前 SHA 的 GitHub run，本项目按严格证据口径仍记 `CI: NO-GO`。
 
