@@ -1,5 +1,8 @@
 # 当前开发进度
 
+2026-09-23 **远端验证入口：** 已推送集成分支并建立唯一草稿 PR [#1042](https://github.com/wanglei581/YITIJI/pull/1042)，
+起始 HEAD `aa46be8f0`。仅用于当前候选 CI/Windows runner 验证，未合并 main、未部署；下方历史“未 push/未开 PR”不再代表当前状态。
+
 2026-09-23 **支付合流验证完成，签名候选进入主树。** `1a1292102` 的隔离 SQLite 支付流程
 217 条、付款码 41 条、渠道适配 70 条及 API `tsc --noEmit` 均退出 0；Grok session
 `ba24696b-f9b0-43fa-be94-f8bd678b6dc3`，原始日志在 `.codex-tmp/payment-integrated-1a1292102-verification/logs/`，
