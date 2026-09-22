@@ -98,7 +98,8 @@ for (const [page, sourceCode, rootClass, cssPath] of [
   ['optimize', optimize, 'qx-resume-optimize', './resume-optimize-qx.css'],
   // 2026-09-23 版式参考迁入青序流光（稿 46 ?screen=templates），根作用域换成宿主 46 的 .rdq- 样式。
   ['templates', templates, 'rdq-tpl-grid', './resume-decision-qx.css'],
-  ['materials', materials, 'resume-materials-lightflow', './resume-library-lightflow.css'],
+  // 2026-09-23 求职材料库迁入青序流光（稿 25-material-workshop），根作用域换成本页的 Qx 根类与样式。
+  ['materials', materials, 'qx-resume-materials', './resume-materials-qx.css'],
 ]) {
   expectIncludes(sourceCode, `import '${cssPath}'`, `${page} imports its local LightFlow CSS`)
   expectIncludes(sourceCode, rootClass, `${page} uses its route-specific LightFlow root`)
@@ -120,6 +121,10 @@ expectIncludes(templates, 'QxPageFrame', 'templates uses Qingxu page frame (46-r
 expectIncludes(kioskShell, "'/resume/templates'", 'templates is registered in QX_MIGRATED_ROUTES')
 expectNotIncludes(templates, 'KioskStageFit', 'templates stays inside the KioskRoot stage instead of scaling twice')
 expectNotIncludes(templates, 'resume-lightflow', 'templates no longer mixes the LightFlow namespace into the Qingxu frame')
+expectIncludes(materials, 'QxPageFrame', 'materials uses Qingxu page frame (25-material-workshop migration)')
+expectIncludes(kioskShell, "'/resume/materials'", 'materials is registered in QX_MIGRATED_ROUTES')
+expectNotIncludes(materials, 'KioskPageFrame', 'materials no longer mounts the old LightFlow page frame')
+expectNotIncludes(materials, 'resume-lightflow', 'materials no longer mixes the LightFlow namespace into the Qingxu frame')
 
 expectCssContract('src/pages/resume/resume-diagnosis-lightflow.css', [
   'resume-source-lightflow',
@@ -137,6 +142,7 @@ for (const [path, rootClass] of [
   ['src/pages/resume/resume-triage-qx.css', 'qx-resume-triage'],
   // 稿 21 子面板换装（诊断方向 / U 盘 / 手机扫码 / 预览 / 扫描交接），同一作用域根。
   ['src/pages/resume/resume-triage-panels-qx.css', 'qx-resume-triage'],
+  ['src/pages/resume/resume-materials-qx.css', 'qx-resume-materials'],
 ]) {
   const source = read(path)
   expect(source.length > 0, `${path} exists`)

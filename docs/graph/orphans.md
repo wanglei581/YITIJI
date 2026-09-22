@@ -41,9 +41,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 41 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 47 |
 | **medium** | 只被文档或其它文件提及 | 15 |
-| **low** | 全仓零提及 | 92 |
+| **low** | 全仓零提及 | 93 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（92）
+## low — 全仓零提及（93）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
@@ -171,13 +171,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/superpowers/specs/2026-07-16-f1-release-provenance-manifest-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-29-p0-1b-kiosk-session-warning-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 样式（3）
+### 样式（4）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/pages/home/styles/home-v6-footer.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/resume/job-fit-actions.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/resume/jobFit-inkpaper-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `apps/kiosk/src/pages/resume/resume-library-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
 ### 测试（2）
 
@@ -219,7 +220,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（41）
+## high — 仍被 CI / 门禁 / 包脚本引用（47）
 
 ### 页面/组件（14）
 
@@ -240,7 +241,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 | `apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 
-### 样式（26）
+### 样式（32）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -266,8 +267,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/resume/jobFit-inkpaper.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 | `apps/kiosk/src/pages/resume/resume-authoring-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
 | `apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
+| `apps/kiosk/src/pages/resume/resume-fusion-youth.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
+| `apps/kiosk/src/pages/resume/resume-library-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
 | `apps/kiosk/src/pages/resume/self-assessment-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：services/api/scripts/verify-compliance.ts |
+| `apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
+| `apps/kiosk/src/pages/resume/styles/resume-fusion-common.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
+| `apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-job-fit.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
+| `apps/kiosk/src/pages/resume/styles/resume-fusion-library.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
 | `apps/kiosk/src/pages/scan/styles/scan-fusion.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 

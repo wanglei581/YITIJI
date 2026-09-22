@@ -188,9 +188,11 @@ const screens = new Map([
   ['src/pages/ai-plan/AiPlanPage.tsx', 'advisor-artifact'],
 ])
 const qxScreens = new Set([
-  // 稿 21-resume-triage 同一工作台的两条 route，2026-09-23 迁入（/resume/materials 稿 25 不在本批）。
+  // 稿 21-resume-triage 同一工作台的两条 route，2026-09-23 迁入。
   'src/pages/resume/ResumeSourcePage.tsx',
   'src/pages/resume/ResumeParsePage.tsx',
+  // 稿 25-material-workshop（/resume/materials），2026-09-23 迁入。
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
   // 稿 46-resume-decision-workspace.html 宿主的四条 route：job-fit 2026-09-22 迁入，
   // career-plan / templates 2026-09-23 迁入（actions 不在 W3 20 条清单内，下方单独断言）。
   'src/pages/resume/JobFitPage.tsx',
@@ -256,7 +258,10 @@ check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx
 check(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(440px,\s*0\.9fr\)/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses a near-balanced 1080 two-column ratio')
 check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-direction h2')), 'resume direction title cannot wrap character by character')
 for (const route of ['/resume/source', '/resume/parse']) includes('src/layouts/KioskRoot.tsx', `'${route}'`, `${route} is registered as Qingxu-migrated`)
-check(!read('src/layouts/KioskRoot.tsx').includes("'/resume/materials',\n"), 'resume materials (design 25) is not swept into this migration')
+// 稿 25-material-workshop 迁入青序流光（2026-09-23）：此前这里钉的是「materials 不在本批」，
+// 迁入后改为正向断言——登记进 QX_MIGRATED_ROUTES、舞台由 KioskRoot 缩放、旧 LightFlow 壳全部退出。
+includes('src/layouts/KioskRoot.tsx', "'/resume/materials'", 'materials route (design 25) is registered as Qingxu-migrated')
+check(!/KioskStageFit|KioskPageFrame|resume-lightflow/.test(read('src/pages/resume/JobMaterialLibraryPage.tsx')), 'materials has left the LightFlow frame and does not scale the stage a second time')
 
 const interviewSetup = read('src/pages/interview/InterviewSetupPage.tsx')
 includes('src/pages/interview/InterviewSetupPage.tsx', 'interview-setup__stack', 'interview setup uses the prototype vertical stack')

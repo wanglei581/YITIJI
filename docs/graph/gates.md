@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1515 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1516 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -295,7 +295,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 477 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 478 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -649,6 +649,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/resume-fusion-youth.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/resume-generate-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-library-lightflow.css` | `verify-lightflow-k2b-ai-resume.mjs` |
+| `apps/kiosk/src/pages/resume/resume-materials-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-optimize-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-fixture.ts` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-model.ts` | `verify-resume-report-qx.mjs` |

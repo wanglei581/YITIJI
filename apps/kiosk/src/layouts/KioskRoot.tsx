@@ -119,8 +119,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/print/preview',
   '/print/progress',
   '/print/done',
-  /* 稿 21-resume-triage 同一工作台的两条 route：取件与方向、解析等待与失败。
-   * /resume/materials（稿 25）不在本批，仍走旧壳。 */
+  /* 稿 21-resume-triage 同一工作台的两条 route：取件与方向、解析等待与失败。 */
   '/resume/source',
   '/resume/parse',
   '/resume/report',
@@ -131,6 +130,8 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   /* 稿 46 宿主的第四条 route（版式参考）。另外两条 /resume/job-fit/actions、
    * /resume/career-plan 是 KioskRoot 之外的整屏路由，自挂 JobFitStage，不登记在这里。 */
   '/resume/templates',
+  /* 稿 25-material-workshop（求职材料库），2026-09-23 迁入。 */
+  '/resume/materials',
   '/print-scan',
   '/print-scan/sign',
   '/print-scan/convert',

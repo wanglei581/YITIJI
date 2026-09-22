@@ -1,0 +1,208 @@
+/* 求职材料库 · 青序流光（稿 docs/design/kiosk-redesign-2026-08/25-material-workshop.html）
+ *
+ * 作用域：全部挂在本页根 .qx-resume-materials 下。共享壳（.qx-topbar / .qx-ctabar / .qx-btn …）
+ * 51 页共用，只在本根之下做本页必需的调整。尺寸照抄稿 25；颜色一律取 --qx- 令牌，不写裸色值。
+ * 列表行（兜底入口）直接复用 primitives.css 的 .qx-rows / .qx-row，这里不另画一套。 */
+.qx-resume-materials { height: 100%; }
+.qx-resume-materials .qx-rm-scroll { gap: 14px; }
+
+/* ── 分类 ─────────────────────────────────────────────────── */
+.qx-resume-materials .qx-rm-filters { flex: none; display: flex; gap: 9px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
+.qx-resume-materials .qx-rm-filters::-webkit-scrollbar { display: none; }
+.qx-resume-materials .qx-rm-filters button {
+  flex: none; min-height: 50px; padding: 0 17px;
+  border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); background: var(--qx-surface);
+  font: inherit; font-size: 17px; font-weight: 700; color: var(--qx-ink-2); cursor: pointer;
+}
+.qx-resume-materials .qx-rm-filters button[aria-pressed='true'] { background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-on-solid); }
+
+/* ── 工作区：定宽目录 + 详情。工作区吸收余量（.qx-grow 口径），详情随之拉满到底。 ── */
+.qx-resume-materials .qx-rm-workspace { flex: 1 0 auto; display: grid; grid-template-columns: 410px minmax(0, 1fr); gap: 14px; }
+.qx-resume-materials .qx-rm-catalog { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.qx-resume-materials .qx-rm-template {
+  display: block; width: 100%; padding: 15px 18px; text-align: left;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface);
+  font: inherit; color: inherit; cursor: pointer;
+}
+.qx-resume-materials .qx-rm-template[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); box-shadow: inset 0 0 0 1px var(--qx-teal); }
+.qx-resume-materials .qx-rm-template:disabled { cursor: not-allowed; }
+.qx-resume-materials .qx-rm-template b { display: block; font-size: 21px; }
+.qx-resume-materials .qx-rm-desc { display: block; margin-top: 5px; font-size: 16px; line-height: 1.4; color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-use { display: block; margin-top: 6px; font-size: 16px; line-height: 1.38; color: var(--qx-ink-3); }
+.qx-resume-materials .qx-rm-tags { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
+.qx-resume-materials .qx-rm-tags i {
+  font-style: normal; padding: 5px 9px; border-radius: var(--qx-r-s);
+  background: var(--qx-paper); border: 1px solid var(--qx-line); font-size: 16px; color: var(--qx-ink-3);
+}
+/* 分类筛掉的那几份不凭空消失：给一排能直接跳回去的入口。 */
+.qx-resume-materials .qx-rm-others { padding: 14px 16px; border: 1px dashed var(--qx-line-2); border-radius: var(--qx-r); background: var(--qx-paper); }
+.qx-resume-materials .qx-rm-others > b { display: block; font-size: 17px; color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-others > p { margin: 4px 0 0; font-size: 16px; line-height: 1.4; color: var(--qx-ink-3); }
+.qx-resume-materials .qx-rm-others-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.qx-resume-materials .qx-rm-others-list button {
+  min-height: 52px; padding: 0 14px; display: flex; align-items: center; gap: 10px; text-align: left;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r-s); background: var(--qx-surface);
+  font: inherit; font-size: 17px; font-weight: 700; color: var(--qx-ink-2); cursor: pointer;
+}
+.qx-resume-materials .qx-rm-others-list i { font-style: normal; margin-left: auto; font-size: 16px; color: var(--qx-ink-3); }
+
+/* ── 详情：模板事实 + 表单 ─────────────────────────────────── */
+.qx-resume-materials .qx-rm-detail {
+  display: flex; flex-direction: column; min-width: 0; padding: 19px 20px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface);
+}
+.qx-resume-materials .qx-rm-detail-h { display: flex; align-items: baseline; gap: 14px; }
+.qx-resume-materials .qx-rm-detail-h .no { font-size: 19px; font-weight: 700; letter-spacing: 2px; color: var(--qx-teal-d); }
+.qx-resume-materials .qx-rm-detail-h .hint { margin-left: auto; font-size: 18px; font-weight: 600; color: var(--qx-ink-3); }
+.qx-resume-materials .qx-rm-detail h2 { margin: 4px 0 0; font-family: var(--qx-serif); font-size: 27px; }
+.qx-resume-materials .qx-rm-lead { margin: 6px 0 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-tmeta {
+  flex: none; display: flex; gap: 1px; margin-top: 12px; overflow: hidden;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-line);
+}
+/* 四格按内容分宽：短值（类型 / 字段数 / 页数）不折行，只有文件名允许断开。 */
+.qx-resume-materials .qx-rm-tmeta div { flex: 1 1 auto; min-width: 0; padding: 9px 14px; background: var(--qx-paper); }
+.qx-resume-materials .qx-rm-tmeta div + div b { white-space: nowrap; }
+.qx-resume-materials .qx-rm-tmeta u,
+.qx-resume-materials .qx-rm-grid u { display: block; text-decoration: none; font-size: 16px; font-weight: 700; color: var(--qx-ink-3); }
+.qx-resume-materials .qx-rm-tmeta b { display: block; margin-top: 2px; font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+/* 表单吸收详情栏的余量：单行字段两两成排，多行字段按比例拉高（稿 25 的 form.grow）。 */
+.qx-resume-materials .qx-rm-form { flex: 1 0 auto; display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.qx-resume-materials .qx-rm-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qx-resume-materials .qx-rm-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.qx-resume-materials .qx-rm-field[data-wide='true'] { flex: 1 1 0; }
+.qx-resume-materials .qx-rm-field[data-wide='true'] textarea { flex: 1; }
+.qx-resume-materials .qx-rm-field > span:first-child { font-size: 16px; font-weight: 700; color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-field em { font-style: normal; color: var(--qx-cinnabar); }
+.qx-resume-materials .qx-rm-field input,
+.qx-resume-materials .qx-rm-field textarea {
+  width: 100%; min-height: 58px; padding: 12px 14px; resize: none;
+  border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); background: var(--qx-paper);
+  font: inherit; font-size: 18px; color: var(--qx-ink);
+}
+.qx-resume-materials .qx-rm-field textarea { min-height: 130px; }
+.qx-resume-materials .qx-rm-field input:focus,
+.qx-resume-materials .qx-rm-field textarea:focus { outline: 3px solid var(--qx-teal-line); outline-offset: 1px; border-color: var(--qx-teal); }
+.qx-resume-materials .qx-rm-field :disabled { opacity: .72; cursor: not-allowed; }
+/* 校验失败就地说清楚：红框 + 一句话 + 焦点落在第一个出错的字段。 */
+.qx-resume-materials .qx-rm-field [aria-invalid='true'] { border-color: var(--qx-cinnabar); background: var(--qx-cinnabar-soft); }
+.qx-resume-materials .qx-rm-field .fe { font-size: 16px; font-weight: 700; color: var(--qx-cinnabar-d); }
+
+/* ── 生成后流程条 / 提示条 ─────────────────────────────────── */
+.qx-resume-materials .qx-rm-after {
+  flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 13px; padding: 12px 14px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-paper);
+}
+.qx-resume-materials .qx-rm-after > b { font-size: 16px; color: var(--qx-teal-d); }
+.qx-resume-materials .qx-rm-after .st { display: flex; align-items: center; gap: 9px; font-size: 16px; line-height: 1.35; color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-after .st > i {
+  flex: none; width: 26px; height: 26px; border-radius: var(--qx-r-s); background: var(--qx-deep); color: var(--qx-emerald);
+  display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 16px; font-weight: 700;
+}
+.qx-resume-materials .qx-rm-after .sep { color: var(--qx-ink-3); }
+.qx-resume-materials .qx-rm-banner {
+  flex: none; display: flex; align-items: flex-start; gap: 12px; margin-top: 13px; padding: 13px 16px;
+  border: 1px solid var(--qx-line); border-left: 4px solid var(--qx-teal); border-radius: var(--qx-r);
+  background: var(--qx-paper); font-size: 17px; line-height: 1.45; color: var(--qx-ink-2);
+}
+.qx-resume-materials .qx-rm-banner > svg { flex: none; margin-top: 2px; color: var(--qx-teal-d); }
+.qx-resume-materials .qx-rm-banner b { color: var(--qx-ink); }
+.qx-resume-materials .qx-rm-banner[data-tone='warn'] { border-left-color: var(--qx-wheat); background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
+.qx-resume-materials .qx-rm-banner[data-tone='warn'] > svg { color: var(--qx-wheat-d); }
+.qx-resume-materials .qx-rm-banner[data-tone='bad'] { border-color: var(--qx-cinnabar-line); border-left-color: var(--qx-cinnabar); background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
+.qx-resume-materials .qx-rm-banner[data-tone='bad'] > svg { color: var(--qx-cinnabar-d); }
+
+/* ── 真实文件卡：契约字段逐项摊开，不用一句「已生成」代替 ───────── */
+.qx-resume-materials .qx-rm-file { flex: none; margin-top: 13px; overflow: hidden; border: 1px solid var(--qx-teal-line); border-radius: var(--qx-r); background: var(--qx-teal-soft); }
+.qx-resume-materials .qx-rm-file[data-tone='warn'] { border-color: var(--qx-line-2); background: var(--qx-wheat-soft); }
+.qx-resume-materials .qx-rm-file[data-tone='demo'] { border-color: var(--qx-line-2); background: var(--qx-plum-soft); }
+.qx-resume-materials .qx-rm-file-h { display: flex; align-items: center; gap: 13px; padding: 14px 16px; }
+.qx-resume-materials .qx-rm-file-h > svg { flex: none; color: var(--qx-teal-d); }
+.qx-resume-materials .qx-rm-file-h .tx { flex: 1; min-width: 0; }
+.qx-resume-materials .qx-rm-file-h .tx b { display: block; font-size: 21px; }
+.qx-resume-materials .qx-rm-file-h .tx span { display: block; margin-top: 3px; font-size: 16px; line-height: 1.35; color: var(--qx-ink-2); overflow-wrap: anywhere; }
+.qx-resume-materials .qx-rm-file-h .badge {
+  flex: none; min-height: 38px; padding: 0 12px; display: flex; align-items: center;
+  border-radius: var(--qx-r-s); background: var(--qx-surface); font-size: 16px; font-weight: 700; color: var(--qx-teal-d);
+}
+.qx-resume-materials .qx-rm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--qx-line); }
+.qx-resume-materials .qx-rm-grid div { min-width: 0; padding: 8px 16px; background: var(--qx-surface); }
+.qx-resume-materials .qx-rm-grid div:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.qx-resume-materials .qx-rm-grid b { display: block; margin-top: 3px; font-size: 17px; overflow-wrap: anywhere; }
+.qx-resume-materials .qx-rm-grid b[data-off='true'] { color: var(--qx-cinnabar-d); }
+.qx-resume-materials .qx-rm-foot,
+.qx-resume-materials .qx-rm-reason { margin: 0; padding: 9px 16px; font-size: 16px; line-height: 1.4; background: var(--qx-surface); border-top: 1px solid var(--qx-line); }
+.qx-resume-materials .qx-rm-foot { color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-reason { font-weight: 700; color: var(--qx-wheat-d); }
+
+/* ── 整屏状态：读取中 / 失败 / 空 ─────────────────────────────── */
+.qx-resume-materials .qx-rm-state {
+  flex: none; display: flex; flex-direction: column; gap: 16px; padding: 40px 34px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface);
+}
+.qx-resume-materials .qx-rm-state[data-kind='error'] { border-color: var(--qx-cinnabar-line); background: var(--qx-cinnabar-soft); }
+.qx-resume-materials .qx-rm-state[data-kind='warn'] { background: var(--qx-wheat-soft); }
+.qx-resume-materials .qx-rm-state[data-kind='info'] { background: var(--qx-teal-soft); }
+.qx-resume-materials .qx-rm-state h2 { margin: 0; display: flex; align-items: center; gap: 14px; font-size: 30px; }
+.qx-resume-materials .qx-rm-state p { margin: 0; font-size: 21px; line-height: 1.6; color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-state[data-size='sm'] { gap: 8px; padding: 18px 20px; }
+.qx-resume-materials .qx-rm-state[data-size='sm'] h2 { font-size: 22px; gap: 10px; }
+.qx-resume-materials .qx-rm-state[data-size='sm'] p { font-size: 17px; line-height: 1.45; }
+.qx-resume-materials .qx-rm-facts { flex: none; overflow: hidden; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
+.qx-resume-materials .qx-rm-facts-h {
+  display: flex; align-items: center; gap: 12px; padding: 12px 18px;
+  border-bottom: 1px solid var(--qx-line); background: var(--qx-paper); font-size: 19px; font-weight: 700;
+}
+.qx-resume-materials .qx-rm-state .qx-rm-alert { display: block; margin-bottom: 6px; font-weight: 700; color: var(--qx-cinnabar-d); }
+.qx-resume-materials .qx-rm-facts-h span {
+  flex: none; white-space: nowrap; margin-left: auto; min-height: 38px; padding: 0 12px; display: flex; align-items: center;
+  border-radius: var(--qx-r-s); background: var(--qx-teal-soft); color: var(--qx-teal-d); font-size: 16px;
+}
+.qx-resume-materials .qx-rm-facts .qx-rm-grid div { padding: 10px 18px; }
+/* 整屏状态的余量吸收块：兜底出口列表（稿 25 alt-row 134px 起），行高随余量拉伸但封顶，不撑成空卡。 */
+.qx-resume-materials .qx-rm-alt { flex: 1 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.qx-resume-materials .qx-rm-alt .qx-rows { flex: 1 0 auto; max-height: 760px; display: flex; flex-direction: column; }
+.qx-resume-materials .qx-rm-alt .qx-row { flex: 1 0 auto; min-height: 134px; }
+.qx-resume-materials .qx-rm-truth { flex: none; margin: 0; padding: 12px 0 4px; border-top: 1px solid var(--qx-line); font-size: 17px; line-height: 1.45; color: var(--qx-ink-3); }
+.qx-resume-materials .qx-rm-truth b { font-weight: 600; color: var(--qx-ink-2); }
+
+/* ── 操作条：说明与按钮同排；结果态说明独占一行，三个出口等分 ───────── */
+.qx-resume-materials .qx-ctabar { flex-wrap: wrap; }
+.qx-resume-materials .qx-ctabar .qx-btn { flex: 1 1 0; min-width: 0; }
+.qx-resume-materials .qx-ctabar .qx-rm-why-full { flex: 1 1 100%; }
+.qx-resume-materials .qx-btn[aria-disabled='true'] { background: var(--qx-muted-bg); border-color: var(--qx-line); color: var(--qx-muted-ink); cursor: not-allowed; }
+
+/* ── 手机宽度：只作用于不缩放的舞台（KioskRoot 在 ≤760px 下按真实宽度排版）。 ── */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qx-resume-materials { --qx-gutter: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-pagehead { margin-top: 12px; gap: 6px; flex-direction: column; align-items: stretch; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-pagehead h1 { font-size: 23px; letter-spacing: 0; gap: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-pagehead h1::before { width: 4px; height: 21px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-pagehead p { min-width: 0; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-ctabar { gap: 10px; padding: 12px var(--qx-gutter); }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-ctabar .why { flex: 1 1 100%; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-btn { min-height: 52px; padding: 0 12px; gap: 6px; font-size: 16px; white-space: nowrap; }
+  /* 三个出口放不下一排：主操作独占一行，两个次要出口并排，文字不折成两行。 */
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-ctabar .qx-btn[data-variant='primary'] { flex: 1 1 100%; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-btn svg { width: 18px; height: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-navbar { height: 60px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-nav-item { font-size: 12px; gap: 2px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-nav-item svg { width: 20px; height: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-nav-item[aria-current='page']::after { bottom: 6px; width: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-workspace,
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-form-grid,
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-grid { grid-template-columns: minmax(0, 1fr); }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-tmeta { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-tmeta div { flex: 1 1 40%; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-detail { padding: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-detail-h .hint { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-state { padding: 20px 16px; gap: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-state h2 { font-size: 22px; gap: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-state p { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-file-h { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-alt .qx-row { min-height: 88px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qx-resume-materials *, .qx-resume-materials *::before, .qx-resume-materials *::after { transition: none !important; animation: none !important; }
+}
