@@ -1,5 +1,30 @@
 # 当前开发进度
 
+2026-09-22 **当前阻塞快照：支付回调与小程序补签竞态，绑定 `55893b515904fac32375eacb429e651b8d7de6fa`。**
+本条覆盖下方历史审查的全局放行口径：`SOURCE / LOCAL: PARTIAL`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+Grok `grok-4.7-build-fast xhigh` 已返回实质只读报告（session `4725a056-2152-469f-add1-a5ae9348f407`），
+协调窗口用内存夹具复现支付反例，退出码 0；这不是实际渠道或并发数据库验收。
+
+- **支付 P1：** `services/api/src/payment/online-payment.service.ts` 的未知出码错误可把尝试置为 `failed`、订单退回 `unpaid`。
+  迟到成功回调在取件窗口关闭分支返回成功确认，但成功流水更新不接受 `failed`，退款取源随后报
+  `REFUND_SOURCE_ATTEMPT_MISSING`。须同时保护未知结果的出码互斥、成功流水持久化及可退款性。
+- **支付 P2：** `persistChannelAcceptance` 无条件回填可把先到成功回调形成的 `success` 降为 `pending`。
+  修复验收必须覆盖回填/回调两种先后顺序、幂等重放和持久化失败，不只断言页面提示。
+- **小程序 P1：** `apps/miniapp/utils/request.js` 的在途静默补签晚到成功响应无条件保存会话并重放原请求；
+  主动登出未使该响应失效。源码审查确认缺口，微信真机时序尚未验收。成功、失败、换账号和上传路径均须复核。
+  本次 Agy 调用超时，记 `UNREVIEWED`；该源码发现来自协调窗口，不能记成 Agy 批准。
+- **前端候选：** `/resume/job-fit` 的 Claude 改动保留在独立 `kiosk-f2-jobfit-candidate` 工作区，尚未提交或合入。
+  Codex 在该 WIP 执行 typecheck、`verify:job-fit-m1-5-ui`、`verify:fusion-w3`、`git diff --check`，均退出 0；
+  构建后定向 route-sweep **2 passed**。这些仅证明基础路由可渲染，不能替代分析/授权/打印时序和多视口视觉验收。
+  实截发现窄屏仍整体缩放 1080 舞台：390x844 下返回键约 23x23px、主操作约 35px 高，正文过小；
+  无水平溢出不代表手机可用。该候选需修复响应式舞台并复测，1080x1920 画面保持为主视觉基准。
+  Claude 收尾调用超时，迁移数量不计入已完成。
+- **施工归属：** Grok 支付修复工作区 `payment-callback-race-20260922`；Claude 小程序修复工作区
+  `miniapp-resignin-logout-20260922`；两者均从上述 SHA 起步。只接收实际补丁、提交与退出码证据，调用意图不算执行。
+  本次集成树只更新两份正式进度文件，保留既有 `.gitignore` 修改；未产生新的上线或真机验收证据。
+  另外只读核对 Windows 签名候选：`windows-agent-signing-gate-20260917@50483cd28` 仍有15个WIP文件，
+  当前集成树尚无其内部签名/信任脚本；该资产待审查提取，未清理或覆盖。远程 `main` 实查仍为 `eb0f20341`。
+
 2026-09-22 **独立审查边界（绑定 `ad154ac1a`）。** Agy（`gemini-3.8-flash-high`）只读核对确认自我探索/招聘会批次未修改 `services/api`、Prisma 或业务 DTO；小程序 136 个调用端点与后端路由对账无已知缺口，terminal identity、订单幂等、文件归属、支付/退款、打印/扫描归属、状态回放和本人资产契约在源码/本地层为 GO 或 PARTIAL。Agy同时确认真实 Windows/Pantum、生产通道和商业支付证据缺失，均为 NO-GO。Agy报告中把“CI具备运行条件”写成 GO，但没有当前 SHA 的 GitHub run，本项目按严格证据口径仍记 `CI: NO-GO`。
 
 Grok（`grok-4.7-build-fast xhigh`）绑定同一 SHA，因本轮未读完实现、未运行验证，明确将招聘会、自我探索和所有层级标为 `UNREVIEWED`，不构成批准，也没有发现可确认的 P0/P1/P2。该结果不否定本地已执行的门禁/Playwright，只说明外部审查不能替代命令证据。
