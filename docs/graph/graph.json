@@ -11756,7 +11756,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 556,
+      "reachableFileCount": 555,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14128,14 +14128,12 @@
           ],
           "path": "/resume/parse",
           "styles": [
-            "apps/kiosk/src/pages/resume/resume-diagnosis-ext.css",
-            "apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css",
-            "apps/kiosk/src/styles/ai-primitives.css"
+            "apps/kiosk/src/pages/resume/resume-triage-qx.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14371,13 +14369,11 @@
           ],
           "path": "/resume/source",
           "styles": [
-            "apps/kiosk/src/pages/resume/resume-diagnosis-ext.css",
-            "apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css"
+            "apps/kiosk/src/pages/resume/resume-triage-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14665,7 +14661,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 617
+      "sourceFileCount": 618
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18590,6 +18586,11 @@
     ],
     "apps/kiosk/src/pages/resume/resume-report-qx.css": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-triage-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
@@ -24737,6 +24738,7 @@
           "apps/kiosk/src/pages/resume/jobFit-inkpaper.css",
           "apps/kiosk/src/pages/resume/jobMaterialDraft.ts",
           "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
+          "apps/kiosk/src/pages/resume/resume-triage-qx.css",
           "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
           "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
           "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
@@ -25626,6 +25628,7 @@
           "apps/kiosk/src/pages/resume/resume-generate-qx.css",
           "apps/kiosk/src/pages/resume/resume-library-lightflow.css",
           "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
+          "apps/kiosk/src/pages/resume/resume-triage-qx.css",
           "apps/kiosk/src/routes/index.tsx"
         ],
         "missing": []
@@ -26955,6 +26958,7 @@
           "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
+          "apps/kiosk/src/pages/resume/resume-triage-qx.css",
           "apps/kiosk/src/services/api/ai.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
           "apps/kiosk/src/services/api/aiMockAdapter.ts",
@@ -36546,6 +36550,32 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2b-ai-resume.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/resume/resume-diagnosis-ext.css",
+        "kind": "style",
+        "mentions": [
+          "docs/progress/current-progress.md",
+          "docs/progress/next-tasks.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/progress/current-progress.md、docs/progress/next-tasks.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
+          "docs/progress/current-progress.md",
+          "docs/progress/next-tasks.md",
           "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2b-ai-resume.md"
         ],
         "risk": "high",
