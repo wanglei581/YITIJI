@@ -98,6 +98,47 @@ sha256 逐字节恢复后退出 0。1080×1920 与 390×844 截图已人工核�
 合流后已刷新既有 `docs/graph` 生成索引。限制：金额卡来源文案仍写 `POST /orders/quote`；
 合并版上的 409 与参数变化迟到响应无专门浏览器用例；Word 转换在报价前执行，409 时可能留下派生 PDF。
 本次新 HEAD 尚未 push/PR/CI，未碰生产、真实支付或硬件；`CI / DEVICE / PRODUCTION / PAYMENT / COMMERCIAL: NO-GO`。
+2026-09-23 **F2 决策工作台两条路由身份闸（本地候选，基线 `fb2f305b2`）。**
+Claude `claude-opus-5-5` session `c00c485f-2a16-4e5b-90e3-a2a6a7ca398d`；冷审并接手两次超时会话留下的
+未提交在制品（未丢弃）。`/resume/career-plan`、`/resume/job-fit/actions` 挂载时绑定会员 id + 令牌与本机
+AI 简历会话；路由仍挂着时任一项变了（真实路径：会员请求回 401 → AuthProvider 同步 logout → 回登录页被
+扫描收尾闸按住），同一次渲染切到「会话已结束」屏：旧规划/清单/依据与待确认降级打印件不再显示；
+在路上的读取/生成/打印晚到不写结果、不导航；不再发任何请求，旧匿名 accessToken 不会被带给下一位。
+判据只在 `JobFitActionsPage` 导出的 `useRouteIdentityGuard` 一处，职业规划页直接引用（无循环依赖）。
+冷审修正：在制品的票据不再逐次递增，同类重叠请求的晚到判据失效；改为生成/打印同类独占（ref 同步判定），
+finally 只放自己那一趟的忙态，并保留 `verify:job-fit-m1-5-ui` 锚定的 `finally { setPrinting(false)`。
+Grok 反证两轮补修（跨挂载）：401 出口整页回 /login 后按浏览器返回，旧记录重新挂载时会从 `location.state`
+捡回上一位的 taskId 与匿名令牌。现由同一个 `scrubRouteHistoryEntry` 直接改写当前历史记录（只去掉 usr 里的
+taskId/accessToken 与地址里的 `taskId`，保留 key/idx 与其它字段，只动本路由那一条），两处调用：
+会员会话失效事件的同步派发里（无待撤扫描时 AuthProvider 在同一调用栈里就 `location.assign`），以及会话结束后的 effect
+（扫描收尾按住及其余身份变化）。路由不变，会话结束屏与扫描收尾照旧。
+唯一新用例 `tests/visual/resume-decision-identity-fusion-w3.spec.ts`（8 条：可见登录 UI + 真 401；第 7/8 条走比对页
+「查看行动清单」真实带 state 进入，分别覆盖撤销 502 按住后放行、与无扫描立即跳 /login，再浏览器返回；
+第 8 条用页内记录（Navigation API navigate 事件 + replaceState 包装，存 sessionStorage）断言清理落在发起跳转的同一同步调用栈；
+文件名命中 W3 testMatch，`verify:kiosk-browser-spec-coverage` 计为 CI 覆盖 36/38）。
+依赖守卫：`pnpm_config_verify_deps_before_run=error` 下 pnpm 拒绝运行（根 `node_modules` 软链到另一 worktree，
+报 workspace 结构变更），故未 install、未跑任何 pnpm 脚本；改用本地 tsc/eslint/vite/playwright 二进制，
+构建只写 `/tmp`（分别用 W3 / 默认配置同款构建环境变量），以 `/tmp` 临时配置在 4177 起 vite preview，收尾端口已空。
+证据（本地夹具、fail-closed ApiRouter）：typecheck/eslint 退出 0；W3 合跑 16/16（新用例 8 + 相邻岗位匹配与决策工作台 8，
+含离页迟到打印旧用例与匿名路径）；career-plan-materials 2/2；会话结束屏 1080×1920/390×844 截图与 ≥48px 断言。
+跨挂载：第 7 条在无清理的构建上红（返回后以 `x-resume-access-token` 带出上一位匿名令牌重读 `t-act`，旧清单恢复）。
+第 8 条在仅有 effect 清理的构建上红（唯一一次清理 `sameStack=false`）。如实记录：该构建在本机 Chromium
+里结果仍是干净的（effect 在卸载前跑到了，加 500ms 主线程忙等也一样），所以这条红落在「同一调用栈内清理」
+这条约束上，不是结果上。修复后页内记录为 `navigate /login → replaceState …actions usr=null sameStack=true`，
+返回为全新挂载（bfcache 哨兵对照），落 missing-task，无读取、无旧令牌、无打印入口。只去掉同步监听的消融：第 8 条红、第 7 条仍绿
+（扫描按住路径由 effect 兜住）。
+fb2f 原行为 8/8 红（例：401 登出后仍显示上一位的整份规划并可点打印）；去掉两处打印晚到判据的变异只红 2 条，
+均落在迟到打印断言；每次临时替换源文件后均按哈希逐字节恢复。kiosk `verify:*` 可本机运行的 90 条、W3 节点契约测试、
+合规/诚实性 5 条与 repository-integrity 均退出 0；其余 7 条依赖环境未计入：prod-build-config（需 CI 生产 env）、
+5 条 probe（需 :3010 活 API）、qingxu-proto-geometry（只量 docs 原型，本机超时）。截图与日志在 `/tmp/idguard-20260923/`。
+剩余边界：只能改写当前这一条历史记录；更早的、其他路由带 state 的记录（如比对页）不在本范围；401 出口的 `from`
+在按地址带 `?taskId` 进入时仍含任务号（出口在清理前已算好；不含任何凭据，下一位登录后由服务端按新身份鉴权）；
+职业规划页没有带 state 的站内入口，靠同一 hook 覆盖，无专门 e2e；非 401 的身份变化路径只由 effect 覆盖，无 e2e；
+清理直接改 `window.history`，会话结束期间 React Router 内存里的 location 仍是旧值（页面已结束、不再读取）。
+职业规划页 835 行、行动清单页 805 行，均已超 800 行上限（身份闸为安全修复，后续需评估把 hook 拆到独立文件）。未 push、未开 PR、未部署；未跑 W3/W6 全套与 CI；
+项目图谱未刷新；Windows 一体机真机与生产均未验证。
+`SOURCE / LOCAL`：本任务范围（两条路由身份闸 + 跨挂载两轮补修）本地夹具通过；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+
 2026-09-23 **F2 简历决策工作台其余三条路由迁入青序流光（本地候选，基线 `c6c1df925`）。**
 Claude `claude-opus-5-5` session `abcd29ff-ebf3-4138-806d-4c2bf1a1a817`（中途 MCP 超时后原会话续做）。
 `/resume/job-fit/actions`、`/resume/career-plan`、`/resume/templates` 按稿 46 迁入，复用 job-fit 的

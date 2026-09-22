@@ -9,7 +9,7 @@
 //   docs/design/kiosk-redesign-2026-08/46-resume-decision-workspace.html?screen=career-plan
 // 与 /resume/job-fit 同一宿主：舞台（JobFitStage）、呈现件（jobFitQxKit）与窄屏壳层样式共用；
 // 四栏与条目样式在 resume-decision-qx.css。真实规划读回、生成与打印逻辑仍在本页。
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { CareerPlanResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
@@ -50,6 +50,7 @@ import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { JobFitStage } from './JobFitPage'
+import { useRouteIdentityGuard } from './JobFitActionsPage'
 import { CareerPlanExistingMaterials } from './components/career-plan/CareerPlanExistingMaterials'
 import { CareerPlanColumns, CareerPlanSelfCheck } from './components/career-plan/CareerPlanSection'
 import {
@@ -70,7 +71,7 @@ interface PageState {
 type PreconditionGate = 'missing' | 'rejected'
 
 type CareerScreen =
-  | 'missing-task' | 'rejected-task' | 'loading' | 'guide' | 'generating' | 'ai-down' | 'failed'
+  | 'session-ended' | 'missing-task' | 'rejected-task' | 'loading' | 'guide' | 'generating' | 'ai-down' | 'failed'
   | 'ready' | 'print-pending' | 'print-failed' | 'print-degraded'
 
 // 能力级错误码只有一份真值：`../../ai` 的 AI_OUTAGE_CODES。
@@ -118,12 +119,16 @@ function Action({ label, variant, onClick, busy, icon }: {
 export function CareerPlanPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { getToken } = useAuth()
+  const { user, getToken } = useAuth()
   const state = (location.state ?? {}) as PageState
   const session = useMemo(() => readAiResumeSession(), [])
+  // 登出 / 过期 / 换人 / 清场之后本路由会话永久结束（判据见 useRouteIdentityGuard）。
+  const { ended: identityEnded, begin, settle, isLive } = useRouteIdentityGuard({ user, getToken })
   const taskId = state.taskId ?? session?.taskId
   const accessToken = state.accessToken ?? session?.accessToken
-  const [plan, setPlan] = useState<CareerPlanResponse | null>(null)
+  const [storedPlan, setPlan] = useState<CareerPlanResponse | null>(null)
+  /** 渲染闸：会话一结束，同一次渲染里就不再读存着的规划（存值随后在 layout effect 里清掉）。 */
+  const plan = identityEnded ? null : storedPlan
   const [loading, setLoading] = useState(!!taskId)
   const [generating, setGenerating] = useState(false)
   const [printing, setPrinting] = useState(false)
@@ -133,7 +138,8 @@ export function CareerPlanPage() {
    * 这时候直接把用户送去打印，他会以为拿到的是刚才屏幕上那份 AI 规划 —— 那是拿
    * 模板输出冒充 AI 结果。所以停一步，如实说清楚再让他自己决定。
    */
-  const [degradedPrint, setDegradedPrint] = useState<{ filename: string; pageCount: number; go: () => void } | null>(null)
+  const [storedDegradedPrint, setDegradedPrint] = useState<{ filename: string; pageCount: number; go: () => void } | null>(null)
+  const degradedPrint = identityEnded ? null : storedDegradedPrint
   /** 生成这一跳的非能力级失败（留在当前屏）。 */
   const [error, setError] = useState<string | null>(null)
   /** 打印件生成失败，落成 print-failed 屏；与生成失败分开，免得互相覆盖。 */
@@ -146,24 +152,36 @@ export function CareerPlanPage() {
   const [probed, setProbed] = useState(false)
   /** 模型跑了但没给出可用规划（status:'failed'），与「AI 连不上」不是一回事。 */
   const [taskFailReason, setTaskFailReason] = useState<string | null>(null)
-  /** 打印这一跳的代次：离开本页后晚到的返回不许再把用户拽去打印确认页。 */
-  const printRunRef = useRef(0)
 
   useBusyLock(generating || printing)
 
-  useEffect(() => () => { printRunRef.current += 1 }, [])
+  // 会话结束的那一次提交：丢掉规划与待确认打印件，放下忙态（忙锁不许按住隐私计时）。
+  // 离开本页后晚到的打印返回，由身份闸的卸载代次作废，不再把用户拽去打印确认页。
+  useLayoutEffect(() => {
+    if (!identityEnded) return
+    setPlan(null)
+    setDegradedPrint(null)
+    setError(null)
+    setPrintError(null)
+    setGenerating(false)
+    setPrinting(false)
+    setLoading(false)
+  }, [identityEnded])
 
   useEffect(() => {
+    if (identityEnded) return
     if (!taskId) { setLoading(false); return }
+    const run = begin()
+    if (!run) return
     let cancelled = false
     getLatestCareerPlan(taskId, { token: getToken(), accessToken })
       .then((result) => {
-        if (cancelled) return
+        if (cancelled || !isLive(run)) return
         if (result.status === 'completed') setPlan(result)
         setProbed(true)
       })
       .catch((err: unknown) => {
-        if (cancelled) return
+        if (cancelled || !isLive(run)) return
         const code = errorCodeOf(err)
         // 没有规划记录是正常态：说明还没生成过，但这一趟证明了后端可达。
         if (code === 'CAREER_PLAN_NOT_FOUND') { setProbed(true); return }
@@ -176,9 +194,9 @@ export function CareerPlanPage() {
         // 其余错误不足以判定能力不可用，标记已探测，让用户能真的点一次生成看结果。
         setProbed(true)
       })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => { if (!cancelled && isLive(run)) setLoading(false) })
     return () => { cancelled = true }
-  }, [taskId, accessToken, getToken])
+  }, [identityEnded, taskId, accessToken, getToken, begin, isLive])
 
   /**
    * availability 必须来自真实信号，不得写死 'available'：
@@ -241,12 +259,15 @@ export function CareerPlanPage() {
     // 用户主动点一次就清掉上次的能力判定，再发一次真实请求，由结果重新决定。
     // 不加轮询、不自动重探：只有用户按下去才会再打一次。
     if (!taskId || generating) return
+    const run = begin('generate')
+    if (!run) return
     setGenerating(true)
     setAiOutage(null)
     setError(null)
     setTaskFailReason(null)
     try {
       const result = await generateCareerPlan(taskId, { token: getToken(), accessToken })
+      if (!isLive(run)) return
       if (result.status === 'failed') {
         setTaskFailReason(result.failReason ?? '模型这次没有返回可用的规划内容')
       } else {
@@ -254,23 +275,26 @@ export function CareerPlanPage() {
         setProbed(true)
       }
     } catch (err) {
+      if (!isLive(run)) return
       const code = errorCodeOf(err)
       if (code === 'AI_TASK_NOT_FOUND') setRejectedTask(true)
       else if (AI_OUTAGE_CODES.has(code)) setAiOutage(errorMessageOf(err, 'AI 服务当前不可用'))
       else setError(errorMessageOf(err, '生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
+      settle(run)
     }
   }
 
   const handlePrint = async () => {
     if (!taskId || printing) return
-    const run = ++printRunRef.current
+    const run = begin('print')
+    if (!run) return
     setPrinting(true)
     setPrintError(null)
     try {
       const file = await printCareerPlan(taskId, { token: getToken(), accessToken })
-      if (run !== printRunRef.current) return
+      if (!isLive(run)) return
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
       const goPrint = () => navigate('/print/confirm', {
         state: {
@@ -290,15 +314,17 @@ export function CareerPlanPage() {
       // 本页已经有 plan 却拿回降级版 = 规划在这两步之间过期了，必须先说明再打印；
       // 本来就没有 plan 的那条路径按钮文案已经写明「未含 AI 规划」，不再多一次确认。
       if (file.variant === 'degraded' && plan) {
-        setDegradedPrint({ filename: file.filename, pageCount: file.pageCount, go: goPrint })
+        // 存起来的 go 也要再核一次身份：会话结束后它既不渲染，也不许被任何路径调起来。
+        setDegradedPrint({ filename: file.filename, pageCount: file.pageCount, go: () => { if (isLive(run)) goPrint() } })
         return
       }
       goPrint()
     } catch (err) {
-      if (run !== printRunRef.current) return
+      if (!isLive(run)) return
       setPrintError(userMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
+      settle(run)
     }
   }
 
@@ -308,7 +334,7 @@ export function CareerPlanPage() {
   // 明确否认之后必须挡在这里，否则用户会在下一屏点一次生成再吃一次同样的失败。
   const gate: PreconditionGate | null = !taskId ? 'missing' : rejectedTask ? 'rejected' : null
 
-  const screen: CareerScreen = gate === 'missing' ? 'missing-task'
+  const screen: CareerScreen = identityEnded ? 'session-ended' : gate === 'missing' ? 'missing-task'
     : gate === 'rejected' ? 'rejected-task'
       : loading ? 'loading'
         : printing ? 'print-pending'
@@ -378,6 +404,25 @@ export function CareerPlanPage() {
           <CtaNote>没有可读取的简历任务时，不生成任何个人规划内容。</CtaNote>
           <Action label="返回简历服务" variant="ghost" onClick={goResumeHub} />
           <Action label="去上传简历" variant="primary" onClick={goUpload} icon={<ArrowRightIcon size={22} aria-hidden="true" />} />
+        </>
+      ),
+    }
+
+    // 出口一律不带 taskId / accessToken：会话已经不属于现在站在屏幕前的这一位。
+    if (screen === 'session-ended') return {
+      title: '这次会话已结束',
+      subtitle: '登录状态或本机会话刚刚变化（退出、过期或清场）。刚才的求职方案、打印件和还在路上的请求都不再显示或继续。',
+      pill: { tone: 'warn', label: '会话已结束 · 内容已隐藏' },
+      body: (
+        <Sec title="这次没有发生的事" hint="明确否定，避免误解" grow>
+          <Nots items={['不再显示刚才的规划、依据或材料', '不再用刚才的登录凭证读取、生成或打印', '还在路上的返回结果不会再进入打印确认']} />
+        </Sec>
+      ),
+      cta: (
+        <>
+          <CtaNote>需要继续时，请重新登录或重新上传简历。</CtaNote>
+          <Action label="返回简历服务" variant="ghost" onClick={goResumeHub} />
+          <Action label="重新上传简历" variant="primary" onClick={goUpload} icon={<ArrowRightIcon size={22} aria-hidden="true" />} />
         </>
       ),
     }

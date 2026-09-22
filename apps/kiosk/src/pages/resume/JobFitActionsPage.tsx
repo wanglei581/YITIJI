@@ -19,7 +19,7 @@
 //   本页不自建第二个外跳入口，也不复述投递类文案。
 // ============================================================
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { JobFitResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
@@ -36,6 +36,8 @@ import {
 } from '../../ai'
 import { getLatestJobFit, printJobFit } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
+import type { AuthContextValue } from '../../auth/context'
+import { onMemberSessionExpired } from '../../services/auth/memberSessionEvents'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
@@ -63,6 +65,7 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 const JOB_FIT_ROUTE = '/resume/job-fit'
 
 type ActionsScreen =
+  | 'session-ended'
   | 'missing-task'
   | 'loading'
   | 'unknown'
@@ -78,6 +81,96 @@ interface ScreenView {
   pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   body: ReactNode
   cta: ReactNode
+}
+
+/** 生成 / 打印各自独占：同类已有一趟在路上，第二趟直接不发。读取不设独占（effect 的 cancelled 作废旧的那趟）。 */
+type RouteLane = 'generate' | 'print'
+interface RouteRun { readonly epoch: number; readonly lane: RouteLane | null }
+
+function aiResumeSessionKey(): string | null {
+  const session = readAiResumeSession()
+  return session ? `${session.taskId}\n${session.accessToken ?? ''}` : null
+}
+
+/**
+ * 把当前这条历史记录里上一位的任务凭据洗掉：state（React Router 的 usr）里的 taskId / accessToken
+ * 与地址里的 taskId。直接改 window.history，保留 key / idx 与其它字段；只在地址仍是本路由时动手。
+ * 401 之后回登录页是整页跳转，再按浏览器返回，这条记录会重新挂载成下一位 —— 不能让它捡回这些。
+ */
+function scrubRouteHistoryEntry(routePath: string): void {
+  if (typeof window === 'undefined' || window.location.pathname !== routePath) return
+  const entry = window.history.state as { usr?: unknown } | null
+  const url = new URL(window.location.href)
+  const usr = entry?.usr && typeof entry.usr === 'object' ? { ...(entry.usr as Record<string, unknown>) } : null
+  const stateHasTask = usr !== null && ('taskId' in usr || 'accessToken' in usr)
+  if (!stateHasTask && !url.searchParams.has('taskId')) return
+  url.searchParams.delete('taskId')
+  if (usr) {
+    delete usr.taskId
+    delete usr.accessToken
+  }
+  const nextUsr = usr && Object.keys(usr).length > 0 ? usr : stateHasTask ? null : entry?.usr
+  window.history.replaceState({ ...entry, usr: nextUsr }, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
+/**
+ * 决策工作台路由的身份闸（本页与 /resume/career-plan 共用，判据只留这一份）。
+ *
+ * 挂载那一刻绑定：会员 id + 令牌原文（游客为 guest），以及本机 AI 简历会话（taskId + 匿名
+ * accessToken，登出 / 清场会同步抹掉）。路由还挂着时任一项变了 —— 登出、401 过期而回登录页
+ * 还在等扫描收尾、换人、清场 —— 这次会话就**永久结束**：
+ *  - 同一次渲染 `ended` 已为真，页面只画会话结束屏，不读挂载时存下的任何结果；
+ *  - 在路上的读取 / 生成 / 打印回来时 `isLive` 为假：不写结果、不导航；
+ *  - `begin` 不再放行任何请求，挂载时的 taskId / 匿名 accessToken 落不到下一位身上。
+ * `isLive` / `begin` 同步读令牌与会话，登出已发生、还没重渲染的那一拍也拦得住；结束与卸载都让代次 +1。
+ * 生成 / 打印同类独占，所以调用方 finally 里放下的只可能是它自己那一趟的忙态，碰不到更新的一趟。
+ * 另外两处调同一个 `scrubRouteHistoryEntry`：会员会话失效事件的同步派发里（没有待撤扫描时 AuthProvider
+ * 在同一调用栈里就整页跳走，React 来不及再渲染），以及会话结束后的 effect（其余身份变化与扫描收尾按住的路径）。
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- 宿主 46 两条兄弟路由共用这一道闸，判据只留一份
+export function useRouteIdentityGuard({ user, getToken }: Pick<AuthContextValue, 'user' | 'getToken'>) {
+  const { pathname } = useLocation()
+  const token = user ? getToken() : null
+  const identity = user ? `member\n${user.id}\n${token ?? ''}` : 'guest'
+  const session = aiResumeSessionKey()
+  const [bound] = useState(() => ({ identity, token, session, path: pathname }))
+  const [latched, setLatched] = useState(false)
+  const endedRef = useRef(false)
+  const epochRef = useRef(0)
+  const lanesRef = useRef(new Set<RouteLane>())
+  const ended = latched || identity !== bound.identity || session !== bound.session
+
+  const end = useCallback(() => {
+    if (endedRef.current) return
+    endedRef.current = true
+    epochRef.current += 1
+    setLatched(true)
+  }, [])
+  useLayoutEffect(() => { if (ended) end() }, [ended, end])
+  useEffect(() => () => { epochRef.current += 1 }, [])
+  // 与 AuthProvider 同一判据（只认本页绑定的那张会员令牌失效）。事件派发是同步的：无论本监听排在
+  // AuthProvider 之前还是之后，都落在整页跳转真正卸载本页之前。路由不变，会话结束屏与扫描收尾照旧。
+  useEffect(() => onMemberSessionExpired((failedToken) => {
+    if (bound.token === null || (failedToken && failedToken !== bound.token)) return
+    scrubRouteHistoryEntry(bound.path)
+  }), [bound])
+  useEffect(() => { if (ended) scrubRouteHistoryEntry(bound.path) }, [ended, bound])
+
+  const stillBound = useCallback((): boolean => {
+    if (endedRef.current) return false
+    if (getToken() === bound.token && aiResumeSessionKey() === bound.session) return true
+    end()
+    return false
+  }, [bound, getToken, end])
+  const begin = useCallback((lane: RouteLane | null = null): RouteRun | null => {
+    if (!stillBound() || (lane && lanesRef.current.has(lane))) return null
+    if (lane) lanesRef.current.add(lane)
+    return { epoch: epochRef.current, lane }
+  }, [stillBound])
+  const settle = useCallback((run: RouteRun) => { if (run.lane) lanesRef.current.delete(run.lane) }, [])
+  const isLive = useCallback((run: RouteRun): boolean => run.epoch === epochRef.current && stillBound(), [stillBound])
+
+  return { ended, begin, settle, isLive }
 }
 
 function QxAction({ label, variant, onClick, icon }: {
@@ -97,10 +190,11 @@ function QxAction({ label, variant, onClick, icon }: {
 export function JobFitActionsPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { getToken } = useAuth()
+  const { user, getToken } = useAuth()
   const state = location.state as Record<string, unknown> | null
 
   const session = useMemo(() => readAiResumeSession(), [])
+  const { ended: identityEnded, begin, settle, isLive } = useRouteIdentityGuard({ user, getToken })
   const queryTaskId = useMemo(
     () => new URLSearchParams(location.search).get('taskId') ?? undefined,
     [location.search],
@@ -115,33 +209,41 @@ export function JobFitActionsPage() {
   /** 与 JobFitPage 同一判据：无会员 token 但持匿名一次性令牌 = 匿名会话。 */
   const isAnonymous = !currentToken && Boolean(accessToken)
 
-  const [result, setResult] = useState<JobFitResponse | null>(null)
+  const [storedResult, setResult] = useState<JobFitResponse | null>(null)
+  /** 渲染闸：会话一结束，同一次渲染里就不再读存着的结果（存值随后在 layout effect 里清掉）。 */
+  const result = identityEnded ? null : storedResult
   const [loading, setLoading] = useState(Boolean(taskId))
   const [aiOutage, setAiOutage] = useState<string | null>(null)
   const [probed, setProbed] = useState(false)
   const [failReason, setFailReason] = useState<string | null>(null)
   const [printing, setPrinting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /**
-   * 打印这一跳的代次。离开本页（打印等待屏的两个出口都会离开）时作废，
-   * 晚到的返回既不许把用户拽回打印确认页，也不许在别的页面上报错。
-   */
-  const printRunRef = useRef(0)
 
   useBusyLock(printing)
 
-  useEffect(() => () => { printRunRef.current += 1 }, [])
+  // 会话结束的那一次提交：丢掉结果、放下忙态（忙锁不许按住隐私计时）。
+  // 离开本页（打印等待屏的两个出口都会离开）则由身份闸的卸载代次作废晚到的打印返回。
+  useLayoutEffect(() => {
+    if (!identityEnded) return
+    setResult(null)
+    setError(null)
+    setPrinting(false)
+    setLoading(false)
+  }, [identityEnded])
 
   useEffect(() => {
+    if (identityEnded) return
     if (!taskId) {
       setLoading(false)
       return
     }
+    const run = begin()
+    if (!run) return
     let cancelled = false
     setLoading(true)
     getLatestJobFit(taskId, { token: getToken(), accessToken })
       .then((res) => {
-        if (cancelled) return
+        if (cancelled || !isLive(run)) return
         setProbed(true)
         if (res.status === 'completed') {
           setResult(res)
@@ -153,7 +255,7 @@ export function JobFitActionsPage() {
         }
       })
       .catch((err: unknown) => {
-        if (cancelled) return
+        if (cancelled || !isLive(run)) return
         if (isAiOutage(err)) {
           setAiOutage(aiErrorMessageOf(err, 'AI 服务当前不可用'))
           return
@@ -162,12 +264,12 @@ export function JobFitActionsPage() {
         setFailReason(aiErrorMessageOf(err, '匹配结果读取失败'))
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && isLive(run)) setLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [taskId, accessToken, getToken])
+  }, [identityEnded, taskId, accessToken, getToken, begin, isLive])
 
   const availability = deriveAiAvailability({ outage: aiOutage, probed })
 
@@ -199,12 +301,13 @@ export function JobFitActionsPage() {
    */
   const handlePrint = async () => {
     if (!taskId || printing) return
-    const run = ++printRunRef.current
+    const run = begin('print')
+    if (!run) return
     setPrinting(true)
     setError(null)
     try {
       const file = await printJobFit(taskId, { token: getToken(), accessToken })
-      if (run !== printRunRef.current) return
+      if (!isLive(run)) return
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
       navigate('/print/confirm', {
         state: {
@@ -223,10 +326,11 @@ export function JobFitActionsPage() {
         },
       })
     } catch (err) {
-      if (run !== printRunRef.current) return
+      if (!isLive(run)) return
       setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
+      settle(run)
     }
   }
 
@@ -238,7 +342,7 @@ export function JobFitActionsPage() {
    * 两类都保证「AI 挂了仍拿得到东西」：岗位原文照常可看，简历原文照常可打印，
    * 简历优化编辑区照常能改。这不是安慰话 —— 那三条都不经过本页这条 AI 链路。
    */
-  const screen: ActionsScreen = !taskId
+  const screen: ActionsScreen = identityEnded ? 'session-ended' : !taskId
     ? 'missing-task'
     : loading
       ? 'loading'
@@ -257,6 +361,31 @@ export function JobFitActionsPage() {
     : '这次匹配的目标岗位'
 
   function buildView(): ScreenView {
+    // 出口一律不带 taskId / accessToken：会话已经不属于现在站在屏幕前的这一位。
+    if (screen === 'session-ended') {
+      return {
+        title: '这次会话已结束',
+        subtitle: '登录状态或本机会话刚刚变化（退出、过期或清场）。刚才的行动清单和还在路上的请求都不再显示或继续。',
+        pill: { tone: 'warn', label: '会话已结束 · 内容已隐藏' },
+        body: (
+          <Sec title="这次没有发生的事" hint="明确否定，避免误解" grow>
+            <Nots items={[
+              '不再显示刚才的差距清单与改写建议',
+              '不再用刚才的登录凭证读取或生成打印版',
+              '还在路上的返回结果不会再进入打印确认',
+            ]} />
+          </Sec>
+        ),
+        cta: (
+          <>
+            <CtaNote>需要继续时，请重新登录或重新准备简历材料。</CtaNote>
+            <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
+            <QxAction label="去准备简历材料" variant="primary" onClick={goTriage} />
+          </>
+        ),
+      }
+    }
+
     if (screen === 'missing-task') {
       return {
         title: '还没有可用的匹配结果',
@@ -648,7 +777,7 @@ export function JobFitActionsPage() {
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
-        back={taskId
+        back={taskId && !identityEnded
           ? { label: '返回比对结果', onBack: backToCompare }
           : { label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
