@@ -1,6 +1,18 @@
 # 当前开发进度
 
-2026-09-23 **唯一集成候选 `831506deafe4d9a1856dd4813c6e68aca422b64f`：简历取件/解析页已本地合流，商业仍 NO-GO。**
+2026-09-23 **唯一集成候选现为 `09c93dece5bc7eadb4cd2b3dbc4a98bd9f1082cd`：求职材料库已本地迁入青序流光，商业仍 NO-GO。**
+Claude `claude-opus-5-5` / `xhigh` 在隔离分支 `claude/kiosk-resume-materials-qx-20260923` 完成稿 25，
+以 fast-forward 合入本地集成树；原有 `/resume/materials` 路由、模板 GET、生成 POST、登录草稿恢复、
+busy lock、本人文件归属和内部 `printFileUrl` 打印交接保持。新增的目录、字段校验、真实文件卡及空/错/失败态
+均基于现有服务返回，不用假模板或假文件；没有新增后端、入口或招聘闭环。文件实际预览尚缺；
+改动字段会收起旧文件卡而非保留“上个版本”；单双面打印沿用现有页数规则，稿 25 的单面口径待产品确认。
+在合流后的精确 HEAD 上，kiosk typecheck、材料页与 AI 产物打印 URL 合同、W3 和 K2b 静态门禁、
+W3 浏览器 43/43、W6 材料页目标用例 1/1、route-sweep 110/110、`verify:no-raw-error-render`、
+`verify:kiosk-frontend-debt`、`graph:check`、`verify:repository-integrity` 均退出 0。
+已查看生成态 1080×1920 与 390×844 截图；手机首屏展示目录，表单需滚动，未做全流程真机确认。
+其余旧路由仍需逐项盘点和迁移，不能把这一页绿测写成全站统一。未推送、未合并 `main`、未部署。
+
+2026-09-23 **历史集成节点 `831506deafe4d9a1856dd4813c6e68aca422b64f`：简历取件/解析页已本地合流，商业仍 NO-GO。**
 `/resume/source`、`/resume/parse` 已从 Claude 隔离候选进入 `codex/commercial-integration-20260918-r1`；
 `831506dea` 还把解析页返回来源页改为替换历史，避免浏览器后退再次进入自动提交的解析页。
 这只是本地分支：比 PR #1042 的远端分支超前 15 个提交，未推送、未合并 `main`、未部署。
