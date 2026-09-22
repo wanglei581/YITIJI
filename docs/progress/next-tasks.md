@@ -2,6 +2,8 @@
 
 ## 2026-09-23：内部签名 LocalMachine 只有源码/静态契约，签名 job 仍 NO-GO
 
+来源 `20c6acb41` / `86b2b3b48` / `45018ec97` / `d359cf01c` 已依次落为本地集成提交
+`825d0f8ec` / `ce20559ab` / `d0152006f` / `22960b06f`；签名静态契约在集成树退出 0。
 受控路径已经写进 `internal-signing-validation` 的 opt-in。默认仍是 CurrentUser。环境三项
 `GITHUB_ACTIONS` / `RUNNER_OS` / `RUNNER_ENVIRONMENT` 只是可伪造的意外防护，不是证明。
 `run-ownership.marker` 在预检通过后才创建。没有标记不得删除 LocalMachine 信任项，但仍须按 metadata 指纹删除本轮 CurrentUser\My 私钥。这是 SOURCE/STATIC candidate only。
@@ -31,12 +33,12 @@ F2 已整合 `/resume/job-fit` 单路由候选，先验证合流后 W3 与相关
 失败已判为夹具竞态并在本地集成树修复（仅 spec，完整 38/38），待新 HEAD 远端 CI 确认，勿改生产扫描源码
 或放宽 `/print-scan$` 锚点。Windows internal validation 被取消并阻断 MSI；根因由独立窗口分析，当前仍非 Windows GO。
 打印改价二次确认已落本地集成树；一体机服务端与确认页不要重复开发。
-小程序会员单和材料包的服务端金额断言已在 `codex/member-package-price-confirmation-20260923` 完成本地实现，不要重写；Claude 仍须接确认页。
+小程序会员单和材料包的服务端金额断言来源 `d8a30e589` 已落为本地集成提交 `39bb2d404`，不要重写；Claude 仍须接确认页。
 
 ## 2026-09-23：小程序建单价格再确认的服务端已本地完成，前端未接
 
-`POST /me/print-orders` 与 `POST /orders/package` 已接受可选 `quotedAmountCents`。旧客户端不传该字段仍按服务端现价建单。409 `PRICE_CHANGED` 释放临时租约，不要求更换 Idempotency-Key；已建成订单回放冻结金额。
-下一步只由 Claude 做小程序确认页：提交屏上确认金额，409 后展示服务端现价并等用户再次确认，沿用原键，不自动重试。本分支未改前端、未推送、未开 PR。
+`POST /me/print-orders` 与 `POST /orders/package` 已接受可选 `quotedAmountCents`。旧客户端不传该字段仍按服务端现价建单。409 `PRICE_CHANGED` 释放临时租约，不要求更换 Idempotency-Key；已建成订单回放冻结金额。集成树的 API typecheck、会员 HTTP H1-H21、材料包 HTTP H1-H19、隔离 SQLite `verify:print-jobs` 53 项均退出 0。
+下一步只由 Claude 做小程序确认页：提交屏上确认金额，409 后展示服务端现价并等用户再次确认，沿用原键，不自动重试。本地集成候选未改前端、未推送、未开新 PR。
 真机、真实支付、生产与商业放行仍为 NO-GO。
 
 ## 2026-09-23：打印改价二次确认已本地集成，待最终 SHA CI

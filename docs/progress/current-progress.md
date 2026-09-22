@@ -1,10 +1,11 @@
 # 当前开发进度
 
-2026-09-23 **小程序会员单与材料包建单可选价格再确认（本地，未推送）。** 基线 `7c8b5f675`。
+2026-09-23 **小程序会员单与材料包建单可选价格再确认已合入本地集成候选，未推送。** 来源
+`d8a30e589`（父提交 `7c8b5f675`）已落为 `39bb2d404`。
 `POST /me/print-orders` 与 `POST /orders/package` 增加可选 `quotedAmountCents`，只断言一致性；金额仍由既有 `OrderQuoteService` 按文件、页数、份数与当前价目重算。材料包总额、计费页和逐行 `line=` 与 `POST /orders/quote` 的 `aggregatePrintPriceQuotes` 相同。
 幂等获取、回放、键复用、处理中和已废弃都先于报价比对。已建成的订单回放落库金额，不因之后改价或重试时的确认金额重算；`quotedAmountCents` 不进业务指纹。只有新租约会在写事务前比对，不一致为 409 `PRICE_CHANGED`，details 是 `currentAmountCents` / `billablePages` / `line=serviceKey:unitCents:quantity:subtotalCents` 字符串。临时租约在 finally 释放，不墓碑，同一 Idempotency-Key 可按现价再确认。不新建 Order、OrderItem、PrintTask、PaymentAttempt、支付令牌或建单审计。缺省字段仍按服务端现价建单；null、负数、小数、字符串和超过 100000000 为 HTTP 400。只有权威报价也是 0 才走免费 `markPaid`。
 409 助手从 `PrintJobsService` 移到 `order-quote.service.ts`。会员单和材料包已经引用报价服务；若改为直接引用 `pricing.service.ts`，会把 `PriceConfig` 加进这些端点的图谱闭包，本变更不改生成图谱。
-证据在 `/tmp/member-price-*.log`、`/tmp/package-price-*.log`、`/tmp/mut-*.log`（隔离 SQLite，`DOTENV_CONFIG_PATH=/dev/null`）：两条 HTTP 契约最终退出 0；会员/材料包 service 幂等、`verify:print-jobs`、`verify:pricing`、API `tsc --noEmit`、改动文件 eslint、`graph:check`、`verify:repository-integrity`、`git diff --check` 均退出 0。反向变异四次均非 0（绕过会员比对、绕过材料包比对、把确认金额写入指纹、`ValidateIf` 改成 `IsOptional`），按 sha256 逐字节恢复后两条 HTTP 再退出 0。小程序确认页仍待 Claude 发送该字段并在 409 后沿用原键。`CI / DEVICE / PAYMENT / PRODUCTION / COMMERCIAL: NO-GO`。
+来源证据在 `/tmp/member-price-*.log`、`/tmp/package-price-*.log`、`/tmp/mut-*.log`（隔离 SQLite，`DOTENV_CONFIG_PATH=/dev/null`）：两条 HTTP 契约最终退出 0；会员/材料包 service 幂等、`verify:print-jobs`、`verify:pricing`、API `tsc --noEmit`、改动文件 eslint、`graph:check`、`verify:repository-integrity`、`git diff --check` 均退出 0。反向变异四次均非 0（绕过会员比对、绕过材料包比对、把确认金额写入指纹、`ValidateIf` 改成 `IsOptional`），按 sha256 逐字节恢复后两条 HTTP 再退出 0。集成树 `39bb2d404` 另行实跑：项目图谱检查、签名静态契约、仓库完整性、API typecheck、会员 HTTP H1-H21、材料包 HTTP H1-H19、隔离 SQLite `verify:print-jobs` 53 项全部退出 0。小程序确认页仍待 Claude 发送该字段并在 409 后沿用原键。`CI / DEVICE / PAYMENT / PRODUCTION / COMMERCIAL: NO-GO`。
 
 2026-09-23 **当前协作与 #1042 远端证据边界。** Codex 只负责范围决策、串行整合与验收；
 Claude Code 固定 `claude-opus-5-5` / `xhigh`，独占前端实现和最终视觉确认；Grok 固定
@@ -12,9 +13,11 @@ Claude Code 固定 `claude-opus-5-5` / `xhigh`，独占前端实现和最终视�
 一个 worktree 仍只有一个 writer，不因模型切换重复已经通过的施工或测试。草稿 PR #1042 的
 `aa46be8f0` 已确认 `build-and-verify` 与 `postgres-readiness` 通过；scan-safety 旧夹具失败已在本地
 集成树修复并完整 38/38 退出 0，仍待新 HEAD 远端 CI。Windows internal validation 被取消，MSI
-因此被阻断；根因由独立窗口继续分析，不能写成 Windows CI 或安装包通过。
+因此被阻断；阶段诊断和受控 LocalMachine 路径已合入本地候选，但仍无 Windows 运行时证据，不能写成
+Windows CI、签名安装包或清理通过。
 
-2026-09-23 **Windows 内部签名 LocalMachine 路径只完成源码/静态契约。** 父提交 `20c6acb41`。
+2026-09-23 **Windows 内部签名 LocalMachine 路径只完成源码/静态契约。** 来源 `86b2b3b48` 已落为
+`ce20559ab`；后续私钥清理与错误日志修正 `45018ec97` / `d359cf01c` 已落为 `d0152006f` / `22960b06f`。
 只有 `internal-signing-validation` 传入 `-UseEphemeralGitHubHostedLocalMachineTrust`。该分支显式
 `-StoreScope LocalMachine` 且必须带已有的 `-AcknowledgeEphemeralNonProductionHost`。默认调用仍是
 CurrentUser，不会继承这条例外。安装前要同时满足 `GITHUB_ACTIONS=true`、`RUNNER_OS=Windows`、
@@ -36,8 +39,8 @@ metadata 里的指纹来自本轮生成的证书，所以没有标记时仍按�
 signed job `internal-signing-validation` 与 dependent MSI `unsigned-msi-candidate` remain NO-GO，直到上述 CI 日志出现。
 unsigned EXE job `unsigned-exe-upgrade` result separate。本机没有 PowerShell，安装/清理/pipeline 脚本没有解析或执行。
 
-2026-09-23 **Windows 内部签名信任阶段标记，仅本地源码/静态诊断候选。** 分支
-`codex/windows-signing-trust-diagnostics-20260923`，父提交 `e064d99b8`。
+2026-09-23 **Windows 内部签名信任阶段标记，仅本地源码/静态诊断候选。** 来源分支
+`codex/windows-signing-trust-diagnostics-20260923` 的 `20c6acb41` 已落为 `825d0f8ec`。
 `install-internal-code-signing-trust.ps1` 在证书链 `X509Chain.Build`、Root `Import-Certificate`、
 TrustedPublisher `Import-Certificate` 三个调用的紧前和紧后各写一行阶段标记。行内只有 phase、
 store scope、start/pass，调用前刷新输出；标记不包含证书路径、指纹、主题或私钥。
