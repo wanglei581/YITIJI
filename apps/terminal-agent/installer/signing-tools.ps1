@@ -123,7 +123,11 @@ function Get-ValidatedSigningCertificate {
     Fail-SigningTool "Signing certificate $normalized is outside its validity period."
   }
 
-  $eku = @($certificate.EnhancedKeyUsageList | ForEach-Object { $_.ObjectId.Value })
+  $ekuExtensions = @($certificate.Extensions | Where-Object { $_.Oid.Value -eq "2.5.29.37" })
+  $eku = @($ekuExtensions | ForEach-Object {
+    $decoded = [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new($_, $false)
+    $decoded.EnhancedKeyUsages | ForEach-Object { $_.Value }
+  })
   if ($eku -notcontains "1.3.6.1.5.5.7.3.3") {
     Fail-SigningTool "Signing certificate $normalized is missing the Code Signing EKU."
   }

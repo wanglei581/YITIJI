@@ -90,6 +90,70 @@ assert.match(certificateSetup, /Remove-Item -LiteralPath \$certificatePath -Dele
 assert.match(certificateCleanup, /Remove-Item -LiteralPath \$path -DeleteKey -Force/)
 assert.match(signingTools, /"\/sha1"/)
 assert.doesNotMatch(signingTools, /\/dlib/i, 'Azure Trusted Signing adapter is not implemented')
+
+const signingToolsLf = signingTools.replaceAll('\r\n', '\n')
+const signingCertificateGuardStart = signingToolsLf.indexOf('function Get-ValidatedSigningCertificate')
+const signingCertificateGuardEnd = signingToolsLf.indexOf('function Assert-UnsignedAuthenticode')
+assert.ok(
+  signingCertificateGuardStart >= 0 && signingCertificateGuardEnd > signingCertificateGuardStart,
+  'signing certificate guard must stay inside Get-ValidatedSigningCertificate',
+)
+const signingCertificateGuard = signingToolsLf.slice(
+  signingCertificateGuardStart,
+  signingCertificateGuardEnd,
+)
+const signingEkuRead = [
+  '  $ekuExtensions = @($certificate.Extensions | Where-Object { $_.Oid.Value -eq "2.5.29.37" })',
+  '  $eku = @($ekuExtensions | ForEach-Object {',
+  '    $decoded = [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new($_, $false)',
+  '    $decoded.EnhancedKeyUsages | ForEach-Object { $_.Value }',
+  '  })',
+  '  if ($eku -notcontains "1.3.6.1.5.5.7.3.3") {',
+  '    Fail-SigningTool "Signing certificate $normalized is missing the Code Signing EKU."',
+  '  }',
+].join('\n')
+assert.ok(
+  signingCertificateGuard.includes(signingEkuRead),
+  'signing must reject certificates unless extension 2.5.29.37 contains the Code Signing OID',
+)
+assert.equal(signingCertificateGuard.split(signingEkuRead).length, 2)
+assert.doesNotMatch(
+  signingCertificateGuard,
+  /EnhancedKeyUsageList|ObjectId\.Value/,
+  'EnhancedKeyUsageList.ObjectId is the OID string; .Value does not read the Code Signing EKU',
+)
+const signingGuardOrder = [
+  'has no accessible private key',
+  'outside its validity period',
+  '2.5.29.37',
+  'is missing the Code Signing EKU.',
+  'does not permit digital signatures',
+  'return $certificate',
+]
+let signingGuardCursor = -1
+for (const gate of signingGuardOrder) {
+  const at = signingCertificateGuard.indexOf(gate)
+  assert.ok(at > signingGuardCursor, `signing certificate guard out of order or missing: ${gate}`)
+  signingGuardCursor = at
+}
+assert.match(
+  certificateSetup.replaceAll('\r\n', '\n'),
+  /2\.5\.29\.37=\{critical\}\{text\}1\.3\.6\.1\.5\.5\.7\.3\.3/,
+  'internal signer creation must still request the critical Code Signing EKU',
+)
+const trustEkuRead = [
+  '$ekuExtensions = @($signer.Extensions | Where-Object { $_.Oid.Value -eq "2.5.29.37" })',
+  '$ekuValues = @($ekuExtensions | ForEach-Object {',
+  '  $eku = [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new($_, $false)',
+  '  $eku.EnhancedKeyUsages | ForEach-Object { $_.Value }',
+  '})',
+  'if ($ekuValues -notcontains "1.3.6.1.5.5.7.3.3") {',
+  '  Fail "The signer certificate is missing the Code Signing EKU."',
+  '}',
+].join('\n')
+assert.ok(trustInstall.includes(trustEkuRead), 'trust install must keep its Code Signing EKU gate')
+assert.equal(trustInstall.split(trustEkuRead).length, 2)
+
 assert.match(pipelineTest, /failed for the wrong reason/)
 assert.match(pipelineTest, /unsigned-embedded-msi-build/)
 assert.match(pipelineTest, /reattach the signed engine for the unsigned embedded MSI fixture/)
