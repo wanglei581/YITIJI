@@ -385,20 +385,20 @@ try {
   try {
     if (-not [string]::IsNullOrWhiteSpace($rootThumbprint) -and -not [string]::IsNullOrWhiteSpace($signerThumbprint)) {
       if ($UseEphemeralGitHubHostedLocalMachineTrust) {
-        if (-not (Test-Path -LiteralPath $ownershipMarkerPath -PathType Leaf)) {
+        $markerPresent = Test-Path -LiteralPath $ownershipMarkerPath -PathType Leaf
+        & (Join-Path $PSScriptRoot "remove-internal-code-signing-trust.ps1") `
+          -RootThumbprint $rootThumbprint `
+          -SignerThumbprint $signerThumbprint `
+          -StoreScope LocalMachine `
+          -PrivateKeyStoreScope CurrentUser `
+          -RemovePrivateCertificates `
+          -AcknowledgeEphemeralNonProductionHost `
+          -RunOwnershipMarkerPath $ownershipMarkerPath
+        if (-not $markerPresent) {
           if ($null -eq $pipelineFailure) {
-            throw "INTERNAL_SIGNING_TRUST_REMOVE_FAILED: LocalMachine cleanup requires an existing run ownership marker."
+            throw "INTERNAL_SIGNING_PIPELINE_TEST_FAILED: ownership marker missing after pipeline success."
           }
-          $cleanupStatus = "skipped-no-ownership"
-        } else {
-          & (Join-Path $PSScriptRoot "remove-internal-code-signing-trust.ps1") `
-            -RootThumbprint $rootThumbprint `
-            -SignerThumbprint $signerThumbprint `
-            -StoreScope LocalMachine `
-            -PrivateKeyStoreScope CurrentUser `
-            -RemovePrivateCertificates `
-            -AcknowledgeEphemeralNonProductionHost `
-            -RunOwnershipMarkerPath $ownershipMarkerPath
+          $cleanupStatus = "passed-private-only"
         }
       } else {
         & (Join-Path $PSScriptRoot "remove-internal-code-signing-trust.ps1") `

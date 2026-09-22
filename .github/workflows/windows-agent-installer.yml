@@ -325,15 +325,15 @@ jobs:
             Write-Host "INTERNAL_SIGNING_WORKFLOW_CLEANUP_SKIPPED reason=no-metadata"
             exit 0
           }
-          if (-not (Test-Path -LiteralPath $ownershipPath -PathType Leaf)) {
-            Write-Host "INTERNAL_SIGNING_WORKFLOW_CLEANUP_SKIPPED reason=no-ownership"
-            exit 0
-          }
           $metadata = Get-Content -Raw -Encoding UTF8 -LiteralPath $metadataPath | ConvertFrom-Json
           $rootThumbprint = [string]$metadata.root.thumbprint
           $signerThumbprint = [string]$metadata.signer.thumbprint
           if ($rootThumbprint -notmatch '^[0-9A-Fa-f]{40}$' -or $signerThumbprint -notmatch '^[0-9A-Fa-f]{40}$') {
             throw "INTERNAL_SIGNING_WORKFLOW_CLEANUP_FAILED: metadata thumbprints are invalid."
+          }
+          $trustCleanup = "skipped-no-ownership"
+          if (Test-Path -LiteralPath $ownershipPath -PathType Leaf) {
+            $trustCleanup = "removed"
           }
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/remove-internal-code-signing-trust.ps1 `
             -RootThumbprint $rootThumbprint `
@@ -344,7 +344,7 @@ jobs:
             -AcknowledgeEphemeralNonProductionHost `
             -RunOwnershipMarkerPath "$ownershipPath"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Write-Host "INTERNAL_SIGNING_WORKFLOW_CLEANUP_PASS"
+          Write-Host "INTERNAL_SIGNING_WORKFLOW_CLEANUP_PASS trustCleanup=$trustCleanup privateKeyScope=CurrentUser"
 
       - name: Upload complete internal signing evidence only (NOT FOR DEPLOYMENT)
         if: success()

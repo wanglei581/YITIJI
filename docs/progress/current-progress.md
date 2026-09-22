@@ -17,11 +17,12 @@ LocalMachine 分支复用现有证书 metadata：绑定公开 CER 的文件名�
 `internal-test-only` / `not-for-production-or-fleet-deployment`，以及私钥仍在 CurrentUser 的 `storeScope`。
 绑定失败不记录主题、路径、哈希、指纹或私钥。已存在的同一 Root / TrustedPublisher 指纹在任何写入前拒绝，
 该拒绝路径不删除证书。两项预检都通过后、第一次导入前，才在本次 evidence 目录原子创建零字节
-`run-ownership.marker`。没有这个标记时，pipeline `finally` 和 workflow `if: always()` 都不删除信任项，
-因此预检拒绝不能删掉别人的证书；本轮生成的 CurrentUser 私钥也只在标记已建立时由清理删除。
+`run-ownership.marker`。没有这个标记时不删除 LocalMachine Root / TrustedPublisher，因此预检拒绝不能删掉别人的证书。
+metadata 里的指纹来自本轮生成的证书，所以没有标记时仍按指纹删除并复核 CurrentUser\My 私钥。pipeline 把这种结果记为
+`cleanup=passed-private-only`，原失败仍使进程失败。安装体已成功但标记意外缺失，则是清理不变量失败，不是成功。
+标记存在且信任与私钥都清理成功后才删除标记。workflow 只有缺少 metadata、无法取得指纹时才跳过；有 metadata 但没有标记时仍调用清理。
 信任库存 Root 与 TrustedPublisher，私钥清理范围是 CurrentUser\My。两个范围都是 LocalMachine 时直接失败。
-清理按 metadata 指纹删除并复核不存在；失败继续抛出。workflow 在没有 metadata 或没有所有权标记时跳过删除并写明原因，
-不用 `continue-on-error`。成功和失败制品都不再上传 `internal-signing-certificate.json`、CER、PFX 或所有权标记。
+清理失败继续抛出。不用 `continue-on-error`。成功和失败制品都不再上传 `internal-signing-certificate.json`、CER、PFX 或所有权标记。
 阶段标记和 55 分钟超时保留。没有改信任 API，没有加超时，没有 `certutil`，没有重写安装生命周期。
 
 状态：SOURCE/STATIC candidate only。Windows 上 LocalMachine 导入是否非交互返回，以及清理是否真的删净，都还没有运行时证明。

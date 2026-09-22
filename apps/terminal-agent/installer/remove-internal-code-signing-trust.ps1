@@ -21,17 +21,19 @@ if (-not [string]::IsNullOrWhiteSpace($PrivateKeyStoreScope)) {
 if ($StoreScope -eq "LocalMachine" -and $privateScope -eq "LocalMachine") {
   throw "INTERNAL_SIGNING_TRUST_REMOVE_FAILED: LocalMachine trust and private-key scopes together are forbidden."
 }
-# Callers skip this script when the marker is absent. Reaching the deletes requires the marker.
+# A missing marker skips LocalMachine Root and TrustedPublisher only. This run's private keys still delete.
+$ownsTrustEntries = $StoreScope -ne "LocalMachine"
 if ($StoreScope -eq "LocalMachine") {
-  if ([string]::IsNullOrWhiteSpace($RunOwnershipMarkerPath) -or -not (Test-Path -LiteralPath $RunOwnershipMarkerPath -PathType Leaf)) {
-    throw "INTERNAL_SIGNING_TRUST_REMOVE_FAILED: LocalMachine cleanup requires an existing run ownership marker."
-  }
+  $ownsTrustEntries = -not [string]::IsNullOrWhiteSpace($RunOwnershipMarkerPath) -and (Test-Path -LiteralPath $RunOwnershipMarkerPath -PathType Leaf)
 }
 
-$targets = @(
-  [pscustomobject]@{ Store = "Cert:\$StoreScope\Root"; Thumbprint = $RootThumbprint.ToUpperInvariant(); DeleteKey = $false },
-  [pscustomobject]@{ Store = "Cert:\$StoreScope\TrustedPublisher"; Thumbprint = $SignerThumbprint.ToUpperInvariant(); DeleteKey = $false }
-)
+$targets = @()
+if ($ownsTrustEntries) {
+  $targets += @(
+    [pscustomobject]@{ Store = "Cert:\$StoreScope\Root"; Thumbprint = $RootThumbprint.ToUpperInvariant(); DeleteKey = $false },
+    [pscustomobject]@{ Store = "Cert:\$StoreScope\TrustedPublisher"; Thumbprint = $SignerThumbprint.ToUpperInvariant(); DeleteKey = $false }
+  )
+}
 if ($RemovePrivateCertificates) {
   $targets += @(
     [pscustomobject]@{ Store = "Cert:\$privateScope\My"; Thumbprint = $RootThumbprint.ToUpperInvariant(); DeleteKey = $true },
@@ -57,11 +59,15 @@ foreach ($target in $targets) {
   }
 }
 
-if ($StoreScope -eq "LocalMachine") {
+if ($ownsTrustEntries -and $StoreScope -eq "LocalMachine") {
   Remove-Item -LiteralPath $RunOwnershipMarkerPath -Force
   if (Test-Path -LiteralPath $RunOwnershipMarkerPath) {
     throw "INTERNAL_SIGNING_TRUST_REMOVE_FAILED: run ownership marker remains."
   }
 }
 
-Write-Host "INTERNAL_SIGNING_TRUST_REMOVED scope=$StoreScope privateKeyScope=$privateScope privateCertificatesRemoved=$($RemovePrivateCertificates.IsPresent)"
+$trustCleanup = "removed"
+if (-not $ownsTrustEntries) {
+  $trustCleanup = "skipped-no-ownership"
+}
+Write-Host "INTERNAL_SIGNING_TRUST_REMOVED scope=$StoreScope trustCleanup=$trustCleanup privateKeyScope=$privateScope privateCertificatesRemoved=$($RemovePrivateCertificates.IsPresent)"

@@ -326,13 +326,28 @@ assert.ok(
 const forbidAt = trustRemoval.indexOf(
   'LocalMachine trust and private-key scopes together are forbidden',
 )
-const ownershipAt = trustRemoval.indexOf(
-  'LocalMachine cleanup requires an existing run ownership marker',
-)
 const firstDeleteAt = trustRemoval.indexOf('Remove-Item')
-assert.ok(forbidAt >= 0 && ownershipAt >= 0 && forbidAt < firstDeleteAt && ownershipAt < firstDeleteAt)
+assert.ok(forbidAt >= 0 && forbidAt < firstDeleteAt)
+assert.doesNotMatch(
+  trustRemoval,
+  /LocalMachine cleanup requires an existing run ownership marker/,
+  'a missing marker must not abort private-key cleanup',
+)
+assert.match(
+  trustRemoval,
+  /if \(\$ownsTrustEntries\) \{\n  \$targets \+= @\(\n    \[pscustomobject\]@\{ Store = "Cert:\\\$StoreScope\\Root";[\s\S]*?Store = "Cert:\\\$StoreScope\\TrustedPublisher";[\s\S]*?\n\}\nif \(\$RemovePrivateCertificates\) \{\n  \$targets \+= @\(\n    \[pscustomobject\]@\{ Store = "Cert:\\\$privateScope\\My";/,
+  'LocalMachine trust targets stay marker-gated and private cleanup stays outside that gate',
+)
+assert.match(
+  trustRemoval,
+  /if \(\$ownsTrustEntries -and \$StoreScope -eq "LocalMachine"\) \{\n  Remove-Item -LiteralPath \$RunOwnershipMarkerPath/,
+)
+const remainsAt = trustRemoval.indexOf('Certificate remains at')
+const markerDeleteAt = trustRemoval.indexOf('Remove-Item -LiteralPath $RunOwnershipMarkerPath')
+assert.ok(remainsAt >= 0 && remainsAt < markerDeleteAt)
+assert.match(trustRemoval, /trustCleanup=\$trustCleanup/)
+assert.match(trustRemoval, /skipped-no-ownership/)
 assert.match(trustRemoval, /\$privateScope = \$PrivateKeyStoreScope/)
-assert.match(trustRemoval, /Cert:\\\$privateScope\\My/)
 
 const ackNegativeAt = pipelineTest.indexOf('local-machine-trust-requires-acknowledgement')
 const runnerNegativeAt = pipelineTest.indexOf('local-machine-trust-requires-github-hosted-runner')
@@ -350,7 +365,10 @@ assert.doesNotMatch(pipelineTest, /-PrivateKeyStoreScope LocalMachine/)
 assert.match(pipelineTest, /INTERNAL_SIGNING_PIPELINE_RESULT original=\$originalStatus cleanup=\$cleanupStatus/)
 assert.match(pipelineTest, /original pipeline failure followed by cleanup failure/)
 assert.match(pipelineTest, /cleanup failed after the pipeline body returned/)
-assert.match(pipelineTest, /skipped-no-ownership/)
+assert.match(pipelineTest, /\$markerPresent = Test-Path -LiteralPath \$ownershipMarkerPath -PathType Leaf\n\s+& \(Join-Path \$PSScriptRoot "remove-internal-code-signing-trust\.ps1"\)/)
+assert.match(pipelineTest, /passed-private-only/)
+assert.match(pipelineTest, /ownership marker missing after pipeline success/)
+assert.doesNotMatch(pipelineTest, /skipped-no-ownership/)
 assert.match(pipelineTest, /throw \$pipelineFailure/)
 
 assert.match(signingJob, /timeout-minutes:\s*55/)
@@ -373,15 +391,25 @@ const cleanupStep = signingJob.slice(cleanupStart, cleanupEnd)
 assert.match(cleanupStep, /if: always\(\)/)
 assert.doesNotMatch(cleanupStep, /continue-on-error|\bcatch\b/)
 assert.match(cleanupStep, /reason=no-metadata/)
-assert.match(cleanupStep, /reason=no-ownership/)
+assert.equal(cleanupStep.match(/\bexit 0\b/g).length, 1)
 const workflowRemoveAt = cleanupStep.indexOf('remove-internal-code-signing-trust.ps1')
 const workflowExitAt = cleanupStep.indexOf('if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }')
 const workflowPassAt = cleanupStep.indexOf('INTERNAL_SIGNING_WORKFLOW_CLEANUP_PASS')
+const metadataSkipAt = cleanupStep.indexOf('reason=no-metadata')
+const metadataExitAt = cleanupStep.indexOf('exit 0')
 assert.ok(
-  cleanupStep.indexOf('reason=no-metadata') < workflowRemoveAt &&
-    cleanupStep.indexOf('reason=no-ownership') < workflowRemoveAt &&
+  metadataSkipAt >= 0 &&
+    metadataSkipAt < metadataExitAt &&
+    metadataExitAt < workflowRemoveAt &&
     workflowRemoveAt < workflowExitAt &&
     workflowExitAt < workflowPassAt,
+)
+const trustSkipAssign = cleanupStep.indexOf('$trustCleanup = "skipped-no-ownership"')
+assert.ok(trustSkipAssign > metadataExitAt && trustSkipAssign < workflowRemoveAt)
+assert.doesNotMatch(cleanupStep.slice(trustSkipAssign, workflowRemoveAt), /\bexit 0\b/)
+assert.match(
+  cleanupStep,
+  /INTERNAL_SIGNING_WORKFLOW_CLEANUP_PASS trustCleanup=\$trustCleanup privateKeyScope=CurrentUser/,
 )
 assert.match(cleanupStep, /-StoreScope LocalMachine/)
 assert.match(cleanupStep, /-PrivateKeyStoreScope CurrentUser/)

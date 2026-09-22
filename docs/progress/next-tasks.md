@@ -4,7 +4,7 @@
 
 受控路径已经写进 `internal-signing-validation` 的 opt-in。默认仍是 CurrentUser。环境三项
 `GITHUB_ACTIONS` / `RUNNER_OS` / `RUNNER_ENVIRONMENT` 只是可伪造的意外防护，不是证明。
-`run-ownership.marker` 在预检通过后才创建；没有标记就不得删除信任项。这是 SOURCE/STATIC candidate only。
+`run-ownership.marker` 在预检通过后才创建。没有标记不得删除 LocalMachine 信任项，但仍须按 metadata 指纹删除本轮 CurrentUser\My 私钥。这是 SOURCE/STATIC candidate only。
 Windows LocalMachine 导入是否非交互返回，以及清理是否删净，都未验证。signed job
 `internal-signing-validation` 与 dependent MSI `unsigned-msi-candidate` remain NO-GO，直到一次
 github-hosted Windows 日志按顺序出现 `runner-guard`、chain、root-import、trusted-publisher-import 的
