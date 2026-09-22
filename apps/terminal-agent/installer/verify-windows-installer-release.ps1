@@ -145,20 +145,17 @@ $exeSignature = Assert-ValidAuthenticode -SignToolPath $signTool -Path $signedEx
 
 $workRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-job-print-signing-verify-" + [guid]::NewGuid().ToString("N"))
 $extractRoot = Join-Path $workRoot "bundle-extract"
+$baExtractRoot = Join-Path $workRoot "bundle-ba-extract"
 $enginePath = Join-Path $workRoot "bundle-engine.exe"
 $intermediateRoot = Join-Path $workRoot "wix-intermediate"
 try {
-  New-Item -ItemType Directory -Path $extractRoot, $intermediateRoot -Force | Out-Null
+  New-Item -ItemType Directory -Path $extractRoot, $baExtractRoot, $intermediateRoot -Force | Out-Null
+  # WiX 4.0.6 names attached payloads only when this same extract also passes -oba.
   Invoke-CheckedCommand -FilePath $wixTool -Arguments @(
-    "burn", "extract", $signedExe, "-o", $extractRoot, "-intermediateFolder", $intermediateRoot
+    "burn", "extract", $signedExe, "-o", $extractRoot, "-oba", $baExtractRoot, "-intermediateFolder", $intermediateRoot
   ) -FailureMessage "WiX failed to extract the final signed bundle."
-  $embeddedMsiFiles = @(Get-ChildItem -LiteralPath $extractRoot -Filter "*.msi" -File -Recurse)
-  if ($embeddedMsiFiles.Count -ne 1) {
-    Fail-SigningTool "Expected exactly one MSI in the final signed bundle, found $($embeddedMsiFiles.Count)."
-  }
-  $signedMsiHash = (Get-FileHash -LiteralPath $signedMsi -Algorithm SHA256).Hash.ToUpperInvariant()
-  $embeddedMsiHash = (Get-FileHash -LiteralPath $embeddedMsiFiles[0].FullName -Algorithm SHA256).Hash.ToUpperInvariant()
-  if ($embeddedMsiHash -ne $signedMsiHash -or [string]$identity.embeddedMsi.sha256 -ine $signedMsiHash -or -not [bool]$identity.embeddedMsi.matchesSignedMsi) {
+  $embeddedMsiHash = Assert-ExtractedBundleMsiHash -ExtractRoot $extractRoot -SignedMsiPath $signedMsi -BundleKind "final signed bundle"
+  if ([string]$identity.embeddedMsi.sha256 -ine $embeddedMsiHash -or -not [bool]$identity.embeddedMsi.matchesSignedMsi) {
     Fail-SigningTool "The final bundle does not contain the signed MSI byte-for-byte."
   }
 

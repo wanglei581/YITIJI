@@ -200,6 +200,64 @@ function Assert-ValidAuthenticode {
   return $signature
 }
 
+function Assert-ExtractedBundleMsiHash {
+  param(
+    [Parameter(Mandatory)][string]$ExtractRoot,
+    [Parameter(Mandatory)][string]$SignedMsiPath,
+    [Parameter(Mandatory)][ValidateSet("rebuilt bundle", "final signed bundle")][string]$BundleKind
+  )
+
+  if (-not (Test-Path -LiteralPath $ExtractRoot -PathType Container)) {
+    Fail-SigningTool "Embedded MSI extract directory is missing for $BundleKind."
+  }
+
+  $rootFull = [System.IO.Path]::GetFullPath($ExtractRoot)
+  $rootPrefix = $rootFull.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+  $signedMsiFull = [System.IO.Path]::GetFullPath($SignedMsiPath)
+  if ($signedMsiFull.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Fail-SigningTool "Signed MSI comparison input must stay outside the extract directory for $BundleKind."
+  }
+
+  $msiFiles = @()
+  $names = @()
+  foreach ($file in @(Get-ChildItem -LiteralPath $rootFull -File -Recurse -Force)) {
+    $full = [System.IO.Path]::GetFullPath($file.FullName)
+    if (-not $full.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+      Fail-SigningTool "Embedded MSI search left the extract directory for $BundleKind."
+    }
+    $names += $full.Substring($rootPrefix.Length).Replace('\', '/')
+    if ([string]::Equals($file.Extension, ".msi", [System.StringComparison]::OrdinalIgnoreCase)) {
+      $msiFiles += $file
+    }
+  }
+
+  if ($msiFiles.Count -ne 1) {
+    $sorted = @($names | Sort-Object)
+    $shown = "(none)"
+    if ($sorted.Count -gt 0) {
+      $visible = @($sorted | Select-Object -First 10)
+      $shown = $visible -join ", "
+      if ($sorted.Count -gt 10) {
+        $shown = "$shown ..."
+      }
+    }
+    if ($BundleKind -eq "rebuilt bundle") {
+      Fail-SigningTool "Expected exactly one embedded MSI in rebuilt bundle, found $($msiFiles.Count). Extracted names: $shown."
+    }
+    Fail-SigningTool "Expected exactly one MSI in the final signed bundle, found $($msiFiles.Count). Extracted names: $shown."
+  }
+
+  $signedMsiHash = (Get-FileHash -LiteralPath $signedMsiFull -Algorithm SHA256).Hash.ToUpperInvariant()
+  $embeddedMsiHash = (Get-FileHash -LiteralPath $msiFiles[0].FullName -Algorithm SHA256).Hash.ToUpperInvariant()
+  if ($embeddedMsiHash -ne $signedMsiHash) {
+    if ($BundleKind -eq "rebuilt bundle") {
+      Fail-SigningTool "Rebuilt bundle does not embed the signed MSI byte-for-byte."
+    }
+    Fail-SigningTool "The final bundle does not contain the signed MSI byte-for-byte."
+  }
+  return $embeddedMsiHash
+}
+
 function Assert-DirectoryOutside([string]$CandidatePath, [string]$ProtectedDirectory, [string]$Description) {
   $candidate = [System.IO.Path]::GetFullPath($CandidatePath).TrimEnd('\', '/')
   $protected = [System.IO.Path]::GetFullPath($ProtectedDirectory).TrimEnd('\', '/')

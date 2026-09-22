@@ -1,5 +1,33 @@
 # 当前开发进度
 
+2026-09-23 **Windows 内部签名把 Burn 附加容器成员 `a0` 当成 0 个嵌入 MSI。** 来源
+[run 35777521091](https://github.com/wanglei581/YITIJI/actions/runs/35777521091) job `106917619898`，
+基线 `755fa5a53465e999cc4505e1f6f9f31d803576f4`，session `223e8203-92c3-4a64-8e21-1adb284134a2`。
+unsigned EXE job 的结果另计。该签名 job 的顺序是：LocalMachine `runner-guard`、`chain-validation`、
+`root-import`、`trusted-publisher-import` 均为 start/pass；签名证书已选中；`AIJobPrintAgent.msi` 的
+signtool verify 为 0 error；`dotnet build` 产出 `AIJobPrintTerminalSetup.exe` 且 Build succeeded；
+随后 `wix burn extract` 没有以非 0 退出。提取目录递归 `*.msi` 得到 0，
+`sign-windows-installer-release.ps1` 抛出 `Expected exactly one embedded MSI in rebuilt bundle, found 0`。
+pipeline 记录 `original=failed cleanup=passed`，LocalMachine 信任已移除。
+`unsigned-msi-candidate` 在 workflow 里要求 `internal-signing-validation` 为 success，MSI 门禁因此不能继续。
+松散 MSI 的 signtool 成功只覆盖那个 MSI 文件。最终 EXE 的签名、嵌入复核和安装生命周期没有完成。
+
+根因在 WiX 4.0.6 的提取命名，bundle 已经嵌了 MSI。`Bundle.wxs` 的 `MsiPackage` 是 `Compressed="yes"`，
+构建使用的是签名后的 MSI 路径并且成功。`BurnReader.ExtractAttachedContainers` 按 cabinet 成员名
+`a{n}` 展开（`BurnAuthoredContainerEmbeddedIdFormat = "a{0}"`）。同一次 `burn extract` 只有同时带
+`-oba` 时，`ExtractUXContainer` 才读取 manifest，把 `a0` 改名为 `WixAttachedContainer/<FilePath>`。
+`FilePath` 默认是源文件名 `AIJobPrintAgent.msi`。旧命令只传 `-o`，提取成功，目录里留下的是 `a0`。
+
+修复保留恰好一个 MSI、SHA256 全文件相等、签名生命周期、最终 EXE 复核和 LocalMachine 清理。
+同一次 extract 增加独立的 `-oba` 目录；只统计容器提取目录里的 `*.msi`，并与提取目录之外的签名 MSI 比较哈希。
+无扩展名的 `a0` 仍按 0 个失败。2 个 MSI、哈希不一致、比较文件落在提取目录内，各自用对应失败句失败。
+不从候选根目录读取 MSI 充当嵌入证据。
+
+本机 pwsh 7.6.6 解析四个脚本退出 0，匹配器自测退出 0。三处反向改动（把 0 个放行、把 `a0` 当成 MSI、跳过哈希比较）各自退出 1，
+且失败句分别是错误原因或“预期失败没有发生”。签名契约、安装输入、`graph:check`、`verify:repository-integrity`、
+`git diff --check` 均退出 0。本机没有 WiX，也没有 Windows，WiX 4.0.6 重建 bundle 的真实提取未运行。
+Windows PowerShell 5.1 未运行。signed job 与 dependent MSI 仍是 NO-GO。未 push、未开 PR、未合并、未部署、未使用真机。
+
 2026-09-23 **活动快照：#1042 仍是唯一草稿 PR，商业判定 NO-GO。** `fb21261c9` 的
 [主 CI 35772995192](https://github.com/wanglei581/YITIJI/actions/runs/35772995192) 已完成：
 PostgreSQL readiness、build-and-verify、Kiosk/Admin/Partner 浏览器及路由扫测全部成功。

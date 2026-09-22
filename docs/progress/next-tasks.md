@@ -1,5 +1,15 @@
 # 下一步任务
 
+## 2026-09-23：Burn 嵌入 MSI 提取命名已本地修正，Windows 实跑仍 NO-GO
+
+run [35777521091](https://github.com/wanglei581/YITIJI/actions/runs/35777521091) job `106917619898`
+在基线 `755fa5a53465e999cc4505e1f6f9f31d803576f4` 上已经通过 LocalMachine 信任阶段和松散 MSI 的 signtool，
+并成功编出 Burn EXE。失败点是 `wix burn extract` 只传了 `-o`。WiX 4.0.6 把嵌入 MSI 展开成 `a0`，
+门禁按 `*.msi` 计数得到 0。本地修复让同一次 extract 带上独立的 `-oba`，仍要求容器提取目录里恰好一个 MSI，
+且 SHA256 与签名 MSI 全文件相同。下一步只看新的 Windows 日志：重建 bundle 提取出唯一 MSI，哈希相等，
+engine 与最终 EXE 完成签名复核，LocalMachine 清理成功。在那之前，松散 MSI 的 signtool 行只说明那个 MSI；
+本机匹配器自测也不是 WiX 实跑。`unsigned-msi-candidate` 继续等待 `internal-signing-validation` success。
+
 ## 2026-09-23：当前唯一候选的下一轮收口
 
 `fb21261c9` 的主 CI 35772995192 已全绿；同 SHA 的 Windows run 35772995250 中

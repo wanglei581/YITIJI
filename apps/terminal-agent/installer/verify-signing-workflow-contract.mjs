@@ -15,6 +15,12 @@ const certificateCleanup = read(
   'apps/terminal-agent/installer/remove-internal-code-signing-trust.ps1',
 )
 const signingTools = read('apps/terminal-agent/installer/signing-tools.ps1')
+const signingRelease = read(
+  'apps/terminal-agent/installer/sign-windows-installer-release.ps1',
+).replaceAll('\r\n', '\n')
+const verifyRelease = read(
+  'apps/terminal-agent/installer/verify-windows-installer-release.ps1',
+).replaceAll('\r\n', '\n')
 const pipelineTest = read('apps/terminal-agent/installer/test-internal-signing-pipeline.ps1').replaceAll(
   '\r\n',
   '\n',
@@ -187,6 +193,85 @@ for (const expectedReason of [
     `missing reason-specific signing failure assertion: ${expectedReason}`,
   )
 }
+
+const signingToolsLfForExtract = signingTools.replaceAll('\r\n', '\n')
+const extractMatcherStart = signingToolsLfForExtract.indexOf('function Assert-ExtractedBundleMsiHash')
+const extractMatcherEnd = signingToolsLfForExtract.indexOf('function Assert-DirectoryOutside', extractMatcherStart)
+assert.ok(extractMatcherEnd > extractMatcherStart, 'embedded MSI matcher must stay a single function')
+const extractMatcher = signingToolsLfForExtract.slice(extractMatcherStart, extractMatcherEnd)
+assert.match(extractMatcher, /Get-ChildItem -LiteralPath \$rootFull -File -Recurse -Force/)
+assert.match(extractMatcher, /if \(\$msiFiles\.Count -ne 1\)/)
+assert.match(extractMatcher, /Expected exactly one embedded MSI in rebuilt bundle, found \$\(\$msiFiles\.Count\)/)
+assert.match(extractMatcher, /Expected exactly one MSI in the final signed bundle, found \$\(\$msiFiles\.Count\)/)
+assert.match(extractMatcher, /Rebuilt bundle does not embed the signed MSI byte-for-byte\./)
+assert.match(extractMatcher, /The final bundle does not contain the signed MSI byte-for-byte\./)
+assert.match(extractMatcher, /Embedded MSI search left the extract directory/)
+assert.match(extractMatcher, /Signed MSI comparison input must stay outside the extract directory/)
+assert.match(extractMatcher, /Get-FileHash -LiteralPath \$signedMsiFull -Algorithm SHA256/)
+assert.match(extractMatcher, /Get-FileHash -LiteralPath \$msiFiles\[0\]\.FullName -Algorithm SHA256/)
+assert.doesNotMatch(
+  extractMatcher,
+  /UnsignedCandidateRoot|resolvedCandidateRoot|\$resolvedRoot|\$ReleaseRoot/,
+  'embedded MSI evidence must come from the extract directory',
+)
+for (const [source, label, bundleVariable, bundleKind] of [
+  [signingRelease, 'rebuilt bundle', '$unsignedRebuiltBundle', 'rebuilt bundle'],
+  [verifyRelease, 'final signed bundle', '$signedExe', 'final signed bundle'],
+]) {
+  const extractCall = [
+    '  # WiX 4.0.6 names attached payloads only when this same extract also passes -oba.',
+    '  Invoke-CheckedCommand -FilePath $wixTool -Arguments @(',
+    `    "burn", "extract", ${bundleVariable}, "-o", $extractRoot, "-oba", $baExtractRoot, "-intermediateFolder", $intermediateRoot`,
+    `  ) -FailureMessage "WiX failed to extract the ${label}."`,
+    `  $embeddedMsiHash = Assert-ExtractedBundleMsiHash -ExtractRoot $extractRoot -SignedMsiPath $signedMsi -BundleKind "${bundleKind}"`,
+  ].join('\n')
+  assert.equal(source.split('"burn", "extract"').length, 2, `${label} must extract once`)
+  assert.ok(source.includes(extractCall), `${label} extract must pass -oba on the same command and hash that extract`)
+  assert.equal(source.split(extractCall).length, 2)
+  assert.doesNotMatch(source, /Get-ChildItem[^\n]*-Filter "\*\.msi"/, `${label} must not treat a raw *.msi filter as embedded evidence`)
+}
+assert.doesNotMatch(
+  signingRelease,
+  /Copy-Item[^\n]*\$extractRoot|Copy-Item[^\n]*\$baExtractRoot/,
+  'signing must not copy an MSI into the extract directory',
+)
+const matcherSelfTestCall = [
+  'Invoke-ExtractedMsiMatcherSelfTest',
+  'if ($PSCmdlet.ParameterSetName -eq "MatcherSelfTest") {',
+  '  return',
+  '}',
+].join('\n')
+assert.ok(pipelineTest.includes(matcherSelfTestCall), 'matcher self-test must run before the signing pipeline continues')
+assert.ok(
+  pipelineTest.indexOf(matcherSelfTestCall) < pipelineTest.indexOf('new-internal-code-signing-certificates.ps1'),
+  'matcher self-test must run before internal certificates are created',
+)
+assert.match(pipelineTest, /ParameterSetName = "MatcherSelfTest"/)
+assert.match(pipelineTest, /failed for the wrong reason/)
+for (const matcherCase of [
+  'rebuilt-bundle-container-id-without-msi-extension',
+  'final-bundle-container-id-without-msi-extension',
+  'rebuilt-bundle-zero-extracted-files',
+  'final-bundle-zero-extracted-files',
+  'rebuilt-bundle-two-extracted-msis',
+  'final-bundle-two-extracted-msis',
+  'rebuilt-bundle-hash-mismatch',
+  'final-bundle-hash-mismatch',
+  'signed-msi-inside-extract-directory',
+]) {
+  assert.match(pipelineTest, new RegExp(`Assert-MatcherFailure "${matcherCase}"`), `missing embedded MSI matcher case: ${matcherCase}`)
+}
+for (const matcherReason of [
+  'found 0\\. Extracted names: a0\\.',
+  'found 0\\. Extracted names: \\(none\\)\\.',
+  'found 2\\. Extracted names: first\\.msi, second\\.msi\\.',
+  '^WINDOWS_INSTALLER_SIGNING_FAILED: Rebuilt bundle does not embed the signed MSI byte-for-byte\\.$',
+  '^WINDOWS_INSTALLER_SIGNING_FAILED: The final bundle does not contain the signed MSI byte-for-byte\\.$',
+]) {
+  assert.ok(pipelineTest.includes(matcherReason), `missing embedded MSI matcher reason: ${matcherReason}`)
+}
+assert.match(pipelineTest, /EXTRACTED_MSI_MATCHER_SELFTEST_PASS scope=matcher-only/)
+assert.match(pipelineTest, /one named MSI with equal bytes did not return the signed SHA256/)
 
 // Static source order only. This script does not open a certificate store,
 // call Import-Certificate, or show that an interactive trust prompt returned.

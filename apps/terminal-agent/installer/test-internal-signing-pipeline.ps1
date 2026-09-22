@@ -1,13 +1,14 @@
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = "Pipeline")]
 param(
-  [Parameter(Mandatory)][ValidateScript({ Test-Path -LiteralPath $_ -PathType Container })][string]$UnsignedCandidateRoot,
-  [Parameter(Mandatory)][ValidatePattern("^[0-9A-Fa-f]{40}$")][string]$SourceCommit,
-  [Parameter(Mandatory)][ValidatePattern("^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")][string]$ProductVersion,
-  [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$EvidenceRoot,
-  [switch]$ExerciseLifecycle,
-  [switch]$UseEphemeralGitHubHostedLocalMachineTrust,
-  [string]$SignToolPath,
-  [string]$WixToolPath
+  [Parameter(Mandatory, ParameterSetName = "Pipeline")][ValidateScript({ Test-Path -LiteralPath $_ -PathType Container })][string]$UnsignedCandidateRoot,
+  [Parameter(Mandatory, ParameterSetName = "Pipeline")][ValidatePattern("^[0-9A-Fa-f]{40}$")][string]$SourceCommit,
+  [Parameter(Mandatory, ParameterSetName = "Pipeline")][ValidatePattern("^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")][string]$ProductVersion,
+  [Parameter(Mandatory, ParameterSetName = "Pipeline")][ValidateNotNullOrEmpty()][string]$EvidenceRoot,
+  [Parameter(ParameterSetName = "Pipeline")][switch]$ExerciseLifecycle,
+  [Parameter(ParameterSetName = "Pipeline")][switch]$UseEphemeralGitHubHostedLocalMachineTrust,
+  [Parameter(ParameterSetName = "Pipeline")][string]$SignToolPath,
+  [Parameter(ParameterSetName = "Pipeline")][string]$WixToolPath,
+  [Parameter(Mandatory, ParameterSetName = "MatcherSelfTest")][switch]$EmbeddedMsiMatcherSelfTestOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +28,98 @@ function Expect-Failure([string]$Name, [scriptblock]$Action, [string]$MessagePat
   if (-not $failed) {
     throw "INTERNAL_SIGNING_PIPELINE_TEST_FAILED: Expected failure did not occur: $Name"
   }
+}
+
+function Invoke-ExtractedMsiMatcherSelfTest {
+  function Assert-MatcherFailure([string]$Name, [scriptblock]$Action, [string]$MessagePattern) {
+    $failed = $false
+    try {
+      & $Action
+    } catch {
+      if ($_.Exception.Message -notmatch $MessagePattern) {
+        throw "EXTRACTED_MSI_MATCHER_SELFTEST_FAILED: '$Name' failed for the wrong reason: $($_.Exception.Message)"
+      }
+      $failed = $true
+      Write-Host "EXPECTED_FAILURE_PASS name=$Name message=$($_.Exception.Message)"
+    }
+    if (-not $failed) {
+      throw "EXTRACTED_MSI_MATCHER_SELFTEST_FAILED: Expected failure did not occur: $Name"
+    }
+  }
+
+  $root = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-job-print-msi-matcher-" + [guid]::NewGuid().ToString("N"))
+  $signed = Join-Path (Join-Path $root "signed-msi") "AIJobPrintAgent.msi"
+  $otherSigned = Join-Path (Join-Path $root "other-signed") "AIJobPrintAgent.msi"
+  New-Item -ItemType Directory -Path (Split-Path -Parent $signed), (Split-Path -Parent $otherSigned) -Force | Out-Null
+  [System.IO.File]::WriteAllBytes($signed, [System.Text.Encoding]::UTF8.GetBytes("signed-msi-v1"))
+  [System.IO.File]::WriteAllBytes($otherSigned, [System.Text.Encoding]::UTF8.GetBytes("other-msi-v1"))
+  $expectedHash = (Get-FileHash -LiteralPath $signed -Algorithm SHA256).Hash.ToUpperInvariant()
+
+  try {
+    $unnamed = Join-Path $root "unnamed"
+    New-Item -ItemType Directory -Path $unnamed -Force | Out-Null
+    [System.IO.File]::WriteAllBytes((Join-Path $unnamed "a0"), [System.IO.File]::ReadAllBytes($signed))
+    Assert-MatcherFailure "rebuilt-bundle-container-id-without-msi-extension" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot $unnamed -SignedMsiPath $signed -BundleKind "rebuilt bundle"
+    } "Expected exactly one embedded MSI in rebuilt bundle, found 0\. Extracted names: a0\."
+    Assert-MatcherFailure "final-bundle-container-id-without-msi-extension" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot $unnamed -SignedMsiPath $signed -BundleKind "final signed bundle"
+    } "Expected exactly one MSI in the final signed bundle, found 0\. Extracted names: a0\."
+
+    $empty = Join-Path $root "empty"
+    New-Item -ItemType Directory -Path $empty -Force | Out-Null
+    Assert-MatcherFailure "rebuilt-bundle-zero-extracted-files" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot $empty -SignedMsiPath $signed -BundleKind "rebuilt bundle"
+    } "Expected exactly one embedded MSI in rebuilt bundle, found 0\. Extracted names: \(none\)\."
+    Assert-MatcherFailure "final-bundle-zero-extracted-files" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot $empty -SignedMsiPath $signed -BundleKind "final signed bundle"
+    } "Expected exactly one MSI in the final signed bundle, found 0\. Extracted names: \(none\)\."
+
+    $two = Join-Path $root "two"
+    New-Item -ItemType Directory -Path $two -Force | Out-Null
+    Copy-Item -LiteralPath $signed -Destination (Join-Path $two "first.msi")
+    Copy-Item -LiteralPath $signed -Destination (Join-Path $two "second.msi")
+    Assert-MatcherFailure "rebuilt-bundle-two-extracted-msis" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot $two -SignedMsiPath $signed -BundleKind "rebuilt bundle"
+    } "Expected exactly one embedded MSI in rebuilt bundle, found 2\. Extracted names: first\.msi, second\.msi\."
+    Assert-MatcherFailure "final-bundle-two-extracted-msis" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot $two -SignedMsiPath $signed -BundleKind "final signed bundle"
+    } "Expected exactly one MSI in the final signed bundle, found 2\. Extracted names: first\.msi, second\.msi\."
+
+    $mismatch = Join-Path (Join-Path $root "mismatch") "WixAttachedContainer"
+    New-Item -ItemType Directory -Path $mismatch -Force | Out-Null
+    Copy-Item -LiteralPath $otherSigned -Destination (Join-Path $mismatch "AIJobPrintAgent.msi")
+    Assert-MatcherFailure "rebuilt-bundle-hash-mismatch" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot (Join-Path $root "mismatch") -SignedMsiPath $signed -BundleKind "rebuilt bundle"
+    } "^WINDOWS_INSTALLER_SIGNING_FAILED: Rebuilt bundle does not embed the signed MSI byte-for-byte\.$"
+    Assert-MatcherFailure "final-bundle-hash-mismatch" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot (Join-Path $root "mismatch") -SignedMsiPath $signed -BundleKind "final signed bundle"
+    } "^WINDOWS_INSTALLER_SIGNING_FAILED: The final bundle does not contain the signed MSI byte-for-byte\.$"
+
+    $inside = Join-Path $root "inside"
+    New-Item -ItemType Directory -Path $inside -Force | Out-Null
+    Copy-Item -LiteralPath $signed -Destination (Join-Path $inside "AIJobPrintAgent.msi")
+    Assert-MatcherFailure "signed-msi-inside-extract-directory" {
+      Assert-ExtractedBundleMsiHash -ExtractRoot $inside -SignedMsiPath (Join-Path $inside "AIJobPrintAgent.msi") -BundleKind "rebuilt bundle"
+    } "Signed MSI comparison input must stay outside the extract directory for rebuilt bundle\."
+
+    $match = Join-Path (Join-Path $root "match") "WixAttachedContainer"
+    New-Item -ItemType Directory -Path $match -Force | Out-Null
+    Copy-Item -LiteralPath $signed -Destination (Join-Path $match "AIJobPrintAgent.msi")
+    [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $root "match") "a0"), [System.IO.File]::ReadAllBytes($signed))
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $root "match") "note.txt"), "not-an-msi")
+    $rebuiltHash = Assert-ExtractedBundleMsiHash -ExtractRoot (Join-Path $root "match") -SignedMsiPath $signed -BundleKind "rebuilt bundle"
+    $finalHash = Assert-ExtractedBundleMsiHash -ExtractRoot (Join-Path $root "match") -SignedMsiPath $signed -BundleKind "final signed bundle"
+    if ($rebuiltHash -cne $expectedHash -or $finalHash -cne $expectedHash) {
+      throw "EXTRACTED_MSI_MATCHER_SELFTEST_FAILED: one named MSI with equal bytes did not return the signed SHA256."
+    }
+  } finally {
+    if (Test-Path -LiteralPath $root) {
+      Remove-Item -LiteralPath $root -Recurse -Force
+    }
+  }
+
+  Write-Host "EXTRACTED_MSI_MATCHER_SELFTEST_PASS scope=matcher-only"
 }
 
 function Rewrite-ReleaseIdentityForBundle([string]$Root, $Certificate, [string]$EnginePath) {
@@ -51,6 +144,11 @@ function Rewrite-ReleaseIdentityForBundle([string]$Root, $Certificate, [string]$
     [System.Text.UTF8Encoding]::new($false)
   )
   Write-DetachedCmsSignature -ContentPath $identityPath -SignaturePath $signaturePath -Certificate $Certificate
+}
+
+Invoke-ExtractedMsiMatcherSelfTest
+if ($PSCmdlet.ParameterSetName -eq "MatcherSelfTest") {
+  return
 }
 
 $resolvedEvidence = [System.IO.Path]::GetFullPath($EvidenceRoot)
