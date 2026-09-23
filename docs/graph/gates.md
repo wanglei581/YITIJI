@@ -2013,13 +2013,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/providers/qwen.provider.stub.ts` | `verify-ai-cost-coverage.ts` |
 | `services/api/src/ai/providers/zhipu.provider.stub.ts` | `verify-ai-cost-coverage.ts` |
 | `services/api/src/ai/redis-inflight-lock.ts` | `verify-resume-optimize.ts` |
-| `services/api/src/ai/resume-report-export.controller.ts` | `verify-resume-report-export.ts` |
+| `services/api/src/ai/resume-report-export.controller.ts` | `verify-resume-export-formats.ts`<br/>`verify-resume-report-export.ts` |
 | `services/api/src/ai/resume/appended-self-assessment.service.ts` | `verify-assess-isolation.ts`<br/>`verify-compliance.ts` |
 | `services/api/src/ai/resume/career-plan-degraded-pdf.service.ts` | `verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts` |
 | `services/api/src/ai/resume/career-plan-degraded.ts` | `verify-career-plan-degraded.ts` |
 | `services/api/src/ai/resume/career-plan-pdf.service.ts` | `verify-aigc-pdf-metadata.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts`<br/>`verify-cjk-font.ts` |
 | `services/api/src/ai/resume/career-plan.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts`<br/>`verify-compliance.ts` |
-| `services/api/src/ai/resume/diagnosis-report-pdf.service.ts` | `verify-resume-report-export.ts` |
+| `services/api/src/ai/resume/diagnosis-report-pdf.service.ts` | `verify-resume-export-formats.ts`<br/>`verify-resume-report-export.ts` |
 | `services/api/src/ai/resume/fair-visit-plan-pdf.service.ts` | `verify-aigc-pdf-metadata.ts`<br/>`verify-cjk-font.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-fair-visit-review.ts` |
 | `services/api/src/ai/resume/fair-visit-plan.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-fair-visit-review.ts` |
 | `services/api/src/ai/resume/job-fit-pdf.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-aigc-pdf-metadata.ts`<br/>`verify-cjk-font.ts`<br/>`verify-job-fit-print.ts` |
@@ -2245,7 +2245,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/materials/print-param-suggestion.service.ts` | `verify-print-param-suggestion.ts` |
 | `services/api/src/materials/print-param-suggestion.types.ts` | `verify-print-param-suggestion.ts` |
 | `services/api/src/member-assets/member-assets.controller.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-wave2-account-rebind.ts` |
-| `services/api/src/member-assets/member-assets.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-career-plan.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-job-materials.ts`<br/>`verify-member-assets.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-wave2-account-rebind.ts` |
+| `services/api/src/member-assets/member-assets.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-career-plan.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-job-materials.ts`<br/>`verify-member-assets.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-wave2-account-rebind.ts` |
 | `services/api/src/member-assets/member-assets.types.ts` | `verify-assess-isolation.ts` |
 | `services/api/src/member-auth/dto/member-login.dto.ts` | `verify-legal-doc-version.ts` |
 | `services/api/src/member-auth/dto/member-step-up.dto.ts` | `verify-member-step-up.ts` |

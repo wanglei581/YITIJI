@@ -1,6 +1,25 @@
 # 当前开发进度
 
-2026-09-23 **唯一集成候选现为 `09c93dece5bc7eadb4cd2b3dbc4a98bd9f1082cd`：求职材料库已本地迁入青序流光，商业仍 NO-GO。**
+2026-09-23 **唯一集成候选现为 `dd44e3cf9266a5accdb7360c974e975084aaeef8`：收费简历导出暂存与核销激活已本地合流，商业仍 NO-GO。**
+Grok `grok-4.7-build-fast` / `xhigh`（session `77c62eea-f0c9-4ec0-895a-21807f07ec27`）
+在隔离树从 `b8f8ee311` 提交 8 个后端/验证文件，当前分支 fast-forward 合入这一提交；隔离树的
+436 个无关删除与 `.gitignore` 修改未进提交。收费首次导出的主文件和打印 PDF 副本先以
+`FileObject.status=uploading`、无 `endUserId`、短期限落库，会员列表/读取/访问 URL 不放行；
+权益核销与文件激活在同一数据库事务提交，输家文件保持不可见并由既有过期清理回收。
+已扣权益后草稿版本持久化失败不再删除已购文件，仍返回可访问结果；免费与已核销同内容路径保留。
+该修复替代但未直接合入 `b3085bb7b` 的 catch-only 补偿候选。
+
+在该 HEAD 的全新隔离 SQLite/本地存储中，`verify:resume-export-formats`（含草稿版本）、
+`verify:resume-report-export`、`verify:benefit-redemption`、`verify:member-assets`、
+`verify:file-cleanup-cas-ledger`、`verify:file-retention`、`verify:file-internal-auth`、
+`verify:file-delete-consistency`、`verify:kiosk-upload-print-contract`、
+`verify:member-data-export-files`、`verify:cos:files`（实际为本地后端）、API typecheck 均退出 0。
+图谱 3 个现有生成文件已按代码刷新并通过 `graph:check`。测试包含并发不同内容与诊断报告、
+暂存文件不可见、模拟崩溃遗留行到期清理、物理删除失败重试；未做真实进程强杀、PostgreSQL 并发、
+真实 COS 或最终 SHA CI。持有效内部 HMAC 的打印页数/建单路径尚未对 `uploading` 文件显式拒绝，
+虽然收费暂存路径在核销前不签发该 HMAC，仍须补防御回归；生产和商用不放行。
+
+2026-09-23 **历史集成节点 `09c93dece5bc7eadb4cd2b3dbc4a98bd9f1082cd`：求职材料库已本地迁入青序流光。**
 Claude `claude-opus-5-5` / `xhigh` 在隔离分支 `claude/kiosk-resume-materials-qx-20260923` 完成稿 25，
 以 fast-forward 合入本地集成树；原有 `/resume/materials` 路由、模板 GET、生成 POST、登录草稿恢复、
 busy lock、本人文件归属和内部 `printFileUrl` 打印交接保持。新增的目录、字段校验、真实文件卡及空/错/失败态

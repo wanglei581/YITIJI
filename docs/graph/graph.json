@@ -15524,6 +15524,7 @@
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/resume/appended-self-assessment.service.ts",
+          "services/api/src/benefit-redemption/resume-export-gate.service.ts",
           "services/api/src/contract-review/contract-review-report-file.service.ts",
           "services/api/src/contract-review/contract-review-report.service.ts",
           "services/api/src/contract-review/contract-review.cleanup.task.ts",
@@ -20992,6 +20993,7 @@
       "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/src/ai/resume-report-export.controller.ts": [
+      "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/ai/resume/appended-self-assessment.service.ts": [
@@ -21023,6 +21025,7 @@
       "services/api/scripts/verify-compliance.ts"
     ],
     "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
+      "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/ai/resume/fair-visit-plan-pdf.service.ts": [
@@ -22381,6 +22384,7 @@
       "services/api/scripts/verify-member-assets.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
@@ -34757,6 +34761,8 @@
           "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
           "services/api/src/ai/providers/mock.provider.ts",
+          "services/api/src/ai/resume-report-export.controller.ts",
+          "services/api/src/ai/resume/diagnosis-report-pdf.service.ts",
           "services/api/src/ai/resume/resume-docx.service.ts",
           "services/api/src/ai/resume/resume-pdf.service.ts",
           "services/api/src/ai/resume/resume-text.service.ts",
@@ -34764,6 +34770,7 @@
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/benefit-redemption/resume-export-gate.service.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.service.ts"
