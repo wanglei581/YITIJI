@@ -1,5 +1,9 @@
 # 下一步任务
 
+## 2026-09-23：稿 21 整屏预览工具条后的证据边界
+
+`618643edd` 已把扫描结果 `rs-pv-*` 工具条合入候选：真实 PDF/图片预览、PDF 页码与适配方式、未知页数的诚实禁用、Escape/焦点/inert 和 390×844 触控布局均有本地证据；W2 104/104、W3 43/43、typecheck、`verify:fusion-w2`、`verify:fusion-w3` 和 diff check 均通过。下一步只补 360/375 与 Windows Edge 的嵌入兼容，以及来源异常态和真实后端重查合同；不得用浏览器夹具绿测替代 PostgreSQL/COS、最终 SHA CI、Windows/Pantum、微信、生产和商业证据。
+
 ## 2026-09-23：队列队头不可用文件修复后的证据边界
 
 Agent claim 已在查询层跳过已知不可用的现代文件，避免队头 pending 任务阻塞后续合法 active 任务；事务内二次状态闸和历史无 `fileId` 兼容路径保留。`verify:print-jobs` 已覆盖队头过期 + 后续 active 任务，并在隔离 SQLite 夹具中通过。仍需独立 PostgreSQL 并发与真实 COS 删除/读取一致性验证；不能把本地 PASS 写成 CI、生产、Windows/Pantum 或商业 GO。

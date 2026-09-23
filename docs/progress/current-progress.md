@@ -1,5 +1,9 @@
 # 当前开发进度
 
+2026-09-23 **稿 21 扫描结果整屏预览工具条已本地合流，商业仍 NO-GO。**
+Claude `opus` / `xhigh` 在隔离 worktree 只修改现有扫描结果页、`FileContentPreview`、扫描页 CSS 与 W2 规格；提交 `618643edd` 未新增路由、后端、重查合同、依赖或小程序文件。真实回执文件可在当前结果页打开整屏查看：PDF 使用同一签名 URL 的 `#page/view` 参数，图片按容器测量提供整页/铺满宽度，回执未给页数时翻页按钮保持不可用；关闭、Escape、焦点回归和背景 inert 均为内存态，工具条选择器为 `rs-pv-*`。390×844 的工具条保持在视口内并保留可触控尺寸。
+候选分支已实跑 `pnpm --filter @ai-job-print/kiosk typecheck`、预览 4 项定向 W2（4/4）、`test:browser:w2`（104/104）、`test:browser:w3`（43/43）、`verify:fusion-w2`、`verify:fusion-w3` 与 `git diff --check`，均退出 0；W2/W3 运行中的 Vite 代理报错只来自未启动真实 API，不影响这些浏览器夹具的断言。仍未做 Windows Edge/390 外宽度的实机确认，也未补来源异常态或真实后端交接重查合同；PostgreSQL/COS、最终 SHA CI、Windows/Pantum、微信、生产和商业验收仍未关闭。本批未 push、未合并 `main`、未部署或操作真机。
+
 2026-09-23 **队列队头不可用文件不再阻塞后续合法任务，商业仍 NO-GO。**
 Grok 反证发现 Agent claim 对最早的 `FileObject` 失效任务直接返回空并停止，后续 active 任务会被永久挡住。现将现代任务的 claim 查询先按 `status=active`、未删除、未过期过滤，保留事务内二次文件状态闸和无 `fileId` 历史兼容路径；未激活/隔离/已删/已过期文件不会签发 URL 或领取。`verify:print-jobs` 新增队头过期 + 后续 active 任务夹具，API typecheck 与整条打印 service E2E 全部 PASS。PostgreSQL 并发 TOCTOU、真实 COS 一致性、Windows/Pantum、CI、生产和商业验收仍未关闭。
 
