@@ -32,7 +32,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.service'
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
-import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP } from '../src/admin-ops/derived-alerts'
+import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../src/terminals/printer-availability'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
@@ -51,10 +51,19 @@ function errorCode(err: unknown): string | undefined {
   return e.response?.error?.code ?? e.getResponse?.()?.error?.code ?? e.message
 }
 
-function mockOpsPrisma(terminalRows: unknown[], printRows: unknown[] = [], dispositionRows: unknown[] = []): PrismaService {
+function mockOpsPrisma(
+  terminalRows: unknown[],
+  printRows: unknown[] = [],
+  dispositionRows: unknown[] = [],
+  unavailableRows: unknown[] = [],
+): PrismaService {
   return {
     terminal: { findMany: async () => terminalRows },
-    printTask: { findMany: async () => printRows, count: async () => printRows.length },
+    printTask: {
+      findMany: async (args?: { where?: { status?: string } }) => args?.where?.status === 'pending' ? unavailableRows : printRows,
+      count: async (args?: { where?: { status?: string } }) => args?.where?.status === 'pending' ? unavailableRows.length : printRows.length,
+      findFirst: async () => unavailableRows[0] ?? null,
+    },
     terminalHeartbeat: { groupBy: async () => [], findFirst: async () => null },
     alertDisposition: {
       findMany: async () => dispositionRows,
@@ -102,6 +111,56 @@ async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
   pass('3a. 健康打印机状态(ok/ready/idle)不产生 printer_issue 告警')
 }
 
+async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
+  const now = new Date('2026-09-23T08:00:00.000Z')
+  const bad = {
+    id: 'pt_paid_pending_bad',
+    fileId: 'file_paid_pending_bad',
+    updatedAt: new Date('2026-09-23T07:59:00.000Z'),
+    terminal: { terminalCode: 'VOP-PAID-PENDING' },
+    order: { payStatus: 'paid' },
+    file: {
+      status: 'uploading',
+      deletedAt: null,
+      expiresAt: null,
+      updatedAt: new Date('2026-09-23T07:58:00.000Z'),
+      storageKey: 'must-not-leak',
+    },
+  }
+  const active = {
+    ...bad,
+    id: 'pt_paid_pending_active',
+    fileId: 'file_paid_pending_active',
+    file: { ...bad.file, status: 'active', updatedAt: new Date('2026-09-23T07:57:00.000Z') },
+  }
+  const refunded = { ...bad, id: 'pt_paid_pending_refunded', order: { payStatus: 'refunded' } }
+  const legacy = { ...bad, id: 'pt_paid_pending_legacy', fileId: null, file: null }
+  const svc = new AdminOpsService(mockOpsPrisma([], [], [], [bad, active, refunded, legacy]))
+  const first = await svc.listDerivedAlerts('open')
+  const alert = first.data.find((item) => item.id === 'paid_pending_file_unavailable:pt_paid_pending_bad')
+  if (!alert) fail('3b. 已支付 pending + uploading 文件必须进入派生告警')
+  if (alert.severity !== 'error' || alert.conditionState !== 'firing') fail('3b. 文件不可用告警状态/级别错误')
+  if (first.data.some((item) => item.id.includes('active') || item.id.includes('refunded') || item.id.includes('legacy'))) {
+    fail('3b. active、已退款或历史 fileId=null 任务不得误报')
+  }
+  const encoded = JSON.stringify(alert)
+  for (const banned of ['storageKey', 'must-not-leak', 'file_paid_pending_bad']) {
+    if (banned === 'file_paid_pending_bad') continue
+    if (encoded.includes(banned)) fail(`3b. 告警泄露敏感字段: ${banned}`)
+  }
+  const second = await svc.listDerivedAlerts('open')
+  const repeated = second.data.find((item) => item.id === alert.id)
+  if (!repeated || repeated.episodeToken !== alert.episodeToken) fail('3b. 同一文件故障的 episodeToken 必须稳定')
+  const resolved = await resolveDerivedAlert(
+    mockOpsPrisma([], [], [], [bad]),
+    'paid_pending_file_unavailable',
+    bad.id,
+    now,
+  )
+  if (!resolved || resolved.subjectKey !== alert.subjectKey) fail('3b. 单条正向查证必须复用同一告警条件')
+  pass('3b. 已支付 pending 文件不可用告警、误报排除、稳定身份和单条查证')
+}
+
 async function main() {
   console.log('\n=== 阶段1E Admin 运营视图验证 ===')
 
@@ -122,6 +181,7 @@ async function main() {
   pass('SES-07 终端在线窗口统一为五分钟心跳常量')
 
   await verifyHealthyPrinterStatusesDoNotAlert()
+  await verifyPaidPendingFileUnavailableAlert()
   if (process.env.ADMIN_OPS_ALERT_HEALTH_ONLY === '1') return
 
   const prisma = new PrismaService()
