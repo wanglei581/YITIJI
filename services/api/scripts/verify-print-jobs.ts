@@ -9,6 +9,7 @@
  *   5. 终态幂等：只允许重复回传相同终态；不同终态或回退到 printing 必须拒绝且不重写 DB。
  *   6. 状态查询：getStatus 反映终态；不存在任务 → 404 PRINT_TASK_NOT_FOUND。
  *   9. 动态价格二次确认：quotedAmountCents 与服务端重算不一致 → 409 PRICE_CHANGED 且零建单副作用。
+ *   1d. 有效 HMAC 仍拒绝 uploading（含 resume_export_pending）/ quarantined / deleted / expired，active 对照可建单。
  *
  * 1–8 与 9 的 service 段直调真库（prisma），不起 HTTP server——确定性、CI 友好。
  * 9 的 HTTP 段另起进程内 Nest：真实 PrintJobsController + main.ts 同款 ValidationPipe
@@ -54,6 +55,10 @@ function errCode(e: unknown): string | undefined {
   const resp = (typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response) as
     | { error?: { code?: string } } | undefined
   return resp?.error?.code
+}
+
+function thrownCode(e: unknown): string | undefined {
+  return errCode(e) ?? (/^[A-Z][A-Z0-9_]+$/.test((e as Error).message) ? (e as Error).message : undefined)
 }
 
 async function expectCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
@@ -148,13 +153,21 @@ async function main() {
   const audit = new AuditService(prisma)
   const storage = new StorageService()
   const orderStatus = new OrderStatusService(prisma, audit)
+  const pageCount = new PrintPageCountService(prisma, storage)
+  let conversionCalls = 0
   const printJobs = new PrintJobsService(
     prisma,
     audit,
-    new PrintPageCountService(prisma, storage),
+    pageCount,
     new PricingService(prisma),
     orderStatus,
     new TerminalCapabilitiesService(prisma),
+    {
+      convertForPrint: async () => {
+        conversionCalls += 1
+        throw new Error('CONVERSION_INVOKED')
+      },
+    } as never,
   )
   // N3 拆分后 TerminalsService 需要 agent + admin 两个子服务
   const agentSvc = new TerminalAgentService(prisma, audit)
@@ -186,6 +199,7 @@ async function main() {
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
     // 计费接线后新增的真实 fixture / 价目清理。
     await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: fixtureFileIds } } })
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: fixtureFileIds } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
     await Promise.all(fixtureStorageKeys.map((key) =>
       storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined),
@@ -351,6 +365,94 @@ async function main() {
       '1c. 合同风险提示报告即使哈希无效也一律禁止打印',
     )
     await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: reportSha256 } })
+
+    // ── 1d. 有效 HMAC 不能读取未激活 / 已删 / 已过期文件 ──────────────
+    {
+      const docx = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      const future = new Date(Date.now() + 3_600_000)
+      const past = new Date(Date.now() - 60_000)
+      const cases: Array<[string, string, string, Date | null, Date | null, string | null, string]> = [
+        ['uploading_pdf', 'uploading', 'application/pdf', null, future, 'resume_export_pending', 'resume_upload'],
+        ['uploading_docx', 'uploading', docx, null, future, 'resume_export_pending', 'resume_upload'],
+        ['quarantined', 'quarantined', 'application/pdf', null, future, null, 'print_source'],
+        ['deleted_docx', 'active', docx, new Date(), future, null, 'print_source'],
+        ['expired', 'active', 'application/pdf', null, past, null, 'print_source'],
+      ]
+      const readObject = storage.getObject.bind(storage)
+      let storageReads = 0
+      storage.getObject = async (objectKey: string, bucket?: string | null) => {
+        storageReads += 1
+        return readObject(objectKey, bucket)
+      }
+      const expectUnavailable = async (id: string, step: 'page-count' | 'create', url: string) => {
+        try {
+          if (step === 'page-count') await pageCount.resolveBillablePages(url)
+          else await printJobs.create({ fileUrl: url, fileName: `${id}.bin` }, { terminalId })
+          fail(`1d. ${id} ${step} 应拒绝`)
+        } catch (error) {
+          const code = thrownCode(error)
+          if (code !== 'PRINT_PAGE_COUNT_UNAVAILABLE') fail(`1d. ${id} ${step} 实际 ${code ?? (error as Error).message}`)
+        }
+      }
+      try {
+        for (const [key, status, mimeType, deletedAt, expiresAt, retentionLockedReason, purpose] of cases) {
+          const id = `file_vpj_${key}_${suffix}`
+          const storageKey = `verify/print-jobs/${id}.bin`
+          fixtureFileIds.push(id)
+          fixtureStorageKeys.push(storageKey)
+          await storage.putObject(storageKey, pdfBytes, mimeType, LOCAL_BUCKET_SENTINEL)
+          await prisma.fileObject.create({ data: {
+            id, storageKey, filename: `${key}.bin`, mimeType, sizeBytes: pdfBytes.length, sha256: reportSha256,
+            purpose, status, deletedAt, expiresAt, retentionLockedReason, bucket: LOCAL_BUCKET_SENTINEL,
+          } })
+          await prisma.auditLog.create({ data: {
+            actorRole: 'system', action: 'file.direct_upload_completed', targetType: 'file', targetId: id, payloadJson: '{}',
+          } })
+          const readsBefore = storageReads
+          const conversionsBefore = conversionCalls
+          const signedUrl = signFileUrl(id, 30 * 60 * 1000).url
+          await expectUnavailable(id, 'page-count', signedUrl)
+          await expectUnavailable(id, 'create', signedUrl)
+          const [tasks, orders, attempts, audits, createAudits, stored] = await Promise.all([
+            prisma.printTask.count({ where: { fileId: id } }),
+            prisma.order.count({ where: { printTask: { fileId: id } } }),
+            prisma.paymentAttempt.count({ where: { order: { printTask: { fileId: id } } } }),
+            prisma.auditLog.count({ where: { targetId: id, action: { not: 'file.direct_upload_completed' } } }),
+            prisma.auditLog.count({ where: { action: 'print_job.create', payloadJson: { contains: id } } }),
+            prisma.fileObject.findUnique({ where: { id }, select: { status: true, deletedAt: true, retentionLockedReason: true } }),
+          ])
+          const clean = storageReads === readsBefore && conversionCalls === conversionsBefore
+            && tasks === 0 && orders === 0 && attempts === 0 && audits === 0 && createAudits === 0
+            && stored?.status === status && Boolean(stored.deletedAt) === Boolean(deletedAt)
+            && stored.retentionLockedReason === retentionLockedReason
+          if (!clean) {
+            fail(`1d. ${key} 拒绝后仍有副作用 ${JSON.stringify({ storageReads, readsBefore, conversionCalls, conversionsBefore, tasks, orders, attempts, audits, createAudits, stored })}`)
+          }
+          pass(`1d. ${key} 有效 HMAC 拒绝，且无存储读取、转换、PrintTask、Order、PaymentAttempt`)
+        }
+        const activeId = `file_vpj_active_${suffix}`
+        const activeKey = `verify/print-jobs/${activeId}.pdf`
+        fixtureFileIds.push(activeId)
+        fixtureStorageKeys.push(activeKey)
+        await storage.putObject(activeKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+        await prisma.fileObject.create({ data: {
+          id: activeId, storageKey: activeKey, filename: 'active.pdf', mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length, sha256: reportSha256, purpose: 'print_source', status: 'active',
+          deletedAt: null, expiresAt: future, bucket: LOCAL_BUCKET_SENTINEL,
+        } })
+        const readsBeforeActive = storageReads
+        const activeUrl = signFileUrl(activeId, 30 * 60 * 1000).url
+        const counted = await pageCount.resolveBillablePages(activeUrl)
+        const activeJob = await printJobs.create({ fileUrl: activeUrl, fileName: 'active.pdf' }, { terminalId })
+        createdTaskIds.push(activeJob.taskId)
+        if (counted.billablePages !== 1 || activeJob.status !== 'pending' || storageReads <= readsBeforeActive || conversionCalls !== 0) {
+          fail(`1d-active. 有效文件应识别页数并建单 pages=${counted.billablePages} status=${activeJob.status} reads=${storageReads}`)
+        }
+        pass('1d-active. active 且未过期文件仍识别页数并创建任务')
+      } finally {
+        storage.getObject = readObject
+      }
+    }
 
     // ── 2. 非法 fileUrl 拦截（SSRF 防护）──────────────────────────────
     await expectCode(

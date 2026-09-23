@@ -16,7 +16,7 @@ import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
-import { PrintPageCountService } from './print-page-count.service'
+import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
 import type { BillingPageSource } from './print-page-count.types'
 import { assertVerifiedPrintParameters } from './verified-print-parameters'
 import { DocumentConversionService } from '../document-conversion/document-conversion.service'
@@ -274,7 +274,15 @@ export class PrintJobsService {
     // 合同原件与签约风险报告均不得进入打印链路（2026-09-06 拍板：可保存、不打印）。
     const sourceFile = await this.prisma.fileObject.findUnique({
       where: { id: requestedFileId },
-      select: { purpose: true, sha256: true, mimeType: true, filename: true },
+      select: {
+        purpose: true,
+        sha256: true,
+        mimeType: true,
+        filename: true,
+        status: true,
+        deletedAt: true,
+        expiresAt: true,
+      },
     })
     if (sourceFile?.purpose === 'contract_upload') {
       throw new BadRequestException({
@@ -334,6 +342,12 @@ export class PrintJobsService {
           message: '打印文件已撤销，请返回资料页重新选择可打印文件',
         },
       })
+    }
+
+    // 合同用途与招聘会撤销保持各自错误码，因此排在本闸之前。
+    // uploading / quarantined / 已删除 / 已过期在转换、报价、任务、订单和审计之前失败。
+    if (!isPrintableFileRecord(sourceFile)) {
+      throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
     }
 
     // 隐私预检门控：建单前确认该文件走过 pii_scan 且用户已逐项裁决。
