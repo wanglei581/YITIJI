@@ -1,7 +1,7 @@
-import type { Page, Route } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
-import { assertNoHorizontalOverflow, assertQxPillReadable } from './assert-layout'
+import { assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
 import { setReactRouterState, writeScanWorkbenchSession, SCAN_WORKBENCH_SESSION_KEY, W2_FILE } from './fixtures/fusion-w2-state'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 
@@ -470,6 +470,116 @@ test('successful resume scan can continue to AI parsing @w2', async ({ page, api
   await expectHealthy(page, errors)
 })
 
+/** 只滚手指滚得动的容器（overflow-y: auto / scroll），把目标露到容器中间；overflow:hidden 的舞台一律不碰。 */
+async function revealByUserScroll(target: Locator, block: 'start' | 'center' | 'end' = 'center'): Promise<void> {
+  await target.evaluate((el, where) => {
+    for (let node = el.parentElement; node; node = node.parentElement) {
+      if (!['auto', 'scroll'].includes(getComputedStyle(node).overflowY) || node.scrollHeight <= node.clientHeight) continue
+      const box = node.getBoundingClientRect()
+      const rect = el.getBoundingClientRect()
+      const slack = where === 'start' ? 0 : where === 'end' ? box.height - rect.height : (box.height - rect.height) / 2
+      node.scrollTop += rect.top - box.top - Math.max(0, slack)
+    }
+  }, block)
+}
+
+type Box = { x: number; y: number; width: number; height: number }
+
+async function boxOf(locator: Locator, what: string): Promise<Box> {
+  const box = await locator.boundingBox()
+  expect(box, `${what} 必须有包围盒`).not.toBeNull()
+  return box!
+}
+
+function boxesOverlap(a: Box, b: Box): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+}
+
+function expectInside(inner: Box, outer: Box, message: string): void {
+  expect(
+    inner.y >= outer.y - 0.5 && inner.y + inner.height <= outer.y + outer.height + 0.5
+      && inner.x >= outer.x - 0.5 && inner.x + inner.width <= outer.x + outer.width + 0.5,
+    message,
+  ).toBe(true)
+}
+
+/*
+ * 2026-09-23 实测：390×844 下舞台不缩放，扫描工作台的横幅（541px）与底注（324px）钉死在 329px 的
+ * 正文区里，可滚区被挤成 20px 落到底栏下面，横幅还压在操作条上。「AI 简历识别」手指点不到——
+ * Playwright 只能靠滚动 overflow:hidden 的舞台摸到它，点下去仍被 .sw-xq / .sw-truth 拦截。
+ * 本用例只做用户做得到的事：滚手指滚得动的容器，再在按钮坐标上真按一下（touchscreen.tap，
+ * 不经 Playwright 的自动滚动与重试），必须进到解析页、带着这份扫描件提交。
+ */
+test.describe('scan result at 390x844', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
+
+  test('resume scan AI button is reachable and tappable at 390x844 @w2', async ({ page, api }, testInfo) => {
+    const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+    const binary = new FusionW2BinaryRoute(page)
+    await binary.install()
+    registerShell(api)
+    const parseBodies: Array<{ fileId?: string; source?: string }> = []
+    await page.route('**/api/v1/resume/parse', async (route) => {
+      parseBodies.push(route.request().postDataJSON() as { fileId?: string; source?: string })
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'W2_STOP_AFTER_NAV', message: 'synthetic stop' } }) })
+    })
+
+    await seedScanResult(page, resultState)
+    await page.goto('/scan?stage=result')
+    await expectPdfCompleted(binary)
+    await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
+
+    const viewport = { x: 0, y: 0, width: 390, height: 844 }
+    const scroller = page.locator('[data-qx-page="scan-workbench"]')
+    const hero = page.locator('.sw-xq')
+    const truth = page.getByTestId('scan-workbench-truth')
+    const ctabar = page.locator('.qx-ctabar')
+    const navbar = page.getByRole('navigation', { name: '主导航' })
+    const aiButton = page.getByRole('button', { name: /AI 简历识别/ })
+    await expect(aiButton).toBeEnabled()
+
+    // 顶栏、操作条、底栏不许被横幅盖住（修复前 .sw-xq 溢出正文区，压在「直接打印」上）。
+    await assertTapTargetPointerHit(page.getByRole('button', { name: '返回打印扫描' }))
+    await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '重新扫描' }))
+    await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '直接打印' }))
+    for (const item of await navbar.getByRole('button').all()) await assertTapTargetPointerHit(item)
+
+    // 横幅与底注一字不删，只是随正文一起滚：两头都滚得到、整块露得出来。
+    await expect(hero).toBeVisible()
+    await expect(truth).toBeVisible()
+    await revealByUserScroll(hero, 'start')
+    expectInside(await boxOf(hero, '横幅'), await boxOf(scroller, '扫描工作台滚动区'), '横幅必须能整块滚进可视区')
+    await revealByUserScroll(truth, 'end')
+    expectInside(await boxOf(truth, '底注'), await boxOf(scroller, '扫描工作台滚动区'), '底注必须能整块滚进可视区')
+
+    await revealByUserScroll(aiButton)
+    const view = await boxOf(scroller, '扫描工作台滚动区')
+    const button = await boxOf(aiButton, '「AI 简历识别」')
+    expectInside(button, view, '「AI 简历识别」必须能整块滚进可视区，不靠滚动 overflow:hidden 的舞台')
+    expectInside(button, viewport, '「AI 简历识别」必须整块在视口内')
+    for (const [what, layer] of [['横幅', hero], ['底注', truth], ['操作条', ctabar], ['底栏', navbar]] as const) {
+      expect(boxesOverlap(button, await boxOf(layer, what)), `「AI 简历识别」不得与${what}重叠`).toBe(false)
+    }
+    await assertTapTargetPointerHit(aiButton)
+    // 三列时每个出口只剩 95px 宽，标题逐字竖排；单列后「AI 简历识别」最多折两行。
+    const titleLines = await aiButton.locator('.sw-exit-title').evaluate((el) => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const centers = Array.from(range.getClientRects()).map((rect) => rect.top + rect.height / 2).sort((a, b) => a - b)
+      const tolerance = parseFloat(getComputedStyle(el).fontSize) * 0.6
+      return centers.filter((center, index) => index === 0 || center - centers[index - 1] > tolerance).length
+    })
+    expect(titleLines, '「AI 简历识别」标题不得逐字竖排').toBeLessThanOrEqual(2)
+    await page.screenshot({ path: testInfo.outputPath('qx-scan-result-390-ai-exit.png'), fullPage: false })
+
+    await page.touchscreen.tap(button.x + button.width / 2, button.y + button.height / 2)
+    await page.waitForURL('**/resume/parse')
+    await expect.poll(() => parseBodies.length).toBe(1)
+    expect(parseBodies[0]).toMatchObject({ fileId: 'w2-scan-file', source: 'scan' })
+    await expectHealthy(page, errors)
+  })
+})
+
 test('resume scan return keeps the same scanned file and a late parse result never hijacks it @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
@@ -525,7 +635,7 @@ test('resume scan return keeps the same scanned file and a late parse result nev
  * 顶栏返回把解析页这条历史换成来源页（replace）。浏览器 / 系统后退不能再把解析页翻回来——
  * 那会让它带着原来的路由 state 重新挂载，用同一个 fileId、同一条签名链接再提交一次解析。
  * 扫描件交接本身要保住：回到来源页仍落在 scan-ready、仍是同一份文件。
- * 扫描工作台在 390 下的点击另有遮挡问题（见下一条用例的注释），所以交接按 1080 走，到解析页后再切视口。
+ * 两种视口都从扫描结果页起步、在本视口里点「AI 简历识别」交接（390 的遮挡已修，见上面 390×844 那条）。
  */
 for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844 }]) {
   test(`resume scan top back leaves no parse entry so browser back never re-posts (${viewport.width}x${viewport.height}) @w2`, async ({ page, api }) => {
@@ -542,6 +652,7 @@ for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844
       await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'W2_LATE', message: 'late' } }) }).catch(() => undefined)
     })
 
+    await page.setViewportSize(viewport)
     await seedScanResult(page, resultState)
     await page.goto('/scan?stage=result')
     await expectPdfCompleted(binary)
@@ -549,7 +660,6 @@ for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844
     await page.waitForURL('**/resume/parse')
     await expect.poll(() => parseBodies.length).toBe(1)
     expect(parseBodies[0]).toMatchObject({ fileId: 'w2-scan-file', source: 'scan' })
-    await page.setViewportSize(viewport)
     const historyBefore = await page.evaluate(() => window.history.length)
 
     await page.getByRole('button', { name: '返回简历来源' }).click()
@@ -577,7 +687,7 @@ for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844
 
 test('resume scan-ready track title stays horizontal at 390x844 @w2', async ({ page, api }, testInfo) => {
   // 2026-09-23 实拍：390 下「换一种来源」把交接标题挤成两字一列（7 行竖排）。
-  // 交接链路按 1080 真走一遍（扫描工作台是 1080 舞台，不在本用例范围），回到来源页后再切 390 量。
+  // 交接链路全程在 390 下走：扫描结果页点「AI 简历识别」→ 解析页 → 返回来源页再量。
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
@@ -587,16 +697,16 @@ test('resume scan-ready track title stays horizontal at 390x844 @w2', async ({ p
     json: { success: false, error: { code: 'W2_STOP_AFTER_NAV', message: 'synthetic stop' } },
   })
 
+  await page.setViewportSize({ width: 390, height: 844 })
   await seedScanResult(page, resultState)
   await page.goto('/scan?stage=result')
   await expectPdfCompleted(binary)
+  await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
   await page.getByRole('button', { name: /AI 简历识别/ }).click()
   await page.waitForURL('**/resume/parse')
   await page.getByRole('button', { name: '返回简历来源' }).click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
   await expect(page.getByRole('region', { name: '扫描件交接' })).toBeVisible()
-  await page.setViewportSize({ width: 390, height: 844 })
-  await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
 
   const track = page.getByRole('region', { name: '扫描件交接' }).locator('.qx-rt-track')
   const title = track.getByText('扫描原件 · 由扫描工作台交接', { exact: true })
