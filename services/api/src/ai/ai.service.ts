@@ -29,6 +29,7 @@ import type { ResumeTemplateLayoutPreset } from '../job-materials/job-materials.
 import {
   ResumeExportGateService,
   hashResumeExportContent,
+  resumeExportStagingExpiresAt,
   type ResumeExportGateContext,
   type ResumeExportGateDecision,
   type ResumeExportPricingView,
@@ -677,9 +678,12 @@ export class AiService {
     return { mode: 'free', alreadyPaid: true, serviceRefId: '', benefitGrantId: null, endUserId: ctx.endUserId }
   }
 
-  /** 文件成功生成后落账。生成失败不得调用。 */
-  async commitExportRedemption(decision: ResumeExportGateDecision): Promise<void> {
-    if (this.exportGate) await this.exportGate.commitExportRedemption(decision)
+  /** 文件成功生成后落账。生成失败不得调用。首次收费要带上预写文件 id。 */
+  async commitExportRedemption(
+    decision: ResumeExportGateDecision,
+    stagedFileIds: readonly string[] = [],
+  ): Promise<void> {
+    if (this.exportGate) await this.exportGate.commitExportRedemption(decision, stagedFileIds)
   }
 
   /**
@@ -812,6 +816,9 @@ export class AiService {
     const safeName = (resume.basic.name || '求职者').replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '求职者'
     // 文件名也要诚实：草稿叫「AI简历_x」会在「我的文档」里冒充成 AI 产物。
     const namePrefix = draft ? '简历草稿（未经AI润色）' : 'AI简历'
+    const stage = decision.mode === 'charged' && !decision.alreadyPaid && endUserId
+      ? { endUserId, expiresAt: resumeExportStagingExpiresAt() }
+      : undefined
     const uploaded = await this.files.upload({
       buffer,
       filename: `${namePrefix}_${safeName}.${ext}`,
@@ -822,16 +829,13 @@ export class AiService {
       assetCategory: 'optimized',
       sourceFileId,
       createdBy: 'ai_resume_generate',
+      ...(stage ? { paidExportStaging: stage } : {}),
     })
 
-    // 打印链路只接受系统 HMAC content URL(signFileUrl),不接受 COS 下载 signedUrl
-    // (PrintJobsService.create 会拒绝非系统签名 URL,详见 files/signing.ts)。
-    let printFileUrl: string | undefined
-    if (format === 'pdf') {
-      printFileUrl = signFileUrl(uploaded.fileId).url
-    } else {
-      // Wave 6:docx/txt/md 额外渲染一份同内容纯净 PDF(不套用 templateId,透传 layout),
-      // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
+    // Wave 6:docx/txt/md 额外渲染一份同内容纯净 PDF(不套用 templateId,透传 layout),
+    // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
+    let printFileId = uploaded.fileId
+    if (format !== 'pdf') {
       const pdfRendered = await this.resumePdf.render(resume, { layout, draft })
       const pdfUploaded = await this.files.upload({
         buffer: pdfRendered.buffer,
@@ -843,27 +847,59 @@ export class AiService {
         assetCategory: 'optimized',
         sourceFileId,
         createdBy: 'ai_resume_generate',
+        ...(stage ? { paidExportStaging: stage } : {}),
       })
-      printFileUrl = signFileUrl(pdfUploaded.fileId).url
+      printFileId = pdfUploaded.fileId
     }
 
-    await this.commitExportRedemption(decision)
+    if (stage) {
+      await this.commitExportRedemption(decision, [uploaded.fileId, printFileId])
+    } else {
+      await this.commitExportRedemption(decision)
+    }
+
+    // 打印链路只接受系统 HMAC content URL(signFileUrl),不接受 COS 下载 signedUrl。
+    // 收费导出只在核销提交、文件变为 active 之后签发，避免未付款文件拿到可用链接。
+    const access = stage ? await this.files.signActiveDownload(uploaded.fileId) : uploaded
+    const printFileUrl = signFileUrl(printFileId).url
     if (charge?.taskId) {
-      await this.drafts.persistConfirmed({
+      await this.persistConfirmedExportBestEffort({
         taskId: charge.taskId,
         endUserId,
-        fileId: uploaded.fileId,
+        fileId: access.fileId,
         factsConfirmedAt: charge.factsConfirmedAt,
       })
     }
     return {
-      fileId: uploaded.fileId,
-      filename: uploaded.filename,
-      sizeBytes: uploaded.sizeBytes,
+      fileId: access.fileId,
+      filename: access.filename,
+      sizeBytes: access.sizeBytes,
       pageCount,
-      signedUrl: uploaded.signedUrl,
-      expiresAt: uploaded.signedUrlExpiresAt,
-      ...(printFileUrl ? { printFileUrl } : {}),
+      signedUrl: access.signedUrl,
+      expiresAt: access.signedUrlExpiresAt,
+      printFileUrl,
+    }
+  }
+
+  /**
+   * 草稿快照失败不能反向删除已经核销的文件。重试一次仍失败就留下文件，
+   * 调用方拿到访问地址；同内容再次导出不再扣次。
+   */
+  private async persistConfirmedExportBestEffort(input: {
+    taskId: string
+    endUserId: string | null
+    fileId: string
+    factsConfirmedAt?: string
+  }): Promise<void> {
+    try {
+      await this.drafts.persistConfirmed(input)
+    } catch {
+      try {
+        await this.drafts.persistConfirmed(input)
+      } catch (retryError) {
+        const errorType = retryError instanceof Error ? retryError.constructor.name : typeof retryError
+        this.logger.warn(`code=RESUME_EXPORT_DRAFT_PERSIST_FAILED errorType=${errorType}`)
+      }
     }
   }
 

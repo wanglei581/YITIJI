@@ -70,6 +70,12 @@ export class BenefitRedemptionService {
       // - 一产物一核销唯一约束命中（不同权益并发核销同一 serviceType+serviceRefId）：本 key 无记录
       //   → replay 落空且仍是唯一冲突 → 归一为 BENEFIT_OUTPUT_ALREADY_REDEEMED（事务已回滚扣减）。
       // - 其余（越权 / 类型 / 状态 / 有效期 / 额度校验拒绝）：透传原始错误。
+      // 收费导出把文件激活放进 withinTransaction。输家的事务会回滚这次激活；
+      // 若同一产物的核销其实已经提交，这里再激活一次，不二次扣次。
+      if (params.withinTransaction) {
+        const settled = await this.activateIfRedemptionCommitted(params)
+        if (settled) return settled
+      }
       const replay = await this.replayIfPresent(idempotencyKey, endUserId)
       if (replay) return replay
       if (isUniqueError(error)) {
@@ -301,6 +307,7 @@ export class BenefitRedemptionService {
         if (existing.endUserId !== endUserId) {
           throw new NotFoundException({ error: { code: 'BENEFIT_GRANT_NOT_FOUND', message: '权益不存在或不属于本人' } })
         }
+        if (params.withinTransaction) await params.withinTransaction(tx)
         const grant = await tx.benefitGrant.findUnique({ where: { id: benefitGrantId } })
         return { record: existing, grant, idempotent: true, decremented: false }
       }
@@ -371,6 +378,8 @@ export class BenefitRedemptionService {
         },
       })
 
+      if (params.withinTransaction) await params.withinTransaction(tx)
+
       return {
         record,
         grant: { quantityRemaining: remaining, status: finalStatus },
@@ -408,6 +417,45 @@ export class BenefitRedemptionService {
       quantityRemaining: outcome.grant?.quantityRemaining ?? null,
       status: outcome.grant?.status ?? 'active',
       idempotent: outcome.idempotent,
+    }
+  }
+
+  /**
+   * 同一服务产物的核销已经提交时，补跑 withinTransaction（不再扣次）。
+   * 用于并发输家：它自己的事务已回滚，但赢家的 RedemptionRecord 已在。
+   * 没有已提交核销时返回 null，调用方继续抛原来的错误。
+   */
+  private async activateIfRedemptionCommitted(params: RedeemBenefitParams): Promise<RedeemBenefitResult | null> {
+    if (!params.withinTransaction) return null
+    const paid = await this.prisma.redemptionRecord.findFirst({
+      where: {
+        serviceType: params.serviceType,
+        serviceRefId: params.serviceRefId,
+        endUserId: params.endUserId,
+      },
+    })
+    if (!paid) return null
+    const activated = await this.prisma.$transaction(async (tx) => {
+      const still = await tx.redemptionRecord.findFirst({
+        where: {
+          id: paid.id,
+          endUserId: params.endUserId,
+          serviceType: params.serviceType,
+          serviceRefId: params.serviceRefId,
+        },
+      })
+      if (!still) return false
+      await params.withinTransaction!(tx)
+      return true
+    })
+    if (!activated) return null
+    const grant = await this.prisma.benefitGrant.findUnique({ where: { id: paid.benefitRef } })
+    return {
+      redemptionRecordId: paid.id,
+      benefitGrantId: paid.benefitRef,
+      quantityRemaining: grant?.quantityRemaining ?? null,
+      status: grant?.status ?? 'active',
+      idempotent: true,
     }
   }
 
