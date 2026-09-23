@@ -1,5 +1,10 @@
 # 当前开发进度
 
+2026-09-23 **唯一集成候选 `c81a1930b`：求职材料库真实文件预览已合流并通过本地验收，商业仍 NO-GO。**
+Claude `opus` / `xhigh` 只修改现有 `JobMaterialLibraryPage`、材料页既有 CSS 和既有 W3 规格：真实生成文件才显示预览入口，点击后用当前会员 token 请求服务端返回的 `previewUrlPath`，短期 signed URL 只存内存并交给既有 `FilePreviewDialog`；演示态、缺 `fileId` 或缺预览路径不显示入口，预览失败只说预览失败，不冒充生成或上传失败。
+当前集成树实跑材料页 W3 3/3、kiosk typecheck、`graph:check`、`verify:repository-integrity` 和 `git diff --check` 均退出 0。W3 覆盖生成时不预取、Authorization token、预览成功、预览接口失败、原文错误不泄露、地址栏不变化和缺预览路径不发请求；删除真实文件闸、跳过 token 交换或透传原始错误的反向变异均退出 1。尚未在 390px 与 Windows Edge 实机确认 signed URL 的嵌入策略；稿 21 扫描结果的 `rs-pv-*` 工具条仍是另一项。
+本批未 push、未合并 `main`、未部署或操作真机。
+
 2026-09-23 **唯一集成候选：390px 顶栏状态胶囊已由 Claude 复核关闭，商业仍 NO-GO。**
 Claude `opus` / `xhigh` 在隔离 worktree 复核现有 `qingxu/shell.css` 与 W2/W3 断言后确认无需新增代码：390×844 下「扫描件已交接 · 待确认」最多两行，第二行不再出现单字，1080×1920 保持单行。删除现有 `word-break: keep-all` 与 `overflow-wrap: anywhere` 后对应 W2 退出码 1，恢复后退出码 0；W2/W3、kiosk typecheck 与 `git diff --check` 均退出 0。无新提交、无文件改动。
 本项仍有 360/375 宽度和 Windows Edge 字宽未验收；稿 21 来源异常态、整屏预览工具条、全站旧页面统一、Windows/Pantum、微信、最终 SHA CI、生产和商业验收仍未关闭。
