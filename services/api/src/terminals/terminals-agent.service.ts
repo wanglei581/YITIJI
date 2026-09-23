@@ -23,6 +23,7 @@ import { TERMINAL_CLAIM_INTERVAL_MS } from '../common/throttler/terminal-throttl
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
+import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
 import { PackageOrderFulfillmentService } from '../member-print-orders/package-order-fulfillment.service'
 import { ContractReportPrintLifecycleService } from '../files/contract-report-print-lifecycle.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
@@ -454,6 +455,16 @@ export class TerminalAgentService implements OnModuleInit {
             orderBy: { createdAt: 'asc' },
           })
           if (!task) return null
+
+          // 任务进入队列后文件可能被隔离、删除或过期；重签 URL 前再做一次状态闸门。
+          // 无 fileId 的历史任务保留旧兼容路径，现代业务任务全部带 fileId。
+          if (task.fileId) {
+            const file = await tx.fileObject.findUnique({
+              where: { id: task.fileId },
+              select: { status: true, deletedAt: true, expiresAt: true },
+            })
+            if (!isPrintableFileRecord(file)) return null
+          }
 
           // 订单必须存在（claimableWhere 已要求），并以 CAS 再确认一次仍是 paid+pending：
           // findFirst 与 updateMany 之间存在退款/关单的时间窗，只靠前置查询会漏。

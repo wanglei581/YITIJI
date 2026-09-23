@@ -746,8 +746,11 @@ export class PrintJobsService {
         })
       }
 
-      const liveFile = await tx.fileObject.findUnique({ where: { id: fileId }, select: { deletedAt: true } })
-      if (!liveFile || liveFile.deletedAt) {
+      const liveFile = await tx.fileObject.findUnique({
+        where: { id: fileId },
+        select: { status: true, deletedAt: true, expiresAt: true },
+      })
+      if (!isPrintableFileRecord(liveFile)) {
         throw new ConflictException({
           error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
         })

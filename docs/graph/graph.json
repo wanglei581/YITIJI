@@ -3585,6 +3585,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -3616,6 +3617,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -3669,6 +3671,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -3698,6 +3701,7 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -3727,6 +3731,7 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -3758,6 +3763,7 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -4874,6 +4880,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -4901,6 +4908,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -9469,6 +9477,7 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -10514,6 +10523,7 @@
         "method": "GET",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -10541,6 +10551,7 @@
         "method": "PUT",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -10568,6 +10579,7 @@
         "method": "GET",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -10645,6 +10657,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -10781,6 +10794,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -10843,6 +10857,7 @@
         "method": "GET",
         "models": [
           "AuditLog",
+          "FileObject",
           "Order",
           "OrderItem",
           "Organization",
@@ -15550,6 +15565,7 @@
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/print-sign/print-sign.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts",
           "services/api/src/upload-sessions/upload-sessions.service.ts"
         ]
       },

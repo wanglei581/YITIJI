@@ -1,5 +1,12 @@
 # 当前开发进度
 
+2026-09-23 **唯一集成候选：任务队列二次文件状态闸已补齐，本地商业仍 NO-GO。**
+针对 Grok 反证审查发现的队列履约缺口，现有材料包逐份派发、付费打印重试、管理员打印/扫描重试和 Windows Agent claim
+均在最后一次取任务或派发下一份之前复查 `FileObject.status=active`、未删除且未过期。不可打印文件不会被重新签发 URL、领取或派发后续任务；材料包回传在事务内拒绝并保持当前任务 `claimed`，历史无 `fileId` 任务保留兼容路径。
+新增验证覆盖“下一份文件过期时完成回传不得创建后续 PrintTask，且事务回滚”，材料包履约、材料包幂等和 HTTP 幂等均通过；API typecheck 与打印链路 service E2E 也通过，打印链路覆盖 uploading/quarantined/deleted/expired 拒绝、active 对照、claim、retry、支付报价和终态幂等。
+这只关闭一个后端防御缺口，不等于解决所有并发 TOCTOU；PostgreSQL 并发、真实 COS、Windows/Pantum、微信、最终 SHA CI、生产和商业验收仍未关闭。管理员打印/扫描验证的全新 SQLite 空库初始化本轮遇到 Prisma schema engine 环境错误，不能登记为通过。
+本批尚未 push、合并 `main`、部署或操作真机。
+
 2026-09-23 **唯一集成候选 `d88814280afff1deb1068f32b5397410b379975d`：390px 扫描结果页的 AI 简历识别入口已可真实触控，商业仍 NO-GO。**
 Claude `claude-opus-5-5` / `xhigh` 在当前候选上只修改现有扫描工作台 CSS 与 W2 浏览器规格，没有新增路由、依赖、后端或小程序文件。针对不缩放舞台的手机/窄桌面视口，扫描页改为整页自然滚动，横幅、正文和隐私底注保持完整；小屏多列出口改为单列，操作条允许换行，触控区域保留最小尺寸。1080×1920 规则仍在 `data-kiosk-stage-fit='off'` 范围外不生效。
 验证结果：kiosk typecheck、`verify:fusion-w2`、`verify:fusion-w6`、`verify:repository-integrity` 和 `git diff --check` 均退出 0；W2 Playwright 21/21 通过，其中新增用例在 390×844 以 `touchscreen.tap` 真实点击「AI 简历识别」并到达 `/resume/parse`，保留 `fileId=w2-scan-file`；1080×1920 原有扫描场景也全部通过。先前把 390px 用例放在不存在的 Playwright project 名下的命令退出 1，随后按配置实际项目运行完整 W2 并通过，该配置问题不属于产品断言失败。

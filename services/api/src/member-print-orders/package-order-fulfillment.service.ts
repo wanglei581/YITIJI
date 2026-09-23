@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { ConflictException } from '@nestjs/common'
 import { signFileUrl } from '../files/signing'
+import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
 
 const CLAIM_FILE_URL_TTL_MS = 30 * 60 * 1000
 
@@ -45,7 +46,13 @@ export class PackageOrderFulfillmentService {
       return
     }
 
-    const file = await tx.fileObject.findUnique({ where: { id: next.fileId }, select: { sha256: true } })
+    const file = await tx.fileObject.findUnique({
+      where: { id: next.fileId },
+      select: { sha256: true, status: true, deletedAt: true, expiresAt: true },
+    })
+    if (!isPrintableFileRecord(file)) {
+      throw new ConflictException({ error: { code: 'PACKAGE_FILE_UNAVAILABLE', message: '材料包下一份文件已不可打印' } })
+    }
     const nextTaskId = `ptask_package_${crypto.randomBytes(8).toString('hex')}`
     await tx.printTask.create({
       data: {
