@@ -1,5 +1,8 @@
 # 当前开发进度
 
+2026-09-23 **稿 21/队列修复冷审查：发现已支付不可用文件缺少运营告警，商业仍 NO-GO。**
+Grok session `d6e0a03a-e905-4937-ab57-af8e691c4b11` 复核确认：Agent claim 查询已能跳过已知不可用的现代 `FileObject`，但事务内二次读取仍存在 PostgreSQL TOCTOU 窗口，真实 COS 一致性也未证明。Agy session `c151c096-1ba3-4024-a8f2-326d264e7627` 进一步确认，`paid + pending` 且关联文件已过期、删除、隔离或非 active 的打印任务会被 claim 正常跳过，而当前派生告警只扫描 `failed`，因此可能对管理员隐形并长期悬挂。当前最小正确边界是增加只读派生告警并挂接既有 `AlertDisposition` 人工处置；在退款产品口径、财务审计和真实支付证据明确前，禁止自动退款或强制改写订单状态。以上均为源码/本地审查，不代表 PostgreSQL、COS、CI、设备或生产验收。本批未 push、未合并 `main`、未部署。
+
 2026-09-23 **稿 21 扫描结果整屏预览工具条已本地合流，商业仍 NO-GO。**
 Claude `opus` / `xhigh` 在隔离 worktree 只修改现有扫描结果页、`FileContentPreview`、扫描页 CSS 与 W2 规格；提交 `618643edd` 未新增路由、后端、重查合同、依赖或小程序文件。真实回执文件可在当前结果页打开整屏查看：PDF 使用同一签名 URL 的 `#page/view` 参数，图片按容器测量提供整页/铺满宽度，回执未给页数时翻页按钮保持不可用；关闭、Escape、焦点回归和背景 inert 均为内存态，工具条选择器为 `rs-pv-*`。390×844 的工具条保持在视口内并保留可触控尺寸。
 候选分支已实跑 `pnpm --filter @ai-job-print/kiosk typecheck`、预览 4 项定向 W2（4/4）、`test:browser:w2`（104/104）、`test:browser:w3`（43/43）、`verify:fusion-w2`、`verify:fusion-w3` 与 `git diff --check`，均退出 0；W2/W3 运行中的 Vite 代理报错只来自未启动真实 API，不影响这些浏览器夹具的断言。仍未做 Windows Edge/390 外宽度的实机确认，也未补来源异常态或真实后端交接重查合同；PostgreSQL/COS、最终 SHA CI、Windows/Pantum、微信、生产和商业验收仍未关闭。本批未 push、未合并 `main`、未部署或操作真机。

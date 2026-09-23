@@ -1,5 +1,15 @@
 # 下一步任务
 
+## 2026-09-23：支付成功但文件不可用的可见性与人工处置
+
+这是当前候选新增的 P1 运营风险，不得通过自动退款规避：
+
+1. **先固定合同：** `PrintTask.status=pending`、订单已支付、关联 `FileObject` 为 uploading/quarantined/deleted/expired 或缺失时，不能被 Agent claim，也不能签发下载 URL；必须进入管理员派生告警，明确文件状态、订单、任务和可执行处置，不泄露文件地址或原始异常。
+2. **最小实现边界：** 复用 `collectDerivedAlerts` 与既有 `AlertDisposition`，增加 `paid_pending_file_unavailable`（或等价稳定类型）的只读派生告警和验证；不新增退款服务、不自动取消订单、不自动扣回权益。人工处置的重试、补传、取消和退款口径由产品/财务确认后另行实现。
+3. **必须验证：** 覆盖 active 对照、过期/删除/隔离/上传中/缺失关联、重复告警稳定身份、消警/审计、不泄露 signed URL；随后补 PostgreSQL 并发竞态和真实 COS 删除/读取一致性。SQLite 本地绿测不能替代这些证据。
+
+Grok 已确认 claim 查询仍有匹配后文件状态变化的短暂 TOCTOU 窗口；Agy 已确认当前 `failed` 派生告警不会捕获上述 paid/pending 任务。此项完成前，不能声称打印支付链路达到生产或商业 GO。
+
 ## 2026-09-23：稿 21 整屏预览工具条后的证据边界
 
 `618643edd` 已把扫描结果 `rs-pv-*` 工具条合入候选：真实 PDF/图片预览、PDF 页码与适配方式、未知页数的诚实禁用、Escape/焦点/inert 和 390×844 触控布局均有本地证据；W2 104/104、W3 43/43、typecheck、`verify:fusion-w2`、`verify:fusion-w3` 和 diff check 均通过。下一步只补 360/375 与 Windows Edge 的嵌入兼容，以及来源异常态和真实后端重查合同；不得用浏览器夹具绿测替代 PostgreSQL/COS、最终 SHA CI、Windows/Pantum、微信、生产和商业证据。
