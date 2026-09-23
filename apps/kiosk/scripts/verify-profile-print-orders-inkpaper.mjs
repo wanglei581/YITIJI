@@ -92,22 +92,34 @@ const feedbackVerify = read('scripts/verify-profile-feedback-inkpaper.mjs')
 const resumesVerify = read('scripts/verify-profile-resumes-notifications-inkpaper.mjs')
 
 expectMatches(routes, /path:\s*'me\/print-orders'[\s\S]{0,80}?element:\s*<MyPrintOrdersPage\s*\/>/, '/me/print-orders 路由仍指向 MyPrintOrdersPage')
-expectIncludes(page, "import './me-detail-inkpaper.css'", 'MyPrintOrdersPage 引入明细页局部 CSS')
-expectIncludes(page, "useInkRipple('.me-inkdetail .me-ripple')", 'MyPrintOrdersPage 只在 .me-inkdetail 作用域启用涟漪')
-expectMatches(page, /className="me-inkdetail me-inkdetail-print-orders h-full"/, 'MyPrintOrdersPage 使用独立 me-inkdetail-print-orders 根作用域')
-expectIncludes(page, 'KIcon', 'MyPrintOrdersPage 复用 KIcon 图标系统')
-expectIncludes(page, 'className="me-tabbar"', '状态筛选复用 me-tabbar')
-expectIncludes(page, "'me-ripple me-tab'", '状态筛选按钮复用 me-tab + 涟漪')
-expectIncludes(page, 'className="me-detail-summary"', '打印订单页提供墨青纸感概览卡')
-expectIncludes(page, 'className="me-print-order-card"', '订单卡片使用 print-orders 独立卡片类')
+// 2026-09-23 稿 38-member-assets：本页从墨青纸感（MeListShell + me-detail-inkpaper）迁入青序流光。
+// 下面这组原来钉的是墨青纸感的**形状**（局部 CSS 导入、涟漪、根类名、KIcon、me-tab 类名），
+// 迁移后逐条换成青序壳的同位断言；API、支付字段、取件码、分页筛选、自动刷新、反馈跳转一条不删。
+// me-detail-inkpaper.css 聚合入口仍被 /me/settings 使用，封闭性断言保留。
+const qxCss = [
+  read('src/pages/profile/me/styles/member-records-qx.css'),
+  read('src/pages/profile/me/styles/qx-me-shared.css'),
+].join('\n')
+expectIncludes(page, "import './styles/member-records-qx.css'", 'MyPrintOrdersPage 引入青序记录页 CSS')
+expectMatches(page, /<QxMePage[\s\S]{0,120}?view="orders"/, 'MyPrintOrdersPage 使用青序会员壳的「打印订单」分域视图')
+expectAbsent(page, /MeListShell|me-detail-inkpaper|useInkRipple|me-inkdetail|KioskPageFrame/, 'MyPrintOrdersPage 已离开墨青纸感 / V6 旧壳')
+expectMatches(page, /live=\{false\}/, '打印订单每 5 秒自动同步，整页不挂 aria-live，避免读屏反复播报')
+expectIncludes(page, 'className="qx-me-tabbar"', '状态筛选复用青序 qx-me-tabbar')
+expectIncludes(page, 'className="qx-me-tab"', '状态筛选按钮复用青序 qx-me-tab')
+expectIncludes(page, '<QxMeSummary', '打印订单页提供青序概览卡')
+expectIncludes(page, 'data-server-slot="print-order"', '订单卡片声明为服务端回填的订单位')
 
-expectIncludes(css, '.me-inkdetail-print-orders .me-print-order-card', '明细页 CSS 提供打印订单卡片独立作用域样式')
-expectIncludes(css, '.me-inkdetail-print-orders .me-print-order-actions', '明细页 CSS 提供打印订单操作区样式')
-expectIncludes(css, '.me-inkdetail-print-orders .me-pickup-panel', '明细页 CSS 提供取件码面板样式')
+expectIncludes(qxCss, '.qx-me-asset-item', '青序 CSS 提供打印订单卡片样式')
+expectIncludes(qxCss, '.qx-me-acts', '青序 CSS 提供打印订单操作区样式')
+expectIncludes(qxCss, '.qx-me-assets .me-pickup-panel', '青序 CSS 提供取件码面板样式')
+expectIncludes(qxCss, '.qx-me-assets .me-payment-summary', '青序 CSS 提供订单详单样式')
+expectAbsent(qxCss, /#[0-9a-fA-F]{3,8}\b/, '青序打印订单页样式只用 var(--qx-*) 令牌，无裸 hex')
 expectAbsent(css, /\.kprofile|\.khome|\.kassistant|\.kcampus/, '打印订单页样式不污染其他墨青页面作用域')
 
 expectIncludes(page, 'getMyPrintOrders(getToken(), { pageSize: PAGE_SIZE })', '打印订单保留本人订单真实 API 首屏拉取')
-expectIncludes(page, "loginFrom=\"/me/print-orders\"", '打印订单保留登录回跳来源')
+// 登录回跳来源：青序壳底栏由 recordsCtabar 统一生成，loginFrom 是它的第 4 个位置参数。
+expectMatches(page, /recordsCtabar\(uiState, navigate, \(\) => setReloadKey\(\(k\) => k \+ 1\), '\/me\/print-orders',/, '打印订单保留登录回跳来源')
+expectIncludes(read('src/pages/profile/me/qx/QxMeChrome.tsx'), "navigate('/login', { state: { from: loginFrom } })", '青序会员底栏登录键带回跳来源')
 expectIncludes(page, 'setState(\'ready\')', '打印订单保留游客态 ready 空态/登录引导')
 expectIncludes(page, 'STATUS_FILTERS', '打印订单保留任务状态筛选')
 expectIncludes(page, 'aria-pressed={filterKey === f.key}', '任务状态筛选 chips 带 aria-pressed')
@@ -237,6 +249,21 @@ const allowedChanged = new Set([
   'services/api/src/payment/pending-refund-signal.ts',
   'services/api/src/print-jobs/admin-print-jobs-abandon.service.ts',
   'services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts',
+  // 稿 38-member-assets 迁移（2026-09-23）：文档 + 打印订单同批迁入青序流光。只加行，不改判定逻辑。
+  'apps/kiosk/src/layouts/KioskRoot.tsx',
+  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
+  'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',
+  'apps/kiosk/scripts/verify-job-material-library-ui.mjs',
+  'apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs',
+  'apps/kiosk/tests/visual/fusion-w5.spec.ts',
+  'apps/kiosk/tests/visual/account-assets-journey.spec.ts',
+  // 改了门禁与页面样式入口，按 CLAUDE.md §14 重跑 `pnpm graph` 的生成产物（不手改）。
+  'docs/graph/README.md',
+  'docs/graph/gates.md',
+  'docs/graph/graph.json',
+  'docs/graph/orphans.md',
+  'docs/graph/routes.md',
 ])
 
 // ⚠️ 设计问题，待产品负责人裁决（2026-09-06，序 13 撞上后记录，本次未擅自改动）

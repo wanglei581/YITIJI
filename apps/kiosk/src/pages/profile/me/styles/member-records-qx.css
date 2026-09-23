@@ -13,3 +13,226 @@
 .qx-me-detail-head .qx-me-row-ico { width: 70px; height: 70px; }
 .qx-me-detail-head h2 { margin: 0; font-size: 31px; font-weight: 800; line-height: 1.28; }
 .qx-me-detail-head p { margin: 6px 0 0; font-size: 18px; color: var(--qx-ink-3); }
+
+/* ── 稿 38-member-assets：我的文档 / 打印订单（/me/documents、/me/print-orders） ──
+   只在 .qx-me-assets（QxMePage 的 documents / orders 视图）里生效，令牌一律 var(--qx-*)。
+   详单、取件码、保存期限确认、转 PDF 这几个子组件保留原有类名钩子，这里只给它们青序皮肤，
+   组件本身不动 —— 支付与取件码的诚实性由 verify:member-print-orders-ui 钉在组件源码上。 */
+.qx-me-viewtabs[data-n='2'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.qx-me-tabbar[data-n='5'] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+.qx-me-assets {
+  /* RetentionConfirmOverlay 用 var(--ink) / var(--ink-2) 着色，换壳后映射到青序墨色。 */
+  --ink: var(--qx-ink);
+  --ink-2: var(--qx-ink-2);
+}
+.qx-me-assets .qx-me-list > .qx-me-asset-item { flex: none; }
+.qx-me-asset-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--qx-line);
+  border-radius: 22px;
+  background: var(--qx-paper);
+}
+.qx-me-asset-item[data-expired='true'] { background: var(--qx-muted-bg); border-color: var(--qx-muted-line); }
+.qx-me-asset-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.qx-me-assets .qx-me-row-title,
+.qx-me-assets .qx-me-row-sub { margin: 0; }
+.qx-me-assets .qx-me-row-sub { margin-top: 6px; }
+/* 长文件名整段折行，不截断、不把右侧操作挤出行外。 */
+.qx-me-asset-name { min-width: 0; overflow-wrap: anywhere; }
+.qx-me-assets .qx-me-row-head .qx-me-asset-name { flex: 1 1 240px; }
+.qx-me-assets .qx-me-chip { gap: 6px; }
+.qx-me-assets .qx-me-chip[data-tone='bad'] { background: var(--qx-cinnabar-soft); border-color: var(--qx-cinnabar-line); color: var(--qx-cinnabar); }
+.qx-me-assets .qx-me-chip[data-tone='warn'] { background: var(--qx-wheat-soft); border-color: transparent; color: var(--qx-wheat-d); }
+.qx-me-assets .qx-me-chip[data-tone='ok'] { background: var(--qx-teal-soft); border-color: var(--qx-teal-line); color: var(--qx-teal-d); }
+.qx-me-assets .qx-me-st[data-tone='off'] { background: var(--qx-muted-bg); color: var(--qx-muted-ink); }
+.qx-me-assets .qx-me-small:disabled {
+  background: var(--qx-muted-bg);
+  border-color: var(--qx-muted-line);
+  color: var(--qx-muted-ink);
+  cursor: not-allowed;
+}
+.qx-me-assets .qx-me-small[aria-pressed='true'],
+.qx-me-assets .qx-me-tab[aria-pressed='true'] {
+  background: var(--qx-teal-soft);
+  border-color: var(--qx-teal-line);
+  color: var(--qx-teal-d);
+}
+.qx-me-assets .qx-me-tab[aria-pressed='true'] i { background: var(--qx-surface); color: var(--qx-teal-d); }
+.qx-me-assets .qx-me-reason { margin: 0; }
+.qx-me-assets .qx-me-reason[data-tone='bad'] { color: var(--qx-cinnabar); }
+.qx-me-asset-options { display: flex; flex-wrap: wrap; gap: 9px; }
+.qx-me-asset-more { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.qx-me-asset-refresh { display: flex; align-items: center; gap: 12px; }
+.qx-me-asset-live { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--qx-teal); }
+
+/* 文档预览弹层：舞台被 KioskStageFit 缩放时 fixed 以舞台为包含块，铺满的是 1080×1920 舞台。 */
+.qx-me-asset-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--qx-deep) 55%, transparent);
+}
+.qx-me-asset-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(92%, 860px);
+  height: min(86%, 1100px);
+  overflow: hidden;
+  border-radius: 26px;
+  border: 1px solid var(--qx-line);
+  background: var(--qx-surface);
+}
+.qx-me-asset-dialog-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 84px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--qx-line);
+}
+.qx-me-asset-dialog-head h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 订单详单（OrderPaymentSummary）与取件码（PickupCodePanel） */
+.qx-me-assets .me-payment-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 18px;
+  background: var(--qx-surface);
+}
+.qx-me-assets .me-payment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+.qx-me-assets .me-payment-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--qx-line);
+  font-size: 17px;
+  color: var(--qx-ink-3);
+}
+.qx-me-assets .me-payment-row strong { color: var(--qx-ink); font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
+.qx-me-assets .me-payment-row em { display: block; font-style: normal; font-size: 15px; font-weight: 600; color: var(--qx-ink-3); }
+.qx-me-assets .me-payment-empty { margin: 0; font-size: 17px; font-weight: 750; color: var(--qx-ink-2); }
+.qx-me-assets .me-payment-empty span { display: block; margin-top: 4px; font-weight: 500; color: var(--qx-ink-3); }
+.qx-me-assets .me-note { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--qx-wheat-soft); color: var(--qx-wheat-d); font-size: 17px; line-height: 1.5; }
+.qx-me-assets .me-pickup-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid var(--qx-teal-line);
+  border-radius: 18px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+.qx-me-assets .me-pickup-panel p { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 750; }
+.qx-me-assets .me-pickup-panel p svg { width: 20px; height: 20px; }
+.qx-me-assets .me-pickup-panel strong { font-family: var(--qx-mono); font-size: 40px; letter-spacing: 6px; color: var(--qx-ink); overflow-wrap: anywhere; }
+.qx-me-assets .me-pickup-panel span { font-size: 16px; color: var(--qx-ink-2); }
+.qx-me-assets .me-print-document-action,
+.qx-me-assets .me-doc-action,
+.qx-me-assets .me-dialog-button {
+  min-height: 56px;
+  padding: 0 16px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 16px;
+  background: var(--qx-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 750;
+  color: var(--qx-ink);
+  cursor: pointer;
+}
+.qx-me-assets .me-print-document-action { align-self: flex-start; }
+.qx-me-assets .me-print-document-action svg { width: 19px; height: 19px; }
+.qx-me-assets .me-print-document-note { margin: 0; font-size: 16px; color: var(--qx-ink-3); }
+
+/* 转 PDF（DocumentConvertAction）与保存期限确认（RetentionConfirmOverlay） */
+.qx-me-assets .me-doc-action.is-disabled,
+.qx-me-assets .me-doc-action[aria-disabled='true'],
+.qx-me-assets .me-dialog-button.is-disabled {
+  background: var(--qx-muted-bg);
+  border-color: var(--qx-muted-line);
+  color: var(--qx-muted-ink);
+  cursor: not-allowed;
+}
+.qx-me-assets .me-row-title { margin: 0; font-size: 19px; font-weight: 800; overflow-wrap: anywhere; }
+.qx-me-assets .me-row-meta { margin: 0; font-size: 16px; line-height: 1.45; color: var(--qx-ink-3); }
+.qx-me-assets .me-retention-dialog {
+  width: min(92%, 640px);
+  padding: 32px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+}
+/* 组件自带 text-base / text-sm 是手机字号，27 寸竖屏上读不清，按青序正文字阶放大。 */
+.qx-me-assets .me-retention-dialog #retention-confirm-title { font-size: 26px; font-weight: 800; }
+.qx-me-assets .me-retention-dialog #retention-confirm-desc { margin-top: 12px; font-size: 19px; line-height: 1.6; }
+.qx-me-assets .me-dialog-button { flex: 1 1 0; }
+.qx-me-assets .me-dialog-button.primary { background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-paper); }
+
+/* 手机宽度：只作用于不缩放的舞台（同 shell.css 的限定）。一屏放不下「小青 + 分域 + 概览 + 列表 +
+   说明」，改成整页纵向滚动，列表不再自己滚；行内操作换到正文下面一整行，不挤压文件名。 */
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-me-assets) .qx-body { padding: 0 14px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-me-assets) .qx-ctabar { gap: 10px; padding: 12px 14px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-me-assets) .qx-ctabar .qx-btn { flex: 1 1 0; min-width: 0; min-height: 56px; padding: 0 12px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-me-assets) .qx-navbar { height: 76px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets { overflow-y: auto; gap: 12px; padding-top: 12px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets > * { flex-shrink: 0; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-list { flex: none; overflow: visible; padding: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-xq { padding: 16px 18px; border-radius: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-xq-row { gap: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-xq-face { width: 52px; height: 52px; font-size: 24px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-xq-eyebrow { font-size: 12px; letter-spacing: 3px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-xq-ask { font-size: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-xq-doing { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-vtab { min-height: 60px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-banner,
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-summary { flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-banner-t { font-size: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-banner-mini,
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-summary-mini { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 12px; text-align: left; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-guide { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-row,
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-asset-main { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-row-main { flex: 1 1 calc(100% - 74px); }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-acts { width: 100%; max-width: none; justify-content: flex-start; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-asset-item { padding: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-asset-main { gap: 12px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-asset-main > .qx-me-row-ico { width: 40px; height: 40px; border-radius: 12px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-asset-main > .qx-me-row-ico svg { width: 22px; height: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-asset-main .qx-me-row-main { flex-basis: calc(100% - 52px); }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-asset-name { font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .me-retention-dialog { padding: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .me-retention-dialog #retention-confirm-title { font-size: 21px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .me-retention-dialog #retention-confirm-desc { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-tabbar[data-n='5'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-kiosk-stage-fit='off'] .qx-me-assets .me-payment-grid { grid-template-columns: 1fr; }
+}

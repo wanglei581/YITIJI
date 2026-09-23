@@ -157,10 +157,10 @@ const assert = (condition, message) => { if (!condition) failures.push(message) 
     'src/pages/job-fairs/components/FairCompanyDetailSections.tsx',
     'src/pages/job-fairs/FairMaterialsPage.tsx',
     'src/pages/resume/JobMaterialLibraryPage.tsx',
-    // MyDocumentsPage.tsx 的同类缺陷（打印置灰原因只在 title 里）本批未修：
-    // 它归 verify:profile-documents-inkpaper 的批次范围守卫管辖，一旦本 PR 触碰该页，
-    // 那个守卫会要求本 PR 全部 20+ 文件进它的 allowlist —— 那等于把别人的守卫掏空。
-    // 已在 PR 正文登记为单独跟进（只改文档页那一个文件时才过得了它的范围检查）。
+    // MyDocumentsPage.tsx 的同类缺陷（打印置灰原因只在 title 里）当时未修，
+    // 2026-09-23 稿 38 青序迁移时一并修了：「该文件格式暂不支持打印」改为行内常显原因
+    // （aria-describedby 指向它），打印键不再带 title，于是这里纳入同一条判据。
+    'src/pages/profile/me/MyDocumentsPage.tsx',
   ]
   for (const f of noTitleReason) {
     assert(

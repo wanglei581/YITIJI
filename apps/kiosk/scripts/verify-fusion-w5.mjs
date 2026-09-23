@@ -253,8 +253,6 @@ for (const path of productionFiles) {
 
 const concretePages = [
   'src/pages/profile/ProfilePage.tsx',
-  'src/pages/profile/me/MyPrintOrdersPage.tsx',
-  'src/pages/profile/me/MyDocumentsPage.tsx',
   'src/pages/profile/me/MyBenefitsPage.tsx',
   'src/pages/profile/me/MyFeedbackPage.tsx',
   'src/pages/profile/me/MySettingsPage.tsx',
@@ -283,6 +281,10 @@ const qxMePages = [
   'src/pages/profile/me/MyActivityPage.tsx',
   'src/pages/profile/me/MyNotificationsPage.tsx',
   'src/pages/placeholders/MeActivityDetailPage.tsx',
+  // 稿 38-member-assets（2026-09-23）：文档与打印订单从旧 MeListShell 迁入青序记录壳。
+  // 上面 concretePages 只认 `fusion-w5|MeListShell` 字样，迁走后移到这里按青序壳断言。
+  'src/pages/profile/me/MyDocumentsPage.tsx',
+  'src/pages/profile/me/MyPrintOrdersPage.tsx',
 ]
 for (const path of qxMePages) {
   const source = read(path)
@@ -305,6 +307,21 @@ assert.match(kioskRootSrc, /['"]\/me\/favorites['"]/, '/me/favorites is register
 assert.match(kioskRootSrc, /['"]\/me\/ai-records['"]/, '/me/ai-records is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity['"]/, '/me/activity is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity\/['"]/, '/me/activity/:id uses a precise prefix')
+/* 文档与打印订单同属稿 38，是「文件资产 → 打印订单」这条跨端主链的两屏：
+ * 页面换成青序壳却漏登记，KioskLayout 会在青序页上再叠一层旧顶栏和底栏（两套 chrome 同屏）。
+ * 所以这里同时钉三件事：进了精确集合、页面不再挂旧壳、页面声明的分域视图就是这两张 Tab。 */
+const qxMigratedSet = kioskRootSrc.match(/const QX_MIGRATED_ROUTES = new Set<string>\(\[([\s\S]*?)\]\)/)?.[1] ?? ''
+for (const [route, file, view] of [
+  ['/me/documents', 'src/pages/profile/me/MyDocumentsPage.tsx', 'documents'],
+  ['/me/print-orders', 'src/pages/profile/me/MyPrintOrdersPage.tsx', 'orders'],
+]) {
+  assert.match(qxMigratedSet, new RegExp(`['"]${route.replace(/\//g, '\\/')}['"]`), `${route} is registered in QX_MIGRATED_ROUTES (exact set, not a prefix)`)
+  const source = read(file)
+  assert.doesNotMatch(source, /MeListShell|me-detail-inkpaper|useInkRipple|me-inkdetail/, `${file} has left the legacy InkPaper member shell`)
+  assert.match(source, new RegExp(`view="${view}"`), `${file} renders the ${view} asset view of the Qingxu member chrome`)
+}
+assert.match(qxMeChrome, /key: 'documents'[^\n]*to: '\/me\/documents'/, 'member chrome exposes the 我的文档 asset tab')
+assert.match(qxMeChrome, /key: 'orders'[^\n]*to: '\/me\/print-orders'/, 'member chrome exposes the 打印订单 asset tab')
 assert.doesNotMatch(kioskRootSrc, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/me\/['"]/, 'does not use a wide /me/ prefix')
 const profilePageQx = read('src/pages/profile/ProfilePage.tsx')
 const benefitsPageQx = read('src/pages/profile/me/MyBenefitsPage.tsx')

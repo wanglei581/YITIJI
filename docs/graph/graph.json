@@ -11771,7 +11771,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 555,
+      "reachableFileCount": 554,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -12959,12 +12959,12 @@
           ],
           "path": "/me/documents",
           "styles": [
-            "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-detail-base.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-orders.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-records.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css"
+            "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
+            "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13065,7 +13065,18 @@
         },
         {
           "component": "MyPrintOrdersPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
           "file": "apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx",
           "layout": [
             "KioskRoot",
@@ -13074,12 +13085,12 @@
           ],
           "path": "/me/print-orders",
           "styles": [
-            "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-detail-base.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-orders.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-records.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css"
+            "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
+            "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -16924,7 +16935,12 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/scripts/verify-job-material-library-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
@@ -17150,7 +17166,9 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
@@ -18023,10 +18041,12 @@
       "apps/kiosk/scripts/verify-file-retention-ui.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -18183,7 +18203,9 @@
     "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -18219,7 +18241,9 @@
     ],
     "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/styles/notifications-qx.css": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -18232,7 +18256,9 @@
     "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/profile/profile-inkpaper.css": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -19120,6 +19146,10 @@
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
+    "apps/kiosk/tests/visual/account-assets-journey.spec.ts": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
     "apps/kiosk/tests/visual/fixtures/fusion-w2-binary-route.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
@@ -19158,7 +19188,9 @@
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
     "apps/kiosk/tests/visual/fusion-w5.spec.ts": [
-      "apps/kiosk/scripts/verify-fusion-w6.mjs"
+      "apps/kiosk/scripts/verify-fusion-w6.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "apps/kiosk/tests/visual/fusion-w6-routes.spec.ts": [
       "apps/kiosk/scripts/verify-fusion-w6.mjs"
@@ -19794,8 +19826,26 @@
     "docs/device/windows-host-acceptance-runbook.md": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
     ],
+    "docs/graph/README.md": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "docs/graph/gates.md": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
     "docs/graph/graph.json": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "scripts/verify-repository-integrity.mjs"
+    ],
+    "docs/graph/orphans.md": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "docs/graph/routes.md": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "docs/operations/price-config-production.md": [
       "services/api/scripts/verify-print-rollout-config.ts"
@@ -25372,6 +25422,7 @@
           "apps/kiosk/src/pages/job-fairs/components/FairCompanyDetailSections.tsx",
           "apps/kiosk/src/pages/jobs/JobDetailPage.tsx",
           "apps/kiosk/src/pages/jobs/components/JobDetailSections.tsx",
+          "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
@@ -25385,7 +25436,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26403,6 +26454,7 @@
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
           "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
           "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
           "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -26419,6 +26471,7 @@
           "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
           "apps/kiosk/src/components/FileContentPreview.tsx",
           "apps/kiosk/src/components/FilePreviewDialog.tsx",
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx",
@@ -26439,6 +26492,9 @@
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json",
+          "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
+          "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
+          "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
@@ -26457,11 +26513,13 @@
           "apps/kiosk/src/services/files/usbImportApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/kiosk/src/services/print/printJobsApi.ts",
+          "apps/kiosk/tests/visual/account-assets-journey.spec.ts",
           "apps/kiosk/tests/visual/fixtures/fusion-w2-binary-route.ts",
           "apps/kiosk/tests/visual/fusion-self-assessment-flow.spec.ts",
           "apps/kiosk/tests/visual/fusion-w2-scan.spec.ts",
           "apps/kiosk/tests/visual/fusion-w2-tools.spec.ts",
           "apps/kiosk/tests/visual/fusion-w3.spec.ts",
+          "apps/kiosk/tests/visual/fusion-w5.spec.ts",
           "apps/miniapp/pages/documents/documents-helpers.js",
           "apps/miniapp/pages/documents/documents.js",
           "apps/miniapp/scripts/api-contract.json",
@@ -26476,6 +26534,11 @@
           "apps/terminal-agent/src/local-api/wire.ts",
           "docs/acceptance/member-print-orders-login-smoke.md",
           "docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md",
+          "docs/graph/README.md",
+          "docs/graph/gates.md",
+          "docs/graph/graph.json",
+          "docs/graph/orphans.md",
+          "docs/graph/routes.md",
           "docs/product/feature-scope.md",
           "docs/product/user-data-flow-matrix.md",
           "docs/progress/current-progress.md",
@@ -26716,6 +26779,8 @@
           "apps/admin/src/services/api/userErrorMessage.ts",
           "apps/kiosk/package.json",
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
           "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
           "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
           "apps/kiosk/scripts/verify-price-single-source.mjs",
@@ -26726,7 +26791,9 @@
           "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
           "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
+          "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
@@ -26734,11 +26801,21 @@
           "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
           "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
+          "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
+          "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
+          "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/api/offlineAgencies.ts",
           "apps/kiosk/tests/fixtures/fusion-w4-api.ts",
+          "apps/kiosk/tests/visual/account-assets-journey.spec.ts",
+          "apps/kiosk/tests/visual/fusion-w5.spec.ts",
           "docs/acceptance/member-print-orders-login-smoke.md",
           "docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md",
+          "docs/graph/README.md",
+          "docs/graph/gates.md",
+          "docs/graph/graph.json",
+          "docs/graph/orphans.md",
+          "docs/graph/routes.md",
           "docs/progress/current-progress.md",
           "docs/progress/next-tasks.md",
           "packages/shared/src/types/memberPrintOrders.ts",
@@ -36412,6 +36489,24 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/profile/me/MeListShell.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+          "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+          "docs/progress/current-progress.md",
+          "docs/reviews/branch-split-plan-2026-09-02.md",
+          "docs/reviews/launch-audit-2026-09-05.md",
+          "docs/reviews/page-audit-resume-profile-2026-09-02.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

@@ -87,18 +87,30 @@ const homeVerify = read('scripts/verify-profile-inkpaper-home.mjs')
 const feedbackVerify = read('scripts/verify-profile-feedback-inkpaper.mjs')
 const resumesVerify = read('scripts/verify-profile-resumes-notifications-inkpaper.mjs')
 
-expectIncludes(page, "import './me-detail-inkpaper.css'", 'MyDocumentsPage 引入明细页局部 CSS')
-expectIncludes(page, "useInkRipple('.me-inkdetail .me-ripple')", 'MyDocumentsPage 只在 .me-inkdetail 作用域启用涟漪')
-expectMatches(page, /className="me-inkdetail me-inkdetail-documents h-full"/, 'MyDocumentsPage 使用独立 me-inkdetail-documents 根作用域')
-expectIncludes(page, 'KIcon', 'MyDocumentsPage 复用 KIcon 图标系统')
-expectIncludes(css, '.me-inkdetail-documents .me-document-card', '明细页 CSS 提供文档卡片独立作用域样式')
-expectIncludes(css, '.me-inkdetail-documents .me-doc-actions', '明细页 CSS 提供文档操作区独立作用域样式')
-expectIncludes(css, '.me-retention-dialog', '明细页 CSS 提供保存期限确认弹层样式')
+// 2026-09-23 稿 38-member-assets：本页从墨青纸感（MeListShell + me-detail-inkpaper）迁入青序流光。
+// 下面四条原来钉的是墨青纸感的**形状**（局部 CSS 导入、涟漪作用域、根类名、KIcon），
+// 迁移后换成青序壳的同位断言；能力与诚实性断言（签名 URL、打印确认、删除、保存期限……）一条不删。
+// me-detail-inkpaper.css 聚合入口仍被 /me/settings 使用，封闭性断言保留。
+const qxCss = [
+  read('src/pages/profile/me/styles/member-records-qx.css'),
+  read('src/pages/profile/me/styles/qx-me-shared.css'),
+].join('\n')
+expectIncludes(page, "import './styles/member-records-qx.css'", 'MyDocumentsPage 引入青序记录页 CSS')
+expectMatches(page, /<QxMePage[\s\S]{0,120}?view="documents"/, 'MyDocumentsPage 使用青序会员壳的「我的文档」分域视图')
+expectAbsent(page, /MeListShell|me-detail-inkpaper|useInkRipple|me-inkdetail|KioskPageFrame/, 'MyDocumentsPage 已离开墨青纸感 / V6 旧壳')
+expectIncludes(qxCss, '.qx-me-asset-item', '青序 CSS 提供文档卡片样式')
+expectIncludes(qxCss, '.qx-me-acts', '青序 CSS 提供文档操作区样式')
+expectIncludes(qxCss, '.qx-me-assets .me-retention-dialog', '青序 CSS 提供保存期限确认弹层样式')
+expectIncludes(qxCss, '.qx-me-asset-overlay', '青序 CSS 提供文档预览弹层样式')
+expectAbsent(qxCss, /#[0-9a-fA-F]{3,8}\b/, '青序文档页样式只用 var(--qx-*) 令牌，无裸 hex')
 expectAbsent(css, /\.kprofile|\.khome|\.kassistant|\.kcampus/, '文档页样式不污染其他墨青页面作用域')
 
 expectMatches(routes, /path:\s*'me\/documents'[\s\S]{0,80}?element:\s*<MyDocumentsPage\s*\/>/, '路由仍指向 /me/documents -> MyDocumentsPage')
 expectIncludes(page, 'getMyDocuments(getToken(), { pageSize: 50 })', '我的文档保留本人文档真实 API 拉取')
-expectIncludes(page, "loginFrom=\"/me/documents\"", '我的文档保留登录回跳来源')
+// 登录回跳来源：青序壳的底栏由 recordsCtabar 统一生成，loginFrom 是它的第 4 个位置参数；
+// 钉住这个位置，再钉 recordsCtabar 确实把它作为 /login 的 from 传出去。
+expectMatches(page, /recordsCtabar\(uiState, navigate, \(\) => setReloadKey\(\(k\) => k \+ 1\), '\/me\/documents',/, '我的文档保留登录回跳来源')
+expectIncludes(read('src/pages/profile/me/qx/QxMeChrome.tsx'), "navigate('/login', { state: { from: loginFrom } })", '青序会员底栏登录键带回跳来源')
 expectIncludes(page, 'setItems([])', '我的文档保留游客态清空列表')
 expectIncludes(page, 'fetchAccessUrl(doc.previewUrlPath, token)', '我的文档查看/打印保留短期签名 URL 现取现用')
 expectMatches(page, /fetchAccessUrl\(doc\.previewUrlPath,\s*token\)[\s\S]{0,180}?setPreview\(\{\s*url:\s*res\.url/, '查看文档在当前隐私根内使用短期 URL')
@@ -211,6 +223,20 @@ const allowedChanged = new Set([
   'apps/miniapp/pages/documents/documents-helpers.js',
   'docs/reviews/result-layer-2026-09-06-packets.md',
   'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
+  // 稿 38-member-assets 迁移（2026-09-23）：文档 + 打印订单同批迁入青序流光。
+  // 只加行，不改判定逻辑；业务断言仍在本文件上方与各专属守卫里。
+  'apps/kiosk/src/layouts/KioskRoot.tsx',
+  'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
+  'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',
+  'apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs',
+  'apps/kiosk/tests/visual/fusion-w5.spec.ts',
+  'apps/kiosk/tests/visual/account-assets-journey.spec.ts',
+  // 改了门禁与页面样式入口，按 CLAUDE.md §14 重跑 `pnpm graph` 的生成产物（不手改）。
+  'docs/graph/README.md',
+  'docs/graph/gates.md',
+  'docs/graph/graph.json',
+  'docs/graph/orphans.md',
+  'docs/graph/routes.md',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx',
   'apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx',

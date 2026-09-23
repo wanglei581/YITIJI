@@ -3,6 +3,7 @@ import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW5PaginationRoute } from './fixtures/fusion-w5-pagination-route'
+import { registerPrintConfirm } from './fixtures/fair-workbench-api'
 
 const MEMBER_TOKEN = 'w5-browser-memory-token'
 const MEMBER_PHONE = '13800138000'
@@ -48,11 +49,14 @@ async function expectSharedPageShell(page: Page, title: string): Promise<void> {
   await expect(frame.getByRole('heading', { name: title, exact: true })).toBeVisible()
 }
 
-async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+async function loginThroughVisibleUi(page: Page, returnTo: string, options?: { checkLoginPage?: boolean }): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await expect(page.locator('[data-kiosk-presentation="fusion-youth"]')).toBeVisible()
-  await assertNoHorizontalOverflow(page)
-  await expectTouchTargets(page)
+  // 登录页自身的版面验收属于登录页的用例；390 宽的用例只借它登录，不替它背书也不被它拖红。
+  if (options?.checkLoginPage !== false) {
+    await assertNoHorizontalOverflow(page)
+    await expectTouchTargets(page)
+  }
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
   for (const digit of MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
@@ -901,6 +905,326 @@ test('AI record delete waits for the server and keeps the row on failure @w5-kio
   await expect(toast).toBeVisible()
   await expect(page.getByText('基于诊断生成的优化建议')).toBeVisible()
   await expect(page.getByText('记录已删除')).toHaveCount(0)
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+})
+
+// ───────────── 稿 38-member-assets：我的文档 / 打印订单（青序流光） ─────────────
+// 夹具只是合成的服务端响应，用来驱动页面的真实请求路径；不代表真实后端、COS 或设备。
+
+const LONG_DOC_NAME = '2026届秋招-应聘材料合集-个人简历与成绩单与获奖证书与实习证明-扫描合并版-最终确认稿-请勿外传.pdf'
+const FUTURE = '2099-03-01T00:00:00.000Z'
+
+function memberDocument(overrides: Record<string, unknown>): Record<string, unknown> {
+  const id = String(overrides.id)
+  return {
+    filename: `${id}.pdf`,
+    mimeType: 'application/pdf',
+    sizeBytes: 245_760,
+    purpose: 'print_doc',
+    sensitiveLevel: 'normal',
+    assetCategory: 'original',
+    retentionPolicy: 'months_3',
+    allowedRetentionPolicies: ['months_3', 'months_6', 'long_term'],
+    createdAt: '2026-09-01T08:00:00.000Z',
+    expiresAt: FUTURE,
+    downloadUrlPath: `/files/${id}/download-url`,
+    previewUrlPath: `/files/${id}/preview-url`,
+    ...overrides,
+  }
+}
+
+const MEMBER_DOCUMENTS = [
+  memberDocument({ id: 'doc-long', filename: LONG_DOC_NAME }),
+  memberDocument({ id: 'doc-photo', filename: '一寸证件照.png', mimeType: 'image/png', allowedRetentionPolicies: ['months_3'] }),
+  memberDocument({ id: 'doc-zip', filename: '作品集源文件.zip', mimeType: 'application/zip', allowedRetentionPolicies: ['months_3'] }),
+  memberDocument({ id: 'doc-expired', filename: '已过期的求职信.pdf', expiresAt: '2020-01-01T00:00:00.000Z' }),
+]
+
+function memberOrder(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    status: 'completed',
+    fileName: '个人简历.pdf',
+    createdAt: '2026-09-02T08:00:00.000Z',
+    completedAt: '2026-09-02T08:05:00.000Z',
+    copies: 1,
+    colorMode: 'black_white',
+    duplex: 'simplex',
+    paperSize: 'A4',
+    pageRange: null,
+    amountCents: null,
+    payStatus: null,
+    paymentSource: null,
+    billablePages: null,
+    billingPageSource: null,
+    pickupCode: null,
+    refundedAmountCents: null,
+    discountCents: null,
+    ...overrides,
+  }
+}
+
+const MEMBER_ORDERS = [
+  memberOrder({ id: 'order-queue', status: 'pending', completedAt: null, fileName: LONG_DOC_NAME, amountCents: 200, payStatus: 'unpaid', billablePages: 2, discountCents: 0, refundedAmountCents: 0 }),
+  memberOrder({ id: 'order-paid', amountCents: 300, payStatus: 'paid', paymentSource: 'offline', billablePages: 3, pickupCode: 'W5K7Q2', discountCents: 0, refundedAmountCents: 0 }),
+  memberOrder({ id: 'order-failed', status: 'failed', completedAt: null, fileName: '成绩单.pdf', amountCents: 100, payStatus: 'paid', paymentSource: 'offline', billablePages: 1, refundRequired: true, discountCents: 0, refundedAmountCents: 0 }),
+  memberOrder({ id: 'order-history', fileName: '历史打印.pdf' }),
+]
+
+function memberPage(items: unknown[], nextCursor: string | null = null, total = items.length): { status: number; json: unknown } {
+  return { status: 200, json: { success: true, data: { items, nextCursor, total } } }
+}
+
+/** 旧壳（KioskLayout 深藏青顶栏 + 底栏）不得叠在青序页上；QX 登记漏掉时这里第一个红。 */
+async function expectQxAssetsShell(page: Page, state: string, tab: 'documents' | 'orders'): Promise<void> {
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.getByTestId(`member-assets-state-${state}`)).toBeVisible()
+  await expect(page.locator('.ui-kiosk-topbar'), '青序页不得再挂旧顶栏').toHaveCount(0)
+  await expect(page.locator('.ui-kiosk-nav'), '青序页不得再挂旧底栏').toHaveCount(0)
+  await expect(page.locator('.me-inkdetail, [data-kiosk-component="page-frame"]'), '不得回落墨青纸感 / V6 页框').toHaveCount(0)
+  await expect(page.getByTestId(`member-assets-tab-${tab}`)).toHaveAttribute('aria-current', 'true')
+}
+
+/** 长文件名必须整段折行，不得压到右侧操作区上（同一行时右缘 ≤ 操作区左缘，换行后在它上方）。 */
+async function expectNameClearOfActions(row: ReturnType<Page['locator']>): Promise<void> {
+  const name = await row.locator('.qx-me-asset-name').boundingBox()
+  const acts = await row.locator('.qx-me-acts').boundingBox()
+  expect(name).not.toBeNull()
+  expect(acts).not.toBeNull()
+  const sameLine = name!.y < acts!.y + acts!.height && acts!.y < name!.y + name!.height
+  if (sameLine) expect(name!.x + name!.width, '文件名不得压到操作区上').toBeLessThanOrEqual(acts!.x + 1)
+  else expect(name!.y + name!.height, '换行后文件名在操作区上方').toBeLessThanOrEqual(acts!.y + 1)
+}
+
+async function assetShot(page: Page, name: string): Promise<void> {
+  await page.screenshot({ path: test.info().outputPath(`member-assets-${name}.png`) })
+}
+
+test('documents: signed-out gate on the Qingxu shell sends zero member API requests @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  await page.goto('/me/documents')
+  await expectQxAssetsShell(page, 'documents-login', 'documents')
+  await expect(page.getByRole('heading', { name: '登录后查看我的文档' })).toBeVisible()
+  await assetShot(page, 'documents-login')
+  await expect(page.getByTestId('member-records-primary')).toHaveText('手机号登录')
+  expect(api.requestCount('GET', '/api/v1/me/documents')).toBe(0)
+  await page.getByTestId('member-assets-tab-orders').click()
+  await expect(page).toHaveURL(/\/me\/print-orders$/)
+  await expectQxAssetsShell(page, 'orders-login', 'orders')
+  await expect(page.getByRole('heading', { name: '登录后查看打印订单' })).toBeVisible()
+  await assetShot(page, 'orders-login')
+  expect(api.requestCount('GET', '/api/v1/me/print-orders')).toBe(0)
+  await expectFusionAcceptance(page, errors)
+})
+
+test('documents: real preview, retention, delete and print calls run on the Qingxu shell @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  registerPrintConfirm(api)
+  api.respond('GET', '/api/v1/me/documents', memberPage(MEMBER_DOCUMENTS))
+  api.respond('GET', '/api/v1/files/doc-photo/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-photo', url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/%3E', expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  api.respond('PATCH', '/api/v1/files/doc-long/retention', {
+    status: 200,
+    json: { success: true, data: { file: { assetCategory: 'original', retentionPolicy: 'months_6', expiresAt: FUTURE }, allowedPolicies: ['months_3', 'months_6', 'long_term'] } },
+  })
+  api.respond('DELETE', '/api/v1/files/doc-zip', { status: 200, json: { success: true, data: { deleted: true } } })
+  api.respond('GET', '/api/v1/files/doc-long/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-long', url: '/api/v1/files/doc-long/content?sig=preview', printFileUrl: '/api/v1/files/doc-long/content?sig=print', expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  // 以下三条是 /print/confirm 落地时自己要读的（价目、本人权益、报价），与本页无关但 fail-closed 必须登记。
+  api.respond('GET', '/api/v1/print/price-config', {
+    status: 200,
+    json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] },
+  })
+  api.respond('GET', '/api/v1/me/benefits', { status: 200, json: { success: true, data: { items: [], total: 0 } } })
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 200,
+    json: { amountCents: 200, billablePages: 2, billingPageSource: 'detected', priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }] },
+  })
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  await expectQxAssetsShell(page, 'documents-ready', 'documents')
+  const rows = page.getByTestId('member-assets-document')
+  await expect(rows).toHaveCount(4)
+  await expect(page.getByText(LONG_DOC_NAME, { exact: true })).toBeVisible()
+  await expectNameClearOfActions(rows.filter({ hasText: LONG_DOC_NAME }))
+  // 置灰原因常显在行内（触屏没有 hover，title 读不到）。
+  await expect(page.getByText('该文件格式暂不支持打印', { exact: true })).toBeVisible()
+  await expect(rows.filter({ hasText: '已过期的求职信.pdf' }).getByRole('button', { name: '已到期' })).toBeDisabled()
+  await expect(rows.filter({ hasText: '作品集源文件.zip' }).getByRole('button', { name: '打印' })).toBeDisabled()
+  await assetShot(page, 'documents-ready')
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+
+  // 查看：凭本人 token 现换短期链接，在当前页内预览。
+  const previewRequest = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/v1/files/doc-photo/preview-url')
+  await rows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' }).click()
+  expect((await (await previewRequest).allHeaders()).authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
+  const dialog = page.getByRole('dialog', { name: '一寸证件照.png' })
+  await expect(dialog).toBeVisible()
+  await assetShot(page, 'documents-preview')
+  await assertTapTargetPointerHit(dialog.getByRole('button', { name: '关闭预览' }))
+  await dialog.getByRole('button', { name: '关闭预览' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  // 保存期限：6 个月要先同意，结果以服务端返回回填。
+  const longRow = rows.filter({ hasText: LONG_DOC_NAME })
+  await longRow.getByRole('button', { name: '修改保存期限' }).click()
+  await longRow.getByRole('button', { name: '保存 6 个月' }).click()
+  await assetShot(page, 'documents-retention-confirm')
+  await page.getByRole('button', { name: '同意并保存' }).click()
+  await expect(page.getByTestId('member-assets-toast')).toHaveText('保存期限已更新')
+  expect(api.requestCount('PATCH', '/api/v1/files/doc-long/retention')).toBe(1)
+  await expect(longRow.locator('.qx-me-chip')).toContainText('保存 6 个月')
+
+  // 删除：两步确认，服务端成功后才从列表移除。
+  const zipRow = rows.filter({ hasText: '作品集源文件.zip' })
+  await zipRow.getByRole('button', { name: '删除文档 作品集源文件.zip' }).click()
+  await zipRow.getByRole('button', { name: '再次点击确认删除文档 作品集源文件.zip' }).click()
+  await expect(page.getByText('作品集源文件.zip', { exact: true })).toHaveCount(0)
+  expect(api.requestCount('DELETE', '/api/v1/files/doc-zip')).toBe(1)
+
+  // 打印：换内部 printFileUrl 后进打印确认页，由确认页重新报价。
+  await longRow.getByRole('button', { name: '打印', exact: true }).click()
+  await page.waitForURL('**/print/confirm')
+  await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
+  expect(api.requestCount('GET', '/api/v1/files/doc-long/preview-url')).toBe(1)
+})
+
+test('documents and orders: error then empty come from the server, never a cached list @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/me/documents', { status: 503, json: { success: false, error: { code: 'W5_DOCS_DOWN', message: 'fixture unavailable' } } })
+  api.respond('GET', '/api/v1/me/print-orders', { status: 503, json: { success: false, error: { code: 'W5_ORDERS_DOWN', message: 'fixture unavailable' } } })
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  await expectQxAssetsShell(page, 'documents-error', 'documents')
+  await expect(page.getByRole('heading', { name: '文档这次没有加载出来' })).toBeVisible()
+  await assetShot(page, 'documents-error')
+  api.respond('GET', '/api/v1/me/documents', memberPage([]))
+  await page.getByRole('button', { name: '重新加载', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '还没有文档' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '文档资产概览' })).toContainText('0')
+  await expectFusionAcceptance(page, errors)
+
+  await page.getByTestId('member-assets-tab-orders').click()
+  await expectQxAssetsShell(page, 'orders-error', 'orders')
+  await expect(page.getByRole('heading', { name: '打印订单这次没有加载出来' })).toBeVisible()
+  api.respond('GET', '/api/v1/me/print-orders', memberPage([]))
+  await page.getByRole('button', { name: '重新加载', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '还没有打印订单' })).toBeVisible()
+  await assetShot(page, 'orders-empty')
+  await expect(page.getByRole('region', { name: '打印记录概览' })).toContainText('0')
+  await expectFusionAcceptance(page, errors)
+})
+
+test('orders: payment truth, pickup code, filters, detail, load-more and feedback stay server-driven @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const second = memberOrder({ id: 'order-cancelled', status: 'cancelled', completedAt: null, fileName: '第二页取消的订单.pdf' })
+  // 按游标应答，而不是按第几次请求：有进行中订单时页面每 5 秒会重拉首屏，
+  // 按次数应答会让轮询和「加载更多」抢同一个号。后注册的路由先匹配，这条压过 ApiRouter。
+  await page.route(/\/api\/v1\/me\/print-orders(?:\?.*)?$/, async (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get('cursor')
+    const body = cursor === 'cursor-page-2' ? memberPage([second], null, 5) : memberPage(MEMBER_ORDERS, 'cursor-page-2', 5)
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body.json) })
+  })
+  api.respond('GET', '/api/v1/me/feedback', memberPage([]))
+
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  await expectQxAssetsShell(page, 'orders-ready', 'orders')
+  const rows = page.getByTestId('member-assets-order')
+  await expect(rows).toHaveCount(4)
+  await expectNameClearOfActions(rows.filter({ hasText: LONG_DOC_NAME }))
+  await expect(rows.filter({ hasText: '历史打印.pdf' })).toContainText('暂无支付信息')
+  await expect(rows.filter({ hasText: '成绩单.pdf' })).toContainText('待退款')
+  // 取件码提示只跟着服务端 pickupCode 走：四单里只有一单带码。
+  await expect(page.locator('.qx-me-chip', { hasText: '取件码' })).toHaveCount(1)
+  await expect(page.getByText('进行中任务每 5 秒自动更新')).toBeVisible()
+  await assetShot(page, 'orders-ready')
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+
+  const failedFilter = page.getByRole('button', { name: /^失败/ })
+  await failedFilter.click()
+  await expect(failedFilter).toHaveAttribute('aria-pressed', 'true')
+  await expect(rows).toHaveCount(1)
+  await page.getByRole('button', { name: /^全部/ }).click()
+
+  const paidRow = rows.filter({ hasText: '个人简历.pdf' }).first()
+  await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
+  await expect(paidRow.getByText('W5K7Q2', { exact: true })).toBeVisible()
+  await expect(paidRow.getByText('下单金额')).toBeVisible()
+  await expect(paidRow.getByRole('button', { name: '去我的文档再打印' })).toBeVisible()
+  await assetShot(page, 'orders-detail')
+
+  await page.getByRole('button', { name: /加载更多（已加载 4 \/ 共 5 条）/ }).click()
+  await expect(page.getByText('第二页取消的订单.pdf', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /加载更多/ })).toHaveCount(0)
+
+  const feedbackLoaded = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/v1/me/feedback')
+  await rows.filter({ hasText: '成绩单.pdf' }).getByRole('button', { name: '反馈打印订单 成绩单.pdf' }).click()
+  await expect(page).toHaveURL(/\/me\/feedback\?category=print&relatedPrintTaskId=order-failed$/)
+  await feedbackLoaded
+})
+
+test('documents and orders stay operable at 390x844 without overlap @w5-mobile', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/me/documents', memberPage(MEMBER_DOCUMENTS))
+  api.respond('GET', '/api/v1/me/print-orders', memberPage(MEMBER_ORDERS))
+  api.respond('GET', '/api/v1/files/doc-photo/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-photo', url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/%3E', expiresAt: FUTURE, disposition: 'inline' } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/documents', { checkLoginPage: false })
+  await expectQxAssetsShell(page, 'documents-ready', 'documents')
+  const docRows = page.getByTestId('member-assets-document')
+  await expect(docRows).toHaveCount(4)
+  await assetShot(page, 'mobile-documents-ready')
+  for (let index = 0; index < 4; index += 1) {
+    await docRows.nth(index).scrollIntoViewIfNeeded()
+    await expectNameClearOfActions(docRows.nth(index))
+  }
+  const view = docRows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' })
+  await view.scrollIntoViewIfNeeded()
+  await assertTapTargetPointerHit(view)
+  await view.click()
+  const dialog = page.getByRole('dialog', { name: '一寸证件照.png' })
+  await expect(dialog).toBeVisible()
+  await assetShot(page, 'mobile-documents-preview')
+  const dialogBox = await dialog.boundingBox()
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(0)
+  expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(390)
+  await dialog.getByRole('button', { name: '关闭预览' }).click()
+  await assertTapTargetPointerHit(page.getByTestId('member-records-primary'))
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+
+  await page.getByTestId('member-assets-tab-orders').click()
+  await expectQxAssetsShell(page, 'orders-ready', 'orders')
+  const orderRows = page.getByTestId('member-assets-order')
+  await expect(orderRows).toHaveCount(4)
+  for (let index = 0; index < 4; index += 1) {
+    await orderRows.nth(index).scrollIntoViewIfNeeded()
+    await expectNameClearOfActions(orderRows.nth(index))
+  }
+  const detail = orderRows.filter({ hasText: '个人简历.pdf' }).first().getByRole('button', { name: '查看订单详单 个人简历.pdf' })
+  await detail.scrollIntoViewIfNeeded()
+  await assertTapTargetPointerHit(detail)
+  await detail.click()
+  await expect(page.getByText('W5K7Q2', { exact: true })).toBeVisible()
+  await assetShot(page, 'mobile-orders-detail')
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
 })

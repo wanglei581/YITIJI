@@ -151,7 +151,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/job-fairs',
   '/job-fairs/checkin',
   // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀 —— 尚未迁移的
-  // `/me/documents` `/me/settings` 等兄弟路由会被误命中掉进空壳。
+  // `/me/settings` 等兄弟路由会被误命中掉进空壳。
   '/profile',
   '/me/benefits',
   '/me/feedback',
@@ -167,6 +167,10 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/me/favorites',
   '/me/ai-records',
   '/me/activity',
+  /* 稿 38-member-assets（我的文档 / 打印订单），2026-09-23 迁入。两条同一张稿、互为分域 Tab：
+   * 只迁一条会让「文件资产 → 打印订单」这条跨端主链在两屏之间新旧交替。 */
+  '/me/documents',
+  '/me/print-orders',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
