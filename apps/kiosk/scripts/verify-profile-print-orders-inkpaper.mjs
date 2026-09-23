@@ -76,7 +76,7 @@ expectMatches(routes, /path:\s*'me\/print-orders'[\s\S]{0,80}?element:\s*<MyPrin
 // 2026-09-23 稿 38-member-assets：本页从墨青纸感（MeListShell + me-detail-inkpaper）迁入青序流光。
 // 下面这组原来钉的是墨青纸感的**形状**（局部 CSS 导入、涟漪、根类名、KIcon、me-tab 类名），
 // 迁移后逐条换成青序壳的同位断言；API、支付字段、取件码、分页筛选、自动刷新、反馈跳转一条不删。
-// me-detail-inkpaper.css 聚合入口仍被 /me/settings 使用，封闭性断言保留。
+// me-detail-inkpaper.css 聚合入口：2026-09-23 /me/settings 也迁入青序后已无 src 引用；文件未删，封闭性断言保留。
 const qxCss = [
   read('src/pages/profile/me/styles/member-records-qx.css'),
   read('src/pages/profile/me/styles/qx-me-shared.css'),

@@ -82,7 +82,7 @@ flowchart LR
 | `/me/print-orders` | MyPrintOrdersPage | `apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx` | 10 | 6 |
 | `/me/privacy-requests` | MyPrivacyRequestsPage | `apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx` | 10 | 5 |
 | `/me/resumes` | MyResumesPage | `apps/kiosk/src/pages/profile/me/MyResumesPage.tsx` | 10 | 6 |
-| `/me/settings` | MySettingsPage | `apps/kiosk/src/pages/profile/me/MySettingsPage.tsx` | 18 | 6 |
+| `/me/settings` | MySettingsPage | `apps/kiosk/src/pages/profile/me/MySettingsPage.tsx` | 18 | 5 |
 | `/member/qr-login` | MobileQrLoginPage | `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx` | 0 | 1 |
 | `/print-scan` | PrintScanHomePage | `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | 10 | 6 |
 | `/print-scan/convert` | ConvertImagesPage | `apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx` | 10 | 5 |

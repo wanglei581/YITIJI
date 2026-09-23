@@ -150,8 +150,8 @@ const QX_MIGRATED_ROUTES = new Set<string>([
    * 那会顺手放行未来新增、还没迁的兄弟路由，verify:fusion-w4 也明令禁止该前缀。 */
   '/job-fairs',
   '/job-fairs/checkin',
-  // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀 —— 尚未迁移的
-  // `/me/settings` 等兄弟路由会被误命中掉进空壳。
+  // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀 —— 以后 `/me/` 下新增、
+  // 还没迁的兄弟路由会被误命中掉进空壳。
   '/profile',
   '/me/benefits',
   '/me/feedback',
@@ -171,6 +171,9 @@ const QX_MIGRATED_ROUTES = new Set<string>([
    * 只迁一条会让「文件资产 → 打印订单」这条跨端主链在两屏之间新旧交替。 */
   '/me/documents',
   '/me/print-orders',
+  /* 稿 30-my-profile ?screen=settings（账号设置），2026-09-23 迁入 QxMePage 的 settings 视图。
+   * 它是「我的」下最后一个还挂墨青纸感 KioskPageFrame 的页；漏登记会让旧顶栏叠在青序页上。 */
+  '/me/settings',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',

@@ -11771,7 +11771,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 554,
+      "reachableFileCount": 548,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13185,12 +13185,11 @@
           ],
           "path": "/me/settings",
           "styles": [
-            "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-detail-base.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-orders.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-records.css",
-            "apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css"
+            "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -35963,6 +35962,124 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+          "apps/kiosk/scripts/verify-profile-activity-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+          "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
+          "docs/progress/current-progress.md",
+          "docs/reviews/branch-split-plan-2026-09-02.md",
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md",
+          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
+          "docs/superpowers/plans/2026-07-16-user-center-wave1-ops-ui.md",
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
+          "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-activity-inkpaper.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+          "apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+          "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/profile/me/styles/me-detail-base.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+          "apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+          "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+          "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
+          "apps/kiosk/src/pages/profile/me/styles/me-orders.css",
+          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/profile/me/styles/me-orders.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+          "apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+          "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/profile/me/styles/me-records.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+          "apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+          "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+          "apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+          "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+          "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

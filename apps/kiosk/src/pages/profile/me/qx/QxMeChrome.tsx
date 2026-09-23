@@ -21,6 +21,7 @@ export type QxMeView =
   | 'activity-detail'
   | 'documents'
   | 'orders'
+  | 'settings'
 
 export type QxMeStatusTone = 'ok' | 'warn' | 'bad' | 'unknown'
 
@@ -65,7 +66,7 @@ export function QxMePage({
 }: {
   title: string
   view: QxMeView
-  screen: 'member-list' | 'activity-detail'
+  screen: 'member-list' | 'activity-detail' | 'member-settings'
   screenState: string
   eyebrow: string
   ask: ReactNode
@@ -82,8 +83,15 @@ export function QxMePage({
   const status = qxStatusFromDevice(device)
   const terminalLabel = getTerminalCode() || '设备未绑定'
   const isAssetView = view === 'documents' || view === 'orders'
-  const tabs = isAssetView ? ASSET_VIEWS : view === 'notifications' ? [] : RECORD_VIEWS
-  const testScope = view === 'notifications' ? 'notifications' : isAssetView ? 'member-assets' : 'member-records'
+  /* 账号设置（稿 30 ?screen=settings）不是记录分类，也不属本人资产分域：不挂分类 Tab。 */
+  const isSettingsView = view === 'settings'
+  const tabs = isAssetView ? ASSET_VIEWS : view === 'notifications' || isSettingsView ? [] : RECORD_VIEWS
+  const testScope = view === 'notifications'
+    ? 'notifications'
+    : isSettingsView
+      ? 'member-settings'
+      : isAssetView ? 'member-assets' : 'member-records'
+  const pageClass = isAssetView ? 'qx-me-page qx-me-assets' : isSettingsView ? 'qx-me-page qx-me-settings' : 'qx-me-page'
 
   return (
     <QxPageFrame
@@ -101,7 +109,7 @@ export function QxMePage({
       }
     >
       <div
-        className={isAssetView ? 'qx-me-page qx-me-assets' : 'qx-me-page'}
+        className={pageClass}
         data-kiosk-domain="profile"
         data-kiosk-screen={screen}
         data-state={screenState}

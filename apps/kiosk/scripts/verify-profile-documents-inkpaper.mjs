@@ -72,7 +72,7 @@ const resumesVerify = read('scripts/verify-profile-resumes-notifications-inkpape
 // 2026-09-23 稿 38-member-assets：本页从墨青纸感（MeListShell + me-detail-inkpaper）迁入青序流光。
 // 下面四条原来钉的是墨青纸感的**形状**（局部 CSS 导入、涟漪作用域、根类名、KIcon），
 // 迁移后换成青序壳的同位断言；能力与诚实性断言（签名 URL、打印确认、删除、保存期限……）一条不删。
-// me-detail-inkpaper.css 聚合入口仍被 /me/settings 使用，封闭性断言保留。
+// me-detail-inkpaper.css 聚合入口：2026-09-23 /me/settings 也迁入青序后已无 src 引用；文件未删，封闭性断言保留。
 const qxCss = [
   read('src/pages/profile/me/styles/member-records-qx.css'),
   read('src/pages/profile/me/styles/qx-me-shared.css'),

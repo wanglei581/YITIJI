@@ -311,17 +311,16 @@ for (const [route, element] of [
 expectIncludes(favoritesPage, "import './styles/member-records-qx.css'", 'MyFavoritesPage 引入青序记录页 CSS')
 expectIncludes(favoritesPage, 'QxMePage', 'MyFavoritesPage 使用青序记录壳')
 expectAbsent(favoritesPage, /KioskPageFrame/, 'MyFavoritesPage 已离开 V6 KioskPageFrame')
-// 这张表列的是「还留在墨青明细设计上的页」，不是能力清单：页一旦迁进青序流光就
-// 必须移出，否则等于断言它不许迁。MyBenefitsPage（#931）与 MyFavoritesPage（#934）
-// 都已迁走，各自的青序断言在下方 311-313 / 324-326 行，覆盖没有减少。
-for (const [label, source] of [
-  ['MySettingsPage', settingsPage],
-]) {
-  expectIncludes(source, "import './me-detail-inkpaper.css'", `${label} 引入明细页局部 CSS`)
-  expectIncludes(source, "useInkRipple('.me-inkdetail", `${label} 只在 .me-inkdetail 作用域启用涟漪`)
-  expectClassTokens(source, ['me-inkdetail'], `${label} 使用 .me-inkdetail 根作用域`)
-  expectIncludes(source, 'KIcon', `${label} 复用 KIcon 图标系统`)
-}
+// 这里原来有一张「还留在墨青明细设计上的页」表（局部 CSS、涟漪作用域、根类名、KIcon），
+// 不是能力清单：页一旦迁进青序流光就必须移出，否则等于断言它不许迁。MyBenefitsPage（#931）、
+// MyFavoritesPage（#934）先后迁走；2026-09-23 最后一页 MySettingsPage 也迁入青序会员壳
+// 的 settings 视图，表空了，换成下面的同位青序断言。能力断言（授权查询/撤回、登录、会话说明、
+// 退出、未开放说明）在本文件下方一条不删。
+expectIncludes(settingsPage, "from './qx/QxMeChrome'", 'MySettingsPage 复用青序会员共享壳')
+expectMatches(settingsPage, /<QxMePage[\s\S]{0,120}?view="settings"/, 'MySettingsPage 使用青序会员壳的「账号设置」视图')
+expectAbsent(settingsPage, /KioskPageFrame|me-detail-inkpaper|useInkRipple|me-inkdetail/, 'MySettingsPage 已离开墨青纸感 / V6 旧壳')
+expectIncludes(settingsPage, "navigate('/login', { state: { from: '/me/settings' } })", '账号设置保留登录回跳 /me/settings')
+expectIncludes(settingsPage, "error: { text: '本次未取到'", '账号设置授权读取失败显示「本次未取到」，不猜成未授权')
 expectIncludes(benefitsPage, "import './styles/benefits-qx.css'", 'MyBenefitsPage 引入青序局部 CSS')
 expectIncludes(benefitsPage, 'QxPageFrame', 'MyBenefitsPage 使用青序页框')
 expectAbsent(benefitsPage, /KioskPageFrame/, 'MyBenefitsPage has left the V6 frame')

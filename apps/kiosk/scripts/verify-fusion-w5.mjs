@@ -255,7 +255,6 @@ const concretePages = [
   'src/pages/profile/ProfilePage.tsx',
   'src/pages/profile/me/MyBenefitsPage.tsx',
   'src/pages/profile/me/MyFeedbackPage.tsx',
-  'src/pages/profile/me/MySettingsPage.tsx',
   'src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'src/pages/auth/LoginPage.tsx',
   'src/pages/auth/MobileQrLoginPage.tsx',
@@ -285,6 +284,8 @@ const qxMePages = [
   // 上面 concretePages 只认 `fusion-w5|MeListShell` 字样，迁走后移到这里按青序壳断言。
   'src/pages/profile/me/MyDocumentsPage.tsx',
   'src/pages/profile/me/MyPrintOrdersPage.tsx',
+  // 稿 30 ?screen=settings（2026-09-23）：账号设置从墨青纸感 KioskPageFrame 迁入青序会员壳的 settings 视图。
+  'src/pages/profile/me/MySettingsPage.tsx',
 ]
 for (const path of qxMePages) {
   const source = read(path)
@@ -314,6 +315,7 @@ const qxMigratedSet = kioskRootSrc.match(/const QX_MIGRATED_ROUTES = new Set<str
 for (const [route, file, view] of [
   ['/me/documents', 'src/pages/profile/me/MyDocumentsPage.tsx', 'documents'],
   ['/me/print-orders', 'src/pages/profile/me/MyPrintOrdersPage.tsx', 'orders'],
+  ['/me/settings', 'src/pages/profile/me/MySettingsPage.tsx', 'settings'],
 ]) {
   assert.match(qxMigratedSet, new RegExp(`['"]${route.replace(/\//g, '\\/')}['"]`), `${route} is registered in QX_MIGRATED_ROUTES (exact set, not a prefix)`)
   const source = read(file)
@@ -322,6 +324,13 @@ for (const [route, file, view] of [
 }
 assert.match(qxMeChrome, /key: 'documents'[^\n]*to: '\/me\/documents'/, 'member chrome exposes the 我的文档 asset tab')
 assert.match(qxMeChrome, /key: 'orders'[^\n]*to: '\/me\/print-orders'/, 'member chrome exposes the 打印订单 asset tab')
+/* 账号设置迁入同一青序会员壳：视图要在共享壳里声明、测试作用域独立，且不挂记录分类 Tab
+ * （设置不是记录，也不是资产分域）。页面自身仍须保留 member-settings 屏标，visual 用例与 W6 路由扫描都按它定位。 */
+assert.match(qxMeChrome, /\| 'settings'/, 'member chrome declares the settings view')
+assert.match(qxMeChrome, /'member-settings'/, 'member chrome exposes the member-settings screen and test scope')
+assert.match(qxMeChrome, /view === 'notifications' \|\| isSettingsView \? \[\]/, 'settings view renders no record-category tabs')
+const settingsPageQx = read('src/pages/profile/me/MySettingsPage.tsx')
+assert.match(settingsPageQx, /screen="member-settings"/, 'MySettingsPage keeps the member-settings screen marker on the Qingxu chrome')
 assert.doesNotMatch(kioskRootSrc, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/me\/['"]/, 'does not use a wide /me/ prefix')
 const profilePageQx = read('src/pages/profile/ProfilePage.tsx')
 const benefitsPageQx = read('src/pages/profile/me/MyBenefitsPage.tsx')
