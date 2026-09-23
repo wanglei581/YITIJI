@@ -2,9 +2,9 @@
 
 ## 2026-09-23：队列履约文件状态闸已补齐后的收口顺序
 
-1. **先做候选验证：** `verify:admin-print-scan` 已在已同步 schema 的隔离 SQLite 库、虚构测试密钥下全量通过；仍需由 Grok 对本批 5 个后端文件做只读反证，重点检查 claim、retry 和材料包事务是否误拒合法 active 文件。此前新建空库的 schema engine 初始化失败仅属于验证环境问题，不能替代业务证据。
+1. **先做候选验证：** `verify:admin-print-scan` 已在已同步 schema 的隔离 SQLite 库、虚构测试密钥下全量通过；仍需由 Grok 对本批 5 个后端文件做只读反证，重点检查 claim、retry 和材料包事务是否误拒合法 active 文件。此前新建空库的 schema engine 初始化失败仅属于验证环境问题，不能替代业务证据。Claude 已复核 390px 顶栏胶囊，现有修复和反向变异均通过，不再重复施工。
 2. **保留剩余后端风险：** 当前状态闸仍不是 PostgreSQL 并发锁或对象存储最终一致性证明；需要单独验证状态变化与签名/读取之间的竞态，不得用 SQLite 绿测替代。
-3. **前端继续按 Claude 单写者推进：** 只处理稿 21 剩余来源异常态、整屏预览工具条、390px 顶栏胶囊折行和真实后端交接；不重做已合流的扫描、简历来源、解析、材料库和五个服务台。
+3. **前端继续按 Claude 单写者推进：** 只处理稿 21 剩余来源异常态、整屏预览工具条和真实后端交接；390px 顶栏胶囊已复核关闭，不重做已合流的扫描、简历来源、解析、材料库和五个服务台。
 4. **之后再做发布链：** 唯一候选完整 CI、PostgreSQL readiness、Windows 签名与 Pantum/ADF 真机、小程序 DevTools/Trial（目前只有一个受控账号）、生产 COS/备份/回滚、真实支付退款对账、内容授权与 UAT。
 
 本批没有新增入口、页面、模型或临时脚本；若后续清理旧代码，必须先证明无路由/import/测试/部署依赖，并在本文件记录删除证据。
@@ -43,7 +43,7 @@
 - `parse-rechecking` 与 `upload-rechecking` 没有后端再查合同，需要先定合同再做页面。
 - 来源页的 `upload-unknown`，以及 `scan-expired`、`scan-failed`、`scan-unavailable` 三态还没单列。
 - 整屏预览查看器工具条（`rs-pv-*`）还没做。
-- 390 下顶栏胶囊折行后第二行只剩一个字。
+- 390 下顶栏胶囊已由现有 `keep-all`/`overflow-wrap` 修复并经 W2/W3 反向变异确认；仍需在 360/375 和 Windows Edge 做兼容验收。
 - 390 下 `/scan?stage=result` 的「AI 简历识别」点击被 `.sw-xq` / `.sw-truth` 层拦截，属扫描工作台，需要另开任务核实。
 
 ## 2026-09-23：Burn 嵌入 MSI 提取命名已本地修正，Windows 实跑仍 NO-GO
