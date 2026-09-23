@@ -1,5 +1,8 @@
 # 当前开发进度
 
+2026-09-23 **队列队头不可用文件不再阻塞后续合法任务，商业仍 NO-GO。**
+Grok 反证发现 Agent claim 对最早的 `FileObject` 失效任务直接返回空并停止，后续 active 任务会被永久挡住。现将现代任务的 claim 查询先按 `status=active`、未删除、未过期过滤，保留事务内二次文件状态闸和无 `fileId` 历史兼容路径；未激活/隔离/已删/已过期文件不会签发 URL 或领取。`verify:print-jobs` 新增队头过期 + 后续 active 任务夹具，API typecheck 与整条打印 service E2E 全部 PASS。PostgreSQL 并发 TOCTOU、真实 COS 一致性、Windows/Pantum、CI、生产和商业验收仍未关闭。
+
 2026-09-23 **唯一集成候选 `c81a1930b`：求职材料库真实文件预览已合流并通过本地验收，商业仍 NO-GO。**
 Claude `opus` / `xhigh` 只修改现有 `JobMaterialLibraryPage`、材料页既有 CSS 和既有 W3 规格：真实生成文件才显示预览入口，点击后用当前会员 token 请求服务端返回的 `previewUrlPath`，短期 signed URL 只存内存并交给既有 `FilePreviewDialog`；演示态、缺 `fileId` 或缺预览路径不显示入口，预览失败只说预览失败，不冒充生成或上传失败。
 当前集成树实跑材料页 W3 3/3、kiosk typecheck、`graph:check`、`verify:repository-integrity` 和 `git diff --check` 均退出 0。W3 覆盖生成时不预取、Authorization token、预览成功、预览接口失败、原文错误不泄露、地址栏不变化和缺预览路径不发请求；删除真实文件闸、跳过 token 交换或透传原始错误的反向变异均退出 1。尚未在 390px 与 Windows Edge 实机确认 signed URL 的嵌入策略；稿 21 扫描结果的 `rs-pv-*` 工具条仍是另一项。

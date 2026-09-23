@@ -1,5 +1,9 @@
 # 下一步任务
 
+## 2026-09-23：队列队头不可用文件修复后的证据边界
+
+Agent claim 已在查询层跳过已知不可用的现代文件，避免队头 pending 任务阻塞后续合法 active 任务；事务内二次状态闸和历史无 `fileId` 兼容路径保留。`verify:print-jobs` 已覆盖队头过期 + 后续 active 任务，并在隔离 SQLite 夹具中通过。仍需独立 PostgreSQL 并发与真实 COS 删除/读取一致性验证；不能把本地 PASS 写成 CI、生产、Windows/Pantum 或商业 GO。
+
 ## 2026-09-23：队列履约文件状态闸已补齐后的收口顺序
 
 1. **先做候选验证：** `verify:admin-print-scan` 已在已同步 schema 的隔离 SQLite 库、虚构测试密钥下全量通过；仍需由 Grok 对本批 5 个后端文件做只读反证，重点检查 claim、retry 和材料包事务是否误拒合法 active 文件。此前新建空库的 schema engine 初始化失败仅属于验证环境问题，不能替代业务证据。Claude 已复核 390px 顶栏胶囊，现有修复和反向变异均通过，不再重复施工。

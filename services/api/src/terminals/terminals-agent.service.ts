@@ -438,6 +438,21 @@ export class TerminalAgentService implements OnModuleInit {
       status: 'pending' as const,
       terminalId,
       order: { is: { payStatus: 'paid', taskStatus: 'pending' } },
+      // 已知不可用的现代文件不应卡住后面的合法任务；事务内仍会再次读取
+      // FileObject 做 fail-closed 检查，覆盖查询后到领取前的状态竞态。历史任务
+      // 没有 fileId，保留原来的 URL 路径与领取行为。
+      OR: [
+        { fileId: null },
+        {
+          file: {
+            is: {
+              status: 'active',
+              deletedAt: null,
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            },
+          },
+        },
+      ],
     }
 
     for (let i = 0; i < limit; i++) {

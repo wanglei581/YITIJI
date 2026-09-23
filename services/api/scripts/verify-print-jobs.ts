@@ -962,6 +962,50 @@ async function main() {
     } finally {
       await http.close()
     }
+
+    // 队头文件在排队后过期时，不得卡住后面仍可打印的已付款任务。
+    // 查询层先排除已知不可用文件；事务内仍会再次读取 FileObject 做 fail-closed 检查，
+    // 因此查询后才过期的文件仍不会被签发 URL。
+    const queueProbeFileId = `file_vpj_queue_probe_${suffix}`
+    const queueProbeStorageKey = `verify/print-jobs/${queueProbeFileId}.pdf`
+    fixtureFileIds.push(queueProbeFileId)
+    fixtureStorageKeys.push(queueProbeStorageKey)
+    await storage.putObject(queueProbeStorageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: queueProbeFileId,
+        storageKey: queueProbeStorageKey,
+        filename: 'queue-probe.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: reportSha256,
+        purpose: 'print_source',
+        status: 'active',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        bucket: LOCAL_BUCKET_SENTINEL,
+      },
+    })
+    const blockedProbe = await printJobs.create(
+      { fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url, fileName: 'blocked-queue-head.pdf' },
+      { terminalId },
+    )
+    const activeProbe = await printJobs.create(
+      { fileUrl: signFileUrl(queueProbeFileId, 30 * 60 * 1000).url, fileName: 'active-queue-follow-up.pdf' },
+      { terminalId },
+    )
+    createdTaskIds.push(blockedProbe.taskId, activeProbe.taskId)
+    await prisma.printTask.update({ where: { id: blockedProbe.taskId }, data: { createdAt: new Date('2020-01-01T00:00:00.000Z') } })
+    await prisma.printTask.update({ where: { id: activeProbe.taskId }, data: { createdAt: new Date('2021-01-01T00:00:00.000Z') } })
+    await orderStatus.markPaid(blockedProbe.orderId, { paymentSource: 'offline' })
+    await orderStatus.markPaid(activeProbe.orderId, { paymentSource: 'offline' })
+    await prisma.fileObject.update({ where: { id: fileId }, data: { expiresAt: new Date(Date.now() - 1_000) } })
+    const queueProbeClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (queueProbeClaim.length !== 1 || queueProbeClaim[0]?.taskId !== activeProbe.taskId) {
+      fail(`不可用队头不得阻塞后续 active 任务: ${JSON.stringify(queueProbeClaim.map((task) => task.taskId))}`)
+    }
+    pass('队头文件过期时不签发其 URL，后续 active 任务仍可被 Agent 领取')
+    await terminals.patchTaskStatus(activeProbe.taskId, { status: 'failed', errorCode: 'FILE_NOT_FOUND' }, `Bearer ${agentToken}`, terminalId)
+    await prisma.fileObject.update({ where: { id: fileId }, data: { expiresAt: fileExpiry } })
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
