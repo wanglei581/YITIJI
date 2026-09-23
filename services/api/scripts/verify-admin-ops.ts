@@ -133,15 +133,39 @@ async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
     fileId: 'file_paid_pending_active',
     file: { ...bad.file, status: 'active', updatedAt: new Date('2026-09-23T07:57:00.000Z') },
   }
+  const quarantined = {
+    ...bad,
+    id: 'pt_paid_pending_quarantined',
+    fileId: 'file_paid_pending_quarantined',
+    file: { ...bad.file, status: 'quarantined', updatedAt: new Date('2026-09-23T07:56:00.000Z') },
+  }
+  const deleted = {
+    ...bad,
+    id: 'pt_paid_pending_deleted',
+    fileId: 'file_paid_pending_deleted',
+    file: { ...bad.file, status: 'active', deletedAt: new Date('2026-09-23T07:55:00.000Z'), updatedAt: new Date('2026-09-23T07:55:00.000Z') },
+  }
+  const expired = {
+    ...bad,
+    id: 'pt_paid_pending_expired',
+    fileId: 'file_paid_pending_expired',
+    file: { ...bad.file, status: 'active', expiresAt: new Date('2026-09-23T07:54:00.000Z'), updatedAt: new Date('2026-09-23T07:54:00.000Z') },
+  }
+  const missing = { ...bad, id: 'pt_paid_pending_missing', fileId: 'file_paid_pending_missing', file: null }
   const refunded = { ...bad, id: 'pt_paid_pending_refunded', order: { payStatus: 'refunded' } }
   const legacy = { ...bad, id: 'pt_paid_pending_legacy', fileId: null, file: null }
-  const svc = new AdminOpsService(mockOpsPrisma([], [], [], [bad, active, refunded, legacy]))
+  const svc = new AdminOpsService(mockOpsPrisma([], [], [], [bad, active, quarantined, deleted, expired, missing, refunded, legacy]))
   const first = await svc.listDerivedAlerts('open')
   const alert = first.data.find((item) => item.id === 'paid_pending_file_unavailable:pt_paid_pending_bad')
   if (!alert) fail('3b. 已支付 pending + uploading 文件必须进入派生告警')
   if (alert.severity !== 'error' || alert.conditionState !== 'firing') fail('3b. 文件不可用告警状态/级别错误')
-  if (first.data.some((item) => item.id.includes('active') || item.id.includes('refunded') || item.id.includes('legacy'))) {
-    fail('3b. active、已退款或历史 fileId=null 任务不得误报')
+  for (const id of ['quarantined', 'deleted', 'expired', 'missing']) {
+    if (!first.data.some((item) => item.id === `paid_pending_file_unavailable:pt_paid_pending_${id}`)) {
+      fail(`3b. ${id} 文件不可用状态必须进入派生告警`)
+    }
+  }
+  if (first.firingCount !== 5 || first.data.some((item) => item.id.includes('active') || item.id.includes('refunded') || item.id.includes('legacy'))) {
+    fail('3b. active、已退款或历史 fileId=null 任务不得误报，且五种不可用状态都要计数')
   }
   const encoded = JSON.stringify(alert)
   for (const banned of ['storageKey', 'must-not-leak', 'file_paid_pending_bad']) {
