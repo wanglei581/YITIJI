@@ -593,6 +593,23 @@
   background: transparent;
 }
 .sw-actrow { flex: none; }
+.sw-pvh-open {
+  flex: none;
+  margin-left: auto;
+  min-height: 56px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1.5px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-teal-d);
+  font: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
 
 /* ── 底注 / CTA ───────────────────────────────────────────── */
 .sw-truth {
@@ -715,6 +732,8 @@
   [data-kiosk-stage-fit='off'] .sw-pvh-t { flex: 1 1 0; font-size: 18px; }
   [data-kiosk-stage-fit='off'] .sw-pvh-2 { flex-wrap: wrap; font-size: 15px; }
   [data-kiosk-stage-fit='off'] .sw-preview-cap { font-size: 14px; }
+  /* 整屏查看键独占一行：和标题挤在同一行时标题被压到约 50px 宽、逐字竖排（390 实测 280px 高）。 */
+  [data-kiosk-stage-fit='off'] .sw-pvh-open { flex: 1 0 100%; justify-content: center; margin-left: 0; min-height: var(--qx-tap-min); padding: 0 12px; font-size: 15px; }
   [data-kiosk-stage-fit='off'] .sw-actrow { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   [data-kiosk-stage-fit='off'] .sw-exit { min-height: 64px; padding: 10px 14px; font-size: 17px; }
   [data-kiosk-stage-fit='off'] .sw-exit small { font-size: 14px; }

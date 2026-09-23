@@ -9,7 +9,7 @@ import {
 } from '../services/api/documentConversion'
 import { userMessageOf } from '../services/api/userErrorMessage'
 
-type PreviewKind = 'pdf' | 'image' | 'word' | 'unsupported' | 'unavailable'
+export type PreviewKind = 'pdf' | 'image' | 'word' | 'unsupported' | 'unavailable'
 
 interface FileContentPreviewProps {
   fileUrl?: string | null
@@ -20,6 +20,14 @@ interface FileContentPreviewProps {
   token?: string | null
   className?: string
   compact?: boolean
+  /**
+   * 浏览器自带 PDF 查看器的打开参数（如 `page=2&view=FitH`），只在真的按 PDF 渲染时
+   * 以 `#` 片段接到链接后面；片段不发给服务端，签名查询串原样不动。
+   * 查看器只在加载时读这组参数，所以参数变了就换一个 iframe 重新打开。
+   */
+  pdfOpenParams?: string | null
+  /** 实际渲染成了哪一种（含渲染失败后的 unavailable），给外层决定能摆哪些查看控件。 */
+  onKindChange?: (kind: PreviewKind) => void
 }
 
 function resolvePreviewKind(
@@ -50,6 +58,8 @@ export function FileContentPreview({
   token,
   className = '',
   compact = false,
+  pdfOpenParams,
+  onKindChange,
 }: FileContentPreviewProps) {
   const [renderFailed, setRenderFailed] = useState(false)
   const [convertedUrl, setConvertedUrl] = useState<string | null>(null)
@@ -92,6 +102,12 @@ export function FileContentPreview({
         ? 'unsupported'
         : sourceKind
   const previewUrl = convertedUrl ?? fileUrl
+  const pdfSrc = previewUrl && pdfOpenParams ? `${previewUrl.split('#', 1)[0]}#${pdfOpenParams}` : previewUrl
+
+  useEffect(() => {
+    onKindChange?.(kind)
+  }, [kind, onKindChange])
+
   const wordUnavailableReason = capabilities.reason?.trim() || WORD_CONVERSION_UNAVAILABLE_COPY
 
   return (
@@ -103,8 +119,9 @@ export function FileContentPreview({
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-white">
         {kind === 'pdf' && (
           <iframe
+            key={pdfOpenParams ?? ''}
             title={`${fileName} 预览`}
-            src={previewUrl ?? undefined}
+            src={pdfSrc ?? undefined}
             className={`h-full w-full bg-white ${compact ? 'min-h-[240px]' : 'min-h-[360px]'}`}
             onError={() => setRenderFailed(true)}
           />

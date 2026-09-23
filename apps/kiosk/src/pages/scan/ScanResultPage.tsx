@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation, type NavigateOptions } from 'react-router-dom'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
+  ExpandIcon,
   FileTextIcon,
   FolderIcon,
   HeadphonesIcon,
@@ -13,6 +14,7 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { formatLabelFromMime } from './scanOutputFormat'
+import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
 import {
   ScanCta,
   ScanNoteCard,
@@ -106,6 +108,9 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   // 用户按过「重试扫描（同一份材料）」，而那一刻已经没有可用的成对授权了。
   // 只用于**把这件事说出来**：本页没有替他改发普通重扫，出路是他自己按的那一个。
   const [safeRescanLost, setSafeRescanLost] = useState(false)
+  // 整屏预览只是这一屏的视图状态：不进地址、不进历史、不落存储。
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const closePreview = useCallback(() => setPreviewOpen(false), [])
 
   /**
    * 登记这一场可能存在的重扫授权。幂等（同一场不会重新计时），所以可以被调用两次：
@@ -418,6 +423,17 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
               <span className="sw-pvh-ic"><FileTextIcon size={24} aria-hidden /></span>
               <span className="sw-pvh-t">服务端回执：已完成，并带回文件</span>
               <span className="sw-chip is-ok">{SCAN_TYPE_LABELS[scanType]}</span>
+              {file ? (
+                <button
+                  type="button"
+                  className="sw-pvh-open"
+                  data-testid="scan-result-preview-open"
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  <ExpandIcon size={20} aria-hidden />
+                  整屏查看
+                </button>
+              ) : null}
             </div>
             {file ? (
               <div className="sw-pvh-2">
@@ -503,6 +519,9 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           <small>结束本次扫描，回到功能大厅</small>
         </span>
       </button>
+      {previewOpen && file ? (
+        <ScanResultPreviewViewer file={file} formatLabel={displayFormat} onClose={closePreview} />
+      ) : null}
       </div>
     </ScanWorkbenchShell>
   )

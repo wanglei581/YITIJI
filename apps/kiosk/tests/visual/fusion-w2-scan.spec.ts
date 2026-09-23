@@ -996,3 +996,309 @@ test('sensitive session clear returns the workbench to start without the previou
   await ack.expectAcked(1)
   expect(errors).toEqual([])
 })
+
+// ── 扫描结果 · 整屏预览（稿 21 · rs-pv-*）────────────────────────────────────
+//
+// 工具条只摆「真能做到」的控件：PDF 交给浏览器自带查看器按 page= / view= 打开参数重新打开，
+// 图片由本层 contain / 铺满宽度。无头 Chromium 不渲染 PDF，所以 PDF 这边钉的是交给查看器的
+// 那组打开参数（iframe src 的 # 片段）；图片这边量真实排版。
+// 夹具与回执一一对得上：说 2 页的那份就真是 2 页，说是图片的那份就真能解码。
+
+const PREVIEW_FIXTURE_PREFIX = '/w2-scan-preview/'
+const TWO_PAGE_PDF_PATH = `${PREVIEW_FIXTURE_PREFIX}two-page.pdf`
+const PORTRAIT_PNG_PATH = `${PREVIEW_FIXTURE_PREFIX}portrait.png`
+/** 60×120 灰底黑框的真 PNG（竖版 1:2），适应宽度后必然比可视区高。 */
+const PORTRAIT_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAADwAAAB4CAAAAACLXs7UAAAAMklEQVR42u3LIQEAAAgDsPdPRiwyILja/BLq5kiWZVmWZVmWZVmWZVmWZVmWZVn+y1Qstg3S4njfphIAAAAASUVORK5CYII='
+
+function buildPdf(pageStreams: string[]): string {
+  const kids = pageStreams.map((_, index) => `${3 + index * 2} 0 R`).join(' ')
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    `2 0 obj\n<< /Type /Pages /Count ${pageStreams.length} /Kids [${kids}] >>\nendobj\n`,
+    ...pageStreams.flatMap((stream, index) => {
+      const pageId = 3 + index * 2
+      return [
+        `${pageId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents ${pageId + 1} 0 R >>\nendobj\n`,
+        `${pageId + 1} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`,
+      ]
+    }),
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets: number[] = []
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(pdf, 'ascii'))
+    pdf += object
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii')
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (const offset of offsets) pdf += `${String(offset).padStart(10, '0')} 00000 n \n`
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+  return pdf
+}
+
+const TWO_PAGE_PDF = buildPdf(['0 0 0 rg\n30 30 40 140 re f\n', '0 0 0 rg\n130 30 40 140 re f\n'])
+
+async function installPreviewFixtures(page: Page): Promise<void> {
+  await page.route(`**${PREVIEW_FIXTURE_PREFIX}**`, async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === TWO_PAGE_PDF_PATH) {
+      await route.fulfill({ status: 200, contentType: 'application/pdf', body: TWO_PAGE_PDF })
+    } else if (path === PORTRAIT_PNG_PATH) {
+      await route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from(PORTRAIT_PNG_BASE64, 'base64') })
+    } else {
+      await route.abort('blockedbyclient')
+    }
+  })
+}
+
+function previewResult(file: { fileUrl: string; name: string; pages: number | null; mimeType: string; format: string }) {
+  return { ...resultState, file: { ...resultState.file, ...file } }
+}
+
+async function readScanSession(page: Page): Promise<string | null> {
+  return page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_SESSION_KEY)
+}
+
+async function openScanPreview(page: Page, name: string): Promise<Locator> {
+  await page.getByTestId('scan-result-preview-open').click()
+  const dialog = page.getByRole('dialog', { name: `文件预览：${name}` })
+  await expect(dialog).toBeVisible()
+  return dialog
+}
+
+test('scan result full-screen preview drives real PDF page and fit controls without leaving the result @w2', async ({ page, api }, testInfo) => {
+  const errors = collectRuntimeErrors(page, TWO_PAGE_PDF_PATH)
+  await installPreviewFixtures(page)
+  registerShell(api)
+  await seedScanResult(page, previewResult({
+    fileUrl: TWO_PAGE_PDF_PATH,
+    name: 'w2-scan-two-page.pdf',
+    pages: 2,
+    mimeType: 'application/pdf',
+    format: 'PDF',
+  }))
+  await page.goto('/scan?stage=result')
+  const inline = page.locator('.sw-pvstage [data-file-preview-kind="pdf"] iframe')
+  await expect(inline).toHaveAttribute('src', TWO_PAGE_PDF_PATH)
+  const urlBefore = page.url()
+  const sessionBefore = await readScanSession(page)
+
+  const dialog = await openScanPreview(page, 'w2-scan-two-page.pdf')
+  // 整屏：盖满 1080×1920 舞台，底层整片 inert，焦点落在关闭键上。
+  const scrim = await boxOf(page.getByTestId('rs-pv-scrim'), '整屏预览')
+  const stage = await boxOf(page.locator('.kiosk-stage'), '舞台')
+  expect(Math.abs(scrim.x - stage.x) + Math.abs(scrim.y - stage.y), '预览层从舞台左上角铺起').toBeLessThanOrEqual(1)
+  expect(Math.abs(scrim.width - stage.width) + Math.abs(scrim.height - stage.height), '预览层与舞台同大').toBeLessThanOrEqual(1)
+  for (const layer of ['.qx-topbar', '.qx-ctabar', '.qx-navbar', '[data-testid="scan-workbench-exits"]']) {
+    await expect(page.locator(layer), `${layer} 在预览打开时不可达`).toHaveAttribute('inert', '')
+  }
+  await expect(dialog.getByTestId('rs-pv-close')).toBeFocused()
+  await expect(dialog.getByTestId('rs-pv-meta')).toContainText('2 页')
+
+  const viewer = dialog.locator('[data-testid="rs-pv-view"] [data-file-preview-kind="pdf"] iframe')
+  const prev = dialog.getByTestId('rs-pv-prev')
+  const next = dialog.getByTestId('rs-pv-next')
+  const fitPage = dialog.getByTestId('rs-pv-fit-page')
+  const fitWidth = dialog.getByTestId('rs-pv-fit-width')
+  const indicator = dialog.getByTestId('rs-pv-page')
+  for (const control of [prev, next, fitPage, fitWidth, dialog.getByTestId('rs-pv-close')]) {
+    const box = await boxOf(control, '预览工具条按钮')
+    expect(box.height, '一体机上预览控件 ≥88px').toBeGreaterThanOrEqual(88)
+    expect(box.width).toBeGreaterThanOrEqual(88)
+  }
+
+  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=1&view=Fit`)
+  await expect(indicator).toHaveText('第 1 页 / 共 2 页')
+  await expect(prev).toBeDisabled()
+  await expect(next).toBeEnabled()
+  await expect(fitPage).toHaveAttribute('aria-pressed', 'true')
+  await expect(fitWidth).toHaveAttribute('aria-pressed', 'false')
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-preview-pdf-1080.png'), fullPage: false })
+
+  await next.click()
+  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=2&view=Fit`)
+  await expect(indicator).toHaveText('第 2 页 / 共 2 页')
+  await expect(next, '到最后一页就停，不编出第 3 页').toBeDisabled()
+  await expect(prev).toBeEnabled()
+
+  await fitWidth.click()
+  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=2&view=FitH`)
+  await expect(fitWidth).toHaveAttribute('aria-pressed', 'true')
+  await expect(fitPage).toHaveAttribute('aria-pressed', 'false')
+  await expect(dialog.getByTestId('rs-pv-zoom')).toHaveText('当前：适应宽度')
+
+  await prev.click()
+  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=1&view=FitH`)
+  await fitPage.click()
+  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=1&view=Fit`)
+
+  // 关掉回到这一步：地址、历史、本机登记、页内小预览都原样，底层恢复可达，焦点还给打开键。
+  await dialog.getByTestId('rs-pv-back').click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('[inert]')).toHaveCount(0)
+  await expect(page.getByTestId('scan-result-preview-open')).toBeFocused()
+  expect(page.url()).toBe(urlBefore)
+  expect(await readScanSession(page)).toBe(sessionBefore)
+  await expect(inline).toHaveAttribute('src', TWO_PAGE_PDF_PATH)
+
+  // 视图状态不跨次保留；Esc 也能关。
+  const again = await openScanPreview(page, 'w2-scan-two-page.pdf')
+  await expect(again.locator('[data-testid="rs-pv-view"] iframe')).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=1&view=Fit`)
+  await page.keyboard.press('Escape')
+  await expect(again).toHaveCount(0)
+  expect(page.url()).toBe(urlBefore)
+  await expectHealthy(page, errors)
+})
+
+test('scan result preview keeps page turning honestly unavailable when the receipt has no page count @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  registerShell(api)
+  // 真实扫描链路今天就是这个形状：ScanProgressPage 组装结果时 pages 恒为 null。
+  await seedScanResult(page, previewResult({
+    fileUrl: W2_FILE.fileUrl,
+    name: 'w2-scan.pdf',
+    pages: null,
+    mimeType: 'application/pdf',
+    format: 'PDF',
+  }))
+  await page.goto('/scan?stage=result')
+  await expectPdfCompleted(binary)
+
+  const dialog = await openScanPreview(page, 'w2-scan.pdf')
+  const viewer = dialog.locator('[data-testid="rs-pv-view"] [data-file-preview-kind="pdf"] iframe')
+  await expect(viewer, '页数未知时不写 page=，不替文件编页码').toHaveAttribute('src', `${W2_FILE.fileUrl}#view=Fit`)
+  await expect(dialog.getByTestId('rs-pv-prev')).toBeDisabled()
+  await expect(dialog.getByTestId('rs-pv-next')).toBeDisabled()
+  await expect(dialog.getByTestId('rs-pv-page')).toHaveText('页数未知 · 在预览里上下滑动翻页')
+  await expect(dialog.getByTestId('rs-pv-meta')).toContainText('页数以文件为准')
+  await expect(dialog.getByTestId('rs-pv-note')).toContainText('回执里没有页数，本页不替文件编页码')
+  await expect(dialog.getByText(/第 \d+ 页/)).toHaveCount(0)
+
+  await dialog.getByTestId('rs-pv-fit-width').click()
+  await expect(viewer).toHaveAttribute('src', `${W2_FILE.fileUrl}#view=FitH`)
+  await dialog.getByTestId('rs-pv-close').click()
+  await expect(dialog).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+test('scan result image preview fits the whole page or the full width by measured layout @w2', async ({ page, api }, testInfo) => {
+  const errors = collectRuntimeErrors(page)
+  await installPreviewFixtures(page)
+  registerShell(api)
+  await seedScanResult(page, previewResult({
+    fileUrl: PORTRAIT_PNG_PATH,
+    name: 'w2-scan.png',
+    pages: null,
+    mimeType: 'image/png',
+    format: 'PNG',
+  }))
+  await page.goto('/scan?stage=result')
+
+  const dialog = await openScanPreview(page, 'w2-scan.png')
+  const view = dialog.getByTestId('rs-pv-view')
+  const image = view.locator('[data-file-preview-kind="image"] img')
+  await expect(image).toBeVisible()
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(60)
+  // 一张图就是一整页：不摆翻页键，也不编页码。
+  await expect(dialog.getByTestId('rs-pv-page')).toHaveText('整图 · 共 1 页')
+  await expect(dialog.getByTestId('rs-pv-prev')).toHaveCount(0)
+  await expect(dialog.getByTestId('rs-pv-next')).toHaveCount(0)
+
+  const measure = () => view.evaluate((el) => {
+    const img = el.querySelector('img') as HTMLImageElement
+    const style = getComputedStyle(el)
+    const frame = el.getBoundingClientRect()
+    const box = img.getBoundingClientRect()
+    return {
+      innerWidth: el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+      scrollable: el.scrollHeight - el.clientHeight,
+      imgWidth: box.width,
+      imgHeight: box.height,
+      objectFit: getComputedStyle(img).objectFit,
+      inside: box.left >= frame.left - 0.5 && box.right <= frame.right + 0.5
+        && box.top >= frame.top - 0.5 && box.bottom <= frame.bottom + 0.5,
+    }
+  })
+
+  const whole = await measure()
+  expect(whole.inside, '适应整页：整张图都在可视区里').toBe(true)
+  expect(whole.objectFit, '适应整页：按原比例 contain，不裁不拉伸').toBe('contain')
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-preview-image-page-1080.png'), fullPage: false })
+  expect(whole.scrollable, '适应整页：不需要滑动').toBeLessThanOrEqual(1)
+
+  await dialog.getByTestId('rs-pv-fit-width').click()
+  await expect(dialog.getByTestId('rs-pv-fit-width')).toHaveAttribute('aria-pressed', 'true')
+  const wide = await measure()
+  expect(Math.abs(wide.imgWidth - wide.innerWidth), '适应宽度：图宽等于可视区内宽').toBeLessThanOrEqual(1)
+  expect(Math.abs(wide.imgHeight - wide.imgWidth * 2), '适应宽度：按原比例 1:2 放大，不拉伸').toBeLessThanOrEqual(2)
+  expect(wide.scrollable, '适应宽度：竖版图比可视区高，要能滑到底').toBeGreaterThan(0)
+  await view.evaluate((el) => { el.scrollTop = el.scrollHeight })
+  expect(await view.evaluate((el) => el.scrollTop), '可视区是真实滚动容器').toBeGreaterThan(0)
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-preview-image-width-1080.png'), fullPage: false })
+
+  await dialog.getByTestId('rs-pv-fit-page').click()
+  const back = await measure()
+  expect(back.inside).toBe(true)
+  expect(back.scrollable).toBeLessThanOrEqual(1)
+  await dialog.getByTestId('rs-pv-back').click()
+  await expect(dialog).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+test.describe('scan result full-screen preview at 390x844', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
+
+  test('preview toolbar stays inside the phone viewport with tappable controls @w2', async ({ page, api }, testInfo) => {
+    const errors = collectRuntimeErrors(page, TWO_PAGE_PDF_PATH)
+    await installPreviewFixtures(page)
+    registerShell(api)
+    await seedScanResult(page, previewResult({
+      fileUrl: TWO_PAGE_PDF_PATH,
+      name: 'w2-scan-two-page.pdf',
+      pages: 2,
+      mimeType: 'application/pdf',
+      format: 'PDF',
+    }))
+    await page.goto('/scan?stage=result')
+    await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
+
+    const open = page.getByTestId('scan-result-preview-open')
+    await revealByUserScroll(open)
+    await assertTapTargetPointerHit(open)
+    // 整屏查看键不许把文件卡标题挤成逐字竖排（曾被压到约 50px 宽，整行 280px 高）。
+    const titleLines = await page.locator('.sw-pvh-t').evaluate((el) => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const centers = Array.from(range.getClientRects()).map((rect) => rect.top + rect.height / 2).sort((a, b) => a - b)
+      const tolerance = parseFloat(getComputedStyle(el).fontSize) * 0.6
+      return centers.filter((center, index) => index === 0 || center - centers[index - 1] > tolerance).length
+    })
+    expect(titleLines, '文件卡标题不得逐字竖排').toBeLessThanOrEqual(2)
+    await page.screenshot({ path: testInfo.outputPath('qx-scan-result-390-preview-entry.png'), fullPage: false })
+    const openBox = await boxOf(open, '整屏查看')
+    await page.touchscreen.tap(openBox.x + openBox.width / 2, openBox.y + openBox.height / 2)
+    const dialog = page.getByRole('dialog', { name: '文件预览：w2-scan-two-page.pdf' })
+    await expect(dialog).toBeVisible()
+
+    const viewport = { x: 0, y: 0, width: 390, height: 844 }
+    expectInside(await boxOf(page.getByTestId('rs-pv-scrim'), '整屏预览'), viewport, '预览层铺在视口内')
+    for (const id of ['rs-pv-close', 'rs-pv-next', 'rs-pv-fit-page', 'rs-pv-fit-width', 'rs-pv-back']) {
+      const control = dialog.getByTestId(id)
+      await assertTapTargetPointerHit(control)
+      expectInside(await boxOf(control, id), viewport, `${id} 整块在视口内`)
+    }
+    const stageBox = await boxOf(dialog.getByTestId('rs-pv-view'), '文件可视区')
+    expect(stageBox.height, '手机上仍给文件留出可看的高度').toBeGreaterThanOrEqual(240)
+    await page.screenshot({ path: testInfo.outputPath('qx-scan-result-preview-390.png'), fullPage: false })
+
+    const nextBox = await boxOf(dialog.getByTestId('rs-pv-next'), '下一页')
+    await page.touchscreen.tap(nextBox.x + nextBox.width / 2, nextBox.y + nextBox.height / 2)
+    await expect(dialog.locator('[data-testid="rs-pv-view"] iframe')).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=2&view=Fit`)
+    await dialog.getByTestId('rs-pv-back').click()
+    await expect(dialog).toHaveCount(0)
+    await expectHealthy(page, errors)
+  })
+})
