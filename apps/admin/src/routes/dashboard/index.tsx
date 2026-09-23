@@ -8,6 +8,7 @@ import {
   BriefcaseIcon,
   Building2Icon,
   CalendarIcon,
+  FileWarningIcon,
   FolderIcon,
   MonitorIcon,
   PrinterIcon,
@@ -479,12 +480,27 @@ function buildTodoRows(loaded: LoadedSources): TodoRow[] {
   return rows
 }
 
+const ALERT_ROW_ICON: Record<AdminAlertItem['type'], ElementType> = {
+  terminal_offline: MonitorIcon,
+  printer_issue: PrinterIcon,
+  print_failed: PrinterIcon,
+  paid_pending_file_unavailable: FileWarningIcon,
+}
+
+/**
+ * 已支付但文件不可用的任务排在最前：后端按发生时间倒序，文件状态较早变化的这类告警
+ * 会被新近的离线/失败告警挤出前 3 条，而它涉及已付款订单、只能人工处置。
+ */
 function buildAlertRows(alerts: AdminAlertItem[]): TodoRow[] {
-  return alerts.slice(0, 3).map((alert) => ({
+  const paidPending = alerts.filter((alert) => alert.type === 'paid_pending_file_unavailable')
+  const others = alerts.filter((alert) => alert.type !== 'paid_pending_file_unavailable')
+  return [...paidPending, ...others].slice(0, 3).map((alert) => ({
     key: alert.id,
-    icon: alert.type === 'terminal_offline' ? MonitorIcon : PrinterIcon,
+    icon: ALERT_ROW_ICON[alert.type] ?? PrinterIcon,
     title: alert.title,
-    sub: `${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`,
+    sub: alert.type === 'paid_pending_file_unavailable'
+      ? `已支付 · 需人工处置 · ${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`
+      : `${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`,
     href: '/alerts',
     actionLabel: '处理',
     warn: true,
@@ -580,6 +596,8 @@ export default function DashboardPage() {
 
   const retry = (keys: BlockKey[]) => () => void loadBlocks(keys)
   const alertCount = alerts?.firingCount ?? 0
+  const alertRows = alerts ? buildAlertRows(alerts.data) : []
+  const paidPendingAlertCount = alerts?.data.filter((alert) => alert.type === 'paid_pending_file_unavailable').length ?? 0
 
   if (initialLoading) {
     return (
@@ -851,13 +869,15 @@ export default function DashboardPage() {
                   {alerts.data.length === 0 ? (
                     <p className="py-6 text-center text-sm text-neutral-400">暂无实时告警</p>
                   ) : (
-                    buildAlertRows(alerts.data).map((row, index) => (
+                    alertRows.map((row, index) => (
                       <TodoItemRow key={row.key} row={row} isFirst={index === 0} />
                     ))
                   )}
-                  {alertCount > alerts.data.length && (
+                  {alertCount > alertRows.length && (
                     <p className="border-t border-neutral-900/[0.06] pt-2.5 text-[11.5px] text-neutral-500">
-                      当前共 {alertCount} 条告警仍在发生（含已确认/静默与截断部分），以上仅列最近 {alerts.data.length} 条，完整清单见告警中心。
+                      当前共 {alertCount} 条告警仍在发生（含已确认/静默与截断部分），以上仅列 {alertRows.length} 条
+                      {paidPendingAlertCount > 0 ? `，本次加载的待处理告警中有 ${paidPendingAlertCount} 条已支付文件不可用、已优先列出` : ''}
+                      ，完整清单见告警中心。
                     </p>
                   )}
                 </div>

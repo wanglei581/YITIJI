@@ -16549,6 +16549,9 @@
     "apps/admin/src/routes/ai-services/index.tsx": [
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
     ],
+    "apps/admin/src/routes/alerts/index.tsx": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
     "apps/admin/src/routes/billing/index.tsx": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/kiosk/scripts/verify-price-single-source.mjs",
@@ -16764,6 +16767,9 @@
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "apps/admin/scripts/verify-source-publish-actions.mjs"
+    ],
+    "apps/admin/src/services/api/adminOps.ts": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/services/api/adminOrdersReadonly.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
@@ -20769,6 +20775,9 @@
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/src/admin-ops/derived-alert-identity.ts": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
     "services/api/src/admin-ops/derived-alerts.ts": [
       "services/api/scripts/verify-admin-ops.ts"
     ],
@@ -24050,11 +24059,14 @@
         "files": [
           "apps/admin/package.json",
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/routes/alerts/index.tsx",
           "apps/admin/src/routes/dashboard/index.tsx",
           "apps/admin/src/routes/legal-docs/index.tsx",
           "apps/admin/src/routes/login/LegalDocsModal.tsx",
           "apps/admin/src/routes/printers/index.tsx",
-          "apps/admin/src/routes/screensaver/index.tsx"
+          "apps/admin/src/routes/screensaver/index.tsx",
+          "apps/admin/src/services/api/adminOps.ts",
+          "services/api/src/admin-ops/derived-alert-identity.ts"
         ],
         "missing": []
       },

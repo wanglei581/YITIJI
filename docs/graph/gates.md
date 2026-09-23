@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1516 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1519 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -132,7 +132,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 90 个文件</summary>
+<summary><code>apps/admin/src/</code> — 92 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -144,6 +144,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/account-settings/PhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-phone-transfer-ui.mjs` |
 | `apps/admin/src/routes/ai-services/index.tsx` | `verify-job-ai-ops-dashboard-ui.mjs` |
+| `apps/admin/src/routes/alerts/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
@@ -204,6 +205,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/adminBilling.ts` | `verify-admin-billing-ui.mjs` |
 | `apps/admin/src/services/api/adminHttpAdapter.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-source-publish-actions.mjs` |
 | `apps/admin/src/services/api/adminMockAdapter.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-source-publish-actions.mjs` |
+| `apps/admin/src/services/api/adminOps.ts` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/services/api/adminOrdersReadonly.ts` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs` |
 | `apps/admin/src/services/api/adminPrintJobs.ts` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs` |
 | `apps/admin/src/services/api/adminPrivacyRequests.ts` | `verify-data-request-ui.mjs` |
@@ -1952,7 +1954,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 480 个文件</summary>
+<summary><code>services/api/src/</code> — 481 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1964,6 +1966,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/admin-ops/admin-alert-actions.service.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.controller.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-console-screen-snapshot.ts` |
+| `services/api/src/admin-ops/derived-alert-identity.ts` | `verify-service-desk-dashboard-ui.mjs` |
 | `services/api/src/admin-ops/derived-alerts.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-admin-order-filters.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-payment-flow.ts` |
