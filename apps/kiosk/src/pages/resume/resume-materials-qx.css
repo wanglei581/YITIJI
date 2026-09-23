@@ -130,6 +130,15 @@
 .qx-resume-materials .qx-rm-grid div:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .qx-resume-materials .qx-rm-grid b { display: block; margin-top: 3px; font-size: 17px; overflow-wrap: anywhere; }
 .qx-resume-materials .qx-rm-grid b[data-off='true'] { color: var(--qx-cinnabar-d); }
+/* 预览入口只挂在真实文件卡上：按钮 + 一句链接怎么来的说明；预览失败时这句换成红字原因。 */
+.qx-resume-materials .qx-rm-file-act {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; padding: 12px 16px;
+  background: var(--qx-surface); border-top: 1px solid var(--qx-line);
+}
+.qx-resume-materials .qx-rm-file-act > span { flex: 1 1 240px; min-width: 0; font-size: 16px; line-height: 1.4; color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-file-act[data-tone='bad'] { background: var(--qx-cinnabar-soft); }
+.qx-resume-materials .qx-rm-file-act[data-tone='bad'] > span { font-weight: 700; color: var(--qx-cinnabar-d); }
+.qx-resume-materials .qx-rm-file-act > span > svg { display: inline-block; vertical-align: -3px; }
 .qx-resume-materials .qx-rm-foot,
 .qx-resume-materials .qx-rm-reason { margin: 0; padding: 9px 16px; font-size: 16px; line-height: 1.4; background: var(--qx-surface); border-top: 1px solid var(--qx-line); }
 .qx-resume-materials .qx-rm-foot { color: var(--qx-ink-2); }

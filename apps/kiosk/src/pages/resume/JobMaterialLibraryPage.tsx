@@ -8,20 +8,23 @@
 //   · 必填为空不发请求：就地标红并聚焦第一个出错字段。
 //   · 生成中不画百分比 / 阶段点；文件卡只摊开 POST 返回的真实字段，签名链接本身不上屏。
 //   · 没有 printFileUrl 只禁打印；演示模式不保存真实文件，我的文档与打印都停用。
-//   · 稿 25 的全屏 PDF 预览层本页没有对应能力，不做（不拿占位版面冒充预览）。
+//   · 预览只给服务端真实文件（fileId + previewUrlPath）：凭本人令牌现换一次短期查看链接，交给既有 FilePreviewDialog；
+//     链接只放内存、只认这一次生成的文件，不上屏、不进地址栏。演示对象不给预览（稿 25 的全屏预览层版式未照搬）。
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { JobMaterialDocumentTemplate, JobMaterialGenerateResponse, JobMaterialTemplateType } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
-  AlertTriangleIcon, CheckCircle2Icon, ChevronRightIcon, ClockIcon, FileTextIcon, FolderOpenIcon, InfoIcon, PenLineIcon, PrinterIcon, SparklesIcon,
+  AlertTriangleIcon, CheckCircle2Icon, ChevronRightIcon, ClockIcon, EyeIcon, FileTextIcon, FolderOpenIcon, InfoIcon, PenLineIcon, PrinterIcon, SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
+import { fetchAccessUrl } from '../../services/api/memberAssets'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { API_MODE } from '../../services/api/client'
 import { clearJobMaterialDraft, readJobMaterialDraft, saveJobMaterialDraft, type JobMaterialDraftForm } from './jobMaterialDraft'
@@ -102,6 +105,8 @@ function typeFilterLabel(type: JobMaterialDocumentTemplate['type']): Filter {
 }
 
 const isRequired = (field: JobMaterialDocumentTemplate['fields'][number]) => field.required || field.key in ALWAYS_REQUIRED
+/** 只有服务端真实落库的文件才有预览入口：演示对象、缺文件编号或缺预览端点都不给，本页也不自己拼地址。 */
+const previewPathOf = (file: JobMaterialGenerateResponse, demo: boolean) => (!demo && file.fileId && file.previewUrlPath ? file.previewUrlPath : null)
 const fieldDomId = (key: FieldKey) => `material-field-${key}`
 
 function StateBlock({ kind, icon, title, size, children }: { kind: 'info' | 'warn' | 'error'; icon: ReactNode; title: string; size?: 'sm'; children: ReactNode }) {
@@ -112,7 +117,9 @@ function Banner({ tone, icon, alert, children }: { tone?: 'warn' | 'bad'; icon: 
   return <div className="qx-rm-banner" data-tone={tone} role={alert ? 'alert' : undefined}>{icon}<span>{children}</span></div>
 }
 
-function FileCard({ file, demo }: { file: JobMaterialGenerateResponse; demo: boolean }) {
+function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
+  file: JobMaterialGenerateResponse; demo: boolean; onPreview?: () => void; previewBusy?: boolean; previewError?: string
+}) {
   const canPrint = Boolean(file.printFileUrl)
   const rows: Array<[string, string, boolean?]> = [
     ['文件名', file.filename],
@@ -138,6 +145,17 @@ function FileCard({ file, demo }: { file: JobMaterialGenerateResponse; demo: boo
       <div className="qx-rm-grid">
         {rows.map(([label, value, off]) => <div key={label}><u>{label}</u><b data-off={off ? 'true' : undefined}>{value}</b></div>)}
       </div>
+      {/* 预览失败就写在按钮旁边（点哪儿就在哪儿说），只讲预览这一件事，不说成生成或上传失败。 */}
+      {onPreview ? (
+        <div className="qx-rm-file-act" data-tone={previewError ? 'bad' : undefined}>
+          <button type="button" className="qx-btn" data-variant="teal" disabled={previewBusy} onClick={onPreview}>
+            <EyeIcon size={22} aria-hidden="true" /> {previewBusy ? '正在打开预览…' : '预览文件'}
+          </button>
+          {previewError ? (
+            <span role="alert"><AlertTriangleIcon size={18} aria-hidden="true" /> 预览没能打开：{previewError}。预览失败不代表文件生成失败，文件以本卡信息为准；可以再点一次，或稍后到我的文档里查看。</span>
+          ) : <span>凭本人登录现换一次短期查看链接，只在本页弹窗里显示，不保存。</span>}
+        </div>
+      ) : null}
       <p className="qx-rm-foot">字段取自本次生成的服务端返回；查看链接是一次性签名链接，不在屏幕上展示。</p>
       {demo ? <p id="material-docs-blocked" className="qx-rm-reason">演示模式未保存真实文件，我的文档里不会有这一份。</p> : null}
       {!canPrint ? (
@@ -165,6 +183,9 @@ export function JobMaterialLibraryPage() {
   useBusyLock(submitting)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [generated, setGenerated] = useState<JobMaterialGenerateResponse | null>(null)
+  /** 预览结果绑定到这一次生成返回的对象：改字段 / 重新生成后，旧链接或旧失败都不会挂到新文件卡上。 */
+  const [preview, setPreview] = useState<{ file: JobMaterialGenerateResponse; url?: string; error?: string } | null>(null)
+  const [previewBusy, setPreviewBusy] = useState(false)
 
   useEffect(() => {
     const draft = readJobMaterialDraft()
@@ -273,6 +294,23 @@ export function JobMaterialLibraryPage() {
   const reload = () => setReloadKey((key) => key + 1)
   const goResumeHub = () => navigate('/resume-service')
   const demoMode = API_MODE !== 'http'
+  const openPreview = async (file: JobMaterialGenerateResponse) => {
+    const path = previewPathOf(file, demoMode)
+    const token = getToken()
+    if (!path || !token || previewBusy) return
+    setPreviewBusy(true)
+    setPreview(null)
+    try {
+      const res = await fetchAccessUrl(path, token)
+      if (!res?.url) throw new Error('preview url missing')
+      setPreview({ file, url: res.url })
+    } catch (err) {
+      setPreview({ file, error: userMessageOf(err, '预览链接没能生成，可能已到期或被清理') })
+    } finally {
+      setPreviewBusy(false)
+    }
+  }
+
   const screen: Screen = loading ? 'loading'
     : error ? 'error'
       : templates.length === 0 ? 'empty'
@@ -285,6 +323,7 @@ export function JobMaterialLibraryPage() {
     ? ['warn' as const, '未登录 · 生成前先存草稿', '模板目录随便看；点「登录后生成」时才需要登录，草稿不会丢。']
     : VIEW[screen]
   const others = filter === '全部' ? [] : templates.filter((template) => !visible.includes(template))
+  const currentPreview = generated && preview?.file === generated ? preview : null
   const btn = (variant: 'ghost' | 'primary', label: ReactNode, onClick: () => void) => (
     <button type="button" className="qx-btn" data-variant={variant} onClick={onClick}>{label}</button>
   )
@@ -363,7 +402,10 @@ export function JobMaterialLibraryPage() {
           <b>这次没能生成出来：{submitError}</b> 你填的内容还在，改一改再试一次；本机不会用示例文件冒充结果。
         </Banner>
       ) : null}
-      {generated && !submitting ? <FileCard file={generated} demo={demoMode} /> : (
+      {generated && !submitting ? (
+        <FileCard file={generated} demo={demoMode} previewBusy={previewBusy} previewError={currentPreview?.error}
+          onPreview={previewPathOf(generated, demoMode) && isLoggedIn ? () => void openPreview(generated) : undefined} />
+      ) : (
         <div className="qx-rm-after" data-testid="material-workshop-after">
           <b>生成后</b>
           <span className="st"><i>1</i>返回真实文件</span><span className="sep">›</span>
@@ -489,6 +531,9 @@ export function JobMaterialLibraryPage() {
           </p>
         </section>
       </QxPageFrame>
+      {generated && currentPreview?.url ? (
+        <FilePreviewDialog fileUrl={currentPreview.url} fileName={generated.filename} mimeType={generated.mimeType} onClose={() => setPreview(null)} />
+      ) : null}
     </div>
   )
 }

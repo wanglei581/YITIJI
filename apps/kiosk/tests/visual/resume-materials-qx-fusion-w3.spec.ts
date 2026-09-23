@@ -11,6 +11,9 @@ import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertQxPil
 const MEMBER_TOKEN = 'materials-qx-member-token'
 const TEMPLATES = '/api/v1/job-materials/templates'
 const GENERATE = '/api/v1/job-materials/generate'
+/** 预览端点取自 FILE.previewUrlPath（经 API 前缀）；返回的短期链接指向一份夹具 PDF，由 page.route 应答。 */
+const PREVIEW_URL = '/api/v1/files/jm-fixture-001/preview-url'
+const PREVIEW_PDF = '/w3-fixtures/materials-preview.pdf'
 const VIEWPORTS = [{ width: 1080, height: 1920 }, { width: 390, height: 844 }] as const
 
 const FIELDS = [
@@ -170,6 +173,24 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
   expect(await cta(page, '查看我的文档').getAttribute('aria-disabled')).toBeNull()
   await captureViewports(page, 'materials-generated')
 
+  // 预览：生成时不预取；点了才凭会员令牌现换一次短期链接，交给既有预览弹窗；链接不上屏、不进地址栏。
+  expect(api.requestCount('GET', PREVIEW_URL)).toBe(0)
+  api.respond('GET', PREVIEW_URL, {
+    status: 200,
+    json: { success: true, data: { fileId: 'jm-fixture-001', url: PREVIEW_PDF, expiresAt: '2099-01-01T02:30:00.000Z', disposition: 'inline' } },
+  })
+  await page.route(`**${PREVIEW_PDF}`, (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n%materials-fixture\n' }))
+  const previewSent = page.waitForRequest((req) => new URL(req.url()).pathname === PREVIEW_URL)
+  await card.getByRole('button', { name: '预览文件' }).click()
+  expect((await previewSent).headers().authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
+  const dialog = page.getByRole('dialog', { name: '校招自荐信.pdf' })
+  await expect(dialog.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', PREVIEW_PDF)
+  await expect(page).toHaveURL(/\/resume\/materials$/)
+  expect(await page.locator('body').innerText()).not.toContain(PREVIEW_PDF)
+  await dialog.getByRole('button', { name: '关闭文件预览' }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(api.requestCount('GET', PREVIEW_URL)).toBe(1)
+
   // 改字段就收起文件卡：屏幕上不留一张与当前草稿对不上的「已生成」。
   await page.locator('#material-field-notes').fill('希望语气稳重')
   await expect(screen).toHaveAttribute('data-state', 'select')
@@ -240,4 +261,26 @@ test('material workshop: failed generation keeps the form; a file without print 
   await expect(page).toHaveURL(/\/resume\/materials$/)
   await captureViewports(page, 'materials-generated-no-print')
   expect(api.requestCount('POST', GENERATE)).toBe(2)
+
+  // 预览失败只说预览：就写在按钮旁（点哪儿就在哪儿看得到），不说成上传失败、不透传原文、不开空弹窗；状态原样保留。
+  api.respond('GET', PREVIEW_URL, failure(404, 'fixture preview failure'))
+  await page.getByTestId('material-workshop-file').getByRole('button', { name: '预览文件' }).click()
+  const previewAlert = page.getByTestId('material-workshop-file').getByRole('alert')
+  await expect(previewAlert).toContainText('预览没能打开：预览链接没能生成，可能已到期或被清理')
+  await expect(previewAlert).toBeInViewport()
+  await expect(previewAlert).not.toContainText('上传')
+  await expect(page.getByText('fixture preview failure')).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(screen).toHaveAttribute('data-state', 'generated-no-print')
+  await captureViewports(page, 'materials-preview-failed')
+  expect(api.requestCount('GET', PREVIEW_URL)).toBe(1)
+
+  // 没有真实文件的预览端点就不给预览入口，也不发预览请求（演示模式同一道闸，但 W3 是 http 构建，走不到演示分支）。
+  api.respond('POST', GENERATE, { status: 200, json: { success: true, data: { ...FILE, printFileUrl: undefined, previewUrlPath: '' } } })
+  await cta(page, '重新生成一份').click()
+  await expect.poll(() => api.requestCount('POST', GENERATE)).toBe(3)
+  await expect(screen).toHaveAttribute('data-state', 'generated-no-print')
+  await expect(page.getByTestId('material-workshop-file').getByRole('button', { name: '预览文件' })).toHaveCount(0)
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  expect(api.requestCount('GET', PREVIEW_URL)).toBe(1)
 })
