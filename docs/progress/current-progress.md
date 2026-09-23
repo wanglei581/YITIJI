@@ -4,7 +4,7 @@
 针对 Grok 反证审查发现的队列履约缺口，现有材料包逐份派发、付费打印重试、管理员打印/扫描重试和 Windows Agent claim
 均在最后一次取任务或派发下一份之前复查 `FileObject.status=active`、未删除且未过期。不可打印文件不会被重新签发 URL、领取或派发后续任务；材料包回传在事务内拒绝并保持当前任务 `claimed`，历史无 `fileId` 任务保留兼容路径。
 新增验证覆盖“下一份文件过期时完成回传不得创建后续 PrintTask，且事务回滚”，材料包履约、材料包幂等和 HTTP 幂等均通过；API typecheck 与打印链路 service E2E 也通过，打印链路覆盖 uploading/quarantined/deleted/expired 拒绝、active 对照、claim、retry、支付报价和终态幂等。
-这只关闭一个后端防御缺口，不等于解决所有并发 TOCTOU；PostgreSQL 并发、真实 COS、Windows/Pantum、微信、最终 SHA CI、生产和商业验收仍未关闭。管理员打印/扫描验证的全新 SQLite 空库初始化本轮遇到 Prisma schema engine 环境错误，不能登记为通过。
+这只关闭一个后端防御缺口，不等于解决所有并发 TOCTOU；PostgreSQL 并发、真实 COS、Windows/Pantum、微信、最终 SHA CI、生产和商业验收仍未关闭。随后在已同步 schema 的隔离 SQLite 库、虚构测试密钥下重跑 `verify:admin-print-scan`，Task 10 全部通过，覆盖能力开关 fail-closed、敏感字段不泄露、print retry CAS、退款/关闭竞态、Agent claim 竞态和扫描取消；最初新建空库失败仅为 Prisma schema engine 环境问题，不计为业务失败。
 本批尚未 push、合并 `main`、部署或操作真机。
 
 2026-09-23 **唯一集成候选 `d88814280afff1deb1068f32b5397410b379975d`：390px 扫描结果页的 AI 简历识别入口已可真实触控，商业仍 NO-GO。**
