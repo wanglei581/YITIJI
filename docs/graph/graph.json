@@ -16515,15 +16515,6 @@
     "apps/admin/scripts/support/admin-phone-transfer-ui-contract.mjs": [
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
     ],
-    "apps/admin/scripts/verify-admin-billing-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "apps/admin/scripts/verify-admin-file-lifecycle.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
-    "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
     "apps/admin/scripts/verify-honest-placeholders.mjs": [
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
@@ -16566,7 +16557,6 @@
     "apps/admin/src/routes/billing/index.tsx": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/kiosk/scripts/verify-price-single-source.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "apps/admin/src/routes/components/BulkPublishButton.tsx": [
@@ -16594,9 +16584,6 @@
     ],
     "apps/admin/src/routes/fairs/components/ZonesTab.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
-    ],
-    "apps/admin/src/routes/files/index.tsx": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/admin/src/routes/import-batches/index.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs"
@@ -16635,13 +16622,11 @@
     ],
     "apps/admin/src/routes/orders/index.tsx": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
     "apps/admin/src/routes/orders/orderHonestyCopy.ts": [
-      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
     ],
     "apps/admin/src/routes/partners/OrgContentTrustPanel.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
@@ -16783,12 +16768,10 @@
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/services/api/adminOrdersReadonly.ts": [
-      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
     ],
     "apps/admin/src/services/api/adminPrintJobs.ts": [
-      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
     ],
     "apps/admin/src/services/api/adminPrivacyRequests.ts": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
@@ -16854,9 +16837,6 @@
       "services/api/scripts/verify-jobfair-checkin.ts",
       "services/api/scripts/verify-print-scan-first-release.ts"
     ],
-    "apps/admin/src/services/api/userErrorMessage.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
     "apps/admin/src/services/auth/index.ts": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs",
@@ -16864,12 +16844,7 @@
     ],
     "apps/kiosk/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "apps/kiosk/playwright.w3.config.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/scripts/extract-service-hub-specs.mjs": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
@@ -16910,59 +16885,24 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
-    "apps/kiosk/scripts/verify-file-retention-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/scripts/verify-fusion-home.mjs": [
       "apps/kiosk/scripts/verify-home-narrow-visual-balance.mjs",
       "apps/kiosk/scripts/verify-home-prototype-v1.mjs"
     ],
-    "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
-    "apps/kiosk/scripts/verify-fusion-w3.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
     "apps/kiosk/scripts/verify-fusion-w5.mjs": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
-    "apps/kiosk/scripts/verify-job-material-library-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
-    "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
     "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/scripts/verify-member-print-orders-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "apps/kiosk/scripts/verify-price-single-source.mjs": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "apps/kiosk/scripts/verify-print-confirm-honest.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/scripts/verify-profile-activity-inkpaper.mjs": [
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
@@ -16972,15 +16912,11 @@
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
@@ -16997,32 +16933,19 @@
     ],
     "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
-    "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
-    "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
     "apps/kiosk/scripts/verify-user-center-wave0.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
-    ],
-    "apps/kiosk/scripts/verify-word-conversion-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/kiosk/src/ai/AiEvidence.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
@@ -17082,13 +17005,11 @@
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/components/FileContentPreview.tsx": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/components/FilePreviewDialog.tsx": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/components/KioskDeviceStatusPills.tsx": [
@@ -17166,9 +17087,7 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
@@ -17387,8 +17306,7 @@
     "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx": [
       "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
-      "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs"
     ],
     "apps/kiosk/src/pages/contract-review/ContractReviewSessionNotice.tsx": [
       "apps/kiosk/scripts/verify-contract-review-session.mjs"
@@ -17471,7 +17389,6 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx": [
@@ -17558,7 +17475,6 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx": [
@@ -17570,8 +17486,7 @@
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx": [
       "apps/kiosk/scripts/verify-jobfair-checkin.mjs",
@@ -17721,7 +17636,6 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx": [
@@ -17735,15 +17649,13 @@
     "apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs",
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
@@ -17751,7 +17663,6 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx": [
@@ -17799,8 +17710,6 @@
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-scan-input-safety.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -17818,7 +17727,6 @@
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
@@ -17833,7 +17741,6 @@
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
     "apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx": [
@@ -18046,7 +17953,6 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -18076,7 +17982,6 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs"
@@ -18130,7 +18035,6 @@
     ],
     "apps/kiosk/src/pages/profile/me/components/documentReprint.ts": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx": [
@@ -18166,7 +18070,6 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
@@ -18174,16 +18077,13 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts": [
@@ -18341,8 +18241,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -18367,7 +18266,6 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx": [
@@ -18384,7 +18282,6 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx": [
@@ -18395,7 +18292,6 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
@@ -18418,7 +18314,6 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
@@ -18433,7 +18328,6 @@
     "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "services/api/scripts/verify-compliance.ts"
     ],
@@ -18457,7 +18351,6 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -18676,7 +18569,6 @@
     ],
     "apps/kiosk/src/pages/scan/ScanResultPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx": [
@@ -18837,7 +18729,6 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts": [
@@ -18936,14 +18827,12 @@
     ],
     "apps/kiosk/src/services/api/filesMockAdapter.ts": [
       "apps/kiosk/scripts/verify-file-retention-ui.mjs",
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/services/api/httpAdapter.ts": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/services/api/index.ts": [
       "apps/kiosk/scripts/verify-job-ai-ui.mjs",
@@ -18965,8 +18854,7 @@
       "services/api/scripts/verify-job-application-track.ts"
     ],
     "apps/kiosk/src/services/api/jobFairs.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/services/api/jobFit.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -19014,12 +18902,10 @@
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
     ],
     "apps/kiosk/src/services/api/mockAdapter.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/services/api/offlineAgencies.ts": [
-      "apps/kiosk/scripts/verify-fusion-w4.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
     "apps/kiosk/src/services/api/pendingTasks.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
@@ -19037,7 +18923,6 @@
     ],
     "apps/kiosk/src/services/api/printSign.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/services/api/scanTasks.ts": [
@@ -19087,7 +18972,6 @@
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/files/usbImportApi.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -19097,7 +18981,6 @@
     "apps/kiosk/src/services/print/paymentApi.ts": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-payment-codepay.ts"
@@ -19108,7 +18991,6 @@
     "apps/kiosk/src/services/print/printJobsApi.ts": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-prod-build-config.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts"
@@ -19143,15 +19025,7 @@
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs"
     ],
     "apps/kiosk/tests/fixtures/fusion-w4-api.ts": [
-      "apps/kiosk/scripts/verify-fusion-w4.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "apps/kiosk/tests/visual/account-assets-journey.spec.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "apps/kiosk/tests/visual/fixtures/fusion-w2-binary-route.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
     "apps/kiosk/tests/visual/fixtures/fusion-w6-api.ts": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -19166,31 +19040,23 @@
       "apps/kiosk/scripts/verify-visual-evidence-manifest.mjs"
     ],
     "apps/kiosk/tests/visual/fusion-self-assessment-flow.spec.ts": [
-      "apps/kiosk/scripts/verify-fusion-w3.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/tests/visual/fusion-w2-print.spec.ts": [
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "apps/kiosk/tests/visual/fusion-w2-scan.spec.ts": [
-      "apps/kiosk/scripts/verify-fusion-w6.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
-    "apps/kiosk/tests/visual/fusion-w2-tools.spec.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-fusion-w6.mjs"
     ],
     "apps/kiosk/tests/visual/fusion-w3.spec.ts": [
-      "apps/kiosk/scripts/verify-fusion-w3.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/tests/visual/fusion-w4.spec.ts": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
     "apps/kiosk/tests/visual/fusion-w5.spec.ts": [
-      "apps/kiosk/scripts/verify-fusion-w6.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-fusion-w6.mjs"
     ],
     "apps/kiosk/tests/visual/fusion-w6-routes.spec.ts": [
       "apps/kiosk/scripts/verify-fusion-w6.mjs"
@@ -19232,11 +19098,9 @@
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/pages/documents/documents-helpers.js": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/miniapp/pages/documents/documents.js": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
@@ -19330,9 +19194,6 @@
     "apps/miniapp/project.config.json": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
-    "apps/miniapp/scripts/api-contract.json": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
     "apps/miniapp/scripts/tests/page-lifecycle.test.mjs": [
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
@@ -19340,7 +19201,6 @@
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/utils/api.js": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "apps/miniapp/scripts/verify-miniapp-api-contract.mjs",
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -19383,9 +19243,6 @@
     "apps/miniapp/utils/storage.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
       "apps/miniapp/scripts/verify-package-chain.mjs"
-    ],
-    "apps/partner/scripts/verify-excel-template-download-ui.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/partner/src/layouts/PartnerLayoutWrapper.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
@@ -19452,7 +19309,6 @@
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/sources/ExcelImportModal.tsx": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/partner/scripts/verify-excel-template-download-ui.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-job-headcount.ts",
@@ -19462,7 +19318,6 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "apps/partner/src/routes/sources/index.tsx": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
@@ -19518,9 +19373,6 @@
     "apps/terminal-agent/config/agent-config.example.json": [
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
-    "apps/terminal-agent/installer/verify-installer-inputs.mjs": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
     "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
@@ -19533,9 +19385,6 @@
     ],
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
       "apps/terminal-agent/scripts/verify-scan-watcher.ts"
-    ],
-    "apps/terminal-agent/scripts/verify-usb-import-agent.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/terminal-agent/scripts/verify-windows-service-recovery.mjs": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
@@ -19652,16 +19501,9 @@
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts"
     ],
     "apps/terminal-agent/src/local-api/qr-login-server.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/terminal-agent/scripts/verify-local-print-wake.ts",
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
       "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
-    ],
-    "apps/terminal-agent/src/local-api/types.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
-    "apps/terminal-agent/src/local-api/wire.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/terminal-agent/src/printer/image-to-pdf.ts": [
       "apps/terminal-agent/scripts/verify-image-scale-truth.ts",
@@ -19698,9 +19540,7 @@
     ],
     "docs/acceptance/member-print-orders-login-smoke.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs"
     ],
     "docs/acceptance/print-scan-field-execution-runbook.md": [
@@ -19711,8 +19551,6 @@
       "services/api/scripts/verify-print-scan-first-release.ts"
     ],
     "docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts"
     ],
     "docs/acceptance/toolbox-ai-skill-real-acceptance.md": [
@@ -19826,35 +19664,14 @@
     "docs/device/windows-host-acceptance-runbook.md": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
     ],
-    "docs/graph/README.md": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "docs/graph/gates.md": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
     "docs/graph/graph.json": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "scripts/verify-repository-integrity.mjs"
-    ],
-    "docs/graph/orphans.md": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "docs/graph/routes.md": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "docs/operations/price-config-production.md": [
       "services/api/scripts/verify-print-rollout-config.ts"
     ],
     "docs/operations/recruitment-wave2-readonly-planning-runbook.md": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
-    ],
-    "docs/product/feature-scope.md": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "docs/product/role-boundary.md": [
       "services/api/scripts/verify-member-data-retention.ts"
@@ -19871,15 +19688,12 @@
     ],
     "docs/product/user-data-flow-matrix.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "services/api/scripts/verify-member-data-retention.ts"
     ],
     "docs/progress/current-progress.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "scripts/verify-repository-integrity.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
@@ -19894,9 +19708,7 @@
     ],
     "docs/progress/next-tasks.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
@@ -19909,14 +19721,10 @@
       "services/api/scripts/verify-toolbox-preprod-acceptance.ts"
     ],
     "docs/progress/today-claude.md": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "docs/reviews/ai-resume-assets-closure-planning.md": [
       "services/api/scripts/verify-member-data-retention.ts"
-    ],
-    "docs/reviews/result-layer-2026-09-06-packets.md": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "docs/reviews/user-center-commercial-closure-audit-2026-07-16.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -19936,12 +19744,8 @@
     "docs/superpowers/plans/2026-07-04-print-status-tracking-ui.md": [
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
-    "docs/superpowers/plans/2026-07-04-profile-commercial-first-batch-execution.md": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
     "docs/superpowers/plans/2026-07-12-sign-stamp-implementation.md": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "docs/superpowers/plans/2026-07-16-user-center-wave0-truth-baseline.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -19959,8 +19763,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "docs/superpowers/specs/2026-07-12-sign-stamp-design.md": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "package.json": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -19974,7 +19777,6 @@
     ],
     "packages/shared/src/index.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-campus-recruitment-stats.ts",
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-contract-review-contract.ts",
@@ -19996,7 +19798,6 @@
       "apps/kiosk/scripts/verify-job-ai-history-privacy-ui.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-ai-contract-mirror.mjs",
       "services/api/scripts/verify-job-ai.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
@@ -20031,14 +19832,12 @@
     "packages/shared/src/types/fairDto.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-fair-stats-truth.ts"
     ],
     "packages/shared/src/types/file.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-file-retention-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-contract-review-contract.ts"
     ],
     "packages/shared/src/types/job.ts": [
@@ -20051,7 +19850,6 @@
     "packages/shared/src/types/jobMaterials.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "packages/shared/src/types/jobRequirementStats.ts": [
@@ -20073,24 +19871,19 @@
     "packages/shared/src/types/memberAssets.ts": [
       "services/api/scripts/verify-jobfair-checkin.ts"
     ],
-    "packages/shared/src/types/memberPrintOrders.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
     "packages/shared/src/types/memberPrivacy.ts": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
     ],
     "packages/shared/src/types/mockInterview.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "packages/shared/src/types/partner.ts": [
       "services/api/scripts/verify-partner-smart-campus.ts"
     ],
     "packages/shared/src/types/payment.ts": [
       "apps/kiosk/scripts/verify-price-single-source.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-admin-order-filters.ts"
     ],
     "packages/shared/src/types/print.ts": [
@@ -20102,8 +19895,7 @@
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "packages/shared/src/types/printSign.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "packages/shared/src/types/scanTask.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
@@ -20118,7 +19910,6 @@
     ],
     "packages/shared/src/types/uploadSession.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-contract-review-contract.ts"
     ],
     "packages/ui/src/components/Drawer.tsx": [
@@ -20247,9 +20038,7 @@
     ],
     "services/api/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
@@ -20283,8 +20072,7 @@
       "services/api/scripts/verify-db-load-indexes.ts"
     ],
     "services/api/prisma/migrations/20260711120000_add_fair_material_print_bridge/migration.sql": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/prisma/migrations/20260712090000_add_job_fit_anonymous_consent/migration.sql": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -20324,8 +20112,7 @@
       "services/api/scripts/verify-db-load-indexes.ts"
     ],
     "services/api/prisma/postgres/migrations/20260711120000_add_fair_material_print_bridge/migration.sql": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/prisma/postgres/migrations/20260712090000_add_job_fit_anonymous_consent/migration.sql": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -20360,7 +20147,6 @@
     ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
@@ -20386,7 +20172,6 @@
     ],
     "services/api/prisma/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -20633,57 +20418,32 @@
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
     ],
     "services/api/scripts/verify-admin-fairs.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
-    "services/api/scripts/verify-admin-orders-readonly.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "services/api/scripts/verify-admin-pending-dispose.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "services/api/scripts/verify-admin-print-outcome.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "services/api/scripts/verify-api20-manual-refund.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "services/api/scripts/verify-backend-p0-contracts.mjs": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-benefit-redemption.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
     "services/api/scripts/verify-career-plan.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-change-password.ts": [
       "services/api/scripts/run-verify-change-password.mjs"
     ],
     "services/api/scripts/verify-fair-company-positions.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-fair-info-fields.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-fair-visit-plan.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-file-assets-trial-acceptance.ts": [
       "services/api/scripts/verify-file-assets-trial-acceptance.ts"
     ],
     "services/api/scripts/verify-governed-job-fit.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
-    ],
-    "services/api/scripts/verify-http-exception-filter.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "services/api/scripts/verify-job-ai-backend.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -20705,15 +20465,12 @@
     ],
     "services/api/scripts/verify-job-materials.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-job-materials.ts"
     ],
     "services/api/scripts/verify-jobfair-venue-guide.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-kiosk-cashier-ui.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
@@ -20722,9 +20479,6 @@
     ],
     "services/api/scripts/verify-member-data-request-truth.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
-    ],
-    "services/api/scripts/verify-member-print-orders.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "services/api/scripts/verify-member-step-up-adversarial.ts": [
       "services/api/scripts/verify-member-step-up.ts"
@@ -20740,42 +20494,26 @@
     "services/api/scripts/verify-member-step-up.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
-    "services/api/scripts/verify-offline-agencies-contract.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
-    "services/api/scripts/verify-partner-excel-import.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
     "services/api/scripts/verify-payment-flow.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
-    "services/api/scripts/verify-print-color-duplex-capability.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
-    ],
     "services/api/scripts/verify-print-scan-first-release.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-print-sign.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-production-real-services.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
     "services/api/scripts/verify-production-runtime-gates.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
     "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
     "services/api/scripts/verify-recruitment-p1-preflight.ts": [
@@ -20787,14 +20525,10 @@
     "services/api/scripts/verify-toolbox-ai-skill-intents.ts": [
       "services/api/scripts/verify-toolbox-ai-skill-real-acceptance.ts"
     ],
-    "services/api/scripts/verify-upload-sessions.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
-    ],
     "services/api/scripts/verify-wave2-account-rebind.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/src/activities/activities.controller.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/activity/activity.controller.ts": [
@@ -20832,20 +20566,15 @@
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-admin-order-filters.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-admin-orders-readonly.ts",
       "services/api/scripts/verify-admin-pending-dispose.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-payment-flow.ts"
-    ],
-    "services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "services/api/src/admin-print-scan/admin-print-scan.service.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
@@ -21093,7 +20822,6 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
@@ -21113,7 +20841,6 @@
     "services/api/src/ai/resume/fair-visit-plan.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts"
@@ -21274,7 +21001,6 @@
     ],
     "services/api/src/app.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -21567,7 +21293,6 @@
       "services/api/scripts/verify-member-benefits-admin.ts"
     ],
     "services/api/src/common/filters/http-exception.filter.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -21740,7 +21465,6 @@
       "services/api/scripts/verify-payment-real-channels.ts"
     ],
     "services/api/src/config/production-runtime-gates.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs",
@@ -21885,7 +21609,6 @@
     ],
     "services/api/src/files/dto/kiosk-upload-options.dto.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/files/file-page-count.util.ts": [
@@ -21894,7 +21617,6 @@
     ],
     "services/api/src/files/file-validation.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-cos-storage.ts",
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-file-display-truth.ts",
@@ -21906,7 +21628,6 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-file-retention-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-member-data-retention.ts",
@@ -21929,7 +21650,6 @@
     "services/api/src/files/files.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-cos-files.ts",
@@ -21972,7 +21692,6 @@
     "services/api/src/files/retention-policy.ts": [
       "apps/kiosk/scripts/verify-file-retention-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-file-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -21980,7 +21699,6 @@
     ],
     "services/api/src/files/signing.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-document-conversion.ts",
@@ -22088,12 +21806,10 @@
     "services/api/src/job-materials/job-materials.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-job-materials.ts"
     ],
     "services/api/src/job-materials/job-materials.types.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/src/job-sync/job-sync.controller.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -22121,7 +21837,6 @@
     "services/api/src/jobs/admin-fairs.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
@@ -22185,13 +21900,11 @@
       "services/api/scripts/verify-partner-fair-subresources.ts"
     ],
     "services/api/src/jobs/fair-material-print-bridge.cleanup.task.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/src/jobs/fair-material-print-bridge.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
@@ -22258,7 +21971,6 @@
       "services/api/scripts/verify-publish-expiry-completeness.ts"
     ],
     "services/api/src/jobs/jobs-excel.service.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
@@ -22299,7 +22011,6 @@
       "services/api/scripts/verify-public-fair-demo-guard.ts"
     ],
     "services/api/src/jobs/jobs-partner.service.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -22320,7 +22031,6 @@
       "services/api/scripts/verify-public-fair-demo-guard.ts"
     ],
     "services/api/src/jobs/jobs-shared.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-datetime-honesty.mjs",
       "services/api/scripts/verify-fair-list-integrity.ts",
       "services/api/scripts/verify-fair-stats-truth.ts",
@@ -22333,7 +22043,6 @@
     "services/api/src/jobs/jobs.controller.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -22345,13 +22054,11 @@
     ],
     "services/api/src/jobs/jobs.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-campus-recruitment-stats.ts",
       "services/api/scripts/verify-job-data-quality.ts"
     ],
     "services/api/src/jobs/jobs.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-bulk-publish.ts",
@@ -22383,7 +22090,6 @@
       "services/api/scripts/verify-partner-fair-subresources.ts"
     ],
     "services/api/src/jobs/partner-import-file.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-partner-excel-import.ts"
     ],
     "services/api/src/jobs/recruitment-integration.contract.ts": [
@@ -22396,7 +22102,6 @@
       "services/api/scripts/verify-job-customer-sample-readiness.ts"
     ],
     "services/api/src/kiosk-session/kiosk-session.controller.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/legal/admin-legal-docs.controller.ts": [
@@ -22451,7 +22156,6 @@
     ],
     "services/api/src/member-assets/member-assets.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
@@ -22580,13 +22284,9 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "services/api/src/member-print-orders/member-print-orders.service.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-order.ts"
-    ],
-    "services/api/src/member-print-orders/member-print-orders.types.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "services/api/src/member-print-orders/order-submission-ledger.ts": [
       "services/api/scripts/verify-member-print-order-idempotency.ts",
@@ -22692,14 +22392,12 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/notifications/notifications.controller.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/offline-agencies/admin-offline-agencies.controller.ts": [
@@ -22712,7 +22410,6 @@
     "services/api/src/offline-agencies/offline-agencies.service.ts": [
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
@@ -22757,7 +22454,6 @@
       "services/api/scripts/verify-admin-billing.ts"
     ],
     "services/api/src/payment/admin-order-actions.controller.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-payment-flow.ts"
@@ -22778,7 +22474,6 @@
       "services/api/scripts/verify-payment-flow.ts"
     ],
     "services/api/src/payment/online-payment.service.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "services/api/scripts/verify-admin-print-scan.ts",
@@ -22848,7 +22543,6 @@
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
     "services/api/src/payment/payment-session-token.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "services/api/scripts/verify-admin-print-scan.ts",
@@ -22864,7 +22558,6 @@
     ],
     "services/api/src/payment/payment.controller.ts": [
       "apps/kiosk/scripts/verify-price-single-source.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "services/api/scripts/verify-payment-codepay.ts"
@@ -22876,7 +22569,6 @@
       "services/api/scripts/verify-admin-order-filters.ts"
     ],
     "services/api/src/payment/pending-refund-signal.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-admin-orders-readonly.ts",
       "services/api/scripts/verify-admin-pending-dispose.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
@@ -23019,12 +22711,10 @@
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts"
     ],
     "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-admin-pending-dispose.ts",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
     "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts": [
-      "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
@@ -23062,7 +22752,6 @@
     "services/api/src/print-jobs/print-jobs.service.ts": [
       "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
@@ -23119,29 +22808,23 @@
     ],
     "services/api/src/print-sign/print-sign-geometry.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/print-sign/print-sign.controller.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/src/print-sign/print-sign.dto.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/src/print-sign/print-sign.module.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/src/print-sign/print-sign.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/print-sign/print-sign.types.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/prisma/create-client.ts": [
@@ -23150,7 +22833,6 @@
     ],
     "services/api/src/prisma/prisma.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-admin-fairs.ts",
@@ -23375,7 +23057,6 @@
     ],
     "services/api/src/storage/object-key.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-cos-storage.ts",
       "services/api/scripts/verify-member-data-export-files.ts"
     ],
@@ -23648,7 +23329,6 @@
     ],
     "services/api/src/upload-sessions/upload-sessions.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-upload-scene.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ]
@@ -23723,7 +23403,7 @@
         "missing": []
       },
       "file": "apps/admin/scripts/verify-admin-billing-ui.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/admin",
       "scriptNames": [
@@ -23790,7 +23470,7 @@
         "missing": []
       },
       "file": "apps/admin/scripts/verify-admin-file-lifecycle.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/admin",
       "scriptNames": [
@@ -23855,7 +23535,7 @@
         "missing": []
       },
       "file": "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/admin",
       "scriptNames": [
@@ -24625,7 +24305,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-file-retention-ui.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -24776,7 +24456,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -24841,7 +24521,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-fusion-w3.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -25216,7 +24896,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -25436,7 +25116,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -25533,7 +25213,7 @@
         ]
       },
       "file": "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -25725,7 +25405,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26041,7 +25721,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-price-single-source.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26072,7 +25752,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26430,7 +26110,7 @@
         ]
       },
       "file": "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26444,179 +26124,17 @@
         "dirs": [],
         "files": [
           ".github/workflows/ci.yml",
-          "apps/admin/scripts/verify-admin-file-lifecycle.mjs",
-          "apps/admin/src/routes/files/index.tsx",
-          "apps/kiosk/package.json",
-          "apps/kiosk/playwright.w3.config.ts",
-          "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
-          "apps/kiosk/scripts/verify-file-retention-ui.mjs",
-          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-          "apps/kiosk/scripts/verify-fusion-w3.mjs",
-          "apps/kiosk/scripts/verify-fusion-w5.mjs",
-          "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
-          "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
-          "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
-          "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
-          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
-          "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
-          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-          "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-          "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
-          "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
           "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
-          "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
-          "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
-          "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
-          "apps/kiosk/src/components/FileContentPreview.tsx",
-          "apps/kiosk/src/components/FilePreviewDialog.tsx",
-          "apps/kiosk/src/layouts/KioskRoot.tsx",
-          "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx",
-          "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
-          "apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx",
-          "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
-          "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx",
-          "apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx",
-          "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
-          "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
-          "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
-          "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
-          "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
-          "apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx",
           "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
-          "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
-          "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
-          "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
-          "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
-          "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
-          "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
-          "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
-          "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
-          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
-          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
-          "apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx",
-          "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
-          "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
-          "apps/kiosk/src/routes/index.tsx",
-          "apps/kiosk/src/services/api/filesMockAdapter.ts",
-          "apps/kiosk/src/services/api/httpAdapter.ts",
-          "apps/kiosk/src/services/api/jobFairs.ts",
-          "apps/kiosk/src/services/api/mockAdapter.ts",
-          "apps/kiosk/src/services/api/printSign.ts",
-          "apps/kiosk/src/services/files/usbImportApi.ts",
-          "apps/kiosk/src/services/print/paymentApi.ts",
-          "apps/kiosk/src/services/print/printJobsApi.ts",
-          "apps/kiosk/tests/visual/account-assets-journey.spec.ts",
-          "apps/kiosk/tests/visual/fixtures/fusion-w2-binary-route.ts",
-          "apps/kiosk/tests/visual/fusion-self-assessment-flow.spec.ts",
-          "apps/kiosk/tests/visual/fusion-w2-scan.spec.ts",
-          "apps/kiosk/tests/visual/fusion-w2-tools.spec.ts",
-          "apps/kiosk/tests/visual/fusion-w3.spec.ts",
-          "apps/kiosk/tests/visual/fusion-w5.spec.ts",
-          "apps/miniapp/pages/documents/documents-helpers.js",
-          "apps/miniapp/pages/documents/documents.js",
-          "apps/miniapp/scripts/api-contract.json",
-          "apps/miniapp/utils/api.js",
-          "apps/partner/scripts/verify-excel-template-download-ui.mjs",
-          "apps/partner/src/routes/sources/ExcelImportModal.tsx",
-          "apps/partner/src/routes/sources/index.tsx",
-          "apps/terminal-agent/installer/verify-installer-inputs.mjs",
-          "apps/terminal-agent/scripts/verify-usb-import-agent.ts",
-          "apps/terminal-agent/src/local-api/qr-login-server.ts",
-          "apps/terminal-agent/src/local-api/types.ts",
-          "apps/terminal-agent/src/local-api/wire.ts",
-          "docs/acceptance/member-print-orders-login-smoke.md",
-          "docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md",
-          "docs/graph/README.md",
-          "docs/graph/gates.md",
-          "docs/graph/graph.json",
-          "docs/graph/orphans.md",
-          "docs/graph/routes.md",
-          "docs/product/feature-scope.md",
-          "docs/product/user-data-flow-matrix.md",
-          "docs/progress/current-progress.md",
-          "docs/progress/next-tasks.md",
-          "docs/progress/today-claude.md",
-          "docs/reviews/result-layer-2026-09-06-packets.md",
-          "docs/superpowers/plans/2026-07-04-profile-commercial-first-batch-execution.md",
-          "docs/superpowers/plans/2026-07-12-sign-stamp-implementation.md",
-          "docs/superpowers/specs/2026-07-12-sign-stamp-design.md",
-          "packages/shared/src/index.ts",
-          "packages/shared/src/types/ai.ts",
-          "packages/shared/src/types/fairDto.ts",
-          "packages/shared/src/types/file.ts",
-          "packages/shared/src/types/jobMaterials.ts",
-          "packages/shared/src/types/mockInterview.ts",
-          "packages/shared/src/types/printSign.ts",
-          "packages/shared/src/types/uploadSession.ts",
-          "services/api/package.json",
-          "services/api/prisma/migrations/20260711120000_add_fair_material_print_bridge/migration.sql",
-          "services/api/prisma/postgres/migrations/20260711120000_add_fair_material_print_bridge/migration.sql",
-          "services/api/prisma/postgres/schema.prisma",
-          "services/api/prisma/schema.prisma",
-          "services/api/scripts/verify-admin-fairs.ts",
-          "services/api/scripts/verify-benefit-redemption.ts",
-          "services/api/scripts/verify-career-plan.ts",
-          "services/api/scripts/verify-fair-company-positions.ts",
-          "services/api/scripts/verify-fair-info-fields.ts",
-          "services/api/scripts/verify-fair-visit-plan.ts",
-          "services/api/scripts/verify-http-exception-filter.ts",
-          "services/api/scripts/verify-job-materials.ts",
-          "services/api/scripts/verify-jobfair-venue-guide.ts",
-          "services/api/scripts/verify-kiosk-cashier-ui.ts",
-          "services/api/scripts/verify-partner-excel-import.ts",
-          "services/api/scripts/verify-payment-flow.ts",
-          "services/api/scripts/verify-print-scan-first-release.ts",
-          "services/api/scripts/verify-print-sign.ts",
-          "services/api/scripts/verify-production-real-services.ts",
-          "services/api/scripts/verify-production-runtime-gates.ts",
-          "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts",
-          "services/api/scripts/verify-upload-sessions.ts",
-          "services/api/src/ai/resume/career-plan.service.ts",
-          "services/api/src/ai/resume/fair-visit-plan.service.ts",
-          "services/api/src/app.module.ts",
-          "services/api/src/common/filters/http-exception.filter.ts",
-          "services/api/src/config/production-runtime-gates.ts",
-          "services/api/src/files/dto/kiosk-upload-options.dto.ts",
-          "services/api/src/files/file-validation.ts",
-          "services/api/src/files/file.types.ts",
-          "services/api/src/files/files.service.ts",
-          "services/api/src/files/retention-policy.ts",
-          "services/api/src/files/signing.ts",
-          "services/api/src/job-materials/job-materials.service.ts",
-          "services/api/src/job-materials/job-materials.types.ts",
-          "services/api/src/jobs/admin-fairs.service.ts",
-          "services/api/src/jobs/fair-material-print-bridge.cleanup.task.ts",
-          "services/api/src/jobs/fair-material-print-bridge.service.ts",
-          "services/api/src/jobs/jobs-excel.service.ts",
-          "services/api/src/jobs/jobs-partner.service.ts",
-          "services/api/src/jobs/jobs-shared.ts",
-          "services/api/src/jobs/jobs.controller.ts",
-          "services/api/src/jobs/jobs.module.ts",
-          "services/api/src/jobs/jobs.service.ts",
-          "services/api/src/jobs/partner-import-file.ts",
-          "services/api/src/member-assets/member-assets.service.ts",
-          "services/api/src/mock-interview/mock-interview.service.ts",
-          "services/api/src/payment/online-payment.service.ts",
-          "services/api/src/payment/payment-session-token.ts",
-          "services/api/src/payment/payment.controller.ts",
-          "services/api/src/print-jobs/print-jobs.service.ts",
-          "services/api/src/print-sign/print-sign-geometry.ts",
-          "services/api/src/print-sign/print-sign.controller.ts",
-          "services/api/src/print-sign/print-sign.dto.ts",
-          "services/api/src/print-sign/print-sign.module.ts",
-          "services/api/src/print-sign/print-sign.service.ts",
-          "services/api/src/print-sign/print-sign.types.ts",
-          "services/api/src/prisma/prisma.service.ts",
-          "services/api/src/storage/object-key.ts",
-          "services/api/src/upload-sessions/upload-sessions.service.ts"
+          "apps/kiosk/src/routes/index.tsx"
         ],
         "missing": []
       },
@@ -26769,81 +26287,19 @@
         "dirs": [],
         "files": [
           ".github/workflows/ci.yml",
-          "apps/admin/scripts/verify-admin-billing-ui.mjs",
-          "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-          "apps/admin/src/routes/billing/index.tsx",
-          "apps/admin/src/routes/orders/index.tsx",
-          "apps/admin/src/routes/orders/orderHonestyCopy.ts",
-          "apps/admin/src/services/api/adminOrdersReadonly.ts",
-          "apps/admin/src/services/api/adminPrintJobs.ts",
-          "apps/admin/src/services/api/userErrorMessage.ts",
-          "apps/kiosk/package.json",
-          "apps/kiosk/scripts/verify-fusion-w5.mjs",
-          "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
-          "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
-          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
-          "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
-          "apps/kiosk/scripts/verify-price-single-source.mjs",
-          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-          "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-          "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
-          "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
           "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
-          "apps/kiosk/src/layouts/KioskRoot.tsx",
-          "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
-          "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
-          "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
           "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
-          "apps/kiosk/src/routes/index.tsx",
-          "apps/kiosk/src/services/api/offlineAgencies.ts",
-          "apps/kiosk/tests/fixtures/fusion-w4-api.ts",
-          "apps/kiosk/tests/visual/account-assets-journey.spec.ts",
-          "apps/kiosk/tests/visual/fusion-w5.spec.ts",
-          "docs/acceptance/member-print-orders-login-smoke.md",
-          "docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md",
-          "docs/graph/README.md",
-          "docs/graph/gates.md",
-          "docs/graph/graph.json",
-          "docs/graph/orphans.md",
-          "docs/graph/routes.md",
-          "docs/progress/current-progress.md",
-          "docs/progress/next-tasks.md",
-          "packages/shared/src/types/memberPrintOrders.ts",
-          "packages/shared/src/types/payment.ts",
-          "services/api/package.json",
-          "services/api/scripts/verify-admin-orders-readonly.ts",
-          "services/api/scripts/verify-admin-pending-dispose.ts",
-          "services/api/scripts/verify-admin-print-outcome.ts",
-          "services/api/scripts/verify-api20-manual-refund.ts",
-          "services/api/scripts/verify-backend-p0-contracts.mjs",
-          "services/api/scripts/verify-benefit-redemption.ts",
-          "services/api/scripts/verify-member-print-orders.ts",
-          "services/api/scripts/verify-offline-agencies-contract.ts",
-          "services/api/scripts/verify-print-color-duplex-capability.ts",
-          "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts",
-          "services/api/src/activities/activities.controller.ts",
-          "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts",
-          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
-          "services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts",
-          "services/api/src/kiosk-session/kiosk-session.controller.ts",
-          "services/api/src/member-print-orders/member-print-orders.service.ts",
-          "services/api/src/member-print-orders/member-print-orders.types.ts",
-          "services/api/src/notifications/notifications.controller.ts",
-          "services/api/src/offline-agencies/offline-agencies.service.ts",
-          "services/api/src/payment/admin-order-actions.controller.ts",
-          "services/api/src/payment/pending-refund-signal.ts",
-          "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
-          "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts"
+          "apps/kiosk/src/routes/index.tsx"
         ],
         "missing": []
       },
@@ -27085,7 +26541,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -27133,7 +26589,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -27434,7 +26890,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -27651,7 +27107,7 @@
         "missing": []
       },
       "file": "apps/partner/scripts/verify-excel-template-download-ui.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/partner",
       "scriptNames": [
@@ -28217,7 +27673,7 @@
         "missing": []
       },
       "file": "apps/terminal-agent/scripts/verify-usb-import-agent.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "terminal-agent",
       "scriptNames": [
@@ -29469,7 +28925,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-admin-orders-readonly.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29578,7 +29034,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-admin-pending-dispose.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29633,7 +29089,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-admin-print-outcome.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29996,7 +29452,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-api20-manual-refund.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -30154,7 +29610,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-backend-p0-contracts.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -31501,7 +30957,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-http-exception-filter.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -32921,7 +32377,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-member-print-orders.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -33223,7 +32679,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-offline-agencies-contract.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -33581,7 +33037,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-partner-excel-import.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -34027,7 +33483,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-print-color-duplex-capability.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -35773,7 +35229,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-upload-sessions.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -37348,6 +36804,15 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-03-deploy-data-safety-gate.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/superpowers/plans/2026-07-04-profile-commercial-first-batch-execution.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",

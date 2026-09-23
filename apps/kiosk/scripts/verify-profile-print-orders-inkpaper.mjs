@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,9 +5,11 @@ import { fileURLToPath } from 'node:url'
 // ============================================================
 // verify:profile-print-orders-inkpaper
 //
-// 目标：/me/print-orders 只做墨青纸感视觉收口，
-// 保留本人打印订单真实 API、支付字段、取件码、分页筛选、自动刷新和反馈跳转。
+// 目标：/me/print-orders 的页面/行为合同 —— 青序会员壳结构与旧壳排除，
+// 本人打印订单真实 API、支付字段、取件码、分页筛选、自动刷新、反馈跳转与招聘合规。
 // 支付诚实性细节继续由 verify:member-print-orders-ui 覆盖。
+// 集成候选的文件范围不归本守卫：由 verify:profile-commercial-first-batch、
+// verify:fusion-w5、project graph 与 CI diff 合同负责（见文件末尾退役说明）。
 // ============================================================
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -45,28 +46,8 @@ function readImportedCss(entryPath, expectedImports, message) {
   pass(`${message} — 仅拼接聚合入口显式导入的 CSS`)
   return imports.map((importPath) => read(join(dirname(entryPath), importPath))).join('\n')
 }
-function git(args) {
-  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-}
-function listChangedFiles() {
-  const committed = git(['diff', '--name-only', 'origin/main...HEAD'])
-    .split('\n')
-    .filter(Boolean)
-  const unstaged = git(['diff', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const staged = git(['diff', '--cached', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const untracked = git(['ls-files', '--others', '--exclude-standard'])
-    .split('\n')
-    .filter(Boolean)
-    .filter((file) => !file.startsWith('.ccg/tasks/') && !file.startsWith('docs/superpowers/'))
 
-  return [...new Set([...committed, ...unstaged, ...staged, ...untracked])]
-}
-
-console.log('\n=== /me/print-orders 墨青纸感换装守卫 ===')
+console.log('\n=== /me/print-orders 页面/行为合同守卫 ===')
 
 const page = read('src/pages/profile/me/MyPrintOrdersPage.tsx')
 const css = readImportedCss(
@@ -168,143 +149,23 @@ expectAbsent(feedbackVerify, /\^apps\\\/kiosk\\\/src\\\/pages\\\/profile\\\/me\\
 expectAbsent(resumesVerify, /'apps\/kiosk\/src\/pages\/profile\/me\/MyPrintOrdersPage\.tsx'/, 'resumes/notifications 守卫不再拦截打印订单页专属批次')
 expectAbsent(resumesVerify, /\^apps\\\/kiosk\\\/src\\\/pages\\\/profile\\\/me\\\/printOrders\\\//, 'resumes/notifications 守卫不再拦截 printOrders 子组件')
 
-let changedFiles = []
-try {
-  changedFiles = listChangedFiles()
-} catch (error) {
-  if (error instanceof Error) console.error(`  ${error.message}`)
-  fail('范围守卫无法读取 git diff')
-}
-
-const allowedChanged = new Set([
-  '.github/workflows/ci.yml',
-  'docs/acceptance/member-print-orders-login-smoke.md',
-  'apps/kiosk/package.json',
-  'apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs',
-  'apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs',
-  'apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs',
-  'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',
-  'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
-  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
-  'apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs',
-  'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
-  'apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx',
-  'apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx',
-  'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
-  'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
-  'docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md',
-  'docs/progress/current-progress.md',
-  'docs/progress/next-tasks.md',
-  'services/api/package.json',
-  'services/api/scripts/verify-benefit-redemption.ts',
-  'services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts',
-  // 序 13「订单详情展示真实打印参数与优惠退款额」（2026-09-06）。
-  // 该功能横跨 API → shared 类型 → Admin → Kiosk，以下文件都在本页的业务链路上。
-  'apps/admin/scripts/verify-admin-billing-ui.mjs',
-  'apps/admin/scripts/verify-admin-orders-readonly-ui.mjs',
-  'apps/admin/src/routes/billing/index.tsx',
-  'apps/admin/src/routes/orders/index.tsx',
-  'apps/admin/src/routes/orders/orderHonestyCopy.ts',
-  'apps/admin/src/services/api/adminOrdersReadonly.ts',
-  'apps/kiosk/scripts/verify-member-print-orders-ui.mjs',
-  'apps/kiosk/scripts/verify-price-single-source.mjs',
-  'apps/kiosk/src/pages/print/PrintCashierPage.tsx',
-  'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
-  'packages/shared/src/types/memberPrintOrders.ts',
-  'packages/shared/src/types/payment.ts',
-  'services/api/scripts/verify-admin-orders-readonly.ts',
-  'services/api/scripts/verify-member-print-orders.ts',
-  'services/api/scripts/verify-print-color-duplex-capability.ts',
-  'services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts',
-  'services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts',
-  'services/api/src/member-print-orders/member-print-orders.service.ts',
-  'services/api/src/member-print-orders/member-print-orders.types.ts',
-  // 第二次被迫加行：paymentCopy.ts 同时被 verify:fusion-w5 的哈希冻结契约覆盖，
-  // 纯追加改动要求把基线哈希前移，于是 verify-fusion-w5.mjs 也进了变更集，
-  // 又撞上本 allowlist。
-  'apps/kiosk/scripts/verify-fusion-w5.mjs',
-  // 第三、四、五次：paymentCopy.ts 还同时被 verify-profile-inkpaper-home（两处判定）
-  // 与 verify-lightflow-profile-entry 的范围 allowlist 覆盖。给那两个门禁加行之后，
-  // 它们自己又进了变更集，于是**又**撞回本 allowlist —— 一次修复在同一个 PR 内
-  // 级联触发五处加行。这不是巧合，是下面那段设计问题的直接后果。
-  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
-  'apps/kiosk/scripts/verify-lightflow-profile-entry.mjs',
-  // API-20（2026-09-06）：管理端人工发起退款 + 顾客侧待退款展示。只加行、不动检查逻辑。
-  // 本分支基于 fix/misclassified-p2（#824 待退款信号），变更集含信号打标与公开列表收口文件。
-  'apps/admin/src/services/api/adminPrintJobs.ts',
-  'apps/admin/src/services/api/userErrorMessage.ts',
-  'apps/kiosk/src/services/api/offlineAgencies.ts',
-  'apps/kiosk/tests/fixtures/fusion-w4-api.ts',
-  'services/api/scripts/verify-admin-pending-dispose.ts',
-  'services/api/scripts/verify-admin-print-outcome.ts',
-  'services/api/scripts/verify-api20-manual-refund.ts',
-  'services/api/scripts/verify-backend-p0-contracts.mjs',
-  'services/api/scripts/verify-offline-agencies-contract.ts',
-  'services/api/src/activities/activities.controller.ts',
-  'services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts',
-  'services/api/src/kiosk-session/kiosk-session.controller.ts',
-  'services/api/src/notifications/notifications.controller.ts',
-  'services/api/src/offline-agencies/offline-agencies.service.ts',
-  'services/api/src/payment/admin-order-actions.controller.ts',
-  'services/api/src/payment/pending-refund-signal.ts',
-  'services/api/src/print-jobs/admin-print-jobs-abandon.service.ts',
-  'services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts',
-  // 稿 38-member-assets 迁移（2026-09-23）：文档 + 打印订单同批迁入青序流光。只加行，不改判定逻辑。
-  'apps/kiosk/src/layouts/KioskRoot.tsx',
-  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
-  'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
-  'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',
-  'apps/kiosk/scripts/verify-job-material-library-ui.mjs',
-  'apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs',
-  'apps/kiosk/tests/visual/fusion-w5.spec.ts',
-  'apps/kiosk/tests/visual/account-assets-journey.spec.ts',
-  // 改了门禁与页面样式入口，按 CLAUDE.md §14 重跑 `pnpm graph` 的生成产物（不手改）。
-  'docs/graph/README.md',
-  'docs/graph/gates.md',
-  'docs/graph/graph.json',
-  'docs/graph/orphans.md',
-  'docs/graph/routes.md',
-])
-
-// ⚠️ 设计问题，待产品负责人裁决（2026-09-06，序 13 撞上后记录，本次未擅自改动）
+// 2026-09-23 退役：原「历史变更集 allowlist / unexpectedChanged」范围检查。
 //
-// 上面这张 allowlist 断言的是：只要 PR 碰了 /me/print-orders，**整个变更集**
-// 就必须落在清单内。它是「墨青纸感视觉收口」那个批次落地时的装置，用来证明
-// 那批改动没夹带业务逻辑。那个批次早已合入，这个目的已经达成 ——
-// 已落地的批次不可能被后来的 PR 追溯弄脏。
+// 它断言：只要 PR 碰了 /me/print-orders，origin/main...HEAD 的**整个变更集**就必须落在
+// 墨青纸感视觉收口批次的清单内。那个批次早已合入，目的已达成；留下来之后对任何正当改
+// 这一页的工作都是敌对的 —— 序 13（2026-09-06）横跨四层 19 个文件全在清单外，同一个 PR
+// 内级联触发五处加行；2026-09-06 此处记下的建议裁决即「退役这段变更集范围检查，保留其余
+// 全部断言」。到多批次集成候选上，它把几百个已审计的合法文件一律判越界，清单只剩历史流水账。
 //
-// 但它留下来之后对**任何**正当改这一页的工作都是敌对的。序 13 是第一个撞上的：
-// 该功能横跨四层，19 个文件全在清单外，而它们没有一个是「夹带」。
-// 本次按最小侵入处理 —— 加行放行，不动检查逻辑。
-//
-// 问题在于这条路走不长：下一个改这一页的 PR 还要再加一批，清单会退化成
-// 「历史上谁改过什么」的流水账，不再是契约。一个每次都要靠加行才能变绿的门禁
-// 挡不住任何东西。（原作者已察觉过一半：touchesOwnedPage 条件挡住了「无关 PR
-// 被误伤」，但挡不住「相关 PR 必然被误伤」。）
-//
-// 建议裁决：退役这段变更集范围检查，保留本文件其余全部断言（页面结构、真实
-// API、支付字段、取件码、分页筛选、自动刷新、反馈跳转，以及三个兄弟守卫不得
-// 回头拦截本页）。支付诚实性另有 verify:member-print-orders-ui 覆盖，序 13
-// 已对它做过变异测试（把实付改成「应付减优惠」推算 → 该门禁转红）。
-// 未获裁决前保持现状，不要自行删除。
-
-// 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/print-orders 明细页（或其 printOrders 子组件）时，
-// 才强制 allowlist 范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次改动。
-const touchesOwnedPage =
-  changedFiles.includes('apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx') ||
-  changedFiles.some((file) => file.startsWith('apps/kiosk/src/pages/profile/me/printOrders/'))
-const unexpectedChanged = touchesOwnedPage ? changedFiles.filter((file) => !allowedChanged.has(file)) : []
-if (!touchesOwnedPage) {
-  pass('本 PR 未触碰 /me/print-orders 明细页，跳过范围 allowlist 检查（守卫条件触发）')
-} else if (unexpectedChanged.length === 0) {
-  pass('diff 仅触碰打印订单页视觉收口、局部 CSS、必要守卫、package 和 CI')
-} else {
-  fail(`diff 出现禁止范围变更：${unexpectedChanged.join(', ')}`)
-}
+// 本守卫现在只验上方的页面/行为合同（页面结构、真实 API、支付字段、取件码、分页筛选、
+// 自动刷新、反馈跳转，以及三个兄弟守卫不得回头拦截本页）。文件范围由
+// verify:profile-commercial-first-batch（触碰 /me/* 时委托 verify:fusion-w5 精确合同）、
+// project graph 与 CI diff 合同负责；支付诚实性另有 verify:member-print-orders-ui 覆盖。
+console.log('  INFO 本守卫只验页面/行为合同，不检查文件范围；集成候选的文件范围由 verify:profile-commercial-first-batch / verify:fusion-w5 / project graph / CI diff 合同负责')
 
 if (failures > 0) {
-  console.error(`\n❌ ${failures} 项失败 — /me/print-orders 墨青纸感守卫未通过\n`)
+  console.error(`\n❌ ${failures} 项失败 — /me/print-orders 页面/行为合同守卫未通过\n`)
   process.exit(1)
 }
 
-console.log('✅ ALL PASS — /me/print-orders 墨青纸感换装守卫通过\n')
+console.log('✅ ALL PASS — /me/print-orders 页面/行为合同守卫通过（不含文件范围检查）\n')

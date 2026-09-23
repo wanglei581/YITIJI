@@ -42,15 +42,15 @@ node scripts/project-graph-query.mjs model PrintTask
 | HTTP 端点（services/api） | 532 |
 | Prisma 模型 | 102 |
 | 门禁脚本文件 | 472 |
-| ├ 其中辅助库（被别的门禁 import） | 123 |
+| ├ 其中辅助库（被别的门禁 import） | 94 |
 | ├ 已在 package.json 里有脚本名 | 433 |
 | ├ 在 CI 执行闭包里 | 421 |
 | └ **无脚本名，从未被执行** | 0 |
-| 被至少一条门禁断言的文件 | 1525 |
+| 被至少一条门禁断言的文件 | 1477 |
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 48 |
 | 孤儿候选 · medium（仅文档提及） | 15 |
-| 孤儿候选 · low（全仓零提及） | 93 |
+| 孤儿候选 · low（全仓零提及） | 94 |
 
 ## 分册
 
@@ -78,7 +78,7 @@ flowchart LR
   admin -->|"/api/v1"| api
   partner -->|"/api/v1"| api
   api --> db
-  gates -.->|"断言 1525 个文件"| kiosk
+  gates -.->|"断言 1477 个文件"| kiosk
   gates -.-> admin
   gates -.-> partner
   gates -.-> api

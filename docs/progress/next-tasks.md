@@ -1387,6 +1387,8 @@ POST /api/v1/upload-sessions/scene/resolve → 端点存在，乱码统一回 UP
 
 ### ⚠️ 合入前必须拆分本分支（2026-09-02 记）
 
+> 2026-09-23 更新：下文所述 `verify:profile-print-orders-inkpaper`（及 `verify:profile-documents-inkpaper`）的变更集 allowlist 已退役，两条守卫现只验页面/行为合同，不再因多主题分支「必红」；文件范围改由 `verify:profile-commercial-first-batch` / `verify:fusion-w5` / project graph / CI diff 合同负责。本节保留为历史记录。
+
 `claude/project-readiness-review-959ffe` 已累积 15 个提交，横跨设计地基、
 奔图参数、AI 契约、文档清理、打印订单展示等多个主题。
 `verify:profile-print-orders-inkpaper` 是**批次范围守卫**——只要 diff 碰了
