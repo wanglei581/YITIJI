@@ -1,8 +1,8 @@
 # 当前开发进度
 
-2026-09-23 **已支付文件不可用告警已补入本地候选，商业仍 NO-GO。**
+2026-09-23 **已支付文件不可用告警与 Admin 展示已补入本地候选，商业仍 NO-GO。**
 在 `paid_pending_file_unavailable` 告警类型中，后端只筛选 `PrintTask.status=pending`、订单 `payStatus=paid` 且现代任务 `fileId` 非空的记录；FileObject 非 active、已删除、已过期或关系缺失时，复用既有派生告警和 `AlertDisposition` 单条正向查证。历史 `fileId=null` 兼容任务、active 文件和已退款订单不误报；告警详情只返回任务/终端/不可用原因，不返回 URL、storageKey、哈希或支付字段。改动文件为既有 admin-ops 模块和 `verify-admin-ops.ts`，无 schema、退款、订单状态机、claim、COS 或新文件变更。
-API typecheck、`graph:check`、`git diff --check` 和 `ADMIN_OPS_ALERT_HEALTH_ONLY=1 verify:admin-ops`（健康状态、告警误报排除、稳定 episode、单条查证）退出 0。完整 `verify:admin-ops` 尚未完成：本机隔离数据库初始化遇到 Prisma schema engine `undefined`，因此本项还没有 PostgreSQL/真实 COS/CI 证据；Admin 前端类型、筛选、告警文案尚待 Claude 补齐。本批未 push、未合并 `main`、未部署。
+API typecheck、`graph:check`、`verify:repository-integrity`、`git diff --check` 和 `ADMIN_OPS_ALERT_HEALTH_ONLY=1 verify:admin-ops`（健康状态、告警误报排除、稳定 episode、单条查证）退出 0。Claude 提交 `8f9f8aded` 已合流为 `e9add1c9b`：Admin API 类型、告警筛选、仪表盘专属图标/排序、人工处置文案和现有 UI 门禁已覆盖该类型；Admin typecheck、`verify:service-desk-dashboard-ui` 与相关 Admin UI 门禁退出 0。完整 `verify:admin-ops` 尚未完成：本机隔离数据库初始化遇到 Prisma schema engine `undefined`，因此本项还没有 PostgreSQL/真实 COS/CI 证据。本批未 push、未合并 `main`、未部署。
 
 2026-09-23 **稿 21/队列修复冷审查：发现已支付不可用文件缺少运营告警，商业仍 NO-GO。**
 Grok session `d6e0a03a-e905-4937-ab57-af8e691c4b11` 复核确认：Agent claim 查询已能跳过已知不可用的现代 `FileObject`，但事务内二次读取仍存在 PostgreSQL TOCTOU 窗口，真实 COS 一致性也未证明。Agy session `c151c096-1ba3-4024-a8f2-326d264e7627` 进一步确认，`paid + pending` 且关联文件已过期、删除、隔离或非 active 的打印任务会被 claim 正常跳过，而当前派生告警只扫描 `failed`，因此可能对管理员隐形并长期悬挂。当前最小正确边界是增加只读派生告警并挂接既有 `AlertDisposition` 人工处置；在退款产品口径、财务审计和真实支付证据明确前，禁止自动退款或强制改写订单状态。以上均为源码/本地审查，不代表 PostgreSQL、COS、CI、设备或生产验收。本批未 push、未合并 `main`、未部署。

@@ -1,11 +1,11 @@
 # 下一步任务
 
-## 2026-09-23：支付成功但文件不可用的可见性与人工处置（后端本地候选已补，前端和真实库待验）
+## 2026-09-23：支付成功但文件不可用的可见性与人工处置（代码与 Admin 本地门禁已补，真实库待验）
 
-后端已在本地候选补入 `paid_pending_file_unavailable` 派生告警；这不是自动退款，也不改变订单状态机。剩余工作：
+后端提交 `97efce9db` 与 Claude 的 Admin 提交 `e9add1c9b` 已在唯一候选合流，补入 `paid_pending_file_unavailable` 派生告警、筛选/仪表盘显示和既有人工处置入口；这不是自动退款，也不改变订单状态机。剩余工作：
 
-1. **完成 Admin 前端接线：** Claude 只修改既有 Admin API 类型、告警类型筛选、标签/详情文案和必要断言；不新增页面或 mock 数据。告警必须可进入既有人工 disposition/审计，不显示退款按钮。
-2. **完成真实库验证：** 覆盖 active 对照、过期/删除/隔离/上传中/缺失关联、重复告警稳定身份、消警/审计、不泄露 signed URL；隔离 PostgreSQL/SQLite 与 CI 需要实际通过，不能用 health-only mock 代替。
+1. **完成真实库验证：** 覆盖 active 对照、过期/删除/隔离/上传中/缺失关联、重复告警稳定身份、消警/审计、不泄露 signed URL；隔离 PostgreSQL/SQLite 与 CI 需要实际通过，不能用 health-only mock 代替。当前完整 `verify:admin-ops` 被本机 Prisma schema engine `undefined` 阻断。
+2. **检查列表容量和实时竞态：** 当前 paid/pending 文件告警不截断以保证每个已付款履约风险可见；需在真实 PostgreSQL 评估大队列性能，并验证文件状态在派生查询与 Agent claim 之间变化时的处置表现。
 3. **保留产品边界：** 不新增退款服务、不自动取消订单、不自动扣回权益。人工处置的重试、补传、取消和退款口径由产品/财务确认后另行实现；随后补 PostgreSQL 并发竞态和真实 COS 删除/读取一致性。
 
 Grok 已确认 claim 查询仍有匹配后文件状态变化的短暂 TOCTOU 窗口；Agy 已确认当前 `failed` 派生告警不会捕获上述 paid/pending 任务。此项完成前，不能声称打印支付链路达到生产或商业 GO。
