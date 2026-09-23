@@ -1,5 +1,16 @@
 # 当前开发进度
 
+2026-09-23 **唯一集成候选 `d88814280afff1deb1068f32b5397410b379975d`：390px 扫描结果页的 AI 简历识别入口已可真实触控，商业仍 NO-GO。**
+Claude `claude-opus-5-5` / `xhigh` 在当前候选上只修改现有扫描工作台 CSS 与 W2 浏览器规格，没有新增路由、依赖、后端或小程序文件。针对不缩放舞台的手机/窄桌面视口，扫描页改为整页自然滚动，横幅、正文和隐私底注保持完整；小屏多列出口改为单列，操作条允许换行，触控区域保留最小尺寸。1080×1920 规则仍在 `data-kiosk-stage-fit='off'` 范围外不生效。
+验证结果：kiosk typecheck、`verify:fusion-w2`、`verify:fusion-w6`、`verify:repository-integrity` 和 `git diff --check` 均退出 0；W2 Playwright 21/21 通过，其中新增用例在 390×844 以 `touchscreen.tap` 真实点击「AI 简历识别」并到达 `/resume/parse`，保留 `fileId=w2-scan-file`；1080×1920 原有扫描场景也全部通过。先前把 390px 用例放在不存在的 Playwright project 名下的命令退出 1，随后按配置实际项目运行完整 W2 并通过，该配置问题不属于产品断言失败。
+**边界：** 本批只关闭本地浏览器的扫描入口遮挡；稿 21 的所有来源异常态、整屏预览工具条、390px 顶栏胶囊折行，以及全站其余旧页面统一仍未关闭。未推送、未合并 `main`、未部署、未做 Windows/Pantum、微信或生产验收。
+
+2026-09-23 **唯一集成候选 `ce83d4cb73c6c5f2d565304e7bdbdeff3abefee5`：未激活文件的打印读取与建单闸已本地合流，商业仍 NO-GO。**
+Grok 隔离提交从 `a51d92bfb` fast-forward 合入，限定为打印页数服务、建单服务及两条既有验证脚本，未新增模型、接口、脚本或文件。
+有效内部 HMAC 仍须通过 `FileObject.status=active`、未删除且未过期检查；`uploading`（包括收费简历导出的 `resume_export_pending`）、`quarantined`、已删除或已过期文件在对象读取、Word 转换、报价、PrintTask、Order 与审计前拒绝。合同报告禁印与招聘会撤销原错误语义保留，active 对照仍可计页并建单。
+在隔离 SQLite/本地文件存储上，API typecheck、`verify:print-jobs`、`verify:document-conversion`、`verify:contract-review:print-lifecycle`、`verify:admin-fairs`、`verify:payment-flow`、`verify:miniapp-cloud-print-m2`（含两条幂等子门禁）、`verify:order`、`verify:package-order-fulfillment`（含两条幂等子门禁）、`graph:check`、`verify:repository-integrity` 与 `git diff --check` 均退出 0。`verify:document-conversion` 的真实 soffice 集成因本机未配置 `SOFFICE_PATH` 被跳过。第一次建隔离库与第一次打印门禁分别遇到瞬时 Prisma schema engine 错误、缺测试密钥；在同一隔离路径重试并提供虚构测试密钥后通过，不计为业务断言失败。Grok 当前 HEAD 的独立反证审查尚在进行，不能先记为批准。
+**边界：** 以上不是 PostgreSQL 并发、真实进程强杀、真实 COS、最终 SHA CI、Windows/Pantum、微信、真实支付退款或生产证据；本地未 push、未合并 `main`、未部署。
+
 2026-09-23 **唯一集成候选现为 `dd44e3cf9266a5accdb7360c974e975084aaeef8`：收费简历导出暂存与核销激活已本地合流，商业仍 NO-GO。**
 Grok `grok-4.7-build-fast` / `xhigh`（session `77c62eea-f0c9-4ec0-895a-21807f07ec27`）
 在隔离树从 `b8f8ee311` 提交 8 个后端/验证文件，当前分支 fast-forward 合入这一提交；隔离树的
