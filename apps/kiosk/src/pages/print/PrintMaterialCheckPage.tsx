@@ -472,6 +472,21 @@ export function PrintMaterialCheckPage({
         )}
       >
         <div className="qpd-context-empty" data-w2-page="print-material-check" data-qx-state="missing-context">
+          <div className="qpd-empty-hero">
+            <div className="qpd-empty-hero-head">
+              <span className="qpd-empty-hero-face" aria-hidden="true">青</span>
+              <div>
+                <strong>这一页没有文件。</strong>
+                <p>先选一份真实文件，才能进行材料检查与打印参数设置。</p>
+              </div>
+            </div>
+            <ol className="qpd-empty-flow" aria-label="打印流程">
+              <li aria-current="step">选文件</li>
+              <li>材料检查</li>
+              <li>预览与参数</li>
+              <li>报价确认</li>
+            </ol>
+          </div>
           <div className="qx-state" data-tone="empty">
             <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
             <div>
@@ -480,11 +495,22 @@ export function PrintMaterialCheckPage({
             </div>
           </div>
           <div className="qpd-empty-work qx-grow">
-            <section className="qpd-empty-sheet" aria-label="当前没有文件">
-              <AlertCircleIcon aria-hidden="true" />
-              <strong>当前文件：无</strong>
-              <span>没有文件名、没有页数、没有大小</span>
-            </section>
+            <div className="qpd-empty-left">
+              <section className="qpd-empty-sheet" aria-label="当前没有文件">
+                <AlertCircleIcon aria-hidden="true" />
+                <strong>当前文件：无</strong>
+                <span>没有文件名、没有页数、没有大小</span>
+              </section>
+              <section className="qx-card qpd-empty-proof">
+                <h3>这一屏不会显示什么</h3>
+                <ul>
+                  <li>文件名、文件大小</li>
+                  <li>页数、打印份数</li>
+                  <li>检查结论、隐私片段</li>
+                </ul>
+                <p>没有文件时以上内容一律不显示，也不会放示例文件。</p>
+              </section>
+            </div>
             <section className="qx-card">
               <div className="qx-sec-h"><span className="t">为什么会看到这一屏</span></div>
               <ul>
@@ -492,6 +518,21 @@ export function PrintMaterialCheckPage({
                 <li>公共终端的上一次办理已经结束或上下文已清除。</li>
                 <li>本页不会用示例文件冒充真实待打印文件。</li>
               </ul>
+              <section className="qpd-empty-next">
+                <h3>下一步</h3>
+                <ul>
+                  <li>去选文件，把真实文件带入本次办理。</li>
+                  <li>返回材料检查，逐项完成文件体检和隐私检查。</li>
+                  <li>检查通过后进入预览参数，费用由服务端报价。</li>
+                </ul>
+              </section>
+              <section className="qpd-empty-facts">
+                <h3>当前事实</h3>
+                <ul>
+                  <li>当前没有文件，本页没有订单，也没有扣费。</li>
+                  <li>若选择遮挡，后续是否生成派生文件及处理结果以后端返回为准，完成前不能当作已遮挡。</li>
+                </ul>
+              </section>
             </section>
           </div>
         </div>

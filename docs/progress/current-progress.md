@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-25：稿 13 材料检查无文件态合流（1080×1920 主屏，本地候选）
+
+Claude 以原稿 `docs/design/kiosk-redesign-2026-08/13-print-desk.html` 对照真实 `/print/material-check`（重定向至 `/print/desk?step=check`），仅改现有页面空态 JSX 与对应 CSS：1080 去重复可见页头但保留 h1 读屏，明确显示无文件、四步流程、原因和去选文件出口；390 修复固定操作条竖排字与正文塌高，可滚到末尾且无横向溢出。隔离分支实屏截图在 `apps/kiosk/test-results/kiosk-visual-20260925/print-desk-empty-{1080,390,390-bottom}.png`（未入 Git）；点击“去选文件”进入真实 `/print/upload?source=document`。Codex 选择性合流后独立复跑 Kiosk typecheck、W2 静态合同、局部 eslint 和 W2 材料/PII/预览/旧路由 Playwright **5/5**，均通过。有效文件的等待、结果、隐私片段各态、真实 OCR/PII、报价支付出纸、Windows Edge/27 寸触控及线上未验，51 稿整体 UI NO-GO。`PrintMaterialCheckPage.tsx` 621 行，继续新增功能前须拆分。
+
 ## 2026-09-25：稿 12 文件来源页合流（1080×1920 主屏，本地候选）
 
 Claude 以用户原稿 `docs/design/kiosk-redesign-2026-08/12-file-source.html` 为目标，仅修真实 `/print/upload` 的现有 CSS：1080 去掉与 Hero 重复的可见页头并保留 h1 读屏；390 宽 Hero、来源卡、当前文件说明和固定操作条改为可读、可滚动布局，无横向溢出。手机扫码生成失败和本机文件指引态已在隔离分支浏览器实拍，U 盘未配置仍禁用。Codex 选择性合入 CSS 后，在主候选独立复跑 Kiosk typecheck、W2 静态合同和 W2 intake/upload Playwright **2/2**，均通过；页面截图 `/tmp/file-source-no-repeat-{1080,390}-20260925.png` 是隔离分支本地证据。尚未验证有效二维码、USB 实物、真实文件落库/支付出纸、全状态、Windows Edge/27 寸触控及线上；51 稿整体 UI NO-GO。`file-source-qx.css` 534 行，后续扩功能前须评估拆分。
