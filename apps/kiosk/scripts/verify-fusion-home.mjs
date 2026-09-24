@@ -25,6 +25,7 @@ const fairHook = read('src/pages/home/hooks/useHomeJobFairHighlight.ts')
 const manifest = read('src/pages/home/homeV6Domains.ts')
 const css = [
   read('src/pages/home/styles/home-qx.css'),
+  read('src/pages/home/styles/home-qx-mobile.css'),
 ].join('\n')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 
@@ -40,6 +41,7 @@ check(
 check(!home.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
 check(home.includes('<QxHomeView'), '容器与青序 presentation 已拆分')
 check(home.includes("import './styles/home-qx.css'"), '首页只导入青序页级样式')
+check(home.includes("import './styles/home-qx-mobile.css'"), '首页按顺序加载手机响应式样式')
 check(
   !home.includes('prototype-v1.css') &&
     !home.includes('kiosk-uplift.css') &&
@@ -284,7 +286,8 @@ check(
   home.split('\n').length < 120 &&
     viewOnly.split('\n').length < 320 &&
     homeTile.split('\n').length < 120 &&
-    css.split('\n').length < 300 &&
+    read('src/pages/home/styles/home-qx.css').split('\n').length < 300 &&
+    read('src/pages/home/styles/home-qx-mobile.css').split('\n').length < 120 &&
     fairHook.split('\n').length < 120 &&
     manifest.split('\n').length < 180,
   '运行时文件保持可维护体积'

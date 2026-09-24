@@ -5,7 +5,7 @@
  * 锁定 2026-07-25 视觉统一结论：
  * 1) 唯一共享壳：KioskLayout + kiosk-shell/components + KioskPageFrame
  * 2) 全路由 service-desk + fusion-youth，无 legacy 主题分叉
- * 3) 首页不再自绘顶栏/底栏
+ * 3) 首页 Hero 内顶行与底栏由青序单舞台承载
  * 4) 页面 CSS 不得再散落裸 hex（token 定义文件除外）
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
@@ -112,7 +112,7 @@ expect(indexCss.includes('kiosk-stage-fit.css'), 'index.css 导入 kiosk-stage-f
 
 expect(
   !/function KioskTopBar/.test(home) && !/function HomeNavbar/.test(home),
-  '首页不再自绘顶栏/底栏组件'
+  '首页不混入旧版顶栏/底栏组件'
 )
 expect(
   home.includes('className="qx-home-host"') && !home.includes('kpv1--content-only'),
