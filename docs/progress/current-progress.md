@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-25：整合 PR 与 Windows 签名门禁复核（只读，仍 NO-GO）
+
+GitHub 草稿 [#1042](https://github.com/wanglei581/YITIJI/pull/1042) 当前 head 仍为 `755fa5a53465e999cc4505e1f6f9f31d803576f4`，base 为 `eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`；它不是本地候选 `d87aa3d74`。该 PR 的主 CI 构建、PostgreSQL readiness 与 Kiosk 浏览器 job 成功，但同 SHA 的 Windows 内部签名 job 失败：签名 MSI 与 Burn EXE 构建已成功，随后嵌入 MSI 提取校验报 `Expected exactly one embedded MSI in rebuilt bundle, found 0`；依赖它的 unsigned MSI job 随之失败。本地后续提交 `60c137bb8` 已针对 WiX 4.0.6 的提取命名加 `-oba` 并保留嵌入 MSI 哈希校验；本轮在主候选复跑静态 `verify-signing-workflow-contract.mjs` 通过，但修复尚未在精确 SHA 的 Windows CI 实跑。未修改 PR、未推送或部署，Windows 安装包与商业发布继续 NO-GO。
+
 ## 2026-09-24：稿 10 打印扫描 Hub 合流（1080×1920 主验收，本地候选）
 
 用户明确一体机实际为 **1080×1920 竖屏**；此尺寸是 51 稿真实页面首屏、字阶、触控、固定底栏的主验收分辨率，390 宽仅作兼容辅助，最终仍须 Windows Edge/27 寸触控真机。Claude 在隔离 UI 分支按用户原目录稿 10 调整真实 `/print-scan`：移除多余的可见页头、收紧能力卡与底部入口排版，保留全部 7 张能力卡、证件照说明、到机码、3 张记录卡、反馈入口和隐私/电子签/价格全文（摘要常显、全文可展开）；文档打印彩色/双面声明继续按本机能力登记 fail-closed。Codex 选择性合入既有 Kiosk 4 个文件，在主候选复跑 W2 Hub 浏览器 9/9（1080×1920 主屏和 390 兼容）、kiosk typecheck、W2/P39 静态合同、局部 eslint，均通过；`graph:check` 发现前序代码与图谱不一致，已用现有生成器更新 3 个原有图谱文件；在主候选 `ef80fdbd7` 复查 `pnpm graph:check` 退出 0。浏览器默认/故障态和合成 API 不能证明 Windows Edge、真实设备、支付/出纸或 51 页全覆盖。`print-hub-qx.css` 576 行、`PrintScanHomePage.tsx` 523 行，后续再加功能前须按工程阈值评估拆分，不为凑行数增加无用文件。
