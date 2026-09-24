@@ -376,6 +376,143 @@ export function releaseResumeParseIntent(
   return enqueue(() => Promise.resolve(releaseBody(ownerIdentity, seenEpoch)))
 }
 
+export type ResumeParseChargedTerminalCode =
+  | 'RESUME_PARSE_INTENT_REVOKED'
+  | 'RESUME_PARSE_RESULT_EXPIRED'
+  | 'RESUME_PARSE_RESULT_MISSING'
+
+export type ResumeParseTerminalKind =
+  | { kind: 'charged'; code: ResumeParseChargedTerminalCode }
+  | { kind: 'file_changed'; code: 'FILE_CONTENT_CHANGED' }
+
+export interface ResumeParseTerminalCopy {
+  title: string
+  lead: string
+  happened: string
+  kept: string
+  next: string
+  confirm: string
+}
+
+/** 只认服务端已证明会让同一标识反复失败的三支。状态或错误码有一项对不上就返回 null。 */
+export function classifyResumeParseTerminal(status: number, code: string): ResumeParseTerminalKind | null {
+  if (status === 409 && code === 'RESUME_PARSE_INTENT_REVOKED') {
+    return { kind: 'charged', code: 'RESUME_PARSE_INTENT_REVOKED' }
+  }
+  if (status === 404 && code === 'RESUME_PARSE_RESULT_EXPIRED') {
+    return { kind: 'charged', code: 'RESUME_PARSE_RESULT_EXPIRED' }
+  }
+  if (status === 404 && code === 'RESUME_PARSE_RESULT_MISSING') {
+    return { kind: 'charged', code: 'RESUME_PARSE_RESULT_MISSING' }
+  }
+  if (status === 409 && code === 'FILE_CONTENT_CHANGED') return { kind: 'file_changed', code: 'FILE_CONTENT_CHANGED' }
+  return null
+}
+
+export function resumeParseTerminalCopy(terminal: ResumeParseTerminalKind): ResumeParseTerminalCopy {
+  if (terminal.kind === 'file_changed') {
+    return {
+      title: '文件内容已变化',
+      lead: '服务端在本次调用模型之前停止使用这份文件。',
+      happened: '文件内容已变化，已停止使用。这次没有调用模型。',
+      kept: '本机这次解析标识已释放。稍后可以换一份新文件，不会自动开始解析。',
+      next: '请重新上传一份新文件。不要用这份已停用的文件再解析。',
+      confirm: '',
+    }
+  }
+  const lead = terminal.code === 'RESUME_PARSE_INTENT_REVOKED'
+    ? '服务端确认这次解析已撤销，同一标识不能恢复结果。'
+    : terminal.code === 'RESUME_PARSE_RESULT_EXPIRED'
+      ? '服务端确认这次解析结果已过期，同一标识不能再取回。'
+      : '服务端确认这次解析结果已不在，同一标识不能恢复。'
+  return {
+    title: terminal.code === 'RESUME_PARSE_INTENT_REVOKED'
+      ? '这次解析已撤销'
+      : terminal.code === 'RESUME_PARSE_RESULT_EXPIRED'
+        ? '解析结果已过期'
+        : '解析结果已不在',
+    lead,
+    happened: '这次解析此前已经完成登记。同一标识再提交也不会把结果找回来，也不会再调用模型。',
+    kept: '本机仍保留这次标识。连续确认两次之前不会清除，也不会另起一次。',
+    next: '若要重新解析，请连续确认两次。确认后才会清除本机标识并开始新的一次，那会再次调用 AI。',
+    confirm: `${lead}开始新的一次会再次调用 AI，并清除本机这一次的标识。`,
+  }
+}
+
+export function resumeParseTerminalBlockNote(terminal: ResumeParseTerminalKind, reason: 'mismatch' | 'release_failed'): string {
+  if (terminal.kind === 'file_changed') {
+    return reason === 'release_failed'
+      ? '文件内容已变化，这次没有调用模型。本机没能安全释放这次解析标识，请留在此页，不要开始新的解析。'
+      : '文件内容已变化，这次没有调用模型。本机保存的解析标识对不上，没有释放，也没有另起一次解析。'
+  }
+  const lead = resumeParseTerminalCopy(terminal).lead
+  return reason === 'release_failed'
+    ? `${lead}本机没能清除这次解析标识，没有开始新的一次。`
+    : `${lead}本机保存的解析标识对不上，没有清除，也没有另起一次解析。`
+}
+
+function stillConfirmed(confirm: (() => boolean) | undefined): boolean {
+  if (!confirm) return true
+  try {
+    return confirm()
+  } catch {
+    return false
+  }
+}
+
+function releaseHeldBody(
+  expected: { intent: string; ownerId: string | null; payload: CanonicalResumeParsePayload | null },
+  confirm: (() => boolean) | undefined,
+  seenEpoch: number,
+): { ok: true } | { ok: false; code: string } {
+  const loaded = loadRecords()
+  if ('error' in loaded) return { ok: false, code: loaded.error }
+  let ownerId: string | null
+  try {
+    ownerId = normalizeOwner(expected.ownerId)
+  } catch (err) {
+    return { ok: false, code: err instanceof ResumeParseIntentClientError ? err.code : 'OWNER_INVALID' }
+  }
+  const payload = expected.payload ? canonicalResumeParsePayload(expected.payload) : null
+  const row = loaded.records.length === 1 ? loaded.records[0] : null
+  if (
+    !row
+    || !payload
+    || !samePayload(payload, expected.payload as CanonicalResumeParsePayload)
+    || !isResumeParseIntentHeader(expected.intent)
+    || row.intent !== expected.intent
+    || row.ownerId !== ownerId
+    || !samePayload(row.payload, payload)
+  ) {
+    return { ok: false, code: 'INTENT_NOT_HELD' }
+  }
+  if (!stillConfirmed(confirm)) return { ok: false, code: 'IDENTITY_CHANGED' }
+  if (seenEpoch !== epoch) return { ok: false, code: 'STORAGE_CLEARED' }
+  if (!writeRecords([], seenEpoch)) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+  if (seenEpoch !== epoch) return { ok: false, code: 'STORAGE_CLEARED' }
+  const back = loadRecords()
+  if ('error' in back || back.records.length !== 0) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+  if (seenEpoch !== epoch) return { ok: false, code: 'STORAGE_CLEARED' }
+  if (!stillConfirmed(confirm)) {
+    if (!writeRecords([row], seenEpoch)) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+    const restored = loadRecords()
+    if ('error' in restored || restored.records.length !== 1 || !samePayload(restored.records[0].payload, payload)) {
+      return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+    }
+    return { ok: false, code: 'IDENTITY_CHANGED' }
+  }
+  return { ok: true }
+}
+
+/** 只释放仍能回读到同一 owner、同一意图、同一规范载荷的那一条。确认失败会把原记录写回去。 */
+export function releaseHeldResumeParseIntent(
+  expected: { intent: string; ownerId: string | null; payload: CanonicalResumeParsePayload | null },
+  confirm?: () => boolean,
+): Promise<{ ok: true } | { ok: false; code: string }> {
+  const seenEpoch = epoch
+  return enqueue(() => Promise.resolve(releaseHeldBody(expected, confirm, seenEpoch)))
+}
+
 export function clearAllResumeParseIntents(): void {
   epoch += 1
   const store = storage()

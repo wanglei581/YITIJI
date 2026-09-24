@@ -8,6 +8,7 @@ import {
   interviewReport, interviewStarted, uploadedResume,
 } from './fixtures/fusion-w3-states'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
+import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -751,6 +752,175 @@ test('resume parse public quota rejection stays on the parse page when the inten
   await expect(page).toHaveURL((url) => url.pathname === '/resume/parse')
   await expect(page.getByRole('button', { name: '重新提交解析（新的一次）' })).toHaveCount(0)
   expect(posts).toEqual([expect.stringMatching(/^[A-Za-z0-9_-]{43}$/)])
+})
+
+test('resume parse terminal keyed 4xx tells the truth and does not start another parse @w3-kiosk', async ({ page, api }) => {
+  const posts: Array<{ intent: string; proof: string; body: string }> = []
+  let next: { status: number; code: string; mutate?: 'payload' } = { status: 409, code: 'RESUME_PARSE_INTENT_REVOKED' }
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    const headers = route.request().headers()
+    posts.push({
+      intent: headers['x-resume-parse-intent'] ?? '',
+      proof: headers['x-resume-parse-proof'] ?? '',
+      body: route.request().postData() ?? '',
+    })
+    if (next.mutate === 'payload') {
+      await changeStoredResumeFileId(page, 'other-file')
+    }
+    const status = next.status
+    const code = next.code
+    await route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code, message: 'server' } }),
+    })
+  })
+  const stored = () => readResumeParseIntents(page)
+  const start = async () => {
+    await page.goto('/resume/source')
+    await clearResumeParseIntents(page)
+    await page.reload()
+    await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+    await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+    await page.waitForURL('/resume/parse')
+  }
+
+  next = { status: 409, code: 'RESUME_PARSE_INTENT_REVOKED' }
+  await start()
+  await expect(page.getByTestId('resume-parse-terminal')).toContainText('这次解析已撤销')
+  await expect(page.getByTestId('resume-parse-terminal-next')).toContainText('连续确认两次')
+  await expect(page.getByText('没有调用模型')).toHaveCount(0)
+  await expect(page.getByTestId('resume-parse-replay')).toHaveCount(0)
+  expect(await stored()).toHaveLength(1)
+  expect(posts).toHaveLength(1)
+  const revokedIntent = posts[0].intent
+  await page.getByTestId('resume-parse-new-attempt').click()
+  const firstDialog = page.getByRole('dialog', { name: '重新提交是新的一次' })
+  await expect(firstDialog).toContainText('再次调用 AI')
+  await firstDialog.getByRole('button', { name: '先不提交' }).click()
+  expect(posts).toHaveLength(1)
+  expect((await stored())[0]?.intent).toBe(revokedIntent)
+  await page.getByTestId('resume-parse-new-attempt').click()
+  await page.getByRole('dialog', { name: '重新提交是新的一次' }).getByRole('button', { name: '继续确认' }).click()
+  await expect(page.getByRole('dialog', { name: '再次确认' })).toContainText('这一次已结束的解析标识')
+  expect(posts).toHaveLength(1)
+  await page.getByRole('dialog', { name: '再次确认' }).getByRole('button', { name: '先不提交' }).click()
+  expect(posts).toHaveLength(1)
+  expect((await stored())[0]?.intent).toBe(revokedIntent)
+  next = { status: 200, code: 'OK' }
+  await page.unroute('**/api/v1/resume/parse')
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    const headers = route.request().headers()
+    posts.push({
+      intent: headers['x-resume-parse-intent'] ?? '',
+      proof: headers['x-resume-parse-proof'] ?? '',
+      body: route.request().postData() ?? '',
+    })
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) })
+  })
+  await page.getByTestId('resume-parse-new-attempt').click()
+  await page.getByRole('dialog', { name: '重新提交是新的一次' }).getByRole('button', { name: '继续确认' }).click()
+  await page.getByRole('dialog', { name: '再次确认' }).getByRole('button', { name: '开始新的一次' }).click()
+  await page.waitForURL('/resume/report')
+  expect(posts).toHaveLength(2)
+  expect(posts[1].intent).not.toBe(revokedIntent)
+  expect(posts[1].body).toBe(posts[0].body)
+
+  await page.unroute('**/api/v1/resume/parse')
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    const headers = route.request().headers()
+    posts.push({
+      intent: headers['x-resume-parse-intent'] ?? '',
+      proof: headers['x-resume-parse-proof'] ?? '',
+      body: route.request().postData() ?? '',
+    })
+    if (next.mutate === 'payload') {
+      await changeStoredResumeFileId(page, 'other-file')
+    }
+    await route.fulfill({
+      status: next.status,
+      contentType: 'application/json',
+      body: JSON.stringify(next.status === 200 ? diagnosis : { success: false, error: { code: next.code, message: 'server' } }),
+    })
+  })
+
+  for (const [code, title] of [
+    ['RESUME_PARSE_RESULT_EXPIRED', '解析结果已过期'],
+    ['RESUME_PARSE_RESULT_MISSING', '解析结果已不在'],
+  ] as const) {
+    const before = posts.length
+    next = { status: 404, code }
+    await start()
+    await expect(page.getByTestId('resume-parse-terminal')).toContainText(title)
+    await expect(page.getByText('没有调用模型')).toHaveCount(0)
+    await expect(page.getByTestId('resume-parse-replay')).toHaveCount(0)
+    expect(posts).toHaveLength(before + 1)
+    expect(await stored()).toHaveLength(1)
+    await page.getByTestId('resume-parse-new-attempt').click()
+    await page.getByRole('dialog', { name: '重新提交是新的一次' }).getByRole('button', { name: '先不提交' }).click()
+    expect(posts).toHaveLength(before + 1)
+  }
+
+  const changedBefore = posts.length
+  next = { status: 409, code: 'FILE_CONTENT_CHANGED' }
+  await start()
+  await expect(page.getByTestId('resume-parse-terminal')).toContainText('文件内容已变化')
+  await expect(page.getByTestId('resume-parse-terminal-next')).toContainText('重新上传')
+  await expect(page.getByText('文件内容已变化，已停止使用。这次没有调用模型。', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('resume-parse-replay')).toHaveCount(0)
+  await expect(page.getByTestId('resume-parse-new-attempt')).toHaveCount(0)
+  expect(await stored()).toEqual([])
+  expect(posts).toHaveLength(changedBefore + 1)
+  const changedIntent = posts[changedBefore].intent
+  await page.getByTestId('resume-parse-reupload').click()
+  await page.waitForURL((url) => url.pathname === '/resume/source')
+  expect(posts).toHaveLength(changedBefore + 1)
+  next = { status: 200, code: 'OK' }
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.waitForURL('/resume/report')
+  expect(posts).toHaveLength(changedBefore + 2)
+  expect(posts[changedBefore + 1].intent).not.toBe(changedIntent)
+
+  const mismatchBefore = posts.length
+  next = { status: 409, code: 'FILE_CONTENT_CHANGED', mutate: 'payload' }
+  await start()
+  await expect(page.getByTestId('resume-parse-terminal')).toContainText('对不上')
+  await expect(page.getByTestId('resume-parse-reupload')).toHaveCount(0)
+  await expect(page.getByTestId('resume-parse-new-attempt')).toHaveCount(0)
+  expect((await stored())[0]?.payload.fileId).toBe('other-file')
+  expect(posts).toHaveLength(mismatchBefore + 1)
+
+  for (const reply of [
+    { status: 404, code: 'FILE_NOT_FOUND' },
+    { status: 409, code: 'RESUME_PARSE_INTENT_PAYLOAD_MISMATCH' },
+    { status: 500, code: 'RESUME_PARSE_INTENT_REVOKED' },
+    { status: 408, code: 'FILE_CONTENT_CHANGED' },
+    { status: 404, code: 'AI_TASK_NOT_FOUND' },
+  ]) {
+    const before = posts.length
+    next = reply
+    await start()
+    if (reply.status >= 500 || reply.status === 408 || reply.code === 'AI_TASK_NOT_FOUND') {
+      await expect(page.getByText('没等到解析结果', { exact: true })).toBeVisible()
+      expect(await stored()).toHaveLength(1)
+      const kept = posts[before].intent
+      await page.getByTestId('resume-parse-replay').click()
+      await expect.poll(() => posts.length).toBe(before + 2)
+      expect(posts[before + 1].intent).toBe(kept)
+    } else {
+      await page.waitForURL('/resume/report')
+      expect(await stored()).toHaveLength(1)
+      const kept = posts[before].intent
+      await page.getByTestId('resume-report-primary').click()
+      await page.waitForURL('/resume/parse')
+      await expect.poll(() => posts.length).toBe(before + 2)
+      expect(posts[before + 1].intent).toBe(kept)
+      expect(posts[before + 1].body).toBe(posts[before].body)
+    }
+  }
 })
 
 test('resume parse consent gate pauses the rail and sends nothing until granted @w3-kiosk', async ({ page, api }) => {

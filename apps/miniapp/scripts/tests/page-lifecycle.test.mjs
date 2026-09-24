@@ -5844,6 +5844,182 @@ test('RP-11 resume-parse：可信额度 429 只释放匹配意图；丢写和文
   await flush()
   assert.equal(keptHeaders.length, 2)
   assert.equal(keptHeaders[0]['x-resume-parse-intent'], keptHeaders[1]['x-resume-parse-intent'])
+  assert.equal(missing.data.fileChanged, false)
+  assert.equal(missing.data.terminalCharge, false)
+})
+
+test('RP-12 resume-parse：终态 4xx 只在回读匹配时给出明确退路，不自动再解析', async () => {
+  const intentOf = (wx) => wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT) || []
+  const headerOf = (headers) => headers['x-resume-parse-intent']
+
+  const revoked = { statusCode: 409, code: 'RESUME_PARSE_INTENT_REVOKED', message: '这次解析已撤销' }
+  const wx = createWx()
+  const posts = []
+  const modal = []
+  wx.showModal = (opts) => { modal.push(opts) }
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: { parseResume: (_payload, headers) => {
+      posts.push(headers)
+      return posts.length === 1
+        ? Promise.reject(revoked)
+        : Promise.resolve({ taskId: 'T-new', status: 'completed', accessToken: 'new-token' })
+    } },
+  })
+  page.onLoad({ fileId: 'F-revoked', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts.length, 1)
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.terminalCharge, true)
+  assert.equal(page.data.terminalTitle, '这次解析已撤销')
+  assert.equal(page.data.quotaReleased, false)
+  assert.equal(page.data.fileChanged, false)
+  assert.match(page.data.unknownCause, /已撤销/)
+  assert.doesNotMatch(page.data.unknownCause, /没有调用模型/)
+  assert.equal(intentOf(wx).length, 1)
+  const kept = headerOf(posts[0])
+  page.replaySame()
+  page.retry()
+  await flush()
+  assert.equal(posts.length, 1, '撤销后同一次重查和失败重试都不得再 POST')
+  page.confirmResubmit()
+  assert.equal(modal.length, 1)
+  assert.match(modal[0].content, /再调用一次 AI/)
+  modal[0].success({ confirm: false })
+  assert.equal(posts.length, 1)
+  assert.equal(intentOf(wx)[0].intent, kept)
+  page.confirmResubmit()
+  modal[1].success({ confirm: true })
+  assert.equal(modal.length, 3)
+  assert.match(modal[2].content, /已结束的解析标识/)
+  modal[2].success({ confirm: false })
+  assert.equal(posts.length, 1, '第二次确认取消后不得清除或提交')
+  assert.equal(intentOf(wx)[0].intent, kept)
+  page.confirmResubmit()
+  modal[3].success({ confirm: true })
+  modal[4].success({ confirm: true })
+  await flush()
+  await flush()
+  assert.equal(posts.length, 2)
+  assert.notEqual(headerOf(posts[1]), kept)
+  assert.equal(page.data.done, true)
+
+  for (const [code, snippet] of [
+    ['RESUME_PARSE_RESULT_EXPIRED', /已过期/],
+    ['RESUME_PARSE_RESULT_MISSING', /已不在/],
+  ]) {
+    const box = createWx()
+    const calls = []
+    const sample = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx: box,
+      api: { parseResume: (_payload, headers) => {
+        calls.push(headers)
+        return Promise.reject({ statusCode: 404, code, message: '结果不可用' })
+      } },
+    })
+    sample.onLoad({ fileId: `F-${code}`, fileName: 'a.pdf', fileFormat: 'pdf' })
+    await flush()
+    assert.equal(sample.data.terminalCharge, true, code)
+    assert.match(sample.data.terminalTitle, snippet, code)
+    assert.match(sample.data.unknownCause, snippet)
+    assert.equal(intentOf(box).length, 1)
+    sample.replaySame()
+    await flush()
+    assert.equal(calls.length, 1, code)
+  }
+
+  const changed = { statusCode: 409, code: 'FILE_CONTENT_CHANGED', message: '文件内容已变化' }
+  const wxFile = createWx()
+  const filePosts = []
+  const filePage = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxFile,
+    api: { parseResume: (_payload, headers) => {
+      filePosts.push(headers)
+      return Promise.reject(changed)
+    } },
+  })
+  filePage.onLoad({ fileId: 'F-changed', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(filePage.data.phase, 'failed')
+  assert.equal(filePage.data.fileChanged, true)
+  assert.equal(filePage.data.quotaReleased, false)
+  assert.equal(filePage.data.terminalCharge, false)
+  assert.match(filePage.data.failMsg, /没有调用模型/)
+  assert.equal(intentOf(wxFile).length, 0)
+  filePage.retry()
+  filePage.replaySame()
+  await flush()
+  assert.equal(filePosts.length, 1, '内容变化后不得用同一份文件自动或手动再解析')
+
+  const wxLoss = createWx()
+  const realSet = wxLoss.setStorageSync
+  wxLoss.setStorageSync = (key, value) => {
+    if (key === realStorage.KEYS.RESUME_PARSE_INTENT && Array.isArray(value) && value.length === 0) return
+    realSet(key, value)
+  }
+  const lossPosts = []
+  const lossPage = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxLoss,
+    api: { parseResume: (_payload, headers) => {
+      lossPosts.push(headers)
+      return Promise.reject(changed)
+    } },
+  })
+  lossPage.onLoad({ fileId: 'F-loss', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(lossPage.data.fileChangedBlocked, true)
+  assert.equal(lossPage.data.fileChanged, false)
+  assert.equal(intentOf(wxLoss).length, 1)
+  lossPage.retry()
+  await flush()
+  assert.equal(lossPosts.length, 1)
+
+  const wxDrift = createWx()
+  const driftReply = deferred()
+  const drift = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxDrift,
+    api: { parseResume: () => driftReply.promise },
+  })
+  drift.onLoad({ fileId: 'F-drift', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  const row = intentOf(wxDrift)[0]
+  wxDrift.storage.set(realStorage.KEYS.RESUME_PARSE_INTENT, [{ ...row, payload: { ...row.payload, fileId: 'F-other' } }])
+  driftReply.reject(changed)
+  await flush()
+  assert.equal(drift.data.fileChangedBlocked, true)
+  assert.equal(intentOf(wxDrift)[0].payload.fileId, 'F-other')
+
+  const conservative = [
+    { statusCode: 404, code: 'FILE_NOT_FOUND' },
+    { statusCode: 409, code: 'RESUME_PARSE_INTENT_PAYLOAD_MISMATCH' },
+    { statusCode: 500, code: 'RESUME_PARSE_INTENT_REVOKED' },
+    { statusCode: 408, code: 'FILE_CONTENT_CHANGED' },
+    { statusCode: 404, code: 'AI_TASK_NOT_FOUND' },
+    { statusCode: 429, code: 'FILE_CONTENT_CHANGED' },
+  ]
+  for (const err of conservative) {
+    const box = createWx()
+    const calls = []
+    const sample = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx: box,
+      api: { parseResume: (_payload, headers) => {
+        calls.push(headers)
+        return Promise.reject(err)
+      } },
+    })
+    sample.onLoad({ fileId: `F-${err.statusCode}-${err.code}`, fileName: 'a.pdf', fileFormat: 'pdf' })
+    await flush()
+    assert.equal(sample.data.fileChanged, false, err.code)
+    assert.equal(sample.data.terminalCharge, false, err.code)
+    assert.equal(sample.data.quotaReleased, false, err.code)
+    assert.equal(intentOf(box).length, 1, err.code)
+    const keptIntent = headerOf(calls[0])
+    if (sample.data.phase === 'unknown') sample.replaySame()
+    else sample.retry()
+    await flush()
+    assert.equal(calls.length, 2, `${err.statusCode} ${err.code}`)
+    assert.equal(headerOf(calls[1]), keptIntent, err.code)
+  }
 })
 
 // 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。

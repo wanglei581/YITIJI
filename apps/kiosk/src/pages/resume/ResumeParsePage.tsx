@@ -14,19 +14,24 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import { aiErrorCodeOf, aiErrorMessageOf } from '../../ai'
 import {
   canonicalResumeParsePayload,
+  classifyResumeParseTerminal,
   clearResumeParseIntent,
   prepareResumeParseIntent,
+  releaseHeldResumeParseIntent,
   releaseResumeParseIntent,
   resumeParseIntentBlockMessage,
   resumeParseIntentCode,
   resumeParseIntentHold,
+  resumeParseTerminalBlockNote,
+  resumeParseTerminalCopy,
   resumeParseWireBody,
   type CanonicalResumeParsePayload,
 } from '../../services/resumeParseIntent'
 import { readAiResumeSession, saveAiResumeSession } from './aiResumeSession'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
-import { ResumeTriageHero, type RailMark } from './components/ResumeTriageHero'
+import { ResumeTriageHero } from './components/ResumeTriageHero'
+import { frameCopy, ResumeParseUnknownNote, type ParseView, type ShownTerminal } from './ResumeParseOutcomeNote'
 import { buildScanHandoff } from './resumeScanHandoff'
 import {
   RESUME_SCORING_DIMENSIONS,
@@ -51,21 +56,9 @@ const FAIL_REASONS = [
   'AI 诊断服务暂时不可用，请稍后重试',
 ]
 
-/**
- * 这些码只说明「本机没拿到服务端的可信答复」，服务端可能处理了也可能没处理——所以是
- * 「结果未知」，不能说成「解析失败」，也不能自动再提交一次（那是一次新的 AI 调用）：
- * - NETWORK_ERROR / REQUEST_TIMEOUT：断网 / 超时（见 throwHttpError.networkError）；
- * - UNKNOWN_ERROR：没有 API 错误信封的代答（网关、代理等，API 自己对任何错误都写 code），
- *   或 2xx 响应体截断（JSON 解析失败的错误本身不带 code）。
- */
+// 断网、超时、无信封代答、2xx 截断：没拿到可信答复。5xx / 408 同理。其余 4xx 先按明确失败，终态码另行分流。
 const NO_REPLY_CODES = new Set(['NETWORK_ERROR', 'REQUEST_TIMEOUT', 'UNKNOWN_ERROR'])
 
-/**
- * 按 aiHttpAdapter 真实抛出的错误对象判定（与来源页 upload-unknown 同一口径）：
- * 上面三类码一律未知；任何 5xx（ApiHttpError.status ≥ 500）即使带 API 业务信封也算未知 ——
- * 服务端可能已经处理完，只是回包这一步失败。只有 4xx 业务拒绝与 MOCK_MODE（演示模式明确拒绝，
- * AiMockModeError 不是 ApiHttpError、status 为 0）才是明确失败。
- */
 function parseErrorOutcome(err: unknown): 'failed' | 'unknown' {
   const code = aiErrorCodeOf(err)
   if (code === 'RESUME_PARSE_OUTCOME_UNKNOWN' || code === 'AI_TASK_NOT_FOUND') return 'unknown'
@@ -87,67 +80,6 @@ function anonymousAccessReady(taskId: string, accessToken: string | undefined, a
 
 type ParseTask = { taskId: string; accessToken?: string }
 
-/**
- * 本页真实所处的状态。标题、四步轨、顶栏胶囊都只从这里取，不各自猜。
- * 稿 21 的 parse-unknown / parse-rechecking：解析是一次同步请求，只有收到 2xx 答复才有 taskId。
- * 拿到了编号却不是最终结果时，用既有 GET /resume/records/:taskId 按本人凭证（会员 token 或本次
- * 一次性 accessToken）再查；整次答复都丢了、手里没有编号时没有可查的接口，只如实说未知，
- * 由用户自己决定要不要再提交一次（明确标成新的一次）。
- */
-type ParseView = 'missing-file' | 'consent-checking' | 'consent-needed' | 'waiting' | 'failed' | 'unknown'
-
-const VIEW: Record<ParseView, {
-  ask: ReactNode
-  doing: string
-  flag: string
-  warn: boolean
-  status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
-  rail: RailMark[]
-}> = {
-  'missing-file': {
-    ask: <>没找到<em>要用的简历文件</em>。</>,
-    doing: '这一步需要一份已经拿到的简历，现在没有，所以不往下走。',
-    flag: '已阻断', warn: true,
-    status: { tone: 'warn', label: '这一步没有文件' },
-    rail: ['current', 'todo', 'todo', 'todo'],
-  },
-  'consent-checking': {
-    ask: <>先确认<em>授权状态</em>。</>,
-    doing: '确认完成之前，文件不会交给 AI 服务。',
-    flag: '确认中', warn: false,
-    status: { tone: 'unknown', label: '确认授权中' },
-    rail: ['done', 'wait', 'todo', 'todo'],
-  },
-  'consent-needed': {
-    ask: <>用简历 AI 前，<em>需要你先授权</em>。</>,
-    doing: '不授权就不解析；取消会回到来源选择，文件不会交给 AI。',
-    flag: '待授权', warn: true,
-    status: { tone: 'warn', label: '等待授权' },
-    rail: ['done', 'wait', 'todo', 'todo'],
-  },
-  waiting: {
-    ask: <>文件收到了，正在等<em>最终解析结果</em>。</>,
-    doing: '解析是一次出结果的处理，中间没有阶段可以播报。',
-    flag: '解析中', warn: false,
-    status: { tone: 'unknown', label: '正在解析 · 一次性出结果' },
-    rail: ['done', 'current', 'todo', 'todo'],
-  },
-  failed: {
-    ask: <>这次<em>没能读出内容</em>。</>,
-    doing: '文件已经传到服务端了，正在转到失败说明页，可以直接重新解析，不用再传一遍。',
-    flag: '解析失败', warn: true,
-    status: { tone: 'bad', label: '解析失败 · 可重试' },
-    rail: ['done', 'bad', 'todo', 'todo'],
-  },
-  unknown: {
-    ask: <>这一次解析<em>暂时无法确认有没有完成</em>。</>,
-    doing: '可能已经完成，也可能没有；本页不会自动再提交，也不会把它当成失败。',
-    flag: '结果未知', warn: true,
-    status: { tone: 'warn', label: '解析结果未知' },
-    rail: ['done', 'wait', 'todo', 'todo'],
-  },
-}
-
 export function ResumeParsePage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -160,6 +92,7 @@ export function ResumeParsePage() {
   const watchedOwner = user?.id ?? null
 
   const [outcome, setOutcome] = useState<'failed' | 'unknown' | null>(null)
+  const [terminal, setTerminal] = useState<ShownTerminal | null>(null)
   // 结果未知但拿到了编号（2xx 却不是最终结果）：只放内存与既有最小会话，不进地址栏。
   const [pendingTask, setPendingTask] = useState<ParseTask | null>(null)
   const [recheck, setRecheck] = useState<'idle' | 'checking' | 'not-ready' | 'error' | 'replay' | 'not-found'>('idle')
@@ -327,6 +260,7 @@ export function ResumeParsePage() {
     const ownerId = ownerRef.current
     const knownTaskId = mode === 'replay' ? (pendingTaskRef.current?.taskId ?? '') : ''
     setOutcome(null)
+    setTerminal(null)
     setRecheck('idle')
     setBlockNote(null)
     setConfirmFresh(0)
@@ -383,6 +317,46 @@ export function ResumeParsePage() {
         }
         return
       }
+      const terminalKind = err instanceof ApiHttpError
+        ? classifyResumeParseTerminal(err.status, aiErrorCodeOf(err))
+        : null
+      if (terminalKind) {
+        const held = resumeParseIntentHold({
+          intent: intentRef.current,
+          ownerId,
+          payload: payloadRef.current,
+        }) === 'held'
+        if (!held) {
+          setOutcome('unknown')
+          setStorageBlocked(true)
+          setTerminal({ mode: 'blocked', note: resumeParseTerminalBlockNote(terminalKind, 'mismatch') })
+          return
+        }
+        if (terminalKind.kind === 'file_changed') {
+          const intent = intentRef.current
+          const payload = payloadRef.current
+          const released = await releaseHeldResumeParseIntent(
+            { intent, ownerId, payload },
+            () => samePerson(ownerId) && intentRef.current === intent && payloadRef.current === payload,
+          )
+          if (!samePerson(ownerId)) return
+          const cleared = released.ok && resumeParseIntentHold({ intent, ownerId, payload }) === 'absent'
+          if (!cleared) {
+            setOutcome('unknown')
+            setStorageBlocked(true)
+            setTerminal({ mode: 'blocked', note: resumeParseTerminalBlockNote(terminalKind, 'release_failed') })
+            return
+          }
+          intentRef.current = ''
+          payloadRef.current = null
+          setOutcome('unknown')
+          setTerminal({ mode: 'file_changed', copy: resumeParseTerminalCopy(terminalKind) })
+          return
+        }
+        setOutcome('unknown')
+        setTerminal({ mode: 'charged', source: terminalKind, copy: resumeParseTerminalCopy(terminalKind) })
+        return
+      }
       // 公共额度 429 发生在记账之前，同键重试仍会被拒。只清对得上的本机意图，避免下次换材料被卡住。
       if (err instanceof ApiHttpError && err.status === 429 && aiErrorCodeOf(err) === 'AI_PUBLIC_QUOTA_EXCEEDED') {
         if (await dropHeldIntent(ownerId, '本机解析标识对不上，没有打开拒绝页，也没有另起一次解析。')) {
@@ -397,30 +371,61 @@ export function ResumeParsePage() {
   }, [acceptResult, dropHeldIntent, file?.format, file?.name, fileId, getToken, navigateFail, samePerson, state])
 
   const replaySame = () => {
-    if (inFlightRef.current || confirmFresh !== 0 || identityStoppedRef.current) return
+    if (terminal || inFlightRef.current || confirmFresh !== 0 || identityStoppedRef.current) return
     cancelRef.current = false
     void submitAndWait('replay')
   }
 
+  const openFreshConfirm = () => {
+    if (terminal?.mode === 'file_changed' || terminal?.mode === 'blocked') return
+    if (inFlightRef.current || confirmFresh !== 0 || identityStoppedRef.current) return
+    setConfirmFresh(1)
+  }
+
   const beginFresh = async () => {
     if (inFlightRef.current || identityStoppedRef.current) return
+    if (terminal?.mode === 'file_changed' || terminal?.mode === 'blocked') return
     const ownerId = ownerRef.current
+    const charged = terminal?.mode === 'charged' ? terminal : null
     inFlightRef.current = true
     try {
-      const released = await releaseResumeParseIntent(ownerId)
+      const intent = intentRef.current
+      const payload = payloadRef.current
+      if (charged && resumeParseIntentHold({ intent, ownerId, payload }) !== 'held') {
+        setConfirmFresh(0)
+        setOutcome('unknown')
+        setStorageBlocked(true)
+        setTerminal({ mode: 'blocked', note: resumeParseTerminalBlockNote(charged.source, 'mismatch') })
+        return
+      }
+      const released = charged
+        ? await releaseHeldResumeParseIntent(
+          { intent, ownerId, payload },
+          () => samePerson(ownerId) && intentRef.current === intent && payloadRef.current === payload,
+        )
+        : await releaseResumeParseIntent(ownerId)
       if (!samePerson(ownerId)) return
       if (!released.ok) {
         setConfirmFresh(0)
         setOutcome('unknown')
-        setBlockNote(released.code === 'STORAGE_WRITE_FAILED'
-          ? '本机没能清除上一次未完成的解析，没有开始新的一次。'
-          : resumeParseIntentBlockMessage(released.code))
+        if (charged) {
+          setStorageBlocked(true)
+          setTerminal({
+            mode: 'blocked',
+            note: resumeParseTerminalBlockNote(charged.source, released.code === 'INTENT_NOT_HELD' || released.code === 'IDENTITY_CHANGED' ? 'mismatch' : 'release_failed'),
+          })
+        } else {
+          setBlockNote(released.code === 'STORAGE_WRITE_FAILED'
+            ? '本机没能清除上一次未完成的解析，没有开始新的一次。'
+            : resumeParseIntentBlockMessage(released.code))
+        }
         return
       }
       intentRef.current = ''
       payloadRef.current = null
       keptTokenRef.current = null
       setPendingTask(null)
+      setTerminal(null)
       setConfirmFresh(0)
       setBlockNote(null)
     } finally {
@@ -482,6 +487,7 @@ export function ResumeParsePage() {
     cancelRef.current = true
     inFlightRef.current = false
     setConfirmFresh(0)
+    setTerminal(null)
     setOutcome('unknown')
     setBlockNote('登录状态已变化，没有开始新的一次解析。')
   }, [watchedOwner])
@@ -534,7 +540,7 @@ export function ResumeParsePage() {
       : consent.needsPrompt
         ? 'consent-needed'
         : outcome ?? 'waiting'
-  const copy = VIEW[view]
+  const copy = frameCopy(view, terminal)
 
   const renderFrame = (body: ReactNode, ctabar?: ReactNode) => (
     <QxPageFrame
@@ -604,7 +610,17 @@ export function ResumeParsePage() {
             {failed ? <XCircleIcon size={44} /> : <SparklesIcon size={44} />}
           </span>
           <h2 className="qx-rt-wait-t" role="status" aria-live="polite">
-            {outcome === 'failed' ? '解析出错' : outcome === 'unknown' ? (pendingTask ? '解析还没出最终结果' : '没等到解析结果') : '正在等待真实解析结果…'}
+            {outcome === 'failed'
+              ? '解析出错'
+              : outcome === 'unknown'
+                ? (terminal?.mode === 'charged'
+                  ? terminal.copy.title
+                  : terminal?.mode === 'file_changed'
+                    ? '这份文件已停止使用'
+                    : terminal?.mode === 'blocked'
+                      ? '不能继续这次解析'
+                      : (pendingTask ? '解析还没出最终结果' : '没等到解析结果'))
+                : '正在等待真实解析结果…'}
           </h2>
           {/* 文件信息 chips */}
           {!failed && (
@@ -616,57 +632,17 @@ export function ResumeParsePage() {
           )}
         </section>
 
-        {/* 稿 21 parse-unknown：四行说明沿用来源页 upload-unknown 的版式。 */}
         {outcome === 'unknown' && (
-          <>
-            <p className="qx-rt-note resume-parse-unknown" data-tone="warn">
-              <b>结果未知</b>{pendingTask ? '服务端已经登记了这一次解析，但还没给出最终结果。' : '暂时无法确认这一次解析有没有完成。'}本页不会自动再提交，也不会把它当成失败。
-            </p>
-            <dl className="qx-rt-kv">
-              <div><dt>发生了什么</dt><dd>{pendingTask ? '解析已经提交并拿到了编号，服务端还没返回最终结果。' : '提交解析后网络或服务出了问题，这台机器没能确认结果。'}</dd></div>
-              <div><dt>还不确定的</dt><dd>这一次解析可能已经完成，也可能没有。</dd></div>
-              {pendingTask ? (
-                <div><dt>按编号再查</dt><dd>只是读取这一次的结果，不会重新解析，也不会多出记录。</dd></div>
-              ) : (
-                <>
-                  <div><dt>同一次重查</dt><dd>用已经保存的同一次标识再问一次，不会另起一次解析。</dd></div>
-                  <div><dt>重新提交</dt><dd>会作为新的一次解析重新调用 AI；如果刚才那次其实已经完成，记录里可能多出一条。</dd></div>
-                </>
-              )}
-              <div>
-                <dt>建议这样做</dt>
-                <dd data-testid="resume-parse-unknown-next">
-                  {pendingTask
-                    ? '稍后点下方「按同一编号再查结果」；也可以返回简历来源换一份文件。'
-                    : getToken()
-                      ? '可先到「我的 → 我的简历」核对；暂时没看到时可稍后刷新。先按同一次重查。若决定重新提交，这是新的一次解析。'
-                      : '当前未登录，暂时无法核对这一次的结果。需要继续时，先按同一次重查；重新提交会是新的一次解析。也可以返回简历来源。'}
-                </dd>
-              </div>
-            </dl>
-            {recheck === 'not-ready' && (
-              <p className="qx-rt-note" role="status" data-testid="resume-parse-recheck-result">这次查到的仍不是最终结果，可以稍后再查。</p>
-            )}
-            {recheck === 'error' && (
-              <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-recheck-result">这次没查到结果，可能是网络问题或编号已失效；可以稍后再查，或返回简历来源。</p>
-            )}
-            {blockNote && (
-              <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-intent-note">{blockNote}</p>
-            )}
-            {!storageBlocked && confirmFresh === 0 && (!pendingTask || recheck === 'not-found') && (
-              <button
-                type="button"
-                className="qx-btn"
-                data-variant="ghost"
-                onClick={() => {
-                  if (inFlightRef.current || confirmFresh !== 0) return
-                  setConfirmFresh(1)
-                }}
-              >
-                重新提交解析（新的一次）
-              </button>
-            )}
-          </>
+          <ResumeParseUnknownNote
+            terminal={terminal}
+            pendingTask={Boolean(pendingTask)}
+            recheck={recheck}
+            blockNote={blockNote}
+            storageBlocked={storageBlocked}
+            confirmFresh={confirmFresh}
+            loggedIn={Boolean(getToken())}
+            onFresh={openFreshConfirm}
+          />
         )}
 
         <p className="qx-rt-note" role="note">
@@ -700,9 +676,11 @@ export function ResumeParsePage() {
           </section>
         )}
 
-        <p className="qx-rt-note" data-tone="warn">
-          解析通常在 90 秒内完成；若格式不支持、识别失败或服务不可用，将如实提示失败原因，可重试或重新上传。诊断结果由 AI 生成，仅供参考。
-        </p>
+        {!terminal && (
+          <p className="qx-rt-note" data-tone="warn">
+            解析通常在 90 秒内完成；若格式不支持、识别失败或服务不可用，将如实提示失败原因，可重试或重新上传。诊断结果由 AI 生成，仅供参考。
+          </p>
+        )}
       </div>
 
       {/* DEV 专用 */}
@@ -722,7 +700,17 @@ export function ResumeParsePage() {
           <button type="button" className="qx-btn" data-variant="ghost" onClick={leaveToSource}>
             返回简历来源
           </button>
-          {pendingTask && !storageBlocked && recheck !== 'replay' && recheck !== 'not-found' ? (
+          {terminal?.mode === 'blocked' ? (
+            <button type="button" className="qx-btn" data-variant="primary" disabled>暂不能开始新的一次</button>
+          ) : terminal?.mode === 'file_changed' ? (
+            <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-parse-reupload" onClick={leaveToSource}>
+              重新上传简历
+            </button>
+          ) : terminal?.mode === 'charged' ? (
+            <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-parse-new-attempt" onClick={openFreshConfirm}>
+              重新解析（新的一次）
+            </button>
+          ) : pendingTask && !storageBlocked && recheck !== 'replay' && recheck !== 'not-found' ? (
             <button type="button" className="qx-btn" data-variant="primary" disabled={recheck === 'checking'} onClick={() => { void recheckTask() }}>
               {recheck === 'checking' ? '正在查询…' : '按同一编号再查结果'}
             </button>
@@ -766,8 +754,12 @@ export function ResumeParsePage() {
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-neutral-600" data-testid="resume-parse-fresh-copy">
               {confirmFresh === 1
-                ? '刚才那次解析可能已经完成。重新提交会再调用一次 AI，生成新的一次解析，不会取消或覆盖刚才那次；如果刚才那次其实已经完成，就等于重复解析了一次。'
-                : '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。'}
+                ? (terminal?.mode === 'charged'
+                  ? terminal.copy.confirm
+                  : '刚才那次解析可能已经完成。重新提交会再调用一次 AI，生成新的一次解析，不会取消或覆盖刚才那次；如果刚才那次其实已经完成，就等于重复解析了一次。')
+                : terminal?.mode === 'charged'
+                  ? '将清除本机这一次已结束的解析标识，并开始新的一次 AI 解析。'
+                  : '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。'}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <Button size="lg" variant="secondary" className="min-h-14" onClick={() => setConfirmFresh(0)}>

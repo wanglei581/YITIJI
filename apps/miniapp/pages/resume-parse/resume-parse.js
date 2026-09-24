@@ -149,6 +149,13 @@ Page({
     quotaReleased: false,
     // 额度 429 到了，但标识对不上或没写掉：留着原标识，不能另起一次
     quotaReleaseBlocked: false,
+    // 已收费的终态标识：保留原标识，只有连续两次确认才清除并新开一次
+    terminalCharge: false,
+    terminalBlocked: false,
+    terminalTitle: '',
+    // 本次内容预检在调用模型之前拒绝：释放匹配标识后只引导重新上传
+    fileChanged: false,
+    fileChangedBlocked: false,
     // 没有编号但已登录:这一次若已完成会进「我的 - AI 服务记录」,可去那里核对。
     canCheckRecords: false,
     // 解析参数,重试用
@@ -316,6 +323,9 @@ Page({
           if (isExactPublicQuotaExceeded(err)) {
             return this._releasePublicQuota(identity)
           }
+          const terminal = intentStore.classifyKeyedTerminal(err)
+          if (terminal && terminal.kind === 'file_changed') return this._releaseFileChanged(identity)
+          if (terminal && terminal.kind === 'charged') return this._showChargedTerminal(identity, terminal.code)
           if (submitErrorOutcome(err) === 'unknown') {
             this._stopForIntent(knownTaskId, err && err.code === 'RESUME_PARSE_OUTCOME_UNKNOWN'
               ? '这次解析是否已经完成无法确认。请用同一次重查，不要开始新的解析。'
@@ -506,6 +516,50 @@ Page({
     this._fail(null, { message: QUOTA_REJECTED, quotaReleased: true })
   },
 
+  /**
+   * 409 FILE_CONTENT_CHANGED：预检在额度之前把文件隔离。
+   * 只释放回读仍匹配的本机标识，不自动再 POST，也不走额度 429 的「开始新的一次」。
+   */
+  async _releaseFileChanged(identity) {
+    const copy = intentStore.terminalCopy('FILE_CONTENT_CHANGED')
+    const snapshot = this._quotaSnapshot(identity)
+    if (!snapshot || !this._quotaMemoryMatches(snapshot)) {
+      this._showFileChangedBlocked(copy.blocked)
+      return
+    }
+    let released
+    try {
+      released = await intentStore.releaseHeld(snapshot, () => this._quotaMemoryMatches(snapshot))
+    } catch (e) {
+      released = { ok: false, code: 'STORAGE_WRITE_FAILED' }
+    }
+    if (this._stopped || !sameIdentity(identity) || !this._quotaMemoryMatches(snapshot)) return
+    if (!(released && released.ok) || this._intentHold() !== 'absent') {
+      this._showFileChangedBlocked(copy.blocked)
+      return
+    }
+    this._intent = ''
+    this._intentPayload = null
+    this._fail(null, { message: copy.released, fileChanged: true })
+  },
+
+  _showFileChangedBlocked(message) {
+    if (this._stopped || !this._submitIdentity || !sameIdentity(this._submitIdentity)) return
+    this._fail(null, { message, fileChangedBlocked: true })
+  },
+
+  /** 撤销 / 结果过期 / 结果缺失：模型可能已经跑过。不释放标识，不提供同一次重试。 */
+  _showChargedTerminal(identity, code) {
+    if (this._stopped || !sameIdentity(identity)) return
+    const copy = intentStore.terminalCopy(code)
+    this._terminalCode = code
+    if (this._intentHold() !== 'held') {
+      this._unknown('', copy.blocked, 'idle', { terminalBlocked: true, terminalTitle: '解析标识不能安全继续' })
+      return
+    }
+    this._unknown('', copy.lead, 'idle', { terminalCharge: true, terminalTitle: copy.title })
+  },
+
   /** 只重试保存当前页已经收到的凭证;回读不一致前不发 GET 或第二次 POST。 */
   _saveUnsavedTask(taskId) {
     const task = this._unsavedTask
@@ -620,6 +674,11 @@ Page({
       settleBlocked: extra.settleBlocked === true,
       quotaReleased: false,
       quotaReleaseBlocked: false,
+      terminalCharge: extra.terminalCharge === true,
+      terminalBlocked: extra.terminalBlocked === true,
+      terminalTitle: extra.terminalTitle || '',
+      fileChanged: false,
+      fileChangedBlocked: false,
       canCheckRecords: !taskId && auth.isLoggedIn(),
     })
   },
@@ -634,11 +693,21 @@ Page({
       failMsg: note.message || (err && err.message) || '解析失败,请稍后重试',
       quotaReleased: note.quotaReleased === true,
       quotaReleaseBlocked: note.quotaReleaseBlocked === true,
+      terminalCharge: false,
+      terminalBlocked: false,
+      terminalTitle: '',
+      fileChanged: note.fileChanged === true,
+      fileChangedBlocked: note.fileChangedBlocked === true,
     })
   },
 
+  _terminalLocked() {
+    const d = this.data
+    return d.terminalCharge || d.terminalBlocked || d.fileChanged || d.fileChangedBlocked
+  },
+
   retry() {
-    if (this.data.quotaReleaseBlocked) return
+    if (this.data.quotaReleaseBlocked || this.data.fileChanged || this.data.fileChangedBlocked || this.data.terminalCharge || this.data.terminalBlocked) return
     if (this.data.phase === 'missing') {
       wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
       return
@@ -651,6 +720,7 @@ Page({
 
   /** 没有任务编号时，用已经保存的同一对请求头再提交一次，不另铸意图。 */
   replaySame() {
+    if (this._terminalLocked()) return
     if (this.data.phase !== 'unknown' || this.data.pendingTaskId || this.data.intentReplay || this._submitting) return
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
     this.setData({
@@ -668,6 +738,7 @@ Page({
    * 返回的编号必须还是这一个;对不上就留下原编号,不收下另一条结果,也不另铸意图。
    */
   replayKnown() {
+    if (this._terminalLocked()) return
     const taskId = this.data.pendingTaskId
     if (this.data.phase !== 'unknown' || !this.data.intentReplay || !taskId || this._submitting || this._replayArmed) return
     const hold = this._intentHold()
@@ -698,9 +769,12 @@ Page({
     if (!this._resubmitAllowed()) return
     if (this._submitting || this._confirming) return
     this._confirming = true
+    const charged = this.data.terminalCharge
     wx.showModal({
       title: '重新提交是新的一次',
-      content: '刚才那次解析可能已经完成。重新提交会再调用一次 AI,生成新的一次解析,不会取消或覆盖刚才那次;如果刚才那次其实已经完成,就等于重复解析了一次。确定重新提交吗?',
+      content: charged
+        ? '这次解析标识已经结束，同一标识不能恢复结果。重新提交会再调用一次 AI，生成新的一次解析。确定继续吗?'
+        : '刚才那次解析可能已经完成。重新提交会再调用一次 AI,生成新的一次解析,不会取消或覆盖刚才那次;如果刚才那次其实已经完成,就等于重复解析了一次。确定重新提交吗?',
       confirmText: '重新提交',
       cancelText: '先不提交',
       success: (r) => {
@@ -710,7 +784,9 @@ Page({
         }
         wx.showModal({
           title: '再次确认',
-          content: '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。',
+          content: charged
+            ? '将清除本机这一次已结束的解析标识，并开始新的一次 AI 解析。'
+            : '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。',
           confirmText: '开始新的一次',
           cancelText: '先不提交',
           success: (r2) => {
@@ -734,6 +810,36 @@ Page({
       this._unknown('', '登录状态已变化，没有开始新的一次解析。')
       return
     }
+    if (this.data.terminalCharge) {
+      const copy = intentStore.terminalCopy(this._terminalCode || 'RESUME_PARSE_RESULT_MISSING')
+      const snapshot = this._quotaSnapshot(identity)
+      if (!snapshot || !this._quotaMemoryMatches(snapshot)) {
+        this._submitting = false
+        this._unknown('', copy.blocked, 'idle', { terminalBlocked: true })
+        return
+      }
+      let released
+      try {
+        released = await intentStore.releaseHeld(snapshot, () => this._quotaMemoryMatches(snapshot))
+      } catch (e) {
+        released = { ok: false, code: 'STORAGE_WRITE_FAILED' }
+      }
+      if (this._stopped || !sameIdentity(identity)) {
+        this._submitting = false
+        return
+      }
+      if (!(released && released.ok) || this._intentHold() !== 'absent') {
+        this._submitting = false
+        const failedWrite = released && released.code === 'STORAGE_WRITE_FAILED'
+        this._unknown('', failedWrite ? copy.releaseFailed : copy.blocked, 'idle', { terminalBlocked: true })
+        return
+      }
+      this._intent = ''
+      this._intentPayload = null
+      this._submitting = false
+      this._resubmit()
+      return
+    }
     const cleared = await intentStore.clear(intent, identity.ownerId)
     if (this._stopped || !sameIdentity(identity)) {
       this._submitting = false
@@ -752,19 +858,21 @@ Page({
   /** 新一次 POST 只在两种未知态开放:没有编号;或有编号但当前身份/令牌下查不到。意图重查态不开放。 */
   _resubmitAllowed() {
     const d = this.data
-    if (d.intentReplay || d.settleBlocked || d.quotaReleaseBlocked) return false
+    if (d.intentReplay || d.settleBlocked || d.quotaReleaseBlocked || d.terminalBlocked || d.fileChanged || d.fileChangedBlocked) return false
+    if (d.terminalCharge) return d.phase === 'unknown' && !d.pendingTaskId
     return d.phase === 'unknown' && (!d.pendingTaskId || d.recheck === 'not-found')
   },
 
   /** 发起一次全新的解析 POST(调用方负责确认过这是用户本人的明确选择)。 */
   _resubmit() {
-    if (this._submitting || this.data.quotaReleaseBlocked) return
+    if (this._submitting || this.data.quotaReleaseBlocked || this.data.fileChanged || this.data.fileChangedBlocked || this.data.terminalBlocked) return
     // 同一个 fileId 仍在有效期内(后端约 30 分钟)可直接重提;过期会由后端报错
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
     this.setData({
       phase: 'parsing', failMsg: '', elapsed: 0, done: false,
       unknownCause: '', pendingTaskId: '', recheck: 'idle', canCheckRecords: false,
       intentReplay: false, quotaReleased: false, quotaReleaseBlocked: false,
+      terminalCharge: false, terminalBlocked: false, fileChanged: false, fileChangedBlocked: false,
     })
     this._stopped = false
     this._startElapsed()

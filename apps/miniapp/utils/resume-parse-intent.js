@@ -306,6 +306,43 @@ function releaseHeld(expected, confirm) {
   return enqueue(() => Promise.resolve(releaseHeldBody(expected, confirm)))
 }
 
+/**
+ * 同一标识会反复失败、且服务端分支已经写死的三支。
+ * 状态码和错误码必须同时命中；其余 4xx / 5xx 返回 null，调用方保持原标识。
+ */
+function classifyKeyedTerminal(err) {
+  if (!err || typeof err.statusCode !== 'number' || typeof err.code !== 'string') return null
+  if (err.statusCode === 409 && err.code === 'RESUME_PARSE_INTENT_REVOKED') return { kind: 'charged', code: err.code }
+  if (err.statusCode === 404 && (err.code === 'RESUME_PARSE_RESULT_EXPIRED' || err.code === 'RESUME_PARSE_RESULT_MISSING')) {
+    return { kind: 'charged', code: err.code }
+  }
+  if (err.statusCode === 409 && err.code === 'FILE_CONTENT_CHANGED') return { kind: 'file_changed', code: err.code }
+  return null
+}
+
+function terminalCopy(code) {
+  if (code === 'FILE_CONTENT_CHANGED') {
+    return {
+      title: '文件内容已变化',
+      lead: '服务端在本次调用模型之前停止使用这份文件。这次没有调用模型。',
+      released: '文件内容已变化，已停止使用。这次没有调用模型。请重新上传一份新文件。',
+      blocked: '文件内容已变化，这次没有调用模型。本机没能安全释放这次解析标识，没有另起一次解析。',
+    }
+  }
+  const lead = code === 'RESUME_PARSE_INTENT_REVOKED'
+    ? '服务端确认这次解析已撤销，同一标识不能恢复结果。'
+    : code === 'RESUME_PARSE_RESULT_EXPIRED'
+      ? '服务端确认这次解析结果已过期，同一标识不能再取回。'
+      : '服务端确认这次解析结果已不在，同一标识不能恢复。'
+  return {
+    title: code === 'RESUME_PARSE_INTENT_REVOKED' ? '这次解析已撤销' : code === 'RESUME_PARSE_RESULT_EXPIRED' ? '解析结果已过期' : '解析结果已不在',
+    lead: `${lead}本机仍保留这次标识。`,
+    released: '',
+    blocked: `${lead}本机保存的解析标识对不上，没有清除，也没有另起一次解析。`,
+    releaseFailed: `${lead}本机没能清除这次解析标识，没有开始新的一次。`,
+  }
+}
+
 module.exports = {
   STORE_KEY,
   INTENT_HEADER,
@@ -314,4 +351,6 @@ module.exports = {
   markSettled,
   clear,
   releaseHeld,
+  classifyKeyedTerminal,
+  terminalCopy,
 }
