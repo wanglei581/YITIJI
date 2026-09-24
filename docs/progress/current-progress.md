@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-09-24：完整商业收口已获执行授权，当前仍为商业 NO-GO
+
+**任务目标：** 在现有功能范围内完成 Kiosk、Admin、Partner、原生小程序、API/Worker 与 Windows Agent 的真实业务联通，修复上线阻塞；收敛历史资产、工作副本和 PR，完成容量治理、发布回滚、真机与受控试点验收。执行清单以 `next-tasks.md` 顶部为准；下方日期记录保留历史证据，已被后续提交关闭的事项不得重复施工。
+
+- **源码基线：** `origin/main=eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`；PR #1042 远端仍为 `755fa5a53465e999cc4505e1f6f9f31d803576f4`；最新本地整合候选 `6e1cf43c22ba5154198981aade959c491eca02e8` 比 PR 多 39 个提交，含 Burn MSI 命名修复 `60c137bb8` 和账号设置迁移。远端旧 SHA 的 CI 不覆盖这些提交。
+- **保护范围：** 根工作区仍有大量未提交资产及 3 个冲突路径；旧整合树的 `.gitignore` 为既有未提交改动。本轮从上述候选建立隔离执行树，不携带、不覆盖这些 WIP，不复活落后 main 的治理分支。
+- **线上实测：** 2026-09-24 只读预检 [35965865084](https://github.com/wanglei581/YITIJI/actions/runs/35965865084) 成功：根盘约 40 GiB、使用率 45%、可用约 21 GiB，API 回环健康正常、Redis 可达，部署来源短 SHA 为 `50483cd2`。这不证明三端静态版本、完整应用库大小或业务验收通过；本轮未部署或清理。
+- **协作：** Codex 负责决策、整合与验收；Grok `grok-4.7-build-fast/xhigh` 承担主要修复及回归；Claude `claude-opus-5-5/xhigh` 为前端写入者；Agy `gemini-3.8-flash-high/high` 负责契约和独立评审。只计有证据的结果，超时不算通过。
+- **工程约束：** 优先修复与复用；每批先定文件预算及验证。当前不新增报告、页面、服务或依赖，不批删旧文件，不新增 PR；围绕 #1042 复核独有能力后整合。注册工作副本数量不等于可删数量，目录 `du` 占用也不等于可释放字节。
+- **验收边界：** 已授权本地修复、验证和只读审计。生产发布/重启/迁移、真实支付、硬件操作和不可逆清理仍须具体执行条件与授权。完整 CI、PostgreSQL/COS、微信与 Windows/Pantum 真机、支付退款对账、授权内容及 UAT 尚未关闭。
+
 2026-09-23 **稿 30 `?screen=settings`：`/me/settings` 账号设置已迁入青序流光会员壳（本地候选），商业仍 NO-GO。**
 本页从墨青纸感 V6 页框（`KioskPageFrame` + 明细页墨青样式 + 涟漪）改为复用既有 `QxMePage`，在共享壳里只新增 `settings` 视图（`member-settings` 屏标与测试作用域、不挂记录/资产分类 Tab），路由精确登记进 `KioskRoot` 的 `QX_MIGRATED_ROUTES`；样式只加在 `qx-me-shared.css` 的 `.qx-me-settings` 作用域，令牌一律 `var(--qx-*)`。不新增路由、页面、后端、数据库、小程序、Admin/Partner、假数据或第二套壳，旧样式文件一个未删。保留原有能力：`/me/settings` 路由与登录回跳、`phoneMasked` 脱敏显示、手机号换绑四步（两段验证码 `type=password` 隐藏、45 秒无操作关层清内存）、岗位 AI 授权查询与撤回（二次确认，撤回失败弹层内说明「授权状态没有改变」且徽标不变）、公共终端会话说明、协议/隐私入口、隐私与数据请求入口、切换账号与退出登录（二次确认后走 `clearSessionTo` 清场）、游客态与「账号注销和数据导出尚未开放」诚实说明。行为修正一处：授权状态读取失败原先落成「未授权」，现显示「本次未取到」并提供「重新读取」，撤回按钮在读到「已授权」前一律不可用。游客态按稿补了「登录后才出现的账号操作」三条只读锁定行（不可点、不发请求），填掉原先约 600px 的空白。
 本地证据：Kiosk `typecheck`、`verify:fusion-w5`、`verify:profile-inkpaper-home`、`verify:lightflow-profile-entry`、`verify:member-session-closure`、`verify:data-request-ui`、`verify:job-ai-history-privacy-ui`、`verify:profile-commercial-first-batch`、`verify:user-center-wave0`、`verify:no-raw-error-render` 等 30 条相关门禁，Playwright W5 全量（1080×1920 + 390×844，43 条，含新增 6 条账号设置用例：游客零账号请求与登录回跳、授权读取失败/重试/撤回失败/撤回成功、换绑四步隐藏验证码与假时钟 45 秒超时、取消切换/确认退出、确认切换账号、390 宽无重叠）、W6 全量 112 条、隐私全量 36 条均退出 0，`graph:check`、`verify:repository-integrity`、`git diff --check` 退出 0；kiosk `lint` 0 error。反向变异 7 项各令对应检查退出 1：从 `QX_MIGRATED_ROUTES` 删 `/me/settings`（`verify:fusion-w5` + 浏览器用例旧顶栏重现）、重引墨青样式（`verify:fusion-w5` + `verify:profile-inkpaper-home`）、换绑第 4 步新号不脱敏（浏览器用例读到原号）、授权读取失败猜成未授权（浏览器用例）、失败徽标文案改回「未授权」（`verify:profile-inkpaper-home`）、退出登录绕过 `clearSessionTo`（`verify:member-session-closure` + 浏览器用例）、撤回失败改动授权状态（浏览器用例）；恢复后均与提交逐字节一致。
