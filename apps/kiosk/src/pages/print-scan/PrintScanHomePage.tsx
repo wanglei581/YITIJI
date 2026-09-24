@@ -101,8 +101,8 @@ interface CapabilityDefinition {
 function describeDocPrint(map: ConfiguredCapabilityMap): string {
   const extras = docPrintExtras(map)
   return extras.on.length > 0
-    ? `PDF / 图片上传后打印，A4 黑白 / ${extras.on.join(' / ')}可选`
-    : 'PDF / 图片上传后打印，A4 黑白'
+    ? `PDF / JPG / PNG 上传，先过材料检查再设参数；${extras.on.join(' / ')}可选`
+    : 'PDF / JPG / PNG 上传，先过材料检查再设参数。'
 }
 
 /** 文档打印卡的状态行：未登记的彩色 / 双面如实写「未验证」，与轴芯片同一口径。 */
@@ -129,7 +129,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'doc',
     icon: FileTextIcon,
     title: '文档打印',
-    description: 'PDF、图片上传后设参数打印，A4 黑白',
+    description: 'PDF / JPG / PNG 上传，先过材料检查再设参数。',
     to: '/print/upload?source=document&tab=file',
     aiRole: 'ai',
     needsMfp: true,
@@ -138,7 +138,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     // 运行时由 describeDocPrintFoot 按本机彩色 / 双面登记改写；这里是未登记时的口径。
     stateNote: 'A4 黑白 · 彩色 / 双面未验证',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '这台机器出不了纸。文件可以先传上来存着，换一台再打。',
+    mfpOffNote: '文件可以先传上来存着，换一台再打。',
   },
   {
     key: 'phone-upload',
@@ -152,7 +152,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     available: true,
     iconTone: 'slate',
     stateNote: '不用登录 · 不占打印机',
-    mfpOffStateNote: '照常可用 · 这一步不经过打印机，传上来先存着',
+    mfpOffStateNote: '照常可用 · 传上来先存着',
   },
   {
     key: 'usb-import',
@@ -166,7 +166,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     available: true,
     iconTone: 'slate',
     stateNote: '本地网桥已实现 · Windows 真机未验收',
-    mfpOffStateNote: '照常可用 · 导入不经过打印机，传上来先存着',
+    mfpOffStateNote: '照常可用 · 导入后先存着',
   },
   {
     key: 'photo-print',
@@ -182,7 +182,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     iconTone: 'clay',
     stateNote: '与文档打印同链路',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '照片走文档打印同一条出纸链路，那条停了，这条也出不了。',
+    mfpOffNote: '与文档打印同一条出纸链路，一起停。',
   },
   {
     key: 'scan',
@@ -197,35 +197,35 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     iconTone: 'slate',
     stateNote: '面板手动扫描 · 无一键启动',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '打印和扫描是同一台机器，它出不了纸，扫描一起停。',
+    mfpOffNote: '扫描和打印是同一台机器，一起停。',
   },
   {
     key: 'convert',
     cap: 'convert',
     icon: LayersIcon,
     title: '格式转换',
-    description: '多张图片合并成一份 PDF，便于打印和存档。',
+    description: '多张 JPG / PNG 合并成一份 PDF，顺序自己排。',
     to: '/print-scan/convert',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'teal',
     stateNote: '最多 20 张 · 单张 ≤10MB',
-    mfpOffStateNote: '照常可用 · 合并不经过打印机，合完先存着',
+    mfpOffStateNote: '照常可用 · 合完先存着',
   },
   {
     key: 'sign',
     cap: 'sign',
     icon: PenToolIcon,
     title: '签名盖章',
-    description: '签名 / 印章图片叠到 PDF 上，生成新 PDF。',
+    description: '签名或印章图片叠到 PDF 指定位置，生成新 PDF。',
     to: '/print-scan/sign',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'clay',
     stateNote: '图像合成，不是电子签名',
-    mfpOffStateNote: '照常可用 · 合成不经过打印机，出纸要换机',
+    mfpOffStateNote: '照常可用 · 出纸要换机',
   },
   {
     key: 'id-photo',
@@ -267,6 +267,7 @@ const ARRIVAL_CODE_ENTRY = {
   description:
     '手机上下过单拿到的 8 位数字到机码；早期发出的 10 位字母数字历史码同样能用。扫码或手输都行。不是付款后的取件凭证码',
   to: '/print/pickup-claim',
+  emphasis: ['8 位数字到机码', '10 位字母数字历史码'],
 } as const
 
 const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
@@ -359,9 +360,6 @@ export function PrintScanHomePage() {
         ? 'unavailable'
         : 'unknown'
 
-  const unavailableNote =
-    probe === 'loading' ? '正在确认本机服务配置' : '服务状态无法确认，请重新检测'
-
   const capabilities = useMemo(
     () =>
       CAPABILITIES.map((rawCapability) => {
@@ -376,7 +374,8 @@ export function PrintScanHomePage() {
             : rawCapability
         const capabilityKey = CARD_CAPABILITY_KEY[capability.key]
 
-        // ① 探测轴优先：读不到能力配置 → 七项一律不开（含证件照说明页）。
+        // ① 探测轴优先：读不到能力配置 → 八项一律不开（含证件照说明页）。
+        //    理由只写在徽标上一次；「重新检测 / 联系工作人员」在页顶状态块里，不在八张卡上各抄一遍。
         if (!confirmed && capabilityKey) {
           return {
             ...capability,
@@ -384,7 +383,7 @@ export function PrintScanHomePage() {
             to: '',
             state: undefined,
             stateNote: undefined,
-            note: unavailableNote,
+            note: undefined,
             unavailableBadge:
               probe === 'loading' ? '检查中' : '暂不开放任务 · 服务状态无法确认',
           }
@@ -401,10 +400,10 @@ export function PrintScanHomePage() {
             // 管理员关掉的项整卡停用（含证件照说明）。未配置的「尚未开放」说明页仍可进。
             to: available ? capability.to : '',
             state: available ? capability.state : undefined,
-            note: available
-              ? capability.note
-              : (override.note ?? CAPABILITY_STATUS_NOTES[override.status] ?? capability.note),
-            unavailableBadge: available ? capability.unavailableBadge : '暂不可用',
+            note: available ? capability.note : (override.note ?? undefined),
+            unavailableBadge: available
+              ? capability.unavailableBadge
+              : (CAPABILITY_STATUS_NOTES[override.status] ?? '暂不可用'),
           }
         }
 
@@ -432,7 +431,6 @@ export function PrintScanHomePage() {
       device.printerLabel,
       mfp,
       probe,
-      unavailableNote,
     ]
   )
 
