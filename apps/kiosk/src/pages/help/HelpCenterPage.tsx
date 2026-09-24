@@ -7,12 +7,18 @@
 // - 不出现平台办理招聘闭环、来源平台办理结果、资金发放结果、面试或录用承诺等措辞。
 // - 招聘与政策只作第三方/官方来源信息入口，办理结果以来源平台为准。
 // 底部 Tab（首页 / AI顾问 / 我的）由 KioskLayout 提供，本页不改动。
+// 2026-09-24 迁入青序稿 06-help（帮助台 Hero → 分类卡 → 常见问题 → 三步自助 → 找人）：
+// /help 已登记进 KioskRoot 的 QX_MIGRATED_ROUTES，旧 KioskLayout 顶栏 / 底栏退出，
+// 由本页的 QxPageFrame 顶栏与底部行动条承担（上一句「由 KioskLayout 提供」自此失效）。
 // ============================================================
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
-import { ChevronRightIcon, HeadphonesIcon } from 'lucide-react'
+import {
+  BriefcaseBusinessIcon, ChevronRightIcon, FolderOpenIcon, LandmarkIcon, LockIcon,
+  MapPinIcon, PrinterIcon, ReceiptTextIcon, SparklesIcon, UserIcon, type LucideIcon,
+} from 'lucide-react'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import './help-service-desk.css'
 
 interface QA {
@@ -108,22 +114,43 @@ const FILTER_KEYS = [
   { key: 'privacy', label: '隐私与留存' },
 ] as const
 
+type FilterKey = (typeof FILTER_KEYS)[number]['key']
+
+/* 稿 06 的分类卡：每张卡的摘要只概括本页 ALL_FAQ 里真有的问题，问数由数组现算，不写死。 */
+const CATEGORY_CARDS: { key: Exclude<FilterKey, 'all'>; summary: string; icon: LucideIcon }[] = [
+  { key: 'account', summary: '要不要登录、为什么变回游客、怎么换账号', icon: UserIcon },
+  { key: 'resume', summary: '能做什么、会不会保证面试或录用', icon: SparklesIcon },
+  { key: 'print', summary: '怎么打印、扫描件保存在哪', icon: PrinterIcon },
+  { key: 'policy', summary: '能不能代申请补贴', icon: LandmarkIcon },
+  { key: 'jobs', summary: '能不能在这里办理岗位申请', icon: BriefcaseBusinessIcon },
+  { key: 'records', summary: '文档和订单在哪里看', icon: FolderOpenIcon },
+  { key: 'privacy', summary: '会不会推送给企业、文件存多久', icon: LockIcon },
+]
+
+/* 稿 06「卡住了，先自己试这三步」。只写全终端都成立的做法，不承诺某条通道一定开通。 */
+const SELF_HELP_STEPS = [
+  { title: '照页面上的提示走', body: '出错时先看当前页面的提示与按钮，按提示重试或返回；设备故障请勿自行拆卸或拉扯纸张。' },
+  { title: '退回上一步重做', body: '用页面上的「返回」回到上一步重新选择。打印在你核对参数并确认之后才开始输出，确认前返回不会出纸。' },
+  { title: '换一种文件来源', body: '一种上传方式不成时，回到打印扫描页换本机已开通的其他来源；哪些可用以页面显示为准。' },
+] as const
+
+const faqCount = (key: FilterKey) => (key === 'all' ? ALL_FAQ.length : ALL_FAQ.filter((item) => item.categoryKey === key).length)
+
 function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onNavigate: (route: string) => void }) {
   const [open, setOpen] = useState(false)
   return (
     <div className={`k1-help-row${open ? ' is-open' : ''}`}>
-      <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open} aria-controls={answerId}
-        className="k1-help-toggle flex w-full items-start gap-3 p-[15px_18px] text-left">
+      <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open} aria-controls={answerId} className="k1-help-toggle">
         <span className="k1-help-question-mark" aria-hidden="true">问</span>
-        <span className="min-w-0 flex-1"><span className="k1-help-category">{item.category}</span><strong>{item.q}</strong></span>
-        <ChevronRightIcon className={`k1-help-chevron shrink-0 transition-transform${open ? ' rotate-90' : ''}`} aria-hidden="true" />
+        <span className="k1-help-question"><span className="k1-help-category">{item.category}</span><strong>{item.q}</strong></span>
+        <ChevronRightIcon className="k1-help-chevron" aria-hidden="true" />
       </button>
       {open && (
         <div id={answerId} className="k1-help-answer">
           <p>{item.a}</p>
           {item.link && (
-            <button type="button" onClick={() => onNavigate(item.link!.route)} className="k1-help-link flex items-center gap-2">
-              {item.link.label}<ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+            <button type="button" onClick={() => onNavigate(item.link!.route)} className="k1-help-link">
+              {item.link.label}<ChevronRightIcon aria-hidden="true" />
             </button>
           )}
         </div>
@@ -132,10 +159,9 @@ function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onN
   )
 }
 
-
 export function HelpCenterPage() {
   const navigate = useNavigate()
-  const [activeFilter, setActiveFilter] = useState<string>('all')
+  const [activeFilter, setActiveFilter] = useState<FilterKey | null>(null)
 
   const handleNavigate = (route: string) => {
     if (route === '/login') {
@@ -145,84 +171,124 @@ export function HelpCenterPage() {
     navigate(route)
   }
 
-  const visibleFaq = activeFilter === 'all'
-    ? ALL_FAQ
-    : ALL_FAQ.filter((item) => item.categoryKey === activeFilter)
+  const visibleFaq = activeFilter === null
+    ? []
+    : activeFilter === 'all'
+      ? ALL_FAQ
+      : ALL_FAQ.filter((item) => item.categoryKey === activeFilter)
+  const activeLabel = FILTER_KEYS.find(({ key }) => key === activeFilter)?.label ?? '全部'
 
   return (
-    <KioskPageFrame
-      className="fusion-w5 fusion-w5--system k1-help-center h-full"
-      header={
-        <KioskPageHeader
-          title="帮助中心"
-          description="常见问题与使用说明"
-          onBack={() => navigate('/profile')}
-          backLabel="返回我的"
-        />
-      }
-    >
-      <section data-kiosk-screen="help" className="flex min-h-0 flex-1 flex-col gap-4">
-
-      <div className="k1-help-filters">
-        {FILTER_KEYS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            className={activeFilter === key ? 'is-active' : ''}
-            onClick={() => setActiveFilter(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="k1-help-scroll min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="flex flex-col gap-4">
-
-          <div className="k1-help-faq-list" aria-label="常见问题">
-            {[{ key: activeFilter === 'all' ? 'all' : activeFilter, items: visibleFaq }].map(section => (
-              section.items.map((item, itemIndex) => (
-                <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${itemIndex}`} onNavigate={handleNavigate} />
-              ))
+    <div className="fusion-w5 fusion-w5--system service-desk k1-help-center">
+      <QxPageFrame
+        title={<>你想解决<em>什么问题</em>？</>}
+        subtitle="先在下面点一个分类，不用打字。点开问题就能看到做法和对应入口。"
+        status={{ tone: 'unknown', label: '帮助内容随应用发布' }}
+        back={{ label: '返回我的', onBack: () => navigate('/profile') }}
+        ctabar={
+          /* 稿 06 用行动条替代底部导航；「看设备状态」没有运行时路由，不摆。 */
+          <div className="k1-help-actions">
+            <button type="button" onClick={() => navigate('/')}>返回首页</button>
+            <button type="button" className="is-primary" onClick={() => navigate('/assistant')}>说不清？问 AI 顾问</button>
+          </div>
+        }
+      >
+        <section data-kiosk-screen="help" className="k1-help-scroll qx-scroll">
+          <div className="k1-help-sec-head">
+            <h2><span>01</span>按你正要办的事找</h2>
+            <small>只写本机已经上线的做法</small>
+          </div>
+          <div className="k1-help-filters" role="group" aria-label="按分类筛选常见问题">
+            {CATEGORY_CARDS.map(({ key, summary, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                className={activeFilter === key ? 'is-active' : ''}
+                aria-pressed={activeFilter === key}
+                onClick={() => setActiveFilter(activeFilter === key ? null : key)}
+              >
+                <span className="k1-help-cat-icon" aria-hidden="true"><Icon /></span>
+                <strong>{FILTER_KEYS.find((filter) => filter.key === key)?.label}</strong>
+                <span className="k1-help-count">{faqCount(key)} 问</span>
+                <small>{summary}</small>
+              </button>
             ))}
+            <button
+              type="button"
+              className={`k1-help-filter-all${activeFilter === 'all' ? ' is-active' : ''}`}
+              aria-pressed={activeFilter === 'all'}
+              onClick={() => setActiveFilter('all')}
+            >
+              全部 <span className="k1-help-count">{faqCount('all')} 问</span>
+            </button>
           </div>
 
-          <div className="k1-help-contact">
-            <span>
-              <HeadphonesIcon aria-hidden="true" />
-            </span>
-            <div>
-              <h2>联系现场工作人员</h2>
-              <p>如需更多帮助，请前往大厅服务台联系现场工作人员；设备故障请勿自行拆卸或拉扯纸张。</p>
+          {activeFilter !== null && (
+            <div className="k1-help-faq-list" aria-label="常见问题">
+              <p className="k1-help-faq-head" aria-live="polite">{activeLabel} · {visibleFaq.length} 问，点开看做法</p>
+              {[{ key: activeFilter, items: visibleFaq }].map(section => (
+                section.items.map((item, itemIndex) => (
+                  <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${itemIndex}`} onNavigate={handleNavigate} />
+                ))
+              ))}
             </div>
-            <aside>
-              <small>现场服务时间</small>
-              <strong>以大厅现场公示为准</strong>
-            </aside>
+          )}
+
+          <div className="k1-help-sec-head">
+            <h2><span>02</span>卡住了，先自己试这三步</h2>
+          </div>
+          <ol className="k1-help-steps">
+            {SELF_HELP_STEPS.map((step, index) => (
+              <li key={step.title}>
+                <span className="k1-help-step-no" aria-hidden="true">{index + 1}</span>
+                <strong>{step.title}</strong>
+                <p>{step.body}</p>
+              </li>
+            ))}
+          </ol>
+
+          <div className="k1-help-sec-head">
+            <h2><span>03</span>自己解决不了，找人</h2>
+          </div>
+          <div className="k1-help-people">
+            <div className="k1-help-contact">
+              <span className="k1-help-cat-icon" aria-hidden="true"><MapPinIcon /></span>
+              <div>
+                <h3>联系现场工作人员</h3>
+                <p>如需更多帮助，请前往大厅服务台联系现场工作人员；设备故障请勿自行拆卸或拉扯纸张。</p>
+                <p className="k1-help-note">本页不会替你联系工作人员，也不会自动上报；点任何按钮都不等于已经有人受理。</p>
+              </div>
+              <aside>
+                <small>现场服务时间</small>
+                <strong>以大厅现场公示为准</strong>
+              </aside>
+            </div>
+            <div className="k1-help-contact">
+              <span className="k1-help-cat-icon" aria-hidden="true"><ReceiptTextIcon /></span>
+              <div>
+                <h3>求助前先记下单号</h3>
+                <p>打印相关的问题，先记下屏幕上的订单号或取件码，工作人员才查得到你这一单。登录后也可在「我的」页查看本人的打印订单。</p>
+              </div>
+            </div>
           </div>
 
           <p className="k1-help-footer">
-            本终端仅提供信息与打印辅助服务，办理结果以官方/来源平台为准。
+            本终端仅提供信息与打印辅助服务，办理结果以官方/来源平台为准。帮助内容随应用一起发布，不是实时服务状态。
           </p>
 
           {/* 网站备案信息 */}
-          <p
-            className="k1-help-footer"
-            aria-label="网站备案信息"
-            style={{ marginTop: 8, opacity: 0.6, fontSize: '0.9em' }}
-          >
-            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+          <p className="k1-help-footer k1-help-filing" aria-label="网站备案信息">
+            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
               鲁ICP备2026023517号-2
             </a>
             {' · '}
-            <a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+            <a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">
               鲁公网安备37021402007308号
             </a>
             {' · 职易达AI'}
           </p>
-        </div>
-      </div>
-      </section>
-    </KioskPageFrame>
+        </section>
+      </QxPageFrame>
+    </div>
   )
 }

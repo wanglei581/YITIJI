@@ -174,6 +174,9 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   /* 稿 30-my-profile ?screen=settings（账号设置），2026-09-23 迁入 QxMePage 的 settings 视图。
    * 它是「我的」下最后一个还挂墨青纸感 KioskPageFrame 的页；漏登记会让旧顶栏叠在青序页上。 */
   '/me/settings',
+  /* 稿 06-help（帮助中心），2026-09-24 迁入：页面自带 QxPageFrame 顶栏与 QxAppNavbar，
+   * 漏登记会让旧 KioskLayout 顶栏 / 底栏叠在青序页上。 */
+  '/help',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
