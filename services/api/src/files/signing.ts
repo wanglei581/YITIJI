@@ -34,14 +34,38 @@ export function signFileUrl(
   notAfterMs?: number,
 ): { url: string; expiresAt: Date } {
   const expiresAtMs = resolveSignedExpiry(ttlMs, notAfterMs)
-  const message = `${fileId}.${expiresAtMs}`
-  const signature = createHmac('sha256', getSecret()).update(message).digest('hex')
+  const signature = fileSignatureIdentityHex(fileId, expiresAtMs)
   const url = `/api/v1/files/${fileId}/content?expires=${expiresAtMs}&sig=${signature}`
   return { url, expiresAt: new Date(expiresAtMs) }
 }
 
+function fileSignatureIdentityHex(fileId: string, expiresAtMs: number): string {
+  return createHmac('sha256', getSecret()).update(`${fileId}.${expiresAtMs}`).digest('hex')
+}
+
+function hmacMatchesFileSignature(fileId: string, expiresAtMs: number, sig: string): boolean {
+  const expected = fileSignatureIdentityHex(fileId, expiresAtMs)
+  if (sig.length !== expected.length) return false
+  try {
+    return timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))
+  } catch {
+    return false
+  }
+}
+
 /**
- * 校验签名 URL 的参数。返回 true 表示有效。
+ * 只核对 fileId 与 expires 的 HMAC，不看是否已过期。
+ * 仅用于已通过支付会话或会员校验的历史打印任务回读 fileUrl 血缘。
+ * 下载与新建任务仍必须走 verifyFileSignature，过期即失败。
+ */
+export function verifyFileSignatureIdentity(fileId: string, expires: string, sig: string): boolean {
+  const expiresMs = Number(expires)
+  if (!Number.isSafeInteger(expiresMs) || expiresMs <= 0) return false
+  return hmacMatchesFileSignature(fileId, expiresMs, sig)
+}
+
+/**
+ * 校验签名 URL 的参数。返回 true 表示有效且未过期。
  * 用 timingSafeEqual 防侧信道(虽然 hex string 比较的实际收益有限,但合规上必须)。
  */
 export function verifyFileSignature(fileId: string, expires: string, sig: string): boolean {
@@ -49,15 +73,7 @@ export function verifyFileSignature(fileId: string, expires: string, sig: string
   if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) {
     return false
   }
-  const message = `${fileId}.${expiresMs}`
-  const expected = createHmac('sha256', getSecret()).update(message).digest('hex')
-
-  if (sig.length !== expected.length) return false
-  try {
-    return timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))
-  } catch {
-    return false
-  }
+  return hmacMatchesFileSignature(fileId, expiresMs, sig)
 }
 
 /**
@@ -162,6 +178,27 @@ export function verifyRawUploadSignature(fileId: string, expires: string, sig: s
  * （print-conversion / print-jobs / print-page-count 各自的私有解析器收敛
  *   到本函数属独立重构任务，本次不动它们 —— 见 sign-stamp 设计 §九。）
  */
+const INTERNAL_CONTENT_PATH = /^\/api\/v1\/files\/([^/]+)\/content$/
+
+/**
+ * 从已存 fileUrl 恢复历史 fileId。path 必须是 /api/v1/files/:id/content，host 可有可无。
+ * HMAC 必须对得上，但允许原签名已经过期。伪签名返回 null。这不是下载授权。
+ */
+export function parseHistoricalSignedContentFileId(fileUrl: string): string | null {
+  try {
+    const parsed = new URL(fileUrl, 'http://internal.local')
+    const match = INTERNAL_CONTENT_PATH.exec(parsed.pathname)
+    const expires = parsed.searchParams.get('expires')
+    const sig = parsed.searchParams.get('sig')
+    if (!match?.[1] || !expires || !sig) return null
+    const fileId = decodeURIComponent(match[1])
+    if (parsed.pathname !== `/api/v1/files/${fileId}/content`) return null
+    return verifyFileSignatureIdentity(fileId, expires, sig) ? fileId : null
+  } catch {
+    return null
+  }
+}
+
 export function parseAndVerifySignedContentUrl(url: string): { fileId: string } | null {
   try {
     const parsed = new URL(url, 'http://internal.local')

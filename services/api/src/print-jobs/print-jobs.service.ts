@@ -3,7 +3,7 @@ import { Injectable, NotFoundException, BadRequestException, Optional, ServiceUn
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
-import { signFileUrl, verifyFileSignature } from '../files/signing'
+import { parseHistoricalSignedContentFileId, signFileUrl, verifyFileSignature } from '../files/signing'
 import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { OrderStatusService } from '../payment/order-status.service'
 import {
@@ -131,14 +131,15 @@ const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请联系工作人员�
 const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
 const KIOSK_RETRY_LOG_CODE = 'kiosk_retry'
 
-function parseStoredPrintFileId(fileUrl: string): string | null {
-  try {
-    const u = new URL(fileUrl, 'http://internal.local')
-    return u.pathname.match(/\/files\/([^/]+)\/content$/)?.[1] ?? null
-  } catch {
-    return null
-  }
-}
+const printJobFileSelect = {
+  id: true,
+  filename: true,
+  mimeType: true,
+  sizeBytes: true,
+  status: true,
+  deletedAt: true,
+  expiresAt: true,
+} as const
 
 function printTaskNotFound(): never {
   throw new NotFoundException({
@@ -649,8 +650,8 @@ export class PrintJobsService {
     ctx: PrintJobAccessContext,
   ): Promise<PrintJobTakeawayUrlResult> {
     const { task, order, file } = await this.loadAccessiblePrintJob(taskId, ctx)
-    const fileId = task.fileId ?? parseStoredPrintFileId(task.fileUrl)
-    if (!fileId || !file || file.deletedAt) {
+    const fileId = task.fileId ?? file?.id ?? null
+    if (!fileId || !isPrintableFileRecord(file)) {
       throw new ConflictException({
         error: {
           code: 'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
@@ -680,7 +681,7 @@ export class PrintJobsService {
       orderNo: order.orderNo,
       payStatus: order.payStatus as OrderPayStatus,
       amountCents: order.amountCents,
-      canRetry: this.canRetryPaidFailedJob(task, order, file),
+      canRetry: this.canRetryPaidFailedJob(task, order, file, task.terminal),
     }
   }
 
@@ -724,8 +725,13 @@ export class PrintJobsService {
         error: { code: 'PRINT_RETRY_NOT_PAID', message: '未完成支付的打印任务不能重新提交' },
       })
     }
-    const fileId = task.fileId ?? parseStoredPrintFileId(task.fileUrl)
-    if (!fileId || !isPrintableFileRecord(file)) {
+    if (!isPrintableFileRecord(file)) {
+      throw new ConflictException({
+        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+      })
+    }
+    const fileId = task.fileId ?? file.id
+    if (!fileId) {
       throw new ConflictException({
         error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
       })
@@ -826,13 +832,17 @@ export class PrintJobsService {
   }
 
   private canRetryPaidFailedJob(
-    task: { status: string; errorCode: string | null },
-    order: { payStatus: string },
+    task: { status: string; errorCode: string | null; terminalId: string | null; fileId: string | null },
+    order: { payStatus: string; taskStatus: string },
     file: { status?: string | null; deletedAt?: Date | null; expiresAt?: Date | null } | null,
+    terminal: { enabled: boolean; lifecycleStatus: string } | null,
   ): boolean {
+    if (task.fileId && !file) return false
+    if (task.terminalId && (terminal?.enabled !== true || terminal.lifecycleStatus !== 'active')) return false
     return (
       task.status === 'failed' &&
       order.payStatus === 'paid' &&
+      order.taskStatus === 'failed' &&
       task.errorCode !== PRINT_JOB_UNCONFIRMED_ERROR_CODE &&
       isPrintableFileRecord(file)
     )
@@ -843,17 +853,8 @@ export class PrintJobsService {
       where: { id: taskId },
       include: {
         order: true,
-        file: {
-          select: {
-            id: true,
-            filename: true,
-            mimeType: true,
-            sizeBytes: true,
-            status: true,
-            deletedAt: true,
-            expiresAt: true,
-          },
-        },
+        terminal: { select: { enabled: true, lifecycleStatus: true } },
+        file: { select: printJobFileSelect },
       },
     })
     if (!task?.order) printTaskNotFound()
@@ -868,6 +869,19 @@ export class PrintJobsService {
     const memberOk = Boolean(ctx.endUserId && task.endUserId && ctx.endUserId === task.endUserId)
     if (!session.ok && !memberOk) printTaskNotFound()
 
-    return { task, order: task.order, file: task.file }
+    // 历史任务没有 fileId。身份校验已经完成。只接受 path 为 /api/v1/files/:id/content
+    // 且 HMAC 对得上的旧 URL；过期可以，伪签名不行。host 不参与签名。
+    let file = task.file
+    if (!task.fileId && !file) {
+      const legacyFileId = parseHistoricalSignedContentFileId(task.fileUrl)
+      if (legacyFileId) {
+        file = await this.prisma.fileObject.findUnique({
+          where: { id: legacyFileId },
+          select: printJobFileSelect,
+        })
+      }
+    }
+
+    return { task, order: task.order, file }
   }
 }
