@@ -420,19 +420,16 @@ export function PrintPickupClaimPage() {
               {code.length} / {codeCells.length}
             </div>
           </div>
-          {/* 未扫码就要看得见「怎么扫」：A5 模组不常亮、靠接近感应，站着的人
-              不会自己发现机身侧面有扫码区。点进去才是稿 rHid() 的完整指引屏。 */}
-          <button
-            type="button"
-            className="pcp-hid-entry"
-            onClick={() => setGuide('hid')}
-          >
+          {/* 未扫码就要看得见「怎么扫」：扫码模组靠接近感应、不常亮。压成两行紧凑入口，
+              点进去才是 rHid() 的完整指引屏。 */}
+          <button type="button" className="pcp-hid-entry" onClick={() => setGuide('hid')}>
             <span className="pcp-hid-entry-t">不用手输：把手机上的码，对准机身侧面的扫码区</span>
-            <span className="pcp-hid-entry-d">
-              扫码模组靠接近感应触发，不会一直亮着。把手机屏幕亮度调高，再把屏幕凑近扫码区。
-            </span>
+            <span className="pcp-hid-entry-d">手机亮度调高，再凑近扫码区</span>
           </button>
         </div>
+
+        {/* 有效期不写死日期：本页拿不到服务端的过期时间，只能如实说以服务端为准。 */}
+        <p className="pcp-expire-note">这串码还能用多久，以服务端记录的取件码状态为准；如果已经过期，校验时会直接告诉你。</p>
 
         {/* 三条安心提示。说的是本页行为，不是任何服务端数据，所以可以直接写死。
             站在机器前的人最担心的就是「输错了这码是不是就废了」。 */}

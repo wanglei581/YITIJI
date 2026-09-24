@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-25：稿 11 到机码核销页合流（1080×1920 主屏，本地候选）
+
+Claude 以用户原目录 `docs/design/kiosk-redesign-2026-08/11-arrival-code.html` 为目标，在隔离分支修复真实 `/print/pickup-claim` 的手输态比例和 390 宽键盘遮挡；Codex 只选择性合入现有 JSX/CSS 两文件。1080 首屏可见页头、码格、机身侧面扫码区与调高手机亮度提示、数字键盘、三种码说明、求助和固定操作条；390 宽 8 位码为 4×2、10 位历史码为 5×2，键盘按内容撑开且可滚达底部，无横向溢出。保留真实 HID 输入、250ms 旧码防误提交、终端会话票和支付后核销分支；未造有效期倒计时。Codex 在合流后的主候选复跑取件/终端会话 Playwright **14/14**（含 1080 与 1280×720 横屏）、Kiosk typecheck、W2 静态合同、局部 eslint、diff check，均通过；另在主候选 390×844 浏览器实测数字键高 72px，点「1」后首格变为 1，滚到底时求助区下沿 731.16px、操作条上沿 731.41px，无横向溢出。此证据只覆盖本地浏览器与合成服务；扫码器实物、Windows Edge/27 寸触控、真实订单支付出纸、其它状态和线上仍待验，51 稿整体 UI NO-GO。`PrintPickupClaimPage.tsx` 500 行，后续新增功能前评估拆分。
+
 ## 2026-09-25：整合 PR 与 Windows 签名门禁复核（只读，仍 NO-GO）
 
 GitHub 草稿 [#1042](https://github.com/wanglei581/YITIJI/pull/1042) 当前 head 仍为 `755fa5a53465e999cc4505e1f6f9f31d803576f4`，base 为 `eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`；它不是本地候选 `d87aa3d74`。该 PR 的主 CI 构建、PostgreSQL readiness 与 Kiosk 浏览器 job 成功，但同 SHA 的 Windows 内部签名 job 失败：签名 MSI 与 Burn EXE 构建已成功，随后嵌入 MSI 提取校验报 `Expected exactly one embedded MSI in rebuilt bundle, found 0`；依赖它的 unsigned MSI job 随之失败。本地后续提交 `60c137bb8` 已针对 WiX 4.0.6 的提取命名加 `-oba` 并保留嵌入 MSI 哈希校验；本轮在主候选复跑静态 `verify-signing-workflow-contract.mjs` 通过，但修复尚未在精确 SHA 的 Windows CI 实跑。未修改 PR、未推送或部署，Windows 安装包与商业发布继续 NO-GO。
