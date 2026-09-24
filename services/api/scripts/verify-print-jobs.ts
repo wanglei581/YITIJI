@@ -17,7 +17,7 @@
  * 运行：pnpm --filter ./services/api verify:print-jobs
  */
 import 'dotenv/config'
-import { createHash, randomBytes } from 'crypto'
+import { createHash, createHmac, randomBytes } from 'crypto'
 import { BadRequestException, Module, UnauthorizedException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
@@ -38,7 +38,7 @@ import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { FilesService } from '../src/files/files.service'
 import { FilesController } from '../src/files/files.controller'
-import { signFileSignatureIdentity, signFileUrl, verifyFileSignature } from '../src/files/signing'
+import { signFileUrl, verifyFileSignature } from '../src/files/signing'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -50,6 +50,13 @@ import { assertIsolatedVerificationDatabase } from './support/isolated-verificat
 import { buildRealPdf } from './support/minimal-pdf'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
+
+/** 夹具按 fileId.expires 的 HMAC-SHA256 协议自签，不调用生产签发函数。 */
+function fixtureFileSignature(fileId: string, expiresAtMs: number): string {
+  const secret = process.env['FILE_SIGNING_SECRET']
+  if (!secret) fail('测试签名密钥未设置')
+  return createHmac('sha256', secret).update(`${fileId}.${expiresAtMs}`).digest('hex')
+}
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
 
 function errCode(e: unknown): string | undefined {
@@ -1073,8 +1080,9 @@ async function main() {
       '8m. 外部同路径加伪签名不得重试',
     )
     const expiredAt = Date.now() - 60_000
-    const expiredUrl = `/api/v1/files/${legacyFileId}/content?expires=${expiredAt}&sig=${signFileSignatureIdentity(legacyFileId, expiredAt)}`
-    if (verifyFileSignature(legacyFileId, String(expiredAt), signFileSignatureIdentity(legacyFileId, expiredAt))) {
+    const expiredSig = fixtureFileSignature(legacyFileId, expiredAt)
+    const expiredUrl = `/api/v1/files/${legacyFileId}/content?expires=${expiredAt}&sig=${expiredSig}`
+    if (verifyFileSignature(legacyFileId, String(expiredAt), expiredSig)) {
       fail('8m. 普通验签不得接受已过期 HMAC')
     }
     await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: expiredUrl } })
@@ -1083,7 +1091,7 @@ async function main() {
       fail('8m. 合法但已过期的内部 HMAC 应由已授权任务恢复')
     }
     const hostExpires = Date.now() + 30 * 60 * 1000
-    const hostUrl = `https://files.example/api/v1/files/${legacyFileId}/content?expires=${hostExpires}&sig=${signFileSignatureIdentity(legacyFileId, hostExpires)}`
+    const hostUrl = `https://files.example/api/v1/files/${legacyFileId}/content?expires=${hostExpires}&sig=${fixtureFileSignature(legacyFileId, hostExpires)}`
     const hostCreated = await printJobs.create({ fileUrl: hostUrl, fileName: 'host-hmac.pdf' }, { terminalId })
     createdTaskIds.push(hostCreated.taskId)
     await prisma.printTask.update({ where: { id: hostCreated.taskId }, data: { status: 'cancelled' } })

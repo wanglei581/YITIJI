@@ -64,14 +64,6 @@ export function verifyFileSignatureIdentity(fileId: string, expires: string, sig
   return hmacMatchesFileSignature(fileId, expiresMs, sig)
 }
 
-/** 为指定到期时间生成身份 HMAC。允许过去的时间，供历史血缘夹具使用。 */
-export function signFileSignatureIdentity(fileId: string, expiresAtMs: number): string {
-  if (!Number.isSafeInteger(expiresAtMs) || expiresAtMs <= 0) {
-    throw new Error('FILE_SIGNING_EXPIRY_INVALID')
-  }
-  return fileSignatureIdentityHex(fileId, expiresAtMs)
-}
-
 /**
  * 校验签名 URL 的参数。返回 true 表示有效且未过期。
  * 用 timingSafeEqual 防侧信道(虽然 hex string 比较的实际收益有限,但合规上必须)。
