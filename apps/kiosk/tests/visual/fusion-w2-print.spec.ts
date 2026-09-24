@@ -1142,6 +1142,48 @@ test('preview stage survives reload from sessionStorage @w2', async ({ page, api
   await expectHealthy(page, errors, 'print-preview')
 })
 
+test('a new material check invalidates the previous summary so preview cannot authorize from it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+  registerShell(api)
+  registerPrice(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  // 新一轮检查停在体检进行中：结论不回来，上一轮的摘要也不能再替它放行。
+  const pendingInspection = (): DocumentProcessTaskView => ({ ...materialTask('inspection'), status: 'processing', result: null })
+  let inspectionCreated = false
+  await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+    const body = route.request().postDataJSON() as { kind?: string }
+    if (body.kind !== 'inspection') {
+      await route.abort('blockedbyclient')
+      return
+    }
+    inspectionCreated = true
+    await route.fulfill({ status: 201, json: { success: true, data: pendingInspection() } })
+  })
+  await routeExactJson(page, 'GET', '/api/v1/materials/tasks/w2-inspection', async (route) => {
+    await route.fulfill({ status: 200, json: { success: true, data: pendingInspection() } })
+  })
+
+  // 前提：带着上一轮完整摘要时，预览确实会放行 —— 否则下面的 check-required 证明不了任何事。
+  await page.goto('/print/desk?step=preview')
+  await writeMaterialSession(page)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'preview')
+
+  await page.goto('/print/desk?step=check')
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toHaveAttribute('data-qx-state', 'inspection')
+  await expect.poll(() => inspectionCreated).toBe(true)
+  const stored = await page.evaluate(() => JSON.parse(window.sessionStorage.getItem('ai-job-print:current-print-material-check') ?? 'null') as Record<string, unknown> | null)
+  expect(stored?.['file']).toMatchObject({ fileId: W2_FILE.fileId })
+  expect(stored).not.toHaveProperty('materialCheck')
+  expect(stored).not.toHaveProperty('piiRedactTask')
+
+  await page.goto('/print/desk?step=preview')
+  await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'check-required')
+  await expect(page.getByRole('heading', { name: '不能跳过隐私预检直接打印' })).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 test('sensitive session clear returns the desk to empty without the previous file name @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
