@@ -592,7 +592,7 @@ test.describe('scan result at 390x844', () => {
   })
 })
 
-test('resume scan return keeps the same scanned file and a late parse result never hijacks it @w2', async ({ page, api }) => {
+test('resume scan return keeps the file and an unresolved parse never auto-posts again @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
@@ -635,11 +635,11 @@ test('resume scan return keeps the same scanned file and a late parse result nev
   await expect(page).toHaveURL(/\/resume\/source$/)
   await expect(scanBlock).toBeVisible()
 
-  // 再次开始：仍按扫描件、同一个文件身份提交。
+  // 再次进入仍是同一份扫描件；第一次结果未知时，不能自动再发一次 AI 请求。
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('**/resume/parse')
-  await expect.poll(() => parseBodies.length).toBe(2)
-  expect(parseBodies[1]).toMatchObject({ fileId: 'w2-scan-file', source: 'scan' })
+  await expect(page.getByRole('button', { name: '按同一次重查' })).toBeVisible()
+  expect(parseBodies).toHaveLength(1)
   await expectHealthy(page, errors)
 })
 

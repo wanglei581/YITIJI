@@ -11771,7 +11771,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 555,
+      "reachableFileCount": 556,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14480,6 +14480,7 @@
           "path": "/scan",
           "styles": [
             "apps/kiosk/src/pages/scan/styles/scan-result-viewer-qx.css",
+            "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -14698,7 +14699,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 632
+      "sourceFileCount": 633
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
