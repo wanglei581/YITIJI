@@ -640,12 +640,19 @@ test('resume parse first POST carries both intent headers and a lost reply repla
 })
 
 test('resume parse server failure is labelled failed, never as the running step @w3-kiosk', async ({ page, api }) => {
+  const posts: Array<{ intent: string; proof: string }> = []
+  const failedBody = { taskId: 'resume-w3-failed', status: 'failed', failReason: '文字识别失败，请确保文件清晰', accessToken: 'w3-failed-access' }
   terminalBaseline(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
-  // 第一次：API 带业务信封的 4xx（明确拒绝）；重新解析后：2xx + status=failed（业务明确失败，带编号与一次性令牌）。
-  api.respondWith('POST', '/api/v1/resume/parse', (n) => n === 1
-    ? { status: 429, json: { success: false, error: { code: 'RATE_LIMITED', message: '操作太频繁' } } }
-    : { status: 200, json: { taskId: 'resume-w3-failed', status: 'failed', failReason: '文字识别失败，请确保文件清晰', accessToken: 'w3-failed-access' } })
+  // 2xx + status=failed：先把编号和令牌放进失败报告，清掉这次意图后，「重新解析」必须铸新的一对请求头。
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    const headers = route.request().headers()
+    posts.push({
+      intent: headers['x-resume-parse-intent'] ?? '',
+      proof: headers['x-resume-parse-proof'] ?? '',
+    })
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(failedBody) })
+  })
   await page.goto('/resume/source')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
@@ -660,16 +667,23 @@ test('resume parse server failure is labelled failed, never as the running step 
   await expect(page.getByTestId('resume-report-fallback')).toBeVisible()
   const retry = page.locator('.qx-btn[data-testid="resume-report-primary"]')
   await expect(retry).toHaveText('重新解析')
+  const failureRouteState = () => page.evaluate(() => {
+    const usr = (window.history.state as { usr?: { taskId?: string; accessToken?: string } } | null)?.usr
+    return { taskId: usr?.taskId, accessToken: usr?.accessToken }
+  })
+  await expect.poll(failureRouteState).toEqual({ taskId: 'resume-w3-failed', accessToken: 'w3-failed-access' })
   await retry.click()
   await page.waitForURL('/resume/parse')
   await page.waitForURL('/resume/report')
   await expect(page.getByText('文字识别失败，请确保文件清晰', { exact: false })).toBeVisible()
-  expect(api.requestCount('POST', '/api/v1/resume/parse')).toBe(2)
-  // 明确失败也不丢服务端给过的编号与一次性令牌：只在路由 state 里，不进地址栏。
-  expect(await page.evaluate(() => {
-    const usr = (window.history.state as { usr?: { taskId?: string; accessToken?: string } } | null)?.usr
-    return { taskId: usr?.taskId, accessToken: usr?.accessToken }
-  })).toEqual({ taskId: 'resume-w3-failed', accessToken: 'w3-failed-access' })
+  expect(posts).toHaveLength(2)
+  expect(posts[0].intent).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  expect(posts[0].proof).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  expect(posts[1].intent).not.toBe(posts[0].intent)
+  expect(posts[1].proof).not.toBe(posts[0].proof)
+  expect(posts[1].intent).not.toBe(posts[1].proof)
+  // 重新解析铸了新意图，原来这次失败的编号和令牌仍只留在失败报告的路由 state，不进地址栏。
+  expect(await failureRouteState()).toEqual({ taskId: 'resume-w3-failed', accessToken: 'w3-failed-access' })
   expect(page.url()).not.toContain('w3-failed-access')
   await expect(page.getByRole('button', { name: /重试|重新/ })).toBeVisible()
 })

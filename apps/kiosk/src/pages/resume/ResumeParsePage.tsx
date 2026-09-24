@@ -262,6 +262,23 @@ export function ResumeParsePage() {
           navigateFail(result.failReason ?? '简历解析未能完成，请重试')
           return
         }
+        // 凭证已在上面写后读回。同一次意图清掉之后，报告页「重新解析」才会铸新的一对请求头。
+        if (resumeParseIntentHold({ intent: intentRef.current, ownerId, payload: payloadRef.current }) !== 'held') {
+          setOutcome('unknown')
+          setRecheck('replay')
+          setBlockNote('本机解析标识已不在，没有打开失败报告，也没有另起一次解析。')
+          return
+        }
+        const cleared = await clearResumeParseIntent(intentRef.current, ownerId)
+        if (!samePerson(ownerId)) return
+        if (!cleared.ok) {
+          setOutcome('unknown')
+          setRecheck('replay')
+          setBlockNote('解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请用同一次重查，不要开始新的解析。')
+          return
+        }
+        intentRef.current = ''
+        payloadRef.current = null
         navigateFail(result.failReason ?? '简历解析未能完成，请重试', {
           taskId: result.taskId,
           accessToken: keptTokenRef.current?.accessToken,
