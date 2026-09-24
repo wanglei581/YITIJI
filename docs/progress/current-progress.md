@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-25：一体机 AI 解析同意图恢复本地合流（功能合同，51 稿 UI/商用仍 NO-GO）
+
+Grok 在复用的隔离 worktree 只改现有 Kiosk 解析页、API 适配、公共终端清场和 W3 用例，新增一个聚焦的 `resumeParseIntent.ts`（429 行），没有改用户原目录设计稿或 CSS。真实 HTTP `/resume/parse` 首次 POST 前用 Web Crypto 生成两段独立 32 字节意图/证明，`sessionStorage` 写后回读；丢答复、暂未落库与结果未知用同一对头重放，已知编号必须不变。匿名读取令牌写后回读失败不清意图、不跳报告；用户要开启新一次须两次确认。明确 2xx 失败保存编号/令牌并清同一意图后才进失败报告，使随后“重新解析”铸新标识；公共终端清场纳入该键。主候选合流 `bc41f6c8d`、`a7259eb89`、`4d7a5e803`，Codex 独立复跑 Kiosk typecheck、`verify:fusion-w3`、`verify:ai-down-fallbacks`、`verify:member-session-closure` 和解析 W3 Playwright **9/9**，均退出 0；首轮发现旧测试仍按单击重提而失败，已改为断言两级确认前零 POST 后复跑通过。新增工具令既有图谱过期，已按现有生成器更新 2 个原有图谱文件。
+
+这些仅是本地合成 HTTP/浏览器证据。4xx 配额或业务拒绝后服务端意图是否已受理仍缺明确定义，客户端暂保留原意图并 fail-closed，可能阻碍换材料；真实网关超时、Redis/DB/模型费用、Windows Edge/27 寸触控和当前 SHA CI 均待验。`ResumeParsePage.tsx` 788 行，继续加功能前须拆分/评估；05 顾问页的 Claude Opus 5.5 本轮调用 600 秒超时且无可审改动，不能算 51 稿推进。
+
 ## 2026-09-25：解析意图会员删除防重与小程序同次恢复合流（本地候选，P1/商用仍 NO-GO）
 
 只读复审发现 `parse_intent` 内部账本被会员 AI 记录列表当普通解析记录展示，且本人可直接按 ID 删除；删已完成解析/简历也会按同 taskId 删除账本。相同意图重放可重新调用模型，Redis 配额标记却不再计数。现只改已有 `MemberAssetsService` 和两组已有 verifier：列表排除内部意图，直接删除意图统一 404；删除 parse/简历时在同一事务中硬删结果及派生行、保留证明和 TTL 并把意图标 `revoked`，旧无意图解析可照常删除。`a10446ae4` 的隔离 SQLite 真实 Nest HTTP `verify:member-assets-c2d` **13/13**、资产/解析相关门禁、API typecheck 均通过；同 key 重放测试断言零配额和零模型调用。事务沿 parse→intent 锁顺序。原 POST 已持久化结果但尚未返回时与会员删除交错，旧请求仍可能拿到刚删除的结果；该并发退路未证明，生产 DB/真实模型/CI 未验。
