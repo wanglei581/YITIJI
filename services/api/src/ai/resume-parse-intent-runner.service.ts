@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { FilesService } from '../files/files.service'
 import { AiPublicQuotaService, type AiPublicQuotaContext } from './ai-public-quota.service'
 import { AiService, type ResumeParseIntentBinding } from './ai.service'
 import type { ParseResumeInput, ParseResumeOutput } from './interfaces/ai-provider.interface'
@@ -11,8 +12,10 @@ import {
 
 /**
  * Orchestrates one keyed resume parse.
- * Owner and payload checks happen before quota. Only the startProvider CAS winner
- * calls the provider. Failures are not refunded and are not retried here.
+ * Owner, proof, and payload checks happen before any file probe. A readable
+ * file is required before quota and before the provider. Only the startProvider
+ * CAS winner calls the provider. Failures are not refunded and are not retried here.
+ * A file that disappears after this check can still be charged; that window is not closed here.
  */
 @Injectable()
 export class ResumeParseIntentRunner {
@@ -20,6 +23,7 @@ export class ResumeParseIntentRunner {
     private readonly submission: ResumeParseSubmissionService,
     private readonly quota: AiPublicQuotaService,
     private readonly ai: AiService,
+    private readonly files: FilesService,
   ) {}
 
   async submit(
@@ -37,6 +41,7 @@ export class ResumeParseIntentRunner {
     if (seen.outcome !== 'not_ready') {
       throw closed('RESUME_PARSE_OUTCOME_UNKNOWN', '这次解析是否已经完成无法确认，系统不会自动再次调用')
     }
+    await this.files.assertContentAccessibleForEndUser(dto.fileId, endUserId)
     const intentId = seen.submission.intentId
     if (seen.submission.phase === 'quota_pending') {
       await this.quota.consumeOnce({

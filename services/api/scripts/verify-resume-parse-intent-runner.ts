@@ -62,6 +62,8 @@ function harness() {
   let rejectQuota = false
   let providerError: Error | null = null
   let rollbacks = 0
+  let fileProbes = 0
+  let fileError: Error | null = null
   let releaseProvider: (() => void) | null = null
   let markProviderEntered: (() => void) | null = null
   const providerEntered = new Promise<void>((resolve) => { markProviderEntered = resolve })
@@ -171,19 +173,30 @@ function harness() {
     },
   }
 
+  const files = {
+    async assertContentAccessibleForEndUser() {
+      fileProbes += 1
+      if (fileError) throw fileError
+    },
+  }
   const runner = new ResumeParseIntentRunner(
     submission as unknown as ResumeParseSubmissionService,
     quota as never,
     ai as never,
+    files as never,
   )
   return {
     runner,
     quotaCalls,
+    fileProbes: () => fileProbes,
     rollbacks: () => rollbacks,
     providerCalls: () => providerCalls,
     providerWins: () => providerWins,
     phase: (intentKey: string) => rows.get(resumeParseIntentId(intentKey))?.phase,
     rejectQuota: () => { rejectQuota = true },
+    rejectFile: () => {
+      fileError = new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
+    },
     failProvider: () => { providerError = new Error('provider down') },
     hangProvider: () => {
       releaseProvider = () => undefined
@@ -216,6 +229,12 @@ async function main(): Promise<void> {
   const source = readFileSync(join(dirname(__filename), '../src/ai/resume-parse-intent-runner.service.ts'), 'utf8')
   assert.equal(source.includes('runWithPublicQuota'), false)
   assert.equal(source.includes('rollback'), false)
+  const submitSource = source.slice(source.indexOf('async submit'))
+  const observeAt = submitSource.indexOf('this.submission.observe')
+  const fileAt = submitSource.indexOf('assertContentAccessibleForEndUser')
+  const quotaAt = submitSource.indexOf('this.quota.consumeOnce')
+  const startAt = submitSource.indexOf('this.submission.startProvider')
+  assert.ok(observeAt >= 0 && fileAt > observeAt && quotaAt > fileAt && startAt > quotaAt)
 
   const context: AiPublicQuotaContext = { member: 'member-a', terminal: null, ip: '203.0.113.10' }
   const key = token()
@@ -249,21 +268,45 @@ async function main(): Promise<void> {
   pass('a lost first response replays the same result without another charge or provider call')
 
   const limited = harness()
+  const limitedKey = token()
   limited.rejectQuota()
   await expectHttp(
-    () => limited.runner.submit(dto(), 'member-a', context, token(), token()),
+    () => limited.runner.submit(dto(), 'member-a', context, limitedKey, token()),
     429,
     'AI_PUBLIC_QUOTA_EXCEEDED',
   )
   assert.equal(limited.providerCalls(), 0)
   assert.equal(limited.providerWins(), 0)
+  assert.equal(limited.phase(limitedKey), 'quota_pending')
   pass('quota 429 does not start the provider')
+
+  const missingFile = harness()
+  const missingKey = token()
+  const missingProof = token()
+  missingFile.rejectFile()
+  await expectHttp(
+    () => missingFile.runner.submit(dto(), null, context, missingKey, missingProof),
+    404,
+    'FILE_NOT_FOUND',
+  )
+  await expectHttp(
+    () => missingFile.runner.submit(dto(), null, context, missingKey, missingProof),
+    404,
+    'FILE_NOT_FOUND',
+  )
+  assert.equal(missingFile.quotaCalls.length, 0)
+  assert.equal(missingFile.providerCalls(), 0)
+  assert.equal(missingFile.providerWins(), 0)
+  assert.equal(missingFile.phase(missingKey), 'quota_pending')
+  assert.ok(missingFile.fileProbes() >= 2)
+  pass('an unreadable file is rejected before quota and does not complete the intent')
 
   const owned = harness()
   const ownedKey = token()
   const ownedProof = token()
   await owned.runner.submit(dto(), 'member-a', context, ownedKey, ownedProof)
   const before = owned.quotaCalls.length
+  const probesBeforeRejection = owned.fileProbes()
   await expectHttp(
     () => owned.runner.submit(dto(), 'member-a', context, ownedKey, token()),
     404,
@@ -281,7 +324,22 @@ async function main(): Promise<void> {
   )
   assert.equal(owned.quotaCalls.length, before)
   assert.equal(owned.providerCalls(), 1)
-  pass('wrong proof, owner, and fingerprint are rejected before another charge')
+  assert.equal(owned.fileProbes(), probesBeforeRejection)
+  pass('wrong proof, owner, and fingerprint are rejected before another charge or file probe')
+
+  const replayWithoutFile = harness()
+  const replayKey = token()
+  const replayProof = token()
+  await replayWithoutFile.runner.submit(dto(), null, context, replayKey, replayProof)
+  const probesAfterSuccess = replayWithoutFile.fileProbes()
+  replayWithoutFile.rejectFile()
+  const replayedAnyway = await replayWithoutFile.runner.submit(dto(), null, context, replayKey, replayProof)
+  assert.equal(replayedAnyway.status, 'completed')
+  assert.equal(replayedAnyway.taskId, resumeParseIntentId(replayKey))
+  assert.equal(replayWithoutFile.fileProbes(), probesAfterSuccess)
+  assert.equal(replayWithoutFile.providerCalls(), 1)
+  assert.equal(replayWithoutFile.quotaCalls.filter((call) => call.outcome === 'charged').length, 1)
+  pass('a stored result replays after the file is no longer readable')
 
   const crashed = harness()
   const crashKey = token()

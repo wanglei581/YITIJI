@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { createHash, randomUUID } from 'crypto'
@@ -768,15 +769,7 @@ export class FilesService {
     fileId: string,
     endUserId: string | null
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
-    const record = await this.requireActive(fileId)
-    const allowed = endUserId
-      ? record.endUserId === endUserId
-      : record.endUserId === null && record.ownerType === 'system'
-    if (!allowed) {
-      throw new NotFoundException({
-        error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
-      })
-    }
+    const record = await this.requireActiveForEndUser(fileId, endUserId)
     await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
@@ -785,6 +778,45 @@ export class FilesService {
       filename: record.filename,
       purpose: record.purpose as FilePurpose,
     }
+  }
+
+  /**
+   * Confirms the caller can use this object before a paid parse.
+   * Does not return bytes and does not extract text. A wrong owner gets the
+   * same 404 as a missing row; the storage probe runs only after that check.
+   */
+  async assertContentAccessibleForEndUser(fileId: string, endUserId: string | null): Promise<void> {
+    const record = await this.requireActiveForEndUser(fileId, endUserId)
+    try {
+      const head = await this.storage.headObject(record.storageKey, record.bucket)
+      if (!head) this.throwFileNotFound()
+    } catch (error) {
+      if (error instanceof HttpException) throw error
+      this.rethrowStorageProbe(error)
+    }
+    try {
+      await this.assertContentIntegrity(record.id)
+    } catch (error) {
+      if (error instanceof HttpException) throw error
+      this.rethrowStorageProbe(error)
+    }
+  }
+
+  private async requireActiveForEndUser(fileId: string, endUserId: string | null) {
+    const record = await this.requireActive(fileId)
+    const allowed = endUserId
+      ? record.endUserId === endUserId
+      : record.endUserId === null && record.ownerType === 'system'
+    if (!allowed) this.throwFileNotFound()
+    return record
+  }
+
+  /** Storage failures stay generic. The object key and backend error are not returned. */
+  private rethrowStorageProbe(error: unknown): never {
+    if (isStoredObjectMissing(error)) this.throwFileNotFound()
+    throw new ServiceUnavailableException({
+      error: { code: 'FILE_STORAGE_UNAVAILABLE', message: '文件暂时无法读取，请稍后重试' },
+    })
   }
 
   // ── 列表(admin)─────────────────────────────────────────────────────────
@@ -1461,6 +1493,13 @@ export class FilesService {
 
 function digestFileId(fileId: string): string {
   return createHash('sha256').update(fileId).digest('hex').slice(0, 12)
+}
+
+function isStoredObjectMissing(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  if ((error as { code?: unknown }).code === 'ENOENT') return true
+  const message = error instanceof Error ? error.message : ''
+  return message.startsWith('COS_GET_FAILED: 404') || message.startsWith('COS_HEAD_FAILED: 404')
 }
 
 /** 归属判定。member 只能访问 endUserId 匹配;User 按角色 / 上传者 / 机构。 */

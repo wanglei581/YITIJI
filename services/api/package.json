@@ -51,7 +51,7 @@
     "verify:end-user-assets": "node -r @swc-node/register scripts/verify-end-user-asset-ownership.ts",
     "verify:ai-result-ownership": "node -r @swc-node/register scripts/verify-ai-result-ownership.ts",
     "verify:ai-persistence-consistency": "node -r @swc-node/register scripts/verify-ai-persistence-consistency.ts",
-    "verify:resume-parse-intent": "tsx scripts/verify-resume-parse-submission.ts && tsx scripts/verify-resume-parse-quota-once.ts && tsx scripts/verify-resume-parse-intent-runner.ts && tsx scripts/verify-resume-parse-intent-http.ts",
+    "verify:resume-parse-intent": "tsx scripts/verify-resume-parse-submission.ts && tsx scripts/verify-resume-parse-quota-once.ts && tsx scripts/verify-resume-parse-intent-runner.ts && node -r @swc-node/register scripts/verify-resume-parse-intent-http.ts",
     "verify:member-assets": "node -r @swc-node/register scripts/verify-member-assets.ts",
     "verify:member-favorites-benefits": "node -r @swc-node/register scripts/verify-member-favorites-benefits.ts",
     "verify:member-benefits-admin": "node -r @swc-node/register scripts/verify-member-benefits-admin.ts",
