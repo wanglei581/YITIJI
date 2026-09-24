@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-25：原稿 32/37 收银与支付状态运行时合流（本地候选，UI/商用仍 NO-GO）
+
+Claude Opus 5.5 xhigh 以用户原目录 `32-cashier.html`、`37-pay-states.html` 为只读目标，重排真实 `/print/cashier` 的支付通道→扫码方式、服务端状态、应付金额/价目、订单信息、结果与操作区；支付状态及文案从既有组件拆到单职责 `cashierQxModel.tsx`（447 行），展示组件 464 行，主样式 559 行经评估保留一份。保留服务端金额、通道、支付尝试、回执、终端会话、取件释放和隐私清场；收款码只取服务端内容，时间到只说显示码到期或核验中，不自判付款成功。两轮 Claude MCP 达到时限后 Codex 在隔离树检查代码、清理临时探针、补 390 宽触控回归并提交，再选择性合流为 `9f90c9d56`。无新路由/依赖/PR；新增模型文件有独立状态/文案职责。
+
+Codex 对照原稿与真实 1080×1920 通道已选截图及 390×844 截图，布局、信息层级和操作区确有结构变化。隔离分支 Kiosk typecheck、W2/单一价格源/视觉统一静态门禁、局部 ESLint（0 错误，模型文件 6 条 React Fast Refresh 提示）、正式构建浏览器收银 1080 **6/6**、金额真值 **3/3**、390 触达 **1/1**、完整 W2 打印 **55/55** 退出 0。截图和接口均为本地夹具；23 个状态并未逐一实屏验收，真实微信/支付宝、退款、Windows 字体/27 寸触控与奔图出纸、当前 SHA CI 和生产均未验，稿 32/37 与商业仍 NO-GO。
+
 ## 2026-09-25：已付款打印出纸后回执丢失防重审计（只读，无新增代码）
 
 Grok 4.7 Build Fast xhigh 对 API/Worker/Windows Agent 的领取、租约、出纸前本地记录、状态回传与重启恢复作只读审计，在隔离 SQLite 跑过领取/超时/迟到完成回执交错，并复跑 Agent typecheck、`verify:task-reliability`、API `verify:terminal-status-idempotency`、`verify:print-scan-first-release`、`verify:order`。现有代码只领取 `pending` 且已付的任务；超时的 `claimed`/卡住的 `printing` 落 `failed/PRINT_JOB_UNCONFIRMED`，不自动重派；迟到完成回执 409；Agent 出纸前持久记 `dispatching`，重启只回放状态，不再次打印。本轮未发现这条特定自动重派缺陷，未改代码或新增文件。**未确认不等于已出纸**：需要工作人员现场核查；本地库丢失后对明确失败任务的人工重试仍可能再打，服务端超时也不能撤回已进 Windows 假脱机的任务。探针不是 PostgreSQL 并发或 Windows/奔图真机证据，已付款履约和商用仍 NO-GO。
