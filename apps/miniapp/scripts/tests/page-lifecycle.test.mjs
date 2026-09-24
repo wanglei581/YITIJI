@@ -5434,7 +5434,7 @@ test('RP-3 resume-parse：结果未知且无编号时，仅确认后的新一次
   page.retry()
   await flush()
   assert.equal(posts, 2, '两次确认并清除旧意图后才多一次 POST')
-  second.resolve({ taskId: 'T2', status: 'completed' })
+  second.resolve({ taskId: 'T2', status: 'completed', accessToken: 't2-token' })
   await flush()
   assert.equal(page.data.done, true)
   page._timers[page._timers.length - 1]()
@@ -5485,7 +5485,7 @@ test('RP-4 resume-parse：有编号的未知只按同一编号读；异常回包
 })
 
 test('RP-5 resume-parse：业务拒绝/服务端失败才是明确失败；轮询耗尽仍是未知', async () => {
-  for (const response of [Promise.reject({ statusCode: 400, code: 'FILE_EXPIRED', message: '文件已过期' }), Promise.resolve({ taskId: 'T1', status: 'failed', failReason: '解析失败' })]) {
+  for (const response of [Promise.reject({ statusCode: 400, code: 'FILE_EXPIRED', message: '文件已过期' }), Promise.resolve({ taskId: 'T1', status: 'failed', failReason: '解析失败', accessToken: 'failed-token' })]) {
     const wx = createWx()
     const page = makePage('pages/resume-parse/resume-parse.js', {
       auth: createAuth(null), wx, api: { parseResume: () => response },
@@ -5686,6 +5686,60 @@ test('RP-9 resume-parse：静默丢写不算保存；意图释放失败时不导
   assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'next-token')
   assert.equal(pageB.data.done, true)
   assert.equal(posts, 1)
+})
+
+test('RP-10 resume-parse：匿名终态缺少令牌时不释放意图，同一次重查补回同一对请求头', async () => {
+  const wx = createWx()
+  const posts = []
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: (_payload, headers) => {
+        posts.push(headers)
+        return posts.length === 1
+          ? Promise.resolve({ taskId: 'T-missing', status: 'completed', accessToken: '' })
+          : Promise.resolve({ taskId: 'T-missing', status: 'completed', accessToken: 'recovered-token' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F-missing', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(wx.calls.getRandomValues.length, 2)
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.done, false)
+  assert.equal(page.data.intentReplay, true)
+  assert.equal(page.data.pendingTaskId, 'T-missing')
+  assert.equal(wx.calls.redirectTo.length, 0)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  const saved = wx.storage.get(realStorage.KEYS.RESUME_TASK)
+  assert.ok(!saved || !saved.accessToken)
+  assert.ok(!saved || !saved.settledIntent)
+  page.confirmResubmit()
+  assert.equal(wx.calls.showModal.length, 0, '没有令牌时不得另铸意图')
+  page.replayKnown()
+  await flush()
+  assert.equal(posts.length, 2)
+  assert.equal(posts[0]['x-resume-parse-intent'], posts[1]['x-resume-parse-intent'])
+  assert.equal(posts[0]['x-resume-parse-proof'], posts[1]['x-resume-parse-proof'])
+  assert.equal(wx.calls.getRandomValues.length, 2, '同一次重查不得新取随机数')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'recovered-token')
+  assert.equal(page.data.done, true)
+  assert.equal((wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT) || []).length, 0)
+
+  const wxFailed = createWx()
+  const pageFailed = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxFailed,
+    api: { parseResume: () => Promise.resolve({ taskId: 'T-failed', status: 'failed', failReason: '解析失败' }) },
+  })
+  pageFailed.onLoad({ fileId: 'F-failed', fileFormat: 'pdf' })
+  await flush()
+  assert.notEqual(pageFailed.data.phase, 'failed', '没有令牌的失败态不能当成可以查看的结果')
+  assert.equal(pageFailed.data.phase, 'unknown')
+  assert.equal(pageFailed.data.intentReplay, true)
+  assert.equal(wxFailed.calls.redirectTo.length, 0)
+  assert.equal(wxFailed.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  pageFailed.confirmResubmit()
+  assert.equal(wxFailed.calls.showModal.length, 0)
 })
 
 // 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。

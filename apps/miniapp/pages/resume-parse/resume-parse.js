@@ -37,6 +37,12 @@ const UNKNOWN_CAUSE = {
   notReady: '解析已经提交并拿到了编号,但结果还没有写入完成,这台手机暂时读不到。请用同一次重查,不要开始新的解析。',
   storage: '本机暂时无法保存这次解析的读取凭证。请留在此页,点“查询本次结果”重试保存并查询;退出后匿名结果可能无法找回。',
   settle: '解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请点“继续打开结果”，不要开始新的解析。',
+  anonToken: '这次解析有了编号，但答复里没有匿名读取凭证。请用同一次重查，不要开始新的解析。',
+  anonFailed: '服务端说这次解析没有完成，但这台手机没有拿到读取凭证，不能把它当成可以查看的结果。请用同一次重查，不要开始新的解析。',
+}
+
+function nonemptyToken(value) {
+  return typeof value === 'string' && value ? value : ''
 }
 
 function sameStoredTask(saved, task) {
@@ -323,19 +329,28 @@ Page({
     const taskId = res.taskId || knownTaskId || ''
     const status = res.status
     const terminal = status === 'completed' || status === 'failed'
+    const anonymous = this._submitIdentity ? this._submitIdentity.ownerId === null : ownerId() === null
     if (res.taskId) {
       // 轮询 GET 回的是落库结果,不带 accessToken;照抄 res 会把 POST 存下的令牌清空,
       // 诊断页随即 404。同一任务沿用已存令牌;换了任务绝不继承上一条的令牌。
       const prev = storage.get(storage.KEYS.RESUME_TASK) || {}
-      const keptToken = prev.taskId === res.taskId ? (prev.accessToken || '') : ''
+      const keptToken = prev.taskId === res.taskId ? nonemptyToken(prev.accessToken) : ''
+      const token = nonemptyToken(res.accessToken) || keptToken
+      // 匿名终态没有可读令牌时不能落空凭证、不能释放意图。同一次重查才可能把令牌补回来。
+      if (terminal && anonymous && !token) {
+        this._unknown(res.taskId, status === 'failed' ? UNKNOWN_CAUSE.anonFailed : UNKNOWN_CAUSE.anonToken, 'idle', {
+          intentReplay: this._intentHold() !== 'absent',
+        })
+        return
+      }
       const task = {
         taskId: res.taskId,
-        accessToken: res.accessToken || keptToken,
+        accessToken: token,
         fileId: res.fileId || this.data.fileId,
         fileName: this.data.fileName,
         ts: Date.now(),
       }
-      if (terminal && this._intent && sameIdentity(this._submitIdentity)) task.settledIntent = this._intent
+      if (terminal && this._intent && sameIdentity(this._submitIdentity) && (!anonymous || token)) task.settledIntent = this._intent
       if (!persistResumeTask(task)) {
         // 匿名令牌只下发这一次。写盘或回读失败时留在页实例内,不释放意图、不跳诊断页。
         this._unsavedTask = task
@@ -431,8 +446,15 @@ Page({
   async _finishTerminal(taskId, failedError) {
     const back = storage.read(storage.KEYS.RESUME_TASK)
     const saved = back && back.ok === true && back.found ? back.value : null
+    const anonymous = this._submitIdentity ? this._submitIdentity.ownerId === null : ownerId() === null
     if (!saved || saved.taskId !== taskId) {
       this._unknown(taskId, UNKNOWN_CAUSE.storage)
+      return
+    }
+    if (anonymous && !nonemptyToken(saved.accessToken)) {
+      this._unknown(taskId, failedError ? UNKNOWN_CAUSE.anonFailed : UNKNOWN_CAUSE.anonToken, 'idle', {
+        intentReplay: this._intentHold() !== 'absent',
+      })
       return
     }
     if (this._intent && sameIdentity(this._submitIdentity)) {
@@ -483,6 +505,7 @@ Page({
     const back = storage.read(storage.KEYS.RESUME_TASK)
     const task = back && back.ok === true && back.found ? back.value : null
     if (!task || typeof task.settledIntent !== 'string' || !task.settledIntent || typeof task.taskId !== 'string' || !task.taskId) return false
+    if (identity.ownerId === null && !nonemptyToken(task.accessToken)) return false
     const rows = storage.read(intentStore.STORE_KEY)
     if (!rows || rows.ok !== true || !rows.found || !Array.isArray(rows.value) || rows.value.length !== 1) return false
     const row = rows.value[0]
