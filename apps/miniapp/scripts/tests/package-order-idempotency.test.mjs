@@ -1710,11 +1710,12 @@ test('简历解析意图：多条记录或非法目标字段时不继续', async
   await assert.rejects(resumeIntent.prepare(PARSE_A, 'member-a'), (error) => error.code === 'STORAGE_CORRUPT')
   assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 2)
   wx.storage.delete(resumeIntent.STORE_KEY)
+  const writes = wx.calls.set
   await assert.rejects(
     resumeIntent.prepare({ ...PARSE_A, targetContext: { industry: 1 } }, 'member-a'),
     (error) => error.code === 'PAYLOAD_INVALID',
   )
-  assert.equal(wx.calls.set, wx.calls.set)
+  assert.equal(wx.calls.set, writes, '非法目标字段不得写盘')
   assert.equal(wx.storage.has(resumeIntent.STORE_KEY), false)
   assert.equal(ready.headers[resumeIntent.INTENT_HEADER].length, 43)
 })

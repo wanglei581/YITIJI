@@ -5556,13 +5556,61 @@ test('RP-7 resume-parse：无编号的未知按同一意图重查；409 未知�
   assert.notEqual((wxSwitch.storage.get(realStorage.KEYS.RESUME_TASK) || {}).accessToken, 'secret-token')
 })
 
+test('RP-8 resume-parse：意图仍在时 GET 404 只停在同一次重查，复用请求头并保留匿名令牌', async () => {
+  const wx = createWx()
+  const posts = []
+  let gets = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: (payload, headers) => {
+        posts.push({ payload, headers })
+        return posts.length === 1
+          ? Promise.resolve({ taskId: 'T1', status: 'processing', accessToken: 'anon-token' })
+          : Promise.resolve({ taskId: 'T1', status: 'completed' })
+      },
+      getResumeRecord: () => {
+        gets += 1
+        return Promise.reject({ statusCode: 404, code: 'AI_TASK_NOT_FOUND', message: '' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F1', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(wx.calls.getRandomValues.length, 2, '随机数只为最初的 intent 与 proof')
+  assert.equal((wx.storage.get(realStorage.KEYS.RESUME_TASK) || {}).accessToken, 'anon-token')
+  page._timers[page._timers.length - 1]()
+  await flush()
+  assert.equal(gets, 1)
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.pendingTaskId, 'T1')
+  assert.equal(page.data.recheck, 'not-ready')
+  assert.equal(page.data.intentReplay, true)
+  page.confirmResubmit()
+  assert.equal(wx.calls.showModal.length, 0, '结果未就绪时不得出现新意图入口')
+  page.replayKnown()
+  await flush()
+  assert.equal(posts.length, 2)
+  assert.equal(posts[0].headers['x-resume-parse-intent'], posts[1].headers['x-resume-parse-intent'])
+  assert.equal(posts[0].headers['x-resume-parse-proof'], posts[1].headers['x-resume-parse-proof'])
+  assert.equal(JSON.stringify(posts[0].payload), JSON.stringify(posts[1].payload))
+  assert.equal(wx.calls.getRandomValues.length, 2, '同一次重查不得再生成随机数')
+  assert.equal(page.data.done, true)
+  assert.equal((wx.storage.get(realStorage.KEYS.RESUME_TASK) || {}).taskId, 'T1')
+  assert.equal((wx.storage.get(realStorage.KEYS.RESUME_TASK) || {}).accessToken, 'anon-token')
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T1')
+  assert.equal(gets, 1)
+  assert.equal(posts.length, 2)
+})
+
 // 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。
 // 这不是终态：会员任务在换回提交时的账号后，同一编号可能又读得到。页面既不能说「再查也一样」、
 // 收掉同编号查询，也不能因此自动发新 POST；新的一次只能在用户确认重复风险之后。
 test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（换回账号后读到），新一次须确认；网络/5xx/无码 404 仍是暂时失败', async () => {
   const NOT_FOUND = { statusCode: 404, code: 'AI_TASK_NOT_FOUND', message: '' }
 
-  // ① 轮询拿到 404+AI_TASK_NOT_FOUND → not-found；取消新一次；身份未恢复再查仍 not-found；恢复后同编号读到。
+  // ① 盘上没有本次意图的旧任务：404+AI_TASK_NOT_FOUND → not-found；取消新一次；身份未恢复再查仍 not-found；恢复后同编号读到。
   const wx = createWx()
   const modal = []
   wx.showModal = (opts) => { modal.push(opts) }
@@ -5581,6 +5629,7 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
   })
   page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
   await flush()
+  wx.removeStorageSync(realStorage.KEYS.RESUME_PARSE_INTENT)
   page._timers[page._timers.length - 1]()
   await flush()
   assert.equal(page.data.phase, 'unknown', '查不到不等于解析失败')
@@ -5608,8 +5657,14 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
   page._timers[page._timers.length - 1]()
   assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T1')
 
-  // ② 手动再查的分类：只有 404+AI_TASK_NOT_FOUND 是 not-found；无论哪种都不收掉同编号查询；只有 not-found 开放新一次。
-  for (const [err, expected] of [[{ statusCode: -1 }, 'error'], [{ statusCode: 503, code: 'AI_PROVIDER_ERROR' }, 'error'], [{ statusCode: 404 }, 'error'], [NOT_FOUND, 'not-found']]) {
+  // ② 手动再查：意图还在时 404 是未就绪，不开放新一次。去掉意图的旧任务才是 not-found，新一次仍要两次确认。
+  for (const [err, expected, legacy] of [
+    [{ statusCode: -1 }, 'error', false],
+    [{ statusCode: 503, code: 'AI_PROVIDER_ERROR' }, 'error', false],
+    [{ statusCode: 404 }, 'error', false],
+    [NOT_FOUND, 'not-ready', false],
+    [NOT_FOUND, 'not-found', true],
+  ]) {
     const wx2 = createWx()
     const modal2 = []
     wx2.showModal = (opts) => { modal2.push(opts) }
@@ -5627,14 +5682,16 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
     page2._timers[page2._timers.length - 1]()
     await flush()
     assert.equal(page2.data.recheck, 'idle', '首轮断网仍可再查')
+    if (legacy) wx2.removeStorageSync(realStorage.KEYS.RESUME_PARSE_INTENT)
     page2.recheck()
     await flush()
     assert.equal(page2.data.recheck, expected, `再查遇到 ${err.statusCode}/${err.code || '无码'} 应为 ${expected}`)
+    if (!legacy && err.code === 'AI_TASK_NOT_FOUND') assert.equal(page2.data.intentReplay, true)
     page2.recheck()
     await flush()
     assert.equal(n, 3, '任何一种都保留同编号再查')
     page2.confirmResubmit()
-    assert.equal(modal2.length, expected === 'not-found' ? 1 : 0, '只有 not-found 才开放新一次')
+    assert.equal(modal2.length, expected === 'not-found' ? 1 : 0, '只有没有意图的 not-found 才开放新一次')
     if (expected === 'not-found') {
       modal2[0].success({ confirm: true })
       modal2[1].success({ confirm: true })
@@ -5651,9 +5708,10 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
   const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/resume-parse/resume-parse.wxml'), 'utf8')
   const wxss = fs.readFileSync(path.join(MINIAPP, 'pages/resume-parse/resume-parse.wxss'), 'utf8')
   assert.doesNotMatch(wxml, /同样结果|不必再等|再查也会/, '身份恢复后可能读得到，不得断言再查无用')
-  assert.match(wxml, /<button wx:if="\{\{pendingTaskId\}\}"[^>]*bindtap="recheck"/, '有编号就保留同编号查询')
+  assert.match(wxml, /<button wx:elif="\{\{pendingTaskId\}\}"[^>]*bindtap="recheck"/, '没有意图重放时，有编号仍按同一编号查询')
+  assert.match(wxml, /<button wx:if="\{\{pendingTaskId && intentReplay\}\}"[^>]*bindtap="replayKnown"/, '意图仍在时优先同一次重查')
   assert.match(wxml, /换回提交时的账号/)
-  const queryable = wxml.match(/<view wx:if="\{\{phase === 'unknown' && pendingTaskId && recheck !== 'not-found'\}\}" class="notice warn">([\s\S]*?)<\/view>\s*<\/view>/)
+  const queryable = wxml.match(/<view wx:elif="\{\{phase === 'unknown' && pendingTaskId && recheck !== 'not-found' && !intentReplay\}\}" class="notice warn">([\s\S]*?)<\/view>\s*<\/view>/)
   assert.ok(queryable, '有编号可查时要有单独的提示')
   assert.doesNotMatch(queryable[1], /手动重新提交|重新提交会/, '这一态页面上没有重提入口，不得声称可以手动重提')
   const links = wxml.match(/<view[^>]*class="unknown-link[^"]*"[^>]*>/g) || []
