@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-25：会员删除与在途 AI 解析响应竞态修复（本地候选，P1/商用仍 NO-GO）
+
+此前结果已落库但原 POST 尚未返回时，会员可删除该结果并把意图标 `revoked`；runner 忽略 `complete().advanced=false`，仍把内存里的已删报告回给客户端。Codex 只改现有 runner 和已有验证脚本 `af134054d`：完成状态未推进时重新观察，撤销则返回 409；正常完成后首次响应也按本人/匿名令牌从已提交的结果行读取，删除已提交而回读不到则不交付内存副本。测试先在旧代码复现为失败，再用两个确定性交错夹具覆盖“结果写入后、complete 前删除”和“complete 后、回读前删除”，修复后均不返回报告。无路由、模型、表结构、依赖或新文件。
+
+API typecheck、完整 `verify:resume-parse-intent`、隔离 SQLite 的 `verify:member-assets`，以及隔离 SQLite+本机 Redis+测试密钥下真实 Nest HTTP `verify:member-assets-c2d` **13/13** 均退出 0。Agy Gemini 3.8 Flash 独立只读审查了两文件差异，未发现具体回归。并发时序本身由 runner 替身确定性交错证明，未在真实 PostgreSQL/COS/生产模型或当前 SHA CI 上复现；DB 读取之后到 HTTP 应答之间仍存在正常并发窗口，不能宣称绝对原子交付。AI 解析 P1 与商业仍 NO-GO。
+
 ## 2026-09-25：原稿 10 打印扫描 Hub 运行时合流（本地候选，51 稿/商用仍 NO-GO）
 
 Claude Opus 5.5 xhigh 以用户原目录 `10-print-hub.html` 为只读目标，在独立 UI 分支重排真实 `/print-scan` 的服务卡、状态提示、到机码入口、已下订单/文件与底部信息；证件照说明页补返回路径。能力探测与 MFP 状态仍分轴，读不到能力时八张卡不开放，已存在订单的到机码核销保留，设备离线与状态未知不混写；扫描、彩色/双面、U 盘和证件照只说当前已证实的能力。五个既有源文件改动合流为 `140bdedf5`，没有新增页面、路由、依赖或 PR；页面 CSS 572 行。动效在 reduced-motion 下关闭。
