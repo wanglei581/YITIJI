@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-25：带意图解析失效会员令牌拒绝匿名降级（本地候选，P1/商用仍 NO-GO）
+
+Grok 只读审计发现：旧 `resolveOptionalEndUser` 把失效 Bearer 视作匿名，带意图请求会先按空归属写入账本，再因会员文件无权返回 404；会话恢复后同一标识又因归属不符持续 404。Grok 在复用隔离树只改 `AiController` 与既有 HTTP verifier：仅双头有效且明确提交的 Bearer 无法解析时，在同意、建账本、额度和模型前返回 401 `MEMBER_TOKEN_INVALID`；无 Authorization 的匿名请求及无双头旧路径保留。主候选合入 `4470ee5b3` 后 Codex 独立复跑 API typecheck、完整 `verify:resume-parse-intent` 和 `graph:check`，均退出 0。真实 Nest HTTP/隔离 SQLite+Redis 用例证明坏令牌不写意图、不扣额度、不调用 provider；同一标识改用有效会员令牌可成功并只扣一次，随后重放不重扣。未推送、未部署。
+
+其它 4xx 只读分类：`FILE_NOT_FOUND` 在通常预检失败时留 `quota_pending`，但存在额度已受理到读取之间的删除竞态，客户端不能仅凭这个错误码清标识；`FILE_CONTENT_CHANGED`、`RESUME_PARSE_INTENT_REVOKED`、`RESUME_PARSE_RESULT_EXPIRED/MISSING` 会使旧标识反复失败，需在 Kiosk/小程序按已确认的服务端状态和本地归属条件设计显式新尝试。小程序可信 public quota 429 仍保留旧标识；Kiosk 已安全释放。其它 4xx 客户端修复、真实模型费用与 CI/真机仍待验，P1 不关闭。
+
 ## 2026-09-25：带意图简历解析文件预检（本地候选，P1/商用仍 NO-GO）
 
 只读审计发现：有效双头请求引用不存在、过期、已删或无权文件时，旧链路会先建意图、扣匿名额度并进入 provider 阶段，随后文件提取失败却返回已完成的失败结果。Grok 在复用的隔离树对现有 `FilesService` 与 `ResumeParseIntentRunner` 增加归属、活动状态、对象存在和直传完整性预检；证明/归属/载荷比对仍先于文件探测，已完成结果重放不重新探测，临时存储故障返回通用 503。Codex 修正其超时后留下的 HTTP 验证脚本导入及审计次数断言，合入本地候选 `054610d9b`。API typecheck、lint、`verify:resume-parse-intent` 均退出 0；后者以真实 Nest HTTP、隔离 SQLite/Redis 验证不存在、过期、删除、他人归属、对象缺失不扣额度/不调用 provider，健康文件只扣一次、丢答复可重放，旧无头路径保留。改动限于 5 个既有文件，没有新增页面、PR 或线上操作。
