@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState, type KeyboardEvent } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { CheckIcon, LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
+import { CheckIcon, LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon, TimerOffIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
 import { PAY_CHANNEL_LABEL, type AttemptPaymentMethod, type CashierView } from './cashierStatus'
 
@@ -32,6 +32,11 @@ export interface CashierSnapshot {
 interface CashierPaymentPanelProps {
   /** 页面级状态条已经显示了同一句 view.title 时传 true，面板就不再重复写一遍。 */
   titleShownByPage?: boolean
+  /** 终态卡的标题 / 说明由页面按版式另给时传入（页面状态块已经讲过 view.title，卡片只讲「这张码 / 这次尝试」）。 */
+  terminalTitle?: string
+  terminalDescription?: string
+  /** 页面底部主按钮已经承担「重新发起」时传 true，终态卡不再放第二个同义按钮。 */
+  terminalActionShownByPage?: boolean
   paymentMethod: PaymentMethod | null
   attemptPaymentMethod: AttemptPaymentMethod | null
   snapshot: CashierSnapshot | null
@@ -66,6 +71,9 @@ interface CashierPaymentPanelProps {
 export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
   const {
     titleShownByPage = false,
+    terminalTitle,
+    terminalDescription,
+    terminalActionShownByPage = false,
     paymentMethod,
     attemptPaymentMethod,
     snapshot,
@@ -175,8 +183,9 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
         <KioskStatePanel
           compact
           tone="error"
-          title={view.title}
-          description={view.hint}
+          title={terminalTitle ?? view.title}
+          description={terminalDescription ?? view.hint}
+          icon={view.phase === 'expired' ? <TimerOffIcon aria-hidden="true" /> : undefined}
           className="cashier-fail-card"
           meta={view.phase === 'expired' ? undefined : (
             <div className="cashier-fail-facts">
@@ -188,7 +197,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
               ))}
             </div>
           )}
-          actions={view.canReissue ? (
+          actions={view.canReissue && !terminalActionShownByPage ? (
             <Button variant="secondary" size="lg" style={{ width: '100%' }} disabled={issuing} onClick={onReissue}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
                 <RefreshCwIcon style={{ width: 18, height: 18, animation: issuing ? 'spin 1s linear infinite' : undefined }} aria-hidden="true" />
@@ -294,37 +303,40 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
     </div>
   ) : terminalState ?? (
     <div className="cashier-qr-area">
-      <div className="cashier-qr-panel">
-        {(view.title && !titleShownByPage) || view.hint ? (
-          <div className="cashier-tone-banner" data-tone={view.tone}>
-            {view.title && !titleShownByPage ? <b>{view.title}</b> : null}
-            {view.hint && <p style={{ marginTop: 4 }}>{view.hint}</p>}
-          </div>
-        ) : null}
+      {(view.title && !titleShownByPage) || view.hint ? (
+        <div className="cashier-tone-banner" data-tone={view.tone}>
+          {view.title && !titleShownByPage ? <b>{view.title}</b> : null}
+          {view.hint && <p>{view.hint}</p>}
+        </div>
+      ) : null}
 
-        {qrContent && (
-          <>
-            <div className="cashier-qr-frame">
-              <QRCodeSVG value={qrContent} size={240} level="M" marginSize={1} />
-            </div>
-            <div className="cashier-qr-title">
-              请使用{PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '手机'}扫码支付
-            </div>
-            <div className="cashier-qr-sub">支付主体与金额以手机端展示为准</div>
-            <div className="cashier-qr-badge">
-              <ShieldCheckIcon aria-hidden="true" />
-              {snapshot?.attempt?.channel === 'sandbox'
-                ? '测试支付通道 · 非真实收款'
-                : `${PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '线上支付'} · 支付结果以服务端确认为准`}
-            </div>
-            {remainSec !== null && (
-              <p className="cashier-countdown">
-                收款码 {String(Math.floor(remainSec / 60)).padStart(2, '0')}:{String(remainSec % 60).padStart(2, '0')} 后失效，过期请重新出码
-              </p>
-            )}
-          </>
-        )}
-      </div>
+      {qrContent && (
+        <div className="cashier-qr-panel">
+          {/* 真实收款码只来自服务端 qrCodeContent；四角取景框只是版式，不参与编码。 */}
+          <div className="cashier-qr-frame">
+            <QRCodeSVG value={qrContent} size={292} level="M" marginSize={1} />
+            <span className="cashier-qr-corner" data-at="tl" aria-hidden="true" />
+            <span className="cashier-qr-corner" data-at="tr" aria-hidden="true" />
+            <span className="cashier-qr-corner" data-at="bl" aria-hidden="true" />
+            <span className="cashier-qr-corner" data-at="br" aria-hidden="true" />
+          </div>
+          <div className="cashier-qr-title">
+            请使用{PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '手机'}扫码支付
+          </div>
+          <div className="cashier-qr-sub">这张码属于本次订单，支付主体与金额以手机端展示为准</div>
+          <div className="cashier-qr-badge">
+            <ShieldCheckIcon aria-hidden="true" />
+            {snapshot?.attempt?.channel === 'sandbox'
+              ? '测试支付通道 · 非真实收款'
+              : `${PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '线上支付'} · 支付结果以服务端确认为准`}
+          </div>
+          {remainSec !== null && (
+            <p className="cashier-countdown">
+              收款码 {String(Math.floor(remainSec / 60)).padStart(2, '0')}:{String(remainSec % 60).padStart(2, '0')} 后失效，过期请重新出码
+            </p>
+          )}
+        </div>
+      )}
 
       {canReconcile && (
         <button

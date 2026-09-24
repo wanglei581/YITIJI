@@ -297,3 +297,27 @@ test('cashier 1080x1920 controls satisfy scaled hit targets and dispatch pointer
 
   await page.screenshot({ path: '../../test-results/cashier-qx/runtime-channel-selected-1080x1920.png', fullPage: true })
 })
+
+test('cashier keeps channel, scan method and exit reachable at 390x844 @w2', async ({ page, api }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat', 'alipay'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
+  await expect(page.locator('[data-qx-state="pending"]')).toBeVisible()
+  await page.getByRole('button', { name: '微信支付' }).click()
+  await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
+  for (const name of ['手机扫屏幕上的码', '出示你的付款码', '退出支付']) {
+    const button = page.getByRole('button', { name: new RegExp(name) })
+    await button.scrollIntoViewIfNeeded()
+    await expect(button).toBeVisible()
+    const box = await button.boundingBox()
+    expect(box, `${name} must have a hit area`).not.toBeNull()
+    expect(box!.width, `${name} width`).toBeGreaterThanOrEqual(44)
+    expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(44)
+  }
+  expect(await page.locator('.cashier-qx-route').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  await page.screenshot({ path: '../../test-results/cashier-qx/runtime-channel-selected-390x844.png', fullPage: true })
+})
