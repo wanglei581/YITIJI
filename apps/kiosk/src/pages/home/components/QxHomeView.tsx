@@ -128,9 +128,10 @@ export function QxHomeView({
   const campusReady = campusKnown && campus.enabled
   /* 稿 01-home 眉题：出纸能力进入后核验，首页不再重复顶栏的「打印机在线」；读取中 / 离线 / 异常 / 未知照实写在这里。 */
   const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '进入后核验打印与扫描能力' : device.printerLabel
+  const [introDone, setIntroDone] = useState(false)
 
   return (
-    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home">
+    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home" data-qx-intro={introDone ? 'done' : undefined} onAnimationEnd={(event) => { if (event.animationName === 'qx-home-sheen') setIntroDone(true) }}>
       <section className="qx-home-hero" aria-label="小青助手">
         <div className="qx-home-assistant">
           <span className="qx-home-avatar" aria-hidden="true">青</span>

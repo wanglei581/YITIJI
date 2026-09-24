@@ -9,7 +9,7 @@
   white-space: nowrap;
 }
 .qx-home-host .qx-body { padding: 0; }
-.qx-home { --qx-home-r: 20px; gap: 0; padding-top: 0; }
+.qx-home { --qx-home-r: 20px; --qx-home-ease: cubic-bezier(.2, .75, .25, 1); gap: 0; padding-top: 0; }
 
 .qx-home-hero {
   position: relative;
@@ -55,15 +55,13 @@
 .qx-home-clock span { margin-top: 3px; color: color-mix(in srgb, var(--qx-paper) 64%, transparent); font-size: 15px; }
 
 .qx-home-voice {
-  display: flex; align-items: center; gap: 16px; width: 100%; min-height: 76px; height: 84px;
+  position: relative; isolation: isolate; display: flex; align-items: center; gap: 16px; width: 100%; min-height: 76px; height: 84px;
   margin-top: 22px; padding: 0 26px; border: 1px solid var(--qx-emerald); border-radius: 999px; color: var(--qx-deep);
   background: linear-gradient(110deg, var(--qx-emerald), color-mix(in srgb, var(--qx-emerald) 60%, var(--qx-teal)));
-  font-size: 22px; font-weight: 700; cursor: pointer;
+  font-size: 22px; font-weight: 700; cursor: pointer; overflow: hidden;
 }
-.qx-home-voice-icon {
-  display: grid; place-items: center; width: 48px; height: 48px;
-  border-radius: 50%; background: color-mix(in srgb, var(--qx-deep) 12%, transparent);
-}
+.qx-home-voice > * { position: relative; z-index: 1; }
+.qx-home-voice-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: color-mix(in srgb, var(--qx-deep) 12%, transparent); }
 .qx-home-voice-icon svg { width: 26px; }
 .qx-home-voice small { margin-left: auto; font-size: 17px; }
 
@@ -154,7 +152,7 @@
   box-shadow: 0 4px 16px color-mix(in srgb, var(--qx-ink) 5%, transparent);
 }
 /* 触控回馈：按下即缩 1.5%，160ms 回弹；只跟随手指，不循环（reduced-motion 下整条关掉）。 */
-.qx-home-tile, .qx-home-voice, .qx-home-quick button, .qx-home-identity { transition: transform .16s ease-out, box-shadow .16s ease-out; }
+.qx-home-tile, .qx-home-voice, .qx-home-quick button, .qx-home-identity { transition: transform .16s ease-out, box-shadow .16s ease-out, border-color .16s ease-out; }
 .qx-home-tile:not(:disabled):active, .qx-home-voice:active, .qx-home-quick button:active, .qx-home-identity:active { transform: scale(.985); }
 .qx-home-tile:not(:disabled):active { box-shadow: 0 1px 4px color-mix(in srgb, var(--qx-ink) 8%, transparent); }
 .qx-home-tile > * { flex-shrink: 0; } /* 文字行不许被 flex 压扁：主卡说明曾被挤成 0 高、叠在标题与脚注之间 */
@@ -167,7 +165,7 @@
 .qx-home-tile[data-action='policy-hub'] { grid-column: 1 / -1; }
 .qx-home-tile:disabled { cursor: not-allowed; opacity: .68; }
 .qx-home-tile:focus-visible,
-.qx-home button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.qx-home-host .qx-home :is(button, a):focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; } /* 须压过 service-desk 的全局淡蓝焦点环（0,3,0） */
 .qx-home-tile-head { display: flex; align-items: center; justify-content: space-between; }
 .qx-home-tile-icon {
   display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px;
@@ -180,8 +178,7 @@
   position: absolute; right: 38px; top: 50%; width: 96px; height: 96px; transform: translateY(-50%);
   color: var(--qx-emerald); background: none;
 }
-.qx-home-tile[data-size='feature'] .qx-home-tile-icon svg { width: 84px; height: 84px; stroke-width: 1.3;
-}
+.qx-home-tile[data-size='feature'] .qx-home-tile-icon svg { width: 84px; height: 84px; stroke-width: 1.3; }
 .qx-home-tile[data-size='slim'] .qx-home-tile-head { position: static; }
 .qx-home-tile[data-size='slim'] .qx-home-tile-icon {
   position: absolute; left: 22px; top: 50%; transform: translateY(-50%);
@@ -241,6 +238,17 @@
   max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* 入场只播一次、不表达办理或设备结果；结束后重挂载的服务磁贴保持静止。 */
+@keyframes qx-home-rise { from { opacity: 0; transform: translateY(14px); } } @keyframes qx-home-settle { from { opacity: 0; transform: scale(.965); } } @keyframes qx-home-sheen { to { transform: translateX(420%) skewX(-16deg); } }
+.qx-home:not([data-qx-intro='done']) .qx-home-hero > *, .qx-home:not([data-qx-intro='done']) .qx-home-section-head { animation: qx-home-rise .6s var(--qx-home-ease) var(--qx-home-delay, 0s) backwards; }
+.qx-home-section-head { --qx-home-delay: .28s; }
+.qx-home-hero > :nth-child(n+2) { --qx-home-delay: .08s; } .qx-home-hero > :nth-child(n+3) { --qx-home-delay: .16s; } .qx-home-hero > :nth-child(n+5) { --qx-home-delay: .24s; }
+.qx-home:not([data-qx-intro='done']) .qx-home-tile { animation: qx-home-settle .56s var(--qx-home-ease) var(--qx-home-delay, .34s) backwards; }
+.qx-home-tile:nth-child(n+2) { --qx-home-delay: .4s; } .qx-home-tile:nth-child(n+4) { --qx-home-delay: .48s; } .qx-home-tile:nth-child(n+6) { --qx-home-delay: .56s; } .qx-home-tile:nth-child(n+7) { --qx-home-delay: .62s; }
+.qx-home:not([data-qx-intro='done']) .qx-home-voice::after { content: ''; position: absolute; z-index: 0; inset: 0 auto 0 0; width: 30%; background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--qx-paper) 60%, transparent), transparent); transform: translateX(-120%) skewX(-16deg); pointer-events: none; animation: qx-home-sheen 1.1s ease-in-out .8s backwards; }
+.qx-home-tile:not(:disabled):focus-visible { transform: translateY(-3px); box-shadow: 0 0 0 6px color-mix(in srgb, var(--qx-teal) 22%, transparent), 0 14px 30px color-mix(in srgb, var(--qx-ink) 12%, transparent); } .qx-home-host .qx-home-hero button:focus-visible { outline-color: var(--qx-paper); }
+@media (hover: hover) and (pointer: fine) { .qx-home-tile:not(:disabled):hover:not(:active), .qx-home-voice:hover:not(:active), .qx-home-quick button:hover:not(:active), .qx-home-identity:hover:not(:active) { transform: translateY(-2px); } .qx-home-tile:not(:disabled, [data-size='feature']):hover { border-color: var(--qx-teal); } }
+
 @media (max-width: 760px) {
   .qx-home-host, .qx-home-host .qx-stage { min-height: 100dvh; }
   .qx-home-host .qx-topbar { height: 68px; padding: 0 16px; gap: 8px; }
@@ -286,5 +294,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .qx-home *, .qx-home *::before, .qx-home *::after { animation: none !important; transition: none !important; }
-  .qx-home-tile:active, .qx-home-voice:active, .qx-home-quick button:active, .qx-home-identity:active { transform: none !important; }
+  .qx-home-tile, .qx-home-voice, .qx-home-quick button, .qx-home-identity { transform: none !important; } /* 按压 / 悬停 / 焦点位移一并静止，焦点仍靠描边 */
 }

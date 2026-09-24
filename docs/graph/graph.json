@@ -12078,7 +12078,11 @@
           ],
           "path": "/help",
           "styles": [
-            "apps/kiosk/src/pages/help/help-service-desk.css"
+            "apps/kiosk/src/pages/help/help-service-desk.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
