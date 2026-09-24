@@ -39,7 +39,7 @@ export function HomeHeroHeader({ terminalCode, deviceStatus }: HomeHeroHeaderPro
       <div className="qx-home-brand">
         <h1 className="qx-topbar-brand">职易达</h1>
         <span className="qx-topbar-sub">职易达AI求职操作系统</span>
-        <span className="qx-home-terminal">就业服务大厅 · {terminalCode}</span>
+        <span className="qx-home-terminal"><span className="qx-home-terminal-prefix">就业服务大厅 · </span>{terminalCode}</span>
       </div>
       <span className="qx-topbar-spacer" />
       {/* 状态未知时照实显示「状态未知」而不是隐藏——公共终端上"没显示"会被读成"一切正常"。 */}

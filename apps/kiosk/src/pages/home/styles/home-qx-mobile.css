@@ -11,6 +11,8 @@
   .qx-home-host .qx-home-hero-top .qx-topbar-mark { width: 38px; height: 38px; font-size: 20px; }
   .qx-home-host .qx-home-hero-top .qx-topbar-brand { font-size: 20px; line-height: 1.2; }
   .qx-home-host .qx-home-hero-top .qx-home-terminal { font-size: 13px; }
+  /* 窄屏省掉「就业服务大厅 · 」前缀，把宽度留给真实终端码 / 「设备未绑定」，不让它被省略号吃掉。 */
+  .qx-home-host .qx-home-hero-top .qx-home-terminal-prefix { display: none; }
   .qx-home-host .qx-home-hero-top :is(.qx-topbar-sub, .qx-topbar-spacer, .qx-home-clock) { display: none; }
   /* 品牌让位、pill 不让位：文本可按词组折两行但绝不裁切；只改排版，data-tone 的真实状态色原样保留。 */
   .qx-home-host .qx-home-hero-top .qx-pill {
