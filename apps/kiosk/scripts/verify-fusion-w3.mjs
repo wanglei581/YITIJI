@@ -161,7 +161,6 @@ check(read('src/pages/resume/jobFit-inkpaper.css') === "@import './styles/resume
 
 for (const [path, frameClass] of [
   ['src/pages/resume/resume-fusion-youth.css', 'resume'],
-  ['src/pages/assistant/assistant-lightflow-shell.css', 'assistant'],
   ['src/pages/interview/styles/interview-shell.css', 'interview'],
 ]) check(
   /(?:^|;)\s*padding:\s*0\s*;?/.test(cssRuleBody(read(path), `[data-kiosk-presentation='fusion-youth'] .fusion-w3--${frameClass} > .ui-kiosk-page-content`)),
@@ -203,6 +202,8 @@ const qxScreens = new Set([
   'src/pages/resume/ResumeGeneratePreviewPage.tsx',
   'src/pages/resume/ResumeOptimizePage.tsx',
   'src/pages/ai-plan/AiPlanPage.tsx',
+  // 稿 05-ai-cockpit（/assistant），2026-09-24 迁入。
+  'src/pages/assistant/AssistantPage.tsx',
 ])
 for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
@@ -242,6 +243,9 @@ for (const path of ['src/pages/resume/CareerPlanPage.tsx', 'src/pages/resume/Job
   check(!/KioskFullscreenShell|KioskPageFrame|job-fit-inkpaper|service-desk/.test(read(path)), `${path} has left the V6/LightFlow chrome`)
 }
 includes('src/pages/resume/JobFitActionsPage.tsx', 'data-kiosk-screen="resume-job-fit-actions"', 'resume-job-fit-actions exposes its stable landmark')
+check(!/KioskPageFrame|fusion-w3--assistant/.test(read('src/pages/assistant/AssistantPage.tsx')), 'assistant has left the V6 blue page frame')
+check(!read('src/pages/assistant/assistant-lightflow-shell.css').includes('.ui-kiosk-page-content'), 'assistant shell CSS no longer patches the V6 frame gutter')
+includes('src/layouts/KioskRoot.tsx', "'/assistant'", 'assistant route is registered as Qingxu-migrated')
 includes('src/layouts/KioskRoot.tsx', "'/resume/templates'", 'templates route is registered as Qingxu-migrated')
 check(!read('src/pages/resume/ResumeTemplateLibraryPage.tsx').includes('KioskStageFit'), 'templates does not scale the stage a second time inside KioskRoot')
 for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerPlanPage.tsx']) {

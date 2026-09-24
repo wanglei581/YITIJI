@@ -17,7 +17,8 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { KioskPageFrame } from '@ai-job-print/ui'
+import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KIcon } from '../../components/kiosk-icon'
 import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
@@ -352,10 +353,25 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       : '与小青的本次咨询'
 
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--assistant">
-    <section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
-      <h1 id="assistant-page-title" className="kassist-sr-only">AI顾问</h1>
-
+    /* 稿 05-ai-cockpit：青序顶栏 + 底部主导航，页面名与导航项为「AI 顾问」（稿内「问小青」称呼已下线，小青只留在对话里）；状态胶囊只报 /assistant/chat 实测结果，未问过即「状态未知」。 */
+    <QxPageFrame
+      back={{ label: '返回首页', onBack: () => navigate('/') }}
+      title="AI 顾问"
+      subtitle="求职咨询 · 简历建议 · 打印帮助 · 政策问答"
+      terminalLabel="就业服务大厅"
+      status={aiAvailability === 'available'
+        ? { tone: 'ok', label: '真实模型已应答' }
+        : aiAvailability === 'unavailable' ? { tone: 'bad', label: '模型未接入' } : undefined}
+      navbar={
+        <>
+          <button type="button" className="qx-nav-item" onClick={() => navigate('/')}><HomeIcon size={32} aria-hidden />首页</button>
+          <button type="button" className="qx-nav-item" aria-current="page"><SparklesIcon size={32} aria-hidden />AI 顾问</button>
+          <button type="button" className="qx-nav-item" onClick={() => navigate('/profile')}><UserIcon size={32} aria-hidden />我的</button>
+        </>
+      }
+    >
+    {/* 页面唯一 h1 由 QxPageFrame 的「AI 顾问」承担（稿 05 页面名）；这里只给区域一个可访问名称。 */}
+    <section className="kassist kassist-lightflow" aria-label="AI 顾问咨询工作台">
       <div ref={workbenchRef} data-kiosk-domain="assistant" data-kiosk-screen="assistant" className="assistant-workbench">
         <header className="assistant-prototype-head">
           <span className="assistant-prototype-avatar" aria-hidden="true">青</span>
@@ -400,7 +416,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               </button>
             ))}
             <button type="button" className={`assistant-direct-question${!selectedTask && !toolboxScene ? ' is-active' : ''}`} onClick={clearTask}>
-              <strong>直接问小青</strong>
+              <strong>直接提问</strong>
               <small>其他问题，不选主题直接咨询</small>
             </button>
           </div>
@@ -610,6 +626,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
         }}
       />
     </section>
-    </KioskPageFrame>
+    </QxPageFrame>
   )
 }

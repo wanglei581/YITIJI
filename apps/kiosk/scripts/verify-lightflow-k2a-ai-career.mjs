@@ -37,13 +37,7 @@ function isLocalAssistantSelector(selector) {
   if (!trimmed || trimmed.startsWith('@')) return true
   if (/^(?:from|to|\d+%(?:\s*,\s*\d+%)*)$/.test(trimmed)) return true
   if (trimmed.includes('.kassist')) return true
-  // verify-fusion-w3 requires this shared-frame padding neutralizer on the assistant shell CSS;
-  // it targets the page frame outside the .kassist root and must stay unscoped.
-  return (
-    trimmed.includes("[data-kiosk-presentation='fusion-youth']")
-    && trimmed.includes('.fusion-w3--assistant')
-    && trimmed.includes('.ui-kiosk-page-content')
-  )
+  return false
 }
 
 console.log('\n=== K2a AI 顾问青序 LightFlow 静态合同 ===')
@@ -88,15 +82,22 @@ expect(!kioskRoot.includes("startsWith('/resume')"), '服务台页壳不宽泛�
 
 expectIncludes(assistantPage, "import './assistant-inkpaper.css'", '助手页继续导入局部样式')
 expectIncludes(assistantPage, 'className="kassist kassist-lightflow"', '助手页使用局部 LightFlow 根命名空间')
-expectMatches(
+expectIncludes(
   assistantPage,
-  /<section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">[\s\S]*?<h1 id="assistant-page-title" className="kassist-sr-only">AI顾问<\/h1>/,
-  '页面名称仅以无障碍标题保留',
+  '<section className="kassist kassist-lightflow" aria-label="AI 顾问咨询工作台">',
+  '助手工作台区域保留可访问名称',
 )
-expect(
-  !/<h[1-6](?![^>]*kassist-sr-only)[^>]*>[\s\S]*?AI顾问[\s\S]*?<\/h[1-6]>/.test(assistantPage),
-  '左上角及视觉顶部不显示 AI顾问标题',
-)
+expect(!/<h1[\s>]/.test(assistantPage), '助手页不再自带第二个 h1（页面名由 QxPageFrame 顶部标题承担）')
+expect(!assistantPage.includes('kassist-sr-only">AI顾问'), '隐藏的重复 AI顾问 标题已移除')
+{
+  const frameStart = assistantPage.indexOf('<QxPageFrame')
+  const frameEnd = frameStart < 0 ? -1 : assistantPage.indexOf('\n    >\n', frameStart)
+  const frameProps = frameEnd < 0 ? '' : assistantPage.slice(frameStart, frameEnd)
+  expect(frameProps.includes('title="AI 顾问"'), '稿 05 页面名：QxPageFrame 可见标题为 AI 顾问')
+  expect(/aria-current="page">[\s\S]*?AI 顾问<\/button>/.test(frameProps), '稿 05 底栏：当前导航项可见文案为 AI 顾问')
+  expect(frameProps !== '' && !frameProps.includes('问小青'), '稿 05 已下线「问小青」称呼：页壳标题与底栏不再出现')
+}
+expect(!/>[^<>{}]*问小青[^<>{}]*</.test(assistantPage), '助手页 JSX 可见文案不再出现「问小青」')
 expect(!assistantPage.includes('ReferenceServiceNav'), '助手页移除首页服务分类导航')
 expect(!assistantPage.includes('lf-reference-'), '助手页移除首页 lf-reference 服务卡骨架')
 

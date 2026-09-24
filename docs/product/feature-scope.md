@@ -1,6 +1,6 @@
 # 功能范围文档
 
-> 最后更新：2026-09-17（§1.2 当前跨端候选 `33751df4a` 与线上历史记录分开写）；2026-08-22（补 1.2 实现与上线状态：代码事实，不是宣传）；2026-09-07 取回被 9d3bc4789 覆盖的 §4.4A / §2.7.1
+> 最后更新：2026-09-24（§1.2 校准一体机 51 稿基准与线上部署 SHA）；2026-09-17（§1.2 跨端候选状态）；2026-08-22（补 1.2 实现与上线状态）；2026-09-07 取回被 9d3bc4789 覆盖的 §4.4A / §2.7.1
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [compliance-boundary.md](../compliance/compliance-boundary.md) | [current-progress.md](../progress/current-progress.md) | [next-tasks.md](../progress/next-tasks.md)
 
 ---
@@ -38,7 +38,7 @@ AI 在小程序中作为全局交互层，通过“今天页 + 全局小青 + �
 | 端 | 代码事实 | 对用户 | 线上 |
 |---|---|---|---|
 | 微信小程序 `apps/miniapp/` | 唯一发布源。**当前跨端候选** `33751df4a`（基线 `origin/main@eb0f20341`，未进 `main` / CI）。`verify:miniapp-static` 基础静态 64 页、**136 PASS**；页面生命周期 **155/155**；材料包幂等 **49/49**。四 Tab：首页 / 职业生活圈 / 求职 / 我的。历史冻结点 `d30d2f965` 已被该 tip 取代 | 材料包与单件云打印在**本地候选**中已接持久 `Idempotency-Key`、`submittedAt` / `markSubmitted`（可能已发送的键不因本机 TTL 丢掉）；材料包四页已删 `guardPackageChain()`。该候选尚未进入 `main` / DevTools / Trial，不能写成已开放。职业圈、今日早报入口标明「未开放」。求职进度看板仅为本人本地记录，不是平台投递 | 未授权上传正式版；须按合入后的精确 SHA 与 API/Worker/数据库同 release identity 发布，并完成微信真机与 Windows/奔图现场验收 |
-| 一体机 `apps/kiosk/` | 首页与打印扫描域已接 V6 运行时；7 月 75 屏仍是 CI 回归基线，不是视觉目标。首页真值原型：`docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。`kiosk-redesign-2026-08/` 为负责人指定保留的新原型整目录 | 未付不能出纸；断电卡单用户页说「结果未确认」 | **历史只读记录，待发布前实时复核，不是本候选已部署的证据：** 2026-09-01 核验生产曾运行 `771d53e2`（部署于 2026-08-18）；2026-09-17 预检记载 `DEPLOY_SOURCE` 为 `a8a521cb...`。两份 SHA 互相冲突，均落后于当前 `origin/main` 与本候选。PM2/`NODE_ENV=production`、health/ready=200 只关闭当时的 B1，不代表当前 main 或 `33751df4a` 已部署 |
+| 一体机 `apps/kiosk/` | 首页与打印扫描域已有运行时；7 月 75 屏仍是 CI 回归基线，不是视觉目标。用户指定原项目 `docs/design/kiosk-redesign-2026-08/` 的 51 张编号稿为新版一体机视觉及页面状态基准，`01-home.html` 为新版首页基准；旧 V6 原型只作历史参考。05 AI 顾问页已在本地候选迁入 QX 页壳并通过首屏检查，其余状态与多数页面仍待逐项实现和实屏验收 | 未付不能出纸；断电卡单用户页说「结果未确认」 | **2026-09-24 线上只读记录：** 服务器 `DEPLOY_SOURCE.txt` 为 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`（2026-09-18 部署），落后于当日远端 `main@eb0f20341` 和本地商用候选；PM2 online、health/ready=200 仅证明旧版运行时可用，不代表新版 51 稿、当前代码或真机链路已部署验收 |
 | 管理员后台 `apps/admin/` | 运行时路由在 `apps/admin/src/routes/index.tsx`：工作台、设备（终端/打印机/外设合并）、订单、打印扫描运维、计费、文件、求职材料、AI 服务/配置、岗位/招聘会/政策来源审核、招聘会、企业、合作机构、用户、会员权益/活动/反馈/通知、数据权利工单（唯一入口 `/privacy-requests`）、告警、权限、审计、导入批次、同步源、宣传屏、百宝箱、智慧校园、线下机构、法务文档、账号设置。**没有**候选人筛选 / 面试邀约 / Offer。断电卡单核查 `POST /admin/print-jobs/:id/verify-outcome` 已合入 `main`（#740），未部署。原型：`docs/design/console-ai-os-2026-08/admin/` | 运营可审内容、管设备与订单；C0 仍待冻结（原型有 `/online-platforms`，运行时路由尚未建）。Redis 故障时部分后台动作会 500，见 next-tasks 平台可靠性遗留 | 与四端同闸门，未解冻则后台也是旧构建 |
 | 合作机构后台 `apps/partner/` | 运行时路由在 `apps/partner/src/routes/index.tsx`：工作台、机构资料、岗位、企业、招聘会、智慧校园、政策、终端、统计、数据源、同步日志、账号。**禁止**候选人管理 / 收简历 / 面试邀约。原型：`docs/design/console-ai-os-2026-08/partner/` | 只做外部岗位/招聘会/政策数据管理。C1 统计时区与响应解包仍待收口，不得伪造曝光漏斗 | 同上，未解冻不发新包 |
 | API | main 上已有打印先付后印、到机码、报价、AI 多条链。**本候选额外含：** 材料包/单件耐久幂等、`claimed` 租约绑定 `PAYMENT_SESSION_TTL_SECONDS`（默认 30 分钟）、`markPaidOnline` 写入时履约窗口 CAS 与迟到回调 pending-refund。这些能力在 `33751df4a`，尚未进 `main` | 岗位/招聘会/政策生产库曾清成空列表，需授权来源再录入，代码不能编造 | 生产仍是旧 identity，不是本候选。旧 `50483cd` API-only 窗口不能部署本候选；须 final merged SHA 与小程序同 identity |

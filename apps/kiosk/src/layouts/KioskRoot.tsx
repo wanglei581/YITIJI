@@ -157,6 +157,8 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/me/feedback',
   '/me/privacy-requests',
   '/interview',
+  /* 稿 05-ai-cockpit（问小青），2026-09-24 迁入：旧蓝色 KioskPageFrame 双壳换成 QxPageFrame。 */
+  '/assistant',
   '/screensaver',
   '/login',
   '/session-timeout',

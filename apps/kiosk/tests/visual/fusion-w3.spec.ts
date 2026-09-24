@@ -779,6 +779,63 @@ test('Qingxu topbar stays on one line at 390 and 1080 keeps its full layout @w3-
   await assertNoHorizontalOverflow(page)
 })
 
+test('assistant first screen keeps composer and send above the Qingxu navbar @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/assistant')
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
+  // 稿 05：页面名与当前导航项都是「AI 顾问」，全页只有一个 h1，工作台区域有可访问名称。
+  await expect(page.locator('h1')).toHaveCount(1)
+  await expect(page.getByRole('heading', { level: 1, name: 'AI 顾问' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'AI 顾问咨询工作台' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: 'AI 顾问' })).toHaveAttribute('aria-current', 'page')
+  const navTop = await page.locator('.qx-navbar').evaluate((el) => el.getBoundingClientRect().top)
+  const input = await page.getByLabel('输入咨询问题').evaluate((el) => el.getBoundingClientRect().toJSON())
+  const send = await page.locator('.assistant-send').evaluate((el) => el.getBoundingClientRect().toJSON())
+  const cols = await page.locator('.assistant-ai-tools-grid').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)
+  console.log(`assistant-geometry navTop=${navTop} inputTop=${input.top} sendBottom=${send.bottom} toolCols=${cols}`)
+  await page.screenshot({ path: 'test-results/assistant-qx-r4-1080x1920.png' })
+  expect(send.bottom).toBeLessThan(navTop - 24)
+  expect(input.bottom).toBeLessThan(navTop - 24)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  // 等窄屏重排真正落地（导航贴回 844 视口底部），并回到首屏顶部再量 —— 否则量到的是 1080 版式的残影。
+  await page.waitForFunction(() => Math.abs(document.querySelector('.qx-navbar')!.getBoundingClientRect().bottom - window.innerHeight) <= 1)
+  await page.locator('.kassist').evaluate((el) => { el.scrollTop = 0 })
+  const narrow = await page.evaluate(() => {
+    const box = (sel: string) => document.querySelector(sel)!.getBoundingClientRect()
+    return {
+      greeting: box('.assistant-prototype-head h2'),
+      disclosure: box('.assistant-advisor-disclosure'),
+      disclosureDisplay: getComputedStyle(document.querySelector('.assistant-advisor-disclosure')!).display,
+      firstTopic: box('.assistant-task-grid > *'),
+      navTop: box('.qx-navbar').top,
+      overflowX: document.documentElement.scrollWidth - window.innerWidth,
+    }
+  })
+  console.log(`assistant-geometry-390 greetingW=${narrow.greeting.width} greetingH=${narrow.greeting.height} disclosureW=${narrow.disclosure.width} disclosureH=${narrow.disclosure.height} disclosureDisplay=${narrow.disclosureDisplay} topicTop=${narrow.firstTopic.top} navTop=${narrow.navTop} overflowX=${narrow.overflowX}`)
+  await page.screenshot({ path: 'test-results/assistant-qx-r4-390x844.png' })
+  expect(narrow.overflowX).toBeLessThanOrEqual(0)
+  expect(narrow.greeting.width).toBeGreaterThan(200)
+  expect(narrow.greeting.height).toBeLessThan(80)
+  expect(narrow.disclosure.width).toBeGreaterThan(200)
+  expect(narrow.disclosureDisplay).toBe('block')
+  expect(narrow.disclosure.height).toBeLessThan(125)
+  expect(narrow.greeting.width).toBeLessThanOrEqual(390)
+  expect(narrow.firstTopic.top).toBeGreaterThanOrEqual(0)
+  expect(narrow.firstTopic.top).toBeLessThan(narrow.navTop)
+  await page.locator('.kassist').evaluate((el) => { el.scrollTop = el.scrollHeight })
+  const sendButton = page.locator('.assistant-send')
+  await expect(sendButton).toBeVisible()
+  const narrowNavTop = await page.locator('.qx-navbar').evaluate((el) => el.getBoundingClientRect().top)
+  const narrowSend = await sendButton.evaluate((el) => el.getBoundingClientRect().bottom)
+  const narrowInput = await page.getByLabel('输入咨询问题').evaluate((el) => el.getBoundingClientRect().bottom)
+  console.log(`assistant-geometry-390-scrolled sendBottom=${narrowSend} inputBottom=${narrowInput} navTop=${narrowNavTop}`)
+  await page.screenshot({ path: 'test-results/assistant-qx-r4-390x844-composer.png' })
+  expect(narrowSend).toBeLessThanOrEqual(narrowNavTop)
+  expect(narrowInput).toBeLessThanOrEqual(narrowNavTop)
+  await expect(page.locator('.assistant-voice-trigger')).toBeVisible()
+})
+
 test('assistant filters actions and survives service failure @w3-kiosk', async ({ page, api }) => {
   const runtimeErrors: string[] = []
   page.on('pageerror', (error) => runtimeErrors.push(error.message))

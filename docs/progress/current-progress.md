@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-24：稿 05 AI 顾问页壳与首屏合流（本地候选，UI 仍 NO-GO）
+
+从 Claude 负责的一体机隔离分支选择性合入 `/assistant` 的 3 个已验证提交之 `apps/kiosk` 代码，未覆盖主候选较新的后端和进度文档。页面由旧 `KioskPageFrame` 迁入现有 `QxPageFrame`，正式页名/底栏统一为「AI 顾问」，保留真实对话、语音能力门禁和隐私会话处理；1080×1920 与 390×844 首屏布局收紧。Codex 在合流后的工作区复跑 kiosk typecheck、局部 eslint、W3/K2a 静态合同及 W3 浏览器 assistant 3/3，均通过；初次 typecheck 因本工作区缺少 kiosk 包级依赖失败，按原锁文件离线补齐后通过，未改依赖版本。该提交只证明 05 稿的页壳与局部首屏，用户指定原目录 05 稿其余状态尚未逐项验收；真实 API、Windows Edge/27 寸、CI 与线上未验证。
+
 ## 2026-09-24：招聘会真实导入门禁与 51 稿基准校准（本地候选，仍 NO-GO）
 
 Grok 在既有 `services/api/scripts/verify-jobfair-review.ts` 中把主路径改为真实 `JobsService.importFairs`：验证 Partner 身份与机构归属、跨机构相同 externalId 隔离、导入待审到管理员审核发布、公开列表/按编号读取/详情的显隐，以及发布后再次导入强制回到 pending+draft 并清空审核元数据；原拒绝、脏态、审计和分页断言仍保留。Grok 的隔离 SQLite 门禁 ALL PASS；Codex 独立在临时 PostgreSQL 16.15 `verify_admin_ops`（127.0.0.1:63312）复跑 ALL PASS，测试集群已停止，diff check 通过。脚本为 452 行、仅改既有文件。`.github/workflows/ci.yml` 当前已给此门禁设置 `VERIFICATION_DATABASE_TARGET=isolated`，无需另改。尚未在精确 SHA 的 CI、HTTP 授权、Kiosk/小程序实屏或线上复核。
@@ -24,7 +28,7 @@ Grok 对匿名 `POST /resume/parse` 做只读审查：服务端当前先消费�
 
 隔离分支 `codex/kiosk-visual-audit-20260924` 从主候选 `fbd25e089` 开始，已通过 `69f64c540` 合流到 `fde5f0bd5` 的主候选后端修复；不覆盖简历解析/报告修复。本隔离树顶层编号 HTML 实有 52 份：51 张核心稿（00–51 缺 17）已实际渲染 51/51，后加的 `52-advisor-artifact.html` 另行实拍无产物态。逐张路由登记矩阵及分母/状态边界见 `next-tasks.md` 顶部。截图数量不是运行时覆盖率：核心 48 个独立产品宿主中 37 个主入口登记进 QX 壳、10 个仍未登记且需独立实屏核验、1 个“全部服务”无独立路由；33/37 仅为已有路由状态变体，36 为设计索引。
 
-基线运行时实屏抽检首页、打印 Hub、助手、帮助、登录及无效手机链接态时，助手/帮助仍明显旧壳；本分支后来迁了帮助，助手未迁。首页打印主卡曾在 1080×1920 叠字，现本地修复说明行不裁切、卡片密度和圆角、问候/空态/状态文案；主按钮实际只进入 `/assistant`，现只承诺“打开 AI 顾问”，构建含语音入口时次级文案仍写“语音以本机检测为准”，首页不假装开麦或承诺权限/TRTC 实时可用。触控按下反馈为 160ms、缩放 1.5%，`prefers-reduced-motion` 关闭。`qingxu-home.spec.ts` 与 `fusion-w1.spec.ts` 在 1080×1920 和 390×844 共 14/14 通过，typecheck、局部 lint 和 diff check 通过；浏览器预览在 reduced-motion 下计算样式的 transition/animation 均为 `0s`。更新后实屏见忽略的 `test-results/kiosk-home-qx-postchange2-69f64c540/` 和 `test-results/kiosk-home-final-local/`；其中 `home-ready-synthetic-1080x1920.png` 使用本地 API 夹具展示设备 ready 与招聘会内容，`home-1080x1920.png` 展示无终端绑定/接口不可达时的诚实未知态，均非线上实况。同一运行时状态的三种临时顶部对照见 `test-results/kiosk-home-hero-variants-69f64c540/`，选择保留「温润服务台」，对照不入库。W1 运行中有无真实 API 时的代理 ECONNREFUSED，规格断言仍 14/14；不能把它当真实后端验证。这仅为合成/本地浏览器证据，不代表 51 页完成、真实 AI/API、CI、Windows Edge、27 寸触控、打印支付或生产验收。未发布、未建 PR。
+基线运行时实屏抽检首页、打印 Hub、助手、帮助、登录及无效手机链接态时，助手/帮助仍明显旧壳；其后帮助与助手先后迁入 QX 壳，助手当前合流状态见本文件顶部。首页打印主卡曾在 1080×1920 叠字，现本地修复说明行不裁切、卡片密度和圆角、问候/空态/状态文案；主按钮实际只进入 `/assistant`，现只承诺“打开 AI 顾问”，构建含语音入口时次级文案仍写“语音以本机检测为准”，首页不假装开麦或承诺权限/TRTC 实时可用。触控按下反馈为 160ms、缩放 1.5%，`prefers-reduced-motion` 关闭。`qingxu-home.spec.ts` 与 `fusion-w1.spec.ts` 在 1080×1920 和 390×844 共 14/14 通过，typecheck、局部 lint 和 diff check 通过；浏览器预览在 reduced-motion 下计算样式的 transition/animation 均为 `0s`。更新后实屏见忽略的 `test-results/kiosk-home-qx-postchange2-69f64c540/` 和 `test-results/kiosk-home-final-local/`；其中 `home-ready-synthetic-1080x1920.png` 使用本地 API 夹具展示设备 ready 与招聘会内容，`home-1080x1920.png` 展示无终端绑定/接口不可达时的诚实未知态，均非线上实况。同一运行时状态的三种临时顶部对照见 `test-results/kiosk-home-hero-variants-69f64c540/`，选择保留「温润服务台」，对照不入库。W1 运行中有无真实 API 时的代理 ECONNREFUSED，规格断言仍 14/14；不能把它当真实后端验证。这仅为合成/本地浏览器证据，不代表 51 页完成、真实 AI/API、CI、Windows Edge、27 寸触控、打印支付或生产验收。未发布、未建 PR。
 
 **稿 06 帮助页本地更新：** `/help` 从旧 `KioskPageFrame`/旧顶栏迁入现有 `QxPageFrame` 并登记到 `KioskRoot` 的 QX 路由集合；分类卡按现有 12 条 FAQ 动态计数，点分类后才展开真实问答，避免默认 12 条挤掉自助与找人区。原问答内容、跳转与备案链接保留；不伪称已联系工作人员或有机器服务电话，未实现的“看设备状态”入口不摆。1080×1920 首屏可看到三步与找人区，390×844 可滚到备案与行动条，旧顶栏计数 0、QX 壳计数 1、无横向溢出/页面异常。目标浏览器规格 2/2、typecheck、局部 lint、生产模式本地 build、`verify:fusion-shell`、W5/W6、K1 公共入口、隐私文案与视觉统一静态门禁均通过。Claude MCP 两次在显式 240/180 秒时限退出 124，不能记为其最终确认；Codex 已独立检查、修复合同并实屏复验，截图在忽略的 `test-results/kiosk-help-qx-local/`。仅本地候选，未验 Windows Edge/真实设备/生产。
 
