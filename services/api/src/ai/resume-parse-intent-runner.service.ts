@@ -59,12 +59,22 @@ export class ResumeParseIntentRunner {
       if (followed) return followed
       return this.processing(started.submission.intentId, endUserId, intentKey, proof)
     }
-    const result = await this.ai.submitResumeParse(this.whitelist(dto), endUserId, {
+    await this.ai.submitResumeParse(this.whitelist(dto), endUserId, {
       intentId: started.submission.intentId,
       accessToken: binding.accessToken,
     })
-    await this.submission.complete(request)
-    return this.present(result, started.submission.intentId, binding.accessToken, endUserId)
+    const completed = await this.submission.complete(request)
+    if (!completed.advanced) {
+      // Member deletion keeps a revoked intent tombstone. Never return the
+      // provider's in-memory result after that committed deletion.
+      const again = await this.submission.observe(request)
+      const followed = await this.fromObservation(again, endUserId, intentKey, proof)
+      if (followed) return followed
+      throw closed('RESUME_PARSE_OUTCOME_UNKNOWN', '这次解析是否已经完成无法确认，系统不会自动再次调用')
+    }
+    // Read the committed row for the first response too. A deletion between
+    // complete() and this read must not be bypassed by a stale in-memory copy.
+    return this.replay(started.submission.intentId, endUserId, intentKey, proof)
   }
 
   private async fromObservation(

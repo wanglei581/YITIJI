@@ -64,6 +64,8 @@ function harness() {
   let rollbacks = 0
   let fileProbes = 0
   let fileError: Error | null = null
+  let revokeAfterPersist = false
+  let revokeAfterComplete = false
   let releaseProvider: (() => void) | null = null
   let markProviderEntered: (() => void) | null = null
   const providerEntered = new Promise<void>((resolve) => { markProviderEntered = resolve })
@@ -124,7 +126,12 @@ function harness() {
       const row = rows.get(resumeParseIntentId(input.intentKey))
       if (!row || row.phase !== 'provider_started') return { advanced: false, submission: snapshot(row!) }
       row.phase = 'completed'
-      return { advanced: true, submission: snapshot(row) }
+      const advanced = { advanced: true, submission: snapshot(row) }
+      if (revokeAfterComplete) {
+        results.delete(row.intentId)
+        row.phase = 'revoked'
+      }
+      return advanced
     },
   }
 
@@ -160,6 +167,13 @@ function harness() {
       if (releaseProvider) await new Promise<void>((resolve) => { releaseProvider = resolve })
       const output: ParseResumeOutput = { taskId: intent.intentId, status: 'completed', report: { marker: 'kept' } as never }
       results.set(intent.intentId, output)
+      // Deterministic interleaving: the result is committed, then a member delete
+      // removes it and revokes the intent before the runner calls complete().
+      if (revokeAfterPersist) {
+        results.delete(intent.intentId)
+        const row = rows.get(intent.intentId)
+        if (row) row.phase = 'revoked'
+      }
       return output
     },
     async getResumeRecord(taskId: string, requester?: { endUserId: string | null; accessToken: string | null }) {
@@ -198,6 +212,8 @@ function harness() {
       fileError = new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
     },
     failProvider: () => { providerError = new Error('provider down') },
+    revokeAfterPersist: () => { revokeAfterPersist = true },
+    revokeAfterComplete: () => { revokeAfterComplete = true },
     hangProvider: () => {
       releaseProvider = () => undefined
     },
@@ -340,6 +356,33 @@ async function main(): Promise<void> {
   assert.equal(replayWithoutFile.providerCalls(), 1)
   assert.equal(replayWithoutFile.quotaCalls.filter((call) => call.outcome === 'charged').length, 1)
   pass('a stored result replays after the file is no longer readable')
+
+  const deleted = harness()
+  const deletedKey = token()
+  const deletedProof = token()
+  deleted.revokeAfterPersist()
+  await expectHttp(
+    () => deleted.runner.submit(dto(), 'member-a', context, deletedKey, deletedProof),
+    409,
+    'RESUME_PARSE_INTENT_REVOKED',
+  )
+  assert.equal(deleted.phase(deletedKey), 'revoked')
+  assert.equal(deleted.providerCalls(), 1)
+  assert.equal(deleted.quotaCalls.filter((call) => call.outcome === 'charged').length, 1)
+  pass('member deletion after persist suppresses the in-flight parse response')
+
+  const deletedAfterComplete = harness()
+  const lateDeleteKey = token()
+  const lateDeleteProof = token()
+  deletedAfterComplete.revokeAfterComplete()
+  await expectHttp(
+    () => deletedAfterComplete.runner.submit(dto(), 'member-a', context, lateDeleteKey, lateDeleteProof),
+    404,
+    'AI_TASK_NOT_FOUND',
+  )
+  assert.equal(deletedAfterComplete.phase(lateDeleteKey), 'revoked')
+  assert.equal(deletedAfterComplete.providerCalls(), 1)
+  pass('member deletion after complete is checked against the committed row')
 
   const crashed = harness()
   const crashKey = token()
