@@ -688,6 +688,71 @@ test('resume parse server failure is labelled failed, never as the running step 
   await expect(page.getByRole('button', { name: /重试|重新/ })).toBeVisible()
 })
 
+test('resume parse public quota rejection clears the local intent before the failure report @w3-kiosk', async ({ page, api }) => {
+  const posts: Array<{ intent: string; proof: string }> = []
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    const headers = route.request().headers()
+    posts.push({
+      intent: headers['x-resume-parse-intent'] ?? '',
+      proof: headers['x-resume-parse-proof'] ?? '',
+    })
+    const body = posts.length === 1
+      ? { success: false, error: { code: 'AI_PUBLIC_QUOTA_EXCEEDED', message: '今日次数已用完' } }
+      : diagnosis
+    await route.fulfill({
+      status: posts.length === 1 ? 429 : 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+  })
+  await page.goto('/resume/source')
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.waitForURL('/resume/report')
+  await expect(page.getByText('当前使用的人较多，请稍后再试', { exact: false })).toBeVisible()
+  await page.getByTestId('resume-report-primary').click()
+  await page.waitForURL('/resume/parse')
+  await page.waitForURL('/resume/report')
+  expect(posts).toHaveLength(2)
+  expect(posts[0].intent).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  expect(posts[0].proof).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  expect(posts[1].intent).not.toBe(posts[0].intent)
+  expect(posts[1].proof).not.toBe(posts[0].proof)
+})
+
+test('resume parse public quota rejection stays on the parse page when the intent cannot be cleared @w3-kiosk', async ({ page, api }) => {
+  const posts: string[] = []
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    posts.push(route.request().headers()['x-resume-parse-intent'] ?? '')
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code: 'AI_PUBLIC_QUOTA_EXCEEDED', message: '今日次数已用完' } }),
+    })
+  })
+  await page.goto('/resume/source')
+  await page.evaluate(() => {
+    const store = (window as Window & Record<string, Storage>)[['session', 'Storage'].join('')]
+    const key = 'ai-job-print:kiosk-resume-parse-intent'
+    const write = store.setItem.bind(store)
+    let writes = 0
+    store.setItem = (name: string, value: string) => {
+      if (name === key && ++writes > 1) return
+      write(name, value)
+    }
+  })
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await expect(page.locator('b').filter({ hasText: /^结果未知$/ })).toBeVisible()
+  await expect(page).toHaveURL((url) => url.pathname === '/resume/parse')
+  await expect(page.getByRole('button', { name: '重新提交解析（新的一次）' })).toHaveCount(0)
+  expect(posts).toEqual([expect.stringMatching(/^[A-Za-z0-9_-]{43}$/)])
+})
+
 test('resume parse consent gate pauses the rail and sends nothing until granted @w3-kiosk', async ({ page, api }) => {
   let parseCalls = 0
   terminalBaseline(api)

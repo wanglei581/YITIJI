@@ -213,6 +213,30 @@ export function ResumeParsePage() {
     !cancelRef.current && !identityStoppedRef.current && ownerRef.current === ownerId
   ), [])
 
+  /** 只清当前 owner、当前意图、当前材料仍对得上的那一条。清不掉就停在未知，不导航、不另铸。 */
+  const dropHeldIntent = useCallback(async (ownerId: string | null, missing: string) => {
+    if (!samePerson(ownerId)) return false
+    if (resumeParseIntentHold({ intent: intentRef.current, ownerId, payload: payloadRef.current }) !== 'held') {
+      setOutcome('unknown')
+      setRecheck('replay')
+      setBlockNote(missing)
+      return false
+    }
+    const cleared = await clearResumeParseIntent(intentRef.current, ownerId)
+    if (!samePerson(ownerId) || !cleared.ok) {
+      if (samePerson(ownerId)) {
+        setOutcome('unknown')
+        setRecheck('replay')
+        setStorageBlocked(true)
+        setBlockNote('解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请用同一次重查，不要开始新的解析。')
+      }
+      return false
+    }
+    intentRef.current = ''
+    payloadRef.current = null
+    return true
+  }, [samePerson])
+
   const acceptResult = useCallback(async (result: ResumeParseResponse, ownerId: string | null, knownTaskId: string) => {
     if (!samePerson(ownerId)) return
     if (!result || typeof result !== 'object') {
@@ -263,22 +287,7 @@ export function ResumeParsePage() {
           return
         }
         // 凭证已在上面写后读回。同一次意图清掉之后，报告页「重新解析」才会铸新的一对请求头。
-        if (resumeParseIntentHold({ intent: intentRef.current, ownerId, payload: payloadRef.current }) !== 'held') {
-          setOutcome('unknown')
-          setRecheck('replay')
-          setBlockNote('本机解析标识已不在，没有打开失败报告，也没有另起一次解析。')
-          return
-        }
-        const cleared = await clearResumeParseIntent(intentRef.current, ownerId)
-        if (!samePerson(ownerId)) return
-        if (!cleared.ok) {
-          setOutcome('unknown')
-          setRecheck('replay')
-          setBlockNote('解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请用同一次重查，不要开始新的解析。')
-          return
-        }
-        intentRef.current = ''
-        payloadRef.current = null
+        if (!await dropHeldIntent(ownerId, '本机解析标识已不在，没有打开失败报告，也没有另起一次解析。')) return
         navigateFail(result.failReason ?? '简历解析未能完成，请重试', {
           taskId: result.taskId,
           accessToken: keptTokenRef.current?.accessToken,
@@ -298,20 +307,7 @@ export function ResumeParsePage() {
       setBlockNote('服务端的答复不完整，这台机器没能确认这一次解析的结果。')
       return
     }
-    if (resumeParseIntentHold({ intent: intentRef.current, ownerId, payload: payloadRef.current }) !== 'held') {
-      setOutcome('unknown')
-      setBlockNote('本机解析标识已不在，没有打开结果，也没有另起一次解析。')
-      return
-    }
-    const cleared = await clearResumeParseIntent(intentRef.current, ownerId)
-    if (!samePerson(ownerId)) return
-    if (!cleared.ok) {
-      setOutcome('unknown')
-      setBlockNote('解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请用同一次重查，不要开始新的解析。')
-      return
-    }
-    intentRef.current = ''
-    payloadRef.current = null
+    if (!await dropHeldIntent(ownerId, '本机解析标识已不在，没有打开结果，也没有另起一次解析。')) return
     navigate('/resume/report', {
       state: {
         ...state,
@@ -323,7 +319,7 @@ export function ResumeParsePage() {
         extractionNotice: result.extractionNotice,
       },
     })
-  }, [navigate, navigateFail, samePerson, state])
+  }, [dropHeldIntent, navigate, navigateFail, samePerson, state])
 
   const submitAndWait = useCallback(async (mode: 'start' | 'replay') => {
     if (!fileId || inFlightRef.current || identityStoppedRef.current) return
@@ -387,11 +383,18 @@ export function ResumeParsePage() {
         }
         return
       }
+      // 公共额度 429 发生在记账之前，同键重试仍会被拒。只清对得上的本机意图，避免下次换材料被卡住。
+      if (err instanceof ApiHttpError && err.status === 429 && aiErrorCodeOf(err) === 'AI_PUBLIC_QUOTA_EXCEEDED') {
+        if (await dropHeldIntent(ownerId, '本机解析标识对不上，没有打开拒绝页，也没有另起一次解析。')) {
+          navigateFail(aiErrorMessageOf(err, '今日 AI 解析次数已用完'))
+        }
+        return
+      }
       navigateFail(aiErrorMessageOf(err, 'AI 服务暂时不可用，请稍后重试'))
     } finally {
       inFlightRef.current = false
     }
-  }, [acceptResult, file?.format, file?.name, fileId, getToken, navigateFail, samePerson, state])
+  }, [acceptResult, dropHeldIntent, file?.format, file?.name, fileId, getToken, navigateFail, samePerson, state])
 
   const replaySame = () => {
     if (inFlightRef.current || confirmFresh !== 0 || identityStoppedRef.current) return
