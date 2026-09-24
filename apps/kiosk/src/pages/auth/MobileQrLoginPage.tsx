@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ShieldCheckIcon } from 'lucide-react'
 import { sendSmsCode } from '../../services/auth/memberAuthApi'
@@ -34,6 +34,10 @@ import './mobile-qr-service-desk.css'
  * 所以每一屏都把人送回一体机；页面上的每个结论都只来自 status / sms-code / confirm 三个接口的回执。 */
 
 interface Session extends MobileQrFacts {
+  /** 本会话对应的票据；地址栏换票据（或去掉票据）时整份会话作废重来。 */
+  ticketId: string
+  /** 会话号：每张票据一份。异步回执只落回发出它的那份会话，旧票据的回执到晚了一律丢弃。 */
+  sid: number
   deviceLabel: string | null
   /** status.expiresInSeconds：打开本页（或重新检查）时读到的「剩余」秒数，不自己走秒。 */
   remain: number | null
@@ -44,8 +48,11 @@ interface Session extends MobileQrFacts {
   sentSeconds: number
 }
 
+let sessionSeq = 0
+
 function initialSession(ticketId: string): Session {
   return {
+    ticketId, sid: ++sessionSeq,
     state: ticketId ? 'checking' : 'missing-ticket',
     phone: '', code: '', locked: false, hasUsableCode: false,
     cooldown: 0, retryGate: 0, dailyLimitedPhone: null,
@@ -73,16 +80,25 @@ export function MobileQrLoginPage() {
   const [params] = useSearchParams()
   const ticketId = params.get('ticketId')?.trim() ?? ''
   const [s, setS] = useState<Session>(() => initialSession(ticketId))
-  const aliveRef = useRef(true)
+  // 同一页面实例里换了票据（A → B 或 A → 无票据）：手机号、验证码、设备与结论都属于 A，必须整份丢掉。
+  if (s.ticketId !== ticketId) setS(initialSession(ticketId))
+  const liveSidRef = useRef(0)
   const statusSeqRef = useRef(0)
   const phoneRef = useRef<HTMLInputElement>(null)
   const codeRef = useRef<HTMLInputElement>(null)
   const focusRef = useRef<'phone' | 'code' | null>(null)
   const flowRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    aliveRef.current = true
-    return () => { aliveRef.current = false }
+  useLayoutEffect(() => {
+    liveSidRef.current = s.sid
+    return () => { liveSidRef.current = 0 }
+  }, [s.sid])
+
+  /** 把回执落回发出它的那份会话：换票据或离开本页后才到的回执返回 false，什么都不改。 */
+  const commit = useCallback((sid: number, update: (prev: Session) => Session) => {
+    if (liveSidRef.current !== sid) return false
+    setS((prev) => (prev.sid === sid ? update(prev) : prev))
+    return true
   }, [])
 
   // 换态即回到顶部：结论、原因与下一步必须先落在首屏，不能沿用上一屏的滚动位置。
@@ -102,26 +118,27 @@ export function MobileQrLoginPage() {
   useTick(s.retryGate, useCallback(() => setS((prev) => ({ ...prev, retryGate: Math.max(0, prev.retryGate - 1) })), []))
 
   /** 读一次票据状态。「重新检查」也走这里：它就是再读一次 status，不会替用户再提交确认。 */
+  const sid = s.sid
   const loadTicketStatus = useCallback(async () => {
     if (!ticketId) return
     const seq = ++statusSeqRef.current
-    setS((prev) => ({ ...prev, state: 'checking', serverMessage: '' }))
+    if (!commit(sid, (prev) => ({ ...prev, state: 'checking', serverMessage: '' }))) return
     try {
       const status = await fetchQrLoginStatus(ticketId)
-      if (!aliveRef.current || seq !== statusSeqRef.current) return
+      if (seq !== statusSeqRef.current) return
       const deviceLabel = status.deviceLabel?.trim() || null
-      setS((prev) => status.status === 'confirmed'
+      commit(sid, (prev) => status.status === 'confirmed'
         // 票据已被确认过：可能是刚才那次、也可能是别人，本页不替服务端说「成功了」。
         ? { ...prev, state: 'ticket-expired', deviceLabel, remain: null, code: '' }
         : { ...prev, state: formEntryState(deviceLabel), deviceLabel, remain: status.expiresInSeconds })
     } catch (err) {
-      if (!aliveRef.current || seq !== statusSeqRef.current) return
+      if (seq !== statusSeqRef.current) return
       const failure = classifyStatusError(err)
-      setS((prev) => failure.kind === 'ticket-dead'
+      commit(sid, (prev) => failure.kind === 'ticket-dead'
         ? { ...prev, state: 'ticket-expired', remain: null, code: '' }
         : { ...prev, state: 'status-error', serverMessage: failure.message })
     }
-  }, [ticketId])
+  }, [commit, sid, ticketId])
 
   useEffect(() => {
     void loadTicketStatus()
@@ -129,19 +146,18 @@ export function MobileQrLoginPage() {
 
   const handleSendCode = useCallback(async () => {
     if (sendBlockedBy(s) !== null) return
-    const phone = s.phone
-    setS((prev) => ({ ...prev, state: 'send-loading', serverMessage: '' }))
+    const { sid: owner, phone } = s
+    if (!commit(owner, (prev) => ({ ...prev, state: 'send-loading', serverMessage: '' }))) return
     try {
       const result = await sendSmsCode(phone)
-      if (!aliveRef.current) return
       const seconds = result.cooldownSeconds > 0 ? result.cooldownSeconds : SMS_RESEND_SECONDS
-      focusRef.current = 'code'
       // 只有成功回执才锁号、起倒计时、写「已发送」；本页那道最短等待由回执冷却接管。
-      setS((prev) => ({ ...prev, state: 'code-sent', locked: true, hasUsableCode: true, cooldown: seconds, sentSeconds: seconds, retryGate: 0 }))
+      if (commit(owner, (prev) => ({ ...prev, state: 'code-sent', locked: true, hasUsableCode: true, cooldown: seconds, sentSeconds: seconds, retryGate: 0 }))) {
+        focusRef.current = 'code'
+      }
     } catch (err) {
-      if (!aliveRef.current) return
       const failure = classifySendError(err)
-      setS((prev) => {
+      commit(owner, (prev) => {
         if (failure.kind === 'limited') {
           // 频控不改 locked / hasUsableCode：这次请求什么都没改变。明天口径绑号码，稍后口径起本页最短等待。
           return failure.limit === 'tomorrow'
@@ -159,22 +175,19 @@ export function MobileQrLoginPage() {
         return { ...prev, state: 'send-error', sendError: 'rejected', serverMessage: failure.message }
       })
     }
-  }, [s])
+  }, [commit, s])
 
   const handleConfirm = useCallback(async () => {
     if (!ticketId || !canConfirm(s)) return
-    const { phone, code } = s
-    setS((prev) => ({ ...prev, state: 'confirming', serverMessage: '' }))
+    const { sid: owner, phone, code } = s
+    if (!commit(owner, (prev) => ({ ...prev, state: 'confirming', serverMessage: '' }))) return
     try {
       await confirmQrLogin(ticketId, phone, code)
-      if (!aliveRef.current) return
-      // 确认成功 = 服务端已消费那条码。手机号与验证码不再留在本页。
-      setS((prev) => ({ ...prev, state: 'confirmed', phone: '', code: '', hasUsableCode: false, cooldown: 0, retryGate: 0 }))
+      // 确认成功 = 服务端已消费那条码。手机号与验证码不再留在本页。回执属于旧票据时丢弃，绝不把新票据标成已确认。
+      commit(owner, (prev) => ({ ...prev, state: 'confirmed', phone: '', code: '', hasUsableCode: false, cooldown: 0, retryGate: 0 }))
     } catch (err) {
-      if (!aliveRef.current) return
       const failure = classifyConfirmError(err)
-      if (failure.kind === 'confirm-code-invalid') focusRef.current = 'code'
-      setS((prev) => {
+      const landed = commit(owner, (prev) => {
         switch (failure.kind) {
           case 'confirm-code-invalid':
             return { ...prev, state: failure.kind, code: '' }
@@ -190,8 +203,9 @@ export function MobileQrLoginPage() {
             return { ...prev, state: 'confirm-rejected', serverMessage: failure.message }
         }
       })
+      if (landed && failure.kind === 'confirm-code-invalid') focusRef.current = 'code'
     }
-  }, [s, ticketId])
+  }, [commit, s, ticketId])
 
   const handleChangePhone = useCallback(() => {
     // 换号 = 之前那次发码对新号码毫无意义；最短等待与「今天不能再发的号码」是换号改变不了的事实，保留。

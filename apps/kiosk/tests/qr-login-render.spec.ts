@@ -377,3 +377,48 @@ test('Mobile QR 确认结果未知时不盲重试，重新检查读到死票据�
   expect(api.requestCount('GET', MOBILE_STATUS_PATH)).toBe(2)
   await attachProjectScreenshot(page, testInfo, 'mobile-qr-ticket-expired')
 })
+
+test('Mobile QR 同一页面换票据后丢弃旧票据的会话，迟到的旧确认回执不把新票据标成已确认 @mobile', async ({ page, api }, testInfo) => {
+  const nextTicket = 'mobile_next_ticket_0123456789abcdefghijk'
+  let releaseStaleConfirm: (() => void) | undefined
+  const staleConfirmGate = new Promise<void>((resolve) => { releaseStaleConfirm = resolve })
+  api.respond('GET', MOBILE_STATUS_PATH, pendingTicket('就业大厅 3 号机'))
+  api.respond('GET', `/api/v1/member/auth/qr/${nextTicket}/status`, pendingTicket('就业大厅 5 号机'))
+  api.respond('POST', SMS_CODE_PATH, SMS_SENT)
+  api.respondWith('POST', MOBILE_CONFIRM_PATH, async () => {
+    await staleConfirmGate
+    return { status: 200, json: { success: true, data: { status: 'confirmed' } } }
+  })
+
+  try {
+    await page.goto(`/member/qr-login?ticketId=${MOBILE_TICKET}`)
+    const root = page.locator('main[data-kiosk-screen="member-qr-login"]')
+    await expect(root).toHaveAttribute('data-mobile-qr-state', 'ready')
+    await sendCodeAndFill(root, '123456')
+    await root.getByRole('button', { name: '确认本次一体机登录请求' }).click()
+    await expect(root).toHaveAttribute('data-mobile-qr-state', 'confirming')
+
+    // 不整页刷新、只换地址栏里的票据：页面实例还在，旧票据的号码、验证码与在途确认都不能带进新票据。
+    await page.evaluate((url) => {
+      window.history.pushState(null, '', url)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }, `/member/qr-login?ticketId=${nextTicket}`)
+    await expect(root.getByRole('heading', { level: 1, name: '就业大厅 5 号机' })).toBeVisible()
+    await expect(root).toHaveAttribute('data-mobile-qr-state', 'ready')
+    await expect(root.getByLabel('手机号，11 位数字')).toHaveValue('')
+    await expect(root.getByLabel('短信验证码，6 位数字')).toHaveValue('')
+    await expect(root.getByLabel('短信验证码，6 位数字')).toBeDisabled()
+
+    const staleConfirmed = page.waitForResponse((response) => response.url().endsWith(MOBILE_CONFIRM_PATH))
+    releaseStaleConfirm?.()
+    await staleConfirmed
+    await page.evaluate(() => new Promise((resolve) => window.setTimeout(resolve, 300)))
+    await expect(root).toHaveAttribute('data-mobile-qr-state', 'ready')
+    await expect(root.getByRole('heading', { name: '已确认，请回一体机继续', exact: true })).toHaveCount(0)
+    await expect(root.getByRole('heading', { level: 1, name: '就业大厅 5 号机' })).toBeVisible()
+    expect(api.requestCount('POST', `/api/v1/member/auth/qr/${nextTicket}/confirm`)).toBe(0)
+    await attachProjectScreenshot(page, testInfo, 'mobile-qr-ticket-switched')
+  } finally {
+    releaseStaleConfirm?.()
+  }
+})
