@@ -299,6 +299,43 @@
   .qpd-context-empty[data-w2-page='print-material-check'] :is(.qpd-empty-proof, .qpd-empty-next, .qpd-empty-facts) :is(ul, p) { gap: 8px; font-size: 16px; }
   .qpd-context-empty[data-w2-page='print-material-check'] .qpd-empty-proof { display: block; }
   .qpd-context-empty[data-w2-page='print-material-check'] :is(.qpd-empty-next, .qpd-empty-facts) { margin-top: 16px; padding-top: 14px; }
+  /* 材料检查有文件态 + 预览页「须先完成检查」守卫：操作条说明独占首行、两按钮下行平分；
+     主体改由内容撑开并在操作条上方自身滚动（否则网格被压成几十 px、裁决按钮落到不可达处） */
+  .qx-stage:is(:has(.qpd-check-page), :has(.qpd-guard[data-qx-state='check-required'])) { --qx-gutter: 16px; }
+  .qx-stage:is(:has(.qpd-check-page), :has(.qpd-guard[data-qx-state='check-required'])) > .qx-ctabar { flex-wrap: wrap; gap: 10px; padding: 12px var(--qx-gutter); }
+  .qx-stage:is(:has(.qpd-check-page), :has(.qpd-guard[data-qx-state='check-required'])) > .qx-ctabar .why { order: -1; flex: 1 1 100%; width: 100%; margin: 0; font-size: 15px; line-height: 1.4; }
+  .qx-stage:is(:has(.qpd-check-page), :has(.qpd-guard[data-qx-state='check-required'])) > .qx-ctabar .qx-btn { flex: 1 1 0; min-width: 0; min-height: 56px; padding: 0 10px; font-size: 16px; white-space: nowrap; }
+  .qpd-check-page { overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+  .qpd-check-page > .qpd-check-grid { flex: none; padding-bottom: 16px; }
+  .qpd-check-intro { flex-wrap: wrap; gap: 4px 12px; padding: 10px 14px; }
+  .qpd-check-intro strong { font-size: 17px; }
+  .qpd-check-intro span { font-size: 15px; }
+  .qpd-check-grid .qpd-check-left { min-height: 0; padding: 14px; gap: 12px; }
+  .qpd-check-grid .qpd-check-right { overflow: visible; padding: 14px; }
+  :is(.qpd-check-grid, .qpd-guard-work) .qpd-file-sheet { min-height: 0; padding: 14px; gap: 6px; }
+  :is(.qpd-check-grid, .qpd-guard-work) .qpd-file-sheet svg { width: 40px; height: 40px; }
+  :is(.qpd-check-grid, .qpd-guard-work) .qpd-file-sheet strong { font-size: 19px; }
+  :is(.qpd-check-grid, .qpd-guard-work) .qpd-file-sheet span { font-size: 15px; }
+  .qpd-steps { gap: 8px; }
+  .qpd-steps li { min-height: 52px; padding: 6px 12px; gap: 10px; }
+  .qpd-steps li > span { width: 34px; height: 34px; }
+  .qpd-steps li b { font-size: 17px; }
+  .qpd-privacy-note { margin-top: 0; padding: 12px; }
+  .qpd-privacy-note p { font-size: 15px; }
+  .qpd-working, .qpd-error { min-height: 0; }
+  .qpd-result { padding: 14px; gap: 10px; flex-wrap: wrap; }
+  .qpd-result h2 { font-size: 21px; }
+  .qpd-result p { font-size: 16px; }
+  .qpd-batch { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px; }
+  .qpd-batch > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qpd-batch .qx-btn { min-width: 0; min-height: 56px; padding: 0 10px; font-size: 16px; white-space: nowrap; }
+  .qpd-finding { padding: 14px; gap: 10px; }
+  .qpd-finding > svg { width: 24px; height: 24px; }
+  .qpd-finding header { flex-wrap: wrap; gap: 6px 10px; }
+  .qpd-finding header strong { font-size: 19px; }
+  .qpd-finding dl > div { grid-template-columns: 48px minmax(0, 1fr); font-size: 16px; }
+  .qpd-guard { overflow-x: hidden; overflow-y: auto; scrollbar-width: none; gap: 14px; }
+  .qpd-guard > .qpd-guard-work { flex: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
