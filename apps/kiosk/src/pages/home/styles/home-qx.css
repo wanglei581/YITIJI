@@ -14,8 +14,11 @@
 .qx-home-hero {
   position: relative;
   flex: none;
-  margin-bottom: 24px;
-  padding: 22px var(--qx-gutter) 30px;
+  display: flex;
+  flex-direction: column;
+  min-height: 590px;
+  margin-bottom: 48px;
+  padding: 0 var(--qx-gutter) 40px;
   color: var(--qx-paper);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--qx-deep) 46%, transparent), var(--qx-deep)),
@@ -33,11 +36,22 @@
   clip-path: ellipse(66% 45% at 50% 0);
   pointer-events: none;
 }
-.qx-home-hero > * { position: relative; z-index: 1; grid-column: 1 / -1; }
-/* 身份入口与快捷入口同排（占稿里「更多服务」那格）；DOM 顺序与视觉顺序一致。 */
-.qx-home-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; }
-.qx-home-hero > .qx-home-quick { grid-column: 1; }
-.qx-home-hero > .qx-home-identity { grid-column: 2; align-self: center; margin-top: 10px; }
+.qx-home-hero > * { position: relative; z-index: 1; }
+/* 顶栏收进背景图：覆写共享 104px 实色顶栏，品牌 / 状态 / 时钟同排、浅色字压在深色蒙层上。 */
+.qx-home-hero > .qx-home-hero-top {
+  flex: none; display: flex; align-items: center; gap: 16px; height: 92px; padding: 0;
+  border: 0; box-shadow: none; background: transparent; color: var(--qx-paper);
+  text-shadow: 0 1px 3px color-mix(in srgb, var(--qx-deep) 70%, transparent);
+}
+.qx-home-hero-top > * { flex: none; min-width: 0; }
+.qx-home-hero-top .qx-topbar-brand { flex: 0 1 auto; margin-right: auto; overflow: hidden; color: var(--qx-paper); white-space: nowrap; text-overflow: ellipsis; }
+.qx-home-hero-top .qx-topbar-sub { color: color-mix(in srgb, var(--qx-paper) 72%, transparent); }
+.qx-home-hero-top .qx-pill {
+  white-space: nowrap; color: var(--qx-paper);
+  border-color: color-mix(in srgb, var(--qx-paper) 30%, transparent);
+  background: color-mix(in srgb, var(--qx-deep) 42%, transparent);
+}
+.qx-home-hero-top .qx-home-clock { margin-left: 0; }
 .qx-home-assistant h2 em { font-style: normal; color: var(--qx-emerald); }
 .qx-home-assistant { display: flex; align-items: center; gap: 22px; }
 .qx-home-avatar {
@@ -78,10 +92,10 @@
 .qx-home-section-head > button:disabled { cursor: not-allowed; opacity: .68; }
 
 /* 身份入口：登录前后必须肉眼可辨，否则上一个人走后没人看得出会话是否已清场。
-   底栏「我的」在两种状态下都只写「我的」，担不起这个职责，所以在 hero 里单列一颗。 */
+   底栏「我的」在两种状态下都只写「我的」，担不起这个职责，所以在 hero 快捷入口里作第四颗。 */
 .qx-home-identity {
   display: inline-flex; align-items: center; gap: 10px;
-  min-height: 48px; margin-top: 12px; padding: 0 18px;
+  justify-content: center; min-width: 48px; min-height: 48px; margin-top: 0; padding: 0 18px;
   border: 1px solid color-mix(in srgb, var(--qx-paper) 28%, transparent); border-radius: 999px;
   color: var(--qx-paper); background: color-mix(in srgb, var(--qx-paper) 8%, transparent); cursor: pointer;
 }
@@ -117,7 +131,9 @@
   color: var(--qx-deep); background: var(--qx-emerald); font: 700 18px var(--qx-sans);
 }
 .qx-home-hero-law {
-  margin: 14px 0 0;
+  flex: none;
+  margin: auto 0 0; /* 贴 hero 底；auto 吃掉余量，padding 保底间距，不与上下文卡重叠 */
+  padding-top: 14px;
   color: color-mix(in srgb, var(--qx-paper) 66%, transparent);
   font-size: 16px;
   text-align: center;
