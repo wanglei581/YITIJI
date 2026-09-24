@@ -953,13 +953,25 @@ async function main() {
     }
     try {
       await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'active', deletedAt: null, expiresAt: new Date(Date.now() - 60_000) } })
-      if (await readCanRetry()) fail('8k. 过期文件不得 canRetry')
+      await expectCode(
+        () => printJobs.issueTakeawayUrl(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+        '8k. 过期文件不签发带走链接',
+      )
       await rejectWithoutSideEffect('8k. 过期文件 retry 拒绝且无副作用')
       await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'quarantined', deletedAt: null, expiresAt: fileExpiry } })
-      if (await readCanRetry()) fail('8k. 隔离文件不得 canRetry')
+      await expectCode(
+        () => printJobs.issueTakeawayUrl(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+        '8k. 隔离文件不签发带走链接',
+      )
       await rejectWithoutSideEffect('8k. 隔离文件 retry 拒绝且无副作用')
       await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'uploading', deletedAt: null, expiresAt: fileExpiry } })
-      if (await readCanRetry()) fail('8k. 上传中文件不得 canRetry')
+      await expectCode(
+        () => printJobs.issueTakeawayUrl(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+        '8k. 上传中文件不签发带走链接',
+      )
       await rejectWithoutSideEffect('8k. 上传中文件 retry 拒绝且无副作用')
       await prisma.fileObject.update({
         where: { id: fileId },
@@ -992,9 +1004,167 @@ async function main() {
     ) {
       fail(`8l. active 重试应保持同一订单与金额: ${JSON.stringify(matrixRetried)}`)
     }
-    pass('8l. active 重试仍是同一订单与金额，不可打印状态不会给出 canRetry')
+    const matrixRow = await prisma.printTask.findUnique({ where: { id: retryMatrix.taskId }, select: { status: true } })
+    const matrixOrder = await prisma.order.findUnique({
+      where: { id: retryMatrix.orderId },
+      select: { amountCents: true, payStatus: true, taskStatus: true },
+    })
+    if (
+      matrixRow?.status !== 'pending' ||
+      matrixOrder?.taskStatus !== 'pending' ||
+      matrixOrder?.payStatus !== 'paid' ||
+      matrixOrder?.amountCents !== matrixBefore?.amountCents
+    ) {
+      fail(`8l. 重试后数据库状态异常: ${JSON.stringify({ matrixRow, matrixOrder })}`)
+    }
+    pass('8l. active 重试仍是同一订单与金额，数据库回到 pending')
     await prisma.printTask.update({ where: { id: retryMatrix.taskId }, data: { status: 'cancelled' } })
     await prisma.order.updateMany({ where: { printTaskId: retryMatrix.taskId }, data: { taskStatus: 'cancelled' } })
+
+    const legacyFileId = `file_vpj_legacy_${suffix}`
+    const legacyKey = `verify/print-jobs/${legacyFileId}.pdf`
+    fixtureFileIds.push(legacyFileId)
+    fixtureStorageKeys.push(legacyKey)
+    await storage.putObject(legacyKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: legacyFileId,
+        storageKey: legacyKey,
+        filename: 'legacy-file.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: reportSha256,
+        purpose: 'print_source',
+        status: 'active',
+        expiresAt: fileExpiry,
+        bucket: LOCAL_BUCKET_SENTINEL,
+      },
+    })
+    const legacyJob = await printJobs.create({
+      fileUrl: signFileUrl(legacyFileId, 30 * 60 * 1000).url,
+      fileName: 'legacy-null-file-id.pdf',
+    }, { terminalId })
+    createdTaskIds.push(legacyJob.taskId)
+    await orderStatus.markPaid(legacyJob.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: legacyJob.taskId },
+      data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED', fileId: null },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: legacyJob.taskId },
+      data: { taskStatus: 'failed' },
+    })
+    const legacyToken = legacyJob.paymentSessionToken
+    const legacyTakeaway = await printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken })
+    const legacyUrl = parseSignedContentUrl(legacyTakeaway.signedUrl)
+    if (!legacyTakeaway.canRetry || legacyUrl.fileId !== legacyFileId || !verifyFileSignature(legacyUrl.fileId, legacyUrl.expires, legacyUrl.sig)) {
+      fail('8m. fileId 为空但内部签名 URL 可解析时，active 文件应可带走且 canRetry')
+    }
+    const storedLegacy = await prisma.printTask.findUnique({ where: { id: legacyJob.taskId }, select: { fileUrl: true } })
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: 'https://example.com/outside' } })
+    await expectCode(
+      () => printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken }),
+      'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+      '8m. 外部 URL 不能代替文件授权',
+    )
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: storedLegacy?.fileUrl ?? '' } })
+    const legacyBefore = await prisma.order.findUnique({
+      where: { id: legacyJob.orderId },
+      select: { amountCents: true },
+    })
+    const legacyRetried = await printJobs.retryPaidFailedJob(legacyJob.taskId, { paymentSessionToken: legacyToken })
+    const legacyRow = await prisma.printTask.findUnique({ where: { id: legacyJob.taskId }, select: { status: true, fileId: true } })
+    const legacyOrder = await prisma.order.findUnique({
+      where: { id: legacyJob.orderId },
+      select: { amountCents: true, payStatus: true, taskStatus: true },
+    })
+    if (
+      legacyRetried.orderId !== legacyJob.orderId ||
+      legacyRetried.amountCents !== legacyBefore?.amountCents ||
+      legacyRow?.status !== 'pending' ||
+      legacyRow.fileId !== null ||
+      legacyOrder?.payStatus !== 'paid' ||
+      legacyOrder.taskStatus !== 'pending' ||
+      legacyOrder.amountCents !== legacyBefore?.amountCents
+    ) {
+      fail(`8m. 旧单重试后订单或任务异常: ${JSON.stringify({ legacyRetried, legacyRow, legacyOrder })}`)
+    }
+    pass('8m. 历史 fileId 为空、内部签名 URL 指向 active 文件时，可带走并按原订单重试')
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' } })
+    await prisma.order.updateMany({ where: { printTaskId: legacyJob.taskId }, data: { taskStatus: 'failed' } })
+    await prisma.fileObject.update({
+      where: { id: legacyFileId },
+      data: { status: 'deleted', deletedAt: new Date() },
+    })
+    await expectCode(
+      () => printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken }),
+      'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+      '8m. 历史空 fileId 在文件删除后拒绝带走',
+    )
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(legacyJob.taskId, { paymentSessionToken: legacyToken }),
+      'PRINT_RETRY_FILE_UNAVAILABLE',
+      '8m. 历史空 fileId 在文件删除后拒绝重试',
+    )
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: legacyJob.taskId }, data: { taskStatus: 'cancelled' } })
+
+    const misaligned = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'order-task-mismatch.pdf',
+    }, { terminalId })
+    createdTaskIds.push(misaligned.taskId)
+    await orderStatus.markPaid(misaligned.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: misaligned.taskId },
+      data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: misaligned.taskId },
+      data: { taskStatus: 'printing' },
+    })
+    const misalignedView = await printJobs.issueTakeawayUrl(misaligned.taskId, {
+      paymentSessionToken: misaligned.paymentSessionToken,
+    })
+    if (misalignedView.canRetry) fail('8n. 订单任务状态不是 failed 时不得 canRetry')
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(misaligned.taskId, { paymentSessionToken: misaligned.paymentSessionToken }),
+      'PRINT_RETRY_INVALID_STATE',
+      '8n. 订单任务状态不对齐时 retry 拒绝',
+    )
+    await prisma.printTask.update({ where: { id: misaligned.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: misaligned.taskId }, data: { taskStatus: 'cancelled' } })
+
+    const disabledRetry = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'terminal-disabled.pdf',
+    }, { terminalId })
+    createdTaskIds.push(disabledRetry.taskId)
+    await orderStatus.markPaid(disabledRetry.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: disabledRetry.taskId },
+      data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: disabledRetry.taskId },
+      data: { taskStatus: 'failed' },
+    })
+    await prisma.terminal.update({ where: { id: terminalId }, data: { enabled: false } })
+    try {
+      const disabledView = await printJobs.issueTakeawayUrl(disabledRetry.taskId, {
+        paymentSessionToken: disabledRetry.paymentSessionToken,
+      })
+      if (disabledView.canRetry) fail('8o. 终端禁用时不得 canRetry')
+      await expectCode(
+        () => printJobs.retryPaidFailedJob(disabledRetry.taskId, { paymentSessionToken: disabledRetry.paymentSessionToken }),
+        'PRINT_RETRY_TERMINAL_NOT_ACTIVE',
+        '8o. 终端禁用时 retry 拒绝',
+      )
+    } finally {
+      await prisma.terminal.update({ where: { id: terminalId }, data: { enabled: true, lifecycleStatus: 'active' } })
+    }
+    await prisma.printTask.update({ where: { id: disabledRetry.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: disabledRetry.taskId }, data: { taskStatus: 'cancelled' } })
 
     // ── 9. 动态价格二次确认 ────────────────────────────────────────────
     // 夹具文件 1 页 × 2 份黑白 → 应付 = 单价 × 2。quotedAmountCents 只作一致性断言：
