@@ -232,20 +232,22 @@
 .qx-home-tile[data-size='feature'] .qx-home-tile-foot { color: var(--qx-emerald); }
 .qx-home-tile-foot svg { width: 17px; }
 
+/* 底座可信区：原稿居中、114px 高，与服务区之间只留这一条分界线（导航不再画第二道）。 */
 .qx-home-truth {
-  flex: none; display: flex; align-items: center; gap: 12px; min-height: 64px;
+  flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 114px;
   padding: 8px var(--qx-gutter); border-top: 1px solid var(--qx-line);
-  color: var(--qx-ink-3); background: var(--qx-paper); font-size: 15px;
+  color: var(--qx-ink-3); background: var(--qx-paper); font-size: 15px; text-align: center;
 }
 .qx-home-truth svg { flex: none; width: 22px; color: var(--qx-teal-d); }
 .qx-home-truth > div { min-width: 0; }
 .qx-home-truth p { margin: 0; }
 .qx-home-truth strong { color: var(--qx-ink); }
-.qx-home-legal { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 2px !important; }
+.qx-home-legal { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 5px; margin-top: 2px !important; }
 .qx-home-legal a {
   display: inline-flex; align-items: center; min-height: 48px; color: var(--qx-ink-3);
   text-decoration: underline; text-underline-offset: 3px;
 }
+.qx-home-host .qx-navbar { height: 108px; border-top: 0; box-shadow: none; }
 .qx-home-host .qx-navbar svg { width: 27px; }
 .qx-home-host .qx-nav-item span {
   max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
