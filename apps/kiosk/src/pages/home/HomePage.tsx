@@ -4,7 +4,6 @@
 
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
@@ -14,6 +13,7 @@ import { QxHomeNavbar, QxHomeView } from './components/QxHomeView'
 import { HOME_V6_ROUTES, type HomeV6ActionId } from './homeV6Domains'
 import { useHomeJobFairHighlight } from './hooks/useHomeJobFairHighlight'
 import { useHomeJobHighlight } from './hooks/useHomeJobHighlight'
+import '../../styles/qingxu/index.css'
 import './styles/home-qx.css'
 
 const ASSISTANT_TOPICS: Partial<Record<HomeV6ActionId, 'resume' | 'jobfair'>> = {
@@ -56,14 +56,8 @@ export function HomePage() {
 
   return (
     <div className="qx-home-host">
-      <QxPageFrame
-        title="首页"
-        terminalLabel={`就业服务大厅 · ${terminalCode}`}
-        status={deviceStatus}
-        navbar={
-          <QxHomeNavbar onAction={handleAction} />
-        }
-      >
+      {/* 首页专属舞台：原稿 01-home 的品牌与时间在 Hero 内，不用 QxPageFrame 的独立顶栏。 */}
+      <div className="qx-stage" data-qx-frame="true">
         <QxHomeView
           isLoggedIn={auth.isLoggedIn}
           displayName={auth.displayName}
@@ -72,10 +66,15 @@ export function HomePage() {
           campus={campus}
           jobFair={jobFair}
           jobs={jobs}
+          terminalCode={terminalCode}
+          deviceStatus={deviceStatus}
           continueSlot={<ContinuePanel />}
           onAction={handleAction}
         />
-      </QxPageFrame>
+        <nav className="qx-navbar" aria-label="主导航">
+          <QxHomeNavbar onAction={handleAction} />
+        </nav>
+      </div>
     </div>
   )
 }
