@@ -11771,7 +11771,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 552,
+      "reachableFileCount": 555,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -11938,6 +11938,8 @@
             "apps/kiosk/src/components/kiosk-keyboard/kiosk-keyboard.css",
             "apps/kiosk/src/pages/assistant/assistant-advisor.css",
             "apps/kiosk/src/pages/assistant/assistant-batch8.css",
+            "apps/kiosk/src/pages/assistant/assistant-cockpit-body.css",
+            "apps/kiosk/src/pages/assistant/assistant-cockpit.css",
             "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
             "apps/kiosk/src/pages/assistant/assistant-lightflow-call-gate.css",
             "apps/kiosk/src/pages/assistant/assistant-lightflow-call-live.css",
@@ -14696,7 +14698,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 629
+      "sourceFileCount": 632
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
