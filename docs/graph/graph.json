@@ -11771,7 +11771,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 548,
+      "reachableFileCount": 550,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -11820,6 +11820,7 @@
           ],
           "path": "/",
           "styles": [
+            "apps/kiosk/src/pages/home/styles/home-qx-mobile.css",
             "apps/kiosk/src/pages/home/styles/home-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -14695,7 +14696,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 625
+      "sourceFileCount": 627
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17351,6 +17352,9 @@
     "apps/kiosk/src/pages/home/components/ContinuePanel.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
+    "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx": [
+      "apps/kiosk/scripts/verify-fusion-home.mjs"
+    ],
     "apps/kiosk/src/pages/home/components/HomeTile.tsx": [
       "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
@@ -17389,6 +17393,9 @@
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/home/styles/home-qx-mobile.css": [
+      "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
     "apps/kiosk/src/pages/home/styles/home-qx.css": [
       "apps/kiosk/scripts/verify-fusion-home.mjs"
@@ -20647,6 +20654,7 @@
     ],
     "services/api/src/ai/ai-public-quota.service.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts"
@@ -20690,6 +20698,7 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
+      "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
@@ -20815,14 +20824,17 @@
       "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
+      "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts"
     ],
     "services/api/src/ai/resume-parse-intent.ts": [
+      "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-resume-parse-submission.ts"
     ],
     "services/api/src/ai/resume-parse-submission.service.ts": [
+      "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-resume-parse-submission.ts"
@@ -24380,11 +24392,13 @@
         "files": [
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx",
           "apps/kiosk/src/pages/home/components/HomeTile.tsx",
           "apps/kiosk/src/pages/home/components/QxHomeView.tsx",
           "apps/kiosk/src/pages/home/homeDomainStatus.ts",
           "apps/kiosk/src/pages/home/homeV6Domains.ts",
           "apps/kiosk/src/pages/home/hooks/useHomeJobFairHighlight.ts",
+          "apps/kiosk/src/pages/home/styles/home-qx-mobile.css",
           "apps/kiosk/src/pages/home/styles/home-qx.css"
         ],
         "missing": []
@@ -32046,6 +32060,11 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume-parse-intent-runner.service.ts",
+          "services/api/src/ai/resume-parse-intent.ts",
+          "services/api/src/ai/resume-parse-submission.service.ts",
           "services/api/src/app.module.ts",
           "services/api/src/common/crypto/phone-identity.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
@@ -36045,7 +36064,6 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
-          "docs/design/kiosk-redesign-2026-08/30-my-profile.html",
           "docs/progress/project-full-audit-and-august-launch-plan-2026-06-14.md",
           "docs/reviews/delivery-readiness-audit-2026-09-05.md",
           "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",

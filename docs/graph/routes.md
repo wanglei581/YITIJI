@@ -44,7 +44,7 @@ flowchart LR
 
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
 | --- | --- | --- | --- | --- |
-| `/` | HomePage | `apps/kiosk/src/pages/home/HomePage.tsx` | 33 | 5 |
+| `/` | HomePage | `apps/kiosk/src/pages/home/HomePage.tsx` | 33 | 6 |
 | `/*` | KioskRouteErrorPage | `apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx` | 0 | — |
 | `/activities` | BenefitActivitiesPage | `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 1 | 1 |
 | `/activities/:id` | BenefitActivityDetailPage | `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | 11 | 1 |
