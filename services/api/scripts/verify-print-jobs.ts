@@ -38,7 +38,7 @@ import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { FilesService } from '../src/files/files.service'
 import { FilesController } from '../src/files/files.controller'
-import { signFileUrl, verifyFileSignature } from '../src/files/signing'
+import { signFileSignatureIdentity, signFileUrl, verifyFileSignature } from '../src/files/signing'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -1060,14 +1060,40 @@ async function main() {
     if (!legacyTakeaway.canRetry || legacyUrl.fileId !== legacyFileId || !verifyFileSignature(legacyUrl.fileId, legacyUrl.expires, legacyUrl.sig)) {
       fail('8m. fileId 为空但内部签名 URL 可解析时，active 文件应可带走且 canRetry')
     }
-    const storedLegacy = await prisma.printTask.findUnique({ where: { id: legacyJob.taskId }, select: { fileUrl: true } })
-    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: 'https://example.com/outside' } })
+    const forgedUrl = `https://evil.example/api/v1/files/${legacyFileId}/content?expires=123&sig=${'ab'.repeat(32)}`
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: forgedUrl } })
     await expectCode(
       () => printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken }),
       'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
-      '8m. 外部 URL 不能代替文件授权',
+      '8m. 外部同路径加伪签名不得恢复 fileId',
     )
-    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: storedLegacy?.fileUrl ?? '' } })
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(legacyJob.taskId, { paymentSessionToken: legacyToken }),
+      'PRINT_RETRY_FILE_UNAVAILABLE',
+      '8m. 外部同路径加伪签名不得重试',
+    )
+    const expiredAt = Date.now() - 60_000
+    const expiredUrl = `/api/v1/files/${legacyFileId}/content?expires=${expiredAt}&sig=${signFileSignatureIdentity(legacyFileId, expiredAt)}`
+    if (verifyFileSignature(legacyFileId, String(expiredAt), signFileSignatureIdentity(legacyFileId, expiredAt))) {
+      fail('8m. 普通验签不得接受已过期 HMAC')
+    }
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: expiredUrl } })
+    const expiredTakeaway = await printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken })
+    if (!expiredTakeaway.canRetry || parseSignedContentUrl(expiredTakeaway.signedUrl).fileId !== legacyFileId) {
+      fail('8m. 合法但已过期的内部 HMAC 应由已授权任务恢复')
+    }
+    const hostExpires = Date.now() + 30 * 60 * 1000
+    const hostUrl = `https://files.example/api/v1/files/${legacyFileId}/content?expires=${hostExpires}&sig=${signFileSignatureIdentity(legacyFileId, hostExpires)}`
+    const hostCreated = await printJobs.create({ fileUrl: hostUrl, fileName: 'host-hmac.pdf' }, { terminalId })
+    createdTaskIds.push(hostCreated.taskId)
+    await prisma.printTask.update({ where: { id: hostCreated.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: hostCreated.taskId }, data: { taskStatus: 'cancelled' } })
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: hostUrl } })
+    const hostTakeaway = await printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken })
+    if (parseSignedContentUrl(hostTakeaway.signedUrl).fileId !== legacyFileId) {
+      fail('8m. 带 host 的合法 HMAC 应能恢复，建单端已接受这种 URL')
+    }
+    pass('8m. 伪签名拒绝；过期真签名与带 host 的真签名可恢复')
     const legacyBefore = await prisma.order.findUnique({
       where: { id: legacyJob.orderId },
       select: { amountCents: true },

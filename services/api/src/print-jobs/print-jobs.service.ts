@@ -3,7 +3,7 @@ import { Injectable, NotFoundException, BadRequestException, Optional, ServiceUn
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
-import { signFileUrl, verifyFileSignature } from '../files/signing'
+import { parseHistoricalSignedContentFileId, signFileUrl, verifyFileSignature } from '../files/signing'
 import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { OrderStatusService } from '../payment/order-status.service'
 import {
@@ -140,15 +140,6 @@ const printJobFileSelect = {
   deletedAt: true,
   expiresAt: true,
 } as const
-
-function parseStoredPrintFileId(fileUrl: string): string | null {
-  try {
-    const u = new URL(fileUrl, 'http://internal.local')
-    return u.pathname.match(/\/files\/([^/]+)\/content$/)?.[1] ?? null
-  } catch {
-    return null
-  }
-}
 
 function printTaskNotFound(): never {
   throw new NotFoundException({
@@ -734,8 +725,13 @@ export class PrintJobsService {
         error: { code: 'PRINT_RETRY_NOT_PAID', message: '未完成支付的打印任务不能重新提交' },
       })
     }
-    const fileId = task.fileId ?? parseStoredPrintFileId(task.fileUrl)
-    if (!fileId || !isPrintableFileRecord(file)) {
+    if (!isPrintableFileRecord(file)) {
+      throw new ConflictException({
+        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+      })
+    }
+    const fileId = task.fileId ?? file.id
+    if (!fileId) {
       throw new ConflictException({
         error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
       })
@@ -873,11 +869,11 @@ export class PrintJobsService {
     const memberOk = Boolean(ctx.endUserId && task.endUserId && ctx.endUserId === task.endUserId)
     if (!session.ok && !memberOk) printTaskNotFound()
 
-    // 历史任务没有 fileId。先完成上面的支付会话或会员校验，再从已存的内部签名路径取出文件编号。
-    // 路径解析不是第二套授权；签过期的旧 URL 仍可定位文件。外部地址解析不到编号。
+    // 历史任务没有 fileId。身份校验已经完成。只接受 path 为 /api/v1/files/:id/content
+    // 且 HMAC 对得上的旧 URL；过期可以，伪签名不行。host 不参与签名。
     let file = task.file
     if (!task.fileId && !file) {
-      const legacyFileId = parseStoredPrintFileId(task.fileUrl)
+      const legacyFileId = parseHistoricalSignedContentFileId(task.fileUrl)
       if (legacyFileId) {
         file = await this.prisma.fileObject.findUnique({
           where: { id: legacyFileId },
