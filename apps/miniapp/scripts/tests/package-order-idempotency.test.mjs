@@ -1702,6 +1702,36 @@ test('简历解析意图：随机数缺失或超时失败，且只按同一 inte
   assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 0)
 })
 
+test('简历解析意图：清空写进去但回读失败时把原记录写回去', async () => {
+  const wx = resumeWx(); ACTIVE_WX = wx
+  const ready = await resumeIntent.prepare(PARSE_A, 'member-a')
+  const intent = ready.headers[resumeIntent.INTENT_HEADER]
+  const realGet = wx.getStorageSync.bind(wx)
+  let failNextRead = false
+  wx.setStorageSync = (key, value) => {
+    wx.calls.set += 1
+    if (key === resumeIntent.STORE_KEY && Array.isArray(value) && value.length === 0) failNextRead = true
+    wx.storage.set(key, JSON.parse(JSON.stringify(value)))
+  }
+  wx.getStorageSync = (key) => {
+    if (failNextRead && key === resumeIntent.STORE_KEY) {
+      failNextRead = false
+      throw new Error('readback failed')
+    }
+    return realGet(key)
+  }
+  const released = await resumeIntent.releaseHeld(
+    { ownerId: 'member-a', intent, payload: ready.payload },
+    () => true,
+  )
+  assert.equal(released.ok, false)
+  assert.equal(released.code, 'STORAGE_WRITE_FAILED')
+  const kept = wx.storage.get(resumeIntent.STORE_KEY)
+  assert.equal(kept.length, 1)
+  assert.equal(kept[0].intent, intent)
+  assert.equal(kept[0].payload.fileId, 'file-a')
+})
+
 test('简历解析意图：多条记录或非法目标字段时不继续', async () => {
   const wx = resumeWx(); ACTIVE_WX = wx
   const ready = await resumeIntent.prepare(PARSE_A, 'member-a')

@@ -6022,6 +6022,302 @@ test('RP-12 resume-parse：终态 4xx 只在回读匹配时给出明确退路，
   }
 })
 
+// 新材料撞上另一条未落定意图：空 _intent 不得谎报登录变化。同一归属两次确认才新开。
+test('RP-13 resume-parse：INTENT_CONFLICT 同一归属两次确认才新开，别人的标识只停住', async () => {
+  const intentKey = realStorage.KEYS.RESUME_PARSE_INTENT
+  const rows = (wx) => wx.storage.get(intentKey) || []
+  async function park(wx, auth, fileId) {
+    const gate = deferred()
+    const page = makePage('pages/resume-parse/resume-parse.js', {
+      auth, wx, api: { parseResume: () => gate.promise },
+    })
+    page.onLoad({ fileId, fileName: `${fileId}.pdf`, fileFormat: 'pdf' })
+    await flush()
+    page.onUnload()
+    return rows(wx)[0].intent
+  }
+  function modals(wx) {
+    const modal = []
+    wx.showModal = (opts) => { modal.push(opts) }
+    return modal
+  }
+
+  const wx = createWx()
+  const auth = createAuth(null)
+  const oldIntent = await park(wx, auth, 'file-a')
+  const modal = modals(wx)
+  const seen = []
+  let posts = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth, wx,
+    api: {
+      parseResume: (payload, headers) => {
+        posts += 1
+        seen.push({ payload, headers })
+        return Promise.resolve({ taskId: 'T-fresh', status: 'completed', accessToken: 'fresh-token' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts, 0)
+  assert.equal(page._intent || '', '')
+  assert.equal(page.data.conflict, 'fresh')
+  assert.match(page.data.unknownCause, /可能已经完成/)
+  assert.doesNotMatch(page.data.unknownCause, /尚未完成|登录状态已变化/)
+  page.replaySame()
+  page.retry()
+  await flush()
+  assert.equal(posts, 0)
+  page.confirmResubmit()
+  assert.equal(modal.length, 1)
+  assert.doesNotMatch(modal[0].content, /未完成/)
+  modal[0].success({ confirm: false })
+  assert.equal(rows(wx)[0].intent, oldIntent)
+  page.confirmResubmit()
+  modal[1].success({ confirm: true })
+  modal[2].success({ confirm: false })
+  assert.equal(posts, 0)
+  assert.equal(rows(wx)[0].intent, oldIntent)
+  page.confirmResubmit()
+  modal[3].success({ confirm: true })
+  modal[4].success({ confirm: true })
+  await flush(); await flush()
+  assert.equal(posts, 1)
+  assert.equal(seen[0].payload.fileId, 'file-b')
+  assert.notEqual(seen[0].headers['x-resume-parse-intent'], oldIntent)
+  assert.equal(page.data.done, true)
+
+  const wxOther = createWx()
+  const foreign = await park(wxOther, createAuth('member-a'), 'file-a')
+  const modalOther = modals(wxOther)
+  let otherPosts = 0
+  const pageOther = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth('member-b'), wx: wxOther,
+    api: { parseResume: () => { otherPosts += 1; return Promise.resolve({ taskId: 'T-other', status: 'completed' }) } },
+  })
+  pageOther.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(pageOther.data.conflict, 'blocked')
+  assert.doesNotMatch(pageOther.data.unknownCause, /登录状态已变化/)
+  pageOther.confirmResubmit()
+  pageOther.replaySame()
+  pageOther._startFresh()
+  await flush()
+  assert.equal(modalOther.length, 0)
+  assert.equal(otherPosts, 0)
+  assert.equal(rows(wxOther)[0].intent, foreign)
+  assert.equal(rows(wxOther)[0].ownerId, 'member-a')
+
+  const wxGen = createWx()
+  const authGen = createAuth('member-a')
+  const genIntent = await park(wxGen, authGen, 'file-a')
+  const modalGen = modals(wxGen)
+  let genPosts = 0
+  const pageGen = makePage('pages/resume-parse/resume-parse.js', {
+    auth: authGen, wx: wxGen,
+    api: { parseResume: () => { genPosts += 1; return Promise.resolve({ taskId: 'T-gen', status: 'completed' }) } },
+  })
+  pageGen.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  authGen.logout()
+  authGen.setUser('member-a')
+  pageGen.confirmResubmit()
+  modalGen[0].success({ confirm: true })
+  modalGen[1].success({ confirm: true })
+  await flush(); await flush()
+  assert.equal(genPosts, 0)
+  assert.equal(rows(wxGen)[0].intent, genIntent)
+  assert.equal(pageGen.data.conflict, 'blocked')
+  assert.match(pageGen.data.unknownCause, /登录状态已变化/)
+
+  const wxDrift = createWx()
+  const driftIntent = await park(wxDrift, createAuth(null), 'file-a')
+  const modalDrift = modals(wxDrift)
+  let driftPosts = 0
+  const pageDrift = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxDrift,
+    api: { parseResume: () => { driftPosts += 1; return Promise.resolve({ taskId: 'T-drift', status: 'completed', accessToken: 'tok' }) } },
+  })
+  pageDrift.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  const drifted = rows(wxDrift)[0]
+  wxDrift.storage.set(intentKey, [{ ...drifted, payload: { ...drifted.payload, fileId: 'file-other' } }])
+  pageDrift.confirmResubmit()
+  modalDrift[0].success({ confirm: true })
+  modalDrift[1].success({ confirm: true })
+  await flush(); await flush()
+  assert.equal(driftPosts, 0)
+  assert.equal(rows(wxDrift)[0].intent, driftIntent)
+  assert.equal(rows(wxDrift)[0].payload.fileId, 'file-other')
+  assert.equal(pageDrift.data.conflict, 'blocked')
+  assert.doesNotMatch(pageDrift.data.unknownCause, /登录状态已变化/)
+})
+
+// 已保存结果可以继续这次提交，但清除必须绑住当时的 owner、intent、payload 和任务行。
+// 任务行或载荷在 clear 之前变了，就不能把 INTENT_NOT_FOUND 当成成功，也不能自动 POST。
+test('RP-14 resume-parse：已保存结果只在任务行仍对得上时释放，变了就不清、不提交', async () => {
+  const intentKey = realStorage.KEYS.RESUME_PARSE_INTENT
+  const taskKey = realStorage.KEYS.RESUME_TASK
+  const rows = (wx) => wx.storage.get(intentKey) || []
+
+  async function seedSettled(wx, auth, fileId) {
+    const gate = deferred()
+    const page = makePage('pages/resume-parse/resume-parse.js', {
+      auth, wx, api: { parseResume: () => gate.promise },
+    })
+    page.onLoad({ fileId, fileName: `${fileId}.pdf`, fileFormat: 'pdf' })
+    await flush()
+    const intent = rows(wx)[0].intent
+    page.onUnload()
+    wx.storage.set(taskKey, {
+      taskId: 'T-old',
+      accessToken: 'old-token',
+      fileId,
+      fileName: `${fileId}.pdf`,
+      ts: 1,
+      settledIntent: intent,
+    })
+    return intent
+  }
+
+  const wxOk = createWx()
+  const oldOk = await seedSettled(wxOk, createAuth(null), 'file-a')
+  const modalOk = []
+  wxOk.showModal = (opts) => { modalOk.push(opts) }
+  const seen = []
+  let posts = 0
+  const pageOk = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxOk,
+    api: {
+      parseResume: (payload, headers) => {
+        posts += 1
+        seen.push({ payload, headers })
+        return Promise.resolve({ taskId: 'T-new', status: 'completed', accessToken: 'new-token' })
+      },
+    },
+  })
+  pageOk.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush(); await flush()
+  assert.equal(posts, 1)
+  assert.equal(modalOk.length, 0, '已保存结果对得上时，继续这次提交不必再确认两次')
+  assert.equal(seen[0].payload.fileId, 'file-b')
+  assert.notEqual(seen[0].headers['x-resume-parse-intent'], oldOk)
+  assert.equal(pageOk.data.done, true)
+
+  const wxTask = createWx()
+  const authTask = createAuth(null)
+  const oldTask = await seedSettled(wxTask, authTask, 'file-a')
+  const realGetTask = wxTask.getStorageSync
+  let taskReads = 0
+  wxTask.getStorageSync = (key) => {
+    const value = realGetTask(key)
+    if (key !== taskKey) return value
+    taskReads += 1
+    if (taskReads < 2) return value
+    const moved = { ...value, taskId: 'T-moved', settledIntent: 'not-settled', accessToken: 'other-token' }
+    wxTask.storage.set(taskKey, moved)
+    return moved
+  }
+  let taskPosts = 0
+  const pageTask = makePage('pages/resume-parse/resume-parse.js', {
+    auth: authTask, wx: wxTask,
+    api: { parseResume: () => { taskPosts += 1; return Promise.resolve({ taskId: 'T-task', status: 'completed', accessToken: 'tok' }) } },
+  })
+  pageTask.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush(); await flush()
+  assert.ok(taskReads >= 2, '释放前必须再读已保存的任务行')
+  assert.equal(taskPosts, 0)
+  assert.equal(rows(wxTask)[0].intent, oldTask)
+  assert.equal(rows(wxTask)[0].payload.fileId, 'file-a')
+  assert.equal(pageTask.data.conflict, 'fresh')
+  assert.equal(wxTask.calls.showModal.length, 0)
+  pageTask.confirmResubmit()
+  wxTask.calls.showModal[0].success({ confirm: false })
+  await flush()
+  assert.equal(taskPosts, 0, '任务行变了之后，一次确认也不能提交')
+  assert.equal(rows(wxTask)[0].intent, oldTask)
+
+  const wxPayload = createWx()
+  const oldPayload = await seedSettled(wxPayload, createAuth(null), 'file-a')
+  const realGetPayload = wxPayload.getStorageSync
+  let intentReads = 0
+  wxPayload.getStorageSync = (key) => {
+    if (key !== intentKey) return realGetPayload(key)
+    intentReads += 1
+    if (intentReads < 3) return realGetPayload(key)
+    const held = wxPayload.storage.get(intentKey)
+    const mutated = [{ ...held[0], payload: { ...held[0].payload, fileId: 'file-other' } }]
+    wxPayload.storage.set(intentKey, mutated)
+    return mutated
+  }
+  let payloadPosts = 0
+  const pagePayload = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxPayload,
+    api: { parseResume: () => { payloadPosts += 1; return Promise.resolve({ taskId: 'T-payload', status: 'completed', accessToken: 'tok' }) } },
+  })
+  pagePayload.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush(); await flush()
+  assert.ok(intentReads >= 3, '释放前必须再读本机标识')
+  assert.equal(payloadPosts, 0)
+  assert.equal(rows(wxPayload)[0].intent, oldPayload)
+  assert.equal(rows(wxPayload)[0].payload.fileId, 'file-other', '载荷已变的行不能被清掉')
+  assert.equal(pagePayload.data.conflict, 'fresh')
+  assert.doesNotMatch(pagePayload.data.unknownCause, /登录状态已变化/)
+
+  const wxGen = createWx()
+  const authGen = createAuth('member-a')
+  const oldGen = await seedSettled(wxGen, authGen, 'file-a')
+  const realGetGen = wxGen.getStorageSync
+  let genReads = 0
+  wxGen.getStorageSync = (key) => {
+    const value = realGetGen(key)
+    if (key === taskKey) {
+      genReads += 1
+      if (genReads >= 2) {
+        authGen.logout()
+        authGen.setUser('member-a')
+      }
+    }
+    return value
+  }
+  let genPosts = 0
+  const pageGen = makePage('pages/resume-parse/resume-parse.js', {
+    auth: authGen, wx: wxGen,
+    api: { parseResume: () => { genPosts += 1; return Promise.resolve({ taskId: 'T-gen', status: 'completed' }) } },
+  })
+  pageGen.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush(); await flush()
+  assert.ok(genReads >= 2)
+  assert.equal(genPosts, 0)
+  assert.equal(rows(wxGen)[0].intent, oldGen)
+  assert.equal(rows(wxGen)[0].ownerId, 'member-a')
+  assert.equal(pageGen.data.conflict, 'blocked')
+  assert.match(pageGen.data.unknownCause, /登录状态已变化/)
+  assert.equal(wxGen.calls.showModal.length, 0)
+
+  const wxAnon = createWx()
+  const oldAnon = await seedSettled(wxAnon, createAuth(null), 'file-a')
+  const task = wxAnon.storage.get(taskKey)
+  wxAnon.storage.set(taskKey, { ...task, accessToken: '' })
+  let anonPosts = 0
+  const pageAnon = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxAnon,
+    api: { parseResume: () => { anonPosts += 1; return Promise.resolve({ taskId: 'T-anon', status: 'completed', accessToken: 'tok' }) } },
+  })
+  pageAnon.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(anonPosts, 0)
+  assert.equal(pageAnon.data.conflict, 'blocked')
+  assert.equal(rows(wxAnon)[0].intent, oldAnon)
+  pageAnon.confirmResubmit()
+  pageAnon._startFresh()
+  await flush()
+  assert.equal(wxAnon.calls.showModal.length, 0)
+  assert.equal(anonPosts, 0)
+  assert.equal(rows(wxAnon)[0].intent, oldAnon)
+})
+
 // 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。
 // 这不是终态：会员任务在换回提交时的账号后，同一编号可能又读得到。页面既不能说「再查也一样」、
 // 收掉同编号查询，也不能因此自动发新 POST；新的一次只能在用户确认重复风险之后。

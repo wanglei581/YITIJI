@@ -1,9 +1,9 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
-const config = require('../../utils/config')
 const storage = require('../../utils/storage')
 const intentStore = require('../../utils/resume-parse-intent')
+const session = require('../../utils/resume-parse-session')
 
 /**
  * 本次解析包含的环节。
@@ -39,81 +39,6 @@ const UNKNOWN_CAUSE = {
   settle: '解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请点“继续打开结果”，不要开始新的解析。',
   anonToken: '这次解析有了编号，但答复里没有匿名读取凭证。请用同一次重查，不要开始新的解析。',
   anonFailed: '服务端说这次解析没有完成，但这台手机没有拿到读取凭证，不能把它当成可以查看的结果。请用同一次重查，不要开始新的解析。',
-}
-
-function nonemptyToken(value) {
-  return typeof value === 'string' && value ? value : ''
-}
-
-function sameStoredTask(saved, task) {
-  return !!saved
-    && saved.taskId === task.taskId
-    && (saved.accessToken || '') === (task.accessToken || '')
-    && (saved.settledIntent || '') === (task.settledIntent || '')
-}
-
-/** setStorageSync 不抛也可能没写进去。回读不一致就当没保存。 */
-function persistResumeTask(task) {
-  if (storage.set(storage.KEYS.RESUME_TASK, task) !== true) return false
-  const back = storage.read(storage.KEYS.RESUME_TASK)
-  return !!(back && back.ok === true && back.found && sameStoredTask(back.value, task))
-}
-
-/**
- * GET /resume/records 对「行尚未写入 / 已清理 / 令牌不符 / 不是本人」一律 404 + AI_TASK_NOT_FOUND。
- * 本页若还握着同一 owner 与同一材料的未落定意图,这是结果未就绪(解析行 kind=parse 还没落下),
- * 只能同一次重查,不能当成任务失踪去另起一次。盘上确认没有这次意图时,才走旧的身份核对。
- * 断网 / 5xx / 无错误码的 404 仍算暂时失败。
- */
-function isTaskNotFound(err) {
-  return !!err && err.statusCode === 404 && err.code === 'AI_TASK_NOT_FOUND'
-}
-
-/**
- * 只有这一对才表示 consumeOnce 在 marker / admit / provider 之前拒绝，账本停在 quota_pending。
- * FILE_NOT_FOUND 不能走这里：预检失败和已受理后文件被删都会返回它，清标识可能再扣一次。
- */
-function isExactPublicQuotaExceeded(err) {
-  return !!err && err.statusCode === 429 && err.code === 'AI_PUBLIC_QUOTA_EXCEEDED'
-}
-
-const QUOTA_REJECTED = '今日 AI 解析次数已用完，这次没有开始新的解析。'
-const QUOTA_RELEASE_FAILED = '今日 AI 解析次数已用完，但本机没能安全释放这次解析标识。请留在此页，不要开始新的解析。'
-const QUOTA_MISMATCH = '今日 AI 解析次数已用完，但本机解析标识已经对不上，没有释放，也没有另起一次解析。'
-
-/**
- * POST /resume/parse 被拒时,这一次在服务端到底跑没跑完?(与 Kiosk ResumeParsePage 同一口径)
- * - 断网 / 超时(request.js 统一给 statusCode -1)、任何 5xx(哪怕带 API 错误信封)、
- *   2xx 却被判成失败的响应体、以及其它没有状态码的异常:只说明没拿到可信答复 → 未知。
- * - 有 API 错误码的 4xx 才能确认是业务拒绝(校验、授权、限流、文件失效等)→ 明确失败。
- *   无错误码的 4xx 可能是网关代答;408 是等待超时,都算未知。
- * - 演示数据模式根本不发请求(api.js mockUnavailable)→ 明确失败。
- */
-function submitErrorOutcome(err) {
-  if (config.USE_MOCK) return 'failed'
-  if (err && err.statusCode === 409 && err.code === 'RESUME_PARSE_OUTCOME_UNKNOWN') return 'unknown'
-  if (err && err.statusCode === 404 && err.code === 'AI_TASK_NOT_FOUND') return 'unknown'
-  const code = err && err.statusCode
-  if (typeof code === 'number' && code >= 400 && code < 500 && code !== 408 && err.code) return 'failed'
-  return 'unknown'
-}
-
-function ownerId() {
-  const user = typeof auth.getUser === 'function' ? auth.getUser() : null
-  return user && typeof user.id === 'string' && user.id ? user.id : null
-}
-
-function captureIdentity() {
-  return {
-    generation: typeof auth.sessionGeneration === 'function' ? auth.sessionGeneration() : 0,
-    ownerId: ownerId(),
-  }
-}
-
-function sameIdentity(snapshot) {
-  if (!snapshot) return false
-  if (typeof auth.isSameSession === 'function' && !auth.isSameSession(snapshot.generation)) return false
-  return ownerId() === snapshot.ownerId
 }
 
 function parseJsonOption(value, fallback) {
@@ -156,6 +81,7 @@ Page({
     // 本次内容预检在调用模型之前拒绝：释放匹配标识后只引导重新上传
     fileChanged: false,
     fileChangedBlocked: false,
+    conflict: '',
     // 没有编号但已登录:这一次若已完成会进「我的 - AI 服务记录」,可去那里核对。
     canCheckRecords: false,
     // 解析参数,重试用
@@ -223,27 +149,8 @@ Page({
     return payload
   },
 
-  /**
-   * 本页是否还握着同一次意图。
-   * held:盘上就是这次的 intent、owner、payload。
-   * absent:读成功且没有这一条(旧任务,或已经换了人)。
-   * unreadable:读失败或形态坏了。不能据此另铸意图。
-   */
   _intentHold() {
-    if (!this._intent || !this._submitIdentity || !sameIdentity(this._submitIdentity) || !this._intentPayload) {
-      return 'absent'
-    }
-    const read = storage.read(intentStore.STORE_KEY)
-    if (!read || read.ok !== true) return 'unreadable'
-    if (!read.found) return 'absent'
-    const rows = read.value
-    if (!Array.isArray(rows)) return 'unreadable'
-    if (rows.length === 0) return 'absent'
-    if (rows.length !== 1) return 'unreadable'
-    const row = rows[0]
-    if (!row || row.intent !== this._intent || row.ownerId !== this._submitIdentity.ownerId) return 'absent'
-    if (JSON.stringify(row.payload) !== JSON.stringify(this._intentPayload)) return 'absent'
-    return 'held'
+    return session.intentHold(this, auth)
   },
 
   /** 已知编号的重查失败时留在同一次意图上;没有编号时保持原来的未知态。 */
@@ -265,7 +172,7 @@ Page({
       this._submitting = false
       this._replayArmed = false
     }
-    const identity = captureIdentity()
+    const identity = session.captureIdentity(auth)
     this._submitIdentity = identity
     this.setData({ atext: '正在解析简历,请勿离开…' })
     const requestPayload = this._payload()
@@ -273,28 +180,19 @@ Page({
     try {
       prepared = await intentStore.prepare(requestPayload, identity.ownerId)
     } catch (err) {
-      let blocked = err
-      // 只释放“结果凭证已经回读成功”的那一条。进行中的意图不能被新任务清掉。
-      if (blocked && blocked.code === 'INTENT_CONFLICT' && !knownTaskId && await this._releaseFinishedIntent(identity)) {
-        if (!this._stopped && sameIdentity(identity)) {
-          try {
-            prepared = await intentStore.prepare(requestPayload, identity.ownerId)
-            blocked = null
-          } catch (err2) {
-            blocked = err2
-          }
-        }
+      if (err && err.code === 'INTENT_CONFLICT' && !knownTaskId) {
+        const again = await session.takeConflict(this, auth, identity)
+        if (again) prepared = again
+        else { settle(); return }
       }
       if (!prepared) {
         settle()
-        if (this._stopped || !sameIdentity(identity)) return
-        this._stopForIntent(knownTaskId, blocked && blocked.code === 'INTENT_CONFLICT'
-          ? '本机还有另一次尚未完成的解析，不能换材料或换账号继续。'
-          : '本机没能安全准备这次解析，为避免重复调用已中止。请稍后重试。')
+        if (this._stopped || !session.sameIdentity(auth, identity)) return
+        this._stopForIntent(knownTaskId, '本机没能安全准备这次解析，为避免重复调用已中止。请稍后重试。')
         return
       }
     }
-    if (this._stopped || !sameIdentity(identity)) {
+    if (this._stopped || !session.sameIdentity(auth, identity)) {
       settle()
       return
     }
@@ -303,30 +201,31 @@ Page({
     if (knownTaskId && intent !== this._intent) {
       settle()
       await intentStore.clear(intent, identity.ownerId)
-      if (this._stopped || !sameIdentity(identity)) return
+      if (this._stopped || !session.sameIdentity(auth, identity)) return
       this._stopForIntent(knownTaskId, '这次重查没能沿用原来的解析标识，没有另起一次解析。')
       return
     }
     this._intent = intent
     this._intentPayload = prepared.payload
+    this._conflictExpected = null
     const payload = prepared.payload
     api.parseResume(payload, prepared.headers)
       .then(
         (res) => {
           settle()
-          if (this._stopped || !sameIdentity(identity)) return
+          if (this._stopped || !session.sameIdentity(auth, identity)) return
           this._handle(res, 0, knownTaskId)
         },
         (err) => {
           settle()
-          if (this._stopped || !sameIdentity(identity)) return
-          if (isExactPublicQuotaExceeded(err)) {
-            return this._releasePublicQuota(identity)
+          if (this._stopped || !session.sameIdentity(auth, identity)) return
+          if (session.isExactPublicQuotaExceeded(err)) {
+            return session.releasePublicQuota(this, auth, identity)
           }
           const terminal = intentStore.classifyKeyedTerminal(err)
-          if (terminal && terminal.kind === 'file_changed') return this._releaseFileChanged(identity)
+          if (terminal && terminal.kind === 'file_changed') return session.releaseFileChanged(this, auth, identity)
           if (terminal && terminal.kind === 'charged') return this._showChargedTerminal(identity, terminal.code)
-          if (submitErrorOutcome(err) === 'unknown') {
+          if (session.submitErrorOutcome(err) === 'unknown') {
             this._stopForIntent(knownTaskId, err && err.code === 'RESUME_PARSE_OUTCOME_UNKNOWN'
               ? '这次解析是否已经完成无法确认。请用同一次重查，不要开始新的解析。'
               : UNKNOWN_CAUSE.noReply)
@@ -345,7 +244,7 @@ Page({
    */
   async _handle(res, round, knownTaskId) {
     if (this._stopped) return
-    if (this._submitIdentity && !sameIdentity(this._submitIdentity)) return
+    if (this._submitIdentity && !session.sameIdentity(auth, this._submitIdentity)) return
     // 2xx 却没有可用的响应体(空包、截断成字符串):服务端可能已经跑完,只是答复没到齐。
     if (!res || typeof res !== 'object') {
       this._stopForIntent(knownTaskId, knownTaskId ? UNKNOWN_CAUSE.pollMalformed : UNKNOWN_CAUSE.malformed)
@@ -360,13 +259,13 @@ Page({
     const taskId = res.taskId || knownTaskId || ''
     const status = res.status
     const terminal = status === 'completed' || status === 'failed'
-    const anonymous = this._submitIdentity ? this._submitIdentity.ownerId === null : ownerId() === null
+    const anonymous = this._submitIdentity ? this._submitIdentity.ownerId === null : session.ownerId(auth) === null
     if (res.taskId) {
       // 轮询 GET 回的是落库结果,不带 accessToken;照抄 res 会把 POST 存下的令牌清空,
       // 诊断页随即 404。同一任务沿用已存令牌;换了任务绝不继承上一条的令牌。
       const prev = storage.get(storage.KEYS.RESUME_TASK) || {}
-      const keptToken = prev.taskId === res.taskId ? nonemptyToken(prev.accessToken) : ''
-      const token = nonemptyToken(res.accessToken) || keptToken
+      const keptToken = prev.taskId === res.taskId ? session.nonemptyToken(prev.accessToken) : ''
+      const token = session.nonemptyToken(res.accessToken) || keptToken
       // 匿名终态没有可读令牌时不能落空凭证、不能释放意图。同一次重查才可能把令牌补回来。
       if (terminal && anonymous && !token) {
         this._unknown(res.taskId, status === 'failed' ? UNKNOWN_CAUSE.anonFailed : UNKNOWN_CAUSE.anonToken, 'idle', {
@@ -381,8 +280,8 @@ Page({
         fileName: this.data.fileName,
         ts: Date.now(),
       }
-      if (terminal && this._intent && sameIdentity(this._submitIdentity) && (!anonymous || token)) task.settledIntent = this._intent
-      if (!persistResumeTask(task)) {
+      if (terminal && this._intent && session.sameIdentity(auth, this._submitIdentity) && (!anonymous || token)) task.settledIntent = this._intent
+      if (!session.persistResumeTask(task)) {
         // 匿名令牌只下发这一次。写盘或回读失败时留在页实例内,不释放意图、不跳诊断页。
         this._unsavedTask = task
         this._unknown(res.taskId, UNKNOWN_CAUSE.storage)
@@ -435,7 +334,7 @@ Page({
         .then(
           (r) => this._handle(r, round + 1, taskId),
           (err) => {
-            if (this._stopped || (this._submitIdentity && !sameIdentity(this._submitIdentity))) return
+            if (this._stopped || (this._submitIdentity && !session.sameIdentity(auth, this._submitIdentity))) return
             this._onRecordError(taskId, err)
           },
         )
@@ -448,11 +347,11 @@ Page({
    * 盘上没有这次意图的旧任务,仍按身份/令牌核对。
    */
   _onRecordError(taskId, err) {
-    if (isTaskNotFound(err) && this._intentHold() !== 'absent') {
+    if (session.isTaskNotFound(err) && this._intentHold() !== 'absent') {
       this._unknown(taskId, UNKNOWN_CAUSE.notReady, 'not-ready', { intentReplay: true })
       return
     }
-    if (isTaskNotFound(err)) this._unknown(taskId, UNKNOWN_CAUSE.notFound, 'not-found')
+    if (session.isTaskNotFound(err)) this._unknown(taskId, UNKNOWN_CAUSE.notFound, 'not-found')
     else this._unknown(taskId, UNKNOWN_CAUSE.pollError)
   },
 
@@ -462,95 +361,17 @@ Page({
     return saved.taskId === taskId ? (saved.accessToken || '') : ''
   },
 
-  /** 释放前盘上必须仍是这一次的 intent、owner 和规范载荷。 */
   _quotaSnapshot(identity) {
-    if (!identity || !sameIdentity(identity) || this._intentHold() !== 'held') return null
-    let payload
-    try { payload = JSON.parse(JSON.stringify(this._intentPayload)) } catch (_) { return null }
-    return {
-      generation: identity.generation,
-      ownerId: identity.ownerId,
-      intent: this._intent,
-      payload,
-    }
+    return session.quotaSnapshot(this, auth, identity)
   },
 
-  /** 会话代际、owner、intent、规范载荷都还是释放前那一组。不读盘。 */
   _quotaMemoryMatches(snapshot) {
-    if (!snapshot || !this._intent || !this._intentPayload) return false
-    const generation = typeof auth.sessionGeneration === 'function' ? auth.sessionGeneration() : 0
-    if (generation !== snapshot.generation || ownerId() !== snapshot.ownerId) return false
-    if (this._intent !== snapshot.intent) return false
-    return JSON.stringify(this._intentPayload) === JSON.stringify(snapshot.payload)
-  },
-
-  _showQuotaBlocked(message) {
-    if (this._stopped || !this._submitIdentity || !sameIdentity(this._submitIdentity)) return
-    this._fail(null, { message, quotaReleaseBlocked: true })
-  },
-
-  /**
-   * 可信额度 429：先确认四元组仍在，再清盘并回读。
-   * 成功只停在拒绝页，不自动再 POST。失败留着原标识。
-   */
-  async _releasePublicQuota(identity) {
-    const snapshot = this._quotaSnapshot(identity)
-    if (!snapshot || !this._quotaMemoryMatches(snapshot)) {
-      this._showQuotaBlocked(QUOTA_MISMATCH)
-      return
-    }
-    let released
-    try {
-      released = await intentStore.releaseHeld(snapshot, () => this._quotaMemoryMatches(snapshot))
-    } catch (e) {
-      released = { ok: false, code: 'STORAGE_WRITE_FAILED' }
-    }
-    if (this._stopped || !sameIdentity(identity) || !this._quotaMemoryMatches(snapshot)) return
-    if (!(released && released.ok) || this._intentHold() !== 'absent') {
-      const mismatched = released && (released.code === 'INTENT_NOT_HELD' || released.code === 'IDENTITY_CHANGED')
-      this._showQuotaBlocked(mismatched ? QUOTA_MISMATCH : QUOTA_RELEASE_FAILED)
-      return
-    }
-    this._intent = ''
-    this._intentPayload = null
-    this._fail(null, { message: QUOTA_REJECTED, quotaReleased: true })
-  },
-
-  /**
-   * 409 FILE_CONTENT_CHANGED：预检在额度之前把文件隔离。
-   * 只释放回读仍匹配的本机标识，不自动再 POST，也不走额度 429 的「开始新的一次」。
-   */
-  async _releaseFileChanged(identity) {
-    const copy = intentStore.terminalCopy('FILE_CONTENT_CHANGED')
-    const snapshot = this._quotaSnapshot(identity)
-    if (!snapshot || !this._quotaMemoryMatches(snapshot)) {
-      this._showFileChangedBlocked(copy.blocked)
-      return
-    }
-    let released
-    try {
-      released = await intentStore.releaseHeld(snapshot, () => this._quotaMemoryMatches(snapshot))
-    } catch (e) {
-      released = { ok: false, code: 'STORAGE_WRITE_FAILED' }
-    }
-    if (this._stopped || !sameIdentity(identity) || !this._quotaMemoryMatches(snapshot)) return
-    if (!(released && released.ok) || this._intentHold() !== 'absent') {
-      this._showFileChangedBlocked(copy.blocked)
-      return
-    }
-    this._intent = ''
-    this._intentPayload = null
-    this._fail(null, { message: copy.released, fileChanged: true })
-  },
-
-  _showFileChangedBlocked(message) {
-    if (this._stopped || !this._submitIdentity || !sameIdentity(this._submitIdentity)) return
-    this._fail(null, { message, fileChangedBlocked: true })
+    return session.quotaMemoryMatches(this, auth, snapshot)
   },
 
   /** 撤销 / 结果过期 / 结果缺失：模型可能已经跑过。不释放标识，不提供同一次重试。 */
   _showChargedTerminal(identity, code) {
-    if (this._stopped || !sameIdentity(identity)) return
+    if (this._stopped || !session.sameIdentity(auth, identity)) return
     const copy = intentStore.terminalCopy(code)
     this._terminalCode = code
     if (this._intentHold() !== 'held') {
@@ -564,7 +385,7 @@ Page({
   _saveUnsavedTask(taskId) {
     const task = this._unsavedTask
     if (!task || task.taskId !== taskId) return true
-    if (!persistResumeTask(task)) return false
+    if (!session.persistResumeTask(task)) return false
     this._unsavedTask = null
     return true
   },
@@ -575,18 +396,18 @@ Page({
   async _finishTerminal(taskId, failedError) {
     const back = storage.read(storage.KEYS.RESUME_TASK)
     const saved = back && back.ok === true && back.found ? back.value : null
-    const anonymous = this._submitIdentity ? this._submitIdentity.ownerId === null : ownerId() === null
+    const anonymous = this._submitIdentity ? this._submitIdentity.ownerId === null : session.ownerId(auth) === null
     if (!saved || saved.taskId !== taskId) {
       this._unknown(taskId, UNKNOWN_CAUSE.storage)
       return
     }
-    if (anonymous && !nonemptyToken(saved.accessToken)) {
+    if (anonymous && !session.nonemptyToken(saved.accessToken)) {
       this._unknown(taskId, failedError ? UNKNOWN_CAUSE.anonFailed : UNKNOWN_CAUSE.anonToken, 'idle', {
         intentReplay: this._intentHold() !== 'absent',
       })
       return
     }
-    if (this._intent && sameIdentity(this._submitIdentity)) {
+    if (this._intent && session.sameIdentity(auth, this._submitIdentity)) {
       if (saved.settledIntent !== this._intent) {
         const next = {
           taskId: saved.taskId,
@@ -596,14 +417,14 @@ Page({
           ts: Date.now(),
           settledIntent: this._intent,
         }
-        if (!persistResumeTask(next)) {
+        if (!session.persistResumeTask(next)) {
           this._unsavedTask = next
           this._unknown(taskId, UNKNOWN_CAUSE.storage)
           return
         }
       }
       const released = await intentStore.markSettled(this._intent, this._submitIdentity.ownerId)
-      if (this._stopped || !sameIdentity(this._submitIdentity)) return
+      if (this._stopped || !session.sameIdentity(auth, this._submitIdentity)) return
       if (!(released && (released.ok || released.code === 'INTENT_NOT_FOUND'))) {
         if (failedError) {
           this._fail(failedError)
@@ -614,7 +435,7 @@ Page({
       }
       this._intent = ''
     }
-    if (this._stopped || !sameIdentity(this._submitIdentity)) return
+    if (this._stopped || !session.sameIdentity(auth, this._submitIdentity)) return
     if (failedError) {
       this._fail(failedError)
       return
@@ -626,21 +447,6 @@ Page({
         url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}`,
       })
     }, 500)
-  },
-
-  /** 凭证里记下的已完成意图才可以清。清不掉就保持原样,不铸新的。 */
-  async _releaseFinishedIntent(identity) {
-    if (!identity || !sameIdentity(identity)) return false
-    const back = storage.read(storage.KEYS.RESUME_TASK)
-    const task = back && back.ok === true && back.found ? back.value : null
-    if (!task || typeof task.settledIntent !== 'string' || !task.settledIntent || typeof task.taskId !== 'string' || !task.taskId) return false
-    if (identity.ownerId === null && !nonemptyToken(task.accessToken)) return false
-    const rows = storage.read(intentStore.STORE_KEY)
-    if (!rows || rows.ok !== true || !rows.found || !Array.isArray(rows.value) || rows.value.length !== 1) return false
-    const row = rows.value[0]
-    if (!row || row.intent !== task.settledIntent || row.ownerId !== identity.ownerId) return false
-    const cleared = await intentStore.clear(row.intent, identity.ownerId)
-    return !!(cleared && (cleared.ok || cleared.code === 'INTENT_NOT_FOUND'))
   },
 
   async retrySettle() {
@@ -679,6 +485,7 @@ Page({
       terminalTitle: extra.terminalTitle || '',
       fileChanged: false,
       fileChangedBlocked: false,
+      conflict: extra.conflict || '',
       canCheckRecords: !taskId && auth.isLoggedIn(),
     })
   },
@@ -698,6 +505,7 @@ Page({
       terminalTitle: '',
       fileChanged: note.fileChanged === true,
       fileChangedBlocked: note.fileChangedBlocked === true,
+      conflict: '',
     })
   },
 
@@ -707,7 +515,7 @@ Page({
   },
 
   retry() {
-    if (this.data.quotaReleaseBlocked || this.data.fileChanged || this.data.fileChangedBlocked || this.data.terminalCharge || this.data.terminalBlocked) return
+    if (this.data.quotaReleaseBlocked || this.data.fileChanged || this.data.fileChangedBlocked || this.data.terminalCharge || this.data.terminalBlocked || this.data.conflict) return
     if (this.data.phase === 'missing') {
       wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
       return
@@ -720,13 +528,13 @@ Page({
 
   /** 没有任务编号时，用已经保存的同一对请求头再提交一次，不另铸意图。 */
   replaySame() {
-    if (this._terminalLocked()) return
+    if (this._terminalLocked() || this.data.conflict === 'fresh' || this.data.conflict === 'blocked') return
     if (this.data.phase !== 'unknown' || this.data.pendingTaskId || this.data.intentReplay || this._submitting) return
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
     this.setData({
       phase: 'parsing', failMsg: '', elapsed: 0, done: false,
       unknownCause: '', pendingTaskId: '', recheck: 'idle', canCheckRecords: false,
-      intentReplay: false,
+      intentReplay: false, conflict: '',
     })
     this._stopped = false
     this._startElapsed()
@@ -770,11 +578,14 @@ Page({
     if (this._submitting || this._confirming) return
     this._confirming = true
     const charged = this.data.terminalCharge
+    const fresh = this.data.conflict === 'fresh'
     wx.showModal({
       title: '重新提交是新的一次',
-      content: charged
-        ? '这次解析标识已经结束，同一标识不能恢复结果。重新提交会再调用一次 AI，生成新的一次解析。确定继续吗?'
-        : '刚才那次解析可能已经完成。重新提交会再调用一次 AI,生成新的一次解析,不会取消或覆盖刚才那次;如果刚才那次其实已经完成,就等于重复解析了一次。确定重新提交吗?',
+      content: fresh
+        ? '本机另一次解析标识还在，它可能已经完成。开始新的一次会再调用 AI，不会取消服务端可能已经完成的那一次。确定继续吗?'
+        : charged
+          ? '这次解析标识已经结束，同一标识不能恢复结果。重新提交会再调用一次 AI，生成新的一次解析。确定继续吗?'
+          : '刚才那次解析可能已经完成。重新提交会再调用一次 AI,生成新的一次解析,不会取消或覆盖刚才那次;如果刚才那次其实已经完成,就等于重复解析了一次。确定重新提交吗?',
       confirmText: '重新提交',
       cancelText: '先不提交',
       success: (r) => {
@@ -784,9 +595,11 @@ Page({
         }
         wx.showModal({
           title: '再次确认',
-          content: charged
-            ? '将清除本机这一次已结束的解析标识，并开始新的一次 AI 解析。'
-            : '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。',
+          content: fresh
+            ? '将清除本机这一条解析标识，并开始新的一次 AI 解析。如果上一次其实已经完成，这次就是另一次解析。'
+            : charged
+              ? '将清除本机这一次已结束的解析标识，并开始新的一次 AI 解析。'
+              : '将清除本机这一次解析标识，并开始新的一次 AI 解析。如果刚才那次其实已经完成，这次就是另一次解析。',
           confirmText: '开始新的一次',
           cancelText: '先不提交',
           success: (r2) => {
@@ -801,13 +614,14 @@ Page({
   },
 
   async _startFresh() {
-    if (this._submitting) return
+    if (this._submitting || this.data.conflict === 'blocked' || this.data.conflict === 'retry') return
     this._submitting = true
-    const identity = captureIdentity()
+    const identity = session.captureIdentity(auth)
+    if (this.data.conflict === 'fresh') { await session.releaseConflict(this, auth, identity); return }
     const intent = this._intent
-    if (!intent || !sameIdentity(identity)) {
+    if (!intent || !session.sameIdentity(auth, identity)) {
       this._submitting = false
-      this._unknown('', '登录状态已变化，没有开始新的一次解析。')
+      if (!this._stopped) this._unknown('', session.sameIdentity(auth, identity) ? '本机没有可清除的这次解析标识，没有开始新的一次解析。' : '登录状态已变化，没有开始新的一次解析。')
       return
     }
     if (this.data.terminalCharge) {
@@ -824,7 +638,7 @@ Page({
       } catch (e) {
         released = { ok: false, code: 'STORAGE_WRITE_FAILED' }
       }
-      if (this._stopped || !sameIdentity(identity)) {
+      if (this._stopped || !session.sameIdentity(auth, identity)) {
         this._submitting = false
         return
       }
@@ -841,13 +655,13 @@ Page({
       return
     }
     const cleared = await intentStore.clear(intent, identity.ownerId)
-    if (this._stopped || !sameIdentity(identity)) {
+    if (this._stopped || !session.sameIdentity(auth, identity)) {
       this._submitting = false
       return
     }
     if (!cleared || (!cleared.ok && cleared.code !== 'INTENT_NOT_FOUND')) {
       this._submitting = false
-      this._unknown('', '本机没能清除上一次未完成的解析，没有开始新的一次。')
+      this._unknown('', '本机没能清除上一次的解析标识，没有开始新的一次。')
       return
     }
     this._intent = ''
@@ -859,7 +673,8 @@ Page({
   _resubmitAllowed() {
     const d = this.data
     if (d.intentReplay || d.settleBlocked || d.quotaReleaseBlocked || d.terminalBlocked || d.fileChanged || d.fileChangedBlocked) return false
-    if (d.terminalCharge) return d.phase === 'unknown' && !d.pendingTaskId
+    if (d.conflict === 'blocked' || d.conflict === 'retry') return false
+    if (d.conflict === 'fresh' || d.terminalCharge) return d.phase === 'unknown' && !d.pendingTaskId
     return d.phase === 'unknown' && (!d.pendingTaskId || d.recheck === 'not-found')
   },
 
@@ -872,7 +687,7 @@ Page({
       phase: 'parsing', failMsg: '', elapsed: 0, done: false,
       unknownCause: '', pendingTaskId: '', recheck: 'idle', canCheckRecords: false,
       intentReplay: false, quotaReleased: false, quotaReleaseBlocked: false,
-      terminalCharge: false, terminalBlocked: false, fileChanged: false, fileChangedBlocked: false,
+      terminalCharge: false, terminalBlocked: false, fileChanged: false, fileChangedBlocked: false, conflict: '',
     })
     this._stopped = false
     this._startElapsed()
@@ -912,11 +727,11 @@ Page({
         (err) => {
           settle()
           if (this._stopped) return
-          if (isTaskNotFound(err) && this._intentHold() !== 'absent') {
+          if (session.isTaskNotFound(err) && this._intentHold() !== 'absent') {
             this.setData({ recheck: 'not-ready', intentReplay: true, unknownCause: UNKNOWN_CAUSE.notReady })
             return
           }
-          if (isTaskNotFound(err)) this.setData({ recheck: 'not-found', intentReplay: false, unknownCause: UNKNOWN_CAUSE.notFound })
+          if (session.isTaskNotFound(err)) this.setData({ recheck: 'not-found', intentReplay: false, unknownCause: UNKNOWN_CAUSE.notFound })
           else this.setData({ recheck: 'error', intentReplay: false })
         },
       )

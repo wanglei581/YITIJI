@@ -4,7 +4,7 @@
     <view class="nav-back tap" hover-class="tap-press" bindtap="back">
       <text class="ficon i-right nav-back-ic"></text>
     </view>
-    <view class="nav-title">{{fileChanged || fileChangedBlocked ? '请重新上传' : terminalCharge || terminalBlocked ? '原标识已结束' : phase === 'unknown' ? '解析结果未知' : 'AI 解析中'}}</view>
+    <view class="nav-title">{{fileChanged || fileChangedBlocked ? '请重新上传' : terminalCharge || terminalBlocked ? '原标识已结束' : conflict === 'blocked' ? '不能开始这次解析' : conflict ? '另一次标识还在' : phase === 'unknown' ? '解析结果未知' : 'AI 解析中'}}</view>
     <view style="width:64rpx"></view>
   </view>
 
@@ -49,6 +49,9 @@
       <view wx:elif="{{terminalBlocked}}" class="unknown-next">没有清除本机标识，也没有另起一次解析。</view>
       <view wx:elif="{{settleBlocked}}" class="unknown-next">读取凭证已留在本机。点“继续打开结果”只会再次尝试释放这一次的解析标识，不会另起一次解析。</view>
       <view wx:elif="{{intentReplay}}" class="unknown-next">结果还没写入完成。点“同一次重查”会用原来的解析标识再提交一次，并核对还是不是同一个任务编号，不会另起一次解析。</view>
+      <view wx:elif="{{conflict === 'fresh'}}" class="unknown-next">连续确认两次后才会清除本机这一条标识并开始新的一次，那会调用 AI。本页不会自动提交。</view>
+      <view wx:elif="{{conflict === 'blocked'}}" class="unknown-next">没有清除本机标识，也没有开始新的一次解析。</view>
+      <view wx:elif="{{conflict}}" class="unknown-next">点“继续提交这次材料”会先核对并释放上次已保存结果的标识；成功后才提交这次材料并调用 AI。本页不会自行提交。</view>
       <view wx:elif="{{pendingTaskId && recheck !== 'not-found'}}" class="unknown-next">已收到本次任务编号。点击下方“查询本次结果”会按同一编号查询，不会再次提交解析。</view>
       <!-- 没有本次意图的旧任务：404 不区分原因，只给核对方向。换回提交时的账号后同一编号可能又读得到。 -->
       <view wx:elif="{{pendingTaskId}}" class="unknown-next">如果提交后退出过登录或换过账号，请先换回提交时的账号，再点“查询本次结果”按同一编号查询，或到 AI 服务记录查看。</view>
@@ -58,7 +61,7 @@
       <view wx:elif="{{recheck === 'malformed'}}" class="unknown-next">查询答复不完整，仍无法确认结果；稍后可按同一编号再查。</view>
       <view wx:if="{{canCheckRecords || recheck === 'not-found'}}" class="unknown-link tap" hover-class="tap-press" bindtap="toAiRecords" role="button" aria-label="到我的 AI 服务记录核对">到我的 AI 服务记录核对</view>
       <view wx:if="{{pendingTaskId && recheck === 'not-found' && !intentReplay && !settleBlocked}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
-      <view wx:if="{{!pendingTaskId && !intentReplay && !settleBlocked && !terminalCharge && !terminalBlocked}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
+      <view wx:if="{{!pendingTaskId && !conflict && !intentReplay && !settleBlocked && !terminalCharge && !terminalBlocked}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
     </view>
 
     <!-- 无待解析文件 -->
@@ -122,6 +125,10 @@
       <text class="ficon i-info n-ic"></text>
       <view>刚才那次可能已经完成。本页不会自动重新提交；“同一次重查”使用原来的解析标识，不会开始新的一次解析。</view>
     </view>
+    <view wx:elif="{{phase === 'unknown' && conflict}}" class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <view>本页不会自动重新提交。另一次解析可能已经完成。</view>
+    </view>
     <view wx:elif="{{phase === 'unknown' && pendingTaskId && recheck !== 'not-found' && !intentReplay}}" class="notice warn">
       <text class="ficon i-info n-ic"></text>
       <view>刚才那次可能已经完成。本页不会自动重新提交；“查询本次结果”只按同一编号读取，不会再次解析。</view>
@@ -148,7 +155,9 @@
       <view class="btn ghost tap" bindtap="toUpload">重新选择</view>
       <button wx:if="{{settleBlocked}}" class="btn primary flex-1-5 unknown-action" disabled="{{recheck === 'checking'}}" bindtap="retrySettle">继续打开结果</button>
       <button wx:elif="{{terminalCharge}}" class="btn primary flex-1-5 unknown-action" bindtap="confirmResubmit">重新解析（新的一次）</button>
-      <button wx:elif="{{terminalBlocked}}" class="btn primary flex-1-5" disabled>暂不能开始新的一次</button>
+      <button wx:elif="{{terminalBlocked || conflict === 'blocked'}}" class="btn primary flex-1-5" disabled>暂不能开始新的一次</button>
+      <button wx:elif="{{conflict === 'fresh'}}" class="btn primary flex-1-5 unknown-action" bindtap="confirmResubmit">重新解析（新的一次）</button>
+      <button wx:elif="{{conflict === 'retry'}}" class="btn primary flex-1-5 unknown-action" bindtap="replaySame">继续提交这次材料</button>
       <button wx:elif="{{pendingTaskId && intentReplay}}" class="btn primary flex-1-5 unknown-action" disabled="{{recheck === 'checking'}}" bindtap="replayKnown">同一次重查</button>
       <button wx:elif="{{pendingTaskId}}" class="btn primary flex-1-5 unknown-action" disabled="{{recheck === 'checking'}}" bindtap="recheck">{{recheck === 'checking' ? '正在查询…' : '查询本次结果'}}</button>
       <button wx:else class="btn primary flex-1-5 unknown-action" disabled="{{recheck === 'checking'}}" bindtap="replaySame">同一次重查</button>

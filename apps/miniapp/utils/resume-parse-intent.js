@@ -288,9 +288,15 @@ function releaseHeldBody(expected, confirm) {
   const row = loaded.records.length === 1 ? loaded.records[0] : null
   if (!matchesHeld(row, expected)) return { ok: false, code: 'INTENT_NOT_HELD' }
   if (!stillConfirmed(confirm)) return { ok: false, code: 'IDENTITY_CHANGED' }
-  if (!writeRecords([])) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+  if (!writeRecords([])) {
+    storage.set(STORE_KEY, [row])
+    return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+  }
   const back = loadRecords()
-  if (back.error || back.records.length !== 0) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+  if (back.error || back.records.length !== 0) {
+    if (back.error) storage.set(STORE_KEY, [row])
+    return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+  }
   if (!stillConfirmed(confirm)) {
     if (!writeRecords([row])) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
     const restored = loadRecords()
@@ -304,6 +310,64 @@ function releaseHeldBody(expected, confirm) {
 
 function releaseHeld(expected, confirm) {
   return enqueue(() => Promise.resolve(releaseHeldBody(expected, confirm)))
+}
+
+function normalizeOwner(ownerIdentity) {
+  if (ownerIdentity === null) return null
+  if (typeof ownerIdentity === 'string' && ownerIdentity) return ownerIdentity
+  return undefined
+}
+
+function settledProof(task) {
+  if (!task || typeof task !== 'object') return null
+  if (typeof task.taskId !== 'string' || !task.taskId) return null
+  if (typeof task.settledIntent !== 'string' || !task.settledIntent) return null
+  return {
+    taskId: task.taskId,
+    settledIntent: task.settledIntent,
+    accessToken: typeof task.accessToken === 'string' ? task.accessToken : '',
+  }
+}
+
+function settledTask(task, row) {
+  const proof = settledProof(task)
+  return !!(proof && proof.settledIntent === row.intent)
+}
+
+/**
+ * 只读。fresh 要两次确认后才按 owner+intent+payload 释放。
+ * release 只交出当时的 owner、intent、payload 和任务行快照，不写盘，不 POST。
+ * 调用方必须用 releaseHeld 绑这三项，并在写前写后再核对任务行；不能只按 intent 清除。
+ */
+function assessConflictBody(ownerIdentity, requestPayload, task) {
+  const ownerId = normalizeOwner(ownerIdentity)
+  if (ownerId === undefined) return { action: 'blocked', code: 'OWNER_INVALID' }
+  const loaded = loadRecords()
+  if (loaded.error) return { action: 'blocked', code: loaded.error }
+  if (loaded.records.length !== 1 || !validRecord(loaded.records[0])) return { action: 'blocked', code: 'INTENT_NOT_HELD' }
+  const row = loaded.records[0]
+  if (row.ownerId !== ownerId) return { action: 'blocked', code: 'OTHER_OWNER' }
+  const payload = canonicalPayload(row.payload)
+  if (!payload) return { action: 'blocked', code: 'STORAGE_CORRUPT' }
+  if (settledTask(task, row)) {
+    const settled = settledProof(task)
+    if (ownerId === null && !settled.accessToken) return { action: 'blocked', code: 'CREDENTIAL' }
+    return { action: 'release', expected: { ownerId, intent: row.intent, payload }, settled }
+  }
+  const requested = canonicalPayload(requestPayload)
+  if (requested && samePayload(payload, requested)) return { action: 'reuse' }
+  return { action: 'fresh', expected: { ownerId, intent: row.intent, payload } }
+}
+
+function assessConflict(ownerIdentity, requestPayload, task) {
+  return enqueue(() => Promise.resolve(assessConflictBody(ownerIdentity, requestPayload, task)))
+}
+
+function conflictLead(mode) {
+  if (mode === 'fresh') return '本机还保存着另一次解析标识，材料和这次文件不同。那一次可能已经完成，这台手机不能确认。这次没有提交。'
+  if (mode === 'retry') return '本机还留着另一次已保存结果的解析标识，这次没能释放，所以没有提交。'
+  if (mode === 'login') return '登录状态已变化，没有清除本机标识，也没有开始新的一次解析。'
+  return '本机这条解析标识不能安全清除。这次没有提交，也没有另起一次。'
 }
 
 /**
@@ -351,6 +415,8 @@ module.exports = {
   markSettled,
   clear,
   releaseHeld,
+  assessConflict,
+  conflictLead,
   classifyKeyedTerminal,
   terminalCopy,
 }
