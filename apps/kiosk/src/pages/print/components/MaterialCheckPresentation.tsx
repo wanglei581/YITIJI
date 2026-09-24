@@ -28,6 +28,8 @@ export interface MaterialCheckPresentationProps {
   inspection: { pageLabel: string; canPrint: boolean | null; messages: readonly string[] } | null
   normalization: { targetPaperSize: string; canNormalize: boolean | null; messages: readonly string[] } | null
   privacyModeWarning: string | null
+  /** 非警告性质的扫描说明（如历史 skipped_non_document）：不阻断、不给重试按钮，但也不说成已真实扫描。 */
+  privacyModeNotice?: string | null
   demoMode: boolean
   findings: readonly MaterialFindingPresentation[]
   requiresFormatReview: boolean
@@ -132,13 +134,24 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
 
         {props.stage === 'review' ? (
           <div className="qpd-review">
+            {props.error ? (
+              <div className="qx-state" data-tone="error" role="alert">
+                <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
+                <div>
+                  <div className="qx-state-t">遮挡处理未完成</div>
+                  <p className="qx-state-d">{props.error}</p>
+                </div>
+              </div>
+            ) : null}
             <section className="qpd-result" data-warning={props.privacyModeWarning ? 'true' : undefined}>
               {props.privacyModeWarning ? <AlertCircleIcon aria-hidden="true" /> : <FileCheckIcon aria-hidden="true" />}
               <div>
-                <h2>{props.privacyModeWarning ?? (props.findings.length > 0 ? `发现 ${props.findings.length} 个需确认片段` : '检查完成，请自行再核对')}</h2>
+                <h2>{props.privacyModeWarning ?? props.privacyModeNotice ?? (props.findings.length > 0 ? `发现 ${props.findings.length} 个需确认片段` : '检查完成，请自行再核对')}</h2>
                 <p>
                   {props.privacyModeWarning
                     ? '扫描结果不完整，页面不会把它说成“没有隐私信息”。'
+                    : props.privacyModeNotice
+                      ? '本次没有做内容扫描，页面不会把它说成“没有隐私信息”，请结合预览自行确认。'
                     : props.findings.length > 0
                       ? '逐项选择保留或遮挡。全部决定并完成真实遮挡处理后，才能进入打印参数。'
                       : '规则没有检出片段不等于文件一定没有隐私，请结合预览自行确认。'}
@@ -179,7 +192,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                 <span className="qx-state-ic">{props.requiresFormatReview ? <AlertCircleIcon /> : <CheckCircleIcon />}</span>
                 <div>
                   <div className="qx-state-t">{props.requiresFormatReview ? '当前文件不能直接打印' : '没有待处理的隐私片段'}</div>
-                  <p className="qx-state-d">{props.requiresFormatReview ? '返回上传页重新选择文件。' : '预检已经真实完成；下一步仍需逐页核对预览和打印参数。'}</p>
+                  <p className="qx-state-d">{props.requiresFormatReview ? '返回上传页重新选择文件。' : props.privacyModeNotice ? '本次未做内容扫描；下一步仍需逐页核对预览和打印参数。' : '预检已经真实完成；下一步仍需逐页核对预览和打印参数。'}</p>
                 </div>
               </div>
             ) : (
