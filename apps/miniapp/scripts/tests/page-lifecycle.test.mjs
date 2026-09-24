@@ -5604,6 +5604,90 @@ test('RP-8 resume-parse：意图仍在时 GET 404 只停在同一次重查，复
   assert.equal(posts.length, 2)
 })
 
+test('RP-9 resume-parse：静默丢写不算保存；意图释放失败时不导航，存储恢复后才能开始下一次', async () => {
+  const wx = createWx()
+  const originalSet = wx.setStorageSync
+  let dropTask = true
+  let dropIntentClear = false
+  wx.setStorageSync = (key, value) => {
+    if (dropTask && key === realStorage.KEYS.RESUME_TASK) return
+    if (dropIntentClear && key === realStorage.KEYS.RESUME_PARSE_INTENT && Array.isArray(value) && value.length === 0) return
+    return originalSet(key, value)
+  }
+  let posts = 0
+  let gets = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: () => {
+        posts += 1
+        return Promise.resolve({ taskId: 'T-silent', status: 'completed', accessToken: 'silent-token' })
+      },
+      getResumeRecord: (taskId, token) => {
+        gets += 1
+        return Promise.resolve({ taskId, status: 'completed' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F-silent', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts, 1)
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.done, false)
+  assert.equal(page.data.settleBlocked, false)
+  assert.equal(wx.calls.redirectTo.length, 0)
+  assert.equal(wx.storage.has(realStorage.KEYS.RESUME_TASK), false, '静默丢写后盘上不能出现令牌')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1, '令牌没落盘时必须留着原意图')
+  page.confirmResubmit()
+  assert.equal(wx.calls.showModal.length, 0, '未保存凭证时不得开放新意图')
+  page.recheck()
+  assert.equal(gets, 0, '回读仍失败时不得发出缺令牌的 GET')
+  assert.equal(posts, 1)
+
+  dropTask = false
+  dropIntentClear = true
+  page.recheck()
+  await flush()
+  assert.equal(gets, 1)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'silent-token')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).settledIntent, wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT)[0].intent)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1, '释放写失败时意图还在')
+  assert.equal(page.data.settleBlocked, true)
+  assert.equal(page.data.done, false)
+  assert.equal(wx.calls.redirectTo.length, 0, '意图没释放不得假装完成并跳走')
+  page.confirmResubmit()
+  assert.equal(wx.calls.showModal.length, 0)
+  page.retrySettle()
+  await flush()
+  assert.equal(page.data.settleBlocked, true, '释放仍然丢写时留在原页')
+  assert.equal(posts, 1)
+
+  let postsB = 0
+  const pageB = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: (_payload, headers) => {
+        postsB += 1
+        return Promise.resolve({ taskId: 'T-next', status: 'completed', accessToken: 'next-token', headers })
+      },
+      getResumeRecord: () => Promise.resolve({ taskId: 'T-next', status: 'completed' }),
+    },
+  })
+  pageB.onLoad({ fileId: 'F-next', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(postsB, 0, '清不掉已完成意图时，新材料不得发出 POST')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'silent-token')
+
+  dropIntentClear = false
+  pageB.replaySame()
+  await flush()
+  assert.equal(postsB, 1, '存储恢复后，已完成的旧意图可以被释放并开始新的一次')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'next-token')
+  assert.equal(pageB.data.done, true)
+  assert.equal(posts, 1)
+})
+
 // 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。
 // 这不是终态：会员任务在换回提交时的账号后，同一编号可能又读得到。页面既不能说「再查也一样」、
 // 收掉同编号查询，也不能因此自动发新 POST；新的一次只能在用户确认重复风险之后。
@@ -5709,7 +5793,8 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
   const wxss = fs.readFileSync(path.join(MINIAPP, 'pages/resume-parse/resume-parse.wxss'), 'utf8')
   assert.doesNotMatch(wxml, /同样结果|不必再等|再查也会/, '身份恢复后可能读得到，不得断言再查无用')
   assert.match(wxml, /<button wx:elif="\{\{pendingTaskId\}\}"[^>]*bindtap="recheck"/, '没有意图重放时，有编号仍按同一编号查询')
-  assert.match(wxml, /<button wx:if="\{\{pendingTaskId && intentReplay\}\}"[^>]*bindtap="replayKnown"/, '意图仍在时优先同一次重查')
+  assert.match(wxml, /<button wx:elif="\{\{pendingTaskId && intentReplay\}\}"[^>]*bindtap="replayKnown"/, '意图仍在时优先同一次重查')
+  assert.match(wxml, /<button wx:if="\{\{settleBlocked\}\}"[^>]*bindtap="retrySettle"/, '凭证已保存但意图没释放时只重试释放')
   assert.match(wxml, /换回提交时的账号/)
   const queryable = wxml.match(/<view wx:elif="\{\{phase === 'unknown' && pendingTaskId && recheck !== 'not-found' && !intentReplay\}\}" class="notice warn">([\s\S]*?)<\/view>\s*<\/view>/)
   assert.ok(queryable, '有编号可查时要有单独的提示')

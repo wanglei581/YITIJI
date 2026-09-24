@@ -36,6 +36,21 @@ const UNKNOWN_CAUSE = {
   notFound: '解析已经提交并拿到了编号,但以这台手机当前的登录状态和读取凭证,查不到这一次的结果。',
   notReady: '解析已经提交并拿到了编号,但结果还没有写入完成,这台手机暂时读不到。请用同一次重查,不要开始新的解析。',
   storage: '本机暂时无法保存这次解析的读取凭证。请留在此页,点“查询本次结果”重试保存并查询;退出后匿名结果可能无法找回。',
+  settle: '解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请点“继续打开结果”，不要开始新的解析。',
+}
+
+function sameStoredTask(saved, task) {
+  return !!saved
+    && saved.taskId === task.taskId
+    && (saved.accessToken || '') === (task.accessToken || '')
+    && (saved.settledIntent || '') === (task.settledIntent || '')
+}
+
+/** setStorageSync 不抛也可能没写进去。回读不一致就当没保存。 */
+function persistResumeTask(task) {
+  if (storage.set(storage.KEYS.RESUME_TASK, task) !== true) return false
+  const back = storage.read(storage.KEYS.RESUME_TASK)
+  return !!(back && back.ok === true && back.found && sameStoredTask(back.value, task))
 }
 
 /**
@@ -110,6 +125,8 @@ Page({
     recheck: 'idle', // idle | checking | not-ready | error | malformed | not-found
     // 未落定意图还在时,已知编号的 GET 404 只允许同一次 POST 重查,不开放新意图
     intentReplay: false,
+    // 凭证已回读成功,但释放意图失败:只重试释放,不另起一次
+    settleBlocked: false,
     // 没有编号但已登录:这一次若已完成会进「我的 - AI 服务记录」,可去那里核对。
     canCheckRecords: false,
     // 解析参数,重试用
@@ -225,12 +242,26 @@ Page({
     try {
       prepared = await intentStore.prepare(requestPayload, identity.ownerId)
     } catch (err) {
-      settle()
-      if (this._stopped || !sameIdentity(identity)) return
-      this._stopForIntent(knownTaskId, err && err.code === 'INTENT_CONFLICT'
-        ? '本机还有另一次尚未完成的解析，不能换材料或换账号继续。'
-        : '本机没能安全准备这次解析，为避免重复调用已中止。请稍后重试。')
-      return
+      let blocked = err
+      // 只释放“结果凭证已经回读成功”的那一条。进行中的意图不能被新任务清掉。
+      if (blocked && blocked.code === 'INTENT_CONFLICT' && !knownTaskId && await this._releaseFinishedIntent(identity)) {
+        if (!this._stopped && sameIdentity(identity)) {
+          try {
+            prepared = await intentStore.prepare(requestPayload, identity.ownerId)
+            blocked = null
+          } catch (err2) {
+            blocked = err2
+          }
+        }
+      }
+      if (!prepared) {
+        settle()
+        if (this._stopped || !sameIdentity(identity)) return
+        this._stopForIntent(knownTaskId, blocked && blocked.code === 'INTENT_CONFLICT'
+          ? '本机还有另一次尚未完成的解析，不能换材料或换账号继续。'
+          : '本机没能安全准备这次解析，为避免重复调用已中止。请稍后重试。')
+        return
+      }
     }
     if (this._stopped || !sameIdentity(identity)) {
       settle()
@@ -275,7 +306,7 @@ Page({
    * 否则页面被切走就永久丢失读取权限。
    * @param {string} knownTaskId 轮询 / 再查时本来就知道的编号;POST 首答传空串
    */
-  _handle(res, round, knownTaskId) {
+  async _handle(res, round, knownTaskId) {
     if (this._stopped) return
     if (this._submitIdentity && !sameIdentity(this._submitIdentity)) return
     // 2xx 却没有可用的响应体(空包、截断成字符串):服务端可能已经跑完,只是答复没到齐。
@@ -289,6 +320,9 @@ Page({
       return
     }
 
+    const taskId = res.taskId || knownTaskId || ''
+    const status = res.status
+    const terminal = status === 'completed' || status === 'failed'
     if (res.taskId) {
       // 轮询 GET 回的是落库结果,不带 accessToken;照抄 res 会把 POST 存下的令牌清空,
       // 诊断页随即 404。同一任务沿用已存令牌;换了任务绝不继承上一条的令牌。
@@ -301,8 +335,9 @@ Page({
         fileName: this.data.fileName,
         ts: Date.now(),
       }
-      if (!storage.set(storage.KEYS.RESUME_TASK, task)) {
-        // 匿名令牌只下发这一次。写盘失败时留在页实例内,不跳诊断页、也不再 POST。
+      if (terminal && this._intent && sameIdentity(this._submitIdentity)) task.settledIntent = this._intent
+      if (!persistResumeTask(task)) {
+        // 匿名令牌只下发这一次。写盘或回读失败时留在页实例内,不释放意图、不跳诊断页。
         this._unsavedTask = task
         this._unknown(res.taskId, UNKNOWN_CAUSE.storage)
         return
@@ -310,33 +345,22 @@ Page({
       this._unsavedTask = null
     }
 
-    const taskId = res.taskId || knownTaskId || ''
-    const status = res.status
-
     if (status === 'completed') {
       // 说完成却没给编号:诊断页无从读取这一次,不能带个空编号过去碰运气。
       if (!taskId) {
         this._unknown('', UNKNOWN_CAUSE.malformed)
         return
       }
-      this.setData({ phase: 'parsing', done: true, atext: '解析完成' })
-      if (this._intent && sameIdentity(this._submitIdentity)) {
-        intentStore.markSettled(this._intent, this._submitIdentity.ownerId)
-      }
-      setTimeout(() => {
-        if (this._stopped) return
-        wx.redirectTo({
-          url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}`,
-        })
-      }, 500)
+      await this._finishTerminal(taskId, null)
       return
     }
 
     if (status === 'failed') {
-      if (taskId && this._intent && sameIdentity(this._submitIdentity)) {
-        intentStore.markSettled(this._intent, this._submitIdentity.ownerId)
+      if (!taskId) {
+        this._fail(new Error(res.failReason || 'AI 解析未能完成'))
+        return
       }
-      this._fail(new Error(res.failReason || 'AI 解析未能完成'))
+      await this._finishTerminal(taskId, new Error(res.failReason || 'AI 解析未能完成'))
       return
     }
 
@@ -392,13 +416,91 @@ Page({
     return saved.taskId === taskId ? (saved.accessToken || '') : ''
   },
 
-  /** 只重试保存当前页已经收到的凭证;未保存成功前不发 GET 或第二次 POST。 */
+  /** 只重试保存当前页已经收到的凭证;回读不一致前不发 GET 或第二次 POST。 */
   _saveUnsavedTask(taskId) {
     const task = this._unsavedTask
     if (!task || task.taskId !== taskId) return true
-    if (!storage.set(storage.KEYS.RESUME_TASK, task)) return false
+    if (!persistResumeTask(task)) return false
     this._unsavedTask = null
     return true
+  },
+
+  /**
+   * 终态而且凭证回读成功之后才释放意图。释放失败就留在本页,不导航。
+   */
+  async _finishTerminal(taskId, failedError) {
+    const back = storage.read(storage.KEYS.RESUME_TASK)
+    const saved = back && back.ok === true && back.found ? back.value : null
+    if (!saved || saved.taskId !== taskId) {
+      this._unknown(taskId, UNKNOWN_CAUSE.storage)
+      return
+    }
+    if (this._intent && sameIdentity(this._submitIdentity)) {
+      if (saved.settledIntent !== this._intent) {
+        const next = {
+          taskId: saved.taskId,
+          accessToken: saved.accessToken || '',
+          fileId: saved.fileId || this.data.fileId,
+          fileName: saved.fileName || this.data.fileName,
+          ts: Date.now(),
+          settledIntent: this._intent,
+        }
+        if (!persistResumeTask(next)) {
+          this._unsavedTask = next
+          this._unknown(taskId, UNKNOWN_CAUSE.storage)
+          return
+        }
+      }
+      const released = await intentStore.markSettled(this._intent, this._submitIdentity.ownerId)
+      if (this._stopped || !sameIdentity(this._submitIdentity)) return
+      if (!(released && (released.ok || released.code === 'INTENT_NOT_FOUND'))) {
+        if (failedError) {
+          this._fail(failedError)
+          return
+        }
+        this._unknown(taskId, UNKNOWN_CAUSE.settle, 'idle', { settleBlocked: true })
+        return
+      }
+      this._intent = ''
+    }
+    if (this._stopped || !sameIdentity(this._submitIdentity)) return
+    if (failedError) {
+      this._fail(failedError)
+      return
+    }
+    this.setData({ phase: 'parsing', done: true, atext: '解析完成', settleBlocked: false })
+    setTimeout(() => {
+      if (this._stopped) return
+      wx.redirectTo({
+        url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}`,
+      })
+    }, 500)
+  },
+
+  /** 凭证里记下的已完成意图才可以清。清不掉就保持原样,不铸新的。 */
+  async _releaseFinishedIntent(identity) {
+    if (!identity || !sameIdentity(identity)) return false
+    const back = storage.read(storage.KEYS.RESUME_TASK)
+    const task = back && back.ok === true && back.found ? back.value : null
+    if (!task || typeof task.settledIntent !== 'string' || !task.settledIntent || typeof task.taskId !== 'string' || !task.taskId) return false
+    const rows = storage.read(intentStore.STORE_KEY)
+    if (!rows || rows.ok !== true || !rows.found || !Array.isArray(rows.value) || rows.value.length !== 1) return false
+    const row = rows.value[0]
+    if (!row || row.intent !== task.settledIntent || row.ownerId !== identity.ownerId) return false
+    const cleared = await intentStore.clear(row.intent, identity.ownerId)
+    return !!(cleared && (cleared.ok || cleared.code === 'INTENT_NOT_FOUND'))
+  },
+
+  async retrySettle() {
+    if (!this.data.settleBlocked || this._settling) return
+    const taskId = this.data.pendingTaskId
+    if (!taskId) return
+    this._settling = true
+    try {
+      await this._finishTerminal(taskId, null)
+    } finally {
+      this._settling = false
+    }
   },
 
   /**
@@ -417,6 +519,7 @@ Page({
       pendingTaskId: taskId || '',
       recheck,
       intentReplay: extra.intentReplay === true,
+      settleBlocked: extra.settleBlocked === true,
       canCheckRecords: !taskId && auth.isLoggedIn(),
     })
   },
@@ -544,7 +647,7 @@ Page({
   /** 新一次 POST 只在两种未知态开放:没有编号;或有编号但当前身份/令牌下查不到。意图重查态不开放。 */
   _resubmitAllowed() {
     const d = this.data
-    if (d.intentReplay) return false
+    if (d.intentReplay || d.settleBlocked) return false
     return d.phase === 'unknown' && (!d.pendingTaskId || d.recheck === 'not-found')
   },
 
