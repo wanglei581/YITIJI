@@ -6,8 +6,8 @@
 <title>服务中心 · 职易达</title>
 <style>
 :root{
-  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--muted:#64766f;--line:#ddd7c8;
-  --deep:#0b2b24;--teal:#16866f;--mint:#dff2eb;--blue:#376da7;--blue-soft:#e7eef7;
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--muted:#5d6e67;--line:#ddd7c8;
+  --deep:#0b2b24;--teal:#137662;--mint:#dff2eb;--blue:#376da7;--blue-soft:#e7eef7;
   --amber:#b87518;--amber-soft:#f8ecd6;--clay:#a95336;--clay-soft:#f6e7df;
   --plum:#75558b;--plum-soft:#eee7f3;--neutral:#52645d;--neutral-soft:#e9eee9;
   --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;
@@ -17,6 +17,7 @@
 html,body{width:100%;height:100%;overflow:hidden;background:#e8e3d7;color:var(--ink);font-family:var(--sans)}
 a,button{font:inherit;color:inherit;text-decoration:none}
 button{border:0}
+a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
 #viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
 #stage{width:1080px;height:1920px;position:relative;overflow:hidden;transform-origin:center;background:var(--paper)}
 .screen{height:100%;display:flex;flex-direction:column}
@@ -29,7 +30,7 @@ button{border:0}
 .status i{width:11px;height:11px;border-radius:50%;background:#87958f}.status.warn{background:var(--amber-soft);color:#775016}.status.warn i{background:var(--amber)}
 .hero{height:216px;flex:none;margin:20px 44px 0;padding:28px 42px 26px;background:var(--deep);border-radius:36px;color:#f7f3e8;display:flex;gap:24px;align-items:center}
 .hero-avatar{width:100px;height:100px;flex:none;border:1.5px solid rgba(46,230,168,.4);border-radius:50%;display:grid;place-items:center;color:#46e0b5;font:900 46px/1 var(--serif);background:rgba(46,230,168,.1)}
-.hero-main{flex:1;min-width:0}.eyebrow{color:rgba(242,239,228,.5);font-size:18px;font-weight:700;letter-spacing:5px}.hero h1{margin-top:5px;font:900 38px/1.3 var(--serif);letter-spacing:0}.hero p{margin-top:7px;max-width:760px;color:rgba(242,239,228,.72);font-size:21px;line-height:1.55}.hero p b{color:#fff}
+.hero-main{flex:1;min-width:0}.eyebrow{color:rgba(242,239,228,.55);font-size:18px;font-weight:700;letter-spacing:5px}.hero h1{margin-top:5px;font:900 38px/1.3 var(--serif);letter-spacing:0}.hero p{margin-top:7px;max-width:760px;color:rgba(242,239,228,.72);font-size:21px;line-height:1.55}.hero p b{color:#fff}
 .hero-note{display:flex;align-items:baseline;gap:8px;margin-top:8px;color:#9fc0b5;font-size:14px;line-height:1.35}.hero-note b{flex:none;color:#d8ebe4;font-size:14px}.hero-note span{min-width:0}
 .first-panel{height:0;overflow:hidden;transition:height .25s ease}
 .screen[data-state="first"] .first-panel{height:140px}
@@ -49,16 +50,13 @@ button{border:0}
 .card-icon svg{width:26px;height:26px}.card h3{font:800 21px/1.24 var(--serif);letter-spacing:0}.card p{color:var(--muted);font-size:15px;line-height:1.43;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .card-foot{margin-top:auto;display:flex;align-items:center;gap:7px}.badge{min-height:31px;padding:0 9px;border-radius:10px;background:var(--soft,var(--mint));color:var(--accent,var(--teal));font-size:13px;font-weight:700}
 .go{margin-left:auto;color:var(--teal);font-size:16px;font-weight:750}.go svg{vertical-align:-3px}
-.card[data-ai="true"]{--accent:#76628d;--soft:#f0ebf4}.card[data-kind="info"]{--accent:#3c79ae;--soft:#e9f0f8}.card[data-kind="support"]{--accent:#76628d;--soft:#f0ebf4}.card[data-device="true"]{--accent:#16866f;--soft:#e0f4ed}
-.card.is-unavailable{background:#faf8f1;border-color:#e2dbc9}.card.is-unavailable .card-head,.card.is-unavailable p,.card.is-unavailable .badge{opacity:.62}.card.is-unavailable .go{color:#775016;font-size:14px}.card.is-unavailable .card-foot{gap:9px}
+.card[data-ai="true"]{--accent:#76628d;--soft:#f0ebf4}.card[data-kind="info"]{--accent:#366d9d;--soft:#e9f0f8}.card[data-kind="support"]{--accent:#76628d;--soft:#f0ebf4}.card[data-device="true"]{--accent:#137662;--soft:#e0f4ed}
+.card.is-unavailable{background:#faf8f1;border-color:#dcd4c0;box-shadow:none}.card.is-unavailable .card-icon{background:#ece8dc;color:#586761}.card.is-unavailable h3{color:#2c3b37}.card.is-unavailable p{color:var(--muted)}.card.is-unavailable .badge{background:#f0ead8;color:#4d5b55}.card.is-unavailable .go{color:#775016;font-size:14px}.card.is-unavailable .card-foot{gap:9px}
 .quick-label{height:35px;display:flex;align-items:end;gap:10px;margin-top:12px;color:var(--muted);font-size:15px}.quick-label::before{content:"02";color:var(--teal);font:700 15px/1 var(--serif)}.quick-label b{color:var(--ink);font:800 19px/1 var(--serif)}
 .quick{height:96px;flex:none;margin-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.quick a{min-width:0;border:1px dashed #d5cdbb;border-radius:22px;background:rgba(255,253,248,.64);padding:0 18px;display:flex;align-items:center;gap:12px}.quick svg{width:27px;height:27px;color:var(--teal);flex:none}.quick b{font-size:17px}.quick span{display:block;margin-top:3px;color:var(--muted);font-size:14px}
 .truth{height:144px;flex:none;padding:20px 44px;display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:20px;border-top:1px solid var(--line);background:#f1ede1;color:var(--muted);font-size:18px;line-height:1.5}.truth div{min-width:0}.truth div+div{border-left:1px solid #dcd5c6;padding-left:20px}.truth b{display:block;margin-bottom:5px;color:var(--ink);font-size:18px}
 .navbar{height:128px;flex:none;display:flex;border-top:1px solid var(--line);background:var(--surface)}.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}.nav-item span{font-size:21px;color:var(--muted);font-weight:600}.nav-item.on span{color:var(--teal);font-weight:700}.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal)}.nav-item svg{width:34px;height:34px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-
-/* 2026-09-05 体检修复：27 寸竖屏 1px≈0.31mm，13–15px 辅助文字站立读不清；统一提到 16px（正文字阶仍按规范 17–23）。 */
-.hero-note,.hero-note b,.first-copy p,.seg,.cap-chip,.card p,.badge,.is-unavailable .go,.quick-label,.quick span{font-size:16px}
 </style>
 </head>
 <body>
@@ -118,7 +116,7 @@ const H={
  ['简历打印','选择文件、核价后在本机打印','printer','依赖打印机','12-file-source.html?source=resume','/print/upload?source=resume','device'],
  ['岗位匹配参考','简历与岗位逐项对照，不给录用结论','chart','AI · 不给百分比','46-resume-decision-workspace.html?screen=job-fit&state=missing-task','/resume/job-fit','ai']],
  quick:[['我的简历','查看本人已保存版本','user','39-member-records.html?view=resumes','/me/resumes'],['AI服务记录','查看诊断与优化记录','bot','39-member-records.html?view=ai-records','/me/ai-records'],['自我探索','完成职业倾向参考','chart','34-self-assessment.html?state=intro','/resume/self-assessment/intro']]},
- jobs:{eyebrow:'岗位信息',title:'看清来源，再决定去哪里投',subtitle:'岗位来自第三方或官方来源。本机帮助筛选和理解，投递仍在来源平台完成。',noteTitle:'本机不代收简历',note:'不做企业筛选、面试邀约或Offer管理。',section:'岗位与来源入口',hint:'岗位以进入后的真实加载为准',truthTitle:'投递在来源平台完成。',truth:'本机记录你的浏览与外部跳转；投递进度由你自己填写，本机不掌握来源平台的处理结果。',
+ jobs:{eyebrow:'岗位信息',title:'看清来源，再决定去哪里投',subtitle:'岗位来自第三方或官方来源。本机帮助筛选和理解，投递仍在来源平台完成。',noteTitle:'本机不代收简历',note:'不做企业筛选、面试邀约或Offer管理。',section:'岗位与来源入口',hint:'岗位以进入后的真实加载为准',truthTitle:'投递在来源平台完成。',truth:'本机只记录浏览和外部跳转，不记录投递结果。',
  first:[['找全职','26-browse-list.html?category=fulltime','/jobs?category=fulltime'],['找实习','26-browse-list.html?category=intern','/jobs?category=intern'],['找校招','26-browse-list.html?category=campus','/jobs?category=campus'],['找兼职','26-browse-list.html?category=parttime','/jobs?category=parttime']],
  cards:[
  ['全职岗位','按行业、地区与薪资范围筛选','brief','第三方来源','26-browse-list.html?category=fulltime','/jobs?category=fulltime','info'],
@@ -151,7 +149,7 @@ const H={
  ['评估历史','回看本人历次自我探索结果','chart','本人记录','34-self-assessment.html?state=history','/resume/self-assessment/history','info'],
  ['行业薪资参考','向通用AI顾问询问市场信息','bot','AI · 需核实','05-ai-cockpit.html','/assistant','ai']],
  quick:[['AI服务记录','查看本人AI调用记录','bot','39-member-records.html?view=ai-records','/me/ai-records'],['训练报告','查看模拟面试报告','chart','29-interview-training.html?state=reports-guest','/interview/reports'],['简历服务','先完善求职材料','file','16-service-hubs.html?hub=resume','/resume-service']]},
- policy:{eyebrow:'政策服务',title:'看来源、查条件、备材料',subtitle:'就业政策、社保与档案登记以来源内容为准；AI顾问只做通用说明。',noteTitle:'不承诺办理或资格结果',note:'资格核对使用确定性规则，最终以官方审核为准。',section:'政策与办事指引',hint:'七个入口，来源与条件分开看',truthTitle:'政策内容以来源发布为准。',truth:'AI顾问不替主管部门作资格判断。',
+ policy:{eyebrow:'政策服务',title:'看来源、查条件、备材料',subtitle:'就业政策、社保与档案登记以来源内容为准；AI顾问只做通用说明。',noteTitle:'不承诺办理或资格结果',note:'资格核对使用确定性规则，最终以官方审核为准。',section:'政策与办事指引',hint:'六个入口，来源与条件分开看',truthTitle:'政策内容以来源发布为准。',truth:'AI顾问不替主管部门作资格判断。',
  first:[['找就业政策','48-policy-workspace.html?tab=policy&state=loading','/renshi?tab=policy'],['核对申领条件','48-policy-workspace.html?tab=eligibility&state=form','/renshi?tab=eligibility'],['查社保材料','48-policy-workspace.html?tab=social&state=social','/renshi?tab=social'],['看登记档案','48-policy-workspace.html?tab=register&state=register','/renshi?tab=register']],
  cards:[
  ['就业政策','查看就业、创业与灵活就业政策','file','来源内容','48-policy-workspace.html?tab=policy&state=loading','/renshi?tab=policy','info'],
@@ -161,7 +159,7 @@ const H={
  ['政策公告','查看发布方公告、来源与发布日期','file','来源内容','48-policy-workspace.html?tab=notice&state=loading','/renshi?tab=notice','info'],
  ['打开AI顾问','咨询通用政策说明并核对来源','bot','AI · 需核实','05-ai-cockpit.html','/assistant','ai'],
  ['政策收藏','查看本人收藏的政策内容','user','本人记录','39-member-records.html?view=favorites&tab=policy','/me/favorites?tab=policy','info']],
- quick:[['浏览记录','查看最近浏览的政策','user','39-member-records.html?view=activity','/me/activity'],['AI服务记录','本人AI服务记录，不含顾问问答','bot','39-member-records.html?view=ai-records','/me/ai-records'],['全部服务','返回服务目录','external','02-services.html','/']]}}
+ quick:[['浏览记录','查看最近浏览的政策','user','39-member-records.html?view=activity','/me/activity'],['AI问答记录','查看本人政策问答','bot','39-member-records.html?view=ai-records','/me/ai-records'],['全部服务','返回服务目录','external','02-services.html','/']]}}
 /* hub key → 生产 route（真源 apps/kiosk/src/routes/index.tsx）。五个 hub 共享本页一个 HTML 宿主，
    ?hub= 选中哪个 H 条目，就渲染成对应的那一条生产 route，不新增第二个页面文件。 */
 const HUB_ROUTE={resume:'/resume-service',jobs:'/jobs-service',fairs:'/fairs-service',interview:'/interview-service',policy:'/policy-service'};

@@ -29,7 +29,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -46,7 +46,9 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 .serif{font-family:"Songti SC","STSong","SimSun",serif}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;text-align:left}
-a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:not([tabindex="-1"]):focus-visible{outline:4px solid var(--teal);outline-offset:3px}
+.nav-item:focus-visible{outline:4px solid var(--teal);outline-offset:-6px}
+.scrollarea:focus-visible{outline:4px solid var(--teal);outline-offset:-5px}
 
 .topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
 .back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
@@ -151,8 +153,8 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
   </main>
 
   <div class="truth" data-disclaimer="true" data-testid="system-state-truth">
-    <div><b>怎么判断</b>完整列出八个系统轴；当前只对有真实探测入口的轴给结果，其余写未检测或随业务请求确认，<b>不会默认写成正常</b>。</div>
-    <div><b>这是设计稿</b>本页状态由地址栏参数指定，用于设计验收，不是这台机器的真实读数；「重新检测」在这里只切换演示状态。</div>
+    <div><b>怎么判断</b>八项状态一项不少地列出来；只有能真检测的才给结果，其余照实写未检测或随请求确认，<b>不会默认写成正常</b>。</div>
+    <div><b>读数不留旧值</b>这一页只显示本次检测的结果，不会把上一次的结果接着摆在这里当成现在的情况；拿不准就找工作人员。</div>
   </div>
 
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
@@ -182,24 +184,24 @@ var ICO={
 function svg(n,w,s){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+(s||'currentColor')+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
 var q=new URLSearchParams(location.search);
 
-/* 八个系统轴；判定只有「未检测 / 检测中 / 本次可达 / 本次不可达 / 未取得 / 未验证 / 随请求确认 / 示例」。
+/* 八个状态轴；判定只有「未检测 / 检测中 / 这次连得上 / 这次连不上 / 没读到 / 未验收 / 随请求确认 / 示例」。
    没有「正常」「在线」这类会被当成保证的词。没有独立健康接口的轴不伪造绿灯。 */
 var CAPS=[
- {icon:'upload',tone:['var(--slate-soft)','var(--slate-d)'],name:'API / 网络',dep:'GET /api/v1/health + 浏览器网络状态'},
- {icon:'desk',tone:['var(--teal-soft)','var(--teal-d)'],name:'Terminal Agent',dep:'通过终端心跳与设备状态间接确认；没有独立绿灯'},
- {icon:'printer',tone:['var(--teal-soft)','var(--teal-d)'],name:'打印机',dep:'读取终端打印机状态；未知与离线必须分开'},
- {icon:'scan',tone:['var(--slate-soft)','var(--slate-d)'],name:'扫描接收目录',dep:'平台任务依赖 SMB 接收与本地投递；本页暂无独立探测'},
- {icon:'usb',tone:['var(--wheat-soft)','var(--wheat-d)'],name:'U 盘网桥',dep:'本地 /local/usb/status；Windows 真机流程仍未验收'},
- {icon:'gauge',tone:['var(--clay-soft)','var(--clay-d)'],name:'支付通道',dep:'没有独立健康接口，只能在收银台随真实请求确认'},
- {icon:'spark',tone:['var(--plum-soft)','var(--plum-d)'],name:'AI 服务',dep:'没有统一健康接口，按具体 AI 任务请求确认'},
- {icon:'briefcase',tone:['var(--slate-soft)','var(--slate-d)'],name:'岗位 / 招聘会数据',dep:'列表请求分别确认；可达不代表有已发布数据'}
+ {icon:'upload',tone:['var(--slate-soft)','var(--slate-d)'],name:'联网',dep:'这台机器现在能不能连上服务器'},
+ {icon:'desk',tone:['var(--teal-soft)','var(--teal-d)'],name:'机器后台程序',dep:'没有单独的检测口，只能从机器上报的信号间接看'},
+ {icon:'printer',tone:['var(--teal-soft)','var(--teal-d)'],name:'打印机',dep:'读机器上报的状态；「没读到」和「离线」不合并'},
+ {icon:'scan',tone:['var(--slate-soft)','var(--slate-d)'],name:'扫描件的存放',dep:'扫出来的文件先存在这台机器上再送走；没有单独的检测口'},
+ {icon:'usb',tone:['var(--wheat-soft)','var(--wheat-d)'],name:'U 盘读取',dep:'插盘后由这台机器读取；整条流程还没在正式机器上验收'},
+ {icon:'gauge',tone:['var(--clay-soft)','var(--clay-d)'],name:'付款',dep:'没有单独的检测口，到收银台真付一次才知道'},
+ {icon:'spark',tone:['var(--plum-soft)','var(--plum-d)'],name:'AI 服务',dep:'没有单独的检测口，用到哪个 AI 功能时当场确认'},
+ {icon:'briefcase',tone:['var(--slate-soft)','var(--slate-d)'],name:'岗位与招聘会信息',dep:'打开列表时分别确认；能连上不等于现在有内容'}
 ];
 var JUDGE={
- 'unknown':[['未检测','q'],['未检测','q'],['未检测','q'],['未检测','q'],['未验证','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
- 'checking':[['检测中','q'],['检测中','q'],['检测中','q'],['未检测','q'],['未验证','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
- 'partial':[['本次可达','ok'],['未取得','warn'],['未取得','warn'],['未检测','q'],['未验证','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
- 'offline':[['本次不可达','bad'],['未取得','warn'],['未取得','warn'],['未检测','q'],['未验证','q'],['未取得','warn'],['未取得','warn'],['未取得','warn']],
- 'ready-example':[['示例：可达','ex'],['示例：可达','ex'],['示例：就绪','ex'],['示例：可达','ex'],['未验证','q'],['示例：可达','ex'],['示例：可达','ex'],['示例：有数据','ex']]
+ 'unknown':[['未检测','q'],['未检测','q'],['未检测','q'],['未检测','q'],['未验收','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
+ 'checking':[['检测中','q'],['检测中','q'],['检测中','q'],['未检测','q'],['未验收','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
+ 'partial':[['这次连得上','ok'],['没读到','warn'],['没读到','warn'],['未检测','q'],['未验收','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
+ 'offline':[['这次连不上','bad'],['没读到','warn'],['没读到','warn'],['未检测','q'],['未验收','q'],['没读到','warn'],['没读到','warn'],['没读到','warn']],
+ 'ready-example':[['示例：连得上','ex'],['示例：连得上','ex'],['示例：能用','ex'],['示例：连得上','ex'],['未验收','q'],['示例：连得上','ex'],['示例：连得上','ex'],['示例：有内容','ex']]
 };
 function capList(state){
  var j=JUDGE[state],h='';
@@ -223,7 +225,7 @@ function limitCards(no){
   '</div></section>';
 }
 function capSection(state,no,hint){
- return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">八个系统状态轴</span><span class="hint">'+hint+'</span></div>'+
+ return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">这台机器的八项状态</span><span class="hint">'+hint+'</span></div>'+
   capList(state)+'</section>';
 }
 
@@ -233,7 +235,7 @@ V['unknown']=function(){
   pill:['','还没检测'],
   body:'<section class="sec"><div class="hero">'+
     '<div class="hero-glyph" role="img" aria-label="本机状态未检测">'+svg('question','104')+'</div>'+
-    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">机器状态</div>'+
     '<div class="hero-title serif">这台机器<em>还没检测</em></div>'+
     '<div class="hero-copy">本页<b>不会默认写成正常</b>：没检测过就是没检测过，检测不到就是取不到 —— 不拿一排绿点让你以为一切都好，结果白跑一趟。</div>'+
     '<div class="hero-note">'+svg('info',22)+'这次开机后<b>还没检测过</b>，点下面的重新检测</div>'+
@@ -249,9 +251,9 @@ V['checking']=function(){
   pill:['','正在检测'],
   body:'<section class="sec"><div class="hero">'+
     '<div class="hero-glyph'+(q.get('capture')==='1'?'':' breathe')+'" role="img" aria-label="正在检测本机状态">'+svg('radar','104')+'</div>'+
-    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">机器状态</div>'+
     '<div class="hero-title serif">正在<em>检测</em></div>'+
-    '<div class="hero-copy">先检测<b>API / 网络、终端心跳和打印机状态</b>；扫描目录、U 盘、支付、AI、岗位数据没有统一探测的，明确保留为未检测或随请求确认。</div>'+
+    '<div class="hero-copy">先检测<b>联网、机器后台程序和打印机</b>这三项；扫描件存放、U 盘、付款、AI、岗位信息没有单独的检测口，照实写成未检测或随请求确认。</div>'+
     '<div class="hero-note">'+svg('info',22)+'检测<b>不会打断</b>你已经创建的打印任务</div>'+
     '</div></div></section>'+
    capSection('checking','01','等这次结果')+limitCards('02'),
@@ -265,9 +267,9 @@ V['partial']=function(){
   pill:['warn','部分取不到'],
   body:'<section class="sec"><div class="hero">'+
     '<div class="hero-glyph" role="img" aria-label="部分状态取不到">'+svg('half','104')+'</div>'+
-    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">机器状态</div>'+
     '<div class="hero-title serif">连得上，但<em>有几项取不到</em></div>'+
-    '<div class="hero-copy">这次检测里，本机<b>连得上服务器</b>；打印机那边的心跳和状态<b>没取到</b>。取不到不等于坏了，也不等于好着 —— 所以这里写「未取得」。</div>'+
+    '<div class="hero-copy">这次检测里，这台机器<b>连得上服务器</b>；打印机那边的状态<b>没读到</b>。没读到不等于坏了，也不等于好着 —— 所以这里写「没读到」。</div>'+
     '<div class="hero-note">'+svg('info',22)+'能不能出纸，<b>要到打印那一步才知道</b>；先别在这里下结论</div>'+
     '</div></div></section>'+
    capSection('partial','01','最近一次检测：示例时间')+limitCards('02'),
@@ -281,9 +283,9 @@ V['offline']=function(){
   pill:['bad','连不上服务器'],
   body:'<section class="sec"><div class="hero" data-testid="system-state-fallback">'+
     '<div class="hero-glyph" role="img" aria-label="本机连不上服务器">'+svg('wifioff','104')+'</div>'+
-    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">机器状态</div>'+
     '<div class="hero-title serif">和服务器<em>连不上</em></div>'+
-    '<div class="hero-copy">上传、算价、AI 和来源信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，一连上就把你送回刚才那一页。</div>'+
+    '<div class="hero-copy">传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，一连上就把你送回刚才那一页。</div>'+
     '<div class="hero-note">'+svg('info',22)+'已经交出去的打印任务<b>不会因此取消</b>，到机码照常有效</div>'+
     '</div></div></section>'+
    capSection('offline','01','最近一次检测：示例时间')+limitCards('02'),
@@ -302,9 +304,9 @@ V['ready-example']=function(){
     '</div></div></section>'+
    '<section class="sec"><div class="hero">'+
     '<div class="hero-glyph" role="img" aria-label="布局示例：各项都取到时的样子">'+svg('layout','104')+'</div>'+
-    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE · SAMPLE</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">机器状态 · 排版示例</div>'+
     '<div class="hero-title serif">都取到时<em>长这样</em></div>'+
-    '<div class="hero-copy">真实页面里只有<b>连得上服务器</b>、且<b>打印机心跳与状态都取到</b>时才这样显示；<b>任何一项取不到就退回未知</b>。</div>'+
+    '<div class="hero-copy">只有<b>连得上服务器</b>、而且<b>打印机状态也读到了</b>，才会这样显示；<b>任何一项读不到就退回未检测</b>。</div>'+
     '<div class="hero-note">'+svg('warn',22)+'这是示例值，<b>不是这台机器现在的读数</b></div>'+
     '</div></div></section>'+
    capSection('ready-example','01','示例值，非真实读数')+limitCards('02'),

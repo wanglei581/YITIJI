@@ -30,6 +30,32 @@
   验收范围：静态原型表现；不证明 React 接线、API 可用、Admin 审核或生产数据
 -->
 <link rel="stylesheet" href="directory-workspaces.css">
+<style>
+/* ── 本页覆盖：只写在这一份宿主 HTML 里，不改共享样式表 ─────────────
+   ① 可见焦点：公共触控终端也会接外接键盘与无障碍设备，Tab 到哪必须一眼看得见。
+      统一用「青 3px + 墨 3px」双色环：浅底输入框、浅底卡片和深色主按钮上都够对比。
+      只用 outline / box-shadow，不改盒模型、不位移、不新增任何持续动画。
+   ② 触控目标：本页所有真实可点元素沿用共享样式的 ≥48px，主行动按钮 ≥56px；
+      这里只补焦点表现，不缩小任何热区。 */
+#stage a:focus-visible,
+#stage button:focus-visible,
+#stage input:focus-visible,
+#stage select:focus-visible,
+#stage textarea:focus-visible,
+#stage [tabindex]:focus-visible{
+  outline:3px solid var(--emerald);
+  outline-offset:2px;
+  box-shadow:0 0 0 6px var(--deep);
+  position:relative;
+  z-index:4;
+}
+/* 置灰控件也要能被 Tab 到并看清，但焦点色不得让它看起来像可用 */
+#stage [aria-disabled="true"]:focus-visible{
+  outline:3px solid var(--wheat-d);
+  outline-offset:2px;
+  box-shadow:0 0 0 6px var(--surface);
+}
+</style>
 </head>
 <body>
 <div id="stage" class="platform-shell">
@@ -52,14 +78,52 @@
     <div><b>隐私提示</b>结束会话或闲置超时清除本机登录态和临时会话信息；文件与订单按服务端留存期限管理。</div>
   </div>
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
   <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
 </div>
 <script>window.DW_SCREEN='online-platform'</script>
 <script src="directory-workspaces.js"></script>
+<script>
+/* 本页脚本：只做一件不改真话的事 —— 把用户画面上的技术词换成人话。
+   只替换纯文本节点：四个来源平台入口、二维码位与「投递在来源平台完成」的合规说明
+   都原样保留，不动结构、链接和任何真实字段。
+   共享运行时 directory-workspaces.js 在 load 前同步渲染完主体，这里只在其后做覆盖。 */
+(function () {
+  'use strict'
+  var stage = document.getElementById('stage')
+  /* 人话覆盖表：左边是共享运行时里写给工程的说法，右边是给现场用户看的说法。 */
+  var PLAIN = [
+    ['当前 React 固定展示 4 个官网入口',
+     '固定 4 个官网入口，不随后台配置增减'],
+    ['四个自由文本字段可补充快捷选项未覆盖的内容；补充说明按 React 合同最多 300 字。',
+     '四个空格可以补充快捷选项里没有的内容；补充说明最多 300 字。'],
+    ['静态稿不发起模型调用；确认后才进入 AI 求职方向探索。',
+     '这一页不会调用 AI；确认之后才进入 AI 求职方向探索。'],
+    ['二维码在运行时按内置官网地址生成；静态原型不生成可扫描图形。',
+     '二维码按这台机器内置的官网地址生成；这张示意图不可扫描。'],
+    ['二维码按来源地址在运行时生成，这里只画二维码位置',
+     '二维码按来源平台官网地址生成，这里只是二维码的位置']
+  ]
+  function plainify (root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null)
+    var node
+    while ((node = walker.nextNode())) {
+      var text = node.nodeValue
+      for (var i = 0; i < PLAIN.length; i++) {
+        if (text.indexOf(PLAIN[i][0]) >= 0) text = text.split(PLAIN[i][0]).join(PLAIN[i][1])
+      }
+      if (text !== node.nodeValue) node.nodeValue = text
+    }
+  }
+  plainify(stage)
+  /* 页内 AI 辅助会整块重绘：重绘后再覆盖一次，不新增计时器。 */
+  new MutationObserver(function () { plainify(stage) })
+    .observe(stage, { childList: true, subtree: true })
+})()
+</script>
 </body>
 </html>

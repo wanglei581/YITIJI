@@ -26,19 +26,9 @@
                                                            status ∈ upcoming | ongoing | ended（与服务端 FairStatus 同名）
         GET /api/v1/job-fairs/:id                       —— 详情 + sourceName/sourceUrl/externalId/syncTime
         GET /api/v1/job-fairs/:id/companies             —— 主办方提供的参展名单
-        GET /api/v1/job-fairs/:id/map                   —— 有真实图或展位索引才返回；返回 { zones, booths }
-                                                           （端点名是 /map，不是 /booth-map；未发布 / 无数据时
-                                                            后端可能返回 data:null，前端兜成空集合落空态）
+        GET /api/v1/job-fairs/:id/booth-map             —— 有真实图或展位索引才返回
         GET /api/v1/job-fairs/:id/materials             —— 临时签名 URL，过期需重新获取
-        参会准备单是 fairId + taskId 两级路径，**没有 POST /job-fairs/:id/visit-plan 这种一级写法**
-        （2026-09-02 对 services/api/src/ai/fair-visit-plan.controller.ts +
-          apps/kiosk/src/services/api/fairVisitPlan.ts 核实）：
-        POST /api/v1/job-fairs/:fairId/visit-plan/:taskId        —— 生成；PaidAiThrottle 6/min
-        GET  /api/v1/job-fairs/:fairId/visit-plan/:taskId        —— 读最近一次结果
-        POST /api/v1/job-fairs/:fairId/visit-plan/:taskId/print  —— 生成可打印文件
-        taskId **是调用方传进去的路径参数，不是接口返回值**：来自 location.state.taskId 或当前
-        简历会话的 session.taskId（FairVisitPlanPage.tsx:83）；拿不到 taskId 就落 missing-context，
-        不存在「先 POST 一次换 taskId」这一步。凭证：会员 Bearer，匿名 x-resume-access-token。
+        POST /api/v1/job-fairs/:id/visit-plan           —— { resumeId } → { taskId }；结果由任务状态返回
         GET /api/v1/job-fairs/:id/stats                 —— 真实统计；无数据即空
         对齐 apps/kiosk/src/pages/job-fairs/*
   fallback: 任一子任务失败只影响该 screen；招聘会浏览与来源预约入口保持可用
@@ -61,7 +51,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink-2:#3d5a52;--ink-3:#6b857c;
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink-2:#3d5a52;--ink-3:#526b62;
   --deep:#0b241e;--deep-2:#123a30;--emerald:#2ee6a8;
   --teal:#1f9e86;--teal-d:#157a67;--teal-soft:#e0f2ec;
   --slate:#3f68b0;--slate-d:#35608f;--slate-soft:#e6ecf7;
@@ -76,6 +66,12 @@ html,body{height:100%;overflow:hidden;background:#e8e3d3;color:var(--ink);font-f
 #stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
 .serif{font-family:"Songti SC","STSong","Noto Serif SC","SimSun",serif}
 a{color:inherit;text-decoration:none}button{font:inherit;border:0;background:none;color:inherit;cursor:pointer;text-align:left}
+/* 统一焦点环：3px 深墨环，画在元素外侧的浅纸底上（对比 ≈14:1）。
+   .qinput / .fair-field input 自带 outline:none，用 !important 一次性收回来，
+   搜索框、筛选输入、列表按钮与底栏动作共用同一套环。 */
+:focus-visible{outline:3px solid var(--deep)!important;outline-offset:3px!important}
+/* 贴着舞台底边或滚动容器边缘的控件改画内侧环，避免环被裁掉后看不见 */
+.nav-item:focus-visible,.item-link:focus-visible,.row:focus-visible{outline-offset:-5px!important}
 ul{list-style:none}
 .press{transition:transform 140ms cubic-bezier(.2,.8,.2,1),border-color 140ms ease,background-color 140ms ease}
 .press:active{transform:scale(.985)}
@@ -99,14 +95,17 @@ ul{list-style:none}
 .th-s{flex:1;min-width:260px;font-size:20px;line-height:1.4;color:var(--ink-2)}
 
 .body{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 40px}
-.scroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-top:16px;scrollbar-width:none}
+.scroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:none;
+  /* 左右各留 8px 给焦点环（overflow-y:auto 会连横向一起裁），用负 margin 抵回去，版式位置不变 */
+  scroll-padding:18px 8px 22px;padding:16px 8px 4px;margin:0 -8px}
 .scroll::-webkit-scrollbar{display:none}
 .center{justify-content:center}
 .sec-h{display:flex;align-items:baseline;gap:14px;margin-bottom:2px}
 .sec-h .t{font-size:25px;font-weight:700}
 .sec-h .hint{margin-left:auto;font-size:18px;color:var(--ink-3);font-weight:600}
 
-.list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;scrollbar-width:none;
+  scroll-padding:18px 0 22px;padding:2px 0 4px}
 .list::-webkit-scrollbar{display:none}
 .list.tight{flex:none;overflow:visible}
 .item{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
@@ -160,6 +159,12 @@ ul{list-style:none}
 .fair-filters{display:grid;grid-template-columns:1.2fr 1fr auto;gap:12px;margin-top:12px}
 .fair-field{display:flex;flex-direction:column;gap:7px;font-size:16px;color:var(--ink-3);font-weight:600}
 .fair-field input{height:54px;padding:0 16px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);font-size:18px;color:var(--ink);outline:none}
+/* 日期输入的年/月/日子字段之间继续 Tab 时，document.activeElement 始终是这个 input，
+   但浏览器会把 :focus-visible 暂时判 false，靠 :focus-visible 画的环会在中途闪断。
+   改由外层 .fair-field 承载一枚常驻焦点环：只要焦点还在字段内部（含日期各段），环就一直在。
+   offset 3px 落在卡片 24px 内边距里，不会被裁；只加环不改栅格，版式不动。 */
+.fair-field:focus-within{outline:3px solid var(--deep);outline-offset:3px;border-radius:6px}
+.fair-field:focus-within input{border-color:var(--deep);box-shadow:0 0 0 3px rgba(11,36,30,.22)}
 .fair-local-note{margin-top:10px;font-size:16px;line-height:1.45;color:var(--ink-3)}
 .pager{display:flex;align-items:center;gap:12px;margin-top:4px}
 .pager .pi{flex:1;font-size:17px;color:var(--ink-3)}
@@ -265,9 +270,9 @@ ul{list-style:none}
   </div>
 
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
 
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板">演示</button>
@@ -342,7 +347,7 @@ function fairSearch(active){
     +'<label class="fair-field">地区（省 / 市 / 区县）<input name="region" value="'+region+'" maxlength="40" placeholder="输入地区"></label>'
     +'<label class="fair-field">举办日期<input name="date" value="'+date+'" type="date"></label>'
     +'<button type="submit" class="qbtn press" data-testid="list-local-filter">应用筛选</button></form>'
-    +'<p class="fair-local-note">关键字与状态交给服务端查询；地区、日期和收藏只在本次已加载的场次集合内筛选，不代表全库结果。</p>';
+    +'<p class="fair-local-note">关键字与状态会到全部场次里查；地区、日期和收藏只在这一页已经加载的场次里筛，不代表全部结果。</p>';
 }
 function fairListCard(i){
   return '<article class="fair-card" data-testid="list-fair-'+i+'"><span class="item-ic">'+svg('fair',28)+'</span><div class="fair-card-main">'
@@ -385,9 +390,9 @@ var VIEWS={
 'list:ready':function(){
   var q=new URLSearchParams(location.search),active=q.get('status')||'all',page=Math.max(1,parseInt(q.get('page')||'1',10)||1);
   return '<div class="scroll" data-testid="list-workspace">'+fairSearch(active)
-    +'<div class="fair-count">服务端结果 <b>'+slot('—')+'</b> 场 · 当前展示 <b>'+slot('—')+'</b> 场 · 即将开始 '+slot('—')+' · 进行中 '+slot('—')+'</div>'
+    +'<div class="fair-count">符合条件 <b>'+slot('—')+'</b> 场 · 本页展示 <b>'+slot('—')+'</b> 场 · 即将开始 '+slot('—')+' · 进行中 '+slot('—')+'</div>'
     +'<div class="list">'+fairListCard(1)+fairListCard(2)+fairListCard(3)+'</div>'
-    +'<nav class="pager" aria-label="场次分页"><span class="pi">第 '+page+' 页；总页数以服务端 pagination 为准</span>'
+    +'<nav class="pager" aria-label="场次分页"><span class="pi">第 '+page+' 页；一共多少页，以系统查到的场次数量为准</span>'
     +(page===1?'<button type="button" class="row-btn" aria-disabled="true">上一页</button>':'<a class="row-btn press" href="'+listHref({page:page-1})+'">上一页</a>')
     +'<a class="row-btn primary press" href="'+listHref({page:page+1})+'">下一页</a></nav></div>'
     +'<div class="ctabar"><p class="why">扫码后在来源平台预约或签到；本机不保存结果。</p>'
@@ -419,7 +424,7 @@ var VIEWS={
     '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员</a>'
     +'<a class="btn primary press" href="28-jobfair-enhanced.html?state=loading" data-route="/job-fairs" data-testid="list-primary">重新加载</a>')
     +'<div class="rows">'
-    +row('users','26-browse-list.html','/jobs','岗位信息','岗位和招聘会不是同一个接口，可以先看岗位。','jobs','list')
+    +row('users','26-browse-list.html','/jobs','岗位信息','岗位和招聘会是两套来源，可以先看岗位。','jobs','list')
     +row('build','43-company-directory.html','/companies','企业目录','按用人单位查看在招岗位与来源。','companies','list')
     +'</div></div>';
 },
@@ -428,7 +433,7 @@ var VIEWS={
   return '<div class="scroll">'
     +'<div class="aibar off"><span class="ai-ic">'+svg('info',26)+'</span><span class="ai-tx">'
     +'<span class="ai-t">本机不做签到，也拿不到签到结果</span>'
-    +'<span class="ai-d">这里只列出进行中或即将开始、且服务端已返回 <b>checkinUrl</b> 的场次；不查个人预约记录。</span></span></div>'
+    +'<span class="ai-d">这里只列出进行中或即将开始、并且<b>已经开放入场二维码</b>的场次；不查个人预约记录。</span></span></div>'
     +fairListCard('checkin-1')+fairListCard('checkin-2')
     +'<section class="card"><div class="blk-h">'+svg('walk',24)+'到场当天怎么走</div><div class="rules">'
     +'<span class="rule"><i>1</i><span>点对应场次的「扫码入场」，用手机前往来源平台。</span></span>'
@@ -445,19 +450,19 @@ var VIEWS={
     +'<a class="btn primary narrow press" href="28-jobfair-enhanced.html" data-route="/job-fairs" data-testid="checkin-primary">返回场次列表</a></div>';
 },
 'checkin:qr':function(){
-  return '<div class="scroll"><section class="card"><div class="blk-h">'+svg('qr',24)+'来源平台入场码<span class="hint">仅在 checkinUrl 合法时生成</span></div>'
-    +'<div class="qr-placeholder">'+svg('qr',72)+'<span>二维码由服务端返回的该场次 checkinUrl 生成<br>静态稿不伪造真实地址</span></div></section>'
+  return '<div class="scroll"><section class="card"><div class="blk-h">'+svg('qr',24)+'来源平台入场码<span class="hint">仅在主办方入场链接有效时生成</span></div>'
+    +'<div class="qr-placeholder">'+svg('qr',72)+'<span>二维码由这场招聘会的官方入场链接生成<br>本页是界面示例，不伪造真实地址</span></div></section>'
     +'<section class="card src"><div class="blk-h">'+svg('globe',24)+'场次与来源</div><div class="kv">'+kvRow('招聘会',slot('—','wide'))+kvRow('来源机构',slot('—','wide'))+kvRow('外部编号',slot('—','wide'))+'</div></section>'+fairNotice()+'</div>'
     +'<div class="ctabar"><a class="btn ghost press" href="28-jobfair-enhanced.html?screen=checkin" data-route="/job-fairs/checkin">选择其他场次</a><a class="btn primary press" href="28-jobfair-enhanced.html" data-route="/job-fairs" data-testid="checkin-primary">返回场次列表</a></div>';
 },
 'checkin:empty':function(){
   return '<div class="scroll center">'+stateBlock('checkin','info','empty','暂无可展示的来源入场入口',
-    '当前没有进行中或即将开始、且配置了 checkinUrl 的招聘会。<b>这不代表你未预约</b>，本机不查个人记录。',
+    '当前没有进行中或即将开始、并且开放了入场二维码的招聘会。<b>这不代表你未预约</b>，本机不查个人记录。',
     '<a class="btn ghost press" href="06-help.html" data-route="/help">询问现场工作人员</a><a class="btn primary press" href="28-jobfair-enhanced.html" data-route="/job-fairs" data-testid="checkin-primary">查看招聘会</a>')+'</div>';
 },
 'checkin:error':function(){
   return '<div class="scroll center">'+stateBlock('checkin','error','alert','入场入口列表这次没取到',
-    '招聘会列表请求失败，所以无法判断哪些场次有可用的 checkinUrl。本机不显示缓存二维码，也不判断你的预约或签到状态。',
+    '招聘会列表没有取回来，所以无法判断哪些场次可以扫码入场。本机不显示缓存二维码，也不判断你的预约或签到状态。',
     '<a class="btn ghost press" href="06-help.html" data-route="/help">找现场工作人员</a><a class="btn primary press" href="28-jobfair-enhanced.html?screen=checkin" data-route="/job-fairs/checkin" data-testid="checkin-primary">重新加载</a>')+'</div>';
 },
 /* 086 /job-fairs/:id */
@@ -467,7 +472,7 @@ var VIEWS={
     +'<a class="btn primary press" href="45-online-platform-directory.html" data-route="/jobs/online-platforms" data-testid="detail-primary">去来源平台预约</a></div>';
 },
 'detail:loading':function(){
-  return '<div class="scroll">'+skel(2)+'<p style="font-size:19px;color:var(--ink-3);line-height:1.5">正在取这场的详情与来源三要素。字段返回前不展示任何内容。</p></div>'
+  return '<div class="scroll">'+skel(2)+'<p style="font-size:19px;color:var(--ink-3);line-height:1.5">正在取这场的详情与来源三要素。取回之前，这里不展示任何内容。</p></div>'
     +'<div class="ctabar"><a class="btn ghost press" href="28-jobfair-enhanced.html" data-route="/job-fairs" data-testid="detail-primary">返回场次列表</a></div>';
 },
 'detail:ended':function(){
@@ -495,7 +500,7 @@ var VIEWS={
     +'<a class="btn primary press" href="28-jobfair-enhanced.html?screen=detail&state=loading" data-route="/job-fairs/:id" data-testid="detail-primary">重新加载</a>')
     +'<div class="rows">'
     +row('fair','28-jobfair-enhanced.html','/job-fairs','回场次列表','列表还能打开，可以先看别的场次。','back','detail')
-    +row('doc','28-jobfair-enhanced.html?screen=checkin','/job-fairs/checkin','到场指引','通用指引不依赖这场的详情接口。','checkin','detail')
+    +row('doc','28-jobfair-enhanced.html?screen=checkin','/job-fairs/checkin','到场指引','通用指引和这场的详情分开，照常可以看。','checkin','detail')
     +'</div></div>';
 },
 /* 087 /job-fairs/:id/companies */
@@ -557,18 +562,18 @@ var VIEWS={
     '<a class="btn ghost press" href="28-jobfair-enhanced.html?screen=companies" data-route="/job-fairs/:id/companies">看参展名单</a>'
     +'<a class="btn primary press" href="28-jobfair-enhanced.html?screen=map&state=index" data-route="/job-fairs/:id/map" data-testid="map-primary">重新加载</a>')
     +'<div class="rows">'
-    +row('doc','28-jobfair-enhanced.html?screen=materials','/job-fairs/:id/materials','活动物料','手册与名单是另一份接口，可能还能打开。','materials','map')
+    +row('doc','28-jobfair-enhanced.html?screen=materials','/job-fairs/:id/materials','活动物料','手册与名单是另一份内容，可能还能打开。','materials','map')
     +row('fair','28-jobfair-enhanced.html?screen=detail','/job-fairs/:id','返回招聘会','时间地点仍可查看。','back','map')
     +'</div></div>';
 },
 /* 091 /job-fairs/:id/materials */
 'materials:list':function(){
-  return '<div class="scroll"><div class="sec-h"><span class="t">活动物料</span><span class="hint">共 '+slot('—')+' 份 · 链接由服务端临时签发</span></div>'
+  return '<div class="scroll"><div class="sec-h"><span class="t">活动物料</span><span class="hint">共 '+slot('—')+' 份 · 下载链接临时有效，过期需重新打开</span></div>'
     +'<div class="list tight" data-testid="materials-list">'+materialRow(1)+materialRow(2)+materialRow(3)+'</div>'
     +'<section class="card"><div class="blk-h">'+svg('info',24)+'关于打印这些物料</div>'
     +'<div class="rules">'
     +'<span class="rule"><i>1</i><span>物料链接<b>有有效期</b>，过期后需要重新获取，不能用旧链接直接打印。</span></span>'
-    +'<span class="rule"><i>2</i><span>打印份数、单双面与黑白彩色在打印页选择，<b>价格以现场公示与服务端报价为准</b>。</span></span>'
+    +'<span class="rule"><i>2</i><span>打印份数、单双面与黑白彩色在打印页选择，<b>价格以现场公示与系统报价为准</b>。</span></span>'
     +'<span class="rule"><i>3</i><span>打印是否成功以打印机回流的状态为准；本页不显示逐页进度。</span></span>'
     +'</div></section></div>'
     +'<div class="ctabar"><a class="btn ghost narrow press" href="28-jobfair-enhanced.html?screen=detail" data-route="/job-fairs/:id">返回招聘会</a>'
@@ -612,7 +617,7 @@ var VIEWS={
     +'<span class="ai-d">一份<b>你本人的简历</b>，和这场招聘会<b>真实的参展企业与岗位</b>。两样都齐了才生成，缺一样就先不生成。</span></span></div>'
     +'<section class="card"><div class="blk-h">'+svg('check',24)+'当前上下文</div><div class="kv">'
     +kvRow('本人简历','<span class="tag warn">还没有选</span>')
-    +kvRow('参展企业上下文',slot('待名单返回','wide'))
+    +kvRow('参展企业信息',slot('待名单返回','wide'))
     +kvRow('目标单位（可选）',slot('可从名单中勾选','wide'))
     +'</div></section>'
     +'<section class="card"><div class="blk-h">'+svg('info',24)+'清单里会有什么、不会有什么</div><div class="rules">'
@@ -625,7 +630,7 @@ var VIEWS={
 },
 'visit-plan:generating':function(){
   return '<div class="scroll center">'+stateBlock('visit-plan','info','clock','正在按你的简历和这场名单生成清单',
-    '任务已经提交，结果由服务端返回后才会显示。这中间<b>没有百分比可以给你</b>，本机不会编一个进度条。<br>你可以先去看参展名单，生成完再回来。','')
+    '任务已经提交，结果回来之后才会显示。这中间<b>没有百分比可以给你</b>，本机不会编一个进度条。<br>你可以先去看参展名单，生成完再回来。','')
     +'<div class="rows">'
     +row('users','28-jobfair-enhanced.html?screen=companies','/job-fairs/:id/companies','先看参展名单','名单和 AI 清单是两条线，互不影响。','companies','visit-plan')
     +row('map','28-jobfair-enhanced.html?screen=map','/job-fairs/:id/map','看展位索引','按展位号先规划自己的顺序。','map','visit-plan')
@@ -649,7 +654,7 @@ var VIEWS={
     +'</div></section>'
     +'<div class="rows">'
     +row('users','28-jobfair-enhanced.html?screen=companies','/job-fairs/:id/companies','对照参展名单核一遍','清单里的每家单位都能在名单里找到。','companies','visit-plan')
-    +row('doc','38-member-assets.html?state=documents-ready','/me/documents','存到我的文档','是否入库以服务端返回为准，本页不代为确认。','docs','visit-plan')
+    +row('doc','38-member-assets.html?state=documents-ready','/me/documents','存到我的文档','是否保存成功以系统返回的结果为准，本页不代为确认。','docs','visit-plan')
     +'</div></div>'
     +'<div class="ctabar"><a class="btn ghost narrow press" href="28-jobfair-enhanced.html?screen=visit-plan" data-route="/job-fairs/:id/visit-plan">重新生成</a>'
     +'<a class="btn primary press" href="14-print-confirm.html" data-route="/print/confirm" data-testid="visit-plan-primary">'+svg('print',22)+'打印这份清单</a></div>';
@@ -666,7 +671,7 @@ var VIEWS={
 },
 'visit-plan:failed':function(){
   return '<div class="scroll center">'+stateBlock('visit-plan','error','alert','这次没生成出来',
-    '服务端返回失败。可能是简历内容不完整、参展名单还没回来，或者模型这会儿不稳定。<b>本机不会拿一份通用参会攻略冒充结果</b>。',
+    '这次没有生成成功。可能是简历内容不完整、参展名单还没回来，或者 AI 这会儿不稳定。<b>本机不会拿一份通用参会攻略冒充结果</b>。',
     '<a class="btn ghost press" href="39-member-records.html?view=resumes" data-route="/me/resumes">换一份简历再试</a>'
     +'<a class="btn primary press" href="28-jobfair-enhanced.html?screen=visit-plan" data-route="/job-fairs/:id/visit-plan" data-testid="visit-plan-primary">重新生成</a>')
     +'<div class="rows">'
@@ -685,7 +690,7 @@ var VIEWS={
     +'</div>'
     +'<section class="card"><div class="blk-h">'+svg('info',24)+'这些数字是怎么来的</div>'
     +'<p class="state-p" style="font-size:20px">全部来自<b>主办方回传的统计接口</b>。本机不做人流统计、不接摄像头、也不按签到推算——没有回传就显示为空，不会拿估算值补上。</p></section>'
-    +'<section class="card"><div class="blk-h">'+svg('globe',24)+'口径与更新<span class="hint">字段由服务端返回</span></div><div class="kv">'
+    +'<section class="card"><div class="blk-h">'+svg('globe',24)+'口径与更新<span class="hint">内容以系统返回为准</span></div><div class="kv">'
     +kvRow('数据来源',slot('—','wide'))+kvRow('统计口径',slot('—','wide'))+kvRow('更新时间',slot('—','wide'))
     +'</div></section>'
     +'<div class="rows">'
@@ -749,7 +754,7 @@ var PILL={
   'list:error':['bad','场次名单这次没取到'],
   'checkin:guide':['warn','本机不做签到，只给到场指引'],
   'checkin:qr':['ok','来源入场码已就绪'],
-  'checkin:empty':['','暂无配置 checkinUrl 的可用场次'],
+  'checkin:empty':['','暂无开放入场二维码的场次'],
   'checkin:error':['bad','入场入口列表这次没取到'],
   'detail:loading':['','正在取这场的详情'],
   'detail:ended':['warn','这场已经结束'],
@@ -764,8 +769,8 @@ var PILL={
   'materials:expired':['warn','物料链接已过期'],
   'materials:print-failed':['bad','这次打印没有成功'],
   'visit-plan:missing-context':['warn','缺少简历或参展上下文'],
-  'visit-plan:generating':['','已提交，等服务端返回'],
-  'visit-plan:ready':['ok','清单已由服务端返回'],
+  'visit-plan:generating':['','已提交，等结果返回'],
+  'visit-plan:ready':['ok','清单已经生成'],
   'visit-plan:ai-unavailable':['warn','AI 不可用，浏览与打印不受影响'],
   'visit-plan:failed':['bad','本次生成失败'],
   'stats:empty':['','主办方还没有回传统计'],
@@ -777,7 +782,7 @@ var HEAD={
   'detail':['招聘会详情','时间、地点与来源三要素由主办方发布，本机不代预约。'],
   'companies':['参展企业','名单由主办方提供；本机不代收简历，也不在平台内投递。'],
   'map':['展位分布','有主办方给的图或展位号才显示；本机不画推荐路线。'],
-  'materials':['活动物料','链接由服务端临时签发；打印价格以现场公示与服务端报价为准。'],
+  'materials':['活动物料','下载链接临时有效；打印价格以现场公示与系统报价为准。'],
   'visit-plan':['参会准备清单','需要你确认本人简历，并有这场真实的参展上下文。'],
   'stats':['现场统计','数值由主办方回传，本机不估算、不推算。']
 };
@@ -843,6 +848,11 @@ root.addEventListener('click',function(e){
 
 function tick(){var d=new Date();document.getElementById('clock').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 tick();setInterval(tick,20000);
+/* 舞台是 overflow:hidden 的定尺画布。焦点落到屏外元素时浏览器会滚动这个盒子，
+   整页版式跟着位移（首条内容被顶到筛选区底下）。这里把它按死在 0：
+   位置只由布局决定，滚动只发生在列表自己的滚动容器里。 */
+(function(){var st=document.getElementById('stage');if(!st)return;
+ st.addEventListener('scroll',function(){st.scrollTop=0;st.scrollLeft=0;});})();
 function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
 fit();addEventListener('resize',fit);
 

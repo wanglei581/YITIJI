@@ -64,7 +64,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink-2:#3d5a52;--ink-3:#6b857c;
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink-2:#3d5a52;--ink-3:#526b62;
   --deep:#0b241e;--emerald:#2ee6a8;
   --teal:#1f9e86;--teal-d:#157a67;--teal-soft:#e0f2ec;
   --slate:#3f68b0;--slate-d:#35608f;--slate-soft:#e6ecf7;
@@ -292,8 +292,36 @@ ul{list-style:none}
 .demo-panel a{min-height:48px;padding:8px 10px;font-size:17px;border-bottom:1px solid rgba(231,239,233,.14);display:flex;align-items:center}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* 2026-09-05 体检修复：27 寸竖屏 1px≈0.31mm，13–15px 辅助文字站立读不清；统一提到 16px（正文字阶仍按规范 17–23）。 */
-.template .use,.tags i,.others .list button i,.tmeta u,.field .fe,.after .st>i,.fc-h .badge,.fc-grid u,.fc-foot,.reason,.draft-h span,.draft-rows u,.ly-note i,.hand-rows u{font-size:16px}
+/* ══ 软键盘避让（27 寸竖屏触控 + 中文屏幕键盘） ════════════
+   一体机上打字用的是 Windows 屏幕拼音键盘：它停靠在屏幕下沿、
+   吃掉大约三分之一高度，而且不会滚动页面 —— #stage 是定高 1920 的
+   舞台，窗口层面根本没有可滚的东西。所以避让必须由页面自己做：
+   把整屏内容重排进「键盘上沿以上」那一段，而不是指望 scroll。
+   --kb 是键盘占掉的高度，默认 640px（1920 的 1/3，停靠态量级）；
+   visualViewport 能量到真实高度时由脚本改写这个变量。
+   本页是双栏 + 长表单：压缩后目录列 .catalog 与详情列 .detail
+   本来就各自可滚，字段一个不少、模板一个不删，脚本只负责把正在
+   输入的那一格滚进可视区，并在它下面留出安全距离。
+   底部合规说明（truth）与导航（navbar）压缩后仍留在键盘上方。
+   未聚焦时下面没有任何一条生效，默认态布局完全不变。 */
+#stage{--kb:640px}
+#stage.kb,
+#stage:has(.field textarea:focus),
+#stage:has(.field input:focus){padding-bottom:var(--kb)}
+/* 压缩后详情列一定会溢出，明确让它滚，不出现够不着的字段 */
+#stage.kb .detail,
+#stage:has(.field textarea:focus) .detail,
+#stage:has(.field input:focus) .detail{overflow-y:auto;scroll-padding-bottom:24px}
+/* 压缩后表单按自然高度排布、由详情列统一滚动：
+   长文本框有 110px 的最小可写高度，硬压会让字段互相叠字。宁可滚，不叠。 */
+#stage.kb .form.grow,
+#stage:has(.field textarea:focus) .form.grow,
+#stage:has(.field input:focus) .form.grow{flex:none;grid-template-rows:none}
+
+/* 正在输入的那一格要一眼看得出来：外接键盘 / 辅助设备同样适用 */
+.field input:focus-visible,.field textarea:focus-visible{
+  outline:4px solid var(--teal);outline-offset:2px;border-color:var(--teal);background:var(--surface)}
+.field:focus-within>span:first-child{color:var(--teal-d)}
 </style>
 </head>
 <body>
@@ -319,9 +347,9 @@ ul{list-style:none}
   </div>
 
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
 
   <div class="layer" id="layer" aria-hidden="true"></div>
@@ -437,7 +465,7 @@ function fileOf(){
     fileExpiresAt:'2026-11-29 09:32',
     previewUrlPath:'/files/'+t.id+'/preview-url',
     downloadUrlPath:'/files/'+t.id+'/download-url',
-    printFileUrl:state==='generated'?'系统 HMAC content URL（仅 /print/jobs 可用）':null
+    printFileUrl:state==='generated'?'已就绪（一次性打印链接，只交给打印任务，界面不展示完整地址）':null
   };
 }
 function kb(n){return n<1024*1024?Math.max(1,Math.round(n/1024))+' KB':(n/1024/1024).toFixed(1)+' MB';}
@@ -480,7 +508,7 @@ function afterFlow(){
   return '<div class="after" data-testid="'+SCREEN+'-after"><b>生成后</b>'
     +'<span class="st"><i>1</i>返回真实文件对象</span><span class="sep">›</span>'
     +'<span class="st"><i>2</i>进我的文档，可全屏看完整 PDF</span><span class="sep">›</span>'
-    +'<span class="st"><i>3</i>服务端给出 printFileUrl 才能去打印</span></div>';
+    +'<span class="st"><i>3</i>服务端发回打印凭证，才能去打印</span></div>';
 }
 function ensureSelectedVisible(){
   var list=visibleTemplates();
@@ -512,7 +540,7 @@ function fileCard(mode){
   var f=fileOf(),demo=mode==='demo',noPrint=mode==='no-print';
   var tone=demo?'demo':(noPrint?'warn':'ok');
   var head=demo?['演示对象 · 未保存真实文件','演示模式返回的是占位对象，不进我的文档，也没有打印凭证。']
-    :noPrint?['真实 PDF 已生成 · 打印凭证未就绪','文件已进入我的文档，可查看、可预览；没有 printFileUrl 时只禁打印。']
+    :noPrint?['真实 PDF 已生成 · 打印凭证未就绪','文件已进入我的文档，可查看、可预览；打印凭证没就绪时，只有打印这一步不能用。']
     :['真实 PDF 已生成 · 已进入我的文档','下面每一项都取自 POST /job-materials/generate 的返回字段。'];
   var rows=[
     ['文件名',esc(f.filename),0],['页数',f.pageCount+' 页',0],
@@ -522,14 +550,14 @@ function fileCard(mode){
     ['签名链接有效期 signedUrlExpiresAt',demo?'—':esc(f.signedUrlExpiresAt),demo?1:0],
     ['文件留存到 fileExpiresAt',demo?'不保存':esc(f.fileExpiresAt),demo?1:0],
     ['预览路径 previewUrlPath',demo?'—':esc(f.previewUrlPath),demo?1:0],
-    ['打印凭证 printFileUrl',f.printFileUrl?esc(f.printFileUrl):'未返回（打印保持禁用）',f.printFileUrl?0:1]
+    ['打印凭证',f.printFileUrl?esc(f.printFileUrl):'服务端未发回（打印保持禁用）',f.printFileUrl?0:1]
   ];
   var grid=rows.map(function(r){return '<div><u>'+r[0]+'</u><b'+(r[2]?' class="off"':'')+'>'+r[1]+'</b></div>';}).join('');
   var canPrint=!!f.printFileUrl;
   var reason=canPrint&&!demo?''
     :'<p class="reason" id="'+(demo?'rz-preview':'rz-print')+'">'
       +(demo?'演示模式没有真实文件：预览、我的文档和打印都停用，页面不拿一个示例文件冒充结果。'
-        :'服务端这次没有返回 printFileUrl。文件本身是真的，可以看、可以留在我的文档里；只有打印这一步必须等到凭证就绪。')
+        :'服务端这次没有发回打印凭证。文件本身是真的，可以看、可以留在我的文档里；只有打印这一步必须等凭证就绪。')
       +'</p>';
   var dirtyBar=dirty?'<div class="banner warn" data-testid="'+SCREEN+'-stale"><i aria-hidden="true">'+svg('alert',20)+'</i>'
     +'<span class="bx"><b>表单已经改过了，下面这份文件还是上一次生成的那一版。</b>'
@@ -706,7 +734,7 @@ var VIEWS={
       ['还没有','文件名、页数、大小、留存期限与打印凭证'],
       ['不显示','百分比、阶段点或预计完成时间'],
       ['返回表单','只是回到表单页；这次请求是否已到服务端，以返回为准'],
-      ['成功之后','文件进我的文档，打印仍要等真实 printFileUrl'],
+      ['成功之后','文件进我的文档，打印仍要等服务端发回真实打印凭证'],
       ['失败之后','停在失败页并保留你填的字段，不用示例文件顶替'],
       ['本页不会','代投递，也不会把这份材料发给任何单位']
     ],'submitting-facts')
@@ -773,7 +801,7 @@ function resultCta(demo){
       ?'<b>新草稿还没有对应的文件</b>：改动只在表单里，重新生成才会有新的 PDF；下面三个出口指向的仍是上一版。'
       :'这一份是刚生成的文件；改动模板或任何字段之后都要重新生成。')
     +(demo?'演示模式不保存真实文件，预览、我的文档与打印全部停用。'
-      :(f.printFileUrl?'':'本次没有 printFileUrl，<b>只有打印被禁用</b>，查看与我的文档不受影响。'));
+      :(f.printFileUrl?'':'本次没有拿到打印凭证，<b>只有打印被禁用</b>，查看与我的文档不受影响。'));
   var docsLabel=dirty?'我的文档（上一版）':'我的文档';
   return '<p class="whyline" data-testid="'+SCREEN+'-why">'+why+'</p><div class="ctabar four">'
     +'<button type="button" class="btn ghost press" id="do-generate" data-testid="'+SCREEN+'-regenerate">'
@@ -803,7 +831,7 @@ var SUB={
   'signed-out':'公共终端不凭匿名会话读取任何人的材料；草稿先留着，登录有效才提交。',
   'loading':'返回前不展示模板名称或数量。','error':'读取失败不伪装成空列表。','empty':'读取成功，但已发布模板数量为 0。',
   'submitting':'真实文件返回前不显示文件名和打印入口。',
-  'generated':'文件已进入本人文档；打印仍要求真实 printFileUrl。',
+  'generated':'文件已进入本人文档；打印仍要求服务端发回真实打印凭证。',
   'generated-no-print':'文件存在，但没有打印凭证就不进入打印确认。',
   'demo-result':'演示模式不保存真实文件。','failed':'失败就是失败，不用示例文件顶替结果。',
   'illegal':'不回显地址栏原文，也不猜你想去哪一屏。'
@@ -884,7 +912,7 @@ function previewLayer(){
 function printLayer(){
   var f=fileOf();
   var pairs=[['文件名 name',f.filename],['大小 size',kb(f.sizeBytes)],['页数 pages',f.pageCount],
-    ['文件编号 fileId',f.fileId],['打印地址 fileUrl',f.printFileUrl||'未返回'],['类型 mimeType',f.mimeType]];
+    ['文件编号 fileId',f.fileId],['打印凭证',f.printFileUrl||'服务端未发回'],['类型 mimeType',f.mimeType]];
   /* 单双面固定走**单面**：黑白单面是本机当前唯一已验证的组合，打印确认页也只按这一组
      登记了报价夹具。拿「2 页所以默认双面」把材料送过去，只会撞在那一页的能力受限屏上，
      用户看到的是一句「这台机器暂不支持」，而不是报价 —— 那不是更真实，是白跑一趟。
@@ -903,7 +931,7 @@ function printLayer(){
     +'<div class="hand-g"><b>打印参数 makePrintParams</b><div class="hand-rows">'
     +params.map(function(p){return '<div><u>'+esc(p[0])+'</u><b>'+esc(p[1])+'</b></div>';}).join('')+'</div></div>'
     +'<div class="banner"><i aria-hidden="true">'+svg('info',20)+'</i><span class="bx">'
-    +'<b>真实页面用路由 state 传这一份，不把 printFileUrl 放进地址栏。</b>'
+    +'<b>真实页面用路由内部状态传这一份，不把打印凭证地址放进地址栏。</b>'
     +'本原型的跳转只带来源、fileId、页数和打印参数，用来说明交接内容，不是已经接通的打印链路；'
     +'份数、单双面和颜色在打印确认页还能改，计费也在那里按真实页数算。</span></div></div>'
     +'<div class="ly-act"><button type="button" class="btn ghost press" id="ly-close-2">再看看文件</button>'
@@ -1066,6 +1094,65 @@ function tick(){var d=new Date();document.getElementById('clock').textContent=St
 tick();setInterval(tick,20000);
 function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
 fit();addEventListener('resize',function(){fit();if(layerKind==='preview')layoutPreview();});
+
+/* ── 软键盘避让 ─────────────────────────────────
+   上面的 CSS 已经能单独把布局压到键盘上方（:has 选择器），
+   这里只补两件 CSS 做不了的事：量真实键盘高度、把字段滚进可见区。
+   焦点事件挂在 document 上做委托 —— 表单每次 render() 都是新 DOM，
+   直接绑在 input 上的监听会在下一次重渲染时全部失效。 */
+var stageEl=document.getElementById('stage');
+var KB_FALLBACK=640;   /* 停靠态屏幕拼音键盘约占 1920 的 1/3 */
+var kbTimer=null;
+function stageScale(){var m=/scale\(([\d.]+)\)/.exec(stageEl.style.transform||'');return m?parseFloat(m[1]):1;}
+function kbInset(){
+  var vv=window.visualViewport;
+  if(vv){
+    var covered=innerHeight-vv.height-(vv.offsetTop||0);
+    if(covered>40)return Math.max(240,Math.min(1200,Math.round(covered/(stageScale()||1))));
+  }
+  return KB_FALLBACK;  /* 窗口不缩的停靠键盘（Windows 一体机常态）量不出来，按默认留 */
+}
+function isTextField(el){
+  if(!el)return false;
+  if(el.tagName==='TEXTAREA')return true;
+  return el.tagName==='INPUT'&&/^(text|search|tel|email|number|password|url)$/.test(el.type||'text');
+}
+/* 逐级把可滚祖先滚到「字段整段落在可视区内」，上下各留 24px */
+function revealField(el){
+  var m=24,n=el.parentNode;
+  while(n&&n.nodeType===1&&n!==document.body){
+    var cs=getComputedStyle(n);
+    if(/auto|scroll/.test(cs.overflowY)&&n.scrollHeight>n.clientHeight+1){
+      var er=el.getBoundingClientRect(),nr=n.getBoundingClientRect();
+      var over=er.bottom+m-nr.bottom,under=nr.top+m-er.top;
+      if(over>0)n.scrollTop+=over;else if(under>0)n.scrollTop-=under;
+    }
+    n=n.parentNode;
+  }
+}
+function kbOpen(el){
+  clearTimeout(kbTimer);
+  stageEl.style.setProperty('--kb',kbInset()+'px');
+  stageEl.classList.add('kb');
+  revealField(el);                                     /* 同步读 rect 已经是重排后的位置 */
+  requestAnimationFrame(function(){revealField(el);}); /* 回流晚一拍的情况再对一次 */
+}
+function kbClose(){stageEl.classList.remove('kb');stageEl.style.removeProperty('--kb');}
+document.addEventListener('focusin',function(e){if(isTextField(e.target))kbOpen(e.target);});
+document.addEventListener('focusout',function(e){
+  if(!isTextField(e.target))return;
+  clearTimeout(kbTimer);
+  /* 延迟一拍：在字段之间切焦点、或表单重渲染后重新聚焦时不闪一下布局 */
+  kbTimer=setTimeout(function(){if(!isTextField(document.activeElement))kbClose();},120);
+});
+function kbSync(){
+  var a=document.activeElement;
+  if(!isTextField(a))return;
+  stageEl.style.setProperty('--kb',kbInset()+'px');
+  revealField(a);
+}
+addEventListener('resize',kbSync);
+if(window.visualViewport)visualViewport.addEventListener('resize',kbSync);
 
 if(DEBUG){
   var tab=document.getElementById('demo-tab'),panel=document.getElementById('demo-panel'),html='';
