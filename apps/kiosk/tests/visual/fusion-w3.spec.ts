@@ -406,9 +406,18 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
     expect(parseCalls, `${label}: no automatic re-POST`).toBe(calls)
     await expect(resubmit, label).toBeVisible()
     if (calls === 1) await assertNoHorizontalOverflow(page)
-    // 用户主动再提交：明确是新的一次，只多一次请求；同一刻连点两下也只发一次。
+    // 新的一次要过两级确认。同一刻连点不得跳过任一级，确认完成前不得 POST。
     await resubmit.evaluate((button: HTMLElement) => { button.click(); button.click() })
-    await expect.poll(() => parseCalls, label).toBe(calls + 1)
+    const firstDialog = page.getByRole('dialog', { name: '重新提交是新的一次' })
+    await expect(firstDialog, label).toBeVisible()
+    await expect(firstDialog.getByRole('button', { name: '开始新的一次' }), label).toHaveCount(0)
+    expect(parseCalls, `${label}: opening confirm does not POST`).toBe(calls)
+    await firstDialog.getByRole('button', { name: '继续确认' }).evaluate((button: HTMLElement) => { button.click(); button.click() })
+    const secondDialog = page.getByRole('dialog', { name: '再次确认' })
+    await expect(secondDialog, label).toBeVisible()
+    expect(parseCalls, `${label}: first confirm does not POST`).toBe(calls)
+    await secondDialog.getByRole('button', { name: '开始新的一次' }).evaluate((button: HTMLElement) => { button.click(); button.click() })
+    await expect.poll(() => parseCalls, `${label}: second confirm posts once`).toBe(calls + 1)
   }
   await page.waitForURL('/resume/report')
   await expect(page.locator('[data-kiosk-screen="resume-report"]')).toHaveAttribute('data-state', /^report(?:-minimal)?$/)
