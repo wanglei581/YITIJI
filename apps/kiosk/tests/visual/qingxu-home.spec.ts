@@ -113,6 +113,25 @@ async function expectTouchFloor(locator: Locator, minimumCssHeight: number): Pro
   }
 }
 
+// 主卡说明曾被 flex 压成 0 高、叠在标题与脚注之间（2026-09-24 实拍）。
+// 判据是几何：说明完整可读（不被裁），且纵向落在标题之下、脚注之上。
+async function expectReadableFeature(page: Page): Promise<void> {
+  const tile = page.locator('[data-action="print-hub"]')
+  const [title, desc, foot] = await Promise.all([
+    tile.locator('strong').boundingBox(),
+    tile.locator('.qx-home-tile-desc').boundingBox(),
+    tile.locator('.qx-home-tile-foot').boundingBox(),
+  ])
+  expect(title && desc && foot).toBeTruthy()
+  expect(desc!.height).toBeGreaterThanOrEqual(18)
+  expect(desc!.y).toBeGreaterThanOrEqual(title!.y + title!.height - 1)
+  expect(desc!.y + desc!.height).toBeLessThanOrEqual(foot!.y + 1)
+  const clipped = await tile.locator('.qx-home-tile-desc').evaluate((el) =>
+    el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1,
+  )
+  expect(clipped, '主卡说明不得在纵向或横向被裁切').toBe(false)
+}
+
 function collectRuntimeErrors(page: Page): string[] {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
@@ -142,6 +161,12 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(home.getByText('2026 青岛秋季高校毕业生招聘会', { exact: true })).toBeVisible()
   expect(fairRequestUrl.searchParams.get('terminalId')).toBe('KSK-001')
   await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
+  // 打印机状态未知时，主卡照实说「状态未知」和受影响范围，不写成「进入后核验」的常态眉题。
+  const printTile = home.locator('[data-action="print-hub"]')
+  await expect(printTile).toHaveAttribute('data-panel-state', 'unknown')
+  await expect(printTile.getByText('状态未知', { exact: true })).toBeVisible()
+  await expect(printTile.getByText(/出纸与扫描暂停/)).toBeVisible()
+  await expectReadableFeature(page)
   // 百宝箱 / 智慧校园是**能力闸门**：本机没开通就该点不动，浏览器不是绑定终端，
   // 所以这里必须 disabled。这两条钉的是 fail-closed，不是钉「当前恰好是灰的」。
   await expect(home.getByRole('button', { name: /百宝箱/ })).toBeDisabled()
@@ -186,6 +211,39 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   expect(runtimeErrors).toEqual([])
 })
 
+test('home ready state defers capability claims to entry without hiding the real device pill @w1-kiosk', async ({ page, api }) => {
+  registerHomeApi(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', isOnline: true } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: {
+      smartCampus: { enabled: true, modules: { welcome: true, bigdata: false, luggage: false, panorama: false }, items: [] },
+      toolbox: { enabled: false, items: [] },
+      configVersion: 'qx-home-ready',
+      refreshIntervalMs: 300000,
+      serverTime: '2026-09-07T00:00:00.000Z',
+    },
+  })
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  const printTile = home.locator('[data-action="print-hub"]')
+  await expect(printTile).toHaveAttribute('data-panel-state', 'ready')
+  // 真实设备态仍在顶栏胶囊；主卡按稿只写「进入后核验」，不重复报「打印机在线」。
+  await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('打印机在线')
+  await expect(printTile.getByText('进入后核验打印与扫描能力', { exact: true })).toBeVisible()
+  await expect(printTile.getByText('打印机在线')).toHaveCount(0)
+  await expectReadableFeature(page)
+  // 智慧校园开通只凭终端配置，首页不宣称「已授权」；开通后可点。
+  const campus = home.getByRole('button', { name: /智慧校园/ })
+  await expect(campus).toBeEnabled()
+  await expect(campus.getByText('受控开放', { exact: true })).toBeVisible()
+  await expect(home.getByText('已授权', { exact: true })).toHaveCount(0)
+  await expect(home.getByRole('button', { name: /百宝箱/ })).toBeDisabled()
+  await expect(home.getByRole('button', { name: /查看全部服务|更多服务/ })).toHaveCount(0)
+  await page.screenshot({ path: test.info().outputPath('home-ready-1080x1920.png') })
+})
+
 test('home exposes an honest job-fair error and a real retry @w1-kiosk', async ({ page, api }) => {
   registerHomeApi(api)
   api.abort('GET', '/api/v1/job-fairs', 'internetdisconnected')
@@ -215,6 +273,9 @@ test('home keeps one shell and a usable narrow layout @w1-mobile', async ({ page
   await expect(page.locator('.ui-kiosk-nav')).toHaveCount(0)
   await expect(page.locator('.ui-kiosk-shell')).not.toHaveClass(/kiosk-home-mobile|v6-runtime-shell/)
   await assertNoHorizontalOverflow(page)
+  await expectReadableFeature(page)
+  await expect(page.getByTestId('home-identity')).toBeVisible()
   await expectTouchFloor(page.getByTestId('qx-home').locator('button:visible, a:visible'), 48)
+  await page.screenshot({ path: test.info().outputPath('home-390x844.png'), fullPage: true })
   expect(runtimeErrors).toEqual([])
 })

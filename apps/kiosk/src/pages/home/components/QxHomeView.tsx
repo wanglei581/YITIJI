@@ -8,6 +8,7 @@ import {
   CalendarDaysIcon,
   FileTextIcon,
   GraduationCapIcon,
+  HistoryIcon,
   HomeIcon,
   LandmarkIcon,
   MicIcon,
@@ -124,6 +125,8 @@ export function QxHomeView({
   const campusKnown = campus.status === 'ready' && Boolean(campus.configVersion)
   const toolboxReady = toolboxKnown && toolbox.enabled
   const campusReady = campusKnown && campus.enabled
+  /* 稿 01-home 眉题：出纸能力进入后核验，首页不再重复顶栏的「打印机在线」；读取中 / 离线 / 异常 / 未知照实写在这里。 */
+  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '进入后核验打印与扫描能力' : device.printerLabel
 
   return (
     <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home">
@@ -131,20 +134,11 @@ export function QxHomeView({
         <div className="qx-home-assistant">
           <span className="qx-home-avatar" aria-hidden="true">青</span>
           <div>
-            <h2>{isLoggedIn && displayName ? `${displayName}，你好，我是小青` : '你好，我是小青'}</h2>
+            <h2>{isLoggedIn && displayName ? `${displayName}，你好，我是` : '你好，我是'}<em>小青</em></h2>
             <span>说一句你想办的事，我带你一步一步办</span>
           </div>
           <QxHomeClock />
         </div>
-        <button
-          type="button"
-          className="qx-home-identity"
-          onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
-          data-testid="home-identity"
-        >
-          <UserIcon aria-hidden="true" />
-          <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
-        </button>
         <button
           type="button"
           className="qx-home-voice"
@@ -161,14 +155,25 @@ export function QxHomeView({
           <button type="button" onClick={() => onAction('jobs-hub')}>找工作</button>
           <button type="button" onClick={() => onAction('policy-hub')}>查政策</button>
         </div>
+        {/* 身份入口占稿里「更多服务」那一格（运行时没有全部服务目录路由，不摆那颗按钮）。 */}
+        <button
+          type="button"
+          className="qx-home-identity"
+          onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
+          data-testid="home-identity"
+        >
+          <UserIcon aria-hidden="true" />
+          <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
+        </button>
         <div className="qx-home-continue" data-testid="home-context-region">
           {continueSlot}
           {/* 空态是一句陈述，不是一个动作 —— 做成 disabled 按钮等于摆一颗点不动的控件，
               一体机上没有鼠标悬停，用户看不到 title，只会反复去戳它。 */}
           <div className="qx-home-empty-context" role="status">
+            <span className="qx-home-context-icon" aria-hidden="true"><HistoryIcon /></span>
             <span>
               <strong>这台机器上没有待继续的办理</strong>
-              <small>下面的服务都能直接开始</small>
+              <small>可以从下方服务重新开始，不会显示上一位使用者的资料</small>
             </span>
           </div>
         </div>
@@ -179,7 +184,7 @@ export function QxHomeView({
         <header className="qx-home-section-head">
           <div>
             <h2 id="qx-home-services-title">直接办</h2>
-            <span>选择一项真实服务开始</span>
+            <span>选择一项服务开始</span>
           </div>
         </header>
 
@@ -187,10 +192,10 @@ export function QxHomeView({
           <HomeTile
             actionId="print-hub"
             title="打印 · 扫描"
-            description="简历、证明材料与照片，进入后核验打印与扫描能力"
+            description="简历、证明材料与照片，进入后选择文件来源"
             foot="开始选择材料"
-            badge={device.loading ? '状态读取中' : device.printerReady ? '打印机在线' : device.printerLabel}
-            statusText={printStatus.note}
+            badge={printEyebrow}
+            statusText={device.loading ? undefined : printStatus.note}
             icon={PrinterIcon}
             size="feature"
             /* 设备状态面板标记。判据沿用 V6HomeFooterPanels.tsx:119 的
@@ -270,8 +275,8 @@ export function QxHomeView({
           <HomeTile
             actionId="toolbox"
             title="百宝箱"
-            description={toolbox.status === 'loading' ? '正在读取本机上架配置' : !toolboxKnown ? '暂时无法确认本机上架配置' : toolboxReady ? '进入本机已上架的扩展服务' : '本机尚未上架扩展服务'}
-            badge={toolbox.status === 'loading' ? '读取中' : !toolboxKnown ? '状态未知' : toolboxReady ? '已上架' : '未开放'}
+            description={toolbox.status === 'loading' ? '正在读取本机上架配置' : !toolboxKnown ? '暂时无法确认本机上架配置' : toolboxReady ? '按本机已上架的扩展服务进入' : '本机尚未上架扩展服务'}
+            badge={toolbox.status === 'loading' ? '读取中' : !toolboxKnown ? '状态未知' : toolboxReady ? '受控开放' : '未开放'}
             icon={WrenchIcon}
             tone="neutral"
             size="slim"
@@ -282,8 +287,9 @@ export function QxHomeView({
           <HomeTile
             actionId="smart-campus"
             title="智慧校园"
-            description={campus.status === 'loading' ? '正在读取终端授权' : !campusKnown ? '暂时无法确认终端授权状态' : campusReady ? '进入本机已授权的校园服务' : '需终端或机构授权后使用'}
-            badge={campus.status === 'loading' ? '读取中' : !campusKnown ? '状态未知' : campusReady ? '已授权' : '未开放'}
+            /* 就绪只代表终端配置 smartCampus.enabled，模块进入后才读，故不写首页核实不了的「已授权」。 */
+            description={campus.status === 'loading' ? '正在读取终端授权' : !campusKnown ? '暂时无法确认终端授权状态' : campusReady ? '按本机开通范围进入校园服务' : '需终端或机构授权后使用'}
+            badge={campus.status === 'loading' ? '读取中' : !campusKnown ? '状态未知' : campusReady ? '受控开放' : '未开放'}
             icon={GraduationCapIcon}
             tone="neutral"
             size="slim"

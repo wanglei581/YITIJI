@@ -1,5 +1,75 @@
 # 下一步任务
 
+## 2026-09-24：青序流光 51 稿逐页对照（UI 专项，本地候选）
+
+- **分母：** 本隔离树的 `docs/design/kiosk-redesign-2026-08/` 顶层编号 HTML 实有 **52 份**：00–51 缺 17 共 51 张核心稿，另有后加的 `52-advisor-artifact.html`（已入库于 `9faa26c46`）。只读现场计数：原根工作区 51 份且无 52 号，当前隔离树 52 份，不能混用 checkout 数字。51 张核心稿均在隔离树实际渲染，HTTP 200、无 pageerror；52 号也单独实拍了无产物态，截图在忽略的 `test-results/kiosk-51-reference-016bcf3b/`。核心稿的 33/37 是已有路由的状态版式，36 是设计索引；剩余 48 个产品宿主中，36 个主入口在 `KioskRoot.tsx` 的 QX 集合或精确模式登记，11 个未在该集合，02 没有独立的“全部服务”路由。含 52 号则是 49 个产品宿主、37 个 QX 登记。**36/48 与 37/49 只是壳层路由登记率，不是视觉或业务完成率。**
+- **源事实差异：** 旧 `kimi-full-coverage-v2/COVERAGE-MATRIX.md` 是当时 106 路由的静态归属表；当前 `route-manifest.ts` 列 109 个模式，生成的 `docs/graph/routes.md` 识别 89 条（含 18 条重定向），两者有 21 条清单独有入口和 1 条图谱独有兜底 `/*`。必须以 `src/routes/index.tsx` 与浏览器命中复核，不能任选一个旧数字宣布覆盖。图谱端点数只是 import 可达上界，不证明发起请求或成功交付。
+- **实屏判断：** 基线 `016bcf3b` 已对照运行时 `/`、`/print-scan`、`/assistant`、`/help`、`/login`；`/assistant`、`/help` 明显是旧壳，打印 Hub 有新版内容但页头/字阶仍有差异，首页主打印卡说明曾被挤到几乎不可读。本分支从 `fbd25e089` 修首页并在 1080×1920 与 390×844 复验；其余稿均未逐状态验收。手机 `/upload/phone` 只拍到无效链接态，不能代表正常接力。
+- **上线判断：UI NO-GO。** 每页需用真实路由→API→授权→等待/空/错/禁用→结果沉淀和实屏触控复核；再做 reduced-motion、CI、Windows Edge/27 寸现场、支付/设备与回滚验收。静态原型中的 AI、支付、扫描和二维码演示不当成真实能力；本任务不部署。
+
+下表逐张记录**主入口路由登记**；一个宿主的其它 route/state 仍须按设计矩阵和真实业务门禁复核。“已登记”不表示视觉或商用验收通过。
+
+| 原型宿主 | 运行时主入口 | 当前接入口径 |
+| --- | --- | --- |
+| 00-standby | `/screensaver` | QX 路由已登记；视觉待验 |
+| 01-home | `/` | QX 路由已登记；本地首屏修复待集成 |
+| 02-services | — | 缺独立全部服务路由 |
+| 03-login-gate | `/login` | QX 路由已登记；视觉待验 |
+| 04-session-guard | `/session-timeout` | QX 路由已登记；视觉待验 |
+| 05-ai-cockpit | `/assistant` | 未在 QX 集合；实屏仍旧壳 |
+| 06-help | `/help` | 未在 QX 集合；实屏仍旧壳 |
+| 07-session-resume | `/session-resume` | QX 路由已登记；视觉待验 |
+| 08-legal | `/legal/:doc` | 未在 QX 集合；待实屏验 |
+| 09-system-state | `/error-offline` | 未在 QX 集合；待实屏验 |
+| 10-print-hub | `/print-scan` | QX 路由已登记；有视觉差 |
+| 11-arrival-code | `/print/pickup-claim` | QX 路由已登记；视觉待验 |
+| 12-file-source | `/print/upload` | QX 路由已登记；视觉待验 |
+| 13-print-desk | `/print/material-check` | QX 路由已登记；视觉待验 |
+| 14-print-confirm | `/print/confirm` | QX 路由已登记；视觉待验 |
+| 15-print-fulfill | `/print/progress` | QX 路由已登记；视觉待验 |
+| 16-service-hubs | `/resume-service` | QX 路由已登记；五服务台待逐态验 |
+| 18-scan-workbench | `/scan/start` | QX 路由已登记；视觉待验 |
+| 19-img2pdf | `/print-scan/convert` | QX 路由已登记；视觉待验 |
+| 20-sign-stamp | `/print-scan/sign` | QX 路由已登记；视觉待验 |
+| 21-resume-triage | `/resume/source` | QX 路由已登记；视觉待验 |
+| 22-resume-report | `/resume/report` | QX 路由已登记；与主任务修复合流后待实屏验 |
+| 23-resume-optimize | `/resume/optimize` | QX 路由已登记；视觉待验 |
+| 24-resume-generate | `/resume/generate` | QX 路由已登记；视觉待验 |
+| 25-material-workshop | `/resume/materials` | QX 路由已登记；视觉待验 |
+| 26-browse-list | `/jobs` | QX 路由已登记；视觉待验 |
+| 27-browse-detail | `/jobs/:id` | QX 精确模式已登记；视觉待验 |
+| 28-jobfair-enhanced | `/job-fairs` | QX 路由已登记；视觉待验 |
+| 29-interview-training | `/interview/setup` | 重定向到 QX 工作台；阶段待验 |
+| 30-my-profile | `/profile` | QX 路由已登记；视觉待验 |
+| 31-benefits | `/me/benefits` | QX 路由已登记；视觉待验 |
+| 32-cashier | `/print/cashier` | QX 路由已登记；支付各态待验 |
+| 33-pickup-code | `/print/pickup-claim` | 状态变体，复用 11 的路由 |
+| 34-self-assessment | `/resume/self-assessment/intro` | 未在 QX 集合；待实屏验 |
+| 35-notifications | `/me/notifications` | QX 路由已登记；视觉待验 |
+| 36-index | — | 设计索引，不算产品页 |
+| 37-pay-states | `/print/cashier` | 状态变体，复用 32 的路由 |
+| 38-member-assets | `/me/print-orders` | QX 路由已登记；文档/订单待验 |
+| 39-member-records | `/me/resumes` | QX 路由已登记；记录各态待验 |
+| 40-member-feedback | `/me/feedback` | QX 路由已登记；视觉待验 |
+| 41-member-privacy | `/me/privacy-requests` | QX 路由已登记；视觉待验 |
+| 42-offline-agency-directory | `/jobs/:id/offline` | QX 精确模式已登记；视觉待验 |
+| 43-company-directory | `/companies` | QX 路由已登记；视觉待验 |
+| 44-fair-company-detail | `/job-fairs/:id/companies/:companyId` | QX 精确模式已登记；视觉待验 |
+| 45-online-platform-directory | `/jobs/online-platforms` | QX 路由已登记；视觉待验 |
+| 46-resume-decision-workspace | `/resume/job-fit` | 独立整屏，未在 QX 集合；待实屏验 |
+| 47-contract-review-workspace | `/contract-review` | 独立整屏且能力闸门默认关闭；待验 |
+| 48-policy-workspace | `/renshi` | 未在 QX 集合；待实屏验 |
+| 49-campus-workspace | `/campus` | 未在 QX 集合；待实屏验 |
+| 50-capability-zone-workspace | `/toolbox` | 未在 QX 集合；能力闸门及实屏待验 |
+| 51-phone-relay | `/member/qr-login` | 手机独立壳；有效票据状态待实屏验 |
+| 52-advisor-artifact（补充稿） | `/ai/plan` | QX 路由已登记；仅无产物态实屏对照，其余产物态与发起入口待验 |
+
+**下一批优先级：** 首页卡片密度、圆角、主视觉及低干扰反馈动效；05 顾问、06 帮助旧壳；打印扫描 Hub、收银、扫描、手机接力的真实状态。AI 简历上传→解析→报告→优化/生成、求职材料与顾问必须逐项证明真实 API、授权、失败退路、结果落库及非 AI 回退；现有合成夹具只证明本地合同，不证明生产模型或第三方服务。
+
+**AI 源码核查（仍非线上闭环）：** `AssistantPage` 调 `chatWithAssistant` 并有服务不可用退路；`ResumeSourcePage` 调真实上传适配器，`ResumeParsePage` 提交解析并读取记录，`ResumeReportPage` 读取记录且把技术夹具或 mock provider 标成演示，`ResumeGeneratePage` 提交生成/导出并有授权门；这些是源码与合成门禁事实，未在本轮打真实模型或生产 HTTP。`JobMaterialLibraryPage` 明确使用固定模板，后端无 LLM 撰写，不可叫“AI 自动生成材料”。`/ai/plan` 有真实 session/产物读取和打印适配，但当前只有问答钉选 `qa_pins` 的前台发起入口，`slot_draft` / `compare_report` 的采集页仍缺；无产物态的视觉接近 52 稿，不代表三种产物全链可用。
+
+**四模型证据状态：** Codex 完成 51+1 原型与 7 个运行时入口（含 52 号无产物态）的实屏抽查、首页复验及源代码矩阵；Claude `claude-opus-5-5/xhigh` 首次调用超时只留未验改动，续调完成首页小批、4/4 浏览器与 typecheck/lint；Grok `grok-4.7-build-fast/xhigh` 完成首页截图复核和 AI 源码只读审查，但未亲跑浏览器/真实 API；Agy `gemini-3.8-flash-high/high` 两次超时，记为 **UNREVIEWED**，不算赞同。四者均未给出 51 张运行时逐态验收。
+
 ## 2026-09-24：完整商业收口执行队列
 
 用户已批准开始。以下是当前队列；后文为历史记录，不按旧的“唯一阻塞”或已完成页面重新开发。基线为本地候选 `6e1cf43c22ba5154198981aade959c491eca02e8`，与 main、PR 和生产的区别见 `current-progress.md` 顶部。
