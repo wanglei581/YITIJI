@@ -254,6 +254,58 @@ function clear(intent, ownerIdentity) {
   return enqueue(() => Promise.resolve(removeMatching(intent, ownerIdentity)))
 }
 
+function heldPayload(payload) {
+  const canonical = canonicalPayload(payload)
+  if (!canonical || !samePayload(canonical, payload)) return null
+  return canonical
+}
+
+/** 只认盘上那唯一一条：intent、owner、规范载荷三者都还是这一次。 */
+function matchesHeld(row, expected) {
+  if (!expected || !validRecord(row)) return false
+  const ownerId = expected.ownerId === null ? null : expected.ownerId
+  if (ownerId !== null && (typeof ownerId !== 'string' || !ownerId)) return false
+  const payload = heldPayload(expected.payload)
+  if (!payload || !decodeCanonical(expected.intent)) return false
+  return row.intent === expected.intent && row.ownerId === ownerId && samePayload(row.payload, payload)
+}
+
+function stillConfirmed(confirm) {
+  try {
+    return typeof confirm === 'function' && !!confirm()
+  } catch (e) {
+    return false
+  }
+}
+
+/**
+ * 可信额度拒绝后释放本机意图。写之前和写完回读之后都再问一次 confirm；
+ * 对不上或回读不是空列表就失败，并把还对得上的原记录写回去。
+ */
+function releaseHeldBody(expected, confirm) {
+  const loaded = loadRecords()
+  if (loaded.error) return { ok: false, code: loaded.error }
+  const row = loaded.records.length === 1 ? loaded.records[0] : null
+  if (!matchesHeld(row, expected)) return { ok: false, code: 'INTENT_NOT_HELD' }
+  if (!stillConfirmed(confirm)) return { ok: false, code: 'IDENTITY_CHANGED' }
+  if (!writeRecords([])) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+  const back = loadRecords()
+  if (back.error || back.records.length !== 0) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+  if (!stillConfirmed(confirm)) {
+    if (!writeRecords([row])) return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+    const restored = loadRecords()
+    if (restored.error || restored.records.length !== 1 || !matchesHeld(restored.records[0], expected)) {
+      return { ok: false, code: 'STORAGE_WRITE_FAILED' }
+    }
+    return { ok: false, code: 'IDENTITY_CHANGED' }
+  }
+  return { ok: true }
+}
+
+function releaseHeld(expected, confirm) {
+  return enqueue(() => Promise.resolve(releaseHeldBody(expected, confirm)))
+}
+
 module.exports = {
   STORE_KEY,
   INTENT_HEADER,
@@ -261,4 +313,5 @@ module.exports = {
   prepare,
   markSettled,
   clear,
+  releaseHeld,
 }

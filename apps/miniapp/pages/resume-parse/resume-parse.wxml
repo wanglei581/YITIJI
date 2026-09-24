@@ -84,7 +84,15 @@
       <text class="ficon i-info n-ic"></text>
       <view>本次解析会同时生成诊断，不会再单独重复解析。没有指定方向时按通用方向诊断；结果仅供参考，不代表用人单位意见。</view>
     </view>
-    <view wx:if="{{phase === 'failed'}}" class="notice warn">
+    <view wx:if="{{phase === 'failed' && quotaReleaseBlocked}}" class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <view>这次没有调用新的解析。本机解析标识还在，页面不会自动重试，也不会另起一次。</view>
+    </view>
+    <view wx:elif="{{phase === 'failed' && quotaReleased}}" class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <view>这次没有调用新的解析。点“开始新的一次”才会另起一次；也可以明天或换一份文件后再试。</view>
+    </view>
+    <view wx:elif="{{phase === 'failed'}}" class="notice warn">
       <text class="ficon i-info n-ic"></text>
       <view>本次未产生诊断结果。上传的文件有有效期,超时后需要重新选择文件上传。</view>
     </view>
@@ -112,7 +120,9 @@
     <button wx:elif="{{phase === 'parsing' && done}}" class="btn primary block" disabled>解析完成,正在进入诊断…</button>
     <block wx:elif="{{phase === 'failed'}}">
       <view class="btn ghost tap" bindtap="toUpload">重新选择</view>
-      <view class="btn primary tap flex-1-5" bindtap="retry">重试解析</view>
+      <button wx:if="{{quotaReleaseBlocked}}" class="btn primary flex-1-5" disabled>暂不能开始新的一次</button>
+      <view wx:elif="{{quotaReleased}}" class="btn primary tap flex-1-5" bindtap="retry">开始新的一次</view>
+      <view wx:else class="btn primary tap flex-1-5" bindtap="retry">重试解析</view>
     </block>
     <block wx:elif="{{phase === 'unknown'}}">
       <view class="btn ghost tap" bindtap="toUpload">重新选择</view>

@@ -70,6 +70,18 @@ function isTaskNotFound(err) {
 }
 
 /**
+ * 只有这一对才表示 consumeOnce 在 marker / admit / provider 之前拒绝，账本停在 quota_pending。
+ * FILE_NOT_FOUND 不能走这里：预检失败和已受理后文件被删都会返回它，清标识可能再扣一次。
+ */
+function isExactPublicQuotaExceeded(err) {
+  return !!err && err.statusCode === 429 && err.code === 'AI_PUBLIC_QUOTA_EXCEEDED'
+}
+
+const QUOTA_REJECTED = '今日 AI 解析次数已用完，这次没有开始新的解析。'
+const QUOTA_RELEASE_FAILED = '今日 AI 解析次数已用完，但本机没能安全释放这次解析标识。请留在此页，不要开始新的解析。'
+const QUOTA_MISMATCH = '今日 AI 解析次数已用完，但本机解析标识已经对不上，没有释放，也没有另起一次解析。'
+
+/**
  * POST /resume/parse 被拒时,这一次在服务端到底跑没跑完?(与 Kiosk ResumeParsePage 同一口径)
  * - 断网 / 超时(request.js 统一给 statusCode -1)、任何 5xx(哪怕带 API 错误信封)、
  *   2xx 却被判成失败的响应体、以及其它没有状态码的异常:只说明没拿到可信答复 → 未知。
@@ -133,6 +145,10 @@ Page({
     intentReplay: false,
     // 凭证已回读成功,但释放意图失败:只重试释放,不另起一次
     settleBlocked: false,
+    // 可信额度 429 已释放本机意图：下一次必须是用户明确开始的新标识
+    quotaReleased: false,
+    // 额度 429 到了，但标识对不上或没写掉：留着原标识，不能另起一次
+    quotaReleaseBlocked: false,
     // 没有编号但已登录:这一次若已完成会进「我的 - AI 服务记录」,可去那里核对。
     canCheckRecords: false,
     // 解析参数,重试用
@@ -214,7 +230,9 @@ Page({
     if (!read || read.ok !== true) return 'unreadable'
     if (!read.found) return 'absent'
     const rows = read.value
-    if (!Array.isArray(rows) || rows.length !== 1) return 'unreadable'
+    if (!Array.isArray(rows)) return 'unreadable'
+    if (rows.length === 0) return 'absent'
+    if (rows.length !== 1) return 'unreadable'
     const row = rows[0]
     if (!row || row.intent !== this._intent || row.ownerId !== this._submitIdentity.ownerId) return 'absent'
     if (JSON.stringify(row.payload) !== JSON.stringify(this._intentPayload)) return 'absent'
@@ -295,6 +313,9 @@ Page({
         (err) => {
           settle()
           if (this._stopped || !sameIdentity(identity)) return
+          if (isExactPublicQuotaExceeded(err)) {
+            return this._releasePublicQuota(identity)
+          }
           if (submitErrorOutcome(err) === 'unknown') {
             this._stopForIntent(knownTaskId, err && err.code === 'RESUME_PARSE_OUTCOME_UNKNOWN'
               ? '这次解析是否已经完成无法确认。请用同一次重查，不要开始新的解析。'
@@ -431,6 +452,60 @@ Page({
     return saved.taskId === taskId ? (saved.accessToken || '') : ''
   },
 
+  /** 释放前盘上必须仍是这一次的 intent、owner 和规范载荷。 */
+  _quotaSnapshot(identity) {
+    if (!identity || !sameIdentity(identity) || this._intentHold() !== 'held') return null
+    let payload
+    try { payload = JSON.parse(JSON.stringify(this._intentPayload)) } catch (_) { return null }
+    return {
+      generation: identity.generation,
+      ownerId: identity.ownerId,
+      intent: this._intent,
+      payload,
+    }
+  },
+
+  /** 会话代际、owner、intent、规范载荷都还是释放前那一组。不读盘。 */
+  _quotaMemoryMatches(snapshot) {
+    if (!snapshot || !this._intent || !this._intentPayload) return false
+    const generation = typeof auth.sessionGeneration === 'function' ? auth.sessionGeneration() : 0
+    if (generation !== snapshot.generation || ownerId() !== snapshot.ownerId) return false
+    if (this._intent !== snapshot.intent) return false
+    return JSON.stringify(this._intentPayload) === JSON.stringify(snapshot.payload)
+  },
+
+  _showQuotaBlocked(message) {
+    if (this._stopped || !this._submitIdentity || !sameIdentity(this._submitIdentity)) return
+    this._fail(null, { message, quotaReleaseBlocked: true })
+  },
+
+  /**
+   * 可信额度 429：先确认四元组仍在，再清盘并回读。
+   * 成功只停在拒绝页，不自动再 POST。失败留着原标识。
+   */
+  async _releasePublicQuota(identity) {
+    const snapshot = this._quotaSnapshot(identity)
+    if (!snapshot || !this._quotaMemoryMatches(snapshot)) {
+      this._showQuotaBlocked(QUOTA_MISMATCH)
+      return
+    }
+    let released
+    try {
+      released = await intentStore.releaseHeld(snapshot, () => this._quotaMemoryMatches(snapshot))
+    } catch (e) {
+      released = { ok: false, code: 'STORAGE_WRITE_FAILED' }
+    }
+    if (this._stopped || !sameIdentity(identity) || !this._quotaMemoryMatches(snapshot)) return
+    if (!(released && released.ok) || this._intentHold() !== 'absent') {
+      const mismatched = released && (released.code === 'INTENT_NOT_HELD' || released.code === 'IDENTITY_CHANGED')
+      this._showQuotaBlocked(mismatched ? QUOTA_MISMATCH : QUOTA_RELEASE_FAILED)
+      return
+    }
+    this._intent = ''
+    this._intentPayload = null
+    this._fail(null, { message: QUOTA_REJECTED, quotaReleased: true })
+  },
+
   /** 只重试保存当前页已经收到的凭证;回读不一致前不发 GET 或第二次 POST。 */
   _saveUnsavedTask(taskId) {
     const task = this._unsavedTask
@@ -543,20 +618,27 @@ Page({
       recheck,
       intentReplay: extra.intentReplay === true,
       settleBlocked: extra.settleBlocked === true,
+      quotaReleased: false,
+      quotaReleaseBlocked: false,
       canCheckRecords: !taskId && auth.isLoggedIn(),
     })
   },
 
-  _fail(err) {
+  _fail(err, extra) {
     if (this._stopped) return
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
+    if (this._pollTimer) clearTimeout(this._pollTimer)
+    const note = extra || {}
     this.setData({
       phase: 'failed',
-      failMsg: (err && err.message) || '解析失败,请稍后重试',
+      failMsg: note.message || (err && err.message) || '解析失败,请稍后重试',
+      quotaReleased: note.quotaReleased === true,
+      quotaReleaseBlocked: note.quotaReleaseBlocked === true,
     })
   },
 
   retry() {
+    if (this.data.quotaReleaseBlocked) return
     if (this.data.phase === 'missing') {
       wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
       return
@@ -670,19 +752,19 @@ Page({
   /** 新一次 POST 只在两种未知态开放:没有编号;或有编号但当前身份/令牌下查不到。意图重查态不开放。 */
   _resubmitAllowed() {
     const d = this.data
-    if (d.intentReplay || d.settleBlocked) return false
+    if (d.intentReplay || d.settleBlocked || d.quotaReleaseBlocked) return false
     return d.phase === 'unknown' && (!d.pendingTaskId || d.recheck === 'not-found')
   },
 
   /** 发起一次全新的解析 POST(调用方负责确认过这是用户本人的明确选择)。 */
   _resubmit() {
-    if (this._submitting) return
+    if (this._submitting || this.data.quotaReleaseBlocked) return
     // 同一个 fileId 仍在有效期内(后端约 30 分钟)可直接重提;过期会由后端报错
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
     this.setData({
       phase: 'parsing', failMsg: '', elapsed: 0, done: false,
       unknownCause: '', pendingTaskId: '', recheck: 'idle', canCheckRecords: false,
-      intentReplay: false,
+      intentReplay: false, quotaReleased: false, quotaReleaseBlocked: false,
     })
     this._stopped = false
     this._startElapsed()

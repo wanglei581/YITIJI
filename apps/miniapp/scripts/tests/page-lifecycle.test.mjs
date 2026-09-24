@@ -5742,6 +5742,110 @@ test('RP-10 resume-parse：匿名终态缺少令牌时不释放意图，同一�
   assert.equal(wxFailed.calls.showModal.length, 0)
 })
 
+test('RP-11 resume-parse：可信额度 429 只释放匹配意图；丢写和文件 404 保留原标识', async () => {
+  const quota = { statusCode: 429, code: 'AI_PUBLIC_QUOTA_EXCEEDED', message: '今日额度已用完' }
+  const wx = createWx()
+  const posts = []
+  const api = { parseResume: (payload, headers) => {
+    posts.push({ payload, headers })
+    return Promise.reject(quota)
+  } }
+  const first = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), wx, api })
+  first.onLoad({ fileId: 'F-quota-a', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts.length, 1, '额度拒绝后不得自动二次提交')
+  assert.equal(first.data.phase, 'failed')
+  assert.equal(first.data.quotaReleased, true)
+  assert.equal(first.data.quotaReleaseBlocked, false)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 0)
+  assert.equal(wx.storage.has(realStorage.KEYS.RESUME_TASK), false)
+
+  const second = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), wx, api })
+  second.onLoad({ fileId: 'F-quota-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts.length, 2, '明确换材料后才开始另一次')
+  assert.notEqual(posts[0].headers['x-resume-parse-intent'], posts[1].headers['x-resume-parse-intent'])
+  assert.equal(second.data.quotaReleased, true)
+
+  const wxLoss = createWx()
+  const realSet = wxLoss.setStorageSync
+  let loseClear = true
+  wxLoss.setStorageSync = (key, value) => {
+    if (loseClear && key === realStorage.KEYS.RESUME_PARSE_INTENT && Array.isArray(value) && value.length === 0) return
+    realSet(key, value)
+  }
+  const lossPosts = []
+  const lossApi = { parseResume: (payload, headers) => {
+    lossPosts.push(headers)
+    return Promise.reject(quota)
+  } }
+  const blocked = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), wx: wxLoss, api: lossApi })
+  blocked.onLoad({ fileId: 'F-loss', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(blocked.data.quotaReleaseBlocked, true)
+  assert.equal(blocked.data.quotaReleased, false)
+  assert.equal(wxLoss.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  blocked.retry()
+  await flush()
+  assert.equal(lossPosts.length, 1, '清盘丢写时不能另铸标识或 POST')
+  loseClear = false
+  const recovered = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), wx: wxLoss, api: lossApi })
+  recovered.onLoad({ fileId: 'F-loss', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(lossPosts.length, 2)
+  assert.equal(lossPosts[0]['x-resume-parse-intent'], lossPosts[1]['x-resume-parse-intent'])
+  assert.equal(recovered.data.quotaReleased, true)
+
+  const wxChanged = createWx()
+  const changedReply = deferred()
+  let changedPosts = 0
+  const changed = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxChanged,
+    api: { parseResume: () => { changedPosts += 1; return changedReply.promise } },
+  })
+  changed.onLoad({ fileId: 'F-changed', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  const row = wxChanged.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT)[0]
+  wxChanged.storage.set(realStorage.KEYS.RESUME_PARSE_INTENT, [{ ...row, payload: { ...row.payload, fileId: 'F-other' } }])
+  changedReply.reject(quota)
+  await flush()
+  assert.equal(changed.data.quotaReleaseBlocked, true)
+  assert.equal(wxChanged.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT)[0].payload.fileId, 'F-other')
+  changed.retry()
+  assert.equal(changedPosts, 1, '盘上材料对不上时不能清除或重提')
+
+  const wxSwitched = createWx()
+  const switchedAuth = createAuth('member-a')
+  const switchedReply = deferred()
+  const switched = makePage('pages/resume-parse/resume-parse.js', {
+    auth: switchedAuth, wx: wxSwitched,
+    api: { parseResume: () => switchedReply.promise },
+  })
+  switched.onLoad({ fileId: 'F-owner', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  switchedAuth.setUser('member-b')
+  switchedReply.reject(quota)
+  await flush()
+  assert.equal(wxSwitched.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1, '换人后的旧答复不能清意图')
+
+  const wx404 = createWx()
+  const keptHeaders = []
+  const missing = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wx404,
+    api: { parseResume: (_payload, headers) => {
+      keptHeaders.push(headers)
+      return Promise.reject({ statusCode: 404, code: 'FILE_NOT_FOUND', message: '文件已失效' })
+    } },
+  })
+  missing.onLoad({ fileId: 'F-missing', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(wx404.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  missing.retry()
+  await flush()
+  assert.equal(keptHeaders.length, 2)
+  assert.equal(keptHeaders[0]['x-resume-parse-intent'], keptHeaders[1]['x-resume-parse-intent'])
+})
+
 // 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。
 // 这不是终态：会员任务在换回提交时的账号后，同一编号可能又读得到。页面既不能说「再查也一样」、
 // 收掉同编号查询，也不能因此自动发新 POST；新的一次只能在用户确认重复风险之后。
