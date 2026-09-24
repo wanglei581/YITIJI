@@ -318,14 +318,7 @@ async function verifyHealthHonesty(deadRedisPort: number): Promise<void> {
 
 // ── [C] Redis 可用时缓存路径无回归 ───────────────────────────────────────────
 
-/**
- * 用内存版 Redis 替身驱动真实守卫。
- *
- * 为什么需要这一段：把裸 `redis.get()` 换成 `tryRedis()` 同时动了**命中路径**
- * （命中、脏值清理、stale 回读）。`verify:boot-resilience` 的 C/D 组只证明
- * 「Redis 可达时启动正常、health 为 ok」，**不覆盖守卫的缓存分支**。
- * 替身实现的是守卫与 RedisService 之间的那份契约，正是本次改动的边界。
- */
+/** 内存 Redis 替身：不 GET 缓存；更高版本不覆盖，脏 JSON 被写入盖掉，stale 不交旧 admin。 */
 async function verifyHealthyCachePath(): Promise<void> {
   console.log('\n[C] Redis 可用时的缓存路径无回归（内存版 Redis 替身驱动真实守卫）')
 
@@ -352,8 +345,10 @@ async function verifyHealthyCachePath(): Promise<void> {
       calls.set += 1
       const current = store.get(key)
       if (current) {
-        const parsed = JSON.parse(current) as { tokenVersion?: number }
-        if (typeof parsed.tokenVersion === 'number' && parsed.tokenVersion > tokenVersion) return 'stale' as const
+        try {
+          const parsed = JSON.parse(current) as { tokenVersion?: number }
+          if (typeof parsed.tokenVersion === 'number' && parsed.tokenVersion > tokenVersion) return 'stale' as const
+        } catch { /* 脏 JSON 与 Lua 一样直接覆盖 */ }
       }
       store.set(key, value)
       return 'stored' as const
@@ -385,32 +380,80 @@ async function verifyHealthyCachePath(): Promise<void> {
     check('冷缓存首次鉴权后会话状态被写入缓存（回写路径未被改坏）', store.has(cacheKey))
 
     const getsBefore = calls.get
-    check('二次鉴权仍通过（缓存命中路径）', await guard.canActivate(contextFor(token)))
-    check('二次鉴权确实读了缓存', calls.get > getsBefore)
+    check('二次鉴权仍通过（每次回源数据库）', await guard.canActivate(contextFor(token)))
+    check('二次鉴权不再读取会话缓存', calls.get === getsBefore)
 
-    // 脏值：解析失败必须删键并回源，而不是当作未命中反复读到脏数据。
+    const orgId = `${FIXTURE_PREFIX}cache-org-${suffix}`
+    await prisma.organization.create({
+      data: { id: orgId, name: `门禁临时机构 ${suffix}`, type: 'school', enabled: true },
+    })
+    await prisma.user.update({ where: { id: adminId }, data: { enabled: false } })
+    check(
+      '数据库已禁用但缓存仍是 enabled=true 时旧 token 被拒',
+      !(await guard.canActivate(contextFor(token)).catch(() => false)),
+    )
+    await prisma.user.update({
+      where: { id: adminId },
+      data: { enabled: true, role: 'partner', orgId },
+    })
+    store.set(cacheKey, JSON.stringify({
+      userId: adminId, role: 'admin', orgId: null, enabled: true,
+      tokenVersion: 0, deletedAt: null, orgEnabled: null,
+    }))
+    const demotedReq: Record<string, unknown> = { headers: { authorization: `Bearer ${token}` } }
+    const demoted = await guard.canActivate({
+      switchToHttp: () => ({ getRequest: () => demotedReq }),
+    } as unknown as Parameters<typeof guard.canActivate>[0])
+    const demotedUser = demotedReq['user'] as { role?: string; orgId?: string | null } | undefined
+    check(
+      '数据库已改为 partner 且绑定机构后，旧 admin 缓存不再维持管理员身份',
+      demoted === true && demotedUser?.role === 'partner' && demotedUser.orgId === orgId,
+      JSON.stringify(demotedUser),
+    )
+    await prisma.user.update({
+      where: { id: adminId },
+      data: { enabled: true, role: 'admin', orgId: null },
+    })
+
     store.set(cacheKey, 'not-json-at-all')
     const delsBefore = calls.del
-    check('缓存脏值时仍能鉴权（回源数据库）', await guard.canActivate(contextFor(token)))
-    check('缓存脏值被清理', calls.del > delsBefore)
+    check('缓存脏值时仍按数据库鉴权', await guard.canActivate(contextFor(token)))
+    const overwritten = store.get(cacheKey)
+    check(
+      '脏值不单独 DEL，由版本屏障写入覆盖',
+      calls.del === delsBefore && overwritten !== 'not-json-at-all' && overwritten !== undefined,
+    )
 
-    // stale 分支：缓存里有更高 tokenVersion（并发撤销已先落缓存）→ 必须以缓存那份更新的为准。
     store.set(cacheKey, JSON.stringify({
       userId: adminId, role: 'admin', orgId: null, enabled: true,
       tokenVersion: 99, deletedAt: null, orgEnabled: null,
     }))
     check('缓存中存在更高 tokenVersion 时旧 token 被拒（并发撤销不被回写覆盖）',
       !(await guard.canActivate(contextFor(token)).catch(() => false)))
+    check(
+      '较高 tokenVersion 没有被本次数据库版本覆盖',
+      JSON.parse(store.get(cacheKey) ?? '{}').tokenVersion === 99,
+    )
+
+    await prisma.user.update({
+      where: { id: adminId },
+      data: { enabled: false, role: 'partner', orgId, tokenVersion: 5 },
+    })
+    store.set(cacheKey, JSON.stringify({
+      userId: adminId, role: 'admin', orgId: null, enabled: true,
+      tokenVersion: 99, deletedAt: null, orgEnabled: null,
+    }))
+    const matchedHighVersion = jwt.sign({ sub: adminId, role: 'admin', orgId: null, ver: 99 })
+    check(
+      '缓存版本高于数据库且仍是有效 admin，JWT 与缓存一致但数据库已降权禁用时拒绝',
+      !(await guard.canActivate(contextFor(matchedHighVersion)).catch(() => false)),
+    )
 
     const { bootReadiness, REDIS_SUBSYSTEM } = await import('../src/common/boot/boot-readiness')
     check('可用路径全程未产生假降级结论（/health 不会因为一次正常请求变红）',
       !bootReadiness.isDegraded(REDIS_SUBSYSTEM))
 
-    // 「命令被拒」不等于「Redis 不可用」。ioredis 的 ReplyError 意味着 Redis 活着并回了错
-    // （WRONGTYPE / 未知命令 / 参数不对 / Lua 报错）。若把它当连通性故障，会触发全局静默期，
-    // 期间所有 tryRedis 一律跳过 —— 内部账号回写缓存失败（本身无害，数据库是真源）
-    // 会连带把没有数据库后备的 C 端会员会话打掉，表现为用户被登出。
-    // 这条实测过：曾让 verify:content-pipeline-e2e 的 6 项会员记录断言全红。
+    // ReplyError 表示 Redis 活着但命令被拒。标成降级会进入静默期，误伤没有数据库后备的会员会话。
     const { tryRedis, resetRedisCooldownForTests } = await import('../src/common/redis/redis-degradation')
     resetRedisCooldownForTests()
     class ReplyError extends Error { override name = 'ReplyError' }
@@ -427,6 +470,7 @@ async function verifyHealthyCachePath(): Promise<void> {
     resetRedisCooldownForTests()
   } finally {
     await prisma.user.deleteMany({ where: { id: adminId } })
+    await prisma.organization.deleteMany({ where: { id: { startsWith: FIXTURE_PREFIX } } })
     await prisma.onModuleDestroy()
   }
 }
