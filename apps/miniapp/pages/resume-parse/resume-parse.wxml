@@ -4,7 +4,7 @@
     <view class="nav-back tap" hover-class="tap-press" bindtap="back">
       <text class="ficon i-right nav-back-ic"></text>
     </view>
-    <view class="nav-title">AI 解析中</view>
+    <view class="nav-title">{{phase === 'unknown' ? '解析结果未知' : 'AI 解析中'}}</view>
     <view style="width:64rpx"></view>
   </view>
 
@@ -40,6 +40,22 @@
       <view class="fail-msg">{{failMsg}}</view>
     </view>
 
+    <!-- 未知：服务端可能已完成。只按已有编号查询；无编号时明确告知核对限制。 -->
+    <view wx:elif="{{phase === 'unknown'}}" class="parse-center">
+      <view class="fail-ic"><text class="ficon i-info"></text></view>
+      <view class="fail-title">本次解析结果未知</view>
+      <view class="fail-msg">{{unknownCause}}</view>
+      <view wx:if="{{pendingTaskId && recheck !== 'not-found'}}" class="unknown-next">已收到本次任务编号。点击下方“查询本次结果”会按同一编号查询，不会再次提交解析。</view>
+      <!-- 404 + AI_TASK_NOT_FOUND：后端防枚举，不区分原因；只给核对方向，不下结论。换回提交时的账号后同一编号可能又读得到。 -->
+      <view wx:elif="{{pendingTaskId}}" class="unknown-next">如果提交后退出过登录或换过账号，请先换回提交时的账号，再点“查询本次结果”按同一编号查询，或到 AI 服务记录查看。</view>
+      <view wx:else class="unknown-next">这台手机没有收到本次任务编号，暂时无法直接查询这一次。</view>
+      <view wx:if="{{recheck === 'not-ready'}}" class="unknown-next">本次任务仍在处理中，稍后可按同一编号再查。</view>
+      <view wx:elif="{{recheck === 'error'}}" class="unknown-next">查询暂时失败，稍后可按同一编号再查。</view>
+      <view wx:elif="{{recheck === 'malformed'}}" class="unknown-next">查询答复不完整，仍无法确认结果；稍后可按同一编号再查。</view>
+      <view wx:if="{{canCheckRecords || recheck === 'not-found'}}" class="unknown-link tap" hover-class="tap-press" bindtap="toAiRecords" role="button" aria-label="到我的 AI 服务记录核对">到我的 AI 服务记录核对</view>
+      <view wx:if="{{pendingTaskId && recheck === 'not-found'}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
+    </view>
+
     <!-- 无待解析文件 -->
     <view wx:else class="parse-center">
       <view class="fail-ic"><text class="ficon i-file-text"></text></view>
@@ -69,6 +85,14 @@
       <text class="ficon i-info n-ic"></text>
       <view>本次未产生诊断结果。上传的文件有有效期,超时后需要重新选择文件上传。</view>
     </view>
+    <view wx:if="{{phase === 'unknown' && pendingTaskId && recheck !== 'not-found'}}" class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <view>刚才那次可能已经完成。本页不会自动重新提交；“查询本次结果”只按同一编号读取，不会再次解析。</view>
+    </view>
+    <view wx:elif="{{phase === 'unknown'}}" class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <view>刚才那次可能已经完成。本页不会自动重新提交；手动重新提交会发起新的一次 AI 解析，可能重复处理。</view>
+    </view>
     <view style="height:40rpx"></view>
   </scroll-view>
 
@@ -78,6 +102,11 @@
     <block wx:elif="{{phase === 'failed'}}">
       <view class="btn ghost tap" bindtap="toUpload">重新选择</view>
       <view class="btn primary tap flex-1-5" bindtap="retry">重试解析</view>
+    </block>
+    <block wx:elif="{{phase === 'unknown'}}">
+      <view class="btn ghost tap" bindtap="toUpload">重新选择</view>
+      <button wx:if="{{pendingTaskId}}" class="btn primary flex-1-5 unknown-action" disabled="{{recheck === 'checking'}}" bindtap="recheck">{{recheck === 'checking' ? '正在查询…' : '查询本次结果'}}</button>
+      <button wx:else class="btn primary flex-1-5 unknown-action" bindtap="confirmResubmit">重新提交（新的一次）</button>
     </block>
     <view wx:else class="btn primary block tap" bindtap="toUpload">去选择简历</view>
   </view>

@@ -1,5 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api')
+const auth = require('../../utils/auth')
+const config = require('../../utils/config')
 const storage = require('../../utils/storage')
 
 /**
@@ -19,6 +21,47 @@ const STAGE_DEFS = [
 const POLL_INTERVAL = 3000
 const POLL_MAX = 40
 
+/**
+ * 「结果未知」时说明发生了什么。这些都只说明**这台手机没拿到可信的最终答复**,
+ * 不说明服务端没做:服务端先落库解析结果(ai.service.ts persistResult),再写审计、
+ * 再回包(ai.controller.ts),回包这一步出问题时结果可能早已存在。
+ */
+const UNKNOWN_CAUSE = {
+  noReply: '提交解析后网络中断、等待超时或服务端出错,这台手机没收到完整答复。',
+  malformed: '服务端的答复不完整,这台手机没能确认这一次解析的结果。',
+  pollError: '解析已经提交并拿到了编号,但查询结果时网络或服务出了问题。',
+  pollExhausted: '解析已经提交并拿到了编号,等了约 2 分钟仍没有最终结果。',
+  pollMalformed: '解析已经提交并拿到了编号,但收到的答复不完整。',
+  notFound: '解析已经提交并拿到了编号,但以这台手机当前的登录状态和读取凭证,查不到这一次的结果。',
+  storage: '本机暂时无法保存这次解析的读取凭证。请留在此页,点“查询本次结果”重试保存并查询;退出后匿名结果可能无法找回。',
+}
+
+/**
+ * 当前身份 / 令牌下读不到这个编号:后端对「不存在 / 已清理 / 令牌缺失或不符 / 不是本人」
+ * 一律回 404 + AI_TASK_NOT_FOUND(防枚举,ai.service.ts getResumeRecord),本机分不清是哪一种,
+ * 也不该去分。它**不是终态**:会员任务在换回提交时的账号后,同一编号可能又读得到 ——
+ * 所以仍保留按同一编号再查,只是不再说「稍后再查」,改为先核对提交时的身份。
+ * 断网 / 5xx / 无错误码的 404(可能是网关代答)仍算暂时失败。
+ */
+function isTaskNotFound(err) {
+  return !!err && err.statusCode === 404 && err.code === 'AI_TASK_NOT_FOUND'
+}
+
+/**
+ * POST /resume/parse 被拒时,这一次在服务端到底跑没跑完?(与 Kiosk ResumeParsePage 同一口径)
+ * - 断网 / 超时(request.js 统一给 statusCode -1)、任何 5xx(哪怕带 API 错误信封)、
+ *   2xx 却被判成失败的响应体、以及其它没有状态码的异常:只说明没拿到可信答复 → 未知。
+ * - 有 API 错误码的 4xx 才能确认是业务拒绝(校验、授权、限流、文件失效等)→ 明确失败。
+ *   无错误码的 4xx 可能是网关代答;408 是等待超时,都算未知。
+ * - 演示数据模式根本不发请求(api.js mockUnavailable)→ 明确失败。
+ */
+function submitErrorOutcome(err) {
+  if (config.USE_MOCK) return 'failed'
+  const code = err && err.statusCode
+  if (typeof code === 'number' && code >= 400 && code < 500 && code !== 408 && err.code) return 'failed'
+  return 'unknown'
+}
+
 function parseJsonOption(value, fallback) {
   if (!value) return fallback
   try {
@@ -32,12 +75,20 @@ function parseJsonOption(value, fallback) {
 Page({
   data: {
     statusBarHeight: 20,
-    phase: 'parsing', // parsing | failed | missing
+    phase: 'parsing', // parsing | failed | unknown | missing
     elapsed: 0,
     atext: '正在提交解析…',
     stages: STAGE_DEFS,
     done: false,
     failMsg: '',
+    // 结果未知(phase=unknown):没拿到可信答复,不能说失败,也不自动再提交。
+    unknownCause: '',
+    // 手里有这一次的编号时可按同一编号只读再查;令牌只在本地存储里,不进 data、不进 URL。
+    pendingTaskId: '',
+    // not-found:当前身份/令牌下查不到(见 isTaskNotFound);仍可按同一编号再查,另给确认后的新一次
+    recheck: 'idle', // idle | checking | not-ready | error | malformed | not-found
+    // 没有编号但已登录:这一次若已完成会进「我的 - AI 服务记录」,可去那里核对。
+    canCheckRecords: false,
     // 解析参数,重试用
     fileId: '',
     fileName: '',
@@ -78,6 +129,7 @@ Page({
 
   onUnload() {
     this._stopped = true
+    this._unsavedTask = null
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
     if (this._pollTimer) clearTimeout(this._pollTimer)
   },
@@ -91,6 +143,9 @@ Page({
   },
 
   _submit() {
+    // 同一时刻最多一次解析 POST:连点「重试」、确认框回调重入都只发一次。
+    if (this._submitting) return
+    this._submitting = true
     this.setData({ atext: '正在解析简历,请勿离开…' })
     const payload = {
       fileId: this.data.fileId,
@@ -100,37 +155,74 @@ Page({
       targetContext: this.data.targetContext,
     }
     if (this.data.selectedDimensions.length) payload.selectedDimensions = this.data.selectedDimensions
+    const settle = () => { this._submitting = false }
     api.parseResume(payload)
-      .then((res) => this._handle(res, 0))
-      .catch((err) => this._fail(err))
+      .then(
+        (res) => { settle(); this._handle(res, 0, '') },
+        (err) => {
+          settle()
+          if (submitErrorOutcome(err) === 'unknown') this._unknown('', UNKNOWN_CAUSE.noReply)
+          else this._fail(err)
+        },
+      )
+      // 已收到 2xx 之后本页自己出了异常:服务端那边可能已经完成,同样只能说未知。
+      .catch(() => this._unknown('', UNKNOWN_CAUSE.malformed))
   },
 
   /**
    * 处理解析响应(裸响应:顶层直接是 taskId/status/report)。
    * accessToken 只在提交时下发一次,必须先落地再做任何跳转,
    * 否则页面被切走就永久丢失读取权限。
+   * @param {string} knownTaskId 轮询 / 再查时本来就知道的编号;POST 首答传空串
    */
-  _handle(res, round) {
-    if (this._stopped || !res) return
+  _handle(res, round, knownTaskId) {
+    if (this._stopped) return
+    // 2xx 却没有可用的响应体(空包、截断成字符串):服务端可能已经跑完,只是答复没到齐。
+    if (!res || typeof res !== 'object') {
+      this._unknown(knownTaskId, knownTaskId ? UNKNOWN_CAUSE.pollMalformed : UNKNOWN_CAUSE.malformed)
+      return
+    }
+    // GET 已按既有编号发出；若响应却指向另一编号，不能把别人的令牌/结果落到本机。
+    if (knownTaskId && res.taskId && res.taskId !== knownTaskId) {
+      this._unknown(knownTaskId, UNKNOWN_CAUSE.pollMalformed)
+      return
+    }
 
     if (res.taskId) {
-      storage.set(storage.KEYS.RESUME_TASK, {
+      // 轮询 GET 回的是落库结果,不带 accessToken;照抄 res 会把 POST 存下的令牌清空,
+      // 诊断页随即 404。同一任务沿用已存令牌;换了任务绝不继承上一条的令牌。
+      const prev = storage.get(storage.KEYS.RESUME_TASK) || {}
+      const keptToken = prev.taskId === res.taskId ? (prev.accessToken || '') : ''
+      const task = {
         taskId: res.taskId,
-        accessToken: res.accessToken || '',
+        accessToken: res.accessToken || keptToken,
         fileId: res.fileId || this.data.fileId,
         fileName: this.data.fileName,
         ts: Date.now(),
-      })
+      }
+      if (!storage.set(storage.KEYS.RESUME_TASK, task)) {
+        // 匿名令牌只下发这一次。写盘失败时留在页实例内,不跳诊断页、也不再 POST。
+        this._unsavedTask = task
+        this._unknown(res.taskId, UNKNOWN_CAUSE.storage)
+        return
+      }
+      this._unsavedTask = null
     }
 
+    const taskId = res.taskId || knownTaskId || ''
     const status = res.status
 
     if (status === 'completed') {
-      this.setData({ done: true, atext: '解析完成' })
+      // 说完成却没给编号:诊断页无从读取这一次,不能带个空编号过去碰运气。
+      if (!taskId) {
+        this._unknown('', UNKNOWN_CAUSE.malformed)
+        return
+      }
+      this.setData({ phase: 'parsing', done: true, atext: '解析完成' })
       setTimeout(() => {
         if (this._stopped) return
         wx.redirectTo({
-          url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(res.taskId || '')}`,
+          url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}`,
         })
       }, 500)
       return
@@ -141,27 +233,70 @@ Page({
       return
     }
 
-    // pending / processing:继续轮询
-    if (round >= POLL_MAX) {
-      this._fail(new Error('解析耗时超出预期,请稍后在「我的 - AI 服务记录」查看结果或重试'))
+    // 只有 pending / processing 才是「还在跑」;其它取值是答复不完整,不当成进度。
+    if (status !== 'pending' && status !== 'processing') {
+      this._unknown(taskId, taskId ? UNKNOWN_CAUSE.pollMalformed : UNKNOWN_CAUSE.malformed)
       return
     }
 
-    const taskId = res.taskId
+    // 已登记却没给编号:没有可查的接口,只能如实说未知。
     if (!taskId) {
-      this._fail(new Error('解析已提交但未返回任务标识,请重试'))
+      this._unknown('', UNKNOWN_CAUSE.malformed)
+      return
+    }
+
+    // 等久了不等于失败:编号还在,交给用户按同一编号再查。
+    if (round >= POLL_MAX) {
+      this._unknown(taskId, UNKNOWN_CAUSE.pollExhausted)
       return
     }
 
     this.setData({ atext: '正在解析简历,请勿离开…' })
     this._pollTimer = setTimeout(() => {
       if (this._stopped) return
-      const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
-      const token = saved.taskId === taskId ? saved.accessToken : ''
-      api.getResumeRecord(taskId, token)
-        .then((r) => this._handle(r, round + 1))
-        .catch((err) => this._fail(err))
+      api.getResumeRecord(taskId, this._taskToken(taskId))
+        .then(
+          (r) => this._handle(r, round + 1, taskId),
+          (err) => (isTaskNotFound(err)
+            ? this._unknown(taskId, UNKNOWN_CAUSE.notFound, 'not-found')
+            : this._unknown(taskId, UNKNOWN_CAUSE.pollError)),
+        )
+        .catch(() => this._unknown(taskId, UNKNOWN_CAUSE.pollMalformed))
     }, POLL_INTERVAL)
+  },
+
+  /** 本机为这一编号存下的一次性令牌;别的任务的令牌一律不给(会员读取不需要令牌)。 */
+  _taskToken(taskId) {
+    const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
+    return saved.taskId === taskId ? (saved.accessToken || '') : ''
+  },
+
+  /** 只重试保存当前页已经收到的凭证;未保存成功前不发 GET 或第二次 POST。 */
+  _saveUnsavedTask(taskId) {
+    const task = this._unsavedTask
+    if (!task || task.taskId !== taskId) return true
+    if (!storage.set(storage.KEYS.RESUME_TASK, task)) return false
+    this._unsavedTask = null
+    return true
+  },
+
+  /**
+   * 结果未知:只停下本机等待,不说失败、不自动再提交(再提交是一次新的 AI 调用)。
+   * @param {string} taskId 有编号时给出「按同一编号再查」;没有时说明为什么查不到
+   * @param {string} [recheck] 'not-found' = 当前身份/令牌下查不到这个编号
+   */
+  _unknown(taskId, cause, recheck = 'idle') {
+    if (this._stopped) return
+    if (this._elapsedTimer) clearInterval(this._elapsedTimer)
+    if (this._pollTimer) clearTimeout(this._pollTimer)
+    this.setData({
+      phase: 'unknown',
+      done: false,
+      unknownCause: cause,
+      pendingTaskId: taskId || '',
+      recheck,
+      canCheckRecords: !taskId && auth.isLoggedIn(),
+    })
   },
 
   _fail(err) {
@@ -178,11 +313,92 @@ Page({
       wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
       return
     }
+    // 只有「明确失败」才直接重提。结果未知时刚才那次可能已经完成,
+    // 再提交必须走 confirmResubmit:标明是新的一次,并先让用户确认。
+    if (this.data.phase !== 'failed') return
+    this._resubmit()
+  },
+
+  /**
+   * 结果未知时的「重新提交(新的一次)」。有编号时一般不提供(按同一编号再查即可),
+   * 除非当前身份/令牌下查不到它(recheck=not-found);确认框打开期间、POST 在途时都不接受第二次。
+   */
+  confirmResubmit() {
+    if (!this._resubmitAllowed()) return
+    if (this._submitting || this._confirming) return
+    this._confirming = true
+    wx.showModal({
+      title: '重新提交是新的一次',
+      content: '刚才那次解析可能已经完成。重新提交会再调用一次 AI,生成新的一次解析,不会取消或覆盖刚才那次;如果刚才那次其实已经完成,就等于重复解析了一次。确定重新提交吗?',
+      confirmText: '重新提交',
+      cancelText: '先不提交',
+      success: (r) => {
+        this._confirming = false
+        if (r && r.confirm && !this._stopped && this._resubmitAllowed()) this._resubmit()
+      },
+      fail: () => { this._confirming = false },
+    })
+  },
+
+  /** 新一次 POST 只在两种未知态开放:没有编号;或有编号但当前身份/令牌下查不到(查询在途时不算)。 */
+  _resubmitAllowed() {
+    const d = this.data
+    return d.phase === 'unknown' && (!d.pendingTaskId || d.recheck === 'not-found')
+  },
+
+  /** 发起一次全新的解析 POST(调用方负责确认过这是用户本人的明确选择)。 */
+  _resubmit() {
+    if (this._submitting) return
     // 同一个 fileId 仍在有效期内(后端约 30 分钟)可直接重提;过期会由后端报错
-    this.setData({ phase: 'parsing', failMsg: '', elapsed: 0 })
+    if (this._elapsedTimer) clearInterval(this._elapsedTimer)
+    this.setData({
+      phase: 'parsing', failMsg: '', elapsed: 0, done: false,
+      unknownCause: '', pendingTaskId: '', recheck: 'idle', canCheckRecords: false,
+    })
     this._stopped = false
     this._startElapsed()
     this._submit()
+  },
+
+  /** 按同一编号只读再查一次(既有 GET,凭本人会员身份或本机存下的一次性令牌),不会重新解析。 */
+  recheck() {
+    const taskId = this.data.pendingTaskId
+    if (this.data.phase !== 'unknown' || !taskId || this._rechecking) return
+    if (!this._saveUnsavedTask(taskId)) {
+      this.setData({ unknownCause: UNKNOWN_CAUSE.storage, recheck: 'error' })
+      return
+    }
+    this._rechecking = true
+    this.setData({ recheck: 'checking' })
+    const settle = () => { this._rechecking = false }
+    api.getResumeRecord(taskId, this._taskToken(taskId))
+      .then(
+        (res) => {
+          settle()
+          if (this._stopped) return
+          // 只有最终结果才交给 _handle;仍在跑就原地告诉用户,不偷偷转回自动轮询。
+          if (res && typeof res === 'object' && res.taskId && res.taskId !== taskId) {
+            this.setData({ recheck: 'malformed' })
+            return
+          }
+          if (res && typeof res === 'object' && (res.status === 'completed' || res.status === 'failed')) {
+            this._handle(res, POLL_MAX, taskId)
+            return
+          }
+          this.setData({ recheck: res && typeof res === 'object' && (res.status === 'pending' || res.status === 'processing') ? 'not-ready' : 'malformed' })
+        },
+        (err) => {
+          settle()
+          if (this._stopped) return
+          if (isTaskNotFound(err)) this.setData({ recheck: 'not-found', unknownCause: UNKNOWN_CAUSE.notFound })
+          else this.setData({ recheck: 'error' })
+        },
+      )
+  },
+
+  /** 没有编号但已登录:这一次若已完成,会出现在本人的 AI 服务记录里。 */
+  toAiRecords() {
+    wx.navigateTo({ url: '/pages/ai-records/ai-records' })
   },
 
   toUpload() {
@@ -191,6 +407,7 @@ Page({
 
   back() {
     this._stopped = true
+    this._unsavedTask = null
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
     if (this._pollTimer) clearTimeout(this._pollTimer)
     wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })

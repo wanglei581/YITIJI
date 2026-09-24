@@ -5259,3 +5259,342 @@ test('R11-7 页面：成功路径严格先落盘再 POST；账号/指纹隔离�
   const other = await idem.ensureKey('u:A', idem.fingerprintOf({ ...PAY_PAYLOAD, copies: 3 }))
   assert.notEqual(other.key, sentKeys[0], '参数变了必须换键')
 })
+
+// ── resume-parse：匿名一次性令牌 ────────────────────────────────────────
+//
+// 后端只在 POST /resume/parse 下发 accessToken（ai.service.ts 落库 payload 不含它），
+// 轮询 GET /resume/records/:id 回的是落库结果，**不带令牌**。页面若每一轮都照抄
+// `res.accessToken || ''`，pending→completed 那一轮就把 POST 存下的令牌清空，
+// 诊断页随后按 taskId 取令牌拿到空串 —— 匿名用户一律 404。
+
+test('RP-1 resume-parse：pending→completed 轮询不得清掉一次性令牌；换了任务不得继承上一条的令牌', async () => {
+  const readTask = (wx) => wx.storage.get(realStorage.KEYS.RESUME_TASK) || {}
+
+  // ① 同一任务：POST pending 带令牌 → GET completed 不带令牌 → 令牌必须还在。
+  const wx = createWx()
+  const polls = []
+  const api = {
+    parseResume: () => Promise.resolve({ taskId: 'T1', status: 'pending', accessToken: 'one-time-token' }),
+    getResumeRecord: (taskId, token) => { polls.push({ taskId, token }); return Promise.resolve({ taskId: 'T1', status: 'completed' }) },
+  }
+  const page = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), api, wx })
+  page.onLoad({ fileId: 'F1', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(readTask(wx).accessToken, 'one-time-token', 'POST 下发的令牌先落地')
+  page._timers[page._timers.length - 1]() // 触发这一轮轮询
+  await flush()
+  assert.equal(polls.length, 1)
+  assert.equal(polls[0].token, 'one-time-token', '轮询要带着令牌去问')
+  assert.equal(page.data.done, true)
+  assert.equal(readTask(wx).taskId, 'T1')
+  assert.equal(readTask(wx).accessToken, 'one-time-token', 'completed 响应不带令牌，不得把已存的令牌清空')
+  page._timers[page._timers.length - 1]() // 跳诊断页
+  assert.equal(wx.calls.redirectTo.length, 1)
+  assert.ok(wx.calls.redirectTo[0].includes('taskId=T1'))
+
+  // ② 换了任务：盘上是上一条任务的令牌，这一次 POST 不带令牌（会员）→ 不得继承。
+  const wx2 = createWx()
+  wx2.storage.set(realStorage.KEYS.RESUME_TASK, { taskId: 'OLD', accessToken: 'old-token' })
+  const polls2 = []
+  const api2 = {
+    parseResume: () => Promise.resolve({ taskId: 'T2', status: 'pending' }),
+    getResumeRecord: (taskId, token) => { polls2.push({ taskId, token }); return Promise.resolve({ taskId: 'T2', status: 'completed' }) },
+  }
+  const page2 = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth('A'), api: api2, wx: wx2 })
+  page2.onLoad({ fileId: 'F2', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(readTask(wx2).taskId, 'T2')
+  assert.equal(readTask(wx2).accessToken, '', '新任务不得沿用上一条任务的令牌')
+  page2._timers[page2._timers.length - 1]()
+  await flush()
+  assert.equal(polls2.length, 1)
+  assert.equal(polls2[0].token, '', '不得拿别的任务的令牌去问 T2')
+  assert.equal(readTask(wx2).accessToken, '', 'completed 之后仍不得冒出别的任务的令牌')
+})
+
+test('RP-1b resume-parse：匿名令牌写盘失败时不跳诊断；按同一编号重试保存后才能读取', async () => {
+  const wx = createWx()
+  const originalSet = wx.setStorageSync
+  let storageBlocked = true
+  wx.setStorageSync = (key, value) => {
+    if (key === realStorage.KEYS.RESUME_TASK && storageBlocked) throw new Error('storage full')
+    return originalSet(key, value)
+  }
+  let posts = 0
+  const reads = []
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: () => { posts += 1; return Promise.resolve({ taskId: 'T-storage', status: 'completed', accessToken: 'once-only' }) },
+      getResumeRecord: (taskId, token) => { reads.push({ taskId, token }); return Promise.resolve({ taskId, status: 'completed' }) },
+    },
+  })
+  page.onLoad({ fileId: 'F-storage', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.pendingTaskId, 'T-storage')
+  assert.match(page.data.unknownCause, /无法保存/)
+  assert.equal(wx.calls.redirectTo.length, 0, '未保存凭证时不得跳到需要该凭证的诊断页')
+  page.recheck()
+  assert.equal(reads.length, 0, '写盘继续失败时不得发出缺令牌的 GET')
+  assert.equal(posts, 1, '写盘失败不得触发第二次 AI 解析')
+
+  storageBlocked = false
+  page.recheck()
+  await flush()
+  assert.deepEqual(reads, [{ taskId: 'T-storage', token: 'once-only' }])
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'once-only')
+  assert.equal(page.data.done, true)
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T-storage')
+  assert.equal(posts, 1)
+})
+
+test('RP-2 resume-parse：POST 没拿到可信答复时停在结果未知；不自动二次解析', async () => {
+  const errors = [
+    { statusCode: -1, message: 'network timeout' },
+    { statusCode: 503, code: 'AI_PROVIDER_ERROR' },
+    { statusCode: 408 },
+    { statusCode: 413 }, // 无 API 错误码：可能是网关代答
+  ]
+  for (const error of errors) {
+    const wx = createWx()
+    let posts = 0
+    const page = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx,
+      api: { parseResume: () => { posts += 1; return Promise.reject(error) } },
+    })
+    page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+    await flush()
+    assert.equal(page.data.phase, 'unknown', `status ${error.statusCode} 应是未知`)
+    assert.equal(page.data.pendingTaskId, '')
+    assert.equal(page.data.canCheckRecords, false)
+    assert.equal(posts, 1)
+    page.retry() // 旧的“重试解析”方法不能绕过确认
+    assert.equal(posts, 1)
+    assert.equal(wx.calls.redirectTo.length, 0)
+  }
+
+  const wx = createWx()
+  let posts = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth('A'), wx,
+    api: { parseResume: () => { posts += 1; return Promise.resolve({}) } },
+  })
+  page.onLoad({ fileId: 'F2', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page.data.phase, 'unknown', '2xx 无 taskId/status 也不能说未执行')
+  assert.equal(page.data.canCheckRecords, true, '会员可去本人记录核对')
+  page.toAiRecords()
+  assert.equal(wx.calls.navigateTo[0], '/pages/ai-records/ai-records')
+  assert.equal(posts, 1)
+})
+
+test('RP-3 resume-parse：结果未知且无编号时，仅确认后的新一次可 POST，连点只发一次', async () => {
+  const wx = createWx()
+  const second = deferred()
+  const modal = []
+  wx.showModal = (opts) => { modal.push(opts) }
+  let posts = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: { parseResume: () => { posts += 1; return posts === 1 ? Promise.reject({ statusCode: -1 }) : second.promise } },
+  })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page.data.phase, 'unknown')
+  page.confirmResubmit()
+  page.confirmResubmit()
+  assert.equal(modal.length, 1, '确认框打开时连点不得叠弹窗')
+  assert.match(modal[0].content, /可能已经完成/)
+  assert.equal(posts, 1, '确认前不得发第二个 POST')
+  modal[0].success({ confirm: false })
+  assert.equal(posts, 1, '取消后不得发第二个 POST')
+  page.confirmResubmit()
+  modal[1].success({ confirm: true })
+  page.confirmResubmit()
+  page.retry()
+  assert.equal(posts, 2, '确认后在途期间连点也只多一次 POST')
+  second.resolve({ taskId: 'T2', status: 'completed' })
+  await flush()
+  assert.equal(page.data.done, true)
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T2')
+})
+
+test('RP-4 resume-parse：有编号的未知只按同一编号读；异常回包不得覆盖令牌', async () => {
+  const wx = createWx()
+  let posts = 0
+  const reads = []
+  const api = {
+    parseResume: () => { posts += 1; return Promise.resolve({ taskId: 'T1', status: 'pending', accessToken: 'one-time-token' }) },
+    getResumeRecord: (taskId, token) => {
+      reads.push({ taskId, token })
+      if (reads.length === 1) return Promise.reject({ statusCode: -1 })
+      if (reads.length === 2) return Promise.resolve({ taskId: 'T1', status: 'processing' })
+      if (reads.length === 3) return Promise.resolve({ taskId: 'OTHER', status: 'completed', accessToken: 'foreign' })
+      return Promise.resolve({ taskId: 'T1', status: 'completed' })
+    },
+  }
+  const page = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), api, wx })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  page._timers[page._timers.length - 1]() // 首轮 GET 断网
+  await flush()
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.pendingTaskId, 'T1')
+  page.confirmResubmit() // 已有编号时根本不给新 POST 入口
+  assert.equal(posts, 1)
+  assert.equal(wx.calls.showModal.length, 0)
+  page.recheck()
+  await flush()
+  assert.equal(page.data.recheck, 'not-ready')
+  page.recheck()
+  await flush()
+  assert.equal(page.data.recheck, 'malformed')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).taskId, 'T1')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'one-time-token')
+  page.recheck()
+  await flush()
+  assert.equal(page.data.done, true)
+  assert.equal(reads.length, 4)
+  assert.ok(reads.every((r) => r.taskId === 'T1' && r.token === 'one-time-token'))
+  assert.equal(posts, 1, '全程只有首次解析 POST')
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T1')
+  assert.ok(!wx.calls.redirectTo[0].includes('one-time-token'), '令牌不进 URL')
+})
+
+test('RP-5 resume-parse：业务拒绝/服务端失败才是明确失败；轮询耗尽仍是未知', async () => {
+  for (const response of [Promise.reject({ statusCode: 400, code: 'FILE_EXPIRED', message: '文件已过期' }), Promise.resolve({ taskId: 'T1', status: 'failed', failReason: '解析失败' })]) {
+    const wx = createWx()
+    const page = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx, api: { parseResume: () => response },
+    })
+    page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+    await flush()
+    assert.equal(page.data.phase, 'failed')
+  }
+  const wx = createWx()
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: { parseResume: () => Promise.resolve({ taskId: 'T1', status: 'pending', accessToken: 'token' }) },
+  })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  page._handle({ taskId: 'T1', status: 'processing' }, 40, 'T1')
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.pendingTaskId, 'T1')
+})
+
+// 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。
+// 这不是终态：会员任务在换回提交时的账号后，同一编号可能又读得到。页面既不能说「再查也一样」、
+// 收掉同编号查询，也不能因此自动发新 POST；新的一次只能在用户确认重复风险之后。
+test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（换回账号后读到），新一次须确认；网络/5xx/无码 404 仍是暂时失败', async () => {
+  const NOT_FOUND = { statusCode: 404, code: 'AI_TASK_NOT_FOUND', message: '' }
+
+  // ① 轮询拿到 404+AI_TASK_NOT_FOUND → not-found；取消新一次；身份未恢复再查仍 not-found；恢复后同编号读到。
+  const wx = createWx()
+  const modal = []
+  wx.showModal = (opts) => { modal.push(opts) }
+  let posts = 0
+  const reads = []
+  let restored = false
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: () => { posts += 1; return Promise.resolve({ taskId: 'T1', status: 'pending', accessToken: 'tok' }) },
+      getResumeRecord: (taskId, token) => {
+        reads.push({ taskId, token })
+        return restored ? Promise.resolve({ taskId: 'T1', status: 'completed' }) : Promise.reject(NOT_FOUND)
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  page._timers[page._timers.length - 1]()
+  await flush()
+  assert.equal(page.data.phase, 'unknown', '查不到不等于解析失败')
+  assert.equal(page.data.pendingTaskId, 'T1')
+  assert.equal(page.data.recheck, 'not-found')
+  assert.match(page.data.unknownCause, /当前的登录状态和读取凭证/)
+  assert.doesNotMatch(page.data.unknownCause, /不存在|已删除|网络/, '防枚举：不替后端下结论，也不说成网络问题')
+  page.retry()
+  assert.equal(posts, 1, '旧「重试解析」不能绕过确认')
+  page.confirmResubmit()
+  assert.equal(modal.length, 1, 'not-found 时可选新的一次，但先确认')
+  assert.match(modal[0].content, /重复解析/)
+  modal[0].success({ confirm: false })
+  assert.equal(posts, 1, '取消后不得 POST')
+  page.recheck()
+  await flush()
+  assert.equal(page.data.recheck, 'not-found', '身份没换回来，再查仍是查不到')
+  restored = true // 用户换回提交时的账号
+  page.recheck()
+  await flush()
+  assert.equal(page.data.done, true, '换回身份后同一编号读到结果')
+  assert.equal(reads.length, 3)
+  assert.ok(reads.every((r) => r.taskId === 'T1'), '全程只按同一编号读')
+  assert.equal(posts, 1, '全程没有自动二次 POST')
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T1')
+
+  // ② 手动再查的分类：只有 404+AI_TASK_NOT_FOUND 是 not-found；无论哪种都不收掉同编号查询；只有 not-found 开放新一次。
+  for (const [err, expected] of [[{ statusCode: -1 }, 'error'], [{ statusCode: 503, code: 'AI_PROVIDER_ERROR' }, 'error'], [{ statusCode: 404 }, 'error'], [NOT_FOUND, 'not-found']]) {
+    const wx2 = createWx()
+    const modal2 = []
+    wx2.showModal = (opts) => { modal2.push(opts) }
+    let n = 0
+    let posts2 = 0
+    const page2 = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx: wx2,
+      api: {
+        parseResume: () => { posts2 += 1; return Promise.resolve({ taskId: posts2 === 1 ? 'T1' : 'T2', status: posts2 === 1 ? 'pending' : 'completed', accessToken: 'tok' }) },
+        getResumeRecord: () => { n += 1; return Promise.reject(n === 1 ? { statusCode: -1 } : err) },
+      },
+    })
+    page2.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+    await flush()
+    page2._timers[page2._timers.length - 1]()
+    await flush()
+    assert.equal(page2.data.recheck, 'idle', '首轮断网仍可再查')
+    page2.recheck()
+    await flush()
+    assert.equal(page2.data.recheck, expected, `再查遇到 ${err.statusCode}/${err.code || '无码'} 应为 ${expected}`)
+    page2.recheck()
+    await flush()
+    assert.equal(n, 3, '任何一种都保留同编号再查')
+    page2.confirmResubmit()
+    assert.equal(modal2.length, expected === 'not-found' ? 1 : 0, '只有 not-found 才开放新一次')
+    if (expected === 'not-found') {
+      modal2[0].success({ confirm: true })
+      await flush()
+      assert.equal(posts2, 2, '确认后才发新的一次，且只一次')
+      assert.equal(page2.data.done, true)
+      assert.equal(page2.data.pendingTaskId, '')
+    } else {
+      assert.equal(posts2, 1)
+    }
+  }
+
+  // ③ 视图：不得断言「再查也一样」；有编号就保留「查询本次结果」；not-found 给核对身份与确认后的新一次；链接 48px + 按压反馈 + 按钮语义。
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/resume-parse/resume-parse.wxml'), 'utf8')
+  const wxss = fs.readFileSync(path.join(MINIAPP, 'pages/resume-parse/resume-parse.wxss'), 'utf8')
+  assert.doesNotMatch(wxml, /同样结果|不必再等|再查也会/, '身份恢复后可能读得到，不得断言再查无用')
+  assert.match(wxml, /<button wx:if="\{\{pendingTaskId\}\}"[^>]*bindtap="recheck"/, '有编号就保留同编号查询')
+  assert.match(wxml, /换回提交时的账号/)
+  const queryable = wxml.match(/<view wx:if="\{\{phase === 'unknown' && pendingTaskId && recheck !== 'not-found'\}\}" class="notice warn">([\s\S]*?)<\/view>\s*<\/view>/)
+  assert.ok(queryable, '有编号可查时要有单独的提示')
+  assert.doesNotMatch(queryable[1], /手动重新提交|重新提交会/, '这一态页面上没有重提入口，不得声称可以手动重提')
+  const links = wxml.match(/<view[^>]*class="unknown-link[^"]*"[^>]*>/g) || []
+  assert.ok(links.some((l) => /recheck === 'not-found'/.test(l) && /bindtap="confirmResubmit"/.test(l)), 'not-found 给确认后的新一次')
+  assert.ok(links.some((l) => /recheck === 'not-found'/.test(l) && /bindtap="toAiRecords"/.test(l)), 'not-found 给核对身份的出口')
+  for (const l of links) {
+    assert.match(l, /hover-class="tap-press"/)
+    assert.match(l, /role="button"/)
+    assert.match(l, /aria-label="/)
+  }
+  const linkCss = wxss.match(/\.unknown-link\s*\{([^}]*)\}/)
+  assert.ok(linkCss)
+  assert.match(linkCss[1], /min-height:\s*48px/)
+})
