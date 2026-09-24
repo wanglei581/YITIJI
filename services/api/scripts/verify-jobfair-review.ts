@@ -31,11 +31,12 @@ import { JobsExcelService } from '../src/jobs/jobs-excel.service'
 import { JobQualityService } from '../src/job-ai/job-quality.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const RESIDUE_TAG = 'vresidfairreview'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
-function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
+function fail(m: string): never { console.error(`  FAIL ${m}`); throw new Error(m) }
 
 function errCode(e: unknown): string | undefined {
   const ex = e as { getResponse?: () => unknown; response?: unknown }
@@ -66,6 +67,7 @@ function parsePayload(payloadJson: string): Record<string, unknown> {
 
 async function main() {
   console.log('\n=== 招聘会审核 / 发布状态机 service 级验证（2026-06-17 P0 补门禁）===')
+  assertIsolatedVerificationDatabase()
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()

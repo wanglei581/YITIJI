@@ -28,9 +28,10 @@ import { JobsAdminService } from '../src/jobs/jobs-admin.service'
 import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
 import { JobsExcelService } from '../src/jobs/jobs-excel.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
-function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
+function fail(m: string): never { console.error(`  FAIL ${m}`); throw new Error(m) }
 
 function errCode(e: unknown): string | undefined {
   const ex = e as { getResponse?: () => unknown; response?: unknown }
@@ -52,6 +53,7 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
 
 async function main() {
   console.log('\n=== 岗位审核 / 发布状态机 service 级验证（P1-B⑤ 守门）===')
+  assertIsolatedVerificationDatabase()
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
