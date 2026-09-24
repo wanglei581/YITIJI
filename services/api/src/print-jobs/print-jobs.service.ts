@@ -725,7 +725,7 @@ export class PrintJobsService {
       })
     }
     const fileId = task.fileId ?? parseStoredPrintFileId(task.fileUrl)
-    if (!fileId || !file || file.deletedAt) {
+    if (!fileId || !isPrintableFileRecord(file)) {
       throw new ConflictException({
         error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
       })
@@ -828,14 +828,13 @@ export class PrintJobsService {
   private canRetryPaidFailedJob(
     task: { status: string; errorCode: string | null },
     order: { payStatus: string },
-    file: { deletedAt: Date | null } | null,
+    file: { status?: string | null; deletedAt?: Date | null; expiresAt?: Date | null } | null,
   ): boolean {
     return (
       task.status === 'failed' &&
       order.payStatus === 'paid' &&
       task.errorCode !== PRINT_JOB_UNCONFIRMED_ERROR_CODE &&
-      Boolean(file) &&
-      !file?.deletedAt
+      isPrintableFileRecord(file)
     )
   }
 
@@ -850,7 +849,9 @@ export class PrintJobsService {
             filename: true,
             mimeType: true,
             sizeBytes: true,
+            status: true,
             deletedAt: true,
+            expiresAt: true,
           },
         },
       },

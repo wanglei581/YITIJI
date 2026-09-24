@@ -885,6 +885,117 @@ async function main() {
       '8h. 未支付失败单不能重新提交',
     )
 
+    const unpaidTakeaway = await printJobs.issueTakeawayUrl(unpaid.taskId, {
+      paymentSessionToken: unpaid.paymentSessionToken,
+    })
+    const unconfirmedTakeaway = await printJobs.issueTakeawayUrl(unconfirmedId, {
+      paymentSessionToken: await sessionFor(unconfirmedId),
+    })
+    if (unpaidTakeaway.canRetry || unconfirmedTakeaway.canRetry) {
+      fail('8i. 未支付或 PRINT_JOB_UNCONFIRMED 不得 canRetry')
+    }
+    pass('8i. active 文件上，未支付与 PRINT_JOB_UNCONFIRMED 的 canRetry 仍为 false')
+
+    const retryMatrix = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'canRetry-matrix.pdf',
+    }, { terminalId })
+    createdTaskIds.push(retryMatrix.taskId)
+    await orderStatus.markPaid(retryMatrix.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: retryMatrix.taskId },
+      data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: retryMatrix.taskId },
+      data: { taskStatus: 'failed' },
+    })
+    const matrixToken = retryMatrix.paymentSessionToken
+    const readCanRetry = async () => (await printJobs.issueTakeawayUrl(retryMatrix.taskId, {
+      paymentSessionToken: matrixToken,
+    })).canRetry
+    if (!await readCanRetry()) fail('8j. active 且未过期必须 canRetry')
+    await prisma.fileObject.update({ where: { id: fileId }, data: { expiresAt: null } })
+    if (!await readCanRetry()) fail('8j. active 且 expiresAt 为空必须 canRetry')
+    pass('8j. active future / expiresAt null 的已付失败单 canRetry 为 true')
+
+    const rejectWithoutSideEffect = async (label: string) => {
+      const beforeTask = await prisma.printTask.findUnique({
+        where: { id: retryMatrix.taskId },
+        select: { status: true },
+      })
+      const beforeOrder = await prisma.order.findUnique({
+        where: { id: retryMatrix.orderId },
+        select: { payStatus: true, amountCents: true, taskStatus: true, refundedAmountCents: true },
+      })
+      await expectCode(
+        () => printJobs.retryPaidFailedJob(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_RETRY_FILE_UNAVAILABLE',
+        label,
+      )
+      const afterTask = await prisma.printTask.findUnique({
+        where: { id: retryMatrix.taskId },
+        select: { status: true },
+      })
+      const afterOrder = await prisma.order.findUnique({
+        where: { id: retryMatrix.orderId },
+        select: { payStatus: true, amountCents: true, taskStatus: true, refundedAmountCents: true },
+      })
+      if (
+        beforeTask?.status !== 'failed' || afterTask?.status !== 'failed' ||
+        beforeOrder?.payStatus !== 'paid' || afterOrder?.payStatus !== 'paid' ||
+        beforeOrder.amountCents !== afterOrder?.amountCents ||
+        beforeOrder.taskStatus !== 'failed' || afterOrder?.taskStatus !== 'failed' ||
+        beforeOrder.refundedAmountCents !== 0 || afterOrder?.refundedAmountCents !== 0
+      ) {
+        fail(`${label} 产生了任务或订单副作用`)
+      }
+    }
+    try {
+      await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'active', deletedAt: null, expiresAt: new Date(Date.now() - 60_000) } })
+      if (await readCanRetry()) fail('8k. 过期文件不得 canRetry')
+      await rejectWithoutSideEffect('8k. 过期文件 retry 拒绝且无副作用')
+      await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'quarantined', deletedAt: null, expiresAt: fileExpiry } })
+      if (await readCanRetry()) fail('8k. 隔离文件不得 canRetry')
+      await rejectWithoutSideEffect('8k. 隔离文件 retry 拒绝且无副作用')
+      await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'uploading', deletedAt: null, expiresAt: fileExpiry } })
+      if (await readCanRetry()) fail('8k. 上传中文件不得 canRetry')
+      await rejectWithoutSideEffect('8k. 上传中文件 retry 拒绝且无副作用')
+      await prisma.fileObject.update({
+        where: { id: fileId },
+        data: { status: 'deleted', deletedAt: new Date(), expiresAt: fileExpiry },
+      })
+      await expectCode(
+        () => printJobs.issueTakeawayUrl(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+        '8k. 已删除文件不返回 canRetry',
+      )
+      await rejectWithoutSideEffect('8k. 已删除文件 retry 拒绝且无副作用')
+    } finally {
+      await prisma.fileObject.update({
+        where: { id: fileId },
+        data: { status: 'active', deletedAt: null, expiresAt: fileExpiry },
+      })
+    }
+    if (!await readCanRetry()) fail('8l. 恢复为 active 后必须重新 canRetry')
+    const matrixBefore = await prisma.order.findUnique({
+      where: { id: retryMatrix.orderId },
+      select: { amountCents: true, payStatus: true },
+    })
+    const matrixRetried = await printJobs.retryPaidFailedJob(retryMatrix.taskId, { paymentSessionToken: matrixToken })
+    if (
+      matrixRetried.taskId !== retryMatrix.taskId ||
+      matrixRetried.orderId !== retryMatrix.orderId ||
+      matrixRetried.amountCents !== matrixBefore?.amountCents ||
+      matrixRetried.status !== 'pending' ||
+      matrixBefore?.payStatus !== 'paid'
+    ) {
+      fail(`8l. active 重试应保持同一订单与金额: ${JSON.stringify(matrixRetried)}`)
+    }
+    pass('8l. active 重试仍是同一订单与金额，不可打印状态不会给出 canRetry')
+    await prisma.printTask.update({ where: { id: retryMatrix.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: retryMatrix.taskId }, data: { taskStatus: 'cancelled' } })
+
     // ── 9. 动态价格二次确认 ────────────────────────────────────────────
     // 夹具文件 1 页 × 2 份黑白 → 应付 = 单价 × 2。quotedAmountCents 只作一致性断言：
     // 不一致必须 409 PRICE_CHANGED、带回当前报价，且 Order / PrintTask / 支付尝试 / 建单审计全部零新增。
