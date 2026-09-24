@@ -292,6 +292,9 @@ export function PrintMaterialCheckPage({
     setNormalizeTask(null)
     setPiiTask(null)
     setDecisions({})
+    // 新一轮检查一开始就作废上一轮的检查结论与遮挡结果（fail-closed）：结论只能由本轮 handleContinue 重新写入，
+    // 否则检查未完成时直接进 ?step=preview 会凭旧摘要放行。文件、来源与可复用的检查任务保持不变。
+    persistSession({ materialCheck: undefined, piiRedactTask: undefined })
 
     try {
       const token = getToken()
