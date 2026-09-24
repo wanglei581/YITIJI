@@ -64,11 +64,11 @@
 | 51-phone-relay | `/member/qr-login` | 手机独立壳；有效票据状态待实屏验 |
 | 52-advisor-artifact（补充稿） | `/ai/plan` | QX 路由已登记；仅无产物态实屏对照，其余产物态与发起入口待验 |
 
-**下一批优先级：** 首页卡片密度、圆角、主视觉及低干扰反馈动效；05 顾问、06 帮助旧壳；打印扫描 Hub、收银、扫描、手机接力的真实状态。AI 简历上传→解析→报告→优化/生成、求职材料与顾问必须逐项证明真实 API、授权、失败退路、结果落库及非 AI 回退；现有合成夹具只证明本地合同，不证明生产模型或第三方服务。
+**下一批优先级：** P0：05 顾问、06 帮助旧壳，以及打印扫描 Hub、收银、扫描、手机接力的实际路由/状态与目标稿差异；首页上方主入口的 27 寸竖屏触达需现场验证。P1：其余 51 稿逐页真实路由→等待/空/错/禁用→结果实屏验收，优先打通使用频次高的打印与简历路径。P2：视觉细节和动效继续收口；动效只响应真实按下或实际服务状态，遵守 reduced-motion。首页卡片密度、圆角和按下反馈已有本地候选，不再列为未动手。AI 简历上传→解析→报告→优化/生成、求职材料与顾问必须逐项证明真实 API、授权、失败退路、结果落库及非 AI 回退；现有合成夹具只证明本地合同，不证明生产模型或第三方服务。
 
-**AI 源码核查（仍非线上闭环）：** `AssistantPage` 调 `chatWithAssistant` 并有服务不可用退路；`ResumeSourcePage` 调真实上传适配器，`ResumeParsePage` 提交解析并读取记录，`ResumeReportPage` 读取记录且把技术夹具或 mock provider 标成演示，`ResumeGeneratePage` 提交生成/导出并有授权门；这些是源码与合成门禁事实，未在本轮打真实模型或生产 HTTP。`JobMaterialLibraryPage` 明确使用固定模板，后端无 LLM 撰写，不可叫“AI 自动生成材料”。`/ai/plan` 有真实 session/产物读取和打印适配，但当前只有问答钉选 `qa_pins` 的前台发起入口，`slot_draft` / `compare_report` 的采集页仍缺；无产物态的视觉接近 52 稿，不代表三种产物全链可用。
+**AI 源码核查（仍非线上闭环）：** `AssistantPage` 调 `chatWithAssistant` 并有服务不可用退路；`ResumeSourcePage` 调真实上传适配器，`ResumeParsePage` 提交解析并读取记录，`ResumeReportPage` 读取记录且把技术夹具或 mock provider 标成演示，`ResumeGeneratePage` 提交生成/导出并有授权门；这些是源码与合成门禁事实，未在本轮打真实模型或生产 HTTP。生产启动门禁在装载 `AppModule` 前要求 `OCR_PROVIDER=baidu` 和 `AI_PROVIDER=llm` 及对应密钥，不能把生产默认说成 mock/关闭 OCR；但持久 `ai-model-configs.json` 可让单项 feature disabled 或保留旧密钥，启动过闸也不证明每项能力当下可调用。上线须核对当前部署 SHA、非敏感 feature readiness 和受控真实 AI/OCR 样本。`JobMaterialLibraryPage` 明确使用固定模板，后端无 LLM 撰写，不可叫“AI 自动生成材料”。`/ai/plan` 有真实 session/产物读取和打印适配，但当前只有问答钉选 `qa_pins` 的前台发起入口，`slot_draft` / `compare_report` 的采集页仍缺；无产物态的视觉接近 52 稿，不代表三种产物全链可用。
 
-**四模型证据状态：** Codex 完成 51+1 原型与 7 个运行时入口（含 52 号无产物态）的实屏抽查、首页复验及源代码矩阵；Claude `claude-opus-5-5/xhigh` 首次调用超时只留未验改动，续调完成首页小批、4/4 浏览器与 typecheck/lint；Grok `grok-4.7-build-fast/xhigh` 完成首页截图复核和 AI 源码只读审查，但未亲跑浏览器/真实 API；Agy `gemini-3.8-flash-high/high` 两次超时，记为 **UNREVIEWED**，不算赞同。四者均未给出 51 张运行时逐态验收。
+**四模型证据状态：** Codex 完成 51+1 原型与 7 个运行时入口（含 52 号无产物态）的实屏抽查、首页复验及源代码矩阵；首页两份 W1 规格 11/11、typecheck、局部 lint 已在最后文案版通过。Claude `claude-opus-5-5/xhigh` 完成首页修整、顾问入口文案第一轮修正，并推荐「温润服务台」；Codex 随后将主文案收紧为只承诺打开顾问，语音入口仍须本机检测。Grok `grok-4.7-build-fast/xhigh` 完成首页截图复核和 AI 源码只读审查，但未亲跑浏览器/真实 API；Agy `gemini-3.8-flash-high/high` 前两次超时，后在 session `2c39368e-9441-4ed8-a0fe-c1b8c7a3b1d9` 对截图给出独立 **NO-GO** 评审：主按钮原“点这里说话”与仅导航不符（本地已改）、27 寸竖屏上方按钮触达需现场确认（人机推断）、绿色主按钮权重偏强。Agy 未审最终源码或跑真机；四者均未给出 51 张运行时逐态验收。
 
 ## 2026-09-24：完整商业收口执行队列
 

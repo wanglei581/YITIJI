@@ -204,6 +204,11 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(home.getByRole('link', { name: '鲁公网安备37021402007308号' })).toHaveAttribute('href', /beian\.mps\.gov\.cn/)
 
   const primary = home.getByTestId('home-primary')
+  // 主 CTA 只是打开 AI 顾问，不在首页开麦：文案不得写「点这里说话」。
+  // W1 构建带 VITE_USE_TRTC_CALL=true 只说明助手页显示语音入口；首页不能承诺本机此刻可开麦。
+  await expect(primary).toContainText('打开 AI 顾问，咨询求职问题')
+  await expect(primary).toContainText('语音以本机检测为准')
+  await expect(primary).not.toContainText('点这里说话')
   await expectTouchFloor(primary, 56)
   await expectTouchFloor(home.locator('button:visible, a:visible'), 48)
   await primary.click()

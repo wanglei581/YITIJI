@@ -26,6 +26,8 @@ import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
 
+const ASSISTANT_VOICE_ENTRY = import.meta.env.VITE_USE_TRTC_CALL === 'true' // 主 CTA 只跳 /assistant 不开麦；「语音」跟助手页语音入口同一开关
+
 interface QxHomeViewProps {
   isLoggedIn: boolean
   displayName: string
@@ -37,7 +39,6 @@ interface QxHomeViewProps {
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
 }
-
 
 function fairCopy(state: QxHomeViewProps['jobFair']): {
   description: string
@@ -135,7 +136,7 @@ export function QxHomeView({
           <span className="qx-home-avatar" aria-hidden="true">青</span>
           <div>
             <h2>{isLoggedIn && displayName ? `${displayName}，你好，我是` : '你好，我是'}<em>小青</em></h2>
-            <span>说一句你想办的事，我带你一步一步办</span>
+            <span>告诉我你想办的事，我带你一步一步办</span>
           </div>
           <QxHomeClock />
         </div>
@@ -145,9 +146,9 @@ export function QxHomeView({
           onClick={() => onAction('assistant')}
           data-testid="home-primary"
         >
-          <span className="qx-home-voice-icon"><MicIcon aria-hidden="true" /></span>
-          <span>点这里说话，比如“帮我打一份简历”</span>
-          <small>进入助手</small>
+          <span className="qx-home-voice-icon"><BotIcon aria-hidden="true" /></span>
+          <span>打开 AI 顾问，咨询求职问题</span>
+          <small>{ASSISTANT_VOICE_ENTRY ? '可打字；语音以本机检测为准' : '打字咨询'}</small>
         </button>
         <div className="qx-home-quick" aria-label="常用服务快捷入口">
           <span>也可以直接选：</span>
