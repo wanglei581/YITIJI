@@ -1,14 +1,4 @@
 .qx-home-host { width: 100%; height: 100%; min-height: 0; }
-.qx-home-host .qx-pagehead {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-.qx-home-host .qx-body { padding: 0; }
 .qx-home { --qx-home-r: 20px; --qx-home-ease: cubic-bezier(.2, .75, .25, 1); gap: 0; padding-top: 0; }
 
 .qx-home-hero {
@@ -37,17 +27,24 @@
   pointer-events: none;
 }
 .qx-home-hero > * { position: relative; z-index: 1; }
-/* 顶栏收进背景图：覆写共享 104px 实色顶栏，品牌 / 状态 / 时钟同排、浅色字压在深色蒙层上。 */
+/* 顶栏收进背景图：覆写共享 104px 实色顶栏，浅色字压在深色蒙层上。
+   品牌区吃掉左侧全部余宽并拆成三行（品牌 / 副题 / 终端），状态 pill 与时钟固定在右侧完整展示。 */
 .qx-home-hero > .qx-home-hero-top {
   flex: none; display: flex; align-items: center; gap: 16px; height: 92px; padding: 0;
   border: 0; box-shadow: none; background: transparent; color: var(--qx-paper);
   text-shadow: 0 1px 3px color-mix(in srgb, var(--qx-deep) 70%, transparent);
 }
 .qx-home-hero-top > * { flex: none; min-width: 0; }
-.qx-home-hero-top .qx-topbar-brand { flex: 0 1 auto; margin-right: auto; overflow: hidden; color: var(--qx-paper); white-space: nowrap; text-overflow: ellipsis; }
-.qx-home-hero-top .qx-topbar-sub { color: color-mix(in srgb, var(--qx-paper) 72%, transparent); }
+.qx-home-hero-top > .qx-home-brand { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.qx-home-hero-top > .qx-home-brand > * { display: block; max-width: 100%; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.qx-home-hero-top .qx-topbar-brand { color: var(--qx-paper); font-size: 30px; line-height: 1.2; }
+.qx-home-hero-top .qx-topbar-sub { color: color-mix(in srgb, var(--qx-paper) 72%, transparent); font-size: 17px; line-height: 1.3; }
+.qx-home-hero-top .qx-home-terminal { color: color-mix(in srgb, var(--qx-paper) 64%, transparent); font-size: 16px; line-height: 1.3; }
+/* 占位 spacer 的推挤职责已由品牌区 flex:1 接管，隐藏以免多占一格 gap。 */
+.qx-home-hero-top > .qx-home-brand ~ :empty:not(.qx-pill, .qx-home-clock) { display: none; }
+/* 只压深底保证对比，不覆写文字色：ok / warn / bad 的真实状态色必须原样透出。 */
 .qx-home-hero-top .qx-pill {
-  white-space: nowrap; color: var(--qx-paper);
+  white-space: nowrap;
   border-color: color-mix(in srgb, var(--qx-paper) 30%, transparent);
   background: color-mix(in srgb, var(--qx-deep) 42%, transparent);
 }
