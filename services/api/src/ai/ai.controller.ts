@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -65,6 +65,22 @@ function authOf(req: ReqLike): string | undefined {
   if (typeof auth === 'string') return auth
   if (Array.isArray(auth)) return auth[0]
   return undefined
+}
+
+function resumeParseAuthorization(req: ReqLike): string | undefined {
+  const direct = authOf(req)
+  if (direct !== undefined) return direct
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (key.toLowerCase() !== 'authorization') continue
+    if (typeof value === 'string') return value
+    if (Array.isArray(value) && typeof value[0] === 'string') return value[0]
+  }
+  return undefined
+}
+
+/** Same prefix rule as resolveOptionalEndUser: scheme case does not matter, and a missing space is not a Bearer. */
+function presentedMemberBearer(authorization: string | undefined): boolean {
+  return typeof authorization === 'string' && authorization.toLowerCase().startsWith('bearer ')
 }
 
 /**
@@ -153,11 +169,18 @@ export class AiController {
     @Body() dto: ResumeParseRequestDto,
     @Req() req: ReqLike,
   ): Promise<ResumeParseResponseDto> {
-    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    const authorization = resumeParseAuthorization(req)
+    const endUser = await resolveOptionalEndUser(authorization, this.jwt, this.redis, this.prisma)
+    const intentHeaders = readResumeParseIntentHeaders(req.headers)
+    // 带意图头时，已出示但解析失败的 Bearer 不能降级成匿名，否则会把意图记到空归属上。
+    if (intentHeaders.status === 'present' && presentedMemberBearer(authorization) && !endUser) {
+      throw new UnauthorizedException({
+        error: { code: 'MEMBER_TOKEN_INVALID', message: '登录已失效,请重新登录' },
+      })
+    }
     if (endUser) {
       await this.privacy.requireActiveConsent(endUser.endUserId, 'resume_ai')
     }
-    const intentHeaders = readResumeParseIntentHeaders(req.headers)
     if (intentHeaders.status === 'rejected') {
       throw new BadRequestException({
         error: { code: 'RESUME_PARSE_INTENT_MALFORMED', message: '简历解析意图标识无效' },

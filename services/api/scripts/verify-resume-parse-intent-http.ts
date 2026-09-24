@@ -90,7 +90,12 @@ function makeController() {
       },
     },
     audit: { write: async (entry: unknown) => { audits.push(entry) } },
-    jwt: { verify: () => ({ sub: 'member-1', jti: 'sid-1' }) },
+    jwt: {
+      verify: (token: string) => {
+        if (token === 'invalid-member-token') throw new Error('bad token')
+        return { sub: 'member-1', jti: 'sid-1' }
+      },
+    },
     redis: { get: async (key: string) => (key === 'member:session:sid-1' ? 'member-1' : null) },
     prisma: { endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) } },
     publicQuota: {
@@ -197,6 +202,59 @@ async function main(): Promise<void> {
   assert.equal(allowed.calls.consent, 1)
   assert.equal((allowed.runnerArgs[0] as [unknown, string])[1], 'member-1')
   pass('an allowed member reaches the runner with the member id')
+
+  const mixedCaseMember = makeController()
+  await mixedCaseMember.controller.submitResumeParse(dto, request({
+    ...headers,
+    authorization: 'bEaReR member-token',
+    'x-terminal-id': 'terminal-1',
+  }))
+  assert.equal(mixedCaseMember.calls.consent, 1)
+  assert.equal((mixedCaseMember.runnerArgs[0] as [unknown, string])[1], 'member-1')
+  pass('bearer scheme casing still resolves a valid member')
+
+  const invalidBearer = makeController()
+  await expectHttp(
+    () => invalidBearer.controller.submitResumeParse(dto, request({
+      ...headers,
+      Authorization: 'bEaReR invalid-member-token',
+    })),
+    401,
+    'MEMBER_TOKEN_INVALID',
+  )
+  assert.equal(invalidBearer.calls.consent, 0)
+  assert.equal(invalidBearer.calls.runner, 0)
+  assert.equal(invalidBearer.calls.consume, 0)
+  assert.equal(invalidBearer.calls.parse, 0)
+  assert.equal(invalidBearer.audits.length, 0)
+  pass('a presented bearer that does not resolve is rejected before consent, quota, or the provider')
+
+  const unkeyedInvalid = makeController()
+  const unkeyedResult = await unkeyedInvalid.controller.submitResumeParse(dto, request({
+    authorization: 'Bearer invalid-member-token',
+    'x-terminal-id': 'terminal-1',
+  }))
+  assert.equal(unkeyedResult.taskId, 'legacy-task')
+  assert.equal(unkeyedInvalid.calls.consume, 1)
+  assert.equal(unkeyedInvalid.calls.parse, 1)
+  assert.equal(unkeyedInvalid.calls.runner, 0)
+  assert.equal(unkeyedInvalid.calls.consent, 0)
+  pass('an unkeyed request with an unusable bearer stays on the legacy anonymous path')
+
+  const partialBearer = makeController()
+  await expectHttp(
+    () => partialBearer.controller.submitResumeParse(dto, request({
+      authorization: 'Bearer invalid-member-token',
+      'x-resume-parse-intent': intent,
+    })),
+    400,
+    'RESUME_PARSE_INTENT_MALFORMED',
+  )
+  assert.equal(partialBearer.calls.consent, 0)
+  assert.equal(partialBearer.calls.consume, 0)
+  assert.equal(partialBearer.calls.runner, 0)
+  assert.equal(partialBearer.calls.parse, 0)
+  pass('a partial intent header is still rejected without quota or a provider call')
 
   const processing = makeController()
   processing.setRunnerResult({ taskId: 'intent-task', status: 'processing' })
@@ -577,6 +635,7 @@ async function verifyKeyedFilePreflight(): Promise<void> {
       proof?: string
       fileName?: string
       token?: string
+      authorization?: string
     }) => {
       const headers: Record<string, string> = {
         Accept: 'application/json',
@@ -585,7 +644,8 @@ async function verifyKeyedFilePreflight(): Promise<void> {
       }
       if (input.key) headers['x-resume-parse-intent'] = input.key
       if (input.proof) headers['x-resume-parse-proof'] = input.proof
-      if (input.token) headers.Authorization = `Bearer ${input.token}`
+      if (input.authorization !== undefined) headers.Authorization = input.authorization
+      else if (input.token) headers.Authorization = `Bearer ${input.token}`
       const res = await fetch(`${base}/resume/parse`, {
         method: 'POST',
         headers,
@@ -735,6 +795,71 @@ async function verifyKeyedFilePreflight(): Promise<void> {
     assert.equal(await prisma.aiResumeResult.count({ where: { taskId: 'legacy-parse', kind: 'parse_intent' } }), 0)
     assert.equal(getCalls, 0)
     pass('the unkeyed route still reaches the provider and does not read the object bytes')
+
+    const owned = await upload(userA.id)
+    const guardPair = fresh()
+    const invalidToken = randomBytes(24).toString('base64url')
+    const guardQuota = await quotaSnapshot()
+    const guardProvider = [...preflightProvider]
+    const guardHeads = headCalls
+    const guardGets = getCalls
+    assert.equal(await prisma.userAiConsent.count({ where: { endUserId: userA.id } }), 0)
+    const rejected = await post({
+      fileId: owned.id,
+      ...guardPair,
+      authorization: `bEaReR ${invalidToken}`,
+    })
+    assert.equal(rejected.status, 401)
+    assert.equal(rejected.body.error?.code, 'MEMBER_TOKEN_INVALID')
+    assert.equal(rejected.body.error?.message, '登录已失效,请重新登录')
+    assert.equal(rejected.body.taskId, undefined)
+    assert.equal(await prisma.aiResumeResult.count({ where: { taskId: resumeParseIntentId(guardPair.key) } }), 0)
+    assert.equal(await prisma.auditLog.count({ where: { action: 'resume.parse_submitted', targetId: owned.id } }), 0)
+    assert.equal(await prisma.userAiConsent.count({ where: { endUserId: userA.id } }), 0)
+    assert.deepEqual(await quotaSnapshot(), guardQuota)
+    assert.deepEqual(preflightProvider, guardProvider)
+    assert.equal(headCalls, guardHeads)
+    assert.equal(getCalls, guardGets)
+    hidden(rejected.body, [guardPair.key, guardPair.proof, invalidToken, PDF_SENTINEL, owned.storageKey, userA.id, userB.id])
+
+    await prisma.userAiConsent.create({
+      data: {
+        endUserId: userA.id,
+        scope: 'resume_ai',
+        consentVersion: CURRENT_RESUME_AI_CONSENT_VERSION,
+      },
+    })
+    const accepted = await post({ fileId: owned.id, ...guardPair, token: 'token-a' })
+    assert.equal(accepted.status, 201)
+    assert.equal(accepted.body.status, 'completed')
+    assert.equal(accepted.body.taskId, resumeParseIntentId(guardPair.key))
+    assert.equal(accepted.body.accessToken, undefined)
+    assert.equal((await intentOf(guardPair.key))?.endUserId, userA.id)
+    assert.equal((await intentOf(guardPair.key))?.status, 'completed')
+    const chargedGuard = await quotaSnapshot()
+    assert.notDeepEqual(chargedGuard, guardQuota)
+    const replayed = await post({ fileId: owned.id, ...guardPair, token: 'token-a' })
+    assert.equal(replayed.status, 201)
+    assert.equal(replayed.body.taskId, accepted.body.taskId)
+    assert.equal(replayed.body.status, 'completed')
+    assert.deepEqual(await quotaSnapshot(), chargedGuard)
+    assert.deepEqual(preflightProvider, [...guardProvider, 'keyed'])
+    assert.equal(await prisma.auditLog.count({ where: { action: 'resume.parse_submitted', targetId: owned.id } }), 2)
+    hidden(accepted.body, [guardPair.key, guardPair.proof, invalidToken, PDF_SENTINEL, owned.storageKey, userA.id])
+    hidden(replayed.body, [guardPair.key, guardPair.proof, invalidToken, 'token-a', PDF_SENTINEL, owned.storageKey, userA.id])
+    pass('an invalid bearer writes nothing, then the same key succeeds once for the member and replays')
+
+    const anonFile = await upload(null)
+    const anonPair = fresh()
+    const anon = await post({ fileId: anonFile.id, ...anonPair })
+    assert.equal(anon.status, 201)
+    assert.equal(anon.body.status, 'completed')
+    assert.equal(anon.body.taskId, resumeParseIntentId(anonPair.key))
+    assert.equal(typeof anon.body.accessToken, 'string')
+    assert.equal((await intentOf(anonPair.key))?.endUserId ?? null, null)
+    assert.deepEqual(preflightProvider, [...guardProvider, 'keyed', 'keyed'])
+    hidden(anon.body, [anonPair.key, anonPair.proof, invalidToken, PDF_SENTINEL, anonFile.storageKey])
+    pass('a keyed request with no authorization stays anonymous')
     console.log('PASS keyed resume parse file preflight')
   } finally {
     preflightSessions.clear()
