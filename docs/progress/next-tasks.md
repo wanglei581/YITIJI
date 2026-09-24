@@ -30,7 +30,7 @@
 | 09-system-state | `/error-offline` | 未在 QX 集合；待实屏验 |
 | 10-print-hub | `/print-scan` | QX 路由已登记；1080×1920 默认/故障首屏本地修复通过，真实设备/接口/状态全量待验 |
 | 11-arrival-code | `/print/pickup-claim` | 本地手输态按用户原稿修复 1080/390 码格、键盘和扫码指引；主候选取件/终端会话 14/14 通过，HID 实物、其它状态、真机/支付/出纸仍待验 |
-| 12-file-source | `/print/upload` | QX 路由已登记；视觉待验 |
+| 12-file-source | `/print/upload` | 本地修复 1080 重复页头、390 来源卡/当前文件/操作条布局；W2 2/2 通过。有效二维码、USB/文件落库各态及真机待验，UI NO-GO |
 | 13-print-desk | `/print/material-check` | QX 路由已登记；视觉待验 |
 | 14-print-confirm | `/print/confirm` | QX 路由已登记；视觉待验 |
 | 15-print-fulfill | `/print/progress` | QX 路由已登记；视觉待验 |
