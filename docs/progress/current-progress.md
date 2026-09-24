@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-25：简历解析终态 4xx 双端退路合流（本地候选，P1/商用仍 NO-GO）
+
+Grok 在复用隔离树补齐 Kiosk 与原生小程序对四种可信状态码的处理：409 `RESUME_PARSE_INTENT_REVOKED`、404 `RESUME_PARSE_RESULT_EXPIRED/MISSING` 停止无效的同标识重查，保留本机标识，只有两次明确确认并校验清除后才可开启新 AI 请求；409 `FILE_CONTENT_CHANGED` 只在本人、标识、规范载荷及存储读回匹配时释放，引导重新上传。`FILE_NOT_FOUND`、`AI_TASK_NOT_FOUND`、5xx/408、其它状态/码组合维持原意图及保守退路，不据此宣称未扣额度。Codex 修复测试夹具、收紧文件拒绝文案，并按 Agy Gemini 3.8 Flash 独立只读审查修正二次确认与小程序卡片的终态文字、Kiosk 清场代际错误码。隔离提交 `f7b1b6a5c` 已选择性合流本地候选 `2b7d39a47`；只新增一个从 791 行解析页抽出的结果说明组件和一个 W3 存储夹具，没有新增产品页或 PR。
+
+Kiosk typecheck、W3 静态合同、解析浏览器 **12/12**（1080×1920 主屏，含 390 宽返回路径）、小程序完整 `verify:static` 与生命周期 **194/194** 均退出 0；图谱按既有生成器更新后 `graph:check` 通过。Agy 发现另一个既有换材料路径：小程序遇 `INTENT_CONFLICT` 且页面内存没有 `_intent` 时仍展示“重新提交”，完成确认后却报登录变化，可能形成无效出口；需单独复现并定义安全恢复，当前不将该路径算作修复。真实 Redis/数据库/模型费用、微信与 Windows 真机、当前 SHA CI、生产均未验，AI 解析 P1 和商用继续 NO-GO。
+
 ## 2026-09-25：旧 PR 首批收敛（保留分支与独有资产）
 
 GitHub 只读现查 13 个 OPEN PR，Agy Gemini 3.8 Flash 对 13 个 head 的 ancestry、patch/文件差异做独立盘点；Codex 针对实际执行的三项再查：#1039 head `792a9f987` 是既有整合草稿 #1042 head `755fa5a53` 及本地候选的直接祖先；#548 的两份设备证据文档在 PR head、`origin/main` 与本地候选的 Git blob 完全相同；#1025 的旧页批量删除会与候选仍使用的页面发生修改/删除冲突。已关闭 [#1039](https://github.com/wanglei581/YITIJI/pull/1039)、[#548](https://github.com/wanglei581/YITIJI/pull/548)、[#1025](https://github.com/wanglei581/YITIJI/pull/1025)，逐项回读状态均为 CLOSED，OPEN 数 **13→10**。没有删分支、合并 PR、推候选或改生产。
