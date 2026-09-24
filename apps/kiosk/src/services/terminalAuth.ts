@@ -296,17 +296,43 @@ async function awaitReadySessionOrFailClosed(): Promise<void> {
   if (state !== 'ready') throw new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
 }
 
-export async function terminalProtectedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+export interface TerminalProtectedFetchInit extends RequestInit {
+  /**
+   * 调用方页面还在不在。卸载（用户离开，或隐私清场把 children 换成遮罩）时 abort。
+   * 不传给 fetch：已经发出的 claim / release 不取消，服务端该落的照落。
+   * 它只拦住还没发出的第一次，以及 401 之后那一次重放。
+   */
+  staleSignal?: AbortSignal
+}
+
+function withoutStaleSignal(init: TerminalProtectedFetchInit): RequestInit {
+  const requestInit: RequestInit & { staleSignal?: AbortSignal } = { ...init }
+  delete requestInit.staleSignal
+  return requestInit
+}
+
+export async function terminalProtectedFetch(
+  input: RequestInfo | URL,
+  init: TerminalProtectedFetchInit = {},
+): Promise<Response> {
+  const staleSignal = init.staleSignal
   // 续期在飞就等它出结果。headers() 排在等待**之后**，因此发出去的一定是等完之后的
   // 那张票（续期成功时新票已写进 sessionStorage），不会是刚被换掉的旧票。
+  // 等待期间人走了就不要再把这一单发出去：那时站在机器前的可能已是下一位。
+  if (staleSignal?.aborted) throw new DOMException('请求已取消', 'AbortError')
   if (state !== 'ready') await awaitReadySessionOrFailClosed()
-  let response = await fetch(input, { ...init, headers: headers(init.headers) })
+  if (staleSignal?.aborted) throw new DOMException('请求已取消', 'AbortError')
+  const requestInit = withoutStaleSignal(init)
+  let response = await fetch(input, { ...requestInit, headers: headers(init.headers) })
   if (response.ok) return response
   const error = await asHttpError(response.clone())
   // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动 / 503 重试）；其它错误原样交给调用方。
   if (!sessionInvalid(error)) return response
   await retryRefresh()
-  response = await fetch(input, { ...init, headers: headers(init.headers) })
+  // 刷新最长可达 60 秒。人已离页或本机已清场时不重放：原 401 的 body 还没被读过
+  // （上面读的是 clone），调用方的错误分支仍能解析，只是不该再替上一位发一单。
+  if (staleSignal?.aborted) return response
+  response = await fetch(input, { ...requestInit, headers: headers(init.headers) })
   return response
 }
 

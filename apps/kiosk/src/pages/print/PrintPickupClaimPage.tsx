@@ -82,15 +82,17 @@ type ClaimState = 'idle' | 'loading' | 'success' | 'error'
 type GuideMode = 'keypad' | 'hid'
 
 // ── API 调用（无会员登录态；终端身份由 terminalProtectedFetch 附带） ──
-async function claimPickup(code: string): Promise<ClaimPickupResult> {
+async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<ClaimPickupResult> {
   const terminalId = getTerminalId()
   if (!terminalId) throw new Error('终端身份尚未就绪，请稍后重试')
   // x-terminal-id 仍显式写在这里：terminalProtectedFetch 会用 getTerminalId() 设同一个值，
   // 但这一行是「本请求按哪台机器核销」的可读契约，也是跨端门禁的取证锚点，不省。
+  // staleSignal 不取消已经发出的认领；页面卸载后只是不再重放。
   const res = await terminalProtectedFetch(`${API_BASE_URL}/print/jobs/claim-pickup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-terminal-id': terminalId },
     body: JSON.stringify({ code }),
+    staleSignal,
   })
   const body = (await res.json()) as {
     taskId?: string
@@ -120,6 +122,9 @@ export function PrintPickupClaimPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const claimLockRef = useRef(false)
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 卸载即作废，同时覆盖用户离开和隐私清场（清场会卸掉 children）。
+  // 每次挂载新建：不能复用已经 abort 过的那只。
+  const pageAliveRef = useRef<AbortController | null>(null)
 
   const [code, setCode] = useState('')
   const [state, setState] = useState<ClaimState>('idle')
@@ -146,6 +151,12 @@ export function PrintPickupClaimPage() {
   useEffect(() => cancelSettle, [])
 
   useEffect(() => {
+    const controller = new AbortController()
+    pageAliveRef.current = controller
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
     if (state === 'success') return
     const id = window.setTimeout(() => inputRef.current?.focus(), 80)
     return () => window.clearTimeout(id)
@@ -159,11 +170,15 @@ export function PrintPickupClaimPage() {
     setCode(submittedCode)
     setState('loading')
     setErrorMsg('')
+    // 取本次挂载的信号。await 之后 ref 可能已指向下一次挂载，回读会把上一单画到公共屏上。
+    const staleSignal = pageAliveRef.current?.signal
     try {
-      const data = await claimPickup(submittedCode)
+      const data = await claimPickup(submittedCode, staleSignal)
+      if (staleSignal?.aborted) return
       setResult(data)
       setState('success')
     } catch (err) {
+      if (staleSignal?.aborted) return
       claimLockRef.current = false
       setCode('')
       setErrorMsg(userMessageOf(err, '请求失败，请重试'))

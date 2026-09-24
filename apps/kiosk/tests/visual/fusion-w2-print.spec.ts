@@ -603,6 +603,110 @@ test('pickup claim during a normal session refresh waits for the new ticket @w2'
   expect(errors).toEqual([])
 })
 
+// 401 续期被扣住时，人还在就重放并带上新票；人走了或隐私清场（含 BFCache）就不再重放，
+// 也不把上一单的订单号留在这块公共屏幕上。服务端那一次认领不取消、不回滚。
+const LIFECYCLE_ORDER_NO = 'LIFECYCLE-OLD-ORDER'
+
+function watchPostTokens(page: Page, path: string): string[] {
+  const tokens: string[] = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== path) return
+    tokens.push(request.headers()['x-terminal-session-token'] ?? '')
+  })
+  return tokens
+}
+
+/** 隐私清场会整页重载。这里只让 pageshow(persisted) 把 children 换成遮罩，截住那一次重载。 */
+async function freezeBfCachePrivacyClear(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const raf = window.requestAnimationFrame
+    const timeout = window.setTimeout
+    window.requestAnimationFrame = () => 0
+    window.setTimeout = ((callback: TimerHandler, delay?: number, ...args: unknown[]) =>
+      delay === 250 ? 0 : timeout(callback, delay, ...args)) as typeof window.setTimeout
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+    window.requestAnimationFrame = raf
+    window.setTimeout = timeout
+  })
+}
+
+async function waitForRotatedSession(page: Page): Promise<void> {
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('terminal_session_token_v1'))).toBe(TERMINAL_SESSION_ROTATED)
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+  }))
+}
+
+for (const scenario of ['active', 'leave', 'privacy'] as const) {
+  test(`pickup lifecycle claim refresh ${scenario} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    const refresh = holdTerminalRefresh(api)
+    const claimPath = '/api/v1/print/jobs/claim-pickup'
+    const claimTokens = watchPostTokens(page, claimPath)
+    page.on('request', (request) => {
+      if (request.method() !== 'POST') return
+      if (new URL(request.url()).pathname !== claimPath) return
+      expect(request.postDataJSON()).toEqual({ code: '12345678' })
+      expect(request.headers()['x-terminal-id']).toBe('KSK-001')
+    })
+    api.respondWith('POST', claimPath, (requestNumber) => (
+      requestNumber === 1
+        ? { status: 401, json: { error: { code: 'TERMINAL_SESSION_INVALID', message: 'Expired fixture' } } }
+        : {
+          status: 200,
+          json: {
+            released: false,
+            orderId: 'lifecycle-order',
+            orderNo: LIFECYCLE_ORDER_NO,
+            terminalId: 'KSK-001',
+            amountCents: 100,
+            priceLines: [],
+            paymentSessionToken: 'lifecycle-payment',
+          },
+        }
+    ))
+
+    try {
+      await page.goto('/print/pickup-claim')
+      await page.getByLabel('到机码输入框').pressSequentially('12345678', { delay: 5 })
+      await refresh.arrived
+      expect(api.requestCount('POST', claimPath)).toBe(1)
+      expect(claimTokens).toEqual([TERMINAL_SESSION_FIXTURE])
+
+      if (scenario === 'privacy') {
+        await freezeBfCachePrivacyClear(page)
+        await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
+        await expect(page.getByLabel('到机码输入框')).toHaveCount(0)
+      } else if (scenario === 'leave') {
+        await page.getByRole('button', { name: '返回打印扫描', exact: true }).click()
+        await expect(page).toHaveURL(/\/print-scan$/)
+      }
+
+      const refreshed = page.waitForResponse('**/api/v1/terminals/session-token/refresh')
+      refresh.open()
+      await refreshed
+      if (scenario === 'active') {
+        await expect(page.getByText(LIFECYCLE_ORDER_NO)).toBeVisible()
+        expect(api.requestCount('POST', claimPath)).toBe(2)
+        expect(claimTokens).toEqual([TERMINAL_SESSION_FIXTURE, TERMINAL_SESSION_ROTATED])
+      } else {
+        await waitForRotatedSession(page)
+        expect(api.requestCount('POST', claimPath), '离页或清场后不得重放认领').toBe(1)
+        expect(claimTokens).toEqual([TERMINAL_SESSION_FIXTURE])
+        await expect(page.getByText(LIFECYCLE_ORDER_NO)).toHaveCount(0)
+        if (scenario === 'leave') await expect(page).toHaveURL(/\/print-scan$/)
+        else await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
+      }
+      expect(api.requestCount('POST', '/api/v1/terminals/session-token/refresh')).toBe(1)
+      expect(errors).toEqual([])
+    } finally {
+      refresh.open()
+    }
+  })
+}
+
 function quoteResponseJson(opts?: { amountCents?: number; billablePages?: number; unitCents?: number }) {
   const billablePages = opts?.billablePages ?? 2
   const unitCents = opts?.unitCents ?? 100
@@ -1481,6 +1585,138 @@ test('a terminal-session 401 on Order-only release fails as terminal security, n
   ).toBe(1)
   expect(errors).toEqual([])
 })
+
+// Order-only：续期或 release 本身被扣住时，人还在就换票后释放并进入进度页；
+// 人走了或清场后，已发出的那一次释放照常落服务端（幂等、不取消），但不得再重放，
+// 也不得把上一位推进 /print/progress。
+for (const scenario of ['active-refresh', 'leave-refresh', 'leave-success', 'privacy-refresh'] as const) {
+  const leave = scenario !== 'active-refresh'
+  const lateSuccess = scenario === 'leave-success'
+  test(`pickup lifecycle release ${scenario} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    const releasePath = '/api/v1/print/jobs/lifecycle-order/release'
+    api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+    api.respond('GET', '/api/v1/orders/lifecycle-order/pay-status', {
+      status: 200,
+      json: {
+        orderId: 'lifecycle-order',
+        orderNo: 'LIFECYCLE-ORDER',
+        payStatus: 'paid',
+        paymentSource: 'wechat',
+        payChannel: 'wechat',
+        amountCents: 100,
+        paidAt: NOW,
+        pickupCode: null,
+        attempt: null,
+      },
+    })
+    api.respond('GET', '/api/v1/print/jobs/lifecycle-task', {
+      status: 200,
+      json: { taskId: 'lifecycle-task', status: 'pending' },
+    })
+    const refresh = holdTerminalRefresh(api)
+    let openRelease = (): void => undefined
+    const releaseGate = new Promise<void>((resolve) => { openRelease = resolve })
+    let markRelease = (): void => undefined
+    const releaseArrived = new Promise<void>((resolve) => { markRelease = resolve })
+    const releaseTokens = watchPostTokens(page, releasePath)
+    page.on('request', (request) => {
+      if (request.method() !== 'POST') return
+      if (new URL(request.url()).pathname !== releasePath) return
+      expect(request.headers()['x-terminal-id']).toBe('KSK-001')
+      expect(request.headers()['x-payment-session-token']).toBe('lifecycle-payment')
+    })
+    api.respondWith('POST', releasePath, async (requestNumber) => {
+      markRelease()
+      if (lateSuccess) {
+        await releaseGate
+        return {
+          status: 200,
+          json: {
+            released: true,
+            taskId: 'lifecycle-task',
+            orderId: 'lifecycle-order',
+            orderNo: 'LIFECYCLE-ORDER',
+            terminalId: 'KSK-001',
+            taskStatus: 'pending',
+            printTaskStatus: 'pending',
+            paymentSessionToken: 'lifecycle-payment',
+          },
+        }
+      }
+      if (requestNumber === 1) {
+        return { status: 401, json: { error: { code: 'TERMINAL_SESSION_INVALID', message: 'Expired fixture' } } }
+      }
+      return {
+        status: 200,
+        json: {
+          released: true,
+          taskId: 'lifecycle-task',
+          orderId: 'lifecycle-order',
+          orderNo: 'LIFECYCLE-ORDER',
+          terminalId: 'KSK-001',
+          taskStatus: 'pending',
+          printTaskStatus: 'pending',
+          paymentSessionToken: 'lifecycle-payment',
+        },
+      }
+    })
+
+    try {
+      await page.goto('/print/cashier')
+      await setReactRouterState(page, '/print/cashier', {
+        orderId: 'lifecycle-order',
+        orderNo: 'LIFECYCLE-ORDER',
+        amountCents: 100,
+        priceLines: [],
+        paymentSessionToken: 'lifecycle-payment',
+      })
+      await releaseArrived
+      expect(api.requestCount('POST', releasePath)).toBe(1)
+      expect(releaseTokens[0]).toBe(TERMINAL_SESSION_FIXTURE)
+      if (!lateSuccess) await refresh.arrived
+
+      if (scenario === 'privacy-refresh') {
+        await freezeBfCachePrivacyClear(page)
+        await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
+        await expect(page.getByRole('button', { name: '返回我的打印订单', exact: true })).toHaveCount(0)
+      } else if (leave) {
+        await page.getByRole('button', { name: '返回我的打印订单', exact: true }).click()
+        await expect(page).not.toHaveURL(/\/print\/cashier/)
+      }
+
+      const settled = page.waitForResponse((response) => {
+        const path = new URL(response.url()).pathname
+        return path === (lateSuccess ? releasePath : '/api/v1/terminals/session-token/refresh')
+      })
+      if (lateSuccess) openRelease()
+      else refresh.open()
+      await settled
+
+      if (leave) {
+        if (!lateSuccess) await waitForRotatedSession(page)
+        else {
+          await page.evaluate(() => new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+          }))
+        }
+        expect(api.requestCount('POST', releasePath), '离页或清场后不得重放释放').toBe(1)
+        expect(releaseTokens).toEqual([TERMINAL_SESSION_FIXTURE])
+        await expect(page).not.toHaveURL(/\/print\/progress/)
+      } else {
+        await expect(page).toHaveURL(/\/print\/progress/)
+        expect(api.requestCount('POST', releasePath)).toBe(2)
+        expect(releaseTokens).toEqual([TERMINAL_SESSION_FIXTURE, TERMINAL_SESSION_ROTATED])
+      }
+      expect(api.requestCount('POST', '/api/v1/terminals/session-token/refresh')).toBe(lateSuccess ? 0 : 1)
+      expect(errors).toEqual([])
+    } finally {
+      openRelease()
+      refresh.open()
+    }
+  })
+}
 
 test('print polling reaches done and pickup code comes from the paid response @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)

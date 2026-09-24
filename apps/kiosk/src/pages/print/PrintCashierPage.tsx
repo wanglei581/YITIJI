@@ -109,21 +109,36 @@ export function PrintCashierPage() {
    */
   const authCodeBufferRef = useRef('')
   const lastAutoReconcileAtRef = useRef(0)
+  // 卸载即作废。这不是 cancelRef：重读支付通道也会把 cancelRef 置上，页面却还在。
+  // 释放这条链路只认本控制器，避免通道刷新被误当成「人已经走了」。
+  const pageAliveRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    pageAliveRef.current = controller
+    return () => controller.abort()
+  }, [])
 
   const proceedToPrint = useCallback(async () => {
     if (navigatedRef.current) return
     navigatedRef.current = true
     setReleaseFailed(false)
+    const staleSignal = pageAliveRef.current?.signal
     let nextState = state
     try {
       // 小程序 Order-only 流程在付款前没有 PrintTask；支付成功后由服务端原子释放且幂等返回同一任务。
       if (!state.taskId && orderId && paymentSessionToken) {
-        const released = await releasePickupOrder({ orderId, paymentSessionToken })
+        const released = await releasePickupOrder({ orderId, paymentSessionToken, staleSignal })
+        // 释放期间人走了或本机清场：服务端任务不撤销。不要再推进度页，也不要复位
+        // navigatedRef，否则残留轮询会再释放一次。
+        if (staleSignal?.aborted) return
         nextState = { ...state, ...released, taskId: released.taskId, paymentSessionToken: released.paymentSessionToken }
       }
+      if (staleSignal?.aborted) return
       cancelRef.current = true
       navigate('/print/progress', { state: nextState })
     } catch (error) {
+      if (staleSignal?.aborted) return
       navigatedRef.current = false
       setReleaseFailed(true)
       setIssueError(userMessageOf(error, '订单已付款，但创建打印任务失败，请重试或联系现场工作人员'))
