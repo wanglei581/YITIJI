@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-25：旧 PR 首批收敛（保留分支与独有资产）
+
+GitHub 只读现查 13 个 OPEN PR，Agy Gemini 3.8 Flash 对 13 个 head 的 ancestry、patch/文件差异做独立盘点；Codex 针对实际执行的三项再查：#1039 head `792a9f987` 是既有整合草稿 #1042 head `755fa5a53` 及本地候选的直接祖先；#548 的两份设备证据文档在 PR head、`origin/main` 与本地候选的 Git blob 完全相同；#1025 的旧页批量删除会与候选仍使用的页面发生修改/删除冲突。已关闭 [#1039](https://github.com/wanglei581/YITIJI/pull/1039)、[#548](https://github.com/wanglei581/YITIJI/pull/548)、[#1025](https://github.com/wanglei581/YITIJI/pull/1025)，逐项回读状态均为 CLOSED，OPEN 数 **13→10**。没有删分支、合并 PR、推候选或改生产。
+
+[#1042](https://github.com/wanglei581/YITIJI/pull/1042) 仍是唯一整合目标，当前 head `755fa5a53` 是本地候选祖先，候选尚未冻结/推送；其旧 SHA 的 Windows 签名验证与 unsigned MSI 候选检查失败，不能当作当前候选 CI。#1035 仍有候选缺少的取件鉴权可视化与 API HTTP 验证脚本，#1031 的动效层、#1024 的走查脚本与 55 张截图、#606 的 Agent 更新器等需按实际能力和文件体积复核后再处理；不按标题/年龄批量关 PR。
+
 ## 2026-09-25：历史工作树依赖缓存小批清理实测（源码保留）
 
 对原项目 `.claude/worktrees/resume-submission-closure-61078f` 先只读确认：Git 工作区干净、`node_modules/.pnpm/lock.yaml` 与该树 `pnpm-lock.yaml` 字节一致、当前 `lsof` 无该依赖目录引用；只删除此树可由 `pnpm install --frozen-lockfile` 重建的 `node_modules`，保留工作树、分支、源码、锁文件、历史提交及其它缓存。删除后 Git 工作区仍干净。删除前该目录逻辑 `du` 为 1,140,124 KiB，但同一数据卷 `df -k` 可用空间仅从 261,222,976 增至 261,239,116 KiB，现场实际增量约 **16,140 KiB（15.8 MiB）**；APFS 克隆/共享存储使逻辑目录体积不能直接当作可回收容量。另一棵 `recursive-marinating-storm` 有正在运行的 Kiosk `node`/`esbuild`，未碰；其它工作树与线上备份均未删。后续按物理可用空间实测决定是否继续，不做批量 `rm` 或 Git prune/gc。
