@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-25：已付款打印出纸后回执丢失防重审计（只读，无新增代码）
+
+Grok 4.7 Build Fast xhigh 对 API/Worker/Windows Agent 的领取、租约、出纸前本地记录、状态回传与重启恢复作只读审计，在隔离 SQLite 跑过领取/超时/迟到完成回执交错，并复跑 Agent typecheck、`verify:task-reliability`、API `verify:terminal-status-idempotency`、`verify:print-scan-first-release`、`verify:order`。现有代码只领取 `pending` 且已付的任务；超时的 `claimed`/卡住的 `printing` 落 `failed/PRINT_JOB_UNCONFIRMED`，不自动重派；迟到完成回执 409；Agent 出纸前持久记 `dispatching`，重启只回放状态，不再次打印。本轮未发现这条特定自动重派缺陷，未改代码或新增文件。**未确认不等于已出纸**：需要工作人员现场核查；本地库丢失后对明确失败任务的人工重试仍可能再打，服务端超时也不能撤回已进 Windows 假脱机的任务。探针不是 PostgreSQL 并发或 Windows/奔图真机证据，已付款履约和商用仍 NO-GO。
+
 ## 2026-09-25：旧 #1035 收敛关闭（保留分支与可选边界清单）
 
 Grok 只读比较 PR #1035 的 13 个改动文件与本地候选 `d5dde5177`：PR head `c4def22a2` 与候选不是祖先关系，merge-base `fea6f3705`；其终端守卫、离页/隐私清场/慢释放重放防护、W2 生命周期测试与真实 Nest HTTP 门禁已在候选按当前代码选择性实现。Codex 复核 `d38ea344a` 为候选祖先、PR 当时 OPEN 且冲突，随后关闭 [#1035](https://github.com/wanglei581/YITIJI/pull/1035) 并回读为 CLOSED；开放 PR **10→9**。没有合并旧分支、删除分支、推送候选或部署。旧 PR 独有的非 mock `?boot_ticket=` 路径及三条辅助函数边界可作为后续定向补强，须按当前实现写入既有门禁，不复活旧整包；当前 SHA CI、真实终端/支付/出纸仍未验。
