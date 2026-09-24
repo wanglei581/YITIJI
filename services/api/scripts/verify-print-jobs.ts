@@ -36,7 +36,9 @@ import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
-import { signFileUrl } from '../src/files/signing'
+import { FilesService } from '../src/files/files.service'
+import { FilesController } from '../src/files/files.controller'
+import { signFileUrl, verifyFileSignature } from '../src/files/signing'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -59,6 +61,55 @@ function errCode(e: unknown): string | undefined {
 
 function thrownCode(e: unknown): string | undefined {
   return errCode(e) ?? (/^[A-Z][A-Z0-9_]+$/.test((e as Error).message) ? (e as Error).message : undefined)
+}
+
+function parseSignedContentUrl(fileUrl: string): { fileId: string; expires: string; sig: string } {
+  const parsed = new URL(fileUrl, 'http://print-verify.local')
+  const matched = /^\/api\/v1\/files\/([^/]+)\/content$/.exec(parsed.pathname)
+  const expires = parsed.searchParams.get('expires')
+  const sig = parsed.searchParams.get('sig')
+  if (!matched?.[1] || !expires || !sig) fail(`claim fileUrl 不是 /files/:id/content 签名路径: ${fileUrl.split('?')[0]}`)
+  return { fileId: matched[1], expires, sig }
+}
+
+/**
+ * 在 claim 事务读完目标 FileObject 之后、PrintTask CAS 之前，用另一条连接提交软删除。
+ * 这是测试侧事务屏障，不是 sleep，也不是同事务触发器。
+ */
+async function claimWhileSoftDeleteCommits(
+  prisma: PrismaService,
+  targetFileId: string,
+  claim: () => Promise<void>,
+): Promise<void> {
+  const deleter = new PrismaService()
+  await deleter.onModuleInit()
+  const original = prisma.$transaction.bind(prisma)
+  let committed = false
+  prisma.$transaction = ((arg: unknown, ...rest: unknown[]) => {
+    if (typeof arg !== 'function') return original(arg as never, ...(rest as []))
+    return original(async (tx: { fileObject: { findUnique: (args: { where?: { id?: string } }) => Promise<unknown> } }) => {
+      const findUnique = tx.fileObject.findUnique.bind(tx.fileObject)
+      tx.fileObject.findUnique = async (args) => {
+        const seen = await findUnique(args)
+        if (!committed && args?.where?.id === targetFileId) {
+          await deleter.fileObject.update({
+            where: { id: targetFileId },
+            data: { status: 'deleted', deletedAt: new Date() },
+          })
+          committed = true
+        }
+        return seen
+      }
+      return arg(tx)
+    }, ...(rest as []))
+  }) as typeof prisma.$transaction
+  try {
+    await claim()
+    if (!committed) fail('claim 未在事务内读取目标文件，软删除屏障没有发生')
+  } finally {
+    prisma.$transaction = original
+    await deleter.onModuleDestroy()
+  }
 }
 
 async function expectCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
@@ -1006,6 +1057,91 @@ async function main() {
     pass('队头文件过期时不签发其 URL，后续 active 任务仍可被 Agent 领取')
     await terminals.patchTaskStatus(activeProbe.taskId, { status: 'failed', errorCode: 'FILE_NOT_FOUND' }, `Bearer ${agentToken}`, terminalId)
     await prisma.fileObject.update({ where: { id: fileId }, data: { expiresAt: fileExpiry } })
+
+    // 检查后才软删除：独立事务在文件读取返回后、PrintTask CAS 前提交。
+    // SQLite 的写锁不能在已打开的交互事务里让第二条连接确定性提交，故只在 PostgreSQL 执行。
+    if (prisma.dbKind !== 'postgres') {
+      console.log('  SKIP claim 文件状态交错：需要 PostgreSQL 上的独立提交事务；SQLite 不跑此夹具')
+    } else {
+      const staleFileId = `file_vpj_stale_${suffix}`
+      const liveFileId = `file_vpj_live_${suffix}`
+      const staleKey = `verify/print-jobs/${staleFileId}.pdf`
+      const liveKey = `verify/print-jobs/${liveFileId}.pdf`
+      fixtureFileIds.push(staleFileId, liveFileId)
+      fixtureStorageKeys.push(staleKey, liveKey)
+      await storage.putObject(staleKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+      await storage.putObject(liveKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+      await prisma.fileObject.createMany({
+        data: [staleFileId, liveFileId].map((id, index) => ({
+          id,
+          storageKey: index === 0 ? staleKey : liveKey,
+          filename: index === 0 ? 'stale-after-check.pdf' : 'live-active.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length,
+          sha256: reportSha256,
+          purpose: 'print_source' as const,
+          status: 'active',
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          bucket: LOCAL_BUCKET_SENTINEL,
+        })),
+      })
+      const staleJob = await printJobs.create(
+        { fileUrl: signFileUrl(staleFileId, 30 * 60 * 1000).url, fileName: 'stale-after-check.pdf' },
+        { terminalId },
+      )
+      const liveJob = await printJobs.create(
+        { fileUrl: signFileUrl(liveFileId, 30 * 60 * 1000).url, fileName: 'live-active.pdf' },
+        { terminalId },
+      )
+      createdTaskIds.push(staleJob.taskId, liveJob.taskId)
+      await prisma.printTask.update({ where: { id: staleJob.taskId }, data: { createdAt: new Date('2018-01-01T00:00:00.000Z') } })
+      await prisma.printTask.update({ where: { id: liveJob.taskId }, data: { createdAt: new Date('2019-01-01T00:00:00.000Z') } })
+      await orderStatus.markPaid(staleJob.orderId, { paymentSource: 'offline' })
+      await orderStatus.markPaid(liveJob.orderId, { paymentSource: 'offline' })
+      const files = new FilesService(prisma, audit, storage)
+      const content = new FilesController(files, audit, {} as never, {} as never, prisma)
+      let staleClaim: Awaited<ReturnType<typeof terminals.claimTasks>> = []
+      await claimWhileSoftDeleteCommits(prisma, staleFileId, async () => {
+        staleClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+      })
+      if (staleClaim.length !== 1 || staleClaim[0]?.taskId !== staleJob.taskId) {
+        fail(`检查后软删除仍应领到旧任务，实际: ${JSON.stringify(staleClaim.map((task) => task.taskId))}`)
+      }
+      const staleUrl = parseSignedContentUrl(staleClaim[0]!.fileUrl)
+      if (staleUrl.fileId !== staleFileId || !verifyFileSignature(staleUrl.fileId, staleUrl.expires, staleUrl.sig)) {
+        fail('旧任务 claim 返回的 fileUrl 必须是该 fileId 的有效 HMAC content 路径')
+      }
+      const staleTask = await prisma.printTask.findUnique({ where: { id: staleJob.taskId }, select: { status: true, fileId: true } })
+      const staleOrder = await prisma.order.findUnique({
+        where: { id: staleJob.orderId },
+        select: { payStatus: true, refundedAt: true, refundedAmountCents: true },
+      })
+      const staleFile = await prisma.fileObject.findUnique({ where: { id: staleFileId }, select: { status: true, deletedAt: true } })
+      if (staleTask?.status !== 'claimed' || staleTask.fileId !== staleFileId) fail('旧任务应保持 claimed 且 fileId 不被外键清空')
+      if (staleFile?.status !== 'deleted' || !staleFile.deletedAt) fail('屏障必须留下正常软删除，而不是悬空 fileId')
+      if (staleOrder?.payStatus !== 'paid' || staleOrder.refundedAt || staleOrder.refundedAmountCents !== 0) {
+        fail(`软删除不得改写支付状态: ${JSON.stringify(staleOrder)}`)
+      }
+      await expectCode(
+        () => content.content(staleUrl.fileId, staleUrl.expires, staleUrl.sig, undefined, { setHeader() {}, send() {} } as never),
+        'FILE_NOT_FOUND',
+        '检查后软删除：claim 的 HMAC content 路径拒绝下载',
+      )
+      const liveClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+      if (liveClaim.length !== 1 || liveClaim[0]?.taskId !== liveJob.taskId) {
+        fail(`下一条 active 任务被饿死: ${JSON.stringify(liveClaim.map((task) => task.taskId))}`)
+      }
+      const liveUrl = parseSignedContentUrl(liveClaim[0]!.fileUrl)
+      if (liveUrl.fileId !== liveFileId || !verifyFileSignature(liveUrl.fileId, liveUrl.expires, liveUrl.sig)) {
+        fail('active 对照 claim 返回的 fileUrl 必须是该 fileId 的有效 HMAC content 路径')
+      }
+      const liveResponse = { payload: undefined as Buffer | undefined, setHeader() {}, send(payload: Buffer) { this.payload = payload } }
+      await content.content(liveUrl.fileId, liveUrl.expires, liveUrl.sig, undefined, liveResponse as never)
+      if (!liveResponse.payload?.equals(pdfBytes)) fail('active 对照应经同一 content 路径读回本地存储字节')
+      const liveOrder = await prisma.order.findUnique({ where: { id: liveJob.orderId }, select: { payStatus: true, refundedAmountCents: true } })
+      if (liveOrder?.payStatus !== 'paid' || liveOrder.refundedAmountCents !== 0) fail('active 对照不得改写支付状态')
+      pass('检查后软删除：旧任务仍被领取但 content 拒绝，下一条 active 可领取且读回字节（本地存储，非 COS / 非出纸）')
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
