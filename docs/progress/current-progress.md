@@ -1,12 +1,18 @@
 # 当前开发进度
 
+## 2026-09-24：Partner 岗位真实导入门禁与线上只读容量（本地候选，商用 NO-GO）
+
+Grok 只改既有 `services/api/scripts/verify-job-review.ts`：主路径由直接建 Job 行改为调用真实 `JobsService.importJobs`，覆盖 partner 身份和机构归属、另一机构同 externalId 隔离、初始 pending+draft 对公开列表/详情不可见、管理员审核发布后可见、同一机构再次导入回到同一行并强制下架重审、审核元数据清空，以及 `job.import` 审计和质量快照。原发布红线、拒绝原因、脏态和分页断言保留，部分负向夹具仍直接建行。Codex 独立复跑该门禁：隔离 SQLite `file:/tmp/verify-job-review-83c33ba3/verify.db` 和既有私有 PostgreSQL 16.15 `verify_admin_ops`（127.0.0.1:63312）均 ALL PASS；`verify:jobfair-review` 在同一 SQLite 库 ALL PASS；API `tsc --noEmit` 退出 0，测试 PostgreSQL 集群随后停止。Codex 另只改 `.github/workflows/ci.yml` 三处命令，使两次 `verify:job-review` 与一次 `verify:jobfair-review` 带脚本要求的 `VERIFICATION_DATABASE_TARGET=isolated`；Ruby YAML 解析与 diff check 通过。尚未跑此精确 SHA 的 CI、HTTP Guard/DTO、Partner/Kiosk/小程序页面或线上内容流转，不能称整个 C3 闭环完成。
+
+线上百度云 `120.48.13.190` 于本轮只读核查：系统盘 ext4 40GB、已用约 17GB、可用约 21GB、inode 使用 18%；`/srv` 约 4.5GB，其中 `/srv/ai-job-print` 1.2GB、`/srv/ai-job-print-backups` 2.3GB（两份 runtime 备份各约 1.2GB），`/var/log` 约 479MB、`/var/cache` 约 574MB、`/root/.local/share/pnpm` 约 2.7GB。`DEPLOY_SOURCE.txt` 实际为 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，部署时间 2026-09-18 00:54 +0800；本轮 `git ls-remote` 的远端 main 为 `eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`，本地候选还在其后，生产仍为旧版。PM2 `ai-job-print-api` online，公网 `/api/v1/health` 与 `/health/ready` 返回 200；nginx 对 Kiosk/Admin/Partner 分别指向 `/srv/ai-job-print/apps/{kiosk,admin,partner}/dist`，API 反代 `127.0.0.1:3010`。当前部署标记所指 PG dump 是约 4.27MB 的 custom format，`pg_restore --list` 可读；这不是恢复成功证明。未清理缓存/备份、未重启、迁移或部署；该次 SSH 只读会话已退出。
+
 ## 2026-09-24：前端单写者、解析幂等与本机容量复核（只读审查）
 
 用户确认前端设计和页面实现由 Claude Opus 5.5 xhigh 主导；Codex 负责范围/集成/验收，Grok 主攻后端，Agy 独立反证。首页沿用已选原版，不并入本地布局对照稿。一体机 UI 专项已在独立任务按此边界继续；小程序独立候选 `de5e89637` 已有 Claude 的 404 恢复页补丁及 187/187 生命周期门禁，但尚未合流、Trial 或真机验收。
 
 Grok 对匿名 `POST /resume/parse` 做只读审查：服务端当前先消费公共额度、再运行 AI，匿名令牌只在首次响应返回；回包丢失且客户端无 taskId/token 时，现有 GET 无法恢复，同一次重发可再次调用 AI。首版仅后端 Redis 幂等提议经 Grok 自我反证后撤回：Kiosk/小程序均未发送键，Redis 明文令牌及 provider 完成到缓存提交之间的崩溃窗口也未收口。需设计跨端高熵意图键、身份隔离、持久预约/结果恢复与额度一致性，再做故障注入；当前未修改后端。Agy 本轮 90 秒只读审查超时，计未评审。
 
-本机只读容量：项目根目录约 44GB，其中 `.claude/worktrees` 29GB、项目内 `.worktrees` 7.2GB；`/Users/wanglei/.codex/worktrees` 另约 49GB。Git 登记 204 个 worktree（147 个有 branch 字段，1 个显示 prunable）；磁盘约 236GB 可用。上述大小为 2026-09-24 的 `du`/`df` 快照，目录可能含未提交候选与仍在用的任务，未删除/修剪/GC。线上百度云容量本轮未复测，不能用本机数字代替。
+本机只读容量：项目根目录约 44GB，其中 `.claude/worktrees` 29GB、项目内 `.worktrees` 7.2GB；`/Users/wanglei/.codex/worktrees` 另约 49GB。Git 登记 204 个 worktree（147 个有 branch 字段，1 个显示 prunable）；磁盘约 236GB 可用。上述大小为 2026-09-24 的 `du`/`df` 快照，目录可能含未提交候选与仍在用的任务，未删除/修剪/GC。线上百度云容量见本文件顶部同日只读核查，不能与本机数字混用。
 
 ## 2026-09-24：51 稿视觉专项仍为 UI NO-GO（本地隔离候选）
 
@@ -22,7 +28,7 @@ Grok 对匿名 `POST /resume/parse` 做只读审查：服务端当前先消费�
 
 **任务目标：** 在现有功能范围内完成 Kiosk、Admin、Partner、原生小程序、API/Worker 与 Windows Agent 的真实业务联通，修复上线阻塞；收敛历史资产、工作副本和 PR，完成容量治理、发布回滚、真机与受控试点验收。执行清单以 `next-tasks.md` 顶部为准；下方日期记录保留历史证据，已被后续提交关闭的事项不得重复施工。
 
-- **源码基线：** `origin/main=eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`；PR #1042 远端仍为 `755fa5a53465e999cc4505e1f6f9f31d803576f4`；最新本地整合候选 `6e1cf43c22ba5154198981aade959c491eca02e8` 比 PR 多 39 个提交，含 Burn MSI 命名修复 `60c137bb8` 和账号设置迁移。远端旧 SHA 的 CI 不覆盖这些提交。
+- **源码基线：** 本节队列启动时 `origin/main=eb0f20341cb9e1d174e26d73bac8e89f12ad50e7`、PR #1042 远端为 `755fa5a53465e999cc4505e1f6f9f31d803576f4`，当时本地候选 `6e1cf43c22ba5154198981aade959c491eca02e8` 比 PR 多 39 个提交。2026-09-24 本轮只读 `git ls-remote` 仍为同一 main，PR 仍为同一 head；本轮开始前候选 `b2f6f42d5` 已比 PR 多 56 个提交，含 Burn MSI 命名修复 `60c137bb8` 和账号设置迁移。当前工作树 HEAD 以 Git 实际值为准；远端旧 SHA 的 CI 不覆盖后继提交。
 - **保护范围：** 根工作区仍有大量未提交资产及 3 个冲突路径；旧整合树的 `.gitignore` 为既有未提交改动。本轮从上述候选建立隔离执行树，不携带、不覆盖这些 WIP，不复活落后 main 的治理分支。
 - **线上实测：** 2026-09-24 只读预检 [35965865084](https://github.com/wanglei581/YITIJI/actions/runs/35965865084) 成功：根盘约 40 GiB、使用率 45%、可用约 21 GiB，API 回环健康正常、Redis 可达，部署来源短 SHA 为 `50483cd2`。这不证明三端静态版本、完整应用库大小或业务验收通过；本轮未部署或清理。
 - **协作：** Codex 负责决策、整合与验收；Grok `grok-4.7-build-fast/xhigh` 承担主要修复及回归；Claude `claude-opus-5-5/xhigh` 为前端写入者；Agy `gemini-3.8-flash-high/high` 负责契约和独立评审。只计有证据的结果，超时不算通过。

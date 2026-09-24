@@ -4,7 +4,7 @@
 
 - **前端：** Claude 单写者按现有版式修 Kiosk/小程序页面，先核真实接口与状态，再做 27 寸 Edge/微信真机触控和动画验收；Codex 复核与集成。首页保留原版，不并入被否决的结构性布局对照稿。
 - **AI 解析 P1：** Grok 主修服务端并与 Claude 对齐两端意图键；先定持久恢复/匿名令牌保密/额度及崩溃窗口合同，再写最小范围代码和故障注入用例。仅 Redis 回放且客户端不传键的初版提议已撤回；Agy 独立复审本轮超时，仍待完成。
-- **容量治理：** 本机根目录 44GB（含 `.claude/worktrees` 29GB、`.worktrees` 7.2GB），Codex worktrees 另 49GB，Git 登记 204 个 worktree。先逐路径盘点未提交改动、独有提交、分支/任务所有权和真实占用，再给可审清理清单；不直接删除候选资产。百度云线上空间、备份与日志需另取实时只读证据。
+- **容量治理：** 本机根目录 44GB（含 `.claude/worktrees` 29GB、`.worktrees` 7.2GB），Codex worktrees 另 49GB，Git 登记 204 个 worktree。先逐路径盘点未提交改动、独有提交、分支/任务所有权和真实占用，再给可审清理清单；不直接删除候选资产。百度云已实时只读核到 40GB 盘/约 21GB 可用、`/srv` 4.5GB；两份 runtime 备份各约 1.2GB，PG dump 可列目录但未恢复。需确定保留期、恢复演练与发布峰值空间，未批准前不删线上备份/缓存。
 
 ## 2026-09-24：青序流光 51 稿逐页对照（UI 专项，本地候选）
 
@@ -82,12 +82,12 @@
 
 | 顺序 | 工作项与负责人 | 当前状态与完成判据 |
 |---|---|---|
-| C0 | 候选及旧 PR 收敛：Grok 核查、Codex 决策 | 已核查 13 个 open PR。#1039 已包含于 #1042；#548 两份核心证据与 main/候选同 blob，关闭这两项的具体授权待回复。#1035 有独有测试，#1031/#1024/#1025/#937/#606 等有独有差异，不批量关闭。#742 的恢复脚本不在当前候选，不能直接移植旧补丁。保留 #1042 为整合入口；Burn 修复已在本地候选，等待新 SHA 的 Windows CI。 |
+| C0 | 候选及旧 PR 收敛：Grok 核查、Codex 决策 | 实时核到 13 个 open PR。#1039 的 tip 为 #1042 和本地候选的祖先；#548 两份核心证据与 main/候选同 blob，其旧进度文字已在现有进度文档另处保留。关闭这两项的具体授权待回复。#1035 有独有测试，#1031/#1024/#1025/#937/#606 等有独有差异，不批量关闭；#1038 当前 tip 不是候选祖先，后续同路径已有幂等修复，仍须语义复核。#742 的恢复脚本不在候选，不能直接移植。保留 #1042 为整合入口；本轮开始前本地候选比 PR 远端头多 56 个提交，旧 CI 不覆盖。 |
 | C1 | 已付款打印履约：Grok 主修、Agy 反证 | 进行中。隔离 SQLite 与临时 PostgreSQL 16.15 上 `verify:admin-ops` 均退出 0。`verify:print-jobs` 在同一集群的库 `verify_print_jobs`（`127.0.0.1:63312`）退出 0：测试侧另一条连接在 claim 读完文件后、PrintTask CAS 前提交软删除（不是 sleep，也不是同事务触发器）。旧任务仍被领取，其 HMAC `/files/:id/content` 返回 `FILE_NOT_FOUND`，订单保持 paid，下一条 active 能领到并读回本地字节。SQLite 全量同脚本退出 0，该交错夹具跳过。直接改行的软删除是安全边界模拟，不是用户删除或保留清理已经放行 pending/claimed。`canRetry` 已与 `isPrintableFileRecord` 对齐。旧单 `fileId` 为空时，只接受 path 为 `/api/v1/files/:id/content` 且 HMAC 正确的 fileUrl（允许过期，拒绝伪签名）；失效文件不再签发带走链接；订单状态不对齐或终端禁用时 `canRetry` 为 false。本地隔离 SQLite 完整 `verify:print-jobs` 退出 0。不是 CI，不是页面，不是出纸，也不关闭整个 C1。 |
 | C2 | 四端功能及前端统一：Claude 主修、Grok 契约核查 | 审计中。按真实路由→API→权限→状态→数据沉淀推进；修剩余来源异常态、手机/小程序交接与旧壳混用。已合流的设置、文档、订单、来源、解析、材料库、扫描预览不重做。保留青序流光方向及诚实空/错/禁用状态。2026-09-24 稿 21 `upload-unknown` 与 `/resume/parse` 结果未知、`/resume/report` 失败屏已在本地修复（见 `current-progress.md` 同日条目；仅本地夹具证据，CI/线上/真机未验）。剩余待修：手机接力 H5（`/upload/phone`、`/member/qr-login`）为旧壳；`/assistant`、`/help` 等 13 条 KioskRoot 内路由为旧壳。`scan-expired`/`scan-unavailable` 要先定后端合同。 |
-| C3 | 完整业务回归：Grok 主验、Claude 修界面、Agy 复核 | 进行中。2026-09-24：隔离 SQLite 上 `verify:job-review` 与 `verify:jobfair-review` 均退出 0，只证明 service 加真实库的审核/发布状态机和公开查询过滤。夹具仍是直接建行，不是 Partner 真实入库，也还没到 Kiosk/小程序页面。 |
+| C3 | 完整业务回归：Grok 主验、Claude 修界面、Agy 复核 | 进行中。2026-09-24：`verify:job-review` 主路径改走真实 Partner `importJobs`，经 Admin 审核发布与再导入强制下架；机构隔离、公开列表/详情、审计/质量快照有隔离 SQLite 与私有 PostgreSQL 16.15 ALL PASS。`verify:jobfair-review` 在 SQLite 通过；CI 三处命令补齐隔离数据库标记，尚未跑新 SHA 的 CI。负向夹具部分仍直接造行；HTTP Guard/DTO、Partner/Kiosk/小程序页面及真实来源数据仍未验。 |
 | C4 | 存储与历史资产：Grok 盘点、Codex 审核 | 只读盘点完成首批，尚未删除。8 个已进 main 的干净历史副本约 1.6 GB；另缩小到 5 个旧树的根 node_modules（约 5.08 GiB du、各自安装锁快照匹配、未见可见进程引用），具体清理授权待回复。保留 dirty 源码、锁文件、dist 与测试证据；dazzling-hodgkin 的锁快照不匹配，排除。实际回收不能以 du 保证，执行前需重查活动引用。 |
-| C5 | 候选发布链：Grok 修复、Codex 验收 | 待冻结候选。精确 SHA 的必需 CI、PostgreSQL readiness、Windows 签名/安装/升级验证通过；核实部署来源、配置、备份恢复、回滚和峰值空间。优先更新 #1042，不按任务数新增 PR。 |
+| C5 | 候选发布链：Grok 修复、Codex 验收 | 待冻结候选。线上只读证实 `DEPLOY_SOURCE=origin/main@50483cd2…`（2026-09-18），PM2 API online、health/ready 200，仍落后远端 main 和本地候选；系统盘 40GB、约 21GB 可用，当前 dump 可读目录但未恢复。精确 SHA 的必需 CI、PostgreSQL readiness、Windows 签名/安装/升级、真实恢复/回滚与峰值空间仍待验。优先更新 #1042，不按任务数新增 PR。 |
 | C6 | 真机与商业交付：全组按角色配合 | 已获独立 UU 任务调试授权。现场 Agent 0.4.11 服务运行，Pantum 驱动/配置匹配；仅提交 1 张 Windows 测试页，事件 307、队列归零，实际出纸待用户现场确认。扫描样张/ADF、扫码枪、微信双账号、应用订单履约、真实支付退款、授权内容与 UAT 仍待验；基础硬件结果不替代商业 GO。 |
 
 **每批准入：** 明确一个缺陷/闭环、允许修改的文件、现有能力复用、新文件必要性及最小验证；一个 worktree 一个写入者。先验证最小修复，再独立审查，按实际结果更新这两个现有进度文件，不新增交接或重复审计文档。

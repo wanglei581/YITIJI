@@ -1,19 +1,22 @@
 /**
  * 岗位审核 / 发布状态机 service 级验证（P1-B⑤ 守门）。
  *
- * 覆盖（按验收顺序，service 直调 JobsService.reviewJobSource / publishJobSource）：
- *   1. 初始 pending + draft。
+ * 主路径走 JobsService.importJobs（Partner 身份与机构归属），不再只靠直接插入 Job 行：
+ *   0. 非 partner / 无 orgId 拒绝且不写行；导入行归属调用方机构；
+ *      另一机构用同一 externalId 另成一行，机构列表互不可见。
+ *   1. 导入初始 pending + draft，公开列表和详情都不可见。
  *   2. 未 approved 禁止 publish（合规红线 PUBLISH_REQUIRES_APPROVAL）。
- *   3. approve → approved + draft（不自动发布）。
+ *   3. approve → approved + draft（不自动发布，仍不可见）。
  *   4. approved 后 publish → published。
- *   5. Kiosk 公开查询只返回 approved + published。
- *   6. unpublish → unpublished（且不再进 Kiosk）。
+ *   5. 公开查询只返回 approved + published。
+ *   6. unpublish → unpublished（且不再公开可见）。
  *   7. 终态（approved / rejected）不可回退 pending（INVALID_STATE_TRANSITION）。
- *   8. reject 必填 reason（service 守卫 REJECT_REASON_REQUIRED）。
- *   9. reject 强制 publishStatus=draft（防"已发布的还挂在 Kiosk"——人造 reviewing+published 脏态验证）。
+ *   11. 重新发布后再导入：同一行回到 pending + draft，审核元数据清空，公开不可见；
+ *       本机构 job.import 审计与质量快照都留下记录。
+ *   8–10. 拒绝原因、脏态强制 draft、分页仍用直接造行夹具。
  *
  * service 直调真库（临时 SQLite，DATABASE_URL 由 runner/CI 提供，脚本只建+清自身夹具）。
- * 运行：pnpm --filter @ai-job-print/api verify:job-review
+ * 运行：VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:job-review
  */
 import 'dotenv/config'
 import { randomBytes } from 'crypto'
@@ -28,6 +31,7 @@ import { JobsAdminService } from '../src/jobs/jobs-admin.service'
 import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
 import { JobsExcelService } from '../src/jobs/jobs-excel.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import type { ImportJobItemDto } from '../src/jobs/dto/import-jobs.dto'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
@@ -67,7 +71,11 @@ async function main() {
 
   const sfx = randomBytes(6).toString('hex')
   const orgId = `org_vjr_${sfx}`
-  const user = { userId: `admin_vjr_${sfx}` } as AuthedUser
+  const otherOrgId = `org_vjr_b_${sfx}`
+  const user: AuthedUser = { userId: `admin_vjr_${sfx}`, role: 'admin', orgId: null }
+  const partner: AuthedUser = { userId: `partner_vjr_${sfx}`, role: 'partner', orgId }
+  const otherPartner: AuthedUser = { userId: `partner_vjr_b_${sfx}`, role: 'partner', orgId: otherOrgId }
+  const actorIds = [user.userId, partner.userId, otherPartner.userId]
   const jobIds: string[] = []
 
   const mkJob = async (key: string, extra: Record<string, unknown> = {}) => {
@@ -84,53 +92,166 @@ async function main() {
   }
 
   async function cleanup() {
-    await prisma.auditLog.deleteMany({ where: { targetType: 'job', targetId: { in: jobIds } } })
-    if (jobIds.length) await prisma.job.deleteMany({ where: { id: { in: jobIds } } })
-    await prisma.user.deleteMany({ where: { id: user.userId } })
-    await prisma.organization.deleteMany({ where: { id: orgId } })
+    const orgIds = [orgId, otherOrgId]
+    await prisma.auditLog.deleteMany({
+      where: { OR: [{ targetType: 'job', targetId: { in: jobIds } }, { actorId: { in: actorIds } }] },
+    })
+    await prisma.jobDataQualitySnapshot.deleteMany({ where: { sourceOrgId: { in: orgIds } } })
+    await prisma.job.deleteMany({ where: { OR: [{ id: { in: jobIds } }, { sourceOrgId: { in: orgIds } }] } })
+    await prisma.user.deleteMany({ where: { id: { in: actorIds } } })
+    await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
   }
 
   try {
     await cleanup()
-    // contentTrustStatus='active':发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)。
-    await prisma.organization.create({ data: { id: orgId, name: '审核验证机构', type: 'hr_company', contentTrustStatus: 'active' } })
-    // 审核/发布会写审计（actorId → User FK）；建 admin User 夹具使审计真正落库（对齐真实管理员操作）。
+    // licensed_hr_agency 才能走 importJobs；hr_company 是来源种类，能力矩阵会拒绝。
+    // contentTrustStatus='active'：发布闸门要求来源机构已通过内容信任核验。
+    await prisma.organization.create({ data: { id: orgId, name: '审核验证机构', type: 'licensed_hr_agency', contentTrustStatus: 'active' } })
+    await prisma.organization.create({ data: { id: otherOrgId, name: '对照验证机构', type: 'licensed_hr_agency' } })
+    // 审核/发布/导入会写审计（actorId → User FK）；建真实用户使审计落库。
     await prisma.user.create({ data: { id: user.userId, username: `vjr_admin_${sfx}`, passwordHash: 'x', name: '审核管理员', role: 'admin' } })
+    await prisma.user.create({ data: { id: partner.userId, username: `vjr_partner_${sfx}`, passwordHash: 'x', name: '导入机构账号', role: 'partner', orgId } })
+    await prisma.user.create({ data: { id: otherPartner.userId, username: `vjr_partner_b_${sfx}`, passwordHash: 'x', name: '对照机构账号', role: 'partner', orgId: otherOrgId } })
 
-    // ── 1. 初始 pending + draft ─────────────────────────────────────────
-    const j1 = await mkJob('a')
-    const j2 = await mkJob('b') // 留作"未发布不进 Kiosk"对照
+    const externalId = `EXT-imp-${sfx}`
+    const sourceUrl = 'https://example.com/jobs/import'
+    const item = (title: string): ImportJobItemDto => ({
+      externalId, title, company: '某公司', city: '青岛', sourceUrl,
+      description: '用于审核闭环的岗位说明',
+    })
+    const publicHit = async (id: string, sourceOrgId: string) => {
+      const page = await jobs.getPublishedJobs({ sourceOrgId })
+      const detail = await jobs.getPublishedJobById(id)
+      return {
+        inList: page.data.some((row) => row.id === id),
+        inDetail: detail.data != null,
+      }
+    }
+
+    // ── 0. Partner 身份 / 机构归属 ──────────────────────────────────────
+    const before = await prisma.job.count({ where: { externalId } })
+    await expectCode(
+      () => jobs.importJobs([item('无机构')], { userId: partner.userId, role: 'partner', orgId: null }),
+      'PARTNER_ORG_REQUIRED',
+      '0a. partner 无 orgId → 400 PARTNER_ORG_REQUIRED',
+    )
+    await expectCode(
+      () => jobs.importJobs([item('非机构角色')], { userId: user.userId, role: 'admin', orgId }),
+      'PARTNER_ORG_REQUIRED',
+      '0b. admin 即使带 orgId 也不得导入 → 400 PARTNER_ORG_REQUIRED',
+    )
+    if (await prisma.job.count({ where: { externalId } }) !== before) fail('0c. 身份拒绝仍写入了岗位')
+    else pass('0c. 身份拒绝不写岗位行')
+
+    const imported = await jobs.importJobs([item('导入岗位')], partner)
+    const j1 = imported.items[0]?.id
+    if (j1) jobIds.push(j1)
+    if (!j1 || imported.imported !== 1) fail('1. 导入未返回岗位')
     const init = await prisma.job.findUnique({ where: { id: j1 } })
-    if (init?.reviewStatus === 'pending' && init.publishStatus === 'draft') pass('1. 初始 pending + draft')
-    else fail(`1. 初始状态异常: ${init?.reviewStatus}/${init?.publishStatus}`)
+    if (
+      init?.sourceOrgId === orgId
+      && init.sourceName === '审核验证机构'
+      && init.externalId === externalId
+      && init.sourceUrl === sourceUrl
+      && init.reviewStatus === 'pending'
+      && init.publishStatus === 'draft'
+      && init.reviewedBy == null
+      && init.reviewedAt == null
+    ) pass('1. Partner 导入归属本机构，初始 pending + draft')
+    else fail(`1. 导入初始状态异常: ${init?.sourceOrgId}/${init?.sourceName}/${init?.reviewStatus}/${init?.publishStatus}`)
+
+    const otherImported = await jobs.importJobs([item('他机构同外部编号')], otherPartner)
+    const otherId = otherImported.items[0]?.id
+    if (otherId) jobIds.push(otherId)
+    if (!otherId || otherImported.imported !== 1) fail('1b. 他机构导入未返回岗位')
+    const otherRow = await prisma.job.findUnique({ where: { id: otherId } })
+    const ownList = await jobs.getPartnerJobs(partner)
+    const otherList = await jobs.getPartnerJobs(otherPartner)
+    if (!Array.isArray(ownList) || !Array.isArray(otherList)) fail('1b. 未分页机构列表应为数组')
+    if (
+      otherId !== j1
+      && otherRow?.sourceOrgId === otherOrgId
+      && otherRow.sourceName === '对照验证机构'
+      && ownList.some((row) => row.id === j1)
+      && !ownList.some((row) => row.id === otherId)
+      && otherList.some((row) => row.id === otherId)
+      && !otherList.some((row) => row.id === j1)
+    ) pass('1b. 相同 externalId 按机构拆行，机构列表互不可见')
+    else fail(`1b. 机构归属异常: ${otherId}/${otherRow?.sourceOrgId}`)
+
+    const j2 = await mkJob('b') // 直接造行只留作「未发布不进公开查询」对照
+    const importedHit = await publicHit(j1, orgId)
+    const otherHit = await publicHit(otherId, otherOrgId)
+    if (importedHit.inList || importedHit.inDetail || otherHit.inList || otherHit.inDetail) fail('1d. 未审核岗位进入公开查询')
+    else pass('1d. 未审核导入对公开列表和详情不可见')
 
     // ── 2. 未 approved 禁止 publish（红线）─────────────────────────────
     await expectCode(() => jobs.publishJobSource(j1, 'publish', user), 'PUBLISH_REQUIRES_APPROVAL', '2. 未审核通过 publish → 400 PUBLISH_REQUIRES_APPROVAL（合规红线）')
 
     // ── 3. approve → approved + draft（不自动发布）──────────────────────
     const approved = await jobs.reviewJobSource(j1, 'approve', undefined, user)
-    if (approved.reviewStatus === 'approved' && approved.publishStatus === 'draft') pass('3. approve → approved + draft（不自动发布）')
-    else fail(`3. approve 异常: ${approved.reviewStatus}/${approved.publishStatus}`)
+    const approvedHit = await publicHit(j1, orgId)
+    if (approved.reviewStatus === 'approved' && approved.publishStatus === 'draft' && !approvedHit.inList && !approvedHit.inDetail) pass('3. approve → approved + draft（不自动发布，列表和详情仍不可见）')
+    else fail(`3. approve 异常: ${approved.reviewStatus}/${approved.publishStatus} list=${approvedHit.inList} detail=${approvedHit.inDetail}`)
 
     // ── 4. approved 后 publish → published ──────────────────────────────
     const published = await jobs.publishJobSource(j1, 'publish', user)
-    if (published.publishStatus === 'published') pass('4. approved 后 publish → published')
-    else fail(`4. publish 异常: ${published.publishStatus}`)
+    const publishedHit = await publicHit(j1, orgId)
+    if (published.publishStatus === 'published' && publishedHit.inList && publishedHit.inDetail) pass('4. approved 后 publish → published，列表和详情都可见')
+    else fail(`4. publish 异常: ${published.publishStatus} list=${publishedHit.inList} detail=${publishedHit.inDetail}`)
 
     // ── 5. Kiosk 公开查询只返回 approved + published ────────────────────
     const pub1 = await jobs.getPublishedJobs({ sourceOrgId: orgId })
     const ids1 = pub1.data.map((i) => i.id)
-    if (ids1.includes(j1) && !ids1.includes(j2)) pass('5. Kiosk 公开查询：含 approved+published 的 j1，不含 pending 的 j2')
-    else fail(`5. Kiosk 可见性异常: ${JSON.stringify(ids1)}`)
+    const j1Detail = await jobs.getPublishedJobById(j1)
+    const j2Detail = await jobs.getPublishedJobById(j2)
+    if (ids1.includes(j1) && j1Detail.data != null && !ids1.includes(j2) && j2Detail.data == null) pass('5. Kiosk 公开查询：列表和详情都含 j1，都不含 pending 的 j2')
+    else fail(`5. Kiosk 可见性异常: list=${JSON.stringify(ids1)} j1Detail=${j1Detail.data != null} j2Detail=${j2Detail.data != null}`)
 
     // ── 6. unpublish → unpublished（不再进 Kiosk）──────────────────────
     const unpub = await jobs.publishJobSource(j1, 'unpublish', user)
-    const pub2 = await jobs.getPublishedJobs({ sourceOrgId: orgId })
-    if (unpub.publishStatus === 'unpublished' && !pub2.data.some((i) => i.id === j1)) pass('6. unpublish → unpublished，且不再进 Kiosk 公开查询')
-    else fail(`6. unpublish 异常: ${unpub.publishStatus} kiosk=${JSON.stringify(pub2.data.map((i) => i.id))}`)
+    const unpublishedHit = await publicHit(j1, orgId)
+    if (unpub.publishStatus === 'unpublished' && !unpublishedHit.inList && !unpublishedHit.inDetail) pass('6. unpublish → unpublished，列表和详情都不再公开')
+    else fail(`6. unpublish 异常: ${unpub.publishStatus} list=${unpublishedHit.inList} detail=${unpublishedHit.inDetail}`)
 
     // ── 7. 终态不可回退（approved）─────────────────────────────────────
     await expectCode(() => jobs.reviewJobSource(j1, 'reviewing', undefined, user), 'INVALID_STATE_TRANSITION', '7a. approved（终态）再 review → 400 INVALID_STATE_TRANSITION')
+
+    // ── 11. 已发布岗位再导入：强制 pending+draft 并退出公开查询 ─────────
+    const republished = await jobs.publishJobSource(j1, 'publish', user)
+    const republishedHit = await publicHit(j1, orgId)
+    if (republished.publishStatus !== 'published' || !republishedHit.inList || !republishedHit.inDetail) {
+      fail(`11. 再导入前未能重新发布: list=${republishedHit.inList} detail=${republishedHit.inDetail}`)
+    }
+    const again = await jobs.importJobs([item('再导入岗位')], partner)
+    if (again.items[0]?.id !== j1 || again.imported !== 1) fail('11. 再导入没有命中同一行')
+    const reset = await prisma.job.findUnique({ where: { id: j1 } })
+    const resetHit = await publicHit(j1, orgId)
+    if (
+      reset?.reviewStatus !== 'pending'
+      || reset.publishStatus !== 'draft'
+      || reset.title !== '再导入岗位'
+      || reset.reviewedBy != null
+      || reset.reviewedAt != null
+      || reset.rejectReason != null
+      || resetHit.inList
+      || resetHit.inDetail
+    ) fail(`11. 再导入未强制下架重审: ${reset?.reviewStatus}/${reset?.publishStatus}/${reset?.title} list=${resetHit.inList} detail=${resetHit.inDetail}`)
+    const importAudits = await prisma.auditLog.findMany({
+      where: { actorId: partner.userId, action: 'job.import', targetType: 'job' },
+    })
+    const sawExternalId = importAudits.some((row) => {
+      try {
+        const payload = JSON.parse(row.payloadJson) as { externalIds?: unknown }
+        return Array.isArray(payload.externalIds) && payload.externalIds.includes(externalId)
+      } catch {
+        return false
+      }
+    })
+    const snapshots = await prisma.jobDataQualitySnapshot.count({ where: { jobId: j1, sourceOrgId: orgId } })
+    if (importAudits.length >= 2 && sawExternalId && snapshots >= 2) {
+      pass('11. 已发布后再导入 → 同一行 pending+draft、审核元数据清空、公开不可见，审计与质量快照已落库')
+    } else fail(`11. 副作用缺失: audits=${importAudits.length} payload=${sawExternalId} snapshots=${snapshots}`)
 
     // ── 8. reject 必填 reason（service 守卫）─────────────────────────────
     const j3 = await mkJob('c')
