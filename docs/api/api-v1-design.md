@@ -577,10 +577,11 @@ Kiosk 创建打印任务，后端生成 `actionToken`，由 Terminal Agent 通�
 
 #### POST /resume/parse
 
-提交简历解析任务。  
-后端接收后将文件送入 AI Provider（配置选 OpenAI / Claude / 通义 / 本地模型），异步完成。
+提交简历解析任务。当前实现由服务端提取/OCR、调用所配置 AI Provider 并持久化结果；模型调用可能持续较久，客户端须保留请求凭证并处理网络断开。
 
-**权限**：`kiosk`
+**权限**：匿名或本人会员；会员须有有效 `resume_ai` 授权。以下意图重放合同为本地候选，客户端与线上尚未完成验收。
+
+**新增请求头**：`x-resume-parse-intent` 与 `x-resume-parse-proof`，各为独立的 32 字节安全随机数、无填充 base64url 编码（43 字符）。两头须同时提供或同时不提供；只提供一头/格式错误返回 `400 RESUME_PARSE_INTENT_MALFORMED`。客户端在首次 POST **之前**把意图、证明和同一请求体元数据安全落到本机；网络丢失时用完全相同的头和请求体重发，不得铸新意图。这两项不得放进 URL、审计日志或结果 payload。两头均无时暂走兼容旧路径，旧路径不具备首次响应丢失后的持久重放保证。
 
 **请求体**（对应前端 `ResumeParseRequest`）
 
@@ -589,29 +590,32 @@ Kiosk 创建打印任务，后端生成 `actionToken`，由 Terminal Agent 通�
   "fileId": "f_abc123",
   "fileName": "resume.pdf",
   "fileFormat": "pdf",
-  "source": "upload | scan | manual",
-  "sessionId": "sess_xyz",
-  "terminalId": "t1"
+  "source": "upload",
+  "selectedDimensions": ["basic"],
+  "targetContext": { "skipped": true }
 }
 ```
+
+`selectedDimensions` 与 `targetContext` 可选；`source` 仅允许 `upload` / `scan` / `manual`。`fileId` 是服务端已登记文件的标识，不传简历原文。`terminalId` 由受控终端上下文/请求头处理，不是此 DTO 字段。
 
 **响应**（对应前端 `ResumeParseResponse`）
 
 ```json
 {
-  "taskId": "rr_001",
-  "status": "pending | processing | completed | failed",
-  "report": null,
-  "failReason": null
+  "taskId": "<意图对应的稳定任务号>",
+  "status": "processing | completed | failed",
+  "accessToken": "<仅匿名响应携带>",
+  "report": null
 }
 ```
 
-> mock 模式下 status 立即为 `completed`，report 直接填充（无需轮询）。  
-> http 模式下 status 可能为 `processing`，前端应轮询 `GET /resume/records/:taskId`。
+同意图、同本人和同请求体重放：已持久化则返回同一结果与匿名读取令牌，进行中返回同一 `taskId`、`processing` 和匿名令牌，绝不再次调用模型或重复计入日配额。错证明/归属统一 `404 AI_TASK_NOT_FOUND`；同意图换材料/参数返回 `409 RESUME_PARSE_INTENT_PAYLOAD_MISMATCH`；模型开始后结果不确定返回 `409 RESUME_PARSE_OUTCOME_UNKNOWN`，不会自动重跑或退款。Redis 配额故障返回 503 并拒绝调用。匿名读取令牌只在响应中出现，数据库仅存哈希；会员结果仅本人可读。
+
+意图账本至少留 48 小时并覆盖配置的结果留存期；解析结果默认留 24 小时，过期后不重跑旧意图。若上游模型已经消耗调用、但本服务在结果持久化前崩溃，上游未提供幂等能力时只能标为未知并人工核对，不能同时承诺自动找回结果和零重复费用。客户端须把 `409 RESUME_PARSE_OUTCOME_UNKNOWN` 显示为“结果未知”，不能当成明确失败后自动生成新意图。
 
 #### GET /resume/records/:taskId
 
-轮询/查询简历解析结果（刷新后恢复）。
+轮询/查询已持久化的简历解析结果（刷新后恢复）。匿名请求须在 `x-resume-access-token` 头携带本次令牌；会员按本人身份读取。进行中尚未落结果时此 GET 可能返回 404，客户端应保留原意图并按同一意图重查，不能自动新建解析任务。
 
 **权限**：`kiosk`
 

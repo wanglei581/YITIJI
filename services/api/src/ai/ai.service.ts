@@ -93,6 +93,24 @@ export interface AiResultRequester {
   accessToken: string | null
 }
 
+/** 新意图路径才传入。旧的两参数调用不使用，行为保持不变。 */
+export interface ResumeParseIntentBinding {
+  intentId: string
+  /** 匿名结果访问令牌。会员解析必须为 null。 */
+  accessToken: string | null
+}
+
+function assertResumeParseIntentBinding(intent: ResumeParseIntentBinding, endUserId: string | null): void {
+  const token = intent.accessToken
+  const raw = token && token.length === 43 && /^[A-Za-z0-9_-]{43}$/.test(token) ? Buffer.from(token, 'base64url') : null
+  const tokenOk = !!raw && raw.length === 32 && raw.toString('base64url') === token
+  if (!/^[a-f0-9]{64}$/.test(intent.intentId) || (endUserId ? token !== null : !tokenOk)) {
+    throw new InternalServerErrorException({
+      error: { code: 'RESUME_PARSE_INTENT_BINDING_INVALID', message: '简历解析意图绑定无效' },
+    })
+  }
+}
+
 /** SHA-256(token) 的十六进制串（64 hex chars）。DB 只存此 hash，绝不存明文 token。 */
 function hashAccessToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -237,8 +255,14 @@ export class AiService {
     }
   }
 
-  async submitResumeParse(input: ParseResumeInput, endUserId?: string | null): Promise<ParseResumeOutput> {
+  async submitResumeParse(
+    input: ParseResumeInput,
+    endUserId?: string | null,
+    intent?: ResumeParseIntentBinding,
+  ): Promise<ParseResumeOutput> {
+    if (intent) assertResumeParseIntentBinding(intent, endUserId ?? null)
     const t0 = Date.now()
+    const boundTaskId = intent ? intent.intentId : undefined
     try {
       // 真实诊断路径（llm provider）：先服务端提取简历文本。提取失败 → 直接返回明确原因，
       // 不调 LLM、不落假报告。mock / stub provider 保持原行为（自包含演示，不提取）。
@@ -287,6 +311,7 @@ export class AiService {
       } else {
         result = await this.provider.parseResume(input)
       }
+      if (boundTaskId) result = { ...result, taskId: boundTaskId }
 
       // fileId 随结果落库(阶段2B):优化时按归属重新提取原文;不透明 id,无 PII
       // targetContext 随结果落库(Wave 1 Task 3):优化懒生成时读回透传;只落结构化字段,
@@ -299,8 +324,11 @@ export class AiService {
       }
       // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
       // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
+      // 新意图路径使用调用方传入的令牌，不再另铸随机 token，避免和 intentId 错位。
       const isAnonymous = !endUserId
-      const accessToken = isAnonymous ? randomBytes(24).toString('hex') : undefined
+      const accessToken = boundTaskId
+        ? (isAnonymous && intent?.accessToken ? intent.accessToken : undefined)
+        : (isAnonymous ? randomBytes(24).toString('hex') : undefined)
       const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
       await this.persistResult(resultWithProvider.taskId, 'parse', resultWithProvider.status, resultWithProvider, endUserId ?? null, accessTokenHash)
       this.logService.record({

@@ -569,6 +569,57 @@ export class RedisService implements OnModuleDestroy {
     )
   }
 
+  /**
+   * 一次 Lua：已有 marker 则只回放；否则先检查全部日计数，通过后才递增并写 marker。
+   * 拒绝路径不写任何 key。调用方不得据此退款或重新调用 provider。
+   * 返回 1 回放、2 新计数、0 超限。
+   */
+  async consumeQuotaOnce(input: {
+    markerKey: string
+    markerTtlSeconds: number
+    markerValue: string
+    counterTtlSeconds: number
+    counters: { key: string; limit: number }[]
+  }): Promise<'replay' | 'charged' | 'rejected'> {
+    const keys = [input.markerKey, ...input.counters.map((item) => item.key)]
+    const args = [
+      input.markerTtlSeconds,
+      input.counterTtlSeconds,
+      input.markerValue,
+      ...input.counters.map((item) => item.limit),
+    ]
+    const result = await this.client.eval(
+      `
+      if redis.call('EXISTS', KEYS[1]) == 1 then
+        return 1
+      end
+      local n = #KEYS - 1
+      for i = 1, n do
+        local current = tonumber(redis.call('GET', KEYS[i + 1]) or '0')
+        if (not current) or current >= tonumber(ARGV[i + 3]) then
+          return 0
+        end
+      end
+      for i = 1, n do
+        local nextCount = redis.call('INCR', KEYS[i + 1])
+        if nextCount == 1 then
+          redis.call('EXPIRE', KEYS[i + 1], tonumber(ARGV[2]))
+        end
+      end
+      redis.call('SET', KEYS[1], ARGV[3], 'EX', tonumber(ARGV[1]))
+      return 2
+      `,
+      keys.length,
+      ...keys,
+      ...args,
+    )
+    const code = Number(result)
+    if (code === 1) return 'replay'
+    if (code === 2) return 'charged'
+    if (code === 0) return 'rejected'
+    throw new Error('Invalid resume parse quota result')
+  }
+
   decr(key: string): Promise<number> {
     return this.client.decr(key)
   }

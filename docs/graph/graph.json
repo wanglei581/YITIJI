@@ -15159,6 +15159,7 @@
         "usedBy": [
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume-parse-submission.service.ts",
           "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
@@ -20645,7 +20646,10 @@
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/ai/ai-public-quota.service.ts": [
-      "services/api/scripts/verify-ai-public-quota.ts"
+      "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-resume-parse-intent-http.ts",
+      "services/api/scripts/verify-resume-parse-intent-runner.ts",
+      "services/api/scripts/verify-resume-parse-quota-once.ts"
     ],
     "services/api/src/ai/ai-request-guard.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
@@ -20668,6 +20672,7 @@
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
+      "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-resume-voice-generate.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
@@ -20727,6 +20732,7 @@
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
+      "services/api/scripts/verify-resume-parse-intent-runner.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
@@ -20807,6 +20813,19 @@
     ],
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
+    ],
+    "services/api/src/ai/resume-parse-intent-runner.service.ts": [
+      "services/api/scripts/verify-resume-parse-intent-runner.ts"
+    ],
+    "services/api/src/ai/resume-parse-intent.ts": [
+      "services/api/scripts/verify-resume-parse-intent-runner.ts",
+      "services/api/scripts/verify-resume-parse-quota-once.ts",
+      "services/api/scripts/verify-resume-parse-submission.ts"
+    ],
+    "services/api/src/ai/resume-parse-submission.service.ts": [
+      "services/api/scripts/verify-resume-parse-intent-runner.ts",
+      "services/api/scripts/verify-resume-parse-quota-once.ts",
+      "services/api/scripts/verify-resume-parse-submission.ts"
     ],
     "services/api/src/ai/resume-report-export.controller.ts": [
       "services/api/scripts/verify-resume-export-formats.ts",
@@ -21445,6 +21464,7 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
+      "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-upload-scene.ts"
     ],
@@ -22964,6 +22984,7 @@
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
+      "services/api/scripts/verify-resume-parse-submission.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
@@ -34494,6 +34515,88 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:resume-optimize"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/ai.controller.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-parse-intent-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-parse-intent"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume-parse-intent-runner.service.ts",
+          "services/api/src/ai/resume-parse-intent.ts",
+          "services/api/src/ai/resume-parse-submission.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-parse-intent-runner.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-parse-intent"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/resume-parse-intent.ts",
+          "services/api/src/ai/resume-parse-submission.service.ts",
+          "services/api/src/common/redis/redis.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-parse-quota-once.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-parse-intent"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/resume-parse-intent.ts",
+          "services/api/src/ai/resume-parse-submission.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-parse-submission.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-parse-intent"
       ],
       "wired": true
     },

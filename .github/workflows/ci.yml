@@ -692,6 +692,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:kiosk-ai-capabilities
           # 匿名公网 AI 端点（/assistant/chat、/resume/parse）的限流 + 日配额。
           pnpm --filter @ai-job-print/api verify:ai-public-quota
+          # 简历解析首答丢失：持久意图、Redis 原子配额、单次模型调用及 HTTP 双头兼容。
+          pnpm --filter @ai-job-print/api verify:resume-parse-intent
           pnpm --filter @ai-job-print/api verify:upload-sessions
           # 扫码上传的小程序场景码：明文不落库、兑换一次性、兑换即轮换上传令牌、
           # 失败路径不当预言机。跑进程内 RESP 桩，不连库不连外部 Redis，

@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Post, Put, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -34,6 +34,8 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { BenefitRedemptionService } from '../benefit-redemption/benefit-redemption.service'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { runWithPublicQuota } from './ai-request-guard'
+import { readResumeParseIntentHeaders } from './resume-parse-intent'
+import { ResumeParseIntentRunner } from './resume-parse-intent-runner.service'
 import { assistantOwnerKey } from './llm/llm-chat.service'
 import { AssistantSummaryService } from '../advisor/assistant-summary.service'
 
@@ -123,6 +125,7 @@ export class AiController {
     private readonly publicQuota: AiPublicQuotaService,
     private readonly privacy: MemberPrivacyService,
     private readonly assistantSummary: AssistantSummaryService,
+    @Optional() private readonly resumeParseIntent?: ResumeParseIntentRunner,
   ) {}
 
   /**
@@ -154,14 +157,26 @@ export class AiController {
     if (endUser) {
       await this.privacy.requireActiveConsent(endUser.endUserId, 'resume_ai')
     }
-    const quotaTicket = await this.publicQuota.consume('resume_parse', {
+    const intentHeaders = readResumeParseIntentHeaders(req.headers)
+    if (intentHeaders.status === 'rejected') {
+      throw new BadRequestException({
+        error: { code: 'RESUME_PARSE_INTENT_MALFORMED', message: '简历解析意图标识无效' },
+      })
+    }
+    const quotaContext = {
       member: endUser?.endUserId ?? null,
       terminal: throttleTerminalIdOf(req),
       ip: ipOf(req),
-    })
-    const result = await runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
-      this.aiService.submitResumeParse(dto, endUser?.endUserId ?? null),
-    )
+    }
+    // 两头都缺才是过渡期旧路径。带意图头时不得再走 publicQuota.consume。
+    const result = intentHeaders.status === 'present'
+      ? await this.submitKeyedResumeParse(dto, quotaContext.member, quotaContext, intentHeaders.intentKey, intentHeaders.proof)
+      : await (async () => {
+        const quotaTicket = await this.publicQuota.consume('resume_parse', quotaContext)
+        return runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
+          this.aiService.submitResumeParse(dto, quotaContext.member),
+        )
+      })()
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -185,6 +200,21 @@ export class AiController {
       requestId: req.requestId ?? null,
     })
     return result
+  }
+
+  private submitKeyedResumeParse(
+    dto: ResumeParseRequestDto,
+    endUserId: string | null,
+    quotaContext: { member: string | null; terminal: string | null; ip: string | null },
+    intentKey: string,
+    proof: string,
+  ): Promise<ResumeParseResponseDto> {
+    if (!this.resumeParseIntent) {
+      throw new ServiceUnavailableException({
+        error: { code: 'RESUME_PARSE_INTENT_UNAVAILABLE', message: '解析意图服务暂不可用，请稍后重试' },
+      })
+    }
+    return this.resumeParseIntent.submit(dto, endUserId, quotaContext, intentKey, proof)
   }
 
   /**

@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-25：AI 简历解析持久意图服务端合流（本地候选，P1 仍未关闭）
+
+Grok 在隔离树实现并提交 `5cdeed151`，Codex 选择性合入主候选：`POST /resume/parse` 在双意图头有效时用现有 `AiResumeResult` 建持久意图账本，先核对本人/证明/载荷，再经 Redis 单次 Lua 对三维日配额原子计数，只有 DB CAS 赢家调用模型；结果以稳定 taskId 和匿名令牌哈希落库，首次响应丢失可用同一头重放。迟到结果可从 `provider_started`/`unknown` 恢复，`revoked` 不可恢复；模型已开始但结果未落库的崩溃窗口保持“未知”、不自动重跑或退款。无头旧客户端暂走原路径，半头/坏头 400 fail-closed。主候选独立复跑 API typecheck、账本/真实本地 Redis 配额/runner/HTTP 分支/旧配额/持久化 6 组聚焦验证均通过；4 个新 verifier 归入现有 API 包脚本与 CI，主候选 `pnpm graph:check` 通过（0 个未登记脚本）。这些验证使用内存替身或本机临时 Redis，没有真实模型调用、生产数据库或线上写入；新 CI 门禁尚未在 GitHub 对当前 SHA 实跑。`AiService` 现逾 1000 行，后续新增功能前须拆分。小程序和 Kiosk 尚未在首次 POST 前持久保存并携带意图/证明，真实 HTTP 故障注入、双账号/真机与受控模型费用核对均待验，P1 不关闭，商业 NO-GO。
+
 ## 2026-09-25：稿 13 材料检查无文件态合流（1080×1920 主屏，本地候选）
 
 Claude 以原稿 `docs/design/kiosk-redesign-2026-08/13-print-desk.html` 对照真实 `/print/material-check`（重定向至 `/print/desk?step=check`），仅改现有页面空态 JSX 与对应 CSS：1080 去重复可见页头但保留 h1 读屏，明确显示无文件、四步流程、原因和去选文件出口；390 修复固定操作条竖排字与正文塌高，可滚到末尾且无横向溢出。隔离分支实屏截图在 `apps/kiosk/test-results/kiosk-visual-20260925/print-desk-empty-{1080,390,390-bottom}.png`（未入 Git）；点击“去选文件”进入真实 `/print/upload?source=document`。Codex 选择性合流后独立复跑 Kiosk typecheck、W2 静态合同、局部 eslint 和 W2 材料/PII/预览/旧路由 Playwright **5/5**，均通过。有效文件的等待、结果、隐私片段各态、真实 OCR/PII、报价支付出纸、Windows Edge/27 寸触控及线上未验，51 稿整体 UI NO-GO。`PrintMaterialCheckPage.tsx` 621 行，继续新增功能前须拆分。

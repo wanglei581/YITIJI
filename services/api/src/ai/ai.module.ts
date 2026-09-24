@@ -6,6 +6,8 @@ import { AiController } from './ai.controller'
 import { AiService } from './ai.service'
 import { AiLogService } from './ai-log.service'
 import { AiPublicQuotaService } from './ai-public-quota.service'
+import { ResumeParseSubmissionService } from './resume-parse-submission.service'
+import { ResumeParseIntentRunner } from './resume-parse-intent-runner.service'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -65,6 +67,8 @@ import { KioskAiCapabilitiesController } from './kiosk-ai-capabilities.controlle
     AiLogService,
     // 匿名公网 AI 端点（/assistant/chat、/resume/parse）的日配额闸门。
     AiPublicQuotaService,
+    ResumeParseSubmissionService,
+    ResumeParseIntentRunner,
     MockAiProvider,
     OpenAiProvider,
     ClaudeProvider,
