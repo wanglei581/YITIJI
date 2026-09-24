@@ -196,6 +196,8 @@ function isDemoTask(task: DocumentProcessTaskView | null): boolean {
  *   'mock'/'skeleton' 例外——它们由 isDemoTask 的"流程演示"徽标单独诚实标注。
  */
 function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string; tone: 'neutral' | 'warning' } | null {
+  // 还没有完成的扫描结果（检查进行中 / 尚未开始）不下任何结论，由进行中文案负责说明。
+  if (!task || task.status !== 'completed') return null
   const mode = task?.result?.['mode']
   if (mode === 'skipped_non_document') return { label: '该文件类型无需隐私扫描', tone: 'neutral' }
   if (mode === 'degraded') return { label: '内容扫描暂不可用，请人工确认文件不含敏感信息', tone: 'warning' }
@@ -588,6 +590,10 @@ export function PrintMaterialCheckPage({
           <p className="why">
             {stage === 'error'
               ? '检查结果未知，隐私预检不可跳过。请重试或返回重新选择文件。'
+              : isWorking
+                ? stage === 'submitting'
+                  ? '正在保存选择并生成遮挡文件，完成前不能进入预览。'
+                  : '正在检查材料，结果返回前不能进入预览，也不会自动放行。'
               : submitFailed
                 ? '上次保存选择或遮挡处理没有完成，打印文件未更新。请再次点击继续重试。'
               : requiresFormatReview
