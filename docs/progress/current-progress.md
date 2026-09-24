@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-24：招聘会真实导入门禁与 51 稿基准校准（本地候选，仍 NO-GO）
+
+Grok 在既有 `services/api/scripts/verify-jobfair-review.ts` 中把主路径改为真实 `JobsService.importFairs`：验证 Partner 身份与机构归属、跨机构相同 externalId 隔离、导入待审到管理员审核发布、公开列表/按编号读取/详情的显隐，以及发布后再次导入强制回到 pending+draft 并清空审核元数据；原拒绝、脏态、审计和分页断言仍保留。Grok 的隔离 SQLite 门禁 ALL PASS；Codex 独立在临时 PostgreSQL 16.15 `verify_admin_ops`（127.0.0.1:63312）复跑 ALL PASS，测试集群已停止，diff check 通过。脚本为 452 行、仅改既有文件。`.github/workflows/ci.yml` 当前已给此门禁设置 `VERIFICATION_DATABASE_TARGET=isolated`，无需另改。尚未在精确 SHA 的 CI、HTTP 授权、Kiosk/小程序实屏或线上复核。
+
+用户指定原项目目录 `docs/design/kiosk-redesign-2026-08/` 的 51 个编号 HTML 为一体机新版设计基准，线上旧页面不是目标版本。该目录在原根 checkout 为未跟踪资产；与隔离 UI 分支同名 51 稿相比，3 个字节相同、48 个有差异，隔离分支另有 52 号补充稿。原目录约 725MB，其中 `kimi-full-coverage-v2` 约 644MB、`review-2026-08-23` 约 38MB；这不是应整体复制进发布包的资产。Claude 的隔离 UI 任务正逐页核对原稿与真实页面，已确认 10 号打印 Hub 几何一致、差异主要是文字颜色；设计稿、运行时代码、线上部署和真机验收仍分别计状态，未部署。
+
 ## 2026-09-24：Partner 岗位真实导入门禁与线上只读容量（本地候选，商用 NO-GO）
 
 Grok 只改既有 `services/api/scripts/verify-job-review.ts`：主路径由直接建 Job 行改为调用真实 `JobsService.importJobs`，覆盖 partner 身份和机构归属、另一机构同 externalId 隔离、初始 pending+draft 对公开列表/详情不可见、管理员审核发布后可见、同一机构再次导入回到同一行并强制下架重审、审核元数据清空，以及 `job.import` 审计和质量快照。原发布红线、拒绝原因、脏态和分页断言保留，部分负向夹具仍直接建行。Codex 独立复跑该门禁：隔离 SQLite `file:/tmp/verify-job-review-83c33ba3/verify.db` 和既有私有 PostgreSQL 16.15 `verify_admin_ops`（127.0.0.1:63312）均 ALL PASS；`verify:jobfair-review` 在同一 SQLite 库 ALL PASS；API `tsc --noEmit` 退出 0，测试 PostgreSQL 集群随后停止。Codex 另只改 `.github/workflows/ci.yml` 三处命令，使两次 `verify:job-review` 与一次 `verify:jobfair-review` 带脚本要求的 `VERIFICATION_DATABASE_TARGET=isolated`；Ruby YAML 解析与 diff check 通过。尚未跑此精确 SHA 的 CI、HTTP Guard/DTO、Partner/Kiosk/小程序页面或线上内容流转，不能称整个 C3 闭环完成。
