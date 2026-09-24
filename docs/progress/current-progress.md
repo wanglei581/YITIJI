@@ -4,7 +4,7 @@
 
 Grok 在复用的隔离 worktree 只改现有 Kiosk 解析页、API 适配、公共终端清场和 W3 用例，新增一个聚焦的 `resumeParseIntent.ts`（429 行），没有改用户原目录设计稿或 CSS。真实 HTTP `/resume/parse` 首次 POST 前用 Web Crypto 生成两段独立 32 字节意图/证明，`sessionStorage` 写后回读；丢答复、暂未落库与结果未知用同一对头重放，已知编号必须不变。匿名读取令牌写后回读失败不清意图、不跳报告；用户要开启新一次须两次确认。明确 2xx 失败保存编号/令牌并清同一意图后才进失败报告，使随后“重新解析”铸新标识；公共终端清场纳入该键。主候选合流 `bc41f6c8d`、`a7259eb89`、`4d7a5e803`，Codex 独立复跑 Kiosk typecheck、`verify:fusion-w3`、`verify:ai-down-fallbacks`、`verify:member-session-closure` 和解析 W3 Playwright **9/9**，均退出 0；首轮发现旧测试仍按单击重提而失败，已改为断言两级确认前零 POST 后复跑通过。新增工具令既有图谱过期，已按现有生成器更新 2 个原有图谱文件。
 
-这些仅是本地合成 HTTP/浏览器证据。4xx 配额或业务拒绝后服务端意图是否已受理仍缺明确定义，客户端暂保留原意图并 fail-closed，可能阻碍换材料；真实网关超时、Redis/DB/模型费用、Windows Edge/27 寸触控和当前 SHA CI 均待验。`ResumeParsePage.tsx` 788 行，继续加功能前须拆分/评估；05 顾问页的 Claude Opus 5.5 本轮调用 600 秒超时且无可审改动，不能算 51 稿推进。
+后续 Grok 只读核到有效双头的 `AI_PUBLIC_QUOTA_EXCEEDED` 429：账本留 `quota_pending`，Redis 无 once marker/增量，provider 未启动；只对这一可信错误码在 owner/意图/材料一致且本机清除读回成功时释放意图，其他 4xx 保守保留。Grok 修复提交 `35a0dd69c` 已合入主候选 `1f349f7b4`；Codex 把清除失败提示改成不虚称已有读取凭证的通用句，并在合流后独立复跑 Kiosk typecheck、`verify:fusion-w3`、`graph:check` 和解析 W3 Playwright **11/11**，均通过。仅属本地合成 HTTP/浏览器证据；其它 4xx 的意图受理状态仍待按码核对，真实网关超时、Redis/DB/模型费用、Windows Edge/27 寸触控和当前 SHA CI 均待验。`ResumeParsePage.tsx` 791 行，继续加功能前须拆分/评估；05 顾问页的 Claude Opus 5.5 本轮调用 600 秒超时且无可审改动，不能算 51 稿推进。
 
 ## 2026-09-25：解析意图会员删除防重与小程序同次恢复合流（本地候选，P1/商用仍 NO-GO）
 

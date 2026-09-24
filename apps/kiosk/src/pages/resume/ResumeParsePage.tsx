@@ -228,7 +228,7 @@ export function ResumeParsePage() {
         setOutcome('unknown')
         setRecheck('replay')
         setStorageBlocked(true)
-        setBlockNote('解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请用同一次重查，不要开始新的解析。')
+        setBlockNote('本机没能安全释放这次解析标识。请用同一次重查，不要开始新的解析。')
       }
       return false
     }
