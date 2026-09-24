@@ -23,6 +23,7 @@ import {
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
+import { ApiHttpError } from '../../services/api/httpAdapter'
 import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
 import {
   useDocumentConversionCapabilities,
@@ -123,13 +124,14 @@ const BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image
 const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 /** 稿 21 小青任务头随本页真实状态换话（每条都对应一个能被用户看到的事实，不预告结果）。 */
-type SourceHeroKey = 'source' | 'usb' | 'phone' | 'uploading' | 'upload-failed' | 'staged' | 'scan-ready'
+type SourceHeroKey = 'source' | 'usb' | 'phone' | 'uploading' | 'upload-failed' | 'upload-unknown' | 'staged' | 'scan-ready'
 const SOURCE_HERO: Record<SourceHeroKey, { ask: ReactNode; doing: string; flag: string; warn: boolean }> = {
   source: { ask: <>简历这趟，先<em>把文件交给我</em>。</>, doing: '选一种来源把简历送进来，方向和背景在旁边点选；上传后 AI 自动解析结构、识别问题。', flag: '原件只读不改', warn: false },
   usb: { ask: <>从 U 盘里<em>挑一份简历</em>。</>, doing: '插好后文件列表会自动出现；只列 10MB 以内的 PDF / JPG / PNG，要用哪一份由你来点。', flag: 'U 盘', warn: false },
   phone: { ask: <>用手机<em>扫码上传</em>。</>, doing: '二维码有效期以服务端返回为准；手机传完，回到这台机器确认后才继续。', flag: '手机扫码', warn: false },
   uploading: { ask: <>正在把这一份<em>送到服务端</em>。</>, doing: '一次性上传，没有实时百分比，也没有中止入口；成功或失败都会明确告诉你。', flag: '上传中', warn: false },
   'upload-failed': { ask: <>这一份<em>没能送进来</em>。</>, doing: '原件还在你手里，可以重试，或者换一种来源。', flag: '未送达', warn: true },
+  'upload-unknown': { ask: <>这一份<em>暂时无法确认有没有传上去</em>。</>, doing: '可能已经传上去了，也可能没有。本页不会自动再传一次，也不会拿之前那份文件继续。', flag: '结果未知', warn: true },
   staged: { ask: <>服务端<em>已经确认收到</em>。</>, doing: '下面这份文件名和大小是服务端回给本机的结果，不是本机自己记的。', flag: '已收到', warn: false },
   'scan-ready': { ask: <>扫描好的这一份<em>已经接到这一步</em>。</>, doing: '它是从扫描工作台交接过来的，不是本页去扫的；身份一路不变。', flag: '已交接', warn: false },
 }
@@ -178,20 +180,31 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * 把上传失败翻译成用户看得懂的话。
+ * 这一次上传有没有拿到服务端的**可信答复**（稿 21 upload-unknown）。
  *
- * 事故原样：`fetch` 断网时 `err.message` 就是浏览器的英文原文 `Failed to fetch`，
- * 直接甩给站在一体机前的求职者。而本页自己写着「上传失败会如实提示原因」——
- * 那就别把浏览器的英文当原因。真实后端返回的中文业务错误照常透出，不做覆盖。
+ * 只有 4xx 且带着 API 的业务错误码，才算明确拒收（'rejected'），原因照常透出。
+ * API 的异常过滤器对 4xx 一律写 `error.code`，所以没有信封的 4xx 是代理代回的，不冒充已知失败。
+ * 5xx 一律不算拒收，带信封也一样：`FilesService.upload` 先把 FileObject 落成 active，
+ * 之后签名响应失败时的补偿删除也可能失败，服务端照样回 500，而文件已经归入会员账号。
+ * 其余同样是「结果未知」：断网（fetch 抛 TypeError）、2xx 但响应体截断（JSON 解析失败）、
+ * 2xx 却没带回数据（FILE_UPLOAD_EMPTY，状态仍是 2xx）。kiosk-upload 没有防重键，
+ * 所以这些情况既不能说「没传上」，也不能引导用户盲目重传出第二份。
+ */
+function uploadOutcomeOf(err: unknown): 'rejected' | 'unknown' {
+  if (!(err instanceof ApiHttpError)) return 'unknown'
+  if (err.status < 400 || err.status >= 500) return 'unknown'
+  if (err.code === 'UNKNOWN_ERROR' || err.code === 'NETWORK_ERROR' || err.code === 'REQUEST_TIMEOUT') return 'unknown'
+  return 'rejected'
+}
+
+/**
+ * 把服务端明确拒收的原因翻译成用户看得懂的话（只处理 'rejected'，没收到答复的走结果未知）。
+ * 真实后端返回的中文业务错误照常透出，不做覆盖。
  */
 function uploadErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message.trim() : ''
   if (!raw) return '上传失败,请重试'
-  // 浏览器 / 运行时层面的网络错误：英文原文对用户没有任何意义。
-  if (/^(Failed to fetch|NetworkError|Load failed|The user aborted a request)/i.test(raw)) {
-    return '文件没能传到服务器，请检查网络后重试；也可以改用 U盘 或 手机扫码上传。'
-  }
-  // 纯 ASCII 的技术错误（英文异常 / 堆栈）同样不适合直接展示。
+  // 纯 ASCII 的技术错误（英文异常 / 堆栈）不适合直接展示。
   if (!/[一-龥]/.test(raw)) {
     return `上传失败，请重试或更换上传方式。（技术原因：${raw}）`
   }
@@ -219,6 +232,8 @@ export function ResumeSourcePage() {
   const [phoneBusy, setPhoneBusy] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 上一次上传没拿到可信答复（稿 21 upload-unknown）；只有用户主动换文件 / 换来源才清掉。
+  const [uploadUnknown, setUploadUnknown] = useState(false)
   const [genericDiagnosis, setGenericDiagnosis] = useState(false)
   const [selectedDimensions, setSelectedDimensions] = useState<ResumeScoringDimensionKey[]>(DEFAULT_SELECTED_DIMENSIONS)
   const [targetIndustry, setTargetIndustry] = useState(DEFAULT_EMPLOYMENT_INDUSTRY)
@@ -255,7 +270,10 @@ export function ResumeSourcePage() {
 
   const handleSelect = (option: UploadOption) => {
     setError(null)
-    if (option.type !== selected) setUploadedFile(null)
+    if (option.type !== selected) {
+      setUploadedFile(null)
+      setUploadUnknown(false)
+    }
     setSelected(option.type)
     if (option.type !== 'cloud') return
     fileInputRef.current?.click()
@@ -293,6 +311,10 @@ export function ResumeSourcePage() {
     const file = e.target.files?.[0]
     e.target.value = '' // 允许选同名再次触发
     if (!file) return
+    // 用户已经换成这一份：上一份（哪怕上传成功过）从此不再是「要交给解析的那一份」，
+    // 否则这一份失败 / 结果未知时，主按钮会拿着上一份进解析。
+    setUploadedFile(null)
+    setUploadUnknown(false)
     if (file.size > MAX_BYTES) {
       setError(`文件超过 10MB(${formatSize(file.size)}),请压缩后重试`)
       return
@@ -302,6 +324,11 @@ export function ResumeSourcePage() {
     clearAiResumeSession()
     try {
       const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
+      // 2xx 却没带回文件标识：服务端可能已经收下，但本机没有能继续用的那一份。
+      if (typeof uploaded?.fileId !== 'string' || !uploaded.fileId) {
+        setUploadUnknown(true)
+        return
+      }
       setUploadedFile({
         name: uploaded.filename,
         size: formatSize(uploaded.sizeBytes),
@@ -312,7 +339,8 @@ export function ResumeSourcePage() {
         channel: selected,
       })
     } catch (err) {
-      setError(uploadErrorMessage(err))
+      if (uploadOutcomeOf(err) === 'unknown') setUploadUnknown(true)
+      else setError(uploadErrorMessage(err))
     } finally {
       setUploading(false)
     }
@@ -322,12 +350,14 @@ export function ResumeSourcePage() {
     clearAiResumeSession()
     setUploadedFile({ ...file, fileUrl: file.fileUrl })
     setError(null)
+    setUploadUnknown(false)
   }
 
   const handleUsbUploaded = (file: ResumeUsbImportedFile) => {
     clearAiResumeSession()
     setUploadedFile(file)
     setError(null)
+    setUploadUnknown(false)
   }
 
   const handleStartDiagnosis = () => {
@@ -360,11 +390,13 @@ export function ResumeSourcePage() {
     ? 'scan-ready'
     : uploading
       ? 'uploading'
-      : error
-        ? 'upload-failed'
-        : uploadedFile
-          ? 'staged'
-          : selected === 'usb' ? 'usb' : selected === 'phone' ? 'phone' : 'source'
+      : uploadUnknown
+        ? 'upload-unknown'
+        : error
+          ? 'upload-failed'
+          : uploadedFile
+            ? 'staged'
+            : selected === 'usb' ? 'usb' : selected === 'phone' ? 'phone' : 'source'
   const hero = SOURCE_HERO[heroKey]
 
   // 顶栏状态胶囊只报本机真实可知的状态：忙碌 / 文件已就绪 / 还没有文件。拿不到的一律不报「正常」。
@@ -374,9 +406,11 @@ export function ResumeSourcePage() {
       ? { tone: 'ok' as const, label: '扫描件已交接 · 待确认' }
       : uploadedFile
         ? { tone: 'ok' as const, label: '文件已就绪' }
-        : error
-          ? { tone: 'warn' as const, label: '上传未完成' }
-          : { tone: 'unknown' as const, label: '等待简历文件' }
+        : uploadUnknown
+          ? { tone: 'warn' as const, label: '上传结果未知 · 不重发' }
+          : error
+            ? { tone: 'warn' as const, label: '上传未完成' }
+            : { tone: 'unknown' as const, label: '等待简历文件' }
   const channelLabel = (channel: FileChannel) =>
     channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : channel === 'scan' ? '扫描工作台交接' : '本机文件'
 
@@ -517,6 +551,27 @@ export function ResumeSourcePage() {
 
             {error && (
               <p className="qx-rt-note resume-source-error" data-tone="error" role="alert">{error}</p>
+            )}
+            {/* 稿 21 upload-unknown。没有后端「按同一标识再查」合同，所以不做再查按钮，只如实说未知。 */}
+            {uploadUnknown && (
+              <>
+                <p className="qx-rt-note resume-source-unknown" data-tone="warn" role="status">
+                  <b>结果未知</b>暂时无法确认这一份有没有传上去。本页不会自动再传，也不会用之前那份文件继续。
+                </p>
+                <dl className="qx-rt-kv">
+                  <div><dt>发生了什么</dt><dd>上传过程中网络或服务出了问题，这台机器没能确认上传是否完成。</dd></div>
+                  <div><dt>还不确定的</dt><dd>这份文件可能已经传上去了，也可能没有。</dd></div>
+                  <div><dt>再传一次</dt><dd>可以重新选择文件再传；如果刚才那次其实已经传上去，会多出一份重复文件。</dd></div>
+                  <div>
+                    <dt>建议这样做</dt>
+                    <dd data-testid="resume-source-unknown-next">
+                      {getToken()
+                        ? '可先到「我的 → 我的文档」核对；暂时没看到时可稍后刷新。若决定再传，请重新选择文件，可能出现重复文件。'
+                        : '当前未登录，暂时无法核对账号记录。需要继续时，可重新选择文件或换一种来源。'}
+                    </dd>
+                  </div>
+                </dl>
+              </>
             )}
             {uploading && (
               <p className="qx-rt-note resume-source-status" role="status">上传中，请稍候…</p>

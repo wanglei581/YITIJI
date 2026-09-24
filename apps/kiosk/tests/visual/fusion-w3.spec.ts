@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
@@ -385,17 +385,41 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   expect(runtimeErrors).toEqual([])
 })
 
-test('resume source Qingxu frame keeps intent, the 10MB limit and an honest upload failure @w3-kiosk', async ({ page, api }) => {
+/*
+ * 稿 21 upload-unknown：没拿到服务端的可信答复 ≠ 上传失败。
+ * 每次上传请求都记下 multipart 里的文件名，最后与用户的每一次选择逐条比对：页面若在「结果未知」后
+ * 自己重发，名单就会多出一条 —— 不靠固定等待证明「没有自动重发」。
+ * 上一份成功的 A 在用户换成下一份后，无论下一份失败还是结果未知，都不能再被交给解析。
+ */
+test('resume source Qingxu frame keeps intent, the 10MB limit and separates an upload rejection from an unknown result @w3-kiosk', async ({ page, api }) => {
   const runtimeErrors: string[] = []
-  let uploadCalls = 0
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
   terminalBaseline(api)
+  // 顶栏返回落到简历服务台，它会探一次后端健康（与本用例无关）。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  await page.route('**/w3-fixtures/resume.pdf', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  const uploadNames: string[] = []
+  const uploadReplies: Array<(route: Route) => Promise<void>> = []
   await page.route('**/api/v1/files/kiosk-upload', async (route) => {
-    uploadCalls += 1
-    await route.abort('internetdisconnected')
+    uploadNames.push(route.request().postDataBuffer()?.toString('latin1').match(/filename="([^"]+)"/)?.[1] ?? '?')
+    const reply = uploadReplies.shift()
+    await (reply ? reply(route) : route.abort('failed'))
   })
+  const parseFileIds: string[] = []
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    parseFileIds.push((route.request().postDataJSON() as { fileId?: string }).fileId ?? '')
+    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'AI_PROVIDER_ERROR', message: 'x' } }) })
+  })
+  const reply = (status: number, body: string, contentType = 'application/json') =>
+    (route: Route) => route.fulfill({ status, contentType, body })
+  const uploaded = (fileId: string, filename: string) =>
+    reply(200, JSON.stringify({ success: true, data: { ...uploadedResume.data, fileId, filename } }))
+
   await page.goto('/resume/source?intent=optimize')
-  await expect(page.locator('[data-qx-frame="true"] [data-kiosk-screen="resume-source"]')).toBeVisible()
+  const source = page.locator('[data-qx-frame="true"] [data-kiosk-screen="resume-source"]')
+  await expect(source).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: 'AI 简历优化' })).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="resume-source"] .qx-rt-rail li[aria-current="step"]')).toHaveText(/上传与方向/)
   const primary = page.getByRole('button', { name: '请先上传简历文件' })
@@ -403,15 +427,68 @@ test('resume source Qingxu frame keeps intent, the 10MB limit and an honest uplo
   const input = page.getByLabel('选择本机简历文件')
   await input.setInputFiles({ name: 'too-big.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) })
   await expect(page.locator('.resume-source-error')).toContainText('文件超过 10MB')
-  expect(uploadCalls).toBe(0)
-  await input.setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
-  await expect(page.locator('.resume-source-error')).toContainText('文件没能传到服务器')
-  await expect(page.locator('.resume-source-error')).not.toContainText('Failed to fetch')
-  expect(uploadCalls).toBe(1)
-  await expect(primary).toBeDisabled()
-  await assertNoHorizontalOverflow(page)
+  expect(uploadNames).toEqual([])
   await page.getByRole('button', { name: '返回 AI 简历服务' }).click()
   await page.waitForURL('/resume-service')
+  await page.goto('/resume/source?intent=optimize')
+  await expect(source).toBeVisible()
+
+  const pick = async (name: string, next: (route: Route) => Promise<void>) => {
+    uploadReplies.push(next)
+    await input.setInputFiles({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  }
+  await pick('resume-a.pdf', uploaded('file-w3-a', 'resume-a.pdf'))
+  await expect(source).toHaveAttribute('data-state', 'staged')
+  await expect(page.getByRole('button', { name: '上传并生成优化建议' })).toBeEnabled()
+
+  const unknownReplies: Array<[string, (route: Route) => Promise<void>]> = [
+    ['network drop', (route) => route.abort('internetdisconnected')],
+    ['2xx with a truncated body', reply(200, '{"success":true,"data":{"fileId":"file-w3-cut')],
+    ['2xx without data (FILE_UPLOAD_EMPTY)', reply(200, '{"success":true}')],
+    ['2xx without a file id', reply(200, JSON.stringify({ success: true, data: { ...uploadedResume.data, fileId: '' } }))],
+    ['gateway timeout without an error envelope', reply(504, '<html>504 Gateway Time-out</html>', 'text/html')],
+    ['proxy 503 without an error envelope', reply(503, '<html>503 Service Unavailable</html>', 'text/html')],
+    // 带业务信封的 5xx 也不能说「没传上」：文件可能已落成 active，只是后面的签名 / 补偿失败了。
+    ['500 with an API error envelope', reply(500, JSON.stringify({ success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: '服务器内部错误' } }))],
+    // API 对 4xx 一律写 error.code；没有信封的 4xx 是代理代回的，不冒充已知失败。
+    ['proxy 413 without an error envelope', reply(413, '<html>413 Request Entity Too Large</html>', 'text/html')],
+  ]
+  for (const [index, [label, next]] of unknownReplies.entries()) {
+    await pick(`resume-unknown-${index}.pdf`, next)
+    await expect(source, label).toHaveAttribute('data-state', 'upload-unknown')
+    await expect(page.locator('.resume-source-unknown'), label).toContainText('暂时无法确认')
+    // 未登录：不断言文件归属，也不指去「我的文档」。
+    await expect(page.getByTestId('resume-source-unknown-next'), label).toContainText('当前未登录')
+    await expect(page.getByTestId('resume-source-unknown-next'), label).not.toContainText('我的文档')
+    await expect(page.locator('.resume-source-error'), label).toHaveCount(0)
+    await expect(page.locator('.qx-pill'), label).toHaveText('上传结果未知 · 不重发')
+    await expect(primary, label).toBeDisabled()
+    await expect(page.getByText('resume-a.pdf'), `${label}: the earlier file must not stand in for this one`).toHaveCount(0)
+    await expect(page.locator('[data-file-preview-kind]'), label).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /重试|重新上传|再查/ }), label).toHaveCount(0)
+  }
+  await expect(page.getByText(/没能传到服务器|Failed to fetch|JSON|服务器内部错误|请求失败/)).toHaveCount(0)
+  await assertNoHorizontalOverflow(page)
+
+  // 服务端明确拒收：仍是已知失败，原因照常透出，不被改写成「结果未知」。
+  await pick('resume-rejected.pdf', reply(400, JSON.stringify({ success: false, error: { code: 'FILE_TYPE_NOT_ALLOWED', message: '不支持的文件类型，请上传 PDF 或图片' } })))
+  await expect(source).toHaveAttribute('data-state', 'upload-failed')
+  await expect(page.locator('.resume-source-error')).toContainText('不支持的文件类型')
+  await expect(page.locator('.resume-source-unknown')).toHaveCount(0)
+  await expect(primary).toBeDisabled()
+
+  // 用户主动再选一份并成功：恢复正常，交给解析的是这一份，不是 A。
+  await pick('resume-c.pdf', uploaded('file-w3-c', 'resume-c.pdf'))
+  await expect(source).toHaveAttribute('data-state', 'staged')
+  await page.getByRole('button', { name: '上传并生成优化建议' }).click()
+  await page.waitForURL('/resume/parse')
+  await expect.poll(() => parseFileIds).toEqual(['file-w3-c'])
+  expect(uploadNames).toEqual([
+    'resume-a.pdf',
+    ...unknownReplies.map((_, index) => `resume-unknown-${index}.pdf`),
+    'resume-rejected.pdf',
+    'resume-c.pdf',
+  ])
   expect(runtimeErrors).toEqual([])
 })
 
