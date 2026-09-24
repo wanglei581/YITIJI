@@ -290,6 +290,8 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
   const next = page.getByRole('button', { name: /下一步 · 创建扫描会话/ })
   await expect(next).toBeEnabled()
+  // 稿 18：底部三列口径是一次性说明，只在选类型这一屏出现，后面各屏不复读。
+  await expect(page.getByTestId('scan-workbench-truth')).toBeVisible()
   expect(legacyDeviceRequests).toBe(0)
   const createRequest = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions',
@@ -301,6 +303,7 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   expect(postedBody.terminalId, 'create session must bind the current terminal').toBeTruthy()
   await page.waitForURL(/\/scan\?stage=settings/)
   await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('scan-workbench-truth')).toHaveCount(0)
   // 这一场只建了一次，所以也只确认一次；多出来的一次意味着确认与创建两个 effect
   // 互相喂招（ackRequestedForRef 守的就是它）。
   await ack.expectAcked(1)
@@ -524,15 +527,26 @@ test.describe('scan result at 390x844', () => {
       await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'W2_STOP_AFTER_NAV', message: 'synthetic stop' } }) })
     })
 
-    await seedScanResult(page, resultState)
-    await page.goto('/scan?stage=result')
-    await expectPdfCompleted(binary)
-    await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
-
     const viewport = { x: 0, y: 0, width: 390, height: 844 }
     const scroller = page.locator('[data-qx-page="scan-workbench"]')
     const hero = page.locator('.sw-xq')
     const truth = page.getByTestId('scan-workbench-truth')
+
+    // 底注按稿 18 只在选类型那一屏出现：在那一屏上它必须随正文整块滚得到，不被操作条 / 底栏盖住。
+    await page.goto('/scan?stage=start')
+    await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
+    await expect(truth).toBeVisible()
+    await revealByUserScroll(truth, 'end')
+    const truthBox = await boxOf(truth, '底注')
+    expectInside(truthBox, await boxOf(scroller, '扫描工作台滚动区'), '底注必须能整块滚进可视区')
+    // 操作条在底栏之上：底注下沿不越过操作条上沿（与 expectInside 同一个 0.5px 容差），也就压不到底栏。
+    const ctabarTop = (await boxOf(page.locator('.qx-ctabar'), '操作条')).y
+    expect(truthBox.y + truthBox.height, '底注滚到底时不得压到操作条下面').toBeLessThanOrEqual(ctabarTop + 0.5)
+
+    await seedScanResult(page, resultState)
+    await page.goto('/scan?stage=result')
+    await expectPdfCompleted(binary)
+    await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
     const ctabar = page.locator('.qx-ctabar')
     const navbar = page.getByRole('navigation', { name: '主导航' })
     const aiButton = page.getByRole('button', { name: /AI 简历识别/ })
@@ -544,20 +558,18 @@ test.describe('scan result at 390x844', () => {
     await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '直接打印' }))
     for (const item of await navbar.getByRole('button').all()) await assertTapTargetPointerHit(item)
 
-    // 横幅与底注一字不删，只是随正文一起滚：两头都滚得到、整块露得出来。
+    // 横幅一字不删，只是随正文一起滚，整块露得出来；结果页不再复读底注。
     await expect(hero).toBeVisible()
-    await expect(truth).toBeVisible()
+    await expect(truth).toHaveCount(0)
     await revealByUserScroll(hero, 'start')
     expectInside(await boxOf(hero, '横幅'), await boxOf(scroller, '扫描工作台滚动区'), '横幅必须能整块滚进可视区')
-    await revealByUserScroll(truth, 'end')
-    expectInside(await boxOf(truth, '底注'), await boxOf(scroller, '扫描工作台滚动区'), '底注必须能整块滚进可视区')
 
     await revealByUserScroll(aiButton)
     const view = await boxOf(scroller, '扫描工作台滚动区')
     const button = await boxOf(aiButton, '「AI 简历识别」')
     expectInside(button, view, '「AI 简历识别」必须能整块滚进可视区，不靠滚动 overflow:hidden 的舞台')
     expectInside(button, viewport, '「AI 简历识别」必须整块在视口内')
-    for (const [what, layer] of [['横幅', hero], ['底注', truth], ['操作条', ctabar], ['底栏', navbar]] as const) {
+    for (const [what, layer] of [['横幅', hero], ['操作条', ctabar], ['底栏', navbar]] as const) {
       expect(boxesOverlap(button, await boxOf(layer, what)), `「AI 简历识别」不得与${what}重叠`).toBe(false)
     }
     await assertTapTargetPointerHit(aiButton)
@@ -788,6 +800,26 @@ test('failed scan retry strips control fields but preserves scan parameters @w2'
   expect(retrySession.result).toBeUndefined()
   expect(retrySession.live).toMatchObject({ scanTaskId: SCAN_TASK_ID })
   await ack.expectAcked(1)
+  await expectHealthy(page, errors)
+})
+
+/* 结果快照 outcome 'expired' 有两个来源：服务端回执 expired，以及本机轮询到 10 分钟自己放弃
+ * （ScanProgressPage 的 localGiveUp，撤销没有回执）。两条路写下的快照一字不差，
+ * 所以这一屏只能说「等待超时」，不能替服务端说「会话已过期」「服务端确认」或「编号已作废」。 */
+test('expired result never claims a server-confirmed expiry it cannot tell apart @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await seedScanResult(page, { scanType: 'resume', outcome: 'expired', success: false, reason: '扫描超时，请返回重新开始' })
+  await page.goto('/scan?stage=result')
+  await expect(page.locator('[data-w2-page="scan-result"]')).toHaveAttribute('data-state', 'wait-timeout')
+  await expect(page.getByRole('heading', { level: 1, name: '等待超时', exact: true })).toBeVisible()
+  await expect(page.getByText('等待超时，这次没有拿到文件', { exact: true })).toBeVisible()
+  await expect(page.getByText('扫描超时，请返回重新开始', { exact: true })).toBeVisible()
+  for (const claim of [/会话已过期/, /会话过期了/, /服务端确认/, /编号已作废/]) {
+    await expect(page.getByText(claim), `不得出现 ${claim}`).toHaveCount(0)
+  }
+  await expect(page.getByTestId('scan-workbench-truth')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeVisible()
   await expectHealthy(page, errors)
 })
 

@@ -88,6 +88,11 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const [cancelling, setCancelling] = useState(false)
   const [polls, setPolls] = useState(0)
   /**
+   * 服务端最近一次说的「仍在进行」是哪一种。只用来**转达**：matched 说明文件已经回到服务端、
+   * 还在处理，链路最后一段点亮；它不参与任何判定，也不会让这一屏提前出结果。
+   */
+  const [lastLiveStatus, setLastLiveStatus] = useState<'waiting' | 'matched' | null>(null)
+  /**
    * 这一场在服务端拿到投递授权了没有（见 scanDeliveryAck）。
    *
    * 本页几乎总是从设置页确认成功之后走过来的，但**不能据此假设**：看门狗整页重载、
@@ -251,6 +256,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           returnToStart()
           return
         }
+        setLastLiveStatus(status.status === 'matched' ? 'matched' : 'waiting')
         scheduleNext()
       } catch (err) {
         if (!stopped) {
@@ -323,6 +329,19 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
    * 没确认之前这一屏不许出现「请在打印机面板完成扫描」那句话 —— 它是假的。 */
   const deliveryAcked = ackState === 'acked'
   const ackRetryable = ackState === 'retryable'
+  const matched = deliveryAcked && !error && lastLiveStatus === 'matched'
+  /* 稿 18：链路只在服务端亲口说「已匹配到回传文件」时点亮最后一段；其余时候前三段在哪本机看不见。 */
+  const chainHint = cancelling
+    ? '取消也可能来不及，以服务端为准'
+    : !deliveryAcked
+      ? '授权到手之前，第一段也别开始'
+      : pollInFlight
+        ? '查询回来之前，这一屏不改判'
+        : error
+          ? '这次没问到，位置就是不知道'
+          : matched
+            ? '服务端已匹配到回传文件，停在最后一段'
+            : '服务端还没说收到，前三段停在哪本机不知道'
   const workbenchState = cancelling
     ? 'cancelling'
     : !deliveryAcked
@@ -348,6 +367,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     <ScanWorkbenchShell
       page="scan-progress"
       state={workbenchState}
+      layout="spread"
       title={deliveryAcked ? '等待打印机端扫描完成' : '正在确认投递授权'}
       subtitle={deliveryAcked
         ? '请在打印机面板完成扫描到本机接收目录；本页每 3 秒自动检测结果'
@@ -358,6 +378,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         : [SCAN_ACK_PENDING_NOTICE]}
       ctabar={
         <ScanCta
+          reserveReason
           reason={
             cancelling
               ? '正在等取消回执 —— 这一刻既不说已取消，也不说已完成'
@@ -424,7 +445,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           ? [
               { label: error ? '正在自动重试' : '正在自动检查', tone: error ? 'warn' : 'ok' },
               { label: `已查询 ${polls} 次` },
-              { label: '没有页级进度' },
+              matched ? { label: '服务端：已匹配，仍在处理', tone: 'ok' as const } : { label: '没有页级进度' },
             ]
           : [
               { label: '会话已建成', tone: 'ok' as const },
@@ -460,28 +481,35 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           </>
         )}
       </ScanStatusPanel>
-      <ScanSec no="01" title="链路走到哪一段" hint="不是百分比">
-        <ScanChain active={-1} />
+      <ScanSec no="01" title="链路走到哪一段" hint={chainHint}>
+        <ScanChain active={matched ? 3 : -1} />
       </ScanSec>
-      <div className="sw-grid2">
-        <ScanKvCard
-          title="任务信息"
-          rows={[
-            ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-            ['任务编号', scanTaskId ?? '未创建'],
-            ['开始等待', `已等待 ${elapsed}`],
-            ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-            ['保存策略', '按设备回传的原格式保存，服务端不做转换'],
-          ]}
-        />
-        <ScanNoteCard title="这一屏现在会做什么" foot="自动检查是一次纯读取：不会重扫，也不会改变服务端那边的任何东西。">
-          <ScanPlan items={[
-            '本机每隔几秒自动查一次，你什么都不用做。',
-            '想马上知道就点「立即检查」，它只是插一次队，不改变结果。',
-            '不想扫了就点「取消扫描」，取消成不成由服务端定。',
-          ]} />
-        </ScanNoteCard>
-      </div>
+      <ScanSec no="02" title="这次会话与下一步" hint="这一屏现在能做什么">
+        <div className="sw-grid2">
+          <ScanKvCard
+            title="任务信息"
+            rows={[
+              ['扫描类型', SCAN_TYPE_LABELS[scanType]],
+              ['任务编号', scanTaskId ?? '未创建'],
+              ['开始等待', `已等待 ${elapsed}`],
+              ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
+              ['保存策略', '按设备回传的原格式保存，服务端不做转换'],
+            ]}
+          />
+          <ScanNoteCard title="这一屏现在会做什么" foot="自动检查是一次纯读取：不会重扫，也不会改变服务端那边的任何东西。">
+            {/* 指路跟着主按钮走：没拿到投递授权时右下角是「再确认一次」，写「立即检查」就是指向一颗不存在的按钮。 */}
+            <ScanPlan items={deliveryAcked ? [
+              '本机每隔几秒自动查一次，你什么都不用做。',
+              '想马上知道就点「立即检查」，它只是插一次队，不改变结果。',
+              '不想扫了就点「取消扫描」，取消成不成由服务端定。',
+            ] : [
+              '本机正在向服务端确认：这台机器可以收这一场的文件。',
+              ackRetryable ? '上一次确认没成，点右下角「再确认一次」重来。' : '确认通常就是一两秒，不用你做任何事。',
+              '不想扫了就点「取消扫描」，取消成不成由服务端定。',
+            ]} />
+          </ScanNoteCard>
+        </div>
+      </ScanSec>
     </ScanWorkbenchShell>
   )
 }
