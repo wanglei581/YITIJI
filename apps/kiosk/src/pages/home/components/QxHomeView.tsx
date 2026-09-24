@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { HomeHeroHeader, type HomeDeviceStatus } from './HomeHeroHeader'
 import { HomeTile } from './HomeTile'
 import { Link } from 'react-router-dom'
 import {
@@ -36,6 +37,8 @@ interface QxHomeViewProps {
   campus: SmartCampusCapabilityState
   jobFair: HomeJobFairHighlightState & { retry: () => void }
   jobs: HomeJobHighlightState & { retry: () => void }
+  terminalCode: string
+  deviceStatus: HomeDeviceStatus
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
 }
@@ -62,22 +65,6 @@ function jobCopy(state: QxHomeViewProps['jobs']): { description: string; badge: 
   if (state.status === 'loading') return { description: '正在读取已发布岗位', badge: '读取中' }
   if (state.status === 'error') return { description: '暂时无法获取岗位数量', badge: '读取失败' }
   return { description: '暂无在招岗位', badge: '暂无岗位' }
-}
-
-function QxHomeClock() {
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 10_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  return (
-    <time className="qx-home-clock" dateTime={now.toISOString()}>
-      <strong>{new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now)}</strong>
-      <span>{new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(now)}</span>
-    </time>
-  )
 }
 
 export function QxHomeNavbar({
@@ -112,6 +99,8 @@ export function QxHomeView({
   campus,
   jobFair,
   jobs,
+  terminalCode,
+  deviceStatus,
   continueSlot,
   onAction,
 }: QxHomeViewProps) {
@@ -133,13 +122,13 @@ export function QxHomeView({
   return (
     <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home" data-qx-intro={introDone ? 'done' : undefined} onAnimationEnd={(event) => { if (event.animationName === 'qx-home-sheen') setIntroDone(true) }}>
       <section className="qx-home-hero" aria-label="小青助手">
+        <HomeHeroHeader terminalCode={terminalCode} deviceStatus={deviceStatus} />
         <div className="qx-home-assistant">
           <span className="qx-home-avatar" aria-hidden="true">青</span>
           <div>
             <h2>{isLoggedIn && displayName ? `${displayName}，你好，我是` : '你好，我是'}<em>小青</em></h2>
             <span>告诉我你想办的事，我带你一步一步办</span>
           </div>
-          <QxHomeClock />
         </div>
         <button
           type="button"
@@ -156,17 +145,17 @@ export function QxHomeView({
           <button type="button" onClick={() => onAction('resume-hub')}>改简历</button>
           <button type="button" onClick={() => onAction('jobs-hub')}>找工作</button>
           <button type="button" onClick={() => onAction('policy-hub')}>查政策</button>
+          {/* 身份入口是快捷行第四颗，占稿里「更多服务」那一格（运行时没有全部服务目录路由，不摆那颗按钮）。 */}
+          <button
+            type="button"
+            className="qx-home-identity"
+            onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
+            data-testid="home-identity"
+          >
+            <UserIcon aria-hidden="true" />
+            <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
+          </button>
         </div>
-        {/* 身份入口占稿里「更多服务」那一格（运行时没有全部服务目录路由，不摆那颗按钮）。 */}
-        <button
-          type="button"
-          className="qx-home-identity"
-          onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
-          data-testid="home-identity"
-        >
-          <UserIcon aria-hidden="true" />
-          <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
-        </button>
         <div className="qx-home-continue" data-testid="home-context-region">
           {continueSlot}
           {/* 空态是一句陈述，不是一个动作 —— 做成 disabled 按钮等于摆一颗点不动的控件，
