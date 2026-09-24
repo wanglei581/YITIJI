@@ -2,6 +2,7 @@
 import 'reflect-metadata'
 import { UnauthorizedException } from '@nestjs/common'
 import { ServiceUnavailableException } from '@nestjs/common'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
@@ -245,6 +246,13 @@ async function main(): Promise<void> {
     fail('printer-status and capabilities routes must remain available')
   }
   pass('printer-status and capabilities remain public without a terminal session')
+  // Nest routing, guard execution, and HTTP status codes for pickup claim/release.
+  // The checks above use a fake ExecutionContext and cannot observe those.
+  execFileSync(process.execPath, ['-r', '@swc-node/register', path.join(__dirname, 'verify-pickup-terminal-http.ts')], {
+    cwd: root,
+    stdio: 'inherit',
+    timeout: 60_000,
+  })
   console.log('ALL PASS')
 }
 
