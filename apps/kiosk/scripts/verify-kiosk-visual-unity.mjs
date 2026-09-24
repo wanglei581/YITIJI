@@ -118,7 +118,12 @@ expect(
   home.includes('className="qx-home-host"') && !home.includes('kpv1--content-only'),
   '首页内容区只声明青序页面作用域'
 )
-expect(home.includes('QxPageFrame'), '首页使用 QxPageFrame')
+expect(
+  home.includes('className="qx-stage"') &&
+    home.includes('data-qx-frame="true"') &&
+    home.includes('className="qx-navbar"'),
+  '首页按原稿使用 Hero 内顶行与独立主导航'
+)
 expect(!home.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
 
 expect(layout.includes('ui-kiosk-topbar') || topbar.includes('ui-kiosk-topbar'), '共享顶栏类名存在')

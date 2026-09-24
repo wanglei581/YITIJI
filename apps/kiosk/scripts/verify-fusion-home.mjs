@@ -13,6 +13,7 @@ const check = (condition, message) => {
 
 const home = read('src/pages/home/HomePage.tsx')
 const viewOnly = read('src/pages/home/components/QxHomeView.tsx')
+const heroHeader = read('src/pages/home/components/HomeHeroHeader.tsx')
 const homeTile = read('src/pages/home/components/HomeTile.tsx')
 /* 2026-09-08：QxHomeView 超了文末的 320 行预算，把纯展示组件 HomeTile 拆了出去
  * （CLAUDE.md §8：500 行以上评估拆分；这里不调阈值，改代码）。
@@ -29,7 +30,13 @@ const kioskRoot = read('src/layouts/KioskRoot.tsx')
 
 console.log('\n=== Kiosk 青序流光首页运行时合同 ===')
 
-check(home.includes('<QxPageFrame'), '首页使用青序流光 QxPageFrame')
+check(
+  home.includes('className="qx-stage"') &&
+    home.includes('data-qx-frame="true"') &&
+    home.includes('className="qx-navbar"') &&
+    viewOnly.includes('<HomeHeroHeader'),
+  '首页用专属青序舞台，品牌与状态在 Hero 内，底栏独立固定'
+)
 check(!home.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
 check(home.includes('<QxHomeView'), '容器与青序 presentation 已拆分')
 check(home.includes("import './styles/home-qx.css'"), '首页只导入青序页级样式')
@@ -263,8 +270,11 @@ check(
 check(!css.includes('.kpv1') && !css.includes('.v6-home'), '青序首页样式完全路由作用域化')
 
 check(
-  kioskRoot.includes('useTerminalDeviceStatus(true)') && home.includes('status={deviceStatus}'),
-  '青序顶栏继续使用真实设备状态'
+  kioskRoot.includes('useTerminalDeviceStatus(true)') &&
+    home.includes('deviceStatus={deviceStatus}') &&
+    heroHeader.includes('data-tone={deviceStatus.tone}') &&
+    heroHeader.includes('{deviceStatus.label}'),
+  '首页 Hero 内继续使用真实设备状态'
 )
 check(
   kioskRoot.includes('<KioskStageFit enabled={!usesFluidViewport}>') && kioskRoot.includes("'/'"),
