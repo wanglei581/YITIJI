@@ -5,21 +5,32 @@ import {
   SparklesIcon,
   XCircleIcon,
 } from 'lucide-react'
+import { Button, Card } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { aiErrorCodeOf, aiErrorMessageOf } from '../../ai'
-import { saveAiResumeSession } from './aiResumeSession'
+import {
+  canonicalResumeParsePayload,
+  clearResumeParseIntent,
+  prepareResumeParseIntent,
+  releaseResumeParseIntent,
+  resumeParseIntentBlockMessage,
+  resumeParseIntentCode,
+  resumeParseIntentHold,
+  resumeParseWireBody,
+  type CanonicalResumeParsePayload,
+} from '../../services/resumeParseIntent'
+import { readAiResumeSession, saveAiResumeSession } from './aiResumeSession'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeTriageHero, type RailMark } from './components/ResumeTriageHero'
 import { buildScanHandoff } from './resumeScanHandoff'
 import {
   RESUME_SCORING_DIMENSIONS,
-  type ResumeScoringDimensionKey,
-  type ResumeTargetContext,
+  type ResumeParseResponse,
 } from '@ai-job-print/shared'
 import './resume-triage-qx.css'
 import './resume-triage-panels-qx.css'
@@ -56,9 +67,22 @@ const NO_REPLY_CODES = new Set(['NETWORK_ERROR', 'REQUEST_TIMEOUT', 'UNKNOWN_ERR
  * AiMockModeError 不是 ApiHttpError、status 为 0）才是明确失败。
  */
 function parseErrorOutcome(err: unknown): 'failed' | 'unknown' {
-  if (NO_REPLY_CODES.has(aiErrorCodeOf(err))) return 'unknown'
-  if (err instanceof ApiHttpError && err.status >= 500) return 'unknown'
+  const code = aiErrorCodeOf(err)
+  if (code === 'RESUME_PARSE_OUTCOME_UNKNOWN' || code === 'AI_TASK_NOT_FOUND') return 'unknown'
+  if (NO_REPLY_CODES.has(code)) return 'unknown'
+  if (err instanceof ApiHttpError && (err.status >= 500 || err.status === 408)) return 'unknown'
   return 'failed'
+}
+
+function isTaskNotFound(err: unknown): boolean {
+  return err instanceof ApiHttpError && err.status === 404 && aiErrorCodeOf(err) === 'AI_TASK_NOT_FOUND'
+}
+
+function anonymousAccessReady(taskId: string, accessToken: string | undefined, anonymous: boolean): boolean {
+  const back = readAiResumeSession()
+  if (!back || back.taskId !== taskId) return false
+  if (!anonymous) return true
+  return typeof accessToken === 'string' && accessToken.length > 0 && back.accessToken === accessToken
 }
 
 type ParseTask = { taskId: string; accessToken?: string }
@@ -127,23 +151,36 @@ const VIEW: Record<ParseView, {
 export function ResumeParsePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { getToken } = useAuth()
+  const { user, getToken } = useAuth()
   const consent = useResumeAiConsent()
   const state = location.state as Record<string, unknown> | null
 
   const file = state?.file as { name?: string; format?: string; size?: number | string } | undefined
   const fileId = typeof state?.fileId === 'string' ? state.fileId : ''
+  const watchedOwner = user?.id ?? null
 
   const [outcome, setOutcome] = useState<'failed' | 'unknown' | null>(null)
   // 结果未知但拿到了编号（2xx 却不是最终结果）：只放内存与既有最小会话，不进地址栏。
   const [pendingTask, setPendingTask] = useState<ParseTask | null>(null)
-  const [recheck, setRecheck] = useState<'idle' | 'checking' | 'not-ready' | 'error'>('idle')
+  const [recheck, setRecheck] = useState<'idle' | 'checking' | 'not-ready' | 'error' | 'replay' | 'not-found'>('idle')
+  const [blockNote, setBlockNote] = useState<string | null>(null)
+  const [storageBlocked, setStorageBlocked] = useState(false)
+  const [confirmFresh, setConfirmFresh] = useState<0 | 1 | 2>(0)
   const failed = outcome !== null
   const cancelRef = useRef(false)
   const startedRef = useRef(false)
-  // 同一时刻最多一次解析 POST：快速连点「重新提交」只发一次。
+  // 同一时刻最多一次解析 POST：快速连点只发一次。
   const inFlightRef = useRef(false)
   const failTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const ownerRef = useRef<string | null>(watchedOwner)
+  const ownerWatch = useRef(watchedOwner)
+  const intentRef = useRef('')
+  const payloadRef = useRef<CanonicalResumeParsePayload | null>(null)
+  const keptTokenRef = useRef<ParseTask | null>(null)
+  const pendingTaskRef = useRef<ParseTask | null>(null)
+  const identityStoppedRef = useRef(false)
+  ownerRef.current = watchedOwner
+  pendingTaskRef.current = pendingTask
 
   useBusyLock(Boolean(fileId) && !failed)
 
@@ -154,8 +191,17 @@ export function ResumeParsePage() {
    */
   const navigateFail = useCallback(
     (reason: string, task?: ParseTask) => {
+      if (task) {
+        saveAiResumeSession(task)
+        if (!anonymousAccessReady(task.taskId, task.accessToken, ownerRef.current === null)) {
+          setPendingTask(task)
+          setStorageBlocked(true)
+          setOutcome('unknown')
+          setBlockNote('本机没有把这次解析的读取凭证存牢。请留在此页，用同一次重查；退出后匿名结果可能无法找回。')
+          return
+        }
+      }
       setOutcome('failed')
-      if (task) saveAiResumeSession(task)
       failTimerRef.current = setTimeout(() => {
         navigate('/resume/report', { state: { ...state, success: false, reason, ...(task ? { taskId: task.taskId, accessToken: task.accessToken } : {}) } })
       }, 700)
@@ -163,90 +209,243 @@ export function ResumeParsePage() {
     [navigate, state],
   )
 
-  const submitAndWait = useCallback(async () => {
-    if (!fileId || inFlightRef.current) {
+  const samePerson = useCallback((ownerId: string | null) => (
+    !cancelRef.current && !identityStoppedRef.current && ownerRef.current === ownerId
+  ), [])
+
+  const acceptResult = useCallback(async (result: ResumeParseResponse, ownerId: string | null, knownTaskId: string) => {
+    if (!samePerson(ownerId)) return
+    if (!result || typeof result !== 'object') {
+      setOutcome('unknown')
+      setBlockNote('服务端的答复不完整，这台机器没能确认这一次解析的结果。')
       return
     }
-    inFlightRef.current = true
-    const selectedDimensions = Array.isArray(state?.selectedDimensions)
-      ? (state.selectedDimensions as ResumeScoringDimensionKey[])
-      : undefined
-    const targetContext = state?.targetContext as ResumeTargetContext | undefined
-    try {
-      const result = await submitResumeParse(
-        {
-          fileId,
-          fileName:   file?.name   ?? 'resume.pdf',
-          fileFormat: file?.format ?? 'pdf',
-          source:     (typeof state?.source === 'string' ? state.source : 'upload') as 'upload' | 'scan' | 'manual',
-          selectedDimensions,
-          targetContext,
-        },
-        getToken(),
-      )
-      if (cancelRef.current) return
-      if (result.status !== 'completed') {
-        if (result.status === 'failed') {
-          navigateFail(result.failReason ?? '简历解析未能完成，请重试', { taskId: result.taskId, accessToken: result.accessToken })
-          return
-        }
-        // 服务端登记了这一次（有编号）却还没给最终结果：不是失败，按同一编号再查。
-        saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })
-        setPendingTask({ taskId: result.taskId, accessToken: result.accessToken })
+    if (knownTaskId && result.taskId && result.taskId !== knownTaskId) {
+      setOutcome('unknown')
+      setRecheck('replay')
+      setBlockNote('这次重查返回了另一个编号，没有收下，也没有另起一次解析。')
+      return
+    }
+    const anonymous = ownerId === null
+    if (result.taskId) {
+      const kept = keptTokenRef.current?.taskId === result.taskId ? keptTokenRef.current.accessToken : undefined
+      const accessToken = kept || result.accessToken
+      if ((result.status === 'completed' || result.status === 'failed') && anonymous && !accessToken) {
+        setPendingTask({ taskId: result.taskId })
         setOutcome('unknown')
+        setRecheck('replay')
+        setBlockNote('这次解析有了编号，但答复里没有匿名读取凭证。请用同一次重查，不要开始新的解析。')
         return
       }
-      // Phase C-2A：匿名 parse 会返回一次性 accessToken；连同 taskId 写入最小会话，
-      // 供刷新 / 返回后读回本人结果（绝不持久化 report / 原文）。会员结果无 accessToken。
-      saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })
-      navigate('/resume/report', {
-        state: { ...state, success: true, taskId: result.taskId, accessToken: result.accessToken, providerName: result.providerName, report: result.report, extractionNotice: result.extractionNotice },
+      if (!kept) {
+        // Phase C-2A：匿名令牌只在这次答复里出现。先写后回读，没存牢就不清意图、不离开本页。
+        saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })
+      } else {
+        saveAiResumeSession({ taskId: result.taskId, accessToken: kept })
+      }
+      if (!anonymousAccessReady(result.taskId, accessToken, anonymous)) {
+        keptTokenRef.current = { taskId: result.taskId, accessToken }
+        setPendingTask({ taskId: result.taskId, accessToken })
+        setStorageBlocked(true)
+        setOutcome('unknown')
+        setBlockNote('本机没有把这次解析的读取凭证存牢。请留在此页，用同一次重查；退出后匿名结果可能无法找回。')
+        return
+      }
+      keptTokenRef.current = { taskId: result.taskId, accessToken }
+      setPendingTask({ taskId: result.taskId, accessToken })
+      setStorageBlocked(false)
+    }
+    if (!samePerson(ownerId)) return
+    if (result.status !== 'completed') {
+      if (result.status === 'failed') {
+        if (!result.taskId) {
+          navigateFail(result.failReason ?? '简历解析未能完成，请重试')
+          return
+        }
+        navigateFail(result.failReason ?? '简历解析未能完成，请重试', {
+          taskId: result.taskId,
+          accessToken: keptTokenRef.current?.accessToken,
+        })
+        return
+      }
+      if (result.status !== 'pending' && result.status !== 'processing') {
+        setBlockNote(result.taskId
+          ? '解析已经提交并拿到了编号，但收到的答复不完整。'
+          : '服务端的答复不完整，这台机器没能确认这一次解析的结果。')
+      }
+      setOutcome('unknown')
+      return
+    }
+    if (!result.taskId) {
+      setOutcome('unknown')
+      setBlockNote('服务端的答复不完整，这台机器没能确认这一次解析的结果。')
+      return
+    }
+    if (resumeParseIntentHold({ intent: intentRef.current, ownerId, payload: payloadRef.current }) !== 'held') {
+      setOutcome('unknown')
+      setBlockNote('本机解析标识已不在，没有打开结果，也没有另起一次解析。')
+      return
+    }
+    const cleared = await clearResumeParseIntent(intentRef.current, ownerId)
+    if (!samePerson(ownerId)) return
+    if (!cleared.ok) {
+      setOutcome('unknown')
+      setBlockNote('解析结果的读取凭证已留在本机，但没能释放这一次的解析标识。请用同一次重查，不要开始新的解析。')
+      return
+    }
+    intentRef.current = ''
+    payloadRef.current = null
+    navigate('/resume/report', {
+      state: {
+        ...state,
+        success: true,
+        taskId: result.taskId,
+        accessToken: keptTokenRef.current?.taskId === result.taskId ? keptTokenRef.current.accessToken : result.accessToken,
+        providerName: result.providerName,
+        report: result.report,
+        extractionNotice: result.extractionNotice,
+      },
+    })
+  }, [navigate, navigateFail, samePerson, state])
+
+  const submitAndWait = useCallback(async (mode: 'start' | 'replay') => {
+    if (!fileId || inFlightRef.current || identityStoppedRef.current) return
+    inFlightRef.current = true
+    const ownerId = ownerRef.current
+    const knownTaskId = mode === 'replay' ? (pendingTaskRef.current?.taskId ?? '') : ''
+    setOutcome(null)
+    setRecheck('idle')
+    setBlockNote(null)
+    setConfirmFresh(0)
+    try {
+      const canonical = canonicalResumeParsePayload({
+        fileId,
+        fileName: file?.name ?? 'resume.pdf',
+        fileFormat: file?.format ?? 'pdf',
+        source: typeof state?.source === 'string' ? state.source : 'upload',
+        selectedDimensions: state?.selectedDimensions,
+        targetContext: state?.targetContext,
       })
+      if (!canonical) {
+        setOutcome('unknown')
+        setBlockNote(resumeParseIntentBlockMessage('PAYLOAD_INVALID'))
+        return
+      }
+      let prepared: { payload: CanonicalResumeParsePayload; headers: { intent: string; proof: string } }
+      try {
+        prepared = await prepareResumeParseIntent(canonical, ownerId, { reuseOnly: mode === 'replay' })
+      } catch (err) {
+        if (!samePerson(ownerId)) return
+        setOutcome('unknown')
+        setBlockNote(resumeParseIntentBlockMessage(resumeParseIntentCode(err) || 'PREPARE_FAILED'))
+        if (knownTaskId) setRecheck('replay')
+        return
+      }
+      if (!samePerson(ownerId)) return
+      if (intentRef.current && prepared.headers.intent !== intentRef.current) {
+        setOutcome('unknown')
+        setBlockNote('这次重查没能沿用原来的解析标识，没有另起一次解析。')
+        if (knownTaskId) setRecheck('replay')
+        return
+      }
+      if (resumeParseIntentHold({ intent: prepared.headers.intent, ownerId, payload: prepared.payload }) !== 'held') {
+        setOutcome('unknown')
+        setBlockNote(resumeParseIntentBlockMessage('STORAGE_WRITE_FAILED'))
+        return
+      }
+      intentRef.current = prepared.headers.intent
+      payloadRef.current = prepared.payload
+      const result = await submitResumeParse(resumeParseWireBody(prepared.payload), getToken(), prepared.headers)
+      await acceptResult(result, ownerId, knownTaskId)
     } catch (err) {
-      if (cancelRef.current) return
+      if (!samePerson(ownerId)) return
       // 把真实原因带进失败态：演示模式要说「演示模式不提供简历解析与诊断」，
       // 一律改写成「服务暂时不可用」会让用户以为是网络问题、反复重试同一份文件。
       // 没拿到可信答复：留在本页如实说未知，不转失败屏，也不自动再提交。
       if (parseErrorOutcome(err) === 'unknown') {
         setOutcome('unknown')
+        if (knownTaskId) setRecheck('replay')
+        if (aiErrorCodeOf(err) === 'RESUME_PARSE_OUTCOME_UNKNOWN') {
+          setBlockNote('这次解析是否已经完成无法确认。请用同一次重查，不要开始新的解析。')
+        }
         return
       }
       navigateFail(aiErrorMessageOf(err, 'AI 服务暂时不可用，请稍后重试'))
     } finally {
       inFlightRef.current = false
     }
-  }, [file, fileId, getToken, navigate, navigateFail, state])
+  }, [acceptResult, file?.format, file?.name, fileId, getToken, navigateFail, samePerson, state])
 
-  /** 用户主动再提交：这是新的一次解析（新的 AI 调用、新的编号），不是「重试刚才那次」。 */
-  const resubmit = () => {
-    if (inFlightRef.current) return
-    setOutcome(null)
-    setPendingTask(null)
-    setRecheck('idle')
+  const replaySame = () => {
+    if (inFlightRef.current || confirmFresh !== 0 || identityStoppedRef.current) return
     cancelRef.current = false
-    void submitAndWait()
+    void submitAndWait('replay')
+  }
+
+  const beginFresh = async () => {
+    if (inFlightRef.current || identityStoppedRef.current) return
+    const ownerId = ownerRef.current
+    inFlightRef.current = true
+    try {
+      const released = await releaseResumeParseIntent(ownerId)
+      if (!samePerson(ownerId)) return
+      if (!released.ok) {
+        setConfirmFresh(0)
+        setOutcome('unknown')
+        setBlockNote(released.code === 'STORAGE_WRITE_FAILED'
+          ? '本机没能清除上一次未完成的解析，没有开始新的一次。'
+          : resumeParseIntentBlockMessage(released.code))
+        return
+      }
+      intentRef.current = ''
+      payloadRef.current = null
+      keptTokenRef.current = null
+      setPendingTask(null)
+      setConfirmFresh(0)
+      setBlockNote(null)
+    } finally {
+      inFlightRef.current = false
+    }
+    if (!samePerson(ownerId)) return
+    cancelRef.current = false
+    void submitAndWait('start')
   }
 
   /** 有编号时按同一编号读回（既有 GET，只读，凭本人会员 token 或本次一次性 accessToken）。 */
   const recheckTask = async () => {
-    if (!pendingTask || recheck === 'checking') return
+    if (!pendingTask || recheck === 'checking' || storageBlocked || confirmFresh !== 0) return
+    const ownerId = ownerRef.current
     setRecheck('checking')
     try {
       const res = await getResumeRecord(pendingTask.taskId, { token: getToken(), accessToken: pendingTask.accessToken })
-      if (cancelRef.current) return
-      if (res.status === 'completed' && res.report) {
-        navigate('/resume/report', {
-          state: { ...state, success: true, taskId: pendingTask.taskId, accessToken: pendingTask.accessToken, providerName: res.providerName, report: res.report, extractionNotice: res.extractionNotice },
-        })
+      if (!samePerson(ownerId)) return
+      await acceptResult(res, ownerId, pendingTask.taskId)
+      if ((res.status === 'pending' || res.status === 'processing') && (!res.taskId || res.taskId === pendingTask.taskId)) {
+        setRecheck('not-ready')
+      }
+    } catch (err) {
+      if (!samePerson(ownerId)) return
+      const held = resumeParseIntentHold({
+        intent: intentRef.current,
+        ownerId,
+        payload: payloadRef.current,
+      }) !== 'absent'
+      if (isTaskNotFound(err) && held) {
+        setRecheck('replay')
+        setBlockNote('解析已经提交并拿到了编号，但结果还没有写入完成。请用同一次重查，不要开始新的解析。')
         return
       }
-      if (res.status === 'failed') {
-        navigateFail(res.failReason ?? '简历解析未能完成，请重试', pendingTask)
+      if (isTaskNotFound(err)) {
+        setRecheck('not-found')
+        setBlockNote('以这台机器当前的登录状态和读取凭证，查不到这一次的结果。没有另起一次解析。')
         return
       }
-      setRecheck('not-ready')
-    } catch {
-      if (!cancelRef.current) setRecheck('error')
+      if (held && parseErrorOutcome(err) === 'unknown') {
+        setRecheck('replay')
+        setBlockNote('查询结果时没有拿到可信答复。请用同一次重查，不要开始新的解析。')
+        return
+      }
+      setRecheck('error')
     }
   }
 
@@ -256,15 +455,28 @@ export function ResumeParsePage() {
   }, [navigateFail])
 
   useEffect(() => {
-    cancelRef.current = false
+    if (ownerWatch.current === watchedOwner) return
+    ownerWatch.current = watchedOwner
+    if (!startedRef.current && !inFlightRef.current) return
+    identityStoppedRef.current = true
+    cancelRef.current = true
+    inFlightRef.current = false
+    setConfirmFresh(0)
+    setOutcome('unknown')
+    setBlockNote('登录状态已变化，没有开始新的一次解析。')
+  }, [watchedOwner])
+
+  useEffect(() => {
     const cleanup = () => {
       cancelRef.current = true
       if (failTimerRef.current) clearTimeout(failTimerRef.current)
     }
+    if (identityStoppedRef.current) return cleanup
+    cancelRef.current = false
     if (!fileId || startedRef.current) return cleanup
     if (consent.checking || consent.needsPrompt || !consent.ready) return cleanup
     startedRef.current = true
-    void submitAndWait()
+    void submitAndWait('start')
     return cleanup
   }, [fileId, submitAndWait, consent.checking, consent.needsPrompt, consent.ready])
 
@@ -363,7 +575,7 @@ export function ResumeParsePage() {
     )
   }
 
-  return renderFrame(
+  const page = renderFrame(
     <>
       <div className="qx-rt-wait">
         <section className="qx-card qx-rt-wait-card" data-live={failed ? undefined : 'true'}>
@@ -396,7 +608,10 @@ export function ResumeParsePage() {
               {pendingTask ? (
                 <div><dt>按编号再查</dt><dd>只是读取这一次的结果，不会重新解析，也不会多出记录。</dd></div>
               ) : (
-                <div><dt>重新提交</dt><dd>会作为新的一次解析重新调用 AI；如果刚才那次其实已经完成，记录里可能多出一条。</dd></div>
+                <>
+                  <div><dt>同一次重查</dt><dd>用已经保存的同一次标识再问一次，不会另起一次解析。</dd></div>
+                  <div><dt>重新提交</dt><dd>会作为新的一次解析重新调用 AI；如果刚才那次其实已经完成，记录里可能多出一条。</dd></div>
+                </>
               )}
               <div>
                 <dt>建议这样做</dt>
@@ -404,8 +619,8 @@ export function ResumeParsePage() {
                   {pendingTask
                     ? '稍后点下方「按同一编号再查结果」；也可以返回简历来源换一份文件。'
                     : getToken()
-                      ? '可先到「我的 → 我的简历」核对；暂时没看到时可稍后刷新。若决定重新提交，这是新的一次解析。'
-                      : '当前未登录，暂时无法核对这一次的结果。需要继续时，可重新提交一次解析或返回简历来源。'}
+                      ? '可先到「我的 → 我的简历」核对；暂时没看到时可稍后刷新。先按同一次重查。若决定重新提交，这是新的一次解析。'
+                      : '当前未登录，暂时无法核对这一次的结果。需要继续时，先按同一次重查；重新提交会是新的一次解析。也可以返回简历来源。'}
                 </dd>
               </div>
             </dl>
@@ -414,6 +629,22 @@ export function ResumeParsePage() {
             )}
             {recheck === 'error' && (
               <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-recheck-result">这次没查到结果，可能是网络问题或编号已失效；可以稍后再查，或返回简历来源。</p>
+            )}
+            {blockNote && (
+              <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-intent-note">{blockNote}</p>
+            )}
+            {!storageBlocked && confirmFresh === 0 && (!pendingTask || recheck === 'not-found') && (
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="ghost"
+                onClick={() => {
+                  if (inFlightRef.current || confirmFresh !== 0) return
+                  setConfirmFresh(1)
+                }}
+              >
+                重新提交解析（新的一次）
+              </button>
             )}
           </>
         )}
@@ -471,13 +702,13 @@ export function ResumeParsePage() {
           <button type="button" className="qx-btn" data-variant="ghost" onClick={leaveToSource}>
             返回简历来源
           </button>
-          {pendingTask ? (
+          {pendingTask && !storageBlocked && recheck !== 'replay' && recheck !== 'not-found' ? (
             <button type="button" className="qx-btn" data-variant="primary" disabled={recheck === 'checking'} onClick={() => { void recheckTask() }}>
               {recheck === 'checking' ? '正在查询…' : '按同一编号再查结果'}
             </button>
           ) : (
-            <button type="button" className="qx-btn" data-variant="primary" onClick={resubmit}>
-              重新提交解析（新的一次）
+            <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-parse-replay" onClick={replaySame}>
+              按同一次重查
             </button>
           )}
         </>
@@ -497,5 +728,44 @@ export function ResumeParsePage() {
       </button>
       )}
     </>,
+  )
+
+  return (
+    <>
+      {page}
+      {confirmFresh > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="resume-parse-fresh-title"
+        >
+          <Card className="w-[32rem] max-w-full p-6 shadow-xl">
+            <h2 id="resume-parse-fresh-title" className="text-lg font-semibold text-neutral-900">
+              {confirmFresh === 1 ? '重新提交是新的一次' : '再次确认'}
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-neutral-600" data-testid="resume-parse-fresh-copy">
+              {confirmFresh === 1
+                ? '刚才那次解析可能已经完成。重新提交会再调用一次 AI，生成新的一次解析，不会取消或覆盖刚才那次；如果刚才那次其实已经完成，就等于重复解析了一次。'
+                : '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。'}
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <Button size="lg" variant="secondary" className="min-h-14" onClick={() => setConfirmFresh(0)}>
+                先不提交
+              </Button>
+              {confirmFresh === 1 ? (
+                <Button size="lg" className="min-h-14" onClick={() => setConfirmFresh(2)}>
+                  继续确认
+                </Button>
+              ) : (
+                <Button size="lg" className="min-h-14" onClick={() => { void beginFresh() }}>
+                  开始新的一次
+                </Button>
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
+    </>
   )
 }

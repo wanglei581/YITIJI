@@ -1,5 +1,6 @@
 import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
 import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
+import { clearAllResumeParseIntents, RESUME_PARSE_INTENT_STORAGE_KEY } from '../services/resumeParseIntent'
 import { clearJobMaterialDraft } from '../pages/resume/jobMaterialDraft'
 import {
   clearSession as clearSelfAssessmentSession,
@@ -33,6 +34,7 @@ import {
 const SENSITIVE_SESSION_STORAGE_KEYS = [
   'ai-job-print:current-print-material-check',
   'ai-job-print:current-ai-resume',
+  RESUME_PARSE_INTENT_STORAGE_KEY,
   'ai-job-print:job-material-draft:v1',
   SELF_ASSESSMENT_SESSION_KEY,
   INTERVIEW_WORKBENCH_SESSION_KEY,
@@ -61,6 +63,7 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   clearContractReviewSession()
   clearPrintMaterialSession()
   clearAiResumeSession()
+  clearAllResumeParseIntents()
   clearJobMaterialDraft()
   clearSelfAssessmentSession()
   clearInterviewWorkbenchSession()

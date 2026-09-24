@@ -36,6 +36,7 @@ import type {
   AssistantSessionSummaryResponse,
   AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
+import type { ResumeParseIntentHeaders } from '../resumeParseIntent'
 import { API_MODE } from './client'
 import { aiMockAdapter } from './aiMockAdapter'
 import { aiHttpAdapter } from './aiHttpAdapter'
@@ -82,7 +83,11 @@ export interface ResumeDraftSaveResponse {
 }
 
 export interface AiServiceInterface {
-  submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse>
+  submitResumeParse(
+    req: ResumeParseRequest,
+    token?: string | null,
+    intent?: ResumeParseIntentHeaders | null,
+  ): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
   getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse>
   adjustResumeLayoutDraft(
@@ -133,9 +138,15 @@ const adapter: AiServiceInterface =
 // 导出服务函数（页面层不感知 adapter 切换）
 // ──────────────────────────────────────────────────────────────
 
-/** 提交简历解析任务，返回 taskId 和（mock 模式下的）即时报告 */
-export const submitResumeParse = (req: ResumeParseRequest, token?: string | null) =>
-  adapter.submitResumeParse(req, token)
+/**
+ * 提交简历解析。HTTP 模式还必须带上首次 POST 前已经回读成功的意图和证明；
+ * 缺任一头时适配器不会发无头请求。演示模式仍由 mock 适配器以 MOCK_MODE 拒绝。
+ */
+export const submitResumeParse = (
+  req: ResumeParseRequest,
+  token?: string | null,
+  intent?: ResumeParseIntentHeaders | null,
+) => adapter.submitResumeParse(req, token, intent)
 
 /**
  * 通过 taskId 查询解析结果（用于 http 模式刷新恢复）。

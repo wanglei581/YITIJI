@@ -598,6 +598,38 @@ test('resume parse: a result arriving after leaving never hijacks navigation @w3
   expect(parseCalls).toBe(1)
 })
 
+test('resume parse first POST carries both intent headers and a lost reply replays the same pair @w3-kiosk', async ({ page, api }) => {
+  const calls: Array<{ intent: string; proof: string }> = []
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    const headers = route.request().headers()
+    calls.push({
+      intent: headers['x-resume-parse-intent'] ?? '',
+      proof: headers['x-resume-parse-proof'] ?? '',
+    })
+    if (calls.length === 1) {
+      await route.abort('failed')
+      return
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) })
+  })
+  await page.goto('/resume/source')
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.waitForURL('/resume/parse')
+  await expect.poll(() => calls.length).toBe(1)
+  expect(calls[0].intent).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  expect(calls[0].proof).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  expect(calls[0].intent).not.toBe(calls[0].proof)
+  await expect(page.locator('b').filter({ hasText: /^结果未知$/ })).toBeVisible()
+  await expect(page.getByTestId('resume-parse-replay')).toHaveText('按同一次重查')
+  await page.getByTestId('resume-parse-replay').click()
+  await page.waitForURL('/resume/report')
+  expect(calls).toHaveLength(2)
+  expect(calls[1]).toEqual(calls[0])
+})
+
 test('resume parse server failure is labelled failed, never as the running step @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })

@@ -41,6 +41,12 @@ import type {
   ResumeReadAccess,
 } from './ai'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import {
+  isResumeParseIntentHeader,
+  RESUME_PARSE_INTENT_HEADER,
+  RESUME_PARSE_PROOF_HEADER,
+  type ResumeParseIntentHeaders,
+} from '../resumeParseIntent'
 import { API_BASE_URL } from './client'
 import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
@@ -112,7 +118,25 @@ function terminalHeader(): Record<string, string> {
   return terminalId ? { 'X-Terminal-Id': terminalId } : {}
 }
 
-async function post<T>(path: string, body: unknown, token?: string | null, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+function requireResumeParseIntentHeaders(intent?: ResumeParseIntentHeaders | null): Record<string, string> {
+  const key = intent?.intent
+  const proof = intent?.proof
+  if (!isResumeParseIntentHeader(key) || !isResumeParseIntentHeader(proof) || key === proof) {
+    throw new ApiHttpError('RESUME_PARSE_INTENT_MALFORMED', '缺少解析意图，已中止提交', 400)
+  }
+  return {
+    [RESUME_PARSE_INTENT_HEADER]: key,
+    [RESUME_PARSE_PROOF_HEADER]: proof,
+  }
+}
+
+async function post<T>(
+  path: string,
+  body: unknown,
+  token?: string | null,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
   const ac = new AbortController()
   const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
@@ -127,6 +151,7 @@ async function post<T>(path: string, body: unknown, token?: string | null, timeo
         // AiPublicQuotaService）。同一大厅多台机器共用 NAT 出口 IP，不带这个头
         // 就会共用一份 AI 额度。取不到本机终端身份时不发，后端退化回按 IP 计数。
         ...terminalHeader(),
+        ...extraHeaders,
       },
       credentials: 'include',
       body: JSON.stringify(body),
@@ -244,8 +269,12 @@ async function postForm<T>(path: string, body: FormData, timeoutMs = LLM_TIMEOUT
 // ──────────────────────────────────────────────────────────────
 
 export const aiHttpAdapter = {
-  async submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse> {
-    return post<ResumeParseResponse>('/resume/parse', req, token, LLM_TIMEOUT_MS)
+  async submitResumeParse(
+    req: ResumeParseRequest,
+    token?: string | null,
+    intent?: ResumeParseIntentHeaders | null,
+  ): Promise<ResumeParseResponse> {
+    return post<ResumeParseResponse>('/resume/parse', req, token, LLM_TIMEOUT_MS, requireResumeParseIntentHeaders(intent))
   },
 
   async getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse> {
