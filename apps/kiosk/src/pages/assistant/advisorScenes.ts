@@ -188,8 +188,151 @@ export function newSessionId(): string {
  * 路由均来自 `routes/index.tsx` 的真实注册路径，不是占位。
  */
 export const ADVISOR_MANUAL_ENTRIES = [
-  { label: '打印扫描', route: '/print-scan', hint: '上传、扫描、复印，全程不经过 AI' },
-  { label: '查看招聘会', route: '/job-fairs', hint: '场次、展位与来源平台预约入口' },
-  { label: '政策服务', route: '/policy-service', hint: '人社政策与办事材料说明' },
-  { label: 'AI简历服务', route: '/resume-service', hint: '简历上传与打印等不依赖模型的步骤照常' },
-] as const
+  { label: '打印扫描', route: '/print-scan', hint: '上传、扫描、复印，全程不经过 AI', icon: 'printer' },
+  { label: '查看招聘会', route: '/job-fairs', hint: '场次、展位与来源平台预约入口', icon: 'fair' },
+  { label: '政策服务', route: '/policy-service', hint: '人社政策与办事材料说明', icon: 'policy' },
+  { label: 'AI简历服务', route: '/resume-service', hint: '简历上传与打印等不依赖模型的步骤照常', icon: 'resume' },
+] as const satisfies readonly { label: string; route: string; hint: string; icon: KioskIconName }[]
+
+// ============================================================
+// 稿 05-ai-cockpit 的 12 态（2026-09-25 迁入运行时）
+//
+// 稿里 12 态靠 ?state= 切换；运行时**不接受** URL 指定状态 —— 每一态都只能由
+// 真实信号推出来：请求是否在飞、上一轮返回的 kind、实测可用性、草稿、语音相位。
+// 所以这里只有一个纯函数 + 文案表，不含任何计时器或假进度。
+// ============================================================
+
+export type CockpitVoiceState = 'voice-gate' | 'voice-connecting' | 'voice-live' | 'mic-denied' | 'voice-error'
+
+export type CockpitState =
+  | 'default' | 'composer' | 'submitting'
+  | 'reply-real' | 'reply-not-ai' | 'reply-error' | 'ai-unavailable'
+  | CockpitVoiceState
+
+export interface CockpitSignals {
+  /** 语音面板打开时的真实相位（由 useAiAdvisorCallSession 上报），未打开为 null。 */
+  voice: CockpitVoiceState | null
+  /** `/assistant/chat` 请求是否真的在飞。 */
+  loading: boolean
+  /** 本次会话最后一轮的结果 kind；还没问过为 null。 */
+  lastTurn: 'ai' | 'not-ai' | 'error' | null
+  /** 只来自 `/assistant/chat` 的实测 providerLabel，未问过为 unknown。 */
+  availability: 'available' | 'unavailable' | 'unknown'
+  /** 输入框里有没有还没发出的字。 */
+  hasDraft: boolean
+}
+
+/**
+ * 真实信号 → 稿 05 的状态名。优先级即判定顺序：
+ * 语音面板 > 请求在飞 > 本轮非 AI > 已确认不可用 > 在写下一条 > 本轮失败 > 本轮真实回答 > 初始。
+ * 「在写下一条」排在失败之前：失败后用户重新打字，页面该跟着人走，而不是一直停在失败说明上。
+ */
+export function deriveCockpitState(signals: CockpitSignals): CockpitState {
+  if (signals.voice) return signals.voice
+  if (signals.loading) return 'submitting'
+  if (signals.lastTurn === 'not-ai') return 'reply-not-ai'
+  if (signals.availability === 'unavailable') return 'ai-unavailable'
+  if (signals.hasDraft) return 'composer'
+  if (signals.lastTurn === 'error') return 'reply-error'
+  if (signals.lastTurn === 'ai') return 'reply-real'
+  return 'default'
+}
+
+export interface CockpitCopy {
+  /** 舱面标题：lead + 强调 + tail。强调段用翡翠色，其余白字。 */
+  title: readonly [lead: string, em: string, tail: string]
+  lede: string
+  /** 顶栏状态胶囊。只复述本页已测到的事实。 */
+  pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+  /** 主体第一区的标题与右侧提示。 */
+  section: readonly [title: string, hint: string]
+}
+
+export const COCKPIT_COPY: Record<CockpitState, CockpitCopy> = {
+  default: {
+    title: ['你想解决什么？', '', ''],
+    lede: '选一件事，或直接点常见问题；不打字也能用。',
+    pill: { tone: 'unknown', label: 'AI 状态待本轮返回确认' },
+    section: ['点一下就能问', '点完落进输入框，可以改'],
+  },
+  composer: {
+    title: ['这条问题', '还没有发出', '。'],
+    lede: '可以接着改，也可以换一条再发。',
+    pill: { tone: 'unknown', label: '尚未发送' },
+    section: ['这条还没发出', '改完按右下角发送'],
+  },
+  submitting: {
+    title: ['已发出，', '等服务返回', '。'],
+    lede: '不显示百分比和阶段，只等真实结果。',
+    pill: { tone: 'unknown', label: '等待本轮返回' },
+    section: ['已发出，等真实结果', '请求在飞，没有阶段可报'],
+  },
+  'reply-real': {
+    title: ['这一轮', '由真实模型回答', '。'],
+    lede: '仅供参考；身份、资格与录用结果不由 AI 决定。',
+    pill: { tone: 'ok', label: '真实模型已应答' },
+    section: ['本次咨询', '回答带服务标识，仅供参考'],
+  },
+  'reply-not-ai': {
+    title: ['这一轮', '不是 AI 生成', '。'],
+    lede: '服务标识不带 llm: 前缀，正文不展示。',
+    pill: { tone: 'warn', label: '非 AI 回复 · 正文不展示' },
+    section: ['这一轮不是 AI 生成', '正文不予展示'],
+  },
+  'reply-error': {
+    title: ['这一轮', '没连上', '。'],
+    lede: '可以重试，也可以直接走下面四个入口。',
+    pill: { tone: 'bad', label: '本轮失败 · 可重试' },
+    section: ['这一轮没连上', '不猜原因，也不编回答'],
+  },
+  'ai-unavailable': {
+    title: ['AI 顾问', '暂不可用', '。'],
+    lede: '四个入口不经过 AI，照常能办。',
+    pill: { tone: 'bad', label: '模型未接入' },
+    section: ['AI 顾问暂不可用', '下面四项不经过 AI'],
+  },
+  'voice-gate': {
+    title: ['语音', '默认关闭', '。'],
+    lede: '按下开启之前，本页不申请麦克风。',
+    pill: { tone: 'unknown', label: '语音默认关闭' },
+    section: ['语音咨询默认关闭', '按下才可能请求麦克风'],
+  },
+  'voice-connecting': {
+    title: ['正在', '尝试建立', '语音通道。'],
+    lede: '能不能用，由真实服务返回确认。',
+    pill: { tone: 'unknown', label: '语音尝试建立中' },
+    section: ['正在尝试建立语音通道', '尚未接通'],
+  },
+  'voice-live': {
+    title: ['语音通道', '已接通', '。'],
+    lede: '字幕来自服务端，仅供参考；挂断即结束会话。',
+    pill: { tone: 'ok', label: '语音已接通' },
+    section: ['语音会话控制区', '挂断、切换文字都会结束会话'],
+  },
+  'mic-denied': {
+    title: ['没拿到', '麦克风权限', '。'],
+    lede: '现在只能听、不能说；文字咨询照常。',
+    pill: { tone: 'warn', label: '麦克风权限被拒' },
+    section: ['没拿到麦克风权限', '当前为只听模式'],
+  },
+  'voice-error': {
+    title: ['语音通道', '没建立', '。'],
+    lede: '不推测原因，改文字或重试都行。',
+    pill: { tone: 'bad', label: '语音通道未建立' },
+    section: ['语音通道没建立', '可改用文字'],
+  },
+}
+
+/**
+ * 「不经过 AI 也能办」展开态的子项。逐条取自目的页首屏已有的卡片文案，
+ * 不编造能力；改目的页时要同步回来。取证（2026-09-25）：
+ *   打印扫描 PrintScanHomePage 文档打印 / 手机扫码上传 / 材料扫描卡（扫描按设备回传格式保存，不写「生成 PDF」）；
+ *   招聘会 JobFairsPage 卡片的时间·地点·来源 与底栏「查看入场入口」「看校园招聘」；
+ *   政策服务 serviceHubSpecs policy 前三卡；简历服务只列不调模型的「简历打印」与需登录的「我的简历」。
+ */
+export const ADVISOR_MANUAL_DETAILS: Record<(typeof ADVISOR_MANUAL_ENTRIES)[number]['route'], readonly string[]> = {
+  '/print-scan': ['文档打印：PDF / 图片上传后打印', '手机扫码上传：不用登录', '材料扫描：在打印机面板上扫描纸质材料'],
+  '/job-fairs': ['招聘会列表：时间、地点与来源', '扫码预约：去来源平台完成', '查看入场入口 · 看校园招聘'],
+  '/policy-service': ['就业、创业与灵活就业政策', '社保参保流程与材料说明', '档案托管、登记和证明材料'],
+  '/resume-service': ['简历打印：选择文件、核价后在本机打印', '我的简历：登录后查看已保存版本'],
+}

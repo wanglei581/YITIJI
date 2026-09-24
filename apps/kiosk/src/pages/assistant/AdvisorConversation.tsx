@@ -13,7 +13,8 @@
 import type { AssistantAction } from '@ai-job-print/shared'
 import { useNavigate } from 'react-router-dom'
 import { EvidenceBadge } from '../../ai'
-import { ADVISOR_MANUAL_ENTRIES } from './advisorScenes'
+import { KIcon } from '../../components/kiosk-icon'
+import { ADVISOR_MANUAL_DETAILS, ADVISOR_MANUAL_ENTRIES } from './advisorScenes'
 import { describeProviderLabel } from './advisorProvider'
 
 /**
@@ -40,6 +41,19 @@ export interface Message {
   actions?: AssistantAction[]
   /** 仅 `ai` / `not-ai` 携带，用于如实展示这轮回答的来源标识。 */
   providerLabel?: string
+  /** 仅 `ai` 携带：这一轮返回里被路由白名单丢弃的动作条数（不展示它们的文案）。 */
+  droppedActions?: number
+}
+
+/** 稿 05 的分区标题：编号 · 标题 · 右侧提示。编号由页面按实际渲染的分区依次给。 */
+export function AdvisorSectionLabel({ no, title, hint, id }: { no: number; title: string; hint?: string; id?: string }) {
+  return (
+    <div className="assistant-sec-label">
+      <span className="assistant-sec-no" aria-hidden="true">{String(no).padStart(2, '0')}</span>
+      <h2 id={id} tabIndex={-1}>{title}</h2>
+      {hint ? <span className="assistant-sec-hint">{hint}</span> : null}
+    </div>
+  )
 }
 
 export function AdvisorAvatar() {
@@ -50,13 +64,25 @@ export function AdvisorAvatar() {
   )
 }
 
-/** 「正在整理建议」指示器。只在 AiTaskRegion 的 running 槽里挂载 —— 没在算就不存在。 */
+/**
+ * 「请求在飞」指示器（稿 05 submitting 态的等待卡）。只在 AiTaskRegion 的 running 槽里挂载 ——
+ * 没在算就不存在。只表达「在等」：无百分比、无阶段点、无预计时间（MOTION-SPEC M2）。
+ */
 export function AdvisorThinking() {
   return (
     <div className="assistant-thinking" role="status">
-      <AdvisorAvatar />
-      <span>小青正在整理建议…</span>
-      <span className="assistant-thinking-dots" data-ai-progress="true" aria-hidden="true"><i /><i /><i /></span>
+      <p className="assistant-thinking-bar">
+        <span className="assistant-thinking-dots" data-ai-progress="true" aria-hidden="true"><i /><i /><i /></span>
+        <span>正在等待服务返回 · 没有百分比、阶段和预计时间可显示</span>
+      </p>
+      <p className="assistant-thinking-slot">回答会出现在这一区。返回之前保持空白，不预演内容、不逐字打字。</p>
+      <dl className="assistant-provenance">
+        <div><dt>providerLabel</dt><dd>未取得</dd></div>
+        <div><dt>aiGenerated</dt><dd>未取得</dd></div>
+      </dl>
+      <p className="assistant-gate-note">
+        返回后先过双门禁：服务标识以 <code>llm:</code> 开头<b>且</b>标记为模型生成，才显示正文；否则如实说明、不展示。
+      </p>
     </div>
   )
 }
@@ -74,7 +100,7 @@ export function ChatBubble({ msg }: { msg: Message }) {
 
       {msg.kind === 'error' ? (
         <div className="assistant-message-bubble assistant-message-bubble--error" role="alert">
-          <strong>暂时无法连接</strong>
+          <strong>请求失败，没有回答</strong>
           <p>{msg.text}</p>
         </div>
       ) : msg.kind === 'not-ai' ? (
@@ -86,12 +112,15 @@ export function ChatBubble({ msg }: { msg: Message }) {
         <div className="assistant-message-bubble assistant-message-bubble--not-ai" role="status">
           <strong>这一轮没有 AI 回答</strong>
           <p>{msg.text}</p>
-          <span className="assistant-message-provider">
-            服务标识：{describeProviderLabel(msg.providerLabel)}
-          </span>
+          <dl className="assistant-provenance">
+            <div><dt>providerLabel</dt><dd className="assistant-message-provider">服务标识：{describeProviderLabel(msg.providerLabel)}</dd></div>
+            <div><dt>aiGenerated</dt><dd>否</dd></div>
+          </dl>
+          <span className="assistant-gate-note">同一轮返回里的建议动作也一并丢弃，不当作「AI 建议的下一步」。</span>
         </div>
       ) : (
         <div className="assistant-message-bubble">
+          {msg.role === 'user' && <span className="assistant-message-who">你的问题</span>}
           {/* E3 只挂在真实模型回答上。产品文案（system）与用户消息都不挂。 */}
           {msg.kind === 'ai' && (
             <span className="assistant-message-evrow">
@@ -116,23 +145,38 @@ export function ChatBubble({ msg }: { msg: Message }) {
  * 与 `AiTaskRegion` 的 `manual` 降级配套：原语只收一个 action，
  * 而本页的手动替代天然是四条并列的路，少列任何一条都会让用户以为
  * 「AI 挂了这台机器就没别的能办了」。所以四条全给，且都是真实注册路由。
+ *
+ * 稿 05 两种密度：`rail` 是平时的一排四格；`full` 是 AI 答不了时占主视野的 2×2，
+ * 每格多列出目的页首屏确有的去处（ADVISOR_MANUAL_DETAILS），不编造能力。
  */
-export function AdvisorManualEntries() {
+export function AdvisorManualEntries({ variant = 'full' }: { variant?: 'rail' | 'full' }) {
   const navigate = useNavigate()
 
   return (
-    <nav className="assistant-manual-entries" aria-label="不依赖 AI 的功能入口">
-      {ADVISOR_MANUAL_ENTRIES.map((entry) => (
-        <button
-          key={entry.route}
-          type="button"
-          className="assistant-manual-entry"
-          onClick={() => navigate(entry.route)}
-        >
-          <strong>{entry.label}</strong>
-          <small>{entry.hint}</small>
-        </button>
-      ))}
+    <nav className="assistant-manual-entries" data-variant={variant} aria-label="不依赖 AI 的功能入口">
+      {ADVISOR_MANUAL_ENTRIES.map((entry) => {
+        const details = variant === 'full' ? ADVISOR_MANUAL_DETAILS[entry.route] : []
+        return (
+          <button
+            key={entry.route}
+            type="button"
+            className="assistant-manual-entry"
+            onClick={() => navigate(entry.route)}
+          >
+            <span className="assistant-manual-top">
+              <span className="assistant-manual-icon" aria-hidden="true"><KIcon name={entry.icon} /></span>
+              <strong>{entry.label}</strong>
+              <KIcon name="arrow" />
+            </span>
+            <small>{entry.hint}</small>
+            {details.length > 0 && (
+              <span className="assistant-manual-details">
+                {details.map((detail) => <span key={detail}>{detail}</span>)}
+              </span>
+            )}
+          </button>
+        )
+      })}
     </nav>
   )
 }

@@ -17,7 +17,7 @@
 //   · 状态标签复用原语的 `AiCapabilityChip`，不另造一套说法
 // ============================================================
 
-import type { ComponentType } from 'react'
+import type { ComponentType, CSSProperties } from 'react'
 import { useId } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -111,17 +111,41 @@ export interface AiToolSectionProps {
   degraded: boolean
   /** 为什么置灰。degraded 为真时必须给，且常驻可见。 */
   degradedReason: string
+  /**
+   * 灯色的唯一来源：`/assistant/chat` 的实测可用性。八个专项在服务端走同一个
+   * `assistant_chat` 就绪闸门（ai.service.ts chatWithAssistant），所以一次实测对八盏灯同样成立；
+   * 没问过就是「待确认」，不预先点亮。
+   */
+  availability: 'available' | 'unavailable' | 'unknown'
+  /** 当前 URL intent 对应的专项：这盏灯标「当前」，表示本次会话正交给它。 */
+  activeSkill?: string
 }
 
-export function AiToolSection({ degraded, degradedReason }: AiToolSectionProps) {
+const LAMP_LABEL = { available: '已确认', unavailable: '暂停', unknown: '待确认' } as const
+
+export function AiToolSection({ degraded, degradedReason, availability, activeSkill }: AiToolSectionProps) {
   const navigate = useNavigate()
   const reasonId = useId()
+  const lamp = degraded ? 'unavailable' : availability
 
   return (
-    <section className="assistant-ai-tools" aria-labelledby="ai-tools-heading" data-ai-tools-degraded={degraded || undefined}>
+    <section
+      className="assistant-ai-tools"
+      aria-labelledby="ai-tools-heading"
+      data-ai-tools-degraded={degraded || undefined}
+      data-lamp={lamp}
+    >
       <div className="assistant-ai-tools-header">
-        <h2 id="ai-tools-heading">AI 专项工具</h2>
-        {degraded ? <AiCapabilityChip tone="degraded" /> : <span>直接进入专项 AI 会话</span>}
+        <h2 id="ai-tools-heading">本机 AI 专项</h2>
+        {degraded ? (
+          <AiCapabilityChip tone="degraded" />
+        ) : (
+          <span className="assistant-ai-tools-count">
+            {availability === 'available'
+              ? <>8 项 · <b>本轮已确认可用</b></>
+              : '8 项 · 首轮提问后确认可用性'}
+          </span>
+        )}
       </div>
 
       {/* 原因常驻可见：置灰的按钮自己说不出话，这一行就是它们的解释。 */}
@@ -132,25 +156,31 @@ export function AiToolSection({ degraded, degradedReason }: AiToolSectionProps) 
       )}
 
       <div className="assistant-ai-tools-grid">
-        {AI_TOOLS.map((tool) => {
+        {AI_TOOLS.map((tool, index) => {
           const Icon = tool.icon
+          const active = tool.id === activeSkill
           return (
             <button
               key={tool.id}
               type="button"
               className={`assistant-ai-tool-card adv-tool--${tool.accent}`}
+              style={{ '--rail-i': index } as CSSProperties}
+              data-active={active || undefined}
+              aria-current={active ? 'true' : undefined}
               // 置灰但保持可聚焦、可读；不绑 onClick，按下去不会有任何副作用。
               aria-disabled={degraded || undefined}
               aria-describedby={degraded ? reasonId : undefined}
-              onClick={degraded ? undefined : () => navigate(`/assistant?intent=${tool.id}`)}
+              onClick={degraded || active ? undefined : () => navigate(`/assistant?intent=${tool.id}`)}
             >
+              <i className="assistant-ai-lamp" data-lamp={lamp} aria-hidden="true" />
               <span className="aat-icon" aria-hidden="true">
                 <Icon />
               </span>
               <span className="aat-body">
-                <strong>{tool.title}</strong>
-                <small>{tool.description}</small>
+                <strong>{tool.title.replace(/^AI /, '')}</strong>
+                <small>{active ? '当前会话 · ' : ''}{tool.description}</small>
               </span>
+              <span className="kassist-sr-only">（{LAMP_LABEL[lamp]}）</span>
             </button>
           )
         })}

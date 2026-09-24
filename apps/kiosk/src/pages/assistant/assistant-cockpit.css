@@ -1,0 +1,422 @@
+/* ============================================================
+ * assistant-cockpit.css — 稿 05-ai-cockpit（AI 驾驶舱）运行时层
+ *
+ * 叠在 inkpaper / batch8 / advisor 之后，是 /assistant 最后生效的一层（选择器同权重，靠顺序胜出）。
+ * 只用青序令牌（--qx-*，styles/qingxu/tokens.css），不写裸 hex。
+ *
+ * 两种排布：
+ *   · 舞台模式 [data-kiosk-stage-fit='on']：1080×1920 定高舞台。舱面 / 主体 / 输入坞 / 边界说明
+ *     是四行网格，只有主体滚动 —— 输入坞永远在导航之上，这是 27 寸竖屏站立操作的主形态。
+ *   · 流式模式（手机 390、横屏桌面）：整块 .kassist 统一滚动，内容按自然高度排。
+ *
+ * 动效只承载真实信息：状态切换时标题换场、请求在飞时舱标外圈呼吸、能力灯首屏通电一次、
+ * 当前专项被点名时扫一道光。prefers-reduced-motion 下全部直接就位。
+ * ============================================================ */
+
+/* ── 页壳：本页自己管左右留白（输入坞与边界说明要通栏） ───────────────── */
+.qx-stage .qx-body:has(> .kassist-lightflow) { padding: 0; }
+
+.kassist.kassist-lightflow {
+  --ck-gutter: var(--qx-gutter, 40px);
+  --ck-ease: cubic-bezier(.22, 1, .36, 1);
+  --ck-on-deep: rgb(242 239 228);
+  --ck-on-deep-2: rgb(242 239 228 / 74%);
+  --ck-on-deep-3: rgb(242 239 228 / 50%);
+  --ck-rail-ink: rgb(223 243 234);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 0 env(safe-area-inset-bottom, 0px);
+  color: var(--qx-ink);
+  background: transparent;
+  font-family: var(--qx-sans);
+}
+
+.kassist.kassist-lightflow .assistant-workbench {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+}
+
+/* 舞台模式：四行网格，工作台 display:contents 让语音面板能与主体同格（它在 inert 的工作台之外）。 */
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  row-gap: 16px;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-workbench { display: contents; }
+/* 每行显式定位：语音面板显式占 2–4 行，其余若靠自动放置会被挤进隐式行。 */
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-cockpit { grid-row: 1; grid-column: 1; }
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-cockpit-body { grid-row: 2; grid-column: 1; }
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-composer { grid-row: 3; grid-column: 1; }
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-truth { grid-row: 4; grid-column: 1; }
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-cockpit-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-cockpit-body::-webkit-scrollbar { display: none; }
+
+/* 本页的视觉隐藏：clip-path 而不是负 margin —— 负 margin 会让元素越出视口，撞越界门禁。 */
+.kassist.kassist-lightflow .kassist-sr-only,
+.kassist.kassist-lightflow .assistant-hold-talk-input,
+.kassist.kassist-lightflow .assistant-composer > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.kassist.kassist-lightflow :is(button, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--qx-teal);
+  outline-offset: 3px;
+}
+.kassist.kassist-lightflow .assistant-cockpit :is(button, [tabindex]):focus-visible {
+  outline-color: var(--qx-emerald);
+}
+
+/* ══ 舱面 ══════════════════════════════════════════════════════ */
+.kassist.kassist-lightflow .assistant-cockpit {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0 var(--ck-gutter);
+  padding: 22px 30px 20px;
+  overflow: hidden;
+  border-radius: 32px;
+  color: var(--ck-on-deep);
+  background: linear-gradient(158deg, var(--qx-deep-2) 0%, var(--qx-deep) 68%);
+  box-shadow: 0 18px 44px rgb(11 36 30 / 18%);
+}
+/* 网格底纹 + 状态切换时的一道扫描线（伪元素，不参与布局也不越界）。 */
+.kassist.kassist-lightflow .assistant-cockpit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: .5;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(46 230 168 / 7%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(46 230 168 / 7%) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+.kassist.kassist-lightflow .assistant-cockpit-row {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 300px;
+  align-items: center;
+  gap: 26px;
+}
+.kassist.kassist-lightflow .assistant-cockpit-mark {
+  position: relative;
+  display: grid;
+  width: 92px;
+  height: 92px;
+  place-items: center;
+  border: 1.5px solid rgb(46 230 168 / 42%);
+  border-radius: 26px;
+  color: var(--qx-emerald);
+  background: rgb(46 230 168 / 9%);
+}
+.kassist.kassist-lightflow .assistant-cockpit-mark svg { width: 46px; height: 46px; }
+/* 请求真的在飞时（等回答 / 等语音通道）舱标外圈呼吸；其余状态静止。 */
+.kassist.kassist-lightflow .assistant-cockpit-mark::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border: 2px solid rgb(46 230 168 / 55%);
+  border-radius: 31px;
+  opacity: 0;
+}
+.kassist.kassist-lightflow .assistant-cockpit:is([data-cockpit-state='submitting'], [data-cockpit-state='voice-connecting']) .assistant-cockpit-mark::after {
+  animation: kassist-cockpit-ring 1600ms var(--ck-ease) infinite;
+}
+
+.kassist.kassist-lightflow .assistant-cockpit-copy { min-width: 0; }
+.kassist.kassist-lightflow .assistant-cockpit p { margin: 0; padding: 0; border: 0; background: none; }
+.kassist.kassist-lightflow .assistant-cockpit p.assistant-cockpit-eyebrow {
+  color: var(--ck-on-deep-3);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 4px;
+}
+.kassist.kassist-lightflow .assistant-cockpit-eyebrow span { letter-spacing: 1px; color: var(--qx-emerald); }
+.kassist.kassist-lightflow .assistant-cockpit-headline h2 {
+  margin: 6px 0 0;
+  color: var(--ck-on-deep);
+  font-family: var(--qx-serif);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: 1px;
+  animation: kassist-cockpit-title-in 280ms var(--ck-ease) both;
+}
+.kassist.kassist-lightflow .assistant-cockpit-headline h2 em { font-style: normal; color: var(--qx-emerald); }
+.kassist.kassist-lightflow .assistant-cockpit p.assistant-cockpit-lede {
+  margin-top: 8px;
+  color: var(--ck-on-deep-2);
+  font-size: 20px;
+  line-height: 1.5;
+}
+.kassist.kassist-lightflow .assistant-cockpit-disclosure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.kassist.kassist-lightflow .assistant-cockpit .kiosk-aigc-mark {
+  margin: 0;
+  border-color: rgb(232 180 92 / 42%);
+  color: var(--qx-on-deep-warn);
+  background: rgb(232 180 92 / 12%);
+  font-size: 14px;
+}
+.kassist.kassist-lightflow .assistant-cockpit p.assistant-advisor-disclosure {
+  display: block;
+  flex: 1 1 320px;
+  min-width: 0;
+  margin: 0;
+  color: rgb(242 239 228 / 64%);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.kassist.kassist-lightflow .assistant-advisor-disclosure b { color: var(--ck-on-deep); font-weight: 600; }
+
+.kassist.kassist-lightflow .assistant-cockpit-telemetry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding-left: 24px;
+  border-left: 1px solid rgb(242 239 228 / 16%);
+}
+.kassist.kassist-lightflow .assistant-cockpit-telemetry > div { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.kassist.kassist-lightflow .assistant-cockpit-telemetry dt {
+  flex: none;
+  width: 80px;
+  color: var(--ck-on-deep-3);
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+.kassist.kassist-lightflow .assistant-cockpit-telemetry dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ck-on-deep);
+  font-size: 18px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kassist.kassist-lightflow .assistant-cockpit-telemetry dd[data-tone='hi'] { color: var(--qx-emerald); }
+.kassist.kassist-lightflow .assistant-cockpit-telemetry dd[data-tone='amber'] { color: var(--qx-on-deep-warn); }
+.kassist.kassist-lightflow .assistant-cockpit-telemetry dd[data-tone='bad'] { color: var(--qx-on-deep-bad); }
+
+/* ── 能力仪表带（AiToolSection） ─────────────────────────────── */
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgb(46 230 168 / 16%);
+}
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools-header h2 {
+  margin: 0;
+  color: var(--ck-rail-ink);
+  font-family: var(--qx-sans);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.kassist.kassist-lightflow .assistant-ai-tools-count {
+  color: rgb(223 243 234 / 62%);
+  font-family: var(--qx-mono);
+  font-size: 15px;
+  letter-spacing: .04em;
+}
+.kassist.kassist-lightflow .assistant-ai-tools-count b { color: var(--qx-emerald); font-weight: 600; }
+.kassist.kassist-lightflow .assistant-cockpit .kiosk-ai-chip { font-size: 14px; }
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools-reason {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid rgb(232 139 125 / 34%);
+  border-radius: 13px;
+  color: var(--qx-on-deep-bad);
+  background: rgb(232 139 125 / 10%);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tool-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 8px 14px;
+  overflow: hidden;
+  border: 1px solid rgb(46 230 168 / 14%);
+  border-top-width: 1px;
+  border-radius: 14px;
+  color: var(--ck-rail-ink);
+  background: rgb(255 255 255 / 4.5%);
+  box-shadow: none;
+  text-align: left;
+  transform: none;
+  filter: none;
+  opacity: 1;
+  animation: kassist-cockpit-chip-in 420ms var(--ck-ease) both;
+  animation-delay: calc(90ms + var(--rail-i, 0) * 38ms);
+  transition: background-color 160ms var(--ck-ease), border-color 160ms var(--ck-ease), transform 160ms var(--ck-ease);
+}
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tool-card:hover { transform: none; box-shadow: none; }
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tool-card:active { transform: scale(.975); }
+.kassist.kassist-lightflow .assistant-cockpit .aat-icon { display: none; }
+.kassist.kassist-lightflow .assistant-cockpit .aat-body { display: grid; gap: 2px; min-width: 0; }
+.kassist.kassist-lightflow .assistant-cockpit .aat-body strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kassist.kassist-lightflow .assistant-cockpit .aat-body small {
+  overflow: hidden;
+  color: rgb(223 243 234 / 52%);
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 灯色只由实测可用性决定：空心 = 待确认 · 翡翠呼吸 = 本轮已确认 · 灰 = 暂停。 */
+.kassist.kassist-lightflow .assistant-ai-lamp {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px rgb(223 243 234 / 48%);
+}
+.kassist.kassist-lightflow .assistant-ai-lamp[data-lamp='available'] {
+  background: var(--qx-emerald);
+  box-shadow: 0 0 0 0 rgb(46 230 168 / 50%);
+  animation: kassist-cockpit-lamp 3.4s ease-in-out infinite;
+}
+.kassist.kassist-lightflow .assistant-ai-lamp[data-lamp='unavailable'] { background: rgb(74 99 91); box-shadow: none; }
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tool-card[aria-disabled='true'] {
+  border-color: rgb(255 255 255 / 7%);
+  color: rgb(223 243 234 / 45%);
+  cursor: not-allowed;
+}
+/* 当前专项：本次会话正交给它。落位即刻生效，扫光只是叠在上面的一次性装饰。 */
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tool-card[data-active] {
+  border-color: rgb(46 230 168 / 62%);
+  background: rgb(46 230 168 / 13%);
+  box-shadow: 0 0 0 1px rgb(46 230 168 / 30%);
+}
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tool-card[data-active] .aat-body small { color: var(--qx-emerald); }
+.kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tool-card[data-active]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, rgb(46 230 168 / 28%) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: kassist-cockpit-sweep 900ms var(--ck-ease) 420ms both;
+}
+
+/* ══ 流式模式（手机 / 窄屏） ══════════════════════════════════════ */
+@media (max-width: 760px) {
+  .qx-stage:has(.kassist-lightflow) .qx-pagehead { margin: 10px 14px 0; gap: 2px 12px; }
+  .qx-stage:has(.kassist-lightflow) .qx-pagehead h1 { font-size: 26px; }
+  .qx-stage:has(.kassist-lightflow) .qx-pagehead h1::before { height: 24px; }
+  .qx-stage:has(.kassist-lightflow) .qx-pagehead p { min-width: 0; font-size: 14px; }
+  .kassist.kassist-lightflow .assistant-cockpit { gap: 10px; padding: 14px 16px; border-radius: 22px; }
+  .kassist.kassist-lightflow .assistant-cockpit-row { grid-template-columns: 52px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .kassist.kassist-lightflow .assistant-cockpit-mark { width: 52px; height: 52px; border-radius: 16px; }
+  .kassist.kassist-lightflow .assistant-cockpit-mark::after { border-radius: 21px; }
+  .kassist.kassist-lightflow .assistant-cockpit-mark svg { width: 28px; height: 28px; }
+  .kassist.kassist-lightflow .assistant-cockpit p.assistant-cockpit-eyebrow { font-size: 12px; letter-spacing: 2px; }
+  .kassist.kassist-lightflow .assistant-cockpit-headline h2 { margin-top: 0; font-size: 24px; letter-spacing: 0; }
+  /* 窄屏只留标题：眉题与说明由标题本身承担，省下的高度留给首屏的主题与问题。 */
+  .kassist.kassist-lightflow .assistant-cockpit p.assistant-cockpit-eyebrow,
+  .kassist.kassist-lightflow .assistant-cockpit p.assistant-cockpit-lede { display: none; }
+  .kassist.kassist-lightflow .assistant-cockpit-disclosure { margin-top: 8px; }
+  .kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools { gap: 8px; padding-top: 10px; }
+  .kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools-header h2 { font-size: 15px; }
+  .kassist.kassist-lightflow .assistant-cockpit p.assistant-cockpit-lede { font-size: 15px; }
+  .kassist.kassist-lightflow .assistant-cockpit p.assistant-advisor-disclosure { font-size: 13px; }
+  .kassist.kassist-lightflow .assistant-cockpit-telemetry {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding: 10px 0 0;
+    border-top: 1px solid rgb(242 239 228 / 14%);
+    border-left: 0;
+  }
+  .kassist.kassist-lightflow .assistant-cockpit-telemetry > div { gap: 6px; }
+  .kassist.kassist-lightflow .assistant-cockpit-telemetry dt { width: auto; font-size: 12px; letter-spacing: 0; }
+  .kassist.kassist-lightflow .assistant-cockpit-telemetry dd { font-size: 13px; }
+  /* 仪表带在窄屏改为一行横滑：八盏灯都在，不挤占首屏。 */
+  .kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools-grid {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools-grid::-webkit-scrollbar { display: none; }
+  .kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tool-card { flex: 0 0 160px; min-height: 52px; padding: 6px 12px; scroll-snap-align: start; }
+  .kassist.kassist-lightflow .assistant-cockpit .aat-body strong { font-size: 15px; }
+  .kassist.kassist-lightflow .assistant-cockpit .aat-body small { font-size: 12px; }
+  .kassist.kassist-lightflow .assistant-ai-tools-count { font-size: 12px; }
+  .kassist.kassist-lightflow .assistant-cockpit .assistant-ai-tools-reason { font-size: 13px; }
+}
+
+/* ══ 动效 ═══════════════════════════════════════════════════════ */
+@keyframes kassist-cockpit-title-in { from { opacity: .35; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes kassist-cockpit-enter { from { opacity: .4; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes kassist-cockpit-chip-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+@keyframes kassist-cockpit-bar { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
+@keyframes kassist-cockpit-dot { 0%, 100% { opacity: .28; } 50% { opacity: 1; } }
+@keyframes kassist-cockpit-ring { 0% { opacity: .9; transform: scale(.92); } 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes kassist-cockpit-lamp { 0%, 100% { box-shadow: 0 0 0 0 rgb(46 230 168 / 50%); } 50% { box-shadow: 0 0 0 5px rgb(46 230 168 / 0%); } }
+@keyframes kassist-cockpit-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .kassist.kassist-lightflow *,
+  .kassist.kassist-lightflow *::before,
+  .kassist.kassist-lightflow *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
