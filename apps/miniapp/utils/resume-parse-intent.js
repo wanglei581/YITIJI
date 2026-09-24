@@ -90,16 +90,18 @@ function canonicalPayload(payload) {
     const t = payload.targetContext
     if (typeof t !== 'object') return null
     if (t.skipped != null && typeof t.skipped !== 'boolean') return null
-    const text = (value) => (typeof value === 'string' ? value : null)
-    targetContext = {
-      industry: text(t.industry),
-      targetJob: text(t.targetJob),
-      experience: text(t.experience),
-      scene: text(t.scene),
-      major: text(t.major),
-      degree: text(t.degree),
-      skipped: typeof t.skipped === 'boolean' ? t.skipped : null,
+    const text = (value) => {
+      if (value == null) return null
+      return typeof value === 'string' ? value : undefined
     }
+    const industry = text(t.industry)
+    const targetJob = text(t.targetJob)
+    const experience = text(t.experience)
+    const scene = text(t.scene)
+    const major = text(t.major)
+    const degree = text(t.degree)
+    if ([industry, targetJob, experience, scene, major, degree].includes(undefined)) return null
+    targetContext = { industry, targetJob, experience, scene, major, degree, skipped: typeof t.skipped === 'boolean' ? t.skipped : null }
   }
   return {
     fileId: payload.fileId,
@@ -130,10 +132,12 @@ function loadRecords() {
   const result = storage.read(STORE_KEY)
   if (!result.ok) return { error: 'STORAGE_UNREADABLE' }
   if (!result.found) return { records: [] }
-  if (!Array.isArray(result.value) || result.value.some((row) => !validRecord(row))) {
+  const rows = result.value
+  if (!Array.isArray(rows) || rows.length > 1 || rows.some((row) => !validRecord(row))) {
     return { error: 'STORAGE_CORRUPT' }
   }
-  return { records: result.value }
+  if (rows.length === 1 && rows[0].intent === rows[0].proof) return { error: 'STORAGE_CORRUPT' }
+  return { records: rows }
 }
 
 function writeRecords(records) {
@@ -243,11 +247,11 @@ function removeMatching(intent, ownerIdentity) {
 }
 
 function markSettled(intent, ownerIdentity) {
-  return removeMatching(intent, ownerIdentity)
+  return enqueue(() => Promise.resolve(removeMatching(intent, ownerIdentity)))
 }
 
 function clear(intent, ownerIdentity) {
-  return removeMatching(intent, ownerIdentity)
+  return enqueue(() => Promise.resolve(removeMatching(intent, ownerIdentity)))
 }
 
 module.exports = {

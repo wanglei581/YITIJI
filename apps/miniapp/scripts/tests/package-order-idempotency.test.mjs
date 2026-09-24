@@ -1692,12 +1692,29 @@ test('简历解析意图：随机数缺失或超时失败，且只按同一 inte
   wx.control.randomMode = 'ok'
   const ready = await resumeIntent.prepare(PARSE_A, 'member-a')
   const intent = ready.headers[resumeIntent.INTENT_HEADER]
-  assert.equal(resumeIntent.markSettled(intent, 'member-b').ok, false)
+  assert.equal((await resumeIntent.markSettled(intent, 'member-b')).ok, false)
   assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 1)
   wx.control.writeThrows = true
-  assert.equal(resumeIntent.clear(intent, 'member-a').code, 'STORAGE_WRITE_FAILED')
+  assert.equal((await resumeIntent.clear(intent, 'member-a')).code, 'STORAGE_WRITE_FAILED')
   wx.control.writeThrows = false
   assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 1)
-  assert.equal(resumeIntent.markSettled(intent, 'member-a').ok, true)
+  assert.equal((await resumeIntent.markSettled(intent, 'member-a')).ok, true)
   assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 0)
+})
+
+test('简历解析意图：多条记录或非法目标字段时不继续', async () => {
+  const wx = resumeWx(); ACTIVE_WX = wx
+  const ready = await resumeIntent.prepare(PARSE_A, 'member-a')
+  const row = wx.storage.get(resumeIntent.STORE_KEY)[0]
+  wx.storage.set(resumeIntent.STORE_KEY, [row, { ...row, intent: row.proof, proof: row.intent }])
+  await assert.rejects(resumeIntent.prepare(PARSE_A, 'member-a'), (error) => error.code === 'STORAGE_CORRUPT')
+  assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 2)
+  wx.storage.delete(resumeIntent.STORE_KEY)
+  await assert.rejects(
+    resumeIntent.prepare({ ...PARSE_A, targetContext: { industry: 1 } }, 'member-a'),
+    (error) => error.code === 'PAYLOAD_INVALID',
+  )
+  assert.equal(wx.calls.set, wx.calls.set)
+  assert.equal(wx.storage.has(resumeIntent.STORE_KEY), false)
+  assert.equal(ready.headers[resumeIntent.INTENT_HEADER].length, 43)
 })

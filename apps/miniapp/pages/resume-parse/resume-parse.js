@@ -3,6 +3,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const config = require('../../utils/config')
 const storage = require('../../utils/storage')
+const intentStore = require('../../utils/resume-parse-intent')
 
 /**
  * 本次解析包含的环节。
@@ -57,9 +58,29 @@ function isTaskNotFound(err) {
  */
 function submitErrorOutcome(err) {
   if (config.USE_MOCK) return 'failed'
+  if (err && err.statusCode === 409 && err.code === 'RESUME_PARSE_OUTCOME_UNKNOWN') return 'unknown'
+  if (err && err.statusCode === 404 && err.code === 'AI_TASK_NOT_FOUND') return 'unknown'
   const code = err && err.statusCode
   if (typeof code === 'number' && code >= 400 && code < 500 && code !== 408 && err.code) return 'failed'
   return 'unknown'
+}
+
+function ownerId() {
+  const user = typeof auth.getUser === 'function' ? auth.getUser() : null
+  return user && typeof user.id === 'string' && user.id ? user.id : null
+}
+
+function captureIdentity() {
+  return {
+    generation: typeof auth.sessionGeneration === 'function' ? auth.sessionGeneration() : 0,
+    ownerId: ownerId(),
+  }
+}
+
+function sameIdentity(snapshot) {
+  if (!snapshot) return false
+  if (typeof auth.isSameSession === 'function' && !auth.isSameSession(snapshot.generation)) return false
+  return ownerId() === snapshot.ownerId
 }
 
 function parseJsonOption(value, fallback) {
@@ -142,11 +163,7 @@ Page({
     }, 1000)
   },
 
-  _submit() {
-    // 同一时刻最多一次解析 POST:连点「重试」、确认框回调重入都只发一次。
-    if (this._submitting) return
-    this._submitting = true
-    this.setData({ atext: '正在解析简历,请勿离开…' })
+  _payload() {
     const payload = {
       fileId: this.data.fileId,
       fileName: this.data.fileName || `resume.${this.data.fileFormat || 'pdf'}`,
@@ -155,14 +172,50 @@ Page({
       targetContext: this.data.targetContext,
     }
     if (this.data.selectedDimensions.length) payload.selectedDimensions = this.data.selectedDimensions
+    return payload
+  },
+
+  async _submit() {
+    // 同一时刻最多一次解析 POST:连点「重试」、确认框回调重入都只发一次。
+    if (this._submitting) return
+    this._submitting = true
+    const identity = captureIdentity()
+    this._submitIdentity = identity
+    this.setData({ atext: '正在解析简历,请勿离开…' })
+    const requestPayload = this._payload()
+    let prepared
+    try {
+      prepared = await intentStore.prepare(requestPayload, identity.ownerId)
+    } catch (err) {
+      this._submitting = false
+      if (this._stopped || !sameIdentity(identity)) return
+      this._unknown('', err && err.code === 'INTENT_CONFLICT'
+        ? '本机还有另一次尚未完成的解析，不能换材料或换账号继续。'
+        : '本机没能安全准备这次解析，为避免重复调用已中止。请稍后重试。')
+      return
+    }
+    if (this._stopped || !sameIdentity(identity)) {
+      this._submitting = false
+      return
+    }
+    this._intent = prepared.headers[intentStore.INTENT_HEADER]
+    const payload = prepared.payload
     const settle = () => { this._submitting = false }
-    api.parseResume(payload)
+    api.parseResume(payload, prepared.headers)
       .then(
-        (res) => { settle(); this._handle(res, 0, '') },
+        (res) => {
+          settle()
+          if (this._stopped || !sameIdentity(identity)) return
+          this._handle(res, 0, '')
+        },
         (err) => {
           settle()
-          if (submitErrorOutcome(err) === 'unknown') this._unknown('', UNKNOWN_CAUSE.noReply)
-          else this._fail(err)
+          if (this._stopped || !sameIdentity(identity)) return
+          if (submitErrorOutcome(err) === 'unknown') {
+            this._unknown('', err && err.code === 'RESUME_PARSE_OUTCOME_UNKNOWN'
+              ? '这次解析是否已经完成无法确认。请用同一次重查，不要开始新的解析。'
+              : UNKNOWN_CAUSE.noReply)
+          } else this._fail(err)
         },
       )
       // 已收到 2xx 之后本页自己出了异常:服务端那边可能已经完成,同样只能说未知。
@@ -177,6 +230,7 @@ Page({
    */
   _handle(res, round, knownTaskId) {
     if (this._stopped) return
+    if (this._submitIdentity && !sameIdentity(this._submitIdentity)) return
     // 2xx 却没有可用的响应体(空包、截断成字符串):服务端可能已经跑完,只是答复没到齐。
     if (!res || typeof res !== 'object') {
       this._unknown(knownTaskId, knownTaskId ? UNKNOWN_CAUSE.pollMalformed : UNKNOWN_CAUSE.malformed)
@@ -219,6 +273,9 @@ Page({
         return
       }
       this.setData({ phase: 'parsing', done: true, atext: '解析完成' })
+      if (this._intent && sameIdentity(this._submitIdentity)) {
+        intentStore.markSettled(this._intent, this._submitIdentity.ownerId)
+      }
       setTimeout(() => {
         if (this._stopped) return
         wx.redirectTo({
@@ -229,6 +286,9 @@ Page({
     }
 
     if (status === 'failed') {
+      if (taskId && this._intent && sameIdentity(this._submitIdentity)) {
+        intentStore.markSettled(this._intent, this._submitIdentity.ownerId)
+      }
       this._fail(new Error(res.failReason || 'AI 解析未能完成'))
       return
     }
@@ -319,9 +379,23 @@ Page({
     this._resubmit()
   },
 
+  /** 没有任务编号时，用已经保存的同一对请求头再提交一次，不另铸意图。 */
+  replaySame() {
+    if (this.data.phase !== 'unknown' || this.data.pendingTaskId || this._submitting) return
+    if (this._elapsedTimer) clearInterval(this._elapsedTimer)
+    this.setData({
+      phase: 'parsing', failMsg: '', elapsed: 0, done: false,
+      unknownCause: '', pendingTaskId: '', recheck: 'idle', canCheckRecords: false,
+    })
+    this._stopped = false
+    this._startElapsed()
+    this._submit()
+  },
+
   /**
    * 结果未知时的「重新提交(新的一次)」。有编号时一般不提供(按同一编号再查即可),
    * 除非当前身份/令牌下查不到它(recheck=not-found);确认框打开期间、POST 在途时都不接受第二次。
+   * 必须连续确认两次，并且成功清除本机未落定意图之后，才允许新的一对请求头。
    */
   confirmResubmit() {
     if (!this._resubmitAllowed()) return
@@ -333,11 +407,49 @@ Page({
       confirmText: '重新提交',
       cancelText: '先不提交',
       success: (r) => {
-        this._confirming = false
-        if (r && r.confirm && !this._stopped && this._resubmitAllowed()) this._resubmit()
+        if (!(r && r.confirm) || this._stopped || !this._resubmitAllowed()) {
+          this._confirming = false
+          return
+        }
+        wx.showModal({
+          title: '再次确认',
+          content: '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。',
+          confirmText: '开始新的一次',
+          cancelText: '先不提交',
+          success: (r2) => {
+            this._confirming = false
+            if (r2 && r2.confirm && !this._stopped && this._resubmitAllowed()) this._startFresh()
+          },
+          fail: () => { this._confirming = false },
+        })
       },
       fail: () => { this._confirming = false },
     })
+  },
+
+  async _startFresh() {
+    if (this._submitting) return
+    this._submitting = true
+    const identity = captureIdentity()
+    const intent = this._intent
+    if (!intent || !sameIdentity(identity)) {
+      this._submitting = false
+      this._unknown('', '登录状态已变化，没有开始新的一次解析。')
+      return
+    }
+    const cleared = await intentStore.clear(intent, identity.ownerId)
+    if (this._stopped || !sameIdentity(identity)) {
+      this._submitting = false
+      return
+    }
+    if (!cleared || (!cleared.ok && cleared.code !== 'INTENT_NOT_FOUND')) {
+      this._submitting = false
+      this._unknown('', '本机没能清除上一次未完成的解析，没有开始新的一次。')
+      return
+    }
+    this._intent = ''
+    this._submitting = false
+    this._resubmit()
   },
 
   /** 新一次 POST 只在两种未知态开放:没有编号;或有编号但当前身份/令牌下查不到(查询在途时不算)。 */

@@ -48,12 +48,13 @@
       <view wx:if="{{pendingTaskId && recheck !== 'not-found'}}" class="unknown-next">已收到本次任务编号。点击下方“查询本次结果”会按同一编号查询，不会再次提交解析。</view>
       <!-- 404 + AI_TASK_NOT_FOUND：后端防枚举，不区分原因；只给核对方向，不下结论。换回提交时的账号后同一编号可能又读得到。 -->
       <view wx:elif="{{pendingTaskId}}" class="unknown-next">如果提交后退出过登录或换过账号，请先换回提交时的账号，再点“查询本次结果”按同一编号查询，或到 AI 服务记录查看。</view>
-      <view wx:else class="unknown-next">这台手机没有收到本次任务编号，暂时无法直接查询这一次。</view>
+      <view wx:else class="unknown-next">这台手机没有收到本次任务编号。点“同一次重查”会用原来的解析标识再提交一次，不会另起一次解析。</view>
       <view wx:if="{{recheck === 'not-ready'}}" class="unknown-next">本次任务仍在处理中，稍后可按同一编号再查。</view>
       <view wx:elif="{{recheck === 'error'}}" class="unknown-next">查询暂时失败，稍后可按同一编号再查。</view>
       <view wx:elif="{{recheck === 'malformed'}}" class="unknown-next">查询答复不完整，仍无法确认结果；稍后可按同一编号再查。</view>
       <view wx:if="{{canCheckRecords || recheck === 'not-found'}}" class="unknown-link tap" hover-class="tap-press" bindtap="toAiRecords" role="button" aria-label="到我的 AI 服务记录核对">到我的 AI 服务记录核对</view>
       <view wx:if="{{pendingTaskId && recheck === 'not-found'}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
+      <view wx:if="{{!pendingTaskId}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
     </view>
 
     <!-- 无待解析文件 -->
@@ -106,7 +107,7 @@
     <block wx:elif="{{phase === 'unknown'}}">
       <view class="btn ghost tap" bindtap="toUpload">重新选择</view>
       <button wx:if="{{pendingTaskId}}" class="btn primary flex-1-5 unknown-action" disabled="{{recheck === 'checking'}}" bindtap="recheck">{{recheck === 'checking' ? '正在查询…' : '查询本次结果'}}</button>
-      <button wx:else class="btn primary flex-1-5 unknown-action" bindtap="confirmResubmit">重新提交（新的一次）</button>
+      <button wx:else class="btn primary flex-1-5 unknown-action" disabled="{{recheck === 'checking'}}" bindtap="replaySame">同一次重查</button>
     </block>
     <view wx:else class="btn primary block tap" bindtap="toUpload">去选择简历</view>
   </view>

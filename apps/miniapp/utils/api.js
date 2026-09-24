@@ -644,11 +644,20 @@ const api = {
    * 丢了就只能重新上传重新解析(等于重复扣一次模型费用),必须先落地再渲染。
    * @param {object} p { fileId, fileName, fileFormat, source, selectedDimensions?, targetContext? }
    */
-  parseResume(p) {
+  parseResume(p, headers) {
+    const intent = headers && headers['x-resume-parse-intent'];
+    const proof = headers && headers['x-resume-parse-proof'];
+    if (typeof intent !== 'string' || intent.length !== 43 || typeof proof !== 'string' || proof.length !== 43 || intent === proof) {
+      const error = new Error('缺少解析意图，已中止提交');
+      error.code = 'RESUME_PARSE_INTENT_MALFORMED';
+      error.statusCode = 400;
+      return Promise.reject(error);
+    }
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历诊断'));
     return request('/resume/parse', {
       method: 'POST',
       data: p,
+      header: { 'x-resume-parse-intent': intent, 'x-resume-parse-proof': proof },
       needAuth: true,
       timeout: config.aiTimeout,
     });

@@ -110,12 +110,20 @@ function createWx(storage = new Map()) {
 function createAuth(initialId) {
   let user = initialId ? { id: initialId } : null
   let loggedIn = !!user
+  let generation = 1
   // 补签资格与「当前有没有 token」解耦，和 utils/auth.js 一样：
   // JWT 自然过期时 getToken() 会先 clearSession 再返回 null，于是「过期」与「登出」
   // 在 token 维度上完全同形；只有这面独立的旗子能把两者分开。
   let resigninEligible = !!user
   return {
-    setUser(id) { user = id ? { id } : null; loggedIn = !!user; if (id) resigninEligible = true },
+    setUser(id) {
+      const next = id || null
+      const prev = user && user.id
+      user = id ? { id } : null
+      loggedIn = !!user
+      if (id) resigninEligible = true
+      if (prev !== next) generation += 1
+    },
     /** 登录态为真但 getUser() 拿不到 id —— request.js 静默续签后 user 字段缺失时的真实形态。 */
     setIdlessSession() { user = {}; loggedIn = true },
     /** JWT 自然过期：本地没有可用会话了，但没主动登出，仍可静默补签。 */
@@ -124,7 +132,15 @@ function createAuth(initialId) {
     canSilentResignin: () => resigninEligible,
     isLoggedIn: () => loggedIn,
     getUser: () => user,
-    logout() { user = null; loggedIn = false; resigninEligible = false },
+    logout() {
+      const prev = user && user.id
+      user = null
+      loggedIn = false
+      resigninEligible = false
+      if (prev) generation += 1
+    },
+    sessionGeneration: () => generation,
+    isSameSession: (expected) => expected === generation,
   }
 }
 
@@ -5412,9 +5428,12 @@ test('RP-3 resume-parse：结果未知且无编号时，仅确认后的新一次
   assert.equal(posts, 1, '取消后不得发第二个 POST')
   page.confirmResubmit()
   modal[1].success({ confirm: true })
+  assert.equal(posts, 1, '第一次确认后还要再次确认')
+  modal[2].success({ confirm: true })
   page.confirmResubmit()
   page.retry()
-  assert.equal(posts, 2, '确认后在途期间连点也只多一次 POST')
+  await flush()
+  assert.equal(posts, 2, '两次确认并清除旧意图后才多一次 POST')
   second.resolve({ taskId: 'T2', status: 'completed' })
   await flush()
   assert.equal(page.data.done, true)
@@ -5485,6 +5504,56 @@ test('RP-5 resume-parse：业务拒绝/服务端失败才是明确失败；轮�
   page._handle({ taskId: 'T1', status: 'processing' }, 40, 'T1')
   assert.equal(page.data.phase, 'unknown')
   assert.equal(page.data.pendingTaskId, 'T1')
+})
+
+test('RP-7 resume-parse：无编号的未知按同一意图重查；409 未知不当失败；换账号不收下结果', async () => {
+  const wx = createWx()
+  const posts = []
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: (_payload, headers) => {
+        posts.push(headers)
+        return posts.length === 1
+          ? Promise.reject({ statusCode: -1 })
+          : Promise.resolve({ taskId: 'T9', status: 'completed', accessToken: 'tok-9' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page.data.phase, 'unknown')
+  page.replaySame()
+  await flush()
+  assert.equal(posts.length, 2)
+  assert.equal(posts[0]['x-resume-parse-intent'], posts[1]['x-resume-parse-intent'])
+  assert.equal(posts[0]['x-resume-parse-proof'], posts[1]['x-resume-parse-proof'])
+  assert.equal(page.data.done, true)
+
+  const wx409 = createWx()
+  const page409 = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wx409,
+    api: { parseResume: () => Promise.reject({ statusCode: 409, code: 'RESUME_PARSE_OUTCOME_UNKNOWN', message: '无法确认' }) },
+  })
+  page409.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page409.data.phase, 'unknown')
+  assert.notEqual(page409.data.phase, 'failed')
+
+  const wxSwitch = createWx()
+  const auth = createAuth('A')
+  const gate = deferred()
+  const pageSwitch = makePage('pages/resume-parse/resume-parse.js', {
+    auth, wx: wxSwitch,
+    api: { parseResume: () => gate.promise },
+  })
+  pageSwitch.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  auth.setUser('B')
+  gate.resolve({ taskId: 'T-secret', status: 'completed', accessToken: 'secret-token' })
+  await flush()
+  assert.equal(wxSwitch.calls.redirectTo.length, 0)
+  assert.notEqual((wxSwitch.storage.get(realStorage.KEYS.RESUME_TASK) || {}).accessToken, 'secret-token')
 })
 
 // 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。
@@ -5568,8 +5637,9 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
     assert.equal(modal2.length, expected === 'not-found' ? 1 : 0, '只有 not-found 才开放新一次')
     if (expected === 'not-found') {
       modal2[0].success({ confirm: true })
+      modal2[1].success({ confirm: true })
       await flush()
-      assert.equal(posts2, 2, '确认后才发新的一次，且只一次')
+      assert.equal(posts2, 2, '两次确认并清除旧意图后才发新的一次，且只一次')
       assert.equal(page2.data.done, true)
       assert.equal(page2.data.pendingTaskId, '')
     } else {

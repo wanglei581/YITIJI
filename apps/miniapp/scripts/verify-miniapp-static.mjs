@@ -565,7 +565,7 @@ if (
   resumeParseJs.includes('selectedDimensions') &&
   resumeParseJs.includes('targetContext') &&
   resumeParseJs.includes("{ skipped: true }") &&
-  resumeParseJs.includes('api.parseResume(payload)')
+  resumeParseJs.includes('api.parseResume(payload, prepared.headers)')
 ) ok('简历解析透传诊断维度与目标方向，并允许通用诊断')
 else bad('简历解析方向透传', '必须从 URL 读取 selectedDimensions/targetContext 并传给 parseResume，未指定时显式 skipped')
 
