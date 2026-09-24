@@ -187,15 +187,26 @@ export function ResumeReportPage() {
     </>
   )
 
+  /*
+   * 只有**明确失败**会到这里：解析结果未知留在解析页（稿 21 parse-unknown），不转成失败屏。
+   * 「重新解析」是一次新的提交（新的 AI 调用），因此只放在服务端明确说没成的这一屏。
+   */
+  const failCta = (
+    <>
+      <p className="why" id="resume-report-why">上一次已明确没解析成功；重新解析会作为新的一次提交。这一屏一条 AI 结论都不给。</p>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')} data-route="/">返回首页</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry} data-route="/resume/parse" data-testid="resume-report-primary">重新解析</button>
+    </>
+  )
   const failView = (failReason: string) => (
-    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={<p className="why">这一屏一条 AI 结论都不给。</p>}>
+    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={failCta}>
       <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed" className="qx-scroll rrp-page">
         <ResumeReportHead viewState="diagnose-failed" />
         <section className="rrp-state">
           <h2>解析中断，中断的只是「读懂它」这一步</h2>
           <p>失败原因：{failReason}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>
         </section>
-        <ResumeDiagnosisFailExits file={state.file} onRetry={handleRetry} onHome={() => navigate('/')} />
+        <ResumeDiagnosisFailExits file={state.file} />
       </section>
     </QxPageFrame>
   )

@@ -14151,6 +14151,7 @@
           ],
           "path": "/resume/parse",
           "styles": [
+            "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css",
             "apps/kiosk/src/pages/resume/resume-triage-qx.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -18529,6 +18530,7 @@
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-report-qx.css": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css": [
@@ -20368,6 +20370,8 @@
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
+      "services/api/scripts/verify-job-review.ts",
+      "services/api/scripts/verify-jobfair-review.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -21641,7 +21645,8 @@
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
-      "services/api/scripts/verify-multipart-field-nesting.ts"
+      "services/api/scripts/verify-multipart-field-nesting.ts",
+      "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/files/files.module.ts": [
       "services/api/scripts/verify-file-assets-trial-acceptance.ts"
@@ -21670,6 +21675,7 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
@@ -24044,6 +24050,7 @@
           "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeDiagnosisFailExits.tsx",
+          "apps/kiosk/src/pages/resume/resume-report-qx.css",
           "apps/kiosk/src/services/api/ai.ts",
           "apps/kiosk/src/services/api/aiMockAdapter.ts",
           "apps/kiosk/src/services/api/careerPlan.ts",
@@ -31482,6 +31489,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/job-ai/job-quality.service.ts",
@@ -31615,6 +31623,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/lib/verify-fair-residue.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/job-ai/job-quality.service.ts",
@@ -33521,6 +33530,8 @@
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/files.controller.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/payment-session-token.ts",

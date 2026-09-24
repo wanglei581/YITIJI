@@ -8,7 +8,8 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { submitResumeParse } from '../../services/api'
+import { getResumeRecord, submitResumeParse } from '../../services/api'
+import { ApiHttpError } from '../../services/api/httpAdapter'
 import { aiErrorCodeOf, aiErrorMessageOf } from '../../ai'
 import { saveAiResumeSession } from './aiResumeSession'
 import { useResumeAiConsent } from './resumeAiConsent'
@@ -21,6 +22,7 @@ import {
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
 import './resume-triage-qx.css'
+import './resume-triage-panels-qx.css'
 
 const STEPS = [
   { key: 'reading',    label: '读取上传文件',    hint: '校验格式与页数' },
@@ -39,15 +41,34 @@ const FAIL_REASONS = [
 ]
 
 /**
- * 这两个码只说明「本机没等到服务端的答复」（断网 / 超时，见 throwHttpError.networkError），
- * 服务端可能处理了也可能没处理——所以是「结果未知」，不能说成「解析失败」。
+ * 这些码只说明「本机没拿到服务端的可信答复」，服务端可能处理了也可能没处理——所以是
+ * 「结果未知」，不能说成「解析失败」，也不能自动再提交一次（那是一次新的 AI 调用）：
+ * - NETWORK_ERROR / REQUEST_TIMEOUT：断网 / 超时（见 throwHttpError.networkError）；
+ * - UNKNOWN_ERROR：没有 API 错误信封的代答（网关、代理等，API 自己对任何错误都写 code），
+ *   或 2xx 响应体截断（JSON 解析失败的错误本身不带 code）。
  */
-const NO_REPLY_CODES = new Set(['NETWORK_ERROR', 'REQUEST_TIMEOUT'])
+const NO_REPLY_CODES = new Set(['NETWORK_ERROR', 'REQUEST_TIMEOUT', 'UNKNOWN_ERROR'])
+
+/**
+ * 按 aiHttpAdapter 真实抛出的错误对象判定（与来源页 upload-unknown 同一口径）：
+ * 上面三类码一律未知；任何 5xx（ApiHttpError.status ≥ 500）即使带 API 业务信封也算未知 ——
+ * 服务端可能已经处理完，只是回包这一步失败。只有 4xx 业务拒绝与 MOCK_MODE（演示模式明确拒绝，
+ * AiMockModeError 不是 ApiHttpError、status 为 0）才是明确失败。
+ */
+function parseErrorOutcome(err: unknown): 'failed' | 'unknown' {
+  if (NO_REPLY_CODES.has(aiErrorCodeOf(err))) return 'unknown'
+  if (err instanceof ApiHttpError && err.status >= 500) return 'unknown'
+  return 'failed'
+}
+
+type ParseTask = { taskId: string; accessToken?: string }
 
 /**
  * 本页真实所处的状态。标题、四步轨、顶栏胶囊都只从这里取，不各自猜。
- * 稿 21 的 parse-rechecking（按同一请求标识再查）没有对应的后端合同 —— 解析是一次请求、
- * 成功才回 taskId，失败或没答复时手里没有可查的标识 —— 所以本页不做「再查」，只如实说未知。
+ * 稿 21 的 parse-unknown / parse-rechecking：解析是一次同步请求，只有收到 2xx 答复才有 taskId。
+ * 拿到了编号却不是最终结果时，用既有 GET /resume/records/:taskId 按本人凭证（会员 token 或本次
+ * 一次性 accessToken）再查；整次答复都丢了、手里没有编号时没有可查的接口，只如实说未知，
+ * 由用户自己决定要不要再提交一次（明确标成新的一次）。
  */
 type ParseView = 'missing-file' | 'consent-checking' | 'consent-needed' | 'waiting' | 'failed' | 'unknown'
 
@@ -95,8 +116,8 @@ const VIEW: Record<ParseView, {
     rail: ['done', 'bad', 'todo', 'todo'],
   },
   unknown: {
-    ask: <>这一次解析<em>有没有出结果，本机没拿到答复</em>。</>,
-    doing: '可能是网络断了或等太久；不确定服务端处理没有，本页不会自动再提交一次。',
+    ask: <>这一次解析<em>暂时无法确认有没有完成</em>。</>,
+    doing: '可能已经完成，也可能没有；本页不会自动再提交，也不会把它当成失败。',
     flag: '结果未知', warn: true,
     status: { tone: 'warn', label: '解析结果未知' },
     rail: ['done', 'wait', 'todo', 'todo'],
@@ -114,27 +135,39 @@ export function ResumeParsePage() {
   const fileId = typeof state?.fileId === 'string' ? state.fileId : ''
 
   const [outcome, setOutcome] = useState<'failed' | 'unknown' | null>(null)
+  // 结果未知但拿到了编号（2xx 却不是最终结果）：只放内存与既有最小会话，不进地址栏。
+  const [pendingTask, setPendingTask] = useState<ParseTask | null>(null)
+  const [recheck, setRecheck] = useState<'idle' | 'checking' | 'not-ready' | 'error'>('idle')
   const failed = outcome !== null
   const cancelRef = useRef(false)
   const startedRef = useRef(false)
+  // 同一时刻最多一次解析 POST：快速连点「重新提交」只发一次。
+  const inFlightRef = useRef(false)
   const failTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useBusyLock(Boolean(fileId) && !failed)
 
+  /**
+   * 只给**明确失败**用：结果未知留在本页，不转去报告页的失败屏。
+   * 服务端给过编号时（2xx + status=failed，匿名还带一次性 accessToken）照样带上：只进路由 state
+   * 与既有最小会话（aiResumeSession 只存 taskId + accessToken），不进地址栏。
+   */
   const navigateFail = useCallback(
-    (reason: string, kind: 'failed' | 'unknown' = 'failed') => {
-      setOutcome(kind)
+    (reason: string, task?: ParseTask) => {
+      setOutcome('failed')
+      if (task) saveAiResumeSession(task)
       failTimerRef.current = setTimeout(() => {
-        navigate('/resume/report', { state: { ...state, success: false, reason } })
+        navigate('/resume/report', { state: { ...state, success: false, reason, ...(task ? { taskId: task.taskId, accessToken: task.accessToken } : {}) } })
       }, 700)
     },
     [navigate, state],
   )
 
   const submitAndWait = useCallback(async () => {
-    if (!fileId) {
+    if (!fileId || inFlightRef.current) {
       return
     }
+    inFlightRef.current = true
     const selectedDimensions = Array.isArray(state?.selectedDimensions)
       ? (state.selectedDimensions as ResumeScoringDimensionKey[])
       : undefined
@@ -153,7 +186,14 @@ export function ResumeParsePage() {
       )
       if (cancelRef.current) return
       if (result.status !== 'completed') {
-        navigateFail(result.failReason ?? 'AI 服务尚未返回最终解析结果，请稍后重试')
+        if (result.status === 'failed') {
+          navigateFail(result.failReason ?? '简历解析未能完成，请重试', { taskId: result.taskId, accessToken: result.accessToken })
+          return
+        }
+        // 服务端登记了这一次（有编号）却还没给最终结果：不是失败，按同一编号再查。
+        saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })
+        setPendingTask({ taskId: result.taskId, accessToken: result.accessToken })
+        setOutcome('unknown')
         return
       }
       // Phase C-2A：匿名 parse 会返回一次性 accessToken；连同 taskId 写入最小会话，
@@ -166,12 +206,49 @@ export function ResumeParsePage() {
       if (cancelRef.current) return
       // 把真实原因带进失败态：演示模式要说「演示模式不提供简历解析与诊断」，
       // 一律改写成「服务暂时不可用」会让用户以为是网络问题、反复重试同一份文件。
-      navigateFail(
-        aiErrorMessageOf(err, 'AI 服务暂时不可用，请稍后重试'),
-        NO_REPLY_CODES.has(aiErrorCodeOf(err)) ? 'unknown' : 'failed',
-      )
+      // 没拿到可信答复：留在本页如实说未知，不转失败屏，也不自动再提交。
+      if (parseErrorOutcome(err) === 'unknown') {
+        setOutcome('unknown')
+        return
+      }
+      navigateFail(aiErrorMessageOf(err, 'AI 服务暂时不可用，请稍后重试'))
+    } finally {
+      inFlightRef.current = false
     }
   }, [file, fileId, getToken, navigate, navigateFail, state])
+
+  /** 用户主动再提交：这是新的一次解析（新的 AI 调用、新的编号），不是「重试刚才那次」。 */
+  const resubmit = () => {
+    if (inFlightRef.current) return
+    setOutcome(null)
+    setPendingTask(null)
+    setRecheck('idle')
+    cancelRef.current = false
+    void submitAndWait()
+  }
+
+  /** 有编号时按同一编号读回（既有 GET，只读，凭本人会员 token 或本次一次性 accessToken）。 */
+  const recheckTask = async () => {
+    if (!pendingTask || recheck === 'checking') return
+    setRecheck('checking')
+    try {
+      const res = await getResumeRecord(pendingTask.taskId, { token: getToken(), accessToken: pendingTask.accessToken })
+      if (cancelRef.current) return
+      if (res.status === 'completed' && res.report) {
+        navigate('/resume/report', {
+          state: { ...state, success: true, taskId: pendingTask.taskId, accessToken: pendingTask.accessToken, providerName: res.providerName, report: res.report, extractionNotice: res.extractionNotice },
+        })
+        return
+      }
+      if (res.status === 'failed') {
+        navigateFail(res.failReason ?? '简历解析未能完成，请重试', pendingTask)
+        return
+      }
+      setRecheck('not-ready')
+    } catch {
+      if (!cancelRef.current) setRecheck('error')
+    }
+  }
 
   const handleDevFail = useCallback(() => {
     cancelRef.current = true
@@ -295,7 +372,7 @@ export function ResumeParsePage() {
             {failed ? <XCircleIcon size={44} /> : <SparklesIcon size={44} />}
           </span>
           <h2 className="qx-rt-wait-t" role="status" aria-live="polite">
-            {outcome === 'failed' ? '解析出错' : outcome === 'unknown' ? '没等到解析结果' : '正在等待真实解析结果…'}
+            {outcome === 'failed' ? '解析出错' : outcome === 'unknown' ? (pendingTask ? '解析还没出最终结果' : '没等到解析结果') : '正在等待真实解析结果…'}
           </h2>
           {/* 文件信息 chips */}
           {!failed && (
@@ -306,6 +383,40 @@ export function ResumeParsePage() {
             </div>
           )}
         </section>
+
+        {/* 稿 21 parse-unknown：四行说明沿用来源页 upload-unknown 的版式。 */}
+        {outcome === 'unknown' && (
+          <>
+            <p className="qx-rt-note resume-parse-unknown" data-tone="warn">
+              <b>结果未知</b>{pendingTask ? '服务端已经登记了这一次解析，但还没给出最终结果。' : '暂时无法确认这一次解析有没有完成。'}本页不会自动再提交，也不会把它当成失败。
+            </p>
+            <dl className="qx-rt-kv">
+              <div><dt>发生了什么</dt><dd>{pendingTask ? '解析已经提交并拿到了编号，服务端还没返回最终结果。' : '提交解析后网络或服务出了问题，这台机器没能确认结果。'}</dd></div>
+              <div><dt>还不确定的</dt><dd>这一次解析可能已经完成，也可能没有。</dd></div>
+              {pendingTask ? (
+                <div><dt>按编号再查</dt><dd>只是读取这一次的结果，不会重新解析，也不会多出记录。</dd></div>
+              ) : (
+                <div><dt>重新提交</dt><dd>会作为新的一次解析重新调用 AI；如果刚才那次其实已经完成，记录里可能多出一条。</dd></div>
+              )}
+              <div>
+                <dt>建议这样做</dt>
+                <dd data-testid="resume-parse-unknown-next">
+                  {pendingTask
+                    ? '稍后点下方「按同一编号再查结果」；也可以返回简历来源换一份文件。'
+                    : getToken()
+                      ? '可先到「我的 → 我的简历」核对；暂时没看到时可稍后刷新。若决定重新提交，这是新的一次解析。'
+                      : '当前未登录，暂时无法核对这一次的结果。需要继续时，可重新提交一次解析或返回简历来源。'}
+                </dd>
+              </div>
+            </dl>
+            {recheck === 'not-ready' && (
+              <p className="qx-rt-note" role="status" data-testid="resume-parse-recheck-result">这次查到的仍不是最终结果，可以稍后再查。</p>
+            )}
+            {recheck === 'error' && (
+              <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-recheck-result">这次没查到结果，可能是网络问题或编号已失效；可以稍后再查，或返回简历来源。</p>
+            )}
+          </>
+        )}
 
         <p className="qx-rt-note" role="note">
           <b>说明</b>当前服务仅返回最终解析结果。以下为本次处理内容说明，不代表服务端实时阶段。
@@ -355,6 +466,22 @@ export function ResumeParsePage() {
         <CheckIcon size={18} aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: '-3px' }} />
         返回仅停止本机等待，不会撤回已提交的服务请求；简历原文不会发送给企业，也不进入平台候选人简历库。
       </p>
+      {outcome === 'unknown' ? (
+        <>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={leaveToSource}>
+            返回简历来源
+          </button>
+          {pendingTask ? (
+            <button type="button" className="qx-btn" data-variant="primary" disabled={recheck === 'checking'} onClick={() => { void recheckTask() }}>
+              {recheck === 'checking' ? '正在查询…' : '按同一编号再查结果'}
+            </button>
+          ) : (
+            <button type="button" className="qx-btn" data-variant="primary" onClick={resubmit}>
+              重新提交解析（新的一次）
+            </button>
+          )}
+        </>
+      ) : (
       <button
         type="button"
         className="qx-btn"
@@ -368,6 +495,7 @@ export function ResumeParsePage() {
         <XCircleIcon size={20} aria-hidden="true" />
         返回上一步
       </button>
+      )}
     </>,
   )
 }

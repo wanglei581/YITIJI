@@ -370,7 +370,22 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   )
   terminalBaseline(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
-  api.abort('POST', '/api/v1/resume/parse', 'internetdisconnected')
+  // 结果未知（没拿到可信答复）≠ 解析失败：留在解析页，不转失败屏、不自动再提交。
+  // 假时钟推过原先 700ms 的转页计时，确定性地证明「不会自己跳走、不会自己重发」。
+  let parseCalls = 0
+  const parseReplies: Array<(route: Route) => Promise<void>> = [
+    (route) => route.abort('internetdisconnected'),
+    (route) => route.fulfill({ status: 504, contentType: 'text/html', body: '<html>504 Gateway Time-out</html>' }),
+    // 带 API 业务信封的 5xx 也不算明确失败：服务端可能处理完了，只是回包失败。
+    (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'AI_PROVIDER_ERROR', message: 'upstream' } }) }),
+    (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) }),
+  ]
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    parseCalls += 1
+    const reply = parseReplies.shift()
+    await (reply ? reply(route) : route.abort('failed'))
+  })
+  await page.clock.install()
   await page.goto('/resume/source')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   const preview = page.locator('[data-file-preview-kind="pdf"]')
@@ -378,10 +393,69 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   await expect(preview.locator('iframe')).toHaveAttribute('src', '/w3-fixtures/resume.pdf')
   await expect.poll(() => previewLoaded).toBe(true)
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
-  await expect(page.getByText('没等到解析结果', { exact: true })).toBeVisible()
-  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'unknown', current: null, pill: '解析结果未知', saysReceived: false, saysError: false })
-  await expect(page.getByRole('button', { name: /重试|重新/ })).toBeVisible()
-  await assertNoHorizontalOverflow(page)
+  const resubmit = page.getByRole('button', { name: '重新提交解析（新的一次）' })
+  for (const [label, calls] of [['network drop', 1], ['gateway 504 without an API envelope', 2], ['503 with an API envelope', 3]] as const) {
+    await expect(page.getByText('没等到解析结果', { exact: true }), label).toBeVisible()
+    expect(await parseViewSnapshot(page), label).toMatchObject({ state: 'unknown', current: null, pill: '解析结果未知', saysReceived: false, saysError: false })
+    await expect(page.locator('.resume-parse-unknown'), label).toContainText('暂时无法确认')
+    await expect(page.getByTestId('resume-parse-unknown-next'), label).toContainText('当前未登录')
+    await expect(page.getByTestId('resume-parse-unknown-next'), label).not.toContainText('我的简历')
+    await expect(page.getByText(/解析中断|解析出错/), label).toHaveCount(0)
+    await page.clock.runFor(5_000)
+    await expect(page, label).toHaveURL((url) => url.pathname === '/resume/parse')
+    expect(parseCalls, `${label}: no automatic re-POST`).toBe(calls)
+    await expect(resubmit, label).toBeVisible()
+    if (calls === 1) await assertNoHorizontalOverflow(page)
+    // 用户主动再提交：明确是新的一次，只多一次请求；同一刻连点两下也只发一次。
+    await resubmit.evaluate((button: HTMLElement) => { button.click(); button.click() })
+    await expect.poll(() => parseCalls, label).toBe(calls + 1)
+  }
+  await page.waitForURL('/resume/report')
+  await expect(page.locator('[data-kiosk-screen="resume-report"]')).toHaveAttribute('data-state', /^report(?:-minimal)?$/)
+  expect(parseCalls).toBe(4)
+  expect(runtimeErrors).toEqual([])
+})
+
+/*
+ * 拿到了编号但不是最终结果（2xx + status=processing；AiTaskStatus 合同允许，现有 provider 不产出）：
+ * 用既有 GET /resume/records/:taskId 按同一编号只读再查，一次性令牌只走请求头，不进地址栏，
+ * 全程不再 POST 解析。
+ */
+test('resume parse unknown with a task id rechecks the same record instead of re-posting @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  let parseCalls = 0
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    parseCalls += 1
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ taskId: 'resume-w3-pending', status: 'processing', accessToken: 'w3-pending-access' }) })
+  })
+  const recordReads: Array<{ url: string; access: string | undefined }> = []
+  await page.route('**/api/v1/resume/records/resume-w3-pending', async (route) => {
+    recordReads.push({ url: route.request().url(), access: route.request().headers()['x-resume-access-token'] })
+    const body = recordReads.length === 1
+      ? { taskId: 'resume-w3-pending', status: 'processing' }
+      : { ...diagnosis, taskId: 'resume-w3-pending' }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+  })
+  await page.goto('/resume/source')
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await expect(page.getByText('解析还没出最终结果', { exact: true })).toBeVisible()
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'unknown', pill: '解析结果未知', saysError: false })
+  await expect(page.getByRole('button', { name: '重新提交解析（新的一次）' })).toHaveCount(0)
+  const recheck = page.getByRole('button', { name: '按同一编号再查结果' })
+  await recheck.click()
+  await expect(page.getByTestId('resume-parse-recheck-result')).toContainText('仍不是最终结果')
+  await expect(page).toHaveURL((url) => url.pathname === '/resume/parse')
+  await recheck.click()
+  await page.waitForURL('/resume/report')
+  await expect(page.locator('[data-kiosk-screen="resume-report"]')).toHaveAttribute('data-state', /^report(?:-minimal)?$/)
+  expect(parseCalls).toBe(1)
+  expect(recordReads.map((read) => read.access)).toEqual(['w3-pending-access', 'w3-pending-access'])
+  for (const read of recordReads) expect(read.url).not.toContain('w3-pending-access')
+  expect(page.url()).not.toContain('w3-pending-access')
   expect(runtimeErrors).toEqual([])
 })
 
@@ -527,12 +601,35 @@ test('resume parse: a result arriving after leaving never hijacks navigation @w3
 test('resume parse server failure is labelled failed, never as the running step @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
-  api.respond('POST', '/api/v1/resume/parse', { status: 503, json: { success: false, error: { code: 'AI_PROVIDER_ERROR', message: 'upstream' } } })
+  // 第一次：API 带业务信封的 4xx（明确拒绝）；重新解析后：2xx + status=failed（业务明确失败，带编号与一次性令牌）。
+  api.respondWith('POST', '/api/v1/resume/parse', (n) => n === 1
+    ? { status: 429, json: { success: false, error: { code: 'RATE_LIMITED', message: '操作太频繁' } } }
+    : { status: 200, json: { taskId: 'resume-w3-failed', status: 'failed', failReason: '文字识别失败，请确保文件清晰', accessToken: 'w3-failed-access' } })
   await page.goto('/resume/source')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await expect(page.getByText('解析出错', { exact: true })).toBeVisible()
   expect(await parseViewSnapshot(page)).toMatchObject({ state: 'failed', current: null, bad: 'AI 解析', pill: '解析失败 · 可重试', saysReceived: false })
+  // 明确失败才进报告页失败屏；非 AI 出路是青序 rrp-row，重新解析在青序操作条里。
+  await page.waitForURL('/resume/report')
+  await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
+  const exits = page.getByTestId('resume-report-fail-exits').locator('.rrp-row')
+  await expect(exits).toHaveCount(4)
+  for (let index = 0; index < 4; index += 1) await assertTapTargetPointerHit(exits.nth(index))
+  await expect(page.getByTestId('resume-report-fallback')).toBeVisible()
+  const retry = page.locator('.qx-btn[data-testid="resume-report-primary"]')
+  await expect(retry).toHaveText('重新解析')
+  await retry.click()
+  await page.waitForURL('/resume/parse')
+  await page.waitForURL('/resume/report')
+  await expect(page.getByText('文字识别失败，请确保文件清晰', { exact: false })).toBeVisible()
+  expect(api.requestCount('POST', '/api/v1/resume/parse')).toBe(2)
+  // 明确失败也不丢服务端给过的编号与一次性令牌：只在路由 state 里，不进地址栏。
+  expect(await page.evaluate(() => {
+    const usr = (window.history.state as { usr?: { taskId?: string; accessToken?: string } } | null)?.usr
+    return { taskId: usr?.taskId, accessToken: usr?.accessToken }
+  })).toEqual({ taskId: 'resume-w3-failed', accessToken: 'w3-failed-access' })
+  expect(page.url()).not.toContain('w3-failed-access')
   await expect(page.getByRole('button', { name: /重试|重新/ })).toBeVisible()
 })
 
