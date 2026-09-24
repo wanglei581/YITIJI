@@ -693,7 +693,7 @@ test('mobile QR login renders a real API error and touch-safe retry @w5-mobile',
   await page.goto('/member/qr-login?ticketId=w5-expired-ticket')
   const root = page.locator('main[data-kiosk-screen="member-qr-login"]')
   await expect(root).toHaveAttribute('data-kiosk-viewport', 'mobile')
-  await expect(root.getByText('暂时无法确认登录', { exact: true })).toBeVisible()
+  await expect(root.getByRole('heading', { name: '二维码状态读取失败', exact: true })).toBeVisible()
   await expect(root.getByRole('button', { name: '重新检查二维码', exact: true })).toBeVisible()
   await expectFusionAcceptance(page, errors)
 })

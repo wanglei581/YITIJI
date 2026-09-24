@@ -9,7 +9,7 @@ const kioskScenarios = [
 ] as const
 
 const mobileScenarios = [
-  { path: '/member/qr-login', landmark: '暂时无法确认登录' },
+  { path: '/member/qr-login', landmark: '这个链接不能用来登录' },
   { path: '/upload/phone', landmark: '上传链接已失效' },
 ] as const
 
