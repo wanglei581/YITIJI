@@ -1,0 +1,63 @@
+/* 青序首页 · 手机与窄桌面（≤760 即 KioskRoot 的 compact 视口，舞台不缩放、按真实宽度排版）。
+   390×844 目标：Hero ≤540，底栏上方至少露出第一张服务卡 96px；桌面 1080×1920 规则不在此处改。 */
+@media (max-width: 760px) {
+  .qx-home-host, .qx-home-host .qx-stage { min-height: 100dvh; }
+  .qx-home { overflow-y: auto; }
+  .qx-home-hero { min-height: 0; margin-bottom: 20px; padding: 0 16px 16px; }
+  .qx-home-hero::after { bottom: -16px; height: 32px; }
+
+  /* 顶行：Hero 已有 16px 左右内边距，共享 .qx-topbar 的 16px 再叠一层就把状态 pill 挤出右缘被裁。 */
+  .qx-home-host .qx-home-hero > .qx-home-hero-top { height: auto; min-height: 64px; gap: 10px; padding: 8px 0; }
+  .qx-home-host .qx-home-hero-top .qx-topbar-mark { width: 38px; height: 38px; font-size: 20px; }
+  .qx-home-host .qx-home-hero-top .qx-topbar-brand { font-size: 20px; line-height: 1.2; }
+  .qx-home-host .qx-home-hero-top .qx-home-terminal { font-size: 13px; }
+  .qx-home-host .qx-home-hero-top :is(.qx-topbar-sub, .qx-topbar-spacer, .qx-home-clock) { display: none; }
+  /* 品牌让位、pill 不让位：文本可按词组折两行但绝不裁切；只改排版，data-tone 的真实状态色原样保留。 */
+  .qx-home-host .qx-home-hero-top .qx-pill {
+    flex: 0 0 auto; max-width: 52%; min-height: 40px; margin-left: auto; padding: 4px 12px; gap: 6px;
+    font-size: 14px; line-height: 1.25; white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+  }
+  .qx-home-host .qx-home-hero-top .qx-pill::before { flex: none; }
+
+  .qx-home-assistant { gap: 12px; margin-top: 6px; }
+  .qx-home-assistant div { gap: 2px; }
+  .qx-home-avatar { width: 48px; height: 48px; font-size: 24px; }
+  .qx-home-assistant h2 { font-size: 21px; line-height: 1.25; }
+  .qx-home-assistant span:last-child { font-size: 14px; }
+  .qx-home-voice { height: auto; min-height: 60px; margin-top: 14px; gap: 12px; padding: 0 14px; font-size: 16px; }
+  .qx-home-voice-icon { width: 40px; height: 40px; }
+  .qx-home-voice-icon svg { width: 22px; }
+  .qx-home-voice small { display: none; }
+
+  /* 快捷区四颗真实入口排成 2×2；引导语在手机上省掉，入口本身已由 aria-label 说明。 */
+  .qx-home-quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 8px; min-height: 0; margin-top: 12px; }
+  .qx-home-quick > span { display: none; }
+  .qx-home-quick button { width: 100%; min-width: 0; height: auto; min-height: 48px; padding: 6px 10px; font-size: 16px; line-height: 1.25; }
+  .qx-home-quick .qx-home-identity { gap: 6px; font-size: 14px; text-align: center; }
+  .qx-home-identity svg { flex: none; width: 18px; height: 18px; }
+
+  .qx-home-continue { min-height: 0; margin-top: 12px; }
+  .qx-home-empty-context, .qx-home .continue { min-height: 0; gap: 12px; padding: 10px 12px; }
+  .qx-home .continue { grid-template-columns: 1fr; }
+  .qx-home .continue .btn { width: 100%; }
+  .qx-home-empty-context .qx-home-context-icon { width: 40px; height: 40px; }
+  .qx-home-context-icon svg { width: 22px; }
+  .qx-home-empty-context strong, .qx-home .continue strong { font-size: 15px; }
+  .qx-home-empty-context small, .qx-home .continue p { font-size: 13px; line-height: 1.4; }
+  .qx-home-hero-law { padding-top: 10px; font-size: 12px; line-height: 1.4; }
+
+  .qx-home-board { flex: none; min-height: auto; padding-left: 16px; padding-right: 16px; }
+  .qx-home-section-head { min-height: 56px; padding: 4px 0 8px; }
+  .qx-home-section-head div { gap: 10px; }
+  .qx-home-section-head h2 { font-size: 24px; letter-spacing: 1px; }
+  .qx-home-section-head span { font-size: 14px; }
+  .qx-home-tiles { flex: none; grid-template-columns: 1fr; grid-template-rows: none; gap: 10px; }
+  .qx-home-tile, .qx-home-tile[data-size='feature'], .qx-home-tile[data-action='policy-hub'] { grid-column: auto; min-height: 148px; }
+  .qx-home-tile[data-size='slim'] { min-height: 104px; padding-right: 104px; }
+  .qx-home-tile[data-size='feature'] .qx-home-tile-icon { top: 18px; right: 16px; width: 56px; height: 56px; transform: none; }
+  .qx-home-tile[data-size='feature'] .qx-home-tile-icon svg { width: 44px; height: 44px; }
+  .qx-home-tile-desc, .qx-home-tile-status { white-space: normal; }
+  .qx-home-truth { padding: 12px 16px; align-items: flex-start; font-size: 13px; }
+  .qx-home-host .qx-navbar { height: 84px; }
+  .qx-home-host .qx-nav-item { min-height: 48px; font-size: 15px; }
+}

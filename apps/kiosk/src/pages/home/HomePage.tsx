@@ -15,6 +15,7 @@ import { useHomeJobFairHighlight } from './hooks/useHomeJobFairHighlight'
 import { useHomeJobHighlight } from './hooks/useHomeJobHighlight'
 import '../../styles/qingxu/index.css'
 import './styles/home-qx.css'
+import './styles/home-qx-mobile.css'
 
 const ASSISTANT_TOPICS: Partial<Record<HomeV6ActionId, 'resume' | 'jobfair'>> = {
   'assistant-resume': 'resume',

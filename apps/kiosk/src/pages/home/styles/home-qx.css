@@ -262,49 +262,6 @@
 .qx-home-tile:not(:disabled):focus-visible { transform: translateY(-3px); box-shadow: 0 0 0 6px color-mix(in srgb, var(--qx-teal) 22%, transparent), 0 14px 30px color-mix(in srgb, var(--qx-ink) 12%, transparent); } .qx-home-host .qx-home-hero button:focus-visible { outline-color: var(--qx-paper); }
 @media (hover: hover) and (pointer: fine) { .qx-home-tile:not(:disabled):hover:not(:active), .qx-home-voice:hover:not(:active), .qx-home-quick button:hover:not(:active), .qx-home-identity:hover:not(:active) { transform: translateY(-2px); } .qx-home-tile:not(:disabled, [data-size='feature']):hover { border-color: var(--qx-teal); } }
 
-@media (max-width: 760px) {
-  .qx-home-host, .qx-home-host .qx-stage { min-height: 100dvh; }
-  .qx-home-host .qx-topbar { height: 68px; padding: 0 16px; gap: 8px; }
-  .qx-home-host .qx-topbar-brand { font-size: 18px; }
-  .qx-home-host .qx-topbar-mark { width: 38px; height: 38px; font-size: 20px; }
-  .qx-home-host .qx-topbar-sub { display: none; }
-  .qx-home-host .qx-pill { min-height: 48px; padding: 0 10px; font-size: 14px; }
-  .qx-home-host .qx-pagehead { margin: 12px 16px 0; gap: 4px; }
-  .qx-home-host .qx-pagehead h1 { width: 100%; font-size: 27px; }
-  .qx-home-host .qx-pagehead p { min-width: 0; font-size: 16px; }
-  .qx-home { overflow-y: auto; }
-  .qx-home-hero, .qx-home-board { padding-left: 16px; padding-right: 16px; }
-  .qx-home-hero { margin-bottom: 18px; }
-  .qx-home-board { flex: none; min-height: auto; }
-  .qx-home-assistant h2 { font-size: 23px; }
-  .qx-home-assistant span:last-child { font-size: 14px; }
-  .qx-home-clock { display: none; }
-  .qx-home-avatar { width: 58px; height: 58px; font-size: 28px; }
-  .qx-home-voice { height: auto; min-height: 64px; padding: 0 14px; font-size: 16px; }
-  .qx-home-voice small { display: none; }
-  .qx-home-hero { grid-template-columns: minmax(0, 1fr); }
-  .qx-home-hero > .qx-home-identity { grid-column: 1; justify-self: start; }
-  .qx-home-quick { flex-wrap: wrap; padding: 8px 0; }
-  .qx-home-quick > span { width: 100%; }
-  .qx-home-quick button { min-width: 0; flex: 1 1 calc(50% - 5px); }
-  .qx-home .continue { grid-template-columns: 1fr; }
-  .qx-home-empty-context { padding: 14px 16px; }
-  .qx-home .continue .btn { width: 100%; }
-  .qx-home-section-head { align-items: flex-start; padding: 10px 0; }
-  .qx-home-section-head div { align-items: flex-start; flex-direction: column; gap: 2px; }
-  .qx-home-section-head h2 { font-size: 25px; }
-  .qx-home-section-head > button { max-width: 142px; text-align: right; }
-  .qx-home-tiles { flex: none; grid-template-columns: 1fr; grid-template-rows: none; gap: 10px; }
-  .qx-home-tile, .qx-home-tile[data-size='feature'], .qx-home-tile[data-action='policy-hub'] { grid-column: auto; min-height: 148px; }
-  .qx-home-tile[data-size='slim'] { min-height: 104px; padding-right: 104px; }
-  .qx-home-tile[data-size='feature'] .qx-home-tile-icon { top: 18px; right: 16px; width: 56px; height: 56px; transform: none; }
-  .qx-home-tile[data-size='feature'] .qx-home-tile-icon svg { width: 44px; height: 44px; }
-  .qx-home-tile-desc, .qx-home-tile-status { white-space: normal; }
-  .qx-home-truth { padding: 12px 16px; align-items: flex-start; font-size: 13px; }
-  .qx-home-host .qx-navbar { height: 84px; }
-  .qx-home-host .qx-nav-item { min-height: 48px; font-size: 15px; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .qx-home *, .qx-home *::before, .qx-home *::after { animation: none !important; transition: none !important; }
   .qx-home-tile, .qx-home-voice, .qx-home-quick button, .qx-home-identity { transform: none !important; } /* 按压 / 悬停 / 焦点位移一并静止，焦点仍靠描边 */
