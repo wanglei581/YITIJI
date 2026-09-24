@@ -1588,3 +1588,116 @@ test('页面：跳转失败先锁住、服务端 404 再解锁之后，那一次
   assert.equal(calls.create.length, 2, '解锁之后这一次点击必须真的发出去')
   assert.equal(calls.create[1].opts.idempotencyKey, key, '仍然是同一个键（404 不清键）')
 })
+
+const resumeIntent = requireMiniapp('../utils/resume-parse-intent.js')
+
+function resumeWx() {
+  const storage = new Map()
+  const calls = { random: [], set: 0 }
+  const control = { readThrows: false, writeThrows: false, writeDrops: false, randomMode: 'ok' }
+  let seed = 0
+  const wx = {
+    storage, calls, control,
+    getStorageSync(key) {
+      if (control.readThrows) throw new Error('read failed')
+      return storage.has(key) ? storage.get(key) : ''
+    },
+    setStorageSync(key, value) {
+      calls.set += 1
+      if (control.writeThrows) throw new Error('write failed')
+      if (control.writeDrops) return
+      storage.set(key, JSON.parse(JSON.stringify(value)))
+    },
+    getRandomValues(opts) {
+      calls.random.push(opts.length)
+      if (control.randomMode === 'missing') return
+      if (control.randomMode === 'silent') return
+      if (control.randomMode === 'completeOnly') { if (opts.complete) opts.complete({}); return }
+      seed += 1
+      const bytes = new Uint8Array(opts.length)
+      for (let i = 0; i < bytes.length; i += 1) bytes[i] = (seed * 17 + i * 3) & 0xff
+      if (opts.success) opts.success({ randomValues: bytes.buffer })
+      if (opts.complete) opts.complete({})
+    },
+  }
+  return wx
+}
+
+const PARSE_A = { fileId: 'file-a', fileName: 'a.pdf', fileFormat: 'pdf', source: 'upload', selectedDimensions: ['b', 'a'] }
+const PARSE_B = { fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf', source: 'upload' }
+
+test('简历解析意图：首次生成两枚独立 43 字符头，读回后同一材料复用', async () => {
+  const wx = resumeWx(); ACTIVE_WX = wx
+  const first = await resumeIntent.prepare({ ...PARSE_A, resumeText: 'SECRET_RESUME' }, 'member-a')
+  assert.equal(wx.calls.random.length, 2)
+  assert.deepEqual(wx.calls.random, [32, 32])
+  assert.match(first.headers[resumeIntent.INTENT_HEADER], /^[A-Za-z0-9_-]{43}$/)
+  assert.match(first.headers[resumeIntent.PROOF_HEADER], /^[A-Za-z0-9_-]{43}$/)
+  assert.notEqual(first.headers[resumeIntent.INTENT_HEADER], first.headers[resumeIntent.PROOF_HEADER])
+  assert.equal(JSON.stringify(wx.storage.get(resumeIntent.STORE_KEY)).includes('SECRET_RESUME'), false)
+  const again = await resumeIntent.prepare({ ...PARSE_A, selectedDimensions: ['a', 'b'] }, 'member-a')
+  assert.equal(wx.calls.random.length, 2)
+  assert.equal(again.headers[resumeIntent.INTENT_HEADER], first.headers[resumeIntent.INTENT_HEADER])
+  assert.equal(again.headers[resumeIntent.PROOF_HEADER], first.headers[resumeIntent.PROOF_HEADER])
+  assert.deepEqual(again.payload.selectedDimensions, ['a', 'b'])
+})
+
+test('简历解析意图：换账号或换材料不覆盖未落定记录', async () => {
+  const wx = resumeWx(); ACTIVE_WX = wx
+  const first = await resumeIntent.prepare(PARSE_A, 'member-a')
+  await assert.rejects(resumeIntent.prepare(PARSE_A, 'member-b'), (error) => error.code === 'INTENT_CONFLICT')
+  await assert.rejects(resumeIntent.prepare(PARSE_B, 'member-a'), (error) => error.code === 'INTENT_CONFLICT')
+  await assert.rejects(resumeIntent.prepare(PARSE_A, null), (error) => error.code === 'INTENT_CONFLICT')
+  const kept = wx.storage.get(resumeIntent.STORE_KEY)
+  assert.equal(kept.length, 1)
+  assert.equal(kept[0].ownerId, 'member-a')
+  assert.equal(kept[0].intent, first.headers[resumeIntent.INTENT_HEADER])
+  const anonWx = resumeWx(); ACTIVE_WX = anonWx
+  const anon = await resumeIntent.prepare(PARSE_A, null)
+  assert.equal(anonWx.storage.get(resumeIntent.STORE_KEY)[0].ownerId, null)
+  assert.equal((await resumeIntent.prepare(PARSE_A, null)).headers[resumeIntent.INTENT_HEADER], anon.headers[resumeIntent.INTENT_HEADER])
+})
+
+test('简历解析意图：存储读坏、形态非法或写不回时不交出请求头', async () => {
+  const wx = resumeWx(); ACTIVE_WX = wx
+  wx.control.readThrows = true
+  await assert.rejects(resumeIntent.prepare(PARSE_A, 'member-a'), (error) => error.code === 'STORAGE_UNREADABLE')
+  assert.equal(wx.calls.random.length, 0)
+  assert.equal(wx.calls.set, 0)
+  wx.control.readThrows = false
+  wx.storage.set(resumeIntent.STORE_KEY, { bad: true })
+  await assert.rejects(resumeIntent.prepare(PARSE_A, 'member-a'), (error) => error.code === 'STORAGE_CORRUPT')
+  assert.deepEqual(wx.storage.get(resumeIntent.STORE_KEY), { bad: true })
+  wx.storage.delete(resumeIntent.STORE_KEY)
+  wx.control.writeThrows = true
+  await assert.rejects(resumeIntent.prepare(PARSE_A, 'member-a'), (error) => error.code === 'STORAGE_WRITE_FAILED')
+  assert.equal(wx.storage.has(resumeIntent.STORE_KEY), false)
+  wx.control.writeThrows = false
+  wx.control.writeDrops = true
+  await assert.rejects(resumeIntent.prepare(PARSE_A, 'member-a'), (error) => error.code === 'STORAGE_WRITE_FAILED')
+  assert.equal(wx.storage.has(resumeIntent.STORE_KEY), false)
+})
+
+test('简历解析意图：随机数缺失或超时失败，且只按同一 intent+owner 删除', async () => {
+  const wx = resumeWx(); ACTIVE_WX = wx
+  const randomValues = wx.getRandomValues
+  wx.control.randomMode = 'missing'
+  delete wx.getRandomValues
+  await assert.rejects(resumeIntent.prepare(PARSE_A, 'member-a'), (error) => error.code === 'RANDOM_UNAVAILABLE')
+  wx.getRandomValues = randomValues
+  wx.control.randomMode = 'silent'
+  const timed = resumeIntent.prepare(PARSE_A, 'member-a')
+  await new Promise((resolve) => setTimeout(resolve, 8100))
+  await assert.rejects(timed, (error) => error.code === 'RANDOM_TIMEOUT')
+  wx.control.randomMode = 'ok'
+  const ready = await resumeIntent.prepare(PARSE_A, 'member-a')
+  const intent = ready.headers[resumeIntent.INTENT_HEADER]
+  assert.equal(resumeIntent.markSettled(intent, 'member-b').ok, false)
+  assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 1)
+  wx.control.writeThrows = true
+  assert.equal(resumeIntent.clear(intent, 'member-a').code, 'STORAGE_WRITE_FAILED')
+  wx.control.writeThrows = false
+  assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 1)
+  assert.equal(resumeIntent.markSettled(intent, 'member-a').ok, true)
+  assert.equal(wx.storage.get(resumeIntent.STORE_KEY).length, 0)
+})
