@@ -96,15 +96,31 @@ interface CapabilityDefinition {
 /**
  * 文档打印卡的描述行：彩色 / 双面只有在**本机**登记为 available 时才敢写进文案。
  * 未登记的机器上写「彩色、双面可选」= 谎报能力（CLAUDE.md §9「不伪造能力」）。
+ * 卡面描述按稿 10 的密度只留一行半；「彩色 / 双面未验证」的披露挪到状态行（describeDocPrintFoot），不删。
  */
 function describeDocPrint(map: ConfiguredCapabilityMap): string {
-  const on = (key: 'color_print' | 'duplex_print') => map[key]?.status === 'available'
-  const extras = [on('color_print') ? '彩色' : null, on('duplex_print') ? '双面' : null].filter(
-    (v): v is string => v !== null,
-  )
-  return extras.length > 0
-    ? `PDF、图片上传后设参数打印，A4 黑白 / ${extras.join(' / ')}可选`
-    : 'PDF、图片上传后设参数打印，A4 黑白（本机彩色 / 双面尚未通过真机验证）'
+  const extras = docPrintExtras(map)
+  return extras.on.length > 0
+    ? `PDF / 图片上传后打印，A4 黑白 / ${extras.on.join(' / ')}可选`
+    : 'PDF / 图片上传后打印，A4 黑白'
+}
+
+/** 文档打印卡的状态行：未登记的彩色 / 双面如实写「未验证」，与轴芯片同一口径。 */
+function describeDocPrintFoot(map: ConfiguredCapabilityMap): string {
+  const extras = docPrintExtras(map)
+  return extras.off.length > 0 ? `A4 黑白 · ${extras.off.join(' / ')}未验证` : 'A4 · 黑白 / 彩色 · 单双面'
+}
+
+function docPrintExtras(map: ConfiguredCapabilityMap): { on: string[]; off: string[] } {
+  const on: string[] = []
+  const off: string[] = []
+  for (const [key, label] of [
+    ['color_print', '彩色'],
+    ['duplex_print', '双面'],
+  ] as const) {
+    ;(map[key]?.status === 'available' ? on : off).push(label)
+  }
+  return { on, off }
 }
 
 const CAPABILITIES: readonly CapabilityDefinition[] = [
@@ -119,7 +135,8 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     needsMfp: true,
     available: true,
     iconTone: 'teal',
-    stateNote: 'A4 · 黑白单面',
+    // 运行时由 describeDocPrintFoot 按本机彩色 / 双面登记改写；这里是未登记时的口径。
+    stateNote: 'A4 黑白 · 彩色 / 双面未验证',
     mfpOffBadge: '这台机器现在出不了纸',
     mfpOffNote: '这台机器出不了纸。文件可以先传上来存着，换一台再打。',
   },
@@ -128,7 +145,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'phone',
     icon: SmartphoneIcon,
     title: '手机扫码上传',
-    description: '手机或其他联网设备扫码，把文件传到这台机器',
+    description: '手机扫屏幕上的码，把文件传进这台机器。',
     to: '/print/upload?source=document&tab=qr&mode=transfer',
     aiRole: 'none',
     needsMfp: false,
@@ -172,7 +189,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'scan',
     icon: ScanLineIcon,
     title: '材料扫描',
-    description: '纸质材料扫描后按设备回传格式保存，可打印、可做简历识别',
+    description: '在奔图面板上扫描纸质材料，回传后可打印、可识别。',
     to: '/scan',
     aiRole: 'ai',
     needsMfp: true,
@@ -187,7 +204,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'convert',
     icon: LayersIcon,
     title: '格式转换',
-    description: '多张图片（最多 20 张）合并成一份 PDF，便于打印和存档',
+    description: '多张图片合并成一份 PDF，便于打印和存档。',
     to: '/print-scan/convert',
     aiRole: 'none',
     needsMfp: false,
@@ -201,7 +218,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'sign',
     icon: PenToolIcon,
     title: '签名盖章',
-    description: '在 PDF 上叠加签名 / 印章图片（版式合成，非 CA 电子签）',
+    description: '签名 / 印章图片叠到 PDF 上，生成新 PDF。',
     to: '/print-scan/sign',
     aiRole: 'none',
     needsMfp: false,
@@ -296,6 +313,7 @@ const QUICK_LINKS: readonly (QxPrintQuickLinkView & { to?: string })[] = [
     icon: MessageSquareIcon,
     title: '反馈问题',
     description: '反馈打印或扫描问题，无需登录',
+    compact: true,
   },
 ]
 
@@ -350,7 +368,11 @@ export function PrintScanHomePage() {
         // 文档打印卡的彩色/双面表述按本机能力登记动态改写，其余卡原样。
         const capability =
           rawCapability.key === 'doc-print'
-            ? { ...rawCapability, description: describeDocPrint(capabilityLoad.map) }
+            ? {
+                ...rawCapability,
+                description: describeDocPrint(capabilityLoad.map),
+                stateNote: describeDocPrintFoot(capabilityLoad.map),
+              }
             : rawCapability
         const capabilityKey = CARD_CAPABILITY_KEY[capability.key]
 

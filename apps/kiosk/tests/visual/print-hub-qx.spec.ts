@@ -63,7 +63,78 @@ test('print hub default state reads capabilities and never claims 设备正常 @
   await expect(page.getByText('请直接在奔图机器面板上操作')).toBeVisible()
   await expectNoForgedReady(page)
   await assertNoHorizontalOverflow(page)
+  // 稿 10：无独立页头（h1 只给读屏），1080 首屏横幅紧贴顶栏，快捷入口与底注整屏可见、不被底栏遮住。
+  await expect(page.getByRole('heading', { level: 1, name: '打印扫描服务' })).toHaveCount(1)
+  if (page.viewportSize()?.width === 1080) {
+    const geo = await page.evaluate(() => {
+      const box = (el: Element | null) => el!.getBoundingClientRect()
+      const notes = [...document.querySelectorAll('.ph-note')].map((el) => el.getBoundingClientRect().bottom)
+      return {
+        pageheadH: box(document.querySelector('.qx-pagehead')).height,
+        heroTop: box(document.querySelector('.ph-xq')).top,
+        heroBottom: box(document.querySelector('.ph-xq')).bottom,
+        gridTop: box(document.querySelector('.ph-grid')).top,
+        gridBottom: box(document.querySelector('.ph-grid')).bottom,
+        srcBottom: box(document.querySelector('.ph-src')).bottom,
+        noticesBottom: box(document.querySelector('.ph-notices')).bottom,
+        truthTop: box(document.querySelector('.ph-truth')).top,
+        notesBottom: Math.max(...notes),
+        truthBottom: box(document.querySelector('.ph-truth')).bottom,
+        navTop: box(document.querySelector('.qx-navbar')).top,
+      }
+    })
+    console.log(`print-hub-geometry ${JSON.stringify(geo)}`)
+    await page.screenshot({ path: 'test-results/print-hub-qx-1080x1920.png' })
+    expect(geo.pageheadH).toBeLessThanOrEqual(1)
+    expect(geo.heroTop).toBeLessThan(140)
+    expect(geo.notesBottom).toBeLessThanOrEqual(geo.navTop)
+    expect(geo.truthBottom).toBeLessThanOrEqual(geo.navTop)
+  }
   await page.screenshot({ path: test.info().outputPath('print-hub-default.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
+test('print hub 390 keeps hero readable and bottom notes above the nav bar @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/print-scan')
+  await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+  // 手机宽度下横幅标题曾被「青」头像挤成逐字竖排：要求占到过半宽度、每行不少于四个字。
+  const hero = await page.locator('.ph-xq-ask').evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const lines = new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size
+    return { width: el.getBoundingClientRect().width, lines, chars: (el.textContent ?? '').length }
+  })
+  expect(hero.width, '横幅标题不得被挤成窄条').toBeGreaterThan(390 * 0.5)
+  expect(hero.chars / hero.lines, '横幅标题不得逐字竖排').toBeGreaterThanOrEqual(4)
+
+  // 滚到底：底注与快捷入口必须落在底栏之上，不被遮住。
+  const geo = await page.locator('.qx-scroll').evaluate((scroller) => {
+    scroller.scrollTop = scroller.scrollHeight
+    const notes = [...document.querySelectorAll('.ph-note')].map((el) => el.getBoundingClientRect().bottom)
+    return {
+      atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+      scrolls: scroller.scrollHeight > scroller.clientHeight,
+      notesBottom: Math.max(...notes),
+      truthBottom: document.querySelector('.ph-truth')!.getBoundingClientRect().bottom,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+    }
+  })
+  expect(geo.scrolls && geo.atEnd, '390 下内容应在 .qx-scroll 内滚动且已滚到底').toBe(true)
+  expect(geo.truthBottom).toBeLessThanOrEqual(geo.navTop)
+  expect(geo.notesBottom).toBeLessThanOrEqual(geo.navTop)
+  await expect(page.getByTestId('print-hub-truth')).toBeInViewport()
+  await expect(page.getByTestId('print-hub-copy-note')).toBeInViewport()
+  await assertNoHorizontalOverflow(page)
+  await expectNoForgedReady(page)
   expect(errors).toEqual([])
 })
 

@@ -11,7 +11,7 @@
   flex: none;
   margin: 16px 0 0;
   border-radius: 36px;
-  padding: 28px 42px 26px;
+  padding: 22px 42px 20px;
   background: linear-gradient(158deg, var(--qx-deep-2) 0%, var(--qx-deep) 68%);
   color: var(--qx-paper);
   position: relative;
@@ -85,7 +85,7 @@
 }
 .ph-sec {
   flex: none;
-  margin-top: 24px;
+  margin-top: 12px;
 }
 .ph-sec--grow {
   /* 能力卡按内容撑开，不把网格压扁后溢到下一区。余量由整页 .qx-scroll 吸收。 */
@@ -95,7 +95,7 @@
   display: flex;
   align-items: baseline;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .ph-no {
   font-family: var(--qx-serif);
@@ -118,19 +118,19 @@
 .ph-axes {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin: 0 0 14px;
+  gap: 10px;
+  margin: 0 0 10px;
 }
 .ph-chip {
   min-height: var(--qx-tap-min);
-  padding: 0 18px;
+  padding: 0 12px;
   border-radius: 14px;
   background: var(--qx-paper);
   border: 1px solid var(--qx-line-2);
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-size: 18px;
+  gap: 8px;
+  font-size: 16px;
   color: var(--qx-ink-2);
   font-weight: 600;
 }
@@ -154,13 +154,13 @@
 .ph-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 .ph-cap {
   background: var(--qx-surface);
   border: 1px solid var(--qx-line);
   border-radius: 32px;
-  padding: 18px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
   text-align: left;
@@ -175,13 +175,13 @@
   outline-offset: 3px;
 }
 .ph-cap-ic {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .ph-cap-ic[data-tone='teal'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
 .ph-cap-ic[data-tone='slate'] { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
@@ -189,20 +189,20 @@
 .ph-cap-ic[data-tone='wheat'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
 .ph-cap-name {
   display: block;
-  font-size: 23px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.3;
 }
 .ph-cap-desc {
   display: block;
-  margin-top: 6px;
-  font-size: 17px;
+  margin-top: 4px;
+  font-size: 16px;
   color: var(--qx-ink-3);
   line-height: 1.45;
   flex: 1;
 }
 .ph-cap-foot {
-  margin-top: 8px;
+  margin-top: 6px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -323,21 +323,25 @@
 }
 
 /* ── 快捷记录卡 / 复印说明 ─────────────────────────────────── */
+/* 稿 10 只有三张（文档 / 订单 / 复印）；运行时多一张免登录「反馈问题」（verify:kiosk-feedback-entry 钉住）。
+ * 四张挤进一行而不是折成两行：图标与标题同一行，说明占满卡宽，1080 首屏才放得下底注。 */
 .ph-notes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 .ph-note {
   background: var(--qx-surface);
   border: 1px dashed var(--qx-line-2);
   border-radius: 24px;
-  padding: 18px 20px;
-  display: flex;
-  gap: 13px;
-  align-items: flex-start;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  align-items: center;
+  column-gap: 12px;
   text-align: left;
-  min-height: 126px;
+  min-height: 0;
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -348,10 +352,11 @@
   outline-offset: 3px;
 }
 .ph-note[data-static='true'] { cursor: default; }
+.ph-note > span:last-child { display: contents; }
 .ph-note-ic {
   flex: none;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -363,10 +368,12 @@
   background: var(--qx-wheat-soft);
   color: var(--qx-wheat-d);
 }
-.ph-note b { display: block; font-size: 20px; font-weight: 700; }
+.ph-note b { display: block; font-size: 20px; font-weight: 700; line-height: 1.3; }
+.ph-note .d,
+.ph-note-go { grid-column: 1 / -1; }
 .ph-note .d {
   display: block;
-  margin-top: 5px;
+  margin-top: 8px;
   font-size: 17px;
   line-height: 1.45;
   color: var(--qx-ink-3);
@@ -435,13 +442,13 @@
 .ph-truth {
   flex: none;
   margin-top: auto;
-  padding: 16px 0 18px;
+  padding: 4px 0 6px;
   display: flex;
   gap: 26px;
 }
 .ph-truth div {
   flex: 1;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.5;
   color: var(--qx-ink-3);
 }
@@ -459,13 +466,41 @@
   display: inline-block;
   flex: none;
 }
-.ph-stack { height: 16px; }
+.ph-stack { height: 6px; }
 .ph-notices {
-  margin: 16px 0 0;
-  font-size: 17px;
+  margin: 6px 0 0;
+  font-size: 16px;
   line-height: 1.5;
   color: var(--qx-ink-3);
 }
+.ph-notices > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--qx-ink-2);
+  font-weight: 600;
+}
+.ph-notices > summary:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.ph-notices > p { margin: 4px 0 0; }
+/* 02 区标题行里的紧凑入口（反馈问题）：触控 ≥48px，文字 ≥16px。 */
+.ph-sec-act {
+  margin-left: auto;
+  align-self: center;
+  min-height: 48px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px dashed var(--qx-line-2);
+  border-radius: 999px;
+  background: var(--qx-surface);
+  color: var(--qx-ink-2);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ph-sec-act:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 .ph-dot--breathe { animation: ph-breathe 1600ms ease-in-out infinite; }
 @keyframes ph-breathe {
   0%, 100% { opacity: 0.5; }
@@ -478,4 +513,64 @@
 .ph-src-ic[data-tone='clay'] {
   background: color-mix(in srgb, var(--qx-wheat-soft) 55%, var(--qx-cinnabar-soft));
   color: var(--qx-cinnabar-d);
+}
+
+/* 稿 10 没有独立页头：顶栏下直接是小青横幅（y≈124）。QxPageFrame 的 .qx-pagehead 在本页只保留给读屏
+ * （h1「打印扫描服务」仍是全页唯一 h1），视觉上收起，把 92px 还给能力区与底部快捷入口。
+ * 用 clip-path 而非 margin:-1px，避免触发越界门禁。 */
+.qx-stage:has([data-qx-page="print-hub"]) > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── 手机窄屏（390）──────────────────────────────────────────
+ * 稿 10 只画了 1080；窄屏下 100px 头像 + 24px 间距 + 42px 左右内边距把横幅正文挤成竖排。
+ * 这里只收窄尺寸、把多列改单列，不改结构与文案；卡片/入口触控仍 ≥48px。 */
+@media (max-width: 520px) {
+  .ph-xq {
+    margin-top: 16px;
+    padding: 24px;
+    border-radius: 28px;
+  }
+  .ph-xq-row { display: block; }
+  .ph-xq-face {
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
+    margin-bottom: 16px;
+  }
+  .ph-xq-eyebrow { font-size: 16px; letter-spacing: 3px; }
+  .ph-xq-ask { font-size: 30px; }
+  .ph-xq-doing { font-size: 17px; }
+
+  .ph-sec-h { flex-wrap: wrap; row-gap: 6px; }
+  .ph-sec-h .t { font-size: 24px; }
+  .ph-sec-h .hint { margin-left: 0; font-size: 16px; }
+  .ph-sec-act { margin-left: 0; }
+
+  .ph-grid,
+  .ph-notes { grid-template-columns: minmax(0, 1fr); }
+  .ph-cap { min-height: 88px; border-radius: 24px; }
+  .ph-cap--wide {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    min-height: 88px;
+    padding: 14px 18px;
+  }
+  .ph-cap--wide .ph-cap-ic { margin-bottom: 6px; }
+  .ph-cap--wide .ph-cap-foot { margin-top: 6px; }
+
+  .ph-src { gap: 14px; padding: 16px 18px; min-height: 88px; border-radius: 24px; }
+  .ph-src-ic { width: 56px; height: 56px; border-radius: 18px; }
+  .ph-src-go { width: 48px; height: 48px; }
+  .ph-src-name { font-size: 22px; }
+  .ph-src-desc { font-size: 17px; }
+
+  .ph-truth { flex-direction: column; gap: 8px; }
 }

@@ -11946,7 +11946,11 @@
             "apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css",
             "apps/kiosk/src/pages/assistant/assistant-lightflow-content.css",
             "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css",
-            "apps/kiosk/src/styles/ai-primitives.css"
+            "apps/kiosk/src/styles/ai-primitives.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -21879,11 +21883,13 @@
     ],
     "services/api/src/jobs/dto/import-fairs.dto.ts": [
       "services/api/scripts/verify-jobfair-checkin.ts",
+      "services/api/scripts/verify-jobfair-review.ts",
       "services/api/scripts/verify-recruitment-integration-readiness.ts"
     ],
     "services/api/src/jobs/dto/import-jobs.dto.ts": [
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
       "services/api/scripts/verify-job-data-quality.ts",
+      "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-recruitment-integration-readiness.ts"
     ],
     "services/api/src/jobs/dto/partner-edit.dto.ts": [
@@ -31497,6 +31503,7 @@
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/jobs/dto/import-jobs.dto.ts",
           "services/api/src/jobs/jobs-admin.service.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
@@ -31631,6 +31638,7 @@
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/jobs/dto/import-fairs.dto.ts",
           "services/api/src/jobs/jobs-admin.service.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",

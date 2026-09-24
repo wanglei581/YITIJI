@@ -2119,8 +2119,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/jobs/dto/admin-fair.dto.ts` | `verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts` |
 | `services/api/src/jobs/dto/data-source.dto.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-partner-source-capabilities.ts` |
 | `services/api/src/jobs/dto/excel-import.dto.ts` | `verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-headcount.ts`<br/>`verify-partner-excel-template.ts` |
-| `services/api/src/jobs/dto/import-fairs.dto.ts` | `verify-jobfair-checkin.ts`<br/>`verify-recruitment-integration-readiness.ts` |
-| `services/api/src/jobs/dto/import-jobs.dto.ts` | `verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-recruitment-integration-readiness.ts` |
+| `services/api/src/jobs/dto/import-fairs.dto.ts` | `verify-jobfair-checkin.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-recruitment-integration-readiness.ts` |
+| `services/api/src/jobs/dto/import-jobs.dto.ts` | `verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-review.ts`<br/>`verify-recruitment-integration-readiness.ts` |
 | `services/api/src/jobs/dto/partner-edit.dto.ts` | `verify-jobfair-checkin.ts` |
 | `services/api/src/jobs/dto/publish.dto.ts` | `verify-content-trust-publish-gate.ts` |
 | `services/api/src/jobs/excel-template.ts` | `verify-job-headcount.ts`<br/>`verify-partner-excel-import.ts`<br/>`verify-partner-excel-template.ts` |

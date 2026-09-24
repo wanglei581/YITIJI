@@ -42,6 +42,8 @@ export interface QxPrintQuickLinkView {
   icon: LucideIcon
   title: string
   description: string
+  /** 稿 10 的快捷区只有三张卡；标 compact 的入口收成 02 区标题行里的小按钮（仍可达、仍 ≥48px）。 */
+  compact?: boolean
 }
 
 export interface QxPrintArrivalCodeView {
@@ -328,6 +330,22 @@ export function QxPrintHubView({
           <span className="ph-no">02</span>
           <span className="t">已下过单 · 我的文件</span>
           <span className="hint">{recordsGroupHint}</span>
+          {quickLinks.filter((link) => link.compact).map((link) => {
+            const Icon = link.icon
+            return (
+              <button
+                key={link.key}
+                type="button"
+                className="ph-sec-act"
+                data-testid={`print-hub-quick-${link.key}`}
+                aria-label={`${link.title}：${link.description}`}
+                onClick={() => onQuickLink(link.key)}
+              >
+                <Icon size={22} aria-hidden="true" />
+                {link.title}
+              </button>
+            )
+          })}
         </div>
         <button
           type="button"
@@ -355,7 +373,7 @@ export function QxPrintHubView({
         </button>
         <div className="ph-stack" />
         <div className="ph-notes">
-          {quickLinks.map((link) => {
+          {quickLinks.filter((link) => !link.compact).map((link) => {
             const Icon = link.icon
             return (
               <button
@@ -387,9 +405,11 @@ export function QxPrintHubView({
       </section>
 
       {notices.length > 0 ? (
-        <p className="ph-notices" data-disclaimer="true">
-          {notices.join(' ')}
-        </p>
+        // 全文逐字保留，只是默认收起：摘要行常驻可见，点开即读（原生 details，键盘 / 读屏可达）。
+        <details className="ph-notices" data-disclaimer="true">
+          <summary>隐私、电子签与价格说明（点开看全文）</summary>
+          <p>{notices.join(' ')}</p>
+        </details>
       ) : null}
 
       <PrintHubTruth />
