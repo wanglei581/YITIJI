@@ -73,6 +73,7 @@ import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
 import { AuthScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { firstQueryString, type PartnerImportDataType, type PartnerListQuery } from './jobs-shared'
+import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import {
   KioskJobBoardService,
   kioskJobBoardTerminalRef,
@@ -457,6 +458,7 @@ export class JobsController {
     @Body() dto: RotateDataSourceCredentialDto,
     @CurrentUser() user: AuthedUser,
   ) {
+    assertRecruitmentContentHostingEnabled()
     return this.jobsPartner.rotatePartnerDataSourceCredential(id, dto, user)
   }
 
@@ -471,6 +473,7 @@ export class JobsController {
     @Param('id') id: string,
     @CurrentUser() user: AuthedUser,
   ) {
+    assertRecruitmentContentHostingEnabled()
     return this.jobsPartner.archivePartnerDataSource(id, true, user)
   }
 
@@ -482,6 +485,7 @@ export class JobsController {
     @Param('id') id: string,
     @CurrentUser() user: AuthedUser,
   ) {
+    assertRecruitmentContentHostingEnabled()
     return this.jobsPartner.archivePartnerDataSource(id, false, user)
   }
 

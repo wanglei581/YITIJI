@@ -19,6 +19,7 @@
 // ============================================================
 
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { PrismaService } from '../prisma/prisma.service'
 import { JobsService } from '../jobs/jobs.service'
 import { PoliciesService } from '../policies/policies.service'
@@ -325,6 +326,7 @@ export class BulkPublishService {
     rawIds: string[],
     user: AuthedUser,
   ): Promise<BulkPublishExecuteResult> {
+    assertRecruitmentContentHostingEnabled()
     const ids = [...new Set(rawIds.filter((id) => typeof id === 'string' && id.trim().length > 0))]
 
     if (ids.length === 0) {
