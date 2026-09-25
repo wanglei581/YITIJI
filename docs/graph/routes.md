@@ -288,32 +288,32 @@ flowchart LR
   app --> audit["/audit<br/>1 页 · 5 端点"]
   app --> benefit_activities["/benefit-activities<br/>1 页 · 4 端点"]
   app --> billing["/billing<br/>1 页 · 1 端点"]
-  app --> companies["/companies<br/>1 页 · 29 端点"]
+  app --> companies["/companies<br/>1 页 · 37 端点"]
   app --> devices["/devices<br/>1 页 · 5 端点"]
-  app --> fair_sources["/fair-sources<br/>1 页 · 15 端点"]
-  app --> fairs["/fairs<br/>1 页 · 16 端点"]
+  app --> fair_sources["/fair-sources<br/>1 页 · 18 端点"]
+  app --> fairs["/fairs<br/>1 页 · 24 端点"]
   app --> files["/files<br/>1 页 · 13 端点"]
-  app --> import_batches["/import-batches<br/>1 页 · 13 端点"]
+  app --> import_batches["/import-batches<br/>1 页 · 16 端点"]
   app --> job_materials["/job-materials<br/>1 页 · 0 端点"]
-  app --> job_sources["/job-sources<br/>1 页 · 15 端点"]
+  app --> job_sources["/job-sources<br/>1 页 · 18 端点"]
   app --> legal_docs["/legal-docs<br/>1 页 · 0 端点"]
   app --> login["/login<br/>1 页 · 0 端点"]
   app --> member_benefits["/member-benefits<br/>1 页 · 2 端点"]
   app --> member_feedback["/member-feedback<br/>1 页 · 2 端点"]
   app --> member_notifications["/member-notifications<br/>1 页 · 2 端点"]
-  app --> offline_agencies["/offline-agencies<br/>1 页 · 20 端点"]
+  app --> offline_agencies["/offline-agencies<br/>1 页 · 28 端点"]
   app --> orders["/orders<br/>1 页 · 4 端点"]
-  app --> partners["/partners<br/>1 页 · 20 端点"]
+  app --> partners["/partners<br/>1 页 · 28 端点"]
   app --> peripherals["/peripherals<br/>1 页 · 0 端点"]
   app --> permissions["/permissions<br/>1 页 · 0 端点"]
-  app --> policy_sources["/policy-sources<br/>1 页 · 19 端点"]
+  app --> policy_sources["/policy-sources<br/>1 页 · 18 端点"]
   app --> print_scan["/print-scan<br/>1 页 · 5 端点"]
   app --> printers["/printers<br/>1 页 · 0 端点"]
   app --> privacy_requests["/privacy-requests<br/>1 页 · 0 端点"]
   app --> screen["/screen<br/>1 页 · 0 端点"]
   app --> screensaver["/screensaver<br/>1 页 · 11 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 2 端点"]
-  app --> sync_sources["/sync-sources<br/>1 页 · 0 端点"]
+  app --> sync_sources["/sync-sources<br/>1 页 · 8 端点"]
   app --> terminals["/terminals<br/>1 页 · 0 端点"]
   app --> toolbox["/toolbox<br/>1 页 · 15 端点"]
   app --> users["/users<br/>1 页 · 4 端点"]
@@ -329,38 +329,38 @@ flowchart LR
 | `/audit` | AuditPage | `apps/admin/src/routes/audit/index.tsx` | 5 | — |
 | `/benefit-activities` | BenefitActivitiesPage | `apps/admin/src/routes/benefit-activities/index.tsx` | 4 | — |
 | `/billing` | BillingPage | `apps/admin/src/routes/billing/index.tsx` | 1 | — |
-| `/companies` | CompaniesPage | `apps/admin/src/routes/companies/index.tsx` | 29 | — |
+| `/companies` | CompaniesPage | `apps/admin/src/routes/companies/index.tsx` | 37 | — |
 | `/devices` | DevicesPage | `apps/admin/src/routes/devices/index.tsx` | 5 | — |
-| `/fair-sources` | FairSourcesPage | `apps/admin/src/routes/fair-sources/index.tsx` | 15 | — |
-| `/fairs` | FairsPage | `apps/admin/src/routes/fairs/index.tsx` | 16 | — |
+| `/fair-sources` | FairSourcesPage | `apps/admin/src/routes/fair-sources/index.tsx` | 18 | — |
+| `/fairs` | FairsPage | `apps/admin/src/routes/fairs/index.tsx` | 24 | — |
 | `/files` | FilesPage | `apps/admin/src/routes/files/index.tsx` | 13 | — |
-| `/import-batches` | ImportBatchesPage | `apps/admin/src/routes/import-batches/index.tsx` | 13 | — |
+| `/import-batches` | ImportBatchesPage | `apps/admin/src/routes/import-batches/index.tsx` | 16 | — |
 | `/job-materials` | JobMaterialsPage | `apps/admin/src/routes/job-materials/index.tsx` | 0 | — |
-| `/job-sources` | JobSourcesPage | `apps/admin/src/routes/job-sources/index.tsx` | 15 | — |
+| `/job-sources` | JobSourcesPage | `apps/admin/src/routes/job-sources/index.tsx` | 18 | — |
 | `/legal-docs` | LegalDocsPage | `apps/admin/src/routes/legal-docs/index.tsx` | 0 | — |
 | `/login` | LoginPage | `apps/admin/src/routes/login/index.tsx` | 0 | 1 |
 | `/member-benefits` | MemberBenefitsPage | `apps/admin/src/routes/member-benefits/index.tsx` | 2 | — |
 | `/member-feedback` | MemberFeedbackPage | `apps/admin/src/routes/member-feedback/index.tsx` | 2 | — |
 | `/member-notifications` | MemberNotificationsPage | `apps/admin/src/routes/member-notifications/index.tsx` | 2 | — |
-| `/offline-agencies` | OfflineAgenciesPage | `apps/admin/src/routes/offline-agencies/index.tsx` | 20 | — |
+| `/offline-agencies` | OfflineAgenciesPage | `apps/admin/src/routes/offline-agencies/index.tsx` | 28 | — |
 | `/orders` | OrdersPage | `apps/admin/src/routes/orders/index.tsx` | 4 | — |
-| `/partners` | PartnersPage | `apps/admin/src/routes/partners/index.tsx` | 20 | — |
+| `/partners` | PartnersPage | `apps/admin/src/routes/partners/index.tsx` | 28 | — |
 | `/peripherals` | Navigate | — _(重定向)_ | 0 | — |
 | `/permissions` | PermissionsPage | `apps/admin/src/routes/permissions/index.tsx` | 0 | — |
-| `/policy-sources` | PolicySourcesPage | `apps/admin/src/routes/policy-sources/index.tsx` | 19 | — |
+| `/policy-sources` | PolicySourcesPage | `apps/admin/src/routes/policy-sources/index.tsx` | 18 | — |
 | `/print-scan` | PrintScanOpsPage | `apps/admin/src/routes/print-scan/index.tsx` | 5 | — |
 | `/printers` | Navigate | — _(重定向)_ | 0 | — |
 | `/privacy-requests` | PrivacyRequestsPage | `apps/admin/src/routes/privacy-requests/index.tsx` | 0 | — |
 | `/screen` | ScreenPage | `apps/admin/src/routes/screen/index.tsx` | 0 | — |
 | `/screensaver` | ScreensaverPage | `apps/admin/src/routes/screensaver/index.tsx` | 11 | — |
 | `/smart-campus` | SmartCampusPage | `apps/admin/src/routes/smart-campus/index.tsx` | 2 | — |
-| `/sync-sources` | SyncSourcesPage | `apps/admin/src/routes/sync-sources/index.tsx` | 0 | — |
+| `/sync-sources` | SyncSourcesPage | `apps/admin/src/routes/sync-sources/index.tsx` | 8 | — |
 | `/terminals` | Navigate | — _(重定向)_ | 0 | — |
 | `/toolbox` | ToolboxPage | `apps/admin/src/routes/toolbox/index.tsx` | 15 | — |
 | `/users` | UsersPage | `apps/admin/src/routes/users/index.tsx` | 4 | — |
 
 <details>
-<summary>展开：每个路由触达的端点（26 个路由）</summary>
+<summary>展开：每个路由触达的端点（27 个路由）</summary>
 
 **`/`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/alerts`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/print-tasks`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /files/cleanup-expired`
 
@@ -376,19 +376,19 @@ flowchart LR
 
 **`/billing`** → `PUT /admin/billing/price-config/:param`
 
-**`/companies`** → `DELETE /admin/companies/:param/jobs/:param`、`DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/companies`、`GET /admin/companies/:param`、`GET /admin/companies/:param/linkable-jobs`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`PATCH /admin/companies/:param`、`PATCH /admin/companies/:param/publish`、`PATCH /admin/companies/:param/review`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/companies`、`POST /admin/companies/:param/jobs`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`PUT /admin/orgs/:param/accounts/:param/email`
+**`/companies`** → `DELETE /admin/companies/:param/jobs/:param`、`DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/companies`、`GET /admin/companies/:param`、`GET /admin/companies/:param/linkable-jobs`、`GET /admin/import-batches`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/companies/:param`、`PATCH /admin/companies/:param/publish`、`PATCH /admin/companies/:param/review`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/companies`、`POST /admin/companies/:param/jobs`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/orgs/:param/accounts/:param/email`
 
 **`/devices`** → `GET /admin/import-batches`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`
 
-**`/fair-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/bulk-publish/execute`、`POST /admin/bulk-publish/preview`、`POST /files/cleanup-expired`
+**`/fair-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/bulk-publish/execute`、`POST /admin/bulk-publish/preview`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`
 
-**`/fairs`** → `DELETE /admin/fairs/:param/companies/:param`、`DELETE /admin/fairs/:param/materials/:param`、`DELETE /admin/fairs/:param/venue-guide`、`DELETE /admin/fairs/:param/zones/:param`、`GET /admin/fairs`、`GET /admin/fairs/:param`、`GET /admin/fairs/:param/stats`、`GET /admin/fairs/:param/venue-guide`、`PATCH /admin/fairs/:param`、`PATCH /admin/fairs/:param/companies/:param`、`PATCH /admin/fairs/:param/materials/:param`、`PATCH /admin/fairs/:param/materials/:param/publish`、`PATCH /admin/fairs/:param/zones/:param`、`POST /admin/fairs/:param/companies`、`POST /admin/fairs/:param/zones`、`PUT /admin/fairs/:param/venue-guide`
+**`/fairs`** → `DELETE /admin/fairs/:param/companies/:param`、`DELETE /admin/fairs/:param/materials/:param`、`DELETE /admin/fairs/:param/venue-guide`、`DELETE /admin/fairs/:param/zones/:param`、`GET /admin/fairs`、`GET /admin/fairs/:param`、`GET /admin/fairs/:param/stats`、`GET /admin/fairs/:param/venue-guide`、`GET /admin/import-batches`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/fairs/:param`、`PATCH /admin/fairs/:param/companies/:param`、`PATCH /admin/fairs/:param/materials/:param`、`PATCH /admin/fairs/:param/materials/:param/publish`、`PATCH /admin/fairs/:param/zones/:param`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/fairs/:param/companies`、`POST /admin/fairs/:param/zones`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/fairs/:param/venue-guide`
 
 **`/files`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /files/cleanup-expired`
 
-**`/import-batches`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /files/cleanup-expired`
+**`/import-batches`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`
 
-**`/job-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/bulk-publish/execute`、`POST /admin/bulk-publish/preview`、`POST /files/cleanup-expired`
+**`/job-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/bulk-publish/execute`、`POST /admin/bulk-publish/preview`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`
 
 **`/member-benefits`** → `PATCH /admin/member-benefits/:param/revoke`、`POST /admin/member-benefits`
 
@@ -396,19 +396,21 @@ flowchart LR
 
 **`/member-notifications`** → `DELETE /admin/notifications/broadcasts/:param`、`POST /admin/notifications/broadcasts`
 
-**`/offline-agencies`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`PUT /admin/orgs/:param/accounts/:param/email`
+**`/offline-agencies`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/import-batches`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/orgs/:param/accounts/:param/email`
 
 **`/orders`** → `GET /admin/orders`、`GET /admin/orders/:param`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`
 
-**`/partners`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`PUT /admin/orgs/:param/accounts/:param/email`
+**`/partners`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/import-batches`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/orgs/:param/accounts/:param/email`
 
-**`/policy-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/policy-sources/:param/eligibility-rules`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`GET /policies/eligibility-questions`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`PATCH /admin/policy-sources/:param/publish`、`PATCH /admin/policy-sources/:param/review`、`POST /admin/bulk-publish/execute`、`POST /admin/bulk-publish/preview`、`POST /files/cleanup-expired`
+**`/policy-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/policy-sources/:param/eligibility-rules`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`GET /policies/eligibility-questions`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`
 
 **`/print-scan`** → `GET /admin/import-batches`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`
 
 **`/screensaver`** → `DELETE /admin/ad-assets/:param`、`DELETE /admin/ad-playlists/:param`、`GET /admin/ad-assets`、`GET /admin/ad-playlists`、`GET /admin/ai-posters/status`、`GET /admin/screensaver/terminals`、`PATCH /admin/ad-assets/:param`、`POST /admin/ad-assets/external-video`、`POST /admin/ad-playlists`、`PUT /admin/ad-playlists/:param`、`PUT /admin/terminals/:param/screensaver-config`
 
 **`/smart-campus`** → `GET /admin/smart-campus/terminals`、`PUT /admin/terminals/:param/smart-campus-config`
+
+**`/sync-sources`** → `GET /admin/import-batches`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`
 
 **`/toolbox`** → `GET /admin/toolbox/allowed-hosts`、`GET /admin/toolbox/apps`、`GET /admin/toolbox/apps/:param/versions`、`GET /admin/toolbox/launch-summary`、`GET /admin/toolbox/terminals`、`POST /admin/toolbox/allowed-hosts`、`POST /admin/toolbox/allowed-hosts/:param/review`、`POST /admin/toolbox/apps`、`POST /admin/toolbox/apps/:param/suspend`、`POST /admin/toolbox/apps/:param/versions`、`POST /admin/toolbox/apps/:param/versions/:param/approve`、`POST /admin/toolbox/apps/:param/versions/:param/publish`、`POST /admin/toolbox/apps/:param/versions/:param/reject`、`POST /admin/toolbox/apps/:param/versions/:param/submit`、`PUT /admin/terminals/:param/toolbox-config`
 
@@ -425,57 +427,59 @@ flowchart LR
 ```mermaid
 flowchart LR
   app["partner"]
-  app --> _root_["/<br/>1 页 · 1 端点"]
+  app --> _root_["/<br/>1 页 · 22 端点"]
   app --> account["/account<br/>1 页 · 0 端点"]
-  app --> companies["/companies<br/>1 页 · 26 端点"]
+  app --> companies["/companies<br/>1 页 · 21 端点"]
   app --> fairs["/fairs<br/>1 页 · 21 端点"]
   app --> jobs["/jobs<br/>1 页 · 21 端点"]
   app --> login["/login<br/>1 页 · 0 端点"]
-  app --> policy["/policy<br/>1 页 · 29 端点"]
+  app --> policy["/policy<br/>1 页 · 31 端点"]
   app --> profile["/profile<br/>1 页 · 1 端点"]
   app --> screen["/screen<br/>1 页 · 0 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 21 端点"]
   app --> sources["/sources<br/>1 页 · 21 端点"]
-  app --> stats["/stats<br/>1 页 · 0 端点"]
+  app --> stats["/stats<br/>1 页 · 21 端点"]
   app --> sync_logs["/sync-logs<br/>1 页 · 21 端点"]
   app --> terminals["/terminals<br/>1 页 · 0 端点"]
 ```
 
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
 | --- | --- | --- | --- | --- |
-| `/` | DashboardPage | `apps/partner/src/routes/dashboard/index.tsx` | 1 | — |
+| `/` | DashboardPage | `apps/partner/src/routes/dashboard/index.tsx` | 22 | — |
 | `/account` | AccountPage | `apps/partner/src/routes/account/index.tsx` | 0 | — |
-| `/companies` | CompaniesPage | `apps/partner/src/routes/companies/index.tsx` | 26 | — |
-| `/fairs` | FairsPage | `apps/partner/src/routes/fairs/index.tsx` | 21 | — |
-| `/jobs` | JobsPage | `apps/partner/src/routes/jobs/index.tsx` | 21 | — |
+| `/companies` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
+| `/fairs` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
+| `/jobs` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
 | `/login` | LoginPage | `apps/partner/src/routes/login/index.tsx` | 0 | 1 |
-| `/policy` | PolicyPage | `apps/partner/src/routes/policy/index.tsx` | 29 | — |
+| `/policy` | PolicyPage | `apps/partner/src/routes/policy/index.tsx` | 31 | — |
 | `/profile` | ProfilePage | `apps/partner/src/routes/profile/index.tsx` | 1 | — |
 | `/screen` | ScreenPage | `apps/partner/src/routes/screen/index.tsx` | 0 | — |
 | `/smart-campus` | SmartCampusPage | `apps/partner/src/routes/smart-campus/index.tsx` | 21 | — |
-| `/sources` | SourcesPage | `apps/partner/src/routes/sources/index.tsx` | 21 | — |
-| `/stats` | StatsPage | `apps/partner/src/routes/stats/index.tsx` | 0 | — |
-| `/sync-logs` | SyncLogsPage | `apps/partner/src/routes/sync-logs/index.tsx` | 21 | — |
+| `/sources` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
+| `/stats` | StatsPage | `apps/partner/src/routes/stats/index.tsx` | 21 | — |
+| `/sync-logs` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
 | `/terminals` | TerminalsPage | `apps/partner/src/routes/terminals/index.tsx` | 0 | — |
 
 <details>
-<summary>展开：每个路由触达的端点（9 个路由）</summary>
+<summary>展开：每个路由触达的端点（10 个路由）</summary>
 
-**`/`** → `PUT /partner/profile`
+**`/`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/profile`、`PUT /partner/smart-campus/terminals/:param/config`
 
-**`/companies`** → `GET /partner/companies`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/companies/:param`、`PATCH /partner/companies/:param/publish`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/companies/import`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/profile`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/companies`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/fairs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/jobs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
-**`/policy`** → `DELETE /partner/policies/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/policies/:param/eligibility-rules`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`GET /policies/eligibility-questions`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/policies/:param`、`PATCH /partner/policies/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/policies`、`POST /partner/policies/:param/eligibility-preview`、`PUT /partner/policies/:param/eligibility-rules`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/policy`** → `DELETE /partner/policies/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/policies/:param/eligibility-rules`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`GET /policies/eligibility-questions`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/policies/:param`、`PATCH /partner/policies/:param/publish`、`PATCH /partner/policies/:param/release`、`PATCH /partner/policies/:param/review`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/policies`、`POST /partner/policies/:param/eligibility-preview`、`PUT /partner/policies/:param/eligibility-rules`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/profile`** → `PUT /partner/profile`
 
 **`/smart-campus`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/sources`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
+
+**`/stats`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/sync-logs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 

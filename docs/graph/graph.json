@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 546,
+    "endpointCount": 547,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3749,6 +3749,18 @@
         "services": [
           "SmartCampusService"
         ]
+      },
+      {
+        "controller": "services/api/src/recruitment-hosting/admin-recruitment-hosting.controller.ts",
+        "handler": "AdminRecruitmentHostingController.getRecruitmentHosting",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/admin/system/recruitment-hosting",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/terminals/admin-terminals.controller.ts",
@@ -11498,7 +11510,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 152,
+      "reachableFileCount": 160,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -11653,12 +11665,18 @@
             "GET /admin/companies",
             "GET /admin/companies/:param",
             "GET /admin/companies/:param/linkable-jobs",
+            "GET /admin/import-batches",
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /admin/system/recruitment-hosting",
             "PATCH /admin/companies/:param",
             "PATCH /admin/companies/:param/publish",
             "PATCH /admin/companies/:param/review",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "PATCH /admin/orgs/:param",
             "PATCH /admin/orgs/:param/accounts/:param/password",
             "PATCH /admin/orgs/:param/accounts/:param/status",
@@ -11673,6 +11691,8 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
             "PUT /admin/orgs/:param/accounts/:param/email"
           ],
           "file": "apps/admin/src/routes/companies/index.tsx",
@@ -11708,6 +11728,7 @@
             "GET /admin/ai/usage",
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
+            "GET /admin/system/recruitment-hosting",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
@@ -11717,6 +11738,8 @@
             "PATCH /admin/job-sources/:param/review",
             "POST /admin/bulk-publish/execute",
             "POST /admin/bulk-publish/preview",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/fair-sources/index.tsx",
@@ -11738,13 +11761,21 @@
             "GET /admin/fairs/:param",
             "GET /admin/fairs/:param/stats",
             "GET /admin/fairs/:param/venue-guide",
+            "GET /admin/import-batches",
+            "GET /admin/system/recruitment-hosting",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/fairs/:param",
             "PATCH /admin/fairs/:param/companies/:param",
             "PATCH /admin/fairs/:param/materials/:param",
             "PATCH /admin/fairs/:param/materials/:param/publish",
             "PATCH /admin/fairs/:param/zones/:param",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "POST /admin/fairs/:param/companies",
             "POST /admin/fairs/:param/zones",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
             "PUT /admin/fairs/:param/venue-guide"
           ],
           "file": "apps/admin/src/routes/fairs/index.tsx",
@@ -11788,6 +11819,7 @@
             "GET /admin/ai/usage",
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
+            "GET /admin/system/recruitment-hosting",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
@@ -11795,6 +11827,8 @@
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/import-batches/index.tsx",
@@ -11824,6 +11858,7 @@
             "GET /admin/ai/usage",
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
+            "GET /admin/system/recruitment-hosting",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
@@ -11833,6 +11868,8 @@
             "PATCH /admin/job-sources/:param/review",
             "POST /admin/bulk-publish/execute",
             "POST /admin/bulk-publish/preview",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/job-sources/index.tsx",
@@ -11914,9 +11951,15 @@
             "DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param",
             "DELETE /admin/orgs/:param/accounts/:param/action-tickets/current",
             "DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current",
+            "GET /admin/import-batches",
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /admin/system/recruitment-hosting",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "PATCH /admin/orgs/:param",
             "PATCH /admin/orgs/:param/accounts/:param/password",
             "PATCH /admin/orgs/:param/accounts/:param/status",
@@ -11929,6 +11972,8 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
             "PUT /admin/orgs/:param/accounts/:param/email"
           ],
           "file": "apps/admin/src/routes/offline-agencies/index.tsx",
@@ -11962,9 +12007,15 @@
             "DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param",
             "DELETE /admin/orgs/:param/accounts/:param/action-tickets/current",
             "DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current",
+            "GET /admin/import-batches",
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /admin/system/recruitment-hosting",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "PATCH /admin/orgs/:param",
             "PATCH /admin/orgs/:param/accounts/:param/password",
             "PATCH /admin/orgs/:param/accounts/:param/status",
@@ -11977,6 +12028,8 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
             "PUT /admin/orgs/:param/accounts/:param/email"
           ],
           "file": "apps/admin/src/routes/partners/index.tsx",
@@ -12018,6 +12071,7 @@
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
             "GET /admin/policy-sources/:param/eligibility-rules",
+            "GET /admin/system/recruitment-hosting",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
@@ -12026,10 +12080,8 @@
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
-            "PATCH /admin/policy-sources/:param/publish",
-            "PATCH /admin/policy-sources/:param/review",
-            "POST /admin/bulk-publish/execute",
-            "POST /admin/bulk-publish/preview",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/policy-sources/index.tsx",
@@ -12129,7 +12181,16 @@
         },
         {
           "component": "SyncSourcesPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /admin/import-batches",
+            "GET /admin/system/recruitment-hosting",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown"
+          ],
           "file": "apps/admin/src/routes/sync-sources/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -12193,7 +12254,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 157
+      "sourceFileCount": 165
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15133,14 +15194,35 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 55,
+      "reachableFileCount": 59,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
         {
           "component": "DashboardPage",
           "endpoints": [
-            "PUT /partner/profile"
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/profile",
+            "PUT /partner/smart-campus/terminals/:param/config"
           ],
           "file": "apps/partner/src/routes/dashboard/index.tsx",
           "layout": [
@@ -15162,9 +15244,8 @@
           "wrappers": []
         },
         {
-          "component": "CompaniesPage",
+          "component": "RecruitmentHostingGate",
           "endpoints": [
-            "GET /partner/companies",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
             "GET /partner/excel/mapping-rule",
@@ -15173,8 +15254,6 @@
             "GET /partner/jobs/quality-summary",
             "GET /partner/smart-campus/terminals",
             "GET /partner/sync-logs",
-            "PATCH /partner/companies/:param",
-            "PATCH /partner/companies/:param/publish",
             "PATCH /partner/data-sources/:param/archive",
             "PATCH /partner/data-sources/:param/toggle",
             "PATCH /partner/data-sources/:param/unarchive",
@@ -15182,25 +15261,25 @@
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
-            "POST /partner/companies/import",
             "POST /partner/data-sources",
             "POST /partner/data-sources/:param/rotate-credential",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
-            "PUT /partner/profile",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
-          "file": "apps/partner/src/routes/companies/index.tsx",
+          "file": "apps/partner/src/routes/RecruitmentHostingGate.tsx",
           "layout": [
             "PartnerLayoutWrapper"
           ],
           "path": "/companies",
           "styles": [],
-          "wrappers": []
+          "wrappers": [
+            "CompaniesPage"
+          ]
         },
         {
-          "component": "FairsPage",
+          "component": "RecruitmentHostingGate",
           "endpoints": [
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
@@ -15224,16 +15303,18 @@
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
-          "file": "apps/partner/src/routes/fairs/index.tsx",
+          "file": "apps/partner/src/routes/RecruitmentHostingGate.tsx",
           "layout": [
             "PartnerLayoutWrapper"
           ],
           "path": "/fairs",
           "styles": [],
-          "wrappers": []
+          "wrappers": [
+            "FairsPage"
+          ]
         },
         {
-          "component": "JobsPage",
+          "component": "RecruitmentHostingGate",
           "endpoints": [
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
@@ -15257,13 +15338,15 @@
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
-          "file": "apps/partner/src/routes/jobs/index.tsx",
+          "file": "apps/partner/src/routes/RecruitmentHostingGate.tsx",
           "layout": [
             "PartnerLayoutWrapper"
           ],
           "path": "/jobs",
           "styles": [],
-          "wrappers": []
+          "wrappers": [
+            "JobsPage"
+          ]
         },
         {
           "component": "LoginPage",
@@ -15299,6 +15382,8 @@
             "PATCH /partner/jobs/:param/publish",
             "PATCH /partner/policies/:param",
             "PATCH /partner/policies/:param/publish",
+            "PATCH /partner/policies/:param/release",
+            "PATCH /partner/policies/:param/review",
             "POST /partner/data-sources",
             "POST /partner/data-sources/:param/rotate-credential",
             "POST /partner/excel/:param/confirm",
@@ -15375,7 +15460,7 @@
           "wrappers": []
         },
         {
-          "component": "SourcesPage",
+          "component": "RecruitmentHostingGate",
           "endpoints": [
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
@@ -15399,17 +15484,41 @@
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
-          "file": "apps/partner/src/routes/sources/index.tsx",
+          "file": "apps/partner/src/routes/RecruitmentHostingGate.tsx",
           "layout": [
             "PartnerLayoutWrapper"
           ],
           "path": "/sources",
           "styles": [],
-          "wrappers": []
+          "wrappers": [
+            "SourcesPage"
+          ]
         },
         {
           "component": "StatsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
           "file": "apps/partner/src/routes/stats/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -15419,7 +15528,7 @@
           "wrappers": []
         },
         {
-          "component": "SyncLogsPage",
+          "component": "RecruitmentHostingGate",
           "endpoints": [
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
@@ -15443,13 +15552,15 @@
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
-          "file": "apps/partner/src/routes/sync-logs/index.tsx",
+          "file": "apps/partner/src/routes/RecruitmentHostingGate.tsx",
           "layout": [
             "PartnerLayoutWrapper"
           ],
           "path": "/sync-logs",
           "styles": [],
-          "wrappers": []
+          "wrappers": [
+            "SyncLogsPage"
+          ]
         },
         {
           "component": "TerminalsPage",
@@ -15463,7 +15574,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 56
+      "sourceFileCount": 60
     }
   },
   "dataModel": {
@@ -20855,6 +20966,9 @@
     ],
     "services/api/scripts/deploy-data-safety-gate.ts": [
       "services/api/scripts/verify-deploy-data-safety-gate.ts"
+    ],
+    "services/api/scripts/lib/console-hosting-flag-assertions.ts": [
+      "services/api/scripts/verify-partner-source-capabilities.ts"
     ],
     "services/api/scripts/lib/recruitment-hosting-default-probe.ts": [
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
@@ -34226,6 +34340,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/lib/console-hosting-flag-assertions.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/crypto/secret-cipher.ts",
           "services/api/src/common/crypto/webhook-secret-strength.ts",
