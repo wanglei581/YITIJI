@@ -1909,6 +1909,8 @@ model AiServiceLog {
   terminalId       String?
   endUserId        String?
   endUser          EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  // 未登录任务上的年满14 / 录音声明快照。只有状态和文案版本，不含个人身份。
+  clientDeclarationJson String?
   createdAt        DateTime @default(now())
 
   @@index([operation, createdAt])

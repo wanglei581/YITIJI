@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import type { AiProviderName, AiTokenUsage, AiUsageReport } from './interfaces/ai-provider.interface'
 import { PrismaService } from '../prisma/prisma.service'
+import {
+  clientDeclarationJson,
+  currentClientDeclaration,
+  type ClientDeclaration,
+} from '../common/privacy/client-declaration'
 
 // ============================================================
 // AI 日志服务
@@ -73,6 +78,11 @@ export interface AiLogEntry {
   createdAt?: string            // ISO string; set by record() if omitted
   endUserId?: string | null
   terminalId?: string | null
+  /**
+   * 未登录声明快照。有 endUserId 时忽略。
+   * 不传时，若当前 HTTP 请求带了声明上下文且本行没有 endUserId，则采用请求头解析结果。
+   */
+  clientDeclaration?: ClientDeclaration | null
   // ❌ 以下字段禁止记录：
   // 文件正文、履历正文、聊天原文、建议正文、文件标识、文件名
 }
@@ -453,6 +463,7 @@ export class AiLogService {
         estimatedCostCny: entry.estimatedCostCny ?? null,
         endUserId: entry.endUserId ?? null,
         terminalId: entry.terminalId ?? null,
+        clientDeclarationJson: declarationJsonFor(entry),
       },
     }).catch((error: unknown) => {
       const reason = error instanceof Error ? error.message : 'unknown'
@@ -620,6 +631,12 @@ function parseTokenUsage(value: string | null | undefined): AiLogEntry['tokenUsa
   } catch {
     return undefined
   }
+}
+
+function declarationJsonFor(entry: AiLogRecordInput): string | null {
+  if (entry.endUserId) return null
+  if (entry.clientDeclaration) return clientDeclarationJson(entry.clientDeclaration)
+  return clientDeclarationJson(currentClientDeclaration())
 }
 
 function toNonNegativeInt(value: unknown): number {

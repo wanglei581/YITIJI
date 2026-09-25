@@ -338,7 +338,7 @@ export class AiService {
         ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
-        status:    resultWithProvider.status === 'failed' ? 'failed' : 'success',
+        status:    resultWithProvider.status === 'failed' ? 'failed' : 'success', endUserId: endUserId ?? null,
         ...(extractionErrorCode ? { errorCode: extractionErrorCode } : {}),
       })
       return accessToken ? { ...resultWithProvider, accessToken } : resultWithProvider
@@ -349,7 +349,7 @@ export class AiService {
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
         status:    'failed',
-        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN', endUserId: endUserId ?? null,
       })
       throw err
     }
@@ -975,7 +975,7 @@ export class AiService {
     return { deletedCount }
   }
 
-  async chatWithAssistant(input: ChatInput, ownerKey = 'anon'): Promise<AssistantChatResult> {
+  async chatWithAssistant(input: ChatInput, ownerKey = 'anon', endUserId: string | null = null): Promise<AssistantChatResult> {
     const t0 = Date.now()
     // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
     const useLlm = this.llmConfig.isReady('assistant_chat')
@@ -996,7 +996,7 @@ export class AiService {
         ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
-        status:    'success',
+        status:    'success', endUserId,
       })
       // S0-1 / 风险 R1：把 provider 标签透出，让调用方能分辨「真实模型」与
       // 「mock/stub provider 预置话术」。回落时这里必须如实标 aiGenerated=false，
@@ -1010,7 +1010,7 @@ export class AiService {
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
         status:    'failed',
-        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN', endUserId,
       })
       throw err
     }
