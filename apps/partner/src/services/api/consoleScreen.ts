@@ -17,7 +17,7 @@
  *    必须分开提示，否则机构管理员会以为自己权限没开。
  */
 
-import type { ScreenSnapshot } from '@ai-job-print/shared'
+import type { ScreenSnapshot, ScreenTerminalTwin } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
 import { authHeader } from '../auth'
 
@@ -113,5 +113,66 @@ export async function fetchPartnerScreenSnapshot(): Promise<ScreenFetchResult> {
 export async function loadPartnerScreenSnapshot(): Promise<ScreenSnapshot> {
   const result = await fetchPartnerScreenSnapshot()
   if (result.kind === 'ok') return result.snapshot
+  throw new ScreenFetchError(result)
+}
+
+/* ── 单台终端孪生 ─────────────────────────────────────────────────────────
+ * GET /api/v1/partner/screen/terminals/:terminalId
+ * 机构只可能拿到本机构终端：别家终端与不存在同样 404（服务端裁决，前端不带任何机构标识）。
+ * 响应是裸对象，与机构快照一致；terminalId 只做路径段编码，不拼 query。
+ */
+
+export type TwinFetchResult =
+  | { kind: 'ok'; twin: ScreenTerminalTwin }
+  | Exclude<ScreenFetchResult, { kind: 'ok' }>
+
+function asPartnerTwin(payload: unknown): ScreenTerminalTwin | null {
+  if (!payload || typeof payload !== 'object') return null
+  const twin = payload as Partial<ScreenTerminalTwin>
+  if (twin.audience !== 'partner') return null
+  if (typeof twin.generatedAt !== 'string') return null
+  if (!twin.terminal || typeof twin.terminal !== 'object') return null
+  return payload as ScreenTerminalTwin
+}
+
+export async function fetchPartnerTerminalTwin(terminalId: string): Promise<TwinFetchResult> {
+  if (API_MODE !== 'http') return { kind: 'mock' }
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/partner/screen/terminals/${encodeURIComponent(terminalId)}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json', ...authHeader() },
+    })
+  } catch {
+    return { kind: 'offline' }
+  }
+  if (res.status === 401) return { kind: 'unauthorized' }
+  if (res.status === 403) {
+    const body = await readErrorBody(res)
+    return {
+      kind: 'forbidden',
+      code: body.error?.code ?? 'AUTH_ROLE_FORBIDDEN',
+      message: readableMessage(body.error?.code, body.error?.message),
+    }
+  }
+  if (res.status === 404) return { kind: 'failed', message: '没有找到这台终端，请从本机构终端列表重新选择' }
+  if (!res.ok) {
+    const body = await readErrorBody(res)
+    return { kind: 'failed', message: readableMessage(body.error?.code, body.error?.message) }
+  }
+  let payload: unknown
+  try {
+    payload = await res.json()
+  } catch {
+    return { kind: 'failed', message: '服务响应不是合法的终端孪生数据，请稍后重试' }
+  }
+  const twin = asPartnerTwin(payload)
+  if (!twin) return { kind: 'failed', message: '服务响应不是合法的终端孪生数据，请稍后重试' }
+  return { kind: 'ok', twin }
+}
+
+export async function loadPartnerTerminalTwin(terminalId: string): Promise<ScreenTerminalTwin> {
+  const result = await fetchPartnerTerminalTwin(terminalId)
+  if (result.kind === 'ok') return result.twin
   throw new ScreenFetchError(result)
 }

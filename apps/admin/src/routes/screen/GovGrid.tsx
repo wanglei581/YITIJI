@@ -1,199 +1,486 @@
-import type { ScreenSnapshotMetrics } from '@ai-job-print/shared'
+import { formatTime } from '@ai-job-print/shared'
+import type { ScreenAlertItem, ScreenSnapshotMetrics } from '@ai-job-print/shared'
 import {
-  ScreenBarList,
   ScreenFleetWall,
-  ScreenGrid,
-  ScreenKpi,
-  ScreenMetricCard,
-  ScreenMiniGrid,
-  ScreenSparkline,
+  SCREEN_SOURCE_ENTRY_NOTE,
+  TWIN_STAGE_H,
+  TWIN_STAGE_W,
+  TwinAlertList,
+  TwinAreaTrend,
+  TwinBarList,
+  TwinCity,
+  TwinLegend,
+  TwinMetricPanel,
+  TwinPanel,
+  TwinRing,
+  TwinSceneBox,
+  TwinSlot,
+  TwinTiles,
   screenCount,
-  screenFleetOnlineText,
   screenFleetScopeNote,
-  screenReasonCopy,
-  type ScreenBarItem,
+  twinAreas,
+  twinTerminalState,
+  twinTerminalsFromCells,
+  type TwinAlertItem,
+  type TwinBarItem,
+  type TwinCityHighlight,
+  type TwinCityTerminal,
+  type TwinState,
 } from '@ai-job-print/ui'
-import { aiOperationLabel } from './metricLabels'
+import { aiOperationLabel, taskStatusLabel } from './metricLabels'
+import { screenHref } from './screenTabs'
+import { TwinShell, TwinShellEmpty, useAdminSnapshot, type ScreenChrome } from './screenView'
 
 /**
- * 政务版（`?profile=gov`）：4 列 × 3 行共 10 块，与契约的
- * `ADMIN_GOV_METRIC_KEYS` 一一对应，块位照 docs/design/ops-screen-2026-09/01-gov-screen.html。
+ * 政务总览：城区数字孪生 + 六块面板。块位照设计稿「政务版 · 城区数字孪生」。
  *
- * 与原型不同的三处，都是「原型画了但契约给不出」，一律以契约为准、不补假值：
- *   1. 累计打印的「黑白 X · 彩色 Y」——分色恒 `available:false`，副行换成未接入说明。
- *   2. 信息归集的「待审 46 · 审核中 12」——契约里待审是 pending+reviewing 的**合并**计数，
- *      拆不出来，所以写「待审核 N 条（含审核中）」。
- *   3. 观众是上级检查与来访参观，所以本版不含告警与成本（契约也没下发）。
+ * 数据只来自两份真实快照（gov：终端 / 打印 / AI / 在架信息；ops：任务流、来源入口、告警），
+ * 与设计稿不同的地方一律以契约为准、不补假值：
+ *   1. 打印趋势的「今日」是上海自然日到现在的累计，不与昨天整日比涨跌（半天比一天会误导），只并列写出。
+ *   2. 按区聚焦时，终端类数字切成本区（由机队格子算出，截断时写明样本）；打印、AI、来源入口
+ *      的记录还没有区域归属，保持全市口径并在角标写明，不冒充本区数字。
+ *   3. 在架信息都是第三方 / 官方来源，本平台不收简历、不代投递。
  */
 
-export function GovGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
+const TITLE = '职易达 · 就业服务终端运行态势'
+const SUBTITLE = '数字孪生 · 政务总览'
+const UNASSIGNED = '未设置所在区'
+const HIGHLIGHTS: ReadonlyArray<{ key: TwinCityHighlight; label: string }> = [
+  { key: 'all', label: '全部' },
+  { key: 'alert', label: '告警' },
+  { key: 'offline', label: '离线' },
+  { key: 'printing', label: '打印中' },
+]
+
+function parseHighlight(raw: string | null): TwinCityHighlight {
+  return raw === 'alert' || raw === 'offline' || raw === 'printing' ? raw : 'all'
+}
+
+function countStates(terminals: TwinCityTerminal[]): Record<TwinState, number> {
+  const out: Record<TwinState, number> = { ok: 0, pr: 0, wa: 0, off: 0, un: 0 }
+  for (const t of terminals) out[twinTerminalState(t)] += 1
+  return out
+}
+
+function alertRows(items: ScreenAlertItem[], onOpen: (code: string) => void): TwinAlertItem[] {
+  return items.slice(0, 4).map((item, index) => ({
+    key: `${item.terminalCode ?? 'none'}-${item.type}-${index}`,
+    severity: item.severity === 'error' ? 'err' : item.severity === 'warning' ? 'warn' : 'un',
+    severityText: item.severity === 'error' ? '严重' : item.severity === 'warning' ? '警告' : '提示',
+    code: item.terminalCode ?? '—',
+    text: item.title,
+    whenText: formatTime(item.occurredAt),
+    href: item.terminalCode ? '/alerts' : undefined,
+    onClick: item.terminalCode ? () => onOpen(item.terminalCode as string) : undefined,
+  }))
+}
+
+function TaskFlow({ printByStatus, scanByStatus }: { printByStatus: Record<string, number>; scanByStatus: Record<string, number> }) {
+  const count = (source: Record<string, number>, keys: string[]) => keys.reduce((sum, key) => sum + (source[key] ?? 0), 0)
   return (
-    <ScreenGrid layout="gov">
-      <ScreenMetricCard
-        title="在网终端"
-        metric={metrics.terminalsOnline}
-        span={3}
-        foot={
-          metrics.terminalsOnline?.available
-            ? `${metrics.terminalsOnline.source}。${screenFleetScopeNote(metrics.terminalsOnline.value, '')}。「从未上报」单列，不计入在线分子。`
-            : ''
-        }
-        render={(value) => {
-          const text = screenFleetOnlineText(value)
-          return (
-            <ScreenKpi
-              value={text.value}
-              unit={text.unit}
-              label={`最近 ${value.onlineWindowSeconds} 秒有心跳${value.truncated ? '（分母为样本台数）' : ''}`}
-            />
-          )
-        }}
-      />
+    <div className="twin-flow">
+      <div className="twin-flow-node"><b>{screenCount(count(printByStatus, ['pending']))}</b><span>{taskStatusLabel('pending')}</span></div>
+      <i className="twin-pipe" aria-hidden="true" />
+      <div className="twin-flow-node is-pr"><b>{screenCount(count(printByStatus, ['claimed', 'printing']))}</b><span>打印中</span></div>
+      <i className="twin-pipe" aria-hidden="true" />
+      <div className="twin-flow-node is-ok"><b>{screenCount(count(printByStatus, ['completed']))}</b><span>打印完成</span></div>
+      <i className="twin-flow-sep" aria-hidden="true" />
+      <div className="twin-flow-node"><b>{screenCount(count(scanByStatus, ['completed']))}</b><span>扫描完成</span></div>
+      <div className="twin-flow-node is-warn"><b>{screenCount(count(printByStatus, ['failed']))}</b><span>失败待核查</span></div>
+      <div className="twin-flow-node is-muted"><b>{screenCount(count(printByStatus, ['cancelled', 'canceled']))}</b><span>已取消</span></div>
+    </div>
+  )
+}
 
-      <ScreenMetricCard
-        title="累计打印"
-        metric={metrics.printPagesCumulative}
-        span={3}
-        foot="已支付打印订单的内容页数求和：算的是单份文档页，不乘打印份数，不代表物理出纸张数。双面不单独计价，故不拆双面。"
-        render={(value) => (
-          <ScreenKpi
-            value={screenCount(value.totalPages)}
-            unit="页"
-            labelMuted={!value.byColor.available}
-            label={
-              value.byColor.available
-                ? `黑白 ${screenCount(value.byColor.value.blackWhite)} · 彩色 ${screenCount(value.byColor.value.color)}`
-                : `分色未接入：${screenReasonCopy(value.byColor.reason).howTo}`
-            }
-          />
-        )}
-      />
+function Legend({ counts }: { counts: Record<TwinState, number> }) {
+  return (
+    <TwinLegend
+      items={[
+        { state: 'ok', label: `在线 ${counts.ok}` },
+        { state: 'pr', label: `打印中 ${counts.pr}` },
+        { state: 'wa', label: `告警 ${counts.wa}` },
+        { state: 'off', label: `离线 ${counts.off}` },
+        { state: 'un', label: `未上报 ${counts.un}` },
+      ]}
+    />
+  )
+}
 
-      <ScreenMetricCard
-        title="AI 服务调用"
-        metric={metrics.aiCallsCumulative}
-        span={3}
-        foot="AI 服务日志累计。该日志为尽力写入，只作趋势，不作台账。"
-        render={(value) => (
-          <ScreenKpi
-            value={screenCount(value.totalCalls)}
-            unit="次"
-            label="简历诊断 / 优化 / 模拟面试 / 职业规划等"
-          />
-        )}
-      />
+export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
+  const gov = useAdminSnapshot('gov', 60)
+  const ops = useAdminSnapshot('ops', 60, 'gov-tab')
+  if (!gov.data) {
+    return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={gov.failure} onRetry={() => void gov.refresh()} />
+  }
+  const g: ScreenSnapshotMetrics = gov.data.metrics
+  const o: ScreenSnapshotMetrics | null = ops.data ? ops.data.metrics : null
+  const opsPending = !ops.data && !ops.failure
+  const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
+  const terminals = twinTerminalsFromCells(cells)
+  const areas = twinAreas(terminals)
+  const rawArea = chrome.params.get('area')
+  const focus = rawArea !== null && areas.some((a) => a.area === rawArea) ? rawArea : null
+  const highlight = parseHighlight(chrome.params.get('status'))
+  const inView = focus === null ? terminals : terminals.filter((t) => t.area === focus)
+  const counts = countStates(inView)
+  const cityScope = focus === null ? undefined : '全市口径'
+  const openTerminal = (id: string) => chrome.onNavigate(screenHref('terminal', chrome.params, { id }))
+  const areaCodes = new Set(inView.map((t) => t.code))
+  const openAlertTerminal = (code: string) => {
+    const hit = terminals.find((t) => t.code === code)
+    if (hit) openTerminal(hit.id)
+    else chrome.onNavigate('/alerts')
+  }
 
-      <ScreenMetricCard
-        title="在架岗位信息"
-        metric={metrics.jobsOnShelf}
-        span={3}
-        foot="已审核通过 + 已发布 + 未过期。均为第三方 / 官方来源信息，本平台不收简历。"
-        render={(value) => (
-          <ScreenKpi
-            value={screenCount(value.published)}
-            unit="条"
-            label={`来自 ${screenCount(value.sourceOrgCount)} 家信息来源机构`}
-          />
-        )}
-      />
+  const toolbar = (
+    <>
+      <label className="twin-fgrp">
+        <span className="twin-flabel">区域</span>
+        <select
+          className="twin-select"
+          value={focus ?? ''}
+          onChange={(event) => chrome.setParam('area', event.target.value === '' ? null : event.target.value)}
+        >
+          <option value="">全市</option>
+          {areas.map((a) => (
+            <option key={a.area} value={a.area}>
+              {a.area}（{a.count} 台）
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="twin-fgrp" role="group" aria-label="终端状态">
+        <span className="twin-flabel">状态</span>
+        {HIGHLIGHTS.map((h) => (
+          <button
+            key={h.key}
+            type="button"
+            className="twin-chip"
+            aria-pressed={highlight === h.key}
+            onClick={() => chrome.setParam('status', h.key === 'all' ? null : h.key)}
+          >
+            {h.label}
+          </button>
+        ))}
+      </div>
+      <label className="twin-fgrp">
+        <span className="twin-flabel">终端</span>
+        <input
+          className="twin-search"
+          type="search"
+          list="twin-terminal-codes"
+          placeholder="输入终端编号直达"
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return
+            const code = event.currentTarget.value.trim().toUpperCase()
+            const hit = terminals.find((t) => t.code.toUpperCase() === code)
+            if (hit) openTerminal(hit.id)
+          }}
+        />
+        <datalist id="twin-terminal-codes">
+          {terminals.map((t) => (
+            <option key={t.id} value={t.code} />
+          ))}
+        </datalist>
+      </label>
+    </>
+  )
 
-      <ScreenMetricCard
-        title="终端状态墙"
-        tag={metrics.fleetWall?.available ? `${screenCount(metrics.fleetWall.value.matchedCount)} 台` : undefined}
-        metric={metrics.fleetWall}
-        span={6}
-        tall
-        foot={
-          metrics.fleetWall?.available
-            ? `每格一台终端，按终端编号排序。${screenFleetScopeNote(metrics.fleetWall.value, '')}。「从未上报」= 已注册但没有过任何心跳，与「离线」分开计。`
-            : ''
-        }
-        render={(value) => <ScreenFleetWall value={value} scopeLabel="" />}
-      />
-
-      <ScreenMetricCard
-        title="信息归集"
-        tag="在架量"
-        metric={metrics.contentInventory}
-        span={6}
-        tall
-        foot="「在架」= 审核通过且已发布且未过期。待审核为 pending 与 reviewing 的合计，服务端不单独下发两者，故此处不拆。"
-        render={(value) => (
-          <ScreenMiniGrid
-            items={[
-              {
-                value: screenCount(value.jobsPublished),
-                label: '岗位信息',
-                hint: `待审核 ${screenCount(value.jobsPending)} 条（含审核中）`,
-              },
-              {
-                value: screenCount(value.fairsPublished),
-                label: '招聘会信息',
-                hint: `待审核 ${screenCount(value.fairsPending)} 条（含审核中）`,
-              },
-              {
-                value: screenCount(value.policiesPublished),
-                label: '政策公告',
-                hint: `待审核 ${screenCount(value.policiesPending)} 条（含审核中）`,
-              },
-              {
-                value: screenCount(value.companiesPublished),
-                label: '企业展示',
-                hint: `待审核 ${screenCount(value.companiesPending)} 条（含审核中）`,
-              },
-            ]}
-          />
-        )}
-      />
-
-      <ScreenMetricCard
-        title="AI 服务分项"
-        tag="近 24 小时"
-        metric={metrics.aiBreakdown24h}
-        span={3}
-        foot="AI 服务日志近 24 小时滚动窗（非自然日）。失败含超时与上游拒绝。"
-        render={(value) => {
-          const rows: ScreenBarItem[] = Object.entries(value.byOperation)
-            .map(([operation, count]) => ({ label: aiOperationLabel(operation), value: count }))
-            .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-            .slice(0, 4)
-          if (value.failedCalls > 0 || value.totalCalls > 0) {
-            rows.push({ label: '调用失败', value: value.failedCalls, tone: 'error' })
+  return (
+    <TwinShell
+      chrome={chrome}
+      title={TITLE}
+      subtitle={SUBTITLE}
+      layout="city"
+      toolbar={toolbar}
+      snapshot={gov.data}
+      pollSeconds={60}
+      failure={gov.failure}
+      onRefresh={() => {
+        void gov.refresh()
+        void ops.refresh()
+      }}
+      refreshing={gov.status === 'loading'}
+    >
+      <TwinSlot slot="l1">
+        <TwinMetricPanel
+          title={focus === null ? '终端与服务' : `${focus}终端`}
+          sub="实时"
+          metric={g.terminalsOnline}
+          source={
+            g.terminalsOnline?.available
+              ? `终端心跳投影，最近 ${g.terminalsOnline.value.onlineWindowSeconds} 秒有心跳算在线。${screenFleetScopeNote(g.terminalsOnline.value, '')}。` +
+                (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在区统计，由机队样本算出。')
+              : ''
           }
-          return <ScreenBarList items={rows} emptyText="近 24 小时没有 AI 调用记录" />
-        }}
-      />
+          render={(value) => {
+            const online = focus === null ? value.healthy : counts.ok + counts.pr
+            const total = focus === null ? value.sampledCount : inView.length
+            return (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+                  <TwinRing value={online} total={total}>
+                    <span className="twin-big">{screenCount(online)}</span>
+                    <span className="twin-muted" style={{ marginTop: 6 }}>正常 · 共 {screenCount(total)} 台</span>
+                  </TwinRing>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="twin-kv">
+                      <span>累计打印</span>
+                      {g.printPagesCumulative?.available ? (
+                        <b>
+                          {screenCount(g.printPagesCumulative.value.totalPages)}
+                          <span className="twin-unit">页</span>
+                        </b>
+                      ) : (
+                        <span className="twin-pend">未接入</span>
+                      )}
+                    </div>
+                    <div className="twin-kv">
+                      <span>AI 服务调用</span>
+                      {g.aiCallsCumulative?.available ? (
+                        <b>
+                          {screenCount(g.aiCallsCumulative.value.totalCalls)}
+                          <span className="twin-unit">次</span>
+                        </b>
+                      ) : (
+                        <span className="twin-pend">未接入</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="twin-push">
+                  {focus === null ? (
+                    <TwinLegend
+                      items={[
+                        { state: 'ok', label: `正常 ${value.healthy}` },
+                        { state: 'wa', label: `告警 ${value.degraded}` },
+                        { state: 'off', label: `离线 ${value.offline}` },
+                        { state: 'un', label: `未上报 ${value.unknown}` },
+                      ]}
+                    />
+                  ) : (
+                    <Legend counts={counts} />
+                  )}
+                </div>
+              </>
+            )
+          }}
+        />
+      </TwinSlot>
 
-      <ScreenMetricCard
-        title="打印量"
-        tag="近 14 日"
-        metric={metrics.printTrend14d}
-        span={3}
-        foot={
-          metrics.printTrend14d?.available
-            ? metrics.printTrend14d.value.peak
-              ? `按订单支付时间 paidAt 落入的 Asia/Shanghai 自然日聚合。峰值 ${screenCount(metrics.printTrend14d.value.peak.pages)} 页 / 日（${metrics.printTrend14d.value.peak.date}）。`
-              : '按订单支付时间 paidAt 落入的 Asia/Shanghai 自然日聚合。近 14 日无打印记录，折线为真实的零线。'
-            : ''
-        }
-        render={(value) => <ScreenSparkline days={value.days} seriesLabel="每日打印页数" />}
-      />
+      <TwinSlot slot="l2">
+        <TwinMetricPanel
+          title="打印量趋势"
+          sub="近 14 天 · 页"
+          scope={cityScope}
+          metric={g.printTrend14d}
+          source="按订单支付时间落入的上海自然日聚合已支付打印订单的内容页数；不乘份数，不代表物理出纸张数。「今日」是今天零点到现在的累计。"
+          render={(value) => {
+            const days = value.days
+            const today = days.length ? days[days.length - 1].pages : null
+            const yesterday = days.length > 1 ? days[days.length - 2].pages : null
+            return (
+              <>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                  <span className="twin-muted">今日</span>
+                  <span className="twin-big" style={{ fontSize: '1.9em' }}>{today === null ? '—' : screenCount(today)}</span>
+                  {yesterday !== null ? <span className="twin-muted">页 · 昨日 {screenCount(yesterday)} 页</span> : <span className="twin-muted">页</span>}
+                </div>
+                <TwinAreaTrend days={days.map((d) => ({ date: d.date, value: d.pages }))} seriesLabel="近 14 天每日打印页数" />
+              </>
+            )
+          }}
+        />
+      </TwinSlot>
 
-      <ScreenMetricCard
-        title="服务人次"
-        metric={metrics.visitCount}
-        span={3}
-        foot=""
-        render={() => null}
-      />
+      <TwinSlot slot="l3">
+        <TwinMetricPanel
+          title="AI 服务分项"
+          sub="近 24 小时"
+          scope={cityScope}
+          metric={g.aiBreakdown24h}
+          source="AI 服务日志近 24 小时滚动窗（非自然日），只计次数，不含对话与简历内容。失败含超时与上游拒绝。"
+          render={(value) => {
+            const rows: TwinBarItem[] = Object.entries(value.byOperation)
+              .map(([operation, count]) => ({ label: aiOperationLabel(operation), value: count }))
+              .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+              .slice(0, 4)
+            if (value.totalCalls > 0) rows.push({ label: '调用失败', value: value.failedCalls, tone: 'error' })
+            return (
+              <>
+                <TwinBarList items={rows} emptyText="近 24 小时没有 AI 调用记录" />
+                <p className="twin-cap twin-push">
+                  共 {screenCount(value.totalCalls)} 次 · 失败 {screenCount(value.failedCalls)} 次
+                </p>
+              </>
+            )
+          }}
+        />
+      </TwinSlot>
 
-      <ScreenMetricCard
-        title="耗材余量 / 终端地图"
-        metric={metrics.suppliesAndMap}
-        span={3}
-        foot=""
-        render={() => null}
-      />
-    </ScreenGrid>
+      <TwinSlot slot="scene">
+        {g.fleetWall?.available ? (
+          chrome.lite ? (
+            <div style={{ padding: 20 }}>
+              <ScreenFleetWall value={g.fleetWall.value} scopeLabel="" />
+            </div>
+          ) : (
+            <>
+              <TwinSceneBox baseWidth={TWIN_STAGE_W} baseHeight={TWIN_STAGE_H} label="终端分布数字孪生">
+                <TwinCity
+                  terminals={terminals}
+                  focusArea={focus}
+                  highlight={highlight}
+                  unassignedLabel={UNASSIGNED}
+                  hubLabel="数据中枢"
+                  emptyText="还没有登记的终端。终端注册并上报心跳后会出现在这里。"
+                  onSelectArea={(area) => chrome.setParam('area', area)}
+                  onSelectTerminal={(t) => openTerminal(t.id)}
+                />
+              </TwinSceneBox>
+              <div className="twin-overlay is-tl">
+                {focus === null ? (
+                  <span>
+                    终端分布 · {screenCount(g.fleetWall.value.matchedCount)} 台 · 按所在区示意
+                    {g.fleetWall.value.truncated ? `（显示前 ${screenCount(g.fleetWall.value.sampledCount)} 台）` : ''}
+                  </span>
+                ) : (
+                  <>
+                    <button type="button" className="twin-crumb" onClick={() => chrome.setParam('area', null)}>
+                      全市
+                    </button>
+                    <span aria-hidden="true">›</span>
+                    <b>{focus}</b>
+                    <span className="twin-muted">· 点立柱查看单台终端</span>
+                  </>
+                )}
+              </div>
+              <div className="twin-overlay is-tr">
+                <Legend counts={counts} />
+              </div>
+            </>
+          )
+        ) : (
+          <TwinPanel title="终端分布" source="终端心跳投影。">
+            <p className="twin-cap">终端列表本次没有取到，城区孪生暂不显示；其余面板不受影响。</p>
+          </TwinPanel>
+        )}
+      </TwinSlot>
+
+      <TwinSlot slot="bottom">
+        {focus !== null ? (
+          <TwinPanel title={`${focus}终端一览`} sub="按状态排序 · 点击进入单台孪生" source="按终端所在区筛选的机队样本。">
+            <div className="twin-chips">
+              {[...inView]
+                .sort((a, b) => {
+                  const rank: Record<TwinState, number> = { off: 0, wa: 1, un: 2, pr: 3, ok: 4 }
+                  return rank[twinTerminalState(a)] - rank[twinTerminalState(b)] || a.code.localeCompare(b.code)
+                })
+                .map((t) => {
+                  const st = twinTerminalState(t)
+                  return (
+                    <button key={t.id} type="button" className="twin-alert" onClick={() => openTerminal(t.id)}>
+                      <span className={`twin-sev ${st === 'off' ? 'is-err' : st === 'un' ? 'is-un' : st === 'pr' ? 'is-pr' : st === 'ok' ? 'is-ok' : ''}`}>
+                        {st === 'off' ? '离线' : st === 'wa' ? '告警' : st === 'un' ? '未上报' : st === 'pr' ? '打印中' : '在线'}
+                      </span>
+                      <span className="twin-code">{t.code}</span>
+                    </button>
+                  )
+                })}
+            </div>
+          </TwinPanel>
+        ) : opsPending ? (
+          <TwinPanel title="近 24 小时任务流" source="打印与扫描任务按状态计数。">
+            <p className="twin-cap">正在取数…</p>
+          </TwinPanel>
+        ) : (
+          <TwinMetricPanel
+            title="近 24 小时任务流"
+            sub="打印与扫描"
+            metric={o?.taskFlow24h}
+            source="打印任务与扫描任务近 24 小时按当前状态计数；失败需人工核查，详见打印扫描运维。"
+            render={(value) => <TaskFlow printByStatus={value.printByStatus} scanByStatus={value.scanByStatus} />}
+          />
+        )}
+      </TwinSlot>
+
+      <TwinSlot slot="r1">
+        <TwinMetricPanel
+          title="信息服务 · 在架"
+          sub={focus === null ? '第三方 / 官方来源' : '全市发布 · 不分区'}
+          tone="info"
+          metric={g.contentInventory}
+          source="「在架」= 审核通过且已发布且未过期。待审核为待审与审核中的合计。均为第三方 / 官方来源信息，本平台不收简历、不代投递。"
+          render={(value) => (
+            <>
+              <TwinTiles
+                items={[
+                  { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
+                  { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
+                  { value: screenCount(value.policiesPublished), unit: '条', label: '政策公告', hint: `待审核 ${screenCount(value.policiesPending)}` },
+                  { value: screenCount(value.companiesPublished), unit: '家', label: '企业展示', hint: `待审核 ${screenCount(value.companiesPending)}` },
+                ]}
+              />
+              <p className="twin-cap twin-push">
+                {g.jobsOnShelf?.available ? `来自 ${screenCount(g.jobsOnShelf.value.sourceOrgCount)} 家来源机构 · ` : ''}本平台不收简历、不代投递
+              </p>
+            </>
+          )}
+        />
+      </TwinSlot>
+
+      <TwinSlot slot="r2">
+        {opsPending ? (
+          <TwinPanel title="来源平台访问" tone="info" source={SCREEN_SOURCE_ENTRY_NOTE}>
+            <p className="twin-cap">正在取数…</p>
+          </TwinPanel>
+        ) : (
+          <TwinMetricPanel
+            title="来源平台访问"
+            sub="近 30 天 · Top 5"
+            scope={cityScope}
+            tone="info"
+            metric={o?.sourceEntryOpensTop}
+            source={SCREEN_SOURCE_ENTRY_NOTE}
+            render={(value) => (
+              <>
+                <TwinBarList
+                  items={value.items.slice(0, 5).map((item) => ({ label: item.sourceName, value: item.count, tone: 'info' as const }))}
+                  emptyText={`近 30 天没有达到 ${value.minSampleThreshold} 次的来源入口`}
+                />
+                <p className="twin-cap twin-push">统计打开来源平台入口的次数，不是投递结果</p>
+              </>
+            )}
+          />
+        )}
+      </TwinSlot>
+
+      <TwinSlot slot="r3">
+        {opsPending ? (
+          <TwinPanel title="实时告警" tone="err" source="与告警中心同一份实时派生告警。">
+            <p className="twin-cap">正在取数…</p>
+          </TwinPanel>
+        ) : (
+          <TwinMetricPanel
+            title={focus === null ? '实时告警' : `${focus}告警`}
+            sub={o?.alertsRealtime?.available ? `当前 ${screenCount(o.alertsRealtime.value.firingCount)} 条` : undefined}
+            tone="err"
+            metric={o?.alertsRealtime}
+            source="与告警中心同一份实时派生告警（终端离线、打印机异常等），按发生时间倒序。处置请到告警中心。"
+            render={(value) => {
+              const items = focus === null ? value.items : value.items.filter((item) => item.terminalCode !== null && areaCodes.has(item.terminalCode))
+              return (
+                <>
+                  <TwinAlertList items={alertRows(items, openAlertTerminal)} emptyText={focus === null ? '当前没有告警' : `${focus}当前没有告警`} />
+                  <a className="twin-cap twin-push" href="/alerts" onClick={(event) => { event.preventDefault(); chrome.onNavigate('/alerts') }} style={{ alignSelf: 'flex-end', minHeight: 44, display: 'inline-flex', alignItems: 'center', color: '#9fe8cd' }}>
+                    进入告警中心 →
+                  </a>
+                </>
+              )
+            }}
+          />
+        )}
+      </TwinSlot>
+    </TwinShell>
   )
 }
