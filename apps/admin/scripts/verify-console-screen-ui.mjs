@@ -133,6 +133,7 @@ check(
 )
 
 // ── 4. 跨机构隔离与非法参数 ───────────────────────────────────────────────
+// 每端第一个 fetch 必须是快照（下面两条按「第一个」取）；其后只允许单台孪生与使用统计两个端点。
 check(!/['"]\/admin\//.test(stripComments(partnerService)), '机构侧取数没有引用任何 /admin 端点')
 check(!/orgId/.test(stripComments(partnerService)), '机构侧取数不出现 orgId（服务端只从鉴权用户回源）')
 const partnerUrl = partnerService.match(/fetch\(`([^`]+)`/)
@@ -158,6 +159,29 @@ for (const file of allFiles) {
   const code = stripComments(file.source)
   check(!/[?&]t=\$\{Date\.now\(\)\}|_=\$\{Date\.now\(\)\}/.test(code), `${file.path} 没有缓存穿透参数`)
 }
+// 孪生大屏新增了单台孪生与使用统计两个端点：两端的每一个 fetch 地址都必须在白名单里，
+// 唯一允许的 query 是经白名单纠正过的 range（today / 7d / 30d），非法值不发给服务端。
+const PARTNER_URLS = [
+  '${API_BASE_URL}/partner/screen/snapshot',
+  '${API_BASE_URL}/partner/screen/terminals/${encodeURIComponent(terminalId)}',
+  '${API_BASE_URL}/partner/screen/usage?range=${normalizeUsageRange(range)}',
+]
+const ADMIN_URLS = [
+  '${API_BASE_URL}/admin/screen/snapshot?profile=${profile}',
+  '${API_BASE_URL}/admin/screen/terminals/${encodeURIComponent(terminalId)}',
+  '${API_BASE_URL}/admin/screen/usage?range=${normalizeUsageRange(range)}',
+]
+for (const [name, service, allowed] of [['机构', partnerService, PARTNER_URLS], ['管理员', adminService, ADMIN_URLS]]) {
+  const urls = [...stripComments(service).matchAll(/fetch\(`([^`]+)`/g)].map((m) => m[1])
+  check(
+    urls.length === allowed.length && urls.every((url) => allowed.includes(url)),
+    `${name}侧只打快照 / 单台孪生 / 使用统计三个端点，参数都在白名单里（实际 ${urls.join(' | ')}）`,
+  )
+  check(
+    /export function normalizeUsageRange\(raw: string \| null \| undefined\): ScreenUsageRange \{\s*return raw === '7d' \|\| raw === '30d' \? raw : 'today'/.test(service),
+    `${name}侧 range 只有 today / 7d / 30d，其余一律纠正为 today`,
+  )
+}
 
 // ── 5. 信封口径：admin 解 data，partner 读裸对象 ──────────────────────────
 check(/\(payload as \{ data\?: unknown \}\)\.data/.test(adminService), '管理员侧解 ApiResponse 信封的 data')
@@ -181,9 +205,26 @@ check(
     && /displayToken === 'not_issued'/.test(read('apps/partner/src/routes/screen/screenMeta.ts')),
   '页眉如实渲染「未签发免登录展示令牌」的访问口径',
 )
-for (const [name, page] of [['管理员', adminPage], ['机构', partnerPage]]) {
+// 取数失败的整屏说法统一在孪生外壳里（两端共用）；页面只负责把「重新登录」接到用户点击上。
+const twinShell = read('packages/ui/src/screen/twin/TwinShell.tsx')
+check(
+  /result\.kind === 'unauthorized'/.test(twinShell) && /重新登录/.test(twinShell) && /onClick=\{onRelogin\}/.test(twinShell),
+  '孪生外壳 401 渲染「重新登录」按钮，点了才跳转',
+)
+check(!/useEffect\(/.test(stripComments(twinShell)), '孪生外壳没有任何副作用（不会在 401 时自动跳走）')
+for (const [name, page, view] of [
+  ['管理员', adminPage, read('apps/admin/src/routes/screen/screenView.tsx')],
+  ['机构', partnerPage, read('apps/partner/src/routes/screen/screenView.tsx')],
+]) {
   check(!/redirectToLogin\(\)\s*\n\s*\}?\s*,?\s*\n?\s*\/\/ auto/.test(page), `${name}页 401 不静默跳转`)
-  check(/kind === 'unauthorized'/.test(page) && /重新登录/.test(page), `${name}页 401 渲染「重新登录」而不是自动跳走`)
+  check(
+    /onRelogin: \(\) => redirectToLogin\(\)/.test(page) && (page.match(/redirectToLogin\(/g) ?? []).length === 1,
+    `${name}页只把 redirectToLogin 接在「重新登录」这一个用户动作上`,
+  )
+  check(
+    /export \{ TwinFailurePanel as FailurePanel, TwinShell, TwinShellEmpty \} from '@ai-job-print\/ui'/.test(view),
+    `${name}端的整屏失败说法来自共用外壳，不各写一份`,
+  )
 }
 
 // ── 7. 每张卡都有来源脚注 ─────────────────────────────────────────────────
@@ -191,6 +232,18 @@ check(
   /foot: ReactNode/.test(read('packages/ui/src/screen/ScreenPrimitives.tsx')),
   'ScreenCard 的 foot 是必填 prop（类型层面保证，不靠评审）',
 )
+// 孪生面板同样把来源说明做成必填：TwinPanel 与 TwinMetricPanel 的 source 都没有问号。
+const twinPanelSrc = read('packages/ui/src/screen/twin/TwinPanel.tsx')
+check(
+  /export interface TwinPanelProps \{[\s\S]*?^\s{2}source: ReactNode$/m.test(twinPanelSrc)
+    && /export interface TwinMetricPanelProps<T> extends Omit<TwinPanelProps, 'children' \| 'source'> \{[\s\S]*?^\s{2}source: ReactNode$/m.test(twinPanelSrc),
+  'TwinPanel / TwinMetricPanel 的 source 是必填 prop（类型层面保证每块面板都有来源说明）',
+)
+for (const file of screenFiles.filter((f) => /<Twin(Metric)?Panel\b/.test(f.source))) {
+  const opens = (file.source.match(/<Twin(Metric)?Panel\b/g) ?? []).length
+  const sources = (file.source.match(/\ssource=/g) ?? []).length
+  check(sources >= opens, `${file.path} 的 ${opens} 个孪生面板都传了 source（实际 ${sources} 处）`)
+}
 const gridFiles = screenFiles.filter((file) => /Grid\.tsx$/.test(file.path))
 check(gridFiles.length === 3, `三套 profile 的栅格文件都在（实际 ${gridFiles.length}）`)
 for (const file of gridFiles) {
@@ -225,14 +278,25 @@ check(
   /不收简历/.test(read('apps/admin/src/routes/screen/GovGrid.tsx')),
   '政务版在架岗位卡写明「本平台不收简历」',
 )
+check(
+  /不收简历/.test(read('apps/partner/src/routes/screen/PartnerGrid.tsx'))
+    && /不收简历/.test(read('apps/partner/src/routes/screen/PartnerUsageView.tsx')),
+  '机构版总览与信息使用都写明「本平台不收简历」',
+)
+check(
+  /不是投递或预约结果/.test(read('packages/ui/src/screen/twin/TwinInfoFlow.tsx'))
+    && /不是投递结果/.test(read('apps/partner/src/routes/screen/PartnerUsageView.tsx')),
+  '机构版「打开来源平台入口」在场景与面板里都写明不是投递 / 预约结果',
+)
 
 // ── 9. mock 模式一个数字都不出 ────────────────────────────────────────────
 for (const [name, service] of [['管理员', adminService], ['机构', partnerService]]) {
   check(/API_MODE !== 'http'/.test(service) && /kind: 'mock'/.test(service), `${name}侧 mock 模式直接返回 mock，不发请求`)
 }
-for (const [name, page] of [['管理员', adminPage], ['机构', partnerPage]]) {
-  check(/演示模式不展示大屏数值/.test(page), `${name}页 mock 模式渲染明确说明而不是假数据`)
-}
+check(
+  /result\.kind === 'mock'/.test(twinShell) && /演示模式不展示大屏数值/.test(twinShell),
+  '孪生外壳在 mock 模式渲染明确说明而不是假数据（两端共用）',
+)
 
 // ── 10. 机构未接入指标是算出来的，不是写死的清单 ──────────────────────────
 const partnerLabels = read('apps/partner/src/routes/screen/metricLabels.ts')
@@ -263,6 +327,8 @@ for (const file of gridFiles) {
   const code = stripComments(file.source)
   // 栅格里每个 <ScreenCard>/<ScreenMetricCard> 都必须在下一个卡片开始前闭合
   const opens = (code.match(/<Screen(Card|MetricCard)\b/g) ?? []).length
+  // 孪生栅格（GovGrid / PartnerGrid）不用 ScreenCard，改由下方 .twin-panel 的选择器检查与 E2E 的运行时检查守住
+  if (opens === 0 && /<Twin(Metric)?Panel\b/.test(code)) continue
   const closes = (code.match(/<\/ScreenCard>|\/>\s*$/gm) ?? []).length
   check(opens > 0 && closes >= opens, `${file.path} 的卡片逐个闭合，没有卡片套卡片（${opens} 开 / ${closes} 闭）`)
 }
@@ -272,6 +338,11 @@ const CSS_FILES = [
   'packages/ui/src/styles/ops-screen.css',
   'packages/ui/src/styles/ops-screen-blocks.css',
   'packages/ui/src/styles/ops-screen-scale.css',
+  // 孪生大屏：壳 / 面板小件 / 块位与字阶 / 3D 场景
+  'packages/ui/src/styles/twin-screen.css',
+  'packages/ui/src/styles/twin-screen-parts.css',
+  'packages/ui/src/styles/twin-screen-layout.css',
+  'packages/ui/src/styles/twin-screen-3d.css',
 ]
 const css = CSS_FILES.map(read).join('\n')
 for (const rel of CSS_FILES) {
@@ -282,10 +353,11 @@ for (const app of ['admin', 'partner']) {
   const entry = read(`apps/${app}/src/index.css`)
   check(
     CSS_FILES.every((rel) => entry.includes(`@ai-job-print/ui/styles/${rel.split('/').pop()}`)),
-    `apps/${app} 入口引入了全部三份大屏样式（顺序即层叠顺序）`,
+    `apps/${app} 入口引入了全部 ${CSS_FILES.length} 份大屏样式（顺序即层叠顺序）`,
   )
 }
 check(!/\.ops-card\s+\.ops-card/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), '样式里没有卡中卡选择器')
+check(!/\.twin-panel\s+\.twin-panel/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), '样式里没有孪生面板套面板的选择器')
 
 // ── 13. 动效降级 ──────────────────────────────────────────────────────────
 // M4 教训：只断言「字符串存在」是空转的 —— 壳层另有一处 reduced-motion
@@ -302,6 +374,15 @@ check(
   'reduced-motion 下屏底扫描光带被关掉',
 )
 check(/\[data-ops-motion='off'\]/.test(css), '样式提供显式关闭动效的通道')
+check(
+  reducedBlocks.some((block) => ['.tw3-flow', '.tw3-fl', '.tw3-ring', '.tw3-sweep', '.tw3-beam'].every((sel) => block.includes(sel)) && /animation: none !important/.test(block)),
+  'reduced-motion 下孪生场景的流线、脉冲环、扫描与光柱都被关掉',
+)
+check(
+  reducedBlocks.some((block) => /\.twin \*/.test(block) && /animation: none !important/.test(block))
+    && /\[data-ops-motion='off'\] \.twin \*/.test(css),
+  '孪生面板的动效同样随 reduced-motion 与「关闭动效」一起停下'
+)
 check(
   /animation: none !important/.test(css),
   '降级时动效被强制关闭',
@@ -363,17 +444,32 @@ for (const app of ['admin', 'partner']) {
     /const headingLevel = presenting \? 1 : 2/.test(page),
     `apps/${app} 按是否全屏演示决定标题层级（嵌入 h2 / 全屏 h1）`,
   )
-  const headerOpens = (page.match(/<Screen(Header|Shell)\b/g) ?? []).length
-  const headerLevels = (page.match(/headingLevel=\{headingLevel\}/g) ?? []).length
+  // 孪生大屏的页眉都在共用外壳里：页面只把层级放进下发给各页签的 chrome，外壳原样透传
   check(
-    headerOpens > 0 && headerLevels === headerOpens,
-    `apps/${app} 的 ${headerOpens} 个页眉调用点都显式传了 headingLevel（实际 ${headerLevels} 处）`,
+    /const chrome: ScreenChrome = \{\s*headingLevel,/.test(page),
+    `apps/${app} 把按展示与否算出的 headingLevel 放进下发给各页签的 chrome`,
   )
   check(
-    /headingLevel: ScreenHeadingLevel/.test(view) && /headingLevel=\{headingLevel\}/.test(view),
-    `apps/${app} 的 ScreenShell 把 headingLevel 透传下去，不自己决定层级`,
+    /headingLevel: ScreenHeadingLevel/.test(view) && /export type ScreenChrome = TwinChrome & \{ headingLevel: ScreenHeadingLevel \}/.test(view),
+    `apps/${app} 的 chrome 类型把 headingLevel 收窄为 1 | 2，不自己决定层级`,
   )
 }
+const twinFrame = read('packages/ui/src/screen/twin/TwinFrame.tsx')
+check(
+  (twinShell.match(/headingLevel=\{headingLevel\}/g) ?? []).length >= 4
+    && /const headingLevel = chrome\.headingLevel/.test(twinShell),
+  '孪生外壳把 chrome 的 headingLevel 原样透传给页眉与块位（有数据 / 无数据两种外壳都是）',
+)
+check(
+  /^\s{2}headingLevel: ScreenHeadingLevel$/m.test(twinFrame)
+    && /const Heading = headingLevel === 1 \? 'h1' : 'h2'/.test(twinFrame)
+    && !/headingLevel\s*=\s*[12]/.test(stripComments(twinFrame)),
+  '孪生页眉按层级渲染真实 h1 / h2，headingLevel 必填且没有默认值',
+)
+check(
+  /TwinPanelHeadingContext\.Provider value=\{headingLevel === 1 \? 2 : 3\}/.test(twinFrame),
+  '孪生面板标题比页眉低一级（页眉 h1 → 面板 h2；页眉 h2 → 面板 h3）',
+)
 // 不许用 CSS 把多出来的 h1 藏掉：那只骗眼睛，读屏器和 locator 照样看得见
 check(
   !/\.ops-hd\s+h1\s*\{[^}]*display:\s*none/.test(css),
@@ -384,6 +480,10 @@ check(
   (css.match(/\.ops-hd :is\(h1, h2\)/g) ?? []).length >= 3,
   '页眉字阶三处（基础 / wall / desk）都同时覆盖 h1 与 h2',
 )
+check(
+  (css.match(/\.twin-hd :is\(h1, h2\)/g) ?? []).length >= 3,
+  '孪生页眉字阶三处（基础 / wall / desk）都同时覆盖 h1 与 h2',
+)
 
 // ── 15. 路由与侧栏接线 ────────────────────────────────────────────────────
 const adminRoutes = read('apps/admin/src/routes/index.tsx')
@@ -392,6 +492,19 @@ const partnerRoutes = read('apps/partner/src/routes/index.tsx')
 const partnerLayout = read('apps/partner/src/layouts/PartnerLayoutWrapper.tsx')
 check(/path: 'screen',\s*element: <ScreenPage \/>/.test(adminRoutes), '管理员 /screen 路由已注册')
 check(/path: 'screen',\s*element: <ScreenPage \/>/.test(partnerRoutes), '机构 /screen 路由已注册')
+check(
+  /path: 'screen\/:tab',\s*element: <ScreenPage \/>/.test(adminRoutes) && /path: 'screen\/:tab',\s*element: <ScreenPage \/>/.test(partnerRoutes),
+  '两端 /screen/:tab 页签路由已注册（每个页签一个地址）',
+)
+check(
+  /location\.pathname\.startsWith\('\/screen\/'\) \? 'screen'/.test(adminLayout) && /location\.pathname\.startsWith\('\/screen\/'\) \? 'screen'/.test(partnerLayout),
+  '两端侧栏在 /screen/* 页签下仍高亮「数据大屏」',
+)
+check(
+  /if \(raw === 'gov' \|\| raw === 'usage' \|\| raw === 'ops' \|\| raw === 'terminal'\) return raw/.test(read('apps/admin/src/routes/screen/screenTabs.ts'))
+    && /return raw === 'usage' \|\| raw === 'terminal' \? raw : 'overview'/.test(read('apps/partner/src/routes/screen/screenTabs.ts')),
+  '非法页签在前端纠正为默认页签，不渲染未知视图',
+)
 check(/'\/screen':\s*'screen'/.test(adminLayout) && /key: 'screen'/.test(adminLayout), '管理员侧栏有数据大屏入口')
 check(/'\/screen':\s*'screen'/.test(partnerLayout) && /key: 'screen'/.test(partnerLayout), '机构侧栏有数据大屏入口')
 check(

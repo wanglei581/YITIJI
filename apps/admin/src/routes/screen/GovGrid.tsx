@@ -62,7 +62,9 @@ function alertRows(items: ScreenAlertItem[], onOpen: (code: string) => void, pre
 }
 
 function TaskFlow({ printByStatus, scanByStatus }: { printByStatus: Record<string, number>; scanByStatus: Record<string, number> }) {
-  const count = (source: Record<string, number>, keys: string[]) => keys.reduce((sum, key) => sum + (source[key] ?? 0), 0)
+  // 只累加服务端实际下发的状态键：没下发的状态就是这 24 小时里一条都没有，不另补数
+  const count = (source: Record<string, number>, keys: string[]) =>
+    Object.entries(source).reduce((sum, [key, value]) => (keys.includes(key) ? sum + value : sum), 0)
   return (
     <div className="twin-flow">
       <div className="twin-flow-node"><b>{screenCount(count(printByStatus, ['pending']))}</b><span>{taskStatusLabel('pending')}</span></div>
