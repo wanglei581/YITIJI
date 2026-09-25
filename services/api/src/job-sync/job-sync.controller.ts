@@ -20,6 +20,10 @@ import { JobSyncService } from './job-sync.service'
 import { UnpublishSourceContentDto, UpdateSourceEnabledDto } from './dto/source-operations.dto'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { UpdateResponseConfigDto } from './dto/response-config.dto'
+import {
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 
 /**
  * 路由前缀：/api/v1（由 main.ts 全局设置）
@@ -47,6 +51,8 @@ export class JobSyncController {
   async triggerSync(
     @Param('sourceId') sourceId: string,
   ): Promise<ApiResponse<{ queued: boolean; jobId: string | null; sourceId: string }>> {
+    // 关闭时不能回 202 queued:true。定时轮询仍在 service 里静默跳过，不走这个入口。
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     let sourceInfo: { name: string; syncFreq: string; lastSyncAt: Date | null }
     try {
       sourceInfo = await this.service.getSourceForTrigger(sourceId)

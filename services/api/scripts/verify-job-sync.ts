@@ -22,6 +22,7 @@
  */
 import 'dotenv/config'
 import { JobSyncService } from '../src/job-sync/job-sync.service'
+import { JobSyncController } from '../src/job-sync/job-sync.controller'
 import { PrismaService } from '../src/prisma/prisma.service'
 import type { AuditService } from '../src/audit/audit.service'
 import type { JobQualityService } from '../src/job-ai/job-quality.service'
@@ -260,6 +261,20 @@ async function main() {
       const due = await syncService.enqueueDueSources()
       if (due !== 0) fail(`托管关闭时定时同步仍入队 ${due}`)
       else pass('托管关闭时定时同步不入队')
+      // 期望 403，不是从当前实现抄来的：需求禁止把「没入队」说成已触发同步。
+      const controller = new JobSyncController(syncService)
+      try {
+        await controller.triggerSync(goodSourceId)
+        fail('托管关闭时手动同步不应返回已排队')
+      } catch (error) {
+        const response = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+        const status = (error as { getStatus?: () => number }).getStatus?.()
+        if (response?.error?.code !== 'RECRUITMENT_HOSTING_DISABLED' || status !== 403) {
+          fail(`托管关闭时手动同步应 403 RECRUITMENT_HOSTING_DISABLED，实际 ${status ?? '无状态'} ${response?.error?.code ?? (error as Error).message}`)
+        } else {
+          pass('托管关闭时手动同步 403 RECRUITMENT_HOSTING_DISABLED')
+        }
+      }
       const queued = await syncService.enqueue(goodSourceId, true)
       if (queued !== null) fail('托管关闭时手动同步仍入队')
       else pass('托管关闭时手动同步不入队')
