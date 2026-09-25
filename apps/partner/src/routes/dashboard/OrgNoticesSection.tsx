@@ -74,8 +74,7 @@ export function OrgNoticesSection() {
           <>
             {data.truncated && (
               <p className="border-b border-warning/20 bg-warning-bg px-5 py-2.5 text-xs text-warning-fg" role="status">
-                共 <strong className="tabular-nums">{data.total}</strong> 条处置通知，这里只显示最新 {data.items.length} 条。
-                其余通知没有丢失，如需完整记录请联系平台运营。
+                共 <strong className="tabular-nums">{data.total}</strong> 条处置通知，这里只显示最新 {data.items.length} 条。其余通知没有丢失，如需完整记录请联系平台运营。
               </p>
             )}
             <ul className="divide-y divide-neutral-900/[0.06]">

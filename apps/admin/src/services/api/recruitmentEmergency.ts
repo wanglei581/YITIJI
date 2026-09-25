@@ -6,7 +6,9 @@
 //   POST /admin/recruitment-emergency/takedown       裸对象
 //   POST /admin/recruitment-emergency/circuit-break  裸对象
 // API_MODE=mock → 演示数据。托管开关默认打开（保持既有演示与用例口径）；
-//   浏览器里 localStorage['mock:recruitment-hosting'] = 'off' 时按关闭演示（只在 mock 下读）。
+//   浏览器里 localStorage['mock:recruitment-hosting'] = 'off' 时按关闭演示，= 'error' 时模拟
+//   读取失败（页面应按关闭处理并说明读不到）；localStorage['mock:recruitment-emergency'] = 'fail'
+//   时下架 / 熔断按服务端「已被紧急下架」拒绝，用来验证弹窗不自行假定成功。只在 mock 下读。
 //
 // 页面只能按服务端返回的结果说话：下架 / 熔断成功与否以响应为准，不自行假定。
 // ============================================================
@@ -23,6 +25,7 @@ import { authHeader, redirectToLogin } from '../auth'
 import { publishFairSourceRecord, publishJobSourceRecord } from './sources'
 
 export const MOCK_RECRUITMENT_HOSTING_KEY = 'mock:recruitment-hosting'
+export const MOCK_RECRUITMENT_EMERGENCY_KEY = 'mock:recruitment-emergency'
 
 export interface RecruitmentEmergencyServiceInterface {
   /** 部署级托管开关。true = 私有化部署（b）打开；false = 我们云上默认关闭。 */
@@ -94,16 +97,24 @@ const httpAdapter: RecruitmentEmergencyServiceInterface = {
 // ─── Mock adapter ─────────────────────────────────────────────────────────────
 
 function mockHostingEnabled(): boolean {
+  let value: string | null = null
   try {
-    return window.localStorage.getItem(MOCK_RECRUITMENT_HOSTING_KEY) !== 'off'
-  } catch {
-    return true
-  }
+    value = window.localStorage.getItem(MOCK_RECRUITMENT_HOSTING_KEY)
+  } catch { /* 读不到按默认演示 */ }
+  if (value === 'error') throw new ApiHttpError('NETWORK_ERROR', '网络连接失败，请检查网络后重试', 0)
+  return value !== 'off'
 }
 
 function assertMockReason(reasonCode: string, reasonText: string): void {
   if (!reasonCode || !reasonText.trim()) {
     throw new ApiHttpError('TAKEDOWN_REASON_REQUIRED', '紧急下架必须选择事由并填写说明', 403)
+  }
+  let mode: string | null = null
+  try {
+    mode = window.localStorage.getItem(MOCK_RECRUITMENT_EMERGENCY_KEY)
+  } catch { /* 读不到按默认演示 */ }
+  if (mode === 'fail') {
+    throw new ApiHttpError('EMERGENCY_TAKEDOWN_IRREVERSIBLE', '该内容已紧急下架，不能恢复', 403)
   }
 }
 

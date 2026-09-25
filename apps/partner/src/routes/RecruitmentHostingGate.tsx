@@ -45,8 +45,7 @@ export function RecruitmentHostingGate({ page, children }: { page: RecruitmentHo
         </div>
         <h2 className="mt-3 text-[15px] font-bold text-neutral-800">本平台不提供{meta.subject}托管</h2>
         <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-          本平台已关闭岗位、招聘会与企业资料的托管：不接收导入与同步，也不在一体机和小程序上展示这类内容，
-          所以这一页在这里不可用。这不是故障，也不是本机构的数据出了问题。
+          本平台已关闭岗位、招聘会与企业资料的托管：不接收导入与同步，也不在一体机和小程序上展示这类内容，所以这一页在这里不可用。这不是故障，也不是本机构的数据出了问题。
         </p>
         <p className="mt-2 text-sm leading-relaxed text-neutral-600">
           本机构的政策公告仍可在「政策公告管理」里自行审核、发布。

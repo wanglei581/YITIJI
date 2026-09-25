@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2Icon, ZapOffIcon } from 'lucide-react'
 import type { RecruitmentCircuitBreakResult, RecruitmentCircuitBreakScope } from '@ai-job-print/shared'
 import { recruitmentEmergencyService } from '../../../services/api/recruitmentEmergency'
@@ -40,6 +40,7 @@ export function CircuitBreakDialog({
 }: {
   target: CircuitBreakTarget | null
   onClose: () => void
+  /** 服务端确认过的熔断，在操作者看完结果、关掉弹窗时调用（理由同紧急下架弹窗）。 */
   onDone?: (result: RecruitmentCircuitBreakResult) => void
 }) {
   const [reason, setReason] = useState<EmergencyReasonValue>(EMPTY_EMERGENCY_REASON)
@@ -57,6 +58,15 @@ export function CircuitBreakDialog({
     setResult(null)
   }, [targetKey])
 
+  // 关弹窗的唯一出口：有已确认的结果时先交给页面刷新，再关。
+  const close = () => {
+    if (submitting) return
+    if (result) onDone?.(result)
+    onClose()
+  }
+  const closeRef = useRef(close)
+  useEffect(() => { closeRef.current = close })
+
   // 捕获阶段挂在 window 上并截住 Escape：弹窗可能叠在抽屉上，抽屉自己也监听 Escape，
   // 不截住的话一次 Escape 会把下面的抽屉一起关掉。
   useEffect(() => {
@@ -64,11 +74,11 @@ export function CircuitBreakDialog({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       e.stopPropagation()
-      if (!submitting) onClose()
+      closeRef.current()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [target, submitting, onClose])
+  }, [target])
 
   if (!target) return null
 
@@ -87,7 +97,6 @@ export function CircuitBreakDialog({
         reasonText: reason.reasonText.trim(),
       })
       setResult(res)
-      onDone?.(res)
     } catch (e) {
       setError(userMessageOf(e, '熔断没有成功，状态未改变，请稍后重试'))
     } finally {
@@ -100,7 +109,7 @@ export function CircuitBreakDialog({
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose() }}
+      onClick={(e) => { if (e.target === e.currentTarget) close() }}
     >
       <div
         className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-surface shadow-xl"
@@ -173,7 +182,7 @@ export function CircuitBreakDialog({
           {result ? (
             <button
               type="button"
-              onClick={onClose}
+              onClick={close}
               className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
             >
               完成
@@ -182,7 +191,7 @@ export function CircuitBreakDialog({
             <>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={close}
                 disabled={submitting}
                 className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
               >

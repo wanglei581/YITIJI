@@ -371,14 +371,12 @@ export default function StatsPage() {
             <SnapshotRow snapshot={data.snapshot} recruitmentHosting={recruitmentHosting} />
             {recruitmentHosting && data.snapshot.pendingReview > data.snapshot.pendingReviewPolicies && (
               <p className="mt-2.5 text-xs text-neutral-500">
-                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReview - data.snapshot.pendingReviewPolicies}</strong> 条岗位、招聘会或企业资料待管理员审核，
-                通过并发布后才会在终端展示。
+                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReview - data.snapshot.pendingReviewPolicies}</strong> 条岗位、招聘会或企业资料待管理员审核，通过并发布后才会在终端展示。
               </p>
             )}
             {data.snapshot.pendingReviewPolicies > 0 && (
               <p className="mt-2.5 text-xs text-neutral-500">
-                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReviewPolicies}</strong> 条政策待本机构自行审核，
-                审核通过并确认发布后才会在终端展示。
+                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReviewPolicies}</strong> 条政策待本机构自行审核，审核通过并确认发布后才会在终端展示。
               </p>
             )}
           </section>

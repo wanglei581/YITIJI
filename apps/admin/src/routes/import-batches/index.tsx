@@ -128,7 +128,10 @@ export default function ImportBatchesPage() {
       title="Excel 导入记录"
       subtitle={hostingOff ? '合作机构 Excel 批量导入的历史批次（导入已停止，只读）' : '合作机构 Excel 批量导入的历史批次，确认后进入审核队列'}
     >
-      <RecruitmentHostingNotice hosting={hosting} subject="Excel 导入的岗位与招聘会" />
+      <RecruitmentHostingNotice
+        hosting={hosting}
+        detail="机构的 Excel 导入已停止，管理员也不再审核发布导入的岗位与招聘会。本页只保留历史批次，供查看与追溯。"
+      />
 
       {/* 搜索 + 状态筛选 */}
       <div className="mb-4 flex flex-wrap items-center gap-3">

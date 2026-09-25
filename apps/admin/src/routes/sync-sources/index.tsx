@@ -335,7 +335,10 @@ export default function SyncSourcesPage() {
         </button>
       }
     >
-      <RecruitmentHostingNotice hosting={hosting} subject="数据源的同步、启停与字段映射" />
+      <RecruitmentHostingNotice
+        hosting={hosting}
+        detail="数据源不再同步、启停或配置字段映射，本页只保留查看与按来源熔断。熔断是单向操作，提交后不能撤销，并会自动通知受影响的机构。"
+      />
       {/* 说明 */}
       {hosting.writable && (
         <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">

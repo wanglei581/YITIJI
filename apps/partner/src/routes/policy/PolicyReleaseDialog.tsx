@@ -81,8 +81,7 @@ export function PolicyReleaseDialog({
         </dl>
 
         <p className="mt-3 text-xs leading-relaxed text-neutral-600">
-          发布后，一体机「政策服务」页展示这一版本，并标注由{publisher}发布。平台不审核、不代发政策，只在违法违规等紧急情况下单向下架。
-          之后如需修改，保存修改会生成新的内容版本并自动撤下、回到待审核，须重新审核通过并确认发布后才会再展示。
+          发布后，一体机「政策服务」页展示这一版本，并标注由{publisher}发布。平台不审核、不代发政策，只在违法违规等紧急情况下单向下架。之后如需修改，保存修改会生成新的内容版本并自动撤下、回到待审核，须重新审核通过并确认发布后才会再展示。
         </p>
 
         <label className="mt-4 flex items-start gap-2.5 rounded-lg border border-primary-200 bg-primary-50/40 px-3 py-3 text-sm text-neutral-800">
