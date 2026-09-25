@@ -26,7 +26,6 @@ export function unprintableFileReason(file: FileSnapshot, now: Date): 'missing' 
   if (file.deletedAt) return 'deleted'
   if (file.expiresAt && file.expiresAt.getTime() <= now.getTime()) return 'expired'
   if (file.status !== 'active') return 'not_active'
-  if (file.deletedAt !== null) return 'not_active'
   return null
 }
 
