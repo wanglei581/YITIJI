@@ -23481,6 +23481,7 @@
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "services/api/src/terminals/kiosk-job-board.service.ts": [
+      "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/terminals/printer-availability.ts": [
@@ -29984,7 +29985,8 @@
           "services/api/src/jobs/jobs.service.ts",
           "services/api/src/offline-agencies/admin-offline-agencies.controller.ts",
           "services/api/src/offline-agencies/offline-agencies.service.ts",
-          "services/api/src/prisma/prisma.service.ts"
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
         ],
         "missing": []
       },

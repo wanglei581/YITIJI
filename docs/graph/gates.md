@@ -2352,7 +2352,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/terminals/dto/heartbeat.dto.ts` | `verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-network-diagnostics.ts` |
 | `services/api/src/terminals/dto/record-toolbox-launch-event.dto.ts` | `verify-toolbox-launch-events.ts` |
 | `services/api/src/terminals/dto/save-toolbox-config.dto.ts` | `verify-terminal-device-config.ts` |
-| `services/api/src/terminals/kiosk-job-board.service.ts` | `verify-kiosk-job-board-switch.ts` |
+| `services/api/src/terminals/kiosk-job-board.service.ts` | `verify-backend-p0-http.ts`<br/>`verify-kiosk-job-board-switch.ts` |
 | `services/api/src/terminals/printer-availability.ts` | `verify-admin-ops.ts` |
 | `services/api/src/terminals/release-observation.service.ts` | `verify-release-observation-contract.mjs` |
 | `services/api/src/terminals/terminal-capabilities.service.ts` | `verify-admin-fairs.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
