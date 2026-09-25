@@ -2047,7 +2047,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/health.controller.ts` | `verify-cjk-font.ts` |
 | `services/api/src/common/jwt-verifier.module.ts` | `verify-production-runtime-gates.ts`<br/>`verify-upload-sessions-http.ts` |
 | `services/api/src/common/middleware/request-id.middleware.ts` | `verify-error-observability.ts` |
-| `services/api/src/common/pdf/aigc-label.ts` | `verify-ai-safety-aigc.ts` |
+| `services/api/src/common/pdf/aigc-label.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/common/pdf/aigc-pdf-metadata.ts` | `verify-aigc-pdf-metadata.ts` |
 | `services/api/src/common/pdf/cjk-font.ts` | `verify-cjk-font.ts` |
 | `services/api/src/common/pickup-code.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-idempotency.ts` |

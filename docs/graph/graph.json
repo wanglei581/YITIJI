@@ -22173,7 +22173,8 @@
       "services/api/scripts/verify-error-observability.ts"
     ],
     "services/api/src/common/pdf/aigc-label.ts": [
-      "services/api/scripts/verify-ai-safety-aigc.ts"
+      "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-production-runtime-gates.ts"
     ],
     "services/api/src/common/pdf/aigc-pdf-metadata.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts"
@@ -35055,6 +35056,7 @@
         "dirs": [],
         "files": [
           "services/api/src/common/jwt-verifier.module.ts",
+          "services/api/src/common/pdf/aigc-label.ts",
           "services/api/src/config/production-runtime-gates.ts"
         ],
         "missing": []

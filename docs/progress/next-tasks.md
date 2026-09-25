@@ -27,7 +27,7 @@
 3. **小青不再引导去岗位：** `/assistant/chat` 目前不区分来源，回复里可能引导用户去看岗位或招聘会。托管关闭时提示词不再引导岗位、招聘会、政策；建议请求带 `channel=miniapp`，服务端只给小程序已注册页面的 `actions`（小程序端已丢掉映射不到的卡片，但文字回复拦不住）。
 4. **导出 PDF 的 AI 标识（2026-09-26 只读核查，未改生成代码）：** 简历 `ResumePdfService.render`、简历对照 `JobFitPdfService.render`、职业规划 `CareerPlanPdfService.render`，以及诊断/修改清单、自我探索、参会准备、面试报告、顾问产物，元数据只有自定义 `AIGenerated=true` 和 Subject 散文；Producer/Creator 仍是 PDFKit，Keywords 与 XMP 都没有，也不符合 GB 45438 附录 E 的 Info 键 `/AIGC`。纸面显式「AI 生成」只有诊断报告每页页眉和合同审查报告；简历、对照、职业规划的页面没有。最小改法：在 `applyAigcPdfMetadata` 写 `/AIGC`（`Label=1`，`ContentProducer` 为服务提供者名称或编码，`ProduceID` 为任务号，首次写入时传播侧与生产者相同，两个预留码可空；位置按 TC260 文本文件实践指南 §6.3，放 Document Information Dictionary），页眉加「本文件含人工智能生成内容」。简历版面是否印显式标识仍待产品裁决：标识办法第四条要求导出文件内含显式标识，不能只用元数据代替。
 
-**3.5c 后端已在分支 `claude/ai-safety-aigc-20260926` 落地（未合入候选、未部署）：** `applyAigcPdfMetadata`、合同审查 PDF 与简历 DOCX 写入 Info/custom 键 `AIGC`。`ContentProducer` 读 `AIGC_CONTENT_PRODUCER`，未设置时用「职易达」，正式值待法务。简历对照、职业规划、自我探索、模拟面试、参会准备、顾问作业、合同审查的可见页眉为「AI 生成，仅供参考」。简历 PDF/DOCX 正文仍不印可见标识。题目单与职业规划降级 PDF 保持 `AIGenerated=false` 且不写 `AIGC`。门禁 `verify:ai-safety-aigc` 挂在已进 CI 的 `verify:aigc-pdf-metadata` 后面。
+**3.5c 后端已并入候选（分支 `claude/ai-safety-aigc-20260926`，未部署）：** `applyAigcPdfMetadata`、合同审查 PDF 与简历 DOCX 写入 Info/custom 键 `AIGC`。`ContentProducer` 读 `AIGC_CONTENT_PRODUCER`；开发和 CI 未设置时用「职易达」，**生产必须设置**：空着或填产品名，启动闸门报 `PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING`，部署在 3c 预检中止（备份与重启之前，不会中断线上）。填公司全称还是统一社会信用代码由产品负责人定，**下一次部署前要先写进服务器 `.env`**。简历对照、职业规划、自我探索、模拟面试、参会准备、顾问作业、合同审查的可见页眉为「AI 生成，仅供参考」。简历 PDF/DOCX 正文仍不印可见标识。题目单与职业规划降级 PDF 保持 `AIGenerated=false` 且不写 `AIGC`。门禁 `verify:ai-safety-aigc` 挂在已进 CI 的 `verify:aigc-pdf-metadata` 后面。
 
 **后端对接口径（2026-09-26，`claude/miniapp-backend-review-20260926`）：**
 

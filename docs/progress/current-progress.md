@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-09-26（下午）：3.13 两个后台页面并入候选；Agy 复核两处返工；AIGC 生产方名称进启动闸门
+
+- **并入：** `claude/console-hosting-pages-20260926`（`e80bb6fc3`）并入候选为 `38d69ea9a`；冲突只在进度文档（两侧保留）与图谱产物（取本侧后重新生成，`--check` 通过）。
+- **Agy 复核（4 条，成立 2 条）：**
+  - 成立：机构后台在能力接口失败时按打开渲染招聘类五页，新增 / 导入 / 同步按钮点了才 403。改为 fail-closed（`c6c335cb9`）：侧栏只在服务端明确回 `recruitmentHosting: true` 时显示这五页；直接打开地址时说「暂时无法确认这一页是否开放」并给「重新读取」，不冒充「未开放」；工作台、统计、内容可信横幅没读到时也只提政策。能力上下文加了 `retry`。
+  - 成立：管理员「Excel 导入记录」在开关没读到时仍写「确认后进入审核队列」。改为三态：关闭说导入已停止，打开照旧，没读到两种说法都不下。
+  - 不成立：「去来源平台投递」含「平台投递」——这是 CLAUDE.md §2 规定的白名单按钮文案；工作台「查看」在托管关闭时本来就直接去政策页（`dashboard/index.tsx` 的 `onView`）。
+- **AIGC 生产方名称（`390f956a4`）：** 生产启动闸门新增 `PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING`，空值、纯空白、产品名「职易达」一律拒绝；三处生产环境夹具补上该键；`.env.example` 两处与部署清单同步。部署脚本 3c 预检用同一闸门、排在 pg_dump 与 PM2 重启之前，所以未配置只会让发布提前中止。
+- **验证（本机）：** api / admin / partner 三处 tsc 通过，改动文件 eslint 零告警；`verify:production-runtime-gates`（74 条，含新增 4 条）、`verify:production-real-services`、`verify:cjk-font` 通过；变异两处（删掉整条检查、只删产品名判断）均按预期变红。
+- **待产品负责人：** 下一次部署前在服务器 `.env` 写入 `AIGC_CONTENT_PRODUCER`（公司全称或统一社会信用代码）。
+
 ## 2026-09-26：3.13 两个后台页面（分支 `claude/console-hosting-pages-20260926`，已并入候选，未部署）
 
 基线是候选 `97ea36fa8`，并入了 Grok 中途停下的 `claude/console-hosting-flag-20260926`（`c83acbd1e`，未验证）。没有改 `apps/kiosk`、`apps/miniapp`，没有访问生产。
