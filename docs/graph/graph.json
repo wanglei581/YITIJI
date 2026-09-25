@@ -15216,8 +15216,10 @@
           "services/api/src/job-materials/job-materials.service.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
           "services/api/src/payment/reconciliation.service.ts",
+          "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
+          "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
@@ -15923,12 +15925,14 @@
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/pending-refund-signal.ts",
           "services/api/src/payment/reconciliation.service.ts",
+          "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/payment/refund.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -16100,6 +16104,7 @@
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
@@ -16153,6 +16158,7 @@
         ],
         "usedBy": [
           "services/api/src/payment/reconciliation.service.ts",
+          "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/payment/refund.service.ts"
         ]
       },
@@ -22542,7 +22548,8 @@
     ],
     "services/api/src/payment/dto/order-action.dto.ts": [
       "services/api/scripts/verify-order.ts",
-      "services/api/scripts/verify-payment-flow.ts"
+      "services/api/scripts/verify-payment-flow.ts",
+      "services/api/scripts/verify-refund-idempotent.ts"
     ],
     "services/api/src/payment/online-payment.service.ts": [
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -22645,6 +22652,7 @@
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
     "services/api/src/payment/price-config.seed.ts": [
@@ -22722,6 +22730,9 @@
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-reconciliation.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
+    ],
+    "services/api/src/payment/refund-amount-hold.ts": [
+      "services/api/scripts/verify-refund-idempotent.ts"
     ],
     "services/api/src/payment/refund-convergence.task.ts": [
       "services/api/scripts/verify-api20-manual-refund.ts",
@@ -23225,6 +23236,9 @@
       "services/api/scripts/verify-toolbox-launch-events.ts",
       "services/api/scripts/verify-toolbox-review-workflow.ts"
     ],
+    "services/api/src/terminals/claim-unprintable-file.ts": [
+      "services/api/scripts/verify-payment-flow.ts"
+    ],
     "services/api/src/terminals/dto/create-terminal-bind-code.dto.ts": [
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
@@ -23331,11 +23345,13 @@
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts"
     ],
     "services/api/src/terminals/terminals-agent.service.ts": [
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
+      "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
@@ -28965,7 +28981,8 @@
           "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/prisma/prisma.service.ts",
-          "services/api/src/terminals/printer-availability.ts"
+          "services/api/src/terminals/printer-availability.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []
       },
@@ -33353,6 +33370,7 @@
           "services/api/src/payment/payment-provider.factory.ts",
           "services/api/src/payment/payment-provider.types.ts",
           "services/api/src/payment/payment-session-token.ts",
+          "services/api/src/payment/pending-refund-signal.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/providers/sandbox-payment.provider.ts",
@@ -33362,7 +33380,9 @@
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts",
-          "services/api/src/terminals/terminal-capabilities.service.ts"
+          "services/api/src/terminals/claim-unprintable-file.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []
       },
@@ -34240,6 +34260,7 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/signing.ts",
+          "services/api/src/payment/dto/order-action.dto.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/payment-provider.factory.ts",
@@ -34248,6 +34269,7 @@
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/providers/sandbox-payment.provider.ts",
+          "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/payment/refund.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
