@@ -229,6 +229,7 @@ export const partnerMockAdapter = {
       canManageSmartCampus: false,
       canManageCompanies: true,
       companyManageScope: 'unrestricted',
+      recruitmentHosting: true,
     }
   },
   async toggleDataSource(id: string): Promise<PartnerDataSource> {
