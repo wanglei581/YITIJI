@@ -11,7 +11,7 @@ ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 flowchart TD
   EndUser["EndUser<br/><small>33 字段</small>"]
   Organization["Organization<br/><small>26 字段</small>"]
-  Terminal["Terminal<br/><small>24 字段</small>"]
+  Terminal["Terminal<br/><small>27 字段</small>"]
   FileObject["FileObject<br/><small>48 字段</small>"]
   Job["Job<br/><small>47 字段</small>"]
   JobFair["JobFair<br/><small>39 字段</small>"]
@@ -121,7 +121,7 @@ flowchart TD
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineJob** | 22 | Job、OfflineAgency | 1 个文件<br/>`offline-agencies/offline-agencies.service.ts` |
 | **OnlinePlatformDirectory** | 33 | FileObject、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
-| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 25 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
+| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 26 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **OrderItem** | 15 | Order | 5 个文件<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`payment/pickup-expiry-refund.service.ts`<br/>`payment/pickup-validity.ts`<br/>… |
 | **OrderSubmissionLedger** | 11 | — | 1 个文件<br/>`member-print-orders/order-submission-ledger.ts` |
 | **Organization** | 26 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 16 个文件<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>`auth/partner-phone-rebind.service.ts`<br/>… |
@@ -132,21 +132,21 @@ flowchart TD
 | **PolicyPost** | 22 | Organization、PolicyEligibilityRule | 10 个文件<br/>`activity/activity.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 4 个文件<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>… |
 | **PrintMaterialPack** | 9 | — | **无代码读写** |
-| **PrintTask** | 22 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 26 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
-| **PrintTaskStatusLog** | 7 | PrintTask | 9 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
+| **PrintTask** | 22 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 28 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
+| **PrintTaskStatusLog** | 7 | PrintTask | 10 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **QualificationRecord** | 26 | FileObject、OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **RedemptionRecord** | 11 | — | 3 个文件<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`member-benefits/member-benefits.service.ts` |
 | **Refund** | 12 | Order | 3 个文件<br/>`payment/reconciliation.service.ts`<br/>`payment/refund-amount-hold.ts`<br/>`payment/refund.service.ts` |
 | **ReviewDecision** | 18 | User | **无代码读写** |
-| **ScanTask** | 22 | EndUser、Terminal | 6 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>`member-feedback/kiosk-feedback.service.ts`<br/>… |
+| **ScanTask** | 22 | EndUser、Terminal | 8 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.fleet.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **ScreensaverContent** | 9 | — | **无代码读写** |
 | **SyncLog** | 15 | JobSource | 6 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 24 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 25 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
+| **Terminal** | 27 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 27 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
-| **TerminalCapability** | 9 | Terminal | 1 个文件<br/>`terminals/terminal-capabilities.service.ts` |
+| **TerminalCapability** | 9 | Terminal | 2 个文件<br/>`console-screen/console-screen.twin.ts`<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
-| **TerminalHeartbeat** | 16 | Terminal | 4 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`terminals/printer-availability.ts`<br/>`terminals/terminal-heartbeat-retention.task.ts`<br/>… |
+| **TerminalHeartbeat** | 16 | Terminal | 5 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`terminals/printer-availability.ts`<br/>… |
 | **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **TerminalScanDeletionAudit** | 13 | Terminal | 1 个文件<br/>`terminals/terminal-scan-deletion-audit.service.ts` |
 | **TerminalScreensaverConfig** | 9 | AdPlaylist | 2 个文件<br/>`content/content.service.ts`<br/>`device-fleet/device-fleet.service.ts` |
