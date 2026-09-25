@@ -2,7 +2,7 @@
 
 > 状态：**草案（待审阅）**。本文件只是可执行说明，**不代表任何部署 / 迁移 / 验收已执行**。
 > 每一个写操作（部署、切软链、migrate、重启 PM2、造夹具）都必须先备份、再经用户显式确认后执行。
-> 起草日期：2026-07-04 ｜ 依据：本轮只读盘点 + 预生产只读探测（root@120.48.13.190，NODE_ENV=staging）。
+> 起草日期：2026-07-04 ｜ 依据：本轮只读盘点 + 预生产只读探测（生产服务器，NODE_ENV=staging；登录方式见运维私有记录）。
 > 环境定位：本 runbook 针对**预生产（staging）**，不是正式生产；不接 live 支付、不真机出纸。
 > 合规上位：`docs/compliance/compliance-boundary.md` §8.x、`CLAUDE.md` §12；`docs/product/payment-domain-c5-plan-2026-07.md`。
 

@@ -13,7 +13,7 @@
 - [x] 后端 `verify:benefit-activities` 覆盖可见性、领取、重复领取、库存、过期/结束拒绝、补贴提示信息化、手机号脱敏审计和 controller 鉴权元数据。
 - [x] 本机 PostgreSQL 16 throwaway 库已完成 `db:pg:deploy`、表/外键核查、真实 API 进程 + Redis + HTTP 端到端、Kiosk/Admin Chrome 截图级冒烟。
 - [x] clean review 分支已完成本机验证、Antigravity + Claude 双模型审查，Critical = 0；Claude 提醒的 `verify-member-favorites-benefits` 已补跑通过。
-- [x] 百度云 SSH 公钥恢复：已用 root 密码恢复当前 Mac 公钥，`root@120.48.13.190` 公钥登录返回 `instance-061dyczx / SSH_OK`。
+- [x] 百度云 SSH 公钥恢复：已恢复当前 Mac 的公钥登录，登录验证返回 `SSH_OK`（账号与主机信息见运维私有记录）。
 - [x] 百度云预生产部署：最终 `a4b1803a` 已部署到 `/srv/ai-job-print`；PostgreSQL 迁移、schema 同步、API/Kiosk/Admin/Partner 构建、PM2 `ai-job-print-api` 重启完成。
 - [x] 百度云核心 verify：`verify:member-benefits-admin`、`verify:benefit-activities`、`verify:feedback-notifications`、`verify:member-favorites-benefits` 均在服务器 PostgreSQL 上 ALL PASS；`verify:feedback-notifications` 已新增超过 100 条广播全部已读回归。
 - [x] 百度云公网 HTTP 冒烟：`/api/v1/health` 已修复为 nginx 反代到 API 并返回 `db=postgres`；Admin 创建/发布权益活动、Kiosk 公网列表可见、会员领取、`/me/benefits` 可见、Admin 领取记录可见；反馈/广播通知公网链路通过，最终样本 `unreadBefore=338` → `unreadAfter=0`。
