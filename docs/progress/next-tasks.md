@@ -34,6 +34,12 @@
 4. 「我的」：简历多版本、面试复盘、材料归档集中展示；退款进度等步骤 1.11 的后端。
 5. 在微信开发者工具里截图自验本轮改动（分包后逐页打开、主包体积截图）——会在产品负责人的开发者工具里多开一个窗口，需要他同意。
 
+## 2026-09-26：数据大屏后端补充
+
+政务版快照（profile=gov）补 `taskFlow24h` 与 `alertsRealtime`，查询和 `admin:alerts` 实时缓存与运维版同一份，`ADMIN_GOV_METRIC_KEYS` 现为 12 项。
+机队格子 `ScreenFleetCell` 增加 `locationLabel: string | null`，供机构版按服务点位聚合，只读终端档案。
+终端孪生 today 的 `printPages` / `printTasks` / `scans` / `failed` 改为 `number | null`：0 仍是 0，大于 0 且小于 5 为 null；管理员与机构同一口径。
+
 ## 2026-09-25：商业收口推进方案（定稿 55 步，9/26 增补 3.11–3.15 共 60 步；取代下方同日「商业闭环逐步推进板」）
 
 **来源：** Claude（Opus 5.5）起草并总指挥；Grok（`grok-4.7-build-fast`，xhigh）多路对照候选核实做法、工作量与验收命令；Agy（`gemini-3.8-flash-high`）独立评审步骤链、依赖与排期；两轮专家团评审拍板事项；Codex 按产品负责人要求暂停。

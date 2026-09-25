@@ -44,14 +44,11 @@ export class ConsoleScreenService {
 
   async getAdminSnapshot(profile: AdminScreenProfile): Promise<ScreenSnapshot> {
     const now = new Date()
-    const includeAlerts = profile === 'ops'
     const [realtime, counts, cumulative, alerts] = await Promise.all([
       this.cache.getOrLoad('admin:realtime', SCREEN_CACHE_TTL_SECONDS.realtime, () => this.loadAdminRealtimeCore(now)),
       this.cache.getOrLoad('admin:counts', SCREEN_CACHE_TTL_SECONDS.counts, () => this.loadAdminCounts(now)),
       this.cache.getOrLoad('admin:cumulative', SCREEN_CACHE_TTL_SECONDS.cumulative, () => this.settle('printCumulative', () => loadPrintCumulativeSlice(this.prisma, now))),
-      includeAlerts
-        ? this.cache.getOrLoad('admin:alerts', SCREEN_CACHE_TTL_SECONDS.realtime, () => this.loadAdminAlerts())
-        : Promise.resolve(undefined),
+      this.cache.getOrLoad('admin:alerts', SCREEN_CACHE_TTL_SECONDS.realtime, () => this.loadAdminAlerts()),
     ])
     const all = assembleAdminMetrics({
       fleet: realtime.value.fleet,
@@ -62,7 +59,7 @@ export class ConsoleScreenService {
       sync: counts.value.sync,
       jumps: counts.value.jumps,
       fairs: counts.value.fairs,
-      ...(alerts ? { alerts: alerts.value } : {}),
+      alerts: alerts.value,
     })
     const loadFlags = [
       realtime.value.fleet.ok,
@@ -73,7 +70,7 @@ export class ConsoleScreenService {
       counts.value.jumps.ok,
       counts.value.fairs.ok,
       cumulative.value.ok,
-      ...(alerts ? [alerts.value.ok] : []),
+      alerts.value.ok,
     ]
     const okCount = loadFlags.filter(Boolean).length
     const status = snapshotLoadStatus(okCount, loadFlags.length)
@@ -81,7 +78,7 @@ export class ConsoleScreenService {
       realtime.storedAt,
       counts.storedAt,
       cumulative.storedAt,
-      ...(alerts ? [alerts.storedAt] : []),
+      alerts.storedAt,
     )
     return {
       generatedAt: new Date(generatedMs).toISOString(),

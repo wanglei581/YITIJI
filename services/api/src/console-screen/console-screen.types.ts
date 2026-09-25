@@ -74,6 +74,7 @@ export interface ScreenFleetCell {
   terminalCode: string
   displayName: string | null
   areaLabel: string | null // 所在区，例如「天河区」；未设置为 null
+  locationLabel: string | null // 服务点位，例如「体育中心」；未设置为 null
   geo: { lat: number; lng: number } | null
   activity: ScreenTerminalActivity | null // 有 claimed/printing 打印任务 → printing；进行中扫描 → scanning；无数据 → null
   alert: ScreenFleetAlert | null
@@ -127,10 +128,11 @@ export interface ScreenTerminalTwin {
   scanner: ScreenMetric<{ state: 'ready' | 'busy' | 'error' | 'unknown'; label: string | null }>
   currentTask: ScreenMetric<{ pages: number; colorMode: 'bw' | 'color' | null; startedAt: string | null } | null>
   today: {
-    printPages: number
-    printTasks: number
-    scans: number
-    failed: number
+    // 0 保留；大于 0 且小于 SCREEN_MIN_AGGREGATE_SAMPLE 为 null。管理员与机构同一口径。
+    printPages: number | null
+    printTasks: number | null
+    scans: number | null
+    failed: number | null
     visits: ScreenMetric<number>
   }
   consumables: ScreenMetric<{ paper: string | null; toner: string | null }>
@@ -262,6 +264,8 @@ export const ADMIN_GOV_METRIC_KEYS = [
   'printTrend14d',
   'visitCount',
   'suppliesAndMap',
+  'taskFlow24h',
+  'alertsRealtime',
 ] as const
 
 export const ADMIN_OPS_METRIC_KEYS = [

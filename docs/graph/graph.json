@@ -21939,6 +21939,9 @@
     "services/api/src/console-screen/console-screen.timeline.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/src/console-screen/console-screen.twin.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
     "services/api/src/console-screen/console-screen.types.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts"
@@ -30632,6 +30635,7 @@
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
           "services/api/src/console-screen/console-screen.timeline.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.types.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/admin-terminals.controller.ts",
