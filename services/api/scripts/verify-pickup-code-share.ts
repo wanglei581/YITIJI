@@ -44,7 +44,7 @@ import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { RefundService } from '../src/payment/refund.service'
 import { PICKUP_LOCKOUT_FAILURE_THRESHOLD } from '../src/print-jobs/pickup-claim-lockout'
 import { PICKUP_CLAIM_SOURCE_RATE_LIMIT } from '../src/print-jobs/pickup-claim-rate-limit'
-import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
+import { PICKUP_RELEASED_REPLAY_MS, PickupOrderService } from '../src/print-jobs/pickup-order.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
@@ -372,9 +372,39 @@ async function main(): Promise<void> {
     }
     if (released.billablePages !== created.billablePages) fail(`核销回执必须带页数，实际 ${released.billablePages}`)
     if ('amountCents' in released || releasedJson.includes(fileName)) fail('核销回执不得带金额或完整文件名')
-    const again = await capture(() => pickup.claim(reissued.pickupCode!, terminalId, 'owner'))
-    if (!again.thrown || again.code !== 'PICKUP_CODE_ALREADY_USED') {
-      fail(`重复核销必须拒绝，实际 ${JSON.stringify(again)}`)
+    if (PICKUP_RELEASED_REPLAY_MS !== 10 * 60 * 1000) fail('同机重试窗口必须是核销后 10 分钟')
+    const beforeReplay = await prisma.order.findUniqueOrThrow({ where: { id: created.id } })
+    const tasksBeforeReplay = await prisma.printTask.count({ where: { endUserId: userId } })
+    const releasedReplay = await pickup.claim(reissued.pickupCode!, terminalId, 'owner')
+    if (!releasedReplay.released || releasedReplay.taskId !== released.taskId || releasedReplay.orderId !== created.id) {
+      fail(`同机 10 分钟内再输码必须交回原任务视图，实际 ${JSON.stringify(releasedReplay)}`)
+    }
+    const afterReplay = await prisma.order.findUniqueOrThrow({ where: { id: created.id } })
+    const tasksAfterReplay = await prisma.printTask.count({ where: { endUserId: userId } })
+    if (
+      afterReplay.updatedAt.getTime() !== beforeReplay.updatedAt.getTime()
+      || afterReplay.pickupStatus !== beforeReplay.pickupStatus
+      || afterReplay.printTaskId !== beforeReplay.printTaskId
+      || afterReplay.taskStatus !== beforeReplay.taskStatus
+      || tasksAfterReplay !== tasksBeforeReplay
+    ) {
+      fail('同机重试不得建任务、出纸或改订单状态')
+    }
+    const otherTerminalReplay = await capture(() => pickup.claim(reissued.pickupCode!, otherTerminalId, 'owner-other'))
+    if (!otherTerminalReplay.thrown || otherTerminalReplay.code !== 'PICKUP_CODE_INVALID') {
+      fail(`其它终端再输已核销码必须拒绝，实际 ${JSON.stringify(otherTerminalReplay)}`)
+    }
+    await prisma.printTask.update({
+      where: { id: released.taskId! },
+      data: { createdAt: new Date(Date.now() - PICKUP_RELEASED_REPLAY_MS - 1000) },
+    })
+    const lateReplay = await capture(() => pickup.claim(reissued.pickupCode!, terminalId, 'owner-late'))
+    if (!lateReplay.thrown || lateReplay.code !== 'PICKUP_CODE_ALREADY_USED') {
+      fail(`超过 10 分钟必须拒绝，实际 ${JSON.stringify(lateReplay)}`)
+    }
+    const afterLate = await prisma.order.findUniqueOrThrow({ where: { id: created.id } })
+    if (afterLate.printTaskId !== beforeReplay.printTaskId || await prisma.printTask.count({ where: { endUserId: userId } }) !== tasksBeforeReplay) {
+      fail('超时拒绝不得再建任务')
     }
     const usedRow = await prisma.order.findUniqueOrThrow({ where: { id: created.id } })
     const taskCount = await prisma.printTask.count({ where: { endUserId: userId } })
@@ -383,7 +413,7 @@ async function main(): Promise<void> {
     if (!usedReissue.thrown || usedReissue.code !== 'PICKUP_CODE_NOT_REISSUABLE') {
       fail(`已核销不得重发，实际 ${JSON.stringify(usedReissue)}`)
     }
-    pass('一次性核销：打码文件名 + 页数，重复核销与事后重发都拒绝')
+    pass('同机 10 分钟内再输已核销码交回原任务且不改状态；其它终端或超过 10 分钟拒绝，事后重发也拒绝')
 
     redis.reset()
     for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD; i += 1) {

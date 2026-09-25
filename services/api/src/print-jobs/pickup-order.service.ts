@@ -33,6 +33,9 @@ import { maskPickupFileName } from './pickup-file-mask'
 const REFUNDED_PAY_STATUSES = new Set(['refunding', 'partial_refunded', 'refunded'])
 const CLAIMABLE_PAY_STATUSES = ['unpaid', 'paying', 'paid'] as const
 
+/** 同一终端核销后这段时间内再输同一码，返回已放行视图，不再建任务。 */
+export const PICKUP_RELEASED_REPLAY_MS = 10 * 60 * 1000
+
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
 
@@ -104,11 +107,10 @@ export class PickupOrderService {
         },
       })
     }
-    // 一次性：已核销或已经挂上打印任务的码不能再核销。不计入锁定（手里是真码）。
+    // 已核销：同一终端、核销后 10 分钟内再输同一码，把上次放行视图再交出去。
+    // 不建任务、不出纸、不改状态。其它终端或超过 10 分钟仍拒绝。不计入锁定。
     if (order.pickupStatus === 'used' || order.printTaskId) {
-      throw new BadRequestException({
-        error: { code: 'PICKUP_CODE_ALREADY_USED', message: '这份到机码已经使用过，不能再次取件' },
-      })
+      return this.replayReleasedClaim(order, terminal.id)
     }
     const paymentWindowClosed = Boolean(
       order.paidAt
@@ -175,9 +177,7 @@ export class PickupOrderService {
           throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
         }
         if (raced.pickupStatus === 'used' || raced.printTaskId) {
-          throw new BadRequestException({
-            error: { code: 'PICKUP_CODE_ALREADY_USED', message: '这份到机码已经使用过，不能再次取件' },
-          })
+          return this.replayReleasedClaim(raced, terminal.id)
         }
         if (raced.pickupStatus === 'pending') this.assertPayStatusClaimable(raced.payStatus)
       }
@@ -307,6 +307,26 @@ export class PickupOrderService {
    * 有 `terminal_mismatch` 记录 = 用户走错机器（payload 里有 orderId，
    * 能直接查到该单绑的是哪台）；没有记录 = 码本身不存在（输错或已换单）。
    */
+  /**
+   * 响应丢失后的同机重试。只读已核销订单和它的打印任务，命中窗口就交回原视图。
+   */
+  private async replayReleasedClaim(order: OrderRecord, terminalId: string) {
+    const expired = new BadRequestException({
+      error: { code: 'PICKUP_CODE_ALREADY_USED', message: '这份到机码已经使用过，不能再次取件' },
+    })
+    if (order.terminalId !== terminalId || order.pickupStatus !== 'used' || !order.printTaskId) throw expired
+    const task = await this.prisma.printTask.findUnique({
+      where: { id: order.printTaskId },
+      select: { createdAt: true, terminalId: true },
+    })
+    if (!task || task.terminalId !== terminalId || Date.now() - task.createdAt.getTime() > PICKUP_RELEASED_REPLAY_MS) {
+      throw expired
+    }
+    const fresh = await this.prisma.order.findUnique({ where: { id: order.id } })
+    if (!fresh || fresh.pickupStatus !== 'used' || fresh.printTaskId !== order.printTaskId) throw expired
+    return this.releasedView(fresh)
+  }
+
   private async noteClaimFailure(
     terminalId: string,
     reason: 'code_not_found' | 'terminal_mismatch',
