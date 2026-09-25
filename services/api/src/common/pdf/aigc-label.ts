@@ -38,7 +38,7 @@ export function aigcContentProducer(): string {
   return trimmed.length > 0 ? trimmed : AIGC_DEFAULT_PRODUCER
 }
 
-/** 首次写入：传播方与生产方相同，两个预留码为空。ProduceID 是任务号，空串直接拒绝。 */
+/** 首次写入：传播方与生产方相同，两个预留码为空。ProduceID 是任务号或已分配的文件编号，空串直接拒绝。 */
 export function buildAigcLabelJson(produceId: string): string {
   const producer = aigcContentProducer()
   const id = requireAigcProduceId(produceId)

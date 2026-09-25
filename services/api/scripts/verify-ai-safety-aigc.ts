@@ -7,7 +7,9 @@
  * 运行：pnpm --filter @ai-job-print/api verify:ai-safety-aigc
  */
 import { readdirSync, readFileSync, statSync } from 'fs'
+import { tmpdir } from 'os'
 import { join } from 'path'
+import { Logger } from '@nestjs/common'
 import { PDFDocument } from 'pdf-lib'
 import { createRequire } from 'module'
 import {
@@ -47,6 +49,13 @@ import { AdvisorPdfService } from '../src/advisor/advisor-pdf.service'
 import { ContractReviewReportPdfService } from '../src/contract-review/contract-review-report-pdf.service'
 import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
 import { ResumeDocxService } from '../src/ai/resume/resume-docx.service'
+import { AiService } from '../src/ai/ai.service'
+import { MockAiProvider } from '../src/ai/providers/mock.provider'
+import type { GeneratedResume } from '../src/ai/interfaces/ai-provider.interface'
+import { PrismaService } from '../src/prisma/prisma.service'
+import { AuditService } from '../src/audit/audit.service'
+import { StorageService } from '../src/storage/storage.service'
+import { FilesService } from '../src/files/files.service'
 import { CareerPlanDegradedPdfService } from '../src/ai/resume/career-plan-degraded-pdf.service'
 import { InterviewPracticeSheetPdfService } from '../src/mock-interview/interview-practice-sheet-pdf.service'
 import {
@@ -659,8 +668,169 @@ async function main(): Promise<void> {
     fail('append:ai-generated', `追加后 AIGenerated=${afterAppend['AIGenerated'] ?? '空'}，AIGC=${afterAppend['AIGC'] ?? '空'}`)
   } else pass('append:ai-generated')
 
+  await assertResumeExportProduceId()
+
   console.log(failed === 0 ? '\nAI 标识与提示词安全句：PASS' : `\nAI 标识与提示词安全句：${failed} FAIL`)
   if (failed > 0) process.exit(1)
+}
+
+const EXPORT_RESUME: GeneratedResume = {
+  basic: { name: '编号验证', phone: '', email: '', city: '' },
+  intention: { position: '后端开发' },
+  summary: '熟悉服务端开发。',
+  education: [],
+  experience: [],
+  projects: [],
+  skills: [],
+  certificates: [],
+}
+
+function exportErrorCode(err: unknown): string {
+  if (err && typeof err === 'object' && 'getResponse' in err) {
+    const body = (err as { getResponse: () => unknown }).getResponse()
+    if (body && typeof body === 'object' && 'error' in body) {
+      const code = (body as { error?: { code?: string } }).error?.code
+      if (code) return code
+    }
+  }
+  return err instanceof Error ? err.message : 'unknown'
+}
+
+async function docxProduceId(buffer: Buffer): Promise<string | null> {
+  const docxRequire = createRequire(require.resolve('docx'))
+  const JSZip = docxRequire('jszip') as {
+    loadAsync: (buf: Buffer) => Promise<{ file: (name: string) => { async: (type: 'string') => Promise<string> } | null }>
+  }
+  const zip = await JSZip.loadAsync(buffer)
+  const customXml = await zip.file('docProps/custom.xml')?.async('string') ?? ''
+  const customMatch = customXml.match(/name="AIGC"[\s\S]*?<vt:lpwstr>([\s\S]*?)<\/vt:lpwstr>/)
+  const decoded = (customMatch?.[1] ?? '')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+  return parseAigcLabelJson(decoded)?.ProduceID ?? null
+}
+
+async function fileProduceId(
+  storage: StorageService,
+  row: { storageKey: string; bucket: string; mimeType: string },
+): Promise<string | null> {
+  const buffer = await storage.getObject(row.storageKey, row.bucket)
+  if (row.mimeType === 'application/pdf') {
+    const info = await readPdfInfo(buffer)
+    return parseAigcLabelJson(info['AIGC'] ?? '')?.ProduceID ?? null
+  }
+  return docxProduceId(buffer)
+}
+
+/**
+ * 不带 taskId 的非草稿导出必须成功，且 PDF/DOCX 的 ProduceID 等于落库文件编号。
+ * 带 taskId 时 ProduceID 等于任务号（与简历对照、职业规划打印一致）。
+ */
+async function assertResumeExportProduceId(): Promise<void> {
+  if (!process.env['DATABASE_URL']) {
+    process.env['DATABASE_URL'] = `file:${join(__dirname, '../prisma/dev.db')}`
+  }
+  if (!process.env['FILE_SIGNING_SECRET'] || process.env['FILE_SIGNING_SECRET'].length < 32) {
+    process.env['FILE_SIGNING_SECRET'] = 'verify-ai-safety-aigc-export-secret-0123456789'
+  }
+  if (!process.env['FILE_STORAGE_DRIVER']) process.env['FILE_STORAGE_DRIVER'] = 'local'
+  if (!process.env['FILE_STORAGE_DIR']?.trim()) {
+    process.env['FILE_STORAGE_DIR'] = join(tmpdir(), 'aigc-export-produce-id')
+  }
+  process.env['AI_PROVIDER'] = 'mock'
+  Logger.overrideLogger({ log: () => {}, error: () => {}, warn: () => {}, debug: () => {}, verbose: () => {}, fatal: () => {} })
+
+  const prisma = new PrismaService()
+  await prisma.onModuleInit()
+  const storage = new StorageService()
+  const files = new FilesService(prisma, new AuditService(prisma), storage)
+  const emptyStub = {} as never
+  const ai = new AiService(
+    new MockAiProvider() as never,
+    emptyStub, emptyStub, emptyStub, emptyStub, emptyStub,
+    emptyStub,
+    { record: () => {} } as never,
+    emptyStub,
+    emptyStub,
+    emptyStub,
+    new ResumePdfService(),
+    files,
+    prisma,
+    new AuditService(prisma) as never,
+    new ResumeDocxService(),
+    emptyStub,
+  )
+  const created: Array<{ id: string; storageKey: string; bucket: string }> = []
+
+  async function remember(fileId: string): Promise<{ id: string; storageKey: string; bucket: string; mimeType: string }> {
+    const row = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    if (!row) {
+      fail('export:file', `FileObject ${fileId} 未落库`)
+      throw new Error('missing file')
+    }
+    created.push({ id: row.id, storageKey: row.storageKey, bucket: row.bucket })
+    return row
+  }
+
+  async function expectProduceId(
+    id: string,
+    fileId: string,
+    expected: string,
+    row: { storageKey: string; bucket: string; mimeType: string },
+  ): Promise<void> {
+    const actual = await fileProduceId(storage, row)
+    if (actual !== expected) fail(id, `ProduceID=${actual ?? '空'}，期望 ${expected}，文件 ${fileId}`)
+    else pass(id)
+  }
+
+  try {
+    const cases: Array<{ id: string; format: 'pdf' | 'docx'; taskId?: string }> = [
+      { id: 'export:pdf:no-task', format: 'pdf' },
+      { id: 'export:docx:no-task', format: 'docx' },
+      { id: 'export:pdf:task', format: 'pdf', taskId: 'verify-aigc-export-task-pdf' },
+      { id: 'export:docx:task', format: 'docx', taskId: 'verify-aigc-export-task-docx' },
+    ]
+    for (const item of cases) {
+      try {
+        const exported = await ai.exportGeneratedResume(
+          EXPORT_RESUME,
+          null,
+          null,
+          item.format,
+          undefined,
+          undefined,
+          false,
+          item.taskId ? { taskId: item.taskId } : undefined,
+        )
+        const primary = await remember(exported.fileId)
+        const expected = item.taskId ?? exported.fileId
+        await expectProduceId(item.id, exported.fileId, expected, primary)
+        if (item.format !== 'pdf' && exported.printFileUrl) {
+          const printFileId = /\/files\/([^/]+)\/content/.exec(exported.printFileUrl)?.[1]
+          if (!printFileId) fail(`${item.id}:print`, '打印 PDF 副本没有 fileId')
+          else {
+            const printRow = await remember(printFileId)
+            const printExpected = item.taskId ?? printFileId
+            await expectProduceId(`${item.id}:print`, printFileId, printExpected, printRow)
+          }
+        }
+      } catch (err) {
+        if ((err as Error).message !== 'missing file') {
+          fail(item.id, `导出失败 ${exportErrorCode(err)}`)
+        }
+      }
+    }
+  } finally {
+    for (const row of created) {
+      try { await storage.deleteObject(row.storageKey, row.bucket) } catch { /* 清理失败不掩盖断言 */ }
+    }
+    if (created.length > 0) {
+      await prisma.fileObject.deleteMany({ where: { id: { in: created.map((row) => row.id) } } })
+    }
+    await prisma.onModuleDestroy()
+  }
 }
 
 void main().catch((error: unknown) => {

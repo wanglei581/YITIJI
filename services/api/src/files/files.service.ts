@@ -129,6 +129,11 @@ export class FilesService {
      * 避免会员数据导出按 endUserId 把未付款文件列出来。
      */
     paidExportStaging?: { endUserId: string; expiresAt: Date }
+    /**
+     * 渲染前已经写进 AIGC.ProduceID 的编号。传入则作为 FileObject.id，
+     * 缺省时在这里生成。只接受 32 位十六进制，和对象键里的文件段一致。
+     */
+    id?: string
   }): Promise<FileUploadResponse> {
     if (args.purpose === 'member_data_export' || args.purpose === 'contract_review_report') {
       throw new BadRequestException({
@@ -186,7 +191,11 @@ export class FilesService {
       }
     }
     const sensitiveLevel = this.resolveSensitiveLevel(args.purpose, args.sensitiveLevel)
-    const id = randomUUID().replace(/-/g, '')
+    const providedId = args.id?.trim() ?? ''
+    const id = providedId.length > 0 ? providedId : randomUUID().replace(/-/g, '')
+    if (!/^[0-9a-f]{32}$/.test(id)) {
+      throw new Error('FILE_ID_INVALID')
+    }
     const ownerEndUserId = staging?.endUserId ?? args.endUserId ?? null
     const owner = deriveOwner({
       endUserId: ownerEndUserId,
