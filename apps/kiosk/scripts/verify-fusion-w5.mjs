@@ -217,6 +217,11 @@ assert.match(
   /view === 'fallback'[\s\S]{0,1600}?data-testid="legal-doc-fallback-warning"[\s\S]{0,400}?不作为正式版本/,
   'legal document keeps the audited fallback branch and labels it as not the official version',
 )
+/* 离线页的健康探测必须走与其它接口相同的 API_BASE_URL（与 useApiReadiness 同源）：写死 '/api/v1/health' 时，
+ * VITE_API_BASE_URL 指向别的源就永远探测失败，一体机卡在离线页。浏览器夹具的基址恰好也是 /api/v1，测不出这一条。 */
+const errorOffline = read('src/pages/placeholders/ErrorOfflinePage.tsx')
+assert.match(errorOffline, /fetch\(`\$\{API_BASE_URL\}\/health`/, 'offline page probes /health through API_BASE_URL')
+assert.doesNotMatch(errorOffline, /fetch\(\s*['"`]\/api\//, 'offline page hard-codes no /api path in its probes')
 assertSinglePaddingNeutralizer(
   benefitActivityDetailCss,
   'activities-detail-inkpaper.css',

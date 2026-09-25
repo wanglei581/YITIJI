@@ -6,12 +6,15 @@
 // 稿里的 ready-example 是「写死示例值」的排版稿，运行时不渲染 —— 本页不伪造任何读数。
 //
 // 能真检测的只有两条（其余六轴照实写未检测 / 未验收 / 随请求确认，不默认写成正常）：
-//   1) 联网 = GET /api/v1/health（5s 超时）+ navigator.onLine；
+//   1) 联网 = GET {API_BASE_URL}/health（5s 超时）+ navigator.onLine —— 与其它接口同一个基址，
+//      VITE_API_BASE_URL 指向别的源时也探得到（写死 /api/v1 会永远探测失败、卡在本页）；
 //   2) 机器后台程序 / 打印机 = 公开只读 printer-status（后端按 5 分钟心跳窗算 isOnline），
 //      映射沿用 useTerminalDeviceStatus 的纯函数，default 分支不返回在线。
-// 行为沿用旧页：每 10 秒自动重试 + 监听 online 事件；连得上时 replace 回安全的
+// 行为沿用旧页：自动重试 + 监听 online 事件；连得上时 replace 回安全的
 // location.state.from（没有来源时回 /）——来源页之外，只有打印机也读到可用才离开，
 // 否则停在 partial 把「连得上但几项取不到」照实摆出来。
+// 自动重试退避：每多一次「检测完仍留在本页」（offline / partial），间隔翻倍 10 → 20 → 40 秒，封顶 60 秒；
+// online 事件归零并立即重测；「重新检测」按钮始终立即执行。页面卸载时中断在途的探测与它的 5 秒计时器。
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -84,15 +87,40 @@ interface CheckResult {
   printer: PrinterReading | null
 }
 
-async function readPrinterStatus(): Promise<PrinterReading> {
+/** 一次探测 = 一个 AbortController + 它的 5 秒计时器。放在 ref 里，页面卸载时连同计时器一起中断。 */
+interface ProbeWindow { controller: AbortController; timer: number }
+type ProbeRef = { current: ProbeWindow | null }
+const PROBE_TIMEOUT_MS = 5_000
+
+function openProbe(ref: ProbeRef): AbortSignal {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
+  ref.current = { controller, timer }
+  return controller.signal
+}
+
+function closeProbe(ref: ProbeRef, abort: boolean): void {
+  const probe = ref.current
+  if (!probe) return
+  window.clearTimeout(probe.timer)
+  if (abort) probe.controller.abort()
+  ref.current = null
+}
+
+/** 自动重测间隔：连续 streak 次检测完仍留在本页，间隔 = 10 秒 × 2^streak，封顶 60 秒。 */
+const AUTO_CHECK_BASE_MS = 10_000
+const AUTO_CHECK_MAX_MS = 60_000
+function autoCheckDelayMs(streak: number): number {
+  return Math.min(AUTO_CHECK_BASE_MS * 2 ** streak, AUTO_CHECK_MAX_MS)
+}
+
+async function readPrinterStatus(signal: AbortSignal): Promise<PrinterReading> {
   const terminalId = getTerminalId()
   if (!terminalId) return UNREAD
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 5000)
   try {
     const response = await fetch(`${API_BASE_URL}/terminals/${encodeURIComponent(terminalId)}/printer-status`, {
       cache: 'no-store',
-      signal: controller.signal,
+      signal,
     })
     if (!response.ok) return UNREAD
     const body = (await response.json()) as { isOnline?: boolean; printerStatus?: string | null; data?: { isOnline?: boolean; printerStatus?: string | null } }
@@ -110,8 +138,6 @@ async function readPrinterStatus(): Promise<PrinterReading> {
     return { heartbeatOnline, ready: false, verdict }
   } catch {
     return UNREAD
-  } finally {
-    window.clearTimeout(timeout)
   }
 }
 
@@ -139,7 +165,10 @@ export default function ErrorOfflinePage() {
   const [attempts, setAttempts] = useState(0)
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState<CheckResult | null>(null)
+  // 连续多少次检测完仍留在本页（offline / partial）；决定下一次自动重测的间隔。
+  const [stayStreak, setStayStreak] = useState(0)
   const checkingRef = useRef(false)
+  const probeRef = useRef<ProbeWindow | null>(null)
   // 检测是异步的：用户在检测途中点了「返回首页 / 帮助与求助」离开本页后，迟到的结果不得再改状态或把人拽走。
   const mountedRef = useRef(true)
   const safeFrom = useMemo(() => {
@@ -157,19 +186,28 @@ export default function ErrorOfflinePage() {
     checkingRef.current = true
     setChecking(true)
     setAttempts((value) => value + 1)
-    const controller = new AbortController()
-    const timeout = window.setTimeout(() => controller.abort(), 5000)
     let reachable = false
     try {
       if (!navigator.onLine) throw new Error('offline')
-      const response = await fetch('/api/v1/health', { cache: 'no-store', signal: controller.signal })
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        signal: openProbe(probeRef),
+      })
       reachable = response.ok
     } catch {
       reachable = false
     } finally {
-      window.clearTimeout(timeout)
+      closeProbe(probeRef, false)
     }
-    const printer = reachable ? await readPrinterStatus() : null
+    let printer: PrinterReading | null = null
+    if (reachable && mountedRef.current) {
+      try {
+        printer = await readPrinterStatus(openProbe(probeRef))
+      } finally {
+        closeProbe(probeRef, false)
+      }
+    }
     checkingRef.current = false
     if (!mountedRef.current) return
     // 连得上：有来源页就回去（稿：一连上就把你送回刚才那一页）；没有来源页时，打印机也读到可用才回首页。
@@ -177,6 +215,7 @@ export default function ErrorOfflinePage() {
       navigate(returnTo, { replace: true })
       return
     }
+    setStayStreak((value) => value + 1)
     setResult({ at: new Date(), reachable, printer })
     setChecking(false)
   }, [navigate, returnTo, safeFrom])
@@ -185,19 +224,27 @@ export default function ErrorOfflinePage() {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      closeProbe(probeRef, true)
     }
   }, [])
 
   useEffect(() => {
-    const handleOnline = () => void retry()
-    window.addEventListener('online', handleOnline)
-    // partial 已经照实摆出读数：不再自动反复重测（反复闪「检测中」），只留手动「重新检测」。
-    const interval = view === 'partial' ? null : window.setInterval(() => void retry(), 10_000)
-    return () => {
-      if (interval !== null) window.clearInterval(interval)
-      window.removeEventListener('online', handleOnline)
+    // 网络恢复：退避归零，立刻重测。
+    const handleOnline = () => {
+      setStayStreak(0)
+      void retry()
     }
-  }, [retry, view])
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [retry])
+
+  const autoDelayMs = autoCheckDelayMs(stayStreak)
+  useEffect(() => {
+    // 每次检测结束（view 从 checking 回来）都按当前退避重新排下一次；检测进行中不排。
+    if (view === 'checking') return
+    const timer = window.setTimeout(() => void retry(), autoDelayMs)
+    return () => window.clearTimeout(timer)
+  }, [autoDelayMs, retry, view])
 
   const verdicts = verdictsFor(view, result)
   const printerRead = result?.printer && result.printer.verdict[0] !== '没读到' ? result.printer.verdict[0] : null
@@ -228,15 +275,16 @@ export default function ErrorOfflinePage() {
       title: <>和服务器<em>连不上</em></>,
       copy: safeFrom
         ? <>传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，一连上就把你送回刚才那一页。</>
-        : <>传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，一连上就带你回首页。</>,
+        : <>传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，连上服务器、打印机也读得到时就带你回首页。</>,
       note: <>已经交出去的打印任务<b>不会因此取消</b>，到机码照常有效</>,
     },
   }
   const current = hero[view]
+  const nextAuto = `约 ${autoDelayMs / 1000} 秒后自动再${view === 'offline' ? '试' : '检测'}`
   const hint = view === 'unknown' ? '检测之后才有判定'
     : view === 'checking' ? '等这次结果'
-      : view === 'offline' ? `${lastCheck} · 每 10 秒自动重试，已重试 ${attempts} 次`
-        : lastCheck
+      : view === 'offline' ? `${lastCheck} · 已重试 ${attempts} 次，${nextAuto}`
+        : `${lastCheck} · ${nextAuto}`
   const pill = {
     unknown: { tone: 'unknown', label: '还没检测' },
     checking: { tone: 'unknown', label: '正在检测' },

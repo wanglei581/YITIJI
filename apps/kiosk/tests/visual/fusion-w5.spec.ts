@@ -784,6 +784,36 @@ test('offline page follows a recovered health response in a fresh page @w5-kiosk
   await expectFusionAcceptance(page, errors)
 })
 
+test('offline page backs off its automatic re-checks and resets on the online event @w5-kiosk', async ({ page, api }) => {
+  // 自动重测：每多一次「检测完仍留在本页」间隔翻倍 10 → 20 → 40 秒、封顶 60 秒；「重新检测」立即执行；
+  // online 事件归零并立即重测。提示里的次数与下一次间隔必须照实写（旧页写死「每 10 秒」）。
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.abort('GET', '/api/v1/health', 'internetdisconnected')
+  await page.clock.install()
+  await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-unknown')).toBeVisible()
+  expect(api.requestCount('GET', '/api/v1/health')).toBe(0)
+
+  await page.clock.runFor(10_000)
+  await expect(page.getByText('已重试 1 次，约 20 秒后自动再试', { exact: false })).toBeVisible()
+  await page.clock.runFor(19_000)
+  await page.waitForTimeout(300)
+  expect(api.requestCount('GET', '/api/v1/health')).toBe(1)
+  await page.clock.runFor(1_000)
+  await expect(page.getByText('已重试 2 次，约 40 秒后自动再试', { exact: false })).toBeVisible()
+
+  await page.getByRole('button', { name: '重新检测', exact: true }).click()
+  await expect(page.getByText('已重试 3 次，约 60 秒后自动再试', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: '重新检测', exact: true }).click()
+  await expect(page.getByText('已重试 4 次，约 60 秒后自动再试', { exact: false })).toBeVisible()
+
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect(page.getByText('已重试 5 次，约 20 秒后自动再试', { exact: false })).toBeVisible()
+  expect(api.requestCount('GET', '/api/v1/health')).toBe(5)
+  expect(errors).toEqual([])
+})
+
 test('mobile QR login renders a real API error and touch-safe retry @w5-mobile', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   api.respond('GET', '/api/v1/member/auth/qr/w5-expired-ticket/status', {
