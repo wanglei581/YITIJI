@@ -118,6 +118,19 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
     howTo: '口径：可吊销的只读展示令牌是后续独立需求。',
     transient: false,
   },
+  upload_counter_unwritten: {
+    title: '未接入',
+    detail:
+      '上传的原始记录按隐私要求会在 24 小时内删除（高敏文件 1 小时），直接数原始记录会漏掉已删除的那部分，所以这里不给数。',
+    howTo: '接入方式：在上传完成时另写一条不含文件内容的计数（只记次数、成败与渠道），按天汇总后上屏。',
+    transient: false,
+  },
+  inspection_counter_unwritten: {
+    title: '未接入',
+    detail: '材料检查任务里含隐私命中信息，按规定 24 小时内删除，近 7 天、30 天的检查次数无法从原始记录还原。',
+    howTo: '接入方式：检查完成时另写一条不含内容的计数，原始检查任务继续按时删除。',
+    transient: false,
+  },
   source_query_failed: {
     title: '取数失败',
     detail: '本次快照里这一块的数据源查询失败了。这是一次性故障，不是数据层缺口；下次刷新可能就恢复。',

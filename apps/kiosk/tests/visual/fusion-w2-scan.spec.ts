@@ -619,7 +619,7 @@ test('resume scan return keeps the file and an unresolved parse never auto-posts
   expect(parseBodies[0]).toMatchObject({ fileId: 'w2-scan-file', source: 'scan' })
 
   // 扫描工作台是 replace 交接的：顶栏返回必须把同一份扫描件带回来源页（稿 21 scan-ready），不能丢。
-  await page.getByRole('button', { name: '返回简历来源' }).click()
+  await page.getByLabel('返回简历来源').click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
   const scanBlock = page.getByRole('region', { name: '扫描件交接' })
   await expect(scanBlock).toBeVisible()
@@ -674,7 +674,7 @@ for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844
     expect(parseBodies[0]).toMatchObject({ fileId: 'w2-scan-file', source: 'scan' })
     const historyBefore = await page.evaluate(() => window.history.length)
 
-    await page.getByRole('button', { name: '返回简历来源' }).click()
+    await page.getByLabel('返回简历来源').click()
     await page.waitForURL((url) => url.pathname === '/resume/source')
     // 换掉而不是压栈：历史条目数不变；同一份扫描件原样落在 scan-ready。
     expect(await page.evaluate(() => window.history.length)).toBe(historyBefore)
@@ -716,7 +716,9 @@ test('resume scan-ready track title stays horizontal at 390x844 @w2', async ({ p
   await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
   await page.getByRole('button', { name: /AI 简历识别/ }).click()
   await page.waitForURL('**/resume/parse')
-  await page.getByRole('button', { name: '返回简历来源' }).click()
+  // 顶栏返回键用 aria-label 命名；解析失败后正文里还会出现一个同名按钮，
+  // 按角色取会随失败态出现的时机时而命中两个（strict mode）。这里点的是顶栏那一个。
+  await page.getByLabel('返回简历来源').click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
   await expect(page.getByRole('region', { name: '扫描件交接' })).toBeVisible()
 

@@ -994,7 +994,7 @@ for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844
     await assertQxPillReadable(page, `/resume/parse ${viewport.width}`)
     const historyBefore = await page.evaluate(() => window.history.length)
 
-    await page.getByRole('button', { name: '返回简历来源' }).click()
+    await page.getByLabel('返回简历来源').click()
     await page.waitForURL((url) => url.pathname === '/resume/source' && url.search === '?intent=optimize')
     // 换掉而不是压栈：历史条目数不变。
     expect(await page.evaluate(() => window.history.length)).toBe(historyBefore)
