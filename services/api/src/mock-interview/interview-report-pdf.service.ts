@@ -33,7 +33,7 @@ export class InterviewReportPdfService {
   private readonly logger = new Logger(InterviewReportPdfService.name)
 
   async render(
-    meta: { position: string; industry: string; interviewerLabel: string; date: string; contentId?: string | null },
+    meta: { position: string; industry: string; interviewerLabel: string; date: string; contentId: string },
     report: InterviewReportPayload,
     qa?: { excerpts: InterviewQaExcerpt[]; includeAnswers: boolean },
   ): Promise<{ buffer: Buffer; pageCount: number }> {
@@ -42,7 +42,7 @@ export class InterviewReportPdfService {
       title: 'AI 模拟面试练习报告',
       subject: 'AI 生成的模拟面试练习报告，仅供求职者本人练习复盘参考，不代表任何招聘结果，不参与企业筛选或面试邀约',
       kind: 'interview',
-      contentId: meta.contentId ?? null,
+      contentId: meta.contentId,
     })
     const ok = registerInterviewCjkFont(doc)
     if (!ok) {

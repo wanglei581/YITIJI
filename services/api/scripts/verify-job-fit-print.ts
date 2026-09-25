@@ -161,6 +161,7 @@ async function runtimeChecks(): Promise<void> {
       date: '2026-07-12',
       job: { id: 'job_runtime', title: '行政专员', company: '示例企业', sourceName: '示例来源', sourceUrl: 'https://example.com/job', externalId: 'runtime' },
       decisionSupport: undefined,
+      contentId: 'verify-job-fit-print',
     },
     legacyPayload,
   )

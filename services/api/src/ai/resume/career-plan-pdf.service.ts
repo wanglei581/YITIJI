@@ -33,7 +33,7 @@ export class CareerPlanPdfService {
         interview: string | null
         selfAssessment?: string | null
       }
-      contentId?: string | null
+      contentId: string
     },
     plan: CareerPlanPayload,
   ): Promise<{ buffer: Buffer; pageCount: number }> {
@@ -42,7 +42,7 @@ export class CareerPlanPdfService {
       title: 'AI 职业规划建议',
       subject: 'AI 生成的职业方向与技能计划建议，仅供求职者本人参考，不构成就业结果或薪资承诺',
       kind: 'careerplan',
-      contentId: meta.contentId ?? null,
+      contentId: meta.contentId,
     })
     const ok = registerCjkFont(doc)
     if (!ok) {

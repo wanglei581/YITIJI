@@ -25,7 +25,7 @@ export class FairVisitPlanPdfService {
    * 免去解析压缩后的 PDF 流。
    */
   async render(
-    meta: { date: string; fairName: string; sourceName: string; venue: string; sourceUrl: string; contentId?: string | null },
+    meta: { date: string; fairName: string; sourceName: string; venue: string; sourceUrl: string; contentId: string },
     plan: FairVisitPlanPayload,
   ): Promise<{ buffer: Buffer; pageCount: number; sections: string[] }> {
     const isReview = plan.mode === 'review'
@@ -37,7 +37,7 @@ export class FairVisitPlanPdfService {
         ? 'AI 生成的参会回顾与后续跟进参考，仅供求职者本人使用；招聘会仅为第三方或官方来源信息入口'
         : 'AI 生成的参会准备参考，仅供求职者本人现场准备使用；招聘会仅为第三方或官方来源信息入口',
       kind: 'fairvisit',
-      contentId: meta.contentId ?? null,
+      contentId: meta.contentId,
     })
     const ok = registerCjkFont(doc)
     if (!ok) {

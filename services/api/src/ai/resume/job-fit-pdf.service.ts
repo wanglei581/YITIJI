@@ -16,7 +16,8 @@ type JobFitReportMeta = {
     externalId: string | null
   }
   decisionSupport: JobFitPayload['decisionSupport'] | undefined
-  contentId?: string | null
+  /** 对照任务号。岗位 id 不是生成记录，不能拿来顶替。 */
+  contentId: string
 }
 
 const PDF_DROP_TERMS = [
@@ -39,7 +40,7 @@ export class JobFitPdfService {
       title: '简历对照',
       subject: 'AI 生成的简历与岗位要求对照，仅供求职者本人整理材料参考，不代表招聘评估或录用结果',
       kind: 'jobfit',
-      contentId: meta.contentId ?? meta.job.id ?? null,
+      contentId: meta.contentId,
     })
     const fontReady = registerCjkFont(doc)
     if (!fontReady) {

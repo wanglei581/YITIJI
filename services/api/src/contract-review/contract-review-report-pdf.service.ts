@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
-import { buildAigcLabelJson, stampAigcPageHeader } from '../common/pdf/aigc-label'
+import { buildAigcLabelJson, requireAigcProduceId, stampAigcPageHeader } from '../common/pdf/aigc-label'
 import type { ContractReviewFinding, ContractReviewResult } from './contract-review.types'
 
 const PRIORITY_LABEL: Record<ContractReviewFinding['priority'], string> = {
@@ -32,8 +32,9 @@ export class ContractReviewReportPdfService {
     const metadata = doc.info as Record<string, string | Date>
     metadata['AIGenerated'] = 'true'
     metadata['ServiceProviderCode'] = 'zyd-contract-v1'
-    metadata['ContentId'] = args.taskId
-    metadata['AIGC'] = buildAigcLabelJson(args.taskId)
+    const produceId = requireAigcProduceId(args.taskId)
+    metadata['ContentId'] = produceId
+    metadata['AIGC'] = buildAigcLabelJson(produceId)
     metadata['GeneratedAt'] = args.generatedAt.toISOString()
     metadata['RulePackVersion'] = args.result.rulePackVersion
     metadata['DisclaimerVersion'] = args.result.disclaimerVersion

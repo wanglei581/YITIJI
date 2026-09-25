@@ -207,6 +207,7 @@ async function main() {
       date: '2026-09-26',
       job: { title: '行政专员', company: null, sourceName: null, sourceUrl: null, externalId: null },
       decisionSupport: undefined,
+      contentId: 'verify-miniapp-review',
     },
     {
       summary: '建议投递。参考等级较高。总评很好。匹配度很高。',

@@ -476,7 +476,7 @@ export class SelfAssessmentService {
     dimensions: SelfAssessmentDimensionResult[]
     summary: string | null
     appendixDisclaimer: string | undefined
-    contentId?: string | null
+    contentId: string
   }): Promise<{ buffer: Buffer; pageCount: number }> {
     return this.pdf.render(meta)
   }

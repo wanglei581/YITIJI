@@ -27,7 +27,7 @@ export class AdvisorPdfService {
   private readonly logger = new Logger(AdvisorPdfService.name)
 
   async render(
-    meta: { date: string; providerLabel: string; contentId?: string | null },
+    meta: { date: string; providerLabel: string; contentId: string },
     payload: AdvisorArtifactPayload,
   ): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
@@ -35,7 +35,7 @@ export class AdvisorPdfService {
       title: this.titleOf(payload),
       subject: `AI 顾问作业面产物，${ADVISOR_DISCLAIMER}；不代表投递、面试或录用结果，本机不代收简历、不做平台内投递。`,
       kind: 'advisor',
-      contentId: meta.contentId ?? null,
+      contentId: meta.contentId,
     })
     const ok = registerCjkFont(doc)
     if (!ok) {

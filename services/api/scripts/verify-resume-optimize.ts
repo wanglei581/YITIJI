@@ -573,7 +573,7 @@ async function main(): Promise<void> {
       setResponses([optimizeReply()])
       const opt = await ai.getResumeOptimize(taskId, { endUserId: null, accessToken })
       assertStubHealthy()
-      const exported = await ai.exportGeneratedResume(opt.optimizedResume!, null)
+      const exported = await ai.exportGeneratedResume(opt.optimizedResume!, null, null, 'pdf', undefined, undefined, false, { taskId })
       createdFileIds.push(exported.fileId)
       const fileRow = await prisma.fileObject.findUnique({ where: { id: exported.fileId } })
       if (!fileRow || fileRow.purpose !== 'resume_upload') fail('10. FileObject 异常')

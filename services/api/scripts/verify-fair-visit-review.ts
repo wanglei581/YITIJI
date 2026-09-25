@@ -355,6 +355,7 @@ async function main() {
     const meta = {
       date: '2026-08-18', fairName: '示例招聘会', sourceName: '示例来源',
       venue: '示例会展中心', sourceUrl: 'https://jobs.example.gov.cn/f/1',
+      contentId: 'verify-fair-review',
     }
     const reviewPlan = {
       mode: 'review' as const,

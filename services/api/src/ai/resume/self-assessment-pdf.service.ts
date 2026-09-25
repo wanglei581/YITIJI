@@ -22,7 +22,7 @@ export class SelfAssessmentPdfService {
     dimensions: SelfAssessmentDimensionResult[]
     summary: string | null
     appendixDisclaimer?: string | undefined
-    contentId?: string | null
+    contentId: string
   }): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     // 维度强度由规则打分得出，解读文字才是 AI 生成。文件级标识仍按含 AI 内容标注。
@@ -30,7 +30,7 @@ export class SelfAssessmentPdfService {
       title: '自我探索 · 倾向参考',
       subject: '规则打分 + AI 文字解读，仅供求职者本人参考，不构成心理测评、人格判定或就业结果结论',
       kind: 'selfassessment',
-      contentId: meta.contentId ?? null,
+      contentId: meta.contentId,
     })
     const ok = registerCjkFont(doc)
     if (!ok) {

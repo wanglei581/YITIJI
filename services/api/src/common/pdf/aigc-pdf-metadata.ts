@@ -13,10 +13,10 @@
 // 简历 PDF 仍不加可见标识，是否印在投递件上待产品负责人拍板。
 //
 // 隐私：metadata 只写标识与时间，不写简历正文、诊断结论、姓名、fileId。
-// contentId 只允许传服务端任务 id（不可反查用户身份的随机串），可不传。
+// contentId 只允许传服务端任务号、会话号或产物号，必须能回到生成记录。空串拒绝写入。
 // ============================================================
 
-import { buildAigcLabelJson } from './aigc-label'
+import { buildAigcLabelJson, requireAigcProduceId } from './aigc-label'
 
 /** 本终端的 AIGC 服务方标识前缀。与合同审查的 `zyd-contract-v1` 同一命名族。 */
 const SERVICE_PROVIDER_PREFIX = 'zyd'
@@ -33,8 +33,8 @@ export interface AigcPdfMetadataInput {
   readonly kind: string
   /** 生成时间；不传取当前时间 */
   readonly generatedAt?: Date
-  /** 可选的服务端任务 id，用于事后定位同一份产物；不得传用户身份信息 */
-  readonly contentId?: string | null
+  /** 服务端任务号、会话号或产物号。AI 生成的 PDF 必填，不得传用户身份，也不得用随机号代替。 */
+  readonly contentId: string
 }
 
 /**
@@ -47,6 +47,7 @@ export function applyAigcPdfMetadata(
   doc: { info: PDFKit.DocumentInfo },
   input: AigcPdfMetadataInput,
 ): void {
+  const contentId = requireAigcProduceId(input.contentId ?? '')
   const generatedAt = input.generatedAt ?? new Date()
   const info = doc.info as unknown as Record<string, string | Date>
   info['Title'] = input.title
@@ -57,7 +58,7 @@ export function applyAigcPdfMetadata(
   info['AIGenerated'] = 'true'
   info['ServiceProviderCode'] = `${SERVICE_PROVIDER_PREFIX}-${input.kind}-v1`
   info['GeneratedAt'] = generatedAt.toISOString()
-  if (input.contentId) info['ContentId'] = input.contentId
+  info['ContentId'] = contentId
   // 首次写入时传播方与生产方相同。AIGenerated=false 的文件不走本函数，因此不写 AIGC。
-  info['AIGC'] = buildAigcLabelJson(input.contentId?.trim() || '')
+  info['AIGC'] = buildAigcLabelJson(contentId)
 }

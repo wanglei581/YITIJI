@@ -802,6 +802,16 @@ export class AiService {
         },
       })
     }
+    // 非草稿是 AI 生成文件。客户端没带任务号时，没有可回溯的生成记录，不能写空 ProduceID，也不另造随机号。
+    const produceId = charge?.taskId?.trim() ?? ''
+    if (!draft && produceId.length === 0) {
+      throw new BadRequestException({
+        error: {
+          code: 'AIGC_PRODUCE_ID_REQUIRED',
+          message: '导出 AI 生成的简历需要关联的生成任务号，不能写入空的内容编号。',
+        },
+      })
+    }
 
     let buffer: Buffer
     let pageCount: number
@@ -809,7 +819,7 @@ export class AiService {
     let ext: string
     switch (format) {
       case 'docx': {
-        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : charge?.taskId })
+        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : produceId })
         buffer = rendered.buffer
         pageCount = 0
         mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -836,7 +846,7 @@ export class AiService {
           layout,
           templatePreset: template?.resumeLayoutPreset,
           draft,
-          contentId: draft ? null : charge?.taskId,
+          contentId: draft ? null : produceId,
         })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
@@ -869,7 +879,7 @@ export class AiService {
     // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
     let printFileId = uploaded.fileId
     if (format !== 'pdf') {
-      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : charge?.taskId })
+      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : produceId })
       const pdfUploaded = await this.files.upload({
         buffer: pdfRendered.buffer,
         filename: `${namePrefix}_${safeName}.pdf`,

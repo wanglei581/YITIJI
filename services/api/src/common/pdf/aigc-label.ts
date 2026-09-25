@@ -11,6 +11,8 @@ export const AIGC_DEFAULT_PRODUCER = '职易达'
 export const AIGC_RULE_SCORE_NOTICE = '这部分按规则计算，不是 AI 生成'
 
 export interface AigcLabelFields {
+  // GB 45438-2025 附录 E c)2：Label 类型为字符串。value1 取 1，序列化是 "1" 不是整数 1。
+  // TC260《文件元数据隐式标识 文本文件》§6.3 的 PDF 示例同样写成 "Label":"value1"。
   Label: '1'
   ContentProducer: string
   ProduceID: string
@@ -20,6 +22,15 @@ export interface AigcLabelFields {
   ReservedCode2: ''
 }
 
+/** 空串和纯空白不能当内容编号：随机 UUID 也无法回到生成记录。 */
+export function requireAigcProduceId(produceId: string): string {
+  const id = produceId.trim()
+  if (id.length === 0) {
+    throw new Error('AIGC ProduceID 不能为空')
+  }
+  return id
+}
+
 /** 未设置环境变量时用产品名。正式值填公司名称还是统一社会信用代码，待法务给定。 */
 export function aigcContentProducer(): string {
   const raw = process.env['AIGC_CONTENT_PRODUCER']
@@ -27,10 +38,10 @@ export function aigcContentProducer(): string {
   return trimmed.length > 0 ? trimmed : AIGC_DEFAULT_PRODUCER
 }
 
-/** 首次写入：传播方与生产方相同，两个预留码为空。ProduceID 是任务号。 */
+/** 首次写入：传播方与生产方相同，两个预留码为空。ProduceID 是任务号，空串直接拒绝。 */
 export function buildAigcLabelJson(produceId: string): string {
   const producer = aigcContentProducer()
-  const id = produceId.trim()
+  const id = requireAigcProduceId(produceId)
   const fields: AigcLabelFields = {
     Label: '1',
     ContentProducer: producer,
@@ -48,7 +59,7 @@ export function parseAigcLabelJson(raw: string): AigcLabelFields | null {
     const value = JSON.parse(raw) as Partial<AigcLabelFields>
     if (value.Label !== '1') return null
     if (typeof value.ContentProducer !== 'string' || value.ContentProducer.trim().length === 0) return null
-    if (typeof value.ProduceID !== 'string') return null
+    if (typeof value.ProduceID !== 'string' || value.ProduceID.trim().length === 0) return null
     if (value.ReservedCode1 !== '' || value.ReservedCode2 !== '') return null
     if (value.ContentPropagator !== value.ContentProducer) return null
     if (value.PropagateID !== value.ProduceID) return null

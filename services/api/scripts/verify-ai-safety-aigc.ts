@@ -210,6 +210,36 @@ async function main(): Promise<void> {
     fail('aigc:default-producer', `未设置环境变量时应为「${AIGC_DEFAULT_PRODUCER}」`)
   } else pass('aigc:default-producer')
 
+  const produceIdRejected = (value: string): boolean => {
+    try {
+      buildAigcLabelJson(value)
+      return false
+    } catch (error) {
+      return error instanceof Error && error.message.includes('ProduceID')
+    }
+  }
+  if (!produceIdRejected('')) fail('aigc:produce-id-empty', '空 ProduceID 仍能写入')
+  else pass('aigc:produce-id-empty')
+  if (!produceIdRejected(' \n\t ')) fail('aigc:produce-id-blank', '纯空白 ProduceID 仍能写入')
+  else pass('aigc:produce-id-blank')
+  const labelShell = {
+    Label: '1',
+    ContentProducer: AIGC_DEFAULT_PRODUCER,
+    ReservedCode1: '',
+    ContentPropagator: AIGC_DEFAULT_PRODUCER,
+    ReservedCode2: '',
+  }
+  if (parseAigcLabelJson(JSON.stringify({ ...labelShell, ProduceID: '', PropagateID: '' })) !== null) {
+    fail('aigc:parse-produce-id-empty', '空 ProduceID 被当成合法标识')
+  } else pass('aigc:parse-produce-id-empty')
+  if (parseAigcLabelJson(JSON.stringify({ ...labelShell, ProduceID: '   ', PropagateID: '   ' })) !== null) {
+    fail('aigc:parse-produce-id-blank', '纯空白 ProduceID 被当成合法标识')
+  } else pass('aigc:parse-produce-id-blank')
+  // GB 45438-2025 附录 E c)2：Label 是字符串。整数 1 不是合法标识。
+  if (parseAigcLabelJson(JSON.stringify({ ...labelShell, Label: 1, ProduceID: 'task-1', PropagateID: 'task-1' })) !== null) {
+    fail('aigc:label-string', 'Label 整数 1 不符合附录 E 的字符串类型')
+  } else pass('aigc:label-string')
+
   const sample = '这是一段仅用于验证的示例内容。'
   const renders: Array<{ id: string; produceId: string; buffer: Buffer; wantVisible: boolean }> = []
   renders.push({

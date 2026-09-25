@@ -7,7 +7,7 @@ import {
   TextRun,
 } from 'docx'
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
-import { buildAigcLabelJson } from '../../common/pdf/aigc-label'
+import { buildAigcLabelJson, requireAigcProduceId } from '../../common/pdf/aigc-label'
 
 // ============================================================
 // ResumeDocxService — Wave 1 Task 4 简历 Word(docx) 渲染
@@ -140,6 +140,7 @@ export class ResumeDocxService {
 
     const generatedAt = new Date()
     const draft = options?.draft === true
+    const produceId = draft ? '' : requireAigcProduceId(options?.contentId ?? '')
     const doc = new Document({
       title: `${resume.basic.name} 的简历`,
       creator: '青序 AI 求职服务',
@@ -156,7 +157,7 @@ export class ResumeDocxService {
             { name: 'AIGenerated', value: 'true' },
             { name: 'ServiceProviderCode', value: 'zyd-resume-docx-v1' },
             { name: 'GeneratedAt', value: generatedAt.toISOString() },
-            { name: 'AIGC', value: buildAigcLabelJson(options?.contentId?.trim() || '') },
+            { name: 'AIGC', value: buildAigcLabelJson(produceId) },
           ],
       sections: [
         {
