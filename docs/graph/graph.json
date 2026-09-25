@@ -17474,6 +17474,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/ai/AiEvidence.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
     ],
     "apps/kiosk/src/ai/AiTaskRegion.tsx": [
@@ -17655,6 +17656,9 @@
     "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
+    ],
     "apps/kiosk/src/pages/assistant/AdvisorConversation.tsx": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
@@ -17665,7 +17669,8 @@
     ],
     "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx": [
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
-      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx": [
       "services/api/scripts/verify-assistant-voice.ts"
@@ -17674,6 +17679,7 @@
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
@@ -17687,6 +17693,7 @@
     ],
     "apps/kiosk/src/pages/assistant/advisorScenes.ts": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
@@ -17832,6 +17839,7 @@
     "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx": [
       "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs"
     ],
     "apps/kiosk/src/pages/contract-review/ContractReviewSessionNotice.tsx": [
@@ -17919,6 +17927,7 @@
     "apps/kiosk/src/pages/interview/InterviewReportPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "scripts/verify-no-raw-error-render.mjs"
@@ -17961,6 +17970,7 @@
       "apps/kiosk/scripts/verify-mic-capability-truth.mjs"
     ],
     "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/session/types.ts": [
@@ -18771,6 +18781,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -18837,6 +18848,7 @@
     "apps/kiosk/src/pages/resume/ResumeReportPage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
@@ -18859,6 +18871,7 @@
     ],
     "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "services/api/scripts/verify-compliance.ts"
@@ -18894,12 +18907,14 @@
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareBatchBar.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCard.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCustomEditor.tsx": [
@@ -18921,6 +18936,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx": [
@@ -18936,6 +18952,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts": [
@@ -20142,6 +20159,7 @@
       "services/api/scripts/verify-cos-lifecycle-policy.ts"
     ],
     "docs/compliance/compliance-boundary.md": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "scripts/verify-compliance-copy.mjs",
       "services/api/scripts/verify-member-data-retention.ts"
     ],
@@ -20263,6 +20281,9 @@
     "docs/progress/today-claude.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
+    ],
     "docs/reviews/ai-resume-assets-closure-planning.md": [
       "services/api/scripts/verify-member-data-retention.ts"
     ],
@@ -20355,8 +20376,11 @@
       "services/api/scripts/verify-companies.ts"
     ],
     "packages/shared/src/types/complianceCopy.ts": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "scripts/verify-compliance-copy.mjs"
     ],
     "packages/shared/src/types/consoleScreen.ts": [
@@ -25320,7 +25344,8 @@
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fusion-self-assessment-flow.spec.ts",
           "apps/kiosk/tests/visual/fusion-w3.spec.ts",
-          "apps/kiosk/tests/visual/route-manifest.ts"
+          "apps/kiosk/tests/visual/route-manifest.ts",
+          "packages/shared/src/types/complianceCopy.ts"
         ],
         "missing": []
       },
@@ -25839,6 +25864,44 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:jobfairs-terminal-priority"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps",
+          "apps/kiosk/src/pages/contract-review"
+        ],
+        "files": [
+          "apps/kiosk/src/ai/AiEvidence.tsx",
+          "apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/assistant/advisorScenes.ts",
+          "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx",
+          "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
+          "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
+          "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
+          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCard.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts",
+          "docs/compliance/compliance-boundary.md",
+          "docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md",
+          "packages/shared/src/types/complianceCopy.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-ai-label-copy"
       ],
       "wired": true
     },
@@ -27340,7 +27403,8 @@
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
           "apps/kiosk/src/services/api/aiMockAdapter.ts",
           "apps/kiosk/src/services/api/jobMaterials.ts",
-          "apps/kiosk/src/utils/wavRecorder.ts"
+          "apps/kiosk/src/utils/wavRecorder.ts",
+          "packages/shared/src/types/complianceCopy.ts"
         ],
         "missing": []
       },
