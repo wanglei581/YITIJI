@@ -97,10 +97,27 @@ function scannerState(scanning: boolean, scanInputHealth: string | null | undefi
   return { state: 'unknown', label: null }
 }
 
+/**
+ * 已结束任务的开区间不能画到 now。优先用 completedAt；没有就用最后一条日志。
+ * 两者都不晚于开区间起点时不画这段，避免把截断的重试日志补成「打印到现在」。
+ */
+function finishedPrintEnd(
+  task: { status: string; completedAt: Date | null },
+  logs: ReadonlyArray<{ createdAt: Date }>,
+  open: Date,
+): Date | null {
+  if (!PRINT_END.has(task.status)) return null
+  if (task.completedAt instanceof Date && task.completedAt.getTime() > open.getTime()) return task.completedAt
+  const last = logs[logs.length - 1]
+  if (last && last.createdAt.getTime() > open.getTime()) return last.createdAt
+  return null
+}
+
 function printingIntervals(
   tasks: Array<{
     status: string
     claimedAt: Date | null
+    completedAt: Date | null
     createdAt: Date
     statusLogs: Array<{ toStatus: string; createdAt: Date }>
   }>,
@@ -108,9 +125,10 @@ function printingIntervals(
 ): TimelinePrintInterval[] {
   const intervals: TimelinePrintInterval[] = []
   for (const task of tasks) {
+    const logs = [...task.statusLogs].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
     let open: Date | null = null
     let closed = false
-    for (const log of task.statusLogs) {
+    for (const log of logs) {
       if (log.toStatus === 'printing') {
         if (!open) open = log.createdAt
         continue
@@ -121,8 +139,11 @@ function printingIntervals(
         closed = true
       }
     }
-    if (open) intervals.push({ from: open, to: now })
-    else if (!closed && task.status === 'printing') {
+    if (open) {
+      const end = finishedPrintEnd(task, logs, open)
+      if (end) intervals.push({ from: open, to: end })
+      else if (!PRINT_END.has(task.status)) intervals.push({ from: open, to: now })
+    } else if (!closed && task.status === 'printing') {
       intervals.push({ from: task.claimedAt ?? task.createdAt, to: now })
     }
   }
@@ -227,10 +248,13 @@ export async function loadTerminalTwin(
       select: {
         status: true,
         claimedAt: true,
+        completedAt: true,
         createdAt: true,
+        // 倒序取最近 20 条，重试风暴才不会把结尾的 completed/failed/cancelled 截掉。
+        // 任务行已是终态时，printingIntervals 还会用 completedAt 收口，不用 now。
         statusLogs: {
           where: { toStatus: { in: ['printing', 'completed', 'failed', 'cancelled'] } },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
           take: 20,
           select: { toStatus: true, createdAt: true },
         },

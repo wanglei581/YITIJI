@@ -1826,10 +1826,12 @@ async function assertTwinCases(
 
   const steadyId = `term_scrn_steady_${ids.suffix}`
   const floodId = `term_scrn_flood_${ids.suffix}`
+  const retryId = `term_scrn_retry_${ids.suffix}`
   await prisma.terminal.createMany({
     data: [
       { id: steadyId, terminalCode: `SCRN-STD-${ids.suffix}`, agentToken: `tok_std_${ids.suffix}`, deviceFingerprint: `fp_std_${ids.suffix}`, orgId: ids.orgA, enabled: true },
       { id: floodId, terminalCode: `SCRN-FLD-${ids.suffix}`, agentToken: `tok_fld_${ids.suffix}`, deviceFingerprint: `fp_fld_${ids.suffix}`, orgId: ids.orgA, enabled: true },
+      { id: retryId, terminalCode: `SCRN-RTY-${ids.suffix}`, agentToken: `tok_rty_${ids.suffix}`, deviceFingerprint: `fp_rty_${ids.suffix}`, orgId: ids.orgA, enabled: true },
     ],
   })
   const steadyAnchor = new Date()
@@ -1868,6 +1870,50 @@ async function assertTwinCases(
     floodTwin.timeline24h.available === false
       && floodTwin.timeline24h.reason === SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded,
     floodTwin.timeline24h.available ? 'available' : floodTwin.timeline24h.reason,
+  )
+
+  const retryDone = new Date(Date.now() - 30 * 60_000)
+  const retryStart = new Date(retryDone.getTime() - 24_000)
+  const retryTaskId = `pt_scrn_retry_${ids.suffix}`
+  await prisma.printTask.create({
+    data: {
+      id: retryTaskId,
+      terminalId: retryId,
+      fileUrl: 'https://internal/retry-secret',
+      fileMd5: 'md5retry',
+      paramsJson: '{}',
+      status: 'completed',
+      claimedAt: retryStart,
+      completedAt: retryDone,
+      createdAt: retryStart,
+    },
+  })
+  await prisma.printTaskStatusLog.createMany({
+    data: [
+      ...Array.from({ length: 24 }, (_, index) => ({
+        taskId: retryTaskId,
+        fromStatus: index === 0 ? 'claimed' : 'printing',
+        toStatus: 'printing',
+        createdAt: new Date(retryStart.getTime() + index * 1_000),
+      })),
+      { taskId: retryTaskId, fromStatus: 'printing', toStatus: 'completed', createdAt: retryDone },
+    ],
+  })
+  await prisma.terminalHeartbeat.create({
+    data: { terminalId: retryId, status: 'online', printerStatus: 'ready', createdAt: new Date() },
+  })
+  cache.clear()
+  const retryTwin = await screen.getAdminTerminalTwin(retryId)
+  const retrySegments = retryTwin.timeline24h.available ? retryTwin.timeline24h.value : []
+  const timelineEnd = retrySegments[retrySegments.length - 1]?.to
+  const printing = retrySegments.filter((segment) => segment.state === 'printing')
+  assert(
+    '5u. 25 次流转后已完成的任务不会被画成打印到现在',
+    retryTwin.timeline24h.available === true
+      && printing.length >= 1
+      && timelineEnd !== undefined
+      && printing.every((segment) => segment.to !== timelineEnd && Date.parse(segment.to) <= retryDone.getTime()),
+    `end=${timelineEnd ?? 'none'} printing=${printing.map((segment) => `${segment.from}->${segment.to}`).join(',') || 'none'}`,
   )
 }
 
