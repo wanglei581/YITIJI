@@ -387,7 +387,7 @@ export interface ScreenUsageServiceItem {
 }
 
 export interface ScreenUsageChannelsValue {
-  paidOrders: number
+  paidOrders: number | null
   kiosk: number | null
   miniapp: number | null
   unlabeled: number | null
@@ -414,26 +414,26 @@ export interface ScreenUsagePulseValue {
 export interface ScreenUsagePrintStepsValue {
   uploaded: ScreenMetric<number>
   inspected: ScreenMetric<number>
-  paid: number
-  printed: number
+  paid: number | null
+  printed: number | null
 }
 
 export interface ScreenUsageResumeStepsValue {
   uploaded: ScreenMetric<number>
-  analyzed: number
-  optimized: number
-  exported: number
+  analyzed: number | null
+  optimized: number | null
+  exported: number | null
 }
 
 export interface ScreenUsageAiValue {
-  total: number
-  success: number
-  failed: number
+  total: number | null
+  success: number | null
+  failed: number | null
   successRate: number | null
   avgLatencyMs: number | null
-  estimatedCostCny: number
-  costMeasuredCalls: number
-  fallbackCalls: number
+  estimatedCostCny: number | null
+  costMeasuredCalls: number | null
+  fallbackCalls: number | null
   byOperation: Array<{ operation: string; count: number | null }>
   providers: Array<{ provider: string; label: string; count: number | null }>
 }

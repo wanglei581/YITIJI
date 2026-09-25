@@ -576,18 +576,21 @@ async function assertBehavior(): Promise<void> {
     const steps = opened(admin.metrics.printSteps)
     const resume = opened(admin.metrics.resumeSteps)
     assert(
-      'u15. 上传和检查计数未写入；付款与出纸、解析与导出给实数',
+      'u15. 上传和检查未写入；付款、出纸、解析、优化、导出与结果共用少于 5 则 null',
       steps?.uploaded.available === false
         && steps.uploaded.reason === 'upload_counter_unwritten'
         && steps.inspected.available === false
         && steps.inspected.reason === 'inspection_counter_unwritten'
         && steps.paid === channels?.paidOrders
-        && steps.printed === printedToday
+        && steps.printed === outcomes?.printed
+        && steps.printed === show(printedToday)
         && resume?.uploaded.available === false
-        && resume.analyzed === 3
-        && resume.optimized === 2
-        && resume.exported === 5,
-      `printedStep=${String(steps?.printed)} analyzed=${String(resume?.analyzed)}`,
+        && resume.analyzed === show(successOf(['parseResume'], today.from, today.to))
+        && resume.optimized === show(successOf(['optimizeResume'], today.from, today.to))
+        && resume.exported === 5
+        && resume.analyzed === null
+        && resume.optimized === null,
+      `printedStep=${String(steps?.printed)} analyzed=${String(resume?.analyzed)} optimized=${String(resume?.optimized)}`,
     )
 
     const aiMetric = opened(admin.metrics.ai)
@@ -604,18 +607,22 @@ async function assertBehavior(): Promise<void> {
     const deepseek = aiMetric?.providers.find((row) => row.provider === 'llm:deepseek')
     const qwen = aiMetric?.providers.find((row) => row.provider === 'llm:qwen')
     const mock = aiMetric?.providers.find((row) => row.provider === 'mock')
+    const fallbackN = aiToday.filter((row) => row.provider === 'mock' || row.provider === 'stub').length
     assert(
-      'u16. AI 总量、成功率、已采集成本和兜底提供者',
-      aiMetric?.total === aiToday.length
-        && aiMetric.success === successN
-        && aiMetric.failed === failedN
+      'u16. AI 总量、成功率、已采集成本和兜底提供者少于 5 则 null',
+      aiMetric?.total === show(aiToday.length)
+        && aiMetric.success === show(successN)
+        && aiMetric.failed === show(failedN)
+        && failedN === 4
+        && aiMetric.failed === null
         && aiMetric.successRate === Math.round((successN / aiToday.length) * 1000) / 10
         && aiMetric.successRate !== Math.round((successN / (successN + failedN)) * 1000) / 10
+        && successN + failedN >= SCREEN_MIN_AGGREGATE_SAMPLE
         && aiMetric.avgLatencyMs === avgLatency
-        && aiMetric.estimatedCostCny === 4.5
-        && aiMetric.costMeasuredCalls === measured.length
         && measured.length === 3
-        && aiMetric.fallbackCalls === aiToday.filter((row) => row.provider === 'mock' || row.provider === 'stub').length
+        && aiMetric.estimatedCostCny === null
+        && aiMetric.costMeasuredCalls === null
+        && aiMetric.fallbackCalls === show(fallbackN)
         && classify?.count === 8
         && voice?.count === 5
         && contract?.count === null
@@ -755,6 +762,18 @@ async function assertBehavior(): Promise<void> {
         && dailyA.days[0]?.browse === null,
       `days=${String(dailyA?.days.length)} yOpens=${String(dailyA?.days[5]?.sourceOpens)}`,
     )
+    assert(
+      'u23b. 机构端浏览、收藏同样是 4 为 null、5 为实数',
+      countBrowse(['company_profile'], today.from, today.to, owned.A['company_profile']) === 4
+        && rowA('company_profile')?.browse === null
+        && rowA('policy')?.browse === 5
+        && countFav('policy', today.from, today.to, owned.A['policy']) === 4
+        && rowA('policy')?.favorites === null
+        && rowA('job')?.favorites === 5
+        && rowA('job_fair')?.favorites === null
+        && dailyA?.days[5]?.sourceOpens === 5
+        && dailyA.days[0]?.browse === null,
+    )
 
     const packed = JSON.stringify({ admin, weekSnap, monthSnap, partnerA, partnerB })
     const secrets = [PHONE, phoneEnc, FILE_NAME, fileUrl, orderNo, IP_SECRET, APP_COMPANY, '自填机密岗位', FAVORITE_SNAPSHOT, termLeak, memberId, `tok_${suffix}`]
@@ -869,10 +888,190 @@ async function assertBehavior(): Promise<void> {
     )
 
     await assertHttp(prisma, { adminId, userA, userB, userBlank, orgA })
+    await assertSmallSampleFloor({
+      prisma, usage, cache, memberId, terminalId: termLeak, fileUrl, suffix,
+    })
   } finally {
     await prisma.onModuleDestroy().catch(() => undefined)
     isolated.cleanup()
   }
+}
+
+async function assertSmallSampleFloor(input: {
+  prisma: PrismaService
+  usage: ConsoleScreenUsageService
+  cache: ScreenSnapshotCache
+  memberId: string
+  terminalId: string
+  fileUrl: string
+  suffix: string
+}): Promise<void> {
+  const { prisma, usage, cache, memberId, terminalId, fileUrl, suffix } = input
+  await prisma.browseLog.deleteMany()
+  await prisma.favorite.deleteMany()
+  await prisma.externalJumpLog.deleteMany()
+  await prisma.aiServiceLog.deleteMany()
+  await prisma.printTask.deleteMany()
+  await prisma.scanTask.deleteMany()
+  await prisma.order.deleteMany()
+  await prisma.auditLog.deleteMany()
+  cache.clear()
+
+  const read = async (range: 'today' | '7d' = 'today') => {
+    cache.clear()
+    return usage.getAdminUsage(range, NOW)
+  }
+  const aiOf = (snap: ScreenUsageSnapshot) => opened(snap.metrics.ai)
+  const stepsOf = (snap: ScreenUsageSnapshot) => opened(snap.metrics.printSteps)
+  const resumeOf = (snap: ScreenUsageSnapshot) => opened(snap.metrics.resumeSteps)
+  let seq = 0
+  const nextId = (prefix: string) => `${prefix}_${seq += 1}_${suffix}`
+
+  const printRow = (completedAt: Date) => ({
+    id: nextId('edge_print'),
+    terminalId,
+    fileUrl,
+    fileMd5: 'md5',
+    status: 'completed',
+    completedAt,
+    printOutcome: null,
+    createdAt: completedAt,
+    updatedAt: completedAt,
+  })
+  await prisma.printTask.create({ data: printRow(NOW) })
+  let snap = await read()
+  assert(
+    'u44. 当天只完成 1 次打印时，结果和步骤都是 null',
+    opened(snap.metrics.outcomes)?.printed === null && stepsOf(snap)?.printed === null,
+  )
+  await prisma.printTask.createMany({ data: [printRow(NOW), printRow(NOW), printRow(NOW)] })
+  snap = await read()
+  assert(
+    'u45. 出纸 4 次时两处仍都是 null',
+    opened(snap.metrics.outcomes)?.printed === null && stepsOf(snap)?.printed === null,
+  )
+  await prisma.printTask.create({ data: printRow(NOW) })
+  snap = await read()
+  assert(
+    'u46. 出纸 5 次时两处都是 5',
+    opened(snap.metrics.outcomes)?.printed === 5 && stepsOf(snap)?.printed === 5,
+  )
+
+  const paidRow = (paidAt: Date) => ({
+    orderNo: nextId('edge_order'),
+    payStatus: 'paid',
+    channel: 'kiosk',
+    paidAt,
+    endUserId: null,
+    createdAt: paidAt,
+    amountCents: 100,
+  })
+  await prisma.order.createMany({ data: [paidRow(NOW), paidRow(NOW), paidRow(NOW), paidRow(NOW)] })
+  snap = await read()
+  assert(
+    'u47. 已支付订单 4 笔时，渠道总数和打印步骤都是 null',
+    opened(snap.metrics.channels)?.paidOrders === null && stepsOf(snap)?.paid === null,
+  )
+  await prisma.order.create({ data: paidRow(NOW) })
+  snap = await read()
+  assert(
+    'u48. 已支付订单 5 笔时，渠道总数和打印步骤都是 5',
+    opened(snap.metrics.channels)?.paidOrders === 5 && stepsOf(snap)?.paid === 5,
+  )
+
+  const aiRow = (seed: AiSeed) => ({ ...seed, terminalId })
+  const seedAi = (count: number, seed: AiSeed) => prisma.aiServiceLog.createMany({
+    data: Array.from({ length: count }, () => aiRow(seed)),
+  })
+  const successSeed = (createdAt: Date): AiSeed => ({
+    operation: 'parseResume', status: 'success', provider: 'llm:deepseek',
+    estimatedCostCny: 1.5, latencyMs: 100, createdAt,
+  })
+  await seedAi(4, successSeed(NOW))
+  snap = await read()
+  assert(
+    'u49. AI 成功、总量、时延、成本和解析步骤在 4 次时都是 null',
+    aiOf(snap)?.total === null
+      && aiOf(snap)?.success === null
+      && aiOf(snap)?.failed === null
+      && aiOf(snap)?.successRate === null
+      && aiOf(snap)?.avgLatencyMs === null
+      && aiOf(snap)?.estimatedCostCny === null
+      && aiOf(snap)?.costMeasuredCalls === null
+      && aiOf(snap)?.fallbackCalls === null
+      && resumeOf(snap)?.analyzed === null,
+  )
+  await seedAi(1, successSeed(NOW))
+  snap = await read()
+  assert(
+    'u50. AI 成功、总量、时延、成本和解析步骤在 5 次时给出实数',
+    aiOf(snap)?.total === 5
+      && aiOf(snap)?.success === 5
+      && aiOf(snap)?.successRate === 100
+      && aiOf(snap)?.avgLatencyMs === 100
+      && aiOf(snap)?.estimatedCostCny === 7.5
+      && aiOf(snap)?.costMeasuredCalls === 5
+      && resumeOf(snap)?.analyzed === 5,
+  )
+
+  await prisma.aiServiceLog.deleteMany()
+  await seedAi(2, { ...successSeed(NOW), estimatedCostCny: null })
+  await seedAi(2, { ...successSeed(NOW), status: 'failed', estimatedCostCny: null, latencyMs: null })
+  await seedAi(3, { ...successSeed(NOW), operation: 'chatAssistant', status: 'running', provider: 'llm:qwen', estimatedCostCny: null, latencyMs: null })
+  snap = await read()
+  assert(
+    'u51. 成功加失败只有 4 次时成功率为 null，哪怕总调用已经到 7',
+    aiOf(snap)?.total === 7 && aiOf(snap)?.successRate === null,
+  )
+  await seedAi(1, { ...successSeed(NOW), estimatedCostCny: null })
+  snap = await read()
+  assert(
+    'u52. 成功加失败达到 5 次时给出成功率，分母仍含其它状态',
+    aiOf(snap)?.total === 8 && aiOf(snap)?.successRate === 37.5,
+  )
+
+  await prisma.aiServiceLog.deleteMany()
+  await seedAi(4, { ...successSeed(NOW), status: 'failed', estimatedCostCny: null, latencyMs: null })
+  snap = await read()
+  assert('u53. 失败 4 次为 null', aiOf(snap)?.failed === null && aiOf(snap)?.total === null)
+  await seedAi(1, { ...successSeed(NOW), status: 'failed', estimatedCostCny: null, latencyMs: null })
+  snap = await read()
+  assert('u54. 失败 5 次为 5', aiOf(snap)?.failed === 5 && aiOf(snap)?.total === 5)
+
+  await prisma.aiServiceLog.deleteMany()
+  const fallbackSeed: AiSeed = {
+    operation: 'voiceSynthesize', status: 'running', provider: 'stub',
+    estimatedCostCny: null, latencyMs: null, createdAt: NOW,
+  }
+  await seedAi(4, fallbackSeed)
+  snap = await read()
+  assert('u55. 兜底调用 4 次为 null', aiOf(snap)?.fallbackCalls === null)
+  await seedAi(1, fallbackSeed)
+  snap = await read()
+  assert('u56. 兜底调用 5 次为 5', aiOf(snap)?.fallbackCalls === 5)
+
+  await prisma.aiServiceLog.deleteMany()
+  const optimized: AiSeed = { ...successSeed(NOW), operation: 'optimizeResume', estimatedCostCny: null, latencyMs: null }
+  await seedAi(4, optimized)
+  snap = await read()
+  assert('u57. 优化 4 次为 null', resumeOf(snap)?.optimized === null)
+  await seedAi(1, optimized)
+  snap = await read()
+  assert('u58. 优化 5 次为 5', resumeOf(snap)?.optimized === 5)
+
+  const auditRow = (createdAt: Date) => ({
+    actorRole: 'admin',
+    action: 'resume.diagnosis_exported',
+    targetType: 'resume',
+    createdAt,
+    payloadJson: '{}',
+  })
+  await prisma.auditLog.createMany({ data: [auditRow(NOW), auditRow(NOW), auditRow(NOW), auditRow(NOW)] })
+  snap = await read()
+  assert('u59. 导出 4 次为 null', resumeOf(snap)?.exported === null)
+  await prisma.auditLog.create({ data: auditRow(NOW) })
+  snap = await read()
+  assert('u60. 导出 5 次为 5', resumeOf(snap)?.exported === 5)
 }
 
 async function assertHttp(
