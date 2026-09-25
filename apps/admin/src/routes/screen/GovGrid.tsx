@@ -148,10 +148,11 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
           sub="实时"
           metric={g.terminalsOnline}
           source={
-            g.terminalsOnline?.available
-              ? `终端心跳投影，最近 ${g.terminalsOnline.value.onlineWindowSeconds} 秒有心跳算在线。${screenFleetScopeNote(g.terminalsOnline.value, '')}。` +
-                (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在区统计，由机队样本算出。')
-              : ''
+            '终端心跳投影。' +
+            (g.terminalsOnline?.available
+              ? `最近 ${g.terminalsOnline.value.onlineWindowSeconds} 秒有心跳算在线。${screenFleetScopeNote(g.terminalsOnline.value, '')}。`
+              : '') +
+            (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在区统计，由机队样本算出。')
           }
           render={(value) => {
             const online = focus === null ? value.healthy : counts.ok + counts.pr

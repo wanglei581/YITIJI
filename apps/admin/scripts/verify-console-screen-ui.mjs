@@ -173,6 +173,9 @@ const ADMIN_URLS = [
 ]
 for (const [name, service, allowed] of [['机构', partnerService, PARTNER_URLS], ['管理员', adminService, ADMIN_URLS]]) {
   const urls = [...stripComments(service).matchAll(/fetch\(`([^`]+)`/g)].map((m) => m[1])
+  // 先数所有 fetch 调用：用普通引号或拼接写的地址不会被上面的模板串正则捕获，不能因此漏过
+  const calls = (stripComments(service).match(/\bfetch\(/g) ?? []).length
+  check(calls === allowed.length, `${name}侧 fetch 调用恰好 ${allowed.length} 处（实际 ${calls}）`)
   check(
     urls.length === allowed.length && urls.every((url) => allowed.includes(url)),
     `${name}侧只打快照 / 单台孪生 / 使用统计三个端点，参数都在白名单里（实际 ${urls.join(' | ')}）`,
@@ -248,6 +251,10 @@ for (const file of screenFiles.filter((f) => /<Twin(Metric)?Panel\b/.test(f.sour
   const opens = (file.source.match(/<Twin(Metric)?Panel\b/g) ?? []).length
   const sources = (file.source.match(/\ssource=/g) ?? []).length
   check(sources >= opens, `${file.path} 的 ${opens} 个孪生面板都传了 source（实际 ${sources} 处）`)
+  check(
+    !/\ssource=(""|''|\{\s*(''|""|``)\s*\})/.test(file.source) && !/\ssource=\{[^{}]*:\s*(''|""|``)\s*\}/.test(file.source),
+    `${file.path} 没有把来源说明写成空串（不可用时也要留口径）`,
+  )
 }
 const gridFiles = screenFiles.filter((file) => /Grid\.tsx$/.test(file.path))
 check(gridFiles.length === 3, `三套 profile 的栅格文件都在（实际 ${gridFiles.length}）`)
