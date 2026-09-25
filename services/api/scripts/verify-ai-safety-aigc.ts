@@ -81,10 +81,14 @@ function squash(value: string): string {
   return value.replace(/\s+/gu, '')
 }
 
-async function visibleText(buffer: Buffer): Promise<string> {
+async function visiblePages(buffer: Buffer): Promise<string[]> {
   const doc = await unpdf.getDocumentProxy(new Uint8Array(buffer))
-  const extracted = await unpdf.extractText(doc, { mergePages: true })
-  return Array.isArray(extracted.text) ? extracted.text.join('\n') : extracted.text
+  const extracted = await unpdf.extractText(doc, { mergePages: false })
+  return Array.isArray(extracted.text) ? extracted.text : [extracted.text]
+}
+
+async function visibleText(buffer: Buffer): Promise<string> {
+  return (await visiblePages(buffer)).join('\n')
 }
 
 const JOB_FIT_BANNED = [
@@ -116,6 +120,162 @@ function walkTs(dir: string, out: string[] = []): string[] {
     else if (name.endsWith('.ts')) out.push(path)
   }
   return out
+}
+
+const GUARD_CALL = /(?:^|[^\w$.])(?:withAiSafety|buildGuardedSystemPrompt|appendAiSafetySentences)\s*\(/
+
+/** 读到逗号、分号或换行，但字符串和括号里的换行继续。续行以 + ? : 结尾时也继续。 */
+function cutExpression(raw: string): string {
+  let index = 0
+  while (index < raw.length && /\s/u.test(raw[index] ?? '')) index += 1
+  const start = index
+  let depth = 0
+  let quote: string | null = null
+  for (; index < raw.length; index += 1) {
+    const ch = raw[index] ?? ''
+    if (quote) {
+      if (ch === '\\') { index += 1; continue }
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') { quote = ch; continue }
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth === 0) return raw.slice(start, index).trim()
+      depth -= 1
+    } else if (depth === 0 && (ch === ',' || ch === ';')) {
+      return raw.slice(start, index).trim()
+    } else if (depth === 0 && ch === '\n') {
+      const soFar = raw.slice(start, index).trim()
+      if (soFar.length > 0 && !/[+\-?:&|=]$/u.test(soFar)) return soFar
+    }
+  }
+  return raw.slice(start).trim()
+}
+
+function systemContents(src: string): Array<{ line: number; index: number; expr: string }> {
+  const out: Array<{ line: number; index: number; expr: string }> = []
+  const roleRe = /role\s*:\s*(['"])system\1(?!\s*\|)/g
+  for (const match of src.matchAll(roleRe)) {
+    const at = match.index ?? 0
+    const after = src.slice(at + match[0].length, at + match[0].length + 400)
+    const content = /^\s*(?:as\s+const\s*)?,\s*content\s*:\s*/.exec(after)
+    if (!content) continue
+    const expr = cutExpression(after.slice(content[0].length))
+    if (!expr || expr === 'string') continue
+    out.push({ line: src.slice(0, at).split('\n').length, index: at, expr })
+  }
+  return out
+}
+
+function splitTernary(expr: string): { whenTrue: string; whenFalse: string } | null {
+  let depth = 0
+  let quote: string | null = null
+  let mark = -1
+  for (let index = 0; index < expr.length; index += 1) {
+    const ch = expr[index] ?? ''
+    if (quote) {
+      if (ch === '\\') { index += 1; continue }
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') { quote = ch; continue }
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1
+    else if (ch === ')' || ch === ']' || ch === '}') depth -= 1
+    else if (depth === 0 && ch === '?' && expr[index + 1] !== '.' && expr[index + 1] !== '?') mark = index
+    else if (depth === 0 && ch === ':' && mark >= 0) {
+      return { whenTrue: expr.slice(mark + 1, index).trim(), whenFalse: expr.slice(index + 1).trim() }
+    }
+  }
+  return null
+}
+
+function bindingsOf(name: string, src: string): string[] {
+  const re = new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${name}\\s*(?::[^=\\n]+)?=\\s*`, 'g')
+  return [...src.matchAll(re)].map((match) => cutExpression(src.slice((match.index ?? 0) + match[0].length)))
+}
+
+function nearestParamFunction(src: string, index: number, name: string): string | null {
+  const re = new RegExp(`(\\w+)\\s*\\(\\s*${name}\\s*:`, 'g')
+  let found: string | null = null
+  let foundAt = -1
+  for (const match of src.matchAll(re)) {
+    const at = match.index ?? 0
+    if (at < index && index - at < 12000 && at > foundAt) {
+      found = match[1] ?? null
+      foundAt = at
+    }
+  }
+  return found
+}
+
+function callArgsOf(src: string, name: string): Array<{ index: number; expr: string }> {
+  const re = new RegExp(`(?:^|[^\\w])(?:this\\.)?${name}\\s*\\(`, 'g')
+  const out: Array<{ index: number; expr: string }> = []
+  for (const match of src.matchAll(re)) {
+    const at = (match.index ?? 0) + match[0].length
+    const expr = cutExpression(src.slice(at))
+    if (/^\w+\s*:/u.test(expr)) continue
+    out.push({ index: at, expr })
+  }
+  return out
+}
+
+function functionReturns(name: string, src: string): string[] {
+  const re = new RegExp(`function\\s+${name}\\s*\\([^)]*\\)[^{]*\\{`)
+  const match = re.exec(src)
+  if (!match || match.index === undefined) return []
+  const bodyStart = match.index + match[0].length - 1
+  let depth = 0
+  let bodyEnd = bodyStart
+  let quote: string | null = null
+  for (let index = bodyStart; index < src.length; index += 1) {
+    const ch = src[index] ?? ''
+    if (quote) {
+      if (ch === '\\') { index += 1; continue }
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') { quote = ch; continue }
+    if (ch === '{') depth += 1
+    else if (ch === '}') {
+      depth -= 1
+      if (depth === 0) { bodyEnd = index; break }
+    }
+  }
+  const body = src.slice(bodyStart + 1, bodyEnd)
+  return [...body.matchAll(/return\s+/g)].map((item) => cutExpression(body.slice((item.index ?? 0) + item[0].length)))
+}
+
+function expressionGuarded(expr: string, src: string, index: number, depth = 0, seen: string[] = []): boolean {
+  if (depth > 12) return false
+  const text = expr.trim()
+  if (!text) return false
+  if (GUARD_CALL.test(text)) return true
+  if (text.includes(AI_SAFETY_NO_FABRICATION) && text.includes(AI_SAFETY_NO_DISCRIMINATION)) return true
+  const ternary = splitTernary(text)
+  if (ternary) {
+    return expressionGuarded(ternary.whenTrue, src, index, depth + 1, seen)
+      && expressionGuarded(ternary.whenFalse, src, index, depth + 1, seen)
+  }
+  if (text.startsWith('`') && text.endsWith('`')) {
+    const holes = [...text.matchAll(/\$\{([^}]+)\}/g)].map((item) => item[1]?.trim() ?? '')
+    return holes.some((hole) => expressionGuarded(hole, src, index, depth + 1, seen))
+  }
+  const call = /^([A-Za-z_$][\w$]*)\s*\(/u.exec(text)
+  if (call && call[1] && !['withAiSafety', 'buildGuardedSystemPrompt', 'appendAiSafetySentences'].includes(call[1])) {
+    const returns = functionReturns(call[1], src)
+    return returns.length > 0 && returns.every((item) => expressionGuarded(item, src, index, depth + 1, seen))
+  }
+  if (!/^[A-Za-z_$][\w$]*$/u.test(text) || seen.includes(text)) return false
+  const paramFn = nearestParamFunction(src, index, text)
+  if (paramFn) {
+    const args = callArgsOf(src, paramFn)
+    // 实参和形参可以同名。这里跟的是调用点上的表达式，不能把形参名记成已访问。
+    return args.length > 0 && args.every((arg) => expressionGuarded(arg.expr, src, arg.index, depth + 1, seen))
+  }
+  const bindings = bindingsOf(text, src)
+  return bindings.length > 0 && bindings.every((item) => expressionGuarded(item, src, index, depth + 1, [...seen, text]))
 }
 
 async function main(): Promise<void> {
@@ -185,18 +345,16 @@ async function main(): Promise<void> {
     fail('tendency:prompt', '参会准备仍要求「值得跟进」（审计表第 86 行）')
   } else pass('tendency:prompt')
 
-  // 审计表第 95 行的兜底：新写的 system 消息如果没走护栏，文件里必须调用 withAiSafety。
+  // 审计表第 95 行：同一文件里每一个送给模型的 system 都要过护栏。一个包了、一个没包，必须红。
   for (const file of walkTs(SRC)) {
     const src = readFileSync(file, 'utf8')
-    if (!/role:\s*['"]system['"]/.test(src)) continue
+    const sites = systemContents(src)
+    if (sites.length === 0) continue
     const rel = file.slice(SRC.length + 1)
-    if (src.includes('withAiSafety(') || src.includes('buildGuardedSystemPrompt(') || src.includes('appendAiSafetySentences(')) {
-      pass(`walk:${rel}`)
-    } else if (src.includes(AI_SAFETY_NO_FABRICATION) && src.includes(AI_SAFETY_NO_DISCRIMINATION)) {
-      pass(`walk:${rel}`)
-    } else {
-      fail(`walk:${rel}`, '有 system prompt 但没有安全句（审计表第 95、106 行）')
-    }
+    const bare = sites.filter((site) => !expressionGuarded(site.expr, src, site.index))
+    if (bare.length > 0) {
+      fail(`walk:${rel}`, `第 ${bare.map((site) => site.line).join('、')} 行的 system 没有护栏，也没有两句安全句（审计表第 95、106 行）`)
+    } else pass(`walk:${rel}`)
   }
 
   process.env['AIGC_CONTENT_PRODUCER'] = '91310000MA1TESTCODE'
@@ -240,7 +398,8 @@ async function main(): Promise<void> {
     fail('aigc:label-string', 'Label 整数 1 不符合附录 E 的字符串类型')
   } else pass('aigc:label-string')
 
-  const sample = '这是一段仅用于验证的示例内容。'
+  // 短文通常只有一页。应标识的 PDF 必须长到至少两页，才能抓住第二页丢掉的页眉。
+  const sample = '这是一段仅用于把应标识报告撑到第二页的示例内容。'.repeat(120)
   const renders: Array<{ id: string; produceId: string; buffer: Buffer; wantVisible: boolean }> = []
   renders.push({
     id: 'job-fit',
@@ -349,7 +508,18 @@ async function main(): Promise<void> {
         disclaimerVersion: 'v1',
         rulePackVersion: 'v1',
         generatedByAi: true,
-        findings: [],
+        findings: [1, 2, 3, 4, 5, 6].map((index) => ({
+          id: `f-${index}`,
+          category: 'term' as const,
+          priority: 'attention' as const,
+          title: `核对事项 ${index}`,
+          evidence: { pageNumber: index, excerpt: sample.slice(0, 180), charStart: null, charEnd: null },
+          explanation: sample.slice(0, 800),
+          basisRef: null,
+          verificationQuestion: '请对照合同原文核对此处。',
+          uncertainty: '示例不确定性说明。',
+          source: 'ai' as const,
+        })),
       },
     })).buffer,
   })
@@ -375,9 +545,18 @@ async function main(): Promise<void> {
     const info = await readPdfInfo(item.buffer)
     const aigc = parseAigcLabelJson(info['AIGC'] ?? '')
     if (item.wantVisible) {
-      // 审计表第 11–36、103 行：可见文字要同时有「AI 生成」和「仅供参考」，元数据单独通过不算。
-      if (!text.includes('AI生成') || !text.includes('仅供参考')) fail(`pdf:${item.id}:visible`, '可见文字没有同时出现「AI 生成」和「仅供参考」')
-      else pass(`pdf:${item.id}:visible`)
+      // 审计表第 11–36、103 行：每一页都要同时有「AI 生成」和「仅供参考」。合并全文会让第二页丢页眉也通过。
+      const pages = await visiblePages(item.buffer)
+      if (pages.length < 2) {
+        fail(`pdf:${item.id}:pages`, `应标识的 PDF 只有 ${pages.length} 页，第二页页眉测不到`)
+      } else {
+        const missing = pages
+          .map((page, index) => ({ index, text: squash(page) }))
+          .filter((page) => !page.text.includes('AI生成') || !page.text.includes('仅供参考'))
+        if (missing.length > 0) {
+          fail(`pdf:${item.id}:visible`, `第 ${missing.map((page) => page.index + 1).join('、')} 页没有同时出现「AI 生成」和「仅供参考」`)
+        } else pass(`pdf:${item.id}:visible`)
+      }
     } else if (text.includes('AI生成') || text.includes('仅供参考')) {
       // 简历正文是否印标识待拍板（审计表第 15 行，本路明确先不做）。
       fail(`pdf:${item.id}:visible`, '简历 PDF 正文出现了可见标识，这一项还没拍板')

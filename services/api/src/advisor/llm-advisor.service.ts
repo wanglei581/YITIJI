@@ -196,12 +196,13 @@ export class LlmAdvisorService {
    */
   async classify(topic: string, ctx: AdvisorLlmContext = {}): Promise<AdvisorClassification> {
     if (!this.isAvailable()) return { ...classifySkillByKeyword(topic), source: 'fallback' }
-    const sys =
+    const sys = withAiSafety(
       '你在判断求职者的诉求属于哪种作业型，只做分类，不回答问题本身。' +
       '\nqa：拿不准的判断题（「要不要」「该不该」），没有现成的两样东西可比。' +
       '\nslot_fill：东西还不存在，要先把信息问出来再写（「我不会写」「帮我写」）。' +
       '\ncompare：有明确的两样东西要放一起逐条看（「我够不够格」「符不符合要求」）。' +
-      '\n只输出 JSON：{"skill":"qa|slot_fill|compare","reason":"一句话说明为什么按这个型办（用第二人称对用户说）"}'
+      '\n只输出 JSON：{"skill":"qa|slot_fill|compare","reason":"一句话说明为什么按这个型办（用第二人称对用户说）"}',
+    )
     try {
       const masked = maskUserTextForLlmText(topic.slice(0, 600), 'advisor_classify')
       const raw = await this.callLlm(sys, `【用户诉求】${masked}`, ctx.onLlmCall)
@@ -331,7 +332,7 @@ export class LlmAdvisorService {
    * 校验不过的条目直接降级为 missing —— 宁可说「没写到」也不能拿编的原文当证据。
    */
   async compare(material: string, requirements: string, ctx: AdvisorLlmContext = {}): Promise<AdvisorCompare> {
-    const sys =
+    const sys = withAiSafety(
       '你在做一件很窄的事：把岗位正文的要求逐条拿去材料里找，看**有没有写到**。' +
       '\n硬性要求：' +
       '\n1. 只判断「有没有写到」，不判断「写得好不好」——后者需要行业经验，本机没有依据。' +
@@ -343,7 +344,8 @@ export class LlmAdvisorService {
       '\n只输出 JSON（不要 markdown 代码块）：' +
       '{"items":[{"requirement":"要求原文","verdict":"covered|missing|not_a_capability","evidence":"covered 时填材料原文摘录(≤60字)，其余填一句说明"}],' +
       '"extras":[{"point":"材料里有但岗位没提的点","note":"一句说明"}],' +
-      '"summary":"一句话总览（说明这是逐条比对结果，不代表录用判断）"}'
+      '"summary":"一句话总览（说明这是逐条比对结果，不代表录用判断）"}',
+    )
 
     const maskedMaterial = maskUserTextForLlmText(material.slice(0, 8000), 'advisor_compare_material')
     const maskedReq = maskUserTextForLlmText(requirements.slice(0, 4000), 'advisor_compare_req')
