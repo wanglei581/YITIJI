@@ -49,6 +49,14 @@ async function expectSharedPageShell(page: Page, title: string): Promise<void> {
   await expect(frame.getByRole('heading', { name: title, exact: true })).toBeVisible()
 }
 
+/**
+ * 冻结假时钟。`page.clock.install()` 之后时间仍按真实速度流动（Playwright 的默认），
+ * 5 秒探测超时、10 秒自动重测都可能自己走到；页面渲染完再 pauseAt，之后只有 runFor 才推进时间。
+ */
+async function freezeClock(page: Page): Promise<void> {
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 500)
+}
+
 /** 稿 08-legal 迁入青序流光后的页壳：QxPageFrame + 页内文档头标题（h1「协议与隐私」只留给读屏）。 */
 async function expectQingxuLegalShell(page: Page, title: string): Promise<void> {
   await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
@@ -793,6 +801,7 @@ test('offline page backs off its automatic re-checks and resets on the online ev
   await page.clock.install()
   await page.goto('/error-offline')
   await expect(page.getByTestId('system-state-state-unknown')).toBeVisible()
+  await freezeClock(page)
   expect(api.requestCount('GET', '/api/v1/health')).toBe(0)
 
   await page.clock.runFor(10_000)
@@ -815,18 +824,20 @@ test('offline page backs off its automatic re-checks and resets on the online ev
 })
 
 test('offline page aborts its in-flight probe when the user leaves the page @w5-kiosk', async ({ page, api }) => {
-  // 探测在途时离开本页：卸载必须中断这次请求（连同它的 5 秒计时器）。装上假时钟，5 秒超时不会自己触发，
-  // 所以这里看到的中断只能来自卸载。
+  // 探测在途时离开本页：卸载必须中断这次请求（连同它的 5 秒计时器）。时钟冻结后 5 秒超时不会自己触发，
+  // 所以这里看到的中断只能来自卸载（去掉卸载时的 abort，本条等满 3 秒后转红）。
   const errors = runtimeErrors(page)
   registerKioskShell(api)
   api.respondWith('GET', '/api/v1/health', () => new Promise(() => {}))
   await page.clock.install()
   await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-unknown')).toBeVisible()
+  await freezeClock(page)
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
   await expect(page.getByTestId('system-state-state-checking')).toBeVisible()
   const aborted = page.waitForEvent('requestfailed', {
     predicate: (request) => new URL(request.url()).pathname === '/api/v1/health',
-    timeout: 5_000,
+    timeout: 3_000,
   })
   await page.getByRole('button', { name: '帮助与求助', exact: true }).click()
   await expect(page).toHaveURL(/\/help$/)
