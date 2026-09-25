@@ -197,7 +197,7 @@ export default function ErrorOfflinePage() {
       glyph: 'question', label: '本机状态未检测',
       title: <>这台机器<em>还没检测</em></>,
       copy: <>本页<b>不会默认写成正常</b>：没检测过就是没检测过，检测不到就是取不到 —— 不拿一排绿点让你以为一切都好，结果白跑一趟。</>,
-      note: <>进入本页后<b>还没检测过</b>，每 10 秒会自动检测一次</>,
+      note: <>进入本页后<b>还没检测过</b>，点下面的重新检测</>,
     },
     checking: {
       glyph: 'radar', label: '正在检测本机状态',

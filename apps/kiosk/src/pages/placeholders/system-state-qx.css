@@ -88,7 +88,8 @@
   font-family: inherit; font-size: 25px; font-weight: 700; text-align: center; cursor: pointer;
 }
 .k9-system-state .k9s-btn.is-primary { flex: 1.3; border-color: var(--qx-deep); color: var(--qx-emerald); background: var(--qx-deep); }
-.k9-system-state .k9s-btn:disabled { opacity: .72; cursor: progress; }
+/* 检测进行中：主按钮原生 disabled，外观退成稿 checking 态那一格的描边按钮，不再像可点的主操作。 */
+.k9-system-state .k9s-btn.is-primary:disabled { border-color: var(--qx-line-2); color: var(--qx-ink-2); background: var(--qx-surface); cursor: progress; }
 .k9-system-state .k9s-btn:active:not(:disabled) { transform: scale(.985); }
 .k9-system-state .k9s-btn:focus-visible { outline: 4px solid var(--qx-teal); outline-offset: 3px; }
 .k9-system-state .k9s-truth { display: flex; gap: 26px; padding: 14px 44px 16px; border-top: 1px solid var(--qx-line); background: var(--qx-paper); }

@@ -335,10 +335,10 @@ export function LegalDocPage() {
             </LegalCard>
             <LegalCard tone="teal" glyph="desk" title="现在就要看">
               <p>找<b>现场工作人员</b>索取现行版本，或按运营方公示的方式联系。</p>
-              <p className="fine">也可以先看本机留存的说明文本，但它不作为正式版本。屏幕这边不会替你转达，也不会自动记录这次读取失败。</p>
+              <p className="fine">屏幕这边不会替你转达，也不会自动记录这次读取失败。</p>
               <button type="button" className="legal-doc-inbtn is-ghost" data-testid="legal-local-text"
                       onClick={() => setLocalOptIn((prev) => ({ ...prev, [meta.key]: true }))}>
-                看本机留存文本
+                看本机留存文本（非正式版本）
               </button>
             </LegalCard>
           </div>

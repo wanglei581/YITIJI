@@ -101,8 +101,11 @@
 .k1-legal-doc .legal-doc-sk-body { flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 26px 30px; border: 1px solid var(--qx-line); border-radius: var(--legal-r-lg); background: var(--qx-surface); }
 .k1-legal-doc .legal-doc-sk-body i { height: 22px; border-radius: 10px; background: var(--qx-muted-bg); }
 .k1-legal-doc .legal-doc-sk-body i:first-child { width: 44%; height: 34px; }
-.k1-legal-doc .legal-doc-sk-body i:nth-child(3n) { width: 76%; }
-.k1-legal-doc .legal-doc-sk-body i:nth-child(3n + 1):not(:first-child) { width: 64%; }
+/* 行宽照稿逐行：90 / 82 / 76 / 90 / 64 / 82 / 76。 */
+.k1-legal-doc .legal-doc-sk-body i:is(:nth-child(2), :nth-child(5)) { width: 90%; }
+.k1-legal-doc .legal-doc-sk-body i:is(:nth-child(3), :nth-child(7)) { width: 82%; }
+.k1-legal-doc .legal-doc-sk-body i:is(:nth-child(4), :nth-child(8)) { width: 76%; }
+.k1-legal-doc .legal-doc-sk-body i:nth-child(6) { width: 64%; }
 .k1-legal-doc .legal-doc-breathe { display: inline-flex; animation: legal-doc-breathe 1600ms ease-in-out infinite; }
 @keyframes legal-doc-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
 

@@ -572,6 +572,59 @@ test('legal document keeps its standalone theme and scrollable long body @w5-kio
   await expectFusionAcceptance(page, errors)
 })
 
+test('legal document never passes local or missing text off as the official version @w5-kiosk', async ({ page, api }) => {
+  // 稿 08-legal 的三条诚实性：取不到 → error 并给重试，不静默顶替；本机留存文本只在用户点开 / 服务端尚无激活版本时出现，
+  // 且一律挂「不作为正式版本」；未知文档 → not-found，不回落到任何一份。
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.abort('GET', '/api/v1/kiosk/legal/terms_of_service', 'internetdisconnected')
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+
+  await page.goto('/legal/terms')
+  await expect(page.getByRole('heading', { name: '正文没取到', exact: true })).toBeVisible()
+  await expect(page.getByText('本终端为「AI求职打印服务终端」', { exact: false })).toHaveCount(0)
+  await expect(page.getByTestId('legal-doc-fallback-warning')).toHaveCount(0)
+  await expect(page.getByTestId('legal-primary')).toHaveText('重新取正文')
+
+  await page.getByRole('button', { name: '看本机留存文本（非正式版本）', exact: true }).click()
+  await expect(page.getByTestId('legal-doc-fallback-warning')).toContainText('不作为正式版本')
+  await expect(page.getByText('本终端为「AI求职打印服务终端」', { exact: false })).toBeVisible()
+  await expect(page.getByTestId('legal-ai-explain')).toBeDisabled()
+
+  // 服务端可达但尚无激活版本（data: null）：直接给本机留存文本，同样挂标注。
+  await page.getByRole('group', { name: '法律文档' }).getByRole('button', { name: '隐私政策' }).click()
+  await expect(page).toHaveURL(/\/legal\/privacy$/)
+  await expect(page.getByTestId('legal-doc-fallback-warning')).toContainText('不作为正式版本')
+  await expect(page.getByRole('heading', { name: '一、我们收集的信息', exact: true })).toBeVisible()
+
+  await page.goto('/legal/not-a-document')
+  await expect(page.getByRole('heading', { name: '没有这份文档', exact: true })).toBeVisible()
+  await expect(page.getByTestId('legal-doc-fallback-warning')).toHaveCount(0)
+  await expectFusionAcceptance(page, errors)
+})
+
+test('legal document returns to the page it was opened from @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', {
+    status: 200,
+    json: { success: true, data: { content: '一、我们收集的信息\n\n登录用的手机号。', publishedAt: '2026-07-24T00:00:00.000Z' } },
+  })
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+
+  await page.goto('/help')
+  await page.getByRole('group', { name: '按分类筛选常见问题' }).getByRole('button', { name: /隐私与留存/ }).click()
+  await page.getByRole('button', { name: /文件会保存多久/ }).click()
+  await page.getByRole('button', { name: '隐私政策', exact: true }).click()
+  await expect(page).toHaveURL(/\/legal\/privacy$/)
+  await expect(page.getByRole('heading', { name: '一、我们收集的信息', exact: true })).toBeVisible()
+  const back = page.getByRole('button', { name: '返回上一页', exact: true }).first()
+  await expect(back).toBeVisible()
+  await back.click()
+  await expect(page).toHaveURL(/\/help$/)
+  expect(errors).toEqual([])
+})
+
 test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
