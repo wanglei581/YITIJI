@@ -814,6 +814,26 @@ test('offline page backs off its automatic re-checks and resets on the online ev
   expect(errors).toEqual([])
 })
 
+test('offline page aborts its in-flight probe when the user leaves the page @w5-kiosk', async ({ page, api }) => {
+  // 探测在途时离开本页：卸载必须中断这次请求（连同它的 5 秒计时器）。装上假时钟，5 秒超时不会自己触发，
+  // 所以这里看到的中断只能来自卸载。
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respondWith('GET', '/api/v1/health', () => new Promise(() => {}))
+  await page.clock.install()
+  await page.goto('/error-offline')
+  await page.getByRole('button', { name: '重新检测', exact: true }).click()
+  await expect(page.getByTestId('system-state-state-checking')).toBeVisible()
+  const aborted = page.waitForEvent('requestfailed', {
+    predicate: (request) => new URL(request.url()).pathname === '/api/v1/health',
+    timeout: 5_000,
+  })
+  await page.getByRole('button', { name: '帮助与求助', exact: true }).click()
+  await expect(page).toHaveURL(/\/help$/)
+  expect((await aborted).failure()?.errorText).toMatch(/ABORTED/i)
+  expect(errors).toEqual([])
+})
+
 test('mobile QR login renders a real API error and touch-safe retry @w5-mobile', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   api.respond('GET', '/api/v1/member/auth/qr/w5-expired-ticket/status', {
