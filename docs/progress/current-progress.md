@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-25：原稿 51 手机确认登录运行时合流（本地候选，UI/商用仍 NO-GO）
+
+Claude Opus 5.5 xhigh 以用户原目录 `51-phone-relay.html` 的 `screen=qr-login` 为只读目标，重做真实 `/member/qr-login` 手机壳、设备核对、手机号验证、逐态提示与底部操作；与同稿的手机上传流程分开，后者本次未改。页面只按真实票据状态、发码、确认回执推进：手机端“已确认”不冒称一体机已登录，服务端回执未知不盲重试，机名缺失不编造，剩余时间只标为打开时读取。原有文件拆出三份有实际引用的状态判据、逐态文案、展示组件；无新路由、依赖、设计稿改写或 PR。Codex 复核发现同页切换 `ticketId` 时旧手机号/验证码和迟到确认可能串到新票据，Claude 再以独立会话号和在途回执隔离修复，增加既有浏览器套件回归；两次 Claude MCP 汇报超时，但隔离树留下干净提交，Codex 独立核对并选择性合流 `5c9ed5d4f`、`ba32fdc5a`。
+
+Codex 对照原始 390 设计截图与真实路由的待填、已确认截图：结构与信息层级为新稿，不是旧页换色。隔离树正式构建的 390×844 浏览器 `qr-login-render` **4/4**，含发码→错码→确认、结果未知后仅查状态、换票据丢弃旧确认；Kiosk 构建/typecheck、`verify:qr-login-ui`、`verify:fusion-w5`、diff check 退出 0。主候选合流后 Kiosk typecheck、上述两项静态门禁、390 浏览器 fusion smoke **1/1**、W5 错误触控 **1/1**、`graph:check` 和 diff check 退出 0；项目图谱仅同步更新既有两份生成文件。此处只覆盖原稿的 QR 登录分屏和本地夹具；其余 51 号手机上传分屏、真实短信/微信环境、跨设备 claim、Windows Edge/一体机真机、线上与当前 SHA CI 未验，UI/商用仍 NO-GO。
+
 ## 2026-09-25：内部账号旧缓存权限放行修复（本地候选，商用仍 NO-GO）
 
 Grok 4.7 Build Fast xhigh 在隔离 SQLite 的真实 Nest HTTP 场景复现：管理员被禁用后，旧 Redis 会话快照仍使 `/admin/orgs` 和 `/auth/me` 返回 200；管理员降为合作机构后，旧 token 仍可列全部机构。合作机构停用和改绑路径原已回源。Grok 以两次提交 `1557c558b`、`8f6ed6c21` 修复内部账号鉴权：每次以数据库账号与机构状态为准，Redis 仅作更高 tokenVersion 的写入屏障；版本冲突直接拒绝，脏 JSON 由原子写覆盖。新回归先使旧实现 **36/37** 失败，修复后隔离 `verify:redis-degradation-truth` **38/38**，API `tsc --noEmit` 退出 0；临时 Nest HTTP 场景修复后分别为 401/403。Agy Gemini 3.8 Flash 对最终两份关键文件做只读源码复核，未发现具体 P0/P1；第一次较宽复核超时，不能当作评审结论。Codex 仅选择性接入三个已有鉴权/门禁文件，主候选 API `tsc --noEmit` 与 `git diff --check` 退出 0。所有证据仍是本地隔离库/夹具，当前 SHA CI、真实 PostgreSQL 并发、线上会话与压测未验；内部请求现在每次查 User，合作机构再查 Organization，须在发布前量测数据库读压与延迟。未推送或部署，商用仍 NO-GO。
