@@ -404,6 +404,37 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 /* 输入焦点要在浅底输入坞里一眼看得到（外接键盘 / 辅助设备同样适用） */
 .dock textarea:focus,.dock textarea:focus-visible{
   outline:4px solid var(--teal);outline-offset:2px;border-color:var(--teal);background:#fff}
+/* 2026-09-05 体检修复：回答正文超高时此前会画到下方「可以直接去的地方」「不经过 AI 也能办」两个区块上
+   （reply-* / voice-* 共 7 态）。回答区改为自身滚动，下方两个区块保持固定高度不被覆盖。 */
+.ans{flex:1;min-height:0;margin-top:14px;display:flex;flex-direction:column;border-radius:var(--r-lg);padding:22px 26px 20px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin}
+/* 2026-09-05 体检修复（续）：回答态下 body 只有 648px，而驾驶舱的能力清单占 416px，回答区被压到 44px 只剩一条横纹。
+   有回答时把能力清单的五行分组收起（表头「本机 AI 能力 · 在线/受控/未开放」计数保留可见），回答区拿回约 350px；
+   回到提问态清单自动展开。只用 :has()（Chromium/Edge Kiosk 支持），不改结构与状态名。 */
+#stage:has(#body-root[data-state^="reply-"]) .rail .rgrp,
+#stage:has(#body-root[data-state^="voice-"]) .rail .rgrp,
+#stage:has(#body-root[data-state="ai-unavailable"]) .rail .rgrp,
+#stage:has(#body-root[data-state="mic-denied"]) .rail .rgrp{display:none}
+#stage:has(#body-root[data-state^="reply-"]) .rail .sweep,
+#stage:has(#body-root[data-state^="voice-"]) .rail .sweep,
+#stage:has(#body-root[data-state="ai-unavailable"]) .rail .sweep,
+#stage:has(#body-root[data-state="mic-denied"]) .rail .sweep{display:none}
+#stage:has(#body-root[data-state^="reply-"]) .ans,
+#stage:has(#body-root[data-state^="voice-"]) .ans,
+#stage:has(#body-root[data-state="ai-unavailable"]) .ans,
+#stage:has(#body-root[data-state="mic-denied"]) .ans{min-height:200px}
+/* 2026-09-05 体检修复：27 寸竖屏 1px≈0.31mm，13–15px 辅助文字站立读不清；统一提到 16px（正文字阶仍按规范 17–23）。 */
+.ment-go small,.tag,.ans-list li i,.act small,.rail-n,.rail-route .rr-x{font-size:16px}.rc .rt{font-size:15px}
+/* 2026-09-25 体检修复：「非 AI 回答」态的状态卡比「请求失败」态多出字段与门禁两段（约 81px），
+   下方「不经过 AI 也能办」四张卡被压到 203px、内容需 238px，溢出约 37px。只收本态的留白与行距，
+   字号、文案与其它状态不变。 */
+#body-root[data-state="reply-not-ai"] .state.fit{padding:18px 26px}
+#body-root[data-state="reply-not-ai"] .state.fit .kvrow{margin-top:10px}
+#body-root[data-state="reply-not-ai"] .state.fit .gate{margin-top:8px}
+#body-root[data-state="reply-not-ai"] .state.fit .acts{margin-top:12px}
+#body-root[data-state="reply-not-ai"] .mrail.big.dense .ment{gap:6px;padding:12px 22px}
+#body-root[data-state="reply-not-ai"] .mrail.big.dense .ment-sub{gap:6px}
+#body-root[data-state="reply-not-ai"] .mrail.big.dense .ment-sub span{line-height:1.3}
+#body-root[data-state="reply-not-ai"] .mrail.big.dense .ment-go{padding-top:7px}
 </style>
 </head>
 <body>

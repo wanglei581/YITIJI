@@ -311,6 +311,9 @@ a:focus-visible,button:focus-visible,[role=checkbox]:focus-visible{outline:3px s
 .demo-panel .dp-t{color:var(--emerald);font-size:14px;font-weight:700;letter-spacing:2px;flex:none;padding:4px 0 2px}
 .demo-panel a{display:flex;align-items:center;min-height:28px;color:#f2efe4;font-size:14px;padding:0 10px;border-radius:8px;background:rgba(255,255,255,.07);white-space:nowrap;flex:none}
 .demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+/* 2026-09-05 体检修复：选文档前的空态提示（12 个 document-* 态）文字比预览列高出约 39px，画到列边框外；改为列内滚动。 */
+.pv-empty{overflow-y:auto;overscroll-behavior:contain}
+.pv-cap{flex:none;min-height:34px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ink-3);text-align:center;padding:0 6px}
 </style>
 </head>
 <body>

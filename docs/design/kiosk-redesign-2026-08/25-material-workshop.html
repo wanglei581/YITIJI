@@ -322,6 +322,8 @@ ul{list-style:none}
 .field input:focus-visible,.field textarea:focus-visible{
   outline:4px solid var(--teal);outline-offset:2px;border-color:var(--teal);background:var(--surface)}
 .field:focus-within>span:first-child{color:var(--teal-d)}
+/* 2026-09-05 体检修复：27 寸竖屏 1px≈0.31mm，13–15px 辅助文字站立读不清；统一提到 16px（正文字阶仍按规范 17–23）。 */
+.template .use,.tags i,.others .list button i,.tmeta u,.field .fe,.after .st>i,.fc-h .badge,.fc-grid u,.fc-foot,.reason,.draft-h span,.draft-rows u,.ly-note i,.hand-rows u{font-size:16px}
 </style>
 </head>
 <body>
