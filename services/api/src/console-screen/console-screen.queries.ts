@@ -2,7 +2,6 @@ import {
   SCREEN_UNAVAILABLE_REASON,
   type ScreenContentInventoryValue,
   type ScreenFairStructureValue,
-  type ScreenFleetHealth,
   type ScreenFleetWallValue,
   type ScreenPendingReviewValue,
   type ScreenPrintPagesValue,
@@ -28,6 +27,7 @@ import {
   shanghaiDayStart,
   unavailableMetric,
 } from './console-screen.metric'
+import { attachFleetCells } from './console-screen.fleet'
 import {
   type PartnerOrgId,
   partnerOrgIdWhere,
@@ -46,12 +46,15 @@ const FLEET_TERMINAL_SELECT = {
   terminalCode: true,
   displayName: true,
   locationLabel: true,
+  areaLabel: true,
+  geoLat: true,
+  geoLng: true,
   enabled: true,
   org: { select: { name: true } },
   heartbeats: {
     orderBy: { createdAt: 'desc' as const },
     take: 1,
-    select: { status: true, agentVersion: true, createdAt: true },
+    select: { status: true, agentVersion: true, printerStatus: true, createdAt: true },
   },
 }
 
@@ -107,6 +110,7 @@ function sourceOrgFilter(orgId: PartnerOrgId | undefined): { sourceOrgId: string
 
 export function mapFleetOverview(
   overview: DeviceFleetOverview,
+  cells: ScreenFleetWallValue['cells'],
   listing?: { matchedCount: number; truncated: boolean; sampleCap: number },
 ): {
   online: ScreenTerminalsOnlineValue
@@ -134,13 +138,14 @@ export function mapFleetOverview(
     online,
     wall: {
       ...online,
-      cells: overview.terminals.map((item) => ({ health: item.health as ScreenFleetHealth })),
+      cells,
     },
   }
 }
 
 export interface FleetSlice {
   overview: DeviceFleetOverview
+  cells: ScreenFleetWallValue['cells']
   matchedCount: number
   truncated: boolean
 }
@@ -159,11 +164,13 @@ async function loadFleetSlice(
     take: FLEET_SAMPLE_TAKE,
     select: FLEET_TERMINAL_SELECT,
   })
+  const overview = buildDeviceFleetOverview(
+    { terminals, screensaverConfigs: [], smartCampusConfigs: [], toolboxConfigs: [] },
+    now,
+  )
   return {
-    overview: buildDeviceFleetOverview(
-      { terminals, screensaverConfigs: [], smartCampusConfigs: [], toolboxConfigs: [] },
-      now,
-    ),
+    overview,
+    cells: await attachFleetCells(prisma, terminals, overview, now),
     matchedCount,
     truncated: matchedCount > FLEET_SAMPLE_TAKE,
   }

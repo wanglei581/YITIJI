@@ -1,5 +1,5 @@
-import { Controller, ForbiddenException, Get, Query, UseGuards } from '@nestjs/common'
-import type { ScreenSnapshot } from './console-screen.types'
+import { Controller, ForbiddenException, Get, Param, Query, UseGuards } from '@nestjs/common'
+import type { ScreenSnapshot, ScreenTerminalTwin } from './console-screen.types'
 import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -28,6 +28,27 @@ export class PartnerScreenController {
   ): Promise<ScreenSnapshot> {
     try {
       return this.screen.getPartnerSnapshot(requirePartnerOrgId(user.orgId))
+    } catch (error) {
+      if (error instanceof PartnerOrgRequiredError) {
+        throw new ForbiddenException({
+          error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' },
+        })
+      }
+      throw error
+    }
+  }
+
+  /**
+   * 机构端单台孪生。orgId 只来自当前用户。
+   * 别家终端与不存在终端同一 404，响应体不包含对方编号。
+   */
+  @Get('partner/screen/terminals/:terminalId')
+  getPartnerTerminalTwin(
+    @CurrentUser() user: AuthedUser,
+    @Param('terminalId') terminalId: string,
+  ): Promise<ScreenTerminalTwin> {
+    try {
+      return this.screen.getPartnerTerminalTwin(requirePartnerOrgId(user.orgId), terminalId)
     } catch (error) {
       if (error instanceof PartnerOrgRequiredError) {
         throw new ForbiddenException({
