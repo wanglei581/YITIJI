@@ -58,6 +58,25 @@ export class RecruitmentEmergencyService {
     if (!trimmed) {
       throw new BadRequestException({ error: { code: 'CIRCUIT_BREAK_TARGET_REQUIRED', message: '请指定机构或来源' } })
     }
+    if (scope === 'org') {
+      const org = await this.prisma.organization.findUnique({ where: { id: trimmed }, select: { id: true } })
+      if (!org) throw new NotFoundException({ error: { code: 'CONTENT_NOT_FOUND', message: '机构不存在' } })
+    } else {
+      const source = await this.prisma.jobSource.findUnique({ where: { id: trimmed }, select: { id: true } })
+      if (!source) throw new NotFoundException({ error: { code: 'CONTENT_NOT_FOUND', message: '来源不存在' } })
+      await this.prisma.jobSource.update({ where: { id: trimmed }, data: { enabled: false } })
+    }
+    await this.prisma.recruitmentCircuitBreak.upsert({
+      where: { scope_targetId: { scope, targetId: trimmed } },
+      create: {
+        scope,
+        targetId: trimmed,
+        reasonCode: reason.reasonCode,
+        reasonText: reason.reasonText,
+        actorId: actor.userId,
+      },
+      update: {},
+    })
     const rows = await this.loadScope(scope, trimmed)
     for (const item of rows) {
       await this.applyOne(item.targetType, item.row, reason, actor, 'circuit_break')
@@ -150,31 +169,29 @@ export class RecruitmentEmergencyService {
   private async loadScope(scope: 'org' | 'source', id: string): Promise<Array<{ targetType: EmergencyTargetType; row: TargetRow }>> {
     const orgWhere = scope === 'org' ? { sourceOrgId: id } : undefined
     const sourceWhere = scope === 'source' ? { sourceId: id } : undefined
-    const published = { publishStatus: 'published' as const }
     const [jobs, fairs, companies, policies, materials, agencies] = await Promise.all([
       this.prisma.job.findMany({
-        where: { ...published, ...(orgWhere ?? sourceWhere) },
+        where: { ...(orgWhere ?? sourceWhere) },
         select: { id: true, sourceOrgId: true, sourceId: true, title: true, publishStatus: true },
       }),
       this.prisma.jobFair.findMany({
-        where: { ...published, ...(orgWhere ?? sourceWhere) },
+        where: { ...(orgWhere ?? sourceWhere) },
         select: { id: true, sourceOrgId: true, sourceId: true, title: true, publishStatus: true },
       }),
       scope === 'org'
         ? this.prisma.companyProfile.findMany({
-            where: { ...published, sourceOrgId: id },
+            where: { sourceOrgId: id },
             select: { id: true, sourceOrgId: true, name: true, publishStatus: true },
           })
         : Promise.resolve([]),
       scope === 'org'
         ? this.prisma.policyPost.findMany({
-            where: { ...published, sourceOrgId: id },
+            where: { sourceOrgId: id },
             select: { id: true, sourceOrgId: true, title: true, publishStatus: true },
           })
         : Promise.resolve([]),
       this.prisma.fairMaterial.findMany({
         where: {
-          ...published,
           deletedAt: null,
           jobFair: scope === 'org' ? { sourceOrgId: id } : { sourceId: id },
         },
@@ -185,7 +202,7 @@ export class RecruitmentEmergencyService {
       }),
       scope === 'org'
         ? this.prisma.offlineAgency.findMany({
-            where: { ...published, sourceOrgId: id },
+            where: { sourceOrgId: id },
             select: { id: true, name: true, publishStatus: true, sourceOrgId: true },
           })
         : Promise.resolve([]),

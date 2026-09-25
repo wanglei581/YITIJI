@@ -2500,6 +2500,20 @@ model RecruitmentEmergencyHold {
   @@index([orgId, createdAt])
 }
 
+// 机构或来源熔断。单向，不可撤销。发布和同步都要查这张表，不能只看当下已发布的行。
+model RecruitmentCircuitBreak {
+  id         String   @id @default(cuid())
+  scope      String
+  targetId   String
+  reasonCode String
+  reasonText String
+  actorId    String
+  createdAt  DateTime @default(now())
+
+  @@unique([scope, targetId])
+  @@index([scope, createdAt])
+}
+
 // 机构可见的站内记录。没有单独的机构通知通道，下架结果写在这里。
 model PartnerOrgNotice {
   id          String    @id @default(cuid())

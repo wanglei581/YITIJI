@@ -13,6 +13,11 @@ import { RecruitmentEmergencyService } from '../src/recruitment-hosting/recruitm
 import { EmergencyTakedownDto } from '../src/recruitment-hosting/recruitment-emergency.controller'
 import { OfflineAgenciesService } from '../src/offline-agencies/offline-agencies.service'
 import { FairMaterialService } from '../src/jobs/fair-material.service'
+import { JobsAdminService } from '../src/jobs/jobs-admin.service'
+import { JobSyncService } from '../src/job-sync/job-sync.service'
+import { SyncService } from '../src/sync/sync.service'
+import { encryptSecret } from '../src/common/crypto/secret-cipher'
+import { createHmac } from 'crypto'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
@@ -78,14 +83,18 @@ async function main() {
   pass('1. 下架 DTO 接受招聘会资料与线下机构')
 
   async function cleanup() {
-    await prisma.partnerOrgNotice.deleteMany({ where: { orgId } }).catch(() => undefined)
-    await prisma.recruitmentEmergencyHold.deleteMany({ where: { orgId } }).catch(() => undefined)
+    const orgIds = [orgId, `org_src_${sfx}`]
+    await prisma.partnerOrgNotice.deleteMany({ where: { orgId: { in: orgIds } } }).catch(() => undefined)
+    await prisma.recruitmentEmergencyHold.deleteMany({ where: { orgId: { in: orgIds } } }).catch(() => undefined)
+    await prisma.recruitmentCircuitBreak.deleteMany({ where: { actorId: userId } }).catch(() => undefined)
+    await prisma.job.deleteMany({ where: { sourceOrgId: { in: orgIds } } }).catch(() => undefined)
+    await prisma.jobSource.deleteMany({ where: { orgId: { in: orgIds } } }).catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { actorId: userId } }).catch(() => undefined)
     await prisma.fairMaterial.deleteMany({ where: { jobFairId: fairId } }).catch(() => undefined)
     await prisma.offlineAgency.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
     await prisma.jobFair.deleteMany({ where: { id: fairId } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { id: userId } }).catch(() => undefined)
-    await prisma.organization.deleteMany({ where: { id: orgId } }).catch(() => undefined)
+    await prisma.organization.deleteMany({ where: { id: { in: orgIds } } }).catch(() => undefined)
   }
 
   try {
@@ -173,11 +182,94 @@ async function main() {
     const agencyCircuitHold = await prisma.recruitmentEmergencyHold.findFirst({ where: { targetType: 'offline_agency', targetId: circuitAgencyId } })
     if (circuitMaterial?.publishStatus !== 'unpublished' || !materialCircuitHold) fail('6. 机构熔断没有下架招聘会资料')
     if (circuitAgency?.publishStatus !== 'unpublished' || !agencyCircuitHold) fail('6b. 机构熔断没有下架线下机构')
-    if (draftMaterial?.publishStatus !== 'draft') fail('6c. 本条只要求已发布内容；草稿不应被误改')
-    pass('6. 机构熔断覆盖已发布的招聘会资料与线下机构')
+    const draftHold = await prisma.recruitmentEmergencyHold.findFirst({ where: { targetType: 'fair_material', targetId: draftMaterialId } })
+    if (draftMaterial?.publishStatus !== 'unpublished' || !draftHold) fail('6c. 机构熔断没有处理草稿资料')
+    pass('6. 机构熔断覆盖已发布和草稿的招聘会资料与线下机构')
     const notices = await prisma.partnerOrgNotice.count({ where: { orgId, kind: 'recruitment_emergency_takedown' } })
     if (notices < 4) fail(`7. 下架通知不足，实际 ${notices}`)
     pass('7. 招聘会资料与线下机构下架都通知了机构')
+
+    const rule = await prisma.recruitmentCircuitBreak.findUnique({ where: { scope_targetId: { scope: 'org', targetId: orgId } } })
+    if (!rule) fail('8. 机构熔断没有留下持久规则')
+    pass('8. 机构熔断留下持久规则')
+    const lateJobId = `job_late_${sfx}`
+    await prisma.job.create({
+      data: {
+        id: lateJobId, sourceOrgId: orgId, externalId: `late-${sfx}`, sourceName: '熔断验证机构',
+        sourceUrl: 'https://example.com/late', title: '熔断后新岗位', company: '某公司', city: '青岛',
+        reviewStatus: 'approved', publishStatus: 'draft',
+      },
+    })
+    const jobsAdmin = new JobsAdminService(prisma, audit)
+    await expectCode(
+      () => jobsAdmin.publishJobSource(lateJobId, 'publish', actor),
+      'EMERGENCY_TAKEDOWN_IRREVERSIBLE',
+      '9. 熔断后新进来的岗位不能发布',
+    )
+    const late = await prisma.job.findUnique({ where: { id: lateJobId } })
+    if (late?.publishStatus !== 'draft') fail('9b. 被拒的新岗位被写成了已发布')
+    pass('9b. 熔断规则挡住新岗位，且没有把它发出去')
+
+    const org2 = `org_src_${sfx}`
+    await prisma.organization.create({
+      data: { id: org2, name: '来源熔断机构', type: 'licensed_hr_agency', contentTrustStatus: 'active' },
+    })
+    const sourceSecret = 'circuit-webhook-secret-0123456789'
+    const source = await prisma.jobSource.create({
+      data: {
+        orgId: org2, name: '熔断来源', sourceKind: 'manual', accessMode: 'webhook', syncFreq: 'manual',
+        enabled: true, webhookSecret: encryptSecret(sourceSecret),
+      },
+    })
+    const sourcedJobId = `job_src_${sfx}`
+    await prisma.job.create({
+      data: {
+        id: sourcedJobId, sourceOrgId: org2, sourceId: source.id, externalId: `src-${sfx}`,
+        sourceName: '来源熔断机构', sourceUrl: 'https://example.com/src', title: '来源草稿岗位',
+        company: '某公司', city: '青岛', reviewStatus: 'approved', publishStatus: 'draft',
+      },
+    })
+    await emergency.circuitBreak('source', source.id, 'rights_complaint', '来源熔断', actor)
+    const sourceRow = await prisma.jobSource.findUnique({ where: { id: source.id } })
+    const sourcedJob = await prisma.job.findUnique({ where: { id: sourcedJobId } })
+    const sourceRule = await prisma.recruitmentCircuitBreak.findUnique({ where: { scope_targetId: { scope: 'source', targetId: source.id } } })
+    if (!sourceRule || sourceRow?.enabled !== false || sourcedJob?.publishStatus !== 'unpublished') {
+      fail(`10. 来源熔断未停用或未下架草稿: enabled=${sourceRow?.enabled} status=${sourcedJob?.publishStatus}`)
+    }
+    pass('10. 来源熔断停用数据源，并下架该来源全部状态的岗位')
+    await prisma.jobSource.update({ where: { id: source.id }, data: { enabled: true } })
+    const syncJobs = new JobSyncService(prisma, { refreshForJob: async () => undefined } as never, audit)
+    if (await syncJobs.enqueue(source.id, true) !== null) fail('11. 来源重新启用后仍会入队')
+    const pulled = await syncJobs.pullApiSource(source.id)
+    if (pulled.added !== 0 || pulled.updated !== 0) fail('11b. 来源重新启用后仍会拉取')
+    pass('11. 来源熔断后，重新启用也不入队、不拉取')
+    let imported = 0
+    const webhook = new SyncService(
+      prisma,
+      { importJobsFromWebhook: async () => { imported += 1; return { imported: 1, added: 1, updated: 0 } } } as never,
+      audit,
+      { setNxEx: async () => true } as never,
+    )
+    const rawBody = JSON.stringify({ items: [] })
+    const timestamp = String(Math.floor(Date.now() / 1000))
+    const signature = createHmac('sha256', sourceSecret).update(`${timestamp}.${rawBody}`).digest('hex')
+    await expectCode(
+      () => webhook.handleWebhook({
+        sourceId: source.id,
+        timestampHeader: timestamp,
+        nonceHeader: `nonce-${sfx}-ok`,
+        signatureHeader: signature,
+        rawBody,
+        parsed: { items: [] } as never,
+        ip: null,
+        userAgent: null,
+        requestId: null,
+      }),
+      'EMERGENCY_TAKEDOWN_IRREVERSIBLE',
+      '12. 来源重新启用后 Webhook 仍拒绝',
+    )
+    if (imported !== 0) fail('12b. Webhook 在熔断后来源上仍然落库')
+    pass('12b. 熔断来源的 Webhook 不落库')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

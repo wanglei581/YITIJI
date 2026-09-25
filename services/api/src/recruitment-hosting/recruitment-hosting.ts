@@ -79,17 +79,115 @@ type HoldDelegate = {
   findFirst?: (args: { where: { targetType: string; targetId: string } }) => Promise<{ id: string } | null>
 }
 
-/** 内存假 Prisma 没有这张表时跳过，避免既有发布闸门夹具被新表拖红。 */
+type CircuitDelegate = {
+  findFirst?: (args: { where: { scope: string; targetId: string } }) => Promise<{ id: string } | null>
+}
+
+type ScopeRow = { sourceOrgId?: string | null; sourceId?: string | null; jobFairId?: string | null; jobFair?: { sourceOrgId?: string | null; sourceId?: string | null } | null }
+
+type ScopeReader = {
+  findFirst?: (args: { where: { id: string } }) => Promise<ScopeRow | null>
+  findUnique?: (args: { where: { id: string }; select?: unknown }) => Promise<ScopeRow | null>
+}
+
+type EmergencyGatePrisma = {
+  recruitmentEmergencyHold?: HoldDelegate
+  recruitmentCircuitBreak?: CircuitDelegate
+  job?: ScopeReader
+  jobFair?: ScopeReader
+  companyProfile?: ScopeReader
+  policyPost?: ScopeReader
+  fairMaterial?: ScopeReader
+  offlineAgency?: ScopeReader
+}
+
+export function recruitmentCircuitBrokenException(message = '该机构或来源已熔断，不能再发布或同步'): ForbiddenException {
+  return new ForbiddenException({
+    error: { code: EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE, message },
+  })
+}
+
+function irreversible(message: string): never {
+  throw new ForbiddenException({
+    error: { code: EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE, message },
+  })
+}
+
+async function contentScope(
+  prisma: EmergencyGatePrisma,
+  targetType: string,
+  targetId: string,
+): Promise<{ orgId: string | null; sourceId: string | null }> {
+  const read = async (reader: ScopeReader | undefined) => {
+    if (!reader) return null
+    // 用 findFirst，避免发布路径里「第一次 findUnique 代表读到发布前状态」的夹具被多打一次。
+    if (reader.findFirst) return reader.findFirst({ where: { id: targetId } })
+    return reader.findUnique?.({ where: { id: targetId } }) ?? null
+  }
+  if (targetType === 'job') {
+    const row = await read(prisma.job)
+    return { orgId: row?.sourceOrgId ?? null, sourceId: row?.sourceId ?? null }
+  }
+  if (targetType === 'job_fair') {
+    const row = await read(prisma.jobFair)
+    return { orgId: row?.sourceOrgId ?? null, sourceId: row?.sourceId ?? null }
+  }
+  if (targetType === 'company') {
+    const row = await read(prisma.companyProfile)
+    return { orgId: row?.sourceOrgId ?? null, sourceId: null }
+  }
+  if (targetType === 'policy') {
+    const row = await read(prisma.policyPost)
+    return { orgId: row?.sourceOrgId ?? null, sourceId: null }
+  }
+  if (targetType === 'offline_agency') {
+    const row = await read(prisma.offlineAgency)
+    return { orgId: row?.sourceOrgId ?? null, sourceId: null }
+  }
+  if (targetType === 'fair_material') {
+    const row = await read(prisma.fairMaterial)
+    if (row?.jobFair?.sourceOrgId) {
+      return { orgId: row.jobFair.sourceOrgId, sourceId: row.jobFair.sourceId ?? null }
+    }
+    const fairId = row?.jobFairId
+    if (fairId) {
+      const fair = prisma.jobFair?.findFirst
+        ? await prisma.jobFair.findFirst({ where: { id: fairId } })
+        : await prisma.jobFair?.findUnique?.({ where: { id: fairId } })
+      return { orgId: fair?.sourceOrgId ?? null, sourceId: fair?.sourceId ?? null }
+    }
+  }
+  return { orgId: null, sourceId: null }
+}
+
+/** 机构或来源熔断后，该范围的同步和发布都要停。缺表时先跳过，夹具在下一步补上。 */
+export async function recruitmentCircuitBlocks(
+  prisma: EmergencyGatePrisma,
+  scope: { orgId?: string | null; sourceId?: string | null },
+): Promise<boolean> {
+  const table = prisma.recruitmentCircuitBreak
+  if (!table?.findFirst) return false
+  if (scope.orgId) {
+    const orgHit = await table.findFirst({ where: { scope: 'org', targetId: scope.orgId } })
+    if (orgHit) return true
+  }
+  if (scope.sourceId) {
+    const sourceHit = await table.findFirst({ where: { scope: 'source', targetId: scope.sourceId } })
+    if (sourceHit) return true
+  }
+  return false
+}
+
+/** 单条 hold 或机构 / 来源熔断都拒绝再发布。 */
 export async function assertNotEmergencyHeld(
-  prisma: { recruitmentEmergencyHold?: HoldDelegate },
+  prisma: EmergencyGatePrisma,
   targetType: string,
   targetId: string,
 ): Promise<void> {
   const found = await prisma.recruitmentEmergencyHold?.findFirst?.({ where: { targetType, targetId } })
-  if (!found) return
-  throw new ForbiddenException({
-    error: { code: EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE, message: '该内容已紧急下架，不能恢复' },
-  })
+  if (found) irreversible('该内容已紧急下架，不能恢复')
+  const scope = await contentScope(prisma, targetType, targetId)
+  if (await recruitmentCircuitBlocks(prisma, scope)) irreversible('该机构或来源已熔断，不能再发布')
 }
 
 export function closedJobPage(params?: { page?: number; pageSize?: number }) {

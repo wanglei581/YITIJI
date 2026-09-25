@@ -24,6 +24,7 @@ import {
 import {
   assertRecruitmentContentHostingEnabled,
   isRecruitmentContentHostingEnabled,
+  recruitmentCircuitBlocks,
 } from '../recruitment-hosting/recruitment-hosting'
 import { resolvePublicUrl, validatePublicUrl, type ResolvedPublicUrl } from './ssrf-guard'
 import type { UpdateResponseConfigDto } from './dto/response-config.dto'
@@ -158,8 +159,14 @@ export class JobSyncService {
    * Enqueue a sourceId. If Redis/BullMQ available, adds to queue (idempotent
    * by jobId). Otherwise executes inline via setImmediate.
    */
+  async isSyncBlocked(sourceId: string): Promise<boolean> {
+    const source = await this.prisma.jobSource.findUnique({ where: { id: sourceId }, select: { orgId: true } })
+    return recruitmentCircuitBlocks(this.prisma, { orgId: source?.orgId ?? null, sourceId })
+  }
+
   async enqueue(sourceId: string, manual: boolean): Promise<string | null> {
     if (!isRecruitmentContentHostingEnabled()) return null
+    if (await this.isSyncBlocked(sourceId)) return null
     if (this.queue) {
       const jobId = manual ? `${sourceId}_manual` : sourceId
       const bullJob = await this.queue.add(
@@ -212,6 +219,7 @@ export class JobSyncService {
       }
       const threshold = SYNC_FREQ_THRESHOLD_MS[s.syncFreq]
       if (threshold === undefined) continue   // manual / realtime: skip auto-schedule
+      if (await this.isSyncBlocked(s.id)) continue
       const lastMs = s.lastSyncAt ? s.lastSyncAt.getTime() : 0
       if (now - lastMs >= threshold) {
         await this.enqueue(s.id, false)
@@ -416,6 +424,7 @@ export class JobSyncService {
 
   async pullApiSource(sourceId: string): Promise<SyncStats> {
     if (!isRecruitmentContentHostingEnabled()) return { added: 0, updated: 0, dup: 0, error: 0 }
+    if (await this.isSyncBlocked(sourceId)) return { added: 0, updated: 0, dup: 0, error: 0 }
     const source = await this.prisma.jobSource.findUnique({ where: { id: sourceId }, include: { org: true } })
     if (!source || !source.enabled || !source.org.enabled || source.accessMode !== 'api' || !source.endpoint) {
       throw new Error(`Source ${sourceId}: not a valid enabled API source with endpoint`)

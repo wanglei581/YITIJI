@@ -237,7 +237,6 @@ export class BulkPublishService {
    * 只读,不写任何状态。
    */
   async previewBulkPublish(filter: BulkPublishFilter): Promise<BulkPublishPreviewResult> {
-    this.assertAdminPolicyBulk(filter.kind)
     const d = this.descriptor(filter.kind)
     const scope = this.scopeWhere(filter)
 

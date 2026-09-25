@@ -527,6 +527,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.partnerOrgNotice
   }
 
+  get recruitmentCircuitBreak() {
+    return this.client.recruitmentCircuitBreak
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   $transaction<R>(
