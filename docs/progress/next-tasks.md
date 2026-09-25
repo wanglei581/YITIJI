@@ -56,7 +56,7 @@
 | 30-my-profile | `/profile` | QX 路由已登记；视觉待验 |
 | 31-benefits | `/me/benefits` | QX 路由已登记；视觉待验 |
 | 32-cashier | `/print/cashier` | 原稿通道/扫码方式/金额/订单/状态结构已合流，1080/390 本地截图与 W2 用例通过；真实支付/真机及其它状态待验 |
-| 33-pickup-code | `/print/pickup-claim` | 状态变体，复用 11 的路由 |
+| 33-pickup-code | 尚无已核实的独立核销路由 | 原稿 33 写“取件码核销/出纸”，原稿 11 明确本页只收“到机码”、不收付款后的“取件凭证码”；两种码不能共用 `claim-pickup` 输入合同。先核对订单取件凭证的权限、核销和出纸后端合同，再决定是否存在一体机独立入口；当前 UI/业务 NO-GO，不能算作 11 的状态变体。 |
 | 34-self-assessment | `/resume/self-assessment/intro` | 未在 QX 集合；待实屏验 |
 | 35-notifications | `/me/notifications` | QX 路由已登记；视觉待验 |
 | 36-index | — | 设计索引，不算产品页 |
