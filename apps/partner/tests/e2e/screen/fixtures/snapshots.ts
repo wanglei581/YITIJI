@@ -208,26 +208,30 @@ export function partnerDegraded(): ScreenSnapshot {
 }
 
 /**
- * 招聘内容托管关闭（托管 a，我们云上）：岗位、招聘会、企业资料不在云上。
- * 存量计数故意给 0 —— 屏上必须写「未开启」，不能把 0 当「没有」画出来；政策照常出数。
- * 待审里还留着岗位与企业的存量：面板要说明那是存量。
+ * 招聘内容托管关闭（托管 a，我们云上的默认部署），照服务端写（console-screen.assemble.ts）：
+ *   - closeRecruitmentMetrics 把 jobsOnShelf、fairStructure、sourceEntryOpensTop 换成 recruitment_hosting_disabled
+ *     （机构侧的 sourceEntryOpensTop 原本就是未接入，托管关闭时原因被换成托管关闭）；
+ *   - contentInventory 与 pendingReview 原样返回，含岗位类存量；政策由本机构自审，这里有 3 条待审；
+ *   - 同步：数据源不再写 SyncLog，近 24 小时 0 批 → { total: 0, success: 0, failed: 0, successRate: null }。
  */
 export function partnerHostingOff(): ScreenSnapshot {
   const snapshot = partnerFull()
   snapshot.limits = { ...LIMITS, recruitmentHosting: 'disabled' }
   snapshot.metrics.jobsOnShelf = na('Job approved+published+validThrough', 'current', 'recruitment_hosting_disabled')
   snapshot.metrics.fairStructure = na('FairCompany/FairZone/FairMaterial', 'ongoing', 'recruitment_hosting_disabled')
+  snapshot.metrics.sourceEntryOpensTop = na('ExternalJumpLog', 'current', 'recruitment_hosting_disabled')
+  snapshot.metrics.syncSuccessRate24h = ok('SyncLog.result', '24h', { total: 0, success: 0, failed: 0, successRate: null })
   snapshot.metrics.contentInventory = ok('Job/JobFair/PolicyPost/CompanyProfile counts', 'current', {
-    jobsPublished: 0,
-    jobsPending: 0,
-    fairsPublished: 0,
-    fairsPending: 0,
+    jobsPublished: 328,
+    jobsPending: 4,
+    fairsPublished: 12,
+    fairsPending: 1,
     policiesPublished: 9,
-    policiesPending: 0,
-    companiesPublished: 0,
-    companiesPending: 0,
+    policiesPending: 3,
+    companiesPublished: 26,
+    companiesPending: 2,
   })
-  snapshot.metrics.pendingReview = ok('reviewStatus pending+reviewing', 'current', { total: 3, jobs: 2, fairs: 0, policies: 0, companies: 1 })
+  snapshot.metrics.pendingReview = ok('reviewStatus pending+reviewing', 'current', { total: 10, jobs: 4, fairs: 1, policies: 3, companies: 2 })
   return snapshot
 }
 
@@ -302,17 +306,41 @@ export function partnerUsageVisitsFailed(range: string): ScreenUsageSnapshot {
   return base
 }
 
-/** 托管关闭：服务端只下发政策一类（照常出数），岗位、招聘会、企业整类不在云上。 */
+/**
+ * 托管关闭的信息使用，照 console-screen.usage.service.ts / usage.queries.ts 写：
+ *   - partnerContent 只下发政策一类（byType 过滤到 policy）；
+ *   - partnerDaily 只数政策的浏览与打开来源入口（countsTowardPartnerDaily），少于 5（含 0）→ null；
+ *   - partnerTop 只从政策里挑，浏览达到 5 次才列。
+ */
+const POLICY_DAILY = [
+  [21, 8], [16, 6], [9, 3], [18, 7], [24, 9], [2, 0], [15, 5], [19, 6], [22, 8], [13, 4], [11, 5], [25, 10], [27, 11], [20, 7], [17, 6],
+  [0, 0], [14, 5], [18, 6], [21, 8], [23, 9], [26, 10], [22, 8], [15, 5], [19, 7], [28, 11], [31, 12], [24, 9], [21, 8], [29, 11], [26, 10],
+] as const
+const suppressed = (value: number): number | null => (value >= 5 ? value : null)
+
 export function partnerUsageHostingOff(range: string): ScreenUsageSnapshot {
   const base = partnerUsage(range)
   base.limits = { minAggregateSample: 5, recruitmentHosting: 'disabled' }
+  const n = base.range === '30d' ? 30 : base.range === '7d' ? 7 : 1
+  const days: Array<{ date: string; browse: number | null; sourceOpens: number | null }> = []
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const [browse, opens] = POLICY_DAILY[i % POLICY_DAILY.length]
+    days.push({ date: shanghaiDate(i), browse: suppressed(browse), sourceOpens: suppressed(opens) })
+  }
+  const today = POLICY_DAILY[0]
+  const k = n === 1 ? 1 : n === 7 ? 6 : 24
   base.metrics.partnerContent = ok('BrowseLog/Favorite/ExternalJumpLog join sourceOrgId', base.range, {
     coverage: 'members_only',
     basis: 'current_content_join',
-    byType: [{ type: 'policy', browse: 21, favorites: null, sourceOpens: 8 }],
+    byType: [{ type: 'policy', browse: suppressed(n === 1 ? today[0] : 21 * k), favorites: suppressed(n === 1 ? 3 : 3 * k), sourceOpens: suppressed(n === 1 ? today[1] : 8 * k) }],
   })
+  base.metrics.partnerDaily = ok('BrowseLog/ExternalJumpLog.createdAt', base.range, { days })
   base.metrics.partnerTop = ok('BrowseLog join content title', base.range, {
-    items: [{ type: 'policy', title: '2026 年高校毕业生就业见习补贴申领指南', browse: 11 }],
+    items: [
+      { type: 'policy', title: '2026 年高校毕业生就业见习补贴申领指南', browse: 11 * k },
+      { type: 'policy', title: '海珠区灵活就业人员社保补贴申领办法', browse: 7 * k },
+      { type: 'policy', title: '创业担保贷款贴息政策问答', browse: 5 * k },
+    ],
   })
   return base
 }

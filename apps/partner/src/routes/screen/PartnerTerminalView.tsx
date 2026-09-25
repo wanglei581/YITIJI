@@ -134,6 +134,7 @@ function PartnerTerminalLive({
       failure={twin.failure}
       onRefresh={() => void twin.refresh()}
       refreshing={twin.status === 'loading'}
+      hostingOff={fleetSnapshot?.limits.recruitmentHosting === 'disabled'}
     >
       {current ? (
         <TwinTerminalBoard twin={current} formatClock={(iso) => formatTime(iso)} formatDateTime={(iso) => formatDateTime(iso)} unassignedAreaLabel={UNASSIGNED} />

@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
 import {
-  SCREEN_UNAVAILABLE_REASON,
   type ScreenContentType,
   type ScreenPartnerContentUsageValue,
   type ScreenUsageRange,
@@ -29,6 +28,7 @@ import {
 } from '@ai-job-print/ui'
 import { loadPartnerUsage, normalizeUsageRange } from '../../services/api/consoleScreen'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
+import { OrgFavoritesPanel, OrgTopPoliciesPanel } from './PartnerUsageHostingOff'
 
 /**
  * 信息使用：本机构发布的信息被浏览、收藏、打开来源平台入口了多少次。
@@ -38,6 +38,8 @@ import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, typ
  *   - 按内容当前的来源机构归属计入本机构（内容换了机构，历史记录跟着内容走）。
  *   - 任何分组少于 5 次一律显示「少于 5」（服务端已置空），合计里有未知就写「至少」，不补数。
  *   - 「打开来源平台入口」不是投递或预约结果；本平台不收简历、不代投递。
+ *   - 招聘内容托管关闭时服务端只下发政策一类（variant="org-usage"）：场景只画政策一类，
+ *     底栏换成「热门政策」，右栏是收藏与统计口径，每日趋势在左栏长高（PartnerUsageHostingOff.tsx）。
  */
 
 const TITLE = '本机构信息使用态势'
@@ -100,6 +102,24 @@ function VisitsValue({ metric }: { metric: ScreenUsageSnapshot['metrics']['visit
   )
 }
 
+/** 统计口径。托管开启时在左下，托管关闭时挪到右栏；托管关闭时没有岗位与招聘会，最后一句只说打开入口。 */
+function NotesPanel({ visits, hostingOff }: { visits: ScreenUsageSnapshot['metrics']['visits']; hostingOff: boolean }) {
+  return (
+    <TwinPanel title="统计口径" sub="本页数字怎么来的" source={MEMBERS_NOTE}>
+      <ul className="twin-notes">
+        <li>只统计登录会员的浏览、收藏与打开来源平台入口</li>
+        <li>按内容当前的来源机构归属计入本机构</li>
+        <li>任何分组少于 5 次都不显示具体数字</li>
+        <li>{hostingOff ? '打开来源平台入口只计打开次数，不是办理结果' : '打开来源平台入口不是投递或预约结果，本平台不收简历、不代投递'}</li>
+      </ul>
+      <div className="twin-kv twin-push">
+        <span>访问人次</span>
+        <VisitsValue metric={visits} />
+      </div>
+    </TwinPanel>
+  )
+}
+
 function useUsage(range: ScreenUsageRange) {
   const fetcher = useCallback(() => loadPartnerUsage(range), [range])
   const result = useRefreshable<ScreenUsageSnapshot>(
@@ -126,16 +146,14 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
   const u = usage.data.metrics
   const rangeText = RANGE_LABEL[usage.data.range]
   const content = u.partnerContent?.available ? orderedTypes(u.partnerContent.value) : null
-  // 托管 a：服务端只下发政策一类；岗位、招聘会、企业照样占位，写「未开启」，不当成没人看
+  // 托管 a：服务端只下发政策一类，场景与各块只画下发的类型，岗位、招聘会、企业不占位
   const hostingOff = usage.data.limits.recruitmentHosting === 'disabled'
   const flowTypes: TwinInfoFlowType[] = content
-    ? TYPE_ORDER.flatMap((type): TwinInfoFlowType[] => {
-        const row = content.find((item) => item.type === type)
-        if (row) return [{ key: type, label: TYPE_LABEL[type], browse: row.browse, favorites: row.favorites, sourceOpens: row.sourceOpens }]
-        return hostingOff ? [{ key: type, label: TYPE_LABEL[type], browse: null, favorites: null, sourceOpens: null, disabled: true }] : []
-      })
+    ? content.map((row) => ({ key: row.type, label: TYPE_LABEL[row.type], browse: row.browse, favorites: row.favorites, sourceOpens: row.sourceOpens }))
     : []
   const topLimit = chrome.presenting ? 5 : 8
+  // 托管关闭的展示档：每日趋势长进左下（两格高），图与当日数一起放大
+  const grown = hostingOff && chrome.presenting
 
   const toolbar = (
     <div className="twin-fgrp" role="group" aria-label="统计时间">
@@ -160,6 +178,8 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
       failure={usage.failure}
       onRefresh={() => void usage.refresh()}
       refreshing={usage.status === 'loading'}
+      hostingOff={hostingOff}
+      variant={hostingOff ? 'org-usage' : undefined}
     >
       <TwinSlot slot="l1">
         <TwinMetricPanel
@@ -205,21 +225,45 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
           source="按上海自然日统计本机构信息的浏览与打开来源平台入口次数。少于 5 次的日子画在底线上的空心点，不连线、不补数。"
           render={(value) =>
             value.days.length <= 1 ? (
-              <>
-                <TwinTiles
-                  items={[
-                    { value: value.days.length ? twinSmall(value.days[0].browse) : '—', unit: '次', label: '今日浏览' },
-                    { value: value.days.length ? twinSmall(value.days[0].sourceOpens) : '—', unit: '次', label: '今日打开来源平台' },
-                  ]}
-                />
-                <p className="twin-cap twin-push">选「近 7 天」或「近 30 天」查看趋势</p>
-              </>
+              grown ? (
+                // 托管关闭的展示档：本块长满左栏两格高，当日两个数各占一半，不留一大片空白
+                <>
+                  <div className="twin-stat-list is-tall">
+                    <div className="twin-stat">
+                      <span>今日浏览</span>
+                      <b>
+                        {value.days.length ? twinSmall(value.days[0].browse) : '—'}
+                        <span className="twin-unit">次</span>
+                      </b>
+                    </div>
+                    <div className="twin-stat">
+                      <span>今日打开来源平台</span>
+                      <b>
+                        {value.days.length ? twinSmall(value.days[0].sourceOpens) : '—'}
+                        <span className="twin-unit">次</span>
+                      </b>
+                    </div>
+                  </div>
+                  <p className="twin-cap">选「近 7 天」或「近 30 天」查看趋势</p>
+                </>
+              ) : (
+                <>
+                  <TwinTiles
+                    items={[
+                      { value: value.days.length ? twinSmall(value.days[0].browse) : '—', unit: '次', label: '今日浏览' },
+                      { value: value.days.length ? twinSmall(value.days[0].sourceOpens) : '—', unit: '次', label: '今日打开来源平台' },
+                    ]}
+                  />
+                  <p className="twin-cap twin-push">选「近 7 天」或「近 30 天」查看趋势</p>
+                </>
+              )
             ) : (
               <>
                 <TwinAreaTrend
                   days={value.days.map((d) => ({ date: d.date, value: d.browse }))}
                   seriesLabel={`${rangeText}每日浏览次数`}
                   secondary={{ label: `${rangeText}每日打开来源平台入口次数`, values: value.days.map((d) => d.sourceOpens) }}
+                  height={grown ? 470 : undefined}
                 />
                 <p className="twin-cap twin-push">
                   <span className="twin-key is-acc" aria-hidden="true" />浏览{'\u3000'}<span className="twin-key is-gold" aria-hidden="true" />打开来源平台入口
@@ -230,20 +274,11 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
         />
       </TwinSlot>
 
-      <TwinSlot slot="l3">
-        <TwinPanel title="统计口径" sub="本页数字怎么来的" source={MEMBERS_NOTE}>
-          <ul className="twin-notes">
-            <li>只统计登录会员的浏览、收藏与打开来源平台入口</li>
-            <li>按内容当前的来源机构归属计入本机构</li>
-            <li>任何分组少于 5 次都不显示具体数字</li>
-            <li>打开来源平台入口不是投递或预约结果，本平台不收简历、不代投递</li>
-          </ul>
-          <div className="twin-kv twin-push">
-            <span>访问人次</span>
-            <VisitsValue metric={u.visits} />
-          </div>
-        </TwinPanel>
-      </TwinSlot>
+      {hostingOff ? null : (
+        <TwinSlot slot="l3">
+          <NotesPanel visits={u.visits} hostingOff={false} />
+        </TwinSlot>
+      )}
 
       <TwinSlot slot="scene">
         {content ? (
@@ -252,6 +287,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
               types={flowTypes}
               hubLabel="本机构信息"
               hubCaption={`${rangeText} · 登录会员`}
+              opensCaption={hostingOff ? '不是办理结果' : undefined}
             />
           </TwinSceneBox>
         ) : (
@@ -259,91 +295,105 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
         )}
         {content ? (
           <div className="twin-overlay is-tl">
-            <span>本机构信息 → 浏览 → 收藏 / 打开来源平台入口 · 柱高与线宽按真实次数</span>
+            <span>{hostingOff ? '本机构信息 → 政策公告 → 收藏 / 打开来源入口' : '本机构信息 → 浏览 → 收藏 / 打开来源平台入口'} · 柱高与线宽按真实次数</span>
           </div>
         ) : null}
       </TwinSlot>
 
       <TwinSlot slot="bottom">
-        <TwinMetricPanel
-          title="按信息类型"
-          sub={rangeText}
-          tone="info"
-          metric={u.partnerContent}
-          source={MEMBERS_NOTE}
-          render={(value) => (
-            <TwinTiles
-              cols={4}
-              compact
-              items={TYPE_ORDER.flatMap((type): TwinTileItem[] => {
-                const row = value.byType.find((item) => item.type === type)
-                if (row) {
-                  return [{ value: twinSmall(row.browse), unit: '次浏览', label: TYPE_LABEL[type], hint: `收藏 ${twinSmall(row.favorites)} · 来源 ${twinSmall(row.sourceOpens)}` }]
-                }
-                return hostingOff ? [{ label: TYPE_LABEL[type], unavailableReason: SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled }] : []
-              })}
-            />
-          )}
-        />
+        {hostingOff ? (
+          <OrgTopPoliciesPanel metric={u.partnerTop} rangeText={rangeText} limit={5} membersNote={MEMBERS_NOTE} />
+        ) : (
+          <TwinMetricPanel
+            title="按信息类型"
+            sub={rangeText}
+            tone="info"
+            metric={u.partnerContent}
+            source={MEMBERS_NOTE}
+            render={(value) => (
+              <TwinTiles
+                cols={4}
+                compact
+                items={TYPE_ORDER.flatMap((type): TwinTileItem[] => {
+                  const row = value.byType.find((item) => item.type === type)
+                  if (row) {
+                    return [{ value: twinSmall(row.browse), unit: '次浏览', label: TYPE_LABEL[type], hint: `收藏 ${twinSmall(row.favorites)} · 来源 ${twinSmall(row.sourceOpens)}` }]
+                  }
+                  return []
+                })}
+              />
+            )}
+          />
+        )}
       </TwinSlot>
 
       <TwinSlot slot="r1">
-        <TwinMetricPanel
-          title="打开来源平台入口"
-          sub={rangeText}
-          tone="info"
-          metric={u.partnerContent}
-          source={SCREEN_SOURCE_ENTRY_NOTE}
-          render={(value) => {
-            const bars = barsOf(orderedTypes(value), (row) => row.sourceOpens, 'info')
-            return (
-              <>
-                <TwinBarList items={bars.items} emptyText="没有达到 5 次的类型" />
-                <p className="twin-cap twin-push">
-                  {bars.small.length ? `少于 5 次：${bars.small.join('、')} · ` : ''}统计打开来源平台入口的次数，不是投递结果
-                </p>
-              </>
-            )
-          }}
-        />
+        {hostingOff ? (
+          <OrgFavoritesPanel metric={u.partnerContent} rangeText={rangeText} membersNote={MEMBERS_NOTE} />
+        ) : (
+          <TwinMetricPanel
+            title="打开来源平台入口"
+            sub={rangeText}
+            tone="info"
+            metric={u.partnerContent}
+            source={SCREEN_SOURCE_ENTRY_NOTE}
+            render={(value) => {
+              const bars = barsOf(orderedTypes(value), (row) => row.sourceOpens, 'info')
+              return (
+                <>
+                  <TwinBarList items={bars.items} emptyText="没有达到 5 次的类型" />
+                  <p className="twin-cap twin-push">
+                    {bars.small.length ? `少于 5 次：${bars.small.join('、')} · ` : ''}统计打开来源平台入口的次数，不是投递结果
+                  </p>
+                </>
+              )
+            }}
+          />
+        )}
       </TwinSlot>
 
       <TwinSlot slot="r2">
-        <TwinMetricPanel
-          title="收藏"
-          sub={rangeText}
-          metric={u.partnerContent}
-          source={`${MEMBERS_NOTE}收藏记在用户本人名下，这里只有按类型的合计，看不到是谁收藏的。`}
-          render={(value) => {
-            const bars = barsOf(orderedTypes(value), (row) => row.favorites, 'acc')
-            return (
-              <>
-                <TwinBarList items={bars.items} emptyText="没有达到 5 次的类型" />
-                <p className="twin-cap twin-push">{bars.small.length ? `少于 5 次：${bars.small.join('、')}` : '只有合计，看不到是谁收藏的'}</p>
-              </>
-            )
-          }}
-        />
+        {hostingOff ? (
+          <NotesPanel visits={u.visits} hostingOff />
+        ) : (
+          <TwinMetricPanel
+            title="收藏"
+            sub={rangeText}
+            metric={u.partnerContent}
+            source={`${MEMBERS_NOTE}收藏记在用户本人名下，这里只有按类型的合计，看不到是谁收藏的。`}
+            render={(value) => {
+              const bars = barsOf(orderedTypes(value), (row) => row.favorites, 'acc')
+              return (
+                <>
+                  <TwinBarList items={bars.items} emptyText="没有达到 5 次的类型" />
+                  <p className="twin-cap twin-push">{bars.small.length ? `少于 5 次：${bars.small.join('、')}` : '只有合计，看不到是谁收藏的'}</p>
+                </>
+              )
+            }}
+          />
+        )}
       </TwinSlot>
 
-      <TwinSlot slot="r3">
-        <TwinMetricPanel
-          title="热门内容"
-          sub={`${rangeText} · 按浏览`}
-          tone="info"
-          metric={u.partnerTop}
-          source={`${MEMBERS_NOTE}只列浏览达到 5 次的内容，按浏览次数排序。`}
-          render={(value) => (
-            <>
-              <TwinRankList
-                items={value.items.slice(0, topLimit).map((item, i) => ({ key: `${item.type}-${i}`, title: item.title, tag: TYPE_TAG[item.type], value: item.browse }))}
-                emptyText="没有浏览达到 5 次的内容"
-              />
-              <p className="twin-cap twin-push">少于 5 次的内容不列出</p>
-            </>
-          )}
-        />
-      </TwinSlot>
+      {hostingOff ? null : (
+        <TwinSlot slot="r3">
+          <TwinMetricPanel
+            title="热门内容"
+            sub={`${rangeText} · 按浏览`}
+            tone="info"
+            metric={u.partnerTop}
+            source={`${MEMBERS_NOTE}只列浏览达到 5 次的内容，按浏览次数排序。`}
+            render={(value) => (
+              <>
+                <TwinRankList
+                  items={value.items.slice(0, topLimit).map((item, i) => ({ key: `${item.type}-${i}`, title: item.title, tag: TYPE_TAG[item.type], value: item.browse }))}
+                  emptyText="没有浏览达到 5 次的内容"
+                />
+                <p className="twin-cap twin-push">少于 5 次的内容不列出</p>
+              </>
+            )}
+          />
+        </TwinSlot>
+      )}
     </TwinShell>
   )
 }

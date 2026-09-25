@@ -1,9 +1,11 @@
 import { formatDateTime } from '@ai-job-print/shared'
 import type { ScreenSnapshotMetrics } from '@ai-job-print/shared'
 import {
+  SCREEN_HOSTING_OFF_NOTE,
   SCREEN_SOURCE_ENTRY_NOTE,
   ScreenAlertList,
   ScreenBarList,
+  ScreenCard,
   ScreenGrid,
   ScreenKpi,
   ScreenMetricCard,
@@ -14,7 +16,7 @@ import {
   screenReasonCopy,
   type ScreenBarItem,
 } from '@ai-job-print/ui'
-import { taskStatusLabel, taskStatusTone } from './metricLabels'
+import { printCompletion, taskStatusLabel, taskStatusTone } from './metricLabels'
 
 /**
  * 运营版（`?profile=ops`）：6 列 × 3 行共 12 块，与契约的
@@ -30,7 +32,18 @@ import { taskStatusLabel, taskStatusTone } from './metricLabels'
  *
  * 成功率为 null 表示窗口内没有分母。这时写「无调用」而不是 0%——
  * 0% 会被读成「全都失败了」。
+ *
+ * 招聘内容托管关闭（我们云上的默认部署）时是另一套卡片（hostingOff）：
+ *   - 「待审内容」换成「机构待审政策」（托管 a 下管理员不审核，政策由运营机构自审）；
+ *   - 「同步成功率」换成「打印完成率」（数据源不再同步岗位与招聘会，近 24 小时恒为 0 批）。
+ *     选它而不是「今日 AI 调用」：AI 分项不在运营快照里，而任务流就在，打印完成率与今日失败并列最有用；
+ *   - 「打开来源平台入口」「招聘会结构」换成一块「岗位类存量」（政务快照的内容计数），
+ *     让运维看清托管关闭前留下、待清理的存量；
+ *   - 「审核时效 / 按机构维度」整块是未接入说明且托管 a 下不审核，不再占位；
+ *     实时告警、任务流、AI 成本各占半行长大。
  */
+
+export type OpsStock = ScreenSnapshotMetrics['contentInventory'] | 'pending'
 
 function rateLabel(total: number, unit: string): string {
   return `近 24 小时 · ${screenCount(total)} ${unit}`
@@ -41,7 +54,9 @@ function nestedHowTo(metric: { available: boolean } & Partial<{ reason: string }
   return metric.available === false ? screenReasonCopy(metric.reason ?? '').howTo : ''
 }
 
-export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
+export function OpsGrid({ metrics, hostingOff = false, stock }: { metrics: ScreenSnapshotMetrics; hostingOff?: boolean; stock?: OpsStock }) {
+  // 托管关闭时第二、三行各两块，半行宽；托管开启时三块，各占 4 列
+  const wide: 4 | 6 = hostingOff ? 6 : 4
   return (
     <ScreenGrid layout="ops">
       <ScreenMetricCard
@@ -94,20 +109,37 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         )}
       />
 
-      <ScreenMetricCard
-        title="待审内容"
-        metric={metrics.pendingReview}
-        span={2}
-        foot="四类内容 pending + reviewing 的服务端计数，非前端截断后统计。"
-        render={(value) => (
-          <ScreenKpi
-            value={screenCount(value.total)}
-            unit="条"
-            tone={value.total > 0 ? 'warn' : 'normal'}
-            label={`岗位 ${value.jobs} · 招聘会 ${value.fairs} · 政策 ${value.policies} · 企业 ${value.companies}`}
-          />
-        )}
-      />
+      {hostingOff ? (
+        <ScreenMetricCard
+          title="机构待审政策"
+          metric={metrics.pendingReview}
+          span={2}
+          foot="政策 pending + reviewing 的服务端计数。政策由运营机构在本平台自行审核发布，管理员只保留紧急下架。"
+          render={(value) => (
+            <ScreenKpi
+              value={screenCount(value.policies)}
+              unit="条"
+              tone={value.policies > 0 ? 'warn' : 'normal'}
+              label="运营机构自行审核"
+            />
+          )}
+        />
+      ) : (
+        <ScreenMetricCard
+          title="待审内容"
+          metric={metrics.pendingReview}
+          span={2}
+          foot="四类内容 pending + reviewing 的服务端计数，非前端截断后统计。"
+          render={(value) => (
+            <ScreenKpi
+              value={screenCount(value.total)}
+              unit="条"
+              tone={value.total > 0 ? 'warn' : 'normal'}
+              label={`岗位 ${value.jobs} · 招聘会 ${value.fairs} · 政策 ${value.policies} · 企业 ${value.companies}`}
+            />
+          )}
+        />
+      )}
 
       <ScreenMetricCard
         title="AI 成功率"
@@ -128,30 +160,52 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         }
       />
 
-      <ScreenMetricCard
-        title="同步成功率"
-        metric={metrics.syncSuccessRate24h}
-        span={2}
-        foot="同步日志全局聚合，部分失败按失败计。逐源明细见数据接入通道页。"
-        render={(value) =>
-          value.successRate === null ? (
-            <ScreenKpi value="近 24 小时无同步批次" label="没有分母，因此不给百分比" labelMuted />
-          ) : (
-            <ScreenKpi
-              value={value.successRate.toFixed(1)}
-              unit="%"
-              tone={value.successRate < 90 ? 'warn' : 'normal'}
-              label={rateLabel(value.total, '个批次')}
-            />
-          )
-        }
-      />
+      {hostingOff ? (
+        <ScreenMetricCard
+          title="打印完成率"
+          metric={metrics.taskFlow24h}
+          span={2}
+          foot="已完成 ÷（已完成 + 失败），只看近 24 小时里已经结束的打印任务；排队、打印中、取消不进分母。分母少于 5 不给百分比。"
+          render={(value) => {
+            const c = printCompletion(value.printByStatus)
+            return c.rate === null ? (
+              <ScreenKpi value="样本不足" label={`近 24 小时已结束 ${screenCount(c.finished)} 个任务，不给百分比`} labelMuted />
+            ) : (
+              <ScreenKpi
+                value={c.rate.toFixed(1)}
+                unit="%"
+                tone={c.rate < 90 ? 'warn' : 'normal'}
+                label={`完成 ${screenCount(c.completed)} / 共 ${screenCount(c.finished)} 个`}
+              />
+            )
+          }}
+        />
+      ) : (
+        <ScreenMetricCard
+          title="同步成功率"
+          metric={metrics.syncSuccessRate24h}
+          span={2}
+          foot="同步日志全局聚合，部分失败按失败计。逐源明细见数据接入通道页。"
+          render={(value) =>
+            value.successRate === null ? (
+              <ScreenKpi value="近 24 小时无同步批次" label="没有分母，因此不给百分比" labelMuted />
+            ) : (
+              <ScreenKpi
+                value={value.successRate.toFixed(1)}
+                unit="%"
+                tone={value.successRate < 90 ? 'warn' : 'normal'}
+                label={rateLabel(value.total, '个批次')}
+              />
+            )
+          }
+        />
+      )}
 
       <ScreenMetricCard
         title="实时告警"
         tag="派生 · 无历史"
         metric={metrics.alertsRealtime}
-        span={4}
+        span={wide}
         tall
         foot="告警由当前状态实时派生、不落表，因此没有历史与平均修复时长。需要 MTTR 要先建告警事件表。"
         render={(value) => (
@@ -174,7 +228,7 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         title="任务流"
         tag="近 24 小时"
         metric={metrics.taskFlow24h}
-        span={4}
+        span={wide}
         tall
         foot="打印任务与扫描任务按状态分组，窗口为近 24 小时滚动窗。已完成含免费单。"
         render={(value) => {
@@ -192,51 +246,85 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         }}
       />
 
-      <ScreenMetricCard
-        title="打开来源平台入口"
-        tag="近 30 日 · Top 5"
-        metric={metrics.sourceEntryOpensTop}
-        span={4}
-        tall
-        foot={<>{SCREEN_SOURCE_ENTRY_NOTE}行为日志保留 30 天，故无累计值。</>}
-        render={(value) => (
-          <ScreenBarList
-            items={value.items.map((item) => ({ label: item.sourceName, value: item.count }))}
-            emptyText={`近 30 日没有${value.copy}的记录`}
+      {hostingOff ? (
+        stock === 'pending' ? (
+          <ScreenCard
+            title="岗位类存量"
+            tag="托管关闭后不再审核发布"
+            span={6}
+            foot="取自政务快照的内容计数，正在取数。"
+          >
+            <p className="ops-empty">正在取数…</p>
+          </ScreenCard>
+        ) : (
+          <ScreenMetricCard
+            title="岗位类存量"
+            tag="托管关闭后不再审核发布"
+            metric={stock}
+            span={6}
+            foot={<>托管关闭前留下的岗位、招聘会、企业资料：仍在库里，不再审核发布，也不对外展示；清理前按这里核对。{SCREEN_HOSTING_OFF_NOTE}。</>}
+            render={(value) => (
+              <ScreenMiniGrid
+                compact
+                items={[
+                  { value: screenCount(value.jobsPublished), label: '岗位 · 在架存量', hint: `待审 ${screenCount(value.jobsPending)}` },
+                  { value: screenCount(value.fairsPublished), label: '招聘会 · 在架存量', hint: `待审 ${screenCount(value.fairsPending)}` },
+                  { value: screenCount(value.companiesPublished), label: '企业资料 · 在架存量', hint: `待审 ${screenCount(value.companiesPending)}` },
+                  { value: screenCount(value.jobsPending + value.fairsPending + value.companiesPending), label: '待审存量合计', hint: '不再进入审核' },
+                ]}
+              />
+            )}
           />
-        )}
-      />
+        )
+      ) : (
+        <>
+          <ScreenMetricCard
+            title="打开来源平台入口"
+            tag="近 30 日 · Top 5"
+            metric={metrics.sourceEntryOpensTop}
+            span={4}
+            tall
+            foot={<>{SCREEN_SOURCE_ENTRY_NOTE}行为日志保留 30 天，故无累计值。</>}
+            render={(value) => (
+              <ScreenBarList
+                items={value.items.map((item) => ({ label: item.sourceName, value: item.count }))}
+                emptyText={`近 30 日没有${value.copy}的记录`}
+              />
+            )}
+          />
 
-      <ScreenMetricCard
-        title="招聘会结构"
-        tag={
-          metrics.fairStructure?.available
-            ? `进行中 ${screenCount(metrics.fairStructure.value.ongoingFairs)} 场`
-            : undefined
-        }
-        metric={metrics.fairStructure}
-        span={4}
-        foot="结构数直接来自招聘会子表，只统计进行中的场次。"
-        render={(value) => (
-          <ScreenMiniGrid
-            compact
-            items={[
-              { value: screenCount(value.companies), label: '参展企业', hint: '进行中场次合计' },
-              { value: screenCount(value.zones), label: '展区', hint: '已配置导览' },
-              { value: screenCount(value.publishedMaterials), label: '活动资料', hint: '已发布可打印' },
-              value.materialPrintCount.available
-                ? { value: screenCount(value.materialPrintCount.value), label: '资料打印量', hint: '累计' }
-                : { label: '资料打印量', unavailableReason: value.materialPrintCount.reason },
-            ]}
+          <ScreenMetricCard
+            title="招聘会结构"
+            tag={
+              metrics.fairStructure?.available
+                ? `进行中 ${screenCount(metrics.fairStructure.value.ongoingFairs)} 场`
+                : undefined
+            }
+            metric={metrics.fairStructure}
+            span={4}
+            foot="结构数直接来自招聘会子表，只统计进行中的场次。"
+            render={(value) => (
+              <ScreenMiniGrid
+                compact
+                items={[
+                  { value: screenCount(value.companies), label: '参展企业', hint: '进行中场次合计' },
+                  { value: screenCount(value.zones), label: '展区', hint: '已配置导览' },
+                  { value: screenCount(value.publishedMaterials), label: '活动资料', hint: '已发布可打印' },
+                  value.materialPrintCount.available
+                    ? { value: screenCount(value.materialPrintCount.value), label: '资料打印量', hint: '累计' }
+                    : { label: '资料打印量', unavailableReason: value.materialPrintCount.reason },
+                ]}
+              />
+            )}
           />
-        )}
-      />
+        </>
+      )}
 
       <ScreenMetricCard
         title="AI 成本与用量"
         tag="近 24 小时"
         metric={metrics.aiCost24h}
-        span={4}
+        span={wide}
         foot={
           metrics.aiCost24h?.available ? (
             <>
@@ -264,13 +352,15 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         )}
       />
 
-      <ScreenMetricCard
-        title="审核时效 / 按机构维度"
-        metric={metrics.reviewSlaAndOrgDimension}
-        span={4}
-        foot=""
-        render={() => null}
-      />
+      {hostingOff ? null : (
+        <ScreenMetricCard
+          title="审核时效 / 按机构维度"
+          metric={metrics.reviewSlaAndOrgDimension}
+          span={4}
+          foot=""
+          render={() => null}
+        />
+      )}
     </ScreenGrid>
   )
 }

@@ -49,6 +49,27 @@ const SERVICE_LAYOUT: Record<string, { at: [number, number]; lift: number }> = {
   scan: { at: [664, 680], lift: 64 },
 }
 
+/** 信息服务一排（上方那道）按这个次序排。 */
+const INFO_ROW = ['jobs', 'fairs', 'policy', 'company'] as const
+const INFO_ROW_MID = (SERVICE_LAYOUT.jobs.at[0] + SERVICE_LAYOUT.company.at[0]) / 2
+const INFO_ROW_STEP = (SERVICE_LAYOUT.company.at[0] - SERVICE_LAYOUT.jobs.at[0]) / (INFO_ROW.length - 1)
+
+/**
+ * 本次要画的服务锚点。四类信息服务都在时就是设计稿的固定版式（逐像素不变）；
+ * 招聘内容托管关闭时服务端只下发政策这一类信息服务，剩下的在这一排里居中排开，
+ * 不在原来岗位、招聘会、企业的位置上留空洞，也不画灰色占位节点。
+ */
+function serviceLayoutFor(placed: readonly TwinNetworkService[]): Record<string, { at: [number, number]; lift: number }> {
+  const info = INFO_ROW.filter((key) => placed.some((s) => s.key === key))
+  if (info.length === 0 || info.length === INFO_ROW.length) return SERVICE_LAYOUT
+  const out: Record<string, { at: [number, number]; lift: number }> = { ...SERVICE_LAYOUT }
+  info.forEach((key, i) => {
+    const x = Math.round(INFO_ROW_MID + (i - (info.length - 1) / 2) * INFO_ROW_STEP)
+    out[key] = { at: [x, i % 2 === 0 ? 250 : 236], lift: i % 2 === 0 ? 116 : 64 }
+  })
+  return out
+}
+
 const CHANNEL_AT: Record<'kiosk' | 'miniapp', [number, number]> = { kiosk: [112, 318], miniapp: [112, 590] }
 const HUB_AT: [number, number] = [292, 470]
 const AI_AT: [number, number] = [480, 440]
@@ -112,11 +133,12 @@ export function TwinNetwork({ channels, services, outcomes, hubLabel, hubCaption
   }
 
   const placed = services.filter((s) => SERVICE_LAYOUT[s.key] !== undefined)
+  const layoutOf = serviceLayoutFor(placed)
   const hasAi = placed.some((s) => s.lane === 'ai')
   channels.forEach((c, i) => flow(CHANNEL_AT[c.key], HUB_AT, '#2ee6a8', flowWidth(c.count, 1.6, 9), i === 0 ? -30 : 30, '6 12', i * 0.4))
   if (hasAi) flow(HUB_AT, AI_AT, '#57d7ff', 7.5, 24, '10 10', 0)
   placed.forEach((s, k) => {
-    const layout = SERVICE_LAYOUT[s.key]
+    const layout = layoutOf[s.key]
     const from = s.lane === 'ai' ? AI_AT : HUB_AT
     flow(from, layout.at, LANE_STROKE[s.lane], flowWidth(s.count, 1.6, 9), s.lane === 'info' ? 40 : s.lane === 'print' ? -30 : 18, '6 12', k * 0.23)
   })
@@ -125,7 +147,7 @@ export function TwinNetwork({ channels, services, outcomes, hubLabel, hubCaption
     const layout = OUTCOME_LAYOUT[o.key]
     for (const src of layout.from) {
       const s = byKey.get(src)
-      if (s) flow(SERVICE_LAYOUT[src].at, layout.at, '#f2c879', flowWidth(o.count, 1.2, 14), 26, '3 10', j * 0.3)
+      if (s) flow(layoutOf[src].at, layout.at, '#f2c879', flowWidth(o.count, 1.2, 14), 26, '3 10', j * 0.3)
     }
   })
 
@@ -134,8 +156,8 @@ export function TwinNetwork({ channels, services, outcomes, hubLabel, hubCaption
   const solids = [
     ...channels.map((c) => ({ y: CHANNEL_AT[c.key][1], node: <TwinPrism key={`cp-${c.key}`} at={CHANNEL_AT[c.key]} size={70} h={26} className="p-ai" /> })),
     ...placed.map((s) => ({
-      y: SERVICE_LAYOUT[s.key].at[1],
-      node: <TwinPrism key={`sp-${s.key}`} at={SERVICE_LAYOUT[s.key].at} size={50} h={s.count === null ? 10 : 12 + Math.sqrt(s.count) * 1.6} className={s.count === null ? 'p-na' : LANE_CLASS[s.lane]} />,
+      y: layoutOf[s.key].at[1],
+      node: <TwinPrism key={`sp-${s.key}`} at={layoutOf[s.key].at} size={50} h={s.count === null ? 10 : 12 + Math.sqrt(s.count) * 1.6} className={s.count === null ? 'p-na' : LANE_CLASS[s.lane]} />,
     })),
     ...outcomes.map((o) => ({ y: OUTCOME_LAYOUT[o.key].at[1], node: <TwinPrism key={`op-${o.key}`} at={OUTCOME_LAYOUT[o.key].at} size={44} h={18} className="p-out" /> })),
   ].sort((a, b) => a.y - b.y)
@@ -170,7 +192,7 @@ export function TwinNetwork({ channels, services, outcomes, hubLabel, hubCaption
           </TwinPill>
         ))}
         {placed.map((s) => (
-          <TwinPill key={`sl-${s.key}`} at={SERVICE_LAYOUT[s.key].at} lift={SERVICE_LAYOUT[s.key].lift} width={170} className={cn('tw3-svc', s.count === null ? 'p-na' : LANE_CLASS[s.lane])}>
+          <TwinPill key={`sl-${s.key}`} at={layoutOf[s.key].at} lift={layoutOf[s.key].lift} width={170} className={cn('tw3-svc', s.count === null ? 'p-na' : LANE_CLASS[s.lane])}>
             <b>{s.label}</b>
             <span>{countText(s.count)}</span>
           </TwinPill>

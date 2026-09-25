@@ -4,11 +4,14 @@ import { TwinPill, TwinPrism } from './TwinNetwork'
 import { TWIN_BILLBOARD, TWIN_WORLD, stageToGround } from './twinMath'
 
 /**
- * 信息流向：本机构信息 → 四类内容 → 收藏 / 打开来源平台入口。机构版「信息使用」的场景。
+ * 信息流向：本机构信息 → 各类内容 → 收藏 / 打开来源平台入口。机构版「信息使用」的场景。
  *
  * 柱高与线宽只按真实计数取平方根缩放；服务端对少于 5 的计数给 null，这里画最矮的柱、
  * 写「少于 5」，不补数。合计里只要有一类是 null，就写「至少 N」，不把未知当 0 加进去。
  * 节点位置是固定版式，不表达任何数量。
+ *
+ * 只画服务端下发的类型：招聘内容托管关闭时服务端只下发政策一类，场景里就只有这一类，
+ * 落在弧的正中；岗位、招聘会、企业不画灰色占位节点。
  */
 
 export interface TwinInfoFlowType {
@@ -17,8 +20,6 @@ export interface TwinInfoFlowType {
   browse: number | null
   favorites: number | null
   sourceOpens: number | null
-  /** 这一类在本部署未开启（托管 a 下的岗位、招聘会、企业）：画灰色矮柱、写「未开启」，不连线、不计入合计。 */
-  disabled?: boolean
 }
 
 export interface TwinInfoFlowProps {
@@ -26,6 +27,8 @@ export interface TwinInfoFlowProps {
   types: TwinInfoFlowType[]
   hubLabel: string
   hubCaption: string
+  /** 「打开来源平台入口」牌子的小字说明；缺省是招聘内容也在时的「不是投递或预约结果」。 */
+  opensCaption?: string
 }
 
 /** 版式：舞台坐标（976×780）上的锚点，四类内容排成一道弧。 */
@@ -37,6 +40,9 @@ const TYPE_AT: ReadonlyArray<[number, number]> = [
   [508, 690],
 ]
 const TYPE_LIFT = [112, 62, 112, 62]
+/** 只有一类时：落在弧的正中、与中枢同高，两条去向左右对称。 */
+const SINGLE_AT: ReadonlyArray<[number, number]> = [[572, 452]]
+const SINGLE_LIFT = [112]
 const FAVORITES_AT: [number, number] = [864, 320]
 const OPENS_AT: [number, number] = [864, 580]
 
@@ -44,11 +50,14 @@ function countText(count: number | null): string {
   return count === null ? '少于 5' : screenCount(count)
 }
 
-/** 合计：全部已知才给确数；有 null 就是「至少」；全是 null 就说每类都少于 5。prefix 用小字另排。 */
+/**
+ * 合计：全部已知才给确数；有 null 就是「至少」；全是 null 就说每类都少于 5（只有一类时就是「少于 5」）。
+ * prefix 用小字另排。
+ */
 export function twinInfoTotalParts(values: ReadonlyArray<number | null>): { prefix: string | null; text: string } {
   const known = values.filter((v): v is number => v !== null)
   if (values.length === 0) return { prefix: null, text: '—' }
-  if (known.length === 0) return { prefix: '每类', text: '少于 5' }
+  if (known.length === 0) return { prefix: values.length === 1 ? null : '每类', text: '少于 5' }
   const sum = known.reduce((a, b) => a + b, 0)
   return { prefix: known.length === values.length ? null : '至少', text: screenCount(sum) }
 }
@@ -62,8 +71,10 @@ function flowWidth(count: number | null, base: number, div: number): number {
   return count === null ? base : base + Math.sqrt(count) / div
 }
 
-export function TwinInfoFlow({ types, hubLabel, hubCaption }: TwinInfoFlowProps) {
+export function TwinInfoFlow({ types, hubLabel, hubCaption, opensCaption = '不是投递或预约结果' }: TwinInfoFlowProps) {
   const placed = types.slice(0, TYPE_AT.length)
+  const anchors = placed.length === 1 ? SINGLE_AT : TYPE_AT
+  const lifts = placed.length === 1 ? SINGLE_LIFT : TYPE_LIFT
   const flows: Array<{ d: string; stroke: string; width: number; dash: string; delay: number }> = []
   const flow = (a: [number, number], b: [number, number], stroke: string, width: number, bend: number, dash: string, delay: number) => {
     const p1 = stageToGround(a[0], a[1])
@@ -73,25 +84,23 @@ export function TwinInfoFlow({ types, hubLabel, hubCaption }: TwinInfoFlowProps)
     const qy = 2 * mid.v - (p1.v + p2.v) / 2
     flows.push({ d: `M${p1.u.toFixed(0)} ${p1.v.toFixed(0)} Q${qx.toFixed(0)} ${qy.toFixed(0)} ${p2.u.toFixed(0)} ${p2.v.toFixed(0)}`, stroke, width, dash, delay })
   }
-  const live = placed.filter((t) => !t.disabled)
   placed.forEach((t, i) => {
-    if (t.disabled) return
-    flow(HUB_AT, TYPE_AT[i], '#8fb2ee', flowWidth(t.browse, 1.6, 8), i < 2 ? 36 : -36, '6 12', i * 0.3)
-    flow(TYPE_AT[i], FAVORITES_AT, '#f2c879', flowWidth(t.favorites, 1.1, 10), 22, '3 10', 0.2 + i * 0.25)
-    flow(TYPE_AT[i], OPENS_AT, '#f2c879', flowWidth(t.sourceOpens, 1.1, 10), -22, '3 10', 0.4 + i * 0.25)
+    flow(HUB_AT, anchors[i], '#8fb2ee', flowWidth(t.browse, 1.6, 8), i < 2 ? 36 : -36, '6 12', i * 0.3)
+    flow(anchors[i], FAVORITES_AT, '#f2c879', flowWidth(t.favorites, 1.1, 10), 22, '3 10', 0.2 + i * 0.25)
+    flow(anchors[i], OPENS_AT, '#f2c879', flowWidth(t.sourceOpens, 1.1, 10), -22, '3 10', 0.4 + i * 0.25)
   })
 
   const hub = stageToGround(HUB_AT[0], HUB_AT[1])
   const solids = [
     ...placed.map((t, i) => ({
-      y: TYPE_AT[i][1],
+      y: anchors[i][1],
       node: (
         <TwinPrism
           key={`tp-${t.key}`}
-          at={TYPE_AT[i]}
-          size={t.disabled ? 44 : 52}
-          h={t.disabled ? 6 : t.browse === null ? 10 : 12 + Math.sqrt(t.browse) * 1.8}
-          className={t.disabled || t.browse === null ? 'p-na' : 'p-info'}
+          at={anchors[i]}
+          size={52}
+          h={t.browse === null ? 10 : 12 + Math.sqrt(t.browse) * 1.8}
+          className={t.browse === null ? 'p-na' : 'p-info'}
         />
       ),
     })),
@@ -116,20 +125,20 @@ export function TwinInfoFlow({ types, hubLabel, hubCaption }: TwinInfoFlowProps)
           <div className="tw3-tower" style={{ height: 116 }} />
         </div>
         {placed.map((t, i) => (
-          <TwinPill key={`tl-${t.key}`} at={TYPE_AT[i]} lift={TYPE_LIFT[i]} width={176} className={cn('tw3-svc', t.disabled || t.browse === null ? 'p-na' : 'p-info')}>
+          <TwinPill key={`tl-${t.key}`} at={anchors[i]} lift={lifts[i]} width={176} className={cn('tw3-svc', t.browse === null ? 'p-na' : 'p-info')}>
             <b>{t.label}</b>
-            <span>{t.disabled ? '未开启' : `浏览 ${countText(t.browse)}`}</span>
+            <span>{`浏览 ${countText(t.browse)}`}</span>
           </TwinPill>
         ))}
         <TwinPill at={FAVORITES_AT} lift={96} width={190} className="tw3-big p-out">
           <b>收藏</b>
-          <span>{twinInfoTotal(live.map((t) => t.favorites))}</span>
+          <span>{twinInfoTotal(placed.map((t) => t.favorites))}</span>
           <i>记在用户本人名下</i>
         </TwinPill>
         <TwinPill at={OPENS_AT} lift={96} width={190} className="tw3-big p-out">
           <b>打开来源平台入口</b>
-          <span>{twinInfoTotal(live.map((t) => t.sourceOpens))}</span>
-          <i>不是投递或预约结果</i>
+          <span>{twinInfoTotal(placed.map((t) => t.sourceOpens))}</span>
+          <i>{opensCaption}</i>
         </TwinPill>
         <TwinPill at={HUB_AT} lift={178} width={176} className="tw3-core">
           <b>{hubLabel}</b>

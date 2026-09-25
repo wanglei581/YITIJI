@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ScreenHeadingLevel } from '../ScreenFrame'
-import { TwinBanner, TwinHeader, TwinScreen, TwinSlot, TwinStatePanel, type TwinLayout, type TwinTab } from './TwinFrame'
+import { TwinBanner, TwinHeader, TwinScreen, TwinSlot, TwinStatePanel, type TwinLayout, type TwinTab, type TwinVariant } from './TwinFrame'
 
 /**
  * 孪生大屏的外壳：页眉（标题 / 页签 / 时钟 / 动作）+ 整屏级横幅 + 块位栅格 + 取数失败的整屏状态。
@@ -122,10 +122,14 @@ export interface TwinShellProps {
   failure: TwinFailure | null
   onRefresh: () => void
   refreshing: boolean
+  /** 招聘内容托管关闭（取自快照的 limits.recruitmentHosting）：根上挂 data-hosting="off"。 */
+  hostingOff?: boolean
+  /** 托管关闭时机构两屏的版式变体（块位重排），见 TwinVariant。 */
+  variant?: TwinVariant
   children: ReactNode
 }
 
-export function TwinShell({ chrome, title, subtitle, layout, toolbar, meta, pollSeconds, failure, onRefresh, refreshing, children }: TwinShellProps) {
+export function TwinShell({ chrome, title, subtitle, layout, toolbar, meta, pollSeconds, failure, onRefresh, refreshing, hostingOff, variant, children }: TwinShellProps) {
   const headingLevel = chrome.headingLevel
   const stamp = meta ? `数据时间 ${meta.generatedAtText} · 每 ${pollSeconds} 秒刷新` : '正在取数，未取到之前不显示任何数值'
   const banners: ReactNode[] = []
@@ -204,6 +208,8 @@ export function TwinShell({ chrome, title, subtitle, layout, toolbar, meta, poll
       banners={banners.length ? banners : undefined}
       layout={layout}
       lite={chrome.lite}
+      hostingOff={hostingOff}
+      variant={variant}
     >
       {children}
     </TwinScreen>

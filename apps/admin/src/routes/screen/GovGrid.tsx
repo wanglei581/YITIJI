@@ -1,5 +1,5 @@
 import { formatTime } from '@ai-job-print/shared'
-import { SCREEN_UNAVAILABLE_REASON, type ScreenAlertItem, type ScreenSnapshotMetrics } from '@ai-job-print/shared'
+import type { ScreenAlertItem, ScreenSnapshotMetrics } from '@ai-job-print/shared'
 import {
   ScreenFleetWall,
   SCREEN_SOURCE_ENTRY_NOTE,
@@ -30,7 +30,8 @@ import {
   type TwinAlertItem,
   type TwinBarItem,
 } from '@ai-job-print/ui'
-import { aiOperationLabel, taskStatusLabel } from './metricLabels'
+import { GovPolicyPanel, GovQualityPanel } from './GovHostingOff'
+import { aiOperationLabel, sumStatuses, taskStatusLabel } from './metricLabels'
 import { metricReason } from './screenMeta'
 import { screenHref } from './screenTabs'
 import { TwinShell, TwinShellEmpty, snapshotMeta, useAdminSnapshot, type ScreenChrome } from './screenView'
@@ -44,6 +45,8 @@ import { TwinShell, TwinShellEmpty, snapshotMeta, useAdminSnapshot, type ScreenC
  *   2. 按区聚焦时，终端类数字切成本区（由机队格子算出，截断时写明样本）；打印、AI、来源入口
  *      的记录还没有区域归属，保持全市口径并在角标写明，不冒充本区数字。
  *   3. 在架信息都是第三方 / 官方来源，本平台不收简历、不代投递。
+ *   4. 招聘内容托管关闭（我们云上的默认部署）时，右上与右中两块整块是招聘内容，换成「政策服务」与
+ *      「服务质量」（GovHostingOff.tsx），边界只在政策服务里说一次，屏上不出现「未开启」格子。
  */
 
 const TITLE = '职易达 · 就业服务终端运行态势'
@@ -83,8 +86,7 @@ function alertRows(items: ScreenAlertItem[], actions: AlertActions, presenting: 
 
 function TaskFlow({ printByStatus, scanByStatus }: { printByStatus: Record<string, number>; scanByStatus: Record<string, number> }) {
   // 只累加服务端实际下发的状态键：没下发的状态就是这 24 小时里一条都没有，不另补数
-  const count = (source: Record<string, number>, keys: string[]) =>
-    Object.entries(source).reduce((sum, [key, value]) => (keys.includes(key) ? sum + value : sum), 0)
+  const count = sumStatuses
   return (
     <div className="twin-flow">
       <div className="twin-flow-node"><b>{screenCount(count(printByStatus, ['pending']))}</b><span>{taskStatusLabel('pending')}</span></div>
@@ -109,9 +111,8 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   }
   // 任务流与告警 9/26 起随政务快照下发（与运营版同一份实现、同一档缓存）
   const g: ScreenSnapshotMetrics = gov.data.metrics
-  // 托管 a：我们云上不存岗位、招聘会、企业资料，这三格写「未开启」，不以 0 冒充「没有」
+  // 托管 a：我们云上不存岗位、招聘会、企业资料。右上、右中两块整块换成政策服务与服务质量（见文件头第 4 条）
   const hostingOff = gov.data.limits.recruitmentHosting === 'disabled'
-  const OFF = SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled
   const sourcesPending = !ops.data && !ops.failure
   const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
   const terminals = twinTerminalsFromCells(cells)
@@ -168,6 +169,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
         void ops.refresh()
       }}
       refreshing={gov.status === 'loading'}
+      hostingOff={hostingOff}
     >
       <TwinSlot slot="l1">
         <TwinMetricPanel
@@ -271,7 +273,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
           source="AI 服务日志近 24 小时滚动窗（非自然日），只计次数，不含对话与简历内容。失败含超时与上游拒绝。"
           render={(value) => {
             const rows: TwinBarItem[] = Object.entries(value.byOperation)
-              .map(([operation, count]) => ({ label: aiOperationLabel(operation), value: count }))
+              .map(([operation, count]) => ({ label: aiOperationLabel(operation, hostingOff), value: count }))
               .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
               .slice(0, 4)
             if (value.totalCalls > 0) rows.push({ label: '调用失败', value: value.failedCalls, tone: 'error' })
@@ -370,38 +372,38 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
       </TwinSlot>
 
       <TwinSlot slot="r1">
-        <TwinMetricPanel
-          title="信息服务 · 在架"
-          sub={focus === null ? '第三方 / 官方来源' : '全市发布 · 不分区'}
-          tone="info"
-          metric={g.contentInventory}
-          source="「在架」= 审核通过且已发布且未过期。待审核为待审与审核中的合计。均为第三方 / 官方来源信息，本平台不收简历、不代投递。"
-          render={(value) => (
-            <>
-              <TwinTiles
-                items={[
-                  hostingOff
-                    ? { label: '岗位信息', unavailableReason: OFF }
-                    : { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
-                  hostingOff
-                    ? { label: '招聘会', unavailableReason: OFF }
-                    : { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
-                  { value: screenCount(value.policiesPublished), unit: '条', label: '政策公告', hint: `待审核 ${screenCount(value.policiesPending)}` },
-                  hostingOff
-                    ? { label: '企业展示', unavailableReason: OFF }
-                    : { value: screenCount(value.companiesPublished), unit: '家', label: '企业展示', hint: `待审核 ${screenCount(value.companiesPending)}` },
-                ]}
-              />
-              <p className="twin-cap twin-push">
-                {g.jobsOnShelf?.available ? `来自 ${screenCount(g.jobsOnShelf.value.sourceOrgCount)} 家来源机构 · ` : ''}本平台不收简历、不代投递
-              </p>
-            </>
-          )}
-        />
+        {hostingOff ? (
+          <GovPolicyPanel metric={g.contentInventory} focused={focus !== null} />
+        ) : (
+          <TwinMetricPanel
+            title="信息服务 · 在架"
+            sub={focus === null ? '第三方 / 官方来源' : '全市发布 · 不分区'}
+            tone="info"
+            metric={g.contentInventory}
+            source="「在架」= 审核通过且已发布且未过期。待审核为待审与审核中的合计。均为第三方 / 官方来源信息，本平台不收简历、不代投递。"
+            render={(value) => (
+              <>
+                <TwinTiles
+                  items={[
+                    { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
+                    { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
+                    { value: screenCount(value.policiesPublished), unit: '条', label: '政策公告', hint: `待审核 ${screenCount(value.policiesPending)}` },
+                    { value: screenCount(value.companiesPublished), unit: '家', label: '企业展示', hint: `待审核 ${screenCount(value.companiesPending)}` },
+                  ]}
+                />
+                <p className="twin-cap twin-push">
+                  {g.jobsOnShelf?.available ? `来自 ${screenCount(g.jobsOnShelf.value.sourceOrgCount)} 家来源机构 · ` : ''}本平台不收简历、不代投递
+                </p>
+              </>
+            )}
+          />
+        )}
       </TwinSlot>
 
       <TwinSlot slot="r2">
-        {sourcesPending ? (
+        {hostingOff ? (
+          <GovQualityPanel taskFlow={g.taskFlow24h} ops={ops.data ? { metrics: ops.data.metrics } : ops.failure ? 'failed' : 'pending'} scope={cityScope} />
+        ) : sourcesPending ? (
           <TwinPanel title="来源平台访问" tone="info" source={SCREEN_SOURCE_ENTRY_NOTE}>
             <p className="twin-cap">正在取数…</p>
           </TwinPanel>

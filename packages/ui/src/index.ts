@@ -28,7 +28,7 @@ export { FunnelCard } from './charts/FunnelCard'
 export { MetricGrid } from './charts/MetricGrid'
 
 /* ── Ops data screen (Admin / Partner 数据大屏) ────────── */
-export { SCREEN_REASON_COPY, SCREEN_SOURCE_ENTRY_NOTE, screenReasonCopy } from './screen/screenCopy'
+export { SCREEN_HOSTING_OFF_NOTE, SCREEN_REASON_COPY, SCREEN_SOURCE_ENTRY_NOTE, screenReasonCopy } from './screen/screenCopy'
 export {
   ScreenBarList,
   ScreenCard,
@@ -78,6 +78,7 @@ export {
 export { TwinNetwork, TwinPill, TwinPrism } from './screen/twin/TwinNetwork'
 export { TwinInfoFlow, twinInfoTotal, twinInfoTotalParts } from './screen/twin/TwinInfoFlow'
 export { TwinRankList } from './screen/twin/TwinRankList'
+export { TwinTerminalWall } from './screen/twin/TwinTerminalWall'
 export { TWIN_STATE_TEXT, TwinCity, twinAreas, twinTerminalState, twinTerminalsFromCells } from './screen/twin/TwinCity'
 export {
   TWIN_HIGHLIGHTS,
@@ -167,6 +168,7 @@ export type {
   TwinSlotProps,
   TwinStatePanelProps,
   TwinTab,
+  TwinVariant,
 } from './screen/twin/TwinFrame'
 export type { TwinMetricPanelProps, TwinPanelProps, TwinTone, TwinUnavailableProps } from './screen/twin/TwinPanel'
 export type {
@@ -186,6 +188,7 @@ export type {
 export type { TwinNetworkLane, TwinNetworkProps, TwinNetworkService } from './screen/twin/TwinNetwork'
 export type { TwinInfoFlowProps, TwinInfoFlowType } from './screen/twin/TwinInfoFlow'
 export type { TwinRankItem } from './screen/twin/TwinRankList'
+export type { TwinTerminalWallProps } from './screen/twin/TwinTerminalWall'
 export type { TwinChrome, TwinFailure, TwinForbiddenCopy, TwinShellMeta, TwinShellProps } from './screen/twin/TwinShell'
 export type { TwinCityHighlight, TwinCityProps, TwinCityTerminal, TwinFleetCellLike } from './screen/twin/TwinCity'
 export type { TwinCityToolbarProps } from './screen/twin/TwinCityControls'

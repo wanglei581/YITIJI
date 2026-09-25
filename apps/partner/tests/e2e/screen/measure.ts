@@ -363,3 +363,70 @@ export async function geometry(page: Page, floor: number): Promise<GeometryRepor
     }
   }, floor)
 }
+
+export interface HostingOffAudit {
+  /** 可见文字里带「未开启」的（边界句里没有这三个字）。 */
+  offText: string[]
+  /** 边界句在屏上出现的次数：每屏只许一次；没有政策内容的屏（终端孪生）为零。 */
+  boundary: number
+  /** 只有说明、没有读数的面板 / 卡片：未接入块、空态块，或正文里一个数字、一个「少于 5」都没有。 */
+  noticeOnly: string[]
+  /** 岗位类字眼出现在边界句与豁免句之外的可见文字里（面板标题、磁贴、图例、场景牌子……）。 */
+  recruitmentWords: string[]
+}
+
+/**
+ * 招聘内容托管关闭（托管 a）时的一屏体检。
+ * boundary 是边界句全文；exempt 里的片段所在的文字不算岗位类字眼（例如机构待审里那一句存量说明、
+ * 运营看板里专门盘点存量的那块卡片标题）。
+ */
+export async function hostingOffAudit(page: Page, boundary: string, exempt: readonly string[] = []): Promise<HostingOffAudit> {
+  return page.evaluate(
+    ({ sentence, skip }) => {
+      const root = document.querySelector('.twin') as HTMLElement | null
+      if (!root) return { offText: ['<no-twin-root>'], boundary: 0, noticeOnly: [], recruitmentWords: [] }
+      const rendered = (el: Element) => {
+        for (let node: Element | null = el; node; node = node.parentElement) {
+          if (getComputedStyle(node).display === 'none') return false
+        }
+        return getComputedStyle(el).visibility !== 'hidden' && el.getClientRects().length > 0
+      }
+      const texts: Array<{ text: string; el: Element }> = []
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = (node.textContent ?? '').trim()
+        const el = node.parentElement
+        if (!text || !el || !rendered(el)) continue
+        texts.push({ text, el })
+      }
+      const offText = texts.filter((t) => t.text.includes('未开启')).map((t) => t.text.slice(0, 40))
+      const boundaryCount = root.innerText.split(sentence).length - 1
+
+      const WORDS = ['岗位', '招聘会', '企业资料', '企业展示', '参展企业', '同步']
+      const ownerTitle = (el: Element) =>
+        el.closest('.twin-panel, .ops-card')?.querySelector('.twin-ph-t, h2')?.textContent?.trim() ?? ''
+      // 一句话常被拆成几个文字节点（数字另起一个），按所在元素的整句判断边界句与豁免句
+      const whole = (el: Element) => (el.textContent ?? '').replace(/\s+/g, ' ')
+      const recruitmentWords = texts
+        .filter((t) => !whole(t.el).includes(sentence) && !skip.some((s) => whole(t.el).includes(s) || ownerTitle(t.el).includes(s)))
+        .filter((t) => WORDS.some((w) => t.text.includes(w)))
+        .map((t) => `${ownerTitle(t.el) || '面板外'}「${t.text.slice(0, 30)}」`)
+
+      const noticeOnly: string[] = []
+      for (const box of [...root.querySelectorAll('.twin-panel, .ops-card')].filter(rendered)) {
+        const title = box.querySelector('.twin-ph-t, h2')?.textContent?.trim() ?? box.className
+        if (box.querySelector('.twin-na, .ops-na')) {
+          noticeOnly.push(`${title}（未接入 / 未开启说明块）`)
+          continue
+        }
+        const body = [...box.children]
+          .filter((child) => !child.matches('.twin-ph, h2, .ops-foot, .twin-pop'))
+          .map((child) => (child instanceof HTMLElement ? child.innerText : child.textContent) ?? '')
+          .join(' ')
+        if (!/\d/.test(body) && !body.includes('少于 5')) noticeOnly.push(`${title}（正文没有读数）`)
+      }
+      return { offText, boundary: boundaryCount, noticeOnly, recruitmentWords }
+    },
+    { sentence: boundary, skip: [...exempt] },
+  )
+}

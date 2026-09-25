@@ -96,6 +96,18 @@
 [data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r2'] { top: 366px; height: 300px; }
 [data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r3'] { top: 682px; height: 282px; }
 
+/*
+ * 招聘内容托管关闭（托管 a，根上 data-hosting="off"）：机构两屏的块位变体。
+ * 整块是招聘内容的面板不渲染，腾出的块位交给真实数据的邻居，不留空洞、不裁内容。
+ *   机构总览：展示档不放「建设中的指标」，场景长满中栏；右栏告警占两个块位高。
+ *   信息使用：每日趋势长进左下；右栏收藏与统计口径各占半栏。
+ */
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] .twin-slot[data-slot='scene'] { height: 956px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] .twin-slot[data-slot='r2'] { height: 628px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='l2'] { height: 628px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='r1'] { height: 464px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='r2'] { top: 500px; height: 464px; }
+
 /* 运营看板：沿用卡片栅格，整块铺满 */
 [data-ops-screen='wall'] .twin-grid[data-layout='full'] .twin-slot[data-slot='full'] { left: 28px; top: 16px; width: 1864px; height: 964px; }
 
@@ -208,9 +220,46 @@
   }
 }
 
+/* 托管关闭的机构两屏：桌面档同样把腾出的格子交给邻居 */
+[data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] {
+  grid-template-areas:
+    'scene scene scene'
+    'bottom bottom bottom'
+    'l1 l2 l3'
+    'r1 r2 r2';
+}
+
+[data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] {
+  grid-template-areas:
+    'scene scene scene'
+    'bottom bottom bottom'
+    'l1 l2 l2'
+    'r1 r2 r2';
+}
+
+@container (max-width: 1100px) {
+  [data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] {
+    grid-template-areas:
+      'scene scene'
+      'bottom bottom'
+      'l1 r1'
+      'l2 r2'
+      'l3 r2';
+  }
+
+  [data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] {
+    grid-template-areas:
+      'scene scene'
+      'bottom bottom'
+      'l1 r1'
+      'l2 r2';
+  }
+}
+
 @container (max-width: 720px) {
   [data-ops-screen='desk'] .twin-grid,
-  [data-ops-screen='desk'] .twin-grid[data-layout='terminal'] {
+  [data-ops-screen='desk'] .twin-grid[data-layout='terminal'],
+  [data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: none;
   }
@@ -260,6 +309,11 @@
 [data-ops-screen='wall'] .twin-banner { font-size: 15px; }
 [data-ops-screen='wall'] .twin-state { font-size: 16px; }
 [data-ops-screen='wall'] .twin-empty { font-size: 15px; }
+[data-ops-screen='wall'] .twin-fleet-cell b { font-size: 15px; }
+[data-ops-screen='wall'] .twin-fleet-cell span { font-size: 13px; }
+[data-ops-screen='wall'] .twin-fleet-more { font-size: 13px; }
+[data-ops-screen='wall'] .twin-gapline { font-size: 14px; }
+[data-ops-screen='wall'] .twin-stat-list.is-tall .twin-stat b { font-size: 48px; }
 [data-ops-screen='wall'] .twin-rows { font-size: 16px; }
 [data-ops-screen='wall'] .twin-overlay { font-size: 15px; }
 [data-ops-screen='wall'] .twin-flow-node b { font-size: 32px; }
@@ -311,6 +365,11 @@
 [data-ops-screen='desk'] .twin-banner { font-size: 14px; }
 [data-ops-screen='desk'] .twin-state { font-size: 15px; }
 [data-ops-screen='desk'] .twin-empty { font-size: 14px; }
+[data-ops-screen='desk'] .twin-fleet-cell b { font-size: 14px; }
+[data-ops-screen='desk'] .twin-fleet-cell span { font-size: 12px; }
+[data-ops-screen='desk'] .twin-fleet-more { font-size: 12px; }
+[data-ops-screen='desk'] .twin-gapline { font-size: 13px; }
+[data-ops-screen='desk'] .twin-stat-list.is-tall .twin-stat b { font-size: 36px; }
 [data-ops-screen='desk'] .twin-rows { font-size: 14px; }
 [data-ops-screen='desk'] .twin-overlay { font-size: 13px; }
 [data-ops-screen='desk'] .twin-flow-node b { font-size: 26px; }
