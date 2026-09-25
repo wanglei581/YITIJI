@@ -29,6 +29,8 @@ import {
 } from './llm-http'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
+import { withAiSafety } from './ai-prompt-safety'
+import { applyAssistantChannel, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -197,8 +199,16 @@ const SKILL_SCOPED_PROMPTS: Record<AssistantSkill, string> = {
   ].join('\n'),
 }
 
+export function assistantSkillSystemPrompt(skill: AssistantSkill): string {
+  return withAiSafety(SKILL_SCOPED_PROMPTS[skill])
+}
+
+export function assistantSkillPrompts(): string[] {
+  return (Object.keys(SKILL_SCOPED_PROMPTS) as AssistantSkill[]).map(assistantSkillSystemPrompt)
+}
+
 function buildSkillScopedSystemPrompt(basePrompt: string, skill?: AssistantSkill): string {
-  const scopedPrompt = skill ? SKILL_SCOPED_PROMPTS[skill] : undefined
+  const scopedPrompt = skill ? assistantSkillSystemPrompt(skill) : undefined
   return scopedPrompt ? `${basePrompt}\n\n${scopedPrompt}` : basePrompt
 }
 
@@ -307,13 +317,17 @@ export class LlmChatService {
     session.messages.push({ role: 'user', content: input.message })
     const skill = input.skill
 
+    const channel = resolveAssistantChannel(input.channel)
+    const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
+    const systemPrompt = channel === 'miniapp' ? `${guarded}\n\n${miniappChannelConstraint()}` : guarded
     const payloadMessages: ChatMessage[] = [
-      { role: 'system', content: buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill) },
+      { role: 'system', content: systemPrompt },
       ...session.messages.slice(-MAX_HISTORY),
     ]
 
     const rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, onLlmCall)
-    const reply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
+    const guardedReply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
+    const reply = channel === 'miniapp' ? applyAssistantChannel({ reply: guardedReply }, 'miniapp').reply : guardedReply
     if (reply !== rawReply) {
       this.logger.warn('LLM 回复命中禁用词，已替换为范围内兜底回复')
     }
@@ -327,13 +341,14 @@ export class LlmChatService {
     this.sessions.set(sessionId, session)
 
     const intent = classifyIntent(input.message)
-    const actions = skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]
+    const routed = skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]
+    const actions = applyAssistantChannel({ reply, actions: routed }, channel).actions
 
     return {
       sessionId,
       reply,
       intent,
-      actions: actions.length ? actions : undefined,
+      actions,
     }
   }
 

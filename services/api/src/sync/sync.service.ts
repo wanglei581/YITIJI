@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
+import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { JobsService } from '../jobs/jobs.service'
@@ -7,6 +7,10 @@ import { decryptSecret } from '../common/crypto/secret-cipher'
 import { RedisService } from '../common/redis/redis.service'
 import type { WebhookPayloadDto } from './dto/webhook-payload.dto'
 import { assertDataSourceCapability } from '../jobs/partner-capabilities'
+import {
+  EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE,
+  recruitmentCircuitBlocks,
+} from '../recruitment-hosting/recruitment-hosting'
 
 const TIMESTAMP_WINDOW_MS = 5 * 60 * 1000
 /** Nonce TTL in Redis — matches the timestamp acceptance window (300 s = 5 min). */
@@ -117,6 +121,12 @@ export class SyncService {
       denied()
     }
     if (!sigMatch) denied()
+
+    if (await recruitmentCircuitBlocks(this.prisma, { orgId: src.orgId, sourceId: src.id })) {
+      throw new ForbiddenException({
+        error: { code: EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE, message: '该来源已熔断，不再接收同步' },
+      })
+    }
 
     // 4) 防重放(nonce 在 sourceId 下 5min 唯一)
     //    Redis SET NX EX:多实例/PM2-cluster 安全;key 已存在 → replay → deny

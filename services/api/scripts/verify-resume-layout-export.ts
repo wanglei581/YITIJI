@@ -105,7 +105,7 @@ function assertStaticContracts(): void {
   if (!/exportGeneratedResume\([\s\S]*format: ResumeExportFormat = 'pdf',\s*layout\?: ResumeLayoutSettings,\s*templateId\?: string/.test(aiSrc)) {
     fail('4a. AiService.exportGeneratedResume 未接收 layout 可选参数')
   }
-  if (!aiSrc.includes('this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })')) fail('4a. AiService 未把 layout / draft 透传给 ResumePdfService')
+  if (!aiSrc.includes('templatePreset: template?.resumeLayoutPreset') || !aiSrc.includes('contentId: draft ? null : produceId')) fail('4a. AiService 未把 layout / draft / contentId 透传给 ResumePdfService')
   // draft 与 layout 一样必须从 dto 剥离并透传：漏了它，ai-down 时导出的原样草稿
   // 会被当成 AI 产物打上 AIGenerated=true。
   if (!controllerSrc.includes('const { taskId, format, layout, templateId, draft, ...resume } = dto')) {
@@ -180,6 +180,9 @@ async function main(): Promise<void> {
         null,
         'pdf',
         testCase.layout,
+        undefined,
+        false,
+        { taskId: `verify-layout-${testCase.name}` },
       )
       createdFileIds.push(exported.fileId)
       if (!exported.printFileUrl) fail(`5. [${testCase.name}] PDF 未返回 printFileUrl`)
@@ -206,6 +209,9 @@ async function main(): Promise<void> {
         null,
         format,
         layout,
+        undefined,
+        false,
+        { taskId: `verify-layout-${format}` },
       )
       createdFileIds.push(exported.fileId)
       if (!exported.printFileUrl) fail(`6. [${format}] 接收 layout 时应返回打印用 PDF 副本 printFileUrl(Wave 6)`)
@@ -235,7 +241,7 @@ async function main(): Promise<void> {
         return value ? value[1] : null
       }
 
-      const aiPdf = await pdf.render(FIXTURE)
+      const aiPdf = await pdf.render(FIXTURE, { contentId: 'verify-layout-export' })
       if (readInfo(aiPdf.buffer, 'AIGenerated') !== 'true') fail('7. AI 版简历 PDF 必须仍写 AIGenerated=true')
 
       const draftPdf = await pdf.render(FIXTURE, { draft: true })

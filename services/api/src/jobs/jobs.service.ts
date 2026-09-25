@@ -26,8 +26,12 @@ import type { CreateDataSourceDto } from './dto/data-source.dto'
 import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
 import type { FieldMapping } from './dto/excel-import.dto'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import {
+  assertRecruitmentContentHostingEnabled,
+  isRecruitmentContentHostingEnabled,
+} from '../recruitment-hosting/recruitment-hosting'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
-import type { PartnerImportDataType, PartnerListQuery } from './jobs-shared'
+import type { PaginatedResult, PartnerImportDataType, PartnerListQuery } from './jobs-shared'
 
 // ─── Re-export all types that controllers / other services import from here ───
 export type {
@@ -50,6 +54,13 @@ export type {
   PartnerDataSourceDto,
 } from './jobs-shared'
 export { buildJobIndustryTag } from './jobs-shared'
+
+function closedPartnerList<T>(query?: PartnerListQuery): T[] | PaginatedResult<T> {
+  if (query?.page === undefined && query?.pageSize === undefined) return []
+  const page = query.page ?? 1
+  const pageSize = query.pageSize ?? 20
+  return { data: [], pagination: { page, pageSize, total: 0, totalPages: 1 } }
+}
 
 @Injectable()
 export class JobsService {
@@ -133,12 +144,14 @@ export class JobsService {
   }
 
   cancelExcelImport(batchId: string, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.admin.cancelExcelImport(batchId, user)
   }
 
   // ── Partner ────────────────────────────────────────────────────────────────
 
   getPartnerDataSources(user: AuthedUser) {
+    if (!isRecruitmentContentHostingEnabled()) return []
     return this.partner.getPartnerDataSources(user)
   }
 
@@ -147,51 +160,71 @@ export class JobsService {
   }
 
   createPartnerDataSource(dto: CreateDataSourceDto, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.createPartnerDataSource(dto, user)
   }
 
   togglePartnerDataSource(id: string, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.togglePartnerDataSource(id, user)
   }
 
   getPartnerJobs(user: AuthedUser, query?: PartnerListQuery) {
+    if (!isRecruitmentContentHostingEnabled()) return closedPartnerList(query)
     return this.partner.getPartnerJobs(user, query)
   }
 
   importJobs(items: ImportJobItemDto[], user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.importJobs(items, user)
   }
 
   importJobsFromWebhook(orgId: string, sourceId: string, items: ImportJobItemDto[]) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.importJobsFromWebhook(orgId, sourceId, items)
   }
 
   unpublishPartnerJob(id: string, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.unpublishPartnerJob(id, user)
   }
 
   updatePartnerJob(id: string, dto: UpdatePartnerJobDto, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.updatePartnerJob(id, dto, user)
   }
 
   getPartnerFairs(user: AuthedUser, query?: PartnerListQuery) {
+    if (!isRecruitmentContentHostingEnabled()) return closedPartnerList(query)
     return this.partner.getPartnerFairs(user, query)
   }
 
   importFairs(dto: ImportFairsDto, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.importFairs(dto, user)
   }
 
   unpublishPartnerFair(id: string, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.unpublishPartnerFair(id, user)
   }
 
   updatePartnerFair(id: string, dto: UpdatePartnerFairDto, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.partner.updatePartnerFair(id, dto, user)
   }
 
-  getPartnerDashboard(user: AuthedUser) {
-    return this.partner.getPartnerDashboard(user)
+  async getPartnerDashboard(user: AuthedUser) {
+    const dash = await this.partner.getPartnerDashboard(user)
+    if (isRecruitmentContentHostingEnabled()) return dash
+    return {
+      ...dash,
+      jobs: { total: 0, published: 0, pending: 0 },
+      fairs: { total: 0, published: 0, pending: 0 },
+      pendingTotal: dash.policies.pending,
+      sources: { total: 0, enabled: 0 },
+      recentSyncs: [],
+    }
   }
 
   getPartnerSyncLogs(
@@ -203,6 +236,9 @@ export class JobsService {
       result?: 'success' | 'partial' | 'failed'
     },
   ) {
+    if (!isRecruitmentContentHostingEnabled()) {
+      return { data: [], pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 } }
+    }
     return this.partner.getPartnerSyncLogs(user, query)
   }
 
@@ -220,10 +256,12 @@ export class JobsService {
     fieldMapping: FieldMapping
     user: AuthedUser
   }) {
+    assertRecruitmentContentHostingEnabled()
     return this.excel.previewExcelImport(args)
   }
 
   confirmExcelImport(batchId: string, user: AuthedUser) {
+    assertRecruitmentContentHostingEnabled()
     return this.excel.confirmExcelImport(batchId, user)
   }
 

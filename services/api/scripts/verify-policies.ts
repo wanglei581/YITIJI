@@ -94,6 +94,8 @@ async function main() {
   const admin: AuthedUser = { userId: adminRow.id, role: 'admin', orgId: null }
 
   const cleanup = async () => {
+    await prisma.partnerOrgNotice.deleteMany({ where: { orgId: { in: [orgA, orgB] } } }).catch(() => undefined)
+    await prisma.recruitmentEmergencyHold.deleteMany({ where: { orgId: { in: [orgA, orgB] } } }).catch(() => undefined)
     await prisma.policyPost.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
     await prisma.auditLog.deleteMany({ where: { actorId: { in: [partnerA.userId, partnerB.userId, admin.userId] } } })
     await prisma.user.deleteMany({ where: { id: { in: [partnerA.userId, partnerB.userId, admin.userId] } } })
@@ -131,15 +133,23 @@ async function main() {
     }
 
     // ── 4a. 未过审发布被拒 ─────────────────────────────────────────────────
-    await expectCode(() => svc.publishPolicy(guide.id, 'publish', admin), 'PUBLISH_REQUIRES_APPROVAL', '4a. 未过审发布 → PUBLISH_REQUIRES_APPROVAL')
-    await expectCode(() => svc.reviewPolicy(guide.id, 'reject', undefined, admin), 'REJECT_REASON_REQUIRED', '4b. reject 缺原因被拒')
+    await expectCode(() => svc.publishPolicy(guide.id, 'publish', admin), 'ADMIN_POLICY_PUBLISH_DISABLED', '4a-admin. 管理员发布被拒')
+    await expectCode(
+      () => svc.publishPolicy(guide.id, 'publish', partnerA, { responsibilityAcknowledged: true }),
+      'PUBLISH_REQUIRES_APPROVAL',
+      '4a. 未过审发布 → PUBLISH_REQUIRES_APPROVAL',
+    )
+    await expectCode(() => svc.reviewPolicy(guide.id, 'reject', undefined, partnerA), 'REJECT_REASON_REQUIRED', '4b. reject 缺原因被拒')
 
-    // ── 3. 审核 + 发布 → Kiosk 可见 + 过滤 ────────────────────────────────
+    // ── 3. 机构审核 + 发布确认 → Kiosk 可见 + 过滤 ─────────────────────────
     {
-      await svc.reviewPolicy(guide.id, 'approve', undefined, admin)
-      await svc.publishPolicy(guide.id, 'publish', admin)
-      await svc.reviewPolicy(noticePost.id, 'approve', undefined, admin)
-      await svc.publishPolicy(noticePost.id, 'publish', admin)
+      await svc.reviewPolicy(guide.id, 'approve', undefined, partnerA)
+      const published = await svc.publishPolicy(guide.id, 'publish', partnerA, { responsibilityAcknowledged: true })
+      if (published.publishConfirmedBy !== partnerA.userId || published.publishConfirmedContentVersion !== published.contentVersion) {
+        fail('3-ack. 发布确认没有记下确认人和版本号')
+      }
+      await svc.reviewPolicy(noticePost.id, 'approve', undefined, partnerA)
+      await svc.publishPolicy(noticePost.id, 'publish', partnerA, { responsibilityAcknowledged: true })
 
       const all = await svc.getPublishedPolicies()
       if (!all.data.some((p) => p.id === guide.id) || !all.data.some((p) => p.id === noticePost.id)) {
@@ -189,6 +199,17 @@ async function main() {
       }
       pass('8. 6 类审计动作齐全')
     }
+
+    await svc.reviewPolicy(guide.id, 'approve', undefined, partnerA)
+    await svc.publishPolicy(guide.id, 'unpublish', admin, { reasonCode: 'rights_complaint', reasonText: '权利投诉核验' })
+    await expectCode(
+      () => svc.publishPolicy(guide.id, 'publish', partnerA, { responsibilityAcknowledged: true }),
+      'EMERGENCY_TAKEDOWN_IRREVERSIBLE',
+      '下架后不能恢复',
+    )
+    const notices = await prisma.partnerOrgNotice.findMany({ where: { orgId: orgA } })
+    if (!notices.some((row) => row.kind === 'recruitment_emergency_takedown')) fail('政策下架通知未写出')
+    else pass('政策下架通知写出')
 
     {
       const unpaged = await svc.getPartnerPolicies(partnerA)

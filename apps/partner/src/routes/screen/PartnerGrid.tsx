@@ -1,5 +1,5 @@
 import { formatTime } from '@ai-job-print/shared'
-import type { ScreenFleetCell, ScreenSnapshotMetrics } from '@ai-job-print/shared'
+import { SCREEN_UNAVAILABLE_REASON, type ScreenFleetCell, type ScreenSnapshotMetrics } from '@ai-job-print/shared'
 import {
   ScreenFleetWall,
   TWIN_STAGE_H,
@@ -94,6 +94,9 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
     return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={snap.failure} onRetry={() => void snap.refresh()} />
   }
   const g: ScreenSnapshotMetrics = snap.data.metrics
+  // 托管 a：我们云上不存岗位、招聘会、企业资料，这三格写「未开启」，不以 0 冒充「没有」
+  const hostingOff = snap.data.limits.recruitmentHosting === 'disabled'
+  const OFF = SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled
   const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
   const terminals = twinTerminalsFromCells(cells, 'location')
   const groups = twinAreas(terminals)
@@ -367,10 +370,16 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
             <>
               <TwinTiles
                 items={[
-                  { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
-                  { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
+                  hostingOff
+                    ? { label: '岗位信息', unavailableReason: OFF }
+                    : { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
+                  hostingOff
+                    ? { label: '招聘会', unavailableReason: OFF }
+                    : { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
                   { value: screenCount(value.policiesPublished), unit: '条', label: '政策公告', hint: `待审核 ${screenCount(value.policiesPending)}` },
-                  { value: screenCount(value.companiesPublished), unit: '家', label: '企业资料', hint: `待审核 ${screenCount(value.companiesPending)}` },
+                  hostingOff
+                    ? { label: '企业资料', unavailableReason: OFF }
+                    : { value: screenCount(value.companiesPublished), unit: '家', label: '企业资料', hint: `待审核 ${screenCount(value.companiesPending)}` },
                 ]}
               />
               <p className="twin-cap twin-push">已审核通过、已发布且在有效期内</p>
@@ -404,6 +413,9 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
                   .sort((a, b) => b.value - a.value)}
                 emptyText="本机构没有待审核的内容"
               />
+              {hostingOff && value.jobs + value.fairs + value.companies > 0 ? (
+                <p className="twin-cap twin-push">岗位、招聘会、企业资料在本平台云端已停止审核发布，这里是存量</p>
+              ) : null}
             </>
           )}
         />

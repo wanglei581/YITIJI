@@ -31,6 +31,7 @@ import { RESUME_EXPORT_STAGING_LOCK, RESUME_EXPORT_STAGING_MAX_MS } from './file
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { UserRole } from '../common/decorators/roles.decorator'
 import { PrismaService } from '../prisma/prisma.service'
+import { assertJobFitPrintFileReadable } from '../ai/resume/job-fit-hosting'
 import { AuditService } from '../audit/audit.service'
 import { StorageService } from '../storage/storage.service'
 import { generateObjectKey, type FileOwnerType as ObjKeyOwnerType } from '../storage/object-key'
@@ -129,6 +130,11 @@ export class FilesService {
      * 避免会员数据导出按 endUserId 把未付款文件列出来。
      */
     paidExportStaging?: { endUserId: string; expiresAt: Date }
+    /**
+     * 渲染前已经写进 AIGC.ProduceID 的编号。传入则作为 FileObject.id，
+     * 缺省时在这里生成。只接受 32 位十六进制，和对象键里的文件段一致。
+     */
+    id?: string
   }): Promise<FileUploadResponse> {
     if (args.purpose === 'member_data_export' || args.purpose === 'contract_review_report') {
       throw new BadRequestException({
@@ -186,7 +192,11 @@ export class FilesService {
       }
     }
     const sensitiveLevel = this.resolveSensitiveLevel(args.purpose, args.sensitiveLevel)
-    const id = randomUUID().replace(/-/g, '')
+    const providedId = args.id?.trim() ?? ''
+    const id = providedId.length > 0 ? providedId : randomUUID().replace(/-/g, '')
+    if (!/^[0-9a-f]{32}$/.test(id)) {
+      throw new Error('FILE_ID_INVALID')
+    }
     const ownerEndUserId = staging?.endUserId ?? args.endUserId ?? null
     const owner = deriveOwner({
       endUserId: ownerEndUserId,
@@ -653,6 +663,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
 
     const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
@@ -704,6 +715,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
     const signed = this.storage.getDownloadUrl(
@@ -746,6 +758,7 @@ export class FilesService {
     ) {
       this.throwFileNotFound()
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
@@ -770,6 +783,7 @@ export class FilesService {
     endUserId: string | null
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
     const record = await this.requireActiveForEndUser(fileId, endUserId)
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
@@ -800,6 +814,10 @@ export class FilesService {
       if (error instanceof HttpException) throw error
       this.rethrowStorageProbe(error)
     }
+  }
+
+  private assertJobFitFileReadable(record: { id: string; createdBy: string | null }): Promise<void> {
+    return assertJobFitPrintFileReadable(this.prisma as never, record)
   }
 
   private async requireActiveForEndUser(fileId: string, endUserId: string | null) {

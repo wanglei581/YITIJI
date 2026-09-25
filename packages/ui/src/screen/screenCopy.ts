@@ -19,6 +19,8 @@
 export interface ScreenReasonCopy {
   /** 卡片主文案。取数失败与结构性缺失必须不同，样式也不同。 */
   title: string
+  /** 窄格子（磁贴）里用的短称；没有就用 title。完整说明仍在悬停提示里。 */
+  short?: string
   /** 为什么没有数据。 */
   detail: string
   /** 接入方式，渲染在脚注里。 */
@@ -123,6 +125,13 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
     detail:
       '上传的原始记录按隐私要求会在 24 小时内删除（高敏文件 1 小时），直接数原始记录会漏掉已删除的那部分，所以这里不给数。',
     howTo: '接入方式：在上传完成时另写一条不含文件内容的计数（只记次数、成败与渠道），按天汇总后上屏。',
+    transient: false,
+  },
+  recruitment_hosting_disabled: {
+    title: '招聘内容托管未开启',
+    short: '未开启',
+    detail: '本平台的云服务不保存岗位、招聘会、企业资料，这一项只在客户私有化部署中有数据。',
+    howTo: '在客户私有化部署中开启招聘内容托管后自动出现。',
     transient: false,
   },
   inspection_counter_unwritten: {

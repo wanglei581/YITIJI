@@ -5,7 +5,11 @@ import type { ScanSessionFileView } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
-import { revokeCreatedScanSession, revokeLiveScanSession } from './scanSessionRevoke'
+import {
+  noteScanTaskStatusFromServer,
+  revokeCreatedScanSession,
+  revokeLiveScanSession,
+} from './scanSessionRevoke'
 import {
   acknowledgeScanDelivery,
   SCAN_ACK_PENDING_NOTICE,
@@ -210,6 +214,11 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       setPollInFlight(true)
       try {
         const status = await getScanSessionStatus(scanTaskId, controlToken, getToken())
+        /* 先记服务端这句话，再看本页还在不在、再据此改屏。终态是这条任务自己的事实，
+         * 与本页卸没卸载无关；而下面 cancelled 那一支会推进扫描代次，挂载时一起发出、
+         * 还没回话的那次确认随后落地时，靠这一笔认出「服务端已经结束了它」，
+         * 不再补发 DELETE（见 scanSessionRevoke 的 endedByServer）。 */
+        noteScanTaskStatusFromServer(scanTaskId, status.status)
         if (stopped) return
         setPolls((count) => count + 1)
         setError(null)
@@ -299,7 +308,9 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     cancellingRef.current = true
     setCancelling(true)
     try {
-      await cancelScanSession(scanTaskId, controlToken, getToken())
+      const cancelled = await cancelScanSession(scanTaskId, controlToken, getToken())
+      // 取消回执也是服务端说的终态：确认若还在路上，它回来时不许再补一次 DELETE。
+      noteScanTaskStatusFromServer(scanTaskId, cancelled.status)
       setBusyPhase('terminal')
       returnToStart()
     } catch (err) {
@@ -307,6 +318,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
         try {
           const latest = await getScanSessionStatus(scanTaskId, controlToken, getToken())
+          noteScanTaskStatusFromServer(scanTaskId, latest.status)
           if (latest.status === 'completed' && latest.file) {
             setBusyPhase('terminal')
             finishWithResult({

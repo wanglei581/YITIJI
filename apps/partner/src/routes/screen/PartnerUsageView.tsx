@@ -1,6 +1,12 @@
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
-import type { ScreenContentType, ScreenPartnerContentUsageValue, ScreenUsageRange, ScreenUsageSnapshot } from '@ai-job-print/shared'
+import {
+  SCREEN_UNAVAILABLE_REASON,
+  type ScreenContentType,
+  type ScreenPartnerContentUsageValue,
+  type ScreenUsageRange,
+  type ScreenUsageSnapshot,
+} from '@ai-job-print/shared'
 import {
   SCREEN_SOURCE_ENTRY_NOTE,
   TWIN_STAGE_H,
@@ -18,6 +24,8 @@ import {
   twinInfoTotalParts,
   twinSmall,
   type TwinBarItem,
+  type TwinInfoFlowType,
+  type TwinTileItem,
 } from '@ai-job-print/ui'
 import { loadPartnerUsage, normalizeUsageRange } from '../../services/api/consoleScreen'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
@@ -124,6 +132,15 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
   const u = usage.data.metrics
   const rangeText = RANGE_LABEL[usage.data.range]
   const content = u.partnerContent?.available ? orderedTypes(u.partnerContent.value) : null
+  // 托管 a：服务端只下发政策一类；岗位、招聘会、企业照样占位，写「未开启」，不当成没人看
+  const hostingOff = usage.data.limits.recruitmentHosting === 'disabled'
+  const flowTypes: TwinInfoFlowType[] = content
+    ? TYPE_ORDER.flatMap((type): TwinInfoFlowType[] => {
+        const row = content.find((item) => item.type === type)
+        if (row) return [{ key: type, label: TYPE_LABEL[type], browse: row.browse, favorites: row.favorites, sourceOpens: row.sourceOpens }]
+        return hostingOff ? [{ key: type, label: TYPE_LABEL[type], browse: null, favorites: null, sourceOpens: null, disabled: true }] : []
+      })
+    : []
   const topLimit = chrome.presenting ? 5 : 8
 
   const toolbar = (
@@ -238,7 +255,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
         {content ? (
           <TwinSceneBox baseWidth={TWIN_STAGE_W} baseHeight={TWIN_STAGE_H} label="本机构信息流向">
             <TwinInfoFlow
-              types={content.map((row) => ({ key: row.type, label: TYPE_LABEL[row.type], browse: row.browse, favorites: row.favorites, sourceOpens: row.sourceOpens }))}
+              types={flowTypes}
               hubLabel="本机构信息"
               hubCaption={`${rangeText} · 登录会员`}
             />
@@ -264,12 +281,13 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
             <TwinTiles
               cols={4}
               compact
-              items={orderedTypes(value).map((row) => ({
-                value: twinSmall(row.browse),
-                unit: '次浏览',
-                label: TYPE_LABEL[row.type],
-                hint: `收藏 ${twinSmall(row.favorites)} · 来源 ${twinSmall(row.sourceOpens)}`,
-              }))}
+              items={TYPE_ORDER.flatMap((type): TwinTileItem[] => {
+                const row = value.byType.find((item) => item.type === type)
+                if (row) {
+                  return [{ value: twinSmall(row.browse), unit: '次浏览', label: TYPE_LABEL[type], hint: `收藏 ${twinSmall(row.favorites)} · 来源 ${twinSmall(row.sourceOpens)}` }]
+                }
+                return hostingOff ? [{ label: TYPE_LABEL[type], unavailableReason: SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled }] : []
+              })}
             />
           )}
         />

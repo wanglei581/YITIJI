@@ -17,6 +17,7 @@ import type { FairMaterialPrintView } from './fair-material-print-bridge.service
 import { FairCompanyZoneService } from './fair-company-zone.service'
 import { FairMaterialService } from './fair-material.service'
 import { FairVenueGuideService } from './fair-venue-guide.service'
+import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 
 // Re-export so existing imports from this file keep working.
 export { FAIR_MATERIAL_MAX_BYTES } from './fair-material.service'
@@ -144,6 +145,7 @@ export class AdminFairsService {
   }
 
   async updateFairInfo(fairId: string, dto: UpdateFairInfoDto, user: AuthedUser): Promise<Fair> {
+    assertRecruitmentContentHostingEnabled()
     const fair = await this.prisma.jobFair.findUnique({ where: { id: fairId } })
     if (!fair) this.throwFairNotFound(fairId)
 

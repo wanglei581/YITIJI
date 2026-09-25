@@ -42,7 +42,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
 | **high** | 仍被 CI / 门禁 / 包脚本引用 | 54 |
-| **medium** | 只被文档或其它文件提及 | 15 |
+| **medium** | 只被文档或其它文件提及 | 16 |
 | **low** | 全仓零提及 | 94 |
 
 
@@ -191,7 +191,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## medium — 只被文档或其它文件提及（15）
+## medium — 只被文档或其它文件提及（16）
 
 ### 页面/组件（9）
 
@@ -207,13 +207,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/jobs/components/JobFilterAssistant.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md |
 | `apps/kiosk/src/pages/jobs/components/JobListInsights.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
 
-### 样式（6）
+### 样式（7）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/pages/auth/login-batch8.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md、docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md |
 | `apps/kiosk/src/pages/home/styles/home-v6-motion-responsive.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/home/styles/home-v6.css |
 | `apps/kiosk/src/pages/home/styles/home-v6.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-v6-migration-matrix.md、docs/progress/current-progress.md |
+| `apps/kiosk/src/pages/placeholders/system-pages-batch8.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-home.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css |
 | `apps/kiosk/src/pages/resume/careerPlan-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-v6-migration-matrix.md |
 | `apps/kiosk/src/pages/resume/resume-diagnosis-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/current-progress.md、docs/progress/next-tasks.md |

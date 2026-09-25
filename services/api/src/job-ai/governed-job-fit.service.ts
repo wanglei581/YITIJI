@@ -166,13 +166,16 @@ export class GovernedJobFitService {
 
   private async createRecommendation(sessionId: string, jobId: string, result: JobFitAnalyzeWithUsageResult): Promise<void> {
     if (result.response.status !== 'completed') return
+    // 简历对照不再产出等级。缺省时不写成 reference_medium，避免编一个等级。
+    const echoed = (result.response as { fitLevel?: string }).fitLevel
+    if (echoed !== 'reference_high' && echoed !== 'reference_medium' && echoed !== 'reference_low') return
     await this.prisma.jobAiRecommendation.create({
       data: {
         sessionId,
         jobId,
         rank: 1,
-        fitLevel: result.response.fitLevel ?? 'reference_medium',
-        summary: result.response.summary ?? '岗位匹配参考已生成，请结合简历和岗位要求自行判断。',
+        fitLevel: echoed,
+        summary: result.response.summary ?? '岗位要求与简历的对照已生成，请结合原文自行判断。',
         matchPointsJson: JSON.stringify((result.response.matchPoints ?? []).map((item) => item.point).slice(0, 5)),
         gapPointsJson: JSON.stringify((result.response.gapPoints ?? []).map((item) => item.gap).slice(0, 5)),
         actionChecklistJson: JSON.stringify((result.response.targetedSuggestions ?? []).slice(0, 5)),

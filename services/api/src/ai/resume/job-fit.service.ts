@@ -7,6 +7,7 @@ import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmJobFitService, type JobFitPayload, type JobFitTokenUsage } from './llm-job-fit.service'
 import { JobFitPdfService } from './job-fit-pdf.service'
+import { assertStoredJobFitReadable } from './job-fit-hosting'
 
 // ============================================================
 // 2D 岗位匹配参考会话服务。
@@ -199,7 +200,7 @@ export class JobFitService {
       targetType: 'ai_task',
       targetId: input.taskId,
       // 仅元数据：不含简历/岗位/输出内容
-      payload: { mode: input.jobId ? 'job' : 'manual', fitLevel: payload.fitLevel, hasEndUser: !!parse.endUserId },
+      payload: { mode: input.jobId ? 'job' : 'manual', hasEndUser: !!parse.endUserId },
       ipAddress: null, userAgent: null, requestId: null,
     })
     return {
@@ -216,6 +217,7 @@ export class JobFitService {
     if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
       throw new NotFoundException({ error: { code: 'JOB_FIT_NOT_FOUND', message: '暂无分析结果，请先发起岗位匹配参考' } })
     }
+    assertStoredJobFitReadable(row.payloadJson)
     return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredJobFit)
   }
 
@@ -227,6 +229,7 @@ export class JobFitService {
       throw new NotFoundException({ error: { code: 'JOB_FIT_NOT_FOUND', message: '暂无分析结果，请先发起岗位匹配参考' } })
     }
 
+    assertStoredJobFitReadable(row.payloadJson)
     const stored = JSON.parse(row.payloadJson) as StoredJobFit
     const { buffer, pageCount } = await this.pdf.render(
       {
@@ -234,12 +237,13 @@ export class JobFitService {
         job: stored.job,
         // 旧缓存没有该可选字段时，PDF 明示降级而不是补造关键词。
         decisionSupport: stored.payload.decisionSupport,
+        contentId: taskId,
       },
       stored.payload,
     )
     const uploaded = await this.files.upload({
       buffer,
-      filename: '岗位匹配决策报告.pdf',
+      filename: '简历对照.pdf',
       mimeType: 'application/pdf',
       purpose: 'print_doc',
       uploaderId: null,
@@ -350,11 +354,13 @@ export class JobFitService {
   }
 
   private toResponse(taskId: string, stored: StoredJobFit): JobFitCompletedResponse {
+    const payload = { ...stored.payload } as JobFitPayload & { fitLevel?: unknown }
+    delete payload.fitLevel
     return {
       taskId,
       status: 'completed' as const,
       job: stored.job,
-      ...stored.payload,
+      ...payload,
       providerName: stored.providerName,
     }
   }

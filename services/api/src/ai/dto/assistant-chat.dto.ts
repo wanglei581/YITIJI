@@ -32,6 +32,10 @@ export class AssistantChatRequestDto {
   skill?: (typeof ASSISTANT_SKILLS)[number]
 
   @IsOptional()
+  @IsIn(['kiosk', 'miniapp'])
+  channel?: 'kiosk' | 'miniapp'
+
+  @IsOptional()
   context?: Record<string, unknown>
 }
 

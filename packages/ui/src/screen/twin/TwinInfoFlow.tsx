@@ -17,6 +17,8 @@ export interface TwinInfoFlowType {
   browse: number | null
   favorites: number | null
   sourceOpens: number | null
+  /** 这一类在本部署未开启（托管 a 下的岗位、招聘会、企业）：画灰色矮柱、写「未开启」，不连线、不计入合计。 */
+  disabled?: boolean
 }
 
 export interface TwinInfoFlowProps {
@@ -71,7 +73,9 @@ export function TwinInfoFlow({ types, hubLabel, hubCaption }: TwinInfoFlowProps)
     const qy = 2 * mid.v - (p1.v + p2.v) / 2
     flows.push({ d: `M${p1.u.toFixed(0)} ${p1.v.toFixed(0)} Q${qx.toFixed(0)} ${qy.toFixed(0)} ${p2.u.toFixed(0)} ${p2.v.toFixed(0)}`, stroke, width, dash, delay })
   }
+  const live = placed.filter((t) => !t.disabled)
   placed.forEach((t, i) => {
+    if (t.disabled) return
     flow(HUB_AT, TYPE_AT[i], '#8fb2ee', flowWidth(t.browse, 1.6, 8), i < 2 ? 36 : -36, '6 12', i * 0.3)
     flow(TYPE_AT[i], FAVORITES_AT, '#f2c879', flowWidth(t.favorites, 1.1, 10), 22, '3 10', 0.2 + i * 0.25)
     flow(TYPE_AT[i], OPENS_AT, '#f2c879', flowWidth(t.sourceOpens, 1.1, 10), -22, '3 10', 0.4 + i * 0.25)
@@ -81,7 +85,15 @@ export function TwinInfoFlow({ types, hubLabel, hubCaption }: TwinInfoFlowProps)
   const solids = [
     ...placed.map((t, i) => ({
       y: TYPE_AT[i][1],
-      node: <TwinPrism key={`tp-${t.key}`} at={TYPE_AT[i]} size={52} h={t.browse === null ? 10 : 12 + Math.sqrt(t.browse) * 1.8} className={t.browse === null ? 'p-na' : 'p-info'} />,
+      node: (
+        <TwinPrism
+          key={`tp-${t.key}`}
+          at={TYPE_AT[i]}
+          size={t.disabled ? 44 : 52}
+          h={t.disabled ? 6 : t.browse === null ? 10 : 12 + Math.sqrt(t.browse) * 1.8}
+          className={t.disabled || t.browse === null ? 'p-na' : 'p-info'}
+        />
+      ),
     })),
     { y: FAVORITES_AT[1], node: <TwinPrism key="op-fav" at={FAVORITES_AT} size={46} h={18} className="p-out" /> },
     { y: OPENS_AT[1], node: <TwinPrism key="op-open" at={OPENS_AT} size={46} h={18} className="p-out" /> },
@@ -104,19 +116,19 @@ export function TwinInfoFlow({ types, hubLabel, hubCaption }: TwinInfoFlowProps)
           <div className="tw3-tower" style={{ height: 116 }} />
         </div>
         {placed.map((t, i) => (
-          <TwinPill key={`tl-${t.key}`} at={TYPE_AT[i]} lift={TYPE_LIFT[i]} width={176} className={cn('tw3-svc', t.browse === null ? 'p-na' : 'p-info')}>
+          <TwinPill key={`tl-${t.key}`} at={TYPE_AT[i]} lift={TYPE_LIFT[i]} width={176} className={cn('tw3-svc', t.disabled || t.browse === null ? 'p-na' : 'p-info')}>
             <b>{t.label}</b>
-            <span>浏览 {countText(t.browse)}</span>
+            <span>{t.disabled ? '未开启' : `浏览 ${countText(t.browse)}`}</span>
           </TwinPill>
         ))}
         <TwinPill at={FAVORITES_AT} lift={96} width={190} className="tw3-big p-out">
           <b>收藏</b>
-          <span>{twinInfoTotal(placed.map((t) => t.favorites))}</span>
+          <span>{twinInfoTotal(live.map((t) => t.favorites))}</span>
           <i>记在用户本人名下</i>
         </TwinPill>
         <TwinPill at={OPENS_AT} lift={96} width={190} className="tw3-big p-out">
           <b>打开来源平台入口</b>
-          <span>{twinInfoTotal(placed.map((t) => t.sourceOpens))}</span>
+          <span>{twinInfoTotal(live.map((t) => t.sourceOpens))}</span>
           <i>不是投递或预约结果</i>
         </TwinPill>
         <TwinPill at={HUB_AT} lift={178} width={176} className="tw3-core">

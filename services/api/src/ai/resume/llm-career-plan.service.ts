@@ -11,6 +11,24 @@ import {
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
+import { withAiSafety } from '../llm/ai-prompt-safety'
+
+export const CAREER_PLAN_SYSTEM_PROMPT = withAiSafety(
+  '你是求职者本人的职业发展顾问。基于简历原文（以及可选的简历对照、模拟面试表现摘要），' +
+  '输出一份「职业规划建议」。这只是给本人参考的发展建议，不是任何就业承诺。' +
+  '\n硬性要求：' +
+  '\n1. currentSnapshot 现状画像每条的 evidence 必须是简历原文真实出现的内容（原文摘录），绝不编造。' +
+  '\n2. 不承诺薪资数字、录用、Offer、通过率；不输出任何百分比。' +
+  '\n3. 不得建议删除、替换、包装真实经历伪装目标岗位；行动建议只能基于真实学习与积累路径。' +
+  '\n4. 不给无依据的示例数字（如"每月完成100份"），只能说"补充你实际的数量与结果"。' +
+  '\n5. 方向只描述简历里已有事实的延伸，不写适合或不适合。' +
+  '\n只输出 JSON（不要 markdown 代码块）：' +
+  '{"summary":"2-3 句概述（说明仅供参考）",' +
+  '"currentSnapshot":[{"point":"现状要点","evidence":"简历原文摘录(≤60字)"}](2-4 条),' +
+  '"directions":[{"title":"方向名","why":"简历里已有事实的延伸","firstStep":"第一步行动"}](1-3 个),' +
+  '"skillPlan":[{"skill":"要提升的能力","action":"具体行动","timeframe":"阶段，如 1-3 个月"}](2-4 条),' +
+  '"actionChecklist":["近期可执行行动"](3-6 条)}',
+)
 
 // ============================================================
 // 2E 职业规划建议（真实化既有「职业规划」入口）。
@@ -65,7 +83,7 @@ export interface CareerPlanContext {
   /** 简历原文（必有） */
   resumeText: string
   /** 最近一次岗位匹配参考（可选；有则规划更聚焦目标岗位） */
-  jobFit?: { jobTitle: string; fitLevel: string; gaps: string[] } | null
+  jobFit?: { jobTitle: string; gaps: string[] } | null
   /** 最近一次模拟面试表现（可选，仅会员可聚合；只用元数据级摘要） */
   interview?: { position: string; level: string; risks: string[] } | null
   /** 最近一次自我探索（可选；仅作 hint，不参与校验 / 配额 / 签名门禁）
@@ -99,21 +117,7 @@ export class LlmCareerPlanService {
   constructor(private readonly config: LlmConfigService) {}
 
   async build(ctx: CareerPlanContext): Promise<CareerPlanPayload> {
-    const sys =
-      '你是求职者本人的职业发展顾问。基于简历原文（以及可选的岗位匹配参考、模拟面试表现摘要），' +
-      '输出一份「职业规划建议」。这只是给本人参考的发展建议，不是任何就业承诺。' +
-      '\n硬性要求：' +
-      '\n1. currentSnapshot 现状画像每条的 evidence 必须是简历原文真实出现的内容（原文摘录），绝不编造。' +
-      '\n2. 不承诺薪资数字、录用、Offer、通过率；不输出任何百分比；不判断人格、心理或其他敏感属性。' +
-      '\n3. 不得建议删除、替换、包装真实经历伪装目标岗位；行动建议只能基于真实学习与积累路径。' +
-      '\n4. 不给无依据的示例数字（如"每月完成100份"），只能说"补充你实际的数量与结果"。' +
-      '\n5. 方向建议要立足简历现状的合理延伸（含当前赛道深耕与相邻转型），写明第一步行动。' +
-      '\n只输出 JSON（不要 markdown 代码块）：' +
-      '{"summary":"2-3 句总览（说明仅供参考）",' +
-      '"currentSnapshot":[{"point":"现状要点","evidence":"简历原文摘录(≤60字)"}](2-4 条),' +
-      '"directions":[{"title":"方向名","why":"为什么适合（基于现状）","firstStep":"第一步行动"}](1-3 个),' +
-      '"skillPlan":[{"skill":"要提升的能力","action":"具体行动","timeframe":"阶段，如 1-3 个月"}](2-4 条),' +
-      '"actionChecklist":["近期可执行行动"](3-6 条)}'
+    const sys = CAREER_PLAN_SYSTEM_PROMPT
 
     // S0-2 / 风险 R2：简历先截断再遮盖高置信 PII。
     // 校验同样必须用送出去的这份，理由见 llm-job-fit.service.ts 同位置注释。
@@ -121,7 +125,7 @@ export class LlmCareerPlanService {
     const parts: string[] = [`【简历原文】\n${maskedResume}`]
     if (ctx.jobFit) {
       parts.push(
-        `【最近岗位匹配参考】目标岗位「${ctx.jobFit.jobTitle}」，参考等级 ${ctx.jobFit.fitLevel}；` +
+        `【最近简历对照】目标岗位「${ctx.jobFit.jobTitle}」；` +
         `主要差距：${ctx.jobFit.gaps.slice(0, 3).join('；').slice(0, 400)}`,
       )
     }

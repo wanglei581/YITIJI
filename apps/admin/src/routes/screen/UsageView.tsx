@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
-import { formatTime, type ScreenUsageRange, type ScreenUsageSnapshot } from '@ai-job-print/shared'
+import { SCREEN_UNAVAILABLE_REASON, formatTime, type ScreenUsageRange, type ScreenUsageSnapshot } from '@ai-job-print/shared'
 import {
   SCREEN_SOURCE_ENTRY_NOTE,
   TWIN_STAGE_H,
@@ -384,8 +384,13 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                 compact
                 items={[
                   { value: twinSmall(value.policy), label: '政策服务' },
-                  { value: twinSmall(value.fair), label: '招聘会' },
-                  { value: twinSmall(value.company), label: '企业展示' },
+                  // 托管 a：招聘会与企业资料不在我们云上，写「未开启」而不是「少于 5」
+                  usage.data?.limits.recruitmentHosting === 'disabled'
+                    ? { label: '招聘会', unavailableReason: SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled }
+                    : { value: twinSmall(value.fair), label: '招聘会' },
+                  usage.data?.limits.recruitmentHosting === 'disabled'
+                    ? { label: '企业展示', unavailableReason: SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled }
+                    : { value: twinSmall(value.company), label: '企业展示' },
                 ]}
               />
               <p className="twin-cap twin-push">{MEMBERS_NOTE}</p>

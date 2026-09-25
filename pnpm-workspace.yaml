@@ -5,11 +5,23 @@ packages:
 # pnpm 11 is the single supported package-manager line. Keep all project settings here.
 engineStrict: true
 overrides:
-  qs: 6.15.2
+  # qs: GHSA-x5fp-wj9c-mxmx (6.14.2–6.15.3 array-limit bypass) and
+  # GHSA-4mjr-xmp4-gh2g (<6.16.0 isBuffer DoS) both first-fix at 6.16.0.
+  # The previous pin 6.15.2 sits inside both ranges. express@5.2.1 asks for
+  # qs@^6.14.0, so 6.16.0 stays inside that range.
+  qs: 6.16.0
   '@hono/node-server': 2.0.10
   uuid: 14.0.0
   shell-quote: 1.9.0
-  hono: 4.12.27
+  # hono: seven open advisories. The four below 4.12.34
+  # (GHSA-f23p-vx2j-j53r, GHSA-79qm-7rj5-m7r9, GHSA-54fx-42gc-7vw4, GHSA-8j4g-w8fx-2239)
+  # and the three below 4.13.5
+  # (GHSA-gqvv-2mrq-wpjv, GHSA-g6gw-c38x-mqfc, GHSA-crvj-82cr-hjcx)
+  # are all cleared by 4.13.5. The previous pin 4.12.27 is inside every range.
+  # Carrier: prisma@7.8.0 pins @prisma/dev@0.24.3, which asks for hono@^4.12.8.
+  # @hono/node-server@2.0.10 peers hono@^4, so 4.13.5 satisfies it.
+  # Stay on the minimum fix; do not float to later 4.13.x.
+  hono: 4.13.5
   # multer: 2026-09-08 新发三条 high，全部首修 2.3.0（2026-08-28 发布，已过 minimumReleaseAge）
   #   GHSA-wc9g-mqfw-jrwm（构造 multipart 字段名致 DoS，影响 < 2.3.0）
   #   GHSA-535w-7cp7-47q4（字段名里超大数组下标致 DoS，影响 < 2.3.0）
@@ -43,7 +55,32 @@ overrides:
   # 取 3.1.6（2026-08-23）而非昨日发布的 3.1.7：同样越过四条，且满足 minimumReleaseAge。
   # 不取 4.x：跨大版本，fast-uri 是 ajv 的传递依赖，风险不成比例。
   fast-uri: 3.1.6
-  postcss: 8.5.18
+  # postcss: GHSA-fxqj-rqcc-2cmp (sourceMappingURL reads arbitrary .map files
+  # when `from` is unset) affects <=8.5.22. First fix is 8.5.23.
+  # The previous pin 8.5.18 is inside that range. vite@6.4.3 asks for
+  # postcss@^8.5.3, so 8.5.23 stays inside the direct dependency's range.
+  postcss: 8.5.23
+  # valibot: GHSA-5qjj-4xww-7phc (record() issue paths make flatten() throw)
+  # affects <=1.4.1. First fix is 1.4.2. @prisma/dev@0.24.3, pinned by
+  # prisma@7.8.0, depends on valibot@1.2.0 exactly, so the direct dependency
+  # cannot float. 1.4.2 stays on the 1.x line.
+  valibot: 1.4.2
+  # body-parser: GHSA-v422-hmwv-36x6 affects 2.0.0–2.2.x. First fix on this
+  # line is 2.3.0. express@5.2.1 (services/api direct) asks for ^2.2.1, which
+  # already allows 2.3.0, but the lock stayed on 2.2.2. Pin the minimum fix
+  # so a later resolve cannot drop back under 2.3.0.
+  body-parser: 2.3.0
+  # @babel/core: GHSA-4x5r-pxfx-6jf8 affects <=7.29.0 on the 7.x line.
+  # First fix is 7.29.6. @vitejs/plugin-react@4.7.0 asks for ^7.28.0, which
+  # already allows 7.29.6, but the lock resolved 7.29.0. Pin the minimum fix.
+  # The same advisory's 8.x fix is 8.0.0-rc.6; this tree is not on 8.x.
+  '@babel/core': 7.29.6
+  # esbuild: GHSA-g7r4-m6w7-qqqr affects >=0.27.3 <0.28.1. First fix is 0.28.1.
+  # Only tsx@4.22.3 (services/api devDependency) requests esbuild@~0.28.0,
+  # which already allows 0.28.1. vite@6.4.3 requests ^0.25.0 and resolves
+  # 0.25.12, outside the advisory. A global esbuild override would pull vite
+  # off 0.25, so the selector matches only the ~0.28.0 request.
+  'esbuild@~0.28.0': 0.28.1
   # nanoid: GHSA-28wg-ghj8-5hjv + GHSA-2v37-7h3g-55p8
   # postcss still requests the vulnerable 3.3.12 line; 3.3.18 fixes both loop conditions.
   nanoid@3.3.12: 3.3.18

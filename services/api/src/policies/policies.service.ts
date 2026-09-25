@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -14,6 +15,12 @@ import type { ReviewAction } from '../jobs/dto/review.dto'
 import type { PublishAction } from '../jobs/dto/publish.dto'
 import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
+import {
+  ADMIN_POLICY_PUBLISH_DISABLED_CODE,
+  assertEmergencyReason,
+  assertNotEmergencyHeld,
+  POLICY_RESPONSIBILITY_ACK_REQUIRED_CODE,
+} from '../recruitment-hosting/recruitment-hosting'
 import {
   normalizeOptionalHttpUrl,
   parsePublishStatusFilter,
@@ -48,6 +55,10 @@ export interface PolicyPostDto {
   reviewStatus: string
   publishStatus: string
   rejectReason: string | null
+  contentVersion: number
+  publishConfirmedBy: string | null
+  publishConfirmedAt: string | null
+  publishConfirmedContentVersion: number | null
   syncTime: string
   updatedAt: string
 }
@@ -95,6 +106,10 @@ interface PrismaPolicyRow {
   reviewStatus: string
   publishStatus: string
   rejectReason: string | null
+  contentVersion: number
+  publishConfirmedBy: string | null
+  publishConfirmedAt: Date | null
+  publishConfirmedContentVersion: number | null
   syncTime: Date
   updatedAt: Date
 }
@@ -116,6 +131,10 @@ function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
     reviewStatus: p.reviewStatus,
     publishStatus: p.publishStatus,
     rejectReason: p.rejectReason,
+    contentVersion: p.contentVersion ?? 1,
+    publishConfirmedBy: p.publishConfirmedBy ?? null,
+    publishConfirmedAt: p.publishConfirmedAt ? p.publishConfirmedAt.toISOString() : null,
+    publishConfirmedContentVersion: p.publishConfirmedContentVersion ?? null,
     syncTime: p.syncTime.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   }
@@ -283,6 +302,10 @@ export class PoliciesService {
         rejectReason: null,
         reviewedBy: null,
         reviewedAt: null,
+        contentVersion: { increment: 1 },
+        publishConfirmedBy: null,
+        publishConfirmedAt: null,
+        publishConfirmedContentVersion: null,
         syncTime: new Date(),
       },
     })
@@ -363,8 +386,13 @@ export class PoliciesService {
   }
 
   async reviewPolicy(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<PolicyPostDto> {
+    if (user.role === 'admin') {
+      throw new ForbiddenException({
+        error: { code: ADMIN_POLICY_PUBLISH_DISABLED_CODE, message: '管理员不能审核政策，请由机构自行审核' },
+      })
+    }
     const post = await this.prisma.policyPost.findUnique({ where: { id } })
-    if (!post) {
+    if (!post || (user.role === 'partner' && post.sourceOrgId !== user.orgId)) {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
     }
     if (post.reviewStatus === 'approved' || post.reviewStatus === 'rejected') {
@@ -390,7 +418,7 @@ export class PoliciesService {
     })
     await this.audit.write({
       actorId: user.userId,
-      actorRole: 'admin',
+      actorRole: user.role,
       action: 'policy.review',
       targetType: 'policy',
       targetId: id,
@@ -399,37 +427,90 @@ export class PoliciesService {
     return mapPolicy(updated)
   }
 
-  async publishPolicy(id: string, action: PublishAction, user: AuthedUser): Promise<PolicyPostDto> {
+  async publishPolicy(
+    id: string,
+    action: PublishAction,
+    user: AuthedUser,
+    options?: { responsibilityAcknowledged?: boolean; reasonCode?: string; reasonText?: string },
+  ): Promise<PolicyPostDto> {
+    if (user.role === 'admin' && action === 'publish') {
+      throw new ForbiddenException({
+        error: { code: ADMIN_POLICY_PUBLISH_DISABLED_CODE, message: '管理员不能发布政策' },
+      })
+    }
     const post = await this.prisma.policyPost.findUnique({ where: { id } })
-    if (!post) {
+    if (!post || (user.role === 'partner' && post.sourceOrgId !== user.orgId)) {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
     }
-    if (action === 'publish' && post.reviewStatus !== 'approved') {
+    if (user.role === 'admin' && action === 'unpublish') {
+      const reason = assertEmergencyReason(options?.reasonCode, options?.reasonText)
+      await this.prisma.policyPost.update({ where: { id }, data: { publishStatus: 'unpublished' } })
+      await this.prisma.recruitmentEmergencyHold.upsert({
+        where: { targetType_targetId: { targetType: 'policy', targetId: id } },
+        create: {
+          targetType: 'policy',
+          targetId: id,
+          orgId: post.sourceOrgId,
+          reasonCode: reason.reasonCode,
+          reasonText: reason.reasonText,
+          actorId: user.userId,
+        },
+        update: {},
+      })
+      if (this.prisma.partnerOrgNotice) {
+        await this.prisma.partnerOrgNotice.create({
+          data: {
+            orgId: post.sourceOrgId,
+            kind: 'recruitment_emergency_takedown',
+            title: '政策已紧急下架',
+            body: `「${post.title}」已紧急下架。事由：${reason.reasonText}。此下架不能由管理员恢复。`,
+            payloadJson: JSON.stringify({ targetType: 'policy', targetId: id, reasonCode: reason.reasonCode }),
+          },
+        })
+      }
+      const updated = await this.prisma.policyPost.findUnique({ where: { id } })
+      await this.audit.write({
+        actorId: user.userId,
+        actorRole: 'admin',
+        action: 'policy.emergency_takedown',
+        targetType: 'policy',
+        targetId: id,
+        payload: { reasonCode: reason.reasonCode, reasonText: reason.reasonText },
+      })
+      return mapPolicy(updated!)
+    }
+    if (action === 'unpublish') return this.unpublishPartnerPolicy(id, user)
+    if (post.reviewStatus !== 'approved') {
       throw new BadRequestException({
         error: { code: 'PUBLISH_REQUIRES_APPROVAL', message: '未通过审核的政策内容不得发布' },
       })
     }
-    if (action === 'publish') {
-      // 发布闸门:来源机构必须 contentTrustStatus='active' 且未归档(fail-closed)。
-      // 详见 src/common/content-trust.ts 顶部注释。unpublish 不受闸门限制。
-      await assertOrgContentTrustActive(this.prisma as unknown as OrgTrustReader, post.sourceOrgId, {
-        contentType: '政策内容',
-        contentId: id,
+    if (options?.responsibilityAcknowledged !== true) {
+      throw new BadRequestException({
+        error: { code: POLICY_RESPONSIBILITY_ACK_REQUIRED_CODE, message: '发布前必须确认对本条政策内容负责' },
       })
     }
-    const toStatus = action === 'publish' ? 'published' : 'unpublished'
-    if (action === 'publish') {
-      const cas = await this.prisma.policyPost.updateMany({
-        where: { id, reviewStatus: 'approved' },
-        data: { publishStatus: 'published' },
+    // 发布闸门:来源机构必须 contentTrustStatus='active' 且未归档(fail-closed)。
+    await assertOrgContentTrustActive(this.prisma as unknown as OrgTrustReader, post.sourceOrgId, {
+      contentType: '政策内容',
+      contentId: id,
+    })
+    await assertNotEmergencyHeld(this.prisma, 'policy', id)
+    const version = post.contentVersion ?? 1
+    const confirmedAt = new Date()
+    const cas = await this.prisma.policyPost.updateMany({
+      where: { id, reviewStatus: 'approved' },
+      data: {
+        publishStatus: 'published',
+        publishConfirmedBy: user.userId,
+        publishConfirmedAt: confirmedAt,
+        publishConfirmedContentVersion: version,
+      },
+    })
+    if (cas.count !== 1) {
+      throw new ConflictException({
+        error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
       })
-      if (cas.count !== 1) {
-        throw new ConflictException({
-          error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
-        })
-      }
-    } else {
-      await this.prisma.policyPost.update({ where: { id }, data: { publishStatus: 'unpublished' } })
     }
     const updated = await this.prisma.policyPost.findUnique({ where: { id } })
     if (!updated) {
@@ -437,11 +518,18 @@ export class PoliciesService {
     }
     await this.audit.write({
       actorId: user.userId,
-      actorRole: 'admin',
+      actorRole: user.role,
       action: 'policy.publish',
       targetType: 'policy',
       targetId: id,
-      payload: { action, fromPublishStatus: post.publishStatus, toPublishStatus: toStatus },
+      payload: {
+        action,
+        fromPublishStatus: post.publishStatus,
+        toPublishStatus: 'published',
+        contentVersion: version,
+        responsibilityAcknowledged: true,
+        confirmedAt: confirmedAt.toISOString(),
+      },
     })
     return mapPolicy(updated)
   }

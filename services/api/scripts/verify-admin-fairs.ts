@@ -552,6 +552,22 @@ async function main() {
       pass('11. 统计聚合与真实行数一致(软删不计入)')
     }
 
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    try {
+      await expectCode(
+        () => svc.updateFairInfo(fairPublished.id, { title: '关闭后不得改' }, adminUser),
+        'RECRUITMENT_HOSTING_DISABLED',
+        '托管关闭时管理员代改招聘会被拒',
+      )
+      const materials = await svc.getPublishedFairMaterials(fairPublished.id, 1, 20)
+      if (materials.data.length !== 0) fail('托管关闭时招聘会资料列表不是空')
+      else pass('托管关闭时招聘会资料列表返回空')
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
+
     console.log('\n=== ALL PASS ===')
   } finally {
     await cleanup()

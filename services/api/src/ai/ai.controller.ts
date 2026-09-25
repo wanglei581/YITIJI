@@ -457,6 +457,7 @@ export class AiController {
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async transcribeResumeVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
+    @Req() req: ReqLike,
   ): Promise<ResumeVoiceTranscribeResponseDto> {
     if (!audio?.buffer?.length) {
       throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
@@ -465,6 +466,7 @@ export class AiController {
       throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
     }
     // A-6 成本可见性：ASR 按时长计费，tokenUsage 恒为空，不编造单价。
+    const voiceMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
     const asrStartedAt = Date.now()
     const result = await this.asr.recognizeWav(audio.buffer)
     this.logService.record({
@@ -475,7 +477,7 @@ export class AiController {
       latencyMs: Math.max(0, Date.now() - asrStartedAt),
       tokenUsage: undefined,
       errorCode: result.ok ? undefined : (result.errorCode ?? 'ASR_FAILED'),
-      endUserId: null,
+      endUserId: voiceMember?.endUserId ?? null,
       terminalId: null,
     })
     if (!result.ok) {
@@ -559,6 +561,7 @@ export class AiController {
       this.aiService.chatWithAssistant(
         dto,
         assistantOwnerKey(chatMember?.endUserId ?? null, ipOf(req)),
+        chatMember?.endUserId ?? null,
       ),
     )
     await this.audit.write({
