@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { ActivityIcon, BuildingIcon, FileTextIcon, LayoutGridIcon, MapPinIcon, PencilIcon } from 'lucide-react'
 import { Page } from '../Page'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
+import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
+import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
 import { VenueGuideTab } from './VenueGuideTab'
 import { CompaniesTab } from './components/CompaniesTab'
 import { EditFairDrawer } from './components/EditFairDrawer'
@@ -45,6 +49,10 @@ export default function FairsPage() {
   const [stats, setStats] = useState<AdminFairStats | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('companies')
   const [editOpen, setEditOpen] = useState(false)
+  const [takedown, setTakedown] = useState<EmergencyTakedownTarget | null>(null)
+  // 托管关闭（我们云上默认）时整页只读：不编辑基本信息、企业、展区、导览与资料，只留查看与紧急下架。
+  const hosting = useRecruitmentHosting()
+  const readOnly = !hosting.writable
 
   const loadList = useCallback(async () => {
     setListState('loading')
@@ -88,15 +96,20 @@ export default function FairsPage() {
   return (
     <Page
       title="招聘会管理"
-      subtitle="招聘会内容运营 — 基本信息 · 参展企业 · 展区 · 活动资料 · 统计(审核/发布请到「招聘会信息源」)"
+      subtitle={readOnly
+        ? '招聘会内容查看 — 基本信息 · 参展企业 · 展区 · 活动资料 · 统计(只读,保留紧急下架)'
+        : '招聘会内容运营 — 基本信息 · 参展企业 · 展区 · 活动资料 · 统计(审核/发布请到「招聘会信息源」)'}
     >
+      <RecruitmentHostingNotice hosting={hosting} subject="招聘会及其企业、展区、导览与资料" />
       {listState === 'loading' && <LoadingState className="py-24" />}
       {listState === 'error' && <ErrorState className="py-24" onRetry={() => void loadList()} />}
       {listState === 'ready' && fairs.length === 0 && (
         <EmptyState
           className="py-24"
           title="暂无招聘会数据"
-          description="招聘会由合作机构在机构后台导入,经「招聘会信息源」审核后在此进行内容运营。"
+          description={readOnly
+            ? '当前只读：只能查看与紧急下架。'
+            : '招聘会由合作机构在机构后台导入,经「招聘会信息源」审核后在此进行内容运营。'}
         />
       )}
 
@@ -155,13 +168,24 @@ export default function FairsPage() {
                     来源:{selectedFair.sourceName} · 外部编号 {selectedFair.externalId} · 同步于 {fmtDateTime(selectedFair.syncTime)}
                   </p>
                 </div>
-                <button
-                  onClick={() => setEditOpen(true)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
-                >
-                  <PencilIcon className="h-3.5 w-3.5" />
-                  编辑基本信息
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {!readOnly && (
+                    <button
+                      onClick={() => setEditOpen(true)}
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
+                    >
+                      <PencilIcon className="h-3.5 w-3.5" />
+                      编辑基本信息
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setTakedown({ targetType: 'job_fair', targetId: selectedFair.id, title: selectedFair.title, orgName: selectedFair.sourceName })}
+                    className="rounded-lg border border-error/30 px-3 py-1.5 text-xs font-medium text-error-fg hover:bg-error-bg"
+                  >
+                    紧急下架
+                  </button>
+                </div>
               </div>
 
               {/* 标签页 */}
@@ -182,26 +206,38 @@ export default function FairsPage() {
                 ))}
               </div>
 
-              {activeTab === 'companies' && <CompaniesTab fairId={selectedFair.id} companies={detail?.companies ?? []} onChanged={refresh} />}
-              {activeTab === 'zones'     && <ZonesTab fairId={selectedFair.id} zones={detail?.zones ?? []} onChanged={refresh} />}
-              {activeTab === 'venue'     && <VenueGuideTab fairId={selectedFair.id} venueDefault={selectedFair.venue} companies={detail?.companies ?? []} />}
-              {activeTab === 'materials' && <MaterialsTab fairId={selectedFair.id} materials={detail?.materials ?? []} onChanged={refresh} />}
+              {activeTab === 'companies' && <CompaniesTab fairId={selectedFair.id} companies={detail?.companies ?? []} onChanged={refresh} readOnly={readOnly} />}
+              {activeTab === 'zones'     && <ZonesTab fairId={selectedFair.id} zones={detail?.zones ?? []} onChanged={refresh} readOnly={readOnly} />}
+              {activeTab === 'venue'     && <VenueGuideTab fairId={selectedFair.id} venueDefault={selectedFair.venue} companies={detail?.companies ?? []} readOnly={readOnly} />}
+              {activeTab === 'materials' && (
+                <MaterialsTab
+                  fairId={selectedFair.id}
+                  materials={detail?.materials ?? []}
+                  onChanged={refresh}
+                  readOnly={readOnly}
+                  onTakedown={(m) => setTakedown({ targetType: 'fair_material', targetId: m.id, title: m.name, orgName: selectedFair.sourceName })}
+                />
+              )}
               {activeTab === 'stats'     && <StatsTab stats={stats} />}
 
-              <EditFairDrawer
-                fair={selectedFair}
-                open={editOpen}
-                onClose={() => setEditOpen(false)}
-                onSaved={refresh}
-              />
+              {!readOnly && (
+                <EditFairDrawer
+                  fair={selectedFair}
+                  open={editOpen}
+                  onClose={() => setEditOpen(false)}
+                  onSaved={refresh}
+                />
+              )}
             </>
           )}
         </>
       )}
 
       <p className="mt-6 text-xs text-neutral-400">
-        招聘会数字化模块:仅提供信息展示和现场服务,不接收简历,不参与招聘闭环。所有修改操作均记录审计日志。
+        招聘会数字化模块:仅提供信息展示和现场服务,不接收简历,不参与招聘闭环。所有修改操作均记录审计日志。紧急下架只能下架、不能恢复,须写明事由,并会通知所属机构。
       </p>
+
+      <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={refresh} />
     </Page>
   )
 }

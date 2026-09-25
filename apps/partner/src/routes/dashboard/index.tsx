@@ -16,6 +16,8 @@ import {
 } from 'lucide-react'
 import { getPartnerDashboard, type PartnerDashboardData } from '../../services/api/orgSelf'
 import { getPartnerStats, type PartnerStatsResponse } from '../../services/api/stats'
+import { useRecruitmentHosting } from '../../services/capabilities'
+import { OrgNoticesSection } from './OrgNoticesSection'
 
 function firstPendingPath(snapshot: PartnerStatsResponse['snapshot']): string {
   if (snapshot.pendingReviewJobs > 0) return '/jobs'
@@ -28,6 +30,10 @@ function firstPendingPath(snapshot: PartnerStatsResponse['snapshot']): string {
 // 内容计数来自 GET /partner/dashboard；待审核标题数与统计页统一为
 // GET /partner/stats snapshot.pendingReview（pending+reviewing，含企业）。
 // 无埋点支撑的「展示/跳转/打印次数」不展示假数字。
+//
+// 招聘内容托管关闭（3.13，我们云上默认）时：岗位 / 招聘会 / 数据源的卡片与同步记录不展示，
+// 待审核只算政策（snapshot.pendingReviewPolicies）——岗位类存量没有人能审，算进来只会误导。
+// 政策由本机构自己审核发布；岗位 / 招聘会 / 企业（托管打开时）仍由平台管理员审核。
 
 const RESULT_CONFIG: Record<string, { label: string; badge: 'success' | 'error' | 'warning' }> = {
   success: { label: '成功', badge: 'success' },
@@ -37,16 +43,18 @@ const RESULT_CONFIG: Record<string, { label: string; badge: 'success' | 'error' 
 
 const DATA_TYPE_LABEL: Record<string, string> = { job: '岗位', fair: '招聘会', policy: '政策' }
 
-function PendingReviewCallout({ count, onView }: { count: number; onView: () => void }) {
+function PendingReviewCallout({ count, recruitmentHosting, onView }: { count: number; recruitmentHosting: boolean; onView: () => void }) {
   if (count === 0) return null
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl border border-warning/30 bg-warning-bg px-5 py-4">
       <div className="flex items-center gap-3">
         <AlertCircleIcon className="h-5 w-5 shrink-0 text-warning-fg" aria-hidden="true" />
         <div>
-          <p className="text-sm font-semibold text-warning-fg">有 {count} 条数据待管理员审核</p>
+          <p className="text-sm font-semibold text-warning-fg">有 {count} 条内容待审核</p>
           <p className="mt-0.5 text-xs text-warning-fg">
-            数据提交后需经管理员审核，通过后才会在终端展示
+            {recruitmentHosting
+              ? '岗位、招聘会、企业资料由平台管理员审核；政策由本机构自行审核并确认发布。通过并发布后才会在终端展示'
+              : '政策由本机构自行审核：审核通过并确认发布责任后，才会在终端展示'}
           </p>
         </div>
       </div>
@@ -66,14 +74,16 @@ function PendingReviewCallout({ count, onView }: { count: number; onView: () => 
 function MetricsGrid({
   data,
   snapshot,
+  recruitmentHosting,
   onGo,
 }: {
   data: PartnerDashboardData
   snapshot: PartnerStatsResponse['snapshot']
+  recruitmentHosting: boolean
   onGo: (path: string) => void
 }) {
   const pendingReview = snapshot.pendingReview
-  const metrics = [
+  const hostedMetrics = [
     {
       label: '已上传岗位', value: data.jobs.total,
       note: `已发布 ${data.jobs.published} · 待初审 ${data.jobs.pending}`,
@@ -105,6 +115,20 @@ function MetricsGrid({
       icon: DatabaseIcon, iconClass: 'bg-cyan-50 text-cyan-600', path: '/sources',
     },
   ]
+  // 托管关闭：只留政策。岗位 / 招聘会 / 数据源在本平台不开放，展示成 0 会被读成「还没上传」。
+  const policyOnlyMetrics = [
+    {
+      label: '政策公告', value: data.policies.total,
+      note: `已发布 ${data.policies.published} · 待初审 ${data.policies.pending}`,
+      icon: ScrollTextIcon, iconClass: 'bg-success-bg text-success-fg', path: '/policy',
+    },
+    {
+      label: '待审核政策', value: snapshot.pendingReviewPolicies,
+      note: snapshot.pendingReviewPolicies > 0 ? '含审核中，由本机构自行审核发布' : '当前无待审核',
+      icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: '/policy',
+    },
+  ]
+  const metrics = recruitmentHosting ? hostedMetrics : policyOnlyMetrics
   return (
     <section role="region" aria-label="数据概览">
       <div className="mb-3 flex items-center gap-2">
@@ -208,6 +232,8 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+  // 'unknown'（能力没读到）沿用 fail-open，按打开展示；只有服务端明确关闭才收起岗位类卡片。
+  const recruitmentHosting = useRecruitmentHosting() !== 'off'
   const [data, setData] = useState<PartnerDashboardData | null>(null)
   const [snapshot, setSnapshot] = useState<PartnerStatsResponse['snapshot'] | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
@@ -239,9 +265,14 @@ export default function DashboardPage() {
         <ErrorState className="py-20" onRetry={() => setReloadKey((k) => k + 1)} />
       ) : (
         <div className="flex flex-col gap-6">
-          <PendingReviewCallout count={snapshot.pendingReview} onView={() => navigate(firstPendingPath(snapshot))} />
-          <MetricsGrid data={data} snapshot={snapshot} onGo={(p) => navigate(p)} />
-          <SyncLogSection data={data} onGoLogs={() => navigate('/sync-logs')} />
+          <PendingReviewCallout
+            count={recruitmentHosting ? snapshot.pendingReview : snapshot.pendingReviewPolicies}
+            recruitmentHosting={recruitmentHosting}
+            onView={() => navigate(recruitmentHosting ? firstPendingPath(snapshot) : '/policy')}
+          />
+          <MetricsGrid data={data} snapshot={snapshot} recruitmentHosting={recruitmentHosting} onGo={(p) => navigate(p)} />
+          <OrgNoticesSection />
+          {recruitmentHosting && <SyncLogSection data={data} onGoLogs={() => navigate('/sync-logs')} />}
         </div>
       )}
     </Page>

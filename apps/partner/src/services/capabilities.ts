@@ -43,3 +43,22 @@ export function useCapability(key: BooleanCapability): boolean {
   const { capabilities } = usePartnerCapabilities()
   return capabilities ? capabilities[key] : true
 }
+
+/**
+ * 部署级招聘内容托管（3.13）。我们云上默认关闭；私有化部署（b）打开。
+ *
+ * - 'off'：服务端明确说关闭。岗位 / 企业 / 招聘会 / 数据源 / 同步日志在侧栏隐藏，
+ *   直接打开这些地址时给出如实说明，不渲染会 403 或永远为空的管理页。
+ * - 'on'：服务端明确说打开。
+ * - 'loading'：还没拿到能力，招聘类页面先等，不抢先发请求。
+ * - 'unknown'：能力接口失败，或旧服务端没有这个字段。沿用本文件的 fail-open 约定
+ *   按打开渲染，真正的拦截仍在服务端（RECRUITMENT_HOSTING_DISABLED）。
+ */
+export type RecruitmentHostingState = 'loading' | 'on' | 'off' | 'unknown'
+
+export function useRecruitmentHosting(): RecruitmentHostingState {
+  const { status, capabilities } = usePartnerCapabilities()
+  if (status === 'loading') return 'loading'
+  if (!capabilities || typeof capabilities.recruitmentHosting !== 'boolean') return 'unknown'
+  return capabilities.recruitmentHosting ? 'on' : 'off'
+}

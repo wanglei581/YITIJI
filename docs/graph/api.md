@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`546` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`547` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -899,6 +899,12 @@
 | GET | `/api/v1/admin/recruitment-content/organizations/:organizationId/qualifications/:qualificationId/evidence-access` | AdminRecruitmentContentController.getQualificationEvidence | admin | RecruitmentContentReadService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>OfflineAgencyBranch<br/>OfflineAgencyProfile<br/>OnlinePlatformDirectory<br/>Organization<br/>PrintTask<br/>QualificationRecord |
 | GET | `/api/v1/admin/recruitment-content/platform-directories` | AdminRecruitmentContentController.listDirectories | admin | RecruitmentContentReadService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>OfflineAgencyBranch<br/>OfflineAgencyProfile<br/>OnlinePlatformDirectory<br/>Organization<br/>PrintTask<br/>QualificationRecord |
 | GET | `/api/v1/admin/recruitment-content/platform-directories/:id` | AdminRecruitmentContentController.getDirectory | admin | RecruitmentContentReadService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>OfflineAgencyBranch<br/>OfflineAgencyProfile<br/>OnlinePlatformDirectory<br/>Organization<br/>PrintTask<br/>QualificationRecord |
+
+## `services/api/src/recruitment-hosting/admin-recruitment-hosting.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/system/recruitment-hosting` | AdminRecruitmentHostingController.getRecruitmentHosting | admin | — | — |
 
 ## `services/api/src/recruitment-hosting/recruitment-emergency.controller.ts`
 

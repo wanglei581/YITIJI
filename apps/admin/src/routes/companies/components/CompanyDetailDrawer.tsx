@@ -11,10 +11,13 @@ export function CompanyDetailDrawer({
   companyId,
   onClose,
   onChanged,
+  readOnly = false,
 }: {
   companyId: string | null
   onClose: () => void
   onChanged: () => void
+  /** 托管关闭（我们云上默认）时只读：展示资料照常，编辑 / 审核 / 发布 / 关联岗位一律不给。 */
+  readOnly?: boolean
 }) {
   const [detail, setDetail] = useState<AdminCompanyDetail | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
@@ -83,9 +86,11 @@ export function CompanyDetailDrawer({
         state === 'ready' ? (
           <div className="flex justify-end gap-2">
             <GhostButton onClick={onClose} disabled={saving}>关闭</GhostButton>
-            <PrimaryButton onClick={() => void save()} disabled={saving || !form.name.trim()}>
-              {saving ? '保存中…' : '保存展示信息'}
-            </PrimaryButton>
+            {!readOnly && (
+              <PrimaryButton onClick={() => void save()} disabled={saving || !form.name.trim()}>
+                {saving ? '保存中…' : '保存展示信息'}
+              </PrimaryButton>
+            )}
           </div>
         ) : undefined
       }
@@ -105,17 +110,20 @@ export function CompanyDetailDrawer({
             </div>
           </Card>
 
-          <ReviewPublishSection detail={detail} onMutated={mutated} />
+          <ReviewPublishSection detail={detail} onMutated={mutated} readOnly={readOnly} />
 
           {/* 展示信息编辑 */}
           <Card className="space-y-4 p-4">
             <p className="text-sm font-medium text-neutral-700">展示信息</p>
             <InlineError message={saveError} />
             <InlineSuccess message={saveSuccess} />
-            <CompanyFormFields form={form} onChange={setForm} />
+            {/* 只读时用 fieldset 统一禁用：内容照常可读，但不能改。 */}
+            <fieldset disabled={readOnly} className="min-w-0">
+              <CompanyFormFields form={form} onChange={setForm} />
+            </fieldset>
           </Card>
 
-          <LinkedJobsSection detail={detail} onMutated={mutated} />
+          <LinkedJobsSection detail={detail} onMutated={mutated} readOnly={readOnly} />
 
           <p className="text-xs text-neutral-400">
             企业展示仅作为来源企业与岗位的导览信息；系统不接收求职者简历，求职者通过既有「去来源平台投递 / 扫码投递」入口跳转外部来源平台。所有修改操作均记录审计日志。

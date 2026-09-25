@@ -22,6 +22,9 @@
 //     **不代表投递、意向或简历相关的任何结果**；
 //     用户可见文案一律遵守 CLAUDE.md §2 的投递/预约文案白名单。
 //   - 只给机构级聚合，最小样本阈值 N≥5，不出个人明细。
+//
+// 招聘内容托管关闭（3.13，我们云上默认）时：在架岗位 / 招聘会 / 企业与启用数据源不展示，
+// 同步概况整段不展示（导入与同步已停止）；待审核只算政策，且写明政策由本机构自行审核发布。
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -49,6 +52,7 @@ import {
   type StatsMetric,
   type StatsPeriod,
 } from '../../services/api/stats'
+import { useRecruitmentHosting } from '../../services/capabilities'
 
 // ─── 时间范围选择器 ────────────────────────────────────────────────────────
 
@@ -92,16 +96,18 @@ function PeriodSelector({
 
 // ─── 在架内容快照 ──────────────────────────────────────────────────────────
 
-function SnapshotRow({ snapshot }: { snapshot: PartnerStatsResponse['snapshot'] }) {
-  const items = [
+function SnapshotRow({ snapshot, recruitmentHosting }: { snapshot: PartnerStatsResponse['snapshot']; recruitmentHosting: boolean }) {
+  const hostedItems = [
     { label: '在架岗位',   value: snapshot.publishedJobs,      icon: BriefcaseIcon, tone: 'bg-primary-50 text-primary-600' },
     { label: '在架招聘会', value: snapshot.publishedFairs,     icon: CalendarIcon,  tone: 'bg-info-bg text-info-fg' },
     { label: '在架企业',   value: snapshot.publishedCompanies, icon: BuildingIcon,  tone: 'bg-purple-50 text-purple-600' },
     { label: '在架政策',   value: snapshot.publishedPolicies,  icon: FileTextIcon,  tone: 'bg-cyan-50 text-cyan-600' },
     { label: '启用数据源', value: snapshot.activeSources,      icon: DatabaseIcon,  tone: 'bg-warning-bg text-warning-fg' },
   ]
+  // 托管关闭：只留政策。岗位 / 招聘会 / 企业与数据源在本平台不开放，不把存量计数当成「在架」展示。
+  const items = recruitmentHosting ? hostedItems : hostedItems.filter((item) => item.label === '在架政策')
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className={`grid grid-cols-2 gap-3 ${recruitmentHosting ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
       {items.map((item) => {
         const Icon = item.icon
         return (
@@ -253,7 +259,9 @@ function NoActivityState({
   onRetry: () => void
 }) {
   const navigate = useNavigate()
-  const { pendingReview, activeSources } = data.snapshot
+  const { activeSources } = data.snapshot
+  const adminPending = data.snapshot.pendingReviewJobs + data.snapshot.pendingReviewFairs + data.snapshot.pendingReviewCompanies
+  const policyPending = data.snapshot.pendingReviewPolicies
   const hasContent =
     data.snapshot.publishedJobs +
       data.snapshot.publishedFairs +
@@ -265,8 +273,11 @@ function NoActivityState({
   let reason: string
   if (activeSources === 0) {
     reason = '本机构当前没有启用中的数据源，因此不会产生同步批次。先去数据源页配置并启用一个来源。'
-  } else if (pendingReview > 0) {
-    reason = `本机构有 ${pendingReview} 条内容还在等管理员审核，审核通过并发布后才会在终端展示。`
+  } else if (adminPending > 0) {
+    reason = `本机构有 ${adminPending} 条岗位、招聘会或企业资料还在等管理员审核，审核通过并发布后才会在终端展示。`
+      + (policyPending > 0 ? `另有 ${policyPending} 条政策待本机构自行审核发布。` : '')
+  } else if (policyPending > 0) {
+    reason = `本机构有 ${policyPending} 条政策待本机构自行审核，审核通过并确认发布后才会在终端展示。`
   } else if (!hasContent) {
     reason = '本机构还没有已发布的内容，先导入岗位或招聘会，通过审核后即可在终端展示。'
   } else {
@@ -302,6 +313,8 @@ function NoActivityState({
 // ─── 主页面 ────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
+  // 'unknown'（能力没读到）沿用 fail-open 按打开展示；只有服务端明确关闭才收起岗位类统计。
+  const recruitmentHosting = useRecruitmentHosting() !== 'off'
   const [period, setPeriod] = useState<StatsPeriod>('week')
   const [data, setData] = useState<PartnerStatsResponse | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
@@ -331,8 +344,11 @@ export default function StatsPage() {
   return (
     <Page
       title="数据统计"
-      subtitle={withFrontendHint('同步概况', FRONTEND_HINT.none)}
-      actions={<PeriodSelector value={period} onChange={setPeriod} />}
+      subtitle={recruitmentHosting
+        ? withFrontendHint('同步概况', FRONTEND_HINT.none)
+        : withFrontendHint('政策概况', FRONTEND_HINT.none)}
+      // 周期只作用于同步概况；托管关闭时那一段不展示，选择器也就不给，免得点了没有任何变化。
+      actions={recruitmentHosting ? <PeriodSelector value={period} onChange={setPeriod} /> : undefined}
     >
       {state === 'loading' ? (
         <LoadingState className="py-20" />
@@ -352,49 +368,57 @@ export default function StatsPage() {
               <h2 className="text-[13px] font-bold text-neutral-700">在架内容</h2>
               <span className="text-[11.5px] text-neutral-400">当前快照 · 不随周期选择变化</span>
             </div>
-            <SnapshotRow snapshot={data.snapshot} />
-            {data.snapshot.pendingReview > 0 && (
+            <SnapshotRow snapshot={data.snapshot} recruitmentHosting={recruitmentHosting} />
+            {recruitmentHosting && data.snapshot.pendingReview > data.snapshot.pendingReviewPolicies && (
               <p className="mt-2.5 text-xs text-neutral-500">
-                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReview}</strong> 条内容待管理员审核，
-                通过并发布后才会在终端展示。
+                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReview - data.snapshot.pendingReviewPolicies}</strong> 条岗位、招聘会或企业资料待管理员审核，通过并发布后才会在终端展示。
+              </p>
+            )}
+            {data.snapshot.pendingReviewPolicies > 0 && (
+              <p className="mt-2.5 text-xs text-neutral-500">
+                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReviewPolicies}</strong> 条政策待本机构自行审核，审核通过并确认发布后才会在终端展示。
               </p>
             )}
           </section>
 
           {/* 同步概况 —— 周期内，含环比；不承诺曝光/跳转效果 */}
-          <section aria-label="同步概况">
-            <div className="mb-2.5 flex items-center gap-2">
-              <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-              <h2 className="text-[13px] font-bold text-neutral-700">同步概况</h2>
-              <span className="text-[11.5px] text-neutral-400">
-                {data.period.label}（{data.period.from} ~ {data.period.to}）· 时区 {data.timezone}
-              </span>
-            </div>
-
-            {data.sync.totalBatches.current === 0 ? (
-              <NoActivityState data={data} periodLabel={periodLabel} onRetry={retry} />
-            ) : (
-              <div className="flex flex-col gap-4">
-                <SyncMetrics sync={data.sync} />
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-                  <SectionCard title="按日同步趋势">
-                    <TrendLineChart
-                      labels={data.trend.map((b) => b.date.slice(5))}
-                      series={[
-                        { label: '新增', values: data.trend.map((b) => b.added) },
-                        { label: '更新', values: data.trend.map((b) => b.updated) },
-                        { label: '失败', values: data.trend.map((b) => b.failed) },
-                      ]}
-                      height={240}
-                    />
-                  </SectionCard>
-                  <SectionCard title="同步状态分布">
-                    <StatusDistCard dist={data.statusDist} />
-                  </SectionCard>
+          {recruitmentHosting && (
+            <>
+              <section aria-label="同步概况">
+                <div className="mb-2.5 flex items-center gap-2">
+                  <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+                  <h2 className="text-[13px] font-bold text-neutral-700">同步概况</h2>
+                  <span className="text-[11.5px] text-neutral-400">
+                    {data.period.label}（{data.period.from} ~ {data.period.to}）· 时区 {data.timezone}
+                  </span>
                 </div>
-              </div>
-            )}
-          </section>
+
+                {data.sync.totalBatches.current === 0 ? (
+                  <NoActivityState data={data} periodLabel={periodLabel} onRetry={retry} />
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <SyncMetrics sync={data.sync} />
+                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
+                      <SectionCard title="按日同步趋势">
+                        <TrendLineChart
+                          labels={data.trend.map((b) => b.date.slice(5))}
+                          series={[
+                            { label: '新增', values: data.trend.map((b) => b.added) },
+                            { label: '更新', values: data.trend.map((b) => b.updated) },
+                            { label: '失败', values: data.trend.map((b) => b.failed) },
+                          ]}
+                          height={240}
+                        />
+                      </SectionCard>
+                      <SectionCard title="同步状态分布">
+                        <StatusDistCard dist={data.statusDist} />
+                      </SectionCard>
+                    </div>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
 
           {/* 归因 —— 恒不可用，如实说明，不承诺效果 */}
           <section aria-label="浏览与跳转归因">

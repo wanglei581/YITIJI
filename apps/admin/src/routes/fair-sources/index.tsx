@@ -18,6 +18,10 @@ import { Pagination, useTableState } from '../components/DataTable'
 import { BulkPublishButton } from '../components/BulkPublishButton'
 import { toOrgOptions } from '../../services/api/bulkPublish'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
+import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
+import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -74,7 +78,10 @@ export default function FairSourcesPage() {
   const [rejectingId,  setRejectingId]  = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [actionError,  setActionError]  = useState<string | null>(null)
+  const [takedown,     setTakedown]     = useState<EmergencyTakedownTarget | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
+  // 托管关闭（我们云上默认）时只留查看与紧急下架；审核 / 发布 / 批量发布点了也只会 403。
+  const hosting = useRecruitmentHosting()
 
   const listQuery = useMemo(() => ({
     page,
@@ -161,8 +168,9 @@ export default function FairSourcesPage() {
     <Page
       title="招聘会信息源"
       subtitle="第三方平台同步招聘会数据管理"
-      actions={<BulkPublishButton kind="fair" orgOptions={orgOptions} onDone={reload} />}
+      actions={hosting.writable ? <BulkPublishButton kind="fair" orgOptions={orgOptions} onDone={reload} /> : undefined}
     >
+      <RecruitmentHostingNotice hosting={hosting} subject="招聘会" />
       {actionError && (
         <div className="mb-4 rounded-lg border border-error/30 bg-error-bg px-4 py-2.5 text-sm text-error-fg" role="alert">
           {actionError}。请修正后重试，或刷新页面。
@@ -286,42 +294,53 @@ export default function FairSourcesPage() {
                         ) : (
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setViewing(s)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看</button>
-                            {(s.reviewStatus === 'pending' || s.reviewStatus === 'reviewing') && (
+                            {hosting.writable && (
                               <>
-                                <button
-                                  type="button"
-                                  className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
-                                  onClick={() => handleApprove(s.id)}
-                                >
-                                  审核通过
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
-                                  onClick={() => { setRejectingId(s.id); setRejectReason('') }}
-                                >
-                                  拒绝
-                                </button>
+                                {(s.reviewStatus === 'pending' || s.reviewStatus === 'reviewing') && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
+                                      onClick={() => handleApprove(s.id)}
+                                    >
+                                      审核通过
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
+                                      onClick={() => { setRejectingId(s.id); setRejectReason('') }}
+                                    >
+                                      拒绝
+                                    </button>
+                                  </>
+                                )}
+                                {s.reviewStatus === 'approved' && s.publishStatus !== 'published' && (
+                                  <button
+                                    type="button"
+                                    className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                                    onClick={() => handlePublish(s.id)}
+                                  >
+                                    发布
+                                  </button>
+                                )}
+                                {s.publishStatus === 'published' && (
+                                  <button
+                                    type="button"
+                                    className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
+                                    onClick={() => handleUnpublish(s.id, s.name)}
+                                  >
+                                    下架
+                                  </button>
+                                )}
                               </>
                             )}
-                            {s.reviewStatus === 'approved' && s.publishStatus !== 'published' && (
-                              <button
-                                type="button"
-                                className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                                onClick={() => handlePublish(s.id)}
-                              >
-                                发布
-                              </button>
-                            )}
-                            {s.publishStatus === 'published' && (
-                              <button
-                                type="button"
-                                className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                                onClick={() => handleUnpublish(s.id, s.name)}
-                              >
-                                下架
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
+                              onClick={() => setTakedown({ targetType: 'job_fair', targetId: s.id, title: s.name, orgName: s.sourceName })}
+                            >
+                              紧急下架
+                            </button>
                           </div>
                         )}
                       </td>
@@ -336,8 +355,10 @@ export default function FairSourcesPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        仅展示第三方平台同步的招聘会信息，不参与招聘闭环。
+        仅展示第三方平台同步的招聘会信息，不参与招聘闭环。紧急下架只能下架、不能恢复，须写明事由，并会通知所属机构。
       </p>
+
+      <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={reload} />
 
       <Drawer
         open={viewing !== null}

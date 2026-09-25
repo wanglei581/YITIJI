@@ -5,7 +5,8 @@ import { DangerDeleteButton, InlineError, InlineSuccess } from '../../../compone
 import { JOB_CATEGORY_LABELS, PUBLISH_BADGE, errMsg, inputCls } from './shared'
 import { companiesAdminService, type AdminCompanyDetail, type CompanyLinkableJob } from '../../../services/api/companiesAdmin'
 
-export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyDetail; onMutated: () => void }) {
+/** readOnly：托管关闭（我们云上默认）时只列已关联岗位，不搜索、不关联、不移除（点了也只会 403）。 */
+export function LinkedJobsSection({ detail, onMutated, readOnly = false }: { detail: AdminCompanyDetail; onMutated: () => void; readOnly?: boolean }) {
   const [keyword, setKeyword] = useState('')
   const [linkable, setLinkable] = useState<CompanyLinkableJob[]>([])
   const [linkableTotal, setLinkableTotal] = useState(0)
@@ -29,7 +30,7 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
     }
   }, [detail.id])
 
-  useEffect(() => { void search('') }, [search])
+  useEffect(() => { if (!readOnly) void search('') }, [search, readOnly])
 
   const toggle = (jobId: string) => {
     setSelected((prev) => {
@@ -85,7 +86,7 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
 
       {/* 已关联岗位 */}
       {detail.linkedJobs.length === 0 ? (
-        <p className="rounded-lg bg-neutral-50 px-3 py-3 text-center text-xs text-neutral-400">暂无关联岗位，可在下方搜索同来源机构的已发布岗位进行关联</p>
+        <p className="rounded-lg bg-neutral-50 px-3 py-3 text-center text-xs text-neutral-400">{readOnly ? '暂无关联岗位' : '暂无关联岗位，可在下方搜索同来源机构的已发布岗位进行关联'}</p>
       ) : (
         <>
           {detail.linkedJobsTotal > detail.linkedJobs.length && (
@@ -101,7 +102,7 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
                 </p>
               </div>
               <StatusBadge dot status={PUBLISH_BADGE[j.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[j.publishStatus]?.label ?? j.publishStatus} />
-              <DangerDeleteButton onConfirm={() => void unlink(j.id)} busy={busyJobId === j.id} confirmText="确认移除?" />
+              {!readOnly && <DangerDeleteButton onConfirm={() => void unlink(j.id)} busy={busyJobId === j.id} confirmText="确认移除?" />}
             </li>
           ))}
           </ul>
@@ -109,68 +110,72 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
       )}
 
       {/* 可关联岗位搜索 */}
-      <div className="space-y-2 rounded-lg border border-neutral-100 bg-neutral-50/60 p-3">
-        <p className="text-xs font-medium text-neutral-600">添加关联（仅同来源机构、已审核发布的岗位可关联）</p>
-        <div className="flex gap-2">
-          <input
-            className={inputCls}
-            placeholder="按岗位名称搜索"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void search(keyword) }}
-          />
-          <button
-            onClick={() => void search(keyword)}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
-          >
-            <SearchIcon className="h-4 w-4" />
-            搜索
-          </button>
-        </div>
-        {searchState === 'loading' && <LoadingState className="py-6" />}
-        {searchState === 'error' && <ErrorState className="py-6" onRetry={() => void search(keyword)} />}
-        {searchState === 'ready' && linkable.length === 0 && (
-          <p className="py-4 text-center text-xs text-neutral-400">没有可关联的岗位</p>
-        )}
-        {searchState === 'ready' && linkable.length > 0 && (
-          <>
-            {linkableTotal > linkable.length && (
-              <p className="text-xs text-warning-fg">仅显示最近 {linkable.length} 条</p>
-            )}
-            <ul className="max-h-56 divide-y divide-neutral-900/[0.06] overflow-y-auto rounded-lg border border-neutral-100 bg-surface">
-              {linkable.map((j) => (
-                <li key={j.id}>
-                  <label className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-neutral-50">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-neutral-300"
-                      checked={selected.has(j.id)}
-                      onChange={() => toggle(j.id)}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-neutral-800">{j.title}</p>
-                      <p className="text-xs text-neutral-400">
-                        {j.city || '—'} · {j.category ? JOB_CATEGORY_LABELS[j.category] ?? j.category : '—'}
-                        {j.companyProfileId ? ' · 已关联其他企业，关联后将转移' : ''}
-                      </p>
-                    </div>
-                  </label>
-                </li>
-              ))}
-            </ul>
-            <div className="flex justify-end">
+      {!readOnly && (
+        <>
+          <div className="space-y-2 rounded-lg border border-neutral-100 bg-neutral-50/60 p-3">
+            <p className="text-xs font-medium text-neutral-600">添加关联（仅同来源机构、已审核发布的岗位可关联）</p>
+            <div className="flex gap-2">
+              <input
+                className={inputCls}
+                placeholder="按岗位名称搜索"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void search(keyword) }}
+              />
               <button
-                disabled={busy || selected.size === 0}
-                onClick={() => void link()}
-                className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => void search(keyword)}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
               >
-                <LinkIcon className="h-3.5 w-3.5" />
-                {busy ? '关联中…' : `关联所选（${selected.size}）`}
+                <SearchIcon className="h-4 w-4" />
+                搜索
               </button>
             </div>
-          </>
-        )}
-      </div>
+            {searchState === 'loading' && <LoadingState className="py-6" />}
+            {searchState === 'error' && <ErrorState className="py-6" onRetry={() => void search(keyword)} />}
+            {searchState === 'ready' && linkable.length === 0 && (
+              <p className="py-4 text-center text-xs text-neutral-400">没有可关联的岗位</p>
+            )}
+            {searchState === 'ready' && linkable.length > 0 && (
+              <>
+                {linkableTotal > linkable.length && (
+                  <p className="text-xs text-warning-fg">仅显示最近 {linkable.length} 条</p>
+                )}
+                <ul className="max-h-56 divide-y divide-neutral-900/[0.06] overflow-y-auto rounded-lg border border-neutral-100 bg-surface">
+                  {linkable.map((j) => (
+                    <li key={j.id}>
+                      <label className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-neutral-50">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-neutral-300"
+                          checked={selected.has(j.id)}
+                          onChange={() => toggle(j.id)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm text-neutral-800">{j.title}</p>
+                          <p className="text-xs text-neutral-400">
+                            {j.city || '—'} · {j.category ? JOB_CATEGORY_LABELS[j.category] ?? j.category : '—'}
+                            {j.companyProfileId ? ' · 已关联其他企业，关联后将转移' : ''}
+                          </p>
+                        </div>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-end">
+                  <button
+                    disabled={busy || selected.size === 0}
+                    onClick={() => void link()}
+                    className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <LinkIcon className="h-3.5 w-3.5" />
+                    {busy ? '关联中…' : `关联所选（${selected.size}）`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </Card>
   )
 }

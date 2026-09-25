@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1525 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1526 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1806,7 +1806,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 81 个文件</summary>
+<summary><code>services/api/scripts/</code> — 82 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1834,6 +1834,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/d2-same-host/verify-governance-store.mjs` | `verify-governance.mjs` |
 | `services/api/scripts/d2-same-host/verify-governance-wiring.mjs` | `verify-governance.mjs` |
 | `services/api/scripts/deploy-data-safety-gate.ts` | `verify-deploy-data-safety-gate.ts` |
+| `services/api/scripts/lib/console-hosting-flag-assertions.ts` | `verify-partner-source-capabilities.ts` |
 | `services/api/scripts/lib/recruitment-hosting-default-probe.ts` | `verify-recruitment-hosting-default-off.ts` |
 | `services/api/scripts/lib/verify-fair-residue.ts` | `verify-activity-logs.ts`<br/>`verify-admin-fairs.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-partner-edit.ts`<br/>`verify-public-fair-demo-guard.ts` |
 | `services/api/scripts/lib/verify-governed-job-fit-runtime.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-governed-job-fit.ts` |

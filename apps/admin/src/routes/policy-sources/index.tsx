@@ -7,10 +7,9 @@ import { policiesAdminService, type AdminPolicyRecord } from '../../services/api
 import type { AdminSourcePage, ReviewStatus } from '../../services/api'
 import { requireAdminSourcePage } from '../../services/api/sourcePaging'
 import { Pagination, useTableState } from '../components/DataTable'
-import { BulkPublishButton } from '../components/BulkPublishButton'
-import { toOrgOptions } from '../../services/api/bulkPublish'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
+import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -36,6 +35,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   policy: '政策', announcement: '公告', notice: '通知', recruitment: '招募',
 }
 
+const SUBTITLE = '合作机构自行审核发布的政策扶持 / 公告内容（管理员只读 + 紧急下架）'
+
 const REVIEW_FILTERS = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
 const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
   全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected',
@@ -43,17 +44,20 @@ const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * 政策由机构自己审核、发布并确认发布责任（3.13）。管理员在这里只能查看与紧急下架：
+ * 服务端对管理员的审核 / 发布 / 批量发布一律回 403 ADMIN_POLICY_PUBLISH_DISABLED，
+ * 与招聘内容托管开关无关，所以本页不按开关分支，两种部署都一样。
+ */
 export default function PolicySourcesPage() {
   const [records,      setRecords]      = useState<AdminPolicyRecord[]>([])
   const [total,        setTotal]        = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
   const [reviewFilter, setReviewFilter] = useState('全部')
-  const [rejectingId,  setRejectingId]  = useState<string | null>(null)
-  const [rejectReason, setRejectReason] = useState('')
-  // 申领条件只读复核:审核前要能看到这条政策挂了哪些申领门槛(条件在机构侧录入)
+  // 申领条件只读复核:紧急处置前要能看到这条政策挂了哪些申领门槛(条件在机构侧录入)
   const [rulesFor,     setRulesFor]     = useState<AdminPolicyRecord | null>(null)
-  const [actionError,  setActionError]  = useState<string | null>(null)
+  const [takedown,     setTakedown]     = useState<EmergencyTakedownTarget | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   const listQuery = useMemo(() => ({
@@ -83,43 +87,9 @@ export default function PolicySourcesPage() {
     policiesAdminService.getPolicySources(listQuery).then(applyPage).catch(() => setError(true))
   }, [listQuery, applyPage])
 
-  const orgOptions = useMemo(() => toOrgOptions(records), [records])
-
-  const handleApprove = (id: string) => {
-    setActionError(null)
-    void policiesAdminService.reviewPolicy(id, 'approve')
-      .then(() => reload())
-      .catch((e) => setActionError(userMessageOf(e, '审核通过失败，请查看原因后重试')))
-  }
-  const handleReject = (id: string) => {
-    if (!rejectReason.trim()) return
-    setActionError(null)
-    void policiesAdminService.reviewPolicy(id, 'reject', rejectReason.trim())
-      .then(() => {
-        setRejectingId(null)
-        setRejectReason('')
-        reload()
-      })
-      .catch((e) => setActionError(userMessageOf(e, '驳回失败，请稍后重试')))
-  }
-  const handlePublish = (id: string) => {
-    setActionError(null)
-    void policiesAdminService.publishPolicy(id, 'publish')
-      .then(() => reload())
-      .catch((e) => setActionError(userMessageOf(e, '发布失败，请查看原因后重试')))
-  }
-  const handleUnpublish = (id: string, title: string) => {
-    if (!window.confirm(`确认下架「${title}」？下架后一体机不再展示该政策。`)) return
-    // 二次确认（#813）与失败可见（任务包 3）都要：误触要拦，真失败也不能静默。
-    setActionError(null)
-    void policiesAdminService.publishPolicy(id, 'unpublish')
-      .then(() => reload())
-      .catch((e) => setActionError(userMessageOf(e, '下架失败，请稍后重试')))
-  }
-
   if (loading) {
     return (
-      <Page title="政策信息源" subtitle="合作机构提交的政策扶持/公告内容审核与发布">
+      <Page title="政策信息源" subtitle={SUBTITLE}>
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -129,7 +99,7 @@ export default function PolicySourcesPage() {
 
   if (error) {
     return (
-      <Page title="政策信息源" subtitle="合作机构提交的政策扶持/公告内容审核与发布">
+      <Page title="政策信息源" subtitle={SUBTITLE}>
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <ScrollTextIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -139,16 +109,11 @@ export default function PolicySourcesPage() {
   }
 
   return (
-    <Page
-      title="政策信息源"
-      subtitle="合作机构提交的政策扶持/公告内容审核与发布"
-      actions={<BulkPublishButton kind="policy" orgOptions={orgOptions} onDone={reload} />}
-    >
-      {actionError && (
-        <div className="mb-4 rounded-lg border border-error/30 bg-error-bg px-4 py-2.5 text-sm text-error-fg" role="alert">
-          {actionError}。请修正后重试，或刷新页面。
-        </div>
-      )}
+    <Page title="政策信息源" subtitle={SUBTITLE}>
+      <div role="status" className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-3 text-sm text-info-fg">
+        政策由发布机构自己审核、发布，并在发布时确认对内容负责；管理员不审核、不发布，本页只保留查看与紧急下架。
+        紧急下架是单向操作，提交后不能恢复，并会自动通知发布机构。
+      </div>
       {/* 筛选标签 */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex gap-2">
@@ -222,55 +187,22 @@ export default function PolicySourcesPage() {
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="px-4 py-3">
-                        {rejectingId === r.id ? (
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              autoFocus
-                              className="h-7 w-40 rounded border border-error/30 px-2 text-xs focus:border-red-400 focus:outline-none"
-                              placeholder="拒绝原因(必填)"
-                              value={rejectReason}
-                              onChange={(e) => setRejectReason(e.target.value)}
-                            />
-                            <button
-                              onClick={() => handleReject(r.id)}
-                              disabled={!rejectReason.trim()}
-                              className="rounded bg-error px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
-                            >
-                              确认
-                            </button>
-                            <button onClick={() => { setRejectingId(null); setRejectReason('') }} className="rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100">取消</button>
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              className="whitespace-nowrap rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                              onClick={() => setRulesFor(r)}
-                            >
-                              查看申领条件
-                            </button>
-                            {(r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
-                              <>
-                                <button className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg" onClick={() => handleApprove(r.id)}>
-                                  审核通过
-                                </button>
-                                <button className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg" onClick={() => { setRejectingId(r.id); setRejectReason('') }}>
-                                  拒绝
-                                </button>
-                              </>
-                            )}
-                            {r.reviewStatus === 'approved' && r.publishStatus !== 'published' && (
-                              <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50" onClick={() => handlePublish(r.id)}>
-                                发布
-                              </button>
-                            )}
-                            {r.publishStatus === 'published' && (
-                              <button className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg" onClick={() => handleUnpublish(r.id, r.title)}>
-                                下架
-                              </button>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="whitespace-nowrap rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                            onClick={() => setRulesFor(r)}
+                          >
+                            查看申领条件
+                          </button>
+                          <button
+                            type="button"
+                            className="whitespace-nowrap rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
+                            onClick={() => setTakedown({ targetType: 'policy', targetId: r.id, title: r.title, orgName: r.sourceName })}
+                          >
+                            紧急下架
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -283,9 +215,11 @@ export default function PolicySourcesPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。审核通过并发布后在一体机「政策服务」页展示,所有操作记录审计日志。
+        政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。发布机构审核通过并确认发布责任后在一体机「政策服务」页展示,所有操作记录审计日志。
         「查看申领条件」为只读复核:条件由来源机构在合作机构后台录入,本页不改条件。
       </p>
+
+      <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={reload} />
 
       {/* key 绑 id:换一条政策必须重挂组件,避免上一条的条件在新标题下短暂残留 */}
       {rulesFor && (
