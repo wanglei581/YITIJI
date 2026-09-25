@@ -118,6 +118,9 @@ interface StoredUploadSessionCleanup {
   expiresAt: string
   file: UploadSessionFileView | null
   status: 'expired'
+  /** 比较失败后未能删掉的复制对象。主会话键过期后仍靠这条记录回收。 */
+  stagedObjectKey?: string | null
+  stagedBucket?: string | null
 }
 
 const SESSION_TTL_SECONDS = 10 * 60
@@ -442,7 +445,7 @@ export class UploadSessionsService {
           })
         }
         // 复制可以先做。会员归属必须等确认比较成功后再写，否则取消会把它当成已绑定资产留下。
-        memberBind = await this.prepareMemberBind(stored.file.fileId, endUserId)
+        memberBind = await this.prepareMemberBind(sessionId, stored.file.fileId, endUserId)
         confirmedFile = {
           ...stored.file,
           fileExpiresAt: memberBind.boundExpiry ? memberBind.boundExpiry.toISOString() : null,
@@ -466,14 +469,26 @@ export class UploadSessionsService {
         stored.file.fileId,
       )
       if (committed !== 'updated') {
-        if (memberBind?.previousKey) {
-          await this.files.deleteObjectAtKey(memberBind.storageKey, memberBind.bucket).catch(() => undefined)
-        }
+        await this.discardStagedCopy(sessionId, memberBind).catch(() => undefined)
         throw new BadRequestException({
           error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端上传已失效，请重新上传' },
         })
       }
-      if (memberBind) await this.applyMemberBind(memberBind)
+      if (memberBind) {
+        try {
+          await this.applyMemberBind(sessionId, memberBind)
+        } catch (error) {
+          await this.commitSession(
+            { ...stored, status: 'uploaded', file: stored.file, confirmedAt: null },
+            lock.lockKey,
+            lock.lockToken,
+            'confirmed',
+            stored.file.fileId,
+          ).catch(() => undefined)
+          await this.discardStagedCopy(sessionId, memberBind).catch(() => undefined)
+          throw error
+        }
+      }
       await this.removeFromExpiryIndex(sessionId)
       return { sessionId, status: 'confirmed', file: confirmedFile }
     })
@@ -536,14 +551,14 @@ export class UploadSessionsService {
       try {
         const record = await this.loadOptional(sessionId)
         if (record?.status === 'confirmed') {
-          await this.removeFromExpiryIndex(sessionId)
+          await this.releaseCleanup(sessionId)
           continue
         }
         if (record && (record.status === 'cancelled' || record.status === 'expired')) {
           if (record.file) {
             await this.deleteRetainedFile(record, 'upload session expired', { lockKey, lockToken })
           }
-          await this.removeFromExpiryIndex(sessionId)
+          await this.releaseCleanup(sessionId)
           cleaned += 1
           continue
         }
@@ -551,15 +566,15 @@ export class UploadSessionsService {
         if (!cleanup || new Date(cleanup.expiresAt).getTime() > now) continue
         if (record && this.markExpired(record, now).status !== 'expired') continue
         if (!record) {
-          await this.cleanupAbandonedFile(cleanup, 'upload session expired')
-          await this.removeFromExpiryIndex(sessionId)
+          if (cleanup.file) await this.cleanupAbandonedFile(cleanup, 'upload session expired')
+          await this.releaseCleanup(sessionId)
           cleaned += 1
           continue
         }
         const committed = await this.abandonAfterCommit(record, 'expired', 'upload session expired', { lockKey, lockToken })
         if (committed !== 'updated') {
           const current = await this.loadOptional(sessionId)
-          if (current?.status === 'confirmed') await this.removeFromExpiryIndex(sessionId)
+          if (current?.status === 'confirmed') await this.releaseCleanup(sessionId)
           continue
         }
         cleaned += 1
@@ -583,7 +598,7 @@ export class UploadSessionsService {
     await this.files.systemDelete(record.file.fileId, reason)
   }
 
-  private async prepareMemberBind(fileId: string, endUserId: string): Promise<MemberBindPlan> {
+  private async prepareMemberBind(sessionId: string, fileId: string, endUserId: string): Promise<MemberBindPlan> {
     const file = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!file || file.deletedAt) {
       throw new NotFoundException({
@@ -618,7 +633,16 @@ export class UploadSessionsService {
       copiedKey = userKey
       const current = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
       if (!current || current.deletedAt) {
-        await this.files.deleteObjectAtKey(userKey, file.bucket).catch(() => undefined)
+        await this.discardStagedCopy(sessionId, {
+          fileId,
+          endUserId,
+          storageKey: userKey,
+          previousKey: file.storageKey,
+          bucket: file.bucket,
+          boundExpiry,
+          retention,
+          isContractUpload,
+        }).catch(() => undefined)
         throw new NotFoundException({
           error: { code: 'FILE_NOT_FOUND', message: '上传文件不存在或已被清理' },
         })
@@ -637,7 +661,7 @@ export class UploadSessionsService {
     }
   }
 
-  private async applyMemberBind(plan: MemberBindPlan): Promise<void> {
+  private async applyMemberBind(sessionId: string, plan: MemberBindPlan): Promise<void> {
     await this.prisma.fileObject.update({
       where: { id: plan.fileId },
       data: {
@@ -660,7 +684,11 @@ export class UploadSessionsService {
       },
     })
     if (plan.previousKey) {
-      await this.files.deleteObjectAtKey(plan.previousKey, plan.bucket).catch(() => undefined)
+      try {
+        await this.files.deleteObjectAtKey(plan.previousKey, plan.bucket)
+      } catch {
+        await this.rememberStagedObject(sessionId, plan.previousKey, plan.bucket)
+      }
     }
   }
 
@@ -746,8 +774,40 @@ export class UploadSessionsService {
     )
     if (committed !== 'updated') return committed
     await this.deleteRetainedFile({ ...stored, status: nextStatus }, reason, lock)
-    await this.removeFromExpiryIndex(stored.sessionId)
+    await this.releaseCleanup(stored.sessionId)
     return 'updated'
+  }
+
+  private async discardStagedCopy(sessionId: string, plan: MemberBindPlan | null): Promise<void> {
+    if (!plan?.previousKey) return
+    try {
+      await this.files.deleteObjectAtKey(plan.storageKey, plan.bucket)
+    } catch (error) {
+      await this.rememberStagedObject(sessionId, plan.storageKey, plan.bucket)
+      throw error
+    }
+  }
+
+  private async rememberStagedObject(sessionId: string, objectKey: string, bucket: string | null): Promise<void> {
+    const existing = await this.loadCleanupRecord(sessionId)
+    const next: StoredUploadSessionCleanup = {
+      sessionId,
+      expiresAt: existing?.expiresAt ?? new Date(0).toISOString(),
+      file: existing?.file ?? null,
+      status: 'expired',
+      stagedObjectKey: objectKey,
+      stagedBucket: bucket,
+    }
+    await this.redis.setEx(cleanupKey(sessionId), CLEANUP_RECORD_TTL_SECONDS, JSON.stringify(next))
+    await this.redisClient.zadd(UPLOAD_EXPIRY_INDEX_KEY, Date.now(), sessionId)
+  }
+
+  private async releaseCleanup(sessionId: string): Promise<void> {
+    const cleanup = await this.loadCleanupRecord(sessionId)
+    if (cleanup?.stagedObjectKey) {
+      await this.files.deleteObjectAtKey(cleanup.stagedObjectKey, cleanup.stagedBucket ?? null)
+    }
+    await this.removeFromExpiryIndex(sessionId)
   }
 
   private async deleteRetainedFile(

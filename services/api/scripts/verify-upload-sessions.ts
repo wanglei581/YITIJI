@@ -1716,6 +1716,132 @@ async function main(): Promise<void> {
     assert.equal(cancelOk && liveMember && status.status === 'cancelled', false)
   }
 
+  {
+    // 确认比较已经写成 confirmed，随后会员归属的数据库更新失败。
+    // 调用方收到错误，但一体机读到的仍是 confirmed，而且不能再重试绑定。
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const originalUpdate = prisma.fileObject.update.bind(prisma.fileObject)
+    let failUpdate = true
+    prisma.fileObject.update = async (args) => {
+      if (failUpdate && args.data.ownerType === 'user') {
+        failUpdate = false
+        throw new Error('member bind update failed')
+      }
+      return originalUpdate(args)
+    }
+    await expectRejects(
+      () => service.confirm(session.sessionId, session.controlToken, 'member_1'),
+      Error,
+      'confirm must not succeed when member ownership update fails',
+    )
+    const during = await service.getStatus(session.sessionId, session.controlToken)
+    assert.notEqual(during.status, 'confirmed', 'kiosk must not observe success after the failed confirm')
+    const row = prisma.files.get(uploaded.file!.fileId)
+    assert.equal(row?.deletedAt ?? null, null, 'failed ownership update must not drop the original file')
+    assert.notEqual(row?.ownerType, 'user')
+    const retried = await service.confirm(session.sessionId, session.controlToken, 'member_1')
+    assert.equal(retried.status, 'confirmed')
+    assert.equal(prisma.files.get(uploaded.file!.fileId)?.ownerType, 'user')
+    assert.equal(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
+  }
+
+  {
+    // 复制已经落到会员 key，比较失败后 deleteObjectAtKey 也失败。这份复制不能留下。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const objects = new Set<string>()
+    let stagedKey = ''
+    let failStagedDelete = true
+    const entered = deferred()
+    const release = deferred()
+    files.copyObjectToKey = async (_from: string, to: string) => {
+      objects.add(to)
+      stagedKey = to
+      entered.resolve()
+      await release.promise
+    }
+    files.deleteObjectAtKey = async (key: string) => {
+      if (failStagedDelete && key === stagedKey) {
+        failStagedDelete = false
+        throw new Error('staged object delete failed')
+      }
+      objects.delete(key)
+    }
+    const confirming = service.confirm(session.sessionId, session.controlToken, 'member_1').then(
+      () => ({ ok: true as const }),
+      () => ({ ok: false as const }),
+    )
+    await entered.promise
+    await redis.del(lockKey)
+    await service.cancel(session.sessionId, session.controlToken)
+    release.resolve()
+    const confirmed = await confirming
+    assert.equal(confirmed.ok, false, 'confirm must not succeed after the compare loses')
+    assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
+    await redis.del(`upload_session:${session.sessionId}`)
+    await service.cleanupExpiredSessions(new Date(session.expiresAt).getTime() + 1)
+    assert.equal(objects.has(stagedKey), false, 'staged member object must be removed after the compare loses')
+  }
+
+  {
+    // 取消时对象删除失败。主会话键先过期后，清理记录仍要留着 fileId，重试才能删掉对象。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'cleanup-pointer.pdf' }),
+    })
+    const originalDelete = files.systemDelete.bind(files)
+    let failDelete = true
+    files.systemDelete = async (fileId: string, reason: string) => {
+      if (failDelete) {
+        failDelete = false
+        throw new Error('storage delete failed once')
+      }
+      return originalDelete(fileId, reason)
+    }
+    await expectRejects(
+      () => service.cancel(session.sessionId, session.controlToken),
+      Error,
+      'cancel must not succeed when delete fails',
+    )
+    await redis.del(`upload_session:${session.sessionId}`)
+    const cleanupRaw = await redis.get(`upload_session_cleanup:${session.sessionId}`)
+    assert.equal(cleanupRaw?.includes(uploaded.file!.fileId), true, 'cleanup record must keep the file id after the session key expires')
+    await service.cleanupExpiredSessions(new Date(session.expiresAt).getTime() + 1)
+    assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
+  }
+
   console.log('PASS upload session verification')
 }
 
