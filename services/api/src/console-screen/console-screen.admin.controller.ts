@@ -1,5 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common'
-import type { ScreenSnapshot } from './console-screen.types'
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
+import type { ScreenSnapshot, ScreenTerminalTwin } from './console-screen.types'
 import { Roles } from '../common/decorators/roles.decorator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -20,5 +20,11 @@ export class AdminScreenController {
   @Get('admin/screen/snapshot')
   async getAdminSnapshot(@Query() query: AdminScreenQueryDto): Promise<ApiResponse<ScreenSnapshot>> {
     return ApiResponse.ok(await this.screen.getAdminSnapshot(query.profile))
+  }
+
+  /** 单台终端孪生。与快照同一登录会话，不另开公开入口。 */
+  @Get('admin/screen/terminals/:terminalId')
+  async getAdminTerminalTwin(@Param('terminalId') terminalId: string): Promise<ApiResponse<ScreenTerminalTwin>> {
+    return ApiResponse.ok(await this.screen.getAdminTerminalTwin(terminalId))
   }
 }

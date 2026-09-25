@@ -5,6 +5,7 @@ import {
   type AdminScreenProfile,
   type ScreenAlertsValue,
   type ScreenSnapshot,
+  type ScreenTerminalTwin,
 } from './console-screen.types'
 import { AdminOpsService } from '../admin-ops/admin-ops.service'
 import { PrismaService } from '../prisma/prisma.service'
@@ -29,6 +30,7 @@ import {
   loadSyncSlice,
 } from './console-screen.queries'
 import { PartnerOrgRequiredError, requirePartnerOrgId } from './console-screen.org'
+import { loadTerminalTwin, terminalTwinNotFound } from './console-screen.twin'
 
 @Injectable()
 export class ConsoleScreenService {
@@ -98,6 +100,17 @@ export class ConsoleScreenService {
     }
   }
 
+  async getAdminTerminalTwin(terminalId: string): Promise<ScreenTerminalTwin> {
+    await this.assertTwinVisible(terminalId, null)
+    return this.loadCachedTwin(`admin:twin:${terminalId}`, terminalId, 'admin', null)
+  }
+
+  async getPartnerTerminalTwin(orgId: string, terminalId: string): Promise<ScreenTerminalTwin> {
+    const scopedOrgId = requirePartnerOrgId(orgId)
+    await this.assertTwinVisible(terminalId, scopedOrgId)
+    return this.loadCachedTwin(`partner:${scopedOrgId}:twin:${terminalId}`, terminalId, 'partner', scopedOrgId)
+  }
+
   async getPartnerSnapshot(orgId: string): Promise<ScreenSnapshot> {
     const scopedOrgId = requirePartnerOrgId(orgId)
     const now = new Date()
@@ -144,6 +157,27 @@ export class ConsoleScreenService {
       },
       metrics: pickMetrics(metricKeysFor('partner'), all),
     }
+  }
+
+  private async assertTwinVisible(terminalId: string, orgId: string | null): Promise<void> {
+    const row = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      select: { id: true, orgId: true },
+    })
+    if (!row || (orgId !== null && row.orgId !== orgId)) throw terminalTwinNotFound()
+  }
+
+  private async loadCachedTwin(
+    cacheKey: string,
+    terminalId: string,
+    audience: 'admin' | 'partner',
+    expectedOrgId: string | null,
+  ): Promise<ScreenTerminalTwin> {
+    const now = new Date()
+    const loaded = await this.cache.getOrLoad(cacheKey, SCREEN_CACHE_TTL_SECONDS.realtime, () =>
+      loadTerminalTwin(this.prisma, terminalId, audience, expectedOrgId, now),
+    )
+    return { ...loaded.value, generatedAt: new Date(loaded.storedAt).toISOString() }
   }
 
   private async settle<T>(slice: string, load: () => Promise<T>): Promise<Loaded<T>> {

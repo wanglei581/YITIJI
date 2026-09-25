@@ -81,7 +81,7 @@ export function assembleAdminMetrics(input: {
   alerts?: Loaded<ScreenAlertsValue>
 }): ScreenSnapshotMetrics {
   const fleet = input.fleet.ok
-    ? mapFleetOverview(input.fleet.value.overview, {
+    ? mapFleetOverview(input.fleet.value.overview, input.fleet.value.cells, {
         matchedCount: input.fleet.value.matchedCount,
         truncated: input.fleet.value.truncated,
         sampleCap: FLEET_SAMPLE_TAKE,
@@ -179,7 +179,7 @@ export function assemblePartnerMetrics(input: {
   fairs: Loaded<ScreenFairStructureValue>
 }): ScreenSnapshotMetrics {
   const fleet = input.fleet.ok
-    ? mapFleetOverview(input.fleet.value.overview, {
+    ? mapFleetOverview(input.fleet.value.overview, input.fleet.value.cells, {
         matchedCount: input.fleet.value.matchedCount,
         truncated: input.fleet.value.truncated,
         sampleCap: FLEET_SAMPLE_TAKE,
