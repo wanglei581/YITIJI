@@ -75,6 +75,12 @@ overrides:
   # already allows 7.29.6, but the lock resolved 7.29.0. Pin the minimum fix.
   # The same advisory's 8.x fix is 8.0.0-rc.6; this tree is not on 8.x.
   '@babel/core': 7.29.6
+  # esbuild: GHSA-g7r4-m6w7-qqqr affects >=0.27.3 <0.28.1. First fix is 0.28.1.
+  # Only tsx@4.22.3 (services/api devDependency) requests esbuild@~0.28.0,
+  # which already allows 0.28.1. vite@6.4.3 requests ^0.25.0 and resolves
+  # 0.25.12, outside the advisory. A global esbuild override would pull vite
+  # off 0.25, so the selector matches only the ~0.28.0 request.
+  'esbuild@~0.28.0': 0.28.1
   # nanoid: GHSA-28wg-ghj8-5hjv + GHSA-2v37-7h3g-55p8
   # postcss still requests the vulnerable 3.3.12 line; 3.3.18 fixes both loop conditions.
   nanoid@3.3.12: 3.3.18
