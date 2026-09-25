@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-25：旧交付文档 PR #1027 收敛（远程 PR 已关闭）
+
+只读核对 PR #1027 的唯一文件 `docs/delivery/kiosk-redesign-r1/delivery.yaml`：补丁把 2026-09-10 的路由数、生产 SHA 写成新的固定字串，并依据负责人自述把百度 OCR 旧密钥轮换的 BL-05 标为 CLOSED。当前正式进度已有后续路由/生产证据，BL-05 仍缺旧密钥失效的独立验证；直接合并会重新引入过期计数并放宽取证。已在 GitHub 关闭 #1027（head `57ce7a889`），远程分支、讨论和历史保留，未删除代码资产。实时 OPEN PR 从 9 减为 8；#1042 仍是唯一整合草稿，未推送或部署。
+
 ## 2026-09-25：原稿 15 打印交付页仍在隔离准备（未合流）
 
 Claude 以原始 `15-print-fulfill.html` 为只读目标在独立 UI 树抽出 `printProgressModel.ts`，把运行时 `PrintProgressPage.tsx` 从 851 行降到约 775 行；Kiosk typecheck、`verify:fusion-w2`、`verify:production-real-services` 与局部 ESLint 通过。Claude 的两次任务均到时限，版式和九类状态尚未按原稿完成，工作树仍有未提交改动；本批没有合流主候选，稿 15 的 UI/设备/商业验收均未完成。后续先核真实 Agent 状态与原稿状态映射，再完成布局、逐态浏览器和 Windows 真机触控，不以这次拆分充当设计升级。
