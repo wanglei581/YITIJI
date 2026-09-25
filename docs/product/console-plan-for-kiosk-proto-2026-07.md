@@ -1,6 +1,6 @@
 # Admin / Partner 后台功能规划 —— 支撑 Kiosk 75 屏原型商用闭环
 
-> ⚠️ **2026-08-22 口径**：本文是 2026-07-17 的后台规划快照，**不是**现行功能口径。现行四端实现/上线状态看 [`feature-scope.md` §1.2](./feature-scope.md)；后台运行时真源是 `apps/admin/` 与 `apps/partner/`；施工队列看 [`next-tasks.md`](../progress/next-tasks.md) 的 C0–C6。不要按本文的 75 屏基准去改前台视觉或重做后台。
+> **方案快照（2026-09-26 标注）：** 本文写于 （2026-07），功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
 >
 > 建立时间:2026-07-17
 > 基准:`docs/design/kiosk-proto-2026-07/`(前台 75 屏定稿)+ 真实代码盘点(`apps/admin/src/routes/index.tsx`、`apps/partner/src/routes/index.tsx`,盘点基线 worktree `epic-nightingale-ebea54`)

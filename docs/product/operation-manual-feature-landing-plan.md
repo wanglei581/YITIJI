@@ -1,5 +1,7 @@
 # AI求职材料中心开发方向与落地方案
 
+> **方案快照（2026-09-26 标注）：** 本文写于 （2026-06），功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+
 > 日期：2026-06-06  
 > 参考材料：仓库外归档原稿 `其他文档/产品需求资料/操作手册功能借鉴分析与落地方案.docx`、用户提供的阿里百炼「求职招聘专区」截图、秒哒在线原型 `https://app-bl2q2l2zlz41.appmiaoda.com` 与本地秒哒原型 catalog / source
 > 约束入口：`AGENTS.md`、`docs/compliance/compliance-boundary.md`、`docs/product/feature-scope.md`

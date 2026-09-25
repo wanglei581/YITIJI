@@ -1,5 +1,7 @@
 # 开发任务书 · Codex 终审原始论证（设计难题出处）
 
+> **历史材料（2026-09-26 标注）：** 本文是 （2026-08） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+
 > 审查对象：`docs/api/console-ai-dev-spec-2026-08.md`
 > 审查方：Codex gpt-5.6-sol / xhigh，2026-08-11
 > **原结论：规格不能直接开工，需系统性返工。**

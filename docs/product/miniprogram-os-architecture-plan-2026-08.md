@@ -1,6 +1,9 @@
 # 微信小程序商业产品与 AI 求职操作系统方案
 
-> 文档状态：正式方案候选，待用户确认后进入开发立项
+> **方案快照（2026-09-26 标注）：** 本文写于 （2026-08），功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+>
+> 小程序首发范围以 docs/progress/next-tasks.md 3.11 与小程序专管窗口的方案为准。
+
 > 最后更新：2026-08-06（补充找回源码事实）
 > 适用范围：微信小程序、一体机协同、AI 能力编排、远程下单与到机打印、会员与商业化
 > 上游约束：[功能范围](./feature-scope.md)｜[双渠道差异化策略](./miniprogram-vs-kiosk-differentiation-strategy-2026-07.md)｜[打印扫描商用方案](./print-scan-commercial-plan.md)｜[百宝箱微应用平台](./toolbox-micro-app-platform.md)｜[合规边界](../compliance/compliance-boundary.md)

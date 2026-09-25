@@ -1,5 +1,7 @@
 # 双后台 AI 化升级改造方案 · Console AI OS
 
+> **方案快照（2026-09-26 标注）：** 本文写于 （2026-08），功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+
 > 立项日期：2026-08-11
 > 适用范围：`apps/admin`（管理员后台）、`apps/partner`（合作机构后台）、`services/api`（AI 底座）
 > 前台基线：`docs/design/kiosk-ai-os-v3-2026-08/`（V3「AI 神经中枢」，27 页 + AI 覆盖矩阵 30 条）

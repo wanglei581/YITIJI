@@ -1,5 +1,7 @@
 # 百宝箱微应用平台方案
 
+> **方案快照（2026-09-26 标注）：** 本文写于 （2026-08），功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+
 > 状态：规划、第一阶段安全底座、Phase 2 最小治理规则底座、Phase 2B 后端审核发布工作流、Phase 2C Admin 审核发布 UI、首批低风险 AI skill intent 接线
 > 最后更新：2026-08-09（合同风险能力移出百宝箱）
 > 关联：`docs/superpowers/plans/2026-07-01-toolbox-micro-app-platform.md`、`packages/shared/src/types/toolboxMicroApp.ts`

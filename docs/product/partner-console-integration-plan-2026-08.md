@@ -1,5 +1,7 @@
 # 合作机构后台 · 三端数据打通与 AI 化专项方案
 
+> **托管 a 下停放（2026-09-26 标注）：** 本文涉及的岗位、招聘会、企业资料在我们云上暂停，代码保留；客户私有化部署（b）或取得人力资源服务许可证后再参考。现行口径见 docs/compliance/compliance-boundary.md §1.1。
+
 > 立项：2026-08-11
 > 上级：[console-ai-upgrade-plan-2026-08.md](./console-ai-upgrade-plan-2026-08.md)（双后台总方案）
 > 证据基础：[job-chain-field-consistency-2026-08.md](../reviews/job-chain-field-consistency-2026-08.md)（岗位链字段级审查）

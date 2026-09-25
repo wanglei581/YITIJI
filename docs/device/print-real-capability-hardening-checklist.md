@@ -1,5 +1,7 @@
 # 真实打印能力收口版 — Windows 真机验证 Checklist
 
+> **历史材料（2026-09-26 标注）：** 本文是 （2026-06） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+
 > 关联分支：`feat/kiosk-print-real-capability-hardening` @ `6e34b5e`（基于 main `5e612b3`）
 > 方案②：wire 字段名 `fileMd5` 实际承载 **SHA-256**（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
 > 状态机：`pending → claimed → printing → completed | failed`（终态幂等，合法转换受校验）。

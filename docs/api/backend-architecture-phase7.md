@@ -1,5 +1,7 @@
 # Phase 7.6 后端骨架架构设计
 
+> **历史材料（2026-09-26 标注）：** 本文是 （2026-05） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+
 > 版本：Draft 1.0  
 > 日期：2026-05-26  
 > 状态：设计阶段，暂未写真实后端代码  

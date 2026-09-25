@@ -8,6 +8,8 @@
 
 ## 1. 架构概述
 
+生产供应商：DeepSeek 主用、通义千问备用，只放境内已备案模型（生产白名单）。OpenAI、Claude 等只作开发期占位说明，不列为生产选项。
+
 ```
 Kiosk 前台
   │  submitResumeParse / getResumeOptimize / chatWithAssistant
@@ -22,12 +24,10 @@ ai.ts（适配器选择层）
   │  /api/v1/resume/records/:id/optimize
   │  /api/v1/assistant/chat
   ▼
-AI Provider（可切换）
-  ├── OpenAI GPT-4o
-  ├── Claude claude-sonnet-4-6
-  ├── 通义千问 qwen-long
-  ├── 智谱 GLM-4
-  └── 本地部署（Ollama / vLLM）
+AI Provider
+  生产白名单（只放境内已备案模型）
+  ├── DeepSeek（主用）
+  └── 通义千问（备用）
 ```
 
 **核心原则：前端永远只和后端 AI 模块通信，不直接接触任何 AI 提供商 API。**

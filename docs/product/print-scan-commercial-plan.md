@@ -1,5 +1,7 @@
 # 打印扫描板块商用级方案
 
+> **方案快照（2026-09-26 标注）：** 本文写于 （2026-06），功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+
 > 日期：2026-06-30
 > 状态：方案已确认，未进入运行时代码实现
 > 关联文档：[feature-scope.md](./feature-scope.md) | [user-data-flow-matrix.md](./user-data-flow-matrix.md) | [print-material-pack-prd.md](./print-material-pack-prd.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)

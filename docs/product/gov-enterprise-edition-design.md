@@ -1,5 +1,9 @@
 # 政企版（Gov/Enterprise Edition）完整设计方案
 
+> **方案快照（2026-09-26 标注）：** 本文写于 （2026-07），功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+>
+> 其中私有化部署章节可作为托管 b 的参考。
+
 > 生成日期：2026-07-02　状态：设计定稿候选（用户已确认要做政企版，本文档为完整方案）
 > 上位文档：[commercial-grade-feature-plan-2026-07.md](./commercial-grade-feature-plan-2026-07.md)（总体方案 §三 L3 收入层、§五登录体系、Phase 3）
 > 合规基线：[compliance-boundary.md](../compliance/compliance-boundary.md) 全部条款继续生效；本方案不新增任何招聘闭环能力。

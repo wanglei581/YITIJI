@@ -1,5 +1,7 @@
 # 微信小程序 Gate 0 决策确认单
 
+> **方案快照（2026-09-26 标注）：** 本文写于 （2026-08），功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+
 > 状态：2026-08-07 用户已确认四项路线决策。本单是正式工程收敛的可执行结论；权威背景为
 > `miniprogram-os-architecture-plan-2026-08.md`、`recovered-miniapp-gate0-api-contract-audit-2026-08-06.md`
 > 与 `recovered-miniapp-vs-v8-2026-08-06.md`。

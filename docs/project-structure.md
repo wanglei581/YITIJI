@@ -3,14 +3,14 @@
 > 最后更新：2026-08-13
 > 当前结论：本项目先做目录索引和治理规则，不做物理目录迁移。
 
-本文件用于解释仓库里每个主要目录的职责。当前 `apps/`、`services/`、`packages/` 是 monorepo 常见结构，不是技术错误；上线前收口阶段优先保持运行链路稳定。
+本文件用于解释仓库里每个主要目录的职责。当前 `apps/`、`services/`、`packages/` 是 monorepo 常见结构，不是技术错误。阶段与进度以 docs/progress/ 为准，优先保持运行链路稳定。
 
 ## 正式源码目录
 
 - `apps/miniapp/`：职易达原生微信小程序的**唯一正式源码和发布入口**。任何仓库外同名目录或旧 `zhiyida-miniapp` 副本都只能作为历史参考，不得直接编译、上传或双向同步。
 - `apps/kiosk/`：一体机前台，面向 27 寸竖屏触控显示器，同时兼容浏览器访问。
 - `apps/admin/`：管理员后台，面向运营、设备、内容和业务数据管理。
-- `apps/partner/`：合作机构后台，面向校企、公共就业、招聘会等外部合作机构。
+- `apps/partner/`：机构后台。机构 = 运营主体：官方渠道二维码、政策、本机构终端数据。
 - `apps/terminal-agent/`：Windows 本地 Terminal Agent，负责打印机、扫描仪、U 盘、扫码器、摄像头等硬件交互。
 - `services/api/`：后端 API 服务，包含 NestJS 业务模块、Prisma schema、seed、迁移和服务级 `verify:*` 脚本。
 - `services/worker/`：打印、AI、同步等异步任务队列预留目录。

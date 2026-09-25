@@ -1,5 +1,7 @@
 # 就业服务 / AI 求职市场调研报告（2026-07）
 
+> **历史材料（2026-09-26 标注）：** 本文是 （2026-07） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+
 > 调研方式：中文网络检索 15 轮 + 页面深读（2026-07-02）。所有产品均为可查证的真实产品，来源 URL 附于各节。「印咖」「悦印」经检索未找到可查证信息，已用同类可查证产品（印点点、易云打印、云知印等）替代；「夸克简历」实为夸克浏览器/夸克文档内的「简历助手 + AI 简历」功能，按实际形态描述。
 > 本报告是 [commercial-grade-feature-plan-2026-07.md](./commercial-grade-feature-plan-2026-07.md) 的调研输入。
 
