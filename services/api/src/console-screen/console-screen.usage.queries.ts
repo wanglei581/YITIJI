@@ -1,5 +1,5 @@
 import { SCREEN_MIN_AGGREGATE_SAMPLE, type ScreenContentType, type ScreenUsageRange } from './console-screen.types'
-import { daysAgoStart, shanghaiDayKey, shanghaiDayStart } from './console-screen.metric'
+import { daysAgoStart, recruitmentHostingLimit, shanghaiDayKey, shanghaiDayStart } from './console-screen.metric'
 import { partnerSourceOrgWhere, type PartnerOrgId } from './console-screen.org'
 import type { PrismaService } from '../prisma/prisma.service'
 
@@ -305,6 +305,10 @@ export async function loadOwnedContent(prisma: PrismaService, orgId: PartnerOrgI
   ]
 }
 
+function countsTowardPartnerDaily(type: ScreenContentType): boolean {
+  return recruitmentHostingLimit() === 'enabled' || type === 'policy'
+}
+
 function chunkIds(ids: string[]): string[][] {
   const chunks: string[][] = []
   for (let offset = 0; offset < ids.length; offset += USAGE_ID_CHUNK) {
@@ -363,8 +367,10 @@ export async function loadPartnerUsageFacts(
       ),
     ])
     byType.push({ type: content.type, browse, favorites, sourceOpens })
-    browseRows += browse
-    jumpRows += sourceOpens
+    if (countsTowardPartnerDaily(content.type)) {
+      browseRows += browse
+      jumpRows += sourceOpens
+    }
     for (const chunk of chunkIds(ids)) {
       const grouped = await prisma.browseLog.groupBy({
         by: ['targetId'],
@@ -380,7 +386,10 @@ export async function loadPartnerUsageFacts(
     }
   }
   const dailyRows = browseRows + jumpRows
-  const top = topCandidates
+  const topPool = recruitmentHostingLimit() === 'enabled'
+    ? topCandidates
+    : topCandidates.filter((item) => item.type === 'policy')
+  const top = topPool
     .sort((a, b) => b.browse - a.browse || a.title.localeCompare(b.title) || a.type.localeCompare(b.type))
     .slice(0, 5)
   if (dailyRows > rowCap) {
@@ -389,6 +398,7 @@ export async function loadPartnerUsageFacts(
   const browseTimes: Date[] = []
   const jumpTimes: Date[] = []
   for (const content of owned) {
+    if (!countsTowardPartnerDaily(content.type)) continue
     const ids = content.rows.map((row) => row.id)
     for (const chunk of chunkIds(ids)) {
       const [browses, jumps] = await Promise.all([
