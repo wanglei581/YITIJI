@@ -154,7 +154,7 @@ async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
     ...bad,
     id: 'pt_paid_pending_expired',
     fileId: 'file_paid_pending_expired',
-    file: { ...bad.file, status: 'active', expiresAt: new Date('2026-09-23T07:54:00.000Z'), updatedAt: new Date('2026-09-23T07:54:00.000Z') },
+    file: { ...bad.file, status: 'active', expiresAt: new Date(Date.now() - 60 * 60 * 1000), updatedAt: new Date('2026-09-23T07:54:00.000Z') },
   }
   const missing = { ...bad, id: 'pt_paid_pending_missing', fileId: 'file_paid_pending_missing', file: null }
   const refunded = { ...bad, id: 'pt_paid_pending_refunded', order: { payStatus: 'refunded' } }
