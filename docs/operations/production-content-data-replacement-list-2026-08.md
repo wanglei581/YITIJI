@@ -1,6 +1,6 @@
 # 生产内容数据替换清单（2026-08）
 
-> **历史材料（2026-09-26 标注）：** 本文是 （2026-08） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+> **历史材料（2026-09-26 标注）：** 本文是 2026-08 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 
 > 状态：**执行清单，第一步已完成**。2026-08-07 第一步已由数据负责人确认后执行：当时盘点的 215 条预生产/演示岗位、3 场已结束招聘会、演示机构/演示岗位下架，2 个预生产/样例数据源停用（备份锚点 `pre-content-cleanup-20260807T081738Z.dump`，当时执行基线 `main@256e06ef`，见 `current-progress.md`）。该私有表快照不是当前实时状态；2026-08-09 只重新确认公网 Job、JobFair、PolicyPost、OfflineAgency 公开集合为空。正式 backfill 前必须另获具名授权重跑生产私有表只读 SQL。本文是后续**接入真实来源**的执行清单；不替代授权，也不授权删改生产。
 > 事实依据：`docs/progress/next-tasks.md`「生产内容数据运营收口」条目。

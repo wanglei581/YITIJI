@@ -1,6 +1,8 @@
 # AI数字人引导员需求规划
 
-> **历史材料（2026-09-26 标注）：** 本文是 （2026-05） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+> **历史材料（2026-09-26 标注）：** 本文是 2026-05 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+>
+> 当前结论（2026-06-11 起）：Kiosk `/assistant` 已落地 TRTC 真人照片顾问「小青」+ 文字对话；早期轻量 3D / SVG 数字人引导员方案不再作为开发路线。数字人形象对外开放前，先完成本人授权与深度合成相关手续（compliance-boundary.md §1.2 C）。
 
 ## 0. 当前实现口径（2026-06）
 

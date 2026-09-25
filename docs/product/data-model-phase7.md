@@ -1,6 +1,6 @@
 # Phase 7 正式 DTO 定义
 
-> **历史材料（2026-09-26 标注）：** 本文是 （2026-05） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+> **历史材料（2026-09-26 标注）：** 本文是 2026-05 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 
 > 版本：Phase 7  
 > 状态：设计稿，Phase 7 后端实现前冻结  

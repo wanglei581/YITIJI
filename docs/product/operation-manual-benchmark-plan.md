@@ -1,6 +1,6 @@
 # 操作手册功能借鉴分析与落地方案（内部摘要）
 
-> **历史材料（2026-09-26 标注）：** 本文是 （2026-06） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+> **历史材料（2026-09-26 标注）：** 本文是 2026-06 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 
 > 编制：2026-06-06 · 密级：内部 · 产品与合规
 > 本文是对一份机器生成的产品分析稿（原稿已仓库外归档到 `其他文档/产品需求资料/操作手册功能借鉴分析与落地方案.docx`，不入库）的**人工可 review 摘要**，只沉淀可执行结论。

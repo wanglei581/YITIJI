@@ -1,6 +1,6 @@
 # 秒哒参考截图 Catalog(全 49 张)
 
-> **历史材料（2026-09-26 标注）：** 本文是 （2026-05） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+> **历史材料（2026-09-26 标注）：** 本文是 2026-05 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 
 > **本文档作用**:秒哒旧项目 49 张截图的逐张分析。**CLAUDE.md §4 规约**:秒哒只作参考,
 > 不作正式工程继续开发。本文档为后续开发的 **PRD 起点** — 列出每张图的功能意图、

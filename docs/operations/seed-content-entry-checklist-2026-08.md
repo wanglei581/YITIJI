@@ -1,6 +1,6 @@
 # 上线种子内容录入清单：30 条政策 + 20 场招聘会
 
-> **历史材料（2026-09-26 标注）：** 本文是 （2026-08） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+> **历史材料（2026-09-26 标注）：** 本文是 2026-08 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 
 现行操作见 [托管 a 下的内容录入：机构官方渠道二维码 + 政策](./content-ingestion-operator-guide.md)。
 

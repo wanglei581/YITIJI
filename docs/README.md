@@ -15,12 +15,16 @@
 | 现在做到哪一步、已完成什么 | [progress/current-progress.md](progress/current-progress.md) |
 | 下一步做什么 | [progress/next-tasks.md](progress/next-tasks.md) |
 | 当日开发摘要与协作收尾 | [progress/today-claude.md](progress/today-claude.md) |
-| 功能边界（能做 / 不能做） | [product/feature-scope.md](product/feature-scope.md) |
+| 定位、托管方式、AI 求职操作系统分层、功能边界（能做 / 不能做）、已知缺口 | [product/feature-scope.md](product/feature-scope.md)（§零 定位与分层，§七 缺口） |
+| 谁是运营主体、我们做什么、管理员能做什么 | [product/role-boundary.md](product/role-boundary.md) |
 | 按谁排序、12 个月长什么 / 不长什么（从属于功能边界与合规） | [product/audience-growth-space.md](product/audience-growth-space.md) |
-| 合规红线 | [compliance/](compliance/) 全部 |
+| 合规红线、法规与资质总表 | [compliance/](compliance/) 全部；总表在 [compliance-boundary.md](compliance/compliance-boundary.md) §1.2 |
 | 目录职责 | [project-structure.md](project-structure.md) |
 
-**这六处之外的任何文档，都不是当前口径。**
+**这张表之外的任何文档，都不是当前口径。**
+
+> **2026-09-26 起：** 公司定位为设备与软件供应方，托管选 a（我们云上不存岗位、招聘会、企业资料）。招聘相关的口径以 compliance-boundary.md §1.1、feature-scope.md §零 与 next-tasks.md 3.11–3.15 为准。
+> 文首带「方案快照」「历史材料」「托管 a 下停放」标注的文档只作背景：方案快照 = 当时的设计，功能以代码为准；历史材料 = 不代表现状，不要据此施工；托管 a 下停放 = 只在私有化部署（b）或取得许可证后参考。
 
 ---
 
@@ -31,12 +35,13 @@
 路由，逐页台账见 `kimi-full-coverage-v2/COVERAGE-MATRIX.md`。
 
 > **两处数字已于 2026-09-02 更正，别再引用旧值：**
-> 1. **路由总数是 107，不是 106。** 提交 `6d74c2f17` 修好项目图谱解析器（补 `React.lazy()` 路由与单文件多
->    controller 解析）后，kiosk 真实注册路由为 **107**；此前的 86 是解析器漏算的误报，106 是同一轮的中间值。
->    **凡按旧值算过的覆盖率分母都要重算。**
+> 1. **路由总数（2026-09-26 候选 `b3fc7dde1` 复数）：** `apps/kiosk/src/routes/index.tsx` 共 110 条路径，其中 18 条重定向、
+>    91 条内容页、1 条未知路由页（2026-09-02 记的 107 是当时的数）。**凡按旧值算过的覆盖率分母都要重算。**
 > 2. **「运行时只有 `/` 与 `/print-scan` 是新版」说的是上一代 V6，不是青序流光新稿。** 两者不是同一把尺子，
->    并排读会高估进度。青序流光新稿的落地数是 **1 / 51**（只有 `/print/pickup-claim`），唯一权威登记是
->    `apps/kiosk/src/layouts/KioskRoot.tsx` 的 `QX_MIGRATED_ROUTES` 集合。
+>    并排读会高估进度。青序流光的唯一权威登记是
+>    `apps/kiosk/src/layouts/KioskRoot.tsx` 的 `QX_MIGRATED_ROUTES` 集合：2026-09-02 只有 `/print/pickup-claim` 1 条，
+>    2026-09-26 已登记 59 条路径（含 `/print/material-check` 等重定向路径，不能直接折算成「51 稿落地 N 张」）。
+>    逐页状态看 `kimi-full-coverage-v2/COVERAGE-MATRIX.md` 与 next-tasks.md，引用前按当时代码重数。
 >    **不要用 `grep -rl kiosk-redesign-2026-08 apps/kiosk/src` 当证据** —— 它现在命中 5 个文件，其中 4 处只是
 >    注释里的视觉真值指针，会随注释增加而虚涨。
 >

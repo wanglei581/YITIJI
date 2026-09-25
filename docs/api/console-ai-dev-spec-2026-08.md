@@ -1,6 +1,6 @@
 # 双后台 AI 化改造 · 开发任务书（给 Codex）
 
-> **历史材料（2026-09-26 标注）：** 本文是 （2026-08） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+> **历史材料（2026-09-26 标注）：** 本文是 2026-08 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 
 > 立项日期：2026-08-11 · 重新定位：2026-08-11
 >

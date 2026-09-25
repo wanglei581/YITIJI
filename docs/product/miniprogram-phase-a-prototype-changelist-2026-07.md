@@ -1,6 +1,6 @@
 # 小程序 Phase A 原型改动清单（2026-07）
 
-> **历史材料（2026-09-26 标注）：** 本文是 （2026-07） 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+> **历史材料（2026-09-26 标注）：** 本文是 2026-07 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 
 > 依据 [双渠道差异化商业方案](miniprogram-vs-kiosk-differentiation-strategy-2026-07.md) 的 Phase A：
 > **确立「手机准备 → 一体机履约 → 账户沉淀」分工，打通「材料包 → 到机码 → 出纸 → 状态回流」核心闭环。**
