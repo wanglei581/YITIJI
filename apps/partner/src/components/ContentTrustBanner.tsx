@@ -2,21 +2,22 @@ import { useEffect, useState } from 'react'
 import { AlertTriangleIcon } from 'lucide-react'
 import { isOrgContentPublishable } from '@ai-job-print/shared'
 import { getOrgProfile, type PartnerOrgProfile } from '../services/api/orgSelf'
+import { useRecruitmentHosting } from '../services/capabilities'
 
 /**
  * 「本机构的内容为什么还没上架」的常驻说明。
  *
- * ## 合作机构不能自己发布，这一点决定了这条横幅该说什么
+ * ## 谁来上架，决定了这条横幅该说什么
  *
  * `PATCH partner/{jobs,fairs,policies}/:id/publish` 的 handler 分别是
  * `unpublishPartnerJob` / `unpublishPartnerFair` / `unpublishPartnerPolicy`，
  * `@Body() _dto` 直接丢弃、service 里 `publishStatus: 'unpublished'` 硬编码 ——
- * **路由叫 publish，实际只会下架。合作机构没有「发布」这个动作。**
+ * **路由叫 publish，实际只会下架。**
  *
- * 所以这里不能写成「你点发布会被拒绝」（本文件初版就是这么写的，错的）。
- * 真正上架由管理员执行，而管理员那一步受「内容可信」闸门约束：机构没被标为
- * `contentTrustStatus=active` 之前，`assertOrgContentTrustActive` 会 fail-closed 拒绝，
- * 内容审核通过了也上不了终端。
+ * 3.13（2026-09-26）起政策改由机构自己审核并发布（`PATCH partner/policies/:id/release`，
+ * 须确认发布责任）；岗位 / 招聘会（仅托管打开时存在）仍由管理员上架。两条路都受「内容可信」
+ * 闸门约束：机构没被标为 `contentTrustStatus=active` 之前，`assertOrgContentTrustActive`
+ * 会 fail-closed 拒绝，内容审核通过了也上不了终端。
  *
  * 合作机构看到的现象是：**我的岗位审核通过了，一体机上却没有**，而后台不给任何原因。
  * 这条横幅补的就是这个原因，以及该找谁。
@@ -33,6 +34,8 @@ import { getOrgProfile, type PartnerOrgProfile } from '../services/api/orgSelf'
  */
 export function ContentTrustBanner() {
   const [profile, setProfile] = useState<PartnerOrgProfile | null>(null)
+  // 'unknown' 沿用 fail-open 按打开说；只有服务端明确关闭托管时，才只提政策。
+  const recruitmentHosting = useRecruitmentHosting() !== 'off'
 
   useEffect(() => {
     let alive = true
@@ -57,12 +60,16 @@ export function ContentTrustBanner() {
         <div className="mt-1">
           {archived
             ? '本机构已归档。已归档机构的内容不会被上架到一体机与小程序。'
-            : '本机构尚未通过平台的「内容可信」核验。在核验通过之前，岗位 / 招聘会 / 政策即使已经录入、通过审核，平台也无法把它们上架到一体机与小程序。'}
+            : recruitmentHosting
+              ? '本机构尚未通过平台的「内容可信」核验。在核验通过之前，岗位 / 招聘会 / 政策即使已经录入、通过审核，也无法上架到一体机与小程序。'
+              : '本机构尚未通过平台的「内容可信」核验。在核验通过之前，政策即使已经录入、通过审核，也无法发布到一体机与小程序。'}
         </div>
         <div className="mt-1">
           {archived
             ? '如需继续供稿，请联系平台运营取消归档并重新核验。'
-            : '内容上架由平台管理员执行，本后台不提供发布动作。请联系平台完成来源授权核验（需提供授权书 / 合同 / 公开声明编号等核验依据），核验通过后本提示会自动消失。'}
+            : recruitmentHosting
+              ? '岗位 / 招聘会由平台管理员上架，政策由本机构自行发布，两者都要先通过核验。请联系平台完成来源授权核验（需提供授权书 / 合同 / 公开声明编号等核验依据），核验通过后本提示会自动消失。'
+              : '政策由本机构自行审核发布，发布前要先通过核验。请联系平台完成来源授权核验（需提供授权书 / 合同 / 公开声明编号等核验依据），核验通过后本提示会自动消失。'}
         </div>
       </div>
     </div>
