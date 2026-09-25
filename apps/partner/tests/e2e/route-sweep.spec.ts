@@ -8,7 +8,8 @@ import {
 } from './helpers'
 
 /**
- * 从 `apps/partner/src/routes/index.tsx` 读出的全部 14 条路由。
+ * 从 `apps/partner/src/routes/index.tsx` 读出的已登录路由。
+ * `/screen` 单独断言：旧地址改写到 `/screen/overview`，mock 不展示数值、不发大屏请求。
  * 每条：不是白屏、有 h1/页头、无 console error、无未捕获 rejection、无英文技术串。
  */
 const AUTHED_ROUTES: Array<{ path: string; title: string | RegExp }> = [
@@ -20,7 +21,6 @@ const AUTHED_ROUTES: Array<{ path: string; title: string | RegExp }> = [
   { path: '/smart-campus', title: '智慧校园' },
   { path: '/policy', title: '政策公告' },
   { path: '/terminals', title: '终端数据' },
-  { path: '/screen', title: '数据大屏' },
   { path: '/stats', title: '数据统计' },
   { path: '/sources', title: '数据源管理' },
   { path: '/sync-logs', title: '同步日志' },
@@ -34,6 +34,23 @@ test.describe('partner route sweep (mock)', () => {
     await page.goto('/login', { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('heading', { name: '合作机构登录' })).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('#root')).not.toBeEmpty()
+    await assertPageHonest(page, errors)
+  })
+
+  test('已登录访问 /screen 改写到机构总览，演示模式不发大屏请求', async ({ page }) => {
+    const { errors } = collectPageFaults(page)
+    const screenRequests: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/partner/screen')) screenRequests.push(request.url())
+    })
+    await injectPartnerAuth(page)
+    await gotoPartner(page, '/screen', '数据大屏')
+    await waitForMockList(page)
+    await expect(page).toHaveURL(/\/screen\/overview$/)
+    await expect(page.locator('h1')).toHaveCount(1)
+    await expect(page.locator('h1')).toHaveText('数据大屏')
+    await expect(page.getByText('演示模式不展示大屏数值')).toBeVisible()
+    expect(screenRequests).toEqual([])
     await assertPageHonest(page, errors)
   })
 
