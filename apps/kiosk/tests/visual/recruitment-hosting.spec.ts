@@ -10,9 +10,10 @@
 //   · 关闭时直达招聘类地址，落到诚实说明页，不是报错页，也不去请求招聘类接口；
 //   · 配置还没读到时按关闭处理，但只说「正在确认」，不提前下「未开放」的结论；
 //   · 简历对照不再分档（服务端不再返回 fitLevel），关闭时只能手填岗位要求，不能引用系统内岗位（jobId）。
-import type { Page } from '@playwright/test'
+import { test as unitTest, type Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
+import { createRecruitmentHostingLoader, type RecruitmentHostingState } from '../../src/hooks/recruitmentHostingModel'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
 
@@ -47,6 +48,38 @@ function collectRuntimeErrors(page: Page): string[] {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   return errors
+}
+
+/** 扣住一类响应：handler 里 await gate().promise，测试在合适的时刻 resolve。 */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
+const CLOSED_CLAIM = '本终端未开放岗位与招聘会信息'
+
+/**
+ * 记下页面上每一次出现「未开放岗位与招聘会」时，测试是否已经放行了配置答复。
+ * 只在断言时刻看一眼会漏掉一闪而过的结论；这里从文档一开始就盯着。
+ */
+async function recordClosedClaims(page: Page): Promise<void> {
+  await page.addInitScript((claim) => {
+    const w = window as unknown as { __rhClaims: boolean[]; __rhReleased: boolean }
+    w.__rhClaims = []
+    w.__rhReleased = false
+    new MutationObserver(() => {
+      if ((document.documentElement?.textContent ?? '').includes(claim)) w.__rhClaims.push(w.__rhReleased)
+    }).observe(document, { subtree: true, childList: true, characterData: true })
+  }, CLOSED_CLAIM)
+}
+
+async function markConfigReleased(page: Page): Promise<void> {
+  await page.evaluate(() => { (window as unknown as { __rhReleased: boolean }).__rhReleased = true })
+}
+
+async function closedClaims(page: Page): Promise<boolean[]> {
+  return page.evaluate(() => (window as unknown as { __rhClaims: boolean[] }).__rhClaims)
 }
 
 async function expectNoRecruitmentCopy(page: Page, where: string): Promise<void> {
@@ -220,6 +253,40 @@ test('an older server without recruitmentHosting falls back to jobBoard, and to 
   expect(api.requestCount('GET', '/api/v1/jobs'), '按关闭处理时不再请求岗位').toBe(1)
 })
 
+// 请求在途时本机被重新绑定到另一台终端（Agent 换了身份）。今天整棵树会因为换身份重挂，
+// 浏览器里造不出「同一个 hook 实例看见身份变化」；这里直接驱动 hook 用的加载器。
+unitTest('the hosting loader re-reads for the new terminal when the id changes mid-request @w1-kiosk', async () => {
+  let terminalId = 'KSK-001'
+  const requested: string[] = []
+  const answers = new Map<string, (config: unknown) => void>()
+  const settled: RecruitmentHostingState[] = []
+  const loader = createRecruitmentHostingLoader({
+    getTerminalId: () => terminalId,
+    fetchConfig: (id) => {
+      requested.push(id)
+      return new Promise((resolve) => answers.set(id, resolve))
+    },
+    onSettle: (state) => settled.push(state),
+  })
+
+  const first = loader.load()
+  expect(requested).toEqual(['KSK-001'])
+  terminalId = 'KSK-002'
+  answers.get('KSK-001')!(terminalConfigWithHosting(RECRUITMENT_HOSTING_ON))
+  await expect.poll(() => requested, { message: '按新身份重读一次，而不是把结果丢掉就停' }).toEqual(['KSK-001', 'KSK-002'])
+  expect(settled, '旧终端「打开」的答复不能记到新终端头上').toEqual([])
+  answers.get('KSK-002')!(terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF))
+  await first
+  expect(settled).toEqual([{ status: 'ready', enabled: false }])
+
+  // 卸载之后晚到的答复不再回报。
+  const late = loader.load()
+  loader.dispose()
+  answers.get('KSK-002')!(terminalConfigWithHosting(RECRUITMENT_HOSTING_ON))
+  await late
+  expect(settled).toHaveLength(1)
+})
+
 // ── 关闭：直达招聘类地址 ───────────────────────────────────────────────────
 
 const GATED_URLS: readonly { url: string; topic: string }[] = [
@@ -298,6 +365,43 @@ test('hosting unknown: a direct URL says it is checking and does not claim anyth
   await expect(page.locator('.qx-pagehead h1')).toHaveText('本终端未开放招聘会信息')
 })
 
+test('hosting unknown: the home footer and the member guide stay neutral until the answer arrives @w1-kiosk', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  let gate = deferred()
+  api.respondWith('GET', CONFIG, async () => {
+    await gate.promise
+    return { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF) }
+  })
+  await recordClosedClaims(page)
+
+  // 首页底栏：没读到之前只说不代收简历，不提岗位与招聘会开没开。
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const footer = page.locator('.qx-home-truth')
+  await expect(footer).toContainText('能力状态以真实接口为准。本终端不代收简历。')
+  await page.waitForTimeout(600)
+  await expect(footer).not.toContainText('未开放')
+  await markConfigReleased(page)
+  gate.resolve()
+  await expect(footer).toContainText(`${CLOSED_CLAIM}，也不代收简历。`)
+  let claims = await closedClaims(page)
+  expect(claims.length, '读到「关闭」之后确实说了未开放（阳性对照）').toBeGreaterThan(0)
+  expect(claims.every(Boolean), '首页在配置答复之前没有说过未开放').toBe(true)
+
+  // 「我的」未登录页的指引：整页重新载入，配置缓存随之清空，再扣住一次。
+  gate = deferred()
+  await page.goto('/me/favorites', { waitUntil: 'domcontentloaded' })
+  const guide = page.locator('.qx-me-guide')
+  await expect(guide).toContainText('也不把你的资料转交给任何企业')
+  await page.waitForTimeout(600)
+  await expect(guide).not.toContainText('未开放')
+  await markConfigReleased(page)
+  gate.resolve()
+  await expect(guide).toContainText(CLOSED_CLAIM)
+  claims = await closedClaims(page)
+  expect(claims.length, '读到「关闭」之后指引确实说了未开放（阳性对照）').toBeGreaterThan(0)
+  expect(claims.every(Boolean), '「我的」指引在配置答复之前没有说过未开放').toBe(true)
+})
+
 // ── 关闭：「我的」收藏与足迹 ──────────────────────────────────────────────
 
 const POLICY_FAVORITE = { id: 'fav-policy', targetType: 'policy', targetId: 'policy-001', title: '高校毕业生就业服务指引', createdAt: '2026-09-20T08:00:00.000Z' }
@@ -365,6 +469,77 @@ test('hosting off: the signed-out member pages offer policy instead of jobs @w1-
   await expect(page.getByTestId('member-records-guest-jobs')).toHaveCount(0)
   await expect(page.getByText('岗位与招聘会只做来源信息入口')).toHaveCount(0)
   await expectNoRecruitmentCopy(page, '未登录的我的收藏')
+})
+
+// ── 「我的」AI 服务记录 ─────────────────────────────────────────────────────
+
+const AI_RECORD_BASE = { status: 'completed', provider: 'demo', optimized: false, hasDraft: false, latestVersion: null, createdAt: '2026-09-20T08:00:00.000Z', expiresAt: null }
+const AI_RECORDS = [
+  { ...AI_RECORD_BASE, id: 'ai-parse', kind: 'parse', taskId: 'task-parse' },
+  { ...AI_RECORD_BASE, id: 'ai-fit', kind: 'job_fit', taskId: 'task-fit' },
+  // 招聘会准备单挂在一场招聘会下；托管关闭时服务端仍可能把旧记录带回来。
+  { ...AI_RECORD_BASE, id: 'ai-fair', kind: 'fair_visit_plan', taskId: 'task-fair', ref: { type: 'job_fair', id: 'fair-001', name: '2026 青岛高校毕业生招聘会' } },
+]
+const JOB_AI_SESSION = {
+  session: { id: 'jas-001', operation: 'explain', status: 'completed', provider: 'llm', resumeTaskId: null, createdAt: '2026-09-19T08:00:00.000Z', expiresAt: null },
+  job: { title: '前端工程师', company: '青岛示例制造有限公司' },
+  recommendationCount: 0,
+}
+
+function registerAiRecords(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/me/ai-records', { status: 200, json: { success: true, data: { items: AI_RECORDS, nextCursor: null, total: AI_RECORDS.length } } })
+  api.respond('GET', '/api/v1/me/job-ai-sessions', { status: 200, json: { success: true, data: { items: [JOB_AI_SESSION], nextCursor: null, total: 1 } } })
+  api.respond('GET', '/api/v1/me/mock-interviews', { status: 200, json: { success: true, data: { items: [] } } })
+  // 登录后全站收藏心形状态会读一次收藏（FavoritesProvider），与本页无关。
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+}
+
+test('hosting off: AI records never ask for job AI sessions and do not list fair plans @w1-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  const recruitmentHits = trackRecruitmentRequests(page)
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  registerMemberLogin(api)
+  registerAiRecords(api)
+
+  await loginThroughVisibleUi(page, '/me/ai-records')
+  const list = page.getByTestId('member-records-list')
+  await expect(list.locator('[data-record-kind="job_fit"]'), '简历对照记录照常保留').toContainText('简历对照')
+  await expect(list.locator('[data-record-kind="parse"]')).toHaveCount(1)
+  await expect(list.locator('[data-record-kind="fair_visit_plan"]'), '夹具带回了招聘会准备单，页面也不列').toHaveCount(0)
+  await expect(page.getByText('招聘会准备单')).toHaveCount(0)
+  await expect(page.getByText('2026 青岛高校毕业生招聘会')).toHaveCount(0)
+  await expect(list.locator('[data-record-kind="job-ai-session"]')).toHaveCount(0)
+  await expect(page.getByText('岗位 AI 参考记录')).toHaveCount(0)
+  await expect(page.getByText('当前 2 行')).toBeVisible()
+  expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions'), '托管关闭时不请求岗位 AI 会话').toBe(0)
+  await expectNoRecruitmentCopy(page, 'AI 服务记录')
+  expect(recruitmentHits).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('hosting on: AI records wait for the hosting answer, then list job AI sessions and fair plans @w1-kiosk', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_ON)
+  registerMemberLogin(api)
+  registerAiRecords(api)
+  const gate = deferred()
+  api.respondWith('GET', CONFIG, async () => {
+    await gate.promise
+    return { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_ON) }
+  })
+
+  await loginThroughVisibleUi(page, '/me/ai-records')
+  await expect(page.getByTestId('member-records-state-ai-records-loading')).toBeVisible()
+  await page.waitForTimeout(400)
+  expect(api.requestCount('GET', '/api/v1/me/ai-records'), '托管没读到之前不拉列表，免得拉两遍、闪一次骨架').toBe(0)
+  gate.resolve()
+
+  const list = page.getByTestId('member-records-list')
+  await expect(list.locator('[data-record-kind="fair_visit_plan"]')).toContainText('2026 青岛高校毕业生招聘会')
+  await expect(list.locator('[data-record-kind="job-ai-session"]')).toContainText('前端工程师')
+  await expect(list.locator('[data-record-kind="job_fit"]')).toHaveCount(1)
+  await expect(page.getByText('当前 4 行')).toBeVisible()
+  expect(api.requestCount('GET', '/api/v1/me/ai-records')).toBe(1)
+  expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions')).toBe(1)
 })
 
 // ── 简历对照 ──────────────────────────────────────────────────────────────
@@ -445,4 +620,34 @@ test('hosting off: job fit keeps only the manual path and never sends a jobId @w
   await expect(screen).toHaveAttribute('data-state', 'result')
   expect(analyzeBody).toEqual({ taskId: JOB_FIT_TASK, manualJob: { title: '行政专员', requirements: '熟练使用 Excel，能组织会务' } })
   expect(recruitmentHits, '托管关闭时简历对照不请求岗位列表').toEqual([])
+})
+
+const PICK_JOB = { id: 'job-rh', title: '前端开发工程师', company: '示例来源企业', sourceName: '来源平台', externalId: 'X-RH' }
+
+test('hosting on: switching job fit to manual entry drops the picked job from the checklist @w1-kiosk', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_ON)
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [PICK_JOB], pagination: { page: 1, pageSize: 8, total: 1, totalPages: 1 } } })
+  api.respond('GET', `/api/v1/resume/job-fit/${JOB_FIT_TASK}`, { status: 404, json: { error: { code: 'JOB_FIT_NOT_FOUND', message: '尚未对照' } } })
+
+  await page.goto(`/resume/job-fit?taskId=${JOB_FIT_TASK}`, { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'pick')
+  const targetSlot = page.locator('.jfq-slot').filter({ hasText: '目标岗位' }).locator('b')
+  const targetCheck = page.locator('.jfq-check').filter({ hasText: '目标岗位' })
+  await expect(targetSlot).toHaveText('尚未选择')
+
+  await page.getByRole('button', { name: /^前端开发工程师，/ }).click()
+  await expect(targetSlot).toHaveText('前端开发工程师')
+  await expect(targetCheck).toHaveAttribute('data-tone', 'ok')
+
+  // 切到手填、名称还空着：「开始比对」只认手填，检查单也不能再拿刚才点过的岗位充数。
+  await page.getByRole('button', { name: /手填目标岗位/ }).click()
+  await expect(page.getByRole('textbox', { name: '目标岗位名称' })).toBeVisible()
+  await expect(targetSlot).toHaveText('尚未选择')
+  await expect(targetCheck).toHaveAttribute('data-tone', 'wait')
+  await expect(targetCheck.locator('.jfq-chip')).toHaveText('待选择')
+
+  // 阳性对照：手填名称之后检查单跟着变。
+  await page.getByRole('textbox', { name: '目标岗位名称' }).fill('行政专员')
+  await expect(targetSlot).toHaveText('行政专员')
+  await expect(targetCheck).toHaveAttribute('data-tone', 'ok')
 })

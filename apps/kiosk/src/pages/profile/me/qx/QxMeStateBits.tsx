@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { BriefcaseIcon, LandmarkIcon, PrinterIcon } from 'lucide-react'
-import { useRecruitmentHosting } from '../../../../hooks/useRecruitmentHosting'
+import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../../hooks/useRecruitmentHosting'
 import { QxMeBanner, QxMeGuide, QX_ME_GUIDE } from './QxMeChrome'
 
 export function QxMeSkeletonList({ count = 4, foot }: { count?: number; foot: string }) {
@@ -134,6 +134,13 @@ export function QxMeGuestRows({ onJobs, onPrint, hostingOpen }: { onJobs: () => 
   )
 }
 
+/** 未登录指引第三条。托管读到「关闭」才说未开放；还没读到时只说本机不代收简历，不提岗位与招聘会。 */
+function guestBoundary(status: RecruitmentHostingState['status']): [string, string, string] {
+  return status === 'ready'
+    ? ['边界', '本机不代收简历', '本终端未开放岗位与招聘会信息']
+    : ['边界', '本机不代收简历', '也不把你的资料转交给任何企业']
+}
+
 export function QxMeLoginBlock({
   title,
   desc,
@@ -147,7 +154,8 @@ export function QxMeLoginBlock({
   onJobs: () => void
   onPrint: () => void
 }) {
-  const hostingOpen = useRecruitmentHosting().enabled
+  const hosting = useRecruitmentHosting()
+  const hostingOpen = hosting.enabled
   return (
     <>
       <QxMeBanner tone="lock" title={title} desc={<>{desc}<b>下面是登录后会出现的内容结构，以及现在就能办的事。</b></>} minis={['共 —', '登录后回填']} />
@@ -157,7 +165,7 @@ export function QxMeLoginBlock({
         <QxMeGuestRows onJobs={onJobs} onPrint={onPrint} hostingOpen={hostingOpen} />
         <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束会话只清除本机登录态与临时会话信息</b>；服务端的记录按各自留存期限管理。</div>
       </section>
-      <QxMeGuide items={hostingOpen ? [...QX_ME_GUIDE.login] : [...QX_ME_GUIDE.login.slice(0, 2), ['边界', '本机不代收简历', '本终端未开放岗位与招聘会信息']]} />
+      <QxMeGuide items={hostingOpen ? [...QX_ME_GUIDE.login] : [...QX_ME_GUIDE.login.slice(0, 2), guestBoundary(hosting.status)]} />
     </>
   )
 }

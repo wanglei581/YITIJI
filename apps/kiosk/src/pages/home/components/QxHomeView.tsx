@@ -19,6 +19,7 @@ import {
   UserIcon,
   WrenchIcon,
 } from 'lucide-react'
+import type { RecruitmentHostingState } from '../../../hooks/useRecruitmentHosting'
 import type { SmartCampusCapabilityState } from '../../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
 import type { ToolboxCapabilityState } from '../../../hooks/useToolboxConfig'
@@ -37,8 +38,8 @@ interface QxHomeViewProps {
   campus: SmartCampusCapabilityState
   jobFair: HomeJobFairHighlightState & { retry: () => void }
   jobs: HomeJobHighlightState & { retry: () => void }
-  /** 招聘内容托管（3.13）是否打开；关闭时不渲染岗位 / 招聘会磁贴与「找工作」快捷入口。 */
-  recruitmentOpen: boolean
+  /** 招聘内容托管（3.13）。没打开（含还没读到）时不摆岗位 / 招聘会磁贴与「找工作」；读到「关闭」才说「未开放」。 */
+  recruitment: RecruitmentHostingState
   terminalCode: string
   deviceStatus: HomeDeviceStatus
   continueSlot?: ReactNode
@@ -101,7 +102,7 @@ export function QxHomeView({
   campus,
   jobFair,
   jobs,
-  recruitmentOpen,
+  recruitment,
   terminalCode,
   deviceStatus,
   continueSlot,
@@ -121,6 +122,7 @@ export function QxHomeView({
   /* 稿 01-home 眉题：出纸能力进入后核验，首页不再重复顶栏的「打印机在线」；读取中 / 离线 / 异常 / 未知照实写在这里。 */
   const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '进入后核验打印与扫描能力' : device.printerLabel
   const [introDone, setIntroDone] = useState(false)
+  const recruitmentOpen = recruitment.enabled
 
   return (
     <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home" data-recruitment={recruitmentOpen ? 'open' : 'closed'} data-qx-intro={introDone ? 'done' : undefined} onAnimationEnd={(event) => { if (event.animationName === 'qx-home-sheen') setIntroDone(true) }}>
@@ -299,7 +301,7 @@ export function QxHomeView({
       <footer className="qx-home-truth">
         <ShieldCheckIcon aria-hidden="true" />
         <div>
-          <p><strong>能力状态以真实接口为准。</strong>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : '本终端未开放岗位与招聘会信息，也不代收简历。'}</p>
+          <p><strong>能力状态以真实接口为准。</strong>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : recruitment.status === 'ready' ? '本终端未开放岗位与招聘会信息，也不代收简历。' : '本终端不代收简历。'}</p>
           <p className="qx-home-legal">
             <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">鲁ICP备2026023517号-2</a>
             <span aria-hidden="true">·</span>

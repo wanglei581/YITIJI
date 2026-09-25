@@ -616,6 +616,8 @@ export function JobFitPage() {
   // ── 选择视图 ──────────────────────────────────────────────────────────────
   // 托管关闭时手填是唯一的路：之前在岗位列表里点过的岗位不再算进「目标岗位」。
   const pickedJob = hosting.enabled ? selectedJob : null
+  // 检查单跟着当前这条路走：切到手填后，之前点过的岗位不算目标（「开始比对」也只认手填的名称）。
+  const target = mode === 'pick' ? pickedJob?.title : manualTitle.trim()
   return (
     <JobFitStage>
       <QxPageFrame
@@ -745,8 +747,8 @@ export function JobFitPage() {
 
           <Sec no="02" title="分析前检查" hint="三项齐备才启动" grow>
             <PreflightChecklist
-              targetLabel={pickedJob ? pickedJob.title : manualTitle.trim() || '尚未选择'}
-              hasTarget={Boolean(pickedJob || manualTitle.trim())}
+              targetLabel={target || '尚未选择'}
+              hasTarget={Boolean(target)}
               consentConfirmed={isAnonymous && anonymousConsentActive}
               manualOnly={!hosting.enabled}
             />
