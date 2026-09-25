@@ -316,9 +316,14 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     } catch (err) {
       const code = err instanceof ApiHttpError ? err.code : undefined
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
+        /* 这个码本身就是服务端报的终态：cancel() 两处都只在 status === 'completed' 时抛，
+         * 而 completed 是吸收态。所以在补查**之前**就记下 —— 补查拿不到回话时下面会
+         * 回到 start、推进代次，那次还在路上的确认落地时不许再为它补一发 DELETE。
+         * （SCAN_TASK_CANCEL_CONFLICT 不在此列：它可能来自 CAS 撞车，那时任务正是 matched，
+         * 还撤得掉，见 scanSessionRevoke 的 ScanRevokeVerdict 注释。） */
+        noteScanTaskStatusFromServer(scanTaskId, 'completed')
         try {
           const latest = await getScanSessionStatus(scanTaskId, controlToken, getToken())
-          noteScanTaskStatusFromServer(scanTaskId, latest.status)
           if (latest.status === 'completed' && latest.file) {
             setBusyPhase('terminal')
             finishWithResult({
