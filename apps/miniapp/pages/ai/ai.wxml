@@ -3,7 +3,7 @@
   <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="navbar">
-    <view class="nav-title left serif">职业生活圈</view>
+    <view class="nav-title left serif">AI 工具</view>
   </view>
 
   <view class="content has-tabbar">
@@ -13,8 +13,8 @@
     <view class="xq-card sheen tap rise" hover-class="tap-press" bindtap="tapChat">
       <view class="avatar lg mono-plum serif">青</view>
       <view class="xq-body">
-        <view class="xq-name serif">求职助手 · 小青</view>
-        <view class="xq-desc">简历、打印、政策，随时问我</view>
+        <view class="xq-name serif">AI 助手 · 小青</view>
+        <view class="xq-desc">简历、面试、打印，随时问我</view>
       </view>
       <view class="xq-go">对话 →</view>
     </view>
@@ -22,7 +22,7 @@
     <!-- AI 免责声明（强制） -->
     <view class="as-disc">
       <text class="ficon i-info"></text>
-      <text>小青与各项 AI 结果均由 AI 生成，可能存在错误。政策、补贴等信息请以官方渠道为准。</text>
+      <text>小青与各项结果均由 AI 生成，可能存在错误，请核对后使用。</text>
     </view>
 
 
@@ -90,7 +90,7 @@
     </view>
 
     <view class="compliance-note">
-      AI 提供的诊断、优化、匹配度、职业建议均为参考，最终决策请结合自身情况与官方信息。
+      AI 提供的诊断、优化、对照结果和职业建议均为参考，最终决策请结合自身情况。
     </view>
 
   </view>

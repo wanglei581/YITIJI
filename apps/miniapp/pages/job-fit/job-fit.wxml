@@ -4,14 +4,14 @@
   <view style="height:{{statusBarHeight}}px"></view>
   <view class="navbar">
     <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-center nav-title">岗位匹配参考</view>
+    <view class="nav-center nav-title">简历对照</view>
   </view>
 
   <!-- 无已解析简历:不伪造分析结果,给真实入口 -->
   <view wx:if="{{phase === 'no-task'}}" class="running-state">
     <view class="st-ic"><text class="ficon i-file-text"></text></view>
     <view class="rs-title">还没有可用的简历</view>
-    <view class="rs-sub">岗位匹配需要先上传并解析一份简历,才能与岗位要求做对比</view>
+    <view class="rs-sub">简历对照需要先上传并解析一份简历，才能和你填写的职位要求做对比</view>
     <view class="jf-cta tap" bindtap="toUpload">
       <text>去上传简历</text><text class="ficon i-right jf-cta-arrow"></text>
     </view>
@@ -22,7 +22,7 @@
       <view class="rs-ring"></view>
       <text class="ficon i-history rs-ic"></text>
     </view>
-    <view class="rs-title">正在读取历史岗位匹配结果…</view>
+    <view class="rs-title">正在读取历史对照结果…</view>
     <view class="rs-sub">只读取账户中已保存的结果，不会重新调用 AI</view>
   </view>
 
@@ -31,7 +31,7 @@
     <view class="card">
       <view class="card-head"><view class="ch-title">需要你的授权</view></view>
       <view class="card-inner">
-        <view class="jf-p">岗位匹配需要读取你已解析简历中的文本内容(教育、经历、技能等),与目标岗位要求做对比分析。</view>
+        <view class="jf-p">简历对照需要读取你已解析简历中的文本内容(教育、经历、技能等),与你填写的职位要求做对比分析。</view>
         <view class="jf-p">分析结果只提供给你本人参考,<text class="jf-strong">不会发送给任何用人单位,也不构成投递</text>。</view>
         <view class="jf-p">授权可以随时撤销。</view>
         <view wx:if="{{resumeName}}" class="jf-file">
@@ -49,14 +49,7 @@
 
   <!-- 确认目标岗位 -->
   <view wx:elif="{{phase === 'target'}}" class="content">
-    <view wx:if="{{jobId}}" class="card">
-      <view class="card-head"><view class="ch-title">目标岗位</view></view>
-      <view class="card-inner">
-        <view class="jf-target-title">{{jobTitleHint || '已选择系统内岗位'}}</view>
-        <view class="jf-hint">将按该岗位的公开要求做对比分析。</view>
-      </view>
-    </view>
-    <view wx:else class="card">
+    <view class="card">
       <view class="card-head"><view class="ch-title">填写目标岗位</view></view>
       <view class="card-inner">
         <view class="jf-label">岗位名称</view>
@@ -243,13 +236,12 @@
 
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <text>以上分析不代表招聘方意见。投递须前往来源平台操作。</text>
+      <text>以上分析不代表用人单位意见，仅供你本人修改简历参考。</text>
     </view>
-    <view wx:if="{{!historyMode}}" class="jf-revoke tap" bindtap="tapRevokeConsent">撤销岗位分析授权</view>
+    <view wx:if="{{!historyMode}}" class="jf-revoke tap" bindtap="tapRevokeConsent">撤销 AI 分析授权</view>
   </view>
 
   <view wx:if="{{phase === 'done'}}" class="actionbar">
-    <view class="btn ghost tap {{printing ? 'disabled' : ''}}" bindtap="tapPrint">{{printing ? '生成中…' : '生成报告去打印'}}</view>
-    <view wx:if="{{fit.job.id || jobId}}" class="btn primary tap flex-1-6" bindtap="tapViewJob">查看岗位</view>
+    <view class="btn primary block tap {{printing ? 'disabled' : ''}}" bindtap="tapPrint">{{printing ? '生成中…' : '生成报告去打印'}}</view>
   </view>
 </view>

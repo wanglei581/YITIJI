@@ -36,7 +36,7 @@
       <view class="card-head"><view class="ch-title">生成依据</view></view>
       <view class="card-inner">
         <view class="cp-p">规划内容由 AI 依据你<text class="cp-strong">已解析简历中的文本</text>生成,包括教育、经历与技能描述。</view>
-        <view class="cp-p">如果你此前做过岗位匹配或模拟面试,系统会一并参考,并在结果里如实标注。</view>
+        <view class="cp-p">如果你此前做过简历对照或模拟面试,系统会一并参考,并在结果里如实标注。</view>
         <view wx:if="{{resumeName}}" class="cp-file">
           <text class="ficon i-file-text cp-file-ic"></text>
           <text class="cp-file-name">{{resumeName}}</text>
@@ -91,15 +91,15 @@
       <text>当前服务端使用占位模型,以下内容仅用于流程演示,不能作为求职依据。</text>
     </view>
 
-    <!-- 生成依据如实展示:只有简历时不能暗示还参考了岗位匹配或面试 -->
+    <!-- 生成依据如实展示:只有简历时不能暗示还参考了简历对照或面试 -->
     <view class="cp-based">
       <view class="cb-cap">本次生成依据</view>
       <view class="chips">
         <view wx:if="{{plan.basedOnResume}}" class="chip teal">简历原文</view>
-        <view wx:if="{{plan.basedOnJobFit}}" class="chip teal">岗位匹配（{{plan.jobFitName}}）</view>
+        <view wx:if="{{plan.basedOnJobFit}}" class="chip teal">简历对照（{{plan.jobFitName}}）</view>
         <view wx:if="{{plan.basedOnInterview}}" class="chip teal">模拟面试（{{plan.interviewName}}）</view>
       </view>
-      <view wx:if="{{!plan.basedOnJobFit && !plan.basedOnInterview}}" class="cb-hint">本次只参考了简历,未结合岗位匹配或面试记录。</view>
+      <view wx:if="{{!plan.basedOnJobFit && !plan.basedOnInterview}}" class="cb-hint">本次只参考了简历,未结合简历对照或面试记录。</view>
     </view>
 
     <view wx:if="{{plan.summary}}" class="card">

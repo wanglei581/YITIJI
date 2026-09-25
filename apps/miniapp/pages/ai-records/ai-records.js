@@ -7,16 +7,15 @@ const KIND_META = {
   parse:           { type: 'resume',  title: '简历诊断',   icon: 'i-file-search', tone: 'plum', route: '/pages/resume-diagnose/resume-diagnose' },
   optimize:        { type: 'resume',  title: '简历优化',   icon: 'i-edit',        tone: 'teal', route: '/pages/resume-optimize/resume-optimize' },
   generate:        { type: 'resume',  title: 'AI 生成简历', icon: 'i-file-text',  tone: 'plum', route: '/pages/resume-build/resume-build' },
-  job_fit:         { type: 'job',     title: '岗位匹配',   icon: 'i-link',        tone: 'teal', route: '/pages/job-fit/job-fit' },
+  job_fit:         { type: 'job',     title: '简历对照',   icon: 'i-link',        tone: 'teal', route: '/pages/job-fit/job-fit' },
   career_plan:     { type: 'career',  title: '职业规划',   icon: 'i-compass',     tone: 'plum', route: '/pages/career-plan/career-plan' },
-  // route 有意留空：fair-visit-plan 页要求 ?fairId= 才能取数（getFairVisitPlan 的
-  // fairId 在路径里），而 /me/ai-records 只 select 了 id/taskId/kind，**不带招聘会标识**。
-  // 硬接上会让「查看结果」点进去撞「缺少招聘会参数」——比诚实的说明更糟。
-  // 等后端记录带上 fairId 再接。
-  fair_visit_plan: { type: 'career',  title: '招聘会规划',  icon: 'i-calendar',    tone: 'wheat',
-                     route: '/pages/fair-visit-plan/fair-visit-plan' },
   self_assessment: { type: 'career',  title: '自我探索',   icon: 'i-form',        tone: 'wheat', route: '/pages/self-explore/self-explore' },
 }
+
+// 一体机上生成的「招聘会规划」记录在小程序里不展示：招聘会页已停放，
+// 小程序首发按非招聘类目提审（compliance-boundary.md §1.1）。记录仍在账户里，
+// 一体机「我的」照常可看；拿证恢复招聘会页时把它加回 KIND_META。
+const HIDDEN_KINDS = ['fair_visit_plan']
 
 const STATUS_LABEL = {
   completed: '已完成',
@@ -47,10 +46,8 @@ function timeLabel(iso) {
 function mapRecord(item) {
   const meta = KIND_META[item.kind] || { type: 'other', title: item.kind || 'AI 服务', icon: 'i-robot', tone: 'wheat', route: '' }
   const status = item.status || ''
-  const ref = item.ref && item.ref.type === 'job_fair' ? item.ref : null
-  const fairId = ref && typeof ref.id === 'string' ? ref.id : ''
-  const canOpen = status === 'completed' && Boolean(meta.route) && (item.kind !== 'fair_visit_plan' || Boolean(fairId))
-  const title = item.kind === 'fair_visit_plan' && ref && ref.name ? `${meta.title} · ${ref.name}` : meta.title
+  const canOpen = status === 'completed' && Boolean(meta.route)
+  const title = meta.title
   return {
     id: String(item.id || ''),
     taskId: String(item.taskId || ''),
@@ -64,11 +61,8 @@ function mapRecord(item) {
     icon: meta.icon,
     tone: meta.tone,
     route: meta.route,
-    fairId,
     canOpen,
-    noRouteReason: item.kind === 'fair_visit_plan' && !fairId
-      ? '这场招聘会规划没有对应的招聘会标识，无法直接打开。'
-      : (meta.noRouteReason || ''),
+    noRouteReason: meta.noRouteReason || '',
     actionLabel: canOpen ? '查看结果' : '查看状态',
     source: 'ai',
   }
@@ -115,8 +109,8 @@ Page({
     filters: [
       { key: 'all', label: '全部' },
       { key: 'resume', label: '简历服务' },
-      { key: 'job', label: '岗位匹配' },
-      // 这一组现在装的是职业规划 / 招聘会规划 / 自我探索，没有一项是「评估」。
+      { key: 'job', label: '简历对照' },
+      // 这一组装的是职业规划 / 自我探索，没有一项是「评估」。
       { key: 'career', label: '规划探索' },
       { key: 'interview', label: '模拟面试' },
     ],
@@ -155,7 +149,7 @@ Page({
       // 第 51 条起永远不显示。分页写法对照 orders.js / documents.js。
       const cursor = append ? this._nextCursor : null
       const list = await api.getMyAiRecords({ pageSize: 50, ...(cursor ? { cursor } : {}) })
-      const page = (list || []).map(mapRecord)
+      const page = (list || []).filter((item) => !HIDDEN_KINDS.includes(item && item.kind)).map(mapRecord)
       let interviews = this._interviews || []
       if (!append) {
         try {
@@ -207,19 +201,12 @@ Page({
         wx.navigateTo({ url: `${record.route}?sessionId=${encodeURIComponent(record.sessionId)}` })
         return
       }
-      if (record.kind === 'fair_visit_plan') {
-        wx.navigateTo({
-          url: `${record.route}?fairId=${encodeURIComponent(record.fairId)}&taskId=${encodeURIComponent(record.taskId)}`,
-        })
-        return
-      }
       wx.navigateTo({ url: `${record.route}?taskId=${encodeURIComponent(record.taskId)}` })
       return
     }
     const reason = record.status !== 'completed'
       ? `任务状态：${record.statusLabel}`
-      // 有专属原因就说专属的。笼统说「没有注册页面」对招聘会规划是不准确的——
-      // 那一页注册了，只是没有招聘会标识进不去。
+      // 有专属原因就说专属的，没有才用通用说明。
       : (record.noRouteReason || '当前版本没有注册这类结果的独立回看页面，记录仍保留在你的账户中。')
     wx.showModal({
       title: record.title,
@@ -236,7 +223,7 @@ Page({
       itemList: ['删除记录'],
       success: (res) => {
         if (res.tapIndex !== 0) return
-        const cascadeNote = record.kind === 'parse' ? '删除诊断记录会同时删除这次任务的优化、匹配与规划等派生结果。' : ''
+        const cascadeNote = record.kind === 'parse' ? '删除诊断记录会同时删除这次任务的优化、对照与规划等派生结果。' : ''
         wx.showModal({
           title: '删除 AI 记录',
           content: `确认删除“${record.title}”？${cascadeNote}该操作删除账户内结果，已生成到“我的文档”的文件仍需单独删除。`,

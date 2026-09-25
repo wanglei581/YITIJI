@@ -3,7 +3,7 @@
 
   <view class="navbar">
     <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-title">求职材料模板</view>
+    <view class="nav-title">材料模板</view>
   </view>
 
   <view class="content has-bar">

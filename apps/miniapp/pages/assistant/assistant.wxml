@@ -12,7 +12,7 @@
       </view>
       <view style="flex:1">
         <view class="as-name">小青</view>
-        <view class="as-role">求职服务智能助手</view>
+        <view class="as-role">AI 简历与打印助手</view>
       </view>
       <view class="as-more tap" hover-class="tap-press" bindtap="tapMore">
         <text class="ficon i-setting"></text>

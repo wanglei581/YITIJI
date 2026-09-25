@@ -231,7 +231,6 @@
     <view class="fail-actions">
       <view class="btn ghost tap" bindtap="printOriginal">打印原件</view>
       <view class="btn ghost tap" bindtap="goPrint">去打印</view>
-      <view class="btn ghost tap" bindtap="viewJobs">查看岗位</view>
       <view class="btn primary tap" bindtap="retryDiagnosis">重试诊断</view>
     </view>
   </view>

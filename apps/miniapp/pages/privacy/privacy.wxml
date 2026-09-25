@@ -98,8 +98,8 @@
       <view class="pv-group">
         <view class="pv-item tap" hover-class="tap-press" bindtap="revokeConsent">
           <view class="pv-main">
-            <view class="pv-t">撤回岗位 AI 授权</view>
-            <view class="pv-s">立即生效；不删除简历、文档、打印订单或收藏</view>
+            <view class="pv-t">撤回 AI 分析授权</view>
+            <view class="pv-s">立即生效；不删除简历、文档或打印订单</view>
           </view>
           <text class="ficon i-right pv-go"></text>
         </view>
@@ -138,7 +138,7 @@
       导出包为本人相关元数据清单：账号摘要、文件清单、AI 服务记录摘要、打印订单、收藏、权益、浏览与外部跳转记录、通知、反馈、授权与历史请求；不含文件原文与简历正文全文，单个分区超过 500 条会导出失败。导出包由服务端生成后约 23 小时到期。
     </view>
     <view class="compliance-note">
-      简历、文件和 AI 结果只服务本人，不提供给招聘企业或合作机构。岗位和招聘会仅提供来源信息入口。
+      简历、文件和 AI 结果只服务本人，不提供给任何企业或合作机构。
     </view>
   </view>
 

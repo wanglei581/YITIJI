@@ -7,8 +7,8 @@
       <text class="ficon i-aim launch-icon-ic"></text>
     </view>
     <view class="launch-brand">职易达</view>
-    <view class="launch-sub">求职 · AI · 打印 · 生活服务</view>
-    <view class="launch-slogan">让每一步求职准备，都更清晰一点</view>
+    <view class="launch-sub">AI 简历 · 文档打印</view>
+    <view class="launch-slogan">简历和材料，手机上准备好，到机器前直接打印</view>
   </view>
 
   <view class="launch-btns">

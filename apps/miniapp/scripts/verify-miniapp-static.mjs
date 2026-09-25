@@ -30,11 +30,13 @@ function read(rel) {
 // 也就是说开发者工具实际读的那份代码上，门禁从来没跑起来过。
 // 这两个目录本来就在 app.json 的 packOptions.ignore 里，不属于产物。
 const SKIP_DIRS = new Set(['.claude', 'node_modules', '.git'])
+// 停放页 = packOptions.ignore 里的 pages/* 目录：不注册、不打包（首发按非招聘类目提审，compliance-boundary.md §1.1），门禁只查实际上传的范围。
+const PARKED_DIRS = new Set((JSON.parse(read('project.config.json')).packOptions?.ignore || []).filter((e) => e?.type === 'folder' && /^pages\//.test(e.value)).map((e) => e.value))
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
-    if (SKIP_DIRS.has(entry.name)) continue
     const rel = `${dir}/${entry.name}`
+    if (SKIP_DIRS.has(entry.name) || PARKED_DIRS.has(rel.slice(2))) continue
     if (entry.isDirectory()) walk(rel, out)
     else out.push(rel)
   }
@@ -63,11 +65,10 @@ if (appJson) {
   const tab = appJson.tabBar || {}
   const expected = [
     { pagePath: 'pages/home/home', text: '首页' },
-    // 职业生活圈改版：该 Tab 由「AI百宝箱」（按「这是不是 AI」分类）改为
-    // 「职业生活圈」（按用户处境分组）。tabBar 是 custom:true，真正渲染出来的
-    // 文案在 custom-tab-bar/index.js，本门禁的价值就是逼这两处必须同时改。
-    { pagePath: 'pages/ai/ai', text: '职业生活圈' },
-    { pagePath: 'pages/jobs/jobs', text: '求职' },
+    // tabBar 是 custom:true，真正渲染的文案在 custom-tab-bar/index.js，本门禁逼两处同时改。
+    // 首发（无人力资源服务许可证）：「职业生活圈」改名「AI 工具」，「求职」位让给「打印」。
+    { pagePath: 'pages/ai/ai', text: 'AI 工具' },
+    { pagePath: 'pages/print/print', text: '打印' },
     { pagePath: 'pages/me/me', text: '我的' },
   ]
   const tabOk = tab.custom === true &&
@@ -89,7 +90,6 @@ if (appJson) {
 }
 
 const wxmlFiles = files.filter((f) => f.endsWith('.wxml'))
-const TAB_PATHS = ['/pages/home/home', '/pages/ai/ai', '/pages/jobs/jobs', '/pages/me/me']
 const PAGE_PATHS = appJson ? (appJson.pages || []) : []
 
 const allowedTopLevel = new Set([
@@ -156,7 +156,7 @@ if (oversize.length) {
 
 const registeredPageDirs = new Set(PAGE_PATHS.map((page) => path.dirname(page)))
 const physicalPageDirs = fs.readdirSync(path.join(ROOT, 'pages'), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
+  .filter((entry) => entry.isDirectory() && !PARKED_DIRS.has(`pages/${entry.name}`))
   .map((entry) => `pages/${entry.name}`)
 const loosePageFiles = fs.readdirSync(path.join(ROOT, 'pages'), { withFileTypes: true })
   .filter((entry) => entry.isFile())
@@ -557,9 +557,9 @@ if (
   resumeDiagnoseWxml.includes('这不是录取分') &&
   resumeDiagnoseWxml.includes('report.truncatedInput') &&
   resumeDiagnoseWxml.includes('打印原件') &&
-  resumeDiagnoseJs.includes('viewJobs()')
+  resumeDiagnoseJs.includes('goPrint()')
 ) ok('简历诊断页展示问题证据、内容块、截断提示与非 AI 失败出口')
-else bad('简历诊断结果层', '必须引用 issues/contentBlocks，说明非录取分，展示截断提示，并保留打印原件/去打印/查看岗位出口')
+else bad('简历诊断结果层', '必须引用 issues/contentBlocks，说明非录取分，展示截断提示，并保留打印原件/去打印出口（「查看岗位」随岗位页停放）')
 
 if (
   resumeParseJs.includes('selectedDimensions') &&

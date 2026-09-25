@@ -5,7 +5,7 @@ const storage = require('../../utils/storage')
 const auth = require('../../utils/auth')
 
 /**
- * 岗位匹配参考。
+ * 简历对照（原「岗位匹配参考」，后端能力名仍是 job_fit）。
  *
  * 合规红线:后端只输出 fitLevel 三档参考等级(reference_high / medium / low),
  * **没有百分比、匹配率或录用概率字段**,服务端还有双层拦截。
@@ -38,12 +38,10 @@ Page({
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     const opts = options || {}
-    const jobId = opts.jobId || ''
-    const hint = opts.jobTitle ? decodeURIComponent(opts.jobTitle) : ''
+    // 只做「简历 ↔ 用户自己填写 / 粘贴的职位要求」对照：不再接收 jobId / jobTitle，
+    // 平台岗位入口（岗位详情页）已停放，首发按非招聘类目提审（compliance-boundary.md §1.1）。
     const historyTaskId = opts.taskId || ''
     this.setData({
-      jobId,
-      jobTitleHint: hint,
       taskId: historyTaskId,
       historyMode: !!historyTaskId,
     })
@@ -98,7 +96,7 @@ Page({
 
   _checkConsent() {
     if (!this._isAnonymousTask && !auth.isLoggedIn()) {
-      this._fail('登录已失效，请重新登录后使用岗位匹配参考')
+      this._fail('登录已失效，请重新登录后使用简历对照')
       return
     }
     const request = this._isAnonymousTask
@@ -144,7 +142,7 @@ Page({
           this.setData({ phase: 'done', fit })
           return
         }
-        this._fail('这条岗位匹配记录没有可展示的结果')
+        this._fail('这条简历对照记录没有可展示的结果')
       })
       .catch((err) => {
         if (this._stopped) return
@@ -152,7 +150,7 @@ Page({
           this._fail('登录已失效，请重新登录后查看历史结果')
           return
         }
-        this._fail((err && err.message) || '历史岗位匹配结果读取失败')
+        this._fail((err && err.message) || '历史简历对照结果读取失败')
       })
   },
 
@@ -257,7 +255,7 @@ Page({
         wx.hideLoading()
         this.setData({ printing: false })
         if (this._stopped) return
-        const name = encodeURIComponent((res && res.filename) || '岗位匹配决策报告.pdf')
+        const name = encodeURIComponent((res && res.filename) || '简历对照报告.pdf')
         const fid = encodeURIComponent((res && res.fileId) || '')
         const pages = (res && res.pageCount) || ''
         wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${fid}&pages=${pages}` })
@@ -272,16 +270,6 @@ Page({
           confirmText: '知道了',
         })
       })
-  },
-
-  /** 只有系统内岗位(jobId 模式)有详情页,手填岗位没有 */
-  tapViewJob() {
-    const id = this.data.jobId || (this.data.fit && this.data.fit.job.id)
-    if (!id) {
-      wx.showToast({ title: '手填岗位没有详情页', icon: 'none' })
-      return
-    }
-    wx.navigateTo({ url: `/pages/job-detail/job-detail?id=${id}` })
   },
 
   tapOptimizeResume() {
@@ -307,10 +295,10 @@ Page({
 
   tapRevokeConsent() {
     wx.showModal({
-      title: '撤销岗位分析授权',
+      title: '撤销 AI 分析授权',
       content: this._isAnonymousTask
-        ? '撤销后，这份匿名简历不能再次用于岗位分析，重新授权后可继续。'
-        : '撤销后，账号内简历不能再次用于岗位 AI 分析，重新授权后可继续。',
+        ? '撤销后，这份匿名简历不能再次用于简历对照，重新授权后可继续。'
+        : '撤销后，账号内简历不能再次用于简历对照，重新授权后可继续。',
       confirmText: '确认撤销',
       confirmColor: '#b5643c',
       success: (modal) => {
@@ -353,6 +341,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '岗位匹配参考', path: '/pages/job-fit/job-fit' }
+    return { title: '简历对照', path: '/pages/job-fit/job-fit' }
   },
 })

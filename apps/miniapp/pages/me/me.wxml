@@ -99,7 +99,7 @@
         </view>
       </view>
 
-      <view class="privacy-note">系统只记录本人的浏览、收藏、外部跳转、打印与 AI 调用行为，不记录投递或预约结果。</view>
+      <view class="privacy-note">你的简历、文档、打印订单和 AI 记录只对你本人可见，不提供给任何第三方。</view>
       <view class="tab-spacer"></view>
     </view>
   </scroll-view>
