@@ -16,6 +16,8 @@ import {
   type DegradedSelfAssessmentDimension,
 } from './career-plan-degraded'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
+import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
+import { storedJobFitUsesSystemJob, systemJobTitleFromJobFit } from './job-fit-hosting'
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -62,6 +64,42 @@ interface StoredCareerPlan {
     selfAssessment: string | null
   }
   providerName: string
+}
+
+function scrubSystemJobTitle(value: string, title: string): string {
+  return title.length >= 2 ? value.split(title).join('') : value
+}
+
+/** 去掉系统岗位标题，保留规划正文。basedOn.jobFit 清空，避免标题从依据栏漏出。 */
+export function redactCareerPlanSystemJobTitle(stored: StoredCareerPlan, title: string): StoredCareerPlan {
+  const clean = (value: string | undefined) => scrubSystemJobTitle(value ?? '', title)
+  const payload = stored.payload
+  return {
+    ...stored,
+    basedOn: { ...stored.basedOn, jobFit: null },
+    payload: {
+      ...payload,
+      summary: clean(payload?.summary),
+      currentSnapshot: (payload?.currentSnapshot ?? []).map((item) => ({
+        ...item,
+        point: clean(item.point),
+        evidence: clean(item.evidence),
+      })),
+      directions: (payload?.directions ?? []).map((item) => ({
+        ...item,
+        title: clean(item.title),
+        why: clean(item.why),
+        firstStep: clean(item.firstStep),
+      })),
+      skillPlan: (payload?.skillPlan ?? []).map((item) => ({
+        ...item,
+        skill: clean(item.skill),
+        action: clean(item.action),
+        timeframe: clean(item.timeframe),
+      })),
+      actionChecklist: (payload?.actionChecklist ?? []).map((item) => clean(item)),
+    },
+  }
 }
 
 @Injectable()
@@ -208,7 +246,8 @@ export class CareerPlanService {
     if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
       throw new NotFoundException({ error: { code: 'CAREER_PLAN_NOT_FOUND', message: '暂无职业规划记录，请先生成' } })
     }
-    return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredCareerPlan)
+    const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
+    return this.toResponse(taskId, await this.withoutSystemJobTitle(taskId, stored))
   }
 
   /**
@@ -231,7 +270,7 @@ export class CareerPlanService {
     const hasPlan = !!row && !!row.expiresAt && row.expiresAt.getTime() >= Date.now()
 
     const rendered = hasPlan
-      ? await this.renderAiPlanPdf(row!)
+      ? await this.renderAiPlanPdf(taskId, row!)
       : await this.renderDegradedPdf(parse, row ? 'expired' : 'never_generated')
 
     const uploaded = await this.files.upload({
@@ -266,9 +305,23 @@ export class CareerPlanService {
     }
   }
 
+  /**
+   * 托管关闭时，旧规划里引用的系统岗位标题从读取结果和打印稿里去掉。
+   * 整份规划仍然返回。没有 job_fit 存档时无法判断来源，保持原文。
+   */
+  private async withoutSystemJobTitle(taskId: string, stored: StoredCareerPlan): Promise<StoredCareerPlan> {
+    if (isRecruitmentContentHostingEnabled()) return stored
+    const fit = await this.prisma.aiResumeResult.findUnique({
+      where: { taskId_kind: { taskId, kind: 'job_fit' } },
+      select: { payloadJson: true },
+    })
+    if (!fit?.payloadJson || !storedJobFitUsesSystemJob(fit.payloadJson)) return stored
+    return redactCareerPlanSystemJobTitle(stored, systemJobTitleFromJobFit(fit.payloadJson) ?? '')
+  }
+
   /** AI 版式。逻辑与改动前一致，只是抽成方法。 */
-  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }) {
-    const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
+  private async renderAiPlanPdf(taskId: string, row: { payloadJson: string; updatedAt: Date }) {
+    const stored = await this.withoutSystemJobTitle(taskId, JSON.parse(row.payloadJson) as StoredCareerPlan)
     const { buffer, pageCount } = await this.pdf.render(
       { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn },
       stored.payload,

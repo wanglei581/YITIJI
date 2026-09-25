@@ -675,6 +675,9 @@ model Organization {
   contentTrustReviewedAt DateTime?
   contentTrustReason String?
   archivedAt DateTime?
+  /// 入驻时核验过的官方注册域。JSON 数组，元素为 domain / verifiedAt / verifiedBy。
+  /// 这是机构身份核验，不是渠道内容审核。渠道能否保存只跟这份名单比对。
+  verifiedOfficialDomainsJson String @default("[]")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

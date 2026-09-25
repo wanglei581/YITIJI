@@ -17,6 +17,18 @@ export function storedJobFitUsesSystemJob(payloadJson: string | null | undefined
   }
 }
 
+/** 系统内岗位存档上的标题。没有 job.id，或标题短于 2 个字时不返回标题。 */
+export function systemJobTitleFromJobFit(payloadJson: string | null | undefined): string | null {
+  if (!storedJobFitUsesSystemJob(payloadJson)) return null
+  try {
+    const stored = JSON.parse(payloadJson ?? '') as { job?: { title?: unknown } }
+    const title = typeof stored.job?.title === 'string' ? stored.job.title.trim() : ''
+    return title.length >= 2 ? title : null
+  } catch {
+    return null
+  }
+}
+
 /** 托管关闭时，只有手填岗位的存档可以查看或打印。 */
 export function assertStoredJobFitReadable(payloadJson: string | null | undefined): void {
   if (isRecruitmentContentHostingEnabled()) return

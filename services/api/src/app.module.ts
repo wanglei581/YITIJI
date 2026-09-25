@@ -64,6 +64,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 import { ClientDeclarationMiddleware } from './common/privacy/client-declaration.middleware'
 import { RecruitmentContentModule } from './recruitment-content/recruitment-content.module'
 import { RecruitmentHostingModule } from './recruitment-hosting/recruitment-hosting.module'
+import { OfficialChannelsModule } from './official-channels/official-channels.module'
 import { CommunityModule } from './community/community.module'
 import { AssistantModule } from './assistant/assistant.module'
 import { DocumentConversionModule } from './document-conversion/document-conversion.module'
@@ -156,6 +157,7 @@ const redisUrl = process.env['REDIS_URL']
     OfflineAgenciesModule,
     RecruitmentContentModule,
     RecruitmentHostingModule,
+    OfficialChannelsModule,
     KioskSessionModule,
     HelpModule,
     LegalModule,
