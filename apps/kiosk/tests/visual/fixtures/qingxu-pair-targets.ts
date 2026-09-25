@@ -28,7 +28,7 @@ import {
 } from './kiosk-p1-evidence-capture-api'
 import { assistantMockFallbackReply, assistantReply } from './fusion-w3-states'
 import { writeScanWorkbenchSession } from './fusion-w2-state'
-import { w6KioskCases, type W6RouteCase } from './fusion-w6-route-cases'
+import { w6RouteCases, type W6RouteCase } from './fusion-w6-route-cases'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const PROTO_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08')
@@ -550,18 +550,25 @@ function canonical(route: string | null): string | null {
   return `${mapped}${mapped.includes('?') ? '&' : '?'}${query}`
 }
 
+function findCase(pathPart: string | undefined): W6RouteCase | undefined {
+  if (!pathPart) return undefined
+  return w6RouteCases.find((item) => item.pattern === pathPart || item.url.split('?')[0] === pathPart)
+}
+
 function w6Case(route: string | null): W6RouteCase | undefined {
   if (!route) return undefined
-  const pathPart = canonical(route)?.split('?')[0]
-  return w6KioskCases.find((item) => item.pattern === pathPart || item.url.split('?')[0] === pathPart)
+  const raw = route.split('?')[0]
+  return findCase(raw) ?? findCase(canonical(route)?.split('?')[0])
 }
 
 function runtimeUrlFor(route: string | null): string | null {
   const canon = canonical(route)
-  if (!canon) return null
-  const hit = w6Case(canon)
+  if (!canon || !route) return null
+  const raw = route.split('?')[0]
+  if (CANONICAL_ROUTE[raw]) return canon
+  const hit = w6Case(route)
   if (!hit) return canon
-  const extra = canon.includes('?') ? canon.slice(canon.indexOf('?')) : ''
+  const extra = route.includes('?') ? route.slice(route.indexOf('?')) : ''
   const base = hit.url.split('?')[0]
   if (!extra) return hit.url
   const own = hit.url.includes('?') ? hit.url.slice(hit.url.indexOf('?') + 1) : ''
