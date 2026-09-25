@@ -18,8 +18,13 @@
 //  4. **不包大事务**:见 executeBulkPublish 注释。
 // ============================================================
 
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common'
+import {
+  ADMIN_POLICY_PUBLISH_DISABLED_CODE,
+  EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE,
+  assertNotEmergencyHeld,
+  assertRecruitmentContentHostingEnabled,
+} from '../recruitment-hosting/recruitment-hosting'
 import { PrismaService } from '../prisma/prisma.service'
 import { JobsService } from '../jobs/jobs.service'
 import { PoliciesService } from '../policies/policies.service'
@@ -232,6 +237,7 @@ export class BulkPublishService {
    * 只读,不写任何状态。
    */
   async previewBulkPublish(filter: BulkPublishFilter): Promise<BulkPublishPreviewResult> {
+    this.assertAdminPolicyBulk(filter.kind)
     const d = this.descriptor(filter.kind)
     const scope = this.scopeWhere(filter)
 
@@ -326,6 +332,7 @@ export class BulkPublishService {
     rawIds: string[],
     user: AuthedUser,
   ): Promise<BulkPublishExecuteResult> {
+    this.assertAdminPolicyBulk(kind)
     assertRecruitmentContentHostingEnabled()
     const ids = [...new Set(rawIds.filter((id) => typeof id === 'string' && id.trim().length > 0))]
 
@@ -359,6 +366,25 @@ export class BulkPublishService {
       },
     })
     const rowMap = new Map(prefetched.map((r) => [String(r.id), r]))
+    const holdType = kind === 'fair' ? 'job_fair' : 'job'
+    const blockedIds: string[] = []
+    for (const id of ids) {
+      try {
+        await assertNotEmergencyHeld(this.prisma, holdType, id)
+      } catch (error) {
+        if (extractError(error).code !== EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE) throw error
+        blockedIds.push(id)
+      }
+    }
+    if (blockedIds.length > 0) {
+      throw new ForbiddenException({
+        error: {
+          code: EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE,
+          message: '批量发布包含已紧急下架的内容，整批未发布',
+          blockedIds,
+        },
+      })
+    }
 
     const results: BulkPublishItemResult[] = []
     for (const id of ids) {
@@ -397,6 +423,14 @@ export class BulkPublishService {
     )
 
     return { kind, requested: ids.length, publishedCount, failedCount, results }
+  }
+
+  /** 管理员对政策只剩紧急下架，批量发布与托管开关无关。 */
+  private assertAdminPolicyBulk(kind: BulkPublishKind): void {
+    if (kind !== 'policy') return
+    throw new ForbiddenException({
+      error: { code: ADMIN_POLICY_PUBLISH_DISABLED_CODE, message: '管理员不能批量发布政策' },
+    })
   }
 }
 
