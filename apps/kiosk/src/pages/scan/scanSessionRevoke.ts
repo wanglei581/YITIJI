@@ -1,3 +1,4 @@
+import type { ScanTaskStatus } from '@ai-job-print/shared'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
 import { readScanWorkbenchSession, type ScanLiveState } from './scanWorkbenchSession'
@@ -76,6 +77,52 @@ const REVOKE_ATTEMPT_CAP: Record<ScanRevokeIntent, number> = {
  */
 const attemptsByTask = new Map<string, number>()
 
+/**
+ * 服务端**亲口报过终态**的 scanTaskId。进了这张表，本机就再也不为它发 DELETE ——
+ * 任何意图都不例外，补偿也不例外。
+ *
+ * ## 它补的是哪一个洞（2026-09-26，CI run 36172469588）
+ *
+ * 上面第 3 条硬约束「已是终态就不发」原先只靠本机登记兑现：结果快照（`hasResult`）、
+ * 或者 live 已经被抹掉。可等待页那次投递确认（ACK）的回调**不读登记** —— 凭证在挂载
+ * 那一刻就进了闭包，回话时只看「扫描代次变没变」。而等待页自己处理服务端的
+ * `cancelled` 时也推进代次（`returnToStart` 的 `live: undefined`）。确认与第一次状态
+ * 查询是挂载时**同时**发出的，谁先回话由网络决定：只要状态先回、确认后回，那次确认
+ * 就被读成「用户走了、任务可能刚变得可投递」，补发一次 DELETE —— 给的是一条服务端
+ * 早已终结的任务。completed / failed / expired 同理：确认还在路上时用户从结果页离开，
+ * 代次一样会变。
+ *
+ * ## 为什么挡得住所有意图
+ *
+ * 服务端的终态是吸收态：scan-tasks.service.ts 里没有任何一条路把 completed / failed /
+ * expired / cancelled 改回 waiting，而 Agent 的租约只签 `status: 'waiting'` 的行
+ * （getScanDeliveryLease）。服务端说过一次终态，这条任务就再也收不到文件 ——
+ * 补偿要防的那个「可投递却没人看着的收件箱」已经不可能出现，再发只会换回 409 / 400。
+ * 「确认成功」也推翻不了这一点：`ack()` 对**已经确认过**的任务原样回当初的时间戳，
+ * 这一句排在状态判断之前，任务被取消之后照样回 200。
+ *
+ * 判据挂在两个入口共用的 {@link sendRevoke} 上，而不是某一个调用点：等待页的补偿、
+ * 设置页的补偿、离开 / 清场那一路合起来，谁都绕不过它。模块内存即可 —— 整页重载之后
+ * 只剩 sessionStorage 里的登记，而终态在那里已经由结果快照 / 被抹掉的 live 表达了。
+ */
+const endedByServer = new Set<string>()
+
+/** 服务端一旦报出这几种状态，这条任务就不会再变回可投递（理由见 {@link endedByServer}）。 */
+const SERVER_TERMINAL_STATUSES: ReadonlySet<string> = new Set(
+  ['completed', 'failed', 'expired', 'cancelled'] satisfies readonly ScanTaskStatus[],
+)
+
+/**
+ * 记下服务端刚刚对这条任务说的状态。只记终态；waiting / matched 以及任何本机不认识的值
+ * 一律不记 —— 判不准就保留撤销的能力。
+ *
+ * 调用方（等待页的轮询、取消回执）拿到回答**先记，再改屏 / 推进代次**：代次一变，
+ * 还在路上的那次确认回话随时可能落地，那一刻这张表里必须已经有它。
+ */
+export function noteScanTaskStatusFromServer(scanTaskId: string, status: ScanTaskStatus): void {
+  if (SERVER_TERMINAL_STATUSES.has(status)) endedByServer.add(scanTaskId)
+}
+
 function revokeUrl(scanTaskId: string): string {
   return new URL(
     `${API_BASE_URL}/scan/sessions/${encodeURIComponent(scanTaskId)}`,
@@ -94,6 +141,9 @@ function sendRevoke(
   outgoingMemberToken: string | null | undefined,
   intent: ScanRevokeIntent,
 ): boolean {
+  // 服务端已经报过终态：这条任务不可能再被投递，DELETE 只是一次注定 409 / 400 的噪音。
+  // 排在去重之前，而且不看意图 —— 补偿也不例外（见 endedByServer）。
+  if (endedByServer.has(scanTaskId)) return false
   // 判据是「已经发了几次」对上「这一次的意图允许几次」，不是「发过没有」：
   // 清场那一次丢了而 ACK 随后成功的场景里，「发过没有」会把唯一一次补偿挡掉。
   const alreadySent = attemptsByTask.get(scanTaskId) ?? 0
@@ -157,7 +207,9 @@ export function revokeLiveScanSession(outgoingMemberToken: string | null | undef
  * 把上一位的收件箱重新立起来。所以这条路径由**持有响应的那一方**直接交出凭证。
  *
  * 三点和上面一致，不再重复判断：
- * 1. 凭证是服务端刚刚回的，必然不是终态、也必然没过期 —— 不再查 hasResult / expiresAt；
+ * 1. 本机登记那两道判据（hasResult / expiresAt）这里不查：凭证不来自登记。但别据此以为
+ *    「凭证必然不是终态」—— 确认补偿交来的是挂载时抓进闭包的凭证，那之后服务端可能
+ *    已经报过终态。这一条由 {@link sendRevoke} 里的 {@link endedByServer} 挡，两个入口同一道；
  * 2. 身份必须是**发起创建的那一个**（服务端 `cancel()` 校验 `task.endUserId === endUserId`，
  *    换人之后用新身份发只会 403，旧任务原地存活），所以入参由调用方在创建时取好；
  * 3. 与 `revokeLiveScanSession` 共用同一份计数与同一套上限（{@link REVOKE_ATTEMPT_CAP}）。
