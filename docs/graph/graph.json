@@ -11771,7 +11771,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 561,
+      "reachableFileCount": 562,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14699,7 +14699,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 638
+      "sourceFileCount": 639
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -36080,7 +36080,6 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-          "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "docs/design/kiosk-v6-migration-matrix.md"
         ],
         "risk": "high",

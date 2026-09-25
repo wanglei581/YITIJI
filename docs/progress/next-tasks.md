@@ -35,7 +35,7 @@
 | 08-legal | `/legal/:doc` | 未在 QX 集合；待实屏验 |
 | 09-system-state | `/error-offline` | 未在 QX 集合；待实屏验 |
 | 10-print-hub | `/print-scan` | 原稿结构与七态运行时增量已合流；1080×1920/390 本地截图、正式构建浏览器 9/9，真实设备/接口/Windows 字体待验 |
-| 11-arrival-code | `/print/pickup-claim` | 本地手输态按用户原稿修复 1080/390 码格、键盘和扫码指引；主候选取件/终端会话 14/14 通过，HID 实物、其它状态、真机/支付/出纸仍待验 |
+| 11-arrival-code | `/print/pickup-claim` | 原稿输入/旧码/扫码、等待/错误/成功结构已合流本地候选；正式构建 W2 取件打印 58/58，1080/390 待输/成功实屏。Agy 复核超时未审，顶栏样式仍与原稿有差异；HID 实物、逐态、真机/支付/出纸和线上仍待验，UI/商业 NO-GO。 |
 | 12-file-source | `/print/upload` | 本地修复 1080 重复页头、390 来源卡/当前文件/操作条布局；W2 2/2 通过。有效二维码、USB/文件落库各态及真机待验，UI NO-GO |
 | 13-print-desk | `/print/material-check` → `/print/desk?step=check` | 本地无文件态与有效文件等待、隐私结果、遮挡失败/重试及旧摘要预览守卫做了状态安全/可用性修复；相关 W2 6/6。结构级源稿对齐、真实 OCR/PII、参数报价及真机逐态待验，UI NO-GO |
 | 14-print-confirm | `/print/confirm` | QX 路由已登记；视觉待验 |
