@@ -514,7 +514,10 @@ export class AlipayProvider implements PaymentProvider {
     }
     // refund_status=REFUND_SUCCESS → 成功；查得记录但无该字段 → 受理中/不可判（绝不假报成功）。
     const refundStatus = asString(node['refund_status'])
-    if (refundStatus === 'REFUND_SUCCESS') return { status: 'success', channelRefundNo: asString(node['trade_no']) }
+    const refundAmountCents = yuanToCents(asString(node['refund_amount']))
+    if (refundStatus === 'REFUND_SUCCESS') {
+      return { status: 'success', channelRefundNo: asString(node['trade_no']), refundAmountCents }
+    }
     const hasRecord = asString(node['out_request_no']) === input.refundNo
     return { status: hasRecord ? 'processing' : 'unknown', channelRefundNo: asString(node['trade_no']) }
   }

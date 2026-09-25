@@ -14,6 +14,7 @@ import {
 import { priceChanged } from '../payment/order-quote.service'
 import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
+import { forbidsAutomaticReprint, PARTIAL_OUTPUT_ERROR_CODE } from './paid-anomaly-disposition'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
@@ -128,7 +129,6 @@ const USER_FAILURE_REASONS: Record<string, string> = {
 
 /** 未知错误码 / 仅有原始 errorMessage 时的统一安全兜底文案。 */
 const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请联系工作人员处理或稍后重试'
-const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
 const KIOSK_RETRY_LOG_CODE = 'kiosk_retry'
 
 const printJobFileSelect = {
@@ -712,11 +712,14 @@ export class PrintJobsService {
         error: { code: 'PRINT_RETRY_INVALID_STATE', message: '仅失败的打印任务可以重新提交' },
       })
     }
-    if (task.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE) {
+    if (forbidsAutomaticReprint(task.errorCode)) {
+      const partial = task.errorCode === PARTIAL_OUTPUT_ERROR_CODE
       throw new ConflictException({
         error: {
-          code: 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
-          message: '打印结果未确认，不能重新提交，请联系工作人员核查',
+          code: partial ? 'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN' : 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
+          message: partial
+            ? '只出了一部分，不能自动重打或自动退款，请联系工作人员'
+            : '打印结果未确认，不能重新提交，请联系工作人员核查',
         },
       })
     }
@@ -843,7 +846,7 @@ export class PrintJobsService {
       task.status === 'failed' &&
       order.payStatus === 'paid' &&
       order.taskStatus === 'failed' &&
-      task.errorCode !== PRINT_JOB_UNCONFIRMED_ERROR_CODE &&
+      !forbidsAutomaticReprint(task.errorCode) &&
       isPrintableFileRecord(file)
     )
   }

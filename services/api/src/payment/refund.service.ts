@@ -26,7 +26,9 @@
  *     （discountCents 非 0 拒绝——线上入账单当前不可能有抵扣，防御性断言）；
  *   · `offline` / `manual_confirmed` / `free` / `voucher` → 不调 provider（只记状态 + 审计），
  *     且 voucher/free 退款**不恢复 BenefitGrant 额度**。
- * - 全额退款为主；`partial_refunded` 与部分退款动作仅预留，不接。
+ * - 只做整单退款。没有部分退款入口；`partial_refunded` 不写入。
+ *   渠道通知或查证金额不等于整单实付时，Refund 进入 manual_review，订单停在
+ *   refunding 并记 refund.notify_amount_mismatch，不自动再打一笔，也不无限抛错重试。
  */
 import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
@@ -34,6 +36,11 @@ import { PrismaService } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
 import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput, type RefundExecuteResult } from './payment-provider.types'
+import {
+  holdMismatchedChannelRefund,
+  isWholeOrderRefundAmount,
+  REFUND_STATUS_MANUAL_REVIEW,
+} from './refund-amount-hold'
 import {
   isOnlineCollectedPendingRefund,
   isOnlineCollectedRefundLock,
@@ -170,17 +177,21 @@ export class RefundService {
     const refund = await this.prisma.refund.findUnique({ where: { refundNo: event.refundNo } })
     if (!refund) throw new BadRequestException('REFUND_NOTIFY_UNKNOWN_REFUND') // 不误改任何订单
     if (refund.channel !== 'wechat') throw new BadRequestException('REFUND_NOTIFY_CHANNEL_MISMATCH')
-    // 金额交叉核对：通知退款额必须与本地退款记录一致（SUCCESS 必带金额，provider 已保证）。
-    if (event.status === 'success' && event.refundAmountCents !== refund.amountCents) {
-      await this.audit.write({
-        actorId: null,
-        actorRole: 'system',
-        action: 'refund.notify_amount_mismatch',
-        targetType: 'order',
-        targetId: refund.orderId,
-        payload: { refundNo: refund.refundNo, notifyAmountCents: event.refundAmountCents, localAmountCents: refund.amountCents },
-      })
-      throw new BadRequestException('REFUND_NOTIFY_AMOUNT_MISMATCH')
+    // 金额必须等于整单实付。不等时进人工，对渠道回成功，避免通知重试把订单卡在 refunding。
+    if (event.status === 'success') {
+      const order = await this.requireOrder(refund.orderId)
+      const notifyAmount = event.refundAmountCents
+      if (notifyAmount === null || !isWholeOrderRefundAmount(order, notifyAmount, refund.amountCents)) {
+        const outcome = await holdMismatchedChannelRefund(this.prisma, {
+          refundId: refund.id,
+          refundNo: refund.refundNo,
+          order,
+          recordedAmountCents: refund.amountCents,
+          notifyAmountCents: notifyAmount,
+          channelRefundNo: event.channelRefundNo,
+        })
+        return outcome === 'idempotent' ? { ok: true, idempotent: true } : { ok: true }
+      }
     }
 
     if (event.status === 'success') {
@@ -275,6 +286,9 @@ export class RefundService {
     // ① 幂等门：同 refundNo 已存在。
     const existing = await this.prisma.refund.findUnique({ where: { refundNo } })
     if (existing) {
+      if (existing.status === REFUND_STATUS_MANUAL_REVIEW) {
+        return this.toView(existing, await this.requireOrder(existing.orderId), true)
+      }
       if (REAL_REFUND_CHANNELS.has(existing.channel) && existing.status === 'pending') {
         return this.convergePendingRefund(existing, opts.operatorId)
       }
@@ -660,6 +674,21 @@ export class RefundService {
     if (q.status === 'unknown') {
       // 渠道查无此单：原退款请求可能从未到达渠道 —— 同号重发（渠道幂等，绝不二次出款）。
       return this.executeProviderRefund(refund, operatorId)
+    }
+    if (
+      typeof q.refundAmountCents === 'number' &&
+      !isWholeOrderRefundAmount(order, q.refundAmountCents, refund.amountCents)
+    ) {
+      await holdMismatchedChannelRefund(this.prisma, {
+        refundId: refund.id,
+        refundNo: refund.refundNo,
+        order,
+        recordedAmountCents: refund.amountCents,
+        notifyAmountCents: q.refundAmountCents,
+        channelRefundNo: q.channelRefundNo,
+      })
+      const parked = await this.prisma.refund.findUnique({ where: { id: refund.id } })
+      return this.toView(parked ?? refund, await this.requireOrder(refund.orderId), false)
     }
     return this.completePendingRefund(refund, q.channelRefundNo, operatorId, { converged: true })
   }
