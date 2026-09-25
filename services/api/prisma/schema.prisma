@@ -2452,6 +2452,23 @@ model TerminalToolboxConfig {
   updatedAt   DateTime @updatedAt
 }
 
+// ── KioskJobBoardConfig ──────────────────────────────────────────────────────
+// 一体机岗位板块开关。落库方式与 TerminalToolboxConfig 相同（自由 terminalId
+// 字符串，可在终端注册前预置），下发仍走 GET /terminals/:id/config，不另建通道。
+//
+// terminalId = '__global__' 是全局行；其它值是终端 terminalCode。
+// 无行 = 开（全局默认开、逐台默认开）。全局 enabled=false 优先于逐台开。
+//
+// 不复用 TerminalCapability：缺行在那张表里是拒绝，且没有全局行，和「默认开」相反。
+model KioskJobBoardConfig {
+  id         String   @id @default(cuid())
+  terminalId String   @unique
+  enabled    Boolean  @default(true)
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
 // ── ToolboxGovernance ──────────────────────────────────────────────────────
 // 百宝箱微应用审核发布底座。这里只存声明式元数据和版本快照,不承载第三方代码。
 // 发布到终端时由服务端将已审核版本投影到 TerminalToolboxConfig.itemsJson。
