@@ -6,9 +6,10 @@ import { OfflineAgenciesService } from './offline-agencies.service'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
 import { AuditModule } from '../audit/audit.module'
+import { TerminalsModule } from '../terminals/terminals.module'
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule],
+  imports: [PrismaModule, AuthModule, AuditModule, TerminalsModule],
   controllers: [
     OfflineAgenciesController,
     KioskOfflineJobsController,

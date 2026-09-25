@@ -15,6 +15,11 @@ import type { JobAiQuotaContext } from './job-ai-quota.service'
 
 import { resolveClientIp } from '../common/client-ip'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
   ip?: string
@@ -99,11 +104,17 @@ export class JobAiController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    private readonly jobBoard: KioskJobBoardService,
   ) {}
+
+  private assertJobBoard(req: ReqLike): Promise<void> {
+    return this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req as KioskJobBoardRequest))
+  }
 
   @Post('ai/recommendations')
   @PaidAiThrottle(6)
   async recommendations(@Body() dto: JobRecommendationsDto, @Req() req: ReqLike) {
+    await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
     return ApiResponse.ok(await this.service.recommendations({
@@ -118,6 +129,7 @@ export class JobAiController {
   @Post(':id/ai/explain')
   @PaidAiThrottle(10)
   async explain(@Param('id') id: string, @Req() req: ReqLike) {
+    await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
     return ApiResponse.ok(await this.service.explainJob(id, requester, quota.terminal, quota))
@@ -126,6 +138,7 @@ export class JobAiController {
   @Post(':id/ai/match')
   @PaidAiThrottle(6)
   async match(@Param('id') id: string, @Body() dto: JobAiMatchDto, @Req() req: ReqLike) {
+    await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
     return ApiResponse.ok(await this.governed.matchForMember({

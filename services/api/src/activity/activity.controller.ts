@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common'
+import { Body, Controller, HttpCode, HttpStatus, Optional, Post, Req } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { ApiResponse } from '../common/dto/api-response.dto'
@@ -6,6 +6,10 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ActivityService } from './activity.service'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+} from '../terminals/kiosk-job-board.service'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
@@ -46,12 +50,22 @@ const TERMINAL_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
  */
 @Controller('activity')
 export class ActivityController {
+  private readonly jobBoard: KioskJobBoardService
+
   constructor(
     private readonly activity: ActivityService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
-  ) {}
+    @Optional() jobBoard?: KioskJobBoardService,
+  ) {
+    this.jobBoard = jobBoard ?? new KioskJobBoardService(prisma)
+  }
+
+  private async assertJobWrite(req: ReqLike, body: { terminalId?: string }, targetType: string): Promise<void> {
+    if (targetType !== 'job') return
+    await this.jobBoard.assertOpen(kioskJobBoardTerminalRef({ headers: req.headers, body }))
+  }
 
   private async endUserIdOf(req: ReqLike): Promise<string | null> {
     const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
@@ -73,6 +87,7 @@ export class ActivityController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
   async browse(@Body() body: RecordBrowseDto, @Req() req: ReqLike) {
+    await this.assertJobWrite(req, body, cleanStr(body.targetType) ?? '')
     const endUserId = await this.endUserIdOf(req)
     if (!endUserId) return ApiResponse.ok({ recorded: false as const, reason: 'LOGIN_REQUIRED' })
     const terminalId = await this.resolveTerminalId(body.terminalId)
@@ -89,6 +104,7 @@ export class ActivityController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async externalJump(@Body() body: RecordJumpDto, @Req() req: ReqLike) {
+    await this.assertJobWrite(req, body, cleanStr(body.targetType) ?? '')
     const endUserId = await this.endUserIdOf(req)
     if (!endUserId) return ApiResponse.ok({ recorded: false as const, reason: 'LOGIN_REQUIRED' })
     const terminalId = await this.resolveTerminalId(body.terminalId)

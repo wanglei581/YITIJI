@@ -10,6 +10,7 @@ import { AdminFairsController } from './admin-fairs.controller'
 import { PartnerFairsController } from './partner-fairs.controller'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
+import { TerminalsModule } from '../terminals/terminals.module'
 import { JobQualityService } from '../job-ai/job-quality.service'
 import { FilesModule } from '../files/files.module'
 import { FairMaterialPrintBridgeService } from './fair-material-print-bridge.service'
@@ -29,7 +30,7 @@ import { KioskCampusRecruitmentStatsController } from './kiosk-campus-recruitmen
   // StorageService 为 @Global 模块导出,AdminFairsService 直接注入(活动资料落地)
   // N5/N6: AdminFairsService 拆为门面 + 3 个内部子服务(不对外 export)
   // N1: JobsService 拆为门面 + 4 个业务域子服务
-  imports: [PrismaModule, AuthModule, FilesModule],
+  imports: [PrismaModule, AuthModule, FilesModule, TerminalsModule],
   providers: [
     // N1 子服务（不对外 export，仅供 JobsService 门面注入）
     JobsKioskService,
