@@ -53,6 +53,7 @@ import {
   snapshotLoadStatus,
 } from '../src/console-screen/console-screen.metric'
 import { metricKeysFor } from '../src/console-screen/console-screen.assemble'
+import { ConsoleScreenUsageService } from '../src/console-screen/console-screen.usage.service'
 import {
   loadAdminFleet,
   loadContentSlice,
@@ -85,6 +86,7 @@ function assert(label: string, condition: boolean, detail?: string): void {
   } else {
     console.error(`  ✗ ${label}${detail ? ` — ${detail}` : ''}`)
     failed += 1
+    if (process.env['VERIFY_FAIL_FAST'] === '1') process.exit(1)
   }
 }
 
@@ -175,6 +177,10 @@ function assertSourceContract(): void {
       && SHARED_CACHE_TTL_SECONDS.counts === SCREEN_CACHE_TTL_SECONDS.counts
       && SHARED_CACHE_TTL_SECONDS.cumulative === SCREEN_CACHE_TTL_SECONDS.cumulative
       && SCREEN_MIN_AGGREGATE_SAMPLE === 5,
+  )
+  assert(
+    '1y. 招聘内容托管未开启是稳定原因码',
+    SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled === 'recruitment_hosting_disabled',
   )
   const adminController = stripComments(readSrc('src/console-screen/console-screen.admin.controller.ts'))
   const partnerController = stripComments(readSrc('src/console-screen/console-screen.partner.controller.ts'))
@@ -840,6 +846,464 @@ async function assertNestConstructsCache(): Promise<void> {
   }
 }
 
+function isHostingClosed(
+  metric: { available: boolean; source: string; window: string; reason?: string } | undefined,
+  source: string,
+  window: string,
+): boolean {
+  return Boolean(
+    metric
+      && metric.available === false
+      && metric.reason === 'recruitment_hosting_disabled'
+      && SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled === 'recruitment_hosting_disabled'
+      && metric.source === source
+      && metric.window === window
+      && !('value' in metric),
+  )
+}
+
+function firstMetricDiff(left: object, right: object, except: readonly string[]): string {
+  const leftKeys = Object.keys(left).sort()
+  const rightKeys = Object.keys(right).sort()
+  if (JSON.stringify(leftKeys) !== JSON.stringify(rightKeys)) {
+    return `keys ${leftKeys.join(',')} vs ${rightKeys.join(',')}`
+  }
+  for (const key of leftKeys) {
+    if (except.includes(key)) continue
+    const l = JSON.stringify((left as Record<string, unknown>)[key])
+    const r = JSON.stringify((right as Record<string, unknown>)[key])
+    if (l !== r) return `${key} ${(l ?? '').slice(0, 140)} != ${(r ?? '').slice(0, 140)}`
+  }
+  return ''
+}
+
+function limitRest(limits: { recruitmentHosting: string }): string {
+  const { recruitmentHosting: _hosting, ...rest } = limits
+  return JSON.stringify(rest)
+}
+
+async function assertRecruitmentHostingContract(
+  prisma: PrismaService,
+  screen: ConsoleScreenService,
+  args: {
+    orgA: string
+    orgB: string
+    memberId: string
+    suffix: string
+    now: Date
+    jumpQualified: string
+    jumpSmall: string
+  },
+): Promise<void> {
+  const { orgA, orgB, memberId, suffix, now, jumpQualified, jumpSmall } = args
+  const orgEmpty = `org_scrn_host_${suffix}`
+  const policyId = `pol_host_${suffix}`
+  const fairId = `fair_host_${suffix}`
+  const companyId = `co_host_${suffix}`
+  let jobId = ''
+  process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
+  try {
+    const govOn = await screen.getAdminSnapshot('gov')
+    const opsOn = await screen.getAdminSnapshot('ops')
+    const partnerAOn = await screen.getPartnerSnapshot(orgA)
+    const partnerBOn = await screen.getPartnerSnapshot(orgB)
+    await prisma.organization.create({
+      data: { id: orgEmpty, name: '大屏托管空机构', type: 'school_employment_center', sceneTemplate: 'school', enabled: true },
+    })
+    const emptyOn = await screen.getPartnerSnapshot(orgEmpty)
+    const expectedLimits = JSON.stringify({
+      minAggregateSample: 5,
+      displayToken: 'not_issued',
+      displayTokenReason: 'display_token_not_issued',
+      access: 'authenticated_console',
+    })
+    const enabledSnaps = [govOn, opsOn, partnerAOn, partnerBOn, emptyOn]
+    assert(
+      '6a. 托管打开时 limits.recruitmentHosting=enabled，其余限额与打开前的口径相同',
+      enabledSnaps.every((snap) => snap.limits.recruitmentHosting === 'enabled' && limitRest(snap.limits) === expectedLimits),
+      limitRest(govOn.limits),
+    )
+    const govInventory = {
+      jobsPublished: 3,
+      jobsPending: 1,
+      fairsPublished: 0,
+      fairsPending: 0,
+      policiesPublished: 0,
+      policiesPending: 0,
+      companiesPublished: 0,
+      companiesPending: 0,
+    }
+    const pendingAll = { total: 1, jobs: 1, fairs: 0, policies: 0, companies: 0 }
+    const inventoryA = { ...govInventory, jobsPublished: 1 }
+    const inventoryB = { ...govInventory, jobsPublished: 2, jobsPending: 0 }
+    const inventoryEmpty = { ...govInventory, jobsPublished: 0, jobsPending: 0 }
+    const pendingB = { total: 0, jobs: 0, fairs: 0, policies: 0, companies: 0 }
+    assert(
+      '6c. 托管打开时在架岗位仍按种子计数，空机构是 0 而不是未接入',
+      govOn.metrics.jobsOnShelf?.available === true
+        && govOn.metrics.jobsOnShelf.value.published === 3
+        && govOn.metrics.jobsOnShelf.value.sourceOrgCount === 2
+        && govOn.metrics.jobsOnShelf.source === 'Job approved+published+validThrough'
+        && govOn.metrics.jobsOnShelf.window === 'current'
+        && partnerAOn.metrics.jobsOnShelf?.available === true
+        && partnerAOn.metrics.jobsOnShelf.value.published === 1
+        && partnerAOn.metrics.jobsOnShelf.value.sourceOrgCount === 1
+        && partnerBOn.metrics.jobsOnShelf?.available === true
+        && partnerBOn.metrics.jobsOnShelf.value.published === 2
+        && emptyOn.metrics.jobsOnShelf?.available === true
+        && emptyOn.metrics.jobsOnShelf.value.published === 0,
+      JSON.stringify(govOn.metrics.jobsOnShelf),
+    )
+    assert(
+      '6d. 托管打开时招聘会结构仍给出 0，材料打印计数保持原有未接入',
+      opsOn.metrics.fairStructure?.available === true
+        && opsOn.metrics.fairStructure.value.ongoingFairs === 0
+        && opsOn.metrics.fairStructure.value.companies === 0
+        && opsOn.metrics.fairStructure.value.zones === 0
+        && opsOn.metrics.fairStructure.value.publishedMaterials === 0
+        && opsOn.metrics.fairStructure.value.materialPrintCount.available === false
+        && opsOn.metrics.fairStructure.value.materialPrintCount.reason === SCREEN_UNAVAILABLE_REASON.printCountNeverIncremented
+        && opsOn.metrics.fairStructure.source === 'FairCompany/FairZone/FairMaterial'
+        && opsOn.metrics.fairStructure.window === 'ongoing'
+        && partnerAOn.metrics.fairStructure?.available === true
+        && partnerAOn.metrics.fairStructure.value.companies === 0
+        && JSON.stringify(partnerAOn.metrics.fairStructure) === JSON.stringify(opsOn.metrics.fairStructure),
+      JSON.stringify(opsOn.metrics.fairStructure)?.slice(0, 240),
+    )
+    assert(
+      '6e. 托管打开时管理员外跳榜仍按 30 天样本，机构端仍是缺少来源机构快照',
+      opsOn.metrics.sourceEntryOpensTop?.available === true
+        && opsOn.metrics.sourceEntryOpensTop.source === 'ExternalJumpLog.sourceName'
+        && opsOn.metrics.sourceEntryOpensTop.window === '30d'
+        && opsOn.metrics.sourceEntryOpensTop.value.copy === SCREEN_JUMP_COPY
+        && opsOn.metrics.sourceEntryOpensTop.value.items.some((item) => item.sourceName === jumpQualified && item.count === 20)
+        && !opsOn.metrics.sourceEntryOpensTop.value.items.some((item) => item.sourceName === jumpSmall)
+        && partnerAOn.metrics.sourceEntryOpensTop?.available === false
+        && partnerAOn.metrics.sourceEntryOpensTop.reason === SCREEN_UNAVAILABLE_REASON.missingImmutableSourceOrg
+        && partnerAOn.metrics.sourceEntryOpensTop.source === 'ExternalJumpLog'
+        && partnerAOn.metrics.sourceEntryOpensTop.window === 'current'
+        && !('value' in partnerAOn.metrics.sourceEntryOpensTop),
+    )
+
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+    const govOff = await screen.getAdminSnapshot('gov')
+    const opsOff = await screen.getAdminSnapshot('ops')
+    const partnerAOff = await screen.getPartnerSnapshot(orgA)
+    const partnerBOff = await screen.getPartnerSnapshot(orgB)
+    const emptyOff = await screen.getPartnerSnapshot(orgEmpty)
+    const disabledSnaps = [govOff, opsOff, partnerAOff, partnerBOff, emptyOff]
+    assert(
+      '6b. 托管关闭时 limits.recruitmentHosting=disabled，其余限额不变',
+      disabledSnaps.every((snap, index) => (
+        snap.limits.recruitmentHosting === 'disabled' && limitRest(snap.limits) === limitRest(enabledSnaps[index]!.limits)
+      )),
+      govOff.limits.recruitmentHosting,
+    )
+    assert(
+      '6f. 托管关闭后在架岗位改为未开启，空机构也不再显示 0',
+      isHostingClosed(govOff.metrics.jobsOnShelf, 'Job approved+published+validThrough', 'current')
+        && isHostingClosed(partnerAOff.metrics.jobsOnShelf, 'Job approved+published+validThrough', 'current')
+        && isHostingClosed(partnerBOff.metrics.jobsOnShelf, 'Job approved+published+validThrough', 'current')
+        && isHostingClosed(emptyOff.metrics.jobsOnShelf, 'Job approved+published+validThrough', 'current')
+        && !('jobsOnShelf' in opsOff.metrics),
+      JSON.stringify({ gov: govOff.metrics.jobsOnShelf, empty: emptyOff.metrics.jobsOnShelf }),
+    )
+    assert(
+      '6g. 托管关闭后招聘会结构改为未开启，不再展示参展企业 0',
+      isHostingClosed(opsOff.metrics.fairStructure, 'FairCompany/FairZone/FairMaterial', 'ongoing')
+        && isHostingClosed(partnerAOff.metrics.fairStructure, 'FairCompany/FairZone/FairMaterial', 'ongoing')
+        && isHostingClosed(partnerBOff.metrics.fairStructure, 'FairCompany/FairZone/FairMaterial', 'ongoing')
+        && isHostingClosed(emptyOff.metrics.fairStructure, 'FairCompany/FairZone/FairMaterial', 'ongoing')
+        && !('fairStructure' in govOff.metrics),
+      JSON.stringify(opsOff.metrics.fairStructure),
+    )
+    assert(
+      '6h. 托管关闭后外跳榜改为未开启，机构端不再沿用缺少来源快照',
+      isHostingClosed(opsOff.metrics.sourceEntryOpensTop, 'ExternalJumpLog.sourceName', '30d')
+        && isHostingClosed(partnerAOff.metrics.sourceEntryOpensTop, 'ExternalJumpLog', 'current')
+        && isHostingClosed(partnerBOff.metrics.sourceEntryOpensTop, 'ExternalJumpLog', 'current')
+        && isHostingClosed(emptyOff.metrics.sourceEntryOpensTop, 'ExternalJumpLog', 'current')
+        && !('sourceEntryOpensTop' in govOff.metrics),
+      JSON.stringify({ ops: opsOff.metrics.sourceEntryOpensTop, partner: partnerAOff.metrics.sourceEntryOpensTop }),
+    )
+    assert(
+      '6i. 内容库存与待审在关闭后仍可用，岗位、招聘会、企业字段原样保留',
+      govOn.metrics.contentInventory?.available === true
+        && JSON.stringify(govOn.metrics.contentInventory.value) === JSON.stringify(govInventory)
+        && JSON.stringify(govOff.metrics.contentInventory) === JSON.stringify(govOn.metrics.contentInventory)
+        && JSON.stringify(partnerAOn.metrics.contentInventory?.available === true ? partnerAOn.metrics.contentInventory.value : null) === JSON.stringify(inventoryA)
+        && JSON.stringify(partnerAOff.metrics.contentInventory) === JSON.stringify(partnerAOn.metrics.contentInventory)
+        && JSON.stringify(partnerBOn.metrics.contentInventory?.available === true ? partnerBOn.metrics.contentInventory.value : null) === JSON.stringify(inventoryB)
+        && JSON.stringify(partnerBOff.metrics.contentInventory) === JSON.stringify(partnerBOn.metrics.contentInventory)
+        && JSON.stringify(emptyOn.metrics.contentInventory?.available === true ? emptyOn.metrics.contentInventory.value : null) === JSON.stringify(inventoryEmpty)
+        && JSON.stringify(emptyOff.metrics.contentInventory) === JSON.stringify(emptyOn.metrics.contentInventory)
+        && opsOn.metrics.pendingReview?.available === true
+        && JSON.stringify(opsOn.metrics.pendingReview.value) === JSON.stringify(pendingAll)
+        && JSON.stringify(opsOff.metrics.pendingReview) === JSON.stringify(opsOn.metrics.pendingReview)
+        && JSON.stringify(partnerAOn.metrics.pendingReview?.available === true ? partnerAOn.metrics.pendingReview.value : null) === JSON.stringify(pendingAll)
+        && JSON.stringify(partnerAOff.metrics.pendingReview) === JSON.stringify(partnerAOn.metrics.pendingReview)
+        && JSON.stringify(partnerBOn.metrics.pendingReview?.available === true ? partnerBOn.metrics.pendingReview.value : null) === JSON.stringify(pendingB)
+        && JSON.stringify(partnerBOff.metrics.pendingReview) === JSON.stringify(partnerBOn.metrics.pendingReview)
+        && !('contentInventory' in opsOn.metrics)
+        && !('pendingReview' in govOn.metrics),
+      `gov=${JSON.stringify(govOff.metrics.contentInventory)?.slice(0, 180)} pending=${JSON.stringify(opsOff.metrics.pendingReview)}`,
+    )
+    const diffs = [
+      firstMetricDiff(govOn.metrics, govOff.metrics, ['jobsOnShelf']),
+      firstMetricDiff(opsOn.metrics, opsOff.metrics, ['fairStructure', 'sourceEntryOpensTop']),
+      firstMetricDiff(partnerAOn.metrics, partnerAOff.metrics, ['jobsOnShelf', 'fairStructure', 'sourceEntryOpensTop']),
+      firstMetricDiff(partnerBOn.metrics, partnerBOff.metrics, ['jobsOnShelf', 'fairStructure', 'sourceEntryOpensTop']),
+      firstMetricDiff(emptyOn.metrics, emptyOff.metrics, ['jobsOnShelf', 'fairStructure', 'sourceEntryOpensTop']),
+    ]
+    assert(
+      '6j. 审核时效和其余快照指标在开关两侧逐字段相同，状态仍是 ok',
+      diffs.every((diff) => diff === '')
+        && govOn.status === 'ok'
+        && govOff.status === 'ok'
+        && govOff.degraded === false
+        && opsOn.status === opsOff.status
+        && partnerAOn.status === partnerAOff.status
+        && emptyOn.status === emptyOff.status
+        && JSON.stringify(govOn.window) === JSON.stringify(govOff.window)
+        && opsOn.metrics.reviewSlaAndOrgDimension?.available === false
+        && opsOn.metrics.reviewSlaAndOrgDimension.reason === SCREEN_UNAVAILABLE_REASON.reviewDecisionUnwritten
+        && partnerAOn.metrics.reviewSlaAndOrgDimension?.reason === SCREEN_UNAVAILABLE_REASON.reviewDecisionUnwritten,
+      diffs.filter(Boolean).join(' | '),
+    )
+
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
+    const browseBefore = await prisma.browseLog.count()
+    const jobJumpsBefore = await prisma.externalJumpLog.count({ where: { targetType: 'job' } })
+    const jumpsBefore = await prisma.externalJumpLog.count()
+    const job = await prisma.job.findFirst({
+      where: { sourceOrgId: orgA, reviewStatus: 'approved', publishStatus: 'published' },
+      select: { id: true },
+    })
+    jobId = job?.id ?? ''
+    const expiresAt = new Date(now.getTime() + 86_400_000)
+    await prisma.policyPost.create({
+      data: { id: policyId, sourceOrgId: orgA, sourceName: 'A源', title: '甲机构政策' },
+    })
+    await prisma.jobFair.create({
+      data: {
+        id: fairId,
+        sourceOrgId: orgA,
+        externalId: `fair-${suffix}`,
+        sourceName: 'A源',
+        sourceUrl: 'https://example.com/fair-host',
+        title: '甲机构招聘会',
+        startAt: new Date(now.getTime() - 86_400_000),
+        endAt: new Date(now.getTime() + 86_400_000),
+        venue: '馆',
+        city: '青岛',
+      },
+    })
+    await prisma.companyProfile.create({
+      data: { id: companyId, sourceOrgId: orgA, externalId: `co-${suffix}`, sourceName: 'A源', name: '甲机构企业' },
+    })
+    const targets = [
+      { type: 'job', id: jobId },
+      { type: 'job_fair', id: fairId },
+      { type: 'policy', id: policyId },
+      { type: 'company_profile', id: companyId },
+    ]
+    await prisma.browseLog.createMany({
+      data: targets.flatMap((target) => Array.from({ length: 6 }, () => ({
+        endUserId: memberId,
+        targetType: target.type,
+        targetId: target.id,
+        createdAt: now,
+        expiresAt,
+      }))),
+    })
+    await prisma.externalJumpLog.createMany({
+      data: [
+        ...Array.from({ length: 6 }, () => ({
+          endUserId: memberId,
+          targetType: 'job',
+          targetId: jobId,
+          action: 'external_open',
+          sourceName: '托管回归源',
+          createdAt: now,
+          expiresAt,
+        })),
+        ...Array.from({ length: 6 }, () => ({
+          endUserId: memberId,
+          targetType: 'policy',
+          targetId: policyId,
+          action: 'external_open',
+          sourceName: '政策入口',
+          createdAt: now,
+          expiresAt,
+        })),
+      ],
+    })
+    const usage = new ConsoleScreenUsageService(prisma, new ScreenSnapshotCache())
+    const adminUseOn = await usage.getAdminUsage('today', now)
+    const partnerUseOn = await usage.getPartnerUsage(orgA, 'today', now)
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+    const adminUseOff = await usage.getAdminUsage('today', now)
+    const partnerUseOff = await usage.getPartnerUsage(orgA, 'today', now)
+    assert(
+      '6k. 使用统计 limits.recruitmentHosting 覆盖开与关，样本下限仍是 5',
+      adminUseOn.limits.recruitmentHosting === 'enabled'
+        && adminUseOff.limits.recruitmentHosting === 'disabled'
+        && partnerUseOn.limits.recruitmentHosting === 'enabled'
+        && partnerUseOff.limits.recruitmentHosting === 'disabled'
+        && adminUseOn.limits.minAggregateSample === 5
+        && adminUseOff.limits.minAggregateSample === 5
+        && partnerUseOn.limits.minAggregateSample === 5,
+    )
+    const jobsOn = adminUseOn.metrics.jobs
+    const topOn = adminUseOn.metrics.topSources30d
+    assert(
+      '6l. 托管打开时岗位使用与外跳榜按种子计数，关闭后两项未开启',
+      browseBefore === 0
+        && jobJumpsBefore === 20 + 3
+        && jumpsBefore === 20 + 3
+        && jobId.length > 0
+        && jobsOn?.available === true
+        && jobsOn.value.browse === 6
+        && jobsOn.value.favorites === null
+        && jobsOn.value.sourceOpens === 20 + 3 + 6
+        && jobsOn.value.coverage === 'members_only'
+        && jobsOn.source === 'BrowseLog/Favorite/ExternalJumpLog'
+        && jobsOn.window === 'today'
+        && isHostingClosed(adminUseOff.metrics.jobs, 'BrowseLog/Favorite/ExternalJumpLog', 'today')
+        && topOn?.available === true
+        && topOn.source === 'ExternalJumpLog.sourceName'
+        && topOn.window === '30d'
+        && topOn.value.copy === SCREEN_JUMP_COPY
+        && topOn.value.items.some((item) => item.sourceName === '托管回归源' && item.count === 6)
+        && topOn.value.items.some((item) => item.sourceName === '政策入口' && item.count === 6)
+        && topOn.value.items.some((item) => item.sourceName === jumpQualified && item.count === 20)
+        && !topOn.value.items.some((item) => item.sourceName === jumpSmall)
+        && isHostingClosed(adminUseOff.metrics.topSources30d, 'ExternalJumpLog.sourceName', '30d'),
+      `jobs=${JSON.stringify(jobsOn)} jumpsBefore=${jobJumpsBefore}`,
+    )
+    const servicesOn = adminUseOn.metrics.services?.available === true ? adminUseOn.metrics.services.value : null
+    const servicesOff = adminUseOff.metrics.services?.available === true ? adminUseOff.metrics.services.value : null
+    const hiddenServices = new Set(['jobs', 'fairs', 'company'])
+    assert(
+      '6m. 托管关闭后服务节点不下发岗位、招聘会、企业，政策保留且其余节点逐项相同',
+      servicesOn !== null
+        && servicesOff !== null
+        && servicesOn.find((item) => item.key === 'jobs')?.count === 6
+        && servicesOn.find((item) => item.key === 'fairs')?.count === 6
+        && servicesOn.find((item) => item.key === 'policy')?.count === 6
+        && servicesOn.find((item) => item.key === 'company')?.count === 6
+        && servicesOff.some((item) => item.key === 'policy' && item.count === 6 && item.lane === 'info')
+        && servicesOff.every((item) => !hiddenServices.has(item.key))
+        && JSON.stringify(servicesOff) === JSON.stringify(servicesOn.filter((item) => !hiddenServices.has(item.key)))
+        && adminUseOn.metrics.services?.source === adminUseOff.metrics.services?.source
+        && adminUseOn.metrics.services?.window === adminUseOff.metrics.services?.window,
+      `on=${servicesOn?.map((item) => item.key).join(',')} off=${servicesOff?.map((item) => item.key).join(',')}`,
+    )
+    const contentOn = adminUseOn.metrics.content?.available === true ? adminUseOn.metrics.content.value : null
+    const contentOff = adminUseOff.metrics.content?.available === true ? adminUseOff.metrics.content.value : null
+    const outcomesOn = adminUseOn.metrics.outcomes?.available === true ? adminUseOn.metrics.outcomes.value : null
+    const outcomesOff = adminUseOff.metrics.outcomes?.available === true ? adminUseOff.metrics.outcomes.value : null
+    const usageDiff = firstMetricDiff(adminUseOn.metrics, adminUseOff.metrics, ['jobs', 'topSources30d', 'services'])
+    assert(
+      '6n. 内容与结果在关闭后仍原样计数，招聘会和企业浏览不下成未开启',
+      contentOn !== null
+        && contentOn.policy === 6
+        && contentOn.fair === 6
+        && contentOn.company === 6
+        && contentOn.coverage === 'members_only'
+        && JSON.stringify(contentOff) === JSON.stringify(contentOn)
+        && outcomesOn !== null
+        && outcomesOn.sourceOpens === 20 + 3 + 6 + 6
+        && JSON.stringify(outcomesOff) === JSON.stringify(outcomesOn)
+        && usageDiff === ''
+        && adminUseOn.status === 'ok'
+        && adminUseOff.status === 'ok',
+      `content=${JSON.stringify(contentOff)} outcomes=${JSON.stringify(outcomesOff)} diff=${usageDiff}`,
+    )
+    const contentPartnerOn = partnerUseOn.metrics.partnerContent?.available === true ? partnerUseOn.metrics.partnerContent.value : null
+    const contentPartnerOff = partnerUseOff.metrics.partnerContent?.available === true ? partnerUseOff.metrics.partnerContent.value : null
+    const typed = (
+      rows: { byType: Array<{ type: string; browse: number | null; favorites: number | null; sourceOpens: number | null }> } | null,
+      type: string,
+    ) => rows?.byType.find((item) => item.type === type)
+    assert(
+      '6o. 机构内容分类在打开时四类都在，关闭后只下发政策',
+      contentPartnerOn !== null
+        && contentPartnerOff !== null
+        && contentPartnerOn.coverage === 'members_only'
+        && contentPartnerOn.basis === 'current_content_join'
+        && contentPartnerOff.coverage === 'members_only'
+        && contentPartnerOff.basis === 'current_content_join'
+        && contentPartnerOn.byType.map((item) => item.type).join(',') === 'job,job_fair,policy,company_profile'
+        && typed(contentPartnerOn, 'job')?.browse === 6
+        && typed(contentPartnerOn, 'job')?.sourceOpens === 6
+        && typed(contentPartnerOn, 'job')?.favorites === null
+        && typed(contentPartnerOn, 'job_fair')?.browse === 6
+        && typed(contentPartnerOn, 'job_fair')?.sourceOpens === null
+        && typed(contentPartnerOn, 'policy')?.browse === 6
+        && typed(contentPartnerOn, 'policy')?.sourceOpens === 6
+        && typed(contentPartnerOn, 'company_profile')?.browse === 6
+        && typed(contentPartnerOn, 'company_profile')?.sourceOpens === null
+        && contentPartnerOff.byType.map((item) => item.type).join(',') === 'policy'
+        && typed(contentPartnerOff, 'policy')?.browse === 6
+        && typed(contentPartnerOff, 'policy')?.favorites === null
+        && typed(contentPartnerOff, 'policy')?.sourceOpens === 6,
+      `on=${JSON.stringify(contentPartnerOn?.byType)} off=${JSON.stringify(contentPartnerOff?.byType)}`,
+    )
+    const topPartnerOn = partnerUseOn.metrics.partnerTop?.available === true ? partnerUseOn.metrics.partnerTop.value : null
+    const topPartnerOff = partnerUseOff.metrics.partnerTop?.available === true ? partnerUseOff.metrics.partnerTop.value : null
+    assert(
+      '6p. 机构热门在关闭后滤掉岗位、招聘会、企业，政策标题仍在',
+      topPartnerOn !== null
+        && topPartnerOff !== null
+        && topPartnerOn.items.length === 4
+        && topPartnerOn.items.some((item) => item.type === 'job' && item.title === 'A岗1' && item.browse === 6)
+        && topPartnerOn.items.some((item) => item.type === 'job_fair' && item.title === '甲机构招聘会' && item.browse === 6)
+        && topPartnerOn.items.some((item) => item.type === 'policy' && item.title === '甲机构政策' && item.browse === 6)
+        && topPartnerOn.items.some((item) => item.type === 'company_profile' && item.title === '甲机构企业' && item.browse === 6)
+        && topPartnerOff.items.length === 1
+        && topPartnerOff.items[0]?.type === 'policy'
+        && topPartnerOff.items[0]?.title === '甲机构政策'
+        && topPartnerOff.items[0]?.browse === 6
+        && topPartnerOff.items.every((item) => item.type !== 'job' && item.type !== 'job_fair' && item.type !== 'company_profile'),
+      `on=${JSON.stringify(topPartnerOn?.items)} off=${JSON.stringify(topPartnerOff?.items)}`,
+    )
+    const dailyOn = partnerUseOn.metrics.partnerDaily?.available === true ? partnerUseOn.metrics.partnerDaily.value : null
+    const dailyOff = partnerUseOff.metrics.partnerDaily?.available === true ? partnerUseOff.metrics.partnerDaily.value : null
+    const day = shanghaiDayKey(now)
+    const partnerDiff = firstMetricDiff(partnerUseOn.metrics, partnerUseOff.metrics, ['partnerContent', 'partnerTop', 'partnerDaily'])
+    assert(
+      '6q. 机构按日在关闭后仍可用，且只统计政策',
+      partnerUseOn.metrics.partnerDaily?.available === true
+        && partnerUseOff.metrics.partnerDaily?.available === true
+        && dailyOn?.days.length === 1
+        && dailyOn.days[0]?.date === day
+        && dailyOn.days[0]?.browse === 24
+        && dailyOn.days[0]?.sourceOpens === 12
+        && dailyOff?.days.length === 1
+        && dailyOff.days[0]?.date === day
+        && dailyOff.days[0]?.browse === 6
+        && dailyOff.days[0]?.sourceOpens === 6
+        && partnerDiff === ''
+        && partnerUseOn.metrics.visits?.available === false
+        && partnerUseOn.metrics.visits.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten,
+      `on=${JSON.stringify(dailyOn)} off=${JSON.stringify(dailyOff)} diff=${partnerDiff}`,
+    )
+  } finally {
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
+    await prisma.browseLog.deleteMany({ where: { endUserId: memberId } })
+    await prisma.favorite.deleteMany({ where: { endUserId: memberId } })
+    const jumpTargets = [jobId, policyId].filter((id) => id.length > 0)
+    if (jumpTargets.length > 0) {
+      await prisma.externalJumpLog.deleteMany({ where: { targetId: { in: jumpTargets } } })
+    }
+    await prisma.policyPost.deleteMany({ where: { id: policyId } })
+    await prisma.jobFair.deleteMany({ where: { id: fairId } })
+    await prisma.companyProfile.deleteMany({ where: { id: companyId } })
+    await prisma.organization.deleteMany({ where: { id: orgEmpty } })
+  }
+}
+
 async function assertServiceContract(): Promise<void> {
   const isolated = prepareIsolatedScreenDatabase()
   assert(
@@ -917,6 +1381,8 @@ async function assertServiceContract(): Promise<void> {
     await prisma.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } })
   }
 
+  const previousHosting = process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+  process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
   try {
     await cleanup()
     const now = new Date()
@@ -1387,6 +1853,16 @@ async function assertServiceContract(): Promise<void> {
     assert('3k. 响应不含投递成功等违禁文案', !/投递成功|一键投递|立即投递|平台投递/.test(asText))
     assert('3l. Partner 响应 audience=partner 且 generatedAt 为 ISO', partnerA.audience === 'partner' && /\d{4}-\d{2}-\d{2}T/.test(partnerA.generatedAt))
 
+    await assertRecruitmentHostingContract(prisma, screen, {
+      orgA,
+      orgB,
+      memberId,
+      suffix,
+      now,
+      jumpQualified,
+      jumpSmall,
+    })
+
     let fleetCalls = 0
     let seenFleetTake: unknown
     const originalFindMany = prisma.terminal.findMany.bind(prisma.terminal)
@@ -1575,6 +2051,8 @@ async function assertServiceContract(): Promise<void> {
     await assertTwinCases(prisma, screen, cache, ids)
     await assertHttp(prisma, ids)
   } finally {
+    if (previousHosting === undefined) delete process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+    else process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = previousHosting
     await cleanup()
     await prisma.onModuleDestroy()
     isolated.cleanup()
