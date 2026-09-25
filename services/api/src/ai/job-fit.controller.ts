@@ -159,12 +159,14 @@ export class JobFitController {
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
     return this.service.printReport(taskId, await this.requesterOf(req))
   }
 
   @Get(':taskId')
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
     return this.service.getLatest(taskId, await this.requesterOf(req))
   }
