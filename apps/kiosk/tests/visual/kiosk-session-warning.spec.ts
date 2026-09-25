@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
+import { installScanRevokeProbe, waitForAckConsumed } from '../fixtures/scan-revoke-probe'
 
 const SENSITIVE_SESSION_KEY = 'ai-job-print:current-ai-resume'
 
@@ -515,7 +516,12 @@ interface ScanBusyOptions {
    * `'already-completed'` 按服务端 `cancel()` 的真实回法：任务已经 completed →
    * 400 `SCAN_TASK_ALREADY_COMPLETED`，并且此后的状态查询如实回 completed（带 resultFile）。
    */
-  deleteFailure?: 'abort' | 'server-error' | 'already-completed'
+  deleteFailure?: 'abort' | 'server-error' | 'already-completed' | 'cancel-conflict'
+  /**
+   * 配合 `'already-completed'`：服务端说完「已经完成」之后，状态查询一律拿不到回话
+   * （页面那次补查落进它自己的 catch）。
+   */
+  recheckUnreachable?: boolean
   resultFile?: {
     fileId: string
     fileUrl: string
@@ -602,79 +608,6 @@ function registerScanBusyAck(
   }
 }
 
-interface ScanRevokeProbeSnapshot {
-  /** 确认（ACK）的回话被页面读完、并且紧跟其后的那串微任务已经跑完的次数。 */
-  ackConsumed: number
-  /** 页面**调用过**几次 `fetch(DELETE /scan/sessions/:id)`（不论它后来到没到路由）。 */
-  deletes: number
-}
-
-/**
- * 页内记账：这一页调用过几次 DELETE，以及确认回话被页面消化了几次。
- *
- * 两样都只能在页面里记，`installScanProgressRoute` 的路由计数替代不了：
- *   · 路由计数是**异步**的：页面调用 fetch 之后，要经过一次浏览器 → Playwright 的往返
- *     handler 才 +1。断言排在这次往返前面，读到的 0 什么也证明不了；
- *   · 「确认回话已经被处理完」只有页面自己知道。等待页的确认回调（ScanProgressPage 的
- *     ACK effect）是在响应体 `json()` 落定之后那一串**微任务**里跑的，它要发 DELETE
- *     就在那串里同步调用 fetch。所以在 `json()` 落定时排一个宏任务：它跑起来的那一刻，
- *     那串微任务连同其中任何一次 DELETE 调用必然都已经跑完 —— 这是事件循环的顺序保证，
- *     不是「等得够久」。（哪天那段回调里多了一次 await 宏任务，这个信号就要跟着改。）
- *
- * 读的时候一次读全：清场会整页重载，把这份记账连同文档一起换成全新的零，
- * 分两次读就可能一半来自旧文档、一半来自新文档。
- */
-async function installScanRevokeProbe(page: Page): Promise<() => Promise<ScanRevokeProbeSnapshot | null>> {
-  await page.addInitScript(({ ackPath, taskPath }) => {
-    const probe = { ackConsumed: 0, deletes: 0 }
-    Object.assign(window, { __scanRevokeProbe: probe })
-    const nativeFetch = window.fetch.bind(window)
-    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : null
-      const url = new URL(request ? request.url : String(input), window.location.href)
-      const method = (init?.method ?? request?.method ?? 'GET').toUpperCase()
-      if (method === 'DELETE' && url.pathname === taskPath) probe.deletes += 1
-      const pending = nativeFetch(input, init)
-      if (method !== 'POST' || url.pathname !== ackPath) return pending
-      return pending.then((response) => {
-        const nativeJson = response.json.bind(response)
-        response.json = () => nativeJson().finally(() => {
-          window.setTimeout(() => {
-            probe.ackConsumed += 1
-          }, 0)
-        })
-        return response
-      })
-    }
-  }, {
-    ackPath: `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`,
-    taskPath: `/api/v1/scan/sessions/${SCAN_TASK_ID}`,
-  })
-  return async () => {
-    try {
-      return await page.evaluate(() => {
-        const probe = (window as unknown as { __scanRevokeProbe?: ScanRevokeProbeSnapshot }).__scanRevokeProbe
-        return probe ? { ackConsumed: probe.ackConsumed, deletes: probe.deletes } : null
-      })
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('Execution context was destroyed')) return null
-      throw error
-    }
-  }
-}
-
-/** 等确认回话被页面消化完，交回**满足条件的那一份**快照（不另读第二次，理由见上）。 */
-async function waitForAckConsumed(
-  readProbe: () => Promise<ScanRevokeProbeSnapshot | null>,
-): Promise<ScanRevokeProbeSnapshot> {
-  const last: { snapshot: ScanRevokeProbeSnapshot | null } = { snapshot: null }
-  await expect.poll(async () => {
-    last.snapshot = await readProbe()
-    return last.snapshot?.ackConsumed ?? 0
-  }, { message: '确认回话必须被页面读完：这之后才谈得上「它有没有补发 DELETE」' }).toBe(1)
-  return last.snapshot!
-}
-
 async function installScanProgressRoute(
   page: Page,
   options: ScanBusyOptions = {},
@@ -700,6 +633,18 @@ async function installScanProgressRoute(
           body: JSON.stringify({
             success: false,
             error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' },
+          }),
+        })
+        return
+      }
+      if (options.deleteFailure === 'cancel-conflict') {
+        // 服务端 cancel() 的 409：CAS 之前判到终态，或者 CAS 撞车之后重读 —— 两处同一个码。
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: false,
+            error: { code: 'SCAN_TASK_CANCEL_CONFLICT', message: '任务状态已变化，取消失败，请刷新重试' },
           }),
         })
         return
@@ -734,7 +679,7 @@ async function installScanProgressRoute(
       return
     }
     statusReq += 1
-    if (options.networkError) {
+    if (options.networkError || (completedBeforeCancel && options.recheckUnreachable)) {
       await route.abort('internetdisconnected')
       return
     }
@@ -1004,7 +949,7 @@ test('server-cancelled status that lands before the delivery-ack response still 
 }) => {
   registerKioskShell(api)
   const ack = registerScanBusyAck(page, api, { hold: true })
-  const readProbe = await installScanRevokeProbe(page)
+  const readProbe = await installScanRevokeProbe(page, SCAN_TASK_ID)
   const counts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -1035,7 +980,7 @@ for (const status of ['completed', 'expired', 'failed'] as const) {
   }) => {
     registerKioskShell(api)
     const ack = registerScanBusyAck(page, api, { hold: true })
-    const readProbe = await installScanRevokeProbe(page)
+    const readProbe = await installScanRevokeProbe(page, SCAN_TASK_ID)
     const counts = await installScanProgressRoute(page, {
       scanTaskId: SCAN_TASK_ID,
       controlToken: SCAN_CONTROL_TOKEN,
@@ -1078,7 +1023,7 @@ test('user cancel while the delivery ack is still in flight sends exactly one DE
 }) => {
   registerKioskShell(api)
   const ack = registerScanBusyAck(page, api, { hold: true })
-  const readProbe = await installScanRevokeProbe(page)
+  const readProbe = await installScanRevokeProbe(page, SCAN_TASK_ID)
   const counts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -1111,7 +1056,7 @@ test('user cancel that finds the scan already completed sends no second DELETE w
 }) => {
   registerKioskShell(api)
   const ack = registerScanBusyAck(page, api, { hold: true })
-  const readProbe = await installScanRevokeProbe(page)
+  const readProbe = await installScanRevokeProbe(page, SCAN_TASK_ID)
   const counts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -1142,6 +1087,83 @@ test('user cancel that finds the scan already completed sends no second DELETE w
   const settled = await waitForAckConsumed(readProbe)
   expect(settled.deletes, '补查已经拿到 completed：离开之后确认才回话，也不许再补一次 DELETE').toBe(1)
   expect(counts.deleteRequests()).toBe(1)
+})
+
+/* 上一条的补查**拿不到回话**（Agy 复核 #2）。页面落回 start、推进代次，那次确认随后才落地。
+ * 期望仍是只有用户按的那一次：SCAN_TASK_ALREADY_COMPLETED 这个码本身就是服务端报的终态
+ * （scan-tasks.service.ts 的 cancel() 两处都只在 status === 'completed' 时抛，completed 是吸收态），
+ * 用不着等补查来证明。 */
+test('user cancel that hits already-completed with an unanswered recheck sends no second DELETE when the ack lands late @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api, { hold: true })
+  const readProbe = await installScanRevokeProbe(page, SCAN_TASK_ID)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'waiting',
+    deleteFailure: 'already-completed',
+    recheckUnreachable: true,
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page.getByTestId('scan-ack-pending-notice')).toBeVisible()
+  await ack.expectAcked(1)
+  await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
+  const pollsBeforeCancel = counts.statusRequests()
+
+  await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  // 补查确实发出去了、也确实没拿到回话：页面落回 start，而不是结果屏。
+  await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
+  expect(counts.statusRequests()).toBeGreaterThan(pollsBeforeCancel)
+  ack.release()
+
+  const settled = await waitForAckConsumed(readProbe)
+  expect(settled.deletes, '服务端已经说了 ALREADY_COMPLETED：补查落空也不许再补一次 DELETE').toBe(1)
+  expect(counts.deleteRequests()).toBe(1)
+})
+
+/* Agy 复核 #1 的反面对照：取消撞上 409 SCAN_TASK_CANCEL_CONFLICT 时，**不许**把任务记成已结束。
+ *
+ * 这个码在服务端 cancel() 里有两处来历：CAS 之前判到 failed / expired / cancelled；
+ * 或者 CAS 撞车（`where` 钉着读到时的 status 与 lastAttemptHash）之后重读 —— 那一刻任务
+ * 可能正是 matched，也就是一次投递刚刚开始。cancel() 放行 matched，所以再来一发 DELETE
+ * 仍能把它撤掉（上传收尾那句 `where: { status: 'matched' }` 随之落空，文件被补偿删除）。
+ * 本机从这个码分不出是哪一支，那次迟到确认的补偿就必须照发 —— 在 matched 那一支里，
+ * 它是用户按下「取消扫描」之后唯一还能把那次投递撤掉的一发。
+ * 期望「补偿恰好多出一发」来自这条契约：它不是终态，所以补偿照常；补偿本身上限一次。 */
+test('a cancel answered with SCAN_TASK_CANCEL_CONFLICT keeps the late-ack compensation armed @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api, { hold: true })
+  const readProbe = await installScanRevokeProbe(page, SCAN_TASK_ID)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'waiting',
+    deleteFailure: 'cancel-conflict',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page.getByTestId('scan-ack-pending-notice')).toBeVisible()
+  await ack.expectAcked(1)
+  await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
+
+  await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
+  await expect.poll(async () => (await readProbe())?.deletes ?? 0, { message: '用户按的那一次已经发出' }).toBe(1)
+  ack.release()
+
+  const settled = await waitForAckConsumed(readProbe)
+  expect(settled.deletes, '409 证明不了任务已经结束：迟到确认的那一发补偿必须照发').toBe(2)
 })
 
 test('explicit user cancel sends exactly one DELETE before navigating away @scan-busy @warning-kiosk', async ({

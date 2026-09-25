@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
+import { installScanRevokeProbe, waitForAckConsumed } from '../fixtures/scan-revoke-probe'
 
 const MEMBER_TOKEN = 'privacy-member-memory-token'
 const MEMBER_PHONE = '13800138000'
@@ -1730,6 +1731,148 @@ test('a delivery ack that lands mid-clear still ends with a confirmed cancel @pr
     }
   }, { timeout: 10_000 }).toBeNull()
 })
+
+/**
+ * 压住下一次主框架整页导航，直到用例放行。
+ *
+ * 用在清场收尾之后那次重载上：导航提交之前旧文档照常运行（定时器、网络回话、Promise
+ * 都在走），所以能在「闸已经拿到确认、机器正要交出去」与「新文档接管」之间，
+ * **确定地**插进一次迟到的回话 —— 不靠时长去赌那一帧。
+ */
+async function holdNextMainFrameNavigation(page: Page): Promise<{ arrived: () => boolean; release: () => void }> {
+  let armed = true
+  let arrived = false
+  let release: () => void = () => undefined
+  const released = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    let mainFrameNavigation = false
+    try {
+      mainFrameNavigation = request.isNavigationRequest() && request.frame() === page.mainFrame()
+    } catch {
+      mainFrameNavigation = false
+    }
+    if (!armed || !mainFrameNavigation) {
+      await route.fallback()
+      return
+    }
+    armed = false
+    arrived = true
+    await released
+    await route.fallback()
+  })
+  return { arrived: () => arrived, release: () => release() }
+}
+
+/* 收尾闸拿到确认**之后**，那次还在路上的投递确认才落地（Agy 复核 #3，2026-09-26）。
+ *
+ * 上面那条是「确认在清场途中回话」；这里是紧接着的那一段：闸已经拿到服务端的回答、
+ * 整页重载的导航已经发出，等待页挂载时发出的那次 ACK 才回来。它的回调看到扫描代次变了，
+ * 会按 'ack-compensation' 补一发 DELETE。等待页忙碌时隐私硬截止照样会到（忙碌只顺延
+ * VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC），所以这个顺序在真机上是可达的。
+ *
+ * 期望按服务端对闸那一发 DELETE 的回答分开，全部来自 scan-tasks.service.ts 的 cancel()：
+ *   · 200（刚 CAS 成 cancelled）/ 404（根本没有）/ 400 ALREADY_COMPLETED（两处都只在
+ *     status === 'completed' 时抛）—— 任务已经结束或不存在，只许有闸那一发；
+ *   · 409 CANCEL_CONFLICT —— 证明不了：CAS 撞车那一支里任务可能正是 matched（一次投递
+ *     刚开始），cancel() 放行 matched，再来一发仍能把那次投递撤掉。补偿必须照发。 */
+const GATE_CANCEL_ANSWERS = [
+  {
+    key: 'cancelled (200)',
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+    expectedDeletes: 1,
+  },
+  {
+    key: 'not found (404)',
+    status: 404,
+    json: { success: false, error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } },
+    expectedDeletes: 1,
+  },
+  {
+    key: 'already completed (400)',
+    status: 400,
+    json: { success: false, error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' } },
+    expectedDeletes: 1,
+  },
+  {
+    key: 'cancel conflict (409)',
+    status: 409,
+    json: { success: false, error: { code: 'SCAN_TASK_CANCEL_CONFLICT', message: '任务状态已变化，取消失败，请刷新重试' } },
+    expectedDeletes: 2,
+  },
+] as const
+
+for (const answer of GATE_CANCEL_ANSWERS) {
+  const expectation = answer.expectedDeletes === 1 ? 'sends no second DELETE' : 'still sends its compensation DELETE'
+  test(`a delivery ack landing after the cleanup gate got ${answer.key} ${expectation} @privacy-kiosk`, async ({ page, api }) => {
+    registerKioskShell(api)
+    api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, { status: answer.status, json: answer.json })
+    await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: SCAN_TASK_ID,
+            status: 'waiting',
+            scanType: 'resume',
+            file: null,
+            errorCode: null,
+            errorMessage: null,
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        }),
+      })
+    })
+    // 等待页挂载即发出的那次投递确认：压在半路，直到闸拿到回答、重载已经发出。
+    let releaseAck: () => void = () => undefined
+    const ackReleased = new Promise<void>((resolve) => {
+      releaseAck = resolve
+    })
+    let ackCount = 0
+    await routeExact(page, 'POST', `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`, async (route) => {
+      ackCount += 1
+      await ackReleased
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: SCAN_DELIVERY_ACKED_AT },
+        }),
+      })
+    })
+    const readProbe = await installScanRevokeProbe(page, SCAN_TASK_ID)
+
+    await page.goto('/scan')
+    await seedLiveScanSession(page)
+    await page.goto('/scan?stage=progress')
+    await expect(page.getByTestId('scan-ack-pending-notice')).toBeVisible()
+    await expect.poll(() => ackCount).toBe(1)
+
+    // 从这一刻起，下一次整页导航（清场收尾之后的重载）压住不放。
+    const handover = await holdNextMainFrameNavigation(page)
+    await expect.poll(handover.arrived, {
+      timeout: 15_000,
+      message: '隐私硬截止要把忙碌的等待页清场，并在闸拿到回答之后发出重载',
+    }).toBe(true)
+    await expect.poll(async () => (await readProbe())?.deletes ?? 0, { message: '到这一刻只有闸那一发' }).toBe(1)
+
+    releaseAck()
+    const settled = await waitForAckConsumed(readProbe)
+    expect(
+      settled.deletes,
+      answer.expectedDeletes === 1
+        ? '闸已经拿到「任务已结束 / 不存在」的回答：迟到的确认不许再补一发 DELETE'
+        : '409 证明不了任务已经结束：迟到确认的那一发补偿必须照发',
+    ).toBe(answer.expectedDeletes)
+    handover.release()
+  })
+}
 
 /* 会员会话失效（401）那条出口 —— 它是清场链路上最后一个绕过收尾闸的口子。
  *
