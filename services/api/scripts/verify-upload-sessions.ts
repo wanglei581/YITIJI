@@ -1618,6 +1618,104 @@ async function main(): Promise<void> {
     assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
   }
 
+  {
+    // 比较先把 file 写成 null，随后 systemDelete 失败。重试清扫只看见空文件指针，对象泄漏。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'delete-once.pdf' }),
+    })
+    let failDelete = true
+    const originalDelete = files.systemDelete.bind(files)
+    files.systemDelete = async (fileId: string, reason: string) => {
+      if (failDelete) {
+        failDelete = false
+        throw new Error('storage delete failed once')
+      }
+      return originalDelete(fileId, reason)
+    }
+    await expectRejects(
+      () => service.cancel(session.sessionId, session.controlToken),
+      Error,
+      'cancel must not succeed when the object delete fails',
+    )
+    assert.equal(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
+    await service.cleanupExpiredSessions(new Date(session.expiresAt).getTime() + 1)
+    assert.notEqual(
+      prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null,
+      null,
+      'retry cleanup must delete the object the failed cancel still owns',
+    )
+    assert.equal(
+      redis.hasSortedSetMember('upload_session_expiry_index', session.sessionId),
+      false,
+      'expiry index stays until the object delete succeeds',
+    )
+  }
+
+  {
+    // 会员归属在最终比较前已经写上。取消看到 ownerType=user 就跳过删除，确认比较失败，留下已取消会话的会员文件。
+    const { service, prisma, redis } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const entered = deferred()
+    const release = deferred()
+    const originalUpdate = prisma.fileObject.update.bind(prisma.fileObject)
+    prisma.fileObject.update = async (args) => {
+      const updated = await originalUpdate(args)
+      if (args.data.ownerType === 'user') {
+        entered.resolve()
+        await release.promise
+      }
+      return updated
+    }
+    const confirming = service.confirm(session.sessionId, session.controlToken, 'member_1').then(
+      () => ({ ok: true as const }),
+      () => ({ ok: false as const }),
+    )
+    await entered.promise
+    await redis.del(lockKey)
+    let cancelOk = true
+    try {
+      await service.cancel(session.sessionId, session.controlToken)
+    } catch {
+      cancelOk = false
+    }
+    release.resolve()
+    const confirmed = await confirming
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    const stored = prisma.files.get(uploaded.file!.fileId)
+    const liveMember = Boolean(stored && !stored.deletedAt && (stored.ownerType === 'user' || stored.endUserId))
+    if (status.status === 'cancelled' || status.status === 'expired') {
+      assert.equal(liveMember, false, 'a cancelled upload must not leave a live member-owned file')
+    }
+    if (confirmed.ok) {
+      assert.equal(status.status, 'confirmed')
+      assert.equal(stored?.deletedAt ?? null, null)
+    } else {
+      assert.notEqual(status.status, 'confirmed')
+    }
+    assert.equal(cancelOk && liveMember && status.status === 'cancelled', false)
+  }
+
   console.log('PASS upload session verification')
 }
 
