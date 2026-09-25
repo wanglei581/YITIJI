@@ -287,12 +287,29 @@ async function main(): Promise<void> {
       pass('未知 refundNo：真实订单未被误改')
     } else fail(`R5: refund=${r5Refund?.status}, order=${r5Order?.payStatus}`)
 
-    // ── 6. 金额不符拒绝 ───────────────────────────────────────────────────────
+    // ── 6. 渠道金额不等于整单：进人工，不卡在抛错重试里 ─────────────────────
     const R6 = await makePaidAndRefunding('r6')
-    const r6Notify = buildRefundNotify({ mchid: MCH_ID, out_trade_no: `attempt_wxrn_${suffix}_r6`, out_refund_no: R6.refundNo, refund_id: 'rfd6', refund_status: 'SUCCESS', amount: { refund: R6.amountCents + 1, total: R6.amountCents } })
-    await expectCode('金额不符拒绝（REFUND_NOTIFY_AMOUNT_MISMATCH）', 'REFUND_NOTIFY_AMOUNT_MISMATCH', () =>
-      refundSvc.processWechatRefundNotify(r6Notify.rawBody, r6Notify.headers),
-    )
+    const r6Notify = buildRefundNotify({ mchid: MCH_ID, out_trade_no: `attempt_wxrn_${suffix}_r6`, out_refund_no: R6.refundNo, refund_id: 'rfd6', refund_status: 'SUCCESS', amount: { refund: R6.amountCents - 1, total: R6.amountCents } })
+    const r6Result = await refundSvc.processWechatRefundNotify(r6Notify.rawBody, r6Notify.headers)
+    const r6Again = buildRefundNotify({ mchid: MCH_ID, out_trade_no: `attempt_wxrn_${suffix}_r6`, out_refund_no: R6.refundNo, refund_id: 'rfd6', refund_status: 'SUCCESS', amount: { refund: R6.amountCents - 1, total: R6.amountCents } })
+    const r6AgainResult = await refundSvc.processWechatRefundNotify(r6Again.rawBody, r6Again.headers)
+    const r6Refund = await prisma.refund.findUnique({ where: { refundNo: R6.refundNo } })
+    const r6Order = await prisma.order.findUnique({ where: { id: R6.orderId } })
+    const r6Audits = await prisma.auditLog.count({ where: { action: 'refund.notify_amount_mismatch', targetId: R6.orderId } })
+    if (
+      r6Result.ok === true &&
+      r6AgainResult.ok === true &&
+      r6AgainResult.idempotent === true &&
+      r6Refund?.status === 'manual_review' &&
+      r6Order?.payStatus === 'refunding' &&
+      r6Order.refundReason === 'REFUND_AMOUNT_MISMATCH_MANUAL' &&
+      r6Order.refundedAmountCents === 0 &&
+      r6Audits === 1
+    ) {
+      pass('渠道少退：manual_review + 订单保持 refunding，重复通知幂等且只记 1 条审计')
+    } else {
+      fail(`R6 short refund mismatch ${JSON.stringify({ r6Result, r6AgainResult, status: r6Refund?.status, pay: r6Order?.payStatus, reason: r6Order?.refundReason, r6Audits })}`)
+    }
 
     // ── 7. 时间窗过期拒绝 ─────────────────────────────────────────────────────
     const R7 = await makePaidAndRefunding('r7')

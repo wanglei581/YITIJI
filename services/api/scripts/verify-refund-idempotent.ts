@@ -15,6 +15,7 @@
  *
  * 运行：pnpm --filter @ai-job-print/api verify:refund-idempotent
  */
+import 'reflect-metadata'
 import 'dotenv/config'
 import { createHash, randomBytes, randomUUID } from 'crypto'
 
@@ -36,6 +37,9 @@ import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { RefundService } from '../src/payment/refund.service'
+import { holdMismatchedChannelRefund, REFUND_STATUS_MANUAL_REVIEW } from '../src/payment/refund-amount-hold'
+import { ValidationPipe } from '@nestjs/common'
+import { AdminRefundDto } from '../src/payment/dto/order-action.dto'
 import { AdminPrintScanService } from '../src/admin-print-scan/admin-print-scan.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
@@ -383,6 +387,69 @@ async function main(): Promise<void> {
       '8c. 旧开关塞回 false 无效：未支付与退款态一律不可 claim，任务保持 pending',
     )
     delete process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
+
+    // ── (9) 部分退款入口关闭；渠道少退进人工且重复幂等 ─────────────────────
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })
+    let rejectedPartialField = false
+    try {
+      await pipe.transform(
+        { refundReason: '整单', amountCents: 1 },
+        { type: 'body', metatype: AdminRefundDto },
+      )
+    } catch {
+      rejectedPartialField = true
+    }
+    assert(rejectedPartialField, '9a. 退款请求体带 amountCents 被拒绝（没有部分退款入口）')
+
+    const shortOrderId = await makeOrder(300)
+    const shortOrder = await prisma.order.findUnique({ where: { id: shortOrderId } })
+    if (!shortOrder) fail('9 short order missing')
+    await prisma.order.update({
+      where: { id: shortOrderId },
+      data: { payStatus: 'refunding', paymentSource: 'wechat', payChannel: 'wechat', discountCents: 0 },
+    })
+    const shortRefundNo = `RFD-${shortOrder.orderNo}`
+    await prisma.refund.create({
+      data: {
+        orderId: shortOrderId,
+        refundNo: shortRefundNo,
+        amountCents: shortOrder.amountCents,
+        status: 'pending',
+        channel: 'wechat',
+        reason: '渠道少退验证',
+      },
+    })
+    const spyBeforeShort = spy.refundCalls
+    const held = await holdMismatchedChannelRefund(prisma, {
+      refundId: (await prisma.refund.findUnique({ where: { refundNo: shortRefundNo } }))!.id,
+      refundNo: shortRefundNo,
+      order: shortOrder,
+      recordedAmountCents: shortOrder.amountCents,
+      notifyAmountCents: shortOrder.amountCents - 1,
+      channelRefundNo: 'wx_short',
+    })
+    const heldAgain = await holdMismatchedChannelRefund(prisma, {
+      refundId: (await prisma.refund.findUnique({ where: { refundNo: shortRefundNo } }))!.id,
+      refundNo: shortRefundNo,
+      order: shortOrder,
+      recordedAmountCents: shortOrder.amountCents,
+      notifyAmountCents: shortOrder.amountCents - 1,
+      channelRefundNo: 'wx_short',
+    })
+    const replay = await refundService.refund(shortOrderId, { refundNo: shortRefundNo, reason: '再点一次' })
+    const shortRow = await prisma.order.findUnique({ where: { id: shortOrderId } })
+    const shortRefund = await prisma.refund.findUnique({ where: { refundNo: shortRefundNo } })
+    const shortAudits = await prisma.auditLog.count({ where: { action: 'refund.notify_amount_mismatch', targetId: shortOrderId } })
+    assert(held === 'held' && heldAgain === 'idempotent', '9b. 少退第一次进入人工，第二次幂等')
+    assert(
+      shortRefund?.status === REFUND_STATUS_MANUAL_REVIEW &&
+        shortRow?.payStatus === 'refunding' &&
+        shortRow.refundedAmountCents === 0 &&
+        shortAudits === 1 &&
+        replay.idempotent &&
+        spy.refundCalls === spyBeforeShort,
+      '9c. 少退不打成已退款、不再打渠道、审计只有 1 条',
+    )
 
     console.log(`\n  ✅ verify:refund-idempotent 全部通过（${passed} checks）`)
   } finally {

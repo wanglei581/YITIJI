@@ -38,7 +38,11 @@ import { verifyPaymentCallbackRace } from './support/payment-callback-race-cases
 import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { ReconciliationService } from '../src/payment/reconciliation.service'
-import { ONLINE_PAID_PENDING_REFUND_REASON, OrderStatusService } from '../src/payment/order-status.service'
+import {
+  ONLINE_PAID_PENDING_REFUND_REASON,
+  PAID_UNFULFILLED_PENDING_REFUND_REASON,
+} from '../src/payment/pending-refund-signal'
+import { OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken, paymentSessionTtlMs } from '../src/payment/payment-session-token'
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
@@ -54,6 +58,8 @@ import {
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { PAID_UNFULFILLED_FILE_AUDIT_ACTION } from '../src/terminals/claim-unprintable-file'
+import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
@@ -162,6 +168,7 @@ async function main(): Promise<void> {
   const grantIds: string[] = []
   const fixtureFileIds: string[] = []
   const fixtureStorageKeys: string[] = []
+  const extraTerminalIds: string[] = []
   let orderSeq = 0
 
   async function seedPdfFixture(label: string, pages: number): Promise<string> {
@@ -232,7 +239,8 @@ async function main(): Promise<void> {
     await prisma.endUser.deleteMany({ where: { id: endUserId } })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
-    await prisma.terminal.deleteMany({ where: { id: terminalId } })
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [terminalId, ...extraTerminalIds] } } })
+    await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, ...extraTerminalIds] } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
     for (const key of fixtureStorageKeys) {
       await storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
@@ -1912,6 +1920,275 @@ async function main(): Promise<void> {
     } finally {
       provider.createQrPayment = originalCreateQrBlock
       provider.createCodePayment = originalCreateCodeBlock
+    }
+
+    // ── F-03 / F-04：付款后文件失效待退款；缺纸、断电、未确认不混进同一条 ──
+    {
+      const anomalyTerminalId = `t_f03_${suffix}`
+      const anomalyToken = randomBytes(16).toString('hex')
+      extraTerminalIds.push(anomalyTerminalId)
+      await prisma.terminal.create({
+        data: {
+          id: anomalyTerminalId,
+          terminalCode: `KSK-F03-${suffix}`,
+          agentToken: anomalyToken,
+          deviceFingerprint: 'verify-f03',
+        },
+      })
+      const agent = new TerminalAgentService(prisma, audit)
+      const claim = () => agent.claimTasks(anomalyTerminalId, { maxTasks: 1 }, `Bearer ${anomalyToken}`)
+
+      async function seedFile(label: string, file: { deletedAt?: Date | null; expiresAt?: Date | null }): Promise<string> {
+        const fileId = `f_f03_${suffix}_${label}`
+        await prisma.fileObject.create({
+          data: {
+            id: fileId,
+            storageKey: `verify/f03/${fileId}.pdf`,
+            filename: `${label}.pdf`,
+            mimeType: 'application/pdf',
+            sizeBytes: 128,
+            sha256: '',
+            purpose: 'print_source',
+            status: 'active',
+            deletedAt: file.deletedAt ?? null,
+            expiresAt: file.expiresAt ?? null,
+            bucket: LOCAL_BUCKET_SENTINEL,
+          },
+        })
+        fixtureFileIds.push(fileId)
+        return fileId
+      }
+
+      async function seedPaidTask(
+        label: string,
+        fileId: string | null,
+        task: { status?: string; createdAt?: Date; claimExpiry?: Date | null; endUserId?: string | null },
+      ): Promise<{ taskId: string; orderId: string }> {
+        const taskId = `pt_f03_${suffix}_${label}`
+        await prisma.printTask.create({
+          data: {
+            id: taskId,
+            terminalId: anomalyTerminalId,
+            endUserId: task.endUserId ?? null,
+            fileId,
+            fileUrl: fileId ? signFileUrl(fileId, 60_000).url : '/api/v1/files/legacy/content',
+            fileMd5: `sha-${label}`,
+            paramsJson: '{}',
+            status: task.status ?? 'pending',
+            createdAt: task.createdAt,
+            claimExpiry: task.claimExpiry ?? null,
+            claimedAt: task.status === 'claimed' || task.status === 'printing' ? new Date() : null,
+          },
+        })
+        taskIds.push(taskId)
+        const order = await prisma.order.create({
+          data: {
+            orderNo: `ORD-F03-${suffix}-${label}`,
+            type: 'print',
+            printTaskId: taskId,
+            terminalId: anomalyTerminalId,
+            endUserId: task.endUserId ?? null,
+            amountCents: 200,
+            payStatus: 'paid',
+            taskStatus: task.status ?? 'pending',
+            paymentSource: 'offline',
+            discountCents: 0,
+          },
+        })
+        orderIds.push(order.id)
+        return { taskId, orderId: order.id }
+      }
+
+      const expiredFile = await seedFile('expired', { expiresAt: new Date(Date.now() - 60_000) })
+      const liveFile = await seedFile('live', {})
+      const expired = await seedPaidTask('expired', expiredFile, { createdAt: new Date('2019-01-01T00:00:00.000Z') })
+      const live = await seedPaidTask('live', liveFile, { createdAt: new Date('2021-01-01T00:00:00.000Z') })
+      const firstClaim = await claim()
+      const expiredOrder = await prisma.order.findUnique({ where: { id: expired.orderId } })
+      const expiredTask = await prisma.printTask.findUnique({ where: { id: expired.taskId } })
+      const expiredRefunds = await prisma.refund.count({ where: { orderId: expired.orderId } })
+      const expiredAudits = await prisma.auditLog.count({
+        where: { action: PAID_UNFULFILLED_FILE_AUDIT_ACTION, targetId: expired.orderId },
+      })
+      if (
+        firstClaim.length === 1 &&
+        firstClaim[0]?.taskId === live.taskId &&
+        !firstClaim.some((row) => row.taskId === expired.taskId) &&
+        expiredOrder?.payStatus === 'paid' &&
+        expiredOrder.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON &&
+        expiredOrder.refundedAmountCents === 0 &&
+        expiredTask?.status === 'pending' &&
+        expiredRefunds === 0 &&
+        expiredAudits === 1
+      ) {
+        pass('F-03 expired file: claim skips it, marks paid-unfulfilled refund, prints the live task')
+      } else {
+        fail(`F-03 expired file mismatch ${JSON.stringify({ firstClaim, expiredOrder, expiredTask, expiredRefunds, expiredAudits })}`)
+      }
+      const secondClaim = await claim()
+      const expiredAuditsAgain = await prisma.auditLog.count({
+        where: { action: PAID_UNFULFILLED_FILE_AUDIT_ACTION, targetId: expired.orderId },
+      })
+      if (secondClaim.length === 0 && expiredAuditsAgain === 1) {
+        pass('F-03 repeat claim is idempotent and still does not print the expired file')
+      } else {
+        fail(`F-03 repeat claim mismatch claims=${secondClaim.length} audits=${expiredAuditsAgain}`)
+      }
+
+      const deletedFile = await seedFile('deleted', { deletedAt: new Date() })
+      const deleted = await seedPaidTask('deleted', deletedFile, { createdAt: new Date('2018-01-01T00:00:00.000Z') })
+      const deletedClaim = await claim()
+      const deletedOrder = await prisma.order.findUnique({ where: { id: deleted.orderId } })
+      if (
+        deletedClaim.length === 0 &&
+        deletedOrder?.payStatus === 'paid' &&
+        deletedOrder.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON &&
+        (await prisma.printTask.findUnique({ where: { id: deleted.taskId } }))?.status === 'pending'
+      ) {
+        pass('F-03 deleted file: claim does not print and marks the same refund signal')
+      } else {
+        fail(`F-03 deleted file mismatch ${JSON.stringify({ deletedClaim, deletedOrder })}`)
+      }
+
+      const raceFile = await seedFile('race', {})
+      const race = await seedPaidTask('race', raceFile, { createdAt: new Date('2017-01-01T00:00:00.000Z') })
+      const [raceA, raceB] = await Promise.all([claim(), claim()])
+      const raceWins = [raceA, raceB].filter((rows) => rows.some((row) => row.taskId === race.taskId))
+      const raceOrder = await prisma.order.findUnique({ where: { id: race.orderId } })
+      const raceTask = await prisma.printTask.findUnique({ where: { id: race.taskId } })
+      if (raceWins.length === 1 && raceTask?.status === 'claimed' && raceOrder?.refundReason == null && raceOrder?.payStatus === 'paid') {
+        pass('F-04 claim race: one winner, no refund mark')
+      } else {
+        fail(`F-04 claim race mismatch ${JSON.stringify({ raceA, raceB, raceTask, raceOrder })}`)
+      }
+
+      const paperFile = await seedFile('paper', {})
+      const paper = await seedPaidTask('paper', paperFile, { status: 'claimed', endUserId })
+      await agent.patchTaskStatus(paper.taskId, { status: 'failed', errorCode: 'PAPER_EMPTY' }, `Bearer ${anomalyToken}`, anomalyTerminalId)
+      const paperAfterFail = await prisma.printTask.findUnique({ where: { id: paper.taskId } })
+      const paperOrder = await prisma.order.findUnique({ where: { id: paper.orderId } })
+      const paperClaim = await claim()
+      if (
+        paperAfterFail?.status === 'failed' &&
+        paperAfterFail.errorCode === 'PAPER_EMPTY' &&
+        paperClaim.length === 0 &&
+        paperOrder?.payStatus === 'paid' &&
+        paperOrder.refundReason == null &&
+        paperOrder.taskStatus === 'failed'
+      ) {
+        pass('F-04 paper empty: failed, still paid, not auto-refunded, not auto-redispatched')
+      } else {
+        fail(`F-04 paper empty mismatch ${JSON.stringify({ paperAfterFail, paperOrder, paperClaim })}`)
+      }
+
+      const lostFile = await seedFile('lost', {})
+      const lost = await seedPaidTask('lost', lostFile, { status: 'claimed' })
+      await agent.patchTaskStatus(lost.taskId, { status: 'completed' }, `Bearer ${anomalyToken}`, anomalyTerminalId)
+      const lostLog = await prisma.printTaskStatusLog.findFirst({
+        where: { taskId: lost.taskId, errorCode: 'PRINTING_REPORT_LOST' },
+      })
+      const lostOrder = await prisma.order.findUnique({ where: { id: lost.orderId } })
+      if (lostLog && lostOrder?.payStatus === 'paid' && lostOrder.taskStatus === 'completed' && lostOrder.refundReason == null) {
+        pass('F-04 lost printing receipt: completed without a refund mark')
+      } else {
+        fail(`F-04 receipt lost mismatch ${JSON.stringify({ lostLog: Boolean(lostLog), lostOrder })}`)
+      }
+
+      const unconfirmedFile = await seedFile('unconfirmed', {})
+      const unconfirmed = await seedPaidTask('unconfirmed', unconfirmedFile, { status: 'claimed', endUserId })
+      await agent.patchTaskStatus(
+        unconfirmed.taskId,
+        { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+        `Bearer ${anomalyToken}`,
+        anomalyTerminalId,
+      )
+      try {
+        await printJobs.retryPaidFailedJob(unconfirmed.taskId, { endUserId })
+        fail('F-04 unconfirmed retry should be rejected')
+      } catch (error) {
+        if (errorCode(error) !== 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN') {
+          fail(`F-04 unconfirmed retry code ${errorCode(error)}`)
+        }
+      }
+      const unconfirmedOrder = await prisma.order.findUnique({ where: { id: unconfirmed.orderId } })
+      const unconfirmedTask = await prisma.printTask.findUnique({ where: { id: unconfirmed.taskId } })
+      if (
+        unconfirmedTask?.status === 'failed' &&
+        unconfirmedTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
+        unconfirmedOrder?.payStatus === 'paid' &&
+        unconfirmedOrder.refundReason == null
+      ) {
+        pass('F-04 unconfirmed: stays failed and paid, no automatic refund')
+      } else {
+        fail(`F-04 unconfirmed mismatch ${JSON.stringify({ unconfirmedTask, unconfirmedOrder })}`)
+      }
+
+      const partialFile = await seedFile('partial', {})
+      const partial = await seedPaidTask('partial', partialFile, { status: 'claimed', endUserId })
+      await agent.patchTaskStatus(
+        partial.taskId,
+        { status: 'failed', errorCode: 'PARTIAL_OUTPUT' },
+        `Bearer ${anomalyToken}`,
+        anomalyTerminalId,
+      )
+      try {
+        await printJobs.retryPaidFailedJob(partial.taskId, { endUserId })
+        fail('F-04 partial retry should be rejected')
+      } catch (error) {
+        if (errorCode(error) !== 'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN') {
+          fail(`F-04 partial retry code ${errorCode(error)}`)
+        }
+      }
+      const partialOrder = await prisma.order.findUnique({ where: { id: partial.orderId } })
+      if (partialOrder?.payStatus === 'paid' && partialOrder.refundReason == null && partialOrder.taskStatus === 'failed') {
+        pass('F-04 partial output: manual only, no automatic full refund')
+      } else {
+        fail(`F-04 partial mismatch ${JSON.stringify(partialOrder)}`)
+      }
+
+      const powerFile = await seedFile('power', {})
+      const power = await seedPaidTask('power', powerFile, {
+        status: 'claimed',
+        claimExpiry: new Date(Date.now() - 60_000),
+      })
+      await agent.resetExpiredClaims()
+      const powerTask = await prisma.printTask.findUnique({ where: { id: power.taskId } })
+      const powerOrder = await prisma.order.findUnique({ where: { id: power.orderId } })
+      const powerAudits = await prisma.auditLog.count({
+        where: { action: 'print_job.timeout_unconfirmed', targetId: power.taskId },
+      })
+      const powerRefundAudits = await prisma.auditLog.count({
+        where: { action: PAID_UNFULFILLED_FILE_AUDIT_ACTION, targetId: power.orderId },
+      })
+      const powerClaim = await claim()
+      await agent.resetExpiredClaims()
+      const powerAuditsAgain = await prisma.auditLog.count({
+        where: { action: 'print_job.timeout_unconfirmed', targetId: power.taskId },
+      })
+      if (
+        powerTask?.status === 'failed' &&
+        powerTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
+        powerOrder?.payStatus === 'paid' &&
+        powerOrder.taskStatus === 'failed' &&
+        powerOrder.refundReason == null &&
+        powerAudits === 1 &&
+        powerAuditsAgain === 1 &&
+        powerRefundAudits === 0 &&
+        powerClaim.every((row) => row.taskId !== power.taskId)
+      ) {
+        pass('F-04 power loss: PRINT_JOB_UNCONFIRMED, no file-unavailable refund, no automatic requeue')
+      } else {
+        fail(`F-04 power loss mismatch ${JSON.stringify({ powerTask, powerOrder, powerAudits, powerAuditsAgain, powerRefundAudits, powerClaim })}`)
+      }
+
+      const retried = await printJobs.retryPaidFailedJob(paper.taskId, { endUserId })
+      if (retried.status === 'pending' && (await prisma.order.findUnique({ where: { id: paper.orderId } }))?.refundReason == null) {
+        pass('F-04 paper empty can be retried by the user after it stays failed')
+      } else {
+        fail(`F-04 paper retry mismatch ${JSON.stringify(retried)}`)
+      }
+      await prisma.printTask.update({ where: { id: paper.taskId }, data: { status: 'failed', errorCode: 'PAPER_EMPTY' } })
+      await prisma.order.update({ where: { id: paper.orderId }, data: { taskStatus: 'failed' } })
     }
 
     await verifyPaymentCallbackRace({

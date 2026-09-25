@@ -33,6 +33,7 @@ import { NestFactory, Reflector } from '@nestjs/core'
 import { JwtModule, JwtService } from '@nestjs/jwt'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { AuditService } from '../src/audit/audit.service'
+import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.service'
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
@@ -243,6 +244,8 @@ async function main() {
   const paidSubjectKeys: string[] = []
   let paidTerminalReady = false
   let paidUserReady = false
+  const tAnomaly = `term_vop_anom_${suffix}`
+  let anomalyTerminalReady = false
   const subjectKeys = [
     `terminal_offline:${tOffline}`,
     `printer_issue:${tPrinterIssue}`,
@@ -334,10 +337,14 @@ async function main() {
       await prisma.auditLog.deleteMany({ where: { targetId: { in: paidSubjectKeys } } })
     }
     if (paidOrderIds.length > 0) await prisma.order.deleteMany({ where: { id: { in: paidOrderIds } } })
-    if (paidTaskIds.length > 0) await prisma.printTask.deleteMany({ where: { id: { in: paidTaskIds } } })
+    if (paidTaskIds.length > 0) {
+      await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: paidTaskIds } } })
+      await prisma.printTask.deleteMany({ where: { id: { in: paidTaskIds } } })
+    }
     if (paidFileIds.length > 0) await prisma.fileObject.deleteMany({ where: { id: { in: paidFileIds } } })
     if (paidUserReady) await prisma.endUser.deleteMany({ where: { id: paidEndUserId } })
     if (paidTerminalReady) await prisma.terminal.deleteMany({ where: { id: tPaid } })
+    if (anomalyTerminalReady) await prisma.terminal.deleteMany({ where: { id: tAnomaly } })
   }
 
   try {
@@ -1045,6 +1052,97 @@ async function main() {
       const otherAlert = first.data.find((item) => item.id === alertId('other'))!
       if (otherAlert.subjectKey.endsWith(uploading.taskId) || otherAlert.terminalCode === paidCode) fail('10. 另一终端的告警串到了本任务')
       pass('10. 真实库已支付文件不可用：误报/漏报、归属、消警、审计与信息最小化')
+    }
+
+    // ── 11. 缺纸 / 断电 / 未确认不走文件失效待退款 ─────────────────────────
+    {
+      const anomalyToken = `tok_anom_${suffix}`
+      await prisma.terminal.create({
+        data: { id: tAnomaly, terminalCode: `KSK-ANOM-${suffix}`, agentToken: anomalyToken, deviceFingerprint: 'fp-anom' },
+      })
+      anomalyTerminalReady = true
+      const agent = new TerminalAgentService(prisma, new AuditService(prisma))
+      const fileId = `file_vop_anom_${suffix}`
+      await prisma.fileObject.create({
+        data: {
+          id: fileId,
+          storageKey: `vop-anom-${suffix}`,
+          filename: 'anom.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 64,
+          sha256: 'a'.repeat(64),
+          purpose: 'print',
+          status: 'active',
+          bucket: 'local-fs',
+        },
+      })
+      paidFileIds.push(fileId)
+      async function seedClaimed(label: string, claimExpiry: Date | null): Promise<{ taskId: string; orderId: string }> {
+        const taskId = `pt_vop_anom_${suffix}_${label}`
+        const orderId = `ord_vop_anom_${suffix}_${label}`
+        await prisma.printTask.create({
+          data: {
+            id: taskId,
+            terminalId: tAnomaly,
+            fileId,
+            fileUrl: 'https://internal/anom',
+            fileMd5: 'b'.repeat(64),
+            paramsJson: '{}',
+            status: 'claimed',
+            claimedAt: new Date(),
+            claimExpiry,
+          },
+        })
+        paidTaskIds.push(taskId)
+        await prisma.order.create({
+          data: {
+            id: orderId,
+            orderNo: `ORD-ANOM-${label}-${suffix}`.toUpperCase(),
+            type: 'print',
+            printTaskId: taskId,
+            terminalId: tAnomaly,
+            amountCents: 80,
+            currency: 'CNY',
+            payStatus: 'paid',
+            taskStatus: 'claimed',
+            paymentSource: 'offline',
+            discountCents: 0,
+          },
+        })
+        paidOrderIds.push(orderId)
+        return { taskId, orderId }
+      }
+      const paper = await seedClaimed('paper', null)
+      const unconfirmed = await seedClaimed('unconfirmed', null)
+      const power = await seedClaimed('power', new Date(Date.now() - 60_000))
+      await agent.patchTaskStatus(paper.taskId, { status: 'failed', errorCode: 'PAPER_EMPTY' }, `Bearer ${anomalyToken}`, tAnomaly)
+      await agent.patchTaskStatus(unconfirmed.taskId, { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' }, `Bearer ${anomalyToken}`, tAnomaly)
+      await agent.resetExpiredClaims()
+      const rows = await prisma.order.findMany({
+        where: { id: { in: [paper.orderId, unconfirmed.orderId, power.orderId] } },
+        select: { id: true, payStatus: true, taskStatus: true, refundReason: true },
+      })
+      const byId = new Map(rows.map((row) => [row.id, row]))
+      const paperRow = byId.get(paper.orderId)
+      const unconfirmedRow = byId.get(unconfirmed.orderId)
+      const powerRow = byId.get(power.orderId)
+      const powerTask = await prisma.printTask.findUnique({ where: { id: power.taskId }, select: { status: true, errorCode: true } })
+      const alerts = await svc.listDerivedAlerts('all', 200)
+      const mixed = alerts.data.filter((item) =>
+        item.type === 'paid_pending_file_unavailable' &&
+        [paper.taskId, unconfirmed.taskId, power.taskId].includes(item.subjectId),
+      )
+      if (
+        paperRow?.payStatus === 'paid' && paperRow.taskStatus === 'failed' && paperRow.refundReason == null &&
+        unconfirmedRow?.payStatus === 'paid' && unconfirmedRow.taskStatus === 'failed' && unconfirmedRow.refundReason == null &&
+        powerRow?.payStatus === 'paid' && powerRow.taskStatus === 'failed' && powerRow.refundReason == null &&
+        powerTask?.status === 'failed' && powerTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
+        mixed.length === 0
+      ) {
+        pass('11. 缺纸、断电、未确认都不写成文件失效待退款，也不进文件不可用告警')
+      } else {
+        fail(`11. 去向串线 ${JSON.stringify({ paperRow, unconfirmedRow, powerRow, powerTask, mixed: mixed.map((item) => item.id) })}`)
+      }
     }
 
     console.log('\n=== ALL PASS ===')
