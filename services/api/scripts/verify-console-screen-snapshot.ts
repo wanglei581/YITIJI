@@ -26,6 +26,7 @@ import {
   SCREEN_MIN_AGGREGATE_SAMPLE,
   SCREEN_ONLINE_WINDOW_SECONDS,
   SCREEN_UNAVAILABLE_REASON,
+  type ScreenTimelineState,
 } from '../src/console-screen/console-screen.types'
 import {
   SCREEN_CACHE_TTL_SECONDS as SHARED_CACHE_TTL_SECONDS,
@@ -62,7 +63,15 @@ import {
 import { PartnerOrgRequiredError, requirePartnerOrgId } from '../src/console-screen/console-screen.org'
 import { offlineAlertTitle } from '../src/console-screen/console-screen.fleet'
 import { CHINA_LAT_MIN, CHINA_LNG_MAX, terminalPlacementPatch } from '../src/terminals/terminal-placement'
-import { TIMELINE_HEARTBEAT_ROW_CAP, TIMELINE_SEGMENT_CAP, deriveTerminalTimeline } from '../src/console-screen/console-screen.timeline'
+import {
+  TIMELINE_HEARTBEAT_ROW_CAP,
+  TIMELINE_SEGMENT_CAP,
+  deriveTerminalTimeline,
+  type TimelineDeriveResult,
+  type TimelineHeartbeat,
+  type TimelinePrintInterval,
+} from '../src/console-screen/console-screen.timeline'
+import { isHealthyPrinterStatus } from '../src/terminals/printer-status'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 let passed = 0
@@ -371,6 +380,154 @@ function assertSourceContract(): void {
   )
 }
 
+type TimelineSample = {
+  now: Date
+  heartbeats: readonly TimelineHeartbeat[]
+  prints: readonly TimelinePrintInterval[]
+  heartbeatRowCapExceeded?: boolean
+  printRowCapExceeded?: boolean
+  segmentCap?: number
+  onlineWindowMs?: number
+}
+
+/**
+ * deriveTerminalTimeline 改成单遍扫描之前的 O(n²) 实现。
+ * 只留在 verify 里做逐段差分，生产路径不再走这里。
+ */
+function deriveTerminalTimelineQuadratic(input: TimelineSample): TimelineDeriveResult {
+  if (input.heartbeatRowCapExceeded || input.printRowCapExceeded) {
+    return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
+  }
+  const nowMs = input.now.getTime()
+  const windowStart = nowMs - 24 * 60 * 60 * 1000
+  const onlineWindowMs = input.onlineWindowMs ?? SCREEN_ONLINE_WINDOW_SECONDS * 1000
+  const segmentCap = input.segmentCap ?? TIMELINE_SEGMENT_CAP
+  const rank: Record<ScreenTimelineState, number> = { unknown: 0, offline: 1, idle: 2, alert: 3, printing: 4 }
+  const heartbeats = input.heartbeats
+    .filter((row) => row.at instanceof Date && Number.isFinite(row.at.getTime()) && row.at.getTime() <= nowMs)
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+  type Seg = { from: number; to: number; state: ScreenTimelineState }
+  const overlay = (segments: Seg[], from: number, to: number, state: ScreenTimelineState): Seg[] => {
+    if (to <= from) return segments
+    const next: Seg[] = []
+    for (const seg of segments) {
+      if (seg.to <= from || seg.from >= to) {
+        next.push(seg)
+        continue
+      }
+      if (seg.from < from) next.push({ from: seg.from, to: from, state: seg.state })
+      next.push({
+        from: Math.max(seg.from, from),
+        to: Math.min(seg.to, to),
+        state: rank[seg.state] > rank[state] ? seg.state : state,
+      })
+      if (seg.to > to) next.push({ from: to, to: seg.to, state: seg.state })
+    }
+    return next
+  }
+  let segments: Seg[] = [{
+    from: windowStart,
+    to: nowMs,
+    state: heartbeats.length > 0 ? 'offline' : 'unknown',
+  }]
+  for (const heartbeat of heartbeats) {
+    const at = heartbeat.at.getTime()
+    const from = Math.max(at, windowStart)
+    const to = Math.min(at + onlineWindowMs, nowMs)
+    const status = heartbeat.printerStatus
+    const alert = Boolean(status) && status !== 'unknown' && !isHealthyPrinterStatus(status)
+    segments = overlay(segments, from, to, alert ? 'alert' : 'idle')
+  }
+  for (const print of input.prints) {
+    if (!(print.from instanceof Date) || !(print.to instanceof Date)) continue
+    segments = overlay(
+      segments,
+      Math.max(print.from.getTime(), windowStart),
+      Math.min(print.to.getTime(), nowMs),
+      'printing',
+    )
+  }
+  const sorted = segments.filter((seg) => seg.to > seg.from).sort((a, b) => a.from - b.from || a.to - b.to)
+  const merged: Seg[] = []
+  for (const seg of sorted) {
+    const last = merged[merged.length - 1]
+    if (last && last.state === seg.state && last.to === seg.from) last.to = seg.to
+    else merged.push({ ...seg })
+  }
+  if (merged.length > segmentCap) return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
+  return {
+    ok: true,
+    segments: merged.map((seg) => ({
+      from: new Date(seg.from).toISOString(),
+      to: new Date(seg.to).toISOString(),
+      state: seg.state,
+    })),
+  }
+}
+
+function timelineSampleDiff(label: string, sample: TimelineSample): string | null {
+  const next = deriveTerminalTimeline(sample)
+  const previous = deriveTerminalTimelineQuadratic(sample)
+  if (JSON.stringify(next) === JSON.stringify(previous)) return null
+  return `${label}: new=${JSON.stringify(next).slice(0, 320)} old=${JSON.stringify(previous).slice(0, 320)}`
+}
+
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6D2B79F5) >>> 0
+    let value = Math.imul(state ^ (state >>> 15), 1 | state)
+    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function diffTimelineSamples(now: Date): string[] {
+  const failures: string[] = []
+  const collect = (label: string, sample: TimelineSample) => {
+    const diff = timelineSampleDiff(label, sample)
+    if (diff) failures.push(diff)
+  }
+  collect('no-heartbeat', { now, heartbeats: [], prints: [] })
+  collect('stale-heartbeat', {
+    now,
+    heartbeats: [{ at: new Date(now.getTime() - 48 * 60 * 60 * 1000), printerStatus: 'ready' }],
+    prints: [],
+  })
+  collect('print-on-unknown', {
+    now,
+    heartbeats: [],
+    prints: [{ from: new Date(now.getTime() - 60_000), to: new Date(now.getTime() - 30_000) }],
+  })
+  const statuses = [null, 'ready', 'ok', 'idle', 'unknown', 'paper_empty', 'offline', 'toner_low', '']
+  for (let index = 0; index < 50; index += 1) {
+    const rand = mulberry32(0xC0FFEE + index)
+    const sampleNow = new Date(now.getTime() - Math.floor(rand() * 3_600_000))
+    const heartbeatCount = Math.floor(rand() * 240)
+    const heartbeats: TimelineHeartbeat[] = Array.from({ length: heartbeatCount }, () => ({
+      at: new Date(sampleNow.getTime() - (rand() * 28 - 1) * 3_600_000),
+      printerStatus: statuses[Math.floor(rand() * statuses.length)] ?? null,
+    }))
+    if (index % 7 === 0) heartbeats.push({ at: new Date(Number.NaN), printerStatus: 'ready' })
+    const prints: TimelinePrintInterval[] = Array.from({ length: Math.floor(rand() * 12) }, () => {
+      const start = sampleNow.getTime() - rand() * 26 * 3_600_000
+      const end = start + (rand() - 0.1) * 3_600_000
+      return { from: new Date(Math.min(start, end)), to: new Date(Math.max(start, end)) }
+    })
+    collect(`random-${index}`, {
+      now: sampleNow,
+      heartbeats,
+      prints,
+      onlineWindowMs: [60_000, 180_000, 300_000][Math.floor(rand() * 3)] ?? 180_000,
+      heartbeatRowCapExceeded: index === 3,
+      printRowCapExceeded: index === 11,
+      segmentCap: index === 17 ? 2 : undefined,
+    })
+    if (failures.length > 0) break
+  }
+  return failures
+}
+
 async function createOnlineHeartbeats(
   prisma: PrismaService,
   terminalId: string,
@@ -596,6 +753,37 @@ async function assertPureHelpers(): Promise<void> {
       && rowCapTimeline.reason === SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded
       && TIMELINE_SEGMENT_CAP >= 480,
   )
+  const tenSecondCount = (24 * 60 * 60 * 1000) / 10_000
+  const tenSecondBeats: TimelineHeartbeat[] = Array.from({ length: tenSecondCount }, (_, index) => ({
+    at: new Date(timelineNow.getTime() - 24 * 60 * 60 * 1000 + index * 10_000),
+    printerStatus: 'ready',
+  }))
+  const timelineStarted = performance.now()
+  const tenSecondTimeline = deriveTerminalTimeline({ now: timelineNow, heartbeats: tenSecondBeats, prints: [] })
+  const tenSecondMs = performance.now() - timelineStarted
+  const tenSecondReferenceStarted = performance.now()
+  const tenSecondReference = deriveTerminalTimelineQuadratic({ now: timelineNow, heartbeats: tenSecondBeats, prints: [] })
+  const tenSecondReferenceMs = performance.now() - tenSecondReferenceStarted
+  console.log(
+    `  timeline 10s×24h: new ${tenSecondMs.toFixed(2)} ms, quadratic reference ${tenSecondReferenceMs.toFixed(2)} ms, segments ${tenSecondTimeline.ok ? tenSecondTimeline.segments.length : 'unavailable'}`,
+  )
+  assert(
+    '2s. 10 秒一次、24 小时心跳推导 < 100ms，且与旧算法逐段一致、合并为 1 段 idle',
+    tenSecondMs < 100
+      && JSON.stringify(tenSecondTimeline) === JSON.stringify(tenSecondReference)
+      && tenSecondTimeline.ok
+      && tenSecondTimeline.segments.length === 1
+      && tenSecondTimeline.segments[0]?.state === 'idle'
+      && TIMELINE_HEARTBEAT_ROW_CAP >= 8_640,
+    `new=${tenSecondMs.toFixed(2)} ms reference=${tenSecondReferenceMs.toFixed(2)} ms cap=${TIMELINE_HEARTBEAT_ROW_CAP}`,
+  )
+  const timelineDiffs = diffTimelineSamples(timelineNow)
+  assert(
+    '2t. 50 组随机心跳和打印区间与旧算法逐段一致',
+    timelineDiffs.length === 0,
+    timelineDiffs[0],
+  )
+
   assert(
     '2r. 离线文案按分钟/小时给领导短句',
     offlineAlertTitle(34 * 60_000) === '离线 34 分钟'
