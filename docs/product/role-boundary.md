@@ -85,13 +85,13 @@
 - 求职信、推荐信、简历模板等材料，下载与打印。
 - 打印、扫描、复印、U 盘导入、手机传文件、取件码出纸。
 - 政策查询（机构发布）；本机构官方渠道二维码（只在绑定了运营机构的终端上）。
-- AI 顾问「小青」：文字对话与功能引导；数字人形象在本人书面肖像与声音授权完成前不开放。
+- AI 顾问「小青」：文字对话与功能引导；数字人形象在本人书面肖像与声音授权完成前不开放（现状：生产构建默认打开数字人通话，见 feature-scope §七 #19）。
 - 我的：简历、文档、订单、AI 记录。
 
 ### 求职者 · 小程序
 
 - AI 工具（简历生成、诊断、优化、简历对照、模拟面试、职业规划、自我探索、小青文字助手）。
-- 上传文件、下单付款、取件码（可分享给他人代取）、订单与退款申请。
+- 上传文件、下单（目前都到一体机现场付款，小程序内付款按 next-tasks 4.1 验收后再开）、取件码（可分享给他人代取）、订单与退款申请。
 - 我的：文档、简历多版本、AI 记录、通知、设置、协议与注销。
 - **首发不含**：岗位、招聘会、找企业、政策、职业圈动态、收藏、足迹、会员权益、求职进度、合同审查（2026-09-25 产品负责人拍板，next-tasks 2.6；已进入本地唯一候选，提交 `9354c39f3`、`935755746`）。
 
@@ -131,7 +131,7 @@
 ### 运营机构不能
 
 - ❌ 看求职者简历内容（会员文件仅本人可见；所有文件访问均走短期签名 URL）。
-- ❌ 看求职者个人信息（姓名、电话、邮箱，字段层 DTO 白名单已强制）。
+- ❌ 看求职者个人信息（姓名、电话、邮箱）。现状：全局入参白名单只拒绝请求里多出的字段；机构接口的响应是否不含这些字段，要逐个响应 DTO 核对，不能只靠这条管道证明。
 - ❌ 看到其他机构的数据。
 - ❌ 在我方云上发布岗位、招聘会、企业资料（托管 a）。
 - ❌ 录入不属于本机构官方域名的链接，包括企业招聘码和商业招聘网站。
@@ -144,7 +144,7 @@
 - ❌ 无审计查看求职者简历内容。
 - ❌ 做审核、发布、下架、删除等管理动作而不落 `AuditLog`。
 
-> **口径修正（2026-08-01，保留）**：本行此前写作「所有写操作都同步落 `AuditLog`，DB 层无 DELETE 权限」，与代码不符，已改为上面的可验证表述。实测（口径：**显式 Prisma delegate 调用**）：`services/api/src` 有 29 处 `delete/deleteMany`（覆盖 19 个模型）、28 个 `@Delete()` 端点。这**不等于**全部物理删除面——另有 Prisma 嵌套 `deleteMany: {}`（如 `fair-company-zone.service.ts:88`），以及 SQLite 与 PostgreSQL 两份 Prisma schema **各 40 处 `onDelete: Cascade`**，后者会随父记录级联删除且不经过任何 service 审计封装。此外还有部署期 destructive DDL（`services/api/prisma/migrations` 下 `DROP TABLE` 10 处、`DROP INDEX` 1 处）与 Terminal Agent 本地 SQLite（`apps/terminal-agent/src/agent/db.ts:221` 对 `pending_patches` 执行 `DELETE FROM`）。**线上实际库角色权限未核验**，不要据此断言线上无 DELETE 收敛。`activity.service.ts` 的删除属会员删除本人浏览/跳转记录与 TTL 清理，不写 `AuditLog` 是设计如此。
+> **口径修正（2026-08-01，保留）**：本行此前写作「所有写操作都同步落 `AuditLog`，DB 层无 DELETE 权限」，与代码不符，已改为上面的可验证表述。实测（口径：**显式 Prisma delegate 调用**；2026-09-26 在 `aad9a7a39` 复数）：`services/api/src` 有 40 处 `delete/deleteMany`（覆盖 29 个模型）、36 个 `@Delete()` 端点（2026-08-01 时为 29 处、19 个模型、28 个）。这**不等于**全部物理删除面——另有 Prisma 嵌套 `deleteMany: {}`（如 `fair-company-zone.service.ts:88`），以及 SQLite 与 PostgreSQL 两份 Prisma schema **各 51 处 `onDelete: Cascade`**（2026-08-01 时各 40 处），后者会随父记录级联删除且不经过任何 service 审计封装。此外还有部署期 destructive DDL（`services/api/prisma/migrations` 下 `DROP TABLE` 11 处、`DROP INDEX` 3 处）与 Terminal Agent 本地 SQLite（`apps/terminal-agent/src/agent/db.ts:596` 对 `pending_patches` 执行 `DELETE FROM`）。**线上实际库角色权限未核验**，不要据此断言线上无 DELETE 收敛。`activity.service.ts` 的删除属会员删除本人浏览/跳转记录与 TTL 清理，不写 `AuditLog` 是设计如此。
 >
 > 有效约束：删除必须走 service 层（软删或带审计的封装），禁止在 controller 里直接调 Prisma `delete`；管理侧删除、审核、发布必须落 `AuditLog`；会员自助删除本人记录与 TTL 清理豁免；「DB 层按角色收敛 DELETE 权限」是待办。
 
