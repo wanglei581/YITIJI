@@ -2072,7 +2072,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/console-screen/console-screen.types.ts` | `verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.usage.controller.ts` | `verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.usage.queries.ts` | `verify-console-screen-usage.ts` |
-| `services/api/src/console-screen/console-screen.usage.service.ts` | `verify-console-screen-usage.ts` |
+| `services/api/src/console-screen/console-screen.usage.service.ts` | `verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts` |
 | `services/api/src/content/content-signing.ts` | `verify-ad-asset-range.ts`<br/>`verify-screensaver-content.ts` |
 | `services/api/src/content/content.controller.ts` | `verify-ad-asset-range.ts`<br/>`verify-multipart-field-nesting.ts` |
 | `services/api/src/content/content.service.ts` | `verify-ad-asset-range.ts`<br/>`verify-external-video-e2e.ts`<br/>`verify-screensaver-content.ts` |
