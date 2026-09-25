@@ -6,6 +6,8 @@ import { PaymentController } from './payment.controller'
 import { PAYMENT_PROVIDER_TOKEN, resolvePaymentProviders } from './payment-provider.factory'
 import { PricingService } from './pricing.service'
 import { QrPaymentExpiryTask } from './qr-payment-expiry.task'
+import { PickupExpiryRefundService } from './pickup-expiry-refund.service'
+import { PickupExpiryRefundTask } from './pickup-expiry-refund.task'
 import { RefundConvergenceTask } from './refund-convergence.task'
 import { RefundService } from './refund.service'
 
@@ -29,10 +31,12 @@ import { RefundService } from './refund.service'
     QrPaymentExpiryTask,
     RefundService,
     RefundConvergenceTask,
+    PickupExpiryRefundService,
+    PickupExpiryRefundTask,
     // 启动期解析注册表（fail-closed）：sandbox 缺密钥 / 生产配 sandbox / 真实通道缺配置 /
     // sandbox 与真实通道混配 / 未知取值 → 直接拒绝启动。
     { provide: PAYMENT_PROVIDER_TOKEN, useFactory: () => resolvePaymentProviders(process.env) },
   ],
-  exports: [PricingService, OrderStatusService, OnlinePaymentService, RefundService],
+  exports: [PricingService, OrderStatusService, OnlinePaymentService, RefundService, PickupExpiryRefundService],
 })
 export class PaymentModule {}

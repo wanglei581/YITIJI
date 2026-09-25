@@ -275,7 +275,7 @@ export class RefundService {
    */
   async refund(
     orderId: string,
-    opts: { refundNo?: string; reason: string; operatorId?: string },
+    opts: { refundNo?: string; reason: string; operatorId?: string; unreleasedOnly?: boolean },
   ): Promise<RefundResultView> {
     const reason = opts.reason?.trim()
     if (!reason) throw new BadRequestException('REFUND_REASON_REQUIRED')
@@ -377,6 +377,10 @@ export class RefundService {
                 id: orderId,
                 payStatus: 'paid',
                 taskStatus: { notIn: [...ACTIVE_PRINT_TASK_STATES] },
+                // 到期未取自动退只退还没核销、没挂打印任务的单。人工退款不带这个限制。
+                ...(opts.unreleasedOnly
+                  ? { printTaskId: null, pickupStatus: { in: ['pending', 'expired'] } }
+                  : {}),
               },
               data: { payStatus: 'refunding' },
             })
