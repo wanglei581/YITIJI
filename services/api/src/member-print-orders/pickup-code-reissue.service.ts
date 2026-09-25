@@ -4,6 +4,7 @@ import { encryptSecret } from '../common/crypto/secret-cipher'
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { PrismaService } from '../prisma/prisma.service'
 import { MemberPrintOrderCreateService } from './member-print-order-create.service'
+import { PackageOrderService } from './package-order.service'
 
 const REISSUE_ATTEMPTS = 6
 
@@ -19,6 +20,8 @@ function isUniqueConflict(error: unknown): boolean {
 /**
  * 作废当前到机码并重发一枚新的 8 位码。沿用同一订单、同一截止（付款起 7 天，不顺延）。
  * 旧码的哈希被替换，立即无法认领。已核销、已过期、已退款或已开始出纸的单不能重发。
+ *
+ * 材料包主单的文件在 OrderItem，`sourceFileId` 为空。能否重发只看有没有到机码。
  */
 @Injectable()
 export class PickupCodeReissueService {
@@ -26,12 +29,13 @@ export class PickupCodeReissueService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly orders: MemberPrintOrderCreateService,
+    private readonly packages: PackageOrderService,
   ) {}
 
   async reissue(endUserId: string, orderId: string) {
     const now = new Date()
     const existing = await this.prisma.order.findFirst({
-      where: { id: orderId, endUserId, sourceFileId: { not: null } },
+      where: { id: orderId, endUserId, pickupCodeHash: { not: null } },
     })
     if (!existing?.pickupCodeHash) {
       throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
@@ -73,6 +77,7 @@ export class PickupCodeReissueService {
           targetId: existing.id,
           payload: { terminalId: existing.terminalId, previousHashPrefix: existing.pickupCodeHash.slice(0, 12) },
         })
+        if (!existing.sourceFileId) return this.packages.detail(endUserId, existing.id)
         return this.orders.detail(endUserId, existing.id)
       } catch (error) {
         if (isUniqueConflict(error)) continue

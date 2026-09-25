@@ -33,6 +33,7 @@ import { AuditService } from '../src/audit/audit.service'
 import type { RedisService } from '../src/common/redis/redis.service'
 import { PickupCodeReissueService } from '../src/member-print-orders/pickup-code-reissue.service'
 import { MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
+import { PackageOrderService } from '../src/member-print-orders/package-order.service'
 import { PickupExpiryRefundService } from '../src/payment/pickup-expiry-refund.service'
 import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from '../src/payment/pickup-validity'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
@@ -146,7 +147,8 @@ async function main(): Promise<void> {
   const pricing = new PricingService(prisma)
   const quote = new OrderQuoteService(pageCount, pricing, capabilities, prisma)
   const memberOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
-  const reissue = new PickupCodeReissueService(prisma, audit, memberOrders)
+  const packages = new PackageOrderService(prisma, quote, capabilities, audit, orderStatus)
+  const reissue = new PickupCodeReissueService(prisma, audit, memberOrders, packages)
   const redis = new FakeRedis()
   const pickup = new PickupOrderService(prisma, capabilities, audit, redis as unknown as RedisService, storage)
   const refunds = new RefundService(prisma, audit, new PaymentProviderRegistry([]))
@@ -285,6 +287,29 @@ async function main(): Promise<void> {
     })
     if (!reissueAudit || reissueAudit.payloadJson.includes(reissued.pickupCode!)) fail('重发审计不得写下明文码')
     pass('作废重发：旧码立即无效，截止不变，分享仍只有码和网点名')
+
+    const packageOrder = await packages.create(userId, {
+      terminalId,
+      files: [{ fileId }],
+      params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+    }, randomUUID())
+    const packageBefore = await prisma.order.findUniqueOrThrow({ where: { id: packageOrder.orderId } })
+    if (packageBefore.sourceFileId !== null || !packageBefore.pickupCodeHash) fail('材料包主单必须没有 sourceFileId，且已签发到机码')
+    const packageReissued = await reissue.reissue(userId, packageOrder.orderId)
+    if (!packageReissued.pickupCode || packageReissued.pickupCode === packageOrder.pickupCode) {
+      fail(`材料包必须重发成新码，实际 ${packageReissued.pickupCode ?? 'missing'}`)
+    }
+    const packageAfter = await prisma.order.findUniqueOrThrow({ where: { id: packageOrder.orderId } })
+    if (packageAfter.pickupCodeHash === packageBefore.pickupCodeHash) fail('材料包重发必须换掉旧哈希')
+    const packageOld = await capture(() => pickup.claim(packageOrder.pickupCode!, terminalId, 'pkg-old'))
+    if (!packageOld.thrown || packageOld.code !== 'PICKUP_CODE_INVALID') {
+      fail(`材料包旧码必须立即失效，实际 ${JSON.stringify(packageOld)}`)
+    }
+    const packageNew = await pickup.claim(packageReissued.pickupCode, terminalId, 'pkg-new')
+    if (packageNew.orderId !== packageOrder.orderId || packageNew.released) {
+      fail(`材料包新码必须认领同一张未付款单，实际 ${JSON.stringify(packageNew)}`)
+    }
+    pass('材料包可以作废重发：新码可认领，旧码立即失效')
 
     await prisma.order.update({
       where: { id: created.id },
@@ -472,6 +497,7 @@ async function main(): Promise<void> {
     await prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } }).catch(() => undefined)
     await prisma.order.updateMany({ where: { endUserId: userId }, data: { printTaskId: null } }).catch(() => undefined)
     await prisma.printTask.deleteMany({ where: { endUserId: userId } }).catch(() => undefined)
+    await prisma.orderItem.deleteMany({ where: { order: { endUserId: userId } } }).catch(() => undefined)
     await prisma.order.deleteMany({ where: { endUserId: userId } }).catch(() => undefined)
     await prisma.piiFinding.deleteMany({ where: { task: { endUserId: userId } } }).catch(() => undefined)
     await prisma.documentProcessTask.deleteMany({ where: { endUserId: userId } }).catch(() => undefined)
