@@ -511,7 +511,11 @@ interface ScanBusyOptions {
   controlToken?: string
   status?: 'waiting' | 'processing' | 'completed' | 'expired' | 'failed' | 'cancelled'
   networkError?: boolean
-  deleteFailure?: 'abort' | 'server-error'
+  /**
+   * `'already-completed'` 按服务端 `cancel()` 的真实回法：任务已经 completed →
+   * 400 `SCAN_TASK_ALREADY_COMPLETED`，并且此后的状态查询如实回 completed（带 resultFile）。
+   */
+  deleteFailure?: 'abort' | 'server-error' | 'already-completed'
   resultFile?: {
     fileId: string
     fileUrl: string
@@ -535,6 +539,8 @@ const TERMINAL_SESSION_FIXTURE = 'playwright-terminal-session-fixture'
 interface ScanAckProbe {
   /** 断言恰好确认过 `count` 次，且每一次都带齐服务端要校验的三样凭据。 */
   expectAcked: (count: number) => Promise<void>
+  /** 放行被压住的那次回话。只对 `{ hold: true }` 注册的有意义，其余情况是空操作。 */
+  release: () => void
 }
 
 /**
@@ -549,8 +555,17 @@ interface ScanAckProbe {
  *
  * 顺带记下每一次的凭据：只 respond 不看请求头的话，「本机漏带凭据」在夹具里永远
  * 不会红，而真实服务端回的是 401（无终端会话票 / 终端 id）或 403（控制凭据对不上）。
+ *
+ * `hold`：确认请求照常发出、照常被记账，但回话压到用例调 `release()` 才给。
+ * 用来把「服务端终态先到、确认回话后到」这一种顺序钉死 —— 挂载时两个请求同时发出，
+ * 不压的话谁先回来由网络决定（CI run 36172469588 撞到的正是后到的那一种）。
+ * 闸门在注册这一刻就建好：`release()` 赶在请求到达之前调用也不会被静默丢掉。
  */
-function registerScanBusyAck(page: Page, api: ApiRouter): ScanAckProbe {
+function registerScanBusyAck(
+  page: Page,
+  api: ApiRouter,
+  options: { hold?: boolean } = {},
+): ScanAckProbe {
   const path = `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`
   const calls: Array<Record<string, string>> = []
   page.on('request', (request) => {
@@ -558,10 +573,22 @@ function registerScanBusyAck(page: Page, api: ApiRouter): ScanAckProbe {
     if (new URL(request.url()).pathname !== path) return
     calls.push(request.headers())
   })
-  api.respond('POST', path, {
+  const acked = {
     status: 200,
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: SCAN_DELIVERY_ACKED_AT } },
-  })
+  }
+  let release: () => void = () => undefined
+  if (options.hold) {
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    api.respondWith('POST', path, async () => {
+      await held
+      return acked
+    })
+  } else {
+    api.respond('POST', path, acked)
+  }
   return {
     expectAcked: async (count) => {
       await expect.poll(() => calls.length, { message: `期望恰好确认 ${count} 次投递授权` }).toBe(count)
@@ -571,7 +598,81 @@ function registerScanBusyAck(page: Page, api: ApiRouter): ScanAckProbe {
         expect(headers['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
       }
     },
+    release: () => release(),
   }
+}
+
+interface ScanRevokeProbeSnapshot {
+  /** 确认（ACK）的回话被页面读完、并且紧跟其后的那串微任务已经跑完的次数。 */
+  ackConsumed: number
+  /** 页面**调用过**几次 `fetch(DELETE /scan/sessions/:id)`（不论它后来到没到路由）。 */
+  deletes: number
+}
+
+/**
+ * 页内记账：这一页调用过几次 DELETE，以及确认回话被页面消化了几次。
+ *
+ * 两样都只能在页面里记，`installScanProgressRoute` 的路由计数替代不了：
+ *   · 路由计数是**异步**的：页面调用 fetch 之后，要经过一次浏览器 → Playwright 的往返
+ *     handler 才 +1。断言排在这次往返前面，读到的 0 什么也证明不了；
+ *   · 「确认回话已经被处理完」只有页面自己知道。等待页的确认回调（ScanProgressPage 的
+ *     ACK effect）是在响应体 `json()` 落定之后那一串**微任务**里跑的，它要发 DELETE
+ *     就在那串里同步调用 fetch。所以在 `json()` 落定时排一个宏任务：它跑起来的那一刻，
+ *     那串微任务连同其中任何一次 DELETE 调用必然都已经跑完 —— 这是事件循环的顺序保证，
+ *     不是「等得够久」。（哪天那段回调里多了一次 await 宏任务，这个信号就要跟着改。）
+ *
+ * 读的时候一次读全：清场会整页重载，把这份记账连同文档一起换成全新的零，
+ * 分两次读就可能一半来自旧文档、一半来自新文档。
+ */
+async function installScanRevokeProbe(page: Page): Promise<() => Promise<ScanRevokeProbeSnapshot | null>> {
+  await page.addInitScript(({ ackPath, taskPath }) => {
+    const probe = { ackConsumed: 0, deletes: 0 }
+    Object.assign(window, { __scanRevokeProbe: probe })
+    const nativeFetch = window.fetch.bind(window)
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : null
+      const url = new URL(request ? request.url : String(input), window.location.href)
+      const method = (init?.method ?? request?.method ?? 'GET').toUpperCase()
+      if (method === 'DELETE' && url.pathname === taskPath) probe.deletes += 1
+      const pending = nativeFetch(input, init)
+      if (method !== 'POST' || url.pathname !== ackPath) return pending
+      return pending.then((response) => {
+        const nativeJson = response.json.bind(response)
+        response.json = () => nativeJson().finally(() => {
+          window.setTimeout(() => {
+            probe.ackConsumed += 1
+          }, 0)
+        })
+        return response
+      })
+    }
+  }, {
+    ackPath: `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`,
+    taskPath: `/api/v1/scan/sessions/${SCAN_TASK_ID}`,
+  })
+  return async () => {
+    try {
+      return await page.evaluate(() => {
+        const probe = (window as unknown as { __scanRevokeProbe?: ScanRevokeProbeSnapshot }).__scanRevokeProbe
+        return probe ? { ackConsumed: probe.ackConsumed, deletes: probe.deletes } : null
+      })
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Execution context was destroyed')) return null
+      throw error
+    }
+  }
+}
+
+/** 等确认回话被页面消化完，交回**满足条件的那一份**快照（不另读第二次，理由见上）。 */
+async function waitForAckConsumed(
+  readProbe: () => Promise<ScanRevokeProbeSnapshot | null>,
+): Promise<ScanRevokeProbeSnapshot> {
+  const last: { snapshot: ScanRevokeProbeSnapshot | null } = { snapshot: null }
+  await expect.poll(async () => {
+    last.snapshot = await readProbe()
+    return last.snapshot?.ackConsumed ?? 0
+  }, { message: '确认回话必须被页面读完：这之后才谈得上「它有没有补发 DELETE」' }).toBe(1)
+  return last.snapshot!
 }
 
 async function installScanProgressRoute(
@@ -586,10 +687,23 @@ async function installScanProgressRoute(
 
   let statusReq = 0
   let deleteReq = 0
+  let completedBeforeCancel = false
   await page.route(`**/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     const request = route.request()
     if (request.method() === 'DELETE') {
       deleteReq += 1
+      if (options.deleteFailure === 'already-completed') {
+        completedBeforeCancel = true
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: false,
+            error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' },
+          }),
+        })
+        return
+      }
       if (options.deleteFailure === 'abort') {
         await route.abort('internetdisconnected')
         return
@@ -624,7 +738,7 @@ async function installScanProgressRoute(
       await route.abort('internetdisconnected')
       return
     }
-    const status = options.status ?? 'waiting'
+    const status = completedBeforeCancel ? 'completed' : options.status ?? 'waiting'
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -866,6 +980,168 @@ test('server-cancelled poll status navigates back to /scan/start without sending
   expect(counts.deleteRequests()).toBe(0)
   // 等待页挂载确认了一次投递授权，且只此一次：这一屏走到哪个终态都不该再确认。
   await ack.expectAcked(1)
+})
+
+/* ── 上一条的另一种到达顺序（CI run 36172469588 撞到的那一种） ─────────────────
+ *
+ * 等待页挂载时**同时**发出两个请求：投递确认（ACK）和第一次状态查询。上一条用例
+ * 两个都立刻回话，谁先到由网络决定；绝大多数时候 ACK 先到，于是它一直是绿的。
+ * 这里把 ACK 压住，钉死另一种顺序：状态查询先回 `cancelled`，页面据此回到 start、
+ * 抹掉本机登记（`live: undefined` 同时推进扫描代次），**然后** ACK 才回话。
+ *
+ * 期望「一次 DELETE 都没有」来自契约，不来自观察：
+ *   · 服务端的终态是吸收态 —— scan-tasks.service.ts 里没有任何一条路把 completed /
+ *     failed / expired / cancelled 改回 waiting，而 Agent 的租约只签 `status: 'waiting'`
+ *     的行（getScanDeliveryLease）。服务端说过 cancelled，这条任务就再也收不到文件；
+ *   · 所以这时再 DELETE 只会换回 409 / 400，这正是 scanSessionRevoke 自己写下的第 3 条
+ *     硬约束「已是终态就不发」；
+ *   · 这一点与 ACK 回什么无关：服务端对**已经确认过**的任务原样回那一刻的时间戳
+ *     （`ack()` 的 `if (task.deliveryAckedAt) return ...` 排在状态判断之前），
+ *     任务被取消之后也一样 —— 所以「ACK 成功」证明不了任务还活着。 */
+test('server-cancelled status that lands before the delivery-ack response still sends no DELETE @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api, { hold: true })
+  const readProbe = await installScanRevokeProbe(page)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'cancelled',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+
+  // 顺序钉死：cancelled 已经处理完（回到 start、登记已抹、代次已推进），确认还压在路上。
+  await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
+  await ack.expectAcked(1)
+  ack.release()
+
+  const settled = await waitForAckConsumed(readProbe)
+  expect(settled.deletes, '服务端已经说过 cancelled：确认回话再晚到，本机也不许为这条任务发 DELETE').toBe(0)
+  expect(counts.deleteRequests()).toBe(0)
+})
+
+/* 同一条契约的另外三种终态。它们不像 cancelled 那样自己推进代次（结果屏还要用 live），
+ * 代次是在用户**离开结果屏**时变的 —— 只要那一刻挂载时发出的确认还没回话，
+ * 它回来时一样会被读成「用户走了」。期望同上：服务端报过终态，一次 DELETE 都不该有。 */
+for (const status of ['completed', 'expired', 'failed'] as const) {
+  test(`server-${status} status followed by leaving before the delivery-ack response lands sends no DELETE @scan-busy @warning-kiosk`, async ({
+    page,
+    api,
+  }) => {
+    registerKioskShell(api)
+    const ack = registerScanBusyAck(page, api, { hold: true })
+    const readProbe = await installScanRevokeProbe(page)
+    const counts = await installScanProgressRoute(page, {
+      scanTaskId: SCAN_TASK_ID,
+      controlToken: SCAN_CONTROL_TOKEN,
+      status,
+      resultFile: status === 'completed'
+        ? {
+            fileId: 'scan-busy-result-file',
+            fileUrl: 'https://scan-busy.invalid/result.pdf',
+            filename: 'scan-busy-result.pdf',
+            sizeBytes: 4096,
+            mimeType: 'application/pdf',
+          }
+        : undefined,
+    })
+    await gotoScanProgressWithHistory(page, {
+      scanTaskId: SCAN_TASK_ID,
+      controlToken: SCAN_CONTROL_TOKEN,
+    })
+    await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
+    await ack.expectAcked(1)
+
+    // 离开整条扫描流程 = 撤（结果快照在，所以是 no-op）→ 清登记 → 推进代次。
+    // 页内跳转，不用 page.goto：整页加载会把还在路上的确认连同它的回调一起干掉，那样怎么写都是绿的。
+    await page.getByRole('button', { name: '首页', exact: true }).click()
+    await page.waitForURL((url) => url.pathname === '/')
+    ack.release()
+
+    const settled = await waitForAckConsumed(readProbe)
+    expect(settled.deletes, `服务端已经说过 ${status}：离开之后确认才回话，本机也不许为这条任务发 DELETE`).toBe(0)
+    expect(counts.deleteRequests()).toBe(0)
+  })
+}
+
+/* 用户自己按的取消也是同一件事：取消回执（200 cancelled）就是服务端报的终态。
+ * 确认没回话之前「取消扫描」照样可按，所以这一种顺序真实存在。期望是**恰好一次** ——
+ * 用户按的那一次；那次确认随后回来，不许再补第二次。 */
+test('user cancel while the delivery ack is still in flight sends exactly one DELETE @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api, { hold: true })
+  const readProbe = await installScanRevokeProbe(page)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'waiting',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  // 确认还压着：本页停在「正在确认投递授权」。
+  await expect(page.getByTestId('scan-ack-pending-notice')).toBeVisible()
+  await ack.expectAcked(1)
+  await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
+
+  await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
+  ack.release()
+
+  const settled = await waitForAckConsumed(readProbe)
+  expect(settled.deletes, '取消回执已经说了 cancelled：随后回话的确认不许再补一次 DELETE').toBe(1)
+  expect(counts.deleteRequests()).toBe(1)
+})
+
+/* 取消撞上「已经完成」：服务端回 400 SCAN_TASK_ALREADY_COMPLETED，本页补查一次状态，
+ * 拿到 completed 落到结果屏。补查那句 completed 同样是服务端报的终态 ——
+ * 用户随后离开、确认才回话，也只许有用户按的那一次 DELETE。 */
+test('user cancel that finds the scan already completed sends no second DELETE when the ack lands after leaving @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api, { hold: true })
+  const readProbe = await installScanRevokeProbe(page)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'waiting',
+    deleteFailure: 'already-completed',
+    resultFile: {
+      fileId: 'scan-busy-result-file',
+      fileUrl: 'https://scan-busy.invalid/result.pdf',
+      filename: 'scan-busy-result.pdf',
+      sizeBytes: 4096,
+      mimeType: 'application/pdf',
+    },
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page.getByTestId('scan-ack-pending-notice')).toBeVisible()
+  await ack.expectAcked(1)
+  await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
+
+  await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
+  await page.getByRole('button', { name: '首页', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/')
+  ack.release()
+
+  const settled = await waitForAckConsumed(readProbe)
+  expect(settled.deletes, '补查已经拿到 completed：离开之后确认才回话，也不许再补一次 DELETE').toBe(1)
+  expect(counts.deleteRequests()).toBe(1)
 })
 
 test('explicit user cancel sends exactly one DELETE before navigating away @scan-busy @warning-kiosk', async ({
