@@ -156,6 +156,8 @@ export function TwinCity({
   const selected = selectedId === null ? null : (model.placedTerminals.find((p) => p.terminal.id === selectedId) ?? null)
 
   const center = TWIN_WORLD / 2
+  // 聚焦某区时中枢也退为背景，不压在被看的街区前面
+  const hubDim = focusDistrict !== null ? 'is-dim' : undefined
   const flows = model.placedTerminals.filter((p, i) => p.state === 'pr' || (p.state === 'ok' && i % 3 === 0))
 
   return (
@@ -169,10 +171,10 @@ export function TwinCity({
         }}
       >
         <div className="tw3-ground" />
-        <div className="tw3-sweep" style={{ left: center - 300, top: center - 300, width: 600, height: 600 }} />
-        <div className="tw3-hubring is-dashed" style={{ left: center - HUB_R, top: center - HUB_R, width: HUB_R * 2, height: HUB_R * 2 }} />
-        <div className="tw3-hubring is-rev" style={{ left: center - 110, top: center - 110, width: 220, height: 220 }} />
-        <div className="tw3-hubring" style={{ left: center - 36, top: center - 36, width: 72, height: 72 }} />
+        <div className={cn('tw3-sweep', hubDim)} style={{ left: center - 300, top: center - 300, width: 600, height: 600 }} />
+        <div className={cn('tw3-hubring is-dashed', hubDim)} style={{ left: center - HUB_R, top: center - HUB_R, width: HUB_R * 2, height: HUB_R * 2 }} />
+        <div className={cn('tw3-hubring is-rev', hubDim)} style={{ left: center - 110, top: center - 110, width: 220, height: 220 }} />
+        <div className={cn('tw3-hubring', hubDim)} style={{ left: center - 36, top: center - 36, width: 72, height: 72 }} />
 
         <svg className="tw3-flows" width={TWIN_WORLD} height={TWIN_WORLD} viewBox={`0 0 ${TWIN_WORLD} ${TWIN_WORLD}`} aria-hidden="true">
           {flows.map((p, i) => {
@@ -236,10 +238,10 @@ export function TwinCity({
           )
         })}
 
-        <div className="tw3-bb" style={{ left: center - 60, top: center - 150, width: 120, height: 150, transform: TWIN_BILLBOARD }}>
+        <div className={cn('tw3-bb', hubDim)} style={{ left: center - 60, top: center - 150, width: 120, height: 150, transform: TWIN_BILLBOARD }}>
           <div className="tw3-tower" style={{ height: 116 }} />
         </div>
-        <div className="tw3-bb" style={{ left: center - 70, top: center - 40, width: 140, height: 40, transform: `translateZ(-2px) ${TWIN_BILLBOARD}` }}>
+        <div className={cn('tw3-bb', hubDim)} style={{ left: center - 70, top: center - 40, width: 140, height: 40, transform: `translateZ(-2px) ${TWIN_BILLBOARD}` }}>
           <div className="tw3-lbl" style={{ height: 40 }}>
             <div className="c" style={{ ['--c' as string]: 'var(--tw-acc)', minHeight: 28 }}>{hubLabel}</div>
           </div>
@@ -247,7 +249,8 @@ export function TwinCity({
 
         {model.districts.map((d) => {
           const count = (model.groups.get(d.key) ?? []).length
-          const lift = d.key === model.tallestKey ? 210 : 150
+          // 聚焦时本区的告警标签会抬高，区名牌再抬一截，二者不叠在一起
+          const lift = (d.key === model.tallestKey ? 210 : 150) + (focusDistrict !== null && focusDistrict.key === d.key ? 150 : 0)
           const areaName = d.key === NO_AREA ? unassignedLabel : d.key
           const focused = focusDistrict !== null && focusDistrict.key === d.key
           return (
@@ -274,7 +277,8 @@ export function TwinCity({
         })}
 
         {alertLabels.map((p, i) => {
-          const lift = PILLAR_HEIGHT[p.state] + ALERT_LIFTS[i % ALERT_LIFTS.length]
+          // 聚焦时镜头更平、楼更近：标签再抬高，免得被前排楼顶遮住
+          const lift = PILLAR_HEIGHT[p.state] + ALERT_LIFTS[i % ALERT_LIFTS.length] + (focusDistrict !== null ? 120 : 0)
           return (
             <div
               key={`al-${p.terminal.id}`}

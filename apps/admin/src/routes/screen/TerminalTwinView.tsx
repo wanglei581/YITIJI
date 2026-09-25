@@ -12,7 +12,7 @@ import {
 } from '@ai-job-print/ui'
 import { loadAdminTerminalTwin } from '../../services/api/consoleScreen'
 import { screenHref } from './screenTabs'
-import { FailurePanel, TwinShell, TwinShellEmpty, failureOf, useAdminSnapshot, type ScreenChrome } from './screenView'
+import { FailurePanel, TwinShell, TwinShellEmpty, failureOf, snapshotMeta, useAdminSnapshot, type ScreenChrome } from './screenView'
 
 /**
  * 终端孪生：单台终端的设备模型与实时状态。
@@ -79,7 +79,7 @@ export function TerminalTwinView({ chrome }: { chrome: ScreenChrome }) {
 
   if (chosen === null) {
     return (
-      <TwinShell chrome={chrome} title={TITLE} subtitle="单台设备实时映射" layout="full" toolbar={toolbar} snapshot={gov.data ?? null} pollSeconds={60} failure={gov.failure} onRefresh={() => void gov.refresh()} refreshing={gov.status === 'loading'}>
+      <TwinShell chrome={chrome} title={TITLE} subtitle="单台设备实时映射" layout="full" toolbar={toolbar} meta={gov.data ? snapshotMeta(gov.data) : null} pollSeconds={60} failure={gov.failure} onRefresh={() => void gov.refresh()} refreshing={gov.status === 'loading'}>
         <TwinSlot slot="full">
           <TwinStatePanel title="还没有可查看的终端" description="终端注册并上报心跳后，可在这里查看单台设备的实时状态。" />
         </TwinSlot>
@@ -113,7 +113,7 @@ function TerminalTwinLive({
       subtitle={subtitle}
       layout={current ? 'terminal' : 'full'}
       toolbar={toolbar}
-      snapshot={fleetSnapshot}
+      meta={current ? { generatedAt: current.generatedAt, status: 'ok', failedSlices: 0, access: fleetSnapshot ? snapshotMeta(fleetSnapshot).access : null } : null}
       pollSeconds={POLL_SECONDS}
       failure={twin.failure}
       onRefresh={() => void twin.refresh()}

@@ -119,9 +119,21 @@
 }
 
 [data-ops-screen='desk'] .twin-slot {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+[data-ops-screen='desk'] .twin-clock {
+  display: none;
+}
+
+[data-ops-screen='desk'] .twin-toolbar-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 [data-ops-screen='desk'] .twin-slot > .twin-panel {
@@ -204,12 +216,14 @@
 [data-ops-screen='wall'] .twin-kv > span { font-size: 15px; }
 [data-ops-screen='wall'] .twin-kv b { font-size: 34px; }
 [data-ops-screen='wall'] .twin-tile b { font-size: 30px; }
+[data-ops-screen='wall'] .twin-tiles.is-compact .twin-tile b { font-size: 22px; }
+[data-ops-screen='wall'] .twin-tiles.is-compact .twin-tile > span { font-size: 13px; }
 [data-ops-screen='wall'] .twin-tile span { font-size: 15px; }
 [data-ops-screen='wall'] .twin-tile small { font-size: 13px; }
 [data-ops-screen='wall'] .twin-lg { font-size: 14px; }
 [data-ops-screen='wall'] .twin-bar-row { font-size: 15px; }
 [data-ops-screen='wall'] .twin-bar-row > b { font-size: 17px; }
-[data-ops-screen='wall'] .twin-alert { font-size: 15px; }
+[data-ops-screen='wall'] .twin-alert { font-size: 15px; min-height: 46px; }
 [data-ops-screen='wall'] .twin-sev { font-size: 13px; }
 [data-ops-screen='wall'] .twin-banner { font-size: 15px; }
 [data-ops-screen='wall'] .twin-state { font-size: 16px; }
@@ -218,6 +232,9 @@
 [data-ops-screen='wall'] .twin-overlay { font-size: 15px; }
 [data-ops-screen='wall'] .twin-flow-node b { font-size: 32px; }
 [data-ops-screen='wall'] .twin-flow-node span { font-size: 15px; }
+[data-ops-screen='wall'] .twin-heat b { font-size: 13px; }
+[data-ops-screen='wall'] .twin-step b { font-size: 20px; }
+[data-ops-screen='wall'] .twin-step span { font-size: 13px; }
 
 /* ---------- 桌面档字阶（≥12px，60 厘米可读） ---------- */
 [data-ops-screen='desk'] .twin { font-size: 14px; }
@@ -244,6 +261,8 @@
 [data-ops-screen='desk'] .twin-kv > span { font-size: 13px; }
 [data-ops-screen='desk'] .twin-kv b { font-size: 26px; }
 [data-ops-screen='desk'] .twin-tile b { font-size: 24px; }
+[data-ops-screen='desk'] .twin-tiles.is-compact .twin-tile b { font-size: 19px; }
+[data-ops-screen='desk'] .twin-tiles.is-compact .twin-tile > span { font-size: 12px; }
 [data-ops-screen='desk'] .twin-tile span { font-size: 13px; }
 [data-ops-screen='desk'] .twin-tile small { font-size: 12px; }
 [data-ops-screen='desk'] .twin-lg { font-size: 13px; }
@@ -258,3 +277,6 @@
 [data-ops-screen='desk'] .twin-overlay { font-size: 13px; }
 [data-ops-screen='desk'] .twin-flow-node b { font-size: 26px; }
 [data-ops-screen='desk'] .twin-flow-node span { font-size: 13px; }
+[data-ops-screen='desk'] .twin-heat b { font-size: 12px; }
+[data-ops-screen='desk'] .twin-step b { font-size: 18px; }
+[data-ops-screen='desk'] .twin-step span { font-size: 12px; }

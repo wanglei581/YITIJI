@@ -16,7 +16,8 @@ import {
   loadAdminScreenSnapshot,
   type ScreenFetchResult,
 } from '../../services/api/consoleScreen'
-import { accessText, countFailedSlices, generatedAtText } from './screenMeta'
+import { formatDateTime } from '@ai-job-print/shared'
+import { accessText, countFailedSlices } from './screenMeta'
 
 /**
  * 大屏外壳：页眉（标题 / 页签 / 时钟 / 动作）+ 整屏级横幅 + 块位栅格，以及取数失败的整屏状态。
@@ -112,6 +113,22 @@ export function FailurePanel({ result, onRetry, onRelogin }: { result: ScreenFai
   )
 }
 
+/** 页眉时间戳与整屏横幅需要的最小信息；快照、统计、孪生三种响应都能给出。 */
+export interface ShellMeta {
+  generatedAt: string
+  status: 'ok' | 'degraded' | 'unavailable'
+  failedSlices: number
+  access: string | null
+}
+
+export function snapshotMeta(snapshot: ScreenSnapshot): ShellMeta {
+  return { generatedAt: snapshot.generatedAt, status: snapshot.status, failedSlices: countFailedSlices(snapshot.metrics), access: accessText(snapshot) }
+}
+
+function stampText(iso: string): string {
+  return formatDateTime(iso, { fallback: '时间未知' })
+}
+
 export interface TwinShellProps {
   chrome: ScreenChrome
   title: string
@@ -119,8 +136,8 @@ export interface TwinShellProps {
   layout: TwinLayout
   /** 桌面档筛选栏；展示模式不渲染。 */
   toolbar?: ReactNode
-  /** 已取到的主快照；没有时由调用方渲染整屏状态。 */
-  snapshot: ScreenSnapshot | null
+  /** 已取到的主数据的时间与状态；没有时由调用方渲染整屏状态。 */
+  meta: ShellMeta | null
   pollSeconds: number
   /** 最近一次刷新失败的原因（已有数据时也要传，身份类失败要说清楚）。 */
   failure: ScreenFailure | null
@@ -135,7 +152,7 @@ export function TwinShell({
   subtitle,
   layout,
   toolbar,
-  snapshot,
+  meta,
   pollSeconds,
   failure,
   onRefresh,
@@ -143,7 +160,7 @@ export function TwinShell({
   children,
 }: TwinShellProps) {
   const headingLevel = chrome.headingLevel
-  const stamp = snapshot ? `数据时间 ${generatedAtText(snapshot)} · 每 ${pollSeconds} 秒刷新` : '正在取数，未取到之前不显示任何数值'
+  const stamp = meta ? `数据时间 ${stampText(meta.generatedAt)} · 每 ${pollSeconds} 秒刷新` : '正在取数，未取到之前不显示任何数值'
   const header = (
     <TwinHeader
       title={title}
@@ -151,34 +168,24 @@ export function TwinShell({
       subtitle={`${subtitle}　｜　${stamp}`}
       tabs={chrome.tabs}
       onNavigate={chrome.onNavigate}
-      actions={
-        <>
-          {chrome.presenting ? null : (
-            <button type="button" className="twin-btn" onClick={onRefresh} disabled={refreshing}>
-              刷新
-            </button>
-          )}
-          {chrome.pageActions}
-        </>
-      }
+      actions={chrome.presenting ? chrome.pageActions : undefined}
     />
   )
-  const failed = snapshot ? countFailedSlices(snapshot.metrics) : 0
   const banners: ReactNode[] = []
-  if (snapshot && failure?.kind === 'offline') {
+  if (meta && failure?.kind === 'offline') {
     banners.push(
       <TwinBanner key="offline" tone="error">
-        <b>与服务器断开</b>，正在按刷新节奏重试。屏上仍是上次成功取数的数据（{generatedAtText(snapshot)}），没有用 0 代替。
+        <b>与服务器断开</b>，正在按刷新节奏重试。屏上仍是上次成功取数的数据（{stampText(meta.generatedAt)}），没有用 0 代替。
       </TwinBanner>,
     )
-  } else if (snapshot && failure?.kind === 'failed') {
+  } else if (meta && failure?.kind === 'failed') {
     banners.push(
       <TwinBanner key="stale" tone="warn">
-        最近一次刷新失败，屏上是 {generatedAtText(snapshot)} 取到的数据。{failure.message}
+        最近一次刷新失败，屏上是 {stampText(meta.generatedAt)} 取到的数据。{failure.message}
       </TwinBanner>,
     )
   }
-  if (snapshot && failure?.kind === 'unauthorized') {
+  if (meta && failure?.kind === 'unauthorized') {
     banners.push(
       <TwinBanner key="auth" tone="error">
         <b>登录已过期</b>，屏上数字停在上一次成功取数的时刻。本期未签发免登录的只读展示令牌，重新登录后会继续自动刷新。
@@ -188,23 +195,23 @@ export function TwinShell({
       </TwinBanner>,
     )
   }
-  if (snapshot && failure?.kind === 'forbidden') {
+  if (meta && failure?.kind === 'forbidden') {
     banners.push(
       <TwinBanner key="forbidden" tone="error">
         <b>已无权查看本大屏</b>，屏上数字停在权限变更前的最后一次成功取数。{failure.message}
       </TwinBanner>,
     )
   }
-  if (snapshot?.status === 'unavailable') {
+  if (meta?.status === 'unavailable') {
     banners.push(
       <TwinBanner key="unavailable" tone="error">
         <b>本次快照的全部数据源均查询失败。</b>各块都写明了原因，页面不会用 0 顶替；等下次刷新恢复即可。
       </TwinBanner>,
     )
-  } else if (snapshot?.status === 'degraded') {
+  } else if (meta?.status === 'degraded') {
     banners.push(
       <TwinBanner key="degraded" tone="warn">
-        <b>部分数据源本次查询失败（{failed} 项）。</b>失败的块已单独标注，其余数字仍是本次真实取数。
+        <b>部分数据源本次查询失败（{meta.failedSlices} 项）。</b>失败的块已单独标注，其余数字仍是本次真实取数。
       </TwinBanner>,
     )
   }
@@ -216,7 +223,13 @@ export function TwinShell({
         chrome.presenting ? undefined : (
           <>
             {toolbar}
-            {snapshot ? <span className="twin-cap twin-access">{accessText(snapshot)}</span> : null}
+            {meta?.access ? <span className="twin-cap">{meta.access}</span> : null}
+            <div className="twin-toolbar-actions">
+              <button type="button" className="twin-btn" onClick={onRefresh} disabled={refreshing}>
+                刷新
+              </button>
+              {chrome.pageActions}
+            </div>
           </>
         )
       }
@@ -252,9 +265,10 @@ export function TwinShellEmpty({
           subtitle={`${subtitle}　｜　${failure ? '没有取到数据' : '正在取数，未取到之前不显示任何数值'}`}
           tabs={chrome.tabs}
           onNavigate={chrome.onNavigate}
-          actions={chrome.pageActions}
+          actions={chrome.presenting ? chrome.pageActions : undefined}
         />
       }
+      toolbar={chrome.presenting ? undefined : <div className="twin-toolbar-actions">{chrome.pageActions}</div>}
       headingLevel={chrome.headingLevel}
       layout="full"
       lite={chrome.lite}

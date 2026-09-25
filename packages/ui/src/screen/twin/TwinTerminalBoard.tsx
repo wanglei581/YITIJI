@@ -155,7 +155,7 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
             screenTitle={screenTitle}
             screenLine={screenLine}
             printing={printing}
-            callouts={deviceCallouts(twin, state)}
+            callouts={deviceCallouts(twin, shownState)}
           />
         </TwinSceneBox>
       </TwinSlot>

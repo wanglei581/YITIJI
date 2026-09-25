@@ -38,12 +38,15 @@ const W = 250
 const D = 150
 const H = 610
 
-const ANCHOR: Record<TwinDeviceCalloutKey, { from: [number, number]; box: [number, number]; side: 'left' | 'right' }> = {
-  terminal: { from: [DEV_X + 108, DEV_Y + 190], box: [24, 150], side: 'left' },
-  printer: { from: [DEV_X + 139, DEV_Y + 505], box: [24, 500], side: 'left' },
-  network: { from: [DEV_X + 215, DEV_Y + 30], box: [900, 96], side: 'right' },
-  scanner: { from: [DEV_X + 162, DEV_Y + 412], box: [900, 330], side: 'right' },
-  supplies: { from: [DEV_X + 150, DEV_Y + 560], box: [900, 564], side: 'right' },
+/** 左侧标注框右缘对齐到 LEFT_EDGE，右侧标注框左缘从 RIGHT_EDGE 开始；引线落在框边上。 */
+const LEFT_EDGE = 410
+const RIGHT_EDGE = 900
+const ANCHOR: Record<TwinDeviceCalloutKey, { from: [number, number]; y: number; side: 'left' | 'right' }> = {
+  terminal: { from: [DEV_X - 20, DEV_Y + 150], y: 150, side: 'left' },
+  printer: { from: [DEV_X + 23, DEV_Y + 492], y: 500, side: 'left' },
+  network: { from: [DEV_X + 207, DEV_Y + 32], y: 96, side: 'right' },
+  scanner: { from: [DEV_X + 122, DEV_Y + 428], y: 330, side: 'right' },
+  supplies: { from: [DEV_X + 172, DEV_Y + 572], y: 564, side: 'right' },
 }
 
 const TONE_STROKE: Record<TwinDeviceCallout['tone'], string> = {
@@ -124,9 +127,9 @@ export function TwinDevice({ code, state, screenTitle, screenLine, printing, cal
       <svg className="tw3-flows" width={TWIN_DEVICE_W} height={TWIN_DEVICE_H} viewBox={`0 0 ${TWIN_DEVICE_W} ${TWIN_DEVICE_H}`} aria-hidden="true">
         {callouts.map((c) => {
           const a = ANCHOR[c.key]
-          const boxX = a.side === 'left' ? a.box[0] + 360 : a.box[0]
-          const boxY = a.box[1] + 22
-          const midX = a.side === 'left' ? boxX + 70 : boxX - 70
+          const boxX = a.side === 'left' ? LEFT_EDGE : RIGHT_EDGE
+          const boxY = a.y + 22
+          const midX = a.side === 'left' ? boxX + 50 : boxX - 70
           return (
             <path
               key={c.key}
@@ -143,7 +146,7 @@ export function TwinDevice({ code, state, screenTitle, screenLine, printing, cal
           <div
             key={c.key}
             className={cn('tw3-callout', (c.tone === 'warn' || c.tone === 'pend') && 'is-warn', c.tone === 'err' && 'is-err')}
-            style={{ left: a.box[0], top: a.box[1], maxWidth: 480 }}
+            style={a.side === 'left' ? { right: TWIN_DEVICE_W - LEFT_EDGE, top: a.y, maxWidth: 400 } : { left: RIGHT_EDGE, top: a.y, maxWidth: 480 }}
           >
             <span className="k">{c.label}</span>
             {c.tone === 'pend' ? <span className="twin-pend">{c.value}</span> : <b>{c.value}</b>}

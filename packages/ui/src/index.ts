@@ -68,9 +68,14 @@ export {
   TwinDot,
   TwinLegend,
   TwinRing,
+  TwinHeat,
+  TwinPulse,
+  TwinSteps,
   TwinTiles,
   TwinTimeline,
+  twinSmall,
 } from './screen/twin/TwinCharts'
+export { TwinNetwork } from './screen/twin/TwinNetwork'
 export { TWIN_STATE_TEXT, TwinCity, twinAreas, twinTerminalState, twinTerminalsFromCells } from './screen/twin/TwinCity'
 export { TwinTerminalBoard } from './screen/twin/TwinTerminalBoard'
 export { TWIN_DEVICE_H, TWIN_DEVICE_W, TwinDevice } from './screen/twin/TwinDevice'
@@ -162,7 +167,11 @@ export type {
   TwinTileItem,
   TwinTimelineSegment,
   TwinTrendDay,
+  TwinHeatProps,
+  TwinPulseProps,
+  TwinStepItem,
 } from './screen/twin/TwinCharts'
+export type { TwinNetworkLane, TwinNetworkProps, TwinNetworkService } from './screen/twin/TwinNetwork'
 export type { TwinCityHighlight, TwinCityProps, TwinCityTerminal, TwinFleetCellLike } from './screen/twin/TwinCity'
 export type { TwinTerminalBoardProps, TwinTerminalTwinLike } from './screen/twin/TwinTerminalBoard'
 export type { TwinDeviceCallout, TwinDeviceCalloutKey, TwinDeviceProps } from './screen/twin/TwinDevice'

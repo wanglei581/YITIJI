@@ -1,6 +1,6 @@
 import { TwinSlot } from '@ai-job-print/ui'
 import { OpsGrid } from './OpsGrid'
-import { TwinShell, TwinShellEmpty, useAdminSnapshot, type ScreenChrome } from './screenView'
+import { TwinShell, TwinShellEmpty, snapshotMeta, useAdminSnapshot, type ScreenChrome } from './screenView'
 
 /**
  * 运营看板：面向运维与内容审核，含告警与队列，只在已登录的管理员会话里看，不投放到公开场所。
@@ -22,7 +22,7 @@ export function OpsView({ chrome }: { chrome: ScreenChrome }) {
       title={TITLE}
       subtitle={SUBTITLE}
       layout="full"
-      snapshot={ops.data}
+      meta={snapshotMeta(ops.data)}
       pollSeconds={POLL_SECONDS}
       failure={ops.failure}
       onRefresh={() => void ops.refresh()}

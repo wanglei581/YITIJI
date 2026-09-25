@@ -144,8 +144,8 @@ export function TwinAreaTrend({ days, seriesLabel, width = 380, height = 190 }: 
       ) : null}
       <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="6" fill="var(--tw-acc)" style={{ filter: 'drop-shadow(0 0 6px #2ee6a8)' }} />
       {days.map((day, i) =>
-        i % labelEvery === 0 || i === days.length - 1 ? (
-          <text key={day.date} x={xs[i]} y={height - 8} fill="#8fb3a8" fontSize="13" textAnchor="middle">
+        (i % labelEvery === 0 && days.length - 1 - i >= Math.ceil(labelEvery / 2)) || i === days.length - 1 ? (
+          <text key={day.date} x={xs[i]} y={height - 8} fill="#8fb3a8" fontSize="13" textAnchor={i === 0 ? 'start' : i === days.length - 1 ? 'end' : 'middle'}>
             {shortDay(day.date)}
           </text>
         ) : null,
@@ -198,9 +198,9 @@ export interface TwinTileItem {
   unavailableReason?: string
 }
 
-export function TwinTiles({ items }: { items: TwinTileItem[] }) {
+export function TwinTiles({ items, cols = 2, compact = false }: { items: TwinTileItem[]; cols?: 2 | 3 | 4; compact?: boolean }) {
   return (
-    <div className="twin-tiles">
+    <div className={cn('twin-tiles', cols === 3 && 'is-3', cols === 4 && 'is-4', compact && 'is-compact')}>
       {items.map((item) => {
         const copy = item.unavailableReason ? screenReasonCopy(item.unavailableReason) : null
         return (
@@ -310,6 +310,109 @@ export function TwinTimeline({ segments, ticks }: { segments: TwinTimelineSegmen
           <span key={`${tick}-${i}`}>{tick}</span>
         ))}
       </div>
+    </div>
+  )
+}
+
+/** 少于 5 的计数服务端给 null：一律写「少于 5」，不补 0。 */
+export function twinSmall(count: number | null): string {
+  return count === null ? '少于 5' : screenCount(count)
+}
+
+export interface TwinHeatProps {
+  /** 每行一天：label 如「周六」「今天」，hours 24 项；null = 少于 5 或尚未到来。 */
+  rows: Array<{ key: string; label: string; hours: Array<number | null>; future?: number }>
+}
+
+/** 7 天 × 24 小时热力：颜色深浅按全图最大值的真实比例，少于 5 的格子只画虚线框。 */
+export function TwinHeat({ rows }: TwinHeatProps) {
+  let max = 0
+  for (const row of rows) {
+    for (const value of row.hours) {
+      if (value !== null && value > max) max = value
+    }
+  }
+  return (
+    <div className="twin-heat" role="img" aria-label="近 7 天每小时使用次数热力">
+      {rows.map((row) => (
+        <div key={row.key} style={{ display: 'contents' }}>
+          <b>{row.label}</b>
+          {row.hours.map((value, hour) => {
+            if (row.future !== undefined && hour >= row.future) return <i key={hour} />
+            if (value === null) return <i key={hour} className="is-hidden" />
+            const ratio = max > 0 ? value / max : 0
+            return (
+              <i
+                key={hour}
+                style={{
+                  background: `rgba(46,230,168,${(0.12 + ratio * 0.82).toFixed(2)})`,
+                  boxShadow: ratio > 0.85 ? '0 0 8px rgba(46,230,168,.6)' : undefined,
+                }}
+              />
+            )
+          })}
+        </div>
+      ))}
+      <b />
+      {Array.from({ length: 24 }, (_, hour) => (
+        <b key={`axis-${hour}`} style={{ textAlign: 'center' }}>
+          {hour % 6 === 0 ? hour : ''}
+        </b>
+      ))}
+    </div>
+  )
+}
+
+export interface TwinPulseProps {
+  buckets: Array<{ key: string; info: number | null; ai: number | null; print: number | null }>
+}
+
+const PULSE_COLOR = { info: '#8fb2ee', ai: '#2ee6a8', print: '#72d6ff' } as const
+
+/** 每 5 分钟一柱：信息 / AI / 打印三段堆叠；少于 5 的段不画（服务端已置 null）。 */
+export function TwinPulse({ buckets }: TwinPulseProps) {
+  const max = buckets.reduce((best, b) => {
+    const sum = (b.info === null ? 0 : b.info) + (b.ai === null ? 0 : b.ai) + (b.print === null ? 0 : b.print)
+    return sum > best ? sum : best
+  }, 0)
+  const scale = max > 0 ? 70 / max : 0
+  return (
+    <div className="twin-pulse" role="img" aria-label="近 2 小时每 5 分钟调用次数">
+      {buckets.map((b, i) => (
+        <span key={b.key} className={i === buckets.length - 1 ? 'is-now' : undefined}>
+          {(['info', 'ai', 'print'] as const).map((lane) => {
+            const value = b[lane]
+            if (value === null || value === 0) return null
+            return <i key={lane} style={{ height: Math.max(2, Math.round(value * scale)), background: PULSE_COLOR[lane], color: PULSE_COLOR[lane] }} />
+          })}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+export interface TwinStepItem {
+  label: string
+  /** 数字；null = 少于 5；unavailableReason 有值 = 还没有记录。 */
+  count: number | null
+  unavailableReason?: string
+}
+
+export function TwinSteps({ items }: { items: TwinStepItem[] }) {
+  return (
+    <div className="twin-steps">
+      {items.map((item, i) => {
+        const copy = item.unavailableReason ? screenReasonCopy(item.unavailableReason) : null
+        return (
+          <div key={item.label} style={{ display: 'contents' }}>
+            {i > 0 ? <span className="twin-arrow" aria-hidden="true">›</span> : null}
+            <div className={cn('twin-step', i === items.length - 1 && 'is-end')}>
+              {copy ? <span className="twin-pend" title={copy.detail}>{copy.title}</span> : <b>{twinSmall(item.count)}</b>}
+              <span>{item.label}</span>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

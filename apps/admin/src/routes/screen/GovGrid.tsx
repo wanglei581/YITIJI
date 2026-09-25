@@ -29,7 +29,7 @@ import {
 } from '@ai-job-print/ui'
 import { aiOperationLabel, taskStatusLabel } from './metricLabels'
 import { screenHref } from './screenTabs'
-import { TwinShell, TwinShellEmpty, useAdminSnapshot, type ScreenChrome } from './screenView'
+import { TwinShell, TwinShellEmpty, snapshotMeta, useAdminSnapshot, type ScreenChrome } from './screenView'
 
 /**
  * 政务总览：城区数字孪生 + 六块面板。块位照设计稿「政务版 · 城区数字孪生」。
@@ -126,6 +126,10 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   const cityScope = focus === null ? undefined : '全市口径'
   const openTerminal = (id: string) => chrome.onNavigate(screenHref('terminal', chrome.params, { id }))
   const areaCodes = new Set(inView.map((t) => t.code))
+  const stateRank: Record<TwinState, number> = { off: 0, wa: 1, un: 2, pr: 3, ok: 4 }
+  const sortedArea = [...inView].sort((a, b) => stateRank[twinTerminalState(a)] - stateRank[twinTerminalState(b)] || a.code.localeCompare(b.code))
+  // 展示档底栏只有一行高：列最要紧的 3 台，其余合成一格；桌面档全列
+  const chipLimit = chrome.presenting ? 3 : sortedArea.length
   const openAlertTerminal = (code: string) => {
     const hit = terminals.find((t) => t.code === code)
     if (hit) openTerminal(hit.id)
@@ -193,7 +197,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
       subtitle={SUBTITLE}
       layout="city"
       toolbar={toolbar}
-      snapshot={gov.data}
+      meta={snapshotMeta(gov.data)}
       pollSeconds={60}
       failure={gov.failure}
       onRefresh={() => {
@@ -371,12 +375,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
         {focus !== null ? (
           <TwinPanel title={`${focus}终端一览`} sub="按状态排序 · 点击进入单台孪生" source="按终端所在区筛选的机队样本。">
             <div className="twin-chips">
-              {[...inView]
-                .sort((a, b) => {
-                  const rank: Record<TwinState, number> = { off: 0, wa: 1, un: 2, pr: 3, ok: 4 }
-                  return rank[twinTerminalState(a)] - rank[twinTerminalState(b)] || a.code.localeCompare(b.code)
-                })
-                .map((t) => {
+              {sortedArea.slice(0, chipLimit).map((t) => {
                   const st = twinTerminalState(t)
                   return (
                     <button key={t.id} type="button" className="twin-alert" onClick={() => openTerminal(t.id)}>
@@ -387,6 +386,11 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                     </button>
                   )
                 })}
+              {sortedArea.length > chipLimit ? (
+                <span className="twin-alert">
+                  <span className="twin-muted">另 {sortedArea.length - chipLimit} 台 · 在后台内查看全部</span>
+                </span>
+              ) : null}
             </div>
           </TwinPanel>
         ) : opsPending ? (
@@ -437,7 +441,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
         ) : (
           <TwinMetricPanel
             title="来源平台访问"
-            sub="近 30 天 · Top 5"
+            sub={cityScope ? '近 30 天' : '近 30 天 · Top 5'}
             scope={cityScope}
             tone="info"
             metric={o?.sourceEntryOpensTop}
@@ -472,9 +476,9 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
               return (
                 <>
                   <TwinAlertList items={alertRows(items, openAlertTerminal)} emptyText={focus === null ? '当前没有告警' : `${focus}当前没有告警`} />
-                  <a className="twin-cap twin-push" href="/alerts" onClick={(event) => { event.preventDefault(); chrome.onNavigate('/alerts') }} style={{ alignSelf: 'flex-end', minHeight: 44, display: 'inline-flex', alignItems: 'center', color: '#9fe8cd' }}>
+                  {chrome.presenting ? null : <a className="twin-cap twin-push" href="/alerts" onClick={(event) => { event.preventDefault(); chrome.onNavigate('/alerts') }} style={{ alignSelf: 'flex-end', minHeight: 44, display: 'inline-flex', alignItems: 'center', color: '#9fe8cd' }}>
                     进入告警中心 →
-                  </a>
+                  </a>}
                 </>
               )
             }}
