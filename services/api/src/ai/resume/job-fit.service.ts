@@ -350,11 +350,13 @@ export class JobFitService {
   }
 
   private toResponse(taskId: string, stored: StoredJobFit): JobFitCompletedResponse {
+    const payload = { ...stored.payload } as JobFitPayload & { fitLevel?: unknown }
+    delete payload.fitLevel
     return {
       taskId,
       status: 'completed' as const,
       job: stored.job,
-      ...stored.payload,
+      ...payload,
       providerName: stored.providerName,
     }
   }
