@@ -62,7 +62,7 @@ import {
 import { PartnerOrgRequiredError, requirePartnerOrgId } from '../src/console-screen/console-screen.org'
 import { offlineAlertTitle } from '../src/console-screen/console-screen.fleet'
 import { CHINA_LAT_MIN, CHINA_LNG_MAX, terminalPlacementPatch } from '../src/terminals/terminal-placement'
-import { TIMELINE_SEGMENT_CAP, deriveTerminalTimeline } from '../src/console-screen/console-screen.timeline'
+import { TIMELINE_HEARTBEAT_ROW_CAP, TIMELINE_SEGMENT_CAP, deriveTerminalTimeline } from '../src/console-screen/console-screen.timeline'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 let passed = 0
@@ -369,6 +369,25 @@ function assertSourceContract(): void {
       && !/DROP COLUMN/.test(sqliteGeoMigration)
       && !/DROP COLUMN/.test(pgGeoMigration),
   )
+}
+
+async function createOnlineHeartbeats(
+  prisma: PrismaService,
+  terminalId: string,
+  times: readonly Date[],
+  printerStatus: string,
+): Promise<void> {
+  const chunkSize = 200
+  for (let offset = 0; offset < times.length; offset += chunkSize) {
+    await prisma.terminalHeartbeat.createMany({
+      data: times.slice(offset, offset + chunkSize).map((createdAt) => ({
+        terminalId,
+        status: 'online',
+        printerStatus,
+        createdAt,
+      })),
+    })
+  }
 }
 
 async function assertPureHelpers(): Promise<void> {
@@ -1615,6 +1634,52 @@ async function assertTwinCases(
       && cleared.data.geoLat === null
       && cleared.data.geoLng === null
       && cleared.data.areaLabel === '越秀区',
+  )
+
+  const steadyId = `term_scrn_steady_${ids.suffix}`
+  const floodId = `term_scrn_flood_${ids.suffix}`
+  await prisma.terminal.createMany({
+    data: [
+      { id: steadyId, terminalCode: `SCRN-STD-${ids.suffix}`, agentToken: `tok_std_${ids.suffix}`, deviceFingerprint: `fp_std_${ids.suffix}`, orgId: ids.orgA, enabled: true },
+      { id: floodId, terminalCode: `SCRN-FLD-${ids.suffix}`, agentToken: `tok_fld_${ids.suffix}`, deviceFingerprint: `fp_fld_${ids.suffix}`, orgId: ids.orgA, enabled: true },
+    ],
+  })
+  const steadyAnchor = new Date()
+  const steadyTimes: Date[] = []
+  for (let at = steadyAnchor.getTime() - 24 * 60 * 60 * 1000; at <= steadyAnchor.getTime(); at += 30_000) {
+    steadyTimes.push(new Date(at))
+  }
+  await createOnlineHeartbeats(prisma, steadyId, steadyTimes, 'ready')
+  await prisma.terminalHeartbeat.create({
+    data: { terminalId: steadyId, status: 'online', printerStatus: 'ready', createdAt: new Date() },
+  })
+  cache.clear()
+  const steadyTwin = await screen.getAdminTerminalTwin(steadyId)
+  const steadySegments = steadyTwin.timeline24h.available ? steadyTwin.timeline24h.value : []
+  const steadyIdle = steadySegments.filter((segment) => segment.state === 'idle').length
+  assert(
+    '5s. 30 秒一次、全天在线的终端 timeline24h 可用，合并后只有 1 段 idle',
+    steadyTwin.timeline24h.available === true
+      && steadySegments.length === 1
+      && steadyIdle === 1
+      && steadySegments[0]?.state === 'idle',
+    `available=${String(steadyTwin.timeline24h.available)} segments=${steadySegments.length} idle=${steadyIdle} rows=${steadyTimes.length + 1} cap=${TIMELINE_HEARTBEAT_ROW_CAP}`,
+  )
+
+  const floodAt = Date.now()
+  await createOnlineHeartbeats(
+    prisma,
+    floodId,
+    Array.from({ length: TIMELINE_HEARTBEAT_ROW_CAP + 1 }, () => new Date(floodAt)),
+    'ready',
+  )
+  cache.clear()
+  const floodTwin = await screen.getAdminTerminalTwin(floodId)
+  assert(
+    '5t. 心跳行数超过上限时 timeline24h 仍如实不可用',
+    floodTwin.timeline24h.available === false
+      && floodTwin.timeline24h.reason === SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded,
+    floodTwin.timeline24h.available ? 'available' : floodTwin.timeline24h.reason,
   )
 }
 
