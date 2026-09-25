@@ -71,7 +71,7 @@ export function HomePage() {
           campus={campus}
           jobFair={jobFair}
           jobs={jobs}
-          recruitmentOpen={recruitment.enabled}
+          recruitment={recruitment}
           terminalCode={terminalCode}
           deviceStatus={deviceStatus}
           continueSlot={<ContinuePanel />}

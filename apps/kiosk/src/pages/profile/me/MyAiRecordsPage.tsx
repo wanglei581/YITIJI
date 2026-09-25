@@ -76,8 +76,11 @@ type Toast = { tone: 'ok' | 'bad'; text: string }
 export function MyAiRecordsPage() {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
-  // 招聘内容托管（3.13）关闭时：不摆岗位 AI 类入口与说明，也不给回到招聘会规划的按钮（那些页不开放）。
-  const hostingOpen = useRecruitmentHosting().enabled
+  // 招聘内容托管（3.13）关闭时：不读、不列岗位 AI 会话与招聘会准备单，也不摆岗位 AI 类入口与说明（那些页不开放）。
+  // 托管还没读到时先不拉列表：否则先按「关闭」拉一遍、读到「打开」再拉一遍，列表会闪一次骨架。
+  const hosting = useRecruitmentHosting()
+  const hostingOpen = hosting.enabled
+  const hostingKnown = hosting.status === 'ready'
   const [items, setItems] = useState<AiRecordView[]>([])
   const [jobAiSessions, setJobAiSessions] = useState<JobAiSessionListItem[]>([])
   const [interviews, setInterviews] = useState<MemberInterviewItem[]>([])
@@ -113,21 +116,24 @@ export function MyAiRecordsPage() {
       return
     }
     setState('loading')
+    if (!hostingKnown) return
     const token = getToken()
     Promise.all([
       getMyAiRecords(token, { pageSize: 50 }),
-      listMyJobAiSessions(token, { pageSize: 50 }),
+      hostingOpen ? listMyJobAiSessions(token, { pageSize: 50 }) : Promise.resolve(null),
       getMyInterviews(token),
     ])
       .then(([recordsPage, sessionsPage, interviewPage]) => {
         if (!mountedRef.current || loadSeqRef.current !== seq) return
-        setItems(recordsPage.items as AiRecordView[])
+        // 招聘会准备单挂在某一场招聘会下，托管关闭时不列；简历对照（job_fit）照常保留。
+        const records = hostingOpen ? recordsPage.items : recordsPage.items.filter((item) => item.kind !== 'fair_visit_plan')
+        setItems(records as AiRecordView[])
         const completedJobFitTaskIds = new Set(
           recordsPage.items
             .filter((item) => item.kind === 'job_fit' && item.status === 'completed')
             .map((item) => item.taskId),
         )
-        setJobAiSessions(sessionsPage.items.filter((session) => shouldDisplayJobAiSession(session, completedJobFitTaskIds)))
+        setJobAiSessions(sessionsPage ? sessionsPage.items.filter((session) => shouldDisplayJobAiSession(session, completedJobFitTaskIds)) : [])
         setInterviews(interviewPage.items)
         setState('ready')
       })
@@ -135,7 +141,7 @@ export function MyAiRecordsPage() {
         if (!mountedRef.current || loadSeqRef.current !== seq) return
         setState('error')
       })
-  }, [getToken, isLoggedIn])
+  }, [getToken, isLoggedIn, hostingKnown, hostingOpen])
 
   useEffect(() => { load() }, [load, reloadKey])
   useEffect(() => {
@@ -320,12 +326,14 @@ export function MyAiRecordsPage() {
             }}
             onDelete={(sessionId) => void removeInterview(sessionId)}
           />
-          <JobAiSessionRecords
-            items={jobAiSessions}
-            confirmId={confirmJobAiSessionId}
-            busyId={busyJobAiSessionId}
-            onDelete={(sessionId) => void removeJobAiSession(sessionId)}
-          />
+          {hostingOpen ? (
+            <JobAiSessionRecords
+              items={jobAiSessions}
+              confirmId={confirmJobAiSessionId}
+              busyId={busyJobAiSessionId}
+              onDelete={(sessionId) => void removeJobAiSession(sessionId)}
+            />
+          ) : null}
           {items.length > 0 ? (
             <div className="qx-me-legal">简历与规划 AI 记录 · 仅展示服务元数据，不展示简历原文或诊断正文</div>
           ) : null}
