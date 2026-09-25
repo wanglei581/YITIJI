@@ -228,8 +228,8 @@ async function main() {
 
     // ── 5. 【核心】预览与真实判定同路径 ──────────────────────────────────
     {
-      await policies.reviewPolicy(post.id, 'approve', undefined, admin)
-      await policies.publishPolicy(post.id, 'publish', admin)
+      await policies.reviewPolicy(post.id, 'approve', undefined, partnerA)
+      await policies.publishPolicy(post.id, 'publish', partnerA, { responsibilityAcknowledged: true })
 
       const answerSets: Record<string, string>[] = [
         {},

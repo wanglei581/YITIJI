@@ -746,6 +746,13 @@ model PolicyPost {
   reviewedAt    DateTime?
   rejectReason  String?
 
+  /** 正文版本。机构每次改标题、摘要或正文时 +1。发布确认记的是这个号。 */
+  contentVersion Int @default(1)
+  /** 机构发布责任确认：谁、何时、确认了哪个版本。 */
+  publishConfirmedBy String?
+  publishConfirmedAt DateTime?
+  publishConfirmedContentVersion Int?
+
   /** P21:结构化申领条件(条件核对的唯一依据来源) */
   eligibilityRules PolicyEligibilityRule[]
 
@@ -2475,6 +2482,36 @@ model KioskJobBoardConfig {
   updatedBy  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// 紧急下架留痕。同一目标只有一行；存在即不可再发布。不删招聘内容表。
+model RecruitmentEmergencyHold {
+  id         String   @id @default(cuid())
+  targetType String
+  targetId   String
+  orgId      String
+  sourceId   String?
+  reasonCode String
+  reasonText String
+  actorId    String
+  createdAt  DateTime @default(now())
+
+  @@unique([targetType, targetId])
+  @@index([orgId, createdAt])
+}
+
+// 机构可见的站内记录。没有单独的机构通知通道，下架结果写在这里。
+model PartnerOrgNotice {
+  id          String    @id @default(cuid())
+  orgId       String
+  kind        String
+  title       String
+  body        String
+  payloadJson String    @default("{}")
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([orgId, createdAt])
 }
 
 // ── ToolboxGovernance ──────────────────────────────────────────────────────
