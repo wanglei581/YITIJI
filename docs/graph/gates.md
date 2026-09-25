@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1522 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1523 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -236,13 +236,14 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/scripts/</code> — 28 个文件</summary>
+<summary><code>apps/kiosk/scripts/</code> — 29 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/kiosk/scripts/extract-service-hub-specs.mjs` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/scripts/lib/fusion-baseline-contract.mjs` | `verify-fusion-baseline.mjs` |
 | `apps/kiosk/scripts/lib/shell-chrome-contract.mjs` | `verify-fusion-shell.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-visual-unity.mjs` |
+| `apps/kiosk/scripts/lib/visible-copy.mjs` | `verify-kiosk-ai-label-copy.mjs` |
 | `apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/scripts/tests/interview-workbench-model.test.mjs` | `verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/scripts/tests/scan-cleanup-gate.test.mjs` | `verify-scan-session-truth.mjs` |

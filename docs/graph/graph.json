@@ -17383,6 +17383,9 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
+    "apps/kiosk/scripts/lib/visible-copy.mjs": [
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
+    ],
     "apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
@@ -25875,6 +25878,7 @@
           "apps/kiosk/src/pages/contract-review"
         ],
         "files": [
+          "apps/kiosk/scripts/lib/visible-copy.mjs",
           "apps/kiosk/src/ai/AiEvidence.tsx",
           "apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
