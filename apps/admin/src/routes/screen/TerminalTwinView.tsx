@@ -8,6 +8,7 @@ import {
   twinTerminalState,
   twinTerminalsFromCells,
   TWIN_STATE_TEXT,
+  TWIN_SUBTITLE_SEP,
   type TwinCityTerminal,
 } from '@ai-job-print/ui'
 import { loadAdminTerminalTwin } from '../../services/api/consoleScreen'
@@ -104,7 +105,7 @@ function TerminalTwinLive({
   const twin = useTerminalTwin(terminalId)
   const current = twin.data && twin.data.terminal.id === terminalId ? twin.data : null
   const subtitle = current
-    ? `${current.terminal.code}　｜　${current.terminal.areaLabel ?? '未设置所在区'}${current.terminal.locationLabel ? ` · ${current.terminal.locationLabel}` : ''}`
+    ? `${current.terminal.code}${TWIN_SUBTITLE_SEP}${current.terminal.areaLabel ?? '未设置所在区'}${current.terminal.locationLabel ? ` · ${current.terminal.locationLabel}` : ''}`
     : '单台设备实时映射'
   return (
     <TwinShell

@@ -102,7 +102,9 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
   const highlight = parseTwinHighlight(chrome.params.get('status'))
   const inView = focus === null ? terminals : terminals.filter((t) => t.area === focus)
   const counts = twinCountStates(inView)
-  const cellsInView = focus === null ? cells : cells.filter((c) => (c.locationLabel ?? c.areaLabel) === focus)
+  // 告警与孪生用同一份分组结果：聚焦时只看孪生里落在该点位的那些终端
+  const idsInView = new Set(inView.map((t) => t.id))
+  const cellsInView = focus === null ? cells : cells.filter((c) => idsInView.has(c.terminalId))
   const openTerminal = (id: string) => chrome.onNavigate(screenHref('terminal', chrome.params, { id }))
   const alerts = terminalAlerts(cellsInView, openTerminal)
   const alertLimit = chrome.presenting ? 4 : 6
@@ -143,10 +145,11 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
           sub="实时"
           metric={g.terminalsOnline}
           source={
-            g.terminalsOnline?.available
-              ? `终端心跳投影，只统计登记在本机构名下的终端，最近 ${g.terminalsOnline.value.onlineWindowSeconds} 秒有心跳算在线。${screenFleetScopeNote(g.terminalsOnline.value, '本机构')}。` +
-                (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在服务点位统计，由机队样本算出。')
-              : ''
+            '终端心跳投影，只统计登记在本机构名下的终端。' +
+            (g.terminalsOnline?.available
+              ? `最近 ${g.terminalsOnline.value.onlineWindowSeconds} 秒有心跳算在线。${screenFleetScopeNote(g.terminalsOnline.value, '本机构')}。`
+              : '') +
+            (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在服务点位统计，由机队样本算出。')
           }
           render={(value) => {
             const online = focus === null ? value.healthy : counts.ok + counts.pr

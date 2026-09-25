@@ -239,7 +239,7 @@ export async function fetchAdminUsage(range: ScreenUsageRange): Promise<UsageFet
   if (API_MODE !== 'http') return { kind: 'mock' }
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/admin/screen/usage?range=${range}`, {
+    res = await fetch(`${API_BASE_URL}/admin/screen/usage?range=${normalizeUsageRange(range)}`, {
       method: 'GET',
       headers: { Accept: 'application/json', ...authHeader() },
     })

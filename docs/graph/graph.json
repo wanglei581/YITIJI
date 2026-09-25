@@ -11343,7 +11343,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 152,
+      "reachableFileCount": 156,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -11936,6 +11936,17 @@
           "wrappers": []
         },
         {
+          "component": "ScreenPage",
+          "endpoints": [],
+          "file": "apps/admin/src/routes/screen/index.tsx",
+          "layout": [
+            "AdminLayoutWrapper"
+          ],
+          "path": "/screen/:tab",
+          "styles": [],
+          "wrappers": []
+        },
+        {
           "component": "ScreensaverPage",
           "endpoints": [
             "DELETE /admin/ad-assets/:param",
@@ -12038,7 +12049,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 157
+      "sourceFileCount": 161
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -14974,7 +14985,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 55,
+      "reachableFileCount": 58,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -15183,6 +15194,17 @@
           "wrappers": []
         },
         {
+          "component": "ScreenPage",
+          "endpoints": [],
+          "file": "apps/partner/src/routes/screen/index.tsx",
+          "layout": [
+            "PartnerLayoutWrapper"
+          ],
+          "path": "/screen/:tab",
+          "styles": [],
+          "wrappers": []
+        },
+        {
           "component": "SmartCampusPage",
           "endpoints": [
             "GET /partner/data-sources",
@@ -15304,7 +15326,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 56
+      "sourceFileCount": 59
     }
   },
   "dataModel": {
@@ -17012,6 +17034,12 @@
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/routes/screen/screenMeta.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/admin/src/routes/screen/screenTabs.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/admin/src/routes/screen/screenView.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/routes/screensaver/index.tsx": [
@@ -19638,6 +19666,9 @@
     "apps/partner/src/routes/screen/PartnerGrid.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "apps/partner/src/routes/screen/PartnerUsageView.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
     "apps/partner/src/routes/screen/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -19645,6 +19676,12 @@
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/partner/src/routes/screen/screenMeta.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/partner/src/routes/screen/screenTabs.ts": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/partner/src/routes/screen/screenView.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/partner/src/routes/smart-campus/index.tsx": [
@@ -20291,6 +20328,18 @@
     "packages/ui/src/screen/screenCopy.ts": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "packages/ui/src/screen/twin/TwinFrame.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/screen/twin/TwinInfoFlow.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/screen/twin/TwinPanel.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/screen/twin/TwinShell.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
     "packages/ui/src/styles/fusion-youth.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs"
@@ -20312,6 +20361,18 @@
     ],
     "packages/ui/src/styles/service-desk.css": [
       "packages/ui/scripts/verify-service-desk-foundation.mjs"
+    ],
+    "packages/ui/src/styles/twin-screen-3d.css": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/styles/twin-screen-layout.css": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/styles/twin-screen-parts.css": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/styles/twin-screen.css": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "packages/ui/src/theme/visualTheme.ts": [
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
@@ -24220,23 +24281,36 @@
           "apps/admin/src/routes/screen/GovGrid.tsx",
           "apps/admin/src/routes/screen/index.tsx",
           "apps/admin/src/routes/screen/screenMeta.ts",
+          "apps/admin/src/routes/screen/screenTabs.ts",
+          "apps/admin/src/routes/screen/screenView.tsx",
           "apps/admin/src/services/api/consoleScreen.ts",
           "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/index.tsx",
           "apps/partner/src/routes/screen/PartnerGrid.tsx",
+          "apps/partner/src/routes/screen/PartnerUsageView.tsx",
           "apps/partner/src/routes/screen/index.tsx",
           "apps/partner/src/routes/screen/metricLabels.ts",
           "apps/partner/src/routes/screen/screenMeta.ts",
+          "apps/partner/src/routes/screen/screenTabs.ts",
+          "apps/partner/src/routes/screen/screenView.tsx",
           "apps/partner/src/services/api/consoleScreen.ts",
           "packages/shared/src/types/consoleScreen.ts",
           "packages/ui/src/screen/ScreenFleetWall.tsx",
           "packages/ui/src/screen/ScreenFrame.tsx",
           "packages/ui/src/screen/ScreenPrimitives.tsx",
           "packages/ui/src/screen/screenCopy.ts",
+          "packages/ui/src/screen/twin/TwinFrame.tsx",
+          "packages/ui/src/screen/twin/TwinInfoFlow.tsx",
+          "packages/ui/src/screen/twin/TwinPanel.tsx",
+          "packages/ui/src/screen/twin/TwinShell.tsx",
           "packages/ui/src/styles/ops-screen-blocks.css",
           "packages/ui/src/styles/ops-screen-scale.css",
-          "packages/ui/src/styles/ops-screen.css"
+          "packages/ui/src/styles/ops-screen.css",
+          "packages/ui/src/styles/twin-screen-3d.css",
+          "packages/ui/src/styles/twin-screen-layout.css",
+          "packages/ui/src/styles/twin-screen-parts.css",
+          "packages/ui/src/styles/twin-screen.css"
         ],
         "missing": []
       },
