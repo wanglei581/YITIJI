@@ -1421,6 +1421,24 @@ test('phone upload is exempt from the kiosk hard privacy deadline @privacy-mobil
 
 const SCAN_WORKBENCH_KEY = 'ai-job-print:current-scan-workbench'
 
+/**
+ * 读本机扫描登记，跨过清场那次**刻意的**整页重载。
+ *
+ * 硬清场拿到收尾闸的确认之后会重载文档；evaluate 恰好撞上导航提交，旧上下文被销毁，
+ * Playwright 抛 "Execution context was destroyed"。expect.poll 不替回调吞异常 ——
+ * 一抛整条用例当场红（2026-09-26 CI round 13 就是这么红的，与产品行为无关）。
+ * 这里只吞这一种，返回 undefined 让 poll 在新文档里再读一次；其它异常照抛。
+ * sessionStorage 跨同一标签页的重载保留，所以新文档里读到 null 仍然证明登记确实被抹掉了。
+ */
+async function readScanWorkbenchAcrossReload(page: Page): Promise<string | null | undefined> {
+  try {
+    return await page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY)
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Execution context was destroyed')) return undefined
+    throw error
+  }
+}
+
 /** 记录每一次撤销请求的请求头（谁发的、带没带控制凭证）。 */
 function recordScanRevokes(page: Page): () => Array<Record<string, string>> {
   const seen: Array<Record<string, string>> = []
@@ -2089,5 +2107,8 @@ test('an orphan session-timeout route hard-clears and revokes the scan task @pri
   expect(revokes()[0]?.['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
   // 游客没有会员令牌：不带 Authorization 也要能撤（服务端对无主任务只校验控制凭证）。
   expect(revokes()[0]?.authorization).toBeUndefined()
-  await expect.poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY)).toBeNull()
+  // 清场拿到确认后会刻意重载：这一次读可能正好撞上导航提交，读法见 readScanWorkbenchAcrossReload。
+  await expect.poll(() => readScanWorkbenchAcrossReload(page)).toBeNull()
+  // 恰好一次：读完登记之后再数一遍，中途没有冒出第二发。
+  expect(revokes()).toHaveLength(1)
 })
