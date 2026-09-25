@@ -53,6 +53,7 @@ import {
   type CockpitVoiceState,
   type ConsultationTask,
 } from './advisorScenes'
+import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import './assistant-inkpaper.css'
 import './assistant-batch8.css'
 import './assistant-advisor.css'
@@ -108,6 +109,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [selectedTaskId, setSelectedTaskId] = useState<ConsultationTask['id'] | null>(null)
   const [sendVoiceDirect, setSendVoiceDirect] = useState(false)
   const { isLoggedIn, getToken } = useAuth()
+  const hostingOpen = useRecruitmentHosting().enabled // 3.13 托管关闭时不渲染岗位 / 招聘会 / 企业类入口
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const toolboxSkill = useMemo(() => normalizeToolboxSkill(searchParams.get('intent')), [searchParams])
@@ -318,6 +320,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     return undefined
   }, [messages])
   const visibleActions = contextActions?.length ? contextActions : selectedTask?.serviceActions
+  const goActions = hostingOpen ? visibleActions : visibleActions?.filter((action) => !isRecruitmentRoute(action.route))
 
   // S1-1：四态只由真实生命周期派生 —— pending 是真实 fetch 在飞，
   // failed 是真的失败，done 是真的拿到了模型回答。本页没有任何计时器参与。
@@ -354,9 +357,9 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     reason: aiAvailability === 'unavailable'
       ? `本机 AI 顾问还没有接上真实模型（服务标识：${describeProviderLabel(providerLabel)}），这一轮和之后的提问都不会有 AI 回答。`
       : '刚才这一轮没有连上 AI 顾问，这次没有回答。页面不会用编出来的回答顶上。',
-    manualPath: '不用等 AI：打印扫描、招聘会信息、政策服务、AI简历服务这四个入口都不经过对话，可以直接进去自己办 —— 就是下面这四个按钮。',
+    manualPath: `不用等 AI：打印扫描、${hostingOpen ? '招聘会信息' : '帮助中心'}、政策服务、AI简历服务这四个入口都不经过对话，可以直接进去自己办 —— 就是下面这四个按钮。`,
     action: { label: '去打印扫描', onClick: () => navigate('/print-scan') },
-  }), [aiAvailability, navigate, providerLabel])
+  }), [aiAvailability, hostingOpen, navigate, providerLabel])
 
   const focusComposer = () => {
     window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
@@ -627,11 +630,11 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             </section>
           )}
 
-          {visibleActions && visibleActions.length > 0 && (hasUserTurn || selectedTask) && !advisorTask.isFailed && (
+          {goActions && goActions.length > 0 && (hasUserTurn || selectedTask) && !advisorTask.isFailed && (
             <section className="assistant-go-section" aria-labelledby="assistant-go-title">
               <AdvisorSectionLabel no={nextNo()} id="assistant-go-title" title="可以直接去的地方" hint="只列路由白名单内的入口" />
               <div className="action-chips" aria-label="回答后的操作">
-                {visibleActions.map((action) => (
+                {goActions.map((action) => (
                   <button key={action.route} type="button" className="action-chip" onClick={() => navigate(action.route)}>
                     {action.label}
                     <small aria-hidden="true">{action.route}</small>

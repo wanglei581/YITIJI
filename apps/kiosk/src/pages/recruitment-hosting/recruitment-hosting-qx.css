@@ -1,0 +1,51 @@
+/* 招聘内容托管关闭说明页（/jobs、/job-fairs、/companies、/campus… 在托管关闭时的落点）。
+ * 版式取稿 09 system-state：状态 Hero → 可以直接去的地方 → 屏幕不会替你猜的三件事。
+ * 颜色一律 var(--qx-*) 或其 color-mix，选择器全部以 .rh-off 起头，不外溢到共享层。
+ * 1080×1920 定高舞台上 Hero 吸收余量（primitives.css .qx-grow 规则的「主视觉块」）：去处行保持
+ * 固定高度，不被拉成空荡的长条；确认中只有 Hero，一整块居中说「正在确认」。 */
+.rh-off { gap: 18px; padding-bottom: 8px; }
+
+.rh-off-hero {
+  position: relative; overflow: hidden; flex: 1 1 auto; min-height: 260px;
+  display: flex; align-items: center; gap: 36px; padding: 36px 44px; border-radius: 32px;
+  color: var(--qx-paper); background: linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep) 72%);
+}
+.rh-off-hero::after {
+  content: ''; position: absolute; top: -160px; right: -140px; width: 420px; height: 420px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--qx-emerald) 14%, transparent), transparent 66%);
+  pointer-events: none;
+}
+.rh-off-glyph {
+  position: relative; z-index: 1; flex: none; width: 168px; height: 168px;
+  display: grid; place-items: center; border: 2px solid color-mix(in srgb, var(--qx-emerald) 30%, transparent);
+  border-radius: 50%; color: var(--qx-emerald);
+}
+.rh-off-hero-main { position: relative; z-index: 1; flex: 1; min-width: 0; }
+.rh-off-eyebrow { margin: 0 0 10px; color: color-mix(in srgb, var(--qx-paper) 55%, transparent); font-size: 18px; letter-spacing: 5px; }
+.rh-off-hero h2 { margin: 0; font-family: var(--qx-serif); font-size: 40px; font-weight: 700; line-height: 1.24; letter-spacing: 1px; }
+.rh-off-hero-main > p:last-child { margin: 14px 0 0; color: color-mix(in srgb, var(--qx-paper) 78%, transparent); font-size: 21px; line-height: 1.6; }
+
+.rh-off-actions { flex: none; display: flex; flex-direction: column; gap: 12px; }
+.rh-off-actions .qx-row { min-height: 128px; }
+.rh-off-actions .qx-row-ic { color: var(--qx-teal-d); background: var(--qx-teal-soft); border-color: transparent; }
+
+.rh-off-facts { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.rh-off-fact { min-height: 210px; padding: 22px 24px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
+.rh-off-fact-ic {
+  display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--qx-r);
+  color: var(--qx-slate-d); background: var(--qx-slate-soft);
+}
+.rh-off-fact b { display: block; margin-top: 14px; font-size: 22px; font-weight: 700; }
+.rh-off-fact p { margin: 8px 0 0; color: var(--qx-ink-2); font-size: 18px; line-height: 1.55; }
+
+/* 手机与窄桌面不缩放舞台、按真实宽度排版：Hero 回到内容高度，整页随内容滚动，三件事单列。 */
+@media (max-width: 760px) {
+  .rh-off-hero { flex: none; min-height: 0; flex-direction: column; align-items: flex-start; gap: 16px; padding: 22px; border-radius: 22px; }
+  .rh-off-glyph { width: 72px; height: 72px; }
+  .rh-off-glyph svg { width: 32px; height: 32px; }
+  .rh-off-hero h2 { font-size: 26px; }
+  .rh-off-hero-main > p:last-child { font-size: 16px; }
+  .rh-off-actions .qx-row { min-height: 88px; }
+  .rh-off-facts { grid-template-columns: minmax(0, 1fr); }
+  .rh-off-fact { min-height: 0; }
+}

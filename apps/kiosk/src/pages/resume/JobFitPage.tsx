@@ -1,10 +1,10 @@
 // ============================================================
-// 2D 目标岗位定向优化 + 岗位匹配参考。
+// 2D 目标岗位定向优化 + 简历对照（原「岗位匹配参考」）。
 //
-// 入口：诊断报告页（携带 taskId/accessToken）。流程：选择系统内已发布岗位
-// （搜索选择）或手填目标岗位 → 真实分析 → 参考等级 + 匹配点（含原文依据）+
-// 差距建议 + 定向优化建议，并可查看系统内岗位详情。
-// 合规：等级仅供参考（无百分比/录用承诺，服务端双层拦截）；不做平台内投递。
+// 入口：诊断报告页（携带 taskId/accessToken）。流程：手填岗位要求，或（招聘内容托管
+// 打开时）选择系统内已发布岗位 → 真实分析 → 已写到的要求（含原文依据）+ 差距建议 +
+// 定向优化建议。托管关闭（我们云上默认，next-tasks 3.13/3.14）时只有手填这一条路。
+// 合规：2026-09-26 起不再分档（服务端不返回 fitLevel），无百分比/录用承诺；不做平台内投递。
 //
 // 视觉真值（2026-09-22 迁入青序流光）：
 //   docs/design/kiosk-redesign-2026-08/46-resume-decision-workspace.html?screen=job-fit
@@ -42,8 +42,9 @@ import { AnonymousJobFitConsentCard } from './jobFit/AnonymousJobFitConsentCard'
 import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDialog'
 import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
 import { buildJobFitStateView, type JobFitExits, type JobFitStaticState } from './jobFit/JobFitQxStates'
-import { CtaNote, Guardline, KitRows, LevelVerdictCard, ManualTargetFields, NextSteps, PreflightChecklist, Sec } from './jobFit/jobFitQxKit'
-import { JOB_FIT_LEVEL_KEY, JOB_FIT_RESULT_SPEC, type JobFitStepTarget } from './jobFit/jobFitResultSpec'
+import { CtaNote, Guardline, KitRows, ManualTargetFields, NextSteps, PreflightChecklist, Sec } from './jobFit/jobFitQxKit'
+import { JOB_FIT_NEXT_STEPS, type JobFitStepTarget } from './jobFit/jobFitResultSpec'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { JobAiConsentModal } from '../jobs/components/JobAiConsentModal'
 import { grantJobAiConsent } from '../../services/api/jobAi'
 import './job-fit-qx.css'
@@ -118,6 +119,9 @@ export function JobFitPage() {
   const isAnonymous = !currentToken && Boolean(accessToken)
 
   const [tab, setTab] = useState<'pick' | 'manual'>('pick')
+  // 招聘内容托管（3.13）关闭时没有系统内岗位可选：只留手填这一条路，也不请求岗位列表。
+  const hosting = useRecruitmentHosting()
+  const mode = hosting.enabled ? tab : 'manual'
   const [keyword, setKeyword] = useState('')
   const [jobs, setJobs] = useState<ExternalJobDTO[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
@@ -157,6 +161,7 @@ export function JobFitPage() {
   useBusyLock(analyzing || printing || revokingConsent)
 
   useEffect(() => {
+    if (!hosting.enabled) return
     let cancelled = false
     setJobsLoading(true)
     getJobs({ keyword: keyword || undefined, page: 1, pageSize: 8 })
@@ -174,7 +179,7 @@ export function JobFitPage() {
       })
       .finally(() => { if (!cancelled) setJobsLoading(false) })
     return () => { cancelled = true }
-  }, [keyword])
+  }, [keyword, hosting.enabled])
 
   useEffect(() => {
     setResult(null)
@@ -234,7 +239,7 @@ export function JobFitPage() {
     triage: () => navigate('/resume/source?intent=diagnose'),
     printHub: () => navigate('/print-scan'),
     scan: () => navigate('/scan/start'),
-    jobs: () => navigate('/jobs'),
+    jobs: hosting.enabled ? () => navigate('/jobs') : undefined,
     optimize: () => navigate('/resume/optimize', { state: { taskId, accessToken } }),
     assistant: () => navigate('/assistant'),
     backToPick: () => {
@@ -290,7 +295,8 @@ export function JobFitPage() {
   // 上面已经挡过缺简历；这里只是把类型收成 string，后面分析/授权/撤回才能过 typecheck。
   if (!taskId) return null
 
-  if (loadingLatest) return staticScreen('loading')
+  // 托管状态没读到之前同样停在读取屏：否则打开托管的终端会先闪一下「只能手填」再变回来。
+  if (loadingLatest || hosting.status === 'loading') return staticScreen('loading')
 
   async function handleAnalyze() {
     if (!taskId) return
@@ -299,13 +305,13 @@ export function JobFitPage() {
     setNotice(null)
     setMemberConsentRequired(false)
     const input: JobFitRequest | null =
-      tab === 'pick' && selectedJob
+      mode === 'pick' && selectedJob
         ? { taskId, jobId: selectedJob.id }
-        : tab === 'manual' && manualTitle.trim()
+        : mode === 'manual' && manualTitle.trim()
           ? { taskId, manualJob: { title: manualTitle.trim(), ...(manualReq.trim() ? { requirements: manualReq.trim() } : {}) } }
           : null
     if (!input) {
-      setError(tab === 'pick' ? '请先选择一个岗位' : '请填写目标岗位名称')
+      setError(mode === 'pick' ? '请先选择一个岗位' : '请填写目标岗位名称')
       return
     }
     const token = getToken()
@@ -315,7 +321,7 @@ export function JobFitPage() {
       const res = await analyzeJobFit(input, { token, accessToken })
       if (analysisRunRef.current !== run) return
       if (res.status === 'failed') {
-        setAnalysisFail({ kind: 'failed', message: res.failReason ?? '请求中断，没有可确认的结果。系统不展示等级、依据或建议，也不保留半截结论。' })
+        setAnalysisFail({ kind: 'failed', message: res.failReason ?? '请求中断，没有可确认的结果。系统不展示对照要点或建议，也不保留半截结论。' })
       } else {
         setResult(res)
       }
@@ -432,7 +438,7 @@ export function JobFitPage() {
     setPendingMemberInput(null)
     setConsentError(null)
     // 卡片继续留在页面上，用户随时可以再点一次授权 —— 不静默吞掉这件事。
-    setError('岗位匹配参考需要先同意岗位 AI 辅助；你可以在下方卡片重新授权。')
+    setError('简历对照需要先同意岗位 AI 辅助；你可以在下方卡片重新授权。')
   }
 
   const handleCancelAnonymousConsent = () => {
@@ -502,31 +508,29 @@ export function JobFitPage() {
      */
     const gapActionCount =
       (result.gapPoints ?? []).length + (result.targetedSuggestions ?? []).length
-    const levelKey = result.fitLevel ? JOB_FIT_LEVEL_KEY[result.fitLevel] : null
-    const spec = levelKey ? JOB_FIT_RESULT_SPEC[levelKey] : null
+    // 系统内岗位的来源与「查看岗位」只在招聘内容托管打开时出现；关着时岗位页本来就进不去。
+    const showSource = hosting.enabled && Boolean(result.job?.sourceName)
     const goStep = (target: JobFitStepTarget) => {
       if (target === 'actions') { navigate('/resume/job-fit/actions', { state: { taskId, accessToken } }); return }
       if (target === 'optimize') { exits.optimize(); return }
-      if (target === 'materials') { navigate('/resume/materials'); return }
-      if (target === 'jobs') { exits.jobs(); return }
-      exits.backToPick()
+      navigate('/resume/materials')
     }
     return (
       <JobFitStage>
         <QxPageFrame
-          title={spec?.title ?? '岗位匹配参考'}
-          subtitle={spec?.subtitle ?? '具体依据与差距由服务端逐条返回，本页不补默认内容。'}
-          status={{ tone: 'ok', label: spec?.pill ?? '匹配参考已返回' }}
+          title="简历对照"
+          subtitle="按你给的岗位要求，逐条列出简历里已经写到的和还没体现的；不分档、不打分，也不判断能否录用。"
+          status={{ tone: 'ok', label: '对照结果已返回' }}
           back={{ label: '返回简历服务', onBack: exits.resumeHub }}
           navbar={navbar}
           ctabar={
             <>
-              <CtaNote>{spec?.note ?? '参考只描述准备程度，不代表企业的真实评价。'}</CtaNote>
+              <CtaNote>对照只说明简历里写到了什么，不代表企业的真实评价。</CtaNote>
               <button type="button" className="qx-btn" data-variant="ghost" disabled={printing} onClick={() => void handlePrint()}>
                 <PrinterIcon size={22} aria-hidden="true" />
                 {printing ? '生成中' : '打印报告'}
               </button>
-              {result.job?.id ? (
+              {hosting.enabled && result.job?.id ? (
                 <button type="button" className="qx-btn" data-variant="teal" onClick={() => { if (result.job?.id) navigate(`/jobs/${result.job.id}`) }}>
                   <BriefcaseIcon size={22} aria-hidden="true" />
                   查看岗位
@@ -546,40 +550,39 @@ export function JobFitPage() {
             className="qx-scroll"
             data-kiosk-domain="resume"
             data-kiosk-screen="resume-job-fit"
-            data-state={levelKey ? `result-${levelKey}` : 'result'}
-            data-testid={`resume-job-fit-state-result${levelKey ? `-${levelKey}` : ''}`}
+            data-state="result"
+            data-testid="resume-job-fit-state-result"
           >
-            <Sec title="岗位匹配参考" hint="仅供本人准备使用">
-              {spec && levelKey && <LevelVerdictCard levelKey={levelKey} spec={spec} />}
+            <Sec title="对照概要" hint="仅供本人准备使用">
               <DecisionSummaryBar
                 jobTitle={result.job?.title ?? '目标岗位'}
                 company={result.job?.company}
-                fitLevel={result.fitLevel}
                 summary={result.summary}
               />
               <Guardline
-                head="三档参考 · 较高 / 中等 / 偏低"
-                body="不等于录用结论：不展示分数或通过率，结果只供本人准备，不提供给企业；本平台不提供投递功能，投递请前往岗位来源平台。"
+                head="只对照，不打分"
+                body="不分档、不给分数或通过率，也不等于录用结论；结果只供本人准备，不提供给企业。"
               />
             </Sec>
 
             <FitSkillMap
               matchPoints={result.matchPoints ?? []}
+              gapPoints={result.gapPoints ?? []}
               keywordCoverage={result.decisionSupport?.keywordCoverage}
             />
 
             {/*
               「怎么办」已拆到 `/resume/job-fit/actions`（S2-2，矩阵 §3.5）：
-              本页专心做「差在哪」（等级 + 逐条证据 + 关键词命中），
+              本页专心做「差在哪」（已写到 / 还没体现两栏 + 关键词命中），
               行动页专心做「怎么补」（差距项 + 定向改写 + 打印/改简历/备材料）。
               原先两块同屏，27 寸竖屏上要一边读比对一边找按钮，两件事互相打断。
             */}
-            {spec && gapActionCount > 0 && (
-              <Sec title="下一步建议" hint="按这一档的优先级排序">
+            {gapActionCount > 0 && (
+              <Sec title="下一步建议" hint="都是本机既有流程">
                 <p className="jfq-sec-copy">
                   这次一共列出 {gapActionCount} 条可以着手补的地方。补什么、怎么补、本机能不能补，单独放在一屏里。
                 </p>
-                <NextSteps items={spec.steps.map((step) => ({
+                <NextSteps items={JOB_FIT_NEXT_STEPS.map((step) => ({
                   title: step.title,
                   desc: step.desc,
                   onClick: () => goStep(step.target),
@@ -587,11 +590,11 @@ export function JobFitPage() {
               </Sec>
             )}
 
-            {result.job?.sourceName && (
+            {showSource && (
               <Sec title="岗位来源" hint="以来源平台公示为准">
                 <div className="qx-card jfq-consent-card">
                   <p>
-                    岗位来源：{result.job.sourceName}{result.job.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
+                    岗位来源：{result.job?.sourceName}{result.job?.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
                   </p>
                   <p>准备好之后，请前往来源平台完成投递。</p>
                   {error && <p className="jfq-alert" role="alert">{error}</p>}
@@ -603,7 +606,7 @@ export function JobFitPage() {
               <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
             )}
             {notice && <p className="jfq-notice" aria-live="polite">{notice}</p>}
-            {error && !result.job?.sourceName && <p className="jfq-alert" role="alert">{error}</p>}
+            {error && !showSource && <p className="jfq-alert" role="alert">{error}</p>}
           </main>
         </QxPageFrame>
       </JobFitStage>
@@ -611,11 +614,13 @@ export function JobFitPage() {
   }
 
   // ── 选择视图 ──────────────────────────────────────────────────────────────
+  // 托管关闭时手填是唯一的路：之前在岗位列表里点过的岗位不再算进「目标岗位」。
+  const pickedJob = hosting.enabled ? selectedJob : null
   return (
     <JobFitStage>
       <QxPageFrame
         title="先把目标说清，再决定下一步"
-        subtitle="匹配只对本人提供三档参考；岗位、授权与结果全部以服务端返回为准。"
+        subtitle="对照结果只给本人看，不分档、不打分；岗位要求、授权与结果全部以服务端返回为准。"
         status={{ tone: 'unknown', label: '匹配前需要真实任务与本人授权' }}
         back={{ label: '返回简历服务', onBack: exits.resumeHub }}
         navbar={navbar}
@@ -657,8 +662,8 @@ export function JobFitPage() {
           data-state="pick"
           data-testid="resume-job-fit-state-pick"
         >
-          <Sec no="01" title="选择目标岗位" hint="系统岗位或手填目标，二选一">
-            <div className="jfq-choices">
+          <Sec no="01" title={hosting.enabled ? '选择目标岗位' : '填一份岗位要求'} hint={hosting.enabled ? '系统岗位或手填目标，二选一' : 'AI 对照你的简历，只供本人分析'}>
+            {hosting.enabled ? (<div className="jfq-choices">
               <button
                 type="button"
                 className="jfq-choice"
@@ -679,9 +684,9 @@ export function JobFitPage() {
                 <p>只填写目标名称与要求，不会把内容提供给企业，也不替你操作。</p>
                 <span>只供本人分析</span>
               </button>
-            </div>
+            </div>) : null}
 
-            {tab === 'pick' ? (
+            {mode === 'pick' ? (
               <div className="jfq-field">
                 <small>目标岗位</small>
                 <div style={{ position: 'relative' }}>
@@ -701,7 +706,7 @@ export function JobFitPage() {
                   ) : jobsError ? (
                     <p className="jfq-alert" role="alert">
                       岗位列表这次没取回来（不是没有岗位）。可以稍后重试，或直接切到「手填目标岗位」——
-                      手填不依赖岗位库，照常能做匹配参考。
+                      手填不依赖岗位库，照常能做简历对照。
                     </p>
                   ) : jobs.length === 0 ? (
                     <p className="jfq-sec-copy">没有找到岗位，可切换「手填目标岗位」</p>
@@ -740,9 +745,10 @@ export function JobFitPage() {
 
           <Sec no="02" title="分析前检查" hint="三项齐备才启动" grow>
             <PreflightChecklist
-              targetLabel={selectedJob ? selectedJob.title : manualTitle.trim() || '尚未选择'}
-              hasTarget={Boolean(selectedJob || manualTitle.trim())}
+              targetLabel={pickedJob ? pickedJob.title : manualTitle.trim() || '尚未选择'}
+              hasTarget={Boolean(pickedJob || manualTitle.trim())}
               consentConfirmed={isAnonymous && anonymousConsentActive}
+              manualOnly={!hosting.enabled}
             />
             {error && <p className="jfq-alert" role="alert">{error}</p>}
             {notice && <p className="jfq-notice" aria-live="polite">{notice}</p>}
@@ -760,7 +766,7 @@ export function JobFitPage() {
           <Sec no="03" title="不做 AI 分析，也能先推进" hint="都是既有流程">
             <KitRows items={[
               { icon: <PrinterIcon size={22} />, title: '打印现有简历', desc: '已有电子稿或纸质件，直接走打印流程', onClick: exits.printHub },
-              { icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对', onClick: exits.jobs },
+              ...(exits.jobs ? [{ icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对', onClick: exits.jobs }] : []),
               { icon: <HelpCircleIcon size={22} />, title: '问 AI 顾问怎么定目标', desc: '还没想清楚方向时，先把想法说出来', onClick: exits.assistant },
             ]} />
           </Sec>

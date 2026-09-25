@@ -1,4 +1,5 @@
 import type { ApiRouter } from './api-router'
+import { RECRUITMENT_HOSTING_ON } from './recruitment-hosting'
 
 interface WireFairPosition {
   id: string
@@ -121,6 +122,8 @@ export function w4TerminalConfig(options: W4ApiOptions = {}) {
       items: [],
     },
     toolbox: { enabled: false, items: [] },
+    // W4 覆盖岗位 / 招聘会 / 企业 / 校招 / 线下机构整域：服务端恒下发托管字段，这里按客户私有化部署（b）打开。
+    ...RECRUITMENT_HOSTING_ON,
     configVersion: 'w4-fixture',
     refreshIntervalMs: 300000,
     serverTime: '2026-07-24T08:00:00.000Z',

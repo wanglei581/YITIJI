@@ -14,6 +14,9 @@
 .qx-me-detail-head h2 { margin: 0; font-size: 31px; font-weight: 800; line-height: 1.28; }
 .qx-me-detail-head p { margin: 6px 0 0; font-size: 18px; color: var(--qx-ink-3); }
 
+/* 招聘内容托管关闭（3.13）时收藏说明只剩「政策收藏」一条：占满一行，不挤在三栏的第一栏里。 */
+.qx-me-fav-next[data-n='1'] { grid-template-columns: minmax(0, 1fr); }
+
 /* ── 稿 38-member-assets：我的文档 / 打印订单（/me/documents、/me/print-orders） ──
    只在 .qx-me-assets（QxMePage 的 documents / orders 视图）里生效，令牌一律 var(--qx-*)。
    详单、取件码、保存期限确认、转 PDF 这几个子组件保留原有类名钩子，这里只给它们青序皮肤，

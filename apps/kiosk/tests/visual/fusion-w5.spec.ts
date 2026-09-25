@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW5PaginationRoute } from './fixtures/fusion-w5-pagination-route'
 import { registerPrintConfirm } from './fixtures/fair-workbench-api'
@@ -171,6 +172,7 @@ function terminalConfig(toolbox: { enabled: boolean; items: unknown[] }): unknow
   return {
     smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
     toolbox,
+    ...RECRUITMENT_HOSTING_ON,
     configVersion: 'w5-browser-fixture',
     refreshIntervalMs: 300000,
     serverTime: '2026-07-24T00:00:00.000Z',
@@ -303,7 +305,7 @@ test('profile permission state uses the canonical fusion shell @w5-kiosk', async
   registerKioskShell(api)
   api.respond('GET', '/api/v1/terminals/KSK-001/config', {
     status: 200,
-    json: { smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] }, toolbox: { enabled: false, items: [] }, configVersion: 'w5', refreshIntervalMs: 300000, serverTime: '2026-07-24T00:00:00.000Z' },
+    json: { smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] }, toolbox: { enabled: false, items: [] }, ...RECRUITMENT_HOSTING_ON, configVersion: 'w5', refreshIntervalMs: 300000, serverTime: '2026-07-24T00:00:00.000Z' },
   })
   api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {

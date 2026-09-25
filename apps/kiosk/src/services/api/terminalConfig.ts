@@ -8,6 +8,8 @@ import { terminalProtectedFetch } from '../terminalAuth'
 const OFF_CONFIG: KioskTerminalConfig = {
   smartCampus: { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES }, items: [] },
   toolbox: { enabled: true, items: [] },
+  // 本地模式按我们云上的默认（托管 a）：招聘内容托管关闭。
+  recruitmentHosting: { enabled: false, deploymentEnabled: false, reason: 'deployment_off' },
   configVersion: 'mock-off',
   refreshIntervalMs: 5 * 60 * 1000,
   serverTime: new Date(0).toISOString(),
@@ -48,6 +50,15 @@ export async function getKioskTerminalConfig(terminalId: string): Promise<KioskT
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<KioskTerminalConfig>
+}
+
+/** 同步读取仍在有效期内的缓存配置；没有就返回 null，不发请求。 */
+export function peekCachedKioskTerminalConfig(
+  terminalId: string,
+  maxAgeMs = DEFAULT_CACHE_TTL_MS,
+): KioskTerminalConfig | null {
+  if (!cachedConfig || cachedTerminalId !== terminalId) return null
+  return Date.now() - cachedAt <= maxAgeMs ? cachedConfig : null
 }
 
 export async function getCachedKioskTerminalConfig(

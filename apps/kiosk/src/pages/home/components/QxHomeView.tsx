@@ -37,6 +37,8 @@ interface QxHomeViewProps {
   campus: SmartCampusCapabilityState
   jobFair: HomeJobFairHighlightState & { retry: () => void }
   jobs: HomeJobHighlightState & { retry: () => void }
+  /** 招聘内容托管（3.13）是否打开；关闭时不渲染岗位 / 招聘会磁贴与「找工作」快捷入口。 */
+  recruitmentOpen: boolean
   terminalCode: string
   deviceStatus: HomeDeviceStatus
   continueSlot?: ReactNode
@@ -99,6 +101,7 @@ export function QxHomeView({
   campus,
   jobFair,
   jobs,
+  recruitmentOpen,
   terminalCode,
   deviceStatus,
   continueSlot,
@@ -120,7 +123,7 @@ export function QxHomeView({
   const [introDone, setIntroDone] = useState(false)
 
   return (
-    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home" data-qx-intro={introDone ? 'done' : undefined} onAnimationEnd={(event) => { if (event.animationName === 'qx-home-sheen') setIntroDone(true) }}>
+    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home" data-recruitment={recruitmentOpen ? 'open' : 'closed'} data-qx-intro={introDone ? 'done' : undefined} onAnimationEnd={(event) => { if (event.animationName === 'qx-home-sheen') setIntroDone(true) }}>
       <section className="qx-home-hero" aria-label="小青助手">
         <HomeHeroHeader terminalCode={terminalCode} deviceStatus={deviceStatus} />
         <div className="qx-home-assistant">
@@ -143,7 +146,7 @@ export function QxHomeView({
         <div className="qx-home-quick" aria-label="常用服务快捷入口">
           <span>也可以直接选：</span>
           <button type="button" onClick={() => onAction('resume-hub')}>改简历</button>
-          <button type="button" onClick={() => onAction('jobs-hub')}>找工作</button>
+          {recruitmentOpen ? <button type="button" onClick={() => onAction('jobs-hub')}>找工作</button> : null}
           <button type="button" onClick={() => onAction('policy-hub')}>查政策</button>
           {/* 身份入口是快捷行第四颗，占稿里「更多服务」那一格（运行时没有全部服务目录路由，不摆那颗按钮）。 */}
           <button
@@ -197,6 +200,7 @@ export function QxHomeView({
           />
           <HomeTile actionId="resume-hub" title="AI 简历" description="诊断、逐条优化、生成新版本" foot="进入简历服务" badge="AI 服务" icon={FileTextIcon} onAction={onAction} />
           <HomeTile actionId="interview-hub" title="模拟面试" description="问答对练，可跳过，不做录用判断" foot="进入面试服务" badge="练习服务" icon={MicIcon} onAction={onAction} />
+          {recruitmentOpen ? (<>
           {jobs.status === 'error' ? (
             <button
               type="button"
@@ -262,6 +266,7 @@ export function QxHomeView({
               <span className="qx-home-tile-foot">查看招聘会 <ArrowRightIcon aria-hidden="true" /></span>
             </button>
           )}
+          </>) : null}
           <HomeTile actionId="policy-hub" title="就业政策" description="资格与办理条件以官方核验为准" icon={LandmarkIcon} tone="slate" size="slim" onAction={onAction} />
           <HomeTile
             actionId="toolbox"
@@ -294,7 +299,7 @@ export function QxHomeView({
       <footer className="qx-home-truth">
         <ShieldCheckIcon aria-hidden="true" />
         <div>
-          <p><strong>能力状态以真实接口为准。</strong>岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。</p>
+          <p><strong>能力状态以真实接口为准。</strong>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : '本终端未开放岗位与招聘会信息，也不代收简历。'}</p>
           <p className="qx-home-legal">
             <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">鲁ICP备2026023517号-2</a>
             <span aria-hidden="true">·</span>

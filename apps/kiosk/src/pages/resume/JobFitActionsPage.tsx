@@ -40,6 +40,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { readAiResumeSession } from './aiResumeSession'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { JobFitStage } from './JobFitPage'
 import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import {
@@ -129,6 +130,8 @@ export function JobFitActionsPage() {
   const [error, setError] = useState<string | null>(null)
 
   useBusyLock(printing)
+  // 招聘内容托管（3.13）关闭时没有岗位信息可看：「看来源岗位要求」「查看岗位」换成本机照常能走的去处。
+  const hostingOpen = useRecruitmentHosting().enabled
 
   // 会话结束的那一次提交：丢掉结果、放下忙态（忙锁不许按住隐私计时）。
   // 离开本页（打印等待屏的两个出口都会离开）则由身份闸的卸载代次作废晚到的打印返回。
@@ -312,7 +315,7 @@ export function JobFitActionsPage() {
             <Sec no="02" title="拿到清单的四步" hint="顺序固定，不能跳过" copy="每一步都在既有流程里完成，本页不会替你跳过其中任何一步。" grow>
               <Steps items={[
                 { title: '准备本人简历任务', desc: '上传 PDF 或扫描纸质简历，等待解析成功。' },
-                { title: '选择目标岗位', desc: '从已发布岗位中选择，或只填一个目标岗位名称。' },
+                { title: '选择目标岗位', desc: hostingOpen ? '从已发布岗位中选择，或只填一个目标岗位名称。' : '填一份岗位要求，至少要有岗位名称。' },
                 { title: '确认本人授权', desc: '确认之后，简历才会用于这次岗位匹配分析。' },
                 { title: '等待匹配结果返回', desc: '结果返回后，差距与建议才会变成可执行的行动项。' },
               ]} />
@@ -320,7 +323,9 @@ export function JobFitActionsPage() {
             <Sec no="03" title="现在就能开始的两条路" hint="按你手上有什么来选">
               <RouteCards items={[
                 { title: '去做岗位匹配', desc: '选择目标岗位并确认授权，走完才会有行动清单。', action: '去岗位匹配', onClick: () => navigate(JOB_FIT_ROUTE) },
-                { title: '先看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对要求。', action: '去岗位信息', onClick: goJobs },
+                hostingOpen
+                  ? { title: '先看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对要求。', action: '去岗位信息', onClick: goJobs }
+                  : { title: '先准备简历材料', desc: '上传或扫描一份简历，解析成功后才能对照。', action: '去准备简历', onClick: goTriage },
               ]} />
             </Sec>
           </>
@@ -386,17 +391,19 @@ export function JobFitActionsPage() {
             <Sec title="当前判定" hint="只写已经确认的事实">
               <Verdict items={[
                 { tone: 'bad', label: 'AI 差距与准备建议', value: '当前不可用' },
-                { tone: 'ok', label: '岗位原文与来源信息', value: '照常可看' },
+                hostingOpen ? { tone: 'ok', label: '岗位原文与来源信息', value: '照常可看' } : { tone: 'ok', label: '简历优化编辑区', value: '照常能改' },
                 { tone: 'ok', label: '简历原文与打印', value: '不经过这条 AI' },
               ]} />
               <p className="jfq-sec-copy">
-                岗位原文与来源信息照常可看；你的简历原文照常可打印；简历优化编辑区也照常能改。想投递请回岗位详情页，从来源平台入口走。
+                {hostingOpen
+                  ? '岗位原文与来源信息照常可看；你的简历原文照常可打印；简历优化编辑区也照常能改。想投递请回岗位详情页，从来源平台入口走。'
+                  : '你的简历原文照常可打印；简历优化编辑区也照常能改。'}
               </p>
             </Sec>
             <Sec title="现在能用的非 AI 入口" hint="都是既有流程" grow>
               <KitRows items={[
                 { icon: <PenLineIcon size={22} />, title: '自己改简历', desc: '简历优化编辑区照常能改', onClick: goResumeOptimize },
-                { icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息', onClick: goJobs },
+                ...(hostingOpen ? [{ icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息', onClick: goJobs }] : []),
                 { icon: <PrinterIcon size={22} />, title: '打印现有简历', desc: '走既有打印流程，不依赖 AI', onClick: goPrintHub },
               ]} />
             </Sec>
@@ -434,7 +441,9 @@ export function JobFitActionsPage() {
               <RouteCards items={[
                 { title: '回比对结果', desc: '重新分析一次，或换一个更具体的目标岗位。', action: '返回比对结果', onClick: backToCompare },
                 { title: '先自己改简历', desc: '按目标岗位调整内容重点，不依赖这份清单。', action: '去简历优化', onClick: goResumeOptimize },
-                { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己逐条比对。', action: '去岗位信息', onClick: goJobs },
+                hostingOpen
+                  ? { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己逐条比对。', action: '去岗位信息', onClick: goJobs }
+                  : { title: '打印现有简历', desc: '手上已有可用文件时，直接进入既有打印流程。', action: '去打印服务', onClick: goPrintHub },
               ]} />
             </Sec>
           </>
@@ -458,7 +467,9 @@ export function JobFitActionsPage() {
           <Sec title="现在能做的" hint="回到比对页会重新读取" grow>
             <RouteCards items={[
               { title: '回比对结果', desc: '比对页会重新读取这次的匹配结果。', action: '返回比对结果', onClick: backToCompare },
-              { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息。', action: '去岗位信息', onClick: goJobs },
+              hostingOpen
+                ? { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息。', action: '去岗位信息', onClick: goJobs }
+                : { title: '先自己改简历', desc: '按目标岗位调整内容重点，不依赖这份清单。', action: '去简历优化', onClick: goResumeOptimize },
             ]} />
           </Sec>
         ),
@@ -636,7 +647,7 @@ export function JobFitActionsPage() {
             />
           </Sec>
 
-          {result?.job?.sourceName && (
+          {hostingOpen && result?.job?.sourceName && (
             <Sec title="岗位来源" hint="以来源平台公示为准">
               <div className="qx-card jfq-consent-card">
                 <p>

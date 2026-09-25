@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { MemberAgreement } from './components/MemberAgreement'
 import { LoginGatePhoneFields } from './components/LoginGatePhoneFields'
 import {
@@ -15,7 +16,7 @@ import {
 import { ScanQrLoginPanel } from './ScanQrLoginPanel'
 import {
   derivePhoneGateState,
-  LOGIN_ANON_ENTRIES,
+  loginAnonEntries,
   LOGIN_GATE_COPY,
   LOGIN_GATE_PILL,
   loginReturnLabel,
@@ -31,6 +32,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login, isLoggedIn } = useAuth()
+  const hostingOpen = useRecruitmentHosting().enabled // 3.13 托管关闭时「岗位与招聘会」换成政策服务
 
   const fromState = (location.state as { from?: unknown } | null)?.from
   const hintState = (location.state as { hint?: unknown } | null)?.hint
@@ -235,7 +237,7 @@ export function LoginPage() {
             <section style={{ marginTop: 18 }}>
               <div className="qx-sec-h"><span className="t">不登录也能办</span></div>
               <div className="lg-entries">
-                {LOGIN_ANON_ENTRIES.map((entry, index) => (
+                {loginAnonEntries(hostingOpen).map((entry, index) => (
                   <button
                     key={entry.id}
                     type="button"

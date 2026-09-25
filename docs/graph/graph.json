@@ -12258,7 +12258,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 567,
+      "reachableFileCount": 571,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -12485,7 +12485,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/campus",
           "styles": [],
@@ -12514,7 +12515,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/companies",
           "styles": [
@@ -12549,7 +12551,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/companies/:id",
           "styles": [
@@ -12563,7 +12566,18 @@
         },
         {
           "component": "HelpCenterPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
           "file": "apps/kiosk/src/pages/help/HelpCenterPage.tsx",
           "layout": [
             "KioskRoot",
@@ -12724,7 +12738,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs",
           "styles": [
@@ -12778,7 +12793,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id",
           "styles": [
@@ -12832,7 +12848,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/companies",
           "styles": [
@@ -12886,7 +12903,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/companies/:companyId",
           "styles": [
@@ -12939,7 +12957,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/map",
           "styles": [
@@ -12993,7 +13012,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/materials",
           "styles": [
@@ -13047,7 +13067,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/stats",
           "styles": [
@@ -13079,7 +13100,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/visit-plan",
           "styles": [
@@ -13133,7 +13155,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/checkin",
           "styles": [
@@ -13187,7 +13210,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/jobs",
           "styles": [
@@ -13240,7 +13264,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/jobs/:id",
           "styles": [
@@ -14404,6 +14429,7 @@
           "path": "/resume/job-fit",
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -15190,7 +15216,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 645
+      "sourceFileCount": 649
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",

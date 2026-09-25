@@ -4,6 +4,7 @@
 
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
@@ -28,6 +29,8 @@ export function HomePage() {
   const device = useOutletContext<TerminalDeviceStatusView>()
   const toolbox = useToolboxCapabilityState()
   const campus = useSmartCampusCapabilityState()
+  // 招聘内容托管（3.13）：没打开时首页不摆岗位、招聘会入口；两个 hook 自己也不发请求。
+  const recruitment = useRecruitmentHosting()
   const jobFair = useHomeJobFairHighlight()
   const jobs = useHomeJobHighlight()
   const terminalCode = getTerminalCode() || '设备未绑定'
@@ -35,6 +38,7 @@ export function HomePage() {
   const handleAction = (actionId: HomeV6ActionId) => {
     if (actionId === 'smart-campus' && !(campus.status === 'ready' && campus.enabled)) return
     if (actionId === 'toolbox' && !(toolbox.status === 'ready' && toolbox.enabled)) return
+    if ((actionId === 'jobs-hub' || actionId === 'fairs-hub') && !recruitment.enabled) return
 
     if (actionId === 'login') {
       navigate('/login', { state: { from: '/' } })
@@ -67,6 +71,7 @@ export function HomePage() {
           campus={campus}
           jobFair={jobFair}
           jobs={jobs}
+          recruitmentOpen={recruitment.enabled}
           terminalCode={terminalCode}
           deviceStatus={deviceStatus}
           continueSlot={<ContinuePanel />}
