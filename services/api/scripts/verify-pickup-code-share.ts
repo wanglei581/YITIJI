@@ -31,7 +31,7 @@ process.env.REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379/14'
 
 import { AuditService } from '../src/audit/audit.service'
 import type { RedisService } from '../src/common/redis/redis.service'
-import { PickupCodeReissueService } from '../src/member-print-orders/pickup-code-reissue.service'
+import { PICKUP_REISSUE_STUCK_CLAIM_MS, PickupCodeReissueService } from '../src/member-print-orders/pickup-code-reissue.service'
 import { MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
 import { PackageOrderService } from '../src/member-print-orders/package-order.service'
 import { PickupExpiryRefundService } from '../src/payment/pickup-expiry-refund.service'
@@ -310,6 +310,38 @@ async function main(): Promise<void> {
       fail(`材料包新码必须认领同一张未付款单，实际 ${JSON.stringify(packageNew)}`)
     }
     pass('材料包可以作废重发：新码可认领，旧码立即失效')
+
+    if (PICKUP_REISSUE_STUCK_CLAIM_MS !== 15 * 60 * 1000) fail('卡死认领的重发门槛必须是 15 分钟')
+    redis.reset()
+    const liveOrder = await memberOrders.create(
+      userId,
+      { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      randomUUID(),
+    )
+    const liveClaim = await pickup.claim(liveOrder.pickupCode!, terminalId, 'live-claim')
+    if (liveClaim.released) fail('未付款认领不得直接出纸')
+    const liveHash = (await prisma.order.findUniqueOrThrow({ where: { id: liveOrder.id } })).pickupCodeHash
+    const blockedReissue = await capture(() => reissue.reissue(userId, liveOrder.id))
+    if (!blockedReissue.thrown || blockedReissue.code !== 'PICKUP_CODE_NOT_REISSUABLE') {
+      fail(`认领中不得重发，实际 ${JSON.stringify(blockedReissue)}`)
+    }
+    const stillLive = await prisma.order.findUniqueOrThrow({ where: { id: liveOrder.id } })
+    if (stillLive.pickupStatus !== 'claimed' || stillLive.pickupCodeHash !== liveHash) fail('认领中的重发不得改状态或换码')
+    const stillCode = await pickup.claim(liveOrder.pickupCode!, terminalId, 'live-claim')
+    if (stillCode.released || stillCode.orderId !== liveOrder.id) fail('认领中的原码必须仍然有效')
+    await prisma.order.update({
+      where: { id: liveOrder.id },
+      data: { pickupClaimedAt: new Date(Date.now() - PICKUP_REISSUE_STUCK_CLAIM_MS - 1000) },
+    })
+    const stuck = await reissue.reissue(userId, liveOrder.id)
+    if (!stuck.pickupCode || stuck.pickupCode === liveOrder.pickupCode) fail('卡死超过 15 分钟必须重发新码')
+    const stuckOld = await capture(() => pickup.claim(liveOrder.pickupCode!, terminalId, 'stuck-old'))
+    if (!stuckOld.thrown || stuckOld.code !== 'PICKUP_CODE_INVALID') {
+      fail(`卡死重发后旧码必须失效，实际 ${JSON.stringify(stuckOld)}`)
+    }
+    const stuckRow = await prisma.order.findUniqueOrThrow({ where: { id: liveOrder.id } })
+    if (stuckRow.pickupStatus !== 'pending' || stuckRow.pickupClaimedAt) fail('卡死重发必须回到未认领')
+    pass('认领中不可重发；卡死超过 15 分钟可以重发并作废旧码')
 
     await prisma.order.update({
       where: { id: created.id },

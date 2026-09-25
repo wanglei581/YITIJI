@@ -8,6 +8,9 @@ import { PackageOrderService } from './package-order.service'
 
 const REISSUE_ATTEMPTS = 6
 
+/** 现场认领超过这个时间仍未出纸，视为卡死，允许作废重发。活租约内不允许。 */
+export const PICKUP_REISSUE_STUCK_CLAIM_MS = 15 * 60 * 1000
+
 function isUniqueConflict(error: unknown): boolean {
   let current: unknown = error
   for (let i = 0; i < 6 && current && typeof current === 'object'; i += 1) {
@@ -20,6 +23,7 @@ function isUniqueConflict(error: unknown): boolean {
 /**
  * 作废当前到机码并重发一枚新的 8 位码。沿用同一订单、同一截止（付款起 7 天，不顺延）。
  * 旧码的哈希被替换，立即无法认领。已核销、已过期、已退款或已开始出纸的单不能重发。
+ * 正在认领（claimed 且未满 15 分钟）不能重发，避免把现场付款中的单打回 pending。
  *
  * 材料包主单的文件在 OrderItem，`sourceFileId` 为空。能否重发只看有没有到机码。
  */
@@ -41,6 +45,7 @@ export class PickupCodeReissueService {
       throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
     }
 
+    const stuckBefore = new Date(now.getTime() - PICKUP_REISSUE_STUCK_CLAIM_MS)
     for (let attempt = 0; attempt < REISSUE_ATTEMPTS; attempt += 1) {
       const code = randomPickupCode()
       const hash = hashPickupCode(code)
@@ -51,9 +56,12 @@ export class PickupCodeReissueService {
             endUserId,
             printTaskId: null,
             pickupCodeHash: { not: null },
-            pickupStatus: { in: ['pending', 'claimed'] },
             payStatus: { in: ['unpaid', 'paying', 'paid'] },
             pickupCodeExpiresAt: { gt: now },
+            OR: [
+              { pickupStatus: 'pending' },
+              { pickupStatus: 'claimed', pickupClaimedAt: { lt: stuckBefore } },
+            ],
           },
           data: {
             pickupCodeHash: hash,
