@@ -55,7 +55,11 @@ overrides:
   # 取 3.1.6（2026-08-23）而非昨日发布的 3.1.7：同样越过四条，且满足 minimumReleaseAge。
   # 不取 4.x：跨大版本，fast-uri 是 ajv 的传递依赖，风险不成比例。
   fast-uri: 3.1.6
-  postcss: 8.5.18
+  # postcss: GHSA-fxqj-rqcc-2cmp (sourceMappingURL reads arbitrary .map files
+  # when `from` is unset) affects <=8.5.22. First fix is 8.5.23.
+  # The previous pin 8.5.18 is inside that range. vite@6.4.3 asks for
+  # postcss@^8.5.3, so 8.5.23 stays inside the direct dependency's range.
+  postcss: 8.5.23
   # nanoid: GHSA-28wg-ghj8-5hjv + GHSA-2v37-7h3g-55p8
   # postcss still requests the vulnerable 3.3.12 line; 3.3.18 fixes both loop conditions.
   nanoid@3.3.12: 3.3.18
