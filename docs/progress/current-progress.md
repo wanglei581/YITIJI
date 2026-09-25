@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-25：原稿 15 打印交付页仍在隔离准备（未合流）
+
+Claude 以原始 `15-print-fulfill.html` 为只读目标在独立 UI 树抽出 `printProgressModel.ts`，把运行时 `PrintProgressPage.tsx` 从 851 行降到约 775 行；Kiosk typecheck、`verify:fusion-w2`、`verify:production-real-services` 与局部 ESLint 通过。Claude 的两次任务均到时限，版式和九类状态尚未按原稿完成，工作树仍有未提交改动；本批没有合流主候选，稿 15 的 UI/设备/商业验收均未完成。后续先核真实 Agent 状态与原稿状态映射，再完成布局、逐态浏览器和 Windows 真机触控，不以这次拆分充当设计升级。
+
 ## 2026-09-25：小程序传到一体机的上传回执判定（本地候选，商业 NO-GO）
 
 Grok 在 `codex/miniapp-upload-receipt-20260925` 修复原生小程序 `pages/kiosk-send`。`uploadToKioskSession` 兑现不再直接写成已收到：空对象、`data:null`、缺 `file.fileId`、用途不是 `resume_upload` / `print_doc` / `contract_upload`、或 `sessionId` 不是这一次，都停在「结果还不确定」，按钮是「回一体机核对」，不再发送。网络、5xx、408 和这条匿名链路上的 401 同样不重传，也不提示去登录。服务端明确拒收才允许重选；二维码过期、已使用、令牌无效只引导回一体机。成功后按钮改为「回一体机继续」。scene 仍只兑换一次，上传令牌只留在页面内存。
