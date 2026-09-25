@@ -1,13 +1,15 @@
 import crypto from 'crypto'
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { hashPickupCode } from '../common/pickup-code'
 import {
   CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
   claimedUnpaidExpiredLeaseWhere,
+  isLiveKioskPickupLease,
   isPickupWindowClosed,
 } from '../payment/order-status.service'
+import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from '../payment/pickup-validity'
 import { createPaymentSessionToken, verifyPaymentSessionToken } from '../payment/payment-session-token'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
@@ -20,6 +22,8 @@ import {
   isPickupClaimLocked,
   recordPickupClaimFailure,
 } from './pickup-claim-lockout'
+import { consumePickupClaimRate } from './pickup-claim-rate-limit'
+import { maskPickupFileName } from './pickup-file-mask'
 
 /**
  * 视为「钱已经在退回路上」的支付态：这三个态下不得出纸，也不得推进取件状态。
@@ -56,10 +60,17 @@ export class PickupOrderService {
     error: { code: 'PICKUP_CODE_INVALID', message: '到机码无效或已过期' },
   } as const
 
-  async claim(codeInput: string, terminalRef: string | undefined) {
+  async claim(codeInput: string, terminalRef: string | undefined, source?: string) {
     const code = codeInput.trim().toUpperCase()
     const terminal = await this.requireTerminal(terminalRef)
 
+    // 限流在锁定之前：过期码不计入锁定，但仍占用终端与来源配额。
+    if (await consumePickupClaimRate(this.redis, terminal.id, source)) {
+      throw new HttpException(
+        { error: { code: 'PICKUP_CLAIM_RATE_LIMITED', message: '尝试过于频繁，请稍后再试' } },
+        HttpStatus.TOO_MANY_REQUESTS,
+      )
+    }
     // 锁定检查必须在查库之前：锁定的意义就是「不再为这台终端检查任何码」。
     if (await isPickupClaimLocked(this.redis, terminal.id)) {
       throw new ForbiddenException({
@@ -93,10 +104,22 @@ export class PickupOrderService {
         },
       })
     }
-    // 未认领过期、或 claimed 未付租约已过：落 expired 并拒绝。
+    // 一次性：已核销或已经挂上打印任务的码不能再核销。不计入锁定（手里是真码）。
+    if (order.pickupStatus === 'used' || order.printTaskId) {
+      throw new BadRequestException({
+        error: { code: 'PICKUP_CODE_ALREADY_USED', message: '这份到机码已经使用过，不能再次取件' },
+      })
+    }
+    const paymentWindowClosed = Boolean(
+      order.paidAt
+      && order.pickupCodeHash
+      && !isLiveKioskPickupLease(order)
+      && order.paidAt.getTime() + PICKUP_VALIDITY_FROM_PAYMENT_MS <= Date.now(),
+    )
+    // 未认领过期、付款已满 7 天，或 claimed 未付租约已过：落 expired 并拒绝。
     // 活着的 claimed 租约（含已付）不算关窗，落到下面的幂等认领 / 付款 / release。
     // pending 过期写只打 pending，避免并发认领后被误关；claimed 未付过期另走租约 CAS。
-    if (isPickupWindowClosed(order)) {
+    if (isPickupWindowClosed(order) || paymentWindowClosed) {
       await this.prisma.order.updateMany({
         where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
         data: {
@@ -116,7 +139,6 @@ export class PickupOrderService {
     // 繁忙机器上成功远多于失败，计数攒不起来；纯枚举场景没有成功，计数会一路涨到阈值。
     await clearPickupClaimFailures(this.redis, terminal.id)
 
-    if (order.pickupStatus === 'used' && order.printTaskId) return this.releasedView(order)
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })
     }
@@ -141,6 +163,7 @@ export class PickupOrderService {
           id: order.id,
           pickupStatus: 'pending',
           printTaskId: null,
+          pickupCodeHash: order.pickupCodeHash,
           payStatus: { in: [...CLAIMABLE_PAY_STATUSES] },
         },
         data: { pickupStatus: 'claimed', pickupClaimedAt: new Date(), taskStatus: 'awaiting_payment' },
@@ -148,6 +171,14 @@ export class PickupOrderService {
       if (claimed.count !== 1) {
         const raced = await this.prisma.order.findUnique({ where: { id: order.id } })
         if (!raced) throw new NotFoundException('ORDER_NOT_FOUND')
+        if (raced.pickupCodeHash !== order.pickupCodeHash) {
+          throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+        }
+        if (raced.pickupStatus === 'used' || raced.printTaskId) {
+          throw new BadRequestException({
+            error: { code: 'PICKUP_CODE_ALREADY_USED', message: '这份到机码已经使用过，不能再次取件' },
+          })
+        }
         if (raced.pickupStatus === 'pending') this.assertPayStatusClaimable(raced.payStatus)
       }
     }
@@ -388,6 +419,8 @@ export class PickupOrderService {
       terminalId: order.terminalId,
       taskStatus: order.taskStatus,
       printTaskStatus: order.taskStatus,
+      fileName: maskPickupFileName(order.sourceFileName),
+      billablePages: order.billablePages,
       paymentSessionToken: this.paymentToken(order),
     }
   }

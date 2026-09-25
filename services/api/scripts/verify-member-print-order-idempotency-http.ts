@@ -22,6 +22,7 @@ import { EndUserAuthGuard, memberSessionKey } from '../src/common/guards/end-use
 import { RedisService } from '../src/common/redis/redis.service'
 import { fingerprintMemberPrintOrderPayload, MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
 import { MemberPrintOrdersController } from '../src/member-print-orders/member-print-orders.controller'
+import { PickupCodeReissueService } from '../src/member-print-orders/pickup-code-reissue.service'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
@@ -123,6 +124,7 @@ const redisStub = {
       },
     },
     { provide: MemberPrintOrdersService, useValue: { list: async () => ({ items: [], nextCursor: null, total: 0 }) } },
+    { provide: PickupCodeReissueService, useValue: { reissue: async () => ({}) } },
     {
       provide: PrismaService,
       useFactory: () => {

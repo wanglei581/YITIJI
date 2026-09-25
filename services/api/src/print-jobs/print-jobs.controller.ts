@@ -35,8 +35,12 @@ export class PrintJobsController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @UseGuards(TerminalIdentityGuard)
-  claimPickup(@Body() dto: ClaimPickupDto, @Headers('x-terminal-id') terminalId: string | undefined) {
-    return this.pickupOrders.claim(dto.code, terminalId)
+  claimPickup(
+    @Body() dto: ClaimPickupDto,
+    @Headers('x-terminal-id') terminalId: string | undefined,
+    @Ip() ip: string,
+  ) {
+    return this.pickupOrders.claim(dto.code, terminalId, ip || 'unknown')
   }
 
   @Post(':orderId/release')

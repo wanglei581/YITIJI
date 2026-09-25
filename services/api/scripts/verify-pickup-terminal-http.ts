@@ -198,7 +198,7 @@ async function main(): Promise<void> {
         } else {
           assert.deepEqual(calls, [{
             method: route,
-            args: route === 'claim' ? [pickupCode, terminalA] : [orderId, terminalA, paymentToken],
+            args: route === 'claim' ? [pickupCode, terminalA, '127.0.0.1'] : [orderId, terminalA, paymentToken],
           }], `${label}: exactly one business call with unchanged arguments`)
           assert.deepEqual(body, route === 'claim'
             ? { orderId, paymentSessionToken: paymentToken }

@@ -324,7 +324,8 @@ check(
 // claim 路径上「码不存在」与「码存在但不属于本终端」必须走同一个拒绝对象。
 check(
   pickupOrderSrc.includes('private static readonly CLAIM_REJECTION') &&
-    (pickupOrderSrc.match(/throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/g) || []).length === 2,
+    /if \(!order\) \{[\s\S]{0,500}?throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/.test(pickupOrderSrc) &&
+    /order\.terminalId !== terminal\.id[\s\S]{0,500}?throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/.test(pickupOrderSrc),
   'claim 的两条失败路径共用同一个 CLAIM_REJECTION 响应（不泄露「这枚码是否存在」）',
 )
 check(

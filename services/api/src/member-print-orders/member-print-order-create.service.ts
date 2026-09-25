@@ -47,10 +47,10 @@ import {
  * 7 天才真的生效。
  *
  * **因此界面绝不能按本常量显示倒计时**（CLAUDE.md §9「不伪造能力」）：
- * 所有对外展示都必须用落库的 `Order.pickupCodeExpiresAt`，
- * 它已经是夹取后的真实值。该约束由 `verify-backend-p0-contracts.mjs` 与
- * `verify-miniapp-cloud-print-m2.ts` 两侧断言守住 —— 后者会真的建一个
- * 短留存文件的订单，验证落库过期时间跟的是文件而不是这个常量。
+ * 所有对外展示都必须用落库的 `Order.pickupCodeExpiresAt`。
+ * 未付款时它是夹取后的值；付款成功后 `OrderStatusService` 把它改成
+ * `paidAt + 7 天`，并把仍有效的源文件延长到同一时刻（长期文件 expiresAt=null 不缩短）。
+ * 该约束由 `verify-backend-p0-contracts.mjs` 与 `verify-miniapp-cloud-print-m2.ts` 守住。
  *
  * 同理：**不要为了「让 7 天生效」去掉下面的 Math.min 夹取**，那只会制造
  * 指向已删除文件的取件码。要延长实际有效期，改的是文件留存策略，不是这里。
@@ -362,7 +362,13 @@ export class MemberPrintOrderCreateService {
     const order = await this.requireOwned(endUserId, orderId)
     await this.expireIfNeeded(order)
     const fresh = await this.requireOwned(endUserId, orderId)
-    return this.toView(fresh, this.visibleCode(fresh))
+    const terminal = fresh.terminalId
+      ? await this.prisma.terminal.findFirst({
+          where: { id: fresh.terminalId },
+          select: { displayName: true, locationLabel: true },
+        })
+      : null
+    return this.toView(fresh, this.visibleCode(fresh), terminal ?? undefined)
   }
 
   async cancel(endUserId: string, orderId: string, dto: CancelMemberPrintOrderDto) {
@@ -529,6 +535,13 @@ export class MemberPrintOrderCreateService {
       taskStatus: order.taskStatus,
       pickupStatus: order.pickupStatus,
       pickupCode: code,
+      // 分享载荷只有码和网点名。文件名与金额留在订单视图，不得放进 share。
+      share: code
+        ? {
+            pickupCode: code,
+            outletName: terminal?.displayName?.trim() || terminal?.locationLabel?.trim() || '打印网点',
+          }
+        : null,
       pickupCodeExpiresAt: order.pickupCodeExpiresAt?.toISOString() ?? null,
       printTaskId: order.printTaskId,
       createdAt: order.createdAt.toISOString(),

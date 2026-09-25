@@ -3,6 +3,11 @@ import { AuditService } from '../audit/audit.service'
 // 取件码长度/字符集/签发的唯一定义。曾在本文件和
 // member-print-orders/member-print-order-create.service.ts 各写一份 PICKUP_CODE_LEN=10。
 import { randomPickupCode } from '../common/pickup-code'
+import {
+  collectPickupFileIds,
+  extendActivePrintFilesToDeadline,
+  pickupDeadlineFromPayment,
+} from './pickup-validity'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { paymentSessionTtlMs } from './payment-session-token'
 import { ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
@@ -171,7 +176,10 @@ export class OrderStatusService {
 
     // 幂等：已支付则原样返回（同来源）；不同来源视为冲突拒绝，不覆盖。
     if (order.payStatus === 'paid') {
-      if (order.paymentSource === paymentSource) return order
+      if (order.paymentSource === paymentSource) {
+        await this.coverCloudPickupFiles(order)
+        return order
+      }
       throw new BadRequestException('ORDER_ALREADY_PAID')
     }
     // 只允许 unpaid → paid；refunded / failed 不可再转 paid。
@@ -213,6 +221,8 @@ export class OrderStatusService {
     // findUnique({ where: { pickupCode } }) 是本文件生成时的查重），因此对这类单
     // 保持该列为 null 不影响任何链路。
     const mintPickupCode = order.pickupCodeHash == null
+    const paidAt = new Date()
+    const anchoredExpiry = order.pickupCodeHash ? pickupDeadlineFromPayment(paidAt) : null
     let settled = false
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
       const pickupCode = mintPickupCode ? await this.generateUniquePickupCode(this.prisma) : null
@@ -223,10 +233,12 @@ export class OrderStatusService {
           data: {
             payStatus: 'paid',
             paymentSource,
-            paidAt: new Date(),
+            paidAt,
             paidBy: operatorId ?? 'system',
             // 只在本单没有 pickupCodeHash 时写；否则真码在 hash/enc 里，另铸会造出幽灵码。
             ...(mintPickupCode ? { pickupCode } : {}),
+            // 云打印到机码从付款时刻起 7 天，不再沿用建单时被文件夹短的截止。
+            ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
           },
         })
       } catch (e) {
@@ -246,6 +258,9 @@ export class OrderStatusService {
       break
     }
     if (!settled) throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
+    if (anchoredExpiry) {
+      await extendActivePrintFilesToDeadline(this.prisma, await collectPickupFileIds(this.prisma, order), anchoredExpiry)
+    }
 
     await this.audit.write({
       // actorId 是 User 外键；操作员身份放 payload，避免非 User 标识触发外键约束（服务级动作 actorRole=system）。
@@ -291,7 +306,10 @@ export class OrderStatusService {
 
     // 幂等：同通道已入账原样返回；不同来源已支付（如 Admin 已线下确认）拒绝覆盖。
     if (order.payStatus === 'paid') {
-      if (order.paymentSource === channel) return order
+      if (order.paymentSource === channel) {
+        await this.coverCloudPickupFiles(order)
+        return order
+      }
       throw new BadRequestException('ORDER_ALREADY_PAID')
     }
     // 取件窗口已关（未认领过期 / expired / cancelled）：渠道钱可能已入账，但本单无法出纸。
@@ -310,6 +328,8 @@ export class OrderStatusService {
 
     // 已有 pickupCodeHash 的云打印单不再另铸明文码（与 markPaid 同一口径）。
     const mintPickupCode = order.pickupCodeHash == null
+    const paidAt = new Date()
+    const anchoredExpiry = order.pickupCodeHash ? pickupDeadlineFromPayment(paidAt) : null
     let settled = false
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
       const pickupCode = mintPickupCode ? await this.generateUniquePickupCode(this.prisma) : null
@@ -325,9 +345,10 @@ export class OrderStatusService {
             payStatus: 'paid',
             paymentSource: channel,
             payChannel: channel,
-            paidAt: new Date(),
+            paidAt,
             paidBy: 'online_callback',
             ...(mintPickupCode ? { pickupCode } : {}),
+            ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
           },
         })
       } catch (e) {
@@ -348,6 +369,9 @@ export class OrderStatusService {
       break
     }
     if (!settled) throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
+    if (anchoredExpiry) {
+      await extendActivePrintFilesToDeadline(this.prisma, await collectPickupFileIds(this.prisma, order), anchoredExpiry)
+    }
 
     await this.audit.write({
       actorId: null,
@@ -389,6 +413,7 @@ export class OrderStatusService {
       return { order: await this.settleRedemptionInTransaction(tx, orderId, opts), settled: true }
     })
 
+    await this.coverCloudPickupFiles(outcome.order)
     if (!outcome.settled) return outcome.order
 
     await this.writeRedemptionSettlementAudit(orderId, outcome.order, opts)
@@ -438,6 +463,8 @@ export class OrderStatusService {
       throw new BadRequestException('REDEEM_REQUIRES_FULL_COVERAGE')
     }
 
+    const paidAt = new Date()
+    const anchoredExpiry = order.pickupCodeHash ? pickupDeadlineFromPayment(paidAt) : null
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
       const pickupCode = await this.generateUniquePickupCode(tx)
       let res: { count: number }
@@ -449,9 +476,10 @@ export class OrderStatusService {
             paymentSource: 'voucher',
             payChannel: 'voucher',
             discountCents: order.amountCents, // 全额抵扣（净应付 0）
-            paidAt: new Date(),
+            paidAt,
             paidBy: 'redemption',
             pickupCode,
+            ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
           },
         })
       } catch (e) {
@@ -463,9 +491,27 @@ export class OrderStatusService {
         if (fresh.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
         throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
+      if (anchoredExpiry) {
+        await extendActivePrintFilesToDeadline(tx, await collectPickupFileIds(tx, order), anchoredExpiry)
+      }
       return this.requireOrder(tx, orderId)
     }
     throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
+  }
+
+  /** 已付款云打印单：把源文件延长到落库的到机码截止。不改截止本身。 */
+  private async coverCloudPickupFiles(order: {
+    id: string
+    sourceFileId: string | null
+    pickupCodeHash: string | null
+    pickupCodeExpiresAt: Date | null
+  }): Promise<void> {
+    if (!order.pickupCodeHash || !order.pickupCodeExpiresAt) return
+    await extendActivePrintFilesToDeadline(
+      this.prisma,
+      await collectPickupFileIds(this.prisma, order),
+      order.pickupCodeExpiresAt,
+    )
   }
 
   async refund(orderId: string, opts: { reason: string; operatorId?: string }): Promise<OrderRecord> {
