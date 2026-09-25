@@ -1454,6 +1454,8 @@ async function assertTwinCases(
   })
   cache.clear()
   const busy = await screen.getAdminTerminalTwin(ids.termA)
+  const busyFleet = await loadPartnerFleet(prisma, new Date(), ids.orgA)
+  const busyCell = busyFleet.cells.find((cell) => cell.terminalId === ids.termA)
   assert(
     '5i. 进行中扫描为 busy，今日扫描 +1，打印状态仍优先',
     busy.scanner.available === true
@@ -1461,7 +1463,8 @@ async function assertTwinCases(
       && busy.scanner.value.label === null
       && busy.today.scans === 1
       && busy.printer.available === true
-      && busy.printer.value.state === 'printing',
+      && busy.printer.value.state === 'printing'
+      && busyCell?.activity === 'printing',
   )
   await prisma.terminalCapability.create({
     data: { terminalId: ids.termA, capabilityKey: 'color_print', status: 'available' },
