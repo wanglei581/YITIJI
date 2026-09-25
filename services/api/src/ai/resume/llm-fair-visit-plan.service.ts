@@ -11,6 +11,7 @@ import {
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
+import { withAiSafety } from '../llm/ai-prompt-safety'
 
 // 招聘会 AI 参会准备单。
 // 合规：仅供本人参会准备参考，不包含任何就业结果承诺，不向企业传递候选人信息。
@@ -139,35 +140,35 @@ export function buildSystemPrompt(mode: FairVisitPlanMode): string {
     '\n- 只输出 JSON，不要 markdown 代码块。'
 
   if (mode === 'review') {
-    return (
+    return withAiSafety(
       '你是求职者本人的求职跟进顾问。**这场招聘会已经结束。**' +
       '基于本人简历原文与该场招聘会的公开企业/岗位信息，输出一份「参会回顾与后续跟进」。' +
       '\n硬性要求：' +
       '\n- 活动已经结束：不得输出任何「出发前」「现场」「参会当天」的动作或提醒。' +
       '\n- **你不知道用户是否到过现场、是否与任何企业接触过、是否取得任何材料。' +
       '一律不得假设、不得暗示，禁止使用「你在现场应该已经…」「你拿到的资料…」这类句式。**' +
-      '\n- 参展企业在活动结束后通常仍在招聘：priorityCompanies 输出「仍值得继续跟进的企业」，' +
-      '理由只能基于简历方向与该企业公开岗位信息的匹配点。' +
+      '\n- 参展企业在活动结束后通常仍在招聘：priorityCompanies 只列简历里已经写到的事实与公开岗位信息的对应，' +
+      '不评价该不该继续了解，也不按性别、年龄、婚育、民族、户籍、健康状况挑选企业。' +
       common +
       '{"summary":"2-3 句回顾总览，说明这场活动已结束、以下为后续跟进参考",' +
       '"fairHighlights":["这场活动的真实概况（过去式）"],' +
-      '"priorityCompanies":[{"companyName":"企业名","reason":"为什么仍值得继续跟进","sourceUrl":null}],' +
+      '"priorityCompanies":[{"companyName":"企业名","reason":"简历里已写事实与公开岗位信息的对应","sourceUrl":null}],' +
       '"followUpActions":["现在就能做的跟进动作，如去来源平台查看该企业在招岗位、按方向补充简历材料"],' +
-      '"nextTimeQuestions":["下次参加同类活动可以提前准备的问题"]}'
+      '"nextTimeQuestions":["下次参加同类活动可以提前准备的问题"]}',
     )
   }
 
-  return (
+  return withAiSafety(
     '你是求职者本人的招聘会参会准备顾问。基于本人简历原文与已发布招聘会公开信息，输出一份参会准备单。' +
     '\n硬性要求：' +
     '\n- 仅供本人参会准备参考。' +
     common +
     '{"summary":"2-3 句总览，包含仅供本人参会准备参考",' +
     '"fairHighlights":["本场活动真实看点"],' +
-    '"priorityCompanies":[{"companyName":"企业名","reason":"为什么适合现场优先了解","sourceUrl":null}],' +
+    '"priorityCompanies":[{"companyName":"企业名","reason":"简历里已写事实与公开岗位信息的对应","sourceUrl":null}],' +
     '"preparationChecklist":["参会前准备动作"],' +
     '"questionsToAsk":["现场可向来源平台或企业展位咨询的问题"],' +
-    '"onsiteTips":["现场路线、资料、打印等提醒"]}'
+    '"onsiteTips":["现场路线、资料、打印等提醒"]}',
   )
 }
 
