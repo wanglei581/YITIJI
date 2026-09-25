@@ -1,4 +1,4 @@
-# 远程旧分支清理记录（2026-09-25，商业收口步骤 0.7）
+# 远程旧分支清理记录（2026-09-25，商业收口步骤 0.7：368 → 34）
 
 产品负责人授权按三方推荐执行，2026-09-25 晚已执行：每个分支删除时都带「远程最新提交仍等于下表提交号」的保护，三批共 259 个全部删除、零拒绝，远程分支 368 → 109。只删两类：最新提交已是 `main` 祖先的分支，以及对应 PR 已合并、且合并后没有新提交的分支。其余（合并后又有提交、PR 关闭未合并、从未开 PR）共 102 个本次不动，逐个判断后另行处理；`main`、整合分支、备份分支与待抽取的 4 个分支保留。
 
@@ -267,3 +267,119 @@
 | `refactor/n1-jobs-service-split` | `2498c154dda9d88214bdcd865d9c2e1838b3b544` | 2026-07-19 | PR 已合并，合并后无新提交（#318:MERGED） |
 | `refactor/n3-terminals-service-split` | `401a83c27b54b067b888e982eddbec239bcd83f7` | 2026-07-19 | PR 已合并，合并后无新提交（#320:MERGED,#316:MERGED） |
 | `refactor/n56-service-split` | `9b389d03a605bfeda5ed1dcf4fc7e8b02ffaab5e` | 2026-07-19 | PR 已合并，合并后无新提交（#315:MERGED） |
+
+## 第二批（2026-09-25 夜，75 个）
+
+Grok 对剩下 102 个逐个比对两个基线（`origin/main@eb0f20341`、整合分支 `0f415cf65`）：独有提交按补丁等价，或改动过的文件与基线字节相同、或该字节曾原样出现在基线历史里又被后续版本取代，判删；有未被吸收、可能有价值的改动判保留。Claude 抽查 7 个成立（含近 14 天仍有推送的 2 个）；17 个「需要看」由 Claude 提建议、Agy 复核一致：删 3、保留 14。产品负责人授权按推荐执行。删除同样带「远程提交号未变」保护，零拒绝；远程分支 109 → 34。
+
+| 分支 | 最新提交 | 日期 | 依据 |
+| --- | --- | --- | --- |
+| `claude/admin-account-settings-6ee9e8` | `e8c3a42bcb740e453f159d1cff2c408b741fcdfc` | 2026-07-14 | 管理员改密已在基线（账号设置页和 verify:change-password 都在） |
+| `claude/docs-stale-facts-fix-round2-20260818` | `f908398773c8ecc586d4d41877b30eeb376c017b` | 2026-08-18 | 基线那份审查稿里已经没有「端点不存在」的误判句 |
+| `claude/epic-feistel-b5f30a` | `bf37b9d3c1cd4af2cd601031b69f6a51b13ea205` | 2026-08-06 | 文件清理在基线已是 files.cleanup.task，本分支是另一套旧服务 |
+| `claude/jovial-bassi-53427d` | `733d3df6ce4436ddaf7783920db1ddaf045df679` | 2026-07-03 | 失败原因回显 failureReasonForUser 已在基线 |
+| `claude/lucid-kilby-0199ed` | `9a10b9e97a613c73810b8c6f258dbf0bf8d62c45` | 2026-07-19 | 合并后只剩进度勾选，对应 PR 已在 main，表述已被后续任务单取代 |
+| `claude/project-readiness-review-959ffe` | `61fd5b093739a38cf0c31f71c5828de6287d3d94` | 2026-09-03 | 51 页青序原型基线已有 99 个文件，本分支是更早的 84 文件快照 |
+| `claude/qx-b3-fairs` | `64a6e6591589bc2459c12206f01066fdcbc93d23` | 2026-09-10 | 招聘会青序页已在整合分支改成 QxFairWorkbench，「筛选筛空」也在 |
+| `codex/admin-initial-phone-binding-production-release-20260715` | `b65cd17c960f235b0686b3b5147380716a8f0395` | 2026-07-15 | Admin 首次绑手机号服务已在基线 |
+| `codex/campus-companies-batch6-20260717` | `5e45fd13651df7338264026a2ef6b60514923718` | 2026-07-18 | 只剩已完成事项的进度记 |
+| `codex/deploy-ci-unblock-20260806` | `75b161061afc939ed74dc7b87ace6767a6be1e53` | 2026-08-07 | 2026-08 的 CI 解阻旧稿，main 后来已经收口 |
+| `codex/docs-printfileurl-status-correction-20260712` | `52e6581828619b1b38936939142f2affccb0315f` | 2026-07-12 | 只记录已经合入的 printFileUrl 修复 |
+| `codex/f1-d2-prime-main-integration-20260731` | `c87349c8648d188829778d544e87bf2ac96c5571` | 2026-07-31 | d2 同机演练脚本已在 main，这次整合已被商业整合分支取代 |
+| `codex/file-cleanup-cas-20260811` | `038c147abcbee65b33a9d2c59cbbb5ff42b4462b` | 2026-08-11 | 清理防旧候选基线已有 cleanupStale；删除重试迁移留在 storage-delete-retry |
+| `codex/file-flow-main-integration` | `841395228a66662bbe3d35faa3fdf46d85ce8b44` | 2026-08-06 | 旧的主线整合，打印扫描页面基线已经继续改过 |
+| `codex/fix-agent-image-jobname-20260813` | `8a3ac546e3210309ce12173729e6717ff16205d5` | 2026-08-14 | 安装器升级校验基线已有，没有留下独立的作业名修复 |
+| `codex/fix-js-yaml-advisory-20260807` | `ed31557ec3c529009f7f4f566c1305c82ee3fa73` | 2026-08-07 | js-yaml 公告修复已在基线 |
+| `codex/gate04-agent-acl-no-cli-token` | `0d93c38cf9c862d9dace38d443445058a0652e14` | 2026-07-26 | 合并后只剩 Gate 0.4 进度记，安装脚本改动已在基线 |
+| `codex/gate0k-scan-usb-prep-20260727` | `22d1ab79fb364e6a1d90c73fc8a7bce22ee81bbe` | 2026-07-27 | 合并后只剩 7 月扫描/U 盘进度，现场状态已被后续文档取代 |
+| `codex/kiosk-filing-hotfix-20260901` | `6b4a92f56c26ac058a073f8c6dbeb3a390a5bff8` | 2026-09-01 | 备案页脚改在已下线的 V6 首页上，基线已有首页备案字样 |
+| `codex/kiosk-w16-w22-visual-closeout-20260725` | `7da74dfb702851e93b9671c21460918cb04d6ddd` | 2026-07-25 | 7 月视觉收口，已被青序流光取代 |
+| `codex/legacy-pending-print-task-disposition-20260711` | `2f762c5fc4da32876823b697d227fb3acff3622e` | 2026-07-11 | 独有提交的显著行已在 main 或整合分支 |
+| `codex/legal-doc-publish-20260810` | `d0c10c6fdddb4559d2d5453b5bf27824441c9f43` | 2026-08-10 | 法律页已在基线，剩下是旧样式和进度记 |
+| `codex/me-account-batch7-20260717` | `4d5ad50ee900927f64d2a4a2931a953a0b2426e9` | 2026-07-18 | 我的账号旧视觉批次，设置页已有后续版本 |
+| `codex/me-account-batch7-final` | `1d1fe42cead386dfa361fc0ce523fb31f596a7ec` | 2026-07-18 | 同上，账号页旧视觉，已被后续版本取代 |
+| `codex/me-account-batch7-v2` | `3e6dc6b939c0df526077646bec802ddc0220e453` | 2026-07-18 | 同上，账号页旧视觉，已被后续版本取代 |
+| `codex/miniapp-m2-first-slice` | `703d4ceebd7172e1fc40b3cb75e523cd6698b01d` | 2026-08-12 | PrintService 完成确认已在基线（queryCompletionEvent），剩余是旧进度句 |
+| `codex/package-order-idempotency-r12-20260917` | `d9d79f2689dddd0614a76b71a2252a96d7468a69` | 2026-09-17 | 套餐下单幂等已在整合分支，只剩收口进度记 |
+| `codex/phase0-s0c-resume-parse-truth-20260729` | `959976c46a96d9b03c121049d0a8878abebebbd1` | 2026-07-29 | git cherry 对两个基线都没有独有提交 |
+| `codex/print-core-batch1-20260717` | `89f1944f760ea8a4405d495f8bf5b958c6335e7e` | 2026-07-18 | 打印核心第一批旧稿，后续打印域已在基线 |
+| `codex/print-first-order-evidence-20260807` | `b38f7036af3f39c200a97d042ce67db35469dad7` | 2026-08-07 | 只剩进度记 |
+| `codex/print-scan-admin-ops-review-fixes-20260712` | `22ca94137c16561246c5d09446204dcc29812940` | 2026-07-12 | 7 月评审修补，订单只读后台已在基线 |
+| `codex/print-scan-physical-proof-docs` | `6ae4865510e9ccdf1647c11a8171f90bc425c63e` | 2026-07-14 | 7 月实物验收草稿，后续已有真机出纸证据 |
+| `codex/print-scan-windows-acceptance` | `267608a287a59b0cd61f6a012629b21bb37a8429` | 2026-07-06 | 7 月 Windows 验收准备，已被后续现场记录取代 |
+| `codex/profile-commercial-p0a-payment-foundation` | `65d8cac7b76d631291cb2d55937761ff5e7b1a5f` | 2026-07-03 | 支付地基旧分支，没有留下独立代码 |
+| `codex/recruitment-wave2-prod-admission-20260810` | `0b14f131f54e616c1feda52654a1fbb8310f0b53` | 2026-08-10 | 只剩基线已有的准入脚本差异 |
+| `codex/release-auth-payment-preserving-20260715` | `ebe34fcca500fb85e8da0e46e779014b29c010f6` | 2026-07-15 | 只剩进度记 |
+| `codex/release-base-6c2a9668` | `298c20ada80fc48a50f2f9dc63e080baf06d3b4e` | 2026-07-16 | 独有文件字节曾在基线历史里，已被后续版本取代 |
+| `codex/release-strict-scan-health-20260715` | `3ba8e653350d13ca0c27da9c467d0631faba6a09` | 2026-07-15 | git cherry 对两个基线都没有独有提交 |
+| `codex/smart-campus-visible-locked-20260811` | `713ad42d05ba0147201d94698f3ed5cd79a01412` | 2026-08-11 | 改的是旧首页，且与已定「本机没开通就不出现」相反（三方同意删） |
+| `codex/system-batch8-20260717` | `e319c976fbea1e623e9e446e640d135ea6f20241` | 2026-07-18 | 7 月系统批次旧稿，对应页面基线已有后续版 |
+| `codex/terminal-agent-runtime-packaging` | `49a132781298c1f72bae5d8ee00141c4f5cdf7c5` | 2026-07-27 | 配置改到 ProgramData 的做法基线里已经大量存在 |
+| `codex/user-center-plan-status-reconcile-20260716` | `3dd0bba65bfddc222a8761b9cb709f44b548885a` | 2026-07-17 | 用户中心计划对账的文字基线已有 |
+| `codex/v3-local-snapshot-20260811` | `2ffa2fad158593acb826184ac300b2704a208bde` | 2026-08-11 | 只剩进度记 |
+| `codex/v3-production-gate0-20260811` | `7559430f5bf84e7fe3d05a5e3bde282c2be21ae1` | 2026-08-11 | V3 事实重述，设计文件基线已有后续版 |
+| `codex/windows-acceptance-candidate` | `4ae91fc106af2ae0370d6f4e3b47f7c11e940068` | 2026-06-30 | 6 月验收候选，已被后续 Windows 证据取代 |
+| `codex/windows-agent-0-4-1-provisioning` | `37545691107b58d518a66f0129a9268fd540458f` | 2026-08-13 | 0.4.1 供应旧线；升级测试已在基线，在线更新另有保留分支 |
+| `codex/windows-agent-local-panel-20260810` | `28c9202dcc57a6ad8f98f7de9e29ffcfb53738da` | 2026-08-10 | 没有留下独立面板文件，安装器校验基线已有另一版 |
+| `codex/windows-agent-upgrade-0-3-2-20260810` | `1d932ddaec6039a07b661c16ea2d98d0a9f167df` | 2026-08-10 | 0.3.2 升级旧线，生命周期测试已在基线 |
+| `codex/windows-agent-upgrade-20260810` | `85842e36b723be1f58681cfdeac3365bb715ce41` | 2026-08-10 | 同日的升级旧线，生命周期测试已在基线 |
+| `codex/windows-pantum-field-readiness-r3-20260917` | `792a9f987af84a795431747248e546bf2f1abbb6` | 2026-09-17 | git cherry 对两个基线都没有独有提交 |
+| `docs/f4-physical-print-pass-20260725` | `34e8a23148e767bfe84d0be3c054961a7075eddb` | 2026-07-25 | 只剩 F4 出纸进度，后续文档已覆盖 |
+| `docs/fix-7c-ssot-f4-next-20260725` | `ade7d56a6bf64eca057425f9af03afca4d3075c6` | 2026-07-25 | 只剩 7c 进度纠偏 |
+| `docs/fix-overclaim-usb-disclaimer-20260726` | `62b2931dfe68981aef72da9e997d66ebf3da3b30` | 2026-07-26 | 只剩进度记，U 盘免责正文不在独有差异里 |
+| `docs/gate04-field-ready` | `97377bf0c23bf125319d8cf21adb4ba03f282a6d` | 2026-07-27 | 恢复步骤所在的 onboarding 文档已在基线，分支是旧表述 |
+| `docs/kiosk-ai-os-v3-baseline` | `931066146e8b61cffae574f58f4e7b411997ff54` | 2026-08-09 | V3 审计稿基线已有；缺的台账属于已被青序取代的旧设计 |
+| `docs/p1-dep-audit-20260725` | `1552e07db84c9c3d8457e32676aa4162f2d3c2c1` | 2026-07-25 | 依赖审计文件已在基线 |
+| `docs/partner-342-hotswap-20260725` | `ee0109a49df38c3a09c98374c915d039f1a95d6d` | 2026-07-25 | 合并后只剩一行已合入说明 |
+| `docs/preprod-deploy-83f2117f` | `d69ff5db37b92376dffd549bf6a7ce5f827717dc` | 2026-07-26 | 只剩预发部署进度 |
+| `docs/user-center-plan-reconcile-v2` | `e2ae2c553d66f8855aa41d77d827401c4ff1ed16` | 2026-07-17 | 对账文字基线已有 |
+| `feat/kiosk-home-v3-pilot` | `e449614d2d59abffa333d62a8cfeae9edaf0800e` | 2026-08-09 | 首页 V3 试点已被 2026-09-03 青序流光裁决取代 |
+| `feat/member-print-orders-failure-reason` | `b9bf81af6074b9631cfdcdf05b62c1ff8b83c093` | 2026-07-17 | 失败原因回显已在基线 |
+| `feat/qx-service-hubs` | `fd8818e38c27c7de900ba29cbf80af5ee0edca9c` | 2026-09-10 | 五个服务台页 QxServiceHubPage 已在整合分支 |
+| `feat/session-impact-domain-gate` | `9ced008c4785ddec5f71e3ffda32d4a1775a866f` | 2026-09-09 | 提交说明写明暂不合入，只留下未启用的测试 |
+| `feature/job-master` | `28e4e47c7fc3cbfbbb1f671986efe17862636f26` | 2026-07-03 | 「岗位大师」不在 51 张原稿与推进方案内，属岗位类、受许可证约束（三方同意删） |
+| `feature/kiosk-ai-os-prototype-sync` | `e0f7ca4e2be344f89ae913081351fed557372fa5` | 2026-08-04 | 7 月旧原型截图；旧原型 HTML 已保留在 docs/design，首页已被青序流光取代（三方同意删） |
+| `feature/payment-c5-6-refund-regression-gate` | `faec754bee8da54af484e8082c3213d85044404f` | 2026-07-12 | 和后面的 v2 重复；回归脚本已在基线，SOP 留在 v2 |
+| `fix/contract-review-ci-20260804` | `38e564f9e4f84180fc113b7ab5ee74d7d7c27b95` | 2026-08-04 | 合同审查 CI 修复已随后续 main 收口 |
+| `fix/dep-advisories-multer-2.3.0` | `072f9a0efae3518de12dedfc965ac4d3e5069910` | 2026-09-09 | multer 版本修复已在基线 |
+| `fix/grok-cred-hardening-20260903` | `19f09a9a1e9965aacbfb38a4599d648c7cb393ac` | 2026-09-03 | 名是凭证加固，独有文件实为旧页面/图谱稿，基线已有后续版，也没有 GROK 密钥改动 |
+| `fix/kiosk-pickup-claim-title` | `9059ef97c9822052010bfc285ad9d89782402a6f` | 2026-08-19 | 「到机码核销」已在基线大量出现 |
+| `fix/login-keypad-finding` | `dfefbee50e689bef7d835ea7017a9f5833bdba50` | 2026-08-16 | 只剩说明文字，键盘修复已随后续取件页演进 |
+| `fix/main-red-after-833` | `c4110e3f966bfb4e543d834171e387a34c4074ba` | 2026-09-06 | CI 变红后的修补，main 后续已经过 |
+| `fix/printer-heartbeat-ready-v2` | `4281d34e29d832936348d4f5c4dd1d4459a40e3a` | 2026-07-17 | 只剩进度记 |
+| `fix/self-assessment-staged-cleanup-r3` | `f7d36064bb01eecbd26d1d918ebbadb147913d0e` | 2026-08-02 | 合规 §4.6.4 已在基线，其余是审查过程稿 |
+| `ops/close-unpaid-runbook-20260725` | `e03afe2f425d584f49d9d9ce29309596d51a5c00` | 2026-07-25 | 独有文件的字节曾在基线历史里，已被后续版本取代 |
+
+## 保留（27 个，另有 7 个受保护分支）
+
+受保护：`main`、整合分支 `codex/commercial-integration-20260918-r1`、`backup/commercial-closeout-candidate-20260925`、待抽取的 `chore/walkthrough-harness`、`feat/qx-batch-help`、`codex/b1-r1-pm2-mode-20260825`、`codex/windows-agent-online-update`。下面 27 个有未被基线吸收的内容，等对应步骤用完或判定后再清。
+
+| 分支 | 日期 | 留下的内容 | 对应步骤 |
+| --- | --- | --- | --- |
+| `chore/deadpages` | 2026-09-10 | 要删的 V6 死页里有 31 个文件基线仍在，PR 已关，算不算死代码需产品看 | 3.7 |
+| `claude/miniapp-console-sharing-2026-08` | 2026-08-18 | 未吸收的治理句：删 worktree 前必须核对 cwd，路径统一到 .worktrees/；渠道字段迁移则已在基线 | — |
+| `claude/miniapp-lane` | 2026-09-03 | 43 个提交从未开 PR；招聘会/简历页基线已有另一版，行级对不上 | 小程序分路 |
+| `claude/partner-account-settings` | 2026-07-14 | 合作机构后台的账号设置/改密页，两个基线都没有这条路由 | — |
+| `claude/professional-circle-plan-review-dc97b4` | 2026-08-17 | 市场验证后的战略修订（含数据不出域）不在两个基线 | — |
+| `claude/recursing-tu-8ebb65` | 2026-08-04 | 材料包 Bundle 接口和公开终端列表，两个基线都没有 bundles 模块 | — |
+| `claude/user-self-refund-a3-s3` | 2026-08-16 | 会员自助退款端点不在基线，PR #632 已关，开不开需产品定 | 1.11 |
+| `codex/bos-storage-adapter` | 2026-08-10 | 百度 BOS 适配器和切换文档不在基线，现用 COS/本地，PR 已关 | R-04 |
+| `codex/dual-device-collaboration-docs` | 2026-07-06 | 双机协同规则写进协作说明和打印验收包，基线没有这段 | — |
+| `codex/governance-safety-20260822` | 2026-08-22 | 改了发布/备份脚本和治理说明，没有 PR，和现行门禁是否重复不清楚 | 1.6 |
+| `codex/job-fit-anonymous-consent-ui-fix-20260712` | 2026-07-13 | 岗位匹配的匿名授权弹窗和规格不在基线，页面本身在 | 3.5 |
+| `codex/payment-code-privacy-20260811` | 2026-08-16 | 公共终端付款码遮挡的验证句不在基线，页面文件在，PR 已关 | 3.5 / 2.4 |
+| `codex/pickup-terminal-auth-20260910` | 2026-09-10 | 取件请求鉴权和防重放，PR #1035 已关，和基线现有取件页是否同一套不清楚 | 1.3 / 1.4 |
+| `codex/prelaunch-stabilization-20260811` | 2026-08-11 | 上传鉴权和体积限制的收紧不在基线原文里，PR 已关 | 1.1 |
+| `codex/remove-fake-pickup-claim-20260811` | 2026-08-11 | 「去掉假取件」改了 19 个文件，基线只有零星「假取件」字样，对不上 | 1.4 / 3.7 |
+| `codex/storage-delete-retry-20260811` | 2026-08-11 | 对象删除重试的数据库迁移两个基线都没有 | — |
+| `codex/windows-agent-burn-exe` | 2026-08-07 | Burn EXE 安装器候选不在已保留的在线更新分支里，还要不要这条安装路径未定 | 4.2 |
+| `codex/windows-agent-same-version-gate` | 2026-09-04 | 同版本恢复闸门脚本 test-exe-same-version-transition.ps1 两个基线都没有 | — |
+| `docs/delivery-refresh-0910` | 2026-09-10 | 把交付包 BL-05（OCR 密钥）从 OPEN 改为 CLOSED 并写了取证边界，基线仍是 OPEN | — |
+| `feat/kiosk-pii-redaction-contract` | 2026-08-09 | 隐私遮挡四步交互契约的原句不在基线，遮挡代码本身在 | 3.5 |
+| `feat/payment-c5-6-verify-gate-v2` | 2026-07-17 | 退款对账 SOP 不在基线；回归脚本本身已经在 | — |
+| `feat/pii-redaction-text-layer` | 2026-08-09 | 隐私遮挡文字层的 finding boxes 迁移两个基线都没有 | — |
+| `feature/id-photo-design` | 2026-07-13 | 证件照类型 idPhoto.ts 和实现不在两个基线，PR 已关 | 2.4 |
+| `field/windows-phase-f-2026-09` | 2026-09-06 | 现场结论：Agent 领取遇到 HTTP 429、延迟约 4 分钟，两个基线的进度文档都没有 | — |
+| `fix/p1-money-rebase` | 2026-09-06 | 入账守取件窗口、关单回滚 claimed、出码失败释放锁，基线没有这段 | — |
+| `fix/partner-stats-empty-state` | 2026-08-03 | 合入后补的两份 G1/下一步审查结论不在基线，是否还有未关风险不清楚 | 3.8 |
+| `team/audit-p9-truncation` | 2026-09-06 | 列表不再静默截断（标明 truncated），基线没有 verify-list-truncation-honesty.ts | — |
