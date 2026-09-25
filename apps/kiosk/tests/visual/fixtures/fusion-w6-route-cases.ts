@@ -185,7 +185,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: qx, featureText: '本机不代收简历' },
   { pattern: '/job-fairs/:id/companies/:companyId', url: '/job-fairs/fair-001/companies/fair-company-001', marker: qx, featureText: '青岛示例制造有限公司' },
   { pattern: '/job-fairs/:id/map', url: '/job-fairs/fair-001/map', marker: qx, featureText: '本机不画推荐路线' },
-  { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: qx, featureText: '链接由服务端临时签发' },
+  { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: qx, featureText: '下载链接临时有效' },
   { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: qx, featureText: 'AI参会准备单' },
   { pattern: '/job-fairs/:id/stats', url: '/job-fairs/fair-001/stats', marker: qx, featureText: '真实数据正在接入' },
   { pattern: '/resume/self-assessment/intro', url: '/resume/self-assessment/intro', marker: screen('resume-self-assessment-intro'), featureText: '自我探索', requiresFusionRoot: false },

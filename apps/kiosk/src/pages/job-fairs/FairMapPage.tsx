@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import { getFairMap, getFairVenueGuide, getJobFairById } from '../../services/api'
 import { QxFairWorkbench } from './QxFairWorkbench'
+import { FAIR_HEAD } from './fairWorkbenchSpecs'
 import { FairSkeletonList } from './components/FairWorkbenchBits'
 import { fmtFairSyncDate } from './fairFormat'
 import {
@@ -161,7 +162,7 @@ export function FairMapPage() {
       screen="map"
       state={uiState}
       fairId={fairId}
-      subtitle={fair ? `${fair.name} · ${fair.venue} · 有主办方给的图或展位号才显示；本机不画推荐路线。` : undefined}
+      subtitle={fair ? `${fair.name} · ${fair.venue} · ${FAIR_HEAD.map[1]}` : undefined}
       ctabar={ctabar}
     >
       {loading ? (

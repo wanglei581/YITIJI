@@ -39,6 +39,7 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { API_MODE } from '../../services/api/client'
 import { QxFairWorkbench } from './QxFairWorkbench'
+import { FAIR_HEAD } from './fairWorkbenchSpecs'
 import { FairSkeletonList } from './components/FairWorkbenchBits'
 import { fmtFairSyncDate } from './fairFormat'
 import {
@@ -166,7 +167,7 @@ export function FairMaterialsPage() {
         )
         : (
           <>
-            <p className="why">打印份数、单双面与黑白彩色在打印页选择，价格以现场公示与服务端报价为准。</p>
+            <p className="why">打印份数、单双面与黑白彩色在打印页选择，价格以现场公示与系统报价为准。</p>
             <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
           </>
         )
@@ -176,7 +177,7 @@ export function FairMaterialsPage() {
       screen="materials"
       state={uiState}
       fairId={fairId}
-      subtitle={fair ? `${fair.name} · 链接由服务端临时签发；打印价格以现场公示与服务端报价为准。` : undefined}
+      subtitle={fair ? `${fair.name} · ${FAIR_HEAD.materials[1]}` : undefined}
       ctabar={ctabar}
     >
       {uiState === 'print-failed' ? (
@@ -223,7 +224,7 @@ export function FairMaterialsPage() {
                 ? `已取回 ${materials.length} / 共 ${materialsTotal} 份`
                 : `共 ${materials.length} 份`}
             </span>
-            <span className="rsp">链接由服务端临时签发</span>
+            <span className="rsp">下载链接临时有效，过期需重新打开</span>
           </p>
 
           <div className="dw-rlist" data-testid="fair-materials-list">
