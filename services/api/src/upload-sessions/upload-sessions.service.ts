@@ -994,6 +994,20 @@ export class UploadSessionsService {
       })
       return
     }
+    // 行已墓碑时，pendingStorageKey 是还没切成 storageKey 的复制件。
+    // 删除失败必须留下指针；不得删除行当前指向的对象。
+    if (row.deletedAt && row.pendingStorageKey && row.pendingStorageKey !== row.storageKey) {
+      await this.files.deleteObjectAtKey(row.pendingStorageKey, row.bucket)
+      await this.prisma.fileObject.updateMany({
+        where: {
+          id: row.id,
+          pendingStorageKey: row.pendingStorageKey,
+          storageKey: row.storageKey,
+        },
+        data: { pendingStorageKey: null },
+      })
+      return
+    }
     if (
       row.pendingStorageKey
       && row.pendingStorageKey !== row.storageKey

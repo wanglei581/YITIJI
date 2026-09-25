@@ -2180,6 +2180,71 @@ async function main(): Promise<void> {
     assert.equal((await service.getStatus(session.sessionId, session.controlToken)).status, 'confirmed')
   }
 
+  {
+    // 归属切换前行已被墓碑，pendingStorageKey 仍指着会员复制件。
+    // 第一次删复制件失败后指针必须还在；重试删掉复制件，且不碰仍在使用的会员对象。
+    const { service, prisma, files } = makeService()
+    const anonymousKey = 'tmp/uploads/file_orphan/file_orphan.pdf'
+    const copiedKey = 'users/member_1/resumes/file_orphan.pdf'
+    const liveKey = 'users/member_live/resumes/file_live.pdf'
+    const base = {
+      filename: 'resume.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 4,
+      sha256: 'sha',
+      bucket: 'local-fs',
+      purpose: 'resume_upload' as const,
+      sensitiveLevel: 'sensitive',
+      expiresAt: null,
+      retentionPolicy: null,
+      retentionSetBy: null,
+      retentionConsentAt: null,
+      retentionConsentVersion: null,
+      retentionLockedReason: null,
+      replacedStorageKey: null,
+      updatedAt: new Date(),
+    }
+    prisma.files.set('file_orphan', {
+      ...base,
+      id: 'file_orphan',
+      storageKey: anonymousKey,
+      endUserId: null,
+      ownerType: 'system',
+      ownerId: null,
+      deletedAt: new Date(),
+      pendingStorageKey: copiedKey,
+    })
+    prisma.files.set('file_live', {
+      ...base,
+      id: 'file_live',
+      storageKey: liveKey,
+      endUserId: 'member_live',
+      ownerType: 'user',
+      ownerId: 'member_live',
+      deletedAt: null,
+      pendingStorageKey: liveKey,
+    })
+    const objects = new Set<string>([anonymousKey, copiedKey, liveKey])
+    let failCopiedKey = true
+    files.deleteObjectAtKey = async (key: string) => {
+      if (failCopiedKey && key === copiedKey) throw new Error('pending copy delete failed')
+      objects.delete(key)
+    }
+    await service.cleanupExpiredSessions(Date.now())
+    assert.equal(prisma.files.get('file_orphan')?.pendingStorageKey, copiedKey, 'failed delete must keep the durable pointer')
+    assert.equal(objects.has(copiedKey), true)
+    failCopiedKey = false
+    await service.cleanupExpiredSessions(Date.now())
+    assert.equal(prisma.files.get('file_orphan')?.pendingStorageKey ?? null, null)
+    assert.equal(objects.has(copiedKey), false, 'retry must delete the tombstoned pending copy')
+    assert.equal(prisma.files.get('file_orphan')?.storageKey, anonymousKey)
+    assert.equal(objects.has(anonymousKey), true)
+    assert.equal(objects.has(liveKey), true, 'a live member object must not be deleted')
+    assert.equal(prisma.files.get('file_live')?.deletedAt ?? null, null)
+    assert.equal(prisma.files.get('file_live')?.storageKey, liveKey)
+    assert.equal(prisma.files.get('file_live')?.pendingStorageKey, liveKey)
+  }
+
   console.log('PASS upload session verification')
 }
 
