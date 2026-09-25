@@ -357,8 +357,10 @@ check(
   '成功认领清零失败计数（否则繁忙终端会被零散手误累积锁死）',
 )
 check(
-  lockoutSrc.includes('tryRedis(') && lockoutSrc.includes("if (!attempt.ok) return false"),
-  'Redis 不可用时锁定 fail-open —— 否则 REDIS_DEGRADED_IMPACT 的 terminal-agent-print:unaffected 会变成假话',
+  lockoutSrc.includes('tryRedis(') &&
+    lockoutSrc.includes('memoryHas(lockKey(terminalId))') &&
+    !lockoutSrc.includes('if (!attempt.ok) return false'),
+  'Redis 不可用时锁定走进程内兜底，不得无条件放行',
 )
 check(
   /isPickupClaimLocked\(this\.redis, terminal\.id\)[\s\S]{0,400}?findUnique\(\{ where: \{ pickupCodeHash/.test(pickupOrderSrc),

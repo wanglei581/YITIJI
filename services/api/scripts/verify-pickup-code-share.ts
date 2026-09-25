@@ -30,6 +30,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'verify-jwt-secret-0123456789
 process.env.REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379/14'
 
 import { AuditService } from '../src/audit/audit.service'
+import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
 import type { RedisService } from '../src/common/redis/redis.service'
 import { PICKUP_REISSUE_STUCK_CLAIM_MS, PickupCodeReissueService } from '../src/member-print-orders/pickup-code-reissue.service'
 import { MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
@@ -44,6 +45,13 @@ import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { RefundService } from '../src/payment/refund.service'
 import { PICKUP_LOCKOUT_FAILURE_THRESHOLD } from '../src/print-jobs/pickup-claim-lockout'
 import { PICKUP_CLAIM_SOURCE_RATE_LIMIT } from '../src/print-jobs/pickup-claim-rate-limit'
+import {
+  PICKUP_CLAIM_MEMORY_MAX_KEYS,
+  memoryHas,
+  memoryIncrement,
+  memorySet,
+  resetPickupClaimMemoryFallbackForTests,
+} from '../src/print-jobs/pickup-claim-memory'
 import { PICKUP_RELEASED_REPLAY_MS, PickupOrderService } from '../src/print-jobs/pickup-order.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -452,6 +460,68 @@ async function main(): Promise<void> {
       fail(`来源限额跨终端仍然有效，实际 ${JSON.stringify(sameSourceOtherTerminal)}`)
     }
     pass('限流按来源与终端分别计数：打满来源后换来源仍可试，换终端躲不掉来源限额')
+
+    resetPickupClaimMemoryFallbackForTests()
+    const memoryNow = 1_700_000_000_000
+    if (memoryIncrement('exp', 10, memoryNow) !== 1 || memoryIncrement('exp', 10, memoryNow + 9_999) !== 2) {
+      fail('进程内计数必须在窗口内累加')
+    }
+    if (memoryIncrement('exp', 10, memoryNow + 10_000) !== 1) fail('进程内计数必须在窗口结束后重新从 1 开始')
+    if (!memorySet('lock-exp', 15, memoryNow) || !memoryHas('lock-exp', memoryNow + 14_999) || memoryHas('lock-exp', memoryNow + 15_000)) {
+      fail('进程内锁定必须在 TTL 后自动消失')
+    }
+    resetPickupClaimMemoryFallbackForTests()
+    for (let i = 0; i < PICKUP_CLAIM_MEMORY_MAX_KEYS; i += 1) {
+      if (memoryIncrement(`cap-${i}`, 60, memoryNow) !== 1) fail('容量内的新键必须能写入')
+    }
+    if (memoryIncrement('cap-overflow', 60, memoryNow) !== null) fail('进程内计数达到容量后必须拒绝新键')
+    resetRedisCooldownForTests()
+    redis.failing = false
+    redis.reset()
+    const ignoredMemory = await capture(() => pickup.claim(rateOrder.pickupCode!, terminalId, 'memory-ignored'))
+    if (ignoredMemory.code !== 'PICKUP_CODE_EXPIRED') {
+      fail(`Redis 正常时不得被进程内兜底拖死，实际 ${JSON.stringify(ignoredMemory)}`)
+    }
+    pass('进程内兜底有上限且自动过期；Redis 正常时不看这份内存')
+
+    resetPickupClaimMemoryFallbackForTests()
+    resetRedisCooldownForTests()
+    redis.reset()
+    redis.failing = true
+    for (let i = 0; i < PICKUP_CLAIM_SOURCE_RATE_LIMIT; i += 1) {
+      const hit = await capture(() => pickup.claim(rateOrder.pickupCode!, terminalId, 'redis-down-src'))
+      if (hit.code !== 'PICKUP_CODE_EXPIRED') fail(`Redis 故障时限流前仍应判过期，第 ${i + 1} 次 ${JSON.stringify(hit)}`)
+    }
+    const downLimited = await capture(() => pickup.claim(rateOrder.pickupCode!, terminalId, 'redis-down-src'))
+    if (downLimited.status !== 429 || downLimited.code !== 'PICKUP_CLAIM_RATE_LIMITED') {
+      fail(`Redis 故障时来源限额必须仍生效，实际 ${JSON.stringify(downLimited)}`)
+    }
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD; i += 1) {
+      await capture(() => pickup.claim(`3000000${i}`.slice(0, 8), otherTerminalId, 'redis-down-lock'))
+    }
+    const downLocked = await capture(() => pickup.claim('30000099', otherTerminalId, 'redis-down-lock'))
+    if (downLocked.code !== 'PICKUP_CLAIM_LOCKED') {
+      fail(`Redis 故障时失败锁定必须仍生效，实际 ${JSON.stringify(downLocked)}`)
+    }
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+      await capture(() => pickup.claim(`4000000${i}`.slice(0, 8), terminalId, 'redis-down-clear'))
+    }
+    const clearDuringOutage = await memberOrders.create(
+      userId,
+      { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      randomUUID(),
+    )
+    await pickup.claim(clearDuringOutage.pickupCode!, terminalId, 'redis-down-clear')
+    await capture(() => pickup.claim('40000098', terminalId, 'redis-down-clear'))
+    const afterOutageClear = await capture(() => pickup.claim('40000097', terminalId, 'redis-down-clear'))
+    if (afterOutageClear.code !== 'PICKUP_CODE_INVALID') {
+      fail(`Redis 故障时成功认领仍须清零失败计数，实际 ${JSON.stringify(afterOutageClear)}`)
+    }
+    redis.failing = false
+    redis.reset()
+    resetPickupClaimMemoryFallbackForTests()
+    resetRedisCooldownForTests()
+    pass('Redis 不可用时按进程内兜底严格限流和锁定')
 
     const now = new Date()
     const eightDaysAgo = new Date(now.getTime() - 8 * DAY)

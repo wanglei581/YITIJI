@@ -2,13 +2,15 @@
  * 到机认领的服务端限流：按终端、按来源（调用方 IP / 调用方给定的来源键）各一桶。
  *
  * 与 `pickup-claim-lockout.ts` 分工：锁定只数「码不存在 / 走错终端」；
- * 本模块数每一次认领尝试，包括过期码。Redis 不可用时放行，与锁定同一 fail-open，
- * 避免 Redis 故障时已付款用户取不到件（`terminal-agent-print: unaffected`）。
+ * 本模块数每一次认领尝试，包括过期码。
+ * Redis 正常时只认 Redis。Redis 不可用时改走进程内有界计数，限额不变，
+ * 不能因为 Redis 挂了就把尝试全部放行。
  */
 import { createHash } from 'crypto'
 import { Logger } from '@nestjs/common'
 import { tryRedis } from '../common/redis/redis-degradation'
 import type { RedisService } from '../common/redis/redis.service'
+import { memoryIncrement } from './pickup-claim-memory'
 
 /** 同一终端每分钟认领尝试上限（含成功与失败）。 */
 export const PICKUP_CLAIM_TERMINAL_RATE_LIMIT = 40
@@ -30,6 +32,11 @@ function terminalBucket(terminalId: string): string {
   return `pickup:claim:rate:t:${terminalId}`
 }
 
+function memoryExceeded(key: string, limit: number): boolean {
+  const count = memoryIncrement(key, PICKUP_CLAIM_RATE_WINDOW_SECONDS)
+  return count === null || count > limit
+}
+
 /** 返回 true 表示本请求已超过终端或来源限额，调用方应直接拒绝、不再查码。 */
 export async function consumePickupClaimRate(
   redis: RedisService,
@@ -41,11 +48,16 @@ export async function consumePickupClaimRate(
     () => redis.incrWithTtl(sourceBucket(source), PICKUP_CLAIM_RATE_WINDOW_SECONDS),
     logger,
   )
-  if (src.ok && src.value > PICKUP_CLAIM_SOURCE_RATE_LIMIT) return true
+  if (src.ok) {
+    if (src.value > PICKUP_CLAIM_SOURCE_RATE_LIMIT) return true
+  } else if (memoryExceeded(sourceBucket(source), PICKUP_CLAIM_SOURCE_RATE_LIMIT)) {
+    return true
+  }
   const term = await tryRedis(
     'pickup-claim-rate-terminal',
     () => redis.incrWithTtl(terminalBucket(terminalId), PICKUP_CLAIM_RATE_WINDOW_SECONDS),
     logger,
   )
-  return term.ok && term.value > PICKUP_CLAIM_TERMINAL_RATE_LIMIT
+  if (term.ok) return term.value > PICKUP_CLAIM_TERMINAL_RATE_LIMIT
+  return memoryExceeded(terminalBucket(terminalId), PICKUP_CLAIM_TERMINAL_RATE_LIMIT)
 }

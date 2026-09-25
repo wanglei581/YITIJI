@@ -34,18 +34,15 @@
  *      而不是打一枪就能长期瘫痪。
  *    残留风险与后续选项（现场工作人员绕行通道）记在 PR 正文，本轮不做。
  *
- * ── Redis 不可用时：放行（fail-open），并且这是刻意的 ────────────────────
- * `common/redis/redis-degradation.ts` 的 `REDIS_DEGRADED_IMPACT` 里
- * `'terminal-agent-print': 'unaffected'` 是一条**被门禁实际发请求核对**的声明
- * （`verify:redis-degradation-truth`）。若本模块在 Redis 挂掉时改为拒绝认领，
- * 那条声明立刻变成假话，且所有人都取不到已付费的文件 —— 拿可用性换一个
- * 本就有 20 次/分钟兜底的纵深防线，不划算。
- * 代价是：Redis 故障期间 K 回到 201,600 的量级。这一点在 PR 正文里明确标注为
- * 残留风险；要消除它就得把计数落库（另开任务，会引入 schema 变更与写放大）。
+ * ── Redis 不可用时：进程内有界兜底，限额不变 ────────────────────────────
+ * 不再无条件放行。计数和锁定落到本进程内存（容量有上限、自动过期）。
+ * 没超过阈值的真实取件仍然成功，所以正常取件不依赖 Redis 存活；
+ * 超过阈值的尝试照样被拒绝。Redis 恢复后仍只认 Redis，不读这份内存。
  */
 import { Logger } from '@nestjs/common'
 import { tryRedis } from '../common/redis/redis-degradation'
 import type { RedisService } from '../common/redis/redis.service'
+import { memoryDelete, memoryHas, memoryIncrement, memorySet } from './pickup-claim-memory'
 
 /** 失败计数滑动窗口（秒）。 */
 export const PICKUP_LOCKOUT_WINDOW_SECONDS = 10 * 60
@@ -64,11 +61,12 @@ const lockKey = (terminalId: string): string => `pickup:claim:lock:${terminalId}
 /**
  * 该终端当前是否处于锁定中。
  *
- * Redis 不可用一律返回 false（放行）—— 见文件头「fail-open」说明。
+ * Redis 正常时只看 Redis。Redis 不可用时看进程内锁定标记。
  */
 export async function isPickupClaimLocked(redis: RedisService, terminalId: string): Promise<boolean> {
   const attempt = await tryRedis('pickup-claim-lock-get', () => redis.get(lockKey(terminalId)), logger)
-  return attempt.ok && attempt.value !== null
+  if (attempt.ok) return attempt.value !== null
+  return memoryHas(lockKey(terminalId))
 }
 
 /**
@@ -84,18 +82,24 @@ export async function recordPickupClaimFailure(redis: RedisService, terminalId: 
     () => redis.incrWithTtl(failureKey(terminalId), PICKUP_LOCKOUT_WINDOW_SECONDS),
     logger,
   )
-  if (!attempt.ok) return false
-  if (attempt.value < PICKUP_LOCKOUT_FAILURE_THRESHOLD) return false
+  const failures = attempt.ok
+    ? attempt.value
+    : memoryIncrement(failureKey(terminalId), PICKUP_LOCKOUT_WINDOW_SECONDS)
+  if (failures !== null && failures < PICKUP_LOCKOUT_FAILURE_THRESHOLD) return false
 
-  await tryRedis(
-    'pickup-claim-lock-set',
-    () => redis.setEx(lockKey(terminalId), PICKUP_LOCKOUT_SECONDS, String(Date.now())),
-    logger,
-  )
+  if (attempt.ok) {
+    await tryRedis(
+      'pickup-claim-lock-set',
+      () => redis.setEx(lockKey(terminalId), PICKUP_LOCKOUT_SECONDS, String(Date.now())),
+      logger,
+    )
+  } else {
+    memorySet(lockKey(terminalId), PICKUP_LOCKOUT_SECONDS)
+  }
   // 运营可见性：锁定是运维事件，必须能在服务端日志里看到是哪台机器、攒了多少次。
   logger.warn(
     `取件码认领失败次数达阈值，终端已锁定 ${PICKUP_LOCKOUT_SECONDS}s：` +
-      `terminalId=${terminalId} failures=${attempt.value} window=${PICKUP_LOCKOUT_WINDOW_SECONDS}s`,
+      `terminalId=${terminalId} failures=${failures ?? 'memory-full'} window=${PICKUP_LOCKOUT_WINDOW_SECONDS}s`,
   )
   return true
 }
@@ -107,5 +111,6 @@ export async function recordPickupClaimFailure(redis: RedisService, terminalId: 
  * 没有它，繁忙机器上零散的手误会日积月累撞上阈值。
  */
 export async function clearPickupClaimFailures(redis: RedisService, terminalId: string): Promise<void> {
-  await tryRedis('pickup-claim-fail-clear', () => redis.del(failureKey(terminalId)), logger)
+  const attempt = await tryRedis('pickup-claim-fail-clear', () => redis.del(failureKey(terminalId)), logger)
+  if (!attempt.ok) memoryDelete(failureKey(terminalId))
 }
