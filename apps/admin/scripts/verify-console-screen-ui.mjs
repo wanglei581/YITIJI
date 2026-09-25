@@ -234,9 +234,14 @@ check(
 )
 // 孪生面板同样把来源说明做成必填：TwinPanel 与 TwinMetricPanel 的 source 都没有问号。
 const twinPanelSrc = read('packages/ui/src/screen/twin/TwinPanel.tsx')
+// 只在各自的接口体里找（接口体不含花括号）：跨接口匹配会让其中一个改成可选时照样通过
+const interfaceBody = (source, head) => {
+  const at = source.indexOf(head)
+  return at < 0 ? '' : source.slice(at, source.indexOf('}', at))
+}
 check(
-  /export interface TwinPanelProps \{[\s\S]*?^\s{2}source: ReactNode$/m.test(twinPanelSrc)
-    && /export interface TwinMetricPanelProps<T> extends Omit<TwinPanelProps, 'children' \| 'source'> \{[\s\S]*?^\s{2}source: ReactNode$/m.test(twinPanelSrc),
+  /^\s{2}source: ReactNode$/m.test(interfaceBody(twinPanelSrc, 'export interface TwinPanelProps {'))
+    && /^\s{2}source: ReactNode$/m.test(interfaceBody(twinPanelSrc, "export interface TwinMetricPanelProps<T> extends Omit<TwinPanelProps, 'children' | 'source'> {")),
   'TwinPanel / TwinMetricPanel 的 source 是必填 prop（类型层面保证每块面板都有来源说明）',
 )
 for (const file of screenFiles.filter((f) => /<Twin(Metric)?Panel\b/.test(f.source))) {
