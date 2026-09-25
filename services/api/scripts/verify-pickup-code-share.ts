@@ -523,6 +523,52 @@ async function main(): Promise<void> {
     resetRedisCooldownForTests()
     pass('Redis 不可用时按进程内兜底严格限流和锁定')
 
+    redis.failing = false
+    redis.reset()
+    resetPickupClaimMemoryFallbackForTests()
+    resetRedisCooldownForTests()
+    const sweepPackage = await packages.create(userId, {
+      terminalId,
+      files: [{ fileId }],
+      params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+    }, randomUUID())
+    await orderStatus.markPaid(sweepPackage.orderId, { paymentSource: 'offline', operatorId: 'verify-f02' })
+    const sweepReleased = await pickup.claim(sweepPackage.pickupCode!, terminalId, 'pkg-sweep')
+    if (!sweepReleased.released || !sweepReleased.taskId) fail('材料包付款后认领必须释放任务')
+    const sweepTask = await prisma.printTask.findUniqueOrThrow({ where: { id: sweepReleased.taskId } })
+    if (sweepTask.status !== 'pending') fail(`释放后的材料包任务必须仍是 pending，实际 ${sweepTask.status}`)
+    const releasedPackage = await prisma.order.findUniqueOrThrow({ where: { id: sweepPackage.orderId } })
+    if (releasedPackage.pickupStatus !== 'used' || releasedPackage.printTaskId !== sweepReleased.taskId || releasedPackage.taskStatus !== 'pending') {
+      fail('release 必须同时写下主单 printTaskId 与 pickupStatus=used')
+    }
+    await prisma.order.update({
+      where: { id: sweepPackage.orderId },
+      data: { paidAt: new Date('2000-01-01T00:00:00.000Z') },
+    })
+    const sweepSnapshot = await prisma.order.findUniqueOrThrow({ where: { id: sweepPackage.orderId } })
+    await sweep.sweep({ now: new Date(), limit: 50 })
+    const sweepAfter = await prisma.order.findUniqueOrThrow({ where: { id: sweepPackage.orderId } })
+    const sweepRefunds = await prisma.refund.count({ where: { orderId: sweepPackage.orderId } })
+    const sweepAudit = await prisma.auditLog.findFirst({
+      where: {
+        targetId: sweepPackage.orderId,
+        action: { in: ['order.pickup_expired_auto_refund', 'order.pickup_expired_auto_refund_skipped'] },
+      },
+    })
+    if (
+      sweepRefunds !== 0
+      || sweepAudit
+      || sweepAfter.payStatus !== 'paid'
+      || sweepAfter.refundedAmountCents !== sweepSnapshot.refundedAmountCents
+      || sweepAfter.pickupStatus !== 'used'
+      || sweepAfter.printTaskId !== sweepSnapshot.printTaskId
+      || sweepAfter.taskStatus !== 'pending'
+      || sweepAfter.amountCents !== sweepSnapshot.amountCents
+    ) {
+      fail(`已释放且任务仍 pending 的材料包不得被到期清扫退款。pay=${sweepAfter.payStatus} pickup=${sweepAfter.pickupStatus} refunds=${sweepRefunds} audit=${sweepAudit?.action ?? 'none'}`)
+    }
+    pass('材料包已 release 且任务仍 pending 时，到期清扫不退款、订单不变')
+
     const now = new Date()
     const eightDaysAgo = new Date(now.getTime() - 8 * DAY)
     const sixDaysAgo = new Date(now.getTime() - 6 * DAY)
