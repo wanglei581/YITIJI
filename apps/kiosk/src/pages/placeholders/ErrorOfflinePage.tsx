@@ -140,6 +140,8 @@ export default function ErrorOfflinePage() {
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState<CheckResult | null>(null)
   const checkingRef = useRef(false)
+  // 检测是异步的：用户在检测途中点了「返回首页 / 帮助与求助」离开本页后，迟到的结果不得再改状态或把人拽走。
+  const mountedRef = useRef(true)
   const safeFrom = useMemo(() => {
     const candidate = (location.state as { from?: unknown } | null)?.from
     return typeof candidate === 'string' && candidate !== '/error-offline' && isSafeInternalPath(candidate)
@@ -169,6 +171,7 @@ export default function ErrorOfflinePage() {
     }
     const printer = reachable ? await readPrinterStatus() : null
     checkingRef.current = false
+    if (!mountedRef.current) return
     // 连得上：有来源页就回去（稿：一连上就把你送回刚才那一页）；没有来源页时，打印机也读到可用才回首页。
     if (reachable && (safeFrom !== null || printer?.ready)) {
       navigate(returnTo, { replace: true })
@@ -177,6 +180,13 @@ export default function ErrorOfflinePage() {
     setResult({ at: new Date(), reachable, printer })
     setChecking(false)
   }, [navigate, returnTo, safeFrom])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     const handleOnline = () => void retry()
