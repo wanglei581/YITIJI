@@ -136,6 +136,25 @@ test.describe('partner screen geometry', () => {
     expect(inAlerts).toEqual([])
   })
 
+  test('展示档每块面板都放得进自己的块位（三个页签）', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    await serveHappy(page)
+    const overflow: string[] = []
+    for (const c of CASES) {
+      await open(page, `/screen/${c.key}?display=1`)
+      await expect(c.marker(page)).toBeVisible()
+      await settle(page)
+      const report = await geometry(page, 13)
+      expect(report.stageScale, '舞台 1:1 才量得准块位').toBe(1)
+      overflow.push(...report.slotOverflow.map((item) => `${c.key}：${item}`))
+    }
+    // 产品缺陷（已上报，未修）：1920×1080 舞台的块位是定高的，面板内容比块位高时面板直接长出块位
+    // （实测：本机构终端告警 +10px、热门内容 +4px，都还在栏间距里，没压到别的块）。
+    // 前置断言照常把关；全部修好后本条会「意外通过」而转红，届时删掉这一行。
+    test.fail(true, '展示档定高块位装不下面板内容（packages/ui twin-screen-layout.css 定高块位 + 面板不收缩）')
+    expect(overflow).toEqual([])
+  })
+
   test('点位牌子：聚焦前、逐个点位聚焦后，看得见的牌子两两不重叠', async ({ page }, testInfo) => {
     const wall = testInfo.project.name.includes('wall')
     const display = wall ? '&display=1' : ''

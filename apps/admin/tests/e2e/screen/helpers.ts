@@ -35,6 +35,32 @@ export interface CallLog {
 const prepared = new WeakSet<BrowserContext>()
 const pageErrors = new WeakMap<BrowserContext, string[]>()
 
+/**
+ * 跨平台字体归一（只在测试里）。
+ *
+ * 大屏数字用 Bahnschrift（Windows）/ DIN Alternate（macOS），正文与标题的中文字体是雅黑 / 苹方 / 宋体；
+ * CI 的 Linux runner 一个都没有，拉丁字母与数字会回退到 DejaVu 一类的宽字体，定高块位里的
+ * 一行数字就可能折行、把面板撑出块位 —— 那量的是 CI 的字体，不是产品。
+ * 这里给样式表里排在最前的几个字体名挂上「本机与 CI 都有、彼此度量兼容」的替身
+ * （Arial ≡ Liberation Sans，Times New Roman ≡ Liberation Serif），且只接管拉丁字母、数字与标点；
+ * 汉字照旧落到各平台自己的中文字体（中文一字一格，宽度不随字体变）。
+ * 于是本机与 CI 量到的是同一套宽度，几何断言在两边说的是同一件事。
+ */
+const LATIN = 'U+0000-02FF, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF'
+const SANS_REGULAR = "local('Arial'), local('ArialMT'), local('Liberation Sans'), local('LiberationSans')"
+const SANS_BOLD = "local('Arial Bold'), local('Arial-BoldMT'), local('Liberation Sans Bold'), local('LiberationSans-Bold')"
+const SERIF_REGULAR = "local('Times New Roman'), local('TimesNewRomanPSMT'), local('Liberation Serif'), local('LiberationSerif')"
+const SERIF_BOLD = "local('Times New Roman Bold'), local('TimesNewRomanPS-BoldMT'), local('Liberation Serif Bold'), local('LiberationSerif-Bold')"
+export const FONT_NORMALIZE_CSS = [
+  ['Bahnschrift', SANS_REGULAR, SANS_BOLD, ''],
+  ['Noto Sans SC', SANS_REGULAR, SANS_BOLD, `unicode-range: ${LATIN};`],
+  ['Noto Serif SC', SERIF_REGULAR, SERIF_BOLD, `unicode-range: ${LATIN};`],
+]
+  .map(([family, regular, bold, range]) =>
+    `@font-face { font-family: '${family}'; font-weight: 100 500; src: ${regular}; ${range} }\n`
+    + `@font-face { font-family: '${family}'; font-weight: 600 900; src: ${bold}; ${range} }`)
+  .join('\n')
+
 /** 鉴权与侧栏用到的旁路接口；页面未捕获异常按 context 收集，每条用例结束时断言为空。 */
 async function prepareContext(context: BrowserContext): Promise<void> {
   if (prepared.has(context)) return
@@ -51,6 +77,17 @@ async function prepareContext(context: BrowserContext): Promise<void> {
       /* ignore */
     }
   }, MOCK_ADMIN_AUTH)
+  await context.addInitScript((css) => {
+    const inject = () => {
+      if (document.getElementById('e2e-font-normalize')) return
+      const style = document.createElement('style')
+      style.id = 'e2e-font-normalize'
+      style.textContent = css
+      ;(document.head ?? document.documentElement).appendChild(style)
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject)
+    else inject()
+  }, FONT_NORMALIZE_CSS)
   // http 构建里布局的 boot 鉴权会真的打 /auth/me；不 stub 就一路 clearAuth → 跳 /login。
   await context.route('**/auth/me', (route) =>
     route.fulfill({

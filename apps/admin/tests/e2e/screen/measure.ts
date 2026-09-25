@@ -111,6 +111,8 @@ export interface GeometryReport {
   panels: string[]
   cards: number
   outsideViewport: string[]
+  /** 舞台档：块位里的内容超出块位自己的矩形（定高块位被撑高 / 撑宽）。桌面档块位随内容长高，恒为空。 */
+  slotOverflow: string[]
   overlaps: string[]
   nested: string[]
   textEscapes: string[]
@@ -158,6 +160,24 @@ export async function geometry(page: Page, floor: number): Promise<GeometryRepor
     const panels = [...document.querySelectorAll('.twin-panel')].filter(rendered) as HTMLElement[]
     const cards = [...document.querySelectorAll('.ops-card')].filter(rendered) as HTMLElement[]
     const slots = [...document.querySelectorAll('.twin-slot')].filter(rendered) as HTMLElement[]
+
+    const slotOverflow: string[] = []
+    if (root?.getAttribute('data-ops-screen') === 'wall') {
+      for (const slot of slots) {
+        const s = slot.getBoundingClientRect()
+        let bottom = s.bottom
+        let right = s.right
+        for (const child of slot.children) {
+          const r = child.getBoundingClientRect()
+          bottom = Math.max(bottom, r.bottom)
+          right = Math.max(right, r.right)
+        }
+        const dy = Math.round(bottom - s.bottom)
+        const dx = Math.round(right - s.right)
+        if (dy > 1) slotOverflow.push(`${name(slot)} 下沿超出块位 ${dy}px`)
+        if (dx > 1) slotOverflow.push(`${name(slot)} 右沿超出块位 ${dx}px`)
+      }
+    }
 
     const outsideViewport: string[] = []
     for (const el of [...panels, ...cards, ...slots]) {
@@ -333,6 +353,7 @@ export async function geometry(page: Page, floor: number): Promise<GeometryRepor
       panels: panels.map((p) => name(p)),
       cards: cards.length,
       outsideViewport,
+      slotOverflow,
       overlaps,
       nested,
       textEscapes,
