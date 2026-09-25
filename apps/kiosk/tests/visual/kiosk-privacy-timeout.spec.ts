@@ -1566,20 +1566,26 @@ test('an unreachable revoke clears the device instantly and keeps retrying @priv
 // 交给下一位。** 判据必须是「那一步有没有发生」，不是「屏幕上写了什么」——
 // 清场的最后一步是整页重载 / 进屏保，它跑掉了就等于机器已经交出去了。
 
+/**
+ * 闸那一发 DELETE 可以拿到的回答。'cancel-conflict' 是 409 SCAN_TASK_CANCEL_CONFLICT：
+ * 服务端 cancel() 在 CAS 之前判到终态、或者 CAS 撞车之后重读时都回它（两处同一个码）。
+ */
+type GatedRevokeAnswer = 'cancelled' | 'server-error' | 'cancel-conflict'
+
 /** 一个可以由用例决定什么时候回话、回什么的撤销端点。 */
 function gatedRevokeEndpoint(page: Page): Promise<{
   received: (nth: number) => Promise<void>
-  release: (nth: number, result: 'cancelled' | 'server-error') => void
+  release: (nth: number, result: GatedRevokeAnswer) => void
   attempts: () => number
 }> {
   const receivedResolvers: Array<() => void> = []
   const receivedPromises: Array<Promise<void>> = []
-  const releaseResolvers: Array<(result: 'cancelled' | 'server-error') => void> = []
-  const releasePromises: Array<Promise<'cancelled' | 'server-error'>> = []
+  const releaseResolvers: Array<(result: GatedRevokeAnswer) => void> = []
+  const releasePromises: Array<Promise<GatedRevokeAnswer>> = []
   const slot = (nth: number) => {
     while (receivedPromises.length <= nth) {
       receivedPromises.push(new Promise<void>((resolve) => { receivedResolvers.push(resolve) }))
-      releasePromises.push(new Promise<'cancelled' | 'server-error'>((resolve) => { releaseResolvers.push(resolve) }))
+      releasePromises.push(new Promise<GatedRevokeAnswer>((resolve) => { releaseResolvers.push(resolve) }))
     }
   }
   slot(4)
@@ -1598,6 +1604,17 @@ function gatedRevokeEndpoint(page: Page): Promise<{
       })
       return
     }
+    if (verdict === 'cancel-conflict') {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error: { code: 'SCAN_TASK_CANCEL_CONFLICT', message: '任务状态已变化，取消失败，请刷新重试' },
+        }),
+      })
+      return
+    }
     // 502：服务端**没有给出结论**。它和「已完成，撤不了」不是一回事 ——
     // 后者是确定的终态（撤得掉 / 领不走），前者什么都证明不了。
     await route.fulfill({
@@ -1607,7 +1624,7 @@ function gatedRevokeEndpoint(page: Page): Promise<{
     })
   }).then(() => ({
     received: (nth: number) => { slot(nth + 1); return receivedPromises[nth] },
-    release: (nth: number, result: 'cancelled' | 'server-error') => { slot(nth + 1); releaseResolvers[nth]?.(result) },
+    release: (nth: number, result: GatedRevokeAnswer) => { slot(nth + 1); releaseResolvers[nth]?.(result) },
     attempts: () => attempts,
   }))
 }
@@ -1680,6 +1697,65 @@ test('a cancel that never confirms keeps the kiosk locked and honest @privacy-ki
   await expect(clearing).toBeVisible()
   // 遮罩之外什么都不渲染：下一位看不到、也碰不到上一位的任何东西。
   await expect(page.locator('[data-w2-page], [data-kiosk-page]')).toHaveCount(0)
+})
+
+/* 409 SCAN_TASK_CANCEL_CONFLICT：只凭这一句不许换人，而且只许再问一次（2026-09-26）。
+ *
+ * cancel() 在 CAS 撞车之后也回这个码，那一刻任务可能正是 matched —— 一次投递刚开始，文件正往
+ * 上一位的任务里写，那份纸可能正是下一位在面板上扫的。再问一次就分得清：对 matched 再发一次，
+ * 要么撤掉它（200），要么输给已完成（400）或终态（409）。真是终态的任务每次都回 409 ——
+ * 所以闸必须等第二次的回答，而第二次之后就收口，不许把机器按到自然过期。 */
+test('a cancel conflict makes the cleanup gate ask once more and hand over only after that answer @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  const revoke = await gatedRevokeEndpoint(page)
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page)
+  // 孤儿 /session-timeout：guard 立刻 hardClear，撤销交给收尾闸。
+  await page.goto('/session-timeout')
+  await revoke.received(0)
+  revoke.release(0, 'cancel-conflict')
+
+  // 第二问来了，而机器还没交出去：遮罩按着，页面还在原路由。
+  await expect.poll(() => revoke.attempts(), {
+    timeout: 10_000,
+    message: '第一次 409 之后必须再问一次，而不是凭这一句换人',
+  }).toBe(2)
+  const clearing = page.getByTestId('session-guard-state-clearing')
+  await expect(clearing).toHaveAttribute('data-cleanup', 'holding')
+  expect(new URL(page.url()).pathname).toBe('/session-timeout')
+  // 第一次 409 不是「服务端没给结论」：闸在同一次尝试里接着问，屏上不许报一句失败。
+  // （交给退避循环的写法会先发布 server-error，这一屏就会说「服务端暂时没有给出结论」。）
+  await expect(page.getByTestId('session-guard-cleanup-status')).toContainText('正在向服务端确认')
+
+  // 第二次拿到 200（那次投递被撤掉了）：这一刻才交出机器。
+  revoke.release(1, 'cancelled')
+  await page.waitForURL((url) => url.pathname === '/', { timeout: 15_000 })
+  expect(revoke.attempts()).toBe(2)
+  expect(pageErrors).toEqual([])
+})
+
+test('a repeated cancel conflict ends the cleanup after exactly two DELETEs instead of holding the kiosk @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  const revoke = await gatedRevokeEndpoint(page)
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page)
+  await page.goto('/session-timeout')
+  await revoke.received(0)
+  revoke.release(0, 'cancel-conflict')
+  await expect.poll(() => revoke.attempts(), { timeout: 10_000 }).toBe(2)
+  revoke.release(1, 'cancel-conflict')
+
+  // 第二次 409 = failed / cancelled / expired：确定的收口，立刻交出机器。
+  // 多问一次（或交给退避循环）的话，第三发会一直挂在这里，页面永远停在清场屏上。
+  await expect.poll(() => new URL(page.url()).pathname, {
+    timeout: 15_000,
+    message: '两次 409 之后必须收口换人，不许把机器按到自然过期',
+  }).toBe('/')
+  expect(revoke.attempts()).toBe(2)
 })
 
 test('a delivery ack that lands mid-clear still ends with a confirmed cancel @privacy-kiosk', async ({ page, api }) => {
@@ -1791,41 +1867,40 @@ async function holdNextMainFrameNavigation(page: Page): Promise<{ arrived: () =>
  * 会按 'ack-compensation' 补一发 DELETE。等待页忙碌时隐私硬截止照样会到（忙碌只顺延
  * VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC），所以这个顺序在真机上是可达的。
  *
- * 期望按服务端对闸那一发 DELETE 的回答分开，全部来自 scan-tasks.service.ts 的 cancel()：
- *   · 200（刚 CAS 成 cancelled）/ 404（根本没有）/ 400 ALREADY_COMPLETED（两处都只在
- *     status === 'completed' 时抛）—— 任务已经结束或不存在，只许有闸那一发；
- *   · 409 CANCEL_CONFLICT —— 证明不了：CAS 撞车那一支里任务可能正是 matched（一次投递
- *     刚开始），cancel() 放行 matched，再来一发仍能把那次投递撤掉。补偿必须照发。 */
+ * 闸拿到的每一种确定回答都证明任务已经结束或根本没有（scan-tasks.service.ts 的 cancel()）：
+ *   · 200（刚 CAS 成 cancelled）/ 404（根本没有）/ 400 ALREADY_COMPLETED（只在 completed 时抛）；
+ *   · 409 CANCEL_CONFLICT 要问两次：第一次分不清终态与「撞上一次刚开始的投递」，闸会立刻再问；
+ *     第二次还是 409 就只剩 failed / cancelled / expired。所以这一格闸自己发两发。
+ * 期望统一：迟到的确认**不许再补一发** —— 页面上的 DELETE 总数就是闸自己那几发。 */
 const GATE_CANCEL_ANSWERS = [
   {
     key: 'cancelled (200)',
     status: 200,
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
-    expectedDeletes: 1,
+    gateDeletes: 1,
   },
   {
     key: 'not found (404)',
     status: 404,
     json: { success: false, error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } },
-    expectedDeletes: 1,
+    gateDeletes: 1,
   },
   {
     key: 'already completed (400)',
     status: 400,
     json: { success: false, error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' } },
-    expectedDeletes: 1,
+    gateDeletes: 1,
   },
   {
-    key: 'cancel conflict (409)',
+    key: 'a repeated cancel conflict (409, 409)',
     status: 409,
     json: { success: false, error: { code: 'SCAN_TASK_CANCEL_CONFLICT', message: '任务状态已变化，取消失败，请刷新重试' } },
-    expectedDeletes: 2,
+    gateDeletes: 2,
   },
 ] as const
 
 for (const answer of GATE_CANCEL_ANSWERS) {
-  const expectation = answer.expectedDeletes === 1 ? 'sends no second DELETE' : 'still sends its compensation DELETE'
-  test(`a delivery ack landing after the cleanup gate got ${answer.key} ${expectation} @privacy-kiosk`, async ({ page, api }) => {
+  test(`a delivery ack landing after the cleanup gate got ${answer.key} adds no DELETE of its own @privacy-kiosk`, async ({ page, api }) => {
     registerKioskShell(api)
     api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, { status: answer.status, json: answer.json })
     await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
@@ -1878,16 +1953,16 @@ for (const answer of GATE_CANCEL_ANSWERS) {
       timeout: 15_000,
       message: '隐私硬截止要把忙碌的等待页清场，并在闸拿到回答之后发出重载',
     }).toBe(true)
-    await expect.poll(async () => (await readProbe())?.deletes ?? 0, { message: '到这一刻只有闸那一发' }).toBe(1)
+    await expect.poll(async () => (await readProbe())?.deletes ?? 0, {
+      message: `到这一刻只有闸自己那 ${answer.gateDeletes} 发`,
+    }).toBe(answer.gateDeletes)
 
     releaseAck()
     const settled = await waitForAckConsumed(readProbe)
     expect(
       settled.deletes,
-      answer.expectedDeletes === 1
-        ? '闸已经拿到「任务已结束 / 不存在」的回答：迟到的确认不许再补一发 DELETE'
-        : '409 证明不了任务已经结束：迟到确认的那一发补偿必须照发',
-    ).toBe(answer.expectedDeletes)
+      '闸已经拿到「任务已结束 / 不存在」的确定回答：迟到的确认不许再补一发 DELETE',
+    ).toBe(answer.gateDeletes)
     handover.release()
   })
 }
