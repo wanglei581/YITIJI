@@ -23,6 +23,7 @@ export interface FleetTerminalRow {
   terminalCode: string
   displayName: string | null
   areaLabel: string | null
+  locationLabel: string | null
   geoLat: number | null
   geoLng: number | null
   heartbeats: Array<{ createdAt: Date; printerStatus: string | null }>
@@ -123,6 +124,7 @@ export async function attachFleetCells(
       terminalCode: row.terminalCode,
       displayName: row.displayName,
       areaLabel: row.areaLabel,
+      locationLabel: row.locationLabel,
       geo: screenGeo(row.geoLat, row.geoLng),
       activity: fleetActivity({
         fresh,

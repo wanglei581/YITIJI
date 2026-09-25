@@ -62,6 +62,7 @@ import {
 } from '../src/console-screen/console-screen.queries'
 import { PartnerOrgRequiredError, requirePartnerOrgId } from '../src/console-screen/console-screen.org'
 import { offlineAlertTitle } from '../src/console-screen/console-screen.fleet'
+import { suppressTerminalTodayCount } from '../src/console-screen/console-screen.twin'
 import { CHINA_LAT_MIN, CHINA_LNG_MAX, terminalPlacementPatch } from '../src/terminals/terminal-placement'
 import {
   TIMELINE_HEARTBEAT_ROW_CAP,
@@ -338,11 +339,11 @@ function assertSourceContract(): void {
       && /PartnerOrgRequiredError/.test(service),
   )
   assert(
-    '1q. gov 不加载 derived alerts；ops 才打 admin:alerts',
-    /includeAlerts = profile === 'ops'/.test(service)
-      && /'admin:alerts'/.test(service)
-      && /loadAdminRealtimeCore/.test(service)
-      && /listDerivedAlerts/.test(service),
+    '1q. gov 与 ops 共用 admin:alerts 实时档，不按 profile 分叉',
+    /getOrLoad\(\s*'admin:alerts'\s*,\s*SCREEN_CACHE_TTL_SECONDS\.realtime\s*,\s*\(\)\s*=>\s*this\.loadAdminAlerts\(\)\s*\)/.test(service)
+      && /listDerivedAlerts/.test(service)
+      && !/includeAlerts/.test(service)
+      && !/profile === 'ops'/.test(service),
   )
   const cacheSrc = readSrc('src/console-screen/console-screen.cache.ts')
   const moduleSrc = readSrc('src/console-screen/console-screen.module.ts')
@@ -569,15 +570,26 @@ async function assertPureHelpers(): Promise<void> {
     allSmall.belowThreshold && allSmall.items.length === 0,
   )
   assert(
-    '2c. gov/ops/partner 指标键集合互不相同且含未接入槽位',
+    '2c. gov 现为 12 项且含任务流与告警，ops 仍不含 visitCount',
     metricKeysFor('admin', 'gov').includes('visitCount')
-      && !metricKeysFor('admin', 'gov').includes('alertsRealtime')
+      && metricKeysFor('admin', 'gov').includes('taskFlow24h')
+      && metricKeysFor('admin', 'gov').includes('alertsRealtime')
+      && metricKeysFor('admin', 'gov').length === 12
+      && ADMIN_GOV_METRIC_KEYS.length === 12
       && metricKeysFor('admin', 'ops').includes('alertsRealtime')
+      && metricKeysFor('admin', 'ops').includes('taskFlow24h')
       && !metricKeysFor('admin', 'ops').includes('visitCount')
+      && metricKeysFor('admin', 'gov').join() !== metricKeysFor('admin', 'ops').join()
       && metricKeysFor('partner').includes('sourceEntryOpensTop')
-      && ADMIN_GOV_METRIC_KEYS.length === 10
       && ADMIN_OPS_METRIC_KEYS.length === 12
       && PARTNER_METRIC_KEYS.length > 10,
+  )
+  assert(
+    '2u. 终端当日计数：0 保留，1 与 4 为 null，5 给出',
+    suppressTerminalTodayCount(0) === 0
+      && suppressTerminalTodayCount(1) === null
+      && suppressTerminalTodayCount(4) === null
+      && suppressTerminalTodayCount(5) === 5,
   )
 
   let now = 1_000
@@ -1100,13 +1112,32 @@ async function assertServiceContract(): Promise<void> {
     })
 
     const gov = await screen.getAdminSnapshot('gov')
-    assert('3a2. gov 不调用 listDerivedAlerts', alertCalls === 0, `alertCalls=${alertCalls}`)
+    assert(
+      '3a2. gov 走同一份 derived alerts 与 24h 任务流',
+      alertCalls === 1
+        && gov.metrics.alertsRealtime?.available === true
+        && gov.metrics.alertsRealtime.source === 'derived-alerts'
+        && gov.metrics.alertsRealtime.window === 'current'
+        && gov.metrics.taskFlow24h?.available === true
+        && gov.metrics.taskFlow24h.source === 'PrintTask/ScanTask.groupBy(status)'
+        && gov.metrics.taskFlow24h.window === '24h',
+      `alertCalls=${alertCalls} alerts=${JSON.stringify(gov.metrics.alertsRealtime)?.slice(0, 180)} flow=${JSON.stringify(gov.metrics.taskFlow24h)?.slice(0, 180)}`,
+    )
     const ops = await screen.getAdminSnapshot('ops')
-    assert('3a3. ops 才加载 derived alerts', alertCalls === 1, `alertCalls=${alertCalls}`)
+    assert(
+      '3a3. ops 命中同一 admin:alerts 缓存，任务流与告警与 gov 相同',
+      alertCalls === 1
+        && JSON.stringify(ops.metrics.alertsRealtime) === JSON.stringify(gov.metrics.alertsRealtime)
+        && JSON.stringify(ops.metrics.taskFlow24h) === JSON.stringify(gov.metrics.taskFlow24h),
+      `alertCalls=${alertCalls}`,
+    )
     const partnerA = await screen.getPartnerSnapshot(orgA)
     const partnerB = await screen.getPartnerSnapshot(orgB)
 
-    assert('3a. gov 含 visitCount 未接入且不含 alerts', Boolean(gov.metrics.visitCount && gov.metrics.visitCount.available === false && !gov.metrics.alertsRealtime))
+    assert(
+      '3a. gov 含 visitCount 未接入，同时含任务流与告警',
+      Boolean(gov.metrics.visitCount && gov.metrics.visitCount.available === false && gov.metrics.alertsRealtime && gov.metrics.taskFlow24h),
+    )
     assert('3b. ops 含 alerts 且不含 visitCount', Boolean(ops.metrics.alertsRealtime && !ops.metrics.visitCount))
     assert(
       '3c. 未接入不用 0 冒充',
@@ -1152,6 +1183,14 @@ async function assertServiceContract(): Promise<void> {
         && cellA.activity === 'printing'
         && cellA.alert === null
         && !JSON.stringify(wallA).includes(termB),
+    )
+    assert(
+      '5a2. 机队格子带服务点位，未设置则为 null',
+      cellA?.locationLabel === '体育中心'
+        && cellB?.locationLabel === null
+        && govCells.find((cell) => cell.terminalId === termA)?.locationLabel === '体育中心'
+        && govCells.find((cell) => cell.terminalId === termB)?.locationLabel === null,
+      `A=${String(cellA?.locationLabel)} B=${String(cellB?.locationLabel)}`,
     )
     assert(
       '5b. Partner B 格子是缺纸告警、活动空闲，未设坐标为 null',
@@ -1432,14 +1471,17 @@ async function assertServiceContract(): Promise<void> {
       return originalListDerivedAlerts(view, limit)
     }) as AdminOpsService['listDerivedAlerts']
     assert(
-      '3v. gov 不因未加载的告警源降级；ops 告警失败才 degraded',
-      govAlertsDown.status === 'ok'
-        && govAlertsDown.degraded === false
-        && !govAlertsDown.metrics.alertsRealtime
+      '3v. 告警源失败时 gov 与 ops 一起 degraded，任务流仍在',
+      govAlertsDown.status === 'degraded'
+        && govAlertsDown.degraded === true
+        && govAlertsDown.metrics.alertsRealtime?.available === false
+        && govAlertsDown.metrics.alertsRealtime.reason === SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
+        && govAlertsDown.metrics.taskFlow24h?.available === true
+        && govAlertsDown.metrics.terminalsOnline?.available === true
         && opsAlertsDown.status === 'degraded'
         && opsAlertsDown.metrics.alertsRealtime?.available === false
-        && opsAlertsDown.metrics.alertsRealtime?.reason === SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
-        && opsAlertsDown.metrics.terminalsOnline?.available === true,
+        && opsAlertsDown.metrics.alertsRealtime.reason === SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
+        && JSON.stringify(govAlertsDown.metrics.alertsRealtime) === JSON.stringify(opsAlertsDown.metrics.alertsRealtime),
       `gov=${govAlertsDown.status} ops=${opsAlertsDown.status}`,
     )
 
@@ -1583,9 +1625,9 @@ async function assertTwinCases(
       && current?.colorMode === 'bw'
       && current?.startedAt === storedTask?.claimedAt?.toISOString()
       && adminTwin.today.printPages === 10
-      && adminTwin.today.printTasks === 2
+      && adminTwin.today.printTasks === null
       && adminTwin.today.scans === 0
-      && adminTwin.today.failed === 1
+      && adminTwin.today.failed === null
       && adminTwin.today.visits.available === false
       && adminTwin.today.visits.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten
       && !('value' in adminTwin.today.visits)
@@ -1611,8 +1653,14 @@ async function assertTwinCases(
   )
   const partnerTwin = await screen.getPartnerTerminalTwin(ids.orgA, ids.termA)
   assert(
-    '5f. 机构 A 可读自己的终端孪生',
-    partnerTwin.audience === 'partner' && partnerTwin.terminal.id === ids.termA && !JSON.stringify(partnerTwin).includes(ids.resumeFileName),
+    '5f. 机构 A 可读自己的终端孪生，当日计数与管理员同一口径',
+    partnerTwin.audience === 'partner'
+      && partnerTwin.terminal.id === ids.termA
+      && partnerTwin.today.printPages === 10
+      && partnerTwin.today.printTasks === null
+      && partnerTwin.today.scans === 0
+      && partnerTwin.today.failed === null
+      && !JSON.stringify(partnerTwin).includes(ids.resumeFileName),
   )
   let foreign: unknown
   let missing: unknown
@@ -1664,11 +1712,11 @@ async function assertTwinCases(
   const busyFleet = await loadPartnerFleet(prisma, new Date(), ids.orgA)
   const busyCell = busyFleet.cells.find((cell) => cell.terminalId === ids.termA)
   assert(
-    '5i. 进行中扫描为 busy，今日扫描 +1，打印状态仍优先',
+    '5i. 进行中扫描为 busy，今日扫描 1 笔不显示，打印状态仍优先',
     busy.scanner.available === true
       && busy.scanner.value.state === 'busy'
       && busy.scanner.value.label === null
-      && busy.today.scans === 1
+      && busy.today.scans === null
       && busy.printer.available === true
       && busy.printer.value.state === 'printing'
       && busyCell?.activity === 'printing',
@@ -1967,6 +2015,67 @@ async function assertTwinCases(
       && cutoffEnd !== undefined
       && cutoffPrinting.every((segment) => segment.to === cutoffDone.toISOString() && segment.to !== cutoffEnd),
     `end=${cutoffEnd ?? 'none'} done=${cutoffDone.toISOString()} printing=${cutoffPrinting.map((segment) => segment.to).join(',') || 'none'}`,
+  )
+
+  const boundId = `term_scrn_bound_${ids.suffix}`
+  const boundAt = new Date()
+  await prisma.terminal.create({
+    data: {
+      id: boundId,
+      terminalCode: `SCRN-BND-${ids.suffix}`,
+      agentToken: `tok_bnd_${ids.suffix}`,
+      deviceFingerprint: `fp_bnd_${ids.suffix}`,
+      orgId: ids.orgA,
+      enabled: true,
+      locationLabel: '边界点位',
+    },
+  })
+  await prisma.printTask.createMany({
+    data: Array.from({ length: 4 }, (_, index) => ({
+      id: `pt_bnd_${ids.suffix}_${index}`,
+      terminalId: boundId,
+      fileUrl: `https://internal/bound-${index}`,
+      fileMd5: `md5bnd${index}${ids.suffix}`,
+      paramsJson: '{}',
+      status: 'completed',
+      createdAt: boundAt,
+    })),
+  })
+  await prisma.printTaskStatusLog.create({
+    data: {
+      taskId: `pt_bnd_${ids.suffix}_0`,
+      fromStatus: 'printing',
+      toStatus: 'failed',
+      createdAt: boundAt,
+    },
+  })
+  await prisma.order.create({
+    data: {
+      orderNo: `SCRN-BND-${ids.suffix}`,
+      type: 'print',
+      terminalId: boundId,
+      amountCents: 10,
+      billablePages: 5,
+      payStatus: 'paid',
+      taskStatus: 'completed',
+      paidAt: boundAt,
+    },
+  })
+  cache.clear()
+  const adminBound = await screen.getAdminTerminalTwin(boundId)
+  const partnerBound = await screen.getPartnerTerminalTwin(ids.orgA, boundId)
+  assert(
+    '5w. 终端当日计数覆盖 0、1、4、5：管理员与机构相同',
+    adminBound.today.scans === 0
+      && adminBound.today.failed === null
+      && adminBound.today.printTasks === null
+      && adminBound.today.printPages === 5
+      && partnerBound.today.scans === adminBound.today.scans
+      && partnerBound.today.failed === adminBound.today.failed
+      && partnerBound.today.printTasks === adminBound.today.printTasks
+      && partnerBound.today.printPages === adminBound.today.printPages
+      && partnerBound.audience === 'partner',
+    `admin=${JSON.stringify(adminBound.today)} partner=${JSON.stringify(partnerBound.today)}`,
   )
 }
 
