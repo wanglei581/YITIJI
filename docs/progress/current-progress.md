@@ -1,5 +1,37 @@
 # 当前开发进度
 
+## 2026-09-26（上午）：候选并入五路（第 10 轮 CI 前），3.13 复核后返工
+
+- **并入候选（本地合并后一次推送）：**
+  - 文档第二轮（同伴窗口，快进 `1097b5822`、`00cf5a8ea`、`8b26f80c6`）：
+    - 合规边界 §1.2 按条文复核改写，新增 `docs/compliance/pilot-compliance-procedures.md`（七项试点制度草案）；
+    - 更正「数字人需关闭」的结论；
+    - 写明 AI 简历导出可以去掉可见标识的条件。
+  - 小程序后端三项（Grok，`claude/miniapp-backend-review-20260926`）：
+    - 简历对照不再产出等级与总评；
+    - 新增 `age_14_plus` 与 `voice_recording` 两个同意范围；
+    - 小青按 `channel=miniapp` 只返回小程序已注册页面。新门禁 `verify:miniapp-review-backend`。
+  - 法务文档新增 `operator_info` 类型（Grok，`claude/legal-operator-info-20260926`）。
+  - 08 法务页、09 系统状态页迁移及复核修复（Claude 子代理）：
+    - 健康检查改走 `API_BASE_URL`；
+    - 自动重试 10→20→40 秒退避，封顶 60 秒；
+    - 离页中止在途请求；
+    - 返回按钮的文案与去向一致。
+  - 依赖安全（Grok，`claude/deps-security-20260926`）：Dependabot 15 条未关告警全部按最低修复版处理，高危 react-router 升到同主版本 7.18.2，无需跨大版本；告警要等进入默认分支后才会自动关闭。
+- **Agy 复核：**
+  - 小程序后端 5 条意见，Claude 逐条对代码核实，均不需返工：
+    - 3 条不成立：两个变量是同一对象；`resume_ai` 在出错文案之前已返回；`/job-fit` 是已注册的简历对照工具页。
+    - 2 条影响很小。
+  - 3.13（`claude/recruitment-hosting-off-20260926`）7 条意见，核实 6 条成立，**暂不并入**，已派 Grok 在原分支返工：
+    - 手填岗位匹配的查看与打印被一刀切 403；
+    - 手动「立即同步」谎报已排队；
+    - 批量发布绕过紧急下架；
+    - 下架入口缺招聘会资料与线下机构；
+    - 熔断只是一次性下架；
+    - 业务开关里有识别测试环境的后门。
+- **第 9 轮 CI（`e5c2c6411`）：** 主门禁、PostgreSQL、Windows 安装包全绿；一体机浏览器冒烟 1 条红（扫描等待页「服务端已取消」后多发一次 DELETE，自第 7 轮以来一体机源码未改，判断为竞态），已派子代理查根因。
+- **没有操作生产。**
+
 ## 2026-09-26：全面文档更新（Claude + Grok + Agy）
 
 按设备与软件供应方 + 托管 a 改写 CLAUDE.md、AGENTS.md、feature-scope（新增 §零 AI 求职操作系统分层、§七 已知缺口）、role-boundary、compliance-boundary（新增 §1.2 法规与资质总表）、docs/README；约 50 份旧方案加文首状态标注；content-ingestion-operator-guide 旧正文（岗位、招聘会发布到一体机）改写为托管 a 下的官方渠道与政策指南，旧文只留在 git 历史。只改文档，不删文件。（分支 `claude/docs-refresh-20260926`，由「项目资金预算评估」窗口完成，主执行窗口快进合入候选。）
