@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException, Optional } from '@nestjs/common'
-import { createHash, randomBytes, timingSafeEqual } from 'crypto'
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import type { AiProvider, AiProviderName, AssistantChatResult, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { isLlmProviderLabel } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
@@ -46,6 +46,11 @@ const AI_RESUME_RESULT_TTL_HOURS = ((): number => {
   const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
   return Number.isFinite(raw) && raw > 0 ? raw : 24
 })()
+
+/** 与 FilesService.upload 自行生成的 FileObject.id 同一格式，渲染前就能写进 ProduceID。 */
+function allocateFileObjectId(): string {
+  return randomUUID().replace(/-/g, '')
+}
 
 // ============================================================
 // AiService — 选择 provider 并统一处理日志
@@ -338,7 +343,7 @@ export class AiService {
         ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
-        status:    resultWithProvider.status === 'failed' ? 'failed' : 'success',
+        status:    resultWithProvider.status === 'failed' ? 'failed' : 'success', endUserId: endUserId ?? null,
         ...(extractionErrorCode ? { errorCode: extractionErrorCode } : {}),
       })
       return accessToken ? { ...resultWithProvider, accessToken } : resultWithProvider
@@ -349,7 +354,7 @@ export class AiService {
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
         status:    'failed',
-        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN', endUserId: endUserId ?? null,
       })
       throw err
     }
@@ -802,6 +807,17 @@ export class AiService {
         },
       })
     }
+    // 有任务号时 ProduceID 用任务号，与简历对照、职业规划打印一致。
+    // 没有任务号时，渲染前先分配文件编号并写入 ProduceID，入库用同一个编号。
+    // PDF / DOCX 各用自己的文件编号；txt/md 本身不写 AIGC，打印用 PDF 副本用它自己的编号。
+    const taskProduceId = charge?.taskId?.trim() ?? ''
+    const needsAllocatedId = !draft && taskProduceId.length === 0
+    const primaryFileId = needsAllocatedId && (format === 'pdf' || format === 'docx')
+      ? allocateFileObjectId()
+      : undefined
+    const printCopyFileId = needsAllocatedId && format !== 'pdf' ? allocateFileObjectId() : undefined
+    const produceId = taskProduceId || primaryFileId || ''
+    const printProduceId = taskProduceId || printCopyFileId || ''
 
     let buffer: Buffer
     let pageCount: number
@@ -809,7 +825,7 @@ export class AiService {
     let ext: string
     switch (format) {
       case 'docx': {
-        const rendered = await this.resumeDocx.render(resume)
+        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : produceId })
         buffer = rendered.buffer
         pageCount = 0
         mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -832,7 +848,12 @@ export class AiService {
       }
       case 'pdf':
       default: {
-        const rendered = await this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })
+        const rendered = await this.resumePdf.render(resume, {
+          layout,
+          templatePreset: template?.resumeLayoutPreset,
+          draft,
+          contentId: draft ? null : produceId,
+        })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
         mimeType = 'application/pdf'
@@ -857,6 +878,7 @@ export class AiService {
       assetCategory: 'optimized',
       sourceFileId,
       createdBy: 'ai_resume_generate',
+      ...(primaryFileId ? { id: primaryFileId } : {}),
       ...(stage ? { paidExportStaging: stage } : {}),
     })
 
@@ -864,7 +886,7 @@ export class AiService {
     // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
     let printFileId = uploaded.fileId
     if (format !== 'pdf') {
-      const pdfRendered = await this.resumePdf.render(resume, { layout, draft })
+      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : printProduceId })
       const pdfUploaded = await this.files.upload({
         buffer: pdfRendered.buffer,
         filename: `${namePrefix}_${safeName}.pdf`,
@@ -875,6 +897,7 @@ export class AiService {
         assetCategory: 'optimized',
         sourceFileId,
         createdBy: 'ai_resume_generate',
+        ...(printCopyFileId ? { id: printCopyFileId } : {}),
         ...(stage ? { paidExportStaging: stage } : {}),
       })
       printFileId = pdfUploaded.fileId
@@ -975,7 +998,7 @@ export class AiService {
     return { deletedCount }
   }
 
-  async chatWithAssistant(input: ChatInput, ownerKey = 'anon'): Promise<AssistantChatResult> {
+  async chatWithAssistant(input: ChatInput, ownerKey = 'anon', endUserId: string | null = null): Promise<AssistantChatResult> {
     const t0 = Date.now()
     // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
     const useLlm = this.llmConfig.isReady('assistant_chat')
@@ -996,7 +1019,7 @@ export class AiService {
         ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
-        status:    'success',
+        status:    'success', endUserId,
       })
       // S0-1 / 风险 R1：把 provider 标签透出，让调用方能分辨「真实模型」与
       // 「mock/stub provider 预置话术」。回落时这里必须如实标 aiGenerated=false，
@@ -1010,7 +1033,7 @@ export class AiService {
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
         status:    'failed',
-        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN', endUserId,
       })
       throw err
     }

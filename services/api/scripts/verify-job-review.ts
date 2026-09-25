@@ -30,6 +30,7 @@ import { JobsKioskService } from '../src/jobs/jobs-kiosk.service'
 import { JobsAdminService } from '../src/jobs/jobs-admin.service'
 import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
 import { JobsExcelService } from '../src/jobs/jobs-excel.service'
+import { RecruitmentEmergencyService } from '../src/recruitment-hosting/recruitment-emergency.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import type { ImportJobItemDto } from '../src/jobs/dto/import-jobs.dto'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -97,6 +98,8 @@ async function main() {
       where: { OR: [{ targetType: 'job', targetId: { in: jobIds } }, { actorId: { in: actorIds } }] },
     })
     await prisma.jobDataQualitySnapshot.deleteMany({ where: { sourceOrgId: { in: orgIds } } })
+    await prisma.partnerOrgNotice.deleteMany({ where: { orgId: { in: orgIds } } }).catch(() => undefined)
+    await prisma.recruitmentEmergencyHold.deleteMany({ where: { orgId: { in: orgIds } } }).catch(() => undefined)
     await prisma.job.deleteMany({ where: { OR: [{ id: { in: jobIds } }, { sourceOrgId: { in: orgIds } }] } })
     await prisma.user.deleteMany({ where: { id: { in: actorIds } } })
     await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
@@ -313,6 +316,43 @@ async function main() {
         fail('10f. reviewStatus 筛选在分页下未生效')
       }
       pass('10f. 分页下 reviewStatus 筛选生效')
+    }
+
+    const emergency = new RecruitmentEmergencyService(prisma, _audit)
+    await emergency.takedown('job', j1, 'illegal_content', '验证紧急下架', user)
+    await expectCode(
+      () => jobs.publishJobSource(j1, 'publish', user),
+      'EMERGENCY_TAKEDOWN_IRREVERSIBLE',
+      '下架后管理员不能恢复',
+    )
+    const notices = await prisma.partnerOrgNotice.findMany({ where: { orgId } })
+    if (notices.length < 1) fail('下架通知未写出')
+    else pass('下架通知写出')
+    await emergency.circuitBreak('org', orgId, 'authority_order', '验证熔断', user)
+    const circuit = await prisma.auditLog.findFirst({ where: { action: 'recruitment.circuit_break', targetId: orgId } })
+    if (!circuit) fail('熔断没有审计')
+    else pass('熔断留痕')
+
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    try {
+      await expectCode(
+        () => jobs.importJobs([item('关闭后导入')], partner),
+        'RECRUITMENT_HOSTING_DISABLED',
+        '托管关闭时招聘类写入停止',
+      )
+      await expectCode(
+        () => jobs.publishJobSource(j1, 'publish', user),
+        'RECRUITMENT_HOSTING_DISABLED',
+        '管理员发布被拒',
+      )
+      const hidden = await jobs.getPublishedJobs({ sourceOrgId: orgId })
+      if (hidden.data.length !== 0) fail('托管关闭时公开岗位列表不是空')
+      else pass('托管关闭时招聘类读返回空')
+      await expectCode(() => jobs.getPublishedJobById(j1), 'RECRUITMENT_HOSTING_DISABLED', '托管关闭时岗位详情拒绝')
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
     }
   } finally {
     await cleanup()

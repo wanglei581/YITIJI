@@ -125,6 +125,13 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
     howTo: '接入方式：在上传完成时另写一条不含文件内容的计数（只记次数、成败与渠道），按天汇总后上屏。',
     transient: false,
   },
+  recruitment_hosting_disabled: {
+    title: '招聘内容托管未开启',
+    detail:
+      '按托管 a 的决定，我们云上不存岗位、招聘会、企业资料，这一项在客户私有化部署（b 版本）里才有数据。',
+    howTo: '在客户私有化部署中开启招聘内容托管后自动出现。',
+    transient: false,
+  },
   inspection_counter_unwritten: {
     title: '未接入',
     detail: '材料检查任务里含隐私命中信息，按规定 24 小时内删除，近 7 天、30 天的检查次数无法从原始记录还原。',

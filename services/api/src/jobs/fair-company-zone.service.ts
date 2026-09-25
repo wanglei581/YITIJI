@@ -3,6 +3,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { mapFairCompany, mapFairZone } from './fair.mapper'
@@ -47,6 +48,7 @@ export class FairCompanyZoneService {
   // ── 参展企业 CRUD ───────────────────────────────────────────────────────────
 
   async createCompany(fairId: string, dto: SaveFairCompanyDto, user: AuthedUser): Promise<FairCompany> {
+    assertRecruitmentContentHostingEnabled()
     await this.assertFairExists(fairId)
     const created = await this.prisma.fairCompany.create({
       data: {
@@ -72,6 +74,7 @@ export class FairCompanyZoneService {
   }
 
   async updateCompany(fairId: string, companyId: string, dto: SaveFairCompanyDto, user: AuthedUser): Promise<FairCompany> {
+    assertRecruitmentContentHostingEnabled()
     await this.assertCompanyInFair(fairId, companyId)
     const updated = await this.prisma.fairCompany.update({
       where: { id: companyId },
@@ -98,6 +101,7 @@ export class FairCompanyZoneService {
   }
 
   async deleteCompany(fairId: string, companyId: string, user: AuthedUser): Promise<{ success: true }> {
+    assertRecruitmentContentHostingEnabled()
     const company = await this.assertCompanyInFair(fairId, companyId)
     await this.prisma.fairCompany.delete({ where: { id: companyId } })
     await this.writeFairAudit(user, 'fair.company.delete', fairId, { companyId, name: company.name })
@@ -113,6 +117,7 @@ export class FairCompanyZoneService {
   }
 
   async createZone(fairId: string, dto: SaveFairZoneDto, user: AuthedUser): Promise<FairZone> {
+    assertRecruitmentContentHostingEnabled()
     await this.assertFairExists(fairId)
     const created = await this.prisma.fairZone.create({
       data: {
@@ -130,6 +135,7 @@ export class FairCompanyZoneService {
   }
 
   async updateZone(fairId: string, zoneId: string, dto: SaveFairZoneDto, user: AuthedUser): Promise<FairZone> {
+    assertRecruitmentContentHostingEnabled()
     await this.assertZoneInFair(fairId, zoneId)
     const updated = await this.prisma.fairZone.update({
       where: { id: zoneId },
@@ -147,6 +153,7 @@ export class FairCompanyZoneService {
   }
 
   async deleteZone(fairId: string, zoneId: string, user: AuthedUser): Promise<{ success: true }> {
+    assertRecruitmentContentHostingEnabled()
     const zone = await this.assertZoneInFair(fairId, zoneId)
     await this.prisma.fairZone.delete({ where: { id: zoneId } })
     await this.writeFairAudit(user, 'fair.zone.delete', fairId, { zoneId, name: zone.name })

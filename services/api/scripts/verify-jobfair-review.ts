@@ -437,6 +437,19 @@ async function main() {
       }
       pass('13d. 第二页 skip/take 生效')
     }
+
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    try {
+      const hidden = await jobs.getPublishedFairs({})
+      if (hidden.data.length !== 0) fail('托管关闭时公开招聘会列表不是空')
+      else pass('托管关闭时招聘会列表返回空')
+      await expectCode(() => jobs.publishFairSource(fairA, 'publish', adminUser), 'RECRUITMENT_HOSTING_DISABLED', '托管关闭时管理员发布招聘会被拒')
+      await expectCode(() => jobs.importFairs({ items: [item('关闭后导入', venueToken)] }, partner), 'RECRUITMENT_HOSTING_DISABLED', '托管关闭时招聘会导入停止')
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

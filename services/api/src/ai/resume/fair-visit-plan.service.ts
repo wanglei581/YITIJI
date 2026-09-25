@@ -168,6 +168,7 @@ export class FairVisitPlanService {
         sourceName: stored.fair.sourceName,
         venue: stored.fair.venue,
         sourceUrl: stored.fair.sourceUrl,
+        contentId: taskId,
       },
       stored.payload,
     )

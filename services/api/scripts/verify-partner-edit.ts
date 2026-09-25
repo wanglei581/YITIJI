@@ -280,6 +280,19 @@ async function main() {
       pass('6. 编辑后的岗位/招聘会从 Kiosk 公开数据撤下(待重审)')
     }
 
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    try {
+      await expectCode(() => svc.updatePartnerJob(jobA.id, { title: '关闭后不得改' }, partnerA), 'RECRUITMENT_HOSTING_DISABLED', '托管关闭时机构改岗位被拒')
+      await expectCode(() => svc.updatePartnerFair(fairA.id, { title: '关闭后不得改' }, partnerA), 'RECRUITMENT_HOSTING_DISABLED', '托管关闭时机构改招聘会被拒')
+      const hidden = await svc.getPartnerJobs(partnerA)
+      if (!Array.isArray(hidden) || hidden.length !== 0) fail('托管关闭时机构岗位列表不是空')
+      else pass('托管关闭时机构岗位列表返回空')
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
+
     // ── 7. 审计 ────────────────────────────────────────────────────────────
     {
       const logs = await prisma.auditLog.findMany({ where: { actorId: partnerA.userId } })

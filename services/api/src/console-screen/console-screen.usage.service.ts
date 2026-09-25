@@ -23,6 +23,7 @@ import { ScreenSnapshotCache } from './console-screen.cache'
 import {
   availableMetric,
   filterSourceEntryOpens,
+  recruitmentHostingLimit,
   shanghaiDayKey,
   snapshotLoadStatus,
   unavailableMetric,
@@ -54,7 +55,9 @@ import {
 export const USAGE_ADMIN_CACHE_ORG = 'platform'
 
 export function usageCacheKey(audience: ScreenAudience, orgId: string, range: ScreenUsageRange): string {
-  return `usage:${audience}:${orgId}:${range}`
+  const base = `usage:${audience}:${orgId}:${range}`
+  if (recruitmentHostingLimit() === 'enabled') return base
+  return `${base}:recruitment-hosting-disabled`
 }
 
 const TIMELINE_SOURCE = 'AiServiceLog+PrintTask+ScanTask+BrowseLog+ExternalJumpLog+Favorite.createdAt'
@@ -128,7 +131,7 @@ export class ConsoleScreenUsageService {
       })),
       visits: visitsMetric(),
       services: this.fromFacts(facts, 'BrowseLog/AiServiceLog/PrintTask/ScanTask', range, (value) => (
-        USAGE_SERVICE_NODES.map((node) => ({
+        visibleUsageServiceNodes().map((node) => ({
           key: node.key,
           lane: node.lane,
           coverage: node.coverage,
@@ -160,13 +163,25 @@ export class ConsoleScreenUsageService {
         exported: suppressSmallCount(value.resumeExported),
       })),
       ai: this.fromFacts(facts, 'AiServiceLog', range, buildAiValue),
-      jobs: this.fromFacts(facts, 'BrowseLog/Favorite/ExternalJumpLog', range, (value) => ({
-        browse: suppressSmallCount(value.browseByType['job'] ?? 0),
-        favorites: suppressSmallCount(value.favoriteByType['job'] ?? 0),
-        sourceOpens: suppressSmallCount(value.jumpByType['job'] ?? 0),
-        coverage: 'members_only' as const,
-      })),
-      topSources30d: topSourcesMetric(jumps),
+      jobs: recruitmentHostingLimit() === 'enabled'
+        ? this.fromFacts(facts, 'BrowseLog/Favorite/ExternalJumpLog', range, (value) => ({
+            browse: suppressSmallCount(value.browseByType['job'] ?? 0),
+            favorites: suppressSmallCount(value.favoriteByType['job'] ?? 0),
+            sourceOpens: suppressSmallCount(value.jumpByType['job'] ?? 0),
+            coverage: 'members_only' as const,
+          }))
+        : unavailableMetric(
+            'BrowseLog/Favorite/ExternalJumpLog',
+            range,
+            SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled,
+          ),
+      topSources30d: recruitmentHostingLimit() === 'enabled'
+        ? topSourcesMetric(jumps)
+        : unavailableMetric(
+            'ExternalJumpLog.sourceName',
+            '30d',
+            SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled,
+          ),
       content: this.fromFacts(facts, 'BrowseLog', range, (value) => ({
         policy: suppressSmallCount(value.browseByType['policy'] ?? 0),
         fair: suppressSmallCount((value.browseByType['job_fair'] ?? 0) + (value.browseByType['fair_company'] ?? 0)),
@@ -192,12 +207,14 @@ export class ConsoleScreenUsageService {
     ))
     const metrics: ScreenUsageMetrics = {
       partnerContent: this.fromFacts(facts, 'BrowseLog/Favorite/ExternalJumpLog join sourceOrgId', range, (value) => ({
-        byType: value.byType.map((row) => ({
-          type: row.type,
-          browse: suppressSmallCount(row.browse),
-          favorites: suppressSmallCount(row.favorites),
-          sourceOpens: suppressSmallCount(row.sourceOpens),
-        })),
+        byType: value.byType
+          .filter((row) => recruitmentHostingLimit() === 'enabled' || row.type === 'policy')
+          .map((row) => ({
+            type: row.type,
+            browse: suppressSmallCount(row.browse),
+            favorites: suppressSmallCount(row.favorites),
+            sourceOpens: suppressSmallCount(row.sourceOpens),
+          })),
         coverage: 'members_only' as const,
         basis: 'current_content_join' as const,
       })),
@@ -229,7 +246,10 @@ export class ConsoleScreenUsageService {
       window: { timezone: SCREEN_TIMEZONE, from: span.from.toISOString(), to: span.to.toISOString() },
       status,
       degraded: status !== 'ok',
-      limits: { minAggregateSample: SCREEN_MIN_AGGREGATE_SAMPLE },
+      limits: {
+        minAggregateSample: SCREEN_MIN_AGGREGATE_SAMPLE,
+        recruitmentHosting: recruitmentHostingLimit(),
+      },
       metrics,
     }
   }
@@ -255,6 +275,11 @@ export class ConsoleScreenUsageService {
       return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.sourceQueryFailed }
     }
   }
+}
+
+function visibleUsageServiceNodes() {
+  if (recruitmentHostingLimit() === 'enabled') return USAGE_SERVICE_NODES
+  return USAGE_SERVICE_NODES.filter((node) => node.key !== 'jobs' && node.key !== 'fairs' && node.key !== 'company')
 }
 
 function visitsMetric(): ScreenMetric<never> {

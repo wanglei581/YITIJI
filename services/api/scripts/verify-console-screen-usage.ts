@@ -48,6 +48,9 @@ import {
 } from '../src/console-screen/console-screen.usage.queries'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
+// 本文件钉住托管打开（b）时的逐字段口径。关闭后的形状在 verify:console-screen-snapshot。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
+
 let passed = 0
 let failed = 0
 
@@ -792,6 +795,7 @@ async function assertBehavior(): Promise<void> {
         && admin.window.timezone === 'Asia/Shanghai'
         && admin.window.from === TODAY_START.toISOString()
         && admin.limits.minAggregateSample === 5
+        && admin.limits.recruitmentHosting === 'enabled'
         && admin.status === 'ok'
         && admin.degraded === false
         && partnerA.range === 'today'

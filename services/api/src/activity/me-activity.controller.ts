@@ -1,4 +1,8 @@
 import { Controller, Delete, Get, Optional, Param, Query, Req, UseGuards } from '@nestjs/common'
+import {
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -57,15 +61,18 @@ export class MeActivityController {
     @Query('targetType') targetType?: string,
     @Req() req?: KioskJobBoardRequest,
   ) {
-    const open = await this.jobBoardOpen(req)
+    const hosting = isRecruitmentContentHostingEnabled()
+    const open = hosting && await this.jobBoardOpen(req)
     const type = targetType || undefined
+    if (!hosting && (type === 'job' || type === 'job_fair')) throw recruitmentHostingDisabledException()
     if (!open && type === 'job') await this.jobBoard!.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
+    const exclude = !hosting ? ['job', 'job_fair'] : (!open && !type ? ['job'] : undefined)
     return ApiResponse.ok(
       await this.activity.listBrowse(
         user.endUserId,
         parseMemberPageQuery(cursor, pageSize),
         type,
-        !open && !type ? { excludeTargetTypes: ['job'] } : undefined,
+        exclude ? { excludeTargetTypes: exclude } : undefined,
       ),
     )
   }
@@ -78,15 +85,18 @@ export class MeActivityController {
     @Query('targetType') targetType?: string,
     @Req() req?: KioskJobBoardRequest,
   ) {
-    const open = await this.jobBoardOpen(req)
+    const hosting = isRecruitmentContentHostingEnabled()
+    const open = hosting && await this.jobBoardOpen(req)
     const type = targetType || undefined
+    if (!hosting && (type === 'job' || type === 'job_fair')) throw recruitmentHostingDisabledException()
     if (!open && type === 'job') await this.jobBoard!.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
+    const exclude = !hosting ? ['job', 'job_fair'] : (!open && !type ? ['job'] : undefined)
     return ApiResponse.ok(
       await this.activity.listJumps(
         user.endUserId,
         parseMemberPageQuery(cursor, pageSize),
         type,
-        !open && !type ? { excludeTargetTypes: ['job'] } : undefined,
+        exclude ? { excludeTargetTypes: exclude } : undefined,
       ),
     )
   }

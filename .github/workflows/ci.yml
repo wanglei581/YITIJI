@@ -70,6 +70,8 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
+      # 招聘内容托管生产默认关。既有 verify 要看打开后的行为，必须显式打开。
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true'
     steps:
       # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
       - uses: actions/checkout@v4
@@ -643,6 +645,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ocr-baidu
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:job-fit
+          pnpm --filter @ai-job-print/api verify:miniapp-review-backend
           pnpm --filter @ai-job-print/api verify:job-fit-governance
           pnpm --filter @ai-job-print/api verify:governed-job-fit
           pnpm --filter @ai-job-print/api verify:job-fit-print
@@ -676,6 +679,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:companies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-emergency-scope
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-hosting-default-off
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract
@@ -825,6 +830,8 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
+      # 与 build-and-verify 相同：既有 verify 显式打开招聘内容托管，未设置即关只由专门门禁覆盖。
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -957,6 +964,8 @@ jobs:
           # 求职进度（见 build-and-verify 同名条目）：断言含两份 schema 形状比对，PG 侧同样跑。
           pnpm --filter @ai-job-print/api verify:job-application-track
           pnpm --filter @ai-job-print/api verify:companies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-emergency-scope
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-hosting-default-off
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract

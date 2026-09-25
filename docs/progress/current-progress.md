@@ -1,8 +1,76 @@
 # 当前开发进度
 
+## 2026-09-26（上午）：候选并入五路（第 10 轮 CI 前），3.13 复核后返工
+
+- **并入候选（本地合并后一次推送）：**
+  - 文档第二轮（同伴窗口，快进 `1097b5822`、`00cf5a8ea`、`8b26f80c6`）：
+    - 合规边界 §1.2 按条文复核改写，新增 `docs/compliance/pilot-compliance-procedures.md`（七项试点制度草案）；
+    - 更正「数字人需关闭」的结论；
+    - 写明 AI 简历导出可以去掉可见标识的条件。
+  - 小程序后端三项（Grok，`claude/miniapp-backend-review-20260926`）：
+    - 简历对照不再产出等级与总评；
+    - 新增 `age_14_plus` 与 `voice_recording` 两个同意范围；
+    - 小青按 `channel=miniapp` 只返回小程序已注册页面。新门禁 `verify:miniapp-review-backend`。
+  - 法务文档新增 `operator_info` 类型（Grok，`claude/legal-operator-info-20260926`）。
+  - 08 法务页、09 系统状态页迁移及复核修复（Claude 子代理）：
+    - 健康检查改走 `API_BASE_URL`；
+    - 自动重试 10→20→40 秒退避，封顶 60 秒；
+    - 离页中止在途请求；
+    - 返回按钮的文案与去向一致。
+  - 依赖安全（Grok，`claude/deps-security-20260926`）：Dependabot 15 条未关告警全部按最低修复版处理，高危 react-router 升到同主版本 7.18.2，无需跨大版本；告警要等进入默认分支后才会自动关闭。
+- **Agy 复核：**
+  - 小程序后端 5 条意见，Claude 逐条对代码核实，均不需返工：
+    - 3 条不成立：两个变量是同一对象；`resume_ai` 在出错文案之前已返回；`/job-fit` 是已注册的简历对照工具页。
+    - 2 条影响很小。
+  - 3.13（`claude/recruitment-hosting-off-20260926`）7 条意见，核实 6 条成立，**暂不并入**，已派 Grok 在原分支返工：
+    - 手填岗位匹配的查看与打印被一刀切 403；
+    - 手动「立即同步」谎报已排队；
+    - 批量发布绕过紧急下架；
+    - 下架入口缺招聘会资料与线下机构；
+    - 熔断只是一次性下架；
+    - 业务开关里有识别测试环境的后门。
+- **第 9 轮 CI（`e5c2c6411`）：** 主门禁、PostgreSQL、Windows 安装包全绿；一体机浏览器冒烟 1 条红（扫描等待页「服务端已取消」后多发一次 DELETE，自第 7 轮以来一体机源码未改，判断为竞态），已派子代理查根因。
+- **没有操作生产。**
+## 2026-09-26：3.5c 小修（分支 `claude/ai-safety-aigc-20260926`，未合入、未部署）
+
+Agy 复核后的三条成立项已修，反向变异后恢复。没有改 `apps/`、产品文档、合规文档，没有访问生产。
+
+- `f8ccb77b3`：AI 生成文件的 ProduceID 必填。空串和纯空白在写入时抛错，解析时作废。
+- 简历导出没有任务号时，服务端在渲染前分配文件编号，写入 ProduceID，并用同一个编号入库。有任务号时仍用任务号，与简历对照、职业规划打印一致。不再因缺少任务号拒绝收费导出。
+- `8a5caa72a`：提示词门禁按每一条 system 检查；应标识的 PDF 至少两页，并逐页检查可见标识。顾问判型和比对提示词补上了安全句。
+- `f78eb374d`：给草稿简历追加 AI 解读页后，`AIGenerated` 从 false 改为 true。
+- 图谱已按这次门禁引用重生成。
+## 2026-09-26：扫描等待页「终态先到、投递确认后到」时误发 DELETE——CI 偶发红灯的根因修复（本地分支，待合入候选）
+
+分支 `claude/kiosk-scan-cancelled-delete-race-20260926`（接在候选 `8b26f80c6` 之后）。只改一体机扫描等待页、撤销模块和对应浏览器用例；没有改后端，没有推送，没有部署。
+
+- **现象：** CI run 36172469588 的 kiosk-browser-smoke 里，`kiosk-session-warning.spec.ts`「server-cancelled poll status navigates back to /scan/start without sending DELETE」收到 1 次 DELETE（期望 0）。上一轮绿灯 `b3fc7dde1` 以来 `apps/kiosk/src` 没有改动，是时序竞态；同批 expired / failed 两条是绿的。
+- **根因（本地 Playwright trace + 临时打点确认，打点已撤）：** 等待页挂载时**同时**发出投递确认（ACK）和第一次状态查询。状态先回 `cancelled` 时，页面回到 start，`live: undefined` 推进扫描代次；ACK 随后回话，回调只看「代次变了」，按 `ack-compensation` 补发一次 DELETE，对象是服务端已经结束的任务。清场收尾闸和卸载信标都没有参与（trace 里没有它们的请求）；本机登记在 `returnToStart` 里是同步抹掉的，没有残留。completed / failed / expired 在「确认还没回、用户已离开结果屏」时同样会补发。
+- **修复（`aba29cd6f`）：** `scanSessionRevoke.ts` 记下服务端报过终态的任务 id，两个撤销入口共用的 `sendRevoke` 对这些 id 一律不发，补偿意图也不例外；`ScanProgressPage.tsx` 在轮询回答、取消回执、取消后补查三处拿到状态就先记、再改屏。依据：服务端终态是吸收态（scan-tasks.service.ts 没有任何路径改回 waiting，Agent 租约只签 waiting 行），此时 DELETE 只会换回 409 / 400；`ack()` 对已确认过的任务在状态判断之前就原样回时间戳，所以「ACK 成功」证明不了任务还活着。
+- **用例（`bdbb464d8`）：** `kiosk-session-warning.spec.ts` 新增 6 条，把 ACK 回话压住，钉死四种顺序：cancelled 先到；completed / expired / failed 之后离开结果屏；确认未回时用户取消；取消撞上「已完成」再离开。「没有 DELETE」由页内 fetch 探针同步记账，以「ACK 响应体解析完之后的下一个宏任务」为确定信号，不靠等待时长。原有那条用例不改。
+- **验证：** 撤掉整个修复，6 条新用例全红（多出来的正是那一次补偿 DELETE）；逐行撤掉四处改动，各自只让对应的用例转红，每个变异体都先过了 `tsc`。整份 `kiosk-session-warning.spec.ts` `--repeat-each=15`：33 条 × 15 = 495 次全过（0 失败、0 flaky）。`fusion-w2-scan.spec.ts` 26/26，`scan-session-truth.spec.ts` 38/38，`kiosk-scan-safety.spec.ts` 38/38，`kiosk-privacy-timeout.spec.ts` 36/36（其中 1 条写死了 4187 端口，单独在原端口重跑通过）。kiosk `tsc --noEmit`、`eslint src/`（0 错误）、`verify:scan-session-truth`、`verify:fusion-w2`、`verify:kiosk-runtime-error-boundary`、`verify:no-raw-error-render`、`generate-project-graph.mjs --check` 通过。
+
 ## 2026-09-26：全面文档更新（Claude + Grok + Agy）
 
 按设备与软件供应方 + 托管 a 改写 CLAUDE.md、AGENTS.md、feature-scope（新增 §零 AI 求职操作系统分层、§七 已知缺口）、role-boundary、compliance-boundary（新增 §1.2 法规与资质总表）、docs/README；约 50 份旧方案加文首状态标注；content-ingestion-operator-guide 旧正文（岗位、招聘会发布到一体机）改写为托管 a 下的官方渠道与政策指南，旧文只留在 git 历史。只改文档，不删文件。（分支 `claude/docs-refresh-20260926`，由「项目资金预算评估」窗口完成，主执行窗口快进合入候选。）
+## 2026-09-26：3.13 返工——手填匹配、同步如实失败、熔断持久化
+
+分支仍是 `claude/recruitment-hosting-off-20260926`。没有改 `apps/`、`CLAUDE.md`、`docs/product/`、`docs/compliance/`，没有访问生产。
+
+- 托管关闭时，手填岗位匹配仍可查看、再次打印；存档带系统内 `jobId` 的查看、打印、我的记录和 PDF 下载返回 `RECRUITMENT_HOSTING_DISABLED`。逐台岗位板块关闭时手填仍拒绝。
+- 手动同步在托管关闭时返回 403，不再回 `queued: true`。定时轮询仍静默不入队。
+- 批量发布碰到紧急下架整批拒绝并列出 id。`kind=policy` 无论开关都返回 `ADMIN_POLICY_PUBLISH_DISABLED`。
+- 紧急下架补上招聘会资料与线下机构。熔断写入 `RecruitmentCircuitBreak`，范围内全部发布状态都下架；之后新内容不能发布。来源熔断停用数据源，重新启用也不入队、不拉取、Webhook 不落库。
+- 生产代码不再因为验证脚本路径或 `VERIFICATION_DATABASE_TARGET=isolated` 把未设置的开关当成打开。CI 的两个 verify job 显式设 `RECRUITMENT_CONTENT_HOSTING_ENABLED=true`。
+
+## 2026-09-26：3.13 后端——关闭招聘内容托管，管理员只留紧急下架
+
+分支 `claude/recruitment-hosting-off-20260926`。只改后端、门禁和进度备注，没有改 `apps/`、`CLAUDE.md`、`docs/product/`、`docs/compliance/`，没有访问生产。
+
+- 部署开关 `RECRUITMENT_CONTENT_HOSTING_ENABLED`：未设置即关。关闭时招聘类列表返回空、详情和写入返回 `RECRUITMENT_HOSTING_DISABLED`。一体机读 `GET /api/v1/terminals/:id/config` 的 `recruitmentHosting`。
+- 政策改由机构 `PATCH /partner/policies/:id/review` 与 `PATCH /partner/policies/:id/release` 审核发布，确认人、时间和 `contentVersion` 写入审计。管理员发布返回 `ADMIN_POLICY_PUBLISH_DISABLED`。
+- 紧急下架与按机构/来源熔断单向，事由必填，写入 `RecruitmentEmergencyHold` 与机构站内通知 `PartnerOrgNotice`。下架后不能再发布。
+- 隔离 SQLite `scratchpad/g313-verify.db` 上扩充后的八条门禁、`verify:content-trust-publish-gate`、`verify:policy-eligibility`、`verify:kiosk-job-board-switch` 通过。岗位板块开关第 20 条仍要求逐台关闭时手填岗位匹配拒绝，本路未改这条语义。
 
 ## 2026-09-26：小程序首发审核范围收口——停放 20 页、简历对照去结论、分包（步骤 2.6，本地分支待合入）
 

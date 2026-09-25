@@ -18,6 +18,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ApiResponse } from '../common/dto/api-response.dto'
+import { readClientDeclaration } from '../common/privacy/client-declaration'
 import { CreateUploadSessionDto, PhoneUploadSessionDto, ResolveUploadSceneDto } from './upload-sessions.dto'
 import {
   UploadSessionsService,
@@ -85,8 +86,14 @@ export class UploadSessionsController {
     @Param('sessionId') sessionId: string,
     @Body() body: PhoneUploadSessionDto,
     @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
   ): Promise<ApiResponse<UploadSessionStatusResponse>> {
-    return ApiResponse.ok(await this.sessions.uploadFile({ sessionId, uploadToken: body.uploadToken, file }))
+    return ApiResponse.ok(await this.sessions.uploadFile({
+      sessionId,
+      uploadToken: body.uploadToken,
+      file,
+      clientDeclaration: readClientDeclaration(req.headers),
+    }))
   }
 
   @Post(':sessionId/confirm')

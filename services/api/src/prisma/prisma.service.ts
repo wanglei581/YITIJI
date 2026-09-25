@@ -519,6 +519,18 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.jobMaterialTemplate
   }
 
+  get recruitmentEmergencyHold() {
+    return this.client.recruitmentEmergencyHold
+  }
+
+  get partnerOrgNotice() {
+    return this.client.partnerOrgNotice
+  }
+
+  get recruitmentCircuitBreak() {
+    return this.client.recruitmentCircuitBreak
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   $transaction<R>(

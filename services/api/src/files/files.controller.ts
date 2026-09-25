@@ -42,6 +42,7 @@ import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
 import { UpdateRetentionDto } from './dto/update-retention.dto'
 import { signFileUrl, verifyFileSignature, verifyRawUploadSignature } from './signing'
+import { readClientDeclaration } from '../common/privacy/client-declaration'
 import type {
   FilePurpose,
   FileSensitiveLevel,
@@ -162,6 +163,7 @@ export class FilesController {
         sizeBytes: res.sizeBytes,
         source: endUser ? 'kiosk_member' : 'kiosk_anonymous',
         hasEndUser: Boolean(endUser),
+        ...(endUser ? {} : { clientDeclaration: readClientDeclaration(req.headers) }),
       },
       ipAddress: extractIp(req),
       userAgent: extractUa(req),

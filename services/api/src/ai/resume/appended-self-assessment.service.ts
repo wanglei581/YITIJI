@@ -11,7 +11,7 @@
 // ============================================================
 
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
-import { PDFDocument } from 'pdf-lib'
+import { appendAigcPages } from '../../common/pdf/aigc-label'
 import { PrismaService } from '../../prisma/prisma.service'
 import { FilesService } from '../../files/files.service'
 import { signFileUrl } from '../../files/signing'
@@ -94,22 +94,17 @@ export class AppendedSelfAssessmentService {
       dimensions: stored.dimensions,
       summary: stored.summary,
       appendixDisclaimer: DISCLAIMER_TEXT,
+      contentId: opts.taskId,
     })
 
-    // 5) pdf-lib 合并：resume + 自我探索
-    const merged = await PDFDocument.load(resumeBundle.buffer, { ignoreEncryption: true })
-    const assessment = await PDFDocument.load(saBuffer, { ignoreEncryption: true })
-    const copied = await merged.copyPages(assessment, assessment.getPageIndices())
-    copied.forEach((p) => merged.addPage(p))
-    // 报价 / 展示必须用合并后的真实总页数。saPageCount 是附录页数，只进审计与
-    // appendixPageCount；写成 pageCount 会让 2 页简历 + 1 页附录按 1 页下单。
-    const mergedPageCount = merged.getPageCount()
-    const out = await merged.save({ useObjectStreams: false })
+    // 5) 合并：保留原简历 Info；追加页是 AI 解读，AIGC.Label 置 "1"。
+    const mergedPdf = await appendAigcPages(resumeBundle.buffer, saBuffer, opts.taskId)
+    const mergedPageCount = mergedPdf.pageCount
 
     // 6) 上传合并后的 PDF（仅本人打印用途，不进分享用途）
     const filename = `self-assessment-append-${opts.taskId}.pdf`
     const uploaded = await this.files.upload({
-      buffer: Buffer.from(out),
+      buffer: mergedPdf.buffer,
       filename,
       mimeType: 'application/pdf',
       // §1.2: 合并 PDF 走 self_assessment_report 用途,触发 sensitive 留存/标签,
