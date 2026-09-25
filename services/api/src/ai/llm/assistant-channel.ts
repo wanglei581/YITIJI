@@ -159,5 +159,5 @@ export function applyAssistantChannel<T extends { reply: string; actions?: Chann
     ...output,
     reply: scrubMiniappReply(output.reply),
     actions: filterAssistantActions(output.actions, 'miniapp'),
-  }
+  } as T
 }

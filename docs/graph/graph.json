@@ -15448,7 +15448,7 @@
         ]
       },
       {
-        "fieldCount": 12,
+        "fieldCount": 13,
         "name": "AiServiceLog",
         "relations": [
           "EndUser"
@@ -15494,7 +15494,8 @@
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
-          "services/api/src/terminals/terminals-agent.service.ts"
+          "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/upload-sessions/upload-sessions.service.ts"
         ]
       },
       {
@@ -19416,7 +19417,8 @@
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/app.json": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "apps/miniapp/custom-tab-bar/index.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
@@ -21000,6 +21002,7 @@
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
+      "services/api/scripts/verify-miniapp-review-backend.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
@@ -21117,6 +21120,9 @@
     ],
     "services/api/src/ai/llm/ai-config-audit.ts": [
       "services/api/scripts/verify-ai-contract-mirror.mjs"
+    ],
+    "services/api/src/ai/llm/assistant-channel.ts": [
+      "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "services/api/src/ai/llm/llm-base-url.ts": [
       "services/api/scripts/verify-ai-config.ts"
@@ -21250,7 +21256,8 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
-      "services/api/scripts/verify-job-fit-print.ts"
+      "services/api/scripts/verify-job-fit-print.ts",
+      "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "services/api/src/ai/resume/job-fit.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -21278,7 +21285,8 @@
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-fit.ts",
-      "services/api/scripts/verify-llm-input-pii-mask.ts"
+      "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "services/api/src/ai/resume/llm-resume-generate.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
@@ -21804,6 +21812,9 @@
     ],
     "services/api/src/common/pii/pii-masker.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
+    ],
+    "services/api/src/common/privacy/client-declaration.ts": [
+      "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "services/api/src/common/recruitment-capability.ts": [
       "services/api/scripts/verify-recruitment-capability-gate.ts"
@@ -22818,6 +22829,7 @@
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
+      "services/api/scripts/verify-miniapp-review-backend.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -23418,6 +23430,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-miniapp-review-backend.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
       "services/api/scripts/verify-order.ts",
@@ -33256,6 +33269,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:miniapp-code"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/miniapp/app.json",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/llm/assistant-channel.ts",
+          "services/api/src/ai/resume/job-fit-pdf.service.ts",
+          "services/api/src/ai/resume/llm-job-fit.service.ts",
+          "services/api/src/common/privacy/client-declaration.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-miniapp-review-backend.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:miniapp-review-backend"
       ],
       "wired": true
     },

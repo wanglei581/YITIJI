@@ -188,6 +188,7 @@ async function main() {
       await llm.analyze(RESUME, job)
       fail('4. 违规词应导致失败')
     } catch (error) {
+      if (error instanceof Error && error.message.startsWith('VERIFY FAILED')) throw error
       const body = JSON.stringify((error as { getResponse?: () => unknown }).getResponse?.() ?? error)
       if (!body.includes('AI_JOB_FIT_FAILED')) fail(`4. 失败码不符: ${body}`)
       if (body.includes('建议投递') || body.includes('reference_high') || body.includes('适合投递')) {
