@@ -31,6 +31,9 @@ model Terminal {
   displayName       String?
   macAddress        String?  @unique
   locationLabel     String?
+  areaLabel         String?
+  geoLat            Float?
+  geoLng            Float?
   enabled           Boolean  @default(true)
   orgId             String?
   org               Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
