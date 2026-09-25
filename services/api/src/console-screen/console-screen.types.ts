@@ -51,6 +51,8 @@ export const SCREEN_UNAVAILABLE_REASON = {
   partnerAlertsUnscoped: 'alerts_not_org_scoped',
   displayTokenNotIssued: 'display_token_not_issued',
   sourceQueryFailed: 'source_query_failed',
+  uploadCounterUnwritten: 'upload_counter_unwritten',
+  inspectionCounterUnwritten: 'inspection_counter_unwritten',
 } as const
 
 export type ScreenUnavailableReason =
@@ -364,4 +366,134 @@ export interface ScreenSnapshot {
   limits: ScreenSnapshotLimits
   freshness: ScreenSnapshotFreshness
   metrics: ScreenSnapshotMetrics
+}
+
+// ── 服务调用 / 信息使用（第一步）──
+
+export type ScreenUsageRange = 'today' | '7d' | '30d'
+export type ScreenUsageLane = 'info' | 'ai' | 'print'
+export type ScreenUsageServiceKey =
+  | 'jobs' | 'fairs' | 'policy' | 'company'
+  | 'aiResume' | 'aiAdvisor' | 'interview' | 'careerPlan' | 'jobAi'
+  | 'print' | 'scan'
+export type ScreenUsageCoverage = 'members_only' | 'all_recorded'
+export type ScreenContentType = 'job' | 'job_fair' | 'policy' | 'company_profile'
+
+export interface ScreenUsageServiceItem {
+  key: ScreenUsageServiceKey
+  lane: ScreenUsageLane
+  count: number | null
+  coverage: ScreenUsageCoverage
+}
+
+export interface ScreenUsageChannelsValue {
+  paidOrders: number
+  kiosk: number | null
+  miniapp: number | null
+  unlabeled: number | null
+  memberOrders: number | null
+}
+
+export interface ScreenUsageOutcomesValue {
+  sourceOpens: number | null
+  favorites: number | null
+  aiReports: number | null
+  printed: number | null
+}
+
+export interface ScreenUsageHeatValue {
+  days: Array<{ date: string; hours: Array<number | null> }>
+  peakHour: number | null
+}
+
+export interface ScreenUsagePulseValue {
+  bucketMinutes: 5
+  buckets: Array<{ start: string; info: number | null; ai: number | null; print: number | null }>
+}
+
+export interface ScreenUsagePrintStepsValue {
+  uploaded: ScreenMetric<number>
+  inspected: ScreenMetric<number>
+  paid: number
+  printed: number
+}
+
+export interface ScreenUsageResumeStepsValue {
+  uploaded: ScreenMetric<number>
+  analyzed: number
+  optimized: number
+  exported: number
+}
+
+export interface ScreenUsageAiValue {
+  total: number
+  success: number
+  failed: number
+  successRate: number | null
+  avgLatencyMs: number | null
+  estimatedCostCny: number
+  costMeasuredCalls: number
+  fallbackCalls: number
+  byOperation: Array<{ operation: string; count: number | null }>
+  providers: Array<{ provider: string; label: string; count: number | null }>
+}
+
+export interface ScreenUsageJobsValue {
+  browse: number | null
+  favorites: number | null
+  sourceOpens: number | null
+  coverage: 'members_only'
+}
+
+export interface ScreenUsageContentValue {
+  policy: number | null
+  fair: number | null
+  company: number | null
+  coverage: 'members_only'
+}
+
+export interface ScreenPartnerContentUsageValue {
+  byType: Array<{ type: ScreenContentType; browse: number | null; favorites: number | null; sourceOpens: number | null }>
+  coverage: 'members_only'
+  basis: 'current_content_join'
+}
+
+export interface ScreenPartnerDailyValue {
+  days: Array<{ date: string; browse: number | null; sourceOpens: number | null }>
+}
+
+export interface ScreenPartnerTopContentValue {
+  items: Array<{ type: ScreenContentType; title: string; browse: number }>
+}
+
+export interface ScreenUsageMetrics {
+  channels?: ScreenMetric<ScreenUsageChannelsValue>
+  visits?: ScreenMetric<never>
+  services?: ScreenMetric<ScreenUsageServiceItem[]>
+  outcomes?: ScreenMetric<ScreenUsageOutcomesValue>
+  heat7d?: ScreenMetric<ScreenUsageHeatValue>
+  pulse2h?: ScreenMetric<ScreenUsagePulseValue>
+  printSteps?: ScreenMetric<ScreenUsagePrintStepsValue>
+  resumeSteps?: ScreenMetric<ScreenUsageResumeStepsValue>
+  ai?: ScreenMetric<ScreenUsageAiValue>
+  jobs?: ScreenMetric<ScreenUsageJobsValue>
+  topSources30d?: ScreenMetric<ScreenSourceEntryOpensValue>
+  content?: ScreenMetric<ScreenUsageContentValue>
+  partnerContent?: ScreenMetric<ScreenPartnerContentUsageValue>
+  partnerDaily?: ScreenMetric<ScreenPartnerDailyValue>
+  partnerTop?: ScreenMetric<ScreenPartnerTopContentValue>
+}
+
+export const ADMIN_USAGE_METRIC_KEYS = ['channels', 'visits', 'services', 'outcomes', 'heat7d', 'pulse2h', 'printSteps', 'resumeSteps', 'ai', 'jobs', 'topSources30d', 'content'] as const
+export const PARTNER_USAGE_METRIC_KEYS = ['partnerContent', 'partnerDaily', 'partnerTop', 'visits'] as const
+
+export interface ScreenUsageSnapshot {
+  generatedAt: string
+  audience: ScreenAudience
+  range: ScreenUsageRange
+  window: { timezone: typeof SCREEN_TIMEZONE; from: string; to: string }
+  status: ScreenSnapshotStatus
+  degraded: boolean
+  limits: { minAggregateSample: typeof SCREEN_MIN_AGGREGATE_SAMPLE }
+  metrics: ScreenUsageMetrics
 }
