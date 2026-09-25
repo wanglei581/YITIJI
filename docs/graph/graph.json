@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 541,
+    "endpointCount": 543,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -828,6 +828,7 @@
           "Job",
           "JobFair",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/admin/bulk-publish/execute",
@@ -849,6 +850,7 @@
           "Job",
           "JobFair",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/admin/bulk-publish/preview",
@@ -3003,6 +3005,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/admin/policy-sources",
@@ -3043,6 +3046,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/admin/policy-sources/:id/publish",
@@ -3063,6 +3067,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/admin/policy-sources/:id/review",
@@ -9207,6 +9212,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/partner/policies",
@@ -9227,6 +9233,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/partner/policies",
@@ -9247,6 +9254,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/partner/policies/:id",
@@ -9267,6 +9275,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/partner/policies/:id",
@@ -9347,9 +9356,52 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/partner/policies/:id/publish",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/policies/policies.service.ts"
+        ],
+        "services": [
+          "PoliciesService"
+        ]
+      },
+      {
+        "controller": "services/api/src/policies/policies.controller.ts",
+        "handler": "PoliciesController.releasePartnerPolicy",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "PartnerOrgNotice",
+          "PolicyPost"
+        ],
+        "path": "/api/v1/partner/policies/:id/release",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/policies/policies.service.ts"
+        ],
+        "services": [
+          "PoliciesService"
+        ]
+      },
+      {
+        "controller": "services/api/src/policies/policies.controller.ts",
+        "handler": "PoliciesController.reviewPartnerPolicy",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "PartnerOrgNotice",
+          "PolicyPost"
+        ],
+        "path": "/api/v1/partner/policies/:id/review",
         "roles": [
           "partner"
         ],
@@ -9677,6 +9729,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/policies",
@@ -9695,6 +9748,7 @@
         "models": [
           "AuditLog",
           "Organization",
+          "PartnerOrgNotice",
           "PolicyPost"
         ],
         "path": "/api/v1/policies/:id",
@@ -15308,7 +15362,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 103,
+    "modelCount": 105,
     "models": [
       {
         "fieldCount": 7,
@@ -16287,6 +16341,14 @@
         ]
       },
       {
+        "fieldCount": 8,
+        "name": "PartnerOrgNotice",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/policies/policies.service.ts"
+        ]
+      },
+      {
         "fieldCount": 13,
         "name": "PaymentAttempt",
         "relations": [
@@ -16331,7 +16393,7 @@
         ]
       },
       {
-        "fieldCount": 22,
+        "fieldCount": 26,
         "name": "PolicyPost",
         "relations": [
           "Organization",
@@ -16440,6 +16502,12 @@
         "usedBy": [
           "services/api/src/recruitment-content/recruitment-content-read.service.ts"
         ]
+      },
+      {
+        "fieldCount": 9,
+        "name": "RecruitmentEmergencyHold",
+        "relations": [],
+        "usedBy": []
       },
       {
         "fieldCount": 11,

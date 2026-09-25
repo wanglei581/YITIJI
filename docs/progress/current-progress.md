@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-09-26：3.13 后端——关闭招聘内容托管，管理员只留紧急下架
+
+分支 `claude/recruitment-hosting-off-20260926`。只改后端、门禁和进度备注，没有改 `apps/`、`CLAUDE.md`、`docs/product/`、`docs/compliance/`，没有访问生产。
+
+- 部署开关 `RECRUITMENT_CONTENT_HOSTING_ENABLED`：未设置即关。关闭时招聘类列表返回空、详情和写入返回 `RECRUITMENT_HOSTING_DISABLED`。一体机读 `GET /api/v1/terminals/:id/config` 的 `recruitmentHosting`。
+- 政策改由机构 `PATCH /partner/policies/:id/review` 与 `PATCH /partner/policies/:id/release` 审核发布，确认人、时间和 `contentVersion` 写入审计。管理员发布返回 `ADMIN_POLICY_PUBLISH_DISABLED`。
+- 紧急下架与按机构/来源熔断单向，事由必填，写入 `RecruitmentEmergencyHold` 与机构站内通知 `PartnerOrgNotice`。下架后不能再发布。
+- 隔离 SQLite `scratchpad/g313-verify.db` 上扩充后的八条门禁、`verify:content-trust-publish-gate`、`verify:policy-eligibility`、`verify:kiosk-job-board-switch` 通过。岗位板块开关第 20 条仍要求逐台关闭时手填岗位匹配拒绝，本路未改这条语义。
+
 ## 2026-09-26：小程序首发审核范围收口——停放 20 页、简历对照去结论、分包（步骤 2.6，本地分支待合入）
 
 小程序专管窗口在分支 `claude/miniapp-nonrecruit-review-v2`（接在候选 `b3fc7dde1` 之后）完成。只改 `apps/miniapp` 和本文、`next-tasks.md`；没有改后端、没有操作公众平台、没有发布。

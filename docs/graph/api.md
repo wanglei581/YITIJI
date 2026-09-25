@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`541` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`543` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -233,8 +233,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/admin/bulk-publish/execute` | BulkPublishController.execute | admin | BulkPublishService | Job<br/>JobFair<br/>Organization<br/>PolicyPost |
-| POST | `/api/v1/admin/bulk-publish/preview` | BulkPublishController.preview | admin | BulkPublishService | Job<br/>JobFair<br/>Organization<br/>PolicyPost |
+| POST | `/api/v1/admin/bulk-publish/execute` | BulkPublishController.execute | admin | BulkPublishService | Job<br/>JobFair<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| POST | `/api/v1/admin/bulk-publish/preview` | BulkPublishController.preview | admin | BulkPublishService | Job<br/>JobFair<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
 
 ## `services/api/src/common/health.controller.ts`
 
@@ -837,20 +837,22 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/policy-sources` | PoliciesController.getPolicySources | admin | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
+| GET | `/api/v1/admin/policy-sources` | PoliciesController.getPolicySources | admin | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
 | GET | `/api/v1/admin/policy-sources/:id/eligibility-rules` | PoliciesController.getAdminEligibilityRules | admin | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
-| PATCH | `/api/v1/admin/policy-sources/:id/publish` | PoliciesController.publishPolicy | admin | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
-| PATCH | `/api/v1/admin/policy-sources/:id/review` | PoliciesController.reviewPolicy | admin | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
-| GET | `/api/v1/partner/policies` | PoliciesController.getPartnerPolicies | partner | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
-| POST | `/api/v1/partner/policies` | PoliciesController.createPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
-| DELETE | `/api/v1/partner/policies/:id` | PoliciesController.deletePartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
-| PATCH | `/api/v1/partner/policies/:id` | PoliciesController.updatePartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
+| PATCH | `/api/v1/admin/policy-sources/:id/publish` | PoliciesController.publishPolicy | admin | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| PATCH | `/api/v1/admin/policy-sources/:id/review` | PoliciesController.reviewPolicy | admin | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| GET | `/api/v1/partner/policies` | PoliciesController.getPartnerPolicies | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| POST | `/api/v1/partner/policies` | PoliciesController.createPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| DELETE | `/api/v1/partner/policies/:id` | PoliciesController.deletePartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| PATCH | `/api/v1/partner/policies/:id` | PoliciesController.updatePartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
 | POST | `/api/v1/partner/policies/:id/eligibility-preview` | PoliciesController.previewPartnerEligibility | partner | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 | GET | `/api/v1/partner/policies/:id/eligibility-rules` | PoliciesController.getPartnerEligibilityRules | partner | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 | PUT | `/api/v1/partner/policies/:id/eligibility-rules` | PoliciesController.replacePartnerEligibilityRules | partner | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
-| PATCH | `/api/v1/partner/policies/:id/publish` | PoliciesController.unpublishPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
-| GET | `/api/v1/policies` | PoliciesController.getPolicies | — | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
-| GET | `/api/v1/policies/:id` | PoliciesController.getPublishedPolicy | — | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
+| PATCH | `/api/v1/partner/policies/:id/publish` | PoliciesController.unpublishPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| PATCH | `/api/v1/partner/policies/:id/release` | PoliciesController.releasePartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| PATCH | `/api/v1/partner/policies/:id/review` | PoliciesController.reviewPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| GET | `/api/v1/policies` | PoliciesController.getPolicies | — | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
+| GET | `/api/v1/policies/:id` | PoliciesController.getPublishedPolicy | — | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost |
 | POST | `/api/v1/policies/eligibility-check` | PoliciesController.checkEligibility | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 | GET | `/api/v1/policies/eligibility-questions` | PoliciesController.getEligibilityQuestions | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 

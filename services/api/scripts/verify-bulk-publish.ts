@@ -370,6 +370,20 @@ async function main() {
     assert('空 id 列表被拒绝(BULK_IDS_REQUIRED)', empty === 'BULK_IDS_REQUIRED', `实际 ${empty}`)
 
     assert('preview 的 batchLimit 与服务端上限一致', (await bulk.previewBulkPublish({ kind: 'job' })).batchLimit === BULK_PUBLISH_MAX_BATCH)
+
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    let closed = ''
+    try {
+      await bulk.executeBulkPublish('job', ['j1'], user)
+    } catch (e) {
+      const resp = (e as { getResponse?: () => unknown }).getResponse?.() as { error?: { code?: string } }
+      closed = resp?.error?.code ?? ''
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
+    assert('托管关闭时管理员批量发布被拒', closed === 'RECRUITMENT_HOSTING_DISABLED', `实际 ${closed}`)
   }
 
   // ── ⑧ 源码层:不存在第二条写路径 ──────────────────────────────────────────

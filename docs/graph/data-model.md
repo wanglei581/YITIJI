@@ -2,9 +2,9 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`103` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`105` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 103 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 105 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
@@ -125,16 +125,18 @@ flowchart TD
 | **OrderItem** | 15 | Order | 5 个文件<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`payment/pickup-expiry-refund.service.ts`<br/>`payment/pickup-validity.ts`<br/>… |
 | **OrderSubmissionLedger** | 11 | — | 1 个文件<br/>`member-print-orders/order-submission-ledger.ts` |
 | **Organization** | 26 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 16 个文件<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>`auth/partner-phone-rebind.service.ts`<br/>… |
+| **PartnerOrgNotice** | 8 | — | 1 个文件<br/>`policies/policies.service.ts` |
 | **PaymentAttempt** | 13 | Order | 4 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`payment/online-payment.service.ts`<br/>`payment/reconciliation.service.ts`<br/>… |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`print-jobs/pii-scan-gate.ts` |
 | **PlatformQualification** | 19 | FileObject | 1 个文件<br/>`common/recruitment-capability.ts` |
 | **PolicyEligibilityRule** | 10 | PolicyPost | 1 个文件<br/>`policies/policy-eligibility.service.ts` |
-| **PolicyPost** | 22 | Organization、PolicyEligibilityRule | 11 个文件<br/>`activity/activity.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>… |
+| **PolicyPost** | 26 | Organization、PolicyEligibilityRule | 11 个文件<br/>`activity/activity.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 4 个文件<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>… |
 | **PrintMaterialPack** | 9 | — | **无代码读写** |
 | **PrintTask** | 22 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 29 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
 | **PrintTaskStatusLog** | 7 | PrintTask | 10 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **QualificationRecord** | 26 | FileObject、OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
+| **RecruitmentEmergencyHold** | 9 | — | **无代码读写** |
 | **RedemptionRecord** | 11 | — | 3 个文件<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`member-benefits/member-benefits.service.ts` |
 | **Refund** | 12 | Order | 3 个文件<br/>`payment/reconciliation.service.ts`<br/>`payment/refund-amount-hold.ts`<br/>`payment/refund.service.ts` |
 | **ReviewDecision** | 18 | User | **无代码读写** |
@@ -161,7 +163,7 @@ flowchart TD
 | **UserDataRequest** | 22 | EndUser | 6 个文件<br/>`member-privacy/member-data-export-download.service.ts`<br/>`member-privacy/member-data-export-reconciler.service.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserNotification** | 10 | — | **无代码读写** |
 
-## 没有任何代码读写的模型（10）
+## 没有任何代码读写的模型（11）
 
 > 注意：这里的判定只看 \`this.prisma.<model>.<op>\` 形式的调用。
 > 通过关系字段级联读写、raw SQL 或迁移脚本访问的模型不会被计入，**不能据此删表**。
@@ -173,6 +175,7 @@ flowchart TD
 - `KioskActivity`
 - `KioskSession`
 - `PrintMaterialPack`
+- `RecruitmentEmergencyHold`
 - `ReviewDecision`
 - `ScreensaverContent`
 - `UserNotification`

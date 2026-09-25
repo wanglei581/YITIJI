@@ -254,6 +254,23 @@ async function main() {
       if (jobs.length === 0) { pass('No Job records written for failed sync') } else { fail(`Unexpected Job records: ${jobs.length}`) }
     }
 
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    try {
+      const due = await syncService.enqueueDueSources()
+      if (due !== 0) fail(`托管关闭时定时同步仍入队 ${due}`)
+      else pass('托管关闭时定时同步不入队')
+      const queued = await syncService.enqueue(goodSourceId, true)
+      if (queued !== null) fail('托管关闭时手动同步仍入队')
+      else pass('托管关闭时手动同步不入队')
+      const pulled = await syncService.pullApiSource(goodSourceId)
+      if (pulled.added !== 0 || pulled.updated !== 0) fail('托管关闭时拉取仍写入')
+      else pass('托管关闭时拉取不执行')
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
+
   } finally {
     // ── 7. Cleanup test data ──────────────────────────────────────────────────
     console.log('\n── Cleanup ──────────────────────────────────────────────────────────────')
