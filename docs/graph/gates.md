@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1513 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1514 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1882,7 +1882,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 507 个文件</summary>
+<summary><code>services/api/src/</code> — 508 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2173,6 +2173,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/jobs/work-type.ts` | `verify-job-customer-sample-readiness.ts` |
 | `services/api/src/kiosk-session/kiosk-session.controller.ts` | `verify-backend-p0-contracts.mjs` |
 | `services/api/src/legal/admin-legal-docs.controller.ts` | `verify-legal-doc-version.ts` |
+| `services/api/src/legal/dto/admin-legal-doc.dto.ts` | `verify-legal-doc-version.ts` |
 | `services/api/src/legal/legal-constants.ts` | `verify-legal-doc-version.ts` |
 | `services/api/src/legal/legal.controller.ts` | `verify-legal-doc-version.ts` |
 | `services/api/src/legal/legal.service.ts` | `verify-legal-doc-version.ts` |

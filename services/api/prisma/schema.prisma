@@ -2675,7 +2675,7 @@ model HelpItem {
 
 model LegalDocVersion {
   id          String    @id @default(cuid())
-  docType     String    // "privacy_policy" | "terms_of_service" | "ai_disclaimer"
+  docType     String    // "privacy_policy" | "terms_of_service" | "ai_disclaimer" | "contract_review_disclaimer" | "operator_info"
   version     String    // "v1.0", "v1.1" 等
   title       String    @default("")
   content     String    // Markdown 格式全文

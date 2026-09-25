@@ -11,6 +11,8 @@ export const LEGAL_DOC_TYPES = [
   'terms_of_service',
   'ai_disclaimer',
   'contract_review_disclaimer',
+  // 电商法第十五条：首页持续公示的经营者信息。不进入登录同意（LEGAL_CONSENT_DOC_TYPES）。
+  'operator_info',
 ] as const
 export type LegalDocType = (typeof LEGAL_DOC_TYPES)[number]
 

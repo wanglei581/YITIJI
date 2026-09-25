@@ -22576,6 +22576,9 @@
     "services/api/src/legal/admin-legal-docs.controller.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "services/api/src/legal/dto/admin-legal-doc.dto.ts": [
+      "services/api/scripts/verify-legal-doc-version.ts"
+    ],
     "services/api/src/legal/legal-constants.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
@@ -32517,6 +32520,7 @@
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
           "services/api/src/legal/admin-legal-docs.controller.ts",
+          "services/api/src/legal/dto/admin-legal-doc.dto.ts",
           "services/api/src/legal/legal-constants.ts",
           "services/api/src/legal/legal.controller.ts",
           "services/api/src/legal/legal.service.ts",
