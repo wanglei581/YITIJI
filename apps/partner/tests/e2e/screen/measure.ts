@@ -378,11 +378,17 @@ export interface HostingOffAudit {
 /**
  * 招聘内容托管关闭（托管 a）时的一屏体检。
  * boundary 是边界句全文；exempt 里的片段所在的文字不算岗位类字眼（例如机构待审里那一句存量说明、
- * 运营看板里专门盘点存量的那块卡片标题）。
+ * 运营看板里专门盘点存量的那块卡片标题）。methodology 是「本页数字怎么来的」一类口径面板的标题，
+ * 它们本来就只写说明，不参加「只剩说明」这一条。
  */
-export async function hostingOffAudit(page: Page, boundary: string, exempt: readonly string[] = []): Promise<HostingOffAudit> {
+export async function hostingOffAudit(
+  page: Page,
+  boundary: string,
+  exempt: readonly string[] = [],
+  methodology: readonly string[] = [],
+): Promise<HostingOffAudit> {
   return page.evaluate(
-    ({ sentence, skip }) => {
+    ({ sentence, skip, notes }) => {
       const root = document.querySelector('.twin') as HTMLElement | null
       if (!root) return { offText: ['<no-twin-root>'], boundary: 0, noticeOnly: [], recruitmentWords: [] }
       const rendered = (el: Element) => {
@@ -415,6 +421,7 @@ export async function hostingOffAudit(page: Page, boundary: string, exempt: read
       const noticeOnly: string[] = []
       for (const box of [...root.querySelectorAll('.twin-panel, .ops-card')].filter(rendered)) {
         const title = box.querySelector('.twin-ph-t, h2')?.textContent?.trim() ?? box.className
+        if (notes.includes(title)) continue
         if (box.querySelector('.twin-na, .ops-na')) {
           noticeOnly.push(`${title}（未接入 / 未开启说明块）`)
           continue
@@ -423,10 +430,12 @@ export async function hostingOffAudit(page: Page, boundary: string, exempt: read
           .filter((child) => !child.matches('.twin-ph, h2, .ops-foot, .twin-pop'))
           .map((child) => (child instanceof HTMLElement ? child.innerText : child.textContent) ?? '')
           .join(' ')
-        if (!/\d/.test(body) && !body.includes('少于 5')) noticeOnly.push(`${title}（正文没有读数）`)
+        // 「近 24 小时」「近 7 天」这类窗口说明里的数字不是读数（「近 24 小时没有同步批次」照样算只剩说明）
+        const reading = body.replace(/近\s*\d+\s*(小时|天|日)/g, '')
+        if (!/\d/.test(reading) && !reading.includes('少于 5')) noticeOnly.push(`${title}（正文没有读数）`)
       }
       return { offText, boundary: boundaryCount, noticeOnly, recruitmentWords }
     },
-    { sentence: boundary, skip: [...exempt] },
+    { sentence: boundary, skip: [...exempt], notes: [...methodology] },
   )
 }

@@ -47,13 +47,15 @@ interface HostingOffCase {
   panels: number
   boundary: number
   exempt: string[]
+  /** 「统计口径」这类只写口径的面板：产品负责人要求保留，不参加「只剩说明」这一条。 */
+  methodology: string[]
 }
 
 const CASES: HostingOffCase[] = [
-  { name: 'overview', path: '/screen/overview', title: '本机构运营概览', panels: 5, boundary: 1, exempt: [STOCK_LINE] },
-  { name: 'usage', path: '/screen/usage', title: '本机构信息使用态势', panels: 5, boundary: 1, exempt: [] },
-  { name: 'usage-7d', path: '/screen/usage?range=7d', title: '本机构信息使用态势', panels: 5, boundary: 1, exempt: [] },
-  { name: 'terminal', path: '/screen/terminal?id=t-hz-zd-04', title: '终端数字孪生', panels: 4, boundary: 0, exempt: [] },
+  { name: 'overview', path: '/screen/overview', title: '本机构运营概览', panels: 5, boundary: 1, exempt: [STOCK_LINE], methodology: [] },
+  { name: 'usage', path: '/screen/usage', title: '本机构信息使用态势', panels: 5, boundary: 1, exempt: [], methodology: ['统计口径'] },
+  { name: 'usage-7d', path: '/screen/usage?range=7d', title: '本机构信息使用态势', panels: 5, boundary: 1, exempt: [], methodology: ['统计口径'] },
+  { name: 'terminal', path: '/screen/terminal?id=t-hz-zd-04', title: '终端数字孪生', panels: 4, boundary: 0, exempt: [], methodology: [] },
 ]
 
 test.describe('partner screen · 托管关闭', () => {
@@ -67,7 +69,7 @@ test.describe('partner screen · 托管关闭', () => {
       await expect(page.locator('.twin-panel')).toHaveCount(c.panels)
       await settle(page)
 
-      const audit = await hostingOffAudit(page, BOUNDARY, c.exempt)
+      const audit = await hostingOffAudit(page, BOUNDARY, c.exempt, c.methodology)
       expect(audit.offText, '不得出现「未开启」格子或标签').toEqual([])
       expect(audit.noticeOnly, '不得有只剩说明、没有读数的块').toEqual([])
       expect(audit.recruitmentWords, '岗位类字眼只许出现在边界句与存量说明里').toEqual([])
