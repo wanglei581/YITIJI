@@ -87,9 +87,55 @@ function mergeAdjacent(segments: Seg[]): Seg[] {
 }
 
 /**
+ * 把一条心跳窗口贴进已经按时间排好的分段。
+ * 与上一窗口相交就延长；状态不同按 RANK 切开（高的盖住重叠部分）。
+ * 窗口之间的缺口记为 gapState。只向前扫，心跳阶段不做全量 overlay。
+ */
+function applyHeartbeatWindow(
+  segments: Seg[],
+  windowStart: number,
+  from: number,
+  to: number,
+  state: ScreenTimelineState,
+  gapState: ScreenTimelineState,
+): void {
+  const lastEnd = segments.length === 0 ? windowStart : segments[segments.length - 1]!.to
+  if (segments.length === 0 || lastEnd < from) {
+    if (from > lastEnd) segments.push({ from: lastEnd, to: from, state: gapState })
+    segments.push({ from, to, state })
+    return
+  }
+
+  const rank = RANK[state]
+  while (segments.length > 0) {
+    const last = segments[segments.length - 1]!
+    if (last.to <= from) break
+    const lastRank = RANK[last.state]
+    if (lastRank > rank) {
+      if (to > last.to) segments.push({ from: last.to, to, state })
+      return
+    }
+    if (last.from < from) {
+      if (lastRank === rank) last.to = Math.max(last.to, to)
+      else {
+        last.to = from
+        segments.push({ from, to, state })
+      }
+      return
+    }
+    segments.pop()
+  }
+
+  const prev = segments[segments.length - 1]
+  if (prev && prev.state === state && prev.to >= from) prev.to = Math.max(prev.to, to)
+  else segments.push({ from, to, state })
+}
+
+/**
  * 近 24 小时时间轴。
  * 心跳覆盖 [at, at+在线窗口]；窗口之间的缺口是 offline（从未有心跳则整段 unknown）。
  * 打印机异常心跳标 alert。printing 区间盖在最上面。相邻同状态合并。
+ * 心跳按时间单遍扫描；打印区间数量少，最后逐段 overlay。
  */
 export function deriveTerminalTimeline(input: {
   now: Date
@@ -110,25 +156,30 @@ export function deriveTerminalTimeline(input: {
   const heartbeats = input.heartbeats
     .filter((row) => row.at instanceof Date && Number.isFinite(row.at.getTime()) && row.at.getTime() <= nowMs)
     .sort((a, b) => a.at.getTime() - b.at.getTime())
-  let segments: Seg[] = [{
-    from: windowStart,
-    to: nowMs,
-    state: heartbeats.length > 0 ? 'offline' : 'unknown',
-  }]
+  const gapState: ScreenTimelineState = heartbeats.length > 0 ? 'offline' : 'unknown'
+  const segments: Seg[] = []
   for (const heartbeat of heartbeats) {
     const at = heartbeat.at.getTime()
     const from = Math.max(at, windowStart)
     const to = Math.min(at + onlineWindowMs, nowMs)
+    if (to <= from) continue
     const state: ScreenTimelineState = printerIssue(heartbeat.printerStatus) ? 'alert' : 'idle'
-    segments = overlay(segments, from, to, state)
+    applyHeartbeatWindow(segments, windowStart, from, to, state, gapState)
   }
+  if (segments.length === 0) {
+    segments.push({ from: windowStart, to: nowMs, state: gapState })
+  } else {
+    const tail = segments[segments.length - 1]!
+    if (tail.to < nowMs) segments.push({ from: tail.to, to: nowMs, state: gapState })
+  }
+  let painted = segments
   for (const print of input.prints) {
     if (!(print.from instanceof Date) || !(print.to instanceof Date)) continue
     const from = Math.max(print.from.getTime(), windowStart)
     const to = Math.min(print.to.getTime(), nowMs)
-    segments = overlay(segments, from, to, 'printing')
+    painted = overlay(painted, from, to, 'printing')
   }
-  const merged = mergeAdjacent(segments)
+  const merged = mergeAdjacent(painted)
   if (merged.length > segmentCap) {
     return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
   }
