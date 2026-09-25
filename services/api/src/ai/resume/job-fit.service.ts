@@ -199,7 +199,7 @@ export class JobFitService {
       targetType: 'ai_task',
       targetId: input.taskId,
       // 仅元数据：不含简历/岗位/输出内容
-      payload: { mode: input.jobId ? 'job' : 'manual', fitLevel: payload.fitLevel, hasEndUser: !!parse.endUserId },
+      payload: { mode: input.jobId ? 'job' : 'manual', hasEndUser: !!parse.endUserId },
       ipAddress: null, userAgent: null, requestId: null,
     })
     return {
@@ -350,11 +350,13 @@ export class JobFitService {
   }
 
   private toResponse(taskId: string, stored: StoredJobFit): JobFitCompletedResponse {
+    const payload = { ...stored.payload } as JobFitPayload & { fitLevel?: unknown }
+    delete payload.fitLevel
     return {
       taskId,
       status: 'completed' as const,
       job: stored.job,
-      ...stored.payload,
+      ...payload,
       providerName: stored.providerName,
     }
   }

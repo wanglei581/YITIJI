@@ -154,7 +154,7 @@ async function main() {
     responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
     const r1WithUsage = await svc.analyzeWithUsage({ taskId, jobId: jobPub.id }, requester)
     const r1 = r1WithUsage.response
-    if (r1.status !== 'completed' || !('fitLevel' in r1)) fail('1. 应 completed')
+    if (r1.status !== 'completed' || 'fitLevel' in r1) fail('1. 应 completed 且不再返回 fitLevel')
     if (r1.job?.sourceName !== '验证人才网' || !r1.job?.sourceUrl) fail('1. 缺岗位来源信息')
     if (r1WithUsage.provider !== 'llm:deepseek:stub' || r1WithUsage.tokenUsage?.totalTokens !== 1500) {
       fail('1. analyzeWithUsage 应返回 provider 与 tokenUsage 元数据')
@@ -231,7 +231,7 @@ async function main() {
       typeof r1bLegacy.job?.sourceName !== 'string' ||
       typeof r1bLegacy.job?.sourceUrl !== 'string' ||
       typeof r1bLegacy.job?.externalId !== 'string' ||
-      typeof r1bLegacy.fitLevel !== 'string' ||
+      'fitLevel' in r1b ||
       typeof r1bLegacy.summary !== 'string' ||
       !Array.isArray(r1bLegacy.matchPoints) ||
       !Array.isArray(r1bLegacy.gapPoints) ||

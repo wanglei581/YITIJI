@@ -61,6 +61,7 @@ import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
 import { ContractReviewHttpModule } from './contract-review/contract-review-http.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
+import { ClientDeclarationMiddleware } from './common/privacy/client-declaration.middleware'
 import { RecruitmentContentModule } from './recruitment-content/recruitment-content.module'
 import { CommunityModule } from './community/community.module'
 import { AssistantModule } from './assistant/assistant.module'
@@ -173,6 +174,6 @@ export class AppModule implements NestModule {
     // path-to-regexp v6+ 需要命名参数表达通配。
     // '*path' = 匹配任意路径并捕获到 params.path,
     // 等价于以前的裸 '*',且不再触发 LegacyRouteConverter 警告。
-    consumer.apply(RequestIdMiddleware).forRoutes('*path')
+    consumer.apply(RequestIdMiddleware, ClientDeclarationMiddleware).forRoutes('*path')
   }
 }

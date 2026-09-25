@@ -68,9 +68,9 @@ flowchart TD
 | **AgentReleasePlan** | 18 | ActiveReleaseObservationAssignment、AgentReleaseArtifact、AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AgentReleaseTarget** | 10 | ActiveReleaseObservationAssignment、AgentReleasePlan、Terminal、TerminalReleaseObservation | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AiResumeResult** | 15 | EndUser | 13 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume-parse-submission.service.ts`<br/>… |
-| **AiServiceLog** | 12 | EndUser | 4 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
+| **AiServiceLog** | 13 | EndUser | 4 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **AlertDisposition** | 12 | — | 2 个文件<br/>`admin-ops/admin-alert-actions.service.ts`<br/>`admin-ops/admin-ops.service.ts` |
-| **AuditLog** | 12 | User | 19 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`audit/audit.service.ts`<br/>`auth/admin-initial-phone-bind.service.ts`<br/>… |
+| **AuditLog** | 12 | User | 20 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`audit/audit.service.ts`<br/>`auth/admin-initial-phone-bind.service.ts`<br/>… |
 | **BenefitActivity** | 19 | BenefitClaim、User | 2 个文件<br/>`benefit-activities/benefit-activities.service.ts`<br/>`community/community.service.ts` |
 | **BenefitClaim** | 8 | BenefitActivity、BenefitGrant、EndUser | 1 个文件<br/>`benefit-activities/benefit-activities.service.ts` |
 | **BenefitGrant** | 16 | BenefitClaim、EndUser | 6 个文件<br/>`benefit-activities/benefit-activities.service.ts`<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>… |

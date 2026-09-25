@@ -176,6 +176,7 @@ async function main() {
     if (r1.basedOn?.interview !== null) fail('5a. 匿名任务不得聚合面试上下文')
     const req1 = llmRequestBodies[0] ?? ''
     if (!req1.includes('档案管理员_岗位标记JFCP')) fail('5a. prompt 未携带 job_fit 上下文')
+    if (req1.includes('参考等级') || req1.includes('reference_medium')) fail('5a. prompt 不得携带对照等级')
     if (req1.includes('面试标记IVCP')) fail('5a. 匿名 prompt 不得含面试摘要')
     const row1 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId: taskAnon, kind: 'career_plan' } } })
     if (!row1 || row1.accessTokenHash !== tokenHash) fail('1. career_plan 行未继承 parse 归属')

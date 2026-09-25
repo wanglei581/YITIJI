@@ -32,6 +32,7 @@ import {
 } from './upload-session-member-bind'
 import { deleteAnonymousObjectThenTombstone } from './upload-session-object-delete'
 import { isWellFormedSceneToken, mintSceneToken, sceneIndexKey } from './upload-scene'
+import { clientDeclarationJson, type ClientDeclaration } from '../common/privacy/client-declaration'
 import type {
   UploadSessionChannel,
   UploadSessionMode,
@@ -285,6 +286,7 @@ export class UploadSessionsService {
     sessionId: string
     uploadToken: string
     file: Express.Multer.File
+    clientDeclaration?: ClientDeclaration
   }): Promise<UploadSessionStatusResponse> {
     if (!args.file) {
       throw new BadRequestException({
@@ -398,6 +400,21 @@ export class UploadSessionsService {
         throw uploadInProgressException()
       }
       await this.persistCleanupRecord(uploaded)
+      if (args.clientDeclaration) {
+        await this.prisma.auditLog.create({
+          data: {
+            actorId: null,
+            actorRole: 'kiosk',
+            action: 'file.upload',
+            targetType: 'file',
+            targetId: file.fileId,
+            payloadJson: JSON.stringify({
+              source: 'upload_session',
+              clientDeclaration: JSON.parse(clientDeclarationJson(args.clientDeclaration) ?? '{}'),
+            }),
+          },
+        }).catch(() => undefined)
+      }
       return this.toStatusResponse(uploaded)
     } finally {
       await this.redis.getAndDelIfEquals(lockKey, lockToken).catch(() => undefined)
