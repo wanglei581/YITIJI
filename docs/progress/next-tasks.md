@@ -38,7 +38,7 @@
 | 11-arrival-code | `/print/pickup-claim` | 原稿输入/旧码/扫码、等待/错误/成功结构已合流本地候选；正式构建 W2 取件打印 58/58，1080/390 待输/成功实屏。Agy 复核超时未审，顶栏样式仍与原稿有差异；HID 实物、逐态、真机/支付/出纸和线上仍待验，UI/商业 NO-GO。 |
 | 12-file-source | `/print/upload` | 本地修复 1080 重复页头、390 来源卡/当前文件/操作条布局；W2 2/2 通过。有效二维码、USB/文件落库各态及真机待验，UI NO-GO |
 | 13-print-desk | `/print/material-check` → `/print/desk?step=check` | 本地无文件态与有效文件等待、隐私结果、遮挡失败/重试及旧摘要预览守卫做了状态安全/可用性修复；相关 W2 6/6。结构级源稿对齐、真实 OCR/PII、参数报价及真机逐态待验，UI NO-GO |
-| 14-print-confirm | `/print/confirm` | QX 路由已登记；视觉待验 |
+| 14-print-confirm | `/print/confirm` | 原稿文件/参数/报价/确认步骤结构已合流本地候选；1080 首屏可见主按钮，390 可滚动，正式构建 W2 117/117 与报价真值 10/10。浏览器仅为本地夹具；顶栏样式、其它状态实屏、真实价格/权益/支付/真机/线上仍待验，UI/商业 NO-GO。 |
 | 15-print-fulfill | `/print/progress` | QX 路由已登记；视觉待验 |
 | 16-service-hubs | `/resume-service` | QX 路由已登记；五服务台待逐态验 |
 | 18-scan-workbench | `/scan/start` | 原稿四阶段结构已合流，合成回执浏览器 26/26；390 仅部分状态，真实面板/Agent/文件/真机待验 |
