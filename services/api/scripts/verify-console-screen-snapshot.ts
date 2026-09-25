@@ -1884,7 +1884,7 @@ async function assertTwinCases(
       paramsJson: '{}',
       status: 'completed',
       claimedAt: retryStart,
-      completedAt: retryDone,
+      completedAt: null,
       createdAt: retryStart,
     },
   })
@@ -1912,8 +1912,61 @@ async function assertTwinCases(
     retryTwin.timeline24h.available === true
       && printing.length >= 1
       && timelineEnd !== undefined
-      && printing.every((segment) => segment.to !== timelineEnd && Date.parse(segment.to) <= retryDone.getTime()),
-    `end=${timelineEnd ?? 'none'} printing=${printing.map((segment) => `${segment.from}->${segment.to}`).join(',') || 'none'}`,
+      && printing.some((segment) => segment.to === retryDone.toISOString())
+      && printing.every((segment) => segment.to !== timelineEnd),
+    `end=${timelineEnd ?? 'none'} done=${retryDone.toISOString()} printing=${printing.map((segment) => `${segment.from}->${segment.to}`).join(',') || 'none'}`,
+  )
+
+  const cutoffId = `term_scrn_cutoff_${ids.suffix}`
+  const cutoffDone = new Date(Date.now() - 45 * 60_000)
+  const cutoffStart = new Date(cutoffDone.getTime() - 25_000)
+  const cutoffTaskId = `pt_scrn_cutoff_${ids.suffix}`
+  await prisma.terminal.create({
+    data: {
+      id: cutoffId,
+      terminalCode: `SCRN-CUT-${ids.suffix}`,
+      agentToken: `tok_cut_${ids.suffix}`,
+      deviceFingerprint: `fp_cut_${ids.suffix}`,
+      orgId: ids.orgA,
+      enabled: true,
+    },
+  })
+  await prisma.printTask.create({
+    data: {
+      id: cutoffTaskId,
+      terminalId: cutoffId,
+      fileUrl: 'https://internal/cutoff-secret',
+      fileMd5: 'md5cutoff',
+      paramsJson: '{}',
+      status: 'completed',
+      claimedAt: cutoffStart,
+      completedAt: cutoffDone,
+      createdAt: cutoffStart,
+    },
+  })
+  await prisma.printTaskStatusLog.createMany({
+    data: Array.from({ length: 25 }, (_, index) => ({
+      taskId: cutoffTaskId,
+      fromStatus: index === 0 ? 'claimed' : 'printing',
+      toStatus: 'printing',
+      createdAt: new Date(cutoffStart.getTime() + index * 1_000),
+    })),
+  })
+  await prisma.terminalHeartbeat.create({
+    data: { terminalId: cutoffId, status: 'online', printerStatus: 'ready', createdAt: new Date() },
+  })
+  cache.clear()
+  const cutoffTwin = await screen.getAdminTerminalTwin(cutoffId)
+  const cutoffSegments = cutoffTwin.timeline24h.available ? cutoffTwin.timeline24h.value : []
+  const cutoffEnd = cutoffSegments[cutoffSegments.length - 1]?.to
+  const cutoffPrinting = cutoffSegments.filter((segment) => segment.state === 'printing')
+  assert(
+    '5v. 结束日志被截掉但任务已 completed 时，用 completedAt 收口，不画到现在',
+    cutoffTwin.timeline24h.available === true
+      && cutoffPrinting.length >= 1
+      && cutoffEnd !== undefined
+      && cutoffPrinting.every((segment) => segment.to === cutoffDone.toISOString() && segment.to !== cutoffEnd),
+    `end=${cutoffEnd ?? 'none'} done=${cutoffDone.toISOString()} printing=${cutoffPrinting.map((segment) => segment.to).join(',') || 'none'}`,
   )
 }
 
