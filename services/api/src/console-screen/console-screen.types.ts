@@ -58,6 +58,25 @@ export type ScreenUnavailableReason =
 
 export type ScreenFleetHealth = 'healthy' | 'degraded' | 'offline' | 'unknown'
 
+export type ScreenTerminalActivity = 'idle' | 'printing' | 'scanning'
+
+export interface ScreenFleetAlert {
+  kind: 'offline' | 'printer_issue' | 'never_reported'
+  title: string // 面向领导的一句话：「离线 34 分钟」「打印机缺纸」「从未上报」，不含用户信息
+  since: string | null // ISO 时间
+}
+
+export interface ScreenFleetCell {
+  health: ScreenFleetHealth
+  terminalId: string // 用于下钻；机构端只会出现本机构终端
+  terminalCode: string
+  displayName: string | null
+  areaLabel: string | null // 所在区，例如「天河区」；未设置为 null
+  geo: { lat: number; lng: number } | null
+  activity: ScreenTerminalActivity | null // 有 claimed/printing 打印任务 → printing；进行中扫描 → scanning；无数据 → null
+  alert: ScreenFleetAlert | null
+}
+
 export interface ScreenTerminalsOnlineValue {
   healthy: number
   total: number
@@ -73,7 +92,47 @@ export interface ScreenTerminalsOnlineValue {
 }
 
 export interface ScreenFleetWallValue extends ScreenTerminalsOnlineValue {
-  cells: Array<{ health: ScreenFleetHealth }>
+  cells: ScreenFleetCell[]
+}
+
+export type ScreenTimelineState = 'idle' | 'printing' | 'alert' | 'offline' | 'unknown'
+
+export interface ScreenTerminalTwin {
+  generatedAt: string
+  audience: ScreenAudience
+  terminal: {
+    id: string
+    code: string
+    displayName: string | null
+    areaLabel: string | null
+    locationLabel: string | null
+    geo: { lat: number; lng: number } | null
+  }
+  status: {
+    health: ScreenFleetHealth
+    lastHeartbeatAt: string | null
+    onlineWindowSeconds: typeof SCREEN_ONLINE_WINDOW_SECONDS
+    agentVersion: string | null
+    wiredNetwork: string | null
+  }
+  printer: ScreenMetric<{
+    name: string | null
+    state: 'ready' | 'printing' | 'error' | 'offline' | 'unknown'
+    errorLabel: string | null
+    colorEnabled: boolean
+    duplexEnabled: boolean
+  }>
+  scanner: ScreenMetric<{ state: 'ready' | 'busy' | 'error' | 'unknown'; label: string | null }>
+  currentTask: ScreenMetric<{ pages: number; colorMode: 'bw' | 'color' | null; startedAt: string | null } | null>
+  today: {
+    printPages: number
+    printTasks: number
+    scans: number
+    failed: number
+    visits: ScreenMetric<number>
+  }
+  consumables: ScreenMetric<{ paper: string | null; toner: string | null }>
+  timeline24h: ScreenMetric<Array<{ from: string; to: string; state: ScreenTimelineState }>>
 }
 
 export interface ScreenPrintPagesValue {
