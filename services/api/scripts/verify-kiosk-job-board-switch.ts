@@ -142,7 +142,7 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
     prisma,
     board,
   )
-  const companies = new CompaniesController(new CompaniesService(prisma, audit))
+  const companies = new CompaniesController(new CompaniesService(prisma, audit), board)
   const offlineJobs = new KioskOfflineJobsController({
     findOneJob: async () => { throw new Error('closed offline job must not be read') },
   } as never, board)

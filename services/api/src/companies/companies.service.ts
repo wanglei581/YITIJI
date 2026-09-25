@@ -74,8 +74,11 @@ function addRegionFilter(where: Record<string, unknown>, field: 'province' | 'ci
   where[field] = variants.length > 1 ? { in: variants } : variants[0]
 }
 
-/** 把筛选条件编译为 Prisma where（只允许白名单枚举；地区支持规范名与常见无后缀录入匹配）。 */
-function publicWhere(f: PublicCompanyFilters) {
+/**
+ * 把筛选条件编译为 Prisma where（只允许白名单枚举；地区支持规范名与常见无后缀录入匹配）。
+ * matchJobTitles 为 false 时，关键词不再命中岗位标题，避免岗位板块关闭后用搜索摸出岗位。
+ */
+function publicWhere(f: PublicCompanyFilters, options?: { matchJobTitles?: boolean }) {
   assertEnum(f.companyType, COMPANY_TYPES, '企业类型')
   assertEnum(f.industry, COMPANY_INDUSTRIES, '行业')
   assertEnum(f.recruitType, COMPANY_RECRUIT_TYPES, '招聘类型')
@@ -95,11 +98,14 @@ function publicWhere(f: PublicCompanyFilters) {
   }
   const kw = f.keyword?.trim()
   if (kw) {
-    where['OR'] = [
+    const or: Record<string, unknown>[] = [
       { name: { contains: kw } },
       { description: { contains: kw } },
-      { jobs: { some: { ...publishedJob(), title: { contains: kw } } } },
     ]
+    if (options?.matchJobTitles !== false) {
+      or.push({ jobs: { some: { ...publishedJob(), title: { contains: kw } } } })
+    }
+    where['OR'] = or
   }
   return where
 }
@@ -113,9 +119,14 @@ export class CompaniesService {
 
   // ── Kiosk 公开读 ──────────────────────────────────────────────────────────
 
-  /** 找企业列表（游标分页；openJobCount / 代表岗位均为真实统计）。 */
-  async listPublic(filters: PublicCompanyFilters, page: MemberPageQuery) {
-    const where = publicWhere(filters)
+  /** 找企业列表（游标分页；openJobCount / 代表岗位均为真实统计）。岗位板块关闭时不返回代表岗位标题。 */
+  async listPublic(
+    filters: PublicCompanyFilters,
+    page: MemberPageQuery,
+    options?: { includeJobTitles?: boolean },
+  ) {
+    const includeJobTitles = options?.includeJobTitles !== false
+    const where = publicWhere(filters, { matchJobTitles: includeJobTitles })
     const total = await this.prisma.companyProfile.count({ where })
     const rows = await this.prisma.companyProfile.findMany({
       where,
@@ -129,7 +140,7 @@ export class CompaniesService {
     })
     // 代表岗位：当前页企业的已发布岗位标题各取前 3（真实数据，无则空数组）
     const ids = rows.map((r) => r.id)
-    const jobRows = ids.length === 0 ? [] : await this.prisma.job.findMany({
+    const jobRows = !includeJobTitles || ids.length === 0 ? [] : await this.prisma.job.findMany({
       where: { companyProfileId: { in: ids }, ...publishedJob() },
       select: { companyProfileId: true, title: true },
       orderBy: [{ syncTime: 'desc' }],
@@ -152,7 +163,7 @@ export class CompaniesService {
       city: r.city,
       district: r.district,
       description: r.description,
-      repJobTitles: repMap.get(r.id) ?? [],
+      repJobTitles: includeJobTitles ? (repMap.get(r.id) ?? []) : [],
       openJobCount: r._count.jobs,
       fairParticipant: r.fairParticipant,
       tags: parseJsonArray(r.tagsJson),
@@ -251,11 +262,21 @@ export class CompaniesService {
     }
   }
 
-  /** 企业在招岗位（仅已发布；行内引导既有岗位详情/来源投递链路）。 */
-  async listPublicJobs(companyId: string, page: MemberPageQuery) {
+  /**
+   * 企业在招岗位（仅已发布；行内引导既有岗位详情/来源投递链路）。
+   * includeJobs 为 false 时企业仍须存在，但岗位标题与来源链接不返回。
+   */
+  async listPublicJobs(
+    companyId: string,
+    page: MemberPageQuery,
+    options?: { includeJobs?: boolean },
+  ) {
     const company = await this.prisma.companyProfile.findFirst({ where: { id: companyId, ...PUBLISHED }, select: { id: true } })
     if (!company) {
       throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在或未发布' } })
+    }
+    if (options?.includeJobs === false) {
+      return { items: [], nextCursor: null, total: 0 }
     }
     const where = { companyProfileId: companyId, ...publishedJob() }
     const total = await this.prisma.job.count({ where })
