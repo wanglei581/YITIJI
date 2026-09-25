@@ -5,7 +5,11 @@ packages:
 # pnpm 11 is the single supported package-manager line. Keep all project settings here.
 engineStrict: true
 overrides:
-  qs: 6.15.2
+  # qs: GHSA-x5fp-wj9c-mxmx (6.14.2–6.15.3 array-limit bypass) and
+  # GHSA-4mjr-xmp4-gh2g (<6.16.0 isBuffer DoS) both first-fix at 6.16.0.
+  # The previous pin 6.15.2 sits inside both ranges. express@5.2.1 asks for
+  # qs@^6.14.0, so 6.16.0 stays inside that range.
+  qs: 6.16.0
   '@hono/node-server': 2.0.10
   uuid: 14.0.0
   shell-quote: 1.9.0
