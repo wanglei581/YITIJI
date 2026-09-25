@@ -9,7 +9,10 @@ async function loadBindFile(host: MemberBindHost, fileId: string): Promise<BindF
   return row as BindFileRow | null
 }
 
-/** 对象删除失败只记账，不把文件行标成已删。条件更新避免盖住并发改过的 storageKey。 */
+/**
+ * 对象删除失败只记账，不把文件行标成已删。条件更新避免盖住并发改过的 storageKey。
+ * storageDeletePendingAt 只表示「删这一行的 storageKey」。删 replacedStorageKey 失败不得调用。
+ */
 export async function noteObjectDeleteFailure(
   host: MemberBindHost,
   row: BindFileRow,
@@ -27,17 +30,13 @@ export async function noteObjectDeleteFailure(
   })
 }
 
+/** 删匿名旧键。失败时保留 replacedStorageKey，交给 recoverStorageKeys，不写本行删除账。 */
 export async function releaseReplacedObject(host: MemberBindHost, file: BindFileRow): Promise<void> {
   if (!file.replacedStorageKey || file.replacedStorageKey === file.storageKey) return
-  try {
-    await host.files.deleteObjectAtKey(file.replacedStorageKey, file.bucket)
-  } catch (error) {
-    await noteObjectDeleteFailure(host, file, error)
-    throw error
-  }
+  await host.files.deleteObjectAtKey(file.replacedStorageKey, file.bucket)
   await host.prisma.fileObject.updateMany({
     where: { id: file.id, storageKey: file.storageKey, replacedStorageKey: file.replacedStorageKey },
-    data: { replacedStorageKey: null, storageDeletePendingAt: null, storageDeleteError: null },
+    data: { replacedStorageKey: null },
   })
 }
 

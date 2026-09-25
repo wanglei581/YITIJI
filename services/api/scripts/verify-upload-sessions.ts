@@ -12,6 +12,7 @@ import { FilesService } from '../src/files/files.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
+import { releaseReplacedObject } from '../src/upload-sessions/upload-session-object-delete'
 import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import {
@@ -23,6 +24,97 @@ import {
   file,
   makeService,
 } from './support/upload-session-verifier'
+
+async function assertReconcileKeepsMemberObject(args: {
+  prisma: PrismaService
+  files: FilesService
+  storage: StorageService
+  service: UploadSessionsService
+  redis: FakeRedis
+}): Promise<void> {
+  const { prisma, files, storage, service, redis } = args
+  const endUserId = `eu_retain_${Date.now()}`
+  let fileId = ''
+  const originalDelete = storage.deleteObject.bind(storage)
+  try {
+    await prisma.endUser.create({
+      data: { id: endUserId, phoneHash: `hash_${endUserId}`, phoneEnc: 'enc' },
+    })
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId,
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    fileId = uploaded.file!.fileId
+    const row = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.ok(row)
+    const anonymousKey = row.storageKey
+    const userKey = `users/${endUserId}/resumes/${fileId}.pdf`
+    await files.copyObjectToKey(anonymousKey, userKey, row.mimeType, row.bucket)
+    await prisma.fileObject.update({
+      where: { id: fileId },
+      data: {
+        endUserId,
+        ownerType: 'user',
+        ownerId: endUserId,
+        storageKey: userKey,
+        pendingStorageKey: null,
+        replacedStorageKey: anonymousKey,
+      },
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const parsed = JSON.parse((await redis.get(sessionKey)) ?? '{}') as Record<string, unknown>
+    parsed.bind = {
+      phase: 'copied',
+      fileId,
+      endUserId,
+      userKey,
+      previousKey: anonymousKey,
+      bucket: row.bucket,
+    }
+    await redis.setExistingWithCurrentTtl(sessionKey, JSON.stringify(parsed))
+    storage.deleteObject = async (objectKey: string, bucket?: string | null) => {
+      if (objectKey === anonymousKey) throw new Error('old key delete failed')
+      return originalDelete(objectKey, bucket)
+    }
+    await assert.rejects(
+      () => service.confirm(session.sessionId, session.controlToken, endUserId),
+      /old key delete failed/,
+    )
+    const failed = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.equal(failed?.storageKey, userKey)
+    assert.equal(failed?.storageDeletePendingAt ?? null, null)
+    assert.equal(failed?.deletedAt ?? null, null)
+    assert.ok(await storage.headObject(userKey, row.bucket), 'member object must stay after the old key delete fails')
+    await files.reconcileStorageDeletions('manual')
+    const reconciled = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.equal(reconciled?.storageDeletedAt ?? null, null, 'reconcile must not mark the member row deleted')
+    assert.equal(reconciled?.deletedAt ?? null, null)
+    assert.ok(await storage.headObject(userKey, row.bucket), 'reconcile must not delete the member object')
+    assert.equal(reconciled?.replacedStorageKey, anonymousKey)
+    await assert.rejects(
+      () => releaseReplacedObject({ prisma, files } as never, reconciled as never),
+      /old key delete failed/,
+    )
+    await files.reconcileStorageDeletions('manual')
+    const afterRelease = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.equal(afterRelease?.storageDeletePendingAt ?? null, null)
+    assert.equal(afterRelease?.storageDeletedAt ?? null, null)
+    assert.ok(await storage.headObject(userKey, row.bucket), 'releaseReplacedObject must not schedule the member object')
+    console.log('  PASS replaced-key delete failure does not let reconcile remove the member object')
+  } finally {
+    storage.deleteObject = originalDelete
+    if (fileId) await prisma.fileObject.deleteMany({ where: { id: fileId } })
+    await prisma.endUser.deleteMany({ where: { id: endUserId } })
+  }
+}
 
 async function main(): Promise<void> {
   {
@@ -801,6 +893,7 @@ async function main(): Promise<void> {
       assert.ok(after?.storageDeletedAt, 'physical object deletion must be recorded')
       assert.equal(await storage.headObject(before.storageKey, before.bucket), null)
       console.log('  PASS isolated expiry cleanup removes FileObject storage and records deletion ledger')
+      await assertReconcileKeepsMemberObject({ prisma, files, storage, service, redis })
     } finally {
       await prisma.onModuleDestroy()
       rmSync(REAL_STORAGE_DIR, { recursive: true, force: true })

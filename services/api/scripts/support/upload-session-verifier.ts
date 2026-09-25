@@ -36,6 +36,7 @@ interface StoredFile {
   pendingStorageKey?: string | null
   replacedStorageKey?: string | null
   updatedAt?: Date | null
+  storageDeletePendingAt?: Date | null
   retentionPolicy: string | null
   retentionSetBy: string | null
   retentionConsentAt: Date | null

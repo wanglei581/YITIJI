@@ -215,12 +215,7 @@ export async function driveMemberBind(
     session = await casBind(host, session, lock, intent(), expected)
     const published = finishIfPublished()
     if (published) return published
-    try {
-      await host.files.deleteObjectAtKey(file.replacedStorageKey, bucket)
-    } catch (error) {
-      await noteObjectDeleteFailure(host, file, error)
-      throw error
-    }
+    await host.files.deleteObjectAtKey(file.replacedStorageKey, bucket)
     await host.prisma.fileObject.updateMany({
       where: { id: file.id, storageKey: file.storageKey, replacedStorageKey: file.replacedStorageKey },
       data: { replacedStorageKey: null },
@@ -399,12 +394,7 @@ export async function finishConfirmed(
 ): Promise<void> {
   const file = record.file ? await loadBindFile(host, record.file.fileId) : null
   if (file?.replacedStorageKey && file.replacedStorageKey !== file.storageKey) {
-    try {
-      await host.files.deleteObjectAtKey(file.replacedStorageKey, file.bucket)
-    } catch (error) {
-      await noteObjectDeleteFailure(host, file, error)
-      throw error
-    }
+    await host.files.deleteObjectAtKey(file.replacedStorageKey, file.bucket)
     await host.prisma.fileObject.updateMany({
       where: { id: file.id, replacedStorageKey: file.replacedStorageKey },
       data: { replacedStorageKey: null },
@@ -734,10 +724,8 @@ export async function abandonAfterCommit(
   await deleteRetainedFile(host, next, reason, lock)
   try {
     await releaseCleanup(host, stored.sessionId)
-  } catch (error) {
-    // 主文件的删除结果已经分开记账。多余对象失败时留下错误类型，索引仍在，下一轮再删。
-    const row = fileId ? await loadBindFile(host, fileId) : null
-    if (row && !row.deletedAt) await noteObjectDeleteFailure(host, row, error)
+  } catch {
+    // 失败的是多余对象或过期索引，不是这一行的 storageKey。不写 storageDeletePendingAt。
   }
   return 'updated'
 }

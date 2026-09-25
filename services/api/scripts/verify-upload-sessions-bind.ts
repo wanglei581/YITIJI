@@ -980,6 +980,59 @@ async function main(): Promise<void> {
     assert.equal(prisma.files.get('p000')?.pendingStorageKey, 'poison/p000')
   }
 
+  {
+    // 旧匿名键删失败时，不能把会员新键写进 storageDeletePendingAt。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const fileId = uploaded.file!.fileId
+    const row = prisma.files.get(fileId)!
+    const anonymousKey = row.storageKey
+    const userKey = `users/member_1/resumes/${fileId}.pdf`
+    row.ownerType = 'user'
+    row.endUserId = 'member_1'
+    row.ownerId = 'member_1'
+    row.storageKey = userKey
+    row.replacedStorageKey = anonymousKey
+    row.pendingStorageKey = null
+    row.storageDeletePendingAt = null
+    prisma.files.set(fileId, row)
+    const objects = new Set<string>([anonymousKey, userKey])
+    files.deleteObjectAtKey = async (key: string) => {
+      if (key === anonymousKey) throw new Error('old key delete failed')
+      objects.delete(key)
+    }
+    const sessionKey = `upload_session:${session.sessionId}`
+    const parsed = JSON.parse((await redis.get(sessionKey)) ?? '{}') as Record<string, unknown>
+    parsed.bind = {
+      phase: 'copied',
+      fileId,
+      endUserId: 'member_1',
+      userKey,
+      previousKey: anonymousKey,
+      bucket: row.bucket,
+    }
+    await redis.setExistingWithCurrentTtl(sessionKey, JSON.stringify(parsed))
+    await assert.rejects(
+      () => service.confirm(session.sessionId, session.controlToken, 'member_1'),
+      /old key delete failed/,
+    )
+    const kept = prisma.files.get(fileId)
+    assert.equal(kept?.storageKey, userKey)
+    assert.equal(kept?.storageDeletePendingAt ?? null, null, 'the member storageKey must not be marked pending delete')
+    assert.equal(kept?.replacedStorageKey, anonymousKey)
+    assert.equal(objects.has(userKey), true, 'the member object must stay when the old key delete fails')
+  }
 
   console.log('PASS upload session bind fault verification')
 }
