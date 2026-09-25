@@ -5,6 +5,9 @@ import { RefreshCwIcon, PlayIcon, SettingsIcon } from 'lucide-react'
 import { API_BASE_URL, API_MODE, ApiHttpError } from '../../services/api/client'
 import { authHeader, redirectToLogin } from '../../services/auth'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
+import { CircuitBreakDialog, type CircuitBreakTarget } from '../components/recruitment/CircuitBreakDialog'
 
 /**
  * 统一鉴权 fetch:带 Bearer(authHeader)+ credentials,401 走全局 redirectToLogin。
@@ -173,6 +176,9 @@ export default function SyncSourcesPage() {
   const [configErr,    setConfigErr]    = useState<string | null>(null)
   const [sourceActionId, setSourceActionId] = useState<string | null>(null)
   const [sourceActionError, setSourceActionError] = useState<{ id: string; message: string } | null>(null)
+  const [circuitTarget, setCircuitTarget] = useState<CircuitBreakTarget | null>(null)
+  // 托管关闭（我们云上默认）时同步、启停、映射、批量下架都会 403，只留查看与按来源熔断。
+  const hosting = useRecruitmentHosting()
 
   const load = useCallback(() => {
     setLoading(true)
@@ -329,11 +335,14 @@ export default function SyncSourcesPage() {
         </button>
       }
     >
+      <RecruitmentHostingNotice hosting={hosting} subject="数据源的同步、启停与字段映射" />
       {/* 说明 */}
-      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
-        停用通道只停止后续 API 拉取、Webhook 接收或文件使用，既有已发布内容保持不变；如需下架，请使用独立的“批量下架内容”操作。
-        {API_MODE !== 'http' && <span className="ml-2 font-medium text-info">（当前为 mock 模式，触发操作仅模拟）</span>}
-      </div>
+      {hosting.writable && (
+        <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
+          停用通道只停止后续 API 拉取、Webhook 接收或文件使用，既有已发布内容保持不变；如需下架，请使用独立的“批量下架内容”操作。
+          {API_MODE !== 'http' && <span className="ml-2 font-medium text-info">（当前为 mock 模式，触发操作仅模拟）</span>}
+        </div>
+      )}
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
@@ -404,42 +413,53 @@ export default function SyncSourcesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-1.5">
-                          {s.accessMode === 'api' && <button
-                            onClick={() => openConfig(s)}
-                            className="flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
-                          >
-                            <SettingsIcon className="h-3 w-3" />
-                            mappings
-                          </button>}
-                          {s.accessMode === 'api' && <button
-                            disabled={trigState === 'loading' || s.archived || !s.enabled || !s.hasEndpoint}
-                            onClick={() => handleTrigger(s.id)}
-                            className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                              trigState === 'ok'    ? 'bg-success-bg text-success-fg' :
-                              trigState === 'error' ? 'bg-error-bg text-error-fg' :
-                              'bg-primary-50 text-primary-600 hover:bg-primary-100'
-                            }`}
-                            title={s.archived ? '数据源已归档' : !s.hasEndpoint ? '请先配置 endpoint' : !s.enabled ? '数据源已停用' : ''}
-                          >
-                            <PlayIcon className="h-3 w-3" />
-                            {trigState === 'loading' ? '触发中…' :
-                             trigState === 'ok'      ? '已入队' :
-                             trigState === 'error'   ? '触发失败' :
-                             '立即同步'}
-                          </button>}
+                          {hosting.writable && (
+                            <>
+                              {s.accessMode === 'api' && <button
+                                onClick={() => openConfig(s)}
+                                className="flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                              >
+                                <SettingsIcon className="h-3 w-3" />
+                                mappings
+                              </button>}
+                              {s.accessMode === 'api' && <button
+                                disabled={trigState === 'loading' || s.archived || !s.enabled || !s.hasEndpoint}
+                                onClick={() => handleTrigger(s.id)}
+                                className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                                  trigState === 'ok'    ? 'bg-success-bg text-success-fg' :
+                                  trigState === 'error' ? 'bg-error-bg text-error-fg' :
+                                  'bg-primary-50 text-primary-600 hover:bg-primary-100'
+                                }`}
+                                title={s.archived ? '数据源已归档' : !s.hasEndpoint ? '请先配置 endpoint' : !s.enabled ? '数据源已停用' : ''}
+                              >
+                                <PlayIcon className="h-3 w-3" />
+                                {trigState === 'loading' ? '触发中…' :
+                                 trigState === 'ok'      ? '已入队' :
+                                 trigState === 'error'   ? '触发失败' :
+                                 '立即同步'}
+                              </button>}
+                              <button
+                                disabled={s.archived || sourceActionId === s.id}
+                                onClick={() => void handleEnabled(s)}
+                                className="rounded border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                              >
+                                {s.archived ? '已归档' : s.enabled ? '停用通道' : '审批并启用'}
+                              </button>
+                              <button
+                                disabled={sourceActionId === s.id}
+                                onClick={() => void handleBulkUnpublish(s)}
+                                className="rounded px-2.5 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
+                              >
+                                批量下架内容
+                              </button>
+                            </>
+                          )}
                           <button
-                            disabled={s.archived || sourceActionId === s.id}
-                            onClick={() => void handleEnabled(s)}
-                            className="rounded border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                            type="button"
+                            onClick={() => setCircuitTarget({ scope: 'source', id: s.id, name: s.name, orgName: s.orgName })}
+                            className="rounded px-2.5 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
                           >
-                            {s.archived ? '已归档' : s.enabled ? '停用通道' : '审批并启用'}
-                          </button>
-                          <button
-                            disabled={sourceActionId === s.id}
-                            onClick={() => void handleBulkUnpublish(s)}
-                            className="rounded px-2.5 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
-                          >
-                            批量下架内容
+                            按来源熔断
                           </button>
                           {sourceActionError?.id === s.id && (
                             <span className="max-w-[16rem] text-xs text-error-fg">{sourceActionError.message}。请修正后重试。</span>
@@ -558,7 +578,10 @@ export default function SyncSourcesPage() {
 
       <p className="mt-3 text-xs text-neutral-400">
         所有操作写入审计。批量下架只改变岗位/招聘会发布状态，不删除来源、内容或历史记录。
+        「按来源熔断」是应急处置：停用该来源，并把它导入的内容全部下架锁定，不可撤销，会通知所属机构。
       </p>
+
+      <CircuitBreakDialog target={circuitTarget} onClose={() => setCircuitTarget(null)} onDone={load} />
     </Page>
   )
 }

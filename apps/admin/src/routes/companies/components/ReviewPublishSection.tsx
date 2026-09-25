@@ -4,7 +4,8 @@ import { Field, GhostButton, InlineError, InlineSuccess, PrimaryButton } from '.
 import { PUBLISH_BADGE, REVIEW_BADGE, errMsg, inputCls } from './shared'
 import { companiesAdminService, type AdminCompanyDetail } from '../../../services/api/companiesAdmin'
 
-export function ReviewPublishSection({ detail, onMutated }: { detail: AdminCompanyDetail; onMutated: () => void }) {
+/** readOnly：托管关闭（我们云上默认）时只显示状态，不给审核 / 发布 / 下架（点了也只会 403）。 */
+export function ReviewPublishSection({ detail, onMutated, readOnly = false }: { detail: AdminCompanyDetail; onMutated: () => void; readOnly?: boolean }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -41,44 +42,49 @@ export function ReviewPublishSection({ detail, onMutated }: { detail: AdminCompa
       {detail.reviewStatus === 'rejected' && detail.rejectReason && (
         <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">拒绝原因：{detail.rejectReason}</p>
       )}
+      {readOnly && (
+        <p className="text-xs text-neutral-500">当前只读：不审核、不发布；如需处置，请用列表中的「紧急下架」。</p>
+      )}
       <InlineError message={error} />
       <InlineSuccess message={success} />
-      <div className="flex flex-wrap items-center gap-2">
-        {detail.reviewStatus !== 'approved' && (
-          <PrimaryButton
-            disabled={busy}
-            onClick={() => void run(() => companiesAdminService.reviewCompany(detail.id, 'approve'), '已通过审核')}
-          >
-            通过审核
-          </PrimaryButton>
-        )}
-        {detail.reviewStatus !== 'rejected' && (
-          <GhostButton disabled={busy} onClick={() => setRejecting((v) => !v)}>拒绝…</GhostButton>
-        )}
-        {canPublish && (
-          <PrimaryButton
-            disabled={busy}
-            onClick={() => void run(() => companiesAdminService.publishCompany(detail.id, true), '已发布，一体机「找企业」可见')}
-          >
-            发布
-          </PrimaryButton>
-        )}
-        {canUnpublish && (
-          <GhostButton
-            disabled={busy}
-            onClick={() => {
-              if (!window.confirm(`确认下架「${detail.name}」？下架后一体机不再展示该企业。`)) return
-              void run(() => companiesAdminService.publishCompany(detail.id, false), '已下架，一体机不再展示')
-            }}
-          >
-            下架
-          </GhostButton>
-        )}
-        {detail.reviewStatus !== 'approved' && detail.publishStatus !== 'published' && (
-          <span className="text-xs text-neutral-400">审核通过后才能发布</span>
-        )}
-      </div>
-      {rejecting && (
+      {!readOnly && (
+        <div className="flex flex-wrap items-center gap-2">
+          {detail.reviewStatus !== 'approved' && (
+            <PrimaryButton
+              disabled={busy}
+              onClick={() => void run(() => companiesAdminService.reviewCompany(detail.id, 'approve'), '已通过审核')}
+            >
+              通过审核
+            </PrimaryButton>
+          )}
+          {detail.reviewStatus !== 'rejected' && (
+            <GhostButton disabled={busy} onClick={() => setRejecting((v) => !v)}>拒绝…</GhostButton>
+          )}
+          {canPublish && (
+            <PrimaryButton
+              disabled={busy}
+              onClick={() => void run(() => companiesAdminService.publishCompany(detail.id, true), '已发布，一体机「找企业」可见')}
+            >
+              发布
+            </PrimaryButton>
+          )}
+          {canUnpublish && (
+            <GhostButton
+              disabled={busy}
+              onClick={() => {
+                if (!window.confirm(`确认下架「${detail.name}」？下架后一体机不再展示该企业。`)) return
+                void run(() => companiesAdminService.publishCompany(detail.id, false), '已下架，一体机不再展示')
+              }}
+            >
+              下架
+            </GhostButton>
+          )}
+          {detail.reviewStatus !== 'approved' && detail.publishStatus !== 'published' && (
+            <span className="text-xs text-neutral-400">审核通过后才能发布</span>
+          )}
+        </div>
+      )}
+      {!readOnly && rejecting && (
         <div className="space-y-2 rounded-lg border border-error/20 bg-error-bg/50 p-3">
           <Field label="拒绝原因" required>
             <textarea
