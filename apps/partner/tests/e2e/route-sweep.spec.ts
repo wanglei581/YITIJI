@@ -54,6 +54,37 @@ test.describe('partner route sweep (mock)', () => {
     await assertPageHonest(page, errors)
   })
 
+  // 演示包里大屏一个请求都不发、一个数都不画：三个页签、桌面档与展示档都一样
+  for (const [path, title] of [
+    ['/screen/usage', '本机构信息使用态势'],
+    ['/screen/terminal', '终端数字孪生'],
+    ['/screen/overview?display=1', '本机构运营概览'],
+    ['/screen/usage?display=1', '本机构信息使用态势'],
+    ['/screen/terminal?display=1', '终端数字孪生'],
+  ] as const) {
+    test(`演示模式 ${path}：说明不展示数值，不发大屏请求`, async ({ page }) => {
+      const { errors } = collectPageFaults(page)
+      const screenRequests: string[] = []
+      page.on('request', (request) => {
+        if (request.url().includes('/partner/screen')) screenRequests.push(request.url())
+      })
+      await injectPartnerAuth(page)
+      const display = path.includes('display=1')
+      if (display) {
+        await page.goto(path, { waitUntil: 'domcontentloaded' })
+        await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible({ timeout: 15_000 })
+      } else {
+        await gotoPartner(page, path, '数据大屏')
+        await expect(page.getByRole('heading', { level: 2, name: title })).toBeVisible()
+      }
+      await expect(page.locator('h1')).toHaveCount(1)
+      await expect(page.getByText('演示模式不展示大屏数值')).toBeVisible()
+      await expect(page.locator('[data-ops-screen]')).not.toContainText(/\d+\s*(条|台|次|场|家)/)
+      expect(screenRequests).toEqual([])
+      await assertPageHonest(page, errors)
+    })
+  }
+
   for (const route of AUTHED_ROUTES) {
     test(`已登录访问 ${route.path} 有页头且无运行时错误`, async ({ page }) => {
       const { errors } = collectPageFaults(page)
