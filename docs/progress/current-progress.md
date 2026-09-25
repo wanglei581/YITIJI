@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-09-26：3.5c 小修（分支 `claude/ai-safety-aigc-20260926`，未合入、未部署）
+
+Agy 复核后的三条成立项已修，反向变异后恢复。没有改 `apps/`、产品文档、合规文档，没有访问生产。
+
+- `f8ccb77b3`：AI 生成文件的 ProduceID 必填。空串和纯空白在写入时抛错，解析时作废。
+- `8a5caa72a`：提示词门禁按每一条 system 检查；应标识的 PDF 至少两页，并逐页检查可见标识。顾问判型和比对提示词补上了安全句。
+- `f78eb374d`：给草稿简历追加 AI 解读页后，`AIGenerated` 从 false 改为 true。
+- 图谱已按这次门禁引用重生成。
+
 ## 2026-09-26：全面文档更新（Claude + Grok + Agy）
 
 按设备与软件供应方 + 托管 a 改写 CLAUDE.md、AGENTS.md、feature-scope（新增 §零 AI 求职操作系统分层、§七 已知缺口）、role-boundary、compliance-boundary（新增 §1.2 法规与资质总表）、docs/README；约 50 份旧方案加文首状态标注；content-ingestion-operator-guide 旧正文（岗位、招聘会发布到一体机）改写为托管 a 下的官方渠道与政策指南，旧文只留在 git 历史。只改文档，不删文件。（分支 `claude/docs-refresh-20260926`，由「项目资金预算评估」窗口完成，主执行窗口快进合入候选。）
