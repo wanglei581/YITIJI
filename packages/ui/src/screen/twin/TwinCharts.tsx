@@ -263,7 +263,7 @@ export function TwinTiles({ items, cols = 2, compact = false }: { items: TwinTil
         return (
           <div className="twin-tile" key={item.label}>
             {copy ? (
-              <span className="twin-pend" title={copy.detail}>{copy.title}</span>
+              <span className="twin-pend" title={`${copy.title}：${copy.detail}`}>{copy.short ?? copy.title}</span>
             ) : (
               <b>
                 {item.value}

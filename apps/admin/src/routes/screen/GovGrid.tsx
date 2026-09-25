@@ -1,5 +1,5 @@
 import { formatTime } from '@ai-job-print/shared'
-import type { ScreenAlertItem, ScreenSnapshotMetrics } from '@ai-job-print/shared'
+import { SCREEN_UNAVAILABLE_REASON, type ScreenAlertItem, type ScreenSnapshotMetrics } from '@ai-job-print/shared'
 import {
   ScreenFleetWall,
   SCREEN_SOURCE_ENTRY_NOTE,
@@ -89,6 +89,9 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   }
   // 任务流与告警 9/26 起随政务快照下发（与运营版同一份实现、同一档缓存）
   const g: ScreenSnapshotMetrics = gov.data.metrics
+  // 托管 a：我们云上不存岗位、招聘会、企业资料，这三格写「未开启」，不以 0 冒充「没有」
+  const hostingOff = gov.data.limits.recruitmentHosting === 'disabled'
+  const OFF = SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled
   const sourcesPending = !ops.data && !ops.failure
   const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
   const terminals = twinTerminalsFromCells(cells)
@@ -352,10 +355,16 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
             <>
               <TwinTiles
                 items={[
-                  { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
-                  { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
+                  hostingOff
+                    ? { label: '岗位信息', unavailableReason: OFF }
+                    : { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
+                  hostingOff
+                    ? { label: '招聘会', unavailableReason: OFF }
+                    : { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
                   { value: screenCount(value.policiesPublished), unit: '条', label: '政策公告', hint: `待审核 ${screenCount(value.policiesPending)}` },
-                  { value: screenCount(value.companiesPublished), unit: '家', label: '企业展示', hint: `待审核 ${screenCount(value.companiesPending)}` },
+                  hostingOff
+                    ? { label: '企业展示', unavailableReason: OFF }
+                    : { value: screenCount(value.companiesPublished), unit: '家', label: '企业展示', hint: `待审核 ${screenCount(value.companiesPending)}` },
                 ]}
               />
               <p className="twin-cap twin-push">

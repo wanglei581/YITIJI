@@ -19,6 +19,8 @@
 export interface ScreenReasonCopy {
   /** 卡片主文案。取数失败与结构性缺失必须不同，样式也不同。 */
   title: string
+  /** 窄格子（磁贴）里用的短称；没有就用 title。完整说明仍在悬停提示里。 */
+  short?: string
   /** 为什么没有数据。 */
   detail: string
   /** 接入方式，渲染在脚注里。 */
@@ -127,8 +129,8 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
   },
   recruitment_hosting_disabled: {
     title: '招聘内容托管未开启',
-    detail:
-      '按托管 a 的决定，我们云上不存岗位、招聘会、企业资料，这一项在客户私有化部署（b 版本）里才有数据。',
+    short: '未开启',
+    detail: '本平台的云服务不保存岗位、招聘会、企业资料，这一项只在客户私有化部署中有数据。',
     howTo: '在客户私有化部署中开启招聘内容托管后自动出现。',
     transient: false,
   },
