@@ -23,7 +23,7 @@ flowchart LR
   app --> assistant["/assistant<br/>1 页 · 38 端点"]
   app --> campus["/campus<br/>1 页 · 33 端点"]
   app --> companies["/companies<br/>2 页 · 15 端点"]
-  app --> help["/help<br/>1 页 · 0 端点"]
+  app --> help["/help<br/>1 页 · 10 端点"]
   app --> interview["/interview<br/>6 页 · 15 端点"]
   app --> job_fairs["/job-fairs<br/>9 页 · 33 端点"]
   app --> jobs["/jobs<br/>2 页 · 33 端点"]
@@ -52,7 +52,7 @@ flowchart LR
 | `/campus` | CampusPage | `apps/kiosk/src/pages/campus/CampusPage.tsx` | 33 | — |
 | `/companies` | CompaniesPage | `apps/kiosk/src/pages/companies/CompaniesPage.tsx` | 15 | 5 |
 | `/companies/:id` | CompanyDetailPage | `apps/kiosk/src/pages/companies/CompanyDetailPage.tsx` | 15 | 5 |
-| `/help` | HelpCenterPage | `apps/kiosk/src/pages/help/HelpCenterPage.tsx` | 0 | 5 |
+| `/help` | HelpCenterPage | `apps/kiosk/src/pages/help/HelpCenterPage.tsx` | 10 | 5 |
 | `/interview` | InterviewWorkbenchPage | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | 15 | 13 |
 | `/interview/report` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/reports` | Navigate | — _(重定向)_ | 0 | — |
@@ -135,7 +135,7 @@ flowchart LR
 | `/upload/phone` | PhoneUploadPage | `apps/kiosk/src/pages/upload/PhoneUploadPage.tsx` | 10 | 1 |
 
 <details>
-<summary>展开：每个路由触达的端点（66 个路由）</summary>
+<summary>展开：每个路由触达的端点（67 个路由）</summary>
 
 **`/`** → `DELETE /me/job-ai-sessions/:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
@@ -150,6 +150,8 @@ flowchart LR
 **`/companies`** → `GET /companies`、`GET /companies/:param`、`GET /companies/:param/jobs`、`GET /companies/filters`、`GET /companies/stats`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/companies/:id`** → `GET /companies`、`GET /companies/:param`、`GET /companies/:param/jobs`、`GET /companies/filters`、`GET /companies/stats`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
+
+**`/help`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/interview`** → `DELETE /me/mock-interviews/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /mock-interviews`、`POST /mock-interviews/:param/answer`、`POST /mock-interviews/:param/report/print`、`POST /mock-interviews/:param/start`
 
