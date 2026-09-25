@@ -210,9 +210,10 @@ export function LegalDocPage() {
   const activeChapter = chapter.key === chapterKey && chapter.index < sections.length ? chapter.index : 0
 
   // 返回：有站内上一页就回上一页（进来的那一页）；来路不明时回受控来源或首页，不接受任意路径。
+  // 按钮上写的必须就是点下去的去处：标签与 goBack 用同一个优先级（先历史，再受控来源，最后首页）。
   const historyIndex = (window.history.state as { idx?: number } | null)?.idx ?? 0
   const fromTarget = fromKey ? FROM_TARGETS[fromKey] : null
-  const backLabel = fromTarget?.label ?? (historyIndex > 0 ? '返回上一页' : '返回首页')
+  const backLabel = historyIndex > 0 ? '返回上一页' : (fromTarget?.label ?? '返回首页')
   const goBack = () => {
     if (historyIndex > 0) {
       navigate(-1)

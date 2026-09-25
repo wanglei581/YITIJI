@@ -625,6 +625,43 @@ test('legal document returns to the page it was opened from @w5-kiosk', async ({
   expect(errors).toEqual([])
 })
 
+test('legal document back button says where it goes, with and without in-app history @w5-kiosk', async ({ page, api }) => {
+  // 标签与去处同一个优先级：有站内上一页 →「返回上一页」且真的回上一页（哪怕地址带 ?from=login）；
+  // 冷开、没有站内上一页 → 受控来源「返回登录」且真的去 /login。两个分支都点一次，确认按钮没说谎。
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', {
+    status: 200,
+    json: { success: true, data: { content: '一、服务说明\n\n本终端提供打印与 AI 简历服务。', publishedAt: '2026-07-24T00:00:00.000Z' } },
+  })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  const topbarBack = page.locator('.qx-topbar-back')
+  const ctaBack = page.locator('.legal-doc-cta .legal-doc-btn').first()
+
+  // 分支一：站内有上一页（/help），地址又带 ?from=login。现有入口不会这样拼地址，
+  // 用 pushState + popstate 模拟一次站内前进（与 kiosk-privacy-timeout 的做法相同）。
+  await page.goto('/help')
+  await expect(page.locator('[data-kiosk-screen="help"]')).toBeVisible()
+  await page.evaluate(() => {
+    window.history.pushState({ usr: null, key: 'legal-from-login', idx: 1 }, '', '/legal/terms?from=login')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+  })
+  await expect(page.getByRole('heading', { name: '一、服务说明', exact: true })).toBeVisible()
+  await expect(topbarBack).toHaveAttribute('aria-label', '返回上一页')
+  await expect(ctaBack).toHaveText('返回上一页')
+  await ctaBack.click()
+  await expect(page).toHaveURL(/\/help$/)
+
+  // 分支二：冷开 ?from=login，没有站内上一页 → 按受控来源回登录。
+  await page.goto('/legal/terms?from=login')
+  await expect(page.getByRole('heading', { name: '一、服务说明', exact: true })).toBeVisible()
+  await expect(topbarBack).toHaveAttribute('aria-label', '返回登录')
+  await expect(ctaBack).toHaveText('返回登录')
+  await topbarBack.click()
+  await expect(page).toHaveURL(/\/login$/)
+  expect(errors).toEqual([])
+})
+
 test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
