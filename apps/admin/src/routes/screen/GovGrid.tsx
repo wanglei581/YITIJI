@@ -62,7 +62,7 @@ function countStates(terminals: TwinCityTerminal[]): Record<TwinState, number> {
   return out
 }
 
-function alertRows(items: ScreenAlertItem[], onOpen: (code: string) => void): TwinAlertItem[] {
+function alertRows(items: ScreenAlertItem[], onOpen: (code: string) => void, presenting: boolean): TwinAlertItem[] {
   return items.slice(0, 4).map((item, index) => ({
     key: `${item.terminalCode ?? 'none'}-${item.type}-${index}`,
     severity: item.severity === 'error' ? 'err' : item.severity === 'warning' ? 'warn' : 'un',
@@ -70,7 +70,7 @@ function alertRows(items: ScreenAlertItem[], onOpen: (code: string) => void): Tw
     code: item.terminalCode ?? '—',
     text: item.title,
     whenText: formatTime(item.occurredAt),
-    href: item.terminalCode ? '/alerts' : undefined,
+    href: item.terminalCode && !presenting ? '/alerts' : undefined,
     onClick: item.terminalCode ? () => onOpen(item.terminalCode as string) : undefined,
   }))
 }
@@ -133,7 +133,8 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   const openAlertTerminal = (code: string) => {
     const hit = terminals.find((t) => t.code === code)
     if (hit) openTerminal(hit.id)
-    else chrome.onNavigate('/alerts')
+    // 展示档无人值守：找不到对应终端时原地不动，绝不跳出舞台进后台页面
+    else if (!chrome.presenting) chrome.onNavigate('/alerts')
   }
 
   const toolbar = (
@@ -199,7 +200,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
       toolbar={toolbar}
       meta={snapshotMeta(gov.data)}
       pollSeconds={60}
-      failure={gov.failure}
+      failure={gov.failure ?? ops.failure}
       onRefresh={() => {
         void gov.refresh()
         void ops.refresh()
@@ -467,7 +468,13 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
         ) : (
           <TwinMetricPanel
             title={focus === null ? '实时告警' : `${focus}告警`}
-            sub={o?.alertsRealtime?.available ? `当前 ${screenCount(o.alertsRealtime.value.firingCount)} 条` : undefined}
+            sub={
+              o?.alertsRealtime?.available
+                ? focus === null
+                  ? `当前 ${screenCount(o.alertsRealtime.value.firingCount)} 条`
+                  : `本区 ${screenCount(o.alertsRealtime.value.items.filter((item) => item.terminalCode !== null && areaCodes.has(item.terminalCode)).length)} 条 · 全市 ${screenCount(o.alertsRealtime.value.firingCount)} 条`
+                : undefined
+            }
             tone="err"
             metric={o?.alertsRealtime}
             source="与告警中心同一份实时派生告警（终端离线、打印机异常等），按发生时间倒序。处置请到告警中心。"
@@ -475,7 +482,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
               const items = focus === null ? value.items : value.items.filter((item) => item.terminalCode !== null && areaCodes.has(item.terminalCode))
               return (
                 <>
-                  <TwinAlertList items={alertRows(items, openAlertTerminal)} emptyText={focus === null ? '当前没有告警' : `${focus}当前没有告警`} />
+                  <TwinAlertList items={alertRows(items, openAlertTerminal, chrome.presenting)} emptyText={focus === null ? '当前没有告警' : `${focus}当前没有告警`} />
                   {chrome.presenting ? null : <a className="twin-cap twin-push" href="/alerts" onClick={(event) => { event.preventDefault(); chrome.onNavigate('/alerts') }} style={{ alignSelf: 'flex-end', minHeight: 44, display: 'inline-flex', alignItems: 'center', color: '#9fe8cd' }}>
                     进入告警中心 →
                   </a>}

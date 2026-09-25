@@ -19,7 +19,8 @@ export interface TwinNetworkService {
 }
 
 export interface TwinNetworkProps {
-  channels: Array<{ key: 'kiosk' | 'miniapp'; label: string; count: number | null; caption: string }>
+  /** count：数字 = 真实计数；null = 服务端因样本少于 5 置空；'na' = 该指标本次不可用（未接入或取数失败）。 */
+  channels: Array<{ key: 'kiosk' | 'miniapp'; label: string; count: number | null | 'na'; caption: string }>
   services: TwinNetworkService[]
   outcomes: Array<{ key: 'sourceOpens' | 'favorites' | 'aiReports' | 'printed'; label: string; count: number | null }>
   hubLabel: string
@@ -56,12 +57,13 @@ const OUTCOME_LAYOUT: Record<string, { at: [number, number]; lift: number; from:
 const LANE_CLASS: Record<TwinNetworkLane, string> = { info: 'p-info', ai: 'p-ai', print: 'p-print' }
 const LANE_STROKE: Record<TwinNetworkLane, string> = { info: '#8fb2ee', ai: '#2ee6a8', print: '#72d6ff' }
 
-function countText(count: number | null): string {
+function countText(count: number | null | 'na'): string {
+  if (count === 'na') return '未接入'
   return count === null ? '少于 5' : screenCount(count)
 }
 
-function flowWidth(count: number | null, base: number, div: number): number {
-  return count === null ? base : base + Math.sqrt(count) / div
+function flowWidth(count: number | null | 'na', base: number, div: number): number {
+  return count === null || count === 'na' ? base : base + Math.sqrt(count) / div
 }
 
 function Pill({ at, lift, width, className, children }: { at: [number, number]; lift: number; width: number; className: string; children: ReactNode }) {

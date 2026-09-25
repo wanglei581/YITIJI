@@ -17,6 +17,7 @@ import {
   TwinTiles,
   screenCount,
   twinSmall,
+  type TwinTileItem,
 } from '@ai-job-print/ui'
 import { loadAdminUsage, normalizeUsageRange } from '../../services/api/consoleScreen'
 import { aiOperationLabel } from './metricLabels'
@@ -52,6 +53,14 @@ function usageMeta(usage: ScreenUsageSnapshot): ShellMeta {
 function weekdayOf(date: string): string {
   const [y, m, d] = date.split('-').map(Number)
   return WEEKDAY[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
+}
+
+/** 访问人次三态：已接入给数，未接入给原因；契约里它现在是 never，接入后类型会随之放开。 */
+function visitsTile(metric: ScreenUsageSnapshot['metrics']['visits']): TwinTileItem {
+  if (!metric) return { label: '访问人次', unavailableReason: 'kiosk_session_unwritten' }
+  if (metric.available === false) return { label: '访问人次', unavailableReason: metric.reason }
+  const value = (metric as { value: unknown }).value
+  return typeof value === 'number' ? { value: twinSmall(value), unit: '人次', label: '访问人次' } : { label: '访问人次', unavailableReason: 'source_query_failed' }
 }
 
 function percent(value: number | null): string {
@@ -147,9 +156,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                         unit: value.memberOrders !== null && value.paidOrders !== null && value.paidOrders > 0 ? '%' : undefined,
                         label: '会员下单占比',
                       },
-                      u.visits && u.visits.available === false
-                        ? { label: '访问人次', unavailableReason: u.visits.reason }
-                        : { label: '访问人次', unavailableReason: 'kiosk_session_unwritten' },
+                      visitsTile(u.visits),
                     ]}
                   />
                 </div>
@@ -225,8 +232,8 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
             <TwinSceneBox baseWidth={TWIN_STAGE_W} baseHeight={TWIN_STAGE_H} label="服务调用网络">
               <TwinNetwork
                 channels={[
-                  { key: 'kiosk', label: '一体机', count: u.channels?.available ? u.channels.value.kiosk : null, caption: '已付款订单' },
-                  { key: 'miniapp', label: '小程序', count: u.channels?.available ? u.channels.value.miniapp : null, caption: '已付款订单' },
+                  { key: 'kiosk', label: '一体机', count: u.channels?.available ? u.channels.value.kiosk : 'na', caption: '已付款订单' },
+                  { key: 'miniapp', label: '小程序', count: u.channels?.available ? u.channels.value.miniapp : 'na', caption: '已付款订单' },
                 ]}
                 services={u.services.value.map((s) => ({ key: s.key, lane: s.lane, count: s.count }))}
                 outcomes={[
