@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`532` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`537` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -368,7 +368,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/jobs` | JobAiController.list | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
+| GET | `/api/v1/jobs` | JobAiController.list | — | JobAiService<br/>KioskJobBoardService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>KioskJobBoardConfig<br/>Terminal<br/>UserAiConsent |
 | DELETE | `/api/v1/jobs/:id` | JobAiController.remove | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
 | POST | `/api/v1/jobs/:id/ai/explain` | JobAiController.explain | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
 | POST | `/api/v1/jobs/:id/ai/match` | JobAiController.match | — | GovernedJobFitService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
@@ -379,7 +379,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/me/job-applications` | JobApplicationsController.list | — | — | — |
-| POST | `/api/v1/me/job-applications` | JobApplicationsController.create | — | JobApplicationsService | Job<br/>JobApplication |
+| POST | `/api/v1/me/job-applications` | JobApplicationsController.create | — | JobApplicationsService<br/>KioskJobBoardService | Job<br/>JobApplication<br/>KioskJobBoardConfig<br/>Terminal |
 | DELETE | `/api/v1/me/job-applications/:id` | JobApplicationsController.remove | — | — | — |
 | PATCH | `/api/v1/me/job-applications/:id` | JobApplicationsController.update | — | JobApplicationsService | Job<br/>JobApplication |
 
@@ -486,7 +486,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/kiosk/campus/recruitment-stats` | KioskCampusRecruitmentStatsController.getRecruitmentStats | — | CampusRecruitmentStatsService | Job<br/>JobFair |
+| GET | `/api/v1/kiosk/campus/recruitment-stats` | KioskCampusRecruitmentStatsController.getRecruitmentStats | — | CampusRecruitmentStatsService<br/>KioskJobBoardService | Job<br/>JobFair<br/>KioskJobBoardConfig<br/>Terminal |
 
 ## `services/api/src/jobs/partner-fairs.controller.ts`
 
@@ -647,6 +647,7 @@
 | POST | `/api/v1/me/print-orders` | MemberPrintOrdersController.create | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/me/print-orders/:orderId/reissue-pickup-code` | MemberPrintOrdersController.reissuePickupCode | — | PickupCodeReissueService | AuditLog<br/>FileObject<br/>Order<br/>Terminal |
 | GET | `/api/v1/me/print-orders/cloud` | MemberPrintOrdersController.listCloud | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/submissions/resolve` | MemberPrintOrdersController.resolveSubmissions | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 
@@ -735,15 +736,15 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/kiosk/offline-jobs/:id` | KioskOfflineJobsController.findOne | — | OfflineAgenciesService | OfflineAgency<br/>OfflineJob |
+| GET | `/api/v1/kiosk/offline-jobs/:id` | KioskOfflineJobsController.findOne | — | KioskJobBoardService<br/>OfflineAgenciesService | KioskJobBoardConfig<br/>OfflineAgency<br/>OfflineJob<br/>Terminal |
 
 ## `services/api/src/offline-agencies/offline-agencies.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/kiosk/offline-agencies` | OfflineAgenciesController.findAll | — | OfflineAgenciesService | OfflineAgency<br/>OfflineJob |
-| GET | `/api/v1/kiosk/offline-agencies/:id` | OfflineAgenciesController.findOne | — | OfflineAgenciesService | OfflineAgency<br/>OfflineJob |
-| GET | `/api/v1/kiosk/offline-agencies/:id/jobs` | OfflineAgenciesController.findJobsByAgency | — | OfflineAgenciesService | OfflineAgency<br/>OfflineJob |
+| GET | `/api/v1/kiosk/offline-agencies/:id` | OfflineAgenciesController.findOne | — | KioskJobBoardService<br/>OfflineAgenciesService | KioskJobBoardConfig<br/>OfflineAgency<br/>OfflineJob<br/>Terminal |
+| GET | `/api/v1/kiosk/offline-agencies/:id/jobs` | OfflineAgenciesController.findJobsByAgency | — | KioskJobBoardService<br/>OfflineAgenciesService | KioskJobBoardConfig<br/>OfflineAgency<br/>OfflineJob<br/>Terminal |
 
 ## `services/api/src/orgs/admin-orgs.controller.ts`
 
@@ -800,7 +801,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/admin/orders/:id/mark-paid` | AdminOrderActionsController.markPaid | admin | OrderStatusService | AuditLog<br/>Order |
+| POST | `/api/v1/admin/orders/:id/mark-paid` | AdminOrderActionsController.markPaid | admin | OrderStatusService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem |
 | POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
 
 ## `services/api/src/payment/order-quote.controller.ts`
@@ -921,6 +922,15 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/sync/webhook` | SyncController.webhook | — | — | — |
+
+## `services/api/src/terminals/admin-kiosk-job-board.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/kiosk-job-board` | AdminKioskJobBoardController.getGlobal | admin | KioskJobBoardService | KioskJobBoardConfig<br/>Terminal |
+| PUT | `/api/v1/admin/kiosk-job-board` | AdminKioskJobBoardController.saveGlobal | admin | AuditService<br/>KioskJobBoardService | AuditLog<br/>KioskJobBoardConfig<br/>Terminal |
+| GET | `/api/v1/admin/terminals/:terminalId/job-board-config` | AdminKioskJobBoardController.getTerminal | admin | KioskJobBoardService | KioskJobBoardConfig<br/>Terminal |
+| PUT | `/api/v1/admin/terminals/:terminalId/job-board-config` | AdminKioskJobBoardController.saveTerminal | admin | AuditService<br/>KioskJobBoardService | AuditLog<br/>KioskJobBoardConfig<br/>Terminal |
 
 ## `services/api/src/terminals/admin-printers.controller.ts`
 

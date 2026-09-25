@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 532,
+    "endpointCount": 537,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -1993,6 +1993,47 @@
         ]
       },
       {
+        "controller": "services/api/src/terminals/admin-kiosk-job-board.controller.ts",
+        "handler": "AdminKioskJobBoardController.getGlobal",
+        "method": "GET",
+        "models": [
+          "KioskJobBoardConfig",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/kiosk-job-board",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/kiosk-job-board.service.ts"
+        ],
+        "services": [
+          "KioskJobBoardService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-kiosk-job-board.controller.ts",
+        "handler": "AdminKioskJobBoardController.saveGlobal",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "KioskJobBoardConfig",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/kiosk-job-board",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
+        ],
+        "services": [
+          "AuditService",
+          "KioskJobBoardService"
+        ]
+      },
+      {
         "controller": "services/api/src/legal/admin-legal-docs.controller.ts",
         "handler": "AdminLegalDocsController.list",
         "method": "GET",
@@ -2520,7 +2561,9 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "Order"
+          "FileObject",
+          "Order",
+          "OrderItem"
         ],
         "path": "/api/v1/admin/orders/:id/mark-paid",
         "roles": [
@@ -3693,6 +3736,47 @@
         ],
         "services": [
           "TerminalsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-kiosk-job-board.controller.ts",
+        "handler": "AdminKioskJobBoardController.getTerminal",
+        "method": "GET",
+        "models": [
+          "KioskJobBoardConfig",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/terminals/:terminalId/job-board-config",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/kiosk-job-board.service.ts"
+        ],
+        "services": [
+          "KioskJobBoardService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-kiosk-job-board.controller.ts",
+        "handler": "AdminKioskJobBoardController.saveTerminal",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "KioskJobBoardConfig",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/terminals/:terminalId/job-board-config",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
+        ],
+        "services": [
+          "AuditService",
+          "KioskJobBoardService"
         ]
       },
       {
@@ -6070,15 +6154,19 @@
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "KioskJobBoardConfig",
+          "Terminal",
           "UserAiConsent"
         ],
         "path": "/api/v1/jobs",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/job-ai/job-ai.service.ts"
+          "services/api/src/job-ai/job-ai.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
         ],
         "services": [
-          "JobAiService"
+          "JobAiService",
+          "KioskJobBoardService"
         ]
       },
       {
@@ -6275,15 +6363,19 @@
         "method": "GET",
         "models": [
           "Job",
-          "JobFair"
+          "JobFair",
+          "KioskJobBoardConfig",
+          "Terminal"
         ],
         "path": "/api/v1/kiosk/campus/recruitment-stats",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/jobs/campus-recruitment-stats.service.ts"
+          "services/api/src/jobs/campus-recruitment-stats.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
         ],
         "services": [
-          "CampusRecruitmentStatsService"
+          "CampusRecruitmentStatsService",
+          "KioskJobBoardService"
         ]
       },
       {
@@ -6374,15 +6466,19 @@
         "handler": "OfflineAgenciesController.findOne",
         "method": "GET",
         "models": [
+          "KioskJobBoardConfig",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "Terminal"
         ],
         "path": "/api/v1/kiosk/offline-agencies/:id",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/offline-agencies/offline-agencies.service.ts"
+          "services/api/src/offline-agencies/offline-agencies.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
         ],
         "services": [
+          "KioskJobBoardService",
           "OfflineAgenciesService"
         ]
       },
@@ -6391,15 +6487,19 @@
         "handler": "OfflineAgenciesController.findJobsByAgency",
         "method": "GET",
         "models": [
+          "KioskJobBoardConfig",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "Terminal"
         ],
         "path": "/api/v1/kiosk/offline-agencies/:id/jobs",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/offline-agencies/offline-agencies.service.ts"
+          "services/api/src/offline-agencies/offline-agencies.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
         ],
         "services": [
+          "KioskJobBoardService",
           "OfflineAgenciesService"
         ]
       },
@@ -6408,15 +6508,19 @@
         "handler": "KioskOfflineJobsController.findOne",
         "method": "GET",
         "models": [
+          "KioskJobBoardConfig",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "Terminal"
         ],
         "path": "/api/v1/kiosk/offline-jobs/:id",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/offline-agencies/offline-agencies.service.ts"
+          "services/api/src/offline-agencies/offline-agencies.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
         ],
         "services": [
+          "KioskJobBoardService",
           "OfflineAgenciesService"
         ]
       },
@@ -6949,15 +7053,19 @@
         "method": "POST",
         "models": [
           "Job",
-          "JobApplication"
+          "JobApplication",
+          "KioskJobBoardConfig",
+          "Terminal"
         ],
         "path": "/api/v1/me/job-applications",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/job-applications/job-applications.service.ts"
+          "services/api/src/job-applications/job-applications.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
         ],
         "services": [
-          "JobApplicationsService"
+          "JobApplicationsService",
+          "KioskJobBoardService"
         ]
       },
       {
@@ -7133,6 +7241,25 @@
         ],
         "services": [
           "MemberPrintOrderCreateService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
+        "handler": "MemberPrintOrdersController.reissuePickupCode",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "FileObject",
+          "Order",
+          "Terminal"
+        ],
+        "path": "/api/v1/me/print-orders/:orderId/reissue-pickup-code",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-print-orders/pickup-code-reissue.service.ts"
+        ],
+        "services": [
+          "PickupCodeReissueService"
         ]
       },
       {
@@ -15037,7 +15164,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 102,
+    "modelCount": 103,
     "models": [
       {
         "fieldCount": 7,
@@ -15548,7 +15675,7 @@
         ]
       },
       {
-        "fieldCount": 46,
+        "fieldCount": 48,
         "name": "FileObject",
         "relations": [
           "DocumentProcessTask",
@@ -15585,6 +15712,7 @@
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/member-privacy/member-data-export-reconciler.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/payment/pickup-validity.ts",
           "services/api/src/print-conversion/print-conversion.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/pii-scan-gate.ts",
@@ -15593,7 +15721,8 @@
           "services/api/src/print-sign/print-sign.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts",
-          "services/api/src/upload-sessions/upload-sessions.service.ts"
+          "services/api/src/upload-sessions/upload-session-member-bind.ts",
+          "services/api/src/upload-sessions/upload-session-object-delete.ts"
         ]
       },
       {
@@ -15778,6 +15907,14 @@
         "usedBy": []
       },
       {
+        "fieldCount": 6,
+        "name": "KioskJobBoardConfig",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/terminals/kiosk-job-board.service.ts"
+        ]
+      },
+      {
         "fieldCount": 9,
         "name": "KioskSession",
         "relations": [],
@@ -15920,10 +16057,12 @@
           "services/api/src/member-print-orders/order-submission-ledger.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/member-print-orders/pickup-code-reissue.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/pending-refund-signal.ts",
+          "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/payment/refund.service.ts",
@@ -15944,6 +16083,8 @@
         ],
         "usedBy": [
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
+          "services/api/src/payment/pickup-expiry-refund.service.ts",
+          "services/api/src/payment/pickup-validity.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
@@ -16097,6 +16238,7 @@
           "services/api/src/member-feedback/member-feedback.service.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
+          "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/refund.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
@@ -16251,6 +16393,7 @@
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts",
           "services/api/src/terminals/release-observation.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
@@ -20402,6 +20545,7 @@
       "services/api/scripts/verify-jobfair-review.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-print-orders.ts",
@@ -20412,11 +20556,13 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/scripts/support/minimal-pdf.ts": [
@@ -20430,6 +20576,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
@@ -20448,6 +20595,11 @@
     ],
     "services/api/scripts/support/recruitment-wave2-public-snapshot.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
+    ],
+    "services/api/scripts/support/upload-session-verifier.ts": [
+      "services/api/scripts/verify-upload-sessions-bind.ts",
+      "services/api/scripts/verify-upload-sessions-faults.ts",
+      "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/scripts/verify-admin-fairs.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -20505,6 +20657,9 @@
     "services/api/scripts/verify-kiosk-cashier-ui.ts": [
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
+    ],
+    "services/api/scripts/verify-kiosk-job-board-switch.ts": [
+      "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "services/api/scripts/verify-member-assets.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -20564,12 +20719,14 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/activity/activity.controller.ts": [
-      "services/api/scripts/verify-activity-logs.ts"
+      "services/api/scripts/verify-activity-logs.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/activity/activity.service.ts": [
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-jobfair-checkin.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-member-data-retention.ts"
     ],
     "services/api/src/activity/activity.types.ts": [
@@ -20578,7 +20735,8 @@
       "services/api/scripts/verify-jobfair-checkin.ts"
     ],
     "services/api/src/activity/me-activity.controller.ts": [
-      "services/api/scripts/verify-activity-logs.ts"
+      "services/api/scripts/verify-activity-logs.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/admin-ops/admin-alert-actions.service.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -20726,6 +20884,9 @@
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
+    "services/api/src/ai/career-plan.controller.ts": [
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+    ],
     "services/api/src/ai/dto/assistant-chat.dto.ts": [
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
@@ -20766,7 +20927,8 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
-      "services/api/scripts/verify-job-fit-print.ts"
+      "services/api/scripts/verify-job-fit-print.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/ai/kiosk-ai-capabilities.controller.ts": [
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
@@ -21131,6 +21293,7 @@
       "services/api/scripts/verify-jobfair-review.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
@@ -21154,6 +21317,7 @@
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
@@ -21474,6 +21638,7 @@
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
@@ -21499,6 +21664,7 @@
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
@@ -21506,7 +21672,8 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
-      "services/api/scripts/verify-upload-scene.ts"
+      "services/api/scripts/verify-upload-scene.ts",
+      "services/api/scripts/verify-upload-sessions-faults.ts"
     ],
     "services/api/src/common/throttler/terminal-throttle.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts",
@@ -21522,12 +21689,14 @@
       "services/api/scripts/verify-community-daily-brief.ts"
     ],
     "services/api/src/companies/companies.controller.ts": [
-      "services/api/scripts/verify-companies.ts"
+      "services/api/scripts/verify-companies.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/companies/companies.service.ts": [
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
-      "services/api/scripts/verify-job-validity-expiry.ts"
+      "services/api/scripts/verify-job-validity-expiry.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/companies/companies.types.ts": [
       "services/api/scripts/verify-companies.ts"
@@ -21692,8 +21861,7 @@
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-file-display-truth.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
-      "services/api/scripts/verify-member-data-export-files.ts",
-      "services/api/scripts/verify-upload-sessions.ts"
+      "services/api/scripts/verify-member-data-export-files.ts"
     ],
     "services/api/src/files/file.types.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -21701,8 +21869,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
-      "services/api/scripts/verify-member-data-retention.ts",
-      "services/api/scripts/verify-upload-sessions.ts"
+      "services/api/scripts/verify-member-data-retention.ts"
     ],
     "services/api/src/files/files.cleanup.task.ts": [
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
@@ -21755,6 +21922,7 @@
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
+      "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/files/lifecycle-summary.ts": [
@@ -21809,7 +21977,8 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
-      "services/api/scripts/verify-job-ai-privacy.ts"
+      "services/api/scripts/verify-job-ai-privacy.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/job-ai/job-ai.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -21856,13 +22025,15 @@
       "services/api/scripts/verify-job-application-track.ts"
     ],
     "services/api/src/job-applications/job-applications.controller.ts": [
-      "services/api/scripts/verify-job-application-track.ts"
+      "services/api/scripts/verify-job-application-track.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/job-applications/job-applications.module.ts": [
       "services/api/scripts/verify-job-application-track.ts"
     ],
     "services/api/src/job-applications/job-applications.service.ts": [
-      "services/api/scripts/verify-job-application-track.ts"
+      "services/api/scripts/verify-job-application-track.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/job-materials/job-material-pdf.service.ts": [
       "services/api/scripts/verify-cjk-font.ts",
@@ -21922,7 +22093,8 @@
       "services/api/scripts/verify-campus-recruitment-stats.ts"
     ],
     "services/api/src/jobs/campus-recruitment-stats.service.ts": [
-      "services/api/scripts/verify-campus-recruitment-stats.ts"
+      "services/api/scripts/verify-campus-recruitment-stats.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/jobs/data-source-credential-policy.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -22022,7 +22194,8 @@
     ],
     "services/api/src/jobs/job-requirement-stats.service.ts": [
       "services/api/scripts/verify-backend-p0-http.ts",
-      "services/api/scripts/verify-job-requirement-stats.ts"
+      "services/api/scripts/verify-job-requirement-stats.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/jobs/job-validity.ts": [
       "services/api/scripts/verify-job-validity-expiry.ts"
@@ -22081,6 +22254,7 @@
       "services/api/scripts/verify-job-validity-expiry.ts",
       "services/api/scripts/verify-jobfair-campus-priority.ts",
       "services/api/scripts/verify-jobfair-review.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-partner-org-self.ts",
@@ -22125,6 +22299,7 @@
       "services/api/scripts/verify-job-requirement-stats.ts",
       "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-jobfair-review.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-partner-excel-template.ts"
     ],
@@ -22148,6 +22323,7 @@
       "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-jobfair-campus-priority.ts",
       "services/api/scripts/verify-jobfair-review.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
@@ -22156,6 +22332,7 @@
     ],
     "services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts": [
       "services/api/scripts/verify-campus-recruitment-stats.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/jobs/partner-capabilities.ts": [
@@ -22310,7 +22487,11 @@
       "services/api/scripts/verify-member-favorites-benefits.ts",
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
+    "services/api/src/member-favorites/member-favorites.controller.ts": [
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+    ],
     "services/api/src/member-favorites/member-favorites.service.ts": [
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-member-favorites-benefits.ts"
     ],
     "services/api/src/member-feedback/admin-member-feedback.controller.ts": [
@@ -22352,12 +22533,14 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "services/api/src/member-print-orders/member-print-orders.controller.ts": [
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
-      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/member-print-orders/member-print-orders.service.ts": [
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -22371,10 +22554,15 @@
     "services/api/src/member-print-orders/package-order.service.ts": [
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
-      "services/api/scripts/verify-package-order-idempotency.ts"
+      "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/member-print-orders/package-orders.controller.ts": [
       "services/api/scripts/verify-package-order-idempotency-http.ts"
+    ],
+    "services/api/src/member-print-orders/pickup-code-reissue.service.ts": [
+      "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/member-privacy/admin-member-privacy.controller.ts": [
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -22484,6 +22672,9 @@
     "services/api/src/offline-agencies/dto/create-offline-agency.dto.ts": [
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
     ],
+    "services/api/src/offline-agencies/kiosk-offline-jobs.controller.ts": [
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+    ],
     "services/api/src/offline-agencies/offline-agencies.service.ts": [
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -22570,6 +22761,7 @@
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
@@ -22589,6 +22781,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-redemption-audit.ts",
       "services/api/scripts/verify-refund-convergence.ts",
@@ -22604,6 +22797,7 @@
       "services/api/scripts/verify-payment-codepay.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-refund-convergence.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -22641,7 +22835,8 @@
       "services/api/scripts/verify-payment-codepay.ts"
     ],
     "services/api/src/payment/payment.module.ts": [
-      "services/api/scripts/verify-payment-codepay.ts"
+      "services/api/scripts/verify-payment-codepay.ts",
+      "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/payment/payment.types.ts": [
       "services/api/scripts/verify-admin-order-filters.ts"
@@ -22654,6 +22849,15 @@
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
+    ],
+    "services/api/src/payment/pickup-expiry-refund.service.ts": [
+      "services/api/scripts/verify-pickup-code-share.ts"
+    ],
+    "services/api/src/payment/pickup-expiry-refund.task.ts": [
+      "services/api/scripts/verify-pickup-code-share.ts"
+    ],
+    "services/api/src/payment/pickup-validity.ts": [
+      "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/payment/price-config.seed.ts": [
       "services/api/scripts/verify-admin-billing.ts",
@@ -22668,6 +22872,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -22694,6 +22899,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -22743,6 +22949,7 @@
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-refund-convergence.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
@@ -22814,7 +23021,14 @@
     ],
     "services/api/src/print-jobs/pickup-claim-lockout.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
-      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-pickup-code-share.ts"
+    ],
+    "services/api/src/print-jobs/pickup-claim-memory.ts": [
+      "services/api/scripts/verify-pickup-code-share.ts"
+    ],
+    "services/api/src/print-jobs/pickup-claim-rate-limit.ts": [
+      "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/print-jobs/pickup-order.service.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -22822,6 +23036,7 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts"
     ],
@@ -22874,6 +23089,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
@@ -22983,6 +23199,7 @@
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -23015,6 +23232,7 @@
       "services/api/scripts/verify-partner-stats-contract.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
@@ -23049,6 +23267,7 @@
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
       "services/api/scripts/verify-toolbox-review-workflow.ts",
+      "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts",
       "services/api/scripts/verify-wave3-print-aftercare.ts",
@@ -23163,6 +23382,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -23197,6 +23417,7 @@
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
@@ -23212,6 +23433,7 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
+      "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
@@ -23225,6 +23447,9 @@
     "services/api/src/sync/sync.service.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-job-customer-sample-readiness.ts"
+    ],
+    "services/api/src/terminals/admin-kiosk-job-board.controller.ts": [
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
       "services/api/scripts/verify-terminal-bind-code.ts",
@@ -23255,6 +23480,9 @@
     "services/api/src/terminals/dto/save-toolbox-config.dto.ts": [
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
+    "services/api/src/terminals/kiosk-job-board.service.ts": [
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+    ],
     "services/api/src/terminals/printer-availability.ts": [
       "services/api/scripts/verify-admin-ops.ts"
     ],
@@ -23276,6 +23504,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -23310,6 +23539,7 @@
     ],
     "services/api/src/terminals/terminal-toolbox.service.ts": [
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
@@ -23324,11 +23554,13 @@
       "services/api/scripts/verify-toolbox-review-workflow.ts"
     ],
     "services/api/src/terminals/terminal-utils.ts": [
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "services/api/src/terminals/terminals-admin.service.ts": [
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
@@ -23347,6 +23579,7 @@
     "services/api/src/terminals/terminals-agent.service.ts": [
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
@@ -23423,6 +23656,9 @@
     "services/api/src/upload-sessions/upload-scene.ts": [
       "services/api/scripts/verify-upload-scene.ts"
     ],
+    "services/api/src/upload-sessions/upload-session-object-delete.ts": [
+      "services/api/scripts/verify-upload-sessions.ts"
+    ],
     "services/api/src/upload-sessions/upload-sessions.controller.ts": [
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -23430,6 +23666,7 @@
     "services/api/src/upload-sessions/upload-sessions.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-upload-scene.ts",
+      "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ]
   },
@@ -31867,6 +32104,49 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/activity/activity.controller.ts",
+          "services/api/src/activity/activity.service.ts",
+          "services/api/src/activity/me-activity.controller.ts",
+          "services/api/src/ai/career-plan.controller.ts",
+          "services/api/src/ai/job-fit.controller.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/companies/companies.controller.ts",
+          "services/api/src/companies/companies.service.ts",
+          "services/api/src/job-ai/job-ai.controller.ts",
+          "services/api/src/job-applications/job-applications.controller.ts",
+          "services/api/src/job-applications/job-applications.service.ts",
+          "services/api/src/jobs/campus-recruitment-stats.service.ts",
+          "services/api/src/jobs/job-requirement-stats.service.ts",
+          "services/api/src/jobs/jobs-kiosk.service.ts",
+          "services/api/src/jobs/jobs.controller.ts",
+          "services/api/src/jobs/jobs.service.ts",
+          "services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts",
+          "services/api/src/member-favorites/member-favorites.controller.ts",
+          "services/api/src/member-favorites/member-favorites.service.ts",
+          "services/api/src/offline-agencies/kiosk-offline-jobs.controller.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/admin-kiosk-job-board.controller.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts",
+          "services/api/src/terminals/terminal-toolbox.service.ts",
+          "services/api/src/terminals/terminal-utils.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/file.types.ts",
@@ -32417,6 +32697,7 @@
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
+          "services/api/src/member-print-orders/pickup-code-reissue.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/price-config.seed.ts",
@@ -33433,6 +33714,52 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:payment-real-channels"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.controller.ts",
+          "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/member-print-orders/pickup-code-reissue.service.ts",
+          "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/payment-provider.factory.ts",
+          "services/api/src/payment/payment.module.ts",
+          "services/api/src/payment/pickup-expiry-refund.service.ts",
+          "services/api/src/payment/pickup-expiry-refund.task.ts",
+          "services/api/src/payment/pickup-validity.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/payment/refund.service.ts",
+          "services/api/src/print-jobs/pickup-claim-lockout.ts",
+          "services/api/src/print-jobs/pickup-claim-memory.ts",
+          "services/api/src/print-jobs/pickup-claim-rate-limit.ts",
+          "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.interface.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pickup-code-share.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pickup-code-share",
+        "@ai-job-print/api::verify:print-jobs"
       ],
       "wired": true
     },
@@ -35025,6 +35352,7 @@
           "services/api/prisma/migrations/20260629123000_add_terminal_toolbox_config/migration.sql",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
+          "services/api/scripts/verify-kiosk-job-board-switch.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/smart-campus/smart-campus.module.ts",
@@ -35437,6 +35765,48 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/upload-session-verifier.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-upload-sessions-bind.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:upload-sessions"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/upload-session-verifier.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/upload-sessions/upload-sessions.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-upload-sessions-faults.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:upload-sessions"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/app.module.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
@@ -35460,15 +35830,15 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/upload-session-verifier.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/files/content-sniff.ts",
-          "services/api/src/files/file-validation.ts",
-          "services/api/src/files/file.types.ts",
           "services/api/src/files/files.cleanup.task.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/files/retention-policy.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.service.ts",
+          "services/api/src/upload-sessions/upload-session-object-delete.ts",
           "services/api/src/upload-sessions/upload-sessions.controller.ts",
           "services/api/src/upload-sessions/upload-sessions.service.ts"
         ],
