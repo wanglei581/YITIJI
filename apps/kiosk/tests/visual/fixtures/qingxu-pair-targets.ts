@@ -29,6 +29,7 @@ import {
 import { assistantMockFallbackReply, assistantReply } from './fusion-w3-states'
 import { writeScanWorkbenchSession } from './fusion-w2-state'
 import { w6RouteCases, type W6RouteCase } from './fusion-w6-route-cases'
+import { preparePrioritySeed, priorityPlan } from './qingxu-pair-seeds'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const PROTO_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08')
@@ -110,6 +111,7 @@ export type RuntimePlan =
   | { kind: 'scan-result' }
   | { kind: 'login-error' }
   | { kind: 'assistant' }
+  | { kind: 'priority' }
 
 interface RawPair {
   screen: string
@@ -606,6 +608,8 @@ function isDefaultState(state: string, siblings: string[]): boolean {
 }
 
 function planOf(file: string, screen: string, state: string, siblings: string[]): { plan: RuntimePlan; reason: string | null; marker: string | null } {
+  const priority = priorityPlan(file, screen, state)
+  if (priority) return { plan: priority.plan, reason: priority.reason, marker: priority.marker }
   const nn = file.slice(0, 2)
   if (REGISTER_ONLY.has(file)) {
     return { plan: { kind: 'none' }, reason: nn === '36' ? '36 是设计索引页，只登记不截图' : '37 是 32 收银台的旧版，只登记不截图', marker: null }
@@ -707,8 +711,11 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
     for (const pair of raw) {
       const siblings = byScreen.get(pair.screen) ?? [pair.state]
       const route = routeOf(file, pair)
-      const decided = planOf(file, pair.screen, pair.state, siblings)
-      const runtimeRoute = decided.plan.kind === 'none' ? route : (
+      const priority = priorityPlan(file, pair.screen, pair.state)
+      const decided = priority
+        ? { plan: priority.plan, reason: priority.reason, marker: priority.marker }
+        : planOf(file, pair.screen, pair.state, siblings)
+      const runtimeRoute = priority?.runtimePath ?? (decided.plan.kind === 'none' ? route : (
         file.startsWith('24-') && PREVIEW_STATES.has(pair.state) ? '/resume/generate/preview'
           : file.startsWith('23-') && pair.screen === 'compare' ? '/resume/optimize/compare'
             : file.startsWith('22-') ? '/resume/report'
@@ -720,7 +727,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
                         : file.startsWith('32-') ? '/print/cashier'
                           : file.startsWith('15-') ? (pair.state === 'completed' ? '/print/done' : '/print/progress')
                             : route
-      )
+      ))
       const hit = w6Case(runtimeRoute)
       const marker = decided.marker ?? hit?.marker ?? null
       const extra: Record<string, string> = {}
@@ -736,7 +743,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
         waitProtoState: Boolean(pair.waitProtoState),
         protoSessionLost: Boolean(pair.protoSessionLost),
         route: runtimeRoute,
-        runtimeUrl: decided.plan.kind === 'none' ? null : runtimeUrlFor(runtimeRoute),
+        runtimeUrl: decided.plan.kind === 'none' ? null : (priority?.runtimePath ?? runtimeUrlFor(runtimeRoute)),
         readyMarker: decided.plan.kind === 'none' ? null : marker,
         capture: !REGISTER_ONLY.has(file),
         missingReason: decided.plan.kind === 'none' ? (decided.reason ?? (runtimeRoute ? '没有现成注册器覆盖这一态' : '稿没有对应运行时路由')) : null,
@@ -806,6 +813,11 @@ async function sendAssistant(page: Page, text: string): Promise<void> {
 export async function prepareRuntime(page: Page, api: ApiRouter, target: QingxuPairTarget): Promise<void> {
   const url = target.runtimeUrl
   if (!url || target.plan.kind === 'none') return
+  if (target.plan.kind === 'priority') {
+    registerEvidenceShell(api)
+    await preparePrioritySeed(page, api, target)
+    return
+  }
   if (target.plan.kind === 'fair') {
     registerFairApi(api, fairOptions(target.screen, target.state))
     if (target.screen === 'visit-plan' && target.state === 'generating') {
