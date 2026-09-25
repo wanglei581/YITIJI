@@ -92,73 +92,6 @@
 .pff-sec-h .t { font-size: 26px; font-weight: 700; }
 .pff-sec-h .hint { margin-left: auto; font-size: 18px; color: var(--qx-ink-3); }
 
-.pff-jobs {
-  background: var(--qx-surface);
-  border: 1px solid var(--qx-line);
-  border-radius: 28px;
-  padding: 8px 28px 18px;
-}
-.pff-job {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--qx-line);
-}
-.pff-job:last-child { border-bottom: 0; }
-.pff-t-rail {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 56px;
-}
-.pff-t-dot {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--qx-paper);
-  border: 1px solid var(--qx-line-2);
-  color: var(--qx-ink-3);
-}
-.pff-job.tl-done .pff-t-dot {
-  background: var(--qx-teal);
-  border-color: var(--qx-teal);
-  color: var(--qx-on-solid);
-}
-.pff-job.tl-active .pff-t-dot {
-  background: var(--qx-teal-soft);
-  border-color: var(--qx-teal);
-  color: var(--qx-teal-d);
-}
-.pff-t-line {
-  flex: 1;
-  width: 2px;
-  min-height: 12px;
-  background: var(--qx-line);
-}
-.pff-job:last-child .pff-t-line { display: none; }
-.pff-t-body { flex: 1; min-width: 0; padding-top: 4px; }
-.pff-t-body b { display: block; font-size: 24px; font-weight: 700; }
-.pff-t-body span { display: block; margin-top: 4px; font-size: 18px; line-height: 1.45; color: var(--qx-ink-3); }
-.pff-job-state {
-  flex: none;
-  min-height: var(--qx-tap-min);
-  padding: 12px 18px;
-  border-radius: 14px;
-  font-size: 20px;
-  font-weight: 700;
-  background: var(--qx-paper);
-  color: var(--qx-ink-3);
-  border: 1px solid var(--qx-line-2);
-}
-.pff-job.tl-active .pff-job-state { background: var(--qx-teal-soft); color: var(--qx-teal-d); border-color: transparent; }
-.pff-job.tl-done .pff-job-state { background: var(--qx-teal); color: var(--qx-on-solid); border-color: transparent; }
-.pff-job.pff-err .pff-job-state { background: var(--qx-cinnabar); color: var(--qx-on-solid); border-color: transparent; }
-
 .pff-out {
   display: flex;
   align-items: center;
@@ -628,10 +561,146 @@
 .pff-i-k { color: var(--qx-ink-3); }
 .pff-i-v { font-weight: 600; text-align: right; word-break: break-all; }
 
-.pff-faq { display: flex; flex-direction: column; gap: 10px; }
-.pff-faq-item { display: flex; gap: 10px; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
-.pff-faq-item b { color: var(--qx-ink); }
 
 @media (prefers-reduced-motion: reduce) {
   .pff-pulse i { opacity: 1; }
+}
+
+/* ── 打印进度页（/print/progress）专属 ───────────────────────────
+ * 稿 15 的 printing / client-status-timeout 两态落在本页；其余七态由 /print/done 承接。
+ * 完成页也 import 本文件，所以本节只动 .pfp-* 与 .pfp-page 之下，不改共享类的全局尺寸。
+ * 1080×1920 预算：顶栏 104 + 操作条 133 + 导航 132 之外剩 1551px，五块内容一屏放下不滚动。 */
+
+/* 稿 15 没有独立页头（小青区就是页头）。标题留给读屏：用 clip-path 隐藏，不用 margin:-1px。
+ * 只作用于带 data-pff-head 的两态；「未找到任务」等兜底态仍保留可见页头。 */
+.qx-stage:has([data-pff-head='xq']) > .qx-pagehead {
+  position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+.pfp-page { gap: 18px; padding-top: 22px; padding-bottom: 20px; }
+.pfp-page > * { flex: none; }
+
+/* 小青区（稿 .xq）：稿里只有头像「青」用宋体，首句是黑体 700。 */
+.pfp-page .pff-xq { border-radius: 36px; padding: 32px 44px 28px; }
+.pfp-page .pff-xq-row { gap: 24px; }
+.pfp-page .pff-xq-face { width: 104px; height: 104px; font-size: 48px; }
+.pfp-xq-main { flex: 1; min-width: 0; }
+.pfp-page .pff-xq-eyebrow { margin-bottom: 8px; font-size: 18px; letter-spacing: 5px; }
+.pfp-page .pff-xq-ask { font-family: inherit; font-size: 40px; line-height: 1.32; letter-spacing: 1px; }
+.pfp-page .pff-xq-doing { margin: 10px 0 0; font-size: 22px; line-height: 1.55; }
+
+/* 分区标题（稿 .sec-label） */
+.pfp-page .pff-sec-h { margin-bottom: 14px; }
+.pfp-page .pff-sec-h .t { font-size: 28px; }
+.pfp-page .pff-sec-h .hint { font-size: 19px; text-align: right; }
+
+/* 任务卡（稿 .jobs-card）：一份文件一行 + 服务端状态四步。
+ * 稿里是两份文件两行；真实合同一单一个文件，逐步状态放在同一张卡里，不另起一节。 */
+.pfp-card {
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  border-radius: 32px;
+  padding: 24px 32px 26px;
+}
+.pfp-job { display: flex; align-items: center; gap: 18px; }
+.pfp-job-ic {
+  flex: none; width: 72px; height: 72px; border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d);
+}
+.pfp-job-ic svg { width: 32px; height: 32px; }
+.pfp-job-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pfp-job-name { font-size: 26px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.pfp-job-sub { font-size: 20px; line-height: 1.4; color: var(--qx-ink-3); }
+.pfp-job-id { font-family: var(--qx-mono); font-size: 17px; line-height: 1.4; color: var(--qx-ink-3); overflow-wrap: anywhere; }
+.pfp-job-state {
+  flex: none; display: inline-flex; align-items: center; min-height: 56px; padding: 0 22px;
+  border-radius: 14px; font-size: 21px; font-weight: 700;
+}
+.pfp-job-state[data-tone='doing'] { color: var(--qx-teal-d); background: var(--qx-teal-soft); }
+.pfp-job-state[data-tone='wait'] { color: var(--qx-ink-3); background: var(--qx-paper); border: 1px solid var(--qx-line-2); }
+.pfp-job-state[data-tone='err'] { color: var(--qx-on-solid); background: var(--qx-cinnabar); }
+
+/* 四步：只画服务端回过的阶段，不画逐页进度条（合同里没有页级进度）。 */
+.pfp-steps {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+  margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--qx-line);
+}
+.pfp-step {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  padding: 14px 16px 16px; border-radius: 20px;
+  background: var(--qx-paper); border: 1px solid var(--qx-line);
+}
+.pfp-step-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.pfp-step-dot {
+  flex: none; width: 44px; height: 44px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-surface); border: 1px solid var(--qx-line-2); color: var(--qx-ink-3);
+}
+.pfp-step-dot svg { width: 24px; height: 24px; }
+.pfp-step-st { min-width: 0; font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--qx-ink-3); }
+.pfp-step b { font-size: 21px; font-weight: 700; line-height: 1.3; }
+.pfp-step-d { font-size: 17px; line-height: 1.45; color: var(--qx-ink-3); }
+.pfp-step.tl-done { background: var(--qx-teal-soft); border-color: transparent; }
+.pfp-step.tl-done .pfp-step-dot { background: var(--qx-teal); border-color: var(--qx-teal); color: var(--qx-on-solid); }
+.pfp-step.tl-done .pfp-step-st { color: var(--qx-teal-d); }
+.pfp-step.tl-active { background: var(--qx-surface); border-color: var(--qx-teal); box-shadow: inset 0 4px 0 var(--qx-teal); }
+.pfp-step.tl-active .pfp-step-dot { background: var(--qx-teal-soft); border-color: var(--qx-teal); color: var(--qx-teal-d); }
+.pfp-step.tl-active b,
+.pfp-step.tl-active .pfp-step-st { color: var(--qx-teal-d); }
+.pfp-step[data-failed='true'] { background: var(--qx-cinnabar-soft); border-color: var(--qx-cinnabar); box-shadow: none; }
+.pfp-step[data-failed='true'] .pfp-step-dot { background: var(--qx-cinnabar); border-color: var(--qx-cinnabar); color: var(--qx-on-solid); }
+.pfp-step[data-failed='true'] .pfp-step-st { color: var(--qx-cinnabar-d); }
+
+.pfp-card .pff-inbar { margin-top: 18px; }
+.pfp-card .pff-inbar-ic svg { width: 26px; height: 26px; }
+.pfp-card .pff-inbar-b { margin: 12px 0 0; }
+.pfp-card .pff-inbar-b b { color: var(--qx-ink); }
+
+/* 出纸口（稿 .out-card）：位置引导，不代表进度。它吸收本屏余量，状态越少越舒展。 */
+.pfp-page > .pfp-out { flex: 1 0 auto; border-radius: 32px; padding: 24px 34px; gap: 32px; }
+.pfp-page .pff-out-stage { width: 200px; height: 220px; }
+.pfp-page .pff-out-paper { top: 38px; height: 150px; }
+.pfp-page .pff-out-status { font-size: 34px; line-height: 1.25; gap: 10px 16px; }
+.pfp-page .pff-out-status .pages { font-size: 21px; }
+.pfp-page .pff-out-sub { margin-top: 12px; font-size: 21px; line-height: 1.55; }
+.pfp-out-note { margin: 10px 0 0; font-size: 18px; line-height: 1.5; color: var(--qx-ink-3); }
+.pfp-page .pff-pulse i { animation: pfp-dot 1.2s ease-in-out infinite; }
+.pfp-page .pff-pulse i:nth-child(2) { animation-delay: .2s; }
+.pfp-page .pff-pulse i:nth-child(3) { animation-delay: .4s; }
+@keyframes pfp-dot { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+
+/* 隐私卡（稿 .wipe-card.idle） */
+.pfp-page .pff-wipe { border-radius: 32px; padding: 24px 32px; }
+.pfp-page .pff-wipe-t { font-size: 25px; }
+.pfp-page .pff-wipe-t svg { width: 26px; height: 26px; }
+.pfp-page .pff-wipe-s { font-size: 20px; line-height: 1.55; }
+
+/* 常见情况 + 求助条（稿 .help-strip 的实体出口 ≥56px） */
+.pfp-faq-card { display: flex; flex-direction: column; gap: 16px; padding: 20px 28px 22px; }
+.pfp-faq { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.pfp-faq li { display: flex; gap: 12px; align-items: flex-start; }
+.pfp-faq li svg { flex: none; width: 24px; height: 24px; margin-top: 3px; color: var(--qx-ink-3); }
+.pfp-faq p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.pfp-faq b { color: var(--qx-ink); }
+.pfp-page .pff-help { padding: 16px 20px 16px 24px; }
+.pfp-page .pff-help .txt { font-size: 21px; }
+
+/* 查询超时：「这一刻你可以做的三件」（稿 .done-card + .check-step） */
+.pfp-todo { padding: 14px 32px; }
+.pfp-todo .pff-step-txt { font-size: 21px; }
+
+/* 演示模式收尾与说明（生产构建禁用 mock，只在本地演示出现） */
+.pfp-sim-end { display: flex; flex-direction: column; gap: 12px; }
+.pfp-sim-end-t { margin: 0; text-align: center; font-size: 20px; font-weight: 700; }
+.pfp-demo-list { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
+
+/* 动态状态由读屏播报；视觉上顶栏胶囊和任务卡已经在说，不重复画一枚徽章。 */
+.pfp-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* 底部「结束清空」在打完之前不可按（稿 .end-btn.finish.off）：虚线空态，不用半透明糊掉文字。 */
+.qx-stage:has([data-w2-page='print-progress']) .qx-ctabar .pfp-end { flex: 1.4 1 320px; min-height: var(--qx-btn-h-lg); }
+.qx-ctabar .qx-btn.pfp-end:disabled {
+  opacity: 1; cursor: default;
+  background: var(--qx-paper); border: 1.5px dashed var(--qx-line-2); color: var(--qx-ink-3);
 }
