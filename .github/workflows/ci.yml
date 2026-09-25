@@ -573,6 +573,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
           pnpm --filter @ai-job-print/api verify:console-screen-snapshot
+          # 服务调用 / 信息使用：会 import src，必须在 Prisma client 生成之后。
+          pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:isolated-verification-database
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
@@ -933,6 +935,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-extraction
           pnpm --filter @ai-job-print/api verify-real-resume-diagnosis
           pnpm --filter @ai-job-print/api verify:activity-logs
+          # 服务调用 / 信息使用：SQLite 与 PostgreSQL 都要跑到这条聚合（内存分桶，不靠 SQL 日期函数）。
+          pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:policy-eligibility
