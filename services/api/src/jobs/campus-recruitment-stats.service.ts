@@ -1,11 +1,13 @@
 // 校园招聘聚合：只读 Prisma + 纯函数。不调 AI，不写库。
 
 import { Injectable } from '@nestjs/common'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildPublishedJobWhere, withPublicFairDemoExclusion } from './jobs-shared'
 import {
   aggregateCampusRecruitmentStats,
   CAMPUS_FAIR_THEMES,
+  CAMPUS_RECRUITMENT_STATS_NOTES,
   CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
   type CampusFairRow,
   type CampusRecruitmentStatsData,
@@ -18,6 +20,16 @@ export class CampusRecruitmentStatsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getStats(options?: { includeJobListings?: boolean }): Promise<CampusRecruitmentStatsData> {
+    if (!isRecruitmentContentHostingEnabled()) {
+      return {
+        groups: [],
+        reason: 'no_published_campus_records',
+        generatedAt: new Date().toISOString(),
+        truncated: false,
+        scanLimit: CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
+        notes: [...CAMPUS_RECRUITMENT_STATS_NOTES],
+      }
+    }
     const includeJobListings = options?.includeJobListings !== false
     const jobWhere = buildPublishedJobWhere({ category: 'campus' })
     const fairWhere = withPublicFairDemoExclusion({

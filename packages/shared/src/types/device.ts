@@ -74,10 +74,18 @@ export interface KioskJobBoardConfig {
 }
 
 /** Kiosk 启动和定时刷新使用的统一终端配置视图。只暴露前台渲染必需白名单字段。 */
+export interface RecruitmentHostingPublicConfig {
+  enabled: boolean
+  deploymentEnabled: boolean
+  reason: 'open' | 'deployment_off'
+}
+
 export interface KioskTerminalConfig {
   smartCampus: KioskSmartCampusConfig
   toolbox: KioskToolboxConfig
   jobBoard?: KioskJobBoardConfig
+  /** 3.13 招聘内容托管。未下发时旧客户端只看 jobBoard。 */
+  recruitmentHosting?: RecruitmentHostingPublicConfig
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

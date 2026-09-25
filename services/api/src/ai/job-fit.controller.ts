@@ -13,6 +13,10 @@ import type { JobAiQuotaContext } from '../job-ai/job-ai-quota.service'
 import { resolveClientIp } from '../common/client-ip'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import {
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
+import {
   KioskJobBoardService,
   kioskJobBoardTerminalRef,
   type KioskJobBoardRequest,
@@ -122,7 +126,11 @@ export class JobFitController {
   @Post()
   @PaidAiThrottle(6)
   async analyze(@Body() dto: JobFitRequestDto, @Req() req: ReqLike) {
-    await this.assertJobBoard(req)
+    if (!isRecruitmentContentHostingEnabled()) {
+      if (dto.jobId) throw recruitmentHostingDisabledException()
+    } else {
+      await this.assertJobBoard(req)
+    }
     if (!dto.jobId && !dto.manualJob) {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
