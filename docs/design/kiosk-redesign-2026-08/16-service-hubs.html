@@ -118,7 +118,7 @@ const H={
  ['简历打印','选择文件、核价后在本机打印','printer','依赖打印机','12-file-source.html?source=resume','/print/upload?source=resume','device'],
  ['岗位匹配参考','简历与岗位逐项对照，不给录用结论','chart','AI · 不给百分比','46-resume-decision-workspace.html?screen=job-fit&state=missing-task','/resume/job-fit','ai']],
  quick:[['我的简历','查看本人已保存版本','user','39-member-records.html?view=resumes','/me/resumes'],['AI服务记录','查看诊断与优化记录','bot','39-member-records.html?view=ai-records','/me/ai-records'],['自我探索','完成职业倾向参考','chart','34-self-assessment.html?state=intro','/resume/self-assessment/intro']]},
- jobs:{eyebrow:'岗位信息',title:'看清来源，再决定去哪里投',subtitle:'岗位来自第三方或官方来源。本机帮助筛选和理解，投递仍在来源平台完成。',noteTitle:'本机不代收简历',note:'不做企业筛选、面试邀约或Offer管理。',section:'岗位与来源入口',hint:'岗位以进入后的真实加载为准',truthTitle:'投递在来源平台完成。',truth:'本机只记录浏览和外部跳转，不记录投递结果。',
+ jobs:{eyebrow:'岗位信息',title:'看清来源，再决定去哪里投',subtitle:'岗位来自第三方或官方来源。本机帮助筛选和理解，投递仍在来源平台完成。',noteTitle:'本机不代收简历',note:'不做企业筛选、面试邀约或Offer管理。',section:'岗位与来源入口',hint:'岗位以进入后的真实加载为准',truthTitle:'投递在来源平台完成。',truth:'本机记录你的浏览与外部跳转；投递进度由你自己填写，本机不掌握来源平台的处理结果。',
  first:[['找全职','26-browse-list.html?category=fulltime','/jobs?category=fulltime'],['找实习','26-browse-list.html?category=intern','/jobs?category=intern'],['找校招','26-browse-list.html?category=campus','/jobs?category=campus'],['找兼职','26-browse-list.html?category=parttime','/jobs?category=parttime']],
  cards:[
  ['全职岗位','按行业、地区与薪资范围筛选','brief','第三方来源','26-browse-list.html?category=fulltime','/jobs?category=fulltime','info'],
@@ -151,7 +151,7 @@ const H={
  ['评估历史','回看本人历次自我探索结果','chart','本人记录','34-self-assessment.html?state=history','/resume/self-assessment/history','info'],
  ['行业薪资参考','向通用AI顾问询问市场信息','bot','AI · 需核实','05-ai-cockpit.html','/assistant','ai']],
  quick:[['AI服务记录','查看本人AI调用记录','bot','39-member-records.html?view=ai-records','/me/ai-records'],['训练报告','查看模拟面试报告','chart','29-interview-training.html?state=reports-guest','/interview/reports'],['简历服务','先完善求职材料','file','16-service-hubs.html?hub=resume','/resume-service']]},
- policy:{eyebrow:'政策服务',title:'看来源、查条件、备材料',subtitle:'就业政策、社保与档案登记以来源内容为准；AI顾问只做通用说明。',noteTitle:'不承诺办理或资格结果',note:'资格核对使用确定性规则，最终以官方审核为准。',section:'政策与办事指引',hint:'六个入口，来源与条件分开看',truthTitle:'政策内容以来源发布为准。',truth:'AI顾问不替主管部门作资格判断。',
+ policy:{eyebrow:'政策服务',title:'看来源、查条件、备材料',subtitle:'就业政策、社保与档案登记以来源内容为准；AI顾问只做通用说明。',noteTitle:'不承诺办理或资格结果',note:'资格核对使用确定性规则，最终以官方审核为准。',section:'政策与办事指引',hint:'七个入口，来源与条件分开看',truthTitle:'政策内容以来源发布为准。',truth:'AI顾问不替主管部门作资格判断。',
  first:[['找就业政策','48-policy-workspace.html?tab=policy&state=loading','/renshi?tab=policy'],['核对申领条件','48-policy-workspace.html?tab=eligibility&state=form','/renshi?tab=eligibility'],['查社保材料','48-policy-workspace.html?tab=social&state=social','/renshi?tab=social'],['看登记档案','48-policy-workspace.html?tab=register&state=register','/renshi?tab=register']],
  cards:[
  ['就业政策','查看就业、创业与灵活就业政策','file','来源内容','48-policy-workspace.html?tab=policy&state=loading','/renshi?tab=policy','info'],
@@ -161,7 +161,7 @@ const H={
  ['政策公告','查看发布方公告、来源与发布日期','file','来源内容','48-policy-workspace.html?tab=notice&state=loading','/renshi?tab=notice','info'],
  ['打开AI顾问','咨询通用政策说明并核对来源','bot','AI · 需核实','05-ai-cockpit.html','/assistant','ai'],
  ['政策收藏','查看本人收藏的政策内容','user','本人记录','39-member-records.html?view=favorites&tab=policy','/me/favorites?tab=policy','info']],
- quick:[['浏览记录','查看最近浏览的政策','user','39-member-records.html?view=activity','/me/activity'],['AI问答记录','查看本人政策问答','bot','39-member-records.html?view=ai-records','/me/ai-records'],['全部服务','返回服务目录','external','02-services.html','/']]}}
+ quick:[['浏览记录','查看最近浏览的政策','user','39-member-records.html?view=activity','/me/activity'],['AI服务记录','本人AI服务记录，不含顾问问答','bot','39-member-records.html?view=ai-records','/me/ai-records'],['全部服务','返回服务目录','external','02-services.html','/']]}}
 /* hub key → 生产 route（真源 apps/kiosk/src/routes/index.tsx）。五个 hub 共享本页一个 HTML 宿主，
    ?hub= 选中哪个 H 条目，就渲染成对应的那一条生产 route，不新增第二个页面文件。 */
 const HUB_ROUTE={resume:'/resume-service',jobs:'/jobs-service',fairs:'/fairs-service',interview:'/interview-service',policy:'/policy-service'};
