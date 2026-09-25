@@ -73,14 +73,15 @@ const NAV_ITEMS: NavItem[] = [
  *
  * 招聘内容托管关闭（3.13，我们云上默认）是部署级的整块下线：岗位 / 企业 / 招聘会 /
  * 数据源 / 同步日志的列表恒为空、写入一律 403，整组入口隐藏；直接打开地址时由
- * routes/RecruitmentHostingGate 给出如实说明。只有服务端明确回 false 才隐藏。
+ * routes/RecruitmentHostingGate 给出如实说明。只有服务端明确回 true 才显示；
+ * 能力没读到时也不显示（fail-closed，见 services/capabilities.ts 的 useRecruitmentHosting）。
  */
 const RECRUITMENT_HOSTED_NAV_KEYS = new Set(['jobs', 'companies', 'fairs', 'sources', 'sync-logs'])
 
 function isNavItemVisible(key: string, caps: PartnerDataSourceCapabilities | null): boolean {
-  if (!caps) return true // 能力未知一律放行，见 services/capabilities.ts 的 fail-open 说明
+  if (RECRUITMENT_HOSTED_NAV_KEYS.has(key)) return caps?.recruitmentHosting === true
+  if (!caps) return true // 其余能力未知一律放行，见 services/capabilities.ts 的 fail-open 说明
   if (key === 'smart-campus') return caps.canManageSmartCampus
-  if (RECRUITMENT_HOSTED_NAV_KEYS.has(key)) return caps.recruitmentHosting !== false
   return true
 }
 

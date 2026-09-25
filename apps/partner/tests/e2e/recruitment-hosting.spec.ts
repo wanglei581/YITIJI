@@ -221,3 +221,33 @@ test.describe('托管打开（私有化部署 b）', () => {
     await assertPageHonest(page, errors)
   })
 })
+
+test.describe('能力没读到（按关闭处理）', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginWith(page, { 'mock:recruitment-hosting': 'unavailable' })
+  })
+
+  test('侧栏不显示招聘类五页；直接打开说「暂时无法确认」，重新读取后按实际开关渲染', async ({ page }) => {
+    const { errors } = collectPageFaults(page)
+    await gotoPartner(page, '/jobs', '岗位信息管理')
+    const state = page.getByRole('status', { name: '暂时无法确认这一页是否开放' })
+    await expect(state).toBeVisible()
+    await expect(state).toContainText('为避免误操作')
+    // 读不到不等于关闭：不能冒充「未开放」，也不能渲染一排会 403 的按钮
+    await expect(page.getByRole('status', { name: '本平台未开放此功能' })).toHaveCount(0)
+    await expect(page.getByRole('table')).toHaveCount(0)
+    const nav = sideNav(page)
+    await expect(nav.getByRole('link', { name: '政策公告管理' })).toBeVisible()
+    for (const label of RECRUITMENT_NAV) {
+      await expect(nav.getByRole('link', { name: label }), `能力没读到时侧栏不应有「${label}」`).toHaveCount(0)
+    }
+    await shot(page, 'jobs-direct-url-hosting-unknown')
+
+    await page.evaluate(() => window.localStorage.setItem('mock:recruitment-hosting', 'on'))
+    await state.getByRole('button', { name: '重新读取' }).click()
+    await expect(page.getByRole('status', { name: '暂时无法确认这一页是否开放' })).toHaveCount(0)
+    await waitForMockList(page)
+    await expect(nav.getByRole('link', { name: '岗位信息管理' })).toBeVisible()
+    await assertPageHonest(page, errors)
+  })
+})

@@ -195,6 +195,15 @@ function genId(): string { return `mock-${Date.now()}-${Math.random().toString(3
 
 export const MOCK_RECRUITMENT_HOSTING_KEY = 'mock:recruitment-hosting'
 
+/** 'unavailable' 时能力接口直接失败，用来演示「暂时无法确认」 */
+function mockCapabilitiesUnavailable(): boolean {
+  try {
+    return window.localStorage.getItem(MOCK_RECRUITMENT_HOSTING_KEY) === 'unavailable'
+  } catch {
+    return false
+  }
+}
+
 function mockRecruitmentHostingEnabled(): boolean {
   try {
     return window.localStorage.getItem(MOCK_RECRUITMENT_HOSTING_KEY) !== 'off'
@@ -227,6 +236,7 @@ export const partnerMockAdapter = {
   },
   async getDataSourceCapabilities(): Promise<PartnerDataSourceCapabilities> {
     await delay()
+    if (mockCapabilitiesUnavailable()) throw new Error('mock: capabilities unavailable')
     // 与服务端 projectPartnerDataSourceCapabilities 同一叠加：托管关闭时只把岗位 / 招聘会 / 企业位置 false。
     // 演示默认打开（保持既有演示口径）；localStorage['mock:recruitment-hosting']='off' 时按关闭演示。
     const recruitmentHosting = mockRecruitmentHostingEnabled()

@@ -232,8 +232,8 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  // 'unknown'（能力没读到）沿用 fail-open，按打开展示；只有服务端明确关闭才收起岗位类卡片。
-  const recruitmentHosting = useRecruitmentHosting() !== 'off'
+  // 只有服务端明确打开托管才展示岗位类卡片；能力没读到时与关闭同样只看政策（fail-closed）。
+  const recruitmentHosting = useRecruitmentHosting() === 'on'
   const [data, setData] = useState<PartnerDashboardData | null>(null)
   const [snapshot, setSnapshot] = useState<PartnerStatsResponse['snapshot'] | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')

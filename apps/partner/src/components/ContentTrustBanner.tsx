@@ -34,8 +34,8 @@ import { useRecruitmentHosting } from '../services/capabilities'
  */
 export function ContentTrustBanner() {
   const [profile, setProfile] = useState<PartnerOrgProfile | null>(null)
-  // 'unknown' 沿用 fail-open 按打开说；只有服务端明确关闭托管时，才只提政策。
-  const recruitmentHosting = useRecruitmentHosting() !== 'off'
+  // 只有服务端明确打开托管时才提岗位与招聘会；关闭或没读到时只提政策。
+  const recruitmentHosting = useRecruitmentHosting() === 'on'
 
   useEffect(() => {
     let alive = true

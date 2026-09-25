@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, LoadingState } from '@ai-job-print/ui'
-import { InfoIcon } from 'lucide-react'
+import { AlertTriangleIcon, InfoIcon } from 'lucide-react'
 import { Page } from './Page'
-import { useRecruitmentHosting } from '../services/capabilities'
+import { usePartnerCapabilities, useRecruitmentHosting } from '../services/capabilities'
 
 type RecruitmentHostedPage = 'jobs' | 'companies' | 'fairs' | 'sources' | 'sync-logs'
 
@@ -21,10 +21,12 @@ const PAGE_META: Record<RecruitmentHostedPage, { title: string; subject: string 
  * （列表恒为空、写入一律 403，看起来像「数据丢了」或「系统坏了」），而是如实说明原因与去向。
  *
  * 只描述开关的行为，不宣称存量数据已清理（CLAUDE.md §1）。
- * 能力还在加载时先等，不抢先发请求；能力接口失败时沿用 fail-open，照常渲染原页，由服务端兜底。
+ * 能力还在加载时先等，不抢先发请求。能力接口失败时也不渲染原页（fail-closed）：
+ * 说「暂时无法确认」并给重新读取，不冒充「未开放」——私有化部署（b）里这一页其实是开的。
  */
 export function RecruitmentHostingGate({ page, children }: { page: RecruitmentHostedPage; children: ReactNode }) {
   const hosting = useRecruitmentHosting()
+  const { retry } = usePartnerCapabilities()
   const navigate = useNavigate()
   const meta = PAGE_META[page]
 
@@ -35,7 +37,31 @@ export function RecruitmentHostingGate({ page, children }: { page: RecruitmentHo
       </Page>
     )
   }
-  if (hosting !== 'off') return <>{children}</>
+  if (hosting === 'on') return <>{children}</>
+
+  if (hosting === 'unknown') {
+    return (
+      <Page title={meta.title}>
+        <Card className="mx-auto max-w-2xl p-8 text-center" role="status" aria-label="暂时无法确认这一页是否开放">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-warning-bg text-warning-fg">
+            <AlertTriangleIcon className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <h2 className="mt-3 text-[15px] font-bold text-neutral-800">暂时无法确认这一页是否开放</h2>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+            没有读到本平台开放了哪些功能，可能是网络波动。为避免误操作，{meta.subject}这一页先不打开；政策公告管理等其他页面照常可用。
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+            <Button size="sm" variant="primary" onClick={retry}>
+              重新读取
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
+              返回工作台
+            </Button>
+          </div>
+        </Card>
+      </Page>
+    )
+  }
 
   return (
     <Page title={meta.title} subtitle="本平台未开放此功能">

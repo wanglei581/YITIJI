@@ -58,6 +58,13 @@ export default function ImportBatchesPage() {
   // 处置入口在两个信息源页（逐条紧急下架）与数据接入通道（按来源熔断）；这里不做按批次的批量下架。
   const hosting = useRecruitmentHosting()
   const hostingOff = hosting.status === 'ready' && !hosting.enabled
+  const hostingOn = hosting.status === 'ready' && hosting.enabled
+  // 开关没读到时两种说法都不下：既不说「导入已停止」，也不说「确认后进入审核队列」
+  const footnote = hostingOff
+    ? '机构的 Excel 导入已停止，这里只保留历史批次。要处置某条内容，点「查看岗位 / 查看招聘会」到对应信息源页做紧急下架；要整体停用一个来源，到「数据接入通道」按来源熔断。'
+    : hostingOn
+      ? '导入后数据默认"待审核 + 草稿"，需在岗位信息源或招聘会信息源中审核发布后才会在 Kiosk 展示'
+      : null
 
   useEffect(() => {
     let cancelled = false
@@ -126,7 +133,11 @@ export default function ImportBatchesPage() {
   return (
     <Page
       title="Excel 导入记录"
-      subtitle={hostingOff ? '合作机构 Excel 批量导入的历史批次（导入已停止，只读）' : '合作机构 Excel 批量导入的历史批次，确认后进入审核队列'}
+      subtitle={hostingOff
+        ? '合作机构 Excel 批量导入的历史批次（导入已停止，只读）'
+        : hostingOn
+          ? '合作机构 Excel 批量导入的历史批次，确认后进入审核队列'
+          : '合作机构 Excel 批量导入的历史批次'}
     >
       <RecruitmentHostingNotice
         hosting={hosting}
@@ -277,11 +288,7 @@ export default function ImportBatchesPage() {
         />
       </Card>
 
-      <p className="mt-3 text-xs text-neutral-400">
-        {hostingOff
-          ? '机构的 Excel 导入已停止，这里只保留历史批次。要处置某条内容，点「查看岗位 / 查看招聘会」到对应信息源页做紧急下架；要整体停用一个来源，到「数据接入通道」按来源熔断。'
-          : '导入后数据默认"待审核 + 草稿"，需在岗位信息源或招聘会信息源中审核发布后才会在 Kiosk 展示'}
-      </p>
+      {footnote && <p className="mt-3 text-xs text-neutral-400">{footnote}</p>}
     </Page>
   )
 }

@@ -313,8 +313,8 @@ function NoActivityState({
 // ─── 主页面 ────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
-  // 'unknown'（能力没读到）沿用 fail-open 按打开展示；只有服务端明确关闭才收起岗位类统计。
-  const recruitmentHosting = useRecruitmentHosting() !== 'off'
+  // 只有服务端明确打开托管才展示岗位类统计；能力没读到时与关闭同样收起（fail-closed）。
+  const recruitmentHosting = useRecruitmentHosting() === 'on'
   const [period, setPeriod] = useState<StatsPeriod>('week')
   const [data, setData] = useState<PartnerStatsResponse | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
