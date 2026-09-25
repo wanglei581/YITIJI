@@ -8,6 +8,7 @@ import {
   twinTerminalState,
   twinTerminalsFromCells,
   TWIN_STATE_TEXT,
+  TWIN_SUBTITLE_SEP,
   type TwinCityTerminal,
 } from '@ai-job-print/ui'
 import { loadPartnerTerminalTwin } from '../../services/api/consoleScreen'
@@ -119,7 +120,7 @@ function PartnerTerminalLive({
   const twin = useTerminalTwin(terminalId)
   const current = twin.data && twin.data.terminal.id === terminalId ? twin.data : null
   const subtitle = current
-    ? `${current.terminal.code}　｜　${current.terminal.locationLabel ?? current.terminal.areaLabel ?? UNASSIGNED}`
+    ? `${current.terminal.code}${TWIN_SUBTITLE_SEP}${current.terminal.locationLabel ?? current.terminal.areaLabel ?? UNASSIGNED}`
     : SUBTITLE
   return (
     <TwinShell

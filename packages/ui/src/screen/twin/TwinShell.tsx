@@ -10,6 +10,9 @@ import { TwinBanner, TwinHeader, TwinScreen, TwinSlot, TwinStatePanel, type Twin
  * 旧数据一个都不清、一个 0 都不伪造，横幅说清旧在哪儿、该怎么办。
  */
 
+/** 页眉副标题里各段之间的分隔（全角空格包住竖线），两端统一。 */
+export const TWIN_SUBTITLE_SEP = '\u3000｜\u3000'
+
 export type TwinFailure =
   | { kind: 'mock' }
   | { kind: 'unauthorized' }
@@ -177,7 +180,7 @@ export function TwinShell({ chrome, title, subtitle, layout, toolbar, meta, poll
         <TwinHeader
           title={title}
           headingLevel={headingLevel}
-          subtitle={`${subtitle}　｜　${stamp}`}
+          subtitle={`${subtitle}${TWIN_SUBTITLE_SEP}${stamp}`}
           tabs={chrome.tabs}
           onNavigate={chrome.onNavigate}
           actions={chrome.presenting ? chrome.pageActions : undefined}
@@ -228,7 +231,7 @@ export function TwinShellEmpty({
         <TwinHeader
           title={title}
           headingLevel={headingLevel}
-          subtitle={`${subtitle}　｜　${failure ? '没有取到数据' : '正在取数，未取到之前不显示任何数值'}`}
+          subtitle={`${subtitle}${TWIN_SUBTITLE_SEP}${failure ? '没有取到数据' : '正在取数，未取到之前不显示任何数值'}`}
           tabs={chrome.tabs}
           onNavigate={chrome.onNavigate}
           actions={chrome.presenting ? chrome.pageActions : undefined}

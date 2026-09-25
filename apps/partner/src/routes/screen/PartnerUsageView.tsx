@@ -211,7 +211,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
                   secondary={{ label: `${rangeText}每日打开来源平台入口次数`, values: value.days.map((d) => d.sourceOpens) }}
                 />
                 <p className="twin-cap twin-push">
-                  <span className="twin-key is-acc" aria-hidden="true" />浏览　<span className="twin-key is-gold" aria-hidden="true" />打开来源平台入口
+                  <span className="twin-key is-acc" aria-hidden="true" />浏览{'\u3000'}<span className="twin-key is-gold" aria-hidden="true" />打开来源平台入口
                 </p>
               </>
             )

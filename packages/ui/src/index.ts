@@ -90,7 +90,7 @@ export {
 export { TwinTerminalBoard } from './screen/twin/TwinTerminalBoard'
 export { TWIN_DEVICE_H, TWIN_DEVICE_W, TwinDevice } from './screen/twin/TwinDevice'
 export { TWIN_STAGE_H, TWIN_STAGE_W } from './screen/twin/twinMath'
-export { TwinFailurePanel, TwinShell, TwinShellEmpty } from './screen/twin/TwinShell'
+export { TWIN_SUBTITLE_SEP, TwinFailurePanel, TwinShell, TwinShellEmpty } from './screen/twin/TwinShell'
 export { useTwinBurnInDrift, useTwinNightlyReload } from './screen/twin/useDisplayCare'
 
 /* ── State components ─────────────────────────────────── */
