@@ -5,7 +5,6 @@ import {
   AlertCircleIcon,
   AlertTriangleIcon,
   CheckIcon,
-  FileTextIcon,
   PrinterIcon,
   ShieldIcon,
   SmartphoneIcon,
@@ -29,6 +28,7 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintFileDeletionRecords } from './components/PrintFileDeletionRecords'
 import { PrintFileRetentionNotice } from './components/PrintFileRetentionNotice'
+import { PrintDoneXq, PrintFeeBoundaryBar, PrintJobSummaryCard } from './components/PrintDoneSections'
 import { formatCents } from './cashierStatus'
 import './styles/print-fulfill-qx.css'
 
@@ -105,12 +105,6 @@ interface PickupLookup {
 }
 
 const ACTIVE_PRINT_STATUSES = ['pending', 'claimed', 'printing'] as const
-
-const DUPLEX_LABEL: Record<string, string> = {
-  simplex:           '单面',
-  duplex_long_edge:  '双面（长边）',
-  duplex_short_edge: '双面（短边）',
-}
 
 function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'result-unconfirmed' | 'failed' {
   if (errorCode === PRINT_JOB_UNCONFIRMED) return 'result-unconfirmed'
@@ -347,16 +341,7 @@ export function PrintDonePage() {
         navbar={navbar}
       >
         <div data-w2-page="print-done" data-print-flow-step={6} className="qx-scroll pff-page">
-          <section className="pff-xq">
-            <div className="pff-xq-row">
-              <div className="pff-xq-face" aria-hidden="true">青</div>
-              <div>
-                <div className="pff-xq-eyebrow">PRINT &amp; PICKUP</div>
-                <p className="pff-xq-ask">这趟办完了。</p>
-                <p className="pff-xq-doing">本机上的本次打印文件预览和记录<b>已清除</b>。愿你求职顺利，下次再见。</p>
-              </div>
-            </div>
-          </section>
+          <PrintDoneXq ask="这趟办完了。" doing={<>本机上的本次打印文件预览和记录<b>已清除</b>。愿你求职顺利，下次再见。</>} />
         </div>
       </QxPageFrame>
     )
@@ -382,29 +367,17 @@ export function PrintDonePage() {
         navbar={navbar}
       >
         <div data-w2-page="print-done" data-print-flow-step={6} data-testid="print-fulfill-state-fee-info" className="qx-scroll pff-page">
-          <section className="pff-xq">
-            <div className="pff-xq-row">
-              <div className="pff-xq-face" aria-hidden="true">青</div>
-              <div>
-                <div className="pff-xq-eyebrow">PRINT &amp; PICKUP</div>
-                <p className="pff-xq-ask">钱的事，<em>一笔一笔说清楚</em>。</p>
-                <p className="pff-xq-doing">本页只展示订单的真实状态，不替你承诺结果。</p>
-              </div>
-            </div>
-          </section>
-          <div className="pff-inbar">
-            <div className="pff-inbar-h">
-              <span className="pff-inbar-ic"><CreditGlyph /></span>
-              <span>费用与订单边界<small>订单和支付记录都在，不会因为这次异常消失</small></span>
-            </div>
-            <p className="pff-inbar-b">
-              是否处理费用、处理多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。
-            </p>
-            <div className="pff-inbar-kv">
-              {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
-              {amountCents != null ? <span>支付状态 <b>{paidLabel}</b></span> : <span>支付状态 <b>以订单为准</b></span>}
-            </div>
-          </div>
+          <PrintDoneXq ask={<>钱的事，<em>一笔一笔说清楚</em>。</>} doing="本页只展示订单的真实状态，不替你承诺结果。" />
+          <PrintFeeBoundaryBar
+            sub="订单和支付记录都在，不会因为这次异常消失"
+            body={<>是否处理费用、处理多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
+            facts={
+              <>
+                {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
+                {amountCents != null ? <span>支付状态 <b>{paidLabel}</b></span> : <span>支付状态 <b>以订单为准</b></span>}
+              </>
+            }
+          />
           <div className="qx-card">
             <div className="pff-step"><span className="pff-step-no">1</span><span className="pff-step-txt">把<b>订单号 {orderNo ?? '（未读取到）'}</b> 和这台机器的位置告诉现场工作人员。</span></div>
             <div className="pff-step"><span className="pff-step-no">2</span><span className="pff-step-txt">说明实际拿到了几页、哪几页没出，<b>已出的纸请一并带上</b>。</span></div>
@@ -552,16 +525,7 @@ export function PrintDonePage() {
           }
           className="qx-scroll pff-page"
         >
-          <section className="pff-xq">
-            <div className="pff-xq-row">
-              <div className="pff-xq-face" aria-hidden="true">青</div>
-              <div>
-                <div className="pff-xq-eyebrow">PRINT &amp; PICKUP</div>
-                <p className="pff-xq-ask">{ask}</p>
-                <p className="pff-xq-doing">{doing}</p>
-              </div>
-            </div>
-          </section>
+          <PrintDoneXq ask={ask} doing={doing} />
 
           <div
             className="pff-issue"
@@ -658,16 +622,7 @@ export function PrintDonePage() {
       navbar={navbar}
     >
       <div data-w2-page="print-done" data-print-flow-step={6} data-testid="print-fulfill-state-completed" className="qx-scroll pff-page">
-        <section className="pff-xq">
-          <div className="pff-xq-row">
-            <div className="pff-xq-face" aria-hidden="true">青</div>
-            <div>
-              <div className="pff-xq-eyebrow">PRINT &amp; PICKUP</div>
-              <p className="pff-xq-ask">都打好了，<em>从出纸口拿走</em>。</p>
-              <p className="pff-xq-doing">拿走前记得核一下页数和水印，少页当场能处理。</p>
-            </div>
-          </div>
-        </section>
+        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing="拿走前记得核一下页数和水印，少页当场能处理。" />
 
         <div className="qx-card">
           <div className="pff-done-title">
@@ -758,20 +713,7 @@ export function PrintDonePage() {
 
         <PrintFileDeletionRecords />
 
-        {file && params && (
-          <div className="qx-card">
-            <b className="pff-info-hd">本次任务摘要</b>
-            <div className="pff-i-row"><span className="pff-i-k">文件名</span><span className="pff-i-v">{file.name}</span></div>
-            <div className="pff-i-row"><span className="pff-i-k">页数 / 份数</span><span className="pff-i-v">{file.pages} 页 × {params.copies} 份</span></div>
-            <div className="pff-i-row"><span className="pff-i-k">打印面</span><span className="pff-i-v">{DUPLEX_LABEL[params.duplex] ?? params.duplex}</span></div>
-            <div className="pff-i-row">
-              <span className="pff-i-k">色彩 / 质量</span>
-              <span className="pff-i-v">
-                {params.colorMode === 'color' ? '彩色' : '黑白'} · {params.quality === 'draft' ? '草稿' : params.quality === 'high' ? '高质量' : '标准'}
-              </span>
-            </div>
-          </div>
-        )}
+        {file && params && <PrintJobSummaryCard file={file} params={params} />}
 
         <div className="qx-card">
           <b className="pff-info-hd">打印遇到问题？</b>
@@ -799,8 +741,4 @@ export function PrintDonePage() {
       {feedbackDialog}
     </QxPageFrame>
   )
-}
-
-function CreditGlyph() {
-  return <FileTextIcon aria-hidden="true" />
 }
