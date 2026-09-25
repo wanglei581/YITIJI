@@ -27,6 +27,23 @@
   - 岗位 AI 推荐的档位去留（只影响 b 版本）；
   - 电子签名接受公章图片（缺口 #20）。
 - **没有操作生产。**
+## 2026-09-26：3.5c 一体机 AI 可见标识与合同审查对外文案（Claude 子代理，未并入候选）
+
+分支 `worktree-agent-a1f282085f7f516e1`，基线候选 `9587bbcc4`，本地提交未推送。需求来源 [2026-09-26 AI 标识审计](../reviews/2026-09-26-ai-label-copy-prompt-audit.md) 表一、表二的一体机行。只改一体机页面、`packages/shared` 文案与门禁；没有改小程序、简历对照（`jobFit/**`、`JobFit*.tsx`）、岗位 / 招聘会 / 首页 / 我的，没有改服务端提示词与 PDF，没有访问生产。
+
+- **一套句子：** 新增 `packages/shared` 的 `AI_LABEL_COPY`，底句「AI 生成，仅供参考」，场景后缀逐字取审计「建议」栏。一体机 AIGC 标识 `AigcMark` 改读底句（原「AI 生成内容（AIGC）· 仅供参考」），自我探索与简历对照行动清单随之同句。
+  - 简历诊断报告（真实报告的说明）：「AI 生成，仅供参考，请对照原文核对」；演示报告不挂「AI 生成」。
+  - 简历优化对照卡、优化页与生成预览页徽标：「AI 生成，仅供参考，请自行核对」。
+  - 职业规划：结果屏 `AigcMark`，生成前说明「……都由 AI 生成，仅供参考」。
+  - 模拟面试报告横幅：「AI 生成，仅供参考，只用于本人练习复盘」；面试进行中：「题目由 AI 生成，仅供参考」。
+  - AI 顾问对话、页脚、作业舱与语音字幕条：底句。
+  - 语音通话页头（五态共用）：「小青是 AI 数字人，形象与声音由 AI 生成」；头像替代文字改为「AI 数字人小青」。
+- **合同审查：** 三页与 `advisorScenes.ts` 不再出现「法律意见」，改用审计替换句（「仅作条款风险提示，请自行核对原文」「本结果由 AI 生成，仅供参考，只提示需要核对的条款」「本次结果仅作风险提示，请自行核对原文」「仅供个人核对，不代替专业人士判断」）。
+- **`apps/kiosk/.env.example`：** `VITE_USE_TRTC_CALL` 的注释改为实际行为（按下同意开麦前不请求麦克风、不存音频，离开即结束）。
+- **新门禁 `verify:kiosk-ai-label-copy`**（CI「Cross-client deterministic static gates」步）：运行时解析审计表一、表二与合规表的数字人行，确认期望句就是审计写的，再按 TypeScript AST 查页面可见文字（注释不算）。共 119 条断言；58 个变异中 54 个按预期变红、4 个反向变异保持绿；在原候选页面源码上跑是 46 条红。
+- **改了既有断言（强度不变）：** `verify-resume-diagnosis-flow-ui`（徽标改为绑定共享句并逐字钉值）、`verify-fusion-w3` 与 `fusion-w3.spec.ts`（面试横幅）、`services/api` 的 `verify-toolbox-ai-skill-intents`（顾问场景新措辞）。
+- **验证（本机实跑）：** kiosk `tsc --noEmit` 通过；改动文件 eslint 0 错误；覆盖到的 kiosk 静态门禁 22 条、`scripts/verify-compliance-copy.mjs`（禁词）及同链的 datetime、no-raw-error、`verify-ci-gate-coverage`、`verify-repository-integrity`、API `verify:toolbox-ai-skill-intents` 与 `verify:assistant-voice`（隔离 SQLite）全绿。同链的 `verify:list-truncation-honesty` 在候选 `9587bbcc4` 上本来就红：`recruitment-emergency.service.ts` 的 `listNotices` 取 50 条却不返回 total / truncated（3.13 后端，本分支未改 `services/api/src`），CI「Compliance copy gate」一步会因此红；浏览器用例 w3 49、w6 112、contract-review 3、mic-capability 4、fusion-smoke 8、truth + journeys + route-sweep 332（另 32 条是既有条件跳过）全部通过；图谱已重生成并通过 `--check`。
+- **未做 / 留给后续：** 语音通话「通话中」字幕条要真实 TRTC 房间才出现，只有静态门禁覆盖；`aiMockAdapter.ts` 的 Offer 对比演示回复与 `toolboxMicroApp.ts` 已归档合同条目仍写「法律意见」（前者只在演示模式，与服务端 mock 同步由服务端一路改）；合同审查三页仍是旧页壳，未迁入青序流光；feature-scope §七 #7、#19 待并入候选后更新。
 
 ## 2026-09-26（上午）：候选并入五路（第 10 轮 CI 前），3.13 复核后返工
 

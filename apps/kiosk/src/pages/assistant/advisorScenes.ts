@@ -89,9 +89,10 @@ export interface ToolboxAssistantScene {
 export const TOOLBOX_ASSISTANT_SCENES: Record<ToolboxAssistantSkill, ToolboxAssistantScene> = {
   offer_compare: {
     title: 'Offer 对比',
-    welcome: '这里是 Offer 对比助手。您可以把 2-3 个 Offer 的薪资结构、试用期、地点、福利、工作强度和发展机会发给我；请先打码姓名、手机号、公司敏感编号等隐私信息。对比结果仅供个人参考，不构成录用、入职或法律意见。',
+    // 免责后缀按审计表二 advisorScenes.ts 行改写：对外不写「法律意见」（compliance-boundary §1.2 D）。
+    welcome: '这里是 Offer 对比助手。您可以把 2-3 个 Offer 的薪资结构、试用期、地点、福利、工作强度和发展机会发给我；请先打码姓名、手机号、公司敏感编号等隐私信息。对比结果仅供个人核对，不代替专业人士判断，也不构成录用或入职承诺。',
     placeholder: '输入 Offer 信息，例如：A 公司年包、地点、福利；B 公司年包、试用期、通勤…',
-    disclaimer: '对比结果仅供个人参考，不构成录用、入职或法律意见',
+    disclaimer: '对比结果仅供个人核对，不代替专业人士判断，也不构成录用或入职承诺',
   },
   salary_negotiation: {
     title: '薪资谈判话术',
@@ -103,7 +104,7 @@ export const TOOLBOX_ASSISTANT_SCENES: Record<ToolboxAssistantSkill, ToolboxAssi
     title: 'HR 知识问答',
     welcome: '这里是 HR 知识问答助手。您可以咨询入职、试用期、社保、公积金、离职、请假等常见流程问题；涉及劳动争议、赔偿、仲裁或合同解除时，请以官方人社窗口、法律援助或专业律师意见为准。',
     placeholder: '输入 HR 问题，例如：试用期社保怎么缴？离职证明什么时候开？',
-    disclaimer: '回答仅供常识参考，不构成正式法律意见或官方政策承诺',
+    disclaimer: '回答仅供个人核对，不代替专业人士判断，也不构成官方政策承诺',
   },
   self_intro_gen: {
     title: 'AI 自我介绍生成',

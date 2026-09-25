@@ -1,4 +1,5 @@
 import { ChevronLeftIcon } from 'lucide-react'
+import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import type { ResumeCompareDecision } from './resumeCompareModel'
 import { ResumeCompareCustomEditor } from './ResumeCompareCustomEditor'
 import { wordDiff } from './wordDiff'
@@ -52,7 +53,7 @@ export function ResumeCompareCard(props: {
           <section>
             <p className="qxc-column-label">AI 改写</p>
             <p className="qxc-copy"><HighlightedAfter text={props.item.after} additions={props.item.additions} /></p>
-            <span className="qxc-evidence">AI 生成，仅供本人核对</span>
+            <span className="qxc-evidence">{AI_LABEL_COPY.RESUME_OPTIMIZE}</span>
           </section>
         </div>
 

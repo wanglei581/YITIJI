@@ -433,7 +433,11 @@ assertNotIncludes(generatePreview, '>重新填写<', 'generate preview no longer
 assertNotIncludes(generatePreview, '>返回首页<', 'empty-state home exit uses prototype hub/home labels, not a third home control next to refill')
 assertIncludes(optimize, '合成演示', 'optimize capture fixtures are labeled synthetic')
 assertIncludes(optimize, "q.get('capture') === '1'", 'optimize fixtures require capture=1')
-assertIncludes(optimize, 'AI 优化稿，请自行核对', 'optimize keeps the on-screen AIGC mark')
+// 3.5c：屏显标识从本地写死的「AI 优化稿，请自行核对」改为共享标识（审计表一「简历优化对照（屏）」）。
+// 三条合起来仍钉住原断言的全部内容：徽标绑定哪句、徽标真的渲染、那句逐字是什么。
+assertIncludes(optimize, 'AIGC_SCREEN_MARK = AI_LABEL_COPY.RESUME_OPTIMIZE', 'optimize keeps the on-screen AIGC mark bound to the shared AI label')
+assertIncludes(optimize, '<b>{AIGC_SCREEN_MARK}</b>', 'optimize renders the on-screen AIGC mark')
+assertIncludes(read('../../packages/shared/src/types/complianceCopy.ts'), "RESUME_OPTIMIZE: 'AI 生成，仅供参考，请自行核对'", 'the on-screen AIGC mark reads AI 生成，仅供参考，请自行核对')
 assertIncludes(optimize, '示意，非打印稿', 'HTML preview is labeled as non-print')
 assertIncludes(optimize, '打印的就是这一份', 'real PDF copy is identified as the print file')
 assertIncludes(optimize, '压到一页', 'optimize offers compress-to-one-page')

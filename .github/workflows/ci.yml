@@ -142,6 +142,9 @@ jobs:
           # S1 前端 AI 原语合同（#618）。纯读 apps/kiosk 源码，不碰 Prisma，
           # 因此可以留在这一步；四个 api 侧的 AI 门禁见下方 Verify suites。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-primitives
+          # 3.5c AI 可见标识与合同审查对外文案：期望逐条取自 2026-09-26 审计表一 / 表二。
+          # 纯读 apps/kiosk + packages/shared + docs 源码（TypeScript AST），不碰 Prisma、不连库。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-label-copy
           # 三条主链的 ai-down 出路（#—— AI 是加速器不是前置条件）。纯文本读取
           # apps/kiosk + packages/shared + services/api/src 源码做交叉断言，
           # 不 import 任何后端模块、不碰 Prisma、不连 DB，故留在这一步。

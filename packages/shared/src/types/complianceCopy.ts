@@ -118,9 +118,51 @@ export const COMPLIANCE_COPY = {
    */
   PARTNER_DASHBOARD_TOP:
     '本后台用于合作数据维护与运营统计,不承接平台内简历投递、候选人筛选和面试邀约。',
+
+  /**
+   * Kiosk 合同审查（AI 签约风险提示）首页的服务性质说明：页头副标题与知情同意首句。
+   * 对外不写「法律意见」「律师审查」「判断合同有效」（compliance-boundary §1.2 D）。
+   * 取值出处：docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md 表二 ContractReviewHomePage 行。
+   */
+  KIOSK_CONTRACT_REVIEW_SCOPE: '仅作条款风险提示，请自行核对原文',
+
+  /** Kiosk 合同审查分析中（确认提取结果弹窗）的结果性质说明。出处同上，表二 ContractReviewProcessingPage 行。 */
+  KIOSK_CONTRACT_REVIEW_PROCESSING: '本次结果仅作风险提示，请自行核对原文',
 } as const
 
 export type ComplianceCopyKey = keyof typeof COMPLIANCE_COPY
+
+/**
+ * AI 可见标识文案（next-tasks 3.5c）。
+ *
+ * 依据：compliance-boundary §1.2 A「生成式 AI 登记与标识」「数字人形象与声音」、§1.2 E；
+ * feature-scope §0.5 第 5 条（界面显式标注「AI 生成，仅供参考」）、§七 #19。
+ *
+ * 全站只有一个底句 `BASE`；页面需要交代场景时，只在底句后面接一小段，不另起说法。
+ * 各键的取值逐字来自 docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md（表一、表二）的
+ * 「建议」栏，门禁 apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs 按审计行号核对取值。
+ * 改动取值必须先改审计口径，再同步门禁。
+ *
+ * 小程序不能 import 本包；小程序同名文案由小程序专用会话按同一张审计表维护。
+ */
+export const AI_LABEL_COPY = {
+  /** 底句。一体机 AIGC 可见标识（AigcMark）、AI 助手对话、语音条、职业规划说明都用它。 */
+  BASE: 'AI 生成，仅供参考',
+  /** 审计表一「简历诊断（屏）」：真实报告的说明。 */
+  RESUME_DIAGNOSIS: 'AI 生成，仅供参考，请对照原文核对',
+  /** 审计表一「简历优化对照（屏）」：对照卡的改写栏与优化 / 生成预览页的徽标。 */
+  RESUME_OPTIMIZE: 'AI 生成，仅供参考，请自行核对',
+  /** 审计表一「模拟面试报告（一体机）」：报告页横幅。 */
+  INTERVIEW_REPORT: 'AI 生成，仅供参考，只用于本人练习复盘',
+  /** 审计表一「面试进行中」：会话页页头。 */
+  INTERVIEW_SESSION: '题目由 AI 生成，仅供参考',
+  /** 审计表二「ContractReviewResultPage」：合同审查结果页免责横幅。 */
+  CONTRACT_REVIEW_RESULT: '本结果由 AI 生成，仅供参考，只提示需要核对的条款',
+  /** compliance-boundary §1.2 A「数字人形象与声音」、feature-scope §七 #19：语音通话界面明说。 */
+  DIGITAL_HUMAN: '小青是 AI 数字人，形象与声音由 AI 生成',
+} as const
+
+export type AiLabelCopyKey = keyof typeof AI_LABEL_COPY
 
 /**
  * UI 文案禁词清单(唯一 SSOT)。任何用户可见文案(按钮 / 提示 / 标题)出现这些词必须改写。
