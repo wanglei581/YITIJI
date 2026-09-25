@@ -33758,8 +33758,7 @@
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
-        "@ai-job-print/api::verify:pickup-code-share",
-        "@ai-job-print/api::verify:print-jobs"
+        "@ai-job-print/api::verify:pickup-code-share"
       ],
       "wired": true
     },

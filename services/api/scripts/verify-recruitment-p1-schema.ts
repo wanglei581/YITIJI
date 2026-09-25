@@ -141,8 +141,9 @@ function assertNoSqliteDrift(db: string, label: string): void {
  */
 // main 已含 JobMaterialTemplate（#800，99→100），本刀再加 OrderItem（材料包逐份履约）→ 101。
 // 再加 OrderSubmissionLedger（跨端建单幂等账本）→ 102。
+// 再加 KioskJobBoardConfig（一体机岗位板块的全局 / 单终端开关，2026-09-25 D5 裁决）→ 103。
 // 加表就要同步这个数，忘了改 build-and-verify 与 postgres-readiness 会一起红。
-const EXPECTED_MODEL_COUNT = 102
+const EXPECTED_MODEL_COUNT = 103
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
