@@ -19,6 +19,9 @@ export type MemberStepUpChallengeConsumeResult =
  *
  * 只暴露用到的原子操作,避免散落 raw client 调用。
  */
+/** 与 Lua 中的同名哨兵一致：不比较 bind.phase。空字符串仍表示当前必须没有 bind。 */
+export const UPLOAD_SESSION_PHASE_UNCHECKED = '__phase_unchecked__'
+
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   constructor(@Inject(REDIS_CLIENT) private readonly client: Redis) {}
@@ -93,7 +96,7 @@ export class RedisService implements OnModuleDestroy {
   /**
    * 同一次 Lua：锁值仍是调用方的、会话仍是 expectedStatus、文件身份符合 expectedFileId、键 TTL 仍大于 0，
    * 才按剩余 TTL 写入。expectedFileId 为空表示当前必须还没有文件。
-   * expectedPhase 为空字符串表示当前还没有 bind；传入阶段时必须一致。
+   * expectedPhase 为 null 时不比较阶段；空字符串表示当前必须没有 bind。
    * cleanup 与会话、过期索引在同一次脚本里写入，进程在返回前被杀掉也不会只留下一半。
    */
   async compareAndSetSession(
@@ -116,7 +119,7 @@ export class RedisService implements OnModuleDestroy {
     const keys = [sessionKey, lockKey]
     const args = [lockToken, nextValue, expectedStatus, expectedFileId ?? '']
     if (expectedPhase !== null || cleanup) {
-      args.push(expectedPhase ?? '')
+      args.push(expectedPhase ?? UPLOAD_SESSION_PHASE_UNCHECKED)
       if (cleanup) {
         keys.push(cleanup.key, cleanup.indexKey)
         args.push(
@@ -156,7 +159,7 @@ export class RedisService implements OnModuleDestroy {
         cleanupTtl = tonumber(ARGV[7])
         if cleanupTtl == nil or cleanupTtl <= 0 then return -2 end
       end
-      if expectedPhase ~= nil and expectedPhase ~= false then
+      if expectedPhase ~= nil and expectedPhase ~= false and expectedPhase ~= '__phase_unchecked__' then
         local bind = session['bind']
         local actualPhase = nil
         if type(bind) == 'table' then actualPhase = bind['phase'] end

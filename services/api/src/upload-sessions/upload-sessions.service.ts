@@ -629,7 +629,8 @@ export class UploadSessionsService {
       const expired = new Date(record.expiresAt).getTime() <= now
         || record.status === 'cancelled'
         || record.status === 'expired'
-      if (!expired && record.status === 'uploaded') {
+      const tombstoned = !file || file.deletedAt != null
+      if (!expired && record.status === 'uploaded' && !tombstoned) {
         await this.driveMemberBind(record, lock, record.bind.endUserId)
         return 'cleaned'
       }
@@ -964,13 +965,19 @@ export class UploadSessionsService {
   }
 
   private async recoverStorageKeys(now: number): Promise<number> {
+    const where = {
+      OR: [
+        { pendingStorageKey: { not: null } },
+        { replacedStorageKey: { not: null } },
+      ],
+    }
+    const total = await this.prisma.fileObject.count({ where })
+    const pageCount = Math.ceil(total / CLEANUP_BATCH_LIMIT)
+    const page = pageCount > 0 ? Math.floor(now / 60_000) % pageCount : 0
     const rows = await this.prisma.fileObject.findMany({
-      where: {
-        OR: [
-          { pendingStorageKey: { not: null } },
-          { replacedStorageKey: { not: null } },
-        ],
-      },
+      where,
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      skip: page * CLEANUP_BATCH_LIMIT,
       take: CLEANUP_BATCH_LIMIT,
     })
     let failed = 0

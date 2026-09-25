@@ -9,6 +9,7 @@ import { validateUpload, DEFAULT_SENSITIVE_BY_PURPOSE } from '../src/files/file-
 import { CONTRACT_REVIEW_TTL_MS, defaultRetentionForUpload } from '../src/files/retention-policy'
 import { sniffDeclaredMimeMismatch } from '../src/files/content-sniff'
 import type { FilePurpose, FileUploadResponse } from '../src/files/file.types'
+import { UPLOAD_SESSION_PHASE_UNCHECKED } from '../src/common/redis/redis.service'
 import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
 import { FilesCleanupTask } from '../src/files/files.cleanup.task'
 import { FilesService } from '../src/files/files.service'
@@ -150,7 +151,7 @@ class FakeRedis {
     } else if (actualId !== expectedFileId) {
       return 'conflict'
     }
-    if (expectedPhase !== null) {
+    if (expectedPhase !== null && expectedPhase !== UPLOAD_SESSION_PHASE_UNCHECKED) {
       const actualPhase = parsed.bind?.phase ?? ''
       if (expectedPhase === '' ? Boolean(actualPhase) : actualPhase !== expectedPhase) return 'conflict'
     }
@@ -256,9 +257,21 @@ class FakePrisma {
       await this.fileObject.update({ where: { id: current.id }, data })
       return { count: 1 }
     },
+    count: async ({
+      where,
+    }: {
+      where?: {
+        OR?: Array<{
+          pendingStorageKey?: { not: null }
+          replacedStorageKey?: { not: null }
+        }>
+      }
+    }) => this.rowsFor(where).length,
     findMany: async ({
       where,
       take,
+      skip,
+      orderBy,
     }: {
       where?: {
         OR?: Array<{
@@ -267,17 +280,42 @@ class FakePrisma {
         }>
       }
       take?: number
+      skip?: number
+      orderBy?: Array<Record<string, 'asc' | 'desc'>>
     }) => {
-      let rows = [...this.files.values()]
-      if (where?.OR) {
-        rows = rows.filter((row) => where.OR!.some((clause) => {
-          if (clause.pendingStorageKey) return row.pendingStorageKey != null
-          if (clause.replacedStorageKey) return row.replacedStorageKey != null
-          return false
-        }))
-      }
-      return rows.slice(0, take ?? rows.length)
+      const rows = this.rowsFor(where).sort((left, right) => {
+        for (const order of orderBy ?? []) {
+          const key = Object.keys(order)[0] as 'id' | 'updatedAt'
+          const direction = order[key] === 'desc' ? -1 : 1
+          const a = left[key]
+          const b = right[key]
+          if (a instanceof Date && b instanceof Date) {
+            const diff = a.getTime() - b.getTime()
+            if (diff !== 0) return diff * direction
+          } else if (a !== b) {
+            return String(a) < String(b) ? -direction : direction
+          }
+        }
+        return left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+      })
+      const start = skip ?? 0
+      return rows.slice(start, start + (take ?? rows.length))
     },
+  }
+
+  private rowsFor(where?: {
+    OR?: Array<{
+      pendingStorageKey?: { not: null }
+      replacedStorageKey?: { not: null }
+    }>
+  }): StoredFile[] {
+    const rows = [...this.files.values()]
+    if (!where?.OR) return rows
+    return rows.filter((row) => where.OR!.some((clause) => {
+      if (clause.pendingStorageKey) return row.pendingStorageKey != null
+      if (clause.replacedStorageKey) return row.replacedStorageKey != null
+      return false
+    }))
   }
 
   private matches(
@@ -2243,6 +2281,120 @@ async function main(): Promise<void> {
     assert.equal(prisma.files.get('file_live')?.deletedAt ?? null, null)
     assert.equal(prisma.files.get('file_live')?.storageKey, liveKey)
     assert.equal(prisma.files.get('file_live')?.pendingStorageKey, liveKey)
+  }
+
+  {
+    // 未过期的 uploaded 会话已经写下 bind，但文件行已被墓碑。
+    // 清扫不能每分钟再去 driveMemberBind 并抛 FILE_NOT_FOUND。
+    const { service, prisma, redis } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const fileId = uploaded.file!.fileId
+    const row = prisma.files.get(fileId)!
+    row.deletedAt = new Date()
+    row.pendingStorageKey = 'users/member_1/resumes/tombstoned.pdf'
+    prisma.files.set(fileId, row)
+    const sessionKey = `upload_session:${session.sessionId}`
+    const raw = JSON.parse((await redis.get(sessionKey)) ?? '{}') as Record<string, unknown>
+    raw['bind'] = {
+      phase: 'intent',
+      fileId,
+      endUserId: 'member_1',
+      userKey: row.pendingStorageKey,
+      previousKey: row.storageKey,
+      bucket: row.bucket,
+    }
+    await redis.setExistingWithCurrentTtl(sessionKey, JSON.stringify(raw))
+    await redis.zadd('upload_session_expiry_index', Date.now() - 1, session.sessionId)
+    const first = await service.cleanupExpiredSessions(Date.now())
+    const after = JSON.parse((await redis.get(sessionKey)) ?? '{}') as { status?: string }
+    assert.equal(first.failed, 0, 'a tombstoned bind must be finished without a retryable error')
+    assert.equal(after.status, 'expired')
+    assert.notEqual(prisma.files.get(fileId)?.deletedAt ?? null, null)
+    assert.notEqual(prisma.files.get(fileId)?.ownerType, 'user')
+    const second = await service.cleanupExpiredSessions(Date.now() + 120_000)
+    assert.equal(second.failed, 0, 'the next sweep must not throw FILE_NOT_FOUND again')
+  }
+
+  {
+    // 100 条删除一直失败的行不能永远挡住第 101 条可恢复的行。
+    const { service, prisma, files } = makeService()
+    const objects = new Set<string>()
+    files.deleteObjectAtKey = async (key: string) => {
+      if (key.startsWith('poison/')) throw new Error('poison delete')
+      objects.delete(key)
+    }
+    const stamp = new Date(0)
+    for (let index = 0; index < 100; index += 1) {
+      const id = `p${String(index).padStart(3, '0')}`
+      const pending = `poison/${id}`
+      objects.add(pending)
+      prisma.files.set(id, {
+        id,
+        filename: 'resume.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 4,
+        sha256: 'sha',
+        storageKey: `tmp/${id}.pdf`,
+        bucket: 'local-fs',
+        purpose: 'resume_upload',
+        sensitiveLevel: 'sensitive',
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+        deletedAt: new Date(0),
+        expiresAt: null,
+        pendingStorageKey: pending,
+        replacedStorageKey: null,
+        updatedAt: stamp,
+        retentionPolicy: null,
+        retentionSetBy: null,
+        retentionConsentAt: null,
+        retentionConsentVersion: null,
+        retentionLockedReason: null,
+      })
+    }
+    objects.add('healthy/copy')
+    prisma.files.set('p100', {
+      id: 'p100',
+      filename: 'resume.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 4,
+      sha256: 'sha',
+      storageKey: 'tmp/p100.pdf',
+      bucket: 'local-fs',
+      purpose: 'resume_upload',
+      sensitiveLevel: 'sensitive',
+      endUserId: null,
+      ownerType: 'system',
+      ownerId: null,
+      deletedAt: new Date(0),
+      expiresAt: null,
+      pendingStorageKey: 'healthy/copy',
+      replacedStorageKey: null,
+      updatedAt: stamp,
+      retentionPolicy: null,
+      retentionSetBy: null,
+      retentionConsentAt: null,
+      retentionConsentVersion: null,
+      retentionLockedReason: null,
+    })
+    await service.cleanupExpiredSessions(0)
+    assert.equal(prisma.files.get('p100')?.pendingStorageKey, 'healthy/copy')
+    await service.cleanupExpiredSessions(60_000)
+    assert.equal(prisma.files.get('p100')?.pendingStorageKey ?? null, null, 'the second time page must reach the healthy row')
+    assert.equal(objects.has('healthy/copy'), false)
+    assert.equal(prisma.files.get('p000')?.pendingStorageKey, 'poison/p000')
   }
 
   console.log('PASS upload session verification')
