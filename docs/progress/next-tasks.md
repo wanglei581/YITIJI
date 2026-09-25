@@ -26,6 +26,15 @@
 2. **年满 14 周岁声明与录音单独同意：** 复用 `UserAiConsent`（`/me/ai-consents`），新增 `age_14_plus`、`voice_recording` 两个 scope 和各自的文案版本号；撤回写 `revokedAt`。未登录用户在本机保存声明，第一次上传、录音或发起 AI 请求时把「已声明年满 14」与「已同意录音」及文案版本随请求带给后端，写进这次任务的日志（建议统一放请求头，multipart 也能带）。录音同意文案要写清五件事：用途、交给哪家做语音识别、保存多久（转完即删或写明天数）、不做声纹识别、怎么撤回。依据与口径来自「项目资金预算评估」窗口 9/26 的检索意见（个保法第二十八、二十九、三十一、六十九条），不是律师意见。
 3. **小青不再引导去岗位：** `/assistant/chat` 目前不区分来源，回复里可能引导用户去看岗位或招聘会。托管关闭时提示词不再引导岗位、招聘会、政策；建议请求带 `channel=miniapp`，服务端只给小程序已注册页面的 `actions`（小程序端已丢掉映射不到的卡片，但文字回复拦不住）。
 
+**后端对接口径（2026-09-26，`claude/miniapp-backend-review-20260926`）：**
+
+- 简历对照响应不再带 `fitLevel`。共享类型里该字段改为可选，标注「已停用，服务端不再返回」。不要再读等级。
+- 未登录的上传、录音和 AI 请求用下面四个头。旗标和版本必须成对，版本只允许字母、数字、点、下划线和连字符，最长 64。缺头、旗标不对或版本不合格都记「未声明」，不拦截。已登录会员走 `/me/ai-consents`，不要靠这四个头入库。
+  - `X-Age-14-Plus: declared` 与 `X-Age-14-Plus-Version: age-14-plus-v1`
+  - `X-Voice-Recording: granted` 与 `X-Voice-Recording-Version: voice-recording-v1`
+- 新 scope：`age_14_plus`（版本 `age-14-plus-v1`）、`voice_recording`（版本 `voice-recording-v1`）。授予 `POST /me/ai-consents`，撤回 `POST /me/ai-consents/:scope/revoke`。服务端写入当时的文案版本；撤回写 `revokedAt`。
+- `/assistant/chat` 增加可选字段 `channel`。缺省或 `kiosk` 与原来相同。`miniapp` 时 `actions[].route` 改成小程序页面路径（如 `/pages/resume-upload/resume-upload`），且必须在 `app.json` 已注册页面里。岗位、招聘会、企业没有对应页面，不会返回。政策页面目前也没有，回复里不会提政策。
+
 **小程序下一批（按生态蓝图的双端分工，动手前先请产品负责人确认）：**
 
 1. 首页加「待取件的取件码 / 最近订单」「扫码连接一体机」「今日提醒」三个入口；「AI 百宝箱」链接改名与 Tab 一致。

@@ -224,6 +224,7 @@
     "verify:mock-interview": "node -r @swc-node/register scripts/verify-mock-interview.ts",
     "verify:multipart-field-nesting": "tsc --noEmit --strict --noUnusedLocals --noUnusedParameters --skipLibCheck --target ES2021 --module commonjs --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports scripts/verify-multipart-field-nesting.ts && node -r @swc-node/register scripts/verify-multipart-field-nesting.ts",
     "verify:job-fit": "node -r @swc-node/register scripts/verify-job-fit.ts",
+    "verify:miniapp-review-backend": "node -r @swc-node/register scripts/verify-miniapp-review-backend.ts",
     "verify:job-fit-print": "node -r @swc-node/register scripts/verify-job-fit-print.ts",
     "verify:job-fit-governance": "node -r @swc-node/register scripts/verify-job-fit-governance.ts",
     "verify:governed-job-fit": "node -r @swc-node/register scripts/verify-governed-job-fit.ts",
