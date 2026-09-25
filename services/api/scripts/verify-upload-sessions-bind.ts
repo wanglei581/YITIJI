@@ -350,13 +350,13 @@ async function main(): Promise<void> {
       file: file({ originalname: 'delete-once.pdf' }),
     })
     let failDelete = true
-    const originalDelete = files.systemDelete.bind(files)
-    files.systemDelete = async (fileId: string, reason: string) => {
+    const originalDelete = files.deleteObjectAtKey.bind(files)
+    files.deleteObjectAtKey = async (objectKey: string, bucket?: string | null) => {
       if (failDelete) {
         failDelete = false
         throw new Error('storage delete failed once')
       }
-      return originalDelete(fileId, reason)
+      return originalDelete(objectKey, bucket)
     }
     await expectRejects(
       () => service.cancel(session.sessionId, session.controlToken),
@@ -538,14 +538,14 @@ async function main(): Promise<void> {
       uploadToken: session.uploadToken,
       file: file({ originalname: 'cleanup-pointer.pdf' }),
     })
-    const originalDelete = files.systemDelete.bind(files)
+    const originalDelete = files.deleteObjectAtKey.bind(files)
     let failDelete = true
-    files.systemDelete = async (fileId: string, reason: string) => {
+    files.deleteObjectAtKey = async (objectKey: string, bucket?: string | null) => {
       if (failDelete) {
         failDelete = false
         throw new Error('storage delete failed once')
       }
-      return originalDelete(fileId, reason)
+      return originalDelete(objectKey, bucket)
     }
     await expectRejects(
       () => service.cancel(session.sessionId, session.controlToken),
@@ -599,10 +599,11 @@ async function main(): Promise<void> {
     }
     await redis.zadd('upload_session_expiry_index', 1, first.sessionId)
     await redis.zadd('upload_session_expiry_index', 2, second.sessionId)
-    const originalDelete = files.systemDelete.bind(files)
-    files.systemDelete = async (fileId: string, reason: string) => {
-      if (fileId === firstUpload.file!.fileId) throw new Error('poison session delete')
-      return originalDelete(fileId, reason)
+    const poisonKey = prisma.files.get(firstUpload.file!.fileId)?.storageKey
+    const originalDelete = files.deleteObjectAtKey.bind(files)
+    files.deleteObjectAtKey = async (objectKey: string, bucket?: string | null) => {
+      if (objectKey === poisonKey) throw new Error('poison session delete')
+      return originalDelete(objectKey, bucket)
     }
     const result = await service.cleanupExpiredSessions(10)
     assert.equal(prisma.files.get(firstUpload.file!.fileId)?.deletedAt ?? null, null)

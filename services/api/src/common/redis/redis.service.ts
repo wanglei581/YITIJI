@@ -115,10 +115,11 @@ export class RedisService implements OnModuleDestroy {
       indexScore: number
       indexMember: string
     } | null = null,
+    expectedRevision: number | null = null,
   ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
     const keys = [sessionKey, lockKey]
     const args = [lockToken, nextValue, expectedStatus, expectedFileId ?? '']
-    if (expectedPhase !== null || cleanup) {
+    if (expectedPhase !== null || cleanup || expectedRevision !== null) {
       args.push(expectedPhase ?? UPLOAD_SESSION_PHASE_UNCHECKED)
       if (cleanup) {
         keys.push(cleanup.key, cleanup.indexKey)
@@ -130,6 +131,8 @@ export class RedisService implements OnModuleDestroy {
         )
       }
     }
+    while (args.length < 9) args.push('')
+    args.push(expectedRevision === null ? '' : String(expectedRevision))
     const result = await this.client.eval(
       `
       -- UPLOAD_SESSION_COMMIT
@@ -168,6 +171,12 @@ export class RedisService implements OnModuleDestroy {
         elseif actualPhase ~= expectedPhase then
           return -2
         end
+      end
+      local expectedRevision = ARGV[10]
+      if expectedRevision ~= nil and expectedRevision ~= false and expectedRevision ~= '' then
+        local actualRevision = session['revision']
+        if actualRevision == nil or actualRevision == false then actualRevision = 0 end
+        if tostring(actualRevision) ~= tostring(expectedRevision) then return -2 end
       end
       redis.call('SET', KEYS[1], ARGV[2], 'EX', ttl)
       if cleanupTtl ~= nil then

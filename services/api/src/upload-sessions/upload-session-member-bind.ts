@@ -10,6 +10,11 @@ import { FilesService } from '../files/files.service'
 import { defaultRetentionForUpload } from '../files/retention-policy'
 import { signFileUrl } from '../files/signing'
 import { generateObjectKey } from '../storage/object-key'
+import {
+  deleteAnonymousObjectThenTombstone,
+  noteObjectDeleteFailure,
+  releaseReplacedObject,
+} from './upload-session-object-delete'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import type {
@@ -50,6 +55,8 @@ export interface StoredUploadSession {
   confirmedAt: string | null
   expiresAt: string
   createdAt: string
+  /** 每次成功写回 Redis 加一。清扫和取消必须带读到的值，避免旧快照盖住并发新状态。 */
+  revision?: number
   bind?: MemberBindIntent | null
 }
 
@@ -208,7 +215,12 @@ export async function driveMemberBind(
     session = await casBind(host, session, lock, intent(), expected)
     const published = finishIfPublished()
     if (published) return published
-    await host.files.deleteObjectAtKey(file.replacedStorageKey, bucket)
+    try {
+      await host.files.deleteObjectAtKey(file.replacedStorageKey, bucket)
+    } catch (error) {
+      await noteObjectDeleteFailure(host, file, error)
+      throw error
+    }
     await host.prisma.fileObject.updateMany({
       where: { id: file.id, storageKey: file.storageKey, replacedStorageKey: file.replacedStorageKey },
       data: { replacedStorageKey: null },
@@ -234,6 +246,9 @@ export async function publishConfirmed(
   lock: { lockKey: string; lockToken: string },
   file: BindFileRow,
 ): Promise<UploadSessionConfirmResponse> {
+  if (session.status !== 'confirmed' && new Date(session.expiresAt).getTime() <= Date.now()) {
+    throw expiredBindException()
+  }
   if (!session.file || file.deletedAt || (session.mode === 'member' && (file.ownerType !== 'user' || file.replacedStorageKey))) {
     throw new BadRequestException({
       error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端上传已失效，请重新上传' },
@@ -384,7 +399,12 @@ export async function finishConfirmed(
 ): Promise<void> {
   const file = record.file ? await loadBindFile(host, record.file.fileId) : null
   if (file?.replacedStorageKey && file.replacedStorageKey !== file.storageKey) {
-    await host.files.deleteObjectAtKey(file.replacedStorageKey, file.bucket)
+    try {
+      await host.files.deleteObjectAtKey(file.replacedStorageKey, file.bucket)
+    } catch (error) {
+      await noteObjectDeleteFailure(host, file, error)
+      throw error
+    }
     await host.prisma.fileObject.updateMany({
       where: { id: file.id, replacedStorageKey: file.replacedStorageKey },
       data: { replacedStorageKey: null },
@@ -400,23 +420,14 @@ export async function abandonBoundAttempt(
   reason: string,
 ): Promise<void> {
   const file = record.file ? await loadBindFile(host, record.file.fileId) : null
-  if (file && isLiveMember(file)) {
+  const expired = record.status === 'cancelled'
+    || record.status === 'expired'
+    || new Date(record.expiresAt).getTime() <= Date.now()
+  if (file && isLiveMember(file) && !expired && record.status !== 'confirmed') {
     await driveMemberBind(host, record, lock, record.bind?.endUserId ?? file.endUserId ?? '')
     return
   }
-  if (file && !file.deletedAt && file.ownerType !== 'user') {
-    const claimed = await host.prisma.fileObject.updateMany({
-      where: { id: file.id, storageKey: file.storageKey, deletedAt: null },
-      data: { deletedAt: new Date(), deletedBy: 'system', deleteReason: reason, status: 'deleted' },
-    })
-    if (claimed.count === 0) {
-      const current = await loadBindFile(host, file.id)
-      if (current && isLiveMember(current)) {
-        await driveMemberBind(host, record, lock, record.bind?.endUserId ?? current.endUserId ?? '')
-        return
-      }
-    }
-  }
+  if (file && isLiveMember(file)) await releaseReplacedObject(host, file)
   const nextStatus = record.status === 'cancelled' ? 'cancelled' : 'expired'
   await abandonAfterCommit(host, record, nextStatus, reason, lock)
 }
@@ -526,6 +537,12 @@ export function isLiveMember(file: Pick<BindFileRow, 'deletedAt' | 'ownerType' |
   return !file.deletedAt && (file.ownerType === 'user' || Boolean(file.endUserId))
 }
 
+function expiredBindException(): BadRequestException {
+  return new BadRequestException({
+    error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' },
+  })
+}
+
 export async function loadBindFile(
   host: MemberBindHost,
   fileId: string,
@@ -543,8 +560,13 @@ export async function reloadOrCompensate(
 ): Promise<BindFileRow> {
   const current = await loadBindFile(host, fileId)
   if (!current || current.deletedAt) {
-    if (userKey && current?.storageKey !== userKey) {
-      await host.files.deleteObjectAtKey(userKey, bucket).catch(() => undefined)
+    if (userKey && current && current.storageKey !== userKey) {
+      try {
+        await host.files.deleteObjectAtKey(userKey, bucket)
+      } catch (error) {
+        await noteObjectDeleteFailure(host, { ...current, storageKey: userKey }, error)
+        throw error
+      }
     }
     throw new NotFoundException({
       error: { code: 'FILE_NOT_FOUND', message: '上传文件不存在或已被清理' },
@@ -610,8 +632,12 @@ async function cleanupOne(
     && persisted.bind.phase !== 'done'
     && new Date(persisted.expiresAt).getTime() > now
   ) {
-    await host.redis.setEx(host.sessionKey(sessionId), host.sessionRedisTtlSeconds(), JSON.stringify(persisted.snapshot))
-    record = await host.loadOptional(sessionId)
+    const restored = await host.redis.setNxEx(
+      host.sessionKey(sessionId),
+      JSON.stringify(persisted.snapshot),
+      host.sessionRedisTtlSeconds(),
+    )
+    record = restored ? persisted.snapshot : await host.loadOptional(sessionId)
   }
   if (record?.status === 'confirmed') {
     await finishConfirmed(host, record, lock)
@@ -619,13 +645,13 @@ async function cleanupOne(
   }
   if (record?.bind && record.bind.phase !== 'done') {
     const file = record.file ? await loadBindFile(host, record.file.fileId) : null
-    if (file && isLiveMember(file)) {
-      await driveMemberBind(host, record, lock, record.bind.endUserId)
-      return 'cleaned'
-    }
     const expired = new Date(record.expiresAt).getTime() <= now
       || record.status === 'cancelled'
       || record.status === 'expired'
+    if (file && isLiveMember(file) && !expired) {
+      await driveMemberBind(host, record, lock, record.bind.endUserId)
+      return 'cleaned'
+    }
     const tombstoned = !file || file.deletedAt != null
     if (!expired && record.status === 'uploaded' && !tombstoned) {
       await driveMemberBind(host, record, lock, record.bind.endUserId)
@@ -672,7 +698,7 @@ async function cleanupAbandonedFile(
     select: { endUserId: true, ownerType: true },
   })
   if (file?.endUserId || file?.ownerType === 'user') return
-  await host.files.systemDelete(record.file.fileId, reason)
+  await deleteAnonymousObjectThenTombstone(host, record.file.fileId, reason)
 }
 
 export async function finishExpired(
@@ -696,19 +722,22 @@ export async function abandonAfterCommit(
   lock: { lockKey: string; lockToken: string },
 ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
   const fileId = stored.file?.fileId ?? null
+  const next: StoredUploadSession = { ...stored, status: nextStatus }
   const committed = await host.commitSession(
-    { ...stored, status: nextStatus },
+    next,
     lock.lockKey,
     lock.lockToken,
     stored.status,
     fileId,
   )
   if (committed !== 'updated') return committed
-  await deleteRetainedFile(host, { ...stored, status: nextStatus }, reason, lock)
+  await deleteRetainedFile(host, next, reason, lock)
   try {
     await releaseCleanup(host, stored.sessionId)
-  } catch {
-    // 主文件已经进入删除。多余对象的 key 还在 cleanup 记录上，下一轮再删。
+  } catch (error) {
+    // 主文件的删除结果已经分开记账。多余对象失败时留下错误类型，索引仍在，下一轮再删。
+    const row = fileId ? await loadBindFile(host, fileId) : null
+    if (row && !row.deletedAt) await noteObjectDeleteFailure(host, row, error)
   }
   return 'updated'
 }

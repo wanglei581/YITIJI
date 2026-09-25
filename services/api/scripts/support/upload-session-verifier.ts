@@ -125,6 +125,7 @@ export class FakeRedis {
       indexScore: number
       indexMember: string
     } | null = null,
+    expectedRevision: number | null = null,
   ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
     const now = Date.now()
     const session = this.values.get(sessionKey)
@@ -134,9 +135,9 @@ export class FakeRedis {
     }
     const lock = this.values.get(lockKey)
     if (!lock || lock.expiresAt <= now || lock.value !== lockToken) return 'lost-lock'
-    let parsed: { status?: string; file?: { fileId?: string } | null; bind?: { phase?: string } | null }
+    let parsed: { status?: string; revision?: number; file?: { fileId?: string } | null; bind?: { phase?: string } | null }
     try {
-      parsed = JSON.parse(session.value) as { status?: string; file?: { fileId?: string } | null; bind?: { phase?: string } | null }
+      parsed = JSON.parse(session.value) as { status?: string; revision?: number; file?: { fileId?: string } | null; bind?: { phase?: string } | null }
     } catch {
       return 'conflict'
     }
@@ -151,6 +152,7 @@ export class FakeRedis {
       const actualPhase = parsed.bind?.phase ?? ''
       if (expectedPhase === '' ? Boolean(actualPhase) : actualPhase !== expectedPhase) return 'conflict'
     }
+    if (expectedRevision !== null && (parsed.revision ?? 0) !== expectedRevision) return 'conflict'
     this.values.set(sessionKey, { value: nextValue, expiresAt: session.expiresAt })
     if (cleanup) {
       this.values.set(cleanup.key, {
@@ -452,7 +454,11 @@ export class FakeFilesService {
   }
 
   async copyObjectToKey(): Promise<void> {}
-  async deleteObjectAtKey(): Promise<void> {}
+  async deleteObjectAtKey(objectKey: string): Promise<void> {
+    for (const [id, row] of this.prisma.files) {
+      if (row.storageKey === objectKey) this.storedObjects.delete(id)
+    }
+  }
 
 }
 

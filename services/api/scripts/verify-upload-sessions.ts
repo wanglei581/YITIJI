@@ -8,9 +8,14 @@ import { BadRequestException, ForbiddenException, UnauthorizedException } from '
 import { CONTRACT_REVIEW_TTL_MS } from '../src/files/retention-policy'
 import { sniffDeclaredMimeMismatch } from '../src/files/content-sniff'
 import { FilesCleanupTask } from '../src/files/files.cleanup.task'
+import { FilesService } from '../src/files/files.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
+import { PrismaService } from '../src/prisma/prisma.service'
+import { StorageService } from '../src/storage/storage.service'
+import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import {
+  FakeRedis,
   ISOLATED_DATABASE,
   REAL_STORAGE_DIR,
   deferred,

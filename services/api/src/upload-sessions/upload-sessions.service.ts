@@ -186,6 +186,7 @@ export class UploadSessionsService {
       confirmedAt: null,
       expiresAt: expiresAt.toISOString(),
       createdAt: now.toISOString(),
+      revision: 0,
     }
 
     await this.redis.setEx(sessionKey(sessionId), sessionRedisTtlSeconds(), JSON.stringify(record))
@@ -317,8 +318,9 @@ export class UploadSessionsService {
           error: { code: 'UPLOAD_TOKEN_INVALID', message: '上传令牌无效' },
         })
       }
+      const latest: StoredUploadSession = { ...loaded, status: 'uploading', file: null }
       const started = await this.commitSession(
-        { ...loaded, status: 'uploading', file: null },
+        latest,
         lockKey,
         lockToken,
         loaded.status,
@@ -332,7 +334,6 @@ export class UploadSessionsService {
         }
         throw uploadInProgressException()
       }
-      const latest: StoredUploadSession = { ...loaded, status: 'uploading', file: null }
 
       let file: FileUploadResponse
       try {
@@ -401,17 +402,17 @@ export class UploadSessionsService {
       const stored = await this.load(sessionId)
       const record = this.markExpired(stored)
       this.assertControlToken(record, controlToken)
-      if (stored.mode === 'member' && stored.status === 'uploaded' && stored.file && record.status !== 'expired') {
+      if (record.status === 'expired') {
+        await finishExpired(this.memberBind, stored, 'upload session expired before confirm', lock)
+        throw expiredSessionException()
+      }
+      if (stored.mode === 'member' && stored.status === 'uploaded' && stored.file) {
         if (!endUserId || endUserId !== stored.pendingEndUserId) {
           throw new ForbiddenException({
             error: { code: 'UPLOAD_SESSION_MEMBER_MISMATCH', message: '会员身份与上传会话不一致' },
           })
         }
         return driveMemberBind(this.memberBind, stored, lock, endUserId)
-      }
-      if (record.status === 'expired') {
-        await finishExpired(this.memberBind, stored, 'upload session expired before confirm', lock)
-        throw expiredSessionException()
       }
       if (stored.status !== 'uploaded' || !stored.file) {
         throw new BadRequestException({
@@ -458,6 +459,11 @@ export class UploadSessionsService {
           error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' },
         })
       }
+      const record = this.markExpired(stored)
+      if (record.status === 'expired') {
+        await finishExpired(this.memberBind, stored, 'upload session expired before cancel', lock)
+        throw expiredSessionException()
+      }
       const file = stored.file ? await loadBindFile(this.memberBind, stored.file.fileId) : null
       if (file && isLiveMember(file) && stored.bind && stored.bind.phase !== 'done') {
         await driveMemberBind(
@@ -469,31 +475,6 @@ export class UploadSessionsService {
         throw new BadRequestException({
           error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' },
         })
-      }
-      const record = this.markExpired(stored)
-      if (record.status === 'expired') {
-        await finishExpired(this.memberBind, stored, 'upload session expired before cancel', lock)
-        throw expiredSessionException()
-      }
-      if (file && !file.deletedAt && stored.bind) {
-        const claimed = await this.prisma.fileObject.updateMany({
-          where: { id: file.id, storageKey: file.storageKey, deletedAt: null },
-          data: {
-            deletedAt: new Date(),
-            deletedBy: 'system',
-            deleteReason: 'upload session cancelled',
-            status: 'deleted',
-          },
-        })
-        if (claimed.count === 0) {
-          const current = await loadBindFile(this.memberBind, file.id)
-          if (current && isLiveMember(current)) {
-            await driveMemberBind(this.memberBind, stored, lock, current.endUserId ?? stored.pendingEndUserId ?? '')
-            throw new BadRequestException({
-              error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' },
-            })
-          }
-        }
       }
       const committed = await abandonAfterCommit(this.memberBind, stored, 'cancelled', 'upload session cancelled', lock)
       if (committed !== 'updated') {
@@ -541,6 +522,8 @@ export class UploadSessionsService {
     expectedPhase: string | null = null,
     mirror = false,
   ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
+    const expectedRevision = record.revision ?? 0
+    record.revision = expectedRevision + 1
     const cleanup = mirror
       ? {
           key: cleanupKey(record.sessionId),
@@ -551,7 +534,7 @@ export class UploadSessionsService {
           indexMember: record.sessionId,
         }
       : null
-    return this.redis.compareAndSetSession(
+    const committed = await this.redis.compareAndSetSession(
       sessionKey(record.sessionId),
       lockKey,
       lockToken,
@@ -560,7 +543,10 @@ export class UploadSessionsService {
       expectedFileId,
       expectedPhase,
       cleanup,
+      expectedRevision,
     )
+    if (committed !== 'updated') record.revision = expectedRevision
+    return committed
   }
 
   private cleanupPayload(record: StoredUploadSession): StoredUploadSessionCleanup {
@@ -623,9 +609,7 @@ export class UploadSessionsService {
   }
 
   private markExpired(record: StoredUploadSession, now = Date.now()): StoredUploadSession {
-    if (record.status === 'confirmed' || record.bind?.phase === 'db-applied' || record.bind?.phase === 'done') {
-      return record
-    }
+    if (record.status === 'confirmed' || record.bind?.phase === 'done') return record
     if (new Date(record.expiresAt).getTime() <= now) return { ...record, status: 'expired' }
     return record
   }

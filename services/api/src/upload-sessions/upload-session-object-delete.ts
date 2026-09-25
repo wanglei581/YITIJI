@@ -1,0 +1,61 @@
+import type { BindFileRow, MemberBindHost } from './upload-session-member-bind'
+
+function isLiveMember(file: Pick<BindFileRow, 'deletedAt' | 'ownerType' | 'endUserId'>): boolean {
+  return !file.deletedAt && (file.ownerType === 'user' || Boolean(file.endUserId))
+}
+
+async function loadBindFile(host: MemberBindHost, fileId: string): Promise<BindFileRow | null> {
+  const row = await host.prisma.fileObject.findUnique({ where: { id: fileId } })
+  return row as BindFileRow | null
+}
+
+/** 对象删除失败只记账，不把文件行标成已删。条件更新避免盖住并发改过的 storageKey。 */
+export async function noteObjectDeleteFailure(
+  host: MemberBindHost,
+  row: BindFileRow,
+  error: unknown,
+): Promise<void> {
+  const errorType = error instanceof Error ? error.name : 'Error'
+  const attempts = (row as BindFileRow & { storageDeleteAttempts?: number | null }).storageDeleteAttempts
+  await host.prisma.fileObject.updateMany({
+    where: { id: row.id, storageKey: row.storageKey, deletedAt: null },
+    data: {
+      storageDeletePendingAt: new Date(),
+      storageDeleteAttempts: (attempts ?? 0) + 1,
+      storageDeleteError: errorType.slice(0, 80),
+    },
+  })
+}
+
+export async function releaseReplacedObject(host: MemberBindHost, file: BindFileRow): Promise<void> {
+  if (!file.replacedStorageKey || file.replacedStorageKey === file.storageKey) return
+  try {
+    await host.files.deleteObjectAtKey(file.replacedStorageKey, file.bucket)
+  } catch (error) {
+    await noteObjectDeleteFailure(host, file, error)
+    throw error
+  }
+  await host.prisma.fileObject.updateMany({
+    where: { id: file.id, storageKey: file.storageKey, replacedStorageKey: file.replacedStorageKey },
+    data: { replacedStorageKey: null, storageDeletePendingAt: null, storageDeleteError: null },
+  })
+}
+
+/** 先删对象，成功后才墓碑。删失败时文件行保持未删除，并留下可重试账本。 */
+export async function deleteAnonymousObjectThenTombstone(
+  host: MemberBindHost,
+  fileId: string,
+  reason: string,
+): Promise<void> {
+  const row = await loadBindFile(host, fileId)
+  if (!row || row.deletedAt || isLiveMember(row)) return
+  try {
+    await host.files.deleteObjectAtKey(row.storageKey, row.bucket)
+  } catch (error) {
+    await noteObjectDeleteFailure(host, row, error)
+    throw error
+  }
+  const current = await loadBindFile(host, fileId)
+  if (!current || current.deletedAt || isLiveMember(current) || current.storageKey !== row.storageKey) return
+  await host.files.systemDelete(fileId, reason)
+}
