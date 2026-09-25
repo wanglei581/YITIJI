@@ -548,10 +548,10 @@ export function PrintMaterialCheckPage({
                 </ul>
               </section>
               <section className="qpd-empty-facts">
-                <h3>当前事实</h3>
+                <h3>两条事实</h3>
                 <ul>
-                  <li>当前没有文件，本页没有订单，也没有扣费。</li>
-                  <li>若选择遮挡，后续是否生成派生文件及处理结果以后端返回为准，完成前不能当作已遮挡。</li>
+                  <li>到这里为止<b>没有产生订单，也没有扣任何费用</b>。</li>
+                  <li>之前存过的文件在<b>「我的文档」</b>里；这一页本身不保存文件。</li>
                 </ul>
               </section>
             </section>
