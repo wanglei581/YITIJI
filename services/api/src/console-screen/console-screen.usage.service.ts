@@ -405,25 +405,23 @@ function buildUsageHeat(events: Date[], now: Date): ScreenUsageHeatValue {
   }
   const today = shanghaiDayKey(now)
   const nowHour = shanghaiHour(now)
-  let anyVisible = false
   const dayRows = days.map((date) => ({
     date,
     hours: (counts.get(date) ?? []).map((count, hour) => {
       if (date === today && hour > nowHour) return null
-      const shown = suppressSmallCount(count)
-      if (shown !== null) anyVisible = true
-      return shown
+      return suppressSmallCount(count)
     }),
   }))
-  return { days: dayRows, peakHour: anyVisible ? peakHourOf(counts, days) : null }
+  return { days: dayRows, peakHour: peakHourOf(dayRows) }
 }
 
-function peakHourOf(counts: Map<string, number[]>, days: string[]): number | null {
+/** 只累加已经显示的格子。被压成 null 的原始计数不能凑出一个看不见的峰值。 */
+function peakHourOf(days: Array<{ hours: Array<number | null> }>): number | null {
   const sums = Array.from({ length: 24 }, () => 0)
-  for (const date of days) {
-    const hours = counts.get(date) ?? []
-    hours.forEach((count, hour) => {
-      sums[hour] = (sums[hour] ?? 0) + count
+  for (const day of days) {
+    day.hours.forEach((shown, hour) => {
+      if (shown === null) return
+      sums[hour] = (sums[hour] ?? 0) + shown
     })
   }
   let best = 0

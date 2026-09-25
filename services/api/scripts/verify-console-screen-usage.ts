@@ -671,6 +671,10 @@ async function assertBehavior(): Promise<void> {
         && heat.peakHour === 10,
       `h0=${String(todayHeat?.hours[0])} h1=${String(todayHeat?.hours[1])} h4=${String(todayHeat?.hours[4])} h7=${String(todayHeat?.hours[7])} peak=${String(heat?.peakHour)}`,
     )
+    assert(
+      'u18c. 热力图最后一行是今天',
+      heat?.days[heat.days.length - 1]?.date === shanghaiDayKey(NOW),
+    )
     const pulse = opened(admin.metrics.pulse2h)
     assert(
       'u19. 脉搏是上海时区近 2 小时的 24 个 5 分钟桶',
@@ -921,6 +925,37 @@ async function assertSmallSampleFloor(input: {
     cache.clear()
     return usage.getAdminUsage(range, NOW)
   }
+  const expiresAt = new Date('2026-02-01T00:00:00.000Z')
+  const browseAt = (createdAt: Date) => ({
+    endUserId: memberId,
+    targetType: 'job',
+    targetId: `heat_${suffix}`,
+    createdAt,
+    expiresAt,
+  })
+  await prisma.browseLog.createMany({
+    data: Array.from({ length: 7 }, (_, day) => browseAt(new Date(DAY7_START.getTime() + day * 86_400_000 + 4 * 3_600_000))),
+  })
+  let heat = opened((await read()).metrics.heat7d)
+  assert(
+    'u42. 每天 04:00 各 1 次时格子和峰值都是 null，最后一行仍是今天',
+    heat?.days.length === 7
+      && heat.days.every((day) => day.hours[4] === null)
+      && heat.days.every((day) => day.hours.every((hour) => hour === null))
+      && heat.peakHour === null
+      && heat.days[heat.days.length - 1]?.date === shanghaiDayKey(NOW),
+  )
+  await prisma.browseLog.createMany({
+    data: Array.from({ length: 5 }, () => browseAt(new Date('2026-01-15T02:00:00.000Z'))),
+  })
+  heat = opened((await read()).metrics.heat7d)
+  assert(
+    'u43. 04:00 原始合计为 7 也不当峰值，峰值只来自可见的 10 点',
+    heat?.days.every((day) => day.hours[4] === null)
+      && heat.days.find((day) => day.date === shanghaiDayKey(NOW))?.hours[10] === 5
+      && heat.peakHour === 10,
+  )
+  await prisma.browseLog.deleteMany()
   const aiOf = (snap: ScreenUsageSnapshot) => opened(snap.metrics.ai)
   const stepsOf = (snap: ScreenUsageSnapshot) => opened(snap.metrics.printSteps)
   const resumeOf = (snap: ScreenUsageSnapshot) => opened(snap.metrics.resumeSteps)
