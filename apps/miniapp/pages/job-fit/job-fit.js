@@ -7,25 +7,37 @@ const auth = require('../../utils/auth')
 /**
  * 简历对照（原「岗位匹配参考」，后端能力名仍是 job_fit）。
  *
- * 合规红线:后端只输出 fitLevel 三档参考等级(reference_high / medium / low),
- * **没有百分比、匹配率或录用概率字段**,服务端还有双层拦截。
+ * 合规红线:页面只列「简历里已经写到的要求 / 还没体现的要求」和修改建议,
+ * **不给任何评价性结论**:不显示后端的 fitLevel 三档等级,也不显示「总评」summary
+ * (后端提示词让它写「总评」,会带出匹配度、是否适合投递一类的话)。
+ * 依据:生态蓝图红线「简历对照不给『建议投递』『胜任力等级』这类结论」(2026-09-26)。
+ * 后端报告与提示词去掉等级归 3.14;改好之前页面也不展示。
  * 页面此前显示的「76% 参考匹配度」是前端自造的伪造数据,已删除;
- * 不得以任何形式恢复,包括把等级折算成百分比、按优势条数算比例。
+ * 不得以任何形式恢复,包括把等级折算成百分比、按两栏条数算比例。
  *
  * 流程:需要一份已解析的简历(taskId)→ 用户明确授权 → 才能分析。
  * 授权闸门是后端强制的:未授权直接调分析会 403 JOB_FIT_ANONYMOUS_CONSENT_REQUIRED。
  */
+/**
+ * 有没有可以展示的对照要点。summary 不算:页面不展示「总评」(见文件头注释),
+ * 只有 summary 的结果在页面上是空的,不能当成功结果展示。
+ */
+function hasComparison(fit) {
+  return !!(fit && fit.isCompleted && (
+    fit.matchPoints.length || fit.gapPoints.length ||
+    fit.targetedSuggestions.length || fit.hasRequirementBreakdown
+  ))
+}
+
 Page({
   data: {
     statusBarHeight: 20,
-    // no-task 无已解析简历 | consent 待授权 | target 待确认目标岗位
+    // no-task 无已解析简历 | consent 待授权 | target 待填写目标岗位
     // running 分析中 | done 真实结果 | failed 失败
     phase: 'no-task',
     taskId: '',
     resumeName: '',
-    jobId: '',
-    jobTitleHint: '',
-    // 手填目标岗位(没带 jobId 进来时使用)
+    // 用户自己填写的目标岗位名称与要求(首发只有这一种对照方式)
     manualTitle: '',
     manualReq: '',
     elapsed: 0,
@@ -121,7 +133,7 @@ Page({
       .then((res) => {
         if (this._stopped) return
         const fit = N.jobFit(res)
-        if (fit && fit.isCompleted && (fit.summary || fit.matchPoints.length)) {
+        if (hasComparison(fit)) {
           this.setData({ phase: 'done', fit })
         } else {
           this.setData({ phase: 'target' })
@@ -138,7 +150,7 @@ Page({
       .then((res) => {
         if (this._stopped) return
         const fit = N.jobFit(res)
-        if (fit && fit.isCompleted && (fit.summary || fit.matchPoints.length || fit.gapPoints.length)) {
+        if (hasComparison(fit)) {
           this.setData({ phase: 'done', fit })
           return
         }
@@ -184,20 +196,15 @@ Page({
   inputReq(e) { this.setData({ manualReq: e.detail.value }) },
 
   tapAnalyze() {
-    const { jobId, manualTitle, manualReq } = this.data
-    const payload = { taskId: this.data.taskId }
-    if (jobId) {
-      payload.jobId = jobId
-    } else {
-      const title = (manualTitle || '').trim()
-      if (!title) {
-        wx.showToast({ title: '请填写目标岗位名称', icon: 'none' })
-        return
-      }
-      payload.manualJob = { title }
-      const req = (manualReq || '').trim()
-      if (req) payload.manualJob.requirements = req
+    const title = (this.data.manualTitle || '').trim()
+    if (!title) {
+      wx.showToast({ title: '请填写目标岗位名称', icon: 'none' })
+      return
     }
+    // 只发 manualJob:不接系统内岗位(jobId),见文件头注释。
+    const payload = { taskId: this.data.taskId, manualJob: { title } }
+    const req = (this.data.manualReq || '').trim()
+    if (req) payload.manualJob.requirements = req
 
     this.setData({ phase: 'running', elapsed: 0, failMsg: '' })
     this._startElapsed()
@@ -209,6 +216,7 @@ Page({
         if (!fit) return this._fail('返回内容无法解析,请重试')
         if (fit.isFailed) return this._fail(fit.failReason || '分析失败,请重试')
         if (!fit.isCompleted) return this._fail('分析未完成,请重试')
+        if (!hasComparison(fit)) return this._fail('这次没有整理出可以对照的要点,请补充岗位要求后重试')
         this.setData({ phase: 'done', fit })
       })
       .catch((err) => {
@@ -282,14 +290,14 @@ Page({
       wx.showToast({ title: '简历任务已失效，请重新上传', icon: 'none' })
       return
     }
-    const position = encodeURIComponent((this.data.fit && this.data.fit.job.title) || this.data.jobTitleHint || '')
+    const position = encodeURIComponent((this.data.fit && this.data.fit.job.title) || this.data.manualTitle || '')
     wx.navigateTo({
       url: `/pages/resume-optimize/resume-optimize?taskId=${encodeURIComponent(this.data.taskId)}&from=jobFit&position=${position}`,
     })
   },
 
   tapPracticeInterview() {
-    const position = encodeURIComponent((this.data.fit && this.data.fit.job.title) || this.data.jobTitleHint || this.data.manualTitle || '')
+    const position = encodeURIComponent((this.data.fit && this.data.fit.job.title) || this.data.manualTitle || '')
     wx.navigateTo({ url: `/pages/interview-entry/interview-entry?position=${position}&from=jobFit` })
   },
 

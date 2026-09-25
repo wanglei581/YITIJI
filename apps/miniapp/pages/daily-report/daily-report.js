@@ -22,7 +22,11 @@ function openMiniappRoute(route) {
     wx.switchTab({ url: path })
     return
   }
-  wx.navigateTo({ url: route })
+  // route 由服务端下发：若指向本版本没有的页面（例如停放页），给一句说明，不做静默死按钮。
+  wx.navigateTo({
+    url: route,
+    fail() { wx.showToast({ title: '这个页面当前版本暂未开放', icon: 'none' }) },
+  })
 }
 
 function mapModule(mod) {

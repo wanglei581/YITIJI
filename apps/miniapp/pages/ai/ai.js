@@ -43,7 +43,7 @@ Page({
         items: [
           // 原「岗位匹配」：改名「简历对照」，只对照用户自己填写 / 粘贴的职位要求，
           // 不再从平台岗位进入（岗位页已停放，见 compliance-boundary.md §1.1）。
-          { id: 'match',     icon: 'link',    title: '简历对照', desc: '粘贴职位要求，看简历还差什么', accent: 'teal'  },
+          { id: 'match',     icon: 'link',    title: '简历对照', desc: '粘贴岗位要求，看简历还差什么', accent: 'teal'  },
           { id: 'interview', icon: 'comment', title: '模拟面试', desc: '按目标岗位出题并复盘',   accent: 'plum'  },
           { id: 'plan',      icon: 'compass', title: '职业规划', desc: '方向建议仅供参考',       accent: 'wheat' },
           // 放「想清楚再决定」而不是另起一组：它和简历对照/职业规划一样，

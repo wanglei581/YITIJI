@@ -46,26 +46,14 @@
 .jf-hint { font-size: 22rpx; color: var(--ghost); line-height: 1.6; margin-top: 12rpx; }
 .jf-act { padding: 8rpx 16px 32rpx; }
 
-/* 结果 hero:参考等级为文字三档,页面内没有任何百分比 */
+/* 结果头:只写对照的是哪个岗位,不放等级、不放总评(见 job-fit.js 文件头) */
 /* 横向内缩用 px 与全局 .card 的 margin:0 16px 对齐,rpx 在宽屏机上会错位 */
 .fit-hero { background: var(--surface); border: 1rpx solid #dce9ff;
-  border-radius: 30rpx; margin: 0 16px 12px;
-  padding: 34rpx 30rpx; display: flex; align-items: center; gap: 28rpx;
+  border-radius: 30rpx; margin: 0 16px 12px; padding: 30rpx;
   box-shadow: var(--sh-xs); }
-.fit-level { flex-shrink: 0; max-width: 46%; padding: 20rpx 24rpx; border-radius: 14rpx;
-  background: var(--teal-soft); border: 1rpx solid #d4e6ff; }
-.fit-level.teal  { background: var(--teal-soft); border-color: #d4e6ff; }
-.fit-level.wheat { background: var(--wheat-soft); border-color: #f6ddb0; }
-.fit-level.clay  { background: var(--clay-soft); border-color: #ffd2c2; }
-.fit-level.slate { background: var(--slate-soft); border-color: #d8e2ff; }
-.fl-label { font-size: 30rpx; font-weight: 800; color: var(--ink); line-height: 1.35; }
-.fl-cap { font-size: 20rpx; color: var(--muted); margin-top: 8rpx; }
-.fit-info { flex: 1; min-width: 0; }
-.fit-job { font-size: 30rpx; font-weight: 720; color: var(--ink); line-height: 1.4; }
-.fit-org { font-size: 24rpx; color: var(--muted); margin-top: 6rpx; }
-.fit-src { font-size: 21rpx; color: var(--faint); margin-top: 10rpx; line-height: 1.5; }
-
-.jf-summary { font-size: 27rpx; color: var(--ink); line-height: 1.75; }
+.fit-cap { font-size: var(--fs-sm); color: var(--muted); }
+.fit-job { font-size: var(--fs-md); font-weight: 720; color: var(--ink); line-height: 1.4; margin-top: 8rpx; }
+.fit-src { font-size: var(--fs-sm); color: var(--faint); margin-top: 10rpx; line-height: 1.5; }
 
 /* 岗位原文拆解：按信息优先级纵向排布，避免把职责/门槛做成同权重宫格。 */
 .jf-breakdown { margin: 0 16px 8px; background: var(--surface); border-radius: 14rpx;

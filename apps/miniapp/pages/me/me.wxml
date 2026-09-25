@@ -34,15 +34,8 @@
              与姓名、说明堆成三行，右侧箭头因而失去对齐参照、显得孤立。
              改为整行主按钮：登录是这张卡片唯一的主操作，应当有按钮的分量。 -->
         <view wx:if="{{!isLoggedIn}}" class="profile-cta tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="微信一键登录，解锁完整服务">微信一键登录，解锁完整服务</view>
-
-        <view class="benefit-strip tap" hover-class="tap-press" bindtap="tapEntry" data-id="membership" role="button" aria-label="查看我的实际权益记录">
-          <view class="benefit-icon"><text class="ficon i-crown"></text></view>
-          <view class="benefit-copy">
-            <view class="benefit-title">我的权益</view>
-            <view class="benefit-desc">只展示服务端实际发放记录</view>
-          </view>
-          <view class="benefit-go">查看 <text class="ficon i-right"></text></view>
-        </view>
+        <!-- 「我的权益」条随 pages/membership 一起停放（首发不对 AI 收费）。
+             停放后这里曾留下一个点了没反应的按钮：me.js 的 routes 表已删掉 membership。 -->
       </view>
 
       <view class="stats-card" wx:if="{{isLoggedIn}}">
@@ -81,7 +74,7 @@
           class="menu-item tap"
           wx:for="{{entries}}"
           wx:key="id"
-          wx:if="{{index >= 4 && item.id !== 'membership'}}"
+          wx:if="{{index >= 4}}"
           hover-class="tap-press"
           data-id="{{item.id}}"
           bindtap="tapEntry"

@@ -10,7 +10,7 @@ Page({
     statusBarHeight: 20,
     form: { position: '' },
     levels: [
-      { val: 'fresh', label: '应届/校招' },
+      { val: 'fresh', label: '应届生' },
       { val: 'lt1',   label: '1年以内' },
       { val: 'y1_3',  label: '1-3年' },
       { val: 'y3_5',  label: '3-5年' },

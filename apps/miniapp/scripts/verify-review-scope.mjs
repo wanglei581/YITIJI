@@ -7,11 +7,13 @@
  * 招聘会、找企业页，按非招聘类目提审，拿证后再加回。只藏按钮不够——页面还在注册表里，
  * 审核员照样能打开，所以这些页面「停放」：源码留在仓库，不注册、不打包。
  *
- * 本门禁锁住四件事：
+ * 本门禁锁住六件事：
  *   1. 停放清单里的页面源码还在（拿证后要恢复，不许顺手删掉）；
  *   2. 它们没有注册、不在 Tab 里，且在 project.config.json 的 packOptions.ignore 里（不进上传包）；
  *   3. 实际上传的页面里，写死的页面路径都指向已注册页面（停放页的入口一个不剩）；
- *   4. 实际上传的页面里不出现岗位 / 招聘会类按钮文案，也不用 navigateTo 打开 Tab 页（运行时必失败）。
+ *   4. 实际上传的页面里不出现岗位 / 招聘会类按钮文案，也不用 navigateTo 打开 Tab 页（运行时必失败）；
+ *   5. 写死 data-id 的按钮在处理函数的 routes 表里都有去处（停放后不留死按钮）；
+ *   6. 简历对照页不展示等级与「总评」这类评价性结论。
  *
  * 拿证恢复时：先改这里的 PARKED_PAGES（把要恢复的页面挪出去），再注册页面、恢复入口。
  */
@@ -87,6 +89,37 @@ if (ctaHits.length) bad('上传包里没有岗位 / 招聘会按钮文案', ctaH
 else ok('上传包里没有岗位 / 招聘会按钮文案')
 if (navToTab.length) bad('不用 navigateTo 打开 Tab 页', navToTab.join('; '))
 else ok('没有用 navigateTo 打开 Tab 页')
+
+// 5. 写死 data-id 的按钮必须有去处。停放时只删了 routes 表里的一行、忘了删按钮，
+//    就会留下点了没反应的死按钮（2026-09-26「我的」页「我的权益」条就是这样：
+//    me.js 的 routes 已无 membership，me.wxml 里的入口条还在）。
+//    只查「处理函数里有 routes = {...} 表」的按钮：别的处理函数不按 id 查表。
+const deadButtons = []
+for (const page of registered) {
+  const wxmlPath = `${page}.wxml`
+  const jsPath = `${page}.js`
+  if (!fs.existsSync(path.join(ROOT, wxmlPath)) || !fs.existsSync(path.join(ROOT, jsPath))) continue
+  const wxml = read(wxmlPath)
+  const js = read(jsPath)
+  for (const m of wxml.matchAll(/<[^>]*\bdata-id="([a-z0-9_-]+)"[^>]*>/gi)) {
+    const handler = (m[0].match(/bindtap="([A-Za-z0-9_]+)"/) || [])[1]
+    if (!handler) continue
+    const body = (js.match(new RegExp(`\\b${handler}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n  \\},?\\n`)) || [])[1] || ''
+    const table = body.match(/routes\s*=\s*\{([\s\S]*?)\}/)
+    if (!table) continue
+    const keys = new Set([...table[1].matchAll(/^\s*([a-zA-Z0-9_]+)\s*:/gm)].map((k) => k[1]))
+    if (!keys.has(m[1])) deadButtons.push(`${wxmlPath} data-id="${m[1]}"（${handler} 的 routes 里没有）`)
+  }
+}
+if (deadButtons.length) bad('写死 data-id 的按钮都有去处', deadButtons.join('; '))
+else ok('写死 data-id 的按钮都有去处（没有停放后残留的死按钮）')
+
+// 6. 简历对照不给评价性结论（生态蓝图红线，2026-09-26）：不展示后端的三档等级与「总评」。
+//    后端 fitLevel 仍在返回（报告与提示词去掉等级归 3.14），页面一旦引用就会把等级带回来。
+const jobFitWxml = read('pages/job-fit/job-fit.wxml')
+const verdictRefs = ['fit.fitLabel', 'fit.fitTone', 'fit.fitLevel', 'fit.summary'].filter((ref) => jobFitWxml.includes(ref))
+if (verdictRefs.length) bad('简历对照不展示等级与总评', `job-fit.wxml 引用了 ${verdictRefs.join('、')}`)
+else ok('简历对照页不展示等级与总评，只列已写到 / 还没体现的要求和建议')
 
 console.log(`\n${pass} PASS / ${fails.length} FAIL（首发审核范围）`)
 if (fails.length) process.exit(1)
