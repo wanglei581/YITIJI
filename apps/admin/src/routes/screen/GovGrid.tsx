@@ -108,13 +108,16 @@ function Legend({ counts }: { counts: Record<TwinState, number> }) {
 
 export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   const gov = useAdminSnapshot('gov', 60)
+  // 来源平台访问 Top 5 只在运营快照里；其余块都随政务快照下发
   const ops = useAdminSnapshot('ops', 60, 'gov-tab')
   if (!gov.data) {
     return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={gov.failure} onRetry={() => void gov.refresh()} />
   }
   const g: ScreenSnapshotMetrics = gov.data.metrics
-  const o: ScreenSnapshotMetrics | null = ops.data ? ops.data.metrics : null
-  const opsPending = !ops.data && !ops.failure
+  // 任务流与告警 9/26 起随政务快照下发（与运营版同一份实现、同一档缓存）
+  const o: ScreenSnapshotMetrics = g
+  const opsPending = false
+  const sourcesPending = !ops.data && !ops.failure
   const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
   const terminals = twinTerminalsFromCells(cells)
   const areas = twinAreas(terminals)
@@ -200,7 +203,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
       toolbar={toolbar}
       meta={snapshotMeta(gov.data)}
       pollSeconds={60}
-      failure={gov.failure ?? ops.failure}
+      failure={gov.failure}
       onRefresh={() => {
         void gov.refresh()
         void ops.refresh()
@@ -435,7 +438,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
       </TwinSlot>
 
       <TwinSlot slot="r2">
-        {opsPending ? (
+        {sourcesPending ? (
           <TwinPanel title="来源平台访问" tone="info" source={SCREEN_SOURCE_ENTRY_NOTE}>
             <p className="twin-cap">正在取数…</p>
           </TwinPanel>
@@ -445,7 +448,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
             sub={cityScope ? '近 30 天' : '近 30 天 · Top 5'}
             scope={cityScope}
             tone="info"
-            metric={o?.sourceEntryOpensTop}
+            metric={ops.data?.metrics.sourceEntryOpensTop}
             source={SCREEN_SOURCE_ENTRY_NOTE}
             render={(value) => (
               <>

@@ -32,7 +32,8 @@ export interface TwinTerminalTwinLike {
   }>
   scanner: ScreenMetricLike<{ state: 'ready' | 'busy' | 'error' | 'unknown'; label: string | null }>
   currentTask: ScreenMetricLike<{ pages: number; colorMode: 'bw' | 'color' | null; startedAt: string | null } | null>
-  today: { printPages: number; printTasks: number; scans: number; failed: number; visits: ScreenMetricLike<number> }
+  /** 服务端对 1–4 的计数给 null（少于 5 不显示），0 仍给 0。 */
+  today: { printPages: number | null; printTasks: number | null; scans: number | null; failed: number | null; visits: ScreenMetricLike<number> }
   consumables: ScreenMetricLike<{ paper: string | null; toner: string | null }>
   timeline24h: ScreenMetricLike<Array<{ from: string; to: string; state: 'idle' | 'printing' | 'alert' | 'offline' | 'unknown' }>>
 }
@@ -50,9 +51,9 @@ const PRINTER_TEXT = { ready: '就绪', printing: '打印中', error: '故障', 
 const SCANNER_TEXT = { ready: '就绪', busy: '使用中', error: '暂不可用', unknown: '状态未知' } as const
 const WIRED_TEXT: Record<string, string> = { connected: '有线已连接', disconnected: '有线已断开', unknown: '有线状态未知' }
 
-/** 终端级计数也守「少于 5 不显示」：一台机器一天只有两三单时，具体数字就能对上是谁。 */
-function smallCount(value: number): string {
-  if (value > 0 && value < 5) return '少于 5'
+/** 终端级计数也守「少于 5 不显示」：服务端已把 1–4 置 null；这里再兜一层，防旧服务端直接给出小数字。 */
+function smallCount(value: number | null): string {
+  if (value === null || (value > 0 && value < 5)) return '少于 5'
   return screenCount(value)
 }
 
@@ -185,7 +186,7 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
                 : { label: '服务人次', unavailableReason: twin.today.visits.reason },
             ]}
           />
-          {twin.today.failed > 0 ? <p className="twin-cap">今日打印失败 {smallCount(twin.today.failed)} 次，详情见打印扫描运维</p> : null}
+          {twin.today.failed === null || twin.today.failed > 0 ? <p className="twin-cap">今日打印失败 {smallCount(twin.today.failed)} 次，详情见打印扫描运维</p> : null}
         </TwinPanel>
       </TwinSlot>
 

@@ -28,6 +28,8 @@ export interface TwinCityTerminal {
   code: string
   name: string | null
   area: string | null
+  /** 服务点位（例如「人才服务大厅」）；机构版按它把终端聚成点位。 */
+  location: string | null
   geo: { lat: number; lng: number } | null
   health: 'healthy' | 'degraded' | 'offline' | 'unknown'
   activity: 'idle' | 'printing' | 'scanning' | null
@@ -321,17 +323,23 @@ export interface TwinFleetCellLike {
   terminalCode: string
   displayName: string | null
   areaLabel: string | null
+  locationLabel: string | null
   geo: { lat: number; lng: number } | null
   activity: 'idle' | 'printing' | 'scanning' | null
   alert: { kind: 'offline' | 'printer_issue' | 'never_reported'; title: string } | null
 }
 
-export function twinTerminalsFromCells(cells: readonly TwinFleetCellLike[]): TwinCityTerminal[] {
+/**
+ * groupBy：'area' 按所在区聚成街区（政务版）；'location' 按服务点位聚合（机构版），
+ * 点位没填时退回所在区，再没有就归入「未设置」。
+ */
+export function twinTerminalsFromCells(cells: readonly TwinFleetCellLike[], groupBy: 'area' | 'location' = 'area'): TwinCityTerminal[] {
   return cells.map((cell) => ({
     id: cell.terminalId,
     code: cell.terminalCode,
     name: cell.displayName,
-    area: cell.areaLabel,
+    area: groupBy === 'location' ? cell.locationLabel ?? cell.areaLabel : cell.areaLabel,
+    location: cell.locationLabel,
     geo: cell.geo,
     health: cell.health,
     activity: cell.activity,
