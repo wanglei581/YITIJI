@@ -65,7 +65,7 @@ export interface CareerPlanContext {
   /** 简历原文（必有） */
   resumeText: string
   /** 最近一次岗位匹配参考（可选；有则规划更聚焦目标岗位） */
-  jobFit?: { jobTitle: string; fitLevel: string; gaps: string[] } | null
+  jobFit?: { jobTitle: string; gaps: string[] } | null
   /** 最近一次模拟面试表现（可选，仅会员可聚合；只用元数据级摘要） */
   interview?: { position: string; level: string; risks: string[] } | null
   /** 最近一次自我探索（可选；仅作 hint，不参与校验 / 配额 / 签名门禁）
@@ -121,7 +121,7 @@ export class LlmCareerPlanService {
     const parts: string[] = [`【简历原文】\n${maskedResume}`]
     if (ctx.jobFit) {
       parts.push(
-        `【最近岗位匹配参考】目标岗位「${ctx.jobFit.jobTitle}」，参考等级 ${ctx.jobFit.fitLevel}；` +
+        `【最近简历对照】目标岗位「${ctx.jobFit.jobTitle}」；` +
         `主要差距：${ctx.jobFit.gaps.slice(0, 3).join('；').slice(0, 400)}`,
       )
     }

@@ -108,7 +108,7 @@ export class CareerPlanService {
 
     // 可选上下文（如实分层，绝不跨归属）：
     // 1) 同 taskId 的最近岗位匹配参考
-    let jobFitCtx: { jobTitle: string; fitLevel: string; gaps: string[] } | null = null
+    let jobFitCtx: { jobTitle: string; gaps: string[] } | null = null
     const jobFitRow = includeJobFitTitle
       ? await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
       : null
@@ -116,13 +116,12 @@ export class CareerPlanService {
       try {
         const stored = JSON.parse(jobFitRow.payloadJson) as {
           job?: { title?: string }
-          payload?: { fitLevel?: string; gapPoints?: Array<{ gap?: string }> }
+          payload?: { gapPoints?: Array<{ gap?: string }> }
         }
-        if (stored.job?.title && stored.payload?.fitLevel) {
+        if (stored.job?.title) {
           jobFitCtx = {
             jobTitle: stored.job.title,
-            fitLevel: stored.payload.fitLevel,
-            gaps: (stored.payload.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
+            gaps: (stored.payload?.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
           }
         }
       } catch { /* 损坏行按无上下文处理 */ }

@@ -12,11 +12,10 @@ import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } fr
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
 // ============================================================
-// 2D 目标岗位定向优化 + 岗位匹配度参考。
+// 2D 简历与岗位要求对照。
 //
 // 合规（硬约束）：
-// - 输出是「匹配度参考」：参考等级（高/中/低），绝不输出百分比、AI匹配率、
-//   录用概率、通过率等任何量化承诺；投递动作只引导「去来源平台投递」。
+// - 不输出等级，不写总评，不引导投递。绝不输出百分比、录用概率、通过率。
 // - 防编造（对齐 2B 优化契约）：matchPoints 的 evidence 必须能在简历原文中
 //   找到（归一化子串匹配）；找不到的匹配点直接丢弃；建议只谈表达与准备方向，
 //   不替用户虚构经历。
@@ -27,7 +26,26 @@ import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 const BANNED = [
   '录用概率', '录用率', '通过率', '保过', '保录用', '保面试', '精准命中',
   'AI匹配率', '匹配率', '内部题库', '一键投递', '立即投递', '平台投递',
+  '建议投递', '适合投递', '胜任', '匹配度',
 ] as const
+
+export const JOB_FIT_SYSTEM_PROMPT =
+  '你是求职者本人的简历顾问。基于求职者的简历原文与目标岗位信息，逐条对照岗位要求与简历原文，并给出表达层面的修改建议。' +
+  '这只是给求职者本人整理材料用的对照，不是招聘评估，不代表录用结果。' +
+  '\n硬性要求：' +
+  '\n1. 不要输出等级、百分比、录用概率或通过率。' +
+  '\n2. matchPoints 中每条的 evidence 必须是简历原文中真实出现的内容（原文摘录），绝不编造。' +
+  '\n3. gapPoints 的 suggestion 只谈表达优化与材料准备（如补充量化数据、突出某段经历），绝不虚构求职者没有的经历或技能。' +
+  '\n4. 不得给出无依据的示例数字（如"100份/月""3次/周""提升30%"），只能说"补充你实际处理的数量、频次或结果"。' +
+  '\n5. 不得出现自相矛盾判断（如"大专但符合本科要求"）。学历、年限、技能不符合岗位要求时，直接说明差距（如"学历不符合要求：岗位要求本科及以上，当前简历为大专学历"）。' +
+  '\n6. decisionSupport 为可选 M1.5 决策辅助；输出时 analysisVersion 必须为 job_fit_m1_5。keywordCoverage.matched 只列同时出现在简历原文与岗位文本中的关键词；missing 只列岗位文本中出现且简历尚未具备的关键词。' +
+  '\n7. requirementBreakdown 及 matchPoints/gapPoints 的 requirement 只能逐字摘录岗位原文，不得补写岗位未说明的门槛。responsibilities=主要职责，mustHave=明确必备，preferred=明确优先，attention=原文中的限制或需留意条件；没有就返回空数组。' +
+  '\n只输出 JSON（不要 markdown 代码块）：' +
+  '{"summary":"2-4 句对照概述，只说明简历原文里已经写到哪些要求、还有哪些要求没有写到",' +
+  '"matchPoints":[{"requirement":"岗位原文摘录","point":"与岗位要求的对照点","evidence":"简历原文摘录(≤60字)"}](2-5 条),' +
+  '"gapPoints":[{"requirement":"岗位原文摘录","gap":"简历里还没写到的要求","suggestion":"表达/准备建议"}](1-4 条),' +
+  '"targetedSuggestions":["针对该岗位修改简历的具体建议"](2-5 条),' +
+  '"decisionSupport":{"analysisVersion":"job_fit_m1_5","keywordCoverage":{"matched":["有依据关键词"],"missing":["岗位待补充关键词"]},"requirementBreakdown":{"responsibilities":["岗位原文摘录"],"mustHave":["岗位原文摘录"],"preferred":[],"attention":[]}}(可选)}'
 
 // ── 输出安全防线（Mavis 2D 验收补丁）────────────────────────────────────────
 // A. 自相矛盾判断（如「符合本科要求…大专」）：全局 violation → 重试 → 连续命中诚实失败。
@@ -81,8 +99,6 @@ export interface JobFitDecisionSupport {
 }
 
 export interface JobFitPayload {
-  /** 参考等级（非量化承诺）：reference_high / reference_medium / reference_low */
-  fitLevel: 'reference_high' | 'reference_medium' | 'reference_low'
   summary: string
   /** 匹配点：evidence 必须出自简历原文（服务端已校验） */
   matchPoints: Array<{ requirement?: string; point: string; evidence: string }>
@@ -140,25 +156,7 @@ export class LlmJobFitService {
   constructor(private readonly config: LlmConfigService) {}
 
   async analyze(resumeText: string, job: JobFitJobContext): Promise<JobFitLlmResult> {
-    const sys =
-      '你是求职者本人的简历顾问。基于求职者的简历原文与目标岗位信息，输出「岗位匹配度参考」与定向优化建议。' +
-      '这只是给求职者本人修改简历、准备投递用的参考，不是招聘评估，不代表录用结果。' +
-      '\n硬性要求：' +
-      '\n1. fitLevel 只能是 reference_high / reference_medium / reference_low（参考等级），绝不输出任何百分比、匹配率、录用概率、通过率。' +
-      '\n2. matchPoints 中每条的 evidence 必须是简历原文中真实出现的内容（原文摘录），绝不编造。' +
-      '\n3. gapPoints 的 suggestion 只谈表达优化与准备方向（如补充量化数据、突出某段经历），绝不虚构求职者没有的经历或技能。' +
-      '\n4. 不出现「一键投递/立即投递/平台投递」等表述；投递请引导用户前往岗位来源平台。' +
-      '\n5. 不得建议用户删除、替换、包装真实经历来伪装成目标岗位。跨岗位差距较大时，应建议"如确有相关学习/项目/证书，请补充真实经历，否则优先选择更匹配的岗位"。' +
-      '\n6. 不得给出无依据的示例数字（如"100份/月""3次/周""提升30%"），只能说"补充你实际处理的数量、频次或结果"。' +
-      '\n7. 不得出现自相矛盾判断（如"大专但符合本科要求"）。学历、年限、技能不符合岗位要求时，直接说明差距（如"学历不符合要求：岗位要求本科及以上，当前简历为大专学历"）。' +
-      '\n8. decisionSupport 为可选 M1.5 决策辅助；输出时 analysisVersion 必须为 job_fit_m1_5。keywordCoverage.matched 只列同时出现在简历原文与岗位文本中的关键词；missing 只列岗位文本中出现且简历尚未具备的关键词。' +
-      '\n9. requirementBreakdown 及 matchPoints/gapPoints 的 requirement 只能逐字摘录岗位原文，不得补写岗位未说明的门槛。responsibilities=主要职责，mustHave=明确必备，preferred=明确优先，attention=原文中的限制或需留意条件；没有就返回空数组。' +
-      '\n只输出 JSON（不要 markdown 代码块）：' +
-      '{"fitLevel":"reference_high|reference_medium|reference_low","summary":"2-3 句总评（说明这是参考）",' +
-      '"matchPoints":[{"requirement":"岗位原文摘录","point":"与岗位要求的匹配点","evidence":"简历原文摘录(≤60字)"}](2-5 条),' +
-      '"gapPoints":[{"requirement":"岗位原文摘录","gap":"与岗位要求的差距","suggestion":"表达/准备建议"}](1-4 条),' +
-      '"targetedSuggestions":["针对该岗位修改简历的具体建议"](2-5 条),' +
-      '"decisionSupport":{"analysisVersion":"job_fit_m1_5","keywordCoverage":{"matched":["有依据关键词"],"missing":["岗位待补充关键词"]},"requirementBreakdown":{"responsibilities":["岗位原文摘录"],"mustHave":["岗位原文摘录"],"preferred":[],"attention":[]}}(可选)}'
+    const sys = JOB_FIT_SYSTEM_PROMPT
 
     const jobText =
       `岗位：${job.title}${job.company ? `（${job.company}）` : ''}\n` +
@@ -226,8 +224,9 @@ export class LlmJobFitService {
 
   private validate(p: Partial<JobFitPayload> | null, resumeText: string, job: JobFitJobContext): JobFitPayload | null {
     if (!p) return null
-    const levels = ['reference_high', 'reference_medium', 'reference_low']
-    if (!levels.includes(p.fitLevel ?? '') || typeof p.summary !== 'string' || !p.summary.trim()) return null
+    if (typeof p.summary !== 'string' || !p.summary.trim()) return null
+    const summary = p.summary.replaceAll('总评', '').trim().slice(0, 500)
+    if (!summary) return null
     if (!Array.isArray(p.matchPoints) || !Array.isArray(p.gapPoints) || !Array.isArray(p.targetedSuggestions)) return null
 
     // 防编造：evidence 必须出自简历原文（归一化子串匹配）；不符的匹配点丢弃
@@ -270,8 +269,7 @@ export class LlmJobFitService {
     const decisionSupport = this.validateDecisionSupport(p.decisionSupport, resumeText, job)
 
     return {
-      fitLevel: p.fitLevel as JobFitPayload['fitLevel'],
-      summary: p.summary.trim().slice(0, 500),
+      summary,
       matchPoints,
       gapPoints,
       targetedSuggestions,
