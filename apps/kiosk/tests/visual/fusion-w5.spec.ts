@@ -49,6 +49,13 @@ async function expectSharedPageShell(page: Page, title: string): Promise<void> {
   await expect(frame.getByRole('heading', { name: title, exact: true })).toBeVisible()
 }
 
+/** 稿 08-legal 迁入青序流光后的页壳：QxPageFrame + 页内文档头标题（h1「协议与隐私」只留给读屏）。 */
+async function expectQingxuLegalShell(page: Page, title: string): Promise<void> {
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('.qx-topbar .qx-topbar-back')).toBeVisible()
+  await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+}
+
 async function loginThroughVisibleUi(page: Page, returnTo: string, options?: { checkLoginPage?: boolean }): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await expect(page.locator('[data-kiosk-presentation="fusion-youth"]')).toBeVisible()
@@ -553,7 +560,7 @@ test('legal document keeps its standalone theme and scrollable long body @w5-kio
   await expect(root).toHaveAttribute('data-kiosk-presentation', 'fusion-youth')
   await expect(root).toHaveAttribute('data-visual-theme', 'service-desk')
   await expect(root).toHaveAttribute('data-ux-density', 'touch')
-  await expectSharedPageShell(page, '隐私政策')
+  await expectQingxuLegalShell(page, '隐私政策')
   await expect(page.getByText(paragraphs[0], { exact: true })).toBeVisible()
   const body = root.locator('.legal-doc-body')
   await expect(body).toBeVisible()
@@ -585,23 +592,26 @@ test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ pa
 
   await page.goto('/legal/privacy')
   const root = page.locator('[data-kiosk-screen="legal-doc"]')
-  const header = root.locator('.legal-doc-page-header')
-  const title = header.locator('.ui-kiosk-page-header-title')
-  const back = header.locator('.ui-kiosk-back-button')
-  const tools = header.locator('.legal-doc-tools')
-  await expectSharedPageShell(page, '隐私政策')
+  // 2026-09-25 迁入稿 08-legal：页头由青序顶栏（返回槽）+ 页内文档头承担，字号控件落在「按章节读」一行。
+  // 断言意图不变：窄屏下标题可读、返回键与字号控件互不遮挡、页头不吃掉整屏。
+  const topbar = root.locator('.qx-topbar')
+  const title = root.locator('.legal-doc-title')
+  const back = topbar.locator('.qx-topbar-back')
+  const tools = root.locator('.legal-doc-tools')
+  await expectQingxuLegalShell(page, '隐私政策')
+  await expect(root.locator('[data-kiosk-stage-fit="off"]')).toHaveCount(1)
 
-  const [headerBox, titleBox, backBox, toolsBox] = await Promise.all([
-    header.boundingBox(),
+  const [topbarBox, titleBox, backBox, toolsBox] = await Promise.all([
+    topbar.boundingBox(),
     title.boundingBox(),
     back.boundingBox(),
     tools.boundingBox(),
   ])
-  expect(headerBox).not.toBeNull()
+  expect(topbarBox).not.toBeNull()
   expect(titleBox).not.toBeNull()
   expect(backBox).not.toBeNull()
   expect(toolsBox).not.toBeNull()
-  expect(headerBox!.height).toBeLessThan(260)
+  expect(topbarBox!.height).toBeLessThan(260)
   expect(titleBox!.width).toBeGreaterThan(120)
   const controlsOverlap = !(
     backBox!.x + backBox!.width <= toolsBox!.x
@@ -617,7 +627,7 @@ test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ pa
   )
   expect(controlsOverlap).toBe(false)
   expect(titleAndToolsOverlap).toBe(false)
-  await expect(root.locator('.legal-doc-shell')).toHaveCSS('min-height', '0px')
+  await expect(root.locator('.legal-doc-scroll')).toHaveCSS('min-height', '0px')
   await expectFusionAcceptance(page, errors)
 })
 

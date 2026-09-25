@@ -478,12 +478,19 @@ for (const [source, marker, label] of [
 ]) {
   expectIncludes(source, marker, label)
 }
-expectIncludes(legalDocPage, '<KioskPageFrame', 'LegalDocPage 必须使用共享 KioskPageFrame')
-expectIncludes(legalDocPage, '<KioskPageHeader', 'LegalDocPage 必须使用共享 KioskPageHeader')
+// 2026-09-25 稿 08-legal 迁入青序流光：共享页壳 KioskPageFrame + KioskPageHeader 换成 QxPageFrame，
+// 三条同强度替换 —— 用青序共享壳、已退出 V6 壳、顶栏返回槽接到「回上一页」（来路不明才回受控来源 / 首页）。
+expectIncludes(legalDocPage, '<QxPageFrame', 'LegalDocPage 必须使用青序共享页壳 QxPageFrame')
+expectNotIncludes(legalDocPage, 'KioskPageFrame', 'LegalDocPage 已退出 V6 KioskPageFrame')
 expectPattern(
   legalDocPage,
-  /<KioskPageHeader\b[\s\S]{0,800}?onBack=\{\(\)\s*=>\s*navigate\(-1\)\}/,
-  'LegalDocPage 共享页头必须返回上一页',
+  /<QxPageFrame\b[\s\S]{0,400}?back=\{\{\s*label:\s*backLabel,\s*onBack:\s*goBack\s*\}\}/,
+  'LegalDocPage 顶栏返回槽必须接到 goBack',
+)
+expectPattern(
+  legalDocPage,
+  /const goBack = \(\) => \{\s*if \(historyIndex > 0\) \{\s*navigate\(-1\)/,
+  'LegalDocPage 返回槽必须优先返回上一页',
 )
 expectPattern(
   loginPage,
