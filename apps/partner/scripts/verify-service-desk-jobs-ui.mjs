@@ -77,7 +77,9 @@ check(
   partnerLayoutProps.includes('visualTheme="legacy"') &&
     !partnerLayoutProps.includes('service-desk') &&
     !wrapper.includes('normalizedPathname') &&
-    wrapper.includes("const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'"),
+    // 菜单高亮仍按原路径查表、查不到回落工作台；数据大屏的 /screen/:tab 子路径高亮「数据大屏」。
+    // 这里守的是「不按路由切服务台主题」，不是这一行的字面写法。
+    /const activeKey = PATH_TO_KEY\[location\.pathname\] \?\? (?:'dashboard'|\(location\.pathname\.startsWith\('\/screen\/'\) \? 'screen' : 'dashboard'\))\n/.test(wrapper),
   'PartnerLayout keeps the warm legacy theme without route-level service-desk selection',
 )
 check(
