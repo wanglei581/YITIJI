@@ -14,9 +14,9 @@ Claude 在 `codex/miniapp-qr-login-honesty-20260925` 修复原生小程序 `page
 
 只读核对 PR #1027 的唯一文件 `docs/delivery/kiosk-redesign-r1/delivery.yaml`：补丁把 2026-09-10 的路由数、生产 SHA 写成新的固定字串，并依据负责人自述把百度 OCR 旧密钥轮换的 BL-05 标为 CLOSED。当前正式进度已有后续路由/生产证据，BL-05 仍缺旧密钥失效的独立验证；直接合并会重新引入过期计数并放宽取证。已在 GitHub 关闭 #1027（head `57ce7a889`），远程分支、讨论和历史保留，未删除代码资产。实时 OPEN PR 从 9 减为 8；#1042 仍是唯一整合草稿，未推送或部署。
 
-## 2026-09-25：原稿 15 打印交付页仍在隔离准备（未合流）
+## 2026-09-25：原稿 15 打印交付页 printing 主态已隔离提交（未合流）
 
-Claude 以原始 `15-print-fulfill.html` 为只读目标在独立 UI 树抽出 `printProgressModel.ts`，把运行时 `PrintProgressPage.tsx` 从 851 行降到约 775 行；Kiosk typecheck、`verify:fusion-w2`、`verify:production-real-services` 与局部 ESLint 通过。Claude 的两次任务均到时限，版式和九类状态尚未按原稿完成，工作树仍有未提交改动；本批没有合流主候选，稿 15 的 UI/设备/商业验收均未完成。后续先核真实 Agent 状态与原稿状态映射，再完成布局、逐态浏览器和 Windows 真机触控，不以这次拆分充当设计升级。
+Claude 以原始 `15-print-fulfill.html` 为只读目标，将运行时 `/print/progress` 的打印中主态改为小青区、真实单文件任务卡与服务端四步状态、出纸口引导、隐私提醒、求助和底部动作，提交隔离树 `76d9344a1`。真实合同是一单一文件，不能照原稿演示造第二文件；没有 Agent 页级回流，也没有照稿编逐页进度或机身灯状态。顶部沿用全站深色栏；另保留现有静态门禁要求的常见问题卡。Kiosk typecheck、局部 ESLint、四个打印静态门禁、已有打印交付浏览器 5/5 通过；Claude 对原稿和运行时打印中/等待领取态做 1080×1920 本地夹具截图，主屏不用滚动。未跑 API aftercare 或真实 Windows/奔图。当前页面文件 830 行、共享样式 706 行，后续扩其它状态前必须按工程阈值拆分。原稿其它八态与 `/print/done` 尚未对齐；该提交**未合流主候选**，稿 15 的 UI/设备/商业验收仍 NO-GO。
 
 ## 2026-09-25：小程序传到一体机的上传回执判定（本地候选，商业 NO-GO）
 
