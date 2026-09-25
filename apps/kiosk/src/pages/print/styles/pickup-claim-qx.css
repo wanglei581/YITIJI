@@ -1,384 +1,497 @@
-/* 取件码页 · 青序流光专属样式
- *
- * 地基已有的（按钮、卡片、列表行、占位、状态块、操作条）不在这里重复定义，
- * 只写这一页特有的东西：码位格、安心提示、键盘卡、三码对照、兜底出口。
- *
- * 视觉真值：docs/design/kiosk-redesign-2026-08/11-arrival-code.html
- */
+/* 到机码页 · 青序流光专属样式。视觉真值：docs/design/kiosk-redesign-2026-08/11-arrival-code.html（1080×1920）。
+ * 地基已有的（按钮/卡片基类、顶栏、底部导航）不重复定义，只写本页特有的。
+ * 三段：默认 = 1080×1920 缩放舞台；Windows 横屏（流体 1280×720）；手机宽（390）。
+ * 动效克制（按压 120ms、卡片 240ms 淡入、校验中三点脉冲、扫码角标呼吸、光标闪烁），prefers-reduced-motion 下全部关闭。 */
+
+.pickup-claim-page { --pcp-ease: cubic-bezier(.22, 1, .36, 1); }
+
+/* ── 页头：ARRIVAL CODE 眉标 → 宋体标题 → 说明句（稿 .head）──────
+   共享 .qx-pagehead 是 h1 与说明句同行；稿里三行竖排、标题不带竖条。眉标纯装饰，读屏跳过。 */
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 22px; }
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead::before {
+  content: 'ARRIVAL CODE'; content: 'ARRIVAL CODE' / ''; font-size: 19px; font-weight: 700; letter-spacing: 5px; color: var(--qx-teal-d);
+}
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead h1 { font-size: 44px; }
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead h1::before { display: none; }
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead p { flex: none; min-width: 0; width: 100%; font-size: 21px; line-height: 1.5; }
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead p :is(b, strong) { color: var(--qx-ink); font-weight: 700; }
+
+/* 本页焦点环：3px 深墨环（稿 33 同口径），压过 service-desk 的全局蓝环（0,3,0）。 */
+.qx-stage .pickup-claim-page :is(button, input):focus-visible { outline: 3px solid var(--qx-deep); outline-offset: 3px; }
+
+/* ── 主体：稿里各块按 space-between 铺满定高舞台 ───────────── */
+.qx-scroll.pickup-claim-page { gap: 18px; padding-top: 18px; padding-bottom: 20px; }
+[data-kiosk-stage-fit='on'] .qx-scroll.pickup-claim-page { justify-content: space-between; }
 
 /* ── 码位格 ───────────────────────────────────────────────────
    真实 input 透明覆盖在格子之上：HID 扫码器与物理键盘照旧直接写入它，
-   点格子即聚焦它，用户看到的是下面这排格子。
-   不能用 display:none —— 那样扫码器就没有落点了。 */
-.pcp-input-section { display: flex; flex-direction: column; gap: 12px; }
-.pcp-label { font-size: 21px; font-weight: 700; color: var(--qx-ink-2); }
+   点格子即聚焦它，用户看到的是下面这排格子。不能用 display:none —— 那样扫码器就没有落点了。 */
 .pcp-input-wrap { position: relative; }
-
 .pcp-input {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  padding: 0; border: 0; outline: none;
-  background: transparent; color: transparent; caret-color: transparent;
-  font-size: 16px; cursor: pointer;
+  position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; outline: none; background: transparent;
+  color: transparent; caret-color: transparent; font-size: 16px; cursor: pointer;
 }
-.pcp-input:focus,
-.pcp-input:focus-visible { outline: none; box-shadow: none; }
-/* 上一条（0,2,0）压不过 service-desk 全局焦点环（0,3,0），透明 input 会套一圈蓝框。
-   只在有码位格的手输态去掉：焦点由下面 .pcp-cb.is-cur 的光圈表达；hid 指引屏不动。 */
-.pickup-claim-page .pcp-input-wrap:has(.pcp-codebox) > .pcp-input:is(:focus, :focus-visible) {
-  outline: none;
-  box-shadow: none;
-}
+/* 有码位格时焦点由 .pcp-cb.is-cur 的光圈与光标表达，输入框自身不画环。 */
+.qx-stage .pickup-claim-page .pcp-input-wrap:has(.pcp-codebox) > .pcp-input:is(:focus, :focus-visible) { outline: none; box-shadow: none; }
 
-.pcp-codebox {
-  display: flex; align-items: center; justify-content: center; gap: 12px;
-  min-height: 128px;
-}
+.pcp-codebox { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 128px; }
 .pcp-cb {
-  flex: 1 1 0;
-  width: 112px; max-width: 112px; min-width: 0; height: 128px;
-  display: flex; align-items: center; justify-content: center;
-  border: 2px solid var(--qx-line-2);
-  border-radius: 20px;
-  background: var(--qx-surface);
-  color: var(--qx-ink);
-  font-size: 56px; font-weight: 700;
-  font-family: var(--qx-mono); font-variant-numeric: tabular-nums;
-  transition: border-color .16s ease, background-color .16s ease;
+  flex: 1 1 0; width: 112px; max-width: 112px; min-width: 0; height: 128px; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--qx-line-2); border-radius: 20px; background: var(--qx-surface); color: var(--qx-ink); font-family: var(--qx-sans);
+  font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums;
+  transition: border-color .24s var(--pcp-ease), background-color .24s var(--pcp-ease), box-shadow .24s var(--pcp-ease);
 }
 .pcp-cb.is-filled { border-color: var(--qx-teal); }
 .pcp-cb.is-cur { border-color: var(--qx-teal); background: var(--qx-teal-soft); color: var(--qx-teal-d); }
-.pcp-cb.is-err { border-color: var(--qx-cinnabar); }
-/* 键盘焦点必须可见（可访问性）：焦点在透明覆盖层上时高亮当前格 */
-.pcp-input-wrap:focus-within .pcp-cb.is-cur {
+.pcp-cb.is-err { border-color: var(--qx-cinnabar); background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
+.pcp-input-wrap:focus-within .pcp-cb.is-cur { box-shadow: 0 0 0 4px color-mix(in srgb, var(--qx-teal) 26%, transparent); }
+/* 光标只在输入框真的有焦点时出现：没焦点还闪光标，等于告诉人「可以直接敲键盘」。 */
+.pcp-input-wrap:focus-within .pcp-cb.is-cur::after {
+  content: ''; width: 4px; height: .9em; border-radius: 2px; background: currentColor; animation: pcp-blink 1.1s steps(1) infinite;
+}
+/* 8/10 位填满后没有 .is-cur，焦点改由最后一格承接同一圈光环。 */
+.pcp-input-wrap:focus-within .pcp-codebox:not(:has(.pcp-cb.is-cur, .pcp-cb.is-err)) .pcp-cb:last-child {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--qx-teal) 26%, transparent);
 }
-/* 8/10 位填满后没有 .is-cur，焦点会无处可见：改由最后一格承接同一圈光环。 */
-.pcp-input-wrap:focus-within .pcp-codebox:not(:has(.pcp-cb.is-cur)) .pcp-cb:last-child {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qx-teal) 26%, transparent);
-}
-/* 10 位历史码要在同样宽度里排下 */
 .pcp-codebox--legacy { gap: 10px; }
-.pcp-codebox--legacy .pcp-cb { width: 84px; height: 112px; border-radius: 16px; font-size: 44px; }
-
-.pcp-counter {
-  align-self: flex-end;
-  margin-top: 4px;
-  font-family: var(--qx-mono); font-variant-numeric: tabular-nums;
-  font-size: 19px; font-weight: 700; color: var(--qx-ink-3);
-}
-.pcp-counter--full { color: var(--qx-teal-d); }
-
-/* HID 回声：文案来自 11-arrival-code.html 的 hid-echo（#hid-echo-code）。
-   完整 hid 指引是独立一屏；这句只表示「机器在等扫」，不是硬件状态。 */
-.pcp-scan-echo {
-  margin: 0;
-  min-height: var(--qx-tap-min);
-  display: flex;
-  align-items: center;
-  padding: 12px 18px;
-  border-radius: 14px;
-  background: var(--qx-paper);
-  border: 1px dashed var(--qx-line-2);
-  color: var(--qx-ink-3);
-  font-size: 20px;
-  line-height: 1.5;
-}
+.pcp-codebox--legacy .pcp-cb { width: 84px; max-width: 84px; height: 112px; border-radius: 16px; font-size: 44px; }
 
 /* 手输页的扫码入口：扫码模组靠接近感应、不常亮，未扫码时就要写出位置和亮度。
-   压成两行紧凑触控条（1080 下约 70px 高），不再是大卡片；完整指引在 rHid() 屏。 */
+   一条紧凑触控条；完整指引在 rHid() 屏。 */
 .pcp-hid-entry {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 2px;
-  width: 100%;
-  min-height: 64px;
-  padding: 9px 18px;
-  border: 1px solid var(--qx-teal);
-  border-radius: 14px;
-  background: var(--qx-teal-soft);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 2px 14px; width: 100%; min-height: 64px;
+  padding: 16px 22px; border: 1px solid var(--qx-teal-line); border-radius: 16px; background: var(--qx-teal-soft); color: inherit;
+  font: inherit; text-align: center; cursor: pointer; transition: transform .12s var(--pcp-ease), border-color .16s ease;
 }
-.pcp-hid-entry:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
-.pcp-hid-entry-t { font-size: 20px; font-weight: 700; line-height: 1.3; color: var(--qx-ink); }
-.pcp-hid-entry-d { font-size: 17px; line-height: 1.3; color: var(--qx-ink-2); }
+.pcp-hid-entry:active { transform: scale(.99); border-color: var(--qx-teal); }
+.pcp-hid-entry-t { font-size: 20px; font-weight: 700; line-height: 1.35; color: var(--qx-ink); }
+.pcp-hid-entry-d { font-size: 18px; line-height: 1.35; color: var(--qx-teal-d); font-weight: 600; }
 
-/* 有效期说明：只转述服务端记录为准，不在前台自算剩余时间。 */
-.pcp-expire-note {
-  margin: 0;
-  font-size: 19px;
+/* 有效期只转述「以服务端记录为准」，不在前台自算剩余时间。 */
+.pcp-expire-note { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); text-align: center; }
+.pcp-expire-note b { color: var(--qx-teal-d); font-weight: 700; }
+
+/* 三条安心提示：说的是本页行为，不是服务端数据。 */
+.pcp-easy {
+  display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: center; margin: 0; padding: 0; list-style: none; color: var(--qx-teal-d);
+  font-size: 19px; font-weight: 650;
+}
+.pcp-easy li::before { content: '✓ '; }
+
+/* ── 状态条：校验中 / 失败（稿 .state-strip）──────────────────── */
+.pcp-strip {
+  margin: 0; display: flex; align-items: center; gap: 14px; padding: 20px 28px; border-radius: 18px; font-size: 22px; font-weight: 650;
   line-height: 1.5;
-  color: var(--qx-ink-2);
-  text-align: center;
 }
+.pcp-strip > svg { flex: none; }
+.pcp-strip small { display: block; margin-top: 2px; font-size: 18px; font-weight: 500; }
+.pcp-strip--checking { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.pcp-strip--error { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
 
-/* hid 指引屏（对照稿 11 rHid）。令牌走 --qx-*，不写裸色。 */
-.pcp-hid-card {
-  display: flex;
-  gap: 32px;
-  align-items: center;
-  padding: 36px 38px;
+.pcp-dots { display: inline-flex; gap: 7px; }
+.pcp-dots i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; animation: pcp-pulse 1.6s ease-in-out infinite; }
+.pcp-dots i:nth-child(2) { animation-delay: .2s; }
+.pcp-dots i:nth-child(3) { animation-delay: .4s; }
+
+/* ── 键盘卡：说明 → 3×4 数字键（或历史码字母键）→ 确认行（稿 .kb）──── */
+.qx-card.pcp-keypad-card { display: flex; flex-direction: column; gap: 14px; padding: 20px 26px; border-radius: 32px; }
+/* 校验中键盘整体淡一次（稿 .kb.inert）；键本身的 disabled 半透明不再叠乘，否则数字看不清。 */
+.pcp-keypad-card > * { transition: opacity .24s var(--pcp-ease); }
+.pcp-keypad-card[data-inert] > :not(.pcp-kb-foot) { opacity: .5; }
+.qx-card.pcp-keypad-card[data-inert] :is(.knp-key, .pcp-alpha-key):disabled { opacity: 1; }
+.pcp-keypad-note { margin: 0; text-align: center; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.pcp-keypad-note b { color: var(--qx-slate-d); font-weight: 700; }
+
+.pcp-keypad-card .knp { margin-top: 0; gap: 14px; grid-template-rows: repeat(4, 100px); }
+.pcp-keypad-card .knp-key {
+  min-height: 100px; border-radius: 18px; border-color: var(--qx-line-2); font-size: 38px; font-weight: 700;
+  transition: transform .12s var(--pcp-ease), background-color .12s ease, border-color .12s ease;
 }
-.pcp-hid-stage {
-  flex: none;
-  width: 260px;
-  height: 260px;
-  border-radius: 26px;
-  position: relative;
-  background: linear-gradient(180deg, var(--qx-deep-2), var(--qx-deep));
-  display: flex;
-  align-items: center;
+.pcp-keypad-card .knp-key:active:not(:disabled) { background: var(--qx-teal-soft); border-color: var(--qx-teal); }
+/* 「输入历史码」是模式选择不是数字：石板浅底（稿 .key.abc）。 */
+.pcp-keypad-card .knp-key.knp-alt {
+  background: var(--qx-slate-soft); border-color: var(--qx-slate-soft); color: var(--qx-slate-d); font-size: 22px; letter-spacing: 1px;
+}
+/* 「删除」深底翡翠字（稿 .key.fn）。共享键盘的 --qx-teal-deep 在青序令牌里不存在，
+   原先落成白字透明底——这颗键在本页整颗看不见。 */
+.pcp-keypad-card .knp-key.knp-del {
+  background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-emerald); font-size: 22px; font-weight: 650;
+  letter-spacing: 1px;
+}
+.pcp-keypad-card .knp-key.knp-del:active:not(:disabled) { background: var(--qx-deep-2); border-color: var(--qx-deep-2); }
+.pcp-keypad-card .knp-key.knp-del:disabled { opacity: .6; }
+
+.pcp-kb-foot { display: flex; gap: 14px; }
+.pcp-keypad-card .qx-btn.pcp-submit {
+  flex: 1; min-height: 100px; border-radius: 18px; background: var(--qx-teal); border-color: var(--qx-teal); color: var(--qx-on-solid);
+  font-size: 26px; letter-spacing: 2px; transition: transform .12s var(--pcp-ease), background-color .16s ease;
+}
+.pcp-keypad-card .qx-btn.pcp-submit:active:not(:disabled) { transform: scale(.985); background: var(--qx-teal-d); }
+/* 没输满时是虚线空键（稿 .key.ok[aria-disabled]），不是半透明的主按钮。 */
+.pcp-keypad-card .qx-btn.pcp-submit:disabled {
+  opacity: 1; background: var(--qx-paper); border: 1px dashed var(--qx-line-2); color: var(--qx-ink-2); font-size: 24px;
+  letter-spacing: 1px;
+}
+.pcp-keypad-card .qx-btn.pcp-submit[aria-busy='true'] { background: var(--qx-teal-soft); border-style: solid; border-color: var(--qx-teal); color: var(--qx-teal-d); }
+
+/* 历史码字母键（稿 .kb.alpha）：8 列 × 4 行，最后一格是删除。 */
+.pcp-alpha { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; }
+.pcp-alpha-key {
+  min-height: 92px; border-radius: 18px; border: 1px solid var(--qx-line-2); background: var(--qx-paper); color: var(--qx-ink);
+  font-family: var(--qx-sans); font-size: 32px; font-weight: 700; cursor: pointer;
+  transition: transform .12s var(--pcp-ease), background-color .12s ease, border-color .12s ease;
+}
+.pcp-alpha-key:active:not(:disabled) { transform: scale(.975); background: var(--qx-teal-soft); border-color: var(--qx-teal); }
+.pcp-alpha-key:disabled { cursor: default; }
+.pcp-alpha-key.pcp-alpha-del { background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-emerald); font-size: 20px; font-weight: 650; }
+.pcp-alpha-key.pcp-alpha-del:disabled { opacity: .6; }
+.pcp-keypad-card .qx-btn.pcp-kb-back {
+  flex: 1; min-height: 92px; border-radius: 18px; background: var(--qx-slate-soft); border-color: var(--qx-slate-soft);
+  color: var(--qx-slate-d); font-size: 21px;
+}
+.pcp-kb-foot:has(.pcp-kb-back) .qx-btn.pcp-submit { min-height: 92px; }
+
+/* ── 动作行（失败屏、hid 屏、成功卡共用；稿 .btn）────────────── */
+.pcp-actions { display: flex; gap: 18px; }
+.qx-btn.pcp-act {
+  flex: 1; min-height: 92px; border-radius: 24px; font-size: 24px; letter-spacing: 1px;
+  transition: transform .12s var(--pcp-ease), background-color .16s ease;
+}
+.qx-btn.pcp-act:active { transform: scale(.98); }
+.qx-btn.pcp-act[data-variant='ghost'] { background: var(--qx-surface); border: 1.5px solid var(--qx-line-2); color: var(--qx-ink-2); }
+.qx-btn.pcp-act--go { flex: 1.4; background: var(--qx-teal); border-color: var(--qx-teal); color: var(--qx-on-solid); }
+.qx-btn.pcp-act--staff { flex: 1.4; background: var(--qx-wheat-d); border-color: var(--qx-wheat-d); color: var(--qx-on-solid); }
+
+/* ── 锁定 / 网络大卡（稿 .block-card）──────────────────────── */
+.qx-card.pcp-block { display: flex; flex-direction: column; gap: 18px; padding: 36px 40px; border-radius: 32px; }
+.qx-card.pcp-block--locked { background: var(--qx-cinnabar-soft); border: 1.5px solid var(--qx-cinnabar); }
+.qx-card.pcp-block--net { background: var(--qx-slate-soft); border: 1.5px solid var(--qx-slate); }
+.pcp-block-head { display: flex; align-items: center; gap: 20px; }
+.pcp-block-ico {
+  flex: none; width: 84px; height: 84px; border-radius: 24px; background: var(--qx-surface); display: flex; align-items: center;
   justify-content: center;
+}
+.pcp-block--locked .pcp-block-ico { color: var(--qx-cinnabar-d); }
+.pcp-block--net .pcp-block-ico { color: var(--qx-slate-d); }
+.pcp-block-t { margin: 0; font-size: 30px; font-weight: 800; line-height: 1.35; color: var(--qx-ink); }
+.pcp-block-t small { display: block; margin-top: 5px; font-size: 20px; font-weight: 600; color: var(--qx-ink-2); }
+.pcp-block-body { margin: 0; font-size: 21px; line-height: 1.65; color: var(--qx-ink-2); }
+.pcp-block-body b { color: var(--qx-ink); }
+.pcp-block .pcp-actions { margin-top: 4px; }
+
+/* ── 成功卡（稿 .win-card）────────────────────────────────── */
+.qx-card.pcp-win { display: flex; flex-direction: column; gap: 20px; padding: 36px 40px; border: 1.5px solid var(--qx-teal); border-radius: 32px; }
+.pcp-win-head { display: flex; align-items: center; gap: 20px; }
+.pcp-win-ico {
+  flex: none; width: 84px; height: 84px; border-radius: 50%; background: var(--qx-teal); color: var(--qx-on-solid); display: flex;
+  align-items: center; justify-content: center; animation: pcp-seal .48s var(--pcp-ease) both;
+}
+.pcp-win-tx { min-width: 0; }
+.pcp-win-t { margin: 0; font-size: 31px; font-weight: 800; line-height: 1.3; color: var(--qx-ink); }
+.pcp-win-s { margin: 6px 0 0; font-size: 20px; font-weight: 600; line-height: 1.5; color: var(--qx-ink-2); }
+.pcp-win-file {
+  display: flex; align-items: center; gap: 18px; padding: 20px 24px; border-radius: 18px; background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+.pcp-win-file > svg { flex: none; }
+.pcp-win-fm { flex: 1; min-width: 0; }
+.pcp-win-fn { margin: 0; font-size: 23px; font-weight: 700; color: var(--qx-ink); overflow-wrap: anywhere; }
+.pcp-win-fs { margin: 4px 0 0; font-size: 19px; color: var(--qx-teal-d); overflow-wrap: anywhere; }
+.pcp-win-steps { display: flex; gap: 34px; margin: 0; padding: 0; list-style: none; }
+.pcp-win-steps li {
+  position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-radius: 16px;
+  background: var(--qx-paper); font-size: 20px; line-height: 1.4; color: var(--qx-ink-2);
+}
+.pcp-win-steps li + li::before { content: '→'; position: absolute; left: -26px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--qx-ink-3); }
+.pcp-win-no {
+  flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--qx-teal); color: var(--qx-on-solid); display: flex;
+  align-items: center; justify-content: center; font-size: 19px; font-weight: 700;
+}
+.pcp-win .qx-btn.pcp-act--go { flex: 1.6; }
+.pcp-safe {
+  margin: 0; display: flex; align-items: center; gap: 14px; padding: 18px 26px; border-radius: 18px; background: var(--qx-teal-soft);
+  color: var(--qx-teal-d); font-size: 20px; font-weight: 600; line-height: 1.5;
+}
+.pcp-safe > svg { flex: none; }
+
+/* ── hid 指引屏（稿 rHid）。令牌走 --qx-*，不写裸色。 ─────────── */
+.qx-card.pcp-hid-card { display: flex; gap: 32px; align-items: center; padding: 36px 38px; border-radius: 32px; }
+.pcp-hid-stage {
+  flex: none; width: 260px; height: 260px; border-radius: 26px; position: relative;
+  --pcp-inset: 28px; background: linear-gradient(180deg, var(--qx-deep-2), var(--qx-deep)); display: flex; align-items: center; justify-content: center;
   color: var(--qx-emerald);
 }
-.pcp-hid-corner {
-  position: absolute;
-  width: 46px;
-  height: 46px;
-  border: 4px solid var(--qx-emerald);
-}
-.pcp-hid-corner--tl { top: 28px; left: 28px; border-right: none; border-bottom: none; border-radius: 12px 0 0 0; }
-.pcp-hid-corner--tr { top: 28px; right: 28px; border-left: none; border-bottom: none; border-radius: 0 12px 0 0; }
-.pcp-hid-corner--bl { bottom: 28px; left: 28px; border-right: none; border-top: none; border-radius: 0 0 0 12px; }
-.pcp-hid-corner--br { bottom: 28px; right: 28px; border-left: none; border-top: none; border-radius: 0 0 12px 0; }
+.pcp-hid-corner { position: absolute; width: 46px; height: 46px; border: 4px solid var(--qx-emerald); animation: pcp-scan 1.6s ease-in-out infinite; }
+.pcp-hid-corner--tl { top: var(--pcp-inset); left: var(--pcp-inset); border-right: none; border-bottom: none; border-radius: 12px 0 0 0; }
+.pcp-hid-corner--tr { top: var(--pcp-inset); right: var(--pcp-inset); border-left: none; border-bottom: none; border-radius: 0 12px 0 0; }
+.pcp-hid-corner--bl { bottom: var(--pcp-inset); left: var(--pcp-inset); border-right: none; border-top: none; border-radius: 0 0 0 12px; }
+.pcp-hid-corner--br { bottom: var(--pcp-inset); right: var(--pcp-inset); border-left: none; border-top: none; border-radius: 0 0 12px 0; }
 .pcp-hid-phone {
-  width: 82px;
-  height: 142px;
-  border-radius: 15px;
-  border: 3px solid color-mix(in srgb, var(--qx-emerald) 70%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 82px; height: 142px; border-radius: 15px; border: 3px solid color-mix(in srgb, var(--qx-emerald) 70%, transparent); display: flex;
+  align-items: center; justify-content: center;
 }
 .pcp-hid-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .pcp-hid-t { margin: 0; font-size: 30px; font-weight: 800; line-height: 1.35; color: var(--qx-ink); }
 .pcp-hid-s { margin: 0; font-size: 21px; color: var(--qx-ink-2); line-height: 1.65; }
 .pcp-hid-s strong { color: var(--qx-teal-d); font-weight: 700; }
-.pcp-hid-cta { flex: 1; }
+/* HID 回声：文案来自稿 #hid-echo-code，只表示「机器在等扫」，不是硬件状态。 */
+.pcp-scan-echo {
+  margin: 0; min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-radius: 14px;
+  background: var(--qx-paper); border: 1px dashed var(--qx-line-2); color: var(--qx-ink-2); font-size: 20px; line-height: 1.5;
+}
+.pcp-scan-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--qx-ink-3); }
+.pcp-scan-dot[data-live] { background: var(--qx-teal); animation: pcp-pulse 1.6s ease-in-out infinite; }
+/* hid 屏的输入框盖在回声条上：焦点只画一圈细翡翠环，表示「扫码会落在这里」，不喧宾夺主。 */
+.qx-stage .pickup-claim-hid .pcp-input-wrap > .pcp-input:focus-visible { outline: 2px solid var(--qx-teal); outline-offset: 2px; border-radius: 14px; }
+.qx-card.pcp-hid-ab { padding: 24px 30px; border-radius: 24px; }
 .pcp-hid-ab-t { margin: 0 0 14px; font-size: 22px; font-weight: 700; }
 .pcp-hid-ab-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .pcp-hid-ab-col {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 18px 20px;
-  border-radius: 16px;
-  background: var(--qx-slate-soft);
-  color: var(--qx-slate-d);
-  font-size: 19px;
-  line-height: 1.6;
+  display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; border-radius: 16px; background: var(--qx-slate-soft);
+  color: var(--qx-slate-d); font-size: 19px; line-height: 1.6;
 }
-.pcp-hid-ab-col.is-current {
-  background: var(--qx-teal-soft);
-  color: var(--qx-teal-d);
-  outline: 2px solid var(--qx-teal);
-}
+.pcp-hid-ab-col.is-current { background: var(--qx-teal-soft); color: var(--qx-teal-d); outline: 2px solid var(--qx-teal); outline-offset: -2px; }
 .pcp-hid-ab-col b { font-size: 21px; }
+.pcp-hid-cta { flex: 1; }
 
-/* ── 三条安心提示 ─────────────────────────────────────────────
-   说的是本页行为，不是服务端数据，所以可以写死。
-   站在机器前的人最担心的就是「输错了这码是不是就废了」。 */
-.pcp-easy {
-  display: flex; flex-wrap: wrap; gap: 10px 28px; justify-content: center;
-  margin: 0; padding: 0; list-style: none;
-  color: var(--qx-teal-d); font-size: 20px; font-weight: 650;
-}
-.pcp-easy li::before { content: '✓ '; }
-
-/* ── 键盘卡 ─────────────────────────────────────────────────── */
-.pcp-keypad-card {
-  padding: 22px 24px 24px;
-  display: flex; flex-direction: column;
-}
-/* 本页由键盘卡吸收余量：站着输码时，键越大越好按。
-   四行等分拉伸，但每键不低于 96px（触控下限）。 */
-.pcp-keypad-card .knp {
-  flex: 1 1 auto; min-height: 0;
-  grid-template-rows: repeat(4, minmax(96px, 1fr));
-}
-.pcp-keypad-note {
-  margin: 0 0 16px; text-align: center;
-  font-size: 19px; line-height: 1.5; color: var(--qx-ink-3);
-}
-.pcp-keypad-note b { color: var(--qx-ink); font-weight: 750; }
-
-/* ── 三种码对照 ───────────────────────────────────────────────
-   现场最高频的求助是「我手上这串码是哪种」——到机码、上传码、
-   取件凭证码长得像，用途完全不同。 */
-.pcp-ab-t { margin: 0 0 14px; font-family: var(--qx-serif); font-size: 25px; font-weight: 700; }
+/* ── 三种码对照（稿 .vs）：现场最高频的求助是「我手上这串码是哪种」。 ── */
+.qx-card.pcp-ab { padding: 22px 28px; border-radius: 24px; }
+.pcp-ab-t { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 21px; font-weight: 700; color: var(--qx-ink); }
+.pcp-ab-t > svg { color: var(--qx-teal-d); }
 .pcp-ab-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .pcp-ab-col {
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: 14px;
-  background: var(--qx-paper);
+  display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 14px; background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
 }
-.pcp-ab-col.is-current { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
-.pcp-ab-col b { font-size: 20px; font-weight: 750; color: var(--qx-ink); }
-.pcp-ab-col span { font-size: 17px; line-height: 1.5; color: var(--qx-ink-3); }
+.pcp-ab-col.is-current { outline: 2px solid var(--qx-teal); outline-offset: -2px; }
+.pcp-ab-col b { font-size: 19px; font-weight: 700; }
+.pcp-ab-col span { font-size: 17px; line-height: 1.55; }
 
-/* ── 兜底出口 ─────────────────────────────────────────────────
-   真正卡住的人需要另一条路，不是把同一条路再讲一遍。 */
-.pch-title { margin: 0 0 12px; font-size: 22px; font-weight: 700; }
-.pch-outs { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
-.pch-outs li {
-  display: flex; align-items: baseline; gap: 8px;
-  min-height: var(--qx-tap-min); padding: 12px 18px;
-  border: 1px solid var(--qx-line); border-radius: 12px; background: var(--qx-paper);
+/* ── 兜底出口（稿 .outs）：真正卡住的人需要另一条路。 ───────────── */
+.qx-card.pcp-help { display: flex; align-items: center; gap: 16px; padding: 18px 24px; border: 1px dashed var(--qx-line-2); border-radius: 24px; }
+.pch-title { flex: none; margin: 0; font-size: 20px; font-weight: 700; }
+.pch-outs { flex: 1; min-width: 0; display: flex; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.pch-outs li,
+.pch-out-btn {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 6px;
+  min-height: 64px; align-content: center; padding: 8px 14px; border: 1px solid var(--qx-line); border-radius: 16px;
+  background: var(--qx-paper); text-align: center;
 }
 .pch-outs li:has(.pch-out-btn) { padding: 0; border: 0; background: transparent; }
-.pch-out-btn {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  width: 100%;
-  min-height: var(--qx-tap-min);
-  padding: 12px 18px;
-  border: 1px solid var(--qx-line);
-  border-radius: 12px;
-  background: var(--qx-paper);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.pch-out-btn:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.pch-out-btn { width: 100%; color: inherit; font: inherit; cursor: pointer; transition: transform .12s var(--pcp-ease), background-color .12s ease; }
+.pch-out-btn:active { transform: scale(.98); background: var(--qx-teal-soft); }
 .pch-outs b { font-size: 19px; font-weight: 700; color: var(--qx-ink); }
-.pch-outs span { font-size: 16px; color: var(--qx-ink-3); }
+.pch-outs span { font-size: 17px; color: var(--qx-ink-2); }
 
-/* ── 错误与忙态 ─────────────────────────────────────────────── */
+/* ── hid 屏里的错误位 ─────────────────────────────────────── */
 .pcp-error {
-  padding: 16px 20px; border-radius: var(--qx-r);
-  border: 1px solid var(--qx-cinnabar); background: var(--qx-cinnabar-soft);
+  padding: 16px 20px; border-radius: 14px; border: 1px solid var(--qx-cinnabar); background: var(--qx-cinnabar-soft);
   color: var(--qx-cinnabar-d); font-size: 20px; font-weight: 650;
 }
-.pcp-spinner {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 3px solid currentColor; border-top-color: transparent;
-  animation: pcp-spin .8s linear infinite;
-}
-@keyframes pcp-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .pcp-spinner { animation: none; } }
 
-/* ── 成功态 ─────────────────────────────────────────────────── */
-.pickup-claim-success { gap: 18px; }
-
-/* 1080×1920 手输态页头（对照稿 11 .head）：ARRIVAL CODE 眉标 → h1 → 说明句，三行竖排。
-   共享 .qx-pagehead 是 h1 与说明句同行 baseline 换行，说明句会挤在标题右侧。
-   眉标纯装饰，用 alt 语法让读屏跳过；不支持的浏览器落回上一行 content。
-   只作用于 data-claim-guide='keypad'，hid 指引屏、成功态与横屏不受影响。 */
-@media (min-width: 1000px) and (min-height: 1800px) {
-  .qx-stage:has(.pickup-claim-page[data-claim-guide='keypad']) > .qx-pagehead {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  .qx-stage:has(.pickup-claim-page[data-claim-guide='keypad']) > .qx-pagehead::before {
-    content: 'ARRIVAL CODE';
-    content: 'ARRIVAL CODE' / '';
-    font-size: 19px;
-    font-weight: 700;
-    letter-spacing: 5px;
-    color: var(--qx-teal-d);
-  }
-  .qx-stage:has(.pickup-claim-page[data-claim-guide='keypad']) > .qx-pagehead p {
-    flex: none;
-    min-width: 0;
-    width: 100%;
-    font-size: 21px;
-    line-height: 1.5;
-  }
+/* ── 克制动效 ─────────────────────────────────────────────── */
+.pcp-enter { animation: pcp-fade-in .24s var(--pcp-ease) both; }
+@keyframes pcp-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pcp-pulse { 0%, 100% { opacity: .25; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes pcp-scan { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes pcp-blink { 50% { opacity: 0; } }
+@keyframes pcp-seal { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .pcp-enter, .pcp-dots i, .pcp-hid-corner, .pcp-scan-dot, .pcp-win-ico,
+  .pcp-input-wrap:focus-within .pcp-cb.is-cur::after { animation: none; }
+  .pcp-dots i { opacity: 1; transform: none; }
+  .pcp-cb, .pcp-hid-entry, .pcp-keypad-card > *, .qx-btn.pcp-act, .pcp-alpha-key, .pch-out-btn,
+  .pcp-keypad-card .knp-key, .pcp-keypad-card .qx-btn.pcp-submit { transition: none; }
+  .pcp-hid-entry:active, .qx-btn.pcp-act:active, .pcp-alpha-key:active, .pch-out-btn:active,
+  .pcp-keypad-card .qx-btn.pcp-submit:active { transform: none; }
 }
 
-/* Windows 横屏窄高（1280×720 流体视口，舞台缩放关闭）。
-   青序原型 11-arrival-code.html 只有 1080×1920，没有取消这条生产约束：
-   主操作必须留在可视区内，用户按得到「确认校验 / 进入现场支付」。
-   旧 print-pickup-claim.css 同名媒体查询还在，但本页已经不 import 它。 */
+/* ── Windows 横屏窄高（1280×720 流体视口，舞台缩放关闭）─────────────
+   原型只有 1080×1920，但没有取消这条生产约束：主操作必须留在可视区内，
+   用户按得到「确认校验 / 进入现场支付」。手输屏改左右两栏：左侧码位与说明，右侧整块键盘。 */
 @media (max-height: 900px) and (orientation: landscape) {
-  .qx-stage:has(.pickup-claim-page),
-  .qx-stage:has(.pickup-claim-success) {
-    max-height: 100%;
-  }
+  .qx-stage:has(.pickup-claim-page) > .qx-pagehead { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 10px; }
+  .qx-stage:has(.pickup-claim-page) > .qx-pagehead::before { display: none; }
+  .qx-stage:has(.pickup-claim-page) > .qx-pagehead h1 { font-size: 30px; }
+  .qx-stage:has(.pickup-claim-page) > .qx-pagehead p { flex: 1; width: auto; min-width: 280px; font-size: 17px; line-height: 1.4; }
+  .qx-stage:has(.pickup-claim-page) > .qx-navbar { height: 72px; }
+  .qx-stage:has(.pickup-claim-page) > .qx-navbar .qx-nav-item { flex-direction: row; gap: 10px; font-size: 18px; }
+  .qx-stage:has(.pickup-claim-page) > .qx-navbar .qx-nav-item svg { width: 26px; height: 26px; }
 
-  .pickup-claim-page { gap: 10px; padding-top: 8px; }
+  .qx-scroll.pickup-claim-page { gap: 10px; padding-top: 8px; padding-bottom: 10px; }
+  .qx-scroll.pickup-claim-page:has(> .pcp-keypad-card) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-auto-rows: min-content;
+    align-content: start;
+    gap: 10px 20px;
+  }
+  .qx-scroll.pickup-claim-page:has(> .pcp-keypad-card) > * { grid-column: 1; }
+  .qx-scroll.pickup-claim-page:has(> .pcp-keypad-card) > .pcp-keypad-card { grid-column: 2; grid-row: 1 / span 5; align-self: start; }
+
   .pcp-codebox { min-height: 72px; gap: 8px; }
   .pcp-cb { width: 64px; max-width: 64px; height: 72px; font-size: 32px; border-radius: 12px; }
   .pcp-codebox--legacy { gap: 6px; }
-  .pcp-codebox--legacy .pcp-cb { width: 48px; max-width: 48px; height: 64px; font-size: 24px; border-radius: 10px; }
-  .pcp-scan-echo { min-height: 48px; padding: 8px 14px; font-size: 16px; }
-  /* 横屏高度吃紧：两句并成一行，放不下再自动折行，触控高度仍 ≥48px。 */
-  .pcp-hid-entry { flex-flow: row wrap; align-items: baseline; align-content: center; gap: 0 12px; min-height: var(--qx-tap-min); padding: 6px 14px; }
-  .pcp-hid-entry-t { font-size: 17px; }
-  .pcp-hid-entry-d { font-size: 16px; }
-  .pcp-hid-card { gap: 16px; padding: 16px 18px; }
-  .pcp-hid-stage { width: 120px; height: 120px; border-radius: 16px; }
+  .pcp-codebox--legacy .pcp-cb { width: 50px; max-width: 50px; height: 64px; font-size: 26px; border-radius: 10px; }
+  .pcp-hid-entry { min-height: var(--qx-tap-min); padding: 6px 14px; gap: 0 10px; }
+  .pcp-hid-entry-t { font-size: 16px; }
+  .pcp-hid-entry-d { font-size: 15px; }
+  .pcp-expire-note { font-size: 15px; }
+  .pcp-easy { font-size: 15px; gap: 4px 14px; }
+  .pcp-strip { padding: 10px 16px; font-size: 17px; }
+  .pcp-strip small { font-size: 15px; }
+
+  .qx-card.pcp-keypad-card { gap: 8px; padding: 12px 16px; border-radius: 20px; }
+  .pcp-keypad-note { font-size: 14px; line-height: 1.4; }
+  .pcp-keypad-card .knp { gap: 8px; grid-template-rows: repeat(4, 56px); }
+  .pcp-keypad-card .knp-key { min-height: 56px; font-size: 26px; border-radius: 12px; }
+  .pcp-keypad-card .knp-key.knp-alt,
+  .pcp-keypad-card .knp-key.knp-del { font-size: 17px; letter-spacing: 0; }
+  .pcp-kb-foot { gap: 8px; }
+  .pcp-keypad-card .qx-btn:is(.pcp-submit, .pcp-kb-back),
+  .pcp-keypad-card .qx-btn.pcp-submit:disabled,
+  .pcp-kb-foot:has(.pcp-kb-back) .qx-btn.pcp-submit { min-height: 56px; border-radius: 12px; font-size: 18px; letter-spacing: 0; }
+  .pcp-alpha { gap: 6px; }
+  .pcp-alpha-key { min-height: 50px; border-radius: 10px; font-size: 22px; }
+  .pcp-alpha-key.pcp-alpha-del { font-size: 14px; }
+
+  .pcp-actions { gap: 10px; }
+  .qx-btn.pcp-act { min-height: 56px; border-radius: 14px; font-size: 18px; letter-spacing: 0; }
+  .qx-card.pcp-block { gap: 10px; padding: 16px 20px; border-radius: 20px; }
+  .pcp-block-ico { width: 52px; height: 52px; border-radius: 14px; }
+  .pcp-block-ico > svg { width: 28px; height: 28px; }
+  .pcp-block-t { font-size: 22px; }
+  .pcp-block-t small { font-size: 15px; }
+  .pcp-block-body { font-size: 16px; line-height: 1.5; }
+
+  .qx-card.pcp-win { gap: 10px; padding: 16px 20px; border-radius: 20px; }
+  .pcp-win-ico { width: 52px; height: 52px; }
+  .pcp-win-ico > svg { width: 28px; height: 28px; }
+  .pcp-win-t { font-size: 22px; }
+  .pcp-win-s { font-size: 15px; }
+  .pcp-win-file { padding: 10px 16px; gap: 12px; }
+  .pcp-win-file > svg { width: 28px; height: 28px; }
+  .pcp-win-fn { font-size: 18px; }
+  .pcp-win-fs { font-size: 15px; }
+  .pcp-win-steps { gap: 26px; }
+  .pcp-win-steps li { padding: 8px 12px; font-size: 15px; gap: 8px; }
+  .pcp-win-steps li + li::before { left: -20px; font-size: 17px; }
+  .pcp-win-no { width: 28px; height: 28px; font-size: 15px; }
+  .pcp-safe { padding: 10px 16px; font-size: 15px; }
+
+  .qx-card.pcp-hid-card { gap: 16px; padding: 16px 18px; border-radius: 20px; }
+  .pcp-hid-stage { --pcp-inset: 12px; width: 120px; height: 120px; border-radius: 16px; }
   .pcp-hid-corner { width: 22px; height: 22px; border-width: 3px; }
-  .pcp-hid-corner--tl, .pcp-hid-corner--tr { top: 12px; }
-  .pcp-hid-corner--bl, .pcp-hid-corner--br { bottom: 12px; }
-  .pcp-hid-corner--tl, .pcp-hid-corner--bl { left: 12px; }
-  .pcp-hid-corner--tr, .pcp-hid-corner--br { right: 12px; }
   .pcp-hid-phone { width: 40px; height: 68px; border-radius: 8px; }
+  .pcp-hid-main { gap: 8px; }
   .pcp-hid-t { font-size: 22px; }
-  .pcp-hid-s { font-size: 16px; }
-  .pcp-easy { font-size: 16px; gap: 6px 16px; }
-  .pcp-keypad-card { padding: 12px 16px 14px; }
-  .pcp-keypad-note { margin-bottom: 8px; font-size: 15px; }
-  .pcp-keypad-card .knp { grid-template-rows: repeat(4, minmax(56px, 1fr)); }
-  .pcp-ab, .pcp-help { padding: 12px 16px; }
-  .pcp-ab-t { margin-bottom: 8px; font-size: 20px; }
+  .pcp-hid-s { font-size: 16px; line-height: 1.5; }
+  .pcp-scan-echo { min-height: 48px; padding: 8px 14px; font-size: 16px; }
+  .qx-card.pcp-hid-ab { padding: 12px 16px; }
+  .pcp-hid-ab-t { margin-bottom: 8px; font-size: 18px; }
+  .pcp-hid-ab-col { padding: 10px 12px; font-size: 15px; }
+  .pcp-hid-ab-col b { font-size: 16px; }
+
+  .qx-card.pcp-ab, .qx-card.pcp-help { padding: 12px 16px; border-radius: 16px; }
+  .pcp-ab-t { margin-bottom: 8px; font-size: 18px; }
   .pcp-ab-col { padding: 10px 12px; }
-  .pch-title { margin-bottom: 8px; font-size: 18px; }
-  .pickup-claim-success { gap: 10px; }
+  .pcp-ab-col b { font-size: 16px; }
+  .pcp-ab-col span { font-size: 14px; }
+  .qx-card.pcp-help { flex-wrap: wrap; gap: 8px; }
+  .pch-title { font-size: 17px; }
+  .pch-outs li, .pch-out-btn { min-height: var(--qx-tap-min); padding: 4px 10px; }
+  .pch-outs b { font-size: 16px; }
+  .pch-outs span { font-size: 14px; }
 }
 
-/* 390 手机宽：底部操作栏两颗按钮挤成竖排文字，说明换到整行、按钮平分。 */
+/* ── 390 手机宽（舞台缩放关闭，按真实宽度排版）──────────────────
+   稿只有 1080；这里保证同一信息层级在手机上不横向溢出、不挤成竖排字、可点区 ≥48px。 */
 @media (max-width: 520px) {
-  .qx-stage:has(.pickup-claim-page) > .qx-ctabar { flex-wrap: wrap; gap: 10px; padding: 12px 20px; }
-  .qx-stage:has(.pickup-claim-page) > .qx-ctabar .why { flex: 0 0 100%; font-size: 16px; line-height: 1.35; }
-  .qx-stage:has(.pickup-claim-page) > .qx-ctabar .qx-btn { flex: 1; min-width: 0; min-height: 56px; font-size: 17px; white-space: nowrap; }
+  .qx-stage:has(.pickup-claim-page) > .qx-pagehead { gap: 6px; margin-top: 14px; }
+  .qx-stage:has(.pickup-claim-page) > .qx-pagehead::before { font-size: 14px; letter-spacing: 3px; }
+  .qx-stage:has(.pickup-claim-page) > .qx-pagehead h1 { font-size: 30px; }
+  .qx-stage:has(.pickup-claim-page) > .qx-pagehead p { font-size: 16px; }
+  .qx-scroll.pickup-claim-page { gap: 14px; padding-top: 12px; }
+
+  /* 码位格：一排 8 格在 390 下每格只剩约 22px 宽。8 位排 4×2，10 位排 5×2，宽高按比例走。 */
+  .pcp-codebox { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; min-height: 0; }
+  .pcp-cb { width: auto; max-width: none; height: auto; aspect-ratio: 6 / 7; border-radius: 14px; font-size: 34px; }
+  .pcp-codebox--legacy { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+  .pcp-codebox--legacy .pcp-cb { width: auto; max-width: none; height: auto; aspect-ratio: 4 / 5; border-radius: 12px; font-size: 28px; }
+
+  .pcp-hid-entry { flex-direction: column; flex-wrap: nowrap; align-items: center; padding: 10px 14px; }
+  .pcp-hid-entry-t { font-size: 17px; }
+  .pcp-hid-entry-d { font-size: 15px; }
+  .pcp-expire-note { font-size: 15px; }
+  .pcp-easy { font-size: 15px; gap: 4px 14px; }
+  .pcp-strip { padding: 14px 16px; font-size: 17px; }
+  .pcp-strip small { font-size: 14px; }
+
+  /* 键盘卡按内容撑开，由 .qx-scroll 负责滚动；键高 72px。 */
+  .qx-card.pcp-keypad-card { padding: 14px; border-radius: 20px; gap: 12px; }
+  .pcp-keypad-note { font-size: 15px; }
+  .pcp-keypad-card .knp { gap: 10px; grid-template-rows: repeat(4, minmax(72px, auto)); }
+  .pcp-keypad-card .knp-key { min-height: 72px; font-size: 30px; border-radius: 14px; }
+  .pcp-keypad-card .knp-key.knp-alt,
+  .pcp-keypad-card .knp-key.knp-del { font-size: 17px; line-height: 1.2; letter-spacing: 0; }
+  .pcp-kb-foot { flex-direction: column; gap: 10px; }
+  .pcp-keypad-card .qx-btn:is(.pcp-submit, .pcp-kb-back),
+  .pcp-keypad-card .qx-btn.pcp-submit:disabled,
+  .pcp-kb-foot:has(.pcp-kb-back) .qx-btn.pcp-submit { min-height: 64px; border-radius: 14px; font-size: 17px; letter-spacing: 0; }
+  .pcp-alpha { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+  .pcp-alpha-key { min-height: 56px; border-radius: 12px; font-size: 24px; }
+  .pcp-alpha-key.pcp-alpha-del { grid-column: span 2; font-size: 16px; }
+
+  .pcp-actions { flex-direction: column; gap: 10px; }
+  .qx-btn.pcp-act { min-height: 64px; border-radius: 16px; font-size: 18px; letter-spacing: 0; }
+  .qx-card.pcp-block { padding: 18px; border-radius: 20px; gap: 12px; }
+  .pcp-block-head { gap: 14px; }
+  .pcp-block-ico { width: 56px; height: 56px; border-radius: 16px; }
+  .pcp-block-ico > svg { width: 30px; height: 30px; }
+  .pcp-block-t { font-size: 21px; }
+  .pcp-block-t small { font-size: 15px; }
+  .pcp-block-body { font-size: 16px; }
+
+  .qx-card.pcp-win { padding: 18px; border-radius: 20px; gap: 14px; }
+  .pcp-win-head { gap: 14px; }
+  .pcp-win-ico { width: 56px; height: 56px; }
+  .pcp-win-ico > svg { width: 30px; height: 30px; }
+  .pcp-win-t { font-size: 22px; }
+  .pcp-win-s { font-size: 15px; }
+  .pcp-win-file { padding: 14px; gap: 12px; }
+  .pcp-win-file > svg { width: 30px; height: 30px; }
+  .pcp-win-fn { font-size: 18px; }
+  .pcp-win-fs { font-size: 15px; }
+  .pcp-win-steps { flex-direction: column; gap: 8px; }
+  .pcp-win-steps li { padding: 10px 14px; font-size: 16px; }
+  .pcp-win-steps li + li::before { display: none; }
+  .pcp-win-no { width: 30px; height: 30px; font-size: 15px; }
+  .pcp-safe { padding: 12px 14px; font-size: 15px; }
+
+  /* hid 指引：左右两栏在 390 下会把说明挤成逐字竖排，改上下排。 */
+  .qx-card.pcp-hid-card { flex-direction: column; align-items: stretch; gap: 16px; padding: 18px; border-radius: 20px; }
+  .pcp-hid-stage { --pcp-inset: 16px; align-self: center; width: 160px; height: 160px; border-radius: 20px; }
+  .pcp-hid-corner { width: 30px; height: 30px; border-width: 3px; }
+  .pcp-hid-phone { width: 52px; height: 90px; border-radius: 10px; }
+  .pcp-hid-t { font-size: 22px; }
+  .pcp-hid-s { font-size: 16px; line-height: 1.6; }
+  .pcp-scan-echo { min-height: 56px; padding: 10px 14px; font-size: 16px; }
+  .qx-card.pcp-hid-ab { padding: 16px; border-radius: 20px; }
+  .pcp-hid-ab-t { font-size: 18px; }
+  .pcp-hid-ab-cols { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .pcp-hid-ab-col { padding: 12px 14px; font-size: 15px; }
+  .pcp-hid-ab-col b { font-size: 17px; }
+
   /* 三种码对照：三栏在 390 下被挤成竖排字，改单列逐条排，三条说明都保留。 */
+  .qx-card.pcp-ab { padding: 16px; border-radius: 20px; }
   .pcp-ab-cols { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .pcp-ab-col { gap: 4px; padding: 12px 16px; }
+  .pcp-ab-col { padding: 12px 16px; }
   .pcp-ab-col b { font-size: 18px; line-height: 1.4; }
   .pcp-ab-col span { font-size: 16px; line-height: 1.5; }
 
-  /* 码位格：一排 8 格在 390 下每格只剩约 22px 宽，像细线。
-     8 位新码排 4×2，10 位历史码排 5×2，宽高按比例走。透明 input 仍是 inset:0 盖住整个 wrap。 */
-  .pcp-codebox {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-    min-height: 0;
-  }
-  .pcp-cb {
-    width: auto; max-width: none; height: auto;
-    aspect-ratio: 6 / 7;
-    border-radius: 14px;
-    font-size: 34px;
-  }
-  .pcp-codebox--legacy { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-  .pcp-codebox--legacy .pcp-cb {
-    width: auto; max-width: none; height: auto;
-    aspect-ratio: 4 / 5;
-    border-radius: 12px;
-    font-size: 28px;
-  }
-
-  /* 键盘卡：.qx-grow（flex 1 1 auto; min-height 0）在滚动区里会被压到 48px，
-     .knp 跟着塌成 0，按键溢出被下面的卡片盖住。手机下改为按内容撑开，由 .qx-scroll 负责滚动。 */
-  .pickup-claim-page > .pcp-keypad-card { flex: none; }
-  .pickup-claim-page .pcp-keypad-card > .knp {
-    flex: none;
-    min-height: auto;
-    gap: 10px;
-    margin-top: 12px;
-    grid-template-rows: repeat(4, minmax(72px, auto));
-  }
-  .pickup-claim-page .pcp-keypad-card .knp-key { min-height: 72px; }
-  .pickup-claim-page .pcp-keypad-card .knp-key.knp-alt { font-size: 18px; line-height: 1.2; }
-  .pcp-keypad-note { margin-bottom: 0; font-size: 16px; }
+  .qx-card.pcp-help { flex-direction: column; align-items: stretch; gap: 10px; padding: 16px; border-radius: 20px; }
+  .pch-outs { flex-direction: column; gap: 8px; }
+  .pch-outs li, .pch-out-btn { min-height: 56px; }
+  .pch-outs b { font-size: 17px; }
+  .pch-outs span { font-size: 15px; }
 }
