@@ -5,7 +5,8 @@ import { assertNoHorizontalOverflow } from './assert-layout'
 import { productionRoutePatterns } from './route-manifest'
 
 const kioskScenarios = [
-  { path: '/error-offline', landmark: '网络连接中断', registerHealthProbe: true },
+  // 2026-09-25 迁入稿 09-system-state：进页默认是「还没检测」，页面标题换成稿的八项状态区块标题。
+  { path: '/error-offline', landmark: '这台机器的八项状态', registerHealthProbe: true },
 ] as const
 
 const mobileScenarios = [
