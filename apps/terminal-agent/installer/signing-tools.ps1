@@ -266,3 +266,143 @@ function Assert-DirectoryOutside([string]$CandidatePath, [string]$ProtectedDirec
     Fail-SigningTool "$Description must be outside '$protected'."
   }
 }
+
+function Read-BurnPeUInt16([byte[]]$Buffer, [int64]$Offset, [string]$Label) {
+  if ($Offset -lt 0 -or ($Offset + 2) -gt $Buffer.LongLength) {
+    Fail-SigningTool "Burn engine signature fixup could not read $Label."
+  }
+  return [System.BitConverter]::ToUInt16($Buffer, [int]$Offset)
+}
+
+function Read-BurnPeUInt32([byte[]]$Buffer, [int64]$Offset, [string]$Label) {
+  if ($Offset -lt 0 -or ($Offset + 4) -gt $Buffer.LongLength) {
+    Fail-SigningTool "Burn engine signature fixup could not read $Label."
+  }
+  return [System.BitConverter]::ToUInt32($Buffer, [int]$Offset)
+}
+
+function Write-BurnPeUInt32([byte[]]$Buffer, [int64]$Offset, [uint32]$Value, [string]$Label) {
+  if ($Offset -lt 0 -or ($Offset + 4) -gt $Buffer.LongLength) {
+    Fail-SigningTool "Burn engine signature fixup could not write $Label."
+  }
+  $encoded = [System.BitConverter]::GetBytes([uint32]$Value)
+  [System.Buffer]::BlockCopy($encoded, 0, $Buffer, [int]$Offset, 4)
+}
+
+# wix burn detach copies EngineSize bytes and leaves the PE certificate table aimed at the
+# outer bundle signature. WiX 4.0.6 reattach saves the engine directory in .wixburn and
+# clears it (BurnWriter.RememberThenResetSignature) so the bundle can be signed. Burn
+# restores it when launching the engine (CopyEngineWithSignatureFixup). Do that here
+# before Authenticode validation. Original signature offset 0 means the engine was never
+# inscribed; leave those bytes alone so they stay NotSigned.
+# Order: https://wixtoolset.org/docs/tools/wixexe/
+# Fixup: https://github.com/wixtoolset/wix/blob/v4.0.6/src/burn/engine/cache.cpp
+function Restore-DetachedBurnEngineSignature([string]$Path) {
+  if (-not [System.BitConverter]::IsLittleEndian) {
+    Fail-SigningTool "Burn engine signature fixup requires a little-endian runtime."
+  }
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    Fail-SigningTool "Detached Burn engine is missing: '$Path'."
+  }
+
+  $bytes = [System.IO.File]::ReadAllBytes($Path)
+  $length = [int64]$bytes.LongLength
+  if ($length -lt 64) {
+    Fail-SigningTool "Detached Burn engine is too small to be a PE."
+  }
+  if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+    Fail-SigningTool "Detached Burn engine is not a PE image."
+  }
+
+  $peOffset = [int64](Read-BurnPeUInt32 $bytes 60 "PE header offset")
+  if ((Read-BurnPeUInt32 $bytes $peOffset "NT signature") -ne [uint32]0x4550) {
+    Fail-SigningTool "Detached Burn engine has no NT signature."
+  }
+
+  $sectionCount = [int](Read-BurnPeUInt16 $bytes ($peOffset + 6) "section count")
+  $optionalSize = [int](Read-BurnPeUInt16 $bytes ($peOffset + 20) "optional header size")
+  if ($sectionCount -lt 1 -or $sectionCount -gt 96) {
+    Fail-SigningTool "Detached Burn engine has an invalid section count."
+  }
+  if ($optionalSize -lt 224) {
+    Fail-SigningTool "Detached Burn engine optional header is too small."
+  }
+
+  $optionalStart = $peOffset + 24
+  $checksumOffset = $optionalStart + 64
+  $certificateTableOffset = $optionalStart + $optionalSize - 96
+  $firstSection = $optionalStart + $optionalSize
+  if ($checksumOffset -ge $certificateTableOffset -or ($certificateTableOffset + 8) -gt $length) {
+    Fail-SigningTool "Detached Burn engine certificate table is outside the image."
+  }
+
+  $wixburnName = [byte[]](0x2E, 0x77, 0x69, 0x78, 0x62, 0x75, 0x72, 0x6E)
+  $wixburnHeader = [int64]-1
+  for ($sectionIndex = 0; $sectionIndex -lt $sectionCount; $sectionIndex++) {
+    $header = $firstSection + ([int64]$sectionIndex * 40)
+    if (($header + 40) -gt $length) {
+      Fail-SigningTool "Detached Burn engine section table is truncated."
+    }
+    $nameMatches = $true
+    for ($nameIndex = 0; $nameIndex -lt 8; $nameIndex++) {
+      if ($bytes[[int]($header + $nameIndex)] -ne $wixburnName[$nameIndex]) {
+        $nameMatches = $false
+        break
+      }
+    }
+    if ($nameMatches) {
+      if ($wixburnHeader -ge 0) {
+        Fail-SigningTool "Detached Burn engine has more than one .wixburn section."
+      }
+      $wixburnHeader = $header
+    }
+  }
+  if ($wixburnHeader -lt 0) {
+    Fail-SigningTool "Detached Burn engine is missing the .wixburn section."
+  }
+
+  $rawSize = [int64](Read-BurnPeUInt32 $bytes ($wixburnHeader + 16) ".wixburn raw size")
+  $rawPointer = [int64](Read-BurnPeUInt32 $bytes ($wixburnHeader + 20) ".wixburn raw pointer")
+  if ($rawSize -lt 52 -or ($rawPointer + $rawSize) -gt $length) {
+    Fail-SigningTool "Detached Burn engine .wixburn section is truncated."
+  }
+  if ((Read-BurnPeUInt32 $bytes $rawPointer ".wixburn magic") -ne [uint32]0x00f14300) {
+    Fail-SigningTool "Detached Burn engine .wixburn magic is not WiX 4.0.6."
+  }
+  if ((Read-BurnPeUInt32 $bytes ($rawPointer + 4) ".wixburn version") -ne [uint32]2) {
+    Fail-SigningTool "Detached Burn engine .wixburn version is not WiX 4.0.6."
+  }
+
+  $originalSignatureOffset = [int64](Read-BurnPeUInt32 $bytes ($rawPointer + 32) "original signature offset")
+  if ($originalSignatureOffset -eq 0) {
+    return
+  }
+
+  $originalChecksum = [uint32](Read-BurnPeUInt32 $bytes ($rawPointer + 28) "original checksum")
+  $originalSignatureSize = [int64](Read-BurnPeUInt32 $bytes ($rawPointer + 36) "original signature size")
+  $signatureEnd = $originalSignatureOffset + $originalSignatureSize
+  if ($originalSignatureSize -lt 8 -or $signatureEnd -gt $length -or $originalSignatureOffset -lt ($rawPointer + 40)) {
+    Fail-SigningTool "Detached Burn engine original signature is outside the copied engine."
+  }
+
+  foreach ($range in @(
+    @($checksumOffset, [int64]4),
+    @($certificateTableOffset, [int64]8),
+    @(($rawPointer + 28), [int64]12)
+  )) {
+    $rangeStart = [int64]$range[0]
+    $rangeSize = [int64]$range[1]
+    if ($originalSignatureOffset -lt ($rangeStart + $rangeSize) -and $rangeStart -lt $signatureEnd) {
+      Fail-SigningTool "Detached Burn engine signature overlaps a header field that the fixup rewrites."
+    }
+  }
+
+  Write-BurnPeUInt32 $bytes $checksumOffset $originalChecksum "PE checksum"
+  Write-BurnPeUInt32 $bytes $certificateTableOffset ([uint32]$originalSignatureOffset) "certificate table offset"
+  Write-BurnPeUInt32 $bytes ($certificateTableOffset + 4) ([uint32]$originalSignatureSize) "certificate table size"
+  $wixburnZero = [int]($rawPointer + 28)
+  for ($index = 0; $index -lt 12; $index++) {
+    $bytes[$wixburnZero + $index] = 0
+  }
+  [System.IO.File]::WriteAllBytes($Path, $bytes)
+}

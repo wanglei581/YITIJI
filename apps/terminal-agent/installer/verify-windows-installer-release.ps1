@@ -162,6 +162,8 @@ try {
   Invoke-CheckedCommand -FilePath $wixTool -Arguments @(
     "burn", "detach", $signedExe, "-engine", $enginePath, "-intermediateFolder", $intermediateRoot
   ) -FailureMessage "WiX failed to detach the final bundle engine for verification."
+  # Match Burn's CopyEngineWithSignatureFixup. Offset 0 is left unchanged and stays NotSigned.
+  Restore-DetachedBurnEngineSignature -Path $enginePath
   $engineSignature = Assert-ValidAuthenticode -SignToolPath $signTool -Path $enginePath -ExpectedThumbprint $normalizedSigner -RequireTimestamp:$timestampRequired
   $engineHash = (Get-FileHash -LiteralPath $enginePath -Algorithm SHA256).Hash.ToUpperInvariant()
   if ([string]$identity.embeddedEngine.sha256 -ine $engineHash -or [string]$identity.embeddedEngine.signerThumbprint -ine $normalizedSigner) {

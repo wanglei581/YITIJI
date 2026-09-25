@@ -132,6 +132,8 @@ try {
   ) -FailureMessage "WiX failed to extract the rebuilt bundle."
   $embeddedMsiHash = Assert-ExtractedBundleMsiHash -ExtractRoot $extractRoot -SignedMsiPath $signedMsi -BundleKind "rebuilt bundle"
 
+  # WiX 4.0.6 order: detach the engine, sign that file, reattach it, then sign the bundle.
+  # https://wixtoolset.org/docs/tools/wixexe/
   Invoke-CheckedCommand -FilePath $wixTool -Arguments @(
     "burn", "detach", $unsignedRebuiltBundle, "-engine", $enginePath, "-intermediateFolder", $intermediateRoot
   ) -FailureMessage "WiX failed to detach the Burn engine."

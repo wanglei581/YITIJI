@@ -235,6 +235,75 @@ assert.doesNotMatch(
   /Copy-Item[^\n]*\$extractRoot|Copy-Item[^\n]*\$baExtractRoot/,
   'signing must not copy an MSI into the extract directory',
 )
+
+function assertOrderedOnce(source, parts, label) {
+  let searchFrom = 0
+  for (const part of parts) {
+    const at = source.indexOf(part, searchFrom)
+    assert.ok(at >= 0, `${label} missing: ${part}`)
+    assert.equal(source.indexOf(part, at + part.length), -1, `${label} duplicate: ${part}`)
+    searchFrom = at + part.length
+  }
+}
+
+assertOrderedOnce(
+  signingRelease,
+  [
+    'https://wixtoolset.org/docs/tools/wixexe/',
+    '"burn", "detach", $unsignedRebuiltBundle, "-engine", $enginePath, "-intermediateFolder", $intermediateRoot',
+    'Assert-UnsignedAuthenticode $enginePath',
+    'Invoke-SignAuthenticode -SignToolPath $signTool -Path $enginePath -Certificate $certificate -StoreScope $CertificateStoreScope -TimestampUrl $TimestampUrl',
+    '$engineSignature = Assert-ValidAuthenticode -SignToolPath $signTool -Path $enginePath -ExpectedThumbprint $certificate.Thumbprint -RequireTimestamp:$requireTimestamp',
+    '"burn", "reattach", $unsignedRebuiltBundle, "-engine", $enginePath, "-o", $reattachedBundle,',
+    'Assert-UnsignedAuthenticode $reattachedBundle',
+    'Invoke-SignAuthenticode -SignToolPath $signTool -Path $signedExe -Certificate $certificate -StoreScope $CertificateStoreScope -TimestampUrl $TimestampUrl',
+    '"detach-burn-engine",',
+    '"sign-burn-engine",',
+    '"reattach-burn-engine",',
+    '"sign-final-bundle"',
+  ],
+  'WiX 4.0.6 engine signing order',
+)
+assert.doesNotMatch(
+  signingRelease,
+  /Restore-DetachedBurnEngineSignature/,
+  'signing must not rewrite the engine certificate table before reattach',
+)
+assertOrderedOnce(
+  verifyRelease,
+  [
+    '"burn", "detach", $signedExe, "-engine", $enginePath, "-intermediateFolder", $intermediateRoot',
+    'Restore-DetachedBurnEngineSignature -Path $enginePath',
+    '$engineSignature = Assert-ValidAuthenticode -SignToolPath $signTool -Path $enginePath -ExpectedThumbprint $normalizedSigner -RequireTimestamp:$timestampRequired',
+    '$engineHash = (Get-FileHash -LiteralPath $enginePath -Algorithm SHA256).Hash.ToUpperInvariant()',
+  ],
+  'final bundle engine verification',
+)
+const fixupMarker = '# Order: https://wixtoolset.org/docs/tools/wixexe/'
+const fixupStart = signingToolsLf.indexOf(fixupMarker)
+assert.ok(fixupStart >= 0, 'missing Burn engine signature fixup')
+assert.equal(signingToolsLf.indexOf(fixupMarker, fixupStart + fixupMarker.length), -1)
+assert.equal(signingToolsLf.indexOf('function Restore-DetachedBurnEngineSignature'), fixupStart + signingToolsLf.slice(fixupStart).indexOf('function Restore-DetachedBurnEngineSignature'))
+assert.equal(signingToolsLf.split('function Restore-DetachedBurnEngineSignature').length, 2)
+const fixupBody = signingToolsLf.slice(fixupStart)
+assertOrderedOnce(
+  fixupBody,
+  [
+    'https://wixtoolset.org/docs/tools/wixexe/',
+    'https://github.com/wixtoolset/wix/blob/v4.0.6/src/burn/engine/cache.cpp',
+    '0x00f14300',
+    '".wixburn version"',
+    'if ($originalSignatureOffset -eq 0) {\n    return\n  }',
+    '$bytes[$wixburnZero + $index] = 0',
+    '[System.IO.File]::WriteAllBytes($Path, $bytes)',
+  ],
+  'Burn engine signature fixup',
+)
+assert.ok(
+  fixupBody.indexOf('if ($originalSignatureOffset -eq 0)') <
+    fixupBody.indexOf('[System.IO.File]::WriteAllBytes'),
+  'an engine with no inscribed signature must not be rewritten',
+)
 const matcherSelfTestCall = [
   'Invoke-ExtractedMsiMatcherSelfTest',
   'if ($PSCmdlet.ParameterSetName -eq "MatcherSelfTest") {',
