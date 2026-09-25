@@ -128,8 +128,9 @@ export async function readPdfInfo(buffer: Buffer): Promise<Record<string, string
 }
 
 /**
- * 把 AI 解读页拷到简历后面。简历原有 Info 保留；
- * 追加页本身是 AI 解读，所以 AIGC.Label 置 "1"。
+ * 把 AI 解读页拷到简历后面。简历原有 Title 等 Info 保留。
+ * 追加页本身是 AI 解读，所以 AIGC.Label 置 "1"，并把 AIGenerated 同步成 true。
+ * 草稿简历原来是 AIGenerated=false；只写 Label 会和 Info 矛盾。
  */
 export async function appendAigcPages(
   resumePdf: Buffer,
@@ -142,5 +143,6 @@ export async function appendAigcPages(
   copied.forEach((page) => merged.addPage(page))
   const pageCount = merged.getPageCount()
   setPdfLibAigcLabel(merged, produceId)
+  infoDict(merged).set(PDFName.of('AIGenerated'), PDFHexString.fromText('true'))
   return { buffer: Buffer.from(await merged.save({ useObjectStreams: false })), pageCount }
 }

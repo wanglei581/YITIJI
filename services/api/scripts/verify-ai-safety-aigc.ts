@@ -632,13 +632,14 @@ async function main(): Promise<void> {
     fail('docx:body', '简历 DOCX 正文印了可见标识，这一项还没拍板（审计表第 16 行）')
   } else pass('docx:body')
 
-  // 追加页保持原简历 Title，并把 AIGC.Label 置为 1（本路第 3 条）。
+  // 追加页保持原简历 Title，并把 AIGC.Label 置为 1。草稿原来 AIGenerated=false，追加后必须改成 true。
   const original = await PDFDocument.create()
   original.addPage()
   original.setTitle('原简历')
   const appendix = await PDFDocument.create()
   appendix.addPage()
-  const merged = await appendAigcPages(Buffer.from(await original.save()), Buffer.from(await appendix.save()), 'task-append')
+  const appendixBuffer = Buffer.from(await appendix.save())
+  const merged = await appendAigcPages(Buffer.from(await original.save()), appendixBuffer, 'task-append')
   const mergedInfo = await readPdfInfo(merged.buffer)
   const mergedAigc = parseAigcLabelJson(mergedInfo['AIGC'] ?? '')
   if (mergedInfo['Title'] !== '原简历') fail('append:title', `原简历 Title 被改成了 ${mergedInfo['Title'] ?? '空'}`)
@@ -646,6 +647,17 @@ async function main(): Promise<void> {
   if (mergedAigc?.Label !== '1' || mergedAigc.ProduceID !== 'task-append') {
     fail('append:aigc', '追加 AI 解读后没有把 AIGC.Label 置为 1')
   } else pass('append:aigc')
+  const draftResume = await new ResumePdfService().render(resume as never, { draft: true })
+  const beforeAppend = await readPdfInfo(draftResume.buffer)
+  if (beforeAppend['AIGenerated'] !== 'false') {
+    fail('append:draft-before', `草稿简历 AIGenerated 应为 false，实际 ${beforeAppend['AIGenerated'] ?? '空'}`)
+  } else pass('append:draft-before')
+  const draftMerged = await appendAigcPages(draftResume.buffer, appendixBuffer, 'task-append-draft')
+  const afterAppend = await readPdfInfo(draftMerged.buffer)
+  const afterAigc = parseAigcLabelJson(afterAppend['AIGC'] ?? '')
+  if (afterAppend['AIGenerated'] !== 'true' || afterAigc?.Label !== '1' || afterAigc.ProduceID !== 'task-append-draft') {
+    fail('append:ai-generated', `追加后 AIGenerated=${afterAppend['AIGenerated'] ?? '空'}，AIGC=${afterAppend['AIGC'] ?? '空'}`)
+  } else pass('append:ai-generated')
 
   console.log(failed === 0 ? '\nAI 标识与提示词安全句：PASS' : `\nAI 标识与提示词安全句：${failed} FAIL`)
   if (failed > 0) process.exit(1)
