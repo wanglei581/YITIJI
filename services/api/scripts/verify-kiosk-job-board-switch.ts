@@ -16,8 +16,19 @@
  *   POST /jobs/:id/ai/match
  *   POST /activity/browse            （仅 targetType=job）
  *   POST /activity/external-jump     （仅 targetType=job）
+ *   GET  /companies/:id/jobs         （空列表，企业详情仍返回）
+ *   GET  /companies                  （去掉代表岗位标题，不再按岗位标题搜索）
+ *   POST /resume/job-fit、GET /resume/job-fit/:taskId、POST .../print
+ *   GET/POST/DELETE /me/favorites    （仅 targetType=job；混合列表去掉岗位）
+ *   GET  /kiosk/campus/recruitment-stats （岗位计数为 null，招聘会统计仍在）
+ *   GET  /me/browse-logs、/me/external-jump-logs （去掉岗位行；?targetType=job 拒绝）
+ *   GET  /me/job-ai-sessions
+ *   POST/GET /resume/career-plan/:taskId 与打印（带岗位标题的结果拒绝；新生成不附标题）
+ *   GET/POST/PATCH /me/job-applications （仅关联了本站岗位的记录）
  * 岗位详情里的 sourceUrl 是扫码投递二维码的内容，没有单独的二维码接口。
  * 机构详情在关闭时去掉内嵌岗位列表，机构本身仍返回。
+ * 顾问/助手不查岗位表。早报只给新增岗位个数，不给标题或来源链接，因此不关。
+ * 企业详情上的 openJobCount 仍返回：企业本身不受开关影响。
  */
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -41,7 +52,16 @@ import { ActivityController } from '../src/activity/activity.controller'
 import { CompaniesService } from '../src/companies/companies.service'
 import { CompaniesController } from '../src/companies/companies.controller'
 import { KioskOfflineJobsController } from '../src/offline-agencies/kiosk-offline-jobs.controller'
-import { JobAiController } from '../src/job-ai/job-ai.controller'
+import { JobAiController, MemberJobAiSessionsController } from '../src/job-ai/job-ai.controller'
+import { JobFitController } from '../src/ai/job-fit.controller'
+import { CareerPlanController } from '../src/ai/career-plan.controller'
+import { KioskCampusRecruitmentStatsController } from '../src/jobs/kiosk-campus-recruitment-stats.controller'
+import { CampusRecruitmentStatsService } from '../src/jobs/campus-recruitment-stats.service'
+import { MemberFavoritesController } from '../src/member-favorites/member-favorites.controller'
+import { MemberFavoritesService } from '../src/member-favorites/member-favorites.service'
+import { MeActivityController } from '../src/activity/me-activity.controller'
+import { JobApplicationsController } from '../src/job-applications/job-applications.controller'
+import { JobApplicationsService } from '../src/job-applications/job-applications.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { CONFIG_REFRESH_INTERVAL_MS } from '../src/terminals/terminal-utils'
 
@@ -143,6 +163,43 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
     board,
   )
   const companies = new CompaniesController(new CompaniesService(prisma, audit), board)
+  const campus = new KioskCampusRecruitmentStatsController(new CampusRecruitmentStatsService(prisma), board)
+  const favorites = new MemberFavoritesController(new MemberFavoritesService(prisma), board)
+  const history = new MeActivityController(new ActivityService(prisma), audit, board)
+  const applications = new JobApplicationsController(new JobApplicationsService(prisma), board)
+  let jobFitReads = 0
+  const jobFit = new JobFitController(
+    {
+      getLatest: async () => { jobFitReads += 1; return { job: { title: 'leaked' } } },
+      printReport: async () => { jobFitReads += 1; return { fileId: 'leaked' } },
+    } as never,
+    new JwtService({ secret: 'verify-job-board-secret-0123456789' }),
+    { get: async () => null } as never,
+    prisma,
+    { analyzeForJobFit: async () => { jobFitReads += 1; return { status: 'completed' } } } as never,
+    board,
+  )
+  let sessionReads = 0
+  const sessions = new MemberJobAiSessionsController(
+    { listMine: async () => { sessionReads += 1; return { items: [], nextCursor: null, total: 0 } } } as never,
+    board,
+  )
+  let careerIncludeTitle: boolean | undefined
+  let careerPrints = 0
+  const career = new CareerPlanController(
+    {
+      generate: async (_taskId: string, _requester: unknown, options?: { includeJobFitTitle?: boolean }) => {
+        careerIncludeTitle = options?.includeJobFitTitle
+        return { basedOn: { jobFit: null } }
+      },
+      getLatest: async () => ({ basedOn: { jobFit: 'KJB career job', resume: true, interview: null, selfAssessment: null } }),
+      printPlan: async () => { careerPrints += 1; return { fileId: 'career' } },
+    } as never,
+    new JwtService({ secret: 'verify-job-board-secret-0123456789' }),
+    { get: async () => null } as never,
+    prisma,
+    board,
+  )
   const offlineJobs = new KioskOfflineJobsController({
     findOneJob: async () => { throw new Error('closed offline job must not be read') },
   } as never, board)
@@ -164,6 +221,9 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
   const codeB = `KJB-${suffix}-B`
   const jobId = `job_kjb_${suffix}`
   const fairId = `fair_kjb_${suffix}`
+  const companyId = `co_kjb_${suffix}`
+  const companyName = `KJB Co ${suffix}`
+  let endUserId = ''
   const user = { userId: adminId, role: 'admin' as const, orgId: null }
   const reqOf = (terminalId?: string) => ({
     headers: terminalId ? { 'x-terminal-id': terminalId } : {},
@@ -174,7 +234,15 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
       where: { terminalId: { in: ['__global__', codeA, codeB, tA, tB] } },
     })
     await prisma.auditLog.deleteMany({ where: { actorId: adminId } })
+    if (endUserId) {
+      await prisma.favorite.deleteMany({ where: { endUserId } })
+      await prisma.browseLog.deleteMany({ where: { endUserId } })
+      await prisma.externalJumpLog.deleteMany({ where: { endUserId } })
+      await prisma.jobApplication.deleteMany({ where: { endUserId } })
+      await prisma.endUser.deleteMany({ where: { id: endUserId } })
+    }
     await prisma.job.deleteMany({ where: { id: jobId } })
+    await prisma.companyProfile.deleteMany({ where: { id: companyId } })
     await prisma.jobFair.deleteMany({ where: { id: fairId } })
     await prisma.terminal.deleteMany({ where: { id: { in: [tA, tB] } } })
     await prisma.organization.deleteMany({ where: { id: orgId } })
@@ -195,6 +263,17 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
     await prisma.terminal.create({
       data: { id: tB, terminalCode: codeB, agentToken: `kjb-b-${suffix}`, deviceFingerprint: `fp-b-${suffix}` },
     })
+    await prisma.companyProfile.create({
+      data: {
+        id: companyId,
+        sourceOrgId: orgId,
+        externalId: `kjb-co-${suffix}`,
+        sourceName: `KJB Source ${suffix}`,
+        name: companyName,
+        reviewStatus: 'approved',
+        publishStatus: 'published',
+      },
+    })
     await prisma.job.create({
       data: {
         id: jobId,
@@ -205,6 +284,8 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
         title: `KJB Job ${suffix}`,
         company: 'KJB Co',
         city: 'Shanghai',
+        category: 'campus',
+        companyProfileId: companyId,
         reviewStatus: 'approved',
         publishStatus: 'published',
       },
@@ -218,12 +299,59 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
         sourceName: `KJB Fair Source ${suffix}`,
         sourceUrl: `https://sources.example.com/fairs/${suffix}`,
         title: `KJB Fair ${suffix}`,
+        theme: 'campus',
         startAt: new Date(now - 86_400_000),
         endAt: new Date(now + 7 * 86_400_000),
         venue: 'Hall',
         city: 'Shanghai',
         reviewStatus: 'approved',
         publishStatus: 'published',
+      },
+    })
+    const member = await prisma.endUser.create({ data: { phoneHash: `kjb-${suffix}`, phoneEnc: 'enc' } })
+    endUserId = member.id
+    const memberUser = { endUserId }
+    const expiresAt = new Date(Date.now() + 86_400_000)
+    await prisma.favorite.create({
+      data: { endUserId, targetType: 'job', targetId: jobId, title: `KJB Job ${suffix}` },
+    })
+    await prisma.favorite.create({
+      data: { endUserId, targetType: 'job_fair', targetId: fairId, title: `KJB Fair ${suffix}` },
+    })
+    await prisma.browseLog.create({
+      data: {
+        endUserId, targetType: 'job', targetId: jobId, targetTitle: `KJB Job ${suffix}`,
+        sourceUrl: `https://sources.example.com/jobs/${suffix}`, expiresAt,
+      },
+    })
+    await prisma.browseLog.create({
+      data: {
+        endUserId, targetType: 'job_fair', targetId: fairId, targetTitle: `KJB Fair ${suffix}`,
+        sourceUrl: `https://sources.example.com/fairs/${suffix}`, expiresAt,
+      },
+    })
+    await prisma.externalJumpLog.create({
+      data: {
+        endUserId, targetType: 'job', targetId: jobId, action: 'external_apply',
+        targetTitle: `KJB Job ${suffix}`, sourceUrl: `https://sources.example.com/jobs/${suffix}`, expiresAt,
+      },
+    })
+    await prisma.externalJumpLog.create({
+      data: {
+        endUserId, targetType: 'job_fair', targetId: fairId, action: 'external_appointment',
+        targetTitle: `KJB Fair ${suffix}`, sourceUrl: `https://sources.example.com/fairs/${suffix}`, expiresAt,
+      },
+    })
+    const linkedApp = await prisma.jobApplication.create({
+      data: {
+        endUserId, jobId, companyName: 'KJB Co', positionTitle: `KJB Job ${suffix}`,
+        channel: 'external_self_reported', statusSource: 'self_reported',
+      },
+    })
+    const manualApp = await prisma.jobApplication.create({
+      data: {
+        endUserId, companyName: '手填公司', positionTitle: `手填进度${suffix}`,
+        channel: 'external_self_reported', statusSource: 'self_reported',
       },
     })
     pass('夹具已创建')
@@ -332,8 +460,168 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
     pass('10d. 全局关时招聘会外跳写入不受影响')
 
     const jobBrowseCount = await prisma.browseLog.count({ where: { targetId: jobId } })
-    if (jobBrowseCount !== 0) fail('10e. 关闭后仍写入了岗位浏览记录')
-    pass('10e. 关闭后没有岗位浏览记录落库')
+    if (jobBrowseCount !== 1) fail('10e. 夹具里的岗位浏览记录被误删')
+    pass('10e. 关闭后没有新的岗位浏览记录落库')
+
+    const closedJobs = await companies.companyJobs(companyId)
+    if (closedJobs.data.total !== 0 || closedJobs.data.items.length !== 0) {
+      fail(`11. 全局关时企业岗位列表未清空: ${JSON.stringify(closedJobs.data)}`)
+    }
+    pass('11. 全局关时 GET /companies/:id/jobs 返回空列表')
+    const detail = await companies.detail(companyId)
+    const detailJson = JSON.stringify(detail.data)
+    if (detail.data.name !== companyName || detailJson.includes(`KJB Job ${suffix}`) || detailJson.includes(`/jobs/${suffix}`)) {
+      fail('11b. 企业详情被误关或漏出岗位标题/来源链接')
+    }
+    pass('11b. 全局关时企业详情仍返回，且不含岗位标题或来源链接')
+    const titled = await companies.list(companyName)
+    const titledCard = titled.data.items.find((row) => row.id === companyId)
+    if (!titledCard || titledCard.repJobTitles.length !== 0) fail('11c. 找企业列表仍返回代表岗位标题')
+    const byJobTitle = await companies.list(`KJB Job ${suffix}`)
+    if (byJobTitle.data.items.some((row) => row.id === companyId)) fail('11d. 关闭后仍能按岗位标题搜到企业')
+    pass('11c. 全局关时代表岗位标题为空，且不能按岗位标题搜到企业')
+
+    await expectCode(
+      () => jobFit.analyze({ taskId: 't', jobId }, {}),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '12. 全局关时 POST /resume/job-fit 拒绝',
+    )
+    await expectCode(() => jobFit.latest('t', {}), 'KIOSK_JOB_BOARD_DISABLED', '12b. 全局关时岗位匹配结果拒绝')
+    await expectCode(() => jobFit.print('t', {}), 'KIOSK_JOB_BOARD_DISABLED', '12c. 全局关时岗位匹配打印拒绝')
+    if (jobFitReads !== 0) fail('12d. 关闭后仍读了岗位匹配')
+    pass('12d. 关闭后没有进入岗位匹配读写')
+
+    await expectCode(
+      () => favorites.list(memberUser, 'job'),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '13. 全局关时只读岗位收藏拒绝',
+    )
+    await expectCode(
+      () => favorites.add(memberUser, { targetType: 'job', targetId: jobId }),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '13b. 全局关时新增岗位收藏拒绝',
+    )
+    await expectCode(
+      () => favorites.remove(memberUser, 'job', jobId),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '13c. 全局关时取消岗位收藏拒绝',
+    )
+    const mixedFav = await favorites.list(memberUser)
+    if (mixedFav.data.items.some((row) => row.targetType === 'job' || row.title === `KJB Job ${suffix}`)) {
+      fail('13d. 混合收藏仍返回岗位')
+    }
+    if (!mixedFav.data.items.some((row) => row.targetType === 'job_fair' && row.title === `KJB Fair ${suffix}`)) {
+      fail('13e. 招聘会收藏被误关')
+    }
+    pass('13e. 全局关时混合收藏去掉岗位，招聘会收藏仍在')
+
+    const statsOff = await campus.getRecruitmentStats()
+    const campusGroup = statsOff.data.groups.find((group) => group.sourceOrgId === orgId)
+    if (!campusGroup || campusGroup.fairCount < 1 || campusGroup.jobListingCount !== null || campusGroup.openJobCount !== null) {
+      fail(`14. 校招统计未按开关隐藏岗位计数: ${JSON.stringify(campusGroup)}`)
+    }
+    if (campusGroup.fairPositionCount !== 0) fail('14b. 招聘会场内岗位计数被改写')
+    pass('14. 全局关时校招岗位计数为 null，招聘会场次仍在')
+
+    await expectCode(
+      () => history.browseLogs(memberUser, undefined, undefined, 'job'),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '15. 全局关时只读岗位浏览记录拒绝',
+    )
+    const browseMixed = await history.browseLogs(memberUser)
+    if (browseMixed.data.items.some((row) => row.targetType === 'job' || (row.sourceUrl ?? '').includes('/jobs/'))) {
+      fail('15b. 浏览记录仍返回岗位标题或来源链接')
+    }
+    if (!browseMixed.data.items.some((row) => row.targetType === 'job_fair')) fail('15c. 招聘会浏览记录被误关')
+    const jumpMixed = await history.jumpLogs(memberUser)
+    if (jumpMixed.data.items.some((row) => row.targetType === 'job')) fail('15d. 外跳记录仍返回岗位')
+    if (!jumpMixed.data.items.some((row) => row.targetType === 'job_fair')) fail('15e. 招聘会外跳记录被误关')
+    await expectCode(
+      () => history.jumpLogs(memberUser, undefined, undefined, 'job'),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '15f. 全局关时只读岗位外跳记录拒绝',
+    )
+    pass('15e. 全局关时浏览和外跳记录去掉岗位，招聘会记录仍在')
+
+    await expectCode(
+      () => sessions.list(memberUser),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '16. 全局关时岗位 AI 会话列表拒绝',
+    )
+    if (sessionReads !== 0) fail('16b. 关闭后仍读取了岗位 AI 会话')
+    pass('16b. 关闭后没有读取岗位 AI 会话')
+
+    const generated = await career.generate('career-task', {})
+    if (careerIncludeTitle !== false || generated.basedOn?.jobFit) fail('17. 全局关时新职业规划仍附岗位标题')
+    pass('17. 全局关时新职业规划不附岗位标题')
+    await expectCode(() => career.latest('career-task', {}), 'KIOSK_JOB_BOARD_DISABLED', '17b. 全局关时已保存的带标题规划拒绝')
+    await expectCode(() => career.print('career-task', {}), 'KIOSK_JOB_BOARD_DISABLED', '17c. 全局关时带标题规划的打印拒绝')
+    if (careerPrints !== 0) fail('17d. 关闭后仍生成了带岗位标题的规划打印')
+    pass('17d. 关闭后没有打印带岗位标题的规划')
+
+    const apps = await applications.list(memberUser)
+    if (apps.data.items.some((row) => row.jobId === jobId || row.positionTitle === `KJB Job ${suffix}`)) {
+      fail('18. 关联本站岗位的求职进度仍返回岗位标题')
+    }
+    if (!apps.data.items.some((row) => row.id === manualApp.id && row.positionTitle === `手填进度${suffix}`)) {
+      fail('18b. 手填求职进度被误关')
+    }
+    pass('18b. 全局关时关联岗位的进度被隐藏，手填进度仍在')
+    await expectCode(
+      () => applications.create(memberUser, { jobId, status: 'intention' }),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '18c. 全局关时按岗位新建进度拒绝',
+    )
+    await expectCode(
+      () => applications.update(memberUser, linkedApp.id, { note: 'no' }),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '18d. 全局关时修改关联岗位的进度拒绝',
+    )
+    const manualUpdated = await applications.update(memberUser, manualApp.id, { note: '仍可改' })
+    if (manualUpdated.data.note !== '仍可改') fail('18e. 手填进度不能修改')
+    pass('18e. 全局关时手填进度仍可修改')
+
+    await adminApi.saveGlobal({ enabled: true }, user, { headers: {} })
+    const openJobs = await companies.companyJobs(companyId, undefined, undefined, reqOf(codeA))
+    if (!openJobs.data.items.some((row) => row.id === jobId && row.sourceUrl?.includes(`/jobs/${suffix}`))) {
+      fail('19. 全局重新打开后，已开终端看不到企业岗位')
+    }
+    pass('19. 全局打开且本台打开时企业岗位列表恢复')
+    const closedTerminalJobs = await companies.companyJobs(companyId, undefined, undefined, reqOf(codeB))
+    if (closedTerminalJobs.data.items.length !== 0) fail('19b. 逐台关时该终端仍看到企业岗位')
+    const anonJobs = await companies.companyJobs(companyId)
+    if (!anonJobs.data.items.some((row) => row.id === jobId)) fail('19c. 无终端身份被逐台关误伤')
+    pass('19c. 逐台关只作用于带该终端身份的企业岗位列表')
+
+    await expectCode(
+      () => jobFit.analyze({ taskId: 't', manualJob: { title: '手填岗位' } }, reqOf(codeB)),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '20. 逐台关时该终端岗位匹配拒绝',
+    )
+    const openedFit = await jobFit.analyze({ taskId: 't', jobId }, reqOf(codeA))
+    if (!openedFit || jobFitReads !== 1) fail('20b. 其它终端的岗位匹配没有放行')
+    pass('20b. 逐台关不误伤其它终端的岗位匹配')
+
+    const terminalStats = await campus.getRecruitmentStats(reqOf(codeB))
+    const terminalGroup = terminalStats.data.groups.find((group) => group.sourceOrgId === orgId)
+    if (!terminalGroup || terminalGroup.jobListingCount !== null || terminalGroup.fairCount < 1) {
+      fail(`21. 逐台关时校招岗位计数未隐藏: ${JSON.stringify(terminalGroup)}`)
+    }
+    const openStats = await campus.getRecruitmentStats(reqOf(codeA))
+    const openGroup = openStats.data.groups.find((group) => group.sourceOrgId === orgId)
+    if (!openGroup || openGroup.jobListingCount === null || openGroup.jobListingCount < 1 || openGroup.openJobCount === null) {
+      fail(`21b. 其它终端的校招岗位计数没有恢复: ${JSON.stringify(openGroup)}`)
+    }
+    pass('21b. 逐台关只隐藏该终端的校招岗位计数')
+
+    await expectCode(
+      () => favorites.list(memberUser, 'job', undefined, undefined, reqOf(codeB)),
+      'KIOSK_JOB_BOARD_DISABLED',
+      '22. 逐台关时该终端读取岗位收藏拒绝',
+    )
+    const otherFav = await favorites.list(memberUser, 'job', undefined, undefined, reqOf(codeA))
+    if (!otherFav.data.items.some((row) => row.targetId === jobId)) fail('22b. 其它终端读不到岗位收藏')
+    pass('22b. 逐台关不误伤其它终端的岗位收藏')
   } finally {
     await cleanup().catch(() => undefined)
     await prisma.onModuleDestroy().catch(() => undefined)
