@@ -449,6 +449,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalToolboxConfig
   }
 
+  get kioskJobBoardConfig() {
+    return this.client.kioskJobBoardConfig
+  }
+
   get toolboxApp() {
     return this.client.toolboxApp
   }

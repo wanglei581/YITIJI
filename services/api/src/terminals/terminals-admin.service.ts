@@ -15,6 +15,7 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
+  Optional,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
@@ -37,6 +38,7 @@ import {
 import type { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { DEFAULT_SMART_CAMPUS_MODULES } from '../smart-campus/smart-campus.types'
 import { ReleaseObservationService, type AdminReleaseObservationView } from './release-observation.service'
+import { KioskJobBoardService } from './kiosk-job-board.service'
 
 // ── Admin view types ───────────────────────────────────────────────────────────
 
@@ -181,12 +183,17 @@ function describePrinterFault(online: boolean, printerStatus: string | null): st
 
 @Injectable()
 export class TerminalAdminService {
+  private readonly jobBoard: KioskJobBoardService
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly agent: TerminalAgentService,
     private readonly toolbox: TerminalToolboxService,
     private readonly releases: ReleaseObservationService,
-  ) {}
+    @Optional() jobBoard?: KioskJobBoardService,
+  ) {
+    this.jobBoard = jobBoard ?? new KioskJobBoardService(prisma)
+  }
 
   listTerminals() {
     return this.prisma.terminal.findMany({ orderBy: { registeredAt: 'desc' } })
@@ -650,9 +657,10 @@ export class TerminalAdminService {
 
   async getKioskTerminalConfig(terminalRef: string): Promise<KioskTerminalConfigView> {
     const terminal = await this.agent.findTerminalByRef(terminalRef)
-    const [smartCampusConfig, toolboxConfig] = await Promise.all([
+    const [smartCampusConfig, toolboxConfig, jobBoard] = await Promise.all([
       this.agent.findSmartCampusConfigByTerminalRef(terminalRef, terminal),
       this.toolbox.getPublicConfig(terminalRef, terminal),
+      this.jobBoard.resolve(terminalRef),
     ])
     const terminalEnabled = terminal?.enabled ?? false
     const smartCampusEnabled = terminalEnabled && !!smartCampusConfig?.enabled
@@ -670,10 +678,17 @@ export class TerminalAdminService {
         enabled: toolboxConfig.enabled,
         items: toolboxConfig.items,
       },
+      jobBoard: {
+        enabled: jobBoard.enabled,
+        globalEnabled: jobBoard.globalEnabled,
+        terminalEnabled: jobBoard.terminalEnabled,
+        reason: jobBoard.reason,
+      },
       configVersion: [
         terminal?.lastSeenAt.toISOString() ?? 'unregistered',
         smartCampusConfig?.updatedAt.toISOString() ?? 'smart-campus:none',
         toolboxConfig.version,
+        jobBoard.version,
       ].join('|'),
       refreshIntervalMs: CONFIG_REFRESH_INTERVAL_MS,
       serverTime,

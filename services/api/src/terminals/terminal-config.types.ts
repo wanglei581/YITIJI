@@ -20,9 +20,17 @@ export interface KioskToolboxConfigView {
   items: KioskToolboxItemView[]
 }
 
+export interface KioskJobBoardConfigView {
+  enabled: boolean
+  globalEnabled: boolean
+  terminalEnabled: boolean | null
+  reason: 'open' | 'global_off' | 'terminal_off'
+}
+
 export interface KioskTerminalConfigView {
   smartCampus: KioskSmartCampusConfig
   toolbox: KioskToolboxConfigView
+  jobBoard: KioskJobBoardConfigView
   configVersion: string
   refreshIntervalMs: number
   serverTime: string
