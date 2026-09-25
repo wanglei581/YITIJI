@@ -826,6 +826,7 @@ async function main(): Promise<void> {
       BAIDU_OCR_SECRET_KEY: 'x',
       AI_PROVIDER: 'llm',
       AI_LLM_API_KEY: 'x',
+      AIGC_CONTENT_PRODUCER: '示例信息技术有限公司',
       FILE_SIGNING_SECRET: 'a-strong-file-signing-secret-0123456789',
       SECRET_ENCRYPTION_KEY: 'a-strong-secret-encryption-key-01234567',
       PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
