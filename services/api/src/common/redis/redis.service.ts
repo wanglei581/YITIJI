@@ -91,8 +91,8 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
-   * 同一次 Lua：锁值仍是调用方的、会话仍是 expectedStatus 且还没有文件、键 TTL 仍大于 0，
-   * 才按剩余 TTL 写入。任一条件不成立都不改会话。
+   * 同一次 Lua：锁值仍是调用方的、会话仍是 expectedStatus、文件身份符合 expectedFileId、键 TTL 仍大于 0，
+   * 才按剩余 TTL 写入。expectedFileId 为空表示当前必须还没有文件。任一条件不成立都不改会话。
    */
   async compareAndSetSession(
     sessionKey: string,
@@ -100,6 +100,7 @@ export class RedisService implements OnModuleDestroy {
     lockToken: string,
     nextValue: string,
     expectedStatus: string,
+    expectedFileId: string | null = null,
   ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
     const result = await this.client.eval(
       `
@@ -113,7 +114,14 @@ export class RedisService implements OnModuleDestroy {
       if not ok or type(session) ~= 'table' then return -2 end
       if session['status'] ~= ARGV[3] then return -2 end
       local file = session['file']
-      if file ~= nil and file ~= cjson.null then return -2 end
+      local actualId = nil
+      if type(file) == 'table' then actualId = file['fileId'] end
+      local expectedFile = ARGV[4]
+      if expectedFile == nil or expectedFile == '' or expectedFile == false then
+        if actualId ~= nil and actualId ~= false then return -2 end
+      elseif actualId ~= expectedFile then
+        return -2
+      end
       redis.call('SET', KEYS[1], ARGV[2], 'EX', ttl)
       return 1
       `,
@@ -123,6 +131,7 @@ export class RedisService implements OnModuleDestroy {
       lockToken,
       nextValue,
       expectedStatus,
+      expectedFileId ?? '',
     )
     const code = Number(result)
     if (code === 1) return 'updated'

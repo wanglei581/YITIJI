@@ -72,14 +72,20 @@ async function main(): Promise<void> {
         if (script.includes('UPLOAD_SESSION_COMMIT')) {
           const sessionKey = keys[0] ?? ''
           const lockKey = keys[1] ?? ''
-          const [lockToken, nextValue, expectedStatus] = args
+          const [lockToken, nextValue, expectedStatus, expectedFile] = args
           const ttl = await client.ttl(sessionKey)
           if (ttl <= 0) return 0
           if ((await client.get(lockKey)) !== lockToken) return -1
           const raw = await client.get(sessionKey)
           if (!raw) return 0
-          const session = JSON.parse(raw) as { status?: string; file?: unknown }
-          if (session.status !== expectedStatus || session.file != null) return -2
+          const session = JSON.parse(raw) as { status?: string; file?: { fileId?: string } | null }
+          const actualId = session.file?.fileId ?? null
+          if (session.status !== expectedStatus) return -2
+          if (!expectedFile) {
+            if (actualId) return -2
+          } else if (actualId !== expectedFile) {
+            return -2
+          }
           await client.setex(sessionKey, ttl, nextValue ?? '')
           return 1
         }

@@ -409,43 +409,54 @@ export class UploadSessionsService {
     controlToken: string | undefined,
     endUserId?: string | null
   ): Promise<UploadSessionConfirmResponse> {
-    return this.withSessionLock(sessionId, async () => {
-      const record = this.markExpired(await this.load(sessionId))
+    return this.withSessionLock(sessionId, async (lock) => {
+      const stored = await this.load(sessionId)
+      const record = this.markExpired(stored)
       this.assertControlToken(record, controlToken)
       if (record.status === 'expired') {
-        await this.expireLocked(record, 'upload session expired before confirm')
+        await this.finishExpired(stored, 'upload session expired before confirm', lock)
         throw expiredSessionException()
       }
-      if (record.status !== 'uploaded' || !record.file) {
+      if (stored.status !== 'uploaded' || !stored.file) {
         throw new BadRequestException({
           error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端尚未上传文件' },
         })
       }
-      let confirmedFile = record.file
-      if (record.mode === 'member') {
-        if (!endUserId || endUserId !== record.pendingEndUserId) {
+      let confirmedFile = stored.file
+      if (stored.mode === 'member') {
+        if (!endUserId || endUserId !== stored.pendingEndUserId) {
           throw new ForbiddenException({
             error: { code: 'UPLOAD_SESSION_MEMBER_MISMATCH', message: '会员身份与上传会话不一致' },
           })
         }
-        const boundFile = await this.bindMemberFile(record.file.fileId, endUserId)
+        const boundFile = await this.bindMemberFile(stored.file.fileId, endUserId)
         confirmedFile = {
-          ...record.file,
+          ...stored.file,
           fileExpiresAt: boundFile.expiresAt ? boundFile.expiresAt.toISOString() : null,
         }
       }
-      if (SIGNED_URL_PURPOSES.has(record.purpose)) {
+      if (SIGNED_URL_PURPOSES.has(stored.purpose)) {
         const signed = signFileUrl(confirmedFile.fileId, CONFIRMED_FILE_URL_TTL_MS)
         confirmedFile = { ...confirmedFile, fileUrl: signed.url }
       }
-
       const confirmed: StoredUploadSession = {
-        ...record,
+        ...stored,
         status: 'confirmed',
         file: confirmedFile,
         confirmedAt: new Date().toISOString(),
       }
-      await this.persist(confirmed)
+      const committed = await this.commitSession(
+        confirmed,
+        lock.lockKey,
+        lock.lockToken,
+        'uploaded',
+        stored.file.fileId,
+      )
+      if (committed !== 'updated') {
+        throw new BadRequestException({
+          error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端上传已失效，请重新上传' },
+        })
+      }
       await this.removeFromExpiryIndex(sessionId)
       return { sessionId, status: 'confirmed', file: confirmedFile }
     })
@@ -455,21 +466,39 @@ export class UploadSessionsService {
     sessionId: string,
     controlToken: string | undefined
   ): Promise<UploadSessionCancelResponse> {
-    return this.withSessionLock(sessionId, async () => {
-      const record = this.markExpired(await this.load(sessionId))
+    return this.withSessionLock(sessionId, async (lock) => {
+      const stored = await this.load(sessionId)
+      const record = this.markExpired(stored)
       this.assertControlToken(record, controlToken)
       if (record.status === 'expired') {
-        await this.expireLocked(record, 'upload session expired before cancel')
+        await this.finishExpired(stored, 'upload session expired before cancel', lock)
         throw expiredSessionException()
       }
-      if (record.status === 'confirmed') {
+      if (stored.status === 'confirmed') {
         throw new BadRequestException({
           error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' },
         })
       }
-      await this.cleanupAbandonedFile(record, 'upload session cancelled')
-      const cancelled: StoredUploadSession = { ...record, status: 'cancelled', file: null }
-      await this.persist(cancelled)
+      const committed = await this.commitSession(
+        { ...stored, status: 'cancelled', file: null },
+        lock.lockKey,
+        lock.lockToken,
+        stored.status,
+        stored.file?.fileId ?? null,
+      )
+      if (committed !== 'updated') {
+        const current = await this.loadOptional(sessionId)
+        if (current?.status === 'confirmed') {
+          throw new BadRequestException({
+            error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' },
+          })
+        }
+        if (!current || this.markExpired(current).status === 'expired') throw expiredSessionException()
+        throw new BadRequestException({
+          error: { code: 'UPLOAD_SESSION_ACTION_IN_PROGRESS', message: '上传会话正在处理中，请稍候' },
+        })
+      }
+      await this.cleanupAbandonedFile(stored, 'upload session cancelled')
       await this.removeFromExpiryIndex(sessionId)
       return { sessionId, status: 'cancelled' }
     })
@@ -504,8 +533,21 @@ export class UploadSessionsService {
         const cleanup = record ?? await this.loadCleanupRecord(sessionId)
         if (!cleanup || new Date(cleanup.expiresAt).getTime() > now) continue
         if (record && this.markExpired(record, now).status !== 'expired') continue
+        if (record) {
+          const committed = await this.commitSession(
+            { ...record, status: 'expired', file: null },
+            lockKey,
+            lockToken,
+            record.status,
+            record.file?.fileId ?? null,
+          )
+          if (committed !== 'updated') {
+            const current = await this.loadOptional(sessionId)
+            if (current?.status === 'confirmed') await this.removeFromExpiryIndex(sessionId)
+            continue
+          }
+        }
         await this.cleanupAbandonedFile(cleanup, 'upload session expired')
-        if (record) await this.persist({ ...record, status: 'expired', file: null })
         await this.removeFromExpiryIndex(sessionId)
         cleaned += 1
       } finally {
@@ -562,6 +604,13 @@ export class UploadSessionsService {
     let storageKey = file.storageKey
     if (userKey !== file.storageKey) {
       await this.files.copyObjectToKey(file.storageKey, userKey, file.mimeType, file.bucket)
+      const current = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
+      if (!current || current.deletedAt) {
+        await this.files.deleteObjectAtKey(userKey, file.bucket).catch(() => undefined)
+        throw new NotFoundException({
+          error: { code: 'FILE_NOT_FOUND', message: '上传文件不存在或已被清理' },
+        })
+      }
       storageKey = userKey
     }
     const updated = await this.prisma.fileObject.update({
@@ -607,19 +656,12 @@ export class UploadSessionsService {
     return raw ? JSON.parse(raw) as StoredUploadSession : null
   }
 
-  private async persist(record: StoredUploadSession): Promise<void> {
-    const key = sessionKey(record.sessionId)
-    const ttl = await this.redis.ttl(key)
-    if (ttl <= 0) throw expiredSessionException()
-    const updated = await this.redis.setExistingWithCurrentTtl(key, JSON.stringify(record))
-    if (updated !== 'updated') throw expiredSessionException()
-  }
-
   private async commitSession(
     record: StoredUploadSession,
     lockKey: string,
     lockToken: string,
     expectedStatus: StoredUploadSession['status'],
+    expectedFileId: string | null = null,
   ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
     return this.redis.compareAndSetSession(
       sessionKey(record.sessionId),
@@ -627,6 +669,7 @@ export class UploadSessionsService {
       lockToken,
       JSON.stringify(record),
       expectedStatus,
+      expectedFileId,
     )
   }
 
@@ -652,13 +695,27 @@ export class UploadSessionsService {
     ])
   }
 
-  private async expireLocked(record: StoredUploadSession, reason: string): Promise<void> {
-    await this.cleanupAbandonedFile(record, reason)
-    await this.persist({ ...record, status: 'expired', file: null })
-    await this.removeFromExpiryIndex(record.sessionId)
+  private async finishExpired(
+    stored: StoredUploadSession,
+    reason: string,
+    lock: { lockKey: string; lockToken: string },
+  ): Promise<void> {
+    const committed = await this.commitSession(
+      { ...stored, status: 'expired', file: null },
+      lock.lockKey,
+      lock.lockToken,
+      stored.status,
+      stored.file?.fileId ?? null,
+    )
+    if (committed !== 'updated') return
+    await this.cleanupAbandonedFile(stored, reason)
+    await this.removeFromExpiryIndex(stored.sessionId)
   }
 
-  private async withSessionLock<T>(sessionId: string, action: () => Promise<T>): Promise<T> {
+  private async withSessionLock<T>(
+    sessionId: string,
+    action: (lock: { lockKey: string; lockToken: string }) => Promise<T>,
+  ): Promise<T> {
     const lockKey = uploadLockKey(sessionId)
     const lockToken = randomUUID()
     const acquired = await this.redis.setNxEx(lockKey, lockToken, UPLOAD_LOCK_TTL_SECONDS)
@@ -670,7 +727,7 @@ export class UploadSessionsService {
       })
     }
     try {
-      return await action()
+      return await action({ lockKey, lockToken })
     } finally {
       await this.redis.getAndDelIfEquals(lockKey, lockToken).catch(() => undefined)
     }

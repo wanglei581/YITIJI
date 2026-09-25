@@ -115,6 +115,7 @@ class FakeRedis {
     lockToken: string,
     nextValue: string,
     expectedStatus: string,
+    expectedFileId: string | null = null,
   ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
     const now = Date.now()
     const session = this.values.get(sessionKey)
@@ -124,13 +125,19 @@ class FakeRedis {
     }
     const lock = this.values.get(lockKey)
     if (!lock || lock.expiresAt <= now || lock.value !== lockToken) return 'lost-lock'
-    let parsed: { status?: string; file?: unknown }
+    let parsed: { status?: string; file?: { fileId?: string } | null }
     try {
-      parsed = JSON.parse(session.value) as { status?: string; file?: unknown }
+      parsed = JSON.parse(session.value) as { status?: string; file?: { fileId?: string } | null }
     } catch {
       return 'conflict'
     }
-    if (parsed.status !== expectedStatus || parsed.file != null) return 'conflict'
+    const actualId = parsed.file?.fileId ?? null
+    if (parsed.status !== expectedStatus) return 'conflict'
+    if (!expectedFileId) {
+      if (actualId) return 'conflict'
+    } else if (actualId !== expectedFileId) {
+      return 'conflict'
+    }
     this.values.set(sessionKey, { value: nextValue, expiresAt: session.expiresAt })
     return 'updated'
   }
@@ -1477,6 +1484,138 @@ async function main(): Promise<void> {
     assert.equal(prisma.files.get(winnerId)?.deletedAt ?? null, null)
     assert.equal(files.uploadCalls.length, 1, 'A must not store a file after the uploading transition loses the lock')
     assert.equal(files.uploadCalls[0]?.filename, 'winner-before-uploading.pdf')
+  }
+
+  {
+    // 会员确认在绑定文件时锁过期。取消先删文件再标 cancelled。
+    // 旧确认恢复后普通 persist(confirmed)，对已删除文件返回成功。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const entered = deferred()
+    const release = deferred()
+    const originalCopy = files.copyObjectToKey.bind(files)
+    files.copyObjectToKey = async (fromKey: string, toKey: string, mimeType: string, bucket?: string | null) => {
+      entered.resolve()
+      await release.promise
+      return originalCopy(fromKey, toKey, mimeType, bucket)
+    }
+    const confirming = service.confirm(session.sessionId, session.controlToken, 'member_1').then(
+      () => ({ ok: true as const }),
+      () => ({ ok: false as const }),
+    )
+    await entered.promise
+    await redis.del(lockKey)
+    await service.cancel(session.sessionId, session.controlToken)
+    release.resolve()
+    const confirmed = await confirming
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    assert.equal(confirmed.ok, false, 'confirm must not succeed after cancel committed during member bind')
+    assert.equal(status.status, 'cancelled')
+    assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
+  }
+
+  {
+    // 取消读到 uploaded 后锁过期，确认先完成。旧取消仍会删除已确认文件。
+    const { service, prisma, redis } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const originalGet = redis.get.bind(redis)
+    const held = deferred()
+    const release = deferred()
+    let armed = true
+    redis.get = async (key: string) => {
+      const value = await originalGet(key)
+      if (armed && key === sessionKey && value?.includes('"status":"uploaded"')) {
+        armed = false
+        held.resolve()
+        await release.promise
+        return value
+      }
+      return value
+    }
+    const cancelling = service.cancel(session.sessionId, session.controlToken).then(
+      () => ({ ok: true as const }),
+      () => ({ ok: false as const }),
+    )
+    await held.promise
+    await redis.del(lockKey)
+    const confirmed = await service.confirm(session.sessionId, session.controlToken)
+    release.resolve()
+    await cancelling
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    assert.equal(confirmed.status, 'confirmed')
+    assert.equal(status.status, 'confirmed')
+    assert.equal(status.file?.fileId, confirmed.file.fileId)
+    assert.equal(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null, 'stale cancel must not delete a confirmed file')
+  }
+
+  {
+    // 确认还在绑文件时会话到期。过期清扫若先删文件再写 expired，确认仍可能返回成功。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const entered = deferred()
+    const release = deferred()
+    const originalCopy = files.copyObjectToKey.bind(files)
+    files.copyObjectToKey = async (fromKey: string, toKey: string, mimeType: string, bucket?: string | null) => {
+      entered.resolve()
+      await release.promise
+      return originalCopy(fromKey, toKey, mimeType, bucket)
+    }
+    const confirming = service.confirm(session.sessionId, session.controlToken, 'member_1').then(
+      () => ({ ok: true as const }),
+      () => ({ ok: false as const }),
+    )
+    await entered.promise
+    const raw = await redis.get(sessionKey)
+    assert.ok(raw)
+    const parsed = JSON.parse(raw) as { expiresAt: string }
+    parsed.expiresAt = new Date(Date.now() - 1000).toISOString()
+    await redis.setExistingWithCurrentTtl(sessionKey, JSON.stringify(parsed))
+    await redis.zadd('upload_session_expiry_index', Date.now() - 1000, session.sessionId)
+    await redis.del(lockKey)
+    await service.cleanupExpiredSessions(Date.now())
+    release.resolve()
+    const confirmed = await confirming
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    assert.equal(confirmed.ok, false, 'confirm must not succeed after expiry cleanup committed')
+    assert.notEqual(status.status, 'confirmed')
+    assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
   }
 
   console.log('PASS upload session verification')
