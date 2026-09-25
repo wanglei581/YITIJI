@@ -31,6 +31,7 @@ import { RESUME_EXPORT_STAGING_LOCK, RESUME_EXPORT_STAGING_MAX_MS } from './file
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { UserRole } from '../common/decorators/roles.decorator'
 import { PrismaService } from '../prisma/prisma.service'
+import { assertJobFitPrintFileReadable } from '../ai/resume/job-fit-hosting'
 import { AuditService } from '../audit/audit.service'
 import { StorageService } from '../storage/storage.service'
 import { generateObjectKey, type FileOwnerType as ObjKeyOwnerType } from '../storage/object-key'
@@ -653,6 +654,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
 
     const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
@@ -704,6 +706,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
     const signed = this.storage.getDownloadUrl(
@@ -746,6 +749,7 @@ export class FilesService {
     ) {
       this.throwFileNotFound()
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
@@ -770,6 +774,7 @@ export class FilesService {
     endUserId: string | null
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
     const record = await this.requireActiveForEndUser(fileId, endUserId)
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
@@ -800,6 +805,10 @@ export class FilesService {
       if (error instanceof HttpException) throw error
       this.rethrowStorageProbe(error)
     }
+  }
+
+  private assertJobFitFileReadable(record: { id: string; createdBy: string | null }): Promise<void> {
+    return assertJobFitPrintFileReadable(this.prisma as never, record)
   }
 
   private async requireActiveForEndUser(fileId: string, endUserId: string | null) {

@@ -15,6 +15,8 @@ import type {
 } from './member-assets.types'
 import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
 import { RESUME_PARSE_INTENT_KIND } from '../ai/resume-parse-submission.service'
+import { isRecruitmentContentHostingEnabled, RECRUITMENT_HOSTING_DISABLED_CODE } from '../recruitment-hosting/recruitment-hosting'
+import { assertJobFitPrintFileReadable, storedJobFitUsesSystemJob } from '../ai/resume/job-fit-hosting'
 
 // ============================================================
 // 会员个人资产中心服务（Phase C-2B 只读 → C-2D 真实管理）
@@ -126,12 +128,14 @@ export class MemberAssetsService {
         sensitiveLevel: true,
         assetCategory: true,
         retentionPolicy: true,
+        createdBy: true,
         createdAt: true,
         expiresAt: true,
       },
       ...memberPageArgs(page),
     })
-    return buildMemberPage(rows, page, total, (f) => ({
+    const visible = await this.omitSystemJobFitFiles(rows, where, total)
+    return buildMemberPage(visible.rows, page, visible.total, (f) => ({
       id: f.id,
       filename: f.filename,
       mimeType: f.mimeType,
@@ -209,7 +213,7 @@ export class MemberAssetsService {
       kind: { notIn: [...HIDDEN_RESUME_RESULT_KINDS] },
     }
     const now = new Date()
-    const [total, rows, qaRows] = await Promise.all([
+    const [counted, fetched, qaRows] = await Promise.all([
       this.prisma.aiResumeResult.count({ where }),
       this.prisma.aiResumeResult.findMany({
         where,
@@ -244,6 +248,9 @@ export class MemberAssetsService {
         },
       }),
     ])
+    const visibleAi = await this.omitSystemJobFitRecords(fetched, where, counted)
+    const rows = visibleAi.rows
+    const total = visibleAi.total
     const parseTaskIds = rows.filter((r) => r.kind === 'parse').map((r) => r.taskId)
     const draftMeta = await loadResumeDraftMeta(this.prisma, endUserId, parseTaskIds)
     const list = buildMemberPage(rows, page, total, (r): MemberAiRecordItem => {
@@ -282,6 +289,54 @@ export class MemberAssetsService {
       fileId: row.fileId,
     }))
     return { ...list, qaRecords }
+  }
+
+  /**
+   * 托管关闭时，我的记录里不展示引用系统内岗位的匹配结果。手填结果保留。
+   */
+  private async omitSystemJobFitRecords<T extends { id: string; kind: string; payloadJson: string }>(
+    rows: T[],
+    where: { endUserId: string; expiresAt: { gt: Date }; kind: { notIn: readonly string[] } },
+    total: number,
+  ): Promise<{ rows: T[]; total: number }> {
+    if (isRecruitmentContentHostingEnabled()) return { rows, total }
+    const fits = await this.prisma.aiResumeResult.findMany({
+      where: { ...where, kind: 'job_fit' },
+      select: { id: true, payloadJson: true },
+    })
+    const hiddenIds = new Set(fits.filter((row) => storedJobFitUsesSystemJob(row.payloadJson)).map((row) => row.id))
+    if (hiddenIds.size === 0) return { rows, total }
+    return {
+      rows: rows.filter((row) => !hiddenIds.has(row.id)),
+      total: Math.max(0, total - hiddenIds.size),
+    }
+  }
+
+  /** 托管关闭时，我的文档不列出系统内岗位匹配报告。下载入口另按存档拒绝。 */
+  private async omitSystemJobFitFiles<T extends { id: string; createdBy: string | null }>(
+    rows: T[],
+    where: object,
+    total: number,
+  ): Promise<{ rows: T[]; total: number }> {
+    if (isRecruitmentContentHostingEnabled()) return { rows, total }
+    const files = await this.prisma.fileObject.findMany({
+      where: { ...(where as Record<string, unknown>), createdBy: 'job_fit' } as never,
+      select: { id: true, createdBy: true },
+    })
+    const hiddenIds = new Set<string>()
+    for (const file of files) {
+      try {
+        await assertJobFitPrintFileReadable(this.prisma as never, file)
+      } catch (error) {
+        if (!isHostingDisabledError(error)) throw error
+        hiddenIds.add(file.id)
+      }
+    }
+    if (hiddenIds.size === 0) return { rows, total }
+    return {
+      rows: rows.filter((row) => !hiddenIds.has(row.id)),
+      total: Math.max(0, total - hiddenIds.size),
+    }
   }
 
   /**
@@ -385,6 +440,11 @@ export class MemberAssetsService {
       deletedCount: deletion.deletedCount,
     }
   }
+}
+
+function isHostingDisabledError(error: unknown): boolean {
+  const response = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+  return response?.error?.code === RECRUITMENT_HOSTING_DISABLED_CODE
 }
 
 async function loadResumeDraftMeta(

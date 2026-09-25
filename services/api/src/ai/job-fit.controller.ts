@@ -126,11 +126,9 @@ export class JobFitController {
   @Post()
   @PaidAiThrottle(6)
   async analyze(@Body() dto: JobFitRequestDto, @Req() req: ReqLike) {
-    if (!isRecruitmentContentHostingEnabled()) {
-      if (dto.jobId) throw recruitmentHostingDisabledException()
-    } else {
-      await this.assertJobBoard(req)
-    }
+    // 逐台岗位板块与托管开关独立：板块关闭时手填也拒绝。托管关闭只挡系统内 jobId。
+    await this.assertJobBoard(req)
+    if (!isRecruitmentContentHostingEnabled() && dto.jobId) throw recruitmentHostingDisabledException()
     if (!dto.jobId && !dto.manualJob) {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
@@ -159,14 +157,12 @@ export class JobFitController {
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
     return this.service.printReport(taskId, await this.requesterOf(req))
   }
 
   @Get(':taskId')
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
     return this.service.getLatest(taskId, await this.requesterOf(req))
   }

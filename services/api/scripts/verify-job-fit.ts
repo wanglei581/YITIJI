@@ -21,6 +21,8 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { LlmJobFitService } from '../src/ai/resume/llm-job-fit.service'
 import { JobFitService } from '../src/ai/resume/job-fit.service'
+import { assertJobFitPrintFileReadable } from '../src/ai/resume/job-fit-hosting'
+import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 
 const RESUME_TEXT = '张某某，本科，行政管理专业。曾任某商贸公司行政文员，负责档案管理与会议安排，整理合同文件300余份_简历标记RSME。熟练使用Office办公软件。'
 const JOB_DESC = '负责公司日常行政事务、档案与合同管理、跨部门协调_岗位标记JOBD'
@@ -408,6 +410,111 @@ async function main() {
       if (joined.includes(secret)) fail(`11. 日志泄露内容: ${secret.slice(0, 10)}`)
     }
     pass('11. 日志脱敏：简历/岗位文本不出现在日志')
+
+    // 12–15. 托管关闭只拒绝系统内岗位存档。期望值来自需求：手填结果仍可看、可打印；
+    // 带 job.id 的查看、再次打印、我的记录和 PDF 下载拒绝。与逐台岗位板块无关。
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    const previousSigning = process.env.FILE_SIGNING_SECRET
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    if (!process.env.FILE_SIGNING_SECRET || process.env.FILE_SIGNING_SECRET.length < 32) {
+      process.env.FILE_SIGNING_SECRET = 'verify-job-fit-signing-secret-0123456789'
+    }
+    const manualJob = { title: '手填岗位', company: null, sourceName: null, sourceUrl: null, externalId: null }
+    const systemJob = { id: jobPub.id, title: '行政专员', company: '某商贸公司', sourceName: '验证人才网', sourceUrl: 'https://example.com/job', externalId: `vjf-pub-${suffix}` }
+    const writeFit = async (ownerTaskId: string, endUserId: string | null, job: Record<string, unknown>) => {
+      const payloadJson = JSON.stringify({ job, payload: VALID, providerName: 'verify' })
+      await prisma.aiResumeResult.upsert({
+        where: { taskId_kind: { taskId: ownerTaskId, kind: 'job_fit' } },
+        create: {
+          taskId: ownerTaskId, kind: 'job_fit', status: 'completed', provider: 'verify',
+          payloadJson, endUserId, expiresAt: new Date(Date.now() + 3600_000),
+        },
+        update: { status: 'completed', payloadJson, endUserId, expiresAt: new Date(Date.now() + 3600_000) },
+      })
+    }
+    const codeOf = (error: unknown) => {
+      const response = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+      return response?.error?.code
+    }
+    try {
+      await writeFit(taskId, null, manualJob)
+      const manualLatest = await svc.getLatest(taskId, requester)
+      if (manualLatest.status !== 'completed' || manualLatest.job?.title !== '手填岗位' || manualLatest.job?.id) {
+        fail('12. 托管关闭时手填结果应可读且不含系统岗位 id')
+      }
+      pass('12. 托管关闭时手填岗位匹配结果仍可查看')
+
+      const printSvc = new JobFitService(
+        prisma,
+        llm,
+        stubExtraction as never,
+        { upload: async () => ({ fileId: 'fit-pdf', filename: '岗位匹配决策报告.pdf', sizeBytes: 4 }) } as never,
+        { render: async () => ({ buffer: Buffer.from('%PDF'), pageCount: 1 }) } as never,
+        audit,
+      )
+      const printed = await printSvc.printReport(taskId, requester)
+      if (!printed.printFileUrl?.includes('/files/fit-pdf/content')) fail('13. 托管关闭时手填结果应能再次打印')
+      pass('13. 托管关闭时手填岗位匹配可以再次打印')
+
+      await writeFit(taskId, null, systemJob)
+      try {
+        await svc.getLatest(taskId, requester)
+        fail('14. 托管关闭时系统内岗位结果不应返回')
+      } catch (error) {
+        if (codeOf(error) !== 'RECRUITMENT_HOSTING_DISABLED') fail(`14. 期望 RECRUITMENT_HOSTING_DISABLED，实际 ${codeOf(error) ?? (error as Error).message}`)
+      }
+      pass('14. 托管关闭时系统内岗位匹配结果拒绝查看')
+      try {
+        await printSvc.printReport(taskId, requester)
+        fail('15. 托管关闭时系统内岗位结果不应再次打印')
+      } catch (error) {
+        if (codeOf(error) !== 'RECRUITMENT_HOSTING_DISABLED') fail(`15. 期望 RECRUITMENT_HOSTING_DISABLED，实际 ${codeOf(error) ?? (error as Error).message}`)
+      }
+      pass('15. 托管关闭时系统内岗位匹配拒绝再次打印')
+
+      await writeFit(memberTaskId, endUserA, systemJob)
+      const assets = new MemberAssetsService(prisma)
+      const hidden = await assets.listAiRecords(endUserA, { cursor: null, pageSize: 20 })
+      if (hidden.items.some((item) => item.taskId === memberTaskId && item.kind === 'job_fit')) {
+        fail('16. 我的记录仍列出系统内岗位匹配')
+      }
+      pass('16. 托管关闭时我的记录不列出系统内岗位匹配')
+      await writeFit(memberTaskId, endUserA, manualJob)
+      const shown = await assets.listAiRecords(endUserA, { cursor: null, pageSize: 20 })
+      if (!shown.items.some((item) => item.taskId === memberTaskId && item.kind === 'job_fit')) {
+        fail('16b. 我的记录未保留手填岗位匹配')
+      }
+      pass('16b. 托管关闭时我的记录仍保留手填岗位匹配')
+
+      await writeFit(memberTaskId, endUserA, systemJob)
+      const systemRow = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId: memberTaskId, kind: 'job_fit' } } })
+      try {
+        await assertJobFitPrintFileReadable({
+          auditLog: {
+            findFirst: async () => ({ targetId: memberTaskId }),
+          },
+          aiResumeResult: {
+            findUnique: async () => ({ payloadJson: systemRow?.payloadJson ?? '' }),
+          },
+        }, { id: 'fit-pdf', createdBy: 'job_fit' })
+        fail('17. 系统内岗位报告的 PDF 下载应拒绝')
+      } catch (error) {
+        if (codeOf(error) !== 'RECRUITMENT_HOSTING_DISABLED') fail(`17. 期望 RECRUITMENT_HOSTING_DISABLED，实际 ${codeOf(error) ?? (error as Error).message}`)
+      }
+      pass('17. 托管关闭时系统内岗位匹配 PDF 下载拒绝')
+      await writeFit(memberTaskId, endUserA, manualJob)
+      const manualRow = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId: memberTaskId, kind: 'job_fit' } } })
+      await assertJobFitPrintFileReadable({
+        auditLog: { findFirst: async () => ({ targetId: memberTaskId }) },
+        aiResumeResult: { findUnique: async () => ({ payloadJson: manualRow?.payloadJson ?? '' }) },
+      }, { id: 'fit-pdf', createdBy: 'job_fit' })
+      pass('17b. 托管关闭时手填岗位匹配 PDF 下载仍放行')
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+      if (previousSigning === undefined) delete process.env.FILE_SIGNING_SECRET
+      else process.env.FILE_SIGNING_SECRET = previousSigning
+    }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {
