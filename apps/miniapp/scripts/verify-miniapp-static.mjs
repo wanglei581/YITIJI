@@ -54,8 +54,15 @@ if (!fails.length) ok('JSON 全部可解析')
 const appJson = parsedJson['./app.json']
 if (!appJson) bad('app.json 存在', '未读取到')
 
+// 注册页面 = 主包 pages + 各分包 root/pages。2026-09-26 起非 Tab 页各自一个分包（root 就是页面目录，
+// 页面路径不变），只读 appJson.pages 会把 39 个分包页全当成「未注册」。分包结构另有 verify-package-layout.mjs。
+const registeredPagesOf = (app) => [
+  ...(app?.pages || []),
+  ...(app?.subpackages || app?.subPackages || []).flatMap((pkg) => (pkg.pages || []).map((page) => `${pkg.root}/${page}`)),
+]
+
 if (appJson) {
-  const pages = appJson.pages || []
+  const pages = registeredPagesOf(appJson)
   const missingPages = pages.filter((p) =>
     ['.js', '.wxml', '.wxss', '.json'].some((ext) => !fs.existsSync(path.join(ROOT, `${p}${ext}`)))
   )
@@ -75,7 +82,8 @@ if (appJson) {
     Array.isArray(tab.list) &&
     tab.list.length === 4 &&
     tab.list.every((item, i) => item.pagePath === expected[i].pagePath && item.text === expected[i].text) &&
-    tab.list.every((item) => pages.includes(item.pagePath))
+    // Tab 页必须在主包：微信不允许 tabBar 指向分包页面。
+    tab.list.every((item) => (appJson.pages || []).includes(item.pagePath))
   if (tabOk) ok('tabBar 四 Tab 配置正确')
   else bad('tabBar 四 Tab 配置', JSON.stringify(tab))
 
@@ -90,7 +98,7 @@ if (appJson) {
 }
 
 const wxmlFiles = files.filter((f) => f.endsWith('.wxml'))
-const PAGE_PATHS = appJson ? (appJson.pages || []) : []
+const PAGE_PATHS = appJson ? registeredPagesOf(appJson) : []
 
 const allowedTopLevel = new Set([
   'README.md',
@@ -1786,7 +1794,7 @@ for (const f of wxssFiles) {
 if (!wxssStrayHits.length) ok(`wxss 无 WXSS 编译器拒绝的空声明（${wxssFiles.length} 个文件）`)
 else bad('wxss 含 WXSS 会拒绝的空声明', `${wxssStrayHits.slice(0, 5).join('；')}——会导致整个小程序白屏`)
 
-const pageCount = (appJson?.pages || []).length
+const pageCount = PAGE_PATHS.length
 console.log(`\n${pass} PASS / ${fails.length} FAIL（注册页面 ${pageCount}）`)
 if (fails.length) {
   console.error('\n失败项：')

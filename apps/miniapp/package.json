@@ -7,8 +7,9 @@
     "node": ">=22.13 <23"
   },
   "scripts": {
-    "verify:static": "node scripts/verify-miniapp-static.mjs && pnpm run verify:review-scope && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale && pnpm run verify:user-error && pnpm run verify:package-chain && pnpm run verify:package-order-idempotency && pnpm run verify:order-submission-reconcile && pnpm run verify:package-helpers && pnpm run verify:page-lifecycle && pnpm run verify:price-confirmation && pnpm run verify:session-generation && pnpm run verify:empty-state",
+    "verify:static": "node scripts/verify-miniapp-static.mjs && pnpm run verify:review-scope && pnpm run verify:package-layout && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale && pnpm run verify:user-error && pnpm run verify:package-chain && pnpm run verify:package-order-idempotency && pnpm run verify:order-submission-reconcile && pnpm run verify:package-helpers && pnpm run verify:page-lifecycle && pnpm run verify:price-confirmation && pnpm run verify:session-generation && pnpm run verify:empty-state",
     "verify:review-scope": "node scripts/verify-review-scope.mjs",
+    "verify:package-layout": "node scripts/verify-package-layout.mjs",
     "verify:api-contract": "node scripts/verify-miniapp-api-contract.mjs",
     "contract:update": "node scripts/verify-miniapp-api-contract.mjs --write",
     "verify:visual-scale": "node scripts/verify-miniapp-visual-scale.mjs",

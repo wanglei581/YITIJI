@@ -39,7 +39,11 @@ const PARKED_PAGES = [
 const RECRUITMENT_CTAS = ['查看岗位', '去来源平台投递', '扫码投递', '查看招聘会', '去来源平台预约', '扫码预约', '复制来源链接', '一键投递', '立即投递']
 
 const app = JSON.parse(read('app.json'))
-const registered = new Set(app.pages || [])
+// 注册页面 = 主包 pages + 各分包 root/pages（2026-09-26 起非 Tab 页各自一个分包，路径不变）。
+const registered = new Set([
+  ...(app.pages || []),
+  ...(app.subpackages || app.subPackages || []).flatMap((pkg) => (pkg.pages || []).map((page) => `${pkg.root}/${page}`)),
+])
 const tabs = ((app.tabBar && app.tabBar.list) || []).map((t) => `/${t.pagePath}`)
 const ignored = new Set(((JSON.parse(read('project.config.json')).packOptions || {}).ignore || [])
   .filter((e) => e && e.type === 'folder').map((e) => e.value))
