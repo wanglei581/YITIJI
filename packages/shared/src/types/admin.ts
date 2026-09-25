@@ -36,3 +36,16 @@ export type PublishAction = 'publish' | 'unpublish'
 export interface PublishActionPayload {
   action: PublishAction
 }
+
+/**
+ * `GET /api/v1/admin/system/recruitment-hosting` 的 `data`。
+ *
+ * 信封是 `{ success: true, data }`。`enabled` 与 `deploymentEnabled` 都等于
+ * 部署开关，不看请求参数。管理员招聘类页面用它决定只留查看与紧急下架。
+ */
+export interface AdminRecruitmentHostingStatus {
+  recruitmentHosting: {
+    enabled: boolean
+    deploymentEnabled: boolean
+  }
+}
