@@ -12,6 +12,11 @@ import type { JobAiQuotaContext } from '../job-ai/job-ai-quota.service'
 
 import { resolveClientIp } from '../common/client-ip'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 // ── DTO（全局 forbidNonWhitelisted）─────────────────────────────────────────
 
 class ManualJobDto {
@@ -78,7 +83,18 @@ export class JobFitController {
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
     private readonly governed: GovernedJobFitService,
+    private readonly jobBoard?: KioskJobBoardService,
   ) {}
+
+  /**
+   * 岗位板块关闭时，匹配请求、已保存的结果和打印稿都不再返回岗位标题或来源链接。
+   * 运行时探针若没注入开关服务，assertOpen 不存在，保持原配额测试路径。
+   */
+  private async assertJobBoard(req: ReqLike): Promise<void> {
+    const gate = this.jobBoard as { assertOpen?: (terminalRef: string | null) => Promise<void> } | undefined
+    if (!gate || typeof gate.assertOpen !== 'function') return
+    await gate.assertOpen(kioskJobBoardTerminalRef(req as KioskJobBoardRequest))
+  }
 
   private async requesterOf(req: ReqLike) {
     const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
@@ -106,6 +122,7 @@ export class JobFitController {
   @Post()
   @PaidAiThrottle(6)
   async analyze(@Body() dto: JobFitRequestDto, @Req() req: ReqLike) {
+    await this.assertJobBoard(req)
     if (!dto.jobId && !dto.manualJob) {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
@@ -134,11 +151,13 @@ export class JobFitController {
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
+    await this.assertJobBoard(req)
     return this.service.printReport(taskId, await this.requesterOf(req))
   }
 
   @Get(':taskId')
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
+    await this.assertJobBoard(req)
     return this.service.getLatest(taskId, await this.requesterOf(req))
   }
 }
