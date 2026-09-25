@@ -19,7 +19,7 @@ import 'dotenv/config'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { promises as fs } from 'node:fs'
+import { constants as fsConstants, promises as fs } from 'node:fs'
 import path from 'node:path'
 import { BadRequestException, ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
@@ -585,6 +585,27 @@ async function cleanup(): Promise<void> {
 
 const MEMBER_RACE_ROUNDS = 2
 
+type FifoHandle = Awaited<ReturnType<typeof fs.open>>
+
+/**
+ * confirm 若在读端打开前返回，写端 fs.open 会停在 libuv 线程池里。
+ * 这种状态下事件循环不空，process.exit 也不会返回。
+ * 非阻塞读端把这次 open 唤醒，随后关闭句柄并删除 FIFO。
+ */
+async function releaseBlockedFifoWriter(fifo: string, writerOpen: Promise<FifoHandle>): Promise<void> {
+  const release = await fs.open(fifo, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK).catch(() => undefined)
+  if (!release) return
+  try {
+    const opened = await writerOpen
+    await opened.close()
+  } catch {
+    // 写端已失败时没有句柄可关；调用方仍抛出原来的 confirm 错误。
+  } finally {
+    await release.close().catch(() => undefined)
+  }
+  await fs.unlink(fifo).catch(() => undefined)
+}
+
 async function raceMemberConfirmAgainstCancel(): Promise<void> {
   for (let round = 1; round <= MEMBER_RACE_ROUNDS; round += 1) {
     const member = await createLocalMemberToken()
@@ -612,7 +633,10 @@ async function raceMemberConfirmAgainstCancel(): Promise<void> {
       method: 'POST',
       headers: { Authorization: `Bearer ${member.token}`, 'x-upload-session-control': created.controlToken },
     })
-    let writer: Awaited<ReturnType<typeof fs.open>> | undefined
+    const writerOpen = fs.open(source, 'w')
+    void writerOpen.catch(() => undefined)
+    let writer: FifoHandle | undefined
+    let writerGate: 'pending' | 'held' | 'done' = 'pending'
     let cancel: { status: number; body: ApiEnvelope<unknown> } | undefined
     let confirmResult: { status: number; body: ApiEnvelope<SessionStatusResponse> } | undefined
     try {
@@ -620,7 +644,8 @@ async function raceMemberConfirmAgainstCancel(): Promise<void> {
         `race ${round}: confirm returned ${result.status} before the object read blocked`,
       )))
       early.catch(() => undefined)
-      writer = await Promise.race([fs.open(source, 'w'), early])
+      writer = await Promise.race([writerOpen, early])
+      writerGate = 'held'
       assert.ok((await readRaceFile(fileId))?.pendingStorageKey, `race ${round}: pendingStorageKey missing while copy is blocked`)
       const deadline = Date.now() + 45_000
       while ((await redis.pttl(`upload_session_upload_lock:${created.sessionId}`)) >= 0) {
@@ -634,14 +659,21 @@ async function raceMemberConfirmAgainstCancel(): Promise<void> {
       await writer.write(PDF_BYTES)
       await writer.close()
       writer = undefined
+      writerGate = 'done'
       confirmResult = await confirm
     } finally {
-      if (writer) {
-        await writer.write(PDF_BYTES).catch(() => undefined)
-        await writer.close().catch(() => undefined)
+      try {
+        if (writerGate === 'held' && writer) {
+          await writer.write(PDF_BYTES).catch(() => undefined)
+          await writer.close().catch(() => undefined)
+          writer = undefined
+        } else if (writerGate === 'pending') {
+          await releaseBlockedFifoWriter(source, writerOpen)
+        }
+      } finally {
+        confirmResult ??= await confirm.catch(() => undefined)
+        await redis.quit()
       }
-      confirmResult ??= await confirm.catch(() => undefined)
-      await redis.quit()
     }
     assert.ok(confirmResult && cancel, `race ${round}: both requests finished`)
     console.log(`  race ${round}: confirm HTTP ${confirmResult.status} cancel HTTP ${cancel.status}`)
