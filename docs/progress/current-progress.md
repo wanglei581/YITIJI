@@ -1,10 +1,10 @@
 # 当前开发进度
 
-## 2026-09-25：小程序传到一体机的上传回执判定（隔离分支，未合流，商业 NO-GO）
+## 2026-09-25：小程序传到一体机的上传回执判定（本地候选，商业 NO-GO）
 
 Grok 在 `codex/miniapp-upload-receipt-20260925` 修复原生小程序 `pages/kiosk-send`。`uploadToKioskSession` 兑现不再直接写成已收到：空对象、`data:null`、缺 `file.fileId`、用途不是 `resume_upload` / `print_doc` / `contract_upload`、或 `sessionId` 不是这一次，都停在「结果还不确定」，按钮是「回一体机核对」，不再发送。网络、5xx、408 和这条匿名链路上的 401 同样不重传，也不提示去登录。服务端明确拒收才允许重选；二维码过期、已使用、令牌无效只引导回一体机。成功后按钮改为「回一体机继续」。scene 仍只兑换一次，上传令牌只留在页面内存。
 
-先写失败用例再改页面。`apps/miniapp/scripts/tests/kiosk-send-receipt.test.mjs` 15/15，并已串进既有 `verify:page-lifecycle`；完整 `verify:static` 退出 0。微信开发者工具和真机未跑。未合并、未推送、未部署。
+先写失败用例再改页面。`apps/miniapp/scripts/tests/kiosk-send-receipt.test.mjs` 15/15，并已串进既有 `verify:page-lifecycle`；完整 `verify:static` 退出 0。微信开发者工具和真机未跑。隔离提交 `482928673` 已选择性合流本地主候选 `9a1606b95`；未推送、未部署。
 
 ## 2026-09-25：手机上传会员确认恢复候选的隔离实证（未合流，商业 NO-GO）
 
