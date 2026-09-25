@@ -288,7 +288,14 @@ function buildFixture() {
   const organization = makeTable([
     { id: ORG, name: '来源机构A', contentTrustStatus: 'active', archivedAt: null },
   ])
-  const prisma = { job, jobFair, policyPost, organization } as unknown as PrismaService
+  const recruitmentEmergencyHold = {
+    findFirst: async () => null,
+    upsert: async () => ({ id: 'hold' }),
+  }
+  const recruitmentCircuitBreak = { findFirst: async () => null }
+  const prisma = {
+    job, jobFair, policyPost, organization, recruitmentEmergencyHold, recruitmentCircuitBreak,
+  } as unknown as PrismaService
 
   const adminSvc = new JobsAdminService(prisma, fakeAudit)
   const policiesSvc = new PoliciesService(prisma, fakeAudit)

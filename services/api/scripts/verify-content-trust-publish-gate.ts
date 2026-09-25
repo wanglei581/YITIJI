@@ -322,7 +322,17 @@ function buildFixture() {
 
   // $transaction 把同一批模型双测原样交给回调：本套断言的是闸门与审计行为，
   // 不模拟回滚；缺了它服务层进不去事务分支。
-  const prismaModels = { organization, job, jobFair, policyPost, companyProfile, offlineAgency, fairMaterial }
+  const recruitmentEmergencyHold = {
+    findFirst: async () => null,
+    upsert: async () => ({ id: 'hold' }),
+  }
+  const recruitmentCircuitBreak = {
+    findFirst: async () => null,
+  }
+  const prismaModels = {
+    organization, job, jobFair, policyPost, companyProfile, offlineAgency, fairMaterial,
+    recruitmentEmergencyHold, recruitmentCircuitBreak,
+  }
   const prisma = {
     ...prismaModels,
     $transaction: async <T>(fn: (tx: typeof prismaModels) => Promise<T>): Promise<T> => fn(prismaModels),

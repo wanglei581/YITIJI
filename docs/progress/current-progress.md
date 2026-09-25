@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-09-26：3.13 返工——手填匹配、同步如实失败、熔断持久化
+
+分支仍是 `claude/recruitment-hosting-off-20260926`。没有改 `apps/`、`CLAUDE.md`、`docs/product/`、`docs/compliance/`，没有访问生产。
+
+- 托管关闭时，手填岗位匹配仍可查看、再次打印；存档带系统内 `jobId` 的查看、打印、我的记录和 PDF 下载返回 `RECRUITMENT_HOSTING_DISABLED`。逐台岗位板块关闭时手填仍拒绝。
+- 手动同步在托管关闭时返回 403，不再回 `queued: true`。定时轮询仍静默不入队。
+- 批量发布碰到紧急下架整批拒绝并列出 id。`kind=policy` 无论开关都返回 `ADMIN_POLICY_PUBLISH_DISABLED`。
+- 紧急下架补上招聘会资料与线下机构。熔断写入 `RecruitmentCircuitBreak`，范围内全部发布状态都下架；之后新内容不能发布。来源熔断停用数据源，重新启用也不入队、不拉取、Webhook 不落库。
+- 生产代码不再因为验证脚本路径或 `VERIFICATION_DATABASE_TARGET=isolated` 把未设置的开关当成打开。CI 的两个 verify job 显式设 `RECRUITMENT_CONTENT_HOSTING_ENABLED=true`。
+
 ## 2026-09-26：3.13 后端——关闭招聘内容托管，管理员只留紧急下架
 
 分支 `claude/recruitment-hosting-off-20260926`。只改后端、门禁和进度备注，没有改 `apps/`、`CLAUDE.md`、`docs/product/`、`docs/compliance/`，没有访问生产。

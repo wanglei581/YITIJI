@@ -445,21 +445,18 @@ export class PoliciesService {
     if (user.role === 'admin' && action === 'unpublish') {
       const reason = assertEmergencyReason(options?.reasonCode, options?.reasonText)
       await this.prisma.policyPost.update({ where: { id }, data: { publishStatus: 'unpublished' } })
-      const hold = this.prisma.recruitmentEmergencyHold
-      if (hold) {
-        await hold.upsert({
-          where: { targetType_targetId: { targetType: 'policy', targetId: id } },
-          create: {
-            targetType: 'policy',
-            targetId: id,
-            orgId: post.sourceOrgId,
-            reasonCode: reason.reasonCode,
-            reasonText: reason.reasonText,
-            actorId: user.userId,
-          },
-          update: {},
-        })
-      }
+      await this.prisma.recruitmentEmergencyHold.upsert({
+        where: { targetType_targetId: { targetType: 'policy', targetId: id } },
+        create: {
+          targetType: 'policy',
+          targetId: id,
+          orgId: post.sourceOrgId,
+          reasonCode: reason.reasonCode,
+          reasonText: reason.reasonText,
+          actorId: user.userId,
+        },
+        update: {},
+      })
       if (this.prisma.partnerOrgNotice) {
         await this.prisma.partnerOrgNotice.create({
           data: {

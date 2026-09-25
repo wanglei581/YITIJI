@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 543,
+    "endpointCount": 546,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -829,7 +829,8 @@
           "JobFair",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/admin/bulk-publish/execute",
         "roles": [
@@ -851,7 +852,8 @@
           "JobFair",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/admin/bulk-publish/preview",
         "roles": [
@@ -3006,7 +3008,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/admin/policy-sources",
         "roles": [
@@ -3047,7 +3050,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/admin/policy-sources/:id/publish",
         "roles": [
@@ -3068,7 +3072,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/admin/policy-sources/:id/review",
         "roles": [
@@ -3454,6 +3459,64 @@
         ],
         "services": [
           "RecruitmentContentReadService"
+        ]
+      },
+      {
+        "controller": "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
+        "handler": "EmergencyTakedownDto.circuitBreak",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "CompanyProfile",
+          "FairMaterial",
+          "Job",
+          "JobFair",
+          "JobSource",
+          "OfflineAgency",
+          "Organization",
+          "PartnerOrgNotice",
+          "PolicyPost",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold"
+        ],
+        "path": "/api/v1/admin/recruitment-emergency/circuit-break",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
+        ],
+        "services": [
+          "RecruitmentEmergencyService"
+        ]
+      },
+      {
+        "controller": "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
+        "handler": "EmergencyTakedownDto.takedown",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "CompanyProfile",
+          "FairMaterial",
+          "Job",
+          "JobFair",
+          "JobSource",
+          "OfflineAgency",
+          "Organization",
+          "PartnerOrgNotice",
+          "PolicyPost",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold"
+        ],
+        "path": "/api/v1/admin/recruitment-emergency/takedown",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
+        ],
+        "services": [
+          "RecruitmentEmergencyService"
         ]
       },
       {
@@ -9206,6 +9269,35 @@
         ]
       },
       {
+        "controller": "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
+        "handler": "EmergencyTakedownDto.notices",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "CompanyProfile",
+          "FairMaterial",
+          "Job",
+          "JobFair",
+          "JobSource",
+          "OfflineAgency",
+          "Organization",
+          "PartnerOrgNotice",
+          "PolicyPost",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold"
+        ],
+        "path": "/api/v1/partner/org-notices",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
+        ],
+        "services": [
+          "RecruitmentEmergencyService"
+        ]
+      },
+      {
         "controller": "services/api/src/policies/policies.controller.ts",
         "handler": "PoliciesController.getPartnerPolicies",
         "method": "GET",
@@ -9213,7 +9305,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/partner/policies",
         "roles": [
@@ -9234,7 +9327,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/partner/policies",
         "roles": [
@@ -9255,7 +9349,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/partner/policies/:id",
         "roles": [
@@ -9276,7 +9371,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/partner/policies/:id",
         "roles": [
@@ -9357,7 +9453,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/partner/policies/:id/publish",
         "roles": [
@@ -9378,7 +9475,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/partner/policies/:id/release",
         "roles": [
@@ -9399,7 +9497,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/partner/policies/:id/review",
         "roles": [
@@ -9730,7 +9829,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/policies",
         "roles": [],
@@ -9749,7 +9849,8 @@
           "AuditLog",
           "Organization",
           "PartnerOrgNotice",
-          "PolicyPost"
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
         ],
         "path": "/api/v1/policies/:id",
         "roles": [],
@@ -15362,7 +15463,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 105,
+    "modelCount": 106,
     "models": [
       {
         "fieldCount": 7,
@@ -15493,6 +15594,7 @@
           "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
+          "services/api/src/ai/resume/job-fit-hosting.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
           "services/api/src/ai/resume/resume-draft.store.ts",
           "services/api/src/ai/resume/self-assessment.service.ts",
@@ -15531,6 +15633,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/ai/resume/job-fit-hosting.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
@@ -15627,7 +15730,8 @@
           "services/api/src/companies/companies.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.usage.queries.ts",
-          "services/api/src/orgs/partner-stats.service.ts"
+          "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
       {
@@ -15760,7 +15864,8 @@
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/jobs/admin-fairs.service.ts",
           "services/api/src/jobs/fair-material-print-bridge.service.ts",
-          "services/api/src/jobs/fair-material.service.ts"
+          "services/api/src/jobs/fair-material.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
       {
@@ -15990,7 +16095,8 @@
           "services/api/src/jobs/jobs-kiosk.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
           "services/api/src/member-favorites/member-favorites.service.ts",
-          "services/api/src/orgs/partner-stats.service.ts"
+          "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
       {
@@ -16074,7 +16180,9 @@
           "services/api/src/jobs/jobs-partner.service.ts",
           "services/api/src/jobs/partner-fairs.controller.ts",
           "services/api/src/member-favorites/member-favorites.service.ts",
-          "services/api/src/orgs/partner-stats.service.ts"
+          "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-hosting.ts"
         ]
       },
       {
@@ -16103,6 +16211,7 @@
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
           "services/api/src/sync/sync.service.ts"
         ]
       },
@@ -16196,7 +16305,8 @@
           "OfflineJob"
         ],
         "usedBy": [
-          "services/api/src/offline-agencies/offline-agencies.service.ts"
+          "services/api/src/offline-agencies/offline-agencies.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
       {
@@ -16336,6 +16446,7 @@
           "services/api/src/orgs/admin-orgs.service.ts",
           "services/api/src/policies/policies.service.ts",
           "services/api/src/recruitment-content/recruitment-content-read.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts"
         ]
@@ -16345,7 +16456,8 @@
         "name": "PartnerOrgNotice",
         "relations": [],
         "usedBy": [
-          "services/api/src/policies/policies.service.ts"
+          "services/api/src/policies/policies.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
       {
@@ -16410,7 +16522,8 @@
           "services/api/src/member-favorites/member-favorites.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/policies/policies.service.ts",
-          "services/api/src/policies/policy-eligibility.service.ts"
+          "services/api/src/policies/policy-eligibility.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
       {
@@ -16504,10 +16617,21 @@
         ]
       },
       {
+        "fieldCount": 7,
+        "name": "RecruitmentCircuitBreak",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
+        ]
+      },
+      {
         "fieldCount": 9,
         "name": "RecruitmentEmergencyHold",
         "relations": [],
-        "usedBy": []
+        "usedBy": [
+          "services/api/src/policies/policies.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
+        ]
       },
       {
         "fieldCount": 11,
@@ -20804,6 +20928,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
@@ -21314,6 +21439,9 @@
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts"
     ],
+    "services/api/src/ai/resume/job-fit-hosting.ts": [
+      "services/api/scripts/verify-job-fit.ts"
+    ],
     "services/api/src/ai/resume/job-fit-pdf.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
@@ -21573,6 +21701,7 @@
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts",
       "services/api/scripts/verify-redemption-audit.ts",
       "services/api/scripts/verify-refund-convergence.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -21726,7 +21855,8 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
-      "services/api/scripts/verify-partner-source-capabilities.ts"
+      "services/api/scripts/verify-partner-source-capabilities.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/common/crypto/webhook-secret-strength.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -21758,7 +21888,8 @@
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
-      "services/api/scripts/verify-publish-expiry-completeness.ts"
+      "services/api/scripts/verify-publish-expiry-completeness.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/common/decorators/roles.decorator.ts": [
       "services/api/scripts/verify-admin-users.ts",
@@ -22328,7 +22459,8 @@
     ],
     "services/api/src/job-sync/job-sync.controller.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
-      "services/api/scripts/verify-backend-p0-http.ts"
+      "services/api/scripts/verify-backend-p0-http.ts",
+      "services/api/scripts/verify-job-sync.ts"
     ],
     "services/api/src/job-sync/job-sync.module.ts": [
       "services/api/scripts/verify-job-data-quality.ts"
@@ -22343,7 +22475,8 @@
       "services/api/scripts/verify-job-headcount.ts",
       "services/api/scripts/verify-job-sync.ts",
       "services/api/scripts/verify-job-validity-expiry.ts",
-      "services/api/scripts/verify-partner-source-capabilities.ts"
+      "services/api/scripts/verify-partner-source-capabilities.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/jobs/admin-fairs.controller.ts": [
       "services/api/scripts/verify-jobfair-venue-guide.ts",
@@ -22443,7 +22576,8 @@
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
-      "services/api/scripts/verify-public-fair-demo-guard.ts"
+      "services/api/scripts/verify-public-fair-demo-guard.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/jobs/fair-venue-guide.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
@@ -22487,7 +22621,8 @@
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
-      "services/api/scripts/verify-publish-expiry-completeness.ts"
+      "services/api/scripts/verify-publish-expiry-completeness.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/jobs/jobs-excel.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
@@ -22683,6 +22818,7 @@
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
+      "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-member-assets.ts",
       "services/api/scripts/verify-member-data-retention.ts",
@@ -22952,7 +23088,8 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
-      "services/api/scripts/verify-offline-agencies-page.ts"
+      "services/api/scripts/verify-offline-agencies-page.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/orgs/admin-org-account-view.ts": [
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
@@ -23517,6 +23654,7 @@
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-reconciliation.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts",
       "services/api/scripts/verify-redemption-audit.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-refund-convergence.ts",
@@ -23570,6 +23708,14 @@
     "services/api/src/recruitment-content/recruitment-wave2-target.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts",
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
+    ],
+    "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts": [
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
+    ],
+    "services/api/src/recruitment-hosting/recruitment-emergency.service.ts": [
+      "services/api/scripts/verify-companies.ts",
+      "services/api/scripts/verify-job-review.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/release-provenance/release-activation.ts": [
       "services/api/scripts/verify-release-genesis.ts",
@@ -23717,7 +23863,8 @@
     ],
     "services/api/src/sync/sync.service.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
-      "services/api/scripts/verify-job-customer-sample-readiness.ts"
+      "services/api/scripts/verify-job-customer-sample-readiness.ts",
+      "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/terminals/admin-kiosk-job-board.controller.ts": [
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
@@ -30626,7 +30773,8 @@
           "services/api/src/companies/companies.controller.ts",
           "services/api/src/companies/companies.service.ts",
           "services/api/src/companies/companies.types.ts",
-          "services/api/src/prisma/prisma.service.ts"
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ],
         "missing": []
       },
@@ -32058,9 +32206,11 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/resume/job-fit-hosting.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
           "services/api/src/ai/resume/llm-job-fit.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -32198,7 +32348,8 @@
           "services/api/src/jobs/jobs-partner.service.ts",
           "services/api/src/jobs/jobs.controller.ts",
           "services/api/src/jobs/jobs.service.ts",
-          "services/api/src/prisma/prisma.service.ts"
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ],
         "missing": []
       },
@@ -32219,6 +32370,7 @@
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/job-sync/job-sync.controller.ts",
           "services/api/src/job-sync/job-sync.service.ts",
           "services/api/src/jobs/fair-material-print-bridge.service.ts",
           "services/api/src/prisma/prisma.service.ts"
@@ -34741,6 +34893,35 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:recruitment-content-http"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/secret-cipher.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/job-sync/job-sync.service.ts",
+          "services/api/src/jobs/fair-material.service.ts",
+          "services/api/src/jobs/jobs-admin.service.ts",
+          "services/api/src/offline-agencies/offline-agencies.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
+          "services/api/src/sync/sync.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-recruitment-emergency-scope.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:recruitment-emergency-scope"
       ],
       "wired": true
     },

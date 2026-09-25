@@ -5,10 +5,7 @@ import { ForbiddenException } from '@nestjs/common'
  *
  * 部署级开关：环境变量未设置、空值或不是 true/1 时关闭。我们的云上默认关。
  * b 版本在部署配置里显式设为 true。
- *
- * 验证进程例外：argv 含 `scripts/verify-`，或 `VERIFICATION_DATABASE_TARGET=isolated`
- * 且变量未设置时，按打开处理，避免既有夹具被新的默认值误伤。显式 false/0 一律关闭。
- * 生产进程不会走验证脚本入口，未设置即为关。
+ * 不看进程是不是验证脚本。旧门禁要打开时，必须自己把变量设成 true。
  *
  * 关闭时的返回：列表与聚合是空集合（HTTP 200，形状不变）；按 id 的详情、
  * 解读、打印链接和一切写入是 403，`error.code = RECRUITMENT_HOSTING_DISABLED`。
@@ -36,15 +33,12 @@ const OFF_VALUES = new Set(['0', 'false', 'no', 'off'])
 
 export function isRecruitmentContentHostingEnabled(
   env: NodeJS.ProcessEnv = process.env,
-  argv: readonly string[] = process.argv,
+  _argv: readonly string[] = process.argv,
 ): boolean {
+  void _argv
   const raw = env[RECRUITMENT_CONTENT_HOSTING_ENV]?.trim().toLowerCase()
   if (raw && ON_VALUES.has(raw)) return true
   if (raw && OFF_VALUES.has(raw)) return false
-  if (raw) return false
-  const joined = argv.join(' ')
-  if (joined.includes('scripts/verify-')) return true
-  if (env.VERIFICATION_DATABASE_TARGET === 'isolated') return true
   return false
 }
 
@@ -160,13 +154,15 @@ async function contentScope(
   return { orgId: null, sourceId: null }
 }
 
-/** 机构或来源熔断后，该范围的同步和发布都要停。缺表时先跳过，夹具在下一步补上。 */
+/** 机构或来源熔断后，该范围的同步和发布都要停。 */
 export async function recruitmentCircuitBlocks(
-  prisma: EmergencyGatePrisma,
+  prisma: object,
   scope: { orgId?: string | null; sourceId?: string | null },
 ): Promise<boolean> {
-  const table = prisma.recruitmentCircuitBreak
-  if (!table?.findFirst) return false
+  const table = (prisma as EmergencyGatePrisma).recruitmentCircuitBreak
+  if (!table?.findFirst) {
+    throw new Error('recruitmentCircuitBreak delegate is required')
+  }
   if (scope.orgId) {
     const orgHit = await table.findFirst({ where: { scope: 'org', targetId: scope.orgId } })
     if (orgHit) return true
@@ -180,14 +176,19 @@ export async function recruitmentCircuitBlocks(
 
 /** 单条 hold 或机构 / 来源熔断都拒绝再发布。 */
 export async function assertNotEmergencyHeld(
-  prisma: EmergencyGatePrisma,
+  prisma: object,
   targetType: string,
   targetId: string,
 ): Promise<void> {
-  const found = await prisma.recruitmentEmergencyHold?.findFirst?.({ where: { targetType, targetId } })
+  const gate = prisma as EmergencyGatePrisma
+  const hold = gate.recruitmentEmergencyHold
+  if (!hold?.findFirst) {
+    throw new Error('recruitmentEmergencyHold delegate is required')
+  }
+  const found = await hold.findFirst({ where: { targetType, targetId } })
   if (found) irreversible('该内容已紧急下架，不能恢复')
-  const scope = await contentScope(prisma, targetType, targetId)
-  if (await recruitmentCircuitBlocks(prisma, scope)) irreversible('该机构或来源已熔断，不能再发布')
+  const scope = await contentScope(gate, targetType, targetId)
+  if (await recruitmentCircuitBlocks(gate, scope)) irreversible('该机构或来源已熔断，不能再发布')
 }
 
 export function closedJobPage(params?: { page?: number; pageSize?: number }) {

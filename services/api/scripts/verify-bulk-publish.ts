@@ -198,8 +198,12 @@ function buildFixture() {
   const recruitmentEmergencyHold = {
     findFirst: async (args: { where: { targetType: string; targetId: string } }) =>
       holds.find((row) => row.targetType === args.where.targetType && row.targetId === args.where.targetId) ?? null,
+    upsert: async () => ({ id: 'hold' }),
   }
-  const prisma = { job, jobFair, policyPost, organization, recruitmentEmergencyHold } as unknown as PrismaService
+  const recruitmentCircuitBreak = {
+    findFirst: async () => null,
+  }
+  const prisma = { job, jobFair, policyPost, organization, recruitmentEmergencyHold, recruitmentCircuitBreak } as unknown as PrismaService
 
   const adminSvc = new JobsAdminService(prisma, fakeAudit)
   const policiesSvc = new PoliciesService(prisma, fakeAudit)
