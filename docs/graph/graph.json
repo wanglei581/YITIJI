@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 537,
+    "endpointCount": 539,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3552,9 +3552,46 @@
           "PrintTaskStatusLog",
           "ScanTask",
           "SyncLog",
-          "Terminal"
+          "Terminal",
+          "TerminalCapability",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/admin/screen/snapshot",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/console-screen/console-screen.service.ts"
+        ],
+        "services": [
+          "ConsoleScreenService"
+        ]
+      },
+      {
+        "controller": "services/api/src/console-screen/console-screen.admin.controller.ts",
+        "handler": "AdminScreenController.getAdminTerminalTwin",
+        "method": "GET",
+        "models": [
+          "AiServiceLog",
+          "AlertDisposition",
+          "CompanyProfile",
+          "ExternalJumpLog",
+          "FairCompany",
+          "FairMaterial",
+          "FairZone",
+          "Job",
+          "JobFair",
+          "Order",
+          "PolicyPost",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "SyncLog",
+          "Terminal",
+          "TerminalCapability",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/screen/terminals/:terminalId",
         "roles": [
           "admin"
         ],
@@ -9348,9 +9385,46 @@
           "PrintTaskStatusLog",
           "ScanTask",
           "SyncLog",
-          "Terminal"
+          "Terminal",
+          "TerminalCapability",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/partner/screen/snapshot",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/console-screen/console-screen.service.ts"
+        ],
+        "services": [
+          "ConsoleScreenService"
+        ]
+      },
+      {
+        "controller": "services/api/src/console-screen/console-screen.partner.controller.ts",
+        "handler": "PartnerScreenController.getPartnerTerminalTwin",
+        "method": "GET",
+        "models": [
+          "AiServiceLog",
+          "AlertDisposition",
+          "CompanyProfile",
+          "ExternalJumpLog",
+          "FairCompany",
+          "FairMaterial",
+          "FairZone",
+          "Job",
+          "JobFair",
+          "Order",
+          "PolicyPost",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "SyncLog",
+          "Terminal",
+          "TerminalCapability",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/partner/screen/terminals/:terminalId",
         "roles": [
           "partner"
         ],
@@ -16053,6 +16127,7 @@
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/order-submission-ledger.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
@@ -16228,7 +16303,9 @@
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
+          "services/api/src/console-screen/console-screen.fleet.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/contract-review/contract-review-report.service.ts",
           "services/api/src/contract-review/contract-review.cleanup.task.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
@@ -16262,6 +16339,7 @@
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
@@ -16321,7 +16399,9 @@
         ],
         "usedBy": [
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/console-screen/console-screen.fleet.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/scan-tasks/scan-task-reaper.task.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
@@ -16362,7 +16442,7 @@
         ]
       },
       {
-        "fieldCount": 24,
+        "fieldCount": 27,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -16382,6 +16462,8 @@
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.service.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/content/content.service.ts",
           "services/api/src/device-fleet/device-fleet.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
@@ -16422,6 +16504,7 @@
           "Terminal"
         ],
         "usedBy": [
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ]
       },
@@ -16444,6 +16527,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/terminals/printer-availability.ts",
           "services/api/src/terminals/terminal-heartbeat-retention.task.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
@@ -20274,6 +20358,9 @@
     "services/api/prisma/migrations/20260917120000_add_console_screen_query_indexes/migration.sql": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/prisma/migrations/20260925143000_add_terminal_area_geo/migration.sql": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
@@ -20315,6 +20402,9 @@
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
     "services/api/prisma/postgres/migrations/20260917120000_add_console_screen_query_indexes/migration.sql": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/prisma/postgres/migrations/20260925143000_add_terminal_area_geo/migration.sql": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/prisma/postgres/schema.prisma": [
@@ -21275,6 +21365,7 @@
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-companies.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
@@ -21729,6 +21820,9 @@
     "services/api/src/console-screen/console-screen.dto.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/src/console-screen/console-screen.fleet.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
     "services/api/src/console-screen/console-screen.metric.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
@@ -21745,6 +21839,9 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.service.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/src/console-screen/console-screen.timeline.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.types.ts": [
@@ -23452,6 +23549,7 @@
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts"
@@ -23486,6 +23584,9 @@
     ],
     "services/api/src/terminals/printer-availability.ts": [
       "services/api/scripts/verify-admin-ops.ts"
+    ],
+    "services/api/src/terminals/printer-status.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/terminals/release-observation.service.ts": [
       "services/api/scripts/verify-release-observation-contract.mjs"
@@ -23533,12 +23634,16 @@
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-terminal-identity.ts"
     ],
+    "services/api/src/terminals/terminal-placement.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
     "services/api/src/terminals/terminal-session.service.ts": [
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-terminal-identity.ts"
     ],
     "services/api/src/terminals/terminal-toolbox.service.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-order.ts",
@@ -23560,6 +23665,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "services/api/src/terminals/terminals-admin.service.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -23579,6 +23685,7 @@
     ],
     "services/api/src/terminals/terminals-agent.service.ts": [
       "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -23616,6 +23723,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminals.service.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-order.ts",
@@ -30360,11 +30468,14 @@
           ".github/workflows/ci.yml",
           "packages/shared/src/types/consoleScreen.ts",
           "services/api/prisma/migrations/20260917120000_add_console_screen_query_indexes/migration.sql",
+          "services/api/prisma/migrations/20260925143000_add_terminal_area_geo/migration.sql",
           "services/api/prisma/postgres/migrations/20260917120000_add_console_screen_query_indexes/migration.sql",
+          "services/api/prisma/postgres/migrations/20260925143000_add_terminal_area_geo/migration.sql",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/jwt-auth.guard.ts",
           "services/api/src/common/guards/roles.guard.ts",
@@ -30373,14 +30484,23 @@
           "services/api/src/console-screen/console-screen.assemble.ts",
           "services/api/src/console-screen/console-screen.cache.ts",
           "services/api/src/console-screen/console-screen.dto.ts",
+          "services/api/src/console-screen/console-screen.fleet.ts",
           "services/api/src/console-screen/console-screen.metric.ts",
           "services/api/src/console-screen/console-screen.module.ts",
           "services/api/src/console-screen/console-screen.org.ts",
           "services/api/src/console-screen/console-screen.partner.controller.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
+          "services/api/src/console-screen/console-screen.timeline.ts",
           "services/api/src/console-screen/console-screen.types.ts",
-          "services/api/src/prisma/prisma.service.ts"
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/admin-terminals.controller.ts",
+          "services/api/src/terminals/printer-status.ts",
+          "services/api/src/terminals/terminal-placement.ts",
+          "services/api/src/terminals/terminal-toolbox.service.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
         ],
         "missing": []
       },
