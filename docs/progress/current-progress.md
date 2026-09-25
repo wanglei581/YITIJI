@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-26：全面文档更新（Claude + Grok + Agy）
+
+按设备与软件供应方 + 托管 a 改写 CLAUDE.md、AGENTS.md、feature-scope（新增 §零 AI 求职操作系统分层、§七 已知缺口）、role-boundary、compliance-boundary（新增 §1.2 法规与资质总表）、docs/README；约 50 份旧方案加文首状态标注；content-ingestion-operator-guide 旧正文（岗位、招聘会发布到一体机）改写为托管 a 下的官方渠道与政策指南，旧文只留在 git 历史。只改文档，不删文件。（分支 `claude/docs-refresh-20260926`，由「项目资金预算评估」窗口完成，主执行窗口快进合入候选。）
+
 ## 2026-09-26：小程序首发审核范围收口——停放 20 页、简历对照去结论、分包（步骤 2.6，本地分支待合入）
 
 小程序专管窗口在分支 `claude/miniapp-nonrecruit-review-v2`（接在候选 `b3fc7dde1` 之后）完成。只改 `apps/miniapp` 和本文、`next-tasks.md`；没有改后端、没有操作公众平台、没有发布。
