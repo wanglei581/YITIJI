@@ -130,8 +130,82 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   ]) {
     await expect(outOfPaper, `缺纸页不得再出现「${banned}」`).not.toContainText(banned)
   }
+
+  // 稿 15 out-of-paper 的结构：小青区即页头 → 任务卡（真实单文件 + 缺纸说明 + 费用边界）→ 现场三步 → 底栏两出口。
+  await expect(outOfPaper.locator('.pff-xq-ask')).toHaveText('机器里没纸了。')
+  const taskCard = outOfPaper.getByTestId('print-fulfill-list')
+  await expect(taskCard).toContainText(W2_FILE.name)
+  await expect(taskCard).toContainText('缺纸中断')
+  await expect(taskCard).toContainText(`任务号 ${W2_ORDER.taskId}`)
+  await expect(taskCard.getByTestId('print-fulfill-fallback')).toContainText('打印机缺纸')
+  await expect(taskCard).toContainText('费用与订单边界')
+  // takeaway-url 404：订单号与金额退回进页时带来的真值，不编退款状态。
+  await expect(taskCard.locator('.pff-inbar-kv')).toContainText(`订单 ${W2_ORDER.orderNo}`)
+  await expect(taskCard.locator('.pff-inbar-kv')).toContainText('支付状态 已付 ¥2.00')
+  await expect(page.locator('.qx-pill')).toHaveText('已付 ¥2.00 · 缺纸')
+  const steps = outOfPaper.locator('.pff-step')
+  await expect(steps).toHaveCount(3)
+  await expect(steps.nth(0)).toContainText('本机不知道出了几页')
+  await expect(steps.nth(2)).toContainText(`订单号 ${W2_ORDER.orderNo}`)
+  // 服务端不回已出页数、也没有费用处理结果：不许出现页数进度或退款承诺。
+  for (const banned of ['已出 1', '等待加纸', '退款', '自动续打后']) {
+    await expect(outOfPaper, `缺纸页不得出现「${banned}」`).not.toContainText(banned)
+  }
+  await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
+  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('联系工作人员处理')
+  await expect(outOfPaper.getByRole('status')).toContainText('暂时无法签发带走链接，请联系工作人员')
+
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-out-of-paper.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
+test('PAPER_EMPTY with server canRetry offers whole-file resubmit and server order facts @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PAPER_EMPTY',
+      failureReasonForUser: '打印机缺纸，当前无法打印，请联系工作人员补纸后重试',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: 'SRV-ORDER-777',
+      payStatus: 'paid',
+      amountCents: 350,
+      canRetry: true,
+    },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+
+  const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
+  await expect(outOfPaper).toBeVisible()
+  // 带走接口回了订单：订单号与金额以服务端为准，不用进页时带来的值。
+  await expect(page.locator('.qx-pill')).toHaveText('已付 ¥3.50 · 缺纸')
+  await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('订单 SRV-ORDER-777')
+  await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('支付状态 已付 ¥3.50')
+  await expect(outOfPaper).not.toContainText(W2_ORDER.orderNo)
+  // canRetry 为真才出现重打出口，且说清是整份重打、不再收费，不是「续打剩下的」。
+  await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
+  await expect(outOfPaper.locator('.pff-step').nth(2)).toContainText('整份重打')
+  await expect(outOfPaper).toContainText('不会在加纸后自动继续')
+  await expect(outOfPaper.getByRole('region', { name: '文件带走' })).toBeVisible()
+
+  await expectTouchAndBounds(page)
+  await page.screenshot({ path: test.info().outputPath('fulfill-out-of-paper-retry.png'), fullPage: true })
   expect(errors).toEqual([])
 })
 

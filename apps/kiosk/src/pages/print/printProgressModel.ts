@@ -18,7 +18,7 @@
 //   refund-info            /print/done 的费用说明态；本页只写订单边界，不承诺退款
 // ============================================================
 
-import type { PrintJobParams } from '@ai-job-print/shared'
+import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import type { BackendJobStatus } from '../../services/print/printJobsApi'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
@@ -73,6 +73,35 @@ export type PaymentFact = 'free' | 'paid' | 'unknown'
 export function paymentFactOf(amountCents: number | null): PaymentFact {
   if (amountCents == null) return 'unknown'
   return amountCents === 0 ? 'free' : 'paid'
+}
+
+export interface OutOfPaperMoney {
+  fact: PaymentFact
+  amountCents: number | null
+}
+
+/** 缺纸页只展示已核实的收款事实；服务端有订单回执时优先使用回执。 */
+export function outOfPaperMoneyOf(
+  takeaway: Pick<PrintJobTakeawayUrl, 'payStatus' | 'amountCents'> | null,
+  flowAmountCents: number | null,
+): OutOfPaperMoney {
+  if (!takeaway) return { fact: paymentFactOf(flowAmountCents), amountCents: flowAmountCents }
+  return {
+    fact: takeaway.payStatus === 'paid' ? paymentFactOf(takeaway.amountCents) : 'unknown',
+    amountCents: takeaway.amountCents,
+  }
+}
+
+export function outOfPaperPill(money: OutOfPaperMoney): string {
+  if (money.fact === 'paid' && money.amountCents != null) return `已付 ${formatCents(money.amountCents)} · 缺纸`
+  if (money.fact === 'free') return '本次未收款 · 缺纸'
+  return '订单保留 · 缺纸'
+}
+
+export function outOfPaperDoing(money: OutOfPaperMoney): string {
+  return money.fact === 'paid'
+    ? '不是你操作的问题，纸匣空了。订单和已付金额都保留着，请联系工作人员处理。'
+    : '不是你操作的问题，纸匣空了。订单记录保留着，请联系工作人员处理。'
 }
 
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */

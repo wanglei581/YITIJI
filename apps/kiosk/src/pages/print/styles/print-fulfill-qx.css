@@ -569,6 +569,7 @@
 /* ── 打印进度页（/print/progress）专属 ───────────────────────────
  * 稿 15 的 printing / client-status-timeout 两态落在本页；其余七态由 /print/done 承接。
  * 完成页也 import 本文件，所以本节只动 .pfp-* 与 .pfp-page 之下，不改共享类的全局尺寸。
+ * .pfp-page 是稿 15 的一屏骨架（小青区即页头 / 任务卡 / 分区标题 / 三步卡），完成页的缺纸态也挂它，见文末。
  * 1080×1920 预算：顶栏 104 + 操作条 133 + 导航 132 之外剩 1551px，五块内容一屏放下不滚动。 */
 
 /* 稿 15 没有独立页头（小青区就是页头）。标题留给读屏：用 clip-path 隐藏，不用 margin:-1px。
@@ -704,3 +705,18 @@
   opacity: 1; cursor: default;
   background: var(--qx-paper); border: 1.5px dashed var(--qx-line-2); color: var(--qx-ink-3);
 }
+
+/* ── 打印完成页缺纸态（/print/done · errorCode=PAPER_EMPTY，稿 15 out-of-paper）──────
+ * 骨架沿用上面的 .pfp-page；这里只补缺纸态独有的：故障条图标描边、设备上报原因行、
+ * 订单事实的等宽数字、以及任务区之后的「文件带走」区（没有签发内容时整块不占位）。 */
+.pfd-page .pff-inbar[data-tone='bad'] .pff-inbar-ic { border-color: var(--qx-cinnabar); color: var(--qx-cinnabar-d); }
+.pfd-page .pff-inbar-kv b { font-family: var(--qx-mono); font-variant-numeric: tabular-nums; }
+.pfd-reason { display: flex; align-items: baseline; gap: 12px; }
+.pfd-reason-k {
+  flex: none; padding: 2px 10px; border-radius: 8px;
+  font-size: 16px; font-weight: 700; line-height: 1.5;
+  background: var(--qx-surface); border: 1px solid var(--qx-cinnabar-line); color: var(--qx-cinnabar-d);
+}
+.pfd-takeaway { display: flex; flex-direction: column; gap: 10px; }
+.pfd-takeaway:empty { display: none; }
+.pfd-takeaway > p[role='status'] { margin: 0; font-size: 18px; line-height: 1.5; color: var(--qx-ink-3); }

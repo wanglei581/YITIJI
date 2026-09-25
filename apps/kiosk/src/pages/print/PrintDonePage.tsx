@@ -28,7 +28,13 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintFileDeletionRecords } from './components/PrintFileDeletionRecords'
 import { PrintFileRetentionNotice } from './components/PrintFileRetentionNotice'
-import { PrintDoneXq, PrintFeeBoundaryBar, PrintJobSummaryCard } from './components/PrintDoneSections'
+import {
+  PrintDoneXq,
+  PrintFeeBoundaryBar,
+  PrintJobSummaryCard,
+  PrintOutOfPaperPanel,
+} from './components/PrintDoneSections'
+import { outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill } from './printProgressModel'
 import { formatCents } from './cashierStatus'
 import './styles/print-fulfill-qx.css'
 
@@ -440,71 +446,121 @@ export function PrintDonePage() {
   }
 
   if (resultState === 'failed') {
+    const feedbackButton = canReportIssue ? (
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeedbackOpen(true)}>反馈问题</button>
+    ) : null
+    const retryButton = takeaway?.canRetry && !isUnconfirmed ? (
+      <button
+        type="button"
+        className="qx-btn"
+        data-variant="teal"
+        disabled={retrying}
+        onClick={() => { void handleResubmitPrint() }}
+      >
+        {retrying ? '正在重新提交…' : '重新提交打印'}
+      </button>
+    ) : null
+    const takeawayNotices = (
+      <>
+        {takeawayQrUrl && (
+          <div className="print-done-takeaway" role="region" aria-label="文件带走">
+            <p className="print-done-takeaway-title">文件带走</p>
+            <div className="print-done-takeaway-qr">
+              <QRCodeSVG value={takeawayQrUrl} size={168} level="M" marginSize={0} />
+            </div>
+            {takeawayRemaining >= 0 && (
+              <p className="print-done-takeaway-note">
+                剩余 {formatRemainingSeconds(takeawayRemaining)}，请用本人手机扫码保存
+              </p>
+            )}
+          </div>
+        )}
+        {takeaway && takeawayExpired && (
+          <p role="status">带走链接已过期，请联系工作人员补打</p>
+        )}
+        {takeawayError && <p role="status">{takeawayError}</p>}
+        {retryError && <p role="status">{retryError}</p>}
+      </>
+    )
+
+    if (visual === 'out-of-paper') {
+      // 稿 15 out-of-paper：小青区即页头 → 任务卡（单文件 + 缺纸说明 + 费用边界）→ 现场三步 → 底栏两出口。
+      // 稿里「加纸后继续」「已出 1 份」在真实合同里都不成立，改写理由见 PrintOutOfPaperPanel 头注。
+      const money = outOfPaperMoneyOf(takeaway, amountCents)
+      const faultOrderNo = takeaway?.orderNo ?? (typeof state.orderNo === 'string' ? state.orderNo : null)
+      return (
+        <QxPageFrame
+          back={{ label: '返回首页', onBack: () => navigate('/') }}
+          title="打印机缺纸"
+          subtitle="服务端登记缺纸，这次打印不会在加纸后自动续打"
+          status={{ tone: 'bad', label: outOfPaperPill(money) }}
+          terminalLabel="就业服务大厅"
+          ctabar={
+            <>
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>查看费用说明</button>
+              {feedbackButton}
+              {retryButton}
+              <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
+                联系工作人员处理
+              </button>
+            </>
+          }
+          navbar={navbar}
+        >
+          <div
+            data-w2-page="print-done" data-print-flow-step={6}
+            data-pff-head="xq"
+            data-screen="print-fulfill"
+            data-state="out-of-paper"
+            data-testid="print-fulfill-state-out-of-paper"
+            className="qx-scroll pff-page pfp-page pfd-page"
+          >
+            <PrintDoneXq mainClassName="pfp-xq-main" ask={<>机器里<em>没纸了</em>。</>} doing={outOfPaperDoing(money)} />
+            <PrintOutOfPaperPanel
+              file={file ?? null}
+              params={params ?? null}
+              taskId={taskId}
+              orderNo={faultOrderNo}
+              failureReason={failureReason}
+              money={money}
+              canRetry={Boolean(takeaway?.canRetry)}
+              takeaway={takeawayNotices}
+            />
+          </div>
+          {feedbackDialog}
+        </QxPageFrame>
+      )
+    }
+
     const jam = visual === 'paper-jam'
-    const empty = visual === 'out-of-paper'
-    const issueTitle = isUnconfirmed
-      ? '打印结果未确认'
-      : jam
-        ? '打印机卡纸'
-        : empty
-          ? '打印机缺纸'
-          : '打印失败'
+    const issueTitle = isUnconfirmed ? '打印结果未确认' : jam ? '打印机卡纸' : '打印失败'
     const ask = isUnconfirmed
       ? <>这次打印<em>结果未确认</em>。</>
       : jam
         ? <>纸<em>卡住了</em>，别硬拉。</>
-        : empty
-          ? <>机器里<em>没纸了</em>。</>
-          : <>打印失败，<em>请联系工作人员</em>。</>
-    // 缺纸这一支的三句话此前是「加纸后可以继续」「订单保留，加纸后可继续打印」
-    // 「剩下没打的部分会在加纸后继续……不需要重新下单」。**服务端没有任何一条链路
-    // 会在补纸后自动续打**：PrintTask 此刻已经是 failed 终态，唯一的重来是
-    // POST /print/jobs/:taskId/retry，而它有两个前提与这段承诺都对不上 ——
-    //   ① 要服务端先在 takeaway-url 里给出 canRetry（print-jobs.service.ts
-    //      canRetryPaidFailedJob：failed + 已付 + 原文件未被删），拿不到就连
-    //      「重新提交打印」按钮都不会出现（本页 takeaway 为 null 时正是如此）；
-    //   ② 它重打的是**整份文件**，不是"剩下没打的部分"。
-    // 承诺自动续打会让用户补完纸站在机器前空等一个永远不会来的结果，等到去找
-    // 工作人员时纸和时间都已经白费。所以只说三件真的：订单与已付金额保留、
-    // 找工作人员补打、按钮出现时才可以自己重打。
+        : <>打印失败，<em>请联系工作人员</em>。</>
     const doing = isUnconfirmed
       ? '系统已经正式登记，工作人员核查后给出结论，不会让你自认倒霉。'
       : jam
         ? '硬拉可能撕坏纸、伤到机器，交给我们来处理。'
-        : empty
-          ? '不是你操作的问题，纸匣空了。订单和已付金额都保留着，请联系工作人员处理。'
-          : '订单和支付记录都在，请凭订单找现场工作人员处理。'
+        : '订单和支付记录都在，请凭订单找现场工作人员处理。'
     const issueSub = isUnconfirmed
       ? '服务端已明确登记，等待人工核查'
       : jam
         ? '你的订单和已付金额都保留着'
-        : empty
-          ? '订单与已付金额保留，不会自动续打'
-          : '打印任务已由服务端确认失败'
+        : '打印任务已由服务端确认失败'
     return (
       <QxPageFrame
-        title={isUnconfirmed ? '打印结果未确认' : jam ? '打印机卡纸' : empty ? '打印机缺纸' : '打印失败'}
+        title={issueTitle}
         subtitle={isUnconfirmed ? '服务端无法确认本次是否已出纸' : '打印任务已由服务端确认失败'}
-        status={{ tone: isUnconfirmed ? 'bad' : 'bad', label: `${paidLabel} · ${issueTitle}` }}
+        status={{ tone: 'bad', label: `${paidLabel} · ${issueTitle}` }}
         terminalLabel="就业服务大厅"
         ctabar={
           <>
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>返回首页</button>
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>查看费用说明</button>
-            {canReportIssue ? (
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeedbackOpen(true)}>反馈问题</button>
-            ) : null}
-            {takeaway?.canRetry && !isUnconfirmed ? (
-              <button
-                type="button"
-                className="qx-btn"
-                data-variant="teal"
-                disabled={retrying}
-                onClick={() => { void handleResubmitPrint() }}
-              >
-                {retrying ? '正在重新提交…' : '重新提交打印'}
-              </button>
-            ) : null}
+            {feedbackButton}
+            {retryButton}
             <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
               {isUnconfirmed ? '联系工作人员核查' : '使用帮助'}
             </button>
@@ -519,9 +575,7 @@ export function PrintDonePage() {
               ? 'print-fulfill-state-result-unconfirmed'
               : jam
                 ? 'print-fulfill-state-paper-jam'
-                : empty
-                  ? 'print-fulfill-state-out-of-paper'
-                  : 'print-fulfill-state-failed'
+                : 'print-fulfill-state-failed'
           }
           className="qx-scroll pff-page"
         >
@@ -544,11 +598,9 @@ export function PrintDonePage() {
                 ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。系统不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留，请凭订单号联系现场工作人员核查处理。{taskId ? `（任务号 ${taskId}）` : null}</>
                 : jam
                   ? <>请<b>不要自己打开机器或拽纸</b>。工作人员会取出卡纸并补打受影响的部分，已出的纸你先收好。</>
-                  : empty
-                    ? <>纸匣已空，这次打印<b>不会在加纸后自动继续</b>。已出的纸你可以先拿走，剩下的部分请<b>联系现场工作人员</b>补打。订单和已付金额都保留着；只有本页出现「重新提交打印」按钮时，才能自己重打一次，且不会重复收费。</>
-                    : failureReason}
+                  : failureReason}
             </p>
-            {(jam || empty) && failureReason ? <p className="pff-issue-body">{failureReason}</p> : null}
+            {jam && failureReason ? <p className="pff-issue-body">{failureReason}</p> : null}
             {isUnconfirmed ? <span className="pff-inbar-code">errorCode = PRINT_JOB_UNCONFIRMED</span> : null}
           </div>
 
@@ -556,24 +608,7 @@ export function PrintDonePage() {
             <p className="pff-out-sub">订单号 {takeaway?.orderNo ?? state.orderId}</p>
           )}
           <p className="pff-out-sub">联系工作人员补打</p>
-          {takeawayQrUrl && (
-            <div className="print-done-takeaway" role="region" aria-label="文件带走">
-              <p className="print-done-takeaway-title">文件带走</p>
-              <div className="print-done-takeaway-qr">
-                <QRCodeSVG value={takeawayQrUrl} size={168} level="M" marginSize={0} />
-              </div>
-              {takeawayRemaining >= 0 && (
-                <p className="print-done-takeaway-note">
-                  剩余 {formatRemainingSeconds(takeawayRemaining)}，请用本人手机扫码保存
-                </p>
-              )}
-            </div>
-          )}
-          {takeaway && takeawayExpired && (
-            <p role="status">带走链接已过期，请联系工作人员补打</p>
-          )}
-          {takeawayError && <p role="status">{takeawayError}</p>}
-          {retryError && <p role="status">{retryError}</p>}
+          {takeawayNotices}
         </div>
         {feedbackDialog}
       </QxPageFrame>
