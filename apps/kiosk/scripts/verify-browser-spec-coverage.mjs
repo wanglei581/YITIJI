@@ -49,6 +49,11 @@ const EXEMPT = new Map([
     '证据产出脚本（playwright.p1-evidence.config.ts），用途是生成验收截图而不是断言，'
       + '没有失败判据，进 CI 只会浪费时间。',
   ],
+  [
+    'qingxu-pairs.spec.ts',
+    '按需并排截图（playwright.qingxu-pairs.config.ts / capture:qingxu-pairs）。'
+      + '产出原稿与运行页对照图，没有失败判据；全量要几十分钟，进 CI 会占住浏览器 job。与 kiosk-p1-visual-evidence 同类。',
+  ],
 ])
 
 const ciYml = readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
@@ -143,7 +148,9 @@ check(
 )
 
 // 豁免只许减不许增：写下当前值，改大必须显式改这个数并说明。
-const EXEMPT_LIMIT = 2
+// 2026-09-25：qingxu-pairs.spec.ts 与既有 p1 证据脚本同类，按需截图、不进 CI。
+// 孤儿检查和理由长度检查没有放宽；这个数是新增一条豁免时门禁要求的显式登记。
+const EXEMPT_LIMIT = 3
 check(
   `豁免条目不超过 ${EXEMPT_LIMIT} 条（只许降）`,
   EXEMPT.size <= EXEMPT_LIMIT,
