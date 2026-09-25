@@ -9,7 +9,15 @@ overrides:
   '@hono/node-server': 2.0.10
   uuid: 14.0.0
   shell-quote: 1.9.0
-  hono: 4.12.27
+  # hono: seven open advisories. The four below 4.12.34
+  # (GHSA-f23p-vx2j-j53r, GHSA-79qm-7rj5-m7r9, GHSA-54fx-42gc-7vw4, GHSA-8j4g-w8fx-2239)
+  # and the three below 4.13.5
+  # (GHSA-gqvv-2mrq-wpjv, GHSA-g6gw-c38x-mqfc, GHSA-crvj-82cr-hjcx)
+  # are all cleared by 4.13.5. The previous pin 4.12.27 is inside every range.
+  # Carrier: prisma@7.8.0 pins @prisma/dev@0.24.3, which asks for hono@^4.12.8.
+  # @hono/node-server@2.0.10 peers hono@^4, so 4.13.5 satisfies it.
+  # Stay on the minimum fix; do not float to later 4.13.x.
+  hono: 4.13.5
   # multer: 2026-09-08 新发三条 high，全部首修 2.3.0（2026-08-28 发布，已过 minimumReleaseAge）
   #   GHSA-wc9g-mqfw-jrwm（构造 multipart 字段名致 DoS，影响 < 2.3.0）
   #   GHSA-535w-7cp7-47q4（字段名里超大数组下标致 DoS，影响 < 2.3.0）
