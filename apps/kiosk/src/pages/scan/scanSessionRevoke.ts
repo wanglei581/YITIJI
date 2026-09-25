@@ -257,29 +257,24 @@ export function revokeCreatedScanSession(
  * 与 `getScanDeliveryLease()`，共同点是**这条任务此后不可能再被 Agent 领走**：
  *   · `cancelled` —— 200，服务端刚把它 CAS 成 cancelled；
  *   · `not-found` —— 404 `SCAN_TASK_NOT_FOUND`，服务端那边根本没有这条任务；
- *   · `already-terminal` —— 400 `SCAN_TASK_ALREADY_COMPLETED` 或 409
- *     `SCAN_TASK_CANCEL_CONFLICT`。前者两处都只在 `status === 'completed'` 时抛；
- *     后者有两处来历：CAS 之前判到 `status !== 'waiting' && !== 'matched'`（cancelled /
- *     failed / expired），或者 CAS 撞车之后重读 —— 那一刻任务可能正是 **matched**
- *     （一次投递刚刚开始）。租约查询只签 `status: 'waiting'` 的行，而没有任何一条路把
- *     任务改回 waiting，所以这几种一律领不走 —— 这正是本闸要的判据。
+ *   · `already-terminal` —— 400 `SCAN_TASK_ALREADY_COMPLETED`（两处都只在
+ *     `status === 'completed'` 时抛），或者**同一轮里第二次**的 409 `SCAN_TASK_CANCEL_CONFLICT`
+ *     （见下面 `conflict`）。
+ * 三种都会记进 {@link endedByServer}：闸确认之后才落地的那次投递确认，不许再为它补一发。
  *
- * 三种里能证明「这条任务已经结束 / 根本没有」的（200、404、ALREADY_COMPLETED）
- * 同时记进 {@link endedByServer}：闸确认之后才落地的那次投递确认，不许再为它补一发。
- * CANCEL_CONFLICT **不记**：matched 那一支里任务还活着，`cancel()` 放行 matched，
- * 再来一发 DELETE 仍能把那次投递撤掉。
- *
- * `confirmed: false` 的三种，一种都不许当成「清干净了」：
+ * `confirmed: false` 的四种，一种都不许当成「清干净了」：
  *   · `forbidden` —— 403，本机手里这份身份/凭据动不了那条任务（它可能仍是 waiting）；
  *   · `server-error` —— 5xx / 429 / 其它非终态码，服务端没给结论；
- *   · `unreachable` —— 请求压根没拿到应答（断网、被掐断）。
+ *   · `unreachable` —— 请求压根没拿到应答（断网、被掐断）；
+ *   · `conflict` —— **第一次**的 409 `SCAN_TASK_CANCEL_CONFLICT`。它有两处来历：CAS 之前
+ *     判到 cancelled / failed / expired；或者 CAS 撞车（`where` 钉着读到时的 status 与
+ *     lastAttemptHash）之后重读 —— 那一刻任务可能正是 **matched**：一次投递刚开始，文件
+ *     正往上一位的任务里写，而那份纸可能正是下一位在面板上扫的。只凭这一句不许换人。
+ *     闸拿到它会立刻再问一次（`afterConflict`），理由与上限见 {@link requestConfirmedScanRevoke}。
  */
 export type ScanRevokeVerdict =
   | { confirmed: true; reason: 'cancelled' | 'not-found' | 'already-terminal' }
-  | { confirmed: false; reason: 'forbidden' | 'server-error' | 'unreachable' }
-
-/** 服务端明确说「这条任务已经不可能被领走了」的两个码。 */
-const TERMINAL_CANCEL_CODES = new Set(['SCAN_TASK_ALREADY_COMPLETED', 'SCAN_TASK_CANCEL_CONFLICT'])
+  | { confirmed: false; reason: 'forbidden' | 'server-error' | 'unreachable' | 'conflict' }
 
 async function readErrorCode(res: Response): Promise<string> {
   try {
@@ -322,10 +317,24 @@ function revokeHeaders(controlToken: string, identityToken: string | null): Head
  *   服务端 `cancel()` 对 `endUserId === null` 的调用方只校验 controlToken —— 那是它
  *   刻意为「登出之后仍要撤得掉」留的路（见 scan-tasks.service.ts 里那段注释），
  *   所以传 null 是合法调用，不是绕过校验。
+ *
+ * @param options.afterConflict 这是**同一次尝试里**紧跟在一次 409 CANCEL_CONFLICT 之后的
+ *   那一问。这时再回 409 就是确定的终态，记下并确认 —— 判据全部来自 scan-tasks.service.ts：
+ *   · 只有投递 CAS（waiting → matched）会改 lastAttemptHash，也没有任何一条路把任务
+ *     写回 waiting；所以第一次 409 之后，任务要么已是终态，要么正是 matched（只可能从
+ *     waiting 走过来），不会再是 waiting；
+ *   · 对 matched 再发一次，`cancel()` 的 CAS 要么赢（200，上传收尾那句
+ *     `where: { status: 'matched' }` 随之落空、文件被补偿删除），要么输给
+ *     matched → completed（400 ALREADY_COMPLETED）或 → failed / cancelled / expired（409）；
+ *   · 所以第二次的回答不论哪一种都是确定的：再回 409 只剩 failed / cancelled / expired，
+ *     都是吸收态，此后任何 DELETE 都只会再换回 409。
+ *   上限因此是「再问一次」，不是两次，也不需要等：第二次的每一种回答都已经说得清，
+ *   而真是终态的任务每次都回 409 —— 不设上限的重试只会把这台机器按到自然过期。
  */
 export async function requestConfirmedScanRevoke(
   credentials: { scanTaskId: string; controlToken: string },
   identityToken: string | null,
+  options: { afterConflict?: boolean } = {},
 ): Promise<ScanRevokeVerdict> {
   let res: Response
   try {
@@ -347,9 +356,15 @@ export async function requestConfirmedScanRevoke(
     endedByServer.add(credentials.scanTaskId)
     return { confirmed: true, reason: 'not-found' }
   }
-  if (TERMINAL_CANCEL_CODES.has(code)) {
-    // 只有 ALREADY_COMPLETED 证明得了结束；CANCEL_CONFLICT 为什么不记，见上面 verdict 的注释。
-    if (code === 'SCAN_TASK_ALREADY_COMPLETED') endedByServer.add(credentials.scanTaskId)
+  if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
+    endedByServer.add(credentials.scanTaskId)
+    return { confirmed: true, reason: 'already-terminal' }
+  }
+  if (code === 'SCAN_TASK_CANCEL_CONFLICT') {
+    // 第一次：说明不了任务是不是正在收文件，不许据此换人（见 ScanRevokeVerdict 的 conflict）。
+    if (!options.afterConflict) return { confirmed: false, reason: 'conflict' }
+    // 紧跟在一次 409 之后的第二次：只剩 failed / cancelled / expired（理由见上面的 afterConflict）。
+    endedByServer.add(credentials.scanTaskId)
     return { confirmed: true, reason: 'already-terminal' }
   }
   if (res.status === 403 || code === 'SCAN_TASK_FORBIDDEN') {

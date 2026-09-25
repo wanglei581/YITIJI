@@ -1904,6 +1904,39 @@ assert.match(
     + '退回去是安全的 —— 凭据没落进登记就永远不会 ACK，而租约只签已确认的行。',
 )
 
+/* F8b. 409 SCAN_TASK_CANCEL_CONFLICT：只凭第一次不许换人，而且**只许再问一次**（2026-09-26）。
+ *
+ * cancel() 在 CAS 撞车之后也回这个码，那一刻任务可能正是 matched —— 一次投递刚开始，文件正往
+ * 上一位的任务里写，那份纸可能正是下一位在面板上扫的。所以第一次 409 必须是 confirmed: false。
+ * 第二次的每一种回答都是确定的（理由写在 requestConfirmedScanRevoke 的 afterConflict 上），
+ * 所以上限就是一次：放宽成循环 / 交给退避，真是终态的任务会把这台机器按到自然过期；
+ * 去掉这一次，又回到「凭一句分不清的 409 就换人」。行为由 scan-cleanup-gate.test.mjs 跑，
+ * 这里钉形状，免得有人把它「顺手」改成循环。 */
+assert.match(
+  scanRevoke,
+  /if \(code === 'SCAN_TASK_CANCEL_CONFLICT'\) \{[^{}]{0,300}?if \(!options\.afterConflict\) return \{ confirmed: false, reason: 'conflict' \}[^{}]{0,300}?endedByServer\.add\(credentials\.scanTaskId\)\s*\n\s*return \{ confirmed: true, reason: 'already-terminal' \}/,
+  '第一次 409 只能是 confirmed: false / conflict；只有紧跟在它之后的那一问（afterConflict）才许把 409 当成终态并记下',
+)
+const attemptOnceStart = scanCleanupGate.indexOf('async function attemptOnce(')
+const attemptOnceEnd = scanCleanupGate.indexOf('\nfunction nextDelayMs(')
+assert.ok(attemptOnceStart > 0 && attemptOnceEnd > attemptOnceStart, '收尾闸必须还有 attemptOnce（一次尝试）这个单元')
+const attemptOnceBody = stripComments(scanCleanupGate.slice(attemptOnceStart, attemptOnceEnd))
+assert.match(
+  attemptOnceBody,
+  /if \(!verdict\.confirmed && verdict\.reason === 'conflict'\) \{[^{}]{0,200}?verdict = await requestConfirmedScanRevoke\(task, task\.identityToken, \{ afterConflict: true \}\)/,
+  '拿到 conflict 必须在同一次尝试里立刻再问一次，并且那一问要带 afterConflict —— 否则第二次 409 仍分不清',
+)
+assert.equal(
+  (stripComments(scanCleanupGate).match(/afterConflict: true/g) ?? []).length,
+  1,
+  '再问只许一次：多一处 afterConflict 就是多一次（或一个循环）',
+)
+assert.doesNotMatch(
+  attemptOnceBody,
+  /\bwhile \(|\bfor \(/,
+  '一次尝试里不许有循环：409 之后的那一问是有界的，别处的重试归退避表管',
+)
+
 /* F9. 三处 fail-closed 都要接在同一条闸上，少一处那一处就是缺口。 */
 assert.match(
   scanDeliveryAck,
