@@ -126,7 +126,7 @@ function staticChecks(reporter: Reporter): boolean {
     'class JobFitPdfService',
     'new PDFDocument',
     'async render(',
-    '岗位匹配决策报告',
+    '简历对照',
     '仅供本人参考',
     '不构成任何就业、薪资或录用承诺',
   ], '真实 PDF 的标题、免责声明与渲染器') && complete

@@ -231,7 +231,7 @@ export class CareerPlanService {
     const hasPlan = !!row && !!row.expiresAt && row.expiresAt.getTime() >= Date.now()
 
     const rendered = hasPlan
-      ? await this.renderAiPlanPdf(row!)
+      ? await this.renderAiPlanPdf(row!, taskId)
       : await this.renderDegradedPdf(parse, row ? 'expired' : 'never_generated')
 
     const uploaded = await this.files.upload({
@@ -267,10 +267,10 @@ export class CareerPlanService {
   }
 
   /** AI 版式。逻辑与改动前一致，只是抽成方法。 */
-  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }) {
+  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }, taskId: string) {
     const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
     const { buffer, pageCount } = await this.pdf.render(
-      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn },
+      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn, contentId: taskId },
       stored.payload,
     )
     return { buffer, pageCount, filename: `职业规划建议单.pdf`, variant: 'ai' as const }

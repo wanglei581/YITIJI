@@ -9,14 +9,14 @@
 //
 // 本文件把合同审查那套 metadata 写法抽成公共实现，让所有 AI 产物 PDF 一致。
 //
-// ⚠️ 边界（本批次刻意不做）：
-// 只加**隐式元数据**，不加任何可见水印 / 页眉 / 页脚。
-// 简历 PDF 是用户要拿去投递的材料，往上面印可见 AI 标识会直接影响求职结果，
-// 属于产品裁决范围，不由工程侧单方面决定。可见标识另案处理。
+// 本函数只写元数据。可见页眉由允许印标识的 PDF 服务调用 stampAigcPageHeader。
+// 简历 PDF 仍不加可见标识，是否印在投递件上待产品负责人拍板。
 //
 // 隐私：metadata 只写标识与时间，不写简历正文、诊断结论、姓名、fileId。
 // contentId 只允许传服务端任务 id（不可反查用户身份的随机串），可不传。
 // ============================================================
+
+import { buildAigcLabelJson } from './aigc-label'
 
 /** 本终端的 AIGC 服务方标识前缀。与合同审查的 `zyd-contract-v1` 同一命名族。 */
 const SERVICE_PROVIDER_PREFIX = 'zyd'
@@ -58,4 +58,6 @@ export function applyAigcPdfMetadata(
   info['ServiceProviderCode'] = `${SERVICE_PROVIDER_PREFIX}-${input.kind}-v1`
   info['GeneratedAt'] = generatedAt.toISOString()
   if (input.contentId) info['ContentId'] = input.contentId
+  // 首次写入时传播方与生产方相同。AIGenerated=false 的文件不走本函数，因此不写 AIGC。
+  info['AIGC'] = buildAigcLabelJson(input.contentId?.trim() || '')
 }

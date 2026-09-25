@@ -7,6 +7,7 @@ import {
   TextRun,
 } from 'docx'
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
+import { buildAigcLabelJson } from '../../common/pdf/aigc-label'
 
 // ============================================================
 // ResumeDocxService — Wave 1 Task 4 简历 Word(docx) 渲染
@@ -30,8 +31,11 @@ export interface RenderedResumeDocx {
 
 @Injectable()
 export class ResumeDocxService {
-  /** 渲染简历 docx。返回 buffer。 */
-  async render(resume: GeneratedResume): Promise<RenderedResumeDocx> {
+  /**
+   * 渲染简历 docx。正文不加可见标识（是否印在投递件上待产品负责人拍板）。
+   * 非草稿写入 AIGC 自定义属性；草稿不是模型文字，不写 AIGC。
+   */
+  async render(resume: GeneratedResume, options?: { contentId?: string | null; draft?: boolean }): Promise<RenderedResumeDocx> {
     const children: Paragraph[] = []
 
     // ── 头部:姓名 + 求职意向 + 联系方式 ─────────────────────────────
@@ -135,17 +139,25 @@ export class ResumeDocxService {
     }
 
     const generatedAt = new Date()
+    const draft = options?.draft === true
     const doc = new Document({
       title: `${resume.basic.name} 的简历`,
       creator: '青序 AI 求职服务',
-      subject: 'AI 优化稿，仅供参考，请自行核对',
-      description: 'AI 生成，仅供参考，请自行核对',
-      keywords: 'AIGC,resume',
-      customProperties: [
-        { name: 'AIGenerated', value: 'true' },
-        { name: 'ServiceProviderCode', value: 'zyd-resume-docx-v1' },
-        { name: 'GeneratedAt', value: generatedAt.toISOString() },
-      ],
+      subject: draft ? '用户本人填写的简历内容原样排版，未经 AI 润色' : 'AI 优化稿，仅供参考，请自行核对',
+      description: draft ? '未经 AI 润色的原样草稿' : 'AI 生成，仅供参考，请自行核对',
+      keywords: draft ? 'resume' : 'AIGC,resume',
+      customProperties: draft
+        ? [
+            { name: 'AIGenerated', value: 'false' },
+            { name: 'ServiceProviderCode', value: 'zyd-resume-draft-docx-v1' },
+            { name: 'GeneratedAt', value: generatedAt.toISOString() },
+          ]
+        : [
+            { name: 'AIGenerated', value: 'true' },
+            { name: 'ServiceProviderCode', value: 'zyd-resume-docx-v1' },
+            { name: 'GeneratedAt', value: generatedAt.toISOString() },
+            { name: 'AIGC', value: buildAigcLabelJson(options?.contentId?.trim() || '') },
+          ],
       sections: [
         {
           properties: {},

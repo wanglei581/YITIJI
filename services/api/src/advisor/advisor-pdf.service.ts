@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../common/pdf/aigc-pdf-metadata'
+import { AIGC_VISIBLE_HEADER, stampAigcPageHeader } from '../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import { ADVISOR_DISCLAIMER, COMPARE_LIMITS, SLOT_DRAFT_BLANK_POLICY } from './advisor-skills'
 import type { AdvisorArtifactPayload } from './advisor-artifact.types'
@@ -26,14 +27,15 @@ export class AdvisorPdfService {
   private readonly logger = new Logger(AdvisorPdfService.name)
 
   async render(
-    meta: { date: string; providerLabel: string },
+    meta: { date: string; providerLabel: string; contentId?: string | null },
     payload: AdvisorArtifactPayload,
   ): Promise<{ buffer: Buffer; pageCount: number }> {
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
+    const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     applyAigcPdfMetadata(doc, {
       title: this.titleOf(payload),
       subject: `AI 顾问作业面产物，${ADVISOR_DISCLAIMER}；不代表投递、面试或录用结果，本机不代收简历、不做平台内投递。`,
       kind: 'advisor',
+      contentId: meta.contentId ?? null,
     })
     const ok = registerCjkFont(doc)
     if (!ok) {
@@ -56,7 +58,7 @@ export class AdvisorPdfService {
     doc.fontSize(10).fillColor('#6b7280').text(`生成时间：${meta.date} ｜ 生成方式：${meta.providerLabel}`)
     doc.moveDown(0.2)
     doc.fontSize(9).fillColor('#9ca3af').text(
-      `${ADVISOR_DISCLAIMER}。本机不代收简历、不做平台内投递，也不预测录用结果或承诺薪资；` +
+      `${ADVISOR_DISCLAIMER}。${AIGC_VISIBLE_HEADER}。本机不代收简历、不做平台内投递，也不预测录用结果或承诺薪资；` +
       '每条结论后附出处等级（E1 你的材料与你说过的话 / E2 本机读到的来源事实 / E3 AI 判断），请自行分辨可信度。',
     )
 
@@ -114,6 +116,7 @@ export class AdvisorPdfService {
       note('「没写到」的条目如果你其实做过，那是材料漏写，不是你缺 —— 补上再重跑，结果会变。')
     }
 
+    stampAigcPageHeader(doc)
     const pageCount = doc.bufferedPageRange().count
     doc.end()
     const buffer = await done

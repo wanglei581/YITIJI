@@ -809,7 +809,7 @@ export class AiService {
     let ext: string
     switch (format) {
       case 'docx': {
-        const rendered = await this.resumeDocx.render(resume)
+        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : charge?.taskId })
         buffer = rendered.buffer
         pageCount = 0
         mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -832,7 +832,12 @@ export class AiService {
       }
       case 'pdf':
       default: {
-        const rendered = await this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })
+        const rendered = await this.resumePdf.render(resume, {
+          layout,
+          templatePreset: template?.resumeLayoutPreset,
+          draft,
+          contentId: draft ? null : charge?.taskId,
+        })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
         mimeType = 'application/pdf'
@@ -864,7 +869,7 @@ export class AiService {
     // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
     let printFileId = uploaded.fileId
     if (format !== 'pdf') {
-      const pdfRendered = await this.resumePdf.render(resume, { layout, draft })
+      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : charge?.taskId })
       const pdfUploaded = await this.files.upload({
         buffer: pdfRendered.buffer,
         filename: `${namePrefix}_${safeName}.pdf`,

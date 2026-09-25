@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
+import { stampAigcPageHeader } from '../../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { JobFitPayload } from './llm-job-fit.service'
 
@@ -15,6 +16,7 @@ type JobFitReportMeta = {
     externalId: string | null
   }
   decisionSupport: JobFitPayload['decisionSupport'] | undefined
+  contentId?: string | null
 }
 
 const PDF_DROP_TERMS = [
@@ -32,13 +34,12 @@ export class JobFitPdfService {
   private readonly logger = new Logger(JobFitPdfService.name)
 
   async render(meta: JobFitReportMeta, payload: JobFitPayload): Promise<{ buffer: Buffer; pageCount: number }> {
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
-    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     applyAigcPdfMetadata(doc, {
-      title: 'AI 简历对照报告',
+      title: '简历对照',
       subject: 'AI 生成的简历与岗位要求对照，仅供求职者本人整理材料参考，不代表招聘评估或录用结果',
       kind: 'jobfit',
-      contentId: meta.job.id ?? null,
+      contentId: meta.contentId ?? meta.job.id ?? null,
     })
     const fontReady = registerCjkFont(doc)
     if (!fontReady) {
@@ -59,7 +60,7 @@ export class JobFitPdfService {
     }
     const bullet = (text: string) => doc.fontSize(10.5).fillColor('#374151').text(`· ${text}`, { lineGap: 3 })
 
-    doc.fontSize(18).fillColor('#111827').text('岗位匹配决策报告')
+    doc.fontSize(18).fillColor('#111827').text('简历对照')
     doc.moveDown(0.3)
     doc.fontSize(10).fillColor('#6b7280').text(`生成时间：${meta.date} ｜ 目标岗位：${meta.job.title}`)
     if (meta.job.company) doc.fontSize(10).fillColor('#6b7280').text(`企业：${meta.job.company}`)
@@ -128,6 +129,7 @@ export class JobFitPdfService {
       doc.fontSize(9.5).fillColor('#6b7280').text(`来源链接：${meta.job.sourceUrl}`, { lineGap: 3 })
     }
 
+    stampAigcPageHeader(doc)
     const pageCount = doc.bufferedPageRange().count
     doc.end()
     const buffer = await done
