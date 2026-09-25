@@ -5,9 +5,10 @@ import { AdminScreenController } from './console-screen.admin.controller'
 import { PartnerScreenController } from './console-screen.partner.controller'
 import { ScreenSnapshotCache } from './console-screen.cache'
 import { ConsoleScreenService } from './console-screen.service'
+import { ConsoleScreenUsageModule } from './console-screen.usage.controller'
 
 @Module({
-  imports: [AuthModule, AdminOpsModule],
+  imports: [AuthModule, AdminOpsModule, ConsoleScreenUsageModule],
   controllers: [AdminScreenController, PartnerScreenController],
   providers: [ConsoleScreenService, ScreenSnapshotCache],
 })
