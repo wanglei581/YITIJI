@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 539,
+    "endpointCount": 541,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3600,6 +3600,41 @@
         ],
         "services": [
           "ConsoleScreenService"
+        ]
+      },
+      {
+        "controller": "services/api/src/console-screen/console-screen.usage.controller.ts",
+        "handler": "AdminUsageController.getAdminUsage",
+        "method": "GET",
+        "models": [
+          "AiServiceLog",
+          "AuditLog",
+          "BrowseLog",
+          "CompanyProfile",
+          "ExternalJumpLog",
+          "FairCompany",
+          "FairMaterial",
+          "FairZone",
+          "Favorite",
+          "Job",
+          "JobFair",
+          "Order",
+          "PolicyPost",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "SyncLog",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/screen/usage",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/console-screen/console-screen.usage.service.ts"
+        ],
+        "services": [
+          "ConsoleScreenUsageService"
         ]
       },
       {
@@ -9433,6 +9468,41 @@
         ],
         "services": [
           "ConsoleScreenService"
+        ]
+      },
+      {
+        "controller": "services/api/src/console-screen/console-screen.usage.controller.ts",
+        "handler": "AdminUsageController.getPartnerUsage",
+        "method": "GET",
+        "models": [
+          "AiServiceLog",
+          "AuditLog",
+          "BrowseLog",
+          "CompanyProfile",
+          "ExternalJumpLog",
+          "FairCompany",
+          "FairMaterial",
+          "FairZone",
+          "Favorite",
+          "Job",
+          "JobFair",
+          "Order",
+          "PolicyPost",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "SyncLog",
+          "Terminal"
+        ],
+        "path": "/api/v1/partner/screen/usage",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/console-screen/console-screen.usage.service.ts"
+        ],
+        "services": [
+          "ConsoleScreenUsageService"
         ]
       },
       {
@@ -15386,7 +15456,8 @@
         "usedBy": [
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/ai-result.cleanup.task.ts",
-          "services/api/src/console-screen/console-screen.queries.ts"
+          "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts"
         ]
       },
       {
@@ -15412,6 +15483,7 @@
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/first-admin-bootstrap.ts",
           "services/api/src/auth/partner-phone-rebind.service.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/files/file-content-integrity.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/job-materials/job-materials.service.ts",
@@ -15485,6 +15557,7 @@
         "usedBy": [
           "services/api/src/activity/activity.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
@@ -15499,6 +15572,7 @@
           "services/api/src/activity/activity.service.ts",
           "services/api/src/companies/companies.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/orgs/partner-stats.service.ts"
         ]
       },
@@ -15584,6 +15658,7 @@
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
@@ -15710,6 +15785,7 @@
         ],
         "usedBy": [
           "services/api/src/assistant/daily-brief.service.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-favorites/member-favorites.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
@@ -15847,6 +15923,7 @@
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/companies/companies.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/job-ai/job-context.service.ts",
           "services/api/src/job-ai/job-quality.service.ts",
@@ -15929,6 +16006,7 @@
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/job-sync/job-sync.service.ts",
           "services/api/src/jobs/admin-fairs.service.ts",
           "services/api/src/jobs/campus-recruitment-stats.service.ts",
@@ -16128,6 +16206,7 @@
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/order-submission-ledger.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
@@ -16264,6 +16343,7 @@
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/community/community.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
           "services/api/src/member-favorites/member-favorites.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
@@ -16306,6 +16386,7 @@
           "services/api/src/console-screen/console-screen.fleet.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/contract-review/contract-review-report.service.ts",
           "services/api/src/contract-review/contract-review.cleanup.task.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
@@ -16402,6 +16483,7 @@
           "services/api/src/console-screen/console-screen.fleet.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/scan-tasks/scan-task-reaper.task.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
@@ -16735,6 +16817,7 @@
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-release-bundle.mjs",
       "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -20077,7 +20160,8 @@
     ],
     "packages/shared/src/types/consoleScreen.ts": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
-      "services/api/scripts/verify-console-screen-snapshot.ts"
+      "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "packages/shared/src/types/contractReview.ts": [
       "services/api/scripts/verify-contract-review-contract.ts"
@@ -20629,6 +20713,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
@@ -21615,6 +21700,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-error-observability.ts",
       "services/api/scripts/verify-http-exception-filter.ts",
@@ -21658,6 +21744,7 @@
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -21680,6 +21767,7 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
@@ -21741,6 +21829,7 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -21815,7 +21904,8 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.cache.ts": [
-      "services/api/scripts/verify-console-screen-snapshot.ts"
+      "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/console-screen/console-screen.dto.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
@@ -21824,13 +21914,15 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.metric.ts": [
-      "services/api/scripts/verify-console-screen-snapshot.ts"
+      "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/console-screen/console-screen.module.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.org.ts": [
-      "services/api/scripts/verify-console-screen-snapshot.ts"
+      "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/console-screen/console-screen.partner.controller.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
@@ -21845,7 +21937,17 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.types.ts": [
-      "services/api/scripts/verify-console-screen-snapshot.ts"
+      "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts"
+    ],
+    "services/api/src/console-screen/console-screen.usage.controller.ts": [
+      "services/api/scripts/verify-console-screen-usage.ts"
+    ],
+    "services/api/src/console-screen/console-screen.usage.queries.ts": [
+      "services/api/scripts/verify-console-screen-usage.ts"
+    ],
+    "services/api/src/console-screen/console-screen.usage.service.ts": [
+      "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/content/content-signing.ts": [
       "services/api/scripts/verify-ad-asset-range.ts",
@@ -23264,6 +23366,7 @@
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
@@ -30510,6 +30613,38 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:console-screen-snapshot"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          "packages/shared/src/types/consoleScreen.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/console-screen/console-screen.cache.ts",
+          "services/api/src/console-screen/console-screen.metric.ts",
+          "services/api/src/console-screen/console-screen.org.ts",
+          "services/api/src/console-screen/console-screen.types.ts",
+          "services/api/src/console-screen/console-screen.usage.controller.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
+          "services/api/src/console-screen/console-screen.usage.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-console-screen-usage.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:console-screen-usage"
       ],
       "wired": true
     },

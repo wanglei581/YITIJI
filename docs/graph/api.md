@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`539` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`541` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -286,6 +286,13 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/partner/screen/snapshot` | PartnerScreenController.getPartnerSnapshot | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | GET | `/api/v1/partner/screen/terminals/:terminalId` | PartnerScreenController.getPartnerTerminalTwin | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+
+## `services/api/src/console-screen/console-screen.usage.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/screen/usage` | AdminUsageController.getAdminUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
+| GET | `/api/v1/partner/screen/usage` | AdminUsageController.getPartnerUsage | partner | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
 
 ## `services/api/src/content/ai-poster.controller.ts`
 

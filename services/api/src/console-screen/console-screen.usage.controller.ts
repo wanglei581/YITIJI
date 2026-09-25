@@ -13,7 +13,7 @@ import type { ScreenUsageRange, ScreenUsageSnapshot } from './console-screen.typ
 import { ConsoleScreenUsageService } from './console-screen.usage.service'
 
 /** 缺省 today。非法值由 forbidNonWhitelisted / IsIn 返回 400。不接受 orgId。 */
-export class UsageRangeQueryDto {
+class UsageRangeQueryDto {
   @IsOptional()
   @IsIn(['today', '7d', '30d'])
   range?: ScreenUsageRange
@@ -30,6 +30,7 @@ export class AdminUsageController {
    * 与 snapshot 一样：已登录 admin 会话，响应走 ApiResponse。
    */
   @Get('admin/screen/usage')
+  @Roles('admin')
   async getAdminUsage(@Query() query: UsageRangeQueryDto): Promise<ApiResponse<ScreenUsageSnapshot>> {
     return ApiResponse.ok(await this.usage.getAdminUsage(query.range ?? 'today'))
   }
@@ -47,6 +48,7 @@ export class PartnerUsageController {
    * 响应保持裸对象，与 /partner/screen/snapshot 一致。
    */
   @Get('partner/screen/usage')
+  @Roles('partner')
   getPartnerUsage(
     @CurrentUser() user: AuthedUser,
     @Query() query: UsageRangeQueryDto,
@@ -70,3 +72,5 @@ export class PartnerUsageController {
   providers: [ConsoleScreenUsageService, ScreenSnapshotCache],
 })
 export class ConsoleScreenUsageModule {}
+
+export { UsageRangeQueryDto }
