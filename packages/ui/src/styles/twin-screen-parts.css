@@ -1,0 +1,712 @@
+/* ============================================================
+   数字孪生数据大屏：面板里的小件（数字 / 磁贴 / 图例 / 条形 / 告警 / 定义列表 /
+   场景浮层 / 任务流 / 时段热力 / 调用脉冲 / 步骤完成数）
+
+   从 twin-screen.css 拆出（单文件不超过 800 行）。引入顺序在 twin-screen.css 之后：变量定义在那边。
+   ============================================================ */
+/* ---------- 数字与小块 ---------- */
+.twin-big {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--tw-strong);
+  text-shadow: 0 0 20px rgba(46, 230, 168, 0.35);
+}
+
+.twin-unit {
+  margin-left: 6px;
+  color: var(--tw-muted);
+}
+
+.twin-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.twin-kv > span {
+  color: #a9cfc3;
+}
+
+.twin-kv b {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--tw-strong);
+}
+
+/* 环形图旁并排的图例或数值（机构总览的终端、数据同步）。 */
+.twin-ring-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.twin-ring-cap { margin-top: 6px; }
+
+.twin-legend-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.twin-legend-col .twin-legend {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.twin-big-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.twin-big.is-warn {
+  color: var(--tw-gold);
+  text-shadow: 0 0 20px rgba(232, 180, 92, 0.35);
+}
+
+.twin-kv b.is-warn { color: var(--tw-gold); }
+
+.twin-lite-wall { padding: 20px; }
+
+/* 折线图的图例短线：实线 = 主序列，虚线 = 第二序列。 */
+.twin-key {
+  display: inline-block;
+  width: 18px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 3px solid var(--tw-acc);
+}
+
+.twin-key.is-gold {
+  border-top: 2px dashed #f2c879;
+}
+
+.twin-notes {
+  margin: 0;
+  padding-left: 1.2em;
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #cfe9e0;
+}
+
+.twin-notes li::marker { color: var(--tw-acc); }
+
+/* 竖排的大数字行（信息使用 · 使用概况）：标签在左、数字在右，「至少」等前缀用小字。 */
+.twin-stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.twin-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(3, 26, 21, 0.55);
+  border: 1px solid rgba(46, 230, 168, 0.18);
+}
+
+.twin-stat > span { color: #a9cfc3; }
+
+.twin-stat b {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--tw-strong);
+  white-space: nowrap;
+}
+
+.twin-stat b small {
+  margin-right: 6px;
+  font-size: 0.5em;
+  font-weight: 500;
+  color: var(--tw-muted);
+}
+
+/* 排行榜：名次 · 标题 · 类型 · 次数，下面一条比例细条 */
+.twin-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.twin-rank li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 4px;
+}
+
+.twin-rank-no {
+  font-family: var(--tw-num);
+  font-weight: 700;
+  color: var(--tw-acc);
+  text-align: center;
+}
+
+.twin-rank-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #d6ece5;
+}
+
+.twin-rank-tag {
+  padding: 0 8px;
+  border-radius: 10px;
+  color: #9fb9da;
+  border: 1px solid rgba(143, 178, 238, 0.45);
+  white-space: nowrap;
+}
+
+.twin-rank li > b {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--tw-strong);
+}
+
+.twin-rank-bar {
+  grid-column: 2 / 5;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.twin-rank-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #3f68b0, #8fb2ee);
+}
+
+.twin-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.twin-tile {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(3, 26, 21, 0.55);
+  border: 1px solid rgba(127, 163, 224, 0.28);
+}
+
+.twin-tile b {
+  display: block;
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--tw-strong);
+}
+
+.twin-tile > span {
+  display: block;
+  margin-top: 4px;
+  color: #bcd6f6;
+}
+
+.twin-tile > span.twin-pend {
+  display: inline-flex;
+  margin: 4px 0 2px;
+}
+
+.twin-tiles.is-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.twin-tiles.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.twin-tiles.is-compact .twin-tile { padding: 8px 10px; }
+/* 四列紧凑磁贴的数字不折行（「2.18 秒」曾在舞台档折成两行把面板撑出块位），单位另用小一号的 span */
+.twin-tiles.is-compact .twin-tile b { white-space: nowrap; }
+
+.twin-tile small {
+  color: #8fb0d6;
+}
+
+.twin-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.twin-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tw-ink-2);
+  white-space: nowrap;
+}
+
+.twin-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 10px var(--c);
+}
+
+.twin-dot.is-warn {
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+
+.twin-dot.is-off {
+  border-radius: 3px;
+}
+
+.twin-dot.is-un {
+  background: transparent;
+  border: 2px dashed var(--c);
+  box-shadow: none;
+}
+
+.twin-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.twin-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.twin-bar-row > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.twin-bar-row > b {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--tw-strong);
+  text-align: right;
+}
+
+.twin-hbar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.twin-hbar > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 5px;
+  background: linear-gradient(90deg, rgba(46, 230, 168, 0.35), var(--tw-acc));
+  box-shadow: 0 0 12px rgba(46, 230, 168, 0.55);
+}
+
+.twin-hbar.is-info > i {
+  background: linear-gradient(90deg, rgba(127, 163, 224, 0.35), var(--tw-info));
+  box-shadow: 0 0 12px rgba(127, 163, 224, 0.55);
+}
+
+.twin-hbar.is-error > i {
+  background: linear-gradient(90deg, rgba(232, 139, 125, 0.35), var(--tw-err));
+  box-shadow: none;
+}
+
+.twin-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.twin-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: rgba(3, 26, 21, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* 可点的告警行（链接或按钮）：按钮去掉浏览器默认外观，键盘聚焦要看得见 */
+button.twin-alert {
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+a.twin-alert:hover,
+button.twin-alert:hover {
+  border-color: rgba(46, 230, 168, 0.35);
+}
+
+a.twin-alert:focus-visible,
+button.twin-alert:focus-visible {
+  outline: 2px solid var(--tw-gold);
+  outline-offset: 2px;
+}
+
+.twin-alert > .twin-code {
+  flex: none;
+  font-family: var(--tw-num);
+  font-weight: 600;
+  color: var(--tw-strong);
+}
+
+/* 说明文字是唯一可以让位的一段：放不下就省略号，时间戳永远留在行内 */
+.twin-alert > .twin-alert-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.twin-alert > .twin-when {
+  flex: none;
+  margin-left: auto;
+  font-family: var(--tw-num);
+  color: var(--tw-muted);
+}
+
+.twin-sev {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 13px;
+  font-weight: 700;
+  color: #2b1b02;
+  background: var(--tw-warn);
+}
+
+.twin-sev.is-err {
+  color: #2a0905;
+  background: var(--tw-err);
+  box-shadow: 0 0 12px rgba(232, 139, 125, 0.6);
+  animation: tw-blink 1.6s ease-in-out infinite;
+}
+
+.twin-sev.is-un {
+  color: #e4f3ee;
+  background: rgba(125, 143, 137, 0.45);
+}
+
+.twin-sev.is-pr {
+  color: #03202b;
+  background: var(--tw-print);
+}
+
+.twin-sev.is-ok {
+  color: #03261d;
+  background: var(--tw-acc);
+}
+
+.twin-empty {
+  margin: 0;
+  color: var(--tw-muted);
+}
+
+/* 设备概况：定义列表，一行一项 */
+.twin-rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.twin-rows > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.twin-rows > div:last-child {
+  border-bottom: 0;
+}
+
+.twin-rows dt {
+  flex: none;
+  color: var(--tw-muted);
+}
+
+.twin-rows dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--tw-ink);
+}
+
+/* 场景上的浮层：面包屑与图例（不进 3D 世界） */
+.twin-overlay {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(46, 230, 168, 0.35);
+  background: rgba(3, 30, 24, 0.75);
+  color: #d4f5ea;
+}
+
+.twin-overlay.is-tl {
+  left: 16px;
+  top: 16px;
+}
+
+.twin-overlay.is-tr {
+  right: 16px;
+  top: 16px;
+}
+
+/* 面板底部的站内跳转（桌面档才渲染；展示档无人值守不给出口）。 */
+.twin-link {
+  align-self: flex-end;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: #9fe8cd;
+  text-decoration: none;
+  border-radius: 6px;
+}
+.twin-link:hover { color: #d4fff0; }
+.twin-link:focus-visible { outline: 2px solid #2ee6a8; outline-offset: 2px; }
+
+.twin-crumb {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9fe8cd;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* 任务流：节点 + 管道 */
+.twin-flow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.twin-flow-node {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 84px;
+  border-radius: 12px;
+  background: rgba(3, 26, 21, 0.62);
+  border: 1px solid rgba(46, 230, 168, 0.3);
+}
+
+.twin-flow-node b {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--tw-strong);
+}
+
+.twin-flow-node span {
+  color: #a9cfc3;
+}
+
+.twin-flow-node.is-pr { border-color: rgba(114, 214, 255, 0.5); }
+.twin-flow-node.is-pr b { color: #bfeaff; }
+.twin-flow-node.is-ok { border-color: rgba(46, 230, 168, 0.6); box-shadow: 0 0 18px rgba(46, 230, 168, 0.25); }
+.twin-flow-node.is-warn b { color: var(--tw-gold); }
+.twin-flow-node.is-muted b { color: #b8c9c3; }
+
+.twin-pipe {
+  position: relative;
+  flex: 0 0 36px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(46, 230, 168, 0.2), rgba(46, 230, 168, 0.7), rgba(46, 230, 168, 0.2));
+}
+
+.twin-pipe::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--tw-acc);
+  box-shadow: 0 0 12px var(--tw-acc);
+  animation: tw-travel 2.2s linear infinite;
+}
+
+.twin-flow-sep {
+  flex: none;
+  width: 1px;
+  height: 70px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.twin-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+/* 按内容宽度流式排的小标签（建设中的指标）：不拉成等宽格子，一行放得下更多。 */
+.twin-chips.is-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+/* 定义行里的「未接入」只占自身宽度，不被拉成整行 */
+.twin-kv .twin-pend { align-self: flex-start; }
+
+@keyframes tw-travel {
+  0% { left: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+
+/* ---------- 时段热力：7 天 × 24 小时，少于 5 的格子虚线不填色 ---------- */
+.twin-heat {
+  display: grid;
+  grid-template-columns: 3.2em repeat(24, minmax(0, 1fr));
+  gap: 3px;
+  align-items: center;
+}
+
+.twin-heat i {
+  display: block;
+  height: 21px;
+  border-radius: 3px;
+}
+
+.twin-heat i.is-hidden {
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+}
+
+.twin-heat b {
+  font-weight: 500;
+  color: #8fb3a8;
+  white-space: nowrap;
+}
+
+/* ---------- 调用脉冲：每 5 分钟一柱，三段堆叠 ---------- */
+.twin-pulse {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 74px;
+}
+
+.twin-pulse > span {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+}
+
+.twin-pulse > span > i {
+  display: block;
+  border-radius: 2px;
+}
+
+.twin-pulse > span.is-now > i {
+  box-shadow: 0 0 10px currentColor;
+}
+
+/* ---------- 服务步骤完成数 ---------- */
+.twin-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.twin-step {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: rgba(3, 26, 21, 0.6);
+  border: 1px solid rgba(46, 230, 168, 0.25);
+}
+
+.twin-step.is-end {
+  border-color: rgba(46, 230, 168, 0.6);
+}
+
+.twin-step b {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--tw-strong);
+  line-height: 1.2;
+}
+
+.twin-step span {
+  color: #a9cfc3;
+  white-space: nowrap;
+}
+
+.twin-step .twin-pend {
+  align-self: flex-start;
+}
+
+.twin-steps > .twin-arrow {
+  flex: none;
+  color: var(--tw-acc);
+}
+
+/* 模型占比：一条分段条 */
+.twin-split {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+
+.twin-split > i {
+  display: block;
+  border-radius: 4px;
+}

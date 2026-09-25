@@ -25,6 +25,7 @@ export const partnerRouter = createBrowserRouter([
     children: [
       { index: true,        element: <DashboardPage /> },
       { path: 'screen',     element: <ScreenPage /> },
+      { path: 'screen/:tab', element: <ScreenPage /> },
       { path: 'profile',    element: <ProfilePage /> },
       // 招聘内容托管关闭（3.13）时这五页整块下线，直接打开地址时给如实说明，见 RecruitmentHostingGate。
       { path: 'jobs',       element: <RecruitmentHostingGate page="jobs"><JobsPage /></RecruitmentHostingGate> },

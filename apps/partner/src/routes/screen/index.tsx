@@ -1,241 +1,124 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRefreshable, replaceIfChanged } from '@ai-job-print/refresh'
-import type { ScreenSnapshot } from '@ai-job-print/shared'
-import {
-  ScreenBody,
-  ScreenDesk,
-  ScreenGrid,
-  ScreenHeader,
-  ScreenStage,
-  ScreenStatePanel,
-  useScreenPresent,
-} from '@ai-job-print/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ScreenDesk, ScreenStage, useTwinBurnInDrift, useTwinNightlyReload } from '@ai-job-print/ui'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
-import {
-  ScreenFetchError,
-  loadPartnerScreenSnapshot,
-  type ScreenFetchResult,
-} from '../../services/api/consoleScreen'
 import { redirectToLogin } from '../../services/auth'
 import { PartnerGrid } from './PartnerGrid'
-import { ScreenShell } from './screenView'
+import { PartnerTerminalView } from './PartnerTerminalView'
+import { PartnerUsageView } from './PartnerUsageView'
+import { PARTNER_SCREEN_TABS, normalizePartnerTab, screenHref } from './screenTabs'
+import { describePartnerForbidden, type ScreenChrome } from './screenView'
 
 /**
- * 合作机构数据大屏 —— `/screen`，无任何 query 参数。
+ * 合作机构数据大屏 —— `/screen/:tab`（overview 机构总览 / usage 信息使用 / terminal 终端孪生）。
  *
- * 与管理员版的差别只有三处：没有 profile 切换（机构只有一种视图）、
- * 数据全部按本机构收窄、账号没绑机构时要单独提示（403 ORG_REQUIRED，
- * 与「角色不符」不是一回事，否则机构管理员会以为是权限没开）。
+ * 与管理员版同一套外壳与组件，差别在三处：只有本机构的三个页签；数据全部按本机构收窄
+ * （服务端只从鉴权用户回源，地址与请求里一个机构标识都没有）；账号没绑机构时单独提示
+ * （403 ORG_REQUIRED 与「角色不符」不是一回事，否则机构管理员会以为是权限没开）。
+ *
+ * 两种观看距离：桌面档嵌在后台内容区里，带筛选栏；展示档由「新窗口展示」打开（地址加 display=1），
+ * 1920×1080 舞台等比铺满窗口，适合挂在服务点位的屏上无人值守。
+ * 取数失败的说法（mock 演示模式不展示大屏数值 / 登录过期要「重新登录」/ kind === 'unauthorized'
+ * 不自动跳走）统一在 @ai-job-print/ui 的 TwinShell。
  */
 
-const TITLE = '本机构运营概览'
-const SUBTITLE =
-  '数据来源：本机构终端心跳、本机构已审核发布的岗位 / 招聘会 / 政策 / 企业资料、本机构数据源同步日志。每一块都带来源脚注。'
-const POLL_SECONDS = 60
-
-type ScreenFailure = Exclude<ScreenFetchResult, { kind: 'ok' }>
-
-function resultOf(error: unknown): ScreenFailure | null {
-  return error instanceof ScreenFetchError ? error.result : null
-}
-
-function ScreenSkeleton() {
-  return (
-    <ScreenGrid layout="partner">
-      {Array.from({ length: 8 }, (_, index) => (
-        <div className="ops-card ops-span-3" key={index} aria-hidden="true">
-          <div className="ops-skel" style={{ height: 14, width: '38%' }} />
-          <div className="ops-body">
-            <div className="ops-skel" style={{ height: 28, width: '52%' }} />
-          </div>
-          <div className="ops-foot">
-            <div className="ops-skel" style={{ height: 10, width: '84%' }} />
-          </div>
-        </div>
-      ))}
-    </ScreenGrid>
-  )
-}
-
-function FailurePanel({ result, onRetry }: { result: ScreenFailure; onRetry: () => void }) {
-  if (result.kind === 'mock') {
-    return (
-      <ScreenStatePanel
-        title="演示模式不展示大屏数值"
-        description="当前构建为 mock 模式（VITE_API_MODE 不等于 http），没有连接真实后端。大屏只展示真实取数，因此这里一个数字都不显示。联调请配置 VITE_API_MODE=http 与 VITE_API_BASE_URL。"
-      />
-    )
-  }
-  if (result.kind === 'unauthorized') {
-    return (
-      <ScreenStatePanel
-        title="登录已过期"
-        description="大屏只在已登录的后台会话里展示，本期未签发免登录的只读展示令牌。重新登录后即可继续显示。"
-        action={
-          <button type="button" className="ops-btn" onClick={() => redirectToLogin()}>
-            重新登录
-          </button>
-        }
-      />
-    )
-  }
-  if (result.kind === 'forbidden') {
-    return (
-      <ScreenStatePanel
-        title={result.code === 'ORG_REQUIRED' ? '当前账号未绑定机构' : '无权查看本大屏'}
-        description={
-          result.code === 'ORG_REQUIRED'
-            ? `${result.message}。大屏只展示本机构数据，账号没有机构归属时没有可展示的范围，请联系平台侧为该账号绑定机构。`
-            : result.message
-        }
-      />
-    )
-  }
-  if (result.kind === 'offline') {
-    return (
-      <ScreenStatePanel
-        title="与服务器断开"
-        description="没有取到任何一次成功数据，因此这里不显示任何数值。恢复网络后可手动重试。"
-        action={
-          <button type="button" className="ops-btn" onClick={onRetry}>
-            重试
-          </button>
-        }
-      />
-    )
-  }
-  return (
-    <ScreenStatePanel
-      title="大屏数据获取失败"
-      description={result.message}
-      action={
-        <button type="button" className="ops-btn" onClick={onRetry}>
-          重试
-        </button>
-      }
-    />
-  )
-}
-
 export default function PartnerScreenPage() {
-  const { presenting, setPresenting } = useScreenPresent()
-  const [offlineHint, setOfflineHint] = useState(false)
+  const { tab: rawTab } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const tab = normalizePartnerTab(rawTab)
+  const presenting = searchParams.get('display') === '1'
+  const lite = searchParams.get('lite') === '1'
   // 动效可显式关掉（低性能机 / 录屏）。关掉后纵深层次保留，只是静止。
   const [motion, setMotion] = useState(true)
+  const drift = useTwinBurnInDrift(presenting)
+  useTwinNightlyReload(presenting)
 
-  const fetcher = useCallback(() => loadPartnerScreenSnapshot(), [])
-  const { data, status, error, refresh } = useRefreshable<ScreenSnapshot>(
-    'partner:screen',
-    fetcher,
-    useMemo(
-      () => ({
-        intervalMs: POLL_SECONDS * 1000,
-        merge: replaceIfChanged<ScreenSnapshot>,
-        failPolicy: 'keep-last' as const,
-      }),
-      [],
-    ),
+  // 旧地址 /screen、缺省或非法页签：就地改写成规范地址，地址栏与实际视图一致。
+  useEffect(() => {
+    if (rawTab !== tab) navigate(screenHref(tab, searchParams, {}, true), { replace: true })
+  }, [rawTab, tab, navigate, searchParams])
+
+  const setParam = useCallback(
+    (key: string, value: string | null) => {
+      const next = new URLSearchParams(searchParams)
+      if (value === null) next.delete(key)
+      else next.set(key, value)
+      setSearchParams(next, { replace: true })
+    },
+    [searchParams, setSearchParams],
   )
 
-  const failure = resultOf(error)
-  useEffect(() => {
-    setOfflineHint(failure?.kind === 'offline')
-  }, [failure])
+  const openDisplayWindow = () => {
+    window.open(screenHref(tab, searchParams, { display: '1' }, true), '_blank', 'noopener')
+  }
+  const exitDisplay = () => {
+    window.close()
+    // 不是脚本打开的窗口关不掉：回到桌面档，不留空白页
+    navigate(screenHref(tab, searchParams, { display: null }, true), { replace: true })
+  }
+  const enterFullscreen = () => {
+    const el = document.documentElement
+    if (el.requestFullscreen && !document.fullscreenElement) void el.requestFullscreen().catch(() => undefined)
+  }
 
-  const actions = (
+  // 页眉标题层级：嵌在后台 Page 里外层 PageHeader 已是 h1，这里降 h2；展示窗口里整份文档就是大屏，回到 h1。
+  const headingLevel = presenting ? 1 : 2
+
+  const pageActions = presenting ? (
     <>
-      <button
-        type="button"
-        className="ops-btn"
-        onClick={() => {
-          void refresh()
-        }}
-        disabled={status === 'loading'}
-      >
-        刷新
+      <button type="button" className="twin-btn" onClick={enterFullscreen}>
+        全屏
       </button>
-      <button
-        type="button"
-        className="ops-btn"
-        aria-pressed={!motion}
-        onClick={() => setMotion(!motion)}
-      >
+      <button type="button" className="twin-btn" onClick={exitDisplay}>
+        退出展示
+      </button>
+    </>
+  ) : (
+    <>
+      <button type="button" className="twin-btn" aria-pressed={!motion} onClick={() => setMotion(!motion)}>
         {motion ? '关闭动效' : '开启动效'}
       </button>
-      <button
-        type="button"
-        className="ops-btn"
-        aria-pressed={presenting}
-        onClick={() => setPresenting(!presenting)}
-      >
-        {presenting ? '退出全屏演示' : '全屏演示'}
+      <button type="button" className="twin-btn" aria-pressed={lite} onClick={() => setParam('lite', lite ? null : '1')}>
+        轻量模式
+      </button>
+      <button type="button" className="twin-btn is-primary" onClick={openDisplayWindow}>
+        新窗口展示
       </button>
     </>
   )
 
-  // 标题层级随寄居方式变：嵌在 Page 里外层 PageHeader 已是 h1，这里降 h2；
-  // 全屏演示时覆盖层就是整份文档，标题回到 h1。不做条件 CSS 隐藏 —— 那只骗眼睛，
-  // 读屏器与 locator('h1') 照样看见两个。
-  const headingLevel = presenting ? 1 : 2
-
-  let content: JSX.Element
-  if (!data && failure) {
-    content = (
-      <ScreenBody>
-        <ScreenHeader
-          title={TITLE}
-          headingLevel={headingLevel}
-          subtitle={SUBTITLE}
-          actions={actions}
-        />
-        <FailurePanel
-          result={failure}
-          onRetry={() => {
-            void refresh()
-          }}
-        />
-      </ScreenBody>
-    )
-  } else if (!data) {
-    content = (
-      <ScreenBody>
-        <ScreenHeader
-          title={TITLE}
-          headingLevel={headingLevel}
-          subtitle={SUBTITLE}
-          windowText="正在取数，未取到之前不显示任何数值"
-          actions={actions}
-        />
-        <ScreenSkeleton />
-      </ScreenBody>
-    )
-  } else {
-    content = (
-      <ScreenShell
-        title={TITLE}
-        headingLevel={headingLevel}
-        subtitle={SUBTITLE}
-        snapshot={data}
-        pollSeconds={POLL_SECONDS}
-        stale={Boolean(failure)}
-        offline={offlineHint}
-        failure={failure}
-        onRelogin={() => redirectToLogin()}
-        actions={actions}
-      >
-        <PartnerGrid metrics={data.metrics} />
-      </ScreenShell>
-    )
+  const chrome: ScreenChrome = {
+    headingLevel,
+    presenting,
+    lite,
+    tabs: PARTNER_SCREEN_TABS.map((item) => ({
+      key: item.key,
+      label: item.label,
+      href: screenHref(item.key, searchParams),
+      current: item.key === tab,
+    })),
+    onNavigate: (href) => navigate(href),
+    pageActions,
+    params: searchParams,
+    setParam,
+    onRelogin: () => redirectToLogin(),
+    describeForbidden: describePartnerForbidden,
   }
+
+  const content =
+    tab === 'terminal' ? (
+      <PartnerTerminalView chrome={chrome} />
+    ) : tab === 'usage' ? (
+      <PartnerUsageView chrome={chrome} />
+    ) : (
+      <PartnerGrid chrome={chrome} />
+    )
 
   if (presenting) {
     return (
-      <ScreenStage
-        label={`${TITLE}（全屏演示）`}
-        motion={motion}
-        onExit={() => setPresenting(false)}
-      >
-        {content}
+      <ScreenStage label="本机构数据大屏（展示）" motion={motion} onExit={exitDisplay}>
+        <div style={{ transform: `translate(${drift[0]}px, ${drift[1]}px)` }}>{content}</div>
       </ScreenStage>
     )
   }
@@ -244,11 +127,13 @@ export default function PartnerScreenPage() {
     <Page
       title="数据大屏"
       subtitle={withFrontendHint(
-        '本机构运营概览只读视图，可全屏演示；全部数值来自真实取数，给不出机构维度的指标如实标注',
+        '本机构终端与信息的只读视图，可新窗口展示；全部数值来自真实取数，给不出机构维度的指标如实标注',
         FRONTEND_HINT.screen,
       )}
     >
-      <ScreenDesk label={TITLE} motion={motion}>{content}</ScreenDesk>
+      <ScreenDesk label="本机构数据大屏" motion={motion}>
+        {content}
+      </ScreenDesk>
     </Page>
   )
 }
