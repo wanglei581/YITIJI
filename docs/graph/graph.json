@@ -11771,7 +11771,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 560,
+      "reachableFileCount": 561,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14699,7 +14699,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 637
+      "sourceFileCount": 638
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18757,6 +18757,9 @@
     "apps/kiosk/src/pages/upload/phone-upload-service-desk.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
+    ],
+    "apps/kiosk/src/pages/upload/phoneUploadModel.ts": [
+      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/routes/index.tsx": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
@@ -26666,6 +26669,7 @@
           "apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
+          "apps/kiosk/src/pages/upload/phoneUploadModel.ts",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/api/uploadSessions.ts",
           "apps/kiosk/src/services/files/usbImportApi.ts"

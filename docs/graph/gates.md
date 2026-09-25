@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1483 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1484 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -272,7 +272,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 480 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 481 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -689,6 +689,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/pages/upload/hooks/useUploadSession.ts` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/upload/phone-upload-service-desk.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
+| `apps/kiosk/src/pages/upload/phoneUploadModel.ts` | `verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/routes/index.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-baseline.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w4.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-jobfair-checkin.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-profile-activity-inkpaper.mjs`<br/>`verify-profile-ai-records-inkpaper.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-qr-login-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-smart-campus-ui.mjs`<br/>`verify-visual-evidence-manifest.mjs`<br/>`frontend.mjs` |
 | `apps/kiosk/src/services/api/activity.ts` | `verify-jobfair-checkin.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-activity-inkpaper.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/services/api/ai.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |

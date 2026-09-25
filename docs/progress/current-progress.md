@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-09-25：原稿 51 手机上传分屏运行时合流（本地候选，UI/商用仍 NO-GO）
+
+Claude Opus 5.5 xhigh 以用户原目录 `51-phone-relay.html` 的 `screen=phone-upload` 为只读目标，重做真实 `/upload/phone` 手机页面的三步结构、文件选择、等待/失败/结果未知/已收到与回一体机确认提示。手机只有 URL fragment 的 `sessionId`、上传令牌和可改的用途提示；上传前按三个受支持用途的格式交集保守预检，成功用途只认服务端收据，签名图片手机会话仍不可用。网络或空回执不说已收到，服务端虽回 `uploaded` 但无文件指针/未知用途也保持结果未知；手机号和文件令牌不入可见文案，页面换链接会丢弃前一次结论。Claude MCP 到时限后留下完整代码，Codex 补齐同文件夹的既有浏览器断言、实屏验收并提交隔离树 `60bbc07fd`，选择性合流主候选 `cf12de49d`。只新增一份实际引用的纯逻辑模型 `phoneUploadModel.ts`，无新路由、依赖、PR 或原稿改写。
+
+原稿和运行时 390×844 的待选/已收到截图已实际对照：顶栏、三步、选择卡、文件收据、底部隐私提示按新稿结构落版，并保留触控尺寸。隔离树 Kiosk typecheck/构建、`verify:resume-phone-upload-ui`、`verify:fusion-w6`、局部 ESLint 和 390 W5 浏览器无效链接/断网结果未知/完整收据成功 **3/3** 通过；随后补的“uploaded 但 file=null 不冒称成功”浏览器 **1/1** 通过。主候选 Kiosk typecheck 与上述两项静态门禁通过。所有浏览器回执均为合成夹具；真实手机浏览器/微信上传、扫码场景码、到机确认、Agent 下载/打印和线上尚未验，51 号原稿运行时及商业仍 NO-GO。
+
+## 2026-09-25：手机上传会话收据竞态修复（本地候选，商用仍 NO-GO）
+
+Grok 4.7 Build Fast xhigh 在既有 `verify:upload-sessions` 先复现：场景码兑换用锁外 `pending` 快照覆盖已成功上传的 `uploaded` 收据；30 秒上传锁过期后旧请求还能删除新锁，甚至在校验锁与写收据之间覆盖另一手机已成功的文件。Codex 又定位到更早的普通 `pending → uploading` 写入同样可在锁过期后覆盖成功收据；Grok 为这两段各加确定性交错反证并依次修复。最终 `compareAndSetSession` 通过同一次 Redis Lua 比较锁令牌、会话状态、无文件与剩余 TTL，再写入开始态、场景码轮换或最终收据；失败只删本次未挂接文件，不拆后继锁。中文 multipart 文件名改为复用本机上传的严格还原函数。Grok 三次隔离提交 `92c1d9fac`、`97ab1eb69`、`62be4ff78`，Codex 仅选择性接入六个已有代码/验证文件，主候选文件内容与最终隔离提交相同；没有新增路由、依赖或脚本。既有 `verify-upload-sessions.ts` 现为 1488 行，下一次扩展前应按职责拆分，不能继续堆场景。
+
+隔离树 `verify:upload-sessions`、`verify:upload-scene` **17 项**、`verify:kiosk-upload-print-contract` **11 项**、API typecheck 与局部 ESLint 通过；主候选最新六文件的上传会话门禁、API typecheck、diff check 退出 0。Agy Gemini 3.8 Flash 先独立确认最终收据的校验/落库非原子 P1，再对 Lua 修复作限定只读复核无具体新 P0/P1；`pending → uploading` 的后续原子化由 Codex 复核和 Grok 红绿交错用例证明。确认/取消/过期清扫仍沿用 30 秒会话锁与锁内慢操作，相关交错正在继续审查，不能把整个会话生命周期写成已闭环。真实 Redis/PostgreSQL 并发、HTTP、微信/Windows/奔图、当前 SHA CI 和生产均未验，商业仍 NO-GO。
+
 ## 2026-09-25：原稿 51 手机确认登录运行时合流（本地候选，UI/商用仍 NO-GO）
 
 Claude Opus 5.5 xhigh 以用户原目录 `51-phone-relay.html` 的 `screen=qr-login` 为只读目标，重做真实 `/member/qr-login` 手机壳、设备核对、手机号验证、逐态提示与底部操作；与同稿的手机上传流程分开，后者本次未改。页面只按真实票据状态、发码、确认回执推进：手机端“已确认”不冒称一体机已登录，服务端回执未知不盲重试，机名缺失不编造，剩余时间只标为打开时读取。原有文件拆出三份有实际引用的状态判据、逐态文案、展示组件；无新路由、依赖、设计稿改写或 PR。Codex 复核发现同页切换 `ticketId` 时旧手机号/验证码和迟到确认可能串到新票据，Claude 再以独立会话号和在途回执隔离修复，增加既有浏览器套件回归；两次 Claude MCP 汇报超时，但隔离树留下干净提交，Codex 独立核对并选择性合流 `5c9ed5d4f`、`ba32fdc5a`。
