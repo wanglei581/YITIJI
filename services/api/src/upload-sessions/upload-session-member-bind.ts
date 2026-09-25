@@ -242,7 +242,7 @@ export async function publishConfirmed(
   file: BindFileRow,
 ): Promise<UploadSessionConfirmResponse> {
   if (session.status !== 'confirmed' && new Date(session.expiresAt).getTime() <= Date.now()) {
-    throw expiredBindException()
+    throw expiredBindException(memberRowRetained(file, session))
   }
   if (!session.file || file.deletedAt || (session.mode === 'member' && (file.ownerType !== 'user' || file.replacedStorageKey))) {
     throw new BadRequestException({
@@ -527,10 +527,42 @@ export function isLiveMember(file: Pick<BindFileRow, 'deletedAt' | 'ownerType' |
   return !file.deletedAt && (file.ownerType === 'user' || Boolean(file.endUserId))
 }
 
-function expiredBindException(): BadRequestException {
+function expiredBindException(memberFileRetained = false): BadRequestException {
+  return expiredUploadSessionException(memberFileRetained)
+}
+
+/**
+ * 保持 UPLOAD_SESSION_EXPIRED，另加布尔标记。
+ * 新错误码会让还没改的一体机落到「确认失败」兜底，过期这句话就没了。
+ * 标记只有 true，不带文件名、fileId 或对象键。
+ */
+export function expiredUploadSessionException(memberFileRetained = false): BadRequestException {
   return new BadRequestException({
-    error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' },
+    error: {
+      code: 'UPLOAD_SESSION_EXPIRED',
+      message: '二维码已过期,请重新生成',
+      ...(memberFileRetained ? { memberFileRetained: true } : {}),
+    },
   })
+}
+
+export function memberRowRetained(
+  file: Pick<BindFileRow, 'deletedAt' | 'ownerType' | 'endUserId'> | null,
+  stored: StoredUploadSession,
+): boolean {
+  if (!file || !isLiveMember(file) || file.ownerType !== 'user' || !file.endUserId) return false
+  if (stored.pendingEndUserId && file.endUserId !== stored.pendingEndUserId) return false
+  return true
+}
+
+export async function sessionRetainsMemberFile(
+  host: MemberBindHost,
+  stored: StoredUploadSession,
+): Promise<boolean> {
+  const fileId = stored.file?.fileId ?? stored.bind?.fileId ?? null
+  if (!fileId) return false
+  const file = await loadBindFile(host, fileId)
+  return memberRowRetained(file, stored)
 }
 
 export async function loadBindFile(

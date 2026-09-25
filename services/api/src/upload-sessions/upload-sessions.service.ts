@@ -19,15 +19,18 @@ import {
   abandonAfterCommit,
   cleanupExpiredSessions as sweepExpiredUploadSessions,
   driveMemberBind,
+  expiredUploadSessionException,
   finishExpired,
   isLiveMember,
   loadBindFile,
+  sessionRetainsMemberFile,
   type MemberBindHost,
   type StoredUploadSession,
   type StoredUploadSessionCleanup,
   type UploadSessionConfirmResponse,
   type UploadSessionFileView,
 } from './upload-session-member-bind'
+import { deleteAnonymousObjectThenTombstone } from './upload-session-object-delete'
 import { isWellFormedSceneToken, mintSceneToken, sceneIndexKey } from './upload-scene'
 import type {
   UploadSessionChannel,
@@ -371,13 +374,21 @@ export class UploadSessionsService {
           lockToken,
           'uploading',
         )
-        await this.files.systemDelete(file.fileId, 'upload session expired during upload').catch(() => undefined)
+        await deleteAnonymousObjectThenTombstone(
+          this.memberBind,
+          file.fileId,
+          'upload session expired during upload',
+        )
         if (marked === 'updated') await this.removeFromExpiryIndex(args.sessionId)
         throw expiredSessionException()
       }
       const committed = await this.commitSession(uploaded, lockKey, lockToken, 'uploading')
       if (committed !== 'updated') {
-        await this.files.systemDelete(file.fileId, 'upload lock lost before commit').catch(() => undefined)
+        await deleteAnonymousObjectThenTombstone(
+          this.memberBind,
+          file.fileId,
+          'upload lock lost before commit',
+        )
         if (committed === 'expired') throw expiredSessionException()
         if (committed === 'conflict') {
           throw new BadRequestException({
@@ -402,9 +413,18 @@ export class UploadSessionsService {
       const stored = await this.load(sessionId)
       const record = this.markExpired(stored)
       this.assertControlToken(record, controlToken)
+      if (stored.status === 'confirmed' && stored.file) {
+        if (stored.mode === 'member' && (!endUserId || endUserId !== stored.pendingEndUserId)) {
+          throw new ForbiddenException({
+            error: { code: 'UPLOAD_SESSION_MEMBER_MISMATCH', message: '会员身份与上传会话不一致' },
+          })
+        }
+        return { sessionId, status: 'confirmed', file: stored.file }
+      }
       if (record.status === 'expired') {
+        const retained = await sessionRetainsMemberFile(this.memberBind, stored)
         await finishExpired(this.memberBind, stored, 'upload session expired before confirm', lock)
-        throw expiredSessionException()
+        throw expiredSessionException(retained)
       }
       if (stored.mode === 'member' && stored.status === 'uploaded' && stored.file) {
         if (!endUserId || endUserId !== stored.pendingEndUserId) {
@@ -461,8 +481,9 @@ export class UploadSessionsService {
       }
       const record = this.markExpired(stored)
       if (record.status === 'expired') {
+        const retained = await sessionRetainsMemberFile(this.memberBind, stored)
         await finishExpired(this.memberBind, stored, 'upload session expired before cancel', lock)
-        throw expiredSessionException()
+        throw expiredSessionException(retained)
       }
       const file = stored.file ? await loadBindFile(this.memberBind, stored.file.fileId) : null
       if (file && isLiveMember(file) && stored.bind && stored.bind.phase !== 'done') {
@@ -657,10 +678,8 @@ function sceneUnusableException(): BadRequestException {
   })
 }
 
-function expiredSessionException(): BadRequestException {
-  return new BadRequestException({
-    error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' },
-  })
+function expiredSessionException(memberFileRetained = false): BadRequestException {
+  return expiredUploadSessionException(memberFileRetained)
 }
 
 function uploadInProgressException(): BadRequestException {

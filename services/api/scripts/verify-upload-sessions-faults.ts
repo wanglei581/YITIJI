@@ -379,8 +379,13 @@ async function assertExpiredOwnershipDoesNotConfirm(): Promise<void> {
     await assert.rejects(
       () => service.confirm(sessionId, session.controlToken, endUserId),
       (error: unknown) => {
-        const response = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+        const response = (error as { getResponse?: () => { error?: { code?: string; memberFileRetained?: boolean } } }).getResponse?.()
+        const serialized = JSON.stringify(response ?? {})
         return response?.error?.code === 'UPLOAD_SESSION_EXPIRED'
+          && response.error.memberFileRetained === true
+          && !serialized.includes(row.filename)
+          && !serialized.includes(fileId)
+          && !serialized.includes(userKey)
       },
       'an expired session must not confirm after ownership has switched',
     )
