@@ -92,7 +92,9 @@ export class RedisService implements OnModuleDestroy {
 
   /**
    * 同一次 Lua：锁值仍是调用方的、会话仍是 expectedStatus、文件身份符合 expectedFileId、键 TTL 仍大于 0，
-   * 才按剩余 TTL 写入。expectedFileId 为空表示当前必须还没有文件。任一条件不成立都不改会话。
+   * 才按剩余 TTL 写入。expectedFileId 为空表示当前必须还没有文件。
+   * expectedPhase 为空字符串表示当前还没有 bind；传入阶段时必须一致。
+   * cleanup 与会话、过期索引在同一次脚本里写入，进程在返回前被杀掉也不会只留下一半。
    */
   async compareAndSetSession(
     sessionKey: string,
@@ -101,7 +103,30 @@ export class RedisService implements OnModuleDestroy {
     nextValue: string,
     expectedStatus: string,
     expectedFileId: string | null = null,
+    expectedPhase: string | null = null,
+    cleanup: {
+      key: string
+      value: string
+      ttlSeconds: number
+      indexKey: string
+      indexScore: number
+      indexMember: string
+    } | null = null,
   ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
+    const keys = [sessionKey, lockKey]
+    const args = [lockToken, nextValue, expectedStatus, expectedFileId ?? '']
+    if (expectedPhase !== null || cleanup) {
+      args.push(expectedPhase ?? '')
+      if (cleanup) {
+        keys.push(cleanup.key, cleanup.indexKey)
+        args.push(
+          cleanup.value,
+          String(cleanup.ttlSeconds),
+          String(cleanup.indexScore),
+          cleanup.indexMember,
+        )
+      }
+    }
     const result = await this.client.eval(
       `
       -- UPLOAD_SESSION_COMMIT
@@ -122,16 +147,41 @@ export class RedisService implements OnModuleDestroy {
       elseif actualId ~= expectedFile then
         return -2
       end
+      local expectedPhase = ARGV[5]
+      local cleanupKey = KEYS[3]
+      local cleanupValue = ARGV[6]
+      local cleanupTtl = nil
+      if cleanupKey ~= nil and cleanupKey ~= false and cleanupKey ~= ''
+        and cleanupValue ~= nil and cleanupValue ~= false and cleanupValue ~= '' then
+        cleanupTtl = tonumber(ARGV[7])
+        if cleanupTtl == nil or cleanupTtl <= 0 then return -2 end
+      end
+      if expectedPhase ~= nil and expectedPhase ~= false then
+        local bind = session['bind']
+        local actualPhase = nil
+        if type(bind) == 'table' then actualPhase = bind['phase'] end
+        if expectedPhase == '' then
+          if actualPhase ~= nil and actualPhase ~= false then return -2 end
+        elseif actualPhase ~= expectedPhase then
+          return -2
+        end
+      end
       redis.call('SET', KEYS[1], ARGV[2], 'EX', ttl)
+      if cleanupTtl ~= nil then
+        redis.call('SET', cleanupKey, cleanupValue, 'EX', cleanupTtl)
+        local indexKey = KEYS[4]
+        local indexScore = tonumber(ARGV[8])
+        local indexMember = ARGV[9]
+        if indexKey ~= nil and indexKey ~= false and indexKey ~= ''
+          and indexScore ~= nil and indexMember ~= nil and indexMember ~= false and indexMember ~= '' then
+          redis.call('ZADD', indexKey, indexScore, indexMember)
+        end
+      end
       return 1
       `,
-      2,
-      sessionKey,
-      lockKey,
-      lockToken,
-      nextValue,
-      expectedStatus,
-      expectedFileId ?? '',
+      keys.length,
+      ...keys,
+      ...args,
     )
     const code = Number(result)
     if (code === 1) return 'updated'

@@ -1190,6 +1190,13 @@ model FileObject {
   storageDeleteAttempts  Int?      // 已尝试的物理删除次数(null = 未记账)
   storageDeleteError     String?   // 最近一次失败的错误类型名;不含文件名/路径/租户信息
 
+  // 手机上传会员确认的两个对象键。复制前写入 pendingStorageKey；
+  // 条件更新把 storageKey 换成它，同时把匿名旧键记到 replacedStorageKey。
+  // 两列可空且无默认值：null 表示没有待完成的复制或待删除的旧键。
+  // 清扫只捞非 null 行。Redis 清理记录过期后，旧键和未挂上的复制仍能删掉。
+  pendingStorageKey  String?
+  replacedStorageKey String?
+
   // 文件资产分类 / 派生关系 / 保存策略。
   // 取值由应用层校验,保持 SQLite / PostgreSQL schema parity。
   assetCategory String @default("original") // 'original' | 'optimized' | 'derived'
@@ -1225,6 +1232,8 @@ model FileObject {
   @@index([sourceFileId])
   // 物理删除重试对账的选行索引:待重试行相对全表极少,不能全表扫。
   @@index([storageDeletePendingAt])
+  @@index([pendingStorageKey])
+  @@index([replacedStorageKey])
 }
 
 // ── Materials / Document Processing ─────────────────────────────────────────

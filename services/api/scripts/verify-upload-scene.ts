@@ -72,13 +72,17 @@ async function main(): Promise<void> {
         if (script.includes('UPLOAD_SESSION_COMMIT')) {
           const sessionKey = keys[0] ?? ''
           const lockKey = keys[1] ?? ''
-          const [lockToken, nextValue, expectedStatus, expectedFile] = args
+          const [lockToken, nextValue, expectedStatus, expectedFile, expectedPhase, cleanupValue, cleanupTtl, indexScore, indexMember] = args
           const ttl = await client.ttl(sessionKey)
           if (ttl <= 0) return 0
           if ((await client.get(lockKey)) !== lockToken) return -1
           const raw = await client.get(sessionKey)
           if (!raw) return 0
-          const session = JSON.parse(raw) as { status?: string; file?: { fileId?: string } | null }
+          const session = JSON.parse(raw) as {
+            status?: string
+            file?: { fileId?: string } | null
+            bind?: { phase?: string } | null
+          }
           const actualId = session.file?.fileId ?? null
           if (session.status !== expectedStatus) return -2
           if (!expectedFile) {
@@ -86,7 +90,21 @@ async function main(): Promise<void> {
           } else if (actualId !== expectedFile) {
             return -2
           }
+          if (expectedPhase !== undefined) {
+            const actualPhase = session.bind?.phase ?? ''
+            if (expectedPhase === '' ? Boolean(actualPhase) : actualPhase !== expectedPhase) return -2
+          }
+          const cleanupKey = keys[2]
+          let parsedCleanupTtl = 0
+          if (cleanupKey && cleanupValue) {
+            parsedCleanupTtl = Number(cleanupTtl)
+            if (!Number.isFinite(parsedCleanupTtl) || parsedCleanupTtl <= 0) return -2
+          }
           await client.setex(sessionKey, ttl, nextValue ?? '')
+          if (cleanupKey && cleanupValue && parsedCleanupTtl > 0) {
+            await client.setex(cleanupKey, parsedCleanupTtl, cleanupValue)
+            if (keys[3] && indexMember) await client.zadd(keys[3], indexScore ?? '0', indexMember)
+          }
           return 1
         }
         const key = keys[0] ?? ''
@@ -107,6 +125,34 @@ async function main(): Promise<void> {
     })
   }
   const redis = new RedisService(client as never)
+  {
+    await client.setex('upload_session:atomic', 60, JSON.stringify({ status: 'uploaded', file: { fileId: 'file_atomic' } }))
+    await client.setex('upload_session_upload_lock:atomic', 30, 'token-1')
+    const wrote = await redis.compareAndSetSession(
+      'upload_session:atomic',
+      'upload_session_upload_lock:atomic',
+      'token-1',
+      JSON.stringify({ status: 'uploaded', file: { fileId: 'file_atomic' }, bind: { phase: 'intent', fileId: 'file_atomic' } }),
+      'uploaded',
+      'file_atomic',
+      '',
+      {
+        key: 'upload_session_cleanup:atomic',
+        value: JSON.stringify({ file: { fileId: 'file_atomic' }, bind: { phase: 'intent' } }),
+        ttlSeconds: 60,
+        indexKey: 'upload_session_expiry_index',
+        indexScore: 1,
+        indexMember: 'atomic',
+      },
+    )
+    const mirrored = await client.get('upload_session_cleanup:atomic')
+    const sessionRaw = await client.get('upload_session:atomic')
+    check(
+      '会员确认意图同一次写入会话和清理记录',
+      wrote === 'updated' && Boolean(mirrored?.includes('file_atomic') && mirrored.includes('intent') && sessionRaw?.includes('intent')),
+    )
+    await client.del('upload_session:atomic', 'upload_session_upload_lock:atomic', 'upload_session_cleanup:atomic')
+  }
   const service = new UploadSessionsService(redis as never, null as never, null as never)
 
   const created = await service.create({

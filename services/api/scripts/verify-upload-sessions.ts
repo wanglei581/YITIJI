@@ -36,6 +36,9 @@ interface StoredFile {
   ownerId: string | null
   deletedAt: Date | null
   expiresAt: Date | null
+  pendingStorageKey?: string | null
+  replacedStorageKey?: string | null
+  updatedAt?: Date | null
   retentionPolicy: string | null
   retentionSetBy: string | null
   retentionConsentAt: Date | null
@@ -116,6 +119,15 @@ class FakeRedis {
     nextValue: string,
     expectedStatus: string,
     expectedFileId: string | null = null,
+    expectedPhase: string | null = null,
+    cleanup: {
+      key: string
+      value: string
+      ttlSeconds: number
+      indexKey: string
+      indexScore: number
+      indexMember: string
+    } | null = null,
   ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
     const now = Date.now()
     const session = this.values.get(sessionKey)
@@ -125,9 +137,9 @@ class FakeRedis {
     }
     const lock = this.values.get(lockKey)
     if (!lock || lock.expiresAt <= now || lock.value !== lockToken) return 'lost-lock'
-    let parsed: { status?: string; file?: { fileId?: string } | null }
+    let parsed: { status?: string; file?: { fileId?: string } | null; bind?: { phase?: string } | null }
     try {
-      parsed = JSON.parse(session.value) as { status?: string; file?: { fileId?: string } | null }
+      parsed = JSON.parse(session.value) as { status?: string; file?: { fileId?: string } | null; bind?: { phase?: string } | null }
     } catch {
       return 'conflict'
     }
@@ -138,7 +150,20 @@ class FakeRedis {
     } else if (actualId !== expectedFileId) {
       return 'conflict'
     }
+    if (expectedPhase !== null) {
+      const actualPhase = parsed.bind?.phase ?? ''
+      if (expectedPhase === '' ? Boolean(actualPhase) : actualPhase !== expectedPhase) return 'conflict'
+    }
     this.values.set(sessionKey, { value: nextValue, expiresAt: session.expiresAt })
+    if (cleanup) {
+      this.values.set(cleanup.key, {
+        value: cleanup.value,
+        expiresAt: now + cleanup.ttlSeconds * 1000,
+      })
+      const index = this.sortedSets.get(cleanup.indexKey) ?? new Map<string, number>()
+      index.set(cleanup.indexMember, cleanup.indexScore)
+      this.sortedSets.set(cleanup.indexKey, index)
+    }
     return 'updated'
   }
 
@@ -207,11 +232,78 @@ class FakePrisma {
       const current = this.files.get(where.id)
       if (!current) throw new Error(`file not found: ${where.id}`)
       this.fileUpdateCalls.push({ id: where.id, data })
-      const next = { ...current, ...data }
+      const next = { ...current, ...data, updatedAt: new Date() }
       this.files.set(where.id, next)
       if (select?.expiresAt) return { expiresAt: next.expiresAt }
       return next
     },
+    updateMany: async ({
+      where,
+      data,
+    }: {
+      where: {
+        id?: string
+        storageKey?: string
+        deletedAt?: null
+        pendingStorageKey?: string | null
+        replacedStorageKey?: string | null
+        updatedAt?: { lt: Date }
+      }
+      data: Partial<StoredFile>
+    }) => {
+      const current = where.id ? this.files.get(where.id) : undefined
+      if (!current || !this.matches(current, where)) return { count: 0 }
+      await this.fileObject.update({ where: { id: current.id }, data })
+      return { count: 1 }
+    },
+    findMany: async ({
+      where,
+      take,
+    }: {
+      where?: {
+        OR?: Array<{
+          pendingStorageKey?: { not: null }
+          replacedStorageKey?: { not: null }
+        }>
+      }
+      take?: number
+    }) => {
+      let rows = [...this.files.values()]
+      if (where?.OR) {
+        rows = rows.filter((row) => where.OR!.some((clause) => {
+          if (clause.pendingStorageKey) return row.pendingStorageKey != null
+          if (clause.replacedStorageKey) return row.replacedStorageKey != null
+          return false
+        }))
+      }
+      return rows.slice(0, take ?? rows.length)
+    },
+  }
+
+  private matches(
+    row: StoredFile,
+    where: {
+      id?: string
+      storageKey?: string
+      deletedAt?: null
+      pendingStorageKey?: string | null
+      replacedStorageKey?: string | null
+      updatedAt?: { lt: Date }
+    },
+  ): boolean {
+    if (where.id && row.id !== where.id) return false
+    if ('deletedAt' in where && where.deletedAt === null && row.deletedAt !== null) return false
+    if (typeof where.storageKey === 'string' && row.storageKey !== where.storageKey) return false
+    if ('pendingStorageKey' in where) {
+      if (where.pendingStorageKey === null) {
+        if (row.pendingStorageKey != null) return false
+      } else if (row.pendingStorageKey !== where.pendingStorageKey) return false
+    }
+    if (typeof where.replacedStorageKey === 'string' && row.replacedStorageKey !== where.replacedStorageKey) return false
+    if (where.updatedAt?.lt) {
+      if (!row.updatedAt || row.updatedAt.getTime() >= where.updatedAt.lt.getTime()) return false
+    }
+    return true
   }
 }
 
@@ -281,6 +373,9 @@ class FakeFilesService {
       ownerId: args.endUserId ?? null,
       deletedAt: null,
       expiresAt: retention.expiresAt,
+      pendingStorageKey: null,
+      replacedStorageKey: null,
+      updatedAt: new Date(),
       retentionPolicy: retention.retentionPolicy,
       retentionSetBy: retention.retentionSetBy,
       retentionConsentAt: retention.retentionConsentAt,
@@ -508,14 +603,16 @@ async function main(): Promise<void> {
     const bound = prisma.files.get(uploaded.file!.fileId)!
     assert.equal(bound.expiresAt?.toISOString(), originalExpiry)
     assert.equal(bound.retentionLockedReason, 'contract_review_session_only')
+    const bindingCalls = prisma.fileUpdateCalls.filter((call) => call.data.ownerType === 'user')
+    assert.ok(bindingCalls.length >= 1, 'member confirm must write user ownership')
     assert.ok(
-      prisma.fileUpdateCalls.every(
+      bindingCalls.every(
         (call) =>
           call.data.expiresAt?.toISOString() === originalExpiry &&
           call.data.retentionLockedReason === 'contract_review_session_only'
       ),
       `winning binding must preserve expiry and never clear the retention lock: ${JSON.stringify(
-        prisma.fileUpdateCalls
+        bindingCalls
       )}`
     )
   }
@@ -1840,6 +1937,247 @@ async function main(): Promise<void> {
     assert.equal(cleanupRaw?.includes(uploaded.file!.fileId), true, 'cleanup record must keep the file id after the session key expires')
     await service.cleanupExpiredSessions(new Date(session.expiresAt).getTime() + 1)
     assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
+  }
+
+  {
+    // 一批过期会话里有一条删除失败时，后面的会话也必须在同一次清扫里被处理。
+    const { service, prisma, redis, files } = makeService()
+    const first = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const firstUpload = await service.uploadFile({
+      sessionId: first.sessionId,
+      uploadToken: first.uploadToken,
+      file: file({ originalname: 'batch-first.pdf' }),
+    })
+    const second = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const secondUpload = await service.uploadFile({
+      sessionId: second.sessionId,
+      uploadToken: second.uploadToken,
+      file: file({ originalname: 'batch-second.pdf' }),
+    })
+    for (const id of [first.sessionId, second.sessionId]) {
+      const raw = await redis.get(`upload_session:${id}`)
+      assert.ok(raw)
+      const parsed = JSON.parse(raw) as { expiresAt: string }
+      parsed.expiresAt = new Date(1).toISOString()
+      await redis.setExistingWithCurrentTtl(`upload_session:${id}`, JSON.stringify(parsed))
+      const cleanupRaw = await redis.get(`upload_session_cleanup:${id}`)
+      if (cleanupRaw) {
+        const cleanup = JSON.parse(cleanupRaw) as { expiresAt: string }
+        cleanup.expiresAt = new Date(1).toISOString()
+        await redis.setEx(`upload_session_cleanup:${id}`, 24 * 60 * 60, JSON.stringify(cleanup))
+      }
+    }
+    await redis.zadd('upload_session_expiry_index', 1, first.sessionId)
+    await redis.zadd('upload_session_expiry_index', 2, second.sessionId)
+    const originalDelete = files.systemDelete.bind(files)
+    files.systemDelete = async (fileId: string, reason: string) => {
+      if (fileId === firstUpload.file!.fileId) throw new Error('poison session delete')
+      return originalDelete(fileId, reason)
+    }
+    const result = await service.cleanupExpiredSessions(10)
+    assert.equal(prisma.files.get(firstUpload.file!.fileId)?.deletedAt ?? null, null)
+    assert.notEqual(prisma.files.get(secondUpload.file!.fileId)?.deletedAt ?? null, null, 'one poison session must not abort the rest of the batch')
+    assert.equal(redis.hasSortedSetMember('upload_session_expiry_index', first.sessionId), true)
+    assert.ok((result as { failed?: number }).failed && (result as { failed?: number }).failed! >= 1)
+  }
+
+  {
+    // 进程在会员归属写入之前被杀掉。公开状态不能是 confirmed，恢复后必须绑定且不留下匿名键。
+    const { service, prisma, redis } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const fileId = uploaded.file!.fileId
+    const originalCommit = redis.compareAndSetSession.bind(redis)
+    let stopped = false
+    redis.compareAndSetSession = async (...args: Parameters<FakeRedis['compareAndSetSession']>) => {
+      const result = await originalCommit(...args)
+      const next = JSON.parse(args[3]) as { status?: string; bind?: { phase?: string } | null }
+      const row = prisma.files.get(fileId)
+      const bound = Boolean(row && row.ownerType === 'user' && row.storageKey.startsWith('users/'))
+      const crossedIntent = next.status === 'confirmed' || next.bind?.phase === 'intent' || next.bind?.phase === 'copied'
+      if (!stopped && result === 'updated' && !bound && crossedIntent) {
+        stopped = true
+        throw new Error('HARD_STOP before ownership')
+      }
+      return result
+    }
+    await expectRejects(
+      () => service.confirm(session.sessionId, session.controlToken, 'member_1'),
+      Error,
+      'hard stop before ownership',
+    )
+    assert.notEqual(
+      (await service.getStatus(session.sessionId, session.controlToken)).status,
+      'confirmed',
+      'kiosk must not observe confirmed before the row is bound',
+    )
+    await redis.del(`upload_session:${session.sessionId}`)
+    const cleanupRaw = await redis.get(`upload_session_cleanup:${session.sessionId}`)
+    assert.equal(cleanupRaw?.includes(fileId), true, 'cleanup record must still name the file after the session key is gone')
+    await service.cleanupExpiredSessions(Date.now() + 1000)
+    const recovered = prisma.files.get(fileId)
+    assert.equal(recovered?.ownerType, 'user')
+    assert.match(recovered?.storageKey ?? '', /^users\/member_1\//)
+    assert.equal(recovered?.deletedAt ?? null, null)
+    assert.equal(recovered?.pendingStorageKey ?? null, null)
+    assert.equal(recovered?.replacedStorageKey ?? null, null)
+  }
+
+  {
+    // 锁过期时数据库已经写成会员，但匿名键还在。此时公开状态不能已经是 confirmed。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const fileId = uploaded.file!.fileId
+    const previousKey = prisma.files.get(fileId)!.storageKey
+    const objects = new Set<string>([previousKey])
+    files.copyObjectToKey = async (_from: string, to: string) => {
+      objects.add(to)
+    }
+    files.deleteObjectAtKey = async (key: string) => {
+      objects.delete(key)
+    }
+    const entered = deferred()
+    const release = deferred()
+    let paused = false
+    const originalUpdate = prisma.fileObject.update.bind(prisma.fileObject)
+    prisma.fileObject.update = async (args) => {
+      const updated = await originalUpdate(args)
+      if (!paused && args.data.ownerType === 'user') {
+        paused = true
+        entered.resolve()
+        await release.promise
+      }
+      return updated
+    }
+    const confirming = service.confirm(session.sessionId, session.controlToken, 'member_1').then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    )
+    await entered.promise
+    await redis.del(`upload_session_upload_lock:${session.sessionId}`)
+    const mid = await service.getStatus(session.sessionId, session.controlToken)
+    if (mid.status === 'confirmed') {
+      assert.equal(objects.has(previousKey), false, 'public confirmed while the obsolete anonymous key still exists')
+    }
+    await service.cleanupExpiredSessions(Date.now() + 1000)
+    release.resolve()
+    const confirmed = await confirming
+    const finalStatus = await service.getStatus(session.sessionId, session.controlToken)
+    assert.equal(finalStatus.status, 'confirmed')
+    assert.equal(confirmed.ok, true)
+    assert.equal(objects.has(previousKey), false, 'lock expiry recovery must delete the anonymous key')
+    assert.equal(prisma.files.get(fileId)?.deletedAt ?? null, null)
+    assert.match(prisma.files.get(fileId)?.storageKey ?? '', /^users\/member_1\//)
+  }
+
+  {
+    // 归属更新已经提交，旧键删除和随后的 Redis 写入都失败。不能退回 uploaded，取消也不能删掉会员文件。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const fileId = uploaded.file!.fileId
+    const previousKey = prisma.files.get(fileId)!.storageKey
+    const objects = new Set<string>([previousKey])
+    let failDelete = true
+    let failRedisWrite = true
+    files.copyObjectToKey = async (_from: string, to: string) => {
+      objects.add(to)
+    }
+    files.deleteObjectAtKey = async (key: string) => {
+      if (failDelete && key === previousKey) throw new Error('old key delete failed')
+      objects.delete(key)
+    }
+    const originalSetEx = redis.setEx.bind(redis)
+    redis.setEx = async (key: string, ttlSeconds: number, value: string) => {
+      if (failRedisWrite && key.startsWith('upload_session_cleanup:') && value.includes(previousKey)) {
+        throw new Error('cleanup redis write failed')
+      }
+      return originalSetEx(key, ttlSeconds, value)
+    }
+    const originalCommit = redis.compareAndSetSession.bind(redis)
+    redis.compareAndSetSession = async (...args: Parameters<FakeRedis['compareAndSetSession']>) => {
+      if (failRedisWrite && args[3].includes('"status":"confirmed"')) {
+        throw new Error('confirm redis write failed')
+      }
+      return originalCommit(...args)
+    }
+    await expectRejects(
+      () => service.confirm(session.sessionId, session.controlToken, 'member_1'),
+      Error,
+      'confirm must not succeed when the obsolete key or the confirm write fails',
+    )
+    assert.notEqual((await service.getStatus(session.sessionId, session.controlToken)).status, 'confirmed')
+    const bound = prisma.files.get(fileId)
+    assert.equal(bound?.ownerType, 'user')
+    assert.match(bound?.storageKey ?? '', /^users\/member_1\//)
+    assert.equal(objects.has(bound?.storageKey ?? ''), true, 'the live member object must stay')
+    let cancelDeleted = false
+    const originalSystemDelete = files.systemDelete.bind(files)
+    files.systemDelete = async (id: string, reason: string) => {
+      if (id === fileId) cancelDeleted = true
+      return originalSystemDelete(id, reason)
+    }
+    try {
+      await service.cancel(session.sessionId, session.controlToken)
+    } catch {
+      // 已经归属的会话应拒绝取消，或在删掉旧键前失败。两种都不能删会员文件。
+    }
+    assert.equal(cancelDeleted, false, 'cancel must not delete the live member object')
+    assert.equal(prisma.files.get(fileId)?.deletedAt ?? null, null)
+    failDelete = false
+    failRedisWrite = false
+    await service.cleanupExpiredSessions(Date.now() + 60_000)
+    try {
+      await service.confirm(session.sessionId, session.controlToken, 'member_1')
+    } catch {
+      // 清扫已经完成时，再次确认会看到 confirmed。
+    }
+    const recovered = prisma.files.get(fileId)
+    assert.equal(recovered?.ownerType, 'user')
+    assert.equal(recovered?.deletedAt ?? null, null)
+    assert.equal(objects.has(previousKey), false, 'recovery must delete the anonymous key')
+    assert.equal((await service.getStatus(session.sessionId, session.controlToken)).status, 'confirmed')
   }
 
   console.log('PASS upload session verification')
