@@ -1,4 +1,8 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import {
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 import type { FavoriteTargetType, MemberFavoriteItem } from './member-favorites.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
@@ -50,14 +54,21 @@ export class MemberFavoritesController {
     @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }>> {
     const targetType = this.parseOptionalType(type)
-    const open = await this.jobBoardOpen(req)
+    const hosting = isRecruitmentContentHostingEnabled()
+    const open = hosting && await this.jobBoardOpen(req)
+    if (!hosting && (targetType === 'job' || targetType === 'job_fair')) {
+      throw recruitmentHostingDisabledException()
+    }
     if (!open && targetType === 'job') await this.assertJobFavorite(req)
+    const exclude: FavoriteTargetType[] | undefined = !hosting
+      ? ['job', 'job_fair']
+      : (!open && !targetType ? ['job'] : undefined)
     return ApiResponse.ok(
       await this.favorites.list(
         user.endUserId,
         parseMemberPageQuery(cursor, pageSize),
         targetType,
-        !open && !targetType ? { excludeTargetTypes: ['job'] } : undefined,
+        exclude ? { excludeTargetTypes: exclude } : undefined,
       ),
     )
   }
@@ -69,6 +80,9 @@ export class MemberFavoritesController {
     @Body() dto: AddFavoriteDto,
     @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<MemberFavoriteItem>> {
+    if (!isRecruitmentContentHostingEnabled() && (dto.targetType === 'job' || dto.targetType === 'job_fair')) {
+      throw recruitmentHostingDisabledException()
+    }
     if (dto.targetType === 'job') await this.assertJobFavorite(req)
     return ApiResponse.ok(
       await this.favorites.add(user.endUserId, {
@@ -88,6 +102,9 @@ export class MemberFavoritesController {
     @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<{ removed: boolean }>> {
     const type = this.parseRequiredType(targetType)
+    if (!isRecruitmentContentHostingEnabled() && (type === 'job' || type === 'job_fair')) {
+      throw recruitmentHostingDisabledException()
+    }
     if (type === 'job') await this.assertJobFavorite(req)
     return ApiResponse.ok(await this.favorites.remove(user.endUserId, type, targetId))
   }

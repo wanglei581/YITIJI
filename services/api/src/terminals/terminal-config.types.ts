@@ -27,10 +27,18 @@ export interface KioskJobBoardConfigView {
   reason: 'open' | 'global_off' | 'terminal_off'
 }
 
+/** 一体机用来隐藏招聘类入口。deploymentEnabled 为 false 时整块招聘内容不展示。 */
+export interface RecruitmentHostingPublicView {
+  enabled: boolean
+  deploymentEnabled: boolean
+  reason: 'open' | 'deployment_off'
+}
+
 export interface KioskTerminalConfigView {
   smartCampus: KioskSmartCampusConfig
   toolbox: KioskToolboxConfigView
   jobBoard: KioskJobBoardConfigView
+  recruitmentHosting: RecruitmentHostingPublicView
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

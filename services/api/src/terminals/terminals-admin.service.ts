@@ -18,6 +18,7 @@ import {
   Optional,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { isHealthyPrinterStatus } from './printer-status'
@@ -708,6 +709,7 @@ export class TerminalAdminService {
     const terminalEnabled = terminal?.enabled ?? false
     const smartCampusEnabled = terminalEnabled && !!smartCampusConfig?.enabled
     const serverTime = new Date().toISOString()
+    const deploymentEnabled = isRecruitmentContentHostingEnabled()
 
     return {
       smartCampus: {
@@ -721,11 +723,23 @@ export class TerminalAdminService {
         enabled: toolboxConfig.enabled,
         items: toolboxConfig.items,
       },
-      jobBoard: {
-        enabled: jobBoard.enabled,
-        globalEnabled: jobBoard.globalEnabled,
-        terminalEnabled: jobBoard.terminalEnabled,
-        reason: jobBoard.reason,
+      jobBoard: deploymentEnabled
+        ? {
+            enabled: jobBoard.enabled,
+            globalEnabled: jobBoard.globalEnabled,
+            terminalEnabled: jobBoard.terminalEnabled,
+            reason: jobBoard.reason,
+          }
+        : {
+            enabled: false,
+            globalEnabled: false,
+            terminalEnabled: jobBoard.terminalEnabled,
+            reason: 'global_off' as const,
+          },
+      recruitmentHosting: {
+        enabled: deploymentEnabled,
+        deploymentEnabled,
+        reason: deploymentEnabled ? 'open' as const : 'deployment_off' as const,
       },
       configVersion: [
         terminal?.lastSeenAt.toISOString() ?? 'unregistered',

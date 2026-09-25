@@ -1,4 +1,8 @@
 import { Body, Controller, HttpCode, HttpStatus, Optional, Post, Req } from '@nestjs/common'
+import {
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { ApiResponse } from '../common/dto/api-response.dto'
@@ -63,6 +67,9 @@ export class ActivityController {
   }
 
   private async assertJobWrite(req: ReqLike, body: { terminalId?: string }, targetType: string): Promise<void> {
+    if (!isRecruitmentContentHostingEnabled() && (targetType === 'job' || targetType === 'job_fair')) {
+      throw recruitmentHostingDisabledException()
+    }
     if (targetType !== 'job') return
     await this.jobBoard.assertOpen(kioskJobBoardTerminalRef({ headers: req.headers, body }))
   }

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
+import { Equals, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -15,7 +16,7 @@ import {
 } from './dto/policy.dto'
 import { POLICY_RULE_MANUAL_MODE, type PolicyRuleMatchMode } from './policy-eligibility.types'
 import { ReviewActionDto } from '../jobs/dto/review.dto'
-import { PartnerUnpublishActionDto, PublishActionDto } from '../jobs/dto/publish.dto'
+import { PartnerUnpublishActionDto } from '../jobs/dto/publish.dto'
 
 /**
  * 政策服务(阶段1D)。
@@ -45,6 +46,28 @@ import { PartnerUnpublishActionDto, PublishActionDto } from '../jobs/dto/publish
  * P21 条件核对是**参考**不是裁定:只给出「已录入条件的比对结果」,
  * 不出现「您符合申领资格」这类结论式表述;判定依据必须追回入库的政策原文摘录。
  */
+class PartnerPolicyReleaseDto {
+  @Equals(true, { message: '发布前必须确认对本条政策内容负责' })
+  responsibilityAcknowledged!: boolean
+}
+
+class PolicyAdminActionDto {
+  @IsIn(['publish', 'unpublish'])
+  action!: 'publish' | 'unpublish'
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  reasonCode?: string
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  reasonText?: string
+}
+
 function safeInt(value: string | undefined, defaultValue: number, min: number, max: number): number {
   const n = value !== undefined ? Number(value) : defaultValue
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : defaultValue
@@ -213,6 +236,22 @@ export class PoliciesController {
     return this.eligibility.previewPartnerRules(id, { answers: dto.answers }, user)
   }
 
+  @Patch('partner/policies/:id/review')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  reviewPartnerPolicy(@Param('id') id: string, @Body() dto: ReviewActionDto, @CurrentUser() user: AuthedUser) {
+    return this.policies.reviewPolicy(id, dto.action, dto.reason, user)
+  }
+
+  @Patch('partner/policies/:id/release')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  releasePartnerPolicy(@Param('id') id: string, @Body() dto: PartnerPolicyReleaseDto, @CurrentUser() user: AuthedUser) {
+    return this.policies.publishPolicy(id, 'publish', user, {
+      responsibilityAcknowledged: dto.responsibilityAcknowledged,
+    })
+  }
+
   @Patch('partner/policies/:id/publish')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
@@ -260,7 +299,10 @@ export class PoliciesController {
   @Patch('admin/policy-sources/:id/publish')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  publishPolicy(@Param('id') id: string, @Body() dto: PublishActionDto, @CurrentUser() user: AuthedUser) {
-    return this.policies.publishPolicy(id, dto.action, user)
+  publishPolicy(@Param('id') id: string, @Body() dto: PolicyAdminActionDto, @CurrentUser() user: AuthedUser) {
+    return this.policies.publishPolicy(id, dto.action, user, {
+      reasonCode: dto.reasonCode,
+      reasonText: dto.reasonText,
+    })
   }
 }

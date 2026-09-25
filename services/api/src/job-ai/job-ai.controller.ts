@@ -16,6 +16,10 @@ import type { JobAiQuotaContext } from './job-ai-quota.service'
 import { resolveClientIp } from '../common/client-ip'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import {
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
+import {
   KioskJobBoardService,
   kioskJobBoardTerminalRef,
   type KioskJobBoardRequest,
@@ -114,6 +118,7 @@ export class JobAiController {
   @Post('ai/recommendations')
   @PaidAiThrottle(6)
   async recommendations(@Body() dto: JobRecommendationsDto, @Req() req: ReqLike) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
@@ -129,6 +134,7 @@ export class JobAiController {
   @Post(':id/ai/explain')
   @PaidAiThrottle(10)
   async explain(@Param('id') id: string, @Req() req: ReqLike) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
@@ -138,6 +144,7 @@ export class JobAiController {
   @Post(':id/ai/match')
   @PaidAiThrottle(6)
   async match(@Param('id') id: string, @Body() dto: JobAiMatchDto, @Req() req: ReqLike) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
@@ -172,6 +179,9 @@ export class MemberJobAiSessionsController {
     @Query('pageSize') pageSize?: string,
     @Req() req?: KioskJobBoardRequest,
   ) {
+    if (!isRecruitmentContentHostingEnabled()) {
+      return ApiResponse.ok({ items: [], nextCursor: null, total: 0 })
+    }
     await this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
     return ApiResponse.ok(await this.service.listMine(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
   }

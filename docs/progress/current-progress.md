@@ -35,6 +35,24 @@
 ## 2026-09-26：全面文档更新（Claude + Grok + Agy）
 
 按设备与软件供应方 + 托管 a 改写 CLAUDE.md、AGENTS.md、feature-scope（新增 §零 AI 求职操作系统分层、§七 已知缺口）、role-boundary、compliance-boundary（新增 §1.2 法规与资质总表）、docs/README；约 50 份旧方案加文首状态标注；content-ingestion-operator-guide 旧正文（岗位、招聘会发布到一体机）改写为托管 a 下的官方渠道与政策指南，旧文只留在 git 历史。只改文档，不删文件。（分支 `claude/docs-refresh-20260926`，由「项目资金预算评估」窗口完成，主执行窗口快进合入候选。）
+## 2026-09-26：3.13 返工——手填匹配、同步如实失败、熔断持久化
+
+分支仍是 `claude/recruitment-hosting-off-20260926`。没有改 `apps/`、`CLAUDE.md`、`docs/product/`、`docs/compliance/`，没有访问生产。
+
+- 托管关闭时，手填岗位匹配仍可查看、再次打印；存档带系统内 `jobId` 的查看、打印、我的记录和 PDF 下载返回 `RECRUITMENT_HOSTING_DISABLED`。逐台岗位板块关闭时手填仍拒绝。
+- 手动同步在托管关闭时返回 403，不再回 `queued: true`。定时轮询仍静默不入队。
+- 批量发布碰到紧急下架整批拒绝并列出 id。`kind=policy` 无论开关都返回 `ADMIN_POLICY_PUBLISH_DISABLED`。
+- 紧急下架补上招聘会资料与线下机构。熔断写入 `RecruitmentCircuitBreak`，范围内全部发布状态都下架；之后新内容不能发布。来源熔断停用数据源，重新启用也不入队、不拉取、Webhook 不落库。
+- 生产代码不再因为验证脚本路径或 `VERIFICATION_DATABASE_TARGET=isolated` 把未设置的开关当成打开。CI 的两个 verify job 显式设 `RECRUITMENT_CONTENT_HOSTING_ENABLED=true`。
+
+## 2026-09-26：3.13 后端——关闭招聘内容托管，管理员只留紧急下架
+
+分支 `claude/recruitment-hosting-off-20260926`。只改后端、门禁和进度备注，没有改 `apps/`、`CLAUDE.md`、`docs/product/`、`docs/compliance/`，没有访问生产。
+
+- 部署开关 `RECRUITMENT_CONTENT_HOSTING_ENABLED`：未设置即关。关闭时招聘类列表返回空、详情和写入返回 `RECRUITMENT_HOSTING_DISABLED`。一体机读 `GET /api/v1/terminals/:id/config` 的 `recruitmentHosting`。
+- 政策改由机构 `PATCH /partner/policies/:id/review` 与 `PATCH /partner/policies/:id/release` 审核发布，确认人、时间和 `contentVersion` 写入审计。管理员发布返回 `ADMIN_POLICY_PUBLISH_DISABLED`。
+- 紧急下架与按机构/来源熔断单向，事由必填，写入 `RecruitmentEmergencyHold` 与机构站内通知 `PartnerOrgNotice`。下架后不能再发布。
+- 隔离 SQLite `scratchpad/g313-verify.db` 上扩充后的八条门禁、`verify:content-trust-publish-gate`、`verify:policy-eligibility`、`verify:kiosk-job-board-switch` 通过。岗位板块开关第 20 条仍要求逐台关闭时手填岗位匹配拒绝，本路未改这条语义。
 
 ## 2026-09-26：小程序首发审核范围收口——停放 20 页、简历对照去结论、分包（步骤 2.6，本地分支待合入）
 

@@ -12,6 +12,10 @@ import {
   InternalServerErrorException,
   Optional,
 } from '@nestjs/common'
+import {
+  assertNotEmergencyHeld,
+  assertRecruitmentContentHostingEnabled,
+} from '../recruitment-hosting/recruitment-hosting'
 import { PrismaService } from '../prisma/prisma.service'
 import type { Prisma } from '../generated/prisma/client'
 import { AuditService } from '../audit/audit.service'
@@ -101,6 +105,7 @@ export class JobsAdminService {
   }
 
   async reviewJobSource(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<AdminJobDto> {
+    assertRecruitmentContentHostingEnabled()
     const job = await this.prisma.job.findUnique({ where: { id } })
     if (!job) {
       throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
@@ -155,6 +160,8 @@ export class JobsAdminService {
   }
 
   async publishJobSource(id: string, action: PublishAction, user: AuthedUser): Promise<AdminJobDto> {
+    assertRecruitmentContentHostingEnabled()
+    if (action === 'publish') await assertNotEmergencyHeld(this.prisma, 'job', id)
     const job = await this.prisma.job.findUnique({ where: { id } })
     if (!job) {
       throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
@@ -238,6 +245,7 @@ export class JobsAdminService {
   }
 
   async reviewFairSource(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<AdminFairDto> {
+    assertRecruitmentContentHostingEnabled()
     const fair = await this.prisma.jobFair.findUnique({ where: { id } })
     if (!fair) {
       throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: `Fair ${id} not found` } })
@@ -283,6 +291,8 @@ export class JobsAdminService {
   }
 
   async publishFairSource(id: string, action: PublishAction, user: AuthedUser): Promise<AdminFairDto> {
+    assertRecruitmentContentHostingEnabled()
+    if (action === 'publish') await assertNotEmergencyHeld(this.prisma, 'job_fair', id)
     const fair = await this.prisma.jobFair.findUnique({ where: { id } })
     if (!fair) {
       throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: `Fair ${id} not found` } })

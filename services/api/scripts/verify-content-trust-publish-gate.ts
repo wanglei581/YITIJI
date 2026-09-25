@@ -322,7 +322,17 @@ function buildFixture() {
 
   // $transaction 把同一批模型双测原样交给回调：本套断言的是闸门与审计行为，
   // 不模拟回滚；缺了它服务层进不去事务分支。
-  const prismaModels = { organization, job, jobFair, policyPost, companyProfile, offlineAgency, fairMaterial }
+  const recruitmentEmergencyHold = {
+    findFirst: async () => null,
+    upsert: async () => ({ id: 'hold' }),
+  }
+  const recruitmentCircuitBreak = {
+    findFirst: async () => null,
+  }
+  const prismaModels = {
+    organization, job, jobFair, policyPost, companyProfile, offlineAgency, fairMaterial,
+    recruitmentEmergencyHold, recruitmentCircuitBreak,
+  }
   const prisma = {
     ...prismaModels,
     $transaction: async <T>(fn: (tx: typeof prismaModels) => Promise<T>): Promise<T> => fn(prismaModels),
@@ -601,7 +611,7 @@ async function main(): Promise<void> {
     await assertDeniedByGate('岗位 · 机构 suspended', () => f.jobsAdmin.publishJobSource('job-suspended', 'publish', user))
     await assertDeniedByGate('岗位 · 机构行不存在', () => f.jobsAdmin.publishJobSource('job-missingorg', 'publish', user))
     await assertDeniedByGate('招聘会 · 机构 null', () => f.jobsAdmin.publishFairSource('fair-null', 'publish', user))
-    await assertDeniedByGate('政策 · 机构 null', () => f.policies.publishPolicy('policy-null', 'publish', user))
+    await assertDeniedByGate('政策 · 机构 null', () => f.policies.publishPolicy('policy-null', 'publish', { ...user, role: 'partner', orgId: ORG_NULL }, { responsibilityAcknowledged: true }))
     await assertDeniedByGate('企业资料 · 机构 null', () => f.companies.adminPublish('company-null', { publish: true }, user))
     await assertDeniedByGate('招聘会资料 · 所属招聘会的机构 null', () => f.materials.publishMaterial('fair-null', 'mat-null', 'publish', user))
     await assertDeniedByGate('线下机构 · sourceOrgId 指向 null 机构', () => f.agencies.adminPublish('agency-null', 'published'))
@@ -619,7 +629,7 @@ async function main(): Promise<void> {
     const f = buildFixture()
     await assertDeniedByGate('岗位 · 机构 active 但已归档', () => f.jobsAdmin.publishJobSource('job-archived', 'publish', user))
     await assertDeniedByGate('招聘会 · 机构 active 但已归档', () => f.jobsAdmin.publishFairSource('fair-archived', 'publish', user))
-    await assertDeniedByGate('政策 · 机构 active 但已归档', () => f.policies.publishPolicy('policy-archived', 'publish', user))
+    await assertDeniedByGate('政策 · 机构 active 但已归档', () => f.policies.publishPolicy('policy-archived', 'publish', { ...user, role: 'partner', orgId: ORG_ARCHIVED }, { responsibilityAcknowledged: true }))
     await assertDeniedByGate('企业资料 · 机构 active 但已归档', () => f.companies.adminPublish('company-archived', { publish: true }, user))
   }
 
@@ -629,7 +639,7 @@ async function main(): Promise<void> {
     const f = buildFixture()
     await assertAllowed('岗位 · 可信机构可以发布', () => f.jobsAdmin.publishJobSource('job-trusted', 'publish', user))
     await assertAllowed('招聘会 · 可信机构可以发布', () => f.jobsAdmin.publishFairSource('fair-trusted', 'publish', user))
-    await assertAllowed('政策 · 可信机构可以发布', () => f.policies.publishPolicy('policy-trusted', 'publish', user))
+    await assertAllowed('政策 · 可信机构可以发布', () => f.policies.publishPolicy('policy-trusted', 'publish', { ...user, role: 'partner', orgId: ORG_TRUSTED }, { responsibilityAcknowledged: true }))
     await assertAllowed('企业资料 · 可信机构可以发布', () => f.companies.adminPublish('company-trusted', { publish: true }, user))
     await assertAllowed('招聘会资料 · 可信机构可以发布', () => f.materials.publishMaterial('fair-trusted', 'mat-trusted', 'publish', user))
     await assertAllowed('线下机构 · 可信来源机构可以发布', () => f.agencies.adminPublish('agency-trusted', 'published'))
@@ -655,7 +665,7 @@ async function main(): Promise<void> {
 
     await assertAllowed('岗位 · 不可信机构的已发布内容仍可下架', () => f.jobsAdmin.publishJobSource('job-null', 'unpublish', user))
     await assertAllowed('招聘会 · 同上', () => f.jobsAdmin.publishFairSource('fair-null', 'unpublish', user))
-    await assertAllowed('政策 · 同上', () => f.policies.publishPolicy('policy-null', 'unpublish', user))
+    await assertAllowed('政策 · 同上', () => f.policies.publishPolicy('policy-null', 'unpublish', user, { reasonCode: 'authority_order', reasonText: '主管部门要求下架' }))
     await assertAllowed('企业资料 · 同上', () => f.companies.adminPublish('company-null', { publish: false }, user))
     assert('下架后状态是 unpublished', f.job.rows.find((r) => r.id === 'job-null')?.publishStatus === 'unpublished')
 

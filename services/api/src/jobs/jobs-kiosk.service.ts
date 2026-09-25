@@ -4,6 +4,11 @@
 // ============================================================
 
 import { Injectable } from '@nestjs/common'
+import {
+  closedJobPage,
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   type PublishedFairsParams,
@@ -61,6 +66,7 @@ export class JobsKioskService {
     page?: number
     pageSize?: number
   }): Promise<PaginatedResult<JobListItemDto>> {
+    if (!isRecruitmentContentHostingEnabled()) return closedJobPage(params)
     const page     = Math.max(1, params?.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
     // where 由 jobs-shared 统一构造：岗位要求计数端点必须命中同一批岗位（见该函数注释）
@@ -89,6 +95,7 @@ export class JobsKioskService {
    * 求职者照样会照着一条失效岗位去投递。
    */
   async getPublishedJobById(id: string): Promise<SingleResult<JobListItemDto>> {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const j = await this.prisma.job.findFirst({
       where: {
         id,
@@ -154,6 +161,7 @@ export class JobsKioskService {
    * 不再出现 data 为空但 total 仍报全量的自相矛盾。
    */
   async getPublishedFairs(params?: PublishedFairsParams): Promise<PaginatedResult<FairListItemDto>> {
+    if (!isRecruitmentContentHostingEnabled()) return closedJobPage(params)
     const page     = Math.max(1, params?.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
     const skip     = (page - 1) * pageSize
@@ -181,6 +189,7 @@ export class JobsKioskService {
   }
 
   async getPublishedFairById(id: string): Promise<SingleResult<FairListItemDto>> {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const f = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id, reviewStatus: 'approved', publishStatus: 'published' }),
       include: { _count: { select: publicFairCountSelect } },
@@ -189,6 +198,7 @@ export class JobsKioskService {
   }
 
   async getPublishedFairDetail(id: string): Promise<FairDetailResponse | null> {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const f = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id, reviewStatus: 'approved', publishStatus: 'published' }),
       include: {
@@ -209,6 +219,7 @@ export class JobsKioskService {
     page: number,
     pageSize: number,
   ): Promise<{ data: FairCompany[]; total: number; page: number; pageSize: number }> {
+    if (!isRecruitmentContentHostingEnabled()) return { data: [], total: 0, page, pageSize }
     const fair = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
@@ -228,6 +239,7 @@ export class JobsKioskService {
   }
 
   async getFairCompanyById(fairId: string, companyId: string): Promise<{ data: FairCompany | null }> {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const fair = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
@@ -241,6 +253,7 @@ export class JobsKioskService {
   }
 
   async getFairZones(fairId: string): Promise<{ data: FairZone[] }> {
+    if (!isRecruitmentContentHostingEnabled()) return { data: [] }
     const fair = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
@@ -254,6 +267,7 @@ export class JobsKioskService {
   }
 
   async getFairMap(fairId: string): Promise<{ data: { mapImageUrl: string | null; zones: FairZone[]; booths: [] } | null }> {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const fair = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true, mapImageUrl: true },
@@ -273,6 +287,7 @@ export class JobsKioskService {
   }
 
   async getFairStats(fairId: string): Promise<{ data: FairStatsDto | null }> {
+    if (!isRecruitmentContentHostingEnabled()) return { data: null }
     const fair = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       include: { companies: { include: { positions: true } } },

@@ -7,6 +7,7 @@ import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmJobFitService, type JobFitPayload, type JobFitTokenUsage } from './llm-job-fit.service'
 import { JobFitPdfService } from './job-fit-pdf.service'
+import { assertStoredJobFitReadable } from './job-fit-hosting'
 
 // ============================================================
 // 2D 岗位匹配参考会话服务。
@@ -216,6 +217,7 @@ export class JobFitService {
     if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
       throw new NotFoundException({ error: { code: 'JOB_FIT_NOT_FOUND', message: '暂无分析结果，请先发起岗位匹配参考' } })
     }
+    assertStoredJobFitReadable(row.payloadJson)
     return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredJobFit)
   }
 
@@ -227,6 +229,7 @@ export class JobFitService {
       throw new NotFoundException({ error: { code: 'JOB_FIT_NOT_FOUND', message: '暂无分析结果，请先发起岗位匹配参考' } })
     }
 
+    assertStoredJobFitReadable(row.payloadJson)
     const stored = JSON.parse(row.payloadJson) as StoredJobFit
     const { buffer, pageCount } = await this.pdf.render(
       {

@@ -272,6 +272,8 @@
     "verify:member-data-retention": "node -r @swc-node/register scripts/verify-member-data-retention.ts",
     "verify:ai-user-text-retention": "node -r @swc-node/register scripts/verify-ai-user-text-retention.ts",
     "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts",
+    "verify:recruitment-emergency-scope": "node -r @swc-node/register scripts/verify-recruitment-emergency-scope.ts",
+    "verify:recruitment-hosting-default-off": "node -r @swc-node/register scripts/verify-recruitment-hosting-default-off.ts",
     "verify:offline-agencies-page": "node -r @swc-node/register scripts/verify-offline-agencies-page.ts",
     "verify:offline-agencies-contract": "node -r @swc-node/register scripts/verify-offline-agencies-contract.ts",
     "verify:partner-source-capabilities": "node -r @swc-node/register scripts/verify-partner-source-capabilities.ts",
