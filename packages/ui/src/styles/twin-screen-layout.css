@@ -212,6 +212,12 @@
 [data-ops-screen='wall'] .twin-na { font-size: 14px; }
 [data-ops-screen='wall'] .twin-pend { font-size: 13px; }
 [data-ops-screen='wall'] .twin-big { font-size: 48px; }
+[data-ops-screen='wall'] .twin-big.twin-big-sm { font-size: 36px; }
+[data-ops-screen='wall'] .twin-stat > span { font-size: 15px; }
+[data-ops-screen='wall'] .twin-stat b { font-size: 30px; }
+[data-ops-screen='wall'] .twin-rank li { font-size: 15px; }
+[data-ops-screen='wall'] .twin-rank-tag { font-size: 13px; }
+[data-ops-screen='wall'] .twin-rank li > b { font-size: 17px; }
 [data-ops-screen='wall'] .twin-unit { font-size: 16px; }
 [data-ops-screen='wall'] .twin-kv > span { font-size: 15px; }
 [data-ops-screen='wall'] .twin-kv b { font-size: 34px; }
@@ -257,6 +263,12 @@
 [data-ops-screen='desk'] .twin-na { font-size: 13px; }
 [data-ops-screen='desk'] .twin-pend { font-size: 12px; }
 [data-ops-screen='desk'] .twin-big { font-size: 38px; }
+[data-ops-screen='desk'] .twin-big.twin-big-sm { font-size: 28px; }
+[data-ops-screen='desk'] .twin-stat > span { font-size: 14px; }
+[data-ops-screen='desk'] .twin-stat b { font-size: 24px; }
+[data-ops-screen='desk'] .twin-rank li { font-size: 14px; }
+[data-ops-screen='desk'] .twin-rank-tag { font-size: 12px; }
+[data-ops-screen='desk'] .twin-rank li > b { font-size: 15px; }
 [data-ops-screen='desk'] .twin-unit { font-size: 14px; }
 [data-ops-screen='desk'] .twin-kv > span { font-size: 13px; }
 [data-ops-screen='desk'] .twin-kv b { font-size: 26px; }

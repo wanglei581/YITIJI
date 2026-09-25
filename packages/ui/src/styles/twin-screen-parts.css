@@ -36,6 +36,164 @@
   color: var(--tw-strong);
 }
 
+/* 环形图旁并排的图例或数值（机构总览的终端、数据同步）。 */
+.twin-ring-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.twin-ring-cap { margin-top: 6px; }
+
+.twin-legend-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.twin-legend-col .twin-legend {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.twin-big-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.twin-big.is-warn {
+  color: var(--tw-gold);
+  text-shadow: 0 0 20px rgba(232, 180, 92, 0.35);
+}
+
+.twin-kv b.is-warn { color: var(--tw-gold); }
+
+.twin-lite-wall { padding: 20px; }
+
+/* 折线图的图例短线：实线 = 主序列，虚线 = 第二序列。 */
+.twin-key {
+  display: inline-block;
+  width: 18px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 3px solid var(--tw-acc);
+}
+
+.twin-key.is-gold {
+  border-top: 2px dashed #f2c879;
+}
+
+.twin-notes {
+  margin: 0;
+  padding-left: 1.2em;
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #cfe9e0;
+}
+
+.twin-notes li::marker { color: var(--tw-acc); }
+
+/* 竖排的大数字行（信息使用 · 使用概况）：标签在左、数字在右，「至少」等前缀用小字。 */
+.twin-stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.twin-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(3, 26, 21, 0.55);
+  border: 1px solid rgba(46, 230, 168, 0.18);
+}
+
+.twin-stat > span { color: #a9cfc3; }
+
+.twin-stat b {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--tw-strong);
+  white-space: nowrap;
+}
+
+.twin-stat b small {
+  margin-right: 6px;
+  font-size: 0.5em;
+  font-weight: 500;
+  color: var(--tw-muted);
+}
+
+/* 排行榜：名次 · 标题 · 类型 · 次数，下面一条比例细条 */
+.twin-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.twin-rank li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 4px;
+}
+
+.twin-rank-no {
+  font-family: var(--tw-num);
+  font-weight: 700;
+  color: var(--tw-acc);
+  text-align: center;
+}
+
+.twin-rank-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #d6ece5;
+}
+
+.twin-rank-tag {
+  padding: 0 8px;
+  border-radius: 10px;
+  color: #9fb9da;
+  border: 1px solid rgba(143, 178, 238, 0.45);
+  white-space: nowrap;
+}
+
+.twin-rank li > b {
+  font-family: var(--tw-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--tw-strong);
+}
+
+.twin-rank-bar {
+  grid-column: 2 / 5;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.twin-rank-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #3f68b0, #8fb2ee);
+}
+
 .twin-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -302,6 +460,19 @@
   top: 16px;
 }
 
+/* 面板底部的站内跳转（桌面档才渲染；展示档无人值守不给出口）。 */
+.twin-link {
+  align-self: flex-end;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: #9fe8cd;
+  text-decoration: none;
+  border-radius: 6px;
+}
+.twin-link:hover { color: #d4fff0; }
+.twin-link:focus-visible { outline: 2px solid #2ee6a8; outline-offset: 2px; }
+
 .twin-crumb {
   display: inline-flex;
   align-items: center;
@@ -383,6 +554,16 @@
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 10px;
 }
+
+/* 按内容宽度流式排的小标签（建设中的指标）：不拉成等宽格子，一行放得下更多。 */
+.twin-chips.is-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+/* 定义行里的「未接入」只占自身宽度，不被拉成整行 */
+.twin-kv .twin-pend { align-self: flex-start; }
 
 @keyframes tw-travel {
   0% { left: 0; opacity: 0; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ScreenDesk, ScreenStage } from '@ai-job-print/ui'
+import { ScreenDesk, ScreenStage, useTwinBurnInDrift, useTwinNightlyReload } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { redirectToLogin } from '../../services/auth'
 import { GovGrid } from './GovGrid'
@@ -22,40 +22,6 @@ import type { ScreenChrome } from './screenView'
  * 不自动跳走）统一在 screenView.tsx；这里只管页签、档位与展示窗口的生命周期。
  */
 
-/** 防烧屏：展示档每 4 分钟把整屏挪几个像素，一小时回到原位。 */
-const DRIFT = [
-  [0, 0],
-  [3, 2],
-  [-2, 3],
-  [2, -3],
-  [-3, -2],
-] as const
-
-function useBurnInDrift(enabled: boolean): readonly [number, number] {
-  const [step, setStep] = useState(0)
-  useEffect(() => {
-    if (!enabled) return
-    const timer = window.setInterval(() => setStep((s) => (s + 1) % DRIFT.length), 4 * 60 * 1000)
-    return () => window.clearInterval(timer)
-  }, [enabled])
-  return DRIFT[step]
-}
-
-/** 展示档每天凌晨 3 点重新加载一次，释放长时间运行积累的内存；断网时由轮询横幅说明。 */
-function useNightlyReload(enabled: boolean) {
-  useEffect(() => {
-    if (!enabled) return
-    const openedAt = Date.now()
-    const timer = window.setInterval(() => {
-      const hour = Number(
-        new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', hour: '2-digit', hour12: false }).format(new Date()),
-      )
-      if (hour === 3 && Date.now() - openedAt > 60 * 60 * 1000 && navigator.onLine) window.location.reload()
-    }, 5 * 60 * 1000)
-    return () => window.clearInterval(timer)
-  }, [enabled])
-}
-
 export default function AdminScreenPage() {
   const { tab: rawTab } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -66,8 +32,8 @@ export default function AdminScreenPage() {
   const lite = searchParams.get('lite') === '1'
   // 动效可显式关掉（低性能机 / 录屏）。关掉后纵深层次保留，只是静止。
   const [motion, setMotion] = useState(true)
-  const drift = useBurnInDrift(presenting)
-  useNightlyReload(presenting)
+  const drift = useTwinBurnInDrift(presenting)
+  useTwinNightlyReload(presenting)
 
   // 旧地址 /screen?profile=ops、缺省或非法页签：就地改写成规范地址，地址栏与实际视图一致。
   useEffect(() => {

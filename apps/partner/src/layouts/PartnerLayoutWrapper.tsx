@@ -141,7 +141,7 @@ function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const { capabilities } = usePartnerCapabilities()
-  const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
+  const activeKey = PATH_TO_KEY[location.pathname] ?? (location.pathname.startsWith('/screen/') ? 'screen' : 'dashboard')
   const navItems = projectNavItems(capabilities)
 
   const orgName = user?.name ?? '合作机构后台'

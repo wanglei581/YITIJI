@@ -15,17 +15,19 @@ import {
   TwinRing,
   TwinSceneBox,
   TwinSlot,
+  TwinCityToolbar,
+  TwinStateLegend,
   TwinTiles,
+  parseTwinHighlight,
   screenCount,
   screenFleetScopeNote,
   twinAreas,
+  twinCountStates,
+  twinSortByState,
   twinTerminalState,
   twinTerminalsFromCells,
   type TwinAlertItem,
   type TwinBarItem,
-  type TwinCityHighlight,
-  type TwinCityTerminal,
-  type TwinState,
 } from '@ai-job-print/ui'
 import { aiOperationLabel, taskStatusLabel } from './metricLabels'
 import { screenHref } from './screenTabs'
@@ -45,22 +47,6 @@ import { TwinShell, TwinShellEmpty, snapshotMeta, useAdminSnapshot, type ScreenC
 const TITLE = '职易达 · 就业服务终端运行态势'
 const SUBTITLE = '数字孪生 · 政务总览'
 const UNASSIGNED = '未设置所在区'
-const HIGHLIGHTS: ReadonlyArray<{ key: TwinCityHighlight; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'alert', label: '告警' },
-  { key: 'offline', label: '离线' },
-  { key: 'printing', label: '打印中' },
-]
-
-function parseHighlight(raw: string | null): TwinCityHighlight {
-  return raw === 'alert' || raw === 'offline' || raw === 'printing' ? raw : 'all'
-}
-
-function countStates(terminals: TwinCityTerminal[]): Record<TwinState, number> {
-  const out: Record<TwinState, number> = { ok: 0, pr: 0, wa: 0, off: 0, un: 0 }
-  for (const t of terminals) out[twinTerminalState(t)] += 1
-  return out
-}
 
 function alertRows(items: ScreenAlertItem[], onOpen: (code: string) => void, presenting: boolean): TwinAlertItem[] {
   return items.slice(0, 4).map((item, index) => ({
@@ -92,20 +78,6 @@ function TaskFlow({ printByStatus, scanByStatus }: { printByStatus: Record<strin
   )
 }
 
-function Legend({ counts }: { counts: Record<TwinState, number> }) {
-  return (
-    <TwinLegend
-      items={[
-        { state: 'ok', label: `在线 ${counts.ok}` },
-        { state: 'pr', label: `打印中 ${counts.pr}` },
-        { state: 'wa', label: `告警 ${counts.wa}` },
-        { state: 'off', label: `离线 ${counts.off}` },
-        { state: 'un', label: `未上报 ${counts.un}` },
-      ]}
-    />
-  )
-}
-
 export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   const gov = useAdminSnapshot('gov', 60)
   // 来源平台访问 Top 5 只在运营快照里；其余块都随政务快照下发
@@ -113,24 +85,21 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   if (!gov.data) {
     return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={gov.failure} onRetry={() => void gov.refresh()} />
   }
-  const g: ScreenSnapshotMetrics = gov.data.metrics
   // 任务流与告警 9/26 起随政务快照下发（与运营版同一份实现、同一档缓存）
-  const o: ScreenSnapshotMetrics = g
-  const opsPending = false
+  const g: ScreenSnapshotMetrics = gov.data.metrics
   const sourcesPending = !ops.data && !ops.failure
   const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
   const terminals = twinTerminalsFromCells(cells)
   const areas = twinAreas(terminals)
   const rawArea = chrome.params.get('area')
   const focus = rawArea !== null && areas.some((a) => a.area === rawArea) ? rawArea : null
-  const highlight = parseHighlight(chrome.params.get('status'))
+  const highlight = parseTwinHighlight(chrome.params.get('status'))
   const inView = focus === null ? terminals : terminals.filter((t) => t.area === focus)
-  const counts = countStates(inView)
+  const counts = twinCountStates(inView)
   const cityScope = focus === null ? undefined : '全市口径'
   const openTerminal = (id: string) => chrome.onNavigate(screenHref('terminal', chrome.params, { id }))
   const areaCodes = new Set(inView.map((t) => t.code))
-  const stateRank: Record<TwinState, number> = { off: 0, wa: 1, un: 2, pr: 3, ok: 4 }
-  const sortedArea = [...inView].sort((a, b) => stateRank[twinTerminalState(a)] - stateRank[twinTerminalState(b)] || a.code.localeCompare(b.code))
+  const sortedArea = twinSortByState(inView)
   // 展示档底栏只有一行高：列最要紧的 3 台，其余合成一格；桌面档全列
   const chipLimit = chrome.presenting ? 3 : sortedArea.length
   const openAlertTerminal = (code: string) => {
@@ -141,57 +110,18 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   }
 
   const toolbar = (
-    <>
-      <label className="twin-fgrp">
-        <span className="twin-flabel">区域</span>
-        <select
-          className="twin-select"
-          value={focus ?? ''}
-          onChange={(event) => chrome.setParam('area', event.target.value === '' ? null : event.target.value)}
-        >
-          <option value="">全市</option>
-          {areas.map((a) => (
-            <option key={a.area} value={a.area}>
-              {a.area}（{a.count} 台）
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="twin-fgrp" role="group" aria-label="终端状态">
-        <span className="twin-flabel">状态</span>
-        {HIGHLIGHTS.map((h) => (
-          <button
-            key={h.key}
-            type="button"
-            className="twin-chip"
-            aria-pressed={highlight === h.key}
-            onClick={() => chrome.setParam('status', h.key === 'all' ? null : h.key)}
-          >
-            {h.label}
-          </button>
-        ))}
-      </div>
-      <label className="twin-fgrp">
-        <span className="twin-flabel">终端</span>
-        <input
-          className="twin-search"
-          type="search"
-          list="twin-terminal-codes"
-          placeholder="输入终端编号直达"
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return
-            const code = event.currentTarget.value.trim().toUpperCase()
-            const hit = terminals.find((t) => t.code.toUpperCase() === code)
-            if (hit) openTerminal(hit.id)
-          }}
-        />
-        <datalist id="twin-terminal-codes">
-          {terminals.map((t) => (
-            <option key={t.id} value={t.code} />
-          ))}
-        </datalist>
-      </label>
-    </>
+    <TwinCityToolbar
+      groupLabel="区域"
+      allLabel="全市"
+      groups={areas}
+      focus={focus}
+      highlight={highlight}
+      terminals={terminals}
+      onFocus={(area) => chrome.setParam('area', area)}
+      onHighlight={(next) => chrome.setParam('status', next === 'all' ? null : next)}
+      onOpenTerminal={(t) => openTerminal(t.id)}
+      datalistId="twin-terminal-codes"
+    />
   )
 
   return (
@@ -267,7 +197,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                       ]}
                     />
                   ) : (
-                    <Legend counts={counts} />
+                    <TwinStateLegend counts={counts} />
                   )}
                 </div>
               </>
@@ -364,7 +294,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                 )}
               </div>
               <div className="twin-overlay is-tr">
-                <Legend counts={counts} />
+                <TwinStateLegend counts={counts} />
               </div>
             </>
           )
@@ -397,15 +327,11 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
               ) : null}
             </div>
           </TwinPanel>
-        ) : opsPending ? (
-          <TwinPanel title="近 24 小时任务流" source="打印与扫描任务按状态计数。">
-            <p className="twin-cap">正在取数…</p>
-          </TwinPanel>
         ) : (
           <TwinMetricPanel
             title="近 24 小时任务流"
             sub="打印与扫描"
-            metric={o?.taskFlow24h}
+            metric={g.taskFlow24h}
             source="打印任务与扫描任务近 24 小时按当前状态计数；失败需人工核查，详见打印扫描运维。"
             render={(value) => <TaskFlow printByStatus={value.printByStatus} scanByStatus={value.scanByStatus} />}
           />
@@ -464,36 +390,39 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
       </TwinSlot>
 
       <TwinSlot slot="r3">
-        {opsPending ? (
-          <TwinPanel title="实时告警" tone="err" source="与告警中心同一份实时派生告警。">
-            <p className="twin-cap">正在取数…</p>
-          </TwinPanel>
-        ) : (
-          <TwinMetricPanel
-            title={focus === null ? '实时告警' : `${focus}告警`}
-            sub={
-              o?.alertsRealtime?.available
-                ? focus === null
-                  ? `当前 ${screenCount(o.alertsRealtime.value.firingCount)} 条`
-                  : `本区 ${screenCount(o.alertsRealtime.value.items.filter((item) => item.terminalCode !== null && areaCodes.has(item.terminalCode)).length)} 条 · 全市 ${screenCount(o.alertsRealtime.value.firingCount)} 条`
-                : undefined
-            }
-            tone="err"
-            metric={o?.alertsRealtime}
-            source="与告警中心同一份实时派生告警（终端离线、打印机异常等），按发生时间倒序。处置请到告警中心。"
-            render={(value) => {
-              const items = focus === null ? value.items : value.items.filter((item) => item.terminalCode !== null && areaCodes.has(item.terminalCode))
-              return (
-                <>
-                  <TwinAlertList items={alertRows(items, openAlertTerminal, chrome.presenting)} emptyText={focus === null ? '当前没有告警' : `${focus}当前没有告警`} />
-                  {chrome.presenting ? null : <a className="twin-cap twin-push" href="/alerts" onClick={(event) => { event.preventDefault(); chrome.onNavigate('/alerts') }} style={{ alignSelf: 'flex-end', minHeight: 44, display: 'inline-flex', alignItems: 'center', color: '#9fe8cd' }}>
+        <TwinMetricPanel
+          title={focus === null ? '实时告警' : `${focus}告警`}
+          sub={
+            g.alertsRealtime?.available
+              ? focus === null
+                ? `当前 ${screenCount(g.alertsRealtime.value.firingCount)} 条`
+                : `本区 ${screenCount(g.alertsRealtime.value.items.filter((item) => item.terminalCode !== null && areaCodes.has(item.terminalCode)).length)} 条 · 全市 ${screenCount(g.alertsRealtime.value.firingCount)} 条`
+              : undefined
+          }
+          tone="err"
+          metric={g.alertsRealtime}
+          source="与告警中心同一份实时派生告警（终端离线、打印机异常等），按发生时间倒序。处置请到告警中心。"
+          render={(value) => {
+            const items = focus === null ? value.items : value.items.filter((item) => item.terminalCode !== null && areaCodes.has(item.terminalCode))
+            return (
+              <>
+                <TwinAlertList items={alertRows(items, openAlertTerminal, chrome.presenting)} emptyText={focus === null ? '当前没有告警' : `${focus}当前没有告警`} />
+                {chrome.presenting ? null : (
+                  <a
+                    className="twin-cap twin-push twin-link"
+                    href="/alerts"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      chrome.onNavigate('/alerts')
+                    }}
+                  >
                     进入告警中心 →
-                  </a>}
-                </>
-              )
-            }}
-          />
-        )}
+                  </a>
+                )}
+              </>
+            )
+          }}
+        />
       </TwinSlot>
     </TwinShell>
   )

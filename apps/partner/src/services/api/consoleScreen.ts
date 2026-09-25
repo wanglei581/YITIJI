@@ -17,7 +17,7 @@
  *    必须分开提示，否则机构管理员会以为自己权限没开。
  */
 
-import type { ScreenSnapshot, ScreenTerminalTwin } from '@ai-job-print/shared'
+import type { ScreenSnapshot, ScreenTerminalTwin, ScreenUsageRange, ScreenUsageSnapshot } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
 import { authHeader } from '../auth'
 
@@ -174,5 +174,69 @@ export async function fetchPartnerTerminalTwin(terminalId: string): Promise<Twin
 export async function loadPartnerTerminalTwin(terminalId: string): Promise<ScreenTerminalTwin> {
   const result = await fetchPartnerTerminalTwin(terminalId)
   if (result.kind === 'ok') return result.twin
+  throw new ScreenFetchError(result)
+}
+
+/* ── 本机构信息使用 ────────────────────────────────────────────────────────
+ * GET /api/v1/partner/screen/usage?range=today|7d|30d
+ * 唯一允许的 query 是 range，且先经 normalizeUsageRange 白名单纠正，非法值绝不发给服务端。
+ * 仍然不带任何机构标识：服务端只从鉴权用户回源。响应是裸对象。
+ */
+
+export type UsageFetchResult =
+  | { kind: 'ok'; usage: ScreenUsageSnapshot }
+  | Exclude<ScreenFetchResult, { kind: 'ok' }>
+
+export function normalizeUsageRange(raw: string | null | undefined): ScreenUsageRange {
+  return raw === '7d' || raw === '30d' ? raw : 'today'
+}
+
+function asPartnerUsage(payload: unknown): ScreenUsageSnapshot | null {
+  if (!payload || typeof payload !== 'object') return null
+  const usage = payload as Partial<ScreenUsageSnapshot>
+  if (usage.audience !== 'partner') return null
+  if (typeof usage.generatedAt !== 'string') return null
+  if (!usage.metrics || typeof usage.metrics !== 'object') return null
+  return payload as ScreenUsageSnapshot
+}
+
+export async function fetchPartnerUsage(range: ScreenUsageRange): Promise<UsageFetchResult> {
+  if (API_MODE !== 'http') return { kind: 'mock' }
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/partner/screen/usage?range=${normalizeUsageRange(range)}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json', ...authHeader() },
+    })
+  } catch {
+    return { kind: 'offline' }
+  }
+  if (res.status === 401) return { kind: 'unauthorized' }
+  if (res.status === 403) {
+    const body = await readErrorBody(res)
+    return {
+      kind: 'forbidden',
+      code: body.error?.code ?? 'AUTH_ROLE_FORBIDDEN',
+      message: readableMessage(body.error?.code, body.error?.message),
+    }
+  }
+  if (!res.ok) {
+    const body = await readErrorBody(res)
+    return { kind: 'failed', message: readableMessage(body.error?.code, body.error?.message) }
+  }
+  let payload: unknown
+  try {
+    payload = await res.json()
+  } catch {
+    return { kind: 'failed', message: '服务响应不是合法的信息使用统计，请稍后重试' }
+  }
+  const usage = asPartnerUsage(payload)
+  if (!usage) return { kind: 'failed', message: '服务响应不是合法的信息使用统计，请稍后重试' }
+  return { kind: 'ok', usage }
+}
+
+export async function loadPartnerUsage(range: ScreenUsageRange): Promise<ScreenUsageSnapshot> {
+  const result = await fetchPartnerUsage(range)
+  if (result.kind === 'ok') return result.usage
   throw new ScreenFetchError(result)
 }

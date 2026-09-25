@@ -66,7 +66,8 @@ function flowWidth(count: number | null | 'na', base: number, div: number): numb
   return count === null || count === 'na' ? base : base + Math.sqrt(count) / div
 }
 
-function Pill({ at, lift, width, className, children }: { at: [number, number]; lift: number; width: number; className: string; children: ReactNode }) {
+/** 地面锚点上立起的标签牌；lift 是标签相对锚点的抬高（舞台像素）。 */
+export function TwinPill({ at, lift, width, className, children }: { at: [number, number]; lift: number; width: number; className: string; children: ReactNode }) {
   const g = stageToGround(at[0], at[1])
   const height = lift / g.scale
   return (
@@ -79,7 +80,8 @@ function Pill({ at, lift, width, className, children }: { at: [number, number]; 
   )
 }
 
-function Prism({ at, size, h, className }: { at: [number, number]; size: number; h: number; className: string }) {
+/** 地面锚点上的发光棱柱；h 是柱高（像素），只按真实计数缩放。 */
+export function TwinPrism({ at, size, h, className }: { at: [number, number]; size: number; h: number; className: string }) {
   const g = stageToGround(at[0], at[1])
   return (
     <div className={cn('tw3-prism', className)} style={{ left: g.u - size / 2, top: g.v - size / 2, width: size, height: size, ['--h' as string]: `${Math.round(h)}px` }}>
@@ -122,12 +124,12 @@ export function TwinNetwork({ channels, services, outcomes, hubLabel, hubCaption
   const hub = stageToGround(HUB_AT[0], HUB_AT[1])
   const ai = stageToGround(AI_AT[0], AI_AT[1])
   const solids = [
-    ...channels.map((c) => ({ y: CHANNEL_AT[c.key][1], node: <Prism key={`cp-${c.key}`} at={CHANNEL_AT[c.key]} size={70} h={26} className="p-ai" /> })),
+    ...channels.map((c) => ({ y: CHANNEL_AT[c.key][1], node: <TwinPrism key={`cp-${c.key}`} at={CHANNEL_AT[c.key]} size={70} h={26} className="p-ai" /> })),
     ...placed.map((s) => ({
       y: SERVICE_LAYOUT[s.key].at[1],
-      node: <Prism key={`sp-${s.key}`} at={SERVICE_LAYOUT[s.key].at} size={50} h={s.count === null ? 10 : 12 + Math.sqrt(s.count) * 1.6} className={s.count === null ? 'p-na' : LANE_CLASS[s.lane]} />,
+      node: <TwinPrism key={`sp-${s.key}`} at={SERVICE_LAYOUT[s.key].at} size={50} h={s.count === null ? 10 : 12 + Math.sqrt(s.count) * 1.6} className={s.count === null ? 'p-na' : LANE_CLASS[s.lane]} />,
     })),
-    ...outcomes.map((o) => ({ y: OUTCOME_LAYOUT[o.key].at[1], node: <Prism key={`op-${o.key}`} at={OUTCOME_LAYOUT[o.key].at} size={44} h={18} className="p-out" /> })),
+    ...outcomes.map((o) => ({ y: OUTCOME_LAYOUT[o.key].at[1], node: <TwinPrism key={`op-${o.key}`} at={OUTCOME_LAYOUT[o.key].at} size={44} h={18} className="p-out" /> })),
   ].sort((a, b) => a.y - b.y)
 
   return (
@@ -153,33 +155,33 @@ export function TwinNetwork({ channels, services, outcomes, hubLabel, hubCaption
           </div>
         ) : null}
         {channels.map((c) => (
-          <Pill key={`cl-${c.key}`} at={CHANNEL_AT[c.key]} lift={118} width={176} className="tw3-big p-ai">
+          <TwinPill key={`cl-${c.key}`} at={CHANNEL_AT[c.key]} lift={118} width={176} className="tw3-big p-ai">
             <b>{c.label}</b>
             <span>{countText(c.count)}</span>
             <i>{c.caption}</i>
-          </Pill>
+          </TwinPill>
         ))}
         {placed.map((s) => (
-          <Pill key={`sl-${s.key}`} at={SERVICE_LAYOUT[s.key].at} lift={SERVICE_LAYOUT[s.key].lift} width={170} className={cn('tw3-svc', s.count === null ? 'p-na' : LANE_CLASS[s.lane])}>
+          <TwinPill key={`sl-${s.key}`} at={SERVICE_LAYOUT[s.key].at} lift={SERVICE_LAYOUT[s.key].lift} width={170} className={cn('tw3-svc', s.count === null ? 'p-na' : LANE_CLASS[s.lane])}>
             <b>{SERVICE_LAYOUT[s.key].label}</b>
             <span>{countText(s.count)}</span>
-          </Pill>
+          </TwinPill>
         ))}
         {outcomes.map((o) => (
-          <Pill key={`ol-${o.key}`} at={OUTCOME_LAYOUT[o.key].at} lift={OUTCOME_LAYOUT[o.key].lift} width={170} className="tw3-big p-out">
+          <TwinPill key={`ol-${o.key}`} at={OUTCOME_LAYOUT[o.key].at} lift={OUTCOME_LAYOUT[o.key].lift} width={170} className="tw3-big p-out">
             <b>{o.label}</b>
             <span>{countText(o.count)}</span>
-          </Pill>
+          </TwinPill>
         ))}
-        <Pill at={HUB_AT} lift={178} width={170} className="tw3-core">
+        <TwinPill at={HUB_AT} lift={178} width={170} className="tw3-core">
           <b>{hubLabel}</b>
           <span>{hubCaption}</span>
-        </Pill>
+        </TwinPill>
         {hasAi ? (
-          <Pill at={AI_AT} lift={160} width={230} className="tw3-core">
+          <TwinPill at={AI_AT} lift={160} width={230} className="tw3-core">
             <b>{aiLabel}</b>
             <span>{aiCaption}</span>
-          </Pill>
+          </TwinPill>
         ) : null}
       </div>
     </div>

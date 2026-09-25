@@ -4,6 +4,7 @@ import type { TwinState } from './TwinCharts'
 import {
   HUB_R,
   TWIN_BILLBOARD,
+  TWIN_STAGE_W,
   TWIN_WORLD,
   focusCamera,
   placeBlocks,
@@ -11,6 +12,7 @@ import {
   placeTerminals,
   type DistrictPlacement,
 } from './twinMath'
+import { layoutTwinLabels, twinLabelBox, twinLabelWidth, type TwinLabelRequest } from './twinLabelLayout'
 
 /**
  * 城区孪生：按「所在区」把终端聚成街区，立柱就是终端。
@@ -46,6 +48,11 @@ export interface TwinCityProps {
   /** 没填所在区的终端归到这一组。 */
   unassignedLabel: string
   hubLabel: string
+  /**
+   * 是否画数据中枢（塔、中枢牌与汇流线）。政务版画：各区数据汇到平台。
+   * 机构版不画：设计稿里本机构各点位之间没有中枢，中间只留扫描圈。
+   */
+  hub?: boolean
   emptyText: string
   maxAlertLabels?: number
   onSelectArea?: (area: string | null) => void
@@ -97,6 +104,7 @@ export function TwinCity({
   highlight = 'all',
   unassignedLabel,
   hubLabel,
+  hub = true,
   emptyText,
   maxAlertLabels = 4,
   onSelectArea,
@@ -156,11 +164,33 @@ export function TwinCity({
     })
     .slice(0, maxAlertLabels)
   const selected = selectedId === null ? null : (model.placedTerminals.find((p) => p.terminal.id === selectedId) ?? null)
+  const districtName = (key: string) => (key === NO_AREA ? unassignedLabel : key)
+  const districtLift = (d: DistrictPlacement) => (d.key === model.tallestKey ? 210 : 150)
+  const alertLift = (p: PlacedTerminal, i: number) => PILLAR_HEIGHT[p.state] + ALERT_LIFTS[i % ALERT_LIFTS.length]
 
+  // 牌子互相避让（区名牌、告警牌、中枢、场景顶部的浮层），按当前镜头投影。
+  // 聚焦时只排本区：别区已退成背景；镜头更平、楼更近，牌子起步抬高一截。
   const center = TWIN_WORLD / 2
+  const focusBonus = focusDistrict !== null ? { district: 110, alert: 90 } : { district: 0, alert: 0 }
+  const requests: TwinLabelRequest[] = []
+  for (const d of model.districts) {
+    if (focusDistrict !== null && d.key !== focusDistrict.key) continue
+    const text = `${districtName(d.key)} ${(model.groups.get(d.key) ?? []).length} 台`
+    requests.push({ key: `d:${d.key}`, u: d.cx, v: d.cy - d.r * 0.9, lift: districtLift(d) + focusBonus.district, minLift: 110, width: twinLabelWidth(text, 16, 2, 28), height: 36, optional: false })
+  }
+  alertLabels.forEach((p, i) => {
+    const text = `${p.terminal.code} ${(p.terminal.alert as { title: string }).title}`
+    requests.push({ key: `a:${p.terminal.id}`, u: p.x, v: p.y, lift: alertLift(p, i) + focusBonus.alert, minLift: PILLAR_HEIGHT[p.state] + 36, width: twinLabelWidth(text, 15, 0, 24), height: 30, optional: true })
+  })
+  // 场景顶部一条留给左上角的说明与右上角的图例
+  const obstacles = [{ x0: 0, x1: TWIN_STAGE_W, y0: -1, y1: 58 }]
+  if (hub && focusDistrict === null) {
+    obstacles.push(twinLabelBox(center, center, 40, twinLabelWidth(hubLabel, 15, 0, 30), 30), twinLabelBox(center, center, 116, 64, 116))
+  }
+  const lifts = layoutTwinLabels(requests, obstacles, camera)
   // 聚焦某区时中枢也退为背景，不压在被看的街区前面
   const hubDim = focusDistrict !== null ? 'is-dim' : undefined
-  const flows = model.placedTerminals.filter((p, i) => p.state === 'pr' || (p.state === 'ok' && i % 3 === 0))
+  const flows = hub ? model.placedTerminals.filter((p, i) => p.state === 'pr' || (p.state === 'ok' && i % 3 === 0)) : []
 
   return (
     <div className="tw3-stage">
@@ -240,20 +270,24 @@ export function TwinCity({
           )
         })}
 
-        <div className={cn('tw3-bb', hubDim)} style={{ left: center - 60, top: center - 150, width: 120, height: 150, transform: TWIN_BILLBOARD }}>
-          <div className="tw3-tower" style={{ height: 116 }} />
-        </div>
-        <div className={cn('tw3-bb', hubDim)} style={{ left: center - 70, top: center - 40, width: 140, height: 40, transform: `translateZ(-2px) ${TWIN_BILLBOARD}` }}>
-          <div className="tw3-lbl" style={{ height: 40 }}>
-            <div className="c" style={{ ['--c' as string]: 'var(--tw-acc)', minHeight: 28 }}>{hubLabel}</div>
-          </div>
-        </div>
+        {hub ? (
+          <>
+            <div className={cn('tw3-bb', hubDim)} style={{ left: center - 60, top: center - 150, width: 120, height: 150, transform: TWIN_BILLBOARD }}>
+              <div className="tw3-tower" style={{ height: 116 }} />
+            </div>
+            <div className={cn('tw3-bb', hubDim)} style={{ left: center - 70, top: center - 40, width: 140, height: 40, transform: `translateZ(-2px) ${TWIN_BILLBOARD}` }}>
+              <div className="tw3-lbl" style={{ height: 40 }}>
+                <div className="c" style={{ ['--c' as string]: 'var(--tw-acc)', minHeight: 28 }}>{hubLabel}</div>
+              </div>
+            </div>
+          </>
+        ) : null}
 
         {model.districts.map((d) => {
           const count = (model.groups.get(d.key) ?? []).length
-          // 聚焦时本区的告警标签会抬高，区名牌再抬一截，二者不叠在一起
-          const lift = (d.key === model.tallestKey ? 210 : 150) + (focusDistrict !== null && focusDistrict.key === d.key ? 150 : 0)
-          const areaName = d.key === NO_AREA ? unassignedLabel : d.key
+          // 抬高来自上面的避让排布；聚焦时别区的牌子已退成背景、不参与排布，用默认抬高
+          const lift = lifts.get(`d:${d.key}`) ?? districtLift(d)
+          const areaName = districtName(d.key)
           const focused = focusDistrict !== null && focusDistrict.key === d.key
           return (
             <div
@@ -279,8 +313,10 @@ export function TwinCity({
         })}
 
         {alertLabels.map((p, i) => {
-          // 聚焦时镜头更平、楼更近：标签再抬高，免得被前排楼顶遮住
-          const lift = PILLAR_HEIGHT[p.state] + ALERT_LIFTS[i % ALERT_LIFTS.length] + (focusDistrict !== null ? 120 : 0)
+          // 避让后放不下的告警牌不挂（告警面板里照样有）；聚焦时镜头更平、楼更近，标签再抬高
+          const placed = lifts.get(`a:${p.terminal.id}`)
+          if (placed === null) return null
+          const lift = placed ?? alertLift(p, i)
           return (
             <div
               key={`al-${p.terminal.id}`}

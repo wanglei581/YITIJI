@@ -80,12 +80,15 @@ export function TwinRing({ value, total, size = 168, children }: TwinRingProps) 
 export interface TwinTrendDay {
   /** Asia/Shanghai 自然日，YYYY-MM-DD。 */
   date: string
-  value: number
+  /** null = 服务端因样本少于 5 置空：画在底线上的空心点，不连线、不补数。 */
+  value: number | null
 }
 
 export interface TwinAreaTrendProps {
   days: TwinTrendDay[]
   seriesLabel: string
+  /** 第二条序列（虚线、无面积），与 days 逐日对齐。 */
+  secondary?: { label: string; values: ReadonlyArray<number | null> }
   width?: number
   height?: number
 }
@@ -95,26 +98,58 @@ function shortDay(date: string): string {
   return parts.length === 3 ? `${parts[1]}-${parts[2]}` : date
 }
 
-/** 面积折线。纵轴从 0 起，按真实最大值取整到千位；全为 0 时画真实的零线。 */
-export function TwinAreaTrend({ days, seriesLabel, width = 380, height = 190 }: TwinAreaTrendProps) {
+/** 纵轴上限取 1 / 2 / 5 整档，至少 10：小机构几十次的曲线不会贴在底边，中点刻度也是整数。 */
+function niceMax(max: number): number {
+  if (max <= 10) return 10
+  const pow = 10 ** Math.floor(Math.log10(max))
+  for (const m of [1, 2, 5, 10]) if (m * pow >= max) return m * pow
+  return 10 * pow
+}
+
+/** 连续的非空点连成一段；null 处断开。 */
+function runsOf(xs: number[], values: ReadonlyArray<number | null>, yOf: (v: number) => number): Array<Array<[number, number]>> {
+  const runs: Array<Array<[number, number]>> = []
+  let current: Array<[number, number]> = []
+  values.forEach((v, i) => {
+    if (v === null) {
+      if (current.length) runs.push(current)
+      current = []
+    } else current.push([xs[i], yOf(v)])
+  })
+  if (current.length) runs.push(current)
+  return runs
+}
+
+function pathOf(run: Array<[number, number]>): string {
+  return run.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
+}
+
+/** 面积折线。纵轴从 0 起，上限按真实最大值取整档；全为 0 时画真实的零线；少于 5 的日子不连线。 */
+export function TwinAreaTrend({ days, seriesLabel, secondary, width = 380, height = 190 }: TwinAreaTrendProps) {
   const gradientId = useId()
   if (days.length === 0) return <p className="twin-empty">没有可画的日数据</p>
   const top = 22
   const bottom = 30
   const left = 38
   const right = 10
-  const max = days.reduce((best, day) => (day.value > best ? day.value : best), 0)
-  const step = max <= 1000 ? 500 : 1000
-  const yMax = Math.max(step, Math.ceil(max / step) * step)
+  const base = height - bottom
+  const primary = days.map((day) => day.value)
+  const second = secondary ? days.map((_, i) => secondary.values[i] ?? null) : []
+  let max = 0
+  for (const v of [...primary, ...second]) if (v !== null && v > max) max = v
+  const yMax = niceMax(max)
+  const yOf = (v: number) => top + (1 - v / yMax) * (height - top - bottom)
   const xs = days.map((_, i) => left + (i * (width - left - right)) / Math.max(days.length - 1, 1))
-  const ys = days.map((day) => top + (1 - day.value / yMax) * (height - top - bottom))
-  const line = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${ys[i].toFixed(1)}`).join(' ')
-  const area = `${line} L${xs[xs.length - 1].toFixed(1)} ${height - bottom} L${xs[0].toFixed(1)} ${height - bottom} Z`
-  const peakIndex = max > 0 ? days.findIndex((day) => day.value === max) : -1
+  const runs = runsOf(xs, primary, yOf)
+  const secondRuns = secondary ? runsOf(xs, second, yOf) : []
+  let peak = 0
+  for (const v of primary) if (v !== null && v > peak) peak = v
+  const peakIndex = peak > 0 ? primary.findIndex((v) => v === peak) : -1
+  const last = primary[primary.length - 1]
   const ticks = [0, yMax / 2, yMax]
   const labelEvery = Math.max(1, Math.ceil(days.length / 5))
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={seriesLabel} preserveAspectRatio="none">
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={secondary ? `${seriesLabel}；${secondary.label}` : seriesLabel} preserveAspectRatio="none">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#2ee6a8" stopOpacity=".45" />
@@ -122,7 +157,7 @@ export function TwinAreaTrend({ days, seriesLabel, width = 380, height = 190 }: 
         </linearGradient>
       </defs>
       {ticks.map((tick) => {
-        const y = top + (1 - tick / yMax) * (height - top - bottom)
+        const y = yOf(tick)
         return (
           <g key={tick}>
             <line x1={left} x2={width - right} y1={y} y2={y} stroke="rgba(255,255,255,.07)" />
@@ -132,19 +167,41 @@ export function TwinAreaTrend({ days, seriesLabel, width = 380, height = 190 }: 
           </g>
         )
       })}
-      <path d={area} fill={`url(#${gradientId})`} />
-      <path d={line} fill="none" stroke="var(--tw-acc)" strokeWidth="2.5" style={{ filter: 'drop-shadow(0 0 6px rgba(46,230,168,.8))' }} />
+      {runs.map((run, i) =>
+        run.length > 1 ? (
+          <path key={`a-${i}`} d={`${pathOf(run)} L${run[run.length - 1][0].toFixed(1)} ${base} L${run[0][0].toFixed(1)} ${base} Z`} fill={`url(#${gradientId})`} />
+        ) : null,
+      )}
+      {runs.map((run, i) => (
+        <path key={`l-${i}`} d={pathOf(run)} fill="none" stroke="var(--tw-acc)" strokeWidth="2.5" style={{ filter: 'drop-shadow(0 0 6px rgba(46,230,168,.8))' }} />
+      ))}
+      {runs.map((run, i) => (run.length === 1 ? <circle key={`s-${i}`} cx={run[0][0]} cy={run[0][1]} r="3.5" fill="var(--tw-acc)" /> : null))}
+      {secondRuns.map((run, i) =>
+        run.length > 1 ? (
+          <path key={`b-${i}`} d={pathOf(run)} fill="none" stroke="#f2c879" strokeWidth="2" strokeDasharray="4 6" />
+        ) : (
+          <circle key={`b-${i}`} cx={run[0][0]} cy={run[0][1]} r="3" fill="#f2c879" />
+        ),
+      )}
+      {primary.map((v, i) =>
+        v === null ? (
+          <circle key={`n-${days[i].date}`} cx={xs[i]} cy={base} r="4" fill="none" stroke="#8fb3a8" strokeDasharray="2 2">
+            <title>{`${shortDay(days[i].date)} 少于 5`}</title>
+          </circle>
+        ) : null,
+      )}
       {peakIndex >= 0 ? (
         <g>
-          <circle cx={xs[peakIndex]} cy={ys[peakIndex]} r="5" fill="#04140f" stroke="var(--tw-acc)" strokeWidth="2.5" />
-          <text x={xs[peakIndex]} y={ys[peakIndex] - 12} fill="#f4fdfa" fontSize="13" fontWeight="700" textAnchor="middle">
-            峰值 {screenCount(max)}
+          <circle cx={xs[peakIndex]} cy={yOf(peak)} r="5" fill="#04140f" stroke="var(--tw-acc)" strokeWidth="2.5" />
+          <text x={xs[peakIndex]} y={yOf(peak) - 12} fill="#f4fdfa" fontSize="13" fontWeight="700" textAnchor="middle">
+            峰值 {screenCount(peak)}
           </text>
         </g>
       ) : null}
-      <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="6" fill="var(--tw-acc)" style={{ filter: 'drop-shadow(0 0 6px #2ee6a8)' }} />
+      {last !== null ? <circle cx={xs[xs.length - 1]} cy={yOf(last)} r="6" fill="var(--tw-acc)" style={{ filter: 'drop-shadow(0 0 6px #2ee6a8)' }} /> : null}
       {days.map((day, i) =>
-        (i % labelEvery === 0 && days.length - 1 - i >= Math.ceil(labelEvery / 2)) || i === days.length - 1 ? (
+        // 常规刻度与末尾刻度至少隔一整档，末尾右对齐的日期不会和前一个挤在一起
+        (i % labelEvery === 0 && days.length - 1 - i >= labelEvery) || i === days.length - 1 ? (
           <text key={day.date} x={xs[i]} y={height - 8} fill="#8fb3a8" fontSize="13" textAnchor={i === 0 ? 'start' : i === days.length - 1 ? 'end' : 'middle'}>
             {shortDay(day.date)}
           </text>

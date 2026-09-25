@@ -24,6 +24,7 @@ export const partnerRouter = createBrowserRouter([
     children: [
       { index: true,        element: <DashboardPage /> },
       { path: 'screen',     element: <ScreenPage /> },
+      { path: 'screen/:tab', element: <ScreenPage /> },
       { path: 'profile',    element: <ProfilePage /> },
       { path: 'jobs',       element: <JobsPage /> },
       { path: 'companies',  element: <CompaniesPage /> },

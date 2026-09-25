@@ -150,9 +150,11 @@ export function TwinShell({ chrome, title, subtitle, layout, toolbar, meta, poll
     )
   }
   if (meta && failure?.kind === 'forbidden') {
+    // 机构端「账号未绑定机构」与「角色不符」下一步动作不同，说法由调用方给
+    const copy = chrome.describeForbidden ? chrome.describeForbidden(failure) : { title: '已无权查看本大屏', description: failure.message }
     banners.push(
       <TwinBanner key="forbidden" tone="error">
-        <b>已无权查看本大屏</b>，屏上数字停在权限变更前的最后一次成功取数。{failure.message}
+        <b>{copy.title}</b>，屏上数字停在权限或机构归属变更前的最后一次成功取数。{copy.description}
       </TwinBanner>,
     )
   }

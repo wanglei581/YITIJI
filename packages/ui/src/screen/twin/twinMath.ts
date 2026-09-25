@@ -44,6 +44,42 @@ export function stageToGround(x: number, y: number, tiltDeg = 58): GroundPoint {
   }
 }
 
+/** 镜头：与 .tw3-world 的 transform 与 --tilt 一致（默认 58°，聚焦 46°，见 twin-screen-3d.css）。 */
+export interface TwinCamera {
+  zoom: number
+  dx: number
+  dy: number
+  tiltDeg: number
+}
+
+export const TWIN_TILT_DEFAULT = 58
+export const TWIN_TILT_FOCUS = 46
+export const TWIN_DEFAULT_CAMERA: TwinCamera = { zoom: 1, dx: 0, dy: 0, tiltDeg: TWIN_TILT_DEFAULT }
+
+/**
+ * stageToGround 的正向：地面点 (u, v) 在给定镜头下落在舞台上的哪个像素。
+ * 与 .tw3-world 的 transform 链一致：先 translate、再 scale、再 rotateZ(-38°)、最后 rotateX(倾角)，透视 1700。
+ *
+ * sx / sy 是立在该点上的广告牌（.tw3-bb）的横向 / 纵向屏幕比例：广告牌反向旋转后，
+ * 横向只受缩放与透视影响（zoom × scale）；纵向因为 CSS scale() 不缩放 Z，
+ * 等于 (zoom·cos²t + sin²t) × scale —— 默认镜头下两者都等于 scale。
+ */
+export function groundToStage(u: number, v: number, camera: TwinCamera = TWIN_DEFAULT_CAMERA): { x: number; y: number; scale: number; sx: number; sy: number } {
+  const tilt = (camera.tiltDeg * Math.PI) / 180
+  const px = camera.zoom * (u - TWIN_WORLD / 2 + camera.dx)
+  const py = camera.zoom * (v - TWIN_WORLD / 2 + camera.dy)
+  const x1 = px * Math.cos(YAW) + py * Math.sin(YAW)
+  const y1 = -px * Math.sin(YAW) + py * Math.cos(YAW)
+  const scale = PERSP / (PERSP - y1 * Math.sin(tilt))
+  return {
+    x: ORIGIN_X + (WORLD_CX + x1 - ORIGIN_X) * scale,
+    y: ORIGIN_Y + (WORLD_CY + y1 * Math.cos(tilt) - ORIGIN_Y) * scale,
+    scale,
+    sx: camera.zoom * scale,
+    sy: (camera.zoom * Math.cos(tilt) ** 2 + Math.sin(tilt) ** 2) * scale,
+  }
+}
+
 /** FNV-1a：把字符串变成稳定的 32 位种子。 */
 export function hashSeed(text: string): number {
   let hash = 0x811c9dc5
@@ -226,7 +262,7 @@ export function placeTerminals(district: DistrictPlacement, count: number): Arra
 }
 
 /** 把选中区推到画面中心的相机参数（聚焦模式）。 */
-export function focusCamera(district: DistrictPlacement | null): { zoom: number; dx: number; dy: number } {
-  if (!district) return { zoom: 1, dx: 0, dy: 0 }
-  return { zoom: 1.45, dx: CENTER - district.cx, dy: CENTER - district.cy + 30 }
+export function focusCamera(district: DistrictPlacement | null): TwinCamera {
+  if (!district) return TWIN_DEFAULT_CAMERA
+  return { zoom: 1.45, dx: CENTER - district.cx, dy: CENTER - district.cy + 30, tiltDeg: TWIN_TILT_FOCUS }
 }

@@ -331,10 +331,13 @@
 }
 
 .twin-ph-t {
+  flex: none;
   margin: 0;
   font: inherit;
   letter-spacing: inherit;
   color: inherit;
+  /* 标题永不折行；挤不下时先收窄副标题（带省略号），角标与说明按钮不动 */
+  white-space: nowrap;
 }
 
 .twin-ph-bar {
@@ -347,7 +350,10 @@
 }
 
 .twin-ph-sub {
+  min-width: 0;
   margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 500;
   letter-spacing: 0;
   color: var(--tw-muted);
