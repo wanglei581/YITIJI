@@ -104,7 +104,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/me/feedback', url: '/me/feedback', marker: member, featureText: '意见反馈' },
   { pattern: '/me/settings', url: '/me/settings', marker: screen('member-settings'), featureText: '账号设置' },
   { pattern: '/me/privacy-requests', url: '/me/privacy-requests', marker: screen('member-privacy-requests'), featureText: '隐私与数据请求' },
-  { pattern: '/help', url: '/help', marker: screen('help'), featureText: '帮助中心' },
+  { pattern: '/help', url: '/help', marker: screen('help'), featureText: '你想解决' },
   { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
   { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '权益活动详情' },
   { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
