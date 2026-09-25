@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
+import { RECRUITMENT_HOSTING_OFF } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
 import { productionRoutePatterns } from './route-manifest'
 
@@ -35,6 +36,8 @@ function registerHomeShellApi(api: ApiRouter) {
         items: [],
       },
       toolbox: { enabled: false, items: [] },
+      // 按我们云上的默认（招聘内容托管关闭，3.13）：首页底栏说的是「本终端未开放岗位与招聘会信息，也不代收简历」。
+      ...RECRUITMENT_HOSTING_OFF,
       configVersion: 'filing-smoke-fixture',
       refreshIntervalMs: 300000,
       serverTime: '2026-07-28T00:00:00.000Z',
@@ -109,8 +112,9 @@ test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ pag
   // 断言意图是「已落到干净首页」，不是锁定某句营销文案。V6 首页不再有
   // 「简历、岗位、打印」，改用首页底部的合规声明作锚点：它是 CLAUDE.md §2/§10
   // 强制要求必须出现的文本，稳定且不会随视觉改版消失，断言它同时守住合规底线。
+  // 3.13 起这句随招聘内容托管变：本夹具是托管关闭（我们云上的默认），打开时那句由 qingxu-home / fusion-w1 钉。
   await expect(
-    page.getByText('本终端仅展示与跳转，不代收简历', { exact: false }).first()
+    page.getByText('本终端未开放岗位与招聘会信息，也不代收简历', { exact: false }).first()
   ).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: /还在用吗/ })).toHaveCount(0)

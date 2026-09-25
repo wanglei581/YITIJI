@@ -194,6 +194,32 @@ test('hosting on: home keeps the job and fair entries exactly as today @w1-kiosk
   await page.screenshot({ path: test.info().outputPath('home-hosting-on-1080x1920.png') })
 })
 
+// ── 旧服务端：没有 recruitmentHosting 字段 ─────────────────────────────────────
+
+test('an older server without recruitmentHosting falls back to jobBoard, and to closed without either @w1-kiosk', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  const { recruitmentHosting: _dropped, ...jobBoardOnly } = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
+  api.respond('GET', CONFIG, { status: 200, json: jobBoardOnly })
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 3, totalPages: 3 } } })
+  api.respond('GET', '/api/v1/job-fairs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } } })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByTestId('qx-home')).toHaveAttribute('data-recruitment', 'open')
+  await expect(page.locator('[data-action="jobs-hub"]')).toContainText('3 个在招')
+
+  // 两个字段都没有（比 3.13 更早的服务端）：按关闭处理，不因为「没说关」就放行。
+  const { recruitmentHosting: _hosting, jobBoard: _board, ...neither } = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
+  api.respond('GET', CONFIG, { status: 200, json: neither })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  // 「关闭」也是没读到配置时的样子：先等这份配置真的读完（百宝箱磁贴离开「读取中」），
+  // 再留两帧让同一份配置的托管判定落地，然后才断言仍按关闭处理。
+  await expect(home.getByText('本机尚未上架扩展服务')).toBeVisible()
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  await expect(home).toHaveAttribute('data-recruitment', 'closed')
+  await expect(page.locator('[data-action="jobs-hub"]')).toHaveCount(0)
+  expect(api.requestCount('GET', '/api/v1/jobs'), '按关闭处理时不再请求岗位').toBe(1)
+})
+
 // ── 关闭：直达招聘类地址 ───────────────────────────────────────────────────
 
 const GATED_URLS: readonly { url: string; topic: string }[] = [
