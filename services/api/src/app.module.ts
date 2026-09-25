@@ -62,6 +62,7 @@ import { ScreensaverModule } from './screensaver/screensaver.module'
 import { ContractReviewHttpModule } from './contract-review/contract-review-http.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 import { RecruitmentContentModule } from './recruitment-content/recruitment-content.module'
+import { RecruitmentHostingModule } from './recruitment-hosting/recruitment-hosting.module'
 import { CommunityModule } from './community/community.module'
 import { AssistantModule } from './assistant/assistant.module'
 import { DocumentConversionModule } from './document-conversion/document-conversion.module'
@@ -153,6 +154,7 @@ const redisUrl = process.env['REDIS_URL']
     ConsoleScreenModule,
     OfflineAgenciesModule,
     RecruitmentContentModule,
+    RecruitmentHostingModule,
     KioskSessionModule,
     HelpModule,
     LegalModule,
