@@ -265,6 +265,16 @@ async function attemptOnce(task: PendingTask): Promise<void> {
     attempts += 1
     verdict = await requestConfirmedScanRevoke(task, null)
   }
+  if (!verdict.confirmed && verdict.reason === 'conflict') {
+    /* 409 SCAN_TASK_CANCEL_CONFLICT 分不出两件事：任务已经是终态，还是 CAS 撞上了一次刚开始
+     * 的投递（任务正是 matched，文件正往上一位的任务里写 —— 那份纸可能正是下一位扫的）。
+     * 后者不许换人。立刻再问一次就分得清，理由与上限写在 requestConfirmedScanRevoke 的
+     * afterConflict 上：第二次的每一种回答都是确定的。
+     * 只问这一次，而且不交给退避循环：真是终态的任务每次都回 409，交给循环只会把这台机器
+     * 按到自然过期。 */
+    attempts += 1
+    verdict = await requestConfirmedScanRevoke(task, task.identityToken, { afterConflict: true })
+  }
   if (verdict.confirmed) {
     settleTask(task)
     lastOutcome = 'none'
