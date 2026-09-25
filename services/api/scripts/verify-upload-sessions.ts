@@ -91,6 +91,50 @@ class FakeRedis {
     return existed ? 1 : 0
   }
 
+  async getDel(key: string): Promise<string | null> {
+    const value = await this.get(key)
+    if (value !== null) this.values.delete(key)
+    return value
+  }
+
+  async getAndDelIfEquals(key: string, expectedValue: string): Promise<'missing' | 'matched' | 'mismatched'> {
+    const entry = this.values.get(key)
+    if (!entry || entry.expiresAt <= Date.now()) {
+      this.values.delete(key)
+      return 'missing'
+    }
+    if (entry.value !== expectedValue) return 'mismatched'
+    this.values.delete(key)
+    return 'matched'
+  }
+
+  /** 与 RedisService.compareAndSetSession 同一原子条件：锁、状态、无文件、TTL。 */
+  async compareAndSetSession(
+    sessionKey: string,
+    lockKey: string,
+    lockToken: string,
+    nextValue: string,
+    expectedStatus: string,
+  ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
+    const now = Date.now()
+    const session = this.values.get(sessionKey)
+    if (!session || session.expiresAt <= now) {
+      if (session) this.values.delete(sessionKey)
+      return 'expired'
+    }
+    const lock = this.values.get(lockKey)
+    if (!lock || lock.expiresAt <= now || lock.value !== lockToken) return 'lost-lock'
+    let parsed: { status?: string; file?: unknown }
+    try {
+      parsed = JSON.parse(session.value) as { status?: string; file?: unknown }
+    } catch {
+      return 'conflict'
+    }
+    if (parsed.status !== expectedStatus || parsed.file != null) return 'conflict'
+    this.values.set(sessionKey, { value: nextValue, expiresAt: session.expiresAt })
+    return 'updated'
+  }
+
   async zAdd(key: string, score: number, member: string): Promise<void> {
     const index = this.sortedSets.get(key) ?? new Map<string, number>()
     index.set(member, score)
@@ -769,8 +813,7 @@ async function main(): Promise<void> {
     redis.get = async (key: string) => {
       if (key === lockKey) {
         lockReaders += 1
-        if (lockReaders === 2) lockReadersReady.resolve()
-        await lockReadersReady.promise
+        if (lockReaders >= 2) lockReadersReady.resolve()
       }
       return originalGet(key)
     }
@@ -1115,6 +1158,325 @@ async function main(): Promise<void> {
       await prisma.onModuleDestroy()
       rmSync(REAL_STORAGE_DIR, { recursive: true, force: true })
     }
+  }
+
+  {
+    // 场景码兑换若拿着过期快照回写，会把已经 uploaded 的会话盖回 pending，
+    // 手机收到成功回执，一体机却看不到文件，清理索引也不再指向这份字节。
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const redis = (service as unknown as { redis: FakeRedis }).redis
+    const originalGet = redis.get.bind(redis)
+    const releaseStaleRead = deferred()
+    const staleReadHeld = deferred()
+    let holdSessionRead = true
+    redis.get = async (key: string) => {
+      if (holdSessionRead && key === sessionKey) {
+        holdSessionRead = false
+        const value = await originalGet(key)
+        staleReadHeld.resolve()
+        await releaseStaleRead.promise
+        return value
+      }
+      return originalGet(key)
+    }
+    const resolving = service.resolveScene(session.sceneToken).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    )
+    await staleReadHeld.promise
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'held-resume.pdf' }),
+    }).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    )
+    releaseStaleRead.resolve()
+    await resolving
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    if (uploaded.ok) {
+      assert.equal(status.status, 'uploaded', 'a successful phone upload must stay uploaded after scene resolve')
+      assert.equal(status.file?.fileId, uploaded.value.file?.fileId, 'scene resolve must not detach the uploaded file')
+      assert.equal(prisma.files.get(uploaded.value.file!.fileId)?.deletedAt ?? null, null)
+    } else {
+      assert.notEqual(status.status, 'uploaded', 'rejected upload must not be reported as received')
+      assert.equal(status.file, null)
+    }
+  }
+
+  {
+    const uploadEntered = deferred()
+    const releaseUpload = deferred()
+    const { service, prisma, redis } = makeService({
+      beforeUpload: async (callNumber) => {
+        if (callNumber === 1) {
+          uploadEntered.resolve()
+          await releaseUpload.promise
+        }
+      },
+    })
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const pending = service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'slow.pdf' }),
+    })
+    await uploadEntered.promise
+    await redis.setEx(lockKey, 30, 'successor-lock')
+    releaseUpload.resolve()
+    await expectRejects(
+      () => pending,
+      BadRequestException,
+      'upload that lost its lock must not report success',
+    )
+    assert.equal(await redis.get(lockKey), 'successor-lock', 'finishing upload must not delete a successor lock')
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    assert.equal(status.file, null, 'uncommitted upload must not remain the kiosk receipt')
+    for (const stored of prisma.files.values()) {
+      assert.notEqual(stored.deletedAt, null, 'bytes written after the lock was lost must be deleted')
+    }
+  }
+
+  {
+    const { service } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const garbled = Buffer.from('张三_简历.pdf', 'utf8').toString('latin1')
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: garbled }),
+    })
+    assert.equal(uploaded.file?.filename, '张三_简历.pdf', 'phone multipart UTF-8 filenames must be restored before receipt')
+    const plain = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const kept = await service.uploadFile({
+      sessionId: plain.sessionId,
+      uploadToken: plain.uploadToken,
+      file: file({ originalname: 'résumé.pdf' }),
+    })
+    assert.equal(kept.file?.filename, 'résumé.pdf', 'latin1 filenames without Han characters stay unchanged')
+  }
+
+  {
+    // A 读到自己的锁之后、写入 uploaded 之前，锁过期。B 完成上传。
+    // A 若仍用非原子 SET 回写，两部手机都收到成功，一体机只留下后写的那一份。
+    const { service, prisma, redis } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const cleanupKey = `upload_session_cleanup:${session.sessionId}`
+    const originalCommit = redis.compareAndSetSession.bind(redis)
+    let armed = true
+    let winnerId = ''
+    redis.compareAndSetSession = async (key, heldLock, lockToken, nextValue, expectedStatus) => {
+      if (armed && key === sessionKey && expectedStatus === 'uploading') {
+        const parsed = JSON.parse(nextValue) as { status?: string }
+        if (parsed.status === 'uploaded') {
+          armed = false
+          await redis.del(heldLock)
+          const winner = await service.uploadFile({
+            sessionId: session.sessionId,
+            uploadToken: session.uploadToken,
+            file: file({ originalname: 'winner.pdf' }),
+          })
+          winnerId = winner.file!.fileId
+          // 锁值又变回 A，只核对锁就会盖掉 B 已经写成的收据。
+          await redis.setEx(heldLock, 30, lockToken)
+        }
+      }
+      return originalCommit(key, heldLock, lockToken, nextValue, expectedStatus)
+    }
+    let loserOk = true
+    try {
+      await service.uploadFile({
+        sessionId: session.sessionId,
+        uploadToken: session.uploadToken,
+        file: file({ originalname: 'loser.pdf' }),
+      })
+    } catch {
+      loserOk = false
+    }
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    const cleanup = JSON.parse((await redis.get(cleanupKey)) ?? '{}') as { file?: { fileId?: string } | null }
+    const loserFile = [...prisma.files.values()].find((item) => item.filename === 'loser.pdf')
+    assert.equal(loserOk, false, 'upload whose lock expired before commit must not report success')
+    assert.equal(status.status, 'uploaded')
+    assert.equal(status.file?.fileId, winnerId, 'kiosk receipt must stay with the upload that committed under the lock')
+    assert.equal(cleanup.file?.fileId, winnerId, 'expiry cleanup record must name the same file as the receipt')
+    assert.equal(prisma.files.get(winnerId)?.deletedAt ?? null, null)
+    assert.ok(loserFile?.deletedAt, 'loser may delete only its own bytes')
+  }
+
+  {
+    const { service, prisma, redis } = makeService()
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const cleanupKey = `upload_session_cleanup:${session.sessionId}`
+    const originalCommit = redis.compareAndSetSession.bind(redis)
+    let armed = true
+    let winnerId = ''
+    redis.compareAndSetSession = async (key, heldLock, lockToken, nextValue, expectedStatus) => {
+      if (armed && key === sessionKey && expectedStatus === 'uploading') {
+        const parsed = JSON.parse(nextValue) as { status?: string }
+        if (parsed.status === 'uploaded') {
+          armed = false
+          await redis.del(heldLock)
+          const winner = await service.uploadFile({
+            sessionId: session.sessionId,
+            uploadToken: session.uploadToken,
+            file: file({ originalname: 'kept.pdf' }),
+          })
+          winnerId = winner.file!.fileId
+          await redis.setEx(heldLock, 30, 'successor-lock')
+        }
+      }
+      return originalCommit(key, heldLock, lockToken, nextValue, expectedStatus)
+    }
+    await expectRejects(
+      () => service.uploadFile({
+        sessionId: session.sessionId,
+        uploadToken: session.uploadToken,
+        file: file({ originalname: 'dropped.pdf' }),
+      }),
+      BadRequestException,
+      'stale upload must not overwrite the successor receipt',
+    )
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    const cleanup = JSON.parse((await redis.get(cleanupKey)) ?? '{}') as { file?: { fileId?: string } | null }
+    assert.equal(await redis.get(`upload_session_upload_lock:${session.sessionId}`), 'successor-lock')
+    assert.equal(status.file?.fileId, winnerId)
+    assert.equal(cleanup.file?.fileId, winnerId)
+    assert.equal(prisma.files.get(winnerId)?.deletedAt ?? null, null)
+    const dropped = [...prisma.files.values()].find((item) => item.filename === 'dropped.pdf')
+    assert.ok(dropped?.deletedAt, 'dropped upload deletes its own file')
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const redis = (service as unknown as { redis: FakeRedis }).redis
+    const originalGet = redis.get.bind(redis)
+    const releaseRead = deferred()
+    const readHeld = deferred()
+    let holdRead = true
+    redis.get = async (key: string) => {
+      if (holdRead && key === sessionKey) {
+        holdRead = false
+        const value = await originalGet(key)
+        readHeld.resolve()
+        await releaseRead.promise
+        return value
+      }
+      return originalGet(key)
+    }
+    const resolving = service.resolveScene(session.sceneToken).then(
+      (value) => ({ ok: true as const, value }),
+      () => ({ ok: false as const }),
+    )
+    await readHeld.promise
+    await redis.del(lockKey)
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'during-resolve.pdf' }),
+    })
+    releaseRead.resolve()
+    const resolved = await resolving
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    assert.equal(resolved.ok, false, 'scene resolve must not mint a token after its lock timed out')
+    assert.equal(status.status, 'uploaded')
+    assert.equal(status.file?.fileId, uploaded.file?.fileId, 'scene resolve must not rewind an uploaded receipt')
+    assert.equal(prisma.files.get(uploaded.file!.fileId)?.deletedAt ?? null, null)
+  }
+
+  {
+    // A 拿到锁并读到 pending 后、写入 uploading 前锁过期。B 已原子提交。
+    // 普通 persist 会把 B 的收据盖成 uploading 且没有文件，B 的字节脱离会话。
+    const { service, prisma, redis, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const cleanupKey = `upload_session_cleanup:${session.sessionId}`
+    const originalGet = redis.get.bind(redis)
+    let armed = true
+    let winnerId = ''
+    redis.get = async (key: string) => {
+      const value = await originalGet(key)
+      if (armed && key === sessionKey && value?.includes('"status":"pending"')) {
+        armed = false
+        await redis.del(lockKey)
+        const winner = await service.uploadFile({
+          sessionId: session.sessionId,
+          uploadToken: session.uploadToken,
+          file: file({ originalname: 'winner-before-uploading.pdf' }),
+        })
+        winnerId = winner.file!.fileId
+      }
+      return value
+    }
+    let loserOk = true
+    try {
+      await service.uploadFile({
+        sessionId: session.sessionId,
+        uploadToken: session.uploadToken,
+        file: file({ originalname: 'loser-before-uploading.pdf' }),
+      })
+    } catch {
+      loserOk = false
+    }
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    const cleanup = JSON.parse((await redis.get(cleanupKey)) ?? '{}') as { file?: { fileId?: string } | null }
+    assert.equal(loserOk, false, 'A must not report success after its lock expired before uploading')
+    assert.equal(status.status, 'uploaded')
+    assert.equal(status.file?.fileId, winnerId, 'B receipt must survive A resuming the uploading write')
+    assert.equal(cleanup.file?.fileId, winnerId)
+    assert.equal(prisma.files.get(winnerId)?.deletedAt ?? null, null)
+    assert.equal(files.uploadCalls.length, 1, 'A must not store a file after the uploading transition loses the lock')
+    assert.equal(files.uploadCalls[0]?.filename, 'winner-before-uploading.pdf')
   }
 
   console.log('PASS upload session verification')

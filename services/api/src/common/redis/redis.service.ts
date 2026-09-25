@@ -90,6 +90,47 @@ export class RedisService implements OnModuleDestroy {
     return result === 1 ? 'updated' : 'missing'
   }
 
+  /**
+   * 同一次 Lua：锁值仍是调用方的、会话仍是 expectedStatus 且还没有文件、键 TTL 仍大于 0，
+   * 才按剩余 TTL 写入。任一条件不成立都不改会话。
+   */
+  async compareAndSetSession(
+    sessionKey: string,
+    lockKey: string,
+    lockToken: string,
+    nextValue: string,
+    expectedStatus: string,
+  ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
+    const result = await this.client.eval(
+      `
+      -- UPLOAD_SESSION_COMMIT
+      local ttl = redis.call('TTL', KEYS[1])
+      if ttl <= 0 then return 0 end
+      if redis.call('GET', KEYS[2]) ~= ARGV[1] then return -1 end
+      local raw = redis.call('GET', KEYS[1])
+      if not raw then return 0 end
+      local ok, session = pcall(cjson.decode, raw)
+      if not ok or type(session) ~= 'table' then return -2 end
+      if session['status'] ~= ARGV[3] then return -2 end
+      local file = session['file']
+      if file ~= nil and file ~= cjson.null then return -2 end
+      redis.call('SET', KEYS[1], ARGV[2], 'EX', ttl)
+      return 1
+      `,
+      2,
+      sessionKey,
+      lockKey,
+      lockToken,
+      nextValue,
+      expectedStatus,
+    )
+    const code = Number(result)
+    if (code === 1) return 'updated'
+    if (code === -1) return 'lost-lock'
+    if (code === -2) return 'conflict'
+    return 'expired'
+  }
+
   ttl(key: string): Promise<number> {
     return this.client.ttl(key)
   }

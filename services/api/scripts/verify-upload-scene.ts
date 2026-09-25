@@ -64,7 +64,35 @@ async function main(): Promise<void> {
        * 「取 TTL；TTL<=0 就不写；否则按原 TTL SET 回去」。
        * 这里用 TTL + SETEX 忠实复刻它的语义 —— 兑换时那次**写入是真的发生的**。
        */
-      eval: async (_script: string, _numKeys: string, key: string, value: string) => {
+      eval: async (script: string, numKeys: number, ...rest: string[]) => {
+        const keyCount = Number(numKeys)
+        const keys = rest.slice(0, keyCount)
+        const args = rest.slice(keyCount)
+        // compareAndSetSession：锁、状态、无文件、TTL 同一次判断后才写。
+        if (script.includes('UPLOAD_SESSION_COMMIT')) {
+          const sessionKey = keys[0] ?? ''
+          const lockKey = keys[1] ?? ''
+          const [lockToken, nextValue, expectedStatus] = args
+          const ttl = await client.ttl(sessionKey)
+          if (ttl <= 0) return 0
+          if ((await client.get(lockKey)) !== lockToken) return -1
+          const raw = await client.get(sessionKey)
+          if (!raw) return 0
+          const session = JSON.parse(raw) as { status?: string; file?: unknown }
+          if (session.status !== expectedStatus || session.file != null) return -2
+          await client.setex(sessionKey, ttl, nextValue ?? '')
+          return 1
+        }
+        const key = keys[0] ?? ''
+        const value = args[0] ?? ''
+        // getAndDelIfEquals：值相等才删。上传锁释放走这条，不能误当成 SETEX。
+        if (script.includes('redis.call(\'DEL\'')) {
+          const current = await client.get(key)
+          if (current === null) return 0
+          if (current !== value) return -1
+          await client.del(key)
+          return 1
+        }
         const ttl = await client.ttl(key)
         if (ttl <= 0) return 0
         await client.setex(key, ttl, value)

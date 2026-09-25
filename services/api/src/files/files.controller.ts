@@ -32,7 +32,7 @@ import { AuditService } from '../audit/audit.service'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { FilesService, type FileRequester } from './files.service'
-import { PROXY_MAX_BYTES } from './file-validation'
+import { PROXY_MAX_BYTES, restoreMultipartUtf8Filename } from './file-validation'
 import {
   collectBodyUntilByteLimit,
   RawUploadLimitExceededError,
@@ -66,20 +66,6 @@ function parseDeletedQuery(deleted?: string): boolean | 'all' | undefined {
   if (deleted === 'true' || deleted === '1') return true
   if (deleted === 'false' || deleted === '0') return false
   return undefined
-}
-
-/**
- * Multer/Busboy 可能把浏览器 multipart 中的 UTF-8 文件名按 Latin-1 解码。
- * 仅还原可严格往返验证、且恢复结果含汉字的名称，避免泛化重解码合法 Latin-1 文件名。
- */
-function restoreKioskUtf8Filename(filename: string): string {
-  if (!/[\u0080-\u00ff]/.test(filename) || [...filename].some((character) => character.codePointAt(0)! > 0xff)) return filename
-
-  const bytes = Buffer.from(filename, 'latin1')
-  const restored = bytes.toString('utf8')
-  if (restored.includes('\uFFFD') || !Buffer.from(restored, 'utf8').equals(bytes)) return filename
-
-  return /\p{Script=Han}/u.test(restored) ? restored : filename
 }
 
 /**
@@ -157,7 +143,7 @@ export class FilesController {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const res = await this.files.upload({
       buffer: file.buffer,
-      filename: restoreKioskUtf8Filename(file.originalname),
+      filename: restoreMultipartUtf8Filename(file.originalname),
       mimeType: file.mimetype,
       purpose: options.purpose as FilePurpose,
       uploaderId: null,
