@@ -160,14 +160,19 @@ export class JobAiController {
 @Controller('me/job-ai-sessions')
 @UseGuards(EndUserAuthGuard)
 export class MemberJobAiSessionsController {
-  constructor(private readonly service: JobAiService) {}
+  constructor(
+    private readonly service: JobAiService,
+    private readonly jobBoard: KioskJobBoardService,
+  ) {}
 
   @Get()
   async list(
     @CurrentEndUser() user: AuthedEndUser,
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
+    @Req() req?: KioskJobBoardRequest,
   ) {
+    await this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
     return ApiResponse.ok(await this.service.listMine(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
   }
 

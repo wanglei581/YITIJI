@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
+import { TerminalsModule } from '../terminals/terminals.module'
 import { JobApplicationsController } from './job-applications.controller'
 import { JobApplicationsService } from './job-applications.service'
 
@@ -13,6 +14,7 @@ import { JobApplicationsService } from './job-applications.service'
  */
 @Module({
   imports: [
+    TerminalsModule,
     JwtModule.registerAsync({
       useFactory: () => {
         const secret = process.env['JWT_SECRET']

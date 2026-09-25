@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Query, Req, UseGuards } from '@nestjs/common'
+import { Controller, Delete, Get, Optional, Param, Query, Req, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -7,6 +7,11 @@ import { parseMemberPageQuery } from '../common/utils/member-page'
 import { ActivityService } from './activity.service'
 
 import { resolveClientIp } from '../common/client-ip'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
   ip?: string
@@ -35,7 +40,14 @@ export class MeActivityController {
   constructor(
     private readonly activity: ActivityService,
     private readonly audit: AuditService,
+    @Optional() private readonly jobBoard?: KioskJobBoardService,
   ) {}
+
+  /** 未注入开关时保持原列表（既有验证直接构造控制器）。生产模块会注入。 */
+  private async jobBoardOpen(req?: KioskJobBoardRequest): Promise<boolean> {
+    if (!this.jobBoard) return true
+    return (await this.jobBoard.resolve(kioskJobBoardTerminalRef(req ?? {}))).enabled
+  }
 
   @Get('browse-logs')
   async browseLogs(
@@ -43,9 +55,18 @@ export class MeActivityController {
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
     @Query('targetType') targetType?: string,
+    @Req() req?: KioskJobBoardRequest,
   ) {
+    const open = await this.jobBoardOpen(req)
+    const type = targetType || undefined
+    if (!open && type === 'job') await this.jobBoard!.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
     return ApiResponse.ok(
-      await this.activity.listBrowse(user.endUserId, parseMemberPageQuery(cursor, pageSize), targetType || undefined),
+      await this.activity.listBrowse(
+        user.endUserId,
+        parseMemberPageQuery(cursor, pageSize),
+        type,
+        !open && !type ? { excludeTargetTypes: ['job'] } : undefined,
+      ),
     )
   }
 
@@ -55,9 +76,18 @@ export class MeActivityController {
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
     @Query('targetType') targetType?: string,
+    @Req() req?: KioskJobBoardRequest,
   ) {
+    const open = await this.jobBoardOpen(req)
+    const type = targetType || undefined
+    if (!open && type === 'job') await this.jobBoard!.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
     return ApiResponse.ok(
-      await this.activity.listJumps(user.endUserId, parseMemberPageQuery(cursor, pageSize), targetType || undefined),
+      await this.activity.listJumps(
+        user.endUserId,
+        parseMemberPageQuery(cursor, pageSize),
+        type,
+        !open && !type ? { excludeTargetTypes: ['job'] } : undefined,
+      ),
     )
   }
 
