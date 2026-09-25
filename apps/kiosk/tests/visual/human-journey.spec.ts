@@ -144,10 +144,15 @@ test.describe('真人走查（模拟数据）', () => {
       key: 'unpaid-onsite',
       label: '未付款 → 引导现场支付',
       status: 200,
+      // 与 pickup-order.service.ts 未付款分支同形：released=false 必带 paymentSessionToken，
+      // 页面缺它会按「校验结果未确认」处理（PrintPickupClaimPage.tsx 的回执校验）。
       json: {
         released: false,
         orderId: 'ord-journey-002', orderNo: 'P202609080002',
-        taskStatus: 'awaiting_payment',
+        terminalId: 'KSK-001', amountCents: 200,
+        priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+        fileName: '求职简历.pdf',
+        paymentSessionToken: 'journey-pay-token',
       },
       expectText: /请先完成现场支付|进入现场支付/,
     },
