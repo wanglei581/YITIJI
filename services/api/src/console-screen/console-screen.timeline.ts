@@ -5,7 +5,15 @@ import {
 } from './console-screen.types'
 import { isHealthyPrinterStatus } from '../terminals/printer-status'
 
-export const TIMELINE_HEARTBEAT_ROW_CAP = 2_000
+/**
+ * 24 小时内心跳行上限。超过则整段时间轴不可用，不返回被截断的半截。
+ *
+ * Agent 默认 30 秒一次（heartbeatIntervalMs ?? 30_000，服务端不下发覆盖），
+ * 全天约 2,880 条。服务端仍可能下发更短间隔；按最短 10 秒计，全天 8,640 条。
+ * 12,000 盖住这条下限，并给窗口起点前补入的 1 条、时钟抖动和短暂重连留约 40% 余量。
+ * 2,000 会把最常见的「全天在线」直接判成不可用。查询只取 createdAt、printerStatus。
+ */
+export const TIMELINE_HEARTBEAT_ROW_CAP = 12_000
 export const TIMELINE_PRINT_ROW_CAP = 500
 /** 合并后的段数上限。超过则整段时间轴不可用，不返回被截断的半截。 */
 export const TIMELINE_SEGMENT_CAP = 4_000
