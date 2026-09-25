@@ -552,6 +552,10 @@ async function main(): Promise<void> {
       Error,
       'cancel must not succeed when delete fails',
     )
+    const failedRow = prisma.files.get(uploaded.file!.fileId)
+    assert.equal(failedRow?.status, 'quarantined', 'a failed anonymous delete must make the row unreadable')
+    assert.ok(failedRow?.storageDeletePendingAt, 'a failed anonymous delete must keep the retry ledger')
+    assert.equal(failedRow?.deletedAt ?? null, null)
     await redis.del(`upload_session:${session.sessionId}`)
     const cleanupRaw = await redis.get(`upload_session_cleanup:${session.sessionId}`)
     assert.equal(cleanupRaw?.includes(uploaded.file!.fileId), true, 'cleanup record must keep the file id after the session key expires')

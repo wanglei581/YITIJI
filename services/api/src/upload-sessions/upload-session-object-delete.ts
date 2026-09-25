@@ -10,22 +10,31 @@ async function loadBindFile(host: MemberBindHost, fileId: string): Promise<BindF
 }
 
 /**
- * 对象删除失败只记账，不把文件行标成已删。条件更新避免盖住并发改过的 storageKey。
- * storageDeletePendingAt 只表示「删这一行的 storageKey」。删 replacedStorageKey 失败不得调用。
+ * 对象删除失败只记账，不把文件行标成已删。
+ * storageDeletePendingAt 的含义是「删这一行的 storageKey」。
+ * 删 replacedStorageKey 失败不得调用这里，否则对账会删掉已经换成会员键的有效对象。
+ * quarantine 只用于仍是匿名行的失败：对账删掉对象后只给 quarantined 行补墓碑。
  */
 export async function noteObjectDeleteFailure(
   host: MemberBindHost,
   row: BindFileRow,
   error: unknown,
+  options?: { quarantine?: boolean },
 ): Promise<void> {
   const errorType = error instanceof Error ? error.name : 'Error'
   const attempts = (row as BindFileRow & { storageDeleteAttempts?: number | null }).storageDeleteAttempts
   await host.prisma.fileObject.updateMany({
-    where: { id: row.id, storageKey: row.storageKey, deletedAt: null },
+    where: {
+      id: row.id,
+      storageKey: row.storageKey,
+      deletedAt: null,
+      ...(options?.quarantine ? { endUserId: null, ownerType: { not: 'user' } } : {}),
+    },
     data: {
       storageDeletePendingAt: new Date(),
       storageDeleteAttempts: (attempts ?? 0) + 1,
       storageDeleteError: errorType.slice(0, 80),
+      ...(options?.quarantine ? { status: 'quarantined' } : {}),
     },
   })
 }
@@ -40,7 +49,7 @@ export async function releaseReplacedObject(host: MemberBindHost, file: BindFile
   })
 }
 
-/** 先删对象，成功后才墓碑。删失败时文件行保持未删除，并留下可重试账本。 */
+/** 先删对象，成功后才墓碑。删失败时把匿名行隔离并留下可重试账本。 */
 export async function deleteAnonymousObjectThenTombstone(
   host: MemberBindHost,
   fileId: string,
@@ -51,7 +60,7 @@ export async function deleteAnonymousObjectThenTombstone(
   try {
     await host.files.deleteObjectAtKey(row.storageKey, row.bucket)
   } catch (error) {
-    await noteObjectDeleteFailure(host, row, error)
+    await noteObjectDeleteFailure(host, row, error, { quarantine: true })
     throw error
   }
   const current = await loadBindFile(host, fileId)
