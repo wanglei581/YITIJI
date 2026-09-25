@@ -43,7 +43,8 @@ const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 
   paid:             { badge: 'success', label: '已支付' },
   refunding:        { badge: 'warning', label: '退款中' },
   refunded:         { badge: 'default', label: '已退款' },
-  partial_refunded: { badge: 'default', label: '部分退款' },
+  // 产品只做整单退款，服务端不再写入 partial_refunded；万一出现即为异常，需人工核对。
+  partial_refunded: { badge: 'warning', label: '退款异常·待核对' },
   failed:           { badge: 'error',   label: '支付失败' },
   closed:           { badge: 'default', label: '已关闭' },
 }
@@ -65,7 +66,6 @@ const PAY_FILTERS = [
   { label: '支付中', value: 'paying' },
   { label: '已支付', value: 'paid' },
   { label: '退款中', value: 'refunding' },
-  { label: '部分退款', value: 'partial_refunded' },
   { label: '已退款', value: 'refunded' },
   { label: '支付失败', value: 'failed' },
   { label: '已关闭', value: 'closed' },

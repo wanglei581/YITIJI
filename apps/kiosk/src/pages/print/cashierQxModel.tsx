@@ -353,14 +353,15 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
       }
     case 'partial-refunded':
       return {
-        kind: 'warn', icon: <Undo2Icon aria-hidden="true" />, title: '这一单发生了部分退款',
+        // 稿 32 留有此态；产品只做整单退款，服务端不再写入 partial_refunded，出现即异常。
+        kind: 'warn', icon: <Undo2Icon aria-hidden="true" />, title: '这一单的退款需要人工核对',
         paras: [
-          <>服务端返回订单处于<b>部分退款</b>状态。订单金额只退回了一部分，但这类订单仍然一律不放行出纸。</>,
-          '具体退款金额、剩余金额与到账结果以订单详情和支付渠道账单为准。本机不自行计算，也不提供继续支付或继续打印入口。',
+          <>服务端返回的退款状态<b>不是整单退款</b>。本机只做整单退款，这类订单一律不放行出纸。</>,
+          '请到「我的打印订单」查看，或找现场工作人员核对。金额只认服务端订单详情与支付渠道账单，本机不自行计算，也不提供继续支付或继续打印入口。',
         ],
-        chips: [['warn', '部分退款'], [undefined, '不放行出纸']],
-        rows: [['订单状态', '部分退款（服务端确认）'], ['能否出纸', '否']],
-        ask: [<>这单<em>只退了一部分</em>。</>, '部分退款后同样不能出纸。金额只认服务端订单详情与支付渠道账单。'],
+        chips: [['warn', '退款待核对'], [undefined, '不放行出纸']],
+        rows: [['订单状态', '退款待人工核对（服务端返回）'], ['能否出纸', '否']],
+        ask: [<>这单的<em>退款要人工核对</em>。</>, '不能出纸。金额只认服务端订单详情与支付渠道账单。'],
       }
     case 'refunded':
       return {
@@ -406,7 +407,7 @@ export function cashierQxPill(state: CashierQxState, opts: { locked: boolean; fr
     'order-failed': ['bad', '订单支付已失败'],
     closed: ['bad', '订单已超时关闭'],
     refunding: ['warn', '退款处理中'],
-    'partial-refunded': ['warn', '订单已部分退款'],
+    'partial-refunded': ['warn', '退款待人工核对'],
     refunded: ['bad', '退款已完成'],
   }
   const [tone, label] = PILL[state]
