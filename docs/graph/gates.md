@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1511 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1524 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -129,7 +129,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 90 个文件</summary>
+<summary><code>apps/admin/src/</code> — 92 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -179,6 +179,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screensaver/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/sync-sources/index.tsx` | `verify-no-raw-error-render.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
@@ -900,7 +902,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 34 个文件</summary>
+<summary><code>apps/partner/src/</code> — 37 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -918,9 +920,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/profile/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/screen/PartnerGrid.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/PartnerUsageView.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/metricLabels.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/smart-campus/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/sources/ExcelImportModal.tsx` | `verify-excel-template-download-ui.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-job-headcount.ts`<br/>`verify-partner-excel-import.ts` |
 | `apps/partner/src/routes/sources/RotateCredentialDrawer.tsx` | `verify-backend-p0-contracts.mjs` |
@@ -1562,7 +1567,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/ui/src/</code> — 19 个文件</summary>
+<summary><code>packages/ui/src/</code> — 27 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1577,6 +1582,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/screen/ScreenFrame.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/ScreenPrimitives.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/screenCopy.ts` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/twin/TwinFrame.tsx` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/twin/TwinInfoFlow.tsx` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/twin/TwinPanel.tsx` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/twin/TwinShell.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/fusion-youth.css` | `verify-kiosk-visual-unity.mjs`<br/>`verify-fusion-youth-foundation.mjs` |
 | `packages/ui/src/styles/kiosk-components.css` | `verify-kiosk-visual-unity.mjs` |
 | `packages/ui/src/styles/kiosk-shell.css` | `verify-kiosk-visual-unity.mjs` |
@@ -1584,6 +1593,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/styles/ops-screen-scale.css` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/ops-screen.css` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/service-desk.css` | `verify-service-desk-foundation.mjs` |
+| `packages/ui/src/styles/twin-screen-3d.css` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/styles/twin-screen-layout.css` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/styles/twin-screen-parts.css` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/styles/twin-screen.css` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/theme/visualTheme.ts` | `verify-fusion-youth-foundation.mjs`<br/>`verify-service-desk-foundation.mjs` |
 
 </details>

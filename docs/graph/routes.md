@@ -310,7 +310,7 @@ flowchart LR
   app --> print_scan["/print-scan<br/>1 页 · 5 端点"]
   app --> printers["/printers<br/>1 页 · 0 端点"]
   app --> privacy_requests["/privacy-requests<br/>1 页 · 0 端点"]
-  app --> screen["/screen<br/>1 页 · 0 端点"]
+  app --> screen["/screen<br/>2 页 · 0 端点"]
   app --> screensaver["/screensaver<br/>1 页 · 11 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 2 端点"]
   app --> sync_sources["/sync-sources<br/>1 页 · 0 端点"]
@@ -352,6 +352,7 @@ flowchart LR
 | `/printers` | Navigate | — _(重定向)_ | 0 | — |
 | `/privacy-requests` | PrivacyRequestsPage | `apps/admin/src/routes/privacy-requests/index.tsx` | 0 | — |
 | `/screen` | ScreenPage | `apps/admin/src/routes/screen/index.tsx` | 0 | — |
+| `/screen/:tab` | ScreenPage | `apps/admin/src/routes/screen/index.tsx` | 0 | — |
 | `/screensaver` | ScreensaverPage | `apps/admin/src/routes/screensaver/index.tsx` | 11 | — |
 | `/smart-campus` | SmartCampusPage | `apps/admin/src/routes/smart-campus/index.tsx` | 2 | — |
 | `/sync-sources` | SyncSourcesPage | `apps/admin/src/routes/sync-sources/index.tsx` | 0 | — |
@@ -433,7 +434,7 @@ flowchart LR
   app --> login["/login<br/>1 页 · 0 端点"]
   app --> policy["/policy<br/>1 页 · 29 端点"]
   app --> profile["/profile<br/>1 页 · 1 端点"]
-  app --> screen["/screen<br/>1 页 · 0 端点"]
+  app --> screen["/screen<br/>2 页 · 0 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 21 端点"]
   app --> sources["/sources<br/>1 页 · 21 端点"]
   app --> stats["/stats<br/>1 页 · 0 端点"]
@@ -452,6 +453,7 @@ flowchart LR
 | `/policy` | PolicyPage | `apps/partner/src/routes/policy/index.tsx` | 29 | — |
 | `/profile` | ProfilePage | `apps/partner/src/routes/profile/index.tsx` | 1 | — |
 | `/screen` | ScreenPage | `apps/partner/src/routes/screen/index.tsx` | 0 | — |
+| `/screen/:tab` | ScreenPage | `apps/partner/src/routes/screen/index.tsx` | 0 | — |
 | `/smart-campus` | SmartCampusPage | `apps/partner/src/routes/smart-campus/index.tsx` | 21 | — |
 | `/sources` | SourcesPage | `apps/partner/src/routes/sources/index.tsx` | 21 | — |
 | `/stats` | StatsPage | `apps/partner/src/routes/stats/index.tsx` | 0 | — |
