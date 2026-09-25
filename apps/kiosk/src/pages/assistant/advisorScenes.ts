@@ -8,6 +8,7 @@
 
 import type { AssistantAction, AssistantSkill } from '@ai-job-print/shared'
 import type { KioskIconName } from '../../components/kiosk-icon'
+import { isRecruitmentRoute } from '../../hooks/useRecruitmentHosting'
 
 export interface ConsultationTask {
   id: 'resume' | 'interview' | 'jobs' | 'workplace'
@@ -335,4 +336,20 @@ export const ADVISOR_MANUAL_DETAILS: Record<(typeof ADVISOR_MANUAL_ENTRIES)[numb
   '/job-fairs': ['招聘会列表：时间、地点与来源', '扫码预约：去来源平台完成', '查看入场入口 · 看校园招聘'],
   '/policy-service': ['就业、创业与灵活就业政策', '社保参保流程与材料说明', '档案托管、登记和证明材料'],
   '/resume-service': ['简历打印：选择文件、核价后在本机打印', '我的简历：登录后查看已保存版本'],
+}
+
+/**
+ * 招聘内容托管（next-tasks 3.13）关闭时，「查看招聘会」那一格换成同样不经过 AI 的帮助中心，
+ * 四格不留空。子项取自 /help 首屏已有的分类卡与三步自助（稿 06），不编造能力。
+ */
+const ADVISOR_HELP_ENTRY = { label: '帮助中心', route: '/help', hint: '常见问题与服务边界，不经过 AI', icon: 'help' } as const
+const ADVISOR_HELP_DETAILS: readonly string[] = ['按要办的事找：登录、简历、打印、政策', '常见问题：点开就有做法和对应入口', '卡住了先自己试三步，再找工作人员']
+
+export function advisorManualEntries(hostingOpen: boolean): ReadonlyArray<{ label: string; route: string; hint: string; icon: KioskIconName }> {
+  return hostingOpen ? ADVISOR_MANUAL_ENTRIES : ADVISOR_MANUAL_ENTRIES.map((entry) => (isRecruitmentRoute(entry.route) ? ADVISOR_HELP_ENTRY : entry))
+}
+
+export function advisorManualDetails(route: string): readonly string[] {
+  if (route === ADVISOR_HELP_ENTRY.route) return ADVISOR_HELP_DETAILS
+  return (ADVISOR_MANUAL_DETAILS as Record<string, readonly string[] | undefined>)[route] ?? []
 }

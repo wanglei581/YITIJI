@@ -43,6 +43,7 @@ import {
 } from '../../services/api/careerPlan'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useAuth } from '../../auth/useAuth'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
@@ -118,6 +119,7 @@ export function CareerPlanPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, getToken } = useAuth()
+  const hostingOpen = useRecruitmentHosting().enabled // 招聘内容托管（3.13）关闭时不摆「看来源岗位」
   const state = (location.state ?? {}) as PageState
   const session = useMemo(() => readAiResumeSession(), [])
   // 登出 / 过期 / 换人 / 清场之后本路由会话永久结束（判据见 useRouteIdentityGuard）。
@@ -684,7 +686,7 @@ export function CareerPlanPage() {
           <Sec title="现在能用的非 AI 入口" hint="都是既有流程" grow>
             <KitRows items={[
               { icon: <FileTextIcon size={22} />, title: '手动整理求职材料', desc: '按自己的判断准备材料清单', onClick: () => navigate('/resume/materials') },
-              { icon: <ListIcon size={22} />, title: '看来源岗位与要求', desc: '直接浏览来源平台的岗位信息', onClick: () => navigate('/jobs') },
+              ...(hostingOpen ? [{ icon: <ListIcon size={22} />, title: '看来源岗位与要求', desc: '直接浏览来源平台的岗位信息', onClick: () => navigate('/jobs') }] : []),
               { icon: <PrinterIcon size={22} />, title: '打印现有材料', desc: '走既有打印流程，不依赖 AI', onClick: goPrintHub },
             ]} />
           </Sec>

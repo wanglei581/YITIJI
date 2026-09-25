@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
 
 function homeFair(): Record<string, unknown> {
@@ -50,6 +51,8 @@ function registerHomeApi(api: ApiRouter, fairs: unknown[] = [homeFair()]): void 
         items: [],
       },
       toolbox: { enabled: false, items: [] },
+      // 本组测的是托管打开（客户私有化部署 b）时首页的招聘会 / 岗位磁贴；关闭态见 recruitment-hosting.spec.ts。
+      ...RECRUITMENT_HOSTING_ON,
       configVersion: 'qx-home-e2e',
       refreshIntervalMs: 300000,
       serverTime: '2026-09-07T00:00:00.000Z',
@@ -240,6 +243,7 @@ test('home ready state defers capability claims to entry without hiding the real
     json: {
       smartCampus: { enabled: true, modules: { welcome: true, bigdata: false, luggage: false, panorama: false }, items: [] },
       toolbox: { enabled: false, items: [] },
+      ...RECRUITMENT_HOSTING_ON,
       configVersion: 'qx-home-ready',
       refreshIntervalMs: 300000,
       serverTime: '2026-09-07T00:00:00.000Z',

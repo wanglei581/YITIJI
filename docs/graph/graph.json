@@ -12424,7 +12424,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/campus",
           "styles": [],
@@ -12453,7 +12454,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/companies",
           "styles": [
@@ -12488,7 +12490,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/companies/:id",
           "styles": [
@@ -12663,7 +12666,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs",
           "styles": [
@@ -12717,7 +12721,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id",
           "styles": [
@@ -12771,7 +12776,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/companies",
           "styles": [
@@ -12825,7 +12831,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/companies/:companyId",
           "styles": [
@@ -12878,7 +12885,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/map",
           "styles": [
@@ -12932,7 +12940,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/materials",
           "styles": [
@@ -12986,7 +12995,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/stats",
           "styles": [
@@ -13018,7 +13028,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/:id/visit-plan",
           "styles": [
@@ -13072,7 +13083,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/job-fairs/checkin",
           "styles": [
@@ -13126,7 +13138,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/jobs",
           "styles": [
@@ -13179,7 +13192,8 @@
           "layout": [
             "KioskRoot",
             "KioskRuntimeRoot",
-            "Outlet"
+            "Outlet",
+            "RecruitmentHostingBoundary"
           ],
           "path": "/jobs/:id",
           "styles": [
@@ -14343,6 +14357,7 @@
           "path": "/resume/job-fit",
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",

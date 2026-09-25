@@ -36,6 +36,8 @@
   .qx-home-quick > span { display: none; }
   .qx-home-quick button { width: 100%; min-width: 0; height: auto; min-height: 48px; padding: 6px 10px; font-size: 16px; line-height: 1.25; }
   .qx-home-quick .qx-home-identity { gap: 6px; font-size: 14px; text-align: center; }
+  /* 招聘内容托管关闭时「找工作」不渲染，快捷区剩三颗：身份入口独占第二行，2×2 不留空格。 */
+  .qx-home[data-recruitment='closed'] .qx-home-quick .qx-home-identity { grid-column: 1 / -1; }
   .qx-home-identity svg { flex: none; width: 18px; height: 18px; }
 
   .qx-home-continue { min-height: 0; margin-top: 12px; }

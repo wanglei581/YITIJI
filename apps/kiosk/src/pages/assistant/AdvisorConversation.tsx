@@ -14,7 +14,8 @@ import type { AssistantAction } from '@ai-job-print/shared'
 import { useNavigate } from 'react-router-dom'
 import { EvidenceBadge } from '../../ai'
 import { KIcon } from '../../components/kiosk-icon'
-import { ADVISOR_MANUAL_DETAILS, ADVISOR_MANUAL_ENTRIES } from './advisorScenes'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
+import { advisorManualDetails, advisorManualEntries } from './advisorScenes'
 import { describeProviderLabel } from './advisorProvider'
 
 /**
@@ -151,11 +152,13 @@ export function ChatBubble({ msg }: { msg: Message }) {
  */
 export function AdvisorManualEntries({ variant = 'full' }: { variant?: 'rail' | 'full' }) {
   const navigate = useNavigate()
+  // 招聘内容托管（3.13）关闭时不摆招聘会入口，那一格换成帮助中心（见 advisorManualEntries）。
+  const hostingOpen = useRecruitmentHosting().enabled
 
   return (
     <nav className="assistant-manual-entries" data-variant={variant} aria-label="不依赖 AI 的功能入口">
-      {ADVISOR_MANUAL_ENTRIES.map((entry) => {
-        const details = variant === 'full' ? ADVISOR_MANUAL_DETAILS[entry.route] : []
+      {advisorManualEntries(hostingOpen).map((entry) => {
+        const details = variant === 'full' ? advisorManualDetails(entry.route) : []
         return (
           <button
             key={entry.route}

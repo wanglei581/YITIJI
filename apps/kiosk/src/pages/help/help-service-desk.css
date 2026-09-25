@@ -69,6 +69,8 @@
 .k1-help-center .k1-help-filters .k1-help-filter-all {
   display: flex; justify-content: center; gap: 12px; min-height: 112px; font-size: 22px; font-weight: 800;
 }
+/* 分类卡为偶数张时（招聘内容托管关闭，少一张「岗位与招聘会」），「全部」独占一行，双列不留空格。 */
+.k1-help-center .k1-help-filters .k1-help-filter-all[data-span='full'] { grid-column: 1 / -1; }
 .k1-help-center .k1-help-cat-icon {
   display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 16px;
   color: var(--qx-teal-d); background: var(--qx-teal-soft);

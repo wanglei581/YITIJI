@@ -1,4 +1,4 @@
-// 岗位匹配参考（青序流光）共用呈现件。
+// 简历对照（岗位匹配，青序流光）共用呈现件。
 //
 // 稿：docs/design/kiosk-redesign-2026-08/46-resume-decision-workspace.html?screen=job-fit
 // 对应 resume-decision-workspace.js 里的 sec / slots / checks / kit / waiting /
@@ -10,7 +10,6 @@
 
 import type { ReactNode } from 'react'
 import { AlertTriangleIcon, FileTextIcon, LockIcon, ShieldCheckIcon, TargetIcon, XIcon } from 'lucide-react'
-import { JOB_FIT_LEVELS, type JobFitLevelKey, type JobFitLevelSpec } from './jobFitResultSpec'
 
 export function Sec({ no, title, hint, copy, grow, children }: {
   no?: string
@@ -263,29 +262,6 @@ export function CtaNote({ children }: { children: ReactNode }) {
   )
 }
 
-/** 三档判定卡：档位由服务端返回，三档文案取自 JOB_FIT_RESULT_SPEC，本件只摆事实。 */
-export function LevelVerdictCard({ levelKey, spec }: { levelKey: JobFitLevelKey; spec: JobFitLevelSpec }) {
-  return (
-    <div className="jfq-verdict-card" data-level={levelKey}>
-      <div className="jfq-vc-badge">
-        <small>准备程度</small>
-        <b>{spec.label}</b>
-        <div className="jfq-ladder" role="img" aria-label={`三档参考，这次是${spec.label}`}>
-          {JOB_FIT_LEVELS.map((level) => (
-            <span key={level} data-on={level === spec.label ? 'true' : undefined}>{level}</span>
-          ))}
-        </div>
-      </div>
-      <div className="jfq-vc-main">
-        <small>关注重点</small>
-        <b>{spec.focus}</b>
-        <p>{spec.lead}</p>
-        <p className="jfq-vc-risk"><AlertTriangleIcon size={18} aria-hidden="true" /><span>{spec.risk}</span></p>
-      </div>
-    </div>
-  )
-}
-
 /** 手填目标岗位的两个输入。受控件，值与校验都留在页面。 */
 export function ManualTargetFields({ title, requirement, onTitleChange, onRequirementChange }: {
   title: string
@@ -317,11 +293,15 @@ export function ManualTargetFields({ title, requirement, onTitleChange, onRequir
   )
 }
 
-/** 分析前检查：四项输入的当前状态 + 边界声明。全部由页面算好后传入，本件不推断。 */
-export function PreflightChecklist({ targetLabel, hasTarget, consentConfirmed }: {
+/**
+ * 分析前检查：四项输入的当前状态 + 边界声明。全部由页面算好后传入，本件不推断。
+ * `manualOnly`：招聘内容托管关闭（3.13）时只能手填岗位要求，不再提「系统岗位」。
+ */
+export function PreflightChecklist({ targetLabel, hasTarget, consentConfirmed, manualOnly = false }: {
   targetLabel: string
   hasTarget: boolean
   consentConfirmed: boolean
+  manualOnly?: boolean
 }) {
   return (
     <>
@@ -333,13 +313,13 @@ export function PreflightChecklist({ targetLabel, hasTarget, consentConfirmed }:
       ]} />
       <Checks items={[
         { tone: 'ok', icon: <FileTextIcon size={24} />, title: '本人简历任务', desc: '必须存在，且通过当前会话校验；不会读取别人的任务。', chip: '已确认' },
-        { tone: hasTarget ? 'ok' : 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: '系统岗位或手填目标，至少要有名称，不补默认内容。', chip: hasTarget ? '已选择' : '待选择' },
+        { tone: hasTarget ? 'ok' : 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: manualOnly ? '手填岗位名称与要求，至少要有名称，不补默认内容。' : '系统岗位或手填目标，至少要有名称，不补默认内容。', chip: hasTarget ? '已选择' : '待选择' },
         { tone: consentConfirmed ? 'ok' : 'wait', icon: <ShieldCheckIcon size={24} />, title: '本人授权', desc: '匿名与会员按各自规则确认；未授权不分析。', chip: consentConfirmed ? '已确认' : '待确认' },
-        { tone: 'ok', icon: <LockIcon size={24} />, title: '结果去向', desc: '三档参考只供本人准备，不提供给企业，也不形成投递记录。', chip: '已固定' },
+        { tone: 'ok', icon: <LockIcon size={24} />, title: '结果去向', desc: '对照结果只供本人准备，不提供给企业，也不形成投递记录。', chip: '已固定' },
       ]} />
       <Guardline
-        head="三档参考 · 较高 / 中等 / 偏低"
-        body="不给分数，也不预测通过率；分析过程中不显示进度百分比，返回前不提前放出结果。本平台不提供投递功能，投递请前往岗位来源平台。"
+        head="只对照，不打分"
+        body="不给档位或分数，也不预测通过率；分析过程中不显示进度百分比，返回前不提前放出结果。本平台不提供投递功能。"
       />
     </>
   )

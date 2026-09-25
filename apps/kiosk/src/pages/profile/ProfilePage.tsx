@@ -4,6 +4,7 @@ import { BellIcon, HelpCircleIcon, MessageSquareIcon, ShieldIcon } from 'lucide-
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { getPendingTasks, type PendingTask } from '../../services/api/pendingTasks'
 import { getTerminalCode } from '../../services/api/screensaver'
 import { useMemberAssetCounts } from './assets/useMemberAssetCounts'
@@ -296,12 +297,14 @@ function AccountRows() {
 
 function SignedOutBody() {
   const navigate = useNavigate()
+  // 招聘内容托管（3.13）关闭时本机没有岗位与招聘会可浏览，这句不再提它们。
+  const hostingOpen = useRecruitmentHosting().enabled
   return (
     <>
       <div className="pf-note">
         <div className="pf-note-t">不登录也能用的服务</div>
         <p>
-          打印、扫描、岗位与招聘会浏览、政策查询都<b>不需要账号</b>。需要本人身份、跨设备保存或会员权益的功能，会在进入时再要求登录。
+          {hostingOpen ? '打印、扫描、岗位与招聘会浏览、政策查询都' : '打印、扫描、政策查询都'}<b>不需要账号</b>。需要本人身份、跨设备保存或会员权益的功能，会在进入时再要求登录。
         </p>
       </div>
       <section>
@@ -336,6 +339,7 @@ function SignedOutBody() {
 
 function EmptyStartRows() {
   const navigate = useNavigate()
+  const hostingOpen = useRecruitmentHosting().enabled
   return (
     <section>
       <div className="qx-sec-h">
@@ -354,12 +358,21 @@ function EmptyStartRows() {
             <span className="qx-row-d">U 盘、手机传输或本机扫描都可以。</span>
           </span>
         </button>
-        <button type="button" className="qx-row" onClick={() => navigate('/jobs')}>
-          <span className="qx-row-tx">
-            <span className="qx-row-t">看看岗位并收藏</span>
-            <span className="qx-row-d">收藏只记录你自己的浏览，不发送给任何单位。</span>
-          </span>
-        </button>
+        {hostingOpen ? (
+          <button type="button" className="qx-row" onClick={() => navigate('/jobs')}>
+            <span className="qx-row-tx">
+              <span className="qx-row-t">看看岗位并收藏</span>
+              <span className="qx-row-d">收藏只记录你自己的浏览，不发送给任何单位。</span>
+            </span>
+          </button>
+        ) : (
+          <button type="button" className="qx-row" onClick={() => navigate('/policy-service')}>
+            <span className="qx-row-tx">
+              <span className="qx-row-t">看看就业政策并收藏</span>
+              <span className="qx-row-d">收藏只记录你自己的浏览，不发送给任何单位。</span>
+            </span>
+          </button>
+        )}
       </div>
     </section>
   )
