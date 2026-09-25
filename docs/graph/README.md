@@ -46,7 +46,7 @@ node scripts/project-graph-query.mjs model PrintTask
 | ├ 已在 package.json 里有脚本名 | 443 |
 | ├ 在 CI 执行闭包里 | 431 |
 | └ **无脚本名，从未被执行** | 0 |
-| 被至少一条门禁断言的文件 | 1510 |
+| 被至少一条门禁断言的文件 | 1511 |
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 54 |
 | 孤儿候选 · medium（仅文档提及） | 15 |
@@ -78,7 +78,7 @@ flowchart LR
   admin -->|"/api/v1"| api
   partner -->|"/api/v1"| api
   api --> db
-  gates -.->|"断言 1510 个文件"| kiosk
+  gates -.->|"断言 1511 个文件"| kiosk
   gates -.-> admin
   gates -.-> partner
   gates -.-> api
