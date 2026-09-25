@@ -49,6 +49,9 @@ import type { CreatePrintJobDto } from '../src/print-jobs/dto/create-print-job.d
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { buildRealPdf } from './support/minimal-pdf'
 
+// 静态门禁按源码顺序要求本调用先于任何 Prisma 客户端构造，含下方 claim 屏障的辅助连接。
+assertIsolatedVerificationDatabase()
+
 function pass(m: string) { console.log(`  PASS ${m}`) }
 
 /** 夹具按 fileId.expires 的 HMAC-SHA256 协议自签，不调用生产签发函数。 */
@@ -199,9 +202,8 @@ async function startPrintJobsHttp(printJobs: PrintJobsService, prisma: PrismaSer
 }
 
 async function main() {
-  assertIsolatedVerificationDatabase()
-
   // 动态 import：terminals.service 模块级 requireEnv 必须在上面 env 设好后再加载。
+  // 隔离闸门已在模块顶层执行，早于本文件任何 Prisma 客户端。
   const { TerminalsService } = await import('../src/terminals/terminals.service')
 
   console.log('\n=== 打印链路 service 级 E2E 验证（P1-B 守门）===')
