@@ -7,13 +7,15 @@ import {
   type EmergencyReasonCode,
 } from './recruitment-hosting'
 
-export type EmergencyTargetType = 'job' | 'job_fair' | 'company' | 'policy'
+export type EmergencyTargetType = 'job' | 'job_fair' | 'company' | 'policy' | 'fair_material' | 'offline_agency'
 
 const TARGET_LABEL: Record<EmergencyTargetType, string> = {
   job: '岗位',
   job_fair: '招聘会',
   company: '企业资料',
   policy: '政策',
+  fair_material: '招聘会资料',
+  offline_agency: '线下机构',
 }
 
 interface TargetRow {
@@ -117,6 +119,27 @@ export class RecruitmentEmergencyService {
       })
       return row ? { id: row.id, orgId: row.sourceOrgId, sourceId: null, title: row.name, publishStatus: row.publishStatus } : null
     }
+    if (targetType === 'fair_material') {
+      const row = await this.prisma.fairMaterial.findUnique({
+        where: { id: targetId },
+        select: {
+          id: true, name: true, publishStatus: true,
+          jobFair: { select: { sourceOrgId: true, sourceId: true } },
+        },
+      })
+      return row
+        ? { id: row.id, orgId: row.jobFair.sourceOrgId, sourceId: row.jobFair.sourceId, title: row.name, publishStatus: row.publishStatus }
+        : null
+    }
+    if (targetType === 'offline_agency') {
+      const row = await this.prisma.offlineAgency.findUnique({
+        where: { id: targetId },
+        select: { id: true, name: true, publishStatus: true, sourceOrgId: true },
+      })
+      return row
+        ? { id: row.id, orgId: row.sourceOrgId ?? '', sourceId: null, title: row.name, publishStatus: row.publishStatus }
+        : null
+    }
     const row = await this.prisma.policyPost.findUnique({
       where: { id: targetId },
       select: { id: true, sourceOrgId: true, title: true, publishStatus: true },
@@ -128,7 +151,7 @@ export class RecruitmentEmergencyService {
     const orgWhere = scope === 'org' ? { sourceOrgId: id } : undefined
     const sourceWhere = scope === 'source' ? { sourceId: id } : undefined
     const published = { publishStatus: 'published' as const }
-    const [jobs, fairs, companies, policies] = await Promise.all([
+    const [jobs, fairs, companies, policies, materials, agencies] = await Promise.all([
       this.prisma.job.findMany({
         where: { ...published, ...(orgWhere ?? sourceWhere) },
         select: { id: true, sourceOrgId: true, sourceId: true, title: true, publishStatus: true },
@@ -149,6 +172,23 @@ export class RecruitmentEmergencyService {
             select: { id: true, sourceOrgId: true, title: true, publishStatus: true },
           })
         : Promise.resolve([]),
+      this.prisma.fairMaterial.findMany({
+        where: {
+          ...published,
+          deletedAt: null,
+          jobFair: scope === 'org' ? { sourceOrgId: id } : { sourceId: id },
+        },
+        select: {
+          id: true, name: true, publishStatus: true,
+          jobFair: { select: { sourceOrgId: true, sourceId: true } },
+        },
+      }),
+      scope === 'org'
+        ? this.prisma.offlineAgency.findMany({
+            where: { ...published, sourceOrgId: id },
+            select: { id: true, name: true, publishStatus: true, sourceOrgId: true },
+          })
+        : Promise.resolve([]),
     ])
     return [
       ...jobs.map((row) => ({
@@ -166,6 +206,26 @@ export class RecruitmentEmergencyService {
       ...policies.map((row) => ({
         targetType: 'policy' as const,
         row: { id: row.id, orgId: row.sourceOrgId, sourceId: null, title: row.title, publishStatus: row.publishStatus },
+      })),
+      ...materials.map((row) => ({
+        targetType: 'fair_material' as const,
+        row: {
+          id: row.id,
+          orgId: row.jobFair.sourceOrgId,
+          sourceId: row.jobFair.sourceId,
+          title: row.name,
+          publishStatus: row.publishStatus,
+        },
+      })),
+      ...agencies.map((row) => ({
+        targetType: 'offline_agency' as const,
+        row: {
+          id: row.id,
+          orgId: row.sourceOrgId ?? '',
+          sourceId: null,
+          title: row.name,
+          publishStatus: row.publishStatus,
+        },
       })),
     ]
   }
@@ -232,6 +292,8 @@ export class RecruitmentEmergencyService {
     if (targetType === 'job') await this.prisma.job.update({ where: { id }, data })
     else if (targetType === 'job_fair') await this.prisma.jobFair.update({ where: { id }, data })
     else if (targetType === 'company') await this.prisma.companyProfile.update({ where: { id }, data })
+    else if (targetType === 'fair_material') await this.prisma.fairMaterial.update({ where: { id }, data })
+    else if (targetType === 'offline_agency') await this.prisma.offlineAgency.update({ where: { id }, data })
     else await this.prisma.policyPost.update({ where: { id }, data })
   }
 }

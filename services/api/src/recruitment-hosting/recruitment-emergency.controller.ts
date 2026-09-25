@@ -7,8 +7,8 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { EMERGENCY_REASON_CODES } from './recruitment-hosting'
 import { RecruitmentEmergencyService, type EmergencyTargetType } from './recruitment-emergency.service'
 
-class EmergencyTakedownDto {
-  @IsIn(['job', 'job_fair', 'company', 'policy'])
+export class EmergencyTakedownDto {
+  @IsIn(['job', 'job_fair', 'company', 'policy', 'fair_material', 'offline_agency'])
   targetType!: EmergencyTargetType
 
   @IsString()

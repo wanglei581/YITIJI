@@ -676,6 +676,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:companies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-emergency-scope
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract
@@ -957,6 +958,7 @@ jobs:
           # 求职进度（见 build-and-verify 同名条目）：断言含两份 schema 形状比对，PG 侧同样跑。
           pnpm --filter @ai-job-print/api verify:job-application-track
           pnpm --filter @ai-job-print/api verify:companies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-emergency-scope
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract
