@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-25：小程序扫码登录一体机只说「已确认」（本地候选，商业 NO-GO）
+
+Claude 在 `codex/miniapp-qr-login-honesty-20260925` 修复原生小程序 `pages/kiosk-login`。旧实现在 `confirmQrLoginByToken` 兑现后无条件进成功屏，写「登录成功 / 已在该机完成登录」，连空 `{}` 回执也算；status 缺 `deviceLabel` 时编造「就业服务终端」。但服务端 `confirmByToken` 只把票据标成 confirmed，一体机还要自己 claim 才发登录态，claim 可能失败。现按 `docs/design/kiosk-redesign-2026-08/51-phone-relay.html` 的 qr-login 分屏改为页面内确认（不再走系统弹窗）：只有 `{ status: 'confirmed' }` 回执才显示「已确认，请回一体机查看登录结果」；断网、5xx、空或看不懂的回执进「结果未知」，不渲染确认按钮，只能只读重查状态（仍 pending 才回到确认屏由本人再决定）；已过期 / 已领取 / 已确认 / 票据无效只送回一体机、不对同一张码重试；其余 4xx 为「系统没有接受这次确认」；缺机器名写「一体机名称未提供」并提示核对面前屏幕。票据只留页面内存，重新扫码或换号后晚到响应丢弃；扫码登录与扫码上传分流不变。视觉换成 51 稿的深绿接力条、机器卡、状态卡与事实表。
+
+先写失败用例再改页面：`apps/miniapp/scripts/tests/kiosk-login-confirm.test.mjs` 旧实现 14/14 红、修复后 14/14 绿，已串进既有 `verify:page-lifecycle`；六处反向变异（回执判定、机器名兜底、未知当拒绝、确认屏守卫、换号守卫、未知后重查）均按断言转红。隔离树完整 `verify:static` 退出 0，`git diff --check` 干净，`graph:check` 通过。隔离代码提交 `9317154d7` 已选择性合流本地主候选 `03e55d292`。微信开发者工具和真机未跑；一体机 claim 失败后的双端联动未实测。未推送、未部署。
+
 ## 2026-09-25：旧交付文档 PR #1027 收敛（远程 PR 已关闭）
 
 只读核对 PR #1027 的唯一文件 `docs/delivery/kiosk-redesign-r1/delivery.yaml`：补丁把 2026-09-10 的路由数、生产 SHA 写成新的固定字串，并依据负责人自述把百度 OCR 旧密钥轮换的 BL-05 标为 CLOSED。当前正式进度已有后续路由/生产证据，BL-05 仍缺旧密钥失效的独立验证；直接合并会重新引入过期计数并放宽取证。已在 GitHub 关闭 #1027（head `57ce7a889`），远程分支、讨论和历史保留，未删除代码资产。实时 OPEN PR 从 9 减为 8；#1042 仍是唯一整合草稿，未推送或部署。
