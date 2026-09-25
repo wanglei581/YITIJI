@@ -345,6 +345,16 @@ function allFailed(snapshot: ScreenSnapshot): ScreenSnapshot {
   return snapshot
 }
 
+/**
+ * 数据层缺口（结构性，刷新也不会有）：与 govDegraded 的「本次取数失败」对照。
+ * 原因取一个真实存在、屏上写作「未接入」的缺口码 —— 测的是渲染口径，不是政务快照会不会这样回。
+ */
+export function govStructuralGap(): ScreenSnapshot {
+  const base = govFull()
+  base.metrics.printPagesCumulative = na('Order.payStatus=paid,billablePages', 'cumulative', 'missing_org_id_on_ai_and_orders')
+  return base
+}
+
 /** 全部失败，但 HTTP 仍是 200。只判 res.ok 的实现会在这里渲染出一屏空壳或一屏 0。 */
 export function govUnavailable(): ScreenSnapshot {
   return allFailed(govFull())
@@ -425,6 +435,9 @@ function pulseBuckets(nowMs: number) {
     print: print < 5 ? null : print,
   }))
 }
+
+/** 服务调用夹具里 11 项服务的中文名，按夹具顺序。3D 网络与轻量模式条形图都必须是这 11 个。 */
+export const SERVICE_LABELS = ['岗位信息', '招聘会', '政策服务', '企业展示', 'AI 简历', 'AI 顾问', '模拟面试', '职业规划', '岗位 AI', '打印', '扫描']
 
 /**
  * 服务调用快照。`ai.byOperation` 里合同审查的 count = null（服务端对 1–4 置空）：
@@ -530,6 +543,24 @@ export function usageHostingOff(range: string): ScreenUsageSnapshot {
   return base
 }
 
+/** 下单渠道本次取数失败：场景里一体机、小程序两块牌子写「暂时取不到」，不能写成「未接入」。 */
+export function usageChannelsFailed(range: string): ScreenUsageSnapshot {
+  const base = usageSnapshot(range)
+  base.status = 'degraded'
+  base.degraded = true
+  base.metrics.channels = na('Order.channel', base.range, 'source_query_failed')
+  return base
+}
+
+/** 访问人次本次取数失败（默认夹具里它是结构性的「未接入」）。 */
+export function usageVisitsFailed(range: string): ScreenUsageSnapshot {
+  const base = usageSnapshot(range)
+  base.status = 'degraded'
+  base.degraded = true
+  base.metrics.visits = na('KioskSession', base.range, 'source_query_failed')
+  return base
+}
+
 /* ── 单台终端孪生 ─────────────────────────────────────────────────────── */
 
 /**
@@ -582,4 +613,11 @@ export function terminalTwin(id: string): ScreenTerminalTwin | null {
       seg(0.02, 0, printing ? 'printing' : 'idle'),
     ]),
   }
+}
+
+/** 打印机状态本次取数失败：标注写「暂时取不到」（朱色），纸盒碳粉仍是结构性的「待接入」。 */
+export function terminalTwinPrinterFailed(id: string): ScreenTerminalTwin | null {
+  const twin = terminalTwin(id)
+  if (twin) twin.printer = na('TerminalHeartbeat+TerminalCapability', 'current', 'source_query_failed')
+  return twin
 }

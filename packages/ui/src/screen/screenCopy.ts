@@ -142,6 +142,7 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
   },
   source_query_failed: {
     title: '取数失败',
+    short: '暂时取不到',
     detail: '本次快照里这一块的数据源查询失败了。这是一次性故障，不是数据层缺口；下次刷新可能就恢复。',
     howTo: '处理：等待下次自动刷新，或手动刷新一次；持续失败请查服务端日志。',
     transient: true,

@@ -18,7 +18,8 @@ export interface TwinDeviceCallout {
   key: TwinDeviceCalloutKey
   label: string
   value: string
-  tone: 'ok' | 'warn' | 'err' | 'pend' | 'muted'
+  /** pend = 数据层缺口（虚线陶色标签）；failed = 本次取数失败（实线朱色标签）。 */
+  tone: 'ok' | 'warn' | 'err' | 'pend' | 'failed' | 'muted'
 }
 
 export interface TwinDeviceProps {
@@ -54,6 +55,7 @@ const TONE_STROKE: Record<TwinDeviceCallout['tone'], string> = {
   warn: '#e8b45c',
   err: '#e88b7d',
   pend: '#e8b45c',
+  failed: '#e88b7d',
   muted: '#7d8f89',
 }
 
@@ -145,11 +147,11 @@ export function TwinDevice({ code, state, screenTitle, screenLine, printing, cal
         return (
           <div
             key={c.key}
-            className={cn('tw3-callout', (c.tone === 'warn' || c.tone === 'pend') && 'is-warn', c.tone === 'err' && 'is-err')}
+            className={cn('tw3-callout', (c.tone === 'warn' || c.tone === 'pend') && 'is-warn', (c.tone === 'err' || c.tone === 'failed') && 'is-err')}
             style={a.side === 'left' ? { right: TWIN_DEVICE_W - LEFT_EDGE, top: a.y, maxWidth: 400 } : { left: RIGHT_EDGE, top: a.y, maxWidth: 480 }}
           >
             <span className="k">{c.label}</span>
-            {c.tone === 'pend' ? <span className="twin-pend">{c.value}</span> : <b>{c.value}</b>}
+            {c.tone === 'pend' || c.tone === 'failed' ? <span className={cn('twin-pend', c.tone === 'failed' && 'is-failed')}>{c.value}</span> : <b>{c.value}</b>}
           </div>
         )
       })}

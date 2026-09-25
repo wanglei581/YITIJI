@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { DISTRICTS } from './fixtures/snapshots'
+import { DISTRICTS, SERVICE_LABELS } from './fixtures/snapshots'
 import { adminApi, expectLocation, open, panel, serve, serveHappy, tile, uncaughtPageErrors } from './helpers'
-import { blockedSceneButtons, clickVisibleCenter } from './measure'
+import { blockedSceneButtons, keyboardFocus } from './measure'
 
 /**
  * 页签地址、两档（桌面 / 展示）、轻量模式、区名牌、告警行、「少于 5」、请求形状。
@@ -187,66 +187,84 @@ test.describe('admin screen navigation', () => {
     })
   }
 
-  test('轻量模式下服务调用不画 3D 网络，改画条形图，条目用中文服务名', async ({ page }) => {
+  test('轻量模式下服务调用不画 3D 网络，改画条形图，条目与 3D 网络同一套中文服务名', async ({ page }) => {
     await serveHappy(page)
+    // 先看完整视图：3D 网络里每项服务的中文名
+    await open(page, '/screen/usage')
+    const pills = page.locator('.tw3-svc .c b')
+    await expect(pills).toHaveCount(SERVICE_LABELS.length)
+    const networkLabels = await pills.allTextContents()
+    expect([...networkLabels].sort()).toEqual([...SERVICE_LABELS].sort())
+
     await open(page, '/screen/usage?lite=1')
     const services = panel(page, /^各项服务使用次数$/)
     const rows = services.locator('.twin-bar-row')
-    await expect(rows).toHaveCount(11)
+    await expect(rows).toHaveCount(SERVICE_LABELS.length)
     await expect(page.locator('.tw3-box, .tw3-scene, .tw3-world')).toHaveCount(0)
-    // null 的那一项（第 9 行，岗位 AI）照样写「少于 5」
-    await expect(rows.nth(8).locator('b')).toHaveText('少于 5')
-    // 产品缺陷（已上报，未修）：UsageView 轻量分支把服务的原始键（jobs / aiResume / print…）直接当条目名，
-    // 英文键上了领导看的屏；3D 网络里同一批服务用的是中文名（TwinNetwork 的 SERVICE_LAYOUT）。
-    // 前置断言照常把关；修好后本条会「意外通过」而转红，届时删掉这一行。
-    test.fail(true, '服务调用轻量模式的条目名是英文原始键（apps/admin/src/routes/screen/UsageView.tsx 轻量分支 label: s.key）')
+    // 条目名逐项等于完整视图里的服务名（夹具顺序），没有一个英文键
+    await expect(rows.locator('> span:first-child')).toHaveText(SERVICE_LABELS)
     for (const label of await rows.locator('> span:first-child').allTextContents()) {
-      expect(label, '条目名必须是中文服务名，不能是英文键').toMatch(/[\u4e00-\u9fff]/)
+      expect(label, '条目名必须是中文服务名，不能是英文键').not.toMatch(/[A-Za-z]{3,}/)
     }
+    // null 的那一项（岗位 AI）照样写「少于 5」
+    await expect(rows.filter({ hasText: '岗位 AI' }).locator('b')).toHaveText('少于 5')
   })
 
   for (const display of [false, true]) {
-    test(`区名牌是按钮（${display ? '展示档' : '桌面档'}）：点一下地址写入 area，再点一下清掉`, async ({ page }) => {
+    test(`区名牌是按钮（${display ? '展示档' : '桌面档'}）：每一块都点得进去、再点一下退出`, async ({ page }) => {
       await serveHappy(page)
       const base: Record<string, string> = display ? { display: '1' } : {}
       await open(page, display ? '/screen/gov?display=1' : '/screen/gov')
+      // 用 Playwright 的真点击（带「被别的元素挡住」检查）：海珠区、荔湾区曾被告警牌的透明盒子整块盖住
       for (const { area, count } of DISTRICTS) {
-        await expect(page.getByRole('button', { name: `${area}，${count} 台终端，聚焦该区`, exact: true })).toHaveCount(1)
+        const button = page.getByRole('button', { name: `${area}，${count} 台终端，聚焦该区`, exact: true })
+        await button.click({ timeout: 5_000 })
+        await expectLocation(page, '/screen/gov', { ...base, area })
+        const focused = page.getByRole('button', { name: `${area}，${count} 台终端，退出聚焦`, exact: true })
+        await expect(focused).toHaveAttribute('aria-pressed', 'true')
+        await expect(panel(page, new RegExp(`^${area}终端$`))).toBeVisible()
+        await expect(page.locator('.twin-overlay.is-tl')).toContainText(area)
+        await focused.click({ timeout: 5_000 })
+        await expectLocation(page, '/screen/gov', base)
+        await expect(button).toHaveAttribute('aria-pressed', 'false')
       }
-      // 白云区的牌子没被别的广告牌盒子盖住（盖住的那几块见下一条）；点它看得见的中心，被挡会直接报错
-      await clickVisibleCenter(page, page.getByRole('button', { name: '白云区，6 台终端，聚焦该区', exact: true }))
-      await expectLocation(page, '/screen/gov', { ...base, area: '白云区' })
-      const focused = page.getByRole('button', { name: '白云区，6 台终端，退出聚焦', exact: true })
-      await expect(focused).toHaveAttribute('aria-pressed', 'true')
-      await expect(panel(page, /^白云区终端$/)).toBeVisible()
-      await expect(page.locator('.twin-overlay.is-tl')).toContainText('白云区')
-      await clickVisibleCenter(page, focused)
-      await expectLocation(page, '/screen/gov', base)
       await expect(panel(page, /^终端与服务$/)).toBeVisible()
-      await expect(page.getByRole('button', { name: '白云区，6 台终端，聚焦该区', exact: true })).toHaveAttribute('aria-pressed', 'false')
     })
   }
 
-  test('每块区名牌在自己的中心点上都点得到', async ({ page }, testInfo) => {
+  test('每块区名牌在自己的中心点上都点得到（聚焦前与逐区聚焦后）', async ({ page }, testInfo) => {
     const display = testInfo.project.name.includes('wall')
     await serveHappy(page)
     await open(page, display ? '/screen/gov?display=1' : '/screen/gov')
     await expect(page.locator('button.tw3-district-btn')).toHaveCount(DISTRICTS.length)
+    const blocked = await blockedSceneButtons(page)
     for (const { area, count } of DISTRICTS) {
-      await expect(page.getByRole('button', { name: `${area}，${count} 台终端，聚焦该区`, exact: true })).toBeVisible()
+      await open(page, `/screen/gov?area=${encodeURIComponent(area)}${display ? '&display=1' : ''}`)
+      await expect(page.getByRole('button', { name: `${area}，${count} 台终端，退出聚焦`, exact: true })).toBeVisible()
+      blocked.push(...(await blockedSceneButtons(page, 'button.tw3-district-btn[aria-pressed="true"]')))
     }
-    // 产品缺陷（已上报，未修）：告警牌、区名牌的透明广告牌盒子（.tw3-bb）接收指针事件，
-    // 盖住了别的区名牌 —— 海珠区被 GZ-HZ-007 告警牌的盒子整块挡住、荔湾区中心被挡。
-    // 前面的前置断言照常把关；修好后本条会「意外通过」而转红，届时删掉这一行。
-    test.fail(true, '区名牌被别的牌子的透明盒子挡住，点不到（twin-screen-3d.css 的 .tw3-bb 没有 pointer-events:none）')
-    expect(await blockedSceneButtons(page)).toEqual([])
+    expect(blocked).toEqual([])
   })
+
+  for (const display of [false, true]) {
+    test(`点立柱（${display ? '展示档' : '桌面档'}）：进入该终端的孪生`, async ({ page }) => {
+      await serveHappy(page)
+      await open(page, display ? '/screen/gov?display=1' : '/screen/gov')
+      // 立柱自己也是一块广告牌（.tw3-bb）：广告牌盒子不接指针之后，立柱必须把指针接回来。用真点击验证点得到
+      await page.getByRole('button', { name: 'GZ-TH-005 · 打印 / 扫描中', exact: true }).click({ timeout: 5_000 })
+      await expectLocation(page, '/screen/terminal', { ...(display ? { display: '1' } : {}), id: 't-gz-th-005' })
+      await expect(page.locator('.twin-hd-sub')).toContainText('GZ-TH-005')
+    })
+  }
 
   test('桌面档点告警行：进入对应终端的孪生，不跳出大屏', async ({ page }) => {
     await serveHappy(page)
     await open(page, '/screen/gov')
-    const row = panel(page, /^实时告警$/).locator('.twin-alert', { hasText: 'GZ-HZ-007' })
-    await expect(row).toBeVisible()
+    const rows = panel(page, /^实时告警$/).locator('.twin-alert')
+    await expect(rows).toHaveCount(4)
+    // 桌面档每一行都是链接（中键新开告警中心），普通点击进孪生
+    for (const row of await rows.all()) await expect(row).toHaveAttribute('href', '/alerts')
+    const row = rows.filter({ hasText: 'GZ-HZ-007' })
     await row.click()
     await expectLocation(page, '/screen/terminal', { id: 't-gz-hz-007' })
     await expect(page.getByRole('heading', { name: TERMINAL_TITLE, exact: true })).toBeVisible()
@@ -256,15 +274,27 @@ test.describe('admin screen navigation', () => {
   test('展示档点告警行：进入终端孪生，地址仍带 display=1', async ({ page }) => {
     await serveHappy(page)
     await open(page, '/screen/gov?display=1')
-    const row = panel(page, /^实时告警$/).locator('.twin-alert', { hasText: 'GZ-HZ-007' })
-    await expect(row).toBeVisible()
-    // 产品缺陷（已上报，未修）：TwinAlertList 只给带 href 的行接点击；GovGrid 在展示档把 href 置空，
-    // 行被渲染成没有点击处理的 <div>，onClick 永远调不到。前置断言照常把关；
-    // 修好后本条会「意外通过」而转红，届时删掉这一行。
-    test.fail(true, '展示档告警行不可点击：packages/ui 的 TwinAlertList 丢弃了没有 href 的 onClick')
+    const rows = panel(page, /^实时告警$/).locator('.twin-alert')
+    await expect(rows).toHaveCount(4)
+    // 展示档没有链接出口，但每一行都是真按钮：可点、可 Tab 聚焦
+    await expect(panel(page, /^实时告警$/).getByRole('button', { name: /GZ-/ })).toHaveCount(4)
+    await expect(panel(page, /^实时告警$/).getByRole('link')).toHaveCount(0)
+    const row = rows.filter({ hasText: 'GZ-HZ-007' })
     await row.click()
-    await expectLocation(page, '/screen/terminal', { display: '1', id: 't-gz-hz-007' }, 3000)
+    await expectLocation(page, '/screen/terminal', { display: '1', id: 't-gz-hz-007' })
     await expect(page.getByRole('heading', { level: 1, name: TERMINAL_TITLE })).toBeVisible()
+    await expect(page.locator('.twin-hd-sub')).toContainText('GZ-HZ-007')
+  })
+
+  test('展示档告警行用键盘也能进：Tab 聚焦有焦点环，回车打开孪生', async ({ page }) => {
+    await serveHappy(page)
+    await open(page, '/screen/gov?display=1')
+    const row = panel(page, /^实时告警$/).locator('.twin-alert', { hasText: 'GZ-TH-002' })
+    const ring = await keyboardFocus(page, row)
+    expect(ring, '键盘聚焦时要看得见焦点环').toEqual({ focusVisible: true, outlineStyle: 'solid', outlineWidth: 2 })
+    await page.keyboard.press('Enter')
+    await expectLocation(page, '/screen/terminal', { display: '1', id: 't-gz-th-002' })
+    await expect(page.locator('.twin-hd-sub')).toContainText('GZ-TH-002')
   })
 
   test('少于 5：null 计数写「少于 5」，同一格不出现 0', async ({ page }) => {

@@ -293,6 +293,15 @@ export function partnerUsage(range: string): ScreenUsageSnapshot {
   }
 }
 
+/** 访问人次本次取数失败：与默认的结构性「未接入」对照，屏上要写「暂时取不到」。 */
+export function partnerUsageVisitsFailed(range: string): ScreenUsageSnapshot {
+  const base = partnerUsage(range)
+  base.status = 'degraded'
+  base.degraded = true
+  base.metrics.visits = na('KioskSession', base.range, 'source_query_failed')
+  return base
+}
+
 /** 托管关闭：服务端只下发政策一类（照常出数），岗位、招聘会、企业整类不在云上。 */
 export function partnerUsageHostingOff(range: string): ScreenUsageSnapshot {
   const base = partnerUsage(range)

@@ -1,5 +1,6 @@
 import type { ScreenMetricLike } from '../ScreenPrimitives'
 import { screenCount } from '../ScreenPrimitives'
+import { screenReasonCopy } from '../screenCopy'
 import { TwinSceneBox, TwinSlot } from './TwinFrame'
 import { TwinMetricPanel, TwinPanel } from './TwinPanel'
 import { TwinLegend, TwinTiles, TwinTimeline, type TwinState } from './TwinCharts'
@@ -66,6 +67,15 @@ function heartbeatText(twin: TwinTerminalTwinLike): string {
   return `心跳 ${Math.floor(seconds / 60)} 分钟前`
 }
 
+/**
+ * 部件拿不到数据时的标注：取数失败写「暂时取不到」（朱色，下次刷新可能就好），
+ * 数据层缺口写本部件自己的「待接入」说法（陶色）。两者不能说成一回事。
+ */
+function unavailableCallout(key: TwinDeviceCallout['key'], label: string, reason: string, gapText: string): TwinDeviceCallout {
+  const copy = screenReasonCopy(reason)
+  return copy.transient ? { key, label, value: copy.short ?? copy.title, tone: 'failed' } : { key, label, value: gapText, tone: 'pend' }
+}
+
 function deviceCallouts(twin: TwinTerminalTwinLike, state: TwinState): TwinDeviceCallout[] {
   const out: TwinDeviceCallout[] = [
     {
@@ -85,13 +95,13 @@ function deviceCallouts(twin: TwinTerminalTwinLike, state: TwinState): TwinDevic
       tone: p.state === 'error' ? 'err' : p.state === 'offline' ? 'err' : p.state === 'unknown' ? 'muted' : 'ok',
     })
   } else {
-    out.push({ key: 'printer', label: '打印机', value: '待接入', tone: 'pend' })
+    out.push(unavailableCallout('printer', '打印机', twin.printer.reason, '待接入'))
   }
   if (twin.scanner.available) {
     const s = twin.scanner.value
     out.push({ key: 'scanner', label: '扫码器', value: s.label ?? SCANNER_TEXT[s.state], tone: s.state === 'error' ? 'warn' : s.state === 'unknown' ? 'muted' : 'ok' })
   } else {
-    out.push({ key: 'scanner', label: '扫码器', value: '待接入', tone: 'pend' })
+    out.push(unavailableCallout('scanner', '扫码器', twin.scanner.reason, '待接入'))
   }
   const wired = twin.status.wiredNetwork
   out.push({
@@ -100,12 +110,11 @@ function deviceCallouts(twin: TwinTerminalTwinLike, state: TwinState): TwinDevic
     value: wired ? WIRED_TEXT[wired] ?? '有线状态未知' : '网络状态未上报',
     tone: wired === 'connected' ? 'ok' : wired === 'disconnected' ? 'err' : 'muted',
   })
-  out.push({
-    key: 'supplies',
-    label: '纸盒与碳粉',
-    value: twin.consumables.available ? '已上报' : '待接入 · 需 Agent 上报',
-    tone: twin.consumables.available ? 'ok' : 'pend',
-  })
+  out.push(
+    twin.consumables.available
+      ? { key: 'supplies', label: '纸盒与碳粉', value: '已上报', tone: 'ok' }
+      : unavailableCallout('supplies', '纸盒与碳粉', twin.consumables.reason, '待接入 · 需 Agent 上报'),
+  )
   return out
 }
 

@@ -20,8 +20,9 @@ import {
   type TwinTileItem,
 } from '@ai-job-print/ui'
 import { loadAdminUsage, normalizeUsageRange } from '../../services/api/consoleScreen'
-import { aiOperationLabel } from './metricLabels'
+import { aiOperationLabel, usageServiceLabel } from './metricLabels'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
+import { metricReason } from './screenMeta'
 
 /**
  * 服务调用：系统里每一类服务被用了多少次，按渠道、时段、步骤、AI 功能与模型拆开。
@@ -232,10 +233,13 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
             <TwinSceneBox baseWidth={TWIN_STAGE_W} baseHeight={TWIN_STAGE_H} label="服务调用网络">
               <TwinNetwork
                 channels={[
-                  { key: 'kiosk', label: '一体机', count: u.channels?.available ? u.channels.value.kiosk : 'na', caption: '已付款订单' },
-                  { key: 'miniapp', label: '小程序', count: u.channels?.available ? u.channels.value.miniapp : 'na', caption: '已付款订单' },
+                  { key: 'kiosk', label: '一体机', count: u.channels?.available ? u.channels.value.kiosk : { reason: metricReason(u.channels) }, caption: '已付款订单' },
+                  { key: 'miniapp', label: '小程序', count: u.channels?.available ? u.channels.value.miniapp : { reason: metricReason(u.channels) }, caption: '已付款订单' },
                 ]}
-                services={u.services.value.map((s) => ({ key: s.key, lane: s.lane, count: s.count }))}
+                services={u.services.value.flatMap((s) => {
+                  const label = usageServiceLabel(s.key)
+                  return label === null ? [] : [{ key: s.key, label, lane: s.lane, count: s.count }]
+                })}
                 outcomes={[
                   { key: 'sourceOpens', label: '打开来源平台', count: u.outcomes.value.sourceOpens },
                   { key: 'favorites', label: '收藏', count: u.outcomes.value.favorites },
@@ -265,7 +269,11 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
             source="各项服务在所选时间内的使用次数，少于 5 次显示「少于 5」。"
             render={(value) => (
               <TwinBarList
-                items={value.map((s) => ({ label: s.key, value: s.count === null ? 0 : s.count, valueText: twinSmall(s.count) }))}
+                items={value.flatMap((s) => {
+                  // 与 3D 服务网络同一份中文名；认不出来的键两边都不画，英文键不上屏
+                  const label = usageServiceLabel(s.key)
+                  return label === null ? [] : [{ label, value: s.count === null ? 0 : s.count, valueText: twinSmall(s.count) }]
+                })}
                 emptyText="所选时间内没有服务调用记录"
               />
             )}
@@ -329,7 +337,10 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                   compact
                   items={[
                     { value: percent(value.successRate), label: '成功率' },
-                    { value: value.avgLatencyMs === null ? '样本不足' : `${(value.avgLatencyMs / 1000).toFixed(2)} 秒`, label: '平均耗时' },
+                    // 单位另起一个小号 span：「2.18 秒」整串放在四列紧凑磁贴里，舞台档会折成两行把面板撑出块位
+                    value.avgLatencyMs === null
+                      ? { value: '样本不足', label: '平均耗时' }
+                      : { value: (value.avgLatencyMs / 1000).toFixed(2), unit: '秒', label: '平均耗时' },
                     { value: value.estimatedCostCny === null ? '样本不足' : `¥${value.estimatedCostCny.toFixed(2)}`, label: '估算成本' },
                     { value: twinSmall(value.fallbackCalls), label: '降级兜底' },
                   ]}

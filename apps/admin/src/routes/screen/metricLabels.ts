@@ -1,5 +1,7 @@
+import type { ScreenUsageServiceKey } from '@ai-job-print/shared'
+
 /**
- * 大屏用到的两张展示名映射。
+ * 大屏用到的展示名映射。
  *
  * 都遵守同一条规则：**认不出来的键照原样显示编码，不隐藏该行**。
  * 隐藏会让分项之和对不上总数，看屏的人会以为统计错了；显示编码至少是真的。
@@ -28,6 +30,30 @@ const AI_OPERATION_LABELS: Readonly<Record<string, string>> = {
 
 export function aiOperationLabel(operation: string): string {
   return AI_OPERATION_LABELS[operation] ?? operation
+}
+
+/**
+ * 服务调用里各项服务的中文名。3D 服务网络与轻量模式的条形图共用这一份，两边永远一样。
+ *
+ * 这是上面「认不出来的键照原样显示」的例外：服务网络只画得出有版式的服务，
+ * 认不出来的键两边都不画（返回 null），英文键不上领导看的屏。这里没有合计，不画不会让分项对不上总数。
+ */
+const USAGE_SERVICE_LABELS: Readonly<Record<ScreenUsageServiceKey, string>> = {
+  jobs: '岗位信息',
+  fairs: '招聘会',
+  policy: '政策服务',
+  company: '企业展示',
+  aiResume: 'AI 简历',
+  aiAdvisor: 'AI 顾问',
+  interview: '模拟面试',
+  careerPlan: '职业规划',
+  jobAi: '岗位 AI',
+  print: '打印',
+  scan: '扫描',
+}
+
+export function usageServiceLabel(key: string): string | null {
+  return Object.prototype.hasOwnProperty.call(USAGE_SERVICE_LABELS, key) ? USAGE_SERVICE_LABELS[key as ScreenUsageServiceKey] : null
 }
 
 /** 打印 / 扫描任务状态。与管理端打印扫描运维页同一套中文。 */

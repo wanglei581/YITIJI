@@ -18,6 +18,7 @@ import {
   TwinCityToolbar,
   TwinStateLegend,
   TwinTiles,
+  TwinUnavailable,
   parseTwinHighlight,
   screenCount,
   screenFleetScopeNote,
@@ -30,6 +31,7 @@ import {
   type TwinBarItem,
 } from '@ai-job-print/ui'
 import { aiOperationLabel, taskStatusLabel } from './metricLabels'
+import { metricReason } from './screenMeta'
 import { screenHref } from './screenTabs'
 import { TwinShell, TwinShellEmpty, snapshotMeta, useAdminSnapshot, type ScreenChrome } from './screenView'
 
@@ -48,17 +50,35 @@ const TITLE = '职易达 · 就业服务终端运行态势'
 const SUBTITLE = '数字孪生 · 政务总览'
 const UNASSIGNED = '未设置所在区'
 
-function alertRows(items: ScreenAlertItem[], onOpen: (code: string) => void, presenting: boolean): TwinAlertItem[] {
-  return items.slice(0, 4).map((item, index) => ({
-    key: `${item.terminalCode ?? 'none'}-${item.type}-${index}`,
-    severity: item.severity === 'error' ? 'err' : item.severity === 'warning' ? 'warn' : 'un',
-    severityText: item.severity === 'error' ? '严重' : item.severity === 'warning' ? '警告' : '提示',
-    code: item.terminalCode ?? '—',
-    text: item.title,
-    whenText: formatTime(item.occurredAt),
-    href: item.terminalCode && !presenting ? '/alerts' : undefined,
-    onClick: item.terminalCode ? () => onOpen(item.terminalCode as string) : undefined,
-  }))
+interface AlertActions {
+  /** 打开该终端的孪生（地址方案与桌面档相同：/screen/terminal?id=…，展示档参数跟着走）。 */
+  openTerminal: (code: string) => void
+  canOpenTerminal: (code: string) => boolean
+  openCenter: () => void
+}
+
+/**
+ * 告警行。桌面档：每一行都链到告警中心（中键新开），普通点击打开该终端的孪生，找不到终端时进告警中心。
+ * 展示档：能在机队里找到终端的行是按钮，打开孪生且保留展示档；其余行不给出口 ——
+ * 无人值守的舞台不跳进后台页面，也不放一个点了没反应的按钮。
+ */
+function alertRows(items: ScreenAlertItem[], actions: AlertActions, presenting: boolean): TwinAlertItem[] {
+  return items.slice(0, 4).map((item, index) => {
+    const code = item.terminalCode
+    let onClick: (() => void) | undefined
+    if (code !== null && (!presenting || actions.canOpenTerminal(code))) onClick = () => actions.openTerminal(code)
+    else if (!presenting) onClick = actions.openCenter
+    return {
+      key: `${code ?? 'none'}-${item.type}-${index}`,
+      severity: item.severity === 'error' ? 'err' : item.severity === 'warning' ? 'warn' : 'un',
+      severityText: item.severity === 'error' ? '严重' : item.severity === 'warning' ? '警告' : '提示',
+      code: code ?? '—',
+      text: item.title,
+      whenText: formatTime(item.occurredAt),
+      href: presenting ? undefined : '/alerts',
+      onClick,
+    }
+  })
 }
 
 function TaskFlow({ printByStatus, scanByStatus }: { printByStatus: Record<string, number>; scanByStatus: Record<string, number> }) {
@@ -107,11 +127,15 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   const sortedArea = twinSortByState(inView)
   // 展示档底栏只有一行高：列最要紧的 3 台，其余合成一格；桌面档全列
   const chipLimit = chrome.presenting ? 3 : sortedArea.length
-  const openAlertTerminal = (code: string) => {
-    const hit = terminals.find((t) => t.code === code)
-    if (hit) openTerminal(hit.id)
-    // 展示档无人值守：找不到对应终端时原地不动，绝不跳出舞台进后台页面
-    else if (!chrome.presenting) chrome.onNavigate('/alerts')
+  const alertActions: AlertActions = {
+    openTerminal: (code) => {
+      const hit = terminals.find((t) => t.code === code)
+      if (hit) openTerminal(hit.id)
+      // 展示档无人值守：找不到对应终端时原地不动，绝不跳出舞台进后台页面
+      else if (!chrome.presenting) chrome.onNavigate('/alerts')
+    },
+    canOpenTerminal: (code) => terminals.some((t) => t.code === code),
+    openCenter: () => chrome.onNavigate('/alerts'),
   }
 
   const toolbar = (
@@ -176,7 +200,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                           <span className="twin-unit">页</span>
                         </b>
                       ) : (
-                        <span className="twin-pend">未接入</span>
+                        <TwinUnavailable reason={metricReason(g.printPagesCumulative)} inline />
                       )}
                     </div>
                     <div className="twin-kv">
@@ -187,7 +211,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                           <span className="twin-unit">次</span>
                         </b>
                       ) : (
-                        <span className="twin-pend">未接入</span>
+                        <TwinUnavailable reason={metricReason(g.aiCallsCumulative)} inline />
                       )}
                     </div>
                   </div>
@@ -230,7 +254,8 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                   <span className="twin-big" style={{ fontSize: '1.9em' }}>{today === null ? '—' : screenCount(today)}</span>
                   {yesterday !== null ? <span className="twin-muted">页 · 昨日 {screenCount(yesterday)} 页</span> : <span className="twin-muted">页</span>}
                 </div>
-                <TwinAreaTrend days={days.map((d) => ({ date: d.date, value: d.pages }))} seriesLabel="近 14 天每日打印页数" />
+                {/* 舞台档块位定高 300：折线矮一档，整块放得下（桌面档面板随内容长高，保持原高） */}
+                <TwinAreaTrend days={days.map((d) => ({ date: d.date, value: d.pages }))} seriesLabel="近 14 天每日打印页数" height={chrome.presenting ? 176 : 190} />
               </>
             )
           }}
@@ -418,7 +443,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
             const items = focus === null ? value.items : value.items.filter((item) => item.terminalCode !== null && areaCodes.has(item.terminalCode))
             return (
               <>
-                <TwinAlertList items={alertRows(items, openAlertTerminal, chrome.presenting)} emptyText={focus === null ? '当前没有告警' : `${focus}当前没有告警`} />
+                <TwinAlertList items={alertRows(items, alertActions, chrome.presenting)} emptyText={focus === null ? '当前没有告警' : `${focus}当前没有告警`} />
                 {chrome.presenting ? null : (
                   <a
                     className="twin-cap twin-push twin-link"

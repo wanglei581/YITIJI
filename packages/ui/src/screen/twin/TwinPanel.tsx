@@ -3,6 +3,7 @@ import { cn } from '../../lib/cn'
 import { screenReasonCopy } from '../screenCopy'
 import type { ScreenMetricLike } from '../ScreenPrimitives'
 import { TwinPanelHeadingContext } from './TwinFrame'
+import { TwinReasonChip } from './TwinReasonChip'
 
 /**
  * 孪生大屏的面板。
@@ -71,10 +72,13 @@ export function TwinPanel({ title, sub, scope, tone = 'acc', source, className, 
 
 export interface TwinUnavailableProps {
   reason: string
+  /** true：只在数字的位置放一个小标签（取数失败写「暂时取不到」、缺口写「未接入」），不放整块说明。 */
+  inline?: boolean
 }
 
 /** 未接入块：一句为什么 + 一句怎么接。绝不显示 0。取数失败用实线朱色，与结构性缺口一眼可分。 */
-export function TwinUnavailable({ reason }: TwinUnavailableProps) {
+export function TwinUnavailable({ reason, inline = false }: TwinUnavailableProps) {
+  if (inline) return <TwinReasonChip reason={reason} />
   const copy = screenReasonCopy(reason)
   return (
     <div className={cn('twin-na', copy.transient && 'is-failed')} role="note">

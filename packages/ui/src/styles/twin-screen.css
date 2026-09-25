@@ -475,6 +475,14 @@
   white-space: nowrap;
 }
 
+/* 取数失败（下次刷新可能就好）与上面的数据层缺口一眼可分：实线朱色，与 .twin-na.is-failed 同一套 */
+.twin-pend.is-failed {
+  color: var(--tw-err);
+  border-style: solid;
+  border-color: rgba(232, 139, 125, 0.6);
+  background: rgba(232, 139, 125, 0.08);
+}
+
 /* 状态页：未登录 / 无权限 / 全局失败 / 演示模式。一个数字都不出现。 */
 .twin-state {
   display: flex;

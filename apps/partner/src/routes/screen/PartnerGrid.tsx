@@ -16,6 +16,7 @@ import {
   TwinSlot,
   TwinStateLegend,
   TwinTiles,
+  TwinUnavailable,
   parseTwinHighlight,
   screenCount,
   screenFleetScopeNote,
@@ -274,9 +275,7 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
                     <span className="twin-unit">次</span>
                   </b>
                 ) : (
-                  <span className="twin-pend" title={screenReasonCopy(value.materialPrintCount.reason).detail}>
-                    {screenReasonCopy(value.materialPrintCount.reason).title}
-                  </span>
+                  <TwinUnavailable reason={value.materialPrintCount.reason} inline />
                 )}
               </div>
               <p className="twin-cap twin-push">预约与投递在来源平台完成，本平台不代预约、不收简历</p>

@@ -45,6 +45,12 @@
   --tilt: 46deg;
 }
 
+/* 地面与楼宇体块都是装饰：不接收指针，免得在 3D 深度里压住立在上面的区名牌边缘 */
+.tw3-ground,
+.tw3-bx {
+  pointer-events: none;
+}
+
 .tw3-ground {
   position: absolute;
   inset: -380px;
@@ -108,19 +114,26 @@
 }
 
 /* ---------- 广告牌：反向旋转，始终正对观众 ---------- */
+/*
+ * 广告牌盒子本身是透明的立板（告警牌 260 宽、区名牌 220 宽、高度随抬高），只是用来立起里面的牌子。
+ * 它不接收指针：否则一块告警牌的空白盒子会整块盖住后面的区名牌，看得见、点不动。
+ * 真正可点的只有两样 —— 区名牌按钮（.tw3-district-btn）与终端立柱（.tw3-pillar），各自打开 pointer-events。
+ */
 .tw3-bb {
   position: absolute;
   transform-origin: 50% 100%;
   transform: rotateZ(38deg) rotateX(calc(-1 * var(--tilt)));
   transition: opacity 0.6s ease;
+  pointer-events: none;
 }
 
-/* 终端立柱是真按钮：点它进入单台终端孪生 */
-.tw3-pillar {
+/* 终端立柱是真按钮：点它进入单台终端孪生（它自己也是一块广告牌，所以在这里把指针接回来） */
+.tw3-bb.tw3-pillar {
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 /* 视觉宽 24px，命中区左右各扩 10px 到 44px */

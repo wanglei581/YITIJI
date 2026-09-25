@@ -55,6 +55,28 @@
   flex: 1 1 auto;
 }
 
+/*
+ * 舞台档的块位是定高的：面板内边距与行距比桌面档紧一档，内容在 1920×1080 的块位里放得下 ——
+ * 靠排版放下，不靠 overflow 裁掉。底栏只有 164 高，上下内边距再收一点。
+ */
+[data-ops-screen='wall'] .twin-panel {
+  padding: 14px 20px;
+  gap: 8px;
+}
+
+[data-ops-screen='wall'] .twin-slot[data-slot='bottom'] > .twin-panel {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+[data-ops-screen='wall'] .twin-alerts {
+  gap: 8px;
+}
+
+[data-ops-screen='wall'] .twin-tiles.is-compact .twin-tile {
+  padding: 6px 10px;
+}
+
 [data-ops-screen='wall'] .twin-slot[data-slot='l1'] { left: 32px; top: 20px; width: 420px; height: 300px; }
 [data-ops-screen='wall'] .twin-slot[data-slot='l2'] { left: 32px; top: 336px; width: 420px; height: 300px; }
 [data-ops-screen='wall'] .twin-slot[data-slot='l3'] { left: 32px; top: 652px; width: 420px; height: 312px; }
@@ -64,12 +86,15 @@
 [data-ops-screen='wall'] .twin-slot[data-slot='scene'] { left: 472px; top: 8px; width: 976px; height: 780px; }
 [data-ops-screen='wall'] .twin-slot[data-slot='bottom'] { left: 472px; top: 800px; width: 976px; height: 164px; }
 
-/* 单台终端：左上一条当前任务，设备与标注占左中，右栏三块 */
+/*
+ * 单台终端：左上一条当前任务，设备与标注占左中，右栏三块。
+ * 今日服务是 2×2 磁贴，有失败次数时下面还多一行说明，要 300 高才放得下；24 小时状态内容少，让出 20。
+ */
 [data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='task'] { left: 32px; top: 20px; width: 420px; height: 120px; }
 [data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='scene'] { left: 32px; top: 152px; width: 1404px; height: 812px; }
 [data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r1'] { top: 20px; height: 330px; }
-[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r2'] { top: 366px; height: 280px; }
-[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r3'] { top: 662px; height: 302px; }
+[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r2'] { top: 366px; height: 300px; }
+[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r3'] { top: 682px; height: 282px; }
 
 /* 运营看板：沿用卡片栅格，整块铺满 */
 [data-ops-screen='wall'] .twin-grid[data-layout='full'] .twin-slot[data-slot='full'] { left: 28px; top: 16px; width: 1864px; height: 964px; }
@@ -224,6 +249,7 @@
 [data-ops-screen='wall'] .twin-tile b { font-size: 30px; }
 [data-ops-screen='wall'] .twin-tiles.is-compact .twin-tile b { font-size: 22px; }
 [data-ops-screen='wall'] .twin-tiles.is-compact .twin-tile > span { font-size: 13px; }
+[data-ops-screen='wall'] .twin-tiles.is-compact .twin-unit { font-size: 13px; margin-left: 4px; }
 [data-ops-screen='wall'] .twin-tile span { font-size: 15px; }
 [data-ops-screen='wall'] .twin-tile small { font-size: 13px; }
 [data-ops-screen='wall'] .twin-lg { font-size: 14px; }

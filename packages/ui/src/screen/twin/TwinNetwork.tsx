@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { screenCount } from '../ScreenPrimitives'
+import { screenReasonCopy } from '../screenCopy'
 import { TWIN_BILLBOARD, TWIN_WORLD, stageToGround } from './twinMath'
 
 /**
@@ -14,13 +15,17 @@ export type TwinNetworkLane = 'info' | 'ai' | 'print'
 
 export interface TwinNetworkService {
   key: string
+  /** 服务名由调用方给（与轻量模式的条形图同一份），这里只管摆放。 */
+  label: string
   lane: TwinNetworkLane
   count: number | null
 }
 
+/** 数字 = 真实计数；null = 服务端因样本少于 5 置空；{ reason } = 该指标本次不可用，按原因写「未接入」或「暂时取不到」。 */
+export type TwinNetworkCount = number | null | { reason: string }
+
 export interface TwinNetworkProps {
-  /** count：数字 = 真实计数；null = 服务端因样本少于 5 置空；'na' = 该指标本次不可用（未接入或取数失败）。 */
-  channels: Array<{ key: 'kiosk' | 'miniapp'; label: string; count: number | null | 'na'; caption: string }>
+  channels: Array<{ key: 'kiosk' | 'miniapp'; label: string; count: TwinNetworkCount; caption: string }>
   services: TwinNetworkService[]
   outcomes: Array<{ key: 'sourceOpens' | 'favorites' | 'aiReports' | 'printed'; label: string; count: number | null }>
   hubLabel: string
@@ -29,19 +34,19 @@ export interface TwinNetworkProps {
   aiCaption: string
 }
 
-/** 版式：舞台坐标（976×780）上的锚点与标签抬高，来自设计稿「服务调用孪生」。 */
-const SERVICE_LAYOUT: Record<string, { label: string; at: [number, number]; lift: number }> = {
-  jobs: { label: '岗位信息', at: [462, 250], lift: 116 },
-  fairs: { label: '招聘会', at: [574, 236], lift: 64 },
-  policy: { label: '政策服务', at: [688, 250], lift: 116 },
-  company: { label: '企业展示', at: [800, 236], lift: 60 },
-  aiResume: { label: 'AI 简历', at: [560, 462], lift: 118 },
-  aiAdvisor: { label: 'AI 顾问', at: [656, 476], lift: 62 },
-  interview: { label: '模拟面试', at: [752, 462], lift: 118 },
-  careerPlan: { label: '职业规划', at: [844, 476], lift: 62 },
-  jobAi: { label: '岗位 AI', at: [628, 566], lift: 58 },
-  print: { label: '打印', at: [520, 668], lift: 108 },
-  scan: { label: '扫描', at: [664, 680], lift: 64 },
+/** 版式：舞台坐标（976×780）上的锚点与标签抬高，来自设计稿「服务调用孪生」。没有版式的服务不画。 */
+const SERVICE_LAYOUT: Record<string, { at: [number, number]; lift: number }> = {
+  jobs: { at: [462, 250], lift: 116 },
+  fairs: { at: [574, 236], lift: 64 },
+  policy: { at: [688, 250], lift: 116 },
+  company: { at: [800, 236], lift: 60 },
+  aiResume: { at: [560, 462], lift: 118 },
+  aiAdvisor: { at: [656, 476], lift: 62 },
+  interview: { at: [752, 462], lift: 118 },
+  careerPlan: { at: [844, 476], lift: 62 },
+  jobAi: { at: [628, 566], lift: 58 },
+  print: { at: [520, 668], lift: 108 },
+  scan: { at: [664, 680], lift: 64 },
 }
 
 const CHANNEL_AT: Record<'kiosk' | 'miniapp', [number, number]> = { kiosk: [112, 318], miniapp: [112, 590] }
@@ -57,13 +62,16 @@ const OUTCOME_LAYOUT: Record<string, { at: [number, number]; lift: number; from:
 const LANE_CLASS: Record<TwinNetworkLane, string> = { info: 'p-info', ai: 'p-ai', print: 'p-print' }
 const LANE_STROKE: Record<TwinNetworkLane, string> = { info: '#8fb2ee', ai: '#2ee6a8', print: '#72d6ff' }
 
-function countText(count: number | null | 'na'): string {
-  if (count === 'na') return '未接入'
-  return count === null ? '少于 5' : screenCount(count)
+function countText(count: TwinNetworkCount): string {
+  if (count === null) return '少于 5'
+  if (typeof count === 'number') return screenCount(count)
+  // 不可用：取数失败写「暂时取不到」，数据层缺口写「未接入」，两者不能说成一回事
+  const copy = screenReasonCopy(count.reason)
+  return copy.short ?? copy.title
 }
 
-function flowWidth(count: number | null | 'na', base: number, div: number): number {
-  return count === null || count === 'na' ? base : base + Math.sqrt(count) / div
+function flowWidth(count: TwinNetworkCount, base: number, div: number): number {
+  return typeof count === 'number' ? base + Math.sqrt(count) / div : base
 }
 
 /** 地面锚点上立起的标签牌；lift 是标签相对锚点的抬高（舞台像素）。 */
@@ -155,7 +163,7 @@ export function TwinNetwork({ channels, services, outcomes, hubLabel, hubCaption
           </div>
         ) : null}
         {channels.map((c) => (
-          <TwinPill key={`cl-${c.key}`} at={CHANNEL_AT[c.key]} lift={118} width={176} className="tw3-big p-ai">
+          <TwinPill key={`cl-${c.key}`} at={CHANNEL_AT[c.key]} lift={118} width={176} className={cn('tw3-big', typeof c.count === 'object' && c.count !== null ? 'p-na' : 'p-ai')}>
             <b>{c.label}</b>
             <span>{countText(c.count)}</span>
             <i>{c.caption}</i>
@@ -163,7 +171,7 @@ export function TwinNetwork({ channels, services, outcomes, hubLabel, hubCaption
         ))}
         {placed.map((s) => (
           <TwinPill key={`sl-${s.key}`} at={SERVICE_LAYOUT[s.key].at} lift={SERVICE_LAYOUT[s.key].lift} width={170} className={cn('tw3-svc', s.count === null ? 'p-na' : LANE_CLASS[s.lane])}>
-            <b>{SERVICE_LAYOUT[s.key].label}</b>
+            <b>{s.label}</b>
             <span>{countText(s.count)}</span>
           </TwinPill>
         ))}

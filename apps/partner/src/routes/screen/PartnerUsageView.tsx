@@ -20,7 +20,7 @@ import {
   TwinSceneBox,
   TwinSlot,
   TwinTiles,
-  screenReasonCopy,
+  TwinUnavailable,
   twinInfoTotalParts,
   twinSmall,
   type TwinBarItem,
@@ -87,14 +87,8 @@ function barsOf(rows: TypeRow[], pick: (row: TypeRow) => number | null, tone: Tw
 /** 访问人次三态：已接入给数，未接入给原因；契约里它现在是 never，接入后类型会随之放开。 */
 function VisitsValue({ metric }: { metric: ScreenUsageSnapshot['metrics']['visits'] }) {
   const reason = !metric ? 'kiosk_session_unwritten' : metric.available === false ? metric.reason : null
-  if (reason !== null) {
-    const copy = screenReasonCopy(reason)
-    return (
-      <span className="twin-pend" title={copy.detail}>
-        {copy.title}
-      </span>
-    )
-  }
+  // 数据层缺口写「未接入」、取数失败写「暂时取不到」，由原因表决定，不在这里手写
+  if (reason !== null) return <TwinUnavailable reason={reason} inline />
   const value = (metric as { value: unknown }).value
   return typeof value === 'number' ? (
     <b>
@@ -102,7 +96,7 @@ function VisitsValue({ metric }: { metric: ScreenUsageSnapshot['metrics']['visit
       <span className="twin-unit">人次</span>
     </b>
   ) : (
-    <span className="twin-pend">{screenReasonCopy('source_query_failed').title}</span>
+    <TwinUnavailable reason="source_query_failed" inline />
   )
 }
 

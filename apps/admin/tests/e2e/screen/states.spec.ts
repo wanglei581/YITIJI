@@ -7,8 +7,12 @@ import {
   opsDegraded,
   opsHostingOff,
   opsNoDenominator,
+  govStructuralGap,
   opsUnavailable,
+  terminalTwinPrinterFailed,
+  usageChannelsFailed,
   usageHostingOff,
+  usageVisitsFailed,
 } from './fixtures/snapshots'
 import {
   adminApi,
@@ -143,11 +147,63 @@ test.describe('admin data screen states', () => {
     await expect(page.locator('.twin-na.is-failed')).toHaveCount(2)
     await expect(panel(page, '打印量趋势').locator('.twin-na.is-failed')).toContainText('取数失败')
     await expect(panel(page, 'AI 服务分项').locator('.twin-na.is-failed')).toContainText('取数失败')
+    // 累计打印在总览块里只剩一个标记、不出数：这是本次取数失败，必须读作失败（朱色实线「暂时取不到」），不是「未接入」
     const printed = panel(page, '终端与服务').locator('.twin-kv', { hasText: '累计打印' })
     await expect(printed.locator('b')).toHaveCount(0)
-    await expect(printed.locator('.twin-pend')).toBeVisible()
+    await expect(printed.locator('.twin-pend')).toHaveText('暂时取不到')
+    await expect(printed.locator('.twin-pend')).toHaveClass(/\bis-failed\b/)
+    await expect(printed.locator('.twin-pend')).toHaveAttribute('title', /^取数失败：/)
+    await expect(printed).not.toContainText('未接入')
     await expect(page.getByText('9,706')).toBeVisible()
     await expect(page.getByText('128,431')).toHaveCount(0)
+  })
+
+  test('数字格上「暂时取不到」与「未接入」一眼可分：取数失败朱色实线，数据层缺口陶色虚线', async ({ page }) => {
+    // 结构性缺口：累计打印写「未接入」，不带失败样式
+    await serve(page, adminApi({ gov: govStructuralGap }))
+    await open(page, '/screen/gov')
+    const printed = panel(page, '终端与服务').locator('.twin-kv', { hasText: '累计打印' })
+    await expect(printed.locator('.twin-pend')).toHaveText('未接入')
+    await expect(printed.locator('.twin-pend')).not.toHaveClass(/\bis-failed\b/)
+    await expect(printed.locator('.twin-pend')).toHaveCSS('border-top-style', 'dashed')
+    await expect(page.getByText('9,706')).toBeVisible()
+  })
+
+  test('服务调用：下单渠道取数失败时，场景牌子写「暂时取不到」而不是「未接入」', async ({ page }) => {
+    await serve(page, adminApi({ usage: usageChannelsFailed }))
+    await open(page, '/screen/usage')
+    await expect(panel(page, /^下单渠道$/).locator('.twin-na.is-failed')).toContainText('取数失败')
+    for (const channel of ['一体机', '小程序']) {
+      const pill = page.locator('.tw3-big .c', { has: page.locator('b', { hasText: new RegExp(`^${channel}$`) }) })
+      await expect(pill.locator('span')).toHaveText('暂时取不到')
+      await expect(pill).not.toContainText('未接入')
+    }
+  })
+
+  test('服务调用：访问人次磁贴按原因区分「未接入」与「暂时取不到」', async ({ page }) => {
+    await serve(page, adminApi())
+    await open(page, '/screen/usage')
+    const visits = tile(panel(page, /^下单渠道$/), '访问人次').locator('.twin-pend')
+    await expect(visits).toHaveText('未接入')
+    await expect(visits).not.toHaveClass(/\bis-failed\b/)
+
+    await serve(page, adminApi({ usage: usageVisitsFailed }))
+    await page.reload()
+    await expect(visits).toHaveText('暂时取不到')
+    await expect(visits).toHaveClass(/\bis-failed\b/)
+    await expect(visits).toHaveCSS('border-top-style', 'solid')
+  })
+
+  test('终端孪生：打印机状态取数失败写「暂时取不到」，纸盒碳粉的数据层缺口仍是「待接入」', async ({ page }) => {
+    await serve(page, adminApi({ twin: terminalTwinPrinterFailed }))
+    await open(page, '/screen/terminal?id=t-gz-th-005')
+    const printer = page.locator('.tw3-callout', { has: page.locator('.k', { hasText: /^打印机$/ }) })
+    await expect(printer.locator('.twin-pend')).toHaveText('暂时取不到')
+    await expect(printer.locator('.twin-pend')).toHaveClass(/\bis-failed\b/)
+    await expect(printer).toHaveClass(/\bis-err\b/)
+    const supplies = page.locator('.tw3-callout', { has: page.locator('.k', { hasText: /^纸盒与碳粉$/ }) })
+    await expect(supplies.locator('.twin-pend')).toHaveText('待接入 · 需 Agent 上报')
+    await expect(supplies.locator('.twin-pend')).not.toHaveClass(/\bis-failed\b/)
   })
 
   test('局部失败（运营版）：取数失败与结构性未接入长得不一样', async ({ page }) => {

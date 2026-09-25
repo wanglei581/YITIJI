@@ -30,21 +30,18 @@ export async function blockedSceneButtons(page: Page, selector = 'button.tw3-dis
 }
 
 /**
- * 点场景牌子「看得见的中心」。牌子是 3D 广告牌，Playwright 按 CDP 内容四边形算出来的点击点
- * 不在肉眼看到的牌子上（实测落到了相邻告警牌的盒子里）；这里取牌子投影后的包围盒中心，
- * 先确认那一点命中的就是它，再用鼠标点 —— 与人手点在牌子文字上是同一件事。
+ * 用键盘把焦点放到目标上：先按一次 Tab 进入键盘操作模式，再把焦点移过去。
+ * :focus-visible（焦点环）只在键盘操作下成立，鼠标点出来的焦点不算，所以这里不用 click。
+ * 返回此刻是否显示焦点环、以及描边的样式与宽度。
  */
-export async function clickVisibleCenter(page: Page, target: Locator): Promise<void> {
+export async function keyboardFocus(page: Page, target: Locator): Promise<{ focusVisible: boolean; outlineStyle: string; outlineWidth: number }> {
   await expect(target).toBeVisible()
-  const hit = await target.evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    const x = (r.left + r.right) / 2
-    const y = (r.top + r.bottom) / 2
-    const top = document.elementFromPoint(x, y)
-    return { x, y, ok: !!top && (top === el || el.contains(top)), blocker: top ? `${top.tagName.toLowerCase()}.${String(top.className)}` : '（视口外）' }
+  await page.keyboard.press('Tab')
+  await target.focus()
+  return target.evaluate((el) => {
+    const style = getComputedStyle(el)
+    return { focusVisible: el.matches(':focus-visible'), outlineStyle: style.outlineStyle, outlineWidth: Number.parseFloat(style.outlineWidth) }
   })
-  expect(hit.ok, `点不到：牌子中心被 ${hit.blocker} 挡住`).toBe(true)
-  await page.mouse.click(hit.x, hit.y)
 }
 
 export interface LabelReport {

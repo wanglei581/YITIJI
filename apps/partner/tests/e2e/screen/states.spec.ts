@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { partnerDegraded, partnerHostingOff, partnerTruncated, partnerUsageHostingOff } from './fixtures/snapshots'
+import { partnerDegraded, partnerHostingOff, partnerTruncated, partnerUsageHostingOff, partnerUsageVisitsFailed } from './fixtures/snapshots'
 import {
   expectLocation,
   expectUrlStays,
@@ -98,6 +98,33 @@ test.describe('partner data screen states', () => {
     await expect(page.locator('.twin-na.is-failed')).toHaveCount(1)
     await expect(panel(page, /^数据同步$/).locator('.twin-na.is-failed')).toContainText('取数失败')
     await expect(tile(panel(page, /^本机构在架信息$/), '岗位信息').locator('b')).toHaveText('328条')
+  })
+
+  test('数据层缺口写「未接入」（陶色虚线），不借用取数失败的样式', async ({ page }) => {
+    await serve(page, partnerApi())
+    await open(page, '/screen/overview')
+    // 资料打印量：计数器从未自增，是结构性缺口
+    const printed = panel(page, /^招聘会$/).locator('.twin-kv', { hasText: '资料打印量' })
+    await expect(printed.locator('b')).toHaveCount(0)
+    await expect(printed.locator('.twin-pend')).toHaveText('未接入')
+    await expect(printed.locator('.twin-pend')).toHaveAttribute('title', /^未接入：/)
+    await expect(printed.locator('.twin-pend')).not.toHaveClass(/\bis-failed\b/)
+    await expect(printed.locator('.twin-pend')).toHaveCSS('border-top-style', 'dashed')
+  })
+
+  test('信息使用：访问人次按原因区分「未接入」与「暂时取不到」', async ({ page }) => {
+    await serve(page, partnerApi())
+    await open(page, '/screen/usage')
+    const visits = panel(page, /^统计口径$/).locator('.twin-kv', { hasText: '访问人次' }).locator('.twin-pend')
+    await expect(visits).toHaveText('未接入')
+    await expect(visits).not.toHaveClass(/\bis-failed\b/)
+
+    await serve(page, partnerApi({ usage: partnerUsageVisitsFailed }))
+    await page.reload()
+    await expect(visits).toHaveText('暂时取不到')
+    await expect(visits).toHaveClass(/\bis-failed\b/)
+    await expect(visits).toHaveAttribute('title', /^取数失败：/)
+    await expect(visits).toHaveCSS('border-top-style', 'solid')
   })
 
   test('403 ORG_REQUIRED 与角色不符分开提示', async ({ page }) => {

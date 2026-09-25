@@ -231,6 +231,8 @@
 .twin-tiles.is-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .twin-tiles.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .twin-tiles.is-compact .twin-tile { padding: 8px 10px; }
+/* 四列紧凑磁贴的数字不折行（「2.18 秒」曾在舞台档折成两行把面板撑出块位），单位另用小一号的 span */
+.twin-tiles.is-compact .twin-tile b { white-space: nowrap; }
 
 .twin-tile small {
   color: #8fb0d6;
@@ -349,13 +351,43 @@
   white-space: nowrap;
 }
 
+/* 可点的告警行（链接或按钮）：按钮去掉浏览器默认外观，键盘聚焦要看得见 */
+button.twin-alert {
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+a.twin-alert:hover,
+button.twin-alert:hover {
+  border-color: rgba(46, 230, 168, 0.35);
+}
+
+a.twin-alert:focus-visible,
+button.twin-alert:focus-visible {
+  outline: 2px solid var(--tw-gold);
+  outline-offset: 2px;
+}
+
 .twin-alert > .twin-code {
+  flex: none;
   font-family: var(--tw-num);
   font-weight: 600;
   color: var(--tw-strong);
 }
 
+/* 说明文字是唯一可以让位的一段：放不下就省略号，时间戳永远留在行内 */
+.twin-alert > .twin-alert-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .twin-alert > .twin-when {
+  flex: none;
   margin-left: auto;
   font-family: var(--tw-num);
   color: var(--tw-muted);

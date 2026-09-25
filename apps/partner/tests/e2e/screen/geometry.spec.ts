@@ -34,20 +34,6 @@ test.afterEach(async ({ page }) => {
   expect(uncaughtPageErrors(page), '页面不得有未捕获异常').toEqual([])
 })
 
-/**
- * 已上报的产品缺陷：机构告警行在桌面档（1440 宽三列）放不下「点位 · 告警」长文，时间戳被挤出面板右缘。
- * 只把「本机构终端告警」里的时间戳从桌面档的通用检查里拿出来，由下面「告警行放得下」那条 test.fail 单独盯着；
- * 修好后那条会意外通过而转红，届时连同这里一起删掉。别的面板、别的文字一个都不豁免。
- */
-const KNOWN_ALERT_TIME = /^本机构终端告警「\d{2}:\d{2}」/
-function withoutKnownDeskDefect(report: GeometryReport): GeometryReport {
-  return {
-    ...report,
-    textEscapes: report.textEscapes.filter((item) => !KNOWN_ALERT_TIME.test(item)),
-    textCut: report.textCut.filter((item) => !KNOWN_ALERT_TIME.test(item)),
-  }
-}
-
 function expectCleanLayout(report: GeometryReport, floor: number, where: string) {
   expect(report.nested, `${where}：面板不得嵌套`).toEqual([])
   expect(report.overlaps, `${where}：同类面板 / 块位不得重叠`).toEqual([])
@@ -75,8 +61,7 @@ test.describe('partner screen geometry', () => {
       await settle(page)
 
       const floor = wall ? 13 : 12
-      const measured = await geometry(page, floor)
-      const report = wall ? measured : withoutKnownDeskDefect(measured)
+      const report = await geometry(page, floor)
       expect(report.panels, '面板块数与版式一致').toHaveLength(c.panels)
       expectCleanLayout(report, floor, wall ? '舞台档 1920×1080' : '桌面档 1440')
       if (c.hues) expect(report.hues.length, `色彩需至少 4 种，实际 ${JSON.stringify(report.hues)}`).toBeGreaterThanOrEqual(4)
@@ -91,12 +76,13 @@ test.describe('partner screen geometry', () => {
         expect(report.stageScale, '1920×1080 视口下舞台 1:1').toBe(1)
         expect(report.root).toEqual({ x: 0, y: 0, w: 1920, h: 1080 })
         expect(report.outsideViewport, '展示档面板与块位必须完全落在视口内').toEqual([])
+        expect(report.slotOverflow, '展示档每块面板都放得进自己的块位').toEqual([])
         expect(report.scroll.h, '舞台档不得纵向滚动').toBeLessThanOrEqual(report.scroll.clientH)
       } else {
         expect(report.stageScale).toBeNull()
         await page.setViewportSize({ width: 1100, height: 900 })
         await settle(page)
-        const narrow = withoutKnownDeskDefect(await geometry(page, 12))
+        const narrow = await geometry(page, 12)
         expect(narrow.panels).toHaveLength(c.panels)
         expectCleanLayout(narrow, 12, '桌面档 1100')
       }
@@ -114,10 +100,12 @@ test.describe('partner screen geometry', () => {
     await expect(panel(page, /^本机构终端$/).locator('.twin-ring-cap')).toHaveText('正常 · 共 200 台')
     await settle(page)
     const floor = wall ? 13 : 12
-    const measured = await geometry(page, floor)
-    const report = wall ? measured : withoutKnownDeskDefect(measured)
+    const report = await geometry(page, floor)
     expectCleanLayout(report, floor, '截断分支')
-    if (wall) expect(report.outsideViewport).toEqual([])
+    if (wall) {
+      expect(report.outsideViewport).toEqual([])
+      expect(report.slotOverflow).toEqual([])
+    }
   })
 
   test('告警行在桌面档放得下：时间戳不出面板（1440 宽）', async ({ page }) => {
@@ -130,10 +118,31 @@ test.describe('partner screen geometry', () => {
     await settle(page)
     const report = await geometry(page, 12)
     const inAlerts = [...report.textEscapes, ...report.textCut].filter((item) => item.startsWith('本机构终端告警'))
-    // 产品缺陷（已上报，未修）：.twin-alert 一行是「严重度 + 编号 + 点位 · 告警 + 时间」，中间那段不收缩、
-    // 不省略，1440 宽三列时时间戳被挤出面板右缘。前置断言照常把关；修好后本条会「意外通过」而转红。
-    test.fail(true, '机构告警行在桌面档 1440 宽时时间戳溢出面板（packages/ui 的 .twin-alert 中段不收缩）')
     expect(inAlerts).toEqual([])
+    // 一行是「严重度 + 编号 + 点位 · 告警 + 时间」：中间那段收缩、放不下就省略号截断，完整一句在悬停提示里；
+    // 时间戳整块留在行内与面板内
+    const rows = await alerts.locator('.twin-alert').evaluateAll((els) =>
+      els.map((el) => {
+        const text = el.querySelector<HTMLElement>('.twin-alert-text')
+        const when = el.querySelector<HTMLElement>('.twin-when')
+        const panelBox = el.closest('.twin-panel')?.getBoundingClientRect()
+        const rowBox = el.getBoundingClientRect()
+        const whenBox = when?.getBoundingClientRect()
+        return {
+          code: el.querySelector('.twin-code')?.textContent ?? '',
+          fullTextInTitle: Boolean(text && text.textContent && text.title === text.textContent),
+          truncated: text ? text.scrollWidth > text.clientWidth + 1 : false,
+          whenInside: whenBox && panelBox ? whenBox.right <= Math.min(rowBox.right, panelBox.right) + 0.5 && whenBox.left >= rowBox.left : null,
+        }
+      }),
+    )
+    for (const row of rows) {
+      expect(row.fullTextInTitle, `${row.code}：说明文字的完整一句要在悬停提示里`).toBe(true)
+      if (row.whenInside !== null) expect(row.whenInside, `${row.code}：时间戳不得越出面板`).toBe(true)
+    }
+    // 阳性对照：四行带时间戳，且 1440 宽下至少一行的说明确实被截断（证明量的是放不下的那种行）
+    expect(rows.filter((row) => row.whenInside !== null)).toHaveLength(4)
+    expect(rows.some((row) => row.truncated), '1440 宽下至少一行说明需要省略号截断').toBe(true)
   })
 
   test('展示档每块面板都放得进自己的块位（三个页签）', async ({ page }) => {
@@ -148,10 +157,8 @@ test.describe('partner screen geometry', () => {
       expect(report.stageScale, '舞台 1:1 才量得准块位').toBe(1)
       overflow.push(...report.slotOverflow.map((item) => `${c.key}：${item}`))
     }
-    // 产品缺陷（已上报，未修）：1920×1080 舞台的块位是定高的，面板内容比块位高时面板直接长出块位
-    // （实测：本机构终端告警 +10px、热门内容 +4px，都还在栏间距里，没压到别的块）。
-    // 前置断言照常把关；全部修好后本条会「意外通过」而转红，届时删掉这一行。
-    test.fail(true, '展示档定高块位装不下面板内容（packages/ui twin-screen-layout.css 定高块位 + 面板不收缩）')
+    // 1920×1080 舞台的块位是定高的：面板内容比块位高时面板会直接长出块位
+    // （修复前实测：本机构终端告警 +10px、热门内容 +4px）。
     expect(overflow).toEqual([])
   })
 

@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { screenCount } from '../ScreenPrimitives'
-import { screenReasonCopy } from '../screenCopy'
+import { TwinReasonChip } from './TwinReasonChip'
 
 /**
  * 孪生大屏的图表小件。只画调用方给的真实值：条长、弧长都按真实比例，不做视觉放大；
@@ -259,11 +259,10 @@ export function TwinTiles({ items, cols = 2, compact = false }: { items: TwinTil
   return (
     <div className={cn('twin-tiles', cols === 3 && 'is-3', cols === 4 && 'is-4', compact && 'is-compact')}>
       {items.map((item) => {
-        const copy = item.unavailableReason ? screenReasonCopy(item.unavailableReason) : null
         return (
           <div className="twin-tile" key={item.label}>
-            {copy ? (
-              <span className="twin-pend" title={`${copy.title}：${copy.detail}`}>{copy.short ?? copy.title}</span>
+            {item.unavailableReason ? (
+              <TwinReasonChip reason={item.unavailableReason} />
             ) : (
               <b>
                 {item.value}
@@ -286,9 +285,12 @@ export interface TwinAlertItem {
   severity: 'err' | 'warn' | 'un'
   severityText: string
   code: string
+  /** 行里的说明文字；放不下时省略号截断，完整一句在悬停提示里。 */
   text: string
   whenText?: string
+  /** 链接目标（中键 / Ctrl 点击新开）。有 onClick 时普通点击走 onClick。 */
   href?: string
+  /** 点这一行做什么。给了它这一行就可点、可 Tab 聚焦：有 href 是链接，没有 href 是按钮。 */
   onClick?: () => void
 }
 
@@ -301,24 +303,37 @@ export function TwinAlertList({ items, emptyText }: { items: TwinAlertItem[]; em
           <>
             <span className={cn('twin-sev', item.severity === 'err' && 'is-err', item.severity === 'un' && 'is-un')}>{item.severityText}</span>
             <span className="twin-code">{item.code}</span>
-            <span>{item.text}</span>
+            <span className="twin-alert-text" title={item.text}>
+              {item.text}
+            </span>
             {item.whenText ? <span className="twin-when">{item.whenText}</span> : null}
           </>
         )
-        return item.href ? (
-          <a
-            key={item.key}
-            className="twin-alert"
-            href={item.href}
-            onClick={(event) => {
-              if (!item.onClick || event.metaKey || event.ctrlKey) return
-              event.preventDefault()
-              item.onClick()
-            }}
-          >
-            {body}
-          </a>
-        ) : (
+        if (item.href) {
+          return (
+            <a
+              key={item.key}
+              className="twin-alert"
+              href={item.href}
+              onClick={(event) => {
+                if (!item.onClick || event.metaKey || event.ctrlKey) return
+                event.preventDefault()
+                item.onClick()
+              }}
+            >
+              {body}
+            </a>
+          )
+        }
+        // 没有链接目标、但有动作（展示档、机构端）：仍是一个可聚焦、可按回车的真按钮，不是一块死的 div
+        if (item.onClick) {
+          return (
+            <button key={item.key} type="button" className="twin-alert" onClick={item.onClick}>
+              {body}
+            </button>
+          )
+        }
+        return (
           <div key={item.key} className="twin-alert">
             {body}
           </div>
@@ -459,12 +474,11 @@ export function TwinSteps({ items }: { items: TwinStepItem[] }) {
   return (
     <div className="twin-steps">
       {items.map((item, i) => {
-        const copy = item.unavailableReason ? screenReasonCopy(item.unavailableReason) : null
         return (
           <div key={item.label} style={{ display: 'contents' }}>
             {i > 0 ? <span className="twin-arrow" aria-hidden="true">›</span> : null}
             <div className={cn('twin-step', i === items.length - 1 && 'is-end')}>
-              {copy ? <span className="twin-pend" title={copy.detail}>{copy.title}</span> : <b>{twinSmall(item.count)}</b>}
+              {item.unavailableReason ? <TwinReasonChip reason={item.unavailableReason} /> : <b>{twinSmall(item.count)}</b>}
               <span>{item.label}</span>
             </div>
           </div>
