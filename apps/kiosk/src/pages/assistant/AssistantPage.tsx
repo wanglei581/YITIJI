@@ -20,6 +20,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HomeIcon, KeyboardIcon, SparklesIcon, UserIcon } from 'lucide-react'
+import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KIcon } from '../../components/kiosk-icon'
@@ -604,8 +605,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 fallback={advisorFallback}
               >
                 <AiDisclaimerLine>
-                  这一轮回答由真实模型生成（服务标识：{describeProviderLabel(providerLabel)}），
-                  仅供参考，不构成录用、薪资或办理结果的承诺。
+                  {AI_LABEL_COPY.BASE}。这一轮回答来自真实模型（服务标识：{describeProviderLabel(providerLabel)}），
+                  不构成录用、薪资或办理结果的承诺。
                 </AiDisclaimerLine>
                 <p className="assistant-nodo"><b>这一轮不决定</b><span>身份 · 支付 · 设备状态 · 打印扫描成败 · 岗位来源真伪 · 政策资格 · 录用结果</span></p>
               </AiTaskRegion>
@@ -762,7 +763,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
         <footer className="assistant-truth" data-disclaimer="true">
           <p><b>回答来源</b>只有服务标识以 llm: 开头且标记为模型生成时，正文才会显示；否则如实说明、不展示正文。</p>
-          <p><b>AI 不做的判定</b>{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}；身份、支付、设备、打印扫描成败、岗位来源真伪、政策资格、录用结果一律不由 AI 决定。</p>
+          <p><b>AI 不做的判定</b>{toolboxScene?.disclaimer ?? `${AI_LABEL_COPY.BASE}，不构成正式建议`}；身份、支付、设备、打印扫描成败、岗位来源真伪、政策资格、录用结果一律不由 AI 决定。</p>
           <p><b>隐私与边界</b>本机草稿离场即清；对话、文件与订单按服务端各自留存期限管理。岗位投递与招聘会预约请前往来源平台完成，本机不代收简历。</p>
         </footer>
       </div>

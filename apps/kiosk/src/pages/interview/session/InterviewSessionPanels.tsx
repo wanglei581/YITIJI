@@ -1,4 +1,5 @@
 import type { ElementType, RefObject } from 'react'
+import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import {
   BotIcon,
   Loader2Icon,
@@ -78,7 +79,7 @@ export function InterviewSessionPanels({
           <div className="interview-session__mark"><BotIcon aria-hidden="true" /></div>
           <div className="min-w-0 flex-1">
             <h1>模拟面试 · {position}</h1>
-            <p>模拟练习，仅供参考 · 按自己的真实经历作答即可</p>
+            <p>{AI_LABEL_COPY.INTERVIEW_SESSION} · 按自己的真实经历作答即可</p>
           </div>
         </div>
         <div className="interview-session__status-row">

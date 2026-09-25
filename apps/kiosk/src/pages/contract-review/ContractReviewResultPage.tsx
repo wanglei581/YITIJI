@@ -14,7 +14,7 @@ import {
   KioskPageFrame,
   KioskPageHeader,
 } from '@ai-job-print/ui'
-import type { ContractReviewFinding } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, type ContractReviewFinding } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
@@ -383,7 +383,7 @@ export function ContractReviewResultPage() {
         <div className="cr-disclaimer-banner">
           <InfoIcon />
           <span>
-            本结果由 AI 生成，<strong>仅作风险提示，不构成正式法律意见</strong>。
+            <strong>{AI_LABEL_COPY.CONTRACT_REVIEW_RESULT}</strong>。
             重大争议请咨询律师或官方机构。点击“结束并删除”会立即请求清理合同原件；
             异常情况下仍按知情同意中的最长保留时限自动清理。
           </span>

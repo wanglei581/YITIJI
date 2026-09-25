@@ -3,6 +3,7 @@
 // 仍是模态对话框（背后的工作台 inert）：一体机舞台上它只盖住舱面以下的主体与输入坞，
 // 舱面标题与读数由 onStateChange 上报的真实相位驱动。
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import { KIcon } from '../../components/kiosk-icon'
 import { useAiAdvisorCallSession } from '../../hooks/useAiAdvisorCallSession'
 import { AdvisorManualEntries } from './AdvisorConversation'
@@ -156,7 +157,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
         role="dialog"
         aria-modal="true"
         aria-labelledby="assistant-voice-title"
-        aria-describedby="assistant-voice-sub"
+        aria-describedby="assistant-voice-sub assistant-voice-ai-disclosure"
         aria-busy={ending}
         onKeyDown={handleDialogKeyDown}
       >
@@ -165,6 +166,11 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
             <span>{sectionTitle}</span>
             <h2 id="assistant-voice-title">和小青语音咨询</h2>
             <p id="assistant-voice-sub">{sectionHint}</p>
+            {/*
+              数字人披露（compliance-boundary §1.2 A「数字人形象与声音」，feature-scope §七 #19）：
+              放在页头而不是某一态的正文里 —— 开麦确认、连接中、通话中、只听、失败五态都看得到。
+            */}
+            <p id="assistant-voice-ai-disclosure" className="assistant-voice-ai-disclosure">{AI_LABEL_COPY.DIGITAL_HUMAN}</p>
           </div>
           <button
             ref={closeButtonRef}
@@ -268,7 +274,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
             ) : (
               <>
                 <div className="assistant-voice-avatar assistant-voice-avatar--live">
-                  <img src={ADVISOR_IMG} alt="正在通话的求职顾问小青" />
+                  <img src={ADVISOR_IMG} alt="正在通话的 AI 数字人小青" />
                 </div>
                 <div className={waveActive ? 'assistant-voice-wave' : 'assistant-voice-wave is-quiet'} aria-hidden="true">
                   <i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
@@ -287,7 +293,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               <div className="assistant-voice-caption" aria-live="polite">
                 <div>
                   <strong>实时字幕</strong>
-                  <span>来自服务端 · AI 内容仅供参考</span>
+                  <span>来自服务端 · {AI_LABEL_COPY.BASE}</span>
                 </div>
                 <p>
                   {call.subtitle ||

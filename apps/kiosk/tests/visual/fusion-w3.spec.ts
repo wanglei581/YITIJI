@@ -1264,7 +1264,10 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await page.getByRole('button', { name: '提交回答' }).click()
   await page.getByRole('button', { name: '结束面试' }).click()
   await page.waitForURL(/\/interview\?stage=report/)
-  await expect(page.getByRole('note', { name: '合规提示' })).toContainText('练习结果仅供本人复盘，不会发送给任何企业。')
+  // 3.5c：横幅以 AI 可见标识开头（审计表一「模拟面试报告（一体机）」），不发给企业的边界不变。
+  const reportNote = page.getByRole('note', { name: '合规提示' })
+  await expect(reportNote).toContainText('AI 生成，仅供参考，只用于本人练习复盘。')
+  await expect(reportNote).toContainText('也不会发送给任何企业。')
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
 })
