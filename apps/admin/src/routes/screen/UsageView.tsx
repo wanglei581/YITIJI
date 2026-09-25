@@ -21,7 +21,7 @@ import {
 } from '@ai-job-print/ui'
 import { loadAdminUsage, normalizeUsageRange } from '../../services/api/consoleScreen'
 import { aiOperationLabel } from './metricLabels'
-import { TwinShell, TwinShellEmpty, failureOf, type ScreenChrome, type ShellMeta } from './screenView'
+import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
 
 /**
  * 服务调用：系统里每一类服务被用了多少次，按渠道、时段、步骤、AI 功能与模型拆开。
@@ -47,7 +47,7 @@ const MEMBERS_NOTE = '只含登录会员的浏览与外跳；匿名使用按小�
 
 function usageMeta(usage: ScreenUsageSnapshot): ShellMeta {
   const failed = Object.values(usage.metrics).filter((m) => m && m.available === false && m.reason === 'source_query_failed').length
-  return { generatedAt: usage.generatedAt, status: usage.status, failedSlices: failed, access: '访问口径：仅已登录后台会话可见；只出聚合数字，少于 5 次不显示' }
+  return { generatedAtText: stampText(usage.generatedAt), status: usage.status, failedSlices: failed, access: '访问口径：仅已登录后台会话可见；只出聚合数字，少于 5 次不显示' }
 }
 
 function weekdayOf(date: string): string {

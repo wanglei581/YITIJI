@@ -12,7 +12,7 @@ import {
 } from '@ai-job-print/ui'
 import { loadAdminTerminalTwin } from '../../services/api/consoleScreen'
 import { screenHref } from './screenTabs'
-import { FailurePanel, TwinShell, TwinShellEmpty, failureOf, snapshotMeta, useAdminSnapshot, type ScreenChrome } from './screenView'
+import { FailurePanel, TwinShell, TwinShellEmpty, failureOf, snapshotMeta, stampText, useAdminSnapshot, type ScreenChrome } from './screenView'
 
 /**
  * 终端孪生：单台终端的设备模型与实时状态。
@@ -113,7 +113,7 @@ function TerminalTwinLive({
       subtitle={subtitle}
       layout={current ? 'terminal' : 'full'}
       toolbar={toolbar}
-      meta={current ? { generatedAt: current.generatedAt, status: 'ok', failedSlices: 0, access: fleetSnapshot ? snapshotMeta(fleetSnapshot).access : null } : null}
+      meta={current ? { generatedAtText: stampText(current.generatedAt), status: 'ok', failedSlices: 0, access: fleetSnapshot ? snapshotMeta(fleetSnapshot).access : null } : null}
       pollSeconds={POLL_SECONDS}
       failure={twin.failure}
       onRefresh={() => void twin.refresh()}

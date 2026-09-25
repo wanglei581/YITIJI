@@ -80,6 +80,7 @@ export { TWIN_STATE_TEXT, TwinCity, twinAreas, twinTerminalState, twinTerminalsF
 export { TwinTerminalBoard } from './screen/twin/TwinTerminalBoard'
 export { TWIN_DEVICE_H, TWIN_DEVICE_W, TwinDevice } from './screen/twin/TwinDevice'
 export { TWIN_STAGE_H, TWIN_STAGE_W } from './screen/twin/twinMath'
+export { TwinFailurePanel, TwinShell, TwinShellEmpty } from './screen/twin/TwinShell'
 
 /* ── State components ─────────────────────────────────── */
 export { Spinner } from './components/Spinner'
@@ -172,6 +173,7 @@ export type {
   TwinStepItem,
 } from './screen/twin/TwinCharts'
 export type { TwinNetworkLane, TwinNetworkProps, TwinNetworkService } from './screen/twin/TwinNetwork'
+export type { TwinChrome, TwinFailure, TwinForbiddenCopy, TwinShellMeta, TwinShellProps } from './screen/twin/TwinShell'
 export type { TwinCityHighlight, TwinCityProps, TwinCityTerminal, TwinFleetCellLike } from './screen/twin/TwinCity'
 export type { TwinTerminalBoardProps, TwinTerminalTwinLike } from './screen/twin/TwinTerminalBoard'
 export type { TwinDeviceCallout, TwinDeviceCalloutKey, TwinDeviceProps } from './screen/twin/TwinDevice'
