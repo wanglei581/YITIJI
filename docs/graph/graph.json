@@ -19450,6 +19450,9 @@
     "apps/miniapp/project.config.json": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/scripts/privacy-api-inventory.json": [
+      "apps/miniapp/scripts/verify-package-layout.mjs"
+    ],
     "apps/miniapp/scripts/tests/page-lifecycle.test.mjs": [
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
@@ -27498,6 +27501,24 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/miniapp/scripts/privacy-api-inventory.json"
+        ],
+        "missing": []
+      },
+      "file": "apps/miniapp/scripts/verify-package-layout.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/miniapp",
+      "scriptNames": [
+        "@ai-job-print/miniapp::verify:package-layout"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/miniapp/utils/pickup-qrcode.js"
         ],
         "missing": []
@@ -27508,6 +27529,22 @@
       "package": "@ai-job-print/miniapp",
       "scriptNames": [
         "@ai-job-print/miniapp::verify:static"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "apps/miniapp/scripts/verify-review-scope.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/miniapp",
+      "scriptNames": [
+        "@ai-job-print/miniapp::verify:review-scope"
       ],
       "wired": true
     },

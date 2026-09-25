@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1506 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1507 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -869,10 +869,11 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/miniapp/scripts/</code> — 2 个文件</summary>
+<summary><code>apps/miniapp/scripts/</code> — 3 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
+| `apps/miniapp/scripts/privacy-api-inventory.json` | `verify-package-layout.mjs` |
 | `apps/miniapp/scripts/tests/page-lifecycle.test.mjs` | `verify-package-chain.mjs` |
 | `apps/miniapp/scripts/verify-miniapp-static.mjs` | `verify-miniapp-static.mjs` |
 
