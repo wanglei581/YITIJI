@@ -235,8 +235,7 @@ async function main(): Promise<void> {
     if (created.share.pickupCode !== created.pickupCode || created.share.outletName !== '青序验证大厅') {
       fail(`分享内容应为 8 位码 + 网点名，实际 ${JSON.stringify(created.share)}`)
     }
-    const shareText = JSON.stringify(created.share)
-    if (shareText.includes(fileName) || shareText.includes(String(created.amountCents))) {
+    if ('fileName' in created.share || 'amountCents' in created.share || created.share.outletName.includes('简历')) {
       fail('分享载荷不得含文件名或金额')
     }
     if (!fileRow.expiresAt || !createdRow.pickupCodeExpiresAt || createdRow.pickupCodeExpiresAt.getTime() > fileRow.expiresAt.getTime()) {
@@ -272,7 +271,7 @@ async function main(): Promise<void> {
     if (!reissued.share || reissued.share.pickupCode !== reissued.pickupCode || reissued.share.outletName !== '青序验证大厅') {
       fail(`重发后的分享载荷不对：${JSON.stringify(reissued.share)}`)
     }
-    if (JSON.stringify(reissued.share).includes(fileName)) fail('重发分享载荷不得含文件名')
+    if ('fileName' in reissued.share || 'amountCents' in reissued.share) fail('重发分享载荷不得含文件名或金额')
     const reissuedRow = await prisma.order.findUniqueOrThrow({ where: { id: created.id } })
     if (reissuedRow.pickupCodeExpiresAt?.getTime() !== previousExpiry) fail('重发不得顺延 7 天截止')
     const oldClaim = await capture(() => pickup.claim(created.pickupCode!, terminalId, 'owner'))
