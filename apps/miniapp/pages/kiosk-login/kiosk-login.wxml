@@ -1,80 +1,232 @@
-<!--pages/kiosk-login/kiosk-login.wxml-->
-<view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-
-  <view class="navbar">
-    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack">
-      <text class="ficon i-right"></text>
+<!--pages/kiosk-login/kiosk-login.wxml
+  版式与口径按 docs/design/kiosk-redesign-2026-08/51-phone-relay.html 的 qr-login 分屏（手机接力）：
+  深色接力条 + 机器卡 + 状态卡 + 事实表。手机这一步只做「确认」，登录要一体机自己领取后才算，
+  所以任何一屏都只说「已确认，回一体机看结果」。各分支内部不嵌套 <block>（测试按下一个 </block> 切块）。 -->
+<view class="relay">
+  <view class="relaybar" style="padding-top:{{statusBarHeight}}px">
+    <view class="rb-row">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" aria-role="button" aria-label="返回">
+        <text class="ficon i-right"></text>
+      </view>
+      <view class="rb-copy">
+        <view class="rb-title">扫码登录一体机</view>
+        <view class="rb-sub">{{phase === 'ticket-dead' ? '手机确认登录 · 需回一体机重新生成' : (phase === 'unknown' ? '手机确认登录 · 结果需回一体机核对' : '手机确认登录 · 确认后回一体机')}}</view>
+      </view>
+      <view class="rb-tag">{{phase === 'ticket-dead' ? '需回一体机' : (phase === 'unknown' ? '结果待核对' : '登录接力')}}</view>
     </view>
-    <view class="nav-title">扫码登录一体机</view>
   </view>
 
-  <view class="content">
+  <view class="flow">
 
-    <!-- 未登录：引导先登录 -->
+    <!-- 机器卡：deviceLabel 是可选字段，没拿到就写「名称未提供」，不编机器名 -->
+    <view wx:if="{{isLoggedIn && dev}}" class="devcard {{dev.compact ? 'compact' : ''}} {{dev.unknown ? 'unknown' : ''}}">
+      <view class="dev-glyph"><text class="ficon i-printer"></text></view>
+      <view class="dev-copy">
+        <view class="dev-name">{{dev.name}}</view>
+        <view class="dev-desc">{{dev.desc}}</view>
+        <view wx:if="{{phase === 'ready'}}" class="dev-chip">
+          <text wx:if="{{remainSeconds > 0}}">读取时还剩约 {{remainSeconds}} 秒 · 自一体机生成起共 {{ttlSeconds}} 秒</text>
+          <text wx:else>剩余时间以一体机屏幕为准 · 自一体机生成起共 {{ttlSeconds}} 秒</text>
+        </view>
+      </view>
+      <view wx:if="{{dev.note}}" class="dev-note">
+        <text class="ficon i-info"></text>
+        <text class="dev-note-text">{{dev.note}}</text>
+      </view>
+    </view>
+
+    <!-- 未登录：确认要用小程序里的账号 -->
     <block wx:if="{{!isLoggedIn}}">
-      <view class="state-card">
-        <text class="sc-icon ficon i-user"></text>
+      <view class="statecard">
+        <view class="glyph"><text class="ficon i-user"></text></view>
         <view class="sc-title">请先登录小程序</view>
-        <view class="sc-desc">扫码登录一体机需要您先完成账号登录</view>
-        <button class="btn-primary" bindtap="goLogin">去登录</button>
+        <view class="sc-desc">扫码登录一体机，要用你在小程序里登录的账号来确认。</view>
+        <view class="actions">
+          <button class="btn primary tap" hover-class="tap-press" bindtap="goLogin">去登录</button>
+        </view>
       </view>
     </block>
 
-    <!-- 已登录 + 空闲：引导扫码 -->
-    <block wx:elif="{{isLoggedIn && (phase === 'idle')}}">
-      <view class="guide-card">
-        <text class="guide-icon ficon i-printer"></text>
-        <view class="guide-title">扫描一体机二维码</view>
+    <!-- 引导扫码 -->
+    <block wx:elif="{{phase === 'idle'}}">
+      <view class="statecard guide">
+        <view class="glyph"><text class="ficon i-scan"></text></view>
+        <view class="sc-title">扫描一体机屏幕上的二维码</view>
         <view class="steps">
           <view class="step">
             <view class="step-num">1</view>
-            <view class="step-text">在一体机「登录」页切换到「手机扫码」标签</view>
+            <view class="step-text">在一体机「登录」页选择「手机扫码」，屏幕上会出现二维码</view>
           </view>
           <view class="step">
             <view class="step-num">2</view>
-            <view class="step-text">用本小程序扫描终端屏幕上的二维码</view>
+            <view class="step-text">用本小程序扫描你面前那台机器屏幕上的二维码</view>
           </view>
           <view class="step">
             <view class="step-num">3</view>
-            <view class="step-text">确认后即刻登录，无需输入手机号和验证码</view>
+            <view class="step-text">在手机上核对机器并确认，再回一体机看登录结果</view>
           </view>
         </view>
-        <button class="btn-scan tap rise" hover-class="tap-press" bindtap="scanCode">
-          <text class="ficon i-scan"></text>
-          <text>扫描二维码</text>
-        </button>
+        <view class="actions">
+          <button class="btn primary tap" hover-class="tap-press" bindtap="scanCode">
+            <text class="ficon i-scan"></text>
+            <text>扫描二维码</text>
+          </button>
+        </view>
+      </view>
+      <view class="facts">
+        <view class="fact"><text class="fk">两种码</text><text class="fv">一体机上的登录码和传文件码都可以在这里扫，本页会按码型分开处理。</text></view>
+        <view class="fact"><text class="fk">安全</text><text class="fv">只扫你自己面前那台机器上的码，不要扫别人转发给你的码。</text></view>
       </view>
     </block>
 
-    <!-- 扫码中 / 确认中：loading 态 -->
-    <block wx:elif="{{phase === 'scanning' || phase === 'confirming'}}">
-      <view class="state-card">
+    <!-- 扫码中 -->
+    <block wx:elif="{{phase === 'scanning'}}">
+      <view class="statecard">
         <view class="sc-spinner"></view>
-        <view class="sc-title">{{phase === 'scanning' ? '扫码中…' : '确认中…'}}</view>
-        <view class="sc-desc">{{phase === 'confirming' ? '正在与终端建立连接，请稍候' : '请对准终端屏幕上的二维码'}}</view>
+        <view class="sc-title">正在打开相机</view>
+        <view class="sc-desc">请对准一体机屏幕上的二维码。</view>
       </view>
     </block>
 
-    <!-- 成功 -->
-    <block wx:elif="{{phase === 'success'}}">
-      <view class="state-card success">
-        <view class="sc-icon sc-symbol"><text class="ficon i-check"></text></view>
-        <view class="sc-title">登录成功</view>
-        <view class="sc-desc">已在「{{deviceLabel}}」上完成登录，可在终端继续操作</view>
-        <button class="btn-secondary" bindtap="retry">再次扫码</button>
-      </view>
-    </block>
-
-    <!-- 失败 -->
-    <block wx:elif="{{phase === 'error'}}">
-      <view class="state-card error">
-        <view class="sc-icon sc-symbol"><text class="ficon i-warning"></text></view>
-        <view class="sc-title">登录失败</view>
+    <!-- 没扫到 / 不是一体机的码 -->
+    <block wx:elif="{{phase === 'scan-error'}}">
+      <view class="statecard error">
+        <view class="glyph"><text class="ficon i-warning"></text></view>
+        <view class="sc-title">没有识别到一体机的码</view>
         <view class="sc-desc">{{errorMsg}}</view>
-        <button class="btn-primary" bindtap="retry">重新扫码</button>
+        <view class="actions">
+          <button class="btn primary tap" hover-class="tap-press" bindtap="scanCode">重新扫码</button>
+        </view>
       </view>
     </block>
 
+    <!-- 读票据状态 -->
+    <block wx:elif="{{phase === 'checking'}}">
+      <view class="statecard">
+        <view class="sc-spinner"></view>
+        <view class="sc-title">正在检查二维码</view>
+        <view class="sc-desc">还没核对完这台机器之前，这一页不会让你确认登录。</view>
+      </view>
+    </block>
+
+    <!-- 状态没读到：可能只是网络，可以再读一次 -->
+    <block wx:elif="{{phase === 'status-error'}}">
+      <view class="statecard error">
+        <view class="glyph"><text class="ficon i-warning"></text></view>
+        <view class="sc-title">二维码状态读取失败</view>
+        <view class="sc-desc">可能只是网络没连上。可以先重试一次；仍然失败就回一体机刷新二维码。</view>
+        <view class="actions">
+          <button class="btn primary tap" hover-class="tap-press" bindtap="recheck">重新检查二维码</button>
+          <button class="btn ghost tap" hover-class="tap-press" bindtap="scanCode">重新扫码</button>
+        </view>
+      </view>
+      <view class="facts">
+        <view class="fact"><text class="fk">时限</text><text class="fv">二维码自一体机生成起共 {{ttlSeconds}} 秒，到期只能在一体机上重新生成。</text></view>
+        <view class="fact"><text class="fk">安全</text><text class="fv">本页不显示二维码里的登录信息。</text></view>
+      </view>
+    </block>
+
+    <!-- 待本人确认：核对机器后在页面上确认，不藏进系统弹窗 -->
+    <block wx:elif="{{phase === 'ready'}}">
+      <view wx:if="{{note}}" class="notice calm">
+        <text class="ficon i-info"></text>
+        <text class="notice-text">{{note}}</text>
+      </view>
+      <view class="facts">
+        <view class="fact"><text class="fk">确认什么</text><text class="fv">用你在小程序里登录的账号，确认这一次一体机登录请求。</text></view>
+        <view class="fact"><text class="fk">确认之后</text><text class="fv">手机这边就结束了；一体机还要自己领取这次确认，能不能进入账号以一体机屏幕为准。</text></view>
+        <view class="fact"><text class="fk">安全</text><text class="fv">只确认你刚才亲手扫的那台机器；不是面前这台就取消。</text></view>
+      </view>
+      <view class="actions bar">
+        <button class="btn primary tap" hover-class="tap-press" bindtap="confirmLogin">确认本次登录请求</button>
+        <button class="btn ghost tap" hover-class="tap-press" bindtap="cancelConfirm">不是这台，取消</button>
+      </view>
+    </block>
+
+    <!-- 确认中 -->
+    <block wx:elif="{{phase === 'confirming'}}">
+      <view class="statecard">
+        <view class="sc-spinner"></view>
+        <view class="sc-title">确认中…</view>
+        <view class="sc-desc">正在提交你的确认，请稍候。</view>
+      </view>
+    </block>
+
+    <!-- 已确认：手机只提交了确认，登录结果看一体机 -->
+    <block wx:elif="{{phase === 'confirmed'}}">
+      <view class="statecard done">
+        <view class="glyph"><text class="ficon i-check"></text></view>
+        <view class="sc-title">已确认，请回一体机查看登录结果</view>
+        <view class="sc-desc">手机这一步只做了「确认」。一体机还要继续校验并领取这次确认，能不能进入账号以一体机屏幕上的结果为准。</view>
+      </view>
+      <view class="facts">
+        <view class="fact"><text class="fk">手机端做了什么</text><text class="fv">用你在小程序里的账号，确认了本次一体机登录请求。</text></view>
+        <view class="fact"><text class="fk">手机端没做什么</text><text class="fv">这一页不代表一体机那边已经登上你的账号。</text></view>
+        <view class="fact"><text class="fk">回一体机之后</text><text class="fv">按屏幕上的结果继续；如果没有进入账号，就在一体机上重新生成二维码再扫一次。</text></view>
+        <view class="fact"><text class="fk">离开之前</text><text class="fv">在一体机上办完事记得点退出登录，公共设备不要留登录态。</text></view>
+      </view>
+      <view class="actions bar">
+        <button class="btn ghost tap" hover-class="tap-press" bindtap="scanCode">重新扫码</button>
+      </view>
+    </block>
+
+    <!-- 结果未知：不渲染确认按钮，唯一动作是重读状态 -->
+    <block wx:elif="{{phase === 'unknown'}}">
+      <view class="statecard warn">
+        <view class="glyph"><text class="ficon i-info"></text></view>
+        <view class="sc-title">这次确认有没有成功，本页不知道</view>
+        <view class="sc-desc">请求已经发出去了，但没有拿到明确结果。不要在这里反复确认——先回一体机看屏幕，那边显示的才是真结果。</view>
+      </view>
+      <view wx:if="{{note}}" class="notice warn">
+        <text class="ficon i-warning"></text>
+        <text class="notice-text">{{note}}</text>
+      </view>
+      <view class="facts">
+        <view class="fact"><text class="fk">第一步</text><text class="fv">回一体机看屏幕：已经进入账号就直接在一体机上继续办事。</text></view>
+        <view class="fact"><text class="fk">为什么不重试</text><text class="fv">刚才那次确认可能已经生效，反复确认只会更难判断到底成没成。</text></view>
+        <view class="fact"><text class="fk">重新检查之后</text><text class="fv">可能显示这张二维码不能再确认（多半是那次确认已生效或已被一体机领取），也可能回到确认这一步（说明那次确认没有生效）。</text></view>
+        <view class="fact"><text class="fk">一体机上没登录</text><text class="fv">在一体机上重新生成二维码，再扫一次。</text></view>
+      </view>
+      <view class="actions bar">
+        <button class="btn primary tap" hover-class="tap-press" bindtap="recheck">重新检查这张二维码</button>
+        <view class="reason">本页不会替你再提交一次确认。先回一体机看屏幕最快。</view>
+      </view>
+    </block>
+
+    <!-- 服务端拒绝了这一次：没有生效，可以重读状态再决定 -->
+    <block wx:elif="{{phase === 'rejected'}}">
+      <view class="statecard error">
+        <view class="glyph"><text class="ficon i-warning"></text></view>
+        <view class="sc-title">系统没有接受这次确认</view>
+        <view class="sc-desc">{{errorMsg}}</view>
+        <view class="actions">
+          <button class="btn primary tap" hover-class="tap-press" bindtap="recheck">重新检查这张二维码</button>
+          <button class="btn ghost tap" hover-class="tap-press" bindtap="scanCode">重新扫码</button>
+        </view>
+      </view>
+    </block>
+
+    <!-- 票据已不能再确认：不给同一张码重试，只送回一体机 -->
+    <block wx:elif="{{phase === 'ticket-dead'}}">
+      <view class="statecard warn">
+        <view class="glyph"><text class="ficon i-scan"></text></view>
+        <view class="sc-title">这个二维码不能再确认了</view>
+        <view class="sc-desc">它可能已经超时，也可能已经被一体机领取或已经确认过。请先回一体机看屏幕上的结果。</view>
+      </view>
+      <view class="facts">
+        <view class="fact"><text class="fk">怎么办</text><text class="fv">先看一体机屏幕：已经进入账号就在一体机上继续；没有进入就在一体机上重新生成二维码，再扫新的那张。</text></view>
+        <view class="fact"><text class="fk">为什么没有重试</text><text class="fv">这张二维码在系统里已经不能再确认，在手机上重试只会再失败一次。</text></view>
+        <view class="fact"><text class="fk">安全</text><text class="fv">不要用别人转发给你的二维码登录。</text></view>
+      </view>
+      <view class="actions bar">
+        <button class="btn ghost tap" hover-class="tap-press" bindtap="scanCode">扫新的二维码</button>
+      </view>
+    </block>
+
+  </view>
+
+  <view class="foot">
+    <text class="ficon i-info"></text>
+    <text class="foot-text">本页只做这一次登录确认，不显示二维码里的登录信息；公共设备用完请在一体机上退出登录。</text>
   </view>
 </view>
