@@ -120,7 +120,7 @@ export class ConsoleScreenUsageService {
     const status = snapshotLoadStatus([facts, heat, pulse, jumps].filter((part) => part.ok).length, 4)
     const metrics: ScreenUsageMetrics = {
       channels: this.fromFacts(facts, 'Order.payStatus=paid,paidAt', range, (value) => ({
-        paidOrders: value.channels.paidOrders,
+        paidOrders: suppressSmallCount(value.channels.paidOrders),
         kiosk: suppressSmallCount(value.channels.kiosk),
         miniapp: suppressSmallCount(value.channels.miniapp),
         unlabeled: suppressSmallCount(value.channels.unlabeled),
@@ -150,14 +150,14 @@ export class ConsoleScreenUsageService {
       printSteps: this.fromFacts(facts, 'PrintTask/Order', range, (value) => ({
         uploaded: unwrittenUpload(range),
         inspected: unwrittenInspection(range),
-        paid: value.channels.paidOrders,
-        printed: value.printed,
+        paid: suppressSmallCount(value.channels.paidOrders),
+        printed: suppressSmallCount(value.printed),
       })),
       resumeSteps: this.fromFacts(facts, 'AiServiceLog/AuditLog', range, (value) => ({
         uploaded: unwrittenUpload(range),
-        analyzed: successCount(value, 'parseResume'),
-        optimized: successCount(value, 'optimizeResume'),
-        exported: value.resumeExported,
+        analyzed: suppressSmallCount(successCount(value, 'parseResume')),
+        optimized: suppressSmallCount(successCount(value, 'optimizeResume')),
+        exported: suppressSmallCount(value.resumeExported),
       })),
       ai: this.fromFacts(facts, 'AiServiceLog', range, buildAiValue),
       jobs: this.fromFacts(facts, 'BrowseLog/Favorite/ExternalJumpLog', range, (value) => ({
@@ -304,15 +304,17 @@ function buildAiValue(facts: AdminUsageFacts): ScreenUsageAiValue {
     if (row.status === 'failed') failed += row.count
     byOp.set(row.operation, (byOp.get(row.operation) ?? 0) + row.count)
   }
+  // 成功率的分母是成功 + 失败。running 等其它状态算进 total，但不单独把门槛抬过去。
+  const decided = success + failed
   return {
-    total,
-    success,
-    failed,
-    successRate: total > 0 ? Math.round((success / total) * 1000) / 10 : null,
-    avgLatencyMs: facts.avgLatencyMs,
-    estimatedCostCny: facts.estimatedCostCny,
-    costMeasuredCalls: facts.costMeasuredCalls,
-    fallbackCalls: facts.fallbackCalls,
+    total: suppressSmallCount(total),
+    success: suppressSmallCount(success),
+    failed: suppressSmallCount(failed),
+    successRate: decided >= SCREEN_MIN_AGGREGATE_SAMPLE ? Math.round((success / total) * 1000) / 10 : null,
+    avgLatencyMs: success >= SCREEN_MIN_AGGREGATE_SAMPLE ? facts.avgLatencyMs : null,
+    estimatedCostCny: facts.costMeasuredCalls >= SCREEN_MIN_AGGREGATE_SAMPLE ? facts.estimatedCostCny : null,
+    costMeasuredCalls: suppressSmallCount(facts.costMeasuredCalls),
+    fallbackCalls: suppressSmallCount(facts.fallbackCalls),
     byOperation: [...byOp.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([operation, count]) => ({ operation, count: suppressSmallCount(count) })),
