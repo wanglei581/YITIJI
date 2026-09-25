@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto'
 import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BadRequestException, ForbiddenException, Module, ValidationPipe } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Module, NotFoundException, ValidationPipe } from '@nestjs/common'
 import { NestFactory, type INestApplicationContext } from '@nestjs/core'
 import { JwtModule, JwtService } from '@nestjs/jwt'
 import { Reflector } from '@nestjs/core'
@@ -60,6 +60,9 @@ import {
   loadPrintLiveSlice,
 } from '../src/console-screen/console-screen.queries'
 import { PartnerOrgRequiredError, requirePartnerOrgId } from '../src/console-screen/console-screen.org'
+import { offlineAlertTitle } from '../src/console-screen/console-screen.fleet'
+import { CHINA_LAT_MIN, CHINA_LNG_MAX, terminalPlacementPatch } from '../src/terminals/terminal-placement'
+import { TIMELINE_SEGMENT_CAP, deriveTerminalTimeline } from '../src/console-screen/console-screen.timeline'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 let passed = 0
@@ -179,6 +182,9 @@ function assertSourceContract(): void {
     'console-screen.metric.ts',
     'console-screen.module.ts',
     'console-screen.org.ts',
+    'console-screen.fleet.ts',
+    'console-screen.timeline.ts',
+    'console-screen.twin.ts',
   ].map((name) => stripComments(readSrc(`src/console-screen/${name}`))).join('\n')
 
   assert(
@@ -206,7 +212,8 @@ function assertSourceContract(): void {
   )
   assert(
     '1e. 不签发只读展示令牌，展示只允许已登录后台',
-    !/BindCode|printer-status|terminals\/:id\/config/.test(moduleDir)
+    !/BindCode|terminals\/:id\/config/.test(moduleDir)
+      && !/@Get\([^)]*printer-status/.test(moduleDir)
       && /displayToken: 'not_issued'/.test(readSrc('src/console-screen/console-screen.metric.ts'))
       && /access: 'authenticated_console'/.test(readSrc('src/console-screen/console-screen.metric.ts'))
       && !/@Get\('.*screen\/token/.test(adminController)
@@ -293,6 +300,8 @@ function assertSourceContract(): void {
   const pgSchema = readSrc('prisma/postgres/schema.prisma')
   const sqliteIndexMigration = readSrc('prisma/migrations/20260917120000_add_console_screen_query_indexes/migration.sql')
   const pgIndexMigration = readSrc('prisma/postgres/migrations/20260917120000_add_console_screen_query_indexes/migration.sql')
+  const sqliteGeoMigration = readSrc('prisma/migrations/20260925143000_add_terminal_area_geo/migration.sql')
+  const pgGeoMigration = readSrc('prisma/postgres/migrations/20260925143000_add_terminal_area_geo/migration.sql')
   assert(
     '1n. SQLite/PG schema 与双迁移都声明 toStatus+createdAt、createdAt+sourceName 索引',
     /@@index\(\[toStatus, createdAt\]\)/.test(sqliteSchema)
@@ -334,6 +343,31 @@ function assertSourceContract(): void {
       && /static forTest\(/.test(cacheSrc)
       && /providers:\s*\[\s*ConsoleScreenService,\s*ScreenSnapshotCache\s*\]/.test(moduleSrc)
       && !/useValue|useFactory/.test(moduleSrc),
+  )
+  assert(
+    '1r. 单台孪生沿用 admin/screen 与 partner/screen，机构 id 只来自当前用户，缓存键含机构',
+    /@Get\('admin\/screen\/terminals\/:terminalId'\)/.test(adminController)
+      && /@Get\('partner\/screen\/terminals\/:terminalId'\)/.test(partnerController)
+      && /getPartnerTerminalTwin\(requirePartnerOrgId\(user\.orgId\)/.test(partnerController)
+      && /admin:twin:/.test(service)
+      && /partner:\$\{scopedOrgId\}:twin:/.test(service)
+      && !/query\.orgId/.test(partnerController),
+  )
+  assert(
+    '1s. Terminal 所在区与经纬度写入两份 schema，SQLite REAL / PostgreSQL DOUBLE PRECISION',
+    /areaLabel\s+String\?/.test(sqliteSchema)
+      && /geoLat\s+Float\?/.test(sqliteSchema)
+      && /geoLng\s+Float\?/.test(sqliteSchema)
+      && /areaLabel\s+String\?/.test(pgSchema)
+      && /geoLat\s+Float\?/.test(pgSchema)
+      && /geoLng\s+Float\?/.test(pgSchema)
+      && sqliteGeoMigration.includes('"areaLabel" TEXT')
+      && sqliteGeoMigration.includes('"geoLat" REAL')
+      && sqliteGeoMigration.includes('"geoLng" REAL')
+      && pgGeoMigration.includes('"geoLat" DOUBLE PRECISION')
+      && pgGeoMigration.includes('"geoLng" DOUBLE PRECISION')
+      && !/DROP COLUMN/.test(sqliteGeoMigration)
+      && !/DROP COLUMN/.test(pgGeoMigration),
   )
 }
 
@@ -480,6 +514,76 @@ async function assertPureHelpers(): Promise<void> {
       && requirePartnerOrgId(' org_ok ') === 'org_ok',
   )
 
+  const timelineNow = new Date('2026-09-25T04:00:00.000Z')
+  const timelineStart = new Date(timelineNow.getTime() - 24 * 60 * 60 * 1000)
+  const beatAt = new Date(timelineNow.getTime() - 400_000)
+  const mergedTimeline = deriveTerminalTimeline({
+    now: timelineNow,
+    heartbeats: [
+      { at: beatAt, printerStatus: 'ready' },
+      { at: new Date(beatAt.getTime() + 10_000), printerStatus: 'ok' },
+    ],
+    prints: [],
+    onlineWindowMs: 180_000,
+  })
+  assert(
+    '2p. 重叠在线心跳合并成一段 idle，缺口记 offline，且铺满 24 小时',
+    mergedTimeline.ok
+      && mergedTimeline.segments.filter((segment) => segment.state === 'idle').length === 1
+      && mergedTimeline.segments[0]?.from === timelineStart.toISOString()
+      && mergedTimeline.segments[mergedTimeline.segments.length - 1]?.to === timelineNow.toISOString()
+      && mergedTimeline.segments.every((segment, index) => index === 0 || segment.from === mergedTimeline.segments[index - 1]?.to)
+      && mergedTimeline.segments.every((segment, index) => index === mergedTimeline.segments.length - 1 || segment.state !== mergedTimeline.segments[index + 1]?.state),
+  )
+  const printedTimeline = deriveTerminalTimeline({
+    now: timelineNow,
+    heartbeats: [{ at: beatAt, printerStatus: null }],
+    prints: [{ from: new Date(timelineNow.getTime() - 300_000), to: new Date(timelineNow.getTime() - 200_000) }],
+    onlineWindowMs: 180_000,
+  })
+  const alertTimeline = deriveTerminalTimeline({
+    now: timelineNow,
+    heartbeats: [{ at: new Date(timelineNow.getTime() - 60_000), printerStatus: 'paper_empty' }],
+    prints: [],
+    onlineWindowMs: 180_000,
+  })
+  const unknownTimeline = deriveTerminalTimeline({ now: timelineNow, heartbeats: [], prints: [] })
+  const cappedTimeline = deriveTerminalTimeline({
+    now: timelineNow,
+    heartbeats: [{ at: beatAt, printerStatus: null }],
+    prints: [],
+    onlineWindowMs: 180_000,
+    segmentCap: 1,
+  })
+  const rowCapTimeline = deriveTerminalTimeline({
+    now: timelineNow,
+    heartbeats: [],
+    prints: [],
+    heartbeatRowCapExceeded: true,
+  })
+  assert(
+    '2q. printing 盖在心跳上；缺纸标 alert；没有心跳是 unknown；超上限整段不可用',
+    printedTimeline.ok
+      && printedTimeline.segments.some((segment) => segment.state === 'printing')
+      && alertTimeline.ok
+      && alertTimeline.segments.some((segment) => segment.state === 'alert')
+      && !alertTimeline.segments.some((segment) => segment.state === 'idle')
+      && unknownTimeline.ok
+      && unknownTimeline.segments.length === 1
+      && unknownTimeline.segments[0]?.state === 'unknown'
+      && !cappedTimeline.ok
+      && cappedTimeline.reason === SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded
+      && !rowCapTimeline.ok
+      && rowCapTimeline.reason === SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded
+      && TIMELINE_SEGMENT_CAP >= 480,
+  )
+  assert(
+    '2r. 离线文案按分钟/小时给领导短句',
+    offlineAlertTitle(34 * 60_000) === '离线 34 分钟'
+      && offlineAlertTitle(2 * 60 * 60_000) === '离线 2 小时'
+      && offlineAlertTitle(3 * 24 * 60 * 60_000) === '离线 3 天',
+  )
+
   await assertNestConstructsCache()
 }
 
@@ -567,11 +671,17 @@ async function assertServiceContract(): Promise<void> {
   const taskRecovered = `pt_scrn_ok_${suffix}`
   const userBlank = `user_scrn_nb_${suffix}`
   const printTaskIds = [taskA, taskHist1, taskHist2, taskHist3, taskRecovered]
-  const ids = { orgA, orgB, srcA, srcB, termA, termB, userA, userB, adminId, memberId, taskA, userBlank }
+  const resumeFileName = `求职简历-张三-${suffix}.pdf`
+  const ids = { orgA, orgB, srcA, srcB, termA, termB, userA, userB, adminId, memberId, taskA, userBlank, suffix, resumeFileName }
 
   const cleanup = async () => {
+    await prisma.auditLog.deleteMany({ where: { targetType: 'terminal' } })
+    await prisma.scanTask.deleteMany({ where: { terminal: { orgId: { in: [orgA, orgB] } } } })
+    await prisma.terminalCapability.deleteMany({ where: { terminal: { orgId: { in: [orgA, orgB] } } } })
     await prisma.externalJumpLog.deleteMany({ where: { endUserId: memberId } })
     await prisma.aiServiceLog.deleteMany({ where: { terminalId: { in: [termA, termB] } } })
+    await prisma.printTaskStatusLog.deleteMany({ where: { task: { terminal: { orgId: { in: [orgA, orgB] } } } } })
+    await prisma.printTask.deleteMany({ where: { terminal: { orgId: { in: [orgA, orgB] } } } })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: printTaskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: printTaskIds } } })
     await prisma.order.deleteMany({ where: { terminalId: { in: [termA, termB] } } })
@@ -618,14 +728,14 @@ async function assertServiceContract(): Promise<void> {
     })
     await prisma.terminal.createMany({
       data: [
-        { id: termA, terminalCode: `SCRN-A-${suffix}`, agentToken: `tok_a_${suffix}`, deviceFingerprint: `fp_a_${suffix}`, orgId: orgA, enabled: true },
+        { id: termA, terminalCode: `SCRN-A-${suffix}`, agentToken: `tok_a_${suffix}`, deviceFingerprint: `fp_a_${suffix}`, orgId: orgA, enabled: true, displayName: '天河一体机', areaLabel: '天河区', locationLabel: '体育中心', geoLat: 23.125, geoLng: 113.5 },
         { id: termB, terminalCode: `SCRN-B-${suffix}`, agentToken: `tok_b_${suffix}`, deviceFingerprint: `fp_b_${suffix}`, orgId: orgB, enabled: true },
       ],
     })
     await prisma.terminalHeartbeat.createMany({
       data: [
         { terminalId: termA, status: 'online', createdAt: now },
-        { terminalId: termB, status: 'online', createdAt: now },
+        { terminalId: termB, status: 'online', printerStatus: 'paper_empty', createdAt: now },
       ],
     })
     await prisma.job.createMany({
@@ -646,8 +756,19 @@ async function assertServiceContract(): Promise<void> {
     const yesterdayInstant = new Date(shanghaiDayStart(now).getTime() - 60_000)
     const todayKey = shanghaiDayKey(now)
     const yesterdayKey = shanghaiDayKey(yesterdayInstant)
+    const taskStarted = new Date(now.getTime() - 5 * 60_000)
     await prisma.printTask.create({
-      data: { id: taskA, terminalId: termA, fileUrl: 'https://internal/secret', fileMd5: 'md5', paramsJson: '{}', status: 'printing' },
+      data: {
+        id: taskA,
+        terminalId: termA,
+        endUserId: memberId,
+        fileUrl: 'https://internal/secret',
+        fileMd5: 'md5',
+        paramsJson: JSON.stringify({ fileName: resumeFileName, billablePages: 6, colorMode: 'black_white', copies: 2 }),
+        status: 'printing',
+        claimedAt: taskStarted,
+        createdAt: taskStarted,
+      },
     })
     await prisma.printTask.createMany({
       data: [
@@ -804,6 +925,42 @@ async function assertServiceContract(): Promise<void> {
       partnerA.metrics.terminalsOnline?.available && partnerB.metrics.terminalsOnline?.available
         ? `A matched=${partnerA.metrics.terminalsOnline.value.matchedCount} B matched=${partnerB.metrics.terminalsOnline.value.matchedCount}`
         : 'unavailable',
+    )
+    const wallA = partnerA.metrics.fleetWall
+    const cellA = wallA?.available === true ? wallA.value.cells[0] : undefined
+    const wallB = partnerB.metrics.fleetWall
+    const cellB = wallB?.available === true ? wallB.value.cells[0] : undefined
+    const govCells = gov.metrics.fleetWall?.available === true ? gov.metrics.fleetWall.value.cells : []
+    assert(
+      '5a. Partner A 格子带落点且正在打印，响应不含机构 B 的 terminalId',
+      wallA?.available === true
+        && wallA.value.cells.length === 1
+        && cellA?.health === 'healthy'
+        && cellA.terminalId === termA
+        && cellA.terminalCode === `SCRN-A-${suffix}`
+        && cellA.displayName === '天河一体机'
+        && cellA.areaLabel === '天河区'
+        && cellA.geo?.lat === 23.125
+        && cellA.geo.lng === 113.5
+        && cellA.activity === 'printing'
+        && cellA.alert === null
+        && !JSON.stringify(wallA).includes(termB),
+    )
+    assert(
+      '5b. Partner B 格子是缺纸告警、活动空闲，未设坐标为 null',
+      wallB?.available === true
+        && cellB?.terminalId === termB
+        && cellB.activity === 'idle'
+        && cellB.alert?.kind === 'printer_issue'
+        && cellB.alert.title === '打印机缺纸'
+        && cellB.areaLabel === null
+        && cellB.geo === null
+        && !JSON.stringify(wallB).includes(termA),
+    )
+    assert(
+      '5c. Admin 机队同时有两台，health 仍在',
+      govCells.some((cell) => cell.terminalId === termA && cell.health === 'healthy' && cell.activity === 'printing')
+        && govCells.some((cell) => cell.terminalId === termB && cell.alert?.title === '打印机缺纸'),
     )
     assert(
       '3e. Partner B 同步成功率按本机构聚合（1 成功 1 失败）',
@@ -968,6 +1125,7 @@ async function assertServiceContract(): Promise<void> {
       `fp_a_${suffix}`,
       `fp_b_${suffix}`,
       `file_scrn_${suffix}`,
+      resumeFileName,
       'md5h1',
       'md5h2',
       'md5h3',
@@ -1165,6 +1323,7 @@ async function assertServiceContract(): Promise<void> {
       `loads=${inflightFleetLoads}`,
     )
 
+    await assertTwinCases(prisma, screen, cache, ids)
     await assertHttp(prisma, ids)
   } finally {
     await cleanup()
@@ -1173,9 +1332,302 @@ async function assertServiceContract(): Promise<void> {
   }
 }
 
+async function assertTwinCases(
+  prisma: PrismaService,
+  screen: ConsoleScreenService,
+  cache: ScreenSnapshotCache,
+  ids: {
+    orgA: string
+    orgB: string
+    termA: string
+    termB: string
+    adminId: string
+    memberId: string
+    taskA: string
+    suffix: string
+    resumeFileName: string
+  },
+): Promise<void> {
+  cache.clear()
+  const adminTwin = await screen.getAdminTerminalTwin(ids.termA)
+  const storedTask = await prisma.printTask.findUnique({ where: { id: ids.taskA }, select: { claimedAt: true } })
+  const adminText = JSON.stringify(adminTwin)
+  const current = adminTwin.currentTask.available ? adminTwin.currentTask.value : undefined
+  assert(
+    '5d. 管理员孪生给出设备块，今日按上海日，访问和耗材不可用，且不含文件名',
+    adminTwin.audience === 'admin'
+      && adminTwin.terminal.id === ids.termA
+      && adminTwin.terminal.areaLabel === '天河区'
+      && adminTwin.terminal.locationLabel === '体育中心'
+      && adminTwin.terminal.geo?.lat === 23.125
+      && adminTwin.terminal.geo?.lng === 113.5
+      && adminTwin.status.health === 'healthy'
+      && adminTwin.status.onlineWindowSeconds === SCREEN_ONLINE_WINDOW_SECONDS
+      && adminTwin.printer.available === true
+      && adminTwin.printer.value.name === null
+      && adminTwin.printer.value.state === 'printing'
+      && adminTwin.printer.value.colorEnabled === false
+      && adminTwin.printer.value.duplexEnabled === false
+      && adminTwin.scanner.available === true
+      && adminTwin.scanner.value.state === 'unknown'
+      && adminTwin.currentTask.available === true
+      && current !== null
+      && current?.pages === 6
+      && current?.colorMode === 'bw'
+      && current?.startedAt === storedTask?.claimedAt?.toISOString()
+      && adminTwin.today.printPages === 10
+      && adminTwin.today.printTasks === 2
+      && adminTwin.today.scans === 0
+      && adminTwin.today.failed === 1
+      && adminTwin.today.visits.available === false
+      && adminTwin.today.visits.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten
+      && !('value' in adminTwin.today.visits)
+      && adminTwin.consumables.available === false
+      && adminTwin.consumables.reason === SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo
+      && !('value' in adminTwin.consumables)
+      && adminTwin.timeline24h.available === true
+      && !adminText.includes(ids.resumeFileName)
+      && !adminText.includes('fileName')
+      && !adminText.includes('black_white')
+      && !adminText.includes('https://internal/secret')
+      && !adminText.includes(ids.memberId)
+      && !adminText.includes('"copies"'),
+  )
+  const segments = adminTwin.timeline24h.available ? adminTwin.timeline24h.value : []
+  assert(
+    '5e. 孪生时间轴升序、首尾相接、相邻不同状态，且含 printing',
+    segments.length > 0
+      && segments.length <= TIMELINE_SEGMENT_CAP
+      && segments.some((segment) => segment.state === 'printing')
+      && segments.every((segment, index) => index === 0 || segment.from === segments[index - 1]?.to)
+      && segments.every((segment, index) => index === segments.length - 1 || segment.state !== segments[index + 1]?.state),
+  )
+  const partnerTwin = await screen.getPartnerTerminalTwin(ids.orgA, ids.termA)
+  assert(
+    '5f. 机构 A 可读自己的终端孪生',
+    partnerTwin.audience === 'partner' && partnerTwin.terminal.id === ids.termA && !JSON.stringify(partnerTwin).includes(ids.resumeFileName),
+  )
+  let foreign: unknown
+  let missing: unknown
+  try {
+    await screen.getPartnerTerminalTwin(ids.orgA, ids.termB)
+  } catch (error) {
+    foreign = error
+  }
+  try {
+    await screen.getPartnerTerminalTwin(ids.orgA, `missing_${ids.suffix}`)
+  } catch (error) {
+    missing = error
+  }
+  const foreignBody = foreign instanceof NotFoundException ? foreign.getResponse() : null
+  const missingBody = missing instanceof NotFoundException ? missing.getResponse() : null
+  const foreignText = JSON.stringify(foreignBody)
+  assert(
+    '5g. 别家终端与不存在是同一 404，响应不含对方编号或机构名',
+    foreign instanceof NotFoundException
+      && missing instanceof NotFoundException
+      && foreignText === JSON.stringify(missingBody)
+      && foreignText.includes('TERMINAL_NOT_FOUND')
+      && !foreignText.includes(ids.termB)
+      && !foreignText.includes(`SCRN-B-${ids.suffix}`)
+      && !foreignText.includes('大屏机构B'),
+  )
+  const paperTwin = await screen.getAdminTerminalTwin(ids.termB)
+  assert(
+    '5h. 缺纸终端打印机为 error，没有当前任务时 value 为 null',
+    paperTwin.printer.available === true
+      && paperTwin.printer.value.state === 'error'
+      && paperTwin.printer.value.errorLabel === '打印机缺纸'
+      && paperTwin.currentTask.available === true
+      && paperTwin.currentTask.value === null
+      && paperTwin.scanner.available === true
+      && paperTwin.scanner.value.state === 'unknown',
+  )
+  await prisma.scanTask.create({
+    data: {
+      id: `scan_${ids.suffix}`,
+      terminalId: ids.termA,
+      scanType: 'document',
+      status: 'matched',
+      expiresAt: new Date(Date.now() + 60_000),
+    },
+  })
+  cache.clear()
+  const busy = await screen.getAdminTerminalTwin(ids.termA)
+  assert(
+    '5i. 进行中扫描为 busy，今日扫描 +1，打印状态仍优先',
+    busy.scanner.available === true
+      && busy.scanner.value.state === 'busy'
+      && busy.scanner.value.label === null
+      && busy.today.scans === 1
+      && busy.printer.available === true
+      && busy.printer.value.state === 'printing',
+  )
+  await prisma.terminalCapability.create({
+    data: { terminalId: ids.termA, capabilityKey: 'color_print', status: 'available' },
+  })
+  cache.clear()
+  const colorTwin = await screen.getAdminTerminalTwin(ids.termA)
+  assert(
+    '5j. 只有 available 的 color_print 打开彩色，未登记双面仍关闭',
+    colorTwin.printer.available === true
+      && colorTwin.printer.value.colorEnabled === true
+      && colorTwin.printer.value.duplexEnabled === false,
+  )
+  let uniqueCalls = 0
+  const originalUnique = prisma.terminal.findUnique.bind(prisma.terminal)
+  prisma.terminal.findUnique = (async (args?: unknown) => {
+    uniqueCalls += 1
+    return originalUnique(args as never)
+  }) as typeof prisma.terminal.findUnique
+  cache.clear()
+  uniqueCalls = 0
+  await screen.getAdminTerminalTwin(ids.termA)
+  const firstCalls = uniqueCalls
+  await screen.getAdminTerminalTwin(ids.termA)
+  prisma.terminal.findUnique = originalUnique
+  assert(
+    '5k. 孪生第二次命中 15 秒缓存，不再装载终端行',
+    firstCalls >= 2 && uniqueCalls === firstCalls + 1,
+    `first=${firstCalls} second=${uniqueCalls}`,
+  )
+  const offAt = new Date(Date.now() - 34 * 60_000)
+  const offId = `term_scrn_off_${ids.suffix}`
+  const neverId = `term_scrn_never_${ids.suffix}`
+  const claimId = `term_scrn_claim_${ids.suffix}`
+  await prisma.terminal.createMany({
+    data: [
+      { id: offId, terminalCode: `000-OFF-${ids.suffix}`, agentToken: `tok_off_${ids.suffix}`, deviceFingerprint: `fp_off_${ids.suffix}`, orgId: ids.orgA, enabled: true },
+      { id: neverId, terminalCode: `000-NEVER-${ids.suffix}`, agentToken: `tok_nv_${ids.suffix}`, deviceFingerprint: `fp_nv_${ids.suffix}`, orgId: ids.orgA, enabled: true },
+      { id: claimId, terminalCode: `000-CLAIM-${ids.suffix}`, agentToken: `tok_cl_${ids.suffix}`, deviceFingerprint: `fp_cl_${ids.suffix}`, orgId: ids.orgA, enabled: true },
+    ],
+  })
+  await prisma.terminalHeartbeat.create({
+    data: { terminalId: offId, status: 'online', printerStatus: 'paper_empty', createdAt: offAt },
+  })
+  await prisma.printTask.create({
+    data: {
+      id: `pt_claim_${ids.suffix}`,
+      terminalId: claimId,
+      fileUrl: 'https://internal/claim-secret',
+      fileMd5: 'md5claim',
+      paramsJson: JSON.stringify({ fileName: ids.resumeFileName, billablePages: 3, colorMode: 'color' }),
+      status: 'claimed',
+      claimedAt: new Date(),
+    },
+  })
+  const fleet = await loadPartnerFleet(prisma, new Date(), ids.orgA)
+  const fleetText = JSON.stringify(fleet)
+  const offCell = fleet.cells.find((cell) => cell.terminalId === offId)
+  const neverCell = fleet.cells.find((cell) => cell.terminalId === neverId)
+  const claimCell = fleet.cells.find((cell) => cell.terminalId === claimId)
+  assert(
+    '5l. 离线 34 分钟、从未上报、已领取算打印中，机构墙不含别家 terminalId 和文件名',
+    offCell?.alert?.kind === 'offline'
+      && offCell.alert.title === '离线 34 分钟'
+      && offCell.alert.since === offAt.toISOString()
+      && offCell.activity === null
+      && neverCell?.alert?.kind === 'never_reported'
+      && neverCell.alert.title === '从未上报'
+      && neverCell.alert.since === null
+      && neverCell.health === 'unknown'
+      && claimCell?.activity === 'printing'
+      && claimCell.alert?.kind === 'never_reported'
+      && fleet.cells.every((cell) => cell.terminalId !== ids.termB)
+      && !fleetText.includes(ids.termB)
+      && !fleetText.includes(ids.resumeFileName)
+      && !fleetText.includes('https://internal/claim-secret'),
+  )
+  process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-terminal-admin-secret-not-production'
+  process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-terminal-action-secret-not-production'
+  const [{ AuditService }, { AdminTerminalsController }, { TerminalToolboxService }, { TerminalAdminService }, { TerminalAgentService }, { TerminalsService }] = await Promise.all([
+    import('../src/audit/audit.service'),
+    import('../src/terminals/admin-terminals.controller'),
+    import('../src/terminals/terminal-toolbox.service'),
+    import('../src/terminals/terminals-admin.service'),
+    import('../src/terminals/terminals-agent.service'),
+    import('../src/terminals/terminals.service'),
+  ])
+  const audit = new AuditService(prisma)
+  const agent = new TerminalAgentService(prisma, audit)
+  const adminSvc = new TerminalAdminService(prisma, agent, new TerminalToolboxService(prisma), undefined as never)
+  const terminals = new TerminalsService(agent, adminSvc)
+  const controller = new AdminTerminalsController(terminals, undefined as never, audit)
+  const actor = { userId: ids.adminId, role: 'admin' as const, orgId: null }
+  const req = { headers: {} }
+  const auditWhere = { action: 'terminal.profile.update', targetId: `SCRN-B-${ids.suffix}` }
+  const before = await prisma.auditLog.count({ where: auditWhere })
+  let areaError: unknown
+  let pairError: unknown
+  let rangeError: unknown
+  try {
+    await controller.updateProfile(ids.termB, { areaLabel: '一二三四五六七八九十一二三四五六七八九十一' }, actor, req)
+  } catch (error) {
+    areaError = error
+  }
+  try {
+    await controller.updateProfile(ids.termB, { geoLat: 23.1 }, actor, req)
+  } catch (error) {
+    pairError = error
+  }
+  try {
+    await controller.updateProfile(ids.termB, { geoLat: 0, geoLng: 0 }, actor, req)
+  } catch (error) {
+    rangeError = error
+  }
+  const afterReject = await prisma.auditLog.count({ where: auditWhere })
+  const saved = await controller.updateProfile(ids.termB, { areaLabel: ' 越秀区 ', geoLat: 23.125, geoLng: 113.5 }, actor, req)
+  const inclusive = terminalPlacementPatch({ geoLat: CHINA_LAT_MIN, geoLng: CHINA_LNG_MAX })
+  let belowRange: unknown
+  try {
+    terminalPlacementPatch({ geoLat: CHINA_LAT_MIN - 0.01, geoLng: CHINA_LNG_MAX })
+  } catch (error) {
+    belowRange = error
+  }
+  const auditRow = await prisma.auditLog.findFirst({ where: auditWhere, orderBy: { createdAt: 'desc' } })
+  const payload = JSON.parse(auditRow?.payloadJson ?? '{}') as { areaLabel?: string; geoLat?: number; geoLng?: number }
+  const kept = await controller.updateProfile(ids.termB, { displayName: '只改名称' }, actor, req)
+  const cleared = await controller.updateProfile(ids.termB, { geoLat: null, geoLng: null }, actor, req)
+  assert(
+    '5m. 所在区超过 20 字、经纬度不成对或越界被拒绝且不写审计；成功写入有审计；局部更新不抹坐标',
+    areaError instanceof BadRequestException
+      && JSON.stringify((areaError as BadRequestException).getResponse()).includes('TERMINAL_AREA_LABEL_INVALID')
+      && pairError instanceof BadRequestException
+      && JSON.stringify((pairError as BadRequestException).getResponse()).includes('TERMINAL_GEO_INVALID')
+      && rangeError instanceof BadRequestException
+      && JSON.stringify((rangeError as BadRequestException).getResponse()).includes('TERMINAL_GEO_INVALID')
+      && afterReject === before
+      && saved.data.areaLabel === '越秀区'
+      && saved.data.geoLat === 23.125
+      && saved.data.geoLng === 113.5
+      && inclusive.geoLat === CHINA_LAT_MIN
+      && inclusive.geoLng === CHINA_LNG_MAX
+      && belowRange instanceof BadRequestException
+      && payload.areaLabel === '越秀区'
+      && payload.geoLat === 23.125
+      && payload.geoLng === 113.5
+      && kept.data.displayName === '只改名称'
+      && kept.data.areaLabel === '越秀区'
+      && kept.data.geoLat === 23.125
+      && cleared.data.geoLat === null
+      && cleared.data.geoLng === null
+      && cleared.data.areaLabel === '越秀区',
+  )
+}
+
 async function assertHttp(
   prisma: PrismaService,
-  ids: { adminId: string; userA: string; orgA: string; userBlank: string },
+  ids: {
+    adminId: string
+    userA: string
+    orgA: string
+    orgB: string
+    userBlank: string
+    termA: string
+    termB: string
+    suffix: string
+    resumeFileName: string
+  },
 ): Promise<void> {
   if (process.env['CONSOLE_SCREEN_SKIP_HTTP'] === '1') {
     console.log('  SKIP HTTP（CONSOLE_SCREEN_SKIP_HTTP=1）')
@@ -1298,6 +1750,52 @@ async function assertHttp(
         && !blankText.includes('B岗1')
         && !/"published":\s*[1-9]/.test(blankText),
       `status=${blankRes.status} body=${blankText.slice(0, 200)}`,
+    )
+
+    const twinUnauth = await fetch(`${base}/admin/screen/terminals/${ids.termA}`)
+    assert('5n. 无 token 访问终端孪生为 401', twinUnauth.status === 401, `status=${twinUnauth.status}`)
+    const twinRole = await fetch(`${base}/admin/screen/terminals/${ids.termA}`, { headers: partnerAuth })
+    assert('5o. partner 调 admin 孪生为 403', twinRole.status === 403, `status=${twinRole.status}`)
+    const adminTwinRes = await fetch(`${base}/admin/screen/terminals/${ids.termA}`, { headers: adminAuth })
+    const adminTwinBody = await adminTwinRes.json() as { success?: boolean; data?: { terminal?: { id?: string }; printer?: { value?: { colorEnabled?: boolean } } } }
+    const adminTwinText = JSON.stringify(adminTwinBody)
+    assert(
+      '5p. Admin 孪生走 ApiResponse，且响应 JSON 不含中文文件名',
+      adminTwinRes.status === 200
+        && adminTwinBody.success === true
+        && adminTwinBody.data?.terminal?.id === ids.termA
+        && adminTwinBody.data?.printer?.value?.colorEnabled === true
+        && !adminTwinText.includes(ids.resumeFileName)
+        && !adminTwinText.includes('fileName'),
+      adminTwinText.slice(0, 240),
+    )
+    const partnerTwinRes = await fetch(`${base}/partner/screen/terminals/${ids.termA}`, { headers: partnerAuth })
+    const partnerTwinBody = await partnerTwinRes.json() as { audience?: string; success?: boolean; terminal?: { id?: string } }
+    assert(
+      '5q. Partner 孪生是裸对象',
+      partnerTwinRes.status === 200
+        && partnerTwinBody.audience === 'partner'
+        && partnerTwinBody.success === undefined
+        && partnerTwinBody.terminal?.id === ids.termA,
+    )
+    const foreignRes = await fetch(`${base}/partner/screen/terminals/${ids.termB}?orgId=${ids.orgB}`, { headers: partnerAuth })
+    const missingRes = await fetch(`${base}/partner/screen/terminals/missing_${ids.suffix}`, { headers: partnerAuth })
+    const foreignHttp = await foreignRes.text()
+    const missingHttp = await missingRes.text()
+    const normalize404 = (text: string) => {
+      const body = JSON.parse(text) as { requestId?: string }
+      delete body.requestId
+      return JSON.stringify(body)
+    }
+    assert(
+      '5r. HTTP 上别家终端与不存在同一 404，query orgId 不能改范围',
+      foreignRes.status === 404
+        && missingRes.status === 404
+        && normalize404(foreignHttp) === normalize404(missingHttp)
+        && !foreignHttp.includes(`SCRN-B-${ids.suffix}`)
+        && !foreignHttp.includes('大屏机构B')
+        && !foreignHttp.includes(ids.resumeFileName),
+      `foreign=${foreignRes.status} ${foreignHttp.slice(0, 180)} missing=${missingRes.status}`,
     )
   } finally {
     await app.close()
