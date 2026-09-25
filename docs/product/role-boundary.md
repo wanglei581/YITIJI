@@ -8,6 +8,13 @@
 > **强制约束**:本文档与 [CLAUDE.md §1+§2](../../CLAUDE.md)、
 > [compliance-boundary.md](../compliance/compliance-boundary.md)、
 > [feature-scope.md](feature-scope.md) 共同生效。冲突时以 CLAUDE.md 为准。
+>
+> **2026-09-26 口径变更预告（产品负责人已决定，代码尚未切换）：** 招聘相关内容（岗位、招聘会、
+> 企业资料、政策）改由运营机构自己审核、发布、署名，我方管理员后台对这些内容只保留紧急下架。
+> 本文 §1「可以做信息聚合入口」、§3 收益模式（数据接入费、上架费、流量结算）、§4 Admin 的
+> 「审核 / 发布」、§6 路径 A / B 将在 [next-tasks.md](../progress/next-tasks.md) 步骤 3.12 改写。
+> 改写前以 [compliance-boundary.md §1.1](../compliance/compliance-boundary.md) 为准：
+> **不要按本文 §3 / §6 新增功能或收费，也不要在管理员侧新增代建或发布招聘类内容的功能。**
 
 ---
 
