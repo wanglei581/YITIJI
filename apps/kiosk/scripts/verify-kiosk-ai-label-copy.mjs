@@ -2,6 +2,15 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import {
+  createVisibleCopyReader,
+  findConstInitializer,
+  jsxTagName,
+  parseMarkdownTable,
+  parseSource,
+  stringObject,
+  unwrap,
+} from './lib/visible-copy.mjs'
 
 // ============================================================
 // verify:kiosk-ai-label-copy — 一体机 AI 可见标识与合同审查对外文案（next-tasks 3.5c）
@@ -24,8 +33,7 @@ import ts from 'typescript'
 //      并且用了审计给的替换句。
 //   D. 语音通话面板在五态共用的页头里明说「小青是 AI 数字人，形象与声音由 AI 生成」。
 //
-// 「可见文字」按 TypeScript AST 取：字符串字面量、模板串、JSX 文本（按 JSX 规则折行）、
-// JSX 属性值，以及对共享文案常量的引用（解析成取值）。注释不是节点，所以不算可见文字。
+// 「可见文字」的取法见 lib/visible-copy.mjs（TypeScript AST；注释不算可见文字）。
 // 简历对照（jobFit/**、JobFit*.tsx）与岗位 / 招聘会 / 首页 / 我的 由另一路改，不在本门禁范围。
 // ============================================================
 
@@ -34,6 +42,8 @@ const REPO = join(KIOSK, '../..')
 const AUDIT_PATH = 'docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md'
 const BOUNDARY_PATH = 'docs/compliance/compliance-boundary.md'
 const SHARED_COPY_PATH = 'packages/shared/src/types/complianceCopy.ts'
+const AI_GENERATED = 'AI 生成'
+const FOR_REFERENCE = '仅供参考'
 
 const failures = []
 let passed = 0
@@ -58,60 +68,45 @@ const readRepo = (relativePath) => readFileSync(join(REPO, relativePath), 'utf8'
 
 // ── 审计与合规文档 ─────────────────────────────────────────────────────────
 
-const auditSource = readRepo(AUDIT_PATH)
-const auditLines = auditSource.split('\n')
+const auditLines = readRepo(AUDIT_PATH).split('\n')
 
-function parseAuditTable(heading, expectedColumns) {
-  const headingIndex = auditLines.findIndex((line) => line.includes(heading))
-  if (headingIndex === -1) hardFail(`${AUDIT_PATH} 找不到表格标题 ${heading}`)
-  let cursor = headingIndex + 1
-  while (cursor < auditLines.length && !auditLines[cursor].startsWith('|')) cursor += 1
-  const header = auditLines[cursor]?.split('|').slice(1, -1).map((cell) => cell.trim()) ?? []
-  if (header.join('|') !== expectedColumns.join('|')) {
-    hardFail(`${heading} 表头变了（实测 ${header.join(' / ')}），先对齐本门禁的列定义`)
+function auditTable(heading, columns) {
+  try {
+    return parseMarkdownTable(auditLines, heading, columns)
+  } catch (error) {
+    return hardFail(`${AUDIT_PATH} ${error.message}`)
   }
-  const rows = []
-  for (let lineIndex = cursor + 2; lineIndex < auditLines.length && auditLines[lineIndex].startsWith('|'); lineIndex += 1) {
-    const cells = auditLines[lineIndex].split('|').slice(1, -1).map((cell) => cell.trim())
-    if (cells.length !== expectedColumns.length) hardFail(`${heading} 第 ${rows.length + 1} 行列数不对（L${lineIndex + 1}）`)
-    rows.push({ table: heading, index: rows.length + 1, line: lineIndex + 1, cells })
-  }
-  if (rows.length === 0) hardFail(`${heading} 没有数据行`)
-  return rows
 }
 
-const TABLE_ONE = parseAuditTable('**表一「AI 标识覆盖」**', ['功能', '展示或导出位置（文件:行）', '显式标识', '隐式标识', '建议'])
-const TABLE_TWO = parseAuditTable('**表二「冲突文案」**', ['端', '文件:行', '原文', '问题', '建议改成'])
+const TABLE_ONE = auditTable('**表一「AI 标识覆盖」**', ['功能', '展示或导出位置（文件:行）', '显式标识', '隐式标识', '建议'])
+const TABLE_TWO = auditTable('**表二「冲突文案」**', ['端', '文件:行', '原文', '问题', '建议改成'])
 
-function tag(row, name) {
+function auditRow(row, name) {
   const table = row.table.includes('表一') ? '表一' : '表二'
-  return `[审计${table}#${row.index}「${name}」L${row.line}]`
+  return { row, label: `[审计${table}#${row.index}「${name}」L${row.line}]`, current: row.cells[2], advice: row.cells[4] }
 }
 
 /** 表一按「功能」列精确找行。 */
 function tableOneRow(feature) {
   const row = TABLE_ONE.find((candidate) => candidate.cells[0] === feature)
-  if (!row) hardFail(`审计表一没有「${feature}」这一行`)
-  return { row, label: tag(row, feature), current: row.cells[2], advice: row.cells[4] }
+  return row ? auditRow(row, feature) : hardFail(`审计表一没有「${feature}」这一行`)
 }
 
 /** 表二按「端 = 一体机」+「文件:行」列里的文件名找行。 */
 function tableTwoRow(fileName) {
   const row = TABLE_TWO.find((candidate) => candidate.cells[0] === '一体机' && candidate.cells[1].includes(fileName))
-  if (!row) hardFail(`审计表二没有一体机「${fileName}」这一行`)
-  return { row, label: tag(row, fileName), current: row.cells[2], advice: row.cells[4] }
+  return row ? auditRow(row, fileName) : hardFail(`审计表二没有一体机「${fileName}」这一行`)
 }
 
 /** 本门禁写死的期望句必须就是审计那一行写的 —— 期望来自审计，不来自当前代码。 */
-function adviceSays(auditRow, sentence) {
-  check(auditRow.advice.includes(sentence), `${auditRow.label} 审计建议栏写的就是「${sentence}」`)
+function adviceSays(row, sentence) {
+  check(row.advice.includes(sentence), `${row.label} 审计建议栏写的就是「${sentence}」`)
   return sentence
 }
 
 /** 要退场的旧说法必须是审计那一行引用过的原文。 */
-function auditQuotes(auditRow, oldWording) {
-  check(auditRow.current.includes(`「${oldWording}」`), `${auditRow.label} 审计原文栏引用过旧说法「${oldWording}」`)
-  return oldWording
+function auditQuotes(row, oldWording) {
+  check(row.current.includes(`「${oldWording}」`), `${row.label} 审计原文栏引用过旧说法「${oldWording}」`)
 }
 
 const boundaryLines = readRepo(BOUNDARY_PATH).split('\n')
@@ -123,51 +118,9 @@ const bannedRuleLineIndex = auditLines.findIndex((line) => line.startsWith('3. �
 if (bannedRuleLineIndex === -1) hardFail(`${AUDIT_PATH}「建议新增的门禁断言」找不到第 3 条（合同审查对外文案）`)
 const BANNED_RULE_TAG = `[审计「建议新增的门禁断言」第 3 条 L${bannedRuleLineIndex + 1}]`
 
-// ── TypeScript AST 工具 ──────────────────────────────────────────────────
+// ── 共享文案与可见文字读取器 ──────────────────────────────────────────────
 
-function parse(absolutePath) {
-  const kind = absolutePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-  return ts.createSourceFile(absolutePath, readFileSync(absolutePath, 'utf8'), ts.ScriptTarget.Latest, true, kind)
-}
-
-function unwrap(expression) {
-  let current = expression
-  while (current && (ts.isAsExpression(current) || ts.isParenthesizedExpression(current) || ts.isSatisfiesExpression(current))) {
-    current = current.expression
-  }
-  return current
-}
-
-function findConstInitializer(sourceFile, name) {
-  let found = null
-  const visit = (node) => {
-    if (found) return
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name && node.initializer) {
-      found = node.initializer
-      return
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(sourceFile)
-  return found
-}
-
-function stringObject(sourceFile, name) {
-  const initializer = unwrap(findConstInitializer(sourceFile, name))
-  if (!initializer || !ts.isObjectLiteralExpression(initializer)) return null
-  const map = new Map()
-  for (const property of initializer.properties) {
-    if (!ts.isPropertyAssignment(property)) continue
-    if (!ts.isIdentifier(property.name) && !ts.isStringLiteral(property.name)) continue
-    const value = unwrap(property.initializer)
-    map.set(property.name.text, ts.isStringLiteralLike(value) ? value.text : null)
-  }
-  return map
-}
-
-// ── A. 共享文案 ──────────────────────────────────────────────────────────
-
-const sharedSource = parse(join(REPO, SHARED_COPY_PATH))
+const sharedSource = parseSource(join(REPO, SHARED_COPY_PATH))
 const SHARED = {
   AI_LABEL_COPY: stringObject(sharedSource, 'AI_LABEL_COPY'),
   COMPLIANCE_COPY: stringObject(sharedSource, 'COMPLIANCE_COPY'),
@@ -175,135 +128,25 @@ const SHARED = {
 for (const [name, map] of Object.entries(SHARED)) {
   if (!map) hardFail(`${SHARED_COPY_PATH} 找不到 export const ${name} 对象字面量`)
 }
-
-function isSharedAccess(expression, objectName, key) {
-  const node = unwrap(expression)
-  return Boolean(
-    node &&
-      ts.isPropertyAccessExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === objectName &&
-      (key === undefined || node.name.text === key),
-  )
-}
-
-function resolveText(expression, bindings) {
-  const node = unwrap(expression)
-  if (!node) return null
-  if (ts.isStringLiteralLike(node)) return node.text
-  if (ts.isTemplateExpression(node)) {
-    let text = node.head.text
-    for (const span of node.templateSpans) text += (resolveText(span.expression, bindings) ?? '') + span.literal.text
-    return text
-  }
-  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && SHARED[node.expression.text]) {
-    return SHARED[node.expression.text].get(node.name.text) ?? null
-  }
-  if (ts.isIdentifier(node) && Object.hasOwn(bindings, node.text)) return bindings[node.text]
-  return null
-}
+const { componentText, isSharedAccess, resolveText, collectVisible } = createVisibleCopyReader(SHARED)
 
 // AigcMark 显示的是 AiEvidence.tsx 的 AIGC_MARK_TEXT，它必须绑在共享底句上。
-const aiEvidenceSource = parse(join(KIOSK, 'src/ai/AiEvidence.tsx'))
+const aiEvidenceSource = parseSource(join(KIOSK, 'src/ai/AiEvidence.tsx'))
 const aigcMarkInitializer = findConstInitializer(aiEvidenceSource, 'AIGC_MARK_TEXT')
-const AIGC_MARK_TEXT = aigcMarkInitializer ? resolveText(aigcMarkInitializer, {}) : null
-
-/** JSX 文本按 JSX 规则折行：带换行的空白收成一个空格，首尾整行空白去掉。 */
-function normalizeJsxText(raw) {
-  const lines = raw.split(/\r?\n/)
-  if (lines.length === 1) return raw
-  return lines
-    .map((line, index) => {
-      let text = line
-      if (index > 0) text = text.replace(/^[ \t]+/, '')
-      if (index < lines.length - 1) text = text.replace(/[ \t]+$/, '')
-      return text
-    })
-    .filter((text) => text.length > 0)
-    .join(' ')
-}
-
-function jsxTagName(node) {
-  const opening = ts.isJsxElement(node) ? node.openingElement : node
-  return opening.tagName.getText()
-}
-
-function jsxTextContent(node, bindings) {
-  if (ts.isJsxText(node)) return normalizeJsxText(node.text)
-  if (ts.isJsxExpression(node)) return node.expression ? (resolveText(node.expression, bindings) ?? '') : ''
-  if (ts.isJsxElement(node) || ts.isJsxFragment(node)) return node.children.map((child) => jsxTextContent(child, bindings)).join('')
-  if (ts.isJsxSelfClosingElement(node)) return jsxTagName(node) === 'AigcMark' ? (AIGC_MARK_TEXT ?? '') : ''
-  return ''
-}
-
-/**
- * 收集一段源码（整文件或某个 JSX 子树）里用户看得到的文字，以及它引用了哪些共享文案键、渲染了哪些组件。
- *
- * - `units`：拼好的文字单元（整个 JSX 元素的文字、整条模板串、属性值…），用来判断「有没有」。
- *   同一处文字会出现在多个单元里（外层元素包含内层），所以**不能拿 units 计数**。
- * - `sites`：每个源码位置只记一次的叶子（字符串、模板片段、JSX 文本、共享文案引用、绑定常量、AigcMark），
- *   用来判断「出现了几处」。
- */
-function collectVisible(root, bindings = {}) {
-  const units = []
-  const sites = []
-  const sharedRefs = []
-  const tags = []
-  const site = (node, text) => {
-    if (text) sites.push({ pos: node.getStart(), text })
-  }
-  const visit = (node) => {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node) || ts.isLiteralTypeNode(node)) return
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      units.push(node.text)
-      site(node, node.text)
-    } else if (ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
-      site(node, node.text)
-    } else if (ts.isTemplateExpression(node)) {
-      units.push(resolveText(node, bindings) ?? '')
-    } else if (ts.isJsxText(node)) {
-      site(node, normalizeJsxText(node.text).trim())
-    } else if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && SHARED[node.expression.text]) {
-      sharedRefs.push(`${node.expression.text}.${node.name.text}`)
-      const value = SHARED[node.expression.text].get(node.name.text)
-      if (typeof value === 'string') {
-        units.push(value)
-        site(node, value)
-      }
-    } else if (ts.isJsxElement(node) || ts.isJsxFragment(node)) {
-      units.push(jsxTextContent(node, bindings))
-    } else if (ts.isJsxAttribute(node) && node.initializer && ts.isJsxExpression(node.initializer) && node.initializer.expression) {
-      const value = resolveText(node.initializer.expression, bindings)
-      if (value) units.push(value)
-    } else if (ts.isJsxExpression(node) && node.expression && ts.isIdentifier(node.expression) && Object.hasOwn(bindings, node.expression.text)) {
-      units.push(bindings[node.expression.text])
-      site(node, bindings[node.expression.text])
-    }
-    if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
-      const name = node.tagName.getText()
-      tags.push(name)
-      if (name === 'AigcMark' && AIGC_MARK_TEXT) {
-        units.push(AIGC_MARK_TEXT)
-        site(node, AIGC_MARK_TEXT)
-      }
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(root)
-  return { units: units.filter((unit) => unit.length > 0), sites, sharedRefs, tags }
-}
+const AIGC_MARK_TEXT = aigcMarkInitializer ? resolveText(aigcMarkInitializer) : null
+if (AIGC_MARK_TEXT) componentText.set('AigcMark', AIGC_MARK_TEXT)
 
 const visibleCache = new Map()
 function visibleOf(relativeKioskPath, bindings = {}) {
   const key = `${relativeKioskPath}::${JSON.stringify(bindings)}`
-  if (!visibleCache.has(key)) visibleCache.set(key, collectVisible(parse(join(KIOSK, relativeKioskPath)), bindings))
+  if (!visibleCache.has(key)) visibleCache.set(key, collectVisible(parseSource(join(KIOSK, relativeKioskPath)), bindings))
   return visibleCache.get(key)
 }
 
-const AI_GENERATED = 'AI 生成'
-const FOR_REFERENCE = '仅供参考'
-
 console.log('\n=== 一体机 AI 可见标识与合同审查对外文案（next-tasks 3.5c）===')
+
+// ── A. 共享文案取值逐字来自审计 ───────────────────────────────────────────
+
 console.log('\n-- A. 共享文案取值逐字来自审计 --')
 
 const diagnosisRow = tableOneRow('简历诊断（屏）')
@@ -382,27 +225,22 @@ findAigcRender(aiEvidenceSource)
 check(aigcMarkRendersText, `${careerRow.label} AigcMark 组件把 {AIGC_MARK_TEXT} 渲染到屏上`)
 
 // 优化 / 生成预览页徽标：AIGC_SCREEN_MARK 绑在共享句上，徽标组件把它渲染出来。
-const deliverConstants = parse(join(KIOSK, 'src/pages/resume/components/resume-deliver/constants.ts'))
+const deliverConstants = parseSource(join(KIOSK, 'src/pages/resume/components/resume-deliver/constants.ts'))
+const screenMarkInitializer = findConstInitializer(deliverConstants, 'AIGC_SCREEN_MARK')
 check(
-  isSharedAccess(findConstInitializer(deliverConstants, 'AIGC_SCREEN_MARK'), 'AI_LABEL_COPY', 'RESUME_OPTIMIZE'),
+  isSharedAccess(screenMarkInitializer, 'AI_LABEL_COPY', 'RESUME_OPTIMIZE'),
   `${optimizeRow.label} resume-deliver/constants.ts 的 AIGC_SCREEN_MARK 绑定 AI_LABEL_COPY.RESUME_OPTIMIZE`,
 )
-const AIGC_SCREEN_MARK = resolveText(findConstInitializer(deliverConstants, 'AIGC_SCREEN_MARK'), {}) ?? ''
+const AIGC_SCREEN_MARK = resolveText(screenMarkInitializer) ?? ''
 
 // ── B. AI 结果面 ─────────────────────────────────────────────────────────
 
 console.log('\n-- B. 审计列出的一体机 AI 结果面挂同一套标识 --')
 
 /**
- * @typedef Surface
- * @property {{label: string, current: string}} audit 审计行
- * @property {string} file 一体机源码（相对 apps/kiosk）
- * @property {string} [labelKey] 该面必须引用的 AI_LABEL_COPY 键
- * @property {boolean} [aigcMark] 该面必须渲染 <AigcMark />
- * @property {Record<string, string>} [bindings] 该面 JSX 里渲染的本地常量 → 取值
- * @property {string[]} [retired] 审计原文栏引用、必须退场的旧说法
+ * labelKey：该面必须引用的 AI_LABEL_COPY 键；aigcMark：该面必须渲染 <AigcMark />；
+ * bindings / rendersBinding：该面 JSX 里渲染的本地常量；retired：审计原文栏引用、必须退场的旧说法。
  */
-/** @type {Surface[]} */
 const SURFACES = [
   { audit: diagnosisRow, file: 'src/pages/resume/ResumeReportPage.tsx', labelKey: 'RESUME_DIAGNOSIS', retired: ['供本人修改简历时参考'] },
   { audit: optimizeRow, file: 'src/pages/resume/components/resume-compare/ResumeCompareCard.tsx', labelKey: 'RESUME_OPTIMIZE', retired: ['AI 生成，仅供本人核对'] },
@@ -433,7 +271,6 @@ for (const surface of SURFACES) {
     units.some((unit) => unit.includes(AI_GENERATED) && unit.includes(FOR_REFERENCE)),
     `${where} 可见文字里有一句同时含「${AI_GENERATED}」与「${FOR_REFERENCE}」`,
   )
-
   if (surface.labelKey) {
     const sentence = EXPECTED_AI_LABELS[surface.labelKey].sentence
     check(sharedRefs.includes(`AI_LABEL_COPY.${surface.labelKey}`), `${where} 引用共享标识 AI_LABEL_COPY.${surface.labelKey}`)
@@ -470,9 +307,8 @@ check(contractFiles.length >= 3, `${BANNED_RULE_TAG} 合同审查目录至少扫
 
 const LEGAL_SCAN_FILES = [...contractFiles, 'src/pages/assistant/advisorScenes.ts']
 for (const file of LEGAL_SCAN_FILES) {
-  const { units } = visibleOf(file)
   // 比对前去掉空白：JSX 折行不能把「法律 意见」拆开放行。
-  const flattened = units.map((unit) => unit.replace(/\s+/g, ''))
+  const flattened = visibleOf(file).units.map((unit) => unit.replace(/\s+/g, ''))
   for (const phrase of BANNED_LEGAL_PHRASES) {
     const hit = flattened.find((unit) => unit.includes(phrase))
     check(!hit, `${BANNED_RULE_TAG} ${file} 可见文字不含「${phrase}」${hit ? `（命中：${hit.slice(0, 40)}…）` : ''}`)
@@ -480,8 +316,7 @@ for (const file of LEGAL_SCAN_FILES) {
 }
 
 // 审计这一行引用了两处（页头副标题与知情同意首句），按源码位置计数，一处只算一次。
-const homeVisible = visibleOf(`${contractDir}/ContractReviewHomePage.tsx`)
-const homeScopeSites = homeVisible.sites.filter((entry) => entry.text.includes(CONTRACT_SCOPE)).length
+const homeScopeSites = visibleOf(`${contractDir}/ContractReviewHomePage.tsx`).sites.filter((entry) => entry.text.includes(CONTRACT_SCOPE)).length
 check(homeScopeSites >= 2, `${contractHomeRow.label} 首页页头与知情同意两处都写「${CONTRACT_SCOPE}」（实测 ${homeScopeSites} 处）`)
 check(
   visibleOf(`${contractDir}/ContractReviewProcessingPage.tsx`).units.some((unit) => unit.includes(CONTRACT_PROCESSING)),
@@ -493,21 +328,18 @@ check(
 )
 
 // 顾问场景：审计引用了 Offer 对比（欢迎语与免责）和 HR 知识问答（免责）。
-const scenesSource = parse(join(KIOSK, 'src/pages/assistant/advisorScenes.ts'))
-const scenes = unwrap(findConstInitializer(scenesSource, 'TOOLBOX_ASSISTANT_SCENES'))
+const scenes = unwrap(findConstInitializer(parseSource(join(KIOSK, 'src/pages/assistant/advisorScenes.ts')), 'TOOLBOX_ASSISTANT_SCENES'))
 if (!scenes || !ts.isObjectLiteralExpression(scenes)) hardFail('advisorScenes.ts 找不到 TOOLBOX_ASSISTANT_SCENES 对象字面量')
 function sceneField(sceneKey, field) {
   const scene = scenes.properties.find((property) => ts.isPropertyAssignment(property) && property.name.getText() === sceneKey)
-  if (!scene || !ts.isObjectLiteralExpression(unwrap(scene.initializer))) return null
-  const entry = unwrap(scene.initializer).properties.find((property) => ts.isPropertyAssignment(property) && property.name.getText() === field)
-  return entry ? resolveText(entry.initializer, {}) : null
+  const body = scene ? unwrap(scene.initializer) : null
+  if (!body || !ts.isObjectLiteralExpression(body)) return null
+  const entry = body.properties.find((property) => ts.isPropertyAssignment(property) && property.name.getText() === field)
+  return entry ? resolveText(entry.initializer) : null
 }
 for (const [sceneKey, field] of [['offer_compare', 'welcome'], ['offer_compare', 'disclaimer'], ['hr_qa', 'disclaimer']]) {
   const text = sceneField(sceneKey, field)
-  check(
-    typeof text === 'string' && text.includes(ADVISOR_PERSONAL_CHECK),
-    `${advisorScenesRow.label} ${sceneKey}.${field} 写「${ADVISOR_PERSONAL_CHECK}」`,
-  )
+  check(typeof text === 'string' && text.includes(ADVISOR_PERSONAL_CHECK), `${advisorScenesRow.label} ${sceneKey}.${field} 写「${ADVISOR_PERSONAL_CHECK}」`)
 }
 
 // ── D. 数字人披露 ────────────────────────────────────────────────────────
@@ -515,7 +347,6 @@ for (const [sceneKey, field] of [['offer_compare', 'welcome'], ['offer_compare',
 console.log('\n-- D. 语音通话明说小青是 AI 数字人 --')
 
 const callPanelPath = 'src/pages/assistant/AssistantCallPanel.tsx'
-const callPanelSource = parse(join(KIOSK, callPanelPath))
 let voiceHeader = null
 const findHeader = (node) => {
   if (voiceHeader) return
@@ -530,15 +361,12 @@ const findHeader = (node) => {
   }
   ts.forEachChild(node, findHeader)
 }
-findHeader(callPanelSource)
+findHeader(parseSource(join(KIOSK, callPanelPath)))
 check(Boolean(voiceHeader), `${DIGITAL_HUMAN_TAG} ${callPanelPath} 找到语音对话框页头 <header className="assistant-voice-header">`)
 
 if (voiceHeader) {
   const headerVisible = collectVisible(voiceHeader)
-  check(
-    headerVisible.sharedRefs.includes('AI_LABEL_COPY.DIGITAL_HUMAN'),
-    `${DIGITAL_HUMAN_TAG} 语音对话框页头引用 AI_LABEL_COPY.DIGITAL_HUMAN`,
-  )
+  check(headerVisible.sharedRefs.includes('AI_LABEL_COPY.DIGITAL_HUMAN'), `${DIGITAL_HUMAN_TAG} 语音对话框页头引用 AI_LABEL_COPY.DIGITAL_HUMAN`)
   check(
     headerVisible.units.some((unit) => unit.includes(DIGITAL_HUMAN_SENTENCE)),
     `${DIGITAL_HUMAN_TAG} 语音对话框页头写「${DIGITAL_HUMAN_SENTENCE}」`,
