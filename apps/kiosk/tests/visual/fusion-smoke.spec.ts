@@ -10,7 +10,7 @@ const kioskScenarios = [
 
 const mobileScenarios = [
   { path: '/member/qr-login', landmark: '这个链接不能用来登录' },
-  { path: '/upload/phone', landmark: '上传链接已失效' },
+  { path: '/upload/phone', landmark: '这个链接不能用来上传' },
 ] as const
 
 function collectRuntimeErrors(page: Page): string[] {

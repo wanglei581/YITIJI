@@ -462,9 +462,11 @@ check('W2-W5 state coverage', () => {
     "page.goto('/member/qr-login?ticketId=w5-expired-ticket')",
     "root.getByRole('button', { name: '重新检查二维码', exact: true })",
   ])
-  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'phone upload keeps the explicit expired-link state at 390x844 @w5-mobile'", [
+  // 稿 51：缺 sessionId / token 只说明链接不成立，与「过期 / 已用过」无关，锚点随之从「已失效」换成「不能用来上传」。
+  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'phone upload keeps the explicit invalid-link state at 390x844 @w5-mobile'", [
     "page.goto('/upload/phone')",
-    "root.getByText('上传链接已失效', { exact: true })",
+    "root.getByRole('heading', { name: '这个链接不能用来上传', exact: true })",
+    "root.getByText('上传链接已失效')).toHaveCount(0)",
   ])
 
   const paymentSource = readKiosk('tests/visual/fusion-w2-print.spec.ts')

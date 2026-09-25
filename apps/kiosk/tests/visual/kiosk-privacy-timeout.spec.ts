@@ -1401,14 +1401,14 @@ test('mobile QR login is exempt from the kiosk hard privacy deadline @privacy-mo
 test('phone upload is exempt from the kiosk hard privacy deadline @privacy-mobile', async ({ page }) => {
   await page.goto('/upload/phone')
   await expect(page.locator('main[data-kiosk-screen="phone-upload"]')).toBeVisible()
-  await expect(page.getByText('上传链接已失效', { exact: true })).toBeVisible()
+  await expect(page.getByText('这个链接不能用来上传', { exact: true })).toBeVisible()
   await markCurrentDocument(page, 'phone-upload-document')
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
 
   expect(new URL(page.url()).pathname).toBe('/upload/phone')
   expect(await readDocumentMarker(page)).toBe('phone-upload-document')
-  await expect(page.getByText('上传链接已失效', { exact: true })).toBeVisible()
+  await expect(page.getByText('这个链接不能用来上传', { exact: true })).toBeVisible()
 })
 
 // ── 扫描任务撤销：换人之前必须把服务端那份收掉 ─────────────────────────────

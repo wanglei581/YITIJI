@@ -204,7 +204,7 @@ test('mobile fixture keeps every primitive inside the 390px viewport @w1-mobile'
 
 for (const scenario of [
   { path: '/member/qr-login', landmark: '这个链接不能用来登录' },
-  { path: '/upload/phone', landmark: '上传链接已失效' },
+  { path: '/upload/phone', landmark: '这个链接不能用来上传' },
 ] as const) {
   test(`production ${scenario.path} keeps the mobile fusion contract @w1-mobile`, async ({ page, api }) => {
     void api

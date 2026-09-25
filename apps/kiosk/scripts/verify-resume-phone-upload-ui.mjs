@@ -196,6 +196,7 @@ function assertRefreshButtonLockedWhileUploaded(src, label) {
 const source = read('src/pages/resume/ResumeSourcePage.tsx')
 const panel = read('src/pages/upload/components/UploadSessionQrPanel.tsx')
 const phone = read('src/pages/upload/PhoneUploadPage.tsx')
+const phoneModel = read('src/pages/upload/phoneUploadModel.ts')
 const routes = read('src/routes/index.tsx')
 const api = read('src/services/api/uploadSessions.ts')
 const usbPanel = read('src/pages/resume/components/ResumeUsbImportPanel.tsx')
@@ -260,17 +261,24 @@ assertIncludes(panel, 'uploadSessionUserMessage', 'Kiosk QR errors use public-sa
 assertIncludes(api, 'url.hash = fragment.toString()', 'phone upload token stays in URL fragment')
 assertIncludes(phone, '一体机上确认', 'phone page explains kiosk confirmation')
 assertIncludes(phone, 'PHONE_UPLOAD_PURPOSES', 'phone page maps each supported purpose explicitly')
-assertIncludes(phone, '签名或印章图片', 'signature uploads use their own mobile copy and file filter')
+// 稿 51 ⑥：CreateUploadSessionDto 的 @IsIn 不含 signature_image，一体机开不出这种会话。
+// 手机端不给它任何「看起来能走通」的上传配置，只给诚实不可用态，并指回现场已验证的「本机上传」。
+assertIncludes(phoneModel, "if (purpose === 'signature_image') return 'signature-blocked'", 'signature links are an honest dead end, not an upload flow')
+assertIncludes(phoneModel, '签名 / 印章暂不支持手机上传', 'signature dead end tells the user it is unavailable on the phone')
+assertNotIncludes(phone, 'signature_image', 'phone page offers no signature_image purpose config or file filter')
+// 稿 51 ⑧：fragment 里的 purpose 可被随手改掉，上传前只按受支持用途 accept 的交集放行。
+assertIncludes(phone, 'genericPolicy(SESSION_PURPOSES.map((purpose) => purposes[purpose].accept))', 'phone pre-upload filter is the intersection of all supported purposes')
 assertNotIncludes(phone, '就业服务大厅 · 01号机', 'phone page does not invent a terminal name')
 assertIncludes(phone, 'uploadSessionUserMessage', 'phone upload errors use public-safe copy')
 assertIncludes(phone, "state !== 'success'", 'successful uploads cannot be reset into a false re-upload state')
 assertIncludes(phone, 'location.hash', 'phone page reads fragment upload token')
 assertNotIncludes(phone, 'useSearchParams', 'phone page does not read upload token from query string')
 assertNotIncludes(phone, 'searchParams.get', 'phone page does not fall back to query token')
+// 稿 51：确认用途前可访问名不能跟着未经核对的 purpose 变（那等于把提示读成结论），accept 同样只认交集。
 assertMatches(
   phone,
-  /<input\b(?=[^>]*\btype=(?:"file"|'file'))(?=[^>]*\baria-label=\{\s*`选择\$\{fileNoun\}`\s*\})[^>]*>/,
-  'phone upload file input keeps a dynamic accessible label',
+  /<input\b(?=[^>]*\btype=(?:"file"|'file'))(?=[^>]*\baccept=\{\s*policy\.accept\s*\})(?=[^>]*\baria-label="选择要上传的文件")[^>]*>/,
+  'phone upload file input uses the generic policy and a label that does not echo the unverified purpose',
 )
 assertIncludes(source, 'aria-label="选择本机简历文件"', 'resume source file input has accessible label')
 assertIncludes(routes, '/upload/phone', 'phone upload route is registered')

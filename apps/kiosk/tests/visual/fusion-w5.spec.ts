@@ -698,32 +698,91 @@ test('mobile QR login renders a real API error and touch-safe retry @w5-mobile',
   await expectFusionAcceptance(page, errors)
 })
 
-test('phone upload keeps the explicit expired-link state at 390x844 @w5-mobile', async ({ page }) => {
+test('phone upload keeps the explicit invalid-link state at 390x844 @w5-mobile', async ({ page }) => {
   const errors = runtimeErrors(page)
   await page.goto('/upload/phone')
   const root = page.locator('main[data-kiosk-screen="phone-upload"]')
   await expect(root).toHaveAttribute('data-kiosk-viewport', 'mobile')
-  await expect(root.getByText('上传链接已失效', { exact: true })).toBeVisible()
+  await expect(root.getByRole('heading', { name: '这个链接不能用来上传', exact: true })).toBeVisible()
+  await expect(root.getByText('上传链接已失效')).toHaveCount(0)
   await expectFusionAcceptance(page, errors, { allowNoTouchTargets: true })
 })
 
 test('phone upload renders a real upload failure without exposing fixture credentials @w5-mobile', async ({ page, api }) => {
   const errors = runtimeErrors(page)
+  api.respond('GET', '/api/v1/document-conversion/capabilities', {
+    status: 200, json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false } },
+  })
   api.abort('POST', '/api/v1/upload-sessions/w5-upload-session/files', 'internetdisconnected')
   await page.goto('/upload/phone#sessionId=w5-upload-session&token=w5-one-time-upload&purpose=print_doc')
-  // 2026-08-18（PR #598）：手机页改为按 purpose 显式映射文案与文件过滤器后，
-  // print_doc 的可访问名由「选择文件」变为「选择打印文件」（签名/印章、合同同理）。
-  // 只更新定位到该 input 的方式，下面三条断言（失败态可见、公共安全文案、
-  // 一次性令牌不外泄）保持原样，一条都没有放宽。
-  await page.getByLabel('选择打印文件').setInputFiles({
+  // 手机端不把可修改的 purpose fragment 当真源；断网没有回执，只能标结果未知。
+  await page.getByLabel('选择要上传的文件').setInputFiles({
     name: 'w5-sample.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-w5-browser-fixture'),
   })
-  await expect(page.getByText('上传失败', { exact: true })).toBeVisible()
-  await expect(page.getByText('网络连接失败，请稍后重试', { exact: true })).toBeVisible()
+  const root = page.locator('main[data-kiosk-screen="phone-upload"]')
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'outcome-unknown')
+  await expect(root.getByText('结果未知', { exact: true })).toBeVisible()
+  await expect(root.getByText('已收到', { exact: true })).toHaveCount(0)
+  await expect(root.getByLabel('选择要上传的文件')).toBeDisabled()
   await expect(page.getByText('w5-one-time-upload')).toHaveCount(0)
   await expectFusionAcceptance(page, errors)
+})
+
+test('phone upload only trusts a complete server receipt and keeps the kiosk confirmation boundary @w5-mobile', async ({ page, api }, testInfo) => {
+  const errors = runtimeErrors(page)
+  api.respond('GET', '/api/v1/document-conversion/capabilities', {
+    status: 200, json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false } },
+  })
+  api.respond('POST', '/api/v1/upload-sessions/w5-receipt-session/files', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId: 'w5-receipt-session', status: 'uploaded', purpose: 'resume_upload', mode: 'temporary',
+        file: { fileId: 'w5-receipt-file', filename: 'my-resume.pdf', sizeBytes: 23, mimeType: 'application/pdf', sha256: 'a'.repeat(64), fileExpiresAt: null },
+        requiresKioskConfirmation: false, expiresAt: '2026-09-25T01:00:00.000Z',
+      },
+    },
+  })
+  await page.goto('/upload/phone#sessionId=w5-receipt-session&token=w5-private-upload-token&purpose=print_doc')
+  const root = page.locator('main[data-kiosk-screen="phone-upload"]')
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'idle')
+  const readyScreenshot = testInfo.outputPath('phone-upload-ready-390.png')
+  await page.screenshot({ path: readyScreenshot, animations: 'disabled' })
+  await testInfo.attach('phone-upload-ready-390', { path: readyScreenshot, contentType: 'image/png' })
+  await root.getByLabel('选择要上传的文件').setInputFiles({
+    name: 'my-resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w5-browser-fixture'),
+  })
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'success')
+  await expect(root).toHaveAttribute('data-purpose', 'resume_upload')
+  await expect(root).toHaveAttribute('data-purpose-confirmed', '1')
+  await expect(root.getByRole('heading', { name: '已收到', exact: true })).toBeVisible()
+  await expect(root.getByText('它尚未进入本次任务', { exact: false })).toBeVisible()
+  await expect(root.getByLabel('选择要上传的文件')).toHaveCount(0)
+  await expect(root.getByText('w5-private-upload-token')).toHaveCount(0)
+  const receivedScreenshot = testInfo.outputPath('phone-upload-received-390.png')
+  await page.screenshot({ path: receivedScreenshot, animations: 'disabled' })
+  await testInfo.attach('phone-upload-received-390', { path: receivedScreenshot, contentType: 'image/png' })
+  await expectFusionAcceptance(page, errors, { allowNoTouchTargets: true })
+})
+
+test('phone upload does not call an uploaded status without a file receipt success @w5-mobile', async ({ page, api }) => {
+  api.respond('GET', '/api/v1/document-conversion/capabilities', {
+    status: 200, json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false } },
+  })
+  api.respond('POST', '/api/v1/upload-sessions/w5-incomplete-session/files', {
+    status: 200,
+    json: { success: true, data: { sessionId: 'w5-incomplete-session', status: 'uploaded', purpose: 'print_doc', mode: 'temporary', file: null, requiresKioskConfirmation: false, expiresAt: '2026-09-25T01:00:00.000Z' } },
+  })
+  await page.goto('/upload/phone#sessionId=w5-incomplete-session&token=w5-private-upload-token&purpose=print_doc')
+  const root = page.locator('main[data-kiosk-screen="phone-upload"]')
+  await root.getByLabel('选择要上传的文件').setInputFiles({
+    name: 'my-document.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w5-browser-fixture'),
+  })
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'outcome-unknown')
+  await expect(root.getByRole('heading', { name: '已收到', exact: true })).toHaveCount(0)
 })
 
 const CTA_WHITELIST = ['查看岗位', '去来源平台投递', '扫码投递', '查看招聘会', '去来源平台预约', '扫码预约', '复制来源链接']
