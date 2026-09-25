@@ -78,8 +78,11 @@ const REVOKE_ATTEMPT_CAP: Record<ScanRevokeIntent, number> = {
 const attemptsByTask = new Map<string, number>()
 
 /**
- * 服务端**亲口报过终态**的 scanTaskId。进了这张表，本机就再也不为它发 DELETE ——
- * 任何意图都不例外，补偿也不例外。
+ * 服务端**亲口报过终态**（或者亲口说根本没有这条任务）的 scanTaskId。进了这张表，
+ * 本机就再也不为它发 DELETE —— 任何意图都不例外，补偿也不例外。
+ *
+ * 记它的只有服务端的回答：等待页的状态查询与取消回执（{@link noteScanTaskStatusFromServer}），
+ * 以及清场收尾闸那条等回话的撤销（{@link requestConfirmedScanRevoke}）。
  *
  * ## 它补的是哪一个洞（2026-09-26，CI run 36172469588）
  *
@@ -255,9 +258,16 @@ export function revokeCreatedScanSession(
  *   · `cancelled` —— 200，服务端刚把它 CAS 成 cancelled；
  *   · `not-found` —— 404 `SCAN_TASK_NOT_FOUND`，服务端那边根本没有这条任务；
  *   · `already-terminal` —— 400 `SCAN_TASK_ALREADY_COMPLETED` 或 409
- *     `SCAN_TASK_CANCEL_CONFLICT`。后者的判据是 `status !== 'waiting' && !== 'matched'`，
- *     也就是它已经是 cancelled / failed / expired / completed 之一。租约查询只签
- *     `status: 'waiting'` 的行，所以这几种一律领不走。
+ *     `SCAN_TASK_CANCEL_CONFLICT`。前者两处都只在 `status === 'completed'` 时抛；
+ *     后者有两处来历：CAS 之前判到 `status !== 'waiting' && !== 'matched'`（cancelled /
+ *     failed / expired），或者 CAS 撞车之后重读 —— 那一刻任务可能正是 **matched**
+ *     （一次投递刚刚开始）。租约查询只签 `status: 'waiting'` 的行，而没有任何一条路把
+ *     任务改回 waiting，所以这几种一律领不走 —— 这正是本闸要的判据。
+ *
+ * 三种里能证明「这条任务已经结束 / 根本没有」的（200、404、ALREADY_COMPLETED）
+ * 同时记进 {@link endedByServer}：闸确认之后才落地的那次投递确认，不许再为它补一发。
+ * CANCEL_CONFLICT **不记**：matched 那一支里任务还活着，`cancel()` 放行 matched，
+ * 再来一发 DELETE 仍能把那次投递撤掉。
  *
  * `confirmed: false` 的三种，一种都不许当成「清干净了」：
  *   · `forbidden` —— 403，本机手里这份身份/凭据动不了那条任务（它可能仍是 waiting）；
@@ -328,12 +338,20 @@ export async function requestConfirmedScanRevoke(
     return { confirmed: false, reason: 'unreachable' }
   }
 
-  if (res.ok) return { confirmed: true, reason: 'cancelled' }
+  if (res.ok) {
+    endedByServer.add(credentials.scanTaskId)
+    return { confirmed: true, reason: 'cancelled' }
+  }
   const code = await readErrorCode(res)
   if (res.status === 404 || code === 'SCAN_TASK_NOT_FOUND') {
+    endedByServer.add(credentials.scanTaskId)
     return { confirmed: true, reason: 'not-found' }
   }
-  if (TERMINAL_CANCEL_CODES.has(code)) return { confirmed: true, reason: 'already-terminal' }
+  if (TERMINAL_CANCEL_CODES.has(code)) {
+    // 只有 ALREADY_COMPLETED 证明得了结束；CANCEL_CONFLICT 为什么不记，见上面 verdict 的注释。
+    if (code === 'SCAN_TASK_ALREADY_COMPLETED') endedByServer.add(credentials.scanTaskId)
+    return { confirmed: true, reason: 'already-terminal' }
+  }
   if (res.status === 403 || code === 'SCAN_TASK_FORBIDDEN') {
     return { confirmed: false, reason: 'forbidden' }
   }

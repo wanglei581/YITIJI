@@ -1855,7 +1855,9 @@ assert.match(
  *     放宽任何一格，闸就从「等确认」退化成「等一会儿」。 */
 assert.match(
   scanRevoke,
-  /if \(res\.ok\) return \{ confirmed: true, reason: 'cancelled' \}/,
+  // 2026-09-26：块体里多了一句「记进 endedByServer」（确认之后才落地的投递确认不许再补发），
+  // 判据不变 —— 200 之后必须直接交出 confirmed: true / 'cancelled'，中间不许有别的分支。
+  /if \(res\.ok\) \{[^{}]{0,200}?return \{ confirmed: true, reason: 'cancelled' \}/,
   '200 = 服务端刚把它 CAS 成 cancelled',
 )
 assert.match(
