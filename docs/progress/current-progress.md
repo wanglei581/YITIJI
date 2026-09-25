@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-09-26：扫描等待页「终态先到、投递确认后到」时误发 DELETE——CI 偶发红灯的根因修复（本地分支，待合入候选）
+
+分支 `claude/kiosk-scan-cancelled-delete-race-20260926`（接在候选 `8b26f80c6` 之后）。只改一体机扫描等待页、撤销模块和对应浏览器用例；没有改后端，没有推送，没有部署。
+
+- **现象：** CI run 36172469588 的 kiosk-browser-smoke 里，`kiosk-session-warning.spec.ts`「server-cancelled poll status navigates back to /scan/start without sending DELETE」收到 1 次 DELETE（期望 0）。上一轮绿灯 `b3fc7dde1` 以来 `apps/kiosk/src` 没有改动，是时序竞态；同批 expired / failed 两条是绿的。
+- **根因（本地 Playwright trace + 临时打点确认，打点已撤）：** 等待页挂载时**同时**发出投递确认（ACK）和第一次状态查询。状态先回 `cancelled` 时，页面回到 start，`live: undefined` 推进扫描代次；ACK 随后回话，回调只看「代次变了」，按 `ack-compensation` 补发一次 DELETE，对象是服务端已经结束的任务。清场收尾闸和卸载信标都没有参与（trace 里没有它们的请求）；本机登记在 `returnToStart` 里是同步抹掉的，没有残留。completed / failed / expired 在「确认还没回、用户已离开结果屏」时同样会补发。
+- **修复（`aba29cd6f`）：** `scanSessionRevoke.ts` 记下服务端报过终态的任务 id，两个撤销入口共用的 `sendRevoke` 对这些 id 一律不发，补偿意图也不例外；`ScanProgressPage.tsx` 在轮询回答、取消回执、取消后补查三处拿到状态就先记、再改屏。依据：服务端终态是吸收态（scan-tasks.service.ts 没有任何路径改回 waiting，Agent 租约只签 waiting 行），此时 DELETE 只会换回 409 / 400；`ack()` 对已确认过的任务在状态判断之前就原样回时间戳，所以「ACK 成功」证明不了任务还活着。
+- **用例（`bdbb464d8`）：** `kiosk-session-warning.spec.ts` 新增 6 条，把 ACK 回话压住，钉死四种顺序：cancelled 先到；completed / expired / failed 之后离开结果屏；确认未回时用户取消；取消撞上「已完成」再离开。「没有 DELETE」由页内 fetch 探针同步记账，以「ACK 响应体解析完之后的下一个宏任务」为确定信号，不靠等待时长。原有那条用例不改。
+- **验证：** 撤掉整个修复，6 条新用例全红（多出来的正是那一次补偿 DELETE）；逐行撤掉四处改动，各自只让对应的用例转红，每个变异体都先过了 `tsc`。整份 `kiosk-session-warning.spec.ts` `--repeat-each=15`：33 条 × 15 = 495 次全过（0 失败、0 flaky）。`fusion-w2-scan.spec.ts` 26/26，`scan-session-truth.spec.ts` 38/38，`kiosk-scan-safety.spec.ts` 38/38，`kiosk-privacy-timeout.spec.ts` 36/36（其中 1 条写死了 4187 端口，单独在原端口重跑通过）。kiosk `tsc --noEmit`、`eslint src/`（0 错误）、`verify:scan-session-truth`、`verify:fusion-w2`、`verify:kiosk-runtime-error-boundary`、`verify:no-raw-error-render`、`generate-project-graph.mjs --check` 通过。
+
 ## 2026-09-26：全面文档更新（Claude + Grok + Agy）
 
 按设备与软件供应方 + 托管 a 改写 CLAUDE.md、AGENTS.md、feature-scope（新增 §零 AI 求职操作系统分层、§七 已知缺口）、role-boundary、compliance-boundary（新增 §1.2 法规与资质总表）、docs/README；约 50 份旧方案加文首状态标注；content-ingestion-operator-guide 旧正文（岗位、招聘会发布到一体机）改写为托管 a 下的官方渠道与政策指南，旧文只留在 git 历史。只改文档，不删文件。（分支 `claude/docs-refresh-20260926`，由「项目资金预算评估」窗口完成，主执行窗口快进合入候选。）
