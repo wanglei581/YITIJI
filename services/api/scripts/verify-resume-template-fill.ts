@@ -202,6 +202,8 @@ async function main(): Promise<void> {
       'pdf',
       { columns: 2, accent: 'green', margin: 'narrow', fontScale: 'compact', lineSpacing: 'standard' },
       'resume-template-clean',
+      false,
+      { taskId: 'verify-template-fill' },
     )
     createdFileIds.push(pdfExport.fileId)
     if (!pdfExport.printFileUrl) fail('3a. PDF 模板导出应返回 printFileUrl')
@@ -226,7 +228,7 @@ async function main(): Promise<void> {
 
     const nonPdfFormats: ResumeExportFormat[] = ['docx', 'txt', 'md']
     for (const format of nonPdfFormats) {
-      const exported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, format, undefined, 'campus-cover-letter')
+      const exported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, format, undefined, 'campus-cover-letter', false, { taskId: `verify-template-fill-${format}` })
       createdFileIds.push(exported.fileId)
       const row = await prisma.fileObject.findUnique({ where: { id: exported.fileId } })
       if (!row) fail(`5. ${format} 未创建 FileObject`)

@@ -100,7 +100,7 @@ export class AdvisorArtifactService {
     const row = await this.getOwned(artifactId, sessionId)
     const payload = JSON.parse(row.payloadJson) as AdvisorArtifactPayload
     const { buffer, pageCount } = await this.pdf.render(
-      { date: new Date(row.updatedAt).toISOString().slice(0, 10), providerLabel: row.provider },
+      { date: new Date(row.updatedAt).toISOString().slice(0, 10), providerLabel: row.provider, contentId: artifactId },
       payload,
     )
     const uploaded = await this.files.upload({

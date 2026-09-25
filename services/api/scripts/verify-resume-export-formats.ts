@@ -319,7 +319,7 @@ async function main(): Promise<void> {
       if (!svcSrc.includes('RESUME_EXPORT_UNAVAILABLE')) fail('6a. 未断言 unavailable → RESUME_EXPORT_UNAVAILABLE')
       if (!svcSrc.includes('commitExportRedemption')) fail('6a. 缺少 commitExportRedemption（成功后才落账）')
       const commitIdx = svcSrc.indexOf('await this.commitExportRedemption(decision)')
-      const renderIdx = svcSrc.indexOf('this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })')
+      const renderIdx = svcSrc.indexOf('templatePreset: template?.resumeLayoutPreset')
       if (commitIdx < 0 || renderIdx < 0 || commitIdx < renderIdx) {
         fail('6a. 核销必须在文件成功生成之后，不得提前扣次')
       }
@@ -341,7 +341,7 @@ async function main(): Promise<void> {
     const renderedTexts: Record<string, string> = {}
 
     for (const format of formats) {
-      const exported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, format)
+      const exported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, format, undefined, undefined, false, { taskId: `verify-export-${format}` })
       createdFileIds.push(exported.fileId)
 
       if (!exported.fileId) fail(`2. [${format}] 未返回 fileId`)
@@ -419,7 +419,7 @@ async function main(): Promise<void> {
 
     // ── 4+5 docx 专项:直接对渲染器输出的段落文本做同等断言(不依赖字节解压) ──
     {
-      const docxRendered = await resumeDocx.render(FIXTURE)
+      const docxRendered = await resumeDocx.render(FIXTURE, { contentId: 'verify-export-docx' })
       // docx buffer 是 zip 容器,不能直接字符串扫描内容;但可断言其大小与 FIXTURE 规模相关,
       // 并复用 renderTxt/renderMarkdown 对同一 FIXTURE 的纯文本输出做诱饵串/合规词扫描——
       // 三种渲染器共享同一份 GeneratedResume 字段来源与拼装逻辑(见各自源码顶部注释:
@@ -457,7 +457,7 @@ async function main(): Promise<void> {
       if (freePricing.mode !== 'free' || freePricing.label !== '当前免费，不扣权益' || freePricing.benefit !== null) {
         fail(`6c. free pricing 不符: ${JSON.stringify(freePricing)}`)
       }
-      const freeExported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, 'txt')
+      const freeExported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, 'txt', undefined, undefined, false, { taskId: 'verify-export-free-txt' })
       createdFileIds.push(freeExported.fileId)
       pass('6c. free：GET pricing 写「当前免费，不扣权益」，导出放行且不扣权益')
 
@@ -1138,7 +1138,7 @@ async function main(): Promise<void> {
       pass('6k. 同内容并发不重复扣，成功文件可读，未完成副本不可见')
 
       await setExportPrice(0, true)
-      const freeReplay = await ai.exportGeneratedResume(sameResume, sameUser.id, null, 'txt')
+      const freeReplay = await ai.exportGeneratedResume(sameResume, sameUser.id, null, 'txt', undefined, undefined, false, { taskId: 'verify-export-free-replay' })
       createdFileIds.push(freeReplay.fileId)
       const freePrint = printFileIdOf(freeReplay.printFileUrl)
       if (freePrint) createdFileIds.push(freePrint)

@@ -237,12 +237,13 @@ export class JobFitService {
         job: stored.job,
         // 旧缓存没有该可选字段时，PDF 明示降级而不是补造关键词。
         decisionSupport: stored.payload.decisionSupport,
+        contentId: taskId,
       },
       stored.payload,
     )
     const uploaded = await this.files.upload({
       buffer,
-      filename: '岗位匹配决策报告.pdf',
+      filename: '简历对照.pdf',
       mimeType: 'application/pdf',
       purpose: 'print_doc',
       uploaderId: null,

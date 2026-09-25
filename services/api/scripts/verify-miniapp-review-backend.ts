@@ -176,7 +176,8 @@ async function main() {
     if ('fitLevel' in clean.payload) fail('3. 干净输出仍返回了 fitLevel')
     if (JSON.stringify(clean.payload).includes('reference_high')) fail('3. 响应里仍有等级')
     const sent = seen[0] ?? ''
-    if (!sent.includes('不要输出等级、百分比、录用概率或通过率')) fail('3. 实际请求没发新提示词')
+    if (!sent.includes('不要输出等级、百分比或通过率')) fail('3. 实际请求没发新提示词')
+    if (sent.includes('录用概率')) fail('3. 提示词不应再写出录用概率这四个字')
     if (sent.includes('投递请引导用户前往岗位来源平台') || sent.includes('优先选择更匹配的岗位')) {
       fail('3. 实际请求仍含已删除的两条')
     }
@@ -206,6 +207,7 @@ async function main() {
       date: '2026-09-26',
       job: { title: '行政专员', company: null, sourceName: null, sourceUrl: null, externalId: null },
       decisionSupport: undefined,
+      contentId: 'verify-miniapp-review',
     },
     {
       summary: '建议投递。参考等级较高。总评很好。匹配度很高。',

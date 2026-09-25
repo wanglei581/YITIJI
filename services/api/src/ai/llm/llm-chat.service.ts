@@ -29,6 +29,7 @@ import {
 } from './llm-http'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
+import { withAiSafety } from './ai-prompt-safety'
 import { applyAssistantChannel, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
 
 interface ChatMessage {
@@ -198,8 +199,16 @@ const SKILL_SCOPED_PROMPTS: Record<AssistantSkill, string> = {
   ].join('\n'),
 }
 
+export function assistantSkillSystemPrompt(skill: AssistantSkill): string {
+  return withAiSafety(SKILL_SCOPED_PROMPTS[skill])
+}
+
+export function assistantSkillPrompts(): string[] {
+  return (Object.keys(SKILL_SCOPED_PROMPTS) as AssistantSkill[]).map(assistantSkillSystemPrompt)
+}
+
 function buildSkillScopedSystemPrompt(basePrompt: string, skill?: AssistantSkill): string {
-  const scopedPrompt = skill ? SKILL_SCOPED_PROMPTS[skill] : undefined
+  const scopedPrompt = skill ? assistantSkillSystemPrompt(skill) : undefined
   return scopedPrompt ? `${basePrompt}\n\n${scopedPrompt}` : basePrompt
 }
 

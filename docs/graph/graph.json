@@ -21174,6 +21174,7 @@
     ],
     "services/api/src/advisor/advisor-pdf.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/advisor/advisor-retention.task.ts": [
@@ -21191,11 +21192,13 @@
       "services/api/scripts/verify-ai-user-text-retention.ts"
     ],
     "services/api/src/advisor/assistant-summary.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/advisor/llm-advisor.service.ts": [
-      "services/api/scripts/verify-advisor-work.ts"
+      "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
@@ -21253,6 +21256,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-persistence-consistency.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
@@ -21296,6 +21300,7 @@
     "services/api/src/ai/interfaces/ai-provider.interface.ts": [
       "services/api/scripts/verify-ai-contract-mirror.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
@@ -21325,6 +21330,9 @@
     "services/api/src/ai/llm/ai-config-audit.ts": [
       "services/api/scripts/verify-ai-contract-mirror.mjs"
     ],
+    "services/api/src/ai/llm/ai-prompt-safety.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts"
+    ],
     "services/api/src/ai/llm/assistant-channel.ts": [
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
@@ -21333,6 +21341,7 @@
     ],
     "services/api/src/ai/llm/llm-chat.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -21342,12 +21351,14 @@
     "services/api/src/ai/llm/llm-config.service.ts": [
       "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
     "services/api/src/ai/llm/llm-guard.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-guard.ts"
     ],
     "services/api/src/ai/llm/llm-http.ts": [
@@ -21370,6 +21381,7 @@
     ],
     "services/api/src/ai/providers/mock.provider.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -21417,6 +21429,7 @@
       "services/api/scripts/verify-compliance.ts"
     ],
     "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts"
     ],
@@ -21424,6 +21437,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts"
     ],
     "services/api/src/ai/resume/career-plan-pdf.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
@@ -21444,6 +21458,7 @@
       "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/ai/resume/fair-visit-plan-pdf.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
@@ -21461,6 +21476,7 @@
     ],
     "services/api/src/ai/resume/job-fit-pdf.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-job-fit-print.ts",
@@ -21478,11 +21494,13 @@
     ],
     "services/api/src/ai/resume/llm-career-plan.service.ts": [
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/ai/resume/llm-fair-visit-plan.service.ts": [
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
@@ -21490,6 +21508,7 @@
     "services/api/src/ai/resume/llm-job-fit.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
@@ -21497,6 +21516,7 @@
     ],
     "services/api/src/ai/resume/llm-resume-generate.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -21505,6 +21525,7 @@
     "services/api/src/ai/resume/llm-resume-optimize.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
@@ -21512,6 +21533,7 @@
     ],
     "services/api/src/ai/resume/llm-resume.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
@@ -21521,6 +21543,7 @@
     "services/api/src/ai/resume/llm-self-assessment.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
@@ -21553,6 +21576,7 @@
       "services/api/scripts/verify-resume-extraction.ts"
     ],
     "services/api/src/ai/resume/resume-docx.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
@@ -21574,6 +21598,7 @@
     ],
     "services/api/src/ai/resume/resume-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
@@ -21590,6 +21615,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/resume/self-assessment-pdf.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-cjk-font.ts",
@@ -21658,6 +21684,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-audit-logs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -22004,6 +22031,9 @@
     "services/api/src/common/middleware/request-id.middleware.ts": [
       "services/api/scripts/verify-error-observability.ts"
     ],
+    "services/api/src/common/pdf/aigc-label.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts"
+    ],
     "services/api/src/common/pdf/aigc-pdf-metadata.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts"
     ],
@@ -22213,11 +22243,13 @@
     ],
     "services/api/src/contract-review/contract-review-provider.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-contract-review-timeout.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/contract-review/contract-review-report-pdf.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts"
     ],
@@ -22316,6 +22348,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
@@ -22392,6 +22425,7 @@
     ],
     "services/api/src/job-ai/job-ai-llm.service.ts": [
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
@@ -23066,17 +23100,20 @@
     ],
     "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-practice-sheet.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs"
     ],
     "services/api/src/mock-interview/interview-report-pdf.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
@@ -23589,6 +23626,7 @@
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
@@ -23847,6 +23885,7 @@
     ],
     "services/api/src/storage/storage.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
@@ -24115,6 +24154,7 @@
       "services/api/scripts/verify-trtc-ownership.ts"
     ],
     "services/api/src/trtc/trtc.service.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/upload-sessions/upload-scene.ts": [
@@ -30183,6 +30223,61 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-result-ownership"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services/api/src"
+        ],
+        "files": [
+          "services/api/src/advisor/advisor-pdf.service.ts",
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/llm/ai-prompt-safety.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/ai/llm/llm-guard.ts",
+          "services/api/src/ai/providers/mock.provider.ts",
+          "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts",
+          "services/api/src/ai/resume/career-plan-pdf.service.ts",
+          "services/api/src/ai/resume/fair-visit-plan-pdf.service.ts",
+          "services/api/src/ai/resume/job-fit-pdf.service.ts",
+          "services/api/src/ai/resume/llm-career-plan.service.ts",
+          "services/api/src/ai/resume/llm-fair-visit-plan.service.ts",
+          "services/api/src/ai/resume/llm-job-fit.service.ts",
+          "services/api/src/ai/resume/llm-resume-generate.service.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/llm-resume.service.ts",
+          "services/api/src/ai/resume/llm-self-assessment.service.ts",
+          "services/api/src/ai/resume/resume-docx.service.ts",
+          "services/api/src/ai/resume/resume-pdf.service.ts",
+          "services/api/src/ai/resume/self-assessment-pdf.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pdf/aigc-label.ts",
+          "services/api/src/contract-review/contract-review-provider.service.ts",
+          "services/api/src/contract-review/contract-review-report-pdf.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/job-ai/job-ai-llm.service.ts",
+          "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
+          "services/api/src/mock-interview/interview-report-pdf.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-safety-aigc.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-safety-aigc"
       ],
       "wired": true
     },
