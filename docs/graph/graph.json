@@ -11510,7 +11510,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 164,
+      "reachableFileCount": 166,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12265,7 +12265,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 169
+      "sourceFileCount": 171
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15231,7 +15231,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 62,
+      "reachableFileCount": 64,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -15622,7 +15622,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 63
+      "sourceFileCount": 65
     }
   },
   "dataModel": {
