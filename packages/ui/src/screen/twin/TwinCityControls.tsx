@@ -31,15 +31,19 @@ export function twinSortByState(terminals: readonly TwinCityTerminal[]): TwinCit
   return [...terminals].sort((a, b) => STATE_RANK[twinTerminalState(a)] - STATE_RANK[twinTerminalState(b)] || a.code.localeCompare(b.code))
 }
 
-export function TwinStateLegend({ counts }: { counts: Record<TwinState, number> }) {
+/**
+ * 状态图例。bare：只当颜色说明、不写台数 —— 同一屏的面板里已经写过各状态台数时用（每屏一个数只出现一次）。
+ */
+export function TwinStateLegend({ counts, bare = false }: { counts: Record<TwinState, number>; bare?: boolean }) {
+  const n = (count: number) => (bare ? '' : ` ${count}`)
   return (
     <TwinLegend
       items={[
-        { state: 'ok', label: `在线 ${counts.ok}` },
-        { state: 'pr', label: `打印中 ${counts.pr}` },
-        { state: 'wa', label: `告警 ${counts.wa}` },
-        { state: 'off', label: `离线 ${counts.off}` },
-        { state: 'un', label: `未上报 ${counts.un}` },
+        { state: 'ok', label: `在线${n(counts.ok)}` },
+        { state: 'pr', label: `打印中${n(counts.pr)}` },
+        { state: 'wa', label: `告警${n(counts.wa)}` },
+        { state: 'off', label: `离线${n(counts.off)}` },
+        { state: 'un', label: `未上报${n(counts.un)}` },
       ]}
     />
   )

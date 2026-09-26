@@ -47,6 +47,8 @@ import { TwinShell, TwinShellEmpty, snapshotMeta, useAdminSnapshot, type ScreenC
  *   3. 在架信息都是第三方 / 官方来源，本平台不收简历、不代投递。
  *   4. 招聘内容托管关闭（我们云上的默认部署）时，右上与右中两块整块是招聘内容，换成「政策服务」与
  *      「服务质量」（GovHostingOff.tsx），边界只在政策服务里说一次，屏上不出现「未开启」格子。
+ *      每屏一个数只出现一次：场景左上不再写台数、右上图例只当颜色说明（台数都在左上「终端与服务」里）；
+ *      各区立柱上的「N 台」只在场景里有，照写。
  */
 
 const TITLE = '职易达 · 就业服务终端运行态势'
@@ -111,7 +113,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   }
   // 任务流与告警 9/26 起随政务快照下发（与运营版同一份实现、同一档缓存）
   const g: ScreenSnapshotMetrics = gov.data.metrics
-  // 托管 a：我们云上不存岗位、招聘会、企业资料。右上、右中两块整块换成政策服务与服务质量（见文件头第 4 条）
+  // 托管 a：我们云上不再发布岗位、招聘会、企业资料（存量清理见 next-tasks 3.15）。右上、右中两块整块换成政策服务与服务质量（见文件头第 4 条）
   const hostingOff = gov.data.limits.recruitmentHosting === 'disabled'
   const sourcesPending = !ops.data && !ops.failure
   const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
@@ -311,10 +313,14 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
               </TwinSceneBox>
               <div className="twin-overlay is-tl">
                 {focus === null ? (
-                  <span>
-                    终端分布 · {screenCount(g.fleetWall.value.matchedCount)} 台 · 按所在区示意
-                    {g.fleetWall.value.truncated ? `（显示前 ${screenCount(g.fleetWall.value.sampledCount)} 台）` : ''}
-                  </span>
+                  hostingOff ? (
+                    <span>终端分布 · 按所在区示意{g.fleetWall.value.truncated ? '（只画了机队样本）' : ''}</span>
+                  ) : (
+                    <span>
+                      终端分布 · {screenCount(g.fleetWall.value.matchedCount)} 台 · 按所在区示意
+                      {g.fleetWall.value.truncated ? `（显示前 ${screenCount(g.fleetWall.value.sampledCount)} 台）` : ''}
+                    </span>
+                  )
                 ) : (
                   <>
                     <button type="button" className="twin-crumb" onClick={() => chrome.setParam('area', null)}>
@@ -327,7 +333,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                 )}
               </div>
               <div className="twin-overlay is-tr">
-                <TwinStateLegend counts={counts} />
+                <TwinStateLegend counts={counts} bare={hostingOff} />
               </div>
             </>
           )

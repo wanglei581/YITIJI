@@ -211,11 +211,20 @@ export function partnerDegraded(): ScreenSnapshot {
  * 招聘内容托管关闭（托管 a，我们云上的默认部署），照服务端写（console-screen.assemble.ts）：
  *   - closeRecruitmentMetrics 把 jobsOnShelf、fairStructure、sourceEntryOpensTop 换成 recruitment_hosting_disabled
  *     （机构侧的 sourceEntryOpensTop 原本就是未接入，托管关闭时原因被换成托管关闭）；
- *   - contentInventory 与 pendingReview 原样返回，含岗位类存量；政策由本机构自审，这里有 3 条待审；
+ *   - contentInventory 与 pendingReview 原样返回，含岗位类存量（待审 8 + 1 + 2 = 11 条）；政策由本机构自审，这里有 3 条待审；
+ *     岗位待审取 8：取 4 时存量合计是 7，与「本机构终端」的正常 7 台撞数 —— 每屏一个数只出现一次的体检分不出撞数与复述，夹具里不留巧合；
  *   - 同步：数据源不再写 SyncLog，近 24 小时 0 批 → { total: 0, success: 0, failed: 0, successRate: null }。
  */
 export function partnerHostingOff(): ScreenSnapshot {
-  const snapshot = partnerFull()
+  return withHostingOff(partnerFull())
+}
+
+/** 大机构（机队 640 台、样本 200 台）的托管关闭版：终端状态墙要写「另 N 台」，告警没排满时说其余正常。 */
+export function partnerHostingOffTruncated(): ScreenSnapshot {
+  return withHostingOff(partnerTruncated())
+}
+
+function withHostingOff(snapshot: ScreenSnapshot): ScreenSnapshot {
   snapshot.limits = { ...LIMITS, recruitmentHosting: 'disabled' }
   snapshot.metrics.jobsOnShelf = na('Job approved+published+validThrough', 'current', 'recruitment_hosting_disabled')
   snapshot.metrics.fairStructure = na('FairCompany/FairZone/FairMaterial', 'ongoing', 'recruitment_hosting_disabled')
@@ -223,7 +232,7 @@ export function partnerHostingOff(): ScreenSnapshot {
   snapshot.metrics.syncSuccessRate24h = ok('SyncLog.result', '24h', { total: 0, success: 0, failed: 0, successRate: null })
   snapshot.metrics.contentInventory = ok('Job/JobFair/PolicyPost/CompanyProfile counts', 'current', {
     jobsPublished: 328,
-    jobsPending: 4,
+    jobsPending: 8,
     fairsPublished: 12,
     fairsPending: 1,
     policiesPublished: 9,
@@ -231,7 +240,7 @@ export function partnerHostingOff(): ScreenSnapshot {
     companiesPublished: 26,
     companiesPending: 2,
   })
-  snapshot.metrics.pendingReview = ok('reviewStatus pending+reviewing', 'current', { total: 10, jobs: 4, fairs: 1, policies: 3, companies: 2 })
+  snapshot.metrics.pendingReview = ok('reviewStatus pending+reviewing', 'current', { total: 14, jobs: 8, fairs: 1, policies: 3, companies: 2 })
   return snapshot
 }
 
@@ -310,7 +319,8 @@ export function partnerUsageVisitsFailed(range: string): ScreenUsageSnapshot {
  * 托管关闭的信息使用，照 console-screen.usage.service.ts / usage.queries.ts 写：
  *   - partnerContent 只下发政策一类（byType 过滤到 policy）；
  *   - partnerDaily 只数政策的浏览与打开来源入口（countsTowardPartnerDaily），少于 5（含 0）→ null；
- *   - partnerTop 只从政策里挑，浏览达到 5 次才列。
+ *   - partnerTop 只从政策里挑，浏览达到 5 次才列，每条的浏览不超过政策浏览合计（今日 21 / 近 7 天 126 / 近 30 天 504）。
+ * 各块的数两两不撞（使用概况、每日趋势的峰值与孤立点、热门政策）：每屏一个数只出现一次的体检靠这个分辨复述。
  */
 const POLICY_DAILY = [
   [21, 8], [16, 6], [9, 3], [18, 7], [24, 9], [2, 0], [15, 5], [19, 6], [22, 8], [13, 4], [11, 5], [25, 10], [27, 11], [20, 7], [17, 6],
@@ -335,12 +345,56 @@ export function partnerUsageHostingOff(range: string): ScreenUsageSnapshot {
     byType: [{ type: 'policy', browse: suppressed(n === 1 ? today[0] : 21 * k), favorites: suppressed(n === 1 ? 3 : 3 * k), sourceOpens: suppressed(n === 1 ? today[1] : 8 * k) }],
   })
   base.metrics.partnerDaily = ok('BrowseLog/ExternalJumpLog.createdAt', base.range, { days })
+  const top = TOP_POLICY_BROWSE[base.range]
   base.metrics.partnerTop = ok('BrowseLog join content title', base.range, {
-    items: [
-      { type: 'policy', title: '2026 年高校毕业生就业见习补贴申领指南', browse: 11 * k },
-      { type: 'policy', title: '海珠区灵活就业人员社保补贴申领办法', browse: 7 * k },
-      { type: 'policy', title: '创业担保贷款贴息政策问答', browse: 5 * k },
-    ],
+    items: top.map((browse, i) => ({ type: 'policy' as const, title: TOP_POLICY_TITLES[i], browse })),
+  })
+  return base
+}
+
+/** 热门政策的标题：第四条长到展示档要折成两行（标题写全，最多两行）。 */
+export const TOP_POLICY_TITLES = [
+  '2026 年高校毕业生就业见习补贴申领指南',
+  '海珠区灵活就业人员社保补贴申领办法',
+  '创业担保贷款贴息政策问答',
+  '就业困难人员认定与援助政策申请流程说明（2026 年修订版）',
+  '职业技能提升补贴（技能证书类）申领常见问题',
+] as const
+
+/** 今日只有 3 条达到 5 次；近 7 天、近 30 天各 5 条。 */
+const TOP_POLICY_BROWSE: Record<ScreenUsageRange, number[]> = {
+  today: [9, 6, 5],
+  '7d': [38, 27, 21, 14, 9],
+  '30d': [152, 108, 84, 57, 41],
+}
+
+/**
+ * 每日趋势有空缺的一周（托管关闭的机构版）：两头与中间都有少于 5 的日子，中间还夹一个前后都空的孤立点。
+ *   d0 空 · d1 12 / 5（两条都是孤立点） · d2 空 · d3–d5 连成一段（第二条在 d5 少于 5） · d6 空
+ * 概况与热门政策按这一周重算，和趋势对得上、互相不撞数。
+ */
+export const TREND_GAP_DAYS: ReadonlyArray<readonly [number | null, number | null]> = [
+  [null, null],
+  [12, 5],
+  [null, null],
+  [18, 6],
+  [22, 9],
+  [16, null],
+  [null, null],
+]
+
+export function partnerUsageTrendGaps(range: string): ScreenUsageSnapshot {
+  const base = partnerUsageHostingOff(range)
+  if (base.range !== '7d') return base
+  const days = TREND_GAP_DAYS.map(([browse, opens], i) => ({ date: shanghaiDate(TREND_GAP_DAYS.length - 1 - i), browse, sourceOpens: opens }))
+  base.metrics.partnerDaily = ok('BrowseLog/ExternalJumpLog.createdAt', base.range, { days })
+  base.metrics.partnerContent = ok('BrowseLog/Favorite/ExternalJumpLog join sourceOrgId', base.range, {
+    coverage: 'members_only',
+    basis: 'current_content_join',
+    byType: [{ type: 'policy', browse: 74, favorites: 9, sourceOpens: 24 }],
+  })
+  base.metrics.partnerTop = ok('BrowseLog join content title', base.range, {
+    items: [21, 15, 11, 7, 6].map((browse, i) => ({ type: 'policy' as const, title: TOP_POLICY_TITLES[i], browse })),
   })
   return base
 }

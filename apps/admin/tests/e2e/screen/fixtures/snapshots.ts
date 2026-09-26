@@ -376,7 +376,18 @@ export function govHostingOff(): ScreenSnapshot {
   const base = govFull()
   base.limits = { ...LIMITS, recruitmentHosting: 'disabled' }
   base.metrics.jobsOnShelf = na('Job approved+published+validThrough', 'current', 'recruitment_hosting_disabled')
-  // contentInventory 不动：岗位类存量照样计数（govFull 的数字就是存量）
+  // contentInventory 照样计数（岗位类存量）。招聘会待审取 9 而不是 govFull 的 6：6 与运营看板上「进行中打印 6」
+  // 撞数，每屏一个数只出现一次的体检分不出撞数与复述，夹具里不留巧合
+  base.metrics.contentInventory = ok('Job/JobFair/PolicyPost/CompanyProfile counts', 'current', {
+    jobsPublished: 2184,
+    jobsPending: 58,
+    fairsPublished: 37,
+    fairsPending: 9,
+    policiesPublished: 216,
+    policiesPending: 8,
+    companiesPublished: 148,
+    companiesPending: 14,
+  })
   return base
 }
 
@@ -386,7 +397,8 @@ export function opsHostingOff(): ScreenSnapshot {
   base.metrics.sourceEntryOpensTop = na('ExternalJumpLog.sourceName', '30d', 'recruitment_hosting_disabled')
   base.metrics.fairStructure = na('FairCompany/FairZone/FairMaterial', 'ongoing', 'recruitment_hosting_disabled')
   base.metrics.syncSuccessRate24h = ok('SyncLog.result', '24h', { total: 0, success: 0, failed: 0, successRate: null })
-  // pendingReview 不动：待审里仍有岗位类存量（58 / 6 / 14），政策 8 条是运营机构待审
+  // 待审里仍有岗位类存量（58 / 9 / 14，与政务快照的在架统计一致），政策 8 条是运营机构待审
+  base.metrics.pendingReview = ok('reviewStatus pending+reviewing', 'current', { total: 89, jobs: 58, fairs: 9, policies: 8, companies: 14 })
   return base
 }
 

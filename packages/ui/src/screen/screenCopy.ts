@@ -130,7 +130,7 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
   recruitment_hosting_disabled: {
     title: '招聘内容托管未开启',
     short: '未开启',
-    detail: '本平台的云服务不保存岗位、招聘会、企业资料，这一项只在客户私有化部署中有数据。',
+    detail: '本平台已关闭招聘内容托管：不接收、不审核、不发布岗位、招聘会与企业资料；这一项只在客户私有化部署中提供。',
     howTo: '在客户私有化部署中开启招聘内容托管后自动出现。',
     transient: false,
   },
@@ -159,7 +159,7 @@ export function screenReasonCopy(reason: string): ScreenReasonCopy {
  * 每屏只说一次，放在承载政策内容的那块面板里。屏上其它位置不再为岗位、招聘会、企业资料
  * 摆「未开启」磁贴、标签或灰色场景节点 —— 边界说清一次，其余位置只放真实数据。
  */
-export const SCREEN_HOSTING_OFF_NOTE = '政策由运营机构自行审核发布；岗位、招聘会、企业资料不在本平台托管'
+export const SCREEN_HOSTING_OFF_NOTE = '政策由运营机构自行审核发布；本平台不发布岗位、招聘会与企业资料'
 
 /** 大屏统一的「打开来源平台入口」措辞。屏上任何地方都不出现投递字样。 */
 export const SCREEN_SOURCE_ENTRY_NOTE =

@@ -373,6 +373,11 @@ export interface HostingOffAudit {
   noticeOnly: string[]
   /** 岗位类字眼出现在边界句与豁免句之外的可见文字里（面板标题、磁贴、图例、场景牌子……）。 */
   recruitmentWords: string[]
+  /**
+   * 讲「存」而不讲「做」的托管说法（「不保存岗位」「不在本平台托管」）：连悬停提示、读屏标签与口径弹层一起查。
+   * CLAUDE.md §1：3.15 存量清理完成前，不得对外说我们云上已不存这些数据 —— 运营看板上就还有两千多条岗位存量。
+   */
+  storageClaims: string[]
 }
 
 /**
@@ -390,7 +395,7 @@ export async function hostingOffAudit(
   return page.evaluate(
     ({ sentence, skip, notes }) => {
       const root = document.querySelector('.twin') as HTMLElement | null
-      if (!root) return { offText: ['<no-twin-root>'], boundary: 0, noticeOnly: [], recruitmentWords: [] }
+      if (!root) return { offText: ['<no-twin-root>'], boundary: 0, noticeOnly: [], recruitmentWords: [], storageClaims: [] }
       const rendered = (el: Element) => {
         for (let node: Element | null = el; node; node = node.parentElement) {
           if (getComputedStyle(node).display === 'none') return false
@@ -434,8 +439,93 @@ export async function hostingOffAudit(
         const reading = body.replace(/近\s*\d+\s*(小时|天|日)/g, '')
         if (!/\d/.test(reading) && !reading.includes('少于 5')) noticeOnly.push(`${title}（正文没有读数）`)
       }
-      return { offText, boundary: boundaryCount, noticeOnly, recruitmentWords }
+      const everything = [root.innerText, root.textContent ?? '']
+      for (const el of root.querySelectorAll('[title], [aria-label]')) everything.push(el.getAttribute('title') ?? '', el.getAttribute('aria-label') ?? '')
+      const storageClaims = ['不保存岗位', '不在本平台托管'].filter((phrase) => everything.some((text) => text.includes(phrase)))
+      return { offText, boundary: boundaryCount, noticeOnly, recruitmentWords, storageClaims }
     },
     { sentence: boundary, skip: [...exempt], notes: [...methodology] },
   )
+}
+
+export interface NumberAudit {
+  /** 每块读到的 ≥ 5 的整数，块内去重、升序。块名是面板 / 卡片标题，或「场景牌子」「场景浮层」「块位 xx」。 */
+  blocks: Record<string, number[]>
+  /** 同一个数出现在两块以上：「418：近 24 小时任务流、服务质量」。 */
+  repeats: string[]
+}
+
+/**
+ * 「一个数每屏只出现一次」：收集每块面板 / 卡片 / 场景里渲染出来的 ≥ 5 的整数，
+ * 同一个数落在两块以上就是复述（另一块已经说过的数，这块又说一遍）。
+ *
+ * 不算读数、先剔掉的：终端编号、时刻与日期、坐标轴刻度与日期（.twin-axis）、热力图的时辰轴、排行的名次、
+ * 「近 N 天 / 小时」这类窗口、事件里的时长（「离线 21 分钟」）、「少于 5」「<5」、Top N、
+ * 年份（政策标题里的「2026 年」）。带小数的比例不是整数，不收。
+ *
+ * exemptPlaceLabels：城区立柱上的区名 / 点位牌（「海珠区 8 台」）是各区台数唯一的画法（面板里没有按区的台数），
+ * 这些牌子不参加比对；调用处必须写明为什么豁免。场景里的其余牌子与浮层（左上说明、右上图例）不豁免 ——
+ * 它们若写数，复述的正是面板里的数。
+ */
+export async function numberAudit(page: Page, exemptPlaceLabels = false): Promise<NumberAudit> {
+  return page.evaluate((exemptPlaces) => {
+    const grid = document.querySelector('.twin-grid')
+    if (!grid) return { blocks: { '<no-grid>': [] }, repeats: ['<no-grid>'] }
+    const rendered = (el: Element) => {
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        if (getComputedStyle(node).display === 'none') return false
+      }
+      const style = getComputedStyle(el)
+      return style.visibility !== 'hidden' && el.getClientRects().length > 0
+    }
+    const SKIP = '.twin-axis, .twin-code, .twin-when, .twin-pop, .twin-heat > b, .twin-rank-no, title'
+    const blockOf = (el: Element): string | null => {
+      const box = el.closest('.twin-panel, .ops-card')
+      if (box) return box.querySelector('.twin-ph-t, h2')?.textContent?.trim() || box.className
+      if (el.closest('.tw3-district')) return exemptPlaces ? null : '场景牌子'
+      if (el.closest('.tw3-lbl')) return '场景牌子'
+      if (el.closest('.twin-overlay')) return '场景浮层'
+      const slot = el.closest('.twin-slot')
+      return slot ? `块位 ${slot.getAttribute('data-slot')}` : null
+    }
+    const STRIP = [
+      /近\s*\d+\s*(小时|天|日|分钟)/g,
+      /\d+\s*(秒|分钟|小时)/g,
+      /最近\s*\d+\s*秒/g,
+      /少于\s*\d+/g,
+      /<\s*\d+/g,
+      /Top\s*\d+/gi,
+      /\d{4}\s*年/g,
+      /\d{4}-\d{2}-\d{2}/g,
+      /\b\d{1,2}-\d{2}\b/g,
+      /\d{1,2}:\d{2}(:\d{2})?/g,
+      /[A-Z]{2,}(-[A-Z0-9]+)+/g,
+    ]
+    const found = new Map<number, Set<string>>()
+    const blocks: Record<string, Set<number>> = {}
+    const walker = document.createTreeWalker(grid, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const el = node.parentElement
+      if (!el || el.closest(SKIP) || !rendered(el)) continue
+      const name = blockOf(el)
+      if (name === null) continue
+      let text = node.textContent ?? ''
+      for (const re of STRIP) text = text.replace(re, ' ')
+      for (const m of text.matchAll(/\d[\d,]*(\.\d+)?/g)) {
+        if (m[1]) continue
+        const value = Number(m[0].replace(/,/g, ''))
+        if (!Number.isInteger(value) || value < 5) continue
+        ;(blocks[name] ??= new Set()).add(value)
+        if (!found.has(value)) found.set(value, new Set())
+        found.get(value)?.add(name)
+      }
+    }
+    const repeats = [...found.entries()]
+      .filter(([, names]) => names.size > 1)
+      .sort((a, b) => a[0] - b[0])
+      .map(([value, names]) => `${value}：${[...names].join('、')}`)
+    const out: Record<string, number[]> = {}
+    for (const [name, values] of Object.entries(blocks)) out[name] = [...values].sort((a, b) => a - b)
+    return { blocks: out, repeats }
+  }, exemptPlaceLabels)
 }

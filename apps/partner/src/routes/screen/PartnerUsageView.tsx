@@ -26,9 +26,9 @@ import {
   type TwinInfoFlowType,
   type TwinTileItem,
 } from '@ai-job-print/ui'
-import { loadPartnerUsage, normalizeUsageRange } from '../../services/api/consoleScreen'
+import { loadPartnerUsage } from '../../services/api/consoleScreen'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
-import { OrgFavoritesPanel, OrgTopPoliciesPanel } from './PartnerUsageHostingOff'
+import { OrgDailyTrendPanel, OrgTopPoliciesPanel, OrgUsageNotesPanel } from './PartnerUsageHostingOff'
 
 /**
  * 信息使用：本机构发布的信息被浏览、收藏、打开来源平台入口了多少次。
@@ -38,8 +38,10 @@ import { OrgFavoritesPanel, OrgTopPoliciesPanel } from './PartnerUsageHostingOff
  *   - 按内容当前的来源机构归属计入本机构（内容换了机构，历史记录跟着内容走）。
  *   - 任何分组少于 5 次一律显示「少于 5」（服务端已置空），合计里有未知就写「至少」，不补数。
  *   - 「打开来源平台入口」不是投递或预约结果；本平台不收简历、不代投递。
- *   - 招聘内容托管关闭时服务端只下发政策一类（variant="org-usage"）：场景只画政策一类，
- *     底栏换成「热门政策」，右栏是收藏与统计口径，每日趋势在左栏长高（PartnerUsageHostingOff.tsx）。
+ *   - 默认看近 7 天：小机构按天多是「少于 5」，一周才看得出东西；地址栏上的 range 优先，非法值按没写处理。
+ *   - 招聘内容托管关闭时服务端只下发政策一类（variant="org-usage"，见 PartnerUsageHostingOff.tsx）：
+ *     左栏使用概况（三个合计只在这里写）与统计口径，中栏场景不写数、底部是宽的每日趋势，右栏整栏是热门政策 Top 5；
+ *     选「今日」时每日趋势只剩一行状态（variant="org-usage-today"：底栏收窄、场景长高）。
  */
 
 const TITLE = '本机构信息使用态势'
@@ -57,6 +59,13 @@ const TYPE_TAG: Record<ScreenContentType, string> = { job: '岗位', job_fair: '
 const MEMBERS_NOTE = '只含登录会员的浏览、收藏与打开来源平台入口记录，按内容当前的来源机构归属计入本机构；少于 5 次不显示。'
 
 type TypeRow = ScreenPartnerContentUsageValue['byType'][number]
+
+/** 没写 range（或写了非法值）就看默认的近 7 天；请求前服务层还会再按白名单纠正一次。 */
+const PARTNER_USAGE_DEFAULT_RANGE: ScreenUsageRange = '7d'
+
+function viewRange(raw: string | null): ScreenUsageRange {
+  return raw === 'today' || raw === '7d' || raw === '30d' ? raw : PARTNER_USAGE_DEFAULT_RANGE
+}
 
 function usageMeta(usage: ScreenUsageSnapshot): ShellMeta {
   const failed = Object.values(usage.metrics).filter((m) => m && m.available === false && m.reason === 'source_query_failed').length
@@ -102,15 +111,15 @@ function VisitsValue({ metric }: { metric: ScreenUsageSnapshot['metrics']['visit
   )
 }
 
-/** 统计口径。托管开启时在左下，托管关闭时挪到右栏；托管关闭时没有岗位与招聘会，最后一句只说打开入口。 */
-function NotesPanel({ visits, hostingOff }: { visits: ScreenUsageSnapshot['metrics']['visits']; hostingOff: boolean }) {
+/** 统计口径（托管开启时在左下）。托管关闭的那一版在 PartnerUsageHostingOff.tsx：访问人次写成一条说明。 */
+function NotesPanel({ visits }: { visits: ScreenUsageSnapshot['metrics']['visits'] }) {
   return (
     <TwinPanel title="统计口径" sub="本页数字怎么来的" source={MEMBERS_NOTE}>
       <ul className="twin-notes">
         <li>只统计登录会员的浏览、收藏与打开来源平台入口</li>
         <li>按内容当前的来源机构归属计入本机构</li>
         <li>任何分组少于 5 次都不显示具体数字</li>
-        <li>{hostingOff ? '打开来源平台入口只计打开次数，不是办理结果' : '打开来源平台入口不是投递或预约结果，本平台不收简历、不代投递'}</li>
+        <li>打开来源平台入口不是投递或预约结果，本平台不收简历、不代投递</li>
       </ul>
       <div className="twin-kv twin-push">
         <span>访问人次</span>
@@ -138,7 +147,7 @@ function useUsage(range: ScreenUsageRange) {
 }
 
 export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
-  const range = normalizeUsageRange(chrome.params.get('range'))
+  const range = viewRange(chrome.params.get('range'))
   const usage = useUsage(range)
   if (!usage.data) {
     return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={usage.failure} onRetry={() => void usage.refresh()} />
@@ -152,14 +161,13 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
     ? content.map((row) => ({ key: row.type, label: TYPE_LABEL[row.type], browse: row.browse, favorites: row.favorites, sourceOpens: row.sourceOpens }))
     : []
   const topLimit = chrome.presenting ? 5 : 8
-  // 托管关闭的展示档：每日趋势长进左下（两格高），图与当日数一起放大
-  const grown = hostingOff && chrome.presenting
+  const variant = hostingOff ? (usage.data.range === 'today' ? 'org-usage-today' : 'org-usage') : undefined
 
   const toolbar = (
     <div className="twin-fgrp" role="group" aria-label="统计时间">
       <span className="twin-flabel">时间</span>
       {RANGES.map((r) => (
-        <button key={r.key} type="button" className="twin-chip" aria-pressed={range === r.key} onClick={() => chrome.setParam('range', r.key === 'today' ? null : r.key)}>
+        <button key={r.key} type="button" className="twin-chip" aria-pressed={range === r.key} onClick={() => chrome.setParam('range', r.key === PARTNER_USAGE_DEFAULT_RANGE ? null : r.key)}>
           {r.label}
         </button>
       ))}
@@ -179,7 +187,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
       onRefresh={() => void usage.refresh()}
       refreshing={usage.status === 'loading'}
       hostingOff={hostingOff}
-      variant={hostingOff ? 'org-usage' : undefined}
+      variant={variant}
     >
       <TwinSlot slot="l1">
         <TwinMetricPanel
@@ -196,7 +204,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
             ]
             return (
               <>
-                <div className="twin-stat-list">
+                <div className={hostingOff ? 'twin-stat-list is-tall' : 'twin-stat-list'}>
                   {stats.map(([label, values]) => {
                     const total = twinInfoTotalParts(values)
                     return (
@@ -218,35 +226,16 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
       </TwinSlot>
 
       <TwinSlot slot="l2">
-        <TwinMetricPanel
-          title="每日趋势"
-          sub={rangeText}
-          metric={u.partnerDaily}
-          source="按上海自然日统计本机构信息的浏览与打开来源平台入口次数。少于 5 次的日子画在底线上的空心点，不连线、不补数。"
-          render={(value) =>
-            value.days.length <= 1 ? (
-              grown ? (
-                // 托管关闭的展示档：本块长满左栏两格高，当日两个数各占一半，不留一大片空白
-                <>
-                  <div className="twin-stat-list is-tall">
-                    <div className="twin-stat">
-                      <span>今日浏览</span>
-                      <b>
-                        {value.days.length ? twinSmall(value.days[0].browse) : '—'}
-                        <span className="twin-unit">次</span>
-                      </b>
-                    </div>
-                    <div className="twin-stat">
-                      <span>今日打开来源平台</span>
-                      <b>
-                        {value.days.length ? twinSmall(value.days[0].sourceOpens) : '—'}
-                        <span className="twin-unit">次</span>
-                      </b>
-                    </div>
-                  </div>
-                  <p className="twin-cap">选「近 7 天」或「近 30 天」查看趋势</p>
-                </>
-              ) : (
+        {hostingOff ? (
+          <OrgUsageNotesPanel visits={u.visits} membersNote={MEMBERS_NOTE} />
+        ) : (
+          <TwinMetricPanel
+            title="每日趋势"
+            sub={rangeText}
+            metric={u.partnerDaily}
+            source="按上海自然日统计本机构信息的浏览与打开来源平台入口次数。少于 5 次的日子画成底部的斜纹带，不连线、不补数；前后都少于 5 的那一天单独画点并写出次数。"
+            render={(value) =>
+              value.days.length <= 1 ? (
                 <>
                   <TwinTiles
                     items={[
@@ -256,27 +245,26 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
                   />
                   <p className="twin-cap twin-push">选「近 7 天」或「近 30 天」查看趋势</p>
                 </>
+              ) : (
+                <>
+                  <TwinAreaTrend
+                    days={value.days.map((d) => ({ date: d.date, value: d.browse }))}
+                    seriesLabel={`${rangeText}每日浏览次数`}
+                    secondary={{ label: `${rangeText}每日打开来源平台入口次数`, values: value.days.map((d) => d.sourceOpens) }}
+                  />
+                  <p className="twin-cap twin-push">
+                    <span className="twin-key is-acc" aria-hidden="true" />浏览{'\u3000'}<span className="twin-key is-gold" aria-hidden="true" />打开来源平台入口
+                  </p>
+                </>
               )
-            ) : (
-              <>
-                <TwinAreaTrend
-                  days={value.days.map((d) => ({ date: d.date, value: d.browse }))}
-                  seriesLabel={`${rangeText}每日浏览次数`}
-                  secondary={{ label: `${rangeText}每日打开来源平台入口次数`, values: value.days.map((d) => d.sourceOpens) }}
-                  height={grown ? 470 : undefined}
-                />
-                <p className="twin-cap twin-push">
-                  <span className="twin-key is-acc" aria-hidden="true" />浏览{'\u3000'}<span className="twin-key is-gold" aria-hidden="true" />打开来源平台入口
-                </p>
-              </>
-            )
-          }
-        />
+            }
+          />
+        )}
       </TwinSlot>
 
       {hostingOff ? null : (
         <TwinSlot slot="l3">
-          <NotesPanel visits={u.visits} hostingOff={false} />
+          <NotesPanel visits={u.visits} />
         </TwinSlot>
       )}
 
@@ -288,6 +276,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
               hubLabel="本机构信息"
               hubCaption={`${rangeText} · 登录会员`}
               opensCaption={hostingOff ? '不是办理结果' : undefined}
+              counts={!hostingOff}
             />
           </TwinSceneBox>
         ) : (
@@ -302,7 +291,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
 
       <TwinSlot slot="bottom">
         {hostingOff ? (
-          <OrgTopPoliciesPanel metric={u.partnerTop} rangeText={rangeText} limit={5} membersNote={MEMBERS_NOTE} />
+          <OrgDailyTrendPanel metric={u.partnerDaily} rangeText={rangeText} presenting={chrome.presenting} />
         ) : (
           <TwinMetricPanel
             title="按信息类型"
@@ -329,7 +318,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
 
       <TwinSlot slot="r1">
         {hostingOff ? (
-          <OrgFavoritesPanel metric={u.partnerContent} rangeText={rangeText} membersNote={MEMBERS_NOTE} />
+          <OrgTopPoliciesPanel metric={u.partnerTop} rangeText={rangeText} membersNote={MEMBERS_NOTE} />
         ) : (
           <TwinMetricPanel
             title="打开来源平台入口"
@@ -352,10 +341,8 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
         )}
       </TwinSlot>
 
-      <TwinSlot slot="r2">
-        {hostingOff ? (
-          <NotesPanel visits={u.visits} hostingOff />
-        ) : (
+      {hostingOff ? null : (
+        <TwinSlot slot="r2">
           <TwinMetricPanel
             title="收藏"
             sub={rangeText}
@@ -371,8 +358,8 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
               )
             }}
           />
-        )}
-      </TwinSlot>
+        </TwinSlot>
+      )}
 
       {hostingOff ? null : (
         <TwinSlot slot="r3">

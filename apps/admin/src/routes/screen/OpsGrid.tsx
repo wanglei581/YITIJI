@@ -175,7 +175,8 @@ export function OpsGrid({ metrics, hostingOff = false, stock }: { metrics: Scree
                 value={c.rate.toFixed(1)}
                 unit="%"
                 tone={c.rate < 90 ? 'warn' : 'normal'}
-                label={`完成 ${screenCount(c.completed)} / 共 ${screenCount(c.finished)} 个`}
+                // 完成数已在任务流里写过，这里只跟分母（每屏一个数只出现一次）
+                label={rateLabel(c.finished, '个已结束任务')}
               />
             )
           }}

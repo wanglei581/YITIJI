@@ -9,6 +9,7 @@ import type { TwinState } from './TwinCharts'
  *
  * 最要紧的排前面（离线 → 告警 → 未上报 → 打印中 → 在线）。格数固定为 limit：机队更大时
  * 最后一格如实写「另 N 台」，块位高度不随机队大小变化，也不把格子缩到看不清。
+ * 格子均分墙的高度：台数少时格子大，台数多时每格收到触控下限为止。
  */
 
 const SHORT_STATE: Record<TwinState, string> = {
@@ -25,9 +26,11 @@ export interface TwinTerminalWallProps {
   limit: number
   onOpen: (terminal: TwinCityTerminal) => void
   emptyText: string
+  /** 给了就在每格第三行写服务点位（没填点位的写这句）；已聚焦到一个点位时不给，免得每格都写同一个名字。 */
+  unassignedPlace?: string
 }
 
-export function TwinTerminalWall({ terminals, limit, onOpen, emptyText }: TwinTerminalWallProps) {
+export function TwinTerminalWall({ terminals, limit, onOpen, emptyText, unassignedPlace }: TwinTerminalWallProps) {
   if (terminals.length === 0) return <p className="twin-empty">{emptyText}</p>
   const sorted = twinSortByState(terminals)
   const overflow = sorted.length > limit
@@ -47,6 +50,7 @@ export function TwinTerminalWall({ terminals, limit, onOpen, emptyText }: TwinTe
             >
               <b className="twin-code">{t.code}</b>
               <span>{SHORT_STATE[state]}</span>
+              {unassignedPlace === undefined ? null : <i className="twin-fleet-place">{t.area ?? unassignedPlace}</i>}
             </button>
           </li>
         )
@@ -54,7 +58,7 @@ export function TwinTerminalWall({ terminals, limit, onOpen, emptyText }: TwinTe
       {overflow ? (
         <li className="twin-fleet-more">
           <b>另 {screenCount(sorted.length - shown.length)} 台</b>
-          <span>在终端孪生里查看</span>
+          <span>在终端孪生里看</span>
         </li>
       ) : null}
     </ul>
