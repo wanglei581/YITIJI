@@ -545,10 +545,26 @@
 .twin-stat-list.is-tall { flex: 1 1 auto; }
 .twin-stat-list.is-tall .twin-stat { flex: 1 1 0; align-items: center; }
 
-/* 终端状态墙：一格一台，左边一道状态色；整格是按钮，点进该终端的孪生 */
+/* 等人处理的数（待审核）用金色，与告警同一种「要看一眼」 */
+.twin-stat b.is-warn { color: var(--tw-gold); }
+
+/* 块里的主要内容落在标题与底部说明之间的正中（块被同一行的邻居撑高时不在中间留一截空白） */
+.twin-mid {
+  margin-block: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/*
+ * 终端状态墙：一格一台，左边一道状态色；整格是按钮，点进该终端的孪生。
+ * 格子均分墙的高度（台数少时格子大，台数多时每行收到 56px 为止），列数随面板宽度走。
+ */
 .twin-fleet {
+  flex: 1 1 auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  grid-auto-rows: minmax(56px, 1fr);
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -570,6 +586,7 @@
 
 .twin-fleet-cell {
   width: 100%;
+  height: 100%;
   min-height: 48px;
   display: flex;
   flex-direction: column;
@@ -607,6 +624,31 @@
   line-height: 1.3;
 }
 
+/* 第三行：服务点位，放不下省略（整格的悬停提示里有编号与状态） */
+.twin-fleet-place {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
+  line-height: 1.3;
+  color: var(--tw-muted);
+}
+
+/* 告警列表没排满时，下面一行说其余终端正常：占住剩下的高度，不留一块空白 */
+.twin-allclear {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  margin: 0;
+  border-radius: 10px;
+  background: rgba(46, 230, 168, 0.04);
+  color: var(--tw-muted);
+}
+
 /* 模型构成：一行排不下就折行，每项「名字 次数」 */
 .twin-models {
   display: flex;
@@ -616,6 +658,36 @@
 }
 
 .twin-models b { color: var(--tw-strong); }
+
+/* 高而窄的一整栏里的排行：竖排，标题写全（最多两行），各项均分栏高 */
+.twin-rank.is-tall {
+  flex: 1 1 auto;
+  justify-content: space-around;
+  gap: 16px;
+}
+
+.twin-rank.is-tall li {
+  align-items: baseline;
+  align-content: start;
+  row-gap: 8px;
+}
+
+.twin-rank.is-tall .twin-rank-t {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  text-wrap: pretty;
+  line-height: 1.35;
+}
+
+.twin-rank.is-tall .twin-rank-bar {
+  height: 8px;
+  border-radius: 4px;
+}
+
+/* 跟着容器宽度画的折线（底栏的宽图）：外框定高，里面的 SVG 按量到的宽度出 viewBox */
+.twin-trend { width: 100%; }
 
 /* 宽而矮的底栏里的排行：按列铺开，逐行读 1 2 3 / 4 5 */
 .twin-rank.is-wide {

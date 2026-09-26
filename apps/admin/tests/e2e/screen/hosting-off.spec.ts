@@ -1,7 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
+import { SCREEN_HOSTING_OFF_NOTE, screenReasonCopy } from '@ai-job-print/ui'
 import { SERVICE_LABELS_HOSTING_OFF, govHostingOff, opsHostingOff, usageHostingOff } from './fixtures/snapshots'
 import { adminApi, open, panel, serve, serveHappy, tile, uncaughtPageErrors } from './helpers'
-import { geometry, hostingOffAudit, sceneLabels, type GeometryReport } from './measure'
+import { geometry, hostingOffAudit, numberAudit, sceneLabels, type GeometryReport } from './measure'
 
 /**
  * 招聘内容托管关闭（托管 a）—— 我们云上的默认部署，政务客户与生产环境看到的就是这一版。
@@ -10,10 +11,13 @@ import { geometry, hostingOffAudit, sceneLabels, type GeometryReport } from './m
  * 每个页签、展示档与桌面档都要满足：
  *   - 屏上没有「未开启」格子、标签或灰色场景节点；边界只在承载政策的那块里说一次；
  *   - 没有只剩说明、没有读数的块；岗位类字眼只出现在边界句里（运营看板盘点存量的那块除外）；
- *   - 几何照旧干净：舞台档块位装得下、不重叠、不裁字；桌面档 1440 与 1100 都不横向滚动。
+ *   - 几何照旧干净：舞台档块位装得下、不重叠、不裁字；桌面档 1440 与 1100 都不横向滚动；
+ *   - 每屏一个数只出现一次（numberAudit）：政务总览与运营看板断言；服务调用与终端孪生的复述在托管开启时就有、
+ *     与这一版无关，列在进度文档的遗留项里，这里不断言。
  */
 
-const BOUNDARY = '政策由运营机构自行审核发布；岗位、招聘会、企业资料不在本平台托管'
+/** 边界句走常量，不在用例里另抄一份：文案改了（如 R4 把「不在本平台托管」改成讲行为）用例自动跟上。 */
+const BOUNDARY = SCREEN_HOSTING_OFF_NOTE
 
 test.afterEach(async ({ page }) => {
   expect(uncaughtPageErrors(page), '页面不得有未捕获异常').toEqual([])
@@ -50,13 +54,18 @@ interface HostingOffCase {
   boundary: number
   /** 运营看板里专门盘点岗位类存量的那块，岗位字眼是它的内容本身。 */
   exempt: string[]
+  /**
+   * 每屏一个数只出现一次。exemptPlaces：城区立柱上的「海珠区 8 台」是各区台数唯一的画法（面板里没有按区的台数），
+   * 不参加比对；场景左上的说明与右上的图例照样比。null = 这里不断言（见文件头）。
+   */
+  numbers: null | { exemptPlaces: boolean }
 }
 
 const CASES: HostingOffCase[] = [
-  { key: 'gov', path: '/screen/gov', title: '职易达 · 就业服务终端运行态势', panels: 7, cards: 0, boundary: 1, exempt: [] },
-  { key: 'usage', path: '/screen/usage', title: '职易达 · 系统使用与服务调用态势', panels: 7, cards: 0, boundary: 1, exempt: [] },
-  { key: 'ops', path: '/screen/ops', title: '终端运营看板', panels: 0, cards: 10, boundary: 1, exempt: ['岗位类存量'] },
-  { key: 'terminal', path: '/screen/terminal?id=t-gz-th-005', title: '终端数字孪生', panels: 4, cards: 0, boundary: 0, exempt: [] },
+  { key: 'gov', path: '/screen/gov', title: '职易达 · 就业服务终端运行态势', panels: 7, cards: 0, boundary: 1, exempt: [], numbers: { exemptPlaces: true } },
+  { key: 'usage', path: '/screen/usage', title: '职易达 · 系统使用与服务调用态势', panels: 7, cards: 0, boundary: 1, exempt: [], numbers: null },
+  { key: 'ops', path: '/screen/ops', title: '终端运营看板', panels: 0, cards: 10, boundary: 1, exempt: ['岗位类存量'], numbers: { exemptPlaces: false } },
+  { key: 'terminal', path: '/screen/terminal?id=t-gz-th-005', title: '终端数字孪生', panels: 4, cards: 0, boundary: 0, exempt: [], numbers: null },
 ]
 
 test.describe('admin screen · 托管关闭', () => {
@@ -76,6 +85,11 @@ test.describe('admin screen · 托管关闭', () => {
       expect(audit.noticeOnly, '不得有只剩说明、没有读数的块').toEqual([])
       expect(audit.recruitmentWords, '岗位类字眼只许出现在边界句里').toEqual([])
       expect(audit.boundary, '边界句每屏只说一次（终端孪生没有政策内容，不说）').toBe(c.boundary)
+      expect(audit.storageClaims, '托管说法讲「不发布」，不讲「不保存 / 不在本平台托管」（3.15 存量清理前）').toEqual([])
+      if (c.numbers) {
+        const numbers = await numberAudit(page, c.numbers.exemptPlaces)
+        expect(numbers.repeats, `一个数每屏只出现一次（各块读到的数：${JSON.stringify(numbers.blocks)}）`).toEqual([])
+      }
 
       const floor = wall ? 13 : 12
       const report = await geometry(page, floor)
@@ -102,7 +116,7 @@ test.describe('admin screen · 托管关闭', () => {
     })
   }
 
-  test('政务总览：右上是政策服务，右中是服务质量，边界句在政策服务里', async ({ page }) => {
+  test('政务总览：右上是政策服务，右中是服务质量（运营计数照实写，比例不再跟一个别处写过的次数），边界句在政策服务里', async ({ page }) => {
     await serveHostingOff(page)
     await open(page, '/screen/gov')
     await expect(panel(page, /^信息服务 · 在架$/)).toHaveCount(0)
@@ -114,10 +128,28 @@ test.describe('admin screen · 托管关闭', () => {
     const quality = panel(page, /^服务质量$/)
     await expect(tile(quality, 'AI 成功率').locator('b')).toHaveText('97.5%')
     await expect(tile(quality, '打印完成率').locator('b')).toHaveText('99.3%')
-    await expect(tile(quality, '打印完成率').locator('small')).toHaveText(' · 418/421')
-    // 今日失败 3 次：少于 5 的计数只写「少于 5」
-    await expect(tile(quality, '今日打印失败').locator('b')).toHaveText('少于 5次')
+    // 两个比例不跟次数：AI 调用总数在「AI 服务分项」里写过，完成数与失败数在底栏任务流里写过
+    await expect(quality.locator('.twin-tile small')).toHaveCount(0)
+    // 今日失败与进行中是运营计数：照实写（运营快照给 3，同屏任务流里也是 3），不套「少于 5」
+    await expect(tile(quality, '今日打印失败').locator('b')).toHaveText('3次')
     await expect(tile(quality, '进行中打印').locator('b')).toHaveText('6个')
+    await expect(panel(page, /^近 24 小时任务流$/).locator('.twin-flow-node', { hasText: '失败待核查' }).locator('b')).toHaveText('3')
+    await expect(quality.getByText('少于 5')).toHaveCount(0)
+    // 场景左上不再写台数、右上图例只当颜色说明：台数都在左上「终端与服务」里
+    await expect(page.locator('.twin-overlay.is-tl')).toHaveText('终端分布 · 按所在区示意')
+    await expect(page.locator('.twin-overlay.is-tr .twin-lg')).toHaveText(['在线', '打印中', '告警', '离线', '未上报'])
+    // 打印趋势没有空缺：仍是原来的画法（与托管开启逐像素一致），不画斜纹带
+    const printTrend = panel(page, /^打印量趋势$/)
+    await expect(printTrend.locator('svg[role="img"]')).toHaveCount(1)
+    await expect(printTrend.locator('svg.twin-trend-gaps, .twin-trend-gap')).toHaveCount(0)
+  })
+
+  test('托管说法讲行为不讲存储：边界句与「托管未开启」原因说明都不说「不保存 / 不存 / 不在本平台托管」', () => {
+    // CLAUDE.md §1：3.15 存量清理完成前，不得对外说我们云上已不存这些数据（运营看板上就有两千多条岗位存量）
+    for (const text of [SCREEN_HOSTING_OFF_NOTE, screenReasonCopy('recruitment_hosting_disabled').detail]) {
+      expect(text).not.toMatch(/不保存|不存|不在本平台托管/)
+      expect(text).toMatch(/不发布/)
+    }
   })
 
   test('服务调用：场景只有服务端下发的节点，「岗位 AI」改叫「简历对照」；右栏是 AI 服务 / AI 质量 / 政策服务使用', async ({ page }) => {
@@ -149,7 +181,7 @@ test.describe('admin screen · 托管关闭', () => {
     await expect(rows).toHaveText(SERVICE_LABELS_HOSTING_OFF)
   })
 
-  test('运营看板：机构待审政策与打印完成率上顶栏；岗位类存量盘点清楚；托管开启时不多取政务快照', async ({ page }) => {
+  test('运营看板：机构待审政策与打印完成率上顶栏（完成率只跟分母）；岗位类存量盘点清楚；托管开启时不多取政务快照', async ({ page }) => {
     const log = await serveHostingOff(page)
     await open(page, '/screen/ops')
     const titles = page.locator('.ops-card h2 .ops-h2-text')
@@ -157,7 +189,9 @@ test.describe('admin screen · 托管关闭', () => {
     const card = (title: string) => page.locator('.ops-card').filter({ has: page.locator('h2 .ops-h2-text', { hasText: new RegExp(`^${title}$`) }) })
     await expect(card('机构待审政策').locator('.ops-n')).toHaveText('8条')
     await expect(card('打印完成率').locator('.ops-n')).toHaveText('99.3%')
-    await expect(card('岗位类存量').locator('.ops-mv')).toHaveText(['2,184', '37', '148', '78'])
+    // 完成数 418 已在任务流里写过，这里只跟分母
+    await expect(card('打印完成率').locator('.ops-lb')).toHaveText('近 24 小时 · 421 个已结束任务')
+    await expect(card('岗位类存量').locator('.ops-mv')).toHaveText(['2,184', '37', '148', '81'])
     expect(log.urls, '岗位类存量取自政务快照：托管关闭时多取这一份').toContain('/api/v1/admin/screen/snapshot?profile=gov')
 
     const onLog = await serveHappy(page)

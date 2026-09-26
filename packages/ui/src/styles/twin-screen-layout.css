@@ -99,14 +99,30 @@
 /*
  * 招聘内容托管关闭（托管 a，根上 data-hosting="off"）：机构两屏的块位变体。
  * 整块是招聘内容的面板不渲染，腾出的块位交给真实数据的邻居，不留空洞、不裁内容。
- *   机构总览：展示档不放「建设中的指标」，场景长满中栏；右栏告警占两个块位高。
- *   信息使用：每日趋势长进左下；右栏收藏与统计口径各占半栏。
+ *   机构总览：展示档不放「建设中的指标」，场景长满中栏；左中终端状态墙、右中告警各占两个块位高，
+ *     右上是合成一块的本机构政策。
+ *   信息使用：左栏使用概况与统计口径各占半栏；中栏底部是宽的每日趋势（选「今日」时只剩一行，
+ *     底栏收窄、场景长高）；右栏整栏是热门政策。
  */
 [data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] .twin-slot[data-slot='scene'] { height: 956px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] .twin-slot[data-slot='l2'] { height: 628px; }
 [data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] .twin-slot[data-slot='r2'] { height: 628px; }
-[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='l2'] { height: 628px; }
-[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='r1'] { height: 464px; }
-[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='r2'] { top: 500px; height: 464px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-slot[data-slot='l1'] { height: 600px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-slot[data-slot='l2'] { top: 636px; height: 328px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-slot[data-slot='r1'] { height: 944px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='scene'] { height: 680px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='bottom'] { top: 700px; height: 264px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage-today'] .twin-slot[data-slot='scene'] { height: 856px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage-today'] .twin-slot[data-slot='bottom'] { top: 876px; height: 88px; }
+/*
+ * 右栏整栏的热门政策：每条均分栏高、至多 172，五条正好铺满；不满五条时靠上排，不各自漂在栏里。
+ * 用 flex-basis 0 + max-height 而不是 flex-basis 172：后者会把列表的固有高度撑成 5×172，面板被顶出块位。
+ */
+[data-ops-screen='wall'] .twin-rank.is-tall { justify-content: flex-start; gap: 0; min-height: 0; }
+[data-ops-screen='wall'] .twin-rank.is-tall li { flex: 1 1 0; max-height: 172px; align-content: center; }
+/* 左下的统计口径：条目少、块位高，行距放宽一档 */
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-notes { gap: 12px; }
+.twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-notes li { text-wrap: pretty; }
 
 /* 运营看板：沿用卡片栅格，整块铺满 */
 [data-ops-screen='wall'] .twin-grid[data-layout='full'] .twin-slot[data-slot='full'] { left: 28px; top: 16px; width: 1864px; height: 964px; }
@@ -225,16 +241,16 @@
   grid-template-areas:
     'scene scene scene'
     'bottom bottom bottom'
-    'l1 l2 l3'
+    'l1 l2 l2'
     'r1 r2 r2';
 }
 
-[data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] {
+[data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] {
   grid-template-areas:
     'scene scene scene'
     'bottom bottom bottom'
-    'l1 l2 l2'
-    'r1 r2 r2';
+    'l1 r1 r1'
+    'l2 r1 r1';
 }
 
 @container (max-width: 1100px) {
@@ -243,16 +259,15 @@
       'scene scene'
       'bottom bottom'
       'l1 r1'
-      'l2 r2'
-      'l3 r2';
+      'l2 r2';
   }
 
-  [data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] {
+  [data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] {
     grid-template-areas:
       'scene scene'
       'bottom bottom'
       'l1 r1'
-      'l2 r2';
+      'l2 r1';
   }
 }
 
@@ -312,6 +327,12 @@
 [data-ops-screen='wall'] .twin-fleet-cell b { font-size: 15px; }
 [data-ops-screen='wall'] .twin-fleet-cell span { font-size: 13px; }
 [data-ops-screen='wall'] .twin-fleet-more { font-size: 13px; }
+[data-ops-screen='wall'] .twin-fleet-place { font-size: 13px; }
+[data-ops-screen='wall'] .twin-allclear { font-size: 15px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-notes { font-size: 16px; }
+[data-ops-screen='wall'] .twin-rank.is-tall li { font-size: 17px; }
+[data-ops-screen='wall'] .twin-rank.is-tall .twin-rank-no { font-size: 20px; }
+[data-ops-screen='wall'] .twin-rank.is-tall li > b { font-size: 24px; }
 [data-ops-screen='wall'] .twin-gapline { font-size: 14px; }
 [data-ops-screen='wall'] .twin-stat-list.is-tall .twin-stat b { font-size: 48px; }
 [data-ops-screen='wall'] .twin-rows { font-size: 16px; }
@@ -368,6 +389,11 @@
 [data-ops-screen='desk'] .twin-fleet-cell b { font-size: 14px; }
 [data-ops-screen='desk'] .twin-fleet-cell span { font-size: 12px; }
 [data-ops-screen='desk'] .twin-fleet-more { font-size: 12px; }
+[data-ops-screen='desk'] .twin-fleet-place { font-size: 12px; }
+[data-ops-screen='desk'] .twin-allclear { font-size: 14px; }
+[data-ops-screen='desk'] .twin-rank.is-tall li { font-size: 15px; }
+[data-ops-screen='desk'] .twin-rank.is-tall .twin-rank-no { font-size: 17px; }
+[data-ops-screen='desk'] .twin-rank.is-tall li > b { font-size: 19px; }
 [data-ops-screen='desk'] .twin-gapline { font-size: 13px; }
 [data-ops-screen='desk'] .twin-stat-list.is-tall .twin-stat b { font-size: 36px; }
 [data-ops-screen='desk'] .twin-rows { font-size: 14px; }

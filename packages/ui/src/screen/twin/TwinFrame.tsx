@@ -14,8 +14,9 @@ export type TwinLayout = 'city' | 'terminal' | 'full'
 /**
  * 同一 layout 下的版式变体，只在招聘内容托管关闭时由机构两屏使用：
  * 岗位类面板整块不渲染，腾出的块位交给真实数据的邻居（块位几何在 twin-screen-layout.css）。
+ * org-usage-today：信息使用选「今日」时每日趋势只剩一行状态，底栏收窄、场景长高。
  */
-export type TwinVariant = 'org-overview' | 'org-usage'
+export type TwinVariant = 'org-overview' | 'org-usage' | 'org-usage-today'
 
 /** 面板标题层级 = 页眉层级 + 1：嵌在后台里是 h3，新窗口展示是 h2，不跳级。 */
 export const TwinPanelHeadingContext = createContext<2 | 3>(3)

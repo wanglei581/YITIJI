@@ -5,11 +5,13 @@ import { printCompletion, smallCountText } from './metricLabels'
 /**
  * 政务总览在招聘内容托管关闭（托管 a，我们云上的默认部署）时的右栏两块。
  *
- * 托管关闭时本平台云上不存岗位、招聘会、企业资料，原来的「信息服务 · 在架」与「来源平台访问」
+ * 托管 a：我们云上不再发布岗位、招聘会、企业资料（存量清理见 next-tasks 3.15）。原来的「信息服务 · 在架」与「来源平台访问」
  * 两块整块是招聘内容，不再渲染成一排「未开启」：
  *   - 右上换成「政策服务」：在架政策、待机构审核，并在这里说一次边界（全屏唯一一处）；
  *   - 右中换成「服务质量」：AI 成功率、打印完成率、今日打印失败、进行中打印，全是快照里已有的真实数字。
- * 小于 5 的计数写「少于 5」；比例的分母少于 5 不给百分比。
+ * 今日打印失败与进行中打印是运营计数（不是按人的使用统计），照实写数；只有两个比例的分母少于 5 时不给百分比。
+ * 每屏一个数只出现一次：两个比例不再跟一个次数 —— AI 调用总数已在「AI 服务分项」里写，
+ * 打印的完成数与失败数（完成率的分子与分母）已在底栏任务流里写。样本不足时才写次数（少于 5）。
  */
 
 export function GovPolicyPanel({ metric, focused }: { metric: ScreenSnapshotMetrics['contentInventory']; focused: boolean }) {
@@ -59,7 +61,7 @@ export function GovQualityPanel({ taskFlow, ops, scope }: { taskFlow: ScreenSnap
   const aiRate = fromOps(ops, (m) => m.aiSuccessRate24h, 'AI 成功率', (v) =>
     v.successRate === null || v.total < 5
       ? { value: '样本不足', label: 'AI 成功率', hint: `${smallCountText(v.total)} 次` }
-      : { value: v.successRate.toFixed(1), unit: '%', label: 'AI 成功率', hint: `${screenCount(v.total)} 次` },
+      : { value: v.successRate.toFixed(1), unit: '%', label: 'AI 成功率' },
   )
   const printRate: TwinTileItem = !taskFlow
     ? { label: '打印完成率', unavailableReason: 'source_query_failed' }
@@ -69,16 +71,17 @@ export function GovQualityPanel({ taskFlow, ops, scope }: { taskFlow: ScreenSnap
           const c = printCompletion(taskFlow.value.printByStatus)
           return c.rate === null
             ? { value: '样本不足', label: '打印完成率', hint: `${smallCountText(c.finished)} 个` }
-            : { value: c.rate.toFixed(1), unit: '%', label: '打印完成率', hint: `${smallCountText(c.completed)}/${smallCountText(c.finished)}` }
+            : { value: c.rate.toFixed(1), unit: '%', label: '打印完成率' }
         })()
-  const failed = fromOps(ops, (m) => m.printFailedToday, '今日打印失败', (v) => ({ value: smallCountText(v.failed), unit: '次', label: '今日打印失败' }))
-  const inProgress = fromOps(ops, (m) => m.printInProgress, '进行中打印', (v) => ({ value: smallCountText(v.total), unit: '个', label: '进行中打印' }))
+  // 运营计数照实写（运营快照给的就是原始数，同屏任务流里也是原始数），不套「少于 5」
+  const failed = fromOps(ops, (m) => m.printFailedToday, '今日打印失败', (v) => ({ value: screenCount(v.failed), unit: '次', label: '今日打印失败' }))
+  const inProgress = fromOps(ops, (m) => m.printInProgress, '进行中打印', (v) => ({ value: screenCount(v.total), unit: '个', label: '进行中打印' }))
   return (
     <TwinPanel
       title="服务质量"
       sub="近 24 小时"
       scope={scope}
-      source="AI 成功率 = 成功 ÷（成功 + 失败），近 24 小时滚动窗；打印完成率 = 已完成 ÷（已完成 + 失败），只看近 24 小时里已经结束的打印任务；今日打印失败按上海自然日计转入失败的次数；进行中打印是当前排队与打印中的任务。分母少于 5 不给百分比，少于 5 的计数只写「少于 5」。"
+      source="AI 成功率 = 成功 ÷（成功 + 失败），近 24 小时滚动窗；打印完成率 = 已完成 ÷（已完成 + 失败），只看近 24 小时里已经结束的打印任务；今日打印失败按上海自然日计转入失败的次数；进行中打印是当前排队与打印中的任务，这两个是运营计数，照实写数。两个比例的分母少于 5 不给百分比。"
     >
       <TwinTiles items={[aiRate, printRate, failed, inProgress]} />
       <p className="twin-cap twin-push">失败与进行中按上海自然日与当前时刻计</p>

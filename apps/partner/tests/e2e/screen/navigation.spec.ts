@@ -263,7 +263,8 @@ test.describe('partner screen navigation', () => {
 
   test('少于 5：null 计数写「少于 5」，同一格不出现 0；合计里有未知写「至少」', async ({ page }) => {
     await serveHappy(page)
-    await open(page, '/screen/usage')
+    // 今日档：企业资料的浏览、三类收藏都少于 5（默认的近 7 天里这些数已经够 5）
+    await open(page, '/screen/usage?range=today')
     // 企业资料今日浏览 4 次 → 服务端给 null
     const company = tile(panel(page, /^按信息类型$/), '企业资料')
     await expect(company.locator('b')).toHaveText('少于 5次浏览')
@@ -285,15 +286,42 @@ test.describe('partner screen navigation', () => {
     await expect(tile(today, '打印页数').locator('b')).toHaveText('22页')
   })
 
+  test('信息使用默认看近 7 天：地址栏上的 range 优先；选「今日」写进地址，选回「近 7 天」把参数去掉', async ({ page }) => {
+    const log = await serve(page, partnerApi())
+    const chips = page.getByRole('group', { name: '统计时间' })
+    const usageUrls = () => log.urls.filter((url) => url.includes('/usage'))
+
+    await open(page, '/screen/usage')
+    await expect(page.locator('.twin-hd-sub')).toContainText('近 7 天')
+    await expect(chips.getByRole('button', { name: '近 7 天', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    expect(usageUrls()[0], '没写 range 时第一次就取近 7 天').toBe('/api/v1/partner/screen/usage?range=7d')
+    await expectLocation(page, '/screen/usage', {})
+
+    await chips.getByRole('button', { name: '今日', exact: true }).click()
+    await expectLocation(page, '/screen/usage', { range: 'today' })
+    await expect(page.locator('.twin-hd-sub')).toContainText('今日')
+    await chips.getByRole('button', { name: '近 7 天', exact: true }).click()
+    await expectLocation(page, '/screen/usage', {})
+    await expect(page.locator('.twin-hd-sub')).toContainText('近 7 天')
+
+    // 地址栏上的 range 优先：今日、近 30 天各取各的；展示档同样默认近 7 天
+    for (const [query, label, range] of [['?range=today', '今日', 'today'], ['?range=30d', '近 30 天', '30d'], ['?display=1', '近 7 天', '7d']] as const) {
+      const before = usageUrls().length
+      await open(page, `/screen/usage${query}`)
+      await expect(page.locator('.twin-hd-sub')).toContainText(label)
+      expect(usageUrls()[before], `${query} 取的是 ${range}`).toBe(`/api/v1/partner/screen/usage?range=${range}`)
+    }
+  })
+
   test('请求里一个机构标识都没有：快照与终端不带 query，信息使用只带纠正后的 range', async ({ page }) => {
     const log = await serve(page, partnerApi())
-    // 地址栏上故意带非法 range 与伪造的 orgId：前者要被纠正为 today，后者一个字都不能进请求
+    // 地址栏上故意带非法 range 与伪造的 orgId：前者按没写处理（默认近 7 天），后者一个字都不能进请求
     await open(page, `/screen/usage?range=bogus&orgId=org-evil&org_id=${MOCK_PARTNER_ORG_ID}`)
     await expect(page.getByRole('heading', { name: USAGE_TITLE, exact: true })).toBeVisible()
     const chips = page.getByRole('group', { name: '统计时间' })
-    await expect(chips.getByRole('button', { name: '今日', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    await chips.getByRole('button', { name: '近 7 天', exact: true }).click()
-    await expect(page.locator('.twin-hd-sub')).toContainText('近 7 天')
+    await expect(chips.getByRole('button', { name: '近 7 天', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await chips.getByRole('button', { name: '今日', exact: true }).click()
+    await expect(page.locator('.twin-hd-sub')).toContainText('今日')
     await chips.getByRole('button', { name: '近 30 天', exact: true }).click()
     await expect(page.locator('.twin-hd-sub')).toContainText('近 30 天')
     await tabLink(page, '机构总览').click()
@@ -307,8 +335,8 @@ test.describe('partner screen navigation', () => {
     const usage = urls.filter((url) => url.includes('/usage'))
     const snapshots = urls.filter((url) => url.includes('/snapshot'))
     const twins = urls.filter((url) => url.includes('/terminals/'))
-    expect(usage[0], '第一次请求就必须是纠正后的 today').toBe('/api/v1/partner/screen/usage?range=today')
-    expect(usage).toContain('/api/v1/partner/screen/usage?range=7d')
+    expect(usage[0], '第一次请求就必须是纠正后的默认档 7d').toBe('/api/v1/partner/screen/usage?range=7d')
+    expect(usage).toContain('/api/v1/partner/screen/usage?range=today')
     expect(usage).toContain('/api/v1/partner/screen/usage?range=30d')
     for (const url of usage) expect(url).toMatch(/^\/api\/v1\/partner\/screen\/usage\?range=(today|7d|30d)$/)
     expect(snapshots.length).toBeGreaterThan(0)

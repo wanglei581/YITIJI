@@ -63,7 +63,6 @@ export {
 export { TwinMetricPanel, TwinPanel, TwinUnavailable } from './screen/twin/TwinPanel'
 export {
   TwinAlertList,
-  TwinAreaTrend,
   TwinBarList,
   TwinDot,
   TwinLegend,
@@ -75,6 +74,7 @@ export {
   TwinTimeline,
   twinSmall,
 } from './screen/twin/TwinCharts'
+export { TWIN_TREND_GAP_NOTE, TwinAreaTrend, twinTrendHasGaps } from './screen/twin/TwinAreaTrend'
 export { TwinNetwork, TwinPill, TwinPrism } from './screen/twin/TwinNetwork'
 export { TwinInfoFlow, twinInfoTotal, twinInfoTotalParts } from './screen/twin/TwinInfoFlow'
 export { TwinRankList } from './screen/twin/TwinRankList'
@@ -173,18 +173,17 @@ export type {
 export type { TwinMetricPanelProps, TwinPanelProps, TwinTone, TwinUnavailableProps } from './screen/twin/TwinPanel'
 export type {
   TwinAlertItem,
-  TwinAreaTrendProps,
   TwinBarItem,
   TwinLegendItem,
   TwinRingProps,
   TwinState,
   TwinTileItem,
   TwinTimelineSegment,
-  TwinTrendDay,
   TwinHeatProps,
   TwinPulseProps,
   TwinStepItem,
 } from './screen/twin/TwinCharts'
+export type { TwinAreaTrendProps, TwinTrendDay } from './screen/twin/TwinAreaTrend'
 export type { TwinNetworkLane, TwinNetworkProps, TwinNetworkService } from './screen/twin/TwinNetwork'
 export type { TwinInfoFlowProps, TwinInfoFlowType } from './screen/twin/TwinInfoFlow'
 export type { TwinRankItem } from './screen/twin/TwinRankList'

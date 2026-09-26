@@ -29,7 +29,7 @@ import {
   type TwinState,
 } from '@ai-job-print/ui'
 import { buildPartnerGapEntries, countPartnerGapMetrics } from './metricLabels'
-import { OrgFleetWallPanel, OrgGapLine, OrgPendingPanel, OrgPolicyPanel } from './PartnerHostingOff'
+import { OrgFleetWallPanel, OrgGapLine, OrgPolicyPanel } from './PartnerHostingOff'
 import { screenHref } from './screenTabs'
 import { TwinShell, TwinShellEmpty, snapshotMeta, usePartnerSnapshot, type ScreenChrome } from './screenView'
 
@@ -44,8 +44,10 @@ import { TwinShell, TwinShellEmpty, snapshotMeta, usePartnerSnapshot, type Scree
  *   3. 机队分类必须标样本：服务端对机构机队有取数上限，截断时写明「前 N 台」。
  *   4. 打印、AI 的记录还没有机构归属，不出数，只在「建设中的指标」里如实列名。
  *   5. 招聘内容托管关闭（我们云上的默认部署）时换一套版式（variant="org-overview"，见 PartnerHostingOff.tsx）：
- *      数据同步、招聘会、在架信息三块整块是招聘内容，不渲染；左栏换成终端状态墙与本机构政策，
- *      右栏待审核只算政策、告警长进腾出的块位；展示档不放「建设中的指标」，桌面档收成一行。
+ *      数据同步、招聘会、在架信息三块整块是招聘内容，不渲染；左中终端状态墙长满两个块位，
+ *      右上本机构政策一块写全（在架、待审核、存量、边界），右中告警两个块位高、没排满时下面说一句其余正常；
+ *      展示档不放「建设中的指标」，桌面档收成一行。每屏一个数只出现一次：场景左上不再写台数，
+ *      右上图例只当颜色说明（台数都在左上「本机构终端」里）。
  *   6. 告警行先写事件、后写点位（「离线 21 分钟 · 人才服务大厅」）：放不下时省略号吃掉的是点位，不是时长。
  */
 
@@ -100,7 +102,7 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
     return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={snap.failure} onRetry={() => void snap.refresh()} />
   }
   const g: ScreenSnapshotMetrics = snap.data.metrics
-  // 托管 a：我们云上不存岗位、招聘会、企业资料，整块是招聘内容的面板不渲染（见文件头第 5 条）
+  // 托管 a：我们云上不再发布岗位、招聘会、企业资料（存量清理见 next-tasks 3.15）；整块是招聘内容的面板不渲染（见文件头第 5 条）
   const hostingOff = snap.data.limits.recruitmentHosting === 'disabled'
   const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
   const terminals = twinTerminalsFromCells(cells, 'location')
@@ -121,6 +123,8 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
   const gaps = buildPartnerGapEntries(g).filter((entry) => !hostingOff || entry.reason !== SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled)
   const gapCount = countPartnerGapMetrics(gaps)
   const orgScope = focus === null ? undefined : '全机构口径'
+  // 托管关闭：告警没排满时下面说一句其余终端正常（台数已在左上，这里不再写数）
+  const allClear = hostingOff && alerts.length > 0 && alerts.length < alertLimit && counts.ok + counts.pr > 0
 
   const alertPanel = (
     <TwinMetricPanel
@@ -137,6 +141,12 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
         <>
           <TwinAlertList items={alerts.slice(0, alertLimit)} emptyText={focus === null ? '本机构终端当前没有告警' : `${focus}当前没有告警`} />
           {alerts.length > alertLimit ? <p className="twin-cap twin-push">另 {alerts.length - alertLimit} 台 · 点立柱或在终端孪生里查看</p> : null}
+          {allClear ? (
+            <p className="twin-allclear">
+              <i className="twin-dot s-ok" aria-hidden="true" />
+              {focus === null ? '其余终端运行正常' : `${focus}其余终端运行正常`}
+            </p>
+          ) : null}
         </>
       )}
     />
@@ -220,7 +230,7 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
 
       <TwinSlot slot="l2">
         {hostingOff ? (
-          <OrgFleetWallPanel metric={g.fleetWall} terminals={inView} focus={focus} onOpen={(t) => openTerminal(t.id)} />
+          <OrgFleetWallPanel metric={g.fleetWall} terminals={inView} focus={focus} unassignedPlace={UNASSIGNED} onOpen={(t) => openTerminal(t.id)} />
         ) : (
           <TwinMetricPanel
             title="数据同步"
@@ -282,10 +292,8 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
         )}
       </TwinSlot>
 
-      <TwinSlot slot="l3">
-        {hostingOff ? (
-          <OrgPolicyPanel metric={g.contentInventory} scope={orgScope} />
-        ) : (
+      {hostingOff ? null : (
+        <TwinSlot slot="l3">
           <TwinMetricPanel
             title="招聘会"
             sub={g.fairStructure?.available ? `进行中 ${screenCount(g.fairStructure.value.ongoingFairs)} 场` : '进行中'}
@@ -318,8 +326,8 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
               </>
             )}
           />
-        )}
-      </TwinSlot>
+        </TwinSlot>
+      )}
 
       <TwinSlot slot="scene">
         {g.fleetWall?.available ? (
@@ -344,10 +352,16 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
               </TwinSceneBox>
               <div className="twin-overlay is-tl">
                 {focus === null ? (
-                  <span>
-                    本机构 {screenCount(groups.length)} 个服务点位 · {screenCount(g.fleetWall.value.matchedCount)} 台 · 分布示意
-                    {g.fleetWall.value.truncated ? `（显示前 ${screenCount(g.fleetWall.value.sampledCount)} 台）` : ''}
-                  </span>
+                  hostingOff ? (
+                    <span>
+                      本机构 {screenCount(groups.length)} 个服务点位 · 分布示意{g.fleetWall.value.truncated ? '（只画了机队样本）' : ''}
+                    </span>
+                  ) : (
+                    <span>
+                      本机构 {screenCount(groups.length)} 个服务点位 · {screenCount(g.fleetWall.value.matchedCount)} 台 · 分布示意
+                      {g.fleetWall.value.truncated ? `（显示前 ${screenCount(g.fleetWall.value.sampledCount)} 台）` : ''}
+                    </span>
+                  )
                 ) : (
                   <>
                     <button type="button" className="twin-crumb" onClick={() => chrome.setParam('place', null)}>
@@ -360,7 +374,7 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
                 )}
               </div>
               <div className="twin-overlay is-tr">
-                <TwinStateLegend counts={counts} />
+                <TwinStateLegend counts={counts} bare={hostingOff} />
               </div>
             </>
           )
@@ -405,7 +419,7 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
 
       <TwinSlot slot="r1">
         {hostingOff ? (
-          <OrgPendingPanel metric={g.pendingReview} scope={orgScope} />
+          <OrgPolicyPanel metric={g.contentInventory} scope={orgScope} />
         ) : (
           <TwinMetricPanel
             title="本机构在架信息"

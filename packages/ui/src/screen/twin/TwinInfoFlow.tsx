@@ -12,6 +12,9 @@ import { TWIN_BILLBOARD, TWIN_WORLD, stageToGround } from './twinMath'
  *
  * 只画服务端下发的类型：招聘内容托管关闭时服务端只下发政策一类，场景里就只有这一类，
  * 落在弧的正中；岗位、招聘会、企业不画灰色占位节点。
+ *
+ * counts={false}：牌子上不写次数，只留名字与说明 —— 同一屏的面板已经写过这几个合计时用
+ * （每屏一个数只出现一次）；柱高与线宽照旧按真实次数。
  */
 
 export interface TwinInfoFlowType {
@@ -29,6 +32,8 @@ export interface TwinInfoFlowProps {
   hubCaption: string
   /** 「打开来源平台入口」牌子的小字说明；缺省是招聘内容也在时的「不是投递或预约结果」。 */
   opensCaption?: string
+  /** 牌子上写不写次数；缺省写。 */
+  counts?: boolean
 }
 
 /** 版式：舞台坐标（976×780）上的锚点，四类内容排成一道弧。 */
@@ -71,7 +76,7 @@ function flowWidth(count: number | null, base: number, div: number): number {
   return count === null ? base : base + Math.sqrt(count) / div
 }
 
-export function TwinInfoFlow({ types, hubLabel, hubCaption, opensCaption = '不是投递或预约结果' }: TwinInfoFlowProps) {
+export function TwinInfoFlow({ types, hubLabel, hubCaption, opensCaption = '不是投递或预约结果', counts = true }: TwinInfoFlowProps) {
   const placed = types.slice(0, TYPE_AT.length)
   const anchors = placed.length === 1 ? SINGLE_AT : TYPE_AT
   const lifts = placed.length === 1 ? SINGLE_LIFT : TYPE_LIFT
@@ -127,17 +132,17 @@ export function TwinInfoFlow({ types, hubLabel, hubCaption, opensCaption = '不�
         {placed.map((t, i) => (
           <TwinPill key={`tl-${t.key}`} at={anchors[i]} lift={lifts[i]} width={176} className={cn('tw3-svc', t.browse === null ? 'p-na' : 'p-info')}>
             <b>{t.label}</b>
-            <span>{`浏览 ${countText(t.browse)}`}</span>
+            <span>{counts ? `浏览 ${countText(t.browse)}` : '浏览'}</span>
           </TwinPill>
         ))}
         <TwinPill at={FAVORITES_AT} lift={96} width={190} className="tw3-big p-out">
           <b>收藏</b>
-          <span>{twinInfoTotal(placed.map((t) => t.favorites))}</span>
+          {counts ? <span>{twinInfoTotal(placed.map((t) => t.favorites))}</span> : null}
           <i>记在用户本人名下</i>
         </TwinPill>
         <TwinPill at={OPENS_AT} lift={96} width={190} className="tw3-big p-out">
           <b>打开来源平台入口</b>
-          <span>{twinInfoTotal(placed.map((t) => t.sourceOpens))}</span>
+          {counts ? <span>{twinInfoTotal(placed.map((t) => t.sourceOpens))}</span> : null}
           <i>{opensCaption}</i>
         </TwinPill>
         <TwinPill at={HUB_AT} lift={178} width={176} className="tw3-core">
