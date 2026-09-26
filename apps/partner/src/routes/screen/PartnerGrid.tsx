@@ -29,6 +29,7 @@ import {
   type TwinState,
 } from '@ai-job-print/ui'
 import { buildPartnerGapEntries, countPartnerGapMetrics } from './metricLabels'
+import { OrgFleetWallPanel, OrgGapLine, OrgPendingPanel, OrgPolicyPanel } from './PartnerHostingOff'
 import { screenHref } from './screenTabs'
 import { TwinShell, TwinShellEmpty, snapshotMeta, usePartnerSnapshot, type ScreenChrome } from './screenView'
 
@@ -42,6 +43,10 @@ import { TwinShell, TwinShellEmpty, snapshotMeta, usePartnerSnapshot, type Scree
  *      后者暂未按机构下发，列在「建设中的指标」里。
  *   3. 机队分类必须标样本：服务端对机构机队有取数上限，截断时写明「前 N 台」。
  *   4. 打印、AI 的记录还没有机构归属，不出数，只在「建设中的指标」里如实列名。
+ *   5. 招聘内容托管关闭（我们云上的默认部署）时换一套版式（variant="org-overview"，见 PartnerHostingOff.tsx）：
+ *      数据同步、招聘会、在架信息三块整块是招聘内容，不渲染；左栏换成终端状态墙与本机构政策，
+ *      右栏待审核只算政策、告警长进腾出的块位；展示档不放「建设中的指标」，桌面档收成一行。
+ *   6. 告警行先写事件、后写点位（「离线 21 分钟 · 人才服务大厅」）：放不下时省略号吃掉的是点位，不是时长。
  */
 
 const TITLE = '本机构运营概览'
@@ -83,7 +88,7 @@ function terminalAlerts(cells: readonly ScreenFleetCell[], onOpen: (id: string) 
     severity: style.severity,
     severityText: style.text,
     code: cell.terminalCode,
-    text: cell.alert?.title ? `${placeOf(cell)} · ${cell.alert.title}` : placeOf(cell),
+    text: cell.alert?.title ? `${cell.alert.title} · ${placeOf(cell)}` : placeOf(cell),
     whenText: cell.alert?.since ? formatTime(cell.alert.since) : undefined,
     onClick: () => onOpen(cell.terminalId),
   }))
@@ -95,9 +100,8 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
     return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={snap.failure} onRetry={() => void snap.refresh()} />
   }
   const g: ScreenSnapshotMetrics = snap.data.metrics
-  // 托管 a：我们云上不存岗位、招聘会、企业资料，这三格写「未开启」，不以 0 冒充「没有」
+  // 托管 a：我们云上不存岗位、招聘会、企业资料，整块是招聘内容的面板不渲染（见文件头第 5 条）
   const hostingOff = snap.data.limits.recruitmentHosting === 'disabled'
-  const OFF = SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled
   const cells = g.fleetWall?.available ? g.fleetWall.value.cells : []
   const terminals = twinTerminalsFromCells(cells, 'location')
   const groups = twinAreas(terminals)
@@ -111,9 +115,32 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
   const cellsInView = focus === null ? cells : cells.filter((c) => idsInView.has(c.terminalId))
   const openTerminal = (id: string) => chrome.onNavigate(screenHref('terminal', chrome.params, { id }))
   const alerts = terminalAlerts(cellsInView, openTerminal)
-  const alertLimit = chrome.presenting ? 4 : 6
-  const gaps = buildPartnerGapEntries(g)
+  // 托管关闭时告警占两个块位高（展示档 628px 放得下 9 行），托管开启时一个块位
+  const alertLimit = hostingOff ? (chrome.presenting ? 9 : 8) : chrome.presenting ? 4 : 6
+  // 托管关闭带来的缺口（打开来源平台入口）不进归并：边界已在本机构政策里说过一次
+  const gaps = buildPartnerGapEntries(g).filter((entry) => !hostingOff || entry.reason !== SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled)
   const gapCount = countPartnerGapMetrics(gaps)
+  const orgScope = focus === null ? undefined : '全机构口径'
+
+  const alertPanel = (
+    <TwinMetricPanel
+      title={focus === null ? '本机构终端告警' : `${focus}告警`}
+      sub={g.fleetWall?.available ? `当前 ${screenCount(alerts.length)} 台` : undefined}
+      tone="err"
+      metric={g.fleetWall}
+      source={
+        hostingOff
+          ? '由本机构终端心跳推算：离线、打印机异常（如缺纸）、从未上报，按严重度与发生时间排序。告警中心的全量明细与处置记录暂未按机构下发。'
+          : '由本机构终端心跳推算：离线、打印机异常（如缺纸）、从未上报，按严重度与发生时间排序。告警中心的全量明细与处置记录暂未按机构下发，见「建设中的指标」。'
+      }
+      render={() => (
+        <>
+          <TwinAlertList items={alerts.slice(0, alertLimit)} emptyText={focus === null ? '本机构终端当前没有告警' : `${focus}当前没有告警`} />
+          {alerts.length > alertLimit ? <p className="twin-cap twin-push">另 {alerts.length - alertLimit} 台 · 点立柱或在终端孪生里查看</p> : null}
+        </>
+      )}
+    />
+  )
 
   const toolbar = (
     <TwinCityToolbar
@@ -142,6 +169,8 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
       failure={snap.failure}
       onRefresh={() => void snap.refresh()}
       refreshing={snap.status === 'loading'}
+      hostingOff={hostingOff}
+      variant={hostingOff ? 'org-overview' : undefined}
     >
       <TwinSlot slot="l1">
         <TwinMetricPanel
@@ -190,98 +219,106 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
       </TwinSlot>
 
       <TwinSlot slot="l2">
-        <TwinMetricPanel
-          title="数据同步"
-          sub={g.syncSuccessRate24h?.available && focus === null ? `近 24 小时 · ${screenCount(g.syncSuccessRate24h.value.total)} 个批次` : '近 24 小时'}
-          scope={focus === null ? undefined : '全机构口径'}
-          metric={g.syncSuccessRate24h}
-          source="本机构数据源近 24 小时的同步批次结果，部分失败按失败计。逐批明细见同步日志页。"
-          render={(value) =>
-            value.successRate === null ? (
-              <>
-                <p className="twin-empty">近 24 小时没有同步批次</p>
-                <p className="twin-cap twin-push">没有分母，因此不给成功率</p>
-              </>
-            ) : (
-              <>
-                <div className="twin-ring-row">
-                  <TwinRing value={value.success} total={value.total} size={150}>
-                    <span className="twin-big twin-big-sm">
-                      {value.successRate.toFixed(1)}
-                      <span className="twin-unit">%</span>
-                    </span>
-                    <span className="twin-muted twin-ring-cap">成功率</span>
-                  </TwinRing>
-                  <div className="twin-legend-col">
-                    <div className="twin-kv">
-                      <span>成功</span>
-                      <b>
-                        {screenCount(value.success)}
-                        <span className="twin-unit">批</span>
-                      </b>
-                    </div>
-                    <div className="twin-kv">
-                      <span>失败（含部分失败）</span>
-                      <b className={value.failed > 0 ? 'is-warn' : undefined}>
-                        {screenCount(value.failed)}
-                        <span className="twin-unit">批</span>
-                      </b>
+        {hostingOff ? (
+          <OrgFleetWallPanel metric={g.fleetWall} terminals={inView} focus={focus} onOpen={(t) => openTerminal(t.id)} />
+        ) : (
+          <TwinMetricPanel
+            title="数据同步"
+            sub={g.syncSuccessRate24h?.available && focus === null ? `近 24 小时 · ${screenCount(g.syncSuccessRate24h.value.total)} 个批次` : '近 24 小时'}
+            scope={focus === null ? undefined : '全机构口径'}
+            metric={g.syncSuccessRate24h}
+            source="本机构数据源近 24 小时的同步批次结果，部分失败按失败计。逐批明细见同步日志页。"
+            render={(value) =>
+              value.successRate === null ? (
+                <>
+                  <p className="twin-empty">近 24 小时没有同步批次</p>
+                  <p className="twin-cap twin-push">没有分母，因此不给成功率</p>
+                </>
+              ) : (
+                <>
+                  <div className="twin-ring-row">
+                    <TwinRing value={value.success} total={value.total} size={150}>
+                      <span className="twin-big twin-big-sm">
+                        {value.successRate.toFixed(1)}
+                        <span className="twin-unit">%</span>
+                      </span>
+                      <span className="twin-muted twin-ring-cap">成功率</span>
+                    </TwinRing>
+                    <div className="twin-legend-col">
+                      <div className="twin-kv">
+                        <span>成功</span>
+                        <b>
+                          {screenCount(value.success)}
+                          <span className="twin-unit">批</span>
+                        </b>
+                      </div>
+                      <div className="twin-kv">
+                        <span>失败（含部分失败）</span>
+                        <b className={value.failed > 0 ? 'is-warn' : undefined}>
+                          {screenCount(value.failed)}
+                          <span className="twin-unit">批</span>
+                        </b>
+                      </div>
                     </div>
                   </div>
-                </div>
-                {chrome.presenting ? (
-                  <p className="twin-cap twin-push">失败明细见同步日志</p>
-                ) : (
-                  <a
-                    className="twin-cap twin-push twin-link"
-                    href="/sync-logs"
-                    onClick={(event) => {
-                      event.preventDefault()
-                      chrome.onNavigate('/sync-logs')
-                    }}
-                  >
-                    查看同步日志 →
-                  </a>
-                )}
-              </>
-            )
-          }
-        />
+                  {chrome.presenting ? (
+                    <p className="twin-cap twin-push">失败明细见同步日志</p>
+                  ) : (
+                    <a
+                      className="twin-cap twin-push twin-link"
+                      href="/sync-logs"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        chrome.onNavigate('/sync-logs')
+                      }}
+                    >
+                      查看同步日志 →
+                    </a>
+                  )}
+                </>
+              )
+            }
+          />
+        )}
       </TwinSlot>
 
       <TwinSlot slot="l3">
-        <TwinMetricPanel
-          title="招聘会"
-          sub={g.fairStructure?.available ? `进行中 ${screenCount(g.fairStructure.value.ongoingFairs)} 场` : '进行中'}
-          scope={focus === null ? undefined : '全机构口径'}
-          tone="info"
-          metric={g.fairStructure}
-          source="只统计本机构进行中的场次，结构数直接来自招聘会子表。招聘会是第三方 / 官方来源信息，预约与投递在来源平台完成。"
-          render={(value) => (
-            <>
-              <TwinTiles
-                cols={3}
-                items={[
-                  { value: screenCount(value.companies), unit: '家', label: '参展企业' },
-                  { value: screenCount(value.zones), unit: '个', label: '展区' },
-                  { value: screenCount(value.publishedMaterials), unit: '份', label: '活动资料', hint: '已发布可打印' },
-                ]}
-              />
-              <div className="twin-kv">
-                <span>资料打印量</span>
-                {value.materialPrintCount.available ? (
-                  <b>
-                    {screenCount(value.materialPrintCount.value)}
-                    <span className="twin-unit">次</span>
-                  </b>
-                ) : (
-                  <TwinUnavailable reason={value.materialPrintCount.reason} inline />
-                )}
-              </div>
-              <p className="twin-cap twin-push">预约与投递在来源平台完成，本平台不代预约、不收简历</p>
-            </>
-          )}
-        />
+        {hostingOff ? (
+          <OrgPolicyPanel metric={g.contentInventory} scope={orgScope} />
+        ) : (
+          <TwinMetricPanel
+            title="招聘会"
+            sub={g.fairStructure?.available ? `进行中 ${screenCount(g.fairStructure.value.ongoingFairs)} 场` : '进行中'}
+            scope={focus === null ? undefined : '全机构口径'}
+            tone="info"
+            metric={g.fairStructure}
+            source="只统计本机构进行中的场次，结构数直接来自招聘会子表。招聘会是第三方 / 官方来源信息，预约与投递在来源平台完成。"
+            render={(value) => (
+              <>
+                <TwinTiles
+                  cols={3}
+                  items={[
+                    { value: screenCount(value.companies), unit: '家', label: '参展企业' },
+                    { value: screenCount(value.zones), unit: '个', label: '展区' },
+                    { value: screenCount(value.publishedMaterials), unit: '份', label: '活动资料', hint: '已发布可打印' },
+                  ]}
+                />
+                <div className="twin-kv">
+                  <span>资料打印量</span>
+                  {value.materialPrintCount.available ? (
+                    <b>
+                      {screenCount(value.materialPrintCount.value)}
+                      <span className="twin-unit">次</span>
+                    </b>
+                  ) : (
+                    <TwinUnavailable reason={value.materialPrintCount.reason} inline />
+                  )}
+                </div>
+                <p className="twin-cap twin-push">预约与投递在来源平台完成，本平台不代预约、不收简历</p>
+              </>
+            )}
+          />
+        )}
       </TwinSlot>
 
       <TwinSlot slot="scene">
@@ -334,107 +371,101 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
         )}
       </TwinSlot>
 
-      <TwinSlot slot="bottom">
-        <TwinPanel
-          title="建设中的指标"
-          sub={gapCount > 0 ? `${gapCount} 项 · 记录补上机构归属后按本机构统计显示` : undefined}
-          tone="warn"
-          source="这些指标不是被隐藏，是服务端确实给不出本机构维度的数据（多为打印订单与 AI 记录还没有机构归属）。每一项的原因写在提示里；数据层补齐后会自动出现在上方，不需要改页面。"
-        >
-          {gaps.length === 0 ? (
-            <p className="twin-empty">本机构的全部指标都已接入</p>
-          ) : (
-            <div className="twin-chips is-flow">
-              {gaps.flatMap((entry) =>
-                entry.labels.map((label) => (
-                  <span key={`${entry.reason}-${label}`} className="twin-pend" title={screenReasonCopy(entry.reason).detail}>
-                    {label}
-                  </span>
-                )),
-              )}
-            </div>
-          )}
-        </TwinPanel>
-      </TwinSlot>
+      {hostingOff ? (
+        // 托管关闭：展示档不放「建设中的指标」（场景长满中栏）；桌面档收成一行，点开再看
+        chrome.presenting || gapCount === 0 ? null : (
+          <TwinSlot slot="bottom">
+            <OrgGapLine entries={gaps} count={gapCount} />
+          </TwinSlot>
+        )
+      ) : (
+        <TwinSlot slot="bottom">
+          <TwinPanel
+            title="建设中的指标"
+            sub={gapCount > 0 ? `${gapCount} 项 · 记录补上机构归属后按本机构统计显示` : undefined}
+            tone="warn"
+            source="这些指标不是被隐藏，是服务端确实给不出本机构维度的数据（多为打印订单与 AI 记录还没有机构归属）。每一项的原因写在提示里；数据层补齐后会自动出现在上方，不需要改页面。"
+          >
+            {gaps.length === 0 ? (
+              <p className="twin-empty">本机构的全部指标都已接入</p>
+            ) : (
+              <div className="twin-chips is-flow">
+                {gaps.flatMap((entry) =>
+                  entry.labels.map((label) => (
+                    <span key={`${entry.reason}-${label}`} className="twin-pend" title={screenReasonCopy(entry.reason).detail}>
+                      {label}
+                    </span>
+                  )),
+                )}
+              </div>
+            )}
+          </TwinPanel>
+        </TwinSlot>
+      )}
 
       <TwinSlot slot="r1">
-        <TwinMetricPanel
-          title="本机构在架信息"
-          sub={focus === null ? '已发布 · 有效期内' : undefined}
-          scope={focus === null ? undefined : '全机构口径'}
-          tone="info"
-          metric={g.contentInventory}
-          source="「在架」= 审核通过且已发布且未过期，且来源机构为本机构。待审核为待审与审核中的合计。均为第三方 / 官方来源信息，本平台不收简历、不代投递。"
-          render={(value) => (
-            <>
-              <TwinTiles
-                items={[
-                  hostingOff
-                    ? { label: '岗位信息', unavailableReason: OFF }
-                    : { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
-                  hostingOff
-                    ? { label: '招聘会', unavailableReason: OFF }
-                    : { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
-                  { value: screenCount(value.policiesPublished), unit: '条', label: '政策公告', hint: `待审核 ${screenCount(value.policiesPending)}` },
-                  hostingOff
-                    ? { label: '企业资料', unavailableReason: OFF }
-                    : { value: screenCount(value.companiesPublished), unit: '家', label: '企业资料', hint: `待审核 ${screenCount(value.companiesPending)}` },
-                ]}
-              />
-              <p className="twin-cap twin-push">已审核通过、已发布且在有效期内</p>
-            </>
-          )}
-        />
+        {hostingOff ? (
+          <OrgPendingPanel metric={g.pendingReview} scope={orgScope} />
+        ) : (
+          <TwinMetricPanel
+            title="本机构在架信息"
+            sub={focus === null ? '已发布 · 有效期内' : undefined}
+            scope={focus === null ? undefined : '全机构口径'}
+            tone="info"
+            metric={g.contentInventory}
+            source="「在架」= 审核通过且已发布且未过期，且来源机构为本机构。待审核为待审与审核中的合计。均为第三方 / 官方来源信息，本平台不收简历、不代投递。"
+            render={(value) => (
+              <>
+                <TwinTiles
+                  items={[
+                    { value: screenCount(value.jobsPublished), unit: '条', label: '岗位信息', hint: `待审核 ${screenCount(value.jobsPending)}` },
+                    { value: screenCount(value.fairsPublished), unit: '场', label: '招聘会', hint: `待审核 ${screenCount(value.fairsPending)}` },
+                    { value: screenCount(value.policiesPublished), unit: '条', label: '政策公告', hint: `待审核 ${screenCount(value.policiesPending)}` },
+                    { value: screenCount(value.companiesPublished), unit: '家', label: '企业资料', hint: `待审核 ${screenCount(value.companiesPending)}` },
+                  ]}
+                />
+                <p className="twin-cap twin-push">已审核通过、已发布且在有效期内</p>
+              </>
+            )}
+          />
+        )}
       </TwinSlot>
 
       <TwinSlot slot="r2">
-        <TwinMetricPanel
-          title="待审核"
-          sub="本机构提交"
-          scope={focus === null ? undefined : '全机构口径'}
-          tone="warn"
-          metric={g.pendingReview}
-          source="本机构四类内容待审核与审核中的合计（服务端计数）。审核通过并发布后才对外展示。"
-          render={(value) => (
-            <>
-              <div className="twin-big-row">
-                <span className={value.total > 0 ? 'twin-big is-warn' : 'twin-big'}>{screenCount(value.total)}</span>
-                <span className="twin-unit">条</span>
-              </div>
-              <TwinBarList
-                items={[
-                  { label: '岗位信息', value: value.jobs },
-                  { label: '招聘会', value: value.fairs },
-                  { label: '政策公告', value: value.policies },
-                  { label: '企业资料', value: value.companies },
-                ]
-                  .filter((row) => row.value > 0)
-                  .sort((a, b) => b.value - a.value)}
-                emptyText="本机构没有待审核的内容"
-              />
-              {hostingOff && value.jobs + value.fairs + value.companies > 0 ? (
-                <p className="twin-cap twin-push">岗位、招聘会、企业资料在本平台云端已停止审核发布，这里是存量</p>
-              ) : null}
-            </>
-          )}
-        />
+        {hostingOff ? (
+          alertPanel
+        ) : (
+          <TwinMetricPanel
+            title="待审核"
+            sub="本机构提交"
+            scope={focus === null ? undefined : '全机构口径'}
+            tone="warn"
+            metric={g.pendingReview}
+            source="本机构四类内容待审核与审核中的合计（服务端计数）。审核通过并发布后才对外展示。"
+            render={(value) => (
+              <>
+                <div className="twin-big-row">
+                  <span className={value.total > 0 ? 'twin-big is-warn' : 'twin-big'}>{screenCount(value.total)}</span>
+                  <span className="twin-unit">条</span>
+                </div>
+                <TwinBarList
+                  items={[
+                    { label: '岗位信息', value: value.jobs },
+                    { label: '招聘会', value: value.fairs },
+                    { label: '政策公告', value: value.policies },
+                    { label: '企业资料', value: value.companies },
+                  ]
+                    .filter((row) => row.value > 0)
+                    .sort((a, b) => b.value - a.value)}
+                  emptyText="本机构没有待审核的内容"
+                />
+              </>
+            )}
+          />
+        )}
       </TwinSlot>
 
-      <TwinSlot slot="r3">
-        <TwinMetricPanel
-          title={focus === null ? '本机构终端告警' : `${focus}告警`}
-          sub={g.fleetWall?.available ? `当前 ${screenCount(alerts.length)} 台` : undefined}
-          tone="err"
-          metric={g.fleetWall}
-          source="由本机构终端心跳推算：离线、打印机异常（如缺纸）、从未上报，按严重度与发生时间排序。告警中心的全量明细与处置记录暂未按机构下发，见「建设中的指标」。"
-          render={() => (
-            <>
-              <TwinAlertList items={alerts.slice(0, alertLimit)} emptyText={focus === null ? '本机构终端当前没有告警' : `${focus}当前没有告警`} />
-              {alerts.length > alertLimit ? <p className="twin-cap twin-push">另 {alerts.length - alertLimit} 台 · 点立柱或在终端孪生里查看</p> : null}
-            </>
-          )}
-        />
-      </TwinSlot>
+      {hostingOff ? null : <TwinSlot slot="r3">{alertPanel}</TwinSlot>}
     </TwinShell>
   )
 }

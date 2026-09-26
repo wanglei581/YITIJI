@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
-import { SCREEN_UNAVAILABLE_REASON, formatTime, type ScreenUsageRange, type ScreenUsageSnapshot } from '@ai-job-print/shared'
+import { formatTime, type ScreenUsageRange, type ScreenUsageSnapshot } from '@ai-job-print/shared'
 import {
   SCREEN_SOURCE_ENTRY_NOTE,
   TWIN_STAGE_H,
@@ -23,6 +23,7 @@ import { loadAdminUsage, normalizeUsageRange } from '../../services/api/consoleS
 import { aiOperationLabel, usageServiceLabel } from './metricLabels'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
 import { metricReason } from './screenMeta'
+import { UsageAiPanel, UsageAiQualityPanel, UsagePolicyPanel } from './UsageHostingOff'
 
 /**
  * 服务调用：系统里每一类服务被用了多少次，按渠道、时段、步骤、AI 功能与模型拆开。
@@ -32,6 +33,8 @@ import { metricReason } from './screenMeta'
  *   - 任何分组少于 5 次一律显示「少于 5」（服务端已置空），不补数、不估算。
  *   - 岗位、招聘会、政策、企业的浏览与外跳只含登录会员；外跳是「打开来源平台入口」，不是投递结果。
  *   - 渠道拆分只来自已付款订单（订单才有渠道字段），不是全部调用的渠道。
+ *   - 招聘内容托管关闭时服务端不下发岗位、招聘会、企业三个节点与「岗位信息使用」；
+ *     右栏换成 AI 服务 / AI 质量 / 政策服务使用（UsageHostingOff.tsx），「岗位 AI」节点改叫「简历对照」。
  */
 
 const TITLE = '职易达 · 系统使用与服务调用态势'
@@ -93,6 +96,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
   }
   const u = usage.data.metrics
   const rangeText = RANGE_LABEL[usage.data.range]
+  const hostingOff = usage.data.limits.recruitmentHosting === 'disabled'
   const nowHour = Number(formatTime(usage.data.generatedAt).split(':')[0])
 
   const toolbar = (
@@ -119,6 +123,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
       failure={usage.failure}
       onRefresh={() => void usage.refresh()}
       refreshing={usage.status === 'loading'}
+      hostingOff={hostingOff}
     >
       <TwinSlot slot="l1">
         <TwinMetricPanel
@@ -237,7 +242,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                   { key: 'miniapp', label: '小程序', count: u.channels?.available ? u.channels.value.miniapp : { reason: metricReason(u.channels) }, caption: '已付款订单' },
                 ]}
                 services={u.services.value.flatMap((s) => {
-                  const label = usageServiceLabel(s.key)
+                  const label = usageServiceLabel(s.key, hostingOff)
                   return label === null ? [] : [{ key: s.key, label, lane: s.lane, count: s.count }]
                 })}
                 outcomes={[
@@ -271,7 +276,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
               <TwinBarList
                 items={value.flatMap((s) => {
                   // 与 3D 服务网络同一份中文名；认不出来的键两边都不画，英文键不上屏
-                  const label = usageServiceLabel(s.key)
+                  const label = usageServiceLabel(s.key, hostingOff)
                   return label === null ? [] : [{ label, value: s.count === null ? 0 : s.count, valueText: twinSmall(s.count) }]
                 })}
                 emptyText="所选时间内没有服务调用记录"
@@ -314,100 +319,107 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
       </TwinSlot>
 
       <TwinSlot slot="r1">
-        <TwinMetricPanel
-          title="AI 服务"
-          sub={`${rangeText} · 按功能`}
-          metric={u.ai}
-          source="AI 服务日志：按功能计次，成功率 = 成功 ÷（成功 + 失败），平均耗时只算成功调用，成本只加已采集的估算。模型按调用方记录的提供方统计。少于 5 次不显示。"
-          render={(value) => (
-            <>
-              <TwinBarList
-                items={value.byOperation
-                  .map((row) => ({ label: aiOperationLabel(row.operation), value: row.count === null ? 0 : row.count, valueText: twinSmall(row.count) }))
-                  .sort((a, b) => b.value - a.value)
-                  .slice(0, chrome.presenting ? 4 : 6)}
-                emptyText="所选时间内没有 AI 调用"
-              />
-              <p className="twin-cap">
-                模型：{value.providers.length ? value.providers.map((p) => `${p.label} ${twinSmall(p.count)}`).join(' · ') : '暂无调用'}
-              </p>
-              <div className="twin-push">
-                <TwinTiles
-                  cols={4}
-                  compact
-                  items={[
-                    { value: percent(value.successRate), label: '成功率' },
-                    // 单位另起一个小号 span：「2.18 秒」整串放在四列紧凑磁贴里，舞台档会折成两行把面板撑出块位
-                    value.avgLatencyMs === null
-                      ? { value: '样本不足', label: '平均耗时' }
-                      : { value: (value.avgLatencyMs / 1000).toFixed(2), unit: '秒', label: '平均耗时' },
-                    { value: value.estimatedCostCny === null ? '样本不足' : `¥${value.estimatedCostCny.toFixed(2)}`, label: '估算成本' },
-                    { value: twinSmall(value.fallbackCalls), label: '降级兜底' },
-                  ]}
+        {hostingOff ? (
+          <UsageAiPanel metric={u.ai} rangeText={rangeText} presenting={chrome.presenting} />
+        ) : (
+          <TwinMetricPanel
+            title="AI 服务"
+            sub={`${rangeText} · 按功能`}
+            metric={u.ai}
+            source="AI 服务日志：按功能计次，成功率 = 成功 ÷（成功 + 失败），平均耗时只算成功调用，成本只加已采集的估算。模型按调用方记录的提供方统计。少于 5 次不显示。"
+            render={(value) => (
+              <>
+                <TwinBarList
+                  items={value.byOperation
+                    .map((row) => ({ label: aiOperationLabel(row.operation), value: row.count === null ? 0 : row.count, valueText: twinSmall(row.count) }))
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, chrome.presenting ? 4 : 6)}
+                  emptyText="所选时间内没有 AI 调用"
                 />
-              </div>
-            </>
-          )}
-        />
+                <p className="twin-cap">
+                  模型：{value.providers.length ? value.providers.map((p) => `${p.label} ${twinSmall(p.count)}`).join(' · ') : '暂无调用'}
+                </p>
+                <div className="twin-push">
+                  <TwinTiles
+                    cols={4}
+                    compact
+                    items={[
+                      { value: percent(value.successRate), label: '成功率' },
+                      // 单位另起一个小号 span：「2.18 秒」整串放在四列紧凑磁贴里，舞台档会折成两行把面板撑出块位
+                      value.avgLatencyMs === null
+                        ? { value: '样本不足', label: '平均耗时' }
+                        : { value: (value.avgLatencyMs / 1000).toFixed(2), unit: '秒', label: '平均耗时' },
+                      { value: value.estimatedCostCny === null ? '样本不足' : `¥${value.estimatedCostCny.toFixed(2)}`, label: '估算成本' },
+                      { value: twinSmall(value.fallbackCalls), label: '降级兜底' },
+                    ]}
+                  />
+                </div>
+              </>
+            )}
+          />
+        )}
       </TwinSlot>
 
       <TwinSlot slot="r2">
-        <TwinMetricPanel
-          title="岗位信息使用"
-          sub={rangeText}
-          tone="info"
-          metric={u.jobs}
-          source={`${MEMBERS_NOTE} ${SCREEN_SOURCE_ENTRY_NOTE}`}
-          render={(value) => (
-            <>
-              <TwinTiles
-                cols={3}
-                compact
-                items={[
-                  { value: twinSmall(value.browse), label: '浏览' },
-                  { value: twinSmall(value.favorites), label: '收藏' },
-                  { value: twinSmall(value.sourceOpens), label: '打开来源平台' },
-                ]}
-              />
-              {u.topSources30d?.available ? (
-                <TwinBarList
-                  items={u.topSources30d.value.items.slice(0, chrome.presenting ? 3 : 5).map((item) => ({ label: item.sourceName, value: item.count, tone: 'info' as const }))}
-                  emptyText="近 30 天没有达到 5 次的来源入口"
+        {hostingOff ? (
+          <UsageAiQualityPanel metric={u.ai} rangeText={rangeText} />
+        ) : (
+          <TwinMetricPanel
+            title="岗位信息使用"
+            sub={rangeText}
+            tone="info"
+            metric={u.jobs}
+            source={`${MEMBERS_NOTE} ${SCREEN_SOURCE_ENTRY_NOTE}`}
+            render={(value) => (
+              <>
+                <TwinTiles
+                  cols={3}
+                  compact
+                  items={[
+                    { value: twinSmall(value.browse), label: '浏览' },
+                    { value: twinSmall(value.favorites), label: '收藏' },
+                    { value: twinSmall(value.sourceOpens), label: '打开来源平台' },
+                  ]}
                 />
-              ) : null}
-              <p className="twin-cap twin-push">只统计浏览、收藏与打开来源平台入口，不是投递结果</p>
-            </>
-          )}
-        />
+                {u.topSources30d?.available ? (
+                  <TwinBarList
+                    items={u.topSources30d.value.items.slice(0, chrome.presenting ? 3 : 5).map((item) => ({ label: item.sourceName, value: item.count, tone: 'info' as const }))}
+                    emptyText="近 30 天没有达到 5 次的来源入口"
+                  />
+                ) : null}
+                <p className="twin-cap twin-push">只统计浏览、收藏与打开来源平台入口，不是投递结果</p>
+              </>
+            )}
+          />
+        )}
       </TwinSlot>
 
       <TwinSlot slot="r3">
-        <TwinMetricPanel
-          title="信息内容浏览"
-          sub={rangeText}
-          tone="info"
-          metric={u.content}
-          source={MEMBERS_NOTE}
-          render={(value) => (
-            <>
-              <TwinTiles
-                cols={3}
-                compact
-                items={[
-                  { value: twinSmall(value.policy), label: '政策服务' },
-                  // 托管 a：招聘会与企业资料不在我们云上，写「未开启」而不是「少于 5」
-                  usage.data?.limits.recruitmentHosting === 'disabled'
-                    ? { label: '招聘会', unavailableReason: SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled }
-                    : { value: twinSmall(value.fair), label: '招聘会' },
-                  usage.data?.limits.recruitmentHosting === 'disabled'
-                    ? { label: '企业展示', unavailableReason: SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled }
-                    : { value: twinSmall(value.company), label: '企业展示' },
-                ]}
-              />
-              <p className="twin-cap twin-push">{MEMBERS_NOTE}</p>
-            </>
-          )}
-        />
+        {hostingOff ? (
+          <UsagePolicyPanel metric={u.content} rangeText={rangeText} membersNote={MEMBERS_NOTE} />
+        ) : (
+          <TwinMetricPanel
+            title="信息内容浏览"
+            sub={rangeText}
+            tone="info"
+            metric={u.content}
+            source={MEMBERS_NOTE}
+            render={(value) => (
+              <>
+                <TwinTiles
+                  cols={3}
+                  compact
+                  items={[
+                    { value: twinSmall(value.policy), label: '政策服务' },
+                    { value: twinSmall(value.fair), label: '招聘会' },
+                    { value: twinSmall(value.company), label: '企业展示' },
+                  ]}
+                />
+                <p className="twin-cap twin-push">{MEMBERS_NOTE}</p>
+              </>
+            )}
+          />
+        )}
       </TwinSlot>
     </TwinShell>
   )

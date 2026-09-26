@@ -153,6 +153,14 @@ export function screenReasonCopy(reason: string): ScreenReasonCopy {
   return SCREEN_REASON_COPY[reason] ?? UNKNOWN_REASON
 }
 
+/**
+ * 招聘内容托管关闭（托管 a，我们云上的默认部署）时的边界句。
+ *
+ * 每屏只说一次，放在承载政策内容的那块面板里。屏上其它位置不再为岗位、招聘会、企业资料
+ * 摆「未开启」磁贴、标签或灰色场景节点 —— 边界说清一次，其余位置只放真实数据。
+ */
+export const SCREEN_HOSTING_OFF_NOTE = '政策由运营机构自行审核发布；岗位、招聘会、企业资料不在本平台托管'
+
 /** 大屏统一的「打开来源平台入口」措辞。屏上任何地方都不出现投递字样。 */
 export const SCREEN_SOURCE_ENTRY_NOTE =
   '按来源机构计数，不含个人身份。这是「打开了外部入口」，不是投递结果 —— 用户是否在来源平台完成后续动作，本平台无从得知也不记录。'

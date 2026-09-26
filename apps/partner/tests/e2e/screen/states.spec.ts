@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { partnerDegraded, partnerHostingOff, partnerTruncated, partnerUsageHostingOff, partnerUsageVisitsFailed } from './fixtures/snapshots'
+import { partnerDegraded, partnerTruncated, partnerUsageVisitsFailed } from './fixtures/snapshots'
 import {
   expectLocation,
   expectUrlStays,
@@ -251,38 +251,5 @@ test.describe('partner data screen states', () => {
     await expect(banner).toContainText('请联系平台侧为该账号绑定机构')
     await expect(banner).not.toContainText('无权查看')
     await expect(jobs).toHaveText('328条')
-  })
-
-  test('招聘内容托管关闭：岗位、招聘会、企业写「未开启」，不是 0 也不是「少于 5」，政策照常出数', async ({ page }) => {
-    await serve(page, partnerApi({ snapshot: partnerHostingOff, usage: partnerUsageHostingOff }))
-    await open(page, '/screen/overview')
-    const shelf = panel(page, /^本机构在架信息$/)
-    for (const label of ['岗位信息', '招聘会', '企业资料']) {
-      const cell = tile(shelf, label)
-      await expect(cell.locator('.twin-pend')).toHaveText('未开启')
-      await expect(cell.locator('.twin-pend')).toHaveAttribute('title', /^招聘内容托管未开启：/)
-      await expect(cell.locator('b')).toHaveCount(0)
-      await expect(cell).not.toContainText(/\d|少于/)
-    }
-    await expect(tile(shelf, '政策公告').locator('b')).toHaveText('9条')
-    await expect(panel(page, /^招聘会$/).locator('.twin-na')).toContainText('招聘内容托管未开启')
-    // 待审里还有岗位与企业的存量：说明那是存量，不是还在审
-    await expect(panel(page, /^待审核$/)).toContainText('岗位、招聘会、企业资料在本平台云端已停止审核发布，这里是存量')
-
-    await page.getByRole('navigation', { name: '大屏页签' }).getByRole('link', { name: '信息使用', exact: true }).click()
-    await expectLocation(page, '/screen/usage')
-    // 场景里三类照样占位，写「未开启」、不连线；政策照常出数
-    for (const label of ['岗位信息', '招聘会', '企业资料']) {
-      const pill = page.locator('.tw3-svc .c', { has: page.locator('b', { hasText: new RegExp(`^${label}$`) }) })
-      await expect(pill).toHaveCount(1)
-      await expect(pill.locator('span')).toHaveText('未开启')
-    }
-    await expect(page.locator('.tw3-svc .c', { hasText: '政策公告' }).locator('span')).toHaveText('浏览 21')
-    const byType = panel(page, /^按信息类型$/)
-    for (const label of ['岗位信息', '招聘会', '企业资料']) {
-      await expect(tile(byType, label).locator('.twin-pend')).toHaveText('未开启')
-      await expect(tile(byType, label)).not.toContainText(/\d|少于/)
-    }
-    await expect(tile(byType, '政策公告').locator('b')).toHaveText('21次浏览')
   })
 })

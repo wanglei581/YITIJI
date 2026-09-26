@@ -365,23 +365,18 @@ export function opsUnavailable(): ScreenSnapshot {
 }
 
 /**
- * 招聘内容托管关闭（托管 a，我们云上）：岗位、招聘会、企业资料不在云上。
- * 存量计数故意给 0 —— 屏上必须写「未开启」，不能把 0 当成「没有」画出来。
+ * 招聘内容托管关闭（托管 a，我们云上的默认部署）。逐项照服务端写，不是照屏上想看到的写：
+ *   - console-screen.assemble.ts 的 closeRecruitmentMetrics：jobsOnShelf、fairStructure、sourceEntryOpensTop
+ *     三项换成 recruitment_hosting_disabled；contentInventory 与 pendingReview 原样返回，**含岗位类存量**
+ *     （关闭前留下、等待清理的岗位、招聘会、企业资料，它们仍在库里）；
+ *   - 同步：托管关闭后数据源不再写 SyncLog，近 24 小时 0 批 —— loadSyncSlice 给出
+ *     { total: 0, success: 0, failed: 0 }，rateFromCounts 在分母为 0 时给 successRate: null（仍是 available）。
  */
 export function govHostingOff(): ScreenSnapshot {
   const base = govFull()
   base.limits = { ...LIMITS, recruitmentHosting: 'disabled' }
   base.metrics.jobsOnShelf = na('Job approved+published+validThrough', 'current', 'recruitment_hosting_disabled')
-  base.metrics.contentInventory = ok('Job/JobFair/PolicyPost/CompanyProfile counts', 'current', {
-    jobsPublished: 0,
-    jobsPending: 0,
-    fairsPublished: 0,
-    fairsPending: 0,
-    policiesPublished: 216,
-    policiesPending: 8,
-    companiesPublished: 0,
-    companiesPending: 0,
-  })
+  // contentInventory 不动：岗位类存量照样计数（govFull 的数字就是存量）
   return base
 }
 
@@ -390,6 +385,8 @@ export function opsHostingOff(): ScreenSnapshot {
   base.limits = { ...LIMITS, recruitmentHosting: 'disabled' }
   base.metrics.sourceEntryOpensTop = na('ExternalJumpLog.sourceName', '30d', 'recruitment_hosting_disabled')
   base.metrics.fairStructure = na('FairCompany/FairZone/FairMaterial', 'ongoing', 'recruitment_hosting_disabled')
+  base.metrics.syncSuccessRate24h = ok('SyncLog.result', '24h', { total: 0, success: 0, failed: 0, successRate: null })
+  // pendingReview 不动：待审里仍有岗位类存量（58 / 6 / 14），政策 8 条是运营机构待审
   return base
 }
 
@@ -531,15 +528,37 @@ export function usageSnapshot(range: string): ScreenUsageSnapshot {
   }
 }
 
+/** 托管关闭时服务端下发的服务节点：visibleUsageServiceNodes 去掉 jobs / fairs / company，只剩 8 个。 */
+export const SERVICE_LABELS_HOSTING_OFF = ['政策服务', 'AI 简历', 'AI 顾问', '模拟面试', '职业规划', '简历对照', '打印', '扫描']
+
 /**
- * 托管关闭时的服务调用：招聘会给 0、企业给 null —— 屏上两格都必须写「未开启」，
- * 既不能是 0，也不能是「少于 5」；政策照常出数。
+ * 托管关闭时的服务调用，照 console-screen.usage.service.ts 写：
+ *   - services 由 visibleUsageServiceNodes 给出，岗位、招聘会、企业三个节点整个不下发；
+ *   - jobs、topSources30d 是 recruitment_hosting_disabled；
+ *   - content 照常下发：岗位与招聘会的浏览在托管关闭时不再落日志，招聘会、企业的计数少于 5 → null；
+ *   - jobAi 节点只剩手填岗位的简历对照（jobMatch）在用：系统内岗位的推荐、解读、匹配被服务端拒绝。
  */
 export function usageHostingOff(range: string): ScreenUsageSnapshot {
   const base = usageSnapshot(range)
   base.limits = { minAggregateSample: 5, recruitmentHosting: 'disabled' }
-  base.metrics.content = ok('BrowseLog', base.range, { policy: 412, fair: 0, company: null, coverage: 'members_only' })
+  const services = base.metrics.services
+  if (services?.available) {
+    base.metrics.services = ok(
+      services.source,
+      services.window,
+      services.value
+        .filter((item) => item.key !== 'jobs' && item.key !== 'fairs' && item.key !== 'company')
+        .map((item) => (item.key === 'jobAi' ? { ...item, count: 23 } : item)),
+    )
+  }
+  const ai = base.metrics.ai
+  if (ai?.available) {
+    base.metrics.ai = ok(ai.source, ai.window, { ...ai.value, byOperation: [...ai.value.byOperation, { operation: 'jobMatch', count: 23 }] })
+  }
+  base.metrics.outcomes = ok('mixed', base.range, { sourceOpens: 58, favorites: 41, aiReports: 381, printed: 402 })
+  base.metrics.jobs = na('BrowseLog/Favorite/ExternalJumpLog', base.range, 'recruitment_hosting_disabled')
   base.metrics.topSources30d = na('ExternalJumpLog.sourceName', '30d', 'recruitment_hosting_disabled')
+  base.metrics.content = ok('BrowseLog', base.range, { policy: 412, fair: null, company: null, coverage: 'members_only' })
   return base
 }
 

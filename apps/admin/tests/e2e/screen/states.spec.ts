@@ -2,16 +2,13 @@ import { test, expect } from '@playwright/test'
 import {
   govDegraded,
   govEmpty,
-  govHostingOff,
   govUnavailable,
   opsDegraded,
-  opsHostingOff,
   opsNoDenominator,
   govStructuralGap,
   opsUnavailable,
   terminalTwinPrinterFailed,
   usageChannelsFailed,
-  usageHostingOff,
   usageVisitsFailed,
 } from './fixtures/snapshots'
 import {
@@ -340,37 +337,5 @@ test.describe('admin data screen states', () => {
     // 定高卡只画得下 4 行，说明行必须按实际画出来的行数报，不能照抄服务端的 6
     await expect(page.getByText('已列出 4 / 共 137 条')).toBeVisible()
     await expect(page.getByText('访问口径：仅已登录后台会话可见，本期未签发免登录只读展示令牌')).toBeVisible()
-  })
-
-  test('招聘内容托管关闭：岗位、招聘会、企业写「未开启」，不是 0 也不是「少于 5」，政策照常出数', async ({ page }) => {
-    await serve(page, adminApi({ gov: govHostingOff, ops: opsHostingOff, usage: usageHostingOff }))
-    await open(page, '/screen/gov')
-    const shelf = panel(page, '信息服务')
-    for (const label of ['岗位信息', '招聘会', '企业展示']) {
-      const cell = tile(shelf, label)
-      await expect(cell.locator('.twin-pend')).toHaveText('未开启')
-      await expect(cell.locator('.twin-pend')).toHaveAttribute('title', /^招聘内容托管未开启：/)
-      await expect(cell.locator('b')).toHaveCount(0)
-      await expect(cell).not.toContainText(/\d|少于/)
-    }
-    await expect(tile(shelf, '政策公告').locator('b')).toHaveText('216条')
-    await expect(shelf).not.toContainText(/来自 \d+ 家/)
-    // 来源平台访问取自运营快照，托管关闭时整块说明未开启
-    await expect(panel(page, '来源平台访问').locator('.twin-na')).toContainText('招聘内容托管未开启')
-
-    await page.getByRole('link', { name: '服务调用' }).click()
-    await expectLocation(page, '/screen/usage')
-    const browse = panel(page, '信息内容浏览')
-    for (const label of ['招聘会', '企业展示']) {
-      await expect(tile(browse, label).locator('.twin-pend')).toHaveText('未开启')
-      await expect(tile(browse, label)).not.toContainText(/\d|少于/)
-    }
-    await expect(tile(browse, '政策服务').locator('b')).toHaveText('412')
-
-    await page.getByRole('link', { name: '运营看板' }).click()
-    await expectLocation(page, '/screen/ops')
-    for (const title of ['打开来源平台入口', '招聘会结构']) {
-      await expect(page.locator('.ops-card').filter({ hasText: title }).locator('.ops-na')).toContainText('招聘内容托管未开启')
-    }
   })
 })

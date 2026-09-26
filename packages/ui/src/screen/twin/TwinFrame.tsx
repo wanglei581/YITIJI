@@ -11,6 +11,12 @@ import type { ScreenHeadingLevel } from '../ScreenFrame'
 
 export type TwinLayout = 'city' | 'terminal' | 'full'
 
+/**
+ * 同一 layout 下的版式变体，只在招聘内容托管关闭时由机构两屏使用：
+ * 岗位类面板整块不渲染，腾出的块位交给真实数据的邻居（块位几何在 twin-screen-layout.css）。
+ */
+export type TwinVariant = 'org-overview' | 'org-usage'
+
 /** 面板标题层级 = 页眉层级 + 1：嵌在后台里是 h3，新窗口展示是 h2，不跳级。 */
 export const TwinPanelHeadingContext = createContext<2 | 3>(3)
 export type TwinSlotName = 'l1' | 'l2' | 'l3' | 'r1' | 'r2' | 'r3' | 'scene' | 'bottom' | 'task' | 'full'
@@ -123,13 +129,20 @@ export interface TwinScreenProps {
   /** 与页眉一致传入：页眉 h1 → 面板 h2；页眉 h2 → 面板 h3。 */
   headingLevel: ScreenHeadingLevel
   lite?: boolean
+  /**
+   * 招聘内容托管关闭（托管 a）。根上挂 data-hosting="off"，样式与测试都按它区分两种部署；
+   * 托管开启时不挂任何属性，DOM 与原来逐字一致。
+   */
+  hostingOff?: boolean
+  /** 版式变体，挂在栅格的 data-variant 上；不传就不挂。 */
+  variant?: TwinVariant
   children: ReactNode
 }
 
-export function TwinScreen({ header, toolbar, banners, layout, headingLevel, lite = false, children }: TwinScreenProps) {
+export function TwinScreen({ header, toolbar, banners, layout, headingLevel, lite = false, hostingOff = false, variant, children }: TwinScreenProps) {
   return (
     <TwinPanelHeadingContext.Provider value={headingLevel === 1 ? 2 : 3}>
-    <div className="twin" data-lite={lite ? '1' : undefined}>
+    <div className="twin" data-lite={lite ? '1' : undefined} data-hosting={hostingOff ? 'off' : undefined}>
       {header}
       {toolbar ? (
         <div className="twin-toolbar" role="group" aria-label="筛选">
@@ -138,7 +151,7 @@ export function TwinScreen({ header, toolbar, banners, layout, headingLevel, lit
       ) : null}
       {banners ? <div className="twin-banners">{banners}</div> : null}
       <div className="twin-body">
-        <div className="twin-grid" data-layout={layout}>
+        <div className="twin-grid" data-layout={layout} data-variant={variant}>
           {children}
         </div>
       </div>

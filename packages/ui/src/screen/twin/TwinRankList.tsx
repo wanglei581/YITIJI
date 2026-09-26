@@ -1,8 +1,10 @@
+import { cn } from '../../lib/cn'
 import { screenCount } from '../ScreenPrimitives'
 
 /**
  * 排行榜：名次 + 标题（一行，放不下省略）+ 类型标签 + 次数，下面一条比例细条。
  * 标题比条形图的左栏长得多（内容标题、来源名称），这里给标题整行宽度。
+ * wide：放在宽而矮的底栏里时按列铺开（逐行读：1 2 3 / 4 5），不挤成一列。
  */
 
 export interface TwinRankItem {
@@ -12,12 +14,12 @@ export interface TwinRankItem {
   value: number
 }
 
-export function TwinRankList({ items, emptyText }: { items: TwinRankItem[]; emptyText: string }) {
+export function TwinRankList({ items, emptyText, wide = false }: { items: TwinRankItem[]; emptyText: string; wide?: boolean }) {
   if (items.length === 0) return <p className="twin-empty">{emptyText}</p>
   let max = 0
   for (const item of items) if (item.value > max) max = item.value
   return (
-    <ol className="twin-rank">
+    <ol className={cn('twin-rank', wide && 'is-wide')}>
       {items.map((item, i) => (
         <li key={item.key}>
           <span className="twin-rank-no">{i + 1}</span>
