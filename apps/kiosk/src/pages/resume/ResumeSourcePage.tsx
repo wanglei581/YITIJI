@@ -1,16 +1,13 @@
-import { useRef, useState } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 import { isTerminalKiosk } from '../../services/api/screensaver'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
-import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { FileContentPreview } from '../../components/FileContentPreview'
-import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
-import type { StepperStep } from '@ai-job-print/ui'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
-  CheckCircleIcon,
   CloudUploadIcon,
   FileTextIcon,
   ShieldCheckIcon,
@@ -26,6 +23,7 @@ import {
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
+import { ApiHttpError } from '../../services/api/httpAdapter'
 import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
 import {
   useDocumentConversionCapabilities,
@@ -36,11 +34,15 @@ import { clearAiResumeSession } from './aiResumeSession'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
 import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
-import './resume-diagnosis-lightflow.css'
-import './resume-diagnosis-ext.css'
-import './resume-fusion-youth.css'
+import { ResumeTriageHero } from './components/ResumeTriageHero'
+import { ResumeScanReady } from './components/ResumeScanReady'
+import { readScanHandoff, type ScanHandoff } from './resumeScanHandoff'
+import './resume-triage-qx.css'
+import './resume-triage-panels-qx.css'
 
 type UploadChannel = 'usb' | 'cloud' | 'phone'
+/** 已拿到的文件来自哪条通道；'scan' 只来自扫描工作台的交接（经解析页返回），不是本页可选的通道。 */
+type FileChannel = UploadChannel | 'scan'
 
 interface UploadOption {
   type: UploadChannel
@@ -60,7 +62,8 @@ const UPLOAD_OPTIONS: UploadOption[] = [
   },
   {
     type: 'cloud',
-    label: '云端上传',
+    // 稿 21：它打开的是本机文件选择，不是云盘账号登录，所以用户可见名不叫「云端上传」。
+    label: '本机文件 / 云盘下载目录',
     description: '选择云盘同步目录或本机下载目录中的简历文件',
     helper: '适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。',
     icon: CloudUploadIcon,
@@ -120,12 +123,18 @@ const BASE_SUPPORTED_FORMATS = ['PDF', 'JPG', 'PNG', 'WEBP']
 const BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
 const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
-const RESUME_FLOW_STEPS: StepperStep[] = [
-  { title: '上传与方向' },
-  { title: 'AI 解析' },
-  { title: '诊断报告' },
-  { title: '优化打印' },
-]
+/** 稿 21 小青任务头随本页真实状态换话（每条都对应一个能被用户看到的事实，不预告结果）。 */
+type SourceHeroKey = 'source' | 'usb' | 'phone' | 'uploading' | 'upload-failed' | 'upload-unknown' | 'staged' | 'scan-ready'
+const SOURCE_HERO: Record<SourceHeroKey, { ask: ReactNode; doing: string; flag: string; warn: boolean }> = {
+  source: { ask: <>简历这趟，先<em>把文件交给我</em>。</>, doing: '选一种来源把简历送进来，方向和背景在旁边点选；上传后 AI 自动解析结构、识别问题。', flag: '原件只读不改', warn: false },
+  usb: { ask: <>从 U 盘里<em>挑一份简历</em>。</>, doing: '插好后文件列表会自动出现；只列 10MB 以内的 PDF / JPG / PNG，要用哪一份由你来点。', flag: 'U 盘', warn: false },
+  phone: { ask: <>用手机<em>扫码上传</em>。</>, doing: '二维码有效期以服务端返回为准；手机传完，回到这台机器确认后才继续。', flag: '手机扫码', warn: false },
+  uploading: { ask: <>正在把这一份<em>送到服务端</em>。</>, doing: '一次性上传，没有实时百分比，也没有中止入口；成功或失败都会明确告诉你。', flag: '上传中', warn: false },
+  'upload-failed': { ask: <>这一份<em>没能送进来</em>。</>, doing: '原件还在你手里，可以重试，或者换一种来源。', flag: '未送达', warn: true },
+  'upload-unknown': { ask: <>这一份<em>暂时无法确认有没有传上去</em>。</>, doing: '可能已经传上去了，也可能没有。本页不会自动再传一次，也不会拿之前那份文件继续。', flag: '结果未知', warn: true },
+  staged: { ask: <>服务端<em>已经确认收到</em>。</>, doing: '下面这份文件名和大小是服务端回给本机的结果，不是本机自己记的。', flag: '已收到', warn: false },
+  'scan-ready': { ask: <>扫描好的这一份<em>已经接到这一步</em>。</>, doing: '它是从扫描工作台交接过来的，不是本页去扫的；身份一路不变。', flag: '已交接', warn: false },
+}
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -136,7 +145,7 @@ interface UploadedResumeFile {
   fileId: string
   fileUrl?: string
   mimeType?: string
-  channel: UploadChannel
+  channel: FileChannel
 }
 
 function inferFormat(mimeOrName: string): string {
@@ -149,6 +158,21 @@ function inferFormat(mimeOrName: string): string {
   return 'unknown'
 }
 
+/** 解析页带回来的扫描件交接 → 本页的「已拿到的文件」。只搬已有字段，不补造。 */
+function scanFileFrom(handoff: ScanHandoff | null): UploadedResumeFile | null {
+  if (!handoff) return null
+  const { fileId, file } = handoff
+  return {
+    name: file.name,
+    size: typeof file.size === 'number' ? formatSize(file.size) : file.size ?? '大小未知',
+    format: inferFormat(file.format || file.mimeType || file.name),
+    fileId,
+    fileUrl: file.fileUrl,
+    mimeType: file.mimeType,
+    channel: 'scan',
+  }
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
@@ -156,20 +180,31 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * 把上传失败翻译成用户看得懂的话。
+ * 这一次上传有没有拿到服务端的**可信答复**（稿 21 upload-unknown）。
  *
- * 事故原样：`fetch` 断网时 `err.message` 就是浏览器的英文原文 `Failed to fetch`，
- * 直接甩给站在一体机前的求职者。而本页自己写着「上传失败会如实提示原因」——
- * 那就别把浏览器的英文当原因。真实后端返回的中文业务错误照常透出，不做覆盖。
+ * 只有 4xx 且带着 API 的业务错误码，才算明确拒收（'rejected'），原因照常透出。
+ * API 的异常过滤器对 4xx 一律写 `error.code`，所以没有信封的 4xx 是代理代回的，不冒充已知失败。
+ * 5xx 一律不算拒收，带信封也一样：`FilesService.upload` 先把 FileObject 落成 active，
+ * 之后签名响应失败时的补偿删除也可能失败，服务端照样回 500，而文件已经归入会员账号。
+ * 其余同样是「结果未知」：断网（fetch 抛 TypeError）、2xx 但响应体截断（JSON 解析失败）、
+ * 2xx 却没带回数据（FILE_UPLOAD_EMPTY，状态仍是 2xx）。kiosk-upload 没有防重键，
+ * 所以这些情况既不能说「没传上」，也不能引导用户盲目重传出第二份。
+ */
+function uploadOutcomeOf(err: unknown): 'rejected' | 'unknown' {
+  if (!(err instanceof ApiHttpError)) return 'unknown'
+  if (err.status < 400 || err.status >= 500) return 'unknown'
+  if (err.code === 'UNKNOWN_ERROR' || err.code === 'NETWORK_ERROR' || err.code === 'REQUEST_TIMEOUT') return 'unknown'
+  return 'rejected'
+}
+
+/**
+ * 把服务端明确拒收的原因翻译成用户看得懂的话（只处理 'rejected'，没收到答复的走结果未知）。
+ * 真实后端返回的中文业务错误照常透出，不做覆盖。
  */
 function uploadErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message.trim() : ''
   if (!raw) return '上传失败,请重试'
-  // 浏览器 / 运行时层面的网络错误：英文原文对用户没有任何意义。
-  if (/^(Failed to fetch|NetworkError|Load failed|The user aborted a request)/i.test(raw)) {
-    return '文件没能传到服务器，请检查网络后重试；也可以改用 U盘 或 手机扫码上传。'
-  }
-  // 纯 ASCII 的技术错误（英文异常 / 堆栈）同样不适合直接展示。
+  // 纯 ASCII 的技术错误（英文异常 / 堆栈）不适合直接展示。
   if (!/[一-龥]/.test(raw)) {
     return `上传失败，请重试或更换上传方式。（技术原因：${raw}）`
   }
@@ -178,6 +213,7 @@ function uploadErrorMessage(err: unknown): string {
 
 export function ResumeSourcePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const intent: ResumeIntent = searchParams.get('intent') === 'optimize' ? 'optimize' : 'diagnose'
   const copy = INTENT_COPY[intent]
@@ -190,11 +226,14 @@ export function ResumeSourcePage() {
   const accept = wordConversionAvailable ? `${BASE_ACCEPT},${WORD_ACCEPT}` : BASE_ACCEPT
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<UploadChannel>('cloud')
-  const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(null)
+  // 从解析页带着扫描件交接回来时，直接落在稿 21 的 scan-ready：同一份文件，不用重扫。
+  const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(() => scanFileFrom(readScanHandoff(location.state)))
   const [uploading, setUploading] = useState(false)
   const [phoneBusy, setPhoneBusy] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 上一次上传没拿到可信答复（稿 21 upload-unknown）；只有用户主动换文件 / 换来源才清掉。
+  const [uploadUnknown, setUploadUnknown] = useState(false)
   const [genericDiagnosis, setGenericDiagnosis] = useState(false)
   const [selectedDimensions, setSelectedDimensions] = useState<ResumeScoringDimensionKey[]>(DEFAULT_SELECTED_DIMENSIONS)
   const [targetIndustry, setTargetIndustry] = useState(DEFAULT_EMPLOYMENT_INDUSTRY)
@@ -231,7 +270,10 @@ export function ResumeSourcePage() {
 
   const handleSelect = (option: UploadOption) => {
     setError(null)
-    if (option.type !== selected) setUploadedFile(null)
+    if (option.type !== selected) {
+      setUploadedFile(null)
+      setUploadUnknown(false)
+    }
     setSelected(option.type)
     if (option.type !== 'cloud') return
     fileInputRef.current?.click()
@@ -269,6 +311,10 @@ export function ResumeSourcePage() {
     const file = e.target.files?.[0]
     e.target.value = '' // 允许选同名再次触发
     if (!file) return
+    // 用户已经换成这一份：上一份（哪怕上传成功过）从此不再是「要交给解析的那一份」，
+    // 否则这一份失败 / 结果未知时，主按钮会拿着上一份进解析。
+    setUploadedFile(null)
+    setUploadUnknown(false)
     if (file.size > MAX_BYTES) {
       setError(`文件超过 10MB(${formatSize(file.size)}),请压缩后重试`)
       return
@@ -278,6 +324,11 @@ export function ResumeSourcePage() {
     clearAiResumeSession()
     try {
       const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
+      // 2xx 却没带回文件标识：服务端可能已经收下，但本机没有能继续用的那一份。
+      if (typeof uploaded?.fileId !== 'string' || !uploaded.fileId) {
+        setUploadUnknown(true)
+        return
+      }
       setUploadedFile({
         name: uploaded.filename,
         size: formatSize(uploaded.sizeBytes),
@@ -288,7 +339,8 @@ export function ResumeSourcePage() {
         channel: selected,
       })
     } catch (err) {
-      setError(uploadErrorMessage(err))
+      if (uploadOutcomeOf(err) === 'unknown') setUploadUnknown(true)
+      else setError(uploadErrorMessage(err))
     } finally {
       setUploading(false)
     }
@@ -298,12 +350,14 @@ export function ResumeSourcePage() {
     clearAiResumeSession()
     setUploadedFile({ ...file, fileUrl: file.fileUrl })
     setError(null)
+    setUploadUnknown(false)
   }
 
   const handleUsbUploaded = (file: ResumeUsbImportedFile) => {
     clearAiResumeSession()
     setUploadedFile(file)
     setError(null)
+    setUploadUnknown(false)
   }
 
   const handleStartDiagnosis = () => {
@@ -312,7 +366,8 @@ export function ResumeSourcePage() {
     navigate('/resume/parse', {
       state: {
         intent,
-        source: 'upload',
+        // 扫描工作台交接来的仍按扫描件提交（服务端合同本来就接受 'scan'）。
+        source: uploadedFile.channel === 'scan' ? 'scan' : 'upload',
         // fileUrl / mimeType 一起透传:诊断失败时报告页要凭它们把**原件**送进打印链路。
         // 原来只带 name/size/format,于是 AI 一挂,文件明明还在服务端,用户却一张纸也拿不走。
         // 这是 kiosk-upload 下发的 HMAC content URL(30 分钟 TTL),与 PrintUploadPage 同一条路径。
@@ -330,31 +385,89 @@ export function ResumeSourcePage() {
     })
   }
 
+  const scanReady = uploadedFile?.channel === 'scan'
+  const heroKey: SourceHeroKey = scanReady
+    ? 'scan-ready'
+    : uploading
+      ? 'uploading'
+      : uploadUnknown
+        ? 'upload-unknown'
+        : error
+          ? 'upload-failed'
+          : uploadedFile
+            ? 'staged'
+            : selected === 'usb' ? 'usb' : selected === 'phone' ? 'phone' : 'source'
+  const hero = SOURCE_HERO[heroKey]
+
+  // 顶栏状态胶囊只报本机真实可知的状态：忙碌 / 文件已就绪 / 还没有文件。拿不到的一律不报「正常」。
+  const frameStatus = sourceBusy
+    ? { tone: 'warn' as const, label: uploading ? '上传中' : '接收中' }
+    : scanReady
+      ? { tone: 'ok' as const, label: '扫描件已交接 · 待确认' }
+      : uploadedFile
+        ? { tone: 'ok' as const, label: '文件已就绪' }
+        : uploadUnknown
+          ? { tone: 'warn' as const, label: '上传结果未知 · 不重发' }
+          : error
+            ? { tone: 'warn' as const, label: '上传未完成' }
+            : { tone: 'unknown' as const, label: '等待简历文件' }
+  const channelLabel = (channel: FileChannel) =>
+    channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : channel === 'scan' ? '扫描工作台交接' : '本机文件'
+
+  /** 「换一种来源」：放下交接来的扫描件，并把这条历史里的交接一起清掉，免得返回时又冒出来。 */
+  const dropScanHandoff = () => {
+    setUploadedFile(null)
+    setError(null)
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+  }
+
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" className="resume-lightflow resume-source-lightflow flex h-full flex-col p-6">
-      <KioskPageHeader
-        title={copy.title}
-        description={copy.subtitle}
-        onBack={() => navigate('/')}
-        backLabel="返回首页"
+    <QxPageFrame
+      title={copy.title}
+      subtitle={copy.subtitle}
+      status={frameStatus}
+      terminalLabel="AI 简历服务"
+      back={{ label: '返回 AI 简历服务', onBack: () => navigate('/resume-service') }}
+      ctabar={(
+        <>
+          {uploadedFile && !scanReady ? (
+            <button
+              type="button"
+              className="qx-btn resume-change-file"
+              data-variant="ghost"
+              disabled={sourceBusy}
+              onClick={() => {
+                setUploadedFile(null)
+                setError(null)
+                if (fileInputRef.current) fileInputRef.current.value = ''
+                handleUploadBoxClick()
+              }}
+            >
+              更换文件
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="qx-btn resume-primary-action"
+            data-variant="primary"
+            disabled={!uploadedFile || sourceBusy}
+            onClick={handleStartDiagnosis}
+          >
+            {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
+          </button>
+        </>
+      )}
+    >
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} className="qx-resume-triage">
+      {/* 稿 21 小青任务头：随真实状态换话，四步轨当前在第 1 步。页面 h1 仍是 QxPageFrame 页头。 */}
+      <ResumeTriageHero
+        eyebrow={intent === 'optimize' ? 'AI RESUME OPTIMIZE' : 'AI RESUME DIAGNOSE'}
+        ask={hero.ask}
+        doing={hero.doing}
+        flag={hero.flag}
+        warn={hero.warn}
+        rail={['current', 'todo', 'todo', 'todo']}
       />
-
-      <p className="mt-3 text-sm leading-relaxed text-neutral-600" role="note">
-        {KIOSK_DEVICE_ORIGINAL_NOTICE}
-      </p>
-
-      <AiDriverBanner feature="AI简历诊断" description="上传后自动解析结构、识别问题" />
-
-      <div className="resume-source-privacy mt-3">
-        <ComplianceBanner tone="success" title="隐私保护">
-          {copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}
-        </ComplianceBanner>
-      </div>
-
-      <div className="resume-lightflow__stepper mt-3">
-        <Stepper steps={RESUME_FLOW_STEPS} currentIndex={0} />
-      </div>
 
       <input
         ref={fileInputRef}
@@ -365,157 +478,140 @@ export function ResumeSourcePage() {
         onChange={handleFileChosen}
       />
 
-      <div className="resume-source-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-1">
-        <Card className="resume-source-intro border-primary-100 bg-primary-50/50 p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm">
-              <SparklesIcon className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold text-neutral-900">{copy.infoTitle}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-neutral-600">{copy.infoBody}</p>
-              {intent === 'optimize' && (
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  {OPTIMIZE_FLOW_STEPS.map((step, i) => (
-                    <span key={step} className="flex items-center gap-1.5">
-                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-primary-700 shadow-sm">{step}</span>
-                      {i < OPTIMIZE_FLOW_STEPS.length - 1 && <span className="text-xs text-primary-300">→</span>}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* 阶段2A:没有电子简历的用户 → AI 简历生成(引导式表单,只润色不编造) */}
-        <button
-          type="button"
-          onClick={() => navigate('/resume/generate')}
-          className="resume-source-alternative flex min-h-[72px] w-full items-center gap-4 rounded-2xl border-2 border-dashed border-primary-200 bg-white px-5 py-3 text-left transition-colors hover:border-primary-400 hover:bg-primary-50/40 active:bg-primary-50"
-        >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white">
-            <SparklesIcon className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <div className="flex-1">
-            <p className="text-lg font-bold text-neutral-900">没有电子简历？AI 帮你生成一份</p>
-            <p className="mt-0.5 text-sm text-neutral-500">填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</p>
-          </div>
-          <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">去生成</span>
-        </button>
-
-        <div className="resume-source-split grid min-w-0 grid-cols-1 gap-5">
-          <div className="resume-source-main flex min-w-0 flex-1 flex-col">
-            <div className="resume-source-methods grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="qx-scroll qx-rt-scroll">
+        {scanReady && uploadedFile ? (
+          <ResumeScanReady
+            name={uploadedFile.name}
+            size={uploadedFile.size}
+            format={uploadedFile.format}
+            onDrop={dropScanHandoff}
+            onRescan={() => navigate('/scan')}
+          />
+        ) : (
+          <section className="qx-rt-pick" aria-labelledby="qx-rt-pick-h">
+            <h2 className="qx-rt-sec-h" id="qx-rt-pick-h">简历文件从哪儿来 <small>点一下直接进这条通道</small></h2>
+            <div className="qx-rt-srcs" role="group" aria-label="选择简历来源">
               {UPLOAD_OPTIONS.filter((option) => option.type !== 'cloud' || !isTerminalKiosk()).map((option) => {
-              const isSelected = selected === option.type
-              const Icon = option.icon
-              const disabled = sourceBusy
-              return (
-                <button
-                  type="button"
-                  key={option.type}
-                  onClick={() => !disabled && handleSelect(option)}
-                  disabled={disabled}
-                  className={[
-                    'flex min-h-[148px] w-full flex-col justify-between rounded-2xl border-2 px-5 py-5 text-left shadow-sm transition-colors',
-                    'disabled:cursor-not-allowed disabled:opacity-60',
-                    isSelected
-                      ? 'border-primary-500 bg-white ring-4 ring-primary-100'
-                      : 'border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50/30 active:bg-primary-50',
-                  ].join(' ')}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={['flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl', isSelected ? 'bg-primary-100' : 'bg-neutral-100'].join(' ')}>
-                      <Icon className={['h-8 w-8', isSelected ? 'text-primary-600' : 'text-neutral-500'].join(' ')} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={['text-xl font-bold', isSelected ? 'text-primary-700' : 'text-neutral-900'].join(' ')}>{option.label}</p>
-                      <p className="mt-1 text-sm font-medium text-neutral-600">{option.description}</p>
-                    </div>
-                    {isSelected && <CheckCircleIcon className="h-6 w-6 shrink-0 text-primary-600" aria-hidden="true" />}
-                  </div>
-                  <p className="mt-4 text-xs leading-relaxed text-neutral-400">{option.helper}</p>
-                </button>
-              )
+                const isSelected = selected === option.type
+                const Icon = option.icon
+                return (
+                  <button
+                    type="button"
+                    key={option.type}
+                    className="qx-rt-src"
+                    aria-pressed={isSelected}
+                    onClick={() => !sourceBusy && handleSelect(option)}
+                    disabled={sourceBusy}
+                  >
+                    <span className="ico"><Icon className="h-8 w-8" /></span>
+                    <span className="n">{option.label}</span>
+                    <span className="d">{option.description}</span>
+                    <span className="go">{option.helper}</span>
+                  </button>
+                )
               })}
             </div>
+          </section>
+        )}
 
-            {selected === 'phone' ? (
-              <div className="resume-source-phone-session flex-1">
+        <div className="qx-rt-split">
+          <div className="qx-rt-main">
+            {scanReady ? null : selected === 'phone' ? (
+              <div className="resume-source-phone-session qx-rt-phone">
                 <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
               </div>
             ) : selected === 'usb' ? (
-              <ResumeUsbImportPanel onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
+              <div className="qx-rt-usb">
+                <ResumeUsbImportPanel onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
+              </div>
             ) : (
               <button
                 type="button"
                 disabled={sourceBusy}
                 onClick={handleUploadBoxClick}
-                className={[
-                  'resume-source-dropzone flex flex-1 min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
-                  uploadedFile
-                    ? 'border-primary-300 bg-primary-50/35'
-                    : 'border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
-                  uploading ? 'cursor-not-allowed opacity-70' : '',
-                ].join(' ')}
+                className="qx-rt-dropzone"
+                data-staged={uploadedFile ? 'true' : undefined}
               >
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+                <span className="ico">
                   {uploadedFile ? <FileTextIcon className="h-8 w-8" aria-hidden="true" /> : <UploadCloudIcon className="h-8 w-8" aria-hidden="true" />}
-                </div>
-                <p className="mt-4 text-2xl font-extrabold text-neutral-900">
-                  {uploadedFile ? uploadedFile.name : '点击上传文件'}
-                </p>
-                <p className="mt-2 text-base font-medium text-neutral-500">
+                </span>
+                <strong>{uploadedFile ? uploadedFile.name : '点击上传文件'}</strong>
+                <span>
                   {uploadedFile
-                    ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
-                      uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
-                    } · 已就绪`
+                    ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${channelLabel(uploadedFile.channel)} · 已就绪`
                     : wordConversionAvailable
                       ? '支持 PDF、DOC、DOCX 和图片格式，单个文件最大 10MB'
                       : `${WORD_CONVERSION_UNAVAILABLE_COPY}；支持 PDF / 图片格式，单个文件最大 10MB`}
-                </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-2">
-                  {supportedFormats.map((format) => (
-                    <span key={format} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
-                      {format}
-                    </span>
-                  ))}
-                </div>
+                </span>
+                <span className="qx-rt-fmts">
+                  {supportedFormats.map((format) => <em key={format}>{format}</em>)}
+                </span>
               </button>
             )}
-            <p className="resume-source-upload-hint mt-2 text-sm leading-relaxed text-neutral-500">
-              再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
-              <span
-                aria-disabled={!wordConversionAvailable || undefined}
-                aria-describedby={!wordConversionAvailable ? 'resume-word-conversion-reason' : undefined}
-              >
-                {wordConversionAvailable
-                  ? ` Word ${WORD_CONVERSION_DISCLOSURE}。`
-                  : ` ${WORD_CONVERSION_UNAVAILABLE_COPY}。`}
-              </span>
-            </p>
-            {!wordConversionAvailable && (
-              <p id="resume-word-conversion-reason" className="mt-1 text-xs leading-5 text-neutral-400">
+
+            {error && (
+              <p className="qx-rt-note resume-source-error" data-tone="error" role="alert">{error}</p>
+            )}
+            {/* 稿 21 upload-unknown。没有后端「按同一标识再查」合同，所以不做再查按钮，只如实说未知。 */}
+            {uploadUnknown && (
+              <>
+                <p className="qx-rt-note resume-source-unknown" data-tone="warn" role="status">
+                  <b>结果未知</b>暂时无法确认这一份有没有传上去。本页不会自动再传，也不会用之前那份文件继续。
+                </p>
+                <dl className="qx-rt-kv">
+                  <div><dt>发生了什么</dt><dd>上传过程中网络或服务出了问题，这台机器没能确认上传是否完成。</dd></div>
+                  <div><dt>还不确定的</dt><dd>这份文件可能已经传上去了，也可能没有。</dd></div>
+                  <div><dt>再传一次</dt><dd>可以重新选择文件再传；如果刚才那次其实已经传上去，会多出一份重复文件。</dd></div>
+                  <div>
+                    <dt>建议这样做</dt>
+                    <dd data-testid="resume-source-unknown-next">
+                      {getToken()
+                        ? '可先到「我的 → 我的文档」核对；暂时没看到时可稍后刷新。若决定再传，请重新选择文件，可能出现重复文件。'
+                        : '当前未登录，暂时无法核对账号记录。需要继续时，可重新选择文件或换一种来源。'}
+                    </dd>
+                  </div>
+                </dl>
+              </>
+            )}
+            {uploading && (
+              <p className="qx-rt-note resume-source-status" role="status">上传中，请稍候…</p>
+            )}
+
+            {scanReady ? null : (
+              <p className="qx-rt-hint">
+                再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
+                <span
+                  aria-disabled={!wordConversionAvailable || undefined}
+                  aria-describedby={!wordConversionAvailable ? 'resume-word-conversion-reason' : undefined}
+                >
+                  {wordConversionAvailable
+                    ? ` Word ${WORD_CONVERSION_DISCLOSURE}。`
+                    : ` ${WORD_CONVERSION_UNAVAILABLE_COPY}。`}
+                </span>
+              </p>
+            )}
+            {!wordConversionAvailable && !scanReady && (
+              <p id="resume-word-conversion-reason" className="qx-rt-hint">
                 {conversionCapabilities.reason || '转换引擎未就绪；服务恢复并通过能力探测后会自动开放。'}
               </p>
             )}
             {uploadedFile && (
-              <FileContentPreview
-                compact
-                className="mt-4"
-                fileUrl={uploadedFile.fileUrl}
-                fileName={uploadedFile.name}
-                mimeType={uploadedFile.mimeType}
-                format={uploadedFile.format}
-                fileId={uploadedFile.fileId}
-                token={getToken()}
-              />
+              <div className="qx-rt-preview">
+                <FileContentPreview
+                  compact
+                  fileUrl={uploadedFile.fileUrl}
+                  fileName={uploadedFile.name}
+                  mimeType={uploadedFile.mimeType}
+                  format={uploadedFile.format}
+                  fileId={uploadedFile.fileId}
+                  token={getToken()}
+                />
+              </div>
             )}
           </div>
 
-          <aside className="resume-source-side flex min-w-0 w-full flex-col">
-            <div className="resume-source-direction flex min-h-0 flex-1 flex-col">
+          <aside className="qx-rt-side">
+            <div className="qx-rt-direction">
               <DiagnosisDirectionForm
                 genericDiagnosis={genericDiagnosis}
                 selectedDimensions={selectedDimensions}
@@ -538,91 +634,61 @@ export function ResumeSourcePage() {
           </aside>
         </div>
 
+        <section className="qx-card qx-rt-intro">
+          <h2>{copy.infoTitle}</h2>
+          <p>{copy.infoBody}</p>
+          {intent === 'optimize' && (
+            <ol className="qx-rt-chain" aria-label="优化链路">
+              {OPTIMIZE_FLOW_STEPS.map((step) => <li key={step}>{step}</li>)}
+            </ol>
+          )}
+        </section>
+
+        {/* 阶段2A:没有电子简历的用户 → AI 简历生成(引导式表单,只润色不编造) */}
+        <button type="button" onClick={() => navigate('/resume/generate')} className="qx-rt-alt">
+          <SparklesIcon size={30} aria-hidden="true" />
+          <span>
+            <strong>没有电子简历？AI 帮你生成一份</strong>
+            <small>填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</small>
+          </span>
+          <span className="go">去生成</span>
+        </button>
+
         {/*
-          维度清单默认收起（R5）。
-          事故原样：56px 的主 CTA「开始 AI 诊断」在 1080×1920 首屏只露 21px ——
-          内容 1903px 挤进 1844px 可视区。一体机没有滚动条，用户看到的就是一条
-          被切坏的按钮，以为传失败了。复验还发现两处更糟的：`?intent=optimize`
-          与「上传失败横幅在屏」时该按钮 0px 可见，完全看不到。
-          这张卡是页面上最高的一块非必需内容（291px），收起后四种情形全部归零溢出。
+          维度清单默认收起（R5）：主 CTA 固定在 ctabar，但这张卡仍是页面上最高的
+          非必需内容，收起后工作台不必为它滚一整屏。
           注意只收清单本身；下面那句「不会编造无法验证的结论」是合规声明，常驻可见。
         */}
-        <Card className="resume-source-evidence p-4">
-          <details className="resume-source-dimensions">
-            <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-2 text-base font-bold text-neutral-900">
-              <ShieldCheckIcon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
-              <span className="flex-1">
-                {intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}
-              </span>
-              <span className="text-sm font-medium text-neutral-500">
-                {DIAGNOSIS_DIMENSIONS.length} 项 · 点击展开
-              </span>
+        <section className="qx-card qx-rt-dims">
+          <details>
+            <summary>
+              <ShieldCheckIcon size={22} aria-hidden="true" />
+              <span>{intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}</span>
+              <small>{DIAGNOSIS_DIMENSIONS.length} 项 · 点击展开</small>
             </summary>
-            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-              {DIAGNOSIS_DIMENSIONS.map((item, idx) => {
+            <div className="qx-rt-dim-grid">
+              {DIAGNOSIS_DIMENSIONS.map((item, idx) => (
                 // 最后两项（风险表述提醒、修改优先级建议）为扩展维度，用 wheat 色区分
-                const isExtra = idx >= DIAGNOSIS_DIMENSIONS.length - 2
-                return (
-                  <div
-                    key={item}
-                    className={[
-                      'flex min-h-[64px] items-center justify-center rounded-2xl border px-3 text-center text-sm font-semibold',
-                      isExtra
-                        ? 'fy-inc-extra border-amber-200 bg-amber-50 text-amber-800'
-                        : 'border-neutral-200 bg-neutral-50 text-neutral-700',
-                    ].join(' ')}
-                  >
-                    {item}
-                  </div>
-                )
-              })}
+                <span key={item} className="qx-rt-dim" data-extra={idx >= DIAGNOSIS_DIMENSIONS.length - 2 ? 'true' : undefined}>
+                  {item}
+                </span>
+              ))}
             </div>
           </details>
-          <div className="mt-3 flex items-start gap-2 rounded-2xl bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
-            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <p>诊断维度以当前后端 AI 报告结构为准。系统不会编造「超过多少人」「必然提分」等无法验证的结论。</p>
-          </div>
-        </Card>
+          <p className="qx-rt-note" data-tone="warn">
+            <AlertCircleIcon size={18} aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: '-3px' }} />
+            诊断维度以当前后端 AI 报告结构为准。系统不会编造「超过多少人」「必然提分」等无法验证的结论。
+          </p>
+        </section>
       </div>
 
-      {error && (
-        <div className="resume-source-error mt-4 rounded-md border border-error-bg/60 bg-error-bg/40 px-4 py-3 text-sm text-error-fg">
-          {error}
-        </div>
-      )}
-
-      {uploading && (
-        <div className="resume-source-status mt-4 text-center text-sm font-medium text-primary-700">上传中，请稍候…</div>
-      )}
-
-      <KioskActionBar className="resume-source-actions mt-4">
-        {uploadedFile ? (
-          <Button
-            size="lg"
-            variant="outline"
-            className="resume-change-file min-h-[64px] min-w-[200px] text-lg"
-            disabled={sourceBusy}
-            onClick={() => {
-              setUploadedFile(null)
-              setError(null)
-              if (fileInputRef.current) fileInputRef.current.value = ''
-              handleUploadBoxClick()
-            }}
-          >
-            更换文件
-          </Button>
-        ) : null}
-        <span className="flex-1" aria-hidden="true" />
-        <Button
-          size="lg"
-          className="resume-primary-action min-h-[64px] min-w-[280px] flex-1 text-lg sm:flex-none sm:min-w-[460px]"
-          disabled={!uploadedFile || sourceBusy}
-          onClick={handleStartDiagnosis}
-        >
-          {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
-        </Button>
-      </KioskActionBar>
+      {/* 稿 21 `.truth`：格式 / 用途 / 留存三栏，常驻页底，不随滚动走开。 */}
+      <footer className="qx-rt-truth">
+        <p><b>格式</b>只收 {supportedFormats.join(' / ')}，单份不超过 10MB；U 盘通道只列 PDF / JPG / PNG。</p>
+        <p className="resume-source-privacy"><b>用途 · 隐私</b>{copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}</p>
+        <p><b>留存</b>{KIOSK_DEVICE_ORIGINAL_NOTICE}</p>
+      </footer>
     </section>
-    </KioskPageFrame>
+    </QxPageFrame>
   )
 }

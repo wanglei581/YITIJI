@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { getJobs } from '../../../services/api'
 
 export type HomeJobHighlightState =
@@ -8,8 +9,8 @@ export type HomeJobHighlightState =
   | { status: 'error'; total: null }
 
 // 口径：**不按 category 收窄**。这颗卡片点进去是 /jobs-service 服务台，
-// 底下有全职 /jobs?category=fulltime、实习 ?category=intern、兼职 ?category=parttime
-// 和「全部岗位」/jobs 四个入口（JobsServiceHubPage.tsx:57/69/81/93）。
+// 底下有全职 / intern / campus / parttime 和「全部岗位」/jobs 等入口
+// （serviceHubSpecs.ts 的 jobs.capabilities）。
 // 只数全职的话，全职为 0 而实习有内容时卡片会写「暂无岗位」，
 // 用户就不点了 —— 那比现在什么都不说更糟。所以与「全部岗位」同构（无 category）。
 //
@@ -26,6 +27,8 @@ export type HomeJobHighlightState =
 export function useHomeJobHighlight(): HomeJobHighlightState & { retry: () => void } {
   const [state, setState] = useState<HomeJobHighlightState>({ status: 'loading', total: null })
   const [requestVersion, setRequestVersion] = useState(0)
+  // 招聘内容托管（3.13）没打开时不请求岗位：首页也不会摆这张卡。
+  const hostingOpen = useRecruitmentHosting().enabled
 
   const retry = useCallback(() => {
     setRequestVersion((version) => version + 1)
@@ -34,6 +37,7 @@ export function useHomeJobHighlight(): HomeJobHighlightState & { retry: () => vo
   useEffect(() => {
     let cancelled = false
     setState({ status: 'loading', total: null })
+    if (!hostingOpen) return
 
     void getJobs({ pageSize: 1 })
       .then((response) => {
@@ -52,7 +56,7 @@ export function useHomeJobHighlight(): HomeJobHighlightState & { retry: () => vo
     return () => {
       cancelled = true
     }
-  }, [requestVersion])
+  }, [requestVersion, hostingOpen])
 
   return { ...state, retry }
 }

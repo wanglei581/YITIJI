@@ -266,8 +266,9 @@ export function arrivalCodeHint(signedIn: boolean, probe: ProbeStatus, mfp: MfpS
 
 /** 到机码卡的状态行，随 MFP / 探测态换话。 */
 export function arrivalCodeStateNote(probe: ProbeStatus, mfp: MfpStatus): string | undefined {
+  if (probe === 'loading') return '正在确认这台机器能不能出纸；核销本身不受影响。'
   if (probe !== 'ok')
-    return '本机连能不能出纸都读不到。核销本身能办，但这一趟可能拿不到纸 —— 建议先用上面的「重新检测」。'
+    return '本机连能不能出纸都读不到：核销能办，但这一趟可能拿不到纸。'
   if (mfp === 'unavailable')
     return '这台机器现在出不了纸。核销完也拿不到纸，建议换一台空闲机器再核销。'
   return undefined

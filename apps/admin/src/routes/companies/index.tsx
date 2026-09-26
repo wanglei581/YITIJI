@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Building2Icon, PlusIcon, SearchIcon } from 'lucide-react'
 import { Page } from '../Page'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
+import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
+import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
 import { CompanyDetailDrawer } from './components/CompanyDetailDrawer'
 import { CreateCompanyDrawer } from './components/CreateCompanyDrawer'
 import {
@@ -37,6 +41,10 @@ export default function CompaniesPage() {
   const [listState, setListState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [takedown, setTakedown] = useState<EmergencyTakedownTarget | null>(null)
+  // 托管关闭（我们云上默认）时只读：不新增、不编辑、不审核发布、不关联岗位，只留查看与紧急下架。
+  const hosting = useRecruitmentHosting()
+  const readOnly = !hosting.writable
 
   const loadList = useCallback(async () => {
     setListState('loading')
@@ -64,8 +72,10 @@ export default function CompaniesPage() {
   return (
     <Page
       title="企业展示管理"
-      subtitle="来源企业展示信息运营 — 审核 · 发布 · 展示资料 · 岗位关联（仅信息展示，不参与招聘闭环）"
-      actions={
+      subtitle={readOnly
+        ? '来源企业展示信息查看 — 展示资料 · 岗位关联（只读，保留紧急下架；不参与招聘闭环）'
+        : '来源企业展示信息运营 — 审核 · 发布 · 展示资料 · 岗位关联（仅信息展示，不参与招聘闭环）'}
+      actions={readOnly ? undefined : (
         <button
           onClick={() => setCreateOpen(true)}
           className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
@@ -73,8 +83,9 @@ export default function CompaniesPage() {
           <PlusIcon className="h-4 w-4" />
           新增企业
         </button>
-      }
+      )}
     >
+      <RecruitmentHostingNotice hosting={hosting} subject="企业资料" />
       {/* 筛选条 */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select className={`${inputCls} w-auto`} value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)}>
@@ -110,7 +121,9 @@ export default function CompaniesPage() {
           description={
             hasFilter
               ? '调整筛选条件或关键词后重试。'
-              : '企业由合作机构导入或管理员手工新增，审核通过并发布后在一体机「找企业」展示。'
+              : readOnly
+                ? '当前只读：只能查看与紧急下架。'
+                : '企业由合作机构导入或管理员手工新增，审核通过并发布后在一体机「找企业」展示。'
           }
         />
       )}
@@ -150,15 +163,28 @@ export default function CompaniesPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.linkedJobCount}</td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedId(c.id)
-                        }}
-                        className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                      >
-                        管理
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedId(c.id)
+                          }}
+                          className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                        >
+                          {readOnly ? '查看' : '管理'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setTakedown({ targetType: 'company', targetId: c.id, title: c.name, orgName: c.sourceName })
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
+                        >
+                          紧急下架
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -176,17 +202,22 @@ export default function CompaniesPage() {
         companyId={selectedId}
         onClose={() => setSelectedId(null)}
         onChanged={refreshList}
+        readOnly={readOnly}
       />
 
-      <CreateCompanyDrawer
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={(id) => {
-          setCreateOpen(false)
-          refreshList()
-          setSelectedId(id)
-        }}
-      />
+      {!readOnly && (
+        <CreateCompanyDrawer
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(id) => {
+            setCreateOpen(false)
+            refreshList()
+            setSelectedId(id)
+          }}
+        />
+      )}
+
+      <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={refreshList} />
     </Page>
   )
 }

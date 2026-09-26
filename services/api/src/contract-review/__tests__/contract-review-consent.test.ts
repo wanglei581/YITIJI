@@ -31,7 +31,7 @@ const assertExactStringLiteralUnion =
   ) => void
 
 const CONTRACT_VERSION = 'contract-review-consent-v1'
-const EXPECTED_CONSENT_SCOPES = ['job_ai', 'contract_review', 'resume_ai'] as const
+const EXPECTED_CONSENT_SCOPES = ['job_ai', 'contract_review', 'resume_ai', 'age_14_plus', 'voice_recording'] as const
 const repoRoot = resolve(__dirname, '../../../../..')
 const PROCESSING_STATUSES = [
   'uploaded',
@@ -315,10 +315,12 @@ test('contract review has an isolated consent version in API and shared contract
     job_ai: CURRENT_JOB_AI_CONSENT_VERSION,
     contract_review: CONTRACT_VERSION,
     resume_ai: 'resume-ai-consent-v1',
+    age_14_plus: 'age-14-plus-v1',
+    voice_recording: 'voice-recording-v1',
   })
   assert.match(
     sharedPrivacyTypes,
-    /export type MemberAiConsentScope = 'job_ai' \| 'contract_review' \| 'resume_ai'/
+    /export type MemberAiConsentScope = 'job_ai' \| 'contract_review' \| 'resume_ai' \| 'age_14_plus' \| 'voice_recording'/
   )
   assert.match(sharedPrivacyTypes, /export interface MemberAiConsentStatus/)
   assert.equal(consentVersionForScope('contract_review'), CONTRACT_VERSION)
@@ -334,7 +336,7 @@ test('GrantAiConsentDto accepts job_ai, contract_review and resume_ai at runtime
   const GrantAiConsentDto = parameterTypes[1]
   assert.ok(GrantAiConsentDto, 'grantConsent body DTO metadata must exist')
 
-  for (const scope of ['job_ai', 'contract_review', 'resume_ai']) {
+  for (const scope of ['job_ai', 'contract_review', 'resume_ai', 'age_14_plus', 'voice_recording']) {
     const errors = await validate(plainToInstance(GrantAiConsentDto, { scope }))
     assert.equal(errors.length, 0, `${scope} must remain accepted by the HTTP DTO`)
   }
@@ -356,7 +358,7 @@ test('revoke Param DTO accepts job_ai, contract_review and resume_ai at runtime'
   assert.ok(RevokeAiConsentParamsDto, 'revokeConsent params DTO metadata must exist')
   assert.notEqual(RevokeAiConsentParamsDto, String, 'revoke route must use a validated DTO')
 
-  for (const scope of ['job_ai', 'contract_review', 'resume_ai']) {
+  for (const scope of ['job_ai', 'contract_review', 'resume_ai', 'age_14_plus', 'voice_recording']) {
     const errors = await validate(plainToInstance(RevokeAiConsentParamsDto, { scope }))
     assert.equal(errors.length, 0, `${scope} must remain accepted by the revoke Param DTO`)
   }
@@ -390,9 +392,11 @@ test('contract consent verifier is registered and enforced in the main CI contra
 
 test('consent scope verifier requires an exact string-literal-only union AST', () => {
   const validFixtures = [
-    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'resume_ai'`,
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'resume_ai' | 'age_14_plus' | 'voice_recording'`,
     `export type MemberAiConsentScope =
-      "contract_review"
+      "voice_recording"
+      | "age_14_plus"
+      | "contract_review"
       | "resume_ai"
       | "job_ai"`,
   ]
@@ -450,6 +454,18 @@ test('getConsentStatus returns independent job and contract review status entrie
       {
         scope: 'resume_ai',
         consentVersion: 'resume-ai-consent-v1',
+        granted: false,
+        revokedAt: null,
+      },
+      {
+        scope: 'age_14_plus',
+        consentVersion: 'age-14-plus-v1',
+        granted: false,
+        revokedAt: null,
+      },
+      {
+        scope: 'voice_recording',
+        consentVersion: 'voice-recording-v1',
         granted: false,
         revokedAt: null,
       },

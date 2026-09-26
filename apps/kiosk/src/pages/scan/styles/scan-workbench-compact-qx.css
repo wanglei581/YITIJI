@@ -1,0 +1,108 @@
+/* 扫描工作台 · 青序流光 · 不缩放舞台 / 手机宽度
+ * 视觉真值：docs/design/kiosk-redesign-2026-08/18-scan-workbench.html（1080×1920 为主验收，
+ * 390 宽只做兼容辅助）。主样式在 scan-workbench-qx.css；这里只放按视口收紧的规则，
+ * 必须在主样式之后引入（ScanWorkbenchChrome 里紧跟其后）。
+ */
+
+/* ── 不缩放的舞台（手机竖屏 / 横屏桌面）───────────────────────
+ * KioskRoot 在这两类视口关掉舞台缩放（data-kiosk-stage-fit="off"），按真实视口排版。
+ * 1080 舞台上「横幅 + 正文 + 底注」三段只有正文滚，横幅和底注 flex:none 钉死；视口一矮，
+ * 钉死的两段就比正文区还高。2026-09-23 实测 390×844：横幅 541px、底注 324px，正文区只有
+ * 329px，可滚区被挤成 20px 落到底栏下面，横幅（position:relative）还盖住了操作条——
+ * 结果页的「AI 简历识别」手指点不到（Playwright 只能靠滚动 overflow:hidden 的舞台摸到它，
+ * 点下去仍被 .sw-xq / .sw-truth 拦截）。1280×720 同病，可滚区也是 20px。
+ * 修法：不缩放时三段按自然高度排、整页一起滚；横幅一字不删，底注（2026-09-25 起按稿 18
+ * 只在选类型那一屏出现）也随正文一起滚。 */
+[data-kiosk-stage-fit='off'] .sw-page {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+[data-kiosk-stage-fit='off'] .sw-page::-webkit-scrollbar { display: none; }
+[data-kiosk-stage-fit='off'] .sw-page > .sw-scroll { flex: none; overflow: visible; }
+
+/* 手机宽度（与 KioskRoot 的 ≤760px 紧凑判定同口径）：四个阶段共用的块按手机字阶收紧，
+ * 多列一律改单列——三列时 390 下每个结果出口只有 95px 宽、904px 高，标题逐字竖排。
+ * 操作条按钮允许折行，不再 nowrap 裁掉「创建扫描会话」这类文案。
+ * 可点区域不低于 --qx-tap-min；操作条主按钮不低于 56px。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.sw-page) { --qx-gutter: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.sw-page) .qx-navbar { height: 64px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.sw-page) .qx-nav-item { font-size: 13px; gap: 2px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.sw-page) .qx-nav-item svg { width: 22px; height: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.sw-page) .qx-nav-item[aria-current='page']::after { bottom: 6px; width: 20px; }
+
+  [data-kiosk-stage-fit='off'] .sw-xq { margin-top: 8px; border-radius: 24px; padding: 16px 18px; }
+  [data-kiosk-stage-fit='off'] .sw-xq-row { align-items: flex-start; gap: 12px; }
+  [data-kiosk-stage-fit='off'] .sw-xq-face { width: 48px; height: 48px; font-size: 22px; }
+  [data-kiosk-stage-fit='off'] .sw-xq-eyebrow { font-size: 12px; letter-spacing: 3px; margin-bottom: 4px; }
+  [data-kiosk-stage-fit='off'] .sw-xq-ask { font-size: 22px; letter-spacing: 0; }
+  [data-kiosk-stage-fit='off'] .sw-xq-doing { margin-top: 6px; font-size: 15px; line-height: 1.5; }
+  [data-kiosk-stage-fit='off'] .sw-xq-facts { flex-direction: column; gap: 8px; margin-top: 12px; }
+  [data-kiosk-stage-fit='off'] .sw-xq-facts span { min-height: 0; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
+
+  [data-kiosk-stage-fit='off'] .sw-sec-h { flex-wrap: wrap; gap: 4px 10px; }
+  [data-kiosk-stage-fit='off'] .sw-sec-h .t { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .sw-sec-h .hint { flex-basis: 100%; margin-left: 0; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-types,
+  [data-kiosk-stage-fit='off'] .sw-grid2 { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  [data-kiosk-stage-fit='off'] .sw-ty { min-height: 0; padding: 14px 16px; border-radius: 24px; }
+  [data-kiosk-stage-fit='off'] .sw-ty-ic { width: 48px; height: 48px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-ty-n { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .sw-ty-d { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .sw-chain,
+  [data-kiosk-stage-fit='off'] .sw-chain-wrap { flex-direction: column; }
+  [data-kiosk-stage-fit='off'] .sw-chain-arrow { width: auto; height: 22px; transform: rotate(90deg); }
+  [data-kiosk-stage-fit='off'] .sw-link b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .sw-link-c,
+  [data-kiosk-stage-fit='off'] .sw-link-who { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-pgrp { padding: 14px 16px; }
+  [data-kiosk-stage-fit='off'] .sw-pgrp h4 { font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .sw-note-body,
+  [data-kiosk-stage-fit='off'] .sw-plan li,
+  [data-kiosk-stage-fit='off'] .sw-kv > div { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .sw-foot { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-kv > div > span:first-child { width: 96px; }
+  [data-kiosk-stage-fit='off'] .sw-panel { flex-direction: column; gap: 12px; }
+  [data-kiosk-stage-fit='off'] .sw-mfp { width: auto; align-self: stretch; border-radius: 24px; padding: 16px; }
+  [data-kiosk-stage-fit='off'] .sw-mfp-cap,
+  [data-kiosk-stage-fit='off'] .sw-psrc { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-pstep { gap: 12px; padding: 12px 14px; border-radius: 18px; }
+  [data-kiosk-stage-fit='off'] .sw-pstep-n { width: 36px; height: 36px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .sw-pstep-t { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .sw-state,
+  [data-kiosk-stage-fit='off'] .sw-state-hero { padding: 18px 16px; border-radius: 24px; }
+  [data-kiosk-stage-fit='off'] .sw-state-h,
+  [data-kiosk-stage-fit='off'] .sw-state-hero .sw-state-h { font-size: 22px; }
+  [data-kiosk-stage-fit='off'] .sw-state-p,
+  [data-kiosk-stage-fit='off'] .sw-state-hero .sw-state-p { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .sw-state-hero .sw-chip { min-height: var(--qx-tap-min); font-size: 15px; padding: 0 14px; }
+
+  [data-kiosk-stage-fit='off'] .sw-pvh-1 { flex-wrap: wrap; gap: 8px 10px; }
+  [data-kiosk-stage-fit='off'] .sw-pvh-t { flex: 1 1 0; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .sw-pvh-2 { flex-wrap: wrap; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .sw-preview-cap { font-size: 14px; }
+  /* 整屏查看键独占一行：和标题挤在同一行时标题被压到约 50px 宽、逐字竖排（390 实测 280px 高）。 */
+  [data-kiosk-stage-fit='off'] .sw-pvh-open { flex: 1 0 100%; justify-content: center; margin-left: 0; min-height: var(--qx-tap-min); padding: 0 12px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .sw-actrow { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  [data-kiosk-stage-fit='off'] .sw-exit { min-height: 64px; padding: 10px 14px; font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .sw-exit small { font-size: 14px; }
+
+  [data-kiosk-stage-fit='off'] .sw-truth { flex-direction: column; gap: 10px; padding: 12px 0 8px; }
+  [data-kiosk-stage-fit='off'] .sw-truth div { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-cta-reason { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-cta-row { gap: 10px; }
+  [data-kiosk-stage-fit='off'] .sw-cta-row .qx-btn { min-height: 56px; padding: 6px 12px; gap: 6px; font-size: 17px; line-height: 1.25; white-space: normal; text-align: center; }
+  [data-kiosk-stage-fit='off'] .sw-cta-row .qx-btn svg { width: 20px; height: 20px; }
+}
+
+/* 等待页的理由行在手机宽度按 14px 一行留位（主样式按 19px 算）。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .sw-cta-wrap[data-reserve-reason='true'] { min-height: calc(56px + 14px * 1.3 + 8px); }
+  [data-kiosk-stage-fit='off'] .sw-scroll[data-layout='spread'] { gap: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-scroll[data-layout='spread'] .sw-pgrp { padding: 14px 16px; }
+  [data-kiosk-stage-fit='off'] .sw-scroll[data-layout='spread'] .sw-pgrp h4 { font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .sw-scroll[data-layout='spread'] .sw-note-body,
+  [data-kiosk-stage-fit='off'] .sw-scroll[data-layout='spread'] .sw-plan li { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .sw-scroll[data-layout='spread'] .sw-foot { font-size: 14px; }
+}

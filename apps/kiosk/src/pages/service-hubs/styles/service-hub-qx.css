@@ -1,0 +1,486 @@
+/* 五个服务台的青序流光样式。骨架、三列网格与配色取自稿 16-service-hubs.html。
+ *
+ * 只用 --qx-* 令牌，不写裸 hex：verify:kiosk-visual-unity 会扫本目录，
+ * 新增页面 CSS 出现裸 hex 直接打红（token 定义文件除外）。
+ *
+ * 触控尺寸按 CLAUDE.md §9：可点区域不小于 48px，主行动不小于 56px。
+ * 注意页面在 1080×1920 舞台里等比缩放，屏幕上量到的 px = 这里的值 × stage scale，
+ * 门禁断言会先除回 scale 再比 48/56，所以这里写的就是 CSS px 真值。
+ */
+
+/* .qx-body 已经给了左右 --qx-gutter，这里只补下边距，别再加一次左右内距。 */
+.qx-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-bottom: 28px;
+}
+
+/* 域标识（稿的 eyebrow）。小字 + 字距，做成一枚安静的标签：
+   它负责回答「我现在在哪个服务域」，不与主标题争视线，所以不加粗不放大。 */
+.qx-hub-eyebrow {
+  align-self: flex-start;
+  margin-bottom: -8px;
+  padding: 0 12px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--qx-teal-line);
+  border-radius: 999px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 3px;
+}
+
+/* 稿的 hero-note：原件归属那一句 */
+.qx-hub-hero-note {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--qx-ink-3);
+}
+.qx-hub-hero-note b {
+  flex: none;
+  color: var(--qx-ink-2);
+}
+
+/* 目标分段：稿里是「先告诉我你现在最想完成什么」 */
+.qx-hub-goals {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 24px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+}
+.qx-hub-goals-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.qx-hub-goals-copy b {
+  font-family: var(--qx-serif);
+  font-size: 24px;
+  font-weight: 800;
+}
+.qx-hub-goals-copy span {
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--qx-ink-3);
+}
+.qx-hub-goals-row {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 620px;
+}
+.qx-hub-goal {
+  min-height: 58px;
+  min-width: 132px;
+  padding: 0 18px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: var(--qx-r);
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font-size: 19px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.qx-hub-goal:first-child {
+  border-color: var(--qx-teal-line);
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+.qx-hub-goal:active {
+  transform: scale(0.99);
+}
+.qx-hub-goal.is-unavailable,
+.qx-hub-goal.is-unavailable:first-child {
+  cursor: default;
+  border-style: dashed;
+  background: var(--qx-muted-bg);
+  color: var(--qx-muted-ink);
+  transform: none;
+}
+
+/* 分流提示条：默认态也要出现。公共终端上「没显示」会被读成「一切正常」。 */
+.qx-hub-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 84px;
+  padding: 14px 22px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+  color: var(--qx-ink-3);
+}
+.qx-hub-notice > svg {
+  flex: none;
+  color: var(--qx-teal);
+}
+.qx-hub-notice[data-readiness='unavailable'] {
+  border-color: var(--qx-cinnabar-line);
+  background: var(--qx-cinnabar-soft);
+}
+.qx-hub-notice[data-readiness='unavailable'] > svg {
+  color: var(--qx-cinnabar);
+}
+/* degraded = 本机设备不可用。严重度对齐顶栏状态胶囊的 warn（琥珀），
+   不要用 unavailable 的朱砂红——那一档留给整个后端不可达。 */
+.qx-hub-notice[data-readiness='degraded'] {
+  /* 令牌表里没有 --qx-wheat-line（朱砂有、麦色没有）。这里用 color-mix 就地调一条
+     与 --qx-cinnabar-line 视觉轻重相当的麦色描边，不新增共享令牌，也不写裸 hex
+     （本目录的裸 hex 会被 verify:kiosk-visual-unity 打红——连注释里的也算）。 */
+  border-color: color-mix(in srgb, var(--qx-wheat) 42%, var(--qx-wheat-soft));
+  background: var(--qx-wheat-soft);
+}
+.qx-hub-notice[data-readiness='degraded'] > svg {
+  color: var(--qx-wheat-d);
+}
+.qx-hub-notice[data-readiness='checking'] > svg {
+  color: var(--qx-wheat);
+}
+.qx-hub-notice-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 18px;
+  line-height: 1.45;
+}
+.qx-hub-notice-copy b {
+  color: var(--qx-ink);
+  font-size: 19px;
+}
+.qx-hub-retry {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  min-width: 132px;
+  padding: 0 22px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  font-size: 19px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+/* 能力网格吸收整页的竖向余量。
+   1080×1920 上固定行高会在底部留一条空带（首版实测约 200px 的空白），
+   看着像「页面没加载完」。把余量交给卡片：行高有下限、上不封顶。 */
+.qx-hub-board {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* 主能力板吸收整页余量。
+   判据必须是**显式类名**：此前写的是 `.qx-hub-board:first-of-type`，而 `:first-of-type`
+   按标签名算——`.qx-hub` 里第一个 <section> 是「先告诉我你现在最想完成什么」那块，
+   本板是第二个，于是这条规则一次都没命中。后果在 1080×1920 上直接可见：
+   六卡页（招聘会 / 面试）只排两行 236px，底部留下约 400px 死白。
+
+   `flex: 1 0 auto`（而不是 `flex: 1`）：可以长，但**不许缩**。
+   `.qx-hub` 是滚动容器，允许收缩会让九卡页的网格被压进比 grid 最小行高还矮的盒子里，
+   内容溢出后压到下面的「常用入口」上。 */
+.qx-hub-board--primary {
+  flex: 1 0 auto;
+}
+.qx-hub-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.qx-hub-section-head h2 {
+  font-family: var(--qx-serif);
+  font-size: 28px;
+  font-weight: 900;
+}
+.qx-hub-section-head > span {
+  font-size: 18px;
+  color: var(--qx-ink-3);
+}
+.qx-hub-section-head > b {
+  margin-left: auto;
+  font-size: 18px;
+  color: var(--qx-teal-d);
+}
+
+/* 稿是三列。九张卡正好 3×3；八张时最后一张跨两列，不留孤儿。 */
+.qx-hub-grid {
+  flex: 1 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(236px, 1fr);
+  gap: 16px;
+}
+.qx-hub-grid > :nth-child(8):last-child,
+.qx-hub-grid > :nth-child(7):last-child {
+  grid-column: span 2;
+}
+.qx-hub-grid--wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.qx-hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 236px;
+  padding: 20px;
+  text-align: left;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  cursor: pointer;
+}
+.qx-hub-card:active {
+  transform: scale(0.995);
+}
+.qx-hub-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 54px;
+  height: 54px;
+  border-radius: var(--qx-r);
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+/* 稿按依赖类别分色：AI/账户偏紫，信息偏蓝，设备是主青。 */
+.qx-hub-card[data-kind='ai'] .qx-hub-card-icon,
+.qx-hub-card[data-kind='account'] .qx-hub-card-icon {
+  background: var(--qx-plum-soft);
+  color: var(--qx-plum-d);
+}
+.qx-hub-card[data-kind='info'] .qx-hub-card-icon {
+  background: var(--qx-slate-soft);
+  color: var(--qx-slate-d);
+}
+.qx-hub-card h3 {
+  font-family: var(--qx-serif);
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.24;
+}
+.qx-hub-card p {
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--qx-ink-3);
+}
+.qx-hub-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 17px;
+}
+.qx-hub-badge {
+  flex: none;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--qx-r-s);
+  background: var(--qx-muted-bg);
+  color: var(--qx-ink-2);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.qx-hub-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--qx-teal-d);
+  font-size: 18px;
+  font-weight: 750;
+}
+
+/* 不可用态：**不是灰掉的按钮，是一张说明为什么进不去的卡片**。
+   稿的做法是把「进入 →」换成具体原因，并让它不再是可点控件——
+   用户看得出是「这台机器现在没这个能力」，而不是「这个功能没了」。 */
+.qx-hub-card.is-unavailable,
+.qx-hub-quick-item.is-unavailable {
+  cursor: default;
+  border-style: dashed;
+  background: var(--qx-muted-bg);
+}
+.qx-hub-card.is-unavailable .qx-hub-card-icon,
+.qx-hub-card.is-unavailable h3,
+.qx-hub-card.is-unavailable p,
+.qx-hub-card.is-unavailable .qx-hub-badge {
+  opacity: 0.62;
+}
+.qx-hub-card.is-unavailable .qx-hub-card-icon {
+  background: var(--qx-muted-line);
+  color: var(--qx-muted-ink);
+}
+/* 不可用卡的纵向间距收紧一档。
+   下面让原因独占一行，每张卡因此多出约 14px；八卡 / 七卡页在降级态会被顶出 1920
+   （实测溢出 39px，底部的合规声明被裁掉 12px）。这里收回同样的量，换来
+   「原因完整成行 + 整页仍然一屏放下」。收紧只发生在不可用态，可点卡片一点没动。 */
+.qx-hub-card.is-unavailable {
+  gap: 6px;
+}
+.qx-hub-card.is-unavailable .qx-hub-card-foot {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding-top: 4px;
+}
+/* 不可用原因独占一行（flex-basis 100% 把它挤到徽标下一行）。
+   和徽标同行时可用宽度只剩约 140px，「正在确认AI能力状态」会折成
+   「正在确认AI能力状」+「态」——一体机上站着读，那个孤字格外刺眼。
+   给它整行（约 280px）后，这一族原因文案都能一行放下。 */
+.qx-hub-why {
+  flex: 1 0 100%;
+  min-width: 0;
+  color: var(--qx-wheat-d);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: left;
+}
+
+/* 常用入口：稿的 quick 区，三列虚线卡，通向「我的」台账与邻域服务台。 */
+.qx-hub-quick-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qx-hub-quick-label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 18px;
+  color: var(--qx-ink-3);
+}
+.qx-hub-quick-label b {
+  font-family: var(--qx-serif);
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--qx-ink);
+}
+.qx-hub-quick {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.qx-hub-quick-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 100px;
+  padding: 0 20px;
+  text-align: left;
+  border: 1px dashed var(--qx-line-2);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  cursor: pointer;
+}
+.qx-hub-quick-item > svg {
+  flex: none;
+  color: var(--qx-teal-d);
+}
+.qx-hub-quick-item > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.qx-hub-quick-item b {
+  font-size: 19px;
+  font-weight: 750;
+}
+.qx-hub-quick-item span span,
+.qx-hub-quick-item > span > span {
+  font-size: 17px;
+  color: var(--qx-ink-3);
+}
+.qx-hub-quick-item.is-unavailable > svg {
+  color: var(--qx-muted-ink);
+}
+.qx-hub-quick-item.is-unavailable > span > span {
+  color: var(--qx-wheat-d);
+  font-weight: 700;
+}
+
+/* 合规与诚实性声明区：逐字来自稿，三列（合规边界 / 能力口径 / 隐私清场）。 */
+.qx-hub-truth {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 20px;
+  padding: 20px 24px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-paper);
+  color: var(--qx-ink-3);
+  font-size: 18px;
+  line-height: 1.5;
+}
+.qx-hub-truth > div {
+  min-width: 0;
+}
+.qx-hub-truth > div + div {
+  padding-left: 20px;
+  border-left: 1px solid var(--qx-line);
+}
+.qx-hub-truth b {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--qx-ink);
+  font-size: 18px;
+}
+
+/* 窄屏（手机 / 桌面浏览器）退化成单列，触控尺寸不变。 */
+@media (max-width: 900px) {
+  .qx-hub-goals {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .qx-hub-goals-row {
+    max-width: none;
+  }
+  .qx-hub-grid,
+  .qx-hub-quick,
+  .qx-hub-truth {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* 窄屏是单列纵向滚动，没有「整页余量」可吸收；再让行高按 1fr 拉伸会把每张卡
+     撑成一屏高。恢复内容高度。 */
+  .qx-hub-board--primary,
+  .qx-hub-grid {
+    flex: none;
+  }
+  .qx-hub-grid {
+    grid-auto-rows: auto;
+  }
+  .qx-hub-grid > :nth-child(8):last-child,
+  .qx-hub-grid > :nth-child(7):last-child {
+    grid-column: auto;
+  }
+  .qx-hub-truth > div + div {
+    padding-left: 0;
+    padding-top: 14px;
+    border-left: 0;
+    border-top: 1px solid var(--qx-line);
+  }
+}

@@ -1,5 +1,12 @@
 @import "@ai-job-print/ui/styles/tokens.css";
 @import "@ai-job-print/ui/styles/inkpaper.css";
+@import "@ai-job-print/ui/styles/ops-screen.css";
+@import "@ai-job-print/ui/styles/ops-screen-blocks.css";
+@import "@ai-job-print/ui/styles/ops-screen-scale.css";
+@import "@ai-job-print/ui/styles/twin-screen.css";
+@import "@ai-job-print/ui/styles/twin-screen-parts.css";
+@import "@ai-job-print/ui/styles/twin-screen-layout.css";
+@import "@ai-job-print/ui/styles/twin-screen-3d.css";
 @import "tailwindcss";
 @source "../../../packages/ui/src";
 @source "../../../packages/shared/src";

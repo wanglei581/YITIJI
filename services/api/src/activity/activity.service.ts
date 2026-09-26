@@ -189,9 +189,23 @@ export class ActivityService {
   }
 
   /** 本人浏览记录（仅未过期；可按目标类型过滤；游标分页）。 */
-  async listBrowse(endUserId: string, page: MemberPageQuery, targetType?: string) {
+  async listBrowse(
+    endUserId: string,
+    page: MemberPageQuery,
+    targetType?: string,
+    options?: { excludeTargetTypes?: string[] },
+  ) {
     if (targetType !== undefined) assertTargetType(targetType)
-    const where = { endUserId, expiresAt: { gt: new Date() }, ...(targetType ? { targetType } : {}) }
+    const excluded = options?.excludeTargetTypes
+    const where = {
+      endUserId,
+      expiresAt: { gt: new Date() },
+      ...(targetType
+        ? { targetType }
+        : excluded && excluded.length > 0
+          ? { targetType: { notIn: excluded } }
+          : {}),
+    }
     const total = await this.prisma.browseLog.count({ where })
     const rows = await this.prisma.browseLog.findMany({
       where,
@@ -214,9 +228,23 @@ export class ActivityService {
   }
 
   /** 本人外部跳转记录（仅未过期；可按目标类型过滤；游标分页）。 */
-  async listJumps(endUserId: string, page: MemberPageQuery, targetType?: string) {
+  async listJumps(
+    endUserId: string,
+    page: MemberPageQuery,
+    targetType?: string,
+    options?: { excludeTargetTypes?: string[] },
+  ) {
     if (targetType !== undefined) assertTargetType(targetType)
-    const where = { endUserId, expiresAt: { gt: new Date() }, ...(targetType ? { targetType } : {}) }
+    const excluded = options?.excludeTargetTypes
+    const where = {
+      endUserId,
+      expiresAt: { gt: new Date() },
+      ...(targetType
+        ? { targetType }
+        : excluded && excluded.length > 0
+          ? { targetType: { notIn: excluded } }
+          : {}),
+    }
     const total = await this.prisma.externalJumpLog.count({ where })
     const rows = await this.prisma.externalJumpLog.findMany({
       where,

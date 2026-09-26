@@ -1,4 +1,4 @@
-// 账号资产页未登录走查：直达 /me/resumes、/me/documents，必须停在登录门，且不得打 /api/v1/。
+// 账号资产页未登录走查：直达 /me/resumes、/me/documents、/me/print-orders，必须停在登录门，且不得打 /api/v1/。
 //
 // 与既有 spec 的区别：本文件**每个路由独立 browser.newContext()**。共用 page 连跑
 // 多路由时，一体机的清场/待机控制器会吞掉后续导航，产出「页面空白」的假结论
@@ -13,7 +13,9 @@ const SHOTS = process.env.JOURNEY_SHOTS_DIR ?? 'test-results/account-assets-jour
 // 且红的是「文案变了」不是「登录门没了」）。
 const ASSET_ROUTES = [
   { path: '/me/resumes', gate: '登录后查看我的简历' },
-  { path: '/me/documents', gate: '登录后查看本人记录' },
+  // 2026-09-23 稿 38 迁入青序流光：文档与打印订单的登录门也改成逐页标题。
+  { path: '/me/documents', gate: '登录后查看我的文档' },
+  { path: '/me/print-orders', gate: '登录后查看打印订单' },
 ] as const
 
 type Step = { n: number }
@@ -48,7 +50,7 @@ async function step(page: Page, s: Step, label: string): Promise<void> {
 }
 
 test.describe('账号资产页（未登录）', () => {
-  test('未登录依次访问 /me/resumes 与 /me/documents：登录门且零 /api/v1/ 请求 @kiosk', async ({
+  test('未登录依次访问 /me/resumes、/me/documents 与 /me/print-orders：登录门且零 /api/v1/ 请求 @kiosk', async ({
     browser,
   }) => {
     test.setTimeout(90_000)

@@ -47,8 +47,17 @@ export class MemberFavoritesService {
     endUserId: string,
     page: MemberPageQuery,
     targetType?: FavoriteTargetType,
+    options?: { excludeTargetTypes?: FavoriteTargetType[] },
   ): Promise<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }> {
-    const where = { endUserId, ...(targetType ? { targetType } : {}) }
+    const excluded = options?.excludeTargetTypes
+    const where = {
+      endUserId,
+      ...(targetType
+        ? { targetType }
+        : excluded && excluded.length > 0
+          ? { targetType: { notIn: excluded } }
+          : {}),
+    }
     const total = await this.prisma.favorite.count({ where })
     const rows = await this.prisma.favorite.findMany({
       where,

@@ -75,7 +75,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/', url: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后继续办理', landmark: 'none' },
   { pattern: '/member/qr-login', url: '/member/qr-login?ticketId=w6-ticket', marker: screen('member-qr-login'), featureText: '手机确认登录' },
-  { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '上传链接已失效' },
+  { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '这个链接不能用来上传' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
   { pattern: '/resume/job-fit', url: '/resume/job-fit', marker: screen('resume-job-fit'), featureText: '岗位匹配', requiresFusionRoot: false },
   // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
@@ -89,7 +89,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '练习报告' },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '触摸屏幕开始使用', landmark: 'presentation', seed: seedScreensaver },
   { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
-  { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '网络连接中断' },
+  // 2026-09-25 迁入稿 09-system-state：锚点换成稿里常驻的八项状态区块标题（旧页标题「网络连接中断」已随稿替换）。
+  { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '这台机器的八项状态' },
   { pattern: '/assistant', url: '/assistant', marker: screen('assistant'), featureText: '小青' },
   { pattern: '/profile', url: '/profile', marker: screen('profile'), featureText: '我的' },
   { pattern: '/me/resumes', url: '/me/resumes', marker: member, featureText: '我的简历' },
@@ -104,7 +105,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/me/feedback', url: '/me/feedback', marker: member, featureText: '意见反馈' },
   { pattern: '/me/settings', url: '/me/settings', marker: screen('member-settings'), featureText: '账号设置' },
   { pattern: '/me/privacy-requests', url: '/me/privacy-requests', marker: screen('member-privacy-requests'), featureText: '隐私与数据请求' },
-  { pattern: '/help', url: '/help', marker: screen('help'), featureText: '帮助中心' },
+  { pattern: '/help', url: '/help', marker: screen('help'), featureText: '你想解决' },
   { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
   { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '权益活动详情' },
   { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
@@ -156,7 +157,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/export', url: '/resume/export', expectedPath: compatibilityRedirects['/resume/export'], marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
   { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
   { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },
-  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("AI简历服务")', featureText: 'AI简历服务' },
+  // 五个服务台迁入青序流光（稿 16）后，栏目名「AI简历服务」等降为 eyebrow，h1 换成稿里的主标题。
+  // featureText 顺势从栏目名改钉那五句**合规诚实性声明**——钉合规边界比钉栏目名有判别力：
+  // 迁移里最容易丢的就是这几句，钉住它们，漏抄当场变红。
+  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("把简历这件事，做得更清楚")', featureText: '系统不代投、不替企业筛选或邀约。' },
   { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/settings', url: '/scan/settings', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
@@ -164,7 +168,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
 
   { pattern: '/jobs', url: '/jobs', marker: qx, featureText: '岗位信息' },
-  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("岗位信息")', featureText: '岗位信息' },
+  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("看清来源，再决定去哪里投")', featureText: '投递在来源平台完成。' },
   { pattern: '/jobs/:id', url: '/jobs/job-001', marker: qx, featureText: '前端工程师' },
   { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: qx, featureText: '线下机构岗位' },
   { pattern: '/offline-agencies', url: '/offline-agencies', marker: qx, featureText: '线下招聘机构' },
@@ -172,26 +176,29 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/notifications', url: '/notifications', marker: member, featureText: '消息通知' },
   { pattern: '/companies', url: '/companies', marker: qx, featureText: '找企业' },
   { pattern: '/companies/:id', url: '/companies/company-001', marker: qx, featureText: '青岛示例制造有限公司' },
-  { pattern: '/job-fairs', url: '/job-fairs', marker: w4, featureText: '招聘会' },
-  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("招聘会信息")', featureText: '招聘会信息' },
-  { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: w4, featureText: '来源平台入场入口' },
-  { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: w4, featureText: '2026 青岛高校毕业生招聘会' },
-  { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: w4, featureText: '参展企业' },
+  // 2026-09-20：招聘会八条路由迁入青序流光共享工作台（稿 28），marker 从 W4 框换成 Qx 框。
+  // featureText 按服务台那一轮定下的口径钉**合规诚实性声明**而不是栏目名——
+  // 栏目名改两个字就得改夹具，而这几句是迁移里最容易整段丢掉的东西。
+  { pattern: '/job-fairs', url: '/job-fairs', marker: qx, featureText: '预约在来源平台完成。' },
+  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("先看场次，再准备到场")', featureText: '本机不代收简历，也不承诺外部活动结果。' },
+  { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: qx, featureText: '本机不做签到，也拿不到签到结果。' },
+  { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: qx, featureText: '2026 青岛高校毕业生招聘会' },
+  { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: qx, featureText: '本机不代收简历' },
   { pattern: '/job-fairs/:id/companies/:companyId', url: '/job-fairs/fair-001/companies/fair-company-001', marker: qx, featureText: '青岛示例制造有限公司' },
-  { pattern: '/job-fairs/:id/map', url: '/job-fairs/fair-001/map', marker: w4, featureText: '场馆导览' },
-  { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: w4, featureText: '活动资料' },
-  { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: w4, featureText: 'AI参会准备单' },
-  { pattern: '/job-fairs/:id/stats', url: '/job-fairs/fair-001/stats', marker: 'p:text-is("真实数据正在接入")', featureText: '真实数据正在接入' },
+  { pattern: '/job-fairs/:id/map', url: '/job-fairs/fair-001/map', marker: qx, featureText: '本机不画推荐路线' },
+  { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: qx, featureText: '下载链接临时有效' },
+  { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: qx, featureText: 'AI参会准备单' },
+  { pattern: '/job-fairs/:id/stats', url: '/job-fairs/fair-001/stats', marker: qx, featureText: '真实数据正在接入' },
   { pattern: '/resume/self-assessment/intro', url: '/resume/self-assessment/intro', marker: screen('resume-self-assessment-intro'), featureText: '自我探索', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
-  { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("AI面试训练")', featureText: 'AI面试训练' },
+  { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("把表达练熟，不替你下结论")', featureText: '不进行录用判断，不向企业推荐候选人。' },
   // 合同审查 production_default=false；默认构建直接访问也必须安全回首页。
   { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
-  { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
+  { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("看来源、查条件、备材料")', featureText: 'AI顾问不替主管部门作资格判断。' },
 ] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
@@ -215,12 +222,14 @@ export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
    *
    * 2026-09-09 再移出 '/profile'：同样口径。#931 把它加进 QX_MIGRATED_ROUTES
    * 却漏了这两张表，main 的 kiosk-browser-smoke 因此连红两次合并
-   * （run 34263887180：「同时出现在两张表里：/profile」）。 */
-  '/resume-service',
-  '/jobs-service',
-  '/fairs-service',
-  '/interview-service',
-  '/policy-service',
+   * （run 34263887180：「同时出现在两张表里：/profile」）。
+   *
+   * 2026-09-20 移出最后五条（/resume-service /jobs-service /fairs-service
+   * /interview-service /policy-service）：稿 16-service-hubs 迁入青序流光，
+   * 五条同时从 KioskRoot 的 V6_SHELL_ROUTES 移出。契约一字未改——表内仍要求真的
+   * 挂 V6 壳、表外仍要求不得被误伤染成 V6；这五条只是从表内挪到表外。
+   * 上面那段「从首页点进任何一个服务域，第一跳就掉回旧壳」说的正是这五条，
+   * 现在它们不再掉回去，所以表空了。 */
 ])
 
 const actualPatterns = w6RouteCases.map(({ pattern }) => pattern)

@@ -16,6 +16,12 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import {
+  assertNotEmergencyHeld,
+  assertRecruitmentContentHostingEnabled,
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 import type { CreateOfflineAgencyDto, UpdateOfflineAgencyDto } from './dto/create-offline-agency.dto'
 import type { CreateOfflineJobDto, UpdateOfflineJobDto } from './dto/create-offline-job.dto'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
@@ -115,6 +121,7 @@ export class OfflineAgenciesService {
 
   async findAll(query: AgencyListQuery) {
     const { page, pageSize, skip } = normalizePage(query)
+    if (!isRecruitmentContentHostingEnabled()) return { data: [], total: 0, page, pageSize }
     const { district, orgType, keyword, service } = query
 
     const where: Record<string, unknown> = {
@@ -157,6 +164,7 @@ export class OfflineAgenciesService {
   }
 
   async findOne(id: string) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const agency = await this.prisma.offlineAgency.findFirst({
       where: { id, reviewStatus: 'approved', publishStatus: 'published', status: 'active' },
       include: {
@@ -201,6 +209,10 @@ export class OfflineAgenciesService {
   }
 
   async findJobsByAgency(agencyId: string, query: JobListQuery) {
+    if (!isRecruitmentContentHostingEnabled()) {
+      const { page, pageSize } = normalizePage(query)
+      return { data: [], total: 0, page, pageSize }
+    }
     // 先确认机构已发布
     const agency = await this.prisma.offlineAgency.findFirst({
       where: { id: agencyId, reviewStatus: 'approved', publishStatus: 'published', status: 'active' },
@@ -235,6 +247,7 @@ export class OfflineAgenciesService {
   }
 
   async findOneJob(id: string) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const job = await this.prisma.offlineJob.findFirst({
       where: { id, status: 'active' },
       include: {
@@ -302,6 +315,7 @@ export class OfflineAgenciesService {
   }
 
   async adminCreate(dto: CreateOfflineAgencyDto) {
+    assertRecruitmentContentHostingEnabled()
     return this.prisma.offlineAgency.create({
       data: {
         name:         dto.name,
@@ -324,6 +338,7 @@ export class OfflineAgenciesService {
   }
 
   async adminUpdate(id: string, dto: UpdateOfflineAgencyDto) {
+    assertRecruitmentContentHostingEnabled()
     await this._assertAgencyExists(id)
     const hasContentChanges = Object.entries(dto).some(([key, value]) => key !== 'status' && value !== undefined)
     return this.prisma.offlineAgency.update({
@@ -351,6 +366,7 @@ export class OfflineAgenciesService {
   }
 
   async adminReview(id: string, action: 'reviewing' | 'approve' | 'reject', reason?: string) {
+    assertRecruitmentContentHostingEnabled()
     await this._assertAgencyExists(id)
     const statusMap: Record<string, string> = {
       reviewing: 'reviewing',
@@ -373,6 +389,8 @@ export class OfflineAgenciesService {
   }
 
   async adminPublish(id: string, publishStatus: string) {
+    assertRecruitmentContentHostingEnabled()
+    if (publishStatus === 'published') await assertNotEmergencyHeld(this.prisma, 'offline_agency', id)
     const agency = await this._assertAgencyExists(id)
 
     if (publishStatus === 'published' && agency.reviewStatus !== 'approved') {
@@ -402,6 +420,7 @@ export class OfflineAgenciesService {
   }
 
   async adminDelete(id: string) {
+    assertRecruitmentContentHostingEnabled()
     await this._assertAgencyExists(id)
     // 先删子岗位，再删机构（SQLite FK restrict 约束）
     const deletedJobs = await this.prisma.offlineJob.deleteMany({ where: { agencyId: id } })
@@ -440,6 +459,7 @@ export class OfflineAgenciesService {
   }
 
   async adminCreateJob(agencyId: string, dto: CreateOfflineJobDto) {
+    assertRecruitmentContentHostingEnabled()
     await this._assertAgencyExists(agencyId)
     return this.prisma.$transaction(async (tx) => {
       const job = await tx.offlineJob.create({
@@ -470,6 +490,7 @@ export class OfflineAgenciesService {
   }
 
   async adminUpdateJob(agencyId: string, jobId: string, dto: UpdateOfflineJobDto) {
+    assertRecruitmentContentHostingEnabled()
     await this._assertJobExists(agencyId, jobId)
     return this.prisma.$transaction(async (tx) => {
       const job = await tx.offlineJob.update({
@@ -500,6 +521,7 @@ export class OfflineAgenciesService {
   }
 
   async adminDeleteJob(agencyId: string, jobId: string) {
+    assertRecruitmentContentHostingEnabled()
     await this._assertJobExists(agencyId, jobId)
     return this.prisma.offlineJob.delete({ where: { id: jobId } })
   }

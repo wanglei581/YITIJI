@@ -51,7 +51,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -192,33 +192,7 @@ textarea{font:inherit}
 .tag.slate{background:var(--slate-soft);color:var(--slate-d)}
 
 /* 合成示例（持续标记） */
-/* 2026-09-05 体检修复：回答正文超高时此前会画到下方「可以直接去的地方」「不经过 AI 也能办」两个区块上
-   （reply-* / voice-* 共 7 态）。回答区改为自身滚动，下方两个区块保持固定高度不被覆盖。 */
-.ans{flex:1;min-height:0;margin-top:14px;display:flex;flex-direction:column;border-radius:var(--r-lg);padding:22px 26px 20px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin}
-/* 2026-09-05 体检修复（续）：回答态下 body 只有 648px，而驾驶舱的能力清单占 416px，回答区被压到 44px 只剩一条横纹。
-   有回答时把能力清单的五行分组收起（表头「本机 AI 能力 · 在线/受控/未开放」计数保留可见），回答区拿回约 350px；
-   回到提问态清单自动展开。只用 :has()（Chromium/Edge Kiosk 支持），不改结构与状态名。 */
-#stage:has(#body-root[data-state^="reply-"]) .rail .rgrp,
-#stage:has(#body-root[data-state^="voice-"]) .rail .rgrp,
-#stage:has(#body-root[data-state="ai-unavailable"]) .rail .rgrp,
-#stage:has(#body-root[data-state="mic-denied"]) .rail .rgrp{display:none}
-#stage:has(#body-root[data-state^="reply-"]) .rail .sweep,
-#stage:has(#body-root[data-state^="voice-"]) .rail .sweep,
-#stage:has(#body-root[data-state="ai-unavailable"]) .rail .sweep,
-#stage:has(#body-root[data-state="mic-denied"]) .rail .sweep{display:none}
-#stage:has(#body-root[data-state^="reply-"]) .ans,
-#stage:has(#body-root[data-state^="voice-"]) .ans,
-#stage:has(#body-root[data-state="ai-unavailable"]) .ans,
-#stage:has(#body-root[data-state="mic-denied"]) .ans{min-height:200px}
-/* 「不经过 AI 也能办」四张卡在这些态带副标题，2×2 等高网格会把卡压到内容画出边框；改为按内容定高，回答区吸收剩余。 */
-#stage:has(#body-root[data-state^="reply-"]) .mrail.big,
-#stage:has(#body-root[data-state^="voice-"]) .mrail.big,
-#stage:has(#body-root[data-state="ai-unavailable"]) .mrail.big,
-#stage:has(#body-root[data-state="mic-denied"]) .mrail.big{flex:none;grid-template-rows:auto auto}
-#stage:has(#body-root[data-state^="reply-"]) .mrail.big .ment,
-#stage:has(#body-root[data-state^="voice-"]) .mrail.big .ment,
-#stage:has(#body-root[data-state="ai-unavailable"]) .mrail.big .ment,
-#stage:has(#body-root[data-state="mic-denied"]) .mrail.big .ment{min-height:0;padding:16px 22px;gap:8px}
+.ans{flex:1;min-height:0;margin-top:14px;display:flex;flex-direction:column;border-radius:var(--r-lg);padding:22px 26px 20px}
 .ans.synthetic{border:1.5px dashed var(--wheat);background-color:var(--surface);background-image:repeating-linear-gradient(135deg,rgba(169,120,31,.055) 0 10px,rgba(169,120,31,0) 10px 22px)}
 .ans.waiting{border:1.5px dashed var(--line-2);background:var(--surface)}
 .syn-bar{flex:none;display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px dashed var(--line-2);font-size:18px;line-height:1.45;color:var(--wheat-d);font-weight:600}
@@ -408,8 +382,59 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 @media (prefers-reduced-motion:reduce){.sweep.run{animation:none;opacity:0;}}
 #stage.flat .sweep.run{animation:none;opacity:0;}
 
+/* ══ 软键盘避让（27 寸竖屏触控 + 中文屏幕键盘） ════════════
+   一体机上打字用的是 Windows 屏幕拼音键盘：它停靠在屏幕下沿、
+   吃掉大约三分之一高度，而且不会滚动页面 —— #stage 是定高 1920 的
+   舞台，窗口层面根本没有可滚的东西。所以避让必须由页面自己做：
+   把整屏内容重排进「键盘上沿以上」那一段，而不是指望 scroll。
+   --kb 是键盘占掉的高度，默认 640px（1920 的 1/3，停靠态量级）；
+   visualViewport 能量到真实高度时由脚本改写这个变量。
+   压缩只收起能力仪表带：那是「看状态」的信息，不是「正在打字」
+   要看的信息；失焦即整条恢复，一盏灯都不删。
+   底部说明（truth）与导航（navbar）压缩后仍留在键盘上方，不藏。
+   未聚焦时下面没有任何一条生效，默认态视觉完全不变。 */
+#stage{--kb:640px}
+#stage.kb,#stage:has(#dock textarea:focus){padding-bottom:var(--kb)}
+#stage.kb .rail,#stage:has(#dock textarea:focus) .rail{display:none}
+#stage.kb .body,#stage:has(#dock textarea:focus) .body{overflow-y:auto}
+/* 分区在压缩后按自然高度排布、由 .body 统一滚动：
+   问题行有 76px 的最小触控高度，硬压会让两个分区叠字。宁可滚，不叠。 */
+#stage.kb .sec.grow,#stage:has(#dock textarea:focus) .sec.grow{flex:none}
+
+/* 输入焦点要在浅底输入坞里一眼看得到（外接键盘 / 辅助设备同样适用） */
+.dock textarea:focus,.dock textarea:focus-visible{
+  outline:4px solid var(--teal);outline-offset:2px;border-color:var(--teal);background:#fff}
+/* 2026-09-05 体检修复：回答正文超高时此前会画到下方「可以直接去的地方」「不经过 AI 也能办」两个区块上
+   （reply-* / voice-* 共 7 态）。回答区改为自身滚动，下方两个区块保持固定高度不被覆盖。 */
+.ans{flex:1;min-height:0;margin-top:14px;display:flex;flex-direction:column;border-radius:var(--r-lg);padding:22px 26px 20px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin}
+/* 2026-09-05 体检修复（续）：回答态下 body 只有 648px，而驾驶舱的能力清单占 416px，回答区被压到 44px 只剩一条横纹。
+   有回答时把能力清单的五行分组收起（表头「本机 AI 能力 · 在线/受控/未开放」计数保留可见），回答区拿回约 350px；
+   回到提问态清单自动展开。只用 :has()（Chromium/Edge Kiosk 支持），不改结构与状态名。 */
+#stage:has(#body-root[data-state^="reply-"]) .rail .rgrp,
+#stage:has(#body-root[data-state^="voice-"]) .rail .rgrp,
+#stage:has(#body-root[data-state="ai-unavailable"]) .rail .rgrp,
+#stage:has(#body-root[data-state="mic-denied"]) .rail .rgrp{display:none}
+#stage:has(#body-root[data-state^="reply-"]) .rail .sweep,
+#stage:has(#body-root[data-state^="voice-"]) .rail .sweep,
+#stage:has(#body-root[data-state="ai-unavailable"]) .rail .sweep,
+#stage:has(#body-root[data-state="mic-denied"]) .rail .sweep{display:none}
+#stage:has(#body-root[data-state^="reply-"]) .ans,
+#stage:has(#body-root[data-state^="voice-"]) .ans,
+#stage:has(#body-root[data-state="ai-unavailable"]) .ans,
+#stage:has(#body-root[data-state="mic-denied"]) .ans{min-height:200px}
 /* 2026-09-05 体检修复：27 寸竖屏 1px≈0.31mm，13–15px 辅助文字站立读不清；统一提到 16px（正文字阶仍按规范 17–23）。 */
 .ment-go small,.tag,.ans-list li i,.act small,.rail-n,.rail-route .rr-x{font-size:16px}.rc .rt{font-size:15px}
+/* 2026-09-25 体检修复：「非 AI 回答」态的状态卡比「请求失败」态多出字段与门禁两段（约 81px），
+   下方「不经过 AI 也能办」四张卡被压到 203px、内容需 238px，溢出约 37px。只收本态的留白与行距，
+   字号、文案与其它状态不变。 */
+#body-root[data-state="reply-not-ai"] .state.fit{padding:18px 26px}
+#body-root[data-state="reply-not-ai"] .state.fit .kvrow{margin-top:10px}
+#body-root[data-state="reply-not-ai"] .state.fit .gate{margin-top:8px}
+#body-root[data-state="reply-not-ai"] .state.fit .acts{margin-top:12px}
+#body-root[data-state="reply-not-ai"] .mrail.big.dense .ment{gap:6px;padding:12px 22px}
+#body-root[data-state="reply-not-ai"] .mrail.big.dense .ment-sub{gap:6px}
+#body-root[data-state="reply-not-ai"] .mrail.big.dense .ment-sub span{line-height:1.3}
+#body-root[data-state="reply-not-ai"] .mrail.big.dense .ment-go{padding-top:7px}
 </style>
 </head>
 <body>
@@ -444,9 +469,9 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
   </div>
 
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
     <a class="nav-item on" href="05-ai-cockpit.html" data-route="/assistant" aria-current="page"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><path d="M6.6 6.6a7.6 7.6 0 0 0 0 10.8M17.4 17.4a7.6 7.6 0 0 0 0-10.8"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
 
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
@@ -1061,6 +1086,65 @@ function tick(){var d=new Date();document.getElementById('clock').textContent=('
 tick();setInterval(tick,20000);
 function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
 fit();addEventListener('resize',fit);
+
+/* ── 软键盘避让 ─────────────────────────────────
+   上面的 CSS 已经能单独把布局压到键盘上方（:has 选择器），
+   这里只补两件 CSS 做不了的事：量真实键盘高度、把字段滚进可见区。
+   焦点事件用 document 上的委托：输入坑每次 render 都是新 DOM。 */
+var stageEl=document.getElementById('stage');
+var KB_FALLBACK=640;   /* 停靠态屏幕拼音键盘约占 1920 的 1/3 */
+var kbTimer=null;
+function stageScale(){var m=/scale\(([\d.]+)\)/.exec(stageEl.style.transform||'');return m?parseFloat(m[1]):1}
+function kbInset(){
+ var vv=window.visualViewport;
+ if(vv){
+  var covered=innerHeight-vv.height-(vv.offsetTop||0);
+  if(covered>40)return Math.max(240,Math.min(1200,Math.round(covered/(stageScale()||1))));
+ }
+ return KB_FALLBACK;   /* 窗口不缩的停靠键盘（Windows 一体机常态）量不出来，按默认留 */
+}
+function isTextField(el){
+ if(!el)return false;
+ if(el.tagName==='TEXTAREA')return true;
+ return el.tagName==='INPUT'&&/^(text|search|tel|email|number|password|url)$/.test(el.type||'text');
+}
+/* 逐级把可滚祖先滚到「字段整段落在可视区内」，上下各留 24px */
+function revealField(el){
+ var m=24,n=el.parentNode;
+ while(n&&n.nodeType===1&&n!==document.body){
+  var cs=getComputedStyle(n);
+  if(/auto|scroll/.test(cs.overflowY)&&n.scrollHeight>n.clientHeight+1){
+   var er=el.getBoundingClientRect(),nr=n.getBoundingClientRect();
+   var over=er.bottom+m-nr.bottom,under=nr.top+m-er.top;
+   if(over>0)n.scrollTop+=over;else if(under>0)n.scrollTop-=under;
+  }
+  n=n.parentNode;
+ }
+}
+function kbOpen(el){
+ clearTimeout(kbTimer);
+ stageEl.style.setProperty('--kb',kbInset()+'px');
+ stageEl.classList.add('kb');
+ revealField(el);                                     /* 同步读 rect 已经是重排后的位置 */
+ requestAnimationFrame(function(){revealField(el)});  /* 字体/回流晚一拍的情况再对一次 */
+}
+function kbClose(){stageEl.classList.remove('kb');stageEl.style.removeProperty('--kb')}
+document.addEventListener('focusin',function(e){if(isTextField(e.target))kbOpen(e.target)});
+document.addEventListener('focusout',function(e){
+ if(!isTextField(e.target))return;
+ clearTimeout(kbTimer);
+ /* 延迟一拍：在两个输入框之间切焦点时不闪一下布局 */
+ kbTimer=setTimeout(function(){if(!isTextField(document.activeElement))kbClose()},120);
+});
+function kbSync(){
+ var a=document.activeElement;
+ if(!isTextField(a))return;
+ stageEl.style.setProperty('--kb',kbInset()+'px');
+ revealField(a);
+}
+addEventListener('resize',kbSync);
+if(window.visualViewport)visualViewport.addEventListener('resize',kbSync);
+
 render(state,true);
 paintRail();   /* 仪表带只画一次；切状态不重跑通电序列 */
 })();

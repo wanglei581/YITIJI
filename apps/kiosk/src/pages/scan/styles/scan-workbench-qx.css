@@ -593,6 +593,23 @@
   background: transparent;
 }
 .sw-actrow { flex: none; }
+.sw-pvh-open {
+  flex: none;
+  margin-left: auto;
+  min-height: 56px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1.5px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-teal-d);
+  font: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
 
 /* ── 底注 / CTA ───────────────────────────────────────────── */
 .sw-truth {
@@ -630,14 +647,57 @@
   color: var(--qx-ink-3);
 }
 .sw-preview-cap b { color: var(--qx-ink-2); font-weight: 600; }
-.sw-home-exit {
-  flex: none;
-  align-self: stretch;
-  height: auto;
-  min-height: var(--qx-btn-h);
-  margin-top: 0;
+
+/* ── 状态屏的排法（稿 18 `.body.spread`）────────────────────────
+ * 建会话 / 等授权 / 等回传 / 没扫成这些屏，内容本来就比一屏少。旧排法把余量整片
+ * 堆在正文底下，27 寸竖屏上像页面没做完。稿的做法：卡片按内容收住，余量摊进
+ * 「当前状态 → 链路位置 → 下一步」几段之间；卡片里的字阶跟着放大一档。
+ * 内容多于一屏时 space-between 退化成从顶部排，照常滚动，不会有够不着的内容。 */
+.sw-scroll[data-layout='spread'] { justify-content: space-between; gap: 22px; }
+.sw-scroll[data-layout='spread'] .sw-pgrp { padding: 22px 26px; }
+.sw-scroll[data-layout='spread'] .sw-pgrp h4 { font-size: 23px; }
+.sw-scroll[data-layout='spread'] .sw-note-body { font-size: 20px; line-height: 1.6; }
+.sw-scroll[data-layout='spread'] .sw-plan li { font-size: 20px; line-height: 1.5; }
+.sw-scroll[data-layout='spread'] .sw-foot { font-size: 18px; padding-top: 14px; }
+
+/* 等待页每 3 秒查一次，理由行只在查询在路上那一瞬出现：给它留住一行高度，
+ * 操作条不跟着每 3 秒跳一下，主按钮不在手指底下挪位。 */
+.sw-cta-wrap[data-reserve-reason='true'] {
+  min-height: calc(var(--qx-btn-h-lg) + 19px * 1.3 + 8px);
+  justify-content: flex-end;
 }
 
+/* ── 动效：阶段进场 + 按压反馈 ───────────────────────────────
+ * 进场只在换阶段时播一次（各阶段是各自的页面组件，换阶段即重挂）；同一阶段里
+ * 等待 ↔ 查询来回切不会重播，免得每 3 秒闪一下。填充方式用 backwards：播完不留
+ * opacity / transform，不给整屏预览这类覆盖层多造一层层叠上下文。 */
+.sw-page { animation: sw-enter 220ms ease-out backwards; }
+.sw-state-hero { animation: sw-rise 260ms ease-out backwards; }
+@keyframes sw-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sw-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.sw-ty,
+.sw-exit,
+.sw-pvh-open {
+  transition: transform 120ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+.sw-ty:active,
+.sw-exit:not(:disabled):active,
+.sw-pvh-open:active,
+.qx-stage:has(.sw-page) .qx-ctabar .qx-btn:not(:disabled):active { transform: scale(.985); }
+
+/* 手机宽度 / 不缩放舞台的收紧规则在 scan-workbench-compact-qx.css（同一组组件，按视口拆出）。 */
+
 @media (prefers-reduced-motion: reduce) {
-  .sw-page, .sw-page * { animation: none !important; transition: none !important; }
+  .sw-page, .sw-page *,
+  .qx-stage:has(.sw-page) .qx-ctabar .qx-btn { animation: none !important; transition: none !important; }
+  .sw-ty:active,
+  .sw-exit:not(:disabled):active,
+  .sw-pvh-open:active,
+  .qx-stage:has(.sw-page) .qx-ctabar .qx-btn:not(:disabled):active { transform: none; }
 }

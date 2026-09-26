@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { HomeHeroHeader, type HomeDeviceStatus } from './HomeHeroHeader'
 import { HomeTile } from './HomeTile'
 import { Link } from 'react-router-dom'
 import {
@@ -8,6 +9,7 @@ import {
   CalendarDaysIcon,
   FileTextIcon,
   GraduationCapIcon,
+  HistoryIcon,
   HomeIcon,
   LandmarkIcon,
   MicIcon,
@@ -17,6 +19,7 @@ import {
   UserIcon,
   WrenchIcon,
 } from 'lucide-react'
+import type { RecruitmentHostingState } from '../../../hooks/useRecruitmentHosting'
 import type { SmartCampusCapabilityState } from '../../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
 import type { ToolboxCapabilityState } from '../../../hooks/useToolboxConfig'
@@ -24,6 +27,8 @@ import type { HomeV6ActionId } from '../homeV6Domains'
 import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
+
+const ASSISTANT_VOICE_ENTRY = import.meta.env.VITE_USE_TRTC_CALL === 'true' // 主 CTA 只跳 /assistant 不开麦；「语音」跟助手页语音入口同一开关
 
 interface QxHomeViewProps {
   isLoggedIn: boolean
@@ -33,10 +38,13 @@ interface QxHomeViewProps {
   campus: SmartCampusCapabilityState
   jobFair: HomeJobFairHighlightState & { retry: () => void }
   jobs: HomeJobHighlightState & { retry: () => void }
+  /** 招聘内容托管（3.13）。没打开（含还没读到）时不摆岗位 / 招聘会磁贴与「找工作」；读到「关闭」才说「未开放」。 */
+  recruitment: RecruitmentHostingState
+  terminalCode: string
+  deviceStatus: HomeDeviceStatus
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
 }
-
 
 function fairCopy(state: QxHomeViewProps['jobFair']): {
   description: string
@@ -60,22 +68,6 @@ function jobCopy(state: QxHomeViewProps['jobs']): { description: string; badge: 
   if (state.status === 'loading') return { description: '正在读取已发布岗位', badge: '读取中' }
   if (state.status === 'error') return { description: '暂时无法获取岗位数量', badge: '读取失败' }
   return { description: '暂无在招岗位', badge: '暂无岗位' }
-}
-
-function QxHomeClock() {
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 10_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  return (
-    <time className="qx-home-clock" dateTime={now.toISOString()}>
-      <strong>{new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now)}</strong>
-      <span>{new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(now)}</span>
-    </time>
-  )
 }
 
 export function QxHomeNavbar({
@@ -110,6 +102,9 @@ export function QxHomeView({
   campus,
   jobFair,
   jobs,
+  recruitment,
+  terminalCode,
+  deviceStatus,
   continueSlot,
   onAction,
 }: QxHomeViewProps) {
@@ -124,51 +119,57 @@ export function QxHomeView({
   const campusKnown = campus.status === 'ready' && Boolean(campus.configVersion)
   const toolboxReady = toolboxKnown && toolbox.enabled
   const campusReady = campusKnown && campus.enabled
+  /* 稿 01-home 眉题：出纸能力进入后核验，首页不再重复顶栏的「打印机在线」；读取中 / 离线 / 异常 / 未知照实写在这里。 */
+  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '进入后核验打印与扫描能力' : device.printerLabel
+  const [introDone, setIntroDone] = useState(false)
+  const recruitmentOpen = recruitment.enabled
 
   return (
-    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home">
+    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home" data-recruitment={recruitmentOpen ? 'open' : 'closed'} data-qx-intro={introDone ? 'done' : undefined} onAnimationEnd={(event) => { if (event.animationName === 'qx-home-sheen') setIntroDone(true) }}>
       <section className="qx-home-hero" aria-label="小青助手">
+        <HomeHeroHeader terminalCode={terminalCode} deviceStatus={deviceStatus} />
         <div className="qx-home-assistant">
           <span className="qx-home-avatar" aria-hidden="true">青</span>
           <div>
-            <h2>{isLoggedIn && displayName ? `${displayName}，你好，我是小青` : '你好，我是小青'}</h2>
-            <span>说一句你想办的事，我带你一步一步办</span>
+            <h2>{isLoggedIn && displayName ? `${displayName}，你好，我是` : '你好，我是'}<em>小青</em></h2>
+            <span>告诉我你想办的事，我带你一步一步办</span>
           </div>
-          <QxHomeClock />
         </div>
-        <button
-          type="button"
-          className="qx-home-identity"
-          onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
-          data-testid="home-identity"
-        >
-          <UserIcon aria-hidden="true" />
-          <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
-        </button>
         <button
           type="button"
           className="qx-home-voice"
           onClick={() => onAction('assistant')}
           data-testid="home-primary"
         >
-          <span className="qx-home-voice-icon"><MicIcon aria-hidden="true" /></span>
-          <span>点这里说话，比如“帮我打一份简历”</span>
-          <small>进入助手</small>
+          <span className="qx-home-voice-icon"><BotIcon aria-hidden="true" /></span>
+          <span>打开 AI 顾问，咨询求职问题</span>
+          <small>{ASSISTANT_VOICE_ENTRY ? '可打字；语音以本机检测为准' : '打字咨询'}</small>
         </button>
         <div className="qx-home-quick" aria-label="常用服务快捷入口">
           <span>也可以直接选：</span>
           <button type="button" onClick={() => onAction('resume-hub')}>改简历</button>
-          <button type="button" onClick={() => onAction('jobs-hub')}>找工作</button>
+          {recruitmentOpen ? <button type="button" onClick={() => onAction('jobs-hub')}>找工作</button> : null}
           <button type="button" onClick={() => onAction('policy-hub')}>查政策</button>
+          {/* 身份入口是快捷行第四颗，占稿里「更多服务」那一格（运行时没有全部服务目录路由，不摆那颗按钮）。 */}
+          <button
+            type="button"
+            className="qx-home-identity"
+            onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
+            data-testid="home-identity"
+          >
+            <UserIcon aria-hidden="true" />
+            <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
+          </button>
         </div>
         <div className="qx-home-continue" data-testid="home-context-region">
           {continueSlot}
           {/* 空态是一句陈述，不是一个动作 —— 做成 disabled 按钮等于摆一颗点不动的控件，
               一体机上没有鼠标悬停，用户看不到 title，只会反复去戳它。 */}
           <div className="qx-home-empty-context" role="status">
+            <span className="qx-home-context-icon" aria-hidden="true"><HistoryIcon /></span>
             <span>
               <strong>这台机器上没有待继续的办理</strong>
-              <small>下面的服务都能直接开始</small>
+              <small>可以从下方服务重新开始，不会显示上一位使用者的资料</small>
             </span>
           </div>
         </div>
@@ -179,7 +180,7 @@ export function QxHomeView({
         <header className="qx-home-section-head">
           <div>
             <h2 id="qx-home-services-title">直接办</h2>
-            <span>选择一项真实服务开始</span>
+            <span>选择一项服务开始</span>
           </div>
         </header>
 
@@ -187,10 +188,10 @@ export function QxHomeView({
           <HomeTile
             actionId="print-hub"
             title="打印 · 扫描"
-            description="简历、证明材料与照片，进入后核验打印与扫描能力"
+            description="简历、证明材料与照片，进入后选择文件来源"
             foot="开始选择材料"
-            badge={device.loading ? '状态读取中' : device.printerReady ? '打印机在线' : device.printerLabel}
-            statusText={printStatus.note}
+            badge={printEyebrow}
+            statusText={device.loading ? undefined : printStatus.note}
             icon={PrinterIcon}
             size="feature"
             /* 设备状态面板标记。判据沿用 V6HomeFooterPanels.tsx:119 的
@@ -201,6 +202,7 @@ export function QxHomeView({
           />
           <HomeTile actionId="resume-hub" title="AI 简历" description="诊断、逐条优化、生成新版本" foot="进入简历服务" badge="AI 服务" icon={FileTextIcon} onAction={onAction} />
           <HomeTile actionId="interview-hub" title="模拟面试" description="问答对练，可跳过，不做录用判断" foot="进入面试服务" badge="练习服务" icon={MicIcon} onAction={onAction} />
+          {recruitmentOpen ? (<>
           {jobs.status === 'error' ? (
             <button
               type="button"
@@ -266,12 +268,13 @@ export function QxHomeView({
               <span className="qx-home-tile-foot">查看招聘会 <ArrowRightIcon aria-hidden="true" /></span>
             </button>
           )}
+          </>) : null}
           <HomeTile actionId="policy-hub" title="就业政策" description="资格与办理条件以官方核验为准" icon={LandmarkIcon} tone="slate" size="slim" onAction={onAction} />
           <HomeTile
             actionId="toolbox"
             title="百宝箱"
-            description={toolbox.status === 'loading' ? '正在读取本机上架配置' : !toolboxKnown ? '暂时无法确认本机上架配置' : toolboxReady ? '进入本机已上架的扩展服务' : '本机尚未上架扩展服务'}
-            badge={toolbox.status === 'loading' ? '读取中' : !toolboxKnown ? '状态未知' : toolboxReady ? '已上架' : '未开放'}
+            description={toolbox.status === 'loading' ? '正在读取本机上架配置' : !toolboxKnown ? '暂时无法确认本机上架配置' : toolboxReady ? '按本机已上架的扩展服务进入' : '本机尚未上架扩展服务'}
+            badge={toolbox.status === 'loading' ? '读取中' : !toolboxKnown ? '状态未知' : toolboxReady ? '受控开放' : '未开放'}
             icon={WrenchIcon}
             tone="neutral"
             size="slim"
@@ -282,8 +285,9 @@ export function QxHomeView({
           <HomeTile
             actionId="smart-campus"
             title="智慧校园"
-            description={campus.status === 'loading' ? '正在读取终端授权' : !campusKnown ? '暂时无法确认终端授权状态' : campusReady ? '进入本机已授权的校园服务' : '需终端或机构授权后使用'}
-            badge={campus.status === 'loading' ? '读取中' : !campusKnown ? '状态未知' : campusReady ? '已授权' : '未开放'}
+            /* 就绪只代表终端配置 smartCampus.enabled，模块进入后才读，故不写首页核实不了的「已授权」。 */
+            description={campus.status === 'loading' ? '正在读取终端授权' : !campusKnown ? '暂时无法确认终端授权状态' : campusReady ? '按本机开通范围进入校园服务' : '需终端或机构授权后使用'}
+            badge={campus.status === 'loading' ? '读取中' : !campusKnown ? '状态未知' : campusReady ? '受控开放' : '未开放'}
             icon={GraduationCapIcon}
             tone="neutral"
             size="slim"
@@ -297,7 +301,7 @@ export function QxHomeView({
       <footer className="qx-home-truth">
         <ShieldCheckIcon aria-hidden="true" />
         <div>
-          <p><strong>能力状态以真实接口为准。</strong>岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。</p>
+          <p><strong>能力状态以真实接口为准。</strong>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : recruitment.status === 'ready' ? '本终端未开放岗位与招聘会信息，也不代收简历。' : '本终端不代收简历。'}</p>
           <p className="qx-home-legal">
             <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">鲁ICP备2026023517号-2</a>
             <span aria-hidden="true">·</span>

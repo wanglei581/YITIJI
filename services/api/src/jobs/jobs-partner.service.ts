@@ -33,6 +33,7 @@ import {
   assertPartnerDataTypeCapability,
   getPartnerCapabilities,
   isAdminManagedAccessMode,
+  projectPartnerDataSourceCapabilities,
 } from './partner-capabilities'
 import {
   type AccessMode,
@@ -184,7 +185,7 @@ export class JobsPartnerService {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
     const org = await this.getEnabledPartnerOrg(user.orgId)
-    return getPartnerCapabilities(org.type)
+    return projectPartnerDataSourceCapabilities(org.type)
   }
 
   async createPartnerDataSource(dto: CreateDataSourceDto, user: AuthedUser): Promise<PartnerDataSourceLifecycleDto> {

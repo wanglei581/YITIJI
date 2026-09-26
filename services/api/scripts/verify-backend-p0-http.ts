@@ -15,6 +15,7 @@ import { OfflineAgenciesService } from '../src/offline-agencies/offline-agencies
 import { JobSyncController } from '../src/job-sync/job-sync.controller'
 import { JobSyncService } from '../src/job-sync/job-sync.service'
 import { JobsController } from '../src/jobs/jobs.controller'
+import { KioskJobBoardService } from '../src/terminals/kiosk-job-board.service'
 import { JobsService } from '../src/jobs/jobs.service'
 import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
 import type { JobsKioskService } from '../src/jobs/jobs-kiosk.service'
@@ -80,6 +81,9 @@ const redisStub = {
     // 只依赖 PrismaService（本模块已真实提供），因此按 jobs.module.ts 的方式真实注册，
     // 不用空对象打桩——保持 JobsController 能被真实实例化
     JobRequirementStatsService,
+    // 岗位板块开关（2026-09-25 D5）同样只依赖 PrismaService，真实注册，
+    // 否则 JobsController 实例化失败，整条 P0 HTTP 契约连一条请求都跑不起来。
+    KioskJobBoardService,
     {
       provide: JobsService,
       inject: [JobsPartnerService],

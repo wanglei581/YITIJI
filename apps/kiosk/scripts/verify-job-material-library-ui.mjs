@@ -146,7 +146,9 @@ assertNotContains(
   ['用于简历优化', 'getResumeTemplates', '清爽通用简历模板'],
   'Job material page does not expose resume template optimization flow',
 )
-assertContains('src/pages/profile/me/MyDocumentsPage.tsx', 'name="printer"', 'MyDocuments exposes print action')
+// 2026-09-23 稿 38 迁入青序流光后打印键用 lucide PrinterIcon，不再是墨青 KIcon name="printer"；
+// 改钉按钮本身：可见的「打印」键点击后真的走本页 print(doc)（换短期 printFileUrl → /print/confirm）。
+assertContains('src/pages/profile/me/MyDocumentsPage.tsx', /onClick=\{\(\) => \{ if \(reprintBlocked\) return; void print\(doc\) \}\}[\s\S]{0,200}?<PrinterIcon[\s\S]{0,160}?'打印'/, 'MyDocuments exposes print action')
 assertContains('src/pages/profile/me/MyDocumentsPage.tsx', "navigate('/print/confirm'", 'MyDocuments reuses print confirm route')
 assertNotContains(
   'src/pages/resume/JobMaterialLibraryPage.tsx',

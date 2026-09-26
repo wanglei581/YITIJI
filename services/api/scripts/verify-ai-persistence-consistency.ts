@@ -1,8 +1,9 @@
 import 'reflect-metadata'
 
 import assert from 'node:assert/strict'
-import { ServiceUnavailableException } from '@nestjs/common'
-import { AiService } from '../src/ai/ai.service'
+import { createHash, randomBytes } from 'node:crypto'
+import { HttpException } from '@nestjs/common'
+import { AiService, type ResumeParseIntentBinding } from '../src/ai/ai.service'
 
 const REPORT = {
   sections: [{ key: 'basic', label: '基础信息', score: 8, maxScore: 10 }],
@@ -10,12 +11,25 @@ const REPORT = {
 }
 
 function errorCode(error: unknown): string | undefined {
-  if (!(error instanceof ServiceUnavailableException)) return undefined
+  if (!(error instanceof HttpException)) return undefined
   const response = error.getResponse() as { error?: { code?: string } }
   return response.error?.code
 }
 
-function makeHarness(options: { failPersist: boolean; seedParse?: boolean }) {
+const PARSE_INPUT = {
+  fileId: 'file-1',
+  fileName: 'resume.pdf',
+  fileFormat: 'pdf',
+  source: 'upload' as const,
+}
+const INTENT_ID = createHash('sha256').update('intent').digest('hex')
+const ANON_TOKEN = randomBytes(32).toString('base64url')
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex')
+}
+
+function makeHarness(options: { failPersist: boolean; seedParse?: boolean; extractionFailure?: boolean }) {
   const rows = new Map<string, Record<string, unknown>>()
   if (options.seedParse) {
     rows.set('task-optimize:parse', {
@@ -54,13 +68,17 @@ function makeHarness(options: { failPersist: boolean; seedParse?: boolean }) {
     },
   }
 
+  let providerCalls = 0
   const provider = {
-    name: 'mock',
-    parseResume: async () => ({
-      taskId: 'task-parse',
-      status: 'completed' as const,
-      report: REPORT,
-    }),
+    name: options.extractionFailure ? 'llm' : 'mock',
+    parseResume: async () => {
+      providerCalls += 1
+      return {
+        taskId: 'task-parse',
+        status: 'completed' as const,
+        report: REPORT,
+      }
+    },
     optimizeResume: async (taskId: string) => ({
       taskId,
       status: 'completed' as const,
@@ -88,7 +106,14 @@ function makeHarness(options: { failPersist: boolean; seedParse?: boolean }) {
   }
   const unused = {} as never
 
-  process.env['AI_PROVIDER'] = 'mock'
+  const extraction = {
+    extractResumeText: async () => ({
+      ok: false as const,
+      errorCode: 'FILE_NOT_FOUND',
+      errorMessage: '文件已失效',
+    }),
+  }
+  process.env['AI_PROVIDER'] = options.extractionFailure ? 'llm' : 'mock'
   const service = new AiService(
     provider as never,
     unused,
@@ -96,11 +121,11 @@ function makeHarness(options: { failPersist: boolean; seedParse?: boolean }) {
     unused,
     unused,
     unused,
-    unused,
+    provider as never,
     logService as never,
     unused,
     unused,
-    unused,
+    extraction as never,
     unused,
     unused,
     prisma as never,
@@ -108,7 +133,7 @@ function makeHarness(options: { failPersist: boolean; seedParse?: boolean }) {
     unused,
     unused
   )
-  return { service, rows, logEntries }
+  return { service, rows, logEntries, providerCalls: () => providerCalls }
 }
 
 async function expectPersistenceFailure(
@@ -133,6 +158,8 @@ async function main(): Promise<void> {
     'member-1'
   )
   assert.equal(parsed.status, 'completed')
+  assert.equal(parsed.taskId, 'task-parse')
+  assert.equal(parsed.accessToken, undefined)
   assert.ok(normal.rows.has('task-parse:parse'))
 
   const parseFailure = makeHarness({ failPersist: true })
@@ -180,6 +207,76 @@ async function main(): Promise<void> {
     'generate must not report an unpersisted result as success'
   )
   assert.equal(generateFailure.logEntries.at(-1)?.status, 'failed')
+
+  const memberIntent = makeHarness({ failPersist: false })
+  const memberBound: ResumeParseIntentBinding = { intentId: INTENT_ID, accessToken: null }
+  const memberParsed = await memberIntent.service.submitResumeParse(PARSE_INPUT, 'member-1', memberBound)
+  const memberRow = memberIntent.rows.get(`${INTENT_ID}:parse`)
+  const memberPayload = JSON.parse(String(memberRow?.['payloadJson'])) as { taskId?: string; accessToken?: string }
+  assert.equal(memberParsed.taskId, INTENT_ID)
+  assert.equal(memberParsed.accessToken, undefined)
+  assert.equal(memberIntent.rows.has('task-parse:parse'), false)
+  assert.equal(memberRow?.['taskId'], INTENT_ID)
+  assert.equal(memberRow?.['accessTokenHash'], null)
+  assert.equal(memberPayload.taskId, INTENT_ID)
+  assert.equal(memberPayload.accessToken, undefined)
+
+  const anonIntent = makeHarness({ failPersist: false })
+  const anonParsed = await anonIntent.service.submitResumeParse(PARSE_INPUT, null, {
+    intentId: INTENT_ID,
+    accessToken: ANON_TOKEN,
+  })
+  const anonRow = anonIntent.rows.get(`${INTENT_ID}:parse`)
+  const anonPayloadJson = String(anonRow?.['payloadJson'])
+  const anonPayload = JSON.parse(anonPayloadJson) as { taskId?: string; accessToken?: string }
+  assert.equal(anonParsed.taskId, INTENT_ID)
+  assert.equal(anonParsed.accessToken, ANON_TOKEN)
+  assert.equal(anonRow?.['taskId'], INTENT_ID)
+  assert.equal(anonRow?.['accessTokenHash'], sha256(ANON_TOKEN))
+  assert.equal(anonPayload.taskId, INTENT_ID)
+  assert.equal(anonPayload.accessToken, undefined)
+  assert.equal(anonPayloadJson.includes(ANON_TOKEN), false)
+
+  const intentPersistFailure = makeHarness({ failPersist: true })
+  await expectPersistenceFailure(
+    () => intentPersistFailure.service.submitResumeParse(PARSE_INPUT, 'member-1', memberBound),
+    'intent parse must not report an unpersisted result as success',
+  )
+  assert.equal(intentPersistFailure.rows.has(`${INTENT_ID}:parse`), false)
+  assert.equal(intentPersistFailure.logEntries.at(-1)?.status, 'failed')
+
+  const extractFailure = makeHarness({ failPersist: false, extractionFailure: true })
+  const extracted = await extractFailure.service.submitResumeParse(PARSE_INPUT, null, {
+    intentId: INTENT_ID,
+    accessToken: ANON_TOKEN,
+  })
+  const extractedRow = extractFailure.rows.get(`${INTENT_ID}:parse`)
+  const extractedPayloadJson = String(extractedRow?.['payloadJson'])
+  assert.equal(extractFailure.providerCalls(), 0)
+  assert.equal(extracted.status, 'failed')
+  assert.equal(extracted.taskId, INTENT_ID)
+  assert.equal(extracted.accessToken, ANON_TOKEN)
+  assert.equal(extractedRow?.['taskId'], INTENT_ID)
+  assert.equal(JSON.parse(extractedPayloadJson).taskId, INTENT_ID)
+  assert.equal(extractedRow?.['accessTokenHash'], sha256(ANON_TOKEN))
+  assert.equal(extractedPayloadJson.includes(ANON_TOKEN), false)
+  assert.equal(extractFailure.rows.has('task-parse:parse'), false)
+
+  const nullToken = makeHarness({ failPersist: false })
+  await assert.rejects(
+    () => nullToken.service.submitResumeParse(PARSE_INPUT, null, { intentId: INTENT_ID, accessToken: null }),
+    (error: unknown) => errorCode(error) === 'RESUME_PARSE_INTENT_BINDING_INVALID',
+  )
+  assert.equal(nullToken.providerCalls(), 0)
+  assert.equal(nullToken.rows.size, 0)
+
+  const badIntent = makeHarness({ failPersist: false })
+  await assert.rejects(
+    () => badIntent.service.submitResumeParse(PARSE_INPUT, null, { intentId: 'not-a-hash', accessToken: ANON_TOKEN }),
+    (error: unknown) => errorCode(error) === 'RESUME_PARSE_INTENT_BINDING_INVALID',
+  )
+  assert.equal(badIntent.providerCalls(), 0)
+  assert.equal(badIntent.rows.size, 0)
 
   console.log('PASS: AI completed results are returned only after durable persistence')
 }

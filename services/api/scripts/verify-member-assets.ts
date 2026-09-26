@@ -50,8 +50,9 @@ function mockCtx(headers: Record<string, string>): ExecutionContext {
 type MemberDeleteBranch = 'parse' | 'job_fit'
 type MemberDeleteQuery = {
   scope: 'transaction' | 'direct'
-  delegate: 'aiResumeResult.findFirst' | 'aiResumeResult.deleteMany' | 'jobAiSession.deleteMany'
+  delegate: 'aiResumeResult.findFirst' | 'aiResumeResult.deleteMany' | 'aiResumeResult.updateMany' | 'jobAiSession.deleteMany'
   where: Record<string, unknown>
+  data?: Record<string, unknown>
 }
 type MemberDeleteRun = {
   calls: string[]
@@ -93,6 +94,12 @@ function createMemberDeleteRun(
     aiResumeResult: {
       findFirst: findRecord('transaction'),
       deleteMany: recordDelete('transaction', 'aiResumeResult.deleteMany'),
+      updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        state.calls.push('transaction.aiResumeResult.updateMany')
+        state.queries.push({ scope: 'transaction', delegate: 'aiResumeResult.updateMany', where: args.where, data: args.data })
+        state.pendingDeletes.push('transaction.aiResumeResult.updateMany')
+        return { count: 1 }
+      },
     },
     jobAiSession: { deleteMany: recordDelete('transaction', 'jobAiSession.deleteMany') },
   }
@@ -138,9 +145,10 @@ async function verifyMemberAssetDeletionTransaction(branch: MemberDeleteBranch):
 
   const findQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'aiResumeResult.findFirst')
   const resultQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'aiResumeResult.deleteMany')
+  const intentQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'aiResumeResult.updateMany')
   const sessionQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'jobAiSession.deleteMany')
   const expectedResultWhere = branch === 'parse'
-    ? { endUserId: 'member-delete-owner', taskId: `member-delete-task-${branch}` }
+    ? { endUserId: 'member-delete-owner', taskId: `member-delete-task-${branch}`, kind: { not: 'parse_intent' } }
     : { endUserId: 'member-delete-owner', id: `member-delete-${branch}` }
   const expectedSessionWhere = branch === 'parse'
     ? { endUserId: 'member-delete-owner', resumeTaskId: `member-delete-task-${branch}` }
@@ -151,9 +159,13 @@ async function verifyMemberAssetDeletionTransaction(branch: MemberDeleteBranch):
     success.state.calls.includes('transaction.aiResumeResult.findFirst') &&
     success.state.calls.includes('transaction.aiResumeResult.deleteMany') &&
     success.state.calls.includes('transaction.jobAiSession.deleteMany') &&
+    (branch !== 'parse' || success.state.calls.includes('transaction.aiResumeResult.updateMany')) &&
     !success.state.calls.some((call) => call.startsWith('direct.')) &&
     hasWhere(findQuery, { id: `member-delete-${branch}`, endUserId: 'member-delete-owner' }) &&
     hasWhere(resultQuery, expectedResultWhere) &&
+    (branch !== 'parse' || (hasWhere(intentQuery, {
+      endUserId: 'member-delete-owner', taskId: `member-delete-task-${branch}`, kind: 'parse_intent',
+    }) && JSON.stringify(intentQuery?.data) === JSON.stringify({ status: 'revoked' }))) &&
     hasWhere(sessionQuery, expectedSessionWhere)
   if (usesTransactionClient) {
     pass(`14.${branch} 归属查询与级联删除均通过同一 $transaction callback 的 tx，过滤范围正确`)

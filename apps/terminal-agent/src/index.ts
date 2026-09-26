@@ -24,6 +24,7 @@ import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/q
 import type { LocalAgentPanelStatus } from './local-api/types'
 // Phase 8.1C additions
 import { acquireLock, releaseLock } from './agent/instance-lock'
+import { cleanupCrashLeftoverPrintTaskTemps } from './agent/print-task-temp-cleanup'
 import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/db'
 import { startOfflineRetry } from './agent/offline-queue'
 import { startScanDeletionAuditReporter } from './agent/scan-deletion-audit-reporter'
@@ -67,6 +68,18 @@ program
 
     // ── Step 1: Single-instance lock ──────────────────────────────────────
     acquireLock()
+
+    // ── Step 1b: Crash leftovers of Agent-owned print downloads ───────────
+    // Only after the exclusive lock: a live instance's in-flight task_* file
+    // must not be deleted by a second starter. Fail closed before claim/print.
+    try {
+      cleanupCrashLeftoverPrintTaskTemps()
+    } catch (error) {
+      err(
+        'AGENT_STARTUP_FAILED: leftover print task temp files could not be removed; refusing to claim new work.',
+      )
+      failStartup(error, 'AGENT_STARTUP_FAILED')
+    }
 
     // ── Step 2: Open SQLite (task state + offline PATCH queue) ────────────
     const db: AgentDatabase = openDatabase()

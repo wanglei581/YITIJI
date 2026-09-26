@@ -7,10 +7,10 @@
  *
  *  1. 短信验证码登录：错码 401，正码下发会员 token
  *  2. /me/resumes 含 kind=generate（AI 生成简历绝不展示为「简历解析」）+ optimized 标注
- *  3. /me/ai-records 三种 kind 如实区分
+ *  3. /me/ai-records 三种 kind 如实区分；内部 parse_intent 不显示且不可直删
  *  4. 游标分页：pageSize 封顶 50、非法 pageSize 400、游标遍历不重不漏、total 真实
  *  5. 跨会员隔离：B 看不到 A 的资产；B 删 A 的 AI 记录 / 文件被拒，数据无损
- *  6. AI 记录删除：硬删 + parse 级联删 optimize + 审计落库（actorRole=enduser）
+ *  6. AI 记录/简历删除：硬删 parse 及派生，保留 revoked 意图；同 key 重放不扣额/调模型
  *  7. 文档删除：对象存储物理删除 + DB 行软删（保留删除日志字段）+ 审计落库
  *  8. 收藏幂等：重复收藏仅一行；取消收藏幂等
  *  9. 登出后 token 立即失效（Redis 会话删除 → 401）；匿名访问 401
@@ -34,6 +34,7 @@ require('dotenv').config()
 
 import * as fs from 'fs'
 import * as path from 'path'
+import { randomBytes } from 'node:crypto'
 import { Redis } from 'ioredis'
 
 let passCount = 0
@@ -59,6 +60,11 @@ async function main() {
   const { PrismaService } = await import('../src/prisma/prisma.service')
   const { FilesService } = await import('../src/files/files.service')
   const { hashPhone } = await import('../src/common/crypto/phone-identity')
+  const { ResumeParseSubmissionService } = await import('../src/ai/resume-parse-submission.service')
+  const { ResumeParseIntentRunner } = await import('../src/ai/resume-parse-intent-runner.service')
+  const { AiPublicQuotaService } = await import('../src/ai/ai-public-quota.service')
+  const { AiService } = await import('../src/ai/ai.service')
+  const { resumeParseIntentId } = await import('../src/ai/resume-parse-intent')
 
   const app = await NestFactory.create(AppModule, { logger: ['error', 'warn'] })
   app.setGlobalPrefix('api/v1')
@@ -164,9 +170,14 @@ async function main() {
 
     // ── 种子数据：A 三种 AI 记录 + 一个文件；B 一条 parse ────────────────────
     const future = new Date(Date.now() + 3600_000)
-    const t1 = `c2dtask1_${suffix}`
+    const intentKey = randomBytes(32).toString('base64url')
+    const proof = randomBytes(32).toString('base64url')
+    const resumeIntentKey = randomBytes(32).toString('base64url')
+    const resumeProof = randomBytes(32).toString('base64url')
+    const t1 = resumeParseIntentId(intentKey)
     const t2 = `c2dtask2_${suffix}`
     const t3 = `c2dtask3_${suffix}`
+    const t4 = resumeParseIntentId(resumeIntentKey)
     const mkResult = (taskId: string, kind: string, endUserId: string) =>
       prisma.aiResumeResult.create({
         data: {
@@ -183,7 +194,27 @@ async function main() {
     const rowParseA = await mkResult(t1, 'parse', userA.id)
     await mkResult(t1, 'optimize', userA.id)
     const rowGenA = await mkResult(t2, 'generate', userA.id)
-    await mkResult(t3, 'parse', userB.id)
+    const rowLegacyB = await mkResult(t3, 'parse', userB.id)
+    const rowResumeA = await mkResult(t4, 'parse', userA.id)
+    const replayInput = { fileId: 'c2d-file', fileName: 'c2d.pdf', fileFormat: 'pdf', source: 'upload' as const }
+    const submission = app.get(ResumeParseSubmissionService)
+    const intent = await submission.create({
+      intentKey, proof, endUserId: userA.id, fingerprint: replayInput,
+    })
+    if (intent.intentId !== t1) fail('解析意图与 parse 结果未绑定同一 taskId')
+    const intentRow = await prisma.aiResumeResult.findUnique({
+      where: { taskId_kind: { taskId: t1, kind: 'parse_intent' } },
+      select: { id: true, payloadJson: true, expiresAt: true },
+    })
+    if (!intentRow) fail('解析意图未落库')
+    await submission.create({
+      intentKey: resumeIntentKey, proof: resumeProof, endUserId: userA.id, fingerprint: replayInput,
+    })
+    const resumeIntent = await prisma.aiResumeResult.findUnique({
+      where: { taskId_kind: { taskId: t4, kind: 'parse_intent' } },
+      select: { id: true, payloadJson: true, expiresAt: true },
+    })
+    if (!resumeIntent) fail('简历删除验证所需的解析意图未落库')
     const fairTask = `c2dfair_${suffix}`
     await prisma.aiResumeResult.create({
       data: {
@@ -225,6 +256,7 @@ async function main() {
     if (!rParse || rParse['kind'] !== 'parse' || rParse['optimized'] !== true) {
       fail(`parse 简历行缺失或 optimized 未标注: ${JSON.stringify(rParse)}`)
     }
+    if (rItems.some((r) => r['id'] === intentRow.id || r['id'] === resumeIntent.id)) fail('意图账本出现在简历列表')
     if (!rGen || rGen['kind'] !== 'generate') fail(`generate 简历行缺失或 kind 错误: ${JSON.stringify(rGen)}`)
     if (rItems.some((r) => r['taskId'] === t3)) fail('A 的简历列表泄露了 B 的数据')
     pass('2. /me/resumes：parse(已优化标注) + generate 并存，kind 如实，且只见本人')
@@ -232,6 +264,9 @@ async function main() {
     // ── 3. /me/ai-records：三种 kind 如实区分 ────────────────────────────────
     const recordsA = await http('GET', '/me/ai-records', { token: tokenA })
     const aItems = (recordsA.body?.data?.items ?? []) as Array<Record<string, unknown>>
+    if (aItems.some((a) => a['id'] === intentRow.id || a['id'] === resumeIntent.id) || recordsA.body?.data?.total !== 5) {
+      fail('内部意图出现在 AI 记录列表或被计入 total')
+    }
     const kinds = new Set(aItems.filter((a) => [t1, t2].includes(a['taskId'] as string)).map((a) => a['kind']))
     if (!kinds.has('parse') || !kinds.has('optimize') || !kinds.has('generate')) {
       fail(`AI 记录 kind 不全: ${[...kinds].join(',')}`)
@@ -246,6 +281,13 @@ async function main() {
       fail('listAiRecords 不得回传 payload')
     }
     pass('3. /me/ai-records：parse / optimize / generate 三种 kind 如实区分，fair_visit_plan 只带 fairId/fairName')
+
+    const directIntentDelete = await http('DELETE', `/me/ai-records/${intentRow.id}`, { token: tokenA })
+    if (directIntentDelete.status !== 404 || directIntentDelete.body?.error?.code !== 'MEMBER_RECORD_NOT_FOUND') {
+      fail(`直接删除内部意图应 404，实际 ${directIntentDelete.status} ${JSON.stringify(directIntentDelete.body)}`)
+    }
+    if (!(await prisma.aiResumeResult.findUnique({ where: { id: intentRow.id } }))) fail('直接删除误删了内部意图')
+    pass('3b. 内部意图不出现在 AI 记录/简历列表，也不能按 id 直接删除')
 
     // ── 4. 游标分页：封顶 / 非法 400 / 遍历不重不漏 / total 真实 ────────────
     const favSeed = Array.from({ length: 55 }, (_, i) => ({
@@ -308,14 +350,67 @@ async function main() {
     if (delParse.status !== 200) fail(`A 删自己 parse 记录失败 ${delParse.status}`)
     if (delParse.body?.data?.deletedCount !== 2) fail(`parse 级联应删 2 行，实际 ${delParse.body?.data?.deletedCount}`)
     const leftT1 = await prisma.aiResumeResult.count({ where: { taskId: t1 } })
-    if (leftT1 !== 0) fail(`t1 应被级联清空，剩 ${leftT1} 行`)
+    if (leftT1 !== 1) fail(`t1 只应保留撤销的意图，实际 ${leftT1} 行`)
+    const revoked = await prisma.aiResumeResult.findUnique({
+      where: { id: intentRow.id }, select: { status: true, payloadJson: true, expiresAt: true },
+    })
+    if (revoked?.status !== 'revoked' || revoked.payloadJson !== intentRow.payloadJson ||
+        revoked.expiresAt?.getTime() !== intentRow.expiresAt?.getTime()) {
+      fail('删除 parse 未保留意图证明/TTL 并标记 revoked')
+    }
+    const quota = app.get(AiPublicQuotaService)
+    const ai = app.get(AiService)
+    const originalConsumeOnce = quota.consumeOnce
+    const originalSubmitResumeParse = ai.submitResumeParse
+    let quotaCalls = 0
+    let parseCalls = 0
+    quota.consumeOnce = async () => { quotaCalls += 1; throw new Error('revoked replay reached quota') }
+    ai.submitResumeParse = async () => { parseCalls += 1; throw new Error('revoked replay reached provider') }
+    try {
+      let replayCode: string | undefined
+      try {
+        await app.get(ResumeParseIntentRunner).submit(
+          replayInput, userA.id, { member: userA.id, terminal: null, ip: null }, intentKey, proof,
+        )
+      } catch (error) {
+        const body = (error as { getResponse?: () => unknown }).getResponse?.() as { error?: { code?: string } } | undefined
+        replayCode = body?.error?.code
+      }
+      if (replayCode !== 'RESUME_PARSE_INTENT_REVOKED' || quotaCalls !== 0 || parseCalls !== 0) {
+        fail(`同 key 重放应拒绝且零额度/模型调用，实际 ${replayCode} quota=${quotaCalls} parse=${parseCalls}`)
+      }
+    } finally {
+      quota.consumeOnce = originalConsumeOnce
+      ai.submitResumeParse = originalSubmitResumeParse
+    }
     const auditAi = await prisma.auditLog.findFirst({
       where: { action: 'member.ai_record_delete', targetId: rowParseA.id },
       select: { actorRole: true, payloadJson: true },
     })
     if (!auditAi || auditAi.actorRole !== 'enduser') fail('AI 记录删除未写审计（actorRole=enduser）')
     if (!auditAi.payloadJson.includes(userA.id)) fail('审计 payload 缺 endUserId')
-    pass('6. AI 记录删除：硬删 + parse 级联删 optimize（deletedCount=2）+ 审计落库')
+    pass('6. AI 记录删除：硬删 parse/optimize、撤销并保留意图，同 key 重放不再消耗额度/调用模型')
+
+    const delResume = await http('DELETE', `/me/resumes/${rowResumeA.id}`, { token: tokenA })
+    if (delResume.status !== 200 || delResume.body?.data?.deletedCount !== 1) {
+      fail(`简历删除应仅硬删 parse，实际 ${delResume.status} ${JSON.stringify(delResume.body)}`)
+    }
+    const resumeIntentAfter = await prisma.aiResumeResult.findUnique({
+      where: { id: resumeIntent.id }, select: { status: true, payloadJson: true, expiresAt: true },
+    })
+    if (resumeIntentAfter?.status !== 'revoked' || resumeIntentAfter.payloadJson !== resumeIntent.payloadJson ||
+        resumeIntentAfter.expiresAt?.getTime() !== resumeIntent.expiresAt?.getTime() ||
+        await prisma.aiResumeResult.count({ where: { taskId: t4, kind: 'parse' } }) !== 0) {
+      fail('简历删除未将本人意图撤销并保留 TTL/证明')
+    }
+    pass('6b. 简历删除同样硬删 parse、保留并撤销内部意图')
+
+    const delLegacyResume = await http('DELETE', `/me/resumes/${rowLegacyB.id}`, { token: tokenB })
+    if (delLegacyResume.status !== 200 || delLegacyResume.body?.data?.deletedCount !== 1 ||
+        await prisma.aiResumeResult.count({ where: { taskId: t3 } }) !== 0) {
+      fail('旧无意图 parse 应照常删除，不需要伪造意图行')
+    }
+    pass('6c. 旧无意图 parse 仍可经简历删除入口清除')
 
     // ── 7. 文档删除：物理删除 + 软删行 + 审计 ────────────────────────────────
     const delFile = await http('DELETE', `/files/${uploaded.fileId}?reason=member-self-delete-${suffix}`, { token: tokenA })

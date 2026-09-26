@@ -96,7 +96,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -182,8 +182,6 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 .pv-empty{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;background:var(--paper);border:1px dashed var(--line-2);border-radius:var(--r-md);padding:24px;font-size:20px;line-height:1.5;color:var(--ink-2)}
 .pv-ghost{flex:none;width:100%;max-width:330px;aspect-ratio:840/1188;background:var(--surface);border:2px dashed var(--line-2);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px}
 .pv-empty b{font-size:23px}
-/* 2026-09-05 体检修复：选文档前的空态提示（12 个 document-* 态）文字比预览列高出约 39px，画到列边框外；改为列内滚动。 */
-.pv-empty{overflow-y:auto;overscroll-behavior:contain}
 .pv-cap{flex:none;min-height:34px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ink-3);text-align:center;padding:0 6px}
 /* 纸面内容 */
 .pp{position:absolute;background:#b6ae98;border-radius:2px}
@@ -313,6 +311,9 @@ a:focus-visible,button:focus-visible,[role=checkbox]:focus-visible{outline:3px s
 .demo-panel .dp-t{color:var(--emerald);font-size:14px;font-weight:700;letter-spacing:2px;flex:none;padding:4px 0 2px}
 .demo-panel a{display:flex;align-items:center;min-height:28px;color:#f2efe4;font-size:14px;padding:0 10px;border-radius:8px;background:rgba(255,255,255,.07);white-space:nowrap;flex:none}
 .demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+/* 2026-09-05 体检修复：选文档前的空态提示（12 个 document-* 态）文字比预览列高出约 39px，画到列边框外；改为列内滚动。 */
+.pv-empty{overflow-y:auto;overscroll-behavior:contain}
+.pv-cap{flex:none;min-height:34px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ink-3);text-align:center;padding:0 6px}
 </style>
 </head>
 <body>
@@ -339,9 +340,9 @@ a:focus-visible,button:focus-visible,[role=checkbox]:focus-visible{outline:3px s
   <div class="ctabar" id="ctabar"></div>
 
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
 </div>
 <script>
@@ -841,7 +842,7 @@ function docPickers(){
   pick({n:'本机上传 PDF',ic:'pdf',bg:'var(--clay-soft)',fg:'#9e5330',d:'这趟刚传进本机的文件。',f:'PDF · ≤ 15MB',tid:'sign-stamp-pick-doc-local'})+
   phoneDocPick()+
   pick({n:'从我的文档选',ic:'folder',bg:'var(--teal-soft)',fg:'#157a67',d:'你账号里已有的 PDF。',f:'仅本人名下文件',tid:'sign-stamp-pick-doc-docs'})+
-  pick({n:'从 U 盘选 PDF',ic:'usb',bg:'var(--paper)',fg:'#6b857c',d:'U 盘那条路还没通到这一步。',f:'暂时用不了 · 原因见下方',tid:'sign-stamp-pick-doc-usb',disabled:true,rid:'sign-stamp-doc-note'})+
+  pick({n:'从 U 盘选 PDF',ic:'usb',bg:'var(--paper)',fg:'#526b62',d:'U 盘那条路还没通到这一步。',f:'暂时用不了 · 原因见下方',tid:'sign-stamp-pick-doc-usb',disabled:true,rid:'sign-stamp-doc-note'})+
   checkCard('选好之后当场检查',['是不是真的 PDF。','有没有加密、损坏或数字签名域。','页数在不在 1–30 之间。','<b>原文件全程不改写。</b>'])+
   /* 禁用卡的常驻原因：占的是这一行本来空着的第二格，高度低于同组的手机卡，不会把它比下去 */
   checkCard('U 盘为什么用不了',['U 盘导入能用来打印，但还没通到签名盖章这一步。','先用上面三种方式选这份 PDF。'],'sign-stamp-doc-note')+
@@ -852,8 +853,8 @@ function stampPickers(){
   '<div class="pickrow">'+
   pick({n:'本机上传图片',ic:'img',bg:'var(--clay-soft)',fg:'#9e5330',d:'白纸上签好名拍一张，或用已有的印章图片。背景干净、边缘清楚更好。',f:'JPG / PNG · ≤ 10MB',tid:'sign-stamp-pick-stamp-local'})+
   phoneStampPick()+
-  pick({n:'从 U 盘选图片',ic:'usb',bg:'var(--paper)',fg:'#6b857c',d:'U 盘那条路还没通到这一步。',f:'暂时用不了 · 原因见下方',tid:'sign-stamp-pick-stamp-usb',disabled:true,rid:'sign-stamp-stamp-note'})+
-  pick({n:'在屏幕上手写签名',ic:'pen',bg:'var(--paper)',fg:'#6b857c',d:'触屏手写要先做压感校准。',f:'未开放 · 需校准后开放',tid:'sign-stamp-pick-stamp-handwrite',disabled:true,rid:'sign-stamp-stamp-note'})+
+  pick({n:'从 U 盘选图片',ic:'usb',bg:'var(--paper)',fg:'#526b62',d:'U 盘那条路还没通到这一步。',f:'暂时用不了 · 原因见下方',tid:'sign-stamp-pick-stamp-usb',disabled:true,rid:'sign-stamp-stamp-note'})+
+  pick({n:'在屏幕上手写签名',ic:'pen',bg:'var(--paper)',fg:'#526b62',d:'触屏手写要先做压感校准。',f:'未开放 · 需校准后开放',tid:'sign-stamp-pick-stamp-handwrite',disabled:true,rid:'sign-stamp-stamp-note'})+
   checkCard('这张图会被怎么对待',['只能这次新传，U 盘和手写暂时用不了。','按高敏材料短期保留，约 1 小时。','<b>不进「我的文档」，也不能复用历史。</b>'],'sign-stamp-stamp-note')+
   '</div>';
 }

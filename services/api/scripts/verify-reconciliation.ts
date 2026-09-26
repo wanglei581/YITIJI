@@ -12,6 +12,7 @@
  */
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
+import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from '../src/payment/channel-accepted-signal'
 import { ReconciliationService } from '../src/payment/reconciliation.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 
@@ -67,7 +68,16 @@ async function main(): Promise<void> {
 
     // 健康 refunded 单（150 分实付、已退 150、有 success Refund）
     const refundedOk = await mk('refok', { amountCents: 150, payStatus: 'refunded', paymentSource: 'alipay', payChannel: 'alipay', paidAt: new Date(), refundedAmountCents: 150, refundedAt: new Date() })
-    await prisma.paymentAttempt.create({ data: { orderId: refundedOk, channel: 'alipay', amountCents: 150, status: 'success', channelTxnNo: `ali_${suffix}_r` } })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: refundedOk,
+        channel: 'alipay',
+        amountCents: 150,
+        status: 'success',
+        channelTxnNo: `ali_${suffix}_r`,
+        createdAt: new Date(Date.now() - 120_000),
+      },
+    })
     await prisma.refund.create({ data: { orderId: refundedOk, refundNo: `RFD-${suffix}-refok`, amountCents: 150, status: 'success', channel: 'alipay', reason: 't' } })
 
     // 差异：paid 无 success attempt（100 分）
@@ -89,9 +99,115 @@ async function main(): Promise<void> {
     const stuck = await mk('stuck', { amountCents: 60, payStatus: 'refunding', paymentSource: 'wechat', payChannel: 'wechat', paidAt: new Date() })
     await prisma.order.update({ where: { id: stuck }, data: { updatedAt: new Date(Date.now() - 60 * 60 * 1000) } })
 
+    // 渠道已收款、订单未转 paid（迟到回调待退）必须进入对账，不得因 closed 被排除
+    const collected = await mk('coll', {
+      amountCents: 330,
+      payStatus: 'closed',
+      refundReason: 'ONLINE_PAID_PENDING_REFUND',
+      pickupStatus: 'expired',
+    })
+    await prisma.paymentAttempt.create({
+      data: { orderId: collected, channel: 'wechat', amountCents: 330, status: 'success', channelTxnNo: `wx_${suffix}_c` },
+    })
+
+    // 已退款后再出现第二条 success 尝试：必须检出，不得当健康单；gross 按两次实收合计
+    const extra = await mk('extra', {
+      amountCents: 150,
+      payStatus: 'refunded',
+      paymentSource: 'wechat',
+      payChannel: 'wechat',
+      paidAt: new Date(Date.now() - 180_000),
+      refundedAmountCents: 150,
+      refundedAt: new Date(Date.now() - 60_000),
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: extra,
+        channel: 'wechat',
+        amountCents: 150,
+        status: 'success',
+        channelTxnNo: `wx_${suffix}_e1`,
+        createdAt: new Date(Date.now() - 170_000),
+      },
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: extra,
+        channel: 'wechat',
+        amountCents: 150,
+        status: 'success',
+        channelTxnNo: `wx_${suffix}_e2`,
+        createdAt: new Date(),
+      },
+    })
+    await prisma.refund.create({
+      data: { orderId: extra, refundNo: `RFD-${suffix}-extra`, amountCents: 150, status: 'success', channel: 'wechat', reason: 't' },
+    })
+
+    const extraRefunding = await mk('extrf', {
+      amountCents: 80,
+      payStatus: 'refunding',
+      paymentSource: 'wechat',
+      payChannel: 'wechat',
+      paidAt: new Date(Date.now() - 90_000),
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: extraRefunding,
+        channel: 'wechat',
+        amountCents: 80,
+        status: 'success',
+        channelTxnNo: `wx_${suffix}_rf1`,
+        createdAt: new Date(Date.now() - 80_000),
+      },
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: extraRefunding,
+        channel: 'wechat',
+        amountCents: 80,
+        status: 'success',
+        channelTxnNo: `wx_${suffix}_rf2`,
+        createdAt: new Date(),
+      },
+    })
+
     // 专项：LATE_PAID（healthy 单加 late 审计）+ RECONCILED（refundedOk 单加 reconcile 审计）
     await prisma.auditLog.create({ data: { actorRole: 'system', action: 'order.mark_paid_online', targetType: 'order', targetId: healthy, payloadJson: JSON.stringify({ late: true, channel: 'wechat' }) } })
     await prisma.auditLog.create({ data: { actorRole: 'system', action: 'payment.reconciled', targetType: 'order', targetId: refundedOk, payloadJson: JSON.stringify({ channel: 'alipay' }) } })
+
+    const unconfirmed = await mk('uncf', { amountCents: 210, payStatus: 'paying' })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: unconfirmed,
+        channel: 'wechat',
+        amountCents: 210,
+        status: 'created',
+        createdAt: new Date(Date.now() - 60_000),
+      },
+    })
+    const inFlight = await mk('inflt', { amountCents: 40, payStatus: 'paying' })
+    await prisma.paymentAttempt.create({
+      data: { orderId: inFlight, channel: 'wechat', amountCents: 40, status: 'created' },
+    })
+    const livePaying = await mk('livep', { amountCents: 70, payStatus: 'paying' })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: livePaying,
+        channel: 'wechat',
+        amountCents: 70,
+        status: 'pending',
+        prepayId: `prepay_${suffix}_live`,
+        qrCodeContent: 'weixin://wxpay/bizpayurl?pr=live',
+      },
+    })
+    const youngRefunding = await mk('yrf', {
+      amountCents: 55,
+      payStatus: 'refunding',
+      paymentSource: 'wechat',
+      payChannel: 'wechat',
+      paidAt: new Date(),
+    })
 
     const ordersBefore = await prisma.order.count({ where: { terminalId } })
     const refundsBefore = await prisma.refund.count({ where: { order: { is: { terminalId } } } })
@@ -128,6 +244,45 @@ async function main(): Promise<void> {
     else fail('missed REFUND_SUCCESS_ORDER_NOT_REFUNDED')
     if (find(disc, 'STUCK_REFUNDING', stuck)) pass('检出 STUCK_REFUNDING（超龄退款中单）')
     else fail('missed STUCK_REFUNDING')
+    if (find(disc, 'ONLINE_COLLECTED_PENDING_REFUND', collected) && rep.summary.grossPaidCents >= 200 + 100 + 90 + 330) {
+      pass('检出 ONLINE_COLLECTED_PENDING_REFUND，金额计入 gross（不伪装 payStatus=paid）')
+    } else {
+      fail(`missed ONLINE_COLLECTED_PENDING_REFUND: ${JSON.stringify(disc)} summary=${JSON.stringify(rep.summary)}`)
+    }
+    if (
+      find(disc, 'ORDER_EXTRA_COLLECTION_AFTER_REFUND', extra) &&
+      find(disc, 'ORDER_EXTRA_COLLECTION_AFTER_REFUND', extraRefunding) &&
+      !find(disc, 'ORDER_EXTRA_COLLECTION_AFTER_REFUND', refundedOk)
+    ) {
+      pass('检出 ORDER_EXTRA_COLLECTION_AFTER_REFUND（refunded/refunding）；单笔已退健康单不误报')
+    } else {
+      fail(`extra collection mismatch: ${JSON.stringify(disc)}`)
+    }
+    if (rep.summary.grossPaidCents >= 200 + 100 + 90 + 330 + 150 + 150 + 80 + 80) {
+      pass('额外成功尝试按实收合计计入 gross')
+    } else {
+      fail(`extra collection gross missing: ${JSON.stringify(rep.summary)}`)
+    }
+
+    if (
+      find(mine(rep.attention.unconfirmedCollections), CHANNEL_ACCEPTED_UNCONFIRMED_REASON, unconfirmed)
+      && !find(mine(rep.attention.unconfirmedCollections), CHANNEL_ACCEPTED_UNCONFIRMED_REASON, livePaying)
+      && !find(mine(rep.attention.unconfirmedCollections), CHANNEL_ACCEPTED_UNCONFIRMED_REASON, inFlight)
+      && !disc.some((d) => d.orderId === unconfirmed)
+    ) {
+      pass('超龄 created+空标识进 attention；在飞 created 与已出码 pending 不误报；不进 discrepancies 当 paid')
+    } else {
+      fail(`unconfirmed attention mismatch: ${JSON.stringify(rep.attention.unconfirmedCollections)}`)
+    }
+    if (
+      find(mine(rep.attention.refundingInProgress), 'REFUNDING_IN_PROGRESS', youngRefunding)
+      && find(mine(rep.attention.refundingInProgress), 'REFUNDING_IN_PROGRESS', stuck)
+      && !find(disc, 'STUCK_REFUNDING', youngRefunding)
+    ) {
+      pass('refunding 全部进入 attention.refundingInProgress；未超龄不进 STUCK_REFUNDING')
+    } else {
+      fail(`refunding attention mismatch: ${JSON.stringify(rep.attention.refundingInProgress)}`)
+    }
 
     if (find(mine(rep.attention.latePaid), 'LATE_PAID', healthy)) pass('LATE_PAID 进 attention 专项')
     else fail('missed LATE_PAID attention')

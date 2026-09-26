@@ -63,6 +63,11 @@ const jobFitPage = read(kioskRoot, 'src/pages/resume/JobFitPage.tsx')
 // S2-2 拆页：「怎么补」搬到差距行动页，因此这两个组件的断言随之搬过去。
 // 门禁覆盖面不缩水 —— 原来断在结果页上的每一条，现在都在行动页上重新断一次。
 const jobFitActionsPage = read(kioskRoot, 'src/pages/resume/JobFitActionsPage.tsx')
+// 2026-09-22 迁入青序流光（稿 46）：六个静态屏（missing-task / rejected-task /
+// loading / analyzing / ai-down / failed）搬进 JobFitQxStates.tsx。
+// 那些屏上的文案与出口仍归本门禁管，因此这里连同读入，断言按「整条路由」判。
+const jobFitStates = read(kioskRoot, 'src/pages/resume/jobFit/JobFitQxStates.tsx')
+const jobFitRoute = `${jobFitPage}\n${jobFitStates}`
 const recordsPage = read(kioskRoot, 'src/pages/profile/me/MyAiRecordsPage.tsx')
 const packageJson = read(kioskRoot, 'package.json')
 const ci = read(repoRoot, '.github/workflows/ci.yml')
@@ -70,13 +75,13 @@ const summary = expectFile('src/pages/resume/jobFit/DecisionSummaryBar.tsx', '�
 const fitMap = expectFile('src/pages/resume/jobFit/FitSkillMap.tsx', '匹配依据组件存在')
 const gaps = expectFile('src/pages/resume/jobFit/GapActionCards.tsx', '差距行动组件存在')
 const rewrite = expectFile('src/pages/resume/jobFit/ResumeRewriteCard.tsx', '简历改写组件存在')
-expectFile('src/pages/resume/jobFit-inkpaper.css', '岗位匹配墨青纸感样式存在')
+expectFile('src/pages/resume/jobFit-inkpaper.css', '差距行动页墨青纸感样式存在')
 let inkpaperCss = ''
 try {
   inkpaperCss = readLocalCssGraph('src/pages/resume/jobFit-inkpaper.css')
-  pass('岗位匹配样式聚合器仅跟随本地 CSS import 且无缺失、越界或循环')
+  pass('差距行动页样式聚合器仅跟随本地 CSS import 且无缺失、越界或循环')
 } catch (error) {
-  fail(`岗位匹配样式聚合失败 — ${error instanceof Error ? error.message : String(error)}`)
+  fail(`差距行动页样式聚合失败 — ${error instanceof Error ? error.message : String(error)}`)
 }
 
 expectIncludes(sharedAi, 'export interface JobFitPrintResponse', 'shared 声明岗位匹配打印响应')
@@ -98,7 +103,9 @@ expectIncludes(jobFitActionsPage, 'fileUrl: file.printFileUrl', '行动页打印
 expectAbsent(jobFitActionsPage, /fileUrl:\s*file\.signedUrl|signedUrl/, '行动页不把 signedUrl 交给打印任务')
 // 原断言以 <ResumeRewriteCard 作锚点证明「打印失败在当前页可见」。组件搬走后锚点改为
 // 结果视图仍然存在的来源卡，断言的**性质不变**：错误必须渲染在同一屏，不是跳走或吞掉。
-expectMatches(jobFitPage, /job-fit-source[\s\S]{0,1600}\{error && <p[^>]*>{error}<\/p>\}/, '结果态失败会在当前页面诚实展示错误')
+// 锚点随迁移换成结果屏的来源卡标题；断言的**性质不变**：
+// 打印等失败必须以 alert 语义渲染在同一屏，不是跳走、也不是吞掉。
+expectMatches(jobFitPage, /岗位来源[\s\S]{0,1600}\{error && <p className="jfq-alert" role="alert">\{error\}<\/p>\}/, '结果态失败会在当前页面诚实展示错误')
 // 比距离正则更硬的两条：错误必须以 alert 语义渲染在本页，且失败后仍保留重试入口。
 expectMatches(jobFitActionsPage, /\{error && \([\s\S]{0,240}role="alert"/, '行动页打印失败以告警语义在当前页面展示')
 expectIncludes(jobFitActionsPage, 'finally {\n      setPrinting(false)', '行动页打印失败后保留再次尝试入口')
@@ -121,10 +128,12 @@ for (const [source, label] of [[summary, '摘要'], [fitMap, '匹配依据'], [g
 expectIncludes(fitMap, 'keywordCoverage', '关键词组件只读取可选 decisionSupport 关键词字段')
 expectIncludes(jobFitPage, 'result.decisionSupport?.keywordCoverage', '旧缓存无 decisionSupport 时页面自然降级')
 expectAbsent(`${jobFitPage}\n${jobFitActionsPage}\n${summary}\n${fitMap}\n${gaps}\n${rewrite}`, /面试预判|晋升路径|风险与建议/, '无真实契约字段时不展示面试、晋升或风险结论')
-expectIncludes(jobFitPage, "import './jobFit-inkpaper.css'", '岗位匹配页引入局部 LightFlow 样式')
-expectMatches(jobFitPage, /className="service-desk job-fit-inkpaper[^"]*"/, '岗位匹配页使用局部 LightFlow 根作用域')
-expectIncludes(jobFitPage, 'data-visual-theme="service-desk"', '岗位匹配页声明 service-desk 视觉主题')
-expectIncludes(jobFitPage, 'data-ux-density="touch"', '岗位匹配页声明触控密度')
+expectIncludes(jobFitPage, "import './job-fit-qx.css'", '岗位匹配页引入青序流光局部样式')
+expectIncludes(jobFitPage, 'QxPageFrame', '岗位匹配页使用青序流光页面壳')
+expectIncludes(jobFitPage, 'KioskStageFit', '岗位匹配页保留 1080×1920 定高舞台')
+expectIncludes(jobFitPage, 'data-kiosk-screen="resume-job-fit"', '岗位匹配页保留稳定 landmark')
+// 两套色系（墨青纸感 / 青序流光）不能在同一页相遇 —— V6 那次「只迁了一半」就是这么坏的。
+expectAbsent(jobFitPage, /job-fit-inkpaper|service-desk|KioskFullscreenShell|KioskPageFrame/, '岗位匹配页不再混入旧壳与旧色系')
 expectIncludes(jobFitPage, 'role="status"', '岗位匹配加载态声明状态语义')
 expectIncludes(jobFitPage, 'role="alert"', '岗位匹配错误态声明告警语义')
 expectIncludes(jobFitPage, "aria-pressed={tab === 'pick'}", '岗位选择标签声明当前选择态')
@@ -153,6 +162,34 @@ inkpaperCss.split(/\r?\n/).length < 300
   ? pass('岗位匹配局部 LightFlow 样式控制在 300 行内')
   : fail('岗位匹配局部 LightFlow 样式超过 300 行')
 
+const jobFitQxCss = expectFile('src/pages/resume/job-fit-qx.css', '岗位匹配青序流光样式存在')
+{
+  // 自作用域检查：每一条规则的选择器都必须以 .jfq- 开头。
+  // 否则 `.qx-btn { … }` 这种裸写会从本页外溢到整套设计系统上（51 页共用）。
+  const bare = jobFitQxCss.replace(/\/\*[\s\S]*?\*\//g, '')
+  // 首字符排除 `}`：多行规则里上一条的收尾花括号独占一行，否则会把
+  // 「}\n.jfq-xxx」整段当成一个选择器，好写法也会被判成外溢。
+  const rules = [...bare.matchAll(/^\s*([^@\s{}][^{}]*)\{/gm)]
+    .flatMap((match) => match[1].split(',').map((selector) => selector.trim()))
+    .filter(Boolean)
+  const escaped = rules.filter((selector) => !selector.startsWith('.jfq-'))
+  escaped.length === 0
+    ? pass(`岗位匹配青序流光样式全部自作用域（${rules.length} 条规则）`)
+    : fail(`岗位匹配青序流光样式外溢到共享层 — ${escaped.join(' / ')}`)
+}
+expectMatches(jobFitQxCss, /@media\s*\(max-width:\s*1080px\)/, '岗位匹配青序流光样式覆盖 1080 竖屏布局')
+expectMatches(jobFitQxCss, /@media\s*\(max-width:\s*390px\)/, '岗位匹配青序流光样式覆盖窄屏布局')
+expectAbsent(jobFitQxCss, /(^|\n)\s*(?:body|html)\s*\{/, '岗位匹配青序流光样式不污染全局页面')
+// 颜色只能取 tokens.css 的 --qx-*；本页另起一套色值就等于在 51 页里开第二套真值。
+expectAbsent(jobFitQxCss, /#[0-9a-f]{3,8}\b/i, '岗位匹配青序流光样式不写死色值，一律取 --qx-* 令牌')
+
+// 六个静态屏的合规边界：等待与失败态都不得放宽（稿 46 的 nots 段）。
+expectIncludes(jobFitStates, '不显示匹配百分比、评分或通过率预测', '等待态不预告分数或通过率')
+expectIncludes(jobFitStates, '不把简历内容提供给企业或第三方', '等待态保留不提供给企业的边界')
+expectIncludes(jobFitStates, '不替你在来源渠道完成任何投递或预约动作', '等待态不伪称代办投递或预约')
+expectIncludes(jobFitStates, '不承诺恢复时间', 'AI 不可用时不伪造恢复时间')
+expectAbsent(jobFitRoute, /一键投递|立即投递|平台投递|投递简历/, '岗位匹配整条路由不出现平台内投递文案')
+
 expectIncludes(recordsPage, 'completedJobFitTaskIds', '我的 AI 记录识别已完成岗位匹配结果')
 expectIncludes(recordsPage, 'shouldDisplayJobAiSession', '我的 AI 记录仅折叠对应的已完成 match 会话')
 expectIncludes(recordsPage, "session.session.operation !== 'match'", '推荐、解读等其他会话不被折叠')
@@ -172,7 +209,7 @@ expectIncludes(jobFitApi, 'revokeJobFitConsent', '岗位匹配 API 暴露匿名�
 expectIncludes(jobFitPage, "type PreconditionGate = 'missing' | 'rejected'", '岗位匹配区分缺简历与后端不认的 taskId')
 expectIncludes(jobFitPage, 'if (!taskId) return null', '门禁用中间变量后仍把 taskId 收成 string，否则 CI typecheck 红')
 expectIncludes(jobFitPage, "err.code === 'AI_TASK_NOT_FOUND'", '岗位匹配把后端不认的 taskId 挡在选岗表单前')
-expectIncludes(jobFitPage, '重新上传简历', '后端不认的 taskId 引导重新上传而不是空表单')
+expectIncludes(jobFitRoute, '重新上传简历', '后端不认的 taskId 引导重新上传而不是空表单')
 expectIncludes(jobFitPage, 'setRejectedTask(true)', '岗位匹配把 AI_TASK_NOT_FOUND 落成 rejected 门禁')
 expectAbsent(jobFitPage, /granted && err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND'/, '授权请求本身的 AI_TASK_NOT_FOUND 也要出门禁，不能等 granted')
 {

@@ -1,5 +1,7 @@
 # 支付上线生产环境变量逐项清单（W-D ④）
 
+> **收费口径（2026-09-26 标注）：** 客户机器上的打印由客户买断额度、用户免费，或走客户自己的商户号；律师确认前不走我们的商户号（next-tasks 3.11④）。本清单只用于自营点位试点，且试点收费前先解决印刷经营资质或替代路径（compliance-boundary.md §1.2 A）。
+
 > **草案，未经真机/真实商户验证。** 2026-07-06 起草。
 > 事实来源（代码为准）：`services/api/.env.example` 支付段、`services/api/src/config/production-runtime-gates.ts`、`services/api/src/payment/payment-provider.factory.ts`、`services/api/src/payment/providers/{wechat-pay,alipay}.provider.ts`、`services/api/src/payment/payment-session-token.ts`。
 > 需求来源：`docs/product/payment-commercial-adaptation-plan-2026-07.md` §四 W-D ④。

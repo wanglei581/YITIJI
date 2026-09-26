@@ -15,6 +15,11 @@ import type { PublishAction } from './dto/publish.dto'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 import { FairMaterialPrintBridgeService, type FairMaterialPrintView } from './fair-material-print-bridge.service'
 import { withPublicFairDemoExclusion } from './jobs-shared'
+import {
+  assertNotEmergencyHeld,
+  assertRecruitmentContentHostingEnabled,
+  isRecruitmentContentHostingEnabled,
+} from '../recruitment-hosting/recruitment-hosting'
 
 // ============================================================
 // FairMaterialService — 活动资料管理(上传/更新/发布/删除/读取)
@@ -124,6 +129,7 @@ export class FairMaterialService {
     initialPublishStatus?: 'unpublished'
     user: AuthedUser
   }): Promise<FairMaterialDto> {
+    assertRecruitmentContentHostingEnabled()
     const fair = await this.assertFairExists(args.fairId)
 
     if (args.buffer.length > FAIR_MATERIAL_MAX_BYTES) {
@@ -187,6 +193,7 @@ export class FairMaterialService {
   }
 
   async updateMaterial(fairId: string, materialId: string, dto: UpdateFairMaterialDto, user: AuthedUser): Promise<FairMaterialDto> {
+    assertRecruitmentContentHostingEnabled()
     await this.assertMaterialInFair(fairId, materialId)
     const updated = await this.prisma.fairMaterial.update({
       where: { id: materialId },
@@ -204,6 +211,8 @@ export class FairMaterialService {
   }
 
   async publishMaterial(fairId: string, materialId: string, action: PublishAction, user: AuthedUser): Promise<FairMaterialDto> {
+    assertRecruitmentContentHostingEnabled()
+    if (action === 'publish') await assertNotEmergencyHeld(this.prisma, 'fair_material', materialId)
     const material = await this.assertMaterialInFair(fairId, materialId)
     if (action === 'publish') {
       // 发布闸门:资料本身没有 sourceOrgId,信任归属跟随所属招聘会的来源机构。
@@ -231,6 +240,7 @@ export class FairMaterialService {
 
   /** 删除资料:物理删对象 + 软删行(保留删除审计线索,符合 CLAUDE.md §11 删除留痕)。 */
   async deleteMaterial(fairId: string, materialId: string, user: AuthedUser): Promise<{ success: true }> {
+    assertRecruitmentContentHostingEnabled()
     const material = await this.assertMaterialInFair(fairId, materialId)
     await this.printBridges.revokeForMaterial(materialId, 'material_deleted')
     if (!material.storageKey.startsWith('pending:')) {
@@ -253,6 +263,7 @@ export class FairMaterialService {
     page: number,
     pageSize: number,
   ): Promise<{ data: FairMaterialDto[]; total: number; page: number; pageSize: number }> {
+    if (!isRecruitmentContentHostingEnabled()) return { data: [], total: 0, page, pageSize }
     const fair = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
@@ -282,6 +293,7 @@ export class FairMaterialService {
    * 不复用 materialId 冒充 fileId，也不放宽 PrintJobs 的 /files/:id/content 白名单。
    */
   async prepareFairMaterialPrint(fairId: string, materialId: string): Promise<FairMaterialPrintView> {
+    assertRecruitmentContentHostingEnabled()
     return this.printBridges.prepare(fairId, materialId)
   }
 

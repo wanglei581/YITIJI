@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { RedisService } from '../common/redis/redis.service'
 
 const CACHE_TTL_SECONDS = 15 * 60
@@ -28,14 +29,18 @@ export class DailyBriefService {
     const city = requestedCity?.trim() || null
     const modules: DailyReportModule[] = []
 
+    const hosting = isRecruitmentContentHostingEnabled()
     const pickup = await this.pickupExpiring(endUserId, now)
     if (pickup.items.length > 0) modules.push(pickup)
 
-    const fairs = await this.fairCountdown(endUserId, now)
-    if (fairs.items.length > 0) modules.push(fairs)
+    if (hosting) {
+      const fairs = await this.fairCountdown(endUserId, now)
+      if (fairs.items.length > 0) modules.push(fairs)
+    }
 
     if (city) {
       const cityNew = await this.cityNew(city, date)
+      if (!hosting) cityNew.newJobs = 0
       if (cityNew.newJobs > 0 || cityNew.newPolicies > 0) modules.push(cityNew)
     }
 

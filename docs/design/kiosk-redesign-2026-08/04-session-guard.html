@@ -37,7 +37,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -309,13 +309,13 @@ var SRC=resolveFrom();
 /* guard-from 上那句话：来源、落点、为什么，三样必须同时说清楚 */
 var FROM_LABEL=SRC.known
  ? '<b>'+SRC.route+'</b>（静态稿对应 '+SRC.host.split('?')[0]+'）'
- : '<b>首页</b>（'+SRC.reason+'，按 fail-closed 处理）';
+ : '<b>首页</b>（'+SRC.reason+'，为保护隐私只能回首页重新开始）';
 
 /* 倒计时块：数字来自 deadlineAt − 本机时钟；?capture=1 冻结，便于逐字节复现的证据截图 */
 function guardBlock(o){
  return '<section class="sec"><div class="guard">'+
   '<div class="guard-num" role="group" aria-label="本机剩余计时"><b id="count">'+o.num+'</b><span id="count-unit">'+o.unit+'</span></div>'+
-  '<div class="guard-main"><div class="guard-eyebrow">SESSION GUARD</div>'+
+  '<div class="guard-main"><div class="guard-eyebrow">会话保护</div>'+
   '<div class="guard-title serif">'+o.title+'</div>'+
   '<div class="guard-copy">'+o.copy+'</div>'+
   (o.from?'<div class="guard-from">'+svg('info','currentColor',22)+'继续后回到 '+FROM_LABEL+'</div>':'')+
@@ -341,7 +341,7 @@ function continueBtn(){
 function heroGlyph(o){
  return '<section class="sec"><div class="guard"'+(o.fallback?' data-testid="'+SCREEN+'-fallback"':'')+'>'+
   '<div class="guard-num'+(o.spin?' breathe':'')+'" role="img" aria-label="'+o.alt+'">'+svg(o.icon,'currentColor',132)+'</div>'+
-  '<div class="guard-main"><div class="guard-eyebrow">SESSION GUARD</div>'+
+  '<div class="guard-main"><div class="guard-eyebrow">会话保护</div>'+
   '<div class="guard-title serif">'+o.title+'</div>'+
   '<div class="guard-copy">'+o.copy+'</div>'+
   (o.foot?'<div class="guard-from">'+svg('info','currentColor',22)+o.foot+'</div>':'')+
@@ -438,7 +438,7 @@ V['continue-failed']=function(){
  return {body:heroGlyph({icon:'warn',fallback:true,alt:'继续使用没有成功',
    title:'没能<em>就地继续</em>',
    copy:'「继续使用」这一步没有走通：'+(SRC.known?'来源页是 <b>'+SRC.route+'</b>，但守卫这次不认它':'本来就没有读到可用的来源页')+'。可能是已经过了截止时间，也可能是浏览记录的位置对不上 —— <b>本页不推测具体原因</b>。',
-   foot:'运行时这条路是 <b>fail-closed</b>：守卫不通过就直接清场回首页，不会停在一个「还能继续」的假象上'})+
+   foot:'这种情况一律<b>按最稳妥的方式处理</b>：不能确认可以原地继续时，就清空本机会话回首页，不会停在一个「还能继续」的假象上'})+
    '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-source-note">'+
    '<div class="state-h">'+svg('info','currentColor',28)+'这一屏为什么单列出来</div>'+
    '<div class="state-p">continueSession() 的守卫（pendingWarning 为空、已过 deadlineAt、history 位置对不上）任何一条不满足，运行时都会调 <b>hardClear()</b>：清本机会话并回首页。设计稿把这条路径画出来，是为了让它可被验收，<b>不是</b>声称此刻内容还留着。</div>'+

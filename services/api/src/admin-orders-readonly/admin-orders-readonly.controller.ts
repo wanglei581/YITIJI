@@ -27,17 +27,21 @@ function safeInt(value: string | undefined, defaultValue: number, min: number, m
  * 一个没有任何报错的假结论。宁可 400 让前端暴露契约不一致，
  * 也不能给运营一个看起来正常、实则错误的列表。
  */
-function pickRefundRequired(raw: string | undefined): boolean | undefined {
+function pickBoolQuery(field: string, raw: string | undefined): boolean | undefined {
   if (raw === undefined || raw === '') return undefined
   if (raw === 'true' || raw === '1') return true
   if (raw === 'false' || raw === '0') return false
   throw new BadRequestException({
     error: {
       code: 'INVALID_FILTER_VALUE',
-      message: '筛选参数 refundRequired 取值不受支持',
-      details: ['refundRequired 允许的取值：true | false | 1 | 0'],
+      message: `筛选参数 ${field} 取值不受支持`,
+      details: [`${field} 允许的取值：true | false | 1 | 0`],
     },
   })
+}
+
+function pickRefundRequired(raw: string | undefined): boolean | undefined {
+  return pickBoolQuery('refundRequired', raw)
 }
 
 function pickFilter(
@@ -87,15 +91,18 @@ export class AdminOrdersReadonlyController {
     // 往中间插参数会把它们的 page/pageSize 挤到别的形参上（实测：'1' 落到
     // refundRequired 被解析成 true，整条用例莫名 400）。
     @Query('refundRequired') refundRequiredRaw?: string,
+    @Query('opsAttention') opsAttentionRaw?: string,
   ) {
     const refundRequired = pickRefundRequired(refundRequiredRaw)
+    const opsAttention = pickBoolQuery('opsAttention', opsAttentionRaw) === true ? true : undefined
     const resolvedPayStatus = pickFilter('payStatus', payStatus, VALID_PAY_STATUS)
-    if (refundRequired === true && resolvedPayStatus && resolvedPayStatus !== 'paid') {
+    const refundRequiredPayStatuses = new Set(['paid', 'unpaid', 'paying', 'closed'])
+    if (refundRequired === true && resolvedPayStatus && !refundRequiredPayStatuses.has(resolvedPayStatus)) {
       throw new BadRequestException({
         error: {
           code: 'INVALID_FILTER_VALUE',
-          message: '待退款筛选仅适用于已支付订单',
-          details: ['refundRequired=true 时 payStatus 只能是 paid 或省略'],
+          message: '待退款筛选仅适用于已支付或渠道已收款待退订单',
+          details: ['refundRequired=true 时 payStatus 只能是 paid、unpaid、paying、closed 或省略'],
         },
       })
     }
@@ -107,6 +114,7 @@ export class AdminOrdersReadonlyController {
       pickupStatus: pickFilter('pickupStatus', pickupStatus, VALID_PICKUP_STATUS),
       search: search?.trim() || undefined,
       refundRequired,
+      opsAttention,
       page: safeInt(pageStr, 1, 1, 10_000),
       pageSize: safeInt(sizeStr, 20, 1, 100),
     })

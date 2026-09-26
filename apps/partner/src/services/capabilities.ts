@@ -20,11 +20,14 @@ import type { PartnerDataSourceCapabilities } from './api'
 export interface PartnerCapabilitiesState {
   status: 'loading' | 'ready' | 'error'
   capabilities: PartnerDataSourceCapabilities | null
+  /** 重新拉取能力；读取失败时给「重新读取」按钮用 */
+  retry: () => void
 }
 
 export const PartnerCapabilitiesContext = createContext<PartnerCapabilitiesState>({
   status: 'loading',
   capabilities: null,
+  retry: () => {},
 })
 
 export function usePartnerCapabilities(): PartnerCapabilitiesState {
@@ -42,4 +45,25 @@ type BooleanCapability = {
 export function useCapability(key: BooleanCapability): boolean {
   const { capabilities } = usePartnerCapabilities()
   return capabilities ? capabilities[key] : true
+}
+
+/**
+ * 部署级招聘内容托管（3.13）。我们云上默认关闭；私有化部署（b）打开。
+ *
+ * - 'off'：服务端明确说关闭。岗位 / 企业 / 招聘会 / 数据源 / 同步日志在侧栏隐藏，
+ *   直接打开这些地址时给出如实说明，不渲染会 403 或永远为空的管理页。
+ * - 'on'：服务端明确说打开。
+ * - 'loading'：还没拿到能力，招聘类页面先等，不抢先发请求。
+ * - 'unknown'：能力接口失败，或旧服务端没有这个字段。**按关闭处理（fail-closed）**，
+ *   与本文件其余能力位的 fail-open 相反：托管在我们云上默认关闭，按打开渲染只会给出
+ *   一排点了就 403 的新增 / 导入 / 同步按钮。侧栏不显示这五页，直接打开地址时说明
+ *   「暂时无法确认」并给重新读取，不冒充「未开放」。
+ */
+export type RecruitmentHostingState = 'loading' | 'on' | 'off' | 'unknown'
+
+export function useRecruitmentHosting(): RecruitmentHostingState {
+  const { status, capabilities } = usePartnerCapabilities()
+  if (status === 'loading') return 'loading'
+  if (!capabilities || typeof capabilities.recruitmentHosting !== 'boolean') return 'unknown'
+  return capabilities.recruitmentHosting ? 'on' : 'off'
 }

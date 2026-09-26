@@ -2,17 +2,14 @@
 <view class="page-wrap">
   <view style="height:{{statusBarHeight}}px"></view>
 
+  <!-- 底部 Tab 页：没有返回键。原右上角「连接终端」和微信胶囊在同一行
+       （home / me / assistant 三页实测过这一行的按钮会落进胶囊、点不到），
+       而它和下面「扫码登录一体机」是同一个入口，所以不再单独放。 -->
   <view class="navbar">
-    <view class="nav-back tap" hover-class="tap-press" bindtap="back">
-      <text class="ficon i-right nav-back-ic"></text>
-    </view>
-    <view class="nav-title left">打印服务</view>
-    <view class="nav-right">
-      <view class="nav-caps tap" hover-class="tap-press" bindtap="tapScan">连接终端</view>
-    </view>
+    <view class="nav-title left serif">打印</view>
   </view>
 
-  <view class="content">
+  <view class="content has-tabbar">
 
     <view class="print-hero">
       <view class="hero-icon"><text class="ficon i-printer"></text></view>

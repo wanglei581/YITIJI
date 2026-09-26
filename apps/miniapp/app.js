@@ -1,6 +1,4 @@
 // app.js
-const reminders = require('./utils/reminders');
-
 App({
   globalData: {
     statusBarHeight: 20,
@@ -35,25 +33,8 @@ App({
     } catch (e) {
       // 兜底：使用默认值
     }
-
-    // 检查 24h 内有无即将开始的招聘会提醒，弹 Modal 提示
-    try {
-      const upcoming = reminders.getUpcoming();
-      if (upcoming.length > 0) {
-        const first = upcoming[0];
-        const extra = upcoming.length > 1 ? `，还有 ${upcoming.length - 1} 场` : '';
-        wx.showModal({
-          title: '招聘会提醒',
-          content: `「${first.title}」即将开始${extra}，记得准时参加！`,
-          confirmText: '查看详情',
-          cancelText: '知道了',
-          success(res) {
-            if (res.confirm) {
-              wx.navigateTo({ url: `/pages/fair-detail/fair-detail?id=${first.id}` });
-            }
-          },
-        });
-      }
-    } catch (_) {}
+    // 启动时的「招聘会提醒」弹窗已随招聘会页一起停放（首发按非招聘类目提审，
+    // 见 docs/compliance/compliance-boundary.md §1.1）。取得人力资源服务许可证、
+    // 通过求职/招聘类目后，与 pages/fair-reminders 一起恢复。
   },
 });

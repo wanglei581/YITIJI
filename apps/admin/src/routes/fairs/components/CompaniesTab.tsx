@@ -16,10 +16,13 @@ export function CompaniesTab({
   fairId,
   companies,
   onChanged,
+  readOnly = false,
 }: {
   fairId: string
   companies: FairCompanyView[]
   onChanged: () => void
+  /** 托管关闭（我们云上默认）时只读：不渲染新增 / 编辑 / 删除，点了也只会 403。 */
+  readOnly?: boolean
 }) {
   const [editing, setEditing] = useState<FairCompanyView | 'new' | null>(null)
   const [form, setForm] = useState<SaveFairCompanyInput>(EMPTY_COMPANY)
@@ -114,10 +117,12 @@ export function CompaniesTab({
       {error && !editing && <InlineError message={error} />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-neutral-600">{companies.length} 家参展企业</p>
-        <button onClick={openNew} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
-          <PlusIcon className="h-3.5 w-3.5" />
-          新增企业
-        </button>
+        {!readOnly && (
+          <button onClick={openNew} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
+            <PlusIcon className="h-3.5 w-3.5" />
+            新增企业
+          </button>
+        )}
       </div>
 
       <Card className="overflow-hidden p-0">
@@ -125,14 +130,14 @@ export function CompaniesTab({
           <table className="w-full text-sm">
             <thead>
               <tr>
-                {['企业名称', '行业', '规模', '招聘标签', '岗位数', '操作'].map((h) => (
+                {['企业名称', '行业', '规模', '招聘标签', '岗位数', ...(readOnly ? [] : ['操作'])].map((h) => (
                   <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-900/[0.06]">
               {companies.length === 0 ? (
-                <tr><td colSpan={6} className="py-10 text-center text-xs text-neutral-400">暂无参展企业,点击右上角"新增企业"录入</td></tr>
+                <tr><td colSpan={readOnly ? 5 : 6} className="py-10 text-center text-xs text-neutral-400">{readOnly ? '暂无参展企业' : '暂无参展企业,点击右上角"新增企业"录入'}</td></tr>
               ) : (
                 companies.map((c) => (
                   <tr key={c.id} className="hover:bg-neutral-50">
@@ -149,14 +154,16 @@ export function CompaniesTab({
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.jobsCount}</td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(c)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
-                          <PencilIcon className="h-3.5 w-3.5" />
-                        </button>
-                        <DangerDeleteButton onConfirm={() => void remove(c.id)} busy={busyId === c.id} />
-                      </div>
-                    </td>
+                    {!readOnly && (
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEdit(c)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
+                            <PencilIcon className="h-3.5 w-3.5" />
+                          </button>
+                          <DangerDeleteButton onConfirm={() => void remove(c.id)} busy={busyId === c.id} />
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

@@ -1,43 +1,40 @@
 // ============================================================
-// 用户服务协议 / 隐私政策（审计修复：原登录页两个按钮只弹「即将上线」）。
+// 用户服务协议 / 隐私政策 — /legal/:doc（整屏路由，在 KioskRoot 之外）。
 //
-// 内容为 v1 草拟版，与系统当前真实数据实践对齐（短 TTL 文件、不留简历库、
+// 2026-09-25 迁入青序稿 08-legal：文档切换 → 文档头 → 按章节读（左目录 + 右单章）→
+// 「哪一版算数 / 看不懂这一章」两张卡；另有 loading / error / not-found 三态照稿。
+// 页壳是 QxPageFrame；舞台缩放与 JobFitStage 同一判据（竖屏一体机缩放，窄屏 / 横屏按真实宽度排）。
+//
+// 正文口径（稿头注释 + G6 + verify:legal-doc-version 第 12 项）：
+// - 正文只来自 GET /kiosk/legal/{docType} 的当前有效版本；取到之前只放槽位，不显示任何条款。
+// - 请求失败 → error 态并给重试，不静默顶替。下面的本机留存文本只在用户点开时显示，
+//   并显式标注「不作为正式版本」——公共终端断网也要能读到条款。
+// - 服务端可达但尚无激活版本（data: null）→ 直接展示本机留存文本并标注：登录同意此时记录的
+//   正是草拟哨兵版本 draft-pending-legal-review，它对应的就是这份文本。
+// - 未知 :doc → not-found，不回落到任何一份文档。
+//
+// 本机留存文本为 v1 草拟版，与系统当前真实数据实践对齐（短 TTL 文件、不留简历库、
 // OCR 不留原文、会员手机号加密存储等）。正式运营前须经运营方法务审定后替换定稿
-// （见 docs/compliance/）。Kiosk 模式：大字号、可滚动、无外链。
+// （见 docs/compliance/）。
 // ============================================================
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
-import { FileTextIcon, ShieldCheckIcon } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { useKioskStageFit } from '../../hooks/useKioskStageFit'
 import { API_BASE_URL } from '../../services/api'
+import {
+  FROM_TARGETS, formatPublishedAt, readDocLoad, readFromKey, splitLegalSections,
+  type DocLoad, type Section,
+} from './legalDocModel'
+import {
+  DocHead, DocTabs, FontTools, Glyph, LegalCard, LegalReader, LegalSec, LegalTruth, PickCard,
+  ReaderSkeleton, StateBlock, type DocMeta,
+} from './LegalDocViews'
 import './legal-service-desk.css'
 
 const FALLBACK_UPDATED_AT = '2026 年 6 月 22 日'
-
-/** Kiosk URL param → API docType */
-const DOC_TYPE_MAP: Record<string, string> = {
-  terms: 'terms_of_service',
-  privacy: 'privacy_policy',
-}
-
-interface ApiDocContent {
-  content: string
-  publishedAt: string | null
-}
-
-/** 将 Markdown 纯文本按段落分行（不引入新依赖，仅分段落渲染） */
-function splitToParagraphs(content: string): string[] {
-  return content
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-}
-
-interface Section {
-  title: string
-  paragraphs: string[]
-}
 
 const TERMS_SECTIONS: Section[] = [
   {
@@ -124,149 +121,363 @@ const PRIVACY_SECTIONS: Section[] = [
   },
 ]
 
-const DOCS = {
-  terms: { title: '用户服务协议', icon: FileTextIcon, sections: TERMS_SECTIONS },
-  privacy: { title: '隐私政策', icon: ShieldCheckIcon, sections: PRIVACY_SECTIONS },
-} as const
+type DocKey = DocMeta['key']
+
+const DOCS: Record<DocKey, DocMeta> = {
+  terms: {
+    key: 'terms', docType: 'terms_of_service', title: '用户服务协议', eyebrow: 'TERMS OF SERVICE', glyph: 'file', tone: 'slate',
+    summary: '约定你和这台机器之间的服务关系：能办什么、要不要登录、你答应什么、AI 结果怎么算、打印怎么收费。',
+    sections: TERMS_SECTIONS,
+  },
+  privacy: {
+    key: 'privacy', docType: 'privacy_policy', title: '隐私政策', eyebrow: 'PRIVACY POLICY', glyph: 'shield', tone: 'teal',
+    summary: '说明这台机器怎么处理你的个人信息：收什么、拿去做什么、存多久、你能怎么删、找谁问。',
+    sections: PRIVACY_SECTIONS,
+  },
+}
+const DOC_LIST = [DOCS.terms, DOCS.privacy]
+/** URL 段 → 文档。user 是稿 08 的叫法，与 terms 同义；受控清单之外一律 not-found。 */
+const DOC_ALIASES: Record<string, DocKey> = { terms: 'terms', user: 'terms', privacy: 'privacy' }
+
+type View = 'loading' | 'ready' | 'fallback' | 'error' | 'not-found'
+
+async function fetchLegalDoc(docType: DocMeta['docType'], signal: AbortSignal): Promise<DocLoad> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/kiosk/legal/${docType}`, { signal })
+    if (!response.ok) return { status: 'error' }
+    return readDocLoad(await response.json())
+  } catch {
+    return { status: 'error' }
+  }
+}
 
 export function LegalDocPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { doc } = useParams<{ doc: string }>()
-  const meta = doc === 'privacy' ? DOCS.privacy : DOCS.terms
-  const Icon = meta.icon
+  const docKey: DocKey | null = doc && Object.prototype.hasOwnProperty.call(DOC_ALIASES, doc) ? DOC_ALIASES[doc] : null
+  const meta = docKey ? DOCS[docKey] : null
+  const other = docKey === 'privacy' ? DOCS.terms : DOCS.privacy
+  const fromKey = readFromKey(location.search)
+  const { viewportW, viewportH } = useKioskStageFit()
+  const compact = viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
+  const fluid = compact || (viewportW > 960 && viewportW > viewportH)
+
+  const [loads, setLoads] = useState<Record<DocKey, DocLoad>>({ terms: { status: 'loading' }, privacy: { status: 'loading' } })
+  // 请求失败后，用户主动点「看本机留存文本」才显示；重试时清掉，让重试结果说话。
+  const [localOptIn, setLocalOptIn] = useState<Record<DocKey, boolean>>({ terms: false, privacy: false })
   const [fontPercent, setFontPercent] = useState(100)
-  const [activeSection, setActiveSection] = useState(0)
-  const sectionRefs = useRef<(HTMLElement | null)[]>([])
+  const [chapter, setChapter] = useState<{ key: string; index: number }>({ key: '', index: 0 })
+  const controllers = useRef<Partial<Record<DocKey, AbortController>>>({})
+  const bodyRef = useRef<HTMLElement>(null)
 
-  // API-fetched live content; null = loading or failed (fallback to hardcoded)
-  const [apiDocs, setApiDocs] = useState<Record<string, ApiDocContent | null>>({})
-
-  useEffect(() => {
-    const types = ['terms_of_service', 'privacy_policy']
-    types.forEach((docType) => {
-      fetch(`${API_BASE_URL}/kiosk/legal/${docType}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((json: { success?: boolean; data?: ApiDocContent | null } | null) => {
-          if (json?.success && json.data) {
-            setApiDocs((prev) => ({ ...prev, [docType]: json.data ?? null }))
-          }
-        })
-        .catch(() => {
-          // 网络失败时保持兜底内容，不报错
-        })
+  const load = useCallback((key: DocKey) => {
+    controllers.current[key]?.abort()
+    const controller = new AbortController()
+    controllers.current[key] = controller
+    setLoads((prev) => ({ ...prev, [key]: { status: 'loading' } }))
+    void fetchLegalDoc(DOCS[key].docType, controller.signal).then((result) => {
+      if (!controller.signal.aborted) setLoads((prev) => ({ ...prev, [key]: result }))
     })
   }, [])
 
-  const currentDocType = DOC_TYPE_MAP[doc ?? 'terms'] ?? 'terms_of_service'
-  const apiContent = apiDocs[currentDocType] ?? null
+  useEffect(() => {
+    // 两份文档分别取：这一份取不到，另一份不一定也取不到。
+    const current = controllers.current
+    load('terms')
+    load('privacy')
+    return () => {
+      current.terms?.abort()
+      current.privacy?.abort()
+    }
+  }, [load])
 
-  const displayedAt = apiContent?.publishedAt
-    ? new Date(apiContent.publishedAt).toLocaleDateString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      })
-    : FALLBACK_UPDATED_AT
+  const docLoad = docKey ? loads[docKey] : null
+  const view: View = !docKey || !docLoad
+    ? 'not-found'
+    : docLoad.status === 'ready'
+      ? 'ready'
+      : docLoad.status === 'draft' || (docLoad.status === 'error' && localOptIn[docKey])
+        ? 'fallback'
+        : docLoad.status === 'error' ? 'error' : 'loading'
 
-  const selectSection = (index: number) => {
-    setActiveSection(index)
-    sectionRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const servedSections = useMemo(
+    () => (docLoad?.status === 'ready' ? splitLegalSections(docLoad.content) : null),
+    [docLoad],
+  )
+  const sections: Section[] = servedSections ?? meta?.sections ?? []
+  const chapterKey = `${docKey ?? ''}:${view}`
+  const activeChapter = chapter.key === chapterKey && chapter.index < sections.length ? chapter.index : 0
+
+  // 返回：有站内上一页就回上一页（进来的那一页）；来路不明时回受控来源或首页，不接受任意路径。
+  // 按钮上写的必须就是点下去的去处：标签与 goBack 用同一个优先级（先历史，再受控来源，最后首页）。
+  const historyIndex = (window.history.state as { idx?: number } | null)?.idx ?? 0
+  const fromTarget = fromKey ? FROM_TARGETS[fromKey] : null
+  const backLabel = historyIndex > 0 ? '返回上一页' : (fromTarget?.label ?? '返回首页')
+  const goBack = () => {
+    if (historyIndex > 0) {
+      navigate(-1)
+      return
+    }
+    navigate(fromTarget?.route ?? '/', { replace: true })
+  }
+  const switchDoc = (key: DocKey) => {
+    navigate({ pathname: `/legal/${key}`, search: fromKey ? `?from=${fromKey}` : '' }, { replace: true })
+  }
+  const retry = (key: DocKey) => {
+    setLocalOptIn((prev) => ({ ...prev, [key]: false }))
+    load(key)
+  }
+  const selectChapter = (index: number) => {
+    setChapter({ key: chapterKey, index })
+    const body = bodyRef.current
+    if (!body) return
+    body.scrollTop = 0
+    body.scrollIntoView({ block: 'nearest' })
+  }
+
+  const fontTools = (
+    <FontTools
+      percent={fontPercent}
+      onSmaller={() => setFontPercent((value) => Math.max(90, value - 10))}
+      onLarger={() => setFontPercent((value) => Math.min(120, value + 10))}
+    />
+  )
+  const reader = (
+    <LegalSec no="01" title="按章节读" hint={sections.length > 1 ? '点左边换一章' : '全文未分章节'} aside={fontTools}>
+      <LegalReader sections={sections} active={activeChapter} onSelect={selectChapter} fontPercent={fontPercent} bodyRef={bodyRef} />
+    </LegalSec>
+  )
+
+  let status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+  let body: ReactNode
+  let primary: ReactNode
+
+  if (!meta || view === 'not-found') {
+    status = { tone: 'warn', label: '没有这份文档' }
+    body = (
+      <>
+        <LegalSec>
+          <StateBlock kind="warn" glyph="warn" title="没有这份文档" testId="legal-fallback">
+            <p className="legal-doc-state-p">地址里指的这份文档<b>不在本机的受控清单里</b>。本页只有下面两份，<b>不会随便挑一份给你看</b> —— 拿错文档比看不到更麻烦。</p>
+            <p className="legal-doc-state-p">你之前在读的那一份<b>没有被改动</b>；点下面任意一份即可继续。</p>
+          </StateBlock>
+        </LegalSec>
+        <LegalSec no="01" title="本机只有这两份" hint="点一份开始读">
+          <div className="legal-doc-bigpick">
+            {DOC_LIST.map((item) => {
+              const itemLoad = loads[item.key]
+              const itemSections = itemLoad.status === 'ready' ? splitLegalSections(itemLoad.content) : item.sections
+              return <PickCard key={item.key} doc={item} sections={itemSections} onPick={() => switchDoc(item.key)} />
+            })}
+          </div>
+        </LegalSec>
+        <LegalSec>
+          <div className="legal-doc-grid3">
+            <LegalCard tone="wheat" glyph="info" title="为什么不默认给一份">
+              <p>协议和隐私政策<b>不是同一份</b>。地址不对时默认打开其中一份，你可能一直在读另一份还以为读对了。</p>
+            </LegalCard>
+            <LegalCard tone="slate" glyph="info" title="读完回哪里">
+              <p>左上角和下面的返回按钮，会回到<b>你进来的那一页</b>；来路不明时统一回首页，不会把你甩到别处。</p>
+            </LegalCard>
+            <LegalCard tone="teal" glyph="desk" title="要找别的文件">
+              <p>屏幕上只提供这两份。其他材料请找<b>现场工作人员</b>，或按运营方公示的方式联系。</p>
+            </LegalCard>
+          </div>
+        </LegalSec>
+        <LegalSec>
+          <StateBlock kind="warn" glyph="info" title="这一页不影响你办事">
+            <p className="legal-doc-state-p">协议页只是阅读入口。<b>已经创建的打印任务、订单和到机码都不受影响</b>，你可以直接返回继续办原来的事。</p>
+          </StateBlock>
+        </LegalSec>
+      </>
+    )
+    primary = (
+      <button type="button" className="legal-doc-btn is-primary" data-testid="legal-primary" onClick={() => switchDoc('terms')}>
+        读用户服务协议
+      </button>
+    )
+  } else if (view === 'loading') {
+    status = { tone: 'unknown', label: '正在取正文' }
+    body = (
+      <>
+        <LegalSec><DocTabs docs={DOC_LIST} active={meta.key} onSwitch={switchDoc} /></LegalSec>
+        <LegalSec>
+          <DocHead doc={meta} meta={<span>正在取正文，<b>取到之前不显示任何条款</b></span>} />
+        </LegalSec>
+        <LegalSec no="01" title="正在取正文" hint="槽位，不是内容"><ReaderSkeleton /></LegalSec>
+        <LegalSec>
+          <StateBlock kind="warn" glyph="clock" title="为什么不先显示点什么" live>
+            <p className="legal-doc-state-p">法律文本<b>不能拿旧版本或示意文字先顶上</b>：你会以为自己读到了现行条款。所以取到之前这里只放槽位。</p>
+            <p className="legal-doc-state-p">取不到会明确告诉你取不到，并给一个重试入口。</p>
+          </StateBlock>
+        </LegalSec>
+      </>
+    )
+    primary = <button type="button" className="legal-doc-btn" data-testid="legal-primary" disabled>正在取正文…</button>
+  } else if (view === 'error') {
+    status = { tone: 'bad', label: '正文没取到' }
+    body = (
+      <>
+        <LegalSec><DocTabs docs={DOC_LIST} active={meta.key} onSwitch={switchDoc} /></LegalSec>
+        <LegalSec>
+          <StateBlock kind="error" glyph="warn" title="正文没取到" testId="legal-fallback" live>
+            <p className="legal-doc-state-p">这次没能把《{meta.title}》的正文取回来。<b>这里不会拿旧文本或示意文字顶上</b> —— 本机留存文本只在你点开时显示，并标明它不是正式版本。</p>
+            <p className="legal-doc-state-p">这不影响你继续用这台机器；只是<b>暂时读不到这份文档</b>。</p>
+          </StateBlock>
+        </LegalSec>
+        <LegalSec no="01" title="可以这样做" hint="三条都不用等">
+          <div className="legal-doc-grid2">
+            <LegalCard tone="wheat" glyph="refresh" title="再取一次">
+              <p>多数是一次性的网络波动，<b>重试一下</b>通常就能读到。</p>
+              <button type="button" className="legal-doc-inbtn" data-testid="legal-retry" onClick={() => retry(meta.key)}>
+                重新取正文<Glyph name="arrow" size={22} />
+              </button>
+            </LegalCard>
+            <LegalCard tone="teal" glyph="desk" title="现在就要看">
+              <p>找<b>现场工作人员</b>索取现行版本，或按运营方公示的方式联系。</p>
+              <p className="fine">屏幕这边不会替你转达，也不会自动记录这次读取失败。</p>
+              <button type="button" className="legal-doc-inbtn is-ghost" data-testid="legal-local-text"
+                      onClick={() => setLocalOptIn((prev) => ({ ...prev, [meta.key]: true }))}>
+                看本机留存文本（非正式版本）
+              </button>
+            </LegalCard>
+          </div>
+          <div className="legal-doc-grid2">
+            <LegalCard tone="slate" glyph="file" title="换一份试试">
+              <p>两份文档<b>分别取</b>。这一份取不到，另一份不一定也取不到。</p>
+              <button type="button" className="legal-doc-inbtn" data-testid="legal-switch" onClick={() => switchDoc(other.key)}>
+                去取{other.title}<Glyph name="arrow" size={22} />
+              </button>
+            </LegalCard>
+            <LegalCard tone="wheat" glyph="info" title="要不要紧">
+              <p>读不到条款<b>不改变已经生效的条款</b>，也不影响你已经创建的任务；它只是这次没显示出来。</p>
+            </LegalCard>
+          </div>
+        </LegalSec>
+        <LegalSec>
+          <StateBlock kind="warn" glyph="clock" title="什么时候能读到">
+            <p className="legal-doc-state-p">屏幕上<b>不预告恢复时间</b>，也不会替你上报这次失败。要现在就看到现行版本，请找现场工作人员索取。</p>
+          </StateBlock>
+        </LegalSec>
+      </>
+    )
+    primary = (
+      <button type="button" className="legal-doc-btn is-primary" data-testid="legal-primary" onClick={() => retry(meta.key)}>
+        <Glyph name="refresh" size={26} />重新取正文
+      </button>
+    )
+  } else if (view === 'fallback') {
+    // 本机留存文本：只在「服务端尚无激活版本」或「取不到且用户点开」时出现，必须和正式版一眼可分。
+    const optedIn = docLoad?.status === 'error'
+    status = { tone: 'warn', label: '本机留存文本' }
+    body = (
+      <>
+        <LegalSec><DocTabs docs={DOC_LIST} active={meta.key} onSwitch={switchDoc} /></LegalSec>
+        <LegalSec>
+          <div className="legal-doc-state is-compact" data-kind="warn" role="status" data-testid="legal-doc-fallback-warning">
+            <h2 className="legal-doc-state-h"><Glyph name="warn" size={28} />本机留存文本，不作为正式版本</h2>
+            <p className="legal-doc-state-p">
+              当前无法读取正式版本，以下为本机留存的说明文本，<strong>不作为正式版本</strong>。请稍后重试，或向现场工作人员索取正式文本。
+            </p>
+          </div>
+        </LegalSec>
+        <LegalSec>
+          <DocHead doc={meta} meta={<><span>共 {sections.length} 章</span><span>本机留存文本 · 更新日期 <b>{FALLBACK_UPDATED_AT}</b></span></>} />
+        </LegalSec>
+        {reader}
+        <LegalSec>
+          <div className="legal-doc-grid2">
+            <LegalCard tone="wheat" glyph="info" title="哪一版算数">
+              <p>本文本为本机留存的试运营文本，正式运营前以运营方法务审定发布的版本为准；如有疑问可咨询现场工作人员。</p>
+            </LegalCard>
+            <LegalCard tone="plum" glyph="spark" title="看不懂这一章">
+              <p className="fine">AI 顾问只转述运营方发布的正文。<b>正文没取到时这个入口先关着</b>，不拿留存文本去讲。</p>
+              <button type="button" className="legal-doc-inbtn" data-testid="legal-ai-explain" disabled>去问 AI 顾问</button>
+            </LegalCard>
+          </div>
+        </LegalSec>
+      </>
+    )
+    primary = optedIn ? (
+      <button type="button" className="legal-doc-btn is-primary" data-testid="legal-primary" onClick={() => retry(meta.key)}>
+        <Glyph name="refresh" size={26} />重新取正文
+      </button>
+    ) : (
+      <button type="button" className="legal-doc-btn is-primary" data-testid="legal-primary" onClick={() => switchDoc(other.key)}>
+        去读{other.title}
+      </button>
+    )
+  } else {
+    const served = docLoad?.status === 'ready' ? docLoad : null
+    const publishedAt = formatPublishedAt(served?.publishedAt ?? null)
+    status = { tone: 'ok', label: '现行版本' }
+    body = (
+      <>
+        <LegalSec><DocTabs docs={DOC_LIST} active={meta.key} onSwitch={switchDoc} /></LegalSec>
+        <LegalSec>
+          <DocHead
+            doc={meta}
+            meta={(
+              <>
+                <span>{sections.length > 1 ? `共 ${sections.length} 章` : '全文未分章节'}</span>
+                <span>更新日期：<b>{publishedAt ?? '发布记录未给出'}</b></span>
+                {served?.version ? <span>版本：<b>{served.version}</b></span> : null}
+              </>
+            )}
+          />
+        </LegalSec>
+        {reader}
+        <LegalSec>
+          <div className="legal-doc-grid2">
+            <LegalCard tone="wheat" glyph="info" title="哪一版算数">
+              <p>以<b>运营方正式发布</b>的版本为准。本机显示的更新日期来自发布记录，不由本页写死。</p>
+              <p className="fine">以上为运营方当前发布的有效版本；如有疑问可咨询现场工作人员。</p>
+            </LegalCard>
+            <LegalCard tone="plum" glyph="spark" title="看不懂这一章">
+              <p className="fine">AI 顾问只做<b>通俗转述</b>：不改条款效力，不构成法律结论，也不判定你符不符合某一条。本页不会把正文自动发过去，到那边说出想问的章节即可。</p>
+              <button type="button" className="legal-doc-inbtn" data-testid="legal-ai-explain" onClick={() => navigate('/assistant')}>
+                去问 AI 顾问<Glyph name="arrow" size={22} />
+              </button>
+            </LegalCard>
+          </div>
+        </LegalSec>
+      </>
+    )
+    primary = (
+      <button type="button" className="legal-doc-btn is-primary" data-testid="legal-primary" onClick={() => switchDoc(other.key)}>
+        去读{other.title}
+      </button>
+    )
   }
 
   return (
-    <div className="fusion-w5 fusion-w5--system service-desk k1-legal-doc" data-kiosk-screen="legal-doc" data-kiosk-presentation="fusion-youth" data-visual-theme="service-desk" data-ux-density="touch">
-      <KioskPageFrame
-        className="h-full"
-        header={
-          <KioskPageHeader
-            className="legal-doc-page-header"
-            title={meta.title}
-            description={`更新日期：${displayedAt}`}
-            onBack={() => navigate(-1)}
-            backLabel="返回"
-            aside={
-              <div className="legal-doc-tools">
-                <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.max(90, value - 10))} aria-label="缩小字号">A−</button>
-                <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.min(120, value + 10))} aria-label="放大字号">A＋</button>
+    <div
+      className="fusion-w5 fusion-w5--system service-desk k1-legal-doc"
+      data-kiosk-screen="legal-doc"
+      data-kiosk-presentation="fusion-youth"
+      data-visual-theme="service-desk"
+      data-ux-density="touch"
+      data-state={view}
+    >
+      <KioskStageFit enabled={!fluid}>
+        <QxPageFrame
+          title="协议与隐私"
+          status={status}
+          back={{ label: backLabel, onBack: goBack }}
+          ctabar={(
+            <>
+              <div className="legal-doc-cta">
+                <button type="button" className="legal-doc-btn" onClick={goBack}>{backLabel}</button>
+                {primary}
               </div>
-            }
-          />
-        }
-      >
-        <div className="legal-doc-shell">
-
-        <div className="legal-doc-tabs" role="group" aria-label="法律文档">
-          <button type="button" aria-pressed={doc !== 'privacy'} className={doc !== 'privacy' ? 'is-active' : ''} onClick={() => navigate('/legal/terms', { replace: true })}>用户服务协议</button>
-          <button type="button" aria-pressed={doc === 'privacy'} className={doc === 'privacy' ? 'is-active' : ''} onClick={() => navigate('/legal/privacy', { replace: true })}>隐私政策</button>
-        </div>
-
-        <article className="legal-doc-card" style={{ '--legal-font-scale': fontPercent / 100 } as CSSProperties}>
-          {/* 有 API 内容时：隐藏目录侧边栏，全宽显示内容 */}
-          {!apiContent && (
-            <aside className="legal-doc-toc" aria-label="章节目录">
-              {meta.sections.map((section, index) => (
-                <button key={section.title} type="button" className={activeSection === index ? 'is-active' : ''} onClick={() => selectSection(index)}>
-                  {section.title}
-                </button>
-              ))}
-            </aside>
+              <LegalTruth />
+            </>
           )}
-
-          <div className="legal-doc-body">
-            <h2>AI求职打印服务终端 · {meta.title}</h2>
-            {apiContent ? (
-              <>
-                <p className="legal-doc-meta">更新日期 {displayedAt}</p>
-                <div className="legal-doc-intro">
-                  <span className="legal-doc-icon"><Icon aria-hidden="true" /></span>
-                  <p>请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。</p>
-                </div>
-                <div className="legal-doc-sections">
-                  <section>
-                    {splitToParagraphs(apiContent.content).map((para, idx) => (
-                      <p key={idx}>{para}</p>
-                    ))}
-                  </section>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* 读不到服务端「当前已激活版本」时走这里。此前这一支和正式版长得
-                    一模一样（同样的标题、同样的「更新日期」），用户无从分辨自己读到的
-                    不是正式文本 —— 而底部那句免责声明当时是**无条件**挂着的，
-                    正式版展示时也挂，于是它不携带任何信息。现在只在本支出现。 */}
-                <p className="legal-doc-fallback-warning" role="status" data-testid="legal-doc-fallback-warning">
-                  当前无法读取正式版本，以下为本机留存的说明文本，<strong>不作为正式版本</strong>。
-                  请稍后重试，或向现场工作人员索取正式文本。
-                </p>
-                <p className="legal-doc-meta">本机留存文本 · 更新日期 {displayedAt} · 全文共 {meta.sections.length} 章</p>
-                <div className="legal-doc-intro">
-                  <span className="legal-doc-icon"><Icon aria-hidden="true" /></span>
-                  <p>请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。</p>
-                </div>
-                <div className="legal-doc-sections">
-                  {meta.sections.map((section, index) => (
-                    <section key={section.title} ref={(node) => { sectionRefs.current[index] = node }}>
-                      <h3>{section.title}</h3>
-                      {section.paragraphs.map((para, paragraphIndex) => <p key={paragraphIndex}>{para}</p>)}
-                    </section>
-                  ))}
-                </div>
-              </>
-            )}
-            <p className="legal-doc-endmark">— 全文完 · 可上下滑动回看 —</p>
-          </div>
-        </article>
-
-        {/* 这句只对「本机留存文本」成立。正式版本（服务端已激活版本）不该被自己
-            标成「试运营版本」—— 无条件挂着等于永远亮的警告灯，谁也不会再看它一眼。 */}
-        <p className="legal-doc-notice">
-          {apiContent
-            ? '以上为运营方当前发布的有效版本；如有疑问可咨询现场工作人员。'
-            : '本文本为本机留存的试运营文本，正式运营前以运营方法务审定发布的版本为准；如有疑问可咨询现场工作人员。'}
-        </p>
-        </div>
-      </KioskPageFrame>
+        >
+          <div className="legal-doc-scroll" data-testid={`legal-state-${view}`}>{body}</div>
+        </QxPageFrame>
+      </KioskStageFit>
     </div>
   )
 }

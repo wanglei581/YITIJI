@@ -8,12 +8,19 @@
  *   4. 状态回传：claimed → printing → completed（含 completedAt）。
  *   5. 终态幂等：只允许重复回传相同终态；不同终态或回退到 printing 必须拒绝且不重写 DB。
  *   6. 状态查询：getStatus 反映终态；不存在任务 → 404 PRINT_TASK_NOT_FOUND。
+ *   9. 动态价格二次确认：quotedAmountCents 与服务端重算不一致 → 409 PRICE_CHANGED 且零建单副作用。
+ *   1d. 有效 HMAC 仍拒绝 uploading（含 resume_export_pending）/ quarantined / deleted / expired，active 对照可建单。
  *
- * service 直调真库（prisma），不起 HTTP server——确定性、CI 友好，与现有 verify 一致。
+ * 1–8 与 9 的 service 段直调真库（prisma），不起 HTTP server——确定性、CI 友好。
+ * 9 的 HTTP 段另起进程内 Nest：真实 PrintJobsController + main.ts 同款 ValidationPipe
+ * + 真实 HttpExceptionFilter，只替换终端会话 / Redis / JWT 等与计价无关的依赖。
  * 运行：pnpm --filter ./services/api verify:print-jobs
  */
 import 'dotenv/config'
-import { createHash, randomBytes } from 'crypto'
+import { createHash, createHmac, randomBytes } from 'crypto'
+import { BadRequestException, Module, UnauthorizedException, ValidationPipe, type ValidationError } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
+import { JwtService } from '@nestjs/jwt'
 
 // terminals.service 在模块加载期 requireEnv 这两项；signing 在调用期读 FILE_SIGNING_SECRET。
 // 测试兜底（||= 不覆盖外部已设值；CI 已注入这些测试值）。须在动态 import terminals.service 之前设好。
@@ -29,7 +36,9 @@ import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
-import { signFileUrl } from '../src/files/signing'
+import { FilesService } from '../src/files/files.service'
+import { FilesController } from '../src/files/files.controller'
+import { signFileUrl, verifyFileSignature } from '../src/files/signing'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -40,7 +49,17 @@ import type { CreatePrintJobDto } from '../src/print-jobs/dto/create-print-job.d
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { buildRealPdf } from './support/minimal-pdf'
 
+// 静态门禁按源码顺序要求本调用先于任何 Prisma 客户端构造，含下方 claim 屏障的辅助连接。
+assertIsolatedVerificationDatabase()
+
 function pass(m: string) { console.log(`  PASS ${m}`) }
+
+/** 夹具按 fileId.expires 的 HMAC-SHA256 协议自签，不调用生产签发函数。 */
+function fixtureFileSignature(fileId: string, expiresAtMs: number): string {
+  const secret = process.env['FILE_SIGNING_SECRET']
+  if (!secret) fail('测试签名密钥未设置')
+  return createHmac('sha256', secret).update(`${fileId}.${expiresAtMs}`).digest('hex')
+}
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
 
 function errCode(e: unknown): string | undefined {
@@ -48,6 +67,59 @@ function errCode(e: unknown): string | undefined {
   const resp = (typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response) as
     | { error?: { code?: string } } | undefined
   return resp?.error?.code
+}
+
+function thrownCode(e: unknown): string | undefined {
+  return errCode(e) ?? (/^[A-Z][A-Z0-9_]+$/.test((e as Error).message) ? (e as Error).message : undefined)
+}
+
+function parseSignedContentUrl(fileUrl: string): { fileId: string; expires: string; sig: string } {
+  const parsed = new URL(fileUrl, 'http://print-verify.local')
+  const matched = /^\/api\/v1\/files\/([^/]+)\/content$/.exec(parsed.pathname)
+  const expires = parsed.searchParams.get('expires')
+  const sig = parsed.searchParams.get('sig')
+  if (!matched?.[1] || !expires || !sig) fail(`claim fileUrl 不是 /files/:id/content 签名路径: ${fileUrl.split('?')[0]}`)
+  return { fileId: matched[1], expires, sig }
+}
+
+/**
+ * 在 claim 事务读完目标 FileObject 之后、PrintTask CAS 之前，用另一条连接提交软删除。
+ * 这是测试侧事务屏障，不是 sleep，也不是同事务触发器。
+ */
+async function claimWhileSoftDeleteCommits(
+  prisma: PrismaService,
+  targetFileId: string,
+  claim: () => Promise<void>,
+): Promise<void> {
+  const deleter = new PrismaService()
+  await deleter.onModuleInit()
+  const original = prisma.$transaction.bind(prisma)
+  let committed = false
+  prisma.$transaction = ((arg: unknown, ...rest: unknown[]) => {
+    if (typeof arg !== 'function') return original(arg as never, ...(rest as []))
+    return original(async (tx: { fileObject: { findUnique: (args: { where?: { id?: string } }) => Promise<unknown> } }) => {
+      const findUnique = tx.fileObject.findUnique.bind(tx.fileObject)
+      tx.fileObject.findUnique = async (args) => {
+        const seen = await findUnique(args)
+        if (!committed && args?.where?.id === targetFileId) {
+          await deleter.fileObject.update({
+            where: { id: targetFileId },
+            data: { status: 'deleted', deletedAt: new Date() },
+          })
+          committed = true
+        }
+        return seen
+      }
+      return arg(tx)
+    }, ...(rest as []))
+  }) as typeof prisma.$transaction
+  try {
+    await claim()
+    if (!committed) fail('claim 未在事务内读取目标文件，软删除屏障没有发生')
+  } finally {
+    prisma.$transaction = original
+    await deleter.onModuleDestroy()
+  }
 }
 
 async function expectCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
@@ -61,10 +133,77 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
   }
 }
 
-async function main() {
-  assertIsolatedVerificationDatabase()
+/** 与 main.ts 的 flattenValidationErrors 同口径（main.ts 有启动副作用，不能直接 import）。 */
+function flattenValidation(errors: ValidationError[], parent = ''): string[] {
+  const out: string[] = []
+  for (const error of errors) {
+    const label = parent ? `${parent}.${error.property}` : error.property
+    if (error.constraints) out.push(...Object.values(error.constraints).map((m) => `${label}: ${m}`))
+    if (error.children?.length) out.push(...flattenValidation(error.children, label))
+  }
+  return out
+}
 
+interface HttpResult { status: number; json: { error?: { code?: string; details?: string[] }; [key: string]: unknown } }
+
+/**
+ * 进程内 Nest：真实 PrintJobsController / CreatePrintJobDto / ValidationPipe / HttpExceptionFilter。
+ * 控制器依赖在 env 兜底之后再动态加载（同 terminals.service 的处理）。
+ */
+async function startPrintJobsHttp(printJobs: PrintJobsService, prisma: PrismaService, terminalId: string, sessionToken: string) {
+  const { PrintJobsController } = await import('../src/print-jobs/print-jobs.controller')
+  const { PickupOrderService } = await import('../src/print-jobs/pickup-order.service')
+  const { TerminalSessionService } = await import('../src/terminals/terminal-session.service')
+  const { RedisService } = await import('../src/common/redis/redis.service')
+  const { HttpExceptionFilter } = await import('../src/common/filters/http-exception.filter')
+  class PrintJobsHttpModule {}
+  Module({
+    controllers: [PrintJobsController],
+    providers: [
+      { provide: PrintJobsService, useValue: printJobs },
+      { provide: PrismaService, useValue: prisma },
+      { provide: JwtService, useValue: new JwtService({ secret: 'verify-print-jobs-http-jwt-unused-0123456789' }) },
+      { provide: RedisService, useValue: {} },
+      { provide: PickupOrderService, useValue: {} },
+      {
+        provide: TerminalSessionService,
+        useValue: {
+          validate: async (id?: string, token?: string) => {
+            if (id !== terminalId || token !== sessionToken) throw new UnauthorizedException()
+          },
+        },
+      },
+    ],
+  })(PrintJobsHttpModule)
+  const app = await NestFactory.create(PrintJobsHttpModule, { logger: false })
+  app.setGlobalPrefix('api/v1')
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    exceptionFactory: (errors) => {
+      const details = flattenValidation(errors)
+      return new BadRequestException({ error: { code: 'VALIDATION_FAILED', message: details[0] ?? '请求参数校验失败', details } })
+    },
+  }))
+  app.useGlobalFilters(new HttpExceptionFilter())
+  await app.listen(0, '127.0.0.1')
+  const address = app.getHttpServer().address()
+  if (!address || typeof address === 'string') fail('9-http 无法取得监听地址')
+  const post = async (body: unknown): Promise<HttpResult> => {
+    const res = await fetch(`http://127.0.0.1:${address.port}/api/v1/print/jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken },
+      body: JSON.stringify(body),
+    })
+    return { status: res.status, json: (await res.json().catch(() => ({}))) as HttpResult['json'] }
+  }
+  return { post, close: () => app.close() }
+}
+
+async function main() {
   // 动态 import：terminals.service 模块级 requireEnv 必须在上面 env 设好后再加载。
+  // 隔离闸门已在模块顶层执行，早于本文件任何 Prisma 客户端。
   const { TerminalsService } = await import('../src/terminals/terminals.service')
 
   console.log('\n=== 打印链路 service 级 E2E 验证（P1-B 守门）===')
@@ -74,13 +213,21 @@ async function main() {
   const audit = new AuditService(prisma)
   const storage = new StorageService()
   const orderStatus = new OrderStatusService(prisma, audit)
+  const pageCount = new PrintPageCountService(prisma, storage)
+  let conversionCalls = 0
   const printJobs = new PrintJobsService(
     prisma,
     audit,
-    new PrintPageCountService(prisma, storage),
+    pageCount,
     new PricingService(prisma),
     orderStatus,
     new TerminalCapabilitiesService(prisma),
+    {
+      convertForPrint: async () => {
+        conversionCalls += 1
+        throw new Error('CONVERSION_INVOKED')
+      },
+    } as never,
   )
   // N3 拆分后 TerminalsService 需要 agent + admin 两个子服务
   const agentSvc = new TerminalAgentService(prisma, audit)
@@ -112,6 +259,7 @@ async function main() {
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
     // 计费接线后新增的真实 fixture / 价目清理。
     await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: fixtureFileIds } } })
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: fixtureFileIds } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
     await Promise.all(fixtureStorageKeys.map((key) =>
       storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined),
@@ -277,6 +425,94 @@ async function main() {
       '1c. 合同风险提示报告即使哈希无效也一律禁止打印',
     )
     await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: reportSha256 } })
+
+    // ── 1d. 有效 HMAC 不能读取未激活 / 已删 / 已过期文件 ──────────────
+    {
+      const docx = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      const future = new Date(Date.now() + 3_600_000)
+      const past = new Date(Date.now() - 60_000)
+      const cases: Array<[string, string, string, Date | null, Date | null, string | null, string]> = [
+        ['uploading_pdf', 'uploading', 'application/pdf', null, future, 'resume_export_pending', 'resume_upload'],
+        ['uploading_docx', 'uploading', docx, null, future, 'resume_export_pending', 'resume_upload'],
+        ['quarantined', 'quarantined', 'application/pdf', null, future, null, 'print_source'],
+        ['deleted_docx', 'active', docx, new Date(), future, null, 'print_source'],
+        ['expired', 'active', 'application/pdf', null, past, null, 'print_source'],
+      ]
+      const readObject = storage.getObject.bind(storage)
+      let storageReads = 0
+      storage.getObject = async (objectKey: string, bucket?: string | null) => {
+        storageReads += 1
+        return readObject(objectKey, bucket)
+      }
+      const expectUnavailable = async (id: string, step: 'page-count' | 'create', url: string) => {
+        try {
+          if (step === 'page-count') await pageCount.resolveBillablePages(url)
+          else await printJobs.create({ fileUrl: url, fileName: `${id}.bin` }, { terminalId })
+          fail(`1d. ${id} ${step} 应拒绝`)
+        } catch (error) {
+          const code = thrownCode(error)
+          if (code !== 'PRINT_PAGE_COUNT_UNAVAILABLE') fail(`1d. ${id} ${step} 实际 ${code ?? (error as Error).message}`)
+        }
+      }
+      try {
+        for (const [key, status, mimeType, deletedAt, expiresAt, retentionLockedReason, purpose] of cases) {
+          const id = `file_vpj_${key}_${suffix}`
+          const storageKey = `verify/print-jobs/${id}.bin`
+          fixtureFileIds.push(id)
+          fixtureStorageKeys.push(storageKey)
+          await storage.putObject(storageKey, pdfBytes, mimeType, LOCAL_BUCKET_SENTINEL)
+          await prisma.fileObject.create({ data: {
+            id, storageKey, filename: `${key}.bin`, mimeType, sizeBytes: pdfBytes.length, sha256: reportSha256,
+            purpose, status, deletedAt, expiresAt, retentionLockedReason, bucket: LOCAL_BUCKET_SENTINEL,
+          } })
+          await prisma.auditLog.create({ data: {
+            actorRole: 'system', action: 'file.direct_upload_completed', targetType: 'file', targetId: id, payloadJson: '{}',
+          } })
+          const readsBefore = storageReads
+          const conversionsBefore = conversionCalls
+          const signedUrl = signFileUrl(id, 30 * 60 * 1000).url
+          await expectUnavailable(id, 'page-count', signedUrl)
+          await expectUnavailable(id, 'create', signedUrl)
+          const [tasks, orders, attempts, audits, createAudits, stored] = await Promise.all([
+            prisma.printTask.count({ where: { fileId: id } }),
+            prisma.order.count({ where: { printTask: { fileId: id } } }),
+            prisma.paymentAttempt.count({ where: { order: { printTask: { fileId: id } } } }),
+            prisma.auditLog.count({ where: { targetId: id, action: { not: 'file.direct_upload_completed' } } }),
+            prisma.auditLog.count({ where: { action: 'print_job.create', payloadJson: { contains: id } } }),
+            prisma.fileObject.findUnique({ where: { id }, select: { status: true, deletedAt: true, retentionLockedReason: true } }),
+          ])
+          const clean = storageReads === readsBefore && conversionCalls === conversionsBefore
+            && tasks === 0 && orders === 0 && attempts === 0 && audits === 0 && createAudits === 0
+            && stored?.status === status && Boolean(stored.deletedAt) === Boolean(deletedAt)
+            && stored.retentionLockedReason === retentionLockedReason
+          if (!clean) {
+            fail(`1d. ${key} 拒绝后仍有副作用 ${JSON.stringify({ storageReads, readsBefore, conversionCalls, conversionsBefore, tasks, orders, attempts, audits, createAudits, stored })}`)
+          }
+          pass(`1d. ${key} 有效 HMAC 拒绝，且无存储读取、转换、PrintTask、Order、PaymentAttempt`)
+        }
+        const activeId = `file_vpj_active_${suffix}`
+        const activeKey = `verify/print-jobs/${activeId}.pdf`
+        fixtureFileIds.push(activeId)
+        fixtureStorageKeys.push(activeKey)
+        await storage.putObject(activeKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+        await prisma.fileObject.create({ data: {
+          id: activeId, storageKey: activeKey, filename: 'active.pdf', mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length, sha256: reportSha256, purpose: 'print_source', status: 'active',
+          deletedAt: null, expiresAt: future, bucket: LOCAL_BUCKET_SENTINEL,
+        } })
+        const readsBeforeActive = storageReads
+        const activeUrl = signFileUrl(activeId, 30 * 60 * 1000).url
+        const counted = await pageCount.resolveBillablePages(activeUrl)
+        const activeJob = await printJobs.create({ fileUrl: activeUrl, fileName: 'active.pdf' }, { terminalId })
+        createdTaskIds.push(activeJob.taskId)
+        if (counted.billablePages !== 1 || activeJob.status !== 'pending' || storageReads <= readsBeforeActive || conversionCalls !== 0) {
+          fail(`1d-active. 有效文件应识别页数并建单 pages=${counted.billablePages} status=${activeJob.status} reads=${storageReads}`)
+        }
+        pass('1d-active. active 且未过期文件仍识别页数并创建任务')
+      } finally {
+        storage.getObject = readObject
+      }
+    }
 
     // ── 2. 非法 fileUrl 拦截（SSRF 防护）──────────────────────────────
     await expectCode(
@@ -657,6 +893,572 @@ async function main() {
       'PRINT_RETRY_NOT_PAID',
       '8h. 未支付失败单不能重新提交',
     )
+
+    const unpaidTakeaway = await printJobs.issueTakeawayUrl(unpaid.taskId, {
+      paymentSessionToken: unpaid.paymentSessionToken,
+    })
+    const unconfirmedTakeaway = await printJobs.issueTakeawayUrl(unconfirmedId, {
+      paymentSessionToken: await sessionFor(unconfirmedId),
+    })
+    if (unpaidTakeaway.canRetry || unconfirmedTakeaway.canRetry) {
+      fail('8i. 未支付或 PRINT_JOB_UNCONFIRMED 不得 canRetry')
+    }
+    pass('8i. active 文件上，未支付与 PRINT_JOB_UNCONFIRMED 的 canRetry 仍为 false')
+
+    const retryMatrix = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'canRetry-matrix.pdf',
+    }, { terminalId })
+    createdTaskIds.push(retryMatrix.taskId)
+    await orderStatus.markPaid(retryMatrix.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: retryMatrix.taskId },
+      data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: retryMatrix.taskId },
+      data: { taskStatus: 'failed' },
+    })
+    const matrixToken = retryMatrix.paymentSessionToken
+    const readCanRetry = async () => (await printJobs.issueTakeawayUrl(retryMatrix.taskId, {
+      paymentSessionToken: matrixToken,
+    })).canRetry
+    if (!await readCanRetry()) fail('8j. active 且未过期必须 canRetry')
+    await prisma.fileObject.update({ where: { id: fileId }, data: { expiresAt: null } })
+    if (!await readCanRetry()) fail('8j. active 且 expiresAt 为空必须 canRetry')
+    pass('8j. active future / expiresAt null 的已付失败单 canRetry 为 true')
+
+    const rejectWithoutSideEffect = async (label: string) => {
+      const beforeTask = await prisma.printTask.findUnique({
+        where: { id: retryMatrix.taskId },
+        select: { status: true },
+      })
+      const beforeOrder = await prisma.order.findUnique({
+        where: { id: retryMatrix.orderId },
+        select: { payStatus: true, amountCents: true, taskStatus: true, refundedAmountCents: true },
+      })
+      await expectCode(
+        () => printJobs.retryPaidFailedJob(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_RETRY_FILE_UNAVAILABLE',
+        label,
+      )
+      const afterTask = await prisma.printTask.findUnique({
+        where: { id: retryMatrix.taskId },
+        select: { status: true },
+      })
+      const afterOrder = await prisma.order.findUnique({
+        where: { id: retryMatrix.orderId },
+        select: { payStatus: true, amountCents: true, taskStatus: true, refundedAmountCents: true },
+      })
+      if (
+        beforeTask?.status !== 'failed' || afterTask?.status !== 'failed' ||
+        beforeOrder?.payStatus !== 'paid' || afterOrder?.payStatus !== 'paid' ||
+        beforeOrder.amountCents !== afterOrder?.amountCents ||
+        beforeOrder.taskStatus !== 'failed' || afterOrder?.taskStatus !== 'failed' ||
+        beforeOrder.refundedAmountCents !== 0 || afterOrder?.refundedAmountCents !== 0
+      ) {
+        fail(`${label} 产生了任务或订单副作用`)
+      }
+    }
+    try {
+      await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'active', deletedAt: null, expiresAt: new Date(Date.now() - 60_000) } })
+      await expectCode(
+        () => printJobs.issueTakeawayUrl(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+        '8k. 过期文件不签发带走链接',
+      )
+      await rejectWithoutSideEffect('8k. 过期文件 retry 拒绝且无副作用')
+      await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'quarantined', deletedAt: null, expiresAt: fileExpiry } })
+      await expectCode(
+        () => printJobs.issueTakeawayUrl(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+        '8k. 隔离文件不签发带走链接',
+      )
+      await rejectWithoutSideEffect('8k. 隔离文件 retry 拒绝且无副作用')
+      await prisma.fileObject.update({ where: { id: fileId }, data: { status: 'uploading', deletedAt: null, expiresAt: fileExpiry } })
+      await expectCode(
+        () => printJobs.issueTakeawayUrl(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+        '8k. 上传中文件不签发带走链接',
+      )
+      await rejectWithoutSideEffect('8k. 上传中文件 retry 拒绝且无副作用')
+      await prisma.fileObject.update({
+        where: { id: fileId },
+        data: { status: 'deleted', deletedAt: new Date(), expiresAt: fileExpiry },
+      })
+      await expectCode(
+        () => printJobs.issueTakeawayUrl(retryMatrix.taskId, { paymentSessionToken: matrixToken }),
+        'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+        '8k. 已删除文件不返回 canRetry',
+      )
+      await rejectWithoutSideEffect('8k. 已删除文件 retry 拒绝且无副作用')
+    } finally {
+      await prisma.fileObject.update({
+        where: { id: fileId },
+        data: { status: 'active', deletedAt: null, expiresAt: fileExpiry },
+      })
+    }
+    if (!await readCanRetry()) fail('8l. 恢复为 active 后必须重新 canRetry')
+    const matrixBefore = await prisma.order.findUnique({
+      where: { id: retryMatrix.orderId },
+      select: { amountCents: true, payStatus: true },
+    })
+    const matrixRetried = await printJobs.retryPaidFailedJob(retryMatrix.taskId, { paymentSessionToken: matrixToken })
+    if (
+      matrixRetried.taskId !== retryMatrix.taskId ||
+      matrixRetried.orderId !== retryMatrix.orderId ||
+      matrixRetried.amountCents !== matrixBefore?.amountCents ||
+      matrixRetried.status !== 'pending' ||
+      matrixBefore?.payStatus !== 'paid'
+    ) {
+      fail(`8l. active 重试应保持同一订单与金额: ${JSON.stringify(matrixRetried)}`)
+    }
+    const matrixRow = await prisma.printTask.findUnique({ where: { id: retryMatrix.taskId }, select: { status: true } })
+    const matrixOrder = await prisma.order.findUnique({
+      where: { id: retryMatrix.orderId },
+      select: { amountCents: true, payStatus: true, taskStatus: true },
+    })
+    if (
+      matrixRow?.status !== 'pending' ||
+      matrixOrder?.taskStatus !== 'pending' ||
+      matrixOrder?.payStatus !== 'paid' ||
+      matrixOrder?.amountCents !== matrixBefore?.amountCents
+    ) {
+      fail(`8l. 重试后数据库状态异常: ${JSON.stringify({ matrixRow, matrixOrder })}`)
+    }
+    pass('8l. active 重试仍是同一订单与金额，数据库回到 pending')
+    await prisma.printTask.update({ where: { id: retryMatrix.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: retryMatrix.taskId }, data: { taskStatus: 'cancelled' } })
+
+    const legacyFileId = `file_vpj_legacy_${suffix}`
+    const legacyKey = `verify/print-jobs/${legacyFileId}.pdf`
+    fixtureFileIds.push(legacyFileId)
+    fixtureStorageKeys.push(legacyKey)
+    await storage.putObject(legacyKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: legacyFileId,
+        storageKey: legacyKey,
+        filename: 'legacy-file.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: reportSha256,
+        purpose: 'print_source',
+        status: 'active',
+        expiresAt: fileExpiry,
+        bucket: LOCAL_BUCKET_SENTINEL,
+      },
+    })
+    const legacyJob = await printJobs.create({
+      fileUrl: signFileUrl(legacyFileId, 30 * 60 * 1000).url,
+      fileName: 'legacy-null-file-id.pdf',
+    }, { terminalId })
+    createdTaskIds.push(legacyJob.taskId)
+    await orderStatus.markPaid(legacyJob.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: legacyJob.taskId },
+      data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED', fileId: null },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: legacyJob.taskId },
+      data: { taskStatus: 'failed' },
+    })
+    const legacyToken = legacyJob.paymentSessionToken
+    const legacyTakeaway = await printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken })
+    const legacyUrl = parseSignedContentUrl(legacyTakeaway.signedUrl)
+    if (!legacyTakeaway.canRetry || legacyUrl.fileId !== legacyFileId || !verifyFileSignature(legacyUrl.fileId, legacyUrl.expires, legacyUrl.sig)) {
+      fail('8m. fileId 为空但内部签名 URL 可解析时，active 文件应可带走且 canRetry')
+    }
+    const forgedUrl = `https://evil.example/api/v1/files/${legacyFileId}/content?expires=123&sig=${'ab'.repeat(32)}`
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: forgedUrl } })
+    await expectCode(
+      () => printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken }),
+      'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+      '8m. 外部同路径加伪签名不得恢复 fileId',
+    )
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(legacyJob.taskId, { paymentSessionToken: legacyToken }),
+      'PRINT_RETRY_FILE_UNAVAILABLE',
+      '8m. 外部同路径加伪签名不得重试',
+    )
+    const expiredAt = Date.now() - 60_000
+    const expiredSig = fixtureFileSignature(legacyFileId, expiredAt)
+    const expiredUrl = `/api/v1/files/${legacyFileId}/content?expires=${expiredAt}&sig=${expiredSig}`
+    if (verifyFileSignature(legacyFileId, String(expiredAt), expiredSig)) {
+      fail('8m. 普通验签不得接受已过期 HMAC')
+    }
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: expiredUrl } })
+    const expiredTakeaway = await printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken })
+    if (!expiredTakeaway.canRetry || parseSignedContentUrl(expiredTakeaway.signedUrl).fileId !== legacyFileId) {
+      fail('8m. 合法但已过期的内部 HMAC 应由已授权任务恢复')
+    }
+    const hostExpires = Date.now() + 30 * 60 * 1000
+    const hostUrl = `https://files.example/api/v1/files/${legacyFileId}/content?expires=${hostExpires}&sig=${fixtureFileSignature(legacyFileId, hostExpires)}`
+    const hostCreated = await printJobs.create({ fileUrl: hostUrl, fileName: 'host-hmac.pdf' }, { terminalId })
+    createdTaskIds.push(hostCreated.taskId)
+    await prisma.printTask.update({ where: { id: hostCreated.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: hostCreated.taskId }, data: { taskStatus: 'cancelled' } })
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { fileUrl: hostUrl } })
+    const hostTakeaway = await printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken })
+    if (parseSignedContentUrl(hostTakeaway.signedUrl).fileId !== legacyFileId) {
+      fail('8m. 带 host 的合法 HMAC 应能恢复，建单端已接受这种 URL')
+    }
+    pass('8m. 伪签名拒绝；过期真签名与带 host 的真签名可恢复')
+    const legacyBefore = await prisma.order.findUnique({
+      where: { id: legacyJob.orderId },
+      select: { amountCents: true },
+    })
+    const legacyRetried = await printJobs.retryPaidFailedJob(legacyJob.taskId, { paymentSessionToken: legacyToken })
+    const legacyRow = await prisma.printTask.findUnique({ where: { id: legacyJob.taskId }, select: { status: true, fileId: true } })
+    const legacyOrder = await prisma.order.findUnique({
+      where: { id: legacyJob.orderId },
+      select: { amountCents: true, payStatus: true, taskStatus: true },
+    })
+    if (
+      legacyRetried.orderId !== legacyJob.orderId ||
+      legacyRetried.amountCents !== legacyBefore?.amountCents ||
+      legacyRow?.status !== 'pending' ||
+      legacyRow.fileId !== null ||
+      legacyOrder?.payStatus !== 'paid' ||
+      legacyOrder.taskStatus !== 'pending' ||
+      legacyOrder.amountCents !== legacyBefore?.amountCents
+    ) {
+      fail(`8m. 旧单重试后订单或任务异常: ${JSON.stringify({ legacyRetried, legacyRow, legacyOrder })}`)
+    }
+    pass('8m. 历史 fileId 为空、内部签名 URL 指向 active 文件时，可带走并按原订单重试')
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' } })
+    await prisma.order.updateMany({ where: { printTaskId: legacyJob.taskId }, data: { taskStatus: 'failed' } })
+    await prisma.fileObject.update({
+      where: { id: legacyFileId },
+      data: { status: 'deleted', deletedAt: new Date() },
+    })
+    await expectCode(
+      () => printJobs.issueTakeawayUrl(legacyJob.taskId, { paymentSessionToken: legacyToken }),
+      'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+      '8m. 历史空 fileId 在文件删除后拒绝带走',
+    )
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(legacyJob.taskId, { paymentSessionToken: legacyToken }),
+      'PRINT_RETRY_FILE_UNAVAILABLE',
+      '8m. 历史空 fileId 在文件删除后拒绝重试',
+    )
+    await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: legacyJob.taskId }, data: { taskStatus: 'cancelled' } })
+
+    const misaligned = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'order-task-mismatch.pdf',
+    }, { terminalId })
+    createdTaskIds.push(misaligned.taskId)
+    await orderStatus.markPaid(misaligned.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: misaligned.taskId },
+      data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: misaligned.taskId },
+      data: { taskStatus: 'printing' },
+    })
+    const misalignedView = await printJobs.issueTakeawayUrl(misaligned.taskId, {
+      paymentSessionToken: misaligned.paymentSessionToken,
+    })
+    if (misalignedView.canRetry) fail('8n. 订单任务状态不是 failed 时不得 canRetry')
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(misaligned.taskId, { paymentSessionToken: misaligned.paymentSessionToken }),
+      'PRINT_RETRY_INVALID_STATE',
+      '8n. 订单任务状态不对齐时 retry 拒绝',
+    )
+    await prisma.printTask.update({ where: { id: misaligned.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: misaligned.taskId }, data: { taskStatus: 'cancelled' } })
+
+    const disabledRetry = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'terminal-disabled.pdf',
+    }, { terminalId })
+    createdTaskIds.push(disabledRetry.taskId)
+    await orderStatus.markPaid(disabledRetry.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: disabledRetry.taskId },
+      data: { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: disabledRetry.taskId },
+      data: { taskStatus: 'failed' },
+    })
+    await prisma.terminal.update({ where: { id: terminalId }, data: { enabled: false } })
+    try {
+      const disabledView = await printJobs.issueTakeawayUrl(disabledRetry.taskId, {
+        paymentSessionToken: disabledRetry.paymentSessionToken,
+      })
+      if (disabledView.canRetry) fail('8o. 终端禁用时不得 canRetry')
+      await expectCode(
+        () => printJobs.retryPaidFailedJob(disabledRetry.taskId, { paymentSessionToken: disabledRetry.paymentSessionToken }),
+        'PRINT_RETRY_TERMINAL_NOT_ACTIVE',
+        '8o. 终端禁用时 retry 拒绝',
+      )
+    } finally {
+      await prisma.terminal.update({ where: { id: terminalId }, data: { enabled: true, lifecycleStatus: 'active' } })
+    }
+    await prisma.printTask.update({ where: { id: disabledRetry.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: disabledRetry.taskId }, data: { taskStatus: 'cancelled' } })
+
+    // ── 9. 动态价格二次确认 ────────────────────────────────────────────
+    // 夹具文件 1 页 × 2 份黑白 → 应付 = 单价 × 2。quotedAmountCents 只作一致性断言：
+    // 不一致必须 409 PRICE_CHANGED、带回当前报价，且 Order / PrintTask / 支付尝试 / 建单审计全部零新增。
+    const priceParams = {
+      copies: 2, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4',
+      orientation: 'auto', quality: 'standard', scale: 'fit', pagesPerSheet: 1,
+    } as const
+    const priceDto = (extra: Record<string, unknown> = {}) => ({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileMd5: 'sha256-vpj-price',
+      fileName: '价格确认.pdf',
+      params: { ...priceParams },
+      ...extra,
+    })
+    const setBwUnit = (unitCents: number) =>
+      prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents } })
+    const sideEffects = async () => JSON.stringify({
+      orders: await prisma.order.count({ where: { terminalId } }),
+      tasks: await prisma.printTask.count({ where: { terminalId } }),
+      attempts: await prisma.paymentAttempt.count({ where: { order: { terminalId } } }),
+      createAudits: await prisma.auditLog.count({ where: { action: 'print_job.create' } }),
+    })
+    const priceChangedShape = (details: string[] | undefined, current: number) =>
+      Boolean(details?.includes(`currentAmountCents=${current}`))
+      && Boolean(details?.includes('billablePages=1'))
+      && Boolean(details?.includes(`line=print_bw_page:${current / 2}:2:${current}`))
+
+    async function expectPriceChanged(label: string, quotedAmountCents: unknown, current: number): Promise<void> {
+      const before = await sideEffects()
+      let thrown: unknown = null
+      try {
+        const created = await printJobs.create(priceDto({ quotedAmountCents }) as CreatePrintJobDto, { terminalId })
+        createdTaskIds.push(created.taskId)
+      } catch (e) {
+        thrown = e
+      }
+      const ex = thrown as { getStatus?: () => number; getResponse?: () => unknown } | null
+      const resp = ex?.getResponse?.() as { error?: { code?: string; details?: string[] } } | undefined
+      if (ex?.getStatus?.() !== 409 || resp?.error?.code !== 'PRICE_CHANGED' || !priceChangedShape(resp.error.details, current)) {
+        fail(`${label} — 期望 409 PRICE_CHANGED 且带回当前报价 ${current}，实际: ${thrown ? JSON.stringify(resp ?? String(thrown)) : '建单成功'}`)
+      }
+      const after = await sideEffects()
+      if (after !== before) fail(`${label} — 409 后仍有建单副作用: before=${before} after=${after}`)
+      pass(label)
+    }
+
+    await setBwUnit(30)
+    await expectPriceChanged('9a. 0 → 付费：用户确认 0 元、现价 0.60 元 → 409 且带回 60 分，零建单副作用', 0, 60)
+    await setBwUnit(45)
+    await expectPriceChanged('9b. 涨价：用户确认 60 分、现价 90 分 → 409 且带回 90 分，零建单副作用', 60, 90)
+    await setBwUnit(10)
+    await expectPriceChanged('9c. 降价：用户确认 90 分、现价 20 分 → 409 且带回 20 分，零建单副作用', 90, 20)
+    await setBwUnit(30)
+    await expectPriceChanged('9d. 伪造低价：quotedAmountCents=1 → 409 带回真实 60 分，拿不到低价单', 1, 60)
+
+    // 9e：按 409 带回的新价格二次确认 → 建单，金额取服务端重算值。
+    const reconfirmed = await printJobs.create(priceDto({ quotedAmountCents: 60 }) as CreatePrintJobDto, { terminalId })
+    createdTaskIds.push(reconfirmed.taskId)
+    const reconfirmedOrder = await prisma.order.findUnique({ where: { id: reconfirmed.orderId } })
+    if (
+      reconfirmed.amountCents === 60 && reconfirmed.payStatus === 'unpaid' && Boolean(reconfirmed.paymentSessionToken)
+      && reconfirmedOrder?.amountCents === 60 && reconfirmedOrder.payStatus === 'unpaid'
+    ) {
+      pass('9e. 按新价格二次确认（quoted=current=60）→ 建付费单 unpaid，金额 60 分')
+    } else fail(`9e. 二次确认建单异常: ${JSON.stringify({ reconfirmed, reconfirmedOrder })}`)
+
+    // 9f：已建订单价格冻结，后续改价不影响历史单。
+    await setBwUnit(45)
+    const frozen = await prisma.order.findUnique({ where: { id: reconfirmed.orderId } })
+    const frozenLines = JSON.parse(frozen?.itemsJson ?? '[]') as Array<{ unitCents?: number }>
+    if (frozen?.amountCents === 60 && frozenLines[0]?.unitCents === 30) pass('9f. 建单后改价 → 历史订单金额与明细快照不变')
+    else fail(`9f. 历史订单价格被改价影响: ${JSON.stringify(frozen)}`)
+
+    // 9g：旧客户端不带 quotedAmountCents → 兼容，照旧按服务端现价（90 分）建单。
+    const legacy = await printJobs.create(priceDto() as CreatePrintJobDto, { terminalId })
+    createdTaskIds.push(legacy.taskId)
+    if (legacy.amountCents === 90 && legacy.payStatus === 'unpaid') pass('9g. 旧客户端缺省 quotedAmountCents → 兼容建单，按服务端现价 90 分')
+    else fail(`9g. 旧客户端建单异常: ${JSON.stringify(legacy)}`)
+
+    // 9h：免费路径保持：确认 0 元且现价 0 → 建单即 paid + free。
+    await setBwUnit(0)
+    const free = await printJobs.create(priceDto({ quotedAmountCents: 0 }) as CreatePrintJobDto, { terminalId })
+    createdTaskIds.push(free.taskId)
+    const freeOrder = await prisma.order.findUnique({ where: { id: free.orderId } })
+    if (free.amountCents === 0 && free.payStatus === 'paid' && freeOrder?.payStatus === 'paid' && freeOrder.paymentSource === 'free') {
+      pass('9h. 免费单确认 0 元且现价 0 → paid + free 路径不变')
+    } else fail(`9h. 免费单路径异常: ${JSON.stringify({ free, freeOrder })}`)
+
+    // 9-http：同一规则穿过真实 HTTP 管线（DTO 校验 + 全局过滤器），证明 409 体与 400 校验在线上形状下成立。
+    await setBwUnit(30)
+    const http = await startPrintJobsHttp(printJobs, prisma, terminalId, `vpj-http-session-${suffix}`)
+    try {
+      const beforeHttp = await sideEffects()
+      const stale = await http.post(priceDto({ quotedAmountCents: 20 }))
+      if (
+        stale.status === 409 && stale.json['success'] === false && stale.json.error?.code === 'PRICE_CHANGED'
+        && priceChangedShape(stale.json.error.details, 60)
+        && !('orderId' in stale.json) && !('paymentSessionToken' in stale.json) && !('taskId' in stale.json)
+      ) {
+        pass('9-http-a. POST /api/v1/print/jobs 旧报价 → HTTP 409 PRICE_CHANGED，details 带 currentAmountCents=60 与计价行，无订单/支付会话字段')
+      } else fail(`9-http-a. 409 形状异常: ${JSON.stringify(stale)}`)
+
+      for (const bad of [-1, 1.5, '60', null, 100_000_001]) {
+        const res = await http.post(priceDto({ quotedAmountCents: bad }))
+        if (res.status !== 400 || res.json.error?.code !== 'VALIDATION_FAILED') {
+          fail(`9-http-b. quotedAmountCents=${JSON.stringify(bad)} 应 400 VALIDATION_FAILED，实际 ${JSON.stringify(res)}`)
+        }
+      }
+      pass('9-http-b. quotedAmountCents 为负数 / 小数 / 字符串 / null / 超上限 → 400 VALIDATION_FAILED')
+      const afterRejects = await sideEffects()
+      if (afterRejects === beforeHttp) pass('9-http-c. 409 与 400 全部零 Order / PrintTask / 支付尝试 / 建单审计')
+      else fail(`9-http-c. HTTP 拒绝后仍有建单副作用: before=${beforeHttp} after=${afterRejects}`)
+
+      const legacyHttp = await http.post(priceDto())
+      const matchedHttp = await http.post(priceDto({ quotedAmountCents: 60 }))
+      for (const res of [legacyHttp, matchedHttp]) {
+        if (typeof res.json['taskId'] === 'string') createdTaskIds.push(res.json['taskId'])
+      }
+      if (
+        legacyHttp.status === 201 && legacyHttp.json['amountCents'] === 60
+        && matchedHttp.status === 201 && matchedHttp.json['amountCents'] === 60
+        && typeof matchedHttp.json['paymentSessionToken'] === 'string'
+      ) {
+        pass('9-http-d. HTTP 缺省字段（旧客户端）与报价一致（新客户端）均 201 建单，金额取服务端 60 分')
+      } else fail(`9-http-d. HTTP 建单异常: ${JSON.stringify({ legacyHttp, matchedHttp })}`)
+    } finally {
+      await http.close()
+    }
+
+    // 队头文件在排队后过期时，不得卡住后面仍可打印的已付款任务。
+    // 查询层先排除已知不可用文件；事务内仍会再次读取 FileObject 做 fail-closed 检查，
+    // 因此查询后才过期的文件仍不会被签发 URL。
+    const queueProbeFileId = `file_vpj_queue_probe_${suffix}`
+    const queueProbeStorageKey = `verify/print-jobs/${queueProbeFileId}.pdf`
+    fixtureFileIds.push(queueProbeFileId)
+    fixtureStorageKeys.push(queueProbeStorageKey)
+    await storage.putObject(queueProbeStorageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: queueProbeFileId,
+        storageKey: queueProbeStorageKey,
+        filename: 'queue-probe.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: reportSha256,
+        purpose: 'print_source',
+        status: 'active',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        bucket: LOCAL_BUCKET_SENTINEL,
+      },
+    })
+    const blockedProbe = await printJobs.create(
+      { fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url, fileName: 'blocked-queue-head.pdf' },
+      { terminalId },
+    )
+    const activeProbe = await printJobs.create(
+      { fileUrl: signFileUrl(queueProbeFileId, 30 * 60 * 1000).url, fileName: 'active-queue-follow-up.pdf' },
+      { terminalId },
+    )
+    createdTaskIds.push(blockedProbe.taskId, activeProbe.taskId)
+    await prisma.printTask.update({ where: { id: blockedProbe.taskId }, data: { createdAt: new Date('2020-01-01T00:00:00.000Z') } })
+    await prisma.printTask.update({ where: { id: activeProbe.taskId }, data: { createdAt: new Date('2021-01-01T00:00:00.000Z') } })
+    await orderStatus.markPaid(blockedProbe.orderId, { paymentSource: 'offline' })
+    await orderStatus.markPaid(activeProbe.orderId, { paymentSource: 'offline' })
+    await prisma.fileObject.update({ where: { id: fileId }, data: { expiresAt: new Date(Date.now() - 1_000) } })
+    const queueProbeClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (queueProbeClaim.length !== 1 || queueProbeClaim[0]?.taskId !== activeProbe.taskId) {
+      fail(`不可用队头不得阻塞后续 active 任务: ${JSON.stringify(queueProbeClaim.map((task) => task.taskId))}`)
+    }
+    pass('队头文件过期时不签发其 URL，后续 active 任务仍可被 Agent 领取')
+    await terminals.patchTaskStatus(activeProbe.taskId, { status: 'failed', errorCode: 'FILE_NOT_FOUND' }, `Bearer ${agentToken}`, terminalId)
+    await prisma.fileObject.update({ where: { id: fileId }, data: { expiresAt: fileExpiry } })
+
+    // 检查后才软删除：独立事务在文件读取返回后、PrintTask CAS 前提交。
+    // SQLite 的写锁不能在已打开的交互事务里让第二条连接确定性提交，故只在 PostgreSQL 执行。
+    if (prisma.dbKind !== 'postgres') {
+      console.log('  SKIP claim 文件状态交错：需要 PostgreSQL 上的独立提交事务；SQLite 不跑此夹具')
+    } else {
+      const staleFileId = `file_vpj_stale_${suffix}`
+      const liveFileId = `file_vpj_live_${suffix}`
+      const staleKey = `verify/print-jobs/${staleFileId}.pdf`
+      const liveKey = `verify/print-jobs/${liveFileId}.pdf`
+      fixtureFileIds.push(staleFileId, liveFileId)
+      fixtureStorageKeys.push(staleKey, liveKey)
+      await storage.putObject(staleKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+      await storage.putObject(liveKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+      await prisma.fileObject.createMany({
+        data: [staleFileId, liveFileId].map((id, index) => ({
+          id,
+          storageKey: index === 0 ? staleKey : liveKey,
+          filename: index === 0 ? 'stale-after-check.pdf' : 'live-active.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length,
+          sha256: reportSha256,
+          purpose: 'print_source' as const,
+          status: 'active',
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          bucket: LOCAL_BUCKET_SENTINEL,
+        })),
+      })
+      const staleJob = await printJobs.create(
+        { fileUrl: signFileUrl(staleFileId, 30 * 60 * 1000).url, fileName: 'stale-after-check.pdf' },
+        { terminalId },
+      )
+      const liveJob = await printJobs.create(
+        { fileUrl: signFileUrl(liveFileId, 30 * 60 * 1000).url, fileName: 'live-active.pdf' },
+        { terminalId },
+      )
+      createdTaskIds.push(staleJob.taskId, liveJob.taskId)
+      await prisma.printTask.update({ where: { id: staleJob.taskId }, data: { createdAt: new Date('2018-01-01T00:00:00.000Z') } })
+      await prisma.printTask.update({ where: { id: liveJob.taskId }, data: { createdAt: new Date('2019-01-01T00:00:00.000Z') } })
+      await orderStatus.markPaid(staleJob.orderId, { paymentSource: 'offline' })
+      await orderStatus.markPaid(liveJob.orderId, { paymentSource: 'offline' })
+      const files = new FilesService(prisma, audit, storage)
+      const content = new FilesController(files, audit, {} as never, {} as never, prisma)
+      let staleClaim: Awaited<ReturnType<typeof terminals.claimTasks>> = []
+      await claimWhileSoftDeleteCommits(prisma, staleFileId, async () => {
+        staleClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+      })
+      if (staleClaim.length !== 1 || staleClaim[0]?.taskId !== staleJob.taskId) {
+        fail(`检查后软删除仍应领到旧任务，实际: ${JSON.stringify(staleClaim.map((task) => task.taskId))}`)
+      }
+      const staleUrl = parseSignedContentUrl(staleClaim[0]!.fileUrl)
+      if (staleUrl.fileId !== staleFileId || !verifyFileSignature(staleUrl.fileId, staleUrl.expires, staleUrl.sig)) {
+        fail('旧任务 claim 返回的 fileUrl 必须是该 fileId 的有效 HMAC content 路径')
+      }
+      const staleTask = await prisma.printTask.findUnique({ where: { id: staleJob.taskId }, select: { status: true, fileId: true } })
+      const staleOrder = await prisma.order.findUnique({
+        where: { id: staleJob.orderId },
+        select: { payStatus: true, refundedAt: true, refundedAmountCents: true },
+      })
+      const staleFile = await prisma.fileObject.findUnique({ where: { id: staleFileId }, select: { status: true, deletedAt: true } })
+      if (staleTask?.status !== 'claimed' || staleTask.fileId !== staleFileId) fail('旧任务应保持 claimed 且 fileId 不被外键清空')
+      if (staleFile?.status !== 'deleted' || !staleFile.deletedAt) fail('屏障必须留下正常软删除，而不是悬空 fileId')
+      if (staleOrder?.payStatus !== 'paid' || staleOrder.refundedAt || staleOrder.refundedAmountCents !== 0) {
+        fail(`软删除不得改写支付状态: ${JSON.stringify(staleOrder)}`)
+      }
+      await expectCode(
+        () => content.content(staleUrl.fileId, staleUrl.expires, staleUrl.sig, undefined, { setHeader() {}, send() {} } as never),
+        'FILE_NOT_FOUND',
+        '检查后软删除：claim 的 HMAC content 路径拒绝下载',
+      )
+      const liveClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+      if (liveClaim.length !== 1 || liveClaim[0]?.taskId !== liveJob.taskId) {
+        fail(`下一条 active 任务被饿死: ${JSON.stringify(liveClaim.map((task) => task.taskId))}`)
+      }
+      const liveUrl = parseSignedContentUrl(liveClaim[0]!.fileUrl)
+      if (liveUrl.fileId !== liveFileId || !verifyFileSignature(liveUrl.fileId, liveUrl.expires, liveUrl.sig)) {
+        fail('active 对照 claim 返回的 fileUrl 必须是该 fileId 的有效 HMAC content 路径')
+      }
+      const liveResponse = { payload: undefined as Buffer | undefined, setHeader() {}, send(payload: Buffer) { this.payload = payload } }
+      await content.content(liveUrl.fileId, liveUrl.expires, liveUrl.sig, undefined, liveResponse as never)
+      if (!liveResponse.payload?.equals(pdfBytes)) fail('active 对照应经同一 content 路径读回本地存储字节')
+      const liveOrder = await prisma.order.findUnique({ where: { id: liveJob.orderId }, select: { payStatus: true, refundedAmountCents: true } })
+      if (liveOrder?.payStatus !== 'paid' || liveOrder.refundedAmountCents !== 0) fail('active 对照不得改写支付状态')
+      pass('检查后软删除：旧任务仍被领取但 content 拒绝，下一条 active 可领取且读回字节（本地存储，非 COS / 非出纸）')
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

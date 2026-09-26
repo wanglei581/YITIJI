@@ -7,11 +7,52 @@ import os from 'os'
 import path from 'path'
 import type { AgentStartupErrorCode } from './config-manager'
 
+export type StartupDiagnosticCode =
+  | AgentStartupErrorCode
+  | 'DUPLICATE_INSTANCE'
+  | 'INSTANCE_LOCK_UNAVAILABLE'
+
+const LOCK_REASONS = new Set([
+  'duplicate',
+  'stale_lock_requires_operator',
+  'lock_path_not_regular_file',
+  'lock_pid_unproven',
+  'lock_publication_failed',
+  'acquire_attempts_exhausted',
+  'lock_unavailable',
+])
+
+const LOCK_PATH_KINDS = new Set([
+  'missing',
+  'regular_file',
+  'directory',
+  'symlink',
+  'not_regular',
+  'unavailable',
+])
+
+export interface StartupLockDiagnosticDetails {
+  reason: string
+  pathPresent: boolean
+  pathKind: 'missing' | 'regular_file' | 'directory' | 'symlink' | 'not_regular' | 'unavailable'
+  pidParsed: boolean
+}
+
 export interface StartupDiagnostic {
   schemaVersion: 1
   recordedAt: string
   state: 'ready' | 'failed'
-  code: AgentStartupErrorCode
+  code: StartupDiagnosticCode
+  lock?: StartupLockDiagnosticDetails
+}
+
+function sanitizeLockDetails(details: StartupLockDiagnosticDetails): StartupLockDiagnosticDetails {
+  return {
+    reason: LOCK_REASONS.has(details.reason) ? details.reason : 'lock_unavailable',
+    pathPresent: details.pathPresent === true,
+    pathKind: LOCK_PATH_KINDS.has(details.pathKind) ? details.pathKind : 'unavailable',
+    pidParsed: details.pidParsed === true,
+  }
 }
 
 export function getStartupDiagnosticPath(): string {
@@ -39,31 +80,46 @@ function writeTextAtomically(filePath: string, text: string): void {
   }
 }
 
-export function writeStartupDiagnostic(filePath: string, code: AgentStartupErrorCode): void {
+export function writeStartupDiagnostic(
+  filePath: string,
+  code: StartupDiagnosticCode,
+  details?: StartupLockDiagnosticDetails,
+): void {
   const record: StartupDiagnostic = {
     schemaVersion: 1,
     recordedAt: new Date().toISOString(),
     state: code === 'AGENT_READY' ? 'ready' : 'failed',
     code,
   }
+  if (details) {
+    record.lock = sanitizeLockDetails(details)
+  }
   writeTextAtomically(filePath, `${JSON.stringify(record, null, 2)}\n`)
 }
 
 export function writeStartupDiagnosticSafely(
-  code: AgentStartupErrorCode,
+  code: StartupDiagnosticCode,
   options?: {
     filePath?: string
-    writer?: (filePath: string, code: AgentStartupErrorCode) => void
+    writer?: (filePath: string, code: StartupDiagnosticCode) => void
     onFailure?: () => void
+    details?: StartupLockDiagnosticDetails
   },
 ): boolean {
   const filePath = options?.filePath ?? getStartupDiagnosticPath()
-  const writer = options?.writer ?? writeStartupDiagnostic
   try {
-    writer(filePath, code)
+    if (options?.writer) {
+      options.writer(filePath, code)
+    } else {
+      writeStartupDiagnostic(filePath, code, options?.details)
+    }
     return true
   } catch {
-    options?.onFailure?.()
+    try {
+      options?.onFailure?.()
+    } catch {
+      // Diagnostic side effects must never change the fail-closed caller.
+    }
     return false
   }
 }

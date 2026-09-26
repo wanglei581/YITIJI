@@ -103,6 +103,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       title="材料扫描"
       subtitle={subtitle}
       status={status}
+      layout={blocked ? 'spread' : 'stack'}
       facts={
         usbPanel
           ? ['不创建平台任务', '文件只在你的 U 盘', 'Windows / 奔图真机尚未验收']
@@ -229,34 +230,36 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   : (blockedNote ?? '管理员尚未对本终端开放扫描服务，或该能力处于维护 / 待验收状态。')}
             </p>
           </ScanStatusPanel>
-          <div className="sw-grid2">
-            <ScanNoteCard title="你现在还能做什么">
-              <ScanPlan items={[
-                '上传文件打印：手机 / U 盘里的现成文件仍可打印。',
-                '本机扫描任务：当前终端扫描能力未开放或状态未知。',
-                '改用面板扫描到 U 盘：不经过平台会话，文件只进你的 U 盘。',
-              ]} />
-            </ScanNoteCard>
-            <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查终端能力配置。">
-              <p>本页不会假装扫描仪已经就绪，也不会在能力未知时创建任务。</p>
-              <div className="sw-cta-row sw-note-actions">
-                <button
-                  type="button"
-                  className="qx-btn"
-                  data-variant="ghost"
-                  disabled={checking || gate === 'loading'}
-                  onClick={() => void refreshGate()}
-                >
-                  <RefreshCwIcon aria-hidden="true" />
-                  {checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
-                </button>
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-                  <HeadphonesIcon aria-hidden="true" />
-                  联系工作人员
-                </button>
-              </div>
-            </ScanNoteCard>
-          </div>
+          <ScanSec no="01" title="下一步" hint="扫描之外的路照常可用">
+            <div className="sw-grid2">
+              <ScanNoteCard title="你现在还能做什么">
+                <ScanPlan items={[
+                  '上传文件打印：手机 / U 盘里的现成文件仍可打印。',
+                  '本机扫描任务：当前终端扫描能力未开放或状态未知。',
+                  '改用面板扫描到 U 盘：不经过平台会话，文件只进你的 U 盘。',
+                ]} />
+              </ScanNoteCard>
+              <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查终端能力配置。">
+                <p>本页不会假装扫描仪已经就绪，也不会在能力未知时创建任务。</p>
+                <div className="sw-cta-row sw-note-actions">
+                  <button
+                    type="button"
+                    className="qx-btn"
+                    data-variant="ghost"
+                    disabled={checking || gate === 'loading'}
+                    onClick={() => void refreshGate()}
+                  >
+                    <RefreshCwIcon aria-hidden="true" />
+                    {checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
+                  </button>
+                  <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
+                    <HeadphonesIcon aria-hidden="true" />
+                    联系工作人员
+                  </button>
+                </div>
+              </ScanNoteCard>
+            </div>
+          </ScanSec>
         </>
       ) : (
         <>

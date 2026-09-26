@@ -70,6 +70,8 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
+      # 招聘内容托管生产默认关。既有 verify 要看打开后的行为，必须显式打开。
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true'
     steps:
       # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
       - uses: actions/checkout@v4
@@ -140,6 +142,9 @@ jobs:
           # S1 前端 AI 原语合同（#618）。纯读 apps/kiosk 源码，不碰 Prisma，
           # 因此可以留在这一步；四个 api 侧的 AI 门禁见下方 Verify suites。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-primitives
+          # 3.5c AI 可见标识与合同审查对外文案：期望逐条取自 2026-09-26 审计表一 / 表二。
+          # 纯读 apps/kiosk + packages/shared + docs 源码（TypeScript AST），不碰 Prisma、不连库。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-label-copy
           # 三条主链的 ai-down 出路（#—— AI 是加速器不是前置条件）。纯文本读取
           # apps/kiosk + packages/shared + services/api/src 源码做交叉断言，
           # 不 import 任何后端模块、不碰 Prisma、不连 DB，故留在这一步。
@@ -475,6 +480,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:data-request-ui
           pnpm --filter @ai-job-print/admin verify:admin-users-ui
           pnpm --filter @ai-job-print/admin verify:honest-placeholders
+          pnpm --filter @ai-job-print/admin verify:console-screen-ui
           pnpm --filter @ai-job-print/api verify:admin-users
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
@@ -571,6 +577,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
+          pnpm --filter @ai-job-print/api verify:console-screen-snapshot
+          # 服务调用 / 信息使用：会 import src，必须在 Prisma client 生成之后。
+          pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:isolated-verification-database
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
@@ -602,8 +611,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ad-asset-range
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:ai-config
-          pnpm --filter @ai-job-print/api verify:job-review
-          pnpm --filter @ai-job-print/api verify:jobfair-review
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:job-review
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:jobfair-review
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:jobfair-campus-priority
           pnpm --filter @ai-job-print/api verify:fair-list-integrity
@@ -639,6 +648,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ocr-baidu
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:job-fit
+          pnpm --filter @ai-job-print/api verify:miniapp-review-backend
           pnpm --filter @ai-job-print/api verify:job-fit-governance
           pnpm --filter @ai-job-print/api verify:governed-job-fit
           pnpm --filter @ai-job-print/api verify:job-fit-print
@@ -672,6 +682,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:companies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-emergency-scope
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-hosting-default-off
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract
@@ -690,6 +702,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:kiosk-ai-capabilities
           # 匿名公网 AI 端点（/assistant/chat、/resume/parse）的限流 + 日配额。
           pnpm --filter @ai-job-print/api verify:ai-public-quota
+          # 简历解析首答丢失：持久意图、Redis 原子配额、单次模型调用及 HTTP 双头兼容。
+          pnpm --filter @ai-job-print/api verify:resume-parse-intent
           pnpm --filter @ai-job-print/api verify:upload-sessions
           # 扫码上传的小程序场景码：明文不落库、兑换一次性、兑换即轮换上传令牌、
           # 失败路径不当预言机。跑进程内 RESP 桩，不连库不连外部 Redis，
@@ -819,6 +833,8 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
+      # 与 build-and-verify 相同：既有 verify 显式打开招聘内容托管，未设置即关只由专门门禁覆盖。
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -929,6 +945,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-extraction
           pnpm --filter @ai-job-print/api verify-real-resume-diagnosis
           pnpm --filter @ai-job-print/api verify:activity-logs
+          # 服务调用 / 信息使用：SQLite 与 PostgreSQL 都要跑到这条聚合（内存分桶，不靠 SQL 日期函数）。
+          pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:policy-eligibility
@@ -949,6 +967,8 @@ jobs:
           # 求职进度（见 build-and-verify 同名条目）：断言含两份 schema 形状比对，PG 侧同样跑。
           pnpm --filter @ai-job-print/api verify:job-application-track
           pnpm --filter @ai-job-print/api verify:companies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-emergency-scope
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-hosting-default-off
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract
@@ -1018,7 +1038,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
-          pnpm --filter @ai-job-print/api verify:job-review
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:job-review
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:partner-account-action:postgres
           pnpm --filter @ai-job-print/api verify:upload-sessions
@@ -1136,6 +1156,15 @@ jobs:
       - name: Run Admin browser E2E
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs
+
+      - name: Run Admin data-screen browser E2E
+        # 大屏专用 config：VITE_API_MODE=http 构建 + page.route 供快照夹具，
+        # 与既有 mock 包的 27 条用例互不影响（另起端口、另起 webServer）。
+        working-directory: apps/admin
+        run: node scripts/run-e2e.mjs --config=playwright.screen.config.ts
+
+      - name: Run Partner data-screen browser E2E
+        run: pnpm --filter @ai-job-print/partner test:e2e:screen
 
       - name: Run Partner browser E2E (mock)
         # 合作机构后台此前 0 条浏览器用例。mock 模式预览包（vite --mode development），

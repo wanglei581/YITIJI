@@ -16,6 +16,7 @@ import {
   type ScanWorkbenchState,
 } from './scanWorkbench'
 import './styles/scan-workbench-qx.css'
+import './styles/scan-workbench-compact-qx.css'
 
 export function scanTerminalLabel(): string {
   return getTerminalCode() || getTerminalId() || '终端未登记'
@@ -29,6 +30,7 @@ export function ScanWorkbenchShell({
   status,
   ctabar,
   facts,
+  layout = 'stack',
   children,
 }: {
   page: 'scan-start' | 'scan-settings' | 'scan-progress' | 'scan-result'
@@ -38,6 +40,12 @@ export function ScanWorkbenchShell({
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   ctabar: ReactNode
   facts?: readonly string[]
+  /**
+   * 稿 18 的两种排法：`stack` 最后一块吃余量（选类型 / 面板指引 / 结果预览）；
+   * `spread` 给「状态屏」用 —— 卡片按内容收住，余量摊进版块之间，
+   * 不在正文底下留一整片空白，也不靠拉伸说明卡去填高度。
+   */
+  layout?: 'stack' | 'spread'
   children: ReactNode
 }) {
   const navigate = useNavigate()
@@ -91,8 +99,10 @@ export function ScanWorkbenchShell({
         data-testid={`scan-workbench-state-${state}`}
       >
         <ScanHero ask={ask.text} em={ask.em} doing={ask.doing} facts={facts} />
-        <div className="qx-scroll sw-scroll">{children}</div>
-        <ScanTruth />
+        <div className="qx-scroll sw-scroll" data-layout={layout}>{children}</div>
+        {/* 稿 18：底部三列口径是一次性说明，只在起点（选类型）出现，不每一屏复读 ——
+            后面各屏把这块高度还给当前任务；各屏自己的「不猜 / 不改判」写在各自的卡里。 */}
+        {state === 'setup' ? <ScanTruth /> : null}
       </div>
     </QxPageFrame>
   )
@@ -323,13 +333,19 @@ export function ScanKvCard({
 
 export function ScanCta({
   reason,
+  reserveReason,
   children,
 }: {
   reason?: string
+  /**
+   * 给理由行留住位置。等待页每 3 秒查一次，理由行只在「查询在路上」那一瞬出现；
+   * 不留位的话整条操作条每 3 秒跳一下高度，主按钮在手指底下上下挪。
+   */
+  reserveReason?: boolean
   children: ReactNode
 }) {
   return (
-    <div className="sw-cta-wrap">
+    <div className="sw-cta-wrap" data-reserve-reason={reserveReason ? 'true' : undefined}>
       {reason ? <p className="sw-cta-reason" data-testid="scan-workbench-disabled-reason">{reason}</p> : null}
       <div className="sw-cta-row">{children}</div>
     </div>

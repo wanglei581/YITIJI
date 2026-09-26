@@ -55,6 +55,9 @@ git rev-parse --short HEAD | tee "$EVIDENCE_ROOT/PS-G0/git-head.log"
 git status --short --branch | tee "$EVIDENCE_ROOT/PS-G0/git-status.log"
 
 pnpm --filter @ai-job-print/api typecheck 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/api-typecheck.log"
+# typecheck 会执行 prisma generate；如果拆开或跳过 typecheck，必须先显式生成客户端，
+# 否则 verify:print-jobs 的模块缺失不是业务失败。
+pnpm --filter @ai-job-print/api exec prisma generate 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/prisma-generate.log"
 pnpm --filter @ai-job-print/api verify:print-scan-first-release 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/verify-print-scan-first-release.log"
 pnpm --filter @ai-job-print/api verify:print-jobs 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/verify-print-jobs.log"
 pnpm --filter terminal-agent typecheck 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/terminal-agent-typecheck.log"
@@ -415,7 +418,47 @@ pnpm --filter terminal-agent agent 2>&1 | Tee-Object (Join-Path $EvidenceRoot "P
 
 恢复：
 
-先在窗口 B 中按 `Ctrl+C` 停止降级 Agent，确认该进程退出后再执行恢复。否则恢复后启动的新 Agent 会因为 `agent.pid` 实例锁仍存在而退出。
+先在窗口 B 中按 `Ctrl+C` 停止降级 Agent，确认该进程退出后再执行恢复。正常退出应自行释放
+`agent.pid`；强杀、断电或崩溃可能留下外来死 PID 锁，新 Agent 会以
+`stale_lock_requires_operator` 拒绝启动，**不会自动接管**。**不要先删除。** 先核验服务/进程，
+运行 `diagnose-production-agent.ps1`。目录 / junction / symlink 占用锁路径时保持不动并升级。
+只有诊断输出 `lockClearanceEligibility=eligible_for_operator_review`，且服务已停止、锁路径是普通文件、
+严格 PID 可解析、`tasklist` 退出码 0 且 PID 未列出时，才允许人工清锁。`tasklist` 失败不得当成可删。
+干净 `Stop-Service` 是否留下锁是条件 P0，必须 Windows 实测，不得在 macOS 推断。本项 **DEVICE 仍 NO-GO**，
+直到 `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯留下证据。
+
+```powershell
+# Read-only first. Do not delete the lock in this step.
+powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\diagnose-production-agent.ps1
+$AgentDataDir = Join-Path $env:PROGRAMDATA "AIJobPrintAgent"
+$AgentPidPath = Join-Path $AgentDataDir "agent.pid"
+$Services = Get-CimInstance Win32_Service | Where-Object {
+  $_.Name -in @("AIJobPrintAgent", "aijobprintagent.exe") -or $_.DisplayName -eq "AIJobPrintAgent"
+}
+if ($Services | Where-Object { $_.State -ne "Stopped" }) {
+  throw "Stop every AIJobPrintAgent service before removing $AgentPidPath"
+}
+$LockItem = Get-Item -LiteralPath $AgentPidPath -Force -ErrorAction Stop
+if ($LockItem.PSIsContainer -or ($LockItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+  throw "Lock path is not a regular file; leave it untouched and escalate: $AgentPidPath"
+}
+$LockPidRaw = [System.IO.File]::ReadAllText($AgentPidPath)
+if ($LockPidRaw -cnotmatch '^[1-9][0-9]{0,9}\n?$') {
+  throw "Lock PID is not strictly valid; preserve the file and escalate: $AgentPidPath"
+}
+$LockPid = [int64]$Matches[1]
+$Tasklist = & "$env:SystemRoot\System32\tasklist.exe" /FI "PID eq $LockPid" /FO CSV /NH 2>&1 | Out-String
+if ($LASTEXITCODE -ne 0) {
+  throw "tasklist failed; do not remove $AgentPidPath"
+}
+if ($Tasklist.Contains(',' + '"' + $LockPid + '"' + ',')) {
+  throw "PID $LockPid still exists; do not remove $AgentPidPath"
+}
+Remove-Item -LiteralPath $AgentPidPath
+```
+
+不得同时删除 `agent.db`、`agent.token` 或配置文件；清锁后只启动一个 Agent，并保存服务状态、锁内
+PID、清锁时间和重启日志作为现场证据。
 
 ```powershell
 $AgentDataDir = Join-Path $env:PROGRAMDATA "AIJobPrintAgent"

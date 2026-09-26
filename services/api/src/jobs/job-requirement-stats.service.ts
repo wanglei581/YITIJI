@@ -15,6 +15,7 @@
 // ============================================================
 
 import { Injectable } from '@nestjs/common'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildPublishedJobWhere } from './jobs-shared'
 import {
@@ -48,6 +49,12 @@ export class JobRequirementStatsService {
       industry: normalize(params.industry),
       category: normalize(params.category),
       sourceOrgId: normalize(params.sourceOrgId),
+    }
+    if (!isRecruitmentContentHostingEnabled()) {
+      return {
+        data: aggregateJobRequirementStats({ filter, matchedTotal: 0, rows: [] }),
+        success: true,
+      }
     }
     // 与 GET /jobs 完全同一份 where —— 计数表描述的必须是用户真能翻到的那批岗位
     const where = buildPublishedJobWhere({

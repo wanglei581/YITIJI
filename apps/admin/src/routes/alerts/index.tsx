@@ -3,7 +3,7 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
-import { AlertTriangleIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
+import { AlertTriangleIcon, FileWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
 import {
   adminOpsService,
   type AdminAlertItem,
@@ -13,10 +13,16 @@ import {
 } from '../../services/api/adminOps'
 import { ApiHttpError } from '../../services/api/client'
 
-const TYPE_META: Record<AdminAlertItem['type'], { label: string; icon: typeof AlertTriangleIcon }> = {
+const TYPE_META: Record<AdminAlertItem['type'], { label: string; icon: typeof AlertTriangleIcon; guidance?: string }> = {
   terminal_offline: { label: '终端离线',   icon: MonitorOffIcon },
   printer_issue:    { label: '打印机异常', icon: PrinterIcon },
   print_failed:     { label: '打印失败',   icon: AlertTriangleIcon },
+  // 只说明现状与处置边界：本页动作只记录处理，不退款、不恢复文件，也不改订单状态。
+  paid_pending_file_unavailable: {
+    label: '已支付文件不可用',
+    icon: FileWarningIcon,
+    guidance: '订单已支付，但打印文件当前不可用（原因见上一行），任务无法正常出纸，需人工核对订单后处置。确认 / 静默 / 关闭只记录处理，不会退款，也不会恢复文件。',
+  },
 }
 
 const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
@@ -34,6 +40,7 @@ const TYPE_FILTERS = [
   { label: '终端离线', value: 'terminal_offline' },
   { label: '打印机异常', value: 'printer_issue' },
   { label: '打印失败', value: 'print_failed' },
+  { label: '已支付文件不可用', value: 'paid_pending_file_unavailable' },
 ] as const
 
 const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [
@@ -129,7 +136,7 @@ export default function AlertsPage() {
       ? '该分类当前无告警'
       : '这一栏没有告警'
   const emptyDescription = firingCount === 0
-    ? '所有终端在线、打印机正常、近 24 小时无未处理失败任务'
+    ? '所有终端在线、打印机正常、近 24 小时无未处理失败任务、无文件不可用的已支付待打印任务'
     : filtered.length === 0 && typeFilter
       ? `「${TYPE_META[typeFilter as AdminAlertItem['type']]?.label ?? typeFilter}」在当前栏无告警；仍有 ${firingCount} 条问题未恢复`
       : `待处理 ${openCount} · 已确认仍在发生 ${acknowledgedCount} · 已静默/关闭仍在发生 ${suppressedCount}。确认不会把设备显示成正常。`
@@ -150,7 +157,7 @@ export default function AlertsPage() {
       }
     >
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        告警由实时状态派生：终端离线（心跳超 3 分钟）、打印机异常、近 24 小时打印失败。确认 / 静默 / 关闭只记录处理，设备仍异常时不会显示成已恢复；关闭后可以「重新打开」退回待处理。已退款失败单按订单退款状态退出告警，不伪造出纸结果。
+        告警由实时状态派生：终端离线（心跳超 3 分钟）、打印机异常、近 24 小时打印失败、已支付但打印文件不可用的待打印任务（需人工处置）。确认 / 静默 / 关闭只记录处理，设备仍异常时不会显示成已恢复；关闭后可以「重新打开」退回待处理。已退款的订单按订单退款状态退出告警，本页不发起退款，不伪造出纸结果。
       </div>
 
       {truncation && (
@@ -230,6 +237,9 @@ export default function AlertsPage() {
                       {alert.terminalCode ? `${alert.terminalCode} · ` : ''}
                       {alert.detail}
                     </p>
+                    {meta.guidance && (
+                      <p className="mt-1 text-[12px] text-neutral-600">{meta.guidance}</p>
+                    )}
                   </div>
                   <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                     <p className="text-xs tabular-nums text-neutral-500">{fmt(alert.occurredAt)}</p>

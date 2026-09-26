@@ -202,9 +202,11 @@ export function AssistantHoldToTalk({
         <KIcon name="mic" />
         {label}
       </button>
-      <label className="assistant-hold-talk-switch">
+      <label className="assistant-hold-talk-switch" data-checked={sendDirect || undefined} data-blocked={blocked || undefined}>
+        {/* 原生复选框视觉隐藏，整块 label 作 48px 触控开关；焦点环画在 label 上。 */}
         <input
           type="checkbox"
+          className="sr-only assistant-hold-talk-input"
           checked={sendDirect}
           onChange={(event) => onSendDirectChange(event.target.checked)}
           disabled={blocked}

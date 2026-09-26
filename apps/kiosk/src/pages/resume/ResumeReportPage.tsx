@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import type { ResumeParseResponse, ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
-import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { isAiOutage } from '../../ai'
@@ -65,11 +65,13 @@ function ReportNoticePanel({
   extractionNotice?: ReportState['extractionNotice']
   truncated?: boolean
 }) {
+  // 真实报告的说明以 AI 可见标识开头（审计表一「简历诊断（屏）」，next-tasks 3.5c）；
+  // 演示报告不是模型结果，不挂「AI 生成」，沿用演示说明。
   const notices = [
     isDemoReport ? COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE : null,
     isDemoReport
       ? '演示报告不基于你上传的文件内容生成，仅用于展示报告结构；它不会发送给企业，也不代表录用、面试或投递结果。'
-      : '本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。',
+      : `${AI_LABEL_COPY.RESUME_DIAGNOSIS}。本报告只依据上传文件中可解析出的内容，不会发送给企业，也不代表录用、面试或投递结果。`,
     buildExtractionNotice(extractionNotice),
     truncated ? '本次诊断只看了简历前若干字符，后面的内容块可能整块缺失，不是简历里没有那些部分。' : null,
     COMPLIANCE_COPY.KIOSK_RESUME_REPORT_DISCLAIMER,
@@ -187,15 +189,26 @@ export function ResumeReportPage() {
     </>
   )
 
+  /*
+   * 只有**明确失败**会到这里：解析结果未知留在解析页（稿 21 parse-unknown），不转成失败屏。
+   * 「重新解析」是一次新的提交（新的 AI 调用），因此只放在服务端明确说没成的这一屏。
+   */
+  const failCta = (
+    <>
+      <p className="why" id="resume-report-why">上一次已明确没解析成功；重新解析会作为新的一次提交。这一屏一条 AI 结论都不给。</p>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')} data-route="/">返回首页</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry} data-route="/resume/parse" data-testid="resume-report-primary">重新解析</button>
+    </>
+  )
   const failView = (failReason: string) => (
-    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={<p className="why">这一屏一条 AI 结论都不给。</p>}>
+    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={failCta}>
       <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed" className="qx-scroll rrp-page">
         <ResumeReportHead viewState="diagnose-failed" />
         <section className="rrp-state">
           <h2>解析中断，中断的只是「读懂它」这一步</h2>
           <p>失败原因：{failReason}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>
         </section>
-        <ResumeDiagnosisFailExits file={state.file} onRetry={handleRetry} onHome={() => navigate('/')} />
+        <ResumeDiagnosisFailExits file={state.file} />
       </section>
     </QxPageFrame>
   )

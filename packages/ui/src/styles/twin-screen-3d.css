@@ -1,0 +1,596 @@
+/* ============================================================
+   数字孪生数据大屏：3D 场景（城区孪生 / 服务调用网络 / 单台终端）
+
+   纯 CSS 3D：世界平面 rotateX(tilt) rotateZ(-38deg)，建筑三面体，
+   标签用反向旋转的「广告牌」始终正对观众。没有 WebGL、没有外部依赖。
+
+   纵深绑定真实状态：终端立柱高度只由健康态 / 活动态决定（打印中最高、离线最低），
+   建筑体块是按区名哈希出的固定装饰，不参与任何数据表达，也不含随机数。
+   ============================================================ */
+
+.tw3-box {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.tw3-scene {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(var(--tw3-scale, 1));
+  transform-origin: 50% 50%;
+}
+
+.tw3-stage {
+  position: absolute;
+  inset: 0;
+  perspective: 1700px;
+  perspective-origin: 50% 34%;
+}
+
+.tw3-world {
+  --tilt: 58deg;
+  position: absolute;
+  left: 38px;
+  top: 18px;
+  width: 900px;
+  height: 900px;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--tilt)) rotateZ(-38deg) scale(var(--tw3-zoom, 1)) translate(var(--tw3-dx, 0px), var(--tw3-dy, 0px));
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tw3-world.is-focus {
+  --tilt: 46deg;
+}
+
+/* 地面与楼宇体块都是装饰：不接收指针，免得在 3D 深度里压住立在上面的区名牌边缘 */
+.tw3-ground,
+.tw3-bx {
+  pointer-events: none;
+}
+
+.tw3-ground {
+  position: absolute;
+  inset: -380px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(46, 230, 168, 0.14), rgba(46, 230, 168, 0) 62%),
+    linear-gradient(rgba(46, 230, 168, 0.09) 1px, transparent 1px) 0 0 / 30px 30px,
+    linear-gradient(90deg, rgba(46, 230, 168, 0.09) 1px, transparent 1px) 0 0 / 30px 30px;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 34%, transparent 58%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 34%, transparent 58%);
+}
+
+/* ---------- 建筑体块（装饰） ---------- */
+.tw3-bx {
+  position: absolute;
+  transform-style: preserve-3d;
+  transition: opacity 0.6s ease;
+}
+
+.tw3-bx > i {
+  position: absolute;
+  display: block;
+}
+
+.tw3-bx > .t {
+  inset: 0;
+  transform: translateZ(var(--h));
+  background: rgba(22, 118, 94, 0.62);
+  border: 1px solid rgba(96, 244, 196, 0.75);
+  box-shadow: inset 0 0 16px rgba(46, 230, 168, 0.4);
+}
+
+.tw3-bx > .s {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--h);
+  transform-origin: 50% 100%;
+  transform: rotateX(-90deg);
+  border: 1px solid rgba(46, 230, 168, 0.28);
+  background:
+    repeating-linear-gradient(0deg, rgba(150, 255, 220, 0.1) 0 2px, transparent 2px 9px),
+    linear-gradient(0deg, rgba(6, 52, 41, 0.95), rgba(26, 132, 104, 0.6));
+}
+
+.tw3-bx > .w {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--h);
+  transform-origin: 0 50%;
+  transform: rotateY(-90deg);
+  border: 1px solid rgba(46, 230, 168, 0.22);
+  background:
+    repeating-linear-gradient(90deg, rgba(150, 255, 220, 0.07) 0 2px, transparent 2px 9px),
+    linear-gradient(90deg, rgba(18, 96, 76, 0.6), rgba(4, 36, 28, 0.95));
+}
+
+.tw3-bx.is-cbd > .t {
+  background: rgba(40, 160, 128, 0.7);
+  box-shadow: inset 0 0 22px rgba(46, 230, 168, 0.55), 0 0 26px rgba(46, 230, 168, 0.45);
+}
+
+/* ---------- 广告牌：反向旋转，始终正对观众 ---------- */
+/*
+ * 广告牌盒子本身是透明的立板（告警牌 260 宽、区名牌 220 宽、高度随抬高），只是用来立起里面的牌子。
+ * 它不接收指针：否则一块告警牌的空白盒子会整块盖住后面的区名牌，看得见、点不动。
+ * 真正可点的只有两样 —— 区名牌按钮（.tw3-district-btn）与终端立柱（.tw3-pillar），各自打开 pointer-events。
+ */
+.tw3-bb {
+  position: absolute;
+  transform-origin: 50% 100%;
+  transform: rotateZ(38deg) rotateX(calc(-1 * var(--tilt)));
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+/* 终端立柱是真按钮：点它进入单台终端孪生（它自己也是一块广告牌，所以在这里把指针接回来） */
+.tw3-bb.tw3-pillar {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* 视觉宽 24px，命中区左右各扩 10px 到 44px */
+.tw3-pillar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -10px;
+  right: -10px;
+}
+
+.tw3-pillar:focus-visible {
+  outline: 2px solid var(--tw-gold);
+  outline-offset: 4px;
+}
+
+.tw3-beam {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: linear-gradient(0deg, var(--c), rgba(255, 255, 255, 0));
+  box-shadow: 0 0 10px var(--c), 0 0 22px var(--c);
+  animation: tw3-beam 2.8s ease-in-out infinite;
+}
+
+.tw3-kio {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 12px;
+  height: 18px;
+  margin-left: -6px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #0e3b31, #062019);
+  border: 1.5px solid var(--c);
+  box-shadow: 0 0 10px var(--c);
+}
+
+.tw3-kio::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 2px;
+  height: 8px;
+  border-radius: 1px;
+  background: var(--c);
+  opacity: 0.85;
+}
+
+.tw3-ring {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--c);
+  box-shadow: 0 0 12px var(--c);
+  animation: tw3-pulse 2.6s ease-out infinite;
+  pointer-events: none;
+}
+
+.s-ok { --c: #2ee6a8; }
+.s-pr { --c: #72d6ff; }
+.s-wa { --c: #e8b45c; }
+.s-off { --c: #e88b7d; }
+.s-un { --c: #7d8f89; }
+
+.tw3-ring.s-wa,
+.tw3-ring.s-off { animation-duration: 1.4s; }
+.tw3-ring.s-un { animation: none; opacity: 0.35; border-style: dashed; }
+.s-un .tw3-beam { opacity: 0.35; animation: none; }
+.s-off .tw3-beam { animation: tw3-flick 1.3s steps(2, end) infinite; }
+
+.tw3-lbl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.tw3-lbl .c {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #04140f;
+  background: var(--c);
+  box-shadow: 0 0 16px var(--c);
+}
+
+.tw3-lbl .stem {
+  flex-grow: 1;
+  width: 2px;
+  background: linear-gradient(180deg, var(--c), rgba(255, 255, 255, 0));
+}
+
+.tw3-district .c {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 6px;
+  letter-spacing: 2px;
+  color: #e8fff7;
+  background: rgba(3, 30, 24, 0.78);
+  border: 1px solid rgba(46, 230, 168, 0.55);
+  box-shadow: 0 0 14px rgba(46, 230, 168, 0.25);
+}
+
+.tw3-district .c b {
+  font-family: var(--tw-num);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--tw-acc);
+}
+
+.tw3-district .stem {
+  background: linear-gradient(180deg, rgba(46, 230, 168, 0.8), rgba(46, 230, 168, 0));
+}
+
+/* 区名牌是按钮：点它聚焦到该区（与筛选栏的区域选择同一个动作） */
+.tw3-district-btn {
+  pointer-events: auto;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tw3-district-btn:focus-visible {
+  outline: 2px solid var(--tw-gold);
+  outline-offset: 3px;
+}
+
+/* 聚焦某区：其余区变暗但保留，作为位置参照 */
+.tw3-world.is-focus .is-dim {
+  opacity: 0.12;
+  filter: saturate(0.4);
+}
+
+.tw3-world.is-focus .tw3-bb.is-dim {
+  opacity: 0.08;
+}
+
+.tw3-world.is-filtered .is-muted {
+  opacity: 0.2;
+}
+
+/* 没有终端时的说明（不在 3D 世界里，正对观众） */
+.tw3-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 80px;
+  text-align: center;
+  color: var(--tw-ink-2);
+  pointer-events: none;
+}
+
+[data-ops-screen='wall'] .tw3-empty { font-size: 18px; }
+[data-ops-screen='desk'] .tw3-empty { font-size: 16px; }
+
+/* ---------- 中枢 ---------- */
+.tw3-sweep {
+  position: absolute;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(46, 230, 168, 0) 0deg, rgba(46, 230, 168, 0.26) 34deg, rgba(46, 230, 168, 0) 62deg, rgba(46, 230, 168, 0) 360deg);
+  animation: tw3-spin 7s linear infinite;
+  pointer-events: none;
+}
+
+.tw3-hubring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(46, 230, 168, 0.55);
+  box-shadow: 0 0 18px rgba(46, 230, 168, 0.4), inset 0 0 18px rgba(46, 230, 168, 0.25);
+  pointer-events: none;
+}
+
+.tw3-hubring.is-dashed {
+  border-style: dashed;
+  animation: tw3-spin 18s linear infinite;
+}
+
+.tw3-hubring.is-rev {
+  opacity: 0.55;
+  animation: tw3-spin 26s linear infinite reverse;
+}
+
+.tw3-tower {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 46px;
+  margin-left: -23px;
+  clip-path: polygon(50% 0, 100% 18%, 100% 88%, 50% 100%, 0 88%, 0 18%);
+  background: linear-gradient(180deg, rgba(210, 255, 240, 0.95), rgba(46, 230, 168, 0.75) 40%, rgba(10, 90, 70, 0.85));
+  box-shadow: 0 0 30px var(--tw-acc);
+  animation: tw3-float 4s ease-in-out infinite;
+}
+
+.tw3-tower.is-ai {
+  background: linear-gradient(180deg, rgba(230, 255, 248, 0.95), rgba(87, 215, 255, 0.8) 42%, rgba(8, 70, 90, 0.85));
+  box-shadow: 0 0 30px #57d7ff;
+}
+
+.tw3-flows {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.tw3-fl {
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 5 12;
+  animation: tw3-dash 2.4s linear infinite;
+}
+
+.tw3-flow {
+  fill: none;
+  stroke-linecap: round;
+  animation: tw3-dash 1.8s linear infinite;
+}
+
+/* ---------- 服务调用网络：体量柱与节点牌 ---------- */
+.tw3-prism {
+  position: absolute;
+  transform-style: preserve-3d;
+}
+
+.tw3-prism > i {
+  position: absolute;
+  display: block;
+}
+
+.tw3-prism > .t {
+  inset: 0;
+  border-radius: 4px;
+  transform: translateZ(var(--h));
+  background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 62%), var(--pc);
+  border: 1.5px solid var(--pl);
+  box-shadow: 0 0 24px var(--pl), inset 0 0 18px rgba(255, 255, 255, 0.14);
+}
+
+.tw3-prism > .s {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--h);
+  transform-origin: 50% 100%;
+  transform: rotateX(-90deg);
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.08) 0 2px, transparent 2px 8px), linear-gradient(0deg, rgba(3, 18, 15, 0.95), var(--pc));
+  border: 1px solid var(--pl);
+}
+
+.tw3-prism > .w {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--h);
+  transform-origin: 0 50%;
+  transform: rotateY(-90deg);
+  background: linear-gradient(90deg, var(--pc), rgba(3, 18, 15, 0.95));
+  border: 1px solid var(--pl);
+}
+
+.p-info { --pc: rgba(44, 82, 150, 0.78); --pl: rgba(143, 178, 238, 0.9); }
+.p-ai { --pc: rgba(16, 112, 88, 0.8); --pl: rgba(46, 230, 168, 0.9); }
+.p-print { --pc: rgba(18, 92, 124, 0.8); --pl: rgba(114, 214, 255, 0.9); }
+.p-out { --pc: rgba(120, 90, 30, 0.75); --pl: rgba(242, 200, 121, 0.9); }
+.p-na { --pc: rgba(60, 70, 66, 0.55); --pl: rgba(160, 175, 170, 0.55); }
+
+.tw3-svc { --c: var(--pl); }
+
+.tw3-svc .c {
+  min-height: 34px;
+  gap: 8px;
+  border-radius: 8px;
+  color: #eaf6ff;
+  background: rgba(3, 20, 26, 0.86);
+  border: 1px solid var(--pl);
+  box-shadow: 0 0 14px var(--pl);
+}
+
+.tw3-svc .c b {
+  letter-spacing: 1px;
+}
+
+.tw3-svc .c span {
+  font-family: var(--tw-num);
+  font-weight: 700;
+  color: #fff;
+}
+
+.tw3-big .c {
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 16px;
+  border-radius: 12px;
+  color: #eafff8;
+  background: rgba(3, 26, 21, 0.88);
+  border: 1px solid var(--pl);
+  box-shadow: 0 0 18px var(--pl);
+}
+
+.tw3-big .c span {
+  font-family: var(--tw-num);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.15;
+}
+
+.tw3-big .c i {
+  font-style: normal;
+  font-weight: 500;
+  color: #b9d8cf;
+}
+
+.tw3-core { --c: var(--tw-acc); }
+
+.tw3-core .c {
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  color: #eafff8;
+  background: rgba(3, 30, 24, 0.9);
+  border: 1.5px solid var(--tw-acc);
+  box-shadow: 0 0 24px var(--tw-acc);
+}
+
+.tw3-core .c span {
+  font-weight: 500;
+  color: #bfe9dc;
+}
+
+/* ---------- 单台终端：设备模型 ---------- */
+.tw3-dev {
+  position: absolute;
+  perspective: 1500px;
+  perspective-origin: 50% 40%;
+}
+
+.tw3-bob {
+  position: absolute;
+  transform-style: preserve-3d;
+  animation: tw3-bob 5s ease-in-out infinite;
+}
+
+.tw3-devgrp {
+  position: absolute;
+  transform-style: preserve-3d;
+  transform: rotateX(-9deg) rotateY(-31deg);
+}
+
+.tw3-face {
+  position: absolute;
+}
+
+.tw3-plat {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(46, 230, 168, 0.55);
+  box-shadow: 0 0 30px rgba(46, 230, 168, 0.35), inset 0 0 30px rgba(46, 230, 168, 0.25);
+}
+
+.tw3-paper {
+  animation: tw3-paper 2.8s ease-in infinite;
+}
+
+.tw3-callout {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: rgba(3, 30, 24, 0.82);
+  border: 1px solid rgba(46, 230, 168, 0.45);
+  box-shadow: 0 0 18px rgba(46, 230, 168, 0.18);
+  color: var(--tw-ink);
+  white-space: nowrap;
+}
+
+.tw3-callout .k {
+  color: var(--tw-muted);
+}
+
+.tw3-callout b {
+  color: var(--tw-strong);
+}
+
+.tw3-callout.is-warn {
+  border-color: rgba(232, 180, 92, 0.6);
+}
+
+.tw3-callout.is-err {
+  border-color: rgba(232, 139, 125, 0.7);
+}
+
+/* ---------- 3D 标签字阶（场景在桌面档会整体缩放，字号本身不再另降） ---------- */
+[data-ops-screen='wall'] .tw3-lbl .c { font-size: 15px; }
+[data-ops-screen='wall'] .tw3-district .c { font-size: 16px; }
+[data-ops-screen='wall'] .tw3-svc .c b { font-size: 15px; }
+[data-ops-screen='wall'] .tw3-svc .c span { font-size: 19px; }
+[data-ops-screen='wall'] .tw3-big .c b { font-size: 16px; }
+[data-ops-screen='wall'] .tw3-big .c span { font-size: 25px; }
+[data-ops-screen='wall'] .tw3-big .c i { font-size: 13px; }
+[data-ops-screen='wall'] .tw3-core .c b { font-size: 16px; }
+[data-ops-screen='wall'] .tw3-core .c span { font-size: 13px; }
+[data-ops-screen='wall'] .tw3-callout { font-size: 15px; }
+[data-ops-screen='desk'] .tw3-lbl .c { font-size: 15px; }
+[data-ops-screen='desk'] .tw3-district .c { font-size: 16px; }
+[data-ops-screen='desk'] .tw3-svc .c b { font-size: 15px; }
+[data-ops-screen='desk'] .tw3-svc .c span { font-size: 19px; }
+[data-ops-screen='desk'] .tw3-big .c b { font-size: 16px; }
+[data-ops-screen='desk'] .tw3-big .c span { font-size: 25px; }
+[data-ops-screen='desk'] .tw3-big .c i { font-size: 13px; }
+[data-ops-screen='desk'] .tw3-core .c b { font-size: 16px; }
+[data-ops-screen='desk'] .tw3-core .c span { font-size: 13px; }
+[data-ops-screen='desk'] .tw3-callout { font-size: 15px; }
+
+@keyframes tw3-spin { to { transform: rotate(360deg); } }
+@keyframes tw3-pulse { 0% { transform: scale(0.4); opacity: 1; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes tw3-beam { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+@keyframes tw3-flick { 0% { opacity: 0.25; } 100% { opacity: 0.8; } }
+@keyframes tw3-dash { to { stroke-dashoffset: -68; } }
+@keyframes tw3-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes tw3-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes tw3-paper { 0% { transform: translateY(-12px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(20px); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tw3-world,
+  .tw3-beam,
+  .tw3-ring,
+  .tw3-sweep,
+  .tw3-hubring,
+  .tw3-tower,
+  .tw3-fl,
+  .tw3-flow,
+  .tw3-bob,
+  .tw3-paper {
+    animation: none !important;
+    transition: none !important;
+  }
+}

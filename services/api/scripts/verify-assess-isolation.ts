@@ -157,10 +157,21 @@ try {
     join(REPO_ROOT, 'services', 'api', 'src', 'ai', 'resume', 'appended-self-assessment.service.ts'),
     'utf8',
   )
+  // 3.5c 起合并逻辑搬进 common/pdf/aigc-label.ts 的 appendAigcPages（顺带写 AIGC 隐式标识），
+  // 所以「总页数取合并后的文档」这条断言跟着逻辑走：共享函数先把附录页加进去再取页数，
+  // 服务端用的就是这个合并后页数。
+  const aigcLabelSrc = readFileSync(join(REPO_ROOT, 'services', 'api', 'src', 'common', 'pdf', 'aigc-label.ts'), 'utf8')
+  const appendFn = aigcLabelSrc.slice(aigcLabelSrc.indexOf('export async function appendAigcPages('))
+  const addAt = appendFn.indexOf('merged.addPage(')
+  const countAt = appendFn.indexOf('const pageCount = merged.getPageCount()')
+  assert.ok(
+    addAt > 0 && countAt > addAt && /return \{[\s\S]*?,\s*pageCount\s*\}/.test(appendFn.slice(countAt)),
+    'append 必须在合并后读取 merged.getPageCount()，不能用附录页数冒充总页数（appendAigcPages 先 addPage 再取页数并返回）',
+  )
   assert.match(
     appendSrc,
-    /mergedPageCount = merged\.getPageCount\(\)/,
-    'append 必须在合并后读取 merged.getPageCount()，不能用附录页数冒充总页数',
+    /const mergedPdf = await appendAigcPages\([^)]*\)\s*\n\s*const mergedPageCount = mergedPdf\.pageCount/,
+    'append 的总页数取自 appendAigcPages 合并后的文档',
   )
   assert.match(
     appendSrc,

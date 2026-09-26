@@ -16,13 +16,23 @@ const workflowStep = (haystack, name) => {
   return haystack.slice(start, next >= 0 ? next : haystack.length)
 }
 
+const workflowJob = (haystack, name) => {
+  const marker = `  ${name}:`
+  const start = haystack.indexOf(marker)
+  assert.ok(start >= 0, `missing workflow job: ${name}`)
+  const remainder = haystack.slice(start + marker.length)
+  const nextJob = /^  [A-Za-z0-9_-]+:\s*$/m.exec(remainder)
+  const end = nextJob ? start + marker.length + nextJob.index : haystack.length
+  return haystack.slice(start, end)
+}
+
 export function verifyCandidateProvenance({ workflow, candidateIdentity, productVersion }) {
   const freshJobStart = workflow.indexOf('  unsigned-msi-candidate:')
   const upgradeJobStart = workflow.indexOf('  unsigned-exe-upgrade:')
   assert.ok(freshJobStart >= 0, 'missing unsigned-msi-candidate job')
   assert.ok(upgradeJobStart > freshJobStart, 'missing or misordered unsigned-exe-upgrade job')
-  const freshJob = workflow.slice(freshJobStart, upgradeJobStart)
-  const upgradeJob = workflow.slice(upgradeJobStart)
+  const freshJob = workflowJob(workflow, 'unsigned-msi-candidate')
+  const upgradeJob = workflowJob(workflow, 'unsigned-exe-upgrade')
 
   assert.doesNotMatch(freshJob, /test-exe-upgrade-lifecycle\.ps1/)
   assert.doesNotMatch(freshJob, /predecessor-0\.4\.10/)
@@ -102,7 +112,9 @@ export function verifyCandidateProvenance({ workflow, candidateIdentity, product
   )
   assert.match(freshJob, /Upload fresh lifecycle evidence on failure\s*\n\s*if: failure\(\)/)
   assert.doesNotMatch(upgradeJob, /terminal-agent-unsigned-installer-candidates/)
-  assert.equal((workflow.match(new RegExp(`-ProductVersion "${productVersion.replaceAll('.', '\\.')}"`, 'g')) ?? []).length, 4)
+  const productVersionPattern = new RegExp(`-ProductVersion "${productVersion.replaceAll('.', '\\.')}"`, 'g')
+  assert.equal((freshJob.match(productVersionPattern) ?? []).length, 2)
+  assert.equal((upgradeJob.match(productVersionPattern) ?? []).length, 2)
 
   assertOrdered(
     freshJob,

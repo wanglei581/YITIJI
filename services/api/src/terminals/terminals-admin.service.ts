@@ -15,8 +15,10 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
+  Optional,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { isHealthyPrinterStatus } from './printer-status'
@@ -35,8 +37,10 @@ import {
   type TerminalLifecycleStatus,
 } from './terminal-utils'
 import type { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
+import { terminalPlacementPatch } from './terminal-placement'
 import { DEFAULT_SMART_CAMPUS_MODULES } from '../smart-campus/smart-campus.types'
 import { ReleaseObservationService, type AdminReleaseObservationView } from './release-observation.service'
+import { KioskJobBoardService } from './kiosk-job-board.service'
 
 // ── Admin view types ───────────────────────────────────────────────────────────
 
@@ -46,6 +50,9 @@ export interface AdminTerminalView {
   displayName: string | null
   macAddress: string | null
   locationLabel: string | null
+  areaLabel: string | null
+  geoLat: number | null
+  geoLng: number | null
   enabled: boolean
   lifecycleStatus: TerminalLifecycleStatus
   lifecycleVersion: number
@@ -92,6 +99,9 @@ export interface UpdateTerminalProfileResult {
   displayName: string | null
   macAddress: string | null
   locationLabel: string | null
+  areaLabel: string | null
+  geoLat: number | null
+  geoLng: number | null
   enabled: boolean
 }
 
@@ -181,12 +191,17 @@ function describePrinterFault(online: boolean, printerStatus: string | null): st
 
 @Injectable()
 export class TerminalAdminService {
+  private readonly jobBoard: KioskJobBoardService
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly agent: TerminalAgentService,
     private readonly toolbox: TerminalToolboxService,
     private readonly releases: ReleaseObservationService,
-  ) {}
+    @Optional() jobBoard?: KioskJobBoardService,
+  ) {
+    this.jobBoard = jobBoard ?? new KioskJobBoardService(prisma)
+  }
 
   listTerminals() {
     return this.prisma.terminal.findMany({ orderBy: { registeredAt: 'desc' } })
@@ -309,6 +324,9 @@ export class TerminalAdminService {
         displayName: t.displayName ?? null,
         macAddress: t.macAddress ?? null,
         locationLabel: t.locationLabel ?? null,
+        areaLabel: t.areaLabel ?? null,
+        geoLat: t.geoLat ?? null,
+        geoLng: t.geoLng ?? null,
         enabled: t.enabled,
         lifecycleStatus: normalizeLifecycleStatus(t.lifecycleStatus),
         lifecycleVersion: t.lifecycleVersion,
@@ -388,7 +406,15 @@ export class TerminalAdminService {
 
   async updateTerminalProfile(
     terminalId: string,
-    dto: { displayName?: string | null; macAddress?: string | null; locationLabel?: string | null; enabled?: boolean },
+    dto: {
+      displayName?: string | null
+      macAddress?: string | null
+      locationLabel?: string | null
+      areaLabel?: string | null
+      geoLat?: number | null
+      geoLng?: number | null
+      enabled?: boolean
+    },
   ): Promise<UpdateTerminalProfileResult> {
     const terminalRefClauses: Array<{ id?: string; terminalCode?: string; macAddress?: string }> = [
       { id: terminalId },
@@ -409,8 +435,12 @@ export class TerminalAdminService {
       displayName?: string | null
       macAddress?: string | null
       locationLabel?: string | null
+      areaLabel?: string | null
+      geoLat?: number | null
+      geoLng?: number | null
       enabled?: boolean
     } = {}
+    const placement = terminalPlacementPatch(dto)
     if (dto.enabled === true && normalizeLifecycleStatus(terminal.lifecycleStatus) === 'retired') {
       throw new BadRequestException({
         error: { code: 'TERMINAL_RETIRED', message: '终端已永久退役，不能重新启用' },
@@ -418,6 +448,11 @@ export class TerminalAdminService {
     }
     if ('displayName' in dto) data.displayName = cleanNullable(dto.displayName)
     if ('locationLabel' in dto) data.locationLabel = cleanNullable(dto.locationLabel)
+    if ('areaLabel' in placement) data.areaLabel = placement.areaLabel
+    if ('geoLat' in placement) {
+      data.geoLat = placement.geoLat
+      data.geoLng = placement.geoLng
+    }
     if ('enabled' in dto && dto.enabled !== undefined) data.enabled = dto.enabled
     if ('macAddress' in dto) {
       const macAddress = normalizeMacAddress(dto.macAddress)
@@ -435,10 +470,23 @@ export class TerminalAdminService {
           displayName: true,
           macAddress: true,
           locationLabel: true,
+          areaLabel: true,
+          geoLat: true,
+          geoLng: true,
           enabled: true,
         },
       }),
-    ) as { id: string; terminalCode: string; displayName: string | null; macAddress: string | null; locationLabel: string | null; enabled: boolean }
+    ) as {
+      id: string
+      terminalCode: string
+      displayName: string | null
+      macAddress: string | null
+      locationLabel: string | null
+      areaLabel: string | null
+      geoLat: number | null
+      geoLng: number | null
+      enabled: boolean
+    }
 
     return {
       terminalId: saved.terminalCode,
@@ -446,6 +494,9 @@ export class TerminalAdminService {
       displayName: saved.displayName ?? null,
       macAddress: saved.macAddress ?? null,
       locationLabel: saved.locationLabel ?? null,
+      areaLabel: saved.areaLabel ?? null,
+      geoLat: saved.geoLat ?? null,
+      geoLng: saved.geoLng ?? null,
       enabled: saved.enabled,
     }
   }
@@ -650,13 +701,15 @@ export class TerminalAdminService {
 
   async getKioskTerminalConfig(terminalRef: string): Promise<KioskTerminalConfigView> {
     const terminal = await this.agent.findTerminalByRef(terminalRef)
-    const [smartCampusConfig, toolboxConfig] = await Promise.all([
+    const [smartCampusConfig, toolboxConfig, jobBoard] = await Promise.all([
       this.agent.findSmartCampusConfigByTerminalRef(terminalRef, terminal),
       this.toolbox.getPublicConfig(terminalRef, terminal),
+      this.jobBoard.resolve(terminalRef),
     ])
     const terminalEnabled = terminal?.enabled ?? false
     const smartCampusEnabled = terminalEnabled && !!smartCampusConfig?.enabled
     const serverTime = new Date().toISOString()
+    const deploymentEnabled = isRecruitmentContentHostingEnabled()
 
     return {
       smartCampus: {
@@ -670,10 +723,29 @@ export class TerminalAdminService {
         enabled: toolboxConfig.enabled,
         items: toolboxConfig.items,
       },
+      jobBoard: deploymentEnabled
+        ? {
+            enabled: jobBoard.enabled,
+            globalEnabled: jobBoard.globalEnabled,
+            terminalEnabled: jobBoard.terminalEnabled,
+            reason: jobBoard.reason,
+          }
+        : {
+            enabled: false,
+            globalEnabled: false,
+            terminalEnabled: jobBoard.terminalEnabled,
+            reason: 'global_off' as const,
+          },
+      recruitmentHosting: {
+        enabled: deploymentEnabled,
+        deploymentEnabled,
+        reason: deploymentEnabled ? 'open' as const : 'deployment_off' as const,
+      },
       configVersion: [
         terminal?.lastSeenAt.toISOString() ?? 'unregistered',
         smartCampusConfig?.updatedAt.toISOString() ?? 'smart-campus:none',
         toolboxConfig.version,
+        jobBoard.version,
       ].join('|'),
       refreshIntervalMs: CONFIG_REFRESH_INTERVAL_MS,
       serverTime,

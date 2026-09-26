@@ -14,10 +14,20 @@
  * - ORDER_REFUNDED_WITHOUT_REFUND_ROW：payStatus=refunded 但无 success Refund 记录。
  * - REFUND_SUCCESS_ORDER_NOT_REFUNDED：存在 success Refund 但订单未处于 refunded。
  * - STUCK_REFUNDING：订单停留 refunding（退款受理中/半态），超龄需人工跟进（W-B 自动收敛前的人工兜底）。
+ * - ONLINE_COLLECTED_PENDING_REFUND：渠道已收款但订单未转 paid（取件窗口已关），须走 canonical 退款。
+ * - ORDER_EXTRA_COLLECTION_AFTER_REFUND：refunded/refunding 单出现第二条 success PaymentAttempt
+ *   （或 refundedAt 之后新建的成功尝试）。gross 按成功尝试金额合计，不自动逐笔退。
  * - LATE_PAID / RECONCILED：迟到入账 / 主动查单入账专项清单（非错误，运营需知晓复核）。
  */
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import {
+  CHANNEL_ACCEPTED_UNCONFIRMED_NEXT_STEP,
+  CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+  channelAcceptedUnconfirmedWhere,
+  isChannelAcceptedUnconfirmedAttempt,
+} from './channel-accepted-signal'
+import { isOnlineCollectedPendingRefund, ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
 
 /** 线上资金通道（有 PaymentAttempt 台账的入账来源）。 */
 const ONLINE_CHANNELS = new Set(['sandbox', 'wechat', 'alipay'])
@@ -43,13 +53,34 @@ export interface ReconciliationReport {
     refundingCount: number
     lateePaidCount: number
     reconciledCount: number
+    unconfirmedCollectionCount: number
   }
   discrepancies: ReconciliationDiscrepancy[]
-  /** 迟到入账 / reconcile 入账专项（非错误，复核用）。 */
-  attention: { latePaid: ReconciliationDiscrepancy[]; reconciled: ReconciliationDiscrepancy[] }
+  /**
+   * 专项复核：迟到入账 / reconcile 入账 / 渠道已受理本地未确认 / 退款中（含未超龄）。
+   * 不把未确认受理写成 paid。下一步见各条 detail.nextStep。
+   */
+  attention: {
+    latePaid: ReconciliationDiscrepancy[]
+    reconciled: ReconciliationDiscrepancy[]
+    unconfirmedCollections: ReconciliationDiscrepancy[]
+    refundingInProgress: ReconciliationDiscrepancy[]
+  }
 }
 
 type OrderRow = NonNullable<Awaited<ReturnType<PrismaService['order']['findFirst']>>>
+type SuccessAttemptSnap = { amountCents: number; createdAt: Date }
+
+function isExtraCollectionAfterRefund(
+  order: { payStatus: string; refundedAt: Date | null },
+  attempts: SuccessAttemptSnap[],
+): boolean {
+  if (order.payStatus !== 'refunded' && order.payStatus !== 'refunding') return false
+  if (attempts.length >= 2) return true
+  const refundedAt = order.refundedAt
+  if (refundedAt && attempts.some((row) => row.createdAt.getTime() > refundedAt.getTime())) return true
+  return false
+}
 
 @Injectable()
 export class ReconciliationService {
@@ -61,11 +92,35 @@ export class ReconciliationService {
     const createdAt =
       fromDate || toDate ? { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } : undefined
 
-    // 只取涉及资金/退款态的订单（unpaid/paying/closed 无资金流，排除以聚焦对账）。
+    // 资金/退款态，外加「渠道已收款但未转 paid」的迟到回调待退（不得因 payStatus 非 paid 而隐身）。
+    const unconfirmedAttempts = await this.prisma.paymentAttempt.findMany({
+      where: {
+        ...channelAcceptedUnconfirmedWhere(new Date(params.nowMs)),
+        ...(createdAt ? { order: { createdAt } } : {}),
+      },
+      select: {
+        id: true,
+        orderId: true,
+        status: true,
+        channel: true,
+        amountCents: true,
+        failReason: true,
+        prepayId: true,
+        qrCodeContent: true,
+        channelTxnNo: true,
+        createdAt: true,
+      },
+    })
+    const unconfirmedOrderIds = [...new Set(unconfirmedAttempts.map((row) => row.orderId))]
+
     const orders = await this.prisma.order.findMany({
       where: {
         ...(createdAt ? { createdAt } : {}),
-        payStatus: { in: ['paid', 'refunding', 'partial_refunded', 'refunded'] },
+        OR: [
+          { payStatus: { in: ['paid', 'refunding', 'partial_refunded', 'refunded'] } },
+          { refundReason: ONLINE_PAID_PENDING_REFUND_REASON },
+          ...(unconfirmedOrderIds.length > 0 ? [{ id: { in: unconfirmedOrderIds } }] : []),
+        ],
       },
       orderBy: { createdAt: 'asc' },
     })
@@ -79,8 +134,12 @@ export class ReconciliationService {
       }),
     ])
 
-    const successAttemptByOrder = new Map<string, number>()
-    for (const a of attempts) successAttemptByOrder.set(a.orderId, (successAttemptByOrder.get(a.orderId) ?? 0) + 1)
+    const successAttemptsByOrder = new Map<string, { amountCents: number; createdAt: Date }[]>()
+    for (const a of attempts) {
+      const list = successAttemptsByOrder.get(a.orderId) ?? []
+      list.push({ amountCents: a.amountCents, createdAt: a.createdAt })
+      successAttemptsByOrder.set(a.orderId, list)
+    }
 
     const successRefundSumByOrder = new Map<string, number>()
     for (const r of refunds) {
@@ -105,9 +164,16 @@ export class ReconciliationService {
       }
     }
 
+    const unconfirmedByOrder = new Map<string, (typeof unconfirmedAttempts)[number]>()
+    for (const row of unconfirmedAttempts) {
+      if (isChannelAcceptedUnconfirmedAttempt(row, params.nowMs)) unconfirmedByOrder.set(row.orderId, row)
+    }
+
     const discrepancies: ReconciliationDiscrepancy[] = []
     const latePaid: ReconciliationDiscrepancy[] = []
     const reconciled: ReconciliationDiscrepancy[] = []
+    const unconfirmedCollections: ReconciliationDiscrepancy[] = []
+    const refundingInProgress: ReconciliationDiscrepancy[] = []
     let grossPaidCents = 0
     let paidOrderCount = 0
     let refundedCents = 0
@@ -121,12 +187,14 @@ export class ReconciliationService {
     for (const o of orders) {
       const netCaptured = Math.max(0, o.amountCents - o.discountCents) // 实收资金（抵扣不入资金流）
       const refundSum = successRefundSumByOrder.get(o.id) ?? 0
+      const successAttempts = successAttemptsByOrder.get(o.id) ?? []
+      const extraCollection = isExtraCollectionAfterRefund(o, successAttempts)
 
       if (o.payStatus === 'paid') {
         paidOrderCount += 1
         grossPaidCents += netCaptured
         // 线上通道 paid 单必须有 success 支付尝试（对账取原单/退款定位依据）。
-        if (o.paymentSource && ONLINE_CHANNELS.has(o.paymentSource) && (successAttemptByOrder.get(o.id) ?? 0) === 0) {
+        if (o.paymentSource && ONLINE_CHANNELS.has(o.paymentSource) && successAttempts.length === 0) {
           push(discrepancies, 'PAID_WITHOUT_SUCCESS_ATTEMPT', o, { paymentSource: o.paymentSource, amountCents: netCaptured })
         }
         // paid 单不应有 success 退款记录（退款成功必转 refunded）。
@@ -150,10 +218,46 @@ export class ReconciliationService {
         if (ageMs > STUCK_REFUNDING_MS) {
           push(discrepancies, 'STUCK_REFUNDING', o, { payStatus: o.payStatus, ageMinutes: Math.floor(ageMs / 60000) })
         }
+      } else if (isOnlineCollectedPendingRefund(o)) {
+        // 渠道实收已在，但不把 payStatus 伪装成 paid。金额计入 gross，差异清单供运营退款。
+        grossPaidCents += netCaptured
+        push(discrepancies, 'ONLINE_COLLECTED_PENDING_REFUND', o, {
+          payStatus: o.payStatus,
+          amountCents: netCaptured,
+          successAttempts: successAttempts.length,
+        })
+      }
+
+      if (extraCollection) {
+        const attemptSum = successAttempts.reduce((sum, row) => sum + row.amountCents, 0)
+        grossPaidCents += attemptSum
+        push(discrepancies, 'ORDER_EXTRA_COLLECTION_AFTER_REFUND', o, {
+          payStatus: o.payStatus,
+          successAttempts: successAttempts.length,
+          attemptSumCents: attemptSum,
+          refundedAmountCents: o.refundedAmountCents,
+        })
       }
 
       if (lateOrderIds.has(o.id)) push(latePaid, 'LATE_PAID', o, { paymentSource: o.paymentSource, amountCents: netCaptured })
       if (reconciledOrderIds.has(o.id)) push(reconciled, 'RECONCILED', o, { paymentSource: o.paymentSource, amountCents: netCaptured })
+
+      const unconfirmed = unconfirmedByOrder.get(o.id)
+      if (unconfirmed) {
+        push(unconfirmedCollections, CHANNEL_ACCEPTED_UNCONFIRMED_REASON, o, {
+          attemptId: unconfirmed.id,
+          attemptStatus: unconfirmed.status,
+          channel: unconfirmed.channel,
+          payStatus: o.payStatus,
+          nextStep: CHANNEL_ACCEPTED_UNCONFIRMED_NEXT_STEP,
+        })
+      }
+      if (o.payStatus === 'refunding') {
+        push(refundingInProgress, 'REFUNDING_IN_PROGRESS', o, {
+          payStatus: o.payStatus,
+          nextStep: '只读可见。等待渠道退款通知，或由既有 convergeStalePendingRefunds 同号查证；不要换 refundNo 再发起一笔。',
+        })
+      }
     }
 
     return {
@@ -167,9 +271,10 @@ export class ReconciliationService {
         refundingCount,
         lateePaidCount: latePaid.length,
         reconciledCount: reconciled.length,
+        unconfirmedCollectionCount: unconfirmedCollections.length,
       },
       discrepancies,
-      attention: { latePaid, reconciled },
+      attention: { latePaid, reconciled, unconfirmedCollections, refundingInProgress },
     }
   }
 }

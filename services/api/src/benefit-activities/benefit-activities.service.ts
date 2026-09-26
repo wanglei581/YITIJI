@@ -18,6 +18,7 @@ import type {
   BenefitActivityType,
 } from './benefit-activities.types'
 import type { AdminListBenefitActivitiesQueryDto, ListBenefitActivitiesQueryDto, UpsertBenefitActivityDto } from './dto/benefit-activities.dto'
+import { REDEEMABLE_BENEFIT_TYPES } from '../benefit-redemption/benefit-redemption.types'
 
 const FORBIDDEN_COPY = /到账|已发放金额|发放金额|保证|通过率|录用|面试|候选人推荐|平台投递|一键投递|立即投递/
 const STATUS_TYPES: readonly BenefitActivityStatus[] = ['draft', 'published', 'ended']
@@ -184,6 +185,7 @@ export class BenefitActivitiesService {
       if (!activity || !this.isActivityVisible(activity)) {
         throw new ConflictException({ error: { code: 'BENEFIT_ACTIVITY_NOT_CLAIMABLE', message: '活动暂不可领取' } })
       }
+      assertBenefitQuantity(activity.benefitType, activity.quantityTotal)
 
       const now = new Date()
       const validUntil = activity.grantValidDays
@@ -256,9 +258,7 @@ export class BenefitActivitiesService {
     if (FORBIDDEN_COPY.test(text)) {
       throw new BadRequestException({ error: { code: 'BENEFIT_ACTIVITY_COPY_FORBIDDEN', message: '活动文案含有不合规承诺，请调整为信息说明' } })
     }
-    if (dto.benefitType === 'subsidy_eligibility_hint' && dto.quantityTotal !== null && dto.quantityTotal !== undefined) {
-      throw new BadRequestException({ error: { code: 'BENEFIT_ACTIVITY_QUANTITY_FORBIDDEN', message: '政策资格提示不允许设置额度' } })
-    }
+    assertBenefitQuantity(dto.benefitType, dto.quantityTotal)
     const validFrom = parseOptionalDate(dto.validFrom)
     const validUntil = parseOptionalDate(dto.validUntil)
     if (validFrom && validUntil && validFrom.getTime() > validUntil.getTime()) {
@@ -417,6 +417,22 @@ function cleanNullable(value: string | null | undefined): string | null {
 
 function normalizeOptionalInt(value: number | null | undefined): number | null {
   return value === null || value === undefined ? null : Number(value)
+}
+
+// null 和缺省必须留到这里拒绝。DTO 的 @IsOptional 会放行，不能再按 benefitType 做一套条件校验。
+function assertBenefitQuantity(benefitType: string, quantityTotal: number | null | undefined): void {
+  if (benefitType === 'subsidy_eligibility_hint') {
+    if (quantityTotal !== null && quantityTotal !== undefined) {
+      throw new BadRequestException({ error: { code: 'BENEFIT_ACTIVITY_QUANTITY_FORBIDDEN', message: '政策资格提示不允许设置额度' } })
+    }
+    return
+  }
+  if (!(REDEEMABLE_BENEFIT_TYPES as readonly string[]).includes(benefitType)) return
+  if (typeof quantityTotal !== 'number' || !Number.isInteger(quantityTotal) || quantityTotal < 1 || quantityTotal > 9999) {
+    throw new BadRequestException({
+      error: { code: 'BENEFIT_ACTIVITY_QUANTITY_REQUIRED', message: '可核销权益必须填写 1 到 9999 的整数额度' },
+    })
+  }
 }
 
 function parseOptionalDate(value: string | null | undefined): Date | null {

@@ -1,5 +1,5 @@
 // pages/privacy/privacy.js
-// 隐私与数据：把「数据导出」「撤回岗位 AI 授权」「账号注销」接到真实后端。
+// 隐私与数据：把「数据导出」「撤回 AI 分析授权」「账号注销」接到真实后端。
 //
 // 契约来源（每个字段都对着源码核过，未按字段名猜）：
 //   services/api/src/member-auth/member-auth.controller.ts        step-up 两个端点
@@ -384,14 +384,14 @@ Page({
     })
   },
 
-  // ---------- 撤回岗位 AI 授权 ----------
+  // ---------- 撤回 AI 分析授权 ----------
 
   revokeConsent() {
     if (!this.requireLogin()) return
     if (this.data.busy) return
     wx.showModal({
-      title: '撤回岗位 AI 授权',
-      content: '撤回后再次使用岗位 AI 需重新确认授权。此操作只撤回授权，不会删除简历、文档、打印订单或收藏。',
+      title: '撤回 AI 分析授权',
+      content: '撤回后再次使用简历对照等 AI 分析需重新确认授权。此操作只撤回授权，不会删除简历、文档或打印订单。',
       confirmText: '确认撤回',
       success: (r) => {
         if (!r.confirm) return
@@ -424,8 +424,8 @@ Page({
     const unavailable = this.data.capabilityLoaded && !this.data.accountClosureAvailable
     const content = unavailable
       ? '服务端当前未开放线上自助注销，提交后会被服务端直接拒绝，你会看到它的原话。'
-        + '本入口不会删除简历、文档、打印订单或收藏。'
-        + '现在就能做的：导出我的数据、撤回岗位 AI 授权、在「我的文档」里删除文件、退出登录。'
+        + '本入口不会删除简历、文档或打印订单。'
+        + '现在就能做的：导出我的数据、撤回 AI 分析授权、在「我的文档」里删除文件、退出登录。'
       : '账号注销不可逆。提交后由服务端按其注销流程处理，本页只如实展示服务端返回的状态，不代表已经注销。'
 
     wx.showModal({

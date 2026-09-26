@@ -29,6 +29,10 @@ import { computeClaimPause } from '../src/agent/claim-rate-limit'
 import { __resetClaimRateLimitForTests, executeTask, startTaskRunner } from '../src/agent/task-runner'
 import { __setUnauthorizedMarkerPathForTests } from '../src/agent/auth-state'
 import type { AgentConfig, ClaimTask } from '../src/agent/types'
+import {
+  runInstanceLockHardeningTests,
+  runPrintTaskTempCleanupTests,
+} from './agent-crash-privacy.helper'
 
 interface DbEffects {
   deleted: boolean
@@ -715,6 +719,8 @@ async function main(): Promise<void> {
     ['pre-print dispatch durability', verifyDispatchIntentIsDurableBeforePrinterInvocation],
     ['real DB migration and terminal replay', verifyRealDatabaseMigrationAndTerminalReplay],
     ['dead-letter operator workflow', verifyDeadLetterOperatorWorkflow],
+    ['instance-lock exclusive create and successor-safe release', runInstanceLockHardeningTests],
+    ['print-task crash leftover temp cleanup', runPrintTaskTempCleanupTests],
   ]
   const failures: string[] = []
   for (const [name, verify] of cases) {

@@ -15,7 +15,7 @@ import type { BillingPageSource } from '../print-jobs/print-page-count.types'
  * 订单支付状态（对齐 `Order.payStatus`）。注意 `cancelled` 属 `Order.taskStatus`，不是 payStatus。
  * C5-2 线上态：`paying`（已出码待支付）/ `closed`（超时关单）；线下与免费单不进这两态。
  * C5-4 退款态：`refunding`（退款处理中）/ `refunded`（已全额退款）/ `partial_refunded`
- *   （部分退款，**本波仅类型/状态机预留，不接部分退款动作**）。
+ *   （`partial_refunded` 只留在筛选白名单里，禁止写入：产品只做整单退款）。
  * C5-3 出纸门控口径：**只有 paid 可 claim 出纸**；refunding/partial_refunded/refunded 一律不放行。
  */
 export type OrderPayStatus =

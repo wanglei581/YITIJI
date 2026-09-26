@@ -152,6 +152,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.orderItem
   }
 
+  get orderSubmissionLedger() {
+    return this.client.orderSubmissionLedger
+  }
+
   // ── P0a payment foundation ─────────────────────────────────────────────────
 
   get priceConfig() {
@@ -445,6 +449,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalToolboxConfig
   }
 
+  get kioskJobBoardConfig() {
+    return this.client.kioskJobBoardConfig
+  }
+
   get toolboxApp() {
     return this.client.toolboxApp
   }
@@ -509,6 +517,18 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get jobMaterialTemplate() {
     return this.client.jobMaterialTemplate
+  }
+
+  get recruitmentEmergencyHold() {
+    return this.client.recruitmentEmergencyHold
+  }
+
+  get partnerOrgNotice() {
+    return this.client.partnerOrgNotice
+  }
+
+  get recruitmentCircuitBreak() {
+    return this.client.recruitmentCircuitBreak
   }
 
   // ── Transaction ────────────────────────────────────────────────────────────

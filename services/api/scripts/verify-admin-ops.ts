@@ -15,6 +15,11 @@
  *   8. 列表上限：total/firingCount 是精确总数、truncated 如实告知、被截断的告警仍可处置，
  *      且不会因为「这次没列出来」把操作员的处置抹掉。
  *   9. reopen：已关闭/已静默的告警可以被重新打开，回到待处理。
+ *  10. 真实库 paid_pending_file_unavailable：active / 未到期不误报；上传中、隔离、
+ *      软删除、已过期不漏报；已支付/未支付/已退款和两台终端归属分开；确认、关闭、
+ *      恢复后再故障会换 episode；响应不含签名 URL、storageKey、哈希、支付字段或本人标识。
+ *      正常删除文件走 ON DELETE SET NULL，fileId 被清空后与历史空 fileId 一样不告警。
+ *      fileId 仍在而文件行不在的形状只由第 3b 节内存夹具覆盖。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:admin-ops
  */
@@ -28,11 +33,12 @@ import { NestFactory, Reflector } from '@nestjs/core'
 import { JwtModule, JwtService } from '@nestjs/jwt'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { AuditService } from '../src/audit/audit.service'
+import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.service'
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
-import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP } from '../src/admin-ops/derived-alerts'
+import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../src/terminals/printer-availability'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
@@ -51,10 +57,19 @@ function errorCode(err: unknown): string | undefined {
   return e.response?.error?.code ?? e.getResponse?.()?.error?.code ?? e.message
 }
 
-function mockOpsPrisma(terminalRows: unknown[], printRows: unknown[] = [], dispositionRows: unknown[] = []): PrismaService {
+function mockOpsPrisma(
+  terminalRows: unknown[],
+  printRows: unknown[] = [],
+  dispositionRows: unknown[] = [],
+  unavailableRows: unknown[] = [],
+): PrismaService {
   return {
     terminal: { findMany: async () => terminalRows },
-    printTask: { findMany: async () => printRows, count: async () => printRows.length },
+    printTask: {
+      findMany: async (args?: { where?: { status?: string } }) => args?.where?.status === 'pending' ? unavailableRows : printRows,
+      count: async (args?: { where?: { status?: string } }) => args?.where?.status === 'pending' ? unavailableRows.length : printRows.length,
+      findFirst: async () => unavailableRows[0] ?? null,
+    },
     terminalHeartbeat: { groupBy: async () => [], findFirst: async () => null },
     alertDisposition: {
       findMany: async () => dispositionRows,
@@ -102,6 +117,80 @@ async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
   pass('3a. 健康打印机状态(ok/ready/idle)不产生 printer_issue 告警')
 }
 
+async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
+  const now = new Date('2026-09-23T08:00:00.000Z')
+  const bad = {
+    id: 'pt_paid_pending_bad',
+    fileId: 'file_paid_pending_bad',
+    updatedAt: new Date('2026-09-23T07:59:00.000Z'),
+    terminal: { terminalCode: 'VOP-PAID-PENDING' },
+    order: { payStatus: 'paid' },
+    file: {
+      status: 'uploading',
+      deletedAt: null,
+      expiresAt: null,
+      updatedAt: new Date('2026-09-23T07:58:00.000Z'),
+      storageKey: 'must-not-leak',
+    },
+  }
+  const active = {
+    ...bad,
+    id: 'pt_paid_pending_active',
+    fileId: 'file_paid_pending_active',
+    file: { ...bad.file, status: 'active', updatedAt: new Date('2026-09-23T07:57:00.000Z') },
+  }
+  const quarantined = {
+    ...bad,
+    id: 'pt_paid_pending_quarantined',
+    fileId: 'file_paid_pending_quarantined',
+    file: { ...bad.file, status: 'quarantined', updatedAt: new Date('2026-09-23T07:56:00.000Z') },
+  }
+  const deleted = {
+    ...bad,
+    id: 'pt_paid_pending_deleted',
+    fileId: 'file_paid_pending_deleted',
+    file: { ...bad.file, status: 'active', deletedAt: new Date('2026-09-23T07:55:00.000Z'), updatedAt: new Date('2026-09-23T07:55:00.000Z') },
+  }
+  const expired = {
+    ...bad,
+    id: 'pt_paid_pending_expired',
+    fileId: 'file_paid_pending_expired',
+    file: { ...bad.file, status: 'active', expiresAt: new Date(Date.now() - 60 * 60 * 1000), updatedAt: new Date('2026-09-23T07:54:00.000Z') },
+  }
+  const missing = { ...bad, id: 'pt_paid_pending_missing', fileId: 'file_paid_pending_missing', file: null }
+  const refunded = { ...bad, id: 'pt_paid_pending_refunded', order: { payStatus: 'refunded' } }
+  const legacy = { ...bad, id: 'pt_paid_pending_legacy', fileId: null, file: null }
+  const svc = new AdminOpsService(mockOpsPrisma([], [], [], [bad, active, quarantined, deleted, expired, missing, refunded, legacy]))
+  const first = await svc.listDerivedAlerts('open')
+  const alert = first.data.find((item) => item.id === 'paid_pending_file_unavailable:pt_paid_pending_bad')
+  if (!alert) fail('3b. 已支付 pending + uploading 文件必须进入派生告警')
+  if (alert.severity !== 'error' || alert.conditionState !== 'firing') fail('3b. 文件不可用告警状态/级别错误')
+  for (const id of ['quarantined', 'deleted', 'expired', 'missing']) {
+    if (!first.data.some((item) => item.id === `paid_pending_file_unavailable:pt_paid_pending_${id}`)) {
+      fail(`3b. ${id} 文件不可用状态必须进入派生告警`)
+    }
+  }
+  if (first.firingCount !== 5 || first.data.some((item) => item.id.includes('active') || item.id.includes('refunded') || item.id.includes('legacy'))) {
+    fail('3b. active、已退款或历史 fileId=null 任务不得误报，且五种不可用状态都要计数')
+  }
+  const encoded = JSON.stringify(alert)
+  for (const banned of ['storageKey', 'must-not-leak', 'file_paid_pending_bad']) {
+    if (banned === 'file_paid_pending_bad') continue
+    if (encoded.includes(banned)) fail(`3b. 告警泄露敏感字段: ${banned}`)
+  }
+  const second = await svc.listDerivedAlerts('open')
+  const repeated = second.data.find((item) => item.id === alert.id)
+  if (!repeated || repeated.episodeToken !== alert.episodeToken) fail('3b. 同一文件故障的 episodeToken 必须稳定')
+  const resolved = await resolveDerivedAlert(
+    mockOpsPrisma([], [], [], [bad]),
+    'paid_pending_file_unavailable',
+    bad.id,
+    now,
+  )
+  if (!resolved || resolved.subjectKey !== alert.subjectKey) fail('3b. 单条正向查证必须复用同一告警条件')
+  pass('3b. 已支付 pending 文件不可用告警、误报排除、稳定身份和单条查证')
+}
+
 async function main() {
   console.log('\n=== 阶段1E Admin 运营视图验证 ===')
 
@@ -122,6 +211,7 @@ async function main() {
   pass('SES-07 终端在线窗口统一为五分钟心跳常量')
 
   await verifyHealthyPrinterStatusesDoNotAlert()
+  await verifyPaidPendingFileUnavailableAlert()
   if (process.env.ADMIN_OPS_ALERT_HEALTH_ONLY === '1') return
 
   const prisma = new PrismaService()
@@ -146,6 +236,16 @@ async function main() {
   /** 第 8 节:从未被处置过的告警,用来验证 reopen 不凭空造记录。 */
   const taskFresh = `pt_vop_fresh_${suffix}`
   const limitProbePrefix = `pt_vop_limit_${suffix}_`
+  const tPaid = `term_vop_paid_${suffix}`
+  const paidEndUserId = `eu_vop_paid_${suffix}`
+  const paidTaskIds: string[] = []
+  const paidFileIds: string[] = []
+  const paidOrderIds: string[] = []
+  const paidSubjectKeys: string[] = []
+  let paidTerminalReady = false
+  let paidUserReady = false
+  const tAnomaly = `term_vop_anom_${suffix}`
+  let anomalyTerminalReady = false
   const subjectKeys = [
     `terminal_offline:${tOffline}`,
     `printer_issue:${tPrinterIssue}`,
@@ -232,6 +332,19 @@ async function main() {
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [tOffline, tOnline, tPrinterIssue] } } })
     await prisma.terminal.deleteMany({ where: { id: { in: [tOffline, tOnline, tPrinterIssue] } } })
     await prisma.user.deleteMany({ where: { id: adminId } })
+    if (paidSubjectKeys.length > 0) {
+      await prisma.alertDisposition.deleteMany({ where: { subjectKey: { in: paidSubjectKeys } } })
+      await prisma.auditLog.deleteMany({ where: { targetId: { in: paidSubjectKeys } } })
+    }
+    if (paidOrderIds.length > 0) await prisma.order.deleteMany({ where: { id: { in: paidOrderIds } } })
+    if (paidTaskIds.length > 0) {
+      await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: paidTaskIds } } })
+      await prisma.printTask.deleteMany({ where: { id: { in: paidTaskIds } } })
+    }
+    if (paidFileIds.length > 0) await prisma.fileObject.deleteMany({ where: { id: { in: paidFileIds } } })
+    if (paidUserReady) await prisma.endUser.deleteMany({ where: { id: paidEndUserId } })
+    if (paidTerminalReady) await prisma.terminal.deleteMany({ where: { id: tPaid } })
+    if (anomalyTerminalReady) await prisma.terminal.deleteMany({ where: { id: tAnomaly } })
   }
 
   try {
@@ -708,6 +821,328 @@ async function main() {
         fail(`9b. acknowledged 视图 20 条全部列出时不得报 truncated：${JSON.stringify(snapshot)}`)
       }
       pass('9b. truncated / viewTotal 按当前 view 判断；total 仍是全部在发告警数（73）')
+    }
+
+    // ── 10. 真实库：已支付 pending 文件不可用 ─────────────────────────────
+    {
+      const signedUrl = `https://files.invalid/vop-signed-url-${suffix}`
+      const shaCanary = `vop-sha-${suffix}`
+      const pickupCanary = `vop-pickup-${suffix}`
+      const ownerCanary = `vop-owner-${suffix}`
+      const nameCanary = `vop-named-${suffix}.pdf`
+      const amountCanary = 975311
+      const paidCode = `VOP-PAID-${suffix}`
+      const onlineCode = `VOP-ON-${suffix}`
+      const past = new Date(Date.now() - 60 * 60 * 1000)
+      const future = new Date(Date.now() + 24 * 60 * 60 * 1000)
+      const banned = [signedUrl, shaCanary, pickupCanary, ownerCanary, nameCanary, String(amountCanary), 'storageKey', 'fileUrl', 'fileMd5', 'sha256', 'pickupCode', 'amountCents', 'phoneEnc', 'phoneHash', 'endUserId', paidEndUserId, `vop-storage-${suffix}`]
+      const publicKeys = ['id', 'subjectKey', 'episodeToken', 'type', 'severity', 'title', 'detail', 'terminalCode', 'occurredAt', 'conditionState', 'handlingState', 'acknowledgedAt', 'silencedUntil', 'note']
+
+      await prisma.terminal.create({
+        data: { id: tPaid, terminalCode: paidCode, agentToken: `tok_paid_${suffix}`, deviceFingerprint: 'fp' },
+      })
+      paidTerminalReady = true
+      await prisma.endUser.create({
+        data: { id: paidEndUserId, phoneHash: `phonehash_${suffix}`, phoneEnc: ownerCanary },
+      })
+      paidUserReady = true
+
+      const seed = async (key: string, args: {
+        terminalId: string
+        file: { status: string; deletedAt?: Date | null; expiresAt?: Date | null } | null
+        payStatus: string
+        taskStatus?: string
+        withOwner?: boolean
+      }) => {
+        const taskId = `pt_vop_paid_${suffix}_${key}`
+        const fileId = args.file ? `file_vop_paid_${suffix}_${key}` : null
+        if (fileId && args.file) {
+          await prisma.fileObject.create({
+            data: {
+              id: fileId,
+              storageKey: `vop-storage-${suffix}-${key}`,
+              filename: nameCanary,
+              mimeType: 'application/pdf',
+              sizeBytes: 128,
+              sha256: shaCanary,
+              purpose: 'print',
+              status: args.file.status,
+              deletedAt: args.file.deletedAt ?? null,
+              expiresAt: args.file.expiresAt ?? null,
+              endUserId: args.withOwner ? paidEndUserId : null,
+            },
+          })
+          paidFileIds.push(fileId)
+        }
+        await prisma.printTask.create({
+          data: {
+            id: taskId,
+            terminalId: args.terminalId,
+            endUserId: args.withOwner ? paidEndUserId : null,
+            fileId,
+            fileUrl: signedUrl,
+            fileMd5: shaCanary,
+            paramsJson: '{}',
+            status: args.taskStatus ?? 'pending',
+          },
+        })
+        paidTaskIds.push(taskId)
+        const orderId = `ord_vop_paid_${suffix}_${key}`
+        await prisma.order.create({
+          data: {
+            id: orderId,
+            orderNo: `ORD-VOP-P-${key}-${suffix}`.toUpperCase(),
+            type: 'print',
+            printTaskId: taskId,
+            terminalId: args.terminalId,
+            endUserId: args.withOwner ? paidEndUserId : null,
+            amountCents: amountCanary,
+            currency: 'CNY',
+            payStatus: args.payStatus,
+            taskStatus: args.taskStatus ?? 'pending',
+            paymentSource: args.payStatus === 'unpaid' ? null : 'sandbox',
+            discountCents: 0,
+            pickupCode: key === 'uploading' ? pickupCanary : null,
+            sourceFileSha256: shaCanary,
+          },
+        })
+        paidOrderIds.push(orderId)
+        paidSubjectKeys.push(`paid_pending_file_unavailable:${taskId}`)
+        return { taskId, fileId }
+      }
+
+      const active = await seed('active', { terminalId: tPaid, file: { status: 'active' }, payStatus: 'paid' })
+      await seed('future', { terminalId: tPaid, file: { status: 'active', expiresAt: future }, payStatus: 'paid' })
+      const uploading = await seed('uploading', { terminalId: tPaid, file: { status: 'uploading' }, payStatus: 'paid', withOwner: true })
+      await seed('quarantined', { terminalId: tPaid, file: { status: 'quarantined' }, payStatus: 'paid' })
+      await seed('deleted', { terminalId: tPaid, file: { status: 'active', deletedAt: past }, payStatus: 'paid' })
+      await seed('expired', { terminalId: tPaid, file: { status: 'active', expiresAt: past }, payStatus: 'paid' })
+      const setNull = await seed('setnull', { terminalId: tPaid, file: { status: 'active' }, payStatus: 'paid' })
+      await seed('refunded', { terminalId: tPaid, file: { status: 'uploading' }, payStatus: 'refunded' })
+      await seed('legacy', { terminalId: tPaid, file: null, payStatus: 'paid' })
+      await seed('unpaid', { terminalId: tPaid, file: { status: 'uploading' }, payStatus: 'unpaid' })
+      await seed('other', { terminalId: tOnline, file: { status: 'quarantined' }, payStatus: 'paid' })
+      if (!setNull.fileId) fail('10. SET NULL 夹具必须先有文件')
+      await prisma.fileObject.delete({ where: { id: setNull.fileId } })
+      const cleared = await prisma.printTask.findUnique({
+        where: { id: setNull.taskId },
+        select: { fileId: true },
+      })
+      if (cleared?.fileId !== null) fail('10. 正常删除文件后 fileId 必须被 ON DELETE SET NULL 清空')
+
+      const expected = [
+        ['uploading', '文件仍在上传', paidCode],
+        ['quarantined', '文件处于隔离状态', paidCode],
+        ['deleted', '文件已删除', paidCode],
+        ['expired', '文件已过期', paidCode],
+        ['other', '文件处于隔离状态', onlineCode],
+      ] as const
+      const alertId = (key: string) => `paid_pending_file_unavailable:pt_vop_paid_${suffix}_${key}`
+      const load = async (view: 'open' | 'acknowledged' | 'suppressed' | 'all') => svc.listDerivedAlerts(view, 100)
+      const first = await load('open')
+      const second = await load('open')
+      const got = first.data
+        .filter((item) => item.id.startsWith(`paid_pending_file_unavailable:pt_vop_paid_${suffix}_`))
+        .map((item) => item.id)
+        .sort()
+      const want = expected.map(([key]) => alertId(key)).sort()
+      if (got.join('|') !== want.join('|')) {
+        fail(`10. 真实库误报或漏报：got=${got.join('|')} want=${want.join('|')}`)
+      }
+      for (const [key, reason, terminalCode] of expected) {
+        const alert = first.data.find((item) => item.id === alertId(key))
+        const again = second.data.find((item) => item.id === alertId(key))
+        if (!alert || !again) fail(`10. 缺少 ${key} 告警`)
+        if (alert.severity !== 'error' || alert.conditionState !== 'firing' || alert.handlingState !== 'open') {
+          fail(`10. ${key} 初始状态错误`)
+        }
+        const subjectId = alert.subjectKey.slice('paid_pending_file_unavailable:'.length)
+        if (subjectId !== `pt_vop_paid_${suffix}_${key}` || alert.subjectKey !== alert.id || alert.terminalCode !== terminalCode) {
+          fail(`10. ${key} 归属不是对应任务/终端`)
+        }
+        if (!alert.detail.includes(reason) || !alert.detail.includes(terminalCode)) fail(`10. ${key} 详情未说明原因或终端`)
+        if (again.episodeToken !== alert.episodeToken) fail(`10. ${key} 的 episodeToken 不稳定`)
+        const encoded = JSON.stringify(alert)
+        for (const secret of banned) {
+          if (encoded.includes(secret)) fail(`10. ${key} 告警泄露 ${secret}`)
+        }
+        for (const field of Object.keys(alert)) {
+          if (!publicKeys.includes(field)) fail(`10. ${key} 告警出现未声明字段 ${field}`)
+        }
+      }
+      const uploadingAlert = first.data.find((item) => item.id === alertId('uploading'))!
+      const resolved = await resolveDerivedAlert(prisma, 'paid_pending_file_unavailable', uploading.taskId, new Date())
+      if (!resolved || resolved.subjectKey !== uploadingAlert.subjectKey || resolved.episodeToken !== uploadingAlert.episodeToken) {
+        fail('10. 单条正向查证必须复用同一条真实库告警')
+      }
+      for (const absentId of [active.taskId, setNull.taskId, `pt_vop_paid_${suffix}_legacy`, `pt_vop_paid_${suffix}_refunded`, `pt_vop_paid_${suffix}_unpaid`, `pt_vop_paid_${suffix}_future`]) {
+        if (await resolveDerivedAlert(prisma, 'paid_pending_file_unavailable', absentId, new Date())) {
+          fail(`10. 不应正向查到 ${absentId}`)
+        }
+      }
+
+      const acknowledged = await actions.dispose({
+        subjectKey: uploadingAlert.subjectKey,
+        episodeToken: uploadingAlert.episodeToken,
+        action: 'acknowledge',
+      }, adminId)
+      if (acknowledged.idempotent || acknowledged.handlingState !== 'acknowledged' || acknowledged.conditionState !== 'firing') {
+        fail('10. 首次确认返回异常')
+      }
+      if ((await load('open')).data.some((item) => item.id === uploadingAlert.id)) fail('10. 确认后仍在待处理')
+      const ackRow = (await load('acknowledged')).data.find((item) => item.id === uploadingAlert.id)
+      if (!ackRow || ackRow.handlingState !== 'acknowledged' || ackRow.conditionState !== 'firing') fail('10. 确认后已确认列表不诚实')
+      if ((await prisma.auditLog.findMany({ where: { action: 'alert.acknowledge', targetId: uploadingAlert.subjectKey } })).length !== 1) {
+        fail('10. 确认审计应只有 1 条')
+      }
+      if (!(await actions.dispose({
+        subjectKey: uploadingAlert.subjectKey,
+        episodeToken: uploadingAlert.episodeToken,
+        action: 'acknowledge',
+      }, adminId)).idempotent) fail('10. 重复确认应幂等')
+      try {
+        await actions.dispose({
+          subjectKey: uploadingAlert.subjectKey,
+          episodeToken: 'not-the-current-episode',
+          action: 'acknowledge',
+        }, adminId)
+        fail('10. 错误 episode 应被拒绝')
+      } catch (err) {
+        if (errorCode(err) !== 'ALERT_EPISODE_CHANGED') fail(`10. 期望 ALERT_EPISODE_CHANGED，得到 ${errorCode(err)}`)
+      }
+      await actions.dispose({
+        subjectKey: uploadingAlert.subjectKey,
+        episodeToken: uploadingAlert.episodeToken,
+        action: 'close',
+      }, adminId)
+      if ((await load('open')).data.some((item) => item.id === uploadingAlert.id)) fail('10. 关闭后仍在待处理')
+      const closed = (await load('suppressed')).data.find((item) => item.id === uploadingAlert.id)
+      if (!closed || closed.handlingState !== 'closed' || closed.conditionState !== 'firing') fail('10. 关闭后仍应可见且问题仍在发生')
+
+      if (!uploading.fileId) fail('10. 上传中夹具缺少文件')
+      await prisma.fileObject.update({
+        where: { id: uploading.fileId },
+        data: { status: 'active', deletedAt: null, expiresAt: null },
+      })
+      if ((await load('all')).data.some((item) => item.id === uploadingAlert.id)) fail('10. 文件恢复为 active 后告警必须消失')
+      const beforeClearRead = await prisma.alertDisposition.findUnique({ where: { subjectKey: uploadingAlert.subjectKey } })
+      if (!beforeClearRead || beforeClearRead.recoveredAt !== null) fail('10. 条件消失不得由读取写成已恢复')
+      await load('all')
+      const afterClearRead = await prisma.alertDisposition.findUnique({ where: { subjectKey: uploadingAlert.subjectKey } })
+      if (dispositionFingerprint(afterClearRead) !== dispositionFingerprint(beforeClearRead)) {
+        fail('10. 文件恢复后的 GET 不得改写处置记录')
+      }
+      await prisma.fileObject.update({
+        where: { id: uploading.fileId },
+        data: { status: 'uploading' },
+      })
+      const recurred = (await load('open')).data.find((item) => item.id === uploadingAlert.id)
+      if (!recurred || recurred.handlingState !== 'open' || recurred.episodeToken === uploadingAlert.episodeToken) {
+        fail('10. 文件再次不可用必须作为新一轮待处理，不得继承旧关闭')
+      }
+      const paidOrder = await prisma.order.findUnique({
+        where: { id: `ord_vop_paid_${suffix}_uploading` },
+        select: { payStatus: true },
+      })
+      const paidTask = await prisma.printTask.findUnique({
+        where: { id: uploading.taskId },
+        select: { status: true },
+      })
+      if (paidOrder?.payStatus !== 'paid' || paidTask?.status !== 'pending') fail('10. 告警读取和处置不得改写订单支付状态或任务状态')
+      const otherAlert = first.data.find((item) => item.id === alertId('other'))!
+      if (otherAlert.subjectKey.endsWith(uploading.taskId) || otherAlert.terminalCode === paidCode) fail('10. 另一终端的告警串到了本任务')
+      pass('10. 真实库已支付文件不可用：误报/漏报、归属、消警、审计与信息最小化')
+    }
+
+    // ── 11. 缺纸 / 断电 / 未确认不走文件失效待退款 ─────────────────────────
+    {
+      const anomalyToken = `tok_anom_${suffix}`
+      await prisma.terminal.create({
+        data: { id: tAnomaly, terminalCode: `KSK-ANOM-${suffix}`, agentToken: anomalyToken, deviceFingerprint: 'fp-anom' },
+      })
+      anomalyTerminalReady = true
+      const agent = new TerminalAgentService(prisma, new AuditService(prisma))
+      const fileId = `file_vop_anom_${suffix}`
+      await prisma.fileObject.create({
+        data: {
+          id: fileId,
+          storageKey: `vop-anom-${suffix}`,
+          filename: 'anom.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 64,
+          sha256: 'a'.repeat(64),
+          purpose: 'print',
+          status: 'active',
+          bucket: 'local-fs',
+        },
+      })
+      paidFileIds.push(fileId)
+      async function seedClaimed(label: string, claimExpiry: Date | null): Promise<{ taskId: string; orderId: string }> {
+        const taskId = `pt_vop_anom_${suffix}_${label}`
+        const orderId = `ord_vop_anom_${suffix}_${label}`
+        await prisma.printTask.create({
+          data: {
+            id: taskId,
+            terminalId: tAnomaly,
+            fileId,
+            fileUrl: 'https://internal/anom',
+            fileMd5: 'b'.repeat(64),
+            paramsJson: '{}',
+            status: 'claimed',
+            claimedAt: new Date(),
+            claimExpiry,
+          },
+        })
+        paidTaskIds.push(taskId)
+        await prisma.order.create({
+          data: {
+            id: orderId,
+            orderNo: `ORD-ANOM-${label}-${suffix}`.toUpperCase(),
+            type: 'print',
+            printTaskId: taskId,
+            terminalId: tAnomaly,
+            amountCents: 80,
+            currency: 'CNY',
+            payStatus: 'paid',
+            taskStatus: 'claimed',
+            paymentSource: 'offline',
+            discountCents: 0,
+          },
+        })
+        paidOrderIds.push(orderId)
+        return { taskId, orderId }
+      }
+      const paper = await seedClaimed('paper', null)
+      const unconfirmed = await seedClaimed('unconfirmed', null)
+      const power = await seedClaimed('power', new Date(Date.now() - 60_000))
+      await agent.patchTaskStatus(paper.taskId, { status: 'failed', errorCode: 'PAPER_EMPTY' }, `Bearer ${anomalyToken}`, tAnomaly)
+      await agent.patchTaskStatus(unconfirmed.taskId, { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' }, `Bearer ${anomalyToken}`, tAnomaly)
+      await agent.resetExpiredClaims()
+      const rows = await prisma.order.findMany({
+        where: { id: { in: [paper.orderId, unconfirmed.orderId, power.orderId] } },
+        select: { id: true, payStatus: true, taskStatus: true, refundReason: true },
+      })
+      const byId = new Map(rows.map((row) => [row.id, row]))
+      const paperRow = byId.get(paper.orderId)
+      const unconfirmedRow = byId.get(unconfirmed.orderId)
+      const powerRow = byId.get(power.orderId)
+      const powerTask = await prisma.printTask.findUnique({ where: { id: power.taskId }, select: { status: true, errorCode: true } })
+      const alerts = await svc.listDerivedAlerts('all', 200)
+      const mixed = alerts.data.filter((item) =>
+        item.type === 'paid_pending_file_unavailable' &&
+        [paper.taskId, unconfirmed.taskId, power.taskId].includes(item.subjectId),
+      )
+      if (
+        paperRow?.payStatus === 'paid' && paperRow.taskStatus === 'failed' && paperRow.refundReason == null &&
+        unconfirmedRow?.payStatus === 'paid' && unconfirmedRow.taskStatus === 'failed' && unconfirmedRow.refundReason == null &&
+        powerRow?.payStatus === 'paid' && powerRow.taskStatus === 'failed' && powerRow.refundReason == null &&
+        powerTask?.status === 'failed' && powerTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
+        mixed.length === 0
+      ) {
+        pass('11. 缺纸、断电、未确认都不写成文件失效待退款，也不进文件不可用告警')
+      } else {
+        fail(`11. 去向串线 ${JSON.stringify({ paperRow, unconfirmedRow, powerRow, powerTask, mixed: mixed.map((item) => item.id) })}`)
+      }
     }
 
     console.log('\n=== ALL PASS ===')

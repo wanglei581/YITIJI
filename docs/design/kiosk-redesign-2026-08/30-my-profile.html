@@ -19,21 +19,13 @@
   api:  各项数量由对应列表端点的分页 total 得到，**没有 /me/summary 这个聚合端点**
         （2026-09-02 核实：后端无此路由，运行时 useMemberProfileOverview 是 Promise.allSettled
           并发调列表读 total；此前本文件写「GET /me/summary 一律由此返回」是错的）
-        顶部概览只并发这三条，各带 pageSize=1、只取响应里的 total，不拉明细
-        （useMemberProfileOverview.ts:52-56）：
-          GET /api/v1/me/ai-records?pageSize=1
-          GET /api/v1/me/favorites?pageSize=1
-          GET /api/v1/me/documents?pageSize=1
-        allSettled 意味着**三条互不阻塞**：只挂其中一条时，另两个数量照常显示，挂掉那条显示「—」。
-        其余卡片进入各自页面后才按需调用：
         GET /api/v1/me/resumes | /documents | /print-orders | /favorites | /benefits | /ai-records
         GET /api/v1/me/pending-tasks  —— 真实待办；无待办即空态，不造「继续办理」
                                         契约见 apps/kiosk/src/services/api/pendingTasks.ts：
                                         status(pending|claimed|printing) / payStatus / fileName /
                                         updatedAt / resume(payment|print-progress)
         对齐 apps/kiosk/src/pages/profile/*、ContinuePanel 与 /session-resume
-  fallback: 概览数量读取失败 → error：卡片保留入口但数量显示「—」，不拿上次数字冒充当前账号
-            （是「那三条列表端点读 total 失败」，不是「summary 端点失败」——没有那个端点）
+  fallback: summary 失败 → error：卡片保留入口但数量显示「—」，不拿上次数字冒充当前账号
   真话边界：
     ① 区分两件事，别混：
        · **运行时**没有「默认状态」——页面渲染的就是接口返回值，返回空就显示空，
@@ -64,7 +56,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink-2:#3d5a52;--ink-3:#6b857c;
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink-2:#3d5a52;--ink-3:#526b62;
   --deep:#0b241e;--deep-2:#123a30;--emerald:#2ee6a8;
   --teal:#1f9e86;--teal-d:#157a67;--teal-soft:#e0f2ec;
   --slate:#3f68b0;--slate-d:#35608f;--slate-soft:#e6ecf7;
@@ -204,6 +196,9 @@ button.row{width:100%}
 .state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
 .state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
 .state[data-kind=lock]{background:var(--plum-soft);border-color:#ddd0e3}
+.fixnote{flex:none;display:flex;align-items:center;gap:12px;margin-top:12px;padding:14px 20px;border:1px solid #e6d8b4;border-left:6px solid var(--wheat);border-radius:var(--r-sm,18px);background:var(--wheat-soft);color:var(--wheat-d);font-size:18px;line-height:1.45;font-weight:600}
+.fixnote svg{flex:none}
+.demotag{display:inline-flex;align-items:center;margin-left:8px;padding:2px 10px;border-radius:12px;background:var(--wheat-soft);color:var(--wheat-d);font-size:16px;font-weight:700;vertical-align:middle}
 .state-h{display:flex;align-items:center;gap:14px;font-size:30px;font-weight:700}
 .state-p{font-size:21px;line-height:1.6;color:var(--ink-2);max-width:880px}
 .state-p b{color:var(--ink)}
@@ -265,8 +260,8 @@ button.row{width:100%}
   </div>
 
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
     <a class="nav-item press" href="30-my-profile.html" data-route="/profile" aria-current="page"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
 
@@ -301,6 +296,14 @@ var ICON={
 };
 function svg(n,s,w){return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[n]+'</svg>';}
 function slot(t,cls){return '<span class="slot'+(cls?' '+cls:'')+'">'+t+'</span>';}
+/* 静态稿里凡是长得像「某个人的数据」的内容（待办订单、资产数量、这一趟的记录），
+   都必须自己说明白它是排版示例。公共终端上最不能出现的误会，就是让人以为
+   屏幕上还留着上一位使用者的简历、订单和取件码。 */
+function fixNote(tid,text){
+  return '<div class="fixnote" data-evidence-fixture="synthetic" data-testid="profile-'+tid+'">'+svg('alert',22)
+    +'<span><b>界面示例 · 演示状态。</b>'+text+'</span></div>';
+}
+var DEMO_TAG='<span class="demotag">界面示例</span>';
 
 /* 原来六项塞进同一个 3x2 等权方阵：「我的简历」和「AI 服务记录」一样大、
    一样的彩色图标底、一样的「共 — 条 ›」。六个不同的东西套同一个模具，
@@ -320,7 +323,7 @@ function assetGrid(sc,n){
   /* 主层：三张与当下办事直接相关的资产。去掉彩色图标底——那六种颜色不承载语义，
      纯装饰；数量用等宽数字做视觉锚点，配一句说明这一项对用户意味着什么。 */
   var h='<section><div class="sec-h"><span class="t">简历、文档与订单</span>'
-    +'<span class="hint">'+(n?'数量由服务端返回':'数量由服务端返回，未返回显示「—」')+'</span></div>'
+    +'<span class="hint">'+(n?'数量由系统返回 · 此处为界面示例':'数量由系统返回，未返回显示「—」')+'</span></div>'
     +'<div class="grid3" style="margin-top:12px">';
   for(var i=0;i<ASSETS_MAIN.length;i++){
     var a=ASSETS_MAIN[i];
@@ -348,7 +351,7 @@ function accountRows(sc){
   return '<section><div class="sec-h"><span class="t">通知与支持</span><span class="hint">只列已经能用的</span></div><div class="rows" style="margin-top:12px">'
     /* 账号设置入口已在上方账号卡右上（同一个 /me/settings）。
        这里再放一条只是换个说法指向同一处，是拼凑感的来源，去掉。 */
-    +row('bell','35-notifications.html','/me/notifications','消息通知','服务端下发的会员通知，读与标记均落库。','notifications',sc)
+    +row('bell','35-notifications.html','/me/notifications','消息通知','系统下发的会员通知，已读与标记都会记录。','notifications',sc)
     +row('shield','41-member-privacy.html','/me/privacy-requests','隐私请求','当前可提交岗位 AI 授权撤回；数据导出与账号注销尚未开放。','privacy',sc)
     +row('help','06-help.html','/help','帮助中心','服务台位置、常见问题与找人处理。','help',sc)
     +row('msg','40-member-feedback.html','/me/feedback','意见反馈','提交后能看到处理状态。','feedback',sc)
@@ -378,20 +381,20 @@ function todoCard(kind){
   if(kind==='payment'){
     return '<div class="card live"><div class="todo"><span class="todo-ic pay">'+svg('clock',26)+'</span>'
       +'<span class="todo-tx"><span class="todo-t">有一份文件还没付款</span>'
-      +'<span class="todo-meta"><b>求职简历-终稿.pdf</b><i>·</i>订单 <b>P2609020317</b><i>·</i>应付 <b>¥2.40</b></span>'
-      +'<span class="todo-d">金额与明细由 <b>/me/pending-tasks</b> 的 <b>resume.priceLines</b> 返回；付款前不会开始出纸。</span></span>'
+      +'<span class="todo-meta"><b>求职简历-终稿.pdf</b><i>·</i>订单 <b>P2609020317</b><i>·</i>应付 <b>¥2.40</b>'+DEMO_TAG+'</span>'
+      +'<span class="todo-d">应付金额和收费明细以这张订单的实际内容为准；付款前不会开始出纸。</span></span>'
       +'<a class="todo-btn teal press" href="07-session-resume.html" data-route="/session-resume" data-testid="profile-resume">继续付款</a></div></div>';
   }
   if(kind==='printing'){
     return '<div class="card live"><div class="todo"><span class="todo-ic run">'+svg('print',26)+'</span>'
       +'<span class="todo-tx"><span class="todo-t">你的文件正在打印</span>'
-      +'<span class="todo-meta"><b>求职简历-终稿.pdf</b><i>·</i>第 <b>2</b>/<b>3</b> 页<i>·</i>取件码 <b class="code">4829</b></span>'
-      +'<span class="todo-d">出纸进度与取件码由 <b>/me/pending-tasks</b> 的 <b>status</b>（claimed / printing）返回；纸出完前不要离开取件口。</span></span>'
-      +'<a class="todo-btn teal press" href="11-arrival-code.html" data-route="/print/pickup-claim" data-testid="profile-resume">看出纸进度</a></div></div>';
+      +'<span class="todo-meta"><b>求职简历-终稿.pdf</b><i>·</i>第 <b>2</b>/<b>3</b> 页<i>·</i>取件码 <b class="code">4829</b>'+DEMO_TAG+'</span>'
+      +'<span class="todo-d">出纸进度和取件码由打印服务实时给出；纸出完前不要离开取件口。</span></span>'
+      +'<a class="todo-btn teal press" href="33-pickup-code.html" data-route="/print/pickup-claim" data-testid="profile-resume">看出纸进度</a></div></div>';
   }
   return '<div class="card"><div class="todo"><span class="todo-ic">'+svg('clock',26)+'</span>'
     +'<span class="todo-tx"><span class="todo-t">你有未办完的事</span>'
-    +'<span class="todo-d">任务名称、停在第几步与保留时限，全部由 <b>/me/pending-tasks</b> 返回；本页不预写内容。</span></span>'
+    +'<span class="todo-d">办到哪一步、还能保留多久，都按你账号里的真实待办显示；本页不预写内容。</span></span>'
     +'<a class="todo-btn teal press" href="07-session-resume.html" data-route="/session-resume" data-testid="profile-resume">接着办</a></div></div>';
 }
 function stateBlock(kind,icon,title,desc,acts,tid){
@@ -401,7 +404,7 @@ function stateBlock(kind,icon,title,desc,acts,tid){
 function retention(){
   return '<div class="note"><div class="note-t">'+svg('info',24)+'结束使用之后会发生什么</div>'
     +'<p class="note-d">点「结束使用」或会话超时，本机<b>清除的是登录态和这一趟的临时会话信息</b>：屏幕上的内容、未提交的填写、临时预览都会消失。'
-    +'已经提交到服务端的<b>订单、文件和记录不会因此消失</b>，它们按服务端的留存期限管理；要删除请到「隐私请求」提交，处理结果以服务端返回为准。</p></div>';
+    +'已经提交的<b>订单、文件和记录不会因此消失</b>，它们按系统的留存期限管理；要删除请到「隐私请求」提交，处理结果以系统返回为准。</p></div>';
 }
 function skel(w,m){return '<div class="skel-line" style="width:'+w+'%'+(m?';margin-top:14px':'')+'"></div>';}
 
@@ -480,13 +483,13 @@ function rebindView(cfg){
   return h+'</div>';
 }
 
-var MASKED='服务端返回的遮挡号码（例 138****1234）';
+var MASKED='遮挡显示的号码（例 138****1234）';
 /* 本次会话记录：user-data-flow-matrix.md 指定「我的」页三块之一（概览 + 分区入口 + 本次会话记录）。
    运行时已有 ProfileSessionRecords，原型此前缺席。它是**本次会话的本地状态**，不是服务端列表，
    所以它也解释了底部「结束使用」到底会清掉什么——公共终端上用户最在意的就是这件事。 */
 function sessionRecords(kind){
   var h='<section><div class="sec-h"><span class="t">这一趟做过什么</span>'
-    +'<span class="hint">'+(kind==='has'?'离开时这一段会清掉':'只记这一次，不跨人累计')+'</span></div>';
+    +'<span class="hint">'+(kind==='has'?'界面示例 · 离开时这一段会清掉':'只记这一次，不跨人累计')+'</span></div>';
   if(kind!=='has'){
     return h+'<div class="card" style="margin-top:12px"><div class="todo none">'
       +'<span class="todo-ic">'+svg('info',26)+'</span>'
@@ -499,6 +502,7 @@ function sessionRecords(kind){
     ['spark','做了一次简历诊断','17:09','39-member-records.html?view=ai-records','/me/ai-records'],
     ['print','提交打印，等待付款','17:12','07-session-resume.html','/session-resume']
   ];
+  h+=fixNote('session-fixture-note','下面 3 条是排版用的示例记录，不是你的、也不是上一位使用者的操作记录。');
   h+='<div class="rows" style="margin-top:12px">';
   for(var i=0;i<items.length;i++){
     var it=items[i];
@@ -522,16 +526,20 @@ var VIEWS={
   /* 有数据态：显式命名，不做默认。用来验证「这一页有东西时长什么样」。
      数值是接线后由服务端返回的占位，见文件头真话边界 ①。 */
   'profile:ready':function(){
-    return '<div class="scroll">'+idCard(false)+todoCard('payment')+assetGrid('profile',COUNTS)
+    return '<div class="scroll">'+idCard(false)
+      +fixNote('ready-fixture-note','这一屏用来确认「有内容时长什么样」：下面的待办、金额、订单号与数量都是示例，真实页面按你本人的账号显示。')
+      +todoCard('payment')+assetGrid('profile',COUNTS)
       +sessionRecords('has')+accountRows('profile')+'</div>'
       +'<div class="ctabar"><p class="why">离开前请点「结束使用」；这会退出登录并清掉本机这一趟的临时会话信息。</p>'
       +'<a class="btn danger narrow press" href="04-session-guard.html" data-route="/session-timeout" data-testid="profile-primary">'+svg('out',22)+'结束使用</a></div>';
   },
   'profile:printing':function(){
-    return '<div class="scroll">'+idCard(false)+todoCard('printing')+assetGrid('profile',COUNTS)
+    return '<div class="scroll">'+idCard(false)
+      +fixNote('printing-fixture-note','这一屏用来确认「正在打印时长什么样」：下面的文件名、页数、取件码与数量都是示例，真实页面按你本人的任务显示。')
+      +todoCard('printing')+assetGrid('profile',COUNTS)
       +sessionRecords('has')+accountRows('profile')+'</div>'
       +'<div class="ctabar"><p class="why">出纸完成前不要离开取件口；离开会话不会取消已提交的打印。</p>'
-      +'<a class="btn primary press" href="11-arrival-code.html" data-route="/print/pickup-claim" data-testid="profile-primary">看出纸进度</a></div>';
+      +'<a class="btn primary press" href="33-pickup-code.html" data-route="/print/pickup-claim" data-testid="profile-primary">看出纸进度</a></div>';
   },
   'profile:signed-out':function(){
     return '<div class="scroll">'+idCard(true)
@@ -539,8 +547,8 @@ var VIEWS={
       +'<p class="note-d">打印、扫描、岗位与招聘会浏览、政策查询都<b>不需要账号</b>。需要本人身份、跨设备保存或会员权益的功能，会在进入时再要求登录。</p></div>'
       +'<section><div class="sec-h"><span class="t">登录之后会出现</span><span class="hint">现在不预渲染任何人的数据</span></div><div class="rows" style="margin-top:12px">'
       +row('doc','03-login-gate.html','/login','你自己的简历与文档','解析过的简历、生成的材料与扫描件。','a1','profile')
-      +row('print','03-login-gate.html','/login','打印订单与办理进度','订单状态由服务端返回，可继续办理。','a2','profile')
-      +row('gift','03-login-gate.html','/login','权益台账与活动记录','是否有可用权益由接口判定。','a3','profile')
+      +row('print','03-login-gate.html','/login','打印订单与办理进度','订单状态以系统记录为准，可继续办理。','a2','profile')
+      +row('gift','03-login-gate.html','/login','权益台账与活动记录','是否有可用权益由系统判定。','a3','profile')
       +'</div></section>'
       +factSection('登录与不登录的分界','按功能划线，不按页面划线',[
         ['不需要账号','打印、扫描、复印与文件转换'],
@@ -548,7 +556,7 @@ var VIEWS={
         ['需要登录','跨设备保存的简历、文档与打印订单'],
         ['需要登录','会员权益、隐私请求与消息通知'],
         ['现在显示的数量','没有 —— 未登录时本机不预渲染任何人的数据'],
-        ['登录之后','数量与待办由服务端按你的账号返回']
+        ['登录之后','数量与待办按你本人的账号显示']
       ])+'</div>'
       +'<div class="ctabar"><a class="btn ghost narrow press" href="01-home.html" data-route="/">回首页</a>'
       +'<a class="btn primary press" href="03-login-gate.html" data-route="/login" data-testid="profile-primary">去登录</a></div>';
@@ -569,11 +577,11 @@ var VIEWS={
       +'<div class="grid3" style="margin-top:12px">'+tiles+'</div>'
       +'<div class="morelinks">'+more+'</div></section>'
       +factSection('正在读取什么','数量返回前一律显示「—」',[
-        ['请求','GET /me/summary 与 GET /me/pending-tasks'],
+        ['正在读取','你的资产数量，以及有没有没办完的事'],
         ['类目','六项是本页固定结构，读取中也不会变'],
         ['数量','还没有返回，因此数量位留空'],
         ['上一次的数字','不会拿来冒充当前账号'],
-        ['待办','由 /me/pending-tasks 返回，没有就是没有'],
+        ['待办','以你账号里的真实待办为准，没有就是没有'],
         ['读取失败时','数量显示「—」，入口仍然可以点']
       ])
       +'<p style="font-size:19px;color:var(--ink-3);line-height:1.5">正在取你的资产数量与待办。数量返回前显示「—」，不显示上一次的数字。</p></div>'
@@ -617,7 +625,7 @@ var VIEWS={
       +'<span class="row-d">先二次确认，再退出并清除本机这一趟的会话，然后才去登录页。</span></span>'
       +'<span class="row-go">'+svg('right',22)+'</span></button>'
       +row('shield','41-member-privacy.html','/me/privacy-requests','隐私请求与授权撤回','当前可提交岗位 AI 授权撤回；数据导出与账号注销尚未开放。','privacy','settings')
-      +row('bell','35-notifications.html','/me/notifications','消息通知','服务端下发的会员通知。','notifications','settings')
+      +row('bell','35-notifications.html','/me/notifications','消息通知','系统下发的会员通知。','notifications','settings')
       +'</div></section>'
       +'<section><div class="sec-h"><span class="t">协议与帮助</span></div><div class="rows" style="margin-top:12px">'
       +row('doc','08-legal.html?doc=user','/legal/:doc','用户协议','当前生效版本与生效日期由服务端返回。','terms','settings')
@@ -660,7 +668,7 @@ var VIEWS={
       }).join('')
       +'</div></section>'
       +factSection('读取中 / 不受读取影响','分开说，避免整页卡住',[
-        ['正在读取','GET /me/consents —— 当前账号的授权状态'],
+        ['正在读取','当前账号的授权状态'],
         ['读到之前','不放开关，也不显示上一次的结果'],
         ['不受影响','用户协议与隐私说明，随时可读'],
         ['不受影响','帮助与求助，服务台入口照常'],
@@ -743,7 +751,7 @@ var VIEWS={
   /* 四步换绑 */
   'settings:phone-old-code':function(){
     return rebindView({step:1,title:'先向当前手机号发送验证码',
-      metas:[['当前手机号',MASKED],['本步会做','创建一次短时挑战'],['频率限制','由服务端返回'],['本步不会','改动任何绑定关系']],
+      metas:[['当前手机号',MASKED],['本步会做','创建一次短时挑战'],['频率限制','按系统设置执行'],['本步不会','改动任何绑定关系']],
       stepNote:'进行中 · 待发送',
       primary:{label:'发送旧号验证码',next:'phone-old-sending',tid:'phone-old-code'},
       extra:'<div class="note"><div class="note-t">'+svg('info',24)+'换绑之前先确认</div>'
@@ -767,14 +775,14 @@ var VIEWS={
   'settings:phone-rate-limited':function(){
     return rebindView({step:1,title:'发送太频繁，先等一会儿',hint:'冷却由服务端判定',
       error:'触发频率限制：短时间内发送次数过多。冷却结束前，服务端不会再发新的验证码。',
-      metas:[['当前手机号',MASKED],['冷却时长','以服务端返回为准'],['已发出的码','是否仍有效由服务端判定'],['绑定关系','未改动']],
+      metas:[['当前手机号',MASKED],['冷却时长','以系统提示为准'],['已发出的码','是否仍有效由系统判定'],['绑定关系','未改动']],
       resend:60,
       stepNote:'未完成 · 触发频控，冷却中',
       primary:{label:'冷却后重试发送',next:'phone-old-sending',tid:'phone-rate-limited'}});
   },
   'settings:phone-old-verify':function(){
     return rebindView({step:2,title:'输入旧手机号收到的验证码',
-      metas:[['验证码去向',MASKED],['验证成功后','取得只用于本次换绑的短时令牌'],['验证失败','停在本步并显示服务端错误'],['令牌','不写进地址栏']],
+      metas:[['验证码去向',MASKED],['验证成功后','取得只用于本次换绑的短时令牌'],['验证失败','停在本步并显示系统给出的原因'],['令牌','不写进地址栏']],
       field:{label:'旧号验证码（6 位数字）',ph:'请输入 6 位验证码',max:6,code:true,help:'验证码发送至当前遮挡手机号；只在本次换绑流程内使用。'},
       resend:60,
       alt:[['演示：验证码错误','phone-old-verify-failed']],

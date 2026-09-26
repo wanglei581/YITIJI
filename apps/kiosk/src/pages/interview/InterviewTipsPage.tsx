@@ -5,6 +5,15 @@
 // checklist 可勾选（仅本页内存态，引导逐项过一遍）、高频问题卡可展开、
 // STAR 完整说明（不截断）、自我介绍结构、底部 CTA 进入模拟面试。
 // 无任何"保过/通过率"类承诺文案。
+//
+// 2026-09-20：本页是 serviceHubModel.OFFLINE_CAPABLE_ROUTES 里唯一带「出口按钮」的一条。
+// 那张白名单说的是「不联网也能**读**这一页」——本页四块内容全是编译进包的常量，
+// 这一点没变、也不该变。但底部「开始模拟面试」不是阅读，它要 POST /mock-interviews
+// 创建会话。在线服务不可用时，面试服务台已经把「模拟练习」那张卡 fail-closed 掉了，
+// 用户却能从同一个服务台点「先看技巧」进到本页，再从这里一路走进 setup ——
+// 服务台那条判据就这么被绕过去了，最后停在一个填完表才报错的设置页。
+// 所以这里按同一条口径给出口设闸：checking 与 unavailable 都不放行（「还不知道」
+// 不构成放行理由），本地技巧内容一字不减。
 // ============================================================
 
 import { useState } from 'react'
@@ -18,6 +27,7 @@ import {
   LightbulbIcon,
   MicIcon,
 } from 'lucide-react'
+import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { InterviewShell } from './InterviewShell'
 import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession } from './interviewWorkbenchSession'
@@ -105,10 +115,35 @@ const INTRO_STRUCTURES: Array<{ duration: string; points: string[] }> = [
   { duration: '3 分钟', points: ['我是谁', '我做过什么（2-3 段经历 + 量化成绩）', '我为什么适合这个岗位', '我希望在这个岗位解决什么问题'] },
 ]
 
+/**
+ * 出口闸门的三种结论。判据与 `serviceHubModel.unavailableReason` / 服务台提示条同源：
+ * `useApiReadiness` 判的是 `/health` 可达性，`checking` 与 `unavailable` **都**不放行。
+ *
+ * 话术刻意和服务台对齐（「在线服务当前不可用」/「正在确认在线服务」）：用户是从
+ * 面试服务台点「先看技巧」过来的，同一件事在两页上换个说法只会让人以为是两回事。
+ */
+function startGate(status: 'checking' | 'ready' | 'unavailable'): { reason: string; code: string } | null {
+  if (status === 'unavailable') {
+    return {
+      reason: '在线服务当前不可用，模拟面试需要联网创建练习会话；本页的准备清单、高频问题和 STAR 说明不依赖联网，可以继续看。',
+      code: 'api:unavailable',
+    }
+  }
+  if (status === 'checking') {
+    return {
+      reason: '正在确认在线服务，确认完成前不创建练习会话；本页的准备内容不依赖联网，可以继续看。',
+      code: 'api:checking',
+    }
+  }
+  return null
+}
+
 export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
   const [checked, setChecked] = useState<Set<number>>(new Set())
   const [openFaq, setOpenFaq] = useState<number | null>(0)
+  const { status: apiStatus, retry: retryApi } = useApiReadiness()
+  const gate = startGate(apiStatus)
 
   const toggleCheck = (i: number) => {
     setChecked((prev) => {
@@ -122,6 +157,9 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
   const copy = INTERVIEW_STAGE_COPY.tips
   const titleParts = emphasizedTitle(copy)
   const goSetup = () => {
+    // 闸门在这里再挡一次，不只在渲染层。aria-disabled 的按钮仍然能被程序化点击，
+    // 「看起来点不动」和「点了不会发生」必须是同一件事。
+    if (gate) return
     patchInterviewWorkbenchSession({ stage: 'setup' })
     if (onGoStage) onGoStage('setup')
     else navigate('/interview/setup')
@@ -131,10 +169,50 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
     <InterviewShell
       title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
       subtitle={copy.subtitle}
+      // 顶栏胶囊跟着一起说。默认档是 InterviewShell 的「模拟练习」，
+      // 而此刻这台机器恰恰练不了 —— 不出声等于让胶囊替在线服务作保。
+      status={
+        apiStatus === 'unavailable'
+          ? { tone: 'bad', label: '在线服务不可用' }
+          : apiStatus === 'checking'
+            ? { tone: 'unknown', label: '正在确认在线服务' }
+            : undefined
+      }
       ctabar={
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
-          开始模拟面试
-        </button>
+        gate ? (
+          <>
+            <p className="why" id="interview-tips-start-why">{gate.reason}</p>
+            {apiStatus === 'unavailable' ? (
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="ghost"
+                data-testid="interview-tips-recheck"
+                onClick={retryApi}
+              >
+                重新检测
+              </button>
+            ) : null}
+            {/* 不可用时不是「灰掉的按钮」：它必须说得出为什么，并且真的不导航。
+                data-disabled-reason 与服务台同名，走查按同一个钩子取证。 */}
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="primary"
+              aria-disabled="true"
+              aria-describedby="interview-tips-start-why"
+              data-disabled-reason={gate.code}
+              data-testid="interview-primary"
+              onClick={goSetup}
+            >
+              开始模拟面试
+            </button>
+          </>
+        ) : (
+          <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
+            开始模拟面试
+          </button>
+        )
       }
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-tips" data-qx-interview="" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">

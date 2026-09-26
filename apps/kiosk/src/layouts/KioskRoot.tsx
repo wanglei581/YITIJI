@@ -81,11 +81,9 @@ interface V6ShellRoute {
  * fusion-w6-routes.spec.ts:32 会拿它和实际壳归属对账，留着就是自相矛盾。
  * 2026-09-08 移出：'/'（首页迁入青序流光）、'/print-scan'（早已迁入，本次一并清理）。 */
 const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
-  ['/resume-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/jobs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/fairs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/interview-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/policy-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
+  /* 2026-09-20 移出最后五条（五个服务台）：它们迁入青序流光，见下方 QX_MIGRATED_ROUTES。
+   * 这张表现在是空的——V6 壳在运行时已无路由使用。表本身保留：verify:fusion-shell
+   * 用它和 fusion-w6 的 V6_SHELL_ROUTE_PATTERNS 对账，删表会让那条不变量失去锚点。 */
 ])
 
 /**
@@ -104,6 +102,13 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
  * （`isQxMigratedPath(pathname)` 是壳层契约允许的具名谓词形态）。
  */
 const QX_MIGRATED_ROUTES = new Set<string>([
+  /* 五个服务台（稿 16-service-hubs，共用 QxServiceHubPage）。它们是首页进任何业务域的
+   * **第一跳**：首页早已是青序，点进去掉回旧壳正是「新旧页面交替」的来源。 */
+  '/resume-service',
+  '/jobs-service',
+  '/fairs-service',
+  '/interview-service',
+  '/policy-service',
   '/',
   '/print/pickup-claim',
   '/print/cashier',
@@ -114,11 +119,19 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/print/preview',
   '/print/progress',
   '/print/done',
+  /* 稿 21-resume-triage 同一工作台的两条 route：取件与方向、解析等待与失败。 */
+  '/resume/source',
+  '/resume/parse',
   '/resume/report',
   '/resume/optimize',
   '/resume/optimize/compare',
   '/resume/generate',
   '/resume/generate/preview',
+  /* 稿 46 宿主的第四条 route（版式参考）。另外两条 /resume/job-fit/actions、
+   * /resume/career-plan 是 KioskRoot 之外的整屏路由，自挂 JobFitStage，不登记在这里。 */
+  '/resume/templates',
+  /* 稿 25-material-workshop（求职材料库），2026-09-23 迁入。 */
+  '/resume/materials',
   '/print-scan',
   '/print-scan/sign',
   '/print-scan/convert',
@@ -132,13 +145,20 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/scan/progress',
   '/scan/result',
   '/jobs',
-  // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀 —— 尚未迁移的
-  // `/me/documents` `/me/settings` 等兄弟路由会被误命中掉进空壳。
+  /* 招聘会共享工作台（稿 28-jobfair-enhanced.html）。无参的两条放精确集合，
+   * 带 :id 的六条见下方 QX_MIGRATED_EXACT_PATTERNS —— 不能写 '/job-fairs/' 宽前缀：
+   * 那会顺手放行未来新增、还没迁的兄弟路由，verify:fusion-w4 也明令禁止该前缀。 */
+  '/job-fairs',
+  '/job-fairs/checkin',
+  // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀 —— 以后 `/me/` 下新增、
+  // 还没迁的兄弟路由会被误命中掉进空壳。
   '/profile',
   '/me/benefits',
   '/me/feedback',
   '/me/privacy-requests',
   '/interview',
+  /* 稿 05-ai-cockpit（问小青），2026-09-24 迁入：旧蓝色 KioskPageFrame 双壳换成 QxPageFrame。 */
+  '/assistant',
   '/screensaver',
   '/login',
   '/session-timeout',
@@ -149,6 +169,16 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/me/favorites',
   '/me/ai-records',
   '/me/activity',
+  /* 稿 38-member-assets（我的文档 / 打印订单），2026-09-23 迁入。两条同一张稿、互为分域 Tab：
+   * 只迁一条会让「文件资产 → 打印订单」这条跨端主链在两屏之间新旧交替。 */
+  '/me/documents',
+  '/me/print-orders',
+  /* 稿 30-my-profile ?screen=settings（账号设置），2026-09-23 迁入 QxMePage 的 settings 视图。
+   * 它是「我的」下最后一个还挂墨青纸感 KioskPageFrame 的页；漏登记会让旧顶栏叠在青序页上。 */
+  '/me/settings',
+  /* 稿 06-help（帮助中心），2026-09-24 迁入：页面自带 QxPageFrame 顶栏与 QxAppNavbar，
+   * 漏登记会让旧 KioskLayout 顶栏 / 底栏叠在青序页上。 */
+  '/help',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
@@ -162,14 +192,25 @@ const QX_MIGRATED_PREFIXES = [
 /**
  * 带参路由但父段还有未迁兄弟页：不能写宽前缀。
  * - /jobs/:id/offline 不能用 /jobs/（会误伤 /jobs/:id、/jobs/online-platforms）
- * - /job-fairs/:id/companies/:companyId 不能用 /job-fairs/（会误伤列表、详情、地图、资料）
+ * - 招聘会那六条也逐条精确写。**不要**因为「现在六条都迁完了」就合并成
+ *   '/job-fairs/' 前缀：以后这棵子树再长出一条新路由（比如展位预约详情），
+ *   宽前缀会在它还没迁的时候就把它染成青序壳，页面当场掉进空壳。
+ *   verify:fusion-w4 也直接断言 QX_MIGRATED_PREFIXES 里不得出现 '/job-fairs/'。
  */
 const QX_MIGRATED_EXACT_PATTERNS: readonly RegExp[] = [
   // 26 号稿岗位详情：只放行单段 ID。不能写成 '/jobs/' 前缀——那会连
   // /jobs/:id/offline 一起放行（它有自己的稿和自己的模式，见下一行）。
   /^\/jobs\/[^/]+$/,
   /^\/jobs\/[^/]+\/offline$/,
+  // 28 号稿招聘会工作台的六条带参屏（086 / 087 / 090 / 091 / 092 / 093）。
+  // 第一条只放行单段 ID，不会越过 '/' 吃掉后面五条。
+  /^\/job-fairs\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/companies$/,
   /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/map$/,
+  /^\/job-fairs\/[^/]+\/materials$/,
+  /^\/job-fairs\/[^/]+\/visit-plan$/,
+  /^\/job-fairs\/[^/]+\/stats$/,
 ]
 
 function isQxMigratedPath(pathname: string): boolean {

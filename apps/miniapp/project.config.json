@@ -42,6 +42,86 @@
       {
         "value": "README.md",
         "type": "file"
+      },
+      {
+        "value": "pages/jobs",
+        "type": "folder"
+      },
+      {
+        "value": "pages/job-detail",
+        "type": "folder"
+      },
+      {
+        "value": "pages/fairs",
+        "type": "folder"
+      },
+      {
+        "value": "pages/fair-detail",
+        "type": "folder"
+      },
+      {
+        "value": "pages/fair-venue",
+        "type": "folder"
+      },
+      {
+        "value": "pages/fair-companies",
+        "type": "folder"
+      },
+      {
+        "value": "pages/fair-company-detail",
+        "type": "folder"
+      },
+      {
+        "value": "pages/fair-visit-plan",
+        "type": "folder"
+      },
+      {
+        "value": "pages/fair-materials",
+        "type": "folder"
+      },
+      {
+        "value": "pages/fair-reminders",
+        "type": "folder"
+      },
+      {
+        "value": "pages/companies",
+        "type": "folder"
+      },
+      {
+        "value": "pages/company-detail",
+        "type": "folder"
+      },
+      {
+        "value": "pages/contract-review",
+        "type": "folder"
+      },
+      {
+        "value": "pages/policies",
+        "type": "folder"
+      },
+      {
+        "value": "pages/policy-detail",
+        "type": "folder"
+      },
+      {
+        "value": "pages/policy-check",
+        "type": "folder"
+      },
+      {
+        "value": "pages/community",
+        "type": "folder"
+      },
+      {
+        "value": "pages/favorites",
+        "type": "folder"
+      },
+      {
+        "value": "pages/browse-history",
+        "type": "folder"
+      },
+      {
+        "value": "pages/membership",
+        "type": "folder"
       }
     ],
     "include": []

@@ -7,7 +7,7 @@
  * 或重新引入虚拟 PDF / LOCAL_FAIRS mock / 违规文案,本脚本立即 FAIL。
  *
  * 检查维度:
- *   A. 新版组件文件存在(RegionPicker / FairCalendarPopover / FairDataScreen / MapBlock / regions / url)
+ *   A. 新版组件文件存在(RegionPicker / FairCalendarPopover / MapBlock / 青序流光工作台三件套 / regions / url)
  *   B. /job-fairs 列表页:渐变大卡 + 省市区筛选 + 日历 + 合规按钮文案
  *   C. /job-fairs/:id 详情页:3 Tab(详情与特色/参展企业与岗位/数据大屏) + 导航深链
  *   D. /campus 校园页:沉浸式 5 Tab(overview/companies/map/ai/print) + 真实 API 取数
@@ -89,28 +89,43 @@ function readImportedCss(entryRel, expectedImports, label) {
 console.log('\n=== 阶段1F 招聘会/校园招聘新版 UI 防回退验证 ===')
 
 // ── A. 新版组件文件存在 ────────────────────────────────────────────────────
+// 2026-09-20 青序流光迁移：components/FairDataScreen.tsx 与 components/JobFairDetailTabs.tsx
+// 已随「详情页四 Tab 壳」一起退休（详见 JobFairDetailPage.tsx 文件头）。它们承载的能力
+// 没有丢，只是换了落点：数据大屏 → /job-fairs/:id/stats（FairStatsPage），
+// 场馆导览 → /job-fairs/:id/map（FairMapPage，仍走 getFairVenueGuide）。
+// 本节因此把清单换成迁移后的共享工作台三件套，而不是删掉这条断言。
 {
   const files = [
     'src/pages/job-fairs/components/RegionPicker.tsx',
     'src/pages/job-fairs/components/FairCalendarPopover.tsx',
-    'src/pages/job-fairs/components/FairDataScreen.tsx',
     'src/pages/job-fairs/components/MapBlock.tsx',
+    // 八屏共用的青序流光宿主 + 稿面真值表 + 页内基础件 + 详情分区
+    'src/pages/job-fairs/QxFairWorkbench.tsx',
+    'src/pages/job-fairs/fairWorkbenchSpecs.ts',
+    'src/pages/job-fairs/components/FairWorkbenchBits.tsx',
+    'src/pages/job-fairs/components/FairDetailSections.tsx',
     'src/lib/regions.ts',
     'src/lib/url.ts',
   ]
   const missing = files.filter((f) => !existsSync(join(ROOT, f)))
   if (missing.length > 0) fail(`A. 新版组件文件缺失: ${missing.join(', ')}`)
-  else pass('A. 新版组件文件齐全(RegionPicker/Calendar/DataScreen/MapBlock/regions/url)')
+  else pass('A. 新版组件文件齐全(RegionPicker/Calendar/MapBlock/QxFairWorkbench/specs/Bits/DetailSections/regions/url)')
 }
 mustNotContain(
   'src/pages/job-fairs/components/MapBlock.tsx',
   ['openstreetmap'],
   'JOB-13 MapBlock 无 AMAP key 时不得嵌 openstreetmap',
 )
+// 旧四 Tab 壳退休后，场馆图只剩详情页分区与展位分布页两个渲染点，逐一守。
 mustNotContain(
-  'src/pages/job-fairs/components/JobFairDetailTabs.tsx',
+  'src/pages/job-fairs/components/FairDetailSections.tsx',
   ['openstreetmap'],
-  'JOB-13 招聘会详情 Tab 无 openstreetmap iframe',
+  'JOB-13 招聘会详情分区无 openstreetmap iframe',
+)
+mustNotContain(
+  'src/pages/job-fairs/FairMapPage.tsx',
+  ['openstreetmap'],
+  'JOB-13 展位分布页无 openstreetmap iframe',
 )
 mustContain(
   'src/pages/job-fairs/components/MapBlock.tsx',
@@ -119,10 +134,19 @@ mustContain(
 )
 
 // ── B. /job-fairs 列表页 ──────────────────────────────────────────────────
+// B1：列表页的「行卡」2026-09-20 从页内 `function FairRow()` + `.jf-row` 改为
+// components/FairWorkbenchBits.tsx 的 <FairListCard>（青序流光 .qxfw-fair）。
+// 筛选件（地区 / 日历）与合规按钮文案是能力，必须留；行卡的实现位置变了，
+// 所以按钮文案改到它现在真正所在的文件里断言，不是放宽。
 mustContain(
   'src/pages/job-fairs/JobFairsPage.tsx',
-  ['RegionPicker', 'FairCalendarPopover', 'function FairRow(', 'className={`jf-row', '扫码预约'],
-  'B1. 列表页保持新版结构(地区筛选+日历+招聘会行卡+合规按钮)',
+  ['RegionPicker', 'FairCalendarPopover', 'FairListCard', 'QxFairWorkbench'],
+  'B1. 列表页保持新版结构(地区筛选+日历+招聘会行卡+青序流光宿主)',
+)
+mustContain(
+  'src/pages/job-fairs/components/FairWorkbenchBits.tsx',
+  ['扫码预约', '查看详情'],
+  'B1b. 场次卡保留合规按钮文案(扫码预约 / 查看详情)',
 )
 const jobFairCss = readImportedCss(
   'src/pages/jobs-fairs-prototype.css',
@@ -143,11 +167,39 @@ mustNotContain(
 )
 
 // ── C. /job-fairs/:id 详情页 ──────────────────────────────────────────────
+// C1：旧四 Tab（详情与特色 / 参展企业与岗位 / 场馆导览 / 数据大屏）2026-09-20 拆成
+// 各自的真路由，详情页改为稿 28 的 subnav 五行。四项能力逐条钉在新落点上：
+//   参展企业 → /companies   展位分布+场馆导览 → /map（getFairVenueGuide 在那里）
+//   活动物料 → /materials    现场统计 → /stats
+// 扫码导航（buildNavUrl）与场馆图仍在详情页，未随 Tab 一起走。
 mustContain(
   'src/pages/job-fairs/JobFairDetailPage.tsx',
-  ['详情与特色', '参展企业与岗位', '场馆导览', '数据大屏', 'FairDataScreen', 'buildNavUrl', 'getFairVenueGuide'],
-  'C1. 详情页保持 4 Tab(含场馆导览) + 数据大屏 + 场馆导航',
+  ['FairSubnav', 'buildNavUrl', '/companies`', '/map`', '/materials`', '/stats`', '/visit-plan`'],
+  'C1. 详情页保持五条子入口 + 场馆导航深链',
 )
+mustContain(
+  'src/pages/job-fairs/components/FairDetailSections.tsx',
+  ['参展企业名单', '展位分布', '活动物料', '现场统计', 'MapBlock'],
+  'C1b. 详情页 subnav 覆盖旧四 Tab 的全部落点',
+)
+mustContain(
+  'src/pages/job-fairs/FairMapPage.tsx',
+  ['getFairVenueGuide', 'guide.venueName', 'facility.name'],
+  'C1c. 场馆导览迁入展位分布页，设施名仍取服务端字段',
+)
+// C1d：可打印导览资料是展位分布页唯一能真正出纸的出口，**三个状态都要在底栏里**。
+// 迁移前它挂在 KioskPageFrame 的 actionBar 上，空态照样显示；迁移第一版只在 index 态
+// 保留，等于在最需要它的两屏（没有展位图 / 没取到）把它删了。
+// 判据钉在「一份共用的 materialsCta 被三个分支各引用一次」，不数字面出现次数——
+// 数字面很容易被「复制三段一样的 JSX」满足，那反而是回退。
+{
+  const mapRel = 'src/pages/job-fairs/FairMapPage.tsx'
+  const src = read(mapRel)
+  const declared = /const materialsCta = \(/.test(src) && src.includes('查看可打印导览资料')
+  const uses = (src.match(/\{materialsCta\}/g) ?? []).length
+  if (declared && uses >= 3) pass(`C1d. 展位分布页 index / empty / error 三态均保留「查看可打印导览资料」(${uses} 处引用同一份)`)
+  else fail(`C1d. ${mapRel} 必须用同一份 materialsCta 在三态底栏保留可打印导览出口（declared=${declared} uses=${uses}）`)
+}
 mustNotContain(
   'src/pages/job-fairs/JobFairDetailPage.tsx',
   ['活动资料.pdf', "data/fairData"],
@@ -249,8 +301,15 @@ mustContain(
     } else pass('I-2. FairMapPage 签到统计区块由 metricZones 守卫')
 
     // 「已签到」必须只出现在守卫之后,即被守卫覆盖。
+    // 只看**会渲染出去**的文本：注释里解释「不过滤就会恒显示『已签到 0』」
+    // 是这条守卫的成因说明,不是违规渲染。同一口径见
+    // verify-jobfair-commercial-closure.mjs 的 visibleTextOf()。
+    const isOnCommentLine = (idx) => {
+      const lineStart = src.lastIndexOf('\n', idx) + 1
+      return /(^|\s)(\/\/|\*|\/\*)/.test(src.slice(lineStart, idx))
+    }
     const guardIdx = src.indexOf(guardRender)
-    const occurrences = [...src.matchAll(/已签到/g)].map((m) => m.index)
+    const occurrences = [...src.matchAll(/已签到/g)].map((m) => m.index).filter((idx) => !isOnCommentLine(idx))
     const unguarded = occurrences.filter((idx) => idx < guardIdx)
     if (unguarded.length > 0) {
       fail(`I-3. ${mapRel} 存在未被 metricZones 守卫覆盖的「已签到」渲染(${unguarded.length} 处)`)
@@ -275,12 +334,20 @@ mustContain(
 {
   const planRel = 'src/pages/job-fairs/FairVisitPlanPage.tsx'
   const detailRel = 'src/pages/job-fairs/JobFairDetailPage.tsx'
-  const tabsRel = 'src/pages/job-fairs/components/JobFairDetailTabs.tsx'
+  // 旧「详情页磁贴」= components/JobFairDetailTabs.tsx，2026-09-20 迁移后
+  // 变成 components/FairDetailSections.tsx 里的 <FairSubnav> 第四行。
+  // J-6 守的是「AI 入口文案随已结束状态切换」，落点换了，断言跟到新落点。
+  const tabsRel = 'src/pages/job-fairs/components/FairDetailSections.tsx'
+  // 2026-09-20：参会页补回 idle / load-failed 两个真实状态后越过 500 行，
+  // ready 态正文抽到 components/FairVisitPlanSections.tsx。状态机仍在页面里，
+  // 所以 J-2 / J-4 继续读页面；只有「回顾态文案」这一条跟到新落点。
+  const bodyRel = 'src/pages/job-fairs/components/FairVisitPlanSections.tsx'
   const planSrc = read(planRel)
   const detailSrc = read(detailRel)
   const tabsSrc = read(tabsRel)
+  const bodySrc = read(bodyRel)
 
-  if (planSrc === null || detailSrc === null || tabsSrc === null) {
+  if (planSrc === null || detailSrc === null || tabsSrc === null || bodySrc === null) {
     fail('J. 招聘会 AI 参会页三件套缺失')
   } else {
     // J-1 诚实声明必须在页面里逐字存在（钉死；删掉即红）
@@ -294,9 +361,15 @@ mustContain(
     else fail(`J-2. ${planRel} 的诚实声明必须作为 REVIEW_DISCLOSURE 常量渲染进页面`)
 
     // J-3 回顾态不得出现「出发前 / 现场提醒」这类已失效语义
-    const reviewCopyOk = planSrc.includes("'后续可做的跟进动作'") && planSrc.includes('!isReview &&')
+    const reviewCopyOk = bodySrc.includes("'后续可做的跟进动作'") && bodySrc.includes('!isReview &&')
     if (reviewCopyOk) pass('J-3. 回顾态改用「后续跟进」，现场提醒仅在未结束场次渲染')
-    else fail(`J-3. ${planRel} 回顾态必须换成后续跟进语义，且「现场提醒」需被 !isReview 守卫`)
+    else fail(`J-3. ${bodyRel} 回顾态必须换成后续跟进语义，且「现场提醒」需被 !isReview 守卫`)
+    // J-3b 诚实声明必须真的传进正文分区并渲染出去（抽组件时最容易掉的就是这一根线）。
+    if (/\{reviewDisclosure\}/.test(bodySrc) && /reviewDisclosure=\{REVIEW_DISCLOSURE\}/.test(planSrc)) {
+      pass('J-3b. 诚实声明经页面传入正文分区并渲染')
+    } else {
+      fail(`J-3b. ${planRel} 必须把 REVIEW_DISCLOSURE 传给 ${bodyRel} 且在那里渲染`)
+    }
 
     // J-4 页面必须真的读取招聘会状态（此前从头到尾不取 fair、不读 status）
     if (/getJobFairById/.test(planSrc) && /plan\?\.mode/.test(planSrc)) {
@@ -305,11 +378,107 @@ mustContain(
       fail(`J-4. ${planRel} 必须取招聘会状态且优先采用服务端 plan.mode`)
     }
 
-    // J-5 详情页按钮与磁贴文案随状态变化
-    if (/isEnded \? 'AI参会回顾'/.test(detailSrc)) pass('J-5. 详情页 AI 入口文案随已结束状态切换')
-    else fail(`J-5. ${detailRel} 的 AI 入口在已结束场次必须显示「AI参会回顾」`)
-    if (/fair\.status === 'ended' \? 'AI参会回顾'/.test(tabsSrc)) pass('J-6. 详情页磁贴文案随已结束状态切换')
-    else fail(`J-6. ${tabsRel} 的 AI 磁贴在已结束场次必须显示「AI参会回顾」`)
+    // J-5（2026-09-20 改口径）：详情页**只能有一个** AI 入口，且它必须知道这场结没结束。
+    //
+    // 原断言是「详情页源码里要出现 isEnded ? 'AI参会回顾'」。那条在底栏与 subnav
+    // 各放一个同名入口时也会绿 —— 实测就是那样：同一屏两个都叫「AI参会回顾」的控件
+    // 指向同一条路由，读屏念出来无法区分，触屏上四个键挤成一条。
+    // 现在入口唯一地留在 subnav（J-6 守它的文案切换），详情页负责把 isEnded 传进去，
+    // 并且**自己不得再出现这个词面**。后半句是去重的防回退闸门。
+    // 只看**会渲染出去**的文本：上面那段解释去重理由的注释里必然出现这个词面，
+    // 按裸 includes 判会在没有任何违规时红。同一口径见 I-3 与
+    // verify-jobfair-commercial-closure.mjs 的 visibleTextOf()。
+    const detailVisible = detailSrc
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\*)/.test(line))
+      .join('\n')
+    const passesEnded = /isEnded:\s*ended|isEnded,/.test(detailSrc) || /isEnded\s*=/.test(detailSrc)
+    const noDuplicateAiEntry = !detailVisible.includes('AI参会回顾')
+    if (passesEnded && noDuplicateAiEntry) pass('J-5. 详情页把 isEnded 交给 subnav，且自身不再重复 AI 入口')
+    else if (!passesEnded) fail(`J-5. ${detailRel} 必须把 isEnded 传给 FairSubnav，否则 AI 出口无法随已结束状态切换语义`)
+    else fail(`J-5. ${detailRel} 不得再出现「AI参会回顾」—— 入口唯一留在 subnav，同屏两个同名控件已在 2026-09-20 去重`)
+    if (/isEnded \? 'AI参会回顾'/.test(tabsSrc)) pass('J-6. 详情页 subnav 文案随已结束状态切换')
+    else fail(`J-6. ${tabsRel} 的 AI 出口在已结束场次必须显示「AI参会回顾」`)
+  }
+}
+
+// ---------- K. 招聘会不得自称「岗位 / 职位」 ----------
+//
+// 2026-09-22：八条路由迁进青序流光后，场次列表 / 详情 / 到场指引三页复用了
+// sourceTrustReason，而那句话当时只有一套「岗位」措辞 —— 一体机会对着一场双选会说
+// 「无法核对**这条岗位**的来源……可到来源平台自行查询**该职位**」。招聘会是活动不是
+// 职位，那是一句会上公共终端的假话（CLAUDE.md §9「不伪造能力」同源：不许替来源方
+// 下它没下过的结论，也不许把 A 类对象说成 B 类）。
+//
+// 三层断言，缺一层都能让缺陷从另一侧回来：
+//   K-1 措辞表本身分岗位 / 招聘会两套，且招聘会那套一个「岗位 / 职位」都不许有；
+//   K-2 默认值仍是 'job' 且岗位措辞逐字不变 —— 这是「不动既有文案」的防回退闸门；
+//   K-3 三页确实传了 'job_fair'，且不再传岗位口径的 SOURCE_APPLY_UNAVAILABLE_REASON
+//       （那条常量里同样写着「投递链接 / 该职位」，只改函数是修不干净的）。
+{
+  const trustRel = 'src/pages/jobs/utils/sourceTrust.ts'
+  const reasonsRel = 'src/lib/capabilityReasons.ts'
+  const trustSrc = read(trustRel)
+  const reasonsSrc = read(reasonsRel)
+
+  if (trustSrc === null || reasonsSrc === null) {
+    fail(`K. 文件缺失: ${trustRel} / ${reasonsRel}`)
+  } else {
+    // K-1 招聘会措辞里不得出现岗位类名词。
+    const wording = trustSrc.match(/SOURCE_ENTITY_WORDING[^=]*=\s*\{([\s\S]*?)\n\}/)
+    if (!wording) {
+      fail(`K-1. ${trustRel} 找不到 SOURCE_ENTITY_WORDING 措辞表 —— 实体语义参数可能被回退掉了`)
+    } else {
+      const fairLine = wording[1].split('\n').find((line) => /job_fair\s*:/.test(line)) ?? ''
+      const jobLine = wording[1].split('\n').find((line) => /^\s*job\s*:/.test(line)) ?? ''
+      if (!fairLine) fail(`K-1. ${trustRel} 的 SOURCE_ENTITY_WORDING 缺 job_fair 一档`)
+      else if (/岗位|职位/.test(fairLine)) fail(`K-1. 招聘会措辞里仍写着岗位/职位: ${fairLine.trim()}`)
+      else pass(`K-1. 招聘会措辞不含岗位/职位（${fairLine.trim()}）`)
+
+      // K-2 岗位措辞逐字不变：本次修复**不得**顺手改动岗位 / 企业既有文案。
+      if (jobLine.includes("subject: '这条岗位'") && jobLine.includes("lookup: '该职位'")) {
+        pass('K-2a. 岗位措辞逐字保持原样（这条岗位 / 该职位）')
+      } else {
+        fail(`K-2a. ${trustRel} 岗位措辞被改动，岗位/企业页文案会跟着变: ${jobLine.trim()}`)
+      }
+    }
+
+    // K-2b 默认值必须是 'job'：漏传第三个参数的既有调用方要继续拿到岗位措辞。
+    if (/entity:\s*SourceEntityKind\s*=\s*'job'/.test(trustSrc)) {
+      pass("K-2b. sourceTrustReason 的实体参数默认 'job'（既有调用方零改动）")
+    } else {
+      fail(`K-2b. ${trustRel} 的 entity 参数必须默认 'job'，否则岗位/企业页会静默改文案`)
+    }
+
+    // K-3 三页各自传 'job_fair' + 招聘会口径的链接常量。
+    const fairPages = [
+      ['src/pages/job-fairs/JobFairsPage.tsx', 'FAIR_BOOKING_LINK_UNAVAILABLE_REASON'],
+      ['src/pages/job-fairs/JobFairDetailPage.tsx', 'FAIR_BOOKING_LINK_UNAVAILABLE_REASON'],
+      ['src/pages/job-fairs/JobFairCheckinPage.tsx', 'FAIR_CHECKIN_LINK_UNAVAILABLE_REASON'],
+    ]
+    for (const [rel, constName] of fairPages) {
+      const src = read(rel)
+      if (src === null) { fail(`K-3. 文件缺失: ${rel}`); continue }
+      const call = new RegExp(`sourceTrustReason\\([^)]*${constName}[^)]*,\\s*'job_fair'\\)`)
+      if (!call.test(src)) {
+        fail(`K-3. ${rel} 必须以 sourceTrustReason(trust, ${constName}, 'job_fair') 调用`)
+      } else if (/SOURCE_APPLY_UNAVAILABLE_REASON/.test(src)) {
+        // 那条常量写着「未提供可用的投递链接…查询该职位」，招聘会页用它同样是假话。
+        fail(`K-3. ${rel} 不得再使用岗位口径的 SOURCE_APPLY_UNAVAILABLE_REASON`)
+      } else {
+        pass(`K-3. ${rel} 使用招聘会口径（${constName} + 'job_fair'）`)
+      }
+    }
+
+    // K-4 两条招聘会常量本身也不许含岗位类名词。
+    for (const name of ['FAIR_BOOKING_LINK_UNAVAILABLE_REASON', 'FAIR_CHECKIN_LINK_UNAVAILABLE_REASON']) {
+      const m = reasonsSrc.match(new RegExp(`${name}\\s*=\\s*'([^']+)'`))
+      if (!m) fail(`K-4. ${reasonsRel} 缺常量 ${name}`)
+      else if (/岗位|职位|投递/.test(m[1])) fail(`K-4. ${name} 仍含岗位/职位/投递字样: ${m[1]}`)
+      else pass(`K-4. ${name} 为招聘会口径（${m[1]}）`)
+    }
   }
 }
 

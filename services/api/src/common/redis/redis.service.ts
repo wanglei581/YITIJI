@@ -19,6 +19,9 @@ export type MemberStepUpChallengeConsumeResult =
  *
  * 只暴露用到的原子操作,避免散落 raw client 调用。
  */
+/** 与 Lua 中的同名哨兵一致：不比较 bind.phase。空字符串仍表示当前必须没有 bind。 */
+export const UPLOAD_SESSION_PHASE_UNCHECKED = '__phase_unchecked__'
+
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   constructor(@Inject(REDIS_CLIENT) private readonly client: Redis) {}
@@ -88,6 +91,115 @@ export class RedisService implements OnModuleDestroy {
       value,
     )
     return result === 1 ? 'updated' : 'missing'
+  }
+
+  /**
+   * 同一次 Lua：锁值仍是调用方的、会话仍是 expectedStatus、文件身份符合 expectedFileId、键 TTL 仍大于 0，
+   * 才按剩余 TTL 写入。expectedFileId 为空表示当前必须还没有文件。
+   * expectedPhase 为 null 时不比较阶段；空字符串表示当前必须没有 bind。
+   * cleanup 与会话、过期索引在同一次脚本里写入，进程在返回前被杀掉也不会只留下一半。
+   */
+  async compareAndSetSession(
+    sessionKey: string,
+    lockKey: string,
+    lockToken: string,
+    nextValue: string,
+    expectedStatus: string,
+    expectedFileId: string | null = null,
+    expectedPhase: string | null = null,
+    cleanup: {
+      key: string
+      value: string
+      ttlSeconds: number
+      indexKey: string
+      indexScore: number
+      indexMember: string
+    } | null = null,
+    expectedRevision: number | null = null,
+  ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
+    const keys = [sessionKey, lockKey]
+    const args = [lockToken, nextValue, expectedStatus, expectedFileId ?? '']
+    if (expectedPhase !== null || cleanup || expectedRevision !== null) {
+      args.push(expectedPhase ?? UPLOAD_SESSION_PHASE_UNCHECKED)
+      if (cleanup) {
+        keys.push(cleanup.key, cleanup.indexKey)
+        args.push(
+          cleanup.value,
+          String(cleanup.ttlSeconds),
+          String(cleanup.indexScore),
+          cleanup.indexMember,
+        )
+      }
+    }
+    while (args.length < 9) args.push('')
+    args.push(expectedRevision === null ? '' : String(expectedRevision))
+    const result = await this.client.eval(
+      `
+      -- UPLOAD_SESSION_COMMIT
+      local ttl = redis.call('TTL', KEYS[1])
+      if ttl <= 0 then return 0 end
+      if redis.call('GET', KEYS[2]) ~= ARGV[1] then return -1 end
+      local raw = redis.call('GET', KEYS[1])
+      if not raw then return 0 end
+      local ok, session = pcall(cjson.decode, raw)
+      if not ok or type(session) ~= 'table' then return -2 end
+      if session['status'] ~= ARGV[3] then return -2 end
+      local file = session['file']
+      local actualId = nil
+      if type(file) == 'table' then actualId = file['fileId'] end
+      local expectedFile = ARGV[4]
+      if expectedFile == nil or expectedFile == '' or expectedFile == false then
+        if actualId ~= nil and actualId ~= false then return -2 end
+      elseif actualId ~= expectedFile then
+        return -2
+      end
+      local expectedPhase = ARGV[5]
+      local cleanupKey = KEYS[3]
+      local cleanupValue = ARGV[6]
+      local cleanupTtl = nil
+      if cleanupKey ~= nil and cleanupKey ~= false and cleanupKey ~= ''
+        and cleanupValue ~= nil and cleanupValue ~= false and cleanupValue ~= '' then
+        cleanupTtl = tonumber(ARGV[7])
+        if cleanupTtl == nil or cleanupTtl <= 0 then return -2 end
+      end
+      if expectedPhase ~= nil and expectedPhase ~= false and expectedPhase ~= '__phase_unchecked__' then
+        local bind = session['bind']
+        local actualPhase = nil
+        if type(bind) == 'table' then actualPhase = bind['phase'] end
+        if expectedPhase == '' then
+          if actualPhase ~= nil and actualPhase ~= false then return -2 end
+        elseif actualPhase ~= expectedPhase then
+          return -2
+        end
+      end
+      local expectedRevision = ARGV[10]
+      if expectedRevision ~= nil and expectedRevision ~= false and expectedRevision ~= '' then
+        local actualRevision = session['revision']
+        if actualRevision == nil or actualRevision == false then actualRevision = 0 end
+        if tostring(actualRevision) ~= tostring(expectedRevision) then return -2 end
+      end
+      redis.call('SET', KEYS[1], ARGV[2], 'EX', ttl)
+      if cleanupTtl ~= nil then
+        redis.call('SET', cleanupKey, cleanupValue, 'EX', cleanupTtl)
+        local indexKey = KEYS[4]
+        local indexScore = tonumber(ARGV[8])
+        local indexMember = ARGV[9]
+        if indexKey ~= nil and indexKey ~= false and indexKey ~= ''
+          and indexScore ~= nil and indexMember ~= nil and indexMember ~= false and indexMember ~= '' then
+          redis.call('ZADD', indexKey, indexScore, indexMember)
+        end
+      end
+      return 1
+      `,
+      keys.length,
+      ...keys,
+      ...args,
+    )
+    const code = Number(result)
+    if (code === 1) return 'updated'
+    if (code === -1) return 'lost-lock'
+    if (code === -2) return 'conflict'
+    return 'expired'
   }
 
   ttl(key: string): Promise<number> {
@@ -567,6 +679,57 @@ export class RedisService implements OnModuleDestroy {
       1,
       key,
     )
+  }
+
+  /**
+   * 一次 Lua：已有 marker 则只回放；否则先检查全部日计数，通过后才递增并写 marker。
+   * 拒绝路径不写任何 key。调用方不得据此退款或重新调用 provider。
+   * 返回 1 回放、2 新计数、0 超限。
+   */
+  async consumeQuotaOnce(input: {
+    markerKey: string
+    markerTtlSeconds: number
+    markerValue: string
+    counterTtlSeconds: number
+    counters: { key: string; limit: number }[]
+  }): Promise<'replay' | 'charged' | 'rejected'> {
+    const keys = [input.markerKey, ...input.counters.map((item) => item.key)]
+    const args = [
+      input.markerTtlSeconds,
+      input.counterTtlSeconds,
+      input.markerValue,
+      ...input.counters.map((item) => item.limit),
+    ]
+    const result = await this.client.eval(
+      `
+      if redis.call('EXISTS', KEYS[1]) == 1 then
+        return 1
+      end
+      local n = #KEYS - 1
+      for i = 1, n do
+        local current = tonumber(redis.call('GET', KEYS[i + 1]) or '0')
+        if (not current) or current >= tonumber(ARGV[i + 3]) then
+          return 0
+        end
+      end
+      for i = 1, n do
+        local nextCount = redis.call('INCR', KEYS[i + 1])
+        if nextCount == 1 then
+          redis.call('EXPIRE', KEYS[i + 1], tonumber(ARGV[2]))
+        end
+      end
+      redis.call('SET', KEYS[1], ARGV[3], 'EX', tonumber(ARGV[1]))
+      return 2
+      `,
+      keys.length,
+      ...keys,
+      ...args,
+    )
+    const code = Number(result)
+    if (code === 1) return 'replay'
+    if (code === 2) return 'charged'
+    if (code === 0) return 'rejected'
+    throw new Error('Invalid resume parse quota result')
   }
 
   decr(key: string): Promise<number> {

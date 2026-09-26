@@ -1,5 +1,7 @@
 # API Client Adapter 设计说明
 
+> **历史材料（2026-09-26 标注）：** 本文是 2026-05 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+
 > 适用范围：`apps/kiosk/src/services/api/`、`apps/admin/src/services/api/`、`apps/partner/src/services/api/`  
 > 版本：Phase 7.5
 

@@ -304,6 +304,8 @@ const allowedDiagnosticCodes = [
   'AGENT_STARTUP_FAILED',
   'AGENT_UNAUTHORIZED',
   'AGENT_READY',
+  'DUPLICATE_INSTANCE',
+  'INSTANCE_LOCK_UNAVAILABLE',
 ]
 assert.match(diagnosis, /\$allowedDiagnosticCodes\s*=\s*@\(/, 'diagnosis must define an explicit startup diagnostic code whitelist')
 for (const code of allowedDiagnosticCodes) {
@@ -389,6 +391,39 @@ assert.doesNotMatch(
   /Invoke-RestMethod|Invoke-WebRequest|Test-Connection|\bcurl(?:\.exe)?\b|Start-BitsTransfer|WebClient|HttpClient|System\.Net\.WebRequest|Start-Process|\/print|POST/i,
   'diagnosis must not make network, process, or print calls',
 )
+
+assert.match(diagnosis, /function Get-LockPathKind\(/, 'diagnosis must classify the instance lock path kind')
+assert.match(diagnosis, /function Get-StrictLockPidParse\(/, 'diagnosis must parse the lock PID with the same strict decimal rule')
+assert.match(diagnosis, /function Get-TasklistPidPresence\(/, 'diagnosis must query tasklist for the parsed lock PID')
+assert.match(diagnosis, /tasklist\.exe/, 'diagnosis must call tasklist.exe rather than infer process death')
+assert.match(
+  diagnosis,
+  /\$lockClearanceEligibility\s*=\s*"not_eligible_tasklist_unavailable"/,
+  'tasklist failure must not be treated as a dead pid that is safe to clear',
+)
+assert.match(
+  diagnosis,
+  /\$lockClearanceEligibility\s*=\s*"eligible_for_operator_review"/,
+  'diagnosis may only mark operator review after service, PID parse, tasklist, and related-process checks',
+)
+assert.match(diagnosis, /不要先删除/, 'diagnosis must tell the operator not to delete the lock first')
+assert.match(diagnosis, /Non-regular paths \(directory\/junction\/symlink\) must stay untouched/, 'diagnosis must keep directory/junction/symlink lock paths untouched')
+assert.doesNotMatch(
+  diagnosis,
+  /safe_to_delete|safe_to_clear|safe to delete|可以安全删除/i,
+  'diagnosis must never label a lock as safe to delete',
+)
+assert.doesNotMatch(
+  diagnosis,
+  /Remove-Item|\bUnlink(?:-Item)?\b|\bdel\s+-/i,
+  'diagnosis must not auto-delete the instance lock',
+)
+assert.match(diagnosisOutput, /^\s*lockPathKind\s*=\s*\$lockPathKind\s*$/m, 'diagnosis must report lock path kind')
+assert.match(diagnosisOutput, /^\s*lockPidParseStatus\s*=\s*\$lockPidParseStatus\s*$/m, 'diagnosis must report strict lock PID parse status')
+assert.match(diagnosisOutput, /^\s*tasklistExitCode\s*=\s*\$tasklistExitCode\s*$/m, 'diagnosis must report tasklist exit code')
+assert.match(diagnosisOutput, /^\s*tasklistResult\s*=\s*\$tasklistResult\s*$/m, 'diagnosis must report tasklist result')
+assert.match(diagnosisOutput, /^\s*lockClearanceEligibility\s*=\s*\$lockClearanceEligibility\s*$/m, 'diagnosis must report whether operator lock review is allowed')
+assert.match(diagnosisOutput, /^\s*lockOperatorHint\s*=\s*\$lockOperatorHint\s*$/m, 'diagnosis must report the do-not-delete-first operator hint')
 
 assert.match(diagnosis, /\$scriptRoot\s*=\s*\$PSScriptRoot/, 'diagnosis must capture PSScriptRoot after startup')
 assert.match(diagnosis, /MyInvocation\.MyCommand\.Path/, 'diagnosis must fall back to MyInvocation when PSScriptRoot is empty')

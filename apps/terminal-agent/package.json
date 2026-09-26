@@ -34,7 +34,8 @@
     "verify:agent-unauthorized": "node scripts/verify-agent-unauthorized.mjs",
     "verify:release-observation-boundary": "node scripts/verify-release-observation-boundary.mjs",
     "verify:production-provisioning": "node scripts/verify-production-provisioning.mjs",
-    "verify:installer-inputs": "node installer/verify-installer-inputs.mjs",
+    "verify:installer-inputs": "node installer/verify-installer-inputs.mjs && pnpm run verify:signing-workflow-contract",
+    "verify:signing-workflow-contract": "node installer/verify-signing-workflow-contract.mjs",
     "installer:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-staging.ps1",
     "installer:build": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-msi.ps1",
     "installer:build-exe": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-exe.ps1"

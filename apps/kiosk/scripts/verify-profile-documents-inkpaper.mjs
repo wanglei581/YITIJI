@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,8 +5,10 @@ import { fileURLToPath } from 'node:url'
 // ============================================================
 // verify:profile-documents-inkpaper
 //
-// 目标：/me/documents 只做墨青纸感视觉换装，
-// 保留短期签名 URL、打印确认、删除、保存期限和错误提示真实链路。
+// 目标：/me/documents 的页面/行为合同 —— 青序会员壳结构与旧壳排除，
+// 短期签名 URL、打印确认、删除、保存期限、错误提示真实链路、隐私与招聘合规。
+// 集成候选的文件范围不归本守卫：由 verify:profile-commercial-first-batch、
+// verify:fusion-w5、project graph 与 CI diff 合同负责（见文件末尾退役说明）。
 // ============================================================
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -44,27 +45,8 @@ function readImportedCss(entryPath, expectedImports, message) {
   pass(`${message} — 仅拼接聚合入口显式导入的 CSS`)
   return imports.map((importPath) => read(join(dirname(entryPath), importPath))).join('\n')
 }
-function git(args) {
-  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-}
-function listChangedFiles() {
-  const committed = git(['diff', '--name-only', 'origin/main...HEAD'])
-    .split('\n')
-    .filter(Boolean)
-  const unstaged = git(['diff', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const staged = git(['diff', '--cached', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const untracked = git(['ls-files', '--others', '--exclude-standard'])
-    .split('\n')
-    .filter(Boolean)
 
-  return [...new Set([...committed, ...unstaged, ...staged, ...untracked])]
-}
-
-console.log('\n=== Profile 我的文档页墨青纸感守卫 ===')
+console.log('\n=== /me/documents 页面/行为合同守卫 ===')
 
 const page = read('src/pages/profile/me/MyDocumentsPage.tsx')
 const convertAction = read('src/pages/profile/me/components/DocumentConvertAction.tsx')
@@ -87,18 +69,30 @@ const homeVerify = read('scripts/verify-profile-inkpaper-home.mjs')
 const feedbackVerify = read('scripts/verify-profile-feedback-inkpaper.mjs')
 const resumesVerify = read('scripts/verify-profile-resumes-notifications-inkpaper.mjs')
 
-expectIncludes(page, "import './me-detail-inkpaper.css'", 'MyDocumentsPage 引入明细页局部 CSS')
-expectIncludes(page, "useInkRipple('.me-inkdetail .me-ripple')", 'MyDocumentsPage 只在 .me-inkdetail 作用域启用涟漪')
-expectMatches(page, /className="me-inkdetail me-inkdetail-documents h-full"/, 'MyDocumentsPage 使用独立 me-inkdetail-documents 根作用域')
-expectIncludes(page, 'KIcon', 'MyDocumentsPage 复用 KIcon 图标系统')
-expectIncludes(css, '.me-inkdetail-documents .me-document-card', '明细页 CSS 提供文档卡片独立作用域样式')
-expectIncludes(css, '.me-inkdetail-documents .me-doc-actions', '明细页 CSS 提供文档操作区独立作用域样式')
-expectIncludes(css, '.me-retention-dialog', '明细页 CSS 提供保存期限确认弹层样式')
+// 2026-09-23 稿 38-member-assets：本页从墨青纸感（MeListShell + me-detail-inkpaper）迁入青序流光。
+// 下面四条原来钉的是墨青纸感的**形状**（局部 CSS 导入、涟漪作用域、根类名、KIcon），
+// 迁移后换成青序壳的同位断言；能力与诚实性断言（签名 URL、打印确认、删除、保存期限……）一条不删。
+// me-detail-inkpaper.css 聚合入口：2026-09-23 /me/settings 也迁入青序后已无 src 引用；文件未删，封闭性断言保留。
+const qxCss = [
+  read('src/pages/profile/me/styles/member-records-qx.css'),
+  read('src/pages/profile/me/styles/qx-me-shared.css'),
+].join('\n')
+expectIncludes(page, "import './styles/member-records-qx.css'", 'MyDocumentsPage 引入青序记录页 CSS')
+expectMatches(page, /<QxMePage[\s\S]{0,120}?view="documents"/, 'MyDocumentsPage 使用青序会员壳的「我的文档」分域视图')
+expectAbsent(page, /MeListShell|me-detail-inkpaper|useInkRipple|me-inkdetail|KioskPageFrame/, 'MyDocumentsPage 已离开墨青纸感 / V6 旧壳')
+expectIncludes(qxCss, '.qx-me-asset-item', '青序 CSS 提供文档卡片样式')
+expectIncludes(qxCss, '.qx-me-acts', '青序 CSS 提供文档操作区样式')
+expectIncludes(qxCss, '.qx-me-assets .me-retention-dialog', '青序 CSS 提供保存期限确认弹层样式')
+expectIncludes(qxCss, '.qx-me-asset-overlay', '青序 CSS 提供文档预览弹层样式')
+expectAbsent(qxCss, /#[0-9a-fA-F]{3,8}\b/, '青序文档页样式只用 var(--qx-*) 令牌，无裸 hex')
 expectAbsent(css, /\.kprofile|\.khome|\.kassistant|\.kcampus/, '文档页样式不污染其他墨青页面作用域')
 
 expectMatches(routes, /path:\s*'me\/documents'[\s\S]{0,80}?element:\s*<MyDocumentsPage\s*\/>/, '路由仍指向 /me/documents -> MyDocumentsPage')
 expectIncludes(page, 'getMyDocuments(getToken(), { pageSize: 50 })', '我的文档保留本人文档真实 API 拉取')
-expectIncludes(page, "loginFrom=\"/me/documents\"", '我的文档保留登录回跳来源')
+// 登录回跳来源：青序壳的底栏由 recordsCtabar 统一生成，loginFrom 是它的第 4 个位置参数；
+// 钉住这个位置，再钉 recordsCtabar 确实把它作为 /login 的 from 传出去。
+expectMatches(page, /recordsCtabar\(uiState, navigate, \(\) => setReloadKey\(\(k\) => k \+ 1\), '\/me\/documents',/, '我的文档保留登录回跳来源')
+expectIncludes(read('src/pages/profile/me/qx/QxMeChrome.tsx'), "navigate('/login', { state: { from: loginFrom } })", '青序会员底栏登录键带回跳来源')
 expectIncludes(page, 'setItems([])', '我的文档保留游客态清空列表')
 expectIncludes(page, 'fetchAccessUrl(doc.previewUrlPath, token)', '我的文档查看/打印保留短期签名 URL 现取现用')
 expectMatches(page, /fetchAccessUrl\(doc\.previewUrlPath,\s*token\)[\s\S]{0,180}?setPreview\(\{\s*url:\s*res\.url/, '查看文档在当前隐私根内使用短期 URL')
@@ -169,224 +163,17 @@ expectIncludes(homeVerify, '/me/documents 已由专属守卫覆盖', 'profile-in
 expectAbsent(feedbackVerify, /'apps\/kiosk\/src\/pages\/profile\/me\/MyDocumentsPage\.tsx'/, 'feedback 守卫不再拦截文档页专属批次')
 expectAbsent(resumesVerify, /'apps\/kiosk\/src\/pages\/profile\/me\/MyDocumentsPage\.tsx'/, 'resumes/notifications 守卫不再拦截文档页专属批次')
 
-let changedFiles = []
-try {
-  changedFiles = listChangedFiles()
-} catch (error) {
-  if (error instanceof Error) console.error(`  ${error.message}`)
-  fail('范围守卫无法读取 git diff')
-}
-
-const allowedChanged = new Set([
-  '.env.example',
-  '.github/workflows/ci.yml',
-  'apps/kiosk/package.json',
-  'apps/kiosk/scripts/verify-print-confirm-honest.mjs',
-  'apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs',
-  'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',
-  'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
-  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
-  'apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs',
-  'apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs',
-  'apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs',
-  'apps/kiosk/scripts/verify-job-material-library-ui.mjs',
-  'apps/kiosk/src/pages/print/PrintCashierPage.tsx',
-  'apps/kiosk/src/pages/print/PrintConfirmPage.tsx',
-  'apps/kiosk/src/pages/print/PrintDonePage.tsx',
-  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
-  // 包 L1 第 1 次（2026-09-07）：「我的文档」Word 转 PDF 与 reprintable 接线。
-  // MyDocumentsPage 已到 500 行预算，转换入口和保存期限确认弹层拆到子组件；
-  // 小程序两端同步接线。只加行，不改守卫判定逻辑。
-  'apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx',
-  'apps/kiosk/src/pages/profile/me/components/documentReprint.ts',
-  'apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx',
-  'apps/kiosk/scripts/verify-word-conversion-ui.mjs',
-  'apps/kiosk/scripts/verify-lightflow-profile-entry.mjs',
-  'apps/kiosk/scripts/verify-file-retention-ui.mjs',
-  'apps/miniapp/utils/api.js',
-  'apps/miniapp/scripts/api-contract.json',
-  'apps/miniapp/pages/documents/documents.js',
-  'apps/miniapp/pages/documents/documents.wxml',
-  'apps/miniapp/pages/documents/documents.wxss',
-  'apps/miniapp/pages/documents/documents-helpers.js',
-  'docs/reviews/result-layer-2026-09-06-packets.md',
-  'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
-  'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
-  'apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx',
-  'apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx',
-  'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
-  'apps/kiosk/src/services/print/paymentApi.ts',
-  'apps/kiosk/src/services/print/printJobsApi.ts',
-  'docs/acceptance/member-print-orders-login-smoke.md',
-  'docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md',
-  'docs/progress/current-progress.md',
-  'docs/progress/next-tasks.md',
-  'docs/superpowers/plans/2026-07-04-profile-commercial-first-batch-execution.md',
-  'services/api/package.json',
-  'services/api/scripts/verify-benefit-redemption.ts',
-  'services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts',
-  'services/api/scripts/verify-kiosk-cashier-ui.ts',
-  'services/api/scripts/verify-payment-flow.ts',
-  'services/api/scripts/verify-production-real-services.ts',
-  'services/api/scripts/verify-production-runtime-gates.ts',
-  'services/api/src/config/production-runtime-gates.ts',
-  'services/api/src/payment/online-payment.service.ts',
-  'services/api/src/payment/payment-session-token.ts',
-  'services/api/src/payment/payment.controller.ts',
-  'services/api/src/print-jobs/print-jobs.service.ts',
-])
-
-const PRINT_URL_CONTRACT_CHANGED = new Set([
-  'apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs',
-  'apps/kiosk/src/pages/interview/InterviewReportPage.tsx',
-  'apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx',
-  'apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx',
-  'apps/kiosk/src/pages/resume/CareerPlanPage.tsx',
-  'apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx',
-  'apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx',
-  'apps/kiosk/src/services/api/httpAdapter.ts',
-  'apps/kiosk/src/services/api/jobFairs.ts',
-  'apps/kiosk/src/services/api/mockAdapter.ts',
-  'docs/progress/today-claude.md',
-  'packages/shared/src/types/ai.ts',
-  'packages/shared/src/types/fairDto.ts',
-  'packages/shared/src/types/file.ts',
-  'packages/shared/src/types/jobMaterials.ts',
-  'packages/shared/src/types/mockInterview.ts',
-  'services/api/prisma/migrations/20260711120000_add_fair_material_print_bridge/migration.sql',
-  'services/api/prisma/postgres/migrations/20260711120000_add_fair_material_print_bridge/migration.sql',
-  'services/api/prisma/postgres/schema.prisma',
-  'services/api/prisma/schema.prisma',
-  'services/api/scripts/verify-admin-fairs.ts',
-  'services/api/scripts/verify-career-plan.ts',
-  'services/api/scripts/verify-fair-company-positions.ts',
-  'services/api/scripts/verify-fair-info-fields.ts',
-  'services/api/scripts/verify-fair-visit-plan.ts',
-  'services/api/scripts/verify-job-materials.ts',
-  'services/api/scripts/verify-jobfair-venue-guide.ts',
-  'services/api/scripts/verify-print-scan-first-release.ts',
-  'services/api/src/ai/resume/career-plan.service.ts',
-  'services/api/src/ai/resume/fair-visit-plan.service.ts',
-  'services/api/src/files/file-validation.ts',
-  'services/api/src/files/file.types.ts',
-  'services/api/src/files/files.service.ts',
-  'services/api/src/files/signing.ts',
-  'services/api/src/job-materials/job-materials.service.ts',
-  'services/api/src/job-materials/job-materials.types.ts',
-  'services/api/src/jobs/admin-fairs.service.ts',
-  'services/api/src/jobs/fair-material-print-bridge.cleanup.task.ts',
-  'services/api/src/jobs/fair-material-print-bridge.service.ts',
-  'services/api/src/jobs/jobs.controller.ts',
-  'services/api/src/jobs/jobs.module.ts',
-  'services/api/src/jobs/jobs.service.ts',
-  'services/api/src/mock-interview/mock-interview.service.ts',
-  'services/api/src/prisma/prisma.service.ts',
-])
-
-// 签名盖章（feature/sign-stamp-design）批次：MyDocumentsPage.tsx 新增「签名盖章」动作按钮
-// （独立 signingId pending 状态），连带触及的 print-sign 新模块与 signature_image FilePurpose
-// 全仓同步改动。与 PRINT_URL_CONTRACT_CHANGED 同模式：另一批次的合法改动范围，非本守卫职责。
-const SIGN_STAMP_CHANGED = new Set([
-  'apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx',
-  'apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx',
-  'apps/kiosk/src/pages/print-scan/SignStampPage.tsx',
-  'apps/kiosk/src/routes/index.tsx',
-  'apps/kiosk/src/services/api/filesMockAdapter.ts',
-  'apps/kiosk/src/services/api/printSign.ts',
-  'docs/product/user-data-flow-matrix.md',
-  'docs/superpowers/plans/2026-07-12-sign-stamp-implementation.md',
-  'docs/superpowers/specs/2026-07-12-sign-stamp-design.md',
-  'packages/shared/src/index.ts',
-  'packages/shared/src/types/printSign.ts',
-  'packages/shared/src/types/uploadSession.ts',
-  'pnpm-lock.yaml',
-  'services/api/scripts/verify-print-sign.ts',
-  'services/api/src/app.module.ts',
-  'services/api/src/files/dto/kiosk-upload-options.dto.ts',
-  'services/api/src/files/retention-policy.ts',
-  'services/api/src/member-assets/member-assets.service.ts',
-  'services/api/src/print-sign/print-sign-geometry.ts',
-  'services/api/src/print-sign/print-sign.controller.ts',
-  'services/api/src/print-sign/print-sign.dto.ts',
-  'services/api/src/print-sign/print-sign.module.ts',
-  'services/api/src/print-sign/print-sign.service.ts',
-  'services/api/src/print-sign/print-sign.types.ts',
-  'services/api/src/storage/object-key.ts',
-  'services/api/src/upload-sessions/upload-sessions.service.ts',
-])
-
-// 文件真实显示收口批次：/me/documents 的页内预览与上传、扫描、Admin、Partner、
-// Terminal Agent U 盘简历 purpose/会员归属必须在同一候选中验证，不能拆成会失真的
-// 单端改动。这里只登记该批次的精确文件，业务断言仍由各自专属 verifier 负责。
-const FILE_FLOW_CHANGED = new Set([
-  'apps/admin/scripts/verify-admin-file-lifecycle.mjs',
-  'apps/admin/src/routes/files/index.tsx',
-  'apps/kiosk/playwright.w3.config.ts',
-  'apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs',
-  'apps/kiosk/scripts/verify-fusion-w3.mjs',
-  'apps/kiosk/scripts/verify-fusion-w5.mjs',
-  'apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs',
-  'apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs',
-  'apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs',
-  'apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs',
-  'apps/kiosk/src/components/FileContentPreview.tsx',
-  'apps/kiosk/src/components/FilePreviewDialog.tsx',
-  'apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx',
-  'apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx',
-  'apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx',
-  'apps/kiosk/src/pages/resume/ResumeSourcePage.tsx',
-  'apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx',
-  'apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx',
-  'apps/kiosk/src/pages/scan/ScanResultPage.tsx',
-  'apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx',
-  'apps/kiosk/src/services/files/usbImportApi.ts',
-  'apps/kiosk/tests/visual/fixtures/fusion-w2-binary-route.ts',
-  'apps/kiosk/tests/visual/fusion-self-assessment-flow.spec.ts',
-  'apps/kiosk/tests/visual/fusion-w2-scan.spec.ts',
-  'apps/kiosk/tests/visual/fusion-w2-tools.spec.ts',
-  'apps/kiosk/tests/visual/fusion-w3.spec.ts',
-  'apps/partner/scripts/verify-excel-template-download-ui.mjs',
-  'apps/partner/src/routes/sources/ExcelImportModal.tsx',
-  'apps/partner/src/routes/sources/index.tsx',
-  'apps/terminal-agent/scripts/verify-usb-import-agent.ts',
-  'apps/terminal-agent/installer/verify-installer-inputs.mjs',
-  'apps/terminal-agent/src/local-api/qr-login-server.ts',
-  'apps/terminal-agent/src/local-api/types.ts',
-  'apps/terminal-agent/src/local-api/wire.ts',
-  'docs/product/feature-scope.md',
-  'services/api/scripts/verify-http-exception-filter.ts',
-  'services/api/scripts/verify-partner-excel-import.ts',
-  'services/api/scripts/verify-upload-sessions.ts',
-  'services/api/src/common/filters/http-exception.filter.ts',
-  'services/api/src/jobs/jobs-excel.service.ts',
-  'services/api/src/jobs/jobs-partner.service.ts',
-  'services/api/src/jobs/jobs-shared.ts',
-  'services/api/src/jobs/partner-import-file.ts',
-])
-
-// 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/documents 明细页时，才强制 allowlist
-// 范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次。
-const OWNED_PAGES = ['apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx']
-const touchesOwnedPage = changedFiles.some((file) => OWNED_PAGES.includes(file))
-const unexpectedChanged = touchesOwnedPage
-  ? changedFiles.filter(
-      (file) => !allowedChanged.has(file)
-        && !PRINT_URL_CONTRACT_CHANGED.has(file)
-        && !SIGN_STAMP_CHANGED.has(file)
-        && !FILE_FLOW_CHANGED.has(file),
-    )
-  : []
-if (!touchesOwnedPage) {
-  pass('本 PR 未触碰 /me/documents 明细页，跳过范围 allowlist 检查（守卫条件触发）')
-} else if (unexpectedChanged.length === 0) {
-  pass('diff 仅触碰已登记的文档、打印、签章或文件真实显示批次精确范围')
-} else {
-  fail(`diff 出现禁止范围变更：${unexpectedChanged.join(', ')}`)
-}
+// 2026-09-23 退役：原「历史变更集 allowlist / unexpectedChanged」范围检查。
+// 它按 origin/main...HEAD 取整个变更集，再用当年墨青换装批次的清单逐文件比对 ——
+// 该批次早已合入，清单只能靠每个正当 PR 追加行才变绿，已退化成历史流水账；
+// 在多批次集成候选上它会把几百个已审计的合法文件一律判越界，挡不住任何东西。
+// 本守卫现在只验上方的页面/行为合同；文件范围由 verify:profile-commercial-first-batch
+// （触碰 /me/* 时委托 verify:fusion-w5 精确合同）、project graph 与 CI diff 合同负责。
+console.log('  INFO 本守卫只验页面/行为合同，不检查文件范围；集成候选的文件范围由 verify:profile-commercial-first-batch / verify:fusion-w5 / project graph / CI diff 合同负责')
 
 if (failures > 0) {
-  console.error(`\n❌ ${failures} 项失败 — 我的文档页墨青纸感守卫未通过\n`)
+  console.error(`\n❌ ${failures} 项失败 — /me/documents 页面/行为合同守卫未通过\n`)
   process.exit(1)
 }
 
-console.log('✅ ALL PASS — /me/documents 墨青纸感换装守卫通过\n')
+console.log('✅ ALL PASS — /me/documents 页面/行为合同守卫通过（不含文件范围检查）\n')

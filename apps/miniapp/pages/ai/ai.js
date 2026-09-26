@@ -6,12 +6,12 @@ Page({
     statusBarHeight: 20,
     // 按「用户此刻在什么处境」分组，而不是按「这是不是 AI」分组。
     // 用户不会想「我要用一个 AI 工具」，他想的是「我明天面试，材料还没弄好」。
-    // 三段对应一条真实动线：准备材料 → 想清楚 → 到机器前办完。
+    // 两段对应动线的前半程：准备材料 → 想清楚；「到机器前办完」在底部「打印」Tab。
     groups: [
       {
         key: 'prepare',
         title: '准备材料',
-        sub: '改简历、管文档、发起打印',
+        sub: '改简历、写材料、管文档',
         items: [
           // 排在诊断/优化**之前**：那两条都以「你已经有一份简历」为前提，
           // 一份都没有的应届生在这一组里原本无路可走。
@@ -34,39 +34,26 @@ Page({
           // 直接渲染 PDF。desc 也不写「智能/AI」——写了就是伪造。
           { id: 'materials', icon: 'form',        title: '材料模板', desc: '自荐信、感谢信、材料清单', accent: 'wheat' },
           { id: 'documents', icon: 'folder',      title: '我的文档', desc: '管理材料并再次打印', accent: 'clay'  },
-          { id: 'print',     icon: 'printer',     title: '发起打印', desc: '选文档、终端与参数', accent: 'cyan'  },
         ],
       },
       {
         key: 'decide',
         title: '想清楚再决定',
-        sub: '岗位、面试、方向',
+        sub: '面试、方向、自我了解',
         items: [
-          { id: 'contract',  icon: 'file-search', title: '合同审查', desc: '拍照逐条提示需留意条款', accent: 'clay'  },
-          { id: 'match',     icon: 'link',    title: '岗位匹配', desc: '三档参考，不代表录用结果', accent: 'teal'  },
-          { id: 'interview', icon: 'comment', title: '模拟面试', desc: '按岗位出题并复盘',       accent: 'plum'  },
+          // 原「岗位匹配」：改名「简历对照」，只对照用户自己填写 / 粘贴的职位要求，
+          // 不再从平台岗位进入（岗位页已停放，见 compliance-boundary.md §1.1）。
+          { id: 'match',     icon: 'link',    title: '简历对照', desc: '粘贴岗位要求，看简历还差什么', accent: 'teal'  },
+          { id: 'interview', icon: 'comment', title: '模拟面试', desc: '按目标岗位出题并复盘',   accent: 'plum'  },
           { id: 'plan',      icon: 'compass', title: '职业规划', desc: '方向建议仅供参考',       accent: 'wheat' },
-          // 放「想清楚再决定」而不是另起一组：它和岗位匹配/职业规划一样，
+          // 放「想清楚再决定」而不是另起一组：它和简历对照/职业规划一样，
           // 产出的是帮你做判断的参考，不是可交付的材料。
           // 标题按后端口径写「自我探索」——不叫「测评」：测评是资格判定口吻。
           { id: 'explore',   icon: 'aim',     title: '自我探索', desc: '五维倾向参考，非资格评定', accent: 'slate' },
-          { id: 'community', icon: 'comment', title: '最新动态', desc: '政策、权益与平台通知', accent: 'teal' },
-          { id: 'daily',     icon: 'file-text', title: '今日提醒', desc: '到机码、招聘会与当日新增', accent: 'wheat' },
         ],
       },
-      {
-        key: 'onsite',
-        title: '到机器前办',
-        sub: '到机码、扫码登录、U盘',
-        items: [
-          // desc 必须写「现场付款」：材料包在小程序只完成组包与拿到机码，钱是在
-          // 一体机上付的。不写清楚，用户会以为点进去是在手机上下单付款。
-          { id: 'package',   icon: 'folder',  title: '材料包',     desc: '多份材料一次组包，现场付款打印', accent: 'clay'  },
-          { id: 'orders',    icon: 'history', title: '打印订单',   desc: '到机码与出纸状态',   accent: 'clay'  },
-          { id: 'kiosk',     icon: 'scan',    title: '扫码登录',   desc: '连接现场服务终端',   accent: 'teal'  },
-          { id: 'usb',       icon: 'printer', title: 'U盘打印指引', desc: '现场导入与打印步骤', accent: 'wheat' },
-        ],
-      },
+      // 原「到机器前办」一组（材料包 / 打印订单 / 扫码登录 / U盘）与「发起打印」「今日提醒」
+      // 已挪到底部「打印」Tab；「合同审查」「最新动态」随页面停放（首发按非招聘类目提审）。
     ],
 
     // 页面已经做完、但服务端接口还不存在的能力。
@@ -110,24 +97,16 @@ Page({
       // 删掉这条会怎样：上面 groups.prepare 的「生成简历」磁贴点下去 url 取到
       // undefined，wx.navigateTo 不会被调用，卡片变成静默死按钮（用户会以为是
       // 自己没点准，反复去戳）。id 与 groups 里的 id 必须逐字对应。
-      package:   '/pages/package-create/package-create',
       build:     '/pages/resume-build/resume-build',
       voice:     '/pages/resume-voice/resume-voice',
       diagnose:  '/pages/resume-diagnose/resume-diagnose',
       optimize:  '/pages/resume-optimize/resume-optimize',
       documents: '/pages/documents/documents',
       materials: '/pages/job-materials/job-materials',
-      print:     '/pages/print/print',
-      contract:  '/pages/contract-review/contract-review',
       match:     '/pages/job-fit/job-fit',
       interview: '/pages/interview-entry/interview-entry',
       explore:   '/pages/self-explore/self-explore',
       plan:      '/pages/career-plan/career-plan',
-      orders:    '/pages/orders/orders',
-      kiosk:     '/pages/kiosk-login/kiosk-login',
-      usb:       '/pages/usb-import/usb-import',
-      community: '/pages/community/community',
-      daily:     '/pages/daily-report/daily-report',
     }
     const url = routes[id]
     if (url) wx.navigateTo({ url })
@@ -143,7 +122,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '职业生活圈 · 求职与社区',
+      title: 'AI 工具 · 简历与面试准备',
       path:  '/pages/ai/ai',
     }
   },

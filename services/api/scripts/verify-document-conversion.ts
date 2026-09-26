@@ -241,7 +241,16 @@ async function verifyRuntime(): Promise<void> {
   const printPrisma = {
     fileObject: {
       findUnique: async ({ where }: { where: { id: string } }) => where.id === requestedFileId
-        ? { purpose: 'print_doc', sha256: 'b'.repeat(64), mimeType: DOCX_MIME, filename: 'source.docx', assetCategory: 'original' }
+        ? {
+            purpose: 'print_doc',
+            sha256: 'b'.repeat(64),
+            mimeType: DOCX_MIME,
+            filename: 'source.docx',
+            assetCategory: 'original',
+            status: 'active',
+            deletedAt: null,
+            expiresAt: null,
+          }
         : null,
     },
     fairMaterialPrintBridge: { findFirst: async () => null },

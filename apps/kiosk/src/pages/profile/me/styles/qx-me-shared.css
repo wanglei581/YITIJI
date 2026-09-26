@@ -432,3 +432,131 @@ button.qx-me-row { cursor: pointer; }
 .qx-me-fav-next span { display: block; margin-top: 7px; font-size: 16px; line-height: 1.45; color: var(--qx-ink-3); }
 
 .qx-me-grow { flex: 1 1 auto; min-height: 0; }
+
+/* ── 账号设置（/me/settings，稿 30-my-profile ?screen=settings） ──
+   只在 .qx-me-settings（QxMePage 的 settings 视图）里生效，令牌一律 var(--qx-*)。
+   整块正文一起滚，行列表本身不再各自滚动，避免一屏里出现两条滚动条。 */
+.qx-me-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.qx-me-settings-body::-webkit-scrollbar { display: none; }
+.qx-me-settings-body > * { flex: none; }
+.qx-me-settings .qx-me-list { overflow: visible; }
+.qx-me-settings .qx-me-st[data-tone='off'] { background: var(--qx-muted-bg); color: var(--qx-muted-ink); }
+.qx-me-settings .qx-me-small:disabled {
+  background: var(--qx-muted-bg);
+  border-color: var(--qx-muted-line);
+  color: var(--qx-muted-ink);
+  cursor: not-allowed;
+}
+.qx-me-settings-consent {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid var(--qx-line);
+  border-radius: 26px;
+  background: var(--qx-surface);
+}
+.qx-me-settings-consent[data-consent='error'] { border-color: var(--qx-cinnabar-line); }
+.qx-me-settings-note {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--qx-deep) 4.5%, transparent);
+  color: var(--qx-ink-2);
+  font-size: 17px;
+  line-height: 1.55;
+}
+.qx-me-settings-note > svg { flex: none; margin-top: 2px; color: var(--qx-teal-d); }
+.qx-me-settings-note[data-tone='muted'] { color: var(--qx-ink-3); }
+.qx-me-settings-note[data-tone='muted'] > svg { color: var(--qx-ink-3); }
+.qx-me-settings-note b { display: block; margin-bottom: 4px; font-size: 19px; color: var(--qx-ink); }
+
+/* 确认 / 换绑弹层：舞台被 KioskStageFit 缩放时 fixed 以舞台为包含块，铺满的是 1080×1920 舞台。 */
+.qx-me-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--qx-deep) 55%, transparent);
+}
+.qx-me-settings-dialog {
+  width: min(100%, 720px);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 32px 34px;
+  border: 1px solid var(--qx-line);
+  border-radius: 26px;
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+}
+.qx-me-settings-step { margin-bottom: 8px; font-size: 16px; font-weight: 800; letter-spacing: 1px; color: var(--qx-teal-d); }
+.qx-me-settings-dialog h2 { margin: 0; font-size: 30px; font-weight: 800; line-height: 1.3; }
+.qx-me-settings-dialog p { margin: 14px 0 0; font-size: 20px; line-height: 1.6; color: var(--qx-ink-2); }
+.qx-me-settings-dialog p b { color: var(--qx-ink); }
+.qx-me-settings-dialog .qx-me-settings-err { color: var(--qx-cinnabar); font-weight: 700; }
+.qx-me-settings-input {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  margin-top: 18px;
+  padding: 0 22px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 18px;
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font-family: var(--qx-mono);
+  font-size: 32px;
+  letter-spacing: 6px;
+  text-align: center;
+  outline: none;
+}
+.qx-me-settings-input:focus { border-color: var(--qx-teal); box-shadow: 0 0 0 3px var(--qx-teal-soft); }
+/* 公共屏上的 6 位码：type=password 之外再加一层遮挡，驱动或输入法回显时也不露码。 */
+.qx-me-settings-dialog .me-otp-mask { -webkit-text-security: disc; }
+.qx-me-settings-dialog-acts { display: flex; gap: 14px; margin-top: 26px; }
+.qx-me-settings-dialog-acts .qx-btn { flex: 1 1 0; min-width: 0; }
+
+/* 手机宽度：只作用于不缩放的舞台（同 member-records-qx.css 的限定）。改成整页纵向滚动。 */
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-me-settings) .qx-body { padding: 0 14px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-me-settings) .qx-ctabar { gap: 10px; padding: 12px 14px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-me-settings) .qx-ctabar .qx-btn { flex: 1 1 0; min-width: 0; min-height: 56px; padding: 0 12px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-me-settings) .qx-navbar { height: 76px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings { overflow-y: auto; gap: 12px; padding-top: 12px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings > * { flex-shrink: 0; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-settings-body { flex: none; overflow: visible; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-xq { padding: 16px 18px; border-radius: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-xq-row { gap: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-xq-face { width: 52px; height: 52px; font-size: 24px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-xq-eyebrow { font-size: 12px; letter-spacing: 3px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-xq-ask { font-size: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-xq-doing { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-banner,
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-summary,
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-settings-consent { flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-settings-consent { align-items: flex-start; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-banner-t { font-size: 22px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-summary-main strong { font-size: 26px; overflow-wrap: anywhere; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-banner-mini,
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-summary-mini { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 12px; text-align: left; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-row-main { flex: 1 1 calc(100% - 74px); }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-acts { width: 100%; max-width: none; justify-content: flex-start; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings .qx-me-list { padding: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings-dialog { padding: 22px 18px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings-dialog h2 { font-size: 24px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings-dialog p { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings-dialog-acts .qx-btn { min-height: 56px; padding: 0 12px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-me-settings-input { min-height: 60px; font-size: 26px; }
+}

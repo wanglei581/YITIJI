@@ -6,14 +6,26 @@ import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
 // 各写一份 PICKUP_CODE_LEN=10，两处不同步即「按一种长度发码、按另一种长度收码」。
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
-import { OrderQuoteService } from '../payment/order-quote.service'
-import { isPickupWindowClosed, OrderStatusService } from '../payment/order-status.service'
+import { OrderQuoteService, priceChanged } from '../payment/order-quote.service'
+import {
+  CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
+  claimedUnpaidExpiredLeaseWhere,
+  isLiveKioskPickupLease,
+  isPickupWindowClosed,
+  OrderStatusService,
+} from '../payment/order-status.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import type { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
+import {
+  acquireOrderSubmissionLease,
+  completeOrderSubmission,
+  releaseOrderSubmissionLease,
+  resolveOrderSubmissions,
+} from './order-submission-ledger'
 
 /**
  * 取件码有效期上限：7 天（产品裁决 2026-08-18 方案 A，原 24 小时）。
@@ -35,10 +47,10 @@ import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
  * 7 天才真的生效。
  *
  * **因此界面绝不能按本常量显示倒计时**（CLAUDE.md §9「不伪造能力」）：
- * 所有对外展示都必须用落库的 `Order.pickupCodeExpiresAt`，
- * 它已经是夹取后的真实值。该约束由 `verify-backend-p0-contracts.mjs` 与
- * `verify-miniapp-cloud-print-m2.ts` 两侧断言守住 —— 后者会真的建一个
- * 短留存文件的订单，验证落库过期时间跟的是文件而不是这个常量。
+ * 所有对外展示都必须用落库的 `Order.pickupCodeExpiresAt`。
+ * 未付款时它是夹取后的值；付款成功后 `OrderStatusService` 把它改成
+ * `paidAt + 7 天`，并把仍有效的源文件延长到同一时刻（长期文件 expiresAt=null 不缩短）。
+ * 该约束由 `verify-backend-p0-contracts.mjs` 与 `verify-miniapp-cloud-print-m2.ts` 守住。
  *
  * 同理：**不要为了「让 7 天生效」去掉下面的 Math.min 夹取**，那只会制造
  * 指向已删除文件的取件码。要延长实际有效期，改的是文件留存策略，不是这里。
@@ -75,7 +87,8 @@ function printParams(dto: CreateMemberPrintOrderDto): PrintJobParamsDto {
 
 /** Prisma @@unique map name. P2002 matching must pin this constraint, not orderNo / pickupCodeHash. */
 export const MEMBER_PRINT_ORDER_IDEMPOTENCY_UNIQUE = 'Order_endUserId_idempotencyKey_key'
-const IDEMPOTENCY_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+/** Lowercase UUID only. The Order unique is case-sensitive TEXT; `/i` would accept AAAA… as a new key. Do not toLowerCase(). */
+const IDEMPOTENCY_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 export function assertMemberPrintOrderIdempotencyKey(raw: unknown): string {
   if (raw == null || (typeof raw === 'string' && raw.trim() === '')) {
@@ -92,6 +105,7 @@ export function assertMemberPrintOrderIdempotencyKey(raw: unknown): string {
 }
 
 export function fingerprintMemberPrintOrderPayload(dto: Pick<CreateMemberPrintOrderDto, 'fileId' | 'terminalId' | 'copies' | 'colorMode' | 'duplex'>): string {
+  // quotedAmountCents 不进指纹：价格再确认必须沿用原来的 Idempotency-Key。
   return crypto.createHash('sha256').update(JSON.stringify({
     fileId: dto.fileId,
     terminalId: dto.terminalId,
@@ -156,7 +170,16 @@ export function isMemberPrintOrderIdempotencyConflict(error: unknown): boolean {
 }
 
 function isPrismaUniqueConflict(error: unknown): error is object & { code: 'P2002' } {
-  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'P2002')
+  return prismaUniqueConflict(error) != null
+}
+
+function prismaUniqueConflict(error: unknown): object & { code: 'P2002' } | null {
+  let current: unknown = error
+  for (let i = 0; i < 6 && current && typeof current === 'object'; i += 1) {
+    if ((current as { code?: unknown }).code === 'P2002') return current as object & { code: 'P2002' }
+    current = (current as { cause?: unknown }).cause
+  }
+  return null
 }
 
 @Injectable()
@@ -169,12 +192,27 @@ export class MemberPrintOrderCreateService {
     private readonly audit: AuditService,
   ) {}
 
+  async resolveSubmissions(endUserId: string, keys: string[]) {
+    return resolveOrderSubmissions(this.prisma, endUserId, keys)
+  }
+
   async create(endUserId: string, dto: CreateMemberPrintOrderDto, idempotencyKey?: string | null) {
     const key = assertMemberPrintOrderIdempotencyKey(idempotencyKey)
     const fingerprint = fingerprintMemberPrintOrderPayload(dto)
-    const existing = await this.findOwnedByIdempotencyKey(endUserId, key)
-    if (existing) return this.replayOwned(endUserId, existing, fingerprint)
-
+    const acquired = await acquireOrderSubmissionLease(this.prisma, {
+      endUserId,
+      idempotencyKey: key,
+      orderKind: 'print',
+      payloadHash: fingerprint,
+    })
+    if (acquired.type === 'replay') {
+      const existing = await this.findOwnedByIdempotencyKey(endUserId, key)
+      if (!existing) throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
+      return this.replayOwned(endUserId, existing, fingerprint)
+    }
+    const leaseToken = acquired.leaseToken
+    let completed = false
+    try {
     const now = new Date()
     const file = await this.prisma.fileObject.findFirst({
       where: { id: dto.fileId, endUserId, deletedAt: null },
@@ -222,46 +260,65 @@ export class MemberPrintOrderCreateService {
     // 到机码绝不能活得比源文件更久；否则用户会拿到“码仍有效、文件已清理”的假承诺。
     const pickupDeadline = now.getTime() + PICKUP_TTL_MS
     const expiresAt = new Date(Math.min(pickupDeadline, file.expiresAt?.getTime() ?? pickupDeadline))
+    // 只在新租约上、写库前比对。回放已建订单走上面的 replay，不在这里重算。
+    if (dto.quotedAmountCents !== undefined && dto.quotedAmountCents !== quote.amountCents) {
+      throw priceChanged(quote)
+    }
     let order
     try {
-      order = await this.prisma.order.create({
-        data: {
-          orderNo: makeOrderNo(),
-          type: 'print',
-          // channel: 小程序云打印（到店取件）。小程序建单请求体不含该字段——
-          // 由服务端硬编，前端零改动（见 M1 任务卡事实 B/D/E）。
-          channel: 'miniapp_cloud',
-          endUserId,
-          terminalId: terminal.id,
-          sourceFileId: file.id,
-          sourceFileSha256: file.sha256,
-          sourceFileName: file.filename,
-          printParamsJson: JSON.stringify({ ...params, fileName: file.filename }),
-          amountCents: quote.amountCents,
-          billablePages: quote.billablePages,
-          billingPageSource: quote.billingPageSource,
-          itemsJson: JSON.stringify(quote.lines),
-          payStatus: 'unpaid',
-          taskStatus: 'pending_release',
-          pickupCodeHash: hashPickupCode(code),
-          pickupCodeEnc: encryptSecret(code),
-          pickupCodeCreatedAt: now,
-          pickupCodeExpiresAt: expiresAt,
-          pickupStatus: 'pending',
-          idempotencyKey: key,
-          idempotencyPayloadHash: fingerprint,
-        },
+      order = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            orderNo: makeOrderNo(),
+            type: 'print',
+            // channel: 小程序云打印（到店取件）。小程序建单请求体不含该字段——
+            // 由服务端硬编，前端零改动（见 M1 任务卡事实 B/D/E）。
+            channel: 'miniapp_cloud',
+            endUserId,
+            terminalId: terminal.id,
+            sourceFileId: file.id,
+            sourceFileSha256: file.sha256,
+            sourceFileName: file.filename,
+            printParamsJson: JSON.stringify({ ...params, fileName: file.filename }),
+            amountCents: quote.amountCents,
+            billablePages: quote.billablePages,
+            billingPageSource: quote.billingPageSource,
+            itemsJson: JSON.stringify(quote.lines),
+            payStatus: 'unpaid',
+            taskStatus: 'pending_release',
+            pickupCodeHash: hashPickupCode(code),
+            pickupCodeEnc: encryptSecret(code),
+            pickupCodeCreatedAt: now,
+            pickupCodeExpiresAt: expiresAt,
+            pickupStatus: 'pending',
+            idempotencyKey: key,
+            idempotencyPayloadHash: fingerprint,
+          },
+        })
+        await completeOrderSubmission(tx, { endUserId, idempotencyKey: key, leaseToken, orderId: created.id })
+        return created
       })
     } catch (error) {
       // Any P2002: one scoped lookup by (endUserId, key). Replay only when that
       // row exists (fingerprint checked in replayOwned). No row → rethrow the
       // exact original error. Do not classify solely by provider meta tokens.
-      if (isPrismaUniqueConflict(error)) {
+      const unique = prismaUniqueConflict(error)
+      if (unique) {
         const raced = await this.findOwnedByIdempotencyKey(endUserId, key)
-        if (raced) return this.replayOwned(endUserId, raced, fingerprint)
+        if (raced) {
+          completed = true
+          try {
+            await completeOrderSubmission(this.prisma, { endUserId, idempotencyKey: key, leaseToken, orderId: raced.id })
+          } catch {
+            /* already succeeded or fenced; owned row is still the replay source */
+          }
+          return this.replayOwned(endUserId, raced, fingerprint)
+        }
+        throw unique
       }
       throw error
     }
+    completed = true
     const settled = quote.amountCents === 0
       ? await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
       : order
@@ -275,6 +332,11 @@ export class MemberPrintOrderCreateService {
       payload: { terminalId: terminal.id, fileId: file.id, amountCents: quote.amountCents, billablePages: quote.billablePages },
     })
     return this.toView(settled, this.visibleCode(settled) ?? code, terminal)
+    } finally {
+      if (!completed) {
+        await releaseOrderSubmissionLease(this.prisma, { endUserId, idempotencyKey: key, leaseToken })
+      }
+    }
   }
 
   async listCloud(endUserId: string) {
@@ -300,7 +362,13 @@ export class MemberPrintOrderCreateService {
     const order = await this.requireOwned(endUserId, orderId)
     await this.expireIfNeeded(order)
     const fresh = await this.requireOwned(endUserId, orderId)
-    return this.toView(fresh, this.visibleCode(fresh))
+    const terminal = fresh.terminalId
+      ? await this.prisma.terminal.findFirst({
+          where: { id: fresh.terminalId },
+          select: { displayName: true, locationLabel: true },
+        })
+      : null
+    return this.toView(fresh, this.visibleCode(fresh), terminal ?? undefined)
   }
 
   async cancel(endUserId: string, orderId: string, dto: CancelMemberPrintOrderDto) {
@@ -388,40 +456,41 @@ export class MemberPrintOrderCreateService {
   }
 
   private async expireIfNeeded(order: Awaited<ReturnType<MemberPrintOrderCreateService['requireOwned']>>) {
-    if (!['pending', 'claimed'].includes(order.pickupStatus) || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
-    await this.prisma.order.updateMany({
-      where: { id: order.id, pickupStatus: { in: ['pending', 'claimed'] }, printTaskId: null },
-      data: {
-        pickupStatus: 'expired',
-        taskStatus: 'expired',
-        payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
-      },
-    })
+    const now = new Date()
+    if (isLiveKioskPickupLease(order, now)) return
+    const pendingExpired = order.pickupStatus === 'pending'
+      && !!order.pickupCodeExpiresAt
+      && order.pickupCodeExpiresAt <= now
+    const claimedLeaseExpired = order.pickupStatus === 'claimed'
+      && !order.printTaskId
+      && (order.payStatus === 'unpaid' || order.payStatus === 'paying')
+    if (!pendingExpired && !claimedLeaseExpired) return
+    await this.expirePendingForUser(order.endUserId ?? '', order.id)
   }
 
-  private async expirePendingForUser(endUserId: string): Promise<void> {
+  private async expirePendingForUser(endUserId: string, orderId?: string): Promise<void> {
     const now = new Date()
+    const scope = {
+      ...(orderId ? { id: orderId } : { endUserId }),
+      sourceFileId: { not: null } as const,
+      printTaskId: null,
+    }
+    const pendingWindow = {
+      ...scope,
+      pickupStatus: 'pending',
+      pickupCodeExpiresAt: { lte: now },
+    }
     await this.prisma.order.updateMany({
-      where: {
-        endUserId,
-        sourceFileId: { not: null },
-        pickupStatus: { in: ['pending', 'claimed'] },
-        printTaskId: null,
-        pickupCodeExpiresAt: { lte: now },
-        payStatus: { in: ['unpaid', 'paying'] },
-      },
+      where: { ...pendingWindow, payStatus: { in: ['unpaid', 'paying'] } },
       data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
     })
     await this.prisma.order.updateMany({
-      where: {
-        endUserId,
-        sourceFileId: { not: null },
-        pickupStatus: { in: ['pending', 'claimed'] },
-        printTaskId: null,
-        pickupCodeExpiresAt: { lte: now },
-        payStatus: { notIn: ['unpaid', 'paying'] },
-      },
+      where: { ...pendingWindow, payStatus: { notIn: ['unpaid', 'paying'] } },
       data: { pickupStatus: 'expired', taskStatus: 'expired' },
+    })
+    await this.prisma.order.updateMany({
+      where: { ...scope, ...claimedUnpaidExpiredLeaseWhere(now) },
+      data: { ...CLAIMED_UNPAID_LEASE_EXPIRE_DATA },
     })
   }
 
@@ -431,7 +500,7 @@ export class MemberPrintOrderCreateService {
     pickupCodeExpiresAt: Date | null
     pickupCodeEnc: string | null
   }): string | null {
-    if (!['pending', 'claimed'].includes(order.pickupStatus)) return null
+    if (order.pickupStatus !== 'pending') return null
     if (!['unpaid', 'paying', 'paid'].includes(order.payStatus)) return null
     if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date() || !order.pickupCodeEnc) return null
     try { return decryptSecret(order.pickupCodeEnc) } catch { return null }
@@ -466,6 +535,13 @@ export class MemberPrintOrderCreateService {
       taskStatus: order.taskStatus,
       pickupStatus: order.pickupStatus,
       pickupCode: code,
+      // 分享载荷只有码和网点名。文件名与金额留在订单视图，不得放进 share。
+      share: code
+        ? {
+            pickupCode: code,
+            outletName: terminal?.displayName?.trim() || terminal?.locationLabel?.trim() || '打印网点',
+          }
+        : null,
       pickupCodeExpiresAt: order.pickupCodeExpiresAt?.toISOString() ?? null,
       printTaskId: order.printTaskId,
       createdAt: order.createdAt.toISOString(),

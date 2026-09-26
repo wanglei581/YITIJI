@@ -8,11 +8,21 @@ import {
 } from 'lucide-react'
 import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../../../components/qingxu/QxAppNavbar'
+import { useRecruitmentHosting } from '../../../../hooks/useRecruitmentHosting'
 import { useTerminalDeviceStatus } from '../../../../hooks/useTerminalDeviceStatus'
 import { getTerminalCode } from '../../../../services/api/terminalConfig'
 import '../styles/qx-me-shared.css'
 
-export type QxMeView = 'notifications' | 'resumes' | 'favorites' | 'ai-records' | 'activity' | 'activity-detail'
+export type QxMeView =
+  | 'notifications'
+  | 'resumes'
+  | 'favorites'
+  | 'ai-records'
+  | 'activity'
+  | 'activity-detail'
+  | 'documents'
+  | 'orders'
+  | 'settings'
 
 export type QxMeStatusTone = 'ok' | 'warn' | 'bad' | 'unknown'
 
@@ -26,11 +36,19 @@ function qxStatusFromDevice(device: ReturnType<typeof useTerminalDeviceStatus>):
   return { tone: 'bad', label: device.printerLabel }
 }
 
-const RECORD_VIEWS: { key: Exclude<QxMeView, 'notifications' | 'activity-detail'>; label: string; hint: string; to: string }[] = [
+type QxMeTab = { key: QxMeView; label: string; hint: string; to: string }
+
+const RECORD_VIEWS: QxMeTab[] = [
   { key: 'resumes', label: '简历', hint: '诊断与生成', to: '/me/resumes' },
   { key: 'favorites', label: '收藏', hint: '岗位·招聘会·政策', to: '/me/favorites' },
   { key: 'ai-records', label: 'AI记录', hint: '服务元数据', to: '/me/ai-records' },
   { key: 'activity', label: '足迹', hint: '浏览·跳转·进度', to: '/me/activity' },
+]
+
+/* 稿 38：文档与打印订单是同一块「本人资产」的两个分域，互相切换，不混进上面四个记录分类。 */
+const ASSET_VIEWS: QxMeTab[] = [
+  { key: 'documents', label: '我的文档', hint: '预览·打印·留存', to: '/me/documents' },
+  { key: 'orders', label: '打印订单', hint: '进度·支付·取件', to: '/me/print-orders' },
 ]
 
 export function QxMePage({
@@ -44,11 +62,12 @@ export function QxMePage({
   truth,
   toast,
   ctabar,
+  live = true,
   children,
 }: {
   title: string
   view: QxMeView
-  screen: 'member-list' | 'activity-detail'
+  screen: 'member-list' | 'activity-detail' | 'member-settings'
   screenState: string
   eyebrow: string
   ask: ReactNode
@@ -56,13 +75,26 @@ export function QxMePage({
   truth: string
   toast?: { tone: 'ok' | 'bad'; text: string } | null
   ctabar: ReactNode
+  /** 整页 aria-live。定时刷新的页（打印订单每 5 秒同步）传 false，否则读屏会反复播报整块列表。 */
+  live?: boolean
   children: ReactNode
 }) {
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
   const status = qxStatusFromDevice(device)
+  // 招聘内容托管（3.13）关闭时收藏里只有政策：分类提示不再写岗位与招聘会。
+  const hostingOpen = useRecruitmentHosting().enabled
   const terminalLabel = getTerminalCode() || '设备未绑定'
-  const showViewTabs = view !== 'notifications'
+  const isAssetView = view === 'documents' || view === 'orders'
+  /* 账号设置（稿 30 ?screen=settings）不是记录分类，也不属本人资产分域：不挂分类 Tab。 */
+  const isSettingsView = view === 'settings'
+  const tabs = isAssetView ? ASSET_VIEWS : view === 'notifications' || isSettingsView ? [] : RECORD_VIEWS
+  const testScope = view === 'notifications'
+    ? 'notifications'
+    : isSettingsView
+      ? 'member-settings'
+      : isAssetView ? 'member-assets' : 'member-records'
+  const pageClass = isAssetView ? 'qx-me-page qx-me-assets' : isSettingsView ? 'qx-me-page qx-me-settings' : 'qx-me-page'
 
   return (
     <QxPageFrame
@@ -80,12 +112,12 @@ export function QxMePage({
       }
     >
       <div
-        className="qx-me-page"
+        className={pageClass}
         data-kiosk-domain="profile"
         data-kiosk-screen={screen}
         data-state={screenState}
-        data-testid={`${view === 'notifications' ? 'notifications' : 'member-records'}-state-${screenState}`}
-        aria-live="polite"
+        data-testid={`${testScope}-state-${screenState}`}
+        aria-live={live ? 'polite' : undefined}
       >
         <section className="qx-me-xq">
           <div className="qx-me-xq-row">
@@ -98,9 +130,13 @@ export function QxMePage({
           </div>
         </section>
 
-        {showViewTabs ? (
-          <nav className="qx-me-viewtabs" aria-label="我的记录分类">
-            {RECORD_VIEWS.map((item) => {
+        {tabs.length > 0 ? (
+          <nav
+            className="qx-me-viewtabs"
+            data-n={tabs.length}
+            aria-label={isAssetView ? '我的文档与打印订单' : '我的记录分类'}
+          >
+            {tabs.map((item) => {
               const active = item.key === view || (view === 'activity-detail' && item.key === 'activity')
               return (
                 <button
@@ -108,12 +144,12 @@ export function QxMePage({
                   type="button"
                   className="qx-me-vtab"
                   data-route={item.to}
-                  data-testid={`member-records-view-${item.key}`}
+                  data-testid={isAssetView ? `member-assets-tab-${item.key}` : `member-records-view-${item.key}`}
                   aria-current={active ? 'true' : undefined}
                   onClick={() => navigate(item.to)}
                 >
                   {item.label}
-                  <span>{item.hint}</span>
+                  <span>{item.key === 'favorites' && !hostingOpen ? '政策' : item.hint}</span>
                 </button>
               )
             })}
@@ -121,7 +157,7 @@ export function QxMePage({
         ) : null}
 
         {toast ? (
-          <div className="qx-me-toast" role="status" data-tone={toast.tone} data-testid={view === 'notifications' ? 'notifications-toast' : 'member-records-toast'}>
+          <div className="qx-me-toast" role="status" data-tone={toast.tone} data-testid={`${testScope}-toast`}>
             {toast.text}
           </div>
         ) : null}

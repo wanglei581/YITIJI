@@ -319,7 +319,7 @@ function mockConsentScope(): ConsentScope {
     disclaimer: {
       id: 'disclaimer-v1',
       version: 'v1.0',
-      content: '本 AI 签约风险提示服务仅作风险提示，不构成正式法律意见；重大争议请咨询律师或官方窗口。合同原文在受控存储中短期保留，发送模型前脱敏，结束时优先删除，异常情况下最长保留 2 小时。',
+      content: '本 AI 签约风险提示服务仅作条款风险提示，请自行核对原文；重大争议请咨询律师或官方窗口。合同原文在受控存储中短期保留，发送模型前脱敏，结束时优先删除，异常情况下最长保留 2 小时。',
       publishedAt: new Date().toISOString(),
     },
     disclosures: {

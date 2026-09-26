@@ -1,0 +1,159 @@
+/* 简历取件页里的子面板 · 青序流光（稿 21：target / usb-* / phone-* / local-ready / scan-ready）。
+   主工作台样式在 resume-triage-qx.css；这里只给嵌进来的真实子组件换装，逻辑一行不动：
+   - 诊断方向：DiagnosisDirectionForm（本页独占，已改为稿 21 的点选结构）
+   - U 盘：ResumeUsbImportPanel（与自我评估 / 模拟面试共用，只在本页作用域里换装，别处不受影响）
+   - 手机扫码：UploadSessionQrPanel（冻结文件，逐字节受 verify:fusion-w3 哈希约束 —— 只能从外面套样式）
+   - 预览：FileContentPreview（共用组件，同样只在本页作用域里换装） */
+
+/* ── 诊断方向（稿 21 target / target-context） ─────────────────── */
+.qx-resume-triage .qx-rt-target {
+  display: flex; flex-direction: column; gap: 14px; padding: 20px 22px;
+  border-radius: 28px; background: var(--qx-surface); border: 1px solid var(--qx-line);
+}
+.qx-resume-triage .qx-rt-blk-h { display: flex; align-items: center; gap: 12px; }
+.qx-resume-triage .qx-rt-blk-ic { flex: none; width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-blk-h h2 { margin: 0; font-size: 24px; font-weight: 700; }
+.qx-resume-triage .qx-rt-blk-h small { display: block; margin-top: 2px; font-size: 15px; line-height: 1.4; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.qx-resume-triage .qx-rt-seg button {
+  min-height: 76px; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 8px 16px; border-radius: 20px; text-align: left; cursor: pointer;
+  border: 1.5px solid var(--qx-line); background: var(--qx-surface); color: var(--qx-ink);
+}
+.qx-resume-triage .qx-rt-seg b { font-size: 20px; }
+.qx-resume-triage .qx-rt-seg small { font-size: 15px; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-seg button[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-grp { display: flex; flex-direction: column; gap: 8px; }
+.qx-resume-triage .qx-rt-grp .lb,
+.qx-resume-triage .qx-rt-field .lb { font-size: 18px; font-weight: 700; color: var(--qx-ink-2); }
+.qx-resume-triage .qx-rt-grp .lb small { margin-left: 8px; font-size: 15px; font-weight: 500; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-grp .ops { display: flex; flex-wrap: wrap; gap: 8px; }
+.qx-resume-triage .qx-rt-chip {
+  min-height: 52px; min-width: 60px; padding: 0 16px; border-radius: 18px; cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--qx-line); background: var(--qx-surface); color: var(--qx-ink-2); font-size: 18px;
+}
+.qx-resume-triage .qx-rt-chip[data-mute='true'] { border-style: dashed; border-color: var(--qx-line-2); color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-chip[aria-pressed='true'] { border: 1px solid var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); font-weight: 700; }
+.qx-resume-triage .qx-rt-chip:disabled,
+.qx-resume-triage .qx-rt-dimchip:disabled,
+.qx-resume-triage .qx-rt-field :disabled { opacity: .5; cursor: not-allowed; }
+.qx-resume-triage .qx-rt-dimchips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.qx-resume-triage .qx-rt-dimchip {
+  min-height: 60px; display: flex; align-items: center; gap: 10px; padding: 0 12px; cursor: pointer; text-align: left;
+  border-radius: 18px; border: 1.5px solid var(--qx-line); background: var(--qx-surface); color: var(--qx-ink-2); font-size: 17px; font-weight: 600;
+}
+.qx-resume-triage .qx-rt-dimchip .mk { flex: none; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--qx-line-2); background: var(--qx-paper); }
+.qx-resume-triage .qx-rt-dimchip .tx { white-space: nowrap; }
+.qx-resume-triage .qx-rt-dimchip[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-dimchip[aria-pressed='true'] .mk { border-color: var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); }
+.qx-resume-triage .qx-rt-field { display: flex; flex-direction: column; gap: 8px; }
+.qx-resume-triage .qx-rt-field input,
+.qx-resume-triage .qx-rt-field button {
+  min-height: 60px; width: 100%; padding: 0 16px; border-radius: 16px; font: inherit; font-size: 18px;
+  border: 1px solid var(--qx-line-2); background: var(--qx-paper); color: var(--qx-ink);
+}
+.qx-resume-triage .qx-rt-field button { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; text-align: left; }
+.qx-resume-triage .qx-rt-field .val { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qx-resume-triage .qx-rt-field .go,
+.qx-resume-triage .qx-rt-drawer .go { flex: none; display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-field input:focus-visible,
+.qx-resume-triage .qx-rt-field button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
+.qx-resume-triage .qx-rt-drawer {
+  min-height: 64px; display: flex; align-items: center; gap: 10px; padding: 0 18px; cursor: pointer; text-align: left;
+  border-radius: 18px; border: 1.5px dashed var(--qx-line-2); background: var(--qx-paper); color: var(--qx-ink);
+}
+.qx-resume-triage .qx-rt-drawer b { font-size: 19px; }
+.qx-resume-triage .qx-rt-drawer small { font-size: 15px; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-drawer .go { margin-left: auto; }
+.qx-resume-triage .qx-rt-drawer[aria-expanded='true'] { border-style: solid; border-color: var(--qx-teal); }
+.qx-resume-triage .qx-rt-more { display: flex; flex-direction: column; gap: 14px; }
+
+/* ── U 盘（稿 21 usb-wait / usb-list / usb-importing / usb-*-failed） ───── */
+.qx-resume-triage .resume-usb-panel { gap: 12px; padding: 20px 22px; border-radius: 28px; border-color: var(--qx-line); background: var(--qx-surface); }
+.qx-resume-triage .resume-usb-panel__head { gap: 14px; }
+.qx-resume-triage .resume-usb-panel__icon { width: 54px; height: 54px; border-radius: 18px; background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-resume-triage .resume-usb-panel h2 { font-size: 22px; color: var(--qx-ink); }
+.qx-resume-triage .resume-usb-panel__hint { font-size: 16px; color: var(--qx-ink-3); }
+.qx-resume-triage .resume-usb-panel[data-usb-state='importing'] .resume-usb-panel__head::after {
+  content: '导入中 · 没有中止入口'; flex: none; padding: 6px 12px; border-radius: 14px; font-size: 15px; font-weight: 700;
+  background: var(--qx-wheat-soft); border: 1px solid var(--qx-wheat); color: var(--qx-wheat-d);
+}
+.qx-resume-triage .resume-usb-panel__empty { padding: 22px; border-radius: 24px; border: 1.5px dashed var(--qx-line-2); background: var(--qx-paper); font-size: 18px; line-height: 1.55; color: var(--qx-ink-2); }
+.qx-resume-triage .resume-usb-panel__list { gap: 9px; max-height: 360px; }
+.qx-resume-triage .resume-usb-panel__row { min-height: 80px; gap: 14px; padding: 0 16px; border-radius: 18px; border-color: var(--qx-line); background: var(--qx-paper); }
+.qx-resume-triage .resume-usb-panel__row::after { content: '选这一份 →'; flex: none; font-size: 16px; font-weight: 700; color: var(--qx-teal-d); }
+.qx-resume-triage .resume-usb-panel__name { font-size: 20px; color: var(--qx-ink); }
+.qx-resume-triage .resume-usb-panel__size { font-size: 16px; color: var(--qx-ink-3); }
+.qx-resume-triage .resume-usb-panel .ui-kiosk-state-panel,
+.qx-resume-triage .qx-rt-usb > .ui-kiosk-state-panel { padding: 16px 20px; border-radius: 24px; border: 1.5px solid var(--qx-line-2); background: var(--qx-paper); }
+.qx-resume-triage .resume-usb-panel .ui-kiosk-state-panel[data-tone='error'] { border-color: var(--qx-cinnabar); background: var(--qx-cinnabar-soft); }
+.qx-resume-triage .resume-usb-panel .ui-kiosk-state-panel[data-tone='error'] .ui-kiosk-state-title { color: var(--qx-cinnabar-d); }
+.qx-resume-triage .qx-rt-usb > .ui-kiosk-state-panel { border-color: color-mix(in srgb, var(--qx-slate) 28%, var(--qx-surface)); background: var(--qx-slate-soft); }
+.qx-resume-triage .qx-rt-usb > .ui-kiosk-state-panel .ui-kiosk-state-title { color: var(--qx-slate-d); }
+.qx-resume-triage .ui-kiosk-state-title { font-size: 21px; font-weight: 800; }
+.qx-resume-triage .ui-kiosk-state-description { font-size: 17px; line-height: 1.55; color: var(--qx-ink-2); }
+
+/* ── 共用：面板里的旧按钮换成青序幽灵按钮（U 盘「重新检测」、手机扫码三个按钮） ── */
+.qx-resume-triage .resume-usb-panel__actions button,
+.qx-resume-triage .qx-rt-phone .flex-wrap > button {
+  min-height: 56px; padding: 0 18px; border-radius: 18px; font-size: 18px; font-weight: 700;
+  border: 1.5px solid var(--qx-line-2); background: var(--qx-paper); color: var(--qx-ink-2);
+}
+.qx-resume-triage .qx-rt-phone .flex-wrap > button:last-child:not(:disabled) { border-color: var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); }
+
+/* ── 手机扫码（冻结面板，只从外面换装；稿 21 phone-ready / waiting / uploaded） ── */
+.qx-resume-triage .qx-rt-phone > * { padding: 20px 22px; border-radius: 28px; border: 1px solid var(--qx-line); background: var(--qx-surface); box-shadow: none; }
+.qx-resume-triage .qx-rt-phone h2 { font-size: 23px; color: var(--qx-ink); }
+.qx-resume-triage .qx-rt-phone p { font-size: 17px; line-height: 1.55; color: var(--qx-ink-2); }
+.qx-resume-triage .qx-rt-phone .grid { grid-template-columns: 240px minmax(0, 1fr); gap: 16px; }
+.qx-resume-triage .qx-rt-phone .grid > div:first-child { min-height: 240px; border-radius: 28px; border: 1.5px dashed var(--qx-line-2); background: var(--qx-surface); }
+.qx-resume-triage .qx-rt-phone .grid > div:last-child { padding: 16px 18px; border-radius: 22px; background: var(--qx-paper); }
+.qx-resume-triage .qx-rt-phone .bg-error-bg { border-radius: 14px; background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); font-size: 16px; }
+.qx-resume-triage .qx-rt-phone .bg-success-bg { border-radius: 14px; background: var(--qx-teal-soft); color: var(--qx-teal-d); font-size: 16px; }
+
+/* ── 预览（共用 FileContentPreview；稿 21 的整屏查看器工具条不在本批，见进度文档） ── */
+.qx-resume-triage .qx-rt-preview [data-file-preview-kind] { border-radius: 24px; border-color: var(--qx-line-2); background: var(--qx-paper); }
+.qx-resume-triage .qx-rt-preview [data-file-preview-kind] > p:last-child { border-color: var(--qx-line); background: var(--qx-teal-soft); color: var(--qx-teal-d); font-size: 15px; }
+
+/* ── 扫描件交接（稿 21 scan-ready） ─────────────────────────── */
+.qx-resume-triage .qx-rt-scan { display: flex; flex-direction: column; gap: 12px; }
+.qx-resume-triage .qx-rt-track { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-radius: 24px; border: 1px solid var(--qx-line); background: var(--qx-surface); }
+.qx-resume-triage .qx-rt-track .ti,
+.qx-resume-triage .qx-rt-filecard .fi { flex: none; display: flex; align-items: center; justify-content: center; background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-track .ti { width: 54px; height: 54px; border-radius: 18px; }
+.qx-resume-triage .qx-rt-track .tx,
+.qx-resume-triage .qx-rt-filecard .fx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.qx-resume-triage .qx-rt-track b { font-size: 22px; }
+.qx-resume-triage .qx-rt-track small { font-size: 17px; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-track .tbtn { flex: none; min-height: 56px; padding: 0 18px; border-radius: 18px; cursor: pointer; font-size: 18px; font-weight: 700; border: 1px solid var(--qx-line-2); background: var(--qx-paper); color: var(--qx-ink-2); }
+.qx-resume-triage .qx-rt-filecard { display: flex; align-items: center; gap: 16px; padding: 20px 26px; border-radius: 28px; border: 1px solid var(--qx-line); background: var(--qx-surface); }
+.qx-resume-triage .qx-rt-filecard .fi { width: 72px; height: 72px; border-radius: 22px; }
+.qx-resume-triage .qx-rt-filecard b { font-size: 25px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qx-resume-triage .qx-rt-filecard small { font-size: 18px; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-filecard .fb { flex: none; min-height: 52px; display: flex; align-items: center; padding: 0 18px; border-radius: 15px; font-size: 19px; font-weight: 700; background: var(--qx-teal); color: var(--qx-on-solid); }
+.qx-resume-triage .qx-rt-kv { margin: 0; padding: 2px 26px; border-radius: 28px; background: var(--qx-surface); border: 1px solid var(--qx-line); }
+.qx-resume-triage .qx-rt-kv div { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 12px; padding: 14px 0; }
+.qx-resume-triage .qx-rt-kv div + div { border-top: 1px solid var(--qx-line); }
+.qx-resume-triage .qx-rt-kv dt { font-size: 18px; font-weight: 700; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-kv dd { margin: 0; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
+
+@media (max-width: 640px) {
+  .qx-resume-triage .qx-rt-target,
+  .qx-resume-triage .resume-usb-panel,
+  .qx-resume-triage .qx-rt-phone > * { padding: 16px; }
+  .qx-resume-triage .qx-rt-dimchip { font-size: 15px; gap: 8px; padding: 0 10px; }
+  .qx-resume-triage .qx-rt-phone .grid { grid-template-columns: minmax(0, 1fr); }
+  .qx-resume-triage .qx-rt-track { flex-wrap: wrap; }
+  /* 标题的 flex:1 基准是 0，flex-wrap 永远不换行，按钮就把标题挤成两字一列；
+     让标题占满图标（54px + 间距 14px）右侧整行，「换一种来源」自然落到第二行。 */
+  .qx-resume-triage .qx-rt-track .tx { flex-basis: calc(100% - 68px); }
+  .qx-resume-triage .qx-rt-filecard { padding: 16px; }
+  .qx-resume-triage .qx-rt-filecard b { font-size: 20px; }
+  .qx-resume-triage .qx-rt-kv { padding: 2px 16px; }
+  .qx-resume-triage .qx-rt-kv div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qx-resume-triage .qx-rt-target *,
+  .qx-resume-triage .resume-usb-panel * { animation: none !important; transition: none !important; }
+}

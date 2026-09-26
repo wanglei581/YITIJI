@@ -10,16 +10,33 @@ import type { MemberAiConsentScope, MemberAiConsentStatus } from './member-priva
 
 export const CURRENT_JOB_AI_CONSENT_VERSION = '20260701'
 export const CURRENT_RESUME_AI_CONSENT_VERSION = 'resume-ai-consent-v1'
+export const CURRENT_AGE_14_PLUS_CONSENT_VERSION = 'age-14-plus-v1'
+export const CURRENT_VOICE_RECORDING_CONSENT_VERSION = 'voice-recording-v1'
+/** 年满 14 周岁声明正文。服务端只存版本号，不收出生日期。 */
+export const AGE_14_PLUS_CONSENT_COPY = '我确认本人已年满14周岁。本声明不收集出生日期。'
+/**
+ * 录音单独同意正文。五件事：用途、交给哪家做语音识别、保存多久、不做声纹、怎么撤回。
+ * 服务商以生产实际启用的一家为准，文案不把未启用的厂商写成已经在用。
+ */
+export const VOICE_RECORDING_CONSENT_COPY =
+  '录音只用于把你说的话转成文字，供简历整理、模拟面试作答或向小青提问。' +
+  '音频会交给当前启用的语音识别服务处理（腾讯云或百度智能云，以实际配置的一家为准）。' +
+  '转写完成后不保留音频。不做声纹识别。' +
+  '你可以在隐私页撤回这项同意；撤回后新的录音不会再开始。'
 export const CONSENT_VERSION_BY_SCOPE: Readonly<Record<MemberAiConsentScope, string>> = {
   job_ai: CURRENT_JOB_AI_CONSENT_VERSION,
   contract_review: 'contract-review-consent-v1',
   resume_ai: CURRENT_RESUME_AI_CONSENT_VERSION,
+  age_14_plus: CURRENT_AGE_14_PLUS_CONSENT_VERSION,
+  voice_recording: CURRENT_VOICE_RECORDING_CONSENT_VERSION,
 }
 
-const CONSENT_SCOPES = [
+export const CONSENT_SCOPES = [
   'job_ai',
   'contract_review',
   'resume_ai',
+  'age_14_plus',
+  'voice_recording',
 ] as const satisfies readonly MemberAiConsentScope[]
 const CONSENT_SCOPE_SET: ReadonlySet<string> = new Set(CONSENT_SCOPES)
 const CONTRACT_REVIEW_PROCESSING_STATUSES = [
@@ -188,7 +205,11 @@ export class MemberPrivacyService {
           message:
             scope === 'job_ai'
               ? '请登录并确认 AI 简历分析授权后再使用岗位推荐'
-              : '请登录并确认合同审查 AI 授权后再使用合同审查',
+              : scope === 'age_14_plus'
+                ? '请登录并确认已年满14周岁'
+                : scope === 'voice_recording'
+                  ? '请登录并确认录音单独同意'
+                  : '请登录并确认合同审查 AI 授权后再使用合同审查',
         },
       })
     }
@@ -248,7 +269,11 @@ export class MemberPrivacyService {
             ? '请先确认 AI 简历分析授权'
             : scope === 'contract_review'
               ? '请先确认合同审查 AI 授权'
-              : '请先确认简历 AI 服务授权',
+              : scope === 'age_14_plus'
+                ? '请先确认已年满14周岁'
+                : scope === 'voice_recording'
+                  ? '请先确认录音单独同意'
+                  : '请先确认简历 AI 服务授权',
       },
     })
   }

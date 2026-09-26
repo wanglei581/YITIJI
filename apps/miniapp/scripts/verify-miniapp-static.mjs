@@ -30,11 +30,13 @@ function read(rel) {
 // 也就是说开发者工具实际读的那份代码上，门禁从来没跑起来过。
 // 这两个目录本来就在 app.json 的 packOptions.ignore 里，不属于产物。
 const SKIP_DIRS = new Set(['.claude', 'node_modules', '.git'])
+// 停放页 = packOptions.ignore 里的 pages/* 目录：不注册、不打包（首发按非招聘类目提审，compliance-boundary.md §1.1），门禁只查实际上传的范围。
+const PARKED_DIRS = new Set((JSON.parse(read('project.config.json')).packOptions?.ignore || []).filter((e) => e?.type === 'folder' && /^pages\//.test(e.value)).map((e) => e.value))
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
-    if (SKIP_DIRS.has(entry.name)) continue
     const rel = `${dir}/${entry.name}`
+    if (SKIP_DIRS.has(entry.name) || PARKED_DIRS.has(rel.slice(2))) continue
     if (entry.isDirectory()) walk(rel, out)
     else out.push(rel)
   }
@@ -52,8 +54,15 @@ if (!fails.length) ok('JSON 全部可解析')
 const appJson = parsedJson['./app.json']
 if (!appJson) bad('app.json 存在', '未读取到')
 
+// 注册页面 = 主包 pages + 各分包 root/pages。2026-09-26 起非 Tab 页各自一个分包（root 就是页面目录，
+// 页面路径不变），只读 appJson.pages 会把 39 个分包页全当成「未注册」。分包结构另有 verify-package-layout.mjs。
+const registeredPagesOf = (app) => [
+  ...(app?.pages || []),
+  ...(app?.subpackages || app?.subPackages || []).flatMap((pkg) => (pkg.pages || []).map((page) => `${pkg.root}/${page}`)),
+]
+
 if (appJson) {
-  const pages = appJson.pages || []
+  const pages = registeredPagesOf(appJson)
   const missingPages = pages.filter((p) =>
     ['.js', '.wxml', '.wxss', '.json'].some((ext) => !fs.existsSync(path.join(ROOT, `${p}${ext}`)))
   )
@@ -63,18 +72,18 @@ if (appJson) {
   const tab = appJson.tabBar || {}
   const expected = [
     { pagePath: 'pages/home/home', text: '首页' },
-    // 职业生活圈改版：该 Tab 由「AI百宝箱」（按「这是不是 AI」分类）改为
-    // 「职业生活圈」（按用户处境分组）。tabBar 是 custom:true，真正渲染出来的
-    // 文案在 custom-tab-bar/index.js，本门禁的价值就是逼这两处必须同时改。
-    { pagePath: 'pages/ai/ai', text: '职业生活圈' },
-    { pagePath: 'pages/jobs/jobs', text: '求职' },
+    // tabBar 是 custom:true，真正渲染的文案在 custom-tab-bar/index.js，本门禁逼两处同时改。
+    // 首发（无人力资源服务许可证）：「职业生活圈」改名「AI 工具」，「求职」位让给「打印」。
+    { pagePath: 'pages/ai/ai', text: 'AI 工具' },
+    { pagePath: 'pages/print/print', text: '打印' },
     { pagePath: 'pages/me/me', text: '我的' },
   ]
   const tabOk = tab.custom === true &&
     Array.isArray(tab.list) &&
     tab.list.length === 4 &&
     tab.list.every((item, i) => item.pagePath === expected[i].pagePath && item.text === expected[i].text) &&
-    tab.list.every((item) => pages.includes(item.pagePath))
+    // Tab 页必须在主包：微信不允许 tabBar 指向分包页面。
+    tab.list.every((item) => (appJson.pages || []).includes(item.pagePath))
   if (tabOk) ok('tabBar 四 Tab 配置正确')
   else bad('tabBar 四 Tab 配置', JSON.stringify(tab))
 
@@ -89,8 +98,7 @@ if (appJson) {
 }
 
 const wxmlFiles = files.filter((f) => f.endsWith('.wxml'))
-const TAB_PATHS = ['/pages/home/home', '/pages/ai/ai', '/pages/jobs/jobs', '/pages/me/me']
-const PAGE_PATHS = appJson ? (appJson.pages || []) : []
+const PAGE_PATHS = appJson ? registeredPagesOf(appJson) : []
 
 const allowedTopLevel = new Set([
   'README.md',
@@ -156,7 +164,7 @@ if (oversize.length) {
 
 const registeredPageDirs = new Set(PAGE_PATHS.map((page) => path.dirname(page)))
 const physicalPageDirs = fs.readdirSync(path.join(ROOT, 'pages'), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
+  .filter((entry) => entry.isDirectory() && !PARKED_DIRS.has(`pages/${entry.name}`))
   .map((entry) => `pages/${entry.name}`)
 const loosePageFiles = fs.readdirSync(path.join(ROOT, 'pages'), { withFileTypes: true })
   .filter((entry) => entry.isFile())
@@ -389,6 +397,16 @@ if (
   !/appSecret\s*[:=]/.test(apiJs)
 ) ok('登录实现无密钥残留')
 else bad('登录实现无密钥残留', '检查 api.js 的 wx.login 与敏感字段')
+// 登录成功回调必须认 auth.saveSession 的返回值:存不下的会话等于没有会话,
+// 这时提示「登录成功」并跳转,用户会在下一页当场撞 401。微信 / 短信两条入口都要认。
+if (
+  (loginJs.match(/const saved = auth\.saveSession\(res\)/g) || []).length === 2 &&
+  (loginJs.match(/if \(!saved\)/g) || []).length === 2 &&
+  // 总数也必须是 2：多出来的那一次就是没接返回值的漏网调用。
+  (loginJs.match(/auth\.saveSession\(/g) || []).length === 2
+) ok('登录成功回调认 saveSession 返回值（微信 / 短信两条入口）')
+else bad('登录成功回调认 saveSession 返回值', '会话没存下仍提示登录成功并跳转,下一页当场 401')
+
 if (meWxml.includes('bindtap="tapLogin"') && meWxml.includes('未登录') && settingsWxml.includes('退出登录') && settingsJs.includes('api.logout()') && (settingsJs.includes('auth.logout()') || settingsJs.includes('auth.clearSession()'))) ok('登录与真实退出入口完整')
 else bad('登录与真实退出入口完整', '缺少登录按钮、服务端 logout 或本地会话清理')
 
@@ -409,13 +427,57 @@ else bad('401 补签准入与 token 存在性解耦', '补签不得以 auth.getT
 const uploadFileIdx = requestJs.indexOf('function uploadFile(')
 const uploadFileSource = uploadFileIdx >= 0 ? requestJs.slice(uploadFileIdx) : ''
 if (
-  requestJs.includes('function silentResignin()') &&
+  /function silentResignin\s*\(/.test(requestJs) &&
   /function uploadFile\s*\(/.test(requestJs) &&
-  uploadFileSource.includes('silentResignin()') &&
+  /silentResignin\(/.test(uploadFileSource) &&
   /statusCode === 401[\s\S]*extractError\(body,\s*401\)/.test(uploadFileSource) &&
   !requestJs.includes("reject(makeError('登录已失效,请重新登录', 401))")
 ) ok('uploadFile 401 走 silentResignin 且保留 error.code')
 else bad('uploadFile 401 静默补签', '必须复用 silentResignin、401 走 extractError(body, 401)，不得用丢掉 code 的 makeError')
+
+// 会话代际：补签 / 重放 / 失败清理都要认出「我出发时是谁」。
+// 这里只断言防护在位；它们是否真的挡得住晚到的回调，由
+// scripts/tests/session-generation.test.mjs 真跑时序（含源码变异）验证。
+//
+// 代际必须是**进程内**计数，且不得再落存储：落盘会把「推进代际」变成一次可能失败的写，
+// setStorageSync 抛异常或安静丢写时代际原地不动，用户已经点了退出，晚到的补签比对
+// expectGeneration 仍判同代，把账号原样写回来。撤销补签资格同理——storage.remove
+// 可能抛、也可能安静没删，所以必须另有一个内存旗子，不能只依赖盘上的资格标记。
+if (
+  !/SESSION_GENERATION|zyd_session_gen/.test(storageJs + authJs) &&
+  /\blet generation = 1;/.test(authJs) &&
+  /function sessionGeneration\(\)\s*\{\s*return generation;\s*\}/.test(authJs) &&
+  /\blet sessionRevoked = false;/.test(authJs) &&
+  /function getToken\(\)[\s\S]{0,160}?if \(sessionRevoked\) return null;/.test(authJs) &&
+  /function getUser\(\)\s*\{\s*\n\s*if \(sessionRevoked\) return null;/.test(authJs) &&
+  /function canSilentResignin\(\)[\s\S]{0,240}?if \(sessionRevoked\) return false;/.test(authJs) &&
+  /function logout\(\)[\s\S]{0,320}?bumpSessionGeneration\(\);\s*\n\s*sessionRevoked = true;/.test(authJs) &&
+  authJs.includes('function isSameSession(') &&
+  authJs.includes('function logoutIfSameSession(') &&
+  !/function clearSession\(\)[\s\S]{0,200}bumpSessionGeneration\(\)/.test(authJs) &&
+  /if \(!isResignin\) \{\s*\n[\s\S]{0,400}?bumpSessionGeneration\(\);\s*\n\s*sessionRevoked = true;/.test(authJs) &&
+  /const usable = !!data\.token && storage\.get\(storage\.KEYS\.TOKEN\) === data\.token/.test(authJs) &&
+  /if \(!usable\) return false;\s*\n\s*if \(!isResignin\) sessionRevoked = false;/.test(authJs) &&
+  /expectGeneration/.test(authJs) &&
+  /silentResignin\(generation\)/.test(requestJs) &&
+  /expectGeneration:\s*generation/.test(requestJs) &&
+  /resigninInflight\.generation === generation/.test(requestJs) &&
+  /auth\.logoutIfSameSession\(generation\)/.test(requestJs) &&
+  !/\bauth\.logout\(\)/.test(requestJs)
+) ok('401 补签带会话代际（进程内），晚到回调不复活/不覆盖/不误登出')
+else bad('401 补签会话代际防护', '代际必须是进程内计数(不落存储)；登出/显式登录先推进代际并置内存撤销位，撤销位要管住 getToken/getUser/canSilentResignin；新会话写完读回一致才解除撤销；补签与重放按出发代际校验；clearSession 不推进；request.js 不得无条件 auth.logout()')
+
+// 冷启动时内存撤销位已经没了，盘上只剩 token 与 user 两格；它们是两次独立的写，
+// 换号时一格失败就会分属两个人。读接口必须现算一致性（JWT sub === 本机 user.id，
+// 后端 member-auth.service.ts 按 user.id 签 sub），证明不了就按没有会话处理 ——
+// 每次读都现算，所以 clearSession 删不掉也不要紧。
+if (
+  /function identityProven\(/.test(authJs) &&
+  /payload && payload\.sub/.test(authJs) &&
+  /function getToken\(\)[\s\S]{0,320}?\|\| !identityProven\(token\)\) \{\s*\n\s*clearSession\(\);/.test(authJs) &&
+  /function getUser\(\)[\s\S]{0,200}?if \(!identityProven\(storage\.get\(storage\.KEYS\.TOKEN\)\)\) \{\s*\n\s*clearSession\(\);/.test(authJs)
+) ok('token 与 user 必须同一个人（冷启动撕裂写不得拼成会话）')
+else bad('冷启动身份一致性', 'getToken / getUser 必须现算 JWT sub 与本机 user.id 是否一致，不一致按没有会话处理')
 
 const membershipJs = read('pages/membership/membership.js')
 const notificationsJs = read('pages/notifications/notifications.js')
@@ -434,7 +496,8 @@ function fakeMemberToken(exp) {
 }
 
 function loadAuthForVerify(token) {
-  const state = { zyd_token: token, zyd_user: { maskedPhone: '183****1921' } }
+  // zyd_user.id 必须等于 token 的 sub：auth.js 比对这两者（后端按 user.id 签 sub）。
+  const state = { zyd_token: token, zyd_user: { id: 'verify-user', maskedPhone: '183****1921' } }
   const mockStorage = {
     KEYS: { TOKEN: 'zyd_token', USER: 'zyd_user' },
     get(key, fallback = null) { return Object.prototype.hasOwnProperty.call(state, key) ? state[key] : fallback },
@@ -456,7 +519,7 @@ try {
   const active = loadAuthForVerify(fakeMemberToken(nowSeconds + 3600))
   const expiredCleared = !expired.auth.isLoggedIn() && !expired.state.zyd_token && !expired.state.zyd_user
   const activeKept = active.auth.isLoggedIn() && Boolean(active.state.zyd_token)
-  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && (requestJs.includes('auth.logout()') || requestJs.includes('auth.clearSession()'))) {
+  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && /auth\.(logout|logoutIfSameSession|clearSession)\(/.test(requestJs)) {
     ok('过期会员令牌会在展示与请求前主动清理')
   } else {
     bad('过期会员令牌会在展示与请求前主动清理', '登录态或请求层仍可能复用过期 token')
@@ -502,15 +565,15 @@ if (
   resumeDiagnoseWxml.includes('这不是录取分') &&
   resumeDiagnoseWxml.includes('report.truncatedInput') &&
   resumeDiagnoseWxml.includes('打印原件') &&
-  resumeDiagnoseJs.includes('viewJobs()')
+  resumeDiagnoseJs.includes('goPrint()')
 ) ok('简历诊断页展示问题证据、内容块、截断提示与非 AI 失败出口')
-else bad('简历诊断结果层', '必须引用 issues/contentBlocks，说明非录取分，展示截断提示，并保留打印原件/去打印/查看岗位出口')
+else bad('简历诊断结果层', '必须引用 issues/contentBlocks，说明非录取分，展示截断提示，并保留打印原件/去打印出口（「查看岗位」随岗位页停放）')
 
 if (
   resumeParseJs.includes('selectedDimensions') &&
   resumeParseJs.includes('targetContext') &&
   resumeParseJs.includes("{ skipped: true }") &&
-  resumeParseJs.includes('api.parseResume(payload)')
+  resumeParseJs.includes('api.parseResume(payload, prepared.headers)')
 ) ok('简历解析透传诊断维度与目标方向，并允许通用诊断')
 else bad('简历解析方向透传', '必须从 URL 读取 selectedDimensions/targetContext 并传给 parseResume，未指定时显式 skipped')
 
@@ -1351,6 +1414,56 @@ const PACKAGE_CHAIN_PAGES = [
   else bad('取件页不得把本人的有效码当成过期清掉，也不得把它画给一个认不出的会话', misses.join('；'))
 }
 
+// order-detail 与取件页同一条 requireOwned 拒绝契约：必须 404 **且** PRINT_ORDER_NOT_FOUND，
+// 而且只能在通道守卫放行之后盖章。OR 或先盖章再守卫会把网关 404 / hide 期间的失败
+// 写成粘性拒绝，本人被锁在这一页上，重试也不再打网络。
+{
+  const misses = []
+  const bare = stripComments(orderDetailJs)
+  const denied = methodBody(bare, '_isOwnerDeniedError')
+  if (!denied) {
+    misses.push('缺 _isOwnerDeniedError')
+  } else {
+    if (!/Number\(err\.statusCode\) === 404 && err\.code === 'PRINT_ORDER_NOT_FOUND'/.test(denied)) {
+      misses.push('确认拒绝必须同时要求 Number(statusCode)===404 与 PRINT_ORDER_NOT_FOUND')
+    }
+    if (/\|\|/.test(denied)) {
+      misses.push('_isOwnerDeniedError 又用了 OR（网关 404 会把本人粘住）')
+    }
+  }
+  const load = methodBody(bare, '_load')
+  const catches = promiseCallbackBodies(load, 'catch')
+  if (catches.length !== 1) {
+    misses.push('_load 的失败回调不是恰好一个 catch（' + catches.length + '）')
+  } else {
+    const fail = catches[0]
+    const verifyIdx = fail.indexOf('_verifyChannel(token)')
+    const stampIdx = fail.search(/_ownerDeniedFor\s*=/)
+    const denyIdx = fail.indexOf('_denyOwner(')
+    if (verifyIdx < 0) {
+      misses.push('失败回调没有先走 _verifyChannel')
+    } else {
+      if (stampIdx >= 0 && stampIdx < verifyIdx) {
+        misses.push('失败回调在通道守卫之前就给 _ownerDeniedFor 赋值')
+      }
+      if (denyIdx >= 0 && denyIdx < verifyIdx) {
+        misses.push('失败回调在通道守卫之前就 _denyOwner')
+      }
+      if (denyIdx < 0) {
+        misses.push('前台确认失败没有走 _denyOwner（粘性拒绝必须经这一处）')
+      }
+    }
+    if (/_ownerDeniedFor\s*=/.test(fail.slice(0, Math.max(verifyIdx, 0)))) {
+      misses.push('通道守卫之前出现了 _ownerDeniedFor 赋值')
+    }
+  }
+  if (!/if \(confirming && this\._ownerDeniedFor === this\._account\) \{\s*this\._denyOwner\(this\._account\)\s*;?\s*return\s*;?\s*\}/.test(bare)) {
+    misses.push('被拒过的账号仍会在下一次 onShow 再问一遍服务端')
+  }
+  if (!misses.length) ok('订单详情：requireOwned 拒绝是 404 且 PRINT_ORDER_NOT_FOUND，且先过通道守卫再盖章')
+  else bad('订单详情确认拒绝不得在守卫之前盖章，也不得把网关 404 当成归属拒绝', misses.join('；'))
+}
+
 // R9 收口：取件页画码的 **exec 回调**必须重新确认码 / 归属 / 代次。
 //
 // `wx.createSelectorQuery().exec()` 的回调跨帧才回来，中间这张码完全可能已经被换掉
@@ -1681,7 +1794,7 @@ for (const f of wxssFiles) {
 if (!wxssStrayHits.length) ok(`wxss 无 WXSS 编译器拒绝的空声明（${wxssFiles.length} 个文件）`)
 else bad('wxss 含 WXSS 会拒绝的空声明', `${wxssStrayHits.slice(0, 5).join('；')}——会导致整个小程序白屏`)
 
-const pageCount = (appJson?.pages || []).length
+const pageCount = PAGE_PATHS.length
 console.log(`\n${pass} PASS / ${fails.length} FAIL（注册页面 ${pageCount}）`)
 if (fails.length) {
   console.error('\n失败项：')

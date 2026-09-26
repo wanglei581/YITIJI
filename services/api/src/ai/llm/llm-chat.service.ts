@@ -29,6 +29,8 @@ import {
 } from './llm-http'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
+import { withAiSafety } from './ai-prompt-safety'
+import { applyAssistantChannel, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -145,7 +147,7 @@ const SKILL_SCOPED_PROMPTS: Record<AssistantSkill, string> = {
     '请用通俗语言解释入职、试用期、社保、公积金、离职、请假等常见 HR 流程和劳动常识。',
     '不得对具体争议给出确定法律结论，不得承诺仲裁、赔偿或维权结果。',
     '涉及劳动争议、赔偿、合同解除、工伤、仲裁等高风险问题时，应提示咨询官方人社窗口、法律援助或专业律师。',
-    '结论必须标明仅供常识参考，不构成正式法律意见或官方政策承诺。',
+    '结论必须标明仅供常识参考，不代替专业人士判断，也不是官方政策承诺。',
   ].join('\n'),
   self_intro_gen: [
     '当前处于百宝箱「AI 自我介绍生成」技能场景。',
@@ -197,8 +199,16 @@ const SKILL_SCOPED_PROMPTS: Record<AssistantSkill, string> = {
   ].join('\n'),
 }
 
+export function assistantSkillSystemPrompt(skill: AssistantSkill): string {
+  return withAiSafety(SKILL_SCOPED_PROMPTS[skill])
+}
+
+export function assistantSkillPrompts(): string[] {
+  return (Object.keys(SKILL_SCOPED_PROMPTS) as AssistantSkill[]).map(assistantSkillSystemPrompt)
+}
+
 function buildSkillScopedSystemPrompt(basePrompt: string, skill?: AssistantSkill): string {
-  const scopedPrompt = skill ? SKILL_SCOPED_PROMPTS[skill] : undefined
+  const scopedPrompt = skill ? assistantSkillSystemPrompt(skill) : undefined
   return scopedPrompt ? `${basePrompt}\n\n${scopedPrompt}` : basePrompt
 }
 
@@ -307,13 +317,17 @@ export class LlmChatService {
     session.messages.push({ role: 'user', content: input.message })
     const skill = input.skill
 
+    const channel = resolveAssistantChannel(input.channel)
+    const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
+    const systemPrompt = channel === 'miniapp' ? `${guarded}\n\n${miniappChannelConstraint()}` : guarded
     const payloadMessages: ChatMessage[] = [
-      { role: 'system', content: buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill) },
+      { role: 'system', content: systemPrompt },
       ...session.messages.slice(-MAX_HISTORY),
     ]
 
     const rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, onLlmCall)
-    const reply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
+    const guardedReply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
+    const reply = channel === 'miniapp' ? applyAssistantChannel({ reply: guardedReply }, 'miniapp').reply : guardedReply
     if (reply !== rawReply) {
       this.logger.warn('LLM 回复命中禁用词，已替换为范围内兜底回复')
     }
@@ -327,13 +341,14 @@ export class LlmChatService {
     this.sessions.set(sessionId, session)
 
     const intent = classifyIntent(input.message)
-    const actions = skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]
+    const routed = skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]
+    const actions = applyAssistantChannel({ reply, actions: routed }, channel).actions
 
     return {
       sessionId,
       reply,
       intent,
-      actions: actions.length ? actions : undefined,
+      actions,
     }
   }
 

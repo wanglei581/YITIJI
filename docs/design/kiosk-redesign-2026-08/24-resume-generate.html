@@ -59,10 +59,6 @@
               signedUrl 进不了 /print/jobs。printFileUrl 缺失时只能下载或重导出，不进打印。
     孤儿链    历史 /resume/export 没有页面入口，本页**不**把它做成一个正式新页面；
               导出是 /resume/generate/preview 上的一段，不另起路由。
-    站内路由  「打开我的简历」对齐运行时 /me/resumes（apps/kiosk/src/routes/index.tsx），
-              不是 /profile/records?view=resumes。
-              「返回服务大厅」：运行时没有 /services，也没有承载「全部服务」的 Hub 路由；
-              该出口的 data-route 指向 /（首页 HomePage）。
 
   本页不伪造：任务号、provider 在线、生成完成、文件、页数、保存进账号、打印、支付、
               实时通话、声纹、音量波形含义、百分比、匹配度/评分/通过率。
@@ -75,7 +71,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -395,9 +391,9 @@ textarea.fin{padding:14px 18px;line-height:1.5;resize:none;min-height:104px}
   <div class="truth" data-disclaimer="true" data-testid="resume-generate-truth"><i aria-hidden="true">i</i><span id="truth-tx"></span></div>
 
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
 </div>
 <script>
@@ -900,7 +896,7 @@ V.entry=function(){
  '<div class="sec"><div class="split">'+
    a({cls:'orow',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-has-file',al:'我已经有简历文件，去做诊断',
       html:'<span class="oi">'+svg('file',26)+'</span><span class="om"><b>我已经有简历文件</b><span>那边是上传与诊断，不是从零填</span></span>'+GO})+
-   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/me/resumes',tid:SCREEN+'-mine',al:'打开我的简历',
+   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-mine',al:'打开我的简历',
       html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>我的简历</b><span>之前生成过的版本在这里</span></span>'+GO})+
   '</div></div>'+
  ctabar(b({cls:'btn primary wide',go:'input-basic',tid:SCREEN+'-primary',label:svg('pen',26)+'开始填写（第 1 步）'}));
@@ -1182,7 +1178,7 @@ V['voice-denied']=function(){
   '<div class="sec"><div class="split">'+
    a({cls:'orow',href:'05-ai-cockpit.html',route:'/assistant',tid:SCREEN+'-vd-ask',al:'AI顾问该怎么写',
       html:'<span class="oi">'+svg('spark',26)+'</span><span class="om"><b>问 AI顾问该怎么写</b><span>不知道一段经历怎么落笔，可以先问</span></span>'+GO})+
-   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/me/resumes',tid:SCREEN+'-vd-mine',al:'打开我的简历',
+   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-vd-mine',al:'打开我的简历',
       html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>看看以前写过的</b><span>之前的版本可以照着改</span></span>'+GO})+
   '</div></div>'+
   ctabar(b({cls:'btn primary wide',go:'input-history',act:'seg:exp',tid:SCREEN+'-primary',label:svg('pen',26)+'改用键盘继续填'}));
@@ -1349,7 +1345,7 @@ V['preview-no-result']=function(){
     : '这次没有带结果，所以这一页<b>不显示任何简历内容</b>，也不会拿示例冒充你的简历。'),SCREEN+'-nores-box')+
   '<div class="rows3" style="margin-top:16px">'+
    orow({icon:'pen',t:'去填资料并生成',d:'四步，只有姓名和目标岗位必填，其余都能空着',go:'input-basic',tid:SCREEN+'-nr-fill'})+
-   orow({icon:'book',t:'打开我的简历',d:'登录之后，服务端留存期内的版本可以直接打开',href:'39-member-records.html?view=resumes',route:'/me/resumes',tid:SCREEN+'-nr-mine'})+
+   orow({icon:'book',t:'打开我的简历',d:'登录之后，服务端留存期内的版本可以直接打开',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-nr-mine'})+
    orow({icon:'file',t:'我已经有简历文件',d:'那边做上传与诊断，不是从零填',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-nr-file'})+
   '</div>'+
   '<div class="split" style="margin-top:14px">'+
@@ -1372,7 +1368,7 @@ V['preview-loading']=function(){
   '<p class="note"><span class="sq"></span><span>读回来之前，<b>不显示任何简历内容</b>。读的是你自己那一条：凭登录身份，或那次提交返回的<b>一次性访问令牌</b> —— 它<b>不会显示在屏幕上</b>，也<b>不进地址栏</b>；读不回来就是读不回来，不拿别的结果凑数。</span></p>'+
   '</div></div>'+
   '<div class="sec"><div class="split">'+
-   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/me/resumes',tid:SCREEN+'-pl-mine',al:'返回我的简历',
+   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-pl-mine',al:'返回我的简历',
       html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>返回我的简历</b><span>记录列表在那边</span></span>'+GO})+
    a({cls:'orow',href:'06-help.html',route:'/help',tid:SCREEN+'-pl-help',al:'找工作人员',
       html:'<span class="oi">'+svg('help',26)+'</span><span class="om"><b>一直读不出来？</b><span>现场有人能帮你看一眼</span></span>'+GO})+
@@ -1387,7 +1383,7 @@ V['preview-failed']=function(){
   '<div class="rows3" style="margin-top:16px">'+
    orow({icon:'refresh',t:'再读一次',d:'网络原因的话，重试通常就好',go:'preview-loading',tid:SCREEN+'-pf-retry'})+
    orow({icon:'pen',t:'重新填一份生成',d:'内容不长，四步就能填完；只有姓名和目标岗位必填',go:'input-basic',tid:SCREEN+'-pf-refill'})+
-   orow({icon:'book',t:'回我的简历看看别的',d:'其它还在留存期内的版本可以直接打开',href:'39-member-records.html?view=resumes',route:'/me/resumes',tid:SCREEN+'-pf-mine'})+
+   orow({icon:'book',t:'回我的简历看看别的',d:'其它还在留存期内的版本可以直接打开',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-pf-mine'})+
   '</div>'+
   '<div class="split" style="margin-top:14px">'+
    '<div class="mini"><h4>'+svg('clock',24)+'可能是过了留存期</h4><p>生成结果按服务端的留存期限清理，到期是真的没有了。这一页<b>不会假装还留着一份</b>。</p></div>'+
@@ -1683,12 +1679,12 @@ V['session-lost']=function(){
   ],SCREEN+'-sl-steps')+
   '</div></div>'+
   '<div class="sec"><div class="split">'+
-   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/me/resumes',tid:SCREEN+'-sl-mine',al:'打开我的简历',
+   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-sl-mine',al:'打开我的简历',
       html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>打开我的简历</b><span>登录之后，服务端留存期内的版本还在</span></span>'+GO})+
    a({cls:'orow',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-sl-source',al:'返回简历服务',
       html:'<span class="oi">'+svg('file',26)+'</span><span class="om"><b>返回简历服务</b><span>上传、诊断、优化都在那一页</span></span>'+GO})+
   '</div></div>'+
-  ctabar(a({cls:'btn ghost',href:'16-service-hubs.html',route:'/',tid:SCREEN+'-sl-hub',label:svg('back',24)+'返回服务大厅'})+
+  ctabar(a({cls:'btn ghost',href:'16-service-hubs.html',route:'/services',tid:SCREEN+'-sl-hub',label:svg('back',24)+'返回服务大厅'})+
    b({cls:'btn primary wide',go:'input-basic',tid:SCREEN+'-primary',label:svg('pen',26)+'重新填一份'}));
 };
 V.illegal=function(){

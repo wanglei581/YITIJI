@@ -84,7 +84,12 @@ export class CareerPlanService {
     private readonly jobRequirementStats?: CareerPlanJobRequirementStatsPort,
   ) {}
 
-  async generate(taskId: string, requester: CareerPlanRequester) {
+  async generate(
+    taskId: string,
+    requester: CareerPlanRequester,
+    options?: { includeJobFitTitle?: boolean },
+  ) {
+    const includeJobFitTitle = options?.includeJobFitTitle !== false
     const parse = await this.loadAuthorizedParse(taskId, requester)
 
     // 简历原文重提（2B 模式；清理后诚实失败不调 LLM）
@@ -103,19 +108,20 @@ export class CareerPlanService {
 
     // 可选上下文（如实分层，绝不跨归属）：
     // 1) 同 taskId 的最近岗位匹配参考
-    let jobFitCtx: { jobTitle: string; fitLevel: string; gaps: string[] } | null = null
-    const jobFitRow = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
+    let jobFitCtx: { jobTitle: string; gaps: string[] } | null = null
+    const jobFitRow = includeJobFitTitle
+      ? await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
+      : null
     if (jobFitRow && jobFitRow.expiresAt && jobFitRow.expiresAt.getTime() > Date.now()) {
       try {
         const stored = JSON.parse(jobFitRow.payloadJson) as {
           job?: { title?: string }
-          payload?: { fitLevel?: string; gapPoints?: Array<{ gap?: string }> }
+          payload?: { gapPoints?: Array<{ gap?: string }> }
         }
-        if (stored.job?.title && stored.payload?.fitLevel) {
+        if (stored.job?.title) {
           jobFitCtx = {
             jobTitle: stored.job.title,
-            fitLevel: stored.payload.fitLevel,
-            gaps: (stored.payload.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
+            gaps: (stored.payload?.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
           }
         }
       } catch { /* 损坏行按无上下文处理 */ }
@@ -225,7 +231,7 @@ export class CareerPlanService {
     const hasPlan = !!row && !!row.expiresAt && row.expiresAt.getTime() >= Date.now()
 
     const rendered = hasPlan
-      ? await this.renderAiPlanPdf(row!)
+      ? await this.renderAiPlanPdf(row!, taskId)
       : await this.renderDegradedPdf(parse, row ? 'expired' : 'never_generated')
 
     const uploaded = await this.files.upload({
@@ -261,10 +267,10 @@ export class CareerPlanService {
   }
 
   /** AI 版式。逻辑与改动前一致，只是抽成方法。 */
-  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }) {
+  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }, taskId: string) {
     const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
     const { buffer, pageCount } = await this.pdf.render(
-      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn },
+      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn, contentId: taskId },
       stored.payload,
     )
     return { buffer, pageCount, filename: `职业规划建议单.pdf`, variant: 'ai' as const }

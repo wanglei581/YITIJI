@@ -1,0 +1,355 @@
+/* ============================================================
+   运营数据大屏样式（Admin / Partner 两个后台专用）
+
+   色值全部取自 packages/ui/src/styles/inkpaper.css 的墨青 / 青玉两族，
+   不新造设计语言 —— 大屏是同一个产品的另一种观看距离，不是另一套皮肤。
+   与后台的唯一差异：底色用暗色族（墙面显示器 / 投影常在暗环境远看）。
+
+   来源：docs/design/ops-screen-2026-09/screen.css（1920×1080 定稿原型）。
+   与原型的差异只有两处，都是「从静态稿变成真实路由」必须做的：
+     1. 原型把 1920×1080 写死在 body 上；这里改成 .ops-stage 舞台 + 外层等比缩放，
+        因为大屏要嵌在已登录的后台路由里，不能霸占 body。
+     2. 新增 desk 档（常规后台桌面）。舞台档缩到桌面宽度会让 13px 变成 8px，
+        直接破可读下限，所以 desk 不是「缩小的 wall」，是另一套字阶 + 流式栅格。
+
+   本文件只被 apps/admin 与 apps/partner 引入，Kiosk 不引入。
+   全文件无 :root / html / body 裸选择器，一切挂在 [data-ops-screen] 下。
+   ============================================================ */
+
+/* 原型是 `*{box-sizing:border-box}`；移植时漏了这条，padding 与 border 会往
+   高度上加，定高舞台里表现为到处差几像素的裁剪。作用域限定在大屏内，不外溢。 */
+[data-ops-screen] *,
+[data-ops-screen] *::before,
+[data-ops-screen] *::after {
+  box-sizing: border-box;
+}
+
+[data-ops-screen] {
+  --ops-p-200: #c8e7db;
+  --ops-p-300: #a0d5c2;
+  --ops-p-400: #62bda1;
+  --ops-p-500: #35ab8e;
+  --ops-p-600: #1f9e86;
+  --ops-ok: #35ab8e;
+  --ops-warn: #d8905c;
+  --ops-err: #e0705a;
+  --ops-info: #6f9bd8;
+  --ops-dark: #0b241f;
+  --ops-panel: #10302b;
+  --ops-panel-2: #143a33;
+  --ops-line: #22483f;
+  --ops-ink: #eef6f2;
+  --ops-ink-2: #a9c4bb;
+  --ops-ink-3: #6f8d84;
+  --ops-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  color: var(--ops-ink);
+  background: var(--ops-dark);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 舞台档：固定 1920×1080，外层等比缩放居中 ---------- */
+.ops-stage-host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--ops-dark);
+}
+
+.ops-stage-scaler {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+}
+
+.ops-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+}
+
+/* ---------- 屏体 ---------- */
+.ops-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+[data-ops-screen='wall'] .ops-screen {
+  height: 1080px;
+  padding: 20px 28px 16px;
+  gap: 12px;
+}
+
+[data-ops-screen='desk'] .ops-screen {
+  gap: 12px;
+  padding: 16px 18px 18px;
+  border-radius: 14px;
+}
+
+/* ---------- 页眉：标题 + 数据时间戳。时间戳不是装饰，是验收要看的东西 ---------- */
+.ops-hd {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex: none;
+  flex-wrap: wrap;
+}
+
+.ops-hd :is(h1, h2) {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ops-hd .ops-sub {
+  margin: 5px 0 0;
+  color: var(--ops-ink-2);
+  max-width: 120ch;
+}
+
+.ops-stamp {
+  text-align: right;
+  color: var(--ops-ink-2);
+  line-height: 1.7;
+  min-width: 0;
+}
+
+.ops-stamp b {
+  color: var(--ops-ink);
+  font-weight: 600;
+  font-family: var(--ops-mono);
+}
+
+.ops-stamp .ops-win {
+  display: block;
+  color: var(--ops-ink-3);
+}
+
+.ops-stamp.is-stale b {
+  color: var(--ops-warn);
+}
+
+.ops-hd-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ops-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9px;
+  border: 1px solid var(--ops-line);
+  background: var(--ops-panel);
+  color: var(--ops-ink-2);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ops-btn:hover:not(:disabled) {
+  background: var(--ops-panel-2);
+  color: var(--ops-ink);
+}
+
+.ops-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ops-btn[aria-pressed='true'] {
+  background: var(--ops-p-600);
+  border-color: var(--ops-p-600);
+  color: #05201a;
+}
+
+.ops-seg {
+  display: inline-flex;
+  border: 1px solid var(--ops-line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.ops-seg .ops-btn {
+  border: 0;
+  border-radius: 0;
+}
+
+/* ---------- 横幅：整屏级状态，低干扰但明确 ---------- */
+.ops-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: none;
+  border-radius: 10px;
+  border: 1px solid var(--ops-line);
+  background: var(--ops-panel);
+  color: var(--ops-ink-2);
+}
+
+.ops-banner .ops-banner-dot {
+  flex: none;
+  border-radius: 50%;
+  background: var(--ops-ink-3);
+  align-self: center;
+}
+
+.ops-banner.is-warn {
+  border-color: #5a4030;
+  color: var(--ops-warn);
+}
+
+.ops-banner.is-warn .ops-banner-dot {
+  background: var(--ops-warn);
+}
+
+.ops-banner.is-error {
+  border-color: #63332b;
+  color: var(--ops-err);
+}
+
+.ops-banner.is-error .ops-banner-dot {
+  background: var(--ops-err);
+}
+
+.ops-banner b {
+  color: inherit;
+  font-weight: 700;
+}
+
+/* ---------- 栅格：wall 与 desk 共用 12 列语义，行高与断点不同 ---------- */
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  min-height: 0;
+  min-width: 0;
+}
+
+[data-ops-screen='wall'] .ops-grid {
+  flex: 1;
+}
+
+[data-ops-screen='wall'] .ops-grid.ops-grid-gov {
+  grid-template-rows: 192px minmax(0, 1fr) 266px;
+}
+
+[data-ops-screen='wall'] .ops-grid.ops-grid-ops {
+  /* 行 1 是 6 张窄 KPI 卡，副行与脚注都会折行；192px 会裁掉 10–13px。
+     余量从行 3 出（那一行是 2×2 紧凑分项格，248px 足够）。 */
+  grid-template-rows: 220px minmax(0, 1fr) 240px;
+}
+
+[data-ops-screen='wall'] .ops-grid.ops-grid-partner {
+  /* 行 3 装「本机构暂不可用的指标」归并面板：6 组原因，比另外两版的分项格高。 */
+  grid-template-rows: 192px minmax(0, 1fr) minmax(0, 336px);
+}
+
+[data-ops-screen='desk'] .ops-grid {
+  gap: 12px;
+  grid-auto-rows: minmax(172px, auto);
+}
+
+.ops-span-2 { grid-column: span 2; }
+.ops-span-3 { grid-column: span 3; }
+.ops-span-4 { grid-column: span 4; }
+.ops-span-6 { grid-column: span 6; }
+.ops-span-8 { grid-column: span 8; }
+.ops-span-12 { grid-column: span 12; }
+
+[data-ops-screen='desk'] .ops-tall {
+  grid-row: span 2;
+}
+
+/* ---------- 卡片：唯一一层，内部块一律是平面，不做卡中卡 ---------- */
+.ops-card {
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+[data-ops-screen='wall'] .ops-card { padding: 14px 18px; }
+[data-ops-screen='desk'] .ops-card { padding: 12px 14px; }
+/* desk 可纵向滚动，卡片长高即可；舞台档 1080 是硬边界，仍然 hidden 让门禁能抓到溢出 */
+[data-ops-screen='desk'] .ops-body { overflow: visible; }
+[data-ops-screen='desk'] .ops-mini,
+[data-ops-screen='desk'] .ops-mini.is-sm { grid-auto-rows: minmax(0, auto); }
+/* 窄卡里 4 列小格会把「¥38.74」挤到换行；桌面档一律 2×2 */
+[data-ops-screen='desk'] .ops-mini.is-sm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.ops-card > h2 {
+  margin: 0 0 10px;
+  font-weight: 600;
+  color: var(--ops-ink-2);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+}
+
+.ops-card > h2 .ops-h2-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-card > h2 .ops-tag {
+  flex: none;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--ops-panel-2);
+  color: var(--ops-ink-3);
+  border: 1px solid var(--ops-line);
+  white-space: nowrap;
+}
+
+.ops-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ops-card.ops-tall > .ops-body {
+  justify-content: stretch;
+}
+
+/* ---------- 口径脚注：每块必须有，写清来源与窗口 ---------- */
+.ops-foot {
+  flex: none;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ops-line);
+  color: var(--ops-ink-3);
+  line-height: 1.45;
+}
+
+.ops-foot b {
+  color: var(--ops-ink-2);
+  font-weight: 600;
+}

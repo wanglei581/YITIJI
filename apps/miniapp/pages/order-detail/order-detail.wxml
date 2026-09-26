@@ -20,9 +20,11 @@
       </view>
     </view>
 
+    <!-- 标题跟着 error 的成因走：换了账号 / 登录失效时再写「加载失败，点此重试」
+         会把一次身份清场说成网络问题，用户只会反复去点那一下。 -->
     <view class="card" wx:elif="{{error}}" bindtap="retry">
       <view class="empty-slot">
-        <view class="es-t">加载失败，点此重试</view>
+        <view class="es-t">{{errorTitle}}</view>
         <view class="es-d">{{error}}</view>
       </view>
     </view>

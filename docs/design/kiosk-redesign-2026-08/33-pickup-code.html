@@ -6,7 +6,7 @@
 <title>取件码核销 · 职易达</title>
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -26,6 +26,11 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
     var(--paper);
   overflow:hidden;display:flex;flex-direction:column;}
 .serif{font-family:"Songti SC","STSong","SimSun",serif;}
+/* 统一焦点环：3px 深墨环，画在元素外侧的浅纸底上（对比 ≈14:1）。
+   数字键、清空/删除、确认核销与底栏动作共用同一套环。 */
+:focus-visible{outline:3px solid var(--deep)!important;outline-offset:3px!important;}
+/* 贴着舞台底边的底部导航改画内侧环，避免环被舞台裁掉 */
+.nav-item:focus-visible{outline-offset:-5px!important;}
 
 /* 顶栏 */
 .topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;
@@ -64,8 +69,10 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 .xq-doing{margin-top:10px;font-size:21px;line-height:1.5;color:rgba(242,239,228,.72);}
 .xq-doing b{color:#fff;font-weight:600;}
 
-/* 主体 */
-.body{flex:1;display:flex;flex-direction:column;padding:24px 44px 0;gap:24px;}
+/* 主体 —— 订单卡出现后内容会超过一屏；这里让主体自己滚，
+   规矩条、确认核销与底部导航始终留在屏内可点、可聚焦。 */
+.body{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:24px 44px 0;gap:24px;
+  scroll-padding:20px 0 24px;}
 
 /* 取件码输入区 */
 .code-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
@@ -88,8 +95,14 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 .kb-row{display:flex;gap:14px;}
 .key{flex:1;height:96px;border-radius:20px;border:1px solid var(--line-2);background:var(--paper);
   font-size:38px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .16s;}
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  /* 只过渡按压反馈相关的视觉属性：transition:all 会把 outline-width 从 0 起做 .16s 补间，
+     Tab 切入当帧读到的 computed outline-width 仍是 0px，焦点环等于延迟出现。 */
+  transition:transform .16s,background-color .16s,border-color .16s;}
 .key:active{transform:scale(.97);background:var(--teal-soft);border-color:var(--teal);}
+/* 焦点环必须在 Tab 切入当帧即达到 3px，不参与任何过渡 */
+button.key:focus-visible{outline:3px solid var(--deep)!important;outline-offset:3px!important;
+  transition-property:transform,background-color,border-color!important;}
 .key.wide{flex:1.1;font-size:24px;font-weight:700;}
 .key.del{background:var(--deep);color:#fff;border-color:var(--deep);}
 .key.ok{background:var(--teal);color:#fff;border-color:var(--teal);font-size:24px;}
@@ -149,6 +162,7 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 .nav-item svg{width:30px;height:30px;margin-bottom:2px;}
 
 @media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important;}
   .dot.breathe{animation:none;}
   .xq-face::before{animation:none;opacity:.3;}
 }
@@ -160,7 +174,7 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 
   <!-- 顶栏 -->
   <div class="topbar">
-    <div class="back" onclick="location.href='01-home.html'">
+    <div class="back" role="button" tabindex="0" aria-label="返回首页" onclick="location.href='01-home.html'">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
     </div>
     <div class="logo"><div class="logo-mark">职</div><div class="logo-name">职易达</div></div>
@@ -261,13 +275,13 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 
   <!-- CTA 底栏 -->
   <div class="cta-bar">
-    <div class="cta-btn secondary" onclick="clearCode()">清空重输</div>
-    <div class="cta-btn primary" onclick="verifyCode()">确认核销<em>→</em></div>
+    <div class="cta-btn secondary" role="button" tabindex="0" onclick="clearCode()">清空重输</div>
+    <div class="cta-btn primary" role="button" tabindex="0" onclick="verifyCode()">确认核销<em>→</em></div>
   </div>
 
   <!-- 底部导航 -->
   <div class="navbar">
-    <div class="nav-item" onclick="location.href='01-home.html'">
+    <div class="nav-item" role="button" tabindex="0" onclick="location.href='01-home.html'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <div class="ni">首页</div>
     </div>
@@ -275,7 +289,7 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       <div class="ni">AI 顾问</div>
     </div>
-    <div class="nav-item" onclick="location.href='30-my-profile.html'">
+    <div class="nav-item" role="button" tabindex="0" onclick="location.href='30-my-profile.html'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <div class="ni">我的</div>
     </div>
@@ -294,6 +308,10 @@ function fit(){
 window.addEventListener('resize',fit);
 window.addEventListener('orientationchange',fit);
 fit();
+/* 舞台是 overflow:hidden 的定尺画布：焦点落到屏外元素时浏览器会滚动它，整页版式跟着位移。
+   按死在 0，位置只由布局决定。 */
+(function(){var st=document.getElementById('stage'),vp=document.getElementById('viewport');
+ [st,vp].forEach(function(el){if(!el)return;el.addEventListener('scroll',function(){el.scrollTop=0;el.scrollLeft=0;});});})();
 function tick(){
   var d=new Date();
   document.getElementById('clock').textContent=
@@ -337,6 +355,14 @@ function pressDel(){
   cells[currentIdx].classList.remove('filled');
   cells[currentIdx].classList.add('active');
 }
+// 补 role=button 的 div：Enter / 空格等同点击，行为仍走各自的 onclick
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Enter'&&e.key!==' '&&e.key!=='Spacebar') return;
+  var el=e.target;
+  if(!el||!el.getAttribute||el.getAttribute('role')!=='button'||el.tagName==='BUTTON') return;
+  e.preventDefault();
+  el.click();
+});
 document.addEventListener('click',function(e){
   var k=e.target.closest('.key'); if(!k) return;
   var d=k.getAttribute('data-key'), a=k.getAttribute('data-act');

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException, Optional } from '@nestjs/common'
-import { createHash, randomBytes, timingSafeEqual } from 'crypto'
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import type { AiProvider, AiProviderName, AssistantChatResult, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { isLlmProviderLabel } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
@@ -29,6 +29,7 @@ import type { ResumeTemplateLayoutPreset } from '../job-materials/job-materials.
 import {
   ResumeExportGateService,
   hashResumeExportContent,
+  resumeExportStagingExpiresAt,
   type ResumeExportGateContext,
   type ResumeExportGateDecision,
   type ResumeExportPricingView,
@@ -45,6 +46,11 @@ const AI_RESUME_RESULT_TTL_HOURS = ((): number => {
   const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
   return Number.isFinite(raw) && raw > 0 ? raw : 24
 })()
+
+/** 与 FilesService.upload 自行生成的 FileObject.id 同一格式，渲染前就能写进 ProduceID。 */
+function allocateFileObjectId(): string {
+  return randomUUID().replace(/-/g, '')
+}
 
 // ============================================================
 // AiService — 选择 provider 并统一处理日志
@@ -90,6 +96,24 @@ const KNOWN_PROVIDERS: readonly AiProviderName[] = [
 export interface AiResultRequester {
   endUserId: string | null
   accessToken: string | null
+}
+
+/** 新意图路径才传入。旧的两参数调用不使用，行为保持不变。 */
+export interface ResumeParseIntentBinding {
+  intentId: string
+  /** 匿名结果访问令牌。会员解析必须为 null。 */
+  accessToken: string | null
+}
+
+function assertResumeParseIntentBinding(intent: ResumeParseIntentBinding, endUserId: string | null): void {
+  const token = intent.accessToken
+  const raw = token && token.length === 43 && /^[A-Za-z0-9_-]{43}$/.test(token) ? Buffer.from(token, 'base64url') : null
+  const tokenOk = !!raw && raw.length === 32 && raw.toString('base64url') === token
+  if (!/^[a-f0-9]{64}$/.test(intent.intentId) || (endUserId ? token !== null : !tokenOk)) {
+    throw new InternalServerErrorException({
+      error: { code: 'RESUME_PARSE_INTENT_BINDING_INVALID', message: '简历解析意图绑定无效' },
+    })
+  }
 }
 
 /** SHA-256(token) 的十六进制串（64 hex chars）。DB 只存此 hash，绝不存明文 token。 */
@@ -236,8 +260,14 @@ export class AiService {
     }
   }
 
-  async submitResumeParse(input: ParseResumeInput, endUserId?: string | null): Promise<ParseResumeOutput> {
+  async submitResumeParse(
+    input: ParseResumeInput,
+    endUserId?: string | null,
+    intent?: ResumeParseIntentBinding,
+  ): Promise<ParseResumeOutput> {
+    if (intent) assertResumeParseIntentBinding(intent, endUserId ?? null)
     const t0 = Date.now()
+    const boundTaskId = intent ? intent.intentId : undefined
     try {
       // 真实诊断路径（llm provider）：先服务端提取简历文本。提取失败 → 直接返回明确原因，
       // 不调 LLM、不落假报告。mock / stub provider 保持原行为（自包含演示，不提取）。
@@ -286,6 +316,7 @@ export class AiService {
       } else {
         result = await this.provider.parseResume(input)
       }
+      if (boundTaskId) result = { ...result, taskId: boundTaskId }
 
       // fileId 随结果落库(阶段2B):优化时按归属重新提取原文;不透明 id,无 PII
       // targetContext 随结果落库(Wave 1 Task 3):优化懒生成时读回透传;只落结构化字段,
@@ -298,8 +329,11 @@ export class AiService {
       }
       // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
       // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
+      // 新意图路径使用调用方传入的令牌，不再另铸随机 token，避免和 intentId 错位。
       const isAnonymous = !endUserId
-      const accessToken = isAnonymous ? randomBytes(24).toString('hex') : undefined
+      const accessToken = boundTaskId
+        ? (isAnonymous && intent?.accessToken ? intent.accessToken : undefined)
+        : (isAnonymous ? randomBytes(24).toString('hex') : undefined)
       const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
       await this.persistResult(resultWithProvider.taskId, 'parse', resultWithProvider.status, resultWithProvider, endUserId ?? null, accessTokenHash)
       this.logService.record({
@@ -309,7 +343,7 @@ export class AiService {
         ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
-        status:    resultWithProvider.status === 'failed' ? 'failed' : 'success',
+        status:    resultWithProvider.status === 'failed' ? 'failed' : 'success', endUserId: endUserId ?? null,
         ...(extractionErrorCode ? { errorCode: extractionErrorCode } : {}),
       })
       return accessToken ? { ...resultWithProvider, accessToken } : resultWithProvider
@@ -320,7 +354,7 @@ export class AiService {
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
         status:    'failed',
-        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN', endUserId: endUserId ?? null,
       })
       throw err
     }
@@ -677,9 +711,12 @@ export class AiService {
     return { mode: 'free', alreadyPaid: true, serviceRefId: '', benefitGrantId: null, endUserId: ctx.endUserId }
   }
 
-  /** 文件成功生成后落账。生成失败不得调用。 */
-  async commitExportRedemption(decision: ResumeExportGateDecision): Promise<void> {
-    if (this.exportGate) await this.exportGate.commitExportRedemption(decision)
+  /** 文件成功生成后落账。生成失败不得调用。首次收费要带上预写文件 id。 */
+  async commitExportRedemption(
+    decision: ResumeExportGateDecision,
+    stagedFileIds: readonly string[] = [],
+  ): Promise<void> {
+    if (this.exportGate) await this.exportGate.commitExportRedemption(decision, stagedFileIds)
   }
 
   /**
@@ -770,6 +807,17 @@ export class AiService {
         },
       })
     }
+    // 有任务号时 ProduceID 用任务号，与简历对照、职业规划打印一致。
+    // 没有任务号时，渲染前先分配文件编号并写入 ProduceID，入库用同一个编号。
+    // PDF / DOCX 各用自己的文件编号；txt/md 本身不写 AIGC，打印用 PDF 副本用它自己的编号。
+    const taskProduceId = charge?.taskId?.trim() ?? ''
+    const needsAllocatedId = !draft && taskProduceId.length === 0
+    const primaryFileId = needsAllocatedId && (format === 'pdf' || format === 'docx')
+      ? allocateFileObjectId()
+      : undefined
+    const printCopyFileId = needsAllocatedId && format !== 'pdf' ? allocateFileObjectId() : undefined
+    const produceId = taskProduceId || primaryFileId || ''
+    const printProduceId = taskProduceId || printCopyFileId || ''
 
     let buffer: Buffer
     let pageCount: number
@@ -777,7 +825,7 @@ export class AiService {
     let ext: string
     switch (format) {
       case 'docx': {
-        const rendered = await this.resumeDocx.render(resume)
+        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : produceId })
         buffer = rendered.buffer
         pageCount = 0
         mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -800,7 +848,12 @@ export class AiService {
       }
       case 'pdf':
       default: {
-        const rendered = await this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })
+        const rendered = await this.resumePdf.render(resume, {
+          layout,
+          templatePreset: template?.resumeLayoutPreset,
+          draft,
+          contentId: draft ? null : produceId,
+        })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
         mimeType = 'application/pdf'
@@ -812,6 +865,9 @@ export class AiService {
     const safeName = (resume.basic.name || '求职者').replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '求职者'
     // 文件名也要诚实：草稿叫「AI简历_x」会在「我的文档」里冒充成 AI 产物。
     const namePrefix = draft ? '简历草稿（未经AI润色）' : 'AI简历'
+    const stage = decision.mode === 'charged' && !decision.alreadyPaid && endUserId
+      ? { endUserId, expiresAt: resumeExportStagingExpiresAt() }
+      : undefined
     const uploaded = await this.files.upload({
       buffer,
       filename: `${namePrefix}_${safeName}.${ext}`,
@@ -822,17 +878,15 @@ export class AiService {
       assetCategory: 'optimized',
       sourceFileId,
       createdBy: 'ai_resume_generate',
+      ...(primaryFileId ? { id: primaryFileId } : {}),
+      ...(stage ? { paidExportStaging: stage } : {}),
     })
 
-    // 打印链路只接受系统 HMAC content URL(signFileUrl),不接受 COS 下载 signedUrl
-    // (PrintJobsService.create 会拒绝非系统签名 URL,详见 files/signing.ts)。
-    let printFileUrl: string | undefined
-    if (format === 'pdf') {
-      printFileUrl = signFileUrl(uploaded.fileId).url
-    } else {
-      // Wave 6:docx/txt/md 额外渲染一份同内容纯净 PDF(不套用 templateId,透传 layout),
-      // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
-      const pdfRendered = await this.resumePdf.render(resume, { layout, draft })
+    // Wave 6:docx/txt/md 额外渲染一份同内容纯净 PDF(不套用 templateId,透传 layout),
+    // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
+    let printFileId = uploaded.fileId
+    if (format !== 'pdf') {
+      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : printProduceId })
       const pdfUploaded = await this.files.upload({
         buffer: pdfRendered.buffer,
         filename: `${namePrefix}_${safeName}.pdf`,
@@ -843,27 +897,60 @@ export class AiService {
         assetCategory: 'optimized',
         sourceFileId,
         createdBy: 'ai_resume_generate',
+        ...(printCopyFileId ? { id: printCopyFileId } : {}),
+        ...(stage ? { paidExportStaging: stage } : {}),
       })
-      printFileUrl = signFileUrl(pdfUploaded.fileId).url
+      printFileId = pdfUploaded.fileId
     }
 
-    await this.commitExportRedemption(decision)
+    if (stage) {
+      await this.commitExportRedemption(decision, [uploaded.fileId, printFileId])
+    } else {
+      await this.commitExportRedemption(decision)
+    }
+
+    // 打印链路只接受系统 HMAC content URL(signFileUrl),不接受 COS 下载 signedUrl。
+    // 收费导出只在核销提交、文件变为 active 之后签发，避免未付款文件拿到可用链接。
+    const access = stage ? await this.files.signActiveDownload(uploaded.fileId) : uploaded
+    const printFileUrl = signFileUrl(printFileId).url
     if (charge?.taskId) {
-      await this.drafts.persistConfirmed({
+      await this.persistConfirmedExportBestEffort({
         taskId: charge.taskId,
         endUserId,
-        fileId: uploaded.fileId,
+        fileId: access.fileId,
         factsConfirmedAt: charge.factsConfirmedAt,
       })
     }
     return {
-      fileId: uploaded.fileId,
-      filename: uploaded.filename,
-      sizeBytes: uploaded.sizeBytes,
+      fileId: access.fileId,
+      filename: access.filename,
+      sizeBytes: access.sizeBytes,
       pageCount,
-      signedUrl: uploaded.signedUrl,
-      expiresAt: uploaded.signedUrlExpiresAt,
-      ...(printFileUrl ? { printFileUrl } : {}),
+      signedUrl: access.signedUrl,
+      expiresAt: access.signedUrlExpiresAt,
+      printFileUrl,
+    }
+  }
+
+  /**
+   * 草稿快照失败不能反向删除已经核销的文件。重试一次仍失败就留下文件，
+   * 调用方拿到访问地址；同内容再次导出不再扣次。
+   */
+  private async persistConfirmedExportBestEffort(input: {
+    taskId: string
+    endUserId: string | null
+    fileId: string
+    factsConfirmedAt?: string
+  }): Promise<void> {
+    try {
+      await this.drafts.persistConfirmed(input)
+    } catch {
+      try {
+        await this.drafts.persistConfirmed(input)
+      } catch (retryError) {
+        const errorType = retryError instanceof Error ? retryError.constructor.name : typeof retryError
+        this.logger.warn(`code=RESUME_EXPORT_DRAFT_PERSIST_FAILED errorType=${errorType}`)
+      }
     }
   }
 
@@ -911,7 +998,7 @@ export class AiService {
     return { deletedCount }
   }
 
-  async chatWithAssistant(input: ChatInput, ownerKey = 'anon'): Promise<AssistantChatResult> {
+  async chatWithAssistant(input: ChatInput, ownerKey = 'anon', endUserId: string | null = null): Promise<AssistantChatResult> {
     const t0 = Date.now()
     // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
     const useLlm = this.llmConfig.isReady('assistant_chat')
@@ -932,7 +1019,7 @@ export class AiService {
         ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
-        status:    'success',
+        status:    'success', endUserId,
       })
       // S0-1 / 风险 R1：把 provider 标签透出，让调用方能分辨「真实模型」与
       // 「mock/stub provider 预置话术」。回落时这里必须如实标 aiGenerated=false，
@@ -946,7 +1033,7 @@ export class AiService {
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
         status:    'failed',
-        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN', endUserId,
       })
       throw err
     }

@@ -1648,6 +1648,21 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
+/**
+ * 动历史之前，先等 /scan 在选类型那一屏落定。
+ *
+ * 登录回跳落在裸 `/scan`，上面的 waitForURL 只等到 pathname；ScanWorkbenchPage 要等这一帧
+ * 提交之后才 `setSearchParams(replace)` 把缺省阶段补成 `?stage=start`，而那次补写按
+ * **补写那一刻**的 location 解析。赶在它前面 pushState，`?stage=start` 就贴到新插的条目上
+ * （`/print-scan?stage=start`；或把 `/scan?stage=result` 改写回选类型，结果屏出不来）。
+ * URL 已是规范形 = 那次补写做完了，之后 requested 与 view 一致、不会再写；
+ * 选类型屏可见 = 页面确实停在这一屏。
+ */
+async function settleOnScanStart(page: Page): Promise<void> {
+  await expect(page).toHaveURL(/\/scan\?stage=start$/)
+  await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+}
+
 /** 打印确认页与 AI 解析页挂载时会真的问服务端，别让它们撞成未注册请求。 */
 function registerCompletedExitDestinations(api: ApiRouter): void {
   api.respond('GET', '/api/v1/print/price-config', {
@@ -1694,6 +1709,7 @@ for (const exit of COMPLETED_EXITS) {
     // 会员聚合接口，全都得注册才能过 assertNoUnhandledRequests，与本用例要证明的事无关。
     if (exit.needsLogin) await loginThroughVisibleUi(page, '/scan')
     else await page.goto('/scan?stage=start')
+    await settleOnScanStart(page)
     await landOnCompletedScan(page)
 
     await page.getByRole('button', { name: exit.button }).first().click()
@@ -1776,6 +1792,7 @@ for (const exit of COMPLETED_EXITS) {
 
     if (exit.needsLogin) await loginThroughVisibleUi(page, '/scan')
     else await page.goto('/scan?stage=start')
+    await settleOnScanStart(page)
     // 结果条目之前必须是一条**非 /scan** 的条目（见上面的判据说明）。
     // 用 pushState + popstate 在同一个 document 里插，理由和 landOnCompletedScan 一样：
     // page.goto 是整页加载，会把内存里的登录态一起抹掉，documents 那一条就跑不了了。

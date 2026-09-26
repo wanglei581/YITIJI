@@ -1,135 +1,23 @@
-import {
-  AlertTriangleIcon,
-  CheckCircle2Icon,
-  CircleHelpIcon,
-  Clock3Icon,
-  CreditCardIcon,
-  QrCodeIcon,
-  ScanLineIcon,
-  ShieldCheckIcon,
-  WalletCardsIcon,
-} from 'lucide-react'
-import type { PrintPriceLine } from '@ai-job-print/shared'
+import type { ReactNode } from 'react'
+import { AlertTriangleIcon, FileXIcon, QrCodeIcon, ScanLineIcon } from 'lucide-react'
+import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import type { CashierView } from '../cashierStatus'
-import { formatCents, PAY_CHANNEL_LABEL } from '../cashierStatus'
+import { formatCents } from '../cashierStatus'
 import type { CashierSnapshot, PaymentMethod } from '../CashierPaymentPanel'
 import { CashierPaymentPanel } from '../CashierPaymentPanel'
-
-export const CASHIER_QX_STATES = [
-  'no-order',
-  'session-expired',
-  'free-order',
-  'channel-loading',
-  'channel-empty',
-  'channel-failed',
-  'pending',
-  'channel-selected',
-  'pending-qr',
-  'pending-scan',
-  'awaiting-code-confirmation',
-  'pending-verification',
-  'paid',
-  'release-failed',
-  'display-expired-reconciling',
-  'expired',
-  'attempt-failed',
-  'attempt-channel-unknown',
-  'order-failed',
-  'closed',
-  'refunding',
-  'partial-refunded',
-  'refunded',
-] as const
-
-export type CashierQxState = (typeof CASHIER_QX_STATES)[number]
-export type ChannelLoadState = 'loading' | 'ready' | 'empty' | 'error'
-
-interface DeriveCashierQxStateInput {
-  hasOrder: boolean
-  hasSession: boolean
-  amountCents: number | null
-  channelState: ChannelLoadState
-  channels: string[]
-  selectedChannel: string | null
-  paymentMethod: PaymentMethod | null
-  snapshot: CashierSnapshot | null
-  nowMs: number
-  releaseFailed: boolean
-  reconciling: boolean
-}
-
-export function deriveCashierQxState(input: DeriveCashierQxStateInput): CashierQxState {
-  if (!input.hasOrder || input.amountCents === null) return 'no-order'
-  if (!input.hasSession) return 'session-expired'
-  if (input.releaseFailed) return 'release-failed'
-  if (input.amountCents <= 0) return 'free-order'
-
-  const { snapshot } = input
-  if (snapshot) {
-    if (snapshot.payStatus === 'paid') return 'paid'
-    if (snapshot.payStatus === 'failed') return 'order-failed'
-    if (snapshot.payStatus === 'closed') return 'closed'
-    if (snapshot.payStatus === 'refunding') return 'refunding'
-    if (snapshot.payStatus === 'partial_refunded') return 'partial-refunded'
-    if (snapshot.payStatus === 'refunded') return 'refunded'
-    if (snapshot.attempt && !snapshot.attempt.channel) return 'attempt-channel-unknown'
-    if (snapshot.attempt?.status === 'failed') return 'attempt-failed'
-    if (snapshot.attempt?.status === 'expired' && snapshot.attempt.qrCodeContent === null) return 'pending-verification'
-    if (snapshot.attempt?.status === 'expired') return 'expired'
-    if (
-      snapshot.attempt?.qrCodeContent &&
-      snapshot.attempt.expiresAt &&
-      new Date(snapshot.attempt.expiresAt).getTime() <= input.nowMs
-    ) return 'display-expired-reconciling'
-    if (snapshot.attempt?.qrCodeContent) return 'pending-qr'
-    if (snapshot.attempt?.status === 'created' || snapshot.attempt?.status === 'pending') {
-      return 'awaiting-code-confirmation'
-    }
-  }
-
-  if (input.channelState === 'loading') return 'channel-loading'
-  if (input.channelState === 'empty') return 'channel-empty'
-  if (input.channelState === 'error') return 'channel-failed'
-
-  if (!input.selectedChannel) return 'pending'
-  if (input.paymentMethod === 'code') return 'pending-scan'
-  return 'channel-selected'
-}
-
-const STATE_COPY: Record<CashierQxState, { title: string; description: string; tone: 'info' | 'warn' | 'error' | 'ok' }> = {
-  'no-order': { title: '没有待支付的订单', description: '收银台只处理已经由服务端建好的订单。这里不会显示金额，也不会生成收款码。', tone: 'warn' },
-  'session-expired': { title: '当前支付页面已失效', description: '订单仍然保留，请从我的打印订单重新进入。重新进入不会重复扣款。', tone: 'warn' },
-  'free-order': { title: '本次无需付款', description: '订单已经真实创建，可以直接请求服务端建立打印任务。', tone: 'ok' },
-  'channel-loading': { title: '正在加载支付方式', description: '读取本机已启用通道后才会列出选项；读取完成前不会替你选择。', tone: 'info' },
-  'channel-empty': { title: '当前设备暂不支持在线付款', description: '订单已保留，本次没有发起支付。请联系现场工作人员处理。', tone: 'error' },
-  'channel-failed': { title: '支付方式加载失败', description: '本次没有发起支付，也没有产生扣款。请检查网络后重新读取。', tone: 'error' },
-  pending: { title: '请先选择支付通道', description: '多通道必须由你明确选择。选定通道后，再选择屏上收款码或付款码。', tone: 'info' },
-  'channel-selected': { title: '通道已选，请选择扫码方式', description: '选屏上收款码会立即创建支付尝试；付款码读满并提交后才创建尝试。', tone: 'info' },
-  'pending-qr': { title: '请扫码支付', description: '支付尝试已经创建。请勿切换方式、重复付款或重新下单。', tone: 'info' },
-  'pending-scan': { title: '请出示手机付款码', description: '现在还没有向支付平台发起收款，读满十八位并提交后才会创建支付尝试。', tone: 'info' },
-  'awaiting-code-confirmation': { title: '正在确认付款结果', description: '付款码已提交，但支付成功仍只以服务端订单终态为准。请勿重复出示。', tone: 'info' },
-  'pending-verification': { title: '付款结果暂未确认', description: '请先查看支付账单，不要重复付款；仍无法确认时联系工作人员。', tone: 'warn' },
-  paid: { title: '付款已由服务端确认', description: '系统正在创建或恢复同一打印任务，不会再次发起收款。', tone: 'ok' },
-  'release-failed': { title: '打印任务尚未建立', description: '支付或零元订单状态已经由服务端确认；当前只重试打印任务释放，不会重新收款。', tone: 'warn' },
-  'display-expired-reconciling': { title: '收款码到期核验中', description: '显示有效期已到，但渠道结果尚未确认。请勿重复支付。', tone: 'warn' },
-  expired: { title: '屏上收款码已过期', description: '服务端确认旧码已经失效，订单尚未关闭，可以沿用锁定金额重新出码。', tone: 'warn' },
-  'attempt-failed': { title: '这次支付尝试没有完成', description: '服务端确认旧尝试失败且不能再扣款；订单未关闭，可以重新发起。', tone: 'error' },
-  'attempt-channel-unknown': { title: '本次支付通道未确认', description: '本机不猜通道、不出码，也不判断付款成败。请从订单列表重新进入。', tone: 'warn' },
-  'order-failed': { title: '订单支付已失败', description: '服务端将订单记为失败终态，不能继续付款或出码。', tone: 'error' },
-  closed: { title: '订单已超时关闭', description: '服务端确认订单已经关闭，不能再出码或继续支付。', tone: 'error' },
-  refunding: { title: '这一单正在退款', description: '退款尚未完成，这类订单一律不放行出纸。到账时间以支付渠道为准。', tone: 'warn' },
-  'partial-refunded': { title: '这一单发生了部分退款', description: '退款金额与剩余金额以服务端订单详情为准，本机不计算，也不放行出纸。', tone: 'warn' },
-  refunded: { title: '这一单已经退款', description: '服务端返回退款完成。这张订单不能再出纸，如需打印请重新下单。', tone: 'error' },
-}
-
-function StateIcon({ state }: { state: CashierQxState }) {
-  if (state === 'paid' || state === 'free-order') return <CheckCircle2Icon aria-hidden="true" />
-  if (state === 'channel-selected') return <CreditCardIcon aria-hidden="true" />
-  if (state === 'pending-qr') return <QrCodeIcon aria-hidden="true" />
-  if (state === 'pending-scan') return <ScanLineIcon aria-hidden="true" />
-  if (state.includes('pending') || state.includes('loading') || state.includes('reconciling')) return <Clock3Icon aria-hidden="true" />
-  return <AlertTriangleIcon aria-hidden="true" />
-}
+import { COLOR_MODE_LABEL, DUPLEX_LABEL } from '../printConfirmModel'
+import type { PrintFileState } from '../printMaterialSession'
+import {
+  channelLabelOf,
+  copyFor,
+  INSTRUMENT_STATES,
+  pickerNote,
+  PICKERS_ENABLED,
+  TERMINAL_CARD,
+  type CashierQxState,
+  type CopyContext,
+  type Row,
+} from '../cashierQxModel'
 
 interface CashierQxViewProps {
   step: 5
@@ -138,6 +26,8 @@ interface CashierQxViewProps {
   orderId: string | null
   amountCents: number | null
   priceLines: PrintPriceLine[]
+  file: PrintFileState | null
+  params: PrintJobParams | null
   channels: string[]
   selectedChannel: string | null
   displayedChannel: string | null
@@ -145,6 +35,8 @@ interface CashierQxViewProps {
   displayedPaymentMethod: PaymentMethod | null
   snapshot: CashierSnapshot | null
   view: CashierView | null
+  /** 这一单是否已经创建过支付尝试。 */
+  amountLocked: boolean
   issuing: boolean
   codeSubmitting: boolean
   authCodeBufferRef: { current: string }
@@ -159,8 +51,8 @@ interface CashierQxViewProps {
   selectionLocked: boolean
   onSelectChannel: (channel: string) => void
   methodLabels: {
-    readonly qr: { readonly name: string; readonly action: string }
-    readonly code: { readonly name: string; readonly action: string }
+    readonly qr: { readonly name: string; readonly action: string; readonly desc: string }
+    readonly code: { readonly name: string; readonly action: string; readonly desc: string }
   }
   onSelectMethod: (method: PaymentMethod) => void
   onSubmitCode: () => void
@@ -168,155 +60,405 @@ interface CashierQxViewProps {
   onReissue: () => void
   onSimulateSandbox: (result: 'success' | 'failed') => void
 }
-
 export function CashierQxView(props: CashierQxViewProps) {
-  const copy = STATE_COPY[props.state]
-  const amountAvailable = props.amountCents !== null
-  const amountLabel = props.state === 'paid' || props.state === 'release-failed' ? '服务端订单金额' : '本次应付'
-  const channelLabel = props.displayedChannel ? PAY_CHANNEL_LABEL[props.displayedChannel] ?? props.displayedChannel : '尚未选择'
-  const showPickers = ['pending', 'channel-selected', 'pending-scan'].includes(props.state)
-  const showPaymentPanel = ['pending-qr', 'pending-scan', 'awaiting-code-confirmation', 'pending-verification', 'display-expired-reconciling', 'expired', 'attempt-failed', 'paid'].includes(props.state)
+  const { state } = props
+  const attemptChannel = props.snapshot?.attempt?.channel || null
+  const channelKey = state === 'attempt-channel-unknown' ? null : attemptChannel ?? props.displayedChannel
+  const label = channelLabelOf(channelKey)
+  const free = (props.amountCents ?? 1) <= 0
+  const ctx: CopyContext = {
+    label,
+    enabledNames: props.channels.map(channelLabelOf).join('或') || '支付通道',
+    single: props.channels.length === 1,
+    multi: props.channels.length > 1,
+    sandbox: channelKey === 'sandbox',
+    locked: props.amountLocked,
+    free,
+  }
+  const copy = copyFor(state, ctx)
+  const instrument = INSTRUMENT_STATES.has(state)
+  // 解释卡放在较矮的那一栏（稿 32 的做法）：付款码读取卡比右栏矮，所以 pending-scan 放左栏。
+  const noteInPaycol = !instrument || state === 'pending-scan'
+  const pickersEnabled = PICKERS_ENABLED.has(state) && !props.selectionLocked
+  const activeMethod = props.displayedPaymentMethod
+    ?? (props.snapshot?.attempt ? (props.snapshot.attempt.qrCodeContent === null ? 'code' : 'qr') : null)
 
   return (
-    <div className="cashier-qx-page" data-qx-state={props.state}>
-      {showPickers ? (
-        <section className="cashier-qx-pickers" aria-label="支付方式选择">
-          <div className="cashier-qx-picker-group">
-            <span className="cashier-qx-picker-label">支付通道</span>
-            <div className="cashier-qx-picker-options">
-              {props.channels.map((channel) => (
-                <button
-                  key={channel}
-                  type="button"
-                  className="cashier-qx-choice"
-                  data-active={props.displayedChannel === channel ? 'true' : undefined}
-                  disabled={props.issuing || props.codeSubmitting || props.selectionLocked}
-                  onClick={() => props.onSelectChannel(channel)}
-                >
-                  <WalletCardsIcon aria-hidden="true" />
-                  <span>{PAY_CHANNEL_LABEL[channel] ?? channel}</span>
-                  {channel === 'sandbox' ? <small>非真实收款</small> : null}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="cashier-qx-picker-group">
-            <span className="cashier-qx-picker-label">扫码方式：{props.methodLabels.qr.name} / {props.methodLabels.code.name}</span>
-            <div className="cashier-qx-picker-options">
-              <button
-                type="button"
-                className="cashier-qx-choice"
-                data-active={props.displayedPaymentMethod === 'qr' ? 'true' : undefined}
-                disabled={!props.selectedChannel || props.issuing || props.codeSubmitting || props.selectionLocked}
-                onClick={() => props.onSelectMethod('qr')}
-              >
-                <QrCodeIcon aria-hidden="true" /><span>{props.methodLabels.qr.name}</span>
-                <small>{props.methodLabels.qr.action}</small>
-              </button>
-              <button
-                type="button"
-                className="cashier-qx-choice"
-                data-active={props.displayedPaymentMethod === 'code' ? 'true' : undefined}
-                disabled={!props.selectedChannel || props.issuing || props.codeSubmitting || props.selectionLocked}
-                onClick={() => props.onSelectMethod('code')}
-              >
-                <ScanLineIcon aria-hidden="true" /><span>{props.methodLabels.code.name}</span>
-                <small>{props.methodLabels.code.action}</small>
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
+    <div className="cashier-qx-page" data-qx-state={state}>
       <div className="qx-scroll cashier-qx-scroll">
-        <section className="qx-state cashier-qx-state" data-tone={copy.tone === 'error' ? 'error' : 'info'}>
-          <span className="qx-state-ic"><StateIcon state={props.state} /></span>
-          <div>
-            <p className="qx-state-t">{copy.title}</p>
-            <p className="qx-state-d">{copy.description}</p>
-          </div>
-        </section>
-
-        <section className="cashier-qx-main">
-          <div className="cashier-qx-amount qx-card">
-            <span className="cashier-qx-eyebrow">{amountLabel}</span>
-            <strong className="qx-num" data-cashier-amount="">
-              {amountAvailable ? formatCents(props.amountCents ?? 0) : '状态未知'}
-            </strong>
-            <p data-cashier-amount-note={props.displayedChannel === 'sandbox' ? 'sandbox' : 'real'}>
-              {props.displayedChannel === 'sandbox'
-                ? '测试支付通道，不会真实扣款'
-                : amountAvailable
-                  ? '本单实付金额 · 来自服务端已建订单，前端不重新计算'
-                  : '未取得服务端订单金额，不显示估算值'}
-            </p>
-            <div className="cashier-qx-lines">
-              {props.priceLines.length > 0 ? props.priceLines.map((line, index) => (
-                <div key={`${line.serviceKey}-${index}`}>
-                  <span>{line.description ?? line.serviceKey} · {formatCents(line.unitCents)} × {line.quantity}</span>
-                  <b>{formatCents(line.subtotalCents)}</b>
-                </div>
-              )) : <div><span>价目明细</span><b>以服务端订单为准</b></div>}
-            </div>
-          </div>
-
-          <div className="cashier-qx-order qx-card">
-            <div className="qx-sec-h"><span className="t">订单信息</span></div>
-            <dl>
-              <div><dt>打印流程</dt><dd>第 {props.step} 步 · 支付</dd></div>
-              <div><dt>订单号</dt><dd className="qx-num">{props.orderNo ?? props.orderId ?? '状态未知'}</dd></div>
-              <div><dt>支付通道</dt><dd>{channelLabel}</dd></div>
-              <div><dt>出纸条件</dt><dd>{props.canProceed ? '服务端已确认 paid' : '尚未满足'}</dd></div>
-            </dl>
-            <div className="cashier-qx-truth">
-              <ShieldCheckIcon aria-hidden="true" />
-              <span>支付结果、退款结果与金额均以服务端订单为准；本页不会因倒计时或点击动作自行判成功。{props.refundAssistanceCopy}</span>
+        <section className="cashier-qx-xq" aria-label="小青提示">
+          <div className="cashier-qx-xq-row">
+            <div className="cashier-qx-xq-face" aria-hidden="true">青</div>
+            <div className="cashier-qx-xq-main">
+              <div className="cashier-qx-xq-eyebrow">CASHIER · 打印第 {props.step} 步 · 支付</div>
+              <p className="cashier-qx-xq-ask">{copy.ask[0]}</p>
+              <p className="cashier-qx-xq-doing">{copy.ask[1]}</p>
             </div>
           </div>
         </section>
 
-        {showPaymentPanel ? (
-          <section className="qx-card cashier-qx-payment" data-live="true">
-            <CashierPaymentPanel
-              titleShownByPage
-              paymentMethod={props.paymentMethod}
-              attemptPaymentMethod={props.snapshot?.attempt?.qrCodeContent === null ? 'code' : props.snapshot?.attempt ? 'qr' : null}
-              snapshot={props.snapshot}
-              view={props.view}
-              channelsLoading={props.state === 'channel-loading'}
-              issuing={props.issuing}
-              codeSubmitting={props.codeSubmitting}
-              authCodeBufferRef={props.authCodeBufferRef}
-              qrContent={props.qrContent}
-              remainSec={props.remainSec}
-              reconciling={props.reconciling}
-              canReissue={props.canReissue}
-              isDevSandbox={props.isDevSandbox}
-              canProceed={props.canProceed}
-              onSubmitCode={props.onSubmitCode}
-              onReconcile={props.onReconcile}
-              onReissue={props.onReissue}
-              onSimulateSandbox={props.onSimulateSandbox}
-            />
+        <Pickers
+          {...props}
+          enabled={pickersEnabled}
+          activeChannel={channelKey}
+          activeMethod={activeMethod}
+          note={pickerNote(state, free, props.channels.length)}
+        />
+
+        <section className="cashier-qx-state" data-kind={copy.kind}>
+          <h2 className="cashier-qx-state-h">
+            {copy.icon}
+            <span className="qx-state-t">{copy.title}</span>
+          </h2>
+          {copy.paras.map((para, index) => <p key={index} className="cashier-qx-p">{para}</p>)}
+          {copy.chips.length > 0 ? (
+            <div className="cashier-qx-chips">
+              {copy.chips.map(([tone, text]) => <span key={text} className="cashier-qx-chip" data-tone={tone}>{text}</span>)}
+            </div>
+          ) : null}
+        </section>
+
+        {state === 'no-order' ? null : (
+          <section className="cashier-qx-paywrap">
+            <div className="cashier-qx-paycol">
+              {instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
+              {noteInPaycol ? <SideNote state={state} ctx={ctx} /> : null}
+            </div>
+            <div className="cashier-qx-side">
+              {instrument ? <AmountCard {...props} free={free} /> : null}
+              <OrderInfo {...props} channelLabel={label} rows={copy.rows} />
+              {noteInPaycol ? null : <SideNote state={state} ctx={ctx} />}
+            </div>
           </section>
-        ) : null}
+        )}
 
-        <section className="cashier-qx-guidance qx-card qx-grow">
-          <CircleHelpIcon aria-hidden="true" />
-          <div>
-            <h2>付款提示</h2>
-            <ol>
-              <li><b>核对金额。</b> 只认当前订单返回的实际金额。</li>
-              <li><b>只操作一次。</b> 未确认前不要重复扫码或重复出示付款码。</li>
-              <li><b>等待服务端结果。</b> 未到 paid 终态，打印任务不会释放。</li>
-            </ol>
-          </div>
-        </section>
+        <Closure state={state} ctx={ctx} />
 
         {props.issueError ? (
           <div className="cashier-qx-error" role="alert"><AlertTriangleIcon aria-hidden="true" />{props.issueError}</div>
         ) : null}
       </div>
     </div>
+  )
+}
+
+/* ── 两层选择条 ───────────────────────────────────────────────────
+ * 只渲染服务端已启用的通道；没有通道时整格换成说明，不摆假按钮。
+ * 可点与否沿用真实状态机（PICKERS_ENABLED + 支付尝试锁），锁定后仍亮出本单用的是哪一个。 */
+function Pickers(props: CashierQxViewProps & {
+  enabled: boolean
+  activeChannel: string | null
+  activeMethod: PaymentMethod | null
+  note: readonly [string, string] | null
+}) {
+  const busy = props.issuing || props.codeSubmitting
+  const channelDisabled = !props.enabled || busy
+  const methodDisabled = !props.enabled || busy || !props.selectedChannel
+  const showChannels = !props.note
+  return (
+    <section className="cashier-qx-modes" aria-label="支付方式选择">
+      <div className="cashier-qx-picker" data-kind="channels">
+        <span className="cashier-qx-picker-label">支付通道</span>
+        {showChannels ? props.channels.map((channel) => (
+          <button
+            key={channel}
+            type="button"
+            className="cashier-qx-channel"
+            data-active={props.activeChannel === channel ? 'true' : undefined}
+            aria-pressed={props.activeChannel === channel}
+            disabled={channelDisabled}
+            onClick={() => props.onSelectChannel(channel)}
+          >
+            <span>{channelLabelOf(channel)}</span>
+            {channel === 'sandbox' ? <small>非真实收款</small> : null}
+          </button>
+        )) : <span className="cashier-qx-picker-note">{props.note?.[0]}</span>}
+      </div>
+      <div className="cashier-qx-picker" data-kind="methods">
+        <span className="cashier-qx-picker-label">扫码方式</span>
+        {showChannels ? (['qr', 'code'] as const).map((method) => {
+          const labels = props.methodLabels[method]
+          return (
+            <button
+              key={method}
+              type="button"
+              className="cashier-qx-mode"
+              data-active={props.activeMethod === method ? 'true' : undefined}
+              aria-pressed={props.activeMethod === method}
+              disabled={methodDisabled}
+              onClick={() => props.onSelectMethod(method)}
+            >
+              <span className="cashier-qx-mode-ic">{method === 'qr' ? <QrCodeIcon aria-hidden="true" /> : <ScanLineIcon aria-hidden="true" />}</span>
+              <span className="cashier-qx-mode-tx">
+                <b>{labels.action}</b>
+                <small>{labels.name} · {labels.desc}</small>
+              </span>
+            </button>
+          )
+        }) : <span className="cashier-qx-picker-note">{props.note?.[1]}</span>}
+      </div>
+    </section>
+  )
+}
+
+function AmountCard(props: CashierQxViewProps & { free: boolean }) {
+  const { state } = props
+  const known = props.amountCents !== null && state !== 'session-expired' && state !== 'attempt-channel-unknown'
+  const label = state === 'paid' || (state === 'release-failed' && !props.free)
+    ? '已付金额'
+    : state === 'order-failed' || state === 'closed'
+      ? '原应付金额'
+      : state === 'refunding' || state === 'partial-refunded' || state === 'refunded'
+        ? '原订单金额'
+        : '本次应付'
+  const sandbox = props.displayedChannel === 'sandbox' || props.snapshot?.attempt?.channel === 'sandbox'
+  const note = sandbox
+    ? '测试支付通道，不会真实扣款'
+    : !known
+      ? '金额暂不可用，请从我的打印订单重新进入查看。'
+      : props.free
+        ? '本单实付 0 元 · 服务端报价为 0，本次未收款'
+        : state === 'refunding' || state === 'partial-refunded' || state === 'refunded'
+          ? '本单实付金额来自服务端订单；退款金额与到账时间以支付渠道账单为准，本机不估算'
+          : state === 'expired' || state === 'attempt-failed'
+            ? '本单实付金额来自服务端已建订单；重新发起仍按这一金额收款'
+            : '本单实付金额 · 来自服务端已建订单，前端不重新计算'
+  return (
+    <div className="cashier-qx-amount">
+      <div className="cashier-qx-amount-lb">{label}</div>
+      {known ? (
+        <strong className="cashier-qx-amount-num" data-cashier-amount="" data-quote-status="known">
+          {formatCents(props.amountCents ?? 0)}
+        </strong>
+      ) : (
+        <strong className="cashier-qx-amount-num" data-quote-status="unavailable">金额暂不可用</strong>
+      )}
+      <p className="cashier-qx-amount-src" data-cashier-amount-note={sandbox ? 'sandbox' : 'real'}>{note}</p>
+      {known && props.priceLines.length > 0 ? (
+        <div className="cashier-qx-ledger" aria-label="价目明细">
+          {props.priceLines.map((line, index) => (
+            <div key={`${line.serviceKey}-${index}`}>
+              <span>{priceLineLabel(line)} · {formatCents(line.unitCents)} × {line.quantity}</span>
+              <b>{formatCents(line.subtotalCents)}</b>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** 价目行只写服务项本身。后台价目的 description 是给运营看的（曾出现「免费试运营 0 元/页」
+ *  与实收单价并存的情况），照抄到收银台会让用户看到与金额矛盾的说法。 */
+function priceLineLabel(line: PrintPriceLine): string {
+  if (line.serviceKey === 'print_bw_page') return '黑白打印'
+  if (line.serviceKey === 'print_color_page') return '彩色打印'
+  return line.description ?? line.serviceKey
+}
+
+function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row[] }) {
+  const rows: Row[] = [['订单号', props.orderNo ?? props.orderId ?? '状态未知']]
+  if (props.file?.name) {
+    const parts = [props.file.name]
+    if (props.file.pages !== null && props.file.pages !== undefined) parts.push(`${props.file.pages} 页`)
+    if (props.params?.copies) parts.push(`${props.params.copies} 份`)
+    rows.push(['内容', parts.join(' · ')])
+  }
+  if (props.params) {
+    const params = [
+      props.params.paperSize,
+      COLOR_MODE_LABEL[props.params.colorMode] ?? null,
+      DUPLEX_LABEL[props.params.duplex] ?? null,
+    ].filter(Boolean)
+    if (params.length > 0) rows.push(['参数', params.join(' · ')])
+  }
+  if (props.channelLabel && !props.rows.some(([key]) => key === '支付通道')) rows.push(['支付通道', props.channelLabel])
+  rows.push(...props.rows)
+  return (
+    <section className="cashier-qx-group" aria-label="订单信息">
+      <h3>订单信息</h3>
+      <dl className="cashier-qx-kv">
+        {rows.map(([key, value]) => (
+          <div key={key}>
+            <dt>{key}</dt>
+            <dd className={key === '订单号' ? 'qx-num' : undefined}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="cashier-qx-p">{props.refundAssistanceCopy}。</p>
+    </section>
+  )
+}
+
+/** 付款列：真实屏上码 / 扫码器读付款码 / 已失效的码，全部由 CashierPaymentPanel 按服务端快照渲染。 */
+function Instrument(props: CashierQxViewProps & { ctx: CopyContext }) {
+  const { state } = props
+  const waiting = state === 'awaiting-code-confirmation' || state === 'pending-verification'
+  return (
+    <>
+      {waiting ? <ProgressSteps state={state} /> : null}
+      <div className={`cashier-qx-instrument${state === 'pending-scan' ? ' cashier-qx-hid' : ''}`} data-live={state === 'pending-qr' || state === 'pending-scan' ? 'true' : undefined}>
+        <CashierPaymentPanel
+          titleShownByPage
+          terminalTitle={TERMINAL_CARD[state]?.[0]}
+          terminalDescription={TERMINAL_CARD[state]?.[1]}
+          terminalActionShownByPage={state === 'expired' || state === 'attempt-failed'}
+          paymentMethod={props.paymentMethod}
+          attemptPaymentMethod={props.snapshot?.attempt?.qrCodeContent === null ? 'code' : props.snapshot?.attempt ? 'qr' : null}
+          snapshot={props.snapshot}
+          view={props.view}
+          channelsLoading={false}
+          issuing={props.issuing}
+          codeSubmitting={props.codeSubmitting}
+          authCodeBufferRef={props.authCodeBufferRef}
+          qrContent={props.qrContent}
+          remainSec={props.remainSec}
+          reconciling={props.reconciling}
+          canReissue={props.canReissue}
+          isDevSandbox={props.isDevSandbox}
+          canProceed={props.canProceed}
+          onSubmitCode={props.onSubmitCode}
+          onReconcile={props.onReconcile}
+          onReissue={props.onReissue}
+          onSimulateSandbox={props.onSimulateSandbox}
+        />
+      </div>
+    </>
+  )
+}
+
+/** 到账进度（稿 37 confirming）。三步的状态只由「已有支付尝试、尚未 paid」这两个服务端事实推出。 */
+function ProgressSteps({ state }: { state: CashierQxState }) {
+  const steps = [
+    { title: '付款码已提交', desc: '本次支付尝试已由服务端创建', status: 'done', text: '已提交' },
+    {
+      title: '等待支付平台回执',
+      desc: state === 'pending-verification' ? '渠道结果暂未确认，请先查账单' : '回执到达前不显示任何支付结论',
+      status: 'now',
+      text: state === 'pending-verification' ? '待核实' : '等待中',
+    },
+    { title: '服务端确认后释放出纸', desc: '只有服务端确认已付才会创建打印任务', status: 'todo', text: '未开始' },
+  ] as const
+  return (
+    <section className="cashier-qx-group" aria-label="到账进度">
+      <h3>到账进度</h3>
+      <ol className="cashier-qx-steps">
+        {steps.map((step, index) => (
+          <li key={step.title} className="cashier-qx-step" data-step={step.status}>
+            <span className="cashier-qx-step-ic" aria-hidden="true">{index + 1}</span>
+            <span className="cashier-qx-step-tx"><b>{step.title}</b><span>{step.desc}</span></span>
+            <span className="cashier-qx-step-st">{step.text}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+/** 稿 32 的「第二遍解释」卡：只在它讲的事上面没讲过时出现。 */
+function SideNote({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
+  const note: readonly [string, ReactNode] | null =
+    state === 'pending' && !ctx.locked
+      ? ['为什么分两步选择', '支付通道决定由哪个支付平台收款；扫码方式决定是你扫屏幕，还是本机读取你的付款码。']
+      : state === 'channel-selected' && !ctx.locked
+        ? ctx.single
+          ? ['为什么只有一个', '页面只列出本机已启用的支付通道；没启用的不会摆在这里让你白点。']
+          : ['还可以改通道', '本次还没有向支付平台发起收款，所以仍可改选其他通道；出码或提交付款码之后才锁定。']
+        : state === 'pending-qr'
+          ? ['付款完成后', `页面会自动确认结果。长时间未更新时，可以手动刷新，刷新仍然查这一次${ctx.label}的结果。`]
+          : state === 'pending-scan'
+            ? ['还能改', '本次还没有发起支付，所以通道和扫码方式都仍可改：可以改回屏幕上的码，也可以在上方换一个通道。付款码提交之后才会锁定。']
+            : state === 'display-expired-reconciling'
+              ? ['请稍候', '你可能刚好在最后一秒完成付款。确认结果前，请勿再次支付。']
+              : state === 'release-failed'
+                ? ctx.free
+                  ? ['会不会扣钱', '这一单报价为 0，本来就不收款；重试只重新创建打印任务。']
+                  : ['为什么不会重新收款', '这里只重试服务端的幂等任务释放，不会再次创建支付尝试。']
+                : state === 'attempt-channel-unknown'
+                  ? ['为什么不替你挑一个', '猜错会让你扫到一张不属于这一单的码，也可能把别人的付款结果当成你的。宁可这里停住。']
+                  : null
+  if (!note) return null
+  return (
+    <section className="cashier-qx-group" aria-label={note[0]}>
+      <h3>{note[0]}</h3>
+      <p className="cashier-qx-p">{note[1]}</p>
+    </section>
+  )
+}
+
+/** 收尾卡（稿 32 closerScan / closerCard）：吸收竖屏余量，只放判定依据与三条通用动作。 */
+function Closure({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
+  if (state === 'no-order') {
+    return (
+      <section className="cashier-qx-closure qx-grow" aria-label="没有订单上下文">
+        <div className="cashier-qx-empty">
+          <span className="cashier-qx-empty-ic"><FileXIcon aria-hidden="true" /></span>
+          <span>没有订单上下文。<br /><b>这里不显示金额，也不出码 —— 出一张扫不通的码只会让你白扫。</b></span>
+        </div>
+      </section>
+    )
+  }
+  if (state === 'display-expired-reconciling') {
+    return (
+      <section className="cashier-qx-state cashier-qx-closure qx-grow" data-kind="warn" aria-label="请勿重复付款">
+        <h2 className="cashier-qx-state-h"><AlertTriangleIcon aria-hidden="true" />请勿重复付款</h2>
+        <p className="cashier-qx-p">结果未确认前再次付款，可能产生重复扣款。仍未更新时请查看{ctx.label || '支付'}账单。</p>
+        <div className="cashier-qx-chips" style={{ marginTop: 'auto' }}>
+          <span className="cashier-qx-chip" data-tone="warn">正在确认</span>
+          <span className="cashier-qx-chip" data-tone="bad">勿重复支付</span>
+        </div>
+      </section>
+    )
+  }
+  const scan = state === 'pending-qr' || state === 'pending-scan'
+  const basis = scan
+    ? state === 'pending-qr'
+      ? '支付尝试已经创建。请勿切换方式、重复付款或重新下单。'
+      : '读满十八位并提交后才会向支付平台发起；在那之前仍可改回屏幕上的码或更换通道。'
+    : state === 'free-order' || state === 'release-failed'
+      ? '本次只恢复或创建打印任务，不进入收款流程。'
+      : state === 'paid'
+        ? '付款已由服务端确认；接下来去打印进度页查看出纸。'
+        : '请按页面提示处理；支付结果长时间未更新时，先查看支付账单。'
+  const flow = scan
+    ? [['1. 核对金额', '只认当前订单返回的实际金额。'], ['2. 只操作一次', '请勿重复扫码或重复出示手机付款码。'], ['3. 等待结果确认', '付款码不会完整显示或保存在这台机器上。']]
+    : [['1. 看清本页结果', '先确认是等待、成功、失败、关闭还是退款。'], ['2. 不重复付款', '结果异常或长时间未更新时，先查看支付账单。'], ['3. 按底部按钮继续', '当前可用的处理动作已经放在屏幕下方。']]
+  return (
+    <section className="cashier-qx-closure qx-grow" aria-label={scan ? '付款提示' : '接下来怎么办'}>
+      <h2>{scan ? '付款提示' : '接下来怎么办'}</h2>
+      <p className="cashier-qx-p">{basis}</p>
+      <ol className="cashier-qx-flow">
+        {flow.map(([title, desc]) => <li key={title}><b>{title}</b><span>{desc}</span></li>)}
+      </ol>
+    </section>
+  )
+}
+
+/* ── 底部：禁用原因 / 操作条 / 事实说明条（稿 32 .cta-reason + .ctabar + .truth）── */
+export function CashierQxDock({
+  reason,
+  children,
+  billingChannel,
+}: {
+  reason: string | null
+  children: ReactNode
+  /** 这一次真的可能扣款的通道；未确认时为 null，不点名任何一家。 */
+  billingChannel: string | null
+}) {
+  return (
+    <>
+      {reason ? <p className="cashier-qx-cta-reason">{reason}</p> : null}
+      <div className="cashier-qx-cta-row">{children}</div>
+      <div className="cashier-qx-truth" data-disclaimer="true">
+        <p><b>付款安全</b>请勿重复付款；页面会在系统确认结果后更新。付款码不会在屏幕上完整显示或保存。</p>
+        <p><b>金额确认</b>只有订单金额明确后才会生成收款码或读取付款码。</p>
+        <p>
+          <b>异常处理</b>
+          {billingChannel === 'sandbox'
+            ? '本次走的是测试支付通道，不产生真实账单；结果长时间未更新时请联系工作人员。'
+            : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单，再联系工作人员。`}
+        </p>
+      </div>
+    </>
   )
 }

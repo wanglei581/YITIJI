@@ -1,21 +1,14 @@
 .qx-home-host { width: 100%; height: 100%; min-height: 0; }
-.qx-home-host .qx-pagehead {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-.qx-home-host .qx-body { padding: 0; }
-.qx-home { gap: 0; padding-top: 12px; }
+.qx-home { --qx-home-r: 20px; --qx-home-ease: cubic-bezier(.2, .75, .25, 1); gap: 0; padding-top: 0; }
 
 .qx-home-hero {
   position: relative;
   flex: none;
-  margin-bottom: 24px;
-  padding: 18px var(--qx-gutter) 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 590px;
+  margin-bottom: 48px;
+  padding: 0 var(--qx-gutter) 40px;
   color: var(--qx-paper);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--qx-deep) 46%, transparent), var(--qx-deep)),
@@ -34,39 +27,61 @@
   pointer-events: none;
 }
 .qx-home-hero > * { position: relative; z-index: 1; }
+/* 顶栏收进背景图：覆写共享 104px 实色顶栏，浅色字压在深色蒙层上。
+   品牌区吃掉左侧全部余宽并拆成三行（品牌 / 副题 / 终端），状态 pill 与时钟固定在右侧完整展示。 */
+.qx-home-hero > .qx-home-hero-top {
+  flex: none; display: flex; align-items: center; gap: 16px; height: 92px; padding: 0;
+  border: 0; box-shadow: none; background: transparent; color: var(--qx-paper);
+  text-shadow: 0 1px 3px color-mix(in srgb, var(--qx-deep) 70%, transparent);
+}
+.qx-home-hero-top > * { flex: none; min-width: 0; }
+.qx-home-hero-top > .qx-home-brand { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.qx-home-hero-top > .qx-home-brand > * { display: block; max-width: 100%; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.qx-home-hero-top .qx-topbar-brand { color: var(--qx-paper); font-size: 30px; line-height: 1.2; }
+.qx-home-hero-top .qx-topbar-sub { color: color-mix(in srgb, var(--qx-paper) 72%, transparent); font-size: 17px; line-height: 1.3; }
+.qx-home-hero-top .qx-home-terminal { color: color-mix(in srgb, var(--qx-paper) 64%, transparent); font-size: 16px; line-height: 1.3; }
+/* 占位 spacer 的推挤职责已由品牌区 flex:1 接管，隐藏以免多占一格 gap。 */
+.qx-home-hero-top > .qx-home-brand ~ :empty:not(.qx-pill, .qx-home-clock) { display: none; }
+/* 只压深底保证对比，不覆写文字色：ok / warn / bad 的真实状态色必须原样透出。 */
+.qx-home-hero-top .qx-pill {
+  white-space: nowrap;
+  border-color: color-mix(in srgb, var(--qx-paper) 30%, transparent);
+  background: color-mix(in srgb, var(--qx-deep) 42%, transparent);
+}
+.qx-home-hero-top .qx-home-clock { margin-left: 0; }
+.qx-home-assistant h2 em { font-style: normal; color: var(--qx-emerald); }
 .qx-home-assistant { display: flex; align-items: center; gap: 22px; }
 .qx-home-avatar {
-  flex: none; display: grid; place-items: center; width: 82px; height: 82px;
-  border-radius: 50%; color: var(--qx-deep); background: var(--qx-emerald);
-  font-family: var(--qx-serif); font-size: 38px; font-weight: 800;
+  flex: none; display: grid; place-items: center; width: 96px; height: 96px; border-radius: 50%; color: var(--qx-deep);
+  background: linear-gradient(145deg, var(--qx-emerald), var(--qx-teal)); font-family: var(--qx-serif); font-size: 44px; font-weight: 900;
+  box-shadow: 0 0 40px color-mix(in srgb, var(--qx-emerald) 22%, transparent);
 }
 .qx-home-assistant div { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
-.qx-home-assistant h2 { margin: 0; font-family: var(--qx-serif); font-size: 31px; font-weight: 700; }
+.qx-home-assistant h2 { margin: 0; font-family: var(--qx-serif); font-size: 38px; font-weight: 900; letter-spacing: 1px; }
 .qx-home-assistant h2,
 .qx-home-assistant span:last-child { overflow-wrap: anywhere; }
-.qx-home-assistant span:last-child { color: color-mix(in srgb, var(--qx-paper) 72%, transparent); font-size: 17px; }
+.qx-home-assistant span:last-child { color: color-mix(in srgb, var(--qx-paper) 72%, transparent); font-size: 19px; }
 .qx-home-clock { flex: none; display: flex; flex-direction: column; align-items: flex-end; margin-left: auto; }
 .qx-home-clock strong { font-family: var(--qx-mono); font-size: 24px; }
 .qx-home-clock span { margin-top: 3px; color: color-mix(in srgb, var(--qx-paper) 64%, transparent); font-size: 15px; }
 
 .qx-home-voice {
-  display: flex; align-items: center; gap: 16px; width: 100%; min-height: 76px;
-  margin-top: 18px; padding: 0 24px; border: 1px solid var(--qx-emerald); border-radius: 999px;
-  color: var(--qx-deep); background: var(--qx-emerald); font-size: 22px; font-weight: 700; cursor: pointer;
+  position: relative; isolation: isolate; display: flex; align-items: center; gap: 16px; width: 100%; min-height: 76px; height: 84px;
+  margin-top: 22px; padding: 0 26px; border: 1px solid var(--qx-emerald); border-radius: 999px; color: var(--qx-deep);
+  background: linear-gradient(110deg, var(--qx-emerald), color-mix(in srgb, var(--qx-emerald) 60%, var(--qx-teal)));
+  font-size: 22px; font-weight: 700; cursor: pointer; overflow: hidden;
 }
-.qx-home-voice-icon {
-  display: grid; place-items: center; width: 48px; height: 48px;
-  border-radius: 50%; background: color-mix(in srgb, var(--qx-deep) 12%, transparent);
-}
+.qx-home-voice > * { position: relative; z-index: 1; }
+.qx-home-voice-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: color-mix(in srgb, var(--qx-deep) 12%, transparent); }
 .qx-home-voice-icon svg { width: 26px; }
 .qx-home-voice small { margin-left: auto; font-size: 17px; }
 
 .qx-home-quick {
-  display: flex; align-items: center; gap: 10px; min-height: 58px; margin-top: 10px;
+  display: flex; align-items: center; gap: 10px; min-height: 60px; margin-top: 14px;
   color: color-mix(in srgb, var(--qx-paper) 70%, transparent); font-size: 17px;
 }
 .qx-home-quick button {
-  min-width: 116px; min-height: 48px; padding: 0 16px;
+  min-width: 124px; min-height: 48px; height: 54px; padding: 0 18px; font-size: 18px;
   border: 1px solid color-mix(in srgb, var(--qx-paper) 28%, transparent); border-radius: 999px;
   color: var(--qx-paper); background: color-mix(in srgb, var(--qx-paper) 8%, transparent); cursor: pointer;
 }
@@ -74,26 +89,31 @@
 .qx-home-section-head > button:disabled { cursor: not-allowed; opacity: .68; }
 
 /* 身份入口：登录前后必须肉眼可辨，否则上一个人走后没人看得出会话是否已清场。
-   底栏「我的」在两种状态下都只写「我的」，担不起这个职责，所以在 hero 里单列一颗。 */
+   底栏「我的」在两种状态下都只写「我的」，担不起这个职责，所以在 hero 快捷入口里作第四颗。 */
 .qx-home-identity {
   display: inline-flex; align-items: center; gap: 10px;
-  min-height: 48px; margin-top: 12px; padding: 0 18px;
+  justify-content: center; min-width: 48px; min-height: 48px; margin-top: 0; padding: 0 18px;
   border: 1px solid color-mix(in srgb, var(--qx-paper) 28%, transparent); border-radius: 999px;
   color: var(--qx-paper); background: color-mix(in srgb, var(--qx-paper) 8%, transparent); cursor: pointer;
 }
 .qx-home-identity svg { width: 22px; height: 22px; }
 
-.qx-home-continue { min-height: 84px; margin-top: 8px; }
+.qx-home-continue { min-height: 96px; margin-top: 14px; }
 .qx-home-continue:has(.continue) > .qx-home-empty-context { display: none; }
 .qx-home-empty-context,
 .qx-home .continue {
   display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 18px;
-  width: 100%; min-height: 84px; padding: 14px 20px;
-  border: 1px solid color-mix(in srgb, var(--qx-paper) 22%, transparent); border-radius: var(--qx-r);
+  width: 100%; min-height: 96px; padding: 16px 22px;
+  border: 1px solid color-mix(in srgb, var(--qx-paper) 20%, transparent); border-radius: var(--qx-home-r);
   color: var(--qx-paper); background: color-mix(in srgb, var(--qx-paper) 8%, transparent);
 }
 /* 空态是陈述不是动作：单列、不可点、不用 disabled 的灰化——它没有「被禁用」这回事。 */
-.qx-home-empty-context { grid-template-columns: 1fr; text-align: left; }
+.qx-home-empty-context { grid-template-columns: auto 1fr; text-align: left; }
+.qx-home-empty-context .qx-home-context-icon {
+  flex: none; display: grid; place-items: center; width: 54px; height: 54px; border-radius: var(--qx-r);
+  color: var(--qx-emerald); background: color-mix(in srgb, var(--qx-emerald) 11%, transparent);
+}
+.qx-home-context-icon svg { width: 28px; }
 .qx-home-empty-context span,
 .qx-home .continue .c-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .qx-home-empty-context strong,
@@ -108,7 +128,9 @@
   color: var(--qx-deep); background: var(--qx-emerald); font: 700 18px var(--qx-sans);
 }
 .qx-home-hero-law {
-  margin: 10px 0 0;
+  flex: none;
+  margin: auto 0 0; /* 贴 hero 底；auto 吃掉余量，padding 保底间距，不与上下文卡重叠 */
+  padding-top: 14px;
   color: color-mix(in srgb, var(--qx-paper) 66%, transparent);
   font-size: 16px;
   text-align: center;
@@ -122,7 +144,7 @@
   display: flex; align-items: center; justify-content: space-between; min-height: 72px;
 }
 .qx-home-section-head div { display: flex; align-items: baseline; gap: 14px; }
-.qx-home-section-head h2 { margin: 0; font-family: var(--qx-serif); font-size: 28px; }
+.qx-home-section-head h2 { margin: 0; font-family: var(--qx-serif); font-size: 30px; font-weight: 900; letter-spacing: 2px; }
 .qx-home-section-head span { color: var(--qx-ink-3); font-size: 17px; }
 .qx-home-section-head > button {
   display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 12px;
@@ -133,127 +155,127 @@
 .qx-home-tiles {
   flex: 1 1 auto; min-height: 0; display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: 180px repeat(2, minmax(166px, 1fr)) repeat(2, 104px);
-  gap: 12px 16px;
+  grid-template-rows: minmax(204px, auto) repeat(2, minmax(196px, 236px)) repeat(2, 120px);
+  align-content: start; gap: 14px 18px;
+}
+/* 招聘内容托管关闭（3.13）：岗位、招聘会两张磁贴不渲染。稿 01 的 .tiles 让 fr 行吸收余量，这里照做：
+   空出的那一行按比例分给其余四行（每行约放大 1.4 倍，主卡与两张常规卡不被单独拉成空荡的高卡），
+   不留空洞；底部只留与行距相同的 14px，和打开时的底边留白一致。只作用于 1080 舞台，≤760 的手机单列排版
+   在 home-qx-mobile.css 里按内容自然排。 */
+@media (min-width: 761px) {
+  .qx-home[data-recruitment='closed'] .qx-home-tiles {
+    grid-template-rows: minmax(204px, 1fr) minmax(196px, 1.2fr) repeat(2, minmax(120px, .55fr));
+    align-content: stretch;
+    padding-bottom: 14px;
+  }
 }
 .qx-home-tile {
   position: relative; display: flex; min-width: 0; min-height: 166px; flex-direction: column; overflow: hidden;
-  padding: 18px 22px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  padding: 22px 26px; border: 1px solid var(--qx-line); border-radius: var(--qx-home-r);
   color: var(--qx-ink); background: var(--qx-surface); text-align: left; cursor: pointer;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--qx-ink) 5%, transparent);
 }
+/* 触控回馈：按下即缩 1.5%，160ms 回弹；只跟随手指，不循环（reduced-motion 下整条关掉）。 */
+.qx-home-tile, .qx-home-voice, .qx-home-quick button, .qx-home-identity { transition: transform .16s ease-out, box-shadow .16s ease-out, border-color .16s ease-out; }
+.qx-home-tile:not(:disabled):active, .qx-home-voice:active, .qx-home-quick button:active, .qx-home-identity:active { transform: scale(.985); }
+.qx-home-tile:not(:disabled):active { box-shadow: 0 1px 4px color-mix(in srgb, var(--qx-ink) 8%, transparent); }
+.qx-home-tile > * { flex-shrink: 0; } /* 文字行不许被 flex 压扁：主卡说明曾被挤成 0 高、叠在标题与脚注之间 */
 .qx-home-tile[data-size='feature'] {
-  grid-column: 1 / -1; min-height: 160px; padding: 22px 28px;
-  border-color: var(--qx-deep-2); color: var(--qx-paper); background: var(--qx-deep-2);
+  grid-column: 1 / -1; min-height: 204px; padding: 26px 34px; border: 0; color: var(--qx-paper);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--qx-teal) 45%, var(--qx-deep-2)), var(--qx-deep-2));
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--qx-deep-2) 24%, transparent);
 }
-.qx-home-tile[data-size='slim'] { min-height: 104px; padding: 16px 18px 16px 86px; justify-content: center; }
+.qx-home-tile[data-size='slim'] { min-height: 104px; padding: 16px 112px 16px 94px; justify-content: center; }
 .qx-home-tile[data-action='policy-hub'] { grid-column: 1 / -1; }
 .qx-home-tile:disabled { cursor: not-allowed; opacity: .68; }
 .qx-home-tile:focus-visible,
-.qx-home button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.qx-home-host .qx-home :is(button, a):focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; } /* 须压过 service-desk 的全局淡蓝焦点环（0,3,0） */
 .qx-home-tile-head { display: flex; align-items: center; justify-content: space-between; }
 .qx-home-tile-icon {
-  display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--qx-r);
+  display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px;
   color: var(--qx-teal-d); background: var(--qx-teal-soft);
 }
 .qx-home-tile[data-tone='slate'] .qx-home-tile-icon { color: var(--qx-slate-d); background: var(--qx-slate-soft); }
 .qx-home-tile[data-tone='clay'] .qx-home-tile-icon { color: var(--qx-cinnabar-d); background: var(--qx-cinnabar-soft); }
 .qx-home-tile[data-tone='neutral'] .qx-home-tile-icon { color: var(--qx-ink-2); background: var(--qx-paper); }
 .qx-home-tile[data-size='feature'] .qx-home-tile-icon {
-  position: absolute; right: 30px; bottom: 28px; width: 72px; height: 72px;
-  color: var(--qx-emerald); background: color-mix(in srgb, var(--qx-paper) 8%, transparent);
+  position: absolute; right: 38px; top: 50%; width: 96px; height: 96px; transform: translateY(-50%);
+  color: var(--qx-emerald); background: none;
 }
+.qx-home-tile[data-size='feature'] .qx-home-tile-icon svg { width: 84px; height: 84px; stroke-width: 1.3; }
 .qx-home-tile[data-size='slim'] .qx-home-tile-head { position: static; }
 .qx-home-tile[data-size='slim'] .qx-home-tile-icon {
-  position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+  position: absolute; left: 22px; top: 50%; transform: translateY(-50%);
 }
 .qx-home-tile[data-size='slim'] .qx-home-tile-badge {
-  position: absolute; right: 16px; top: 12px;
+  position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
 }
-.qx-home-tile-icon svg { width: 26px; }
+.qx-home-tile-icon svg { width: 30px; height: 30px; }
 .qx-home-tile-badge {
-  display: inline-flex; align-items: center; min-height: 36px; padding: 0 11px; border-radius: 999px;
-  color: var(--qx-ink-2); background: var(--qx-paper); font-size: 14px; font-weight: 700;
+  display: inline-flex; align-items: center; min-height: 38px; padding: 0 13px; border-radius: 999px;
+  color: var(--qx-ink-2); background: var(--qx-paper); font-size: 15px; font-weight: 700;
 }
 .qx-home-tile[data-size='feature'] .qx-home-tile-badge {
-  margin-right: 94px; color: var(--qx-emerald); background: color-mix(in srgb, var(--qx-paper) 8%, transparent);
+  min-height: 24px; margin-right: 110px; padding: 0; color: var(--qx-emerald); background: none; font-size: 17px;
 }
-.qx-home-tile > strong { margin-top: 10px; font-family: var(--qx-serif); font-size: 25px; }
-.qx-home-tile[data-size='feature'] > strong { margin-top: 0; font-size: 34px; }
-.qx-home-tile[data-size='slim'] > strong { margin-top: 0; font-size: 21px; }
+/* 眉题颜色跟真实设备态走（data-panel-state 即 device.kind / loading）：失败信号不能是绿色。 */
+.qx-home-tile[data-panel-state='offline'] .qx-home-tile-badge,
+.qx-home-tile[data-panel-state='unknown'] .qx-home-tile-badge { color: var(--qx-on-deep-warn); }
+.qx-home-tile[data-panel-state='error'] .qx-home-tile-badge { color: var(--qx-on-deep-bad); }
+.qx-home-tile[data-panel-state='loading'] .qx-home-tile-badge { color: color-mix(in srgb, var(--qx-paper) 72%, transparent); }
+.qx-home-tile > strong { margin-top: 14px; font-family: var(--qx-serif); font-size: 27px; font-weight: 900; line-height: 1.25; letter-spacing: 1px; }
+.qx-home-tile[data-size='feature'] > strong { margin-top: 6px; font-size: 36px; font-weight: 900; line-height: 1.2; }
+.qx-home-tile[data-size='slim'] > strong { margin-top: 0; font-size: 23px; }
 .qx-home-tile-desc,
 .qx-home-tile-status {
-  display: block; margin-top: 5px; overflow: hidden; color: var(--qx-ink-3);
-  font-size: 16px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap;
+  display: block; margin-top: 7px; overflow: hidden; color: var(--qx-ink-3);
+  font-size: 17px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap;
 }
 .qx-home-tile[data-size='feature'] .qx-home-tile-desc,
 .qx-home-tile[data-size='feature'] .qx-home-tile-status {
-  max-width: 76%; color: color-mix(in srgb, var(--qx-paper) 72%, transparent); font-size: 18px;
+  max-width: 76%; color: color-mix(in srgb, var(--qx-paper) 72%, transparent); font-size: 19px;
 }
 .qx-home-tile-status { margin-top: 3px; font-size: 14px; }
 .qx-home-tile-foot {
   display: flex; align-items: center; gap: 6px; margin-top: auto; padding-top: 8px;
-  color: var(--qx-teal-d); font-size: 16px; font-weight: 700;
+  color: var(--qx-teal-d); font-size: 17px; font-weight: 700;
 }
 .qx-home-tile[data-size='feature'] .qx-home-tile-foot { color: var(--qx-emerald); }
 .qx-home-tile-foot svg { width: 17px; }
 
+/* 底座可信区：原稿居中、114px 高，与服务区之间只留这一条分界线（导航不再画第二道）。 */
 .qx-home-truth {
-  flex: none; display: flex; align-items: center; gap: 12px; min-height: 64px;
+  flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 114px;
   padding: 8px var(--qx-gutter); border-top: 1px solid var(--qx-line);
-  color: var(--qx-ink-3); background: var(--qx-paper); font-size: 15px;
+  color: var(--qx-ink-3); background: var(--qx-paper); font-size: 15px; text-align: center;
 }
 .qx-home-truth svg { flex: none; width: 22px; color: var(--qx-teal-d); }
 .qx-home-truth > div { min-width: 0; }
 .qx-home-truth p { margin: 0; }
 .qx-home-truth strong { color: var(--qx-ink); }
-.qx-home-legal { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 2px !important; }
+.qx-home-legal { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 5px; margin-top: 2px !important; }
 .qx-home-legal a {
   display: inline-flex; align-items: center; min-height: 48px; color: var(--qx-ink-3);
   text-decoration: underline; text-underline-offset: 3px;
 }
+.qx-home-host .qx-navbar { height: 108px; border-top: 0; box-shadow: none; }
 .qx-home-host .qx-navbar svg { width: 27px; }
 .qx-home-host .qx-nav-item span {
   max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-@media (max-width: 760px) {
-  .qx-home-host, .qx-home-host .qx-stage { min-height: 100dvh; }
-  .qx-home-host .qx-topbar { height: 68px; padding: 0 16px; gap: 8px; }
-  .qx-home-host .qx-topbar-brand { font-size: 18px; }
-  .qx-home-host .qx-topbar-mark { width: 38px; height: 38px; font-size: 20px; }
-  .qx-home-host .qx-topbar-sub { display: none; }
-  .qx-home-host .qx-pill { min-height: 48px; padding: 0 10px; font-size: 14px; }
-  .qx-home-host .qx-pagehead { margin: 12px 16px 0; gap: 4px; }
-  .qx-home-host .qx-pagehead h1 { width: 100%; font-size: 27px; }
-  .qx-home-host .qx-pagehead p { min-width: 0; font-size: 16px; }
-  .qx-home { overflow-y: auto; }
-  .qx-home-hero, .qx-home-board { padding-left: 16px; padding-right: 16px; }
-  .qx-home-hero { margin-bottom: 18px; }
-  .qx-home-board { flex: none; min-height: auto; }
-  .qx-home-assistant h2 { font-size: 23px; }
-  .qx-home-assistant span:last-child { font-size: 14px; }
-  .qx-home-clock { display: none; }
-  .qx-home-avatar { width: 58px; height: 58px; font-size: 28px; }
-  .qx-home-voice { min-height: 64px; padding: 0 14px; font-size: 16px; }
-  .qx-home-voice small { display: none; }
-  .qx-home-quick { flex-wrap: wrap; padding: 8px 0; }
-  .qx-home-quick > span { width: 100%; }
-  .qx-home-quick button { min-width: 0; flex: 1 1 calc(50% - 5px); }
-  .qx-home-empty-context, .qx-home .continue { grid-template-columns: 1fr; }
-  .qx-home .continue .btn { width: 100%; }
-  .qx-home-section-head { align-items: flex-start; padding: 10px 0; }
-  .qx-home-section-head div { align-items: flex-start; flex-direction: column; gap: 2px; }
-  .qx-home-section-head h2 { font-size: 25px; }
-  .qx-home-section-head > button { max-width: 142px; text-align: right; }
-  .qx-home-tiles { flex: none; grid-template-columns: 1fr; grid-template-rows: none; gap: 10px; }
-  .qx-home-tile, .qx-home-tile[data-size='feature'], .qx-home-tile[data-action='policy-hub'] { grid-column: auto; min-height: 148px; }
-  .qx-home-tile[data-size='slim'] { min-height: 104px; }
-  .qx-home-tile-desc, .qx-home-tile-status { white-space: normal; }
-  .qx-home-truth { padding: 12px 16px; align-items: flex-start; font-size: 13px; }
-  .qx-home-host .qx-navbar { height: 84px; }
-  .qx-home-host .qx-nav-item { min-height: 48px; font-size: 15px; }
-}
+/* 入场只播一次、不表达办理或设备结果；结束后重挂载的服务磁贴保持静止。 */
+@keyframes qx-home-rise { from { opacity: 0; transform: translateY(14px); } } @keyframes qx-home-settle { from { opacity: 0; transform: scale(.965); } } @keyframes qx-home-sheen { to { transform: translateX(420%) skewX(-16deg); } }
+.qx-home:not([data-qx-intro='done']) .qx-home-hero > *, .qx-home:not([data-qx-intro='done']) .qx-home-section-head { animation: qx-home-rise .6s var(--qx-home-ease) var(--qx-home-delay, 0s) backwards; }
+.qx-home-section-head { --qx-home-delay: .28s; }
+.qx-home-hero > :nth-child(n+2) { --qx-home-delay: .08s; } .qx-home-hero > :nth-child(n+3) { --qx-home-delay: .16s; } .qx-home-hero > :nth-child(n+5) { --qx-home-delay: .24s; }
+.qx-home:not([data-qx-intro='done']) .qx-home-tile { animation: qx-home-settle .56s var(--qx-home-ease) var(--qx-home-delay, .34s) backwards; }
+.qx-home-tile:nth-child(n+2) { --qx-home-delay: .4s; } .qx-home-tile:nth-child(n+4) { --qx-home-delay: .48s; } .qx-home-tile:nth-child(n+6) { --qx-home-delay: .56s; } .qx-home-tile:nth-child(n+7) { --qx-home-delay: .62s; }
+.qx-home:not([data-qx-intro='done']) .qx-home-voice::after { content: ''; position: absolute; z-index: 0; inset: 0 auto 0 0; width: 30%; background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--qx-paper) 60%, transparent), transparent); transform: translateX(-120%) skewX(-16deg); pointer-events: none; animation: qx-home-sheen 1.1s ease-in-out .8s backwards; }
+.qx-home-tile:not(:disabled):focus-visible { transform: translateY(-3px); box-shadow: 0 0 0 6px color-mix(in srgb, var(--qx-teal) 22%, transparent), 0 14px 30px color-mix(in srgb, var(--qx-ink) 12%, transparent); } .qx-home-host .qx-home-hero button:focus-visible { outline-color: var(--qx-paper); }
+@media (hover: hover) and (pointer: fine) { .qx-home-tile:not(:disabled):hover:not(:active), .qx-home-voice:hover:not(:active), .qx-home-quick button:hover:not(:active), .qx-home-identity:hover:not(:active) { transform: translateY(-2px); } .qx-home-tile:not(:disabled, [data-size='feature']):hover { border-color: var(--qx-teal); } }
 
 @media (prefers-reduced-motion: reduce) {
   .qx-home *, .qx-home *::before, .qx-home *::after { animation: none !important; transition: none !important; }
+  .qx-home-tile, .qx-home-voice, .qx-home-quick button, .qx-home-identity { transform: none !important; } /* 按压 / 悬停 / 焦点位移一并静止，焦点仍靠描边 */
 }

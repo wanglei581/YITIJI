@@ -14,7 +14,7 @@
  *   3. 退款消警必须读 Order.payStatus；禁止为了让红条消失去写 printOutcome。
  */
 
-export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed'] as const
+export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable'] as const
 export type DerivedAlertType = (typeof ALERT_TYPES)[number]
 
 export const ALERT_ACTIONS = ['acknowledge', 'silence', 'close', 'reopen'] as const
@@ -98,6 +98,24 @@ export function printerIssueEpisodeToken(printerStatus: string, lastHealthyAt: D
 /** 失败任务是一次性事件，episode 就是任务 id。新失败是新任务、新 subjectKey。 */
 export function printFailedEpisodeToken(taskId: string): string {
   return taskId
+}
+
+/**
+ * 已支付但文件不可用期间保持稳定；文件状态、删除时间、到期时间或记录更新时间变化时换代。
+ * 缺失关联记录使用任务更新时间作为观测点，避免把历史兼容任务的 fileId=null 误当成同一故障。
+ */
+export function paidPendingFileUnavailableEpisodeToken(args: {
+  status: string | null
+  deletedAt: Date | null
+  expiresAt: Date | null
+  observedAt: Date
+}): string {
+  return [
+    args.status ?? 'missing',
+    args.deletedAt?.toISOString() ?? 'null',
+    args.expiresAt?.toISOString() ?? 'null',
+    args.observedAt.toISOString(),
+  ].join(':')
 }
 
 /**

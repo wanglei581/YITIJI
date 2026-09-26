@@ -23,8 +23,10 @@ export interface CampusRecruitmentSourceGroup {
   syncTime: string
   fairCount: number
   companyCount: number
-  openJobCount: number
-  jobListingCount: number
+  /** 岗位板块关闭时为 null，不返回岗位库计数，也不再用合计反推条数。 */
+  openJobCount: number | null
+  /** 校招岗位条数。岗位板块关闭时为 null。 */
+  jobListingCount: number | null
   fairPositionCount: number
   timeDistribution: CampusRecruitmentTimeBucket[]
 }
@@ -131,7 +133,10 @@ export function aggregateCampusRecruitmentStats(input: {
   generatedAt: Date
   truncated: boolean
   scanLimit?: number
+  /** false：不计入岗位库，岗位计数改为 null。缺省 true，既有调用保持数字。 */
+  includeJobListings?: boolean
 }): CampusRecruitmentStatsData {
+  const includeJobListings = input.includeJobListings !== false
   const groups = new Map<string, MutableGroup>()
 
   for (const fair of input.fairs) {
@@ -148,14 +153,16 @@ export function aggregateCampusRecruitmentStats(input: {
     }
   }
 
-  for (const job of input.jobs) {
-    const group = takeGroup(groups, job.sourceOrgId, job.sourceName, job.syncTime)
-    group.jobListingCount += 1
+  if (includeJobListings) {
+    for (const job of input.jobs) {
+      const group = takeGroup(groups, job.sourceOrgId, job.sourceName, job.syncTime)
+      group.jobListingCount += 1
+    }
   }
 
   const list: CampusRecruitmentSourceGroup[] = [...groups.values()]
     .map((group) => {
-      const jobListingCount = group.jobListingCount
+      const jobListingCount = includeJobListings ? group.jobListingCount : null
       const fairPositionCount = group.fairPositionCount
       return {
         sourceOrgId: group.sourceOrgId,
@@ -163,7 +170,7 @@ export function aggregateCampusRecruitmentStats(input: {
         syncTime: group.syncTime.toISOString(),
         fairCount: group.fairIds.size,
         companyCount: group.companyNames.size,
-        openJobCount: jobListingCount + fairPositionCount,
+        openJobCount: jobListingCount === null ? null : jobListingCount + fairPositionCount,
         jobListingCount,
         fairPositionCount,
         timeDistribution: [...group.months.entries()]

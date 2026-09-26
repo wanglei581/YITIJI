@@ -17,6 +17,7 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
+import { resumeExportStagingExpiresAt } from '../benefit-redemption/resume-export-gate.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AiService, type AiResultRequester } from './ai.service'
 import type { OptimizeResumeOutput, ParseResumeOutput } from './interfaces/ai-provider.interface'
@@ -100,6 +101,9 @@ export class ResumeReportExportController {
       generatedAt,
     })
     const sourceFileId = await this.resolveSourceFileId(parse, row.endUserId)
+    const stage = decision.mode === 'charged' && !decision.alreadyPaid && row.endUserId
+      ? { endUserId: row.endUserId, expiresAt: resumeExportStagingExpiresAt() }
+      : undefined
     const uploaded = await this.files.upload({
       buffer: rendered.buffer,
       filename: this.filename(kind, optimize, generatedAt),
@@ -111,21 +115,24 @@ export class ResumeReportExportController {
       assetCategory: 'derived',
       sourceFileId,
       createdBy: 'ai_resume_diagnosis_export',
+      ...(stage ? { paidExportStaging: stage } : {}),
     })
 
-    await this.ai.commitExportRedemption(decision)
+    if (stage) await this.ai.commitExportRedemption(decision, [uploaded.fileId])
+    else await this.ai.commitExportRedemption(decision)
+    const access = stage ? await this.files.signActiveDownload(uploaded.fileId) : uploaded
 
     await this.audit.write({
       actorId: null,
       actorRole: row.endUserId ? 'enduser' : 'kiosk',
       action: 'resume.diagnosis_exported',
       targetType: 'file',
-      targetId: uploaded.fileId,
+      targetId: access.fileId,
       payload: {
         taskId,
         kind,
         pageCount: rendered.pageCount,
-        sizeBytes: uploaded.sizeBytes,
+        sizeBytes: access.sizeBytes,
         savedToDocuments: Boolean(row.endUserId),
       },
       ipAddress: null,
@@ -134,14 +141,14 @@ export class ResumeReportExportController {
     })
 
     return {
-      fileId: uploaded.fileId,
-      filename: uploaded.filename,
+      fileId: access.fileId,
+      filename: access.filename,
       mimeType: 'application/pdf' as const,
-      sizeBytes: uploaded.sizeBytes,
+      sizeBytes: access.sizeBytes,
       pageCount: rendered.pageCount,
-      signedUrl: uploaded.signedUrl,
-      expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      signedUrl: access.signedUrl,
+      expiresAt: access.signedUrlExpiresAt,
+      printFileUrl: signFileUrl(access.fileId).url,
       savedToDocuments: Boolean(row.endUserId),
       aiGenerated: true as const,
     }

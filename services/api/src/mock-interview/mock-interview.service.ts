@@ -461,6 +461,7 @@ export class MockInterviewService {
         industry: session.industry,
         interviewerLabel: INTERVIEWER_LABEL[session.interviewerType] ?? session.interviewerType,
         date: (session.endedAt ?? session.createdAt).toISOString().slice(0, 10),
+        contentId: sessionId,
       },
       stored.report,
       { excerpts: buildQaExcerpts(turns), includeAnswers: stored.includeAnswersInPrint },

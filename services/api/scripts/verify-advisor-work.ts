@@ -427,7 +427,7 @@ async function main() {
         { kind: 'compare_report', items: [{ requirement: '熟悉夹具', verdict: 'covered', evidence: '主导工装改造' }], extras: [], summary: '比对结果' },
       ]
       for (const payload of payloads) {
-        const out = await pdf.render({ date: '2026-08-16', providerLabel: 'llm:fake:v1' }, payload)
+        const out = await pdf.render({ date: '2026-08-16', providerLabel: 'llm:fake:v1', contentId: `verify-advisor-${payload.kind}` }, payload)
         assert(out.buffer.subarray(0, 4).toString() === '%PDF' && out.pageCount >= 1,
           `G3 ${payload.kind} 渲染出真实 PDF`)
       }

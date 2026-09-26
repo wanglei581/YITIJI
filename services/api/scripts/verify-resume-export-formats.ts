@@ -16,13 +16,18 @@
  *      pdf 直接签发本文件;docx/txt/md 签发另外渲染的同内容 PDF 副本(Wave 6),fileId 不同于主文件。
  *   8. Wave 2 layout 契约:shared 定义 ResumeLayoutSettings;API DTO 定义 ResumeLayoutDto;
  *      ResumeGenerateExportDto 接收 layout 可选字段,但导出响应不回显 layout。
+ *   9. 收费且只剩 1 次时,两个不同内容哈希会同时通过预检。核销提交前,主文件和
+ *      docx/txt/md 的打印副本都不得出现在会员列表、读取或访问 URL 中。
+ *      失败车道保持不可见,短寿命孤儿由 cleanupExpired 清理;对象删除失败走既有账本重试。
+ *      核销已提交后草稿落库失败不得删掉已付费文件,调用方仍拿到原来的访问结果。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:resume-export-formats
+ * 隔离库:DOTENV_CONFIG_PATH=/dev/null DATABASE_URL=file:/tmp/... FILE_STORAGE_DIR=/tmp/...
  */
 import 'dotenv/config'
+import { createHash, randomUUID } from 'crypto'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { randomUUID } from 'crypto'
 import { Logger } from '@nestjs/common'
 
 if (!process.env['FILE_SIGNING_SECRET'] || process.env['FILE_SIGNING_SECRET'].length < 32) {
@@ -49,7 +54,16 @@ import { ResumeTextService } from '../src/ai/resume/resume-text.service'
 import type { GeneratedResume } from '../src/ai/interfaces/ai-provider.interface'
 import type { ResumeExportFormat } from '../src/ai/dto/resume-generate.dto'
 import { BenefitRedemptionService } from '../src/benefit-redemption/benefit-redemption.service'
-import { ResumeExportGateService } from '../src/benefit-redemption/resume-export-gate.service'
+import {
+  buildResumeExportServiceRefId,
+  hashResumeExportContent,
+  ResumeExportGateService,
+  type ResumeExportGateDecision,
+} from '../src/benefit-redemption/resume-export-gate.service'
+import { MemberAssetsService } from '../src/member-assets/member-assets.service'
+import { ResumeReportExportController } from '../src/ai/resume-report-export.controller'
+import { DiagnosisReportPdfService } from '../src/ai/resume/diagnosis-report-pdf.service'
+import type { ResumeReport } from '../src/ai/interfaces/ai-provider.interface'
 import { RESUME_EXPORT_SERVICE_KEY } from '../src/payment/price-config.seed'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
@@ -124,7 +138,68 @@ const FORMAT_EXPECT: Record<ResumeExportFormat, { mime: string; ext: string }> =
   md: { mime: 'text/markdown', ext: 'md' },
 }
 
+const BENEFIT_LOSE_CODES = new Set(['BENEFIT_USED_UP', 'BENEFIT_NOT_ACTIVE'])
+const STAGING_MAX_MS = 15 * 60 * 1000
+
+function installLibsqlBusyTimeout(): void {
+  // SQLite 默认 busy_timeout=0。生产核销在 PostgreSQL 上会等锁然后撞上额度 CAS。
+  // 这里只让本次 verify 的 libsql 连接等待,避免竞态被 SQLITE_BUSY 截断。不改服务代码。
+  const clientEntry = require.resolve('@libsql/client', { paths: [join(__dirname, '..')] })
+  const libsqlPath = require.resolve('libsql', { paths: [join(clientEntry, '..', '..')] })
+  const original = require(libsqlPath) as { __resumeExportBusyPatched?: boolean; prototype: object }
+  if (original.__resumeExportBusyPatched) return
+  function WrappedDatabase(this: unknown, filename: string, options: unknown) {
+    const db = new (original as unknown as new (filename: string, options: unknown) => {
+      pragma: (sql: string) => unknown
+    })(filename, options)
+    db.pragma('busy_timeout = 5000')
+    db.pragma('journal_mode = WAL')
+    return db
+  }
+  WrappedDatabase.prototype = original.prototype
+  Object.assign(WrappedDatabase, original)
+  ;(WrappedDatabase as { __resumeExportBusyPatched?: boolean }).__resumeExportBusyPatched = true
+  require.cache[libsqlPath]!.exports = WrappedDatabase
+}
+
+function httpErrorCode(err: unknown): string | undefined {
+  const candidate = err as { getResponse?: () => unknown }
+  if (typeof candidate?.getResponse !== 'function') return undefined
+  const response = candidate.getResponse() as { error?: { code?: string } } | string
+  if (response && typeof response === 'object') return response.error?.code
+  return undefined
+}
+
+function printFileIdOf(url: string | undefined): string | null {
+  const match = url?.match(/\/files\/([^/?]+)\/content/)
+  return match?.[1] ?? null
+}
+
+function miniReport(marker: string): ResumeReport {
+  return {
+    sections: [
+      { key: 'basic', label: '基础信息完整度', score: 8, maxScore: 10 },
+      { key: 'objective', label: '求职目标清晰度', score: 7, maxScore: 10 },
+      { key: 'experience', label: '经历表达清晰度', score: 4, maxScore: 10 },
+      { key: 'quantification', label: '成果量化程度', score: 3, maxScore: 10 },
+      { key: 'keyword', label: '岗位关键词覆盖', score: 6, maxScore: 10 },
+      { key: 'readability', label: '版式与可读性', score: 8, maxScore: 10 },
+    ],
+    suggestions: [`核对本人经历 ${marker}`],
+    issues: [{
+      id: 'I1',
+      dim: 'experience',
+      title: `经历结果 ${marker}`,
+      evidence: [{ blockKey: 'experience', lineIndex: 0, quote: '负责门店日常运营' }],
+      impact: '读的人看不到具体做成了什么。',
+      fixIt: '补充本人可以核实的结果。',
+    }],
+    contentBlocks: [{ key: 'experience', label: '工作经历', lines: ['负责门店日常运营'] }],
+  }
+}
+
 async function main(): Promise<void> {
+  installLibsqlBusyTimeout()
   console.log('\n=== Wave 1 Task 7 简历导出多格式验证 ===')
 
   Logger.overrideLogger({ log: () => {}, error: () => {}, warn: () => {}, debug: () => {}, verbose: () => {}, fatal: () => {} })
@@ -244,7 +319,7 @@ async function main(): Promise<void> {
       if (!svcSrc.includes('RESUME_EXPORT_UNAVAILABLE')) fail('6a. 未断言 unavailable → RESUME_EXPORT_UNAVAILABLE')
       if (!svcSrc.includes('commitExportRedemption')) fail('6a. 缺少 commitExportRedemption（成功后才落账）')
       const commitIdx = svcSrc.indexOf('await this.commitExportRedemption(decision)')
-      const renderIdx = svcSrc.indexOf('this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })')
+      const renderIdx = svcSrc.indexOf('templatePreset: template?.resumeLayoutPreset')
       if (commitIdx < 0 || renderIdx < 0 || commitIdx < renderIdx) {
         fail('6a. 核销必须在文件成功生成之后，不得提前扣次')
       }
@@ -266,7 +341,7 @@ async function main(): Promise<void> {
     const renderedTexts: Record<string, string> = {}
 
     for (const format of formats) {
-      const exported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, format)
+      const exported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, format, undefined, undefined, false, { taskId: `verify-export-${format}` })
       createdFileIds.push(exported.fileId)
 
       if (!exported.fileId) fail(`2. [${format}] 未返回 fileId`)
@@ -344,7 +419,7 @@ async function main(): Promise<void> {
 
     // ── 4+5 docx 专项:直接对渲染器输出的段落文本做同等断言(不依赖字节解压) ──
     {
-      const docxRendered = await resumeDocx.render(FIXTURE)
+      const docxRendered = await resumeDocx.render(FIXTURE, { contentId: 'verify-export-docx' })
       // docx buffer 是 zip 容器,不能直接字符串扫描内容;但可断言其大小与 FIXTURE 规模相关,
       // 并复用 renderTxt/renderMarkdown 对同一 FIXTURE 的纯文本输出做诱饵串/合规词扫描——
       // 三种渲染器共享同一份 GeneratedResume 字段来源与拼装逻辑(见各自源码顶部注释:
@@ -382,7 +457,7 @@ async function main(): Promise<void> {
       if (freePricing.mode !== 'free' || freePricing.label !== '当前免费，不扣权益' || freePricing.benefit !== null) {
         fail(`6c. free pricing 不符: ${JSON.stringify(freePricing)}`)
       }
-      const freeExported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, 'txt')
+      const freeExported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, 'txt', undefined, undefined, false, { taskId: 'verify-export-free-txt' })
       createdFileIds.push(freeExported.fileId)
       pass('6c. free：GET pricing 写「当前免费，不扣权益」，导出放行且不扣权益')
 
@@ -475,6 +550,606 @@ async function main(): Promise<void> {
         fail(`6f. 同内容再次导出不应重复扣，剩余 ${afterSecond?.quantityRemaining}`)
       }
       pass('6f. 同内容不重复扣（首次 2→1，再次仍为 1）')
+    }
+
+    // ── 6g-6k. 收费竞态：未核销文件在窗口内和失败后都不可见；已付费文件可恢复 ──
+    {
+      const assets = new MemberAssetsService(prisma)
+      const benefitLose = (err: unknown) => BENEFIT_LOSE_CODES.has(httpErrorCode(err) ?? '')
+
+      async function listedIds(endUserId: string): Promise<Set<string>> {
+        const page = await assets.listDocuments(endUserId, { cursor: null, pageSize: 50 })
+        return new Set(page.items.map((item) => item.id))
+      }
+
+      async function expectHidden(fileId: string, endUserId: string, label: string): Promise<void> {
+        const reads = [
+          () => files.readContent(fileId),
+          () => files.readContentForEndUser(fileId, endUserId),
+          () => files.getAccessUrl(fileId, { kind: 'member', endUserId }, 'inline'),
+        ]
+        for (const read of reads) {
+          try {
+            await read()
+            fail(`${label} 仍可读取或签发访问 URL ${fileId}`)
+          } catch (err) {
+            if (httpErrorCode(err) !== 'FILE_NOT_FOUND') {
+              fail(`${label} 读取 ${fileId} 应是 FILE_NOT_FOUND，实际 ${httpErrorCode(err) ?? (err as Error).message}`)
+            }
+          }
+        }
+        const inExport = await prisma.fileObject.findFirst({ where: { id: fileId, endUserId } })
+        if (inExport) fail(`${label} 出现在会员数据导出的 endUserId 查询里 ${fileId}`)
+        const visible = await listedIds(endUserId)
+        if (visible.has(fileId)) fail(`${label} 出现在我的文档 ${fileId}`)
+      }
+
+      function assertStagingRow(row: { id: string; status: string; endUserId: string | null; ownerId: string | null; expiresAt: Date | null; retentionLockedReason: string | null }, endUserId: string, label: string): void {
+        if (row.status !== 'uploading' || row.endUserId !== null || row.ownerId !== endUserId) {
+          fail(`${label} 未核销文件已暴露 ${row.id} status=${row.status} endUserId=${row.endUserId ?? 'null'}`)
+        }
+        if (row.retentionLockedReason !== 'resume_export_pending') {
+          fail(`${label} 预写文件没有短期锁 ${row.id} reason=${row.retentionLockedReason}`)
+        }
+        const ttl = row.expiresAt ? row.expiresAt.getTime() - Date.now() : Number.POSITIVE_INFINITY
+        if (!row.expiresAt || ttl <= 0 || ttl > STAGING_MAX_MS) {
+          fail(`${label} 预写文件不是短寿命孤儿 ${row.id} ttlMs=${ttl}`)
+        }
+      }
+
+      async function withCommitBarrier<T>(
+        expected: number,
+        probe: () => Promise<void>,
+        run: () => Promise<T>,
+      ): Promise<{ arrived: number; value: T }> {
+        let arrived = 0
+        let probeError: Error | null = null
+        let release!: () => void
+        let failGate!: (error: Error) => void
+        const gate = new Promise<void>((resolve, reject) => {
+          release = resolve
+          failGate = reject
+        })
+        const timer = setTimeout(() => failGate(new Error('RACE_BARRIER_TIMEOUT')), 30_000)
+        const original = exportGate.commitExportRedemption.bind(exportGate)
+        exportGate.commitExportRedemption = async (decision: ResumeExportGateDecision, stagedFileIds?: readonly string[]) => {
+          arrived += 1
+          if (arrived >= expected) {
+            try {
+              await probe()
+              release()
+            } catch (error) {
+              probeError = error as Error
+              failGate(error as Error)
+              throw error
+            }
+          }
+          await gate
+          return original(decision, stagedFileIds)
+        }
+        try {
+          const value = await run()
+          if (probeError) throw probeError
+          return { arrived, value }
+        } finally {
+          clearTimeout(timer)
+          exportGate.commitExportRedemption = original
+          release()
+        }
+      }
+
+      await setExportPrice(199, true)
+      const raceUser = await prisma.endUser.create({
+        data: {
+          phoneHash: `verify-resume-export-race-${randomUUID()}`,
+          phoneEnc: `verify-phone-${randomUUID()}`,
+          nickname: '导出竞态会员',
+        },
+      })
+      createdEndUserIds.push(raceUser.id)
+      const raceGrant = await prisma.benefitGrant.create({
+        data: {
+          endUserId: raceUser.id,
+          benefitType: 'free_quota',
+          title: '导出竞态仅 1 次',
+          quantityTotal: 1,
+          quantityRemaining: 1,
+          status: 'active',
+          sourceType: 'platform',
+        },
+      })
+      createdGrantIds.push(raceGrant.id)
+      const lanePdfResume: GeneratedResume = { ...FIXTURE, summary: `${FIXTURE.summary} 并发车道甲` }
+      const laneDocxResume: GeneratedResume = { ...FIXTURE, summary: `${FIXTURE.summary} 并发车道乙` }
+      const pdfHash = hashResumeExportContent(lanePdfResume)
+      const docxHash = hashResumeExportContent(laneDocxResume)
+      if (pdfHash === docxHash) fail('6g. 两条车道的 contentHash 必须不同')
+      const pdfRef = buildResumeExportServiceRefId(raceUser.id, 'race-task-pdf', pdfHash)
+      const docxRef = buildResumeExportServiceRefId(raceUser.id, 'race-task-docx', docxHash)
+      if (pdfRef === docxRef) fail('6g. 两条车道的 serviceRefId 必须不同')
+
+      const race = await withCommitBarrier(2, async () => {
+        const rows = await prisma.fileObject.findMany({
+          where: { ownerId: raceUser.id, createdBy: 'ai_resume_generate' },
+        })
+        if (rows.length !== 3) fail(`6g. 核销前应已落下 pdf + docx + 打印副本共 3 个，实际 ${rows.length}`)
+        for (const row of rows) {
+          assertStagingRow(row, raceUser.id, '6g. 核销窗口')
+          await expectHidden(row.id, raceUser.id, '6g. 核销窗口')
+        }
+      }, () => Promise.allSettled([
+        ai.exportGeneratedResume(lanePdfResume, raceUser.id, null, 'pdf', undefined, undefined, false, {
+          taskId: 'race-task-pdf',
+          benefitGrantId: raceGrant.id,
+        }),
+        ai.exportGeneratedResume(laneDocxResume, raceUser.id, null, 'docx', undefined, undefined, false, {
+          taskId: 'race-task-docx',
+          benefitGrantId: raceGrant.id,
+        }),
+      ]))
+
+      if (race.arrived !== 2) fail(`6g. 两次导出没有都走到核销（arrived=${race.arrived}）`)
+      const fulfilled = race.value.filter((item) => item.status === 'fulfilled')
+      const rejected = race.value.filter((item) => item.status === 'rejected')
+      if (fulfilled.length !== 1 || rejected.length !== 1) {
+        const detail = rejected.map((item) => item.status === 'rejected' ? `${httpErrorCode(item.reason) ?? (item.reason as Error).message}` : '').join(' | ')
+        fail(`6g. 应恰好一次成功一次失败，实际成功 ${fulfilled.length} 失败 ${rejected.length} ${detail}`)
+      }
+      const winner = fulfilled[0].status === 'fulfilled' ? fulfilled[0].value : null
+      const loserError = rejected[0].status === 'rejected' ? rejected[0].reason : null
+      if (!winner || !loserError) fail('6g. 竞态结果无法归类')
+      if (!benefitLose(loserError)) {
+        fail(`6g. 失败车道应是权益拒绝，实际 ${httpErrorCode(loserError) ?? (loserError as Error).message}`)
+      }
+      if (!winner.signedUrl || !winner.printFileUrl) fail('6g. 成功导出没有可用的 signedUrl / printFileUrl')
+      const winnerIds = [...new Set([winner.fileId, printFileIdOf(winner.printFileUrl)].filter((id): id is string => Boolean(id)))]
+      if (winnerIds.length < 1) fail('6g. 成功导出没有 fileId')
+      const raceRows = await prisma.fileObject.findMany({
+        where: { ownerId: raceUser.id, createdBy: 'ai_resume_generate' },
+      })
+      for (const row of raceRows) createdFileIds.push(row.id)
+      if (raceRows.length !== 3) fail(`6g. 竞态后仍应是 3 个文件，实际 ${raceRows.length}`)
+      const loserRows = raceRows.filter((row) => !winnerIds.includes(row.id))
+      if (loserRows.length < 1) fail('6g. 失败车道没有留下文件')
+      const visible = await listedIds(raceUser.id)
+      for (const fileId of winnerIds) {
+        const row = raceRows.find((item) => item.id === fileId)
+        if (!row || row.status !== 'active' || row.endUserId !== raceUser.id || row.deletedAt) {
+          fail(`6g. 成功文件未激活 ${fileId} status=${row?.status}`)
+        }
+        if (!row.expiresAt || row.expiresAt.getTime() - Date.now() < 24 * 60 * 60 * 1000) {
+          fail(`6g. 成功的简历文件没有恢复会员保存期限 ${fileId}`)
+        }
+        if (!visible.has(fileId)) fail(`6g. 成功文件不在我的文档 ${fileId}`)
+        const bytes = await files.readContentForEndUser(fileId, raceUser.id)
+        if (bytes.buffer.length < 1) fail(`6g. 成功文件读不到内容 ${fileId}`)
+        const access = await files.getAccessUrl(fileId, { kind: 'member', endUserId: raceUser.id }, 'inline')
+        if (!access.response.url) fail(`6g. 成功文件没有访问 URL ${fileId}`)
+      }
+      for (const row of loserRows) {
+        assertStagingRow(row, raceUser.id, '6g. 失败车道')
+        await expectHidden(row.id, raceUser.id, '6g. 失败车道')
+        try {
+          await files.completeUpload(row.id, { kind: 'member', endUserId: raceUser.id })
+          fail(`6g. 直传确认把未付款文件激活了 ${row.id}`)
+        } catch (err) {
+          if (httpErrorCode(err) !== 'FILE_NOT_FOUND') {
+            fail(`6g. 直传确认应假装文件不存在，实际 ${httpErrorCode(err) ?? (err as Error).message}`)
+          }
+        }
+        const afterComplete = await prisma.fileObject.findUnique({ where: { id: row.id } })
+        if (afterComplete?.status !== 'uploading') fail(`6g. 直传确认改变了未付款文件状态 ${row.id}`)
+      }
+      const redemptions = await prisma.redemptionRecord.count({
+        where: { endUserId: raceUser.id, serviceType: 'resume_export' },
+      })
+      const grantAfter = await prisma.benefitGrant.findUnique({ where: { id: raceGrant.id } })
+      if (redemptions !== 1 || grantAfter?.quantityRemaining !== 0 || grantAfter.status !== 'used_up') {
+        fail(`6g. 应只核销 1 次，redemptions=${redemptions} remaining=${grantAfter?.quantityRemaining} status=${grantAfter?.status}`)
+      }
+
+      const originalDelete = storage.deleteObject.bind(storage)
+      storage.deleteObject = async () => {
+        throw new Error('SyntheticDeleteFailure')
+      }
+      try {
+        await prisma.fileObject.updateMany({
+          where: { id: { in: loserRows.map((row) => row.id) } },
+          data: { expiresAt: new Date(Date.now() - 1000) },
+        })
+        await files.cleanupExpired('manual')
+      } finally {
+        storage.deleteObject = originalDelete
+      }
+      for (const row of loserRows) {
+        const after = await prisma.fileObject.findUnique({ where: { id: row.id } })
+        if (!after || after.status !== 'quarantined' || after.deletedAt) {
+          fail(`6g. 对象删除失败后应停在隔离态 ${row.id} status=${after?.status} deletedAt=${after?.deletedAt?.toISOString() ?? 'null'}`)
+        }
+        if (!after.storageDeletePendingAt || after.storageDeletedAt || (after.storageDeleteAttempts ?? 0) < 1) {
+          fail(`6g. 物理删除失败必须记入可重试账本 ${row.id}`)
+        }
+        if (after.storageDeleteError !== 'Error') fail(`6g. 账本应只记错误类型，实际 ${after.storageDeleteError}`)
+        const head = await storage.headObject(row.storageKey, row.bucket)
+        if (!head || head.sizeBytes < 1) fail(`6g. 对账前对象不应被当成已删除 ${row.id}`)
+        await expectHidden(row.id, raceUser.id, '6g. 删除失败后')
+      }
+      const reconciled = await files.reconcileStorageDeletions('manual')
+      if (reconciled.reconciledCount !== loserRows.length || reconciled.stillPendingCount !== 0) {
+        fail(`6g. 对账应清掉失败文件，reconciled=${reconciled.reconciledCount} pending=${reconciled.stillPendingCount}`)
+      }
+      for (const row of loserRows) {
+        const after = await prisma.fileObject.findUnique({ where: { id: row.id } })
+        const head = await storage.headObject(row.storageKey, row.bucket)
+        if (!after?.storageDeletedAt || after.storageDeletePendingAt || after.status !== 'deleted' || head) {
+          fail(`6g. 对账后失败文件对象仍在或账本未清 ${row.id}`)
+        }
+        await expectHidden(row.id, raceUser.id, '6g. 对账后')
+      }
+      for (const fileId of winnerIds) {
+        const bytes = await files.readContentForEndUser(fileId, raceUser.id)
+        if (bytes.buffer.length < 1) fail(`6g. 对账误伤了成功文件 ${fileId}`)
+      }
+      pass('6g. 并发不同哈希：窗口和失败后都不可见，删除失败可重试，成功文件仍可读')
+
+      const reportUser = await prisma.endUser.create({
+        data: {
+          phoneHash: `verify-resume-report-race-${randomUUID()}`,
+          phoneEnc: `verify-phone-${randomUUID()}`,
+          nickname: '诊断导出竞态会员',
+        },
+      })
+      createdEndUserIds.push(reportUser.id)
+      const reportGrant = await prisma.benefitGrant.create({
+        data: {
+          endUserId: reportUser.id,
+          benefitType: 'free_quota',
+          title: '诊断导出竞态仅 1 次',
+          quantityTotal: 1,
+          quantityRemaining: 1,
+          status: 'active',
+          sourceType: 'platform',
+        },
+      })
+      createdGrantIds.push(reportGrant.id)
+      const reportA = miniReport('车道甲')
+      const reportB = miniReport('车道乙')
+      const hashA = createHash('sha256').update(JSON.stringify({ kind: 'diagnosis_report', report: reportA, modules: null })).digest('hex')
+      const hashB = createHash('sha256').update(JSON.stringify({ kind: 'diagnosis_report', report: reportB, modules: null })).digest('hex')
+      if (hashA === hashB) fail('6h. 两份诊断报告的 contentHash 必须不同')
+      const future = new Date(Date.now() + 60 * 60 * 1000)
+      const taskA = `diag-race-a-${randomUUID()}`
+      const taskB = `diag-race-b-${randomUUID()}`
+      await prisma.aiResumeResult.createMany({
+        data: [taskA, taskB].map((taskId, index) => ({
+          taskId,
+          kind: 'parse',
+          status: 'completed',
+          provider: 'mock',
+          endUserId: reportUser.id,
+          accessTokenHash: null,
+          expiresAt: future,
+          payloadJson: JSON.stringify({
+            taskId,
+            status: 'completed',
+            report: index === 0 ? reportA : reportB,
+          }),
+        })),
+      })
+      const reportController = new ResumeReportExportController(
+        ai,
+        new DiagnosisReportPdfService(),
+        files,
+        {} as never,
+        {} as never,
+        prisma,
+        audit,
+        { requireActiveConsent: async () => undefined } as never,
+      )
+      const exportReport = (taskId: string) => (reportController as unknown as {
+        exportAuthorized: (taskId: string, kind: 'diagnosis_report', requester: { endUserId: string; accessToken: null }, benefitGrantId: string) => Promise<{ fileId: string; signedUrl: string; printFileUrl: string }>
+      }).exportAuthorized(taskId, 'diagnosis_report', { endUserId: reportUser.id, accessToken: null }, reportGrant.id)
+
+      const reportRace = await withCommitBarrier(2, async () => {
+        const rows = await prisma.fileObject.findMany({
+          where: { ownerId: reportUser.id, createdBy: 'ai_resume_diagnosis_export' },
+        })
+        if (rows.length !== 2) fail(`6h. 核销前应已落下两份诊断 PDF，实际 ${rows.length}`)
+        for (const row of rows) {
+          assertStagingRow(row, reportUser.id, '6h. 核销窗口')
+          await expectHidden(row.id, reportUser.id, '6h. 核销窗口')
+        }
+      }, () => Promise.allSettled([exportReport(taskA), exportReport(taskB)]))
+
+      if (reportRace.arrived !== 2) fail(`6h. 两次诊断导出没有都走到核销（arrived=${reportRace.arrived}）`)
+      const reportOk = reportRace.value.filter((item) => item.status === 'fulfilled')
+      const reportBad = reportRace.value.filter((item) => item.status === 'rejected')
+      if (reportOk.length !== 1 || reportBad.length !== 1) {
+        fail(`6h. 诊断导出应恰好一次成功一次失败，实际成功 ${reportOk.length} 失败 ${reportBad.length}`)
+      }
+      const reportWinner = reportOk[0].status === 'fulfilled' ? reportOk[0].value : null
+      const reportLoserError = reportBad[0].status === 'rejected' ? reportBad[0].reason : null
+      if (!reportWinner?.signedUrl || !reportWinner.printFileUrl) fail('6h. 成功的诊断导出没有可用 URL')
+      if (!reportLoserError || !benefitLose(reportLoserError)) {
+        fail(`6h. 失败的诊断导出应是权益拒绝，实际 ${httpErrorCode(reportLoserError) ?? (reportLoserError as Error).message}`)
+      }
+      if (printFileIdOf(reportWinner.printFileUrl) !== reportWinner.fileId) {
+        fail('6h. 诊断报告的 printFileUrl 应指向同一份 PDF')
+      }
+      const reportRows = await prisma.fileObject.findMany({
+        where: { ownerId: reportUser.id, createdBy: 'ai_resume_diagnosis_export' },
+      })
+      for (const row of reportRows) createdFileIds.push(row.id)
+      if (reportRows.length !== 2) fail(`6h. 应落下 2 个诊断文件，实际 ${reportRows.length}`)
+      const reportLoser = reportRows.find((row) => row.id !== reportWinner.fileId)
+      const reportWinnerRow = reportRows.find((row) => row.id === reportWinner.fileId)
+      if (!reportLoser || !reportWinnerRow) fail('6h. 诊断文件无法归类')
+      assertStagingRow(reportLoser, reportUser.id, '6h. 失败诊断')
+      await expectHidden(reportLoser.id, reportUser.id, '6h. 失败诊断')
+      if (reportWinnerRow.status !== 'active' || reportWinnerRow.endUserId !== reportUser.id) {
+        fail(`6h. 成功诊断未激活 status=${reportWinnerRow.status}`)
+      }
+      const winnerTtl = reportWinnerRow.expiresAt ? reportWinnerRow.expiresAt.getTime() - Date.now() : 0
+      if (winnerTtl < 20 * 60 * 1000 || winnerTtl > 3 * 60 * 60 * 1000) {
+        fail(`6h. 成功诊断的保存期限应恢复为系统短期而不是预写窗口 ttlMs=${winnerTtl}`)
+      }
+      if (!(await listedIds(reportUser.id)).has(reportWinner.fileId)) fail('6h. 成功诊断不在我的文档')
+      const reportBytes = await files.readContentForEndUser(reportWinner.fileId, reportUser.id)
+      if (!reportBytes.buffer.subarray(0, 4).equals(Buffer.from('%PDF'))) fail('6h. 成功诊断不是 PDF')
+      const reportRedemptions = await prisma.redemptionRecord.count({
+        where: { endUserId: reportUser.id, serviceType: 'resume_export' },
+      })
+      const reportGrantAfter = await prisma.benefitGrant.findUnique({ where: { id: reportGrant.id } })
+      if (reportRedemptions !== 1 || reportGrantAfter?.quantityRemaining !== 0) {
+        fail(`6h. 诊断导出应只核销 1 次，redemptions=${reportRedemptions} remaining=${reportGrantAfter?.quantityRemaining}`)
+      }
+      await prisma.fileObject.update({
+        where: { id: reportLoser.id },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      })
+      await files.cleanupExpired('manual')
+      const reaped = await prisma.fileObject.findUnique({ where: { id: reportLoser.id } })
+      if (!reaped?.deletedAt || reaped.status !== 'deleted') fail(`6h. 过期的未付款诊断文件没有被 cleanupExpired 清掉 status=${reaped?.status}`)
+      const reapedHead = await storage.headObject(reportLoser.storageKey, reportLoser.bucket)
+      if (reapedHead) fail('6h. 清理后诊断对象仍在')
+      if (!(await listedIds(reportUser.id)).has(reportWinner.fileId)) fail('6h. 清理误伤了已付费诊断')
+      pass('6h. 诊断报告并发：未付款文件不可见，过期后由既有清理删除，成功文件仍在')
+
+      const persistUser = await prisma.endUser.create({
+        data: {
+          phoneHash: `verify-resume-export-persist-${randomUUID()}`,
+          phoneEnc: `verify-phone-${randomUUID()}`,
+          nickname: '草稿失败会员',
+        },
+      })
+      createdEndUserIds.push(persistUser.id)
+      const persistGrant = await prisma.benefitGrant.create({
+        data: {
+          endUserId: persistUser.id,
+          benefitType: 'free_quota',
+          title: '草稿失败仍保留文件',
+          quantityTotal: 1,
+          quantityRemaining: 1,
+          status: 'active',
+          sourceType: 'platform',
+        },
+      })
+      createdGrantIds.push(persistGrant.id)
+      const drafts = (ai as unknown as { drafts: { persistConfirmed: (input: unknown) => Promise<void> } }).drafts
+      const originalPersist = drafts.persistConfirmed.bind(drafts)
+      drafts.persistConfirmed = async () => {
+        throw new Error('POST_REDEEM_PERSIST_FAILED')
+      }
+      const persistResume: GeneratedResume = { ...FIXTURE, summary: `${FIXTURE.summary} 草稿失败仍可取回` }
+      let persisted: { fileId: string; signedUrl: string; printFileUrl?: string }
+      try {
+        try {
+          persisted = await ai.exportGeneratedResume(persistResume, persistUser.id, null, 'docx', undefined, undefined, false, {
+            taskId: 'persist-fail-task',
+            benefitGrantId: persistGrant.id,
+          })
+        } catch (err) {
+          fail(`6i. 核销已提交后草稿失败必须仍返回已付费文件，实际抛出 ${(err as Error).message}`)
+        }
+        if (!persisted!.signedUrl || !persisted!.printFileUrl) fail('6i. 已付费导出没有返回访问地址')
+        const persistIds = [persisted!.fileId, printFileIdOf(persisted!.printFileUrl)].filter((id): id is string => Boolean(id))
+        for (const fileId of persistIds) createdFileIds.push(fileId)
+        if (persistIds.length !== 2 || persistIds[0] === persistIds[1]) fail('6i. docx 付费导出应保留主文件和打印副本')
+        for (const fileId of persistIds) {
+          const row = await prisma.fileObject.findUnique({ where: { id: fileId } })
+          if (!row || row.status !== 'active' || row.deletedAt || row.endUserId !== persistUser.id) {
+            fail(`6i. 已付费文件被删或未激活 ${fileId} status=${row?.status} deletedAt=${row?.deletedAt?.toISOString() ?? 'null'}`)
+          }
+          if (!(await listedIds(persistUser.id)).has(fileId)) fail(`6i. 已付费文件不在我的文档 ${fileId}`)
+          const bytes = await files.readContentForEndUser(fileId, persistUser.id)
+          if (bytes.buffer.length < 1) fail(`6i. 已付费文件不可读 ${fileId}`)
+        }
+        const persistGrantAfter = await prisma.benefitGrant.findUnique({ where: { id: persistGrant.id } })
+        if (persistGrantAfter?.quantityRemaining !== 0) fail(`6i. 草稿失败不应把已扣次数退回，剩余 ${persistGrantAfter?.quantityRemaining}`)
+        const replay = await ai.exportGeneratedResume(persistResume, persistUser.id, null, 'pdf', undefined, undefined, false, {
+          taskId: 'persist-fail-task',
+          benefitGrantId: persistGrant.id,
+        })
+        createdFileIds.push(replay.fileId)
+        const printId = printFileIdOf(replay.printFileUrl)
+        if (printId) createdFileIds.push(printId)
+        const afterReplay = await prisma.benefitGrant.findUnique({ where: { id: persistGrant.id } })
+        if (afterReplay?.quantityRemaining !== 0) fail(`6i. 同内容重试不得再扣次，剩余 ${afterReplay?.quantityRemaining}`)
+        if (!replay.signedUrl) fail('6i. 同内容重试没有返回可恢复的访问地址')
+      } finally {
+        drafts.persistConfirmed = originalPersist
+      }
+      pass('6i. 核销已提交后草稿失败：已付费文件仍可访问，同内容重试不重复扣')
+
+      const crashUser = await prisma.endUser.create({
+        data: {
+          phoneHash: `verify-resume-export-crash-${randomUUID()}`,
+          phoneEnc: `verify-phone-${randomUUID()}`,
+          nickname: '崩溃孤儿会员',
+        },
+      })
+      createdEndUserIds.push(crashUser.id)
+      const crashGrant = await prisma.benefitGrant.create({
+        data: {
+          endUserId: crashUser.id,
+          benefitType: 'free_quota',
+          title: '崩溃前未核销',
+          quantityTotal: 1,
+          quantityRemaining: 1,
+          status: 'active',
+          sourceType: 'platform',
+        },
+      })
+      createdGrantIds.push(crashGrant.id)
+      const crashOriginal = exportGate.commitExportRedemption.bind(exportGate)
+      exportGate.commitExportRedemption = async () => {
+        throw new Error('CRASH_AFTER_UPLOAD')
+      }
+      try {
+        try {
+          await ai.exportGeneratedResume(
+            { ...FIXTURE, summary: `${FIXTURE.summary} 崩溃孤儿` },
+            crashUser.id,
+            null,
+            'md',
+            undefined,
+            undefined,
+            false,
+            { taskId: 'crash-task', benefitGrantId: crashGrant.id },
+          )
+          fail('6j. 核销前崩溃应抛错')
+        } catch (err) {
+          if ((err as Error).message !== 'CRASH_AFTER_UPLOAD') {
+            fail(`6j. 期望 CRASH_AFTER_UPLOAD，实际 ${(err as Error).message}`)
+          }
+        }
+      } finally {
+        exportGate.commitExportRedemption = crashOriginal
+      }
+      const crashRows = await prisma.fileObject.findMany({
+        where: { ownerId: crashUser.id, createdBy: 'ai_resume_generate' },
+      })
+      for (const row of crashRows) createdFileIds.push(row.id)
+      if (crashRows.length !== 2) fail(`6j. md 崩溃应留下主文件和打印副本，实际 ${crashRows.length}`)
+      for (const row of crashRows) {
+        assertStagingRow(row, crashUser.id, '6j. 崩溃孤儿')
+        await expectHidden(row.id, crashUser.id, '6j. 崩溃孤儿')
+      }
+      const crashGrantAfter = await prisma.benefitGrant.findUnique({ where: { id: crashGrant.id } })
+      if (crashGrantAfter?.quantityRemaining !== 1) fail(`6j. 崩溃不得扣次，剩余 ${crashGrantAfter?.quantityRemaining}`)
+      await prisma.fileObject.updateMany({
+        where: { id: { in: crashRows.map((row) => row.id) } },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      })
+      await files.cleanupExpired('manual')
+      for (const row of crashRows) {
+        const after = await prisma.fileObject.findUnique({ where: { id: row.id } })
+        if (!after?.deletedAt || after.status !== 'deleted') fail(`6j. cleanupExpired 没有清掉崩溃孤儿 ${row.id}`)
+        if (await storage.headObject(row.storageKey, row.bucket)) fail(`6j. 崩溃孤儿对象仍在 ${row.id}`)
+      }
+      for (const fileId of winnerIds) {
+        const bytes = await files.readContentForEndUser(fileId, raceUser.id)
+        if (bytes.buffer.length < 1) fail(`6j. 清理崩溃孤儿时误伤了已付费文件 ${fileId}`)
+      }
+      pass('6j. 核销前崩溃：未付款文件不可见，短寿命到期后清理，不扣次')
+
+      const sameUser = await prisma.endUser.create({
+        data: {
+          phoneHash: `verify-resume-export-same-${randomUUID()}`,
+          phoneEnc: `verify-phone-${randomUUID()}`,
+          nickname: '同内容并发会员',
+        },
+      })
+      createdEndUserIds.push(sameUser.id)
+      const sameGrant = await prisma.benefitGrant.create({
+        data: {
+          endUserId: sameUser.id,
+          benefitType: 'free_quota',
+          title: '同内容并发 1 次',
+          quantityTotal: 1,
+          quantityRemaining: 1,
+          status: 'active',
+          sourceType: 'platform',
+        },
+      })
+      createdGrantIds.push(sameGrant.id)
+      const sameResume: GeneratedResume = { ...FIXTURE, summary: `${FIXTURE.summary} 同内容并发` }
+      const sameRace = await Promise.allSettled([
+        ai.exportGeneratedResume(sameResume, sameUser.id, null, 'txt', undefined, undefined, false, {
+          taskId: 'same-task',
+          benefitGrantId: sameGrant.id,
+        }),
+        ai.exportGeneratedResume(sameResume, sameUser.id, null, 'pdf', undefined, undefined, false, {
+          taskId: 'same-task',
+          benefitGrantId: sameGrant.id,
+        }),
+      ])
+      const sameRows = await prisma.fileObject.findMany({
+        where: { ownerId: sameUser.id, createdBy: 'ai_resume_generate' },
+      })
+      for (const row of sameRows) createdFileIds.push(row.id)
+      const sameOk = sameRace.filter((item) => item.status === 'fulfilled')
+      if (sameOk.length < 1) {
+        const detail = sameRace.map((item) => item.status === 'rejected' ? (httpErrorCode(item.reason) ?? (item.reason as Error).message) : 'ok').join(' | ')
+        fail(`6k. 同内容并发至少一条应成功，实际 ${detail}`)
+      }
+      for (const item of sameRace) {
+        if (item.status === 'rejected' && !benefitLose(item.reason) && httpErrorCode(item.reason) !== 'BENEFIT_OUTPUT_ALREADY_REDEEMED') {
+          fail(`6k. 同内容失败车道应是幂等竞争而不是别的错误 ${httpErrorCode(item.reason) ?? (item.reason as Error).message}`)
+        }
+      }
+      const sameGrantAfter = await prisma.benefitGrant.findUnique({ where: { id: sameGrant.id } })
+      const sameRedemptions = await prisma.redemptionRecord.count({
+        where: { endUserId: sameUser.id, serviceType: 'resume_export' },
+      })
+      if (sameRedemptions !== 1 || sameGrantAfter?.quantityRemaining !== 0) {
+        fail(`6k. 同内容只能扣 1 次，redemptions=${sameRedemptions} remaining=${sameGrantAfter?.quantityRemaining}`)
+      }
+      const returnedIds = new Set<string>()
+      for (const item of sameOk) {
+        if (item.status !== 'fulfilled') continue
+        returnedIds.add(item.value.fileId)
+        const printId = printFileIdOf(item.value.printFileUrl)
+        if (printId) returnedIds.add(printId)
+        if (!item.value.signedUrl) fail('6k. 成功的同内容导出没有 signedUrl')
+      }
+      for (const row of sameRows) {
+        if (row.status === 'active') {
+          if (!returnedIds.has(row.id) || row.endUserId !== sameUser.id) {
+            fail(`6k. 出现了未返回给调用方的活跃文件 ${row.id}`)
+          }
+          if (!(await listedIds(sameUser.id)).has(row.id)) fail(`6k. 已付费同内容文件不在我的文档 ${row.id}`)
+        } else {
+          assertStagingRow(row, sameUser.id, '6k. 未完成的同内容副本')
+          await expectHidden(row.id, sameUser.id, '6k. 未完成的同内容副本')
+        }
+      }
+      const replaySame = await ai.exportGeneratedResume(sameResume, sameUser.id, null, 'pdf', undefined, undefined, false, {
+        taskId: 'same-task',
+        benefitGrantId: sameGrant.id,
+      })
+      createdFileIds.push(replaySame.fileId)
+      const replayPrint = printFileIdOf(replaySame.printFileUrl)
+      if (replayPrint) createdFileIds.push(replayPrint)
+      const afterSameReplay = await prisma.benefitGrant.findUnique({ where: { id: sameGrant.id } })
+      if (afterSameReplay?.quantityRemaining !== 0) fail(`6k. 同内容再导出不得再扣，剩余 ${afterSameReplay?.quantityRemaining}`)
+      const replayRow = await prisma.fileObject.findUnique({ where: { id: replaySame.fileId } })
+      if (replayRow?.status !== 'active' || replayRow.endUserId !== sameUser.id) fail('6k. 已付费重试没有直接给出可读文件')
+      pass('6k. 同内容并发不重复扣，成功文件可读，未完成副本不可见')
+
+      await setExportPrice(0, true)
+      const freeReplay = await ai.exportGeneratedResume(sameResume, sameUser.id, null, 'txt', undefined, undefined, false, { taskId: 'verify-export-free-replay' })
+      createdFileIds.push(freeReplay.fileId)
+      const freePrint = printFileIdOf(freeReplay.printFileUrl)
+      if (freePrint) createdFileIds.push(freePrint)
+      const freeRow = await prisma.fileObject.findUnique({ where: { id: freeReplay.fileId } })
+      if (!freeRow || freeRow.status !== 'active' || freeRow.endUserId !== sameUser.id || freeRow.retentionLockedReason) {
+        fail(`6l. 免费导出应直接成为可读文件 status=${freeRow?.status}`)
+      }
+      const freeRedemptions = await prisma.redemptionRecord.count({ where: { endUserId: sameUser.id, serviceType: 'resume_export' } })
+      if (freeRedemptions !== 1) fail(`6l. 免费导出不得新增核销，实际 ${freeRedemptions}`)
+      if (!freeReplay.signedUrl || !freeReplay.printFileUrl) fail('6l. 免费导出缺少访问地址')
+      pass('6l. 免费导出不预写、不扣次，文件直接可读')
     }
 
     console.log('\n=== ALL PASS ===')

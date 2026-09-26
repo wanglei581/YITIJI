@@ -161,7 +161,6 @@ check(read('src/pages/resume/jobFit-inkpaper.css') === "@import './styles/resume
 
 for (const [path, frameClass] of [
   ['src/pages/resume/resume-fusion-youth.css', 'resume'],
-  ['src/pages/assistant/assistant-lightflow-shell.css', 'assistant'],
   ['src/pages/interview/styles/interview-shell.css', 'interview'],
 ]) check(
   /(?:^|;)\s*padding:\s*0\s*;?/.test(cssRuleBody(read(path), `[data-kiosk-presentation='fusion-youth'] .fusion-w3--${frameClass} > .ui-kiosk-page-content`)),
@@ -188,11 +187,23 @@ const screens = new Map([
   ['src/pages/ai-plan/AiPlanPage.tsx', 'advisor-artifact'],
 ])
 const qxScreens = new Set([
+  // 稿 21-resume-triage 同一工作台的两条 route，2026-09-23 迁入。
+  'src/pages/resume/ResumeSourcePage.tsx',
+  'src/pages/resume/ResumeParsePage.tsx',
+  // 稿 25-material-workshop（/resume/materials），2026-09-23 迁入。
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
+  // 稿 46-resume-decision-workspace.html 宿主的四条 route：job-fit 2026-09-22 迁入，
+  // career-plan / templates 2026-09-23 迁入（actions 不在 W3 20 条清单内，下方单独断言）。
+  'src/pages/resume/JobFitPage.tsx',
+  'src/pages/resume/CareerPlanPage.tsx',
+  'src/pages/resume/ResumeTemplateLibraryPage.tsx',
   'src/pages/resume/ResumeReportPage.tsx',
   'src/pages/resume/ResumeGeneratePage.tsx',
   'src/pages/resume/ResumeGeneratePreviewPage.tsx',
   'src/pages/resume/ResumeOptimizePage.tsx',
   'src/pages/ai-plan/AiPlanPage.tsx',
+  // 稿 05-ai-cockpit（/assistant），2026-09-24 迁入。
+  'src/pages/assistant/AssistantPage.tsx',
 ])
 for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
@@ -219,17 +230,42 @@ includes('src/routes/index.tsx', '<Navigate to="/interview?stage=reports" replac
 const fullscreenShell = read('src/components/kiosk-shell/KioskFullscreenShell.tsx')
 check(fullscreenShell.includes('KioskStageFit'), 'fullscreen kiosk chrome uses the fixed 1080x1920 stage')
 check(/viewport\s*===\s*['"]kiosk['"]/.test(fullscreenShell), 'stage-fit is limited to the kiosk viewport')
+// /resume/job-fit 仍是 KioskRoot 之外的整屏路由（fusion-w6 的 expectedFullScreen 钉着 depth=2），
+// 所以迁进青序流光之后舞台缩放必须自己挂 KioskStageFit —— QxPageFrame 本身不缩放，
+// 少挂这一层，1080×1920 的稿在别的分辨率上会直接溢出屏幕。
+includes('src/pages/resume/JobFitPage.tsx', 'KioskStageFit', 'job-fit keeps the fixed 1080x1920 stage after the Qingxu migration')
+check(!read('src/pages/resume/JobFitPage.tsx').includes('KioskFullscreenShell'), 'job-fit has left the V6 fullscreen chrome')
+// 宿主 46 的另外两条整屏 route 复用 JobFitPage 导出的同一个舞台（缩放判据只有一份）；
+// /resume/templates 在 KioskRoot 之内，舞台由 KioskRoot 负责，页面不得再挂第二层缩放。
+for (const path of ['src/pages/resume/CareerPlanPage.tsx', 'src/pages/resume/JobFitActionsPage.tsx']) {
+  includes(path, '<JobFitStage>', `${path} keeps the fixed 1080x1920 host stage after the Qingxu migration`)
+  includes(path, 'QxPageFrame', `${path} uses the Qingxu page frame`)
+  check(!/KioskFullscreenShell|KioskPageFrame|job-fit-inkpaper|service-desk/.test(read(path)), `${path} has left the V6/LightFlow chrome`)
+}
+includes('src/pages/resume/JobFitActionsPage.tsx', 'data-kiosk-screen="resume-job-fit-actions"', 'resume-job-fit-actions exposes its stable landmark')
+check(!/KioskPageFrame|fusion-w3--assistant/.test(read('src/pages/assistant/AssistantPage.tsx')), 'assistant has left the V6 blue page frame')
+check(!read('src/pages/assistant/assistant-lightflow-shell.css').includes('.ui-kiosk-page-content'), 'assistant shell CSS no longer patches the V6 frame gutter')
+includes('src/layouts/KioskRoot.tsx', "'/assistant'", 'assistant route is registered as Qingxu-migrated')
+includes('src/layouts/KioskRoot.tsx', "'/resume/templates'", 'templates route is registered as Qingxu-migrated')
+check(!read('src/pages/resume/ResumeTemplateLibraryPage.tsx').includes('KioskStageFit'), 'templates does not scale the stage a second time inside KioskRoot')
 for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerPlanPage.tsx']) {
-  includes(path, 'KioskFullscreenShell', `${path} uses fullscreen prototype chrome`)
   check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
 }
 
+// 2026-09-23 迁入青序流光（稿 21）：双栏布局的五条断言从旧 fusion-youth 入口改锚到本页的
+// resume-triage-qx.css，判据不变（grid / 440px 下限 / 近均衡比例 / 方向标题不逐字折行）。
 const resumeSource = read('src/pages/resume/ResumeSourcePage.tsx')
-check(/resume-source-split[^"\n]*\bgrid\b/.test(resumeSource), 'resume source uses a grid for its two-column stage')
+const resumeTriageCss = stripCssComments(read('src/pages/resume/resume-triage-qx.css'))
+check(resumeSource.includes('className="qx-rt-split"') && /(?:^|;)\s*display:\s*grid\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses a grid for its two-column stage')
 check(!resumeSource.includes('lg:w-[348px]'), 'resume source removes the undersized 348px direction rail')
-check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeEntrypoint, '.resume-source-side')), 'resume source direction rail keeps a 440px minimum at 1080')
-check(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(440px,\s*0\.9fr\)/.test(cssRuleBody(resumeEntrypoint, '.resume-source-split')), 'resume source uses a near-balanced 1080 two-column ratio')
-check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeEntrypoint, '.resume-source-direction h2')), 'resume direction title cannot wrap character by character')
+check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-side')), 'resume source direction rail keeps a 440px minimum at 1080')
+check(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(440px,\s*0\.9fr\)/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses a near-balanced 1080 two-column ratio')
+check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-direction h2')), 'resume direction title cannot wrap character by character')
+for (const route of ['/resume/source', '/resume/parse']) includes('src/layouts/KioskRoot.tsx', `'${route}'`, `${route} is registered as Qingxu-migrated`)
+// 稿 25-material-workshop 迁入青序流光（2026-09-23）：此前这里钉的是「materials 不在本批」，
+// 迁入后改为正向断言——登记进 QX_MIGRATED_ROUTES、舞台由 KioskRoot 缩放、旧 LightFlow 壳全部退出。
+includes('src/layouts/KioskRoot.tsx', "'/resume/materials'", 'materials route (design 25) is registered as Qingxu-migrated')
+check(!/KioskStageFit|KioskPageFrame|resume-lightflow/.test(read('src/pages/resume/JobMaterialLibraryPage.tsx')), 'materials has left the LightFlow frame and does not scale the stage a second time')
 
 const interviewSetup = read('src/pages/interview/InterviewSetupPage.tsx')
 includes('src/pages/interview/InterviewSetupPage.tsx', 'interview-setup__stack', 'interview setup uses the prototype vertical stack')
@@ -299,7 +335,11 @@ includes('src/pages/assistant/AssistantPage.tsx', 'safeActions', 'assistant filt
 includes('src/pages/assistant/AssistantPage.tsx', 'ASSISTANT_USER_MESSAGE_MAX_LENGTH', 'assistant retains input limit')
 includes('src/pages/assistant/AssistantCallPanel.tsx', 'data-kiosk-screen="assistant-call"', 'assistant call exposes its sub-state landmark')
 for (const marker of ['startCall', 'resumePlay', 'toggleMute', 'endCall', 'needResume', 'micBlocked']) includes('src/pages/assistant/AssistantCallPanel.tsx', marker, `assistant call retains ${marker}`)
-includes('src/pages/interview/InterviewReportPage.tsx', '练习结果仅供本人复盘，不会发送给任何企业。', 'interview report keeps the user-only privacy boundary')
+// 3.5c：横幅改以共享 AI 标识开头（审计表一「模拟面试报告（一体机）」）。原断言钉的两件事都还在：
+// 「只给本人复盘」由共享句逐字承担，「不会发给企业」留在页面上。
+includes('src/pages/interview/InterviewReportPage.tsx', '<b>{AI_LABEL_COPY.INTERVIEW_REPORT}。</b>', 'interview report banner leads with the shared user-only AI label')
+includes('../../packages/shared/src/types/complianceCopy.ts', "INTERVIEW_REPORT: 'AI 生成，仅供参考，只用于本人练习复盘'", 'interview report label keeps the user-only practice wording')
+includes('src/pages/interview/InterviewReportPage.tsx', '也不会发送给任何企业。', 'interview report keeps the user-only privacy boundary')
 const jobGuidancePresentation = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/CareerPlanPage.tsx')}\n${read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')}`
 for (const forbidden of ['录用概率', '保证录用', '一键投递', '立即投递']) check(!jobGuidancePresentation.includes(forbidden), `job guidance rejects ${forbidden}`)
 for (const forbidden of ['localStorage', 'sessionStorage']) check(!read('src/pages/assistant/AssistantPage.tsx').includes(forbidden), `assistant avoids ${forbidden}`)

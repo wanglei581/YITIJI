@@ -10,14 +10,16 @@
  * 覆盖：
  * create session -> control token gate -> phone multipart upload -> kiosk status
  * -> kiosk confirm/cancel，以及关键安全错误码。
+ * 会员上传后，把对象读卡住直到上传锁真实过期，再并发取消，重复两轮。
  *
  * 默认不触发 /resume/parse，避免误耗 OCR / AI 配额；需要验证上传 fileId
  * 进入解析入口时，显式设置 UPLOAD_SESSION_HTTP_INCLUDE_PARSE=1。
  */
 import 'dotenv/config'
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { promises as fs } from 'node:fs'
+import { constants as fsConstants, promises as fs } from 'node:fs'
 import path from 'node:path'
 import { BadRequestException, ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
@@ -517,6 +519,8 @@ async function runVerifier(): Promise<void> {
   const cancelledData = expectOkData(cancelled.status, cancelled.body, 'cancel with control token succeeds')
   assert.equal(cancelledData.status, 'cancelled')
 
+  await raceMemberConfirmAgainstCancel()
+
   console.log('\nALL PASS')
 }
 
@@ -576,6 +580,177 @@ async function cleanup(): Promise<void> {
   } finally {
     await redis.quit()
     await prisma.onModuleDestroy()
+  }
+}
+
+const MEMBER_RACE_ROUNDS = 2
+
+type FifoHandle = Awaited<ReturnType<typeof fs.open>>
+
+/**
+ * confirm 若在读端打开前返回，写端 fs.open 会停在 libuv 线程池里。
+ * 这种状态下事件循环不空，process.exit 也不会返回。
+ * 非阻塞读端把这次 open 唤醒，随后关闭句柄并删除 FIFO。
+ */
+async function releaseBlockedFifoWriter(fifo: string, writerOpen: Promise<FifoHandle>): Promise<void> {
+  const release = await fs.open(fifo, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK).catch(() => undefined)
+  if (!release) return
+  try {
+    const opened = await writerOpen
+    await opened.close()
+  } catch {
+    // 写端已失败时没有句柄可关；调用方仍抛出原来的 confirm 错误。
+  } finally {
+    await release.close().catch(() => undefined)
+  }
+  await fs.unlink(fifo).catch(() => undefined)
+}
+
+async function raceMemberConfirmAgainstCancel(): Promise<void> {
+  for (let round = 1; round <= MEMBER_RACE_ROUNDS; round += 1) {
+    const member = await createLocalMemberToken()
+    const created = await createMemberSession(`http-e2e-race-${round}`, member.token)
+    const uploaded = await uploadFile({
+      sessionId: created.sessionId,
+      uploadToken: created.uploadToken,
+      filename: `http-e2e-race-${round}.pdf`,
+      mimeType: 'application/pdf',
+    })
+    const uploadedData = expectOkData(uploaded.status, uploaded.body, `race ${round}: member upload`)
+    const fileId = uploadedData.file!.fileId
+    createdFileIds.push(fileId)
+    const root = path.resolve(process.env['FILE_STORAGE_DIR']?.trim() || path.resolve(process.cwd(), 'storage'))
+    const initial = await readRaceFile(fileId)
+    assert.ok(initial?.storageKey, `race ${round}: storageKey missing`)
+    const source = storagePath(root, initial.storageKey)
+    await fs.rename(source, `${source}.held`)
+    await new Promise<void>((resolve, reject) => {
+      execFile('mkfifo', [source], (error) => (error ? reject(error) : resolve()))
+    })
+    await fs.unlink(`${source}.held`)
+    const redis = new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379')
+    const confirm = requestJson<ApiEnvelope<SessionStatusResponse>>(`/upload-sessions/${created.sessionId}/confirm`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${member.token}`, 'x-upload-session-control': created.controlToken },
+    })
+    const writerOpen = fs.open(source, 'w')
+    void writerOpen.catch(() => undefined)
+    let writer: FifoHandle | undefined
+    let writerGate: 'pending' | 'held' | 'done' = 'pending'
+    let cancel: { status: number; body: ApiEnvelope<unknown> } | undefined
+    let confirmResult: { status: number; body: ApiEnvelope<SessionStatusResponse> } | undefined
+    try {
+      const early = confirm.then((result) => Promise.reject(new Error(
+        `race ${round}: confirm returned ${result.status} before the object read blocked`,
+      )))
+      early.catch(() => undefined)
+      writer = await Promise.race([writerOpen, early])
+      writerGate = 'held'
+      assert.ok((await readRaceFile(fileId))?.pendingStorageKey, `race ${round}: pendingStorageKey missing while copy is blocked`)
+      const deadline = Date.now() + 45_000
+      while ((await redis.pttl(`upload_session_upload_lock:${created.sessionId}`)) >= 0) {
+        if (Date.now() >= deadline) throw new Error(`race ${round}: lock did not expire`)
+        await new Promise((resolve) => setTimeout(resolve, 200))
+      }
+      cancel = await requestJson(`/upload-sessions/${created.sessionId}`, {
+        method: 'DELETE',
+        headers: { 'x-upload-session-control': created.controlToken },
+      })
+      await writer.write(PDF_BYTES)
+      await writer.close()
+      writer = undefined
+      writerGate = 'done'
+      confirmResult = await confirm
+    } finally {
+      try {
+        if (writerGate === 'held' && writer) {
+          await writer.write(PDF_BYTES).catch(() => undefined)
+          await writer.close().catch(() => undefined)
+          writer = undefined
+        } else if (writerGate === 'pending') {
+          await releaseBlockedFifoWriter(source, writerOpen)
+        }
+      } finally {
+        confirmResult ??= await confirm.catch(() => undefined)
+        await redis.quit()
+      }
+    }
+    assert.ok(confirmResult && cancel, `race ${round}: both requests finished`)
+    console.log(`  race ${round}: confirm HTTP ${confirmResult.status} cancel HTTP ${cancel.status}`)
+    const confirmWon = confirmResult.status >= 200 && confirmResult.status < 300 && confirmResult.body.success === true
+    const cancelWon = cancel.status >= 200 && cancel.status < 300 && cancel.body.success === true
+    assert.equal(confirmWon && cancelWon, false, `race ${round}: both succeeded`)
+    await assertRaceTerminal(round, member.endUserId, created.sessionId, fileId, root)
+  }
+  console.log(`  PASS member confirm/cancel real lock-expiry overlap x${MEMBER_RACE_ROUNDS}`)
+}
+
+function storagePath(root: string, key: string): string {
+  const full = path.resolve(root, key)
+  assert.ok(full === root || full.startsWith(`${root}${path.sep}`), `storage key escaped: ${key}`)
+  return full
+}
+
+async function readRaceFile(fileId: string) {
+  const prisma = new PrismaService()
+  await prisma.onModuleInit()
+  try {
+    return await prisma.fileObject.findUnique({
+      where: { id: fileId },
+      select: {
+        storageKey: true, pendingStorageKey: true, replacedStorageKey: true,
+        ownerType: true, ownerId: true, endUserId: true, deletedAt: true,
+      },
+    })
+  } finally {
+    await prisma.onModuleDestroy()
+  }
+}
+
+async function assertRaceTerminal(
+  round: number, endUserId: string, sessionId: string, fileId: string, root: string,
+): Promise<void> {
+  const row = await readRaceFile(fileId)
+  const redis = new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379')
+  let keys: string[] = [row?.storageKey, row?.pendingStorageKey, row?.replacedStorageKey].filter((key): key is string => Boolean(key))
+  try {
+    const raw = await redis.get(`upload_session:${sessionId}`)
+    const session = raw
+      ? JSON.parse(raw) as { status?: string; bind?: { userKey?: string; previousKey?: string } | null }
+      : null
+    const status = session?.status ?? 'missing'
+    keys = [...new Set([
+      ...keys,
+      session?.bind?.userKey,
+      session?.bind?.previousKey,
+    ].filter((key): key is string => Boolean(key)))]
+    const present: string[] = []
+    let live: Buffer | null = null
+    for (const key of keys) {
+      const bytes = await fs.readFile(storagePath(root, key)).catch((error: NodeJS.ErrnoException) => (
+        error.code === 'ENOENT' ? null : Promise.reject(error)
+      ))
+      if (!bytes) continue
+      present.push(key)
+      if (key === row?.storageKey) live = bytes
+    }
+    if (status === 'confirmed') {
+      assert.ok(row && !row.deletedAt, `race ${round}: confirmed file deleted`)
+      assert.equal(row?.ownerType, 'user')
+      assert.equal(row?.ownerId, endUserId)
+      assert.equal(row?.endUserId, endUserId)
+      assert.equal(row?.pendingStorageKey, null)
+      assert.equal(row?.replacedStorageKey, null)
+      assert.ok(live?.equals(PDF_BYTES), `race ${round}: confirmed object unreadable`)
+      assert.deepEqual(present.filter((key) => key !== row?.storageKey), [])
+      return
+    }
+    assert.ok(status === 'cancelled' || status === 'expired', `race ${round}: redis ${status}`)
+    assert.ok(row?.deletedAt, `race ${round}: live file after ${status}`)
+    assert.deepEqual(present, [], `race ${round}: objects left after ${status}: ${present.join(',')}`)
+  } finally {
+    await redis.quit()
+    for (const key of keys) await fs.unlink(storagePath(root, key)).catch(() => undefined)
   }
 }
 

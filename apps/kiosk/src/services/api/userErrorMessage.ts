@@ -73,6 +73,9 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_SCAN_SESSION: '扫描任务未创建成功，请返回重试',
   PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED: '检测到上一笔支付待核实，请先等待自动确认或点击核实',
   PAYMENT_ATTEMPT_PENDING: '已有支付正在处理中，请勿重复扫码',
+  // 该码含「受理未知」（出码超时/中断）与「已受理但本地回填失败」两支，本机都无从判定是否扣款。
+  // 因此固定文案只说未知结果，既不断言「已受理」，也不落 5xx「请稍后重试」诱导重复支付。
+  PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED: '支付结果尚未确认，可能已扣款。请勿重复支付，可在手机支付账单中核对，并联系现场工作人员核实该笔订单',
   RECONCILE_TOO_FREQUENT: '核实过于频繁，请稍候几秒再试',
   RECONCILE_UNSUPPORTED: '当前通道不支持主动核实，请继续等待支付结果',
   LOCAL_AGENT_UNREACHABLE: '无法连接本机终端服务，请确认设备正常后重试',

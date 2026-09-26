@@ -96,6 +96,27 @@
   text-align: center;
 }
 
+.unknown-next {
+  margin-top: 24rpx;
+  font-size: 25rpx;
+  line-height: 1.6;
+  color: var(--ink);
+  text-align: center;
+}
+
+/* 文字链可点区撑到 48px（CLAUDE.md §9），视觉仍是一行下划线文字 */
+.unknown-link {
+  margin-top: 28rpx;
+  min-height: 48px;
+  padding: 0 20rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--plum-deep);
+  font-size: 26rpx;
+  text-decoration: underline;
+}
+
 /* 解析环节说明（说明性列表，不表达完成状态） */
 .parse-stages {
   display: flex;
@@ -143,4 +164,14 @@
 /* 操作栏两按钮比例（与诊断页一致） */
 .flex-1-5 {
   flex: 1.5;
+}
+
+.unknown-action {
+  min-width: 0;
+  height: auto;
+  min-height: 52px;
+  padding: 10px 12px;
+  line-height: 1.3;
+  white-space: normal;
+  text-align: center;
 }

@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
+import { installScanRevokeProbe, waitForAckConsumed } from '../fixtures/scan-revoke-probe'
 
 const MEMBER_TOKEN = 'privacy-member-memory-token'
 const MEMBER_PHONE = '13800138000'
@@ -38,6 +39,16 @@ function registerKioskShell(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
     status: 200,
     json: { capabilities: [] },
+  })
+  // 本套件有用例会落在 /interview?stage=tips（forward-history 与 storage-failure 两条）。
+  // 该页挂载时探测 `/health`，决定底部「开始模拟面试」这个出口放不放行——它要
+  // POST /mock-interviews 创建会话，不是本地内容。不注册的话 ApiRouter 会 fail-closed
+  // 地 abort 并在收尾抛 Unhandled API，把隐私用例连坐判红。
+  // 这里按可达应答：本套件测的是清场与历史边界，不是降级态；
+  // 这是一条不含身份信息的公开就绪探针，注册它不削弱任何隐私断言。
+  api.respond('GET', '/api/v1/health', {
+    status: 200,
+    json: { success: true, data: { status: 'ok' } },
   })
   api.respond('GET', '/api/v1/terminals/KSK-001/smart-campus', {
     status: 200,
@@ -1391,14 +1402,14 @@ test('mobile QR login is exempt from the kiosk hard privacy deadline @privacy-mo
 test('phone upload is exempt from the kiosk hard privacy deadline @privacy-mobile', async ({ page }) => {
   await page.goto('/upload/phone')
   await expect(page.locator('main[data-kiosk-screen="phone-upload"]')).toBeVisible()
-  await expect(page.getByText('上传链接已失效', { exact: true })).toBeVisible()
+  await expect(page.getByText('这个链接不能用来上传', { exact: true })).toBeVisible()
   await markCurrentDocument(page, 'phone-upload-document')
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
 
   expect(new URL(page.url()).pathname).toBe('/upload/phone')
   expect(await readDocumentMarker(page)).toBe('phone-upload-document')
-  await expect(page.getByText('上传链接已失效', { exact: true })).toBeVisible()
+  await expect(page.getByText('这个链接不能用来上传', { exact: true })).toBeVisible()
 })
 
 // ── 扫描任务撤销：换人之前必须把服务端那份收掉 ─────────────────────────────
@@ -1409,6 +1420,24 @@ test('phone upload is exempt from the kiosk hard privacy deadline @privacy-mobil
 // 「本不该发生的请求」悄悄变绿。
 
 const SCAN_WORKBENCH_KEY = 'ai-job-print:current-scan-workbench'
+
+/**
+ * 读本机扫描登记，跨过清场那次**刻意的**整页重载。
+ *
+ * 硬清场拿到收尾闸的确认之后会重载文档；evaluate 恰好撞上导航提交，旧上下文被销毁，
+ * Playwright 抛 "Execution context was destroyed"。expect.poll 不替回调吞异常 ——
+ * 一抛整条用例当场红（2026-09-26 CI round 13 就是这么红的，与产品行为无关）。
+ * 这里只吞这一种，返回 undefined 让 poll 在新文档里再读一次；其它异常照抛。
+ * sessionStorage 跨同一标签页的重载保留，所以新文档里读到 null 仍然证明登记确实被抹掉了。
+ */
+async function readScanWorkbenchAcrossReload(page: Page): Promise<string | null | undefined> {
+  try {
+    return await page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY)
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Execution context was destroyed')) return undefined
+    throw error
+  }
+}
 
 /** 记录每一次撤销请求的请求头（谁发的、带没带控制凭证）。 */
 function recordScanRevokes(page: Page): () => Array<Record<string, string>> {
@@ -1537,20 +1566,26 @@ test('an unreachable revoke clears the device instantly and keeps retrying @priv
 // 交给下一位。** 判据必须是「那一步有没有发生」，不是「屏幕上写了什么」——
 // 清场的最后一步是整页重载 / 进屏保，它跑掉了就等于机器已经交出去了。
 
+/**
+ * 闸那一发 DELETE 可以拿到的回答。'cancel-conflict' 是 409 SCAN_TASK_CANCEL_CONFLICT：
+ * 服务端 cancel() 在 CAS 之前判到终态、或者 CAS 撞车之后重读时都回它（两处同一个码）。
+ */
+type GatedRevokeAnswer = 'cancelled' | 'server-error' | 'cancel-conflict'
+
 /** 一个可以由用例决定什么时候回话、回什么的撤销端点。 */
 function gatedRevokeEndpoint(page: Page): Promise<{
   received: (nth: number) => Promise<void>
-  release: (nth: number, result: 'cancelled' | 'server-error') => void
+  release: (nth: number, result: GatedRevokeAnswer) => void
   attempts: () => number
 }> {
   const receivedResolvers: Array<() => void> = []
   const receivedPromises: Array<Promise<void>> = []
-  const releaseResolvers: Array<(result: 'cancelled' | 'server-error') => void> = []
-  const releasePromises: Array<Promise<'cancelled' | 'server-error'>> = []
+  const releaseResolvers: Array<(result: GatedRevokeAnswer) => void> = []
+  const releasePromises: Array<Promise<GatedRevokeAnswer>> = []
   const slot = (nth: number) => {
     while (receivedPromises.length <= nth) {
       receivedPromises.push(new Promise<void>((resolve) => { receivedResolvers.push(resolve) }))
-      releasePromises.push(new Promise<'cancelled' | 'server-error'>((resolve) => { releaseResolvers.push(resolve) }))
+      releasePromises.push(new Promise<GatedRevokeAnswer>((resolve) => { releaseResolvers.push(resolve) }))
     }
   }
   slot(4)
@@ -1569,6 +1604,17 @@ function gatedRevokeEndpoint(page: Page): Promise<{
       })
       return
     }
+    if (verdict === 'cancel-conflict') {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error: { code: 'SCAN_TASK_CANCEL_CONFLICT', message: '任务状态已变化，取消失败，请刷新重试' },
+        }),
+      })
+      return
+    }
     // 502：服务端**没有给出结论**。它和「已完成，撤不了」不是一回事 ——
     // 后者是确定的终态（撤得掉 / 领不走），前者什么都证明不了。
     await route.fulfill({
@@ -1578,7 +1624,7 @@ function gatedRevokeEndpoint(page: Page): Promise<{
     })
   }).then(() => ({
     received: (nth: number) => { slot(nth + 1); return receivedPromises[nth] },
-    release: (nth: number, result: 'cancelled' | 'server-error') => { slot(nth + 1); releaseResolvers[nth]?.(result) },
+    release: (nth: number, result: GatedRevokeAnswer) => { slot(nth + 1); releaseResolvers[nth]?.(result) },
     attempts: () => attempts,
   }))
 }
@@ -1653,6 +1699,65 @@ test('a cancel that never confirms keeps the kiosk locked and honest @privacy-ki
   await expect(page.locator('[data-w2-page], [data-kiosk-page]')).toHaveCount(0)
 })
 
+/* 409 SCAN_TASK_CANCEL_CONFLICT：只凭这一句不许换人，而且只许再问一次（2026-09-26）。
+ *
+ * cancel() 在 CAS 撞车之后也回这个码，那一刻任务可能正是 matched —— 一次投递刚开始，文件正往
+ * 上一位的任务里写，那份纸可能正是下一位在面板上扫的。再问一次就分得清：对 matched 再发一次，
+ * 要么撤掉它（200），要么输给已完成（400）或终态（409）。真是终态的任务每次都回 409 ——
+ * 所以闸必须等第二次的回答，而第二次之后就收口，不许把机器按到自然过期。 */
+test('a cancel conflict makes the cleanup gate ask once more and hand over only after that answer @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  const revoke = await gatedRevokeEndpoint(page)
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page)
+  // 孤儿 /session-timeout：guard 立刻 hardClear，撤销交给收尾闸。
+  await page.goto('/session-timeout')
+  await revoke.received(0)
+  revoke.release(0, 'cancel-conflict')
+
+  // 第二问来了，而机器还没交出去：遮罩按着，页面还在原路由。
+  await expect.poll(() => revoke.attempts(), {
+    timeout: 10_000,
+    message: '第一次 409 之后必须再问一次，而不是凭这一句换人',
+  }).toBe(2)
+  const clearing = page.getByTestId('session-guard-state-clearing')
+  await expect(clearing).toHaveAttribute('data-cleanup', 'holding')
+  expect(new URL(page.url()).pathname).toBe('/session-timeout')
+  // 第一次 409 不是「服务端没给结论」：闸在同一次尝试里接着问，屏上不许报一句失败。
+  // （交给退避循环的写法会先发布 server-error，这一屏就会说「服务端暂时没有给出结论」。）
+  await expect(page.getByTestId('session-guard-cleanup-status')).toContainText('正在向服务端确认')
+
+  // 第二次拿到 200（那次投递被撤掉了）：这一刻才交出机器。
+  revoke.release(1, 'cancelled')
+  await page.waitForURL((url) => url.pathname === '/', { timeout: 15_000 })
+  expect(revoke.attempts()).toBe(2)
+  expect(pageErrors).toEqual([])
+})
+
+test('a repeated cancel conflict ends the cleanup after exactly two DELETEs instead of holding the kiosk @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  const revoke = await gatedRevokeEndpoint(page)
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page)
+  await page.goto('/session-timeout')
+  await revoke.received(0)
+  revoke.release(0, 'cancel-conflict')
+  await expect.poll(() => revoke.attempts(), { timeout: 10_000 }).toBe(2)
+  revoke.release(1, 'cancel-conflict')
+
+  // 第二次 409 = failed / cancelled / expired：确定的收口，立刻交出机器。
+  // 多问一次（或交给退避循环）的话，第三发会一直挂在这里，页面永远停在清场屏上。
+  await expect.poll(() => new URL(page.url()).pathname, {
+    timeout: 15_000,
+    message: '两次 409 之后必须收口换人，不许把机器按到自然过期',
+  }).toBe('/')
+  expect(revoke.attempts()).toBe(2)
+})
+
 test('a delivery ack that lands mid-clear still ends with a confirmed cancel @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
   api.respond('POST', '/api/v1/scan/sessions', {
@@ -1720,6 +1825,147 @@ test('a delivery ack that lands mid-clear still ends with a confirmed cancel @pr
     }
   }, { timeout: 10_000 }).toBeNull()
 })
+
+/**
+ * 压住下一次主框架整页导航，直到用例放行。
+ *
+ * 用在清场收尾之后那次重载上：导航提交之前旧文档照常运行（定时器、网络回话、Promise
+ * 都在走），所以能在「闸已经拿到确认、机器正要交出去」与「新文档接管」之间，
+ * **确定地**插进一次迟到的回话 —— 不靠时长去赌那一帧。
+ */
+async function holdNextMainFrameNavigation(page: Page): Promise<{ arrived: () => boolean; release: () => void }> {
+  let armed = true
+  let arrived = false
+  let release: () => void = () => undefined
+  const released = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    let mainFrameNavigation = false
+    try {
+      mainFrameNavigation = request.isNavigationRequest() && request.frame() === page.mainFrame()
+    } catch {
+      mainFrameNavigation = false
+    }
+    if (!armed || !mainFrameNavigation) {
+      await route.fallback()
+      return
+    }
+    armed = false
+    arrived = true
+    await released
+    await route.fallback()
+  })
+  return { arrived: () => arrived, release: () => release() }
+}
+
+/* 收尾闸拿到确认**之后**，那次还在路上的投递确认才落地（Agy 复核 #3，2026-09-26）。
+ *
+ * 上面那条是「确认在清场途中回话」；这里是紧接着的那一段：闸已经拿到服务端的回答、
+ * 整页重载的导航已经发出，等待页挂载时发出的那次 ACK 才回来。它的回调看到扫描代次变了，
+ * 会按 'ack-compensation' 补一发 DELETE。等待页忙碌时隐私硬截止照样会到（忙碌只顺延
+ * VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC），所以这个顺序在真机上是可达的。
+ *
+ * 闸拿到的每一种确定回答都证明任务已经结束或根本没有（scan-tasks.service.ts 的 cancel()）：
+ *   · 200（刚 CAS 成 cancelled）/ 404（根本没有）/ 400 ALREADY_COMPLETED（只在 completed 时抛）；
+ *   · 409 CANCEL_CONFLICT 要问两次：第一次分不清终态与「撞上一次刚开始的投递」，闸会立刻再问；
+ *     第二次还是 409 就只剩 failed / cancelled / expired。所以这一格闸自己发两发。
+ * 期望统一：迟到的确认**不许再补一发** —— 页面上的 DELETE 总数就是闸自己那几发。 */
+const GATE_CANCEL_ANSWERS = [
+  {
+    key: 'cancelled (200)',
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+    gateDeletes: 1,
+  },
+  {
+    key: 'not found (404)',
+    status: 404,
+    json: { success: false, error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } },
+    gateDeletes: 1,
+  },
+  {
+    key: 'already completed (400)',
+    status: 400,
+    json: { success: false, error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' } },
+    gateDeletes: 1,
+  },
+  {
+    key: 'a repeated cancel conflict (409, 409)',
+    status: 409,
+    json: { success: false, error: { code: 'SCAN_TASK_CANCEL_CONFLICT', message: '任务状态已变化，取消失败，请刷新重试' } },
+    gateDeletes: 2,
+  },
+] as const
+
+for (const answer of GATE_CANCEL_ANSWERS) {
+  test(`a delivery ack landing after the cleanup gate got ${answer.key} adds no DELETE of its own @privacy-kiosk`, async ({ page, api }) => {
+    registerKioskShell(api)
+    api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, { status: answer.status, json: answer.json })
+    await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: SCAN_TASK_ID,
+            status: 'waiting',
+            scanType: 'resume',
+            file: null,
+            errorCode: null,
+            errorMessage: null,
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        }),
+      })
+    })
+    // 等待页挂载即发出的那次投递确认：压在半路，直到闸拿到回答、重载已经发出。
+    let releaseAck: () => void = () => undefined
+    const ackReleased = new Promise<void>((resolve) => {
+      releaseAck = resolve
+    })
+    let ackCount = 0
+    await routeExact(page, 'POST', `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`, async (route) => {
+      ackCount += 1
+      await ackReleased
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: SCAN_DELIVERY_ACKED_AT },
+        }),
+      })
+    })
+    const readProbe = await installScanRevokeProbe(page, SCAN_TASK_ID)
+
+    await page.goto('/scan')
+    await seedLiveScanSession(page)
+    await page.goto('/scan?stage=progress')
+    await expect(page.getByTestId('scan-ack-pending-notice')).toBeVisible()
+    await expect.poll(() => ackCount).toBe(1)
+
+    // 从这一刻起，下一次整页导航（清场收尾之后的重载）压住不放。
+    const handover = await holdNextMainFrameNavigation(page)
+    await expect.poll(handover.arrived, {
+      timeout: 15_000,
+      message: '隐私硬截止要把忙碌的等待页清场，并在闸拿到回答之后发出重载',
+    }).toBe(true)
+    await expect.poll(async () => (await readProbe())?.deletes ?? 0, {
+      message: `到这一刻只有闸自己那 ${answer.gateDeletes} 发`,
+    }).toBe(answer.gateDeletes)
+
+    releaseAck()
+    const settled = await waitForAckConsumed(readProbe)
+    expect(
+      settled.deletes,
+      '闸已经拿到「任务已结束 / 不存在」的确定回答：迟到的确认不许再补一发 DELETE',
+    ).toBe(answer.gateDeletes)
+    handover.release()
+  })
+}
 
 /* 会员会话失效（401）那条出口 —— 它是清场链路上最后一个绕过收尾闸的口子。
  *
@@ -1936,5 +2182,8 @@ test('an orphan session-timeout route hard-clears and revokes the scan task @pri
   expect(revokes()[0]?.['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
   // 游客没有会员令牌：不带 Authorization 也要能撤（服务端对无主任务只校验控制凭证）。
   expect(revokes()[0]?.authorization).toBeUndefined()
-  await expect.poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY)).toBeNull()
+  // 清场拿到确认后会刻意重载：这一次读可能正好撞上导航提交，读法见 readScanWorkbenchAcrossReload。
+  await expect.poll(() => readScanWorkbenchAcrossReload(page)).toBeNull()
+  // 恰好一次：读完登记之后再数一遍，中途没有冒出第二发。
+  expect(revokes()).toHaveLength(1)
 })

@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
 
 const FIXTURE_KIOSK_URL = 'http://127.0.0.1:4178/?viewport=kiosk'
@@ -73,6 +74,7 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
         items: [],
       },
       toolbox: { enabled: false, items: [] },
+      ...RECRUITMENT_HOSTING_ON,
       configVersion: 'w1-browser-fixture',
       refreshIntervalMs: 300000,
       serverTime: '2026-07-24T00:00:00.000Z',
@@ -98,7 +100,7 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
   await expect(frame).toBeVisible()
   await expect(frame.locator('.qx-home[data-qx-page="home"]')).toBeVisible()
   await expect(frame.getByRole('heading', { name: /你好，我是小青/ })).toBeVisible()
-  await expect(frame.getByText('说一句你想办的事', { exact: false })).toBeVisible()
+  await expect(frame.getByText('告诉我你想办的事', { exact: false })).toBeVisible()
   await expect(frame.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expectMinimumTargets(frame.locator('button:not(:disabled)'), 48)
   await expectMinimumTargets(frame.locator('[data-testid="home-primary"]'), 56)
@@ -203,8 +205,8 @@ test('mobile fixture keeps every primitive inside the 390px viewport @w1-mobile'
 })
 
 for (const scenario of [
-  { path: '/member/qr-login', landmark: '暂时无法确认登录' },
-  { path: '/upload/phone', landmark: '上传链接已失效' },
+  { path: '/member/qr-login', landmark: '这个链接不能用来登录' },
+  { path: '/upload/phone', landmark: '这个链接不能用来上传' },
 ] as const) {
   test(`production ${scenario.path} keeps the mobile fusion contract @w1-mobile`, async ({ page, api }) => {
     void api

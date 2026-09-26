@@ -14,6 +14,9 @@ import type {
   MemberResumeItem,
 } from './member-assets.types'
 import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
+import { RESUME_PARSE_INTENT_KIND } from '../ai/resume-parse-submission.service'
+import { isRecruitmentContentHostingEnabled, RECRUITMENT_HOSTING_DISABLED_CODE } from '../recruitment-hosting/recruitment-hosting'
+import { assertJobFitPrintFileReadable, storedJobFitUsesSystemJob } from '../ai/resume/job-fit-hosting'
 
 // ============================================================
 // 会员个人资产中心服务（Phase C-2B 只读 → C-2D 真实管理）
@@ -31,8 +34,8 @@ import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/reten
 // 分页（C-2D）：所有列表走游标分页（take pageSize+1，封顶 50），绝不无界 findMany。
 //
 // 删除语义（C-2D，明确软删/硬删规则）：
-// - AI 记录（AiResumeResult）：**硬删**。payloadJson 含简历敏感内容，本就有 TTL 自动清理，
-//   会员主动删除 = 立即物理删除 DB 行；删除动作由 controller 写审计日志留痕。
+// - AI 记录（AiResumeResult）：结果与派生数据**硬删**。parse_intent 只保留证明摘要与 TTL，
+//   删除 parse 时改为 revoked，避免相同意图重新调用模型；动作由 controller 写审计日志。
 // - 文档（FileObject）：走 FilesService.ownerDelete（对象存储**物理删除** + DB 行软删保留
 //   删除日志字段），不在本 service 重复实现。
 //
@@ -42,8 +45,8 @@ import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/reten
 
 /** 简历资产包含的 AiResumeResult 种类：parse=上传诊断，generate=AI 生成。 */
 const RESUME_KINDS = ['parse', 'generate'] as const
-/** 草稿 / 确认快照不单独成行，合并进对应 parse 行字段。 */
-const HIDDEN_RESUME_RESULT_KINDS = ['optimize_draft', 'optimize_confirmed'] as const
+/** 草稿 / 确认快照不单独成行；解析意图是内部账本，均不进入会员 AI 记录列表。 */
+const HIDDEN_RESUME_RESULT_KINDS = ['optimize_draft', 'optimize_confirmed', RESUME_PARSE_INTENT_KIND] as const
 
 interface ResumeDraftMeta {
   optimized: boolean
@@ -125,12 +128,14 @@ export class MemberAssetsService {
         sensitiveLevel: true,
         assetCategory: true,
         retentionPolicy: true,
+        createdBy: true,
         createdAt: true,
         expiresAt: true,
       },
       ...memberPageArgs(page),
     })
-    return buildMemberPage(rows, page, total, (f) => ({
+    const visible = await this.omitSystemJobFitFiles(rows, where, total)
+    return buildMemberPage(visible.rows, page, visible.total, (f) => ({
       id: f.id,
       filename: f.filename,
       mimeType: f.mimeType,
@@ -208,7 +213,7 @@ export class MemberAssetsService {
       kind: { notIn: [...HIDDEN_RESUME_RESULT_KINDS] },
     }
     const now = new Date()
-    const [total, rows, qaRows] = await Promise.all([
+    const [counted, fetched, qaRows] = await Promise.all([
       this.prisma.aiResumeResult.count({ where }),
       this.prisma.aiResumeResult.findMany({
         where,
@@ -243,6 +248,9 @@ export class MemberAssetsService {
         },
       }),
     ])
+    const visibleAi = await this.omitSystemJobFitRecords(fetched, where, counted)
+    const rows = visibleAi.rows
+    const total = visibleAi.total
     const parseTaskIds = rows.filter((r) => r.kind === 'parse').map((r) => r.taskId)
     const draftMeta = await loadResumeDraftMeta(this.prisma, endUserId, parseTaskIds)
     const list = buildMemberPage(rows, page, total, (r): MemberAiRecordItem => {
@@ -284,11 +292,60 @@ export class MemberAssetsService {
   }
 
   /**
+   * 托管关闭时，我的记录里不展示引用系统内岗位的匹配结果。手填结果保留。
+   */
+  private async omitSystemJobFitRecords<T extends { id: string; kind: string; payloadJson: string }>(
+    rows: T[],
+    where: { endUserId: string; expiresAt: { gt: Date }; kind: { notIn: readonly string[] } },
+    total: number,
+  ): Promise<{ rows: T[]; total: number }> {
+    if (isRecruitmentContentHostingEnabled()) return { rows, total }
+    const fits = await this.prisma.aiResumeResult.findMany({
+      where: { ...where, kind: 'job_fit' },
+      select: { id: true, payloadJson: true },
+    })
+    const hiddenIds = new Set(fits.filter((row) => storedJobFitUsesSystemJob(row.payloadJson)).map((row) => row.id))
+    if (hiddenIds.size === 0) return { rows, total }
+    return {
+      rows: rows.filter((row) => !hiddenIds.has(row.id)),
+      total: Math.max(0, total - hiddenIds.size),
+    }
+  }
+
+  /** 托管关闭时，我的文档不列出系统内岗位匹配报告。下载入口另按存档拒绝。 */
+  private async omitSystemJobFitFiles<T extends { id: string; createdBy: string | null }>(
+    rows: T[],
+    where: object,
+    total: number,
+  ): Promise<{ rows: T[]; total: number }> {
+    if (isRecruitmentContentHostingEnabled()) return { rows, total }
+    const files = await this.prisma.fileObject.findMany({
+      where: { ...(where as Record<string, unknown>), createdBy: 'job_fit' } as never,
+      select: { id: true, createdBy: true },
+    })
+    const hiddenIds = new Set<string>()
+    for (const file of files) {
+      try {
+        await assertJobFitPrintFileReadable(this.prisma as never, file)
+      } catch (error) {
+        if (!isHostingDisabledError(error)) throw error
+        hiddenIds.add(file.id)
+      }
+    }
+    if (hiddenIds.size === 0) return { rows, total }
+    return {
+      rows: rows.filter((row) => !hiddenIds.has(row.id)),
+      total: Math.max(0, total - hiddenIds.size),
+    }
+  }
+
+  /**
    * 删除本人一条 AI 记录（硬删，含级联）。
    *
    * - 归属：findFirst 同时限定 id + endUserId；删他人 / 不存在统一 404（不泄露是否存在）。
-   * - 级联策略：删除 parse 行时，同 taskId 的全部 AiResumeResult 派生行及全部
-   *   JobAiSession 一并物理删除；删除 job_fit 行时仅清该行与同 task 的 match 会话。
+   * - 级联策略：删除 parse 行时，保留同 taskId 的意图证明和 TTL，仅将其撤销；
+   *   其余 AiResumeResult 派生行及全部 JobAiSession 物理删除。
+   *   删除 job_fit 行时仅清该行与同 task 的 match 会话。
    *   其余 kind 只删自身。上述结果与会话删除均在同一事务中完成。
    * - deleteMany 仍带 endUserId 双保险，绝不可能删到他人行。
    * - 导出的 PDF 是独立 FileObject（「我的文档」管理），不在此级联。
@@ -302,13 +359,19 @@ export class MemberAssetsService {
         where: { id: recordId, endUserId },
         select: { id: true, taskId: true, kind: true },
       })
-      if (!row) return null
+      if (!row || row.kind === RESUME_PARSE_INTENT_KIND) return null
       const results = await tx.aiResumeResult.deleteMany({
-        where: row.kind === 'parse' ? { endUserId, taskId: row.taskId } : { endUserId, id: row.id },
+        where: row.kind === 'parse'
+          ? { endUserId, taskId: row.taskId, kind: { not: RESUME_PARSE_INTENT_KIND } }
+          : { endUserId, id: row.id },
       })
       // 并发删除已先一步移除目标时，不得再按 taskId 清理会话。
       if (results.count === 0) return null
       if (row.kind === 'parse') {
+        await tx.aiResumeResult.updateMany({
+          where: { endUserId, taskId: row.taskId, kind: RESUME_PARSE_INTENT_KIND },
+          data: { status: 'revoked' },
+        })
         await tx.jobAiSession.deleteMany({ where: { endUserId, resumeTaskId: row.taskId } })
       } else if (row.kind === 'job_fit') {
         await tx.jobAiSession.deleteMany({
@@ -334,7 +397,8 @@ export class MemberAssetsService {
    * 删除本人一条简历记录（Wave 2，硬删）。
    *
    * 简历 = AiResumeResult（kind='parse' 或 'generate'）。
-   * - 删 parse 行时，同 taskId 的全部派生行及 JobAiSession 一并物理删除（与 deleteAiRecord 一致）。
+   * - 删 parse 行时，将同 taskId 的意图撤销并保留证明和 TTL；其余派生行及
+   *   JobAiSession 物理删除（与 deleteAiRecord 一致）。
    * - 删 generate 行时只删自身。
    * - 归属：findFirst 同时限定 id + endUserId；删他人 / 不存在统一 404。
    * - 与 deleteAiRecord 共享相同的事务策略，不新增 DB schema。
@@ -350,10 +414,16 @@ export class MemberAssetsService {
       })
       if (!row) return null
       const results = await tx.aiResumeResult.deleteMany({
-        where: row.kind === 'parse' ? { endUserId, taskId: row.taskId } : { endUserId, id: row.id },
+        where: row.kind === 'parse'
+          ? { endUserId, taskId: row.taskId, kind: { not: RESUME_PARSE_INTENT_KIND } }
+          : { endUserId, id: row.id },
       })
       if (results.count === 0) return null
       if (row.kind === 'parse') {
+        await tx.aiResumeResult.updateMany({
+          where: { endUserId, taskId: row.taskId, kind: RESUME_PARSE_INTENT_KIND },
+          data: { status: 'revoked' },
+        })
         await tx.jobAiSession.deleteMany({ where: { endUserId, resumeTaskId: row.taskId } })
       }
       return { row, deletedCount: results.count }
@@ -370,6 +440,11 @@ export class MemberAssetsService {
       deletedCount: deletion.deletedCount,
     }
   }
+}
+
+function isHostingDisabledError(error: unknown): boolean {
+  const response = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+  return response?.error?.code === RECRUITMENT_HOSTING_DISABLED_CODE
 }
 
 async function loadResumeDraftMeta(

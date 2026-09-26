@@ -1,5 +1,6 @@
 import type { ApiRouter } from '../../fixtures/api-router'
 import { registerW4Api } from '../../fixtures/fusion-w4-api'
+import { RECRUITMENT_HOSTING_ON } from '../../fixtures/recruitment-hosting'
 
 const success = (data: unknown) => ({ success: true, data })
 
@@ -35,6 +36,8 @@ export function registerW6Api(api: ApiRouter): void {
         placements: ['toolbox'],
       }],
     },
+    // 路由扫描与旅程覆盖全部招聘类路由：服务端恒下发托管字段，这里按客户私有化部署（b）打开。
+    ...RECRUITMENT_HOSTING_ON,
     configVersion: 'w6-fixture',
     refreshIntervalMs: 300000,
     serverTime: '2026-07-24T08:00:00.000Z',

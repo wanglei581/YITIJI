@@ -8,6 +8,8 @@
 
 ## 1. 架构概述
 
+> **2026-09-26 现状与目标：** 真实调用走功能位配置，代码里的厂商是 DeepSeek、通义千问、MiniMax、鱼人（`llm-presets.ts`）；`AI_PROVIDER` 的 openai / claude / qwen / zhipu / local 五个类是占位，调用即报未实现。生产白名单（next-tasks 3.5b，落地中）只放境内已备案模型：DeepSeek 主用、千问自动备用，两家都公示备案号。私有化部署（b）按客户要求接客户侧已备案的模型。下图是 2026-05 的初版分层，供应商以本段为准。
+
 ```
 Kiosk 前台
   │  submitResumeParse / getResumeOptimize / chatWithAssistant
@@ -22,12 +24,10 @@ ai.ts（适配器选择层）
   │  /api/v1/resume/records/:id/optimize
   │  /api/v1/assistant/chat
   ▼
-AI Provider（可切换）
-  ├── OpenAI GPT-4o
-  ├── Claude claude-sonnet-4-6
-  ├── 通义千问 qwen-long
-  ├── 智谱 GLM-4
-  └── 本地部署（Ollama / vLLM）
+AI Provider（功能位配置，见上方说明）
+  ├── DeepSeek（生产主用）
+  ├── 通义千问（生产备用）
+  └── MiniMax / 鱼人（代码已有，不进生产白名单）
 ```
 
 **核心原则：前端永远只和后端 AI 模块通信，不直接接触任何 AI 提供商 API。**

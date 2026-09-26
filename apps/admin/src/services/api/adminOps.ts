@@ -5,6 +5,8 @@
 // API_MODE=mock → 内存演示数据
 //
 // 诚实约束:告警为实时派生;确认/静默/关闭只写处理态,不把仍在发生的故障说成已恢复。
+// paid_pending_file_unavailable:已支付但文件不可用的待打印任务,只读派生、需人工处置;
+// 前端不提供退款动作,也不把确认/静默/关闭说成已退款或文件已恢复。
 // ============================================================
 
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
@@ -33,11 +35,14 @@ export interface AdminPrintTaskPage {
 export type AlertHandlingState = 'open' | 'acknowledged' | 'silenced' | 'closed'
 export type AlertListView = 'open' | 'acknowledged' | 'suppressed' | 'all'
 
+/** 与后端 services/api/src/admin-ops/derived-alert-identity.ts 的 ALERT_TYPES 一一对应。 */
+export type AdminAlertType = 'terminal_offline' | 'printer_issue' | 'print_failed' | 'paid_pending_file_unavailable'
+
 export interface AdminAlertItem {
   id: string
   subjectKey: string
   episodeToken: string
-  type: 'terminal_offline' | 'printer_issue' | 'print_failed'
+  type: AdminAlertType
   severity: 'error' | 'warning'
   title: string
   detail: string

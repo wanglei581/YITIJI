@@ -2,6 +2,7 @@
 import { generateKeyPairSync, randomUUID } from 'crypto'
 import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from '../src/payment/channel-accepted-signal'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
@@ -55,6 +56,72 @@ async function expectCode(label: string, code: string, action: () => Promise<unk
   }
 }
 
+/**
+ * Prisma 标量过滤：`field: value` 是严格相等，`field: null` 是 IS NULL。
+ * `{ not: null }` 是 IS NOT NULL；`{ not: 'x' }` 不匹配 null（与 Prisma `<>` 一致）。
+ * 忽略 failReason 会让 status=expired + failReason=null 误中 CHANNEL_ACCEPTED_UNCONFIRMED 分支。
+ */
+function matchesPrismaScalar(actual: unknown, expected: unknown): boolean {
+  if (expected === undefined) return true
+  if (expected === null) return actual === null
+  if (typeof expected === 'string' || typeof expected === 'number' || typeof expected === 'boolean') {
+    return actual === expected
+  }
+  if (typeof expected === 'object' && expected !== null) {
+    const rec = expected as { not?: unknown; in?: unknown[] }
+    if (Array.isArray(rec.in)) return rec.in.includes(actual)
+    if (Object.prototype.hasOwnProperty.call(rec, 'not')) {
+      if (rec.not === null) return actual !== null
+      return actual !== null && actual !== rec.not
+    }
+  }
+  return true
+}
+
+function matchesAttemptWhere(attempt: Attempt, where: Record<string, unknown>): boolean {
+  const matchesClause = (clause: Record<string, unknown>): boolean => {
+    if (!matchesPrismaScalar(attempt.orderId, clause['orderId'])) return false
+    if (!matchesPrismaScalar(attempt.channel, clause['channel'])) return false
+    if (!matchesPrismaScalar(attempt.channelTxnNo, clause['channelTxnNo'])) return false
+    if (!matchesPrismaScalar(attempt.id, clause['id'])) return false
+    if (!matchesPrismaScalar(attempt.status, clause['status'])) return false
+    if (!matchesPrismaScalar(attempt.qrCodeContent, clause['qrCodeContent'])) return false
+    if (!matchesPrismaScalar(attempt.prepayId, clause['prepayId'])) return false
+    if (!matchesPrismaScalar(attempt.failReason, clause['failReason'])) return false
+
+    const expiresAt = clause['expiresAt'] as { lt?: Date; gt?: Date } | undefined
+    if (expiresAt?.lt && attempt.expiresAt >= expiresAt.lt) return false
+    if (expiresAt?.gt && attempt.expiresAt <= expiresAt.gt) return false
+    return true
+  }
+
+  const { OR: alternatives, ...base } = where
+  if (!matchesClause(base)) return false
+  if (!Array.isArray(alternatives)) return true
+  return alternatives.some((alternative) => matchesClause(alternative as Record<string, unknown>))
+}
+
+/** 与 online-payment.service.ts createCodePayAttempt 的 existing 互斥 OR 同形。 */
+function codePayExistingMutexWhere(orderId: string): Record<string, unknown> {
+  return {
+    orderId,
+    OR: [
+      { status: { in: ['created', 'pending'] } },
+      { status: 'expired', qrCodeContent: null, prepayId: { not: null } },
+      {
+        status: { in: ['created', 'pending', 'expired'] },
+        failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+      },
+      {
+        status: { in: ['created', 'pending', 'expired'] },
+        prepayId: null,
+        qrCodeContent: null,
+        channelTxnNo: null,
+      },
+    ],
+  }
+}
+
 function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
   payment: OnlinePaymentService
   makeOrder: (amountCents: number) => { order: Order; token: string }
@@ -66,41 +133,6 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
   const attempts = new Map<string, Attempt>()
   const audits: Array<Record<string, unknown>> = []
   const findManyCalls: Array<Record<string, unknown>> = []
-
-  const matchesAttemptWhere = (attempt: Attempt, where: Record<string, unknown>): boolean => {
-    const matchesClause = (clause: Record<string, unknown>): boolean => {
-      if (typeof clause['orderId'] === 'string' && attempt.orderId !== clause['orderId']) return false
-      if (typeof clause['channel'] === 'string' && attempt.channel !== clause['channel']) return false
-      if (clause['channel']?.['not'] === 'sandbox' && attempt.channel === 'sandbox') return false
-      if (typeof clause['channelTxnNo'] === 'string' && attempt.channelTxnNo !== clause['channelTxnNo']) return false
-
-      const id = clause['id'] as { not?: string } | string | undefined
-      if (typeof id === 'string' && attempt.id !== id) return false
-      if (id && typeof id !== 'string' && id.not && attempt.id === id.not) return false
-
-      const status = clause['status'] as { in?: string[] } | string | undefined
-      if (typeof status === 'string' && attempt.status !== status) return false
-      if (status && typeof status !== 'string' && status.in && !status.in.includes(attempt.status)) return false
-
-      const qrCodeContent = clause['qrCodeContent'] as { not?: string | null } | string | null | undefined
-      if (qrCodeContent === null && attempt.qrCodeContent !== null) return false
-      if (qrCodeContent && typeof qrCodeContent === 'object' && qrCodeContent.not === null && attempt.qrCodeContent === null) return false
-
-      const prepayId = clause['prepayId'] as { not?: string | null } | string | null | undefined
-      if (prepayId === null && attempt.prepayId !== null) return false
-      if (prepayId && typeof prepayId === 'object' && prepayId.not === null && attempt.prepayId === null) return false
-
-      const expiresAt = clause['expiresAt'] as { lt?: Date; gt?: Date } | undefined
-      if (expiresAt?.lt && attempt.expiresAt >= expiresAt.lt) return false
-      if (expiresAt?.gt && attempt.expiresAt <= expiresAt.gt) return false
-      return true
-    }
-
-    const { OR: alternatives, ...base } = where
-    if (!matchesClause(base)) return false
-    if (!Array.isArray(alternatives)) return true
-    return alternatives.some((alternative) => matchesClause(alternative as Record<string, unknown>))
-  }
 
   const prisma = {
     order: {
@@ -428,6 +460,49 @@ async function main(): Promise<void> {
   const priorSecret = process.env['PAYMENT_SESSION_SECRET']
   process.env['PAYMENT_SESSION_SECRET'] = SESSION_SECRET
   try {
+    const closedQr: Attempt = {
+      id: 'pa_closed_qr',
+      orderId: 'ord_closed_qr',
+      channel: 'sandbox',
+      amountCents: 100,
+      status: 'expired',
+      expiresAt: new Date(Date.now() - 1_000),
+      prepayId: 'sbx_prepay_closed',
+      qrCodeContent: 'sandboxpay://qr?attempt=pa_closed_qr',
+      channelTxnNo: null,
+      failReason: null,
+    }
+    const mutexWhere = codePayExistingMutexWhere(closedQr.orderId)
+    if (matchesAttemptWhere(closedQr, mutexWhere)) {
+      fail('expired QR with failReason=null must not match CHANNEL_ACCEPTED_UNCONFIRMED mutex branch')
+    }
+    pass('Prisma stub: expired+failReason=null does not equal CHANNEL_ACCEPTED_UNCONFIRMED')
+
+    const unconfirmed: Attempt = {
+      ...closedQr,
+      id: 'pa_unconfirmed',
+      prepayId: null,
+      qrCodeContent: null,
+      failReason: CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+    }
+    if (!matchesAttemptWhere(unconfirmed, mutexWhere)) {
+      fail('explicit CHANNEL_ACCEPTED_UNCONFIRMED must still match the mutex')
+    }
+    pass('Prisma stub: explicit CHANNEL_ACCEPTED_UNCONFIRMED still matches mutex')
+
+    const emptyExpired: Attempt = {
+      ...closedQr,
+      id: 'pa_empty_expired',
+      prepayId: null,
+      qrCodeContent: null,
+      channelTxnNo: null,
+      failReason: null,
+    }
+    if (!matchesAttemptWhere(emptyExpired, mutexWhere)) {
+      fail('expired empty identifiers must still match the empty-identifier mutex branch')
+    }
+    pass('Prisma stub: expired empty identifiers still match mutex')
+
     const { payment, makeOrder, attempts, audits } = createFixture()
     const valid = makeOrder(100)
     await expectCode('missing payment session is rejected', 'PAYMENT_SESSION_REQUIRED', () =>
@@ -595,14 +670,16 @@ async function main(): Promise<void> {
     }
 
     class FailedQrCreateSandboxProvider extends SandboxPaymentProvider {
+      calls = 0
       override async createQrPayment(): Promise<never> {
-        throw new Error('SIMULATED_QR_PRECREATE_FAILURE')
+        this.calls += 1
+        throw new Error('ALIPAY_CHANNEL_ERROR: 40004 ACQ.INVALID_PARAMETER')
       }
     }
-    const failedQrCreateFixture = createFixture(new FailedQrCreateSandboxProvider(SESSION_SECRET))
+    const failedQrProvider = new FailedQrCreateSandboxProvider(SESSION_SECRET)
+    const failedQrCreateFixture = createFixture(failedQrProvider)
     const failedQrCreateOrder = failedQrCreateFixture.makeOrder(100)
-    // 渠道出码抛错不得把渠道原始错误透给收银台，也不得把订单卡在 paying 等本地过期。
-    // 契约：立刻把尝试置 failed（不可扫）、订单回 unpaid（可立即重试）、对外只给 PAY_CHANNEL_UNAVAILABLE。
+    // 现有 provider 只抛普通 Error。看起来像 40004 也不能当成明确拒绝再出第二码。
     let qrCreateRejection: unknown
     try {
       await failedQrCreateFixture.payment.createPayAttempt(failedQrCreateOrder.order.id, failedQrCreateOrder.token, 'sandbox')
@@ -616,12 +693,16 @@ async function main(): Promise<void> {
         : qrCreateRejection,
     )
     const rejectionStatus = (qrCreateRejection as { status?: number } | undefined)?.status
-    if (rejectionText.includes('PAY_CHANNEL_UNAVAILABLE') && rejectionStatus === 503) {
-      pass('QR precreate failure surfaces as PAY_CHANNEL_UNAVAILABLE (503), not the raw channel error')
+    if (
+      rejectionText.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+      rejectionText.includes('支付结果尚未确认') &&
+      rejectionStatus === 503
+    ) {
+      pass('QR precreate throw surfaces as PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED (503), not a releasable failure')
     } else {
-      fail(`QR precreate failure must surface as PAY_CHANNEL_UNAVAILABLE 503, got: ${rejectionText} status=${String(rejectionStatus)}`)
+      fail(`QR precreate failure must stay unconfirmed 503, got: ${rejectionText} status=${String(rejectionStatus)}`)
     }
-    if (!rejectionText.includes('SIMULATED_QR_PRECREATE_FAILURE')) {
+    if (!rejectionText.includes('ACQ.INVALID_PARAMETER') && !rejectionText.includes('40004') && !rejectionText.includes('已受理')) {
       pass('raw channel error text never reaches the cashier response')
     } else {
       fail(`raw channel error leaked to the cashier: ${rejectionText}`)
@@ -633,21 +714,77 @@ async function main(): Promise<void> {
       failedQrCreateOrder.token,
     )
     if (
-      failedQrAttempt.status === 'failed' &&
+      failedQrAttempt.status !== 'failed' &&
+      failedQrAttempt.status !== 'success' &&
       failedQrAttempt.qrCodeContent === null &&
-      failedQrAttempt.prepayId === null &&
-      failedQrCreateOrder.order.payStatus === 'unpaid' &&
-      recoveredFromFailedQrCreate.payStatus === 'unpaid'
+      failedQrCreateOrder.order.payStatus === 'paying' &&
+      recoveredFromFailedQrCreate.payStatus === 'paying'
     ) {
-      pass('failed QR precreate is released immediately: attempt not scannable, order back to unpaid without waiting for expiry')
+      pass('plain QR error that looks like 40004 stays locked instead of returning the order to unpaid')
     } else {
       fail(
-        `failed QR precreate must release immediately: ${JSON.stringify({
+        `40004-like QR throw must stay locked: ${JSON.stringify({
           attempt: failedQrAttempt,
           order: failedQrCreateOrder.order,
           status: recoveredFromFailedQrCreate,
         })}`,
       )
+    }
+    await expectCode('40004-like QR throw blocks a second code (PAYMENT_ATTEMPT_PENDING)', 'PAYMENT_ATTEMPT_PENDING', () =>
+      failedQrCreateFixture.payment.createPayAttempt(failedQrCreateOrder.order.id, failedQrCreateOrder.token, 'sandbox'),
+    )
+    if (failedQrProvider.calls === 1 && failedQrCreateFixture.attempts.size === 1) {
+      pass('40004-like QR throw calls the provider once and does not mint a second attempt')
+    } else {
+      fail(`40004-like QR provider calls=${failedQrProvider.calls} attempts=${failedQrCreateFixture.attempts.size}`)
+    }
+
+    class UnknownQrCreateSandboxProvider extends SandboxPaymentProvider {
+      calls = 0
+      override async createQrPayment(): Promise<never> {
+        this.calls += 1
+        throw new Error('ALIPAY_CHANNEL_ERROR: 20000')
+      }
+    }
+    const unknownQrProvider = new UnknownQrCreateSandboxProvider(SESSION_SECRET)
+    const unknownQrFixture = createFixture(unknownQrProvider)
+    const unknownQrOrder = unknownQrFixture.makeOrder(100)
+    let unknownQrRejection: unknown
+    try {
+      await unknownQrFixture.payment.createPayAttempt(unknownQrOrder.order.id, unknownQrOrder.token, 'sandbox')
+      fail('unknown QR precreate should reject')
+    } catch (error) {
+      unknownQrRejection = error
+    }
+    const unknownQrText = JSON.stringify(
+      unknownQrRejection instanceof Error
+        ? { message: unknownQrRejection.message, response: (unknownQrRejection as { response?: unknown }).response }
+        : unknownQrRejection,
+    )
+    const unknownQrStatus = (unknownQrRejection as { status?: number } | undefined)?.status
+    const unknownQrAttempt = [...unknownQrFixture.attempts.values()][0]
+    if (!unknownQrAttempt) fail('missing unknown QR precreate attempt fixture')
+    if (
+      unknownQrText.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+      unknownQrStatus === 503 &&
+      !unknownQrText.includes('20000') &&
+      unknownQrAttempt.status !== 'failed' &&
+      unknownQrAttempt.status !== 'success' &&
+      unknownQrOrder.order.payStatus === 'paying'
+    ) {
+      pass('unknown QR precreate stays unconfirmed: 503, no raw channel text, order remains paying')
+    } else {
+      fail(
+        `unknown QR precreate mismatch: status=${String(unknownQrStatus)} body=${unknownQrText} attempt=${JSON.stringify(unknownQrAttempt)} pay=${unknownQrOrder.order.payStatus}`,
+      )
+    }
+    await expectCode('unknown QR precreate blocks a second code (PAYMENT_ATTEMPT_PENDING)', 'PAYMENT_ATTEMPT_PENDING', () =>
+      unknownQrFixture.payment.createPayAttempt(unknownQrOrder.order.id, unknownQrOrder.token, 'sandbox'),
+    )
+    if (unknownQrProvider.calls === 1 && unknownQrFixture.attempts.size === 1) {
+      pass('unknown QR precreate calls the provider once and does not mint a second attempt')
+    } else {
+      fail(`unknown QR provider calls=${unknownQrProvider.calls} attempts=${unknownQrFixture.attempts.size}`)
     }
 
     class MismatchedAmountSandboxProvider extends SandboxPaymentProvider {

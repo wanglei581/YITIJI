@@ -1,5 +1,9 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
+> **方案快照（2026-09-26 标注）：** 本文写于 2026-08，功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+>
+> 证书到期日以实测为准（2026-09 记录为 12 月 3 日），不要照抄本文日期。
+
 > **验收快照（2026-08-08 线上实测复核）**
 >
 > 本次以 GitHub Actions 记录 + `zyidai.cn` 线上实际响应为证据复核，纠正此前「未部署」的过时判断。
@@ -256,6 +260,7 @@
 - [ ] AI provider / LLM 功能级配置可读取。
   **待取证（服务器只读）**：`grep -E '^(AI_PROVIDER|AI_LLM_API_KEY|TRTC_LLM_API_KEY)=' services/api/.env | sed -E 's/(API_KEY)=.*/\1=SET/'`
   （旁证：预检要求 `AI_PROVIDER=llm` 且至少一把 LLM key 非空；未做模型 live 调用。）
+- [ ] `AIGC_CONTENT_PRODUCER` 设为公司全称或统一社会信用代码（取哪一个由产品负责人定）。它写进导出 PDF / DOCX 的 GB 45438 隐式标识 ContentProducer；生产空着或填产品名「职易达」，启动闸门报 `PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING`，部署在 3c 预检中止（备份与重启之前）。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
 - [ ] `RESUME_PDF_FONT_PATH` / `RESUME_PDF_FONT_FAMILY` 已按需配置；默认系统候选可用时可留空。旧变量 `JOB_MATERIAL_PDF_FONT_PATH` / `_FAMILY` 仅作兼容回退，不再作为新部署主配置。
 - [~] `NODE_ENV=production` 下字体探测失败会以 `PRODUCTION_CJK_FONT_MISSING` 拒绝启动；管理员登录后读取 `GET /api/v1/health/cjk-font`，确认 `data.ok=true`、`path` / `family` 与预期一致。

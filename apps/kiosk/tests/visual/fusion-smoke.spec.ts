@@ -1,16 +1,18 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
+import { RECRUITMENT_HOSTING_OFF } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
 import { productionRoutePatterns } from './route-manifest'
 
 const kioskScenarios = [
-  { path: '/error-offline', landmark: '网络连接中断', registerHealthProbe: true },
+  // 2026-09-25 迁入稿 09-system-state：进页默认是「还没检测」，页面标题换成稿的八项状态区块标题。
+  { path: '/error-offline', landmark: '这台机器的八项状态', registerHealthProbe: true },
 ] as const
 
 const mobileScenarios = [
-  { path: '/member/qr-login', landmark: '暂时无法确认登录' },
-  { path: '/upload/phone', landmark: '上传链接已失效' },
+  { path: '/member/qr-login', landmark: '这个链接不能用来登录' },
+  { path: '/upload/phone', landmark: '这个链接不能用来上传' },
 ] as const
 
 function collectRuntimeErrors(page: Page): string[] {
@@ -34,6 +36,8 @@ function registerHomeShellApi(api: ApiRouter) {
         items: [],
       },
       toolbox: { enabled: false, items: [] },
+      // 按我们云上的默认（招聘内容托管关闭，3.13）：首页底栏说的是「本终端未开放岗位与招聘会信息，也不代收简历」。
+      ...RECRUITMENT_HOSTING_OFF,
       configVersion: 'filing-smoke-fixture',
       refreshIntervalMs: 300000,
       serverTime: '2026-07-28T00:00:00.000Z',
@@ -108,8 +112,9 @@ test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ pag
   // 断言意图是「已落到干净首页」，不是锁定某句营销文案。V6 首页不再有
   // 「简历、岗位、打印」，改用首页底部的合规声明作锚点：它是 CLAUDE.md §2/§10
   // 强制要求必须出现的文本，稳定且不会随视觉改版消失，断言它同时守住合规底线。
+  // 3.13 起这句随招聘内容托管变：本夹具是托管关闭（我们云上的默认），打开时那句由 qingxu-home / fusion-w1 钉。
   await expect(
-    page.getByText('本终端仅展示与跳转，不代收简历', { exact: false }).first()
+    page.getByText('本终端未开放岗位与招聘会信息，也不代收简历', { exact: false }).first()
   ).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: /还在用吗/ })).toHaveCount(0)
@@ -148,6 +153,18 @@ for (const projectTag of ['@kiosk', '@mobile'] as const) {
     const runtimeErrors = collectRuntimeErrors(page)
 
     await page.goto('/help', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+    await expect(page.locator('.ui-kiosk-topbar')).toHaveCount(0)
+    const categories = page.getByRole('group', { name: '按分类筛选常见问题' })
+    await expect(categories.getByRole('button', { name: /登录与账号.*3 问/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /一定要登录才能使用吗/ })).toHaveCount(0)
+    await categories.getByRole('button', { name: /登录与账号.*3 问/ }).click()
+    const question = page.getByRole('button', { name: /一定要登录才能使用吗/ })
+    await expect(question).toBeVisible()
+    await question.click()
+    await expect(question).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByText('不需要。大部分服务可以游客身份直接使用。', { exact: false })).toBeVisible()
+    await expect(page.getByRole('button', { name: '去登录' })).toBeVisible()
     await assertHelpCenterFilingInfo(page)
     await assertNoHorizontalOverflow(page)
     expect(runtimeErrors).toEqual([])

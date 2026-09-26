@@ -12,7 +12,8 @@
 const TYPE_LABEL = {
   export: '导出我的数据',
   delete: '账号注销',
-  revoke_consent: '撤回岗位 AI 授权',
+  // 服务端 revoke_consent 撤回的是 job_ai 授权；小程序里用它的只有「简历对照」。
+  revoke_consent: '撤回简历对照授权',
 }
 
 const STATUS_LABEL = {

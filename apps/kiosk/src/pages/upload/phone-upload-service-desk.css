@@ -1,83 +1,270 @@
-/* PhoneUploadPage — mobile 390×844 service-desk visual contract */
+/* PhoneUploadPage — 稿 51-phone-relay（screen=phone-upload）的手机端落版。
+ * 视觉真值：docs/design/kiosk-redesign-2026-08/phone-relay.css，数值逐项取自那份稿；与 /member/qr-login 同一套接力壳。
+ * 用户自己的手机，不套一体机壳层：没有 topbar / navbar / 大字阶，只有这一次上传。
+ * 390×844 是主视口：390 是上限不是固定值，360 / 375 真机不能横向溢出；高度用 dvh。宽屏只把同一列居中成 390 宽的手机卡。
+ * 触控：任何可点 ≥48px。动效只用 transform / opacity，reduced-motion 一律静态。 */
+
 .k1-phone-upload {
-  --m-paper: var(--color-canvas, var(--k-paper, var(--color-canvas)));
-  --m-surface: var(--color-surface, var(--k-surface, var(--color-surface)));
-  --m-ink: var(--color-neutral-900, var(--k-ink));
-  --m-muted: var(--color-neutral-500, var(--k-muted));
-  --m-line: var(--color-neutral-200, var(--k-line));
-  --m-teal: var(--color-primary-600, var(--k-teal));
-  --m-teal-deep: var(--color-primary-700, var(--k-teal-deep));
-  --m-teal-soft: var(--color-primary-100, var(--k-teal-soft));
-  --m-canvas: var(--color-dark, var(--k-ink));
-  min-height: 100dvh; display: grid; place-items: center; padding: 20px;
-  color: var(--m-ink); background: var(--m-canvas); font-family: var(--font-sans, 'PingFang SC', sans-serif);
+  /* 只消费青序流光令牌（src/styles/qingxu/tokens.css）；hex 仅作令牌缺席时的回落。 */
+  --m-paper: var(--qx-paper, #f5f2e9); --m-surface: var(--qx-surface, #fffdf8); --m-ink: var(--qx-ink, #10302b);
+  --m-ink2: var(--qx-ink-2, #3d5a52); --m-muted: var(--qx-ink-3, #6b857c);
+  --m-line: var(--qx-line, #e3ddcb); --m-line2: var(--qx-line-2, #d4cdb6);
+  --m-deep: var(--qx-deep, #0b241e); --m-deep2: var(--qx-deep-2, #123a30);
+  --m-emerald: var(--qx-emerald, #2ee6a8); --m-on-solid: var(--qx-on-solid, #ffffff);
+  --m-emerald2: color-mix(in srgb, var(--m-emerald) 62%, var(--m-on-solid));
+  --m-teal: var(--qx-teal, #1f9e86); --m-teal-d: var(--qx-teal-d, #157a67); --m-teal-soft: var(--qx-teal-soft, #e0f2ec);
+  --m-teal-line: var(--qx-teal-line, #8dc4b5);
+  --m-wheat: var(--qx-wheat, #a9781f); --m-wheat-d: var(--qx-wheat-d, #8a6219); --m-wheat-soft: var(--qx-wheat-soft, #f3ecda);
+  --m-wheat-line: color-mix(in srgb, var(--m-wheat) 45%, var(--m-wheat-soft));
+  --m-cinnabar: var(--qx-cinnabar, #b23a2e); --m-cinnabar-d: var(--qx-cinnabar-d, #963227); --m-cinnabar-soft: var(--qx-cinnabar-soft, #f6e4e1);
+  --m-cinnabar-line: var(--qx-cinnabar-line, #d9b8b2);
+  --m-muted-bg: var(--qx-muted-bg, #ece7d9); --m-muted-line: var(--qx-muted-line, #dcd7c9); --m-muted-ink: var(--qx-muted-ink, #6d7069);
+  /* 稿 phone-relay.css 里只此一处用到的色值：用令牌混色取近似，不另写字面 hex。多数与稿色差 ΔE≤3；
+     等待态描边沿用与扫码登录页同源的 --m-wheat-line、警示小字取 wheat-d 偏朱，这两项约 ΔE 6。 */
+  --m-hint: color-mix(in srgb, var(--m-ink2) 65%, var(--m-muted));
+  --m-disabled-bg: color-mix(in srgb, var(--m-on-solid) 65%, var(--m-line2));
+  --m-track: color-mix(in srgb, var(--m-on-solid) 50%, var(--m-line2));
+  --m-track-idle: color-mix(in srgb, var(--m-muted-line) 90%, var(--m-paper));
+  --m-dead-ink: color-mix(in srgb, var(--m-cinnabar-d) 65%, var(--m-ink2));
+  --m-dead-pill: color-mix(in srgb, var(--m-cinnabar-line) 75%, var(--m-paper));
+  --m-wait-ink: color-mix(in srgb, var(--m-wheat-d) 85%, var(--m-ink));
+  --m-wait-pill-ink: color-mix(in srgb, var(--m-wheat-d) 75%, var(--m-deep));
+  --m-wait-pill: color-mix(in srgb, var(--m-wheat) 25%, var(--m-wheat-soft));
+  --m-wait-stripe: color-mix(in srgb, var(--m-wheat) 15%, var(--m-wheat-soft));
+  --m-warn-ink: color-mix(in srgb, var(--m-wheat-d) 80%, var(--m-cinnabar-d));
+  --m-done-line: color-mix(in srgb, var(--m-teal) 40%, var(--m-paper));
+  --m-done-ink: color-mix(in srgb, var(--m-teal-d) 45%, var(--m-deep));
+  --m-on-deep: var(--m-paper);
+  --m-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --m-ease: cubic-bezier(.22, 1, .36, 1);
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  justify-content: center;
+  align-items: center;
+  color: var(--m-ink);
+  background: var(--m-muted-bg);
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
+
 .k1-phone-upload .k1-phone-upload-content {
-  box-sizing: border-box; display: flex; width: min(390px, 100%); min-width: 0; max-width: 100%;
-  min-height: min(844px, calc(100dvh - 40px)); flex-direction: column; gap: 16px; padding: 24px 20px;
-  border: 1px solid var(--m-line); border-radius: 28px; background: var(--m-paper); box-shadow: 0 24px 60px rgba(9, 26, 23, .25);
-}
-.k1-phone-upload .phone-upload-invalid {
-  box-sizing: border-box; display: flex; width: min(390px, 100%); min-width: 0; max-width: 100%;
-  flex-direction: column; align-items: center; gap: 16px; padding: 24px; text-align: center; color: var(--m-paper);
-}
-.k1-phone-upload .phone-upload-invalid svg { width: 48px; height: 48px; color: var(--color-error-fg); }
-.k1-phone-upload .phone-upload-invalid p:first-of-type { margin: 0; font-size: 18px; font-weight: 700; }
-.k1-phone-upload .phone-upload-invalid p:last-of-type { margin: 0; color: rgba(244, 241, 232, .72); font-size: 14px; line-height: 1.55; }
-.k1-phone-upload .ph-up-brand { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
-.k1-phone-upload .ph-up-brand > span { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 10px; color: var(--m-paper); background: var(--m-ink); }
-.k1-phone-upload .ph-up-brand svg { width: 20px; height: 20px; }
-.k1-phone-upload .ph-up-brand strong { display: block; font-family: var(--font-serif); font-size: 17px; font-weight: 700; }
-.k1-phone-upload .ph-up-brand small { display: block; margin-top: 2px; color: var(--m-muted); font-size: 13px; }
-.k1-phone-upload .ph-up-target { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--m-line); border-radius: 12px; background: var(--m-surface); font-size: 13px; color: var(--m-muted); }
-.k1-phone-upload .ph-up-target svg { width: 16px; height: 16px; flex: 0 0 auto; }
-.k1-phone-upload .ph-up-target b { color: var(--m-ink); font-weight: 650; }
-.k1-phone-upload .ph-up-pick {
-  position: relative; display: flex; min-height: 150px; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  padding: 20px; border: 2px dashed rgba(31, 158, 134, .45); border-radius: 14px; background-color: var(--m-teal-soft); color: var(--m-teal-deep); text-align: center; cursor: pointer;
-}
-.k1-phone-upload .ph-up-pick:active { transform: scale(.98); }
-.k1-phone-upload .ph-up-pick--drag { border-color: var(--m-teal); background-color: var(--m-teal-soft); }
-.k1-phone-upload .ph-up-pick.is-busy { pointer-events: none; opacity: .75; }
-.k1-phone-upload .ph-up-pick svg { width: 40px; height: 40px; }
-.k1-phone-upload .ph-up-pick b { font-size: 18px; font-weight: 700; }
-.k1-phone-upload .ph-up-pick span { font-size: 13px; line-height: 1.55; color: var(--m-muted); }
-.k1-phone-upload .ph-up-count { flex: 0 0 auto; font-size: 14px; font-weight: 700; }
-.k1-phone-upload .ph-up-file,
-.k1-phone-upload .ph-up-empty { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--m-line); border-radius: 12px; background: var(--m-surface); }
-.k1-phone-upload .ph-up-empty { justify-content: center; border-style: dashed; color: var(--m-muted); font-size: 14px; }
-.k1-phone-upload .ph-up-file-icon { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 10px; color: var(--color-warning-fg); background: var(--color-warning-bg); }
-.k1-phone-upload .ph-up-file-icon svg { width: 22px; height: 22px; }
-.k1-phone-upload .ph-up-file-meta { min-width: 0; flex: 1; }
-.k1-phone-upload .ph-up-file-meta b { display: block; overflow: hidden; font-size: 15px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-.k1-phone-upload .ph-up-file-meta span { display: block; margin-top: 2px; color: var(--m-muted); font-size: 12px; }
-.k1-phone-upload .ph-up-remove { display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center; border: 1px solid var(--m-line); border-radius: 12px; color: var(--m-muted); background: var(--m-paper); }
-.k1-phone-upload .ph-up-remove:disabled { opacity: .4; }
-.k1-phone-upload .ph-up-status { flex: 0 0 auto; padding: 16px; border: 1px solid var(--m-line); border-radius: 12px; background: var(--m-surface); }
-.k1-phone-upload .ph-up-status-head { display: flex; align-items: center; gap: 10px; font-size: 15px; }
-.k1-phone-upload .ph-up-status-head b { font-weight: 700; }
-.k1-phone-upload .ph-up-status-head span { margin-left: auto; color: var(--m-muted); font-size: 13px; }
-.k1-phone-upload .ph-up-track { height: 12px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: var(--color-neutral-100); }
-.k1-phone-upload .ph-up-track-bar { height: 100%; border-radius: 999px; }
-.k1-phone-upload .ph-up-track-bar.is-idle { width: 20%; background: var(--color-neutral-300); }
-.k1-phone-upload .ph-up-track-bar.is-success { width: 100%; background: var(--color-success); }
-.k1-phone-upload .ph-up-track-bar.is-error { width: 100%; background: var(--color-error); }
-.k1-phone-upload .ph-up-status-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; color: var(--m-muted); font-size: 13.5px; line-height: 1.55; }
-.k1-phone-upload .ph-up-status-note svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; }
-.k1-phone-upload .ph-up-privacy { display: flex; flex: 0 0 auto; align-items: flex-start; gap: 8px; margin-top: auto; padding: 12px 14px; border: 1px dashed var(--m-line); border-radius: 12px; color: var(--m-muted); font-size: 13px; line-height: 1.55; }
-.k1-phone-upload .ph-up-privacy svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; color: var(--color-warning-fg); }
-@keyframes ph-up-slide { 0% { background-position: -90% 0; } 100% { background-position: 190% 0; } }
-.k1-phone-upload .ph-up-progress-bar {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  overflow: hidden;
   width: 100%;
-  background: linear-gradient(90deg, rgba(31, 158, 134, 0) 0%, var(--m-teal) 42%, var(--color-primary-500) 58%, rgba(31, 158, 134, 0) 100%);
-  background-size: 45% 100%; background-repeat: no-repeat; animation: ph-up-slide 1.4s ease-in-out infinite;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--m-paper);
 }
-@media (max-height: 900px), (max-width: 430px) {
-  .k1-phone-upload { padding: 0; }
-  .k1-phone-upload .k1-phone-upload-content { width: 100%; min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+
+/* ── 顶部接力条：常驻提示「这一页只为一体机服务」 ── */
+.k1-phone-upload .ph-up-relaybar {
+  position: relative; display: flex; flex: 0 0 auto; align-items: center; gap: 11px; overflow: hidden;
+  padding: 16px 18px 20px; padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  color: var(--m-on-deep); background: linear-gradient(152deg, var(--m-deep2), var(--m-deep) 72%);
 }
+.k1-phone-upload .ph-up-relaybar::after {
+  content: ''; position: absolute; right: -70px; top: -86px; width: 220px; height: 220px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 230, 168, .17), transparent 66%); pointer-events: none;
+}
+.k1-phone-upload .ph-up-seal {
+  display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 11px;
+  color: var(--m-deep); background: linear-gradient(145deg, var(--m-emerald), var(--m-teal)); font-family: var(--m-serif); font-size: 21px; font-weight: 900;
+}
+.k1-phone-upload .ph-up-brand { position: relative; z-index: 1; min-width: 0; flex: 1; }
+.k1-phone-upload .ph-up-brand strong { display: block; font-family: var(--m-serif); font-size: 16px; font-weight: 800; letter-spacing: 1.5px; }
+.k1-phone-upload .ph-up-brand small {
+  display: block; margin-top: 2px; overflow: hidden; color: rgba(242, 239, 228, .72); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap;
+}
+.k1-phone-upload .ph-up-tag {
+  position: relative; z-index: 1; display: inline-flex; flex: 0 0 auto; align-items: center; height: 26px; padding: 0 11px;
+  border: 1px solid rgba(46, 230, 168, .34); border-radius: 13px; color: var(--m-emerald2); font-size: 12px; font-weight: 700; letter-spacing: .5px;
+}
+.k1-phone-upload .ph-up-wave { position: relative; height: 12px; flex: 0 0 auto; background: var(--m-paper); }
+.k1-phone-upload .ph-up-wave::before {
+  content: ''; position: absolute; right: 0; left: 0; top: -14px; height: 26px; background: var(--m-deep); clip-path: ellipse(72% 48% at 50% 0);
+}
+
+/* ── 任务区：唯一纵向流 ── */
+.k1-phone-upload .ph-up-flow {
+  display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 12px; overflow-y: auto;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 14px 18px;
+}
+.k1-phone-upload .ph-up-takeover { display: flex; flex: 1 0 auto; flex-direction: column; gap: 12px; }
+.k1-phone-upload .ph-up-grow { flex: 1 1 auto; min-height: 0; }
+
+/* ── 整屏状态卡：链接不可用 / 签名印章不可用 ── */
+.k1-phone-upload .ph-up-statecard {
+  display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; padding: 26px 22px;
+  border: 1px solid var(--m-line); border-radius: 22px; background: var(--m-surface); text-align: center;
+}
+.k1-phone-upload .ph-up-glyph {
+  display: grid; width: 64px; height: 64px; place-items: center; border-radius: 20px; color: var(--m-wheat-d); background: var(--m-wheat-soft);
+}
+.k1-phone-upload .ph-up-glyph svg { width: 30px; height: 30px; }
+.k1-phone-upload .ph-up-statecard h1 { margin-top: 15px; font-family: var(--m-serif); font-size: 19px; font-weight: 800; line-height: 1.36; }
+.k1-phone-upload .ph-up-statecard p { max-width: 280px; margin-top: 9px; color: var(--m-muted); font-size: 13.5px; line-height: 1.65; }
+
+/* ── 去处行：未经核对的提示降一级，页面不按它决定任何事 ── */
+.k1-phone-upload .ph-up-target {
+  display: flex; flex: 0 0 auto; align-items: flex-start; gap: 9px; padding: 11px 13px;
+  border: 1px solid var(--m-line); border-radius: 14px; color: var(--m-ink2); background: var(--m-surface); font-size: 13px; line-height: 1.5;
+}
+.k1-phone-upload .ph-up-target > svg { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 1px; color: var(--m-teal-d); }
+.k1-phone-upload .ph-up-unsure { display: block; margin-top: 5px; color: var(--m-muted); font-size: 12px; line-height: 1.5; }
+
+/* ── 三步条：只写「接下来怎么做」，不是进度 ── */
+.k1-phone-upload .ph-up-steps {
+  display: flex; flex: 0 0 auto; gap: 14px; padding: 11px 12px; border: 1px dashed var(--m-line2); border-radius: 16px; background: var(--m-surface);
+}
+.k1-phone-upload .ph-up-steps li {
+  position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 5px;
+  color: var(--m-ink2); font-size: 12.5px; font-weight: 650; line-height: 1.35; text-align: center;
+}
+.k1-phone-upload .ph-up-steps li + li::before { content: '›'; position: absolute; left: -11px; top: 50%; color: var(--m-line2); transform: translateY(-50%); }
+.k1-phone-upload .ph-up-step-no {
+  display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; color: var(--m-teal-d); background: var(--m-teal-soft); font-size: 12px; font-weight: 800;
+}
+
+/* ── 选择区：整块可点；不可选的四种模式各有色，wait / unknown 用麦色（停一下，别动），dead 用失败色 ── */
+.k1-phone-upload .ph-up-picker {
+  position: relative; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px;
+  border: 2px dashed rgba(31, 158, 134, .45); border-radius: 20px; color: var(--m-teal-d); background: var(--m-teal-soft); text-align: center; cursor: pointer;
+  transition: transform 120ms var(--m-ease);
+}
+.k1-phone-upload .ph-up-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; opacity: 0; }
+.k1-phone-upload .ph-up-picker-ic svg { width: 30px; height: 30px; }
+.k1-phone-upload .ph-up-picker b { font-size: 17.5px; font-weight: 800; letter-spacing: .5px; }
+.k1-phone-upload .ph-up-hint { max-width: 270px; color: var(--m-hint); font-size: 12.5px; line-height: 1.6; }
+.k1-phone-upload .ph-up-pill {
+  display: flex; min-height: 48px; align-items: center; justify-content: center; margin-top: 2px; padding: 0 26px;
+  border-radius: 24px; color: var(--m-surface); background: var(--m-teal); font-size: 15.5px; font-weight: 750; letter-spacing: 1px;
+}
+.k1-phone-upload .ph-up-picker[aria-disabled='true'] { border-color: var(--m-line2); color: var(--m-muted); background: var(--m-disabled-bg); cursor: default; }
+.k1-phone-upload .ph-up-picker[aria-disabled='true'] :is(.ph-up-hint, .ph-up-picker-ic) { color: var(--m-muted); }
+.k1-phone-upload .ph-up-picker[aria-disabled='true'] .ph-up-pill { color: var(--m-muted-ink); background: var(--m-muted-line); }
+.k1-phone-upload .ph-up-picker[data-mode='busy'] .ph-up-picker-ic svg { animation: ph-up-spin 1.1s linear infinite; }
+.k1-phone-upload .ph-up-picker[data-mode='dead'] { border-style: solid; border-color: var(--m-cinnabar-line); color: var(--m-cinnabar-d); background: var(--m-cinnabar-soft); }
+.k1-phone-upload .ph-up-picker[data-mode='dead'] :is(.ph-up-hint, .ph-up-picker-ic) { color: var(--m-cinnabar-d); }
+.k1-phone-upload .ph-up-picker[data-mode='dead'] .ph-up-pill { color: var(--m-dead-ink); background: var(--m-dead-pill); }
+.k1-phone-upload .ph-up-picker:is([data-mode='wait'], [data-mode='unknown']) { border-style: solid; border-color: var(--m-wheat-line); color: var(--m-wheat-d); background: var(--m-wheat-soft); }
+.k1-phone-upload .ph-up-picker:is([data-mode='wait'], [data-mode='unknown']) :is(.ph-up-hint, .ph-up-picker-ic) { color: var(--m-wait-ink); }
+.k1-phone-upload .ph-up-picker:is([data-mode='wait'], [data-mode='unknown']) .ph-up-pill { color: var(--m-wait-pill-ink); background: var(--m-wait-pill); }
+
+/* ── 文件行 ── */
+.k1-phone-upload .ph-up-filebox {
+  display: flex; flex: 0 0 auto; flex-direction: column; gap: 8px; padding: 12px 13px; border: 1px solid var(--m-line); border-radius: 16px; background: var(--m-surface);
+}
+.k1-phone-upload .ph-up-fb-head { display: flex; align-items: center; font-size: 13px; font-weight: 800; }
+.k1-phone-upload .ph-up-fb-head span { margin-left: auto; color: var(--m-muted); font-weight: 650; }
+.k1-phone-upload .ph-up-file { display: flex; align-items: center; gap: 10px; }
+.k1-phone-upload .ph-up-file-icon {
+  display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: var(--m-wheat-d); background: var(--m-wheat-soft);
+}
+.k1-phone-upload .ph-up-file-icon svg { width: 20px; height: 20px; }
+.k1-phone-upload .ph-up-file-meta { min-width: 0; flex: 1; }
+.k1-phone-upload .ph-up-file-meta b { display: block; overflow: hidden; font-size: 14.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.k1-phone-upload .ph-up-file-meta small { display: block; margin-top: 2px; color: var(--m-muted); font-size: 12px; }
+.k1-phone-upload .ph-up-remove {
+  display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center;
+  border: 1px solid var(--m-line2); border-radius: 12px; color: var(--m-muted); background: var(--m-paper); transition: transform 120ms var(--m-ease);
+}
+.k1-phone-upload .ph-up-remove svg { width: 20px; height: 20px; }
+.k1-phone-upload .ph-up-remove[aria-disabled='true'] { opacity: .45; cursor: not-allowed; }
+.k1-phone-upload .ph-up-empty {
+  display: flex; min-height: 44px; align-items: center; justify-content: center; border: 1px dashed var(--m-line2); border-radius: 12px; color: var(--m-muted); font-size: 13px;
+}
+
+/* ── 状态条：轨道只表达「没开始 / 正在进行 / 结束」三件事，没有百分比 ── */
+.k1-phone-upload .ph-up-progress {
+  display: flex; flex: 0 0 auto; flex-direction: column; gap: 9px; padding: 13px 14px; border: 1px solid var(--m-line); border-radius: 16px; background: var(--m-surface);
+}
+.k1-phone-upload .ph-up-pg-head { display: flex; align-items: center; gap: 9px; font-size: 14.5px; }
+.k1-phone-upload .ph-up-pg-head b { font-weight: 800; }
+.k1-phone-upload .ph-up-pg-head span { margin-left: auto; color: var(--m-muted); font-size: 12.5px; text-align: right; }
+.k1-phone-upload .ph-up-track { height: 8px; overflow: hidden; border-radius: 4px; background: var(--m-track); }
+.k1-phone-upload .ph-up-track i { display: block; width: 100%; height: 100%; border-radius: 4px; }
+.k1-phone-upload .ph-up-track i[data-fill='idle'] { background: repeating-linear-gradient(90deg, var(--m-track-idle) 0 8px, transparent 8px 16px); }
+.k1-phone-upload .ph-up-track i[data-fill='busy'] {
+  background: linear-gradient(90deg, rgba(31, 158, 134, 0) 0%, var(--m-teal) 42%, var(--m-emerald) 58%, rgba(31, 158, 134, 0) 100%);
+  background-repeat: no-repeat; background-size: 46% 100%; animation: ph-up-sheen 1.5s ease-in-out infinite;
+}
+.k1-phone-upload .ph-up-track i[data-fill='done'] { background: var(--m-teal); }
+.k1-phone-upload .ph-up-track i[data-fill='error'] { background: var(--m-cinnabar); }
+/* 结果未知：既不是成功也不是失败，斜纹表达「这一格填不出来」 */
+.k1-phone-upload .ph-up-track i[data-fill='unknown'] { background: repeating-linear-gradient(45deg, var(--m-wheat-line) 0 9px, var(--m-wait-stripe) 9px 18px); }
+.k1-phone-upload .ph-up-note { display: flex; align-items: flex-start; gap: 8px; color: var(--m-muted); font-size: 12.5px; line-height: 1.6; }
+.k1-phone-upload .ph-up-note > svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; }
+.k1-phone-upload .ph-up-note[data-tone='error'] { color: var(--m-cinnabar-d); }
+.k1-phone-upload .ph-up-note[data-tone='warn'] { color: var(--m-warn-ink); }
+.k1-phone-upload .ph-up-note[data-tone='ok'] { color: var(--m-teal-d); }
+.k1-phone-upload .ph-up-server-note { color: var(--m-ink2); font-size: 12.5px; line-height: 1.6; }
+
+/* ── 已收到 ── */
+.k1-phone-upload .ph-up-done {
+  display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; gap: 9px; padding: 22px 20px;
+  border: 1px solid var(--m-done-line); border-radius: 20px; color: var(--m-done-ink); background: var(--m-teal-soft); text-align: center;
+}
+.k1-phone-upload .ph-up-done-glyph { display: grid; width: 56px; height: 56px; place-items: center; border-radius: 18px; color: var(--m-teal-d); background: var(--m-surface); }
+.k1-phone-upload .ph-up-done-glyph svg { width: 26px; height: 26px; }
+.k1-phone-upload .ph-up-done h1 { font-family: var(--m-serif); font-size: 18.5px; font-weight: 800; }
+.k1-phone-upload .ph-up-done > span:last-child { max-width: 262px; font-size: 13px; line-height: 1.6; }
+.k1-phone-upload .ph-up-notice {
+  display: flex; flex: 0 0 auto; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1px solid var(--m-teal-line); border-radius: 12px;
+  color: var(--m-deep2); background: var(--m-teal-soft); font-size: 13px; line-height: 1.55;
+}
+.k1-phone-upload .ph-up-notice > svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px; }
+
+/* ── 格式标签 ── */
+.k1-phone-upload .ph-up-sect { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; padding-top: 2px; color: var(--m-ink2); font-size: 12.5px; font-weight: 800; letter-spacing: .6px; }
+.k1-phone-upload .ph-up-sect::after { content: ''; flex: 1; height: 1px; background: var(--m-line); }
+.k1-phone-upload .ph-up-chips { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 6px; }
+.k1-phone-upload .ph-up-chip {
+  display: inline-flex; min-height: 30px; align-items: center; padding: 0 11px; border: 1px solid var(--m-line2); border-radius: 15px;
+  color: var(--m-ink2); background: var(--m-paper); font-size: 12.5px; font-weight: 700;
+}
+
+/* ── 事实表：时限、留存、恢复路径这类必须写清楚的话 ── */
+.k1-phone-upload .ph-up-facts { display: flex; flex: 0 0 auto; flex-direction: column; overflow: hidden; border: 1px solid var(--m-line); border-radius: 16px; background: var(--m-surface); }
+.k1-phone-upload .ph-up-facts > div { display: flex; gap: 11px; padding: 10px 13px; border-top: 1px solid var(--m-line); }
+.k1-phone-upload .ph-up-facts > div:first-child { border-top: 0; }
+.k1-phone-upload .ph-up-facts dt { flex: 0 0 74px; color: var(--m-muted); font-size: 12.5px; font-weight: 800; line-height: 1.6; }
+.k1-phone-upload .ph-up-facts dd { min-width: 0; flex: 1; color: var(--m-ink2); font-size: 12.5px; line-height: 1.6; }
+.k1-phone-upload .ph-up-facts b { color: var(--m-ink); font-weight: 800; }
+
+/* ── 页脚隐私条 ── */
+.k1-phone-upload .ph-up-footer {
+  display: flex; flex: 0 0 auto; align-items: flex-start; gap: 8px; padding: 11px 18px 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--m-line); color: var(--m-muted); background: var(--m-surface); font-size: 12px; line-height: 1.55;
+}
+.k1-phone-upload .ph-up-footer > svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; color: var(--m-teal-d); }
+
+.k1-phone-upload .ph-up-picker:not([aria-disabled='true']):active { transform: scale(.985); }
+.k1-phone-upload .ph-up-remove:not([aria-disabled='true']):active { transform: scale(.94); }
+.k1-phone-upload .ph-up-picker:focus-within { outline: 3px solid var(--m-teal); outline-offset: 2px; }
+.k1-phone-upload button:focus-visible { outline: 3px solid var(--m-teal); outline-offset: 2px; }
+.k1-phone-upload .ph-up-flow > * { animation: ph-up-rise 240ms var(--m-ease) both; }
+.k1-phone-upload .ph-up-takeover > * { animation: ph-up-rise 240ms var(--m-ease) both; }
+
+/* 宽屏（平板、桌面、1080×1920 竖屏）：同一列居中成 390 宽；够高时收成 844 高的手机卡 */
+@media (min-width: 431px) {
+  .k1-phone-upload .k1-phone-upload-content { max-width: 390px; }
+}
+@media (min-width: 431px) and (min-height: 901px) {
+  .k1-phone-upload .k1-phone-upload-content {
+    height: min(844px, calc(100dvh - 48px)); border: 1px solid var(--m-line); border-radius: 28px; box-shadow: 0 24px 60px rgba(9, 26, 23, .22);
+  }
+}
+
+@keyframes ph-up-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes ph-up-spin { to { transform: rotate(360deg); } }
+@keyframes ph-up-sheen { 0% { background-position: -92% 0; } 100% { background-position: 192% 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   .k1-phone-upload * { animation: none !important; transition: none !important; }
-  .k1-phone-upload .ph-up-progress-bar { background-position: 0 0; }
-  .k1-phone-upload .ph-up-pick:active { transform: none; }
 }

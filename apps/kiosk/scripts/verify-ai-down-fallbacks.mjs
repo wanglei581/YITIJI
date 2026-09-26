@@ -34,6 +34,7 @@ const files = {
   source: kiosk('src/pages/resume/ResumeSourcePage.tsx'),
   report: kiosk('src/pages/resume/ResumeReportPage.tsx'),
   reportExits: kiosk('src/pages/resume/components/ResumeDiagnosisFailExits.tsx'),
+  reportCss: kiosk('src/pages/resume/resume-report-qx.css'),
   generate: kiosk('src/pages/resume/ResumeGeneratePage.tsx'),
   interviewSetup: kiosk('src/pages/interview/InterviewSetupPage.tsx'),
   careerPlan: kiosk('src/pages/resume/CareerPlanPage.tsx'),
@@ -132,10 +133,17 @@ must('reportExits', /id="resume-fail-print-reason"/, '置灰原因必须是常�
 mustNot('reportExits', /<button[^>]*\sdisabled(\s|=|>)/, '禁止对置灰按钮使用原生 disabled')
 
 // E：触控。1080×1920 竖屏，主操作 ≥56px。
+// 2026-09-24 出路区并入稿 22 的青序 `.rrp-row`（高度写在 resume-report-qx.css），
+// 不再逐个挂 Tailwind `min-h-[56px]`；判据换成「四条出路都是 rrp-row」+「rrp-row 的 min-height ≥56px」。
 assert(
-  (files.reportExits.match(/min-h-\[56px\]/g) ?? []).length >= 4,
-  'reportExits: 每条出路按钮都必须 ≥56px（min-h-[56px]）',
+  (files.reportExits.match(/className="rrp-row"/g) ?? []).length >= 4,
+  'reportExits: 四条出路都必须用报告页的 rrp-row 行（可点高度由页面样式统一给）',
 )
+{
+  const rowRule = /\.rrp-row\s*\{([^}]*)\}/.exec(files.reportCss)?.[1] ?? ''
+  const minHeight = Number(/min-height:\s*(\d+)px/.exec(rowRule)?.[1] ?? 0)
+  assert(minHeight >= 56, `resume-report-qx.css: .rrp-row 的 min-height 必须 ≥56px（实测 ${minHeight}px）`)
+}
 
 // C：不伪造 —— 诊断没跑出来就不许给任何结论。
 must('reportExits', '不拿通用建议顶替', '失败态必须写明不给结论，不用通用建议冒充诊断')

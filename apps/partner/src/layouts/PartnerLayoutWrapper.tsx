@@ -4,6 +4,7 @@ import { PartnerLayout, type NavItem } from '@ai-job-print/ui'
 import { useEffect, useState } from 'react'
 import {
   BarChart2Icon,
+  GaugeIcon,
   BriefcaseIcon,
   Building2Icon,
   CalendarIcon,
@@ -28,6 +29,7 @@ const PATH_TO_KEY: Record<string, string> = {
   '/fairs':      'fairs',
   '/smart-campus': 'smart-campus',
   '/policy':     'policy',
+  '/screen':     'screen',
   '/stats':      'stats',
   '/sources':    'sources',
   '/sync-logs':  'sync-logs',
@@ -45,10 +47,11 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'companies',  label: '企业资料管理',   icon: Building2Icon, href: KEY_TO_PATH.companies },
   { key: 'fairs',      label: '招聘会信息管理', icon: CalendarIcon, href: KEY_TO_PATH.fairs },
   { key: 'smart-campus', label: '智慧校园',       icon: GraduationCapIcon, group: '校园服务', href: KEY_TO_PATH['smart-campus'] },
-  { key: 'policy',     label: '政策公告管理',   icon: FileTextIcon, href: KEY_TO_PATH.policy },
+  { key: 'policy',     label: '政策公告管理',   icon: FileTextIcon,  group: '内容管理', href: KEY_TO_PATH.policy },
   { key: 'sources',    label: '数据源管理',     icon: DatabaseIcon, href: KEY_TO_PATH.sources },
   { key: 'sync-logs',  label: '同步日志',       icon: RefreshCwIcon, href: KEY_TO_PATH['sync-logs'] },
-  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon, group: '数据与账号', href: KEY_TO_PATH.stats },
+  { key: 'screen',     label: '数据大屏',       icon: GaugeIcon, group: '数据与账号', href: KEY_TO_PATH.screen },
+  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon, href: KEY_TO_PATH.stats },
   { key: 'account',    label: '账号',           icon: UserCogIcon, href: KEY_TO_PATH.account },
 ]
 
@@ -67,9 +70,17 @@ const NAV_ITEMS: NavItem[] = [
  * 存量数据必须还能被机构自己下架——把整页藏掉反而会把违规内容锁死在已发布状态。
  * 这些页面改为**在真正会 403 的那颗「新增」按钮上禁用并说明原因**，
  * 比藏掉整个入口更准确，也正好消掉「填完整张表才 403」的死路。
+ *
+ * 招聘内容托管关闭（3.13，我们云上默认）是部署级的整块下线：岗位 / 企业 / 招聘会 /
+ * 数据源 / 同步日志的列表恒为空、写入一律 403，整组入口隐藏；直接打开地址时由
+ * routes/RecruitmentHostingGate 给出如实说明。只有服务端明确回 true 才显示；
+ * 能力没读到时也不显示（fail-closed，见 services/capabilities.ts 的 useRecruitmentHosting）。
  */
+const RECRUITMENT_HOSTED_NAV_KEYS = new Set(['jobs', 'companies', 'fairs', 'sources', 'sync-logs'])
+
 function isNavItemVisible(key: string, caps: PartnerDataSourceCapabilities | null): boolean {
-  if (!caps) return true // 能力未知一律放行，见 services/capabilities.ts 的 fail-open 说明
+  if (RECRUITMENT_HOSTED_NAV_KEYS.has(key)) return caps?.recruitmentHosting === true
+  if (!caps) return true // 其余能力未知一律放行，见 services/capabilities.ts 的 fail-open 说明
   if (key === 'smart-campus') return caps.canManageSmartCampus
   return true
 }
@@ -138,7 +149,7 @@ function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const { capabilities } = usePartnerCapabilities()
-  const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
+  const activeKey = PATH_TO_KEY[location.pathname] ?? (location.pathname.startsWith('/screen/') ? 'screen' : 'dashboard')
   const navItems = projectNavItems(capabilities)
 
   const orgName = user?.name ?? '合作机构后台'
@@ -171,8 +182,8 @@ function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
         </div>
       }
     >
-      {/* 合作机构没有「发布」动作（partner 的 /publish 路由实际只下架），内容上架由管理员
-          执行、并受「内容可信」闸门约束。未核验时机构会看到「审核通过了但终端上没有」而
+      {/* 上架受「内容可信」闸门约束：政策由机构自己发布（3.13），岗位 / 招聘会仍由管理员上架，
+          两条路都要求机构先通过核验。未核验时机构会看到「审核通过了但终端上没有」而
           得不到原因 —— 这条横幅补的就是原因与该找谁。挂布局层：三个管理页各 500+ 行，
           逐页塞会漂移、新增页会漏。 */}
       <ContentTrustBanner />

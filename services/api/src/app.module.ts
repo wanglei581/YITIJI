@@ -51,6 +51,7 @@ import { ScanTasksModule } from './scan-tasks/scan-tasks.module'
 import { PrintConversionModule } from './print-conversion/print-conversion.module'
 import { PrintSignModule } from './print-sign/print-sign.module'
 import { DeviceFleetModule } from './device-fleet/device-fleet.module'
+import { ConsoleScreenModule } from './console-screen/console-screen.module'
 import { OfflineAgenciesModule } from './offline-agencies/offline-agencies.module'
 import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
 import { HelpModule } from './help/help.module'
@@ -60,7 +61,9 @@ import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
 import { ContractReviewHttpModule } from './contract-review/contract-review-http.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
+import { ClientDeclarationMiddleware } from './common/privacy/client-declaration.middleware'
 import { RecruitmentContentModule } from './recruitment-content/recruitment-content.module'
+import { RecruitmentHostingModule } from './recruitment-hosting/recruitment-hosting.module'
 import { CommunityModule } from './community/community.module'
 import { AssistantModule } from './assistant/assistant.module'
 import { DocumentConversionModule } from './document-conversion/document-conversion.module'
@@ -149,8 +152,10 @@ const redisUrl = process.env['REDIS_URL']
     PrintConversionModule,
     PrintSignModule,
     DeviceFleetModule,
+    ConsoleScreenModule,
     OfflineAgenciesModule,
     RecruitmentContentModule,
+    RecruitmentHostingModule,
     KioskSessionModule,
     HelpModule,
     LegalModule,
@@ -171,6 +176,6 @@ export class AppModule implements NestModule {
     // path-to-regexp v6+ 需要命名参数表达通配。
     // '*path' = 匹配任意路径并捕获到 params.path,
     // 等价于以前的裸 '*',且不再触发 LegacyRouteConverter 警告。
-    consumer.apply(RequestIdMiddleware).forRoutes('*path')
+    consumer.apply(RequestIdMiddleware, ClientDeclarationMiddleware).forRoutes('*path')
   }
 }

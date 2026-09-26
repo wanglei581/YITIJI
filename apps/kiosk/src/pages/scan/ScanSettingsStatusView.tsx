@@ -4,6 +4,7 @@ import { SCAN_OUTPUT_FORMAT_PENDING } from './scanOutputFormat'
 import type { SessionFailure } from './scanRescanRecovery'
 import { sessionNatureRow, type SessionPhase } from './scanSettingsModel'
 import {
+  ScanChain,
   ScanCta,
   ScanKvCard,
   ScanNoteCard,
@@ -139,6 +140,19 @@ export function ScanSettingsStatusView({
         : cleanupHolding
           ? { tone: 'warn' as const, label: '正在收上一场的尾' }
           : { tone: 'bad' as const, label: '会话创建失败' }
+  /* 稿 18 状态屏骨架：当前状态 → 链路位置 → 下一步。这几屏一律还没有一段开始（链路不点亮），
+   * 标题只说「卡在哪」—— 不写百分比，也不暗示哪一段已经在动。 */
+  const chainHead: readonly [string, string] = awaitingAck
+    ? ['会话建成了，还差投递授权', '授权到手之前，第一段也别开始']
+    : cleanupHolding
+      ? ['还在收上一场的尾', '这一场的四段都还没开始']
+      : phase === 'loading'
+        ? ['会话建成才算迈出第一步', '这四段一段都还没开始']
+        : phase === 'expired'
+          ? ['链路停在哪', '文件没有挂到这次会话']
+          : phase === 'invalid'
+            ? ['还没有会话', '这四段一段都还没开始']
+            : ['现在卡在建会话这一步', '第一段还没开始']
 
   return (
     <ScanWorkbenchShell
@@ -147,6 +161,7 @@ export function ScanSettingsStatusView({
       title={title}
       subtitle={description}
       status={status}
+      layout="spread"
       ctabar={
         <ScanCta
           reason={
@@ -278,65 +293,70 @@ export function ScanSettingsStatusView({
           </p>
         ) : null}
       </ScanStatusPanel>
-      {awaitingAck ? (
-        <div className="sw-grid2">
-          <ScanNoteCard
-            title="本机正在做什么"
-            foot="确认是一次幂等请求：问几次都不会多建一场，也不会延长有效期。"
-          >
-            <ScanPlan items={[
-              '本机把这一场的控制凭据交给服务端，证明有人正看着它。',
-              '服务端确认之后，这台机器才被允许收这一场的文件。',
-              ackRetryable
-                ? '上一次确认没成，点右下角「再确认一次」重来；一直不成就安全返回。'
-                : '通常一两秒；一直转多半是本机到服务端的网络有问题。',
-            ]} />
-          </ScanNoteCard>
-          <ScanNoteCard title="为什么现在不给你操作指引" foot="这一屏的空白是有意的，不是还没加载完。">
-            <p>指引一出现，你就会照着去面板上按开始。<b>而这一刻服务端还不肯把文件投给这一场</b> —— 扫出来的那张纸不会进你的记录，也不会被别人收走，只是白扫一次。</p>
-          </ScanNoteCard>
-        </div>
-      ) : phase === 'loading' ? (
-        <div className="sw-grid2">
-          <ScanNoteCard title="会话建成之后会出现什么" foot="这三样都由服务端下发，本机一样都编不出来。">
-            <ScanPlan items={[
-              '服务端发的任务编号，用来认领待会儿回传的文件。',
-              '按扫描类型定制的面板操作指引，本机原样转达。',
-              '一枚只存在页面内存里的控制凭证，用来查询和取消。',
-            ]} />
-          </ScanNoteCard>
-          <ScanNoteCard title="这一刻你可以做什么" foot="这一刻页面还没有任何结论可写。">
-            <p>把要扫的纸先整理好、订书钉取掉，<b>但先别在面板上按开始</b> —— 会话还没建成，这时候扫出来的文件没人认领。</p>
-            <p>等待通常就是一两秒。一直转，多半是本机到服务端的网络有问题。</p>
-          </ScanNoteCard>
-        </div>
-      ) : (
-        <div className="sw-grid2">
-          {/* 这句落款分两种写法，因为它在两种屏上说的是两件事。
-              本页刚刚**确实**用同一份凭据重放过（配对重扫的未知态才会），
-              这时还挂着「本页不会自动重发」就是当场自打嘴巴 —— 用户据此以为
-              服务端一定没收到，转身去开一场注定撞同字节去重的会话。 */}
-          <ScanNoteCard
-            title="接下来怎么办"
-            foot={replayingLostCreate
-              ? '本页只用同一份凭据问过服务端，没有多建会话，也不会自己变成成功。'
-              : '本页不会自动重发，也不会自己变成成功。'}
-          >
-            {/* 指路跟着 ctabar 的分支走：写死「返回扫描首页」时，拿着凭据的那一屏上
-                最该按的那颗按钮反而没人提。 */}
-            <ScanPlan items={[
-              rescanRetryable
-                ? '点右下角「再试一次安全重扫」：同一份材料的授权还在手上。'
-                : '返回扫描首页，从选择类型重新走一遍。',
-              '连续失败就别在面板上扫了，扫了也没有会话认领。',
-              '叫工作人员看一眼这台机器到服务端的网络。',
-            ]} />
-          </ScanNoteCard>
-          <ScanNoteCard title="为什么不给你一个编号" foot="这一屏的空白是有意的，不是还没加载完。">
-            <p>编号是服务端发的，本机编不出来。<b>硬编一个给你看，你就会照着它去面板上操作</b>，扫出来的文件也没人认领。</p>
-          </ScanNoteCard>
-        </div>
-      )}
+      <ScanSec no="01" title={chainHead[0]} hint={chainHead[1]}>
+        <ScanChain active={-1} />
+      </ScanSec>
+      <ScanSec no="02" title="下一步" hint="这一屏现在能做什么">
+        {awaitingAck ? (
+          <div className="sw-grid2">
+            <ScanNoteCard
+              title="本机正在做什么"
+              foot="确认是一次幂等请求：问几次都不会多建一场，也不会延长有效期。"
+            >
+              <ScanPlan items={[
+                '本机把这一场的控制凭据交给服务端，证明有人正看着它。',
+                '服务端确认之后，这台机器才被允许收这一场的文件。',
+                ackRetryable
+                  ? '上一次确认没成，点右下角「再确认一次」重来；一直不成就安全返回。'
+                  : '通常一两秒；一直转多半是本机到服务端的网络有问题。',
+              ]} />
+            </ScanNoteCard>
+            <ScanNoteCard title="为什么现在不给你操作指引" foot="这一屏的空白是有意的，不是还没加载完。">
+              <p>指引一出现，你就会照着去面板上按开始。<b>而这一刻服务端还不肯把文件投给这一场</b> —— 扫出来的那张纸不会进你的记录，也不会被别人收走，只是白扫一次。</p>
+            </ScanNoteCard>
+          </div>
+        ) : phase === 'loading' ? (
+          <div className="sw-grid2">
+            <ScanNoteCard title="会话建成之后会出现什么" foot="这三样都由服务端下发，本机一样都编不出来。">
+              <ScanPlan items={[
+                '服务端发的任务编号，用来认领待会儿回传的文件。',
+                '按扫描类型定制的面板操作指引，本机原样转达。',
+                '一枚只存在页面内存里的控制凭证，用来查询和取消。',
+              ]} />
+            </ScanNoteCard>
+            <ScanNoteCard title="这一刻你可以做什么" foot="这一刻页面还没有任何结论可写。">
+              <p>把要扫的纸先整理好、订书钉取掉，<b>但先别在面板上按开始</b> —— 会话还没建成，这时候扫出来的文件没人认领。</p>
+              <p>等待通常就是一两秒。一直转，多半是本机到服务端的网络有问题。</p>
+            </ScanNoteCard>
+          </div>
+        ) : (
+          <div className="sw-grid2">
+            {/* 这句落款分两种写法，因为它在两种屏上说的是两件事。
+                本页刚刚**确实**用同一份凭据重放过（配对重扫的未知态才会），
+                这时还挂着「本页不会自动重发」就是当场自打嘴巴 —— 用户据此以为
+                服务端一定没收到，转身去开一场注定撞同字节去重的会话。 */}
+            <ScanNoteCard
+              title="接下来怎么办"
+              foot={replayingLostCreate
+                ? '本页只用同一份凭据问过服务端，没有多建会话，也不会自己变成成功。'
+                : '本页不会自动重发，也不会自己变成成功。'}
+            >
+              {/* 指路跟着 ctabar 的分支走：写死「返回扫描首页」时，拿着凭据的那一屏上
+                  最该按的那颗按钮反而没人提。 */}
+              <ScanPlan items={[
+                rescanRetryable
+                  ? '点右下角「再试一次安全重扫」：同一份材料的授权还在手上。'
+                  : '返回扫描首页，从选择类型重新走一遍。',
+                '连续失败就别在面板上扫了，扫了也没有会话认领。',
+                '叫工作人员看一眼这台机器到服务端的网络。',
+              ]} />
+            </ScanNoteCard>
+            <ScanNoteCard title="为什么不给你一个编号" foot="这一屏的空白是有意的，不是还没加载完。">
+              <p>编号是服务端发的，本机编不出来。<b>硬编一个给你看，你就会照着它去面板上操作</b>，扫出来的文件也没人认领。</p>
+            </ScanNoteCard>
+          </div>
+        )}
+      </ScanSec>
     </ScanWorkbenchShell>
   )
 }

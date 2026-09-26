@@ -44,7 +44,8 @@
       - 连续 3 次轮询失败 → 本机置为「状态读不到」，本页把它单列为 phone-status-unknown，
         不冒充「服务端说过期了」
       - 刷新二维码前必须先在服务端撤销旧码；已上传时刷新被拒
-      - 手机端是独立 route /upload/phone（本原型 51-phone-relay.html?screen=phone-upload）
+      - 手机端上传由正式微信小程序 apps/miniapp 承接；一体机本页只保留扫码入口与会话状态，
+        不再使用独立的 51 号一体机原型页
 
   ★ 哪些「取消」是真的，哪些不是 —— 本页据此排动作，不按视觉对称排：
     1) DELETE /upload-sessions/:sessionId 是**真取消**（upload-sessions.service.ts:324）：
@@ -139,7 +140,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -851,15 +852,15 @@ html.flat *::after,html[data-flat="1"] *::after{
 
   <nav class="navbar" aria-label="全局导航">
     <a class="nav-item" href="01-home.html" data-route="/">
-      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
       <span class="ni">首页</span>
     </a>
     <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant">
-      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
       <span class="ni">AI 顾问</span>
     </a>
     <a class="nav-item" href="30-my-profile.html" data-route="/profile">
-      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
       <span class="ni">我的</span>
     </a>
   </nav>
@@ -1259,11 +1260,11 @@ function demoFlag(){
 }
 function pulse(t){return '<span class="m-pulse"><span class="mp-dots" aria-hidden="true"><i></i><i></i><i></i></span>'+t+'</span>';}
 function li(t){return '<span class="li"><span class="bul">'+svg(I_CHECK,13,'#157a67',3)+'</span><span>'+t+'</span></span>';}
-function liNo(t){return '<span class="li"><span class="bul">'+svg('<path d="M6.5 12h11"/>',13,'#6b857c',3)+'</span><span>'+t+'</span></span>';}
+function liNo(t){return '<span class="li"><span class="bul">'+svg('<path d="M6.5 12h11"/>',13,'#526b62',3)+'</span><span>'+t+'</span></span>';}
 function duoCards(a,b){
   return '<div class="duo">'+
     '<div class="duo-c"><span class="ct">'+svg(I_CHECK,20,'#157a67',3)+a.t+'</span>'+a.items.map(li).join('')+'</div>'+
-    '<div class="duo-c mute"><span class="ct">'+svg('<circle cx="12" cy="12" r="9"/><path d="M6.5 12h11"/>',20,'#6b857c',2)+b.t+'</span>'+
+    '<div class="duo-c mute"><span class="ct">'+svg('<circle cx="12" cy="12" r="9"/><path d="M6.5 12h11"/>',20,'#526b62',2)+b.t+'</span>'+
       b.items.map(liNo).join('')+'</div></div>';
 }
 function triCard(o){
@@ -1951,7 +1952,7 @@ R['usb-wait']=function(){
     trackBar('第 1 步：插入 U 盘')+
     stepBoard('usb',0,'','等你把盘插上')+
     '<div class="blk grow m-fade-in"><div class="stat band" data-testid="rs-usb-wait">'+
-      '<span class="si">'+svg(I_USB,44,'#6b857c',1.7)+'</span>'+
+      '<span class="si">'+svg(I_USB,44,'#526b62',1.7)+'</span>'+
       '<span class="sm"><span class="st">还没有检测到 U 盘</span>'+
       '<span class="sd">插入后文件列表会自动出现。这台机器<b>不会自动读整盘</b>，也不显示上一位使用者的列表；'+
       '要用哪一份，由你在列表里点。</span>'+
@@ -2327,7 +2328,7 @@ R['local-cancelled']=function(){
     trackBar('第 2 步：已取消选择','warnt')+
     stepBoard('local',2,'warn','这一步还没有文件')+
     '<div class="stop m-fade-in" data-testid="rs-local-cancelled">'+
-      '<span class="si">'+svg(I_FOLDER,50,'#6b857c',1.7)+'</span>'+
+      '<span class="si">'+svg(I_FOLDER,50,'#526b62',1.7)+'</span>'+
       '<span class="sm"><span class="sh">这一步还没有文件</span>'+
       '<span class="sp">你关掉了文件选择，所以本次办理里<b>还是空的</b>。'+
       '刚才选的诊断范围、重点维度和目标背景<b>都还留着</b>，重新选一份就能接着往下走。</span></span></div>'+
@@ -2965,7 +2966,7 @@ R['missing-file']=function(){
        '这一步需要一份已经拿到的简历，现在没有，所以<b>不往下走</b>。',
        svg(I_WARN,19,'currentColor',2.2)+'已阻断',true);
   root.innerHTML=
-    '<div class="stop m-fade-in" data-testid="rs-missing-file"><span class="si">'+svg(I_DOC,50,'#6b857c',1.7)+'</span>'+
+    '<div class="stop m-fade-in" data-testid="rs-missing-file"><span class="si">'+svg(I_DOC,50,'#526b62',1.7)+'</span>'+
       '<span class="sm"><span class="sh">这一步没有可解析的文件</span>'+
       '<span class="sp">为了不把上一位使用者的文件带进来，这里<b>不会自动挑一份文件</b>继续往下走。'+
       '从下面挑一种来源就能接着办，<b>之前选的诊断方向和目标背景还在</b>。</span></span></div>'+
@@ -2994,7 +2995,7 @@ R['unknown']=function(){
        '地址里的状态不在本页支持的范围内，<b>为避免误导，这里不展示任何业务内容</b>。',
        svg(I_WARN,19,'currentColor',2.2)+'已阻断',true);
   root.innerHTML=
-    '<div class="stop m-fade-in" data-testid="rs-unknown"><span class="si">'+svg(I_WARN,50,'#6b857c',1.8)+'</span>'+
+    '<div class="stop m-fade-in" data-testid="rs-unknown"><span class="si">'+svg(I_WARN,50,'#526b62',1.8)+'</span>'+
       '<span class="sm"><span class="sh">无法识别的页面状态</span>'+
       '<span class="sp">本页只处理<b>简历取件、诊断方向与解析等待</b>这一段。'+
       '这里<b>不会猜你想去哪一步</b>，也不回显地址里的原始参数，请从下面挑一个能用的入口。</span></span></div>'+
@@ -3390,7 +3391,7 @@ function pvFileFacts(){
 }
 function pvAlt(list){
   return '<div class="pv-alt">'+list.map(function(c){
-    var inner='<span class="pi">'+svg(c.ico||I_CHECK,28,c.h?'#157a67':'#6b857c',2)+'</span>'+
+    var inner='<span class="pi">'+svg(c.ico||I_CHECK,28,c.h?'#157a67':'#526b62',2)+'</span>'+
       '<span class="pm"><span class="n">'+c.n+'</span><span class="d">'+c.d+'</span></span>'+
       (c.g?'<span class="g">'+c.g+'</span>':'');
     return c.h
@@ -3400,7 +3401,7 @@ function pvAlt(list){
 }
 function pvPanel(o){
   return '<div class="pv-panel" data-testid="'+o.tid+'">'+
-    '<div class="pv-pt"><span class="pv-pi">'+svg(o.ico,42,o.col||'#6b857c',1.9)+'</span>'+
+    '<div class="pv-pt"><span class="pv-pi">'+svg(o.ico,42,o.col||'#526b62',1.9)+'</span>'+
     '<span class="pv-ph">'+o.h+'</span></div>'+
     '<div class="pv-pb">'+o.b+'</div>'+pvFileFacts()+pvAlt(o.alts)+'</div>';
 }

@@ -1,4 +1,8 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import {
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 import type { FavoriteTargetType, MemberFavoriteItem } from './member-favorites.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
@@ -6,6 +10,11 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberFavoritesService } from './member-favorites.service'
 import { AddFavoriteDto, FAVORITE_TARGET_TYPES } from './dto/add-favorite.dto'
 import { parseMemberPageQuery } from '../common/utils/member-page'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 
 /**
  * 会员收藏接口（Phase C-2C）。路由前缀 /api/v1/me/favorites。
@@ -21,7 +30,19 @@ import { parseMemberPageQuery } from '../common/utils/member-page'
 @Controller('me/favorites')
 @UseGuards(EndUserAuthGuard)
 export class MemberFavoritesController {
-  constructor(private readonly favorites: MemberFavoritesService) {}
+  constructor(
+    private readonly favorites: MemberFavoritesService,
+    private readonly jobBoard: KioskJobBoardService,
+  ) {}
+
+  /** 收藏对象是岗位时，读写都走岗位板块开关。招聘会与政策收藏不受影响。 */
+  private async assertJobFavorite(req?: KioskJobBoardRequest): Promise<void> {
+    await this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
+  }
+
+  private async jobBoardOpen(req?: KioskJobBoardRequest): Promise<boolean> {
+    return (await this.jobBoard.resolve(kioskJobBoardTerminalRef(req ?? {}))).enabled
+  }
 
   /** 我的收藏列表（本人，可选 ?type=job|job_fair|policy 过滤；游标分页，pageSize 封顶 50）。 */
   @Get()
@@ -30,10 +51,25 @@ export class MemberFavoritesController {
     @Query('type') type?: string,
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
+    @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }>> {
     const targetType = this.parseOptionalType(type)
+    const hosting = isRecruitmentContentHostingEnabled()
+    const open = hosting && await this.jobBoardOpen(req)
+    if (!hosting && (targetType === 'job' || targetType === 'job_fair')) {
+      throw recruitmentHostingDisabledException()
+    }
+    if (!open && targetType === 'job') await this.assertJobFavorite(req)
+    const exclude: FavoriteTargetType[] | undefined = !hosting
+      ? ['job', 'job_fair']
+      : (!open && !targetType ? ['job'] : undefined)
     return ApiResponse.ok(
-      await this.favorites.list(user.endUserId, parseMemberPageQuery(cursor, pageSize), targetType),
+      await this.favorites.list(
+        user.endUserId,
+        parseMemberPageQuery(cursor, pageSize),
+        targetType,
+        exclude ? { excludeTargetTypes: exclude } : undefined,
+      ),
     )
   }
 
@@ -42,7 +78,12 @@ export class MemberFavoritesController {
   async add(
     @CurrentEndUser() user: AuthedEndUser,
     @Body() dto: AddFavoriteDto,
+    @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<MemberFavoriteItem>> {
+    if (!isRecruitmentContentHostingEnabled() && (dto.targetType === 'job' || dto.targetType === 'job_fair')) {
+      throw recruitmentHostingDisabledException()
+    }
+    if (dto.targetType === 'job') await this.assertJobFavorite(req)
     return ApiResponse.ok(
       await this.favorites.add(user.endUserId, {
         targetType: dto.targetType,
@@ -58,8 +99,13 @@ export class MemberFavoritesController {
     @CurrentEndUser() user: AuthedEndUser,
     @Param('targetType') targetType: string,
     @Param('targetId') targetId: string,
+    @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<{ removed: boolean }>> {
     const type = this.parseRequiredType(targetType)
+    if (!isRecruitmentContentHostingEnabled() && (type === 'job' || type === 'job_fair')) {
+      throw recruitmentHostingDisabledException()
+    }
+    if (type === 'job') await this.assertJobFavorite(req)
     return ApiResponse.ok(await this.favorites.remove(user.endUserId, type, targetId))
   }
 

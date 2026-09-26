@@ -5,334 +5,167 @@ import assert from 'node:assert/strict'
 import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
-import { validateUpload, DEFAULT_SENSITIVE_BY_PURPOSE } from '../src/files/file-validation'
-import { CONTRACT_REVIEW_TTL_MS, defaultRetentionForUpload } from '../src/files/retention-policy'
+import { CONTRACT_REVIEW_TTL_MS } from '../src/files/retention-policy'
 import { sniffDeclaredMimeMismatch } from '../src/files/content-sniff'
-import type { FilePurpose, FileUploadResponse } from '../src/files/file.types'
-import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
 import { FilesCleanupTask } from '../src/files/files.cleanup.task'
 import { FilesService } from '../src/files/files.service'
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
-import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
+import { releaseReplacedObject } from '../src/upload-sessions/upload-session-object-delete'
+import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import {
+  FakeRedis,
+  ISOLATED_DATABASE,
+  REAL_STORAGE_DIR,
+  deferred,
+  expectRejects,
+  file,
+  makeService,
+} from './support/upload-session-verifier'
 
-const ISOLATED_DATABASE = process.env['VERIFICATION_DATABASE_TARGET'] === 'isolated'
-const REAL_STORAGE_DIR = path.join('/tmp', `verify-upload-sessions-${process.pid}`)
-if (ISOLATED_DATABASE) process.env['FILE_STORAGE_DIR'] = REAL_STORAGE_DIR
-
-interface StoredFile {
-  id: string
-  filename: string
-  mimeType: string
-  sizeBytes: number
-  sha256: string
-  storageKey: string
-  bucket: string
-  purpose: FilePurpose
-  sensitiveLevel: string
-  endUserId: string | null
-  ownerType: string
-  ownerId: string | null
-  deletedAt: Date | null
-  expiresAt: Date | null
-  retentionPolicy: string | null
-  retentionSetBy: string | null
-  retentionConsentAt: Date | null
-  retentionConsentVersion: string | null
-  retentionLockedReason: string | null
-}
-
-class FakeRedis {
-  private readonly values = new Map<string, { value: string; expiresAt: number }>()
-  private readonly sortedSets = new Map<string, Map<string, number>>()
-
-  get client(): this {
-    return this
-  }
-
-  async get(key: string): Promise<string | null> {
-    const entry = this.values.get(key)
-    if (!entry) return null
-    if (entry.expiresAt <= Date.now()) {
-      this.values.delete(key)
-      return null
-    }
-    return entry.value
-  }
-
-  async setEx(key: string, ttlSeconds: number, value: string): Promise<void> {
-    this.values.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 })
-  }
-
-  async ttl(key: string): Promise<number> {
-    const entry = this.values.get(key)
-    if (!entry) return -2
-    return Math.max(1, Math.ceil((entry.expiresAt - Date.now()) / 1000))
-  }
-
-  async setExistingWithCurrentTtl(key: string, value: string): Promise<'missing' | 'updated'> {
-    const entry = this.values.get(key)
-    if (!entry || entry.expiresAt <= Date.now()) return 'missing'
-    this.values.set(key, { ...entry, value })
-    return 'updated'
-  }
-
-  async setNxEx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
-    const current = this.values.get(key)
-    if (current && current.expiresAt > Date.now()) return false
-    if (current) this.values.delete(key)
-    this.values.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 })
-    return true
-  }
-
-  async del(key: string): Promise<number> {
-    const existed = this.values.delete(key)
-    return existed ? 1 : 0
-  }
-
-  async zAdd(key: string, score: number, member: string): Promise<void> {
-    const index = this.sortedSets.get(key) ?? new Map<string, number>()
-    index.set(member, score)
-    this.sortedSets.set(key, index)
-  }
-
-  zadd(key: string, score: number, member: string): Promise<void> {
-    return this.zAdd(key, score, member)
-  }
-
-  async zRangeByScore(key: string, maxScore: number, limit: number): Promise<string[]> {
-    return [...(this.sortedSets.get(key) ?? new Map()).entries()]
-      .filter(([, score]) => score <= maxScore)
-      .sort(([, left], [, right]) => left - right)
-      .slice(0, limit)
-      .map(([member]) => member)
-  }
-
-  zrangebyscore(
-    key: string,
-    _min: string,
-    maxScore: number,
-    _limit: string,
-    _offset: number,
-    limit: number,
-  ): Promise<string[]> {
-    return this.zRangeByScore(key, maxScore, limit)
-  }
-
-  async zRem(key: string, member: string): Promise<void> {
-    this.sortedSets.get(key)?.delete(member)
-  }
-
-  zrem(key: string, member: string): Promise<void> {
-    return this.zRem(key, member)
-  }
-
-  hasSortedSetMember(key: string, member: string): boolean {
-    return this.sortedSets.get(key)?.has(member) ?? false
-  }
-
-  hasLiveKey(key: string): boolean {
-    const entry = this.values.get(key)
-    return Boolean(entry && entry.expiresAt > Date.now())
-  }
-}
-
-class FakePrisma {
-  readonly files = new Map<string, StoredFile>()
-  readonly fileUpdateCalls: Array<{ id: string; data: Partial<StoredFile> }> = []
-
-  readonly fileObject = {
-    findUnique: async ({ where }: { where: { id: string } }) => this.files.get(where.id) ?? null,
-    update: async ({
-      where,
-      data,
-      select,
-    }: {
-      where: { id: string }
-      data: Partial<StoredFile>
-      select?: { expiresAt?: boolean }
-    }) => {
-      const current = this.files.get(where.id)
-      if (!current) throw new Error(`file not found: ${where.id}`)
-      this.fileUpdateCalls.push({ id: where.id, data })
-      const next = { ...current, ...data }
-      this.files.set(where.id, next)
-      if (select?.expiresAt) return { expiresAt: next.expiresAt }
-      return next
-    },
-  }
-}
-
-class FakeFilesService {
-  private next = 1
-  readonly uploadCalls: Array<{ purpose: FilePurpose; filename: string }> = []
-  readonly storedObjects = new Set<string>()
-  readonly deletionLog: Array<{ fileId: string; deletedBy: string; reason: string }> = []
-
-  constructor(
-    private readonly prisma: FakePrisma,
-    private readonly beforeUpload?: (callNumber: number) => Promise<void>
-  ) {}
-
-  async upload(args: {
-    buffer: Buffer
-    filename: string
-    mimeType: string
-    purpose: FilePurpose
-    endUserId?: string | null
-  }): Promise<FileUploadResponse> {
-    this.uploadCalls.push({ purpose: args.purpose, filename: args.filename })
-    await this.beforeUpload?.(this.uploadCalls.length)
-    const validation = validateUpload({
-      purpose: args.purpose,
-      mimeType: args.mimeType,
-      filename: args.filename,
-      sizeBytes: args.buffer.length,
-      mode: 'proxy',
-    })
-    if (!validation.ok) {
-      throw new BadRequestException({
-        error: { code: validation.code, message: validation.message },
-      })
-    }
-    // 与真实 FilesService.upload 同款魔数校验(files/content-sniff.ts),
-    // 保证本脚本的拒绝断言走的是同一条服务端校验链。
-    const sniff = sniffDeclaredMimeMismatch(args.buffer, args.mimeType)
-    if (!sniff.ok) {
-      throw new BadRequestException({
-        error: {
-          code: 'FILE_CONTENT_MISMATCH',
-          message: '文件内容与声明的类型不一致，请检查文件后重新上传',
-        },
-      })
-    }
-    const id = `file_${this.next++}`
-    const sensitiveLevel = DEFAULT_SENSITIVE_BY_PURPOSE[args.purpose]
-    const retention = defaultRetentionForUpload({
-      purpose: args.purpose,
-      sensitiveLevel,
-      ownerType: args.endUserId ? 'user' : 'system',
-      endUserId: args.endUserId ?? null,
-    })
-    const file: StoredFile = {
-      id,
-      filename: args.filename,
-      mimeType: args.mimeType,
-      sizeBytes: args.buffer.length,
-      sha256: `sha_${id}`,
-      storageKey: `tmp/uploads/${id}/${id}.pdf`,
-      bucket: 'local-fs',
-      purpose: args.purpose,
-      sensitiveLevel,
-      endUserId: args.endUserId ?? null,
-      ownerType: args.endUserId ? 'user' : 'system',
-      ownerId: args.endUserId ?? null,
-      deletedAt: null,
-      expiresAt: retention.expiresAt,
-      retentionPolicy: retention.retentionPolicy,
-      retentionSetBy: retention.retentionSetBy,
-      retentionConsentAt: retention.retentionConsentAt,
-      retentionConsentVersion: retention.retentionConsentVersion,
-      retentionLockedReason:
-        args.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
-    }
-    this.prisma.files.set(id, file)
-    this.storedObjects.add(id)
-    return {
-      fileId: id,
-      filename: file.filename,
-      sizeBytes: file.sizeBytes,
-      mimeType: file.mimeType,
-      sha256: file.sha256,
-      signedUrl: `https://files.local/${id}`,
-      signedUrlExpiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
-      fileExpiresAt: file.expiresAt?.toISOString() ?? null,
-    }
-  }
-
-  async forceDelete(fileId: string, deletedBy: string, reason: string): Promise<unknown> {
-    const current = this.prisma.files.get(fileId)
-    if (!current) throw new Error(`file not found: ${fileId}`)
-    const next = {
-      ...current,
-      deletedAt: new Date(),
-      deletedBy,
-      deleteReason: reason,
-      status: 'deleted',
-    } as StoredFile
-    this.prisma.files.set(fileId, next)
-    this.storedObjects.delete(fileId)
-    this.deletionLog.push({ fileId, deletedBy, reason })
-    return next
-  }
-
-  async systemDelete(fileId: string, reason: string): Promise<unknown> {
-    return this.forceDelete(fileId, 'system', reason)
-  }
-
-  async copyObjectToKey(): Promise<void> {}
-  async deleteObjectAtKey(): Promise<void> {}
-
-}
-
-function makeService(options?: { beforeUpload?: (callNumber: number) => Promise<void> }): {
+async function assertReconcileKeepsMemberObject(args: {
+  prisma: PrismaService
+  files: FilesService
+  storage: StorageService
   service: UploadSessionsService
-  prisma: FakePrisma
-  files: FakeFilesService
   redis: FakeRedis
-} {
-  const redis = new FakeRedis()
-  const prisma = new FakePrisma()
-  const files = new FakeFilesService(prisma, options?.beforeUpload)
-  return {
-    service: new UploadSessionsService(redis as never, prisma as never, files as never),
-    prisma,
-    files,
-    redis,
-  }
-}
-
-function deferred(): { promise: Promise<void>; resolve: () => void } {
-  let resolve!: () => void
-  const promise = new Promise<void>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
-
-function file(args?: Partial<Express.Multer.File>): Express.Multer.File {
-  const buffer = args?.buffer ?? Buffer.from('%PDF-1.4 resume')
-  return {
-    fieldname: 'file',
-    originalname: args?.originalname ?? 'resume.pdf',
-    encoding: '7bit',
-    mimetype: args?.mimetype ?? 'application/pdf',
-    size: args?.size ?? buffer.length,
-    buffer,
-    stream: undefined as never,
-    destination: '',
-    filename: '',
-    path: '',
-  }
-}
-
-async function expectRejects<T extends Error>(
-  action: () => Promise<unknown>,
-  errorType: new (...args: never[]) => T,
-  label: string
-): Promise<void> {
-  let rejected = false
+}): Promise<void> {
+  const { prisma, files, storage, service, redis } = args
+  const endUserId = `eu_retain_${Date.now()}`
+  let fileId = ''
+  const originalDelete = storage.deleteObject.bind(storage)
   try {
-    await action()
-  } catch (error) {
-    rejected = true
-    assert.ok(
-      error instanceof errorType,
-      `${label}: expected ${errorType.name}, got ${(error as Error).constructor.name}`
+    await prisma.endUser.create({
+      data: { id: endUserId, phoneHash: `hash_${endUserId}`, phoneEnc: 'enc' },
+    })
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId,
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    fileId = uploaded.file!.fileId
+    const row = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.ok(row)
+    const anonymousKey = row.storageKey
+    const userKey = `users/${endUserId}/resumes/${fileId}.pdf`
+    await files.copyObjectToKey(anonymousKey, userKey, row.mimeType, row.bucket)
+    await prisma.fileObject.update({
+      where: { id: fileId },
+      data: {
+        endUserId,
+        ownerType: 'user',
+        ownerId: endUserId,
+        storageKey: userKey,
+        pendingStorageKey: null,
+        replacedStorageKey: anonymousKey,
+      },
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const parsed = JSON.parse((await redis.get(sessionKey)) ?? '{}') as Record<string, unknown>
+    parsed.bind = {
+      phase: 'copied',
+      fileId,
+      endUserId,
+      userKey,
+      previousKey: anonymousKey,
+      bucket: row.bucket,
+    }
+    await redis.setExistingWithCurrentTtl(sessionKey, JSON.stringify(parsed))
+    storage.deleteObject = async (objectKey: string, bucket?: string | null) => {
+      if (objectKey === anonymousKey) throw new Error('old key delete failed')
+      return originalDelete(objectKey, bucket)
+    }
+    await assert.rejects(
+      () => service.confirm(session.sessionId, session.controlToken, endUserId),
+      /old key delete failed/,
     )
+    const failed = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.equal(failed?.storageKey, userKey)
+    assert.equal(failed?.deletedAt ?? null, null)
+    assert.ok(await storage.headObject(userKey, row.bucket), 'member object must stay after the old key delete fails')
+    await files.reconcileStorageDeletions('manual')
+    const reconciled = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.equal(reconciled?.storageDeletePendingAt ?? null, null, 'reconcile must not have been aimed at the member key')
+    assert.equal(reconciled?.storageDeletedAt ?? null, null, 'reconcile must not mark the member row deleted')
+    assert.equal(reconciled?.deletedAt ?? null, null)
+    assert.ok(await storage.headObject(userKey, row.bucket), 'reconcile must not delete the member object')
+    assert.equal(reconciled?.replacedStorageKey, anonymousKey)
+    await assert.rejects(
+      () => releaseReplacedObject({ prisma, files } as never, reconciled as never),
+      /old key delete failed/,
+    )
+    await files.reconcileStorageDeletions('manual')
+    const afterRelease = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.equal(afterRelease?.storageDeletePendingAt ?? null, null)
+    assert.equal(afterRelease?.storageDeletedAt ?? null, null)
+    assert.ok(await storage.headObject(userKey, row.bucket), 'releaseReplacedObject must not schedule the member object')
+    console.log('  PASS replaced-key delete failure does not let reconcile remove the member object')
+  } finally {
+    storage.deleteObject = originalDelete
+    if (fileId) await prisma.fileObject.deleteMany({ where: { id: fileId } })
+    await prisma.endUser.deleteMany({ where: { id: endUserId } })
   }
-  assert.equal(rejected, true, `${label}: expected rejection`)
+}
+
+async function assertAnonymousQuarantineReconciles(args: {
+  prisma: PrismaService
+  files: FilesService
+  storage: StorageService
+  service: UploadSessionsService
+}): Promise<void> {
+  const { prisma, files, storage, service } = args
+  let fileId = ''
+  const originalDelete = storage.deleteObject.bind(storage)
+  try {
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'quarantine.pdf' }),
+    })
+    fileId = uploaded.file!.fileId
+    const row = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.ok(row)
+    storage.deleteObject = async (objectKey: string, bucket?: string | null) => {
+      if (objectKey === row.storageKey) throw new Error('anonymous delete failed')
+      return originalDelete(objectKey, bucket)
+    }
+    await assert.rejects(
+      () => service.cancel(session.sessionId, session.controlToken),
+      /anonymous delete failed/,
+    )
+    const failed = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.equal(failed?.status, 'quarantined')
+    assert.equal(failed?.deletedAt ?? null, null)
+    assert.ok(failed?.storageDeletePendingAt)
+    assert.ok(await storage.headObject(row.storageKey, row.bucket))
+    storage.deleteObject = originalDelete
+    await files.reconcileStorageDeletions('manual')
+    const done = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    assert.ok(done?.deletedAt, 'reconcile must tombstone a quarantined anonymous row after the object is gone')
+    assert.equal(done?.status, 'deleted')
+    assert.ok(done?.storageDeletedAt)
+    assert.equal(done?.storageDeletePendingAt ?? null, null)
+    assert.equal(await storage.headObject(row.storageKey, row.bucket), null)
+    console.log('  PASS anonymous delete failure is quarantined and reconcile finishes the tombstone')
+  } finally {
+    storage.deleteObject = originalDelete
+    if (fileId) await prisma.fileObject.deleteMany({ where: { id: fileId } })
+  }
 }
 
 async function main(): Promise<void> {
@@ -457,14 +290,16 @@ async function main(): Promise<void> {
     const bound = prisma.files.get(uploaded.file!.fileId)!
     assert.equal(bound.expiresAt?.toISOString(), originalExpiry)
     assert.equal(bound.retentionLockedReason, 'contract_review_session_only')
+    const bindingCalls = prisma.fileUpdateCalls.filter((call) => call.data.ownerType === 'user')
+    assert.ok(bindingCalls.length >= 1, 'member confirm must write user ownership')
     assert.ok(
-      prisma.fileUpdateCalls.every(
+      bindingCalls.every(
         (call) =>
           call.data.expiresAt?.toISOString() === originalExpiry &&
           call.data.retentionLockedReason === 'contract_review_session_only'
       ),
       `winning binding must preserve expiry and never clear the retention lock: ${JSON.stringify(
-        prisma.fileUpdateCalls
+        bindingCalls
       )}`
     )
   }
@@ -769,8 +604,7 @@ async function main(): Promise<void> {
     redis.get = async (key: string) => {
       if (key === lockKey) {
         lockReaders += 1
-        if (lockReaders === 2) lockReadersReady.resolve()
-        await lockReadersReady.promise
+        if (lockReaders >= 2) lockReadersReady.resolve()
       }
       return originalGet(key)
     }
@@ -1079,6 +913,135 @@ async function main(): Promise<void> {
     )
   }
 
+  {
+    const { service } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const first = await service.confirm(session.sessionId, session.controlToken, 'member_1')
+    const redis = (service as unknown as { redis: FakeRedis }).redis
+    const sessionKey = `upload_session:${session.sessionId}`
+    const parsed = JSON.parse((await redis.get(sessionKey)) ?? '{}') as { expiresAt?: string }
+    parsed.expiresAt = new Date(Date.now() - 1000).toISOString()
+    await redis.setExistingWithCurrentTtl(sessionKey, JSON.stringify(parsed))
+    const second = await service.confirm(session.sessionId, session.controlToken, 'member_1')
+    assert.equal(second.status, 'confirmed')
+    assert.equal(second.file.fileId, first.file.fileId)
+    assert.equal(second.file.fileUrl ?? null, first.file.fileUrl ?? null)
+    let mismatch: { error?: { code?: string } } | undefined
+    try {
+      await service.confirm(session.sessionId, session.controlToken, 'member_2')
+    } catch (error) {
+      mismatch = (error as ForbiddenException).getResponse() as { error?: { code?: string } }
+    }
+    assert.equal(mismatch?.error?.code, 'UPLOAD_SESSION_MEMBER_MISMATCH')
+  }
+
+  {
+    const { service } = makeService()
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'doc.pdf' }),
+    })
+    const first = await service.confirm(session.sessionId, session.controlToken)
+    const second = await service.confirm(session.sessionId, session.controlToken)
+    assert.equal(second.status, 'confirmed')
+    assert.equal(second.file.fileId, first.file.fileId)
+  }
+
+  {
+    const { service, prisma, redis } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const row = prisma.files.get(uploaded.file!.fileId)!
+    const anonymousKey = row.storageKey
+    row.ownerType = 'user'
+    row.endUserId = 'member_1'
+    row.ownerId = 'member_1'
+    row.storageKey = `users/member_1/resumes/${row.id}.pdf`
+    row.replacedStorageKey = null
+    prisma.files.set(row.id, row)
+    const sessionKey = `upload_session:${session.sessionId}`
+    const parsed = JSON.parse((await redis.get(sessionKey)) ?? '{}') as Record<string, unknown>
+    parsed.expiresAt = new Date(Date.now() - 1000).toISOString()
+    parsed.bind = {
+      phase: 'db-applied',
+      fileId: row.id,
+      endUserId: 'member_1',
+      userKey: row.storageKey,
+      previousKey: anonymousKey,
+      bucket: row.bucket,
+    }
+    await redis.setExistingWithCurrentTtl(sessionKey, JSON.stringify(parsed))
+    let body: { error?: { code?: string; memberFileRetained?: boolean } } | undefined
+    try {
+      await service.confirm(session.sessionId, session.controlToken, 'member_1')
+    } catch (error) {
+      body = (error as BadRequestException).getResponse() as typeof body
+    }
+    assert.equal(body?.error?.code, 'UPLOAD_SESSION_EXPIRED')
+    assert.equal(body?.error?.memberFileRetained, true)
+    const serialized = JSON.stringify(body)
+    assert.equal(serialized.includes(row.filename), false)
+    assert.equal(serialized.includes(row.id), false)
+    assert.equal(serialized.includes(row.storageKey), false)
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    assert.notEqual(status.status, 'confirmed')
+  }
+
+  {
+    const { service, redis } = makeService()
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'plain.pdf' }),
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const parsed = JSON.parse((await redis.get(sessionKey)) ?? '{}') as { expiresAt?: string }
+    parsed.expiresAt = new Date(Date.now() - 1000).toISOString()
+    await redis.setExistingWithCurrentTtl(sessionKey, JSON.stringify(parsed))
+    let body: { error?: { code?: string; memberFileRetained?: boolean } } | undefined
+    try {
+      await service.confirm(session.sessionId, session.controlToken)
+    } catch (error) {
+      body = (error as BadRequestException).getResponse() as typeof body
+    }
+    assert.equal(body?.error?.code, 'UPLOAD_SESSION_EXPIRED')
+    assert.equal(body?.error?.memberFileRetained, undefined)
+  }
+
   if (ISOLATED_DATABASE) {
     assertIsolatedVerificationDatabase()
     const prisma = new PrismaService()
@@ -1111,10 +1074,132 @@ async function main(): Promise<void> {
       assert.ok(after?.storageDeletedAt, 'physical object deletion must be recorded')
       assert.equal(await storage.headObject(before.storageKey, before.bucket), null)
       console.log('  PASS isolated expiry cleanup removes FileObject storage and records deletion ledger')
+      await assertReconcileKeepsMemberObject({ prisma, files, storage, service, redis })
+      await assertAnonymousQuarantineReconciles({ prisma, files, storage, service })
     } finally {
       await prisma.onModuleDestroy()
       rmSync(REAL_STORAGE_DIR, { recursive: true, force: true })
     }
+  }
+
+  {
+    // 场景码兑换若拿着过期快照回写，会把已经 uploaded 的会话盖回 pending，
+    // 手机收到成功回执，一体机却看不到文件，清理索引也不再指向这份字节。
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const sessionKey = `upload_session:${session.sessionId}`
+    const redis = (service as unknown as { redis: FakeRedis }).redis
+    const originalGet = redis.get.bind(redis)
+    const releaseStaleRead = deferred()
+    const staleReadHeld = deferred()
+    let holdSessionRead = true
+    redis.get = async (key: string) => {
+      if (holdSessionRead && key === sessionKey) {
+        holdSessionRead = false
+        const value = await originalGet(key)
+        staleReadHeld.resolve()
+        await releaseStaleRead.promise
+        return value
+      }
+      return originalGet(key)
+    }
+    const resolving = service.resolveScene(session.sceneToken).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    )
+    await staleReadHeld.promise
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'held-resume.pdf' }),
+    }).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    )
+    releaseStaleRead.resolve()
+    await resolving
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    if (uploaded.ok) {
+      assert.equal(status.status, 'uploaded', 'a successful phone upload must stay uploaded after scene resolve')
+      assert.equal(status.file?.fileId, uploaded.value.file?.fileId, 'scene resolve must not detach the uploaded file')
+      assert.equal(prisma.files.get(uploaded.value.file!.fileId)?.deletedAt ?? null, null)
+    } else {
+      assert.notEqual(status.status, 'uploaded', 'rejected upload must not be reported as received')
+      assert.equal(status.file, null)
+    }
+  }
+
+  {
+    const uploadEntered = deferred()
+    const releaseUpload = deferred()
+    const { service, prisma, redis } = makeService({
+      beforeUpload: async (callNumber) => {
+        if (callNumber === 1) {
+          uploadEntered.resolve()
+          await releaseUpload.promise
+        }
+      },
+    })
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const pending = service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'slow.pdf' }),
+    })
+    await uploadEntered.promise
+    await redis.setEx(lockKey, 30, 'successor-lock')
+    releaseUpload.resolve()
+    await expectRejects(
+      () => pending,
+      BadRequestException,
+      'upload that lost its lock must not report success',
+    )
+    assert.equal(await redis.get(lockKey), 'successor-lock', 'finishing upload must not delete a successor lock')
+    const status = await service.getStatus(session.sessionId, session.controlToken)
+    assert.equal(status.file, null, 'uncommitted upload must not remain the kiosk receipt')
+    for (const stored of prisma.files.values()) {
+      assert.notEqual(stored.deletedAt, null, 'bytes written after the lock was lost must be deleted')
+    }
+  }
+
+  {
+    const { service } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const garbled = Buffer.from('张三_简历.pdf', 'utf8').toString('latin1')
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: garbled }),
+    })
+    assert.equal(uploaded.file?.filename, '张三_简历.pdf', 'phone multipart UTF-8 filenames must be restored before receipt')
+    const plain = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const kept = await service.uploadFile({
+      sessionId: plain.sessionId,
+      uploadToken: plain.uploadToken,
+      file: file({ originalname: 'résumé.pdf' }),
+    })
+    assert.equal(kept.file?.filename, 'résumé.pdf', 'latin1 filenames without Han characters stay unchanged')
   }
 
   console.log('PASS upload session verification')

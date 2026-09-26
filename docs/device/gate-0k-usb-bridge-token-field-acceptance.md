@@ -37,7 +37,7 @@
 |------|------|
 | 公网 / 本机 nginx Kiosk bundle | **现网** `index-DEJ0O4c6.js`（备案 #424；沿用 bridge token 注入；历史 USB 热更曾为 `index-DmcUs_Nb.js`） |
 | bundle 内 bridge token | 已注入非空字面量（**勿**在聊天/文档回显）；产物含 `X-Local-Bridge-Token` 路径与 B1「可创建扫描任务」 |
-| 预发 secret 文件 | `/root/ai-job-print-secrets/kiosk-local-bridge-token` 存在（`chmod 600`，64 字节级） |
+| 预发 secret 文件 | `<服务器密钥目录>/kiosk-local-bridge-token` 存在（`chmod 600`，64 字节级） |
 | API health | `ok/postgres` |
 | `PRINT_SCAN_CAPABILITY_MODE` | `managed`（`usb_import` 能力行空表不挡 API） |
 
@@ -48,7 +48,7 @@
 ## 令牌与热更步骤（运维）
 
 1. 在预发主机生成 32+ 字节随机令牌，写入仅 root 可读文件，例如：  
-   `/root/ai-job-print-secrets/kiosk-local-bridge-token`（`chmod 600`）  
+   `<服务器密钥目录>/kiosk-local-bridge-token`（`chmod 600`）  
    **不要** `cat` 到聊天。
 2. 用含 B1 的 `main` 构建 Kiosk：  
    `VITE_API_MODE=http`  
@@ -85,10 +85,10 @@
 
 ### W1 取令牌（一体机禁止直连 secrets 时）
 
-一体机策略若拦截对 `/root/ai-job-print-secrets/...` 的 `scp`，**不要**在一体机上硬跑 scp。改用离线搬运（令牌仍勿贴聊天）：
+一体机策略若拦截对 `<服务器密钥目录>/...` 的 `scp`，**不要**在一体机上硬跑 scp。改用离线搬运（令牌仍勿贴聊天）：
 
 1. 在**允许 SSH 的运维机**（Mac/跳板）执行：  
-   `scp root@120.48.13.190:/root/ai-job-print-secrets/kiosk-local-bridge-token ./kiosk-bridge.token`
+   `scp <运维账号>@<生产服务器>:<服务器密钥目录>/kiosk-local-bridge-token ./kiosk-bridge.token`（账号、地址与目录见运维私有记录）
 2. 将 `kiosk-bridge.token` 拷到 U 盘或加密通道，带到一体机，例如：  
    `F:\temp\kiosk-bridge.token`（用完即删）
 3. 一体机只读本地文件，不访问预发 secrets 路径。

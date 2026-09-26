@@ -161,6 +161,77 @@ check(
   'ADM-M9: superseded published legal docs are archived, not draft',
 )
 
+// 派生告警类型以后端 ALERT_TYPES 为准：告警中心的类型元数据、类型筛选和工作台行图标
+// 必须逐一覆盖，任何一处漏掉都会让该类告警在前端「无标签 / 筛不出 / 被当成打印机故障」。
+const alertIdentity = readFileSync(
+  new URL('../../../services/api/src/admin-ops/derived-alert-identity.ts', import.meta.url),
+  'utf8',
+)
+const adminOps = readFileSync(new URL('../src/services/api/adminOps.ts', import.meta.url), 'utf8')
+const alertsPage = readFileSync(new URL('../src/routes/alerts/index.tsx', import.meta.url), 'utf8')
+
+function block(source, start, end) {
+  const from = source.indexOf(start)
+  if (from < 0) return ''
+  const to = source.indexOf(end, from + start.length)
+  return to < 0 ? '' : source.slice(from, to + end.length)
+}
+function keysOf(objectBlock) {
+  return [...objectBlock.matchAll(/^ {2}([a-z_]+):/gm)].map((match) => match[1])
+}
+
+const backendAlertTypes = [
+  ...(alertIdentity.match(/export const ALERT_TYPES = \[([^\]]*)\] as const/)?.[1] ?? '').matchAll(/'([a-z_]+)'/g),
+].map((match) => match[1])
+const frontendAlertTypes = [
+  ...(adminOps.match(/export type AdminAlertType =([^\n]+)/)?.[1] ?? '').matchAll(/'([a-z_]+)'/g),
+].map((match) => match[1])
+const typeMetaKeys = keysOf(block(alertsPage, 'const TYPE_META:', '\n}\n'))
+const typeFilterValues = [
+  ...block(alertsPage, 'const TYPE_FILTERS = [', '] as const').matchAll(/value: '([a-z_]+)'/g),
+].map((match) => match[1])
+const rowIconKeys = keysOf(block(dashboard, 'const ALERT_ROW_ICON:', '\n}\n'))
+const sameSet = (a, b) => a.length === b.length && a.every((item) => b.includes(item))
+
+check(
+  backendAlertTypes.includes('paid_pending_file_unavailable') &&
+    sameSet(frontendAlertTypes, backendAlertTypes) &&
+    /type: AdminAlertType\b/.test(adminOps),
+  `ALERT-TYPES: AdminAlertItem.type mirrors backend ALERT_TYPES (${backendAlertTypes.join(', ')})`,
+)
+check(
+  sameSet(typeMetaKeys, backendAlertTypes) && sameSet(typeFilterValues, backendAlertTypes),
+  `ALERT-TYPES: alerts TYPE_META [${typeMetaKeys.join(', ')}] and TYPE_FILTERS [${typeFilterValues.join(', ')}] cover every alert type`,
+)
+check(
+  sameSet(rowIconKeys, backendAlertTypes) &&
+    dashboard.includes('icon: ALERT_ROW_ICON[alert.type]') &&
+    /const alertRows = alerts \? buildAlertRows\(alerts\.data\) : \[\]/.test(dashboard) &&
+    dashboard.includes('{alertCount > alertRows.length && (') &&
+    /\[\.\.\.paidPending, \.\.\.others\]\.slice\(0, 3\)/.test(dashboard),
+  'ALERT-TYPES: dashboard alert summary keeps paid_pending_file_unavailable (own icon, listed first, footer counts hidden rows)',
+)
+
+const paidPendingMeta = block(alertsPage, '  paid_pending_file_unavailable: {', '\n  },')
+// 工作台只扫告警相关代码：审计动作标签里合法地出现 file.get_signed_url。
+const dashboardAlertCode =
+  block(dashboard, 'const ALERT_ROW_ICON:', '// ─── Page') +
+  block(dashboard, '<SectionCard title="实时告警"', '</SectionCard>')
+const alertSurfaces = stripComments(alertsPage) + stripComments(dashboardAlertCode) + stripComments(adminOps)
+check(
+  dashboardAlertCode.includes('buildAlertRows') &&
+    paidPendingMeta.includes("label: '已支付文件不可用'") &&
+    paidPendingMeta.includes('需人工') &&
+    paidPendingMeta.includes('不会退款') &&
+    paidPendingMeta.includes('不会恢复文件') &&
+    alertsPage.includes('{meta.guidance && (') &&
+    !/signed_?url|storageKey|sha256|contentHash|rawError/i.test(alertSurfaces) &&
+    !/<ActionButton[^>]*>[^<]*退款/.test(alertsPage) &&
+    !/label: '已(退款|恢复)/.test(alertsPage) &&
+    !/refund/i.test(stripComments(alertsPage) + stripComments(adminOps)),
+  'ALERT-TYPES: paid file-unavailable alert says manual handling, no refund action, no signed URL / storageKey / hash',
+)
+
 if (failures.length > 0) {
   console.error(`\n${failures.length} verification check(s) failed.`)
   process.exit(1)

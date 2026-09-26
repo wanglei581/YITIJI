@@ -1,0 +1,160 @@
+/* 扫描结果 · 整屏预览（稿 21 · rs-pv-*）
+ * 视觉真值：docs/design/kiosk-redesign-2026-08/21-resume-triage.html 的 .pv-* 查看器。
+ * 单列一份：scan-workbench-qx.css 已逼近 800 行硬线，查看器不往里堆。
+ *
+ * 同一 route 内的看文件层，占满舞台。舞台被 transform 缩放，所以 fixed 落在舞台上而不是视口上；
+ * 不缩放（手机 / 横屏桌面）时落在视口上。工具条与正文是并排的 flex 段，永远不盖在文件上。
+ * .sw-fv-view 是真实滚动容器：图片适应宽度后用手指直接滑，不做 transform 假平移。
+ */
+.sw-fv {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  padding: 20px;
+  background: color-mix(in srgb, var(--qx-deep) 82%, transparent);
+}
+.sw-fv-shell {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 32px;
+  background: var(--qx-paper);
+  border: 1px solid var(--qx-line-2);
+}
+.sw-fv-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 22px;
+  background: var(--qx-surface);
+  border-bottom: 1px solid var(--qx-line);
+}
+.sw-fv-ic {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sw-fv-meta { flex: 1; min-width: 0; }
+.sw-fv-name,
+.sw-fv-sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sw-fv-name { font-size: 26px; font-weight: 700; }
+.sw-fv-sub { margin-top: 4px; font-size: 18px; color: var(--qx-ink-3); }
+.sw-fv-close {
+  flex: none;
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+  border: 1.5px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-ink-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.sw-fv-stage { flex: 1; min-height: 0; position: relative; background: var(--qx-deep-2); }
+.sw-fv-view {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 18px;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.sw-fv-view::-webkit-scrollbar { display: none; }
+.sw-fv-view > [data-file-preview-kind] {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 12px;
+}
+.sw-fv-view > [data-file-preview-kind] iframe { min-height: 0; }
+/* 图片 · 适应整页：整张图 contain 进可视区，宁可留边也不裁。 */
+.sw-fv-view > [data-file-preview-kind='image'] img { max-height: none; }
+/* 图片 · 适应宽度：放开高度，图按 w-full 铺满宽度、高度随原比例，超出的部分在 .sw-fv-view 里滑动看。 */
+.sw-fv-view[data-fit='width'] > [data-file-preview-kind='image'] { height: auto; min-height: 100%; }
+.sw-fv-view[data-fit='width'] > [data-file-preview-kind='image'] > div { flex: none; display: block; }
+.sw-fv-bar {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 22px;
+  background: var(--qx-surface);
+  border-top: 1px solid var(--qx-line);
+}
+.sw-fv-row { display: flex; align-items: center; gap: 12px; }
+.sw-fv-btn {
+  flex: none;
+  min-height: 88px;
+  min-width: 88px;
+  padding: 0 20px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-ink-2);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.sw-fv-btn[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.sw-fv-btn:disabled { border-style: dashed; color: var(--qx-ink-3); opacity: .62; cursor: not-allowed; }
+.sw-fv-ind {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qx-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.sw-fv-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 22px 20px;
+  background: var(--qx-paper);
+  border-top: 1px solid var(--qx-line);
+}
+.sw-fv-note { margin: 0; font-size: 19px; line-height: 29px; color: var(--qx-ink-2); }
+.sw-fv-note b { color: var(--qx-ink); font-weight: 700; }
+
+/* 不缩放时视口可能只有 720 高：整屏预览按触控底线收紧，两排工具条并成一排可折行，把高度让给文件。 */
+[data-kiosk-stage-fit='off'] .sw-fv { padding: 8px; }
+[data-kiosk-stage-fit='off'] .sw-fv-shell { border-radius: 20px; }
+[data-kiosk-stage-fit='off'] .sw-fv-head { gap: 10px; padding: 8px 12px; }
+[data-kiosk-stage-fit='off'] .sw-fv-ic { width: var(--qx-tap-min); height: var(--qx-tap-min); border-radius: 14px; }
+[data-kiosk-stage-fit='off'] .sw-fv-name { font-size: 18px; }
+[data-kiosk-stage-fit='off'] .sw-fv-sub { font-size: 14px; white-space: normal; }
+[data-kiosk-stage-fit='off'] .sw-fv-close { width: 56px; height: 56px; border-radius: 16px; }
+[data-kiosk-stage-fit='off'] .sw-fv-view { padding: 8px; }
+[data-kiosk-stage-fit='off'] .sw-fv-bar { flex-direction: row; flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; }
+[data-kiosk-stage-fit='off'] .sw-fv-row { flex: 1 1 320px; gap: 8px; }
+[data-kiosk-stage-fit='off'] .sw-fv-btn { min-height: 56px; min-width: 56px; padding: 0 12px; border-radius: 16px; font-size: 16px; gap: 6px; }
+[data-kiosk-stage-fit='off'] .sw-fv-ind { font-size: 15px; }
+[data-kiosk-stage-fit='off'] .sw-fv-foot { gap: 8px; padding: 8px 12px 10px; }
+[data-kiosk-stage-fit='off'] .sw-fv-note { font-size: 14px; line-height: 1.5; }
+[data-kiosk-stage-fit='off'] .sw-fv-foot .qx-btn { min-height: 56px; font-size: 17px; }

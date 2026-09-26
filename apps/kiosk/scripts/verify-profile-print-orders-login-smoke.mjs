@@ -156,7 +156,8 @@ else fail('fixture 缺少历史无 Order 全 null 样例')
 expectAbsent(JSON.stringify(fixture), /微信|支付宝|wechat|alipay|\/print\/confirm|立即支付|去支付|确认核销|核销成功|办理成功/i, 'fixture 不含线上支付/核销/订单直连禁用口径')
 
 expectIncludes(page, 'getMyPrintOrders(getToken(), { pageSize: PAGE_SIZE })', '页面仍调用本人订单真实 API')
-expectIncludes(page, "loginFrom=\"/me/print-orders\"", '游客态仍走登录回跳来源')
+// 2026-09-23 迁入青序流光后，登录回跳来源是 recordsCtabar 的第 4 个位置参数（稿 38）。
+expectMatches(page, /recordsCtabar\(uiState, navigate, \(\) => setReloadKey\(\(k\) => k \+ 1\), '\/me\/print-orders',/, '游客态仍走登录回跳来源')
 expectIncludes(api, "headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }", '真实 API 仍显式携带会员 Bearer token')
 expectIncludes(api, "if (API_MODE !== 'http' || !token) return Promise.resolve({ items: [], nextCursor: null, total: 0 })", 'mock/未登录仍返回空页，不构造假订单')
 expectAbsent(authContext + login, /localStorage|sessionStorage|indexedDB|document\.cookie|__PRINT_ORDER|fixture|testToken|debugToken|mockToken/i, '登录与 AuthProvider 未新增持久化 token、fixture 或调试注入后门')

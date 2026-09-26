@@ -74,6 +74,7 @@ import {
   SmartCampusCapabilityBoundary,
   ToolboxCapabilityBoundary,
 } from '../auth/KioskCapabilityGuard'
+import { RecruitmentHostingBoundary } from '../auth/RecruitmentHostingBoundary'
 
 // Gate 0 requires production_default=false. Only an explicit build-time grant
 // may expose contract review; missing, empty, or malformed values fail closed.
@@ -180,15 +181,6 @@ export const kioskRouter = createBrowserRouter([
       { path: 'activities',         element: <BenefitActivitiesPage /> },
       { path: 'activities/:id',     element: <BenefitActivityDetailPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
-      { path: 'campus',            element: <CampusPage /> },
-      {
-        path: 'campus/welcome',
-        lazy: async () => ({ Component: (await import('../pages/placeholders/CampusWelcomePage')).default }),
-      },
-      {
-        path: 'campus/freshman-insights',
-        lazy: async () => ({ Component: (await import('../pages/campus/FreshmanInsightsPage')).default }),
-      },
       // 百宝箱与智慧校园的根路由、所有深链先经终端配置能力边界；未知、失败和关闭均不挂载业务页。
       {
         element: <ToolboxCapabilityBoundary />,
@@ -256,38 +248,73 @@ export const kioskRouter = createBrowserRouter([
       { path: 'scan/settings', element: <Navigate to="/scan?stage=settings" replace /> },
       { path: 'scan/progress', element: <Navigate to="/scan?stage=progress" replace /> },
       { path: 'scan/result',   element: <Navigate to="/scan?stage=result" replace /> },
-      // 岗位 / 招聘会（Phase 4）
-      { path: 'jobs',                                  element: <JobsPage /> },
-      { path: 'jobs/:id',                              element: <JobDetailPage /> },
-      {
-        path: 'jobs/:id/offline',
-        lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineJobDetailPage')).default }),
-      },
-      {
-        path: 'offline-agencies',
-        lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgenciesPage')).default }),
-      },
-      {
-        path: 'offline-agencies/:id',
-        lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgencyDetailPage')).default }),
-      },
       {
         path: 'notifications',
         lazy: async () => ({ Component: (await import('../pages/placeholders/NotificationsPage')).default }),
       },
-      { path: 'companies',                             element: <CompaniesPage /> },
-      { path: 'companies/:id',                         element: <CompanyDetailPage /> },
-      { path: 'job-fairs',                             element: <JobFairsPage /> },
-      { path: 'job-fairs/checkin',                     element: <JobFairCheckinPage /> },
-      { path: 'job-fairs/:id',                         element: <JobFairDetailPage /> },
-      // 招聘会现场服务（Phase 招聘会数字化）
-      { path: 'job-fairs/:id/companies',               element: <FairCompaniesPage /> },
-      { path: 'job-fairs/:id/companies/:companyId',    element: <FairCompanyDetailPage /> },
-      { path: 'job-fairs/:id/map',                     element: <FairMapPage /> },
-      { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
-      { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
-      { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
-      // 原型 52 / 76–78：小青作业面 / 继续上次 / 线上招聘平台
+      // 岗位 / 招聘会 / 企业 / 校园招聘 / 线下机构（Phase 4），以及岗位、招聘会两个服务台和线上平台目录，
+      // 共用招聘内容托管闸门（next-tasks 3.13）。我们云上默认关闭：不挂载这些页、不请求招聘类接口，
+      // 直达地址落到诚实说明页；客户私有化部署（b）打开后与今天完全相同。
+      {
+        element: <RecruitmentHostingBoundary />,
+        children: [
+          { path: 'jobs',                                  element: <JobsPage /> },
+          { path: 'jobs/:id',                              element: <JobDetailPage /> },
+          {
+            path: 'jobs/:id/offline',
+            lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineJobDetailPage')).default }),
+          },
+          {
+            path: 'offline-agencies',
+            lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgenciesPage')).default }),
+          },
+          {
+            path: 'offline-agencies/:id',
+            lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgencyDetailPage')).default }),
+          },
+          { path: 'companies',                             element: <CompaniesPage /> },
+          { path: 'companies/:id',                         element: <CompanyDetailPage /> },
+          { path: 'job-fairs',                             element: <JobFairsPage /> },
+          { path: 'job-fairs/checkin',                     element: <JobFairCheckinPage /> },
+          { path: 'job-fairs/:id',                         element: <JobFairDetailPage /> },
+          // 招聘会现场服务（Phase 招聘会数字化）
+          { path: 'job-fairs/:id/companies',               element: <FairCompaniesPage /> },
+          { path: 'job-fairs/:id/companies/:companyId',    element: <FairCompanyDetailPage /> },
+          { path: 'job-fairs/:id/map',                     element: <FairMapPage /> },
+          { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
+          { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
+          { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
+          { path: 'campus',                                element: <CampusPage /> },
+          {
+            path: 'campus/welcome',
+            lazy: async () => ({ Component: (await import('../pages/placeholders/CampusWelcomePage')).default }),
+          },
+          {
+            path: 'campus/freshman-insights',
+            lazy: async () => ({ Component: (await import('../pages/campus/FreshmanInsightsPage')).default }),
+          },
+          // 原型 78：线上招聘平台
+          {
+            path: 'jobs/online-platforms',
+            lazy: async () => ({ Component: (await import('../pages/jobs/OnlinePlatformsPage')).OnlinePlatformsPage }),
+          },
+          {
+            path: 'jobs-service',
+            lazy: async () => {
+              const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+              return { Component: () => <QxServiceHubPage hub="jobs" /> }
+            },
+          },
+          {
+            path: 'fairs-service',
+            lazy: async () => {
+              const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+              return { Component: () => <QxServiceHubPage hub="fairs" /> }
+            },
+          },
+        ],
+      },
+      // 原型 52 / 76–77：小青作业面 / 继续上次
       {
         path: 'ai/plan',
         lazy: async () => ({ Component: (await import('../pages/ai-plan/AiPlanPage')).AiPlanPage }),
@@ -297,29 +324,26 @@ export const kioskRouter = createBrowserRouter([
         lazy: async () => ({ Component: (await import('../pages/session-resume/SessionResumePage')).SessionResumePage }),
       },
       {
-        path: 'jobs/online-platforms',
-        lazy: async () => ({ Component: (await import('../pages/jobs/OnlinePlatformsPage')).OnlinePlatformsPage }),
-      },
-      {
         path: 'resume-service',
-        lazy: async () => ({ Component: (await import('../pages/resume/ResumeServiceHubPage')).ResumeServiceHubPage }),
-      },
-      {
-        path: 'jobs-service',
-        lazy: async () => ({ Component: (await import('../pages/jobs/JobsServiceHubPage')).JobsServiceHubPage }),
-      },
-      {
-        path: 'fairs-service',
-        lazy: async () => ({ Component: (await import('../pages/job-fairs/FairsServiceHubPage')).FairsServiceHubPage }),
+        lazy: async () => {
+          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+          return { Component: () => <QxServiceHubPage hub="resume" /> }
+        },
       },
       { path: 'interview', element: <InterviewWorkbenchPage /> },
       {
         path: 'interview-service',
-        lazy: async () => ({ Component: (await import('../pages/interview/InterviewServiceHubPage')).InterviewServiceHubPage }),
+        lazy: async () => {
+          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+          return { Component: () => <QxServiceHubPage hub="interview" /> }
+        },
       },
       {
         path: 'policy-service',
-        lazy: async () => ({ Component: (await import('../pages/policy/PolicyServiceHubPage')).PolicyServiceHubPage }),
+        lazy: async () => {
+          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
+          return { Component: () => <QxServiceHubPage hub="policy" /> }
+        },
       },
         ],
       },

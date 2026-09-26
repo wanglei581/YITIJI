@@ -346,9 +346,16 @@ function visibleStrings(path) {
 
 check('compliance copy', () => {
   const forbidden = [/一键投递/, /立即投递/, /平台内投递/, /投递简历/, /企业收简历/, /候选人管理/]
+  // 已登记的**否定式**边界声明：这几句是在告诉用户「本机不做这件事」，
+  // 与 CLAUDE.md §2 禁止的承诺式文案语义相反，先剥离再查禁词。
+  // 新增一条必须同时满足：① 以「不」开头；② 是完整否定短语，不能只剥离半句。
   const approvedBoundaryCopy = [
     '不提供平台内投递',
     '不会提供平台内投递',
+    // 2026-09-20 招聘会八屏迁入青序流光：稿 28-jobfair-enhanced.html 的参展企业
+    // 边界原话是「本机不代收简历，也不在平台内投递」。登记这一条而不是改写文案，
+    // 是为了让生产页与已签字的稿逐字一致。
+    '不在平台内投递',
   ]
   const violations = []
   for (const path of productionFiles) {
@@ -439,9 +446,10 @@ check('W2-W5 state coverage', () => {
     "json: { success: true, data: { items: [], nextCursor: null, total: 0 } }",
     "page.getByText('还没有登录后保存的简历', { exact: true })",
   ])
+  // 稿 09-system-state（2026-09-25 迁入）：主操作按稿叫「重新检测」（旧页叫「重试连接」），证据锚点随稿换字，判据不变。
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'offline page retains the 8177 state after an aborted health request @w5-kiosk'", [
     "api.abort('GET', '/api/v1/health', 'internetdisconnected')",
-    "page.getByRole('button', { name: '重试连接', exact: true }).click()",
+    "page.getByRole('button', { name: '重新检测', exact: true }).click()",
     "page.getByText(/已重试 1 次/)",
   ])
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'profile permission state uses the canonical fusion shell @w5-kiosk'", [
@@ -455,9 +463,11 @@ check('W2-W5 state coverage', () => {
     "page.goto('/member/qr-login?ticketId=w5-expired-ticket')",
     "root.getByRole('button', { name: '重新检查二维码', exact: true })",
   ])
-  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'phone upload keeps the explicit expired-link state at 390x844 @w5-mobile'", [
+  // 稿 51：缺 sessionId / token 只说明链接不成立，与「过期 / 已用过」无关，锚点随之从「已失效」换成「不能用来上传」。
+  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'phone upload keeps the explicit invalid-link state at 390x844 @w5-mobile'", [
     "page.goto('/upload/phone')",
-    "root.getByText('上传链接已失效', { exact: true })",
+    "root.getByRole('heading', { name: '这个链接不能用来上传', exact: true })",
+    "root.getByText('上传链接已失效')).toHaveCount(0)",
   ])
 
   const paymentSource = readKiosk('tests/visual/fusion-w2-print.spec.ts')

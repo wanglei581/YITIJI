@@ -4,13 +4,11 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 
 // 只允许回到已经明确需要登录的现有页面，禁止把任意 query 当成跳转地址。
+// 「我的权益」「合同审查」两页已停放（首发按非招聘类目提审，compliance-boundary.md §1.1），
+// 从这里摘掉；恢复页面时一并加回（合同审查 6 个端点全部要会员身份，未登录整条链 404）。
 const LOGIN_RETURN_ROUTES = new Set([
   '/pages/documents/documents',
-  '/pages/membership/membership',
   '/pages/notifications/notifications',
-  // 合同审查 6 个端点全部要会员身份：未登录时服务端走匿名路径，
-  // 需要 x-contract-review-source-file-proof 等头，小程序不具备 → 整条链 404。
-  '/pages/contract-review/contract-review',
 ])
 
 function safeReturnTo(raw) {
@@ -65,8 +63,13 @@ Page({
     wx.showLoading({ title: '登录中', mask: true })
     api.loginByPhone(d.code)
       .then(res => {
-        auth.saveSession(res)
+        const saved = auth.saveSession(res)
         wx.hideLoading()
+        // 存不下的会话等于没有会话:这时跳走,用户以为登录了,下一页当场 401。
+        if (!saved) {
+          wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })
+          return
+        }
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._afterLogin(), 600)
       })
@@ -150,9 +153,15 @@ Page({
     wx.showLoading({ title: '登录中', mask: true })
     api.loginBySms(phone, this.data.code)
       .then(res => {
-        auth.saveSession(res)
+        const saved = auth.saveSession(res)
         wx.hideLoading()
         this.setData({ submitting: false })
+        // 与微信入口同一条判据:没存下就留在本页,不提示成功、不跳转。
+        if (!saved) {
+          this.setData({ code: '', otp: ['','','','','',''] })
+          wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })
+          return
+        }
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._afterLogin(), 600)
       })

@@ -4,6 +4,7 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { ActivityController } from './activity.controller'
 import { MeActivityController } from './me-activity.controller'
 import { ActivityService } from './activity.service'
+import { TerminalsModule } from '../terminals/terminals.module'
 
 /**
  * 浏览 / 外部跳转记录模块（P1 闭环）。
@@ -18,6 +19,7 @@ import { ActivityService } from './activity.service'
  */
 @Module({
   imports: [
+    TerminalsModule,
     JwtModule.registerAsync({
       useFactory: () => {
         const secret = process.env['JWT_SECRET']

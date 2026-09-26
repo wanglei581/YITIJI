@@ -94,20 +94,51 @@ export function evaluateJobSourceTrust(job: SourceTrustInput): JobSourceTrust {
 }
 
 /**
+ * 这条来源记录在用户眼里是什么东西。
+ *
+ * 本门禁被岗位、企业在招岗位、线下机构岗位、招聘会场次四类页面共用，但原因句里
+ * 要出现一个具体名词。2026-09-22 之前只有一套「岗位」措辞，招聘会八条路由迁进来
+ * 之后，场次列表 / 详情 / 到场指引三处会对着一场双选会说「无法核对**这条岗位**的
+ * 来源……自行查询**该职位**」—— 招聘会是活动不是职位，那句话是假的。
+ *
+ * 默认值刻意留在 `'job'`：既有的岗位 / 企业 / 参展企业调用一个字都不用改，
+ * 输出也必须逐字保持原样（verify:jobfair-ui 有断言钉住这一点）。
+ */
+export type SourceEntityKind = 'job' | 'job_fair'
+
+/**
+ * 两个名词槽：`subject` 填「无法核对○○的来源」，`lookup` 填「自行查询○○」。
+ *
+ * 拆成两个而不是一个，是因为中文这两处的量词不一样：岗位是「这条 / 该职位」，
+ * 招聘会是「这场 / 该场次」。合成一个词会写出「这条招聘会」。
+ */
+const SOURCE_ENTITY_WORDING: Record<SourceEntityKind, { subject: string; lookup: string }> = {
+  job: { subject: '这条岗位', lookup: '该职位' },
+  job_fair: { subject: '这场招聘会', lookup: '该场次' },
+}
+
+/**
  * 常显的「为什么不能点」原因。
  *
- * 只缺链接时沿用调用方传进来的全局能力门禁常量（SOURCE_APPLY_UNAVAILABLE_REASON），
- * 让岗位 / 企业 / 招聘会参展企业三处文案继续一致；其余情况按缺哪项如实列出。
+ * 只缺链接时沿用调用方传进来的能力门禁常量：岗位 / 企业 / 参展企业传
+ * SOURCE_APPLY_UNAVAILABLE_REASON（投递链接口径），招聘会三页传各自的预约 / 签到
+ * 口径常量 —— 那条常量里同样带名词，只换本函数的措辞是修不干净的。
+ * 其余情况按缺哪项如实列出。
  *
  * 文案边界：只说「本机为什么不放行」，不说「该岗位无效 / 已失效」——
- * 岗位有没有效由来源平台决定，本机无权替它下结论（CLAUDE.md §9）。
+ * 有没有效由来源平台决定，本机无权替它下结论（CLAUDE.md §9）。
  */
-export function sourceTrustReason(trust: JobSourceTrust, linkUnavailableReason: string): string {
+export function sourceTrustReason(
+  trust: JobSourceTrust,
+  linkUnavailableReason: string,
+  entity: SourceEntityKind = 'job',
+): string {
   if (trust.ok) return ''
   if (trust.missing.length === 1 && trust.missing[0] === 'sourceUrl') return linkUnavailableReason
+  const { subject, lookup } = SOURCE_ENTITY_WORDING[entity]
   return (
-    `来源要素缺「${trust.missingLabels.join('、')}」，无法核对这条岗位的来源，`
-    + '本机不放行前往来源平台与扫码；可到来源平台自行查询该职位。'
+    `来源要素缺「${trust.missingLabels.join('、')}」，无法核对${subject}的来源，`
+    + `本机不放行前往来源平台与扫码；可到来源平台自行查询${lookup}。`
   )
 }
 

@@ -63,6 +63,47 @@ export async function assertTapTargetPointerHit(locator: Locator): Promise<void>
   }
 }
 
+/**
+ * 青序顶栏状态胶囊的可读性，量真实排版：不被裁、最多两行、每行至少两个字；
+ * 带「 · 」分隔的标签只许在分隔处折行，不把短语拆开（「扫描件已交接 · 待确 / 认」那种）。
+ * 行按每个字的纵向中心归并：同一行里混排的字体上沿可能差一两像素，按 top 取整会把一行误拆成两行。
+ */
+export async function assertQxPillReadable(page: Page, where: string): Promise<void> {
+  const pill = page.locator('.qx-pill')
+  await expect(pill).toBeVisible()
+  const { text, lines, clipped } = await pill.evaluate((el) => {
+    const node = Array.from(el.childNodes).reverse().find((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())
+    const content = node?.textContent ?? ''
+    const rows: Array<{ mid: number; text: string }> = []
+    for (let index = 0; node && index < content.length; index += 1) {
+      if (!content[index].trim()) continue
+      const range = document.createRange()
+      range.setStart(node, index)
+      range.setEnd(node, index + 1)
+      const rect = range.getBoundingClientRect()
+      const mid = rect.top + rect.height / 2
+      const row = rows.find((item) => Math.abs(item.mid - mid) < rect.height / 2)
+      if (row) row.text += content[index]
+      else rows.push({ mid, text: content[index] })
+    }
+    return {
+      text: content.trim(),
+      lines: rows.sort((a, b) => a.mid - b.mid).map((row) => row.text),
+      clipped: el.scrollWidth > el.clientWidth + 1 || el.getBoundingClientRect().right > window.innerWidth + 0.5,
+    }
+  })
+  const detail = `${where} 顶栏胶囊「${text}」→ ${lines.join(' / ')}`
+  expect(clipped, detail).toBe(false)
+  expect(lines.length, detail).toBeGreaterThan(0)
+  expect(lines.length, detail).toBeLessThanOrEqual(2)
+  expect(Math.min(...lines.map((line) => line.length)), `${detail}：有一行只剩一个字`).toBeGreaterThanOrEqual(2)
+  if (text.includes(' · ')) {
+    for (const phrase of text.split('·').map((part) => part.replace(/\s/g, '')).filter(Boolean)) {
+      expect(lines.some((line) => line.includes(phrase)), `${detail}：「${phrase}」被拆到两行`).toBe(true)
+    }
+  }
+}
+
 export async function assertKioskShellFillsViewport(page: Page): Promise<void> {
   const dimensions = await page.locator('.ui-kiosk-shell').evaluate((shell) => {
     const rect = shell.getBoundingClientRect()

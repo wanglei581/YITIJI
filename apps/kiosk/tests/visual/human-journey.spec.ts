@@ -144,10 +144,15 @@ test.describe('真人走查（模拟数据）', () => {
       key: 'unpaid-onsite',
       label: '未付款 → 引导现场支付',
       status: 200,
+      // 与 pickup-order.service.ts 未付款分支同形：released=false 必带 paymentSessionToken，
+      // 页面缺它会按「校验结果未确认」处理（PrintPickupClaimPage.tsx 的回执校验）。
       json: {
         released: false,
         orderId: 'ord-journey-002', orderNo: 'P202609080002',
-        taskStatus: 'awaiting_payment',
+        terminalId: 'KSK-001', amountCents: 200,
+        priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+        fileName: '求职简历.pdf',
+        paymentSessionToken: 'journey-pay-token',
       },
       expectText: /请先完成现场支付|进入现场支付/,
     },
@@ -222,7 +227,7 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForTimeout(2500)
     await step(page, s, 'jobs-list')
 
-    // 「岗位信息」进的是服务目录页 /jobs-service（8 张分类卡），列表还要再点一层。
+    // 「岗位信息」进的是服务目录页 /jobs-service（含校招在内的分类卡），列表还要再点一层。
     // 这一层是走查发现的：直达 /jobs 会跳过目录，真人不会那样走。
     const fullTime = page.getByRole('button', { name: /全职岗位/ }).first()
     if (await fullTime.count()) {

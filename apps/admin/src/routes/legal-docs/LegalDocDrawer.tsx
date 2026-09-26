@@ -6,6 +6,9 @@ const DOC_TYPE_OPTIONS = [
   { value: 'terms_of_service', label: '用户服务协议' },
   { value: 'privacy_policy', label: '隐私政策' },
   { value: 'ai_disclaimer', label: 'AI 服务免责声明' },
+  { value: 'contract_review_disclaimer', label: '合同审查免责声明' },
+  // 电商法第十五条：首页持续公示营业执照信息或其链接（小程序首页底部「经营者信息」读这一类）
+  { value: 'operator_info', label: '经营者信息' },
 ]
 
 interface Props {

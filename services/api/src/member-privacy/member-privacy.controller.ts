@@ -6,7 +6,7 @@ import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberDataExportDownloadService } from './member-data-export-download.service'
 import { MemberDataRequestService } from './member-data-request.service'
-import { MemberPrivacyService } from './member-privacy.service'
+import { CONSENT_SCOPES, MemberPrivacyService } from './member-privacy.service'
 import type { MemberAiConsentScope, MemberDataRequestType } from './member-privacy.types'
 
 interface ReqLike {
@@ -25,12 +25,12 @@ function terminalIdOf(req: ReqLike): string | null {
 }
 
 class GrantAiConsentDto {
-  @IsIn(['job_ai', 'contract_review', 'resume_ai'])
+  @IsIn(CONSENT_SCOPES)
   scope!: MemberAiConsentScope
 }
 
 class RevokeAiConsentParamsDto {
-  @IsIn(['job_ai', 'contract_review', 'resume_ai'])
+  @IsIn(CONSENT_SCOPES)
   scope!: MemberAiConsentScope
 }
 

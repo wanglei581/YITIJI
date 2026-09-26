@@ -35,11 +35,12 @@ export interface CampusRecruitmentSourceGroup {
   /**
    * 在招岗位数 = 校招岗位条数 + 场内已录入岗位条数。
    * 两套名录不去重；同一岗位若同时出现在岗位库与场内名录会计两次。
+   * 岗位板块关闭时为 null：不返回岗位库计数，也不再用合计反推条数。
    */
-  openJobCount: number
-  /** 已审核已发布、category=campus 的岗位条数。 */
-  jobListingCount: number
-  /** 校园招聘会场内 FairCompanyPosition 条数。 */
+  openJobCount: number | null
+  /** 已审核已发布、category=campus 的岗位条数。岗位板块关闭时为 null。 */
+  jobListingCount: number | null
+  /** 校园招聘会场内 FairCompanyPosition 条数。招聘会统计，不受岗位板块开关影响。 */
   fairPositionCount: number
   timeDistribution: CampusRecruitmentTimeBucket[]
 }

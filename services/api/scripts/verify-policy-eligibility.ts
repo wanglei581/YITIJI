@@ -354,8 +354,8 @@ async function main() {
     const beforeApprove = await eligibility.checkEligibility({ policyIds: [post.id], answers: {} })
     check(beforeApprove.items.length === 0, '6g. 未过审政策不进入条件核对')
 
-    await policies.reviewPolicy(post.id, 'approve', undefined, admin)
-    await policies.publishPolicy(post.id, 'publish', admin)
+    await policies.reviewPolicy(post.id, 'approve', undefined, partnerA)
+    await policies.publishPolicy(post.id, 'publish', partnerA, { responsibilityAcknowledged: true })
 
     // ── 7. 核对结果契约 ───────────────────────────────────────────────────
     const mixed = await eligibility.checkEligibility({
@@ -423,8 +423,8 @@ async function main() {
       { kind: 'policy_guide', title: `无条件条目_${suffix}`, audience: 'graduate' },
       partnerA,
     )
-    await policies.reviewPolicy(bare.id, 'approve', undefined, admin)
-    await policies.publishPolicy(bare.id, 'publish', admin)
+    await policies.reviewPolicy(bare.id, 'approve', undefined, partnerA)
+    await policies.publishPolicy(bare.id, 'publish', partnerA, { responsibilityAcknowledged: true })
     const bareRes = await eligibility.checkEligibility({ policyIds: [bare.id], answers: { household_social: 'local_household' } })
     const bareItem = bareRes.items[0]
     check(bareItem.overall === 'no_recorded_conditions' && bareItem.conditionsRecorded === false, '7p. 未录条件 → no_recorded_conditions')
@@ -469,8 +469,8 @@ async function main() {
           clauses: '{ not valid json',
         },
       })
-      await policies.reviewPolicy(corrupt.id, 'approve', undefined, admin)
-      await policies.publishPolicy(corrupt.id, 'publish', admin)
+      await policies.reviewPolicy(corrupt.id, 'approve', undefined, partnerA)
+      await policies.publishPolicy(corrupt.id, 'publish', partnerA, { responsibilityAcknowledged: true })
       const res = await eligibility.checkEligibility({
         policyIds: [corrupt.id],
         answers: { household_social: 'local_household' },
@@ -493,8 +493,8 @@ async function main() {
           clauses: '[]',
         },
       })
-      await policies.reviewPolicy(emptyPolicy.id, 'approve', undefined, admin)
-      await policies.publishPolicy(emptyPolicy.id, 'publish', admin)
+      await policies.reviewPolicy(emptyPolicy.id, 'approve', undefined, partnerA)
+      await policies.publishPolicy(emptyPolicy.id, 'publish', partnerA, { responsibilityAcknowledged: true })
       const emptyRes = await eligibility.checkEligibility({
         policyIds: [emptyPolicy.id],
         answers: { household_social: 'local_household' },

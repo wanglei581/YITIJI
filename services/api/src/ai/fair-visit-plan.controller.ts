@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { FairVisitPlanService } from './resume/fair-visit-plan.service'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
@@ -36,17 +37,20 @@ export class FairVisitPlanController {
   @Post(':taskId')
   @PaidAiThrottle(6)
   async generate(@Param('fairId') fairId: string, @Param('taskId') taskId: string, @Req() req: ReqLike) {
+    assertRecruitmentContentHostingEnabled()
     return this.service.generate(fairId, taskId, await this.requesterOf(req))
   }
 
   @Get(':taskId')
   async latest(@Param('fairId') fairId: string, @Param('taskId') taskId: string, @Req() req: ReqLike) {
+    assertRecruitmentContentHostingEnabled()
     return this.service.getLatest(fairId, taskId, await this.requesterOf(req))
   }
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async print(@Param('fairId') fairId: string, @Param('taskId') taskId: string, @Req() req: ReqLike) {
+    assertRecruitmentContentHostingEnabled()
     return this.service.printPlan(fairId, taskId, await this.requesterOf(req))
   }
 }

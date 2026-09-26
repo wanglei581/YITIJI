@@ -11,6 +11,7 @@ import {
 } from '../llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import { withAiSafety } from '../llm/ai-prompt-safety'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
 // ============================================================
@@ -48,7 +49,7 @@ const GENERATE_GUARD_TERMS = [
   j('平台', '投递'),
 ]
 
-const GENERATE_SYSTEM_PROMPT = [
+export const GENERATE_SYSTEM_PROMPT = withAiSafety([
   '你是「AI 求职打印服务终端」的简历润色引擎。用户提供了结构化的真实简历资料,你只负责润色表达,绝不编造。',
   '严格要求:',
   '1. 只输出一个 JSON 对象,不要任何解释、前后缀或代码块标记。',
@@ -59,10 +60,11 @@ const GENERATE_SYSTEM_PROMPT = [
   '6. 红线:不得编造或暗示用户输入中不存在的学校、学历、专业、公司、职务、项目、证书、奖项、数据指标或时间段;不得把用户没写的数字写进润色文本。',
   '7. 润色方向:动词开头、表达具体、突出职责与成果;用户原文里有的数字必须原样保留。',
   '8. 不得输出任何录用、投递、面试邀约或求职结果类承诺。',
-].join('\n')
+].join('\n'))
 
-const RETRY_HINT =
-  '上一次输出不符合要求。请严格只输出 JSON 对象,且 educationDesc/experienceDesc/projectDesc/skillsPolished 数组长度必须与输入条目数一致。'
+export const GENERATE_RETRY_HINT = withAiSafety(
+  '上一次输出不符合要求。请严格只输出 JSON 对象,且 educationDesc/experienceDesc/projectDesc/skillsPolished 数组长度必须与输入条目数一致。',
+)
 
 interface ChatMessage {
   role: 'system' | 'user'
@@ -123,7 +125,7 @@ export class LlmResumeGenerateService {
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
-        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: RETRY_HINT }]
+        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: GENERATE_RETRY_HINT }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, GENERATE_TEMPERATURE, messages,
         `llm:${cfg.vendor}:${cfg.model}`, onLlmCall,

@@ -29,6 +29,17 @@ export interface AdminOrderReadonlyItem {
   refundEligible: boolean
   retryForbidden: boolean
   refundRequired: boolean
+  /**
+   * 运营必须看见的三类单：待退款、退款中、渠道已受理但本地确认未落地。
+   * 只读信号，不自动出款、不改 payStatus。字段与取值照抄后端
+   * `services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts`，
+   * 前端不新增第四类取值、不自行推导。
+   *
+   * 两个字段刻意可选：存量后端（未部署本次只读视图）不返回它们，此时页面
+   * 必须什么都不显示，而不是把 `undefined` 当成 false 去编一个「一切正常」。
+   */
+  opsAttention?: boolean
+  opsAttentionCode?: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null
   createdAt: string
   updatedAt: string
 }
@@ -71,6 +82,15 @@ export interface ListAdminOrdersReadonlyParams {
   taskStatus?: string
   search?: string
   refundRequired?: boolean
+  /**
+   * 需运营关注（服务端 opsAttention 的三支 OR）。
+   *
+   * **绝不能与 payStatus 一起钉死**：`channel_accepted_unconfirmed` 的订单
+   * payStatus 是 paying/closed 而不是 paid（渠道收了钱、本地没转成已支付），
+   * 钉死 payStatus=paid 会把这一整类静默挡在筛选外 —— 页面不报错，只是查不到。
+   * 这与 refundRequired 上踩过的坑是同一个，见 routes/orders/index.tsx 的长注释。
+   */
+  opsAttention?: boolean
   page: number
   pageSize: number
 }
@@ -179,6 +199,7 @@ const httpAdapter: AdminOrdersReadonlyService = {
       taskStatus: params.taskStatus,
       search: params.search,
       refundRequired: params.refundRequired ? 'true' : undefined,
+      opsAttention: params.opsAttention ? 'true' : undefined,
       page: String(params.page),
       pageSize: String(params.pageSize),
     }),
@@ -217,6 +238,9 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   refundEligible: false,
   retryForbidden: false,
   refundRequired: false,
+  // mock 不造运营关注信号：假的待退款单会让开发期误以为链路已验证。
+  opsAttention: false,
+  opsAttentionCode: null,
   createdAt: now(),
   updatedAt: now(),
   refundedAt: null,

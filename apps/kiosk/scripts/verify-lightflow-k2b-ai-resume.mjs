@@ -90,24 +90,41 @@ expectNotIncludes(kioskShell, 'SERVICE_DESK_EXACT_ROUTES', 'Kiosk shell removes 
 expectNotIncludes(kioskShell, "startsWith('/resume')", 'Kiosk shell never broad-matches resume routes')
 
 for (const [page, sourceCode, rootClass, cssPath] of [
-  ['source', source, 'resume-source-lightflow', './resume-diagnosis-lightflow.css'],
-  ['parse', parse, 'resume-parse-lightflow', './resume-diagnosis-lightflow.css'],
+  // 稿 21-resume-triage 迁入青序流光（2026-09-23）：两页共用本工作台的 Qx 根类与样式。
+  ['source', source, 'qx-resume-triage', './resume-triage-qx.css'],
+  ['parse', parse, 'qx-resume-triage', './resume-triage-qx.css'],
   ['generate', generate, 'qx-resume-generate', './resume-generate-qx.css'],
   ['generate preview', preview, 'qx-resume-generate', './resume-generate-qx.css'],
   ['optimize', optimize, 'qx-resume-optimize', './resume-optimize-qx.css'],
-  ['templates', templates, 'resume-templates-lightflow', './resume-library-lightflow.css'],
-  ['materials', materials, 'resume-materials-lightflow', './resume-library-lightflow.css'],
+  // 2026-09-23 版式参考迁入青序流光（稿 46 ?screen=templates），根作用域换成宿主 46 的 .rdq- 样式。
+  ['templates', templates, 'rdq-tpl-grid', './resume-decision-qx.css'],
+  // 2026-09-23 求职材料库迁入青序流光（稿 25-material-workshop），根作用域换成本页的 Qx 根类与样式。
+  ['materials', materials, 'qx-resume-materials', './resume-materials-qx.css'],
 ]) {
   expectIncludes(sourceCode, `import '${cssPath}'`, `${page} imports its local LightFlow CSS`)
   expectIncludes(sourceCode, rootClass, `${page} uses its route-specific LightFlow root`)
-  if (!rootClass.startsWith('qx-')) {
+  if (!rootClass.startsWith('qx-') && !rootClass.startsWith('rdq-')) {
     expectIncludes(sourceCode, 'resume-lightflow', `${page} uses shared local LightFlow namespace`)
   }
 }
 
+for (const [page, sourceCode, route] of [['source', source, '/resume/source'], ['parse', parse, '/resume/parse']]) {
+  expectIncludes(sourceCode, 'QxPageFrame', `${page} uses Qingxu page frame (21-resume-triage migration)`)
+  expectIncludes(kioskShell, `'${route}'`, `${page} is registered in QX_MIGRATED_ROUTES`)
+  expectNotIncludes(sourceCode, 'KioskPageFrame', `${page} no longer mounts the old LightFlow page frame`)
+  expectNotIncludes(sourceCode, 'resume-lightflow', `${page} no longer mixes the LightFlow namespace into the Qingxu frame`)
+}
 expectIncludes(report, "import './resume-report-qx.css'", 'report imports Qingxu page CSS')
 expectIncludes(report, 'QxPageFrame', 'report uses Qingxu page frame (22-resume-report migration)')
 expectIncludes(kioskShell, "'/resume/report'", 'report is registered in QX_MIGRATED_ROUTES')
+expectIncludes(templates, 'QxPageFrame', 'templates uses Qingxu page frame (46-resume-decision-workspace migration)')
+expectIncludes(kioskShell, "'/resume/templates'", 'templates is registered in QX_MIGRATED_ROUTES')
+expectNotIncludes(templates, 'KioskStageFit', 'templates stays inside the KioskRoot stage instead of scaling twice')
+expectNotIncludes(templates, 'resume-lightflow', 'templates no longer mixes the LightFlow namespace into the Qingxu frame')
+expectIncludes(materials, 'QxPageFrame', 'materials uses Qingxu page frame (25-material-workshop migration)')
+expectIncludes(kioskShell, "'/resume/materials'", 'materials is registered in QX_MIGRATED_ROUTES')
+expectNotIncludes(materials, 'KioskPageFrame', 'materials no longer mounts the old LightFlow page frame')
+expectNotIncludes(materials, 'resume-lightflow', 'materials no longer mixes the LightFlow namespace into the Qingxu frame')
 
 expectCssContract('src/pages/resume/resume-diagnosis-lightflow.css', [
   'resume-source-lightflow',
@@ -122,6 +139,10 @@ expectCssContract('src/pages/resume/resume-authoring-lightflow.css', [
 for (const [path, rootClass] of [
   ['src/pages/resume/resume-optimize-qx.css', 'qx-resume-optimize'],
   ['src/pages/resume/resume-generate-qx.css', 'qx-resume-generate'],
+  ['src/pages/resume/resume-triage-qx.css', 'qx-resume-triage'],
+  // 稿 21 子面板换装（诊断方向 / U 盘 / 手机扫码 / 预览 / 扫描交接），同一作用域根。
+  ['src/pages/resume/resume-triage-panels-qx.css', 'qx-resume-triage'],
+  ['src/pages/resume/resume-materials-qx.css', 'qx-resume-materials'],
 ]) {
   const source = read(path)
   expect(source.length > 0, `${path} exists`)

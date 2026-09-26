@@ -1,0 +1,405 @@
+/* ============================================================
+   数字孪生数据大屏：两档布局与字阶
+
+   舞台档（wall）：新窗口展示，固定 1920×1080，块位与设计稿逐像素一致：
+     左栏 x=32、中央场景 x=472（宽 976）、右栏 x=1468，面板宽 420。
+   桌面档（desk）：嵌在后台内容区。场景独占一行，面板在下方按容器宽度
+     3 列 → 2 列 → 1 列流式排布（容器查询，不看视口，侧栏收起展开都对）。
+
+   字号全部写在带档位前缀的规则里，门禁按档位统计下限：舞台 ≥13px，桌面 ≥12px。
+   ============================================================ */
+
+/* ---------- 舞台档：外壳 ---------- */
+[data-ops-screen='wall'] .twin {
+  width: 1920px;
+  height: 1080px;
+}
+
+[data-ops-screen='wall'] .twin-hd {
+  height: 84px;
+}
+
+[data-ops-screen='wall'] .twin-toolbar {
+  display: none;
+}
+
+[data-ops-screen='wall'] .twin-banners {
+  position: absolute;
+  z-index: 4;
+  left: 472px;
+  top: 150px;
+  width: 976px;
+}
+
+[data-ops-screen='wall'] .twin-body {
+  position: absolute;
+  left: 0;
+  top: 84px;
+  width: 1920px;
+  height: 996px;
+}
+
+[data-ops-screen='wall'] .twin-grid {
+  position: relative;
+  width: 1920px;
+  height: 996px;
+}
+
+[data-ops-screen='wall'] .twin-slot {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-ops-screen='wall'] .twin-slot > .twin-panel {
+  flex: 1 1 auto;
+}
+
+/*
+ * 舞台档的块位是定高的：面板内边距与行距比桌面档紧一档，内容在 1920×1080 的块位里放得下 ——
+ * 靠排版放下，不靠 overflow 裁掉。底栏只有 164 高，上下内边距再收一点。
+ */
+[data-ops-screen='wall'] .twin-panel {
+  padding: 14px 20px;
+  gap: 8px;
+}
+
+[data-ops-screen='wall'] .twin-slot[data-slot='bottom'] > .twin-panel {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+[data-ops-screen='wall'] .twin-alerts {
+  gap: 8px;
+}
+
+[data-ops-screen='wall'] .twin-tiles.is-compact .twin-tile {
+  padding: 6px 10px;
+}
+
+[data-ops-screen='wall'] .twin-slot[data-slot='l1'] { left: 32px; top: 20px; width: 420px; height: 300px; }
+[data-ops-screen='wall'] .twin-slot[data-slot='l2'] { left: 32px; top: 336px; width: 420px; height: 300px; }
+[data-ops-screen='wall'] .twin-slot[data-slot='l3'] { left: 32px; top: 652px; width: 420px; height: 312px; }
+[data-ops-screen='wall'] .twin-slot[data-slot='r1'] { left: 1468px; top: 20px; width: 420px; height: 300px; }
+[data-ops-screen='wall'] .twin-slot[data-slot='r2'] { left: 1468px; top: 336px; width: 420px; height: 300px; }
+[data-ops-screen='wall'] .twin-slot[data-slot='r3'] { left: 1468px; top: 652px; width: 420px; height: 312px; }
+[data-ops-screen='wall'] .twin-slot[data-slot='scene'] { left: 472px; top: 8px; width: 976px; height: 780px; }
+[data-ops-screen='wall'] .twin-slot[data-slot='bottom'] { left: 472px; top: 800px; width: 976px; height: 164px; }
+
+/*
+ * 单台终端：左上一条当前任务，设备与标注占左中，右栏三块。
+ * 今日服务是 2×2 磁贴，有失败次数时下面还多一行说明，要 300 高才放得下；24 小时状态内容少，让出 20。
+ */
+[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='task'] { left: 32px; top: 20px; width: 420px; height: 120px; }
+[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='scene'] { left: 32px; top: 152px; width: 1404px; height: 812px; }
+[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r1'] { top: 20px; height: 330px; }
+[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r2'] { top: 366px; height: 300px; }
+[data-ops-screen='wall'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='r3'] { top: 682px; height: 282px; }
+
+/*
+ * 招聘内容托管关闭（托管 a，根上 data-hosting="off"）：机构两屏的块位变体。
+ * 整块是招聘内容的面板不渲染，腾出的块位交给真实数据的邻居，不留空洞、不裁内容。
+ *   机构总览：展示档不放「建设中的指标」，场景长满中栏；左中终端状态墙、右中告警各占两个块位高，
+ *     右上是合成一块的本机构政策。
+ *   信息使用：左栏使用概况与统计口径各占半栏；中栏底部是宽的每日趋势（选「今日」时只剩一行，
+ *     底栏收窄、场景长高）；右栏整栏是热门政策。
+ */
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] .twin-slot[data-slot='scene'] { height: 956px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] .twin-slot[data-slot='l2'] { height: 628px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] .twin-slot[data-slot='r2'] { height: 628px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-slot[data-slot='l1'] { height: 600px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-slot[data-slot='l2'] { top: 636px; height: 328px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-slot[data-slot='r1'] { height: 944px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='scene'] { height: 680px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage'] .twin-slot[data-slot='bottom'] { top: 700px; height: 264px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage-today'] .twin-slot[data-slot='scene'] { height: 856px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant='org-usage-today'] .twin-slot[data-slot='bottom'] { top: 876px; height: 88px; }
+/*
+ * 右栏整栏的热门政策：每条均分栏高、至多 172，五条正好铺满；不满五条时靠上排，不各自漂在栏里。
+ * 用 flex-basis 0 + max-height 而不是 flex-basis 172：后者会把列表的固有高度撑成 5×172，面板被顶出块位。
+ */
+[data-ops-screen='wall'] .twin-rank.is-tall { justify-content: flex-start; gap: 0; min-height: 0; }
+[data-ops-screen='wall'] .twin-rank.is-tall li { flex: 1 1 0; max-height: 172px; align-content: center; }
+/* 左下的统计口径：条目少、块位高，行距放宽一档 */
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-notes { gap: 12px; }
+.twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-notes li { text-wrap: pretty; }
+
+/* 运营看板：沿用卡片栅格，整块铺满 */
+[data-ops-screen='wall'] .twin-grid[data-layout='full'] .twin-slot[data-slot='full'] { left: 28px; top: 16px; width: 1864px; height: 964px; }
+
+/* ---------- 桌面档：外壳 ---------- */
+[data-ops-screen='desk'] .twin {
+  border-radius: 14px;
+}
+
+[data-ops-screen='desk'] .twin-hd {
+  flex-wrap: wrap;
+  min-height: 84px;
+  padding: 14px 20px;
+  row-gap: 10px;
+}
+
+[data-ops-screen='desk'] .twin-banners {
+  padding: 12px 16px 0;
+}
+
+[data-ops-screen='desk'] .twin-body {
+  container-type: inline-size;
+  padding: 16px;
+}
+
+[data-ops-screen='desk'] .twin-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    'scene scene scene'
+    'bottom bottom bottom'
+    'l1 l2 l3'
+    'r1 r2 r3';
+}
+
+[data-ops-screen='desk'] .twin-grid[data-layout='terminal'] {
+  grid-template-areas:
+    'task task task'
+    'scene scene scene'
+    'r1 r2 r3';
+}
+
+[data-ops-screen='desk'] .twin-grid[data-layout='full'] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'full';
+}
+
+[data-ops-screen='desk'] .twin-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+[data-ops-screen='desk'] .twin-clock {
+  display: none;
+}
+
+[data-ops-screen='desk'] .twin-toolbar-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-ops-screen='desk'] .twin-slot > .twin-panel {
+  flex: 1 1 auto;
+}
+
+[data-ops-screen='desk'] .twin-slot[data-slot='l1'] { grid-area: l1; }
+[data-ops-screen='desk'] .twin-slot[data-slot='l2'] { grid-area: l2; }
+[data-ops-screen='desk'] .twin-slot[data-slot='l3'] { grid-area: l3; }
+[data-ops-screen='desk'] .twin-slot[data-slot='r1'] { grid-area: r1; }
+[data-ops-screen='desk'] .twin-slot[data-slot='r2'] { grid-area: r2; }
+[data-ops-screen='desk'] .twin-slot[data-slot='r3'] { grid-area: r3; }
+[data-ops-screen='desk'] .twin-slot[data-slot='bottom'] { grid-area: bottom; }
+[data-ops-screen='desk'] .twin-slot[data-slot='task'] { grid-area: task; }
+[data-ops-screen='desk'] .twin-slot[data-slot='full'] { grid-area: full; }
+
+[data-ops-screen='desk'] .twin-slot[data-slot='scene'] {
+  grid-area: scene;
+  height: clamp(420px, 58cqw, 700px);
+  border-radius: 12px;
+  border: 1px solid var(--tw-line);
+  background: radial-gradient(900px 520px at 50% 45%, rgba(12, 61, 49, 0.9), rgba(2, 12, 9, 0.9));
+  overflow: hidden;
+}
+
+[data-ops-screen='desk'] .twin-grid[data-layout='terminal'] .twin-slot[data-slot='scene'] {
+  height: clamp(480px, 60cqw, 760px);
+}
+
+@container (max-width: 1100px) {
+  [data-ops-screen='desk'] .twin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      'scene scene'
+      'bottom bottom'
+      'l1 r1'
+      'l2 r2'
+      'l3 r3';
+  }
+
+  [data-ops-screen='desk'] .twin-grid[data-layout='terminal'] {
+    grid-template-areas:
+      'task task'
+      'scene scene'
+      'r1 r2'
+      'r3 r3';
+  }
+}
+
+/* 托管关闭的机构两屏：桌面档同样把腾出的格子交给邻居 */
+[data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] {
+  grid-template-areas:
+    'scene scene scene'
+    'bottom bottom bottom'
+    'l1 l2 l2'
+    'r1 r2 r2';
+}
+
+[data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] {
+  grid-template-areas:
+    'scene scene scene'
+    'bottom bottom bottom'
+    'l1 r1 r1'
+    'l2 r1 r1';
+}
+
+@container (max-width: 1100px) {
+  [data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant='org-overview'] {
+    grid-template-areas:
+      'scene scene'
+      'bottom bottom'
+      'l1 r1'
+      'l2 r2';
+  }
+
+  [data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] {
+    grid-template-areas:
+      'scene scene'
+      'bottom bottom'
+      'l1 r1'
+      'l2 r1';
+  }
+}
+
+@container (max-width: 720px) {
+  [data-ops-screen='desk'] .twin-grid,
+  [data-ops-screen='desk'] .twin-grid[data-layout='terminal'],
+  [data-ops-screen='desk'] .twin[data-hosting='off'] .twin-grid[data-variant] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: none;
+  }
+
+  [data-ops-screen='desk'] .twin-slot {
+    grid-area: auto !important;
+  }
+}
+
+/* ---------- 舞台档字阶（≥13px，3 米可读） ---------- */
+[data-ops-screen='wall'] .twin { font-size: 15px; }
+[data-ops-screen='wall'] .twin-hd :is(h1, h2) { font-size: 30px; }
+[data-ops-screen='wall'] .twin-hd-sub { font-size: 14px; }
+[data-ops-screen='wall'] .twin-tab { font-size: 15px; }
+[data-ops-screen='wall'] .twin-btn { font-size: 15px; }
+[data-ops-screen='wall'] .twin-clock b { font-size: 28px; }
+[data-ops-screen='wall'] .twin-clock span { font-size: 13px; }
+[data-ops-screen='wall'] .twin-ph { font-size: 19px; }
+[data-ops-screen='wall'] .twin-ph-sub { font-size: 14px; }
+[data-ops-screen='wall'] .twin-scope { font-size: 13px; }
+[data-ops-screen='wall'] .twin-panel { font-size: 15px; }
+[data-ops-screen='wall'] .twin-cap { font-size: 14px; }
+[data-ops-screen='wall'] .twin-pop { font-size: 14px; }
+[data-ops-screen='wall'] .twin-na { font-size: 14px; }
+[data-ops-screen='wall'] .twin-pend { font-size: 13px; }
+[data-ops-screen='wall'] .twin-big { font-size: 48px; }
+[data-ops-screen='wall'] .twin-big.twin-big-sm { font-size: 36px; }
+[data-ops-screen='wall'] .twin-stat > span { font-size: 15px; }
+[data-ops-screen='wall'] .twin-stat b { font-size: 30px; }
+[data-ops-screen='wall'] .twin-rank li { font-size: 15px; }
+[data-ops-screen='wall'] .twin-rank-tag { font-size: 13px; }
+[data-ops-screen='wall'] .twin-rank li > b { font-size: 17px; }
+[data-ops-screen='wall'] .twin-unit { font-size: 16px; }
+[data-ops-screen='wall'] .twin-kv > span { font-size: 15px; }
+[data-ops-screen='wall'] .twin-kv b { font-size: 34px; }
+[data-ops-screen='wall'] .twin-tile b { font-size: 30px; }
+[data-ops-screen='wall'] .twin-tiles.is-compact .twin-tile b { font-size: 22px; }
+[data-ops-screen='wall'] .twin-tiles.is-compact .twin-tile > span { font-size: 13px; }
+[data-ops-screen='wall'] .twin-tiles.is-compact .twin-unit { font-size: 13px; margin-left: 4px; }
+[data-ops-screen='wall'] .twin-tile span { font-size: 15px; }
+[data-ops-screen='wall'] .twin-tile small { font-size: 13px; }
+[data-ops-screen='wall'] .twin-lg { font-size: 14px; }
+[data-ops-screen='wall'] .twin-bar-row { font-size: 15px; }
+[data-ops-screen='wall'] .twin-bar-row > b { font-size: 17px; }
+[data-ops-screen='wall'] .twin-alert { font-size: 15px; min-height: 46px; }
+[data-ops-screen='wall'] .twin-sev { font-size: 13px; }
+[data-ops-screen='wall'] .twin-banner { font-size: 15px; }
+[data-ops-screen='wall'] .twin-state { font-size: 16px; }
+[data-ops-screen='wall'] .twin-empty { font-size: 15px; }
+[data-ops-screen='wall'] .twin-fleet-cell b { font-size: 15px; }
+[data-ops-screen='wall'] .twin-fleet-cell span { font-size: 13px; }
+[data-ops-screen='wall'] .twin-fleet-more { font-size: 13px; }
+[data-ops-screen='wall'] .twin-fleet-place { font-size: 13px; }
+[data-ops-screen='wall'] .twin-allclear { font-size: 15px; }
+[data-ops-screen='wall'] .twin[data-hosting='off'] .twin-grid[data-variant^='org-usage'] .twin-notes { font-size: 16px; }
+[data-ops-screen='wall'] .twin-rank.is-tall li { font-size: 17px; }
+[data-ops-screen='wall'] .twin-rank.is-tall .twin-rank-no { font-size: 20px; }
+[data-ops-screen='wall'] .twin-rank.is-tall li > b { font-size: 24px; }
+[data-ops-screen='wall'] .twin-gapline { font-size: 14px; }
+[data-ops-screen='wall'] .twin-stat-list.is-tall .twin-stat b { font-size: 48px; }
+[data-ops-screen='wall'] .twin-rows { font-size: 16px; }
+[data-ops-screen='wall'] .twin-overlay { font-size: 15px; }
+[data-ops-screen='wall'] .twin-flow-node b { font-size: 32px; }
+[data-ops-screen='wall'] .twin-flow-node span { font-size: 15px; }
+[data-ops-screen='wall'] .twin-heat b { font-size: 13px; }
+[data-ops-screen='wall'] .twin-step b { font-size: 20px; }
+[data-ops-screen='wall'] .twin-step span { font-size: 13px; }
+
+/* ---------- 桌面档字阶（≥12px，60 厘米可读） ---------- */
+[data-ops-screen='desk'] .twin { font-size: 14px; }
+[data-ops-screen='desk'] .twin-hd :is(h1, h2) { font-size: 22px; letter-spacing: 3px; }
+[data-ops-screen='desk'] .twin-hd-sub { font-size: 13px; }
+[data-ops-screen='desk'] .twin-tab { font-size: 14px; }
+[data-ops-screen='desk'] .twin-btn { font-size: 14px; }
+[data-ops-screen='desk'] .twin-clock b { font-size: 20px; }
+[data-ops-screen='desk'] .twin-clock span { font-size: 12px; }
+[data-ops-screen='desk'] .twin-flabel { font-size: 13px; }
+[data-ops-screen='desk'] .twin-select { font-size: 14px; }
+[data-ops-screen='desk'] .twin-search { font-size: 14px; }
+[data-ops-screen='desk'] .twin-chip { font-size: 13px; }
+[data-ops-screen='desk'] .twin-ph { font-size: 16px; }
+[data-ops-screen='desk'] .twin-ph-sub { font-size: 13px; }
+[data-ops-screen='desk'] .twin-scope { font-size: 12px; }
+[data-ops-screen='desk'] .twin-panel { font-size: 14px; }
+[data-ops-screen='desk'] .twin-cap { font-size: 13px; }
+[data-ops-screen='desk'] .twin-pop { font-size: 13px; }
+[data-ops-screen='desk'] .twin-na { font-size: 13px; }
+[data-ops-screen='desk'] .twin-pend { font-size: 12px; }
+[data-ops-screen='desk'] .twin-big { font-size: 38px; }
+[data-ops-screen='desk'] .twin-big.twin-big-sm { font-size: 28px; }
+[data-ops-screen='desk'] .twin-stat > span { font-size: 14px; }
+[data-ops-screen='desk'] .twin-stat b { font-size: 24px; }
+[data-ops-screen='desk'] .twin-rank li { font-size: 14px; }
+[data-ops-screen='desk'] .twin-rank-tag { font-size: 12px; }
+[data-ops-screen='desk'] .twin-rank li > b { font-size: 15px; }
+[data-ops-screen='desk'] .twin-unit { font-size: 14px; }
+[data-ops-screen='desk'] .twin-kv > span { font-size: 13px; }
+[data-ops-screen='desk'] .twin-kv b { font-size: 26px; }
+[data-ops-screen='desk'] .twin-tile b { font-size: 24px; }
+[data-ops-screen='desk'] .twin-tiles.is-compact .twin-tile b { font-size: 19px; }
+[data-ops-screen='desk'] .twin-tiles.is-compact .twin-tile > span { font-size: 12px; }
+[data-ops-screen='desk'] .twin-tile span { font-size: 13px; }
+[data-ops-screen='desk'] .twin-tile small { font-size: 12px; }
+[data-ops-screen='desk'] .twin-lg { font-size: 13px; }
+[data-ops-screen='desk'] .twin-bar-row { font-size: 14px; }
+[data-ops-screen='desk'] .twin-bar-row > b { font-size: 15px; }
+[data-ops-screen='desk'] .twin-alert { font-size: 14px; }
+[data-ops-screen='desk'] .twin-sev { font-size: 12px; }
+[data-ops-screen='desk'] .twin-banner { font-size: 14px; }
+[data-ops-screen='desk'] .twin-state { font-size: 15px; }
+[data-ops-screen='desk'] .twin-empty { font-size: 14px; }
+[data-ops-screen='desk'] .twin-fleet-cell b { font-size: 14px; }
+[data-ops-screen='desk'] .twin-fleet-cell span { font-size: 12px; }
+[data-ops-screen='desk'] .twin-fleet-more { font-size: 12px; }
+[data-ops-screen='desk'] .twin-fleet-place { font-size: 12px; }
+[data-ops-screen='desk'] .twin-allclear { font-size: 14px; }
+[data-ops-screen='desk'] .twin-rank.is-tall li { font-size: 15px; }
+[data-ops-screen='desk'] .twin-rank.is-tall .twin-rank-no { font-size: 17px; }
+[data-ops-screen='desk'] .twin-rank.is-tall li > b { font-size: 19px; }
+[data-ops-screen='desk'] .twin-gapline { font-size: 13px; }
+[data-ops-screen='desk'] .twin-stat-list.is-tall .twin-stat b { font-size: 36px; }
+[data-ops-screen='desk'] .twin-rows { font-size: 14px; }
+[data-ops-screen='desk'] .twin-overlay { font-size: 13px; }
+[data-ops-screen='desk'] .twin-flow-node b { font-size: 26px; }
+[data-ops-screen='desk'] .twin-flow-node span { font-size: 13px; }
+[data-ops-screen='desk'] .twin-heat b { font-size: 12px; }
+[data-ops-screen='desk'] .twin-step b { font-size: 18px; }
+[data-ops-screen='desk'] .twin-step span { font-size: 12px; }

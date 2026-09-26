@@ -22,9 +22,9 @@ import test, { mock } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
@@ -34,18 +34,9 @@ const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
 // ⚠ vm.createContext 建的是**另一个 realm**：沙箱里造出来的数组 / 对象不是宿主
 //   Array、Object 的实例。所以断言一律用 length / 字段比较，不要用 deepStrictEqual
 //   去比 `[]` —— 那会因为原型不同而恒红，看起来像被测代码有问题。
-
-/** 可控 Promise：测试自己决定什么时候、按什么顺序完成它。 */
-function deferred() {
-  const d = {}
-  d.promise = new Promise((resolve, reject) => { d.resolve = resolve; d.reject = reject })
-  // 未处理的 rejection 不该让整个测试进程炸掉 —— 被守卫丢弃的响应正是这种形态。
-  d.promise.catch(() => {})
-  return d
-}
-
-/** 让所有已 resolve 的微任务跑完（页面回调是链在 Promise 上的）。 */
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+//
+// 可控 Promise（deferred）、flush、页面加载器（loadPageDefinition）与带路径的 setData
+//（instantiate）在 ./page-sandbox.mjs：price-confirmation.test.mjs 也用同一份。
 
 /** 假 canvas：让画码的 exec 回调能真的走到最后那句 `qrStatus: 'ready'`。 */
 function fakeCanvasNode() {
@@ -119,12 +110,20 @@ function createWx(storage = new Map()) {
 function createAuth(initialId) {
   let user = initialId ? { id: initialId } : null
   let loggedIn = !!user
+  let generation = 1
   // 补签资格与「当前有没有 token」解耦，和 utils/auth.js 一样：
   // JWT 自然过期时 getToken() 会先 clearSession 再返回 null，于是「过期」与「登出」
   // 在 token 维度上完全同形；只有这面独立的旗子能把两者分开。
   let resigninEligible = !!user
   return {
-    setUser(id) { user = id ? { id } : null; loggedIn = !!user; if (id) resigninEligible = true },
+    setUser(id) {
+      const next = id || null
+      const prev = user && user.id
+      user = id ? { id } : null
+      loggedIn = !!user
+      if (id) resigninEligible = true
+      if (prev !== next) generation += 1
+    },
     /** 登录态为真但 getUser() 拿不到 id —— request.js 静默续签后 user 字段缺失时的真实形态。 */
     setIdlessSession() { user = {}; loggedIn = true },
     /** JWT 自然过期：本地没有可用会话了，但没主动登出，仍可静默补签。 */
@@ -133,7 +132,15 @@ function createAuth(initialId) {
     canSilentResignin: () => resigninEligible,
     isLoggedIn: () => loggedIn,
     getUser: () => user,
-    logout() { user = null; loggedIn = false; resigninEligible = false },
+    logout() {
+      const prev = user && user.id
+      user = null
+      loggedIn = false
+      resigninEligible = false
+      if (prev) generation += 1
+    },
+    sessionGeneration: () => generation,
+    isSameSession: (expected) => expected === generation,
   }
 }
 
@@ -157,9 +164,12 @@ const realStorage = requireMiniapp('../utils/storage.js')
 const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 
-/** 一张只有 exp 有意义的 JWT —— utils/auth.js 只解 payload.exp。 */
-function jwt(expiresAtMs) {
-  return `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: 'member', exp: Math.floor(expiresAtMs / 1000) })}.sig`
+/**
+ * 一张 exp 与 sub 有意义的 JWT。sub 必须等于本机 user.id ——
+ * 后端 member-auth.service.ts 就是用 user.id 签 sub 的，utils/auth.js 会比对这两者。
+ */
+function jwt(expiresAtMs, subject) {
+  return `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: subject, exp: Math.floor(expiresAtMs / 1000) })}.sig`
 }
 
 /** enduser JWT 的真实时长：member-print-orders.module.ts 签发 expiresIn:'30m'。 */
@@ -169,7 +179,7 @@ const JWT_TTL_MS = 30 * 60 * 1000
 function useRealAuth(wx, id) {
   ACTIVE_WX = wx
   wx.storage.clear()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, id), user: { id } })
   return realAuth
 }
 
@@ -179,83 +189,16 @@ function useRealAuth(wx, id) {
  * 与 `realAuth.logout()`（主动登出，连补签资格一起撤销）是两件完全不同的事。
  */
 function expireNaturally(wx) {
-  wx.storage.set(realStorage.KEYS.TOKEN, jwt(Date.now() - 60 * 1000))
+  const current = wx.storage.get(realStorage.KEYS.USER) || {}
+  wx.storage.set(realStorage.KEYS.TOKEN, jwt(Date.now() - 60 * 1000, current.id))
 }
 
 /** 真实的换账号：先登出（撤销补签资格），再登一个别人。 */
 function switchAccount(id) {
   realAuth.logout()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, id), user: { id } })
 }
 
-/**
- * 在沙箱里真实执行一个页面源码，返回 Page() 收到的配置对象。
- * @param {string} relPath 相对 apps/miniapp 的路径
- */
-function loadPageDefinition(relPath, { wx, modules, timers = [] }) {
-  const src = fs.readFileSync(path.join(MINIAPP, relPath), 'utf8')
-  let pageDef = null
-  const sandbox = {
-    console,
-    wx,
-    Page: (def) => { pageDef = def },
-    getApp: () => ({ globalData: { statusBarHeight: 20 } }),
-    require: (id) => {
-      const name = id.replace(/^.*\//, '').replace(/\.js$/, '')
-      if (Object.prototype.hasOwnProperty.call(modules, name)) return modules[name]
-      // 其余一律用真实实现（它们都是无 wx 依赖的纯模块）。
-      return requireMiniapp(`../utils/${name}.js`)
-    },
-    module: { exports: {} },
-    exports: {},
-    // 沙箱里的定时器**只登记不触发**。print-pickup 会每 3 秒轮询一次订单状态，
-    // 用真的 setTimeout 会让这条链一直排下去，node:test 永远等不到事件循环清空
-    // （实测：整个测试文件挂死，2 分钟超时）。测试要验的是回调里的判定，
-    // 不是定时器本身，需要时由测试自己调 timers.run()。
-    setTimeout: (fn) => { timers.push(fn); return timers.length },
-    clearTimeout: () => {},
-    setInterval: (fn) => { timers.push(fn); return timers.length },
-    clearInterval: () => {},
-  }
-  sandbox.globalThis = sandbox
-  vm.createContext(sandbox)
-  vm.runInContext(src, sandbox, { filename: relPath })
-  assert.ok(pageDef, `${relPath} 没有调用 Page()`)
-  return pageDef
-}
-
-/**
- * 写一个带路径的 setData 键，例如 `'fee.total'` / `'files[0].name'`。
- * 真机 setData 支持这种写法；替身若只做 Object.assign，就会在 data 上造出一个
- * **名字里带点的普通键**，页面读 `data.fee.total` 永远是旧值 —— 测试会把一个
- * 好端端的实现判成"金额没写进去"。
- */
-function setByPath(target, path, value) {
-  const keys = String(path).replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean)
-  let cursor = target
-  for (let i = 0; i < keys.length - 1; i += 1) {
-    const key = keys[i]
-    if (cursor[key] === null || typeof cursor[key] !== 'object') {
-      cursor[key] = /^\d+$/.test(keys[i + 1]) ? [] : {}
-    }
-    cursor = cursor[key]
-  }
-  cursor[keys[keys.length - 1]] = value
-}
-
-/** Page 配置 → 可调用的页面实例（带一个真会合并的 setData）。 */
-function instantiate(def) {
-  const page = Object.assign(Object.create(null), def)
-  page.data = JSON.parse(JSON.stringify(def.data || {}))
-  page.setData = function setData(patch, callback) {
-    for (const key of Object.keys(patch || {})) {
-      if (key.indexOf('.') >= 0 || key.indexOf('[') >= 0) setByPath(this.data, key, patch[key])
-      else this.data[key] = patch[key]
-    }
-    if (typeof callback === 'function') callback()
-  }
-  return page
-}
 
 function makePage(relPath, { auth, api, wx }) {
   // 真机上只有**一个**全局 wx，页面和 utils 共用它。替身必须照做：
@@ -985,7 +928,7 @@ test('P1-4 跳转失败：不得卡在「提交中」，也不得让已创建的
   assert.equal(page.data.quoteRecover, 'orders', '必须给出找回这张订单的出口')
   assert.notEqual(page.data.quoteState, 'ready', '「确认下单」必须变灰，防止再下一单')
 
-  // 再点一次「确认下单」：绝不许再 POST（服务端没有幂等键，那就是第二张订单）
+  // 再点一次「确认下单」：绝不许再 POST（同键会回放原单，页面不得把旧单说成新单）
   page.submitOrder()
   await flush()
   assert.equal(creates, 1, '跳转失败后重复点击不得再次建单')
@@ -1955,7 +1898,7 @@ test('R4-4 同一个人建单成功：锁照常生效，再点一次不得发第
 
   page.submitOrder()
   await flush()
-  assert.equal(posts, 1, '已建过单就不许再 POST（服务端没有幂等键，第二次就是第二张订单）')
+  assert.equal(posts, 1, '已建过单就不许再 POST（同键会回放原单，页面不得把旧单说成新单）')
   assert.equal(page.data.submitting, false)
 })
 
@@ -2020,6 +1963,10 @@ test('R4-7 print-pay 报价失败：不本地补一个金额，也不把下单�
   assert.equal(page.data.isFreeOrder, false, '取不到报价不等于免费')
   assert.equal(page.data.files[0].name, '本人文件', '取不到文件名时用中性标签，不回显 URL 里的值')
 
+  // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
+  api.quoteMyPrintOrder = () => Promise.resolve({ amountCents: 150, billablePages: 3 })
+  page.retryQuote()
+  await flush()
   page.continueFlow()
   await flush()
   await flush()
@@ -2157,7 +2104,7 @@ test('R5-1 取件页：码已显示后 JWT 自然过期 —— 必须放行恰�
   assert.ok(!String(page.data.errorMsg).includes('登录已失效'), page.data.errorMsg)
 
   // request.js 静默补签成功 → auth.saveSession 写回带 id 的新会话 → 重发拿到响应。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[1].d.resolve(PICKUP_ORDER)
   await flush()
   assert.equal(page.data.state, 'ready', '被补签救回来的响应必须能写进来')
@@ -2230,7 +2177,7 @@ test('R5-2 材料包码页：切后台期间 JWT 自然过期 —— 回来要�
   assert.equal(pending[1].id, 'pkg-A')
   assert.notEqual(page.data.loadRecover, 'login', '没有人登出，不该把它说成「登录已失效」')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[1].d.resolve(A_PACKAGE)
   await flush()
   assert.equal(page.data.ready, true, '被补签救回来的响应必须能写进来，不得停在 loading')
@@ -2253,7 +2200,7 @@ test('R5-2 材料包码页：打开时 JWT 已经过期 —— 照常发请求�
   // request.js 补签成功 → auth.saveSession 写回带 id 的会话 → 重发拿到响应。
   // 这一跳是 `'' → 'u:A'`：**不是换人**，代次不许 +1，账号比对也不许把它判成换人 ——
   // 作废掉的恰好是那条刚刚被救回来的响应，页面就停在一页转不完的 loading 上。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].d.resolve(A_PACKAGE)
   await flush()
 
@@ -2428,6 +2375,9 @@ test('R5-3 确认支付页：建单在途时真的换了人 —— 不跳 A 的�
 
   // B 自己的那一次：必须是一次**新的** POST，并且跳的是 B 自己的订单。
   const before = wx.calls.redirectTo.length
+  // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
+  page.retryQuote()
+  await flush()
   page.continueFlow()
   await flush()
   assert.equal(creates.length, 2, 'B 必须能安全地发起自己的建单')
@@ -2464,6 +2414,9 @@ test('R5-3 确认支付页：建单锁定后换账号回到本页 —— onShow 
   // 而且 B 点提交发的是 B 自己的那一次，不是被带去 A 的订单。
   wx.control.navFail = false
   const before = wx.calls.redirectTo.length
+  // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
+  page.retryQuote()
+  await flush()
   page.continueFlow()
   await flush()
   assert.equal(creates.length, 2)
@@ -2715,6 +2668,9 @@ test('R5-6 确认支付页：A 的迟到建单回调不得掀掉 B 正在进行�
   page.onShow()                             // B 回到本页：A 的一切被复位
   assert.equal(wx.loading.visible, false, '换人复位时不该把上一位的遮罩留在屏幕上')
 
+  // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
+  page.retryQuote()
+  await flush()
   page.continueFlow()                       // B 自己提交，遮罩再次挂上
   await flush()
   assert.equal(creates.length, 2, 'B 必须能发起自己的那一次')
@@ -2829,7 +2785,7 @@ test('R6-2 幂等键是 UUID v4 形态，且不存到机码 / 文件名 / 金额
   for (const forbidden of ['12345678', '张三', 'pickupCode', 'amountCents', 'filename']) {
     assert.ok(!raw.includes(forbidden), `本机存储里不得出现 ${forbidden}：${raw}`)
   }
-  assert.deepEqual(Object.keys(JSON.parse(raw)[0]).sort(), ['account', 'createdAt', 'fingerprint', 'key', 'orderId'])
+  assert.deepEqual(Object.keys(JSON.parse(raw)[0]).sort(), ['account', 'createdAt', 'fingerprint', 'key', 'orderId', 'submittedAt'])
 })
 
 test('R6-3 A 的 200 晚于换人：orderId 落进 A 的恢复记录，但一个字都不写进 B 的页面', async () => {
@@ -2990,7 +2946,7 @@ test('R6-6 材料包码页显式登出后同一位 A 重新登录：仍能恢复
   assert.equal(page.data.loadRecover, 'login')
 
   // 同一位 A 重新登录 —— 这不是换人，不该被粘性封锁挡住。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   page.onShow()
   assert.equal(pending.length, before + 1, '同一位重新登录必须能恢复加载')
   pending[before].resolve(A_PACKAGE)
@@ -3282,7 +3238,7 @@ test('R7-5 材料包码页 A → 登出 → B 登录：一个 getPackageOrder �
   page.onShow()
   assert.equal(pending.length, before, '登出之后不发请求')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   page.onShow()
   assert.equal(pending.length, before, 'B 的 token 不得拿去要 A 的 orderId（服务端 requireOwned 必然 404）')
   assert.equal(page.data.loadErrorTitle, '账号已切换')
@@ -3296,7 +3252,7 @@ test('R7-5 材料包码页 A → 登出 → B 登录：一个 getPackageOrder �
   assert.equal(page.data.loadErrorTitle, '账号已切换', '说明不许被 loading 覆盖')
 
   // 开页那位自己回来：必须解除封锁。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   page.onShow()
   assert.equal(pending.length, before + 1, '开页那位回来必须能再取一次')
   pending[before].resolve(A_PACKAGE)
@@ -3320,7 +3276,7 @@ test('R7-5 取件页 A → 登出 → B 登录：一个 getCloudPrintOrder 都�
   page.onShow()
   assert.equal(pending.length, before, '登出之后不发请求')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   page.onShow()
   assert.equal(pending.length, before, 'B 的 token 不得拿去要 A 的 orderId')
   assert.equal(page.data.errorAction, 'orders', 'B 的落点是「我的 · 打印订单」')
@@ -3332,7 +3288,7 @@ test('R7-5 取件页 A → 登出 → B 登录：一个 getCloudPrintOrder 都�
   page.onShow()
   assert.equal(pending.length, before, '之后每一次 onShow 都一样')
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   page.onShow()
   assert.equal(pending.length, before + 1, '开页那位回来必须能再取一次')
   pending[before].resolve(PICKUP_ORDER)
@@ -3381,6 +3337,8 @@ test('R7-6 恢复出来的那张订单已取消：服务端证明之后才解锁
   assert.equal(page.data.createdLocked, false, '点过之后「提交」必须真的能按了')
   assert.equal(idem.findRecord('u:A', print), null, '旧记录必须清掉，否则下一次还是复用那个键')
 
+  // 价格再确认（2026-09-23）：「重新下单」当场重新核价，等新报价回来才能提交。
+  await flush()
   page.continueFlow()
   await flush()
   await flush()
@@ -3531,7 +3489,7 @@ test('R8-A 取件页：码已显示 + 轮询在飞 → A 登出 → B 登录 →
 
   // 共用设备上的真实一跳：A 登出、B 登录、回到本页。全程没有任何 onHide。
   realAuth.logout()
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
   page.onShow()
 
   // 这一刻屏幕上就必须是干净的。**不能等那发请求落定**：什么时候落定是网络说了算，
@@ -3788,9 +3746,21 @@ test('R8-F 设备时钟往回拨：未来时间戳的记录仍然有效，不得
   wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, { createdAt: '昨天' })))
   assert.equal(idem.findRecord('u:A', print), null, '非数字时间戳同样作废')
 
-  // 真正过期的（7 天以上）照常淘汰 —— 放宽的只有未来那一侧。
-  wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, { createdAt: Date.now() - idem.TTL_MS - 1000 })))
-  assert.equal(idem.findRecord('u:A', print), null, '真的过期了还是要过期')
+  // 真正过期、且**证明得了从没发出去**（本版写下、submittedAt === 0）才淘汰。
+  wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, {
+    createdAt: Date.now() - idem.TTL_MS - 1000,
+    submittedAt: 0,
+  })))
+  assert.equal(idem.findRecord('u:A', print), null, '从没发出去过的键过期之后必须作废')
+
+  // 已经标过即将出门的，即使 createdAt 过了 7 天也必须还在 —— 忘掉它就是第二张订单。
+  wx.storage.set(idem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: first.key, orderId: '',
+    createdAt: Date.now() - idem.TTL_MS - 1000,
+    submittedAt: Date.now() - idem.TTL_MS - 1000,
+  }])
+  assert.equal(idem.findRecord('u:A', print).key, first.key,
+    '已提交未落定的记录不得因本机 TTL 被忘掉')
 })
 
 test('R8-B3 取件页 _ownsResponse 的放行条件：三条缺一不可，其余一律 fail-closed', async () => {
@@ -3974,7 +3944,7 @@ test('R9-A3 取件页：开页时已过期、补签成功 —— 经一次确认
 
   // request.js 拿到 401 静默补签成功：写回**同一位 A** 的会话，然后重发拿到响应。
   // 这是取件链最常见的一条路，不能被 fail-closed 误伤。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].resolve(PICKUP_ORDER)
   await flush()
 
@@ -4284,7 +4254,7 @@ test('R10-c 确认请求认下的是**发出时那个已知账号**，不是回�
   page.onReady()
 
   // 补签回来的是 A，于是本页发出一发**带着 u:A** 的确认请求。
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].resolve(PICKUP_ORDER)
   await flush()
   assert.equal(pending.length, 2, '前提：确认请求已经发出去了')
@@ -4314,7 +4284,7 @@ test('R10-d 旧响应不得解锁、也不得掀掉正在飞的那发确认请�
   page.onReady()
   const staleToken = page._inflight           // 第一发（归属未定）那一发的令牌
 
-  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
   pending[0].resolve(PICKUP_ORDER)
   await flush()
   const confirmToken = page._inflight
@@ -4337,9 +4307,9 @@ test('R10-d 旧响应不得解锁、也不得掀掉正在飞的那发确认请�
   assert.equal(page.data.codeRaw, '12345678')
 })
 
-test('R10-e 本机存储读出来不是这张表：三个写入口一个字节都不许写', async () => {
+test('R10-e 本机存储读出来不是这张表：四个写入口一个字节都不许写', async () => {
   // null / {} / 字符串 / 数字：**都不是**"本机没有记录"的证据。上一版把它们和
-  // "key 不存在"一起折进 `return []`，于是三个读-改-写回全量的入口照样写回去，
+  // "key 不存在"一起折进 `return []`，于是读-改-写回全量的入口照样写回去，
   // 盘上那条未落定的记录（POST 可能已经到了服务端）被一次读异常抹掉。
   for (const corrupt of [null, {}, 'bad', 42]) {
     const label = JSON.stringify(corrupt)
@@ -4359,6 +4329,7 @@ test('R10-e 本机存储读出来不是这张表：三个写入口一个字节�
     await assert.rejects(() => idem.ensureKey('u:A', 'other-fp'), /读不到|没能保存/, `${label}: ensureKey 必须拒绝`)
     assert.equal(idem.rememberOrderId('u:A', 'other-fp', fakeKey(9), 'ord-x'), null, `${label}: rememberOrderId 必须返回 null`)
     assert.equal(idem.clearRecord('u:A', 'other-fp'), false, `${label}: clearRecord 必须返回 false`)
+    assert.equal(idem.markSubmitted('u:A', print, flying.key), false, `${label}: markSubmitted 必须返回 false`)
     assert.equal(writes, 0, `${label}: 读出来不是这张表时，一个 setStorageSync 都不许发生`)
 
     wx.setStorageSync = realSet
@@ -4385,4 +4356,2088 @@ test('R10-f 本机确实没有这张表（key 不存在）：照常铸键落盘�
   assert.ok(idem.rememberOrderId('u:A', print, record.key, 'ord-1'))
   assert.equal(idem.clearRecord('u:A', print), true)
   assert.equal(idem.findRecord('u:A', print), null)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// R11. order-detail：这一页此前**一条身份生命周期都没有**。
+//
+// 它和 print-pickup、orders 一样会把到机码画在屏幕上（pickupStatus==='pending' 时
+// GET /me/print-orders/:orderId 会带回 pickupCode），但整页只有 onLoad 里的一发请求：
+// 没有 onShow / onHide / onUnload，没有身份判定，没有代次，也没有逐通道序号。
+// 于是这一批门禁在别的页上挨个修过的形态，在这一页原样全部成立：
+//   A 换人 / 前台静默登出之后，上一位的到机码、文件名（常常就写着本人姓名）、金额
+//     原样留在屏幕上等着下一位看 —— request.js 补签失败时调 auth.logout()，
+//     全程没有任何生命周期回调，页面还停在前台；
+//   B 切后台 / 离开本页时在途的那一发回来照样写进 data，把刚清掉的码原样写回去；
+//   C 重复进入 / 重试时两发乱序返回，旧的那发盖掉新的；
+//   D 而修这四条时最容易顺手做错的，是把"同一个人的 30 分钟 JWT 自然到点"也判成换人：
+//     那会当场清掉一张服务端仍然认的码、且**一个请求都不发**，request.js 的 401
+//     静默补签永远没机会跑。R5 在取件页上修的就是这一半，这里不能再犯一次。
+// ══════════════════════════════════════════════════════════════════════
+
+/** 取消成功之后服务端回的那一份：终态，且不再下发到机码。 */
+const A_ORDER_CANCELLED = {
+  id: 'ord-A', orderNo: 'NO-A', status: 'cancelled', payStatus: 'cancelled',
+  pickupStatus: 'expired', amountCents: 100, fileName: 'A的简历.pdf',
+}
+
+/** 每条用例都用真 auth 跑：自然过期那一步（getToken 先 clearSession）只有它有。 */
+function makeOrderDetail(wx, pending) {
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  return makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+}
+
+test('R11-A order-detail：A 的详情已经渲染出来，换成 B —— 到机码与详情必须当场清掉', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '前提：A 的到机码确实渲染出来了')
+
+  switchAccount('B')
+  page.onShow()
+
+  assert.equal(page.data.detail, null, '换人之后不得继续显示上一位的订单详情')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'), '到机码一个字节都不许留在 data 里')
+  assert.ok(!JSON.stringify(page.data).includes('A的简历'), '文件名常常写着本人姓名，同样属于上一位')
+  assert.equal(pending.length, 1, '不得拿 B 的登录态去请求开页那位的订单（服务端 requireOwned 必然 404）')
+  assert.ok(String(page.data.error).includes('账号'), page.data.error)
+  assert.equal(page.data.errorTitle, '账号已切换', '标题不能还写着「加载失败，点此重试」')
+})
+
+test('R11-A2 order-detail：A 的请求在途时切到 B，A 的响应一个字都不许写进 data', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+
+  switchAccount('B')
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail, null, 'A 的迟到响应不得画到 B 的屏幕上')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R11-A3 order-detail：A 登出 → B 登录 → 回到本页，不得拿 B 的登录态去要 A 的订单', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '前提：A 的码确实渲染出来了')
+
+  // 这条路径**看起来不像换人**：A 登出把快照清成 ''，B 登录之后这一跳在状态机眼里是
+  // '' → 'u:B' = 一次正常的补签升级 = 'ok'。只按"这一跳里身份变没变"判就会一路放行，
+  // 拿着**开页那位**的 orderId、带着 B 的登录态发请求。真正认得出它的只有
+  // 「当前这位是不是开页那位」这一条判据。
+  realAuth.logout()
+  page.onShow()
+  assert.equal(page.data.detail, null, '登出这一跳就该清场')
+
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
+  page.onShow()
+
+  assert.equal(pending.length, 1, '不得代表 B 去请求 A 的订单（服务端 requireOwned 必然 404，但请求已经发出去了）')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.errorTitle, '账号已切换', page.data.error)
+})
+
+test('R11-B order-detail：已渲染后 onHide，迟到的响应不得把到机码写回来', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  // **必须先把码渲染出来**再切后台：请求还在途时 detail 本来就是 null，
+  // 那时断言"onHide 清掉了" 恒真 —— 等于给"onHide 根本不清场"发一张通行证。
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '前提：码确实渲染出来了')
+
+  page.retry()
+  page.onHide()
+  assert.equal(page.data.detail, null, 'onHide 必须当场把凭证从 data 里清掉，不是只丢弃响应')
+
+  pending[1].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail, null, '切后台期间到达的响应不得复活凭证')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R11-B2 order-detail：已渲染后 onUnload，迟到的响应同样不得复活凭证', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '前提：码确实渲染出来了')
+
+  page.retry()
+  page.onUnload()
+  assert.equal(page.data.detail, null, 'onUnload 必须当场清掉凭证')
+
+  pending[1].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail, null, '离页之后到达的响应不得把码写回来')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R11-C order-detail：两次加载乱序返回，终态由最新一次决定（latest-wins）', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  page.retry()
+  assert.equal(pending.length, 2, '前提：确实有两发在飞')
+
+  // 后发的先回来，先发的后回来 —— 旧值不得把新值顶掉。
+  pending[1].resolve({ ...A_ORDER, pickupCode: '87654321' })
+  await flush()
+  assert.equal(page.data.detail.pickup, '87-65-43-21')
+
+  pending[0].resolve({ ...A_ORDER, pickupCode: '12345678' })
+  await flush()
+  assert.equal(page.data.detail.pickup, '87-65-43-21', '旧响应晚到不得回滚终态')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R11-D order-detail：同一位账号回到本页必须重新取数，而不是拿上一次的残留顶着', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78')
+
+  page.onHide()
+  page.onShow()
+  assert.equal(pending.length, 2, '回前台必须重新核一次：订单状态与到机码有效性都可能已经变了')
+
+  pending[1].resolve({ ...A_ORDER, pickupCode: '87654321' })
+  await flush()
+  assert.equal(page.data.detail.pickup, '87-65-43-21', '写回来的必须是重新取到的那一份')
+  assert.equal(page.data.loading, false)
+  assert.equal(page.data.error, '')
+})
+
+test('R11-D2 order-detail：JWT 自然过期不是换人 —— 必须放行请求，详情不得被误清', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78')
+
+  // 早上下单、下午回来看详情：30 分钟的 enduser JWT 已经到点，但**没有任何人登出**。
+  expireNaturally(wx)
+  page.onHide()
+  page.onShow()
+
+  assert.equal(pending.length, 2, '自然过期必须放行一次真实请求 —— 补签只能由 request.js 在 401 上做')
+  assert.ok(!String(page.data.error).includes('登录已失效'), page.data.error)
+  assert.notEqual(page.data.errorTitle, '账号已切换', '自然过期不是换人')
+
+  // request.js 静默补签成功 → 写回同一位的新会话 → 这条响应必须能落地。
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
+  pending[1].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '被补签救回来的响应必须能写进来')
+  assert.equal(page.data.error, '')
+})
+
+test('R11-E order-detail：在途期间被静默登出（没有任何生命周期回调）—— 响应不落地且详情当场清掉', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78')
+
+  page.retry()
+  // request.js 续签失败时就是这么做的：auth.logout()，页面还停在前台。
+  realAuth.logout()
+  pending[1].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail, null, '主动登出后屏幕上那张码必须当场清掉')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(realAuth.canSilentResignin(), false, '登出必须撤销补签资格，否则共用设备上会被自动登回')
+  assert.ok(String(page.data.error).includes('登录已失效'), page.data.error)
+  assert.equal(page.data.loading, false, '不能停在「正在加载订单详情…」上转圈')
+})
+
+test('R11-F order-detail：登录着却拿不到会员 id —— fail-closed，不发请求也不显示到机码', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/order-detail/order-detail.js', { auth, api, wx })
+  auth.setIdlessSession()
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+
+  assert.equal(pending.length, 0, '认不出人的会话不得拿去要本人订单')
+  assert.equal(page.data.detail, null)
+  assert.equal(page.data.loading, false, '不能停在 loading 上转圈')
+  assert.ok(String(page.data.error).includes('登录'), page.data.error)
+})
+
+test('R11-G order-detail：本人取消订单照常生效，去重锁必须交还', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.canCancel, true, '前提：这是一张可取消的未付款订单')
+
+  page._submitCancel()
+  assert.equal(page.data.cancelling, true)
+
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  assert.equal(page.data.cancelling, false)
+  assert.equal(page.data.detail.statusLabel, '已取消', '取消结果必须落地')
+  assert.equal(page.data.detail.pickup, '', '终态不再下发到机码')
+  assert.equal(page._cancelLock, false, '去重锁必须交还，否则「再试一次」是个按不动的按钮')
+})
+
+test('R11-G2 order-detail：取消在途时切后台 —— 详情不得被迟到的取消结果写回来，锁照常交还', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  page._submitCancel()
+  page.onHide()
+  assert.equal(page.data.cancelling, false, '清场必须把「正在取消…」的遮罩一起收起')
+
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  assert.equal(page.data.detail, null, '切后台之后到达的取消结果同样不得写进 data')
+  assert.equal(page._cancelLock, false, '被守卫丢弃的那一发也必须放锁')
+})
+
+test('R11-G3 order-detail：详情刷新不得让在途的取消失效（两条链各占一个通道）', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  page._submitCancel()
+  // 取消还在飞的时候用户又点了一次重试 —— 详情通道的重发不该把取消判成"过期的那一次"。
+  page.retry()
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+
+  assert.equal(page.data.detail.statusLabel, '已取消', '取消与详情是两条独立的链，不该互相作废')
+  assert.equal(page._cancelLock, false)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// R12. order-detail 收口：R11 只port了 R10 的一半，那一半挡不住 R10 本身。
+//
+// R11 的 `_accepts` 里，「这一页到底是谁的」只在**成功之后**顺手补一句
+// `if (!this._openerAccount && isMemberIdentity(token.identity)) ...`。
+// 它默认了"归属没定就先渲染、回头再补登记"，而 print-pickup 的 `_ownsResponse`
+// 恰恰是**无条件**先问这一句：`if (account !== this._openerAccount) return false`
+// —— `_openerAccount === ''` 就是"这一页还没有人认领"，此时任何响应都不许写屏。
+//
+// 差别在一条真实链路上是致命的：开页那一刻 JWT 就已经自然到点（走到一体机前才打开，
+// 30 分钟的 enduser JWT 早过期了），于是快照 / 开页账号 / 发起账号三个全是空串，
+// 请求照常带着补签资格发出去。在途期间 B 静默登录（`auth.saveSession` 不需要任何
+// 生命周期回调，没有 onHide 也没有 onShow）—— A 的 200 回来时：
+//   `_resolveAccount` 看到一个确定的 'u:B'，快照是空的 → 判 'ok'；
+//   `foreign` 要 `_openerAccount` 是会员键才成立，而它还是空串 → 不成立；
+//   `sameAccount('', 'u:B')` 是被明确放行的那个方向（补签升级）→ 通过。
+// 四条判据一条都没拦住，A 的到机码画在了 B 的屏幕上。
+//
+// 修法与 print-pickup 同一条：归属只由**服务端**认下来 —— 要么 onLoad（本页刚被
+// 导航打开），要么一发**发出时就带着确定账号**的请求拿到 200。发出时归属未定的
+// 那一发只负责把 401 静默补签触发出来，它的 200 什么都证明不了；本人要恢复显示，
+// 得让本页追一发确认请求。代价是"过期开页"多一个来回。
+//
+// 另一条：取消与详情是两个通道，**但它们写的是同一个 detail 字段**。取消成功之后
+// 到机码已被服务端作废，而更早发出、还在途的那一发详情带着取消之前的 pending + 码，
+// 落地就是把一张已经失效的码重新画到屏幕上。逐通道 latest-wins 管不到跨通道因果。
+// ══════════════════════════════════════════════════════════════════════
+
+test('R12-A order-detail：过期开页 → 在途期间 B 静默登录 → 归属未定那一发的 200 不得画给 B', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  // 开页那一刻 JWT 就已经自然到点：快照 / 开页账号 / 发起账号三个全是空串。
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  assert.equal(pending.length, 1, '仍有补签资格，必须放行这一发（它负责把 401 静默补签触发出来）')
+
+  // 在途期间 B 登录。saveSession 不需要任何生命周期回调 —— 没有 onHide，也没有 onShow。
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
+
+  // 「发出时归属未定」那一发的 200 回来了。
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail, null, '发出时归属未定的那一发，它的 200 证明不了这一页是谁的，不得写屏')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'), 'A 的到机码一个字节都不许出现在 B 的屏幕上')
+  assert.ok(!JSON.stringify(page.data).includes('A的简历'), 'A 的文件名同样不许')
+  assert.equal(pending.length, 2, '必须追一发**带着确定账号**的确认请求 —— 那一发才定得了归属')
+})
+
+test('R12-B order-detail：过期开页 → 补签回同一位 —— 确认请求 200 之后本人必须恢复显示', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  assert.equal(pending.length, 1)
+
+  // request.js 静默补签成功，写回**同一位** A 的新会话。
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail, null, '归属未定那一发的 200 仍然不能直接写屏')
+  assert.equal(pending.length, 2, '必须追一发确认请求')
+
+  // 这一发是带着确定账号 'u:A' 发出去的，服务端 requireOwned 放行了它 → 归属成立。
+  pending[1].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '确认请求 200 之后，本人的详情必须恢复显示')
+  assert.equal(page.data.error, '', '本人不该被留在错误态上（这正是 R9 那条永久 fail-closed 的代价）')
+  assert.equal(pending.length, 2, '不得再追第三发 —— 确认请求自己不能再触发确认')
+})
+
+test('R12-C order-detail：B 的确认请求被服务端按归属拒掉 —— 停在错误态，不显示任何详情也不再追', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2, '前提：确认请求已经发出')
+
+  // 确认请求带着 B 的登录态问服务端要 A 的订单 —— requireOwned 必然拒绝。
+  pending[1].reject(new Error('订单不存在或无权访问'))
+  await flush()
+
+  assert.equal(page.data.detail, null, '被拒之后一个字节的详情都不许显示')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.loading, false, '不能停在「正在加载订单详情…」上转圈')
+  assert.ok(page.data.error, '必须给出一句说得清的错误')
+  assert.equal(pending.length, 2, '确认被拒之后不得再追一发（否则就是一个打不完的循环）')
+})
+
+test('R12-D order-detail：取消成功之后，更早的详情响应不得把订单写回「待取件」并复活到机码', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.canCancel, true, '前提：这是一张可取消的未付款订单')
+
+  // 一发详情刷新在途（用户点重试、或 onShow 触发的刷新都是这个形态）。
+  page.retry()
+  assert.equal(pending.length, 2)
+
+  // 取消成功。服务端此刻已经把到机码作废了 —— 页面上那句话就是这么写的：
+  // 「取消后到机码立即失效，且不能恢复」。
+  page._submitCancel()
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  assert.equal(page.data.detail.statusLabel, '已取消')
+  assert.equal(page.data.detail.pickup, '')
+
+  // **更早**发出的那一发详情这才回来，带着取消之前的 pending + 到机码。
+  // 它在自己通道上仍然是"最新一次"，逐通道 latest-wins 拦不住它。
+  pending[1].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail.statusLabel, '已取消', '更早的详情响应不得把已取消的订单写回「待取件」')
+  assert.equal(page.data.detail.pickup, '', '更不得复活一张服务端已经作废的到机码')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.detail.canCancel, false, '也不得把「取消订单」按钮重新解开')
+})
+
+test('R12-E order-detail：确认被拒不得把这一页认成拒绝者的 —— 本人回来仍须能看到自己的订单', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2, '前提：确认请求已经发出')
+
+  // 服务端按归属拒掉 B。**被拒是一条否定判据**：它证明这一页不是 B 的，
+  // 绝不能反过来被当成"那就算 B 的吧"—— 那样开页那位（真正的本人）会被
+  // foreign 判据永久挡在自己的订单外面。
+  pending[1].reject(new Error('订单不存在或无权访问'))
+  await flush()
+
+  // 本人登录回来。
+  switchAccount('A')
+  page.onShow()   // 'u:B' → 'u:A' 这一跳先清场
+  page.onShow()   // 清场之后本人重新取数
+
+  assert.equal(pending.length, 3, '被拒的是 B 不是 A —— 本人回来必须能重新发起请求')
+  pending[2].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '本人不该被永久挡在自己的订单外面')
+})
+
+test('R12-F order-detail：取消 200 在 hide/show 代次变化后到达，更早的详情不得复活到机码', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.canCancel, true)
+
+  page._submitCancel()
+  page.onHide()
+  page.onShow()
+  assert.equal(pending.length, 2, '回前台必须再取一次详情')
+
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  pending[1].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail.statusLabel, '已取消', 'hide/show 不得把已接受的取消结果丢掉')
+  assert.equal(page.data.detail.pickup, '', '更早的详情 200 不得复活到机码')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.detail.canCancel, false)
+  assert.equal(page._cancelLock, false)
+})
+
+test('R12-F2 order-detail：取消 200 在后台到达不得写屏，回前台的 pending 详情仍不得复活到机码', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  page._submitCancel()
+  page.onHide()
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+  assert.equal(page.data.detail, null, '后台到达的取消结果不得写进 data')
+  assert.equal(page._cancelLock, false)
+
+  page.onShow()
+  assert.equal(pending.length, 2)
+  pending[1].resolve(A_ORDER)
+  await flush()
+
+  assert.equal(page.data.detail.statusLabel, '已取消')
+  assert.equal(page.data.detail.pickup, '')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R12-G order-detail：A 的取消 200 不得在换人后写进 B 的页面', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const cancel = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise },
+    cancelCloudPrintOrder: () => cancel.promise,
+  }
+  const page = makePage('pages/order-detail/order-detail.js', { auth: realAuth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+
+  page._submitCancel()
+  switchAccount('B')
+  page.onShow()
+  cancel.resolve(A_ORDER_CANCELLED)
+  await flush()
+
+  assert.equal(page.data.detail, null, 'A 的取消不得画到 B 的屏幕上')
+  assert.ok(!JSON.stringify(page.data).includes('A的简历'))
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.errorTitle, '账号已切换')
+  assert.equal(pending.length, 1, '不得代表 B 去请求 A 的订单')
+  assert.equal(page._cancelLock, false)
+})
+
+test('R12-H order-detail：过期开页确认被拒后，hide/show 不得再替被拒账号刷服务端', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2, '前提：确认请求已经发出')
+
+  pending[1].reject(notOwnedError())
+  await flush()
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page._ownerDeniedFor, 'u:B', '前台、当前通道上的 requireOwned 404 必须按发出时那个账号粘住')
+
+  page.onHide()
+  page.onShow()
+  page.onShow()
+  assert.equal(pending.length, 2, '被拒过的账号不得因 hide/show 反复问服务端')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R12-I order-detail：只有 404、没有 PRINT_ORDER_NOT_FOUND —— 不得粘性拒绝，回前台仍可再问', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2)
+
+  pending[1].reject(Object.assign(new Error('not found'), { statusCode: 404 }))
+  await flush()
+  assert.equal(page._ownerDeniedFor, '', '网关 404 不是 requireOwned，不得把这位粘死')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+
+  page.onHide()
+  page.onShow()
+  assert.equal(pending.length, 3, '404-only 之后下一次 onShow 必须还能发确认请求')
+})
+
+test('R12-J order-detail：只有 PRINT_ORDER_NOT_FOUND、没有 404 —— 不得粘性拒绝', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2)
+
+  pending[1].reject(Object.assign(new Error('not found'), { code: 'PRINT_ORDER_NOT_FOUND' }))
+  await flush()
+  assert.equal(page._ownerDeniedFor, '', '缺 404 的业务码不是 requireOwned')
+  assert.equal(page.data.detail, null)
+
+  page.onHide()
+  page.onShow()
+  assert.equal(pending.length, 3, 'code-only 之后下一次 onShow 必须还能发确认请求')
+})
+
+test('R12-K order-detail：精确 404+code 在 onHide 之后到达 —— 不得盖章，回前台仍可再问', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'B'), user: { id: 'B' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2)
+
+  page.onHide()
+  pending[1].reject(notOwnedError())
+  await flush()
+  assert.equal(page._ownerDeniedFor, '', '被代次作废的确认失败不得记下拒绝账号')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+
+  page.onShow()
+  assert.equal(pending.length, 3, 'hide 期间到达的 404 不得挡住下一次前台确认请求')
+})
+
+test('R12-L order-detail：精确 404+code 在换人之后到达 —— 不得盖上一位的章，也不得替 B 去要 A 的订单', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS, 'A'), user: { id: 'A' } })
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(pending.length, 2, '前提：确认请求带着 A 发出')
+
+  switchAccount('B')
+  page.onShow()
+  assert.equal(pending.length, 2, '换人清场不得再发一发代表 B 的请求')
+
+  pending[1].reject(notOwnedError())
+  await flush()
+  assert.notEqual(page._ownerDeniedFor, 'u:A', '换人之后到达的拒绝不得盖在 A 头上')
+  assert.equal(page._ownerDeniedFor, '', '也不得把 B 记成被拒（那一发不是 B 发出的）')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.ok(!JSON.stringify(page.data).includes('A的简历'))
+  assert.equal(pending.length, 2, '迟到的拒绝回调不得替 B 去要 A 的订单')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// R11. 单件云打印幂等键 TTL：本机不得比服务端先失忆
+//
+// 材料包链（25158d95b）已经用 submittedAt / markSubmitted 收口过同一条洞。
+// 单件链此前仍按 createdAt+7 天一律淘汰：POST 已出门、响应永久丢失的那一格
+// 会被忘掉，之后重新铸键 = 第二张订单、第二笔钱。
+// ══════════════════════════════════════════════════════════════════════
+
+const PRINT_TTL_KEY = '11111111-1111-4111-8111-111111111111'
+const PRINT_TTL_DAY = 24 * 60 * 60 * 1000
+
+test('R11-1 本机时钟走过 7 天：已提交未落定的记录必须还在，且复用同一个键', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  const at = Date.now() - 30 * PRINT_TTL_DAY
+  wx.storage.set(idem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '',
+    createdAt: at, submittedAt: at,
+  }])
+  assert.equal(idem.findRecord('u:A', print).key, PRINT_TTL_KEY,
+    '30 天前那次"响应丢在路上"的提交不许被忘掉')
+  const randomsBefore = wx.calls.getRandomValues.length
+  const again = await idem.ensureKey('u:A', print)
+  assert.equal(again.key, PRINT_TTL_KEY, '同参数再提交必须复用旧键（换新键 = 第二张订单）')
+  assert.equal(wx.calls.getRandomValues.length, randomsBefore, '一个新键都不许铸')
+})
+
+test('R11-2 模块重载后，超过 TTL 的已提交未落定记录仍然复用', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const first = freshIdem()
+  const print = first.fingerprintOf(PAY_PAYLOAD)
+  const at = Date.now() - 30 * PRINT_TTL_DAY
+  wx.storage.set(first.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '',
+    createdAt: at, submittedAt: at,
+  }])
+  const reloaded = freshIdem()
+  assert.notEqual(reloaded, first, '前提：确实拿到了一份全新的模块实例')
+  assert.equal(reloaded.findRecord('u:A', print).key, PRINT_TTL_KEY)
+  const again = await reloaded.ensureKey('u:A', print)
+  assert.equal(again.key, PRINT_TTL_KEY, '进程重启后判据只能看落盘字段')
+})
+
+test('R11-3 已落定的、以及旧版本没有 submittedAt 的记录，不因本机时间被淘汰', async () => {
+  const settledWx = createWx()
+  useRealAuth(settledWx, 'A')
+  const settledIdem = freshIdem()
+  const print = settledIdem.fingerprintOf(PAY_PAYLOAD)
+  const at = Date.now() - 30 * PRINT_TTL_DAY
+  settledWx.storage.set(settledIdem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: 'ord-9', createdAt: at,
+  }])
+  assert.equal(settledIdem.findRecord('u:A', print).orderId, 'ord-9',
+    '服务端那张单还在（键永久），本机不许先忘掉指回它的唯一线索')
+
+  const legacyWx = createWx()
+  useRealAuth(legacyWx, 'A')
+  const legacyIdem = freshIdem()
+  legacyWx.storage.set(legacyIdem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '', createdAt: at,
+  }])
+  assert.equal(legacyIdem.findRecord('u:A', print).key, PRINT_TTL_KEY, '没有标记 ≠ 证明了没发过')
+  const again = await legacyIdem.ensureKey('u:A', print)
+  assert.equal(again.key, PRINT_TTL_KEY)
+  assert.equal(legacyWx.calls.getRandomValues.length, 0)
+
+  const oddWx = createWx()
+  useRealAuth(oddWx, 'A')
+  const oddIdem = freshIdem()
+  oddWx.storage.set(oddIdem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '', createdAt: at, submittedAt: 'x',
+  }])
+  assert.ok(oddIdem.findRecord('u:A', print), '读不懂的标记不得被解释成"这个键没出过门"')
+})
+
+test('R11-4 铸出来却一个 POST 都没发过的键，过了 TTL 才作废', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  wx.storage.set(idem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '',
+    createdAt: Date.now() - (idem.TTL_MS - 60 * 1000), submittedAt: 0,
+  }])
+  assert.equal(idem.findRecord('u:A', print).key, PRINT_TTL_KEY, 'TTL 之内的未提交键仍然复用')
+
+  wx.storage.set(idem.STORE_KEY, [{
+    account: 'u:A', fingerprint: print, key: PRINT_TTL_KEY, orderId: '',
+    createdAt: Date.now() - (idem.TTL_MS + 60 * 1000), submittedAt: 0,
+  }])
+  assert.equal(idem.findRecord('u:A', print), null)
+  const fresh = await idem.ensureKey('u:A', print)
+  assert.notEqual(fresh.key, PRINT_TTL_KEY, '从没发出去过的键过期之后铸新的')
+  assert.match(fresh.key, idem.KEY_RE)
+  assert.equal(fresh.submittedAt, 0, '新铸的键同样先标成"还没发过"')
+})
+
+test('R11-5 markSubmitted：标住之后退出 TTL；键对不上 / 这一格不在 / 身份不可用一律 false', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  const record = await idem.ensureKey('u:A', print)
+  assert.equal(wx.storage.get(idem.STORE_KEY)[0].submittedAt, 0)
+
+  assert.equal(idem.markSubmitted('u:A', 'fp-none', record.key), false)
+  assert.equal(idem.markSubmitted('u:A', print, PRINT_TTL_KEY), false)
+  assert.equal(idem.markSubmitted('', print, record.key), false)
+  assert.equal(idem.markSubmitted('u:A', print, 'not-a-uuid'), false)
+  assert.equal(wx.storage.get(idem.STORE_KEY)[0].submittedAt, 0, '失败路径不许顺手改盘上的东西')
+
+  assert.equal(idem.markSubmitted('u:A', print, record.key), true)
+  assert.ok(wx.storage.get(idem.STORE_KEY)[0].submittedAt > 0)
+
+  const rows = wx.storage.get(idem.STORE_KEY)
+  rows[0].createdAt = Date.now() - 30 * PRINT_TTL_DAY
+  wx.storage.set(idem.STORE_KEY, rows)
+  assert.equal(idem.findRecord('u:A', print).key, record.key)
+})
+
+test('R11-6 页面：markSubmitted 写失败 / 静默写失败 / 读失败均 0 POST，键原样留着', async () => {
+  async function runOnce(breakWrite) {
+    const wx = createWx()
+    useRealAuth(wx, 'A')
+    const idem = freshIdem()
+    const fingerprint = idem.fingerprintOf(PAY_PAYLOAD)
+    const record = await idem.ensureKey('u:A', fingerprint)
+    assert.equal(wx.storage.get(idem.STORE_KEY)[0].submittedAt, 0)
+    const { page, creates } = payPage(wx)
+    page.onLoad(PAY_QUERY)
+    await flush()
+
+    const realSet = wx.setStorageSync
+    const realGet = wx.getStorageSync
+    if (breakWrite === 'throw') {
+      wx.setStorageSync = () => { throw new Error('setStorageSync failed') }
+    } else if (breakWrite === 'silent') {
+      wx.setStorageSync = () => {}
+    } else if (breakWrite === 'read') {
+      wx.getStorageSync = (k) => { if (k === idem.STORE_KEY) throw new Error('getStorageSync failed'); return realGet(k) }
+    }
+
+    page.continueFlow()
+    await flush(); await flush()
+    assert.equal(creates.length, 0, `${breakWrite}: 标不住不许发 POST`)
+    assert.equal(page.data.submitting, false, `${breakWrite}: 停下来之后按钮必须放开`)
+    assert.match(wx.calls.showModal[wx.calls.showModal.length - 1].content, /没能记下这次提交|读不到本机/)
+
+    wx.setStorageSync = realSet
+    wx.getStorageSync = realGet
+    const after = wx.storage.get(idem.STORE_KEY)
+    assert.equal(after.length, 1, `${breakWrite}: 键原样留着`)
+    assert.equal(after[0].key, record.key)
+    assert.equal(after[0].submittedAt, 0, `${breakWrite}: 没标住就不许在盘上显示成标住了`)
+  }
+
+  await runOnce('throw')
+  await runOnce('silent')
+  await runOnce('read')
+})
+
+test('R11-7 页面：成功路径严格先落盘再 POST；账号/指纹隔离不退化', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  let storageAtCall = null
+  const creates = []
+  const sentKeys = []
+  const api = {
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 150, billablePages: 3 }),
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    createCloudPrintOrder: (data, opts) => {
+      storageAtCall = JSON.parse(JSON.stringify(wx.storage.get(idem.STORE_KEY)))
+      sentKeys.push(opts && opts.idempotencyKey)
+      const d = deferred(); creates.push(d); return d.promise
+    },
+    getCloudPrintOrder: () => deferred().promise,
+  }
+  const page = makePage('pages/print-pay/print-pay.js', { auth: realAuth, api, wx })
+  page.onLoad(PAY_QUERY)
+  await flush()
+  page.continueFlow()
+  await flush(); await flush()
+  assert.equal(creates.length, 1)
+  assert.ok(Array.isArray(storageAtCall) && storageAtCall.length === 1)
+  assert.equal(storageAtCall[0].key, sentKeys[0], 'POST 发出的那一刻，盘上已经是这个键')
+  assert.ok(storageAtCall[0].submittedAt > 0, 'POST 发出的那一刻，盘上这一格已经标成"这个键出门了"')
+  assert.equal(storageAtCall[0].account, 'u:A')
+  assert.equal(storageAtCall[0].fingerprint, print)
+
+  const bKey = await idem.ensureKey('u:B', print)
+  assert.notEqual(bKey.key, sentKeys[0], 'B 不得复用 A 的幂等键')
+  assert.equal(idem.findRecord('u:A', print).key, sentKeys[0], 'B 的写入不得动 A 的记录')
+  const other = await idem.ensureKey('u:A', idem.fingerprintOf({ ...PAY_PAYLOAD, copies: 3 }))
+  assert.notEqual(other.key, sentKeys[0], '参数变了必须换键')
+})
+
+// ── resume-parse：匿名一次性令牌 ────────────────────────────────────────
+//
+// 后端只在 POST /resume/parse 下发 accessToken（ai.service.ts 落库 payload 不含它），
+// 轮询 GET /resume/records/:id 回的是落库结果，**不带令牌**。页面若每一轮都照抄
+// `res.accessToken || ''`，pending→completed 那一轮就把 POST 存下的令牌清空，
+// 诊断页随后按 taskId 取令牌拿到空串 —— 匿名用户一律 404。
+
+test('RP-1 resume-parse：pending→completed 轮询不得清掉一次性令牌；换了任务不得继承上一条的令牌', async () => {
+  const readTask = (wx) => wx.storage.get(realStorage.KEYS.RESUME_TASK) || {}
+
+  // ① 同一任务：POST pending 带令牌 → GET completed 不带令牌 → 令牌必须还在。
+  const wx = createWx()
+  const polls = []
+  const api = {
+    parseResume: () => Promise.resolve({ taskId: 'T1', status: 'pending', accessToken: 'one-time-token' }),
+    getResumeRecord: (taskId, token) => { polls.push({ taskId, token }); return Promise.resolve({ taskId: 'T1', status: 'completed' }) },
+  }
+  const page = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), api, wx })
+  page.onLoad({ fileId: 'F1', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(readTask(wx).accessToken, 'one-time-token', 'POST 下发的令牌先落地')
+  page._timers[page._timers.length - 1]() // 触发这一轮轮询
+  await flush()
+  assert.equal(polls.length, 1)
+  assert.equal(polls[0].token, 'one-time-token', '轮询要带着令牌去问')
+  assert.equal(page.data.done, true)
+  assert.equal(readTask(wx).taskId, 'T1')
+  assert.equal(readTask(wx).accessToken, 'one-time-token', 'completed 响应不带令牌，不得把已存的令牌清空')
+  page._timers[page._timers.length - 1]() // 跳诊断页
+  assert.equal(wx.calls.redirectTo.length, 1)
+  assert.ok(wx.calls.redirectTo[0].includes('taskId=T1'))
+
+  // ② 换了任务：盘上是上一条任务的令牌，这一次 POST 不带令牌（会员）→ 不得继承。
+  const wx2 = createWx()
+  wx2.storage.set(realStorage.KEYS.RESUME_TASK, { taskId: 'OLD', accessToken: 'old-token' })
+  const polls2 = []
+  const api2 = {
+    parseResume: () => Promise.resolve({ taskId: 'T2', status: 'pending' }),
+    getResumeRecord: (taskId, token) => { polls2.push({ taskId, token }); return Promise.resolve({ taskId: 'T2', status: 'completed' }) },
+  }
+  const page2 = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth('A'), api: api2, wx: wx2 })
+  page2.onLoad({ fileId: 'F2', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(readTask(wx2).taskId, 'T2')
+  assert.equal(readTask(wx2).accessToken, '', '新任务不得沿用上一条任务的令牌')
+  page2._timers[page2._timers.length - 1]()
+  await flush()
+  assert.equal(polls2.length, 1)
+  assert.equal(polls2[0].token, '', '不得拿别的任务的令牌去问 T2')
+  assert.equal(readTask(wx2).accessToken, '', 'completed 之后仍不得冒出别的任务的令牌')
+})
+
+test('RP-1b resume-parse：匿名令牌写盘失败时不跳诊断；按同一编号重试保存后才能读取', async () => {
+  const wx = createWx()
+  const originalSet = wx.setStorageSync
+  let storageBlocked = true
+  wx.setStorageSync = (key, value) => {
+    if (key === realStorage.KEYS.RESUME_TASK && storageBlocked) throw new Error('storage full')
+    return originalSet(key, value)
+  }
+  let posts = 0
+  const reads = []
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: () => { posts += 1; return Promise.resolve({ taskId: 'T-storage', status: 'completed', accessToken: 'once-only' }) },
+      getResumeRecord: (taskId, token) => { reads.push({ taskId, token }); return Promise.resolve({ taskId, status: 'completed' }) },
+    },
+  })
+  page.onLoad({ fileId: 'F-storage', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.pendingTaskId, 'T-storage')
+  assert.match(page.data.unknownCause, /无法保存/)
+  assert.equal(wx.calls.redirectTo.length, 0, '未保存凭证时不得跳到需要该凭证的诊断页')
+  page.recheck()
+  assert.equal(reads.length, 0, '写盘继续失败时不得发出缺令牌的 GET')
+  assert.equal(posts, 1, '写盘失败不得触发第二次 AI 解析')
+
+  storageBlocked = false
+  page.recheck()
+  await flush()
+  assert.deepEqual(reads, [{ taskId: 'T-storage', token: 'once-only' }])
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'once-only')
+  assert.equal(page.data.done, true)
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T-storage')
+  assert.equal(posts, 1)
+})
+
+test('RP-2 resume-parse：POST 没拿到可信答复时停在结果未知；不自动二次解析', async () => {
+  const errors = [
+    { statusCode: -1, message: 'network timeout' },
+    { statusCode: 503, code: 'AI_PROVIDER_ERROR' },
+    { statusCode: 408 },
+    { statusCode: 413 }, // 无 API 错误码：可能是网关代答
+  ]
+  for (const error of errors) {
+    const wx = createWx()
+    let posts = 0
+    const page = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx,
+      api: { parseResume: () => { posts += 1; return Promise.reject(error) } },
+    })
+    page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+    await flush()
+    assert.equal(page.data.phase, 'unknown', `status ${error.statusCode} 应是未知`)
+    assert.equal(page.data.pendingTaskId, '')
+    assert.equal(page.data.canCheckRecords, false)
+    assert.equal(posts, 1)
+    page.retry() // 旧的“重试解析”方法不能绕过确认
+    assert.equal(posts, 1)
+    assert.equal(wx.calls.redirectTo.length, 0)
+  }
+
+  const wx = createWx()
+  let posts = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth('A'), wx,
+    api: { parseResume: () => { posts += 1; return Promise.resolve({}) } },
+  })
+  page.onLoad({ fileId: 'F2', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page.data.phase, 'unknown', '2xx 无 taskId/status 也不能说未执行')
+  assert.equal(page.data.canCheckRecords, true, '会员可去本人记录核对')
+  page.toAiRecords()
+  assert.equal(wx.calls.navigateTo[0], '/pages/ai-records/ai-records')
+  assert.equal(posts, 1)
+})
+
+test('RP-3 resume-parse：结果未知且无编号时，仅确认后的新一次可 POST，连点只发一次', async () => {
+  const wx = createWx()
+  const second = deferred()
+  const modal = []
+  wx.showModal = (opts) => { modal.push(opts) }
+  let posts = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: { parseResume: () => { posts += 1; return posts === 1 ? Promise.reject({ statusCode: -1 }) : second.promise } },
+  })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page.data.phase, 'unknown')
+  page.confirmResubmit()
+  page.confirmResubmit()
+  assert.equal(modal.length, 1, '确认框打开时连点不得叠弹窗')
+  assert.match(modal[0].content, /可能已经完成/)
+  assert.equal(posts, 1, '确认前不得发第二个 POST')
+  modal[0].success({ confirm: false })
+  assert.equal(posts, 1, '取消后不得发第二个 POST')
+  page.confirmResubmit()
+  modal[1].success({ confirm: true })
+  assert.equal(posts, 1, '第一次确认后还要再次确认')
+  modal[2].success({ confirm: true })
+  page.confirmResubmit()
+  page.retry()
+  await flush()
+  assert.equal(posts, 2, '两次确认并清除旧意图后才多一次 POST')
+  second.resolve({ taskId: 'T2', status: 'completed', accessToken: 't2-token' })
+  await flush()
+  assert.equal(page.data.done, true)
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T2')
+})
+
+test('RP-4 resume-parse：有编号的未知只按同一编号读；异常回包不得覆盖令牌', async () => {
+  const wx = createWx()
+  let posts = 0
+  const reads = []
+  const api = {
+    parseResume: () => { posts += 1; return Promise.resolve({ taskId: 'T1', status: 'pending', accessToken: 'one-time-token' }) },
+    getResumeRecord: (taskId, token) => {
+      reads.push({ taskId, token })
+      if (reads.length === 1) return Promise.reject({ statusCode: -1 })
+      if (reads.length === 2) return Promise.resolve({ taskId: 'T1', status: 'processing' })
+      if (reads.length === 3) return Promise.resolve({ taskId: 'OTHER', status: 'completed', accessToken: 'foreign' })
+      return Promise.resolve({ taskId: 'T1', status: 'completed' })
+    },
+  }
+  const page = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), api, wx })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  page._timers[page._timers.length - 1]() // 首轮 GET 断网
+  await flush()
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.pendingTaskId, 'T1')
+  page.confirmResubmit() // 已有编号时根本不给新 POST 入口
+  assert.equal(posts, 1)
+  assert.equal(wx.calls.showModal.length, 0)
+  page.recheck()
+  await flush()
+  assert.equal(page.data.recheck, 'not-ready')
+  page.recheck()
+  await flush()
+  assert.equal(page.data.recheck, 'malformed')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).taskId, 'T1')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'one-time-token')
+  page.recheck()
+  await flush()
+  assert.equal(page.data.done, true)
+  assert.equal(reads.length, 4)
+  assert.ok(reads.every((r) => r.taskId === 'T1' && r.token === 'one-time-token'))
+  assert.equal(posts, 1, '全程只有首次解析 POST')
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T1')
+  assert.ok(!wx.calls.redirectTo[0].includes('one-time-token'), '令牌不进 URL')
+})
+
+test('RP-5 resume-parse：业务拒绝/服务端失败才是明确失败；轮询耗尽仍是未知', async () => {
+  for (const response of [Promise.reject({ statusCode: 400, code: 'FILE_EXPIRED', message: '文件已过期' }), Promise.resolve({ taskId: 'T1', status: 'failed', failReason: '解析失败', accessToken: 'failed-token' })]) {
+    const wx = createWx()
+    const page = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx, api: { parseResume: () => response },
+    })
+    page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+    await flush()
+    assert.equal(page.data.phase, 'failed')
+  }
+  const wx = createWx()
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: { parseResume: () => Promise.resolve({ taskId: 'T1', status: 'pending', accessToken: 'token' }) },
+  })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  page._handle({ taskId: 'T1', status: 'processing' }, 40, 'T1')
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.pendingTaskId, 'T1')
+})
+
+test('RP-7 resume-parse：无编号的未知按同一意图重查；409 未知不当失败；换账号不收下结果', async () => {
+  const wx = createWx()
+  const posts = []
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: (_payload, headers) => {
+        posts.push(headers)
+        return posts.length === 1
+          ? Promise.reject({ statusCode: -1 })
+          : Promise.resolve({ taskId: 'T9', status: 'completed', accessToken: 'tok-9' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page.data.phase, 'unknown')
+  page.replaySame()
+  await flush()
+  assert.equal(posts.length, 2)
+  assert.equal(posts[0]['x-resume-parse-intent'], posts[1]['x-resume-parse-intent'])
+  assert.equal(posts[0]['x-resume-parse-proof'], posts[1]['x-resume-parse-proof'])
+  assert.equal(page.data.done, true)
+
+  const wx409 = createWx()
+  const page409 = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wx409,
+    api: { parseResume: () => Promise.reject({ statusCode: 409, code: 'RESUME_PARSE_OUTCOME_UNKNOWN', message: '无法确认' }) },
+  })
+  page409.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(page409.data.phase, 'unknown')
+  assert.notEqual(page409.data.phase, 'failed')
+
+  const wxSwitch = createWx()
+  const auth = createAuth('A')
+  const gate = deferred()
+  const pageSwitch = makePage('pages/resume-parse/resume-parse.js', {
+    auth, wx: wxSwitch,
+    api: { parseResume: () => gate.promise },
+  })
+  pageSwitch.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  auth.setUser('B')
+  gate.resolve({ taskId: 'T-secret', status: 'completed', accessToken: 'secret-token' })
+  await flush()
+  assert.equal(wxSwitch.calls.redirectTo.length, 0)
+  assert.notEqual((wxSwitch.storage.get(realStorage.KEYS.RESUME_TASK) || {}).accessToken, 'secret-token')
+})
+
+test('RP-8 resume-parse：意图仍在时 GET 404 只停在同一次重查，复用请求头并保留匿名令牌', async () => {
+  const wx = createWx()
+  const posts = []
+  let gets = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: (payload, headers) => {
+        posts.push({ payload, headers })
+        return posts.length === 1
+          ? Promise.resolve({ taskId: 'T1', status: 'processing', accessToken: 'anon-token' })
+          : Promise.resolve({ taskId: 'T1', status: 'completed' })
+      },
+      getResumeRecord: () => {
+        gets += 1
+        return Promise.reject({ statusCode: 404, code: 'AI_TASK_NOT_FOUND', message: '' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F1', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(wx.calls.getRandomValues.length, 2, '随机数只为最初的 intent 与 proof')
+  assert.equal((wx.storage.get(realStorage.KEYS.RESUME_TASK) || {}).accessToken, 'anon-token')
+  page._timers[page._timers.length - 1]()
+  await flush()
+  assert.equal(gets, 1)
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.pendingTaskId, 'T1')
+  assert.equal(page.data.recheck, 'not-ready')
+  assert.equal(page.data.intentReplay, true)
+  page.confirmResubmit()
+  assert.equal(wx.calls.showModal.length, 0, '结果未就绪时不得出现新意图入口')
+  page.replayKnown()
+  await flush()
+  assert.equal(posts.length, 2)
+  assert.equal(posts[0].headers['x-resume-parse-intent'], posts[1].headers['x-resume-parse-intent'])
+  assert.equal(posts[0].headers['x-resume-parse-proof'], posts[1].headers['x-resume-parse-proof'])
+  assert.equal(JSON.stringify(posts[0].payload), JSON.stringify(posts[1].payload))
+  assert.equal(wx.calls.getRandomValues.length, 2, '同一次重查不得再生成随机数')
+  assert.equal(page.data.done, true)
+  assert.equal((wx.storage.get(realStorage.KEYS.RESUME_TASK) || {}).taskId, 'T1')
+  assert.equal((wx.storage.get(realStorage.KEYS.RESUME_TASK) || {}).accessToken, 'anon-token')
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T1')
+  assert.equal(gets, 1)
+  assert.equal(posts.length, 2)
+})
+
+test('RP-9 resume-parse：静默丢写不算保存；意图释放失败时不导航，存储恢复后才能开始下一次', async () => {
+  const wx = createWx()
+  const originalSet = wx.setStorageSync
+  let dropTask = true
+  let dropIntentClear = false
+  wx.setStorageSync = (key, value) => {
+    if (dropTask && key === realStorage.KEYS.RESUME_TASK) return
+    if (dropIntentClear && key === realStorage.KEYS.RESUME_PARSE_INTENT && Array.isArray(value) && value.length === 0) return
+    return originalSet(key, value)
+  }
+  let posts = 0
+  let gets = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: () => {
+        posts += 1
+        return Promise.resolve({ taskId: 'T-silent', status: 'completed', accessToken: 'silent-token' })
+      },
+      getResumeRecord: (taskId, token) => {
+        gets += 1
+        return Promise.resolve({ taskId, status: 'completed' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F-silent', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts, 1)
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.done, false)
+  assert.equal(page.data.settleBlocked, false)
+  assert.equal(wx.calls.redirectTo.length, 0)
+  assert.equal(wx.storage.has(realStorage.KEYS.RESUME_TASK), false, '静默丢写后盘上不能出现令牌')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1, '令牌没落盘时必须留着原意图')
+  page.confirmResubmit()
+  assert.equal(wx.calls.showModal.length, 0, '未保存凭证时不得开放新意图')
+  page.recheck()
+  assert.equal(gets, 0, '回读仍失败时不得发出缺令牌的 GET')
+  assert.equal(posts, 1)
+
+  dropTask = false
+  dropIntentClear = true
+  page.recheck()
+  await flush()
+  assert.equal(gets, 1)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'silent-token')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).settledIntent, wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT)[0].intent)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1, '释放写失败时意图还在')
+  assert.equal(page.data.settleBlocked, true)
+  assert.equal(page.data.done, false)
+  assert.equal(wx.calls.redirectTo.length, 0, '意图没释放不得假装完成并跳走')
+  page.confirmResubmit()
+  assert.equal(wx.calls.showModal.length, 0)
+  page.retrySettle()
+  await flush()
+  assert.equal(page.data.settleBlocked, true, '释放仍然丢写时留在原页')
+  assert.equal(posts, 1)
+
+  let postsB = 0
+  const pageB = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: (_payload, headers) => {
+        postsB += 1
+        return Promise.resolve({ taskId: 'T-next', status: 'completed', accessToken: 'next-token', headers })
+      },
+      getResumeRecord: () => Promise.resolve({ taskId: 'T-next', status: 'completed' }),
+    },
+  })
+  pageB.onLoad({ fileId: 'F-next', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(postsB, 0, '清不掉已完成意图时，新材料不得发出 POST')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'silent-token')
+
+  dropIntentClear = false
+  pageB.replaySame()
+  await flush()
+  assert.equal(postsB, 1, '存储恢复后，已完成的旧意图可以被释放并开始新的一次')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'next-token')
+  assert.equal(pageB.data.done, true)
+  assert.equal(posts, 1)
+})
+
+test('RP-10 resume-parse：匿名终态缺少令牌时不释放意图，同一次重查补回同一对请求头', async () => {
+  const wx = createWx()
+  const posts = []
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: (_payload, headers) => {
+        posts.push(headers)
+        return posts.length === 1
+          ? Promise.resolve({ taskId: 'T-missing', status: 'completed', accessToken: '' })
+          : Promise.resolve({ taskId: 'T-missing', status: 'completed', accessToken: 'recovered-token' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F-missing', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(wx.calls.getRandomValues.length, 2)
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.done, false)
+  assert.equal(page.data.intentReplay, true)
+  assert.equal(page.data.pendingTaskId, 'T-missing')
+  assert.equal(wx.calls.redirectTo.length, 0)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  const saved = wx.storage.get(realStorage.KEYS.RESUME_TASK)
+  assert.ok(!saved || !saved.accessToken)
+  assert.ok(!saved || !saved.settledIntent)
+  page.confirmResubmit()
+  assert.equal(wx.calls.showModal.length, 0, '没有令牌时不得另铸意图')
+  page.replayKnown()
+  await flush()
+  assert.equal(posts.length, 2)
+  assert.equal(posts[0]['x-resume-parse-intent'], posts[1]['x-resume-parse-intent'])
+  assert.equal(posts[0]['x-resume-parse-proof'], posts[1]['x-resume-parse-proof'])
+  assert.equal(wx.calls.getRandomValues.length, 2, '同一次重查不得新取随机数')
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_TASK).accessToken, 'recovered-token')
+  assert.equal(page.data.done, true)
+  assert.equal((wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT) || []).length, 0)
+
+  const wxFailed = createWx()
+  const pageFailed = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxFailed,
+    api: { parseResume: () => Promise.resolve({ taskId: 'T-failed', status: 'failed', failReason: '解析失败' }) },
+  })
+  pageFailed.onLoad({ fileId: 'F-failed', fileFormat: 'pdf' })
+  await flush()
+  assert.notEqual(pageFailed.data.phase, 'failed', '没有令牌的失败态不能当成可以查看的结果')
+  assert.equal(pageFailed.data.phase, 'unknown')
+  assert.equal(pageFailed.data.intentReplay, true)
+  assert.equal(wxFailed.calls.redirectTo.length, 0)
+  assert.equal(wxFailed.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  pageFailed.confirmResubmit()
+  assert.equal(wxFailed.calls.showModal.length, 0)
+})
+
+test('RP-11 resume-parse：可信额度 429 只释放匹配意图；丢写和文件 404 保留原标识', async () => {
+  const quota = { statusCode: 429, code: 'AI_PUBLIC_QUOTA_EXCEEDED', message: '今日额度已用完' }
+  const wx = createWx()
+  const posts = []
+  const api = { parseResume: (payload, headers) => {
+    posts.push({ payload, headers })
+    return Promise.reject(quota)
+  } }
+  const first = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), wx, api })
+  first.onLoad({ fileId: 'F-quota-a', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts.length, 1, '额度拒绝后不得自动二次提交')
+  assert.equal(first.data.phase, 'failed')
+  assert.equal(first.data.quotaReleased, true)
+  assert.equal(first.data.quotaReleaseBlocked, false)
+  assert.equal(wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 0)
+  assert.equal(wx.storage.has(realStorage.KEYS.RESUME_TASK), false)
+
+  const second = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), wx, api })
+  second.onLoad({ fileId: 'F-quota-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts.length, 2, '明确换材料后才开始另一次')
+  assert.notEqual(posts[0].headers['x-resume-parse-intent'], posts[1].headers['x-resume-parse-intent'])
+  assert.equal(second.data.quotaReleased, true)
+
+  const wxLoss = createWx()
+  const realSet = wxLoss.setStorageSync
+  let loseClear = true
+  wxLoss.setStorageSync = (key, value) => {
+    if (loseClear && key === realStorage.KEYS.RESUME_PARSE_INTENT && Array.isArray(value) && value.length === 0) return
+    realSet(key, value)
+  }
+  const lossPosts = []
+  const lossApi = { parseResume: (payload, headers) => {
+    lossPosts.push(headers)
+    return Promise.reject(quota)
+  } }
+  const blocked = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), wx: wxLoss, api: lossApi })
+  blocked.onLoad({ fileId: 'F-loss', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(blocked.data.quotaReleaseBlocked, true)
+  assert.equal(blocked.data.quotaReleased, false)
+  assert.equal(wxLoss.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  blocked.retry()
+  await flush()
+  assert.equal(lossPosts.length, 1, '清盘丢写时不能另铸标识或 POST')
+  loseClear = false
+  const recovered = makePage('pages/resume-parse/resume-parse.js', { auth: createAuth(null), wx: wxLoss, api: lossApi })
+  recovered.onLoad({ fileId: 'F-loss', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(lossPosts.length, 2)
+  assert.equal(lossPosts[0]['x-resume-parse-intent'], lossPosts[1]['x-resume-parse-intent'])
+  assert.equal(recovered.data.quotaReleased, true)
+
+  const wxChanged = createWx()
+  const changedReply = deferred()
+  let changedPosts = 0
+  const changed = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxChanged,
+    api: { parseResume: () => { changedPosts += 1; return changedReply.promise } },
+  })
+  changed.onLoad({ fileId: 'F-changed', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  const row = wxChanged.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT)[0]
+  wxChanged.storage.set(realStorage.KEYS.RESUME_PARSE_INTENT, [{ ...row, payload: { ...row.payload, fileId: 'F-other' } }])
+  changedReply.reject(quota)
+  await flush()
+  assert.equal(changed.data.quotaReleaseBlocked, true)
+  assert.equal(wxChanged.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT)[0].payload.fileId, 'F-other')
+  changed.retry()
+  assert.equal(changedPosts, 1, '盘上材料对不上时不能清除或重提')
+
+  const wxSwitched = createWx()
+  const switchedAuth = createAuth('member-a')
+  const switchedReply = deferred()
+  const switched = makePage('pages/resume-parse/resume-parse.js', {
+    auth: switchedAuth, wx: wxSwitched,
+    api: { parseResume: () => switchedReply.promise },
+  })
+  switched.onLoad({ fileId: 'F-owner', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  switchedAuth.setUser('member-b')
+  switchedReply.reject(quota)
+  await flush()
+  assert.equal(wxSwitched.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1, '换人后的旧答复不能清意图')
+
+  const wx404 = createWx()
+  const keptHeaders = []
+  const missing = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wx404,
+    api: { parseResume: (_payload, headers) => {
+      keptHeaders.push(headers)
+      return Promise.reject({ statusCode: 404, code: 'FILE_NOT_FOUND', message: '文件已失效' })
+    } },
+  })
+  missing.onLoad({ fileId: 'F-missing', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(wx404.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT).length, 1)
+  missing.retry()
+  await flush()
+  assert.equal(keptHeaders.length, 2)
+  assert.equal(keptHeaders[0]['x-resume-parse-intent'], keptHeaders[1]['x-resume-parse-intent'])
+  assert.equal(missing.data.fileChanged, false)
+  assert.equal(missing.data.terminalCharge, false)
+})
+
+test('RP-12 resume-parse：终态 4xx 只在回读匹配时给出明确退路，不自动再解析', async () => {
+  const intentOf = (wx) => wx.storage.get(realStorage.KEYS.RESUME_PARSE_INTENT) || []
+  const headerOf = (headers) => headers['x-resume-parse-intent']
+
+  const revoked = { statusCode: 409, code: 'RESUME_PARSE_INTENT_REVOKED', message: '这次解析已撤销' }
+  const wx = createWx()
+  const posts = []
+  const modal = []
+  wx.showModal = (opts) => { modal.push(opts) }
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: { parseResume: (_payload, headers) => {
+      posts.push(headers)
+      return posts.length === 1
+        ? Promise.reject(revoked)
+        : Promise.resolve({ taskId: 'T-new', status: 'completed', accessToken: 'new-token' })
+    } },
+  })
+  page.onLoad({ fileId: 'F-revoked', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts.length, 1)
+  assert.equal(page.data.phase, 'unknown')
+  assert.equal(page.data.terminalCharge, true)
+  assert.equal(page.data.terminalTitle, '这次解析已撤销')
+  assert.equal(page.data.quotaReleased, false)
+  assert.equal(page.data.fileChanged, false)
+  assert.match(page.data.unknownCause, /已撤销/)
+  assert.doesNotMatch(page.data.unknownCause, /没有调用模型/)
+  assert.equal(intentOf(wx).length, 1)
+  const kept = headerOf(posts[0])
+  page.replaySame()
+  page.retry()
+  await flush()
+  assert.equal(posts.length, 1, '撤销后同一次重查和失败重试都不得再 POST')
+  page.confirmResubmit()
+  assert.equal(modal.length, 1)
+  assert.match(modal[0].content, /再调用一次 AI/)
+  modal[0].success({ confirm: false })
+  assert.equal(posts.length, 1)
+  assert.equal(intentOf(wx)[0].intent, kept)
+  page.confirmResubmit()
+  modal[1].success({ confirm: true })
+  assert.equal(modal.length, 3)
+  assert.match(modal[2].content, /已结束的解析标识/)
+  modal[2].success({ confirm: false })
+  assert.equal(posts.length, 1, '第二次确认取消后不得清除或提交')
+  assert.equal(intentOf(wx)[0].intent, kept)
+  page.confirmResubmit()
+  modal[3].success({ confirm: true })
+  modal[4].success({ confirm: true })
+  await flush()
+  await flush()
+  assert.equal(posts.length, 2)
+  assert.notEqual(headerOf(posts[1]), kept)
+  assert.equal(page.data.done, true)
+
+  for (const [code, snippet] of [
+    ['RESUME_PARSE_RESULT_EXPIRED', /已过期/],
+    ['RESUME_PARSE_RESULT_MISSING', /已不在/],
+  ]) {
+    const box = createWx()
+    const calls = []
+    const sample = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx: box,
+      api: { parseResume: (_payload, headers) => {
+        calls.push(headers)
+        return Promise.reject({ statusCode: 404, code, message: '结果不可用' })
+      } },
+    })
+    sample.onLoad({ fileId: `F-${code}`, fileName: 'a.pdf', fileFormat: 'pdf' })
+    await flush()
+    assert.equal(sample.data.terminalCharge, true, code)
+    assert.match(sample.data.terminalTitle, snippet, code)
+    assert.match(sample.data.unknownCause, snippet)
+    assert.equal(intentOf(box).length, 1)
+    sample.replaySame()
+    await flush()
+    assert.equal(calls.length, 1, code)
+  }
+
+  const changed = { statusCode: 409, code: 'FILE_CONTENT_CHANGED', message: '文件内容已变化' }
+  const wxFile = createWx()
+  const filePosts = []
+  const filePage = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxFile,
+    api: { parseResume: (_payload, headers) => {
+      filePosts.push(headers)
+      return Promise.reject(changed)
+    } },
+  })
+  filePage.onLoad({ fileId: 'F-changed', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(filePage.data.phase, 'failed')
+  assert.equal(filePage.data.fileChanged, true)
+  assert.equal(filePage.data.quotaReleased, false)
+  assert.equal(filePage.data.terminalCharge, false)
+  assert.match(filePage.data.failMsg, /没有调用模型/)
+  assert.equal(intentOf(wxFile).length, 0)
+  filePage.retry()
+  filePage.replaySame()
+  await flush()
+  assert.equal(filePosts.length, 1, '内容变化后不得用同一份文件自动或手动再解析')
+
+  const wxLoss = createWx()
+  const realSet = wxLoss.setStorageSync
+  wxLoss.setStorageSync = (key, value) => {
+    if (key === realStorage.KEYS.RESUME_PARSE_INTENT && Array.isArray(value) && value.length === 0) return
+    realSet(key, value)
+  }
+  const lossPosts = []
+  const lossPage = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxLoss,
+    api: { parseResume: (_payload, headers) => {
+      lossPosts.push(headers)
+      return Promise.reject(changed)
+    } },
+  })
+  lossPage.onLoad({ fileId: 'F-loss', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(lossPage.data.fileChangedBlocked, true)
+  assert.equal(lossPage.data.fileChanged, false)
+  assert.equal(intentOf(wxLoss).length, 1)
+  lossPage.retry()
+  await flush()
+  assert.equal(lossPosts.length, 1)
+
+  const wxDrift = createWx()
+  const driftReply = deferred()
+  const drift = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxDrift,
+    api: { parseResume: () => driftReply.promise },
+  })
+  drift.onLoad({ fileId: 'F-drift', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  const row = intentOf(wxDrift)[0]
+  wxDrift.storage.set(realStorage.KEYS.RESUME_PARSE_INTENT, [{ ...row, payload: { ...row.payload, fileId: 'F-other' } }])
+  driftReply.reject(changed)
+  await flush()
+  assert.equal(drift.data.fileChangedBlocked, true)
+  assert.equal(intentOf(wxDrift)[0].payload.fileId, 'F-other')
+
+  const conservative = [
+    { statusCode: 404, code: 'FILE_NOT_FOUND' },
+    { statusCode: 409, code: 'RESUME_PARSE_INTENT_PAYLOAD_MISMATCH' },
+    { statusCode: 500, code: 'RESUME_PARSE_INTENT_REVOKED' },
+    { statusCode: 408, code: 'FILE_CONTENT_CHANGED' },
+    { statusCode: 404, code: 'AI_TASK_NOT_FOUND' },
+    { statusCode: 429, code: 'FILE_CONTENT_CHANGED' },
+  ]
+  for (const err of conservative) {
+    const box = createWx()
+    const calls = []
+    const sample = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx: box,
+      api: { parseResume: (_payload, headers) => {
+        calls.push(headers)
+        return Promise.reject(err)
+      } },
+    })
+    sample.onLoad({ fileId: `F-${err.statusCode}-${err.code}`, fileName: 'a.pdf', fileFormat: 'pdf' })
+    await flush()
+    assert.equal(sample.data.fileChanged, false, err.code)
+    assert.equal(sample.data.terminalCharge, false, err.code)
+    assert.equal(sample.data.quotaReleased, false, err.code)
+    assert.equal(intentOf(box).length, 1, err.code)
+    const keptIntent = headerOf(calls[0])
+    if (sample.data.phase === 'unknown') sample.replaySame()
+    else sample.retry()
+    await flush()
+    assert.equal(calls.length, 2, `${err.statusCode} ${err.code}`)
+    assert.equal(headerOf(calls[1]), keptIntent, err.code)
+  }
+})
+
+// 新材料撞上另一条未落定意图：空 _intent 不得谎报登录变化。同一归属两次确认才新开。
+test('RP-13 resume-parse：INTENT_CONFLICT 同一归属两次确认才新开，别人的标识只停住', async () => {
+  const intentKey = realStorage.KEYS.RESUME_PARSE_INTENT
+  const rows = (wx) => wx.storage.get(intentKey) || []
+  async function park(wx, auth, fileId) {
+    const gate = deferred()
+    const page = makePage('pages/resume-parse/resume-parse.js', {
+      auth, wx, api: { parseResume: () => gate.promise },
+    })
+    page.onLoad({ fileId, fileName: `${fileId}.pdf`, fileFormat: 'pdf' })
+    await flush()
+    page.onUnload()
+    return rows(wx)[0].intent
+  }
+  function modals(wx) {
+    const modal = []
+    wx.showModal = (opts) => { modal.push(opts) }
+    return modal
+  }
+
+  const wx = createWx()
+  const auth = createAuth(null)
+  const oldIntent = await park(wx, auth, 'file-a')
+  const modal = modals(wx)
+  const seen = []
+  let posts = 0
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth, wx,
+    api: {
+      parseResume: (payload, headers) => {
+        posts += 1
+        seen.push({ payload, headers })
+        return Promise.resolve({ taskId: 'T-fresh', status: 'completed', accessToken: 'fresh-token' })
+      },
+    },
+  })
+  page.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(posts, 0)
+  assert.equal(page._intent || '', '')
+  assert.equal(page.data.conflict, 'fresh')
+  assert.match(page.data.unknownCause, /可能已经完成/)
+  assert.doesNotMatch(page.data.unknownCause, /尚未完成|登录状态已变化/)
+  page.replaySame()
+  page.retry()
+  await flush()
+  assert.equal(posts, 0)
+  page.confirmResubmit()
+  assert.equal(modal.length, 1)
+  assert.doesNotMatch(modal[0].content, /未完成/)
+  modal[0].success({ confirm: false })
+  assert.equal(rows(wx)[0].intent, oldIntent)
+  page.confirmResubmit()
+  modal[1].success({ confirm: true })
+  modal[2].success({ confirm: false })
+  assert.equal(posts, 0)
+  assert.equal(rows(wx)[0].intent, oldIntent)
+  page.confirmResubmit()
+  modal[3].success({ confirm: true })
+  modal[4].success({ confirm: true })
+  await flush(); await flush()
+  assert.equal(posts, 1)
+  assert.equal(seen[0].payload.fileId, 'file-b')
+  assert.notEqual(seen[0].headers['x-resume-parse-intent'], oldIntent)
+  assert.equal(page.data.done, true)
+
+  const wxOther = createWx()
+  const foreign = await park(wxOther, createAuth('member-a'), 'file-a')
+  const modalOther = modals(wxOther)
+  let otherPosts = 0
+  const pageOther = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth('member-b'), wx: wxOther,
+    api: { parseResume: () => { otherPosts += 1; return Promise.resolve({ taskId: 'T-other', status: 'completed' }) } },
+  })
+  pageOther.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(pageOther.data.conflict, 'blocked')
+  assert.doesNotMatch(pageOther.data.unknownCause, /登录状态已变化/)
+  pageOther.confirmResubmit()
+  pageOther.replaySame()
+  pageOther._startFresh()
+  await flush()
+  assert.equal(modalOther.length, 0)
+  assert.equal(otherPosts, 0)
+  assert.equal(rows(wxOther)[0].intent, foreign)
+  assert.equal(rows(wxOther)[0].ownerId, 'member-a')
+
+  const wxGen = createWx()
+  const authGen = createAuth('member-a')
+  const genIntent = await park(wxGen, authGen, 'file-a')
+  const modalGen = modals(wxGen)
+  let genPosts = 0
+  const pageGen = makePage('pages/resume-parse/resume-parse.js', {
+    auth: authGen, wx: wxGen,
+    api: { parseResume: () => { genPosts += 1; return Promise.resolve({ taskId: 'T-gen', status: 'completed' }) } },
+  })
+  pageGen.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  authGen.logout()
+  authGen.setUser('member-a')
+  pageGen.confirmResubmit()
+  modalGen[0].success({ confirm: true })
+  modalGen[1].success({ confirm: true })
+  await flush(); await flush()
+  assert.equal(genPosts, 0)
+  assert.equal(rows(wxGen)[0].intent, genIntent)
+  assert.equal(pageGen.data.conflict, 'blocked')
+  assert.match(pageGen.data.unknownCause, /登录状态已变化/)
+
+  const wxDrift = createWx()
+  const driftIntent = await park(wxDrift, createAuth(null), 'file-a')
+  const modalDrift = modals(wxDrift)
+  let driftPosts = 0
+  const pageDrift = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxDrift,
+    api: { parseResume: () => { driftPosts += 1; return Promise.resolve({ taskId: 'T-drift', status: 'completed', accessToken: 'tok' }) } },
+  })
+  pageDrift.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  const drifted = rows(wxDrift)[0]
+  wxDrift.storage.set(intentKey, [{ ...drifted, payload: { ...drifted.payload, fileId: 'file-other' } }])
+  pageDrift.confirmResubmit()
+  modalDrift[0].success({ confirm: true })
+  modalDrift[1].success({ confirm: true })
+  await flush(); await flush()
+  assert.equal(driftPosts, 0)
+  assert.equal(rows(wxDrift)[0].intent, driftIntent)
+  assert.equal(rows(wxDrift)[0].payload.fileId, 'file-other')
+  assert.equal(pageDrift.data.conflict, 'blocked')
+  assert.doesNotMatch(pageDrift.data.unknownCause, /登录状态已变化/)
+})
+
+// 已保存结果可以继续这次提交，但清除必须绑住当时的 owner、intent、payload 和任务行。
+// 任务行或载荷在 clear 之前变了，就不能把 INTENT_NOT_FOUND 当成成功，也不能自动 POST。
+test('RP-14 resume-parse：已保存结果只在任务行仍对得上时释放，变了就不清、不提交', async () => {
+  const intentKey = realStorage.KEYS.RESUME_PARSE_INTENT
+  const taskKey = realStorage.KEYS.RESUME_TASK
+  const rows = (wx) => wx.storage.get(intentKey) || []
+
+  async function seedSettled(wx, auth, fileId) {
+    const gate = deferred()
+    const page = makePage('pages/resume-parse/resume-parse.js', {
+      auth, wx, api: { parseResume: () => gate.promise },
+    })
+    page.onLoad({ fileId, fileName: `${fileId}.pdf`, fileFormat: 'pdf' })
+    await flush()
+    const intent = rows(wx)[0].intent
+    page.onUnload()
+    wx.storage.set(taskKey, {
+      taskId: 'T-old',
+      accessToken: 'old-token',
+      fileId,
+      fileName: `${fileId}.pdf`,
+      ts: 1,
+      settledIntent: intent,
+    })
+    return intent
+  }
+
+  const wxOk = createWx()
+  const oldOk = await seedSettled(wxOk, createAuth(null), 'file-a')
+  const modalOk = []
+  wxOk.showModal = (opts) => { modalOk.push(opts) }
+  const seen = []
+  let posts = 0
+  const pageOk = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxOk,
+    api: {
+      parseResume: (payload, headers) => {
+        posts += 1
+        seen.push({ payload, headers })
+        return Promise.resolve({ taskId: 'T-new', status: 'completed', accessToken: 'new-token' })
+      },
+    },
+  })
+  pageOk.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush(); await flush()
+  assert.equal(posts, 1)
+  assert.equal(modalOk.length, 0, '已保存结果对得上时，继续这次提交不必再确认两次')
+  assert.equal(seen[0].payload.fileId, 'file-b')
+  assert.notEqual(seen[0].headers['x-resume-parse-intent'], oldOk)
+  assert.equal(pageOk.data.done, true)
+
+  const wxTask = createWx()
+  const authTask = createAuth(null)
+  const oldTask = await seedSettled(wxTask, authTask, 'file-a')
+  const realGetTask = wxTask.getStorageSync
+  let taskReads = 0
+  wxTask.getStorageSync = (key) => {
+    const value = realGetTask(key)
+    if (key !== taskKey) return value
+    taskReads += 1
+    if (taskReads < 2) return value
+    const moved = { ...value, taskId: 'T-moved', settledIntent: 'not-settled', accessToken: 'other-token' }
+    wxTask.storage.set(taskKey, moved)
+    return moved
+  }
+  let taskPosts = 0
+  const pageTask = makePage('pages/resume-parse/resume-parse.js', {
+    auth: authTask, wx: wxTask,
+    api: { parseResume: () => { taskPosts += 1; return Promise.resolve({ taskId: 'T-task', status: 'completed', accessToken: 'tok' }) } },
+  })
+  pageTask.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush(); await flush()
+  assert.ok(taskReads >= 2, '释放前必须再读已保存的任务行')
+  assert.equal(taskPosts, 0)
+  assert.equal(rows(wxTask)[0].intent, oldTask)
+  assert.equal(rows(wxTask)[0].payload.fileId, 'file-a')
+  assert.equal(pageTask.data.conflict, 'fresh')
+  assert.equal(wxTask.calls.showModal.length, 0)
+  pageTask.confirmResubmit()
+  wxTask.calls.showModal[0].success({ confirm: false })
+  await flush()
+  assert.equal(taskPosts, 0, '任务行变了之后，一次确认也不能提交')
+  assert.equal(rows(wxTask)[0].intent, oldTask)
+
+  const wxPayload = createWx()
+  const oldPayload = await seedSettled(wxPayload, createAuth(null), 'file-a')
+  const realGetPayload = wxPayload.getStorageSync
+  let intentReads = 0
+  wxPayload.getStorageSync = (key) => {
+    if (key !== intentKey) return realGetPayload(key)
+    intentReads += 1
+    if (intentReads < 3) return realGetPayload(key)
+    const held = wxPayload.storage.get(intentKey)
+    const mutated = [{ ...held[0], payload: { ...held[0].payload, fileId: 'file-other' } }]
+    wxPayload.storage.set(intentKey, mutated)
+    return mutated
+  }
+  let payloadPosts = 0
+  const pagePayload = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxPayload,
+    api: { parseResume: () => { payloadPosts += 1; return Promise.resolve({ taskId: 'T-payload', status: 'completed', accessToken: 'tok' }) } },
+  })
+  pagePayload.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush(); await flush()
+  assert.ok(intentReads >= 3, '释放前必须再读本机标识')
+  assert.equal(payloadPosts, 0)
+  assert.equal(rows(wxPayload)[0].intent, oldPayload)
+  assert.equal(rows(wxPayload)[0].payload.fileId, 'file-other', '载荷已变的行不能被清掉')
+  assert.equal(pagePayload.data.conflict, 'fresh')
+  assert.doesNotMatch(pagePayload.data.unknownCause, /登录状态已变化/)
+
+  const wxGen = createWx()
+  const authGen = createAuth('member-a')
+  const oldGen = await seedSettled(wxGen, authGen, 'file-a')
+  const realGetGen = wxGen.getStorageSync
+  let genReads = 0
+  wxGen.getStorageSync = (key) => {
+    const value = realGetGen(key)
+    if (key === taskKey) {
+      genReads += 1
+      if (genReads >= 2) {
+        authGen.logout()
+        authGen.setUser('member-a')
+      }
+    }
+    return value
+  }
+  let genPosts = 0
+  const pageGen = makePage('pages/resume-parse/resume-parse.js', {
+    auth: authGen, wx: wxGen,
+    api: { parseResume: () => { genPosts += 1; return Promise.resolve({ taskId: 'T-gen', status: 'completed' }) } },
+  })
+  pageGen.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush(); await flush()
+  assert.ok(genReads >= 2)
+  assert.equal(genPosts, 0)
+  assert.equal(rows(wxGen)[0].intent, oldGen)
+  assert.equal(rows(wxGen)[0].ownerId, 'member-a')
+  assert.equal(pageGen.data.conflict, 'blocked')
+  assert.match(pageGen.data.unknownCause, /登录状态已变化/)
+  assert.equal(wxGen.calls.showModal.length, 0)
+
+  const wxAnon = createWx()
+  const oldAnon = await seedSettled(wxAnon, createAuth(null), 'file-a')
+  const task = wxAnon.storage.get(taskKey)
+  wxAnon.storage.set(taskKey, { ...task, accessToken: '' })
+  let anonPosts = 0
+  const pageAnon = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxAnon,
+    api: { parseResume: () => { anonPosts += 1; return Promise.resolve({ taskId: 'T-anon', status: 'completed', accessToken: 'tok' }) } },
+  })
+  pageAnon.onLoad({ fileId: 'file-b', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  assert.equal(anonPosts, 0)
+  assert.equal(pageAnon.data.conflict, 'blocked')
+  assert.equal(rows(wxAnon)[0].intent, oldAnon)
+  pageAnon.confirmResubmit()
+  pageAnon._startFresh()
+  await flush()
+  assert.equal(wxAnon.calls.showModal.length, 0)
+  assert.equal(anonPosts, 0)
+  assert.equal(rows(wxAnon)[0].intent, oldAnon)
+})
+
+// 后端对「不存在 / 已清理 / 令牌缺失或不符 / 非本人」一律 404 + AI_TASK_NOT_FOUND（防枚举）。
+// 这不是终态：会员任务在换回提交时的账号后，同一编号可能又读得到。页面既不能说「再查也一样」、
+// 收掉同编号查询，也不能因此自动发新 POST；新的一次只能在用户确认重复风险之后。
+test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（换回账号后读到），新一次须确认；网络/5xx/无码 404 仍是暂时失败', async () => {
+  const NOT_FOUND = { statusCode: 404, code: 'AI_TASK_NOT_FOUND', message: '' }
+
+  // ① 盘上没有本次意图的旧任务：404+AI_TASK_NOT_FOUND → not-found；取消新一次；身份未恢复再查仍 not-found；恢复后同编号读到。
+  const wx = createWx()
+  const modal = []
+  wx.showModal = (opts) => { modal.push(opts) }
+  let posts = 0
+  const reads = []
+  let restored = false
+  const page = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx,
+    api: {
+      parseResume: () => { posts += 1; return Promise.resolve({ taskId: 'T1', status: 'pending', accessToken: 'tok' }) },
+      getResumeRecord: (taskId, token) => {
+        reads.push({ taskId, token })
+        return restored ? Promise.resolve({ taskId: 'T1', status: 'completed' }) : Promise.reject(NOT_FOUND)
+      },
+    },
+  })
+  page.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+  await flush()
+  wx.removeStorageSync(realStorage.KEYS.RESUME_PARSE_INTENT)
+  page._timers[page._timers.length - 1]()
+  await flush()
+  assert.equal(page.data.phase, 'unknown', '查不到不等于解析失败')
+  assert.equal(page.data.pendingTaskId, 'T1')
+  assert.equal(page.data.recheck, 'not-found')
+  assert.match(page.data.unknownCause, /当前的登录状态和读取凭证/)
+  assert.doesNotMatch(page.data.unknownCause, /不存在|已删除|网络/, '防枚举：不替后端下结论，也不说成网络问题')
+  page.retry()
+  assert.equal(posts, 1, '旧「重试解析」不能绕过确认')
+  page.confirmResubmit()
+  assert.equal(modal.length, 1, 'not-found 时可选新的一次，但先确认')
+  assert.match(modal[0].content, /重复解析/)
+  modal[0].success({ confirm: false })
+  assert.equal(posts, 1, '取消后不得 POST')
+  page.recheck()
+  await flush()
+  assert.equal(page.data.recheck, 'not-found', '身份没换回来，再查仍是查不到')
+  restored = true // 用户换回提交时的账号
+  page.recheck()
+  await flush()
+  assert.equal(page.data.done, true, '换回身份后同一编号读到结果')
+  assert.equal(reads.length, 3)
+  assert.ok(reads.every((r) => r.taskId === 'T1'), '全程只按同一编号读')
+  assert.equal(posts, 1, '全程没有自动二次 POST')
+  page._timers[page._timers.length - 1]()
+  assert.equal(wx.calls.redirectTo[0], '/pages/resume-diagnose/resume-diagnose?taskId=T1')
+
+  // ② 手动再查：意图还在时 404 是未就绪，不开放新一次。去掉意图的旧任务才是 not-found，新一次仍要两次确认。
+  for (const [err, expected, legacy] of [
+    [{ statusCode: -1 }, 'error', false],
+    [{ statusCode: 503, code: 'AI_PROVIDER_ERROR' }, 'error', false],
+    [{ statusCode: 404 }, 'error', false],
+    [NOT_FOUND, 'not-ready', false],
+    [NOT_FOUND, 'not-found', true],
+  ]) {
+    const wx2 = createWx()
+    const modal2 = []
+    wx2.showModal = (opts) => { modal2.push(opts) }
+    let n = 0
+    let posts2 = 0
+    const page2 = makePage('pages/resume-parse/resume-parse.js', {
+      auth: createAuth(null), wx: wx2,
+      api: {
+        parseResume: () => { posts2 += 1; return Promise.resolve({ taskId: posts2 === 1 ? 'T1' : 'T2', status: posts2 === 1 ? 'pending' : 'completed', accessToken: 'tok' }) },
+        getResumeRecord: () => { n += 1; return Promise.reject(n === 1 ? { statusCode: -1 } : err) },
+      },
+    })
+    page2.onLoad({ fileId: 'F1', fileFormat: 'pdf' })
+    await flush()
+    page2._timers[page2._timers.length - 1]()
+    await flush()
+    assert.equal(page2.data.recheck, 'idle', '首轮断网仍可再查')
+    if (legacy) wx2.removeStorageSync(realStorage.KEYS.RESUME_PARSE_INTENT)
+    page2.recheck()
+    await flush()
+    assert.equal(page2.data.recheck, expected, `再查遇到 ${err.statusCode}/${err.code || '无码'} 应为 ${expected}`)
+    if (!legacy && err.code === 'AI_TASK_NOT_FOUND') assert.equal(page2.data.intentReplay, true)
+    page2.recheck()
+    await flush()
+    assert.equal(n, 3, '任何一种都保留同编号再查')
+    page2.confirmResubmit()
+    assert.equal(modal2.length, expected === 'not-found' ? 1 : 0, '只有没有意图的 not-found 才开放新一次')
+    if (expected === 'not-found') {
+      modal2[0].success({ confirm: true })
+      modal2[1].success({ confirm: true })
+      await flush()
+      assert.equal(posts2, 2, '两次确认并清除旧意图后才发新的一次，且只一次')
+      assert.equal(page2.data.done, true)
+      assert.equal(page2.data.pendingTaskId, '')
+    } else {
+      assert.equal(posts2, 1)
+    }
+  }
+
+  // ③ 视图：不得断言「再查也一样」；有编号就保留「查询本次结果」；not-found 给核对身份与确认后的新一次；链接 48px + 按压反馈 + 按钮语义。
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/resume-parse/resume-parse.wxml'), 'utf8')
+  const wxss = fs.readFileSync(path.join(MINIAPP, 'pages/resume-parse/resume-parse.wxss'), 'utf8')
+  assert.doesNotMatch(wxml, /同样结果|不必再等|再查也会/, '身份恢复后可能读得到，不得断言再查无用')
+  assert.match(wxml, /<button wx:elif="\{\{pendingTaskId\}\}"[^>]*bindtap="recheck"/, '没有意图重放时，有编号仍按同一编号查询')
+  assert.match(wxml, /<button wx:elif="\{\{pendingTaskId && intentReplay\}\}"[^>]*bindtap="replayKnown"/, '意图仍在时优先同一次重查')
+  assert.match(wxml, /<button wx:if="\{\{settleBlocked\}\}"[^>]*bindtap="retrySettle"/, '凭证已保存但意图没释放时只重试释放')
+  assert.match(wxml, /换回提交时的账号/)
+  const queryable = wxml.match(/<view wx:elif="\{\{phase === 'unknown' && pendingTaskId && recheck !== 'not-found' && !intentReplay\}\}" class="notice warn">([\s\S]*?)<\/view>\s*<\/view>/)
+  assert.ok(queryable, '有编号可查时要有单独的提示')
+  assert.doesNotMatch(queryable[1], /手动重新提交|重新提交会/, '这一态页面上没有重提入口，不得声称可以手动重提')
+  const links = wxml.match(/<view[^>]*class="unknown-link[^"]*"[^>]*>/g) || []
+  assert.ok(links.some((l) => /recheck === 'not-found'/.test(l) && /bindtap="confirmResubmit"/.test(l)), 'not-found 给确认后的新一次')
+  assert.ok(links.some((l) => /recheck === 'not-found'/.test(l) && /bindtap="toAiRecords"/.test(l)), 'not-found 给核对身份的出口')
+  for (const l of links) {
+    assert.match(l, /hover-class="tap-press"/)
+    assert.match(l, /role="button"/)
+    assert.match(l, /aria-label="/)
+  }
+  const linkCss = wxss.match(/\.unknown-link\s*\{([^}]*)\}/)
+  assert.ok(linkCss)
+  assert.match(linkCss[1], /min-height:\s*48px/)
 })

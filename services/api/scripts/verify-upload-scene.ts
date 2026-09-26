@@ -17,9 +17,14 @@ import 'reflect-metadata'
  * ③ 兑换会轮换 uploadToken：旧网页二维码当场作废；
  * ④ 失败路径不当预言机：格式错/查无此码/已过期/已用掉，对外是同一个错误码。
  */
+import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { createConnection, createServer } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Redis } from 'ioredis'
-import { RedisService } from '../src/common/redis/redis.service'
+import { RedisService, UPLOAD_SESSION_PHASE_UNCHECKED } from '../src/common/redis/redis.service'
 import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
 import { isWellFormedSceneToken, sceneIndexKey } from '../src/upload-sessions/upload-scene'
 import { startInMemoryRedis } from './support/inmemory-redis-server'
@@ -64,7 +69,59 @@ async function main(): Promise<void> {
        * 「取 TTL；TTL<=0 就不写；否则按原 TTL SET 回去」。
        * 这里用 TTL + SETEX 忠实复刻它的语义 —— 兑换时那次**写入是真的发生的**。
        */
-      eval: async (_script: string, _numKeys: string, key: string, value: string) => {
+      eval: async (script: string, numKeys: number, ...rest: string[]) => {
+        const keyCount = Number(numKeys)
+        const keys = rest.slice(0, keyCount)
+        const args = rest.slice(keyCount)
+        // compareAndSetSession：锁、状态、无文件、TTL 同一次判断后才写。
+        if (script.includes('UPLOAD_SESSION_COMMIT')) {
+          const sessionKey = keys[0] ?? ''
+          const lockKey = keys[1] ?? ''
+          const [lockToken, nextValue, expectedStatus, expectedFile, expectedPhase, cleanupValue, cleanupTtl, indexScore, indexMember] = args
+          const ttl = await client.ttl(sessionKey)
+          if (ttl <= 0) return 0
+          if ((await client.get(lockKey)) !== lockToken) return -1
+          const raw = await client.get(sessionKey)
+          if (!raw) return 0
+          const session = JSON.parse(raw) as {
+            status?: string
+            file?: { fileId?: string } | null
+            bind?: { phase?: string } | null
+          }
+          const actualId = session.file?.fileId ?? null
+          if (session.status !== expectedStatus) return -2
+          if (!expectedFile) {
+            if (actualId) return -2
+          } else if (actualId !== expectedFile) {
+            return -2
+          }
+          if (expectedPhase !== undefined && expectedPhase !== UPLOAD_SESSION_PHASE_UNCHECKED) {
+            const actualPhase = session.bind?.phase ?? ''
+            if (expectedPhase === '' ? Boolean(actualPhase) : actualPhase !== expectedPhase) return -2
+          }
+          const cleanupKey = keys[2]
+          let parsedCleanupTtl = 0
+          if (cleanupKey && cleanupValue) {
+            parsedCleanupTtl = Number(cleanupTtl)
+            if (!Number.isFinite(parsedCleanupTtl) || parsedCleanupTtl <= 0) return -2
+          }
+          await client.setex(sessionKey, ttl, nextValue ?? '')
+          if (cleanupKey && cleanupValue && parsedCleanupTtl > 0) {
+            await client.setex(cleanupKey, parsedCleanupTtl, cleanupValue)
+            if (keys[3] && indexMember) await client.zadd(keys[3], indexScore ?? '0', indexMember)
+          }
+          return 1
+        }
+        const key = keys[0] ?? ''
+        const value = args[0] ?? ''
+        // getAndDelIfEquals：值相等才删。上传锁释放走这条，不能误当成 SETEX。
+        if (script.includes('redis.call(\'DEL\'')) {
+          const current = await client.get(key)
+          if (current === null) return 0
+          if (current !== value) return -1
+          await client.del(key)
+          return 1
+        }
         const ttl = await client.ttl(key)
         if (ttl <= 0) return 0
         await client.setex(key, ttl, value)
@@ -73,6 +130,34 @@ async function main(): Promise<void> {
     })
   }
   const redis = new RedisService(client as never)
+  {
+    await client.setex('upload_session:atomic', 60, JSON.stringify({ status: 'uploaded', file: { fileId: 'file_atomic' } }))
+    await client.setex('upload_session_upload_lock:atomic', 30, 'token-1')
+    const wrote = await redis.compareAndSetSession(
+      'upload_session:atomic',
+      'upload_session_upload_lock:atomic',
+      'token-1',
+      JSON.stringify({ status: 'uploaded', file: { fileId: 'file_atomic' }, bind: { phase: 'intent', fileId: 'file_atomic' } }),
+      'uploaded',
+      'file_atomic',
+      '',
+      {
+        key: 'upload_session_cleanup:atomic',
+        value: JSON.stringify({ file: { fileId: 'file_atomic' }, bind: { phase: 'intent' } }),
+        ttlSeconds: 60,
+        indexKey: 'upload_session_expiry_index',
+        indexScore: 1,
+        indexMember: 'atomic',
+      },
+    )
+    const mirrored = await client.get('upload_session_cleanup:atomic')
+    const sessionRaw = await client.get('upload_session:atomic')
+    check(
+      '会员确认意图同一次写入会话和清理记录',
+      wrote === 'updated' && Boolean(mirrored?.includes('file_atomic') && mirrored.includes('intent') && sessionRaw?.includes('intent')),
+    )
+    await client.del('upload_session:atomic', 'upload_session_upload_lock:atomic', 'upload_session_cleanup:atomic')
+  }
   const service = new UploadSessionsService(redis as never, null as never, null as never)
 
   const created = await service.create({
@@ -210,10 +295,117 @@ async function main(): Promise<void> {
 
   client.disconnect()
   await server?.close()
+  await checkPhaseSkipOnRealRedis()
 
   const failed = results.filter((r) => !r.ok)
   console.log(`\n${failed.length === 0 ? `✅ ALL PASS (${results.length} checks)` : `❌ ${failed.length} 项失败`} — 扫码上传场景码`)
   if (failed.length > 0) process.exit(1)
+}
+
+async function freeLoopbackPort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer()
+    probe.once('error', reject)
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address()
+      const port = typeof address === 'object' && address ? address.port : 0
+      probe.close(() => resolve(port))
+    })
+  })
+}
+
+/** 独立 redis-server 上跑 RedisService 的真 Lua。进程内桩不证明 ARGV 语义。 */
+async function checkPhaseSkipOnRealRedis(): Promise<void> {
+  const port = await freeLoopbackPort()
+  if (port === 0 || port === 6379) throw new Error(`refusing redis port ${port}`)
+  const dir = await mkdtemp(join(tmpdir(), 'upload-session-lua-'))
+  const child = spawn('redis-server', [
+    '--bind', '127.0.0.1',
+    '--port', String(port),
+    '--save', '',
+    '--appendonly', 'no',
+    '--daemonize', 'no',
+    '--protected-mode', 'yes',
+    '--dir', dir,
+  ], { stdio: ['pipe', 'ignore', 'pipe'] })
+  const deadline = Date.now() + 8_000
+  while (Date.now() < deadline) {
+    const open = await new Promise<boolean>((resolve) => {
+      const socket = createConnection({ host: '127.0.0.1', port })
+      socket.once('connect', () => {
+        socket.end()
+        resolve(true)
+      })
+      socket.once('error', () => resolve(false))
+    })
+    if (open) break
+    await new Promise((resolve) => setTimeout(resolve, 40))
+  }
+  const real = new Redis(`redis://127.0.0.1:${port}`, { maxRetriesPerRequest: 1, connectTimeout: 1000 })
+  try {
+    if ((await real.ping()) !== 'PONG') throw new Error('isolated redis did not answer ping')
+    const service = new RedisService(real as never)
+    await real.set('upload_session:phase', JSON.stringify({
+      status: 'uploaded',
+      file: { fileId: 'f1' },
+      bind: { phase: 'intent' },
+    }), 'EX', 60)
+    await real.set('upload_session_upload_lock:phase', 'tok', 'EX', 30)
+    const wrote = await service.compareAndSetSession(
+      'upload_session:phase',
+      'upload_session_upload_lock:phase',
+      'tok',
+      JSON.stringify({ status: 'uploaded', file: { fileId: 'f1' }, bind: { phase: 'copied' } }),
+      'uploaded',
+      'f1',
+      null,
+      {
+        key: 'upload_session_cleanup:phase',
+        value: '{"kept":1}',
+        ttlSeconds: 60,
+        indexKey: 'upload_session_expiry_index',
+        indexScore: 1,
+        indexMember: 'phase',
+      },
+    )
+    check(
+      '真实 Redis：不检查阶段时，已有 bind 仍能原子写入清理记录',
+      wrote === 'updated' && (await real.get('upload_session_cleanup:phase')) === '{"kept":1}',
+      `实际 ${wrote}`,
+    )
+    await real.set('upload_session:phase2', JSON.stringify({
+      status: 'uploaded',
+      file: { fileId: 'f2' },
+      bind: { phase: 'intent' },
+    }), 'EX', 60)
+    await real.set('upload_session_upload_lock:phase2', 'tok', 'EX', 30)
+    const blocked = await service.compareAndSetSession(
+      'upload_session:phase2',
+      'upload_session_upload_lock:phase2',
+      'tok',
+      JSON.stringify({ status: 'uploaded', file: { fileId: 'f2' } }),
+      'uploaded',
+      'f2',
+      '',
+      {
+        key: 'upload_session_cleanup:phase2',
+        value: '{"no":1}',
+        ttlSeconds: 60,
+        indexKey: 'upload_session_expiry_index',
+        indexScore: 2,
+        indexMember: 'phase2',
+      },
+    )
+    check(
+      '真实 Redis：空阶段仍要求当前没有 bind',
+      blocked === 'conflict' && (await real.get('upload_session_cleanup:phase2')) === null,
+      `实际 ${blocked}`,
+    )
+  } finally {
+    real.disconnect()
+    child.kill('SIGTERM')
+    await rm(dir, { recursive: true, force: true })
+  }
 }
 
 main().catch((e) => {

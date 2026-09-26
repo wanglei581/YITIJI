@@ -33,6 +33,11 @@ export interface CreatePrintJobInput {
   fileMd5?:  string
   fileName?: string
   params:    PrintJobParams
+  /**
+   * 用户在确认页看到并确认的应付金额（分）。服务端只拿它做一致性断言、绝不按它计价；
+   * 与服务端按最终文件重算的金额不一致 → 409，抛 PrintPriceChangedError，本次不建单。
+   */
+  quotedAmountCents: number
   token?:    string | null
 }
 
@@ -147,6 +152,41 @@ export async function quotePrintOrder(input: QuotePrintOrderInput): Promise<Prin
   }
 }
 
+/** 409 PRICE_CHANGED 带回的服务端现价（按最终打印文件重算）。 */
+export type PrintPriceChangedQuote = Pick<PrintOrderQuote, 'amountCents' | 'billablePages' | 'priceLines'>
+
+/**
+ * 服务端重算金额与用户确认的不一致，本次**没有**建单、没有支付会话。
+ * `currentQuote` 解析不出时为 null：调用方必须重新报价，不得沿用旧价，也不得自动重试建单。
+ */
+export class PrintPriceChangedError extends ApiHttpError {
+  constructor(message: string, public readonly currentQuote: PrintPriceChangedQuote | null) {
+    super('PRICE_CHANGED', message, 409)
+    this.name = 'PrintPriceChangedError'
+  }
+}
+
+/** 解析 details 里的 `key=value` 串（格式见 services/api print-jobs.service 的 priceChanged）。 */
+function parsePriceChangedQuote(details: unknown): PrintPriceChangedQuote | null {
+  if (!Array.isArray(details)) return null
+  const items = details.filter((d): d is string => typeof d === 'string')
+  const intOf = (key: string): number | null => {
+    const raw = items.find((d) => d.startsWith(`${key}=`))?.slice(key.length + 1)
+    return raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : null
+  }
+  const priceLines: PrintPriceLine[] = []
+  for (const item of items) {
+    const m = /^line=([a-z_]+):(\d+):(\d+):(\d+)$/.exec(item)
+    if (m) priceLines.push({ serviceKey: m[1]!, unitCents: Number(m[2]), quantity: Number(m[3]), subtotalCents: Number(m[4]) })
+  }
+  const amountCents = intOf('currentAmountCents')
+  const billablePages = intOf('billablePages')
+  if (amountCents === null || billablePages === null || priceLines.length === 0) return null
+  // 明细对不上总额就当解析失败，宁可重新报价也不展示自相矛盾的价格。
+  if (priceLines.reduce((sum, line) => sum + line.subtotalCents, 0) !== amountCents) return null
+  return { amountCents, billablePages, priceLines }
+}
+
 export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJobCreated> {
   const { token, ...body } = input
   const terminalId = getTerminalId()
@@ -166,7 +206,20 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
   } catch (err) {
     throw networkError(err)
   }
-  if (!res.ok) await throwHttpError(res, token)
+  if (!res.ok) {
+    if (res.status === 409) {
+      const conflict = (await res.clone().json().catch(() => null)) as
+        | { error?: { code?: string; message?: string; details?: unknown } }
+        | null
+      if (conflict?.error?.code === 'PRICE_CHANGED') {
+        throw new PrintPriceChangedError(
+          conflict.error.message || '价格已更新，请核对新价格后再确认',
+          parsePriceChangedQuote(conflict.error.details),
+        )
+      }
+    }
+    await throwHttpError(res, token)
+  }
   return res.json() as Promise<PrintJobCreated>
 }
 

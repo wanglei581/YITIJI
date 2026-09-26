@@ -42,11 +42,49 @@ const read = (rel) => fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
 const exists = (rel) => fs.existsSync(path.join(MINIAPP, rel))
 
 /** 剥注释后再做「不得出现 X」的断言：抓的是代码，不是解释为什么删掉它的那句话。 */
+/**
+ * 从 `marker` 之后的第一个 `{` 起，按括号深度取出**整块**。
+ *
+ * 顺序 / 归属类断言必须按块取，不能按"marker 后面 N 个字符"截：截出来的窗口会滑进
+ * 紧随其后的另一个分支，于是断言测的是别人家的代码 —— 它要么恒真，要么把一处正确的
+ * 实现报成失败。这个门禁自己就栽过一次。
+ */
+const blockAfter = (src, marker) => {
+  const at = src.indexOf(marker)
+  if (at < 0) return ''
+  const open = src.indexOf('{', at)
+  if (open < 0) return ''
+  let depth = 0
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1
+    else if (src[i] === '}') { depth -= 1; if (depth === 0) return src.slice(open, i + 1) }
+  }
+  return ''
+}
+
 const stripComments = (src) => src
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .split('\n')
   .filter((line) => !/^\s*(\/\/|\*)/.test(line))
   .join('\n')
+
+/**
+ * package-confirm 建单回调里那道「回调回来时页面已经不是发起这一发的那位了」守卫，**逐字**。
+ *
+ * 下面几条「先判身份再动 X」的顺序断言都拿它当锚点。锚点必须是整行，不能只判
+ * `_sameIdentity(token)`：那三个字在本文件里还出现在 `_verifyCreatedOrder` 的
+ * 成功分支与 `stillOurs` 里，按片段匹配会命中别的位置，顺序断言就变成恒真。
+ *
+ * 守卫体此前是一个光秃秃的 `return`。原样退出会把 `submitting` 永久留成 true——
+ * 屏幕停在「提交中…」、没有任何请求在跑，而 `submitOrder()` 第一行
+ * `if (this.data.submitting) return` 会吞掉之后每一次点击。所以退出之前必须先
+ * `_releaseStaleAttempt(attempt)` 结清本地这一发（只松开两把锁，不碰订单数据、
+ * 不跳转、不清幂等记录）。锚点写成整行，这两件事就一起被钉住了。
+ */
+const CONFIRM_IDENTITY_GUARD = 'if (!this._sameIdentity(token)) { this._releaseStaleAttempt(attempt); return }'
+
+/** 把一段源码原文当成正则里的字面量用。 */
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 let failed = 0
 const assert = (cond, msg) => { if (cond) console.log(`  PASS  ${msg}`); else { failed++; console.log(`  FAIL  ${msg}`) } }
@@ -253,6 +291,12 @@ for (const code of [
   'PRINT_FILE_PURPOSE_UNSUPPORTED',
   'PACKAGE_FILE_DUPLICATED',
   'PACKAGE_ORDER_NOT_FOUND',
+  // 打印机这一个部件出不了纸：服务端 terminals/printer-availability.ts 在报价与建单
+  // 同口径 fail-closed（无心跳 / 心跳过期 / printerStatus ∈ offline|error|paper_empty）。
+  // 缺这条映射时用户只看到「操作未完成 / 请稍后重试」，而缺纸、卡纸现场工作人员当场
+  // 就能处理、处理完重新核价就能过 —— 那条唯一有用的下一步被藏起来了。
+  // 文案与 recover 取值由 scripts/tests/package-order.test.mjs 真跑一遍断言。
+  'PRINTER_UNAVAILABLE',
 ]) {
   assert(helper.includes(code), `package-order.js 为 ${code} 准备了用户可执行的说明`)
 }
@@ -557,10 +601,51 @@ console.log('\n⑩ 打印参数取值与服务端 DTO 白名单一致')
   const quoteBlock = quoteIdx >= 0 ? confirmCode.slice(quoteIdx, confirmCode.indexOf('\n}', quoteIdx)) : ''
   assert(quoteBlock.includes('pkg.toWireDuplex(') && quoteBlock.includes('pkg.toWireColorMode('),
     '报价参数经同一对 wire 映射函数出去')
-  const createIdx = confirmCode.indexOf('api.createPackageOrder(')
-  const createBlock = createIdx >= 0 ? confirmCode.slice(createIdx, createIdx + 700) : ''
+  // 建单载荷现在由 `_orderPayload()` **单点构造**：幂等指纹算的和 POST 发出去的必须是
+  // 同一个对象，两处各拼一份迟早会分叉成「按一种参数算指纹、按另一种参数下单」——
+  // 本地以为没变而服务端算出另一个指纹就是 409，反过来则是白铸一个新键、第二张订单。
+  // 所以锚点从调用点挪到那个构造函数；验的仍是同一件事。
+  const payloadIdx = confirmCode.indexOf('_orderPayload() {')
+  const createBlock = payloadIdx >= 0 ? confirmCode.slice(payloadIdx, confirmCode.indexOf('\n  },', payloadIdx)) : ''
   assert(createBlock.includes('pkg.toWireDuplex(') && createBlock.includes('pkg.toWireColorMode('),
     '建单参数经**同一对**函数出去（与报价逐字同源）')
+  assert(/api\.createPackageOrder\(payload, \{ idempotencyKey:/.test(confirmCode),
+    'POST 发的就是 _orderPayload() 造出来的那一个对象，并带上幂等键')
+  assert(!/idempotenc/i.test(createBlock),
+    '幂等键不进 body（服务端从 Header 取，白名单 DTO 见到这个字段会整单 400）')
+  {
+    // 幂等键只走 Header，而且这条断言必须钉在 createPackageOrder 自己的函数体里：
+    // 同一个文件里 createCloudPrintOrder 也有一模一样的一行，按全文件判会恒真。
+    const at = api.indexOf('createPackageOrder(data, opts) {')
+    const body = at >= 0 ? api.slice(at, at + 700) : ''
+    assert(!!body, 'createPackageOrder 收 opts（缺了幂等键的调用必须在本地就被挡下来）')
+    assert(/header: \{ 'idempotency-key': idempotencyKey \}/.test(body),
+      'createPackageOrder 把幂等键放 Header（放 body 服务端读不到，照样 400）')
+    assert(/return Promise\.reject\(new Error\('创建材料包订单必须携带幂等键'\)\)/.test(body),
+      '缺键在本地就 reject（发出去只会得到一句被翻译成「请稍后重试」的 400）')
+  }
+  // 顺序：键先落住，**然后**才 POST。反过来等于把"响应丢在路上"原样留着 —— 那正是
+  // 幂等键唯一要防的那件事。用文件内位置判定：ensureKey 必须出现在建单调用之前。
+  {
+    const ensureIdx = confirmCode.indexOf('idem.ensureKey(')
+    const postIdx = confirmCode.indexOf('api.createPackageOrder(')
+    assert(ensureIdx > 0 && postIdx > ensureIdx, '先 ensureKey 落住幂等键，再 POST 建单')
+    assert(/idem\.rememberOrderId\(attempt\.account/.test(confirmCode),
+      '拿到 orderId 先落进发起这次提交的那位的记录（换人时也要落，否则那张订单再也找不回来）')
+    const rememberIdx = confirmCode.indexOf('idem.rememberOrderId(')
+    const identityIdx = confirmCode.indexOf(CONFIRM_IDENTITY_GUARD)
+    assert(rememberIdx > 0 && identityIdx > rememberIdx,
+      'orderId 落盘排在身份判定之前（记录属于发起时那一位，页面此刻可能已经换人）')
+    // 取 submitOrder 的函数体来判，而不是全文件：`_forgetIdempotencyRecord` 里那次
+    // clearRecord 是"确实跳走了"之后的正当清理，按全文件判会把它误伤成一条失败路径。
+    const submitAt = confirmCode.indexOf('submitOrder() {')
+    const submitBody = submitAt >= 0 ? confirmCode.slice(submitAt, confirmCode.indexOf('\n  goBack()', submitAt)) : ''
+    const catchAt = submitBody.indexOf('.catch((err) => {')
+    assert(catchAt > 0 && !submitBody.slice(catchAt).includes('idem.clearRecord('),
+      '请求失败的 catch 里一个 clearRecord 都没有（那个键可能正绑着一张已建成、只是响应丢了的订单）')
+    assert(/if \(this\._needsFreshKey\) \{[\s\S]{0,120}if \(!idem\.clearRecord\(account, fingerprint\)\) \{/.test(submitBody),
+      '409 之后换新键必须先清掉旧记录、并按 clearRecord 的返回值判成没清掉就不发 POST')
+  }
 
   // 正面禁令：四页的代码里不许再出现把 UI 取值直接当 wire 值发的写法。
   for (const page of CHAIN_PAGES) {
@@ -659,20 +744,253 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
   assert(/docLoadingMore && !this\._guard\.accepts\(this\._docsToken\)/.test(createCode),
     '切后台作废翻页请求后，回前台要解开 docLoadingMore（否则「加载更多」永远点不动）')
 
-  const sameIdIdx = confirmCode.indexOf('if (!this._sameIdentity(token)) return')
-  const afterSameId = sameIdIdx >= 0 ? confirmCode.slice(sameIdIdx, sameIdIdx + 400) : ''
+  const sameIdIdx = confirmCode.indexOf(CONFIRM_IDENTITY_GUARD)
+  // 窗口 460：判身份之后、清草稿之前多了一行记原单落库金额（价格再确认，写进锁定说明用）。
+  const afterSameId = sameIdIdx >= 0 ? confirmCode.slice(sameIdIdx, sameIdIdx + 460) : ''
   assert(sameIdIdx >= 0 && afterSameId.includes("removeStorageSync('temp_package_data')"),
     '建单成功后**先判身份再清草稿**（换人时不得删掉当前这位的草稿）')
   assert(/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(confirmCode),
     'redirectTo 失败有兜底（不接住的话页面永远停在「提交中…」，而订单其实已经建好了）')
+  // 建单那一发 200 回来的**不一定是刚建成的订单**：服务端那个键是永久挂在 Order 行上的
+  // （@@unique(endUserId, idempotencyKey)，没有过期清理），而本机这一格只要还没落定
+  // orderId（响应丢在路上、进程被杀在 POST 与响应之间、rememberOrderId 写失败过一次），
+  // 下一次提交就带着**同一个键**过去，服务端按同键回放原单 —— 而那张原单可能早已打完 /
+  // 打印失败 / 被终止 / 被取消 / 到机码过期（到机码窗口取 min(now+7天, 文件有效期)，
+  // 比本机记录的 7 天 TTL 更窄）。所以这条链和 _verifyCreatedOrder 那条一样，必须
+  // **看状态再决定去哪**，判据也必须是同一个 pkg.terminalPackageReason。
+  {
+    const submitAt = confirmCode.indexOf('submitOrder() {')
+    const thenAt = submitAt >= 0 ? confirmCode.indexOf('.then((order) => {', submitAt) : -1
+    const catchAt = thenAt >= 0 ? confirmCode.indexOf('.catch((err) => {', thenAt) : -1
+    const thenBody = catchAt > thenAt && thenAt > 0 ? confirmCode.slice(thenAt, catchAt) : ''
+    assert(!!thenBody, '取不到 submitOrder 的成功分支（拿不到 order 本体就谈不上看状态）')
+    assert(/const terminalReason = recoveryUnsaved \? '' : pkg\.terminalPackageReason\(order\)/.test(thenBody),
+      '建单成功分支也按服务端下发的状态判终态，判据是 pkg.terminalPackageReason（页面不自己认字段）')
+    const terminalAt = thenBody.indexOf('this._lockAfterCreatedTerminal(')
+    const dropAt = thenBody.indexOf("removeStorageSync('temp_package_data')")
+    const redirectAt = thenBody.indexOf('wx.redirectTo(')
+    assert(terminalAt > 0 && dropAt > terminalAt && redirectAt > terminalAt,
+      '终态那一支排在删草稿与跳转**之前**（排在后面等于草稿和幂等记录都没了才发现它是终态）')
+    // recoveryUnsaved 说的是"本机连这张订单的 orderId 都没存住"，而终态那一支要交付的
+    // 恰恰是"草稿与记录都留着、由用户自己按重新下单"。前提对不上时只能走更保守的那一个：
+    // 不在存储正在失败的时候点亮一个会铸新键的按钮。
+    const unsavedAt = thenBody.indexOf('if (recoveryUnsaved)')
+    assert(unsavedAt > 0 && redirectAt > unsavedAt,
+      'recoveryUnsaved 那一支仍排在 redirectTo 之前（排在后面就等于没有）')
+  }
   assert(/_lockAfterCreated\(orderId\)\s*\{[\s\S]{0,700}submitting: false/.test(confirmCode),
     '兜底状态解开 submitting')
   assert(/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(confirmCode),
-    '已建过单就不再 POST 第二次（服务端 CreatePackageOrder 没有幂等键）')
+    '已建过单就不再 POST 第二次（同键回放原单，页面不得把已存在的订单说成新单）')
   assert(/_loadQuote\(\)\s*\{[\s\S]{0,240}if \(this\._createdOrderId\) return/.test(confirmCode),
     '建单之后不再核价（再变 ready 等于把「确认下单」重新点亮）')
   assert(/quoteState === 'loading'\s*\n\s*&& !this\._guard\.accepts\(this\._quoteToken\)/.test(confirmCode),
     'onShow 只在「在途报价确已作废」时才重发（只看 quoteState 会让首次进入连报两次价）')
+
+  // 「那张已建成的订单**现在**怎么样了」的分流。成功与失败各有几条出口，每一条都对应
+  // 一种真实处境；混成一条就必然错一头：要么把用户永久停在一个走不通的出口上，要么在
+  // 证明不了任何事的时候放开按钮 —— 后者的代价是同一份材料包的第二张订单、第二笔钱。
+  {
+    const verifyAt = confirmCode.indexOf('_verifyCreatedOrder(orderId) {')
+    const verifyBody = verifyAt >= 0
+      ? confirmCode.slice(verifyAt, confirmCode.indexOf('\n  },', verifyAt))
+      : ''
+    assert(!!verifyBody, '取不到 package-confirm 的 _verifyCreatedOrder 函数体')
+    const thenAt = verifyBody.indexOf('.then((order) => {')
+    const catchAt = verifyBody.indexOf('.catch((err) => {')
+    const thenBody = thenAt >= 0 && catchAt > thenAt ? verifyBody.slice(thenAt, catchAt) : ''
+    const catchBody = catchAt >= 0 ? verifyBody.slice(catchAt) : ''
+    assert(!!thenBody, '取不到 _verifyCreatedOrder 的成功分支（它必须拿到 order 本体才谈得上看状态）')
+    assert(!!catchBody, '取不到 _verifyCreatedOrder 的失败分支')
+
+    // ① 在途标记必须**无条件**释放，而且排在归属判定之前 —— 两条回调都是。
+    //    `_verifyingOrderId` 记的是"这张订单有一发在飞"，回调一到那件事就不成立了。
+    //    放在归属判定后面（或只在某一支里释放），换人 / 会话过期那两条路会把它永久钉在
+    //    这个 orderId 上，之后每一次重新核对都在函数第一行被吞掉，页面永久锁死。
+    const RELEASE = "if (this._verifyingOrderId === orderId) this._verifyingOrderId = ''"
+    for (const [label, body] of [['成功', thenBody], ['失败', catchBody]]) {
+      const releaseAt = body.indexOf(RELEASE)
+      const ownsAt = body.indexOf('this._ownsVerify(token, orderId)')
+      assert(releaseAt >= 0 && ownsAt > releaseAt,
+        `核对${label}分支先无条件释放在途标记再判归属（不释放 = 后续每一次重新核对都被入口吞掉）`)
+    }
+    // ② 归属判据只有**一处**定义，两条回调共用。各写一套迟早分叉成
+    //    "失败认得出会话过期、成功认不出"——而成功那一路认错的代价是跳转到一页 401。
+    assert(confirmCode.split('this._ownsVerify(token, orderId)').length - 1 === 2,
+      '成功与失败两条回调用的是同一个归属判据（_ownsVerify），不是各写一套')
+    assert(/_ownsVerify\(token, orderId\) \{[\s\S]{0,400}this\._createdOrderId !== orderId[\s\S]{0,400}this\._sameIdentity\(token\) \|\| !this\._identityUsable\(\)/.test(confirmCode),
+      '归属判据把「这台设备自己登出了」算作仍属发起者，只有"换成另一个可用会员身份"才算换人')
+
+    // ③ 成功 200 **必须看状态再决定去哪**。上一版无条件 redirectTo：终态订单也照跳，
+    //    而跳之前它删草稿、跳成功回调里还清掉本机记录 —— 用户落在一张打不出东西的
+    //    到机码页上，材料包也没了，而幂等键还锁着"这一组参数不许再下单"。
+    const dropAt = thenBody.indexOf("removeStorageSync('temp_package_data')")
+    const redirectAt = thenBody.indexOf('wx.redirectTo(')
+    const terminalAt = thenBody.indexOf('this._lockAfterCreatedTerminal(')
+    const expiredAt = thenBody.indexOf('this._lockAfterCreatedLoginExpired()')
+    assert(/const terminalReason = pkg\.terminalPackageReason\(order\)/.test(thenBody),
+      '成功分支拿服务端下发的状态判终态（判据是 pkg.terminalPackageReason，不是页面自己认字段）')
+    assert(terminalAt > 0 && dropAt > terminalAt && redirectAt > terminalAt,
+      '终态那一支排在删草稿与跳转**之前**（排在后面等于草稿和记录已经没了才发现是终态）')
+    assert(expiredAt > 0 && terminalAt > expiredAt,
+      '会话已失效时连状态都不看：不跳转（到机码页同样要登录），先给一条去登录的出口')
+    assert(!thenBody.includes('idem.clearRecord('),
+      '成功分支自己不清幂等记录（只有确实跳走了才由 _forgetIdempotencyRecord 清）')
+
+    // ④ 401 / 会话失效：核不上**证明不了订单不存在**。锁与键原样保留，只把恢复动作
+    //    换成一条走得通的路（默认那条是「去我的打印订单」，而订单列表同样需要登录，
+    //    等于把人堵死在一个进不去的出口上）。两条回调共用同一条出口，不维护两份文案。
+    assert(/if \(\(err && err\.statusCode === 401\) \|\| !this\._identityUsable\(\)\) \{[\s\S]{0,200}_lockAfterCreatedLoginExpired\(\)/.test(catchBody),
+      '核对失败遇到 401 / 会话已失效时走同一条「去登录」出口')
+    assert(/_lockAfterCreatedLoginExpired\(\) \{[\s\S]{0,600}quoteState: 'error'[\s\S]{0,400}quoteRecover: 'login'/.test(confirmCode),
+      "「登录已失效」那一支自己写全 quoteState（模板只在 error 分支渲染这段文案，不写就是一段看不见的话）")
+    assert(/_lockAfterCreatedLoginExpired\(\) \{[\s\S]{0,600}canStartNewOrder: false/.test(confirmCode),
+      '核不上的时候不许把「重新下单」点亮（那是在证明不了任何事的时候放开了第二张订单）')
+
+    // ⑤ 整条失败分支一个字节的幂等记录都不许清。那个键此刻可能正绑着一张已经建成、
+    //    只是核不上的订单；清掉它，下一次同参数提交会铸新键、服务端再建一张。
+    assert(!catchBody.includes('idem.clearRecord('),
+      '核对失败的任何一支都不清幂等记录（清掉 = 下一次铸新键 = 第二张订单）')
+    // ⑥ 只有服务端 requireOwned 明确的 404 才算「它真的没了」，才可以解锁重来。
+    const notFoundAt = catchBody.indexOf('PACKAGE_ORDER_NOT_FOUND')
+    assert(/statusCode === 404 && err\.code === 'PACKAGE_ORDER_NOT_FOUND'/.test(catchBody),
+      "解锁的判据是 404 + PACKAGE_ORDER_NOT_FOUND 两项俱全，不是任意一个失败")
+    const unlockAt = catchBody.indexOf('this._createdOrderId = null')
+    assert(unlockAt > notFoundAt && notFoundAt > 0,
+      '解锁排在那个判据之后（顺序反过来等于任何一次核不上都解锁）')
+  }
+
+  // 终态判据本身：它决定的是「能不能让用户就这一份材料包再下一张单、再付一次钱」，
+  // 所以默认必须 fail-closed，而且必须和服务端真实写入点对得上。
+  {
+    const pkgUtil = stripComments(read('utils/package-order.js'))
+    const at = pkgUtil.indexOf('function terminalPackageReason(order) {')
+    const body = at >= 0 ? pkgUtil.slice(at, pkgUtil.indexOf('\n}', at)) : ''
+    assert(!!body, '取不到 terminalPackageReason 的函数体')
+    // 判据只有这一处定义：页面不许再抄一份字段表（两份迟早只改一边）。
+    // 用 includes 而不是正则：`scripts/project-graph/repo.mjs` 的 stripComments 是逐字符
+    // 扫描的，它把**正则字面量里的单引号**也当成字符串开头，一个落单的 `'` 会让它之后
+    // 的解析整体错位 —— 实测代价是本门禁对 utils/storage.js 与
+    // member-print-order-create.service.ts 的两条图谱边凭空消失（代码一个字没改）。
+    assert(!confirmCode.includes("pickupStatus === '") && !confirmCode.includes("taskStatus === '"),
+      'package-confirm 不自己认订单状态字段，只调 pkg.terminalPackageReason（两份状态表只会改一边）')
+    for (const status of ['completed', 'failed', 'abandoned', 'cancelled', 'expired']) {
+      assert(body.includes(`'${status}'`), `终态表覆盖 ${status}（服务端确有这个写入点，漏掉就是把作废订单永久锁着）`)
+    }
+    // **fail-closed 的三处刻意排除**，每一处都对应一次"再下一单 = 再打一次、再收一次钱"：
+    //   used   —— 服务端和 taskStatus:'pending' + printTaskId 一起写（且 CAS 要 payStatus:'paid'）：
+    //             钱已付、任务刚进队列，此刻放开就是同一份材料包打两遍。
+    //   claimed—— 一体机领走了这一单，用户正站在机器前付款；online-payment 关单时还会把它退回 pending。
+    //   closed —— payStatus 单独 closed 完全可能配着一张仍然活着的到机码（见 online-payment.service.ts:799 附近）。
+    for (const notTerminal of ['used', 'claimed', 'closed']) {
+      assert(!body.includes(`'${notTerminal}'`),
+        `${notTerminal} 不得算终态（它对应的是"还在履约 / 码还活着"，算进去就是第二次打印、第二笔钱）`)
+    }
+    assert(/return ''\n?\s*\}$/.test(body.trimEnd()) || body.trimEnd().endsWith("return ''"),
+      '没认出来的状态一律返回 空串（fail-closed）：不能把将来新增的服务端状态默认解释成"这单作废了"')
+    assert(!body.includes('payStatus'),
+      '终态判据不看 payStatus（closed 会配着活码出现，看它就是误判终态）')
+  }
+
+  // 「重新下单」：唯一一条会换幂等键的用户动作，必须由用户自己按，且清不掉就不许解锁。
+  {
+    const at = confirmCode.indexOf('startNewOrder() {')
+    const body = at >= 0 ? confirmCode.slice(at, confirmCode.indexOf('\n  },', at)) : ''
+    assert(!!body, '取不到 startNewOrder 的函数体')
+    assert(body.startsWith('startNewOrder() {\n    if (!this.data.canStartNewOrder) return'),
+      '只有服务端已证明原单终态时才可达（第一行就挡，不靠模板是否画了那个按钮）')
+    assert(/_lockAfterCreatedTerminal\(orderId, reason\) \{[\s\S]{0,700}canStartNewOrder: true/.test(confirmCode)
+      && confirmCode.split('canStartNewOrder: true').length - 1 === 1,
+      '这个开关有且只有终态那一处打开（多一处就是一条没被服务端证明过的解锁路径）')
+    assert(/idem\.clearRecord\(account, fingerprint\)/.test(body),
+      '只清 (当前账号, 当前载荷指纹) 这一格，不是整张表（别的那几格都可能正绑着一次在途提交）')
+    const clearAt = body.indexOf('if (!idem.clearRecord(')
+    const unlockAt = body.indexOf('this._createdOrderId = null')
+    assert(clearAt > 0 && unlockAt > clearAt,
+      '解锁排在"清不掉就 return"之后（顺序反过来等于那个判断根本不存在：复用旧键只会回放那张作废的订单）')
+    assert(!/api\./.test(body), 'startNewOrder 自己不发任何请求（换键是本地动作，POST 由用户再按一次「确认下单」）')
+    assert(/this\._loadQuote\(\)/.test(body),
+      '解锁后重新向服务端要一次报价（沿用上一张订单的金额就是拿一个可能已经变了的价去下单）')
+  }
+
+  // 「键出门之前先在本机标住」：本机这张表要淘汰"铸出来但从没用过"的键，而"从没用过"
+  // 只能由本机自己记下来 —— 服务端那一侧的 (endUserId, key) 是永久的，它不会告诉我们
+  // 这件事。标记必须排在 POST **之前**，而且标不住就一个 POST 都不发：标不住 = 这个键
+  // 出门之后本机会在 TTL 到点时忘掉它 = 下一次同参数提交铸新键 = 第二张订单、第二笔钱。
+  {
+    const at = confirmCode.indexOf('idem.ensureKey(account, fingerprint)')
+    const chain = at >= 0 ? confirmCode.slice(at, at + 900) : ''
+    const markAt = chain.indexOf('idem.markSubmitted(account, fingerprint, record.key)')
+    const postAt = chain.indexOf('api.createPackageOrder(')
+    assert(markAt > 0 && postAt > markAt,
+      '标记排在 POST 之前（排在后面等于没标：响应丢了的那一格照样会被 TTL 忘掉）')
+    assert(/if \(!idem\.markSubmitted\(account, fingerprint, record\.key\)\) \{[\s\S]{0,160}throw new Error\(idem\.SUBMIT_MARK_FAILED_MESSAGE\)/.test(chain),
+      '标不住就抛出去，一个 POST 都不发（不看返回值等于这道闸不存在）')
+  }
+
+  // 本机记录的寿命判据：**不许只按时间淘汰**。服务端那一侧的键是永久的，
+  // 本机先失忆就等于下一次铸新键、服务端再建一张订单。只有"证明得了从来没发出去过"
+  // 的那一档（本版写下、markSubmitted 从没成功过）才允许过期。
+  {
+    const idemPkg = stripComments(read('utils/package-order-idempotency.js'))
+    assert(/function wasSubmitted\(row\) \{[\s\S]{0,200}row\.orderId \|\| row\.submittedAt !== 0/.test(idemPkg),
+      '「可能已经出门过」的判据只看落盘字段（内存标记在小程序被杀掉重进之后一个都不剩）')
+    // 只有一处写 TTL 比较，而且那一处必须带着 wasSubmitted 这个前置放行。
+    // 退回成光秃秃的 `now - row.createdAt < TTL_MS)` 会让下面这条正向断言当场转红。
+    assert(/&& \(wasSubmitted\(row\) \|\| now - row\.createdAt < TTL_MS\)\)/.test(idemPkg)
+      && idemPkg.split('now - row.createdAt < TTL_MS').length - 1 === 1,
+    'TTL 只淘汰"证明得了没发出去过"的那一档，已提交 / 已落定 / 旧版本无标记的一律不因本机时间淘汰')
+    assert(/submittedAt: 0 \}/.test(idemPkg),
+      '新铸的键先落成 submittedAt: 0（那是"还没发过"唯一可证明的形态）')
+    assert(/wasSubmitted\(row\) === wasSubmitted\(verify\)\)/.test(idemPkg),
+      'persist 的读回核对把这个标记也核上（不核 = "没标住"会被当成标住了）')
+    const markAt = idemPkg.indexOf('function markSubmitted(account, fingerprint, key) {')
+    const markFn = markAt < 0 ? '' : idemPkg.slice(markAt, idemPkg.indexOf('\n}', markAt))
+    assert(!!markFn, '取不到 markSubmitted 的函数体')
+    // 判据是「persist 的返回值决定成败」，不是某一行长什么样：markSubmitted 成功之后
+    // 还要把键登记成在途（noteInFlight），所以它不再以 `return !!persist(...)` 收尾。
+    // 真正要钉住的是 persist 失败必须让整个函数失败 —— 少了这一条，"标记没写进去"
+    // 会被当成写进去了，而那一格正是"键出门之后本机还会在 7 天后忘掉它"的那一格。
+    assert(/if \(!persist\(rows, record\)\) return false/.test(markFn)
+      || /return !!persist\(rows, record\)/.test(markFn),
+    'markSubmitted 经 persist 落盘并读回核对，不是调一次 storage.set 就当标住了')
+    assert(!/storage\.set\(/.test(markFn),
+      'markSubmitted 不绕过 persist 直接写盘（绕过就没有读回核对）')
+    assert(/if \(!rows\) return false/.test(markFn) && /if \(at < 0\) return false/.test(markFn)
+      && /if \(rows\[at\]\.key !== key\) return false/.test(markFn),
+    'markSubmitted 的每条失败路径都返回 false（读不到 / 这一格不在 / 盘上是另一个键，都不许放 POST 出去）')
+  }
+
+  // 建单成功那一支：`_createdOrderId` 一设上就必须**紧接着**结清这一发。
+  // 两行之间插进任何会抛的东西，抛出来之后 catch 里那条
+  // `if (this._createdOrderId) { this._lockAfterCreated(...); return }` 就会带着一个
+  // **未落定**的 _submitAttempt 退出 —— 之后即使别的路径解了锁（例如核对拿到 404），
+  // `if (this._submitAttempt && !this._submitAttempt.settled) return` 仍会把每一次点击
+  // 原样吞掉：报价是 ready、按钮看着能按，按下去什么都不发生。
+  assert(/this\._createdOrderId = orderId\n\s*attempt\.settled = true/.test(confirmCode),
+    '订单锁与这一发的结清紧挨着（中间插入可抛代码会让失败路径留下一个永远吞点击的未落定尝试）')
+
+  // 模板必须真的把这个动作接出去，而且材料包**没有取消端点**，不许凭空造一个。
+  assert(/quoteRecover === 'reorder' \? '重新下单'/.test(confirmWxml),
+    '模板给 reorder 这一态画了按钮文案（只写进 data 不渲染等于没写）')
+  assert(/if \(target === 'reorder'\) return this\.startNewOrder\(\)/.test(confirmCode),
+    'recover 把 reorder 接到 startNewOrder 上')
+  // 终态那句指引只渲染**一次**。此前模板另画了一行 `wx:if="{{canStartNewOrder}}"`，
+  // 而点亮这个开关的唯一一处（_lockAfterCreatedTerminal）写进 quoteErrorText 的句子就以
+  // 同一句话逐字结尾 —— 于是它每次出现都是紧挨着重复的两遍。这里钉的是"只有一份"，
+  // 不是"删掉它"：文案仍在 quoteErrorText 里，下面那条断言守住它没被一起删掉。
+  // 剥掉 <!-- --> 再数：解释"为什么删掉它"的那段注释里逐字引着这句话。
+  const confirmMarkup = confirmWxml.replace(/<!--[\s\S]*?-->/g, '')
+  assert(confirmMarkup.split('原来那张订单仍可在').length - 1 === 0,
+    '模板不再单独重复终态那句指引（它是 quoteErrorText 的结尾，画两遍是确定的重复）')
+  assert(/_lockAfterCreatedTerminal\(orderId, reason\) \{[\s\S]{0,700}原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。/.test(confirmCode),
+    '那句指引本身仍在（它是用户找回旧订单的唯一线索，删重复不等于删信息）')
+  // 材料包**没有取消端点**：PackageOrdersController 只有 @Post() / @Get() / @Get(':id')。
+  // 上面 ③ 已经钉住「api.js 里不许再出现 cancelPackageOrder 这个方法」；这里补的是按
+  // URL 走的那一种（绕开方法名直接拼路径）。单件云打印那条链确实有 /cancel，别顺手抄
+  // 过来 —— 造一个不存在的端点，用户点下去只会拿到 404，而页面把它翻译成「请稍后重试」。
+  assert(!/orders\/package[^\n]{0,60}cancel/.test(confirmCode + stripComments(read('utils/api.js'))),
+    '没有任何一处向 /orders/package/**/cancel 发请求（材料包不提供取消，那个端点不存在）')
 
   assert(/_sameIdentity\(token\)/.test(stripComments(ordersJs)),
     'orders 的取消链按身份判定（用 active 判定会把这一行锁死在「取消中…」）')
@@ -797,12 +1115,32 @@ console.log('\n⑫ R4 身份 / 代次收口')
   // 按全文件判会永远命中它，断言就变成恒真（那是一条测不出任何东西的门禁）。
   const createIdx = confirmCode.indexOf('api.createPackageOrder(')
   const chain = createIdx >= 0 ? confirmCode.slice(createIdx, createIdx + 1200) : ''
-  const guardIdx = chain.indexOf('if (!this._sameIdentity(token)) return')
+  const guardIdx = chain.indexOf(CONFIRM_IDENTITY_GUARD)
   const assignIdx = chain.indexOf('this._createdOrderId = orderId')
   assert(createIdx >= 0 && guardIdx > 0 && assignIdx > guardIdx,
     '建单成功回调里 `_createdOrderId = orderId` 排在身份判定之后（换人时一个字节都不写）')
-  assert(/catch\(\(err\) => \{[\s\S]{0,400}if \(!this\._sameIdentity\(token\)\) return[\s\S]{0,200}if \(this\._createdOrderId\)/.test(confirmCode),
+  assert(new RegExp(`catch\\(\\(err\\) => \\{[\\s\\S]{0,400}${escapeRe(CONFIRM_IDENTITY_GUARD)}[\\s\\S]{0,200}if \\(this\\._createdOrderId\\)`).test(confirmCode),
     '建单失败回调同样先判身份再谈锁（迟到的失败不得锁死新用户）')
+  // ③ 成功与失败**两条**迟到路径都必须结清这一发，一条漏了就是一个永远停在
+  //    「提交中…」的页面。数出现次数，而不是"文件里有这么一行"——只在 then 里写、
+  //    catch 里仍然光秃秃 return，按"存在"判会照样绿。
+  assert(confirmCode.split(CONFIRM_IDENTITY_GUARD).length - 1 === 2,
+    '建单的 then / catch 两条迟到路径都在退出前结清了这一次提交尝试（写一处等于漏一条）')
+  assert(/_releaseStaleAttempt\(attempt\) \{\s*\n\s*attempt\.settled = true\s*\n\s*if \(this\._submitAttempt === attempt\) \{[\s\S]{0,160}submitting: false/.test(confirmCode),
+    '结清只动本地两把锁：落定这一发 + 松开按钮，且只在它仍是"当前这一次"时才动按钮')
+  {
+    // 结清路径**一个字节的订单数据都不许写**：它跑的时候页面上的身份已经不是发起
+    // 这一发的那一位了。写 _createdOrderId 会把 B 的页面永久锁成「订单已创建」；
+    // clearRecord 会删掉发起者唯一还能找回那张订单的线索（那正是第二张订单的来源）。
+    const releaseAt = confirmCode.indexOf('_releaseStaleAttempt(attempt) {')
+    const releaseBody = releaseAt >= 0
+      ? confirmCode.slice(releaseAt, confirmCode.indexOf('\n  },', releaseAt))
+      : ''
+    assert(!!releaseBody, '取不到 _releaseStaleAttempt 的函数体')
+    for (const forbidden of ['_createdOrderId', 'clearRecord', 'redirectTo', 'removeStorageSync', '_lockAfterCreated']) {
+      assert(!releaseBody.includes(forbidden), `结清旧尝试时不得出现 ${forbidden}（那是把上一位的东西写到当前这位身上）`)
+    }
+  }
   assert(/_resetForIdentity\(\)\s*\{[\s\S]{0,200}this\._createdOrderId = null[\s\S]{0,200}submitting: false[\s\S]{0,120}agreedToTerms: false/.test(confirmCode),
     '身份切换时建单锁 / 提交锁 / 协议同意一起复位（协议同意是本人行为，不得继承）')
   assert(/setIdentity\(this\._identityKey\(\)\)\) \{[\s\S]{0,200}this\._resetForIdentity\(\)/.test(confirmCode),
@@ -847,9 +1185,10 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     && /row\.account === verify\.account/.test(idem)
     && /row\.fingerprint === verify\.fingerprint/.test(idem)
     && /row\.key === verify\.key/.test(idem)
-    && /String\(row\.orderId \|\| ''\) === String\(verify\.orderId \|\| ''\)/.test(idem),
-  'persist 写完把记录读回来逐字核对 account/fingerprint/key/**orderId**（漏掉 orderId 那一项，'
-  + 'rememberOrderId 那次写入要落的恰恰就是它：没写进去也照样核得上）')
+    && /String\(row\.orderId \|\| ''\) === String\(verify\.orderId \|\| ''\)/.test(idem)
+    && /wasSubmitted\(row\) === wasSubmitted\(verify\)/.test(idem),
+  'persist 写完把记录读回来逐字核对 account/fingerprint/key/orderId/**submittedAt**（漏掉 orderId '
+  + '那一项，rememberOrderId 要落的恰恰就是它；漏掉 submittedAt，"没标住"会被当成标住了）')
   assert(/if \(!persist\(base\.concat\(\[record\]\), record\)\) \{[\s\S]{0,200}throw new Error/.test(idem),
     'ensureKey 落不住就 reject —— 调用方一个 POST 都不许发（那张订单建成就再也找不回来）')
   // R9：写回全量的**基底**必须是真的读出来的那一份。`loadAll()` 在读失败时返回 null，
@@ -898,16 +1237,46 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   //     的证据。形状不对的 createdAt 仍然一律作废（那是坏数据，不是时钟问题）。
   assert(!/now - row\.createdAt >= 0/.test(idem),
     '未来时间戳不得再被当成无效（设备时钟回跳会让本机自己写的键当场作废）')
-  assert(/Number\.isFinite\(row\.createdAt\)/.test(idem) && /now - row\.createdAt < TTL_MS/.test(idem),
-    '形状不对的 createdAt 仍然作废，真正过期的仍然过期（放宽的只有未来那一侧）')
+  assert(/Number\.isFinite\(row\.createdAt\)/.test(idem),
+    '形状不对的 createdAt 仍然作废（那是坏数据，不是时钟问题）')
+  assert(/function wasSubmitted\(row\) \{[\s\S]{0,200}row\.orderId \|\| row\.submittedAt !== 0/.test(idem),
+    '「可能已经出门过」的判据只看落盘字段（内存标记在小程序被杀掉重进之后一个都不剩）')
+  assert(/&& \(wasSubmitted\(row\) \|\| now - row\.createdAt < TTL_MS\)\)/.test(idem)
+    && idem.split('now - row.createdAt < TTL_MS').length - 1 === 1,
+    'TTL 只淘汰"证明得了没发出去过"的那一档，已提交 / 已落定 / 旧版本无标记的一律不因本机时间淘汰')
+  assert(/submittedAt: 0 \}/.test(idem),
+    '新铸的键先落成 submittedAt: 0（那是"还没发过"唯一可证明的形态）')
+  assert(/wasSubmitted\(row\) === wasSubmitted\(verify\)\)/.test(idem),
+    'persist 的读回核对把这个标记也核上（不核 = "没标住"会被当成标住了）')
+  {
+    const markAt = idem.indexOf('function markSubmitted(account, fingerprint, key) {')
+    const markFn = markAt < 0 ? '' : idem.slice(markAt, idem.indexOf('\n}', markAt))
+    assert(!!markFn, '取不到 markSubmitted 的函数体')
+    // 判据是「persist 的返回值决定成败」，不是某一行长什么样：markSubmitted 成功之后
+    // 还要把键登记成在途（noteInFlight），所以它不再以 `return !!persist(...)` 收尾。
+    // 真正要钉住的是 persist 失败必须让整个函数失败 —— 少了这一条，"标记没写进去"
+    // 会被当成写进去了，而那一格正是"键出门之后本机还会在 7 天后忘掉它"的那一格。
+    assert(/if \(!persist\(rows, record\)\) return false/.test(markFn)
+      || /return !!persist\(rows, record\)/.test(markFn),
+    'markSubmitted 经 persist 落盘并读回核对，不是调一次 storage.set 就当标住了')
+    assert(!/storage\.set\(/.test(markFn),
+      'markSubmitted 不绕过 persist 直接写盘（绕过就没有读回核对）')
+    assert(/if \(!rows\) return false/.test(markFn) && /if \(at < 0\) return false/.test(markFn)
+      && /if \(rows\[at\]\.key !== key\) return false/.test(markFn),
+    'markSubmitted 的每条失败路径都返回 false（读不到 / 这一格不在 / 盘上是另一个键，都不许放 POST 出去）')
+  }
 
   // ③'' clearRecord 必须**读回来证明那一格不在了**，并把结论返回给调用方。
   //     上一版只调一次 saveAll 就当清掉了、什么都不返回；而 storage.set 在"没抛异常也
   //     没写进去"时同样返回 true。调用方照着这个假设解锁，下一次提交就复用那个旧键，
   //     服务端一遍遍回放那张早已作废的订单 —— 用户面对一个能按的按钮，永远打不出东西。
   const clearFn = /function clearRecord\(account, fingerprint\) \{[\s\S]*?\n\}/.exec(idem)
-  assert(!!clearFn && /return slotAbsent\(account, fingerprint\)/.test(clearFn[0]),
-    'clearRecord 写完读回来确认那一格真的不在了，并返回布尔')
+  // 判据是「slotAbsent 的结论决定返回值」：clearRecord 清完还要把那几个键从在途表里
+  // 摘掉，所以它不再以 `return slotAbsent(...)` 收尾。要钉住的是 slotAbsent 说"还在"时
+  // 必须返回 false —— 返回 true 就等于谎称清掉了，下一次提交会复用那个已经作废的键。
+  assert(!!clearFn && (/if \(!slotAbsent\(account, fingerprint\)\) return false/.test(clearFn[0])
+    || /return slotAbsent\(account, fingerprint\)/.test(clearFn[0])),
+  'clearRecord 写完读回来确认那一格真的不在了，并返回布尔')
   assert(!!clearFn && /if \(!isMemberIdentity\(account\) \|\| !fingerprint\) return false/.test(clearFn[0])
     && /!== true\) return false/.test(clearFn[0]),
   'clearRecord 的每一条失败路径都返回 false（返回 undefined 会被调用方当成"清掉了"）')
@@ -954,6 +1323,8 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
       '读不到就返回 null（调用方按"没存住"锁页指路，那正是正确处置）'],
     ['clearRecord', /const rows = loadAll\(\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!rows\) return false/,
       '读不到就返回 false（它写回去的是全量，读不到时会把整张表清空）'],
+    ['markSubmitted', /const rows = loadAll\(\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!rows\) return false/,
+      '读不到就返回 false（标不住不许 POST；写回全量会抹掉别人在飞的键）'],
   ]) {
     const at = idem.indexOf(`function ${fn}(`)
     const body = at < 0 ? '' : idem.slice(at, at + 1400)
@@ -996,8 +1367,15 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     "只有 requireOwned 明确的 404 才算'服务端证明它没了'，不是任意一个失败")
   // 解锁必须是**用户自己点**的一个动作：页面不自动换键，那等于替他做了一次下单决定。
   const startNew = /startNewOrder\(\)\s*\{[\s\S]*?\n  \},/.exec(pay)
-  assert(!!startNew && /this\.data\.createdState !== 'terminal' \|\| !this\.data\.createdCanReorder/.test(startNew[0]),
-    'startNewOrder 只在服务端已证明终态时才可达（其余一律原地返回）')
+  // 判据是「可达状态被枚举成一份白名单，且 createdCanReorder 必须同时成立」，
+  // 而不是某一行长什么样：服务端后来又证明了第二种"可以重新下一单"——'abandoned'
+  // （那个键已被立墓碑，压根没建成过订单）。两者都由服务端证明，页面自己一个都判不出来。
+  // 要钉死的是**不许出现第三种来源**：任何本地推断（超时、年龄、4xx）都不得点亮它。
+  const reorderStates = startNew ? Array.from(startNew[0].matchAll(/'(terminal|abandoned)'/g)).map((m) => m[1]) : []
+  assert(!!startNew && reorderStates.length > 0 && !/createdState === '(live|checking|unknown)'/.test(startNew[0]),
+    'startNewOrder 只在服务端已证明的状态下可达（terminal / abandoned），其余一律原地返回')
+  assert(!!startNew && /!this\.data\.createdCanReorder/.test(startNew[0]),
+    'startNewOrder 还要 createdCanReorder 同时成立（状态与开关两道，缺一不可）')
   assert(!!startNew && /if \(!idem\.clearRecord\(this\._account, idem\.fingerprintOf\(this\._orderPayload\(\)\)\)\) \{/.test(startNew[0]),
     'startNewOrder 清掉旧记录，**并且只在真的清掉（clearRecord 返回 true）之后**才解锁')
   assert(!!startNew && /createdNotice: '本机没能清掉[\s\S]{0,300}\n      \}\)\n      return\n    \}/.test(startNew[0]),
@@ -1016,6 +1394,12 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     const flow = /continueFlow\(\) \{[\s\S]*?\n  \},/.exec(pay)
     assert(!!flow && flow[0].indexOf('if (recoveryUnsaved)') < flow[0].indexOf('wx.redirectTo('),
       '这一支必须排在 redirectTo 之前（排在后面就等于没有）')
+    const markAt = flow[0].indexOf('idem.markSubmitted(attempt.account, fingerprint, record.key)')
+    const postAt = flow[0].indexOf('api.createCloudPrintOrder(')
+    assert(markAt > 0 && postAt > markAt,
+      '单件链标记排在 POST 之前（排在后面等于没标：响应丢了的那一格照样会被 TTL 忘掉）')
+    assert(/if \(!idem\.markSubmitted\(attempt\.account, fingerprint, record\.key\)\) \{[\s\S]{0,160}throw new Error\(idem\.SUBMIT_MARK_FAILED_MESSAGE\)/.test(flow[0]),
+      '单件链标不住就抛出去，一个 POST 都不发（不看返回值等于这道闸不存在）')
   }
 
   // ⑥ "还活着"是一个会到期的结论，不能缓存成永久判定。缓存它的代价：用户照着提示去
@@ -1081,6 +1465,156 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     assert(/const FINGERPRINT_FIELDS = \[/.test(idem)
       && !/FINGERPRINT_FIELDS/.test(stripComments(paySrc)),
     '指纹字段集只有 utils/print-order-idempotency.js 一处定义，页面不自己拼一组')
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 「已提交、未落定」记录的**唯一出口**：服务端的墓碑
+// ══════════════════════════════════════════════════════════════════════════
+//
+// 本机那张表拒绝按任何本地依据淘汰未落定的记录（清错一条 = 用户被收两次钱），代价是
+// 20 条攒满之后这台设备再也下不了单。唯一能推翻"它可能已经建成"的只有服务端：
+// `POST /me/print-orders/submissions/resolve` **先立墓碑再回答** `not_created`，
+// 此后带着那个键的 POST 一律 409，再也建不出订单。
+//
+// 下面每一条都在钉同一件事：**清除的权力只在服务端手里**。行为本身由
+// scripts/tests/order-submission-reconcile.test.mjs 真跑（26 条），这里钉的是那几处
+// 单测照不到的源码形状 —— 谁可以调删除、调用点有没有绕过判据、两条链是不是同一份实现。
+console.log('\n【提交记录核对：只有服务端墓碑才准清】')
+{
+  const engineSrc = read('utils/order-submission-reconcile.js')
+  const engine = stripComments(engineSrc)
+
+  // ① 引擎必须是纯的：不 require storage / wx / 任何幂等模块。
+  //    不是洁癖 —— require 幂等模块会成环（那两个模块要 require 它来建 port），
+  //    而碰 wx / storage 会让它没法在 node 里被真跑，于是这条链上最危险的判断
+  //    （"这一格到底清没清"）就只剩正则能验。
+  assert(!/require\(['"]\.\/storage['"]\)/.test(engine),
+    '核对引擎不直接碰 storage（存储一律经调用方传进来的 port）')
+  assert(!/require\(['"]\.\/(package|print)-order-idempotency['"]\)/.test(engine),
+    '核对引擎不 require 任何幂等模块（会成环，且会把一条链的表读进另一条链）')
+  assert(!/\bwx\./.test(engine), '核对引擎不碰 wx（它必须能在 node 里被真跑）')
+
+  // ② 本机这张表唯一的删除入口就是 clearSubmittedKey，而它只能从 not_created 那一支到达。
+  //    判据取 applyItems 的函数体：processing 与 created 两支都必须**先 return**，
+  //    删除那一行排在它们之后。顺序反了就是"还在处理中也照删"，而那正是第二张订单。
+  const applyAt = engine.indexOf('function applyItems(')
+  const applyBody = applyAt >= 0 ? engine.slice(applyAt, engine.indexOf('\n}', applyAt)) : ''
+  assert(!!applyBody, 'applyItems 函数体取得到')
+  const procAt = applyBody.indexOf(`item.outcome === OUTCOME_PROCESSING`)
+  const createdAt = applyBody.indexOf(`item.outcome === OUTCOME_CREATED`)
+  const clearAt = applyBody.indexOf('port.clearSubmittedKey(')
+  assert(procAt > 0 && createdAt > 0 && clearAt > procAt && clearAt > createdAt,
+    'processing / created 两支都排在删除之前并各自 return（删除只在 not_created 那一档发生）')
+  assert((applyBody.match(/port\.clearSubmittedKey\(/g) || []).length === 1,
+    'applyItems 里只有一处删除调用（多一处就多一条绕过判据的路）')
+  assert(/if \(!item\) \{ unknown \+= 1; continue \}/.test(applyBody),
+    '服务端没回这个键 / 回得自相矛盾时原样留着 —— 少一条答案从来不是"它不存在"')
+
+  // ③ 删除本身必须逐条设防，而且写完要读回来证明。
+  const clearAtFn = engine.indexOf('clearSubmittedKey(account, fingerprint, key) {')
+  const clearBody = clearAtFn >= 0 ? engine.slice(clearAtFn, engine.indexOf('\n    },', clearAtFn)) : ''
+  assert(!!clearBody, 'clearSubmittedKey 函数体取得到')
+  assert(/if \(rows\[at\]\.key !== key\) return false/.test(clearBody),
+    '这一格现在装的是另一个键就不删（墓碑说的不是它）')
+  assert(/if \(rows\[at\]\.orderId\) return false/.test(clearBody),
+    '已落定的记录一律不删（它是找回那张订单的唯一线索）')
+  assert(/if \(!rows\) return false/.test(clearBody),
+    '读不出这张表就一个字节都不写（读失败证明不了任何事）')
+  assert(clearBody.indexOf('const back = loadAll()') > clearBody.indexOf('persist(kept, null)'),
+    '写完必须读回来证明这一格真的不在了（storage.set 在"没写进去"时照样返回 true）')
+
+  // ④ 三种 409 的处置完全相反，判据只有 classifySubmitConflict 一处。
+  assert(/IDEMPOTENCY_KEY_ABANDONED/.test(engine) && /IDEMPOTENCY_IN_PROGRESS/.test(engine),
+    '两个新的 409 错误码都被认得（认不出就会落到"请稍后重试"，而它们的下一步完全不同）')
+  assert(/if \(!err \|\| err\.statusCode !== 409\) return ''/.test(engine),
+    '只有 409 才算冲突（光看 code 会把别处同名错误也认成冲突）')
+
+  // ⑤ 两条链共用同一份 port 实现，而且命名空间各自独立。
+  const ports = ['utils/package-order-idempotency.js', 'utils/print-order-idempotency.js']
+  for (const rel of ports) {
+    const src = stripComments(read(rel))
+    assert(/reconcileEngine\.createSubmissionPort\(\{/.test(src),
+      `${rel} 的 port 来自共用工厂（各写一份迟早分叉，然后只有一份被修）`)
+    assert(/namespace: STORE_KEY,/.test(src), `${rel} 的 port 用自己的表名做命名空间`)
+    // 在途登记必须发生在 markSubmitted 里 —— 也就是 POST **之前**。晚一步登记，
+    // 一次正常提交就可能在请求还在路上时被自己立了墓碑。
+    const msAt = src.indexOf('function markSubmitted(')
+    const msBody = msAt >= 0 ? src.slice(msAt, src.indexOf('\n}', msAt)) : ''
+    assert(/submissionPort\.noteInFlight\(key\)/.test(msBody),
+      `${rel} 在 markSubmitted（POST 之前）就把键登记成在途`)
+    assert(!/submissionPort\.clearSubmittedKey\(/.test(src),
+      `${rel} 自己不调删除入口（清除只能由核对引擎按服务端结论发起）`)
+  }
+
+  // ⑥ 两个页面：名额满必须走核对，而不是把死路原样显示给用户；
+  //    in_progress 一个字节都不许清。
+  const pages = [
+    ['pages/package-confirm/package-confirm.js', 'package'],
+    ['pages/print-pay/print-pay.js', 'print'],
+  ]
+  for (const [rel, label] of pages) {
+    const src = stripComments(read(rel))
+    assert(/err\.message === idem\.PENDING_FULL_MESSAGE\) \{ this\._reconcileSubmissions\(\); return \}/.test(src),
+      `${label} 页把"名额满了"接到核对上（那是这条死路唯一的解法）`)
+    assert(/reconcileEngine\.classifySubmitConflict\(err\)/.test(src),
+      `${label} 页按 classifySubmitConflict 分辨三种 409`)
+    assert(/\{ force: true \}/.test(src),
+      `${label} 页的核对一律 force（用户刚被拦住，要的是当下的真值，不是一句"冷却中"）`)
+    // 整个 409 处置区一个 clearRecord 都不许有。
+    //
+    // 这不是"顺手也检查一下"：`abandoned` 确实需要换键，但换键必须走各页**已经收口过**
+    // 的那条路（package 是 `_needsFreshKey` → 下一次提交前 clearRecord 并读回来确认；
+    // print 是 `startNewOrder` 同样读回来确认）。在 409 处置区里就地清一遍，等于把那段
+    // 判断再写一份，两份迟早分叉 —— 而分叉的那一侧会在"以为清掉了"时换新键，
+    // 于是旧键那张单还在、新键又建一张。
+    const conflictBlock = blockAfter(src, 'const conflict = reconcileEngine.classifySubmitConflict(err)')
+      || src.slice(src.indexOf('classifySubmitConflict(err)'))
+    assert(!/idem\.clearRecord\(/.test(conflictBlock),
+      `${label} 页的 409 处置区不自己清记录（换键走各页已经读回来核对过的那条路）`)
+    // 换人之后迟到的核对回调必须逐字核账号才写。
+    assert(/if \(this\._(identityKey\(\) !== account|account !== account)\)|this\._account !== account/.test(src),
+      `${label} 页的核对回调先核账号再写（这批记录属于发起者，屏幕可能已经换了人）`)
+  }
+
+  // ⑦ 两个页面的错误出口形状不同（一个是页内错误卡片、一个是 modal + 锁态），所以
+  //    `abandoned` / `in_progress` 的落点分别钉，不套同一个正则 —— 套同一个的代价是
+  //    其中一页必然写成"看着像过了"的空断言。
+  {
+    const confirm = stripComments(read('pages/package-confirm/package-confirm.js'))
+    const abandoned = blockAfter(confirm, 'conflict === reconcileEngine.CONFLICT_ABANDONED')
+    const inProgress = blockAfter(confirm, 'conflict === reconcileEngine.CONFLICT_IN_PROGRESS')
+    assert(!!abandoned && !!inProgress, 'package 页两支 409 的块都取得到')
+    assert(/this\._needsFreshKey = true/.test(abandoned),
+      'package 页 abandoned 那一支委托给 _needsFreshKey（下一次提交前会清记录并读回来确认）')
+    assert(!/_needsFreshKey/.test(inProgress) && !/clearRecord/.test(inProgress),
+      'package 页 in_progress 那一支不换键、不清记录（那次提交正在服务端跑，换键就是第二张单）')
+    assert(/submitRecover: shown\.recover/.test(inProgress),
+      'package 页 in_progress 给得出可执行的下一步（再核对一次），不是一句"请稍后重试"')
+  }
+  {
+    const pay = stripComments(read('pages/print-pay/print-pay.js'))
+    const conflictBlock = blockAfter(pay, 'const conflict = reconcileEngine.classifySubmitConflict(err)')
+    assert(!!conflictBlock, 'print 页 409 处置区取得到')
+    const abandoned = blockAfter(conflictBlock, 'conflict === reconcileEngine.CONFLICT_ABANDONED')
+    assert(!!abandoned, 'print 页 abandoned 那一支取得到')
+    // print 页没有页内错误卡片，abandoned 的落点是既有的 terminal 锁态 —— 那一态的按钮
+    // 就是 startNewOrder，而它会 clearRecord 并读回来确认。in_progress 走 modal，什么都不改。
+    assert(/createdCanReorder: true/.test(abandoned),
+      'print 页 abandoned 点亮「重新下单」（它的按钮 startNewOrder 会读回来确认再换键）')
+    // **不许复用 'terminal'**：那一档的标题写着「上一张订单已经结束」，而 abandoned 恰恰是
+    // "根本没建成过订单"。共用一个状态就是在屏幕上陈述一件没发生过的事，
+    // 而同一张卡片里的 createdNotice 说的正相反 —— 用户看到的是两句自相矛盾的话。
+    assert(/createdState: 'abandoned'/.test(abandoned),
+      'print 页 abandoned 用自己的锁态，不冒充「上一张订单已经结束」')
+    const payWxml = read('pages/print-pay/print-pay.wxml')
+    assert(/createdState === 'abandoned' \?/.test(payWxml),
+      'print 页模板给 abandoned 单独的标题（否则那一档会显示一句没发生过的事）')
+    const afterAbandoned = conflictBlock.slice(conflictBlock.indexOf(abandoned) + abandoned.length)
+    assert(/wx\.showModal\(/.test(afterAbandoned)
+      && !/createdCanReorder: true/.test(afterAbandoned)
+      && !/clearRecord/.test(afterAbandoned),
+    'print 页 in_progress 只弹一句说明：不换键、不清记录、不点亮「重新下单」')
   }
 }
 

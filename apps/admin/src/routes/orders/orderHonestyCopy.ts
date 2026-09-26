@@ -42,3 +42,23 @@ export function recordedCentsText(cents: number | null | undefined, currency: st
   const fen = String(cents % 100).padStart(2, '0')
   return `${currency === 'CNY' ? '¥' : currency} ${yuan}.${fen}`
 }
+
+/**
+ * 运营关注角标文案。三个码的唯一来源是后端
+ * `admin-orders-readonly.service.ts` 的互斥推导，前端不新增第四类。
+ *
+ * 返回 null 有两种情况，都必须什么都不显示：
+ *   - 后端没返回该字段（存量部署）—— 不知道就不说，绝不默认「无异常」；
+ *   - 出现了本前端不认识的新码 —— 瞎猜一个中文比留白更危险。
+ *
+ * 「渠道已受理未确认」刻意不写成「已支付」：那一类的 payStatus 是 paying/closed，
+ * 渠道收了钱而本地没转账，写「已支付」会在管理端摆一个与支付状态相反的结论。
+ */
+export function opsAttentionText(
+  code: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null | undefined,
+): string | null {
+  if (code === 'refund_required') return '待退款'
+  if (code === 'refunding') return '退款中'
+  if (code === 'channel_accepted_unconfirmed') return '渠道已受理未确认'
+  return null
+}

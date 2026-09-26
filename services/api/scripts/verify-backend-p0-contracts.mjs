@@ -324,7 +324,8 @@ check(
 // claim 路径上「码不存在」与「码存在但不属于本终端」必须走同一个拒绝对象。
 check(
   pickupOrderSrc.includes('private static readonly CLAIM_REJECTION') &&
-    (pickupOrderSrc.match(/throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/g) || []).length === 2,
+    /if \(!order\) \{[\s\S]{0,500}?throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/.test(pickupOrderSrc) &&
+    /order\.terminalId !== terminal\.id[\s\S]{0,500}?throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/.test(pickupOrderSrc),
   'claim 的两条失败路径共用同一个 CLAIM_REJECTION 响应（不泄露「这枚码是否存在」）',
 )
 check(
@@ -356,8 +357,10 @@ check(
   '成功认领清零失败计数（否则繁忙终端会被零散手误累积锁死）',
 )
 check(
-  lockoutSrc.includes('tryRedis(') && lockoutSrc.includes("if (!attempt.ok) return false"),
-  'Redis 不可用时锁定 fail-open —— 否则 REDIS_DEGRADED_IMPACT 的 terminal-agent-print:unaffected 会变成假话',
+  lockoutSrc.includes('tryRedis(') &&
+    lockoutSrc.includes('memoryHas(lockKey(terminalId))') &&
+    !lockoutSrc.includes('if (!attempt.ok) return false'),
+  'Redis 不可用时锁定走进程内兜底，不得无条件放行',
 )
 check(
   /isPickupClaimLocked\(this\.redis, terminal\.id\)[\s\S]{0,400}?findUnique\(\{ where: \{ pickupCodeHash/.test(pickupOrderSrc),

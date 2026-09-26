@@ -193,6 +193,25 @@ let SMART_CAMPUS_TERMINALS: PartnerSmartCampusTerminal[] = [
 
 function genId(): string { return `mock-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }
 
+export const MOCK_RECRUITMENT_HOSTING_KEY = 'mock:recruitment-hosting'
+
+/** 'unavailable' 时能力接口直接失败，用来演示「暂时无法确认」 */
+function mockCapabilitiesUnavailable(): boolean {
+  try {
+    return window.localStorage.getItem(MOCK_RECRUITMENT_HOSTING_KEY) === 'unavailable'
+  } catch {
+    return false
+  }
+}
+
+function mockRecruitmentHostingEnabled(): boolean {
+  try {
+    return window.localStorage.getItem(MOCK_RECRUITMENT_HOSTING_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
 export const partnerMockAdapter = {
   // Smart Campus
   async getSmartCampusTerminals(): Promise<PartnerSmartCampusTerminal[]> {
@@ -217,18 +236,23 @@ export const partnerMockAdapter = {
   },
   async getDataSourceCapabilities(): Promise<PartnerDataSourceCapabilities> {
     await delay()
+    if (mockCapabilitiesUnavailable()) throw new Error('mock: capabilities unavailable')
+    // 与服务端 projectPartnerDataSourceCapabilities 同一叠加：托管关闭时只把岗位 / 招聘会 / 企业位置 false。
+    // 演示默认打开（保持既有演示口径）；localStorage['mock:recruitment-hosting']='off' 时按关闭演示。
+    const recruitmentHosting = mockRecruitmentHostingEnabled()
     return {
       orgType: 'licensed_hr_agency',
       allowedAccessModes: ['api', 'excel', 'csv', 'json', 'webhook', 'manual'],
       allowedSourceKinds: ['hr_company', 'job_platform', 'aggregator', 'manual'],
       defaultSourceKind: 'hr_company',
       adminManagedAccessModes: ['api', 'webhook'],
-      canImportJobs: true,
+      canImportJobs: recruitmentHosting,
       canImportFairs: false,
       canManagePolicies: false,
       canManageSmartCampus: false,
-      canManageCompanies: true,
+      canManageCompanies: recruitmentHosting,
       companyManageScope: 'unrestricted',
+      recruitmentHosting,
     }
   },
   async toggleDataSource(id: string): Promise<PartnerDataSource> {

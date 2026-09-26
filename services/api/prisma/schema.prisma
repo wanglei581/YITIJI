@@ -31,6 +31,9 @@ model Terminal {
   displayName       String?
   macAddress        String?  @unique
   locationLabel     String?
+  areaLabel         String?
+  geoLat            Float?
+  geoLng            Float?
   enabled           Boolean  @default(true)
   orgId             String?
   org               Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
@@ -365,6 +368,7 @@ model PrintTaskStatusLog {
   createdAt  DateTime  @default(now())
 
   @@index([taskId, createdAt])
+  @@index([toStatus, createdAt])
 }
 
 // ── AlertDisposition ──────────────────────────────────────────────────────────
@@ -541,6 +545,29 @@ model OrderItem {
   @@index([printTaskId])
 }
 
+/// Owner-scoped idempotency ledger for POST /me/print-orders and POST /orders/package.
+/// Not a second order system. Unique is (endUserId, idempotencyKey). No secrets or PII.
+/// status: processing | succeeded | abandoned | terminal_failed
+/// orderKind: print | package | unknown (unknown only on resolver tombstones)
+model OrderSubmissionLedger {
+  id             String    @id @default(cuid())
+  endUserId      String
+  idempotencyKey String
+  orderKind      String
+  payloadHash    String
+  status         String
+  leaseToken     String?
+  leaseExpiresAt DateTime?
+  orderId        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([endUserId, idempotencyKey], map: "OrderSubmissionLedger_endUserId_idempotencyKey_key")
+  @@index([status, leaseExpiresAt])
+  @@index([orderId])
+  @@index([endUserId])
+}
+
 /// 服务端价目 SSOT（P0a 支付域）。首批仅开发默认价 seed，不对外宣称最终定价；
 /// Admin 价格 CRUD 与正式定价另批。金额整数「分」，绝不用浮点。
 model PriceConfig {
@@ -713,6 +740,13 @@ model PolicyPost {
   reviewedBy    String?
   reviewedAt    DateTime?
   rejectReason  String?
+
+  /** 正文版本。机构每次改标题、摘要或正文时 +1。发布确认记的是这个号。 */
+  contentVersion Int @default(1)
+  /** 机构发布责任确认：谁、何时、确认了哪个版本。 */
+  publishConfirmedBy String?
+  publishConfirmedAt DateTime?
+  publishConfirmedContentVersion Int?
 
   /** P21:结构化申领条件(条件核对的唯一依据来源) */
   eligibilityRules PolicyEligibilityRule[]
@@ -1161,6 +1195,13 @@ model FileObject {
   storageDeleteAttempts  Int?      // 已尝试的物理删除次数(null = 未记账)
   storageDeleteError     String?   // 最近一次失败的错误类型名;不含文件名/路径/租户信息
 
+  // 手机上传会员确认的两个对象键。复制前写入 pendingStorageKey；
+  // 条件更新把 storageKey 换成它，同时把匿名旧键记到 replacedStorageKey。
+  // 两列可空且无默认值：null 表示没有待完成的复制或待删除的旧键。
+  // 清扫只捞非 null 行。Redis 清理记录过期后，旧键和未挂上的复制仍能删掉。
+  pendingStorageKey  String?
+  replacedStorageKey String?
+
   // 文件资产分类 / 派生关系 / 保存策略。
   // 取值由应用层校验,保持 SQLite / PostgreSQL schema parity。
   assetCategory String @default("original") // 'original' | 'optimized' | 'derived'
@@ -1196,6 +1237,8 @@ model FileObject {
   @@index([sourceFileId])
   // 物理删除重试对账的选行索引:待重试行相对全表极少,不能全表扫。
   @@index([storageDeletePendingAt])
+  @@index([pendingStorageKey])
+  @@index([replacedStorageKey])
 }
 
 // ── Materials / Document Processing ─────────────────────────────────────────
@@ -1868,6 +1911,8 @@ model AiServiceLog {
   terminalId       String?
   endUserId        String?
   endUser          EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  // 未登录任务上的年满14 / 录音声明快照。只有状态和文案版本，不含个人身份。
+  clientDeclarationJson String?
   createdAt        DateTime @default(now())
 
   @@index([operation, createdAt])
@@ -2387,6 +2432,7 @@ model ExternalJumpLog {
   @@index([endUserId, createdAt])
   @@index([endUserId, targetType, createdAt])
   @@index([expiresAt])
+  @@index([createdAt, sourceName])
 }
 
 // ── TerminalSmartCampusConfig ─────────────────────────────────────────────────
@@ -2416,6 +2462,67 @@ model TerminalToolboxConfig {
   updatedBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ── KioskJobBoardConfig ──────────────────────────────────────────────────────
+// 一体机岗位板块开关。落库方式与 TerminalToolboxConfig 相同（自由 terminalId
+// 字符串，可在终端注册前预置），下发仍走 GET /terminals/:id/config，不另建通道。
+//
+// terminalId = '__global__' 是全局行；其它值是终端 terminalCode。
+// 无行 = 开（全局默认开、逐台默认开）。全局 enabled=false 优先于逐台开。
+//
+// 不复用 TerminalCapability：缺行在那张表里是拒绝，且没有全局行，和「默认开」相反。
+model KioskJobBoardConfig {
+  id         String   @id @default(cuid())
+  terminalId String   @unique
+  enabled    Boolean  @default(true)
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// 紧急下架留痕。同一目标只有一行；存在即不可再发布。不删招聘内容表。
+model RecruitmentEmergencyHold {
+  id         String   @id @default(cuid())
+  targetType String
+  targetId   String
+  orgId      String
+  sourceId   String?
+  reasonCode String
+  reasonText String
+  actorId    String
+  createdAt  DateTime @default(now())
+
+  @@unique([targetType, targetId])
+  @@index([orgId, createdAt])
+}
+
+// 机构或来源熔断。单向，不可撤销。发布和同步都要查这张表，不能只看当下已发布的行。
+model RecruitmentCircuitBreak {
+  id         String   @id @default(cuid())
+  scope      String
+  targetId   String
+  reasonCode String
+  reasonText String
+  actorId    String
+  createdAt  DateTime @default(now())
+
+  @@unique([scope, targetId])
+  @@index([scope, createdAt])
+}
+
+// 机构可见的站内记录。没有单独的机构通知通道，下架结果写在这里。
+model PartnerOrgNotice {
+  id          String    @id @default(cuid())
+  orgId       String
+  kind        String
+  title       String
+  body        String
+  payloadJson String    @default("{}")
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([orgId, createdAt])
 }
 
 // ── ToolboxGovernance ──────────────────────────────────────────────────────
@@ -2619,7 +2726,7 @@ model HelpItem {
 
 model LegalDocVersion {
   id          String    @id @default(cuid())
-  docType     String    // "privacy_policy" | "terms_of_service" | "ai_disclaimer"
+  docType     String    // "privacy_policy" | "terms_of_service" | "ai_disclaimer" | "contract_review_disclaimer" | "operator_info"
   version     String    // "v1.0", "v1.1" 等
   title       String    @default("")
   content     String    // Markdown 格式全文

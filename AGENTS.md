@@ -6,9 +6,11 @@
 
 ## 项目定位
 
-AI求职打印服务终端 = AI简历服务 + 打印扫描 + 求职材料服务 + 第三方岗位信息入口 + 招聘会信息入口 + 线下一体机运营后台。
+AI求职打印服务终端 = AI 求职操作系统（AI 简历、模拟面试、职业规划等 AI 工具，AI 是驱动层）+ 打印扫描与材料履约 + 运营机构的官方渠道与政策入口 + 设备运维后台。
 
 **不是招聘平台。公司暂无人力资源服务许可证。**
+
+2026-09-26 起（产品负责人拍板「按推荐执行，托管选 a」）：公司是**设备与软件供应方**，卖终端、随机交付软件、按年收维保，不运营招聘信息；**我们云上不存岗位、招聘会、企业资料**，机构终端只放该机构官方渠道的二维码，政策由机构自己审核发布、我们只留紧急下架；完整招聘功能只在客户私有化部署（b）里由客户运营。代码切换见 `docs/progress/next-tasks.md` 3.13–3.15，切换前不得在我们云上新增岗位、招聘会、企业类功能。定位与 AI 分层见 [feature-scope.md §零](docs/product/feature-scope.md)，法规与资质见 [compliance-boundary.md §1.1–§1.2](docs/compliance/compliance-boundary.md)。
 
 用户主要在 27 寸竖屏触控显示器上使用，兼容手机和桌面浏览器。
 
@@ -27,7 +29,7 @@ AI求职打印服务终端 = AI简历服务 + 打印扫描 + 求职材料服务 
 7. 自营网络招聘闭环
 8. 企业自主发布岗位并直接收简历
 
-岗位和招聘会只能作为第三方/官方来源信息入口。
+岗位和招聘会只能作为第三方/官方来源信息入口；托管 a 下我们云上连这个入口也不做，下面的文案白名单约束现有代码（切换前）与私有化部署（b）版本。
 
 合规按钮文案：去来源平台投递 / 扫码投递 / 去来源平台预约 / 扫码预约  
 禁止文案：一键投递 / 立即投递 / 平台投递
@@ -44,7 +46,7 @@ AI求职打印服务终端 = AI简历服务 + 打印扫描 + 求职材料服务 
 ## 技术栈
 
 前端：React + Vite + TypeScript + Tailwind CSS + shadcn/ui + lucide-react  
-后端：NestJS 或 FastAPI + PostgreSQL + Redis + BullMQ  
+后端：NestJS（`services/api`）+ Prisma（开发 SQLite / 生产 PostgreSQL）+ Redis + BullMQ（可选）  
 存储：MinIO / 阿里云 OSS / 腾讯 COS  
 终端 Agent：Windows 本地 Node.js/.NET/Python
 
@@ -73,12 +75,9 @@ docs/                # 所有文档
 
 ## AI 协作分工
 
-| 角色 | 职责 |
-|------|------|
-| Claude Code | 主力开发（apps/、services/、packages/） |
-| Codex | 方案审查、代码 review、需求整理、UI/UX 审查、关键问题修复、docs/ 维护 |
+当前分工以 `docs/progress/next-tasks.md` 顶部的「分路」为准（2026-09-25 起：Claude 总指挥，负责原型、页面、任务包与验收合并；Grok 按分路实现后端、测试、CI 与 Agent；Agy 做独立评审；Codex 按产品负责人要求暂停，恢复后接在唯一候选分支之后）。每个模块同一时间只有一个写入方。
 
-两者共用同一 Git 仓库，不分叉副本。
+所有模型共用同一 Git 仓库，不分叉副本。
 
 详见：[docs/decisions/ai-collaboration-rules.md](docs/decisions/ai-collaboration-rules.md)
 
@@ -157,7 +156,7 @@ docs/                # 所有文档
 
 - 当前阶段与已完成事项：[docs/progress/current-progress.md](docs/progress/current-progress.md) 顶部活动快照。
 - 唯一交付阻塞与下一步：[docs/progress/next-tasks.md](docs/progress/next-tasks.md) 顶部清单。
-- 小程序、一体机、管理员后台、合作机构后台的实现 / 开放 / 线上状态：[docs/product/feature-scope.md](docs/product/feature-scope.md) §1.2。
+- 定位、AI 分层与各端功能范围：[docs/product/feature-scope.md](docs/product/feature-scope.md) §零–§四；实现 / 开放 / 线上状态见 §1.2（2026-09-24 快照）与 §1.3（2026-09-26 代码清点）；已知缺口见 §七。
 - 代码事实：精确的 `origin/main@SHA`；生产事实：服务器 `DEPLOY_SOURCE.txt`、PM2、nginx Web Root 与健康检查。
 
 禁止把本地候选、CI 通过、历史真机证据或原型页面写成“已部署 / 已上线 / 当前真机已通过”。
@@ -170,7 +169,8 @@ docs/                # 所有文档
 
 - Windows 驱动识别名称（真机确认）：`Pantum CM2800ADN Series`
 - **代码中必须通过 `printerName` 配置项指定，禁止硬编码任何型号字符串**
-- 硬件支持彩色打印；但奔图开放打印 API 的彩色 mode 取值 **TODO**（待厂家确认，不得假设为 `"color"`）
+- 硬件支持彩色打印；本地驱动的彩色与自动双面已于 2026-09-02 真机验证（EV-013），但每台新机器仍须验过后由管理员后台逐台开通，开通彩色前先改价目描述（见 CLAUDE.md §3）
+- 奔图开放打印 API 的彩色 mode 取值 **TODO**（待厂家确认，不得假设为 `"color"`）
 
 详见：[docs/device/pantum-cm2820adn.md](docs/device/pantum-cm2820adn.md)  
 Agent 设计：[docs/device/windows-terminal-agent-design.md](docs/device/windows-terminal-agent-design.md)  

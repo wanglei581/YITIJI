@@ -3,7 +3,7 @@
  *
  * 检查项：
  *   1. schema.prisma 包含 model LegalDocVersion
- *   2. shared / legal.service.ts 包含四个合规 docType 枚举
+ *   2. shared / legal.service.ts 包含合规 docType 枚举（含 operator_info）
  *   3. admin-legal-docs.controller.ts 使用 @UseGuards
  *   4. legal.controller.ts 中 GET /kiosk/legal/:type 路由存在
  *   5. activate 方法写入 auditLog
@@ -15,9 +15,13 @@
  * 运行: pnpm --filter @ai-job-print/api verify:legal-doc-version
  */
 
+import 'reflect-metadata'
 import * as fs from 'fs'
 import * as path from 'path'
+import { validate } from 'class-validator'
 import { LegalController } from '../src/legal/legal.controller'
+import { CreateLegalDocDto } from '../src/legal/dto/admin-legal-doc.dto'
+import { LEGAL_DOC_TYPES, LegalService } from '../src/legal/legal.service'
 
 const ROOT = path.resolve(__dirname, '../../..')
 
@@ -52,7 +56,7 @@ async function main() {
     pass('schema.prisma 包含 model LegalDocVersion')
   }
 
-  // ── 2. shared / service 包含四个合规 docType 枚举 ────────────────────────────────
+  // ── 2. shared / service 包含合规 docType 枚举 ────────────────────────────────
   {
     const service = readFile('services/api/src/legal/legal.service.ts')
     const shared = readFile('packages/shared/src/types/legalDocs.ts')
@@ -61,6 +65,7 @@ async function main() {
       'terms_of_service',
       'ai_disclaimer',
       'contract_review_disclaimer',
+      'operator_info',
     ]
     const missing = required.filter(
       (docType) => !service.includes(`'${docType}'`) || !shared.includes(`'${docType}'`)
@@ -68,10 +73,13 @@ async function main() {
     if (missing.length > 0) {
       fail('shared / legal.service.ts 缺少合规 docType 枚举', missing.join(', '))
     }
+    if (!LEGAL_DOC_TYPES.includes('operator_info')) {
+      fail('运行中的 LEGAL_DOC_TYPES 未包含 operator_info（源码字符串出现在注释里不算）')
+    }
     if (!service.includes('isActive: false')) {
       fail('legal.service.ts 创建法务文档时必须保持草稿未激活')
     }
-    pass('shared / legal.service.ts 包含 contract_review_disclaimer，且新文档保持未激活')
+    pass('shared / legal.service.ts 包含 operator_info，且新文档保持未激活')
   }
 
   // ── 3. admin 控制器使用鉴权守卫 ──────────────────────────────────────────
@@ -326,8 +334,161 @@ async function main() {
     pass('Kiosk / Admin / Partner 三端法务全文均读已激活版本；本地兜底均已显式标注')
   }
 
+  // ── 13. operator_info：发布、公开读取、未发布（走 DTO / Service / Controller，注释字符串不算）──
+  await assertOperatorInfoRoundTrip()
+
   // ── 完成 ─────────────────────────────────────────────────────────────────
-  console.log('\n=== G6 法务文档版本管理验证通过（12/12 项） ===\n')
+  console.log('\n=== G6 法务文档版本管理验证通过（13/13 项） ===\n')
+}
+
+type MemoryDoc = {
+  id: string; docType: string; version: string; title: string; content: string
+  isActive: boolean; publishedAt: Date | null; publishedBy: string | null; createdAt: Date
+}
+
+function projectRow(row: MemoryDoc, select?: Record<string, boolean>): Partial<MemoryDoc> {
+  if (!select) return row
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(select)) {
+    if (select[key]) out[key] = (row as unknown as Record<string, unknown>)[key]
+  }
+  return out as Partial<MemoryDoc>
+}
+
+function memoryLegalPrisma() {
+  const docs: MemoryDoc[] = []
+  const audits: Array<{ action: string }> = []
+  let seq = 0
+  const tx = {
+    legalDocVersion: {
+      async findFirst(args: { where: { docType: string; isActive: boolean }; select?: Record<string, boolean> }) {
+        const row = docs.find((doc) => doc.docType === args.where.docType && doc.isActive === args.where.isActive) ?? null
+        return row ? projectRow(row, args.select) : null
+      },
+      async findUnique(args: { where: { id: string } }) {
+        return docs.find((doc) => doc.id === args.where.id) ?? null
+      },
+      async create(args: { data: Record<string, unknown>; select?: Record<string, boolean> }) {
+        const row: MemoryDoc = {
+          id: `doc-${++seq}`,
+          docType: String(args.data.docType),
+          version: String(args.data.version),
+          title: String(args.data.title),
+          content: String(args.data.content),
+          isActive: Boolean(args.data.isActive),
+          publishedAt: (args.data.publishedAt as Date | null | undefined) ?? null,
+          publishedBy: (args.data.publishedBy as string | null | undefined) ?? null,
+          createdAt: new Date(),
+        }
+        docs.push(row)
+        return projectRow(row, args.select)
+      },
+      async updateMany(args: { where: { docType: string; isActive: boolean }; data: Partial<MemoryDoc> }) {
+        let count = 0
+        for (const row of docs) {
+          if (row.docType === args.where.docType && row.isActive === args.where.isActive) {
+            Object.assign(row, args.data)
+            count += 1
+          }
+        }
+        return { count }
+      },
+      async update(args: { where: { id: string }; data: Partial<MemoryDoc>; select?: Record<string, boolean> }) {
+        const row = docs.find((doc) => doc.id === args.where.id)
+        if (!row) throw new Error(`missing ${args.where.id}`)
+        Object.assign(row, args.data)
+        return projectRow(row, args.select)
+      },
+    },
+    auditLog: {
+      async create(args: { data: { action: string } }) {
+        audits.push({ action: args.data.action })
+        return { id: `audit-${++seq}` }
+      },
+    },
+  }
+  return { ...tx, $transaction: async <T>(fn: (client: typeof tx) => Promise<T>) => fn(tx), audits }
+}
+
+async function dtoAccepts(docType: string): Promise<boolean> {
+  const dto = new CreateLegalDocDto()
+  dto.docType = docType as CreateLegalDocDto['docType']
+  dto.version = '2026.09.26-v1'
+  dto.title = '经营者信息'
+  dto.content = '营业执照信息见本页。'
+  const errors = await validate(dto)
+  return !errors.some((error) => error.property === 'docType')
+}
+
+async function assertOperatorInfoRoundTrip(): Promise<void> {
+  if (!(await dtoAccepts('operator_info'))) {
+    fail('CreateLegalDocDto 拒绝 operator_info')
+  }
+  if (await dtoAccepts('not_a_legal_doc')) {
+    fail('CreateLegalDocDto 放行了未知 docType（校验元数据可能没生效）')
+  }
+
+  const db = memoryLegalPrisma()
+  const audit = {
+    writeRequired: async (
+      client: { auditLog: { create: (args: { data: { action: string; payloadJson: string } }) => Promise<{ id: string }> } },
+      args: { action: string; payload?: unknown },
+    ) => {
+      const row = await client.auditLog.create({
+        data: { action: args.action, payloadJson: JSON.stringify(args.payload ?? {}) },
+      })
+      return row.id
+    },
+  }
+  const service = new LegalService(db as never, audit as never)
+  const controller = new LegalController(service)
+
+  const unpublishedOperator = await controller.getActive('operator_info')
+  const unpublishedPrivacy = await controller.getActive('privacy_policy')
+  if (JSON.stringify(unpublishedOperator) !== JSON.stringify(unpublishedPrivacy)) {
+    fail('operator_info 未发布时的响应与 privacy_policy 不一致', JSON.stringify({ unpublishedOperator, unpublishedPrivacy }))
+  }
+  if (unpublishedOperator.success !== true || unpublishedOperator.data !== null) {
+    fail('未发布应返回 { success: true, data: null }')
+  }
+
+  const draft = await service.create({
+    docType: 'operator_info',
+    version: '2026.09.26-v1',
+    title: '经营者信息',
+    content: '营业执照：示例主体',
+    adminId: 'admin-operator-info',
+  })
+  if (draft.isActive !== false) fail('新建 operator_info 必须是未激活草稿')
+  const draftRead = await controller.getActive('operator_info')
+  if (draftRead.success !== true || draftRead.data !== null) {
+    fail('只有草稿时公开读取仍应是未发布（data: null）')
+  }
+
+  const activated = await service.activate(draft.id, 'admin-operator-info')
+  if (!activated.isActive || activated.docType !== 'operator_info' || activated.version !== '2026.09.26-v1') {
+    fail('激活 operator_info 后未成为该类型的现行版本')
+  }
+  if (!db.audits.some((row) => row.action === 'legal_doc.activate')) {
+    fail('发布 operator_info 未写入 legal_doc.activate 审计')
+  }
+
+  const live = await controller.getActive('operator_info')
+  if (
+    live.success !== true ||
+    live.data?.docType !== 'operator_info' ||
+    live.data.version !== '2026.09.26-v1' ||
+    live.data.title !== '经营者信息' ||
+    !live.data.content.includes('营业执照') ||
+    !(live.data.publishedAt instanceof Date)
+  ) {
+    fail('公开读取未返回现行 operator_info', JSON.stringify(live))
+  }
+  const privacyAfter = await controller.getActive('privacy_policy')
+  if (JSON.stringify(privacyAfter) !== JSON.stringify(unpublishedPrivacy)) {
+    fail('发布 operator_info 改变了其它类型的未发布语义')
+  }
+  pass('operator_info 可发布、可公开读取现行版本；未发布与其它类型同为 data: null')
 }
 
 main().catch((e: unknown) => {

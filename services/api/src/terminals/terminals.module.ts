@@ -5,6 +5,8 @@ import { TerminalsController } from './terminals.controller'
 import { AdminTerminalsController } from './admin-terminals.controller'
 import { AdminPrintersController } from './admin-printers.controller'
 import { AdminToolboxController } from './admin-toolbox.controller'
+import { AdminKioskJobBoardController } from './admin-kiosk-job-board.controller'
+import { KioskJobBoardService } from './kiosk-job-board.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { TerminalAdminService } from './terminals-admin.service'
 import { TerminalsService } from './terminals.service'
@@ -27,6 +29,7 @@ import { TerminalIdentityGuard } from './terminal-identity.guard'
     AdminReleaseObservationController,
     AdminPrintersController,
     AdminToolboxController,
+    AdminKioskJobBoardController,
   ],
   providers: [
     TerminalAgentService,
@@ -37,6 +40,7 @@ import { TerminalIdentityGuard } from './terminal-identity.guard'
     TerminalAdminService,
     TerminalsService,
     TerminalToolboxService,
+    KioskJobBoardService,
     ToolboxGovernanceService,
     TerminalCapabilitiesService,
     TerminalHeartbeatRetentionTask,
@@ -48,6 +52,7 @@ import { TerminalIdentityGuard } from './terminal-identity.guard'
     TerminalAdminService,
     TerminalsService,
     TerminalToolboxService,
+    KioskJobBoardService,
     ToolboxGovernanceService,
     TerminalCapabilitiesService,
     TerminalSessionService,
