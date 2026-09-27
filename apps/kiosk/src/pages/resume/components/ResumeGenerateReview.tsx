@@ -4,6 +4,7 @@ import type {
   ResumeGenProject,
 } from '@ai-job-print/shared'
 import { PenLineIcon } from 'lucide-react'
+import { maskEmail, maskPhone } from '../../../utils/maskPii'
 
 /** 与 ResumeGeneratePage.buildInput 同一条提交规则：半空条目不送出。 */
 function splitList(text: string, cap: number): string[] {
@@ -75,7 +76,7 @@ export function ResumeGenerateReview(props: {
           <span className="qx-rg-hint">点一行修改资料</span>
         </div>
         <div className="qx-rg-rows">
-          <Row title="基本信息" detail={joined([props.basic.name, props.basic.city, props.basic.phone, props.basic.email])} onEdit={() => props.onEdit(0)} />
+          <Row title="基本信息" detail={joined([props.basic.name, props.basic.city, maskPhone(props.basic.phone), maskEmail(props.basic.email)])} onEdit={() => props.onEdit(0)} />
           <Row title="求职意向" detail={joined([props.intention.position, props.intention.city, props.intention.jobType, props.intention.salary])} onEdit={() => props.onEdit(1)} />
           <Row title="教育经历" detail={countLine(eduKept, eduSkip, '段', '空着（预览页会提示你补）')} onEdit={() => props.onEdit(2)} />
           <Row title="工作 / 实习经历" detail={countLine(expKept, expSkip, '段', '空着（预览页会提示你补）')} onEdit={() => props.onEdit(3)} />
