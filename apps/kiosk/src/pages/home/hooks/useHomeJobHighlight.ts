@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { getJobs } from '../../../services/api'
 
 export type HomeJobHighlightState =
@@ -26,6 +27,8 @@ export type HomeJobHighlightState =
 export function useHomeJobHighlight(): HomeJobHighlightState & { retry: () => void } {
   const [state, setState] = useState<HomeJobHighlightState>({ status: 'loading', total: null })
   const [requestVersion, setRequestVersion] = useState(0)
+  // 招聘内容托管（3.13）没打开时不请求岗位：首页也不会摆这张卡。
+  const hostingOpen = useRecruitmentHosting().enabled
 
   const retry = useCallback(() => {
     setRequestVersion((version) => version + 1)
@@ -34,6 +37,7 @@ export function useHomeJobHighlight(): HomeJobHighlightState & { retry: () => vo
   useEffect(() => {
     let cancelled = false
     setState({ status: 'loading', total: null })
+    if (!hostingOpen) return
 
     void getJobs({ pageSize: 1 })
       .then((response) => {
@@ -52,7 +56,7 @@ export function useHomeJobHighlight(): HomeJobHighlightState & { retry: () => vo
     return () => {
       cancelled = true
     }
-  }, [requestVersion])
+  }, [requestVersion, hostingOpen])
 
   return { ...state, retry }
 }

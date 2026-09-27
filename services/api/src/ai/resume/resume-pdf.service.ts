@@ -1,6 +1,7 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
+import { requireAigcProduceId } from '../../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { GeneratedResume, ResumeLayoutSettings } from '../interfaces/ai-provider.interface'
 import type { ResumeTemplateLayoutPreset, ResumeTemplateSectionKey } from '../../job-materials/job-materials.types'
@@ -70,10 +71,12 @@ export interface ResumePdfRenderOptions {
    * 把一份一个字都不是 AI 写的文件标成 AI 产物，和反过来把 AI 产物标成人工一样失真。
    */
   draft?: boolean
+  /** 任务号，写入 AIGC.ProduceID。非草稿必填。草稿路径不写 AIGC。 */
+  contentId?: string | null
 }
 
 function isRenderOptions(value: ResumeLayoutSettings | ResumePdfRenderOptions | undefined): value is ResumePdfRenderOptions {
-  return Boolean(value && ('layout' in value || 'templatePreset' in value || 'draft' in value))
+  return Boolean(value && ('layout' in value || 'templatePreset' in value || 'draft' in value || 'contentId' in value))
 }
 
 @Injectable()
@@ -132,6 +135,7 @@ export class ResumePdfService {
         title: `${resume.basic.name} 的简历`,
         subject: '经 AI 简历服务生成/优化的简历文件；事实信息来自用户本人填写或原简历，AI 只参与表达润色',
         kind: 'resume',
+        contentId: requireAigcProduceId(renderOptions.contentId ?? ''),
       })
     }
     this.resolveFont(doc)

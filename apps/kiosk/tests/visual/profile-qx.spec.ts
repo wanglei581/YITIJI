@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 
 const MEMBER_TOKEN = 'qx-profile-member-token'
@@ -36,6 +37,7 @@ function registerShell(api: ApiRouter): void {
     json: {
       smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
       toolbox: { enabled: false, items: [] },
+      ...RECRUITMENT_HOSTING_ON,
       configVersion: 'qx-profile',
       refreshIntervalMs: 300000,
       serverTime: '2026-09-07T00:00:00.000Z',

@@ -260,7 +260,7 @@ async function main() {
     if (!/^\/api\/v1\/files\/[^/]+\/content\?expires=\d+&sig=[0-9a-f]+$/.test(printed.printFileUrl ?? '')) {
       fail(`9. printFileUrl 不是内部 HMAC URL: ${printed.printFileUrl}`)
     }
-    const { buffer } = await pdf.render({ date: '2026-06-12', basedOn: { resume: true, jobFit: null, interview: null } }, VALID)
+    const { buffer } = await pdf.render({ date: '2026-06-12', basedOn: { resume: true, jobFit: null, interview: null }, contentId: taskAnon }, VALID)
     if (buffer.slice(0, 4).toString() !== '%PDF') fail('9. 输出不是 PDF')
     pass(`9. 建议单 PDF 真实渲染（${buffer.length} bytes）+ 打印链路返回内部 HMAC URL`)
 

@@ -18,6 +18,12 @@
  *   「发布」渲染 ⟺ reviewStatus === 'approved' && publishStatus !== 'published'
  *   「下架」渲染 ⟺ publishStatus === 'published'
  *
+ * 3.13（2026-09-26）起：
+ *   - job-sources / fair-sources 的审核 / 发布 / 下架整组包在托管开关守卫里：托管关闭（我们云上默认）
+ *     时不渲染，只留查看与紧急下架；托管打开（私有化部署 b）时按上面的矩阵渲染，另加紧急下架。
+ *   - policy-sources 不再有任何管理员审核 / 发布 / 批量发布：政策由机构自己审核发布，
+ *     服务端对管理员一律回 403 ADMIN_POLICY_PUBLISH_DISABLED。页面只留查看与紧急下架。
+ *
  * Run: pnpm --filter @ai-job-print/admin verify:source-publish-actions
  *
  * ⚠ 该 npm script 现在跑两个脚本：本文件（发布/下架按钮渲染条件），以及
@@ -47,8 +53,10 @@ const ORACLES = {
 const targets = [
   join(adminRoot, 'src/routes/job-sources/index.tsx'),
   join(adminRoot, 'src/routes/fair-sources/index.tsx'),
-  join(adminRoot, 'src/routes/policy-sources/index.tsx'),
 ]
+
+/** 托管开关守卫：管理员对招聘内容的审核 / 发布 / 下架只在它为真时渲染。 */
+const HOSTING_GUARD_LINE = '{hosting.writable && ('
 
 /** 形如 `{<expr> && (` 的 JSX 守卫行 */
 const GUARD_RE = /^\s*\{(.+?)\s*&&\s*\($/
@@ -144,6 +152,77 @@ for (const target of targets) {
     fail(`${rel(target)}:${publishGuard.line} approved + unpublished 的行渲染不出「发布」按钮（2026-08-16 事故回归）`)
   }
   pass(`${rel(target)} approved + unpublished 可渲染「发布」按钮`)
+}
+
+/**
+ * 找到 `{hosting.writable && (` 这一守卫包住的行号区间（按括号配对，JSX 里的中文与 className 不含括号）。
+ * 返回 [开始行, 结束行]（1 起算，含两端）。
+ */
+function hostingGuardRange(source, file) {
+  const lines = source.split('\n')
+  const starts = lines.flatMap((line, index) => (line.trim() === HOSTING_GUARD_LINE ? [index] : []))
+  if (starts.length !== 1) fail(`${rel(file)} 应恰好有 1 处 \`${HOSTING_GUARD_LINE}\` 守卫包住审核 / 发布 / 下架，实际 ${starts.length} 处`)
+  let depth = 0
+  for (let i = starts[0]; i < lines.length; i += 1) {
+    for (const ch of lines[i]) {
+      if (ch === '(') depth += 1
+      if (ch === ')') depth -= 1
+    }
+    if (depth === 0) return [starts[0] + 1, i + 1]
+  }
+  fail(`${rel(file)} 的托管守卫没有闭合`)
+}
+
+for (const target of targets) {
+  const source = readFileSync(target, 'utf8')
+  const [from, to] = hostingGuardRange(source, target)
+  const lines = source.split('\n')
+  for (const label of ['审核通过', '拒绝', '发布', '下架']) {
+    const at = lines.flatMap((line, index) => (line.trim() === label ? [index + 1] : []))
+    if (at.length === 0) fail(`${rel(target)} 找不到「${label}」按钮，页面结构已失配`)
+    const outside = at.filter((line) => line < from || line > to)
+    if (outside.length > 0) {
+      fail(`${rel(target)}:${outside.join(',')} 的「${label}」不在托管开关守卫（第 ${from}-${to} 行）里 —— 托管关闭时会渲染出点了就 403 的按钮`)
+    }
+  }
+  if (!/hosting\.writable \? <BulkPublishButton/.test(source)) {
+    fail(`${rel(target)} 的批量发布没有按托管开关收起（期望 \`hosting.writable ? <BulkPublishButton\`）`)
+  }
+  const kind = target.includes('job-sources') ? 'job' : 'job_fair'
+  if (!source.includes(`setTakedown({ targetType: '${kind}'`) || !source.includes('<EmergencyTakedownDialog')) {
+    fail(`${rel(target)} 没有逐条的紧急下架入口（targetType=${kind}）`)
+  }
+  const takedownLine = lines.findIndex((line) => line.includes(`setTakedown({ targetType: '${kind}'`)) + 1
+  if (takedownLine >= from && takedownLine <= to) {
+    fail(`${rel(target)}:${takedownLine} 紧急下架被包进了托管开关守卫 —— 托管关闭时管理员反而无法下架`)
+  }
+  pass(`${rel(target)} 审核 / 发布 / 下架只在托管打开时渲染（第 ${from}-${to} 行），紧急下架两种状态都在`)
+}
+
+// ── 3.13 政策：管理员只读 + 紧急下架 ─────────────────────────────────────────
+/** 去掉块注释与行注释，只看会执行的代码（注释里解释「为什么不再调用」不应打挂断言）。 */
+function codeOnly(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
+{
+  const policyPath = join(adminRoot, 'src/routes/policy-sources/index.tsx')
+  const policyPage = codeOnly(readFileSync(policyPath, 'utf8'))
+  const policyLines = policyPage.split('\n').map((line) => line.trim())
+  for (const label of ['审核通过', '拒绝', '发布', '下架']) {
+    if (policyLines.includes(label)) fail(`${rel(policyPath)} 仍渲染管理员「${label}」按钮 —— 政策由机构自己审核发布`)
+  }
+  for (const token of ['reviewPolicy(', 'publishPolicy(', 'BulkPublishButton', 'window.confirm(']) {
+    if (policyPage.includes(token)) fail(`${rel(policyPath)} 仍含 ${token} —— 管理员不能审核、发布或按旧方式下架政策`)
+  }
+  if (!policyPage.includes("setTakedown({ targetType: 'policy'") || !policyPage.includes('<EmergencyTakedownDialog')) {
+    fail(`${rel(policyPath)} 缺少政策的紧急下架入口`)
+  }
+  const policiesService = codeOnly(readFileSync(join(adminRoot, 'src/services/api/policiesAdmin.ts'), 'utf8'))
+  for (const token of ['reviewPolicy', 'publishPolicy', '/review`', '/publish`']) {
+    if (policiesService.includes(token)) fail(`policiesAdmin.ts 仍能调用管理员审核 / 发布政策（${token}）`)
+  }
+  pass(`${rel(policyPath)} 只留查看与紧急下架；管理员政策 service 不再提供审核 / 发布`)
 }
 
 const jobSources = readFileSync(join(adminRoot, 'src/routes/job-sources/index.tsx'), 'utf8')

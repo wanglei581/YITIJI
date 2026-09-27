@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
 
 const FIXTURE_KIOSK_URL = 'http://127.0.0.1:4178/?viewport=kiosk'
@@ -73,6 +74,7 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
         items: [],
       },
       toolbox: { enabled: false, items: [] },
+      ...RECRUITMENT_HOSTING_ON,
       configVersion: 'w1-browser-fixture',
       refreshIntervalMs: 300000,
       serverTime: '2026-07-24T00:00:00.000Z',

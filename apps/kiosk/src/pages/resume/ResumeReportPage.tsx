@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import type { ResumeParseResponse, ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
-import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { isAiOutage } from '../../ai'
@@ -65,11 +65,13 @@ function ReportNoticePanel({
   extractionNotice?: ReportState['extractionNotice']
   truncated?: boolean
 }) {
+  // 真实报告的说明以 AI 可见标识开头（审计表一「简历诊断（屏）」，next-tasks 3.5c）；
+  // 演示报告不是模型结果，不挂「AI 生成」，沿用演示说明。
   const notices = [
     isDemoReport ? COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE : null,
     isDemoReport
       ? '演示报告不基于你上传的文件内容生成，仅用于展示报告结构；它不会发送给企业，也不代表录用、面试或投递结果。'
-      : '本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。',
+      : `${AI_LABEL_COPY.RESUME_DIAGNOSIS}。本报告只依据上传文件中可解析出的内容，不会发送给企业，也不代表录用、面试或投递结果。`,
     buildExtractionNotice(extractionNotice),
     truncated ? '本次诊断只看了简历前若干字符，后面的内容块可能整块缺失，不是简历里没有那些部分。' : null,
     COMPLIANCE_COPY.KIOSK_RESUME_REPORT_DISCLAIMER,

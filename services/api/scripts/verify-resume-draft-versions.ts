@@ -336,7 +336,7 @@ async function main(): Promise<void> {
     if (left !== 0) fail(`7a. taskA 应被清空，剩 ${left}`)
     pass('7a. 删除 parse 级联草稿与确认快照')
 
-    const docx = await resumeDocx.render(ORIGINAL_RESUME)
+    const docx = await resumeDocx.render(ORIGINAL_RESUME, { contentId: taskA })
     const { createRequire } = require('module') as { createRequire: (filename: string) => NodeRequire }
     const docxRequire = createRequire(require.resolve('docx'))
     const JSZip = docxRequire('jszip') as { loadAsync: (buf: Buffer) => Promise<{ file: (name: string) => { async: (type: 'string') => Promise<string> } | null }> }

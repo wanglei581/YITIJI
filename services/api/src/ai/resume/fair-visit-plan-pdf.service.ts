@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
+import { stampAigcPageHeader } from '../../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { FairVisitPlanPayload } from './llm-fair-visit-plan.service'
 
@@ -24,19 +25,19 @@ export class FairVisitPlanPdfService {
    * 免去解析压缩后的 PDF 流。
    */
   async render(
-    meta: { date: string; fairName: string; sourceName: string; venue: string; sourceUrl: string },
+    meta: { date: string; fairName: string; sourceName: string; venue: string; sourceUrl: string; contentId: string },
     plan: FairVisitPlanPayload,
   ): Promise<{ buffer: Buffer; pageCount: number; sections: string[] }> {
     const isReview = plan.mode === 'review'
     const docTitle = isReview ? '招聘会参会回顾与后续跟进' : '招聘会参会准备单'
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
-    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     applyAigcPdfMetadata(doc, {
       title: `AI ${docTitle}`,
       subject: isReview
         ? 'AI 生成的参会回顾与后续跟进参考，仅供求职者本人使用；招聘会仅为第三方或官方来源信息入口'
         : 'AI 生成的参会准备参考，仅供求职者本人现场准备使用；招聘会仅为第三方或官方来源信息入口',
       kind: 'fairvisit',
+      contentId: meta.contentId,
     })
     const ok = registerCjkFont(doc)
     if (!ok) {
@@ -110,6 +111,7 @@ export class FairVisitPlanPdfService {
       plan.onsiteTips.forEach(bullet)
     }
 
+    stampAigcPageHeader(doc)
     const pageCount = doc.bufferedPageRange().count
     doc.end()
     const buffer = await done

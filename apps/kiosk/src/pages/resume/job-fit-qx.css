@@ -242,33 +242,6 @@
 .jfq-job-tx small { display: block; margin-top: 3px; font-size: 17px; color: var(--qx-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jfq-job svg { flex: none; color: var(--qx-teal-d); }
 
-/* ── 结果：三档判定卡 ───────────────────────────────────────── */
-.jfq-verdict-card {
-  display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 22px;
-  padding: 24px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
-  background: var(--qx-surface);
-}
-.jfq-verdict-card[data-level='high'] { border-color: var(--qx-teal-line); }
-.jfq-verdict-card[data-level='mid'] { border-color: var(--qx-line-2); }
-.jfq-verdict-card[data-level='low'] { border-color: var(--qx-cinnabar-line); }
-.jfq-vc-badge { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--qx-r); background: var(--qx-paper); }
-.jfq-vc-badge small { font-size: 17px; color: var(--qx-ink-3); }
-.jfq-vc-badge > b { font-family: var(--qx-serif); font-size: 44px; font-weight: 700; line-height: 1.1; }
-.jfq-verdict-card[data-level='high'] .jfq-vc-badge > b { color: var(--qx-teal-d); }
-.jfq-verdict-card[data-level='mid'] .jfq-vc-badge > b { color: var(--qx-wheat-d); }
-.jfq-verdict-card[data-level='low'] .jfq-vc-badge > b { color: var(--qx-cinnabar-d); }
-.jfq-ladder { display: flex; gap: 6px; }
-.jfq-ladder span {
-  flex: 1; text-align: center; padding: 6px 0; border-radius: var(--qx-r-s);
-  font-size: 16px; background: var(--qx-muted-bg); color: var(--qx-muted-ink);
-}
-.jfq-ladder span[data-on='true'] { background: var(--qx-deep); color: var(--qx-paper); font-weight: 700; }
-.jfq-vc-main small { display: block; font-size: 17px; color: var(--qx-ink-3); }
-.jfq-vc-main > b { display: block; margin-top: 4px; font-size: 26px; font-weight: 700; }
-.jfq-vc-main p { margin: 10px 0 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
-.jfq-vc-risk { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; font-size: 18px; color: var(--qx-wheat-d); }
-.jfq-vc-risk svg { flex: none; }
-
 /* ── 结果：摘要 / 匹配依据 ──────────────────────────────────── */
 .jfq-summary { display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
 .jfq-summary-eyebrow { margin: 0; font-size: 17px; color: var(--qx-ink-3); }
@@ -280,6 +253,21 @@
 .jfq-ev-item { padding: 14px 18px; border: 1px solid var(--qx-teal-line); border-radius: var(--qx-r); background: var(--qx-teal-soft); }
 .jfq-ev-item p { margin: 0; font-size: 20px; font-weight: 700; }
 .jfq-ev-item span { display: block; margin-top: 6px; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+/* 稿 46 的 evi 两栏：左「简历里已经写到的要求」，右「简历里还没体现的要求」。3.14 起不分档，两栏就是结果本身；
+   它是结果屏的余量吸收块（Sec grow），两栏随之等高拉伸。 */
+.jfq-evi { flex: 1 1 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.jfq-evi-col {
+  display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 16px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-paper);
+}
+.jfq-evi-h { display: flex; align-items: center; gap: 10px; }
+.jfq-evi-h b { font-size: 21px; font-weight: 700; }
+.jfq-evi-ic {
+  display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: var(--qx-r);
+  color: var(--qx-teal-d); background: var(--qx-teal-soft);
+}
+.jfq-evi-col[data-tone='warn'] .jfq-evi-ic { color: var(--qx-wheat-d); background: var(--qx-wheat-soft); }
+.jfq-ev-item[data-tone='warn'] { border-color: var(--qx-line-2); background: var(--qx-wheat-soft); }
 .jfq-kw-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .jfq-kw-label { font-size: 17px; color: var(--qx-ink-3); }
 .jfq-kw { padding: 5px 12px; border-radius: var(--qx-r-s); font-size: 17px; }
@@ -347,10 +335,9 @@
 /* ── 1080 竖屏与窄屏 ───────────────────────────────────────── */
 @media (max-width: 1080px) {
   .jfq-ghosts, .jfq-verdict, .jfq-trace, .jfq-routes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .jfq-verdict-card { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 390px) {
-  .jfq-slots, .jfq-choices, .jfq-ghosts, .jfq-verdict, .jfq-trace, .jfq-routes,
+  .jfq-slots, .jfq-choices, .jfq-ghosts, .jfq-verdict, .jfq-trace, .jfq-routes, .jfq-evi,
   .jfq-modal-actions { grid-template-columns: minmax(0, 1fr); }
   .jfq-modal { padding: 16px; }
 }
@@ -413,8 +400,6 @@
   /* 本页自有组件：窄屏一律单列，正文字号跟着降一档。 */
   .jfq-root .jfq-sec-head { flex-wrap: wrap; gap: 8px; }
   .jfq-root .jfq-sec { gap: 10px; }
-  .jfq-root .jfq-verdict-card { padding: 14px 16px; }
-  .jfq-root .jfq-ladder { font-size: 14px; }
 }
 
 /* 横屏电脑：不拉伸成满屏大横条，按 1080 稿宽居中，其余留白。 */

@@ -5,11 +5,13 @@ import {
   SCREEN_TIMEZONE,
   SCREEN_UNAVAILABLE_REASON,
   type ScreenMetric,
+  type ScreenRecruitmentHosting,
   type ScreenSnapshotLimits,
   type ScreenSnapshotStatus,
   type ScreenSnapshotWindow,
   type ScreenSourceEntryOpenItem,
 } from './console-screen.types'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 
 const TZ_OFFSET_MS = 8 * 60 * 60 * 1000
 export const PRINT_TREND_DAY_COUNT = 14
@@ -31,12 +33,17 @@ export function screenWindowMeta(): ScreenSnapshotWindow {
   }
 }
 
+export function recruitmentHostingLimit(): ScreenRecruitmentHosting {
+  return isRecruitmentContentHostingEnabled() ? 'enabled' : 'disabled'
+}
+
 export function screenLimits(): ScreenSnapshotLimits {
   return {
     minAggregateSample: SCREEN_MIN_AGGREGATE_SAMPLE,
     displayToken: 'not_issued',
     displayTokenReason: SCREEN_UNAVAILABLE_REASON.displayTokenNotIssued,
     access: 'authenticated_console',
+    recruitmentHosting: recruitmentHostingLimit(),
   }
 }
 

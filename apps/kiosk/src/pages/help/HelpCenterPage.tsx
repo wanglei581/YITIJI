@@ -19,6 +19,7 @@ import {
   MapPinIcon, PrinterIcon, ReceiptTextIcon, SparklesIcon, UserIcon, type LucideIcon,
 } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import './help-service-desk.css'
 
 interface QA {
@@ -134,7 +135,7 @@ const SELF_HELP_STEPS = [
   { title: '换一种文件来源', body: '一种上传方式不成时，回到打印扫描页换本机已开通的其他来源；哪些可用以页面显示为准。' },
 ] as const
 
-const faqCount = (key: FilterKey) => (key === 'all' ? ALL_FAQ.length : ALL_FAQ.filter((item) => item.categoryKey === key).length)
+const faqCount = (faq: QA[], key: FilterKey) => (key === 'all' ? faq.length : faq.filter((item) => item.categoryKey === key).length)
 
 function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onNavigate: (route: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -162,6 +163,10 @@ function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onN
 export function HelpCenterPage() {
   const navigate = useNavigate()
   const [activeFilter, setActiveFilter] = useState<FilterKey | null>(null)
+  // 招聘内容托管（3.13）关闭时本机没有岗位与招聘会：这一类问题与分类卡不摆，「全部」按钮独占一行补齐双列。
+  const hostingOpen = useRecruitmentHosting().enabled
+  const faq = hostingOpen ? ALL_FAQ : ALL_FAQ.filter((item) => item.categoryKey !== 'jobs')
+  const cards = hostingOpen ? CATEGORY_CARDS : CATEGORY_CARDS.filter(({ key }) => key !== 'jobs')
 
   const handleNavigate = (route: string) => {
     if (route === '/login') {
@@ -174,8 +179,8 @@ export function HelpCenterPage() {
   const visibleFaq = activeFilter === null
     ? []
     : activeFilter === 'all'
-      ? ALL_FAQ
-      : ALL_FAQ.filter((item) => item.categoryKey === activeFilter)
+      ? faq
+      : faq.filter((item) => item.categoryKey === activeFilter)
   const activeLabel = FILTER_KEYS.find(({ key }) => key === activeFilter)?.label ?? '全部'
 
   return (
@@ -199,7 +204,7 @@ export function HelpCenterPage() {
             <small>只写本机已经上线的做法</small>
           </div>
           <div className="k1-help-filters" role="group" aria-label="按分类筛选常见问题">
-            {CATEGORY_CARDS.map(({ key, summary, icon: Icon }) => (
+            {cards.map(({ key, summary, icon: Icon }) => (
               <button
                 key={key}
                 type="button"
@@ -209,17 +214,18 @@ export function HelpCenterPage() {
               >
                 <span className="k1-help-cat-icon" aria-hidden="true"><Icon /></span>
                 <strong>{FILTER_KEYS.find((filter) => filter.key === key)?.label}</strong>
-                <span className="k1-help-count">{faqCount(key)} 问</span>
+                <span className="k1-help-count">{faqCount(faq, key)} 问</span>
                 <small>{summary}</small>
               </button>
             ))}
             <button
               type="button"
               className={`k1-help-filter-all${activeFilter === 'all' ? ' is-active' : ''}`}
+              data-span={cards.length % 2 === 0 ? 'full' : undefined}
               aria-pressed={activeFilter === 'all'}
               onClick={() => setActiveFilter('all')}
             >
-              全部 <span className="k1-help-count">{faqCount('all')} 问</span>
+              全部 <span className="k1-help-count">{faqCount(faq, 'all')} 问</span>
             </button>
           </div>
 

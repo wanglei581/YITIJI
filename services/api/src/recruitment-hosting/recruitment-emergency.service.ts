@@ -99,13 +99,19 @@ export class RecruitmentEmergencyService {
     return { scope, id: trimmed, unpublished: rows.length, irreversible: true }
   }
 
+  /** 机构看到的下架 / 熔断通知，最新 50 条；超过时如实返回总数与截断标记，不让前端以为这就是全部。 */
   async listNotices(orgId: string) {
-    return this.prisma.partnerOrgNotice.findMany({
-      where: { orgId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-      select: { id: true, kind: true, title: true, body: true, payloadJson: true, readAt: true, createdAt: true },
-    })
+    const where = { orgId }
+    const [items, total] = await Promise.all([
+      this.prisma.partnerOrgNotice.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: { id: true, kind: true, title: true, body: true, payloadJson: true, readAt: true, createdAt: true },
+      }),
+      this.prisma.partnerOrgNotice.count({ where }),
+    ])
+    return { items, total, truncated: total > items.length }
   }
 
   private async loadOne(targetType: EmergencyTargetType, targetId: string): Promise<TargetRow> {

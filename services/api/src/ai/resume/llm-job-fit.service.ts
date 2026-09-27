@@ -10,6 +10,7 @@ import {
 } from '../llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
+import { withAiSafety } from '../llm/ai-prompt-safety'
 
 // ============================================================
 // 2D 简历与岗位要求对照。
@@ -29,11 +30,11 @@ const BANNED = [
   '建议投递', '适合投递', '胜任', '匹配度',
 ] as const
 
-export const JOB_FIT_SYSTEM_PROMPT =
+export const JOB_FIT_SYSTEM_PROMPT = withAiSafety(
   '你是求职者本人的简历顾问。基于求职者的简历原文与目标岗位信息，逐条对照岗位要求与简历原文，并给出表达层面的修改建议。' +
   '这只是给求职者本人整理材料用的对照，不是招聘评估，不代表录用结果。' +
   '\n硬性要求：' +
-  '\n1. 不要输出等级、百分比、录用概率或通过率。' +
+  '\n1. 不要输出等级、百分比或通过率，也不要估计被聘用的可能性。' +
   '\n2. matchPoints 中每条的 evidence 必须是简历原文中真实出现的内容（原文摘录），绝不编造。' +
   '\n3. gapPoints 的 suggestion 只谈表达优化与材料准备（如补充量化数据、突出某段经历），绝不虚构求职者没有的经历或技能。' +
   '\n4. 不得给出无依据的示例数字（如"100份/月""3次/周""提升30%"），只能说"补充你实际处理的数量、频次或结果"。' +
@@ -45,7 +46,8 @@ export const JOB_FIT_SYSTEM_PROMPT =
   '"matchPoints":[{"requirement":"岗位原文摘录","point":"与岗位要求的对照点","evidence":"简历原文摘录(≤60字)"}](2-5 条),' +
   '"gapPoints":[{"requirement":"岗位原文摘录","gap":"简历里还没写到的要求","suggestion":"表达/准备建议"}](1-4 条),' +
   '"targetedSuggestions":["针对该岗位修改简历的具体建议"](2-5 条),' +
-  '"decisionSupport":{"analysisVersion":"job_fit_m1_5","keywordCoverage":{"matched":["有依据关键词"],"missing":["岗位待补充关键词"]},"requirementBreakdown":{"responsibilities":["岗位原文摘录"],"mustHave":["岗位原文摘录"],"preferred":[],"attention":[]}}(可选)}'
+  '"decisionSupport":{"analysisVersion":"job_fit_m1_5","keywordCoverage":{"matched":["有依据关键词"],"missing":["岗位待补充关键词"]},"requirementBreakdown":{"responsibilities":["岗位原文摘录"],"mustHave":["岗位原文摘录"],"preferred":[],"attention":[]}}(可选)}',
+)
 
 // ── 输出安全防线（Mavis 2D 验收补丁）────────────────────────────────────────
 // A. 自相矛盾判断（如「符合本科要求…大专」）：全局 violation → 重试 → 连续命中诚实失败。

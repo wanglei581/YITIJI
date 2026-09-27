@@ -17,6 +17,7 @@ import {
   ShieldCheckIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 interface GuideEntry {
@@ -68,6 +69,9 @@ const GUIDE_ENTRIES: GuideEntry[] = [
 export function FreshmanInsightsPage() {
   const navigate = useNavigate()
   const back = () => navigate('/smart-campus')
+  // 招聘内容托管（3.13）关闭时校园招聘不开放：不摆这一格（剩四格，双列不留空）。
+  const hostingOpen = useRecruitmentHosting().enabled
+  const entries = hostingOpen ? GUIDE_ENTRIES : GUIDE_ENTRIES.filter((entry) => !isRecruitmentRoute(entry.to))
 
   return (
     <KioskPageFrame
@@ -87,7 +91,7 @@ export function FreshmanInsightsPage() {
         </div>
 
         <div className="sc-mod-grid">
-          {GUIDE_ENTRIES.map((entry) => {
+          {entries.map((entry) => {
             const Icon = entry.icon
             return (
               <button

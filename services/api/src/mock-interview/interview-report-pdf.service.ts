@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../common/pdf/aigc-pdf-metadata'
+import { stampAigcPageHeader } from '../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import type { InterviewQaExcerpt } from './interview-qa-excerpt'
 import type { InterviewReportPayload } from './mock-interview-llm.service'
@@ -32,16 +33,16 @@ export class InterviewReportPdfService {
   private readonly logger = new Logger(InterviewReportPdfService.name)
 
   async render(
-    meta: { position: string; industry: string; interviewerLabel: string; date: string },
+    meta: { position: string; industry: string; interviewerLabel: string; date: string; contentId: string },
     report: InterviewReportPayload,
     qa?: { excerpts: InterviewQaExcerpt[]; includeAnswers: boolean },
   ): Promise<{ buffer: Buffer; pageCount: number }> {
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
-    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     applyAigcPdfMetadata(doc, {
       title: 'AI 模拟面试练习报告',
       subject: 'AI 生成的模拟面试练习报告，仅供求职者本人练习复盘参考，不代表任何招聘结果，不参与企业筛选或面试邀约',
       kind: 'interview',
+      contentId: meta.contentId,
     })
     const ok = registerInterviewCjkFont(doc)
     if (!ok) {
@@ -114,6 +115,7 @@ export class InterviewReportPdfService {
     }
 
     // pageCount 必须在 end() 之前读取（pdfkit 行为）
+    stampAigcPageHeader(doc)
     const pageCount = doc.bufferedPageRange().count
     doc.end()
     const buffer = await done

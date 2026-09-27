@@ -22,7 +22,7 @@ type InterviewReportView = InterviewReportResponse & {
   qaExcerpts?: InterviewQaExcerpt[]
   includeAnswersInPrint?: boolean
 }
-import { makePrintParams } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, makePrintParams } from '@ai-job-print/shared'
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -212,8 +212,9 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
 
       <div className="interview-flow__scroll flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
+        {/* 横幅以 AI 可见标识开头（审计表一「模拟面试报告（一体机）」，next-tasks 3.5c）。 */}
         <ComplianceBanner tone="info">
-          本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。练习结果仅供本人复盘，不会发送给任何企业。
+          <b>{AI_LABEL_COPY.INTERVIEW_REPORT}。</b>不代表任何招聘结果，不参与企业筛选、面试邀约或录用决策，也不会发送给任何企业。
         </ComplianceBanner>
 
         {/* 综合表现 */}

@@ -16,6 +16,7 @@ import {
   availableMetric,
   filterSourceEntryOpens,
   FLEET_SAMPLE_TAKE,
+  recruitmentHostingLimit,
   unavailableMetric,
 } from './console-screen.metric'
 import type {
@@ -36,6 +37,30 @@ export type SliceFailReason = typeof SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
 export type Loaded<T> =
   | { ok: true; value: T }
   | { ok: false; reason: SliceFailReason }
+
+/** 托管关闭时这三项不能再以 0 表示「没有岗位」。内容库存与待审仍原样返回。 */
+function closeRecruitmentMetrics(metrics: ScreenSnapshotMetrics): ScreenSnapshotMetrics {
+  if (recruitmentHostingLimit() === 'enabled') return metrics
+  const reason = SCREEN_UNAVAILABLE_REASON.recruitmentHostingDisabled
+  return {
+    ...metrics,
+    ...(metrics.jobsOnShelf
+      ? { jobsOnShelf: unavailableMetric(metrics.jobsOnShelf.source, metrics.jobsOnShelf.window, reason) }
+      : {}),
+    ...(metrics.fairStructure
+      ? { fairStructure: unavailableMetric(metrics.fairStructure.source, metrics.fairStructure.window, reason) }
+      : {}),
+    ...(metrics.sourceEntryOpensTop
+      ? {
+          sourceEntryOpensTop: unavailableMetric(
+            metrics.sourceEntryOpensTop.source,
+            metrics.sourceEntryOpensTop.window,
+            reason,
+          ),
+        }
+      : {}),
+  }
+}
 
 function fromLoaded<T, U>(
   loaded: Loaded<T>,
@@ -108,7 +133,7 @@ export function assembleAdminMetrics(input: {
         '30d',
         SCREEN_UNAVAILABLE_REASON.sourceQueryFailed,
       )
-  return {
+  return closeRecruitmentMetrics({
     terminalsOnline: fleet
       ? availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.online)
       : unavailableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed),
@@ -169,7 +194,7 @@ export function assembleAdminMetrics(input: {
       'current',
       SCREEN_UNAVAILABLE_REASON.reviewDecisionUnwritten,
     ),
-  }
+  })
 }
 
 export function assemblePartnerMetrics(input: {
@@ -186,7 +211,7 @@ export function assemblePartnerMetrics(input: {
       })
     : null
   const blocked = (source: string, reason: string) => unavailableMetric(source, 'current', reason)
-  return {
+  return closeRecruitmentMetrics({
     terminalsOnline: fleet
       ? availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.online)
       : unavailableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed),
@@ -218,5 +243,5 @@ export function assemblePartnerMetrics(input: {
       'ReviewDecision / Order.orgId / AiServiceLog.orgId',
       SCREEN_UNAVAILABLE_REASON.reviewDecisionUnwritten,
     ),
-  }
+  })
 }

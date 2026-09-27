@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../../../components/qingxu/QxAppNavbar'
+import { useRecruitmentHosting } from '../../../../hooks/useRecruitmentHosting'
 import { useTerminalDeviceStatus } from '../../../../hooks/useTerminalDeviceStatus'
 import { getTerminalCode } from '../../../../services/api/terminalConfig'
 import '../styles/qx-me-shared.css'
@@ -81,6 +82,8 @@ export function QxMePage({
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
   const status = qxStatusFromDevice(device)
+  // 招聘内容托管（3.13）关闭时收藏里只有政策：分类提示不再写岗位与招聘会。
+  const hostingOpen = useRecruitmentHosting().enabled
   const terminalLabel = getTerminalCode() || '设备未绑定'
   const isAssetView = view === 'documents' || view === 'orders'
   /* 账号设置（稿 30 ?screen=settings）不是记录分类，也不属本人资产分域：不挂分类 Tab。 */
@@ -146,7 +149,7 @@ export function QxMePage({
                   onClick={() => navigate(item.to)}
                 >
                   {item.label}
-                  <span>{item.hint}</span>
+                  <span>{item.key === 'favorites' && !hostingOpen ? '政策' : item.hint}</span>
                 </button>
               )
             })}

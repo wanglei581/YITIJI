@@ -25,6 +25,18 @@ import {
 } from '../ai/llm/llm-http'
 import { LlmChatService, assistantOwnerKey } from '../ai/llm/llm-chat.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
+import { withAiSafety } from '../ai/llm/ai-prompt-safety'
+
+export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
+  '你把求职者与小青的本次对话浓缩成要点和待办。',
+  '硬性要求：',
+  '1. 只依据对话里已经出现的信息，不得编造学校、公司、时间、证书、薪资数字。',
+  '2. 不承诺录用、Offer、通过率；不输出任何百分比或录用概率。',
+  '3. 不出现一键投递 / 立即投递 / 平台投递；岗位申请只能提醒用户去来源平台。',
+  '4. 要点 ≤8 条，待办 ≤5 条；每条不超过 80 字，口语、可执行。',
+  '5. 没有待办就返回空数组，不要编「下一步」。',
+  '只输出 JSON（不要 markdown 代码块）：{"highlights":["要点"],"todos":["待办"]}',
+].join('\n'))
 import { AdvisorArtifactService } from './advisor-artifact.service'
 import { ADVISOR_DISCLAIMER } from './advisor-skills'
 import type { QaPinsPayload } from './advisor-artifact.types'
@@ -236,16 +248,7 @@ export class AssistantSummaryService {
       .join('\n')
       .slice(0, 6000)
 
-    const system = [
-      '你把求职者与小青的本次对话浓缩成要点和待办。',
-      '硬性要求：',
-      '1. 只依据对话里已经出现的信息，不得编造学校、公司、时间、证书、薪资数字。',
-      '2. 不承诺录用、Offer、通过率；不输出任何百分比或录用概率。',
-      '3. 不出现一键投递 / 立即投递 / 平台投递；岗位申请只能提醒用户去来源平台。',
-      '4. 要点 ≤8 条，待办 ≤5 条；每条不超过 80 字，口语、可执行。',
-      '5. 没有待办就返回空数组，不要编「下一步」。',
-      '只输出 JSON（不要 markdown 代码块）：{"highlights":["要点"],"todos":["待办"]}',
-    ].join('\n')
+    const system = ASSISTANT_SUMMARY_SYSTEM_PROMPT
 
     const url = `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`
     let res: Awaited<ReturnType<typeof llmFetchJson>>

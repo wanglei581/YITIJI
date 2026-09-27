@@ -1,4 +1,4 @@
-// 岗位匹配参考的六个「非选岗 / 非结果」屏。
+// 简历对照（岗位匹配）的六个「非选岗 / 非结果」屏。
 //
 // 稿：46-resume-decision-workspace.html?screen=job-fit&state=…
 //     missing-task / rejected-task / loading / analyzing / ai-down / failed
@@ -7,7 +7,8 @@
 // QxPageFrame 渲染 —— 壳只有一层，不在每屏各挂一个 frame。
 //
 // 所有出口都是站内既有 route（简历服务台 / 上传诊断 / 打印服务 / 扫描 / 岗位信息 /
-// 简历优化 / AI 顾问）。这里不新增页面，也不外跳。
+// 简历优化 / AI 顾问）。这里不新增页面，也不外跳。招聘内容托管关闭（3.13）时没有
+// 「岗位信息」这个出口（exits.jobs 为空），对应位置换成本机照常能走的扫描。
 
 import type { ReactNode } from 'react'
 import {
@@ -50,7 +51,8 @@ export interface JobFitExits {
   triage: () => void
   printHub: () => void
   scan: () => void
-  jobs: () => void
+  /** 招聘内容托管打开时才有；关闭时为空，页面不摆「看来源岗位要求」。 */
+  jobs?: () => void
   optimize: () => void
   assistant: () => void
   /** 返回目标岗位选择（保留已选岗位与手填内容）。 */
@@ -103,7 +105,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec no="02" title="现在缺哪一项" hint="补齐前不会启动分析" grow>
             <Checks items={[
               { tone: 'off', icon: <FileTextIcon size={24} />, title: '本人简历任务', desc: '还没有可读取的简历任务。上传 PDF 或扫描纸质简历，解析成功后才会出现可选任务。', chip: '缺失' },
-              { tone: 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: '可以从已发布岗位里选，也可以只填一个目标岗位名称。当前尚未选择。', chip: '待选择' },
+              { tone: 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: exits.jobs ? '可以从已发布岗位里选，也可以只填一个目标岗位名称。当前尚未选择。' : '填一份岗位要求，至少要有岗位名称。当前尚未填写。', chip: '待选择' },
               { tone: 'wait', icon: <ShieldCheckIcon size={24} />, title: '本人授权', desc: '匿名任务和会员账号按各自规则确认。任务补齐后再走这一步。', chip: '待确认' },
               { tone: 'ok', icon: <LockIcon size={24} />, title: '结果去向', desc: '匹配参考只供本人准备，不提供给企业，也不形成任何投递记录。', chip: '已固定' },
             ]} />
@@ -112,7 +114,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
             <KitRows items={[
               { icon: <PrinterIcon size={22} />, title: '打印现有简历', desc: '已有电子稿或纸质件，直接走打印流程', onClick: exits.printHub },
               { icon: <ScanLineIcon size={22} />, title: '扫描纸质简历', desc: '先扫成 PDF 存下来，再决定要不要分析', onClick: exits.scan },
-              { icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对', onClick: exits.jobs },
+              ...(exits.jobs ? [{ icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对', onClick: exits.jobs }] : []),
             ]} />
           </Sec>
         </>
@@ -150,7 +152,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec title="这次没有发生的事" hint="明确否定，避免误解">
             <Nots items={[
               '没有读取到本人简历原文',
-              '没有生成任何匹配等级或建议',
+              '没有生成任何对照结果或建议',
               '没有把简历内容提供给企业或第三方',
             ]} />
           </Sec>
@@ -176,7 +178,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
             <Waiting
               icon={<ClockIcon size={34} />}
               title="请求已提交，等待服务端返回"
-              desc="读取的是你本人此前的岗位匹配报告。返回之前，不显示等级、依据或建议。"
+              desc="读取的是你本人此前的简历对照报告。返回之前，不显示对照要点或建议。"
               tag="只表达整体等待，没有百分比"
             />
           </Sec>
@@ -191,7 +193,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           </Sec>
           <Sec title="还没有返回的内容" hint="返回前一律留空">
             <Ghosts items={[
-              { title: '匹配等级', desc: '三档参考只在结果返回后显示。', tag: '等待返回' },
+              { title: '对照要点', desc: '已写到与还没体现的要求，只在结果返回后显示。', tag: '等待返回' },
               { title: '匹配依据', desc: '岗位要求与简历依据由服务端逐条给出。', tag: '等待返回' },
               { title: '行动建议', desc: '差距与准备建议只出现在真实结果里。', tag: '等待返回' },
             ]} />
@@ -209,7 +211,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
   if (state === 'analyzing') {
     return {
       title: '已提交分析，等待返回',
-      subtitle: '目标岗位与本人授权已确认。服务端返回之前，不显示等级、依据、百分比或任何录用相关结论。',
+      subtitle: '目标岗位与本人授权已确认。服务端返回之前，不显示对照要点、百分比或任何录用相关结论。',
       pill: { tone: 'unknown', label: '分析进行中，等待服务端返回' },
       body: (
         <>
@@ -224,7 +226,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec title="当前停在哪一步" hint="只标位置，不画进度">
             <Trace items={[
               { phase: '输入', title: '已确认输入', desc: '目标岗位与本人授权都已确认。' },
-              { phase: '当前', title: '等待服务端返回', desc: '等级、依据与建议全部由服务端给出。', now: true },
+              { phase: '当前', title: '等待服务端返回', desc: '对照要点与建议全部由服务端给出。', now: true },
               { phase: '之后', title: '由本人决定下一步', desc: '看完参考后，是否优化、准备材料或打印由你决定。' },
             ]} />
           </Sec>
@@ -251,7 +253,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
   if (state === 'ai-down') {
     return {
       title: 'AI 匹配当前不可用',
-      subtitle: failMessage ?? '这项分析暂时调不通。系统不显示等级、依据或建议，也不会用旧结果冒充这次的结论。',
+      subtitle: failMessage ?? '这项分析暂时调不通。系统不显示对照要点或建议，也不会用旧结果冒充这次的结论。',
       pill: { tone: 'bad', label: 'AI 匹配服务当前不可用' },
       body: (
         <>
@@ -265,7 +267,9 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec title="现在能走的三条路" hint="都进入既有流程">
             <RouteCards items={[
               { title: '继续改简历', desc: '不依赖这项分析，先按目标岗位自己调整内容重点。', action: '去简历优化', onClick: exits.optimize },
-              { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己逐条比对。', action: '去岗位信息', onClick: exits.jobs },
+              exits.jobs
+                ? { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己逐条比对。', action: '去岗位信息', onClick: exits.jobs }
+                : { title: '扫描纸质简历', desc: '先把纸质件扫成 PDF 存下来，服务恢复后再对照。', action: '去扫描', onClick: exits.scan },
               { title: '打印现有简历', desc: '手上已有可用文件时，直接进入既有打印流程。', action: '去打印服务', onClick: exits.printHub },
             ]} />
           </Sec>
@@ -291,7 +295,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
 
   return {
     title: '这次分析没有完成',
-    subtitle: failMessage ?? '请求中断，没有可确认的结果。系统不展示等级、依据或建议，也不保留半截结论。',
+    subtitle: failMessage ?? '请求中断，没有可确认的结果。系统不展示对照要点或建议，也不保留半截结论。',
     pill: { tone: 'bad', label: '本次分析未完成' },
     body: (
       <>

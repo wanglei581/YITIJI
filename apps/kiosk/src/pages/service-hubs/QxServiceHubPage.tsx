@@ -94,6 +94,16 @@ const CONTRACT_REVIEW_CAPABILITY: HubCapability = {
 }
 
 /**
+ * 运行时文案（next-tasks 2.4：能力口径不对的地方改运行时文案，不改编号原稿）。
+ *
+ * 3.14 起「岗位匹配参考」改为「简历对照」：只对照用户自填的岗位要求，不分档。
+ * serviceHubSpecs 必须与稿 16 逐字节一致，所以改名放在这里、按路由覆盖，图标与徽标仍取稿。
+ */
+const RUNTIME_CARD_COPY: Partial<Record<string, Pick<HubCapability, 'title' | 'description'>>> = {
+  '/resume/job-fit': { title: '简历对照', description: '填一份岗位要求，AI 对照你的简历' },
+}
+
+/**
  * 顶栏状态胶囊：拿不到结论时必须说「正在确认」，不得默认 ok。
  *
  * apiDown 这条说的是「在线服务」而不是稿里的「AI能力」：`useApiReadiness` 判的是
@@ -205,7 +215,8 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   // 合同审查只在下面它自己的「签约与权益」分区渲染，不混进能力网格。
   const showContractReview = hub === 'resume' && contractReviewEnabled
 
-  const renderCard = (cap: HubCapability, slot: 'grid' | 'contract') => {
+  const renderCard = (source: HubCapability, slot: 'grid' | 'contract') => {
+    const cap: HubCapability = { ...source, ...RUNTIME_CARD_COPY[source.route] }
     const reason = unavailableReason(cap.kind, cap.route, availability)
     const Icon = HUB_ICON[cap.icon]
     const head = (

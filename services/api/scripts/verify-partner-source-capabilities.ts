@@ -11,6 +11,7 @@ import { webhookSecretStrengthIssue } from '../src/common/crypto/webhook-secret-
 import { ROTATE_CREDENTIAL_CONFIRMATION } from '../src/jobs/data-source-credential-policy'
 import { resolveAuthScopedTracker } from '../src/common/throttler/terminal-throttle'
 import type { RotateDataSourceCredentialDto } from '../src/jobs/dto/data-source.dto'
+import { assertConsoleHostingFlag } from './lib/console-hosting-flag-assertions'
 
 process.env['SECRET_ENCRYPTION_KEY'] ||= 'verify-partner-source-capabilities-key-32-bytes-minimum'
 
@@ -373,6 +374,8 @@ async function main(): Promise<void> {
       expect(row.endpoint === endpoint, `非凭证参数不被误拦且原样保存：${endpoint}`)
     }
     pass('PTR-25b. 连写凭证参数与 userinfo 被拒；形似非凭证的参数不误拦')
+
+    await assertConsoleHostingFlag({ prisma, partner, orgIds })
   } finally {
     await prisma.job.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })
     await prisma.jobFair.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })

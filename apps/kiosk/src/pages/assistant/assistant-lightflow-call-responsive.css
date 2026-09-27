@@ -8,7 +8,10 @@
     border: 0;
     border-radius: 0;
   }
-  .kassist.kassist-lightflow .assistant-voice-header { padding: 14px 16px 12px; }
+  /* 页头多了一行数字人披露（3.5c）：收紧上下留白与行距，把这一行的高度在页头内部消化掉，
+     390×844 上开麦确认态的三个选择键仍整键落在首屏，不被挤出视口。 */
+  .kassist.kassist-lightflow .assistant-voice-header { padding: 10px 16px 8px; }
+  .kassist.kassist-lightflow .assistant-voice-header > div { gap: 2px; }
   .kassist.kassist-lightflow .assistant-voice-header h2 { font-size: 22px; }
   .kassist.kassist-lightflow .assistant-voice-header span,
   .kassist.kassist-lightflow .assistant-voice-header p { font-size: 13px; letter-spacing: 0; }

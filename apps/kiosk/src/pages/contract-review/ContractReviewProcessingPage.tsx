@@ -14,7 +14,7 @@ import {
   KioskPageFrame,
   KioskPageHeader,
 } from '@ai-job-print/ui'
-import type { ContractReviewTaskView, ContractType } from '@ai-job-print/shared'
+import { COMPLIANCE_COPY, type ContractReviewTaskView, type ContractType } from '@ai-job-print/shared'
 import {
   BrainCircuitIcon,
   CheckIcon,
@@ -385,7 +385,7 @@ export function ContractReviewProcessingPage() {
               </div>
             </div>
             <p style={{ fontSize: 17, color: 'var(--muted)', lineHeight: 1.55 }}>
-              本次分析结果仅作风险提示，不构成正式法律意见。重大争议请咨询律师或官方窗口。
+              {COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_PROCESSING}。重大争议请咨询律师或官方窗口。
             </p>
           </div>
         </KioskModal>

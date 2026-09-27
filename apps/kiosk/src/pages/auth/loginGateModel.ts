@@ -160,3 +160,10 @@ export const LOGIN_ANON_ENTRIES = [
   { id: 'code', title: '到机码核销', desc: '手机上下过单，拿到机码直接来这台机器取。', route: '/print/pickup-claim' },
   { id: 'jobs', title: '岗位与招聘会', desc: '来源机构发布的信息，投递与预约都在来源平台自行完成。', route: '/jobs-service' },
 ] as const
+
+/** 招聘内容托管（next-tasks 3.13）关闭时，「岗位与招聘会」换成同样不需要登录的政策服务，三格不留空。 */
+const LOGIN_ANON_POLICY_ENTRY = { id: 'policy', title: '政策服务', desc: '就业、社保与登记指引，资格与办理以官方核验为准。', route: '/policy-service' } as const
+
+export function loginAnonEntries(hostingOpen: boolean): ReadonlyArray<{ id: string; title: string; desc: string; route: string }> {
+  return hostingOpen ? LOGIN_ANON_ENTRIES : LOGIN_ANON_ENTRIES.map((entry) => (entry.id === 'jobs' ? LOGIN_ANON_POLICY_ENTRY : entry))
+}

@@ -161,8 +161,8 @@ export const aiMockAdapter = {
     await delay(500)
     const sceneReplies: Record<AssistantSkill, Pick<AssistantChatResponse, 'reply' | 'actions'>> = {
       offer_compare: {
-        reply: '您可以把两个 Offer 的薪资结构、试用期、地点、福利、加班情况和发展机会分别发给我。我会按维度做个人参考对比；请先打码姓名、手机号、公司敏感编号等隐私信息。结果仅供个人参考，不构成录用、入职或法律意见。',
-        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '优化简历材料', route: '/resume/source' }],
+        reply: '您可以把两个 Offer 的薪资结构、试用期、地点、福利、加班情况和发展机会分别发给我。我会按维度做个人参考对比；请先打码姓名、手机号、公司敏感编号等隐私信息。结果仅供个人核对，不代替专业人士判断。',
+        actions: [{ label: '优化简历材料', route: '/resume/source' }],
       },
       salary_negotiation: {
         reply: '请告诉我岗位、当前薪资范围、目标薪资、已有优势和顾虑。我可以帮您准备温和版、直接版和补充材料版话术；内容仅供沟通准备参考，不承诺涨薪或录用结果。',

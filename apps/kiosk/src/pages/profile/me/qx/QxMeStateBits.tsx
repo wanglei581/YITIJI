@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { BriefcaseIcon, PrinterIcon } from 'lucide-react'
+import { BriefcaseIcon, LandmarkIcon, PrinterIcon } from 'lucide-react'
+import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../../hooks/useRecruitmentHosting'
 import { QxMeBanner, QxMeGuide, QX_ME_GUIDE } from './QxMeChrome'
 
 export function QxMeSkeletonList({ count = 4, foot }: { count?: number; foot: string }) {
@@ -116,14 +118,27 @@ export function QxMePendingRow({
   )
 }
 
-export function QxMeGuestRows({ onJobs, onPrint }: { onJobs: () => void; onPrint: () => void }) {
+/** `hostingOpen`：招聘内容托管（3.13）关闭时没有岗位与招聘会可看，这一行换成同样不用登录的政策服务。 */
+export function QxMeGuestRows({ onJobs, onPrint, hostingOpen }: { onJobs: () => void; onPrint: () => void; hostingOpen: boolean }) {
+  const navigate = useNavigate()
   return (
     <>
       <div className="qx-me-legal">不用登录也能办 · 这两项在这台机器上不需要账号</div>
-      <QxMeStartRow icon={BriefcaseIcon} title="看第三方岗位与招聘会" desc="来源机构、更新时间与外部入口都在详情页里" label="查看岗位" route="/jobs" testid="member-records-guest-jobs" onClick={onJobs} />
+      {hostingOpen ? (
+        <QxMeStartRow icon={BriefcaseIcon} title="看第三方岗位与招聘会" desc="来源机构、更新时间与外部入口都在详情页里" label="查看岗位" route="/jobs" testid="member-records-guest-jobs" onClick={onJobs} />
+      ) : (
+        <QxMeStartRow icon={LandmarkIcon} tone="slate" title="查看就业政策" desc="政策、社保与登记指引，资格以官方核验为准" label="查看政策" route="/policy-service" testid="member-records-guest-policy" onClick={() => navigate('/policy-service')} />
+      )}
       <QxMeStartRow icon={PrinterIcon} tone="wheat" title="打印或扫描材料" desc="当场办完的打印、扫描不需要登录，也不会绑定到账号" label="去打印扫描" route="/print-scan" testid="member-records-guest-print" onClick={onPrint} />
     </>
   )
+}
+
+/** 未登录指引第三条。托管读到「关闭」才说未开放；还没读到时只说本机不代收简历，不提岗位与招聘会。 */
+function guestBoundary(status: RecruitmentHostingState['status']): [string, string, string] {
+  return status === 'ready'
+    ? ['边界', '本机不代收简历', '本终端未开放岗位与招聘会信息']
+    : ['边界', '本机不代收简历', '也不把你的资料转交给任何企业']
 }
 
 export function QxMeLoginBlock({
@@ -139,16 +154,18 @@ export function QxMeLoginBlock({
   onJobs: () => void
   onPrint: () => void
 }) {
+  const hosting = useRecruitmentHosting()
+  const hostingOpen = hosting.enabled
   return (
     <>
       <QxMeBanner tone="lock" title={title} desc={<>{desc}<b>下面是登录后会出现的内容结构，以及现在就能办的事。</b></>} minis={['共 —', '登录后回填']} />
       <section className="qx-me-list qx-me-grow" aria-label="登录后会出现的内容结构，以及不用登录也能办的事">
         <div className="qx-me-legal">登录后会出现的内容结构 · 现在不显示任何明细</div>
         {struct}
-        <QxMeGuestRows onJobs={onJobs} onPrint={onPrint} />
+        <QxMeGuestRows onJobs={onJobs} onPrint={onPrint} hostingOpen={hostingOpen} />
         <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束会话只清除本机登录态与临时会话信息</b>；服务端的记录按各自留存期限管理。</div>
       </section>
-      <QxMeGuide items={[...QX_ME_GUIDE.login]} />
+      <QxMeGuide items={hostingOpen ? [...QX_ME_GUIDE.login] : [...QX_ME_GUIDE.login.slice(0, 2), guestBoundary(hosting.status)]} />
     </>
   )
 }

@@ -11,6 +11,8 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   terms_of_service: '用户服务协议',
   privacy_policy: '隐私政策',
   ai_disclaimer: 'AI 服务免责声明',
+  contract_review_disclaimer: '合同审查免责声明',
+  operator_info: '经营者信息',
 }
 
 const TAB_OPTIONS: { key: string | undefined; label: string }[] = [
@@ -18,6 +20,8 @@ const TAB_OPTIONS: { key: string | undefined; label: string }[] = [
   { key: 'terms_of_service', label: '用户服务协议' },
   { key: 'privacy_policy', label: '隐私政策' },
   { key: 'ai_disclaimer', label: 'AI 免责声明' },
+  { key: 'contract_review_disclaimer', label: '合同审查免责声明' },
+  { key: 'operator_info', label: '经营者信息' },
 ]
 
 function formatDate(iso: string | null): string {

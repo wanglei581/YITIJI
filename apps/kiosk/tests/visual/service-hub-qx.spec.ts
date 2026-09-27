@@ -193,7 +193,8 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
     clickable: false,
     reason: '在线服务当前不可用',
   })
-  expect(byTitle(hub.cards, '岗位匹配参考').reason).toBe('AI能力当前不可用')
+  // 3.14：「岗位匹配参考」这张卡在运行时改名「简历对照」（QxServiceHubPage 的 RUNTIME_CARD_COPY，稿 16 不动）。
+  expect(byTitle(hub.cards, '简历对照').reason).toBe('AI能力当前不可用')
   expect(hub.cards.filter((card) => card.clickable).map((card) => card.title)).toEqual(['线上招聘平台'])
   expect(hub.readiness).toBe('unavailable')
 

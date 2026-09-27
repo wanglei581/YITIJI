@@ -14,6 +14,10 @@ import {
   type OfflineAgencyListFilters,
 } from '../../services/api/offlineAgenciesAdmin'
 import { Pagination, useTableState } from '../components/DataTable'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
+import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
+import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
 
 // ─── 展示常量 ─────────────────────────────────────────────────────────────────
 
@@ -84,6 +88,12 @@ export default function OfflineAgenciesPage() {
 
   // 删除中
   const [deletingId,   setDeletingId]   = useState<string | null>(null)
+
+  // 紧急下架（单向，两种托管状态都提供）
+  const [takedown,     setTakedown]     = useState<EmergencyTakedownTarget | null>(null)
+  // 托管关闭（我们云上默认）时只读：新建 / 编辑 / 审核 / 发布 / 下架 / 删除 / 岗位维护都会 403。
+  const hosting = useRecruitmentHosting()
+  const readOnly = !hosting.writable
 
   const { page, pageSize, setPage, setPageSize } = useTableState(20)
 
@@ -192,8 +202,10 @@ export default function OfflineAgenciesPage() {
   return (
     <Page
       title="线下机构管理"
-      subtitle="线下招聘机构信息管理 — 审核 · 发布 · 岗位维护（仅信息展示，不参与招聘闭环）"
-      actions={
+      subtitle={readOnly
+        ? '线下招聘机构信息查看 — 资质 · 岗位（只读，保留紧急下架；不参与招聘闭环）'
+        : '线下招聘机构信息管理 — 审核 · 发布 · 岗位维护（仅信息展示，不参与招聘闭环）'}
+      actions={readOnly ? undefined : (
         <button
           onClick={openCreate}
           className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
@@ -201,8 +213,9 @@ export default function OfflineAgenciesPage() {
           <PlusIcon className="h-4 w-4" />
           新建机构
         </button>
-      }
+      )}
     >
+      <RecruitmentHostingNotice hosting={hosting} subject="线下机构及其岗位" />
       {/* 筛选条 */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select className={selectCls} value={orgType} onChange={(e) => { setOrgType(e.target.value); setPage(1) }}>
@@ -262,7 +275,7 @@ export default function OfflineAgenciesPage() {
                   <td colSpan={8}>
                     <EmptyState
                       title="暂无线下机构"
-                      description="点击右上角「新建机构」添加"
+                      description={readOnly ? '当前只读：只能查看与紧急下架' : '点击右上角「新建机构」添加'}
                       icon={BuildingIcon}
                       className="py-14"
                     />
@@ -296,19 +309,21 @@ export default function OfflineAgenciesPage() {
                       <button
                         onClick={() => openJobs(row)}
                         className="rounded px-1.5 py-0.5 text-primary-600 hover:bg-primary-50"
-                        title="管理岗位"
+                        title={readOnly ? '查看岗位（只读）' : '管理岗位'}
                       >
                         {row.jobCount} 个
                       </button>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => void openEdit(row.id)}
-                          className="rounded px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
-                        >
-                          编辑
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => void openEdit(row.id)}
+                            className="rounded px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
+                          >
+                            编辑
+                          </button>
+                        )}
                         {/* 与审核动作并排：审核前先看得到资质与网点（CLAUDE.md §11 取证走审计端点） */}
                         <button
                           onClick={() => openGovernance(row)}
@@ -318,45 +333,56 @@ export default function OfflineAgenciesPage() {
                           <ShieldCheckIcon className="h-3.5 w-3.5" />
                           资质
                         </button>
-                        {row.reviewStatus !== 'approved' && (
-                          <button
-                            onClick={() => openReview(row)}
-                            className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                          >
-                            审核
-                          </button>
-                        )}
-                        {row.reviewStatus === 'approved' && row.publishStatus !== 'published' && (
-                          <button
-                            onClick={() => openReview(row)}
-                            className="rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100"
-                          >
-                            审核
-                          </button>
-                        )}
-                        {canPublish && (
-                          <button
-                            onClick={() => void handlePublish(row.id)}
-                            className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
-                          >
-                            发布
-                          </button>
-                        )}
-                        {canUnpublish && (
-                          <button
-                            onClick={() => void handleUnpublish(row.id, row.name)}
-                            className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                          >
-                            下架
-                          </button>
+                        {!readOnly && (
+                          <>
+                            {row.reviewStatus !== 'approved' && (
+                              <button
+                                onClick={() => openReview(row)}
+                                className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                              >
+                                审核
+                              </button>
+                            )}
+                            {row.reviewStatus === 'approved' && row.publishStatus !== 'published' && (
+                              <button
+                                onClick={() => openReview(row)}
+                                className="rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100"
+                              >
+                                审核
+                              </button>
+                            )}
+                            {canPublish && (
+                              <button
+                                onClick={() => void handlePublish(row.id)}
+                                className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
+                              >
+                                发布
+                              </button>
+                            )}
+                            {canUnpublish && (
+                              <button
+                                onClick={() => void handleUnpublish(row.id, row.name)}
+                                className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
+                              >
+                                下架
+                              </button>
+                            )}
+                            <button
+                              onClick={() => void handleDelete(row)}
+                              disabled={deletingId === row.id}
+                              className="rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
+                              title="删除"
+                            >
+                              <Trash2Icon className="h-3.5 w-3.5" />
+                            </button>
+                          </>
                         )}
                         <button
-                          onClick={() => void handleDelete(row)}
-                          disabled={deletingId === row.id}
-                          className="rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
-                          title="删除"
+                          type="button"
+                          onClick={() => setTakedown({ targetType: 'offline_agency', targetId: row.id, title: row.name })}
+                          className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
                         >
-                          <Trash2Icon className="h-3.5 w-3.5" />
+                          紧急下架
                         </button>
                       </div>
                     </td>
@@ -376,8 +402,10 @@ export default function OfflineAgenciesPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        线下机构仅作信息展示，不参与简历投递或招聘闭环。
+        线下机构仅作信息展示，不参与简历投递或招聘闭环。紧急下架只能下架、不能恢复，须写明事由，并会通知所属机构。
       </p>
+
+      <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={() => void loadList()} />
 
       {/* 新建/编辑抽屉 */}
       <AgencyForm
@@ -399,6 +427,7 @@ export default function OfflineAgenciesPage() {
           }
         }}
         onJobsChanged={loadList}
+        readOnly={readOnly}
       />
 
       {/* 治理档案 / 资质抽屉（只读） */}

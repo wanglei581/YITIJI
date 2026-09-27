@@ -158,6 +158,17 @@
   grid-template-rows: minmax(204px, auto) repeat(2, minmax(196px, 236px)) repeat(2, 120px);
   align-content: start; gap: 14px 18px;
 }
+/* 招聘内容托管关闭（3.13）：岗位、招聘会两张磁贴不渲染。稿 01 的 .tiles 让 fr 行吸收余量，这里照做：
+   空出的那一行按比例分给其余四行（每行约放大 1.4 倍，主卡与两张常规卡不被单独拉成空荡的高卡），
+   不留空洞；底部只留与行距相同的 14px，和打开时的底边留白一致。只作用于 1080 舞台，≤760 的手机单列排版
+   在 home-qx-mobile.css 里按内容自然排。 */
+@media (min-width: 761px) {
+  .qx-home[data-recruitment='closed'] .qx-home-tiles {
+    grid-template-rows: minmax(204px, 1fr) minmax(196px, 1.2fr) repeat(2, minmax(120px, .55fr));
+    align-content: stretch;
+    padding-bottom: 14px;
+  }
+}
 .qx-home-tile {
   position: relative; display: flex; min-width: 0; min-height: 166px; flex-direction: column; overflow: hidden;
   padding: 22px 26px; border: 1px solid var(--qx-line); border-radius: var(--qx-home-r);

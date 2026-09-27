@@ -76,6 +76,8 @@
   letter-spacing: 1px;
 }
 .kassist.kassist-lightflow .assistant-voice-header p { margin: 0; color: var(--qx-ink-3); font-size: 17px; }
+/* 数字人披露常驻页头（五态都在）：字号跟副标题走，颜色与字重略重，读得到但不抢标题。 */
+.kassist.kassist-lightflow .assistant-voice-header .assistant-voice-ai-disclosure { color: var(--qx-teal-d); font-weight: 600; }
 .kassist.kassist-lightflow .assistant-voice-close {
   display: inline-grid;
   flex: none;

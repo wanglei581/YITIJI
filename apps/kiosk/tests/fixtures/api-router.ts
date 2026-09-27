@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test'
+import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 
 export type AbortErrorCode = Parameters<Route['abort']>[0]
 
@@ -50,6 +51,14 @@ export class ApiRouter {
     this.respond('GET', '/api/v1/me/documents', {
       status: 200,
       json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+    })
+    // 3.13 招聘内容托管：首页、招聘类路由闸门、「我的」、简历对照、小青、登录与帮助页挂载时都读终端配置。
+    // 默认按「托管打开」（客户私有化部署 b，也就是今天的岗位 / 招聘会行为）应答，既有用例不因这条新请求中断；
+    // 托管关闭（我们云上的默认）的用例自行 respond RECRUITMENT_HOSTING_OFF 覆盖。
+    // 需要百宝箱 / 智慧校园开着、或者要数配置请求次数的用例，本来就各自登记了配置，会覆盖这一条。
+    this.respond('GET', '/api/v1/terminals/KSK-001/config', {
+      status: 200,
+      json: terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'api-router-default'),
     })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {

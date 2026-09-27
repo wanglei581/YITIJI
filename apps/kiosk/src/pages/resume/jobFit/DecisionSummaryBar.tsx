@@ -1,34 +1,28 @@
-import type { JobFitResponse } from '@ai-job-print/shared'
-
-const FIT_LABEL: Record<NonNullable<JobFitResponse['fitLevel']>, string> = {
-  reference_high: '匹配参考：较高',
-  reference_medium: '匹配参考：中等',
-  reference_low: '匹配参考：偏低',
-}
+import { AigcMark } from '../../../ai'
 
 interface DecisionSummaryBarProps {
   jobTitle: string
   company?: string | null
-  fitLevel?: JobFitResponse['fitLevel']
   summary?: string
 }
 
 /**
- * 目标岗位摘要 —— 稿 46 结果屏「岗位匹配参考」分区里紧贴判定卡的那一条。
+ * 简历对照摘要 —— 稿 46 结果屏的摘要条。
  *
- * 三档等级由上层的判定卡承担视觉重量，这里只复述一次文字等级（读屏与打印
- * 的等价信息），不再画第二个徽章 —— 同一屏两个等级徽章会让人以为是两件事。
+ * 2026-09-26（next-tasks 3.14）起服务端不再返回 fitLevel，本条也不再复述任何档位：
+ * 只写对照的是哪份岗位要求，以及服务端给的不带评价的对照概述。AI 标识用全站共享的
+ * AigcMark（文案归 AI 标识那一路统一维护，这里不另写一份）。
  */
-export function DecisionSummaryBar({ jobTitle, company, fitLevel, summary }: DecisionSummaryBarProps) {
+export function DecisionSummaryBar({ jobTitle, company, summary }: DecisionSummaryBarProps) {
   return (
-    <section className="jfq-summary" aria-label="岗位匹配摘要">
+    <section className="jfq-summary" aria-label="简历对照摘要">
       <p className="jfq-summary-eyebrow">
-        岗位决策参考{fitLevel ? ` · ${FIT_LABEL[fitLevel]}` : ''}
+        简历对照 · <AigcMark />
       </p>
       <h2 className="jfq-summary-title">{jobTitle}{company ? ` · ${company}` : ''}</h2>
       {summary && <p className="jfq-summary-body">{summary}</p>}
       <p className="jfq-summary-disclaimer">
-        匹配等级仅供本人参考，不代表录用结果；结果不会提供给任何企业。
+        对照结果只供本人准备，不代表录用结果；结果不会提供给任何企业。
       </p>
     </section>
   )

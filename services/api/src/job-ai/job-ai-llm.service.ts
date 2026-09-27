@@ -3,6 +3,7 @@ import { LlmConfigService } from '../ai/llm/llm-config.service'
 import { LLM_BUSY_MESSAGE, LlmBusyError, LlmTimeoutError, llmFetchJson } from '../ai/llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
+import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import type {
   JobAiExplanationPayload,
   JobAiExplanationLlmResult,
@@ -11,6 +12,22 @@ import type {
   JobAiTokenUsage,
   TargetJobContext,
 } from './job-ai.types'
+
+export const JOB_AI_RECOMMEND_SYSTEM_PROMPT = withAiSafety(
+  '你是求职者本人的岗位筛选助手。只基于简历原文和真实已发布岗位信息，输出岗位推荐参考。' +
+  '输出仅供求职者本人参考，不代表录用结果，不做企业候选人筛选。' +
+  '禁止出现百分比、匹配率、录用概率、通过率、保面试、保录用、一键投递、立即投递、平台投递等表述。' +
+  '只能输出 JSON 数组，不要 markdown 代码块。数组元素格式：' +
+  '{"jobId":"岗位ID","fitLevel":"reference_high|reference_medium|reference_low","summary":"1-2句参考说明",' +
+  '"matchPoints":["匹配点"],"gapPoints":["差距"],"actionChecklist":["准备动作"]}',
+)
+
+export const JOB_AI_EXPLAIN_SYSTEM_PROMPT = withAiSafety(
+  '你是求职者本人的岗位解读助手。只解读真实岗位信息，帮助求职者理解职责、硬性要求、加分项和准备事项。' +
+  '输出仅供参考；禁止出现百分比、录用概率、通过率、保面试、保录用、一键投递、立即投递、平台投递。' +
+  '只输出 JSON，不要 markdown 代码块，格式：' +
+  '{"responsibilities":["职责"],"mustHaveRequirements":["硬性要求"],"niceToHaveRequirements":["加分项"],"preparationTips":["准备建议"]}',
+)
 
 const UNSAFE_TERMS = [
   '录用概率',
@@ -41,13 +58,7 @@ export class JobAiLlmService {
   constructor(private readonly config: LlmConfigService) {}
 
   async recommend(resumePlainText: string, jobs: TargetJobContext[]): Promise<JobAiRecommendationLlmResult> {
-    const system =
-      '你是求职者本人的岗位筛选助手。只基于简历原文和真实已发布岗位信息，输出岗位推荐参考。' +
-      '输出仅供求职者本人参考，不代表录用结果，不做企业候选人筛选。' +
-      '禁止出现百分比、匹配率、录用概率、通过率、保面试、保录用、一键投递、立即投递、平台投递等表述。' +
-      '只能输出 JSON 数组，不要 markdown 代码块。数组元素格式：' +
-      '{"jobId":"岗位ID","fitLevel":"reference_high|reference_medium|reference_low","summary":"1-2句参考说明",' +
-      '"matchPoints":["匹配点"],"gapPoints":["差距"],"actionChecklist":["准备动作"]}'
+    const system = JOB_AI_RECOMMEND_SYSTEM_PROMPT
     const jobLines = jobs.map((job, index) => [
       `#${index + 1} jobId=${job.jobId}`,
       `岗位=${job.title}`,
@@ -76,11 +87,7 @@ export class JobAiLlmService {
   }
 
   async explain(job: TargetJobContext): Promise<JobAiExplanationLlmResult> {
-    const system =
-      '你是求职者本人的岗位解读助手。只解读真实岗位信息，帮助求职者理解职责、硬性要求、加分项和准备事项。' +
-      '输出仅供参考；禁止出现百分比、录用概率、通过率、保面试、保录用、一键投递、立即投递、平台投递。' +
-      '只输出 JSON，不要 markdown 代码块，格式：' +
-      '{"responsibilities":["职责"],"mustHaveRequirements":["硬性要求"],"niceToHaveRequirements":["加分项"],"preparationTips":["准备建议"]}'
+    const system = JOB_AI_EXPLAIN_SYSTEM_PROMPT
     const user = [
       `岗位=${job.title}`,
       `公司=${job.company}`,

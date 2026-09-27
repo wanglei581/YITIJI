@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import type { AccessMode, PartnerImportDataType, SourceKind } from './jobs-shared'
 
 export const ADMIN_MANAGED_ACCESS_MODES = ['api', 'webhook'] as const satisfies readonly AccessMode[]
@@ -110,6 +111,28 @@ export function getPartnerCapabilities(orgType: string) {
     canManageSmartCampus: rule.canManageSmartCampus,
     canManageCompanies: rule.canManageCompanies,
     companyManageScope: rule.companyManageScope,
+  }
+}
+
+/**
+ * `GET /partner/data-sources/capabilities` 的响应。
+ *
+ * 机构类型矩阵仍是唯一规则（`getPartnerCapabilities`）。招聘内容托管是部署级叠加，
+ * 只读 `isRecruitmentContentHostingEnabled()`，不看请求。关闭时岗位、招聘会、企业
+ * 和数据源导入（`canImportJobs` / `canImportFairs` / `canManageCompanies`）为 false。
+ * `canManagePolicies`、智慧校园、接入方式、来源种类和写入范围保持矩阵原值。
+ * 拒写仍走矩阵本身，不把托管关闭改写成 PARTNER_CAPABILITY_DENIED。
+ */
+export function projectPartnerDataSourceCapabilities(orgType: string) {
+  const base = getPartnerCapabilities(orgType)
+  const recruitmentHosting = isRecruitmentContentHostingEnabled()
+  if (recruitmentHosting) return { ...base, recruitmentHosting }
+  return {
+    ...base,
+    recruitmentHosting,
+    canImportJobs: false,
+    canImportFairs: false,
+    canManageCompanies: false,
   }
 }
 

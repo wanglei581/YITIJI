@@ -1,6 +1,8 @@
 // 我的浏览 / 外部跳转记录 / 本人自填求职进度。
 // 合规（CLAUDE.md §2/§10、§4.4A）：浏览/跳转只记动作本身，不得加履约状态；
 // 求职进度只展示用户本人填写的条目，每条带不可隐藏的「本人自填」标签。
+// 招聘内容托管（next-tasks 3.13）关闭时：足迹里不出现岗位、招聘会、企业类记录，
+// 空态与底栏也不再引导去看岗位或招聘会（那些页在本机不开放）。
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -17,6 +19,7 @@ import {
 import { getMyBrowseLogs, getMyJumpLogs } from '../../../services/api/activity'
 import { listMyJobApplications } from '../../../services/api/jobApplications'
 import { useAuth } from '../../../auth/useAuth'
+import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { formatTime } from '../assets/format'
 import { actionLabel, APPLICATION_STATUS_LABEL, detailRoute, TYPE_LABEL } from './activityPresentation'
 import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome'
@@ -25,6 +28,9 @@ import './styles/member-records-qx.css'
 
 type LoadState = 'loading' | 'error' | 'ready'
 type ActivityTab = 'browse' | 'jump' | 'applications'
+
+/** 托管关闭时只保留政策类记录：其余类型的详情页都在招聘内容闸门后面。 */
+const keepWhenClosed = (item: { targetType: string }) => item.targetType === 'policy'
 
 function getTab(searchParams: URLSearchParams): ActivityTab {
   if (searchParams.get('tab') === 'applications') return 'applications'
@@ -36,8 +42,9 @@ export function MyActivityPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
-  const [browse, setBrowse] = useState<MemberBrowseLogItem[]>([])
-  const [jumps, setJumps] = useState<MemberJumpLogItem[]>([])
+  const hostingOpen = useRecruitmentHosting().enabled
+  const [loadedBrowse, setBrowse] = useState<MemberBrowseLogItem[]>([])
+  const [loadedJumps, setJumps] = useState<MemberJumpLogItem[]>([])
   const [applications, setApplications] = useState<JobApplicationItem[]>([])
   const [state, setState] = useState<LoadState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
@@ -70,6 +77,9 @@ export function MyActivityPage() {
 
   useEffect(() => { load() }, [load, reloadKey])
 
+  const browse = hostingOpen ? loadedBrowse : loadedBrowse.filter(keepWhenClosed)
+  const jumps = hostingOpen ? loadedJumps : loadedJumps.filter(keepWhenClosed)
+
   const empty = tab === 'browse' ? browse.length === 0 : tab === 'jump' ? jumps.length === 0 : applications.length === 0
   const uiState = !isLoggedIn
     ? 'login'
@@ -83,7 +93,7 @@ export function MyActivityPage() {
 
   const struct = (
     <>
-      <QxMeStructRow icon={EyeIcon} title="浏览记录" desc="看过哪些岗位、招聘会与政策" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-0" />
+      <QxMeStructRow icon={EyeIcon} title="浏览记录" desc={hostingOpen ? '看过哪些岗位、招聘会与政策' : '看过哪些政策'} mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-0" />
       <QxMeStructRow icon={ExternalLinkIcon} title="外部跳转记录" desc="打开过哪些来源平台或官方入口" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-1" />
       <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由服务端返回，本机不本地留存明细" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-2" />
     </>
@@ -116,9 +126,11 @@ export function MyActivityPage() {
         <QxMeSummary tone="clay" icon={<ClockIcon size={32} />} label="求职进度" big={0} desc="由你自己填写；本终端不参与投递，也不掌握来源平台的结果" minis={['进度 0']} />
         {tabs}
         <section className="qx-me-list qx-me-grow" data-testid="member-records-application-list" aria-label="从这里开始">
-          <QxMeStartRow icon={BriefcaseIcon} title="先去看岗位" desc="在岗位详情点「去来源平台投递」，回来再记一笔" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
-          <QxMePendingRow route="/me/activity?tab=applications" testid="member-records-start-manual" title="投了本站没有的岗位？" sub="也可以自己填公司与岗位名记一笔 · 手填入口待建设" icon={FileTextIcon} />
-          <div className="qx-me-legal">在岗位详情页投完之后，从那里把这次投递记进来。<b>空就是空</b>，本页不会替你造进度。</div>
+          {hostingOpen ? (
+            <QxMeStartRow icon={BriefcaseIcon} title="先去看岗位" desc="在岗位详情点「去来源平台投递」，回来再记一笔" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
+          ) : null}
+          <QxMePendingRow route="/me/activity?tab=applications" testid="member-records-start-manual" title={hostingOpen ? '投了本站没有的岗位？' : '自己记一笔求职进度'} sub="也可以自己填公司与岗位名记一笔 · 手填入口待建设" icon={FileTextIcon} />
+          <div className="qx-me-legal">{hostingOpen ? '在岗位详情页投完之后，从那里把这次投递记进来。' : '求职进度只由你本人填写。'}<b>空就是空</b>，本页不会替你造进度。</div>
         </section>
         <QxMeGuide items={[['怎么产生', '你自己填写', '本终端不会替你自动记录'], ['这里显示什么', '你填的公司、岗位与进度', '来源平台的处理结果本终端不掌握'], ['谁能看到', '只有本人', '不会提供给企业或来源机构']]} />
       </>
@@ -153,7 +165,14 @@ export function MyActivityPage() {
         <QxMeSummary tone="slate" icon={<ClockIcon size={32} />} label="访问足迹" big={0} desc="只记录浏览与打开来源入口动作，不记录投递或预约结果" minis={['浏览 0', '跳转 0']} />
         {tabs}
         <section className="qx-me-list qx-me-grow" aria-label={browseTab ? '从这里开始浏览' : '从这里打开来源入口'}>
-          {browseTab ? (
+          {!hostingOpen ? (
+            <>
+              <QxMeStartRow icon={FileTextIcon} tone="slate" title={browseTab ? '看看就业政策' : '打开政策的官方入口'} desc={browseTab ? '政策、社保与登记指引，浏览动作会记在这里' : '在政策详情里打开发布方的官方入口'} label="查看政策" route="/policy-service" testid="member-records-start-policy" onClick={() => navigate('/policy-service')} />
+              {browseTab
+                ? <QxMeStartRow icon={FileTextIcon} tone="plum" title="先做一份简历" desc="诊断或生成一份简历，当场打印带走" label="去简历服务" route="/resume-service" testid="member-records-start-resume" onClick={() => navigate('/resume-service')} />
+                : <QxMeStartRow icon={EyeIcon} tone="slate" title="先看看浏览记录" desc="浏览与打开官方入口是两类记录，分开保存" label="切到浏览记录" route="/me/activity" testid="member-records-start-browse" onClick={() => setTab('browse')} />}
+            </>
+          ) : browseTab ? (
             <>
               <QxMeStartRow icon={BriefcaseIcon} title="看看第三方岗位" desc="浏览来源平台或机构发布的岗位，浏览动作会记在这里" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
               <QxMeStartRow icon={CalendarDaysIcon} tone="wheat" title="看看招聘会" desc="查看官方或主办方发布的招聘会信息" label="查看招聘会" route="/job-fairs" testid="member-records-start-fairs" onClick={() => navigate('/job-fairs')} />
@@ -168,7 +187,7 @@ export function MyActivityPage() {
           )}
           <div className="qx-me-legal">
             {browseTab
-              ? <>浏览岗位 / 招聘会 / 政策 / 企业之后，这里会出现你的浏览记录。<b>空就是空</b>，本页不会造记录让页面好看。</>
+              ? <>{hostingOpen ? '浏览岗位 / 招聘会 / 政策 / 企业之后' : '浏览政策之后'}，这里会出现你的浏览记录。<b>空就是空</b>，本页不会造记录让页面好看。</>
               : <>打开来源平台或官方入口之后，这里会出现记录。<b>是否投递、是否预约得成由来源平台决定，本系统不记录也不参与。</b></>}
           </div>
         </section>
@@ -229,8 +248,8 @@ export function MyActivityPage() {
     )
   }
 
-  const primaryLabel = tab === 'jump' ? '查看招聘会' : '查看岗位'
-  const primaryGo = () => navigate(tab === 'jump' ? '/job-fairs' : '/jobs')
+  const primaryLabel = !hostingOpen ? '查看政策' : tab === 'jump' ? '查看招聘会' : '查看岗位'
+  const primaryGo = () => navigate(!hostingOpen ? '/policy-service' : tab === 'jump' ? '/job-fairs' : '/jobs')
 
   return (
     <QxMePage

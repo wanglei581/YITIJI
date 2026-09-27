@@ -46,6 +46,7 @@ export const adminRouter = createBrowserRouter([
     children: [
       { index: true,          element: <DashboardPage /> },
       { path: 'screen',       element: <ScreenPage /> },
+      { path: 'screen/:tab',  element: <ScreenPage /> },
       { path: 'devices',      element: <DevicesPage /> },
       // 历史路径重定向到合并后的设备管理 Tab
       { path: 'terminals',    element: <Navigate to="/devices?tab=terminals"   replace /> },

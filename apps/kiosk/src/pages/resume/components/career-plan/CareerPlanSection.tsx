@@ -1,5 +1,5 @@
 import type { ElementType, ReactNode } from 'react'
-import type { CareerPlanResponse } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, type CareerPlanResponse } from '@ai-job-print/shared'
 import { ArrowRightIcon, BotIcon, PencilLineIcon, TargetIcon } from 'lucide-react'
 import { AiDisclaimerLine, AiTaskRegion, EvidenceBadge, type AiTaskFallback, type AiTaskStatus } from '../../../../ai'
 import { Waiting } from '../../jobFit/jobFitQxKit'
@@ -136,7 +136,7 @@ export function CareerPlanGenerateRegion({ task, fallback, error, regenerate = f
               <li>尚需准备：按阶段整理技能缺口。</li>
               <li>执行计划：近期可动手的清单。</li>
             </ul>
-            <AiDisclaimerLine>方向、缺口和行动清单都由 AI 判断，仅供参考；硬门槛（证书等）与「简历漏写」会分开写，不混成一句「你不行」。</AiDisclaimerLine>
+            <AiDisclaimerLine>方向、缺口和行动清单都由 {AI_LABEL_COPY.BASE}；硬门槛（证书等）与「简历漏写」会分开写，不混成一句「你不行」。</AiDisclaimerLine>
             <p className="rdq-muted">岗位匹配或模拟面试已完成时，会在真实数据可用的范围内帮助建议更具体；没有也能直接生成。</p>
           </>
         )}

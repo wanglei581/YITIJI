@@ -53,6 +53,7 @@ export const SCREEN_UNAVAILABLE_REASON = {
   sourceQueryFailed: 'source_query_failed',
   uploadCounterUnwritten: 'upload_counter_unwritten',
   inspectionCounterUnwritten: 'inspection_counter_unwritten',
+  recruitmentHostingDisabled: 'recruitment_hosting_disabled',
 } as const
 
 export type ScreenUnavailableReason =
@@ -312,11 +313,14 @@ export type AdminOpsMetricKey = (typeof ADMIN_OPS_METRIC_KEYS)[number]
 export type PartnerMetricKey = (typeof PARTNER_METRIC_KEYS)[number]
 export type ScreenMetricKey = AdminGovMetricKey | AdminOpsMetricKey | PartnerMetricKey
 
+export type ScreenRecruitmentHosting = 'enabled' | 'disabled'
+
 export interface ScreenSnapshotLimits {
   minAggregateSample: typeof SCREEN_MIN_AGGREGATE_SAMPLE
   displayToken: 'not_issued'
   displayTokenReason: typeof SCREEN_UNAVAILABLE_REASON.displayTokenNotIssued
   access: 'authenticated_console'
+  recruitmentHosting: ScreenRecruitmentHosting
 }
 
 export interface ScreenSnapshotWindow {
@@ -498,6 +502,9 @@ export interface ScreenUsageSnapshot {
   window: { timezone: typeof SCREEN_TIMEZONE; from: string; to: string }
   status: ScreenSnapshotStatus
   degraded: boolean
-  limits: { minAggregateSample: typeof SCREEN_MIN_AGGREGATE_SAMPLE }
+  limits: {
+    minAggregateSample: typeof SCREEN_MIN_AGGREGATE_SAMPLE
+    recruitmentHosting: ScreenRecruitmentHosting
+  }
   metrics: ScreenUsageMetrics
 }

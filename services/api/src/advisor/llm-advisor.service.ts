@@ -11,6 +11,7 @@ import {
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
+import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import {
   ADVISOR_DISCLAIMER,
   classifySkillByKeyword,
@@ -19,6 +20,35 @@ import {
   type EvidenceLevel,
   type StoredSlots,
 } from './advisor-skills'
+
+export const ADVISOR_QA_SYSTEM_PROMPT = withAiSafety(
+  '你是求职者本人的顾问，回答他拿不准的求职判断题。' +
+  '\n硬性要求：' +
+  '\n1. 你没有任何检索能力：不得声称查过数据库、系统、后台或平台，不得说「帮你查了」「逐条查库」。' +
+  '\n2. 不承诺录用、Offer、通过率、薪资数字；不输出任何百分比。' +
+  '\n3. 不替用户做投递或预约决定，不代收简历；岗位申请只能引导用户去来源平台。' +
+  '\n4. 没有依据时必须明说「本机没有你所在行业的具体数据，这条算参考」，不要编出处。' +
+  '\n5. sourceNote 要如实写清这条结论凭什么：是通行做法，还是基于用户自己说过的话。' +
+  '\n只输出 JSON（不要 markdown 代码块）：' +
+  '{"answer":"回答正文（200 字以内，口语化，可分点）",' +
+  '"evidenceLevel":"E1|E2|E3",' +
+  '"sourceNote":"这条的出处与可信度说明（60 字以内）"}' +
+  '\nevidenceLevel 口径：E1=依据用户自己说过的话或他的材料；E2=依据本机读到的来源事实；E3=你的判断与建议。' +
+  '\n本层没有来源事实输入，所以一般只应输出 E1 或 E3，不要谎报 E2。',
+)
+
+export const ADVISOR_DRAFT_SYSTEM_PROMPT = withAiSafety(
+  '你在把求职者自己说的话顺成一段可以直接念出口的书面表达。你不是在替他想内容。' +
+  '\n硬性要求：' +
+  '\n1. 只能使用用户提供的信息。数字、公司名、时间、离职原因、证书资质**一律不得编造**：' +
+  '\n   用户没说的，在稿子里写成 ____ 留空，并在 blanks 里列出留空的是什么。' +
+  '\n2. 不得出现用户没提供过的任何阿拉伯数字（年限、百分比、数量、金额一律如此）。' +
+  '\n3. 不承诺录用、Offer、通过率、薪资；不输出百分比。' +
+  '\n4. 不得声称查过任何数据库或系统。' +
+  '\n5. 语气自然、口语可念，不要书面套话堆砌。' +
+  '\n只输出 JSON（不要 markdown 代码块）：' +
+  '{"draft":"成稿正文（留空处用 ____）","blanks":["留空的是什么"],"summary":"一句话说明这稿还差什么"}',
+)
 
 // ============================================================
 // S3-3 · P26 顾问作业面的模型层。四件事：判型 / 问答 / 成稿 / 比对。
@@ -166,12 +196,13 @@ export class LlmAdvisorService {
    */
   async classify(topic: string, ctx: AdvisorLlmContext = {}): Promise<AdvisorClassification> {
     if (!this.isAvailable()) return { ...classifySkillByKeyword(topic), source: 'fallback' }
-    const sys =
+    const sys = withAiSafety(
       '你在判断求职者的诉求属于哪种作业型，只做分类，不回答问题本身。' +
       '\nqa：拿不准的判断题（「要不要」「该不该」），没有现成的两样东西可比。' +
       '\nslot_fill：东西还不存在，要先把信息问出来再写（「我不会写」「帮我写」）。' +
       '\ncompare：有明确的两样东西要放一起逐条看（「我够不够格」「符不符合要求」）。' +
-      '\n只输出 JSON：{"skill":"qa|slot_fill|compare","reason":"一句话说明为什么按这个型办（用第二人称对用户说）"}'
+      '\n只输出 JSON：{"skill":"qa|slot_fill|compare","reason":"一句话说明为什么按这个型办（用第二人称对用户说）"}',
+    )
     try {
       const masked = maskUserTextForLlmText(topic.slice(0, 600), 'advisor_classify')
       const raw = await this.callLlm(sys, `【用户诉求】${masked}`, ctx.onLlmCall)
@@ -199,20 +230,7 @@ export class LlmAdvisorService {
     history: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>,
     ctx: AdvisorLlmContext = {},
   ): Promise<AdvisorAnswer> {
-    const sys =
-      '你是求职者本人的顾问，回答他拿不准的求职判断题。' +
-      '\n硬性要求：' +
-      '\n1. 你没有任何检索能力：不得声称查过数据库、系统、后台或平台，不得说「帮你查了」「逐条查库」。' +
-      '\n2. 不承诺录用、Offer、通过率、薪资数字；不输出任何百分比。' +
-      '\n3. 不替用户做投递或预约决定，不代收简历；岗位申请只能引导用户去来源平台。' +
-      '\n4. 没有依据时必须明说「本机没有你所在行业的具体数据，这条算参考」，不要编出处。' +
-      '\n5. sourceNote 要如实写清这条结论凭什么：是通行做法，还是基于用户自己说过的话。' +
-      '\n只输出 JSON（不要 markdown 代码块）：' +
-      '{"answer":"回答正文（200 字以内，口语化，可分点）",' +
-      '"evidenceLevel":"E1|E2|E3",' +
-      '"sourceNote":"这条的出处与可信度说明（60 字以内）"}' +
-      '\nevidenceLevel 口径：E1=依据用户自己说过的话或他的材料；E2=依据本机读到的来源事实；E3=你的判断与建议。' +
-      '\n本层没有来源事实输入，所以一般只应输出 E1 或 E3，不要谎报 E2。'
+    const sys = ADVISOR_QA_SYSTEM_PROMPT
 
     const masked = maskUserTextForLlmText(question.slice(0, 600), 'advisor_qa')
     const parts: string[] = []
@@ -260,17 +278,7 @@ export class LlmAdvisorService {
    * 稿子里的每个阿拉伯数字都必须在用户自己填的内容里出现过。
    */
   async draft(slots: StoredSlots, slotKeys: readonly string[], ctx: AdvisorLlmContext = {}): Promise<AdvisorDraft> {
-    const sys =
-      '你在把求职者自己说的话顺成一段可以直接念出口的书面表达。你不是在替他想内容。' +
-      '\n硬性要求：' +
-      '\n1. 只能使用用户提供的信息。数字、公司名、时间、离职原因、证书资质**一律不得编造**：' +
-      '\n   用户没说的，在稿子里写成 ____ 留空，并在 blanks 里列出留空的是什么。' +
-      '\n2. 不得出现用户没提供过的任何阿拉伯数字（年限、百分比、数量、金额一律如此）。' +
-      '\n3. 不承诺录用、Offer、通过率、薪资；不输出百分比。' +
-      '\n4. 不得声称查过任何数据库或系统。' +
-      '\n5. 语气自然、口语可念，不要书面套话堆砌。' +
-      '\n只输出 JSON（不要 markdown 代码块）：' +
-      '{"draft":"成稿正文（留空处用 ____）","blanks":["留空的是什么"],"summary":"一句话说明这稿还差什么"}'
+    const sys = ADVISOR_DRAFT_SYSTEM_PROMPT
 
     // 校验基准必须与送模型的那一份完全一致（遮盖后），否则会把合法输出误判成编造
     const maskedParts: string[] = []
@@ -324,7 +332,7 @@ export class LlmAdvisorService {
    * 校验不过的条目直接降级为 missing —— 宁可说「没写到」也不能拿编的原文当证据。
    */
   async compare(material: string, requirements: string, ctx: AdvisorLlmContext = {}): Promise<AdvisorCompare> {
-    const sys =
+    const sys = withAiSafety(
       '你在做一件很窄的事：把岗位正文的要求逐条拿去材料里找，看**有没有写到**。' +
       '\n硬性要求：' +
       '\n1. 只判断「有没有写到」，不判断「写得好不好」——后者需要行业经验，本机没有依据。' +
@@ -336,7 +344,8 @@ export class LlmAdvisorService {
       '\n只输出 JSON（不要 markdown 代码块）：' +
       '{"items":[{"requirement":"要求原文","verdict":"covered|missing|not_a_capability","evidence":"covered 时填材料原文摘录(≤60字)，其余填一句说明"}],' +
       '"extras":[{"point":"材料里有但岗位没提的点","note":"一句说明"}],' +
-      '"summary":"一句话总览（说明这是逐条比对结果，不代表录用判断）"}'
+      '"summary":"一句话总览（说明这是逐条比对结果，不代表录用判断）"}',
+    )
 
     const maskedMaterial = maskUserTextForLlmText(material.slice(0, 8000), 'advisor_compare_material')
     const maskedReq = maskUserTextForLlmText(requirements.slice(0, 4000), 'advisor_compare_req')

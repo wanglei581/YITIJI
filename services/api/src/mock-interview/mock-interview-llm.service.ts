@@ -10,6 +10,7 @@ import {
 } from '../ai/llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
+import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 
 // ============================================================
 // 2C 模拟面试 LLM 服务：面试官提问 + 练习报告生成。
@@ -103,7 +104,45 @@ export interface InterviewReportPayload {
 
 const Q_TYPES = ['intro', 'position', 'experience', 'skill', 'behavior', 'plan', 'reverse', 'closing'] as const
 
-function basePersona(input: { interviewerType: string; industry: string; position: string; experience: string; difficulty: string }): string {
+type InterviewPersonaInput = { interviewerType: string; industry: string; position: string; experience: string; difficulty: string }
+
+export function interviewQuestionSystemPrompt(input: InterviewPersonaInput & { askedCount: number; questionTarget: number }): string {
+  const isFirst = input.askedCount === 0
+  const isLast = input.askedCount >= input.questionTarget - 1
+  return withAiSafety(
+    basePersona(input) +
+    '\n你的任务：基于已进行的对话提出下一道面试问题。' +
+    `共 ${input.questionTarget} 题，当前是第 ${input.askedCount + 1} 题。` +
+    (isFirst ? '这是开场：先用一句话礼貌问候并自我介绍身份，再提第一题（通常是自我介绍）。' : '') +
+    (isLast ? '这是最后一题：用收尾性问题（如让求职者反问你 1-2 个问题，或补充想强调的内容）。' : '') +
+    '\n只输出 JSON（不要 markdown 代码块）：{"greeting":"仅首题给一句问候，否则省略","question":"问题文本（一次只问一个问题，不超过 80 字）","qType":"intro|position|experience|skill|behavior|plan|reverse|closing 之一"}',
+  )
+}
+
+export function interviewReportSystemPrompt(input: InterviewPersonaInput): string {
+  return withAiSafety(
+    basePersona(input) +
+    '\n你的任务：基于完整对话，生成一份「模拟面试练习报告」。这是练习反馈，不是录用评估。' +
+    '\n要求：所有判断必须基于对话中真实出现的内容；用户没有回答到的方面如实写"本次练习未充分覆盖"；' +
+    '不得编造候选人没说过的经历。练习反馈只谈表达和准备，不给胜任力等级，也不估计被聘用的可能性。' +
+    '\noverall.level 只描述练习里的表达完整度（needs_work=需要加强 / pass=基础达标 / good=表现良好 / excellent=表现突出），不是通过率。' +
+    '\n对话中部分回答带有耗时元数据（秒），可据此在 expression/adaptability 模块中评价回答完整度、表达结构、追问应对与时间控制（过短可能不充分、过长可能不聚焦）。' +
+    '【禁止】评价语速、语调、情绪稳定性——你只有文字转写，没有任何音频特征分析，不得编造此类判断。' +
+    '\n只输出 JSON（不要 markdown 代码块），结构：' +
+    '{"overall":{"level":"needs_work|pass|good|excellent","summary":"2-3 句练习反馈，只谈表达和准备"},' +
+    '"expression":["表达是否清楚 2-4 条"],' +
+    '"positionFit":["对话里已经说到的、与目标岗位要求相关的事实，不判断是否适合"],' +
+    '"credibility":["经历是否讲得具体 2-4 条：背景/职责/结果/经得起追问"],' +
+    '"professional":["对话里已经出现的专业内容，只谈是否讲清楚，不评能力高低"],' +
+    '"adaptability":["沟通与应变 2-3 条：追问应对/承认不确定/表达稳定性"],' +
+    '"risks":["可以改进的准备点 3-5 条，具体可执行"],' +
+    '"predictedQuestions":[{"question":"建议继续准备的问题","why":"考察点","approach":"回答思路"}](3-5 个),' +
+    '"starAdvice":{"s":"情境建议","t":"任务建议","a":"行动建议","r":"结果建议","reminder":"量化提醒"},' +
+    '"checklist":["面试前准备清单 5-8 条：公司岗位调研/自我介绍/代表性经历/反问问题/材料/设备路线"]}',
+  )
+}
+
+function basePersona(input: InterviewPersonaInput): string {
   return (
     `你是一位${INTERVIEWER_STYLE[input.interviewerType] ?? INTERVIEWER_STYLE['hr']}\n` +
     `场景：求职者目标岗位「${input.position}」（${input.industry} 行业），${EXPERIENCE_LABEL[input.experience] ?? input.experience}。\n` +
@@ -127,13 +166,7 @@ export class MockInterviewLlmService {
   async nextQuestion(input: NextQuestionInput, onLlmCall?: AiLlmCallSink): Promise<NextQuestionOutput> {
     const isFirst = input.askedCount === 0
     const isLast = input.askedCount >= input.questionTarget - 1
-    const sys =
-      basePersona(input) +
-      '\n你的任务：基于已进行的对话提出下一道面试问题。' +
-      `共 ${input.questionTarget} 题，当前是第 ${input.askedCount + 1} 题。` +
-      (isFirst ? '这是开场：先用一句话礼貌问候并自我介绍身份，再提第一题（通常是自我介绍）。' : '') +
-      (isLast ? '这是最后一题：用收尾性问题（如让求职者反问你 1-2 个问题，或补充想强调的内容）。' : '') +
-      '\n只输出 JSON（不要 markdown 代码块）：{"greeting":"仅首题给一句问候，否则省略","question":"问题文本（一次只问一个问题，不超过 80 字）","qType":"intro|position|experience|skill|behavior|plan|reverse|closing 之一"}'
+    const sys = interviewQuestionSystemPrompt(input)
 
     const userParts: string[] = []
     if (input.resumeDigest) userParts.push(`【求职者简历摘要（仅练习用）】\n${input.resumeDigest.slice(0, 3000)}`)
@@ -168,24 +201,7 @@ export class MockInterviewLlmService {
    * 由调用方按 interviewReport 操作累计后落 AiServiceLog。
    */
   async buildReport(input: ReportInput, onLlmCall?: AiLlmCallSink): Promise<InterviewReportPayload> {
-    const sys =
-      basePersona(input) +
-      '\n你的任务：基于完整对话，生成一份「模拟面试练习报告」。这是练习反馈，不是录用评估。' +
-      '\n要求：所有判断必须基于对话中真实出现的内容；用户没有回答到的方面如实写"本次练习未充分覆盖"；' +
-      '不编造用户没有说过的经历；overall.level 是练习表现等级（needs_work=需要加强 / pass=基础达标 / good=表现良好 / excellent=表现突出），不是通过率。' +
-      '\n对话中部分回答带有耗时元数据（秒），可据此在 expression/adaptability 模块中评价回答完整度、表达结构、追问应对与时间控制（过短可能不充分、过长可能不聚焦）。' +
-      '【禁止】评价语速、语调、情绪稳定性——你只有文字转写，没有任何音频特征分析，不得编造此类判断。' +
-      '\n只输出 JSON（不要 markdown 代码块），结构：' +
-      '{"overall":{"level":"needs_work|pass|good|excellent","summary":"2-3 句总评"},' +
-      '"expression":["表达清晰度要点 2-4 条：结构性/是否绕圈/重点突出/职责成果是否讲清"],' +
-      '"positionFit":["岗位匹配度参考 2-4 条：回答与目标岗位的贴近度、经历支撑度（只能称为参考）"],' +
-      '"credibility":["经历可信度与细节 2-4 条：背景/职责/量化结果/经得起追问"],' +
-      '"professional":["专业能力表现 2-4 条：按目标岗位类型评价"],' +
-      '"adaptability":["沟通与应变 2-3 条：追问应对/承认不确定/表达稳定性"],' +
-      '"risks":["风险点与改进建议 3-5 条，具体可执行"],' +
-      '"predictedQuestions":[{"question":"建议继续准备的问题","why":"考察点","approach":"回答思路"}](3-5 个),' +
-      '"starAdvice":{"s":"情境建议","t":"任务建议","a":"行动建议","r":"结果建议","reminder":"量化提醒"},' +
-      '"checklist":["面试前准备清单 5-8 条：公司岗位调研/自我介绍/代表性经历/反问问题/材料/设备路线"]}'
+    const sys = interviewReportSystemPrompt(input)
 
     const transcript = input.transcript
       .map((t) => {

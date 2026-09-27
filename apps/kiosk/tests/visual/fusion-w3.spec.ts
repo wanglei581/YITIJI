@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
+import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
@@ -17,7 +18,7 @@ function terminalBaseline(api: ApiRouter): void {
   })
   api.respond('GET', '/api/v1/terminals/KSK-001/config', {
     status: 200,
-    json: { smartCampus: { enabled: false, modules: {}, items: [] }, toolbox: { enabled: false, items: [] }, configVersion: 'w3', refreshIntervalMs: 300000, serverTime: '2026-07-24T00:00:00.000Z' },
+    json: { smartCampus: { enabled: false, modules: {}, items: [] }, toolbox: { enabled: false, items: [] }, ...RECRUITMENT_HOSTING_ON, configVersion: 'w3', refreshIntervalMs: 300000, serverTime: '2026-07-24T00:00:00.000Z' },
   })
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
   // 包 I：助手页「按住说话」挂载时探测语音能力；基线里按未配置处理，按钮应置灰而不是打断页面。
@@ -1264,7 +1265,10 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await page.getByRole('button', { name: '提交回答' }).click()
   await page.getByRole('button', { name: '结束面试' }).click()
   await page.waitForURL(/\/interview\?stage=report/)
-  await expect(page.getByRole('note', { name: '合规提示' })).toContainText('练习结果仅供本人复盘，不会发送给任何企业。')
+  // 3.5c：横幅以 AI 可见标识开头（审计表一「模拟面试报告（一体机）」），不发给企业的边界不变。
+  const reportNote = page.getByRole('note', { name: '合规提示' })
+  await expect(reportNote).toContainText('AI 生成，仅供参考，只用于本人练习复盘。')
+  await expect(reportNote).toContainText('也不会发送给任何企业。')
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
 })
@@ -1503,8 +1507,11 @@ test('job fit completed-but-empty result says未提供 rather than尚未返回 @
   // completed 且各数组为空：结果已经返回了，只是这次没给出匹配点。
   api.respond('GET', '/api/v1/resume/job-fit/t-empty', { status: 200, json: { taskId: 't-empty', status: 'completed', fitLevel: 'reference_medium', summary: '', matchPoints: [], gapPoints: [], targetedSuggestions: [] } })
   await page.goto('/resume/job-fit?taskId=t-empty')
-  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'result-mid')
-  await expect(page.getByText('本次未提供')).toBeVisible()
+  // 3.14 起结果页不分档：夹具里旧服务端留下的 fitLevel 也不再把页面切成 result-mid。
+  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'result')
+  // 结果明细按稿 46 分成「已写到 / 还没体现」两栏，两栏这次都是空数组：两处都照实写「本次未提供」。
+  await expect(page.getByText('本次未提供')).toHaveCount(2)
+  for (const slot of await page.getByText('本次未提供').all()) await expect(slot).toBeVisible()
   await expect(page.getByText('尚未返回')).toHaveCount(0)
 })
 

@@ -114,6 +114,8 @@ export function readScanWorkbenchSession() {
   }
 
   const mod = await import(toDataUrl(gateCode))
+  // 同一个 data URL = 同一份模块实例：拿到的就是闸自己在用的那一份撤销模块（endedByServer 在里面）。
+  const revoke = await import(revokeUrl)
 
   /** 把还在排队的 microtask 放干净（fetch 的 then 链、pump 的 finally）。 */
   const flush = async () => {
@@ -138,6 +140,7 @@ export function readScanWorkbenchSession() {
 
   return {
     mod,
+    revoke,
     calls,
     flush,
     advance,
@@ -322,7 +325,6 @@ test('403 之后摘掉身份再试一次（服务端为登出后留的那条路�
 for (const [status, code, why] of [
   [404, 'SCAN_TASK_NOT_FOUND', '服务端那边根本没有这条任务'],
   [400, 'SCAN_TASK_ALREADY_COMPLETED', '已终态，租约只签 waiting'],
-  [409, 'SCAN_TASK_CANCEL_CONFLICT', '已经不是 waiting/matched'],
 ]) {
   test(`服务端说「领不走了」也算确认：${status} ${code}（${why}）`, async () => {
     const gate = await loadGate({
@@ -341,6 +343,122 @@ for (const [status, code, why] of [
     }
   })
 }
+
+/* ── 409 SCAN_TASK_CANCEL_CONFLICT：只凭这一句不许换人，只许再问一次（2026-09-26）──────
+ *
+ * cancel() 抛这个码有两处来历：CAS 之前判到 cancelled / failed / expired；或者 CAS 撞车之后
+ * 重读 —— 那一刻任务可能正是 matched，一次投递刚开始，文件正往上一位的任务里写（那份纸可能
+ * 正是下一位在面板上扫的）。所以第一次 409 不算确认。
+ *
+ * 再问一次就分得清（scan-tasks.service.ts）：第一次 409 之后任务不会再是 waiting；对 matched
+ * 再发一次，要么 CAS 赢（200），要么输给 completed（400）或 failed / cancelled / expired（409）。
+ * 第二次的每一种回答都是确定的，所以上限是「再问一次」；真是终态的任务每次都回 409，
+ * 不设上限只会把机器按到自然过期。 */
+const CONFLICT = () => jsonError(409, 'SCAN_TASK_CANCEL_CONFLICT')
+const okCancelled = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+const compensationFor = (gate) => gate.revoke.revokeCreatedScanSession(
+  { scanTaskId: 'scan-1', controlToken: 'control-1' },
+  null,
+  'ack-compensation',
+)
+
+test('第一次 409 不许换人：立刻再问一次（不等退避），第二次回话到手才放行', async () => {
+  let answered = 0
+  let resolveSecond
+  const gate = await loadGate({
+    session: liveSession(),
+    fetchImpl: () => {
+      answered += 1
+      if (answered === 1) return CONFLICT()
+      return new Promise((resolve) => { resolveSecond = resolve })
+    },
+  })
+  try {
+    gate.mod.beginScanSessionCleanup('member-token')
+    const exit = handover()
+    gate.mod.whenScanCleanupSettled(exit.run)
+    // 假时钟一格都没推：第二发必须是同一次尝试里立刻补上的，不是退避定时器送来的。
+    await gate.flush()
+    assert.equal(gate.calls.length, 2, '第一次 409 之后必须立刻再问一次')
+    assert.equal(authOf(gate.calls[1]), 'Bearer member-token', '再问那一次用的是同一份身份')
+    assert.equal(exit.released(), 0, '第二次回话到手之前换人 = 那次投递可能正把下一位的纸写进上一位的任务')
+    assert.equal(gate.mod.scanCleanupHolding(), true)
+
+    resolveSecond(await okCancelled())
+    await gate.flush()
+    assert.equal(exit.released(), 1)
+    assert.equal(gate.calls.length, 2)
+  } finally {
+    gate.restore()
+  }
+})
+
+for (const [label, second] of [
+  ['200 cancelled（那次投递被撤掉了）', okCancelled],
+  ['400 SCAN_TASK_ALREADY_COMPLETED（投递先一步写完了）', () => jsonError(400, 'SCAN_TASK_ALREADY_COMPLETED')],
+  ['404 SCAN_TASK_NOT_FOUND', () => jsonError(404, 'SCAN_TASK_NOT_FOUND')],
+  ['又一次 409（只剩 failed / cancelled / expired）', CONFLICT],
+]) {
+  test(`409 之后再问一次得到 ${label}：一共两发，放行，并记成已结束`, async () => {
+    let answered = 0
+    const gate = await loadGate({
+      session: liveSession(),
+      fetchImpl: () => {
+        answered += 1
+        return answered === 1 ? CONFLICT() : second()
+      },
+    })
+    try {
+      gate.mod.beginScanSessionCleanup(null)
+      const exit = handover()
+      gate.mod.whenScanCleanupSettled(exit.run)
+      await gate.flush()
+      assert.equal(gate.calls.length, 2, '只许再问一次')
+      assert.equal(exit.released(), 1)
+      assert.equal(gate.mod.scanCleanupHolding(), false)
+      // 上限：放行之后推到自然过期，一发都不许再有。
+      await gate.advance(TEN_MINUTES)
+      assert.equal(gate.calls.length, 2, '收口之后还在刷请求 = 上限没守住')
+      // 记成已结束：闸确认之后才落地的那次投递确认，不许再为它补一发。
+      assert.equal(compensationFor(gate), false)
+      assert.equal(gate.calls.length, 2)
+    } finally {
+      gate.restore()
+    }
+  })
+}
+
+test('409 之后再问那一次没拿到结论：照旧按住、照旧退避，也不把第一次 409 记成已结束', async () => {
+  let answered = 0
+  const gate = await loadGate({
+    session: liveSession(),
+    fetchImpl: () => {
+      answered += 1
+      if (answered === 1) return CONFLICT()
+      if (answered === 2) return jsonError(502, 'BAD_GATEWAY')
+      return okCancelled()
+    },
+  })
+  try {
+    gate.mod.beginScanSessionCleanup(null)
+    const exit = handover()
+    gate.mod.whenScanCleanupSettled(exit.run)
+    await gate.flush()
+    assert.equal(gate.calls.length, 2)
+    assert.equal(exit.released(), 0, '第二次没给结论：那条任务可能正是 matched，不许换人')
+    assert.equal(gate.mod.scanCleanupStatus().lastOutcome, 'server-error')
+    // 第一次 409 证明不了结束：尽力而为的那条撤销通道对它照发（这一发拿到 200）。
+    assert.equal(compensationFor(gate), true)
+    assert.equal(gate.calls.length, 3)
+
+    // 闸自己照旧按退避表再试：下一次拿到确认才放行。
+    await gate.advance(900)
+    assert.equal(gate.calls.length, 4)
+    assert.equal(exit.released(), 1)
+  } finally {
+    gate.restore()
+  }
+})
 
 test('收尾期间一次投递确认都不许发；收完才放开', async () => {
   let resolveDelete

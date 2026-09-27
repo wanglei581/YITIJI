@@ -1,5 +1,6 @@
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState } from 'react'
+import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { getJobFairs } from '../../../services/api/jobFairs'
 import { getTerminalId } from '../../../services/api/screensaver'
 
@@ -29,6 +30,8 @@ function fairOrder(a: ExternalJobFairDTO, b: ExternalJobFairDTO): number {
 export function useHomeJobFairHighlight(): HomeJobFairHighlightState & { retry: () => void } {
   const [state, setState] = useState<HomeJobFairHighlightState>({ status: 'loading', fair: null })
   const [requestVersion, setRequestVersion] = useState(0)
+  // 招聘内容托管（3.13）没打开时不请求招聘会：首页也不会摆这张卡。
+  const hostingOpen = useRecruitmentHosting().enabled
 
   const retry = useCallback(() => {
     setRequestVersion((version) => version + 1)
@@ -37,6 +40,7 @@ export function useHomeJobFairHighlight(): HomeJobFairHighlightState & { retry: 
   useEffect(() => {
     let cancelled = false
     setState({ status: 'loading', fair: null })
+    if (!hostingOpen) return
 
     const terminalId = getTerminalId()
     void getJobFairs(terminalId ? { terminalId } : undefined)
@@ -53,7 +57,7 @@ export function useHomeJobFairHighlight(): HomeJobFairHighlightState & { retry: 
     return () => {
       cancelled = true
     }
-  }, [requestVersion])
+  }, [requestVersion, hostingOpen])
 
   return { ...state, retry }
 }

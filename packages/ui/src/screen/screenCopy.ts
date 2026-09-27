@@ -19,6 +19,8 @@
 export interface ScreenReasonCopy {
   /** 卡片主文案。取数失败与结构性缺失必须不同，样式也不同。 */
   title: string
+  /** 窄格子（磁贴）里用的短称；没有就用 title。完整说明仍在悬停提示里。 */
+  short?: string
   /** 为什么没有数据。 */
   detail: string
   /** 接入方式，渲染在脚注里。 */
@@ -125,6 +127,13 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
     howTo: '接入方式：在上传完成时另写一条不含文件内容的计数（只记次数、成败与渠道），按天汇总后上屏。',
     transient: false,
   },
+  recruitment_hosting_disabled: {
+    title: '招聘内容托管未开启',
+    short: '未开启',
+    detail: '本平台已关闭招聘内容托管：不接收、不审核、不发布岗位、招聘会与企业资料；这一项只在客户私有化部署中提供。',
+    howTo: '在客户私有化部署中开启招聘内容托管后自动出现。',
+    transient: false,
+  },
   inspection_counter_unwritten: {
     title: '未接入',
     detail: '材料检查任务里含隐私命中信息，按规定 24 小时内删除，近 7 天、30 天的检查次数无法从原始记录还原。',
@@ -133,6 +142,7 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
   },
   source_query_failed: {
     title: '取数失败',
+    short: '暂时取不到',
     detail: '本次快照里这一块的数据源查询失败了。这是一次性故障，不是数据层缺口；下次刷新可能就恢复。',
     howTo: '处理：等待下次自动刷新，或手动刷新一次；持续失败请查服务端日志。',
     transient: true,
@@ -142,6 +152,14 @@ export const SCREEN_REASON_COPY: Readonly<Record<string, ScreenReasonCopy>> = {
 export function screenReasonCopy(reason: string): ScreenReasonCopy {
   return SCREEN_REASON_COPY[reason] ?? UNKNOWN_REASON
 }
+
+/**
+ * 招聘内容托管关闭（托管 a，我们云上的默认部署）时的边界句。
+ *
+ * 每屏只说一次，放在承载政策内容的那块面板里。屏上其它位置不再为岗位、招聘会、企业资料
+ * 摆「未开启」磁贴、标签或灰色场景节点 —— 边界说清一次，其余位置只放真实数据。
+ */
+export const SCREEN_HOSTING_OFF_NOTE = '政策由运营机构自行审核发布；本平台不发布岗位、招聘会与企业资料'
 
 /** 大屏统一的「打开来源平台入口」措辞。屏上任何地方都不出现投递字样。 */
 export const SCREEN_SOURCE_ENTRY_NOTE =

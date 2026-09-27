@@ -145,11 +145,13 @@ function main(): void {
     'toolboxScene?.disclaimer',
   ], 'Kiosk 助手页读取 URL intent、消费场景表并透传请求')
 
+  // 3.5c（2026-09-26 审计表二 advisorScenes.ts 行）：Offer 对比与 HR 问答的免责对外不再写「法律意见」，
+  // 改为「仅供个人核对，不代替专业人士判断」；录用、入职与官方政策这几条承诺边界照旧逐字钉住。
   mustContain(kioskAssistantDir, [
     ...allSkillIntents,
-    '不构成录用、入职或法律意见',
+    '仅供个人核对，不代替专业人士判断，也不构成录用或入职承诺',
     '不构成涨薪或录用承诺',
-    '不构成正式法律意见或官方政策承诺',
+    '仅供个人核对，不代替专业人士判断，也不构成官方政策承诺',
   ], 'Kiosk 助手目录覆盖全部 AI skill intent 与场景合规文案')
 
   mustContain(llmChat, [

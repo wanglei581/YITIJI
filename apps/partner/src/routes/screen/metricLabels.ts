@@ -32,7 +32,7 @@ export const PARTNER_METRIC_LABELS: Readonly<Record<ScreenMetricKey, string>> = 
   aiBreakdown24h: 'AI 服务分项',
   aiSuccessRate24h: 'AI 成功率',
   aiCost24h: 'AI 成本与用量',
-  alertsRealtime: '实时告警',
+  alertsRealtime: '告警中心明细',
   sourceEntryOpensTop: '打开来源平台入口 Top',
   visitCount: '服务人次',
   suppliesAndMap: '耗材余量 / 终端地图',

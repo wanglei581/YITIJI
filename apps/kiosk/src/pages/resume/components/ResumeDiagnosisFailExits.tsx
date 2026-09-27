@@ -18,6 +18,7 @@ import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { makePrintParams } from '@ai-job-print/shared'
 import { BriefcaseIcon, CalendarDaysIcon, PrinterIcon } from 'lucide-react'
+import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { MANUAL_CHECKS } from '../resume-report-model'
 
 export interface ResumeDiagnosisFailFile {
@@ -43,6 +44,8 @@ const DEAD_ROW: CSSProperties = { borderStyle: 'dashed', color: 'var(--qx-ink-3)
 export function ResumeDiagnosisFailExits({ file }: Props) {
   const navigate = useNavigate()
   const canPrintOriginal = Boolean(file?.fileUrl)
+  // 招聘内容托管（3.13）关闭时没有岗位与招聘会可看，这两条出路不摆。
+  const hostingOpen = useRecruitmentHosting().enabled
 
   const printOriginal = () => {
     if (!file?.fileUrl) return
@@ -100,14 +103,18 @@ export function ResumeDiagnosisFailExits({ file }: Props) {
             <PrinterIcon size={26} aria-hidden="true" />
             <span className="tx"><b>去打印 / 扫描其他材料</b><span>打印扫描不依赖 AI，照常可用</span></span>
           </button>
-          <button type="button" className="rrp-row" onClick={() => navigate('/jobs')} data-route="/jobs">
-            <BriefcaseIcon size={26} aria-hidden="true" />
-            <span className="tx"><b>查看岗位</b><span>来源平台的岗位信息照常可看</span></span>
-          </button>
-          <button type="button" className="rrp-row" onClick={() => navigate('/job-fairs')} data-route="/job-fairs">
-            <CalendarDaysIcon size={26} aria-hidden="true" />
-            <span className="tx"><b>查看招聘会</b><span>现场活动信息照常可看</span></span>
-          </button>
+          {hostingOpen ? (
+            <>
+              <button type="button" className="rrp-row" onClick={() => navigate('/jobs')} data-route="/jobs">
+                <BriefcaseIcon size={26} aria-hidden="true" />
+                <span className="tx"><b>查看岗位</b><span>来源平台的岗位信息照常可看</span></span>
+              </button>
+              <button type="button" className="rrp-row" onClick={() => navigate('/job-fairs')} data-route="/job-fairs">
+                <CalendarDaysIcon size={26} aria-hidden="true" />
+                <span className="tx"><b>查看招聘会</b><span>现场活动信息照常可看</span></span>
+              </button>
+            </>
+          ) : null}
         </div>
       </section>
       <section className="rrp-checks" data-testid="resume-report-fallback">

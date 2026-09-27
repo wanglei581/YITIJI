@@ -503,18 +503,31 @@ async function main(): Promise<void> {
     }
 
     // ── §3 政策链路 ────────────────────────────────────────────────────────
+    // 3.13（产品负责人 9/26 决定 ⑫）：政策由机构自己审核、带发布责任确认发布；
+    // 管理员对政策只剩紧急下架，审核与发布一律 403 ADMIN_POLICY_PUBLISH_DISABLED。
     section('§3 政策(PolicyPost)')
     const policyId = await policyViaManual(h, partnerToken)
     if (policyId) {
-      const early = await h.http.patch(`/admin/policy-sources/${policyId}/publish`, { token: adminToken, json: { action: 'publish' } })
+      const adminReview = await h.http.patch(`/admin/policy-sources/${policyId}/review`, { token: adminToken, json: { action: 'approve' } })
+      show('管理员审核', adminReview)
+      assert('政策｜管理员不能审核', adminReview.status === 403 && errCode(adminReview) === 'ADMIN_POLICY_PUBLISH_DISABLED',
+        `实际 ${adminReview.status} ${errCode(adminReview)}`)
+      const early = await h.http.patch(`/partner/policies/${policyId}/release`, { token: partnerToken, json: { responsibilityAcknowledged: true } })
       show('未审核直接发布', early)
       assert('政策｜未审核发布被拒', early.status === 400 && errCode(early) === 'PUBLISH_REQUIRES_APPROVAL',
         `实际 ${early.status} ${errCode(early)}`)
-      const approve = await h.http.patch(`/admin/policy-sources/${policyId}/review`, { token: adminToken, json: { action: 'approve' } })
-      show('审核通过', approve)
+      const approve = await h.http.patch(`/partner/policies/${policyId}/review`, { token: partnerToken, json: { action: 'approve' } })
+      show('机构审核通过', approve)
       assert('政策｜审核通过', approve.status === 200, `实际 ${approve.status} ${errCode(approve)}`)
-      const publish = await h.http.patch(`/admin/policy-sources/${policyId}/publish`, { token: adminToken, json: { action: 'publish' } })
-      show('发布', publish)
+      const noAck = await h.http.patch(`/partner/policies/${policyId}/release`, { token: partnerToken, json: {} })
+      show('未确认发布责任', noAck)
+      assert('政策｜未确认发布责任被拒', noAck.status === 400, `实际 ${noAck.status} ${errCode(noAck)}`)
+      const adminPublish = await h.http.patch(`/admin/policy-sources/${policyId}/publish`, { token: adminToken, json: { action: 'publish' } })
+      show('管理员发布', adminPublish)
+      assert('政策｜管理员不能发布', adminPublish.status === 403 && errCode(adminPublish) === 'ADMIN_POLICY_PUBLISH_DISABLED',
+        `实际 ${adminPublish.status} ${errCode(adminPublish)}`)
+      const publish = await h.http.patch(`/partner/policies/${policyId}/release`, { token: partnerToken, json: { responsibilityAcknowledged: true } })
+      show('机构发布', publish)
       assert('政策｜发布成功', publish.status === 200, `实际 ${publish.status} ${errCode(publish)}: ${errMsg(publish)}`)
       const pub = await h.http.get<{ id: string }[]>('/policies?pageSize=200')
       const list = unwrap(pub) ?? []

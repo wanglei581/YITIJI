@@ -528,18 +528,18 @@ async function main() {
     // ── 11. 报告 PDF 真实渲染 ────────────────────────────────────────────────
     {
       const { buffer, pageCount } = await pdf.render(
-        { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11' },
+        { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11', contentId: 'verify-mock-interview' },
         VALID_REPORT,
       )
       if (pageCount < 1) fail('11. pageCount 应 ≥1')
       if (buffer.slice(0, 4).toString() !== '%PDF') fail('11. 输出不是 PDF')
       const withAnswers = await pdf.render(
-        { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11' },
+        { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11', contentId: 'verify-mock-interview' },
         VALID_REPORT,
         { excerpts: [{ question: SECRET_QUESTION, answerExcerpt: SECRET_ANSWER.slice(0, 200), skipped: false }], includeAnswers: true },
       )
       const withoutAnswers = await pdf.render(
-        { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11' },
+        { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11', contentId: 'verify-mock-interview' },
         VALID_REPORT,
         { excerpts: [{ question: SECRET_QUESTION, answerExcerpt: SECRET_ANSWER.slice(0, 200), skipped: false }], includeAnswers: false },
       )
