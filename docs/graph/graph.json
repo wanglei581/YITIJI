@@ -12493,7 +12493,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 588,
+      "reachableFileCount": 596,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14564,6 +14564,7 @@
           ],
           "path": "/resume/generate",
           "styles": [
+            "apps/kiosk/src/pages/resume/resume-generate-flow-qx.css",
             "apps/kiosk/src/pages/resume/resume-generate-qx.css",
             "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
             "apps/kiosk/src/styles/ai-primitives.css",
@@ -14822,6 +14823,7 @@
           "styles": [
             "apps/kiosk/src/pages/resume/optimize-empty-state-qx.css",
             "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
+            "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -14875,6 +14877,7 @@
           "path": "/resume/optimize/compare",
           "styles": [
             "apps/kiosk/src/pages/resume/resume-optimize-compare.css",
+            "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -14928,6 +14931,7 @@
           ],
           "path": "/resume/parse",
           "styles": [
+            "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css",
             "apps/kiosk/src/pages/resume/resume-triage-qx.css",
             "apps/kiosk/src/styles/ai-primitives.css",
@@ -14984,6 +14988,7 @@
           ],
           "path": "/resume/report",
           "styles": [
+            "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/pages/resume/resume-report-qx.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15170,6 +15175,7 @@
           ],
           "path": "/resume/source",
           "styles": [
+            "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css",
             "apps/kiosk/src/pages/resume/resume-triage-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15203,6 +15209,7 @@
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
             "apps/kiosk/src/pages/resume/resume-decision-qx.css",
+            "apps/kiosk/src/pages/resume/resume-templates-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -15465,7 +15472,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 667
+      "sourceFileCount": 675
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
