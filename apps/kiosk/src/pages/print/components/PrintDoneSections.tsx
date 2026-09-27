@@ -4,6 +4,7 @@
 // 只收 PrintDonePage 已经向服务端核验过的真值：不发请求、不判定任务状态、不改金额。
 //   PrintDoneXq            小青区（稿 .xq）：各结果态的首句与「你现在该干嘛」
 //   PrintFeeBoundaryBar    「费用与订单边界」内联条（稿 moneyBar）：费用说明态与缺纸态共用
+//   PrintDoneRecordSection 完成态「本次记录」：摘要默认可见，保留与删除记录可展开
 //   PrintJobSummaryCard    完成态「本次任务摘要」
 //   PrintOutOfPaperPanel   PAPER_EMPTY 缺纸态正文（稿 out-of-paper）：任务卡 + 缺纸说明 + 费用边界 + 现场三步
 //
@@ -11,12 +12,15 @@
 // 本文件渲染在完成页上，守同一套文案红线：不写「已支付」（用「已付」）、不出现退款 / 赔付字样。
 // ============================================================
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { FileTextIcon, PrinterIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_COMPACT } from '../../../lib/fileName'
 import { formatCents } from '../cashierStatus'
 import { jobSubline, type OutOfPaperMoney } from '../printProgressModel'
+import { PrintFileDeletionRecords } from './PrintFileDeletionRecords'
+import { PrintFileRetentionNotice } from './PrintFileRetentionNotice'
+import type { PrintFileRetentionInput } from './printFileRetention'
 import { PrintJobRow } from './PrintProgressSections'
 
 const DUPLEX_LABEL: Record<string, string> = {
@@ -60,6 +64,40 @@ export function PrintFeeBoundaryBar({ sub, body, facts }: {
       <p className="pff-inbar-b">{body}</p>
       <div className="pff-inbar-kv">{facts}</div>
     </div>
+  )
+}
+
+/** 完成页下半部：摘要默认展开，文件保留与删除记录收在同一区里，避免把求助挤出首屏。 */
+export function PrintDoneRecordSection({
+  file,
+  params,
+  retention,
+}: {
+  file?: { name: string; pages: number }
+  params?: PrintJobParams
+  retention: PrintFileRetentionInput
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="pff-record" aria-label="本次记录">
+      <div className="pff-sec-h"><span className="t">本次记录</span></div>
+      {file && params ? <PrintJobSummaryCard file={file} params={params} /> : (
+        <p className="print-done-card-sub">这次没有带到文件名和打印参数，摘要留空。</p>
+      )}
+      <button
+        type="button"
+        className="pff-record-toggle"
+        aria-expanded={open}
+        aria-controls="print-done-record-extra"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {open ? '收起文件保留和删除记录' : '查看文件保留和删除记录'}
+      </button>
+      <div id="print-done-record-extra" className="pff-record-extra" hidden={!open}>
+        <PrintFileRetentionNotice retention={retention} />
+        <PrintFileDeletionRecords />
+      </div>
+    </section>
   )
 }
 

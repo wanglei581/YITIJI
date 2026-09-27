@@ -131,7 +131,9 @@ test('completed backend status overrides a forged failure state @kiosk', async (
   await openDoneWithState(page, { ...taskState, success: false, reason: '伪造失败' })
 
   await expect(page.getByText('打印完成', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('请取走文件', { exact: true })).toBeVisible()
+  await expect(page.getByText('都打好了，拿走前核一下', { exact: true })).toBeVisible()
+  await expect(page.getByText('请取走文件', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('请取走纸张', { exact: true })).toHaveCount(0)
   await expect(page.getByText('伪造失败')).toHaveCount(0)
   // 2026-09-08 反向变异：原先这里只有 `toHaveCount(0)`。满意度分组长在反馈弹层里、
   // 弹层默认关闭（PrintDonePage 的 feedbackOpen 初值 false），所以那条断言**永远为真** ——

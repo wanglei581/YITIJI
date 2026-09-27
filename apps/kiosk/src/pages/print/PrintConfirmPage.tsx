@@ -303,7 +303,7 @@ export function PrintConfirmPage() {
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
     { label: '页面范围', value: !params.pageRange || params.pageRange === 'all' ? '全部页面' : params.pageRange },
     { label: '打印份数', value: `${params.copies} 份` },
-    { label: '文件编号', value: file.fileId ?? '未登记' },
+    { label: '本次产物', value: '打印件', fileId: file.fileId ?? '' },
   ]
 
   const screen = derivePrintConfirmScreen({

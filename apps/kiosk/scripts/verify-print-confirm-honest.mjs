@@ -775,6 +775,7 @@ expectMatches(
 // ============================================================
 const LITERAL_ROW_ALLOWLIST = new Map([
   ['纸张规格', 'CM2800/CM2820 仅 A4，PrintJobParams.paperSize 类型即字面量 A4（CLAUDE.md §3）'],
+  ['本次产物', '稿 14 末格固定写产物类型「打印件」；内部文件号改挂该格 data-file-id，不展示给用户'],
 ])
 
 const parseTsx = (relativePath) =>
@@ -967,28 +968,54 @@ expectMatches(
 )
 expectMatches(
   doneSrc,
+  /<PrintDoneRecordSection/,
+  '打印完成页把保留说明和删除记录收进本次记录',
+)
+expectMatches(
+  read('src/pages/print/components/PrintDoneSections.tsx'),
   /<PrintFileRetentionNotice/,
   '打印完成页渲染文件保留说明',
 )
 expectMatches(
-  doneSrc,
+  read('src/pages/print/components/PrintDoneSections.tsx'),
   /<PrintFileDeletionRecords/,
   '打印完成页提供本人删除记录查阅',
 )
 expectMatches(
   retentionHelperCode,
   /fileRetentionAvailable\s*!==\s*true/,
-  '取不到保留字段时走「以后台策略为准」，不编造时长',
+  '取不到保留信息时不编造删除日期',
 )
 expectMatches(
   retentionHelper,
-  /未能读取本次文件的保留期，保留期以后台策略为准/,
-  '取不到到期时间时如实标注「保留期以后台策略为准」',
+  /这次没能读到这份文件什么时候删除。这里不猜具体哪一天。/,
+  '取不到到期时间时如实说读不到，不编造日期',
 )
 expectMatches(
   retentionHelper,
-  /这不是对存储介质的物理销毁/,
+  /删掉的是这份电子文件，不会把整台机器毁掉。/,
   '文案不承诺物理销毁',
+)
+expectMatches(
+  retentionNotice,
+  /公共一体机不会长期保存你的简历或证件复印件。/,
+  '保留说明用用户话指向公共一体机，不写内部字段',
+)
+const retentionVisible = `${retentionHelperCode}\n${stripComments(retentionNotice)}\n${stripComments(deletionRecords)}`
+if (/前台|后台|后端|字段|存储介质/.test(retentionVisible)) {
+  fail('文件保留与删除说明不得出现前台 / 后台 / 后端 / 字段 / 存储介质')
+} else {
+  pass('文件保留与删除说明没有工程词')
+}
+expectMatches(
+  read(CONFIRM),
+  /label:\s*'本次产物',\s*value:\s*'打印件',\s*fileId:\s*file\.fileId\s*\?\?\s*''/,
+  '确认页末格展示「打印件」，文件号仍取自 file.fileId',
+)
+expectMatches(
+  read('src/pages/print/components/PrintConfirmView.tsx'),
+  /data-file-id=\{row\.fileId\}/,
+  '确认页把文件号写在 data-file-id，不写进可见文案',
 )
 expectMatches(
   retentionNotice,

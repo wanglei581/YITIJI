@@ -695,7 +695,7 @@ export function PrintProgressPage() {
           </div>
           <div className="pfp-card pfp-faq-card">
             <ul className="pfp-faq">
-              <li><AlertTriangleIcon aria-hidden="true" /><p><b>打印机缺纸 / 卡纸</b>：别硬拉纸；设备上报后本页会转到结果页说明原因。</p></li>
+              <li><AlertTriangleIcon aria-hidden="true" /><p><b>打印机缺纸 / 卡纸</b>：别硬拉纸；打印机报告卡纸或缺纸后，本页会转到结果页说明原因。</p></li>
               <li><ClockIcon aria-hidden="true" /><p><b>长时间无响应</b>：本机连续查 10 分钟仍无结果会提示，凭任务号找工作人员。</p></li>
               <li><FileTextIcon aria-hidden="true" /><p><b>文件校验未通过</b>：上传可能中断或文件已变化，需返回重新上传。</p></li>
               <li>
