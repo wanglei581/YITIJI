@@ -89,7 +89,7 @@ export interface AiServiceInterface {
     intent?: ResumeParseIntentHeaders | null,
   ): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
-  getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse>
+  getResumeOptimize(taskId: string, access?: ResumeReadAccess, existingOnly?: boolean): Promise<ResumeOptimizeResponse>
   adjustResumeLayoutDraft(
     taskId: string,
     resume: GeneratedResume,
@@ -157,8 +157,8 @@ export const getResumeRecord = (taskId: string, access?: ResumeReadAccess) =>
   adapter.getResumeRecord(taskId, access)
 
 /** 通过 taskId 获取优化建议（登录会员传 token，匿名传 accessToken，见上） */
-export const getResumeOptimize = (taskId: string, access?: ResumeReadAccess) =>
-  adapter.getResumeOptimize(taskId, access)
+export const getResumeOptimize = (taskId: string, access?: ResumeReadAccess, existingOnly = false) =>
+  adapter.getResumeOptimize(taskId, access, existingOnly)
 
 /** Wave 2:AI 一键精简 / 调整排版（不新增事实，后端按 taskId 重新提取原文校验）。 */
 export const adjustResumeLayoutDraft = (

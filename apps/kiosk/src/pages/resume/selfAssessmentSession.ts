@@ -143,3 +143,8 @@ export function formatBytes(bytes: number): string {
     ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
     : `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
+
+/** 历史链接始终重新核验；只复用同一条匿名结果的凭证，不复用答案或旧正文。 */
+export function sessionForAssessmentRecord(linkedTaskId: string | null, saved: SelfAssessmentSession): SelfAssessmentSession {
+  return linkedTaskId ? { ...emptySelfAssessmentSession(), taskId: linkedTaskId, accessToken: saved.taskId === linkedTaskId ? saved.accessToken : undefined } : saved
+}

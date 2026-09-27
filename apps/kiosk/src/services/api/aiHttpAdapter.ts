@@ -281,8 +281,9 @@ export const aiHttpAdapter = {
     return get<ResumeParseResponse>(`/resume/records/${taskId}`, access)
   },
 
-  async getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse> {
-    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize`, access, LLM_TIMEOUT_MS)
+  async getResumeOptimize(taskId: string, access?: ResumeReadAccess, existingOnly = false): Promise<ResumeOptimizeResponse> {
+    const query = existingOnly ? '?existingOnly=1' : ''
+    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize${query}`, access, existingOnly ? DEFAULT_TIMEOUT_MS : LLM_TIMEOUT_MS)
   },
 
   async adjustResumeLayoutDraft(

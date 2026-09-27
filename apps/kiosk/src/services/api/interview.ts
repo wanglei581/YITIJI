@@ -230,9 +230,11 @@ export async function transcribeAnswer(sessionId: string, wav: Blob, access: Int
   return json.data
 }
 
-export function getMyInterviews(token: string | null | undefined): Promise<{ items: MemberInterviewItem[]; nextCursor: string | null }> {
+export function getMyInterviews(token: string | null | undefined, opts?: { cursor?: string; pageSize?: number }): Promise<{ items: MemberInterviewItem[]; nextCursor: string | null }> {
   if (API_MODE !== 'http' || !token) return Promise.resolve({ items: [], nextCursor: null })
-  return call<{ items: MemberInterviewItem[]; nextCursor: string | null }>('/me/mock-interviews', { token })
+  const query = new URLSearchParams({ pageSize: String(opts?.pageSize ?? 50) })
+  if (opts?.cursor) query.set('cursor', opts.cursor)
+  return call<{ items: MemberInterviewItem[]; nextCursor: string | null }>(`/me/mock-interviews?${query}`, { token })
 }
 
 export function deleteMyInterview(token: string, sessionId: string): Promise<{ deleted: boolean }> {
