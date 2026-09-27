@@ -96,19 +96,13 @@ interface CapabilityDefinition {
 /**
  * 文档打印卡的描述行：彩色 / 双面只有在**本机**登记为 available 时才敢写进文案。
  * 未登记的机器上写「彩色、双面可选」= 谎报能力（CLAUDE.md §9「不伪造能力」）。
- * 卡面描述按稿 10 的密度只留一行半；「彩色 / 双面暂未开通」的披露挪到状态行（describeDocPrintFoot），不删。
+ * 卡面描述按稿 10 的密度只留一行半；彩色 / 双面状态统一显示在「01 要办什么」的只读说明。
  */
 function describeDocPrint(map: ConfiguredCapabilityMap): string {
   const extras = docPrintExtras(map)
   return extras.on.length > 0
     ? `选文件，检查后设参数；${extras.on.join(' / ')}可选`
     : '选文件，检查后设参数'
-}
-
-/** 文档打印卡的状态行：未登记的彩色 / 双面如实写「暂未开通」，与轴芯片同一口径。 */
-function describeDocPrintFoot(map: ConfiguredCapabilityMap): string {
-  const extras = docPrintExtras(map)
-  return extras.off.length > 0 ? `带走：打印件 · ${extras.off.join(' / ')}暂未开通` : '带走：打印件'
 }
 
 function docPrintExtras(map: ConfiguredCapabilityMap): { on: string[]; off: string[] } {
@@ -136,7 +130,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     available: true,
     iconTone: 'teal',
     // 运行时由 describeDocPrintFoot 按本机彩色 / 双面登记改写；这里是未登记时的口径。
-    stateNote: 'A4 黑白 · 彩色 / 双面暂未开通',
+    stateNote: '带走：打印件',
     mfpOffBadge: '这台机器现在出不了纸',
     mfpOffNote: '文件可以先传上来存着，换一台再打。',
   },
@@ -265,9 +259,9 @@ const ARRIVAL_CODE_ENTRY = {
   icon: TicketIcon,
   title: '到机码核销',
   description:
-    '输入 8 位数字到机码（10 位字母数字历史码也支持），核对订单后领取打印件。不是付款后的取件凭证码',
+    '输入 8 位数字到机码（历史 10 位码也支持），核对订单后领取打印件。',
   to: '/print/pickup-claim',
-  emphasis: ['8 位数字到机码', '10 位字母数字历史码'],
+  emphasis: ['8 位数字到机码'],
 } as const
 
 const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
@@ -369,7 +363,7 @@ export function PrintScanHomePage() {
             ? {
                 ...rawCapability,
                 description: describeDocPrint(capabilityLoad.map),
-                stateNote: describeDocPrintFoot(capabilityLoad.map),
+                stateNote: '带走：打印件',
               }
             : rawCapability
         const capabilityKey = CARD_CAPABILITY_KEY[capability.key]
@@ -510,7 +504,6 @@ export function PrintScanHomePage() {
         onArrivalCode={() => navigate(ARRIVAL_CODE_ENTRY.to)}
         onQuickLink={handleQuickLink}
         onBack={() => navigate('/')}
-        onAdvisor={() => navigate('/assistant')}
       />
       <KioskFeedbackDialog
         open={feedbackOpen}

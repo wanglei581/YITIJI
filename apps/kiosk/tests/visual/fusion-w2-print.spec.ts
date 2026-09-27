@@ -379,6 +379,36 @@ test('pickup 问小青 hands one draft to the assistant: prefilled once, never s
   expect(errors).toEqual([])
 })
 
+for (const help of [
+  { path: '/print-scan', label: '问小青：怎么选打印方式 →', draft: '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。' },
+  { path: '/print/upload?source=document', label: '问小青：这份文件怎么检查 →', draft: '这份文件要怎么检查？检查会看哪些内容？' },
+  { path: '/print/desk?step=check', label: '问小青：保留和遮挡有什么区别 →', draft: '材料检查发现了个人信息片段，保留和遮挡有什么区别？' },
+  { path: '/print/desk?step=preview', label: '问小青：帮我选打印参数 →', draft: '帮我选打印参数：黑白还是彩色、单面还是双面？' },
+]) {
+  test(`M1 AI help hands off the current question once: ${help.path} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+    registerShell(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'w4-m1-assistant-draft') })
+    api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
+    if (help.path.endsWith('preview')) {
+      registerPrice(api)
+      const binary = new FusionW2BinaryRoute(page)
+      await binary.install()
+      await seedMaterialSession(page)
+    }
+    await page.goto(help.path)
+    await page.getByRole('button', { name: help.label, exact: true }).click()
+    await expect(page).toHaveURL(/\/assistant$/)
+    await expect(page.getByLabel('输入咨询问题')).toHaveValue(help.draft)
+    expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
+    await page.goto('/print/upload?source=document')
+    await page.locator('.qx-nav-item', { hasText: 'AI 顾问' }).first().click()
+    await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
+    expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
+    expect(errors).toEqual([])
+  })
+}
+
 test('pickup hid scan posts the claim payload and renders the server result @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -998,9 +1028,14 @@ test('material checks require a PII decision, create the redacted task, and carr
 
   await page.goto('/print/desk?step=check')
   await setReactRouterState(page, '/print/desk?step=check', { file: W2_FILE, source: 'document' })
-  await expect(page.getByText('发现 1 个需确认片段', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '有 1 处要你决定', exact: true })).toBeVisible()
+  await expect(page.locator('.qpd-finding-snippet')).toHaveText('第 1 页 · 138****8000')
+  await expect(page.locator('.qpd-decision-counts')).toContainText('已决定 0 / 1')
   await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeDisabled()
   await page.getByRole('button', { name: '遮挡', exact: true }).click()
+  await expect(page.locator('.qpd-decision-counts')).toContainText('已决定 1 / 1')
+  await expect(page.locator('.qpd-decision-counts')).toContainText('遮挡 1 处')
+  await expect(page.locator('.qpd-finding-decision')).toContainText('原文件不变')
   await page.getByRole('button', { name: '下一步：预览与参数' }).click()
   await page.waitForURL(/\/print\/desk\?step=preview/)
   await expect(page.getByTitle('w2-sample.pdf 预览')).toHaveAttribute('data-preview-src', '/w2-fixtures/sample-redacted.pdf')
@@ -1022,6 +1057,11 @@ test('material check failure exposes its real retry action @w2', async ({ page, 
   await setReactRouterState(page, '/print/desk?step=check', { file: W2_FILE, source: 'document' })
   await expect(page.getByRole('heading', { name: '材料检查未完成' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重试检查' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '现在的事实' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '两条路' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /跳过/ })).toHaveCount(0)
+  await expect(page.locator('.qpd-summary')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-material-check')
 })
 
@@ -1040,6 +1080,21 @@ test('direct preview restores the material session and completes the PDF respons
   await expect(previewHost.locator('canvas')).toHaveCount(1)
   await expect(page.getByRole('button', { name: '问小青：帮我选打印参数 →' })).toBeVisible()
   await expect(page.locator('.qpd-guide button, .qpd-guide a')).toHaveCount(0)
+  await expect(page.locator('.qpd-param-stack > .qpd-param-card')).toHaveCount(4)
+  await expect(page.locator('.qpd-device-strip > div')).toHaveCount(4)
+  await page.getByRole('button', { name: '增加十份', exact: true }).click()
+  await expect(page.locator('.qpd-stepper output')).toHaveText('11 份')
+  await expect(page.getByRole('region', { name: '参数摘要' })).toContainText('11 份')
+  await page.getByRole('button', { name: '减少十份', exact: true }).click()
+  await expect(page.locator('.qpd-stepper output')).toHaveText('1 份')
+  await expect(page.getByRole('button', { name: '减少打印份数' })).toBeDisabled()
+  await page.getByRole('button', { name: '打开完整预览 · 逐页看清' }).click()
+  const dialog = page.getByRole('dialog', { name: `完整预览：${W2_FILE.name}` })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('[data-pdf-preview-host]')).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect(dialog.locator('canvas')).toHaveCount(1)
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
   binary.assertPdfCompleted()
   await expectHealthy(page, errors, 'print-preview')
 })

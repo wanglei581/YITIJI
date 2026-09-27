@@ -1,8 +1,9 @@
 import type { ReactNode, Ref } from 'react'
+import { PrintAiHelp } from '../components/PrintAiHelp'
 import { FileTextIcon, SparklesIcon } from 'lucide-react'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
-import { FileContentPreview } from '../../../components/FileContentPreview'
+import { PrintFilePreviewModal } from '../components/PrintPreviewPanel'
 import type { UsbFileListItem } from '../../../services/files/usbImportApi'
 import {
   FILE_SOURCE_HAS_FILE,
@@ -25,7 +26,6 @@ import {
   NowFileCard,
   PhoneQrSlot,
 } from './FileSourceBits'
-import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
 import '../styles/file-source-qx.css'
 
 export interface FileSourceViewProps {
@@ -270,7 +270,7 @@ export function FileSourceView(props: FileSourceViewProps) {
     </div>
       <div className="fs-actions">
         <button type="button" onClick={onBack}>上一步</button>
-        <button type="button" onClick={props.onAdvisor}>问小青：这份文件怎么检查 →</button>
+        <PrintAiHelp label="问小青：这份文件怎么检查 →" draft="这份文件要怎么检查？检查会看哪些内容？" />
       </div>
     </div>
   )
@@ -685,27 +685,7 @@ export function FileSourceView(props: FileSourceViewProps) {
         {reason && !previewOpen ? <FileSourceReason>{reason}</FileSourceReason> : null}
         <FileSourceTruth />
         {previewOpen && currentFile ? (
-          <div className="fs-preview" role="dialog" aria-modal="true" aria-label={`完整预览：${currentFile.name}`}>
-            <div className="fs-preview-box">
-              <header className="fs-preview-head">
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="fs-preview-t">{truncateFileNameMiddle(currentFile.name, { maxLength: FILE_NAME_BUDGET_CARD })}</div>
-                  <span className="fs-preview-s">{currentFile.size} · 预览不改变本次办理里的文件</span>
-                </div>
-                <button type="button" className="fs-preview-close" onClick={onClosePreview}>关闭</button>
-              </header>
-              <div className="fs-preview-body">
-                <FileContentPreview
-                  className="min-h-0 flex-1 rounded-none border-0"
-                  fileUrl={currentFile.fileUrl}
-                  fileName={currentFile.name}
-                  mimeType={currentFile.mimeType}
-                  fileId={currentFile.fileId}
-                  token={previewToken}
-                />
-              </div>
-            </div>
-          </div>
+          <PrintFilePreviewModal file={currentFile} token={previewToken} onClose={onClosePreview} />
         ) : null}
       </div>
     </QxPageFrame>

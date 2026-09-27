@@ -193,7 +193,7 @@ export function PrintUploadPage() {
 
   const showFileChannel = !useTerminalKiosk()
   const tab = !showFileChannel && selectedTab === 'file' ? 'qr' : selectedTab
-  const wordHint = wordConversionAvailable ? wordOpenCopy : wordClosedCopy
+  const wordHint = (wordConversionAvailable ? wordOpenCopy : wordClosedCopy).replace('由转换引擎生成', '转换后')
 
   useEffect(() => {
     if (tab !== 'usb' || !usbConfigured || file || usbUploading || usbSelected) return undefined
@@ -450,7 +450,7 @@ export function PrintUploadPage() {
     </span>
     {!wordConversionAvailable ? (
       <p id="print-word-conversion-reason" className="fs-hidden-input">
-        {conversionCapabilities.reason || '转换引擎未就绪；服务恢复并通过能力探测后会自动开放。'}
+        Word 转换暂未开放，请另存为 PDF 再上传。
       </p>
     ) : null}
     <FileSourceView
@@ -468,7 +468,7 @@ export function PrintUploadPage() {
       blockedName={blockedName}
       blockedMeta={blockedMeta}
       wordHint={wordHint}
-      conversionReason={conversionCapabilities.reason || null}
+      conversionReason={wordConversionAvailable ? null : 'Word 转换暂未开放，请另存为 PDF 再上传。'}
       usbFiles={usbFiles}
       usbSelected={usbSelected}
       usbDriveLabel={usbStatus?.driveLabel ?? null}

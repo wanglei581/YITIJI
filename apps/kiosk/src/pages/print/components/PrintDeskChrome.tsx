@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { PrintAiHelp } from './PrintAiHelp'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 
 /** 稿 13 的只读引导与步骤轨；操作留在下方工作区。 */
@@ -25,15 +26,17 @@ export function PrintDeskGuide({ step, title, detail }: {
   )
 }
 
-/** 复用现有顾问路由，不伪造预填、自动发送或 AI 检查结果。 */
-export function PrintDeskFooter({ children, onBack }: { children: ReactNode; onBack: () => void }) {
-  const navigate = useNavigate()
+/** 草稿交给现有顾问页，用户确认后自行发送。 */
+export function PrintDeskFooter({ children, onBack, step = 'preview' }: { children: ReactNode; onBack: () => void; step?: 'check' | 'preview' }) {
   return (
     <div className="qpd-bottom">
       <div className="qpd-cta">{children}</div>
       <div className="qpd-actions">
         <button type="button" onClick={onBack}>上一步</button>
-        <button type="button" onClick={() => navigate('/assistant')}>问小青：帮我选打印参数 →</button>
+        <PrintAiHelp
+          label={step === 'check' ? '问小青：保留和遮挡有什么区别 →' : '问小青：帮我选打印参数 →'}
+          draft={step === 'check' ? '材料检查发现了个人信息片段，保留和遮挡有什么区别？' : '帮我选打印参数：黑白还是彩色、单面还是双面？'}
+        />
       </div>
     </div>
   )
