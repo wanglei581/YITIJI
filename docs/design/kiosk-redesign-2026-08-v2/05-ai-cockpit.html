@@ -489,6 +489,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .sr-only{font-size:20px!important}
 .ment-go small,.rail-route .rr-x{font-size:20px!important}
 .demo-tab,.demo-panel{display:none!important}
+.ment-sub span,.mrail.big .ment-sub span,.mrail.big.dense .ment-sub span,.ment-go,.mini-list li,.mini-list b,.spec span,.spec b,.cc-h,.task-f,.task-d{font-size:21px!important;line-height:1.4!important}
 </style>
 </head>
 <body>
@@ -789,7 +790,7 @@ V['reply-not-ai']=function(){
  return '<section class="sec">'+head('01','这一轮不是 AI 生成','正文不予展示')+askBubble()
   +'<div class="state fit" data-kind="warn" style="margin-top:14px" data-testid="cockpit-not-ai">'
   +'<div class="state-h">'+svg('alert','currentColor',26)+'这次不是模型写出的</div>'
-  +'<div class="state-p">后端这次返回的是<b>未接模型时的预置话术</b>。页面不会拿它冒充 AI 回答，所以正文一个字都不显示。</div>'
+  +'<div class="state-p">系统这次给出的是<b>还没接上模型时写好的说明</b>。页面不会拿它冒充 AI 回答，所以正文一个字都不显示。</div>'
   +'<div class="kvrow"><div class="kv2"><span>服务来源</span><b>还没接到模型</b></div>'
   +'<div class="kv2"><span>是否由 AI 写出</span><b>不是</b></div></div>'
   +'<p class="gate">双门禁任一不满足即走本状态；同一轮返回里的建议动作也一并丢弃，不当作「AI 建议的下一步」。</p>'

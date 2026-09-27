@@ -767,7 +767,7 @@ V['local-picking']=function(){
  return '<section class="sec">'+fixtureBar('下面这个目录和五份文件')+'</section>'+
   '<section class="sec"><div class="note"><span class="sq"></span><span>真实一体机这一步是<b>系统文件窗口</b>；静态原型不能弹系统窗口，所以用同页受控列表演示「你挑了哪一份」。<b>一次只能选一个。</b></span></div></section>'+
   '<section class="sec grow">'+listCard('系统文件窗口（演示目录：下载）','5 项 · 一次选一个',
-   rows+nextSteps('挑中之后会怎样',['选中即上传，系统校验格式和大小。','不合格的当场说清楚为什么，不会偷偷收下。','合格的落库成功后成为当前文件。']))+'</section>'+
+   rows+nextSteps('挑中之后会怎样',['选中即上传，系统校验格式和大小。','不合格的当场说清楚为什么，不会偷偷收下。','合格并保存成功后成为当前文件。']))+'</section>'+
   reasonLine('还没选定文件，材料检查按住不放')+
   ctaBar(ghost('取消这次选择',to('local-cancelled'),'/print/upload',SCREEN+'-cancel-pick','取消这次选择'),primaryOff('下一步：材料检查','还没选定文件'));
 };
@@ -824,7 +824,7 @@ V['local-uploading']=function(){
   ],[['','没有可确认的百分比','info'],['warn','本页无取消动作','lock'],['','上传中别拔 U 盘、别关手机页','warn']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','上传中',
     frow({n:LDOC().n,s:LDOC().s,tag:'正在上传',tagCls:'doing',tid:SCREEN+'-uploading-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>已经确认落库之前，<b>当前文件仍然是空的</b>。<br>退出这一页<b>不会</b>让系统停下来，也不会让它更快。</span></div>'+nextSteps('接下来只有三种结果',['成功：已经确认落库，文件名进入「当前文件」。','失败：明确说没送上去，那一屏可以直接重试。','一直不结束：叫工作人员来看，别反复点。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>确认保存之前，<b>当前文件仍然是空的</b>。<br>退出这一页<b>不会</b>让系统停下来，也不会让它更快。</span></div>'+nextSteps('接下来只有三种结果',['成功：已经确认保存，文件名进入「当前文件」。','失败：明确说没送上去，那一屏可以直接重试。','一直不结束：叫工作人员来看，别反复点。']))+'</section>'+
   '<section class="sec">'+helpMini('上传一直不结束，或者反复失败，可以叫工作人员来看一眼。')+'</section>'+
   reasonLine('上传结果还没确认，材料检查按住不放')+
   ctaBar(EXIT(),primaryOff('下一步：材料检查','上传结果未确认'));
@@ -933,7 +933,7 @@ V['phone-uploading']=function(){
   ],[['','这次办理状态：uploading','clock'],['','没有进度百分比','info']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+phoneQrCard('live','传完之后要回这台机器确认',
    '<ul class="steps"><li><span class="n">1</span><span>手机把文件送到系统。</span></li>'+
-   '<li><span class="n">2</span><span>已经确认落库，状态变为已上传。</span></li>'+
+   '<li><span class="n">2</span><span>已经确认保存，状态变为已上传。</span></li>'+
    '<li><span class="n">3</span><span><b>你在这台机器上点确认</b>，才成为当前文件。</span></li></ul>'+
    '<div class="note" style="margin-top:12px"><span class="sq"></span><span>传到了也不等于可以继续 —— <b>没确认就不放行</b>。</span></div>')+'</section>'+
   '<section class="sec">'+helpMini('手机上传卡住不动，可以取消重来，也可以叫工作人员。')+'</section>'+
@@ -1132,7 +1132,7 @@ V['usb-detecting']=function(){
    nextSteps('读完之后',['列表按文件名排序显示出来。','你点其中一份，它被标为已选中。','再点导入，本地服务才开始读字节。'])+
    '<div class="note"><span class="sq"></span><span>读完之前本机<b>不显示任何文件名</b>，也不拿上一次的列表凑数。</span></div>'+
   '</div></section>'+
-  '<section class="sec">'+helpMini('读盘一直不出结果，可能是盘或接口的问题，叫工作人员看看。')+'</section>'+
+  '<section class="sec">'+helpMini('读盘一直不出结果，可能是 U 盘或插口的问题，叫工作人员看看。')+'</section>'+
   reasonLine('还在读盘，材料检查按住不放')+
   ctaBar(ghost('取消，换一条通道',to('source-chooser'),'/print/upload',SCREEN+'-switch-source','取消读盘，换一条通道'),primaryOff('下一步：材料检查','还没有文件'));
 };
@@ -1159,7 +1159,7 @@ V['usb-list']=function(){
  for(var i=0;i<FX_USB.length;i++){var u=fx(FX_USB[i]);
   rows+=frow({n:u.n,s:u.s,tag:'选这份',tagCls:'pickable',href:to('usb-selected',{pick:String(i)}),tid:SCREEN+'-usb-file-'+i});
  }
- rows+=nextSteps('选中之后会怎样',['这一份被标为已选中，其它的不动。','点「导入这一份」，本地服务才开始读字节。','读完传到系统，落库成功才算数。'])+
+ rows+=nextSteps('选中之后会怎样',['这一份被标为已选中，其它的不动。','点「导入这一份」，本地服务才开始读字节。','读完传到系统，保存成功才算数。'])+
   '<div class="note"><span class="sq"></span><span>只列<b>根目录</b>里的 PDF / JPG / PNG，最多 200 个；超过 15MB 的不列。子文件夹里的东西不在这里。</span></div>';
  return '<section class="sec">'+fixtureBar('下面这个盘名和三份文件')+'</section>'+
   '<section class="sec"><div class="note"><span class="sq"></span><span>每一份都带一个<b>一次性标识</b>。选中即消费，<b>重新读盘会换一批</b>，旧的当场作废。一次只能选一个。</span></div></section>'+
@@ -1193,7 +1193,7 @@ V['usb-selected']=function(){
   ],[['','一次性标识已锁定','lock'],['','只动这一份','check']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('准备导入','1 项 · 选中',
     frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'已选中',tagCls:'ok',on:1,tid:SCREEN+'-selected-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('usb','currentColor',38)+'</span><span>选错了？回列表<b>重选一份</b>就行，<br>这一步还没有任何东西被上传。</span></div>'+nextSteps('点「导入这一份」之后',['本地服务用一次性标识把它读出来。','读出来的字节传到系统校验落库。','落库成功它才成为当前文件。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('usb','currentColor',38)+'</span><span>选错了？回列表<b>重选一份</b>就行，<br>这一步还没有任何东西被上传。</span></div>'+nextSteps('点「导入这一份」之后',['本地服务用一次性标识把它读出来。','读出来的内容传到系统，校验并保存。','保存成功，它才成为当前文件。']))+'</section>'+
   reasonLine('还没导入，材料检查按住不放')+
   ctaBar(ghost('回列表重选',to('usb-list'),'/print/upload',SCREEN+'-back-list','回 U 盘列表重选'),primaryLink('导入这一份',to('usb-importing'),'/print/upload'));
 };
@@ -1219,7 +1219,7 @@ V['usb-importing']=function(){
   ],[['','导入中','clock'],['warn','别拔 U 盘','usb']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','导入中',
     frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'导入中',tagCls:'doing',tid:SCREEN+'-importing-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>已经确认之前，<b>当前文件仍然是空的</b>。<br>这一步不解析内容，也不看页数。</span></div>'+nextSteps('导入完成之后',['已经确认落库并回文件名。','它成为本次办理的唯一当前文件。','那时候才可以拔 U 盘。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>已经确认之前，<b>当前文件仍然是空的</b>。<br>这一步不解析内容，也不看页数。</span></div>'+nextSteps('导入完成之后',['已经确认保存，并带回文件名。','它成为本次办理的唯一当前文件。','那时候才可以拔 U 盘。']))+'</section>'+
   '<section class="sec">'+helpMini('导入长时间不结束，先别拔盘，叫工作人员来处理。')+'</section>'+
   reasonLine('导入结果还没确认，材料检查按住不放')+
   ctaBar(ghost('取消，回列表',to('usb-list'),'/print/upload',SCREEN+'-cancel','取消导入，回 U 盘列表'),primaryOff('下一步：材料检查','导入结果未确认'));
@@ -1241,7 +1241,7 @@ V['usb-import-failed']=function(){
 V['usb-ready']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','check','导入完成，可以拔 U 盘了',[
-   '文件名和大小是<b>已经确认落库后回给本机的结果</b>。系统已经读完这份文件，<b>可以拔出 U 盘</b>。',
+   '文件名和大小是<b>已经确认保存后回到这台机器的结果</b>。系统已经读完这份文件，<b>可以拔出 U 盘</b>。',
    '本机<b>没有「安全弹出」按钮</b>——网页管不了操作系统的卷挂载，给一个假按钮不如说清楚。'
   ],[['ok','系统已确认','check'],['','可以拔出 U 盘','usb']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+nowFile({doc:UDOC(),from:'U 盘导入 · '+USB_VOL,back:'usb-list',backName:'U 盘列表'})+'</section>'+
