@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
+- 2026-09-28 修重叠：带顶部提示的状态里，能力卡改成横排，把高度让给证件照横卡，不再压住「已下过单」标题。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 只读步骤说明保留在卡片前，通过必要高度和留白调整触达；位置待复测（规则 1）。
@@ -217,6 +218,34 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .truth{padding:12px 44px}.truth div{font-size:20px;line-height:1.4}.sec.last{margin-bottom:12px}
 .sec.grow+.sec.last{margin-top:36px}
 .qx2-actions{min-height:64px}.navbar{height:116px}
+/* 顶部多了一条提示时，三行竖卡的最小高度装不下证件照横卡。横排后每张卡只占两行字的高度。 */
+#body-root[data-state="device-off"] .sec.grow .grid3,
+#body-root[data-state="capability-loading"] .sec.grow .grid3,
+#body-root[data-state="capability-error"] .sec.grow .grid3,
+#body-root[data-state="locked"] .sec.grow .grid3{grid-template-rows:auto auto auto auto;align-content:start}
+#body-root[data-state="device-off"] .cap:not(.wide),
+#body-root[data-state="capability-loading"] .cap:not(.wide),
+#body-root[data-state="capability-error"] .cap:not(.wide),
+#body-root[data-state="locked"] .cap:not(.wide){
+  display:grid;grid-template-columns:56px minmax(0,1fr);grid-template-areas:"ic name" "ic desc" "ic foot";
+  column-gap:12px;row-gap:2px;align-items:center;min-height:0;padding:12px 14px
+}
+#body-root[data-state="device-off"] .cap:not(.wide) .cap-icon,
+#body-root[data-state="capability-loading"] .cap:not(.wide) .cap-icon,
+#body-root[data-state="capability-error"] .cap:not(.wide) .cap-icon,
+#body-root[data-state="locked"] .cap:not(.wide) .cap-icon{grid-area:ic;margin:0}
+#body-root[data-state="device-off"] .cap:not(.wide) .cap-name,
+#body-root[data-state="capability-loading"] .cap:not(.wide) .cap-name,
+#body-root[data-state="capability-error"] .cap:not(.wide) .cap-name,
+#body-root[data-state="locked"] .cap:not(.wide) .cap-name{grid-area:name}
+#body-root[data-state="device-off"] .cap:not(.wide) .cap-desc,
+#body-root[data-state="capability-loading"] .cap:not(.wide) .cap-desc,
+#body-root[data-state="capability-error"] .cap:not(.wide) .cap-desc,
+#body-root[data-state="locked"] .cap:not(.wide) .cap-desc{grid-area:desc;margin-top:0}
+#body-root[data-state="device-off"] .cap:not(.wide) .cap-foot,
+#body-root[data-state="capability-loading"] .cap:not(.wide) .cap-foot,
+#body-root[data-state="capability-error"] .cap:not(.wide) .cap-foot,
+#body-root[data-state="locked"] .cap:not(.wide) .cap-foot{grid-area:foot;margin-top:0}
 
 </style>
 </head>
