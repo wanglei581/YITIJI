@@ -1,5 +1,9 @@
-// PDF.js 打开参数。unpdf 1.6.2 自带 PDF.js 5.6.205，这里只取同版本
+// PDF.js 打开参数。服务端解析仍用 unpdf 1.6.2 自带的 PDF.js 5.6.205；这里只取
 // pdfjs-dist 的 cmaps/ 与 standard_fonts/，不加载它的 PDF.js 构建，避免两套运行时。
+// pdfjs-dist 钉在 6.3.289（一体机预览要 ≥ 6.2.108，GHSA-hq66-cqwq-w95j）；这两个目录与
+// 5.6.205 逐字节相同（只差一份许可证文本），所以换版本不改变服务端读到的任何数据。
+// 该漏洞在 PDF.js 的脚本引擎，服务端只做 getDocument / 抽文字 / 渲染，不装载脚本沙箱；
+// unpdf 出了带 ≥ 6.2.108 的版本后再把引擎一并升上去（next-tasks 有记录）。
 //
 // Node 侧用文件系统路径，且目录必须以 "/" 结尾：PDF.js 把 cMapUrl 和文件名直接
 // 拼起来交给 fs.readFile。file:// 字符串（中文路径还会被百分号编码）读不到文件。
@@ -27,7 +31,7 @@ function slashDirectory(dir: string): string {
   return normalized.endsWith('/') ? normalized : `${normalized}/`
 }
 
-/** 与 unpdf 内置 PDF.js 5.6.205 匹配的预置 CMap 和标准 14 字体目录。 */
+/** 预置 CMap 和标准 14 字体目录（数据格式与 unpdf 内置的 PDF.js 5.6.205 一致）。 */
 export function pdfjsPresetDataOptions(): PdfjsPresetDataOptions {
   if (cached) return cached
   const packageJson = nodeRequire.resolve('pdfjs-dist/package.json')
@@ -37,7 +41,7 @@ export function pdfjsPresetDataOptions(): PdfjsPresetDataOptions {
   const cmapProbe = path.join(cmaps, 'UniGB-UCS2-H.bcmap')
   const fontProbe = path.join(fonts, 'FoxitSerif.pfb')
   if (!existsSync(cmapProbe) || !existsSync(fontProbe)) {
-    throw new Error(`PDF.js 5.6.205 preset data missing (cmap=${cmapProbe}, font=${fontProbe})`)
+    throw new Error(`PDF.js preset data missing (cmap=${cmapProbe}, font=${fontProbe})`)
   }
   cached = {
     cMapUrl: slashDirectory(cmaps),

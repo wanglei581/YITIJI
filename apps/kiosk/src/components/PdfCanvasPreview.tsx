@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-// 只把 URL 打进包。PDF.js 本体仍是单独文件，预览出现时才 fetch。
+// 只把 URL 打进包。PDF.js 本体和 worker 都是单独文件，预览出现时才 fetch。
 // 不用 import()：那会变成 script 请求，页面重载或跳走时 Chromium 报 net::ERR_ABORTED。
-import pdfjsModuleUrl from 'unpdf/pdfjs?url'
+// 用 pdfjs-dist 的 legacy 构建（带兼容补丁，手机浏览器也能跑）。版本不得低于 6.2.108：
+// 更早的 5.6.83 起各版有 GHSA-hq66-cqwq-w95j（恶意 PDF 执行脚本），unpdf 1.6.2 自带的 5.6.205 就在范围内。
+import pdfjsModuleUrl from 'pdfjs-dist/legacy/build/pdf.min.mjs?url'
+import pdfjsWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 
 /**
  * 把 PDF 画到 canvas 上。
@@ -18,8 +21,11 @@ const FAILURE_COPY = '预览没能生成，打印仍按原文件。'
 const MAX_BITMAP_EDGE = 4096
 const MAX_ZOOM = 4
 
-/** 预置 CMap / 标准字体。目录必须带尾斜杠，PDF.js 按「目录 + 文件名」去取 .bcmap。 */
-function pdfjsDataUrl(kind: 'cmaps' | 'standard_fonts'): string {
+/**
+ * 预置 CMap / 标准字体 / 图像解码器（JBIG2、JPX 的 wasm）。目录必须带尾斜杠，
+ * PDF.js 按「目录 + 文件名」去取。扫描件常见的 JBIG2 黑白图没有 wasm 目录就画不出来。
+ */
+function pdfjsDataUrl(kind: 'cmaps' | 'standard_fonts' | 'wasm'): string {
   const base = import.meta.env.BASE_URL || '/'
   const prefix = base.endsWith('/') ? base : `${base}/`
   return `${prefix}pdfjs/${kind}/`
@@ -37,6 +43,7 @@ type PdfjsNamespace = {
     cMapUrl: string
     cMapPacked: boolean
     standardFontDataUrl: string
+    wasmUrl: string
   }) => PdfLoadingTask
 }
 
@@ -109,18 +116,25 @@ function isBenignPreviewError(error: unknown): boolean {
 
 let pdfjsModule: Promise<PdfjsNamespace> | null = null
 
-function loadUnpdfPdfjs(): Promise<PdfjsNamespace> {
+async function importFetchedModule<T>(url: string): Promise<T> {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('pdfjs-fetch-failed')
+  const blob = new Blob([await response.blob()], { type: 'text/javascript' })
+  const blobUrl = URL.createObjectURL(blob)
+  try {
+    return await import(/* @vite-ignore */ blobUrl) as T
+  } finally {
+    URL.revokeObjectURL(blobUrl)
+  }
+}
+
+function loadPdfjs(): Promise<PdfjsNamespace> {
   if (!pdfjsModule) {
     pdfjsModule = (async () => {
-      const response = await fetch(pdfjsModuleUrl)
-      if (!response.ok) throw new Error('pdfjs-fetch-failed')
-      const blob = new Blob([await response.blob()], { type: 'text/javascript' })
-      const blobUrl = URL.createObjectURL(blob)
-      try {
-        return await import(/* @vite-ignore */ blobUrl) as PdfjsNamespace
-      } finally {
-        URL.revokeObjectURL(blobUrl)
-      }
+      // worker 先进来：它把 WorkerMessageHandler 挂到 globalThis.pdfjsWorker，PDF.js 见到就在
+      // 主线程解析（与原先 unpdf 的做法一致），不再起 Worker，也不需要 workerSrc。
+      await importFetchedModule<unknown>(pdfjsWorkerUrl)
+      return importFetchedModule<PdfjsNamespace>(pdfjsModuleUrl)
     })().catch((error: unknown) => {
       pdfjsModule = null
       throw error
@@ -226,7 +240,7 @@ export function PdfCanvasPreview({
         if (!response.ok) throw new Error('preview-fetch-failed')
         const bytes = new Uint8Array(await response.arrayBuffer())
         if (session.dead) return
-        const { getDocument } = await loadUnpdfPdfjs()
+        const { getDocument } = await loadPdfjs()
         if (session.dead) return
         const loadingTask = getDocument({
           data: bytes,
@@ -239,6 +253,7 @@ export function PdfCanvasPreview({
           cMapUrl: pdfjsDataUrl('cmaps'),
           cMapPacked: true,
           standardFontDataUrl: pdfjsDataUrl('standard_fonts'),
+          wasmUrl: pdfjsDataUrl('wasm'),
         })
         session.loadingTask = loadingTask
         loadingTask.onPassword = () => {

@@ -147,7 +147,24 @@ expect(/<PdfCanvasPreview[\s\S]*className=\{className\}/.test(pdfFrame), 'PdfPre
 expect(!/createElement\(['"]iframe['"]\)/.test(pdfFrame) && !/<iframe/.test(pdfFrame), '打印预览不再创建 iframe')
 expect(!/<iframe/.test(pdfCanvas) && !/<embed/.test(pdfCanvas) && !/<object/.test(pdfCanvas) && !/window\.open/.test(pdfCanvas), '画布预览不把 PDF 当成文档打开')
 expect(/<canvas/.test(pdfCanvas), 'PDF 预览画到 canvas')
-expect(/unpdf\/pdfjs\?url/.test(pdfCanvas) && /getDocument/.test(pdfCanvas), '使用 unpdf 自带的 PDF.js，并调用 getDocument')
+expect(
+  /pdfjs-dist\/legacy\/build\/pdf\.min\.mjs\?url/.test(pdfCanvas) &&
+    /pdfjs-dist\/legacy\/build\/pdf\.worker\.min\.mjs\?url/.test(pdfCanvas) &&
+    /getDocument/.test(pdfCanvas),
+  '使用 pdfjs-dist 的 legacy 构建（本体与 worker 都只取 URL），并调用 getDocument',
+)
+// 依赖审计只看得见 package.json 里的 pdfjs-dist，看不见 unpdf 打包进去的那份 PDF.js。
+// 预览若退回 unpdf 自带的构建，GHSA-hq66-cqwq-w95j 这类漏洞就会从审计里消失。
+const kioskPackage = JSON.parse(read(kioskRoot, 'package.json'))
+expect(
+  !kioskPackage.dependencies?.unpdf && !kioskPackage.devDependencies?.unpdf && Boolean(kioskPackage.dependencies?.['pdfjs-dist']),
+  '一体机只依赖 pdfjs-dist 这一套 PDF.js，不再依赖 unpdf（审计看得见真正在跑的版本）',
+)
+expect(
+  /await importFetchedModule<unknown>\(pdfjsWorkerUrl\)\s*\n\s*return importFetchedModule<PdfjsNamespace>\(pdfjsModuleUrl\)/.test(pdfCanvas),
+  '先导入 worker 再导入本体：PDF.js 在主线程解析，不起 Worker、不需要 workerSrc',
+)
+expect(/wasmUrl:\s*pdfjsDataUrl\('wasm'\)/.test(pdfCanvas), '预览提供 wasm 解码器目录（扫描件常见的 JBIG2 / JPX 图）')
 expect(/cMapUrl:\s*pdfjsDataUrl\('cmaps'\)/.test(pdfCanvas) && /cMapPacked:\s*true/.test(pdfCanvas), '预览把预置 CMap 目录和 cMapPacked 交给 getDocument')
 expect(/standardFontDataUrl:\s*pdfjsDataUrl\('standard_fonts'\)/.test(pdfCanvas), '预览同时提供标准字体数据目录')
 expect(/pdfjs\/\$\{kind\}\//.test(pdfCanvas), 'CMap 与标准字体 URL 带尾斜杠')
@@ -155,9 +172,14 @@ const cmapPlugin = read(kioskRoot, 'pdfjs-cmap-plugin.ts')
 const viteConfig = read(kioskRoot, 'vite.config.ts')
 expect(viteConfig.includes('pdfjsPresetAssets'), 'Vite 注册 CMap 静态资源插件')
 expect(cmapPlugin.includes("urlName: 'cmaps'") && cmapPlugin.includes('configureServer') && cmapPlugin.includes('generateBundle'), '开发服务器和生产构建都能提供 CMap 文件')
+expect(cmapPlugin.includes("urlName: 'wasm'") && cmapPlugin.includes("urlName: 'standard_fonts'"), '标准字体与 wasm 解码器也随 CMap 一起发布')
 expect(!/cp\s+-r/.test(cmapPlugin) && cmapPlugin.includes('readFileSync') && cmapPlugin.includes('emitFile'), 'CMap 用 Node 读写复制，不调用 cp -r')
-expect(!/from ['"]pdfjs-dist['"]/.test(pdfCanvas) && !/require\(['"]pdfjs-dist['"]\)/.test(cmapPlugin), '不把 pdfjs-dist 的 PDF.js 构建引进预览')
-expect(/createObjectURL/.test(pdfCanvas) && !/import\('unpdf'\)/.test(pdfCanvas) && !/import\('unpdf\/pdfjs'\)/.test(pdfCanvas), 'PDF.js 用 fetch 取模块再导入，不发会被离页中止的 script 请求')
+const pdfjsImports = [...pdfCanvas.matchAll(/from ['"](pdfjs-dist[^'"]*)['"]/g)].map((match) => match[1])
+expect(
+  pdfjsImports.length === 2 && pdfjsImports.every((specifier) => specifier.endsWith('?url')) && !/require\(['"]pdfjs-dist['"]\)/.test(cmapPlugin),
+  'PDF.js 只以 ?url 引用，不把它的代码打进主包；CMap 插件只读数据目录',
+)
+expect(/createObjectURL/.test(pdfCanvas) && !/import\(\s*['"](?:unpdf|pdfjs-dist)/.test(pdfCanvas), 'PDF.js 用 fetch 取模块再导入，不发会被离页中止的 script 请求')
 expect(/new AbortController\(/.test(pdfCanvas) && /\.destroy\(/.test(pdfCanvas) && /\.cancel\(/.test(pdfCanvas), '卸载时中止 fetch、销毁文档并取消 render task')
 expect(/devicePixelRatio/.test(pdfCanvas), '按 devicePixelRatio 取缩放，避免字迹发糊')
 expect(/正在准备预览/.test(pdfCanvas) && /预览没能生成，打印仍按原文件/.test(pdfCanvas) && /第 /.test(pdfCanvas) && /共 /.test(pdfCanvas), '加载、失败和页码都如实显示')

@@ -1,5 +1,5 @@
-// 把 pdfjs-dist@5.6.205 的 cmaps/ 与 standard_fonts/ 作为静态文件发布。
-// 只读数据文件，不把 pdfjs-dist 的 PDF.js 构建打进包（预览仍用 unpdf 自带的那份）。
+// 把 pdfjs-dist 的 cmaps/、standard_fonts/ 与 wasm/ 作为静态文件发布，和预览用的 PDF.js 同一个包、同一版本。
+// PDF.js 本体与 worker 由 PdfCanvasPreview 以 ?url 引用、运行时 fetch，这里只管数据文件。
 // 开发服务器直接从该目录取；生产构建用 emitFile 写进 dist，文件名不带 hash。
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -13,7 +13,16 @@ const nodeRequire = createRequire(import.meta.url)
 const PRESET_DIRS = [
   { urlName: 'cmaps', dirName: 'cmaps' },
   { urlName: 'standard_fonts', dirName: 'standard_fonts' },
+  // JBIG2 / JPX 解码器。wasm 用 fetch 取；只有 wasm 起不来时 PDF.js 才 import 同目录的 *_nowasm_fallback.js。
+  { urlName: 'wasm', dirName: 'wasm' },
 ] as const
+
+// 开发服务器的类型：fallback 脚本要按 JS 发，否则模块导入因 MIME 被拒；其余都是二进制。
+function contentTypeFor(file: string): string {
+  if (file.endsWith('.js') || file.endsWith('.mjs')) return 'text/javascript'
+  if (file.endsWith('.wasm')) return 'application/wasm'
+  return 'application/octet-stream'
+}
 
 function pdfjsPackageRoot(): string {
   return path.dirname(nodeRequire.resolve('pdfjs-dist/package.json'))
@@ -50,7 +59,7 @@ function serveDirectory(root: string) {
       return
     }
     res.statusCode = 200
-    res.setHeader('Content-Type', 'application/octet-stream')
+    res.setHeader('Content-Type', contentTypeFor(file))
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
     res.end(readFileSync(file))
   }
