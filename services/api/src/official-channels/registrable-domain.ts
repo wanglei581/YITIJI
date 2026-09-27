@@ -1,38 +1,24 @@
 import { isIP } from 'node:net'
 import { domainToASCII } from 'node:url'
-
-/**
- * 注册域（eTLD+1）比对。
- * 不用字符串前缀或后缀：evil-example.com.cn 会冒充 example.com.cn，
- * example.com.attacker.cn 会冒充 example.com。
- */
-const MULTI_LABEL_PUBLIC_SUFFIXES = new Set<string>([
-  'com.cn', 'net.cn', 'org.cn', 'gov.cn', 'edu.cn', 'ac.cn', 'mil.cn',
-  'com.hk', 'edu.hk', 'gov.hk', 'com.tw', 'edu.tw', 'gov.tw',
-  'co.uk', 'org.uk', 'ac.uk', 'gov.uk',
-  'com.au', 'net.au', 'org.au', 'edu.au',
-  'co.jp', 'ne.jp', 'or.jp', 'ac.jp', 'go.jp',
-  'github.io', 'gitee.io', 'pages.dev', 'vercel.app', 'netlify.app',
-  'workers.dev', 'herokuapp.com', 'azurewebsites.net', 'blogspot.com',
-  'firebaseapp.com', 'web.app', 'cloudfront.net', 'myqcloud.com', 'aliyuncs.com',
-  ...[
-    'ah', 'bj', 'cq', 'fj', 'gd', 'gs', 'gx', 'gz', 'ha', 'hb', 'he', 'hi',
-    'hl', 'hn', 'jl', 'js', 'jx', 'ln', 'nm', 'nx', 'qh', 'sc', 'sd', 'sh',
-    'sn', 'sx', 'tj', 'xj', 'xz', 'yn', 'zj',
-  ].map((label) => `${label}.cn`),
-  ...[
-    'ah', 'bj', 'cq', 'fj', 'gd', 'gs', 'gx', 'gz', 'ha', 'hb', 'he', 'hi',
-    'hl', 'hn', 'jl', 'js', 'jx', 'ln', 'nm', 'nx', 'qh', 'sc', 'sd', 'sh',
-    'sn', 'sx', 'tj', 'xj', 'xz', 'yn', 'zj',
-  ].map((label) => `${label}.gov.cn`),
-])
+import { getDomain, getPublicSuffix } from 'tldts'
 
 const HOST_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/
-const SHARED_HOSTING_SUFFIXES = new Set([
-  'github.io', 'gitee.io', 'pages.dev', 'vercel.app', 'netlify.app', 'workers.dev',
-  'herokuapp.com', 'azurewebsites.net', 'blogspot.com', 'firebaseapp.com',
-  'web.app', 'cloudfront.net', 'myqcloud.com', 'aliyuncs.com',
-])
+const PSL_OPTIONS = { allowPrivateDomains: true } as const
+// These delegated hosting roots are not yet in the bundled PSL. Treat each as
+// a suffix until tldts includes it; a tenant may verify only its own child.
+const PSL_GAP_SUFFIXES = ['gitee.io', 'myqcloud.com', 'aliyuncs.com'] as const
+
+function effectiveSuffix(host: string): string | null {
+  const listed = getPublicSuffix(host, PSL_OPTIONS)
+  const gap = PSL_GAP_SUFFIXES.find((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+  if (gap) return gap
+  // Provincial government namespace is delegated below gov.cn, while the
+  // current PSL only records gov.cn. Fail closed for any two-letter branch.
+  const labels = host.split('.')
+  if (labels.length >= 3 && labels.at(-2) === 'gov' && labels.at(-1) === 'cn'
+      && /^[a-z]{2}$/.test(labels.at(-3) ?? '')) return labels.slice(-3).join('.')
+  return listed
+}
 
 function normalizedHostname(raw: string): string | null {
   const host = domainToASCII(raw.trim().toLowerCase().replace(/\.$/, ''))
@@ -41,80 +27,97 @@ function normalizedHostname(raw: string): string | null {
 }
 
 export const COMMERCIAL_RECRUITMENT_REGISTRABLE_DOMAINS = [
-  'zhipin.com',
-  '51job.com',
-  'zhaopin.com',
-  'liepin.com',
+  'zhipin.com', '51job.com', 'zhaopin.com', 'liepin.com',
 ] as const
-
-export function isCommercialRecruitmentHost(hostname: string): boolean {
-  const registrable = registrableDomainOf(hostname)
-  return registrable !== null
-    && (COMMERCIAL_RECRUITMENT_REGISTRABLE_DOMAINS as readonly string[]).includes(registrable)
-}
 
 export function registrableDomainOf(hostname: string): string | null {
   const host = normalizedHostname(hostname)
   if (!host) return null
-  if ([...SHARED_HOSTING_SUFFIXES].some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) return null
-  const labels = host.split('.')
-  const threeLabelSuffix = labels.slice(-3).join('.')
-  if (MULTI_LABEL_PUBLIC_SUFFIXES.has(threeLabelSuffix)) {
-    return labels.length >= 4 ? labels.slice(-4).join('.') : null
+  const suffix = effectiveSuffix(host)
+  const domain = getDomain(host, PSL_OPTIONS)
+  if (!suffix || !domain || host === suffix) return null
+  if (suffix !== getPublicSuffix(host, PSL_OPTIONS)) {
+    const prefix = host.slice(0, -(suffix.length + 1))
+    const label = prefix.split('.').at(-1)
+    return label ? `${label}.${suffix}` : null
   }
-  const suffix = labels.slice(-2).join('.')
-  if (MULTI_LABEL_PUBLIC_SUFFIXES.has(suffix)) {
-    if (labels.length < 3) return null
-    return labels.slice(-3).join('.')
-  }
-  return labels.length >= 2 && !MULTI_LABEL_PUBLIC_SUFFIXES.has(host) ? labels.slice(-2).join('.') : null
+  return domain
 }
 
-/** 规范化 HTTPS URL。显式非 443 端口、userinfo、IP 与跨域重定向参数全部拒绝。 */
-export function verifiedHttpsUrl(raw: string, allowedDomains?: readonly string[]): URL | null {
+export function isCommercialRecruitmentHost(hostname: string): boolean {
+  const domain = registrableDomainOf(hostname)
+  return domain !== null && (COMMERCIAL_RECRUITMENT_REGISTRABLE_DOMAINS as readonly string[]).includes(domain)
+}
+
+/** Values can be decoded by a later redirect handler. Inspect three further encoding layers. */
+function withoutControls(value: string): string {
+  return [...value].filter((char) => char.charCodeAt(0) > 31 && char.charCodeAt(0) !== 127).join('')
+}
+
+function redirectValue(raw: string): string {
+  let value = withoutControls(raw)
+  for (let i = 0; i < 3; i++) {
+    let decoded: string
+    try { decoded = decodeURIComponent(value) } catch { break }
+    if (decoded === value) break
+    value = withoutControls(decoded)
+  }
+  return value.trim().replace(/\\/g, '/')
+}
+
+function redirectValues(url: URL): string[] {
+  const values = [...url.searchParams.values()]
+  const fragment = url.hash.slice(1)
+  if (fragment.includes('=')) values.push(...new URLSearchParams(fragment).values())
+  return values
+}
+
+function inspectUrl(raw: string, allowedDomains: readonly string[] | undefined, base: URL | undefined, depth: number): URL | null {
+  if (depth > 10) return null
+  // URL normalizes :443 away, so inspect the original authority for a nondefault port.
   if (/^https:\/\/[^/?#]*:(?!443(?:[/?#]|$))\d+(?:[/?#]|$)/i.test(raw.trim())) return null
   let url: URL
-  try {
-    url = new URL(raw.trim())
-  } catch {
-    return null
-  }
+  try { url = base ? new URL(raw, base) : new URL(raw.trim()) } catch { return null }
   if (url.protocol !== 'https:' || url.username || url.password || url.port) return null
   const host = normalizedHostname(url.hostname)
   if (!host || !registrableDomainOf(host)) return null
   url.hostname = host
   if (allowedDomains && !allowedDomains.some((domain) => hostMatchesVerifiedDomain(host, domain))) return null
-  for (const value of allowedDomains ? url.searchParams.values() : []) {
-    const target = value.trim()
-    if (!/^https?:\/\//i.test(target) && !target.startsWith('//')) continue
-    let redirected: URL
-    try { redirected = new URL(target, url) } catch { return null }
-    const redirectHost = normalizedHostname(redirected.hostname)
-    if (!redirectHost || !allowedDomains?.some((domain) => hostMatchesVerifiedDomain(redirectHost, domain))) return null
+  if (!allowedDomains) return url
+  for (const rawValue of redirectValues(url)) {
+    const target = redirectValue(rawValue)
+    const scheme = /^[a-z][a-z\d+.-]*:/i.exec(target)
+    if (!target.startsWith('/') && !scheme && !rawValue.trim().startsWith('\\')) continue
+    // A leading backslash or a noncanonical scheme can be interpreted differently
+    // by redirect handlers. Fail closed even if URL resolves it as a local path.
+    if (rawValue.trim().startsWith('\\') || (scheme && !/^https:\/\//i.test(target))) return null
+    if (!inspectUrl(target, allowedDomains, url, depth + 1)) return null
   }
   return url
+}
+
+/** Canonical HTTPS URL, including every redirect-looking query and fragment value. */
+export function verifiedHttpsUrl(raw: string, allowedDomains?: readonly string[]): URL | null {
+  return inspectUrl(raw, allowedDomains, undefined, 0)
 }
 
 export function httpsHostnameOf(raw: string): string | null {
   return verifiedHttpsUrl(raw)?.hostname ?? null
 }
 
-/** 管理员录入：裸注册域，或 https URL（取注册域）。公共后缀本身无效。 */
+/** An administrator may verify a registered domain or a narrower hostname. */
 export function verifiedDomainFromInput(raw: string): string | null {
   const text = raw.trim()
   if (!text) return null
-  if (text.includes('://') || text.includes('/')) {
-    const host = verifiedHttpsUrl(text)?.hostname
-    return host ? registrableDomainOf(host) : null
-  }
-  const host = normalizedHostname(text)
-  // An entered domain must itself be the registered root, not an arbitrary subdomain.
-  return host && registrableDomainOf(host) === host ? host : null
+  const host = text.includes('://') || text.includes('/')
+    ? verifiedHttpsUrl(text)?.hostname ?? null
+    : normalizedHostname(text)
+  return host && registrableDomainOf(host) ? host : null
 }
 
-export function hostMatchesVerifiedDomain(hostname: string, verifiedRegistrable: string): boolean {
+export function hostMatchesVerifiedDomain(hostname: string, verifiedDomain: string): boolean {
   const host = normalizedHostname(hostname)
-  const verified = normalizedHostname(verifiedRegistrable)
-  return Boolean(host && verified && registrableDomainOf(verified) === verified
+  const verified = normalizedHostname(verifiedDomain)
+  return Boolean(host && verified && registrableDomainOf(host) && registrableDomainOf(verified)
     && (host === verified || host.endsWith(`.${verified}`)))
 }

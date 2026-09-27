@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -62,16 +62,10 @@ export class OfficialChannelsController {
     return ApiResponse.ok(await this.channels.archiveForPartner(user, id))
   }
 
-  /**
-   * 一体机公开读取。organizationId 查询参数即使传入也不参与取数，只认终端身份。
-   */
+  /** 一体机公开读取只认终端验签身份。 */
   @Get('terminals/:terminalId/official-channels')
   @UseGuards(TerminalIdentityGuard)
-  async listForTerminal(
-    @Param('terminalId') terminalId: string,
-    @Query('organizationId') organizationId?: string,
-  ) {
-    void organizationId
+  async listForTerminal(@Param('terminalId') terminalId: string) {
     return ApiResponse.ok(await this.channels.listForTerminal(terminalId))
   }
 }

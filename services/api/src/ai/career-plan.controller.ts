@@ -44,21 +44,6 @@ export class CareerPlanController {
     return (await this.jobBoard.resolve(kioskJobBoardTerminalRef(req as KioskJobBoardRequest))).enabled
   }
 
-  /** 已保存的规划若带岗位标题，关闭时整份不返回，避免正文里的标题漏出。 */
-  private async assertReadable(taskId: string, req: ReqLike): Promise<void> {
-    if (await this.jobBoardOpen(req)) return
-    try {
-      const latest = await this.service.getLatest(taskId, await this.requesterOf(req))
-      if (latest.basedOn?.jobFit) {
-        await this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req as KioskJobBoardRequest))
-      }
-    } catch (error) {
-      const code = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()?.error?.code
-      if (code === 'CAREER_PLAN_NOT_FOUND') return
-      throw error
-    }
-  }
-
   private async requesterOf(req: ReqLike) {
     const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
     if (member) return { endUserId: member.endUserId, accessToken: null }
@@ -74,14 +59,14 @@ export class CareerPlanController {
 
   @Get(':taskId')
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    await this.assertReadable(taskId, req)
-    return this.service.getLatest(taskId, await this.requesterOf(req))
+    const open = await this.jobBoardOpen(req)
+    return this.service.getLatest(taskId, await this.requesterOf(req), { jobBoardOpen: open })
   }
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    await this.assertReadable(taskId, req)
-    return this.service.printPlan(taskId, await this.requesterOf(req))
+    const open = await this.jobBoardOpen(req)
+    return this.service.printPlan(taskId, await this.requesterOf(req), { jobBoardOpen: open })
   }
 }

@@ -69,43 +69,48 @@ interface StoredCareerPlan {
 }
 
 function scrubSystemJobTitle(value: string, title: string): string {
-  if (value === title) return '目标岗位'
-  if (title.length < 4) return value
+  // An unmarked occupation in the person's own prose is not recruitment content.
+  // Only whole, explicitly marked references are changed, and short titles are left alone.
+  if (!title.trim() || title.length < 4) return value
   const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return value
     .replace(new RegExp(`([「“《])${escaped}([」”》])`, 'g'), '$1目标岗位$2')
-    .replace(new RegExp(`(目标岗位[：:]\\s*)${escaped}(?=$|[，。；;、\\s])`, 'g'), '$1目标岗位')
+    .replace(new RegExp(`目标岗位[：:]\\s*${escaped}(?=$|[，。；;、\\s])`, 'g'), '目标岗位')
 }
 
 /** 去掉系统岗位标题，保留规划正文。basedOn.jobFit 清空，避免标题从依据栏漏出。 */
 export function redactCareerPlanSystemJobTitle(stored: StoredCareerPlan, title: string): StoredCareerPlan {
   if (!stored.basedOn?.jobFit || stored.basedOn.jobFitSource === 'manual') return stored
   const clean = (value: string | undefined) => scrubSystemJobTitle(value ?? '', title)
+  const cleanStructured = (value: string | undefined) => value === title && !!title.trim() ? '目标岗位' : clean(value)
   const payload = stored.payload
+  const objects = <T extends object>(items: T[] | undefined): T[] => Array.isArray(items)
+    ? items.filter((item): item is T => !!item && typeof item === 'object' && !Array.isArray(item)) : []
   return {
     ...stored,
     basedOn: { ...stored.basedOn, jobFit: null, jobFitSource: null },
     payload: {
       ...payload,
       summary: clean(payload?.summary),
-      currentSnapshot: (payload?.currentSnapshot ?? []).map((item) => ({
+      currentSnapshot: objects(payload?.currentSnapshot).map((item) => ({
         ...item,
-        point: clean(item.point),
+        point: cleanStructured(item.point),
         evidence: clean(item.evidence),
       })),
-      directions: (payload?.directions ?? []).map((item) => ({
+      directions: objects(payload?.directions).map((item) => ({
         ...item,
-        title: clean(item.title),
+        title: cleanStructured(item.title),
         why: clean(item.why),
         firstStep: clean(item.firstStep),
       })),
-      skillPlan: (payload?.skillPlan ?? []).map((item) => ({
+      skillPlan: objects(payload?.skillPlan).map((item) => ({
         ...item,
-        skill: clean(item.skill),
+        skill: cleanStructured(item.skill),
         action: clean(item.action),
         timeframe: clean(item.timeframe),
       })),
-      actionChecklist: (payload?.actionChecklist ?? []).map((item) => clean(item)),
+      actionChecklist: (Array.isArray(payload?.actionChecklist) ? payload.actionChecklist : [])
+        .filter((item): item is string => typeof item === 'string').map((item) => clean(item)),
     },
   }
 }
@@ -250,14 +255,14 @@ export class CareerPlanService {
   }
 
   /** 读回最近一次规划（刷新恢复 / 会员回看）。 */
-  async getLatest(taskId: string, requester: CareerPlanRequester) {
+  async getLatest(taskId: string, requester: CareerPlanRequester, options?: { jobBoardOpen?: boolean }) {
     await this.loadAuthorizedParse(taskId, requester)
     const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'career_plan' } } })
     if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
       throw new NotFoundException({ error: { code: 'CAREER_PLAN_NOT_FOUND', message: '暂无职业规划记录，请先生成' } })
     }
     const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
-    return this.toResponse(taskId, this.withoutSystemJobTitle(stored))
+    return this.toResponse(taskId, this.withoutSystemJobTitle(stored, options))
   }
 
   /**
@@ -274,13 +279,13 @@ export class CareerPlanService {
    *   用户在一台**打印终端**上一张纸也拿不走 —— 降级路径只做了一半。
    *   降级态本身不是错误状态，不该用 404 表达。
    */
-  async printPlan(taskId: string, requester: CareerPlanRequester) {
+  async printPlan(taskId: string, requester: CareerPlanRequester, options?: { jobBoardOpen?: boolean }) {
     const parse = await this.loadAuthorizedParse(taskId, requester)
     const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'career_plan' } } })
     const hasPlan = !!row && !!row.expiresAt && row.expiresAt.getTime() >= Date.now()
 
     const rendered = hasPlan
-      ? await this.renderAiPlanPdf(row!, taskId)
+      ? await this.renderAiPlanPdf(row!, taskId, options)
       : await this.renderDegradedPdf(parse, row ? 'expired' : 'never_generated')
 
     const uploaded = await this.files.upload({
@@ -316,17 +321,17 @@ export class CareerPlanService {
   }
 
   /**
-   * 托管关闭时，旧规划里引用的系统岗位标题从读取结果和打印稿里去掉。
-   * 整份规划仍然返回。没有 job_fit 存档时无法判断来源，保持原文。
+   * 托管或终端板块关闭时，按规划自身保存的 basedOn 来源清理。
+   * 旧存档无来源字段时，只要有 basedOn.jobFit 就保守按系统引用清理。
    */
-  private withoutSystemJobTitle(stored: StoredCareerPlan): StoredCareerPlan {
-    if (isRecruitmentContentHostingEnabled()) return stored
+  private withoutSystemJobTitle(stored: StoredCareerPlan, options?: { jobBoardOpen?: boolean }): StoredCareerPlan {
+    if (isRecruitmentContentHostingEnabled() && options?.jobBoardOpen !== false) return stored
     return redactCareerPlanSystemJobTitle(stored, stored.basedOn?.jobFit ?? '')
   }
 
   /** AI 版式。逻辑与改动前一致，只是抽成方法。 */
-  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }, taskId: string) {
-    const stored = this.withoutSystemJobTitle(JSON.parse(row.payloadJson) as StoredCareerPlan)
+  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }, taskId: string, options?: { jobBoardOpen?: boolean }) {
+    const stored = this.withoutSystemJobTitle(JSON.parse(row.payloadJson) as StoredCareerPlan, options)
     const { buffer, pageCount } = await this.pdf.render(
       { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn, contentId: taskId },
       stored.payload,
