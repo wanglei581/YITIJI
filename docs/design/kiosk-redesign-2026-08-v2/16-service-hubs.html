@@ -92,6 +92,11 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offse
 .truth{height:auto;min-height:120px}
 .nav-item span{font-size:21px!important}
 .screen[data-card-count="8"] .grid{--card-row-height:272px}
+.first-copy p{font-size:20px!important;line-height:1.35!important}
+.seg{font-size:20px!important;line-height:1.25!important;height:auto!important;min-height:56px;padding:8px 10px!important}
+.first-actions{max-width:none!important}
+.screen[data-state="first"] .first-panel{height:auto!important}
+.first-inner{height:auto!important;min-height:122px}
 </style>
 </head>
 <body>
@@ -169,7 +174,7 @@ const H={
  cards:[
  ['招聘会列表','查看真实场次、时间、地点与来源','calendar','真实加载','28-jobfair-enhanced.html','/job-fairs','info'],
  ['校园招聘','查看校园相关场次与企业信息','building','真实加载','49-campus-workspace.html?screen=campus&state=loading','/campus','info'],
- ['到场指引','核对来源预约与现场流程','map','无签到回执','28-jobfair-enhanced.html?screen=checkin&state=guide','/job-fairs/checkin','info'],
+ ['到场指引','核对来源预约与现场流程','map','无签到结果','28-jobfair-enhanced.html?screen=checkin&state=guide','/job-fairs/checkin','info'],
  ['问AI顾问','了解参会准备与现场沟通建议','bot','AI · 仅供参考','05-ai-cockpit.html?intent=fair','/assistant','ai'],
  ['简历服务','诊断、优化或准备多份简历','file','进入简历中心','16-service-hubs.html?hub=resume','/resume-service','info'],
  ['打印扫描','先查看文件、格式与办理入口；出纸或扫描步骤进入后确认','printer','进入后确认','10-print-hub.html','/print-scan','info']],

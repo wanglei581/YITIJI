@@ -378,6 +378,8 @@ a:focus-visible,button:focus-visible,[role=checkbox]:focus-visible{outline:3px s
 .link{min-height:108px!important}
 .fx-b,.truth .fx,.truth .fx b,.stampmark,.nine button,.sizes button,.pgbtn,.pvlabel,.mini,.pmark,.pfoot{font-size:20px!important}
 .pgrp .foot{font-size:20px!important}
+.pickcard .d,.pickcard span.f,h3 span.r,.protchip{font-size:20px!important;line-height:1.35!important}
+.protchip{height:auto!important;min-height:28px;padding:2px 8px}
 </style>
 </head>
 <body>
@@ -1122,7 +1124,7 @@ function statusFor(){
   [['系统登记为进行中'],['输入已全部保留','ok'],['不会另开一份','ok']]);
  if(M.phase==='known-failed')return stateBlock('error','warn',M.oversize?'合成结果超出大小限制':'这一次明确失败了',
   M.oversize
-   ? '叠加后的 PDF 超过 <b>15 MB</b>，系统拒绝落库，<b>没有生成可用文件</b>。换小一点的签名图，或先压缩原 PDF。'
+   ? '叠加后的 PDF 超过 <b>15 MB</b>，系统没有保存，<b>没有生成可用文件</b>。换小一点的签名图，或先压缩原 PDF。'
    : '系统给了<b>明确的失败答复</b>：这一次<b>没有生成文件</b>。文档、签名图、页码、位置、大小和授权全部保留，重试不用重传。','',
   [['系统明确拒绝'],['输入已全部保留','ok'],['原 PDF 不被改写','ok']]);
  if(M.phase==='result-unknown')return stateBlock('warn','warn','这一次的结果<b>没有确认</b>',

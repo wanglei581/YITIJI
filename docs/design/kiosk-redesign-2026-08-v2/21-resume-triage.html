@@ -949,6 +949,8 @@ html.flat *::after,html[data-flat="1"] *::after{
 #body-root{padding-top:54px}.blk-h .t{font-size:30px;line-height:1.4}.blk-h .h{font-size:20px}.file .fn{font-size:30px;line-height:1.4}.file .fs{font-size:22px}.meta .mk{font-size:20px}.meta .mv{font-size:22px;line-height:1.45}
 .rows .rv{font-size:22px;line-height:1.45}.rows .rv em{font-size:20px}.btn{font-size:26px;line-height:1.4}.out .tx{font-size:22px;line-height:1.4}.out .tx b{font-size:24px}.out .go{font-size:22px}
 .truth{padding:10px 44px}.truth div{font-size:20px;line-height:1.45}.truth [hidden]{display:none}.qx2-actions{min-height:64px}.blk.grow{overflow:visible}
+/* 说明变长后，错误卡按内容撑开，不再压住下一张卡。 */
+.blk:has(> .fail){flex:none}
 
 </style>
 </head>
@@ -1443,16 +1445,16 @@ function retentionValue(src){
   if(!MEMBER)return '临时上传 · 1 小时后清理';
   /* 扫描件的归属在**建立扫描会话那一刻**就定了（18-scan-workbench：匿名会话产生的扫描件
      不挂账号，事后登录也不追溯）。本页没有那一刻的状态，所以不冒充知道。 */
-  if(src==='scan')return '归属在建扫描会话时已定 · 本页读不到';
+  if(src==='scan')return '归属在开始这次扫描时已经定了 · 本页读不到';
   return src==='phone'?'一体机确认后绑定账号 · 默认 90 天':'上传当场绑定账号 · 默认 90 天';
 }
 function retentionNote(src){
   /* 未登录也要分通道说：直传通道登录之后确实会把它存进账号，扫描件不会 ——
      扫描件的归属在**建立扫描会话那一刻**就定了，现在或事后登录都不追溯。 */
   if(!MEMBER)return src==='scan'
-    ? '未登录：不进账号、不归档；归属在建扫描会话那一刻已定，现在登录也不追溯'
+    ? '未登录：不进账号、不归档；归属在开始这次扫描那一刻已经定了，现在登录也不追溯'
     : '未登录：不进账号、不归档；登录后这条通道才会把它存进你的账号';
-  if(src==='scan')return '匿名会话的扫描件不因登录而追溯归档；本页读不到那一刻的结果';
+  if(src==='scan')return '没登录时扫出来的文件不因登录而追溯归档；本页读不到那一刻的结果';
   return src==='phone'
     ? '只传不确认不会自动归档；确认后可在「我的文档」改到 180 天（需同意保存条款）或删除'
     : '可在「我的文档」改到 180 天（需同意保存条款）或删除；原始文件不支持永久保存';
@@ -1471,7 +1473,7 @@ function acctStrip(){
     '<span class="ai">'+svg(g?I_CLOCK:I_SHIELD,26,g?'#8a6219':'#157a67',2)+'</span>'+
     '<span class="am"><span class="an">'+(g?'当前未登录 · 这次按临时上传处理':'已登录会员 · 这次会存进你的账号')+'</span>'+
     '<span class="ad">'+(g
-      ? '简历属高度敏感文件，服务端<b>默认 1 小时</b>清理，<b>不进账号、不归档</b>。登录后：U 盘 / 本机<b>上传当场</b>绑定账号存 <b>90 天</b>，手机扫码要在这台机器<b>确认之后</b>才绑定。'
+      ? '简历属高度敏感文件，系统<b>默认 1 小时</b>清理，<b>不进账号、不归档</b>。登录后：U 盘 / 本机<b>上传当场</b>绑定账号存 <b>90 天</b>，手机扫码要在这台机器<b>确认之后</b>才绑定。'
       : 'U 盘 / 本机文件<b>上传当场</b>绑定账号，默认 <b>90 天</b>；手机扫码要在这台机器<b>确认之后</b>才绑定，只传不确认不归档。可改到 180 天或删除，<b>原始文件不支持永久保存</b>。')+
     '</span></span><span class="ag">'+(g?'去登录 →':'我的文档 →')+'</span></a>';
 }
@@ -1598,11 +1600,11 @@ function pill(txt,tone){
   /* 语序注意：会话清理这句放最前，别让「文件 / 订单」离「闲置超时」太近 ——
      那会被读成「会话结束就删你的订单和文件」，而实际上订单与文件走的是服务端留存期限。 */
   document.getElementById('truth-retention').innerHTML=MEMBER
-    ? '<b>留存 · 已登录</b>结束会话或闲置超时清除本机登录态与临时会话信息；已上传文件与订单按服务端留存期限管理。'+
+    ? '<b>留存 · 已登录</b>结束这次使用，或闲置太久，会清掉这台机器上的登录和临时信息；已上传文件与订单按系统规定的保存时间管理。'+
       'U 盘 / 本机<b>上传当场绑定账号</b>存 <b>90 天</b>，手机扫码<b>确认后</b>才绑定，'+
       '<b>原始文件不支持永久保存</b>，不承诺永久保留。'
-    : '<b>留存 · 未登录</b>结束会话或闲置超时清除本机登录态与临时会话信息；已上传文件与订单按服务端留存期限管理。'+
-      '这次按<b>临时上传</b>处理：简历属高度敏感，服务端<b>默认 1 小时</b>清理，不进账号，不承诺永久保留。';
+    : '<b>留存 · 未登录</b>结束这次使用，或闲置太久，会清掉这台机器上的登录和临时信息；已上传文件与订单按系统规定的保存时间管理。'+
+      '这次按<b>临时上传</b>处理：简历属高度敏感，系统<b>默认 1 小时</b>清理，不进账号，不承诺永久保留。';
 })();
 function mark(st){
   root.setAttribute('data-screen','resume-source');
@@ -1649,7 +1651,7 @@ function chanBlock(cur,lock,lockText){
 /* 通道步骤条：这条通道真实的几步，现在停在哪一步。只描述流程，不代表硬件已经做到哪一步。 */
 var CHAN_STEPS={
   usb:['插入 U 盘','读取盘上文件','选一份','确认这一份','导入完成'],
-  local:['放到本机目录','打开文件选择','选一份','确认送出','服务端收到'],
+  local:['放到本机目录','打开文件选择','选一份','确认送出','系统收到'],
   phone:['生成上传码','手机扫码','手机上传','一体机确认']
 };
 function stepBoard(k,idx,tone,hereText){
@@ -1664,8 +1666,8 @@ function stepBoard(k,idx,tone,hereText){
 }
 /* 静态原型的统一交代：这一页没有硬件、没有网络、没有会话 */
 var PROTO_STATIC_USB={v:'本页是<b>静态原型</b>：不连接任何硬件、不发起任何网络请求，上面的通道状态是<b>固定演示状态</b>，不是这台机器此刻的真实读盘结果。'};
-var PROTO_STATIC_QR={v:'本页是<b>静态原型</b>：<b>不发起任何网络请求，也不轮询任何会话状态</b>；上面的会话状态与倒计时都是<b>固定演示值</b>。'};
-var PROTO_STATIC_FILE={v:'文件名、类型与大小是<b>固定的原型演示数据</b>，不是接口返回值，也不是任何账号里的数据。'};
+var PROTO_STATIC_QR={v:'本页是<b>静态原型</b>：<b>不发起任何网络请求，也不轮询上传进行到哪一步</b>；上面的状态和倒计时都是<b>固定演示值</b>。'};
+var PROTO_STATIC_FILE={v:'文件名、类型与大小是<b>固定的原型演示数据</b>，不是系统返回的，也不是任何账号里的数据。'};
 
 R['source']=function(){
   rail(0);pill('第 1 步 · 取简历文件','ok');
@@ -1710,7 +1712,7 @@ R['target']=function(){
     '<div class="blk m-fade-in">'+head('诊断范围','两选一，随时能切回')+'<div class="seg">'+modeHTML+'</div></div>'+
     '<div class="blk">'+head('重点关注维度',mode==='generic'?'通用诊断下不生效':'可多选，默认 3 项')+
       '<div class="dims">'+dimHTML+'</div></div>'+
-    '<div class="blk grow">'+head('报告固定包含这些内容','6 个维度 + 2 项结论，和后端结构一致，不随这里的选择增减')+
+    '<div class="blk grow">'+head('报告固定包含这些内容','6 个维度 + 2 项结论，和系统里的报告结构一致，不随这里的选择增减')+
       rowsCard([
         {v:'<b>报告固定输出 6 个维度</b>：基础信息完整度、求职目标清晰度、经历表达清晰度、成果量化程度、岗位关键词覆盖、版式与可读性 —— 这里怎么选，这 6 项都会出。'},
         {v:'<b>风险表述提醒</b>：只针对简历文本里的表达风险，不评价你这个人。'},
@@ -1739,7 +1741,7 @@ function chipGroup(key,lb,list,cur,clearable,tid){
 function escapeHTML(value){
   return String(value||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});
 }
-/* 手填兜底：只有 targetJob / major 两个自由文本字段用得上，各自的上限**按服务端 DTO 分开**
+/* 手填兜底：只有 targetJob / major 两个自由文本字段用得上，各自的上限**按系统 DTO 分开**
    （targetJob 80 / major 40），不共用一个数。回显一律走 escapeHTML，不回显原始 query。 */
 var MANUAL_MAX={job:JOB_MAX,major:MAJOR_MAX};
 function manualField(key,lb,cur,placeholder,tid){
@@ -1806,7 +1808,7 @@ function jobPanel(){
         svg(I_CHECK,19,'currentColor',3)+'已填：'+escapeHTML(job)+'</span></div>':'')+
       '<p class="jnote">写完点<b>「应用」</b>才算数（已填过会多一个「清空」）。'+
       '最长 <b>'+JOB_MAX+'</b> 字，会去掉首尾空格、不可见字符和 <b>&lt; &gt; " \' \\</b> 这几个符号；'+
-      '存进去的仍然只是<b>目标岗位这一个自由文本字段</b>，不会顺手多收别的信息。</p>'+
+      '存进去的仍然只是<b>目标岗位这一项</b>，不会顺手多收别的信息。</p>'+
       '</div>';
   }
   var c=ownHas(CAT_BY_KEY,cat)?CAT_BY_KEY[cat]:null;
@@ -2215,13 +2217,13 @@ R['usb-read-failed']=function(){
 R['usb-unavailable']=function(){
   rail(0);pill('U 盘 · 通道未开通','warn');
   hero('这台机器<em>没有开通 U 盘导入</em>。',
-       '本地网桥没有配置，所以 U 盘入口<b>先锁上</b>，不假装能用。',
+       '这台机器还没开通 U 盘读取，所以这个入口<b>先锁上</b>，不假装能用。',
        svg(I_LOCK,19,'currentColor',2.2)+'通道锁定',true);
   root.innerHTML=
     trackBar('U 盘通道未开通','warnt')+
     '<div class="blk m-fade-in"><div class="fail lockf" data-testid="rs-usb-unavailable">'+
       '<div class="ft">'+svg(I_LOCK,22,'currentColor',2)+'当前终端未配置U盘导入</div>'+
-      '<div class="fbdy">请联系工作人员检查 <b>Terminal Agent 本地网桥配置</b>。'+
+      '<div class="fbdy">请联系工作人员检查<b>这台机器的 U 盘读取</b>。'+
       '这是这台机器的<b>配置缺失，不是你的操作问题，也不是重试能解决的</b>；'+
       '在此之前，插着的 U 盘不会被本机读取，也不会有文件被复制走。另外两条通道照常可用。</div></div></div>'+
     '<div class="blk grow">'+head('还能用的两条通道','都在这台机器上完成',true)+
@@ -2233,8 +2235,8 @@ R['usb-unavailable']=function(){
       ])+'</div>'+
     '<div class="blk grow">'+head('现场分工','各做各的那一件')+
       tri([
-        {no:'1',n:'工作人员：补上本地网桥配置',d:'在这台机器上把 Terminal Agent 的 U 盘导入配好，配完入口自己恢复。',go:'你在页面上做不了',warn:true},
-        {no:'2',n:'你现在：换一条通道',d:'手机扫码和本机文件都不经过这条网桥，现在就能把简历送进来。',go:'现在就能走',warn:true},
+        {no:'1',n:'工作人员：开通 U 盘读取',d:'在这台机器上把 U 盘读取配好，配完入口自己恢复。',go:'你在页面上做不了',warn:true},
+        {no:'2',n:'你现在：换一条通道',d:'手机扫码和本机文件都不走 U 盘读取，现在就能把简历送进来。',go:'现在就能走',warn:true},
         {no:'3',n:'你的设置：都还在',d:'诊断方向、重点维度和目标背景不会因为换通道被清掉。',go:'不用重新点',warn:true}
       ])+'</div>'+
     acts([{k:'ghost',n:'报障 · 找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
@@ -2285,7 +2287,7 @@ R['usb-selected']=function(){
       ])+'</div>'+
     rowsCard([
       {v:'导入的用途只有一个：<b>当前这一次 AI '+INTENT_COPY[intent].verb+'</b>，不做别的用途，也<b>不发给任何企业</b>。'},
-      {v:'文件卡里的名称、大小与预览结论是<b>固定的原型演示数据</b>，不是接口返回值。'}
+      {v:'文件卡里的名称、大小与预览结论是<b>固定的原型演示数据</b>，不是系统返回的结果。'}
     ])+
     chanBlock('usb')+
     acts([{k:'ghost',n:H.r.n,href:H.r.h},
@@ -2327,7 +2329,7 @@ R['usb-import-failed']=function(){
     '<div class="blk m-fade-in">'+head('导入失败','来自 U 盘',true)+fileCard('导入失败','err')+'</div>'+
     '<div class="blk"><div class="fail" data-testid="rs-usb-import-failed">'+
       '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'U盘文件导入失败，请重试</div>'+
-      '<div class="fbdy">常见原因：<b>读取过程中盘被拔出</b>、<b>文件被改名或删除</b>、<b>本机与服务端网络中断</b>，'+
+      '<div class="fbdy">常见原因：<b>读取过程中盘被拔出</b>、<b>文件被改名或删除</b>、<b>本机与系统网络中断</b>，'+
       '或者<b>这份文件的一次性标识已经用掉或失效</b>（每份只用一次、10 分钟有效，重新列盘也会作废）。'+
       '所以这一页<b>没有「再导一次」</b>：上面那句提示里的「重试」，在 U 盘通道指的是'+
       '<b>重新读一次盘、重新选一份</b>，而不是把同一份原地再导一遍。</div></div></div>'+
@@ -2403,7 +2405,7 @@ R['local-guide']=function(){
       {v:'这条通道在代码里就是原来的「云端上传」，<b>它做的事一直是本机文件选择</b>：<b>不登录、不保存你的云盘账号</b>，这里把名字改成它真正在做的事。'},
       {v:'一体机<b>不允许弹出系统文件窗口</b>阻断流程，所以本原型用同页受控列表演示这一步；'+
          '<b>正式实现的本机目录读取方式仍在收口，本原型不读取任何真实目录、也不上传任何文件</b>。'},
-      {v:'旧版 <b>.doc</b> 后端会直接拒绝，请先另存为 PDF 或 DOCX。'}
+      {v:'旧版 <b>.doc</b> 系统会直接拒绝，请先另存为 PDF 或 DOCX。'}
     ])+
     chanBlock('local')+
     acts([{k:'ghost',n:'换一种来源',href:url({state:'source'})},
@@ -2462,7 +2464,7 @@ R['local-cancelled']=function(){
       '</div></div>'+
     rowsCard([
       {v:'取消选择<b>不会清掉你已经点好的诊断方向和目标背景</b>，也不会影响本次办理里的其他内容。'},
-      {v:'这一步<b>没有产生任何上传</b>，服务端没有收到内容。'}
+      {v:'这一步<b>没有产生任何上传</b>，系统没有收到内容。'}
     ])+
     chanBlock('local')+
     acts([{k:'ghost',n:'换一种来源',href:url({state:'source'})},
@@ -2482,7 +2484,7 @@ function localReject(o){
       '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+o.ft+'</div><div class="fbdy">'+o.fb+'</div></div></div>'+
     '<div class="blk grow">'+head('可以这样处理','三条都在现场能做')+tri(o.tri)+'</div>'+
     rowsCard([
-      {v:'这一份<b>没有被上传</b>：本机在送出之前就拦下了，服务端没有收到任何内容。'},
+      {v:'这一份<b>没有被上传</b>：本机在送出之前就拦下了，系统没有收到任何内容。'},
       {v:'本次办理里<b>仍然没有文件</b>，重新选一份合规的就能接着走。上面这份的文件名、类型与大小是<b>固定的原型演示数据</b>，不是本机真实读到的目录内容。'}
     ])+
     acts([{k:'ghost',n:'换一种来源',href:url({state:'source'})},
@@ -2494,7 +2496,7 @@ R['local-rejected']=function(){
     h1:'这个<em>格式收不了</em>。',h2:'只收 <b>PDF / DOCX / JPG / PNG / WEBP</b>，压缩包和旧版 .doc 都不行。',
     ft:'该文件用途不支持此文件类型',
     fb:'本机只接收 <b>PDF、DOCX、JPG、PNG、WEBP</b> 五种。压缩包（ZIP / RAR）、表格、幻灯片都不在范围内；'+
-       '旧版 <b>.doc</b> 也不收，后端会返回「暂不支持旧版 .doc 格式，请另存为 PDF 或 DOCX 后重试」。',
+       '旧版 <b>.doc</b> 也不收，系统会告诉你「暂不支持旧版 .doc 格式，请另存为 PDF 或 DOCX 后重试」。',
     tri:[
       {no:'1',n:'先把简历单独导出',d:'从压缩包里取出简历那一份，另存为 PDF 再选。',go:'需要你操作',warn:true},
       {no:'2',n:'Word 请另存为 PDF',d:'.doc 另存为 .docx 或 PDF 都可以收。',go:'需要你操作',warn:true},
@@ -2536,7 +2538,7 @@ R['local-selected']=function(){
     : {no:'2',n:'这一份可以先看清楚',d:'PDF 能在本页逐页看、按整页或宽度适应、放大和转方向；能不能预览<b>不影响能不能解析</b>。',go:'页面能力'};
   rail(0);pill('本机文件 · 确认这一份','ok');
   hero('确认是<em>这一份</em>吗？',
-       '确认之后才把它送到服务端；<b>目录里其他文件一个都不动</b>。',
+       '确认之后才把它送到系统；<b>目录里其他文件一个都不动</b>。',
        svg(I_CHECK,19,'currentColor',2.6)+'待你确认');
   root.innerHTML=
     trackBar('第 3 步：确认要送出的那一个文件')+
@@ -2550,7 +2552,7 @@ R['local-selected']=function(){
       ])+'</div>'+
     rowsCard([
       {v:'送出的用途只有一个：<b>当前这一次 AI '+INTENT_COPY[intent].verb+'</b>，不做别的用途，也<b>不发给任何企业</b>。'},
-      {v:'文件卡里的名称、大小与预览结论是<b>固定的原型演示数据</b>，不是接口返回值。'}
+      {v:'文件卡里的名称、大小与预览结论是<b>固定的原型演示数据</b>，不是系统返回的结果。'}
     ])+
     chanBlock('local')+
     acts([{k:'ghost',n:H.r.n,href:H.r.h},
@@ -2559,12 +2561,12 @@ R['local-selected']=function(){
 R['local-ready']=function(){
   var H=pvHost();
   rail(0);pill('本机文件 · 已收到','ok');
-  hero('服务端<em>已经确认收到</em>。',
-       '下面这份文件名和大小是<b>服务端回给本机的结果</b>，不是本机自己记的。',
+  hero('系统<em>已经确认收到</em>。',
+       '下面这份文件名和大小是<b>系统发回这台机器的结果</b>，不是本机自己记的。',
        svg(I_CHECK,19,'currentColor',2.6)+'已收到');
   root.innerHTML=
     trackBar('第 4 步：已收到，可以继续')+
-    stepBoard('local',4,'','服务端已确认收到')+
+    stepBoard('local',4,'','系统已确认收到')+
     '<div class="blk m-fade-in">'+head('已收到的文件','来自本机下载目录',true)+fileCard('已收到','ok','',true)+'</div>'+
     '<div class="blk grow">'+
       duoCards(
@@ -2579,7 +2581,7 @@ R['local-ready']=function(){
           '不会把这份简历发给任何企业，也没有站内投递。'
         ]})+'</div>'+
     rowsCard([
-      {v:'上面的文件名和大小是<b>服务端回给本机的结果</b>，不是本机自己记的。'},
+      {v:'上面的文件名和大小是<b>系统发回这台机器的结果</b>，不是本机自己记的。'},
       {v:'确认之前<b>还能改</b>：文件、诊断范围、重点维度和目标背景在下一页会一起列出来。'},
       {v:'本次上传的原件<b>只读不改</b>，你自己设备上的那一份完全没有被动过。'}
     ])+
@@ -2590,15 +2592,15 @@ R['local-ready']=function(){
 R['phone-generating']=function(){
   rail(0);pill('手机扫码 · 出码中');
   hero('正在<em>生成这次的上传码</em>。',
-       '每次办理都换一张新码；<b>旧码会先在服务端作废</b>，再出新的。',
+       '每次办理都换一张新码；<b>旧码会先在系统作废</b>，再出新的。',
        svg(I_QR,19,'currentColor',2)+'出码中');
   root.innerHTML=
     trackBar('第 1 步：生成一次性上传码','',{busy:true,busyTag:'出码中 · 没有中止入口'})+
-    stepBoard('phone',0,'','正在向服务端申请会话')+
+    stepBoard('phone',0,'','正在向系统申请这次上传')+
     '<div class="blk grow m-fade-in"><div class="stat doing band" data-testid="rs-phone-generating">'+
       '<span class="si">'+svg(I_QR,44,'#157a67',1.8)+'</span>'+
       '<span class="sm"><span class="st">'+pulse('正在生成上传码')+'</span>'+
-      '<span class="sd">要先向服务端申请一个<b>一次性上传会话</b>，拿到之后才画码。'+
+      '<span class="sd">要先向系统申请一个<b>这一次上传</b>，拿到之后才画码。'+
       '出码之前这里<b>不放一张假的图</b>，免得你对着一个还不能用的码扫。</span>'+
       '<span class="ticks"><span class="tick">一次性上传令牌</span>'+
       '<span class="tick">'+svg(I_CLOCK,18,'currentColor',2)+'有效期 10 分钟</span>'+
@@ -2606,13 +2608,13 @@ R['phone-generating']=function(){
     tri([
       {no:'1',n:'一次办理一张码',d:'换一次办理要重新扫，旧码不会继续可用。',go:'系统行为'},
       {no:'2',n:'手机端不登录账号',d:'码里只有一次性上传令牌，手机拿不到一体机的会员登录凭证。',go:'系统行为'},
-      {no:'3',n:'有效期 10 分钟',d:'以服务端返回的到期时间为准，不由屏幕自己判定。',go:'系统行为'}
+      {no:'3',n:'有效期 10 分钟',d:'以系统给出的到期时间为准，不由屏幕自己判定。',go:'系统行为'}
     ])+'</div>'+
     rowsCard([
       {v:'手机那一侧是独立页面 <b>/upload/phone</b>，只做「选文件、上传、提示回一体机确认」三件事。'},
-      {v:'<b>这一步没有取消入口</b>：申请会话的请求已经发出，离开这一页<b>不会撤回</b>它；'+
-         '万一服务端最后还是建出了会话，它<b>10 分钟后自行到期</b>，也可以出码后再撤销。'},
-      {v:'本页<b>不发起任何网络请求</b>，也不会生成真实会话。'}
+      {v:'<b>这一步没有取消入口</b>：申请这次上传的请求已经发出，离开这一页<b>不会撤回</b>它；'+
+         '万一系统最后还是建出了这次上传，它<b>10 分钟后自行到期</b>，也可以出码后再撤销。'},
+      {v:'本页<b>不发起任何网络请求</b>，也不会生成真实的上传。'}
     ])+
     acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
           {k:'ghost',n:'先离开这一步<br>已发出的出码请求不受影响',href:url({state:'source'})}]);
@@ -2620,16 +2622,16 @@ R['phone-generating']=function(){
 R['phone-gen-failed']=function(){
   rail(0);pill('手机扫码 · 出码失败','bad');
   hero('这次<em>没能出码</em>。',
-       '服务端没有返回可用的上传会话，所以这里<b>不画码</b>。',
+       '系统没有给出可以扫的上传码，所以这里<b>不画码</b>。',
        svg(I_WARN,19,'currentColor',2.2)+'出码失败',true);
   root.innerHTML=
     trackBar('第 1 步：出码失败，可以重试','badt')+
-    stepBoard('phone',0,'bad','这一次没拿到会话')+
+    stepBoard('phone',0,'bad','这一次没能开始上传')+
     '<div class="blk m-fade-in"><div class="fail" data-testid="rs-phone-gen-failed">'+
       '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'二维码生成失败，请稍后重试。</div>'+
-      '<div class="fbdy">常见原因：<b>本机网络中断</b>、<b>服务端暂时不可用</b>，'+
-      '或者<b>上一张码还没能在服务端确认作废</b> —— 最后这种情况下本机<b>不会先出新码</b>，'+
-      '否则旁人手里的旧码还能继续往这次会话里传文件。</div></div></div>'+
+      '<div class="fbdy">常见原因：<b>本机网络中断</b>、<b>系统暂时不可用</b>，'+
+      '或者<b>上一张码还没能在系统确认作废</b> —— 最后这种情况下本机<b>不会先出新码</b>，'+
+      '否则旁人手里的旧码还能继续往这次上传里传文件。</div></div></div>'+
     '<div class="blk grow">'+head('可以这样处理','',true)+
       '<div class="picks">'+
       pickCard({ico:I_REFRESH,n:'再出一次码',d:'网络恢复后重试一次通常就好。',go:'重试 →',href:url({state:'phone-generating'})})+
@@ -2638,7 +2640,7 @@ R['phone-gen-failed']=function(){
       pickCard({ico:I_CHAT,n:'问一句小青',d:'说不清哪一步卡住，先让它看一眼。',go:'去问 →',href:'../kiosk-redesign-2026-08/05-ai-cockpit.html',route:'/assistant',alt:true})+
       '</div></div>'+
     rowsCard([
-      {v:'本页只确认一件事：<b>这一次没有拿到可用的上传会话</b>，屏幕上没有可扫的码。'},
+      {v:'本页只确认一件事：<b>这一次没有准备好上传</b>，屏幕上没有可扫的码。'},
       {v:'<b>没有任何文件被接收</b>，也没有旧码被留在可用状态。'},
       PROTO_STATIC_QR
     ])+
@@ -2646,7 +2648,7 @@ R['phone-gen-failed']=function(){
     acts([{k:'ghost',n:'换一种来源',href:url({state:'source'})},
           {k:'primary',n:'重新出一张码',href:url({state:'phone-generating'}),tid:'rs-primary'}]);
 };
-var QR_STEPS='<div class="qrp" style="font-size:17px;color:var(--ink-3);">下面写的是<b>真机上的三步</b>；'+
+var QR_STEPS='<div class="qrp" style="font-size:17px;color:var(--ink-3);">下面写的是<b>实际办理的三步</b>；'+
   '本原型左边那块是<b>示意图形，扫不出结果</b>。</div>'+
   '<div class="steps">'+
   '<div class="step"><span class="sn">1</span><span>手机打开相机或微信扫一扫，对准屏幕上的码。</span></div>'+
@@ -2660,7 +2662,7 @@ function phoneRetentionLine(){
   return '<div class="qrp" style="font-size:17px;" data-testid="rs-phone-retention"><b>留存</b>　'+
     (MEMBER
       ? '手机传上来的这份要在<b>这台机器确认之后</b>才绑定你的账号（默认 <b>90 天</b>）；<b>只传不确认不会自动归档</b>。'
-      : '当前<b>未登录</b>：这份按<b>临时上传</b>处理，服务端<b>默认 1 小时</b>清理，<b>不进账号</b>。')+'</div>';
+      : '当前<b>未登录</b>：这份按<b>临时上传</b>处理，系统<b>默认 1 小时</b>清理，<b>不进账号</b>。')+'</div>';
 }
 function phoneQr(o){
   rail(0);pill('手机扫码 · '+o.pill,o.tone||'');
@@ -2682,18 +2684,18 @@ R['phone-ready']=function(){
     track:{revoke:{href:revokeHref('leave'),n:'撤销这张码'}},
     blk:'手机上传码',blkH:'一次性 · 有效期 10 分钟',
     h1:'码<em>出好了</em>，用手机扫它。',
-    h2:'有效期以<b>服务端返回的到期时间</b>为准，本机只是把它显示出来。',
-    qrTone:'',side:'真机上怎么扫这张码',
+    h2:'有效期以<b>系统给出的到期时间</b>为准，本机只是把它显示出来。',
+    qrTone:'',side:'在这台机器上怎么扫',
     body:QR_STEPS+
       '<div class="ticks"><span class="tick">'+svg(I_CLOCK,18,'currentColor',2)+'剩余 09:42</span>'+
       '<span class="tick">PDF / Word / JPG / PNG / WEBP</span>'+
       '<span class="tick">单份 ≤ 10MB</span></div>'+
       '<div class="qrp" style="font-size:17px;color:var(--ink-3);">左边是<b>原型示意图形，不可扫描</b>；'+
-      '09:42 是<b>固定演示值</b>。有效期以<b>服务端返回的到期时间</b>为准，真实页面画的是服务端下发的一次性链接。</div>',
+      '09:42 是<b>固定演示值</b>。有效期以<b>系统给出的到期时间</b>为准，真实页面画的是系统给出的临时链接。</div>',
     mid:rowsCard([
       {v:'码里只带<b>一次性上传令牌</b>，手机端<b>不会拿到一体机的会员登录凭证</b>，也不要求注册或登录。'},
       {v:'手机传上来之后<b>不会自动往下走</b>：必须回到这一页，由你确认这份文件，才进入 AI '+INTENT_COPY[intent].verb+'。'},
-      {v:'不想用这张码了，走<b>「撤销这张码」</b>：本机会请求服务端<b>先把这次会话作废</b>，'+
+      {v:'不想用这张码了，走<b>「撤销这张码」</b>：本机会请求系统<b>先把这次上传作废</b>，'+
          '<b>撤销拿到结果才换下一步</b>；换新码同理，<b>撤销没成功就不会给你新码</b>，免得两张码同时能用。'},
       PROTO_STATIC_QR
     ]),
@@ -2705,24 +2707,24 @@ R['phone-ready']=function(){
 R['phone-waiting']=function(){
   phoneQr({
     pill:'等待手机上传',ico:I_CLOCK,flag:'等待中',step:'第 3 步：等手机把文件传上来',
-    si:2,sh:'等服务端说收到文件',
+    si:2,sh:'等系统说收到文件',
     track:{revoke:{href:revokeHref('leave'),n:'撤销这张码'}},
-    blk:'等待手机端上传',blkH:'会话仍是 pending',
+    blk:'等待手机端上传',blkH:'这次上传还在等待',
     h1:'码还有效，<em>在等你手机那一步</em>。',
-    h2:'本机每 <b>2 秒</b>问一次服务端「收到文件没有」，<b>看不到你扫没扫</b>。',
+    h2:'本机每 <b>2 秒</b>问一次系统「收到文件没有」，<b>看不到你扫没扫</b>。',
     qrTone:'',side:'这台机器现在在等什么',
-    body:'<div class="qrp">本机唯一的真实信号是<b>服务端说收到文件了</b>。这台机器<b>看不到你扫没扫</b>，'+
+    body:'<div class="qrp">本机唯一的真实信号是<b>系统说收到文件了</b>。这台机器<b>看不到你扫没扫</b>，'+
       '也看不到手机上打开到哪一步，所以不会显示任何「扫了没」的猜测。</div>'+
       '<div class="steps">'+
       '<div class="step"><span class="sn">·</span><span>手机上选好文件、点上传。</span></div>'+
-      '<div class="step"><span class="sn">·</span><span>服务端收到后，这一页会自己变成「已收到文件」。</span></div>'+
+      '<div class="step"><span class="sn">·</span><span>系统收到后，这一页会自己变成「已收到文件」。</span></div>'+
       '<div class="step"><span class="sn">·</span><span>然后由你确认，才进入 AI '+INTENT_COPY[intent].verb+'。</span></div></div>'+
       '<div class="ticks"><span class="tick warn">'+svg(I_CLOCK,18,'currentColor',2)+'剩余 03:18</span>'+
       '<span class="tick">每 2 秒查一次</span></div>',
     mid:rowsCard([
       {v:'本原型<b>不模拟手机端动作</b>，所以这一页没有「我传好了」这种按钮 —— 那会是一个假信号。'},
-      {v:'剩余 03:18 是<b>固定演示值</b>；真实倒计时按服务端下发的 expiresAt 推算，到点转为已过期。'},
-      {v:'等太久想换：先<b>撤销这张码</b>，本机请求服务端把这次会话作废并<b>清掉未确认的临时文件</b>，'+
+      {v:'剩余 03:18 是<b>固定演示值</b>；真实倒计时按系统给出的到期时间来算，到点转为已过期。'},
+      {v:'等太久想换：先<b>撤销这张码</b>，本机请求系统把这次上传作废并<b>清掉未确认的临时文件</b>，'+
          '<b>拿到撤销结果之后</b>才换来源或出新码；<b>撤销没成功就不给新码</b>。'},
       PROTO_STATIC_QR
     ]),
@@ -2734,13 +2736,13 @@ R['phone-waiting']=function(){
 R['phone-status-unknown']=function(){
   phoneQr({
     pill:'状态读不到',tone:'warn',ico:I_WARN,flag:'状态未知',step:'第 3 步：暂时读不到这张码的状态',
-    si:2,stone:'warn',sh:'这一刻读不到会话状态','blk':'上传码状态未知',blkH:'不等于已过期',
+    si:2,stone:'warn',sh:'这一刻读不到这次上传的状态','blk':'上传码状态未知',blkH:'不等于已过期',
     track:{revoke:{href:revokeHref('leave'),n:'撤销这张码'}},
     h1:'这张码的状态<em>暂时读不到</em>。',
     h2:'连续几次没问到结果，<b>但这不代表码已经失效</b>。',
     qrTone:'unk',side:'为什么不说它「过期了」',
     body:'<div class="qrp"><b>二维码状态获取失败，请刷新二维码重试。</b>读不到状态多半是本机网络抖动，'+
-      '<b>这不代表码已经失效</b>，也不是服务端说这张码作废了。直接告诉你「已过期」是在替服务端下结论，'+
+      '<b>这不代表码已经失效</b>，也不是系统说这张码作废了。直接告诉你「已过期」是在替系统下结论，'+
       '会让你白白重传一次。</div>'+
       '<div class="steps">'+
       '<div class="step"><span class="sn">·</span><span>手机上那一页如果还开着，<b>可以继续把文件传完</b>。</span></div>'+
@@ -2749,7 +2751,7 @@ R['phone-status-unknown']=function(){
       '<div class="ticks"><span class="tick warn">'+svg(I_WARN,18,'currentColor',2)+'状态未知</span>'+
       '<span class="tick">不等于已过期</span></div>',
     mid:rowsCard([
-      {v:'本页只确认一件事：<b>这一刻没读到会话状态</b>，既不说它有效，也不说它失效。'},
+      {v:'本页只确认一件事：<b>这一刻没读到这次上传的状态</b>，既不说它有效，也不说它失效。'},
       {v:'状态读不到时更要<b>先撤销再出新码</b>：这张码有可能还活着。<b>撤销拿到结果才签发新码</b>，'+
          '<b>撤销没成功就不出新码</b>，不然旁人手里的旧码和新码会同时可用。'},
       PROTO_STATIC_QR
@@ -2768,7 +2770,7 @@ R['phone-expired']=function(){
     h2:'重新出一张就行，<b>旧码不再接收文件</b>。',
     qrTone:'bad',side:'这张码已经不能用了',
     body:'<div class="qrp"><b>请刷新二维码后重新上传，旧二维码不再接收文件。</b>'+
-      '过期由服务端结果判定，不是屏幕上的倒计时自己说了算。</div>'+
+      '过期由系统结果判定，不是屏幕上的倒计时自己说了算。</div>'+
       '<div class="steps">'+
       '<div class="step"><span class="sn">·</span><span>手机上那一页如果还开着，也已经不能再传了。</span></div>'+
       '<div class="step"><span class="sn">·</span><span>重新出码之后，用手机<b>重新扫一次</b>。</span></div>'+
@@ -2777,8 +2779,8 @@ R['phone-expired']=function(){
       '<span class="tick">有效期 10 分钟</span></div>',
     mid:rowsCard([
       {v:'过期是<b>正常的安全设计</b>：码在屏幕上停太久，旁人拍走还能用就危险了。'},
-      {v:'本页没有收到任何文件，<b>也不会把过期的会话算作一次上传</b>。'},
-      {v:'这一步<b>不需要再撤销</b>：<b>服务端已经判定这张码过期</b>，它不再接收文件，所以直接申请新的一张就行 —— '+
+      {v:'本页没有收到任何文件，<b>也不会把已经过期的这次上传当成传成功了</b>。'},
+      {v:'这一步<b>不需要再撤销</b>：<b>系统已经判定这张码过期</b>，它不再接收文件，所以直接申请新的一张就行 —— '+
          '换成还可能活着的码（等待中、状态读不到、已收到文件），本机就会<b>先撤销再出新码</b>。'},
       PROTO_STATIC_QR
     ]),
@@ -2790,10 +2792,10 @@ R['phone-uploaded']=function(){
   var H=pvHost();
   rail(0);pill('手机扫码 · 已收到文件','ok');
   hero('手机端<em>传上来了</em>。',
-       '下面这份是<b>服务端确认收到</b>的文件；<b>你确认了才进入 AI '+INTENT_COPY[intent].verb+'</b>。',
+       '下面这份是<b>系统确认收到</b>的文件；<b>你确认了才进入 AI '+INTENT_COPY[intent].verb+'</b>。',
        svg(I_CHECK,19,'currentColor',2.6)+'待你确认');
   root.innerHTML=
-    trackBar('第 4 步：在一体机上确认这份文件','',{revoke:{href:revokeHref('leave'),n:'撤销这次会话'}})+
+    trackBar('第 4 步：在一体机上确认这份文件','',{revoke:{href:revokeHref('leave'),n:'撤销这次上传'}})+
     stepBoard('phone',3,'','回一体机确认这一份')+
     '<div class="blk m-fade-in">'+head('手机端已上传文件','回到一体机确认后继续',true)+fileCard('已收到 · 待确认','wait','',true)+'</div>'+
     '<div class="blk grow">'+head('两个选择','看清楚再点')+
@@ -2806,38 +2808,38 @@ R['phone-uploaded']=function(){
         '</span></span></div>'+
       '<div class="pick alt"><span class="pi">'+svg(I_REFRESH,26,'#3d5a52',2)+'</span>'+
         '<span class="pm"><span class="pn">不是这份 / 想换一份</span>'+
-        '<span class="pd">点「不用这份，重新出码」：<b>先在服务端撤销这次会话</b>（连同这份还没确认的文件一起清掉），'+
+        '<span class="pd">点「不用这份，重新出码」：<b>先在系统撤销这次上传</b>（连同这份还没确认的文件一起清掉），'+
         '<b>撤销成功才出新码</b>；<b>撤销没成功就不出新码</b>。</span></span></div>'+
       '</div>'+
       rowsCard([
-        {v:'文件名和大小是<b>服务端回给本机的结果</b>；在本原型里它们是<b>固定演示数据</b>。'},
+        {v:'文件名和大小是<b>系统发回这台机器的结果</b>；在本原型里它们是<b>固定演示数据</b>。'},
         {v:'确认之前<b>还没有发起解析</b>，也没有任何诊断内容被生成或保存。'},
-        {v:'<b>确认过就不能再撤销了</b>：这次会话确认之后就不接受取消，'+
+        {v:'<b>确认过就不能再撤销了</b>：这次上传确认之后就不接受取消，'+
            (MEMBER?'那份文件已经进你的账号，要删除请去「我的文档」。':'要停用请在确认前撤销。')},
-        {v:'这一步<b>不会出现「手机那边扫过了」这类提示</b>：本机看不到你扫没扫，<b>只认服务端收到文件</b>这一个信号。'}
+        {v:'这一步<b>不会出现「手机那边扫过了」这类提示</b>：本机看不到你扫没扫，<b>只认系统收到文件</b>这一个信号。'}
       ])+'</div>'+
-    acts([{k:'ghost',n:H.r.n+'<br>先撤销这次会话',href:H.r.h,tid:'rs-replace'},
+    acts([{k:'ghost',n:H.r.n+'<br>先撤销这次上传',href:H.r.h,tid:'rs-replace'},
           {k:'primary',n:H.p.n,href:H.p.h,tid:'rs-primary'}]);
 };
 R['phone-confirm-failed']=function(){
   rail(0);pill('手机扫码 · 确认失败','bad');
   hero('这次<em>没能确认成功</em>。',
-       '文件在服务端，但这次确认没有完成，<b>还不能进入解析</b>。',
+       '文件在系统，但这次确认没有完成，<b>还不能进入解析</b>。',
        svg(I_WARN,19,'currentColor',2.2)+'确认失败',true);
   root.innerHTML=
-    trackBar('第 4 步：确认失败，需要重来','badt',{revoke:{href:revokeHref('leave'),n:'撤销这次会话'}})+
+    trackBar('第 4 步：确认失败，需要重来','badt',{revoke:{href:revokeHref('leave'),n:'撤销这次上传'}})+
     stepBoard('phone',3,'bad','这一次确认没完成')+
     '<div class="blk m-fade-in">'+head('确认失败','来自手机扫码',true)+fileCard('确认失败','err')+'</div>'+
     '<div class="blk"><div class="fail" data-testid="rs-phone-confirm-failed">'+
       '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'确认失败，请刷新二维码重试。</div>'+
-      '<div class="fbdy">常见原因：<b>这次上传会话已经过期</b>、<b>会话已经被取消</b>、'+
-      '<b>控制令牌失效</b>，或者本机与服务端之间的网络中断。'+
+      '<div class="fbdy">常见原因：<b>这次上传已经过期</b>、<b>这次上传已经被取消</b>、'+
+      '<b>验证失效</b>，或者本机与系统之间的网络中断。'+
       '这一步不能靠反复点解决，需要<b>重新出一张码、重新传一次</b>；'+
-      '因为这次会话<b>可能还活着</b>，本机会<b>先请求撤销它</b>，<b>撤销拿到结果之后才签发新码</b>。</div></div></div>'+
+      '因为这次上传<b>可能还活着</b>，本机会<b>先请求撤销它</b>，<b>撤销拿到结果之后才签发新码</b>。</div></div></div>'+
     '<div class="blk grow">'+
       duoCards(
         {t:'现在能做的',items:[
-          '重新出一张码：<b>先撤销这次会话</b>，撤成功再出新码。',
+          '重新出一张码：<b>先撤销这次上传</b>，撤成功再出新码。',
           '改用 U 盘或本机文件这两条通道送同一份简历。',
           '反复失败就找现场工作人员看一眼。'
         ]},
@@ -2847,11 +2849,11 @@ R['phone-confirm-failed']=function(){
           '不会把这份简历发给任何企业。'
         ]})+'</div>'+
     rowsCard([
-      {v:'本页只确认一件事：<b>这一次确认没有完成</b>，文件还在服务端，但没有带进本次办理。'},
+      {v:'本页只确认一件事：<b>这一次确认没有完成</b>，文件还在系统，但没有带进本次办理。'},
       PROTO_STATIC_QR
     ])+
     acts([{k:'ghost',n:'改用本机文件',href:url({state:'local-guide'})},
-          {k:'primary',n:'重新出一张码<br>先撤销这次会话',href:revokeHref('refresh'),tid:'rs-primary'}]);
+          {k:'primary',n:'重新出一张码<br>先撤销这次上传',href:revokeHref('refresh'),tid:'rs-primary'}]);
 };
 /* ================= 撤销上传会话：DELETE /upload-sessions/:sessionId 的三态 =================
    真实合同：校验 controlToken → cleanupAbandonedFile（清未确认的临时文件）→ status=cancelled；
@@ -2873,41 +2875,41 @@ function phoneCtxEcho(headline,grow){
   if(fromHasFile())return open+fileCard('已收到 · 未确认','wait')+'</div>';
   return open+'<div class="qrwrap">'+qrBox(from==='phone-status-unknown'?'unk':'')+
     '<div class="qrside"><div class="card"><span class="qh">这张码还是刚才那一张</span>'+
-    '<div class="qrp">本机<b>没有换掉它，也没有把它当成已作废</b>：这次撤销没有拿到服务端结果，'+
+    '<div class="qrp">本机<b>没有换掉它，也没有把它当成已作废</b>：这次撤销没有拿到系统结果，'+
     '所以这张码<b>可能仍然有效</b>；手机上那一页要是还开着，<b>也可能还传得进来</b>。</div>'+
     '<div class="ticks"><span class="tick warn">'+svg(I_WARN,18,'currentColor',2)+'撤销结果未确认</span>'+
-    '<span class="tick">会话上下文已保留</span></div>'+phoneRetentionLine()+'</div></div></div></div>';
+    '<span class="tick">这次上传的内容还在</span></div>'+phoneRetentionLine()+'</div></div></div></div>';
 }
 R['phone-cancelling']=function(){
   rail(0);pill('手机扫码 · 撤销中');
   var refresh=why==='refresh';
   hero(refresh?'先<em>撤销这张旧码</em>，再出新的。':'正在<em>撤销这次上传码</em>。',
        refresh
-         ? '本机在请求服务端把这次会话作废；<b>撤销拿到结果才签发新码</b>，<b>撤销没成功就不出新码</b>。'
-         : '本机在请求服务端把这次会话作废；作废之后这张码<b>不再接收文件</b>。',
+         ? '本机在请求系统把这次上传作废；<b>撤销拿到结果才签发新码</b>，<b>撤销没成功就不出新码</b>。'
+         : '本机在请求系统把这次上传作废；作废之后这张码<b>不再接收文件</b>。',
        svg(I_REFRESH,19,'currentColor',2)+'撤销中');
   root.innerHTML=
-    trackBar('正在撤销这次上传会话（来自：'+FROM_LABEL[from]+'）','',{busy:true,busyTag:'撤销中 · 没有中止入口'})+
-    stepBoard('phone',fromHasFile()?3:1,'warn','正在撤销这次会话')+
+    trackBar('正在撤销这次上传（来自：'+FROM_LABEL[from]+'）','',{busy:true,busyTag:'撤销中 · 没有中止入口'})+
+    stepBoard('phone',fromHasFile()?3:1,'warn','正在撤销这次上传')+
     '<div class="blk m-fade-in"><div class="stat doing band" data-testid="rs-phone-cancelling">'+
       '<span class="si">'+svg(I_REFRESH,44,'#157a67',1.8)+'</span>'+
       '<span class="sm"><span class="st">'+pulse('正在撤销上传码')+'</span>'+
       '<span class="sd">撤销是<b>一次请求、一次出结果</b>：成功就明说旧码已作废，失败就明说没拿到结果，'+
       '<b>不会含糊地当成已经取消</b>，也不会在结果出来之前先给你一张新码。</span>'+
-      '<span class="ticks"><span class="tick">撤销这次上传会话</span>'+
+      '<span class="ticks"><span class="tick">撤销这次上传</span>'+
       '<span class="tick">'+(refresh?'撤成功才出新码':'撤成功才换来源')+'</span>'+demoFlag()+'</span></span></div></div>'+
-    '<div class="blk grow">'+head('撤销这一步会做的三件事','前两件由服务端完成')+
+    '<div class="blk grow">'+head('撤销这一步会做的三件事','前两件由系统完成')+
       tri([
-        {no:'1',n:'让这张码立刻失效',d:'会话状态置为「已取消」，旧码不再接收任何文件。',go:'服务端行为'},
-        {no:'2',n:'清掉未确认的临时文件',d:'手机传上来、但你还没在一体机确认的那一份，会跟着这次会话一起清理。',go:'服务端行为'},
+        {no:'1',n:'让这张码立刻失效',d:'这次上传的状态置为「已取消」，旧码不再接收任何文件。',go:'由系统完成'},
+        {no:'2',n:'清掉未确认的临时文件',d:'手机传上来、但你还没在一体机确认的那一份，会跟着这次上传一起清理。',go:'由系统完成'},
         {no:'3',n:refresh?'撤成功之后才出新码':'撤成功之后才算换掉',
          d:refresh?'新码要等这次撤销有结果才签发；没拿到结果就不给新码。':'没拿到结果就不算换成功，会让你回到刚才那一步重试。',go:'本机行为'}
       ])+'</div>'+
     rowsCard([
-      {v:'<b>已经确认过的文件不适用这个撤销</b>：会话一旦确认，服务端就不再接受取消'+
+      {v:'<b>已经确认过的文件不适用这个撤销</b>：这次上传一旦确认，系统就不再接受取消'+
          (MEMBER?'；那一份已经绑定到你的账号，要删除请去「我的文档」。':'。')},
       {v:'<b>这一步没有取消入口</b>：撤销本身就是取消动作。离开这一页<b>不会撤回</b>已经发出的撤销请求，'+
-         '这张码到底作没作废，一律以<b>服务端结果</b>为准。'},
+         '这张码到底作没作废，一律以<b>系统结果</b>为准。'},
       PROTO_STATIC_QR
     ])+
     acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
@@ -2917,18 +2919,18 @@ R['phone-cancelled']=function(){
   rail(0);pill('手机扫码 · 已撤销','warn');
   var refresh=why==='refresh';
   hero('这张码<em>已经作废了</em>。',
-       '服务端已确认撤销：旧码<b>不再接收文件</b>'+(fromHasFile()?'，那份<b>还没确认的文件也一起清掉了</b>':'')+'。',
+       '系统已确认撤销：旧码<b>不再接收文件</b>'+(fromHasFile()?'，那份<b>还没确认的文件也一起清掉了</b>':'')+'。',
        svg(I_CHECK,19,'currentColor',2.6)+'已撤销');
   root.innerHTML=
-    trackBar('这次上传会话已撤销（来自：'+FROM_LABEL[from]+'）','warnt')+
-    stepBoard('phone',0,'warn','旧会话已作废，可以重新开始')+
+    trackBar('这次上传已撤销（来自：'+FROM_LABEL[from]+'）','warnt')+
+    stepBoard('phone',0,'warn','上一次上传已作废，可以重新开始')+
     '<div class="stop m-fade-in" data-testid="rs-phone-cancelled">'+
       '<span class="si">'+svg(I_CHECK,50,'#157a67',2)+'</span>'+
       '<span class="sm"><span class="sh">旧的上传码已经作废</span>'+
-      '<span class="sp">服务端已确认这次会话状态为<b>已取消</b>：这张码<b>不再接收任何文件</b>，'+
+      '<span class="sp">系统已确认这次上传状态为<b>已取消</b>：这张码<b>不再接收任何文件</b>，'+
       (fromHasFile()
-        ? '手机传上来但<b>没有在一体机确认过</b>的那一份，也跟着这次会话被清理了。'
-        : '这次会话里<b>没有收到过文件</b>，所以也没有内容需要清理。')+
+        ? '手机传上来但<b>没有在一体机确认过</b>的那一份，也跟着这次上传被清理了。'
+        : '这次上传里<b>没有收到过文件</b>，所以也没有内容需要清理。')+
       '刚才选的<b>诊断方向和目标背景都还在</b>，接着走就行。</span></span></div>'+
     '<div class="blk grow">'+head(refresh?'撤销成功了，现在可以出新码':'撤销成功了，挑一条接着走','四条都能直接点')+
       '<div class="picks">'+
@@ -2940,7 +2942,7 @@ R['phone-cancelled']=function(){
       '</div></div>'+
     rowsCard([
       {v:'<b>撤销之后本机才敢出新码</b>：先作废再签发，任何时候屏幕上都只有一张能用的码。'},
-      {v:'本次撤销<b>不影响你已经确认过的文件</b>；确认过的会话本来就不能取消。'},
+      {v:'本次撤销<b>不影响你已经确认过的文件</b>；确认过的这次上传本来就不能取消。'},
       PROTO_STATIC_QR
     ])+
     acts([{k:'ghost',n:'换一种来源',href:url({state:'source'})},
@@ -2954,36 +2956,36 @@ R['phone-cancel-failed']=function(){
        '所以本机<b>不会给你一张新码</b>：旧码可能还活着，<b>两张都能用才是真正的风险</b>。',
        svg(I_WARN,19,'currentColor',2.2)+'撤销未确认',true);
   root.innerHTML=
-    trackBar('撤销未确认，会话保持原样（来自：'+FROM_LABEL[from]+'）','badt')+
+    trackBar('撤销未确认，这次上传保持原样（来自：'+FROM_LABEL[from]+'）','badt')+
     stepBoard('phone',fromHasFile()?3:1,'bad','这一次撤销没有结果')+
     '<div class="blk"><div class="fail" data-testid="rs-phone-cancel-failed">'+
-      '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'上传会话撤销未确认，请重试</div>'+
-      '<div class="fbdy">常见原因：<b>本机网络中断</b>、<b>服务端暂时不可用</b>、<b>会话控制令牌失效</b>，'+
-      '或者<b>这次会话已经被确认过</b>（确认过的会话本来就不接受取消）。本机<b>没有把它当成已经取消</b>，'+
+      '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'这次上传撤销未确认，请重试</div>'+
+      '<div class="fbdy">常见原因：<b>本机网络中断</b>、<b>系统暂时不可用</b>、<b>这次上传的验证失效</b>，'+
+      '或者<b>这次上传已经被确认过</b>（确认过的这次上传本来就不接受取消）。本机<b>没有把它当成已经取消</b>，'+
       '也<b>没有签发新码</b>：你原来那一步的二维码和文件<b>保持原样</b>，可以重试撤销，也可以先回去。</div></div></div>'+
     phoneCtxEcho('你原来那一步还在',true)+
     rowsCard([
-      {v:'本页只确认一件事：<b>没有拿到服务端的撤销结果</b>。<b>这里没有新码</b> —— 既不说旧码已作废，也不抢先签发一张。'},
-      {v:'实在撤不掉也不会卡死你：<b>换 U 盘或本机文件不受这次会话影响</b>，这张码本身<b>最迟 10 分钟到期</b>。'+
-         '本页是<b>静态原型</b>：<b>不发起任何网络请求，也不轮询任何会话状态</b>。'}
+      {v:'本页只确认一件事：<b>没有拿到系统的撤销结果</b>。<b>这里没有新码</b> —— 既不说旧码已作废，也不抢先签发一张。'},
+      {v:'实在撤不掉也不会卡死你：<b>换 U 盘或本机文件不受这次上传影响</b>，这张码本身<b>最迟 10 分钟到期</b>。'+
+         '本页是<b>静态原型</b>：<b>不发起任何网络请求，也不轮询上传进行到哪一步</b>。'}
     ])+
     '<div class="picks">'+
-      pickCard({ico:I_USB,n:'改用 U 盘',d:'不经过这次上传会话，现在就能送同一份简历。',go:'去插盘 →',href:url({state:'usb-wait'}),alt:true})+
-      pickCard({ico:I_FOLDER,n:'改用本机文件',d:'不经过这次上传会话，先下载到本机再选。',go:'去选择 →',href:url({state:'local-guide'}),alt:true})+
+      pickCard({ico:I_USB,n:'改用 U 盘',d:'不经过这次上传，现在就能送同一份简历。',go:'去插盘 →',href:url({state:'usb-wait'}),alt:true})+
+      pickCard({ico:I_FOLDER,n:'改用本机文件',d:'不经过这次上传，先下载到本机再选。',go:'去选择 →',href:url({state:'local-guide'}),alt:true})+
     '</div>'+
     acts([{k:'ghost',n:'回到刚才那一步',href:url({state:from}),tid:'rs-back-to-origin'},
           {k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'primary',n:'重试撤销这次会话',href:revokeHref(why,from),tid:'rs-primary'}]);
+          {k:'primary',n:'重试撤销这次上传',href:revokeHref(why,from),tid:'rs-primary'}]);
 };
 
 /* ================= 共享：上传 / 解析 / 失败 / 兜底 ================= */
 R['uploading']=function(){
   rail(0);pill('正在上传 · 结果未确认');
   hero('文件<em>正在传上去</em>。',
-       '一次性上传，<b>服务端不回传进度百分比</b>，这一步也<b>没有取消入口</b>。',
+       '一次性上传，<b>系统这里不显示进度百分比</b>，这一步也<b>没有取消入口</b>。',
        svg(I_SHIELD,19,'currentColor',2)+'上传中');
   root.innerHTML=
-    trackBar('正在把这一份送到服务端','',{busy:true,busyTag:'上传中 · 没有中止入口'})+
+    trackBar('正在把这一份送到系统','',{busy:true,busyTag:'上传中 · 没有中止入口'})+
     '<div class="blk m-fade-in">'+head('正在上传','来自'+SRC_LABEL[source],true)+
       fileCard(pulse('正在上传'),'doing',
         '<div class="rows" style="margin-top:14px;padding:0 20px;">'+
@@ -3002,7 +3004,7 @@ R['uploading']=function(){
 R['upload-failed']=function(){
   rail(0);pill('上传失败 · 可重试','bad');
   hero('这份文件<em>没传上来</em>。',
-       '服务端没有收到完整文件，原件还在你自己的'+SRC_SHORT[source]+'里。',
+       '系统没有收到完整文件，原件还在你自己的'+SRC_SHORT[source]+'里。',
        svg(I_WARN,19,'currentColor',2.2)+'上传失败',true);
   root.innerHTML=
     trackBar('上传失败，可以重试','badt')+
@@ -3020,7 +3022,7 @@ R['upload-failed']=function(){
       ])+'</div>'+
     rowsCard([
       {v:'本页只确认一件事：<b>没有获得可用于解析的完整上传结果</b>。'},
-      {v:'可能产生的临时对象<b>按服务端清理策略处理</b>，本页不承诺已经删除。'},
+      {v:'可能产生的临时对象<b>按系统的清理规则处理</b>，本页不承诺已经删除。'},
       {v:'<b>尚未发起解析</b>，所以没有任何诊断内容被生成或保存。'}
     ])+
     acts([{k:'ghost',n:'换一份文件',href:url({state:'source'})},
@@ -3051,13 +3053,13 @@ R['parsing']=function(){
         '不会用「稍后再试」糊弄过去，失败会写明原因。'
       ]})+
     acts([{k:'ghost',n:'先离开这一步<br>已提交的解析不受影响',href:url({state:'source'})},
-          {k:'demo',n:'原型链路<br>看诊断报告页',href:'22-resume-report.html',route:'/resume/report'},
+          {k:'demo',n:'看诊断报告',href:'22-resume-report.html',route:'/resume/report'},
           {k:'ghost',n:'等太久<br>找工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'}]);
 };
 R['parse-failed']=function(){
   rail(1);pill('解析失败 · 可重试','bad');
   hero('这次<em>没能读出内容</em>。',
-       '文件已经传到服务端了，<b>可以直接重新解析，不用再传一遍</b>。',
+       '文件已经传到系统了，<b>可以直接重新解析，不用再传一遍</b>。',
        svg(I_WARN,19,'currentColor',2.2)+'解析失败',true);
   root.innerHTML=
     '<div class="blk m-fade-in">'+head('解析失败','来自'+SRC_LABEL[source],true)+fileCard('已上传 · 解析失败','err')+'</div>'+
@@ -3073,8 +3075,8 @@ R['parse-failed']=function(){
         {no:'3',n:'重试或换一份',d:'可以再解析一次，也可以换一份排版更干净的简历。',go:'两条都行',warn:true}
       ])+'</div>'+
     rowsCard([
-      {v:'文件已经在服务端，<b>重新解析不用再传一遍</b>；但只在这份文件的<b>实际保存期限内有效</b>，过期要重传。'},
-      {v:'留存按服务端策略执行，<b>不承诺永久保留</b>。'},
+      {v:'文件已经在系统，<b>重新解析不用再传一遍</b>；但只在这份文件的<b>实际保存期限内有效</b>，过期要重传。'},
+      {v:'保存时间按系统的规则执行，<b>不承诺永久保留</b>。'},
       {v:'不想用 AI 也行：直接去打印扫描把原件按原样打出来，或者点选着现场生成一份新简历。'}
     ])+
     '<div class="outs">'+outGenerate()+outPrint()+'</div>'+
@@ -3105,7 +3107,7 @@ R['missing-file']=function(){
          (MEMBER
            ? '这一份<b>本来就不在你账号里</b>（临时上传的那类，1 小时后就清了）'
            : '<b>临时上传的那一份已经按 1 小时的短期策略清理掉了</b>')+'。'},
-      {v:'本页只说明这一步没有可用文件，<b>不代表服务端已经删除了什么</b>。'}
+      {v:'本页只说明这一步没有可用文件，<b>不代表系统已经删除了什么</b>。'}
     ])+
     acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
           {k:'primary',n:'回到来源选择',href:url({state:'source',source:''}),tid:'rs-primary'}]);
@@ -3207,7 +3209,7 @@ R['scan-expired']=function(){
       '<div class="ft">'+svg(I_CLOCK,22,'currentColor',2)+'扫描交接的临时引用已过期</div>'+
       '<div class="fbdy">交接靠的是一条<b>有有效期的临时引用</b>，停留太久就会失效。'+
       '失效之后<b>这一步一律不放行</b>：不拿一份来路不明的文件顶上，也不悄悄换成上一次那一份。'+
-      '<b>本页不知道服务端那份扫描件现在还在不在</b>，所以既不说它还在，也不说它已经没了。</div></div></div>'+
+      '<b>本页不知道系统那份扫描件现在还在不在</b>，所以既不说它还在，也不说它已经没了。</div></div></div>'+
     '<div class="blk grow">'+head('从这里往下走','三条都能直接点')+
       tri([
         {no:'1',n:'回扫描台重扫一份',d:'重新扫一次，拿一条新的交接引用过来。',go:'去重扫 →',href:'../kiosk-redesign-2026-08/18-scan-workbench.html',route:'/scan/result',warn:true},
@@ -3259,7 +3261,7 @@ R['scan-failed']=function(){
     scanBar('没有拿到可用的文件身份','badt')+
     '<div class="blk m-fade-in"><div class="fail" data-testid="rs-scan-failed">'+
       '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'交接没有带来可用的文件</div>'+
-      '<div class="fbdy">常见原因：<b>扫描会话已经结束</b>、<b>那一份已经不在这次会话里</b>，'+
+      '<div class="fbdy">常见原因：<b>这次扫描已经结束</b>、<b>那一份已经不在这次扫描里</b>，'+
       '或者<b>交接被中途打断</b>。这是<b>一次明确失败</b>，不是「结果未知」——'+
       '所以<b>可以直接再交接一次</b>，重试不会造成重复文件。</div></div></div>'+
     '<div class="blk grow">'+head('这一步发生了什么','说清边界，免得被当成扫描失败')+
@@ -3293,7 +3295,7 @@ function unknownRows(kind){
   var isUp=kind==='upload';
   return rowsCard([
     {k:'现在确定的',v:'本机<b>没有拿到这一次的结果</b><em>　等结果的时候连接断了</em>'},
-    {k:'现在不确定的',v:'服务端到底<b>收没收下 / 办没办完</b><em>　本页不猜，也不按「大概率成功」显示</em>'},
+    {k:'现在不确定的',v:'系统到底<b>收没收下 / 办没办完</b><em>　本页不猜，也不按「大概率成功」显示</em>'},
     {k:'请求标识',v:'<b>'+REQ_KEY[kind]+'</b><em>　原型演示数据；再查只用这一个标识，不换新的</em>'},
     {k:'为什么不重发',v:'重发可能变成<b>两份'+(isUp?'文件':'解析')+'</b><em>　所以这一步没有「重新'+(isUp?'上传':'解析')+'」入口</em>'}
   ],'kv');
@@ -3310,13 +3312,13 @@ R['upload-unknown']=function(){
     duoCards(
       {t:'这一步会做',items:[
         '拿<b>同一个请求标识</b>去查这一次上传的结果，查到什么显示什么。',
-        '查询<b>不改变</b>服务端那一份的状态，也不会新建一次上传。',
+        '查询<b>不改变</b>系统那一份的状态，也不会新建一次上传。',
         '不想查也可以先离开；<b>离开只是停止本机等待</b>，不撤回已经发出的请求。'
       ]},
       {t:'这一步不会做',items:[
         '<b>不会再发一次上传</b>：那可能让同一份简历变成两份。',
         '不会因为「多半成了」就先当成成功，把你带进确认页。',
-        '不会说服务端那一份已经被清理 —— 本页没有这个结果。'
+        '不会说系统那一份已经被清理 —— 本页没有这个结果。'
       ]})+
     acts([{k:'ghost',n:'换一种来源',href:url({state:'source',source:''})},
           {k:'ghost',n:'先离开这一步<br>已发出的请求不受影响',href:url({state:'source',source:''}),tid:'rs-leave'},
@@ -3334,7 +3336,7 @@ R['upload-rechecking']=function(){
         '<div class="rows" style="margin-top:14px;padding:0 20px;">'+
         '<div class="row-i"><span class="rk">'+svg(I_SHIELD,15,'#157a67',3)+'</span>'+
         '<span class="rv">用的是<b>同一个请求标识 '+REQ_KEY.upload+'</b>，'+
-        '这是一次<b>查询</b>，<b>不是重新上传</b>；查询<b>不会新建文件，也不会改变服务端那一份的状态</b>。'+
+        '这是一次<b>查询</b>，<b>不是重新上传</b>；查询<b>不会新建文件，也不会改变系统那一份的状态</b>。'+
         '查到什么显示什么，<b>这里不预告结果</b>。</span></div></div>')+'</div>'+
     '<div class="blk grow">'+head('这次查的是哪一次','和你刚才发出的那一次是同一次')+unknownRows('upload')+'</div>'+
     tri([
@@ -3357,7 +3359,7 @@ R['parse-unknown']=function(){
     duoCards(
       {t:'这一步会做',items:[
         '拿<b>同一个请求标识</b>去查这一次解析的结果，查到什么显示什么。',
-        '文件<b>已经在服务端了</b>，所以查询不需要、也不会再传一遍文件。',
+        '文件<b>已经在系统了</b>，所以查询不需要、也不会再传一遍文件。',
         '不想查也可以先离开；<b>离开只是停止本机等待</b>，不撤回已经提交的解析。'
       ]},
       {t:'这一步不会做',items:[
@@ -3532,16 +3534,16 @@ var PV_FAIL_COPY={
     b:'预览服务在这台终端上<b>没有开通或暂时不可用</b>，所以这一份<b>看不了内容</b>。'+
       '这和<b>上传失败是两回事</b>：上传失败会在上一步就拦住你，这里只是<b>没能把它显示出来</b>。',
     alts:[{ico:I_REFRESH,n:'再请求一次预览',d:'重新发起一次预览请求。<b>成不成要看这一次的结果</b>，本页不预告。',g:'再试一次 →',pv:true},
-      {ico:I_CHECK,n:'不看预览，直接继续',d:'解析读的是<b>服务端拿到的那一份</b>，和能不能在这里显示无关。',g:'继续办理 →',p:true},
+      {ico:I_CHECK,n:'不看预览，直接继续',d:'解析读的是<b>系统拿到的那一份</b>，和能不能在这里显示无关。',g:'继续办理 →',p:true},
       {ico:I_FOLDER,n:'换一份文件',d:'不是这份文件的问题：格式、大小都在范围内。想换也可以，<b>方向和背景都还在</b>。',g:'去换一份 →',r:true},
-      {ico:I_SHIELD,n:'这一步没有发生什么',d:'没有上传失败、没有进入解析、文件也没有被改动。本页<b>不知道服务端那一份现在还在不在</b>，也不替它下结论。'}]},
+      {ico:I_SHIELD,n:'这一步没有发生什么',d:'没有上传失败、没有进入解析、文件也没有被改动。本页<b>不知道系统那一份现在还在不在</b>，也不替它下结论。'}]},
   expired:{ico:I_CLOCK,col:'#8a6219',h:'预览用的临时链接过期了',
     b:'预览走的是<b>有有效期的临时链接</b>，这一条已经过期，所以内容显示不出来了。'+
       '这只说明<b>这条链接不能再用</b>，<b>不代表这份文件已经被删除，也不代表它一定还在</b>。',
     alts:[{ico:I_REFRESH,n:'再请求一次预览',d:'重新取一条链接再看。<b>成不成要看这一次的结果</b>，本页不预告。',g:'再试一次 →',pv:true},
       {ico:I_CHECK,n:'不看预览，直接继续',d:'<b>不是上传失败</b>：上传那一步早就结束了，这里失败的只是「再看一眼」。',g:'继续办理 →',p:true},
       {ico:I_FOLDER,n:'换一份文件',d:'反复过期多半是这一步停留太久；重新取一次文件也可以。',g:'去换一份 →',r:true},
-      {ico:I_SHIELD,n:'链接过期不等于文件没了',d:'本页<b>不声称服务端那一份还在</b>，也不声称它已经被清掉 —— 这两句都要有证据才能说。'}]},
+      {ico:I_SHIELD,n:'链接过期不等于文件没了',d:'本页<b>不声称系统那一份还在</b>，也不声称它已经被清掉 —— 这两句都要有证据才能说。'}]},
   render:{ico:I_WARN,col:'#963227',h:'内容拿到了，但没能显示出来',
     b:'预览内容取回来了，<b>在这台机器上渲染失败</b>。失败发生在<b>显示这一步</b>，'+
       '<b>不是上传，也不是解析</b>；本次办理里的这一份没有被改动，也没有被撤回。',
@@ -3549,7 +3551,7 @@ var PV_FAIL_COPY={
       {ico:I_CHECK,n:'不看预览，直接继续',d:'渲染失败只影响<b>看</b>，不影响<b>办</b>：这一份照样能送去解析。',g:'继续办理 →',p:true},
       {ico:I_FOLDER,n:'换一份文件再看',d:'走到这一步的本来就是 <b>PDF 或图片</b>，所以这里<b>不会让你「再换成 PDF」</b>。'+
         '想换的话，<b>重新导出一份</b>再送一次：加密、超大页面或异常字体最容易卡在渲染这一步。',g:'去换一份 →',r:true},
-      {ico:I_SHIELD,n:'本页不替文件下结论',d:'<b>不下结论说文件坏了</b>，也<b>不下结论说服务端已经删了它</b>：本页只知道这一次没渲染出来。'}]}
+      {ico:I_SHIELD,n:'本页不替文件下结论',d:'<b>不下结论说文件坏了</b>，也<b>不下结论说系统已经删了它</b>：本页只知道这一次没渲染出来。'}]}
 };
 function pvViewport(f,geo){
   /* 顺序就是优先级：先说预览侧失败，再说浏览器能力，最后才是「这地址不画演示内容」。 */
@@ -3678,8 +3680,8 @@ function pvNote(f){
     '<b>不是你的文件内容</b>；翻页、缩放、方向<b>只改这里的显示</b>，<b>不改原件，也不影响解析</b>。';
 }
 function pvTruthLine(){
-  return '<b>留存 · '+(MEMBER?'已登录':'未登录')+'</b>结束会话或闲置超时清除本机登录态与临时会话信息；'+
-    '已上传文件与订单按服务端留存期限管理。这一份：'+retentionValue(source)+
+  return '<b>留存 · '+(MEMBER?'已登录':'未登录')+'</b>结束这次使用，或闲置太久，会清掉这台机器上的登录和临时信息；'+
+    '已上传文件与订单按系统规定的保存时间管理。这一份：'+retentionValue(source)+
     '。简历只用于你这次发起的 AI 服务，<b>不发给任何企业，也没有站内投递</b>，不承诺永久保留。';
 }
 function renderPreview(){
@@ -3849,7 +3851,7 @@ if(DEBUG){
              'local-oversize','local-unreadable','local-ready']],
     ['手机扫码',['phone-generating','phone-gen-failed','phone-ready','phone-waiting','phone-status-unknown',
              'phone-expired','phone-uploaded','phone-confirm-failed']],
-    ['撤销上传会话',['phone-cancelling','phone-cancelled','phone-cancel-failed']],
+    ['撤销这次上传',['phone-cancelling','phone-cancelled','phone-cancel-failed']],
     ['扫描交接',['scan-ready','scan-expired','scan-unavailable','scan-failed']],
     ['结果未知 · 同标识再查',['upload-unknown','upload-rechecking','parse-unknown','parse-rechecking']]
   ];

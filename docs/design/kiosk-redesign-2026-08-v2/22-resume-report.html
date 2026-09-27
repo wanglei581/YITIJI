@@ -588,47 +588,47 @@ html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after
 .head-tx p{font-size:21px!important;color:rgba(242,239,228,.86)!important}
 .head-tag{font-size:20px!important;height:50px!important}
 .rail>span{font-size:20px!important;color:rgba(242,239,228,.8)!important}
-.rail>span i{font-size:17px!important;width:30px!important;height:30px!important;background:rgba(242,239,228,.16)!important;color:rgba(242,239,228,.85)!important}
+.rail>span i{font-size:20px!important;width:34px!important;height:34px!important;background:rgba(242,239,228,.16)!important;color:rgba(242,239,228,.85)!important}
 .ch span{font-size:20px!important}
-.cc u{font-size:19px!important}
+.cc u{font-size:20px!important}
 .seg{font-size:22px!important}
-.seg em{font-size:18px!important}
+.seg em{font-size:20px!important}
 .zone .zh .mini{font-size:20px!important}
 .zfoot{font-size:20px!important;line-height:1.5!important}
 .blk .bno{font-size:21px!important}
 .blk .bhd b{font-size:24px!important}
-.blk .bhd .tag{font-size:17px!important;height:30px!important}
+.blk .bhd .tag{font-size:20px!important;height:34px!important}
 .blk .lines span{font-size:21px!important;line-height:1.5!important}
-.blk .lines span i{font-size:17px!important}
+.blk .lines span i{font-size:20px!important}
 .iss .ihd .no{font-size:20px!important}
 .iss .ihd b{font-size:24px!important}
-.sev{font-size:18px!important}
-.iss .dimlink{font-size:19px!important}
-.ev .evsrc{font-size:18px!important}
+.sev{font-size:20px!important}
+.iss .dimlink{font-size:20px!important}
+.ev .evsrc{font-size:20px!important}
 .ev .evtx{font-size:20px!important;line-height:1.5!important}
-.iss .why2 span{font-size:19px!important}
+.iss .why2 span{font-size:20px!important}
 .dmc b{font-size:21px!important}
-.dmc span{font-size:19px!important}
+.dmc span{font-size:20px!important}
 .dim .nm{font-size:23px!important}
 .dim .tier{font-size:20px!important}
 .dim .sc{font-size:24px!important}
-.dim .sc u{font-size:19px!important}
+.dim .sc u{font-size:20px!important}
 .dd .ddt b{font-size:23px!important}
 .dd .ddt p{font-size:20px!important}
 .dd .dds b u{font-size:21px!important}
-.dd .dds span{font-size:19px!important}
+.dd .dds span{font-size:20px!important}
 .it .no{font-size:20px!important}
 .it .tx b{font-size:23px!important}
 .it .tx p{font-size:20px!important;line-height:1.5!important}
 .subh{font-size:22px!important}
-.subh span{font-size:19px!important}
+.subh span{font-size:20px!important}
 .state-b p{font-size:22px!important}
 .row .tx b{font-size:24px!important}
 .row .tx span{font-size:20px!important}
 .dn{font-size:21px!important}
-.dn i{font-size:18px!important}
+.dn i{font-size:20px!important}
 .checks .list>div{font-size:21px!important}
-.checks .list>div i{font-size:19px!important}
+.checks .list>div i{font-size:20px!important}
 .why{font-size:20px!important;line-height:1.55!important}
 .navbar a{font-size:21px!important}
 /* 原型出处系统与演示控制：2.0 不给用户看 */
@@ -1760,7 +1760,7 @@ function reportState(kind){
       + '<div class="rows">'
       + rowLink('21-resume-triage.html','upload','换一份更完整的简历','内容多一些，解析才有东西可看',SCREEN+'-exit-source','/resume/source')
       + rowLink('24-resume-generate.html','spark','手动逐项填写','不经过模型，自己写一份再来诊断',SCREEN+'-exit-manual','/resume/generate')
-      + rowLink('10-print-hub.html','print','去打印 / 扫描','不依赖报告的现成链路',SCREEN+'-exit-print','/print-scan')
+      + rowLink('10-print-hub.html','print','去打印 / 扫描','不依赖报告的现成流程',SCREEN+'-exit-print','/print-scan')
       + '</div></section>'
       + checklist('不等 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
     cta.innerHTML = btn('39-member-records.html','我的诊断记录',false,SCREEN+'-secondary','/me/ai-records')
@@ -1872,7 +1872,7 @@ R['unavailable'] = function(){
     + '<p>没有接通真实 AI 服务时，读取报告会被<b>直接拒绝</b>，不会返回任何「读过你简历」的结论 —— '
     + '这是有意为之，避免把演示分数当成真实评价。'
     + (TECH ? '（apps/kiosk/src/services/api/aiMockAdapter.ts：演示模式下 getResumeRecord 直接拒绝）' : '') + '</p></section>'
-    + '<section class="card exits"><div class="ch"><b>不靠 AI，这些照常能用</b><span>四条都是现成链路</span></div>'
+    + '<section class="card exits"><div class="ch"><b>不靠 AI，这些照常能用</b><span>四条都是现成流程</span></div>'
     + '<div class="rows">'
     + rowLink('10-print-hub.html','print','打印简历或材料','选好份数和单双面就能出纸',SCREEN+'-exit-print','/print-scan')
     + rowLink('18-scan-workbench.html','scan','扫描纸质简历','在奔图面板扫描，回传成 PDF',SCREEN+'-exit-scan','/scan/start')
@@ -1883,7 +1883,7 @@ R['unavailable'] = function(){
     + checklist('不靠 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
     + btn('10-print-hub.html','去打印 / 扫描',true,SCREEN+'-primary','/print-scan');
-  why.textContent = '能力没接通时不提供优化入口：优化和诊断走同一条 AI 链路，这时候点进去只会再失败一次。';
+  why.textContent = '能力没接通时不提供优化入口：优化和诊断走同一套 AI 流程，这时候点进去只会再失败一次。';
   truthTx.textContent = '静态设计原型：这一屏表达能力未接通，本页不会探测真实服务，也不代表线上状态。';
 };
 
@@ -1900,7 +1900,7 @@ R['illegal'] = function(){
     + '<div class="rows">'
     + rowLink('21-resume-triage.html','upload','返回简历来源','从上传或扫描重新开始',SCREEN+'-exit-source','/resume/source')
     + rowLink('39-member-records.html','folder','打开我的诊断记录','从记录里选一条正常打开',SCREEN+'-exit-records','/me/ai-records')
-    + rowLink('10-print-hub.html','print','去打印 / 扫描','不依赖 AI 的现成链路',SCREEN+'-exit-print','/print-scan')
+    + rowLink('10-print-hub.html','print','去打印 / 扫描','不依赖 AI 的现成流程',SCREEN+'-exit-print','/print-scan')
     + rowLink('01-home.html','help','返回首页','换一个服务入口',SCREEN+'-exit-home','/')
     + '</div></section>'
     + dimNames()

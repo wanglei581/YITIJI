@@ -224,7 +224,7 @@ var q=new URLSearchParams(location.search);
    没有「正常」「在线」这类会被当成保证的词。没有独立健康接口的轴不伪造绿灯。 */
 var CAPS=[
  {icon:'upload',tone:['var(--slate-soft)','var(--slate-d)'],name:'联网',dep:'这台机器现在能不能连上网络'},
- {icon:'desk',tone:['var(--teal-soft)','var(--teal-d)'],name:'机器后台程序',dep:'没有单独的检测口，只能从机器上报的信号间接看'},
+ {icon:'desk',tone:['var(--teal-soft)','var(--teal-d)'],name:'本机程序',dep:'没有单独的检测口，只能从机器上报的信号间接看'},
  {icon:'printer',tone:['var(--teal-soft)','var(--teal-d)'],name:'打印机',dep:'读机器上报的状态；「没读到」和「离线」不合并'},
  {icon:'scan',tone:['var(--slate-soft)','var(--slate-d)'],name:'扫描件的存放',dep:'扫出来的文件先存在这台机器上再送走；没有单独的检测口'},
  {icon:'usb',tone:['var(--wheat-soft)','var(--wheat-d)'],name:'U 盘读取',dep:'插上之后才知道能不能读，这里不提前写成可用'},
@@ -289,7 +289,7 @@ V['checking']=function(){
     '<div class="hero-glyph'+(q.get('capture')==='1'?'':' breathe')+'" role="img" aria-label="正在检测本机状态">'+svg('radar','104')+'</div>'+
     '<div class="hero-main"><div class="hero-eyebrow">机器状态</div>'+
     '<div class="hero-title serif">正在<em>检测</em></div>'+
-    '<div class="hero-copy">先看<b>联网、机器后台和打印机</b>。扫描件存放、U 盘、付款、AI、机构渠道没有单独的检测，用到时再确认。</div>'+
+    '<div class="hero-copy">先看<b>联网、本机程序和打印机</b>。扫描件存放、U 盘、付款、AI、机构渠道没有单独的检测，用到时再确认。</div>'+
     '<div class="hero-note">'+svg('info',22)+'检测<b>不会打断</b>你已经创建的打印任务</div>'+
     '</div></div></section>'+
    capSection('checking','01','等这次结果')+limitCards('02'),
