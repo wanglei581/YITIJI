@@ -37667,6 +37667,8 @@
           "apps/kiosk/scripts/verify-fusion-w4.mjs",
           "apps/kiosk/src/routes/index.tsx",
           "docs/design/kiosk-ai-os-v3-2026-08/35-online-platforms.html",
+          "docs/design/kiosk-redesign-2026-08-v2/45-online-platform-directory.html",
+          "docs/design/kiosk-redesign-2026-08-v2/directory-workspaces.js",
           "docs/design/kiosk-redesign-2026-08/45-online-platform-directory.html",
           "docs/design/kiosk-redesign-2026-08/directory-workspaces.js",
           "docs/design/kiosk-v6-migration-matrix.md",
@@ -38693,15 +38695,6 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/design/kiosk-migration-capability-contracts.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/design/kiosk-redesign-2026-08-v2/README.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
