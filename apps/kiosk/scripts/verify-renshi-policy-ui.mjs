@@ -180,11 +180,11 @@ if (mergesBuiltinWithLibrary(mergeFixture).length > 0 && mergesBuiltinWithLibrar
 //    空态必须挂在政策库分区自己身上，且分区标记可被浏览器断言定位。
 const librarySection = /data-policy-section="library"/.test(policyPanel)
 const builtinSection = /data-policy-section="builtin"/.test(policyPanel)
-const libraryEmptyCopy = /政策库还没有内容/.test(policyPanel)
+const libraryEmptyCopy = /政策库暂无内容/.test(policyPanel)
 if (librarySection && builtinSection && libraryEmptyCopy) {
   pass('K. 政策库/内置指引分区标记与政策库空态文案齐备')
 } else {
-  fail('K. PolicyPanel 必须分区渲染（data-policy-section=library/builtin）并为空政策库提供「政策库还没有内容」空态')
+  fail('K. PolicyPanel 必须分区渲染（data-policy-section=library/builtin）并为空政策库提供「政策库暂无内容」空态')
 }
 
 if (packageJson.includes('"verify:renshi-policy-ui"')) {

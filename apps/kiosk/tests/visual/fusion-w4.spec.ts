@@ -712,7 +712,7 @@ test('/renshi 政策库为空时给出明确空态，内置指引不冒充库内
   const library = page.locator('[data-policy-section="library"]')
   const builtin = page.locator('[data-policy-section="builtin"]')
   await expect(library).toBeVisible()
-  await expect(library.getByText('政策库还没有内容')).toBeVisible()
+  await expect(library.getByText('政策库暂无内容')).toBeVisible()
   await expect(library.locator('.k8-policy-list-item')).toHaveCount(0)
   // 指引本身有真实价值（本机通用办事参考），保留但必须落在自己的分区里。
   await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
@@ -727,7 +727,7 @@ test('/renshi 库内政策与内置指引分区渲染 @w4', async ({ page, api }
   const builtin = page.locator('[data-policy-section="builtin"]')
   await expect(library.locator('.k8-policy-list-item')).toHaveCount(1)
   await expect(library.getByText('高校毕业生就业服务指引')).toBeVisible()
-  await expect(library.getByText('政策库还没有内容')).toHaveCount(0)
+  await expect(library.getByText('政策库暂无内容')).toHaveCount(0)
   await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
   await expect(builtin.getByText('高校毕业生就业服务指引')).toHaveCount(0)
   await verifyPage(page, errors)

@@ -112,7 +112,7 @@ check(
 
 // ── B. 面板真的挂在页面上 ─────────────────────────────────────────────────
 check(
-  page.includes('<EligibilityPanel />') && page.includes("activeTab === 'eligibility'"),
+  /<EligibilityPanel(?:\s[^>]*)?\/>/.test(page) && page.includes("activeTab === 'eligibility'"),
   'B1. EligibilityPanel 挂在政策服务页（不是死代码）',
 )
 check(

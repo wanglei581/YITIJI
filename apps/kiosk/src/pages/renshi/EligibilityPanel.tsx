@@ -18,10 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useIdleTimer } from '../../hooks/useIdleTimer'
-import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import {
-  AlertTriangleIcon,
-  ArrowLeftIcon,
   ArrowRightIcon,
   InfoIcon,
   LockIcon,
@@ -47,14 +44,20 @@ import { EligibilityResults } from './EligibilityResults'
 type Phase =
   | { s: 'loading' }
   | { s: 'error' }
-  /** 未连接后端（mock 模式）：问项与判定都只能来自服务端，本机不造 */
+  /** 未连接政策服务：问项与判定都只能从政策服务取得，本机不造 */
   | { s: 'backend-required' }
   /** 探针发现库里没有可比对内容 —— 不进入作答，直接如实说明 */
   | { s: 'unavailable'; notice: string }
   | { s: 'ask'; questions: EligibilityQuestionSet }
   | { s: 'result'; questions: EligibilityQuestionSet; result: EligibilityCheckResult }
 
-export function EligibilityPanel() {
+export type EligibilityChrome = {
+  tone: 'ok' | 'warn' | 'bad' | 'unknown'
+  label: string
+  subtitle: string
+}
+
+export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: EligibilityChrome) => void }) {
   const [phase, setPhase] = useState<Phase>({ s: 'loading' })
   /** 作答只放 React state：不写 localStorage / sessionStorage / URL query。 */
   const [answers, setAnswers] = useState<Record<string, string>>({})
@@ -89,6 +92,29 @@ export function EligibilityPanel() {
 
   const answeredCount = useMemo(() => countAnswered(answers), [answers])
 
+  useEffect(() => {
+    if (!onChrome) return
+    if (phase.s === 'loading') {
+      onChrome({ tone: 'unknown', label: '正在检查可比对政策', subtitle: '先确认有可比对的政策，再决定是否请你填写。' })
+    } else if (phase.s === 'backend-required') {
+      onChrome({ tone: 'warn', label: '暂时无法核对', subtitle: '本机连不上政策服务；不自造问项，也不给任何结论。' })
+    } else if (phase.s === 'unavailable') {
+      onChrome(phase.notice === COPY_NO_RECORDED_CONDITIONS
+        ? { tone: 'warn', label: '未录入比对条件', subtitle: '有政策但没录可比对条件，本次不做逐条比对。' }
+        : { tone: 'warn', label: '无可比对条目', subtitle: '库里没有可比对的条目；这是录入进度，不是你的核对结果。' })
+    } else if (phase.s === 'error') {
+      onChrome({ tone: 'bad', label: '核对未成功', subtitle: '这次没有拿到结果，本页不显示任何结论。' })
+    } else if (phase.s === 'result') {
+      onChrome({ tone: 'ok', label: '逐条结果已返回', subtitle: '总体说明与逐条判定都按返回内容原样显示。' })
+    } else if (submitting) {
+      onChrome({ tone: 'unknown', label: '正在等待比对结果', subtitle: '等结果返回；本机不猜结论。' })
+    } else if (answeredCount > 0) {
+      onChrome({ tone: 'ok', label: '可以开始比对', subtitle: '已经可以比对了；没填的项会标为「无法判定」，不算不符合。' })
+    } else {
+      onChrome({ tone: 'unknown', label: '等待你填写', subtitle: '先选你的情况再比对；作答只留在本页，不写进网址或浏览器存储。' })
+    }
+  }, [answeredCount, onChrome, phase, submitting])
+
   // 公共屏：作答只在内存，离开即没；但人走了还停在结果页时，下一位仍能读到户籍 / 参保。
   // 60 秒无操作把作答和结论清掉，页面还在（不删 UI），只是回到空白表单。
   useIdleTimer({
@@ -108,22 +134,46 @@ export function EligibilityPanel() {
       .finally(() => setSubmitting(false))
   }
 
-  if (phase.s === 'loading') return <LoadingState className="py-16" />
-  if (phase.s === 'error') return <ErrorState className="py-16" onRetry={probe} />
+  if (phase.s === 'loading') {
+    return (
+      <div className="k8-elig">
+        <EligibilityStepBar step={1} />
+        <div className="rq-state" data-kind="info">
+          <b>正在检查现在有没有可比对的政策</b>
+          <p>先确认有没有录了条件的政策，再决定要不要请你填写。这一步不发送任何个人信息。</p>
+        </div>
+        <p className="rq-note">条件核对按政策原文逐条比对，不使用 AI；小青能不能用都不影响它。</p>
+      </div>
+    )
+  }
+  if (phase.s === 'error') {
+    return (
+      <NoticeBlock
+        title="这次核对没有成功"
+        body="这次没有拿到结果，所以本页不显示任何结论。失败不等于「你不符合」，也不代表库里没有政策。你选过的内容只留在这一页，离开或重来都不会被保存。"
+        onRetry={probe}
+      />
+    )
+  }
 
   if (phase.s === 'backend-required') {
     return (
       <NoticeBlock
-        tone="amber"
         title="本机现在做不了条件核对"
-        body="当前未连接政策服务后端。问项与判定口径必须由服务端下发，本机不会自己编一套问项或结论。请联系运营人员确认服务连接后重试。"
+        body="本机暂时连不上政策服务。问项与判定口径都要由政策服务提供，本机不会自己编一套问项或结论。请联系现场工作人员后再试。"
         onRetry={probe}
       />
     )
   }
 
   if (phase.s === 'unavailable') {
-    return <NoticeBlock tone="slate" title="暂时没有可核对的政策条目" body={phase.notice} onRetry={probe} />
+    return (
+      <NoticeBlock
+        title={phase.notice === COPY_NO_RECORDED_CONDITIONS ? '已发布政策还没录入可比对条件' : '暂时没有可核对的政策条目'}
+        body={phase.notice}
+        onRetry={probe}
+      />
+    )
   }
 
   if (phase.s === 'result') {
@@ -226,28 +276,20 @@ export function EligibilityPanel() {
   )
 }
 
-function NoticeBlock({
-  tone,
-  title,
-  body,
-  onRetry,
-}: {
-  tone: 'amber' | 'slate'
-  title: string
-  body: string
-  onRetry: () => void
-}) {
+function NoticeBlock({ title, body, onRetry }: { title: string; body: string; onRetry: () => void }) {
   return (
-    <div className={`k8-elig-notice k8-elig-notice--${tone}`}>
-      <AlertTriangleIcon className="h-7 w-7 shrink-0" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <b>{title}</b>
-        <p>{body}</p>
+    <div className="k8-elig">
+      <EligibilityStepBar step={1} />
+      <div className="k8-elig-notice">
+        <div className="min-w-0 flex-1">
+          <b>{title}</b>
+          <p>{body}</p>
+        </div>
+        <button type="button" className="k8-elig-notice-retry" onClick={onRetry}>
+          重新检查
+        </button>
       </div>
-      <button type="button" className="k8-elig-notice-retry" onClick={onRetry}>
-        <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
-        重新检查
-      </button>
+      <p className="rq-note">重新检查只是再问一次现在有没有可比对的政策，不收集任何个人信息。</p>
     </div>
   )
 }

@@ -43,10 +43,8 @@ const RESULT_ICON = {
 
 /** 置灰打印按钮的原因 —— 一句话讲清「为什么现在印不了」，不留想象空间。 */
 const PRINT_BLOCKED_WHY =
-  '本机暂时无法把这份核对结果印成纸：服务端还没有生成核对清单文件的通路，' +
-  '而且你填的条件按隐私口径不做任何保存，要打印就得先把这些信息存成文件 —— ' +
-  '这个取舍还没有做。需要留存请自行拍照或抄录；如需打印你自己带来的材料，' +
-  '请回到「就业政策」页使用上传入口。'
+  '本机还不能把这份核对结果印成纸：你填的内容不做保存，要打印就得先存成文件，这个做法还没有开放。' +
+  '需要留存请自行拍照或抄录；如需打印你自己带来的材料，请回到「就业政策」使用上传入口。'
 
 export function EligibilityResults({
   result,
@@ -131,7 +129,7 @@ function PolicyResultCard({ item }: { item: EligibilityCheckItem }) {
       <h3>{item.title}</h3>
       {/* 来源标识按 CLAUDE.md §10：来源机构 / 同步时间 / 外部ID 都要露出，缺失如实写「来源未提供」 */}
       <p className="k8-elig-card-src">
-        来源 <b>{item.source.sourceName}</b> · 同步于 {item.source.syncTime.slice(0, 10)} · 外部ID{' '}
+        来源机构 <b>{item.source.sourceName}</b> · 同步时间 {item.source.syncTime.slice(0, 10)} · 外部编号{' '}
         {item.source.externalId ?? '来源未提供'}
       </p>
       {/* 结论文案由服务端给定，前端不改写 */}

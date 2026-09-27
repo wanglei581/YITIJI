@@ -1,7 +1,8 @@
+import { useEffect, useRef } from 'react'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import {
-  ArrowRightIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
   ClipboardListIcon,
   FileTextIcon,
   ScaleIcon,
@@ -12,63 +13,110 @@ import {
 } from 'lucide-react'
 import { AUDIENCE_CHIPS, type AudienceKey, type TabKey } from './shared'
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+export type SourceQrTarget = {
+  title: string
+  url: string
+  sourceKind: string
+  sourceDetail: string
+}
 
-// 来源链接二维码弹层：承载政策事项提交的外部链接；info-only。
-// 2026-08-11：不再称「官方入口」——系统未核验该链接的官方性。后端 policy.dto.ts 只把
-// 合作机构自填的链接当普通字符串收下，policies.service.ts 没有官方域名、发布主体或证据核验，
-// 所以本链一律写「来源链接 / 由来源机构提交并经平台审核后展示」；「以官方发布为准」这类
-// **让用户自己去核实**的免责表述是诚实的，予以保留。
-// 恢复条件：externalUrl 接入官方域名白名单核验（建议与线上平台目录共用一套）。
-// （此前这段判据写在 PolicyServiceHubPage 文件头，该页 2026-09-20 迁入青序流光后删除，
-//   判据移到真正渲染来源链接的这里，避免指向已不存在的文件。）
-// 打开即记一条 external_open 跳转记录（仅记录打开入口动作，不记录办理结果）。
-export function OfficialEntryQrOverlay({ title, url, onClose }: { title: string; url: string; onClose: () => void }) {
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host
+  } catch {
+    return ''
+  }
+}
+
+/** 来源二维码：点哪一条就展示哪一条的来源，不做泛化码。 */
+export function OfficialEntryQrOverlay({ target, onClose }: { target: SourceQrTarget; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    closeRef.current?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab' || !cardRef.current) return
+      const items = [...cardRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea')]
+        .filter((node) => !node.hasAttribute('disabled'))
+      if (items.length === 0) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      returnFocus?.focus()
+    }
+  }, [])
+
+  const host = hostOf(target.url)
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="relative w-[22rem] max-w-full rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={onClose}
-          aria-label="关闭"
-          className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100"
-        >
-          <XIcon className="h-5 w-5" />
+    <div className="rq-qr-layer" onClick={onClose}>
+      <div
+        ref={cardRef}
+        className="rq-qr-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rq-qr-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button ref={closeRef} type="button" className="rq-qr-close" aria-label="关闭" onClick={onClose}>
+          <XIcon aria-hidden="true" />
         </button>
-        <p className="text-center text-base font-semibold text-neutral-800">扫码打开来源链接</p>
-        <p className="mt-1 truncate text-center text-xs text-neutral-400">{title}</p>
-        <div className="mt-5 flex justify-center"><SourceUrlQr value={url} size={196} /></div>
-        <p className="mt-3 break-all rounded-lg bg-neutral-50 px-3 py-2 text-center text-[11px] text-neutral-500">{url}</p>
-        <p className="mt-4 text-xs leading-relaxed text-neutral-500">
-          请先核对来源机构与目标域名，再使用手机扫码访问。本系统仅提供信息入口和材料服务，不参与办理。
+        <h2 id="rq-qr-title">扫码打开来源链接</h2>
+        <p className="rq-qr-subject">{target.title}</p>
+        <dl className="rq-qr-meta">
+          <div><dt>来源类型</dt><dd>{target.sourceKind}</dd></div>
+          <div><dt>来源说明</dt><dd>{target.sourceDetail}</dd></div>
+          <div><dt>目标域名</dt><dd>{host || '无法识别域名'}</dd></div>
+        </dl>
+        <div className="rq-qr-code"><SourceUrlQr value={target.url} size={220} /></div>
+        <p className="rq-qr-url">{target.url}</p>
+        <p className="rq-qr-note">
+          本系统没有核验过这个链接的官方性，也不代替你办理。请先核对机构和目标域名，确认无误再用手机扫码。
         </p>
       </div>
     </div>
   )
 }
 
-export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) => void }) {
-  // 「条件核对」不是新的首页入口，也不是既有入口的同义卡片：
-  // 它是政策服务这个已有入口内部新增的一个能力面，后端 P21 早已建好、
-  // 合作机构录入面也已接线，此前唯独一体机零引用。
-  const tabs: { key: TabKey; label: string; icon: LucideIcon }[] = [
-    { key: 'policy', label: '就业政策', icon: FileTextIcon },
-    { key: 'eligibility', label: '条件核对', icon: ScaleIcon },
-    { key: 'social', label: '社保指南', icon: ShieldCheckIcon },
-    { key: 'register', label: '就业登记', icon: ClipboardListIcon },
-    { key: 'notice', label: '政策公告', icon: ScrollTextIcon },
-  ]
+const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
+  { key: 'policy', label: '就业政策', icon: FileTextIcon },
+  { key: 'eligibility', label: '条件核对', icon: ScaleIcon },
+  { key: 'social', label: '社保指南', icon: ShieldCheckIcon },
+  { key: 'register', label: '就业登记', icon: ClipboardListIcon },
+  { key: 'notice', label: '政策公告', icon: ScrollTextIcon },
+]
 
+export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) => void }) {
   return (
-    <div className="k8-policy-tabs">
-      {tabs.map(({ key, label, icon: Icon }) => (
+    <div className="rq-tabs" role="group" aria-label="政策服务任务分区" data-testid="renshi-tabbar">
+      {TABS.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
           type="button"
-          onClick={() => onChange(key)}
+          className="rq-tab"
+          data-testid={`renshi-tab-${key}`}
           aria-pressed={active === key}
-          className="k8-policy-tab"
+          onClick={() => onChange(key)}
         >
-          <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <Icon aria-hidden="true" />
           {label}
         </button>
       ))}
@@ -76,40 +124,20 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
   )
 }
 
-/** 条件核对两步进度条（放在这里而不是面板里，避免两个面板互相 import 成环）。 */
-export function EligibilityStepBar({ step }: { step: 1 | 2 }) {
-  const steps = ['选你的情况', '看逐条结果']
-  return (
-    <ol className="k8-elig-steps">
-      {steps.map((label, i) => (
-        <li key={label} className="k8-elig-step" aria-current={step === i + 1 ? 'step' : undefined}>
-          <span className="k8-elig-step-n">{i + 1}</span>
-          {label}
-          {i === 0 && <ArrowRightIcon className="h-5 w-5 shrink-0" aria-hidden="true" />}
-        </li>
-      ))}
-    </ol>
-  )
-}
-
-/** 政策匹配筛选条：选身份即筛选下方「就业政策」事项。 */
 export function AudienceFilter({ value, onChange }: { value: AudienceKey; onChange: (k: AudienceKey) => void }) {
   return (
-    <div className="shrink-0">
-      <p className="k8-policy-aud-cap">
-        先选你的情况
-        <small>选择身份后自动筛出更相关的政策事项，通用事项始终展示</small>
-      </p>
-      <div className="k8-policy-aud-chips">
+    <div className="rq-aud">
+      <p className="rq-aud-cap">先选你的情况<span>选择身份后筛出更相关的事项，通用事项始终展示</span></p>
+      <div className="rq-chips" role="group" aria-label="按身份筛选政策事项">
         {AUDIENCE_CHIPS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             type="button"
-            onClick={() => onChange(key)}
+            className="rq-chip"
             aria-pressed={value === key}
-            className="k8-policy-aud-chip"
+            onClick={() => onChange(key)}
           >
-            <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <Icon aria-hidden="true" />
             {label}
           </button>
         ))}
@@ -118,33 +146,40 @@ export function AudienceFilter({ value, onChange }: { value: AudienceKey; onChan
   )
 }
 
-export function DetailList({ icon: Icon, iconColor, title, items, ordered }: {
-  icon: LucideIcon
-  iconColor: string
-  title: string
-  items: string[]
-  ordered?: boolean
-}) {
+export function DetailList({ title, items, layout }: { title: string; items: string[]; layout: 'list' | 'cols' | 'steps' }) {
   return (
-    <section>
-      <p className={`flex items-center gap-2.5 text-[20px] font-semibold ${iconColor}`}>
-        <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
-        {title}
-      </p>
-      <ul className={['mt-2.5 gap-2.5', title === '需要准备材料' ? 'grid grid-cols-2' : 'flex flex-col'].join(' ')}>
-        {items.map((text, i) => (
-          <li key={i} className="flex items-start gap-3 rounded-[12px] border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-[18px] leading-relaxed text-neutral-700">
-            {ordered ? (
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] font-bold text-wheat-fg bg-wheat-bg">
-                {i + 1}
-              </span>
-            ) : (
-              <CheckCircle2Icon className="mt-0.5 h-6 w-6 shrink-0 text-wheat-fg" aria-hidden="true" />
-            )}
-            {text}
+    <section className={layout === 'cols' ? 'rq-dsec rq-dsec-cols' : 'rq-dsec'}>
+      <p className="rq-dsec-h">{title}</p>
+      <ul>
+        {items.map((text, index) => (
+          <li key={`${title}-${index}`}>
+            {layout === 'steps' ? <span className="rq-sn">{index + 1}</span> : <CheckCircle2Icon aria-hidden="true" />}
+            <span>{text}</span>
           </li>
         ))}
       </ul>
     </section>
   )
+}
+
+export function EligibilityStepBar({ step }: { step: 1 | 2 }) {
+  const steps = ['选你的情况', '看逐条结果']
+  return (
+    <ol className="k8-elig-steps">
+      {steps.map((label, index) => (
+        <li key={label} className="k8-elig-step" aria-current={step === index + 1 ? 'step' : undefined}>
+          <span className="k8-elig-step-n">{index + 1}</span>
+          {label}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+export function SourceLine({ text }: { text: string }) {
+  return <p className="rq-srcline">{text}</p>
+}
+
+export function CollapsedChevron() {
+  return <ChevronDownIcon className="rq-caret" aria-hidden="true" />
 }

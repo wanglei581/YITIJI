@@ -80,13 +80,4 @@ export const CATEGORY_META: Record<string, { label: string; color: string }> = {
   recruitment: { label: '招募', color: 'bg-warning-bg text-warning-fg' },
 }
 
-export const TAG_TONE: Record<TagTone, string> = {
-  amber: 'bg-warning/20 text-warning-fg',
-  slate: 'bg-neutral-100 text-neutral-600',
-}
 
-// 复用按钮样式：麦金/wheat 轻底色描边，不大面积铺色（visual-design-spec §15.6）。
-export const BTN_OFFICIAL =
-  'flex min-h-[48px] items-center gap-2 rounded-lg border bg-wheat-bg px-4 text-sm font-semibold text-wheat-fg hover:bg-wheat-soft'
-export const BTN_PRINT =
-  'flex min-h-[48px] items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50'
