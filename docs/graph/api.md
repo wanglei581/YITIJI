@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`547` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`554` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -725,6 +725,18 @@
 | GET | `/api/v1/kiosk/notifications` | NotificationsController.findAll | — | — | — |
 | PATCH | `/api/v1/kiosk/notifications/:id/read` | NotificationsController.markRead | — | — | — |
 
+## `services/api/src/official-channels/official-channels.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/orgs/:id/verified-official-domains` | OfficialChannelsController.listDomains | admin | OfficialChannelsService | AuditLog<br/>OnlinePlatformDirectory<br/>Organization<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold<br/>Terminal |
+| PUT | `/api/v1/admin/orgs/:id/verified-official-domains` | OfficialChannelsController.replaceDomains | admin | OfficialChannelsService | AuditLog<br/>OnlinePlatformDirectory<br/>Organization<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold<br/>Terminal |
+| GET | `/api/v1/partner/official-channels` | OfficialChannelsController.listOwn | partner | OfficialChannelsService | AuditLog<br/>OnlinePlatformDirectory<br/>Organization<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold<br/>Terminal |
+| POST | `/api/v1/partner/official-channels` | OfficialChannelsController.create | partner | OfficialChannelsService | AuditLog<br/>OnlinePlatformDirectory<br/>Organization<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold<br/>Terminal |
+| DELETE | `/api/v1/partner/official-channels/:id` | OfficialChannelsController.archive | partner | OfficialChannelsService | AuditLog<br/>OnlinePlatformDirectory<br/>Organization<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold<br/>Terminal |
+| PATCH | `/api/v1/partner/official-channels/:id` | OfficialChannelsController.update | partner | OfficialChannelsService | AuditLog<br/>OnlinePlatformDirectory<br/>Organization<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold<br/>Terminal |
+| GET | `/api/v1/terminals/:terminalId/official-channels` | OfficialChannelsController.listForTerminal | admin | OfficialChannelsService | AuditLog<br/>OnlinePlatformDirectory<br/>Organization<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold<br/>Terminal |
+
 ## `services/api/src/offline-agencies/admin-offline-agencies.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
@@ -910,9 +922,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/admin/recruitment-emergency/circuit-break` | EmergencyTakedownDto.circuitBreak | admin | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
-| POST | `/api/v1/admin/recruitment-emergency/takedown` | EmergencyTakedownDto.takedown | admin | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
-| GET | `/api/v1/partner/org-notices` | EmergencyTakedownDto.notices | partner | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
+| POST | `/api/v1/admin/recruitment-emergency/circuit-break` | EmergencyTakedownDto.circuitBreak | admin | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>OnlinePlatformDirectory<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
+| POST | `/api/v1/admin/recruitment-emergency/takedown` | EmergencyTakedownDto.takedown | admin | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>OnlinePlatformDirectory<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
+| GET | `/api/v1/partner/org-notices` | EmergencyTakedownDto.notices | partner | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>OnlinePlatformDirectory<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
 
 ## `services/api/src/scan-tasks/scan-tasks.controller.ts`
 

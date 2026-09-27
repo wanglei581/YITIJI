@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 547,
+    "endpointCount": 554,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -2821,6 +2821,52 @@
         ]
       },
       {
+        "controller": "services/api/src/official-channels/official-channels.controller.ts",
+        "handler": "OfficialChannelsController.listDomains",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "OnlinePlatformDirectory",
+          "Organization",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/orgs/:id/verified-official-domains",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/official-channels/official-channels.service.ts"
+        ],
+        "services": [
+          "OfficialChannelsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/official-channels/official-channels.controller.ts",
+        "handler": "OfficialChannelsController.replaceDomains",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "OnlinePlatformDirectory",
+          "Organization",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/orgs/:id/verified-official-domains",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/official-channels/official-channels.service.ts"
+        ],
+        "services": [
+          "OfficialChannelsService"
+        ]
+      },
+      {
         "controller": "services/api/src/orgs/partner-account-action.controller.ts",
         "handler": "PartnerAccountActionController.deleteAccount",
         "method": "DELETE",
@@ -3473,6 +3519,7 @@
           "JobFair",
           "JobSource",
           "OfflineAgency",
+          "OnlinePlatformDirectory",
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
@@ -3502,6 +3549,7 @@
           "JobFair",
           "JobSource",
           "OfflineAgency",
+          "OnlinePlatformDirectory",
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
@@ -9281,6 +9329,98 @@
         ]
       },
       {
+        "controller": "services/api/src/official-channels/official-channels.controller.ts",
+        "handler": "OfficialChannelsController.listOwn",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "OnlinePlatformDirectory",
+          "Organization",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold",
+          "Terminal"
+        ],
+        "path": "/api/v1/partner/official-channels",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/official-channels/official-channels.service.ts"
+        ],
+        "services": [
+          "OfficialChannelsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/official-channels/official-channels.controller.ts",
+        "handler": "OfficialChannelsController.create",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "OnlinePlatformDirectory",
+          "Organization",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold",
+          "Terminal"
+        ],
+        "path": "/api/v1/partner/official-channels",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/official-channels/official-channels.service.ts"
+        ],
+        "services": [
+          "OfficialChannelsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/official-channels/official-channels.controller.ts",
+        "handler": "OfficialChannelsController.archive",
+        "method": "DELETE",
+        "models": [
+          "AuditLog",
+          "OnlinePlatformDirectory",
+          "Organization",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold",
+          "Terminal"
+        ],
+        "path": "/api/v1/partner/official-channels/:id",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/official-channels/official-channels.service.ts"
+        ],
+        "services": [
+          "OfficialChannelsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/official-channels/official-channels.controller.ts",
+        "handler": "OfficialChannelsController.update",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "OnlinePlatformDirectory",
+          "Organization",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold",
+          "Terminal"
+        ],
+        "path": "/api/v1/partner/official-channels/:id",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/official-channels/official-channels.service.ts"
+        ],
+        "services": [
+          "OfficialChannelsService"
+        ]
+      },
+      {
         "controller": "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
         "handler": "EmergencyTakedownDto.notices",
         "method": "GET",
@@ -9292,6 +9432,7 @@
           "JobFair",
           "JobSource",
           "OfflineAgency",
+          "OnlinePlatformDirectory",
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
@@ -11009,6 +11150,29 @@
         ],
         "services": [
           "TerminalsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/official-channels/official-channels.controller.ts",
+        "handler": "OfficialChannelsController.listForTerminal",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "OnlinePlatformDirectory",
+          "Organization",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold",
+          "Terminal"
+        ],
+        "path": "/api/v1/terminals/:terminalId/official-channels",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/official-channels/official-channels.service.ts"
+        ],
+        "services": [
+          "OfficialChannelsService"
         ]
       },
       {
@@ -16515,7 +16679,9 @@
           "Organization"
         ],
         "usedBy": [
-          "services/api/src/recruitment-content/recruitment-content-read.service.ts"
+          "services/api/src/official-channels/official-channels.service.ts",
+          "services/api/src/recruitment-content/recruitment-content-read.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
       {
@@ -16580,7 +16746,7 @@
         ]
       },
       {
-        "fieldCount": 26,
+        "fieldCount": 27,
         "name": "Organization",
         "relations": [
           "CompanyProfile",
@@ -16605,6 +16771,7 @@
           "services/api/src/jobs/jobs-admin.service.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
+          "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/orgs/admin-org-account-security.ts",
           "services/api/src/orgs/admin-org-content-trust.service.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
@@ -16785,6 +16952,7 @@
         "name": "RecruitmentCircuitBreak",
         "relations": [],
         "usedBy": [
+          "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
@@ -16793,6 +16961,7 @@
         "name": "RecruitmentEmergencyHold",
         "relations": [],
         "usedBy": [
+          "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/policies/policies.service.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
@@ -16908,6 +17077,7 @@
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
@@ -21157,6 +21327,7 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
@@ -21546,6 +21717,7 @@
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
       "services/api/scripts/verify-job-fit-print.ts",
+      "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/ai/kiosk-ai-capabilities.controller.ts": [
@@ -21679,7 +21851,8 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-official-channels.ts"
     ],
     "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
       "services/api/scripts/verify-resume-export-formats.ts",
@@ -21952,6 +22125,7 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
@@ -22153,6 +22327,7 @@
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-excel-import.ts",
@@ -22246,6 +22421,7 @@
       "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts"
     ],
@@ -23367,6 +23543,19 @@
     "services/api/src/notifications/notifications.controller.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
+    "services/api/src/official-channels/dto/official-channel.dto.ts": [
+      "services/api/scripts/verify-official-channels.ts"
+    ],
+    "services/api/src/official-channels/official-channels.controller.ts": [
+      "services/api/scripts/verify-official-channels.ts"
+    ],
+    "services/api/src/official-channels/official-channels.service.ts": [
+      "scripts/verify-compliance-copy.mjs",
+      "services/api/scripts/verify-official-channels.ts"
+    ],
+    "services/api/src/official-channels/registrable-domain.ts": [
+      "services/api/scripts/verify-official-channels.ts"
+    ],
     "services/api/src/offline-agencies/admin-offline-agencies.controller.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-backend-p0-http.ts"
@@ -23922,6 +24111,7 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
       "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
@@ -23986,6 +24176,7 @@
       "services/api/scripts/verify-recruitment-content-http.ts"
     ],
     "services/api/src/recruitment-content/recruitment-content-read.service.ts": [
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-recruitment-content-http.ts"
     ],
     "services/api/src/recruitment-content/recruitment-content-verify-target.ts": [
@@ -24009,11 +24200,14 @@
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
     ],
     "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts": [
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/recruitment-hosting/recruitment-emergency.service.ts": [
+      "scripts/verify-compliance-copy.mjs",
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-job-review.ts",
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/recruitment-hosting/recruitment-hosting.ts": [
@@ -24254,6 +24448,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminal-identity.guard.ts": [
+      "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-terminal-identity.ts"
@@ -29160,7 +29355,9 @@
         "dirs": [],
         "files": [
           "docs/compliance/compliance-boundary.md",
-          "packages/shared/src/types/complianceCopy.ts"
+          "packages/shared/src/types/complianceCopy.ts",
+          "services/api/src/official-channels/official-channels.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ],
         "missing": []
       },
@@ -32621,6 +32818,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/job-fit.controller.ts",
           "services/api/src/ai/resume/job-fit-hosting.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
           "services/api/src/ai/resume/llm-job-fit.service.ts",
@@ -34015,6 +34213,37 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ocr-baidu"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/official-channels/dto/official-channel.dto.ts",
+          "services/api/src/official-channels/official-channels.controller.ts",
+          "services/api/src/official-channels/official-channels.service.ts",
+          "services/api/src/official-channels/registrable-domain.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/recruitment-content/recruitment-content-read.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
+          "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-official-channels.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:official-channels"
       ],
       "wired": true
     },
