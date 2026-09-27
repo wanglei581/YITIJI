@@ -367,7 +367,8 @@ test.describe('真人走查（模拟数据）', () => {
       const cands = await page.locator('button:visible').evaluateAll((els) =>
         els.map((e, i) => ({ i, t: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), dis: (e as HTMLButtonElement).disabled === true })),
       )
-      const fwd = cands.filter((c) => c.t && !c.dis && !/^(首页|AI ?顾问|我的)$|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再取一件/.test(c.t))
+      // 2.0 每页底部有「问小青：…」（规则 7），它是去顾问页的旁路，不是本步的前进按钮。
+      const fwd = cands.filter((c) => c.t && !c.dis && !/^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再取一件/.test(c.t))
       const pick = fwd[fwd.length - 1]
       if (!pick) { console.log(`\n  第 ${hop + 1} 跳：${before} 上没有可用的前进按钮`); break }
       console.log(`\n  第 ${hop + 1} 跳：在 ${before} 点「${pick.t}」`)
@@ -445,7 +446,8 @@ test.describe('真人走查（模拟数据）', () => {
     await step(page, s, 'E-preview')
 
     // 底部导航（首页 / AI 顾问 / 我的）永远排在 DOM 最后，会被误当主 CTA —— 必须排除。
-    const BACK = /^(首页|AI ?顾问|我的)$|返回|退出|上一步|更换|删除|重试|取消|问工作人员/
+    // 「问小青：…」是 2.0 每页底部去顾问页的旁路（规则 7），不算前进。
+    const BACK = /^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员/
     for (let hop = 0; hop < 5; hop += 1) {
       const before = new URL(page.url()).pathname
       const cands = await page.locator('button:visible').evaluateAll((els) =>
@@ -609,7 +611,7 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForTimeout(3000)
     await step(page, s, 'F-scan-entry')
 
-    const BACK = /^(首页|AI ?顾问|我的)$|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/
+    const BACK = /^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/
     for (let hop = 0; hop < 5; hop += 1) {
       const before = page.url()
       const cands = await page.locator('button:visible').evaluateAll((els) =>
