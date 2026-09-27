@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
+import { listPolicyHoldIds, publicPolicyWhere } from '../policies/policy-public-visibility'
 import type { CommunityFeedItem, CommunityFeedKind, CommunityFeedPage } from './community.types'
 
 const CACHE_TTL_SECONDS = 15 * 60
@@ -18,14 +20,21 @@ export class CommunityService {
   async list(cursorValue?: string, requestedLimit?: number): Promise<CommunityFeedPage> {
     const cursor = cursorValue ? this.parseCursor(cursorValue) : null
     const limit = requestedLimit ?? 20
-    const cacheKey = `community:feeds:v1:${cursorValue ?? 'first'}:${limit}`
+    const hostingKey = isRecruitmentContentHostingEnabled() ? 'hosting' : 'closed'
+    const cacheKey = `community:feeds:v2:${hostingKey}:${cursorValue ?? 'first'}:${limit}`
+    const heldIds = await listPolicyHoldIds(this.prisma)
+    const held = new Set(heldIds)
 
-    return this.withPublicCache(cacheKey, async () => {
+    const page = await this.withPublicCache(cacheKey, async () => {
       const take = limit + 1
+      const policyWhere = publicPolicyWhere(
+        { reviewStatus: 'approved', publishStatus: 'published' },
+        heldIds,
+      )
       const [policies, benefits, broadcasts] = await Promise.all([
         this.prisma.policyPost.findMany({
           where: this.afterCursorWhere(
-            { reviewStatus: 'approved', publishStatus: 'published' },
+            policyWhere as Record<string, unknown>,
             'policy',
             cursor,
           ),
@@ -60,6 +69,14 @@ export class CommunityService {
         commentsEnabled: false,
       }
     })
+    if (held.size === 0) return page
+    return {
+      ...page,
+      items: page.items.filter((item) => {
+        if (!item.id.startsWith('policy:')) return true
+        return !held.has(item.id.slice('policy:'.length))
+      }),
+    }
   }
 
   private policyItem(row: { id: string; title: string; summary: string | null; sourceName: string; createdAt: Date }): CommunityFeedItem {

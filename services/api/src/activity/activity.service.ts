@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
 import {
   ACTIVITY_TARGET_TYPES,
   JUMP_ACTIONS_BY_TARGET,
@@ -105,7 +106,7 @@ export class ActivityService {
       return company && { targetTitle: company.name, sourceName: company.jobFair.sourceName, sourceUrl: company.sourceUrl, externalId: company.jobFair.id }
     }
     const policy = await this.prisma.policyPost.findFirst({
-      where: { id: targetId, ...published },
+      where: await publicPolicyLookupWhere(this.prisma, { id: targetId, ...published }),
       select: { title: true, sourceName: true, externalUrl: true },
     })
     // 政策无外部编号；官方入口可能未提供（info-only 条目），如实存 null

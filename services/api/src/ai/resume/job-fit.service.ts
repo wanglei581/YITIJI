@@ -7,7 +7,7 @@ import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmJobFitService, type JobFitPayload, type JobFitTokenUsage } from './llm-job-fit.service'
 import { JobFitPdfService } from './job-fit-pdf.service'
-import { assertStoredJobFitReadable } from './job-fit-hosting'
+import { assertStoredJobFitJobBoardOpen, assertStoredJobFitReadable } from './job-fit-hosting'
 
 // ============================================================
 // 2D 岗位匹配参考会话服务。
@@ -210,19 +210,20 @@ export class JobFitService {
     }
   }
 
-  /** 读回最近一次分析（刷新恢复 / 会员回看）。 */
-  async getLatest(taskId: string, requester: JobFitRequester) {
+  /** 读回最近一次分析（刷新恢复 / 会员回看）。先读存档，再按来源套托管和岗位板块。 */
+  async getLatest(taskId: string, requester: JobFitRequester, jobBoardOpen = true) {
     await this.loadAuthorizedParse(taskId, requester)
     const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
     if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
       throw new NotFoundException({ error: { code: 'JOB_FIT_NOT_FOUND', message: '暂无分析结果，请先发起岗位匹配参考' } })
     }
     assertStoredJobFitReadable(row.payloadJson)
+    assertStoredJobFitJobBoardOpen(row.payloadJson, jobBoardOpen)
     return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredJobFit)
   }
 
   /** 服务端报告生成后只交付内部 HMAC printFileUrl；收费与确认仍由既有 /print/confirm 承担。 */
-  async printReport(taskId: string, requester: JobFitRequester) {
+  async printReport(taskId: string, requester: JobFitRequester, jobBoardOpen = true) {
     const parse = await this.authorizeParseForJobFit(taskId, requester)
     const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
     if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
@@ -230,6 +231,7 @@ export class JobFitService {
     }
 
     assertStoredJobFitReadable(row.payloadJson)
+    assertStoredJobFitJobBoardOpen(row.payloadJson, jobBoardOpen)
     const stored = JSON.parse(row.payloadJson) as StoredJobFit
     const { buffer, pageCount } = await this.pdf.render(
       {

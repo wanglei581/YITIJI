@@ -17,7 +17,10 @@ require('dotenv').config()
 
 import { createServer, type Server } from 'http'
 import { Logger } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { JobFitController } from '../src/ai/job-fit.controller'
+import { KioskJobBoardService } from '../src/terminals/kiosk-job-board.service'
 import { AuditService } from '../src/audit/audit.service'
 import { LlmJobFitService } from '../src/ai/resume/llm-job-fit.service'
 import { JobFitService } from '../src/ai/resume/job-fit.service'
@@ -509,6 +512,104 @@ async function main() {
         aiResumeResult: { findUnique: async () => ({ payloadJson: manualRow?.payloadJson ?? '' }) },
       }, { id: 'fit-pdf', createdBy: 'job_fit' })
       pass('17b. 托管关闭时手填岗位匹配 PDF 下载仍放行')
+
+      // 18. 托管开关与岗位板块的三种组合。手填可分析、可查看、可打印；
+      // jobId 与系统来源存档被拒。期望码：板块检查在 controller 里先于托管；
+      // 存档则先看托管、再看板块（job-fit-hosting.ts）。
+      fileStore.set(fileId, { text: RESUME_TEXT, endUserId: null })
+      const board = new KioskJobBoardService(prisma)
+      const controller = new JobFitController(
+        printSvc,
+        new JwtService({ secret: 'verify-job-fit-board-secret-0123456789' }),
+        { get: async () => null } as never,
+        prisma,
+        {
+          analyzeForJobFit: async (
+            input: { taskId: string; jobId?: string; manualJob?: { title: string; requirements?: string } },
+            who: { endUserId: string | null; accessToken: string | null },
+          ) => svc.analyze(input, who),
+        } as never,
+        board,
+      )
+      const fitReq = { headers: { 'x-resume-access-token': accessToken } }
+      const matrix = [
+        {
+          name: '只有托管关闭',
+          hosting: false,
+          boardOpen: true,
+          jobIdCode: 'RECRUITMENT_HOSTING_DISABLED',
+          archiveCode: 'RECRUITMENT_HOSTING_DISABLED',
+        },
+        {
+          name: '只有岗位板块关闭',
+          hosting: true,
+          boardOpen: false,
+          jobIdCode: 'KIOSK_JOB_BOARD_DISABLED',
+          archiveCode: 'KIOSK_JOB_BOARD_DISABLED',
+        },
+        {
+          name: '两者都关闭',
+          hosting: false,
+          boardOpen: false,
+          jobIdCode: 'KIOSK_JOB_BOARD_DISABLED',
+          archiveCode: 'RECRUITMENT_HOSTING_DISABLED',
+        },
+      ] as const
+      try {
+        for (const item of matrix) {
+          process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = item.hosting ? 'true' : 'false'
+          if (item.boardOpen) {
+            await prisma.kioskJobBoardConfig.deleteMany({ where: { terminalId: '__global__' } })
+          } else {
+            await board.saveGlobal(false, 'verify-job-fit')
+          }
+          responseQueue.push(vjson())
+          const analyzed = await controller.analyze(
+            { taskId, manualJob: { title: '手填岗位', requirements: '细心' } },
+            fitReq,
+          )
+          if (analyzed.status !== 'completed' || analyzed.job?.title !== '手填岗位' || analyzed.job?.id) {
+            fail(`18. ${item.name}：手填分析应成功且不含系统岗位 id`)
+          }
+          const viewed = await controller.latest(taskId, fitReq)
+          if (viewed.status !== 'completed' || viewed.job?.title !== '手填岗位' || viewed.job?.id) {
+            fail(`18. ${item.name}：手填存档应可查看`)
+          }
+          const printedManual = await controller.print(taskId, fitReq)
+          if (!printedManual.printFileUrl?.includes('/files/')) {
+            fail(`18. ${item.name}：手填存档应可打印`)
+          }
+          await writeFit(taskId, null, systemJob)
+          try {
+            await controller.latest(taskId, fitReq)
+            fail(`18. ${item.name}：系统来源存档不应可查看`)
+          } catch (error) {
+            if (codeOf(error) !== item.archiveCode) {
+              fail(`18. ${item.name}：查看系统存档期望 ${item.archiveCode}，实际 ${codeOf(error) ?? (error as Error).message}`)
+            }
+          }
+          try {
+            await controller.print(taskId, fitReq)
+            fail(`18. ${item.name}：系统来源存档不应可打印`)
+          } catch (error) {
+            if (codeOf(error) !== item.archiveCode) {
+              fail(`18. ${item.name}：打印系统存档期望 ${item.archiveCode}，实际 ${codeOf(error) ?? (error as Error).message}`)
+            }
+          }
+          try {
+            await controller.analyze({ taskId, jobId: jobPub.id }, fitReq)
+            fail(`18. ${item.name}：带 jobId 的分析不应放行`)
+          } catch (error) {
+            if (codeOf(error) !== item.jobIdCode) {
+              fail(`18. ${item.name}：jobId 期望 ${item.jobIdCode}，实际 ${codeOf(error) ?? (error as Error).message}`)
+            }
+          }
+          pass(`18. ${item.name}：手填可分析、可查看、可打印；jobId 与系统存档被拒`)
+        }
+      } finally {
+        await prisma.kioskJobBoardConfig.deleteMany({ where: { terminalId: '__global__' } }).catch(() => undefined)
+        process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+      }
     } finally {
       if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
       else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting

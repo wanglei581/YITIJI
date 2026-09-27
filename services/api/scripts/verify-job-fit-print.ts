@@ -57,7 +57,7 @@ function staticChecks(reporter: Reporter): boolean {
     reporter.pass('打印路由存在且先于 GET :taskId')
   }
   const controllerPrint = controller && printRoute >= 0 ? between(controller, printRoute, latestRoute) : null
-  complete = requireAll(controllerPrint, ['this.service.printReport(taskId, await this.requesterOf(req))'], '打印路由沿用 Bearer/x-resume requesterOf 归属') && complete
+  complete = requireAll(controllerPrint, ['this.service.printReport(taskId, await this.requesterOf(req), await this.jobBoardOpen(req))'], '打印路由沿用 Bearer/x-resume requesterOf 归属，并带上岗位板块是否打开') && complete
 
   complete = requireAll(service, [
     "import { FilesService } from '../../files/files.service'",
@@ -65,7 +65,7 @@ function staticChecks(reporter: Reporter): boolean {
     "import { JobFitPdfService } from './job-fit-pdf.service'",
     'private readonly files: FilesService',
     'private readonly pdf: JobFitPdfService',
-    'async printReport(taskId: string, requester: JobFitRequester)',
+    'async printReport(taskId: string, requester: JobFitRequester, jobBoardOpen = true)',
     'await this.authorizeParseForJobFit(taskId, requester)',
     "kind: 'job_fit'",
     "code: 'JOB_FIT_NOT_FOUND'",
@@ -75,7 +75,7 @@ function staticChecks(reporter: Reporter): boolean {
     'printFileUrl: signFileUrl(uploaded.fileId).url',
   ], 'JobFitService 报告生成、归属、文件与审计契约') && complete
 
-  const printMethodStart = service?.indexOf('async printReport(taskId: string, requester: JobFitRequester)') ?? -1
+  const printMethodStart = service?.indexOf('async printReport(taskId: string, requester: JobFitRequester, jobBoardOpen = true)') ?? -1
   const printMethod = service && printMethodStart >= 0 ? service.slice(printMethodStart) : null
   if (!printMethod) {
     reporter.fail('printReport 方法缺失，不能验证输出 URL 契约')

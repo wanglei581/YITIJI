@@ -8,6 +8,7 @@ import {
   sanitizeAnswers,
   validatePolicyEligibilityRules,
 } from './policy-eligibility.engine'
+import { publicPolicyLookupWhere } from './policy-public-visibility'
 import {
   POLICY_ELIGIBILITY_DISCLAIMER,
   POLICY_ELIGIBILITY_PRIVACY_NOTICE,
@@ -100,15 +101,16 @@ export class PolicyEligibilityService {
 
     const requestedIds = (input.policyIds ?? []).slice(0, MAX_POLICIES_PER_CHECK)
     const rows = (await this.prisma.policyPost.findMany({
-      where: {
-        // 只比对已审核通过且已发布的政策 —— 未过审内容不得进入核对面
+      where: await publicPolicyLookupWhere(this.prisma, {
+        // 只比对已审核通过且已发布的政策 —— 未过审内容不得进入核对面。
+        // 托管关闭时再去掉招聘分类；有紧急下架留痕的也不进入核对面。
         reviewStatus: 'approved',
         publishStatus: 'published',
         ...(requestedIds.length > 0
           ? { id: { in: requestedIds } }
           : // 未指定时只取「政策扶持条目」：notice 是公告，没有申领条件
             { kind: 'policy_guide' }),
-      },
+      }),
       orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       take: MAX_POLICIES_PER_CHECK,
       include: { eligibilityRules: { orderBy: { orderIndex: 'asc' } } },
