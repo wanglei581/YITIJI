@@ -173,6 +173,12 @@ const viteConfig = read(kioskRoot, 'vite.config.ts')
 expect(viteConfig.includes('pdfjsPresetAssets'), 'Vite 注册 CMap 静态资源插件')
 expect(cmapPlugin.includes("urlName: 'cmaps'") && cmapPlugin.includes('configureServer') && cmapPlugin.includes('generateBundle'), '开发服务器和生产构建都能提供 CMap 文件')
 expect(cmapPlugin.includes("urlName: 'wasm'") && cmapPlugin.includes("urlName: 'standard_fonts'"), '标准字体与 wasm 解码器也随 CMap 一起发布')
+expect(
+  /server\.middlewares\.use\(serveEngineRaw\(packageRoot\)\)/.test(cmapPlugin) &&
+    cmapPlugin.includes("'legacy/build/pdf.min.mjs'") &&
+    cmapPlugin.includes("'legacy/build/pdf.worker.min.mjs'"),
+  '开发服务器原样返回 PDF.js 两份构建（Vite 改写后注入的 /@vite/client 在 blob: 模块里解析不了）',
+)
 expect(!/cp\s+-r/.test(cmapPlugin) && cmapPlugin.includes('readFileSync') && cmapPlugin.includes('emitFile'), 'CMap 用 Node 读写复制，不调用 cp -r')
 const pdfjsImports = [...pdfCanvas.matchAll(/from ['"](pdfjs-dist[^'"]*)['"]/g)].map((match) => match[1])
 expect(

@@ -65,6 +65,28 @@ function serveDirectory(root: string) {
   }
 }
 
+// 开发服务器会改写 .mjs：把 PDF.js 里的动态 import() 包成 __vite__injectQuery，并注入
+// import "/@vite/client"。预览从 blob: URL 导入模块，这个绝对路径解析不了，预览直接失败。
+// 所以 ?url 指到的这两份构建，开发时原样返回；生产构建里 ?url 资源本来就是逐字节拷贝。
+const ENGINE_FILES = ['legacy/build/pdf.min.mjs', 'legacy/build/pdf.worker.min.mjs'] as const
+
+function serveEngineRaw(packageRoot: string) {
+  const files = ENGINE_FILES.map((rel) => ({ suffix: `/pdfjs-dist/${rel}`, file: path.join(packageRoot, rel) }))
+  return (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
+    const url = req.url ?? ''
+    // 带查询的是 Vite 自己的模块请求（例如 ?url 那个导出 URL 的小模块），交回给 Vite。
+    const hit = url.includes('?') ? undefined : files.find(({ suffix }) => url.endsWith(suffix))
+    if (!hit) {
+      next()
+      return
+    }
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'text/javascript')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.end(readFileSync(hit.file))
+  }
+}
+
 function attachDevMiddleware(
   server: { config: { base: string }; middlewares: Connect.Server },
   packageRoot: string,
@@ -82,6 +104,8 @@ export function pdfjsPresetAssets(): Plugin {
   return {
     name: 'pdfjs-cmap-assets',
     configureServer(server) {
+      // 直接注册（不返回函数），排在 Vite 自己的转换中间件之前。
+      server.middlewares.use(serveEngineRaw(packageRoot))
       attachDevMiddleware(server, packageRoot)
     },
     configurePreviewServer(server) {
