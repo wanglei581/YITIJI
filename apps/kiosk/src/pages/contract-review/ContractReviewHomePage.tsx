@@ -8,7 +8,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
-import { isTerminalKiosk } from '../../services/api/screensaver'
+import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { useNavigate } from 'react-router-dom'
 import {
   Button,
@@ -66,7 +66,9 @@ export function ContractReviewHomePage() {
 
   const [file, setFile] = useState<File | null>(null)
   const [phoneSource, setPhoneSource] = useState<PhoneSource | null>(null)
-  const [channel, setChannel] = useState<ContractChannel>('phone')
+  const kiosk = useTerminalKiosk()
+  const [selectedChannel, setChannel] = useState<ContractChannel>('phone')
+  const channel = kiosk ? 'phone' : selectedChannel
   const [contractType, setContractType] = useState<ContractType>('labor_contract')
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentScope, setConsentScope] = useState<ConsentScope | null>(null)
@@ -89,6 +91,7 @@ export function ContractReviewHomePage() {
   }, [])
 
   function handleFileChange(f: File | null) {
+    if (isTerminalKiosk()) return
     if (!f) return
     if (f.size > DESKTOP_MAX_SIZE_MB * 1024 * 1024) {
       setError(`本机验证文件不能超过 ${DESKTOP_MAX_SIZE_MB}MB`)
@@ -228,13 +231,15 @@ export function ContractReviewHomePage() {
               </button>
             )}
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED}
-            className="sr-only"
-            onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
-          />
+          {!kiosk && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED}
+              className="sr-only"
+              onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+            />
+          )}
           {channel === 'phone' ? (
             selectedName && phoneSource ? (
               <div className="cr-upload-zone cr-upload-zone--filled">
@@ -271,11 +276,11 @@ export function ContractReviewHomePage() {
               drag ? 'cr-upload-zone--drag' : '',
               file ? 'cr-upload-zone--filled' : '',
             ].join(' ')}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}
             onKeyDown={(e) => {
               if (e.key !== 'Enter' && e.key !== ' ') return
               e.preventDefault()
-              fileInputRef.current?.click()
+              if (!isTerminalKiosk()) fileInputRef.current?.click()
             }}
             onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}

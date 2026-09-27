@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
+import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import type { ApiRouter } from '../fixtures/api-router'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
 
@@ -179,12 +180,12 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
     status: 200,
     json: { success: true, data: { fileId: 'jm-fixture-001', url: PREVIEW_PDF, expiresAt: '2099-01-01T02:30:00.000Z', disposition: 'inline' } },
   })
-  await page.route(`**${PREVIEW_PDF}`, (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n%materials-fixture\n' }))
+  await page.route(`**${PREVIEW_PDF}`, (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
   const previewSent = page.waitForRequest((req) => new URL(req.url()).pathname === PREVIEW_URL)
   await card.getByRole('button', { name: '预览文件' }).click()
   expect((await previewSent).headers().authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
   const dialog = page.getByRole('dialog', { name: '校招自荐信.pdf' })
-  await expect(dialog.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', PREVIEW_PDF)
+  await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', PREVIEW_PDF)
   await expect(page).toHaveURL(/\/resume\/materials$/)
   expect(await page.locator('body').innerText()).not.toContain(PREVIEW_PDF)
   await dialog.getByRole('button', { name: '关闭文件预览' }).click()

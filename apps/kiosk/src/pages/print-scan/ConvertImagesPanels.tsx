@@ -100,10 +100,10 @@ export function AddRow({
   onShowQr: () => void
   onOpenUsb: () => void
 }) {
-  const localLabel = kiosk ? '本机上传一张（一体机请用手机扫码）' : '本机上传一张'
+  const localLabel = '本机上传一张'
   return (
     <div className="i2p-addrow">
-      <button
+      {!kiosk && <button
         type="button"
         className="i2p-add"
         data-testid="img2pdf-add-local"
@@ -113,7 +113,7 @@ export function AddRow({
       >
         <PlusIcon size={26} />
         本机上传一张
-      </button>
+      </button>}
       <button
         type="button"
         className="i2p-add"

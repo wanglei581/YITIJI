@@ -138,6 +138,15 @@ expectMatches(
   /catch \(err: unknown\)[\s\S]{0,260}?await failCall\(/,
   'TRTC startup failures use the idempotent failure cleanup path',
 )
+expectIncludes(callHook, 'terminalProtectedFetch', 'TRTC session create carries the terminal session credential')
+expectMatches(
+  callHook,
+  /terminalProtectedFetch\([\s\S]*?\/trtc\/session['"`]/,
+  'TRTC session create uses terminalProtectedFetch',
+)
+const stopBackend = callHook.slice(callHook.indexOf('function stopBackendTask'), callHook.indexOf('export type CallPhase'))
+expectIncludes(stopBackend, 'fetch(', 'TRTC stop stays a keepalive fetch')
+expectNotMatches(stopBackend, /terminalProtectedFetch/, 'TRTC stop does not wait on a terminal session')
 expectIncludes(callHook, 'sessionEpochRef', 'in-flight TRTC starts are guarded by a session epoch')
 expectIncludes(
   callHook,

@@ -119,7 +119,7 @@ export const UPLOAD_STEPS = ['选手机里的文件', '系统接收', '回一体
 
 export function chromeCopy(issue: LinkIssue, state: UploadState, confirmedLabel: string | null) {
   if (issue === 'signature-blocked') {
-    return { sub: '签名 / 印章 · 手机端不可用', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前没有可用的上传入口，也不会发送任何文件；签名 / 印章图片请回一体机在原步骤上传。' }
+    return { sub: '本人手写签名 · 手机端不可用', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前没有可用的上传入口，也不会发送任何文件；本人手写签名图片请回一体机在原步骤上传。' }
   }
   if (issue === 'invalid' || state === 'session-expired') {
     return { sub: issue === 'invalid' ? '上传链接不可用' : '手机上传 · 需回一体机重新生成', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前不能再发送文件；请回一体机重新生成上传二维码后再扫一次。' }
@@ -138,12 +138,12 @@ export function chromeCopy(issue: LinkIssue, state: UploadState, confirmedLabel:
 export function takeoverCopy(issue: Exclude<LinkIssue, null>) {
   if (issue === 'signature-blocked') {
     return {
-      kind: 'warn' as const, icon: 'ban' as IconKey, head: '签名 / 印章暂不支持手机上传',
-      body: '请回到一体机，在「签名盖章」的第 2 步用「本机上传」选一张已有的 JPG / PNG 图片。',
+      kind: 'warn' as const, icon: 'ban' as IconKey, head: '本人手写签名暂不支持手机上传',
+      body: '请回到「签名盖章」的原步骤查看可用方式；没有可用方式时，请联系工作人员。',
       facts: [
-        ['为什么不可用', '手机上传当前只接受 **简历 / 打印文件 / 合同**，签名与印章不在其中，系统不会为它开出上传链接。'],
+        ['为什么不可用', '手机上传当前只接受 **简历 / 打印文件 / 合同**，签名图片不在其中，系统不会为它开出上传链接。'],
         ['不是你的问题', '不是文件格式不对，也不是网络问题，换张图或换台手机都不会变。'],
-        ['现场怎么办', '回一体机在「签名盖章」的第 2 步点**本机上传**，选一张已有的 JPG / PNG 图片。'],
+        ['现场怎么办', '回到原步骤查看可用方式；只接受本人手写签名图片，没有可用方式时请联系工作人员。'],
         ['还是不行', '返回上一步，或请现场工作人员协助；本页没有别的上传方式可试。'],
       ] as FactRow[],
     }

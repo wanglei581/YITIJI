@@ -1,3 +1,4 @@
+import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import './phone-upload-service-desk.css'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -160,6 +161,7 @@ function FileBox({ file, removable, note, onRemove }: {
 }
 
 export function PhoneUploadPage() {
+  const kiosk = useTerminalKiosk()
   const location = useLocation()
   const { capabilities: conversionCapabilities, loading: conversionLoading } = useDocumentConversionCapabilities()
   const purposes = PHONE_UPLOAD_PURPOSES(conversionCapabilities.wordToPdf)
@@ -188,7 +190,7 @@ export function PhoneUploadPage() {
   const view = s.state !== 'success'
     ? uploadView(s.state, { file: s.file, typeIssue: s.typeIssue, unknownType: Boolean(s.file && !s.file.type), chips: policy.chips })
     : null
-  const canPick = ready && view?.picker === 'ready'
+  const canPick = !kiosk && ready && view?.picker === 'ready'
   const chrome = chromeCopy(issue, s.state, confirmed?.label ?? null)
   const takeover = issue ? takeoverCopy(issue) : null
   const chipsText = policy.chips.join(' / ')
@@ -217,7 +219,7 @@ export function PhoneUploadPage() {
   }
 
   const pickFile = (file: File | undefined) => {
-    if (!file || !canPick) return
+    if (isTerminalKiosk() || !file || !canPick) return
     const picked: PickedFile = { name: file.name, size: file.size, ext: extOf(file.name), type: file.type || '' }
     const blocked = precheck(picked, policy)
     if (blocked) {
@@ -232,7 +234,7 @@ export function PhoneUploadPage() {
 
   const renderPicker = (mode: PickerMode) => {
     const copy = pickerCopy(mode, policy.chips)
-    const off = mode !== 'ready'
+    const off = kiosk || mode !== 'ready'
     return (
       <label
         className="ph-up-picker"
@@ -241,7 +243,7 @@ export function PhoneUploadPage() {
         onDragOver={(event) => { if (!off) event.preventDefault() }}
         onDrop={(event) => { event.preventDefault(); pickFile(event.dataTransfer.files?.[0]) }}
       >
-        <input
+        {!kiosk && <input
           type="file"
           className="ph-up-file-input"
           accept={policy.accept}
@@ -252,9 +254,9 @@ export function PhoneUploadPage() {
             event.target.value = ''
             pickFile(file)
           }}
-        />
+        />}
         <span className="ph-up-picker-ic"><Icon name={copy.icon} /></span>
-        <b>{copy.head}</b>
+        <b>{kiosk ? '请在手机上打开上传链接' : copy.head}</b>
         <span className="ph-up-hint"><Rich text={copy.hint} /></span>
         <span className="ph-up-pill" aria-hidden="true">{copy.pill}</span>
       </label>

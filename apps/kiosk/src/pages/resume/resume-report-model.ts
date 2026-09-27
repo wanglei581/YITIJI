@@ -1,3 +1,4 @@
+import { ALLOW_FIXTURES } from '../../utils/buildMode'
 import type {
   ResumeContentBlock,
   ResumeContentBlockKey,
@@ -163,13 +164,13 @@ export function showsReportBody(viewState: ReportViewState): boolean {
 
 export function parseReportSearch(search: string): ReportSearch {
   const q = new URLSearchParams(search)
-  const capture = q.get('capture') === '1'
-  const debug = q.get('debug') === '1'
+  const capture = ALLOW_FIXTURES && q.get('capture') === '1'
+  const debug = ALLOW_FIXTURES && q.get('debug') === '1'
   const tech = capture || debug
   const flat = q.get('flat') === '1' || capture
   let fallback = false
 
-  const wanted = q.get('state')
+  const wanted = ALLOW_FIXTURES ? q.get('state') : null
   let urlState: ReportViewState | null = null
   if (wanted === null) urlState = null
   else if (!isState(wanted)) {

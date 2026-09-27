@@ -85,7 +85,7 @@
   border: 0;
   border-radius: 12px;
 }
-.sw-fv-view > [data-file-preview-kind] iframe { min-height: 0; }
+.sw-fv-view > [data-file-preview-kind] [data-pdf-preview-host] { height: 100%; min-height: 0; }
 /* 图片 · 适应整页：整张图 contain 进可视区，宁可留边也不裁。 */
 .sw-fv-view > [data-file-preview-kind='image'] img { max-height: none; }
 /* 图片 · 适应宽度：放开高度，图按 w-full 铺满宽度、高度随原比例，超出的部分在 .sw-fv-view 里滑动看。 */

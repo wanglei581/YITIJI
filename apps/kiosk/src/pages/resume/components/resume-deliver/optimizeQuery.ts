@@ -1,3 +1,4 @@
+import { ALLOW_FIXTURES } from '../../../../utils/buildMode'
 import type { ResumeExportFormat } from '@ai-job-print/shared'
 import {
   OPTIMIZE_FIXTURE_STATES,
@@ -19,10 +20,10 @@ export interface OptimizeQuery {
 
 export function parseOptimizeQuery(search: string): OptimizeQuery {
   const q = new URLSearchParams(search)
-  const capture = q.get('capture') === '1'
-  const debug = q.get('debug') === '1'
+  const capture = ALLOW_FIXTURES && q.get('capture') === '1'
+  const debug = ALLOW_FIXTURES && q.get('debug') === '1'
   let fallback = false
-  const rawState = q.get('state')
+  const rawState = ALLOW_FIXTURES ? q.get('state') : null
   let requested: OptimizeViewState | null = null
   if (rawState) {
     if ((OPTIMIZE_STATES as readonly string[]).includes(rawState)) requested = rawState as OptimizeViewState
@@ -40,7 +41,7 @@ export function parseOptimizeQuery(search: string): OptimizeQuery {
     if (parsedFormat) format = parsedFormat
     else fallback = true
   }
-  const rawExport = q.get('export')
+  const rawExport = ALLOW_FIXTURES ? q.get('export') : null
   let exportHint: OptimizeQuery['exportHint'] = null
   if (rawExport === 'ready' || rawExport === 'no-print' || rawExport === 'failed') exportHint = rawExport
   else if (rawExport) fallback = true

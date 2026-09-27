@@ -358,7 +358,7 @@ test('scan settings uses server instructions and waiting-to-completed polling re
   await page.waitForURL(/\/scan\?stage=result/, { timeout: 8_000 })
   await expect(page.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => window.sessionStorage.getItem('w2-scan-control'))).toBeNull()
-  await expect(page.locator('[data-file-preview-kind="pdf"]').locator('iframe')).toHaveAttribute('src', W2_FILE.fileUrl)
+  await expect(page.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', W2_FILE.fileUrl)
   expect(previewPaths.some((path) => path.includes('/preview-url'))).toBe(false)
   // 设置页一次 + 等待页挂载一次。结果页不确认 —— 这一场已经结束，再确认只会拿回 409。
   await ack.expectAcked(2)
@@ -440,7 +440,7 @@ test('successful scan result can continue to printing @w2', async ({ page, api }
   await page.goto('/scan?stage=result')
   const preview = page.locator('[data-file-preview-kind="pdf"]')
   await expect(preview).toBeVisible()
-  await expect(preview.locator('iframe')).toHaveAttribute('src', W2_FILE.fileUrl)
+  await expect(preview.locator('[data-pdf-preview-host]')).toHaveAttribute('data-preview-src', W2_FILE.fileUrl)
   await expectPdfCompleted(binary)
   const quoteResponse = page.waitForResponse((response) =>
     response.request().method() === 'POST'
@@ -1033,9 +1033,8 @@ test('sensitive session clear returns the workbench to start without the previou
 
 // ── 扫描结果 · 整屏预览（稿 21 · rs-pv-*）────────────────────────────────────
 //
-// 工具条只摆「真能做到」的控件：PDF 交给浏览器自带查看器按 page= / view= 打开参数重新打开，
-// 图片由本层 contain / 铺满宽度。无头 Chromium 不渲染 PDF，所以 PDF 这边钉的是交给查看器的
-// 那组打开参数（iframe src 的 # 片段）；图片这边量真实排版。
+// 工具条只摆「真能做到」的控件：PDF 画在 canvas 上，翻页和适宽改的是真实绘制；
+// 图片由本层 contain / 铺满宽度。PDF 这边钉页码、版式和像素，不再看内置查看器的 # 片段。
 // 夹具与回执一一对得上：说 2 页的那份就真是 2 页，说是图片的那份就真能解码。
 
 const PREVIEW_FIXTURE_PREFIX = '/w2-scan-preview/'
@@ -1072,6 +1071,26 @@ function buildPdf(pageStreams: string[]): string {
 }
 
 const TWO_PAGE_PDF = buildPdf(['0 0 0 rg\n30 30 40 140 re f\n', '0 0 0 rg\n130 30 40 140 re f\n'])
+
+async function canvasInk(canvas: Locator): Promise<{ dark: number; checksum: number }> {
+  const ink = await canvas.evaluate((node: HTMLCanvasElement) => {
+    const context = node.getContext('2d')
+    if (!context || node.width < 2 || node.height < 2) return null
+    const { data } = context.getImageData(0, 0, node.width, node.height)
+    let dark = 0
+    let checksum = 0
+    for (let index = 0; index < data.length; index += 32) {
+      const red = data[index] ?? 0
+      const green = data[index + 1] ?? 0
+      const blue = data[index + 2] ?? 0
+      if (red < 245 || green < 245 || blue < 245) dark += 1
+      checksum = (checksum + red + green * 3 + blue * 7) % 10000019
+    }
+    return { dark, checksum }
+  })
+  expect(ink, 'canvas has a readable bitmap').not.toBeNull()
+  return ink!
+}
 
 async function installPreviewFixtures(page: Page): Promise<void> {
   await page.route(`**${PREVIEW_FIXTURE_PREFIX}**`, async (route) => {
@@ -1113,8 +1132,8 @@ test('scan result full-screen preview drives real PDF page and fit controls with
     format: 'PDF',
   }))
   await page.goto('/scan?stage=result')
-  const inline = page.locator('.sw-pvstage [data-file-preview-kind="pdf"] iframe')
-  await expect(inline).toHaveAttribute('src', TWO_PAGE_PDF_PATH)
+  const inline = page.locator('.sw-pvstage [data-file-preview-kind="pdf"] [data-pdf-preview-host]')
+  await expect(inline).toHaveAttribute('data-preview-src', TWO_PAGE_PDF_PATH)
   const urlBefore = page.url()
   const sessionBefore = await readScanSession(page)
 
@@ -1130,7 +1149,7 @@ test('scan result full-screen preview drives real PDF page and fit controls with
   await expect(dialog.getByTestId('rs-pv-close')).toBeFocused()
   await expect(dialog.getByTestId('rs-pv-meta')).toContainText('2 页')
 
-  const viewer = dialog.locator('[data-testid="rs-pv-view"] [data-file-preview-kind="pdf"] iframe')
+  const viewer = dialog.locator('[data-testid="rs-pv-view"] [data-file-preview-kind="pdf"] [data-pdf-preview-host]')
   const prev = dialog.getByTestId('rs-pv-prev')
   const next = dialog.getByTestId('rs-pv-next')
   const fitPage = dialog.getByTestId('rs-pv-fit-page')
@@ -1142,7 +1161,13 @@ test('scan result full-screen preview drives real PDF page and fit controls with
     expect(box.width).toBeGreaterThanOrEqual(88)
   }
 
-  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=1&view=Fit`)
+  await expect(viewer).toHaveAttribute('data-preview-src', TWO_PAGE_PDF_PATH)
+  await expect(viewer).toHaveAttribute('data-pdf-page', '1')
+  await expect(viewer).toHaveAttribute('data-pdf-fit', 'page')
+  await expect(viewer).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect.poll(() => viewer.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe('0')
+  const firstInk = await canvasInk(viewer.locator('canvas'))
+  expect(firstInk.dark, '第 1 页不是空白').toBeGreaterThan(0)
   await expect(indicator).toHaveText('第 1 页 / 共 2 页')
   await expect(prev).toBeDisabled()
   await expect(next).toBeEnabled()
@@ -1150,22 +1175,31 @@ test('scan result full-screen preview drives real PDF page and fit controls with
   await expect(fitWidth).toHaveAttribute('aria-pressed', 'false')
   await page.screenshot({ path: testInfo.outputPath('qx-scan-result-preview-pdf-1080.png'), fullPage: false })
 
+  const painted = await viewer.getAttribute('data-pdf-render')
   await next.click()
-  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=2&view=Fit`)
+  await expect(viewer).toHaveAttribute('data-pdf-page', '2')
+  await expect(viewer).toHaveAttribute('data-pdf-fit', 'page')
+  await expect.poll(() => viewer.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe(painted)
+  const secondInk = await canvasInk(viewer.locator('canvas'))
+  expect(secondInk.dark, '第 2 页不是空白').toBeGreaterThan(0)
+  expect(secondInk.checksum, '翻页后画的是另一页').not.toBe(firstInk.checksum)
   await expect(indicator).toHaveText('第 2 页 / 共 2 页')
   await expect(next, '到最后一页就停，不编出第 3 页').toBeDisabled()
   await expect(prev).toBeEnabled()
 
   await fitWidth.click()
-  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=2&view=FitH`)
+  await expect(viewer).toHaveAttribute('data-pdf-page', '2')
+  await expect(viewer).toHaveAttribute('data-pdf-fit', 'width')
   await expect(fitWidth).toHaveAttribute('aria-pressed', 'true')
   await expect(fitPage).toHaveAttribute('aria-pressed', 'false')
   await expect(dialog.getByTestId('rs-pv-zoom')).toHaveText('当前：适应宽度')
 
   await prev.click()
-  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=1&view=FitH`)
+  await expect(viewer).toHaveAttribute('data-pdf-page', '1')
+  await expect(viewer).toHaveAttribute('data-pdf-fit', 'width')
   await fitPage.click()
-  await expect(viewer).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=1&view=Fit`)
+  await expect(viewer).toHaveAttribute('data-pdf-page', '1')
+  await expect(viewer).toHaveAttribute('data-pdf-fit', 'page')
 
   // 关掉回到这一步：地址、历史、本机登记、页内小预览都原样，底层恢复可达，焦点还给打开键。
   await dialog.getByTestId('rs-pv-back').click()
@@ -1174,18 +1208,21 @@ test('scan result full-screen preview drives real PDF page and fit controls with
   await expect(page.getByTestId('scan-result-preview-open')).toBeFocused()
   expect(page.url()).toBe(urlBefore)
   expect(await readScanSession(page)).toBe(sessionBefore)
-  await expect(inline).toHaveAttribute('src', TWO_PAGE_PDF_PATH)
+  await expect(inline).toHaveAttribute('data-preview-src', TWO_PAGE_PDF_PATH)
 
   // 视图状态不跨次保留；Esc 也能关。
   const again = await openScanPreview(page, 'w2-scan-two-page.pdf')
-  await expect(again.locator('[data-testid="rs-pv-view"] iframe')).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=1&view=Fit`)
+  const againHost = again.locator('[data-testid="rs-pv-view"] [data-pdf-preview-host]')
+  await expect(againHost).toHaveAttribute('data-preview-src', TWO_PAGE_PDF_PATH)
+  await expect(againHost).toHaveAttribute('data-pdf-page', '1')
+  await expect(againHost).toHaveAttribute('data-pdf-fit', 'page')
   await page.keyboard.press('Escape')
   await expect(again).toHaveCount(0)
   expect(page.url()).toBe(urlBefore)
   await expectHealthy(page, errors)
 })
 
-test('scan result preview keeps page turning honestly unavailable when the receipt has no page count @w2', async ({ page, api }) => {
+test('scan result preview counts pages from the file when the receipt omits them @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
@@ -1202,17 +1239,24 @@ test('scan result preview keeps page turning honestly unavailable when the recei
   await expectPdfCompleted(binary)
 
   const dialog = await openScanPreview(page, 'w2-scan.pdf')
-  const viewer = dialog.locator('[data-testid="rs-pv-view"] [data-file-preview-kind="pdf"] iframe')
-  await expect(viewer, '页数未知时不写 page=，不替文件编页码').toHaveAttribute('src', `${W2_FILE.fileUrl}#view=Fit`)
+  const viewer = dialog.locator('[data-testid="rs-pv-view"] [data-file-preview-kind="pdf"] [data-pdf-preview-host]')
+  await expect(viewer).toHaveAttribute('data-preview-src', W2_FILE.fileUrl)
+  await expect(viewer).toHaveAttribute('data-pdf-fit', 'page')
   await expect(dialog.getByTestId('rs-pv-prev')).toBeDisabled()
   await expect(dialog.getByTestId('rs-pv-next')).toBeDisabled()
-  await expect(dialog.getByTestId('rs-pv-page')).toHaveText('页数未知 · 在预览里上下滑动翻页')
-  await expect(dialog.getByTestId('rs-pv-meta')).toContainText('页数以文件为准')
-  await expect(dialog.getByTestId('rs-pv-note')).toContainText('回执里没有页数，本页不替文件编页码')
-  await expect(dialog.getByText(/第 \d+ 页/)).toHaveCount(0)
+  await expect(dialog.getByTestId('rs-pv-note')).toContainText('回执里没有页数')
+  // 夹具 PDF 实际只有 1 页。读出来之前不编页码；读出来之后用文件自己的页数，不写成 2 页。
+  await expect(viewer).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect(viewer).toHaveAttribute('data-pdf-page-count', '1')
+  await expect(dialog.getByTestId('rs-pv-meta')).toContainText('1 页')
+  await expect(dialog.getByTestId('rs-pv-page')).toHaveText('第 1 页 / 共 1 页')
+  await expect(dialog.getByTestId('rs-pv-note')).toContainText('打开这份文件后数出来的')
+  await expect(dialog.getByTestId('rs-pv-prev')).toBeDisabled()
+  await expect(dialog.getByTestId('rs-pv-next')).toBeDisabled()
 
   await dialog.getByTestId('rs-pv-fit-width').click()
-  await expect(viewer).toHaveAttribute('src', `${W2_FILE.fileUrl}#view=FitH`)
+  await expect(viewer).toHaveAttribute('data-pdf-fit', 'width')
+  await expect(viewer).toHaveAttribute('data-pdf-page', '1')
   await dialog.getByTestId('rs-pv-close').click()
   await expect(dialog).toHaveCount(0)
   await expectHealthy(page, errors)
@@ -1330,7 +1374,10 @@ test.describe('scan result full-screen preview at 390x844', () => {
 
     const nextBox = await boxOf(dialog.getByTestId('rs-pv-next'), '下一页')
     await page.touchscreen.tap(nextBox.x + nextBox.width / 2, nextBox.y + nextBox.height / 2)
-    await expect(dialog.locator('[data-testid="rs-pv-view"] iframe')).toHaveAttribute('src', `${TWO_PAGE_PDF_PATH}#page=2&view=Fit`)
+    const phoneHost = dialog.locator('[data-testid="rs-pv-view"] [data-pdf-preview-host]')
+    await expect(phoneHost).toHaveAttribute('data-pdf-page', '2')
+    await expect(phoneHost).toHaveAttribute('data-pdf-fit', 'page')
+    await expect(phoneHost).toHaveAttribute('data-pdf-status', 'ready')
     await dialog.getByTestId('rs-pv-back').click()
     await expect(dialog).toHaveCount(0)
     await expectHealthy(page, errors)

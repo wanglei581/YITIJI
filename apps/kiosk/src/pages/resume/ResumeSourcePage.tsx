@@ -1,5 +1,5 @@
 import { type ReactNode, useRef, useState } from 'react'
-import { isTerminalKiosk } from '../../services/api/screensaver'
+import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
@@ -225,7 +225,9 @@ export function ResumeSourcePage() {
     : BASE_SUPPORTED_FORMATS
   const accept = wordConversionAvailable ? `${BASE_ACCEPT},${WORD_ACCEPT}` : BASE_ACCEPT
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [selected, setSelected] = useState<UploadChannel>('cloud')
+  const kiosk = useTerminalKiosk()
+  const [pickedChannel, setSelected] = useState<UploadChannel>(() => isTerminalKiosk() ? 'phone' : 'cloud')
+  const selected = kiosk && pickedChannel === 'cloud' ? 'phone' : pickedChannel
   // 从解析页带着扫描件交接回来时，直接落在稿 21 的 scan-ready：同一份文件，不用重扫。
   const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(() => scanFileFrom(readScanHandoff(location.state)))
   const [uploading, setUploading] = useState(false)
@@ -269,6 +271,7 @@ export function ResumeSourcePage() {
   }
 
   const handleSelect = (option: UploadOption) => {
+    if (isTerminalKiosk() && option.type === 'cloud') return
     setError(null)
     if (option.type !== selected) {
       setUploadedFile(null)
@@ -281,7 +284,7 @@ export function ResumeSourcePage() {
 
   const handleUploadBoxClick = () => {
     setError(null)
-    if (selected !== 'cloud') return
+    if (isTerminalKiosk() || selected !== 'cloud') return
     fileInputRef.current?.click()
   }
 
@@ -308,6 +311,7 @@ export function ResumeSourcePage() {
    * - 只清 taskId + accessToken 这类读回凭证；简历原文本来就不落 session。
    */
   const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isTerminalKiosk()) return
     const file = e.target.files?.[0]
     e.target.value = '' // 允许选同名再次触发
     if (!file) return
@@ -469,14 +473,16 @@ export function ResumeSourcePage() {
         rail={['current', 'todo', 'todo', 'todo']}
       />
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        aria-label="选择本机简历文件"
-        accept={accept}
-        className="hidden"
-        onChange={handleFileChosen}
-      />
+      {!kiosk && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          aria-label="选择本机简历文件"
+          accept={accept}
+          className="hidden"
+          onChange={handleFileChosen}
+        />
+      )}
 
       <div className="qx-scroll qx-rt-scroll">
         {scanReady && uploadedFile ? (

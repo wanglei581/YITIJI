@@ -1,3 +1,4 @@
+import { ALLOW_FIXTURES } from '../../../../utils/buildMode'
 import type { ResumeExportFormat } from '@ai-job-print/shared'
 import {
   GENERATE_FIXTURE_STATES,
@@ -18,10 +19,10 @@ export interface GeneratePreviewQuery {
 
 export function parseGeneratePreviewQuery(search: string): GeneratePreviewQuery {
   const q = new URLSearchParams(search)
-  const capture = q.get('capture') === '1'
-  const debug = q.get('debug') === '1'
+  const capture = ALLOW_FIXTURES && q.get('capture') === '1'
+  const debug = ALLOW_FIXTURES && q.get('debug') === '1'
   let fallback = false
-  const rawState = q.get('state')
+  const rawState = ALLOW_FIXTURES ? q.get('state') : null
   let requested: GeneratePreviewViewState | null = null
   if (rawState) {
     if ((GENERATE_PREVIEW_STATES as readonly string[]).includes(rawState)) {

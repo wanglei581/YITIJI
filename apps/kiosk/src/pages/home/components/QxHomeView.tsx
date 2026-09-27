@@ -1,3 +1,4 @@
+import { useTerminalKiosk } from '../../../services/api/screensaver'
 import { useState, type ReactNode } from 'react'
 import { HomeHeroHeader, type HomeDeviceStatus } from './HomeHeroHeader'
 import { HomeTile } from './HomeTile'
@@ -27,7 +28,6 @@ import type { HomeV6ActionId } from '../homeV6Domains'
 import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
-
 const ASSISTANT_VOICE_ENTRY = import.meta.env.VITE_USE_TRTC_CALL === 'true' // 主 CTA 只跳 /assistant 不开麦；「语音」跟助手页语音入口同一开关
 
 interface QxHomeViewProps {
@@ -110,6 +110,7 @@ export function QxHomeView({
   continueSlot,
   onAction,
 }: QxHomeViewProps) {
+  const kiosk = useTerminalKiosk()
   const printStatus = printDomainStatus({
     deviceLoading: device.loading,
     deviceReady: device.printerReady,
@@ -306,9 +307,9 @@ export function QxHomeView({
         <div>
           <p><strong>能力状态以真实接口为准。</strong>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : channelsTile ? '岗位与招聘会请看本机构官方渠道，本终端不代收简历。' : recruitment.status === 'ready' ? '本终端未开放岗位与招聘会信息，也不代收简历。' : '本终端不代收简历。'}</p>
           <p className="qx-home-legal">
-            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">鲁ICP备2026023517号-2</a>
+            {kiosk ? <span>鲁ICP备2026023517号-2</span> : (<a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">鲁ICP备2026023517号-2</a>)}
             <span aria-hidden="true">·</span>
-            <a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer noopener">鲁公网安备37021402007308号</a>
+            {kiosk ? <span>鲁公网安备37021402007308号</span> : (<a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer noopener">鲁公网安备37021402007308号</a>)}
           </p>
         </div>
       </footer>

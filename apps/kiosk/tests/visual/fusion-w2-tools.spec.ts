@@ -403,7 +403,8 @@ test('signature inspect renders server pages and compose sends placement payload
   })
 
   await loginThroughVisibleUi(page, '/print-scan/sign')
-  await expect(page.getByText('选要盖章的 PDF')).toBeVisible()
+  await expect(page.getByText('选要签名的 PDF')).toBeVisible()
+  await expect(page.getByRole('note')).toContainText('只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。')
   await page.locator('input[accept="application/pdf"]').setInputFiles({
     name: '就业协议.pdf',
     mimeType: 'application/pdf',

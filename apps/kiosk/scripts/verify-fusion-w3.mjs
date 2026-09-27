@@ -114,7 +114,10 @@ const frozen = {
   // 由 verify:kiosk-frontend-debt ② 反向钉死「不得再传 / 不得再声明」。
   // 旧哈希 f3139d5375df69db492fc9428a3b4d99cc2ab389c081b50093418f71d3d0f369。
   'src/pages/interview/session/types.ts': '76a8a9770e1132b416b74586039e07e4410fa4cf97ac2e7ad4ec1c56bf5d1374',
-  'src/hooks/useAiAdvisorCallSession.ts': '75f2bdcc44b03e3c9bcaa505d32139036bc5e0b934d0bace5d6b8237d5bc76f8',
+  // 2026-09-27 重新冻结：创建语音会话改走 terminalProtectedFetch，带上终端会话票。
+  // 停止接口仍是 keepalive fetch，不挂终端会话，已开的计费会话停得掉。
+  // 旧哈希 75f2bdcc44b03e3c9bcaa505d32139036bc5e0b934d0bace5d6b8237d5bc76f8。
+  'src/hooks/useAiAdvisorCallSession.ts': '365da6215997c51c4f8d4a2f41ca623302431fefe2e463864c42c06c760c3a29',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 

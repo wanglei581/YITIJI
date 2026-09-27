@@ -222,7 +222,10 @@ assertIncludes(usbPanel, 'onBusyChange?.(false)', 'resume USB panel clears its p
 assertIncludes(usbPanel, 'item.sizeBytes <= MAX_RESUME_BYTES', 'resume USB panel enforces its stated 10MB file limit')
 assertNotIncludes(usbPanel, '`${mimeType} ${filename}`', 'resume USB format detection does not use filename substrings')
 assertIncludes(usbPanel, "normalizedMime === 'image/jpeg'", 'resume USB format detection prefers exact image MIME')
-assertIncludes(preview, '<iframe', 'shared file preview renders PDF content')
+assertIncludes(preview, 'PdfCanvasPreview', 'shared file preview renders PDF content on a canvas')
+assertNotIncludes(preview, '<iframe', 'shared file preview does not hand PDF to the built-in viewer')
+assertNotIncludes(preview, '<embed', 'shared file preview does not embed the PDF as a document')
+assertNotIncludes(preview, '<object', 'shared file preview does not open the PDF as an object document')
 assertIncludes(preview, '<img', 'shared file preview renders image content')
 assertIncludes(preview, 'setRenderFailed(false)', 'shared file preview resets a prior render failure when the selected file changes')
 assertIncludes(preview, "normalizedMime && !['application/octet-stream', 'binary/octet-stream'].includes(normalizedMime)", 'shared file preview trusts a specific MIME before extension fallback')
@@ -264,7 +267,7 @@ assertIncludes(phone, 'PHONE_UPLOAD_PURPOSES', 'phone page maps each supported p
 // 稿 51 ⑥：CreateUploadSessionDto 的 @IsIn 不含 signature_image，一体机开不出这种会话。
 // 手机端不给它任何「看起来能走通」的上传配置，只给诚实不可用态，并指回现场已验证的「本机上传」。
 assertIncludes(phoneModel, "if (purpose === 'signature_image') return 'signature-blocked'", 'signature links are an honest dead end, not an upload flow')
-assertIncludes(phoneModel, '签名 / 印章暂不支持手机上传', 'signature dead end tells the user it is unavailable on the phone')
+assertIncludes(phoneModel, '本人手写签名暂不支持手机上传', 'signature dead end tells the user it is unavailable on the phone')
 assertNotIncludes(phone, 'signature_image', 'phone page offers no signature_image purpose config or file filter')
 // 稿 51 ⑧：fragment 里的 purpose 可被随手改掉，上传前只按受支持用途 accept 的交集放行。
 assertIncludes(phone, 'genericPolicy(SESSION_PURPOSES.map((purpose) => purposes[purpose].accept))', 'phone pre-upload filter is the intersection of all supported purposes')

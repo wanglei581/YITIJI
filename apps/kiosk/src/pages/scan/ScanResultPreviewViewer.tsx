@@ -19,10 +19,9 @@ import './styles/scan-result-viewer-qx.css'
  * 不调用要登录的预览签发接口，也不带 fileId / token（所以不会触发 Word 转换）。
  *
  * 控件只摆「真能做到」的：
- *   · PDF 交给本机浏览器自带的查看器，按 `page=` / `view=Fit|FitH` 打开参数重新打开；
- *   · 图片由本层按容器量出来的宽高 contain / 铺满宽度；
- *   · 翻页只在回执带了页数时放行。回执没有页数（今天的扫描链路就是这样）时，
- *     上一页 / 下一页如实不可用 —— 本页不替文件编页码，免得「第 3 页」其实停在最后一页。
+ *   · PDF 画在画布上。回执带了页数就按那个翻；回执没写页数时，先不编页码，
+ *     等这份文件自己数出页数再翻。适整页 / 适宽改的是画布缩放。
+ *   · 图片由本层按容器量出来的宽高 contain / 铺满宽度。
  */
 export type ScanPreviewFit = 'page' | 'width'
 
@@ -36,12 +35,6 @@ export interface ScanPreviewFile {
 
 function knownPageCount(pages: number | null): number | null {
   return typeof pages === 'number' && Number.isInteger(pages) && pages >= 1 ? pages : null
-}
-
-/** 浏览器 PDF 查看器的打开参数。页数未知时不写 page=，交给查看器从头显示。 */
-function scanPreviewPdfParams(fit: ScanPreviewFit, page: number, pageCount: number | null): string {
-  const view = fit === 'width' ? 'view=FitH' : 'view=Fit'
-  return pageCount ? `page=${page}&${view}` : view
 }
 
 /**
@@ -84,8 +77,16 @@ export function ScanResultPreviewViewer({
   const [kind, setKind] = useState<PreviewKind | null>(null)
   const [fit, setFit] = useState<ScanPreviewFit>('page')
   const [page, setPage] = useState(1)
-  const pageCount = knownPageCount(file.pages)
+  const [openedPages, setOpenedPages] = useState<number | null>(null)
+  const receiptPages = knownPageCount(file.pages)
+  const pageCount = openedPages ?? receiptPages
   const isPdf = kind === 'pdf'
+
+  useEffect(() => {
+    setOpenedPages(null)
+    setPage(1)
+    setFit('page')
+  }, [file.fileUrl])
   const showBar = kind === 'pdf' || kind === 'image'
 
   useInertBackground(rootRef)
@@ -104,11 +105,12 @@ export function ScanResultPreviewViewer({
     }
   }, [onClose])
 
+  const shownPage = pageCount ? Math.min(page, pageCount) : page
   const pageText = kind === 'image'
     ? '整图 · 共 1 页'
     : pageCount
-      ? `第 ${page} 页 / 共 ${pageCount} 页`
-      : '页数未知 · 在预览里上下滑动翻页'
+      ? `第 ${shownPage} 页 / 共 ${pageCount} 页`
+      : '正在读取文件页数'
 
   return (
     <div className="sw-fv" ref={rootRef} data-testid="rs-pv-scrim">
@@ -142,7 +144,10 @@ export function ScanResultPreviewViewer({
               fileName={file.name}
               mimeType={file.mimeType}
               format={formatLabel}
-              pdfOpenParams={scanPreviewPdfParams(fit, page, pageCount)}
+              pdfPage={shownPage}
+              pdfFit={fit === 'width' ? 'width' : 'page'}
+              showPdfPager={false}
+              onPdfPageCount={setOpenedPages}
               onKindChange={setKind}
             />
           </div>
@@ -156,7 +161,7 @@ export function ScanResultPreviewViewer({
                   type="button"
                   className="sw-fv-btn"
                   data-testid="rs-pv-prev"
-                  disabled={!pageCount || page <= 1}
+                  disabled={!pageCount || shownPage <= 1}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
                 >
                   <ChevronLeftIcon size={22} aria-hidden />
@@ -169,7 +174,7 @@ export function ScanResultPreviewViewer({
                   type="button"
                   className="sw-fv-btn"
                   data-testid="rs-pv-next"
-                  disabled={!pageCount || page >= pageCount}
+                  disabled={!pageCount || shownPage >= pageCount}
                   onClick={() => setPage((current) => Math.min(pageCount ?? current, current + 1))}
                 >
                   下一页
@@ -209,9 +214,13 @@ export function ScanResultPreviewViewer({
           <p className="sw-fv-note" data-testid="rs-pv-note">
             {isPdf ? (
               <>
-                翻页和缩放<b>只改这里的显示</b>：PDF 由本机浏览器自带的查看器按所选页码和版式重新打开，
+                翻页和缩放<b>只改这里的显示</b>：这一页把文件画在画布上，按所选页码和版式重画，
                 <b>不改原件，也不影响打印和 AI 识别</b>。
-                {pageCount ? null : ' 回执里没有页数，本页不替文件编页码，所以翻页按钮不可用。'}
+                {receiptPages
+                  ? null
+                  : pageCount
+                    ? ' 回执里没有页数。这里的页数是打开这份文件后数出来的。'
+                    : ' 回执里没有页数，页数读出来之前不编页码，所以翻页按钮不可用。'}
               </>
             ) : kind === 'image' ? (
               <>

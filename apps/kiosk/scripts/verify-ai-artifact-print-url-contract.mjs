@@ -139,7 +139,7 @@ expectNoMatch(fairMaterialsPage, /fileUrl:\s*(?:latest\.)?previewUrl/, '招聘�
 
 // ── P28 自我探索（S2-7 接线）──────────────────────────────────────────────
 // 报告 PDF 有两条出口，用途不同、URL 不能互换：
-//   页内预览 → signedUrl（COS 签名，只给 <iframe> / 扫码带走）
+//   页内预览 → signedUrl（COS 签名，只给画布预览 / 扫码带走）
 //   打印交接 → printFileUrl（内部 HMAC，/print/jobs 只认这个）
 // 交换二者的后果是「点了打印但打不出来」，而页面已经把用户送进了核价流程。
 expectMatch(selfAssessment, /fileUrl:\s*printed\.printFileUrl/, '自我探索打印交接只传内部 HMAC printFileUrl')
