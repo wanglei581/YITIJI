@@ -3,18 +3,18 @@ import { formatDateTime } from '@ai-job-print/shared'
 /**
  * 打印完成页文件保留说明。
  * 时间只来自任务状态带回的到期时间或删除时间，这里不写死时长。
- * 读不到时间就说读不到，不猜哪一天。
+ * 读不到时间就说读不到，不写具体日期。
  */
 export const FILE_RETENTION_SEE_DOCUMENTS =
   '具体时间以「我的 → 我的文档」里显示的为准。'
 export const FILE_RETENTION_NOT_PHYSICAL =
-  '删掉的是这份电子文件，不会把整台机器毁掉。'
+  '这里说的删除，是从系统里删掉这份电子文件。'
 export const FILE_RETENTION_UNAVAILABLE =
-  '这次没能读到这份文件什么时候删除。这里不猜具体哪一天。'
+  '这次没有读到这份文件的删除时间，所以这里不写具体日期。'
 export const FILE_RETENTION_UNPARSED =
-  '这份文件有删除时间，但这里暂时读不出来。这里不猜具体哪一天。'
+  '这份文件定了删除时间，但这次没有读出来，所以这里不写具体日期。'
 export const FILE_RETENTION_NO_EXPIRY =
-  '这份文件还没有删除日期。这里不猜具体哪一天。'
+  '这份文件还没有定下删除日期。'
 const FILE_RETENTION_AUTO_DELETE =
   '这份文件会在保留期满后自动删除；具体时间以「我的 → 我的文档」里显示的为准。'
 

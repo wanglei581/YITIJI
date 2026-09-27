@@ -988,12 +988,12 @@ expectMatches(
 )
 expectMatches(
   retentionHelper,
-  /这次没能读到这份文件什么时候删除。这里不猜具体哪一天。/,
+  /这次没有读到这份文件的删除时间，所以这里不写具体日期。/,
   '取不到到期时间时如实说读不到，不编造日期',
 )
 expectMatches(
   retentionHelper,
-  /删掉的是这份电子文件，不会把整台机器毁掉。/,
+  /这里说的删除，是从系统里删掉这份电子文件。/,
   '文案不承诺物理销毁',
 )
 expectMatches(
