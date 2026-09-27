@@ -25,7 +25,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'login-required': {
       kind: 'lock',
       title: '先登录才能做签名盖章',
-      body: '签名 / 印章图片属于高敏个人材料，只允许本人在登录后上传与合成。未登录不提供这项能力。',
+      body: '本人手写签名图片属于高敏个人材料，只允许本人在登录后上传与合成。未登录不提供这项能力。',
       chips: [
         { text: '这一页不显示任何文件' },
         { text: '不生成、不保存、不上传' },
@@ -35,7 +35,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'login-expired': {
       kind: 'warn',
       title: '登录已过期',
-      body: '为保护高敏材料，登录过期时已上传的签名 / 印章图片会被丢弃，需要重新登录后重新上传。原文档还在你的账号里。',
+      body: '为保护高敏材料，登录过期时已上传的本人手写签名图片会被丢弃，需要重新登录后重新上传。原文档还在你的账号里。',
       chips: [
         { text: '签名图不做跨会话保留' },
         { text: '不会替你自动重传' },
@@ -86,8 +86,8 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'pick-document': {
       kind: 'info',
-      title: '先选一份要盖章的 PDF',
-      body: '把签名或印章图片叠到 PDF 的指定位置，生成一份新的 PDF。原文件不会被改写。',
+      title: '先选一份要签名的 PDF',
+      body: '把本人手写签名图片叠到 PDF 的指定位置，生成一份新的 PDF。原文件不会被改写。',
       chips: [
         { text: '原 PDF ≤ 15MB · 1–30 页' },
         { text: '产物是新文件', tone: 'ok' },
@@ -174,7 +174,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'pick-stamp': {
       kind: 'info',
-      title: '传一张这次要用的签名 / 印章图',
+      title: '传一张这次要用的本人手写签名图',
       body: '只能用这次新传的图：按高敏材料保留约 1 小时，不进我的文档。',
       chips: [
         { text: 'JPG / PNG ≤ 10MB' },
@@ -184,7 +184,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'stamp-local-uploading': {
       kind: 'info',
-      title: '正在传这张签名 / 印章图',
+      title: '正在传这张本人手写签名图',
       body: '这张图按高敏材料处理：短期保留（约 1 小时），不进「我的文档」，会话结束即不可再用。',
       chips: [
         { text: '单次上传' },
@@ -194,8 +194,8 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'stamp-phone-entry': {
       kind: 'info',
-      title: '用手机传签名 / 印章图',
-      body: '手机拍一张签名，或选一张印章图片。确认之后才会进入下一步。这张图同样只在本次会话短期保留。',
+      title: '用手机传本人手写签名图',
+      body: '手机拍摄本人手写签名，或选择本人的手写签名图片。确认之后才会进入下一步。这张图同样只在本次会话短期保留。',
       chips: [
         { text: '手机扫屏幕码' },
         { text: '需你在手机上确认', tone: 'warn' },
@@ -217,13 +217,13 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'stamp-format-rejected': {
       kind: 'warn',
       title: '这张图不能用',
-      body: '签名 / 印章图片只支持 JPG / PNG。刚才那份没有进入流程，已选的文档不受影响。',
+      body: '本人手写签名图片只支持 JPG / PNG。刚才那份没有进入流程，已选的文档不受影响。',
       chips: [{ text: '已选文档不受影响', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'stamp-too-large': {
       kind: 'warn',
       title: '这张图太大',
-      body: '签名 / 印章图片上限 10 MB。请压缩后重传。',
+      body: '本人手写签名图片上限 10 MB。请压缩后重传。',
       chips: [{ text: '已选文档不受影响', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'stamp-pixels-too-large': {
@@ -247,7 +247,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'stamp-source-expired': {
       kind: 'warn',
       title: '签名图的访问凭证过期了',
-      body: '签名 / 印章图片只在本次会话短期保留（约 1 小时），过期后必须重新上传，不能从历史复用。',
+      body: '本人手写签名图片只在本次会话短期保留（约 1 小时），过期后必须重新上传，不能从历史复用。',
       chips: [{ text: '不能从历史复用', tone: 'warn' }, { text: '已选文档不受影响', tone: 'ok' }],
     },
     'placement-invalid-page': {

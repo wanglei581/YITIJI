@@ -12,7 +12,7 @@ import { useAuth } from '../../auth/useAuth'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
-import { getTerminalId, isTerminalKiosk } from '../../services/api/screensaver'
+import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { getTerminalCode } from '../../services/api/terminalConfig'
 import { convertImagesToPdf } from '../../services/api/printConversion'
 import { userMessageOf } from '../../services/api/userErrorMessage'
@@ -65,7 +65,7 @@ export function ConvertImagesPage() {
   useBusyLock(uploading || generating || qrBusy || rechecking)
 
   const atLimit = images.length >= MAX_IMAGES
-  const kiosk = isTerminalKiosk()
+  const kiosk = useTerminalKiosk()
   // Retention 是转换前规则说明，继续用本机会话；完成态声称必须读响应里的 hasEndUser。
   const loggedIn = Boolean(getToken())
   const hasEndUser =
@@ -95,7 +95,7 @@ export function ConvertImagesPage() {
   const handlePickLocal = () => {
     setUsbOpen(false)
     if (atLimit || uploading || generating) return
-    if (kiosk) {
+    if (isTerminalKiosk()) {
       setShowQr(true)
       return
     }
@@ -103,6 +103,7 @@ export function ConvertImagesPage() {
   }
 
   const handleLocalFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (isTerminalKiosk()) return
     const selectedFile = e.target.files?.[0]
     e.target.value = ''
     if (!selectedFile) return

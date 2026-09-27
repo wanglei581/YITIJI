@@ -643,13 +643,15 @@ export function FileSourceView(props: FileSourceViewProps) {
       back={{ label: '返回打印扫描', onBack }}
       ctabar={ctabar}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        accept={photoOnly ? '.jpg,.jpeg,.png' : printAccept}
-        className="fs-hidden-input"
-        onChange={onFileInputChange}
-      />
+      {showFileChannel && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept={photoOnly ? '.jpg,.jpeg,.png' : printAccept}
+          className="fs-hidden-input"
+          onChange={onFileInputChange}
+        />
+      )}
       <div
         className="qx-scroll fs-page"
         data-w2-page="print-upload"

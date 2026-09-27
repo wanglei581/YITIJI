@@ -218,7 +218,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'sign',
     icon: PenToolIcon,
     title: '签名盖章',
-    description: '签名或印章图片叠到 PDF 指定位置，生成新 PDF。',
+    description: '本人手写签名图片叠到 PDF 指定位置，生成新 PDF。',
     to: '/print-scan/sign',
     aiRole: 'none',
     needsMfp: false,

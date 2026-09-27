@@ -1,3 +1,4 @@
+import { ALLOW_FIXTURES } from '../../utils/buildMode'
 // 小青作业面：三种真实产物的形状、8 态派生、capture 夹具。
 // 夹具必须 ?capture=1 或 ?debug=1 才开，否则 fail-closed 回 no-artifact。
 
@@ -268,6 +269,7 @@ export function isContentState(state: ArtifactViewState): boolean {
 }
 
 export function resolveFixtureState(search: URLSearchParams): ProtoState | null {
+  if (!ALLOW_FIXTURES) return null
   const fixture = search.get('capture') === '1' || search.get('debug') === '1'
   const want = search.get('state')
   if (!isProtoState(want)) return fixture ? 'no-artifact' : null

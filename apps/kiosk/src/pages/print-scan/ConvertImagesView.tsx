@@ -236,13 +236,15 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         </div>
       </div>
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png"
-        className="sr-only"
-        onChange={props.onLocalFile}
-      />
+      {!kiosk && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png"
+          className="sr-only"
+          onChange={props.onLocalFile}
+        />
+      )}
 
       {preview ? (
         <div className="i2p-pv" role="dialog" aria-modal="true" data-testid="img2pdf-preview">

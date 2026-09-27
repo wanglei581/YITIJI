@@ -1,5 +1,5 @@
 // 签名盖章（图形排版），/print-scan/sign。青序流光 20-sign-stamp.html。
-// 四步：选文档 → 传签名/印章图 → 选位置 → 合成结果。业务调用仍走
+// 四步：选文档 → 传本人手写签名图 → 选位置 → 合成结果。业务调用仍走
 // signInspect / signCompose，本文件只换外壳并补状态覆盖。
 
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
@@ -36,7 +36,7 @@ export function SignStampPage() {
     <QxPageFrame
       back={{ label: '返回打印扫描', onBack: () => flow.navigate('/print-scan') }}
       title="签名盖章"
-      subtitle="把签名 / 印章图片叠到 PDF 上，生成一份新文件。这不是电子签名。"
+      subtitle="把本人手写签名图片叠到 PDF 上，生成一份新文件。只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。"
       terminalLabel={terminalLabel}
       status={flow.pill}
       ctabar={
@@ -58,7 +58,7 @@ export function SignStampPage() {
                 data-testid="sign-stamp-add-another"
                 onClick={flow.addAnother}
               >
-                再加一处签名 / 印章
+                再加一处本人手写签名
               </button>
             ) : null}
             <button
@@ -200,8 +200,12 @@ export function SignStampPage() {
           />
         )}
 
-        <input ref={flow.docInputRef} type="file" accept="application/pdf" className="ss-hidden-file" onChange={(e) => void flow.handleLocalDoc(e)} />
-        <input ref={flow.stampInputRef} type="file" accept="image/jpeg,image/png" className="ss-hidden-file" onChange={(e) => void flow.handleLocalStamp(e)} />
+        {!flow.localDisabled && (
+          <input ref={flow.docInputRef} type="file" accept="application/pdf" className="ss-hidden-file" onChange={(e) => void flow.handleLocalDoc(e)} />
+        )}
+        {!flow.localDisabled && (
+          <input ref={flow.stampInputRef} type="file" accept="image/jpeg,image/png" className="ss-hidden-file" onChange={(e) => void flow.handleLocalStamp(e)} />
+        )}
 
         {flow.showQr ? (
           <div className="ss-qr">
@@ -217,8 +221,8 @@ export function SignStampPage() {
             ) : (
               <UploadSessionQrPanel
                 purpose="signature_image"
-                title="手机扫码上传签名/印章图片"
-                description="手机拍摄或选择签名/印章图片（JPG/PNG），确认后自动进入下一步。"
+                title="手机扫码上传本人手写签名图片"
+                description="手机拍摄或选择本人手写签名图片（JPG/PNG），确认后自动进入下一步。"
                 confirmLabel="确认使用该图片"
                 onUploaded={flow.handlePhoneUploaded('stamp')}
                 onBusyChange={flow.setQrBusy}

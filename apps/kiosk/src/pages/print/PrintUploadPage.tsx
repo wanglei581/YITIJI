@@ -20,7 +20,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isTerminalKiosk } from '../../services/api/screensaver'
+import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
@@ -169,7 +169,7 @@ export function PrintUploadPage() {
   const wordOpenCopy = `支持 PDF、DOC、DOCX、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB；${WORD_CONVERSION_DISCLOSURE}`
 
   const initialTab: UploadTab = entryTab
-  const [tab, setTab] = useState<UploadTab>(initialTab)
+  const [selectedTab, setTab] = useState<UploadTab>(initialTab)
   const [channelActive, setChannelActive] = useState(isTransferMode || hasRequestedTab)
   const [file, setFile] = useState<UploadedFile | null>(null)
   const [fileOrigin, setFileOrigin] = useState<FileOrigin | null>(null)
@@ -192,7 +192,8 @@ export function PrintUploadPage() {
   const [usbPollKey, setUsbPollKey] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(false)
 
-  const showFileChannel = !isTerminalKiosk()
+  const showFileChannel = !useTerminalKiosk()
+  const tab = !showFileChannel && selectedTab === 'file' ? 'qr' : selectedTab
   const wordHint = wordConversionAvailable ? wordOpenCopy : wordClosedCopy
 
   useEffect(() => {
@@ -279,6 +280,7 @@ export function PrintUploadPage() {
   useBusyLock(uploading || usbUploading || phone.loading || phone.confirming || phone.cancelling)
 
   const uploadLocalFile = useCallback(async (selected: File) => {
+    if (isTerminalKiosk()) return
     const verdict = classifyLocalFile(selected, {
       acceptWord: wordConversionAvailable && !isPhotoEntry,
       photoOnly: Boolean(isPhotoEntry),
@@ -389,6 +391,7 @@ export function PrintUploadPage() {
   }
 
   const activateChannel = (key: UploadTab) => {
+    if (isTerminalKiosk() && key === 'file') return
     if (file) return
     setTab(key)
     setChannelActive(true)
@@ -484,10 +487,12 @@ export function PrintUploadPage() {
       onFileInputChange={handleFileChange}
       onSelectChannel={activateChannel}
       onOpenPicker={() => {
+        if (isTerminalKiosk()) return
         setPickerCancelled(false)
         inputRef.current?.click()
       }}
       onRetryLocal={() => {
+        if (isTerminalKiosk()) return
         const pending = lastLocalFileRef.current
         if (pending) void uploadLocalFile(pending)
         else inputRef.current?.click()
@@ -511,7 +516,7 @@ export function PrintUploadPage() {
       onClosePreview={() => setPreviewOpen(false)}
       onReplace={() => {
         clearCurrentFile()
-        if (tab === 'file') window.setTimeout(() => inputRef.current?.click(), 0)
+        if (tab === 'file') window.setTimeout(() => { if (!isTerminalKiosk()) inputRef.current?.click() }, 0)
       }}
       onDelete={clearCurrentFile}
       onUsbSelect={(safeId) => void handleUsbFileSelect(safeId)}

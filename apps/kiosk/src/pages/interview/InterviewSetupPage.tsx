@@ -6,7 +6,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
-import { isTerminalKiosk } from '../../services/api/screensaver'
+import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
@@ -131,6 +131,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const navigate = useNavigate()
   const { getToken } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const kiosk = useTerminalKiosk()
   const setupDraft = readInterviewWorkbenchSession()?.setup
 
   const [interviewerType, setInterviewerType] = useState<InterviewerType>(setupDraft?.interviewerType ?? 'hr')
@@ -193,6 +194,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     : [...POPULAR_INDUSTRIES.slice(0, 5), industry]
 
   const handleFileChosen = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (isTerminalKiosk()) return
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -552,8 +554,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                         onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
                         onBusyChange={setUsbBusy}
                       />
-                    ) : resumeChannel === 'desktop' ? (
-                      <Button variant="secondary" className="min-h-[56px] w-full text-base" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                    ) : resumeChannel === 'desktop' && !kiosk ? (
+                      <Button variant="secondary" className="min-h-[56px] w-full text-base" disabled={uploading} onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}>
                         {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
                         本机文件（桌面验证）
                       </Button>
@@ -562,13 +564,15 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                   <p className="mt-3 text-sm text-neutral-500">不上传也可以开始练习</p>
                 </>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-                className="hidden"
-                onChange={handleFileChosen}
-              />
+              {!kiosk && (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={handleFileChosen}
+                />
+              )}
             </Card>
         </div>
 

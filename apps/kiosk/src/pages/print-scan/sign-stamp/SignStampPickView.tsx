@@ -120,16 +120,18 @@ export function SignStampPickView({
         </div>
       </section>
 
-      <section className="ss-sec" aria-label={phase === 'doc' ? '选要盖章的 PDF' : '传这次的签名 / 印章图'}>
+      <p role="note">只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。</p>
+
+      <section className="ss-sec" aria-label={phase === 'doc' ? '选要签名的 PDF' : '传这次的本人手写签名图'}>
         {phase === 'doc' ? (
           <>
             <div className="ss-sec-label">
               <span className="no">01</span>
-              <span className="t">选要盖章的 PDF</span>
+              <span className="t">选要签名的 PDF</span>
               <span className="hint">≤ 15MB · 1–30 页</span>
             </div>
             <div className="ss-pickrow">
-              <PickCard
+              {!localDisabled && (<PickCard
                 title="本机上传 PDF"
                 d="这趟刚传进本机的文件。"
                 f={localDisabled ? localDisabledReason : 'PDF · ≤ 15MB'}
@@ -139,7 +141,7 @@ export function SignStampPickView({
                 disabled={localDisabled}
                 describedBy={localDisabled ? 'sign-stamp-doc-local-note' : undefined}
                 onClick={onLocal}
-              />
+              />)}
               <PickCard
                 title="手机扫码上传 PDF"
                 d="手机扫屏幕上的码，把 PDF 传进这台机器。"
@@ -191,13 +193,13 @@ export function SignStampPickView({
           <>
             <div className="ss-sec-label">
               <span className="no">02</span>
-              <span className="t">传这次的签名 / 印章图</span>
+              <span className="t">传这次的本人手写签名图</span>
               <span className="hint">≤ 10MB · ≤ 2500 万像素</span>
             </div>
             <div className="ss-pickrow">
-              <PickCard
+              {!localDisabled && (<PickCard
                 title="本机上传图片"
-                d="白纸上签好名拍一张，或用已有的印章图片。背景干净、边缘清楚更好。"
+                d="在白纸上签好本人姓名后拍一张。背景干净、边缘清楚更好。"
                 f={localDisabled ? localDisabledReason : 'JPG / PNG · ≤ 10MB'}
                 tid="sign-stamp-pick-stamp-local"
                 tone="clay"
@@ -205,10 +207,10 @@ export function SignStampPickView({
                 disabled={localDisabled}
                 describedBy={localDisabled ? 'sign-stamp-stamp-note' : undefined}
                 onClick={onLocal}
-              />
+              />)}
               <PickCard
                 title="手机扫码上传图片"
-                d="手机拍签名或选印章图片，确认后自动进入下一步。"
+                d="手机拍摄本人手写签名或选择本人的手写签名图片，确认后自动进入下一步。"
                 f="JPG / PNG · ≤ 10MB"
                 tid="sign-stamp-pick-stamp-phone"
                 tone="slate"
@@ -274,7 +276,7 @@ export function SignStampPickView({
           <div className="ss-grp">
             <h3>这一趟四步</h3>
             <div className="ss-steps" data-testid="sign-stamp-steps">
-              {['选文档', '传签名 / 印章图', '选位置', '合成结果'].map((label, i) => (
+              {['选文档', '传本人手写签名图', '选位置', '合成结果'].map((label, i) => (
                 <div key={label} className={`ss-step${i < step ? ' done' : i === step ? ' on' : ''}`}>
                   <i aria-hidden />
                   <span>{label}</span>
@@ -309,14 +311,14 @@ export function pickAsk(phase: 'doc' | 'stamp', state: string, derived: boolean)
     if (state === 'document-local-uploading') return ['正在传这份 PDF。', '单次上传，没有进度回传，传完立刻读页数。']
     if (state === 'document-phone-entry') return ['用手机把 PDF 传进来。', '扫屏幕上的码；手机上确认之后才进下一步。']
     if (state === 'document-inspecting') return ['正在读这份 PDF 的页数。', '加密、损坏、含数字签名域的，这一步就会被拒。']
-    return ['先选一份要盖章的 PDF。', '把签名图叠上去，生成一份新的 PDF，原件不动。']
+    return ['先选一份要签名的 PDF。', '把签名图叠上去，生成一份新的 PDF，原件不动。']
   }
   if (state.startsWith('stamp-') && (state.includes('rejected') || state.includes('too-') || state.includes('corrupt') || state.includes('encoding') || state.includes('source-'))) {
     return ['这张图没收下。', '原因在右边，换一张就行。']
   }
   if (state === 'stamp-local-uploading') return ['正在传这张签名图。', '按高敏材料短期保留，不进「我的文档」。']
-  if (state === 'stamp-phone-entry') return ['用手机传签名 / 印章图。', '手机上确认之后才进下一步，这一页不替你确认。']
+  if (state === 'stamp-phone-entry') return ['用手机传本人手写签名图。', '手机上确认之后才进下一步，这一页不替你确认。']
   if (derived || state === 'add-another-ready') return ['接着叠第二处。', '刚才那份派生 PDF 成了新原文档，签名图要重传。']
-  if (state === 'document-ready') return ['这份 PDF 读好了。', '接下来传这次要用的签名或印章图片。']
+  if (state === 'document-ready') return ['这份 PDF 读好了。', '接下来传这次要用的本人手写签名图片。']
   return ['传一张这次要用的签名图。', '只能这次新传，不进「我的文档」，也不能复用历史。']
 }
