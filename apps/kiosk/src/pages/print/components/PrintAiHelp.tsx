@@ -1,20 +1,4 @@
-import { useNavigate } from 'react-router-dom'
-import { rememberAssistantDraft } from '../../../services/assistantDraft'
-import '../styles/print-ai-help.css'
+import { QxAiHelp } from '../../../components/qingxu/QxAiHelp'
 
-/** 本步的「问小青」：把一句问题留给顾问页预填，由用户在顾问页确认后才发送。 */
-export function PrintAiHelp({ label, draft }: { label: string; draft: string }) {
-  const navigate = useNavigate()
-  return (
-    <button
-      type="button"
-      className="qx-print-ai"
-      onClick={() => {
-        rememberAssistantDraft(draft)
-        navigate('/assistant')
-      }}
-    >
-      {label}
-    </button>
-  )
-}
+/** 打印链各页的「问小青」。实现与样式在共享层（components/qingxu/QxAiHelp.tsx），这里只保留原导入路径。 */
+export const PrintAiHelp = QxAiHelp

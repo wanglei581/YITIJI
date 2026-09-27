@@ -45,7 +45,7 @@ import './styles/pickup-claim-qx.css'
 import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupKeypadCard, PickupOutsStrip, PickupSubtitle, PickupWinCard } from './components/PickupHidGuide'
-import { PrintAiHelp } from './components/PrintAiHelp'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { PICKUP_LOCKED_MESSAGE, classifyClaimFailure, claimMetaLine, claimSuccessCopy, failureScreen, pickupCells } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 
@@ -279,13 +279,12 @@ export function PrintPickupClaimPage() {
       status={{ tone: 'unknown', label: '到机码验证' }}
       terminalLabel="就业服务大厅"
       ctabar={
-        <div className="qx-print-airow">
-          <button type="button" className="qx-print-ai" onClick={() => navigate('/print-scan')}>上一步</button>
-          <PrintAiHelp
+        <QxStepActions onPrev={() => navigate('/print-scan')}>
+          <QxAiHelp
             label="问小青：到机码怎么找 →"
             draft="手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？"
           />
-        </div>
+        </QxStepActions>
       }
       navbar={
         <QxAppNavbar

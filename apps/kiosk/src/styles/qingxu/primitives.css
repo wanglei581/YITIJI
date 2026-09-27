@@ -118,3 +118,31 @@
 /* 吸收块内部若是网格（如数字键盘），行高随之等分拉伸 */
 .qx-grow > .knp,
 .qx-grow .qx-grow-inner { flex: 1 1 auto; min-height: 0; }
+
+/* ── 每页底部「上一步 / 问小青」（v2 稿 .qx2-actions / .qx2-prev / .qx2-ai） ──
+ * 规则 7：每页保留本步的 AI 入口。它不带框、用正文字阶，可点区不低于 56。
+ * 组件见 components/qingxu/QxAiHelp.tsx。 */
+.qx-step-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 64px;
+}
+.qx-step-prev,
+.qx-ai-help {
+  display: inline-flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font-size: var(--qx-fs-body);
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.qx-step-prev { color: var(--qx-ink-2); }
+.qx-ai-help { margin-left: auto; color: var(--qx-teal-d); text-align: right; }
+.qx-step-prev:focus-visible,
+.qx-ai-help:focus-visible { outline: 3px solid var(--qx-deep); outline-offset: 3px; }
