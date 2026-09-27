@@ -1,3 +1,5 @@
+import { useMemberCursorPage } from './useMemberCursorPage'
+import { MemberLoadMore } from './MemberLoadMore'
 // 我的消息通知 — /me/notifications 与 /notifications。
 // 只展示设备 / 打印 / 文件 / 系统类消息；关联反馈仅跳到本人反馈页。
 // 成功态由服务端回执驱动，不乐观改已读。
@@ -60,9 +62,6 @@ function screenStateOf(opts: {
 export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { loginFrom?: string }) {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
-  const [items, setItems] = useState<MemberNotificationItem[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [state, setState] = useState<LoadState>('loading')
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -70,24 +69,11 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
 
   const canUseRemote = API_MODE === 'http' && Boolean(getToken())
 
-  const load = useCallback(() => {
-    if (!isLoggedIn) {
-      setItems([])
-      setUnreadCount(0)
-      setState('ready')
-      return
-    }
-    setState('loading')
-    getMyNotifications(getToken(), { pageSize: 50, unreadOnly })
-      .then((page) => {
-        setItems(page.items)
-        setUnreadCount(page.unreadCount)
-        setState('ready')
-      })
-      .catch(() => setState('error'))
-  }, [getToken, isLoggedIn, unreadOnly])
-
-  useEffect(() => { load() }, [load, reloadKey])
+  const token = getToken()
+  const fetchPage = useCallback((cursor?: string) => getMyNotifications(token, { pageSize: 50, cursor, unreadOnly }), [token, unreadOnly])
+  const pagination = useMemberCursorPage<MemberNotificationItem, Awaited<ReturnType<typeof getMyNotifications>>>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
+  const { items, state: state } = pagination
+  const unreadCount = pagination.page?.unreadCount ?? 0
 
   useEffect(() => {
     if (!toast) return
@@ -275,6 +261,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
       ctabar={ctabar}
     >
       {body}
+      {isLoggedIn && state === 'ready' ? <MemberLoadMore {...pagination} /> : null}
     </QxMePage>
   )
 }
