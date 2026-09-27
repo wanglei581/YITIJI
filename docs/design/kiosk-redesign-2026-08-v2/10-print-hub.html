@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 只读步骤说明保留在卡片前，通过必要高度和留白调整触达；位置待复测（规则 1）。
@@ -7,7 +8,7 @@
 - 能力说明、到机码、我的文件改成用户语言，卡片尾部写明打印件或 PDF（规则 3、4）。
 - 能力与设备工程状态删去，三个底部声明收为一处（规则 4、5）。
 - 返工：能力区与 02 标题之间追加 16px 节间距；区块顺序保持（规则 2）。
-- AI 帮助采用原顾问页支持的 composer 与会话草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 -->
 <html lang="zh-CN">
 <head>
@@ -23,7 +24,7 @@
     ① 探测轴优先。probe !== ok（loading / error）→ 七张能力卡**一律不开**，含证件照说明页；
        badge：loading = 「检查中」，error = 「暂不开放任务 · 服务状态无法确认」。
     ② 能力配置覆盖。CAPABILITY_STATUS_NOTES：testing=测试中，暂未对用户开放 / maintenance=维护中，暂时不可用 /
-       unsupported=本终端不支持该能力 / not_verified=待验收，暂未开放。
+       unsupported=本终端不支持该能力 / not_verified=本机暂未开通。
     ③ MFP 轴 unavailable = 确定出不了纸（敢说哪几项停）；unknown = 读不到状态，不敢声称离线。
   到机码例外: 到机码核销**不在** CARD_CAPABILITY_KEY 里，也不随 MFP 轴停用 —— 它核销的是已存在订单，不是新建本机任务；
              探测失败时仍可点，但卡面如实写「这台机器现在出不了纸」。
@@ -233,7 +234,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
     <div class="xq-row">
       <div class="xq-face serif" aria-hidden="true">青</div>
       <div class="xq-main">
-        <div class="xq-eyebrow">PRINT &amp; SCAN</div>
+        <div class="xq-eyebrow">打印扫描</div>
         <div class="xq-ask serif" id="xq-ask">你的文件，<em>现在在哪</em>？</div>
         <div class="xq-doing" id="xq-doing">选好材料，一步步做成<b>打印件或 PDF</b>。</div>
       </div>
@@ -298,19 +299,19 @@ var CAPS=[
   href:'12-file-source.html?source=document&tab=file&category=photo',route:'/print/upload',mfp:true},
  {key:'scan',capKey:'scan',n:'材料扫描',ic:'scan',bg:'var(--slate-soft)',st:'#35608f',
   d:'到打印机面板扫描',foot:'带走：扫描 PDF',
-  href:'../kiosk-redesign-2026-08/18-scan-workbench.html',route:'/scan/start',mfp:true},
+  href:'18-scan-workbench.html',route:'/scan/start',mfp:true},
  {key:'convert',capKey:'format_convert',n:'格式转换',ic:'img',bg:'var(--teal-soft)',st:'#157a67',
   d:'多张图片合成 PDF',foot:'带走：合并 PDF',
-  href:'../kiosk-redesign-2026-08/19-img2pdf.html',route:'/print-scan/convert',mfp:false},
+  href:'19-img2pdf.html',route:'/print-scan/convert',mfp:false},
  {key:'sign',capKey:'signature_stamp',n:'签名盖章',ic:'sign',bg:'var(--clay-soft)',st:'#9e5330',
-  d:'把签章图片放进 PDF',foot:'带走：签章 PDF',
-  href:'../kiosk-redesign-2026-08/20-sign-stamp.html',route:'/print-scan/sign',mfp:false},
+  d:'放入本人手写签名',foot:'带走：签好的 PDF',
+  href:'20-sign-stamp.html',route:'/print-scan/sign',mfp:false},
  {key:'id-photo',capKey:'id_photo',n:'证件照',ic:'idcard',bg:'var(--wheat-soft)',st:'#8a6219',
   d:'尚未开放，可查看说明',foot:'说明页 · 未开放',wide:true,
   href:'10-print-hub.html?state=feature-id-photo',route:'/print-scan/feature/id-photo',mfp:false}
 ];
 /* CAPABILITY_STATUS_NOTES 逐字对齐运行时 */
-var NOTES={testing:'测试中，暂未对用户开放',maintenance:'维护中，暂时不可用',unsupported:'本终端不支持该能力',not_verified:'待验收，暂未开放'};
+var NOTES={testing:'测试中，暂未对用户开放',maintenance:'维护中，暂时不可用',unsupported:'本终端不支持该能力',not_verified:'本机暂未开通'};
 /* opts: probe='ok'|'loading'|'error'；overrides={capKey:status}；mfp='ready'|'unavailable' */
 function capCard(c,opts){
  var closed=false,badge='';
