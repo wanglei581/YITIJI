@@ -6,7 +6,7 @@ import { clearResumeReferences } from '../../resume/clearResumeReferences'
 // AI 服务记录 — /me/ai-records（本人，仅元数据）。
 // 删除成功只在服务端回执后展示；确认超时回到未确认，不乐观移除。
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type {
   JobAiSessionListItem,
@@ -23,7 +23,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react'
-import { deleteMyAiRecord, getMyAiRecords } from '../../../services/api/memberAssets'
+import { deleteMyAiRecord, getMyAiRecords, type AiRecordsPage } from '../../../services/api/memberAssets'
 import { deleteMyJobAiSession, listMyJobAiSessions } from '../../../services/api/jobAi'
 import { deleteMyInterview, getMyInterviews } from '../../../services/api/interview'
 import { useAuth } from '../../../auth/useAuth'
@@ -97,9 +97,20 @@ export function MyAiRecordsPage() {
   const [toast, setToast] = useState<Toast | null>(null)
   const token = getToken()
   const enabled = isLoggedIn && hostingKnown
-  const fetchRecords = useCallback((cursor?: string) => getMyAiRecords(token, { pageSize: 50, cursor }), [token])
+  // GET /me/ai-records 的首页同时带回记录和小青作业。两个分页器各拉一遍就是两次一模一样的请求，
+  // 所以首页由记录分页器发、小青作业分页器共用同一个请求；之后各按自己的游标加载更多。
+  // 两个分页器的 effect 依赖相同、按声明顺序执行，记录那边总是先发出新的首页请求。
+  const firstRecordsPage = useRef<Promise<AiRecordsPage> | null>(null)
+  const fetchRecords = useCallback((cursor?: string) => {
+    if (cursor) return getMyAiRecords(token, { pageSize: 50, cursor })
+    const request = getMyAiRecords(token, { pageSize: 50 })
+    firstRecordsPage.current = request
+    return request
+  }, [token])
   const fetchQa = useCallback(async (qaCursor?: string) => {
-    const page = await getMyAiRecords(token, { pageSize: 50, qaCursor })
+    const page = await (qaCursor
+      ? getMyAiRecords(token, { pageSize: 50, qaCursor })
+      : firstRecordsPage.current ?? getMyAiRecords(token, { pageSize: 50 }))
     return { items: page.qaRecords, total: page.qaTotal, nextCursor: page.qaNextCursor }
   }, [token])
   const fetchSessions = useCallback((cursor?: string) => listMyJobAiSessions(token, { pageSize: 50, cursor }), [token])
