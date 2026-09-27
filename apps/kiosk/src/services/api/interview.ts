@@ -232,9 +232,12 @@ export async function transcribeAnswer(sessionId: string, wav: Blob, access: Int
 
 export function getMyInterviews(token: string | null | undefined, opts?: { cursor?: string; pageSize?: number }): Promise<{ items: MemberInterviewItem[]; nextCursor: string | null }> {
   if (API_MODE !== 'http' || !token) return Promise.resolve({ items: [], nextCursor: null })
-  const query = new URLSearchParams({ pageSize: String(opts?.pageSize ?? 50) })
+  // 只在调用方给了分页参数时才带查询串：不传的调用方（面试报告页）照旧拿服务端默认页。
+  const query = new URLSearchParams()
+  if (opts?.pageSize) query.set('pageSize', String(opts.pageSize))
   if (opts?.cursor) query.set('cursor', opts.cursor)
-  return call<{ items: MemberInterviewItem[]; nextCursor: string | null }>(`/me/mock-interviews?${query}`, { token })
+  const search = query.toString()
+  return call<{ items: MemberInterviewItem[]; nextCursor: string | null }>(`/me/mock-interviews${search ? `?${search}` : ''}`, { token })
 }
 
 export function deleteMyInterview(token: string, sessionId: string): Promise<{ deleted: boolean }> {
