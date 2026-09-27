@@ -28,14 +28,24 @@
 | 32-cashier | Grok | 通过（一轮返工） | `capture=1&state=pending` | |
 | 45-online-platform-directory | Grok | 通过（一轮返工） | `capture=1&state=ready` | 本机构官方渠道；机构名与二维码是标明的示例；带本目录的 `directory-workspaces.js` |
 | 48-policy-workspace | Grok | 通过（一轮返工） | `capture=1&state=policy-ready` | 带本目录的 `policy-workspace.js` |
-| 18、19、20、37 | Grok G1（进行中，2026-09-28） | | | 打印链与支付；并统一复核 10–15、32、33 的用词 |
+| 18-scan-workbench | Grok G1 | 通过 | `capture=1&flat=1` | 内部链路说明换成用户三步：放纸 → 面板上按扫描 → 文件回到这台机器 |
+| 19-img2pdf | Grok G1 | 通过（一轮返工） | `capture=1&flat=1&state=ready-three` | |
+| 20-sign-stamp | Grok G1 | 通过（一轮返工） | `capture=1&flat=1&state=placement-default` | 只引导本人手写签名；预览工具条在画面下方，顶部只读 |
+| 37-pay-states | Grok G1 | 通过（一轮返工） | `capture=1&flat=1&state=pending` | 金额仍是空位，不编价格 |
+| 10–15、32、33 用词 | Grok G1 | 通过 | | 英文眉题改中文；彩色、双面写「本机暂未开通」；「让服务端报价」改「核对价格」 |
 | 04-session-guard | Grok G2 | 通过 | `capture=1&state=warning&from=%2Fresume%2Foptimize` | 顶栏不放返回，避免没清场就离开 |
 | 07-session-resume | Grok G2 | 通过 | `capture=1&state=payment-unpaid&fixture=1` | 每单按钮带订单尾号，不再一排相同文案 |
 | 08-legal | Grok G2 | 通过 | `capture=1&doc=user&state=ready` | |
 | 09-system-state | Grok G2 | 通过 | `capture=1&state=partial` | 没检测过的项不写成正常 |
 | 51-phone-relay | Grok G2 | 通过 | `capture=1&screen=qr-login&state=code-sent`（390×844） | 手机字阶，不套 27 寸 |
 | 00–03、05、06 用词 | Grok G2 | 通过 | | 03 协议勾选挪到首屏；工程词换白话 |
-| 35、38、39、40、41、31 | Grok G3（进行中） | | | 「我的」与权益；并复核 30 |
+| 31-benefits | Grok G3 | 通过 | `capture=1&state=list` | |
+| 35-notifications | Grok G3 | 通过（一轮返工） | `capture=1&state=ready-all` | 底部操作条在首屏 |
+| 38-member-assets | Grok G3 | 通过 | `capture=1&state=documents-ready` | 文档 / 订单切换在 y=517 |
+| 39-member-records | Grok G3 | 通过（一轮返工） | `capture=1&view=ai-records&state=ready` | 失败、处理中只留删除并写原因；**实现时「我的」分类页签统一按 38 放在 y≥500**（本稿在 y≈324） |
+| 40-member-feedback | Grok G3 | 通过（一轮返工） | `capture=1&state=form-list` | 「提交反馈」在首屏，未填够时灰掉并写原因 |
+| 41-member-privacy | Grok G3 | 通过 | `capture=1&state=history-ready` | |
+| 30 用词 | Grok G3 | 通过 | | |
 | 34-self-assessment | Grok G4 | 通过 | `capture=1&state=intro` | 不显示题库版本 |
 | 46-resume-decision-workspace | Grok G4 | 通过 | `capture=1&screen=job-fit&state=result-high` | 岗位要求只由本人填写或粘贴 |
 | 47-contract-review-workspace | Grok G4 | 通过 | `capture=1&screen=result&state=ready` | 功能开关默认关 |
