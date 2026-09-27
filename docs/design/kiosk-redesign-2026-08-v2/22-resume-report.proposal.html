@@ -1,0 +1,144 @@
+<!-- 青序流光 2.0 · 诊断报告结构提案（不是默认稿）：「一句结论 → 先改这三处（原句/问题/改写，AI 建议稿标识贴在改写旁）→ 让小青帮填 → 全部内容/六维/结论收到第二屏 → CTA」。壳层、令牌、四步轨沿用原稿。默认稿是 22-resume-report.html。2026-09-27 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>职易达 · 简历诊断报告（青序流光 2.0）</title>
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#526b62;
+  --deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;
+  --teal:#1f9e86;--teal2:#157a67;--soft:#e0f2ec;
+  --wheat:#a9781f;--wheat2:#8a6219;--wheatsoft:#f3ecda;
+  --line:#e3ddcb;--line2:#d4cdb6;--bad:#b23a2e;--badsoft:#f6e4e1;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#e8e3d3;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;display:flex;flex-direction:column;overflow:hidden;transform-origin:center center;background:radial-gradient(880px 400px at 90% 2%,rgba(31,158,134,.075),transparent 62%),var(--paper)}
+a{color:inherit;text-decoration:none}
+/* 顶栏 */
+.topbar{flex:none;height:104px;padding:0 34px;display:flex;align-items:center;gap:20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{width:64px;height:64px;flex:none;display:grid;place-items:center;border-radius:20px;border:1px solid var(--line2);background:var(--paper)}
+.brand{flex:none;display:flex;align-items:center;gap:12px}
+.brand i{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--deep);color:var(--green);font-size:24px;font-weight:800;font-style:normal}
+.brand b{font-size:25px;font-weight:800;letter-spacing:1px}
+.sp{flex:1}
+.stepchip{flex:none;height:56px;padding:0 22px;border-radius:28px;display:flex;align-items:center;gap:10px;background:var(--soft);border:1px solid #bfe3d7;color:var(--teal2);font-size:21px;font-weight:700}
+.stepchip .dot{width:11px;height:11px;border-radius:50%;background:var(--teal);flex:none}
+.clock{flex:none;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px}
+/* 任务头：只读，不放可点 */
+.head{flex:none;margin:16px 36px 0;padding:22px 28px 18px;border-radius:26px;position:relative;overflow:hidden;background:linear-gradient(148deg,var(--deep2),var(--deep) 74%);color:#f2efe4}
+.head::after{content:"";position:absolute;right:-130px;top:-140px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.15),transparent 66%)}
+.head-row{display:flex;align-items:center;gap:20px;position:relative;z-index:1}
+.head-ic{flex:none;width:60px;height:60px;border-radius:19px;display:grid;place-items:center;background:rgba(46,230,168,.12);border:1px solid rgba(46,230,168,.34);color:var(--green)}
+.head-tx{flex:1;min-width:0}
+.head-tx h1{font-size:32px;font-weight:800;line-height:1.25;letter-spacing:.4px}
+.head-tx p{margin-top:6px;font-size:21px;line-height:1.4;color:rgba(242,239,228,.86)}
+.head-tag{flex:none;height:50px;padding:0 20px;border-radius:25px;display:flex;align-items:center;font-size:20px;font-weight:800;background:rgba(242,239,228,.14);border:1px solid rgba(242,239,228,.24)}
+.rail{margin-top:14px;padding-top:12px;border-top:1px solid rgba(242,239,228,.16);display:grid;grid-template-columns:repeat(4,1fr);gap:8px;position:relative;z-index:1}
+.rail>span{display:flex;align-items:center;gap:10px;font-size:20px;color:rgba(242,239,228,.82)}
+.rail>span i{width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:20px;font-weight:800;background:rgba(242,239,228,.16);color:rgba(242,239,228,.9)}
+.rail>span.done{color:rgba(242,239,228,.92)}.rail>span.done i{background:rgba(46,230,168,.18);color:var(--green)}
+.rail>span.now{color:#f2efe4;font-weight:800}.rail>span.now i{background:var(--green);color:var(--deep)}
+/* 主体 */
+.body{flex:1;min-height:0;margin:18px 36px 0;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:24px}
+.verdict{padding:28px 30px 26px;display:flex;flex-direction:column;gap:14px}
+.verdict .ai{display:inline-flex;align-items:center;gap:10px;height:38px;padding:0 14px;border-radius:12px;background:var(--soft);color:var(--teal2);font-size:19px;font-weight:800;align-self:flex-start}
+.verdict h2{font-size:32px;line-height:1.45;font-weight:900;letter-spacing:.5px}
+.verdict p{font-size:21px;line-height:1.5;color:var(--ink3)}
+.sec{display:flex;align-items:baseline;gap:14px;padding:6px 6px 0}
+.sec h3{font-size:28px;font-weight:900;letter-spacing:1px}
+.sec span{font-size:20px;color:var(--ink3)}
+.fix{padding:24px 28px 22px;border:2px solid var(--teal);display:flex;flex-direction:column;gap:16px}
+.fix .t{display:flex;align-items:center;gap:14px;font-size:25px;font-weight:800}
+.fix .t i{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:var(--deep);font-style:normal;font-size:22px;font-weight:800}
+.fix .kv{display:grid;grid-template-columns:82px 1fr;gap:12px 16px;align-items:start}
+.fix .kv small{font-size:21px;color:var(--ink3);padding-top:5px}
+.fix .kv small.lw{color:var(--wheat2)}.fix .kv small.lg{color:var(--teal2)}
+.fix .kv .o{font-size:24px;line-height:1.5;color:var(--ink2)}
+.fix .kv .w{font-size:24px;line-height:1.5;color:var(--wheat2)}
+.fix .kv .g{padding:14px 18px;border-radius:16px;background:var(--soft);font-size:24px;line-height:1.6}
+.fix .kv .g u{text-decoration:none;padding:0 8px;border:2px dashed var(--teal2);border-radius:8px;color:var(--teal2);font-weight:800}
+.fix .kv .g{position:relative;padding-top:18px}.fix .kv .g .stamp{position:absolute;right:14px;top:-14px;height:30px;padding:0 12px;border-radius:15px;display:inline-flex;align-items:center;background:var(--teal2);color:#fff;font-size:17px;font-weight:800;letter-spacing:.5px}.fix .kv .g em{display:block;font-style:normal;font-size:21px;color:var(--ink3);margin-top:6px}
+.fix .act{display:flex;justify-content:flex-end;gap:14px}.fix .act a.ai{border-color:#bfe3d7;background:var(--soft);color:var(--teal2)}
+.ask{height:88px;padding:0 24px 0 18px;display:flex;align-items:center;gap:16px;border-radius:22px;border:1px solid #bfe3d7;background:var(--soft);color:var(--teal2);font-size:23px;font-weight:700}.ask i{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--teal);color:#fff;font-style:normal;font-size:22px;font-weight:800;flex:none}.ask span{flex:1}.ask small{font-size:19px;font-weight:600;color:var(--ink3)}
+.fix .act a{height:72px;padding:0 22px;border-radius:18px;display:flex;align-items:center;font-size:25px;font-weight:700;border:2px solid var(--line2);background:var(--surface)}
+.fix .act a.p{background:var(--teal2);border-color:var(--teal2);color:#fff;font-weight:800}
+.row{height:104px;padding:0 24px;display:flex;align-items:center;gap:16px}
+.row i{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--teal2);font-style:normal;font-size:22px;font-weight:800;flex:none}
+.row b{flex:1;font-size:24px;font-weight:700}
+.row span{font-size:20px;color:var(--ink3)}
+.row svg{flex:none}
+.more{margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.more a{height:80px;border-radius:20px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:22px;font-weight:700;background:var(--surface);border:1px solid var(--line);color:var(--ink2)}
+.more a small{font-size:21px;color:var(--ink3);font-weight:600}
+/* 底部 */
+.cta{flex:none;margin:16px 36px 0;display:grid;grid-template-columns:1fr 1.4fr;gap:16px}
+.btn{height:108px;border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;border:2px solid var(--line2);background:var(--surface)}
+.btn.primary{background:var(--deep);border-color:var(--deep);color:#f2efe4}
+.truth{margin-top:auto;padding:36px 48px 8px;font-size:21px;line-height:1.5;color:var(--ink3);text-align:center}
+.navbar{flex:none;height:112px;margin-top:12px;background:var(--surface);border-top:1px solid var(--line);display:flex}
+.navbar a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-size:21px;color:var(--ink3)}
+.navbar a.on{color:var(--teal2);font-weight:800}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage">
+  <header class="topbar">
+    <a class="back" href="#" aria-label="返回简历来源"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <span class="brand"><i class="serif">职</i><b>职易达</b></span>
+    <span class="sp"></span>
+    <span class="stepchip"><span class="dot" aria-hidden="true"></span>第 3 步 / 共 4 步 · 诊断报告</span>
+    <span class="clock">09:30</span>
+  </header>
+
+  <section class="head">
+    <div class="head-row">
+      <span class="head-ic" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5z"/><path d="M14 2.5v5h5"/><path d="M8.5 13h7M8.5 17h4.5"/></svg></span>
+      <span class="head-tx"><h1>简历诊断报告</h1><p>读了你的简历 7 块内容，先改 3 处最要紧的</p></span>
+      <span class="head-tag">AI 生成 · 供参考</span>
+    </div>
+    <div class="rail"><span class="done"><i>1</i>上传与方向</span><span class="done"><i>2</i>AI 解析</span><span class="now"><i>3</i>诊断报告</span><span><i>4</i>优化打印</span></div>
+  </section>
+
+  <main class="body">
+    <div class="card verdict">
+      <span class="ai">AI 生成，仅供参考</span>
+      <h2 class="serif">整体清楚，经历写得太笼统。<br>先改下面三处，招聘方更容易看到你做成了什么。</h2>
+      <p>依据：你刚上传的原文 · 手机号已遮挡 · 这份报告不保存原文，清场后不再显示</p>
+    </div>
+
+    <div class="sec"><h3>先改这三处</h3><span>逐条确认，不会自动改你的简历 · 其余 3 处是格式问题，在「全部 7 块内容」里</span></div>
+
+    <div class="card fix">
+      <div class="t"><i>1</i>项目经历 · 第 2 条</div>
+      <div class="kv">
+        <small>原句</small><div class="o">另一个内容排期项目，参与其中。</div>
+        <small class="lw">问题</small><div class="w">只写了「参与」，看不出你做了什么、做成了什么。</div>
+        <small class="lg">改写</small><div class="g"><span class="stamp">AI 建议稿</span>内容排期项目：负责 <u>哪个环节</u>，排期从 <u>原来</u> 缩短到 <u>现在</u>。<em>虚线框是要你补充的真实情况，AI 不替你编数字；说给小青听就能填进去。</em></div>
+      </div>
+      <div class="act"><a href="#">保留原句</a><a class="ai" href="#">小青换个改法</a><a class="p" href="#">跟小青说几句，填进去 →</a></div>
+    </div>
+
+    <a class="card row" href="#"><i>2</i><b>基础信息：邮箱这一行是空的</b><span>补一个常用邮箱</span><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+    <a class="card row" href="#"><i>3</i><b>技能：「熟练使用 Office」和 Excel 那条重复</b><span>合并成一条，写清用途</span><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+
+    <a class="ask" href="#"><i class="serif">青</i><span>三处一起改？让小青问你几个问题，一次把它们写完</span><small>AI 数字人 →</small></a>
+    <div class="more">
+      <a href="#">全部 7 块内容<small>· 6 条问题</small></a>
+      <a href="#">六维分数</a>
+      <a href="#">报告结论<small>· 13 条</small></a>
+    </div>
+    <p class="truth">AI 建议仅供参考，改不改、怎么改以你本人确认为准。</p>
+  </main>
+
+  <div class="cta"><a class="btn" href="#">重新诊断</a><a class="btn primary" href="#">继续优化这份简历 →</a></div>
+
+  <nav class="navbar"><a href="#"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5"/></svg>首页</a><a href="#"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI 顾问</a><a href="#"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg>我的</a></nav>
+</div></div>
+<script>function fit(){var k=Math.min(innerWidth/1080,innerHeight/1920),s=document.getElementById('stage');if('zoom' in s.style)s.style.zoom=k;else s.style.transform='scale('+k+')'}addEventListener('resize',fit);fit();</script>
+</body>
+</html>

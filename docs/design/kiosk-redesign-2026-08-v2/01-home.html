@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<!-- 青序流光 2.0 · 首页：hero 缩到 400px 只放只读信息（规则 1）；「问小青」下移到 y=504 成为米纸区第一主操作，AI 卡片角标写能力词（规则 7）；AI 两张卡在上、打印通栏居中、政策与官方渠道在下（规则 5、7）；每张卡写「带走什么」（规则 3）；三处边界声明并成一处（规则 4）；补一行真实设备状态；字阶约 +15%（规则 2）；删除无 DOM 的死样式；对比度提到 4.5:1 以上（Grok 复核）。小程序码等真实码有了再加。
+     原稿：../kiosk-redesign-2026-08/01-home.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>职易达 · 首页</title>
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--muted:#5d6e67;--line:#e2ddcf;
+  --deep:#0b241e;--emerald:#35e6ad;--teal:#1f9e86;--teal-d:#157a67;--teal-soft:#e2f2ec;
+  --blue:#416c94;--blue-soft:#e7eef5;--clay:#a65f3c;--clay-soft:#f4e9e1;--neutral:#52645d;--neutral-soft:#e9eee9;
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','SimSun',serif;
+  --sans:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#171b19;font-family:var(--sans)}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;overflow:hidden;transform-origin:center;background:var(--paper);color:var(--ink)}
+#body-root{height:100%;display:flex;flex-direction:column}
+a,button{font:inherit;color:inherit;text-decoration:none}.hero{height:400px;flex:none;color:#f2f6f0;background:linear-gradient(180deg,rgba(7,33,27,.32),rgba(7,33,27,.93)),url('../kiosk-redesign-2026-08/assets/bg-hero.jpg') center/cover no-repeat;position:relative;padding:0 48px;display:flex;flex-direction:column}
+.hero-top{height:92px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:15px}.seal{width:54px;height:54px;border-radius:16px;background:linear-gradient(145deg,#4af0b8,#21ba89);color:var(--deep);display:grid;place-items:center;font:900 29px/1 var(--serif)}
+.brand-name{font:900 28px/1.2 var(--serif);letter-spacing:3px}.brand-sub{margin-top:3px;color:#e9f6f0;font-size:20px;letter-spacing:1px;border-radius:4px;background:rgba(6,26,21,.72);box-shadow:0 0 0 6px rgba(6,26,21,.72);text-shadow:0 1px 2px rgba(4,18,15,.92)}.datetime{text-align:right}.clock{font-size:25px;font-weight:650;font-variant-numeric:tabular-nums}.date{color:rgba(242,246,240,.84)!important;margin-top:4px;color:rgba(242,246,240,.56);font-size:16px;letter-spacing:1px}
+.assistant{display:flex;align-items:center;gap:26px;margin-top:18px}.assistant .who{flex:1;min-width:0}.phone{flex:none;width:236px;display:flex;align-items:center;gap:12px;color:rgba(242,246,240,.82);font-size:19px;line-height:1.35}.phone .code{width:88px;height:88px;flex:none;border:2px dashed rgba(242,246,240,.5);border-radius:12px;display:grid;place-items:center;font-size:16px;color:rgba(242,246,240,.7)}.phone b{display:block;font-size:21px;color:#f2f6f0;font-weight:650}.avatar{width:108px;height:108px;border-radius:50%;display:grid;place-items:center;flex:none;background:linear-gradient(145deg,#4af0b8,#1fa27d);color:var(--deep);font:900 46px/1 var(--serif);box-shadow:0 0 40px rgba(53,230,173,.22)}
+.greeting{font:900 46px/1.2 var(--serif);letter-spacing:2px}.greeting em{font-style:normal;color:var(--emerald)}.hint{margin-top:10px;color:rgba(242,246,240,.78);font-size:24px;letter-spacing:1px}
+
+
+
+.hero-law{margin-top:auto;padding-bottom:22px;font-size:20px;color:rgba(242,246,240,.82);letter-spacing:.5px}
+.wave{height:48px;flex:none;background:var(--paper);position:relative}.wave::before{content:"";position:absolute;left:0;right:0;top:-28px;height:52px;background:var(--deep);clip-path:ellipse(66% 45% at 50% 0)}
+.board{flex:1;min-height:0;padding:2px 48px 18px;display:flex;flex-direction:column}.ask{flex:none;height:96px;margin:54px 0 14px;border-radius:48px;background:linear-gradient(110deg,#37dfaa,#20b38b);color:var(--deep);display:flex;align-items:center;padding:0 22px 0 16px;gap:18px;font-size:27px;font-weight:650;box-shadow:0 10px 28px rgba(31,158,134,.22)}.ask .mic{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;background:rgba(9,37,31,.12);flex:none}.ask small{margin-left:auto;font-size:21px;font-weight:650;opacity:1}.ask .tag{font-size:21px;font-weight:650;opacity:1;margin-left:14px}.status{flex:none;height:56px;margin:0 0 6px;display:flex;align-items:center;gap:36px;font-size:21px;color:var(--muted);white-space:nowrap}.status b{display:inline-flex;align-items:center;gap:9px;color:var(--ink);font-weight:600}.status i{width:12px;height:12px;border-radius:50%;background:var(--teal);display:inline-block}.status i.off{background:#c9c2b2}.status a{margin-left:auto;color:var(--teal-d);font-weight:650;min-height:48px;display:inline-flex;align-items:center}.section-head{height:68px;display:flex;align-items:center;gap:15px}.section-head h2{font:900 32px/1 var(--serif);letter-spacing:2px}.section-head span{font-size:21px;color:var(--muted)}.all-services{margin-left:auto;min-height:56px;padding:0 18px;display:flex;align-items:center;border-radius:10px;color:var(--teal-d);font-size:21px;font-weight:650}
+.tiles{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(272px,1fr) 212px minmax(272px,1fr);gap:16px 18px}.tile{position:relative;border:1px solid var(--line);border-radius:26px;background:var(--surface);padding:26px 28px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 4px 16px rgba(16,48,43,.05);animation:rise .45s ease-out both}.tile:active{transform:scale(.985)}@keyframes rise{from{transform:translateY(16px)}to{transform:translateY(0)}}
+.feature{grid-column:1/-1;grid-row:2;color:#f3f7f1;border:0;padding:28px 34px;background:linear-gradient(135deg,#17644f,#0d4034);box-shadow:0 12px 32px rgba(13,64,52,.24)}.feature .eyebrow{font-size:20px;color:#78edc5;font-weight:650;letter-spacing:1px}.feature .name{margin-top:9px;font:900 34px/1.2 var(--serif);letter-spacing:2px}.feature .desc{margin-top:8px;font-size:23px;color:rgba(243,247,241,.78)}.feature .foot{margin-top:auto;color:#78edc5;font-size:21px;font-weight:650}.feature-icon{position:absolute;right:40px;bottom:31px;color:#78edc5}
+.tile-head{display:flex;align-items:center;justify-content:space-between}.icon{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;color:var(--teal-d);background:var(--teal-soft)}.badge.ai{background:var(--teal-soft);color:var(--teal-d)}.badge{min-height:42px;padding:0 15px;border-radius:21px;display:flex;align-items:center;background:var(--neutral-soft);color:var(--neutral);font-size:18px;font-weight:650}.name{margin-top:14px;font:900 29px/1.25 var(--serif);letter-spacing:1px}.desc{margin-top:8px;color:var(--muted);font-size:22px;line-height:1.45}.foot{margin-top:auto;color:var(--teal-d);font-size:21px;font-weight:650}.jobs .icon,.policy .icon{color:var(--blue);background:var(--blue-soft)}.fair .icon{color:var(--clay);background:var(--clay-soft)}.slim{display:flex;flex-direction:row;align-items:center;gap:17px;padding:16px 22px}.slim .name,.slim .desc{display:block}.slim .name{margin-top:0;font-size:24px}.slim .desc{font-size:16px;margin-top:4px}.slim .icon{flex:none}.slim .badge{position:absolute;right:18px;top:15px}.policy-entry{grid-column:1/-1}.policy-entry .desc{font-size:17px}
+/* ══ 底座 ═══════════════════════════════════════════════════════
+   可信与合规信息区与主导航共用一块底，与服务区之间只留一条分界线。
+   原来 truth-line / legal-line / navbar 各带一道横线或换一次底色，
+   在 1080 宽上叠成三道横栏；现在只保留一条边界，信息区的浅色底
+   向下渐隐进导航栏，层级交给留白和明度，不再靠画线。 */
+.basezone{flex:none;background:var(--surface);border-top:1px solid var(--line)}
+.trust{padding:10px 48px 4px;text-align:center;background:linear-gradient(180deg,#f0ebde,#faf7f0 64%,var(--surface))}
+.trust-main{min-height:34px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:20px;letter-spacing:.5px}
+.trust-main strong{color:var(--ink);font-weight:650;letter-spacing:1px}
+.trust-main svg{flex:none;color:var(--teal-d);opacity:.72}
+.trust-main .sep{color:#a8b0aa}
+/* 备案与版权：弱化到不抢读，但不缩到看不清；两条链接保留 48px 点击高度，
+   那段高度同时就是这一区的呼吸空间，不用再额外堆 padding。 */
+.trust-legal{margin-top:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;color:var(--muted);font-size:20px;line-height:1.5;overflow-wrap:anywhere}
+.trust-legal a{display:inline-flex;align-items:center;min-height:48px;padding:0 8px;color:inherit;text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(93,110,103,.42)}
+.trust-legal a:active{color:var(--teal-d)}
+.navbar{height:112px;flex:none;display:flex}.nav-item{flex:1;min-height:76px;padding-bottom:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;color:var(--muted);font-size:21px;letter-spacing:1px;position:relative}.nav-item.active{color:var(--teal-d);font-weight:700}.nav-item svg{opacity:.78}.nav-item.active svg{opacity:1}.nav-item .indicator{position:absolute;bottom:16px;width:40px;height:4px;border-radius:2px;background:transparent}.nav-item.active .indicator{background:var(--teal)}
+
+/* ══ hero 动效三件 ═════════════════════════════════════════════
+   口径遵循本项目动效规范：动效是状态的语言，不是装饰；
+   只用 transform / opacity（GPU 友好）；不做粒子、3D 翻转、全屏扫描线。
+   三件都能被 prefers-reduced-motion 与 ?flat=1 完全关停。 */
+
+/* ① 呼吸光场 —— 26s 一个周期，慢到几乎察觉不到在动，
+      但盯着看会发现深绿底是「活的」。不抢主操作的注意力。 */
+.hero>*{position:relative;z-index:1}
+.hero::after{
+  content:'';position:absolute;inset:-12% -8%;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(46% 38% at 22% 30%, rgba(46,230,168,.16), transparent 68%),
+    radial-gradient(40% 44% at 78% 66%, rgba(31,162,125,.14), transparent 70%);
+  opacity:.55;
+  animation:heroField 26s ease-in-out infinite;
+}
+@keyframes heroField{
+  0%,100%{transform:translate3d(0,0,0) scale(1);opacity:.5}
+  50%    {transform:translate3d(2.2%,-1.6%,0) scale(1.06);opacity:.78}
+}
+
+/* ② 小青头像呼吸光环 —— 语义是「AI 在线、可对话」，
+      这条本来就写在项目动效规范里（光环扩散 ring / 小青头像），此前没落地。 */
+.avatar{position:relative}
+.avatar::after{
+  content:'';position:absolute;inset:0;border-radius:50%;pointer-events:none;
+  border:2px solid rgba(53,230,173,.5);
+  animation:avatarRing 3.6s cubic-bezier(.25,.6,.35,1) infinite;
+}
+@keyframes avatarRing{
+  0%  {transform:scale(1);opacity:.55}
+  70% {transform:scale(1.42);opacity:0}
+  100%{transform:scale(1.42);opacity:0}
+}
+
+/* ③ 语音条流光 —— 与 AI 驾驶舱仪表带的扫光同一套语言：
+      表示「这是活的通道」。刻意不画声波：没有在录音就不能画出正在听的样子。 */
+
+
+/* ④ 入场序列 —— 用户从待机屏走过来的那一刻，机器要「醒过来」。
+      只跑一次、680ms 走完，之后完全静止；这是全页唯一一处编排动效。
+      与下方服务区已有的 rise 各管各的层，不叠加。 */
+.hero>*{animation:heroIn .52s cubic-bezier(.22,.75,.3,1) both}
+.hero>*:nth-child(1){animation-delay:.04s}
+.hero>*:nth-child(2){animation-delay:.12s}
+.hero>*:nth-child(3){animation-delay:.20s}
+.hero>*:nth-child(4){animation-delay:.28s}
+.hero>*:nth-child(5){animation-delay:.36s}
+@keyframes heroIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+/* 光环等首屏落定后再起，避免和入场撞在一起 */
+.avatar::after{animation-delay:.9s}
+
+/* 无障碍降级必须放在全部动效定义之后：
+   同特异性下后写的规则胜出，之前放在 ④ 入场序列之前时 animation:none 会被覆盖。 */
+@media(prefers-reduced-motion:reduce){
+  .tile,.hero::after,.avatar::after,.voice::after,.hero>*{animation:none!important}
+  .hero::after{opacity:.5}
+  .avatar::after{opacity:.35;transform:none}
+  .voice::after{display:none}
+  .hero>*{opacity:1;transform:none}
+}
+
+/* 键盘 / 辅助输入焦点可见：一体机可外接键盘或辅助设备，
+   焦点框必须在深绿 hero 与浅底服务区上都看得清。 */
+a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:4px solid #0f7f66;outline-offset:3px;border-radius:14px}
+.hero a:focus-visible,.hero button:focus-visible{outline:4px solid #8ff5d2;outline-offset:3px;box-shadow:0 0 0 7px rgba(9,37,31,.45)}
+.navbar .nav-item:focus-visible{outline:4px solid #0f7f66;outline-offset:-5px;border-radius:0}
+.trust-legal a:focus-visible{outline:3px solid #0f7f66;outline-offset:2px}
+
+/* 截图与验收：?flat=1 一键静止，避免拍到动画中间态 */
+#stage.flat .hero::after,#stage.flat .avatar::after,#stage.flat .voice::after,#stage.flat .hero>*{animation:none;opacity:1;transform:none}
+#stage.flat .hero::after{opacity:.6}
+#stage.flat .avatar::after{opacity:.4;transform:none}
+#stage.flat .voice::after{display:none}
+#stage.flat .tile{animation:none}
+.board-close{margin-top:auto;text-align:center;font-size:21px;line-height:1.5;color:var(--muted);padding:8px 64px 2px}
+.hero .date{font-size:20px;color:rgba(242,246,240,.88)}
+</style>
+</head>
+<body>
+<div id="viewport"><main id="stage"><div id="body-root" data-screen="home" data-state="no-context" data-testid="home-state-no-context" class="state-no-context">
+  <section class="hero">
+    <header class="hero-top"><div class="brand"><div class="seal">职</div><div><div class="brand-name">职易达</div><div class="brand-sub">就业服务大厅 · 01 号机</div></div></div><div class="datetime"><div class="clock" id="clock">--:--</div><div class="date" id="dateLine">--</div></div></header>
+    <div class="assistant"><div class="avatar">青</div><div class="who"><div class="greeting"><span id="greeting">你好</span>，我是<em>小青</em></div><div class="hint">今天想办哪件事？下面选一项，或者直接问我</div></div></div>
+    <div class="hero-law">AI 生成的内容都会标明，仅供参考 · 本机不替你投递 · 收费以现场公示为准</div>
+  </section>
+  <div class="wave"></div>
+  <section class="board">
+    <a class="ask" href="05-ai-cockpit.html" aria-label="问小青，说一句你想办的事" data-testid="home-primary"><span class="mic"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg></span>问小青：说一句你想办的事<span class="tag">AI 数字人</span><small>进入助手 →</small></a>
+    <div class="status"><b><i></i>打印机就绪</b><b><i></i>扫描仪就绪</b><b><i></i>网络正常</b><a href="09-system-state.html">设备状态 →</a></div>
+    <div class="section-head"><h2>直接办</h2><span>每项最后都会给你一样东西</span><a class="all-services" href="02-services.html">更多服务 →</a></div>
+    <div class="tiles">
+      <a class="tile" href="16-service-hubs.html?hub=resume" data-hub-link="resume"><span class="tile-head"><span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l4 4v14H7zM14 3v4h4"/></svg></span><span class="badge ai">AI 诊断改写</span></span><span class="name">改简历</span><span class="desc">上传或扫描，AI 逐句指出问题和改法，改不改你定</span><span class="foot">带走：新简历 →</span></a>
+      <a class="tile" href="16-service-hubs.html?hub=interview" data-hub-link="interview"><span class="tile-head"><span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5.5h16V16H9.5L5 19.5z"/></svg></span><span class="badge ai">AI 模拟面试</span></span><span class="name">练面试</span><span class="desc">回答常见问题，当场看反馈，不做录用判断</span><span class="foot">带走：面试反馈 →</span></a>
+      <a class="tile feature" href="10-print-hub.html"><span class="eyebrow">先看价格，付了再打 · 带走：打印件</span><span class="name">打印 · 扫描</span><span class="desc">手机扫码传文件、插 U 盘，或扫描原件；AI 自动识别证件并加水印</span><span class="foot">开始选择材料 →</span><span class="feature-icon" aria-hidden="true"><svg width="92" height="92" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M6 9V3h12v6"/><rect x="3.5" y="9" width="17" height="7.5" rx="1.8"/><path d="M6.5 13.5h11V21h-11z"/></svg></span></a>
+      <a class="tile policy" href="16-service-hubs.html?hub=policy" data-hub-link="policy"><span class="tile-head"><span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/></svg></span><span class="badge">官方发布</span></span><span class="name">查政策</span><span class="desc">补贴、社保怎么办，要带哪些材料</span><span class="foot">带走：材料清单 →</span></a>
+      <a class="tile jobs" href="45-online-platform-directory.html" data-hub-link="channels"><span class="tile-head"><span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h3v3h-3zM17 17h3v3"/></svg></span><span class="badge">机构提供</span></span><span class="name">机构官方渠道</span><span class="desc">岗位、招聘会看机构官网，<br>扫码在手机上打开</span><span class="foot">扫码前往 →</span></a>
+    </div>
+    <p class="board-close">岗位和招聘会不在这台机器上办，扫上面的码去机构官网。</p>
+  </section>
+  <footer class="basezone">
+    <div class="trust">
+      <p class="trust-legal"><a href="https://beian.miit.gov.cn/" rel="noreferrer noopener">鲁ICP备2026023517号-2</a> · <a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" rel="noreferrer noopener">鲁公网安备37021402007308号</a> · 离开 3 分钟自动退出，不保留你的资料</p>
+    </div>
+    <nav class="navbar" aria-label="主导航"><a class="nav-item active" href="01-home.html" aria-current="page"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5"/></svg><span>首页</span><i class="indicator"></i></a><a class="nav-item" href="05-ai-cockpit.html"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>AI 顾问</span><i class="indicator"></i></a><a class="nav-item" href="30-my-profile.html"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg><span>我的</span><i class="indicator"></i></a></nav>
+  </footer>
+</div></main></div>
+<script>
+function fit(){var k=Math.min(innerWidth/1080,innerHeight/1920),s=document.getElementById('stage');if('zoom' in s.style)s.style.zoom=k;else s.style.transform='scale('+k+')'}addEventListener('resize',fit);addEventListener('orientationchange',fit);fit();
+/* ?flat=1：与其它 50 张一致的一键关效开关。此前本页没有接，
+   截图工具会拍在动效跑完之前——今天已经因为这类时序误判过一次。 */
+if(new URLSearchParams(location.search).get('flat')==='1'||new URLSearchParams(location.search).get('capture')==='1'){
+  document.getElementById('stage').classList.add('flat');
+}
+var root=document.getElementById('body-root'),requested=new URLSearchParams(location.search).get('state'),state=requested==='context'?'context':'no-context';root.dataset.state=state;root.dataset.testid='home-state-'+state;root.className='state-'+state;
+var week=['周日','周一','周二','周三','周四','周五','周六'];function tick(){var d=new Date(),h=d.getHours(),g=h<6?'夜深了':h<11?'上午好':h<14?'中午好':h<18?'下午好':'晚上好';document.getElementById('greeting').textContent=g;document.getElementById('clock').textContent=String(h).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');document.getElementById('dateLine').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 · '+week[d.getDay()]}tick();setInterval(tick,10000);
+</script>
+</body>
+</html>
