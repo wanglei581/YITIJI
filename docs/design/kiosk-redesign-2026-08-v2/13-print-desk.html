@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
+- 2026-09-28 按运行能力修订：材料检查必须做完才能继续；选遮挡会另出一份用于打印的文件，上传的原件不改。
+- 2026-09-28 第二遍：遮挡的完整解释只留在「两个选项分别是什么意思」；决定列表底部标签不再被下一张卡盖住。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 保留左右预览与参数结构、页码计算和权限门控，步骤带增高让参数操作进入可触达区（规则 1、2）。
@@ -23,7 +25,7 @@
   然后交给 14-print-confirm.html 由下一步的实际价格。**本页不显示任何金额、权益抵扣、支付或成功结论**。
 
   查询契约：
-    ?state=<下方 22 态之一>   —— 仅本原型使用；示例态必须带 capture=1 或 debug=1
+    ?state=<下方 21 态之一>   —— 仅本原型使用；示例态必须带 capture=1 或 debug=1
     ?capture=1 / ?debug=1     —— 示例可达门；?flat=1 截图去动效并隐藏输入光标（光标闪烁会让两次截图不一致）
     ?from=upload|hub|home|docs —— 真实来源，决定返回落点；**未知值一律安全回落 /print/upload**，
                                  且原值绝不进入 DOM（外部 URL 既不接受也不回显）
@@ -32,10 +34,10 @@
                               —— 完整预览入口，只在 capture=1 / debug=1 且真的握着文件时生效
     ?sug=loading|ready|unavailable —— 检查建议子态，缺省 ready
 
-  22 个业务状态：
+  21 个业务状态：
     missing-context | illegal-context | expired-context
     check-loading | check-clean | check-flagged | check-flagged-partial | check-flagged-decided
-    check-failed | check-retrying | check-skip-confirm
+    check-failed | check-retrying
     preview | file-unsupported
     capability-loading | capability-error | capability-doc-locked
     capability-color-locked | capability-duplex-locked
@@ -65,7 +67,9 @@
     缩放方式    PrintScale = fit | actual；Terminal Agent 已映射到 fit | noscale。两项仍待 Windows / 奔图现场开通。
     设备        useTerminalDeviceStatus kind = ready | offline | error | low_paper | unknown。
                 读不到就是 unknown —— 不说离线，也不说正常。
-    遮挡        当前版本只记录裁决并做遮挡评估，**不生成遮挡后的新文件**，打印用的仍是原文件。
+    遮挡        完整解释只写在检查页左栏「两个选项分别是什么意思」：保留原样印出；
+                遮挡另出一份涂黑文件用于打印，原件不改，下一步预览可逐页核对。
+                材料检查没做完不能继续打印。
     纸张        本机固定 A4，没有 A3，也不提供其它幅面选项。
     金额        本页不显示、不预估任何金额；价格到下一步再看。
 
@@ -84,7 +88,7 @@
 
   本页不做：手机上传、二维码、扫码通道（那是 12-file-source.html 的事，本页完全冻结不碰）、
             AI 简历诊断、金额预估、权益抵扣、支付、建单、出纸、把文件存进「我的文档」。
-  「检查建议」是**按文件事实和你的裁决算出来的确定性结论（E1 / E2）**，不是 AI 判断，
+  「检查建议」是**按文件事实和你的决定算出来的确定性结论（E1 / E2）**，不是 AI 判断，
   算不出来时如实说算不出来，**不阻断主流程**。
 
   原型演示控制：普通地址完全不渲染；仅 ?debug=1 注入（data-proto-control="true"），并保留 debug/capture/flat。
@@ -199,7 +203,7 @@ input{font:inherit}
 .fx{display:flex;align-items:center;gap:12px;background:var(--wheat-soft);color:var(--wheat-d);border-radius:var(--r-md);padding:12px 18px;font-size:18px;font-weight:600;line-height:1.36}
 .fx .fx-b{flex:none;background:var(--wheat-d);color:#fff;border-radius:8px;padding:4px 11px;font-size:15px;letter-spacing:1px;white-space:nowrap}
 
-/* ---------- 材料检查：逐条裁决 ---------- */
+/* ---------- 材料检查：逐条决定 ---------- */
 .finding{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--line)}
 .finding:last-child{border-bottom:0}
 .fd-ic{flex:none;width:54px;height:54px;border-radius:17px;display:flex;align-items:center;justify-content:center}
@@ -527,11 +531,11 @@ var CAPTURE=Q.get('capture')==='1';
 var DEBUG=Q.get('debug')==='1';
 var FIXTURE_OK=CAPTURE||DEBUG;
 
-/* 22 个业务状态。两条路由，一个宿主。 */
+/* 21 个业务状态。两条路由，一个宿主。材料检查没有旁路。 */
 var STATES=[
  'missing-context','illegal-context','expired-context',
  'check-loading','check-clean','check-flagged','check-flagged-partial','check-flagged-decided',
- 'check-failed','check-retrying','check-skip-confirm',
+ 'check-failed','check-retrying',
  'preview','file-unsupported',
  'capability-loading','capability-error','capability-doc-locked','capability-color-locked','capability-duplex-locked',
  'device-loading','device-unknown','device-offline','device-error'
@@ -583,7 +587,6 @@ var ICO={
  sliders:'<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/>',
  layers:'<path d="M12 3.5 3 8l9 4.5L21 8z"/><path d="M3 13l9 4.5L21 13"/>',
  refresh:'<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/>',
- skip:'<path d="M5 5l8 7-8 7z"/><path d="M17 5v14"/>',
  bulb:'<path d="M9 17.5h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6h5.4c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/>'
 };
 function svg(n,s,w,sw){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+s+'" stroke-width="'+(sw||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
@@ -802,18 +805,17 @@ function ppImage(){
 }
 
 /* ================= 本页可变模型 =================
-   参数、裁决都在这里；每次改动都真的改 DOM、真的改参数摘要、真的重算能不能继续。 */
-var SKIP=Q.get('skip')==='1';
-var M={copies:1,color:'bw',duplex:'simplex',orientation:'auto',scale:'fit',rangeMode:'all',rangeText:'',decisions:['pending','pending','pending'],skipped:SKIP};
+   参数、决定都在这里；每次改动都真的改 DOM、真的改参数摘要、真的重算能不能继续。 */
+var M={copies:1,color:'bw',duplex:'simplex',orientation:'auto',scale:'fit',rangeMode:'all',rangeText:'',decisions:['pending','pending','pending']};
 var ST='missing-context';
 
 var FINDINGS=[
- {t:'身份证号',risk:'high',riskTxt:'建议遮挡后再打印',s:'第 2 页 · 3***************27',ic:'id',bg:'var(--cinnabar-soft)',fg:'#963227'},
+ {t:'身份证号',risk:'high',riskTxt:'遮挡后再打印',s:'第 2 页 · 3***************27',ic:'id',bg:'var(--cinnabar-soft)',fg:'#963227'},
  {t:'手机号',risk:'mid',riskTxt:'建议确认是否需要遮挡',s:'第 1 页 · 138****5678',ic:'phone',bg:'var(--wheat-soft)',fg:'#8a6219'},
  {t:'银行卡号',risk:'low',riskTxt:'按材料用途确认',s:'第 3 页 · 6222 **** **** 1234',ic:'bank',bg:'var(--paper)',fg:'#526b62'}
 ];
 function initModel(st){
- M.copies=1;M.color='bw';M.duplex='simplex';M.orientation='auto';M.scale='fit';M.rangeMode='all';M.rangeText='';M.skipped=SKIP;
+ M.copies=1;M.color='bw';M.duplex='simplex';M.orientation='auto';M.scale='fit';M.rangeMode='all';M.rangeText='';
  if(st==='check-flagged')M.decisions=['pending','pending','pending'];
  else if(st==='check-flagged-partial')M.decisions=['redact','keep','pending'];
  else if(st==='check-flagged-decided')M.decisions=['redact','keep','redact'];
@@ -823,7 +825,7 @@ function initModel(st){
  if(st==='capability-color-locked')M.color='color';
  if(st==='capability-duplex-locked')M.duplex='duplex_long_edge';
 }
-var CHECK_STATES={'check-loading':1,'check-clean':1,'check-flagged':1,'check-flagged-partial':1,'check-flagged-decided':1,'check-failed':1,'check-retrying':1,'check-skip-confirm':1};
+var CHECK_STATES={'check-loading':1,'check-clean':1,'check-flagged':1,'check-flagged-partial':1,'check-flagged-decided':1,'check-failed':1,'check-retrying':1};
 var CTX_STATES={'missing-context':1,'illegal-context':1,'expired-context':1};
 function isCheck(st){return !!CHECK_STATES[st]}
 function isCtx(st){return !!CTX_STATES[st]}
@@ -839,11 +841,10 @@ function gateReason(st){
  if(isCheck(st)){
   if(st==='check-loading')return '检查结果还没回来，不预先放行 —— 查完才知道要不要你拿主意。';
   if(st==='check-retrying')return '正在重新检查这份文件，结果回来之前不放行。';
-  if(st==='check-skip-confirm')return null;
   if(st==='check-clean')return null;
   if(st==='check-failed')return null;
   var left=M.decisions.length-decidedCount();
-  if(left>0)return '还有 '+left+' 处没裁决。这三处都要你亲自选「保留」或「建议遮挡」，逐条选完才放行。';
+  if(left>0)return '还有 '+left+' 处没决定。这三处都要你亲自选「保留」或「遮挡」，逐条选完才放行。';
   return null;
  }
  if(d.kind==='docx')return '这份文件本机不能打印：打印只收 PDF / JPG / PNG，Word 既不上传也不转换。先另存成 PDF 再回来。';
@@ -907,8 +908,7 @@ function suggestItems(st){
  if(!r.ok)out.push(['e2','页范围现在不成立，所以这条只按整份文件算，改对之后会重算。']);
  else if(!r.all)out.push(['e2','你选的是自定义页范围，'+(r.ignored&&r.ignored.length?('其中 '+r.ignored.join('、')+' 超出这份文件，会被忽略；'):'')+'实际出纸 <b>'+r.pages+' 页</b>。']);
  var dc=decidedCount();
- if(dc>0)out.push(['e1','你已经裁决了 '+dc+' 处：保留 '+keptCount()+' 处、建议遮挡 '+redactCount()+' 处。<b>保留的那几处会原样印在纸上。</b>']);
- else if(M.skipped)out.push(['e1','这次跳过了材料检查，所以文件里有没有可识别片段是未知的，纸上会原样出现全部内容。']);
+ if(dc>0)out.push(['e1','你已经决定了 '+dc+' 处：保留 '+keptCount()+' 处、遮挡 '+redactCount()+' 处。']);
  else out.push(['e1','打印前请再看一遍个人信息。']);
  return out;
 }
@@ -935,7 +935,7 @@ function suggestBox(st){
 /* ================= 组件 ================= */
 function fixtureBar(what){
  return '<div class="fx" data-testid="'+SCREEN+'-fixture" role="note"><span class="fx-b">示例文件</span>'+
-  '<span>仅展示参数效果；打印仍使用原文件，隐私标记不会修改文件。</span></div>';
+  '<span>· 仅展示效果</span></div>';
 }
 function optBtn(o){
  if(o.locked){
@@ -1069,7 +1069,7 @@ function fileIdCard(st){
  var pages=d.kind==='docx'?'页数不适用':(d.pages+' 页');
  return '<div class="fileid" data-testid="'+SCREEN+'-fileid">'+
   '<b>'+d.n+'</b><span>'+d.s+' · '+pages+'</span>'+
-  '<em>打印文件：<i>原文件</i></em></div>';
+  '<em>打印文件：<i>'+(redactCount()>0?'涂黑后的那一份':'你上传的这一份')+'</i></em></div>';
 }
 function openPvBtn(st){
  var d=docOf(st);
@@ -1260,7 +1260,7 @@ function ctaBar(secondary,primary,reason){
  return (reason?'<div class="cta-reason" id="cta-reason" data-testid="'+SCREEN+'-disabled-reason">'+svg('info','currentColor',22)+'<span>'+reason+'</span></div>':'')+
   '<div class="ctabar">'+secondary+primary+'</div>';
 }
-/* 「我的文档」永远只是一个诚实的查看入口：本页不保存文件，跳过去也不代表存成功。 */
+/* 「我的文档」永远只是一个诚实的查看入口：本页不保存文件，点开也不代表已经存上。 */
 function docsLink(){
  return ghost('查看我的文档','38-member-assets.html','/me/documents',SCREEN+'-docs-link','查看我的文档（本页不保存这一份，点开只是去看已经存过的）');
 }
@@ -1290,17 +1290,15 @@ function leftColCheck(st){
   '<div class="thumb-cap">'+(d.kind==='docx'?'没有可显示的页面':(d.kind==='image'?'整张图片 · 共 1 页':('第 1 页 / 共 '+d.pages+' 页')))+'</div>'+
   fileIdCard(st)+openPvBtn(st)+
   '<div class="mini" style="flex:none;display:flex;flex-direction:column;gap:10px">'+
-   '<div><h4>'+svg('info','currentColor',21)+'<span>两个选项分别是什么意思</span></h4>'+
-   '<p>当前版本会<b>记录你的裁决</b>并做遮挡评估，<b>但不会生成一份遮挡后的新文件</b>，打印用的仍是你上传的这一份原文件。</p></div>'+
+   '<div><h4>'+svg('info','currentColor',21)+'<span>两个选项分别是什么意思</span></h4></div>'+
    '<div class="notes"><div class="note"><span class="sq"></span><span><b>保留</b>：这一处原样印在纸上。</span></div>'+
-   '<div class="note"><span class="sq"></span><span><b>建议遮挡</b>：记录你的选择，供你自己判断要不要换一份再来。</span></div></div>'+
-   '<p>真不想让某段信息出现在纸上，请先在手机或电脑上把它处理掉，再回来重新传一份。</p></div>'+
+   '<div class="note"><span class="sq"></span><span><b>遮挡</b>：另生成一份把这一处涂黑的文件，打印用这一份；你上传的原文件不变。下一步可以逐页核对遮挡结果。</span></div></div></div>'+
   '</div>';
 }
 var DEC_TEXT={
- pending:'<b>还没决定。</b>选「保留」这一处就原样印在纸上；选「建议遮挡」只记录你的裁决。',
- keep:'<b>已选保留。</b>这一处会<b>原样印在纸上</b>，请确认这是你想要的。',
- redact:'<b>已选建议遮挡。</b>裁决已记录；当前版本<b>不生成遮挡后的新文件</b>，打印的仍是原文件。'
+ pending:'还没决定。',
+ keep:'已选保留：这一处原样印在纸上。',
+ redact:'已选遮挡：打印时用涂黑后的文件。'
 };
 function findingRow(i){
  var o=FINDINGS[i],sel=M.decisions[i];
@@ -1311,16 +1309,16 @@ function findingRow(i){
   '<span class="fd-x" data-testid="'+SCREEN+'-finding-'+i+'-outcome">'+DEC_TEXT[sel]+'</span>'+
   '<span class="fd-a">'+
    '<button type="button" class="seg press" data-testid="'+SCREEN+'-finding-'+i+'-keep" data-act="dec:'+i+':keep" aria-pressed="'+(sel==='keep')+'" aria-label="'+o.t+'：保留，原样印在纸上">保留</button>'+
-   '<button type="button" class="seg press" data-testid="'+SCREEN+'-finding-'+i+'-redact" data-act="dec:'+i+':redact" aria-pressed="'+(sel==='redact')+'" aria-label="'+o.t+'：建议遮挡">建议遮挡</button>'+
+   '<button type="button" class="seg press" data-testid="'+SCREEN+'-finding-'+i+'-redact" data-act="dec:'+i+':redact" aria-pressed="'+(sel==='redact')+'" aria-label="'+o.t+'：遮挡">遮挡</button>'+
   '</span></span></div>';
 }
 function findingsCard(){
- var h='<div class="card" style="flex:1;min-height:0;justify-content:space-between" data-testid="'+SCREEN+'-findings">',i;
+ var h='<div class="card" style="flex:1 0 auto;justify-content:space-between" data-testid="'+SCREEN+'-findings">',i;
  for(i=0;i<FINDINGS.length;i++)h+=findingRow(i);
  h+='<div class="meta" data-testid="'+SCREEN+'-decided">'+
-  '<span class="chip'+(decidedCount()===FINDINGS.length?' ok':'')+'">已裁决 '+decidedCount()+' / '+FINDINGS.length+'</span>'+
+  '<span class="chip'+(decidedCount()===FINDINGS.length?' ok':'')+'">已决定 '+decidedCount()+' / '+FINDINGS.length+'</span>'+
   '<span class="chip">保留 '+keptCount()+' 处</span>'+
-  '<span class="chip">建议遮挡 '+redactCount()+' 处</span>'+
+  '<span class="chip">遮挡 '+redactCount()+' 处</span>'+
   (decidedCount()<FINDINGS.length?'<span class="chip warn">还有 '+(FINDINGS.length-decidedCount())+' 处等你决定</span>':'<span class="chip ok">三处都决定完了</span>')+
   '</div></div>';
  return h;
@@ -1342,10 +1340,10 @@ function checkRight(st){
    '<div class="state" data-kind="info" data-testid="'+SCREEN+'-status"><div class="state-h"><span class="dot16 breathe"></span>正在重新检查</div>'+
    '<div class="state-p">用的还是刚才那一份文件，<b>不会产生第二份</b>，也不会重复收费。上一次失败没有留下任何结论。</div></div>'+
    '<div class="card" style="flex:1;min-height:0;justify-content:space-evenly"><div><div class="sec-label" style="margin-bottom:8px"><span class="t" style="font-size:23px">这次重试只有三种结果</span></div>'+
-   '<ul class="steps"><li><span class="n">1</span><span>查出可识别片段：逐条列出来，由你决定保留还是建议遮挡。</span></li>'+
+   '<ul class="steps"><li><span class="n">1</span><span>查出可识别片段：逐条列出来，由你决定保留还是遮挡。</span></li>'+
    '<li><span class="n">2</span><span>没查到：如实说没命中，但不等于文件里一定没有。</span></li>'+
-   '<li><span class="n">3</span><span>还是失败：还可以再试，或者自己看一遍后跳过检查。</span></li></ul></div>'+
-   '<div class="notes"><div class="note"><span class="sq"></span><span>无论哪种结果，<b>打印用的都是你上传的原文件</b>。</span></div>'+
+   '<li><span class="n">3</span><span>还是失败：还可以再试。没检查完不能继续打印。</span></li></ul></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>查出片段后，要逐条选保留或遮挡，选完才能继续。</span></div>'+
    '<div class="note"><span class="sq"></span><span>重试期间参数还没开始设，返回也不会丢东西。</span></div></div></div></div>';
  }
  if(st==='check-clean'){
@@ -1365,32 +1363,21 @@ function checkRight(st){
    '<div class="state" data-kind="error" data-testid="'+SCREEN+'-status"><div class="state-h">'+svg('warn','currentColor',26,2.1)+'材料检查没做成</div>'+
    '<div class="state-p">检查任务失败了，所以<b>这份文件有没有可识别片段，现在是未知</b>。查不出来就说未知，不会因此说「没问题」。</div></div>'+
    '<div class="card" style="flex:1;min-height:0;justify-content:space-evenly"><div><div class="sec-label" style="margin-bottom:8px"><span class="t" style="font-size:23px">现在的事实</span></div>'+
-   '<div class="notes"><div class="note"><span class="sq"></span><span>文件<b>还在</b>本次办理里，没有丢，也没有被删除。</span></div>'+
-   '<div class="note"><span class="sq"></span><span>检查结果：<b>未知（任务失败）</b>，屏幕上不会出现任何检查结论。</span></div>'+
-   '<div class="note"><span class="sq"></span><span>打印用文件：<b>你上传的原文件</b>，和检查成不成功无关。</span></div></div></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>文件<b>还在</b>本次办理里。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>检查结果未知，屏幕上不出现任何检查结论。</span></div>'+
+   '<div class="note"><span class="sq"></span><span><b>没检查完不能继续打印</b>。</span></div></div></div>'+
    '<div><div class="sec-label" style="margin-bottom:8px"><span class="t" style="font-size:23px">两条路都能走</span></div>'+
-   '<div class="notes"><div class="note"><span class="sq"></span><span><b>重试</b>：还是这一份，重新查一次，不会重复收费。</span></div>'+
-   '<div class="note"><span class="sq"></span><span><b>跳过检查</b>：不影响能不能打印，但少了一次隐私提示，需要你再确认一次。</span></div></div></div></div></div>';
+   '<div class="notes"><div class="note"><span class="sq"></span><span><b>重试</b>：还是这一份，再查一次，不重复收费。</span></div>'+
+   '<div class="note"><span class="sq"></span><span><b>返回选文件</b>。</span></div></div></div></div></div>';
  }
- if(st==='check-skip-confirm'){
-  return '<div class="wright">'+
-   '<div class="state" data-kind="error" data-testid="'+SCREEN+'-status"><div class="state-h">'+svg('warn','currentColor',26,2.1)+'跳过检查，确认一下</div>'+
-   '<div class="state-p">跳过之后<b>不会再有任何隐私提示</b>，这份文件里所有内容都会原样印在纸上，包括身份证号、手机号、银行卡号这类信息（如果里面有的话）。</div></div>'+
-   '<div class="card" style="flex:1;min-height:0;justify-content:space-evenly"><div><div class="sec-label" style="margin-bottom:8px"><span class="t" style="font-size:23px">跳过意味着这三件事</span></div>'+
-   '<ul class="steps"><li><span class="n">1</span><span>这份文件<b>有没有可识别片段仍然是未知</b>，屏幕上不会再出现检查结论。</span></li>'+
-   '<li><span class="n">2</span><span>不会有逐条裁决，也<b>不会生成遮挡后的新文件</b>，打的就是原文件。</span></li>'+
-   '<li><span class="n">3</span><span>纸打出来之后拿在你手上，<b>撤不回来</b> —— 请自己先翻一遍。</span></li></ul></div>'+
-   '<div class="notes"><div class="note"><span class="sq"></span><span>不确定就点左边取消，回去再重试一次检查，重试不收费。</span></div>'+
-   '<div class="note"><span class="sq"></span><span>确认跳过之后仍然可以在预览里逐页看清，只是不会有隐私提示。</span></div></div></div></div>';
- }
- /* check-flagged 三个阶段共用同一块逐条裁决区 */
+ /* check-flagged 三个阶段共用同一块逐条决定区 */
  var left=FINDINGS.length-decidedCount();
  var head=left===0?'三处都决定完了':(left===FINDINGS.length?('有 '+FINDINGS.length+' 处要你决定'):('还剩 '+left+' 处要你决定'));
  return '<div class="wright">'+
   '<div class="sec-label" style="margin-bottom:0"><span class="no serif">01</span><span class="t">'+head+'</span><span class="hint">逐条选，选完才能继续</span></div>'+
   findingsCard()+
-  '<div class="mini" data-testid="'+SCREEN+'-redact-truth"><h4>'+svg('info','currentColor',21)+'<span>这里只做裁决，不改你的文件</span></h4>'+
-  '<p>选「建议遮挡」会<b>记录你的裁决</b>并做遮挡评估，<b>但不会生成一份遮挡后的新文件</b> —— 打印用的仍然是你上传的原文件。</p></div>'+
+  '<div class="mini" data-testid="'+SCREEN+'-redact-truth"><h4>'+svg('info','currentColor',21)+'<span>下一步预览</span></h4>'+
+  '<p>选了遮挡的，下一步预览里会显示涂黑后的样子，可以逐页核对。</p></div>'+
   '</div>';
 }
 
@@ -1466,7 +1453,7 @@ V['illegal-context']=function(){
       '本页只认<b>自己定义过的那几个值</b>，其余一律按「没有上下文」处理。'],
   b2t:'现在可以怎么办',
   b2:['直接去选文件那一步，从头把要打印的文件搬进来。',
-      '如果是从别处跳过来的，回那一页重新点一次正常入口。',
+      '如果是从别的页面进来的，回那一页重新点一次正常入口。',
       '反复出现同一个奇怪地址，可以叫工作人员看一下这台机器。'],
   b3t:'返回落点也是同一条规矩',
   b3:['来源参数认不出来时，返回统一回到<b>选文件</b>那一步，不跟着地址走。',
@@ -1498,10 +1485,7 @@ V['expired-context']=function(){
 /* ---------- 材料检查 / 预览与参数：同一套骨架 ---------- */
 function fixtureSection(st){
  var d=docOf(st),what=isCheck(st)?'文件名、页数和检查结果':'文件名、页数、能力登记和设备状态';
- var h='<section class="sec">'+fixtureBar(what);
- if(M.skipped)h+='<div class="fx" style="margin-top:10px;background:var(--cinnabar-soft);color:var(--cinnabar-d)" data-testid="'+SCREEN+'-skipped"><span class="fx-b" style="background:var(--cinnabar-d)">已跳过</span>'+
-  '<span>这次<b>跳过了材料检查</b>，所以这份文件里有没有可识别片段是未知的；纸上会原样出现全部内容。</span></div>';
- return h+'</section>';
+ return '<section class="sec">'+fixtureBar(what)+'</section>';
 }
 function checkView(st){
  return fixtureSection(st)+
@@ -1522,16 +1506,13 @@ function ctaWrap(st){
   sec=ghost('返回打印扫描','10-print-hub.html','/print-scan',SCREEN+'-exit','返回打印扫描')+docsLink();
   pri=primaryCls('去选文件','12-file-source.html','/print/upload','去选文件');
  }else if(st==='check-failed'){
-  sec=ghost('跳过检查',to('check-skip-confirm'),'/print/material-check',SCREEN+'-skip','跳过材料检查（需要再确认一次）')+docsLink();
-  pri=primaryCls('重试材料检查',to('check-retrying'),'/print/material-check','重试材料检查');
- }else if(st==='check-skip-confirm'){
-  sec=ghost('取消，回去重试',to('check-failed'),'/print/material-check',SCREEN+'-skip-cancel','取消跳过，回去重试材料检查')+docsLink();
-  pri=primaryCls('确认跳过检查',to('preview','skip=1'),'/print/preview','确认跳过材料检查，直接去设置打印参数','danger');
+  sec=ghost('返回选文件','12-file-source.html','/print/upload',SCREEN+'-back-files','返回选文件')+docsLink();
+  pri=primaryCls('重试材料检查',to('check-retrying'),'/print/material-check','重试材料检查：还是这一份，再查一次，不重复收费');
  }else if(isCheck(st)){
   sec=backLink()+docsLink();
   pri=reason?primaryOff('下一步：预览与参数',reason):primaryCls('下一步：预览与参数',to('preview'),'/print/preview','下一步：预览与参数');
  }else{
-  sec=ghost('上一步：材料检查',to(M.skipped?'check-failed':'check-clean'),'/print/material-check',SCREEN+'-exit','返回材料检查')+docsLink();
+  sec=ghost('上一步：材料检查',to('check-clean'),'/print/material-check',SCREEN+'-exit','返回材料检查')+docsLink();
   pri=reason?primaryOff('下一步：核对价格',reason):primaryCls('下一步：核对价格','14-print-confirm.html','/print/confirm','下一步：核对价格');
  }
  return '<div class="ctawrap" id="ctawrap">'+ctaBar(sec,pri,reason)+'</div>';
@@ -1544,12 +1525,11 @@ var PILL={
  'expired-context':['warn','办理上下文已过期'],
  'check-loading':['','第 2 步 / 共 4 步 · 正在检查'],
  'check-clean':['ok','第 2 步 / 共 4 步 · 检查完成'],
- 'check-flagged':['warn','第 2 步 / 共 4 步 · 3 处待裁决'],
+ 'check-flagged':['warn','第 2 步 / 共 4 步 · 3 处待决定'],
  'check-flagged-partial':['warn','第 2 步 / 共 4 步 · 还剩 1 处'],
- 'check-flagged-decided':['ok','第 2 步 / 共 4 步 · 裁决完成'],
+ 'check-flagged-decided':['ok','第 2 步 / 共 4 步 · 决定完成'],
  'check-failed':['bad','材料检查失败 · 结果未知'],
  'check-retrying':['','正在重新检查'],
- 'check-skip-confirm':['bad','跳过检查 · 待确认'],
  'preview':['ok','第 3 步 / 共 4 步 · 预览与参数'],
  'file-unsupported':['bad','这份文件本机不能打印'],
  'capability-loading':['warn','正在确认本机打印能力'],
@@ -1568,12 +1548,11 @@ var ASK={
  'expired-context':['这次办理<em>已经过期</em>。','本机不再持有这次的文件，所以什么结论都不显示。'],
  'check-loading':['正在<em>读这份文件</em>。','结论没回来之前不说「没问题」，也不自动放行。'],
  'check-clean':['<em>没命中</em>敏感片段。','规则没查到，不等于一定没有。你自己再看一眼更稳妥。'],
- 'check-flagged':['有 3 处<em>要你拿主意</em>。','怎么处理你说了算。<b>只记录裁决，不生成遮挡后的新文件。</b>'],
- 'check-flagged-partial':['还剩 1 处<em>没裁决</em>。','三处都得你亲自选，选完才放行到下一步。'],
- 'check-flagged-decided':['三处<em>都决定完了</em>。','保留的那几处会原样印在纸上，心里有数就往下走。'],
- 'check-failed':['检查<em>没做成</em>。','所以有没有隐私片段是未知。不会查不出来就说没问题。'],
- 'check-retrying':['正在<em>重新检查</em>。','还是刚才那一份，不会产生第二份，也不会重复收费。'],
- 'check-skip-confirm':['跳过之后<em>没有提示了</em>。','纸上会原样出现全部内容，打出来撤不回来。'],
+ 'check-flagged':['有 3 处<em>要你拿主意</em>。','逐条选保留或遮挡；选完才能继续。'],
+ 'check-flagged-partial':['还剩 1 处<em>没决定</em>。','三处都得你亲自选「保留」或「遮挡」，选完才放行。'],
+ 'check-flagged-decided':['三处<em>都决定完了</em>。','可以去预览，核对版面和参数。'],
+ 'check-failed':['检查<em>没做成</em>。','结果未知。没检查完不能继续打印。可以重试，也可以返回选文件。'],
+ 'check-retrying':['正在<em>重新检查</em>。','还是刚才那一份，再查一次，不重复收费。'],
  'preview':['纸上<em>会长这样</em>。','核对内容与参数，下一步看价格，最后带走打印件。'],
  'file-unsupported':['这份文件<em>印不了</em>。','打印只收 PDF / JPG / PNG，Word 既不上传也不转换。'],
  'capability-loading':['本机能力<em>还在确认</em>。','确认完才知道彩色和双面能不能选，之前不放行。'],
@@ -1619,6 +1598,13 @@ function render(st){
  document.getElementById('pill-dot').className='dot'+((st==='check-loading'||st==='check-retrying'||st==='device-loading'||st==='capability-loading')?' breathe':'');
  document.getElementById('g-ask').innerHTML=ASK[st][0];
  document.getElementById('g-doing').innerHTML=ASK[st][1];
+ var ai=document.querySelector('.qx2-ai');
+ if(ai){
+  var askCheck=isCheck(st);
+  ai.textContent=askCheck?'问小青：保留和遮挡有什么区别 →':'问小青：帮我选打印参数 →';
+  var draft=askCheck?'保留和遮挡有什么区别？':'我准备打印文档，请先问用途和页数，再帮我选择纸张、份数和单双面参数。';
+  ai.onclick=function(){try{sessionStorage.setItem('kiosk-assistant-draft',draft)}catch(e){}};
+ }
  var links=document.querySelectorAll('#demo-panel a');
  for(var i=0;i<links.length;i++)links[i].className=(links[i].getAttribute('data-s')===st?'on':'');
  snapWork();   /* 整屏重绘会换掉 .wsplit 这个节点，位移要按新布局重算；非抓图路径里是空操作 */
@@ -1703,7 +1689,7 @@ document.getElementById('body-root').addEventListener('input',function(e){
 
 /* ================= 完整预览：同一 HTML 宿主内的 near-full-stage 模态 =================
    只做一件事：把这次办理里那一份文件**完整**看一遍。不解析、不改页数、不做隐私检查、不出签名链接。
-   预览不导航、不改地址、不写任何存储，所以关掉之后状态、参数和裁决原样还在。 */
+   预览不导航、不改地址、不写任何存储，所以关掉之后状态、参数和决定原样还在。 */
 var PV_STEPS=[0.5,0.75,1,1.25,1.5,2,3];
 var PV_PAD=16;
 var PV_INERT=['.topbar','.guide','#body-root','.truth','.navbar'];
@@ -1792,7 +1778,7 @@ function pvFailCard(){
   '<div><div class="state-h">'+svg('warn','currentColor',30,2.1)+'<span>'+title+'</span></div>'+
   '<div class="state-p" style="margin-top:12px">'+p1+'</div></div>'+
   '<div class="pv-keep">'+svg('check','currentColor',26,2.4)+
-   '<span><b>这份文件还在本次办理里。</b>上传<b>没有失败</b>，文件<b>没有丢</b>，也<b>没有被删除</b>，你刚才设的参数和裁决也都在 —— 看不了的只是预览这一件事。</span></div>'+
+   '<span><b>这份文件还在本次办理里。</b>上传<b>没有失败</b>，文件<b>没有丢</b>，也<b>没有被删除</b>，你刚才设的参数和决定也都在 —— 看不了的只是预览这一件事。</span></div>'+
   '<div class="state-p">当前文件仍然是 <b>'+pv.doc.n+'</b>（'+pv.doc.s+'）。<b>看不到预览不影响下一步</b>：参数照设，报价照走。</div>'+
   '<div><div class="sec-label" style="margin-bottom:8px"><span class="t" style="font-size:24px">现在可以怎么办</span></div>'+
   '<ul class="steps"><li><span class="n">1</span><span>关掉预览，这一屏、这份文件和刚才的参数原样还在。</span></li>'+
@@ -1911,9 +1897,9 @@ function pvKey(e){
  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
 }
 function pvStanding(st){
- if(isCheck(st))return '材料检查用文件 · 打印用的仍是这一份原文件';
+ if(isCheck(st))return '材料检查用文件 · 示例，仅展示效果';
  if(st==='file-unsupported')return '本次办理的文件 · 这份格式本机不能打印';
- return '打印参数针对的就是这一份 · 本页不生成派生文件';
+ return '打印参数针对的就是这一份';
 }
 function pvOpen(mode,instant){
  if(pv)return;

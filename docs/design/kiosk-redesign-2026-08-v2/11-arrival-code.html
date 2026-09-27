@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
+- 2026-09-28 修重叠：输码首页收紧标题区空高，「码找不到了？」不再压住底部操作。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 返工：恢复原稿的码格、提示、键盘顺序；只以标题区必要高度处理触达，坐标待复测（规则 1、2）。
@@ -302,6 +303,8 @@ html:not(.debug) [data-proto-control]{display:none!important;}
 .key{height:92px}.kb.alpha .key{height:92px}.key.ok,.kb.alpha .key.ok{font-size:26px}.vs{margin-top:22px;padding:20px 28px}.vs-col{font-size:22px;line-height:1.45}.vs-col b{font-size:24px;line-height:1.4}
 .outs{margin-top:20px;padding:14px 20px;gap:12px}.out-chip{white-space:normal;flex-direction:column;height:80px;gap:4px;font-size:22px;text-align:center}.outs .q{font-size:22px}
 .qx2-actions{margin-top:auto;min-height:72px}.navbar{margin-top:0;height:116px}
+/* 输码首页标题区有一段空高，把「码找不到了？」挤到了底部操作条上。收掉这段空高。 */
+#body-root[data-state="idle"] .head{min-height:0;padding-bottom:6px}
 
 </style>
 </head>

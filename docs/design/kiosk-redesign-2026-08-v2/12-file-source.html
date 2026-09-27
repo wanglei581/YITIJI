@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
+- 2026-09-28 修重叠：来源选择和取消相关状态里，把步骤说明折成三列，避免和下一行叠字。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 文件区保留完整预览、更换、删除和下一步，内容态使用 local-ready（规则 1、3）。
@@ -389,6 +390,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .now-n{font-size:30px;line-height:1.4}.now-s{font-size:22px}.now{flex-wrap:wrap}.now-m{min-width:460px}.now-act{margin-left:auto}
 .note,.notes,.mini p{font-size:22px;line-height:1.45}.sec.grow>.card{justify-content:space-between;overflow:visible}.btn{min-height:76px;font-size:26px}
 .qx2-actions{min-height:72px}.ctabar{margin-top:20px}.truth{display:none}
+/* 这些状态的说明卡被挤短后，步骤和下面一行叠在一起。步骤折成三列，把高度还回去。 */
+#body-root[data-state="source-chooser"] .sec{margin-top:10px}
+#body-root[data-state="source-chooser"] .sec.grow>.card,
+#body-root[data-state="phone-cancelled"] .sec.grow>.card{justify-content:flex-start;gap:8px}
+#body-root[data-state="source-chooser"] .steps,
+#body-root[data-state="phone-cancel-requesting"] .steps,
+#body-root[data-state="phone-cancel-failed"] .steps,
+#body-root[data-state="phone-cancelled"] .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 12px;margin-top:8px}
+#body-root[data-state="phone-cancel-requesting"] .emptybox,
+#body-root[data-state="phone-cancel-failed"] .emptybox{gap:8px;padding:4px 0}
+#body-root[data-state="phone-cancel-requesting"] .emptybox .ei,
+#body-root[data-state="phone-cancel-failed"] .emptybox .ei{width:64px;height:64px}
+#body-root[data-state="local-uploading"] .flist{overflow:visible}
 
 </style>
 </head>

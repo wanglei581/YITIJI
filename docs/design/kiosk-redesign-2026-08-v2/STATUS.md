@@ -8,10 +8,10 @@
 | 01-home | Claude | 通过 | `capture=1` | 同上；小程序码等有真实码再加 |
 | 15-print-fulfill | Claude | 通过 | `capture=1` | 只改字阶与断行、补本步 AI 帮助 |
 | 22-resume-report | Claude | 通过 | `capture=1&state=report&taskId=demo123` | 轻优化（结构不动）；`22-resume-report.proposal.html` 是重排结构的提案，待产品负责人定 |
-| 10-print-hub | Codex | 通过 | `capture=1&state=default` | |
-| 11-arrival-code | Codex | 通过 | `capture=1` | |
-| 12-file-source | Codex | 通过 | `capture=1&state=local-ready` | |
-| 13-print-desk | Codex | 通过 | `capture=1&state=preview` | |
+| 10-print-hub | Codex | 通过 | `capture=1&state=default` | 9/28 修了重叠：带提示条的状态里证件照横卡不再压住「02 已下过单」 |
+| 11-arrival-code | Codex | 通过 | `capture=1` | 9/28 修了重叠：「码找不到了？」不再压住底部「上一步 / 问小青」 |
+| 12-file-source | Codex | 通过 | `capture=1&state=local-ready` | 9/28 修了重叠：来源选择、取消相关状态的步骤说明不再压住下一行 |
+| 13-print-desk | Codex | 通过 | `capture=1&state=preview` | 9/28 按运行能力修订：无跳过、遮挡生成新文件。已去掉 check-skip-confirm。同日第二遍：遮挡的完整解释只留一处，决定列表底部标签不再被裁 |
 | 14-print-confirm | Codex | 通过（两轮返工） | `flat=1&state=quoting` | 报价中的灰色禁用主按钮沿用原稿，留到实现阶段统一禁用态 |
 | 33-pickup-code | Codex | 通过 | `capture=1` | |
 | 21-resume-triage | Codex | 通过 | `capture=1&state=summary&source=usb` | |
