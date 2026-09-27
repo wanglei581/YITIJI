@@ -60,6 +60,13 @@ export class ApiRouter {
       status: 200,
       json: terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'api-router-default'),
     })
+    // 3.14 本机构官方渠道：首页（「岗位与招聘会」磁贴）与 /official-channels 挂载时各读一次（同一缓存）。
+    // 默认按「本终端没有渠道」应答：首页不摆磁贴，既有用例的栅格与文案一概不变；
+    // 要看磁贴、渠道卡片或 b 版本「其他来源平台」的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/terminals/KSK-001/official-channels', {
+      status: 200,
+      json: { items: [], legacyPlatforms: [] },
+    })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,

@@ -212,6 +212,8 @@ const WAVE_ROUTES = new Map([
     '/job-fairs/:id/stats', '/fairs-service', '/campus', '/campus/welcome', '/campus/freshman-insights',
     '/smart-campus', '/smart-campus/welcome', '/smart-campus/freshman-insights',
     '/smart-campus/service/:key', '/renshi', '/jobs/online-platforms', '/jobs-service',
+    // 3.14：稿 45 的宿主换成本机构官方渠道，/jobs/online-platforms 留作重定向，两条都归 W4。
+    '/official-channels',
   ]],
   ['W5', [
     '/login', '/member/qr-login', '/upload/phone', '/legal/:doc', '/screensaver',

@@ -185,8 +185,13 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
   await page.goto('/jobs-service')
   const hub = await readHub(page)
 
-  // 白名单：OnlinePlatformsPage 自己不发请求，后端断了也该能看二维码目录。
-  expect(byTitle(hub.cards, '线上招聘平台').clickable).toBe(true)
+  // 3.14：「线上招聘平台」撤出离线白名单。它落到本机构官方渠道（旧地址重定向），渠道要向服务端读——
+  // 原来能离线看是因为四个平台写死在前端，那份常量已经不用了。后端断开时和其余八张一样 fail-closed。
+  expect(byTitle(hub.cards, '线上招聘平台')).toEqual({
+    title: '线上招聘平台',
+    clickable: false,
+    reason: '在线服务当前不可用',
+  })
   // 其余八张都要后端；写着「进入 →」点进去只有错误页，所以必须 fail-closed 并说明原因。
   expect(byTitle(hub.cards, '全职岗位')).toEqual({
     title: '全职岗位',
@@ -195,12 +200,14 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
   })
   // 3.14：「岗位匹配参考」这张卡在运行时改名「简历对照」（QxServiceHubPage 的 RUNTIME_CARD_COPY，稿 16 不动）。
   expect(byTitle(hub.cards, '简历对照').reason).toBe('AI能力当前不可用')
-  expect(hub.cards.filter((card) => card.clickable).map((card) => card.title)).toEqual(['线上招聘平台'])
+  expect(hub.cards.filter((card) => card.clickable).map((card) => card.title)).toEqual([])
   expect(hub.readiness).toBe('unavailable')
 
-  // 白名单那张真的能走通，不是只长得像可点。
-  await page.getByRole('button', { name: /线上招聘平台/ }).click()
-  await page.waitForURL((url) => url.pathname === '/jobs/online-platforms')
+  // 白名单照样放行：这一页上登记在白名单里的只剩常用入口「招聘会」（换一个服务台，/fairs-service）。
+  // 它真的能走通，不是只长得像可点。
+  expect(hub.quick.filter((link) => link.clickable).map((link) => link.title)).toEqual(['招聘会'])
+  await page.locator('.qx-hub-quick-item', { hasText: '招聘会' }).click()
+  await page.waitForURL((url) => url.pathname === '/fairs-service')
 })
 
 test('在线服务「正在确认」同样不放行，白名单不受影响 @kiosk', async ({ page, api }) => {

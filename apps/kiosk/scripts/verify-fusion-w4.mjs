@@ -123,7 +123,9 @@ const jobDetail = read('src/pages/jobs/JobDetailPage.tsx')
 const offlineAgencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
 const offlineAgencyDetail = read('src/pages/offline-agencies/OfflineAgencyDetailPage.tsx')
 const offlineJobDetail = read('src/pages/offline-agencies/OfflineJobDetailPage.tsx')
-const onlinePlatforms = read('src/pages/jobs/OnlinePlatformsPage.tsx')
+// 3.14：稿 45 的运行时宿主从 jobs/OnlinePlatformsPage.tsx（已停放、不注册路由）换成本机构官方渠道页。
+// 下面原先钉在旧页上的判据（青序壳、只给扫码出口、不说代投）原样改钉活页面，不钉停放的死代码。
+const officialChannels = read('src/pages/official-channels/OfficialChannelsPage.tsx')
 const fairCompanyDetail = read('src/pages/job-fairs/FairCompanyDetailPage.tsx')
 const offlineAgencyService = read('src/services/api/offlineAgencies.ts')
 const offlineAgencyBackendService = readFileSync(join(WORKSPACE_ROOT, OFFLINE_AGENCY_BACKEND_SERVICE), 'utf8')
@@ -207,13 +209,14 @@ check('directory pages have left the V6 frame for QxPageFrame', () => {
   assert.doesNotMatch(companiesPage, /KioskPageFrame/, 'companies list has left the V6 frame')
   assert.match(companyDetail, /QxPageFrame/)
   assert.doesNotMatch(companyDetail, /KioskPageFrame/, 'company detail has left the V6 frame')
-  assert.match(onlinePlatforms, /QxPageFrame/)
-  assert.doesNotMatch(onlinePlatforms, /KioskPageFrame/, 'online platforms has left the V6 frame')
+  assert.match(officialChannels, /QxPageFrame/)
+  assert.doesNotMatch(officialChannels, /KioskPageFrame/, 'official channels (稿 45 宿主) stays on the Qingxu frame')
   assert.match(fairCompanyDetail, /QxPageFrame/)
   assert.doesNotMatch(fairCompanyDetail, /KioskPageFrame/, 'fair company detail has left the V6 frame')
   assert.match(kioskRoot, /['"]\/offline-agencies['"]/)
   assert.match(kioskRoot, /['"]\/companies['"]/)
   assert.match(kioskRoot, /['"]\/jobs\/online-platforms['"]/)
+  assert.match(kioskRoot, /['"]\/official-channels['"]/)
   assert.match(kioskRoot, /\/offline-agencies\//)
   assert.match(kioskRoot, /\/companies\//)
   assert.match(kioskRoot, /\/jobs\\\/\[\^\/\]\+\\\/offline/)
@@ -221,10 +224,15 @@ check('directory pages have left the V6 frame for QxPageFrame', () => {
   assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/jobs\//)
   assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/job-fairs\//)
 })
-check('online platforms keep directory-level CTA and never claim apply-on-device', () => {
-  assert.match(onlinePlatforms, /扫码打开来源平台/)
-  assert.doesNotMatch(onlinePlatforms, /一键全网分发|授权代投|同步投递|一键投递|立即投递/)
-  assert.doesNotMatch(onlinePlatforms, /扫码投递|去来源平台投递/)
+// 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
+// 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
+// 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。
+check('official channels keep scan-only exits and never claim apply-on-device', () => {
+  assert.match(officialChannels, /<SourceUrlQr value=\{item\.url\}/)
+  assert.ok(officialChannels.includes('`本渠道由 ${item.organizationName} 提供，信息以其官网为准`'), 'caption must stay verbatim')
+  assert.doesNotMatch(officialChannels, /一键全网分发|授权代投|同步投递|一键投递|立即投递/)
+  assert.doesNotMatch(officialChannels, /扫码投递|去来源平台投递/)
+  assert.doesNotMatch(officialChannels, /window\.open|location\.(?:assign|href|replace)|<a\s|href=/, 'kiosk must not open external pages')
 })
 check('fair company detail keeps source fail-closed apply CTAs and print backend files', () => {
   assert.match(fairCompanyDetail, /prepareFairCompanyPrint/)
@@ -421,7 +429,8 @@ check('legacy CSS entry remains a compatibility aggregator', () => {
   ]) assert.ok(jobsCss.includes(marker), marker)
 })
 
-const w4Dirs = ['jobs', 'companies', 'offline-agencies', 'job-fairs', 'campus', 'smart-campus', 'renshi']
+// official-channels：稿 45 的宿主（3.14 从 jobs/ 迁出），招聘闭环禁词照样要扫到它。
+const w4Dirs = ['jobs', 'companies', 'offline-agencies', 'job-fairs', 'campus', 'smart-campus', 'renshi', 'official-channels']
 const w4Files = w4Dirs.flatMap((dir) => collectTsx(join(KIOSK_ROOT, 'src/pages', dir)))
   .concat([
     join(KIOSK_ROOT, 'src/pages/placeholders/CampusWelcomePage.tsx'),

@@ -40,6 +40,7 @@ interface QxHomeViewProps {
   jobs: HomeJobHighlightState & { retry: () => void }
   /** 招聘内容托管（3.13）。没打开（含还没读到）时不摆岗位 / 招聘会磁贴与「找工作」；读到「关闭」才说「未开放」。 */
   recruitment: RecruitmentHostingState
+  officialChannelCount: number // 3.14：本机构已启用的官方渠道数。容器只在读到「托管关闭」时给 >0；为 0 就不摆「岗位与招聘会」
   terminalCode: string
   deviceStatus: HomeDeviceStatus
   continueSlot?: ReactNode
@@ -103,6 +104,7 @@ export function QxHomeView({
   jobFair,
   jobs,
   recruitment,
+  officialChannelCount,
   terminalCode,
   deviceStatus,
   continueSlot,
@@ -123,9 +125,10 @@ export function QxHomeView({
   const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '进入后核验打印与扫描能力' : device.printerLabel
   const [introDone, setIntroDone] = useState(false)
   const recruitmentOpen = recruitment.enabled
+  const channelsTile = !recruitmentOpen && officialChannelCount > 0
 
   return (
-    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home" data-recruitment={recruitmentOpen ? 'open' : 'closed'} data-qx-intro={introDone ? 'done' : undefined} onAnimationEnd={(event) => { if (event.animationName === 'qx-home-sheen') setIntroDone(true) }}>
+    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home" data-recruitment={recruitmentOpen ? 'open' : 'closed'} data-official-channels={channelsTile ? 'shown' : undefined} data-qx-intro={introDone ? 'done' : undefined} onAnimationEnd={(event) => { if (event.animationName === 'qx-home-sheen') setIntroDone(true) }}>
       <section className="qx-home-hero" aria-label="小青助手">
         <HomeHeroHeader terminalCode={terminalCode} deviceStatus={deviceStatus} />
         <div className="qx-home-assistant">
@@ -268,7 +271,7 @@ export function QxHomeView({
               <span className="qx-home-tile-foot">查看招聘会 <ArrowRightIcon aria-hidden="true" /></span>
             </button>
           )}
-          </>) : null}
+          </>) : channelsTile ? <HomeTile actionId="official-channels" title="岗位与招聘会" description="本机构官方渠道 · 扫码查看" foot="查看官方渠道" badge={`${officialChannelCount} 个渠道`} icon={BriefcaseBusinessIcon} tone="slate" onAction={onAction} /> : null}
           <HomeTile actionId="policy-hub" title="就业政策" description="资格与办理条件以官方核验为准" icon={LandmarkIcon} tone="slate" size="slim" onAction={onAction} />
           <HomeTile
             actionId="toolbox"
@@ -301,7 +304,7 @@ export function QxHomeView({
       <footer className="qx-home-truth">
         <ShieldCheckIcon aria-hidden="true" />
         <div>
-          <p><strong>能力状态以真实接口为准。</strong>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : recruitment.status === 'ready' ? '本终端未开放岗位与招聘会信息，也不代收简历。' : '本终端不代收简历。'}</p>
+          <p><strong>能力状态以真实接口为准。</strong>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : channelsTile ? '岗位与招聘会请看本机构官方渠道，本终端不代收简历。' : recruitment.status === 'ready' ? '本终端未开放岗位与招聘会信息，也不代收简历。' : '本终端不代收简历。'}</p>
           <p className="qx-home-legal">
             <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">鲁ICP备2026023517号-2</a>
             <span aria-hidden="true">·</span>

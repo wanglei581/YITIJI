@@ -56,7 +56,7 @@
   .qx-home-section-head h2 { font-size: 24px; letter-spacing: 1px; }
   .qx-home-section-head span { font-size: 14px; }
   .qx-home-tiles { flex: none; grid-template-columns: 1fr; grid-template-rows: none; gap: 10px; }
-  .qx-home-tile, .qx-home-tile[data-size='feature'], .qx-home-tile[data-action='policy-hub'] { grid-column: auto; min-height: 148px; }
+  .qx-home-tile, .qx-home-tile[data-size='feature'], .qx-home-tile[data-action='policy-hub'], .qx-home-tile[data-action='official-channels'] { grid-column: auto; min-height: 148px; }
   .qx-home-tile[data-size='slim'] { min-height: 104px; padding-right: 104px; }
   .qx-home-tile[data-size='feature'] .qx-home-tile-icon { top: 18px; right: 16px; width: 56px; height: 56px; transform: none; }
   .qx-home-tile[data-size='feature'] .qx-home-tile-icon svg { width: 44px; height: 44px; }

@@ -117,13 +117,16 @@ export interface HubAvailability {
 /**
  * 明确「不联网也能进」的路由白名单。**fail-closed：不在表内的一律按需要后端处理。**
  *
- * 前四条是旧壳五页 `requiresApi: false` 的原样搬迁（历史判据，不是本次新开的口径）：
- *   · `/jobs/online-platforms`  平台目录 + 二维码，`OnlinePlatformsPage` 自己不发请求
+ * 前三条是旧壳五页 `requiresApi: false` 的原样搬迁（历史判据，不是本次新开的口径）：
  *   · `/interview/tips`         静态问答要点（重定向到 `/interview?stage=tips`）
  *   · `/renshi?tab=social`      参保流程与材料，`RenshiPage` 的静态面板
  *   · `/renshi?tab=register`    档案托管 / 登记材料，同上
  * 后六条是本页自身与首页：五个服务台就是这一份组件，它在后端不可达时正在渲染，
  * 把「返回服务目录 / 换一个服务台」也拦掉只会把用户困在原地——那是新缺陷，不是诚实。
+ *
+ * 原先的第四条 `/jobs/online-platforms` 于 3.14 撤出：那一页的四个平台是写死在前端的常量，
+ * 所以不联网也能看；现在它重定向到本机构官方渠道，渠道要向服务端读，后端断开时进去只有
+ * 读取失败页，按上面的规则必须 fail-closed。稿 16 的卡片路由仍是旧地址（规格与稿逐字节一致），靠重定向落地。
  *
  * 为什么不能直接照稿的 `kind` 判放行：稿把 `ai-down` 理解成「AI 能力不可用」，
  * 而代码里 `useApiReadiness === 'unavailable'` 是 **`/health` 不可达**（整个后端断开）。
@@ -132,7 +135,6 @@ export interface HubAvailability {
  * 拦的正是这件事，迁移不能把它丢掉。
  */
 const OFFLINE_CAPABLE_ROUTES = new Set<string>([
-  '/jobs/online-platforms',
   '/interview/tips',
   '/renshi?tab=social',
   '/renshi?tab=register',

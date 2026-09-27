@@ -252,7 +252,13 @@ export const kioskRouter = createBrowserRouter([
         path: 'notifications',
         lazy: async () => ({ Component: (await import('../pages/placeholders/NotificationsPage')).default }),
       },
-      // 岗位 / 招聘会 / 企业 / 校园招聘 / 线下机构（Phase 4），以及岗位、招聘会两个服务台和线上平台目录，
+      // 稿 45：本机构官方渠道（next-tasks 3.14）。两种托管状态都渲染，所以不进下面的招聘内容托管闸门：
+      // 我们云上（a）只列本终端所属机构的官方渠道，客户私有化部署（b）另列原平台目录。
+      { path: 'official-channels', lazy: async () => ({ Component: (await import('../pages/official-channels/OfficialChannelsPage')).OfficialChannelsPage }) },
+      // 旧地址（原线上招聘平台目录，页面源码停放在 pages/jobs/OnlinePlatformsPage.tsx）两种状态都转到官方渠道。
+      // 静态段 jobs/online-platforms 的匹配优先级高于闸门里的 jobs/:id，放在闸门外，闸门就不会接走它。
+      { path: 'jobs/online-platforms', element: <Navigate to="/official-channels" replace /> },
+      // 岗位 / 招聘会 / 企业 / 校园招聘 / 线下机构（Phase 4），以及岗位、招聘会两个服务台，
       // 共用招聘内容托管闸门（next-tasks 3.13）。我们云上默认关闭：不挂载这些页、不请求招聘类接口，
       // 直达地址落到诚实说明页；客户私有化部署（b）打开后与今天完全相同。
       {
@@ -292,11 +298,6 @@ export const kioskRouter = createBrowserRouter([
           {
             path: 'campus/freshman-insights',
             lazy: async () => ({ Component: (await import('../pages/campus/FreshmanInsightsPage')).default }),
-          },
-          // 原型 78：线上招聘平台
-          {
-            path: 'jobs/online-platforms',
-            lazy: async () => ({ Component: (await import('../pages/jobs/OnlinePlatformsPage')).OnlinePlatformsPage }),
           },
           {
             path: 'jobs-service',

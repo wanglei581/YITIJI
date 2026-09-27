@@ -137,6 +137,9 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/print-scan/convert',
   '/offline-agencies',
   '/companies',
+  /* 稿 45 → 本机构官方渠道（3.14）。旧地址 /jobs/online-platforms 现在只做重定向，仍登记在册：
+   * 重定向那一帧不能露出旧顶栏。 */
+  '/official-channels',
   '/jobs/online-platforms',
   '/ai/plan',
   '/scan',
