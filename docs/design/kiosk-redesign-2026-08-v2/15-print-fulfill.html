@@ -283,6 +283,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important;}
 .nav-item .ni{font-size:21px!important}
 .clear-s{font-size:24px!important}
 .demo-tab,.demo-panel{display:none!important}
+.help-ai{display:flex;align-items:center;justify-content:flex-end;min-height:56px;margin-top:6px;padding:0 8px;color:var(--teal-d,#157a67);font-size:22px;font-weight:650;text-decoration:none}
 </style>
 </head>
 <body>
@@ -419,7 +420,7 @@ function jobsCard(label,hint,rows){
 }
 function helpStrip(txt,primary){
   return '<div class="sec"><div class="help-strip" data-testid="'+SCREEN+'-fallback"><span class="txt">'+txt+'</span>'+
-    '<a class="help-btn m-press" href="06-help.html"'+(primary?' data-testid="'+SCREEN+'-primary"':'')+'>'+ICO.help+'联系工作人员</a></div></div>';
+    '<a class="help-btn m-press" href="06-help.html"'+(primary?' data-testid="'+SCREEN+'-primary"':'')+'>'+ICO.help+'联系工作人员</a></div><a class="help-ai m-press" href="05-ai-cockpit.html">问小青：取纸或异常怎么办 →</a></div>';
 }
 function endBar(html){return '<div class="end-bar">'+html+'</div>';}
 /* 一个完整任务区：出纸清单 + 异常说明 + 费用与订单边界，全部收在同一节里。
@@ -496,7 +497,7 @@ function rCompleted(){
     '<div class="check-step"><span class="check-no">2</span><span class="check-txt">当场核对<b>页数和清晰度</b>，少页、卡纸、印花了都能当场处理。</span></div>'+
     '<div class="check-step"><span class="check-no">3</span><span class="check-txt">证件页确认带 <b>「仅供求职使用」水印</b>，再离开。</span></div>'+
     (PICKUP_CODE?
-      '<div class="pickup-card"><div class="pickup-main"><div class="pickup-t">取件码（仅接口返回时展示）</div>'+
+      '<div class="pickup-card"><div class="pickup-main"><div class="pickup-t">取件码</div>'+
       '<div class="pickup-s">离开后再来取，或请工作人员凭码取。请勿拍照外传。</div></div>'+
       '<div class="pickup-code">'+PICKUP_CODE+'</div></div>':'')+
     '</div></div>'+
