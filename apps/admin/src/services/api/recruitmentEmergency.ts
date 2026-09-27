@@ -13,24 +13,49 @@
 // 页面只能按服务端返回的结果说话：下架 / 熔断成功与否以响应为准，不自行假定。
 // ============================================================
 
-import type {
-  AdminRecruitmentHostingStatus,
-  RecruitmentCircuitBreakInput,
-  RecruitmentCircuitBreakResult,
-  RecruitmentEmergencyTakedownInput,
-  RecruitmentEmergencyTakedownResult,
+import {
+  RECRUITMENT_EMERGENCY_TARGET_LABELS,
+  type AdminRecruitmentHostingStatus,
+  type RecruitmentCircuitBreakInput,
+  type RecruitmentCircuitBreakResult,
+  type RecruitmentEmergencyTakedownInput,
+  type RecruitmentEmergencyTakedownResult,
+  type RecruitmentEmergencyTargetType,
 } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 import { publishFairSourceRecord, publishJobSourceRecord } from './sources'
+import { markMockOfficialChannelTakenDown } from './orgOfficialChannels'
 
 export const MOCK_RECRUITMENT_HOSTING_KEY = 'mock:recruitment-hosting'
 export const MOCK_RECRUITMENT_EMERGENCY_KEY = 'mock:recruitment-emergency'
 
+// ─── 3.14 本机构官方渠道也走单条紧急下架 ──────────────────────────────────────
+//
+// 服务端 EmergencyTakedownDto 已接受 targetType='official_channel'（110c6461e），
+// packages/shared 的 RecruitmentEmergencyTargetType 还没加。后端并入后把下面三项挪进 shared
+// （RECRUITMENT_EMERGENCY_TARGET_LABELS 补一行），这里删掉、调用方改回 shared 的类型。
+// 官方渠道不是招聘内容托管：托管开关开或关都能下架。
+
+export type AdminEmergencyTargetType = RecruitmentEmergencyTargetType | 'official_channel'
+
+export const ADMIN_EMERGENCY_TARGET_LABELS: Readonly<Record<AdminEmergencyTargetType, string>> = {
+  ...RECRUITMENT_EMERGENCY_TARGET_LABELS,
+  official_channel: '机构官方渠道',
+}
+
+export interface AdminEmergencyTakedownInput extends Omit<RecruitmentEmergencyTakedownInput, 'targetType'> {
+  targetType: AdminEmergencyTargetType
+}
+
+export interface AdminEmergencyTakedownResult extends Omit<RecruitmentEmergencyTakedownResult, 'targetType'> {
+  targetType: AdminEmergencyTargetType
+}
+
 export interface RecruitmentEmergencyServiceInterface {
   /** 部署级托管开关。true = 私有化部署（b）打开；false = 我们云上默认关闭。 */
   getHostingEnabled(): Promise<boolean>
-  takedown(input: RecruitmentEmergencyTakedownInput): Promise<RecruitmentEmergencyTakedownResult>
+  takedown(input: AdminEmergencyTakedownInput): Promise<AdminEmergencyTakedownResult>
   circuitBreak(input: RecruitmentCircuitBreakInput): Promise<RecruitmentCircuitBreakResult>
 }
 
@@ -86,7 +111,7 @@ const httpAdapter: RecruitmentEmergencyServiceInterface = {
   },
   async takedown(input) {
     const body = await request<unknown>('POST', '/admin/recruitment-emergency/takedown', input)
-    return unwrap<RecruitmentEmergencyTakedownResult>(body, 'publishStatus')
+    return unwrap<AdminEmergencyTakedownResult>(body, 'publishStatus')
   },
   async circuitBreak(input) {
     const body = await request<unknown>('POST', '/admin/recruitment-emergency/circuit-break', input)
@@ -124,9 +149,12 @@ const mockAdapter: RecruitmentEmergencyServiceInterface = {
   },
   async takedown(input) {
     assertMockReason(input.reasonCode, input.reasonText)
-    // 演示数据里岗位 / 招聘会来源行真的改成已下架，其余类型只回执。
+    // 演示数据里岗位 / 招聘会来源行、机构官方渠道真的改成已下架，其余类型只回执。
     if (input.targetType === 'job') await publishJobSourceRecord(input.targetId, 'unpublish')
     if (input.targetType === 'job_fair') await publishFairSourceRecord(input.targetId, 'unpublish')
+    if (input.targetType === 'official_channel') {
+      markMockOfficialChannelTakenDown(input.targetId, input.reasonCode, input.reasonText.trim())
+    }
     return { targetType: input.targetType, targetId: input.targetId, publishStatus: 'unpublished', irreversible: true }
   },
   async circuitBreak(input) {

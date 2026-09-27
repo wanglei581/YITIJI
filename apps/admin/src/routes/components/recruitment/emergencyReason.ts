@@ -1,12 +1,12 @@
 import {
   RECRUITMENT_EMERGENCY_NOTE_MAX,
   type RecruitmentEmergencyReasonCode,
-  type RecruitmentEmergencyTargetType,
 } from '@ai-job-print/shared'
+import type { AdminEmergencyTargetType } from '../../../services/api/recruitmentEmergency'
 
 /** 要紧急下架的那一条内容。title / orgName 只用于弹窗里让人看清对象，不提交。 */
 export interface EmergencyTakedownTarget {
-  targetType: RecruitmentEmergencyTargetType
+  targetType: AdminEmergencyTargetType
   targetId: string
   title: string
   orgName?: string

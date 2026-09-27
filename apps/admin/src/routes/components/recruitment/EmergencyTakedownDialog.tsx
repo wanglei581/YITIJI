@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertOctagonIcon, CheckCircle2Icon } from 'lucide-react'
 import {
-  RECRUITMENT_EMERGENCY_TARGET_LABELS,
-  type RecruitmentEmergencyTakedownResult,
-} from '@ai-job-print/shared'
-import { recruitmentEmergencyService } from '../../../services/api/recruitmentEmergency'
+  ADMIN_EMERGENCY_TARGET_LABELS,
+  recruitmentEmergencyService,
+  type AdminEmergencyTakedownResult,
+  type AdminEmergencyTargetType,
+} from '../../../services/api/recruitmentEmergency'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { EmergencyReasonFields } from './EmergencyReasonFields'
 import {
@@ -20,6 +21,12 @@ const PUBLISH_LABEL: Record<string, string> = {
   draft: '待发布',
   expired: '已过期',
 }
+
+/** 下架的后果随内容类型不同；没登记的类型用招聘类内容的通用说法。 */
+const CONSEQUENCE: Partial<Record<AdminEmergencyTargetType, string>> = {
+  official_channel: '这个渠道的二维码会立即从该机构的一体机上撤下并锁定，机构不能再启用它；平台没有恢复入口。',
+}
+const DEFAULT_CONSEQUENCE = '内容会立即从一体机与小程序下架并锁定，这一条以后不能再发布；平台没有恢复入口。'
 
 /**
  * 单条紧急下架（POST /admin/recruitment-emergency/takedown）。
@@ -38,12 +45,12 @@ export function EmergencyTakedownDialog({
    * 服务端确认过的处置，在操作者看完结果、关掉弹窗时调用（页面据此刷新列表）。
    * 不在请求返回时立刻调：有的页面刷新会整页切到加载态，把还没看的结果一起卸掉。
    */
-  onDone?: (result: RecruitmentEmergencyTakedownResult) => void
+  onDone?: (result: AdminEmergencyTakedownResult) => void
 }) {
   const [reason, setReason] = useState<EmergencyReasonValue>(EMPTY_EMERGENCY_REASON)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<RecruitmentEmergencyTakedownResult | null>(null)
+  const [result, setResult] = useState<AdminEmergencyTakedownResult | null>(null)
 
   const targetKey = target ? `${target.targetType}:${target.targetId}` : null
   useEffect(() => {
@@ -77,7 +84,7 @@ export function EmergencyTakedownDialog({
 
   if (!target) return null
 
-  const label = RECRUITMENT_EMERGENCY_TARGET_LABELS[target.targetType]
+  const label = ADMIN_EMERGENCY_TARGET_LABELS[target.targetType]
   const complete = emergencyReasonComplete(reason)
 
   const submit = async () => {
@@ -133,7 +140,7 @@ export function EmergencyTakedownDialog({
             </p>
             <dl className="grid grid-cols-[6rem_1fr] gap-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-sm">
               <dt className="text-neutral-500">内容</dt>
-              <dd className="text-neutral-800">{RECRUITMENT_EMERGENCY_TARGET_LABELS[result.targetType] ?? result.targetType}（{result.targetId}）</dd>
+              <dd className="text-neutral-800">{ADMIN_EMERGENCY_TARGET_LABELS[result.targetType] ?? result.targetType}（{result.targetId}）</dd>
               <dt className="text-neutral-500">发布状态</dt>
               <dd className="text-neutral-800">{PUBLISH_LABEL[result.publishStatus] ?? result.publishStatus}</dd>
               <dt className="text-neutral-500">能否恢复</dt>
@@ -152,9 +159,7 @@ export function EmergencyTakedownDialog({
           <div className="space-y-4 px-6 py-5">
             <div className="rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-sm text-error-fg">
               <p className="font-semibold">这是单向操作，提交后不能撤销。</p>
-              <p className="mt-1">
-                内容会立即从一体机与小程序下架并锁定，这一条以后不能再发布；平台没有恢复入口。
-              </p>
+              <p className="mt-1">{CONSEQUENCE[target.targetType] ?? DEFAULT_CONSEQUENCE}</p>
               <p className="mt-1">系统会自动通知所属机构，事由与说明会一并写入审计。</p>
             </div>
             {error && (
