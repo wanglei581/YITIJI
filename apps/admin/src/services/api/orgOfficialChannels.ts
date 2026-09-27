@@ -4,8 +4,7 @@
 // http（成功套 { success, data }；失败 { success:false, error:{ code, message } }）：
 //   GET /admin/orgs/:id/verified-official-domains → { items: VerifiedOfficialDomain[] }
 //   PUT /admin/orgs/:id/verified-official-domains  body { domains: string[] }（最多 10 个，整体替换）→ { items }
-//   GET /admin/orgs/:id/official-channels          → { items: AdminOrgOfficialChannel[] }
-//       ↑ 后端新增端点（110c6461e 还没有）。并入后 AdminOrgOfficialChannel 挪到 packages/shared，这里删掉。
+//   GET /admin/orgs/:id/official-channels          → { items: OfficialChannelAdminItem[] }（不含已归档）
 // 单条紧急下架走 recruitmentEmergency.ts（targetType: 'official_channel'）。
 //
 // 登记官方域名是机构身份核验（依据入驻时的盖章确认函），不是内容审核；渠道内容由机构自己负责。
@@ -17,29 +16,17 @@
 //   否则演示会出现「什么都能登记」的假能力。
 // ============================================================
 
-import type { VerifiedOfficialDomain } from '@ai-job-print/shared'
+import type { OfficialChannelAdminItem, VerifiedOfficialDomain } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, getUser, redirectToLogin } from '../auth'
 import { isCommercialRecruitmentHost, OFFICIAL_DOMAIN_MAX, parseDomainInput } from '../../routes/partners/officialDomainRules'
 
-export type { VerifiedOfficialDomain }
-
-/** GET /admin/orgs/:id/official-channels 的单条（后端新增端点，契约见文件头）。 */
-export interface AdminOrgOfficialChannel {
-  id: string
-  name: string
-  url: string
-  displayOrder: number
-  enabled: boolean
-  emergencyTakedown: boolean
-  emergencyReasonCode: string | null
-  emergencyReasonText: string | null
-}
+export type { OfficialChannelAdminItem, VerifiedOfficialDomain }
 
 export interface OrgOfficialChannelsServiceInterface {
   listVerifiedDomains(orgId: string): Promise<VerifiedOfficialDomain[]>
   replaceVerifiedDomains(orgId: string, domains: string[]): Promise<VerifiedOfficialDomain[]>
-  listOfficialChannels(orgId: string): Promise<AdminOrgOfficialChannel[]>
+  listOfficialChannels(orgId: string): Promise<OfficialChannelAdminItem[]>
 }
 
 export const MOCK_ORG_OFFICIAL_CHANNELS_KEY = 'mock:org-official-channels'
@@ -97,7 +84,7 @@ function asDomain(raw: unknown): VerifiedOfficialDomain {
   return { domain: row.domain, verifiedAt: row.verifiedAt, verifiedBy: row.verifiedBy }
 }
 
-function asChannel(raw: unknown): AdminOrgOfficialChannel {
+function asChannel(raw: unknown): OfficialChannelAdminItem {
   const row = (raw ?? {}) as Record<string, unknown>
   if (
     typeof row.id !== 'string' || typeof row.name !== 'string' || typeof row.url !== 'string'
@@ -140,7 +127,7 @@ const mockDomains = new Map<string, VerifiedOfficialDomain[]>([
   ]],
 ])
 
-const mockChannels = new Map<string, AdminOrgOfficialChannel[]>([
+const mockChannels = new Map<string, OfficialChannelAdminItem[]>([
   ['org-mock-1', [
     {
       id: 'oc-mock-a1', name: '人才交流中心官网', url: 'https://www.rencai-demo.gov.cn/',

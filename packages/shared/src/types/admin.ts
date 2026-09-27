@@ -91,6 +91,8 @@ export type RecruitmentEmergencyTargetType =
   | 'policy'
   | 'fair_material'
   | 'offline_agency'
+  /** 3.14 本机构官方渠道。不属于招聘内容托管：托管开关开或关都能下架。 */
+  | 'official_channel'
 
 export const RECRUITMENT_EMERGENCY_TARGET_LABELS: Readonly<Record<RecruitmentEmergencyTargetType, string>> = {
   job: '岗位',
@@ -99,6 +101,7 @@ export const RECRUITMENT_EMERGENCY_TARGET_LABELS: Readonly<Record<RecruitmentEme
   policy: '政策',
   fair_material: '招聘会资料',
   offline_agency: '线下机构',
+  official_channel: '机构官方渠道',
 }
 
 export interface RecruitmentEmergencyTakedownInput {

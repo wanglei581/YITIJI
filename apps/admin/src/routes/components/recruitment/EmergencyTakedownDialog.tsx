@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertOctagonIcon, CheckCircle2Icon } from 'lucide-react'
 import {
-  ADMIN_EMERGENCY_TARGET_LABELS,
-  recruitmentEmergencyService,
-  type AdminEmergencyTakedownResult,
-  type AdminEmergencyTargetType,
-} from '../../../services/api/recruitmentEmergency'
+  RECRUITMENT_EMERGENCY_TARGET_LABELS,
+  type RecruitmentEmergencyTakedownResult,
+  type RecruitmentEmergencyTargetType,
+} from '@ai-job-print/shared'
+import { recruitmentEmergencyService } from '../../../services/api/recruitmentEmergency'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { EmergencyReasonFields } from './EmergencyReasonFields'
 import {
@@ -23,7 +23,7 @@ const PUBLISH_LABEL: Record<string, string> = {
 }
 
 /** 下架的后果随内容类型不同；没登记的类型用招聘类内容的通用说法。 */
-const CONSEQUENCE: Partial<Record<AdminEmergencyTargetType, string>> = {
+const CONSEQUENCE: Partial<Record<RecruitmentEmergencyTargetType, string>> = {
   official_channel: '这个渠道的二维码会立即从该机构的一体机上撤下并锁定，机构不能再启用它；平台没有恢复入口。',
 }
 const DEFAULT_CONSEQUENCE = '内容会立即从一体机与小程序下架并锁定，这一条以后不能再发布；平台没有恢复入口。'
@@ -45,12 +45,12 @@ export function EmergencyTakedownDialog({
    * 服务端确认过的处置，在操作者看完结果、关掉弹窗时调用（页面据此刷新列表）。
    * 不在请求返回时立刻调：有的页面刷新会整页切到加载态，把还没看的结果一起卸掉。
    */
-  onDone?: (result: AdminEmergencyTakedownResult) => void
+  onDone?: (result: RecruitmentEmergencyTakedownResult) => void
 }) {
   const [reason, setReason] = useState<EmergencyReasonValue>(EMPTY_EMERGENCY_REASON)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<AdminEmergencyTakedownResult | null>(null)
+  const [result, setResult] = useState<RecruitmentEmergencyTakedownResult | null>(null)
 
   const targetKey = target ? `${target.targetType}:${target.targetId}` : null
   useEffect(() => {
@@ -84,7 +84,7 @@ export function EmergencyTakedownDialog({
 
   if (!target) return null
 
-  const label = ADMIN_EMERGENCY_TARGET_LABELS[target.targetType]
+  const label = RECRUITMENT_EMERGENCY_TARGET_LABELS[target.targetType]
   const complete = emergencyReasonComplete(reason)
 
   const submit = async () => {
@@ -140,7 +140,7 @@ export function EmergencyTakedownDialog({
             </p>
             <dl className="grid grid-cols-[6rem_1fr] gap-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-sm">
               <dt className="text-neutral-500">内容</dt>
-              <dd className="text-neutral-800">{ADMIN_EMERGENCY_TARGET_LABELS[result.targetType] ?? result.targetType}（{result.targetId}）</dd>
+              <dd className="text-neutral-800">{RECRUITMENT_EMERGENCY_TARGET_LABELS[result.targetType] ?? result.targetType}（{result.targetId}）</dd>
               <dt className="text-neutral-500">发布状态</dt>
               <dd className="text-neutral-800">{PUBLISH_LABEL[result.publishStatus] ?? result.publishStatus}</dd>
               <dt className="text-neutral-500">能否恢复</dt>

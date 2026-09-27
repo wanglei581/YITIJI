@@ -8,27 +8,17 @@
 // 缓存与 getCachedKioskTerminalConfig 同一形态：30 秒内存缓存 + 同一终端的在途请求合并。
 // 失败不进缓存，重试一定会重新请求。
 
+import type { OfficialChannelPublicItem, OfficialChannelPublicResponse } from '@ai-job-print/shared'
 import { isValidSourceUrl } from '../../lib/url'
 import { terminalProtectedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 import { ApiHttpError } from './httpAdapter'
 
-/**
- * 一条渠道。镜像 packages/shared 的 `OfficialChannelPublicItem`：3.14 后端并入后，
- * 这里与下面的响应类型都改为从 `@ai-job-print/shared` 引用 `OfficialChannelPublicResponse`，不再本地定义。
- */
-export interface OfficialChannelItem {
-  name: string
-  url: string
-  displayOrder: number
-  organizationName: string
-}
+/** 一条渠道：服务端公开读取的形状（packages/shared）。 */
+export type OfficialChannelItem = OfficialChannelPublicItem
 
-/** 镜像 packages/shared 的 `OfficialChannelPublicResponse`（3.14 并入后改为 import）。 */
-export interface OfficialChannelsResponse {
-  items: OfficialChannelItem[]
-  legacyPlatforms: OfficialChannelItem[]
-}
+/** 公开读取的响应（packages/shared）。 */
+export type OfficialChannelsResponse = OfficialChannelPublicResponse
 
 export function emptyOfficialChannels(): OfficialChannelsResponse {
   return { items: [], legacyPlatforms: [] }

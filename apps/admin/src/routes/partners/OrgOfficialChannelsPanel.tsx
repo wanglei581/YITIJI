@@ -13,7 +13,7 @@ import { StatusBadge } from '@ai-job-print/ui'
 import { AlertTriangleIcon, ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
 import { getUser } from '../../services/auth'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { orgOfficialChannelsService, type AdminOrgOfficialChannel } from '../../services/api/orgOfficialChannels'
+import { orgOfficialChannelsService, type OfficialChannelAdminItem } from '../../services/api/orgOfficialChannels'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
 import { hostWithinDomain } from './officialDomainRules'
@@ -39,7 +39,7 @@ function ChannelItem({
   canTakedown,
   onTakedown,
 }: {
-  channel: AdminOrgOfficialChannel
+  channel: OfficialChannelAdminItem
   domains: readonly string[] | null
   canTakedown: boolean
   onTakedown: () => void
@@ -110,7 +110,7 @@ export function OrgOfficialChannelsPanel({
   /** 同一抽屉里「官方域名」小节读到的当前登记；null = 还没读到，不做范围提示。 */
   domains: readonly string[] | null
 }) {
-  const [items, setItems] = useState<AdminOrgOfficialChannel[]>([])
+  const [items, setItems] = useState<OfficialChannelAdminItem[]>([])
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [loadError, setLoadError] = useState('')
   const [takedown, setTakedown] = useState<EmergencyTakedownTarget | null>(null)

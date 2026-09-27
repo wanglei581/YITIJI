@@ -8,9 +8,9 @@
 //   DELETE /partner/official-channels/:id   → { archived: true }（归档后从列表消失，机构端没有恢复入口）
 //   服务端拒绝时 message 是中文原因（https、域名范围、跳转参数、商业招聘网站、已紧急下架……），页面原样展示。
 //
-// verifiedDomains 是后端新增字段（110c6461e 的列表响应还没有）。后端并入后，
-// PartnerOfficialChannelList 挪到 packages/shared 的 OfficialChannelPartnerListResponse，这里删掉。
-// 没读到这一项时记为 null（「不知道」），不当成「未登记」。
+// 线上形状是 packages/shared 的 OfficialChannelPartnerListResponse（verifiedDomains: string[]）。
+// 这里解析成 PartnerOfficialChannelList：万一没读到 verifiedDomains，记为 null（「不知道」），
+// 不当成「未登记」——两者在页面上的说法不同。
 //
 // mock：演示两条渠道，其中一条已被平台紧急下架。localStorage['mock:official-channels'] =
 //   'no-domains' | 'empty' | 'error' | 'loading' 切换未登记域名 / 空列表 / 读取失败 / 一直读取中（只在 mock 下读）。
@@ -252,20 +252,16 @@ const mockAdapter: PartnerOfficialChannelsService = {
   },
   async update(id, input) {
     await delay(150)
-    const row = mockRows.find((item) => item.id === id)
-    if (!row) throw new ApiHttpError('OFFICIAL_CHANNEL_NOT_FOUND', '官方渠道不存在', 404)
+    // 判断顺序与服务端 updateForPartner 一致：先空更新，再找行，再看紧急下架。
     if (Object.values(input).every((value) => value === undefined)) {
       throw new ApiHttpError('OFFICIAL_CHANNEL_EMPTY_UPDATE', '没有可更新的字段', 400)
     }
+    const row = mockRows.find((item) => item.id === id)
+    if (!row) throw new ApiHttpError('OFFICIAL_CHANNEL_NOT_FOUND', '官方渠道不存在', 404)
     const enabled = input.enabled ?? row.enabled
-    // 已紧急下架的渠道冻结：机构只能归档。启用被拒的原因与服务端同一句；
-    // 改名、改链接在 110c6461e 的服务端其实还能成功（见 3.14 协调记录），这里按冻结口径拒绝。
+    // 已紧急下架的渠道冻结：名称、链接、排序、启用一律不能改，机构只能归档。原因与服务端同一句。
     if (row.emergencyTakedown) {
-      throw new ApiHttpError(
-        'EMERGENCY_TAKEDOWN_IRREVERSIBLE',
-        enabled ? '该渠道已紧急下架，不能恢复启用' : '该渠道已紧急下架，只能归档，不能修改',
-        403,
-      )
+      throw new ApiHttpError('EMERGENCY_TAKEDOWN_IRREVERSIBLE', '该渠道已紧急下架，只能归档', 403)
     }
     const urlChanged = input.url !== undefined && canonicalChannelUrl(input.url) !== row.url
     const clean = mockClean({ name: input.name, url: urlChanged ? input.url : undefined })
