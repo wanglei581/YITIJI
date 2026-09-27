@@ -11,9 +11,9 @@ import {
 } from '../recruitment-content/recruitment-content-readiness'
 import { OFFICIAL_CHANNEL_CATEGORY, OFFICIAL_CHANNEL_CODES as CODE } from './official-channel.constants'
 import {
-  hostMatchesVerifiedDomain,
   httpsHostnameOf,
   isCommercialRecruitmentHost,
+  verifiedHttpsUrl,
 } from './registrable-domain'
 import { normalizeVerifiedDomainList, parseVerifiedDomains, type VerifiedDomainRecord } from './verified-domains'
 import type { CreateOfficialChannelDto, UpdateOfficialChannelDto } from './dto/official-channel.dto'
@@ -28,6 +28,9 @@ export interface OfficialChannelPublicItem {
 export interface OfficialChannelPartnerItem extends OfficialChannelPublicItem {
   id: string
   enabled: boolean
+  emergencyTakedown: boolean
+  emergencyReasonCode: string | null
+  emergencyReasonText: string | null
 }
 
 function fail(status: 'bad' | 'forbidden' | 'missing', code: string, message: string): never {
@@ -64,17 +67,19 @@ export class OfficialChannelsService {
     if (!normalized.ok) {
       fail('bad', CODE.verifiedDomainInvalid, `不是可核验的官方注册域：${normalized.value}`)
     }
-    await this.prisma.organization.update({
-      where: { id: orgId },
-      data: { verifiedOfficialDomainsJson: JSON.stringify(normalized.items) },
-    })
-    await this.audit.write({
-      actorId: actor.userId,
-      actorRole: actor.role,
-      action: 'organization.verified_domains_replace',
-      targetType: 'organization',
-      targetId: orgId,
-      payload: { domains: normalized.items.map((item) => item.domain) },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.organization.update({
+        where: { id: orgId },
+        data: { verifiedOfficialDomainsJson: JSON.stringify(normalized.items) },
+      })
+      await this.audit.writeRequired(tx, {
+        actorId: actor.userId,
+        actorRole: actor.role,
+        action: 'organization.verified_domains_replace',
+        targetType: 'organization',
+        targetId: orgId,
+        payload: { domains: normalized.items.map((item) => item.domain), basis: 'organization_identity_verification' },
+      })
     })
     return { items: normalized.items }
   }
@@ -85,7 +90,12 @@ export class OfficialChannelsService {
       where: { organizationId: org.id, category: OFFICIAL_CHANNEL_CATEGORY, archivedAt: null },
       orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
     })
-    return { items: rows.map((row) => this.toPartnerItem(row, org.name)) }
+    const holds = await this.prisma.recruitmentEmergencyHold.findMany({
+      where: { targetType: 'official_channel', targetId: { in: rows.map((row) => row.id) } },
+      select: { targetId: true, reasonCode: true, reasonText: true },
+    })
+    const byId = new Map(holds.map((hold) => [hold.targetId, hold]))
+    return { items: rows.map((row) => this.toPartnerItem(row, org.name, byId.get(row.id))) }
   }
 
   async createForPartner(user: AuthedUser, dto: CreateOfficialChannelDto): Promise<OfficialChannelPartnerItem> {
@@ -93,8 +103,12 @@ export class OfficialChannelsService {
     const name = this.cleanName(dto.name)
     const url = this.cleanUrl(dto.url, parseVerifiedDomains(org.verifiedOfficialDomainsJson))
     const enabled = dto.enabled ?? true
-    const row = await this.prisma.onlinePlatformDirectory.create({
-      data: {
+    const row = await this.prisma.$transaction(async (tx) => {
+      const circuit = await tx.recruitmentCircuitBreak.findUnique({
+        where: { scope_targetId: { scope: 'org', targetId: org.id } },
+      })
+      if (circuit) fail('forbidden', CODE.emergencyHeld, '该机构渠道已熔断，不能新增')
+      const created = await tx.onlinePlatformDirectory.create({ data: {
         organizationId: org.id,
         name,
         slug: `oc_${randomBytes(8).toString('hex')}`,
@@ -104,17 +118,16 @@ export class OfficialChannelsService {
         officialDomainsJson: org.verifiedOfficialDomainsJson || '[]',
         displayOrder: dto.displayOrder ?? 0,
         status: enabled ? 'active' : 'inactive',
+        reviewStatus: 'pending',
+        publishStatus: 'draft',
         linkCheckStatus: 'valid',
         lastLinkCheckedAt: new Date(),
-      },
-    })
-    await this.audit.write({
-      actorId: user.userId,
-      actorRole: user.role,
-      action: 'official_channel.create',
-      targetType: 'organization',
-      targetId: org.id,
-      payload: { channelId: row.id, enabled },
+      } })
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId, actorRole: user.role, action: 'official_channel.create',
+        targetType: 'official_channel', targetId: created.id, payload: { orgId: org.id, enabled },
+      })
+      return created
     })
     return this.toPartnerItem(row, org.name)
   }
@@ -133,31 +146,54 @@ export class OfficialChannelsService {
     })
     if (!row) fail('missing', CODE.notFound, '官方渠道不存在')
     const verified = parseVerifiedDomains(org.verifiedOfficialDomainsJson)
-    const url = dto.url === undefined ? row.landingUrl : this.cleanUrl(dto.url, verified)
+    const linkChanged = dto.url !== undefined && verifiedHttpsUrl(dto.url)?.toString() !== row.landingUrl
+    const url = linkChanged ? this.cleanUrl(dto.url!, verified) : row.landingUrl
     const enabled = dto.enabled ?? row.status === 'active'
-    if (dto.url !== undefined || enabled) this.cleanUrl(url, verified)
+    if (enabled && row.status !== 'active' && !linkChanged) this.cleanUrl(url, verified)
     const name = dto.name === undefined ? row.name : this.cleanName(dto.name)
-    const updated = await this.prisma.onlinePlatformDirectory.update({
-      where: { id: row.id },
-      data: {
-        name,
-        landingUrl: url,
-        displayOrder: dto.displayOrder ?? row.displayOrder,
-        status: enabled ? 'active' : 'inactive',
-        officialDomainsJson: org.verifiedOfficialDomainsJson || '[]',
-        linkCheckStatus: 'valid',
-        lastLinkCheckedAt: new Date(),
-      },
-    })
-    await this.audit.write({
-      actorId: user.userId,
-      actorRole: user.role,
-      action: 'official_channel.update',
-      targetType: 'organization',
-      targetId: org.id,
-      payload: { channelId: row.id, enabled },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Lock the row before inspecting the hold. A concurrent takedown locks the
+      // same row first, so one transaction always observes the other's result.
+      const next = await tx.onlinePlatformDirectory.update({
+        where: { id: row.id },
+        data: {
+          name,
+          landingUrl: url,
+          displayOrder: dto.displayOrder ?? row.displayOrder,
+          status: enabled ? 'active' : 'inactive',
+          ...(linkChanged ? {
+            officialDomainsJson: org.verifiedOfficialDomainsJson || '[]',
+            linkCheckStatus: 'valid', lastLinkCheckedAt: new Date(),
+          } : {}),
+        },
+      })
+      const hold = await tx.recruitmentEmergencyHold.findUnique({
+        where: { targetType_targetId: { targetType: 'official_channel', targetId: row.id } },
+      })
+      if (hold && enabled) fail('forbidden', CODE.emergencyHeld, '该渠道已紧急下架，不能恢复启用')
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId, actorRole: user.role, action: 'official_channel.update',
+        targetType: 'official_channel', targetId: row.id, payload: { orgId: org.id, enabled, linkChanged },
+      })
+      return next
     })
     return this.toPartnerItem(updated, org.name)
+  }
+
+  async archiveForPartner(user: AuthedUser, channelId: string): Promise<{ archived: true }> {
+    const org = await this.requirePartnerOrg(user)
+    await this.prisma.$transaction(async (tx) => {
+      const result = await tx.onlinePlatformDirectory.updateMany({
+        where: { id: channelId, organizationId: org.id, category: OFFICIAL_CHANNEL_CATEGORY, archivedAt: null },
+        data: { archivedAt: new Date(), status: 'inactive' },
+      })
+      if (result.count !== 1) fail('missing', CODE.notFound, '官方渠道不存在')
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId, actorRole: user.role, action: 'official_channel.archive',
+        targetType: 'official_channel', targetId: channelId, payload: { orgId: org.id },
+      })
+    })
+    return { archived: true }
   }
 
   /**
@@ -197,9 +233,15 @@ export class OfficialChannelsService {
         archivedAt: null,
       },
       orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
-      select: { name: true, landingUrl: true, displayOrder: true },
+      select: { id: true, name: true, landingUrl: true, displayOrder: true },
     })
+    const holds = await this.prisma.recruitmentEmergencyHold.findMany({
+      where: { targetType: 'official_channel', targetId: { in: rows.map((row) => row.id) } },
+      select: { targetId: true },
+    })
+    const held = new Set(holds.map((hold) => hold.targetId))
     return rows
+      .filter((row) => !held.has(row.id))
       .filter((row) => this.publicUrlAllowed(row.landingUrl, verified))
       .map((row) => ({
         name: row.name,
@@ -214,6 +256,7 @@ export class OfficialChannelsService {
     const rows = await this.prisma.onlinePlatformDirectory.findMany({
       where: {
         organizationId: null,
+        OR: [{ category: null }, { category: { not: OFFICIAL_CHANNEL_CATEGORY } }],
         status: 'active',
         reviewStatus: 'approved',
         publishStatus: 'published',
@@ -254,9 +297,8 @@ export class OfficialChannelsService {
   }
 
   private publicUrlAllowed(url: string, verified: VerifiedDomainRecord[]): boolean {
-    const host = httpsHostnameOf(url)
-    if (!host || isCommercialRecruitmentHost(host)) return false
-    return verified.some((item) => hostMatchesVerifiedDomain(host, item.domain))
+    const checked = verifiedHttpsUrl(url, verified.map((item) => item.domain))
+    return !!checked && !isCommercialRecruitmentHost(checked.hostname)
   }
 
   private cleanName(raw: string): string {
@@ -266,15 +308,14 @@ export class OfficialChannelsService {
   }
 
   private cleanUrl(raw: string, verified: VerifiedDomainRecord[]): string {
+    const checked = verifiedHttpsUrl(raw, verified.map((item) => item.domain))
     const host = httpsHostnameOf(raw)
     if (!host) fail('bad', CODE.urlInvalid, '链接必须是不带账号的 https 地址')
     if (isCommercialRecruitmentHost(host)) {
       fail('bad', CODE.commercialHost, '不能把商业招聘网站保存为本机构官方渠道')
     }
-    if (!verified.some((item) => hostMatchesVerifiedDomain(host, item.domain))) {
-      fail('bad', CODE.domainNotVerified, '链接域名不在该机构已核验的官方域名内')
-    }
-    return raw.trim()
+    if (!checked) fail('bad', CODE.domainNotVerified, '链接或跳转目标不在该机构已核验的官方域名内')
+    return checked.toString()
   }
 
   private async requireOrg(orgId: string): Promise<{ id: string; verifiedOfficialDomainsJson: string; name: string }> {
@@ -294,6 +335,7 @@ export class OfficialChannelsService {
   private toPartnerItem(
     row: { id: string; name: string; landingUrl: string; displayOrder: number; status: string },
     organizationName: string,
+    hold?: { reasonCode: string; reasonText: string },
   ): OfficialChannelPartnerItem {
     return {
       id: row.id,
@@ -301,6 +343,9 @@ export class OfficialChannelsService {
       url: row.landingUrl,
       displayOrder: row.displayOrder,
       enabled: row.status === 'active',
+      emergencyTakedown: !!hold,
+      emergencyReasonCode: hold?.reasonCode ?? null,
+      emergencyReasonText: hold?.reasonText ?? null,
       organizationName,
     }
   }

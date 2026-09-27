@@ -6,6 +6,9 @@ import { join, resolve } from 'node:path'
 
 const API_ROOT = resolve(__dirname, '..')
 const MIGRATION = '20260810100000_recruitment_p1_expand'
+// This migration indexes OnlinePlatformDirectory, which is created by MIGRATION.
+// The old-schema fixture must defer it until after the P1 expansion.
+const P1_DEPENDENT_MIGRATION = '20260927100000_official_channel_org_index'
 const SQLITE_SCHEMA = join(API_ROOT, 'prisma/schema.prisma')
 const PG_SCHEMA = join(API_ROOT, 'prisma/postgres/schema.prisma')
 const SQLITE_MIGRATIONS = join(API_ROOT, 'prisma/migrations')
@@ -27,7 +30,7 @@ function requireTokens(haystack: string, label: string, tokens: string[]): void 
 
 function migrationFiles(dir: string, includeLatest: boolean): string[] {
   return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && (includeLatest || entry.name !== MIGRATION))
+    .filter((entry) => entry.isDirectory() && (includeLatest || (entry.name !== MIGRATION && entry.name !== P1_DEPENDENT_MIGRATION)))
     .map((entry) => join(dir, entry.name, 'migration.sql'))
     .sort()
 }
@@ -363,6 +366,7 @@ function verifySqliteFreshAndUpgrade(): void {
   const legacyTables = ['Organization', 'JobSource', 'Job', 'OfflineAgency', 'OfflineJob']
   const before = legacyTables.map((table) => sqlite(upgradeDb, `SELECT COUNT(*) FROM "${table}";`))
   sqlite(upgradeDb, read(join(SQLITE_MIGRATIONS, MIGRATION, 'migration.sql')))
+  sqlite(upgradeDb, read(join(SQLITE_MIGRATIONS, P1_DEPENDENT_MIGRATION, 'migration.sql')))
   const after = legacyTables.map((table) => sqlite(upgradeDb, `SELECT COUNT(*) FROM "${table}";`))
   assert.deepEqual(after, before, 'SQLite upgrade changed legacy row counts')
   assert.equal(
@@ -439,6 +443,7 @@ async function verifyPostgresUpgrade(): Promise<void> {
       )
     )
     await pool.query(read(join(PG_MIGRATIONS, MIGRATION, 'migration.sql')))
+    await pool.query(read(join(PG_MIGRATIONS, P1_DEPENDENT_MIGRATION, 'migration.sql')))
     const after = await Promise.all(
       legacyTables.map(async (table) =>
         Number((await pool.query(`SELECT COUNT(*)::int AS count FROM "${table}"`)).rows[0]?.count)

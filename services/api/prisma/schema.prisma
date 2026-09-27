@@ -2861,6 +2861,7 @@ model OnlinePlatformDirectory {
   updatedAt            DateTime @updatedAt
 
   @@index([organizationId])
+  @@index([organizationId, category, archivedAt, status, displayOrder], map: "OnlinePlatformDirectory_org_category_archive_status_order_idx")
   @@index([reviewStatus, publishStatus])
   @@index([linkCheckStatus])
   @@index([displayOrder])

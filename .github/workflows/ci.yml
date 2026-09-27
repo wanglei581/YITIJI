@@ -683,6 +683,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:companies
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-emergency-scope
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:official-channels
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-hosting-default-off
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
@@ -968,6 +969,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-application-track
           pnpm --filter @ai-job-print/api verify:companies
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-emergency-scope
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:official-channels
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-hosting-default-off
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts

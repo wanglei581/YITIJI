@@ -17,7 +17,7 @@ import {
 } from './career-plan-degraded'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
 import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
-import { storedJobFitUsesSystemJob, systemJobTitleFromJobFit } from './job-fit-hosting'
+import { storedJobFitUsesSystemJob } from './job-fit-hosting'
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -59,6 +59,8 @@ interface StoredCareerPlan {
   basedOn: {
     resume: true
     jobFit: string | null
+    /** 旧存档无此字段；旧 basedOn.jobFit 按系统岗位引用保守清理。 */
+    jobFitSource?: 'system' | 'manual' | null
     interview: string | null
     /** self_assessment 仅作可选上下文 hint，不参与签名门禁 / 校验 / 配额。 */
     selfAssessment: string | null
@@ -67,16 +69,22 @@ interface StoredCareerPlan {
 }
 
 function scrubSystemJobTitle(value: string, title: string): string {
-  return title.length >= 2 ? value.split(title).join('') : value
+  if (value === title) return '目标岗位'
+  if (title.length < 4) return value
+  const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return value
+    .replace(new RegExp(`([「“《])${escaped}([」”》])`, 'g'), '$1目标岗位$2')
+    .replace(new RegExp(`(目标岗位[：:]\\s*)${escaped}(?=$|[，。；;、\\s])`, 'g'), '$1目标岗位')
 }
 
 /** 去掉系统岗位标题，保留规划正文。basedOn.jobFit 清空，避免标题从依据栏漏出。 */
 export function redactCareerPlanSystemJobTitle(stored: StoredCareerPlan, title: string): StoredCareerPlan {
+  if (!stored.basedOn?.jobFit || stored.basedOn.jobFitSource === 'manual') return stored
   const clean = (value: string | undefined) => scrubSystemJobTitle(value ?? '', title)
   const payload = stored.payload
   return {
     ...stored,
-    basedOn: { ...stored.basedOn, jobFit: null },
+    basedOn: { ...stored.basedOn, jobFit: null, jobFitSource: null },
     payload: {
       ...payload,
       summary: clean(payload?.summary),
@@ -146,7 +154,7 @@ export class CareerPlanService {
 
     // 可选上下文（如实分层，绝不跨归属）：
     // 1) 同 taskId 的最近岗位匹配参考
-    let jobFitCtx: { jobTitle: string; gaps: string[] } | null = null
+    let jobFitCtx: { jobTitle: string; gaps: string[]; source: 'system' | 'manual' } | null = null
     const jobFitRow = includeJobFitTitle
       ? await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
       : null
@@ -160,6 +168,7 @@ export class CareerPlanService {
           jobFitCtx = {
             jobTitle: stored.job.title,
             gaps: (stored.payload?.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
+            source: storedJobFitUsesSystemJob(jobFitRow.payloadJson) ? 'system' : 'manual',
           }
         }
       } catch { /* 损坏行按无上下文处理 */ }
@@ -206,6 +215,7 @@ export class CareerPlanService {
       basedOn: {
         resume: true,
         jobFit: jobFitCtx?.jobTitle ?? null,
+        jobFitSource: jobFitCtx?.source ?? null,
         interview: interviewCtx?.position ?? null,
         selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
       },
@@ -247,7 +257,7 @@ export class CareerPlanService {
       throw new NotFoundException({ error: { code: 'CAREER_PLAN_NOT_FOUND', message: '暂无职业规划记录，请先生成' } })
     }
     const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
-    return this.toResponse(taskId, await this.withoutSystemJobTitle(taskId, stored))
+    return this.toResponse(taskId, this.withoutSystemJobTitle(stored))
   }
 
   /**
@@ -309,19 +319,14 @@ export class CareerPlanService {
    * 托管关闭时，旧规划里引用的系统岗位标题从读取结果和打印稿里去掉。
    * 整份规划仍然返回。没有 job_fit 存档时无法判断来源，保持原文。
    */
-  private async withoutSystemJobTitle(taskId: string, stored: StoredCareerPlan): Promise<StoredCareerPlan> {
+  private withoutSystemJobTitle(stored: StoredCareerPlan): StoredCareerPlan {
     if (isRecruitmentContentHostingEnabled()) return stored
-    const fit = await this.prisma.aiResumeResult.findUnique({
-      where: { taskId_kind: { taskId, kind: 'job_fit' } },
-      select: { payloadJson: true },
-    })
-    if (!fit?.payloadJson || !storedJobFitUsesSystemJob(fit.payloadJson)) return stored
-    return redactCareerPlanSystemJobTitle(stored, systemJobTitleFromJobFit(fit.payloadJson) ?? '')
+    return redactCareerPlanSystemJobTitle(stored, stored.basedOn?.jobFit ?? '')
   }
 
   /** AI 版式。逻辑与改动前一致，只是抽成方法。 */
   private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }, taskId: string) {
-    const stored = await this.withoutSystemJobTitle(taskId, JSON.parse(row.payloadJson) as StoredCareerPlan)
+    const stored = this.withoutSystemJobTitle(JSON.parse(row.payloadJson) as StoredCareerPlan)
     const { buffer, pageCount } = await this.pdf.render(
       { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn, contentId: taskId },
       stored.payload,

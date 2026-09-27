@@ -32,9 +32,11 @@ export function normalizeVerifiedDomainList(
   actorId: string,
   nowIso: string,
 ): { ok: true; items: VerifiedDomainRecord[] } | { ok: false; value: string } {
+  if (!Array.isArray(rawDomains) || rawDomains.length > 10) return { ok: false, value: '官方注册域最多 10 个' }
   const items: VerifiedDomainRecord[] = []
   const seen = new Set<string>()
   for (const raw of rawDomains) {
+    if (typeof raw !== 'string' || !raw.trim()) return { ok: false, value: '空域名' }
     const domain = verifiedDomainFromInput(raw)
     if (!domain || isCommercialRecruitmentHost(domain)) return { ok: false, value: raw }
     if (seen.has(domain)) continue

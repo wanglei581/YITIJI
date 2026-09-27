@@ -59,6 +59,7 @@ export type AuditAction =
   | 'organization.verified_domains_replace'
   | 'official_channel.create'
   | 'official_channel.update'
+  | 'official_channel.archive'
   | 'user.create'
   | 'user.disable'
   | 'system.login'

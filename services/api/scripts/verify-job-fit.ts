@@ -416,6 +416,22 @@ async function main() {
     const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
     const previousSigning = process.env.FILE_SIGNING_SECRET
     process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    const { JobFitController } = await import('../src/ai/job-fit.controller')
+    let governedManualCalls = 0
+    const controller = new JobFitController(
+      svc, {} as never, {} as never, prisma,
+      { analyzeForJobFit: async () => { governedManualCalls++; return { status: 'completed' } } } as never,
+    )
+    const manualOff = await controller.analyze({ taskId, manualJob: { title: '手填岗位', requirements: '细心' } }, { headers: {} })
+    if (manualOff.status !== 'completed' || governedManualCalls !== 1) fail('12a. 托管关闭时 manualJob 应进入分析')
+    pass('12a. 托管关闭时 manualJob 仍可进入分析')
+    try {
+      await controller.analyze({ taskId, jobId: jobPub.id }, { headers: {} })
+      fail('12b. 托管关闭时 jobId 应拒绝')
+    } catch (error) {
+      if (!JSON.stringify((error as { getResponse?: () => unknown }).getResponse?.() ?? '').includes('RECRUITMENT_HOSTING_DISABLED') || governedManualCalls !== 1) fail('12b. jobId 未在分析前被拒')
+    }
+    pass('12b. 托管关闭时 jobId 在分析前被拒绝')
     if (!process.env.FILE_SIGNING_SECRET || process.env.FILE_SIGNING_SECRET.length < 32) {
       process.env.FILE_SIGNING_SECRET = 'verify-job-fit-signing-secret-0123456789'
     }

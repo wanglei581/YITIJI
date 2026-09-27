@@ -7,7 +7,7 @@ import {
   type EmergencyReasonCode,
 } from './recruitment-hosting'
 
-export type EmergencyTargetType = 'job' | 'job_fair' | 'company' | 'policy' | 'fair_material' | 'offline_agency'
+export type EmergencyTargetType = 'job' | 'job_fair' | 'company' | 'policy' | 'fair_material' | 'offline_agency' | 'official_channel'
 
 const TARGET_LABEL: Record<EmergencyTargetType, string> = {
   job: '岗位',
@@ -16,6 +16,7 @@ const TARGET_LABEL: Record<EmergencyTargetType, string> = {
   policy: '政策',
   fair_material: '招聘会资料',
   offline_agency: '线下机构',
+  official_channel: '本机构官方渠道',
 }
 
 interface TargetRow {
@@ -123,6 +124,15 @@ export class RecruitmentEmergencyService {
   }
 
   private async findRow(targetType: EmergencyTargetType, targetId: string): Promise<TargetRow | null> {
+    if (targetType === 'official_channel') {
+      const row = await this.prisma.onlinePlatformDirectory.findFirst({
+        where: { id: targetId, category: 'official_channel', archivedAt: null, organizationId: { not: null } },
+        select: { id: true, organizationId: true, name: true, status: true },
+      })
+      return row && row.organizationId
+        ? { id: row.id, orgId: row.organizationId, sourceId: null, title: row.name, publishStatus: row.status === 'active' ? 'published' : 'unpublished' }
+        : null
+    }
     if (targetType === 'job') {
       const row = await this.prisma.job.findUnique({
         where: { id: targetId },
@@ -175,7 +185,7 @@ export class RecruitmentEmergencyService {
   private async loadScope(scope: 'org' | 'source', id: string): Promise<Array<{ targetType: EmergencyTargetType; row: TargetRow }>> {
     const orgWhere = scope === 'org' ? { sourceOrgId: id } : undefined
     const sourceWhere = scope === 'source' ? { sourceId: id } : undefined
-    const [jobs, fairs, companies, policies, materials, agencies] = await Promise.all([
+    const [jobs, fairs, companies, policies, materials, agencies, channels] = await Promise.all([
       this.prisma.job.findMany({
         where: { ...(orgWhere ?? sourceWhere) },
         select: { id: true, sourceOrgId: true, sourceId: true, title: true, publishStatus: true },
@@ -210,6 +220,12 @@ export class RecruitmentEmergencyService {
         ? this.prisma.offlineAgency.findMany({
             where: { sourceOrgId: id },
             select: { id: true, name: true, publishStatus: true, sourceOrgId: true },
+          })
+        : Promise.resolve([]),
+      scope === 'org'
+        ? this.prisma.onlinePlatformDirectory.findMany({
+            where: { organizationId: id, category: 'official_channel', archivedAt: null },
+            select: { id: true, organizationId: true, name: true, status: true },
           })
         : Promise.resolve([]),
     ])
@@ -250,6 +266,13 @@ export class RecruitmentEmergencyService {
           publishStatus: row.publishStatus,
         },
       })),
+      ...channels.filter((row) => row.organizationId !== null).map((row) => ({
+        targetType: 'official_channel' as const,
+        row: {
+          id: row.id, orgId: row.organizationId!, sourceId: null, title: row.name,
+          publishStatus: row.status === 'active' ? 'published' : 'unpublished',
+        },
+      })),
     ]
   }
 
@@ -260,6 +283,33 @@ export class RecruitmentEmergencyService {
     actor: AuthedUser,
     mode: 'single' | 'circuit_break',
   ) {
+    if (targetType === 'official_channel') {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.onlinePlatformDirectory.update({ where: { id: row.id }, data: { status: 'inactive' } })
+        const existing = await tx.recruitmentEmergencyHold.findUnique({
+          where: { targetType_targetId: { targetType, targetId: row.id } },
+        })
+        if (!existing) {
+          await tx.recruitmentEmergencyHold.create({ data: {
+            targetType, targetId: row.id, orgId: row.orgId, sourceId: null,
+            reasonCode: reason.reasonCode, reasonText: reason.reasonText, actorId: actor.userId,
+          } })
+          await tx.partnerOrgNotice.create({ data: {
+            orgId: row.orgId,
+            kind: 'recruitment_emergency_takedown',
+            title: '本机构官方渠道已紧急下架',
+            body: `「${row.title}」已紧急下架。事由：${reason.reasonText}。此下架不能恢复。`,
+            payloadJson: JSON.stringify({ targetType, targetId: row.id, reasonCode: reason.reasonCode, mode }),
+          } })
+        }
+        await this.audit.writeRequired(tx, {
+          actorId: actor.userId, actorRole: 'admin', action: 'recruitment.emergency_takedown',
+          targetType, targetId: row.id,
+          payload: { orgId: row.orgId, reasonCode: reason.reasonCode, reasonText: reason.reasonText, mode, alreadyHeld: !!existing },
+        })
+      })
+      return
+    }
     const existing = await this.prisma.recruitmentEmergencyHold.findFirst({
       where: { targetType, targetId: row.id },
       select: { id: true },

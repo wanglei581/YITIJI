@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -53,6 +53,13 @@ export class OfficialChannelsController {
     @Body() dto: UpdateOfficialChannelDto,
   ) {
     return ApiResponse.ok(await this.channels.updateForPartner(user, id, dto))
+  }
+
+  @Delete('partner/official-channels/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  async archive(@CurrentUser() user: AuthedUser, @Param('id') id: string) {
+    return ApiResponse.ok(await this.channels.archiveForPartner(user, id))
   }
 
   /**

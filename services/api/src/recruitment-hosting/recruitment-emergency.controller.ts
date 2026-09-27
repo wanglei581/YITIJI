@@ -8,7 +8,7 @@ import { EMERGENCY_REASON_CODES } from './recruitment-hosting'
 import { RecruitmentEmergencyService, type EmergencyTargetType } from './recruitment-emergency.service'
 
 export class EmergencyTakedownDto {
-  @IsIn(['job', 'job_fair', 'company', 'policy', 'fair_material', 'offline_agency'])
+  @IsIn(['job', 'job_fair', 'company', 'policy', 'fair_material', 'offline_agency', 'official_channel'])
   targetType!: EmergencyTargetType
 
   @IsString()

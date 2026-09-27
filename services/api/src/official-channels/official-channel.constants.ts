@@ -11,4 +11,5 @@ export const OFFICIAL_CHANNEL_CODES = {
   orgNotFound: 'ORG_NOT_FOUND',
   orgRequired: 'ORG_REQUIRED',
   terminalNotFound: 'TERMINAL_NOT_FOUND',
+  emergencyHeld: 'EMERGENCY_TAKEDOWN_IRREVERSIBLE',
 } as const

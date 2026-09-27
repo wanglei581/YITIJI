@@ -264,6 +264,49 @@ async function main() {
     if (buffer.slice(0, 4).toString() !== '%PDF') fail('9. 输出不是 PDF')
     pass(`9. 建议单 PDF 真实渲染（${buffer.length} bytes）+ 打印链路返回内部 HMAC URL`)
 
+    // 3.14: the plan's own basedOn determines redaction, even when the most
+    // recent job_fit was overwritten with a manual result after plan generation.
+    const oldPlan = {
+      basedOn: { resume: true, jobFit: '高级财务会计', interview: null, selfAssessment: null },
+      providerName: 'llm',
+      payload: { ...VALID, summary: '我做会计工作，目标岗位：「高级财务会计」。目标岗位：高级财务会计。',
+        directions: [{ title: '财务方向', why: '参考《高级财务会计》，保留销售经验。', firstStep: '继续学习' }] },
+    }
+    await prisma.aiResumeResult.update({
+      where: { taskId_kind: { taskId: taskAnon, kind: 'career_plan' } },
+      data: { payloadJson: JSON.stringify(oldPlan), expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    await prisma.aiResumeResult.update({
+      where: { taskId_kind: { taskId: taskAnon, kind: 'job_fit' } },
+      data: { payloadJson: JSON.stringify({ job: { title: '手填的新岗位' } }) },
+    })
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    try {
+      const latestRedacted = await svc.getLatest(taskAnon, anonReq)
+      if (latestRedacted.basedOn.jobFit !== null || !latestRedacted.summary.includes('我做会计工作')
+        || !latestRedacted.summary.includes('「目标岗位」') || !latestRedacted.summary.includes('目标岗位：目标岗位。')) {
+        fail('9a. 旧规划读取应按自身 basedOn 清理，正文不能被切烂')
+      }
+      let pdfPayload: CareerPlanPayload | undefined
+      const capturePdf = { render: async (_meta: unknown, payload: CareerPlanPayload) => {
+        pdfPayload = payload
+        return { buffer: Buffer.from('%PDF'), pageCount: 1 }
+      } }
+      const printRedacted = new CareerPlanService(
+        prisma, llm, stubExtraction as never, stubFiles as never, capturePdf as never, audit, aiLog,
+        new CareerPlanDegradedPdfService(),
+      )
+      await printRedacted.printPlan(taskAnon, anonReq)
+      if (!pdfPayload?.summary.includes('「目标岗位」') || pdfPayload.summary.includes('高级财务会计')) {
+        fail('9a. PDF 未使用同一份清理结果')
+      }
+      pass('9a. 旧规划查看与 PDF 共用 basedOn 清理，最新手填 job_fit 不覆盖来源')
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
+
     // ── 10. 日志脱敏 ──────────────────────────────────────────────────────────
     const joined = capturedLogs.join('\n')
     for (const secret of ['简历标记CPRS', '档案管理与会议安排', '行政管理深耕']) {

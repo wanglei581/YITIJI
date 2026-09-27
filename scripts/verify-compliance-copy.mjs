@@ -456,6 +456,20 @@ if (miniappOutboundMissing === 0) {
   pass(`5b. 小程序外跳按钮文案使用「复制来源链接」(${MINIAPP_OUTBOUND_FILES.length} 页)`)
 }
 
+// 3.14: official-channel API errors and takedown notices are shown by partner/admin clients.
+// Keep this targeted: the whole API contains historical audit strings and test fixtures.
+const officialBackendFiles = [
+  'services/api/src/official-channels/official-channels.service.ts',
+  'services/api/src/recruitment-hosting/recruitment-emergency.service.ts',
+]
+for (const rel of officialBackendFiles) {
+  const body = fs.readFileSync(path.join(root, rel), 'utf8')
+  for (const forbidden of ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理']) {
+    if (body.includes(forbidden)) fail(`5c. ${rel} 出现禁用文案「${forbidden}」`)
+  }
+}
+if (failures === 0) pass('5c. 官方渠道与下架通知后端文案无禁词')
+
 // ---------- 结果 ----------
 
 if (failures > 0) {

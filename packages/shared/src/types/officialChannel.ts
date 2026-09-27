@@ -22,6 +22,9 @@ export interface OfficialChannelPartnerItem {
   url: string
   displayOrder: number
   enabled: boolean
+  emergencyTakedown: boolean
+  emergencyReasonCode: string | null
+  emergencyReasonText: string | null
   organizationName: string
 }
 
