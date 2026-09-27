@@ -114,7 +114,7 @@ mustContain(
     'getJobAiConsentStatus',
     'revokeJobAiConsent',
     '隐私与 AI 授权管理',
-    '岗位 AI 辅助',
+    'AI 辅助只用于本人求职准备参考',
     '已授权',
     '未授权',
     '撤回授权',

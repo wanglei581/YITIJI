@@ -85,9 +85,9 @@ const LOGIN_NONE: Record<string, string> = {}
 
 const PROFILE_NONE: Record<string, string> = {
   switching: '点「退出并切换」后立刻清会话离开设置页，没有 switching 停留屏',
-  'switch-failed': '切换账号不看登出接口成败，失败也不会留在设置页',
-  'phone-clearing': '换绑成功后的清会话没有单独一屏，完成句在 phone-done',
-  'phone-relogin-failed': '换绑完成只给出「去登录」，不再次登录，没有 relogin-failed 屏',
+  'switch-failed': '清场入口同步抛错才停留；登出网络失败仍由全局守卫保护本机',
+  'phone-clearing': '换绑成功立即交全局清场守卫接管，不通过伪造挂起页面模拟成功',
+  'phone-relogin-failed': '只有清场入口同步抛错才保留重试；网络登出失败不等于本机清场失败',
 }
 
 function hitOf(nn: string, screen: string, state: string): PriorityPlan | null {
@@ -764,6 +764,7 @@ async function punchPhone(page: Page): Promise<void> {
   const phoneTab = page.getByRole('button', { name: '手机号登录', exact: true })
   if (await phoneTab.count()) await phoneTab.click()
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
 }
 
@@ -817,12 +818,14 @@ async function openLogin(page: Page, api: ApiRouter, state: string): Promise<voi
     return
   }
   await punchPhone(page)
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   if (state === 'phone-verifying' || state === 'phone-code-expired' || state === 'phone-code-invalid') {
     const smsTab = page.getByRole('button', { name: '短信验证码', exact: true })
     if (await smsTab.count()) await smsTab.click()
     for (const digit of CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-    await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByRole('button', { name: '确认登录', exact: true }).click()
   }
   await see(page, `[data-testid="login-gate-state-${state}"]`)
 }
@@ -893,17 +896,19 @@ async function openProfile(page: Page, api: ApiRouter, state: string): Promise<v
       // 401 会被当成会员会话失效并拆掉弹层。用 400 让换绑层留下失败句。
       api.respond('POST', '/api/v1/member/auth/step-up/verify', {
         status: 400,
-        json: { error: { code: 'VALIDATION_FAILED', message: state === 'phone-code-expired' ? '验证码已过期' : '验证码不正确' } },
+        json: { error: { code: state === 'phone-code-expired' ? 'STEP_UP_CHALLENGE_INVALID' : 'STEP_UP_CODE_INVALID', message: state === 'phone-code-expired' ? '验证码已过期' : '验证码不正确' } },
       })
     }
-    if (state === 'phone-new-send-failed') {
-      api.respond('POST', '/api/v1/member/auth/sms-code', { status: 500, json: { error: { code: 'SMS_SEND_FAILED', message: '验证码发送失败' } } })
-    }
     if (state === 'phone-new-verify-failed' || state === 'phone-rebind-failed') {
-      api.respond('POST', '/api/v1/member/phone/rebind', { status: 400, json: { error: { code: 'PHONE_REBIND_FAILED', message: '换绑没有完成' } } })
+      // 仅验证页面失败排版。真实 REBIND_CODE_INVALID 返回 401 会触发全局清场，另由 W5 用例覆盖。
+      api.respond('POST', '/api/v1/member/phone/rebind', { status: state === 'phone-new-verify-failed' ? 400 : 409, json: { error: { code: state === 'phone-new-verify-failed' ? 'REBIND_CODE_INVALID' : 'PHONE_CONFLICT', message: state === 'phone-new-verify-failed' ? '新手机验证码不正确' : '该手机号已绑定其他账号，无法换绑' } } })
     }
   }
   await loginThroughVisibleUi(page, dest)
+    if (state === 'phone-new-send-failed') {
+      api.respond('POST', '/api/v1/member/auth/sms-code', { status: 500, json: { error: { code: 'SMS_SEND_FAILED', message: '验证码发送失败' } } })
+    }
+
   if (state === 'signed-out') return
   if (dest === '/profile') {
     await see(page, `[data-testid="profile-state-${state}"]`)
@@ -956,7 +961,7 @@ async function openProfile(page: Page, api: ApiRouter, state: string): Promise<v
   if (state === 'phone-new-verify') return
   await page.getByLabel('新手机号验证码，已隐藏显示').fill(CODE)
   await page.getByRole('button', { name: '确认换绑' }).click()
-  if (state === 'phone-done') await see(page, 'text=换绑成功')
+  if (state === 'phone-done') await see(page, 'text=换绑成功，请用新手机号登录')
   else await see(page, '[role="alert"]')
 }
 

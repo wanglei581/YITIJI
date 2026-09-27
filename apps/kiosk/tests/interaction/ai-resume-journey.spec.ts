@@ -501,7 +501,7 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     const login = await loginMemberViaSms(page, journey, collectors)
     if (!login.codeSource) {
       appendOperation({
-        journey, step: 'member-login-failed', route: new URL(page.url()).pathname, control: '验证并登录',
+        journey, step: 'member-login-failed', route: new URL(page.url()).pathname, control: '确认登录',
         selectorHint: 'sms-log/redis', kind: 'click', disabled: false, dead: false,
         observations: { urlChanged: false, apiRequests: [], domChanged: false, overlayOrToastOrError: true, beforeUrl: '/login', afterUrl: new URL(page.url()).pathname, beforeTextLen: 0, afterTextLen: 0 },
         runtimeErrors: [], forbiddenCopy: [], screenshot: await shot(page, journey, 'login-no-code'),

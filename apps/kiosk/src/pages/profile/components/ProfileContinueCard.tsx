@@ -24,7 +24,7 @@ export function ProfileContinueCard({
           </span>
           <span className="pf-todo-tx">
             <span className="pf-todo-t">待办这次没取到</span>
-            <span className="pf-todo-d">本机不显示上一次的进度。入口仍可点进各自页面重新加载。</span>
+            <span className="pf-todo-d">请到打印订单查看，或重新加载此页。</span>
           </span>
         </div>
       </div>
@@ -40,7 +40,7 @@ export function ProfileContinueCard({
           </span>
           <span className="pf-todo-tx">
             <span className="pf-todo-t">这台机器上没有待继续的办理</span>
-            <span className="pf-todo-d">没有就是没有。本机不会把上一位使用者的进度显示给你。</span>
+            <span className="pf-todo-d">可以去首页选择要办理的服务。</span>
           </span>
           <button
             type="button"
@@ -100,8 +100,8 @@ export function ProfileContinueCard({
           </span>
           <span className="pf-todo-d">
             {isPayment
-              ? '金额与明细由 /me/pending-tasks 返回；付款前不会开始出纸。'
-              : '出纸进度由 /me/pending-tasks 的 status（claimed / printing）返回；纸出完前不要离开取件口。'}
+              ? '应付金额和收费明细以这张订单的实际内容为准；付款前不会开始出纸。'
+              : '纸出完前不要离开取件口，可查看最新出纸进度。'}
           </span>
         </span>
         <button

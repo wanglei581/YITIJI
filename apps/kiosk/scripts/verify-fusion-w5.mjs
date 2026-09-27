@@ -26,11 +26,12 @@ const SELF_ASSESSMENT_V1_ROUTES = [
 const W5_ROUTES_EXPANDED = [...W5_ROUTES, ...SELF_ASSESSMENT_V1_ROUTES]
 
 const FROZEN = new Map([
+  // W4 L1：掩码、真实冷却/有效期、错误码分态；新基线另由 verify-w4-login-profile-l1 动态回归。
   // 哈希随 A2.1 登录切片同步更新（V6 落 main）：该 hook 的两处错误文案由
   // `cause instanceof MemberApiError ? cause.message : 兜底` 改为统一走
   // resolveMemberApiErrorMessage(cause, 兜底)，行为等价且兜底文案更具体。
   // 冻结契约本身不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
-  ['src/pages/auth/hooks/useMemberPhoneLogin.ts', '8f60d06f1e9d0dc2825882f64095d7cf4263b5aa61f32ea2e6736ecef11c40f8'],
+  ['src/pages/auth/hooks/useMemberPhoneLogin.ts', 'c8c88ed5a85d1e3c3d22d8715a23fc9168a50876b194b3352a182d5ff2c97824'],
   ['src/pages/profile/assets/useMemberProfileOverview.ts', '3679de500e38d9d84b5f77680090997dc27eabca861af58c3d407eeb9e420395'],
   // 哈希随「扫描入口统一到 /scan」同步更新（2026-09-13）：唯一改动是「扫描文件」这条
   // 入口的 route 从兼容重定向地址 '/scan/start' 改成工作台真地址 '/scan'，不增不减入口。
@@ -309,7 +310,7 @@ const qxMePages = [
 ]
 for (const path of qxMePages) {
   const source = read(path)
-  assert.match(source, /QxMePage/, `${path} uses Qingxu member chrome`)
+  assert.match(source, path.endsWith('/MySettingsPage.tsx') ? /<QxPageFrame/ : /QxMePage/, `${path} uses its Qingxu page frame`)
   assert.doesNotMatch(source, /KioskPageFrame/, `${path} has left the V6 frame`)
   assert.doesNotMatch(source, /className="qx-nav-item"/, `${path} does not inline navbar items`)
 }
@@ -350,7 +351,7 @@ assert.match(qxMeChrome, /\| 'settings'/, 'member chrome declares the settings v
 assert.match(qxMeChrome, /'member-settings'/, 'member chrome exposes the member-settings screen and test scope')
 assert.match(qxMeChrome, /view === 'notifications' \|\| isSettingsView \? \[\]/, 'settings view renders no record-category tabs')
 const settingsPageQx = read('src/pages/profile/me/MySettingsPage.tsx')
-assert.match(settingsPageQx, /screen="member-settings"/, 'MySettingsPage keeps the member-settings screen marker on the Qingxu chrome')
+assert.match(settingsPageQx, /data-kiosk-screen="member-settings"/, 'MySettingsPage keeps the member-settings screen marker on the Qingxu chrome')
 assert.doesNotMatch(kioskRootSrc, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/me\/['"]/, 'does not use a wide /me/ prefix')
 const profilePageQx = read('src/pages/profile/ProfilePage.tsx')
 const benefitsPageQx = read('src/pages/profile/me/MyBenefitsPage.tsx')

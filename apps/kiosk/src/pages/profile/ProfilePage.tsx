@@ -4,9 +4,10 @@ import { BellIcon, HelpCircleIcon, MessageSquareIcon, ShieldIcon } from 'lucide-
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
-import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { accountPhoneDisplay } from '../auth/accountUserMessage'
+import { maskPhone, maskEmail } from '../../utils/maskPii'
 import { getPendingTasks, type PendingTask } from '../../services/api/pendingTasks'
-import { getTerminalCode } from '../../services/api/screensaver'
 import { useMemberAssetCounts } from './assets/useMemberAssetCounts'
 import { ProfileAssetGrid } from './components/ProfileAssetGrid'
 import { ProfileContinueCard } from './components/ProfileContinueCard'
@@ -20,6 +21,11 @@ import './styles/profile-qx.css'
 type ProfileUiState = 'signed-out' | 'loading' | 'error' | 'empty' | 'member' | 'ready' | 'printing'
 
 export function ProfilePage() {
+  const { user } = useAuth()
+  return <ProfileContent key={user?.id ?? 'guest'} />
+}
+
+function ProfileContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isLoggedIn, displayName, getToken } = useAuth()
@@ -68,6 +74,7 @@ export function ProfilePage() {
       return
     }
     let alive = true
+    setPendingTask(null)
     setTasksLoading(true)
     setTasksError(false)
     getPendingTasks(token)
@@ -88,8 +95,8 @@ export function ProfilePage() {
     }
   }, [isLoggedIn, getToken, reloadKey])
 
-  const headerDisplayName = user?.nickname?.trim() || displayName || '会员账号'
-  const headerPhoneMasked = user?.phoneMasked ?? displayName
+  const headerDisplayName = (user?.nickname?.trim() || displayName || '会员账号').replace(/1\d{10}/g, maskPhone).replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, maskEmail)
+  const headerPhoneMasked = accountPhoneDisplay(user?.phoneMasked ?? displayName)
   const goLogin = () => navigate('/login', { state: { from: location.pathname } })
   const printFile = (file: { name: string; size: string; pages?: number }) => {
     const next = { name: file.name, size: file.size, pages: file.pages ?? 1 }
@@ -111,15 +118,13 @@ export function ProfilePage() {
   })
 
   const status = statusFor(uiState)
-  const terminalLabel = getTerminalCode() || '就业服务大厅'
 
   return (
-    <div className="fusion-w5 h-full" data-kiosk-screen="profile" data-state={uiState} data-testid={`profile-state-${uiState}`}>
+    <div className="fusion-w5 h-full pf-root" data-kiosk-screen="profile" data-takeaway="本人资产、记录与待办" data-state={uiState} data-testid={`profile-state-${uiState}`}>
       <QxPageFrame
         title="我的"
-        subtitle="简历、文档、订单、收藏与权益都在这里；数量以服务端返回为准。"
+        subtitle="简历、文档、订单、收藏与权益都在这里；以实际记录为准。"
         status={status}
-        terminalLabel={terminalLabel}
         ctabar={
           <ProfileCta
             uiState={uiState}
@@ -171,7 +176,7 @@ export function ProfilePage() {
               <span>
                 <div className="qx-state-t">账号数据这次没取到</div>
                 <p className="qx-state-d">
-                  数量与待办都没有返回。入口还能点，但<b>本机不会拿上一次的数字冒充当前账号</b>，所以卡片上一律显示「—」。
+                  数量与待办这次没有取到。可以重新加载，或点进各项查看。
                 </p>
               </span>
             </div>
@@ -183,13 +188,13 @@ export function ProfilePage() {
               <span>
                 <div className="qx-state-t">这个账号下还没有任何记录</div>
                 <p className="qx-state-d">
-                  你还没有在本机保存过简历、生成过文档或下过打印订单，所以<b>六项都是空的</b>。空就是空，本机不会造几条记录让页面好看。
+                  你还没有保存过简历、生成过文档或下过打印订单。办过之后，会列在下面几项里。
                 </p>
               </span>
             </div>
           ) : null}
 
-          {isLoggedIn && uiState !== 'signed-out' && uiState !== 'empty' ? (
+          {isLoggedIn && uiState !== 'loading' && uiState !== 'error' ? (
             <ProfileContinueCard task={pendingTask} tasksError={tasksError} />
           ) : null}
 
@@ -216,15 +221,15 @@ export function ProfilePage() {
           {isLoggedIn ? <AccountRows /> : null}
 
           <p className="pf-truth">
-            <span>
-              <b>结束会话只清除本机登录态与临时会话信息。</b>
-              已提交到服务端的订单与文件按服务端留存期限管理，删除以服务端返回为准。
-            </span>
+            <span><b>结束使用会退出本机并清除临时信息。</b>已提交的订单与文件按保存期限管理。</span>
             <button type="button" onClick={() => navigate('/legal/privacy')}>
               隐私说明
             </button>
           </p>
         </div>
+        <QxStepActions onPrev={() => navigate('/')} prevLabel="返回首页">
+          <QxAiHelp label="问小青：我的记录在哪里找？" draft="我的简历、文档和打印订单在哪里找？离开前应该怎样结束使用？" />
+        </QxStepActions>
       </QxPageFrame>
     </div>
   )
@@ -251,17 +256,17 @@ function deriveProfileState(input: {
 }
 
 function statusFor(state: ProfileUiState): { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string } {
-  if (state === 'error') return { tone: 'bad', label: '账号数据这次没取到' }
+  if (state === 'error') return { tone: 'bad', label: '请重新读取账号数据' }
   if (state === 'loading') return { tone: 'unknown', label: '正在读取数量与待办' }
   if (state === 'printing') return { tone: 'warn', label: '有文件正在出纸' }
-  return { tone: 'unknown', label: '数量与记录均由服务端返回' }
+  return { tone: 'unknown', label: '以你账号里的实际记录为准' }
 }
 
 function AccountRows() {
   const navigate = useNavigate()
   const rows = [
-    { icon: BellIcon, title: '消息通知', desc: '服务端下发的会员通知，读与标记均落库。', to: '/me/notifications', testid: 'profile-notifications' },
-    { icon: ShieldIcon, title: '隐私请求', desc: '当前可提交岗位 AI 授权撤回；数据导出与账号注销尚未开放。', to: '/me/privacy-requests', testid: 'profile-privacy' },
+    { icon: BellIcon, title: '消息通知', desc: '系统下发的会员通知，已读与标记都会记录。', to: '/me/notifications', testid: 'profile-notifications' },
+    { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；数据导出与账号注销尚未开放。', to: '/me/privacy-requests', testid: 'profile-privacy' },
     { icon: HelpCircleIcon, title: '帮助中心', desc: '服务台位置、常见问题与找人处理。', to: '/help', testid: 'profile-help' },
     { icon: MessageSquareIcon, title: '意见反馈', desc: '提交后能看到处理状态。', to: '/me/feedback', testid: 'profile-feedback' },
   ]
@@ -297,20 +302,18 @@ function AccountRows() {
 
 function SignedOutBody() {
   const navigate = useNavigate()
-  // 招聘内容托管（3.13）关闭时本机没有岗位与招聘会可浏览，这句不再提它们。
-  const hostingOpen = useRecruitmentHosting().enabled
   return (
     <>
       <div className="pf-note">
         <div className="pf-note-t">不登录也能用的服务</div>
         <p>
-          {hostingOpen ? '打印、扫描、岗位与招聘会浏览、政策查询都' : '打印、扫描、政策查询都'}<b>不需要账号</b>。需要本人身份、跨设备保存或会员权益的功能，会在进入时再要求登录。
+          打印、扫描、政策查询都<b>不需要账号</b>。需要本人身份、跨设备保存或会员权益的功能，会在进入时再要求登录。
         </p>
       </div>
       <section>
         <div className="qx-sec-h">
           <span className="t">登录之后会出现</span>
-          <span className="hint">现在不预渲染任何人的数据</span>
+          <span className="hint">只显示你本人的记录</span>
         </div>
         <div className="qx-rows">
           <button type="button" className="qx-row" onClick={() => navigate('/login', { state: { from: '/me/resumes' } })}>
@@ -322,13 +325,13 @@ function SignedOutBody() {
           <button type="button" className="qx-row" onClick={() => navigate('/login', { state: { from: '/me/print-orders' } })}>
             <span className="qx-row-tx">
               <span className="qx-row-t">打印订单与办理进度</span>
-              <span className="qx-row-d">订单状态由服务端返回，可继续办理。</span>
+              <span className="qx-row-d">查看订单状态，接着办理。</span>
             </span>
           </button>
           <button type="button" className="qx-row" onClick={() => navigate('/login', { state: { from: '/me/benefits' } })}>
             <span className="qx-row-tx">
               <span className="qx-row-t">权益台账与活动记录</span>
-              <span className="qx-row-d">是否有可用权益由接口判定。</span>
+              <span className="qx-row-d">可用权益以账号里的记录为准。</span>
             </span>
           </button>
         </div>
@@ -339,7 +342,6 @@ function SignedOutBody() {
 
 function EmptyStartRows() {
   const navigate = useNavigate()
-  const hostingOpen = useRecruitmentHosting().enabled
   return (
     <section>
       <div className="qx-sec-h">
@@ -358,21 +360,9 @@ function EmptyStartRows() {
             <span className="qx-row-d">U 盘、手机传输或本机扫描都可以。</span>
           </span>
         </button>
-        {hostingOpen ? (
-          <button type="button" className="qx-row" onClick={() => navigate('/jobs')}>
-            <span className="qx-row-tx">
-              <span className="qx-row-t">看看岗位并收藏</span>
-              <span className="qx-row-d">收藏只记录你自己的浏览，不发送给任何单位。</span>
-            </span>
-          </button>
-        ) : (
-          <button type="button" className="qx-row" onClick={() => navigate('/policy-service')}>
-            <span className="qx-row-tx">
-              <span className="qx-row-t">看看就业政策并收藏</span>
-              <span className="qx-row-d">收藏只记录你自己的浏览，不发送给任何单位。</span>
-            </span>
-          </button>
-        )}
+        <button type="button" className="qx-row" onClick={() => navigate('/policy-service')}>
+          <span className="qx-row-tx"><span className="qx-row-t">看看就业政策并收藏</span><span className="qx-row-d">查看办事指引，资格与办理以官方核验为准。</span></span>
+        </button>
       </div>
     </section>
   )
@@ -404,21 +394,21 @@ function ProfileCta({
       <>
         <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>回首页</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onLogin}>
-          手机号登录
+          <span data-testid="profile-login">手机号登录</span>
         </button>
       </>
     )
   }
   if (uiState === 'loading') {
     return (
-      <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-primary" onClick={onHome}>
-        回首页
-      </button>
+      <><button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
+      <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-primary" onClick={onHome}>回首页</button></>
     )
   }
   if (uiState === 'error') {
     return (
       <>
+        <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
         <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>找工作人员</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onRetry}>
           重新加载
@@ -429,7 +419,7 @@ function ProfileCta({
   if (uiState === 'empty') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onSettings}>账号设置</button>
+        <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onHome}>
           回首页选服务
         </button>
@@ -439,7 +429,8 @@ function ProfileCta({
   if (uiState === 'printing' && pendingTask) {
     return (
       <>
-        <p className="why">出纸完成前不要离开取件口；离开会话不会取消已提交的打印。</p>
+<button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
+        <p className="why">出纸完成前不要离开取件口；离开这一页不会取消已经提交的打印。</p>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onProgress}>
           看出纸进度
         </button>
@@ -448,7 +439,8 @@ function ProfileCta({
   }
   return (
     <>
-      <p className="why">离开前请点「结束使用」；这会退出登录并清掉本机这一趟的临时会话信息。</p>
+      <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
+      <p className="why">离开前请点「结束使用」；这会退出登录并清掉本机这一次的临时信息。</p>
       <button type="button" className="qx-btn" data-variant="danger" data-testid="profile-primary" onClick={onEnd}>
         结束使用
       </button>

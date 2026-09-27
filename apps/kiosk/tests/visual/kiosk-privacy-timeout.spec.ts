@@ -139,15 +139,18 @@ async function routeExact(
 async function loginThroughVisibleUi(page: Page, returnTo = '/interview/reports'): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of MEMBER_PHONE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of MEMBER_CODE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => {
     // 面试五页合并成一张工作台后，/interview/<stage> 会 Navigate 到 /interview?stage=<stage>
     // （routes/index.tsx 的兼容重定向）。这里必须连 stage 一起钉：只认「落在 /interview」
@@ -1357,7 +1360,7 @@ test('signed-in rebind overlay hides the OTP on the public screen @privacy-kiosk
   await loginThroughVisibleUi(page, '/me/settings')
   await expect(page.locator('[data-kiosk-screen="member-settings"]')).toBeVisible()
   await page.getByRole('button', { name: /换绑手机号/ }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '换绑手机号', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '发送验证码', exact: true }).click()
   const otp = page.getByLabel('当前手机号验证码，已隐藏显示')
   await expect(otp).toBeVisible()

@@ -81,11 +81,14 @@ async function loginThroughVisibleUi(page: Page, returnTo: string, options?: { c
 /** 已停在登录页（例如从页面里的「手机号登录」点进来）时，只走可见的手机号 + 验证码登录，再等回跳。 */
 async function completeVisibleLogin(page: Page, returnTo: string): Promise<void> {
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
@@ -1481,6 +1484,7 @@ function serverDown(code: string): { status: number; json: unknown } {
 /** 旧壳（深藏青顶栏 + 底栏 + 墨青纸感页框）不得叠在青序页上；QX 登记漏掉时这里第一个红。 */
 async function expectQxSettingsShell(page: Page, state: string): Promise<void> {
   await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('.qx-topbar button, .qx-topbar a[href]')).toHaveCount(0)
   await expect(page.getByTestId(`member-settings-state-${state}`)).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="member-settings"]')).toBeVisible()
   await expect(page.locator('.ui-kiosk-topbar'), '青序页不得再挂旧顶栏').toHaveCount(0)
@@ -1506,8 +1510,8 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   api.respond('GET', CONSENT_STATUS, consentRows(false))
 
   await page.goto('/me/settings')
-  await expectQxSettingsShell(page, 'guest')
-  await expect(page.getByRole('heading', { name: '当前是游客' })).toBeVisible()
+  await expectQxSettingsShell(page, 'anonymous')
+  await expect(page.getByRole('region', { name: '登录引导' })).toBeVisible()
   await expect(page.getByRole('region', { name: '协议与隐私' }).getByRole('button')).toHaveCount(2)
   await expect(page.getByRole('region', { name: '隐私与 AI 授权管理' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /换绑手机号|切换账号|隐私与数据请求/ })).toHaveCount(0)
@@ -1516,7 +1520,7 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   await expect(locked).toHaveCount(3)
   await expect(locked.filter({ hasText: '登录后可用' })).toHaveCount(3)
   await expect(page.getByText('账号注销和数据导出尚未开放', { exact: false })).toBeVisible()
-  await expect(page.getByRole('region', { name: '公共终端会话说明' })).toContainText('不写入本机存储')
+  await expect(page.getByRole('region', { name: '公共终端使用说明' })).toContainText('退出本机登录并清除这一次的临时信息')
   await settingsShot(page, 'guest')
   expect(api.requestCount('GET', CONSENT_STATUS)).toBe(0)
   await expectFusionAcceptance(page, errors)
@@ -1542,7 +1546,7 @@ test('settings: consent read failure shows 本次未取到, a failed revoke keep
   api.respond('GET', CONSENT_STATUS, serverDown('W5_CONSENT_DOWN'))
 
   await loginThroughVisibleUi(page, '/me/settings')
-  await expectQxSettingsShell(page, 'consent-error')
+  await expectQxSettingsShell(page, 'error')
   const consent = page.getByRole('region', { name: '隐私与 AI 授权管理' })
   const status = page.getByTestId('member-settings-consent-status')
   const revoke = page.getByRole('button', { name: '撤回授权', exact: true })
@@ -1563,7 +1567,7 @@ test('settings: consent read failure shows 本次未取到, a failed revoke keep
   // 撤回失败：弹层留着并说清楚「没有改变」，取消后徽标和按钮都维持服务端上一次返回的「已授权」。
   api.respond('POST', CONSENT_REVOKE, serverDown('W5_REVOKE_DOWN'))
   await revoke.click()
-  const dialog = page.getByRole('dialog', { name: '撤回岗位 AI 授权' })
+  const dialog = page.getByRole('dialog', { name: '撤回 AI 使用授权' })
   await expect(dialog).toBeVisible()
   const failed = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname === CONSENT_REVOKE)
   await dialog.getByRole('button', { name: '确认撤回', exact: true }).click()
@@ -1581,7 +1585,7 @@ test('settings: consent read failure shows 本次未取到, a failed revoke keep
   await expect(dialog.getByRole('alert'), '重开弹层不得残留上一次的失败提示').toHaveCount(0)
   await dialog.getByRole('button', { name: '确认撤回', exact: true }).click()
   await expect(dialog).toHaveCount(0)
-  await expect(page.getByTestId('member-settings-toast')).toHaveText('已撤回岗位 AI 授权，再次使用时需要重新确认')
+  await expect(page.getByTestId('member-settings-toast')).toHaveText('已撤回 AI 授权，再次使用时需要重新确认')
   await expect(status).toHaveText('未授权')
   await expect(revoke).toBeDisabled()
   expect(api.requestCount('POST', CONSENT_REVOKE)).toBe(2)
@@ -1602,10 +1606,11 @@ test('settings: phone rebind hides both codes, closes after 45s idle and clears 
   await expectQxSettingsShell(page, 'member')
   await expectFusionAcceptance(page, errors)
 
-  // 45 秒无操作：换绑弹层自己关掉，不留在大厅屏上。
+  expect(await page.locator('.settings-body').evaluate((el) => el.scrollHeight - el.clientHeight), '账号设置默认态首屏放得下').toBeLessThanOrEqual(1)
+  // 45 秒无操作：换绑表单自己关掉，不留在大厅屏上。
   const rebindRow = page.getByRole('button', { name: /换绑手机号/ })
   await rebindRow.click()
-  const dialog = page.getByRole('dialog', { name: '换绑手机号' })
+  const dialog = page.locator('.settings-rebind')
   await expect(dialog).toContainText('第 1 步')
   await expect(dialog).toContainText('138****8000')
   await page.clock.fastForward(46_000)
@@ -1633,13 +1638,58 @@ test('settings: phone rebind hides both codes, closes after 45s idle and clears 
   const rebind = page.waitForRequest((r) => new URL(r.url()).pathname === PHONE_REBIND)
   await dialog.getByRole('button', { name: '确认换绑', exact: true }).click()
   expect((await rebind).postDataJSON()).toEqual({ stepUpToken: 'w5-step-up-token', newPhone: '13900139000', newPhoneCode: '112233' })
-  await expect(dialog).toContainText('换绑成功')
-  await settingsShot(page, 'rebind-done')
-
-  await dialog.getByRole('button', { name: '去登录', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await settingsShot(page, 'rebind-cleared')
   await page.waitForURL((url) => url.pathname === '/login')
   await expect(page.getByText('换绑成功，请用新手机号登录')).toBeVisible()
   await expectTokenNotPersisted(page)
+})
+
+for (const failure of [
+  { code: 'PHONE_CONFLICT', status: 409, message: '该手机号已绑定其他账号，无法换绑', recovery: 'restart' },
+  { code: 'UNKNOWN_ERROR', status: 500, message: 'HTTP 500', recovery: 'relogin' },
+  { code: 'REBIND_CODE_INVALID', status: 401, message: '新手机验证码不正确', recovery: 'auth-reset' },
+]) test(`settings: rebind ${failure.code} never replays a consumed old-phone proof @w5-kiosk`, async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', CONSENT_STATUS, consentRows(false))
+  api.respond('POST', STEP_UP_SMS, { status: 200, json: { success: true, data: { challengeId: 'recovery-challenge', phoneMasked: '138****8000', expiresInSeconds: 91, cooldownSeconds: 17 } } })
+  api.respond('POST', STEP_UP_VERIFY, { status: 200, json: { success: true, data: { stepUpToken: 'one-use-proof', action: 'phone_rebind', expiresInSeconds: 300 } } })
+  api.respond('POST', PHONE_REBIND, { status: failure.status, json: { error: { code: failure.code, message: failure.message } } })
+  api.respond('POST', LOGOUT, { status: 200, json: { success: true, data: { loggedOut: true } } })
+  await loginThroughVisibleUi(page, '/me/settings')
+  await page.getByTestId('member-settings-rebind').click()
+  const panel = page.locator('.settings-rebind')
+  await panel.getByRole('button', { name: '发送验证码', exact: true }).click()
+  await panel.getByLabel('当前手机号验证码，已隐藏显示').fill('654321')
+  await panel.getByRole('button', { name: '下一步', exact: true }).click()
+  await panel.getByLabel('新手机号', { exact: true }).fill('13900139000')
+  await panel.getByRole('button', { name: '发送验证码', exact: true }).click()
+  await panel.getByLabel('新手机号验证码，已隐藏显示').fill('112233')
+  await panel.getByRole('button', { name: '确认换绑', exact: true }).click()
+  if (failure.recovery === 'auth-reset') {
+    // 真实接口的业务 401 会触发既有全局清场；不以 400 夹具冒充此链路已留在原页。
+    await page.waitForURL((url) => url.pathname === '/login')
+    await expect(panel).toHaveCount(0)
+    await expectTokenNotPersisted(page)
+  } else {
+    await expect(panel.getByRole('button', { name: '确认换绑', exact: true })).toHaveCount(0)
+    await expect(panel.getByLabel('新手机号验证码，已隐藏显示')).toBeDisabled()
+    await expect(panel.getByLabel('新手机号验证码，已隐藏显示')).toHaveValue('')
+    if (failure.recovery === 'restart') {
+      await expect(panel.getByRole('alert')).toHaveText(failure.message)
+      await panel.getByRole('button', { name: '重新验证旧手机号', exact: true }).click()
+      await expect(panel).toHaveAttribute('data-step', 'send_old')
+      await expect(panel.getByRole('button', { name: '发送验证码', exact: true })).toBeEnabled()
+    } else {
+      await expect(panel).not.toContainText('HTTP 500')
+      await panel.getByRole('button', { name: '重新登录核对', exact: true }).click()
+      await page.waitForURL((url) => url.pathname === '/login')
+      await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。')).toBeVisible()
+      await expectTokenNotPersisted(page)
+    }
+  }
+  expect(api.requestCount('POST', PHONE_REBIND)).toBe(1)
 })
 
 test('settings: switch-account cancel keeps the session, logout confirms first and clears it @w5-kiosk', async ({ page, api }) => {
@@ -1654,7 +1704,7 @@ test('settings: switch-account cancel keeps the session, logout confirms first a
   await expectQxSettingsShell(page, 'member')
 
   // 取消不清任何东西。
-  await page.getByRole('button', { name: /切换账号/ }).click()
+  await page.getByRole('button', { name: /换一个账号登录/ }).click()
   const switchDialog = page.getByRole('dialog', { name: '切换账号' })
   await expect(switchDialog).toBeVisible()
   await switchDialog.getByRole('button', { name: '取消', exact: true }).click()
@@ -1685,12 +1735,12 @@ test('settings: switch account confirms, clears the session and lands on the log
 
   await loginThroughVisibleUi(page, '/me/settings')
   await expectQxSettingsShell(page, 'member')
-  await page.getByRole('button', { name: /切换账号/ }).click()
+  await page.getByRole('button', { name: /换一个账号登录/ }).click()
   const switchDialog = page.getByRole('dialog', { name: '切换账号' })
   await expect(switchDialog).toContainText('不会带入下一个账号')
   await switchDialog.getByRole('button', { name: '退出并切换', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/login')
-  await expect(page.getByRole('button', { name: '验证并登录', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '获取验证码', exact: true })).toBeVisible()
   expect(api.requestCount('POST', LOGOUT)).toBe(1)
   await expectTokenNotPersisted(page)
   expect(errors).toEqual([])

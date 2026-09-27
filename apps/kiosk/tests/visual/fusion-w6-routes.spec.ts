@@ -143,9 +143,11 @@ const W6_MEMBER_CODE = '123456'
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of W6_MEMBER_PHONE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of W6_MEMBER_CODE) {
@@ -155,7 +157,8 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
   const pendingTasksRequest = page.waitForRequest((request) =>
     request.method() === 'GET' && new URL(request.url()).pathname === '/api/v1/me/pending-tasks',
   )
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 
   const request = await pendingTasksRequest

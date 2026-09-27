@@ -36,7 +36,7 @@ export function ProfileAssetGrid({
     <section aria-label="我的资产">
       <div className="qx-sec-h">
         <span className="t">简历、文档与订单</span>
-        <span className="hint">{loading ? '数量返回前一律显示「—」' : '数量由服务端返回，未返回显示「—」'}</span>
+        <span className="hint">{loading ? '正在读取数量' : '未取到的数量显示「—」'}</span>
       </div>
       <div className="pf-grid3">
         {MAIN.map((item) => (

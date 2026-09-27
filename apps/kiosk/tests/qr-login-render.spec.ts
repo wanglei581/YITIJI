@@ -16,6 +16,7 @@ function registerKioskShell(api: ApiRouter): void {
 
 async function enterMemberPhone(page: Page): Promise<void> {
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of MEMBER_PHONE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
@@ -174,8 +175,9 @@ test('手机号验证码按钮交互态可读且通用错误使用场景提示 @
   try {
     await page.goto('/login')
     await enterMemberPhone(page)
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
     const sendButton = page.getByTestId('login-gate-send')
-    const loginButton = page.getByRole('button', { name: '验证并登录', exact: true })
+    const loginButton = page.getByRole('button', { name: '短信验证码', exact: true })
     await expect(sendButton).toHaveCount(1)
     await expect(sendButton).toHaveText('获取验证码')
     await expect(sendButton).toBeEnabled()
@@ -192,7 +194,7 @@ test('手机号验证码按钮交互态可读且通用错误使用场景提示 @
     await attachViewportScreenshot(page, testInfo, 'login-send-focus-1080x1920')
 
     await expect(loginButton).toBeDisabled()
-    await expect(loginButton).toContainText('验证并登录')
+    await expect(loginButton).toContainText('还没有可填的验证码')
     const loginBox = await loginButton.boundingBox()
     expect(loginBox?.height ?? 0).toBeGreaterThanOrEqual(56)
 
@@ -422,3 +424,63 @@ test('Mobile QR 同一页面换票据后丢弃旧票据的会话，迟到的旧�
     releaseStaleConfirm?.()
   }
 })
+
+// W4 L1: business messages must keep their meaning; raw codes use the correct recovery.
+for (const scenario of [
+  { code: 'SMS_SEND_FAILED', status: 502, message: 'SMS_SEND_FAILED', expected: '可以立刻重新获取', state: 'phone-send-failed' },
+  { code: 'SMS_TOO_FREQUENT', status: 429, message: 'SMS_TOO_FREQUENT', expected: '稍后再试', state: 'phone-send-limited' },
+  { code: 'SMS_IP_LIMIT', status: 429, message: 'SMS_IP_LIMIT', expected: '稍后再试', state: 'phone-send-limited' },
+  { code: 'SMS_DEVICE_LIMIT', status: 429, message: 'SMS_DEVICE_LIMIT', expected: '稍后再试', state: 'phone-send-limited' },
+  { code: 'SMS_PROVIDER_RATE_LIMIT', status: 429, message: 'SMS_PROVIDER_RATE_LIMIT', expected: '稍后再试', state: 'phone-send-limited' },
+  { code: 'SMS_DAILY_LIMIT', status: 429, message: 'SMS_DAILY_LIMIT', expected: '明天再试', state: 'phone-send-limited' },
+  { code: 'SMS_PROVIDER_PHONE_DAILY_LIMIT', status: 429, message: 'SMS_PROVIDER_PHONE_DAILY_LIMIT', expected: '明天再试', state: 'phone-send-limited' },
+  { code: 'SMS_TOO_FREQUENT', status: 429, message: '当前使用的人较多，请稍后再试', expected: '当前使用的人较多，请稍后再试', state: 'phone-send-limited' },
+]) {
+  test(`W4 SMS recovery ${scenario.code}: ${scenario.message} @kiosk`, async ({ page, api }) => {
+    registerKioskShell(api)
+    api.respond('POST', '/api/v1/member/auth/sms-code', { status: scenario.status, json: { success: false, error: { code: scenario.code, message: scenario.message } } })
+    await page.goto('/login')
+    await expect(page.locator('.qx-topbar button, .qx-topbar a[href]')).toHaveCount(0)
+    await expect(page.getByTestId('login-gate-keypad')).toHaveCount(0)
+    if (scenario.code === 'SMS_SEND_FAILED') {
+      expect((await page.getByTestId('login-gate-tab-phone').boundingBox())!.y).toBeGreaterThanOrEqual(500)
+      expect(await page.locator('.k1-login .qx-scroll').evaluate((el) => el.scrollHeight - el.clientHeight), '登录默认态首屏放得下').toBeLessThanOrEqual(1)
+      await expect(page.getByRole('checkbox', { name: /我已阅读并同意/ })).toBeInViewport()
+    }
+    await enterMemberPhone(page)
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    expect(await page.locator('body').innerText()).not.toContain(MEMBER_PHONE)
+    await page.getByTestId('login-gate-send').click()
+    await expect(page.getByTestId(`login-gate-state-${scenario.state}`)).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText(scenario.expected)
+    await expect(page.getByRole('alert')).not.toContainText(scenario.code)
+    if (scenario.message.startsWith('当前')) await expect(page.getByRole('alert')).toHaveText(scenario.message)
+    if (scenario.code === 'SMS_SEND_FAILED') {
+      await expect(page.getByTestId('login-gate-send')).toBeEnabled()
+      await page.getByTestId('login-gate-send').click()
+      expect(api.requestCount('POST', '/api/v1/member/auth/sms-code')).toBe(2)
+    }
+  })
+}
+
+for (const [code, state] of [['SMS_CODE_INVALID', 'phone-code-invalid'], ['SMS_CODE_EXPIRED', 'phone-code-expired'], ['SMS_CODE_LOCKED', 'phone-code-locked']]) {
+  test(`W4 verification recovery ${code} @kiosk`, async ({ page, api }) => {
+    registerKioskShell(api)
+    api.respond('POST', '/api/v1/member/auth/sms-code', { status: 200, json: { success: true, data: { sent: true, cooldownSeconds: 17, expiresInSeconds: 91 } } })
+    for (const kind of ['terms_of_service', 'privacy_policy']) api.respond('GET', `/api/v1/kiosk/legal/${kind}`, { status: 200, json: { success: true, data: null } })
+    api.respond('POST', '/api/v1/member/auth/login', { status: 400, json: { success: false, error: { code, message: code } } })
+    await page.goto('/login'); await enterMemberPhone(page)
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByTestId('login-gate-send').click()
+    await expect(page.getByRole('status')).toContainText('有效期 91 秒')
+    await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+    for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByRole('button', { name: '确认登录', exact: true }).click()
+    await expect(page.getByTestId(`login-gate-state-${state}`)).toBeVisible()
+    await expect(page.getByRole('alert')).not.toContainText(code)
+    const input = page.getByRole('button', { name: '短信验证码', exact: true })
+    if (code === 'SMS_CODE_INVALID') await expect(input).toBeEnabled()
+    else await expect(input).toBeDisabled()
+  })
+}

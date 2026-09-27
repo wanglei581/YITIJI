@@ -150,12 +150,15 @@ export async function loginThroughVisibleUi(page: Page, returnTo: string): Promi
   const phoneTab = page.getByRole('button', { name: '手机号登录', exact: true })
   if (await phoneTab.count()) await phoneTab.click()
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   const smsTab = page.getByRole('button', { name: '短信验证码', exact: true })
   if (await smsTab.count()) await smsTab.click()
   for (const digit of MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
@@ -569,12 +572,15 @@ export async function openLoginVerificationError(page: Page, api: ApiRouter): Pr
   const phoneTab = page.getByRole('button', { name: '手机号登录', exact: true })
   if (await phoneTab.count()) await phoneTab.click()
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   const smsTab = page.getByRole('button', { name: '短信验证码', exact: true })
   if (await smsTab.count()) await smsTab.click()
   for (const digit of MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.locator('[data-kiosk-screen="login"] [role="alert"]').first().waitFor({ state: 'visible', timeout: 15_000 })
 }
 

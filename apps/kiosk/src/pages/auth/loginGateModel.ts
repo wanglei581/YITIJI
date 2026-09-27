@@ -9,6 +9,7 @@ export type LoginPhoneState =
   | 'phone-verifying'
   | 'phone-code-invalid'
   | 'phone-code-expired'
+  | 'phone-code-locked'
 
 export type LoginQrState =
   | 'qr-loading'
@@ -28,6 +29,7 @@ export const LOGIN_PHONE_STATES: readonly LoginPhoneState[] = [
   'phone-verifying',
   'phone-code-invalid',
   'phone-code-expired',
+  'phone-code-locked',
 ]
 
 export const LOGIN_QR_STATES: readonly LoginQrState[] = [
@@ -46,6 +48,8 @@ const SEND_LIMITED_CODES = new Set([
   'SMS_PROVIDER_RATE_LIMIT',
   'SMS_PROVIDER_PHONE_DAILY_LIMIT',
   'SMS_RATE_LIMITED',
+  'PROVIDER_RATE_LIMIT',
+  'PROVIDER_PHONE_DAILY_LIMIT',
 ])
 
 export function isSendLimitedCode(code: string | null): boolean {
@@ -55,7 +59,8 @@ export function isSendLimitedCode(code: string | null): boolean {
 export function classifyPhoneError(message: string | null): LoginPhoneState | null {
   if (!message) return null
   if (/不正确/.test(message)) return 'phone-code-invalid'
-  if (/过期|不存在|尝试次数过多/.test(message)) return 'phone-code-expired'
+  if (/尝试次数过多|已锁定/.test(message)) return 'phone-code-locked'
+  if (/过期|不存在/.test(message)) return 'phone-code-expired'
   if (/频繁|次数过多|上限|稍后再试|明天再试/.test(message) && !/发送失败/.test(message)) {
     return 'phone-send-limited'
   }
@@ -69,9 +74,15 @@ export function derivePhoneGateState(input: {
   countdown: number
   notice: string | null
   error: string | null
+  errorCode?: string | null
 }): LoginPhoneState {
   if (input.sendingCode) return 'phone-sending'
   if (input.submitting) return 'phone-verifying'
+  if (input.errorCode === 'SMS_CODE_LOCKED') return 'phone-code-locked'
+  if (input.errorCode === 'SMS_CODE_EXPIRED') return 'phone-code-expired'
+  if (input.errorCode === 'SMS_CODE_INVALID') return 'phone-code-invalid'
+  if (input.errorCode === 'SMS_SEND_FAILED') return 'phone-send-failed'
+  if (isSendLimitedCode(input.errorCode ?? null)) return 'phone-send-limited'
   const classified = classifyPhoneError(input.error)
   if (classified) return classified
   if (input.error) return input.countdown > 0 ? 'phone-code-invalid' : 'phone-send-failed'
@@ -109,8 +120,10 @@ export function resolveLoginReturnTo(
   queryFrom: string | null,
   isSafe: (path: string) => boolean,
 ): { returnTo: string; fromRejected: boolean } {
-  if (typeof fromState === 'string' && isSafe(fromState)) {
-    return { returnTo: fromState, fromRejected: false }
+  if (fromState !== undefined) {
+    return typeof fromState === 'string' && isSafe(fromState)
+      ? { returnTo: fromState, fromRejected: false }
+      : { returnTo: '/', fromRejected: true }
   }
   if (typeof queryFrom === 'string' && queryFrom !== '') {
     if (isSafe(queryFrom)) return { returnTo: queryFrom, fromRejected: false }
@@ -120,50 +133,49 @@ export function resolveLoginReturnTo(
 }
 
 export function loginReturnLabel(path: string): string {
-  return path === '/' ? '首页' : path
+  return path === '/' ? '首页' : '刚才的页面'
 }
 
 export const LOGIN_GATE_PILL: Record<LoginGateState, { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }> = {
-  'phone-idle': { tone: 'unknown', label: '登录结果以服务端返回为准' },
-  'phone-sending': { tone: 'unknown', label: '正在请求发送验证码' },
-  'phone-code-sent': { tone: 'ok', label: '服务端回执：验证码已发出' },
-  'phone-send-limited': { tone: 'warn', label: '发码被频率限制挡下' },
-  'phone-send-failed': { tone: 'bad', label: '短信通道发送失败' },
-  'phone-verifying': { tone: 'unknown', label: '验证码已提交，等待核验' },
-  'phone-code-invalid': { tone: 'warn', label: '验证码不正确' },
-  'phone-code-expired': { tone: 'warn', label: '验证码已失效' },
-  'qr-loading': { tone: 'warn', label: '未勾协议 · 尚未申请票据' },
-  'qr-ready': { tone: 'ok', label: '二维码有效期 180 秒' },
-  'qr-expired': { tone: 'warn', label: '二维码已过期' },
-  'qr-confirmed': { tone: 'ok', label: '手机已确认 · 尚未登录' },
-  'qr-error': { tone: 'bad', label: '扫码登录暂不可用' },
+  'phone-idle': { tone: 'unknown', label: '请选择登录方式' },
+  'phone-sending': { tone: 'unknown', label: '正在发送' },
+  'phone-code-sent': { tone: 'ok', label: '短信已发出' },
+  'phone-send-limited': { tone: 'warn', label: '暂时无法发码' },
+  'phone-send-failed': { tone: 'bad', label: '发送未完成' },
+  'phone-verifying': { tone: 'unknown', label: '正在核对' },
+  'phone-code-invalid': { tone: 'warn', label: '请核对短信' },
+  'phone-code-expired': { tone: 'warn', label: '请获取新验证码' },
+  'phone-code-locked': { tone: 'warn', label: '请重新验证' },
+  'qr-loading': { tone: 'unknown', label: '等待二维码' },
+  'qr-ready': { tone: 'ok', label: '请在手机上确认' },
+  'qr-expired': { tone: 'warn', label: '请重新扫码' },
+  'qr-confirmed': { tone: 'unknown', label: '正在完成登录' },
+  'qr-error': { tone: 'bad', label: '请尝试其他方式' },
 }
 
 export const LOGIN_GATE_COPY: Record<LoginGateState, { title: string; sub: string }> = {
-  'phone-idle': { title: '登录后继续办理', sub: '登录成功后回到刚才那一页。不登录也能用公开与无需账户的服务。' },
-  'phone-sending': { title: '正在发送验证码', sub: '结果由服务端返回。成功、频控、通道失败三种下一步不一样。' },
-  'phone-code-sent': { title: '填写短信验证码', sub: '验证码有效期以服务端回执为准；重新获取要等冷却结束。' },
-  'phone-send-limited': { title: '稍后再获取验证码', sub: '这一次请求什么都没有改变，本页读不到还要等多久。' },
-  'phone-send-failed': { title: '短信没发出去', sub: '旧码已被一起作废，可以立刻重新获取。' },
-  'phone-verifying': { title: '正在核验验证码', sub: '结果只由服务端决定；登录成功会直接回到你进来之前那一页。' },
-  'phone-code-invalid': { title: '验证码不正确', sub: '可以核对最新一条再试；它仍受有效期和尝试次数限制。' },
-  'phone-code-expired': { title: '需要重新获取验证码', sub: '服务端那边已经没有这条码，重填同一条只会再失败。' },
-  'qr-loading': { title: '扫码登录', sub: '先勾协议，这台机器才会去要票据；拿到之前不显示任何可扫图形。' },
-  'qr-ready': { title: '扫码登录', sub: '用手机扫码并在手机上确认；确认之后要回到这台机器。' },
-  'qr-expired': { title: '二维码已过期', sub: '票据从生成起只活 180 秒，刷新动作在这台机器上。' },
-  'qr-confirmed': { title: '手机已确认', sub: '这台机器正在换取登录态，换成功才算登录。' },
-  'qr-error': { title: '扫码登录暂不可用', sub: '请求没有成功；手机号登录不经过这条链路。' },
+  'phone-idle': { title: '登录后继续办理', sub: '登录成功后回到刚才那一页。不登录也能使用公开服务。' },
+  'phone-sending': { title: '正在发送验证码', sub: '请稍候，收到发送结果后就可以继续。' },
+  'phone-code-sent': { title: '填写短信验证码', sub: '请填写最新一条短信里的 6 位验证码。' },
+  'phone-send-limited': { title: '暂时无法获取验证码', sub: '可以改用扫码登录，或按下方提示再试。' },
+  'phone-send-failed': { title: '短信没发出去', sub: '旧码已作废，可以立刻重新获取。' },
+  'phone-verifying': { title: '正在核验验证码', sub: '通过后会直接回到刚才的页面，请不要重复提交。' },
+  'phone-code-invalid': { title: '请再核对一次验证码', sub: '已清空刚才填写的内容，手机号不用重填。' },
+  'phone-code-expired': { title: '需要重新获取验证码', sub: '旧码已经不能使用，请重新获取一条。' },
+  'phone-code-locked': { title: '验证码尝试次数过多', sub: '这条验证码已作废，请获取新码后再验证。' },
+  'qr-loading': { title: '扫码登录', sub: '勾选协议后即可获取二维码。' },
+  'qr-ready': { title: '扫码登录', sub: '用手机扫码并确认，再回到这台机器继续办理。' },
+  'qr-expired': { title: '二维码已过期', sub: '请在这台机器上重新生成，再用手机扫码。' },
+  'qr-confirmed': { title: '手机已确认', sub: '正在完成登录，请等待页面跳转。' },
+  'qr-error': { title: '扫码登录暂不可用', sub: '可以重新获取二维码，或改用手机号登录。' },
 }
 
 export const LOGIN_ANON_ENTRIES = [
-  { id: 'print', title: '打印与扫描', desc: '文档、照片、扫描与格式转换，进入后按真实能力状态继续。', route: '/print-scan' },
-  { id: 'code', title: '到机码核销', desc: '手机上下过单，拿到机码直接来这台机器取。', route: '/print/pickup-claim' },
-  { id: 'jobs', title: '岗位与招聘会', desc: '来源机构发布的信息，投递与预约都在来源平台自行完成。', route: '/jobs-service' },
+  { id: 'print', title: '打印与扫描', desc: '文档、照片、扫描与格式转换。', route: '/print-scan' },
+  { id: 'code', title: '到机码核销', desc: '手机上下过单，拿到机码来这台机器取。', route: '/print/pickup-claim' },
+  { id: 'policy', title: '政策服务', desc: '就业、社保与登记指引，以官方核验为准。', route: '/policy-service' },
 ] as const
 
-/** 招聘内容托管（next-tasks 3.13）关闭时，「岗位与招聘会」换成同样不需要登录的政策服务，三格不留空。 */
-const LOGIN_ANON_POLICY_ENTRY = { id: 'policy', title: '政策服务', desc: '就业、社保与登记指引，资格与办理以官方核验为准。', route: '/policy-service' } as const
-
-export function loginAnonEntries(hostingOpen: boolean): ReadonlyArray<{ id: string; title: string; desc: string; route: string }> {
-  return hostingOpen ? LOGIN_ANON_ENTRIES : LOGIN_ANON_ENTRIES.map((entry) => (entry.id === 'jobs' ? LOGIN_ANON_POLICY_ENTRY : entry))
+export function loginAnonEntries(): ReadonlyArray<{ id: string; title: string; desc: string; route: string }> {
+  return LOGIN_ANON_ENTRIES
 }

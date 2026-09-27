@@ -5,8 +5,6 @@ export function ProfileHeader({
   displayName,
   phoneMasked,
   reserveBannerSpace,
-  onLogin,
-  onOpenSettings,
 }: {
   isLoggedIn: boolean
   displayName: string
@@ -32,15 +30,7 @@ export function ProfileHeader({
             : '这台机器是公共终端，不登录就不会显示任何人的简历、订单和文件。'}
         </span>
       </span>
-      {isLoggedIn ? (
-        <button type="button" className="pf-idbtn" data-testid="profile-account" onClick={onOpenSettings}>
-          账号设置
-        </button>
-      ) : (
-        <button type="button" className="pf-idbtn" data-testid="profile-login" onClick={onLogin}>
-          去登录
-        </button>
-      )}
+      <span className="pf-idstat">{isLoggedIn ? '账号设置在页面下方' : '登录后查看本人记录'}</span>
     </section>
   )
 }
