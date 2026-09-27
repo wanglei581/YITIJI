@@ -101,8 +101,8 @@ must(
   '到机码入口指向 /print/pickup-claim'
 )
 must(
-  /不是付款后的取件凭证码/.test(homeSrc),
-  '卡面写明它不是付款后生成的「取件凭证码」'
+  /不是取件码/.test(viewSrc),
+  '卡面保留「不是取件码」徽标，按 2.0 稿避免重复说明'
 )
 
 console.log('\n[C] 状态轴保真')

@@ -13,10 +13,16 @@ export function PdfPreviewFrame({
   src,
   title,
   className,
+  page,
+  onPageChange,
+  onReady,
 }: {
   src: string
   title: string
   className?: string
+  page?: number
+  onPageChange?: (page: number) => void
+  onReady?: (info: { pageCount: number }) => void
 }) {
   return (
     <PdfCanvasPreview
@@ -24,6 +30,9 @@ export function PdfPreviewFrame({
       title={title}
       src={src}
       fit="width"
+      page={page}
+      onPageChange={onPageChange}
+      onReady={onReady}
     />
   )
 }

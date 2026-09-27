@@ -104,6 +104,7 @@ const uploadModule = [
   uploadSrc,
   read('src/pages/print/file-source/FileSourceView.tsx'),
   read('src/pages/print/file-source/FileSourceBits.tsx'),
+  read('src/pages/print/components/PrintPreviewPanel.tsx'),
 ].join('\n')
 const fmtMatch = uploadSrc.match(/function formatBytes\(bytes: number\): string \{([\s\S]*?)\n\}/)
 if (!fmtMatch) {
@@ -239,8 +240,8 @@ check(
   '上传页 FileRow / NowFileCard 经 displayFileName → truncateFileNameMiddle 呈现',
 )
 check(
-  /truncateFileNameMiddle\(\s*currentFile\.name/.test(uploadPage),
-  '上传页 currentFile.name 经中段截断呈现',
+  /truncateFileNameMiddle\(\s*file\.name/.test(uploadPage) && /<PrintFilePreviewModal file=\{currentFile\}/.test(uploadPage),
+  '上传页 currentFile 传给复用预览弹层，file.name 经中段截断呈现',
 )
 check(
   /name=\{item\.filename\}/.test(uploadPage) && /name=\{currentFile\.name\}/.test(uploadPage),

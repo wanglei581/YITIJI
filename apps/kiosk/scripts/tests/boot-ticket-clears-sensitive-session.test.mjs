@@ -23,6 +23,7 @@ const transpile = (relativePath) => ts.transpileModule(
 ).outputText
 
 const PRINT_KEY = 'ai-job-print:current-print-material-check'
+const DRAFT_KEY = 'kiosk-assistant-draft'
 const TOKEN_KEY = 'terminal_session_token_v1'
 const FAVORITE_KEY = 'kiosk:jobFavorites:v1'
 const OLD_TOKEN = 'previous-occupant-terminal-session'
@@ -137,10 +138,12 @@ export function isScanType(value) {
     .replaceAll("from './scanWorkbenchModel'", `from '${scanModelUrl}'`)
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}\n// ${seed}\n`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
+  const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
   const sensitiveCode = `${transpile('src/auth/kioskSensitiveSession.ts')}\n// ${seed}\n`
     .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
     .replaceAll("from '../pages/resume/aiResumeSession'", `from '${leaf('src/pages/resume/aiResumeSession.ts')}'`)
     .replaceAll("from '../services/resumeParseIntent'", `from '${leaf('src/services/resumeParseIntent.ts')}'`)
+    .replaceAll("from '../services/assistantDraft'", `from '${toDataUrl(assistantDraftCode)}'`)
     .replaceAll("from '../pages/resume/jobMaterialDraft'", `from '${leaf('src/pages/resume/jobMaterialDraft.ts')}'`)
     .replaceAll("from '../pages/resume/selfAssessmentSession'", `from '${toDataUrl(selfAssessmentCode)}'`)
     .replaceAll("from '../pages/interview/interviewWorkbenchSession'", `from '${toDataUrl(interviewCode)}'`)
@@ -161,6 +164,7 @@ export function isScanType(value) {
 }
 
 function seedPreviousOccupant(session, local) {
+  session.setItem(DRAFT_KEY, '上一位的打印问题')
   session.setItem(PRINT_KEY, PRINT_VALUE)
   session.setItem(TOKEN_KEY, OLD_TOKEN)
   local.setItem(FAVORITE_KEY, FAVORITE_VALUE)
@@ -171,6 +175,7 @@ test('successful boot-ticket exchange clears the previous occupant and keeps the
   seedPreviousOccupant(session, local)
   await mod.initializeTerminalSession()
   assert.equal(session.getItem(PRINT_KEY), null)
+  assert.equal(session.getItem(DRAFT_KEY), null)
   assert.equal(local.getItem(FAVORITE_KEY), null)
   assert.equal(session.getItem(TOKEN_KEY), NEW_TOKEN)
   assert.equal(mod.terminalSessionState(), 'ready')
@@ -184,6 +189,7 @@ test('failed boot-ticket exchange keeps the session still in use', async () => {
   seedPreviousOccupant(session, local)
   await mod.initializeTerminalSession()
   assert.equal(session.getItem(PRINT_KEY), PRINT_VALUE)
+  assert.equal(session.getItem(DRAFT_KEY), '上一位的打印问题')
   assert.equal(local.getItem(FAVORITE_KEY), FAVORITE_VALUE)
   assert.equal(session.getItem(TOKEN_KEY), OLD_TOKEN)
   assert.equal(mod.terminalSessionState(), 'failed')

@@ -59,7 +59,7 @@ test('print hub default state reads capabilities and never claims 设备正常 @
   await expect(page.getByRole('button', { name: /文档打印/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /U 盘导入打印/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /到机码核销/ })).toContainText('不是付款后的取件凭证码')
+  await expect(page.getByRole('button', { name: /到机码核销/ })).toContainText('不是取件码')
   await expect(page.getByText('在打印机面板上操作，取走纸质复印件。')).toBeVisible()
   await expect(page.getByRole('button', { name: '问小青：怎么选打印方式 →' })).toBeVisible()
   await page.locator('.ph-page').evaluate((element) => { element.scrollTop = 0 })
@@ -93,6 +93,7 @@ test('print hub default state reads capabilities and never claims 设备正常 @
     expect(geo.heroTop).toBeLessThan(140)
     expect(geo.notesBottom).toBeLessThanOrEqual(geo.navTop)
     expect(geo.truthBottom).toBeLessThanOrEqual(geo.navTop)
+    expect(geo.noticesBottom).toBeLessThanOrEqual(geo.navTop)
   }
   await page.screenshot({ path: test.info().outputPath('print-hub-default.png'), fullPage: true })
   expect(errors).toEqual([])
@@ -200,6 +201,18 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
   await expect(page.getByRole('button', { name: /材料扫描/ })).toBeDisabled()
   await expect(page.getByText('扫描仪正在保养', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /格式转换/ })).toBeEnabled()
+  const bottom = await page.locator('.ph-page').evaluate((scroller) => {
+    scroller.scrollTop = scroller.scrollHeight
+    return {
+      atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+      actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
+      footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+    }
+  })
+  expect(bottom.atEnd).toBe(true)
+  expect(bottom.actionsBottom).toBeLessThanOrEqual(bottom.navTop)
+  expect(bottom.footerBottom).toBeLessThanOrEqual(bottom.navTop)
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
 })
@@ -221,6 +234,18 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
   await expect(page.getByTestId('print-hub-cap-sign')).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeEnabled()
   await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText('这台机器现在出不了纸')
+  const bottom = await page.locator('.ph-page').evaluate((scroller) => {
+    scroller.scrollTop = scroller.scrollHeight
+    return {
+      atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+      actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
+      footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+    }
+  })
+  expect(bottom.atEnd).toBe(true)
+  expect(bottom.actionsBottom).toBeLessThanOrEqual(bottom.navTop)
+  expect(bottom.footerBottom).toBeLessThanOrEqual(bottom.navTop)
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
 })

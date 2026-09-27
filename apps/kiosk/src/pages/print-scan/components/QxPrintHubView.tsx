@@ -9,6 +9,7 @@
 // 不驱动任何业务状态；prefers-reduced-motion 下由 shell 与本页样式一并关掉。
 
 import { type CSSProperties, type ReactNode } from 'react'
+import { PrintAiHelp } from '../../print/components/PrintAiHelp'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import {
   ArrowRightIcon,
@@ -77,7 +78,6 @@ interface QxPrintHubViewProps {
   onArrivalCode: () => void
   onQuickLink: (key: string) => void
   onBack: () => void
-  onAdvisor: () => void
 }
 
 export const PrintHubNavbar = QxAppNavbar
@@ -322,7 +322,6 @@ export function QxPrintHubView({
   onArrivalCode,
   onQuickLink,
   onBack,
-  onAdvisor,
 }: QxPrintHubViewProps) {
   const ArrivalIcon = arrivalCode.icon
   const showBanner = hubState !== 'default'
@@ -448,10 +447,10 @@ export function QxPrintHubView({
         <button type="button" onClick={onBack}>上一步</button>
         {hubState === 'capability-error' ? <button type="button" onClick={onRetry}>重新检测</button> : null}
         {showBanner ? <button type="button" onClick={onHelp}>联系工作人员</button> : null}
-        <button type="button" onClick={onAdvisor}>问小青：怎么选打印方式 →</button>
+        <PrintAiHelp label="问小青：怎么选打印方式 →" draft="我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。" />
       </div>
       <footer className="ph-foot">
-        <PrintHubTruth />
+        <div className="ph-truth" data-disclaimer="true" data-testid="print-hub-truth"><div>可用服务与价格，以办理时显示为准。</div></div>
         {notices.length > 0 ? (
           // 全文逐字保留，只是默认收起：开关常驻底注右侧，点开在底注上方展开（原生 details，键盘 / 读屏可达）。
           <details className="ph-notices" data-disclaimer="true">
@@ -459,7 +458,7 @@ export function QxPrintHubView({
               <span>隐私、电子签与价格说明</span>
               <span className="ph-notices-go">点开看全文</span>
             </summary>
-            <p>{notices.join(' ')}</p>
+            <p>{HUB_TRUTH.map((row) => `${row.k}：${row.v}`).join(' ')} {notices.join(' ')}</p>
           </details>
         ) : null}
       </footer>

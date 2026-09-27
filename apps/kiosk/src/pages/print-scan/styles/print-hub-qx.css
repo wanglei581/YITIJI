@@ -13,9 +13,12 @@
   --ph-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   min-height: 0;
   padding-top: 20px;
+  padding-bottom: 16px;
+  overflow-y: auto;
+  flex: 1 1 0;
 }
 
 /* ── 小青横幅 ──────────────────────────────────────────────── */
@@ -120,7 +123,7 @@
 .ph-sec-h .hint + .ph-sec-act { margin-left: 0; }
 
 /* ── 轴芯片（不是按钮，只陈述两条状态轴） ───────────────────── */
-.ph-axes { min-height: 64px; display: flex; flex-direction: column; margin: 0 0 14px; color: var(--qx-ink-2); font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); }
+.ph-axes { min-height: 64px; display: flex; flex-direction: column; margin: 0; color: var(--qx-ink-2); font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); }
 .ph-chip {
   min-height: var(--qx-tap-min);
   padding: 0 14px;
@@ -171,7 +174,7 @@ button.ph-chip { cursor: pointer; }
   flex: none;
   width: 54px;
   height: 54px;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
   border-radius: 18px;
   display: flex;
   align-items: center;
@@ -189,9 +192,9 @@ button.ph-chip { cursor: pointer; }
 }
 .ph-cap-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ph-cap-name { display: block; font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.3; }
-.ph-cap-desc { display: block; margin-top: 5px; font-size: var(--qx-fs-aux); line-height: 1.45; color: var(--qx-ink-3); }
+.ph-cap-desc { display: block; margin-top: 0; font-size: var(--qx-fs-aux); line-height: 1.45; color: var(--qx-ink-3); }
 .ph-cap-foot {
-  margin-top: 10px;
+  margin-top: 6px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -248,7 +251,7 @@ button.ph-chip { cursor: pointer; }
   animation: ph-breathe 1600ms ease-in-out infinite;
 }
 /* 证件照宽卡：落在第三行「签名盖章」右侧的两格里，横排；徽标不折行。 */
-.ph-cap--wide { grid-column: 1 / -1; min-height: 106px; flex-direction: row; align-items: center; gap: 22px; padding: 20px 28px; }
+.ph-cap--wide { grid-column: 1 / -1; min-height: 106px; flex-direction: row; align-items: center; gap: 22px; padding: 14px 26px; }
 .ph-cap--wide .ph-cap-ic { margin-bottom: 0; }
 .ph-cap--wide .ph-cap-foot { flex: none; margin-top: 0; }
 .ph-cap--wide .ph-badge-off { white-space: nowrap; }
@@ -260,7 +263,7 @@ button.ph-chip { cursor: pointer; }
   gap: 22px;
   width: 100%;
   min-height: 126px;
-  padding: 18px 26px;
+  padding: 16px 26px;
   border: 1px solid var(--qx-line);
   border-radius: 32px;
   background: var(--qx-surface);
@@ -586,3 +589,16 @@ button.ph-chip { cursor: pointer; }
   [data-kiosk-stage-fit='off'] .ph-xq { min-height: 0; }
   [data-kiosk-stage-fit='off'] .ph-cap--wide { grid-column: auto; }
 }
+
+/* 主内容为唯一滚动区；子区不缩扁，末尾留白在固定导航之上。 */
+.ph-page > .ph-sec { flex: none; }
+.ph-page .ph-cap-desc { line-height: 1.4; }
+.ph-page .ph-cap-foot { line-height: 1.4; }
+.ph-page .ph-foot { margin-top: 0; }
+
+.ph-page .ph-notices { width: auto; max-width: 45%; }
+.ph-page .ph-notices > summary { min-height: 48px; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 760px) { [data-kiosk-stage-fit='off'] .ph-page .ph-notices { max-width: none; width: 100%; } }
+
+/* 稿 10 底栏为 116px；仅本页采用，不修改公共导航。 */
+.qx-stage:has(.ph-page) > .qx-navbar { height: 116px; }

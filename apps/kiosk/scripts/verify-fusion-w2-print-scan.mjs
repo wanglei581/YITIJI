@@ -342,8 +342,8 @@ assert.match(
 // 是两个不同的码。原型据此要求卡面显式区分，避免两码同名继续互相污染。
 assert.match(printScanHome, /到机码/, 'arrival-code entry uses the backend/miniapp name 到机码')
 assert.match(
-  printScanHome,
-  /不是付款后的取件凭证码/,
+  printScanHomeView,
+  /不是取件码/,
   'arrival-code entry disambiguates itself from the post-payment 取件凭证码'
 )
 // 核销的是订单而非新建打印任务，不得被本机打印/扫描能力探测结果关闭。

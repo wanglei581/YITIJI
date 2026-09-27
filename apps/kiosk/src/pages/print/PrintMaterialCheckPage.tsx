@@ -262,6 +262,8 @@ export function PrintMaterialCheckPage({
   useBusyLock(isWorking)
   const presentationFindings = findings.map((finding) => ({
     id: finding.id,
+    type: finding.type,
+    pageNumber: finding.pageNumber,
     label: finding.label || finding.type,
     maskedSnippet: maskSnippet(finding.type, finding.snippet),
     suggestion: suggestionForFinding(finding),
@@ -487,7 +489,7 @@ export function PrintMaterialCheckPage({
         subtitle="先完成文件体检和隐私预检，再进入打印参数"
         status={{ tone: 'warn', label: '没有待处理的文件' }}
         ctabar={(
-          <PrintDeskFooter onBack={() => navigate(uploadPath)}>
+          <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)}>
             <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print-scan')}>返回打印扫描</button>
             <p className="why">没有文件时不显示文件名、页数或检查结论，也不会产生订单。</p>
             <button className="qx-btn" data-variant="primary" type="button" onClick={() => navigate(uploadPath)}>去选文件</button>
@@ -575,7 +577,7 @@ export function PrintMaterialCheckPage({
       subtitle="第 2 步 / 共 4 步 · 检查格式、大小、页数与图片质量，并完成隐私选择"
       status={status}
       ctabar={(
-        <PrintDeskFooter onBack={() => navigate(uploadPath)}>
+        <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)}>
           <button className="qx-btn" data-variant="ghost" type="button" disabled={isWorking} onClick={() => navigate(uploadPath)}>返回选文件</button>
           <p className="why">
             {stage === 'error'
@@ -637,6 +639,7 @@ export function PrintMaterialCheckPage({
           requiresFormatReview={requiresFormatReview}
           isWorking={isWorking}
           onRetry={() => void runChecks({ retry: true })}
+          onBack={() => navigate(uploadPath)}
           onApplySuggested={applySuggestedDecisions}
           onKeepAll={keepAll}
           onDecision={setDecision}
