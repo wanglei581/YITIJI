@@ -8,8 +8,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { test } from '../fixtures/kiosk-test'
 import { ApiRouter } from '../fixtures/api-router'
 import {
-  PROTO_DIR,
   buildQingxuPairs,
+  protoFile,
   markerSeen,
   prepareRuntime,
   type PairStatus,
@@ -42,8 +42,9 @@ function sha(): string {
 async function listenProto(): Promise<{ origin: string; close: () => Promise<void> }> {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1')
-    const file = path.join(PROTO_DIR, decodeURIComponent(url.pathname))
-    if (!file.startsWith(PROTO_DIR) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+    // v2 目录里有的稿（及其 .js / .css 附件）以 v2 为准，其余读原稿；越出两个目录的一律 404。
+    const file = protoFile(decodeURIComponent(url.pathname).replace(/^\/+/, ''))
+    if (!file) {
       res.writeHead(404)
       res.end()
       return

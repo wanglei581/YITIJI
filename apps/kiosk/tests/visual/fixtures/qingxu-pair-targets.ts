@@ -33,6 +33,18 @@ import { preparePrioritySeed, priorityPlan } from './qingxu-pair-seeds'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const PROTO_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08')
+// 2026-09-27 裁决（CLAUDE.md §9）：v2 目录里有的稿以 v2 为准，没有的仍读原稿。
+export const PROTO_V2_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08-v2')
+
+/** 稿文件（含同目录的 .js / .css 附件）的实际路径：v2 有就用 v2，否则用原稿。越出两个目录的返回 null。 */
+export function protoFile(name: string): string | null {
+  for (const dir of [PROTO_V2_DIR, PROTO_DIR]) {
+    const file = path.join(dir, name)
+    if (!file.startsWith(dir + path.sep)) return null
+    if (fs.existsSync(file) && fs.statSync(file).isFile()) return file
+  }
+  return null
+}
 
 const REGISTER_ONLY = new Set(['36-index.html', '37-pay-states.html'])
 const PREVIEW_STATES = new Set([
@@ -321,11 +333,11 @@ function headerPipes(comment: string): string[] {
 }
 
 function bundleOf(file: string): { html: string; source: string } {
-  const html = fs.readFileSync(path.join(PROTO_DIR, file), 'utf8')
+  const html = fs.readFileSync(protoFile(file) ?? path.join(PROTO_DIR, file), 'utf8')
   let source = html
   for (const match of html.matchAll(/src="([a-z0-9_-]+\.js)"/gi)) {
-    const side = path.join(PROTO_DIR, match[1])
-    if (fs.existsSync(side)) source += `\n${fs.readFileSync(side, 'utf8')}`
+    const side = protoFile(match[1])
+    if (side) source += `\n${fs.readFileSync(side, 'utf8')}`
   }
   return { html, source }
 }
@@ -699,7 +711,10 @@ function routeOf(file: string, pair: RawPair): string | null {
 }
 
 export function buildQingxuPairs(): QingxuPairTarget[] {
-  const files = fs.readdirSync(PROTO_DIR).filter((name) => /^\d{2}-.+\.html$/.test(name)).sort()
+  // 两个目录的并集：v2 里新补的稿（原稿没有的编号）也要进对照。
+  const files = [...new Set([...fs.readdirSync(PROTO_DIR), ...fs.readdirSync(PROTO_V2_DIR)])]
+    .filter((name) => /^\d{2}-.+\.html$/.test(name) && !name.includes('.proposal.'))
+    .sort()
   const targets: QingxuPairTarget[] = []
   for (const file of files) {
     const raw = enumerateFile(file)
