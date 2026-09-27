@@ -70,7 +70,7 @@ expectIncludes(page, 'QxPageFrame', 'MyFeedbackPage 使用青序页框')
 expectAbsent(page, /KioskPageFrame/, 'MyFeedbackPage has left the V6 frame')
 expectIncludes(page, 'loginFrom="/me/feedback"', '意见反馈保留登录回跳来源')
 
-expectIncludes(page, 'getMyFeedback(getToken(), { pageSize: 50 })', '意见反馈保留本人反馈真实列表 API')
+expectIncludes(page, 'getMyFeedback(token, { pageSize: 50, cursor })', '意见反馈保留本人反馈真实列表 API')
 expectIncludes(page, 'getMyFeedbackDetail(getToken(), selectedId)', '意见反馈保留 query ticket 详情拉取')
 expectIncludes(page, 'getMyFeedbackDetail(getToken(), id)', '意见反馈保留点击列表读取详情')
 expectIncludes(page, 'createMyFeedback(getToken(), {', '意见反馈保留创建反馈 API')
@@ -81,7 +81,7 @@ expectIncludes(page, 'closeMyFeedback(getToken(), selected.id)', '意见反馈�
 expectIncludes(page, "MemberFeedbackApiError && error.code === 'FEEDBACK_PRINT_TASK_INVALID'", '意见反馈保留关联打印订单错误提示')
 expectIncludes(page, 'setSearchParams({ ticket: detail.id })', '提交反馈后保留 ticket 深链')
 expectIncludes(page, 'setSearchParams({ ticket: id })', '打开详情后保留 ticket 深链')
-expectIncludes(page, 'setItems([])', '意见反馈保留游客态清空列表')
+expectIncludes(read('src/pages/profile/me/useMemberCursorPage.ts'), 'setItems([])', '意见反馈保留游客态清空列表')
 expectIncludes(page, 'setSelected(null)', '意见反馈保留游客态清空详情')
 expectIncludes(page, 'parseFeedbackCategory(searchParams.get', '意见反馈保留 category 查询参数解析')
 

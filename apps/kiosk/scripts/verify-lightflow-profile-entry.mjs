@@ -370,6 +370,11 @@ for (const marker of [
 // presentation surfaces to the shared fusion frame. Keep this allowlist explicit so
 // unrelated member pages still fail closed.
 const allowedMeChanges = new Set([
+  // W3-a: 本人结果恢复与列表分页，不新增页面。
+  'apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx',
+  'apps/kiosk/src/pages/profile/me/QaRecords.tsx',
+  'apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts',
+  'apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts',
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MeListShell.tsx',

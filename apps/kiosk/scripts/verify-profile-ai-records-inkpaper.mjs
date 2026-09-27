@@ -61,9 +61,9 @@ expectIncludes(aiRecords, 'QxMePage', 'MyAiRecordsPage 使用青序记录壳')
 expectAbsent(aiRecords, /KioskPageFrame/, 'MyAiRecordsPage 已离开 V6 KioskPageFrame')
 expectIncludes(aiRecords, '本页不会提前显示成功', 'MyAiRecordsPage 删除确认写明不乐观显示成功')
 
-expectIncludes(aiRecords, 'getMyAiRecords(token, { pageSize: 50 })', 'MyAiRecordsPage 保留本人 AI 记录真实 API 拉取')
-expectIncludes(aiRecords, 'listMyJobAiSessions(token, { pageSize: 50 })', 'MyAiRecordsPage 保留岗位 AI 会话真实 API 拉取')
-expectIncludes(aiRecords, 'getMyInterviews(token)', 'MyAiRecordsPage 模拟面试分区来自 /me/mock-interviews')
+expectIncludes(aiRecords, 'getMyAiRecords(token, { pageSize: 50, cursor })', 'MyAiRecordsPage 保留本人 AI 记录真实 API 拉取')
+expectIncludes(aiRecords, 'listMyJobAiSessions(token, { pageSize: 50, cursor })', 'MyAiRecordsPage 保留岗位 AI 会话真实 API 拉取')
+expectIncludes(aiRecords, 'getMyInterviews(token, { pageSize: 50, cursor })', 'MyAiRecordsPage 模拟面试分区来自 /me/mock-interviews')
 expectIncludes(aiRecords, 'MockInterviewRecords', 'MyAiRecordsPage 渲染模拟面试分区组件')
 expectIncludes(aiRecords, 'deleteMyAiRecord(token, record.id)', 'MyAiRecordsPage 保留本人 AI 记录删除接口')
 expectIncludes(aiRecords, 'deleteMyJobAiSession(token, sessionId)', 'MyAiRecordsPage 保留岗位 AI 会话删除接口')
@@ -75,7 +75,7 @@ expectIncludes(aiRecords, "setToast({ tone: 'ok', text: '岗位 AI 参考记录�
 expectIncludes(aiRecords, "setToast({ tone: 'bad', text: '删除失败，记录可能已到期或被清理' })", 'MyAiRecordsPage 保留删除失败诚实提示')
 
 expectIncludes(aiRecords, '不展示简历原文、诊断正文或模型原始输出', 'MyAiRecordsPage 保留不展示原文/模型输出隐私口径')
-expectIncludes(aiRecords, '仅展示本人 AI 服务元数据', 'MyAiRecordsPage 保留仅展示元数据口径')
+expectIncludes(aiRecords, '仅展示本人 AI 服务记录', 'MyAiRecordsPage 保留仅展示元数据口径')
 expectIncludes(jobAiRecords, '不展示简历原文、提示词或模型原始输出', 'JobAiSessionRecords 保留不展示提示词/模型输出口径')
 expectIncludes(jobAiRecords, '分析结果仅供参考', 'JobAiSessionRecords 保留分析仅供参考文案')
 

@@ -60,8 +60,8 @@ expectIncludes(activity, "tab === 'applications'", 'MyActivityPage 保留求职�
 expectIncludes(activity, 'listMyJobApplications', 'MyActivityPage 求职进度只读本人自填接口')
 expectAbsent(activity, /企业反馈|面试通知/, 'MyActivityPage 不展示企业端反馈节点')
 
-expectIncludes(activity, 'getMyBrowseLogs(token, { pageSize: 50 })', 'MyActivityPage 保留浏览记录真实 API 拉取')
-expectIncludes(activity, 'getMyJumpLogs(token, { pageSize: 50 })', 'MyActivityPage 保留外部跳转记录真实 API 拉取')
+expectIncludes(activity, 'getMyBrowseLogs(token, { pageSize: 50, cursor })', 'MyActivityPage 保留浏览记录真实 API 拉取')
+expectIncludes(activity, 'getMyJumpLogs(token, { pageSize: 50, cursor })', 'MyActivityPage 保留外部跳转记录真实 API 拉取')
 expectIncludes(activity, "searchParams.get('tab') === 'jump' ? 'jump' : 'browse'", 'MyActivityPage 保留 tab 查询参数切换')
 expectIncludes(activity, "setSearchParams(next === 'jump' ? { tab: 'jump' } : {}, { replace: true })", 'MyActivityPage 保留 tab replace 导航行为')
 expectIncludes(activity, 'detailRoute(it.targetType, it.targetId, it.externalId)', 'MyActivityPage 保留详情跳转路由计算')

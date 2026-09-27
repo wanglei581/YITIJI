@@ -342,7 +342,7 @@ expectIncludes(favoritesPage, "return '/renshi?tab=policy'", '我的收藏保留
 expectIncludes(favoritesPage, '还没有收藏', '我的收藏保留空态标题')
 expectIncludes(favoritesPage, '在岗位 / 招聘会 / 政策详情页点收藏', '我的收藏保留空态说明')
 
-expectIncludes(benefitsPage, 'getMyBenefits(getToken(), { pageSize: 50 })', '我的权益保留真实 API 拉取')
+expectIncludes(benefitsPage, 'getMyBenefits(token, { pageSize: 50, cursor })', '我的权益保留真实 API 拉取')
 expectIncludes(benefitsPage, '还没有权益', '我的权益保留空态标题')
 expectIncludes(benefitsPage, '政策资格提示只提供信息指引，具体办理与结果以官方平台为准', '我的权益保留政策合规说明')
 expectAbsent(benefitsPage, /立即支付|去支付|确认核销|核销成功|办理成功/, '我的权益不新增支付/核销/办理结果口径')
@@ -394,6 +394,11 @@ const allowedProfileLandingChanged = new Set([
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
 ])
 const allowedLowRiskInkpaperChanged = new Set([
+  // W3-a: 本人结果恢复与列表分页，不新增页面。
+  'apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx',
+  'apps/kiosk/src/pages/profile/me/QaRecords.tsx',
+  'apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts',
+  'apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts',
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',

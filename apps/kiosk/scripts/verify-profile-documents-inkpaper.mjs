@@ -88,12 +88,12 @@ expectAbsent(qxCss, /#[0-9a-fA-F]{3,8}\b/, '青序文档页样式只用 var(--qx
 expectAbsent(css, /\.kprofile|\.khome|\.kassistant|\.kcampus/, '文档页样式不污染其他墨青页面作用域')
 
 expectMatches(routes, /path:\s*'me\/documents'[\s\S]{0,80}?element:\s*<MyDocumentsPage\s*\/>/, '路由仍指向 /me/documents -> MyDocumentsPage')
-expectIncludes(page, 'getMyDocuments(getToken(), { pageSize: 50 })', '我的文档保留本人文档真实 API 拉取')
+expectIncludes(page, 'getMyDocuments(token, { pageSize: 50, cursor })', '我的文档保留本人文档真实 API 拉取')
 // 登录回跳来源：青序壳的底栏由 recordsCtabar 统一生成，loginFrom 是它的第 4 个位置参数；
 // 钉住这个位置，再钉 recordsCtabar 确实把它作为 /login 的 from 传出去。
 expectMatches(page, /recordsCtabar\(uiState, navigate, \(\) => setReloadKey\(\(k\) => k \+ 1\), '\/me\/documents',/, '我的文档保留登录回跳来源')
 expectIncludes(read('src/pages/profile/me/qx/QxMeChrome.tsx'), "navigate('/login', { state: { from: loginFrom } })", '青序会员底栏登录键带回跳来源')
-expectIncludes(page, 'setItems([])', '我的文档保留游客态清空列表')
+expectIncludes(read('src/pages/profile/me/useMemberCursorPage.ts'), 'setItems([])', '我的文档保留游客态清空列表')
 expectIncludes(page, 'fetchAccessUrl(doc.previewUrlPath, token)', '我的文档查看/打印保留短期签名 URL 现取现用')
 expectMatches(page, /fetchAccessUrl\(doc\.previewUrlPath,\s*token\)[\s\S]{0,180}?setPreview\(\{\s*url:\s*res\.url/, '查看文档在当前隐私根内使用短期 URL')
 expectIncludes(page, '<FileContentPreview', '我的文档使用页内真实文件预览')

@@ -218,7 +218,7 @@ expectAbsent(jobFitPage, /granted && err instanceof JobFitApiError && err.code =
     ? pass(`getLatest / 分析 / 授权 / 授权后重跑 / 撤回 都把 AI_TASK_NOT_FOUND 落成门禁（${rejectedHits}）`)
     : fail(`仍有路径把 AI_TASK_NOT_FOUND 当成普通红条 — setRejectedTask(true) 只有 ${rejectedHits} 处，至少要 5`)
 }
-expectAbsent(jobFitPage, /err\.code === 'JOB_FIT_NOT_FOUND'/, '没有历史匹配结果不得当成简历被拒')
+expectAbsent(jobFitPage, /if\s*\([^\n]*err\.code === 'JOB_FIT_NOT_FOUND'[^\n]*\)\s*\{\s*setRejectedTask\(true\)/, '没有历史匹配结果不得当成简历被拒')
 expectIncludes(jobFitPage, "err.code === 'JOB_FIT_ANONYMOUS_CONSENT_REQUIRED'", '分析请求显式分流匿名授权 403')
 expectIncludes(jobFitPage, 'AnonymousJobFitConsentDialog', '岗位匹配页编排匿名授权弹窗')
 expectIncludes(anonymousConsentDialog, 'role="dialog"', '匿名授权弹窗声明对话框语义')
