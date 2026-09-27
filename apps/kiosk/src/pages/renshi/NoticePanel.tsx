@@ -3,7 +3,7 @@ import { isValidSourceUrl } from '../../lib/url'
 import type { PolicyPostView } from '../../services/api/policies'
 import { QrCodeIcon, ScrollTextIcon } from 'lucide-react'
 import { CATEGORY_META } from './shared'
-import { CollapsedChevron, type SourceQrTarget } from './components'
+import { CollapsedChevron, SourceFacts, type SourceQrTarget } from './components'
 
 const SRC_RULE = '来源入口由发布方提供，本系统未核验其官方性；扫码前请核对机构和目标域名。'
 
@@ -60,25 +60,30 @@ export function NoticePanel({
                 {notice.content ? (
                   <div className="rq-quote"><span>公告正文</span><p>{notice.content}</p></div>
                 ) : null}
-                {notice.publishedDate ? <p className="rq-srcchip">发布时间 <b>{notice.publishedDate}</b></p> : null}
-                <p className="rq-srcchip">发布机构 <b>{notice.sourceName}</b></p>
+                <SourceFacts
+                  sourceName={notice.sourceName}
+                  syncTime={notice.syncTime}
+                  externalId={notice.externalId}
+                  publishedOn={notice.publishedDate}
+                  dateLabel="发布时间"
+                />
                 <p className="rq-note">{SRC_RULE}</p>
-                {urlOk ? (
-                  <button
-                    type="button"
-                    className="rq-exit"
-                    onClick={() => onOfficialEntry(notice, {
-                      title: notice.title,
-                      url: notice.externalUrl!,
-                      sourceKind: '合作机构发布 · 管理员审核',
-                      sourceDetail: notice.sourceName,
-                    })}
-                  >
-                    <QrCodeIcon aria-hidden="true" />
-                    <span><b>扫码打开来源链接</b><small>先核对机构和目标域名</small></span>
-                  </button>
-                ) : (
-                  <>
+                <div className="rq-strip">
+                  {urlOk ? (
+                    <button
+                      type="button"
+                      className="rq-exit"
+                      onClick={() => onOfficialEntry(notice, {
+                        title: notice.title,
+                        url: notice.externalUrl!,
+                        sourceKind: '合作机构发布 · 管理员审核',
+                        sourceDetail: notice.sourceName,
+                      })}
+                    >
+                      <QrCodeIcon aria-hidden="true" />
+                      <span><b>扫码打开来源链接</b><small>先核对机构和目标域名</small></span>
+                    </button>
+                  ) : (
                     <button
                       type="button"
                       className="rq-exit"
@@ -91,10 +96,12 @@ export function NoticePanel({
                         <small>{urlMissing ? '发布方没有提供来源地址' : '来源地址不是有效的网址'}</small>
                       </span>
                     </button>
-                    <p className="rq-why">
-                      {urlMissing ? '发布方没有提供来源地址' : '来源地址不是有效的网址'}；本机不会猜地址或补链接。
-                    </p>
-                  </>
+                  )}
+                </div>
+                {!urlOk && (
+                  <p className="rq-why">
+                    {urlMissing ? '发布方没有提供来源地址' : '来源地址不是有效的网址'}；本机不会猜地址或补链接。
+                  </p>
                 )}
               </div>
             )}

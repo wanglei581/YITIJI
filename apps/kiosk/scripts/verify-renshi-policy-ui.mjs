@@ -206,19 +206,42 @@ const honestUploadButtonPattern = /<button\b(?:(?!<\/button>)[\s\S])*?onClick=\{
 const socialUploadButtonPattern = /<button\b(?:(?!<\/button>)[\s\S])*?onClick=\{\(\) => navigate\('\/print\/upload'\)\}(?:(?!<\/button>)[\s\S])*?\{guide\.entryLabel\}(?:(?!<\/button>)[\s\S])*?<\/button>/
 const stripNonVisibleComments = (source) => source.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
 const hasHonestUploadButton = (source) => honestUploadButtonPattern.test(stripNonVisibleComments(source))
+const honestUploadButtonGlobal = new RegExp(honestUploadButtonPattern.source, 'g')
+const countHonestUploadButtons = (source) => [...stripNonVisibleComments(source).matchAll(honestUploadButtonGlobal)].length
+const countUploadRoutes = (source) => (stripNonVisibleComments(source).match(/navigate\('\/print\/upload'\)/g) ?? []).length
 const socialEntryLabels = [...builtinData.matchAll(/entryLabel:\s*'([^']+)'/g)].map((match) => match[1])
+const policyHonest = countHonestUploadButtons(policyPanel)
+const registerRoutes = countUploadRoutes(registerPanel)
+const socialRoutes = countUploadRoutes(socialPanel)
+const socialStripped = stripNonVisibleComments(socialPanel)
+const pageHonest = countHonestUploadButtons(page)
+const pageRoutes = countUploadRoutes(page)
 const uploadRouteCount = (allRenshi.match(/navigate\('\/print\/upload'\)/g) ?? []).length
+// 底栏是新调用点：就业政策、社保指南、就业登记、政策公告各一颗，和展开条用同一个正则。
+// 就业登记原来滚在内容底部的那颗收到底栏（同一句诚实文案，不另起一个更松的匹配）。
+// 社保卡里没有线上入口的两项仍是一颗小按钮，文案走 entryLabel，正则不放宽。
+// 政策展开条仍保留一颗。四处底栏各自写 onClick，不合成一个函数。
+const barWhys = [
+  '政策与指引只做说明；需要纸质件请上传你自己的材料。',
+  '社保材料请自行准备，本机只负责打印。',
+  '把清单里需要复印的材料上传，本机可直接出纸。',
+  '公告本身不提供下载；如需打印你自己带来的材料，可在这里上传。',
+]
 const honestPanelEntries =
-  hasHonestUploadButton(policyPanel) &&
-  hasHonestUploadButton(registerPanel) &&
-  socialUploadButtonPattern.test(stripNonVisibleComments(socialPanel)) &&
+  policyHonest === 1 &&
+  registerRoutes === 0 &&
+  socialRoutes === 1 &&
+  socialUploadButtonPattern.test(socialStripped) &&
+  pageHonest === 4 &&
+  pageRoutes === 4 &&
+  barWhys.every((text) => page.includes(text)) &&
   socialEntryLabels.length > 0 &&
   socialEntryLabels.every((label) => label.includes('扫码') || label === '上传自备材料打印') &&
-  uploadRouteCount === 3
+  uploadRouteCount === 6
 if (misleadingPrintLabels.every((label) => !allRenshi.includes(label)) && honestPanelEntries) {
   pass('I2. 保留的通用打印入口明确要求用户上传自备材料')
 } else {
-  fail('I2. /print/upload 入口必须使用「上传自备材料打印」等诚实文案')
+  fail(`I2. /print/upload 入口必须使用「上传自备材料打印」等诚实文案（政策展开 ${policyHonest}，底栏 ${pageHonest}，登记路由 ${registerRoutes}，社保路由 ${socialRoutes}，合计 ${uploadRouteCount}）`)
 }
 const miswiredUploadFixture = `<button onClick={() => navigate('/print/upload')}>直接打印{/* 上传自备材料打印 */}</button>`
 if (!hasHonestUploadButton(miswiredUploadFixture)) {

@@ -180,6 +180,48 @@ export function SourceLine({ text }: { text: string }) {
   return <p className="rq-srcline">{text}</p>
 }
 
+function factText(value?: string | null): string {
+  const text = value?.trim()
+  return text ? text : '—'
+}
+
+function factDate(value?: string | null): string {
+  const text = value?.trim()
+  if (!text) return '—'
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : text
+}
+
+/** 展开条上的四枚来源小块。缺值写「—」，不拿别的字段填。 */
+export function SourceFacts({
+  sourceName,
+  syncTime,
+  externalId,
+  publishedOn,
+  dateLabel = '发布日期',
+}: {
+  sourceName?: string | null
+  syncTime?: string | null
+  externalId?: string | null
+  publishedOn?: string | null
+  dateLabel?: string
+}) {
+  const cells: [string, string, boolean][] = [
+    ['来源机构', factText(sourceName), true],
+    ['同步时间', factDate(syncTime), false],
+    ['外部编号', factText(externalId), false],
+    [dateLabel, factDate(publishedOn), false],
+  ]
+  return (
+    <div className="rq-facts">
+      {cells.map(([label, value, slate]) => (
+        <span key={label} className={slate ? 'rq-fact rq-fact-slate' : 'rq-fact'}>
+          {label} <b>{value}</b>
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export function CollapsedChevron() {
   return <ChevronDownIcon className="rq-caret" aria-hidden="true" />
 }

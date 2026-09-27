@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { PrinterIcon } from 'lucide-react'
 import { getPublishedPolicies, type PolicyPostView, type PublishedPoliciesResult } from '../../services/api/policies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
@@ -43,6 +44,7 @@ export function RenshiPage() {
   const { getToken } = useAuth()
   const [qrEntry, setQrEntry] = useState<SourceQrTarget | null>(null)
   const [eligChrome, setEligChrome] = useState<EligibilityChrome | null>(null)
+  const [eligHost, setEligHost] = useState<HTMLDivElement | null>(null)
 
   const setActiveTab = (tab: TabKey) => {
     const next = new URLSearchParams(searchParams)
@@ -202,6 +204,7 @@ export function RenshiPage() {
   })()
 
   const goHub = () => navigate('/policy-service')
+  const readFailed = policyState === 'error' && (activeTab === 'policy' || activeTab === 'notice')
 
   return (
     <QxPageFrame
@@ -209,6 +212,66 @@ export function RenshiPage() {
       title={TAB_TITLE[activeTab]}
       subtitle={frame.subtitle}
       status={frame.status}
+      ctabar={(
+        <div className="rq-cta-stack">
+          <div className="rq-cta-row" data-testid="renshi-ctabar">
+            {activeTab === 'eligibility' ? (
+              <div ref={setEligHost} className="rq-cta-host" />
+            ) : readFailed ? (
+              <>
+                <button type="button" className="qx-btn" data-variant="primary" onClick={loadPolicies}>重新读取</button>
+                <span className="why">重试会先回到读取中，本机不把「点了重试」直接显示成读取成功。</span>
+              </>
+            ) : activeTab === 'policy' ? (
+              <>
+                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
+                  <PrinterIcon aria-hidden="true" />
+                  上传自备材料打印
+                </button>
+                <span className="why">
+                  {policyState === 'loading'
+                    ? '政策还没读回来，打印你自己带来的材料不受影响。'
+                    : '政策与指引只做说明；需要纸质件请上传你自己的材料。'}
+                </span>
+              </>
+            ) : activeTab === 'social' ? (
+              <>
+                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
+                  <PrinterIcon aria-hidden="true" />
+                  上传自备材料打印
+                </button>
+                <span className="why">社保材料请自行准备，本机只负责打印。</span>
+              </>
+            ) : activeTab === 'register' ? (
+              <>
+                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
+                  <PrinterIcon aria-hidden="true" />
+                  上传自备材料打印
+                </button>
+                <span className="why">把清单里需要复印的材料上传，本机可直接出纸。</span>
+              </>
+            ) : (
+              <>
+                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
+                  <PrinterIcon aria-hidden="true" />
+                  上传自备材料打印
+                </button>
+                <span className="why">
+                  {policyState === 'loading'
+                    ? '公告还没读回来，打印你自己带来的材料不受影响。'
+                    : notices.length === 0
+                      ? '公告为空不影响打印你自己带来的材料。'
+                      : '公告本身不提供下载；如需打印你自己带来的材料，可在这里上传。'}
+                </span>
+              </>
+            )}
+          </div>
+          <p className="rq-truth" data-testid="renshi-truth">
+            <b>仅信息指引 · 不代办</b>
+            本机只做政策说明、材料清单、来源入口与打印辅助；不代申请、不收费、不承诺补贴到账，也不保存身份证、银行卡或社保材料。
+          </p>
+        </div>
+      )}
       navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <div className="w4-policy-page rq-page" data-renshi-tab={activeTab}>
@@ -246,7 +309,7 @@ export function RenshiPage() {
               />
             )
           )}
-          {activeTab === 'eligibility' && <EligibilityPanel onChrome={setEligChrome} />}
+          {activeTab === 'eligibility' && <EligibilityPanel onChrome={setEligChrome} ctaHost={eligHost} />}
           {activeTab === 'notice' && (
             policyState === 'loading' ? (
               <div className="rq-state" data-kind="info"><b>正在读取政策与公告</b><p>社保指南和就业登记是本机整理的，可以先切到上面的分区看。</p></div>
@@ -268,10 +331,6 @@ export function RenshiPage() {
             </QxStepActions>
           )}
         </div>
-        <p className="rq-truth" data-testid="renshi-truth">
-          <b>仅信息指引 · 不代办</b>
-          本机只做政策说明、材料清单、来源入口与打印辅助；不代申请、不收费、不承诺补贴到账，也不保存身份证、银行卡或社保材料。
-        </p>
       </div>
     </QxPageFrame>
   )

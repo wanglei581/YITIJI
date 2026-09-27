@@ -48,6 +48,10 @@ export interface PolicyItem {
   content?: string
   officialUrl?: string
   sourceName: string
+  /** 接口原样。缺了页面写「—」，不用另一项顶上。 */
+  syncTime?: string
+  externalId?: string
+  publishedDate?: string
   updatedAt?: string
 }
 
@@ -65,6 +69,9 @@ export function fromPublished(p: PolicyPostView): PolicyItem {
     content: p.content,
     officialUrl: p.externalUrl,
     sourceName: p.sourceName,
+    syncTime: p.syncTime,
+    externalId: p.externalId?.trim() || undefined,
+    publishedDate: p.publishedDate,
     updatedAt: p.publishedDate ?? p.syncTime?.slice(0, 10),
   }
 }

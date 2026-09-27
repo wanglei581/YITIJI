@@ -17,10 +17,11 @@
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useIdleTimer } from '../../hooks/useIdleTimer'
 import {
   ArrowRightIcon,
-  InfoIcon,
   LockIcon,
   ScaleIcon,
 } from 'lucide-react'
@@ -57,7 +58,23 @@ export type EligibilityChrome = {
   subtitle: string
 }
 
-export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: EligibilityChrome) => void }) {
+function CtaSlot({ host, children }: { host: HTMLElement | null; children: ReactNode }) {
+  if (!host) return null
+  return createPortal(children, host)
+}
+
+const SUBMIT_WHY = '一项都不填时每条条件都会判成「无法判定」，结果没有参考价值。请至少选 1 项（不含「不确定」）。'
+const PARTIAL_WHY = '选「不确定」等于没填，对应条件会标为「无法判定」，不会算成不符合。'
+const PROBE_WHY = '还没确认有可比对的政策，此时不该向你要户籍、年龄段或参保信息。'
+const RETRY_WHY = '重新检查只是再问一次现在有没有可比对的政策，不收集任何个人信息。'
+
+export function EligibilityPanel({
+  onChrome,
+  ctaHost,
+}: {
+  onChrome?: (chrome: EligibilityChrome) => void
+  ctaHost: HTMLElement | null
+}) {
   const [phase, setPhase] = useState<Phase>({ s: 'loading' })
   /** 作答只放 React state：不写 localStorage / sessionStorage / URL query。 */
   const [answers, setAnswers] = useState<Record<string, string>>({})
@@ -137,6 +154,19 @@ export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: Eligibility
   if (phase.s === 'loading') {
     return (
       <div className="k8-elig">
+        <CtaSlot host={ctaHost}>
+          <button
+            type="button"
+            className="k8-elig-submit"
+            aria-disabled="true"
+            aria-describedby="k8-elig-probe-why"
+            onClick={(event) => event.preventDefault()}
+          >
+            <ScaleIcon className="h-6 w-6" aria-hidden="true" />
+            按政策原文逐条比对
+          </button>
+          <span id="k8-elig-probe-why" className="why">{PROBE_WHY}</span>
+        </CtaSlot>
         <EligibilityStepBar step={1} />
         <div className="rq-state" data-kind="info">
           <b>正在检查现在有没有可比对的政策</b>
@@ -149,9 +179,10 @@ export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: Eligibility
   if (phase.s === 'error') {
     return (
       <NoticeBlock
+        host={ctaHost}
+        onRetry={probe}
         title="这次核对没有成功"
         body="这次没有拿到结果，所以本页不显示任何结论。失败不等于「你不符合」，也不代表库里没有政策。你选过的内容只留在这一页，离开或重来都不会被保存。"
-        onRetry={probe}
       />
     )
   }
@@ -159,9 +190,10 @@ export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: Eligibility
   if (phase.s === 'backend-required') {
     return (
       <NoticeBlock
+        host={ctaHost}
+        onRetry={probe}
         title="本机现在做不了条件核对"
         body="本机暂时连不上政策服务。问项与判定口径都要由政策服务提供，本机不会自己编一套问项或结论。请联系现场工作人员后再试。"
-        onRetry={probe}
       />
     )
   }
@@ -169,9 +201,10 @@ export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: Eligibility
   if (phase.s === 'unavailable') {
     return (
       <NoticeBlock
+        host={ctaHost}
+        onRetry={probe}
         title={phase.notice === COPY_NO_RECORDED_CONDITIONS ? '已发布政策还没录入可比对条件' : '暂时没有可核对的政策条目'}
         body={phase.notice}
-        onRetry={probe}
       />
     )
   }
@@ -179,6 +212,7 @@ export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: Eligibility
   if (phase.s === 'result') {
     return (
       <EligibilityResults
+        ctaHost={ctaHost}
         result={phase.result}
         questions={phase.questions}
         onRestart={() => {
@@ -192,8 +226,40 @@ export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: Eligibility
   const { questions } = phase
   const enough = answeredCount > 0
 
+  const total = questions.questions.length
+
   return (
     <div className="k8-elig">
+      <CtaSlot host={ctaHost}>
+        <span className="rq-cta-count">已填 <b>{answeredCount} / {total}</b> 项</span>
+        {/*
+          置灰用 aria-disabled + 点击短路 + 常显原因 + aria-describedby，
+          **不用原生 disabled**：27 寸触摸屏没有 hover，title 永不显示；
+          原生 disabled 还让按钮掉出 tab 序、被读屏跳过（口径见 #620）。
+        */}
+        <button
+          type="button"
+          className="k8-elig-submit"
+          aria-disabled={!enough || submitting || undefined}
+          aria-describedby={enough ? undefined : 'k8-elig-submit-why'}
+          onClick={(event) => {
+            if (!enough || submitting) {
+              event.preventDefault()
+              return
+            }
+            submit(questions)
+          }}
+        >
+          <ScaleIcon className="h-6 w-6" aria-hidden="true" />
+          {submitting ? '正在比对…' : '按政策原文逐条比对'}
+          <ArrowRightIcon className="h-6 w-6" aria-hidden="true" />
+        </button>
+        {enough ? (
+          <span className="why">{PARTIAL_WHY}</span>
+        ) : (
+          <span id="k8-elig-submit-why" className="why">{SUBMIT_WHY}</span>
+        )}
+      </CtaSlot>
       <EligibilityStepBar step={1} />
 
       <p className="k8-elig-privacy">
@@ -204,10 +270,12 @@ export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: Eligibility
       <div className="k8-elig-questions">
         {questions.questions.map((q) => (
           <fieldset key={q.key} className="k8-elig-q">
-            <legend className="k8-elig-q-title">
-              {q.label}
-              {q.sensitive && <small>这项可以不填</small>}
-            </legend>
+            <div className="k8-elig-q-head">
+              <legend className="k8-elig-q-title">
+                {q.label}
+                {q.sensitive && <small>这项可以不填</small>}
+              </legend>
+            </div>
             <div className="k8-elig-opts">
               {q.options.map((opt) => {
                 const active = answers[q.key] === opt.value
@@ -235,61 +303,37 @@ export function EligibilityPanel({ onChrome }: { onChrome?: (chrome: Eligibility
         ))}
       </div>
 
-      <div className="k8-elig-actionbar">
-        <span className="k8-elig-count">
-          已填 {answeredCount} / {questions.questions.length} 项
-          <small>选「不确定」等于没填，对应条件会标为「无法判定」，不会算成不符合。</small>
-        </span>
-        {/*
-          置灰用 aria-disabled + 点击短路 + 常显原因 + aria-describedby，
-          **不用原生 disabled**：27 寸触摸屏没有 hover，title 永不显示；
-          原生 disabled 还让按钮掉出 tab 序、被读屏跳过（口径见 #620）。
-        */}
-        <button
-          type="button"
-          className="k8-elig-submit"
-          aria-disabled={!enough || submitting || undefined}
-          aria-describedby={enough ? undefined : 'k8-elig-submit-why'}
-          onClick={(event) => {
-            if (!enough || submitting) {
-              event.preventDefault()
-              return
-            }
-            submit(questions)
-          }}
-        >
-          <ScaleIcon className="h-6 w-6" aria-hidden="true" />
-          {submitting ? '正在比对…' : '按政策原文逐条比对'}
-          <ArrowRightIcon className="h-6 w-6" aria-hidden="true" />
-        </button>
-      </div>
-      {!enough && (
-        <p id="k8-elig-submit-why" className="k8-elig-why">
-          <InfoIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-          还没有填写任何一项：一项都不填时每条条件都会判成「无法判定」，比对结果没有参考价值。
-          请至少选 1 项（不含「不确定」）后再比对。
-        </p>
-      )}
-
       <p className="k8-elig-disclaimer">{questions.disclaimer}</p>
     </div>
   )
 }
 
-function NoticeBlock({ title, body, onRetry }: { title: string; body: string; onRetry: () => void }) {
+function NoticeBlock({
+  host,
+  title,
+  body,
+  onRetry,
+}: {
+  host: HTMLElement | null
+  title: string
+  body: string
+  onRetry: () => void
+}) {
   return (
     <div className="k8-elig">
+      <CtaSlot host={host}>
+        <button type="button" className="k8-elig-notice-retry" onClick={onRetry}>
+          重新检查
+        </button>
+        <span className="why">{RETRY_WHY}</span>
+      </CtaSlot>
       <EligibilityStepBar step={1} />
       <div className="k8-elig-notice">
         <div className="min-w-0 flex-1">
           <b>{title}</b>
           <p>{body}</p>
         </div>
-        <button type="button" className="k8-elig-notice-retry" onClick={onRetry}>
-          重新检查
-        </button>
       </div>
-      <p className="rq-note">重新检查只是再问一次现在有没有可比对的政策，不收集任何个人信息。</p>
     </div>
   )
 }

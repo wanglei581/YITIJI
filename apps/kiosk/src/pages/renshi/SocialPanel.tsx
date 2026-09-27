@@ -31,7 +31,7 @@ export function SocialPanel({ onOfficialEntry }: { onOfficialEntry: (target: Sou
                 hasOfficial && (
                   <button
                     type="button"
-                    className="rq-exit"
+                    className="rq-mini"
                     onClick={() => onOfficialEntry({
                       title: guide.title,
                       url: guide.officialUrl!,
@@ -40,15 +40,15 @@ export function SocialPanel({ onOfficialEntry }: { onOfficialEntry: (target: Sou
                     })}
                   >
                     <QrCodeIcon aria-hidden="true" />
-                    <span><b>{guide.entryLabel}</b><small>先核对机构和目标域名</small></span>
+                    {guide.entryLabel}
                   </button>
                 )
               ) : (
                 <>
                   {guide.offlineNote ? <p className="rq-note rq-note-warn">{guide.offlineNote}</p> : null}
-                  <button type="button" className="rq-exit" onClick={() => navigate('/print/upload')}>
+                  <button type="button" className="rq-mini" onClick={() => navigate('/print/upload')}>
                     <PrinterIcon aria-hidden="true" />
-                    <span><b>{guide.entryLabel}</b><small>本机只打印你自己带来的文件</small></span>
+                    {guide.entryLabel}
                   </button>
                 </>
               )}

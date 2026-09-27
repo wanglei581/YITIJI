@@ -5,7 +5,7 @@ import { isValidSourceUrl } from '../../lib/url'
 import { FileTextIcon, HeartIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { matchAudience, type AudienceKey, type PolicyItem } from './shared'
-import { AudienceFilter, CollapsedChevron, DetailList, type SourceQrTarget } from './components'
+import { AudienceFilter, CollapsedChevron, DetailList, SourceFacts, type SourceQrTarget } from './components'
 
 const SRC_RULE = '来源入口由发布方提供，本系统未核验其官方性；扫码前请核对机构和目标域名。'
 
@@ -109,7 +109,7 @@ export function PolicyPanel({
         </div>
         {open && (
           <div className="rq-acc">
-            <p className="rq-kindchip">{kind === 'builtin' ? '内置指引 · 非政策库内容' : '政策库'}</p>
+            {kind === 'builtin' ? <p className="rq-kindchip">内置指引 · 非政策库内容</p> : null}
             {(item.content || item.summary) && !item.conditions && (
               <div className="rq-quote">
                 <span>政策原文</span>
@@ -119,7 +119,16 @@ export function PolicyPanel({
             {item.conditions && <DetailList title="先看是否符合" items={item.conditions} layout="list" />}
             {item.materials && <DetailList title="需要准备材料" items={item.materials} layout="cols" />}
             {item.steps && <DetailList title="建议办理路径" items={item.steps} layout="steps" />}
-            <p className="rq-srcchip">整理来源 <b>{item.sourceName}</b>{item.updatedAt ? ` · 更新 ${item.updatedAt}` : ''}</p>
+            {kind === 'library' ? (
+              <SourceFacts
+                sourceName={item.sourceName}
+                syncTime={item.syncTime}
+                externalId={item.externalId}
+                publishedOn={item.publishedDate}
+              />
+            ) : (
+              <p className="rq-srcchip">整理来源 <b>{item.sourceName}</b></p>
+            )}
             {kind === 'library' ? (
               <div className="rq-ai-off">
                 <b>本条政策暂未接入小青</b>
