@@ -38,6 +38,7 @@ import {
 import { GENERATE_RETRY_HINT, GENERATE_SYSTEM_PROMPT } from '../src/ai/resume/llm-resume-generate.service'
 import { SELF_ASSESSMENT_SYSTEM_PROMPT } from '../src/ai/resume/llm-self-assessment.service'
 import { ADVISOR_DRAFT_SYSTEM_PROMPT, ADVISOR_QA_SYSTEM_PROMPT } from '../src/advisor/llm-advisor.service'
+import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { ASSISTANT_SUMMARY_SYSTEM_PROMPT } from '../src/advisor/assistant-summary.service'
 import { SYSTEM_PROMPT as CONTRACT_SYSTEM_PROMPT } from '../src/contract-review/contract-review-provider.service'
 import { JobFitPdfService } from '../src/ai/resume/job-fit-pdf.service'
@@ -68,7 +69,6 @@ import {
 
 const SRC = join(__dirname, '../src')
 const unpdf = require('unpdf') as {
-  getDocumentProxy: (data: Uint8Array) => Promise<unknown>
   extractText: (pdf: unknown, options: { mergePages: boolean }) => Promise<{ text: string | string[] }>
 }
 
@@ -91,7 +91,7 @@ function squash(value: string): string {
 }
 
 async function visiblePages(buffer: Buffer): Promise<string[]> {
-  const doc = await unpdf.getDocumentProxy(new Uint8Array(buffer))
+  const doc = await openUnpdfDocument(new Uint8Array(buffer))
   const extracted = await unpdf.extractText(doc, { mergePages: false })
   return Array.isArray(extracted.text) ? extracted.text : [extracted.text]
 }
