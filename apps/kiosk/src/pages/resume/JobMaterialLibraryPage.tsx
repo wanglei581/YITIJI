@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -57,7 +58,7 @@ const VIEW: Record<Screen, [Tone, string, string]> = {
   select: ['ok', '固定模板生成 · 内容由你填写','选择已发布模板，填写真实信息后按固定模板生成本人可查看、可打印的 PDF。'],
   submitting: ['unknown', '正在生成 PDF', '真实文件返回前不显示文件名和打印入口。'],
   failed: ['bad', '本次文件生成失败', '失败就是失败，不用示例文件顶替结果。'],
-  generated: ['ok', '真实文件已生成 · 可打印', '文件已进入本人文档；打印只认服务端给出的打印凭证。'],
+  generated: ['ok', '真实文件已生成 · 可打印', '文件已进入本人文档；有打印凭证才能去打印。'],
   'generated-no-print': ['warn', '文件已生成 · 打印凭证未就绪', '文件存在，但没有打印凭证就不进入打印确认。'],
   'demo-result': ['warn', '演示结果 · 无真实文件', '演示模式不保存真实文件。'],
 }
@@ -70,19 +71,25 @@ const STATUS_SCREENS = {
   },
   error: {
     kind: 'error', icon: <AlertTriangleIcon size={32} aria-hidden="true" />, title: '模板列表读取失败', action: '重新读取',
-    desc: '这次没有读到模板，不会拿内置默认模板或上一次的列表冒充当前目录。', why: '重新读取只重发这一次目录请求，不改动你填过的字段。',
+    desc: '这次没有读到模板，不会拿内置默认模板或上一次的列表冒充当前目录。', why: '重新读取只再要一次目录，不改动你填过的内容。',
     facts: ['这次失败没有造成什么', '范围很窄', [['没有', '用内置默认模板或示例模板顶替'], ['没有', '生成文件、打印任务或费用'],
       ['仍可用', '打印、扫描与简历诊断三条链路'], ['仍可用', '我的文档里此前生成过的材料'],
-      ['自动重试', '没有 —— 只有点「重新读取」才会再请求一次'], ['错误原文', '不显示在公共屏幕上，只说明这次读不到']]],
+      ['自动重试', '没有 —— 只有点「重新读取」才会再请求一次'], ['失败原因', '不显示在屏幕上，只说明这次读不到']]],
   },
   empty: {
     kind: 'warn', icon: <InfoIcon size={32} aria-hidden="true" />, title: '当前没有已发布的求职材料模板', action: '重新读取一次',
-    desc: '读取成功，但服务端返回的已发布模板数量为 0。发布后会出现在这里；本机不拿示例模板补位。', why: '模板发布后目录会出现在这一页，不需要你做设置。',
-    facts: ['空列表和读取失败不是一回事', '已读取成功', [['接口', '已返回，没有报错'], ['已发布模板', '0 条'],
+    desc: '读取成功，但这次没有已发布的模板。发布后会出现在这里；本机不拿示例模板补位。', why: '模板发布后目录会出现在这一页，不需要你做设置。',
+    facts: ['空列表和读取失败不是一回事', '已读取成功', [['这次读取', '已完成，没有报错'], ['已发布模板', '0 条'],
       ['本机不会', '拿示例模板或旧模板补位'], ['已生成过的材料', '不受影响，仍在我的文档里'],
       ['费用', '没有产生任何生成或打印费用'], ['恢复方式', '模板发布后自动出现，不需要你做设置']]],
   },
 } as const
+
+function fileKindLabel(mimeType: string): string {
+  if (mimeType === 'application/pdf') return 'PDF'
+  if (mimeType.startsWith('image/')) return '图片'
+  return '文档'
+}
 
 function formatBytes(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '未知'
@@ -125,8 +132,8 @@ function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
     ['文件名', file.filename],
     ['页数', file.pageCount > 0 ? `${file.pageCount} 页` : '未返回', file.pageCount <= 0],
     ['大小', formatBytes(file.sizeBytes)],
-    ['类型', file.mimeType],
-    ['文件编号', demo ? '演示对象无文件编号' : file.fileId, demo],
+    ['类型', fileKindLabel(file.mimeType)],
+    ['文件编号', demo ? '演示对象不会保存' : file.fileId, demo],
     ['查看链接有效至', demo ? '演示对象无签名链接' : formatTime(file.signedUrlExpiresAt), demo],
     ['文件留存到', demo ? '不保存' : formatTime(file.fileExpiresAt), demo || !file.fileExpiresAt],
     ['打印凭证', canPrint ? '已就绪（只交给打印确认页）' : '未返回（打印保持禁用）', !canPrint],
@@ -156,7 +163,7 @@ function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
           ) : <span>凭本人登录现换一次短期查看链接，只在本页弹窗里显示，不保存。</span>}
         </div>
       ) : null}
-      <p className="qx-rm-foot">字段取自本次生成的服务端返回；查看链接是一次性签名链接，不在屏幕上展示。</p>
+      <p className="qx-rm-foot">下面这些都是这次生成的结果；查看链接不在屏幕上展示。</p>
       {demo ? <p id="material-docs-blocked" className="qx-rm-reason">演示模式未保存真实文件，我的文档里不会有这一份。</p> : null}
       {!canPrint ? (
         <p id="material-print-blocked" className="qx-rm-reason">{demo ? DEMO_MODE_NO_REAL_FILE_REASON : '打印链接未就绪，请重新生成后再试'}</p>
@@ -371,14 +378,14 @@ export function JobMaterialLibraryPage() {
     <>
       <div className="qx-rm-detail-h">
         <span className="no">{generated ? '已生成' : '正在准备'}</span>
-        <span className="hint">{generated ? '改动字段后需重新生成' : '一次生成一份 PDF'}</span>
+        <span className="hint">{generated ? '改过内容后需重新生成' : '一次生成一份 PDF'}</span>
       </div>
       <h2>{template.title}</h2>
-      <p className="qx-rm-lead">{template.recommendedFor}。模板只组合你填写的字段，不读取简历，不调用 AI；生成的材料仅对本人可见。</p>
+      <p className="qx-rm-lead">{template.recommendedFor}。模板只按你填写的内容排版，不读取简历，不调用 AI；生成的材料仅对本人可见。</p>
       <div className="qx-rm-tmeta" data-testid="material-workshop-template-meta">
         <div><u>输出文件名</u><b>{template.outputFilename}</b></div>
         <div><u>材料类型</u><b>{TYPE_LABEL[template.type]}</b></div>
-        <div><u>可填字段</u><b>{template.fields.length} 项 · {template.fields.filter(isRequired).length} 必填</b></div>
+        <div><u>要填的项</u><b>{template.fields.length} 项 · {template.fields.filter(isRequired).length} 必填</b></div>
         <div><u>页数</u><b>生成后返回</b></div>
       </div>
       {demoMode ? <Banner tone="warn" icon={<InfoIcon size={20} aria-hidden="true" />}>演示模式不会保存真实文件，也不会开放打印。</Banner> : null}
@@ -388,7 +395,7 @@ export function JobMaterialLibraryPage() {
         </Banner>
       ) : null}
       {/* 单行字段两两成排；多行字段各占整行并吸收余量（稿 25 的 form.grow），不留一片空白。 */}
-      <div className="qx-rm-form" role="group" aria-label="材料字段">
+      <div className="qx-rm-form" role="group" aria-label="要填写的内容">
         <div className="qx-rm-form-grid">{template.fields.filter((field) => !field.multiline).map(renderField)}</div>
         {template.fields.filter((field) => field.multiline).map(renderField)}
       </div>
@@ -405,15 +412,17 @@ export function JobMaterialLibraryPage() {
       {generated && !submitting ? (
         <FileCard file={generated} demo={demoMode} previewBusy={previewBusy} previewError={currentPreview?.error}
           onPreview={previewPathOf(generated, demoMode) && isLoggedIn ? () => void openPreview(generated) : undefined} />
-      ) : (
-        <div className="qx-rm-after" data-testid="material-workshop-after">
-          <b>生成后</b>
-          <span className="st"><i>1</i>返回真实文件</span><span className="sep">›</span>
-          <span className="st"><i>2</i>进入我的文档</span><span className="sep">›</span>
-          <span className="st"><i>3</i>有打印凭证才能去打印</span>
-        </div>
-      )}
+      ) : null}
     </>
+  )
+
+  const afterFlow = (
+    <div className="qx-rm-after" data-testid="material-workshop-after">
+      <b>生成后</b>
+      <span className="st"><i>1</i>获得材料 PDF</span><span className="sep">›</span>
+      <span className="st"><i>2</i>核对完整内容</span><span className="sep">›</span>
+      <span className="st"><i>3</i>带走电子版或打印件</span>
+    </div>
   )
 
   let body: ReactNode
@@ -440,13 +449,15 @@ export function JobMaterialLibraryPage() {
   } else {
     body = (
       <>
+        {generated ? null : afterFlow}
         <nav className="qx-rm-filters" aria-label="求职材料分类">
           {FILTERS.map((item) => (
             <button key={item} type="button" aria-pressed={filter === item} onClick={() => setFilter(item)}>{item}</button>
           ))}
         </nav>
         <div className="qx-rm-workspace">
-          <section className="qx-rm-catalog" aria-label="可选求职材料">
+          <section className="qx-rm-catalog" aria-label="可选求职材料" tabIndex={0}>
+            <p className="qx-rm-catalog-hint">上下滑动，查看全部模板</p>
             {visible.length === 0 ? (
               <StateBlock kind="warn" size="sm" icon={<InfoIcon size={24} aria-hidden="true" />} title="该分类暂无求职材料">
                 请切换其他分类查看；空列表不使用内置假模板填充。
@@ -456,8 +467,8 @@ export function JobMaterialLibraryPage() {
                 onClick={() => selectTemplate(template)} data-testid={`material-workshop-template-${template.id}`}>
                 <b>{template.title}</b>
                 <span className="qx-rm-desc">{template.description}</span>
-                <span className="qx-rm-use">适用：{template.recommendedFor}</span>
-                <span className="qx-rm-tags"><i>{TYPE_LABEL[template.type]}</i>{template.tags.map((tag) => <i key={tag}>{tag}</i>)}</span>
+                <span className="qx-rm-use">带走：{template.outputFilename}</span>
+                <span className="qx-rm-tags"><i>模板生成</i><i>{TYPE_LABEL[template.type]}</i>{template.tags.map((tag) => <i key={tag}>{tag}</i>)}</span>
               </button>
             ))}
             {others.length > 0 ? (
@@ -477,7 +488,7 @@ export function JobMaterialLibraryPage() {
           <aside className="qx-rm-detail" aria-live="polite">
             {selected ? renderDetail(selected) : (
               <StateBlock kind="info" size="sm" icon={<FileTextIcon size={24} aria-hidden="true" />} title="请选择求职材料">
-                左侧选一份模板，这里显示它要填的字段。
+                左边选一份模板，这里显示要填写的内容。
               </StateBlock>
             )}
           </aside>
@@ -487,10 +498,17 @@ export function JobMaterialLibraryPage() {
     cta = generated && !submitting && !submitError ? (
       <>
         <p className="why qx-rm-why-full" data-testid="material-workshop-why">
-          这一份是刚生成的文件；改动模板或字段后这张文件卡会收起，需要重新生成。
+          这一份是刚生成的文件；改动模板或填写内容后这张文件卡会收起，需要重新生成。
           {demoMode ? '演示模式不保存真实文件，我的文档与打印都停用。' : generated.printFileUrl ? '' : '本次没有打印凭证，只有打印被禁用，我的文档不受影响。'}
         </p>
         {btn('ghost', '重新生成一份', () => void handleGenerate())}
+        <QxStepActions onPrev={goResumeHub}>
+          <QxAiHelp
+            label="让小青帮我整理材料亮点 →"
+            draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。"
+            testId="material-workshop-ai-help"
+          />
+        </QxStepActions>
         {/* 两个都是能力门禁：aria-disabled + 文件卡里那句常显原因（触屏没有 hover，title 永远显示不出来）。 */}
         <button type="button" className="qx-btn" data-variant="ghost" aria-disabled={demoMode || undefined}
           aria-describedby={demoMode ? 'material-docs-blocked' : undefined} onClick={() => { if (!demoMode) navigate('/me/documents') }}>
@@ -508,6 +526,13 @@ export function JobMaterialLibraryPage() {
         <button type="button" className="qx-btn" data-variant="primary" disabled={submitting || !selected} onClick={() => void handleGenerate()}>
           {submitting ? '生成中…' : isLoggedIn ? '生成可打印版' : '登录后生成'}
         </button>
+        <QxStepActions onPrev={goResumeHub}>
+          <QxAiHelp
+            label="让小青帮我整理材料亮点 →"
+            draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。"
+            testId="material-workshop-ai-help"
+          />
+        </QxStepActions>
       </>
     )
   }
@@ -526,8 +551,7 @@ export function JobMaterialLibraryPage() {
           data-state={screen} data-testid={`material-workshop-state-${screen}`} aria-label="求职材料库">
           {body}
           <p className="qx-rm-truth">
-            <b>材料只交给你本人。</b>这里生成的是个人求职材料，不会代替你向任何岗位投递；素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。
-            岗位申请、预约和投递需前往来源平台或官方渠道完成；打印费用以现场公示与服务端报价为准。
+            模板按你填的内容排版，不调用 AI；不代投递。系统不收取求职者简历给企业。费用以确认时显示为准。
           </p>
         </section>
       </QxPageFrame>

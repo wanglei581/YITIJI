@@ -8,13 +8,83 @@
  * 门禁断言会先除回 scale 再比 48/56，所以这里写的就是 CSS px 真值。
  */
 
+/* 稿 16 没有第二套页头：深色导言就是标题。框架页头留给读屏。 */
+.qx-stage:has([data-qx-page='service-hub']) > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* .qx-body 已经给了左右 --qx-gutter，这里只补下边距，别再加一次左右内距。 */
 .qx-hub {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding-bottom: 28px;
+  gap: 12px;
+  padding-top: 16px;
+  padding-bottom: 12px;
+  font-size: var(--qx-fs-body);
 }
+
+.qx-hub-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: none;
+  padding: 20px 28px;
+  border-radius: 32px;
+  background: var(--qx-deep);
+  color: var(--qx-paper);
+}
+.qx-hub-hero-face {
+  width: 88px;
+  height: 88px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--qx-emerald) 40%, transparent);
+  background: color-mix(in srgb, var(--qx-emerald) 12%, transparent);
+  color: var(--qx-emerald);
+  font-family: var(--qx-serif);
+  font-size: var(--qx-fs-greeting);
+  font-weight: 900;
+  line-height: 1;
+}
+.qx-hub-hero-main { flex: 1; min-width: 0; }
+.qx-hub-hero .qx-hub-eyebrow {
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--qx-paper) 88%, transparent);
+  font-size: var(--qx-fs-aux);
+  letter-spacing: 2px;
+}
+.qx-hub-hero-title {
+  margin: 4px 0 0;
+  font-family: var(--qx-serif);
+  font-size: var(--qx-fs-page);
+  font-weight: 900;
+  line-height: 1.3;
+}
+.qx-hub-hero-sub {
+  margin: 6px 0 0;
+  max-width: 760px;
+  font-size: var(--qx-fs-body);
+  line-height: var(--qx-lh-body);
+  color: color-mix(in srgb, var(--qx-paper) 82%, transparent);
+}
+.qx-hub-hero .qx-hub-hero-note {
+  margin-top: 8px;
+  font-size: var(--qx-fs-aux);
+  color: color-mix(in srgb, var(--qx-paper) 78%, transparent);
+}
+.qx-hub-hero .qx-hub-hero-note b { color: var(--qx-paper); }
 
 /* 域标识（稿的 eyebrow）。小字 + 字距，做成一枚安静的标签：
    它负责回答「我现在在哪个服务域」，不与主标题争视线，所以不加粗不放大。 */
@@ -29,7 +99,7 @@
   border-radius: 999px;
   background: var(--qx-teal-soft);
   color: var(--qx-teal-d);
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 3px;
 }
@@ -39,7 +109,7 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 19px;
+  font-size: 20px;
   line-height: 1.45;
   color: var(--qx-ink-3);
 }
@@ -67,11 +137,11 @@
 }
 .qx-hub-goals-copy b {
   font-family: var(--qx-serif);
-  font-size: 24px;
+  font-size: var(--qx-fs-body-lg);
   font-weight: 800;
 }
 .qx-hub-goals-copy span {
-  font-size: 18px;
+  font-size: var(--qx-fs-aux);
   line-height: 1.4;
   color: var(--qx-ink-3);
 }
@@ -90,7 +160,7 @@
   border-radius: var(--qx-r);
   background: var(--qx-paper);
   color: var(--qx-ink);
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -116,8 +186,9 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 84px;
-  padding: 14px 22px;
+  flex: none;
+  min-height: 64px;
+  padding: 12px 22px;
   border: 1px solid var(--qx-line);
   border-radius: var(--qx-r);
   background: var(--qx-surface);
@@ -155,12 +226,12 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 18px;
+  font-size: var(--qx-fs-aux-lg);
   line-height: 1.45;
 }
 .qx-hub-notice-copy b {
   color: var(--qx-ink);
-  font-size: 19px;
+  font-size: var(--qx-fs-aux-lg);
 }
 .qx-hub-retry {
   flex: none;
@@ -174,7 +245,7 @@
   border-radius: var(--qx-r);
   background: var(--qx-surface);
   color: var(--qx-ink);
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -204,18 +275,52 @@
   align-items: baseline;
   gap: 14px;
 }
+.qx-hub-section-head::before,
+.qx-hub-quick-label::before {
+  color: var(--qx-teal-d);
+  font-family: var(--qx-serif);
+  font-size: var(--qx-fs-aux);
+  font-weight: 700;
+}
+.qx-hub-board--primary > .qx-hub-section-head::before { content: "01"; }
+.qx-hub-quick-label::before { content: "02"; }
 .qx-hub-section-head h2 {
   font-family: var(--qx-serif);
-  font-size: 28px;
+  font-size: var(--qx-fs-sec);
   font-weight: 900;
 }
 .qx-hub-section-head > span {
-  font-size: 18px;
+  font-size: var(--qx-fs-aux);
   color: var(--qx-ink-3);
 }
 .qx-hub-section-head > b {
   margin-left: auto;
-  font-size: 18px;
+  font-size: var(--qx-fs-aux);
+  color: var(--qx-teal-d);
+}
+.qx-hub-chips {
+  display: flex;
+  flex: none;
+  gap: 10px;
+  align-items: center;
+  overflow: hidden;
+}
+.qx-hub-chip {
+  height: 42px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--qx-line);
+  border-radius: 15px;
+  background: var(--qx-surface);
+  color: var(--qx-ink-2);
+  font-size: var(--qx-fs-aux);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.qx-hub-chip:first-child {
+  border-color: var(--qx-teal-line);
+  background: var(--qx-teal-soft);
   color: var(--qx-teal-d);
 }
 
@@ -224,8 +329,8 @@
   flex: 1 0 auto;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: minmax(236px, 1fr);
-  gap: 16px;
+  grid-auto-rows: minmax(196px, 1fr);
+  gap: 12px;
 }
 .qx-hub-grid > :nth-child(8):last-child,
 .qx-hub-grid > :nth-child(7):last-child {
@@ -239,9 +344,9 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 9px;
-  min-height: 236px;
-  padding: 20px;
+  gap: 8px;
+  min-height: 196px;
+  padding: 16px;
   text-align: left;
   border: 1px solid var(--qx-line);
   border-radius: var(--qx-r);
@@ -252,14 +357,21 @@
 .qx-hub-card:active {
   transform: scale(0.995);
 }
+.qx-hub-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
 .qx-hub-card-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 54px;
-  height: 54px;
-  border-radius: var(--qx-r);
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
   background: var(--qx-teal-soft);
   color: var(--qx-teal-d);
 }
@@ -275,13 +387,13 @@
 }
 .qx-hub-card h3 {
   font-family: var(--qx-serif);
-  font-size: 23px;
+  font-size: var(--qx-fs-sec);
   font-weight: 800;
-  line-height: 1.24;
+  line-height: 1.25;
 }
 .qx-hub-card p {
-  font-size: 18px;
-  line-height: 1.45;
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.4;
   color: var(--qx-ink-3);
 }
 .qx-hub-card-foot {
@@ -291,7 +403,7 @@
   width: 100%;
   margin-top: auto;
   padding-top: 8px;
-  font-size: 17px;
+  font-size: var(--qx-fs-aux);
 }
 .qx-hub-badge {
   flex: none;
@@ -311,7 +423,7 @@
   gap: 4px;
   margin-left: auto;
   color: var(--qx-teal-d);
-  font-size: 18px;
+  font-size: var(--qx-fs-aux-lg);
   font-weight: 750;
 }
 
@@ -354,7 +466,7 @@
   flex: 1 0 100%;
   min-width: 0;
   color: var(--qx-wheat-d);
-  font-size: 17px;
+  font-size: var(--qx-fs-aux);
   font-weight: 700;
   text-align: left;
 }
@@ -369,12 +481,12 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 18px;
+  font-size: 21px;
   color: var(--qx-ink-3);
 }
 .qx-hub-quick-label b {
   font-family: var(--qx-serif);
-  font-size: 21px;
+  font-size: var(--qx-fs-body);
   font-weight: 800;
   color: var(--qx-ink);
 }
@@ -387,7 +499,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 100px;
+  min-height: 84px;
   padding: 0 20px;
   text-align: left;
   border: 1px dashed var(--qx-line-2);
@@ -407,12 +519,12 @@
   gap: 3px;
 }
 .qx-hub-quick-item b {
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 750;
 }
 .qx-hub-quick-item span span,
 .qx-hub-quick-item > span > span {
-  font-size: 17px;
+  font-size: 21px;
   color: var(--qx-ink-3);
 }
 .qx-hub-quick-item.is-unavailable > svg {
@@ -427,14 +539,15 @@
 .qx-hub-truth {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
-  gap: 20px;
-  padding: 20px 24px;
+  gap: 16px;
+  flex: none;
+  padding: 14px 20px;
   border: 1px solid var(--qx-line);
   border-radius: var(--qx-r);
   background: var(--qx-paper);
   color: var(--qx-ink-3);
-  font-size: 18px;
-  line-height: 1.5;
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.45;
 }
 .qx-hub-truth > div {
   min-width: 0;
@@ -445,9 +558,9 @@
 }
 .qx-hub-truth b {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   color: var(--qx-ink);
-  font-size: 18px;
+  font-size: var(--qx-fs-aux-lg);
 }
 
 /* 窄屏（手机 / 桌面浏览器）退化成单列，触控尺寸不变。 */

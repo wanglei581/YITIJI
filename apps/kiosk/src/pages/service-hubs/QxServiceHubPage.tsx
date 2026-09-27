@@ -104,6 +104,39 @@ const RUNTIME_CARD_COPY: Partial<Record<string, Pick<HubCapability, 'title' | 'd
 }
 
 /**
+ * 稿 16 的 2.0 只改了简历中心这一屏的可见文案（角标、带走什么、求职材料改为模板生成）。
+ * serviceHubSpecs 仍与原稿逐字节对账，所以覆盖放在这里，不手改规格表。
+ * 岗位 / 招聘会服务台不套这层：它们的卡面仍用规格表原文。
+ */
+const RESUME_V2_CARD: Partial<Record<string, Partial<HubCapability> & { go?: string }>> = {
+  '/resume/source?intent=diagnose': { description: '带走问题清单和改法', badge: 'AI 诊断改写' },
+  '/resume/source?intent=optimize': { description: '对着你的方向逐条看改写', badge: 'AI 优化改写' },
+  '/resume/generate': { description: '带走一份可核对的草稿', badge: 'AI 起草简历' },
+  '/resume/career-plan': { description: '带走下一步可以做的事', badge: 'AI 行动建议' },
+  '/resume/materials': {
+    description: '按模板套填，带走求职信和自我介绍',
+    badge: '模板生成',
+    // 材料是固定模板套填，不调用模型。AI 不可用时这张卡仍按「要联网」拦截，不说成 AI 能力。
+    kind: 'info',
+  },
+  '/resume/job-fit': { badge: 'AI 对照', go: '带走：对照报告' },
+}
+
+function shownCapability(hub: ServiceHubKey, source: HubCapability): HubCapability & { go?: string } {
+  const base = { ...source, ...RUNTIME_CARD_COPY[source.route] }
+  if (hub !== 'resume') return base
+  return { ...base, ...RESUME_V2_CARD[source.route] }
+}
+
+function capChips(state: HubAvailability): string[] {
+  if (state.apiDown) return ['能力配置 · 以办理时确认', '在线服务 · 暂不可用', '不联网内容 · 仍可进入']
+  if (state.apiChecking) return ['能力配置 · 以办理时确认', '在线服务 · 正在确认', '其他入口 · 确认后再进']
+  if (state.deviceOff) return ['能力配置 · 以办理时确认', '本机设备 · 暂不可用', '信息与 AI · 进入后确认']
+  if (state.deviceChecking) return ['能力配置 · 以办理时确认', '本机设备 · 正在确认', '信息与 AI · 进入后确认']
+  return ['能力配置 · 以办理时确认', '来源与流程 · 进入后确认', '本页只做分流']
+}
+
+/**
  * 顶栏状态胶囊：拿不到结论时必须说「正在确认」，不得默认 ok。
  *
  * apiDown 这条说的是「在线服务」而不是稿里的「AI能力」：`useApiReadiness` 判的是
@@ -216,15 +249,17 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   const showContractReview = hub === 'resume' && contractReviewEnabled
 
   const renderCard = (source: HubCapability, slot: 'grid' | 'contract') => {
-    const cap: HubCapability = { ...source, ...RUNTIME_CARD_COPY[source.route] }
+    const cap = shownCapability(hub, source)
     const reason = unavailableReason(cap.kind, cap.route, availability)
     const Icon = HUB_ICON[cap.icon]
     const head = (
       <>
-        <span className="qx-hub-card-icon" aria-hidden="true">
-          <Icon size={28} />
+        <span className="qx-hub-card-head">
+          <span className="qx-hub-card-icon" aria-hidden="true">
+            <Icon size={26} />
+          </span>
+          <h3>{cap.title}</h3>
         </span>
-        <h3>{cap.title}</h3>
         <p>{cap.description}</p>
       </>
     )
@@ -265,7 +300,7 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
         <span className="qx-hub-card-foot">
           <span className="qx-hub-badge">{cap.badge}</span>
           <span className="qx-hub-go">
-            进入
+            {cap.go ?? '进入'}
             <ChevronRightIcon size={20} aria-hidden="true" />
           </span>
         </span>
@@ -278,6 +313,9 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
     : availability.apiChecking || availability.deviceChecking
       ? LoaderCircleIcon
       : CheckCircle2Icon
+  const truthTitle = hub === 'resume' ? '简历用不用，由你本人决定。' : spec.truthTitle
+  const note = hub === 'resume' ? '生成的内容会标明供参考，不会覆盖原文件。' : spec.note
+  const chips = capChips(availability)
 
   return (
     <QxPageFrame
@@ -302,52 +340,17 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
         data-hub-api-blocked={apiBlocked ? 'true' : 'false'}
         data-hub-device-probe={deviceAware ? 'on' : 'off'}
       >
-        {/* 域标识（稿的 eyebrow）。稿把它放在主标题上方；这里放在标题行下方独立一行，
-            用小字 + 字距做成标签，不与 h1 竞争视线，也不混进 h1 的可及名称。 */}
-        <p className="qx-hub-eyebrow">{spec.eyebrow}</p>
-        {/* 稿里的 hero-note：原件/结果归属的一句话，紧跟在标题说明之后。 */}
-        <p className="qx-hub-hero-note">
-          <b>{spec.noteTitle}</b>
-          <span>{spec.note}</span>
-        </p>
-
-        <section className="qx-hub-goals" aria-label="先告诉我你现在最想完成什么">
-          <div className="qx-hub-goals-copy">
-            <b>先告诉我你现在最想完成什么</b>
-            {/* 稿的固定说明，逐字取自 16-service-hubs.html 的 first-copy。
-                这里曾拼进 spec.sectionHint，于是同一句「六个入口，覆盖会前与现场准备」
-                在目标分段和下方分区标题里各出现一次，读起来像页面卡住重复了。 */}
-            <span>选择后直接进入对应服务；不会替你提交或生成结果。</span>
-          </div>
-          <div className="qx-hub-goals-row">
-            {spec.goals.map((goal) => {
-              const kind = capabilityKindFor(spec, goal.route)
-              const reason = unavailableReason(kind, goal.route, availability)
-              if (reason) {
-                return (
-                  <div
-                    key={goal.route}
-                    className="qx-hub-goal is-unavailable"
-                    role="group"
-                    aria-disabled="true"
-                    aria-label={`${goal.label}：${reason}`}
-                    data-disabled-reason={`capability:${kind}`}
-                  >
-                    {goal.label}
-                  </div>
-                )
-              }
-              return (
-                <button
-                  key={goal.route}
-                  type="button"
-                  className="qx-hub-goal"
-                  onClick={() => navigate(goal.route)}
-                >
-                  {goal.label}
-                </button>
-              )
-            })}
+        {/* 稿 16 的深色导言：页头标题留给读屏（视觉上收进 1px），这里是站着能读到的那一块。 */}
+        <section className="qx-hub-hero">
+          <div className="qx-hub-hero-face" aria-hidden="true">青</div>
+          <div className="qx-hub-hero-main">
+            <p className="qx-hub-eyebrow">{spec.eyebrow}</p>
+            <p className="qx-hub-hero-title" aria-hidden="true">{spec.title}</p>
+            <p className="qx-hub-hero-sub">{spec.subtitle}</p>
+            <p className="qx-hub-hero-note">
+              <b>{spec.noteTitle}</b>
+              <span>{note}</span>
+            </p>
           </div>
         </section>
 
@@ -395,6 +398,9 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
             <span>{spec.sectionHint}</span>
             <b>{spec.capabilities.length}项</b>
           </div>
+          <div className="qx-hub-chips" aria-label="本页能确认到的范围">
+            {chips.map((chip) => <span key={chip} className="qx-hub-chip">{chip}</span>)}
+          </div>
           <div className="qx-hub-grid">{spec.capabilities.map((cap) => renderCard(cap, 'grid'))}</div>
         </section>
 
@@ -418,7 +424,10 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
             <span>继续查看与管理</span>
           </div>
           <div className="qx-hub-quick">
-            {spec.quickLinks.map((link) => {
+            {spec.quickLinks.map((source) => {
+              const link = hub === 'resume' && source.route === '/me/resumes'
+                ? { ...source, description: '查看你名下的简历' }
+                : source
               const reason = unavailableReason(link.kind, link.route, availability)
               const Icon = HUB_ICON[link.icon]
               if (reason) {
@@ -457,13 +466,55 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
           </div>
         </section>
 
+        {/* 三条快捷目标与上面的能力卡是同一条路由。2.0 不把可点控件放在够不着的顶部，
+            所以这一排放在卡片下面，文案仍是稿里的「先告诉我你现在最想完成什么」。 */}
+        <section className="qx-hub-goals" aria-label="先告诉我你现在最想完成什么">
+          <div className="qx-hub-goals-copy">
+            <b>先告诉我你现在最想完成什么</b>
+            {/* 稿的固定说明，逐字取自 16-service-hubs.html 的 first-copy。
+                这里曾拼进 spec.sectionHint，于是同一句「六个入口，覆盖会前与现场准备」
+                在目标分段和下方分区标题里各出现一次，读起来像页面卡住重复了。 */}
+            <span>选择后直接进入对应服务；不会替你提交或生成结果。</span>
+          </div>
+          <div className="qx-hub-goals-row">
+            {spec.goals.map((goal) => {
+              const kind = capabilityKindFor(spec, goal.route)
+              const reason = unavailableReason(kind, goal.route, availability)
+              if (reason) {
+                return (
+                  <div
+                    key={goal.route}
+                    className="qx-hub-goal is-unavailable"
+                    role="group"
+                    aria-disabled="true"
+                    aria-label={`${goal.label}：${reason}`}
+                    data-disabled-reason={`capability:${kind}`}
+                  >
+                    {goal.label}
+                  </div>
+                )
+              }
+              return (
+                <button
+                  key={goal.route}
+                  type="button"
+                  className="qx-hub-goal"
+                  onClick={() => navigate(goal.route)}
+                >
+                  {goal.label}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
         {/* 合规与诚实性声明：**逐字取自稿**，不许改写、不许省略。
             三列对应稿的 truth 区：合规边界 / 能力口径 / 隐私清场。
             truth 那句直接是 CLAUDE.md §2 的边界（不代投、不代收简历、不作资格判断）；
             隐私那句是本机的清场承诺，KioskPrivacyGuard 真的会执行。 */}
         <section className="qx-hub-truth" aria-label="服务边界说明">
           <div>
-            <b>{spec.truthTitle}</b>
+            <b>{truthTitle}</b>
             <span>{spec.truth}</span>
           </div>
           <div>
@@ -472,7 +523,7 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
           </div>
           <div>
             <b>隐私</b>
-            <span>结束会话或闲置超时清除本机登录态与临时会话信息。</span>
+            <span>结束这次办理或闲置超时，会清除本机登录和临时信息。</span>
           </div>
         </section>
       </div>
