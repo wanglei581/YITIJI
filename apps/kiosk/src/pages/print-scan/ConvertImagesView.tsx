@@ -1,6 +1,7 @@
 import type { ConvertImagesResponse } from '@ai-job-print/shared'
 import { EyeIcon } from 'lucide-react'
 import type { ChangeEvent, Ref } from 'react'
+import { PdfCanvasPreview } from '../../components/PdfCanvasPreview'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import {
   MAX_IMAGES,
@@ -276,7 +277,15 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
                   onError={props.onPreviewError}
                 />
               ) : result ? (
-                <iframe title="合成 PDF 预览" src={result.printFileUrl} onError={props.onPreviewError} />
+                <PdfCanvasPreview
+                  src={result.printFileUrl}
+                  title="合成 PDF 预览"
+                  page={preview.index + 1}
+                  fit="page"
+                  showPager={false}
+                  onError={props.onPreviewError}
+                  className="h-full max-h-full w-full"
+                />
               ) : (
                 <div className="i2p-pv-fail">还没有可预览的文件。</div>
               )}

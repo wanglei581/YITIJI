@@ -173,7 +173,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     await page.getByRole('button', { name: /生成 PDF 预览/ }).click()
     const dialog = page.getByRole('dialog', { name: 'self-assessment-001.pdf' })
     await expect(dialog).toBeVisible()
-    await expect(dialog.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', '/self-assessment-fixtures/report.pdf')
+    await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/self-assessment-fixtures/report.pdf')
     await expect(dialog.getByText('手机扫码保存')).toBeVisible()
     expect(page.context().pages()).toHaveLength(pageCount)
     await page.getByRole('button', { name: '关闭文件预览' }).click()

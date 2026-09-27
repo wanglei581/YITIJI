@@ -999,7 +999,9 @@ test('direct preview restores the material session and completes the PDF respons
 
   await page.goto('/print/desk?step=preview')
   await expect(page.getByTitle(`${W2_FILE.name} 预览`)).toBeVisible()
-  await expect.poll(() => page.locator(`iframe[data-preview-src="${W2_FILE.fileUrl}"]`).count()).toBe(1)
+  const previewHost = page.locator(`[data-pdf-preview-host][data-preview-src="${W2_FILE.fileUrl}"]`)
+  await expect(previewHost).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect(previewHost.locator('canvas')).toHaveCount(1)
   binary.assertPdfCompleted()
   await expectHealthy(page, errors, 'print-preview')
 })
@@ -2217,4 +2219,129 @@ test('print confirm fail-closes duplicate query keys and missing file context @w
   await expect(page.getByText('未找到文件信息')).toBeVisible()
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
+})
+
+function buildCanvasPreviewPdf(pageStreams: string[]): string {
+  const kids = pageStreams.map((_, index) => `${3 + index * 2} 0 R`).join(' ')
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    `2 0 obj\n<< /Type /Pages /Count ${pageStreams.length} /Kids [${kids}] >>\nendobj\n`,
+    ...pageStreams.flatMap((stream, index) => {
+      const pageId = 3 + index * 2
+      return [
+        `${pageId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents ${pageId + 1} 0 R >>\nendobj\n`,
+        `${pageId + 1} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`,
+      ]
+    }),
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets: number[] = []
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(pdf, 'ascii'))
+    pdf += object
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii')
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (const offset of offsets) pdf += `${String(offset).padStart(10, '0')} 00000 n \n`
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+  return pdf
+}
+
+async function waitForCanvasInk(canvas: import('@playwright/test').Locator): Promise<{ dark: number; checksum: number }> {
+  let ink: { dark: number; checksum: number } | null = null
+  await expect.poll(async () => {
+    ink = await canvas.evaluate((node: HTMLCanvasElement) => {
+      const context = node.getContext('2d')
+      if (!context || node.width < 2 || node.height < 2) return null
+      const { data } = context.getImageData(0, 0, node.width, node.height)
+      let dark = 0
+      let checksum = 0
+      for (let index = 0; index < data.length; index += 32) {
+        const red = data[index] ?? 0
+        const green = data[index + 1] ?? 0
+        const blue = data[index + 2] ?? 0
+        if (red < 250 || green < 250 || blue < 250) dark += 1
+        checksum = (checksum + red + green * 3 + blue * 7) % 10000019
+      }
+      return { dark, checksum }
+    })
+    return ink?.dark ?? 0
+  }, { timeout: 15_000 }).toBeGreaterThan(0)
+  if (!ink) throw new Error('canvas ink missing')
+  return ink
+}
+
+test('print preview paints each PDF page on a canvas and leaves without ERR_ABORTED @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  const errors = collectRuntimeErrors(page)
+  const consoleAborts: string[] = []
+  page.on('console', (message) => {
+    if (message.text().includes('ERR_ABORTED')) consoleAborts.push(message.text())
+  })
+  registerShell(api)
+  registerPrice(api)
+  const pdfPath = '/pdf-canvas-fixtures/two-page.pdf'
+  await page.route(`**${pdfPath}`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: buildCanvasPreviewPdf(['0 0 0 rg\n30 30 40 140 re f\n', '0 0 0 rg\n130 30 40 140 re f\n']),
+  }))
+  const file = { ...W2_FILE, fileUrl: pdfPath, name: 'two-page.pdf', pages: 2 }
+  await page.addInitScript(({ key, value }) => {
+    window.sessionStorage.setItem(key, JSON.stringify(value))
+  }, {
+    key: 'ai-job-print:current-print-material-check',
+    value: {
+      file,
+      source: 'document',
+      materialCheck: {
+        inspectionTaskId: 'w2-inspection-001',
+        normalizeTaskId: 'w2-normalize-001',
+        piiTaskId: 'w2-pii-001',
+        piiRedactTaskId: 'w2-pii-redact-001',
+        checkedAt: '2026-07-24T00:00:00.000Z',
+        findingCount: 0,
+        redactedCount: 0,
+        keptCount: 0,
+        redaction: {
+          claim: 'nothing_to_redact',
+          redactedFileId: null,
+          appliedRedactedCount: 0,
+          failedNoPositionCount: 0,
+          keptCount: 0,
+          reverifyRemainingCount: null,
+          reverifyRan: false,
+        },
+        mode: 'checked',
+      },
+      printParams: W2_PRINT_PARAMS,
+      updatedAt: '2026-07-24T00:00:00.000Z',
+    },
+  })
+
+  await page.goto('/print/desk?step=preview')
+  const host = page.locator(`[data-pdf-preview-host][data-preview-src="${pdfPath}"]`)
+  await expect(host).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect.poll(() => host.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe('0')
+  await expect(host).toHaveAttribute('data-pdf-page', '1')
+  await expect(host).toHaveAttribute('data-pdf-page-count', '2')
+  await expect(host).toContainText('第 1 / 共 2 页')
+  await expect(page.locator('.qpd-preview-shell iframe, .qpd-preview-shell embed, .qpd-preview-shell object')).toHaveCount(0)
+  const canvas = host.locator('canvas')
+  const first = await waitForCanvasInk(canvas)
+
+  const painted = await host.getAttribute('data-pdf-render')
+  await host.getByRole('button', { name: '下一页' }).click()
+  await expect(host).toHaveAttribute('data-pdf-page', '2')
+  await expect(host).toContainText('第 2 / 共 2 页')
+  await expect.poll(() => host.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe(painted)
+  const second = await waitForCanvasInk(canvas)
+  expect(second.checksum, '第二页和第一页不是同一幅画面').not.toBe(first.checksum)
+
+  await page.goto('/print/upload?source=document')
+  await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
+  await expect(page.locator('[data-pdf-preview-host]')).toHaveCount(0)
+  expect(consoleAborts, '离开预览后控制台没有 ERR_ABORTED').toEqual([])
+  expect(errors.filter((item) => item.includes('ERR_ABORTED')), '离开预览后没有 document 级 ERR_ABORTED').toEqual([])
+  await expectHealthy(page, errors, 'print-upload')
 })

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FileWarningIcon, Loader2Icon } from 'lucide-react'
+import { PdfCanvasPreview, type PdfCanvasFit } from './PdfCanvasPreview'
 import {
   convertDocumentToPdf,
   isWordDocument,
@@ -21,11 +22,16 @@ interface FileContentPreviewProps {
   className?: string
   compact?: boolean
   /**
-   * 浏览器自带 PDF 查看器的打开参数（如 `page=2&view=FitH`），只在真的按 PDF 渲染时
-   * 以 `#` 片段接到链接后面；片段不发给服务端，签名查询串原样不动。
-   * 查看器只在加载时读这组参数，所以参数变了就换一个 iframe 重新打开。
+   * 旧的打开参数（如 `page=2&view=FitH`）。现在换成画布上的真实页码和适宽 / 适整页，
+   * 不再拼进链接。显式的 pdfPage / pdfFit 优先。
    */
   pdfOpenParams?: string | null
+  pdfPage?: number
+  pdfFit?: PdfCanvasFit
+  /** 外层自己有翻页条时关掉组件内的「上一页 / 下一页」。 */
+  showPdfPager?: boolean
+  /** 打开文件后数到的页数。外层没有回执页数时用它翻页，不在读到之前编页码。 */
+  onPdfPageCount?: (pageCount: number) => void
   /** 实际渲染成了哪一种（含渲染失败后的 unavailable），给外层决定能摆哪些查看控件。 */
   onKindChange?: (kind: PreviewKind) => void
 }
@@ -49,6 +55,17 @@ function resolvePreviewKind(
   return 'unsupported'
 }
 
+function parsePdfOpenParams(params: string | null | undefined): { page?: number; fit?: PdfCanvasFit } {
+  if (!params) return {}
+  const query = new URLSearchParams(params)
+  const pageNumber = Number(query.get('page'))
+  const view = query.get('view')
+  return {
+    page: Number.isFinite(pageNumber) && pageNumber >= 1 ? Math.floor(pageNumber) : undefined,
+    fit: view === 'FitH' ? 'width' : view === 'Fit' ? 'page' : undefined,
+  }
+}
+
 export function FileContentPreview({
   fileUrl,
   fileName,
@@ -59,6 +76,10 @@ export function FileContentPreview({
   className = '',
   compact = false,
   pdfOpenParams,
+  pdfPage,
+  pdfFit,
+  showPdfPager,
+  onPdfPageCount,
   onKindChange,
 }: FileContentPreviewProps) {
   const [renderFailed, setRenderFailed] = useState(false)
@@ -102,7 +123,11 @@ export function FileContentPreview({
         ? 'unsupported'
         : sourceKind
   const previewUrl = convertedUrl ?? fileUrl
-  const pdfSrc = previewUrl && pdfOpenParams ? `${previewUrl.split('#', 1)[0]}#${pdfOpenParams}` : previewUrl
+  const pdfBytesUrl = previewUrl?.split('#', 1)[0] ?? ''
+  const parsedOpen = parsePdfOpenParams(pdfOpenParams)
+  const canvasPage = pdfPage ?? parsedOpen.page
+  const canvasFit = pdfFit ?? parsedOpen.fit ?? 'width'
+  const canvasPager = showPdfPager ?? pdfOpenParams == null
 
   useEffect(() => {
     onKindChange?.(kind)
@@ -117,15 +142,17 @@ export function FileContentPreview({
       data-file-preview-kind={kind}
     >
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-white">
-        {kind === 'pdf' && (
-          <iframe
-            key={pdfOpenParams ?? ''}
+        {kind === 'pdf' && pdfBytesUrl ? (
+          <PdfCanvasPreview
+            src={pdfBytesUrl}
             title={`${fileName} 预览`}
-            src={pdfSrc ?? undefined}
-            className={`h-full w-full bg-white ${compact ? 'min-h-[240px]' : 'min-h-[360px]'}`}
-            onError={() => setRenderFailed(true)}
+            page={canvasPage}
+            fit={canvasFit}
+            showPager={canvasPager}
+            onReady={({ pageCount }) => onPdfPageCount?.(pageCount)}
+            className={`h-full min-h-0 ${compact ? 'min-h-[240px]' : 'min-h-[360px]'}`}
           />
-        )}
+        ) : null}
         {kind === 'image' && (
           <img
             src={fileUrl ?? undefined}

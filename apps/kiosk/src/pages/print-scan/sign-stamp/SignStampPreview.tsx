@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { FileTextIcon } from 'lucide-react'
 import type { SignStampPosition, SignStampSize } from '@ai-job-print/shared'
+import { PdfCanvasPreview } from '../../../components/PdfCanvasPreview'
 import { MARGIN_RATIO, PAGE_H, PAGE_W, SIZE_FACTOR, ZOOMS } from './constants'
 import type { ComposeResult, PickedFile, ViewMode } from './signStampModel'
 
@@ -74,7 +75,7 @@ export function SignStampPreview({
   const viewRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ id: number; x: number; y: number; sl: number; st: number } | null>(null)
   const pageCount = pages ?? 1
-  const useIframe = Boolean(result?.printFileUrl) && !outErr && !compact
+  const previewUrl = (burned ? result?.printFileUrl : document?.fileAccessUrl) || ''
 
   useEffect(() => {
     if (pan !== 'br' || !viewRef.current) return
@@ -143,6 +144,35 @@ export function SignStampPreview({
     drag.current = null
     viewRef.current?.classList.remove('is-grabbing')
   }
+
+  const showMarker = Boolean(box && stamp && !burned && viewPage === (placePage ?? viewPage))
+  const marker = showMarker && box ? (
+    <span
+      className="ss-stampmark"
+      data-testid="sign-stamp-overlay-marker"
+      data-position={position}
+      data-size={size}
+      data-page={viewPage}
+      data-burned="false"
+      style={previewUrl
+        ? {
+            left: `${(box.x / PAGE_W) * 100}%`,
+            top: `${(box.y / PAGE_H) * 100}%`,
+            width: `${(box.w / PAGE_W) * 100}%`,
+            height: `${(box.h / PAGE_H) * 100}%`,
+            fontSize: 15,
+          }
+        : {
+            left: box.x * scale,
+            top: box.y * scale,
+            width: box.w * scale,
+            height: box.h * scale,
+            fontSize: Math.max(15, box.h * 0.26 * scale),
+          }}
+    >
+      签名图
+    </span>
+  ) : null
 
   return (
     <section className="ss-pvcol" aria-label="文档完整页预览">
@@ -219,75 +249,50 @@ export function SignStampPreview({
         </div>
       )}
 
-      {useIframe ? (
-        <iframe
-          title={`${result?.name ?? '合成 PDF'} 预览`}
-          src={result?.printFileUrl}
-          className="ss-pv-frame"
-          onError={onPreviewError}
-        />
-      ) : (
-        <div
-          className="ss-pv-view"
-          ref={viewRef}
-          data-testid="sign-stamp-pv-view"
-          tabIndex={0}
-          aria-label={`${burned ? '派生 PDF' : '原 PDF'}完整页预览，可拖动平移`}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-        >
-          <div style={{ width: Math.max(pw + 40, 560), height: Math.max(ph + 40, 400), position: 'relative' }}>
-            <div
-              className="ss-pv-page"
-              data-testid="sign-stamp-pv-page"
-              role="img"
-              aria-label={`${burned ? '派生 PDF' : '原 PDF'} 第 ${viewPage} 页完整页面预览`}
-              style={{ left: 20, top: 20, width: pw, height: ph }}
-            >
-              <span className="ss-bar is-title" style={{ left: '8%', top: '8%', width: '50%', height: '2.6%' }} />
-              <span className="ss-bar" style={{ left: '8%', top: '14%', width: '80%', height: '1.4%' }} />
-              <span className="ss-bar" style={{ left: '8%', top: '18%', width: '72%', height: '1.4%' }} />
-              <span className="ss-bar" style={{ left: '8%', top: '22%', width: '78%', height: '1.4%' }} />
-              <span className="ss-bar" style={{ left: '8%', top: '28%', width: '64%', height: '1.4%' }} />
-              <span className="ss-pmark" style={{ left: 8, top: 8, width: 52, height: 24 }}>
-                左上
-              </span>
-              <span className="ss-pmark" style={{ right: 8, top: 8, width: 52, height: 24 }}>
-                右上
-              </span>
-              <span className="ss-pmark" style={{ left: 8, bottom: 8, width: 52, height: 24 }}>
-                左下
-              </span>
-              <span className="ss-pmark" style={{ right: 8, bottom: 8, width: 52, height: 24 }}>
-                右下
-              </span>
-              {box && stamp && viewPage === (placePage ?? viewPage) ? (
-                <span
-                  className="ss-stampmark"
-                  data-testid="sign-stamp-overlay-marker"
-                  data-position={position}
-                  data-size={size}
-                  data-page={viewPage}
-                  data-burned={burned ? 'true' : 'false'}
-                  style={{
-                    left: box.x * scale,
-                    top: box.y * scale,
-                    width: box.w * scale,
-                    height: box.h * scale,
-                    fontSize: Math.max(15, box.h * 0.26 * scale),
-                  }}
-                >
-                  {burned ? '已合成' : '签名图'}
-                </span>
-              ) : null}
-            </div>
+      <div
+        className="ss-pv-view"
+        ref={viewRef}
+        data-testid="sign-stamp-pv-view"
+        tabIndex={0}
+        aria-label={`${burned ? '派生 PDF' : '原 PDF'}完整页预览，可拖动平移`}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        {previewUrl ? (
+          <PdfCanvasPreview
+            src={previewUrl}
+            title={`${burned ? result?.name ?? '合成 PDF' : document.name} 预览`}
+            page={viewPage}
+            fit={viewMode === 'width' ? 'width' : 'page'}
+            zoom={viewMode === 'zoom' ? ZOOMS[zoom] : 1}
+            showPager={false}
+            layout="intrinsic"
+            sheetTestId="sign-stamp-pv-page"
+            onError={onPreviewError}
+            overlay={marker}
+          />
+        ) : (
+          <div
+            className="ss-pv-page"
+            data-testid="sign-stamp-pv-page"
+            data-preview-kind="no-file"
+            style={{ position: 'relative', left: 20, top: 20, width: pw, height: ph }}
+          >
+            <p style={{ margin: 24, fontSize: 18, lineHeight: 1.5 }}>没有可打开的文件内容，这里不画示意纸面。</p>
+            {marker}
           </div>
-        </div>
-      )}
+        )}
+      </div>
       <div className="ss-pv-cap" data-testid="sign-stamp-pv-caption">
-        {burned ? '派生 PDF · 签章已印在纸上' : compact ? `原 PDF 第 ${viewPage} 页 · 下一步可翻页放大` : '原 PDF · 框是标记，原件不改写'}
+        {!previewUrl
+          ? '没有可打开的文件内容，不画示意纸面。'
+          : burned
+            ? '派生 PDF · 签章已印在纸上'
+            : compact
+              ? `原 PDF 第 ${viewPage} 页 · 下一步可翻页放大`
+              : '原 PDF · 框是标记，原件不改写'}
       </div>
     </section>
   )

@@ -12483,7 +12483,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 575,
+      "reachableFileCount": 577,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15454,7 +15454,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 654
+      "sourceFileCount": 656
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17956,6 +17956,9 @@
     "apps/kiosk/src/components/KioskFeedbackDialog.tsx": [
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs"
     ],
+    "apps/kiosk/src/components/PdfCanvasPreview.tsx": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
+    ],
     "apps/kiosk/src/components/hid-guard/KioskHidScanGuard.tsx": [
       "apps/kiosk/scripts/verify-scan-input-safety.mjs"
     ],
@@ -18241,7 +18244,8 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs"
     ],
     "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx": [
-      "apps/kiosk/scripts/verify-contract-review-session.mjs"
+      "apps/kiosk/scripts/verify-contract-review-session.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx": [
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
@@ -18268,7 +18272,8 @@
     "apps/kiosk/src/pages/help/HelpCenterPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
-      "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
+      "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/help/help-service-desk.css": [
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
@@ -18295,7 +18300,8 @@
     ],
     "apps/kiosk/src/pages/home/components/QxHomeView.tsx": [
       "apps/kiosk/scripts/verify-fusion-home.mjs",
-      "apps/kiosk/scripts/verify-home-toolbox-ui.mjs"
+      "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/home/components/ToolboxLaunchModals.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -18358,6 +18364,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/interview/InterviewShell.tsx": [
@@ -18597,7 +18604,8 @@
     ],
     "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -18616,6 +18624,7 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx": [
@@ -18741,6 +18750,7 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs",
@@ -18777,7 +18787,8 @@
     "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
+      "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/print/file-source/fileSourceModel.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
@@ -19271,6 +19282,7 @@
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx": [
@@ -19684,6 +19696,7 @@
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx": [
@@ -20033,6 +20046,9 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-visual-evidence-manifest.mjs"
+    ],
+    "apps/kiosk/tests/w1-a-build-mode.test.mjs": [
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/vite.config.ts": [
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs"
@@ -27240,6 +27256,7 @@
           "apps"
         ],
         "files": [
+          "apps/kiosk/src/components/PdfCanvasPreview.tsx",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/print/PdfPreviewFrame.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
@@ -28042,11 +28059,22 @@
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/main.tsx",
+          "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx",
+          "apps/kiosk/src/pages/help/HelpCenterPage.tsx",
+          "apps/kiosk/src/pages/home/components/QxHomeView.tsx",
           "apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts",
+          "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
+          "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx",
+          "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
+          "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
+          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
+          "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/services/api/printScanCapabilities.ts",
           "apps/kiosk/src/services/api/screensaver.ts",
           "apps/kiosk/src/services/print/printJobsApi.ts",
-          "apps/kiosk/src/services/terminalAuth.ts"
+          "apps/kiosk/src/services/terminalAuth.ts",
+          "apps/kiosk/tests/w1-a-build-mode.test.mjs"
         ],
         "missing": []
       },
