@@ -972,7 +972,7 @@ html.flat *::after,html[data-flat="1"] *::after{
     <div class="xq-row">
       <div class="xq-face serif" aria-hidden="true">青</div>
       <div class="xq-main">
-        <div class="xq-eyebrow" id="xq-eyebrow">AI RESUME DIAGNOSE</div>
+        <div class="xq-eyebrow" id="xq-eyebrow">简历诊断</div>
         <div class="xq-ask serif" id="xq-ask">简历这趟，先<em>把文件交给我</em>。</div>
         <div class="xq-doing" id="xq-doing">选一种来源把简历送进来，方向和背景都点选完成。</div>
       </div>
@@ -1582,7 +1582,7 @@ function rail(idx){
 }
 function hero(ask,doing,flag,warn){
   elAsk.innerHTML=ask;elDoing.innerHTML=doing;
-  elEyebrow.textContent=intent==='optimize'?'AI RESUME OPTIMIZE':'AI RESUME DIAGNOSE';
+  elEyebrow.textContent=intent==='optimize'?'简历优化':'简历诊断';
   if(flag){elFlag.hidden=false;elFlag.className='xq-flag'+(warn?' warn':'');elFlag.innerHTML=flag;}
   else{elFlag.hidden=true;elFlag.innerHTML='';}
 }
