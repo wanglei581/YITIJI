@@ -28,12 +28,13 @@ check('no-media branch is not a blank aria-hidden shell', () => {
 })
 
 check('no-media / empty shell still exposes wake copy and screensaver marker', () => {
-  assert.match(source, /触摸屏幕开始使用/)
+  // 稿 00 把唤醒副标题从「触摸屏幕开始使用」换成 AI 能做什么；主句「轻触屏幕，开始办事」仍在。
+  assert.match(source, /轻触屏幕，开始办事/)
+  assert.match(source, /AI 帮你改简历、练面试/)
   assert.match(page, /data-kiosk-screen="screensaver"/)
-  // Must keep an honest shell path that renders wake prompt without requiring mediaUrl.
   assert.match(
     source,
-    /screensaver-wake-prompt[\s\S]{0,240}触摸屏幕开始使用/,
+    /screensaver-wake-prompt[\s\S]{0,240}AI 帮你改简历、练面试/,
   )
   assert.match(page, /role="presentation"/)
 })

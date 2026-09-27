@@ -1,8 +1,7 @@
 // 本机构官方渠道（/official-channels，next-tasks 3.14）。
 //
-// 视觉真值：docs/design/kiosk-redesign-2026-08/45-online-platform-directory.html。沿用稿 45 的目录行
-// （图标字 · 名称与地址 · 右侧出口）；出口从「扫码打开来源平台」按钮换成直接可扫的二维码——一体机不打开
-// 外部网页，这一页只给二维码，不给可点的外链。兜底态是状态块加一组紧凑的去处行（与招聘托管说明页同一套 qx-row），
+// 视觉按青序流光 2.0 稿 45：标题下三步说明，渠道卡给出真实二维码。稿里的示例码不上屏。
+// 一体机不打开外部网页，这一页只给二维码，不给可点的外链。兜底态是状态块加一组紧凑的去处行，
 // 行不吸收余量：只有三项时拉高只会变成一张张空卡。
 //
 // 两种托管状态都渲染（路由在 RecruitmentHostingBoundary 之外）：
@@ -13,15 +12,15 @@
 // 本机没有终端身份按「没有渠道」处理（useOfficialChannels），不当成错误。
 
 import { useNavigate } from 'react-router-dom'
-import { BotIcon, ChevronRightIcon, LandmarkIcon, PrinterIcon, QrCodeIcon, RouteIcon } from 'lucide-react'
+import { BotIcon, ChevronRightIcon, LandmarkIcon, MessageCircleIcon, PrinterIcon, QrCodeIcon, RouteIcon } from 'lucide-react'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { DirNote, DirSec, DirState, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
+import { DirSec, DirState, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import type { OfficialChannelItem } from '../../services/api/officialChannels'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 import '../../components/qingxu/directory/directory-qx.css'
 import './official-channels-qx.css'
 
@@ -75,6 +74,50 @@ function ChannelList({ items, kind }: { items: readonly OfficialChannelItem[]; k
   )
 }
 
+const CHANNEL_ASK_DRAFT = '这个二维码怎么用？请只说明用手机打开的步骤，不要生成岗位。'
+
+function ChannelAsk() {
+  return (
+    <div className="oc-ask">
+      <span className="oc-ask-ic" aria-hidden="true"><MessageCircleIcon size={26} /></span>
+      <div className="oc-ask-copy">
+        <QxStepActions>
+          <QxAiHelp label="问小青：这个码怎么用" draft={CHANNEL_ASK_DRAFT} testId="official-channels-ask" />
+        </QxStepActions>
+        <span className="oc-ask-desc">带走一句用法说明，不生成岗位</span>
+      </div>
+    </div>
+  )
+}
+
+function ChannelBar({
+  view,
+  onHome,
+  onRetry,
+}: {
+  view: View
+  onHome: () => void
+  onRetry: () => void
+}) {
+  // 稿的「返回全部服务」指向服务目录。运行时没有这条路由，首页就是服务入口。
+  return (
+    <div className="oc-cta">
+      <div className="oc-cta-btns">
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>返回全部服务</button>
+        {view === 'error' ? (
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>回首页</button>
+        ) : null}
+        {view === 'error' ? (
+          <button type="button" className="qx-btn" data-variant="primary" onClick={onRetry}>重新读取</button>
+        ) : (
+          <button type="button" className="qx-btn" data-variant="primary" onClick={onHome}>回首页</button>
+        )}
+      </div>
+      <p className="oc-privacy"><b>隐私提示</b>结束这次办理或闲置超时，会清除本机登录和临时信息；文件与订单按实际保留时间管理。</p>
+    </div>
+  )
+}
+
 export function OfficialChannelsPage() {
   const navigate = useNavigate()
   const channels = useOfficialChannels()
@@ -120,22 +163,8 @@ export function OfficialChannelsPage() {
       title="本机构官方渠道"
       subtitle="扫码后在手机上打开本机构的官网或官方公众号。"
       status={status}
-      terminalLabel={getTerminalCode() || '设备未绑定'}
       navbar={<QxAppNavbar onHome={home} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
-      ctabar={view === 'error' ? (
-        <>
-          <p className="why">这次没有读到渠道，可以重新读取一次。</p>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={home}>返回首页</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={channels.retry}>重新读取</button>
-        </>
-      ) : (
-        <>
-          <p className="why">
-            {view === 'loading' ? '读取完成前这里不下结论。' : view === 'items' ? '扫完码就可以离开，不需要在这台机器上再点什么。' : '想办别的事，点上面任一项就行。'}
-          </p>
-          <button type="button" className="qx-btn" data-variant={view === 'loading' ? 'ghost' : 'primary'} onClick={home}>返回首页</button>
-        </>
-      )}
+      ctabar={<ChannelBar view={view} onHome={home} onRetry={channels.retry} />}
     >
       <div className="dw-page qx-grow oc-page" data-kiosk-screen="official-channels" data-state={view} data-density={density}>
         {view === 'loading' ? (
@@ -151,15 +180,20 @@ export function OfficialChannelsPage() {
             {alternatives}
           </>
         ) : null}
+        {items.length + legacy.length > 0 ? (
+          <ol className="oc-steps" aria-label="怎么用这些二维码">
+            <li><b>1</b>用手机对准下面的二维码</li>
+            <li><b>2</b>在你自己的手机上打开</li>
+            <li><b>3</b>办理以该渠道页面为准</li>
+          </ol>
+        ) : null}
         {view === 'items' ? (
           <section className="dw-sec oc-sec" data-testid="official-channels-org" aria-label="本机构官方渠道">
-            {/* 页头已经是「本机构官方渠道」，分区标题写是哪一家机构，不重复页名。 */}
             <div className="dw-sec-h">
               <span className="no">01</span>
               <span className="t">{items[0]?.organizationName}</span>
             </div>
             <ChannelList items={items} kind="org" />
-            <DirNote><b>扫码在你自己的手机上打开。</b>二维码按渠道登记的网址生成，信息与办理以该渠道为准。</DirNote>
           </section>
         ) : null}
         {view === 'empty' ? (
@@ -179,8 +213,13 @@ export function OfficialChannelsPage() {
         ) : null}
         {view === 'empty' ? alternatives : null}
         {view === 'items' ? (
-          <section className="dw-sec oc-assist" data-testid="official-channels-assist" aria-label="还不确定先看什么">
-            <p className="dw-strip-t">还不确定先看什么</p>
+          <section className="dw-sec oc-assist" data-testid="official-channels-assist" aria-label="也可以问小青">
+            <div className="dw-sec-h">
+              <span className="no">{legacy.length > 0 ? '03' : '02'}</span>
+              <span className="t">也可以问小青</span>
+              <span className="hint">只说明这个码怎么用</span>
+            </div>
+            <ChannelAsk />
             <DirStripItem
               icon={RouteIcon}
               title="AI 求职方向探索"

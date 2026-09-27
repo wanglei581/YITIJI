@@ -31,19 +31,88 @@
 }
 .oc-card[data-channel-kind='legacy'] .oc-card-ic { color: var(--qx-slate-d); background: var(--qx-slate-soft); }
 .oc-card-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.oc-card-kicker { font-size: 16px; font-weight: 600; letter-spacing: 1px; color: var(--qx-ink-3); }
-.oc-card-name { margin: 0; font-size: 29px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
-.oc-card-host { font-size: 20px; color: var(--qx-ink-2); overflow-wrap: anywhere; }
+.oc-card-kicker { font-size: var(--qx-fs-aux); font-weight: 600; letter-spacing: 1px; color: var(--qx-ink-3); }
+.oc-card-name { margin: 0; font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.oc-card-host { font-size: var(--qx-fs-body); color: var(--qx-ink-2); overflow-wrap: anywhere; }
 /* 来源说明放不下一行时只在「，」处断（keep-all：Chromium 实测不在汉字之间断），不把「为准」拆成孤字挂到下一行；
  * 前半句自己就放不下（手机、机构名很长）才由 anywhere 兜底。 */
 .oc-caption {
   margin: 10px 0 0; padding-top: 12px; border-top: 1px dashed var(--qx-line-2);
-  font-size: 18px; line-height: 1.5; color: var(--qx-ink-2);
+  font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); color: var(--qx-ink-2);
   word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty;
 }
 .oc-qr { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .oc-qr-code svg { display: block; width: var(--oc-qr); height: var(--oc-qr); }
-.oc-qr-hint { display: inline-flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; color: var(--qx-teal-d); }
+.oc-qr-hint { display: inline-flex; align-items: center; gap: 8px; font-size: var(--qx-fs-aux); font-weight: 600; color: var(--qx-teal-d); }
+.oc-page .dw-sec-h .t { font-size: var(--qx-fs-sec); }
+.oc-page .dw-sec-h .no,
+.oc-page .dw-sec-h .hint { font-size: var(--qx-fs-aux-lg); }
+/* 共享 .dw-stripitem span 是 17px，低于 --qx-fs-aux。这一区提到辅助字以上。 */
+.oc-page .oc-assist .dw-stripitem b { font-size: var(--qx-fs-btn); }
+.oc-page .oc-assist .dw-stripitem .si-tx > span {
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.4;
+  color: var(--qx-ink-2);
+}
+.oc-ask {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 96px;
+  padding: 12px 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+}
+.oc-ask-ic {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--qx-teal-d);
+  background: var(--qx-teal-soft);
+}
+.oc-ask-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.oc-page .oc-ask .qx-step-actions { min-height: 0; justify-content: flex-start; }
+.oc-page .oc-ask .qx-ai-help {
+  margin: 0;
+  padding: 0;
+  min-height: 48px;
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  font-size: var(--qx-fs-btn);
+  font-weight: 700;
+}
+.oc-ask-desc { font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-2); }
+.qx-stage:has(.oc-page) > .qx-ctabar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-top: 12px;
+  padding-bottom: 10px;
+}
+.oc-cta { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.oc-cta-btns { display: flex; gap: 14px; }
+.oc-cta-btns .qx-btn { flex: 1; min-height: var(--qx-btn-h); }
+.oc-cta-btns .qx-btn[data-variant='primary'] { flex: 1.6; min-height: var(--qx-btn-h-lg); }
+.oc-privacy { margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.oc-privacy b { margin-right: 8px; color: var(--qx-ink); font-weight: 700; }
+.oc-steps { display: flex; gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
+.oc-steps li {
+  flex: 1; padding-top: 8px; border-top: 2px solid var(--qx-line);
+  font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink);
+}
+.oc-steps b { display: block; margin-bottom: 4px; font-family: var(--qx-serif); font-size: var(--qx-fs-btn); color: var(--qx-teal-d); line-height: 1.2; }
+.oc-page[data-density='roomy'] { --oc-qr: 460px; }
+.oc-page[data-density='roomy'] .oc-card {
+  grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 28px 36px 32px;
+}
+.oc-page[data-density='roomy'] .oc-card-main { align-items: center; }
+.oc-page[data-density='roomy'] .oc-card-ic { display: none; }
 
 /* 手机与窄桌面：舞台不缩放、按真实宽度排版（与 shell.css 同样只作用于 data-kiosk-stage-fit="off"）。
  * 整页纵向滚动，二维码换到名称下面整行居中；触控目标仍 ≥48px，按钮 ≥56px。 */
@@ -75,6 +144,12 @@
   [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem .si-ic { width: 48px; height: 48px; border-radius: 14px; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem b { font-size: 19px; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem .si-tx span { margin-top: 4px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem b,
+  [data-kiosk-stage-fit='off'] .oc-page .oc-ask .qx-ai-help { font-size: 21px; }
+  [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem .si-tx > span,
+  [data-kiosk-stage-fit='off'] .oc-ask-desc { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .oc-cta-btns { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .oc-privacy { font-size: 15px; }
   /* 去处行在手机上收到 88px（与 .rh-off-actions 的手机档一致）。 */
   [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row { min-height: 88px; gap: 12px; padding: 12px 14px; }
   [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row-ic { width: 44px; height: 44px; }
@@ -87,7 +162,13 @@
   [data-kiosk-stage-fit='off'] .oc-card-kicker { font-size: 13px; }
   [data-kiosk-stage-fit='off'] .oc-card-name { font-size: 21px; }
   [data-kiosk-stage-fit='off'] .oc-card-host { font-size: 15px; }
-  [data-kiosk-stage-fit='off'] .oc-caption { margin-top: 6px; padding-top: 8px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-caption { margin-top: 6px; padding-top: 8px; font-size: var(--qx-fs-aux); }
   [data-kiosk-stage-fit='off'] .oc-qr { grid-column: 1 / -1; }
-  [data-kiosk-stage-fit='off'] .oc-qr-hint { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-qr-hint { font-size: var(--qx-fs-aux); }
+  [data-kiosk-stage-fit='off'] .oc-steps { flex-direction: column; }
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card {
+    grid-template-columns: 52px minmax(0, 1fr); justify-items: stretch; text-align: left; padding: 16px;
+  }
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-main { align-items: flex-start; }
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-ic { display: flex; }
 }

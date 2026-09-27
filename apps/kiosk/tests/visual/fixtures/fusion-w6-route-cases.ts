@@ -87,7 +87,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/interview/report', url: '/interview/report', expectedPath: '/interview', marker: screen('interview-report'), featureText: '报告不存在或已过期' },
   { pattern: '/interview/tips', url: '/interview/tips', expectedPath: '/interview', marker: screen('interview-tips'), featureText: '面试' },
   { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '练习报告' },
-  { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '触摸屏幕开始使用', landmark: 'presentation', seed: seedScreensaver },
+  { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '轻触屏幕，开始办事', landmark: 'presentation', seed: seedScreensaver },
   { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   // 2026-09-25 迁入稿 09-system-state：锚点换成稿里常驻的八项状态区块标题（旧页标题「网络连接中断」已随稿替换）。
   { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '这台机器的八项状态' },
