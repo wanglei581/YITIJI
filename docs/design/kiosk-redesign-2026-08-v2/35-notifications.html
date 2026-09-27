@@ -235,10 +235,10 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 规则 1：头图只读；全部 / 未读和每条上的按钮落在头图下面。
 规则 2：页标题 36，消息标题 26，正文 22，主按钮 26，次按钮不低于 56。
 规则 3：写明打开消息能去看哪一单、哪一条反馈。
-规则 4：英文眉题改为「消息通知」；工程词改为实际记录和这次办理。
+规则 4：英文眉题改为「消息通知」；工程词改为实际记录和这次办理。头图只留副标题这一句边界，不再加六格说明。
 规则 7：底部增加「问小青」，原有「查看相关反馈」保留。
-列表：每条按内容高度，末尾有「加载更多」。
-未改：颜色令牌、圆角、深绿头图、三 Tab、消息分类。
+列表在中间自己滚动，末尾有「加载更多」。底部说明卡和操作条留在原稿位置，1080×1920 首屏能看到「返回我的」和「全部标记为已读」。
+未改：颜色令牌、圆角、深绿头图高度、三 Tab、消息分类。
 -->
 <style id="qx2">
 #stage{font-size:22px;line-height:1.45}
@@ -247,10 +247,6 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .xq-eyebrow{font-size:21px!important;letter-spacing:1px!important;color:rgba(242,239,228,.92)!important}
 .xq-ask{font-size:36px!important;line-height:1.28!important}
 .xq-doing{font-size:22px!important;line-height:1.45!important;color:rgba(242,239,228,.94)!important}
-.xq{padding-bottom:36px!important}
-.xq .qx-take{position:relative;z-index:1;margin:20px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px 16px}
-.xq .qx-take li{min-height:78px;padding-top:12px;border-top:1px solid rgba(242,239,228,.35);font-size:21px;line-height:1.35;color:rgba(242,239,228,.94)}
-.xq .qx-take b{display:block;margin-bottom:2px;color:var(--green);font-size:22px;font-family:"Songti SC","STSong","SimSun",serif;font-weight:700}
 .banner-t,.summary-main strong{font-size:30px!important}
 .banner-p,.summary-main span,.summary-main b{font-size:22px!important;color:var(--ink2)!important}
 .banner-mini i,.summary-mini i{font-size:21px!important}
@@ -274,11 +270,9 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .cap-t{font-size:26px!important}
 .btn{font-size:26px!important;min-height:72px!important}
 .nav-item{font-size:21px!important}
-.list,.list>.row,.list>.qx-more,.thread,.detail-scroll,.caps{flex:0 0 auto!important;max-height:none!important}
-.list{overflow:visible!important;min-height:0!important}
-.thread{min-height:0!important}
-#stage>.body{display:flex!important;flex-direction:column!important;flex:1 1 0px!important;min-height:0!important;overflow-x:hidden!important;overflow-y:auto!important}
-.truth{height:auto!important;min-height:64px;padding:12px 44px!important;align-items:flex-start}
+.list{min-height:0!important;overflow-y:auto!important}
+.list>.row,.list>.qx-more{flex:0 0 auto!important;max-height:none!important}
+.truth{height:auto!important;min-height:58px;padding:8px 44px!important;align-items:center}
 .qx-more{min-height:56px;width:100%;margin-top:4px;padding:0 18px;border-radius:18px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;text-align:center;font-size:22px;font-weight:750;flex:none;cursor:pointer}
 .demo-tab,.demo-panel{display:none!important}
 </style>
@@ -300,7 +294,6 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
       <div class="xq-doing" id="doing">只显示<b>本人的打印、AI、文件与系统消息</b>；本页没有实时推送。</div>
     </div>
   </div>
-  <ol class="qx-take"><li><b>带走</b>哪一单有变化，打开就能去看</li><li><b>不推送</b>进这一页才更新，没有弹窗</li><li><b>只给你</b>别人的消息不会留在这台上</li><li><b>已读</b>看完可以标已读，删了就没了</li><li><b>反馈</b>只有和反馈有关的那条能点进去</li><li><b>问小青</b>看不懂就问，小青帮你看这条</li></ol>
 </section>
 
   <main class="body" id="body-root" data-screen="notifications" data-state="login" data-testid="notifications-state-login" data-compat="0" data-route-alias="/me/notifications" aria-live="polite"></main>

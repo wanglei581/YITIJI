@@ -251,12 +251,12 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 青序流光 2.0 · 39 我的简历 / 收藏 / AI 记录 / 足迹（view=ai-records&state=ready）
 规则 1：四个分类在只读头图下面。
 规则 2：页标题 36，行标题 26，正文 22，行内按钮 22 且不低于 56。
-规则 3：AI 记录每行有「打开」「接着打印」，写明带走反馈或纸质件。
-规则 4：英文眉题改中文；工程词不出现在画面上。
+规则 3：已完成的 AI 记录保留「打开」「接着打印」；处理中和失败不给这两个按钮，改成一句原因，「删除」保留。
+规则 4：英文眉题改中文；工程词不出现在画面上。头图只留副标题这一句边界，不再加六格说明。
 规则 5：收藏和足迹里的旧入口改为政策和机构官方渠道。
-规则 7：打开进对应的 AI 结果页；底部仍可去 AI 简历服务。
-列表：行高随内容，末尾有「加载更多」。空态改成正常说法。
-未改：颜色令牌、圆角、深绿头图、三 Tab、四个分类的结构。
+规则 7：已完成的记录打开进对应的 AI 结果页；底部仍可去 AI 简历服务。
+列表在中间自己滚动，末尾有「加载更多」。操作条留在原稿位置，1080×1920 首屏能看到「返回我的」和「去 AI 简历服务」。
+未改：颜色令牌、圆角、深绿头图高度、三 Tab、四个分类的结构。
 -->
 <style id="qx2">
 #stage{font-size:22px;line-height:1.45}
@@ -265,10 +265,6 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .xq-eyebrow{font-size:21px!important;letter-spacing:1px!important;color:rgba(242,239,228,.92)!important}
 .xq-ask{font-size:36px!important;line-height:1.28!important}
 .xq-doing{font-size:22px!important;line-height:1.45!important;color:rgba(242,239,228,.94)!important}
-.xq{padding-bottom:36px!important}
-.xq .qx-take{position:relative;z-index:1;margin:20px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px 16px}
-.xq .qx-take li{min-height:78px;padding-top:12px;border-top:1px solid rgba(242,239,228,.35);font-size:21px;line-height:1.35;color:rgba(242,239,228,.94)}
-.xq .qx-take b{display:block;margin-bottom:2px;color:var(--green);font-size:22px;font-family:"Songti SC","STSong","SimSun",serif;font-weight:700}
 .banner-t,.summary-main strong{font-size:30px!important}
 .banner-p,.summary-main span,.summary-main b{font-size:22px!important;color:var(--ink2)!important}
 .banner-mini i,.summary-mini i{font-size:21px!important}
@@ -292,11 +288,15 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .cap-t{font-size:26px!important}
 .btn{font-size:26px!important;min-height:72px!important}
 .nav-item{font-size:21px!important}
-.list,.list>.row,.list>.qx-more,.thread,.detail-scroll,.caps{flex:0 0 auto!important;max-height:none!important}
-.list{overflow:visible!important;min-height:0!important}
-.thread{min-height:0!important}
-#stage>.body{display:flex!important;flex-direction:column!important;flex:1 1 0px!important;min-height:0!important;overflow-x:hidden!important;overflow-y:auto!important}
-.truth{height:auto!important;min-height:64px;padding:12px 44px!important;align-items:flex-start}
+.list{min-height:0!important;overflow-y:auto!important}
+.list>.row,.list>.qx-more{flex:0 0 auto!important;max-height:none!important}
+.body.list-layout{grid-template-rows:auto auto minmax(0,1fr) auto auto!important}
+.body.list-layout.has-toast{grid-template-rows:auto auto auto minmax(0,1fr) auto auto!important}
+.body.list-layout .list{gap:8px;padding:10px 14px}
+.body.list-layout .list>.row{padding-top:10px!important;padding-bottom:10px!important;min-height:0!important}
+.body.list-layout .qx-foot{margin:0}
+.reason.qx-block{display:block;margin-top:6px;color:var(--wheat2)!important;font-weight:700}
+.truth{height:auto!important;min-height:58px;padding:8px 44px!important;align-items:center}
 .qx-more{min-height:56px;width:100%;margin-top:4px;padding:0 18px;border-radius:18px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;text-align:center;font-size:22px;font-weight:750;flex:none;cursor:pointer}
 .demo-tab,.demo-panel{display:none!important}
 </style>
@@ -318,7 +318,6 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
       <div class="xq-doing" id="doing">未登录不展示任何个人内容。</div>
     </div>
   </div>
-  <ol class="qx-take"><li><b>带走</b>打开一条记录，需要就接着打印</li><li><b>简历</b>诊断和生成的版本在「简历」</li><li><b>AI</b>面试反馈和规划在「AI记录」</li><li><b>只给你</b>退出后这台机器不留明细</li><li><b>收藏</b>政策和机构渠道可以再打开</li><li><b>问小青</b>某条看不懂，让小青讲给你</li></ol>
 </section>
 
   <nav class="viewtabs" id="viewtabs" aria-label="我的记录分类"></nav>
@@ -644,6 +643,11 @@ var AI_RECORDS = [
   {id:'r3', kind:'career_plan', label:'职业规划建议', hint:'阶段性行动建议记录', status:'completed', ico:'route', tone:'wheat'}
 ];
 var AI_STATUS = {pending:['待处理','wait'],processing:['处理中','run'],completed:['已完成',''],failed:['失败','bad']};
+function aiBlockedWhy(status){
+  if(status==='failed') return '这次没有生成成功，可以重新办理';
+  if(status==='processing' || status==='pending') return '还在处理，完成后可以打开';
+  return '';
+}
 function aiUse(scope, rowId, kind){
   var open = kind==='parse' ? '22-resume-report.html?state=report'
     : kind==='optimize' ? '23-resume-optimize.html?state=ready'
@@ -669,24 +673,31 @@ function aiDeleteControls(scope, rowId, mode, target){
 }
 function aiSessionRow(s, mode, target){
   var st = AI_STATUS[s.status];
+  var why = aiBlockedWhy(s.status);
+  var use = why ? '' : aiUse('session', s.id, s.id==='s1'?'interview':'plan');
   return '<div class="row'+(mode==='delete-confirm'&&target&&target.scope==='session'&&target.id===s.id?' flag':'')+'" data-record-kind="job-ai-session" data-record-status="'+s.status+'">'
     +'<span class="row-ico '+s.tone+'">'+svg(s.ico)+'</span>'
     +'<span class="row-main"><span class="row-head"><span class="chip">'+s.op+'</span><span class="st '+st[1]+'">'+st[0]+'</span></span>'
-    +'<span class="row-title" style="margin-top:8px;display:block">'+s.hint+'</span></span>'
-    +'<span class="acts">'+aiUse('session', s.id, s.id==='s1'?'interview':'plan')+aiDeleteControls('session', s.id, mode, target)+'</span></div>';
+    +'<span class="row-title" style="margin-top:8px;display:block">'+s.hint+'</span>'
+    +(why?'<span class="reason qx-block">'+why+'</span>':'')
+    +'</span>'
+    +'<span class="acts">'+use+aiDeleteControls('session', s.id, mode, target)+'</span></div>';
 }
 function aiRecordRow(r, mode, target){
   var st = AI_STATUS[r.status];
   var isTarget = target && target.scope==='record' && target.id===r.id;
   var expired = mode==='delete-expired' && isTarget;
+  var why = aiBlockedWhy(r.status);
+  var use = why ? '' : aiUse('record', r.id, r.kind);
   return '<div class="row'+(mode==='delete-confirm'&&isTarget?' flag':'')+'" data-record-kind="'+r.kind+'" data-record-status="'+r.status+'"'+(expired?' data-confirm-window="expired"':'')+'>'
     +'<span class="row-ico '+r.tone+'">'+svg(r.ico)+'</span>'
     +'<span class="row-main"><span class="row-head"><span class="chip">'+r.label+'</span><span class="st '+st[1]+'">'+st[0]+'</span></span>'
     +'<span class="row-title" style="margin-top:8px;display:block">'+r.hint+'</span>'
+    +(why?'<span class="reason qx-block">'+why+'</span>':'')
     +(mode==='delete-confirm'&&isTarget&&r.cascade?'<span class="reason">删除这条诊断记录时，系统会同时删除同一任务的派生记录与AI 使用记录。</span>':'')
     +(expired?'<span class="reason">上一次确认已超时失效，删除未执行；需要重新点击删除。</span>':'')
     +'</span>'
-    +'<span class="acts">'+aiUse('record', r.id, r.kind)+aiDeleteControls('record', r.id, mode, target)+'</span></div>';
+    +'<span class="acts">'+use+aiDeleteControls('record', r.id, mode, target)+'</span></div>';
 }
 function aiRecordsBody(mode){
   /* 被删目标固定为简历诊断记录 r1：系统删 parse 会级联同任务派生记录（r2）与该简历任务的AI 使用记录（s1）。 */
@@ -713,8 +724,8 @@ function aiRecordsBody(mode){
     + (sessions.length?'<div class="legal">AI 办理记录 · 只显示名称和状态，不显示原文</div>'+sessions.map(function(s){return aiSessionRow(s, mode, target);}).join(''):'')
     + (records.length?'<div class="legal">简历与规划 · 只显示名称和状态，不显示原文</div>'+records.map(function(r){return aiRecordRow(r, mode, target);}).join(''):'')
     + '<button type="button" class="qx-more" data-testid="member-records-ai-more">加载更多</button>'
-    + '<div class="'+noteCls+'">'+noteText+'</div>'
     + '</section>'
+    + '<div class="'+noteCls+' qx-foot">'+noteText+'</div>'
     + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile'),
               link('去 AI 简历服务','16-service-hubs.html?hub=resume','/resume-service',SCREEN+'-primary',{primary:true,icon:'spark'})]);
 }

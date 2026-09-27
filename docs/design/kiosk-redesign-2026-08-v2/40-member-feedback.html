@@ -290,10 +290,10 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 规则 1：分类和提交在只读头图下面。
 规则 2：页标题 36，行标题 26，正文 22，主按钮 26。
 规则 3：写明提交后能看到处理进度。
-规则 4：英文眉题改为「意见反馈」；工程词改成人话。
+规则 4：英文眉题改为「意见反馈」；工程词改成人话。头图只留副标题这一句边界，不再加六格说明。
 规则 7：底部增加「问小青：怎么写」。
-列表：工单按内容高度，末尾有「加载更多」。沟通记录不再撑满整屏。
-未改：颜色令牌、圆角、深绿头图、三 Tab、四类反馈。
+列表在中间自己滚动，末尾有「加载更多」。沟通记录不再撑满整屏。未填够时「提交反馈」灰掉，并在按钮上写原因。1080×1920 首屏能看到回退、「问小青：怎么写」和「提交反馈」。
+未改：颜色令牌、圆角、深绿头图高度、三 Tab、四类反馈。
 -->
 <style id="qx2">
 #stage{font-size:22px;line-height:1.45}
@@ -302,10 +302,6 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .xq-eyebrow{font-size:21px!important;letter-spacing:1px!important;color:rgba(242,239,228,.92)!important}
 .xq-ask{font-size:36px!important;line-height:1.28!important}
 .xq-doing{font-size:22px!important;line-height:1.45!important;color:rgba(242,239,228,.94)!important}
-.xq{padding-bottom:36px!important}
-.xq .qx-take{position:relative;z-index:1;margin:20px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px 16px}
-.xq .qx-take li{min-height:78px;padding-top:12px;border-top:1px solid rgba(242,239,228,.35);font-size:21px;line-height:1.35;color:rgba(242,239,228,.94)}
-.xq .qx-take b{display:block;margin-bottom:2px;color:var(--green);font-size:22px;font-family:"Songti SC","STSong","SimSun",serif;font-weight:700}
 .banner-t,.summary-main strong{font-size:30px!important}
 .banner-p,.summary-main span,.summary-main b{font-size:22px!important;color:var(--ink2)!important}
 .banner-mini i,.summary-mini i{font-size:21px!important}
@@ -329,14 +325,20 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .cap-t{font-size:26px!important}
 .btn{font-size:26px!important;min-height:72px!important}
 .nav-item{font-size:21px!important}
-.list,.list>.row,.list>.qx-more,.thread,.detail-scroll,.caps{flex:0 0 auto!important;max-height:none!important}
-.list{overflow:visible!important;min-height:0!important}
+.list{min-height:0!important;overflow-y:auto!important}
+.list>.row,.list>.qx-more{flex:0 0 auto!important;max-height:none!important}
+.body.form-layout{grid-template-rows:auto auto minmax(0,1fr) auto auto!important}
+.body.form-layout.has-toast{grid-template-rows:auto auto auto minmax(0,1fr) auto auto!important}
+.body.form-layout>.card{padding:16px 20px!important}
+.body.form-layout .pick{min-height:72px!important;padding:6px 8px!important}
+.body.form-layout .list>.row{padding-top:10px!important;padding-bottom:10px!important;min-height:0!important}
+.body.form-layout .qx-foot{margin:0}
+#f-content{min-height:72px!important;height:72px!important}
 .thread{min-height:0!important}
-#stage>.body{display:flex!important;flex-direction:column!important;flex:1 1 0px!important;min-height:0!important;overflow-x:hidden!important;overflow-y:auto!important}
-.truth{height:auto!important;min-height:64px;padding:12px 44px!important;align-items:flex-start}
+.truth{height:auto!important;min-height:58px;padding:8px 44px!important;align-items:center}
 .qx-more{min-height:56px;width:100%;margin-top:4px;padding:0 18px;border-radius:18px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;text-align:center;font-size:22px;font-weight:750;flex:none;cursor:pointer}
-#f-content{min-height:88px!important;height:88px!important}
-.xq .qx-take li:nth-child(n+4){display:none}
+.btn.qx-hold{flex-direction:column;gap:2px;line-height:1.25;padding-top:8px;padding-bottom:8px}
+.btn.qx-hold small{font-size:21px;font-weight:700;color:#2c332c;letter-spacing:0}
 .demo-tab,.demo-panel{display:none!important}
 </style>
 </head>
@@ -357,7 +359,6 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
       <div class="xq-doing" id="doing">登录后提交的是<b>本人工单</b>，可以查看进度、追加描述和关闭。</div>
     </div>
   </div>
-  <ol class="qx-take"><li><b>带走</b>说清哪一页、点了什么</li><li><b>进度</b>提交后能看到处理到哪</li><li><b>只给你</b>别人的反馈不会留在这台上</li><li><b>不限时</b>不承诺什么时候回复</li><li><b>另一条</b>打印完成页也可以不登录就说</li><li><b>问小青</b>不知道怎么写，可以先问</li></ol>
 </section>
 
   <main class="body" id="body-root" data-screen="member-feedback" data-state="login" data-testid="member-feedback-state-login" aria-live="polite"></main>
@@ -435,6 +436,16 @@ function link(label, target, route, testid, opts){
 }
 function deadBtn(label, reason, testid, primary){
   return '<span class="btn'+(primary?' primary':'')+'" aria-disabled="true" aria-label="'+esc(label+'（'+reason+'）')+'" data-testid="'+testid+'">'+label+'</span>';
+}
+function submitWhy(n, cat, phoneOk){
+  if(!cat && n<10) return '请先选择分类，并写满 10 个字';
+  if(!cat) return '请先选择一个分类';
+  if(n<10) return '请再写满 10 个字';
+  if(!phoneOk) return '联系电话需为 11 位大陆手机号，或留空';
+  return '';
+}
+function holdSubmit(why){
+  return '<span class="btn primary qx-hold" id="f-submit" data-testid="'+SCREEN+'-primary" aria-disabled="true" aria-label="提交反馈（'+esc(why)+'）">'+svg('send')+'<span>提交反馈</span><small>'+esc(why)+'</small></span>';
 }
 /* 状态横幅：横向排布，不再把一张小卡片摊在整屏中央 */
 function banner(tone, ico, title, desc, minis){
@@ -530,14 +541,14 @@ function listCard(){
     + fixtureNote()
     + TICKETS.map(function(t){ return ticketRow(t, false); }).join('')
     + '<button type="button" class="qx-more" data-testid="member-feedback-more">加载更多</button>'
-    + '<div class="list-foot legal">列表只显示本人工单；免登录提交的一体机问题反馈不会出现在这里，也无法在本页查看或追加。</div>'
-    + '</section>';
+    + '</section>'
+    + '<div class="list-foot legal qx-foot">列表只显示本人工单；免登录提交的一体机问题反馈不会出现在这里，也无法在本页查看或追加。</div>';
 }
 function formBody(state, related){
   var busy = state==='submit-busy';
   var primary = busy
     ? deadBtn('正在提交…（界面示例）','界面示例：本页没有向系统提交任何内容，也没有生成工单',SCREEN+'-primary', true)
-    : '<span class="btn primary" id="f-submit" data-testid="'+SCREEN+'-primary" aria-disabled="true" aria-label="提交反馈（请先选择分类，并填写至少 10 个字的反馈内容）">'+svg('send')+'提交反馈</span>';
+    : holdSubmit('请先选择分类，并写满 10 个字');
   return summaryBlock(TICKETS.length, true)
     + formCard(related, busy)
     + listCard()
@@ -550,7 +561,7 @@ function listEmptyBody(){
         '还没有提交过反馈，所以这里是空的。<b>提交之后</b>，工单会按上面的分类出现在这一页，可以查看状态、追加描述或关闭。',
         '还没有反馈记录 · 可提交的分类')
     + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
-        '<span class="btn primary" id="f-submit" data-testid="'+SCREEN+'-primary" aria-disabled="true" aria-label="提交反馈（请先选择分类，并填写至少 10 个字的反馈内容）">'+svg('send')+'提交反馈</span>']);
+        holdSubmit('请先选择分类，并写满 10 个字')]);
 }
 
 /* ── 详情 ─────────────────────────────────────────────────── */
@@ -734,12 +745,16 @@ function bindLocalForm(){
     if(counter) counter.textContent = content.value.length + ' / 500';
     var ready = n >= 10 && categoryChosen() && phoneOk;
     var enabled = current.tagName === 'A';
-    // 未达标：不可点的 span，不带 href（禁用态不留可跳落点）。
+    var why = submitWhy(n, categoryChosen(), phoneOk);
+    // 未达标：不可点的 span，不带 href（禁用态不留可跳落点），按钮上写明原因。
     if(ready && !enabled){
       current.outerHTML = '<a class="btn primary press" href="'+href('submit-busy')+'" data-route="/me/feedback" data-testid="'+SCREEN+'-primary" id="f-submit" aria-label="提交反馈">'+svg('send')+'提交反馈</a>';
     } else if(!ready && enabled){
-      var why = !categoryChosen() ? '请先选择一个分类' : n < 10 ? '反馈内容至少填写 10 个字' : '联系电话需填写 11 位大陆手机号，或留空';
-      current.outerHTML = '<span class="btn primary" id="f-submit" data-testid="'+SCREEN+'-primary" aria-disabled="true" aria-label="提交反馈（'+why+'）">'+svg('send')+'提交反馈</span>';
+      current.outerHTML = holdSubmit(why);
+    } else if(!ready){
+      var small = current.querySelector('small');
+      if(small) small.textContent = why;
+      current.setAttribute('aria-label', '提交反馈（'+why+'）');
     }
   }
   var content = document.getElementById('f-content');
