@@ -16,7 +16,7 @@
   真话边界（本批次修复要点）：
     ① ready 的每一行都是**办理后显示结构位**：文件名、格式页数、时间、留存期限、订单状态一律不写死，
        不出现任何看起来像真实账号的文件名、订单号或状态结论。
-    ② 数量与筛选计数在接口返回前一律显示「—」，不拿上一次的数字冒充当前账号。
+    ② 数量与筛选计数在系统返回前一律显示「—」，不拿上一次的数字冒充当前账号。
     ③ 登录 / 加载 / 空 / 失败四态都保留完整的任务结构（两域切换 + 分类 + 行结构 + 下一步），
        不做「一张小卡片 + 大片空白」。
     ④ 结束这次办理只清除本机登录状态和这一次的临时信息；已提交到系统的订单与文件按各自留存期限管理。
@@ -24,7 +24,7 @@
     普通 URL 默认 documents-login；ready 排版示例（结构位列表 + 分类计数 + 演示提示条）
     只在 ?debug=1 下渲染。普通这次办理请求 documents-ready / orders-ready 一律按域降级到
     documents-login / orders-login，域不变、只降到该域的登录态，不静默换到另一个域。
-  验收范围：静态版式；不证明 React 接线、接口可用或真实账号数据。
+  验收范围：静态版式；不证明 React 接线、系统可用或真实账号数据。
 -->
 <style>
 :root{
@@ -345,8 +345,8 @@ function accessState(suffix, intent){
     guide('error')+ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
   return {layout:'state',html:
     banner('calm','info',isPrint?'打印凭证已就绪':'预览链接已就绪',isPrint
-      ? '真实 React 会把 <b>fileId、printFileUrl 与默认打印参数</b>通过路由内存态交给打印确认页；这些值不进地址栏。'
-      : '真实 React 会在当前页面打开短期预览链接；关闭预览后仍停留在本人文档列表。',['用途：'+action,'短期有效'])+
+      ? '文件编号、打印凭证和默认打印参数会交给打印确认页；<b>这些内容不出现在地址栏</b>。'
+      : '会在当前页面打开短期预览链接；关闭预览后仍停留在本人文档列表。',['用途：'+action,'短期有效'])+
     listWrap(readyRow('documents',0),isPrint?'进入打印确认后仍会重新报价；此刻还没有订单。':'预览只读，不改变文件保存期限。','访问链接交接成功')+
     guide('ready-documents')+ctaBar([back,isPrint
       ? link('进入打印确认','14-print-confirm.html?state=quoted','/print/confirm',SCREEN+'-primary',{primary:true,icon:'print'})
@@ -399,7 +399,7 @@ function slotRow(kind, i, mode){
 }
 /* ── ready 的结果位：四行不是四条同款骨架，而是四个**不同角色**的结果位。
    角色（最近保存 / 生成的材料 / 扫描件 / 已签章文件；进行中 / 计费待确认 / 已完成 / 已结束）
-   是结构分类，不是任何一条真实记录；每个角色的字段组合与可用动作各不相同，值一律办理后显示。 */
+   是结构分类，不是任何一条真实记录；每个角色的内容组合与可用动作各不相同，值一律办理后显示。 */
 var READY_ROLES = {
   documents:[
     {role:'最近保存', tone:'', ico:'doc', title:'文件名 · 办理后显示', subs:['格式与页数','保存时间','留存期限'], act:'print'},
@@ -447,7 +447,7 @@ function listWrap(inner, foot, label){
   return '<section class="list" data-testid="'+SCREEN+'-list" aria-label="'+esc(label)+'">'+inner
     + '<div class="list-foot">'+foot+'</div></section>';
 }
-/* 分类计数一律显示「—」：接口没返回之前不写任何数字，也不拿排版行数冒充真实数量 */
+/* 分类计数一律显示「—」：系统没返回之前不写任何数字，也不拿排版行数冒充真实数量 */
 function chips(kind, filter){
   var d = DOMAIN[kind];
   return '<div class="chips" role="group" aria-label="'+esc(d.label)+'分类">'+d.filters.map(function(f){
@@ -519,14 +519,14 @@ function viewFor(kind, suffix, filter){
   if(suffix==='error'){
     return {layout:'state', html:
       banner('warn','warn', (docs?'文档':'订单')+'这次没有加载出来',
-        '当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以字段一律显示「—」；已有的文件和订单不会因为这次失败而消失。', ['共 —','本次未取到'])
+        '当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以每一项一律显示「—」；已有的文件和订单不会因为这次失败而消失。', ['共 —','本次未取到'])
       + listWrap([0,1,2,3].map(function(i){return slotRow(kind,i,'error');}).join(''),
           '重试不会重复创建订单，也不会改动已有文件。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的列表结构')
       + guide('error')
       + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
                 link('重新加载', href(kind+'-loading'), d.route, SCREEN+'-primary',{primary:true,icon:'refresh'})])};
   }
-  /* ready：主内容优先，四行是四类**结果位**（角色不同、字段组合不同），值一律办理后显示 */
+  /* ready：主内容优先，四行是四类**结果位**（角色不同、内容组合不同），值一律办理后显示 */
   return {layout:'ready', html:
     fixtureNote(docs
       ? '结构演示：下面四行是「最近保存 / 生成的材料 / 扫描件 / 已签章文件」四类结果位，文件名、时间与留存期限都由办理后显示，本页不显示任何真实账号数据。'

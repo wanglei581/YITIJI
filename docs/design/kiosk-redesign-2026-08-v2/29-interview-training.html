@@ -5,11 +5,11 @@
      时长取值只有 3/5/8（与 shared 的 InterviewDuration 一致）。
      简历来源三条通道（手机扫码冻结入口 / U 盘 / 本机文件桌面验证）作为 setup-resume-* 子状态，
      面板内切换只重绘该面板并 replaceState，不刷新页面，因此已填的岗位 / 行业不会丢。
-     打印出口：report-print-ready（服务端已返回真实文件）→ report-print-handoff（摊开交接内容）
+     打印出口：report-print-ready（系统已返回真实文件）→ report-print-handoff（摊开交接内容）
      → 14-print-confirm.html?source=interview-report&fileId=&pages=&copies=&duplex=&color=。
      交接内容对齐 InterviewReportPage.handlePrint：正式 React 用 navigate('/print/confirm',{state:{file,params}})
      传真实 file 对象与 makePrintParams，printFileUrl 与 signedUrl 一律不进地址栏；
-     本页静态跳转只带非敏感的 fileId / 页数 / 打印参数 / 来源，用来说明交接内容，不是已接通的打印链路。
+     本页静态跳转只带非敏感的 fileId / 页数 / 打印参数 / 来源，用来说明交接内容，不是已接通的打印流程。
      未拿到真实文件前不进入打印确认，也不显示取件码 / 出纸 / 支付结果。 -->
 <!-- 原型演示控制：默认完全不渲染；仅 ?debug=1 注入演示按钮与面板（data-proto-control="true"），面板链接保留 debug=1 及现有 flat/capture -->
 <link rel="stylesheet" href="../kiosk-redesign-2026-08/kimi-full-coverage-v2/design-system/kiosk-motion.css"><style>
@@ -54,6 +54,11 @@
 .field b,.step b,.opt .t b,.history-row b,.res-tab b,.faq-row button{font-size:24px!important}
 .res-btn,.history-action{font-size:21px!important}
 .demo-tab,.demo-panel{display:none!important}
+.chip,.chip.on{font-size:20px!important}
+.pvpage>span{font-size:20px!important;line-height:1.25}
+.qstep>i{font-size:20px!important}
+.history-row small,.question small,.rp-h>span,.qrfake,#scrollcue,.filerow>i{font-size:20px!important;line-height:1.3}
+#ans-count,#fail-count,#mic-count,#tr-count{font-size:20px!important}
 </style>
 </head><body><div id="stage"><header class="top"><a class="back" href="../kiosk-redesign-2026-08/16-service-hubs.html?hub=interview" aria-label="返回面试服务">‹</a><div class="logo"><div class="mark">职</div><div class="brand">职易达</div></div><div class="space"></div><div class="pill"><i></i>AI 模拟面试</div><time class="clock" id="clock">--:--</time></header><section class="hero"><div class="hero-row"><div class="face" id="face">青</div><div><div class="eyebrow">AI 模拟面试</div><div class="ask" id="ask"></div><div class="doing" id="doing"></div></div></div></section><main class="body" id="body" data-screen="interview" data-state="setup" data-testid="interview-state-setup"></main><div class="scrollcue" id="scrollcue" aria-hidden="true"><em>&#8595;</em>下面还有内容，手指往上滑</div><div class="actions" id="actions"></div><nav class="nav" aria-label="全局导航"><a href="01-home.html"><svg width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5"/></svg><span>首页</span><i class="indicator"></i></a><a class="on" href="05-ai-cockpit.html" aria-current="page"><svg width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>AI 顾问</span><i class="indicator"></i></a><a href="../kiosk-redesign-2026-08/30-my-profile.html"><svg width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg><span>我的</span><i class="indicator"></i></a></nav></div><script>
 (function(){
@@ -132,8 +137,8 @@ function pvPages(n){var h='<div class="pv">';
     h+='<span>第 '+(i+1)+' 页 · 排版示意</span></div>'}
   return h+'</div></div>'}
 
-/* 打印版文件夹具：字段与 InterviewPrintResponse（packages/shared/src/types/mockInterview.ts）逐个对应。
-   取值是本原型的合成夹具，不是任何一次真实生成的结果；filename 按服务端模板
+/* 打印版文件夹具：内容与 InterviewPrintResponse（packages/shared/src/types/mockInterview.ts）逐个对应。
+   取值是本原型的合成夹具，不是任何一次真实生成的结果；filename 按系统模板
    `模拟面试练习报告_{position}.pdf` 写，expiresAt 是 signedUrl 的到期时间（uploaded.signedUrlExpiresAt），
    不是文件留存期限。printFileUrl 是系统 HMAC content URL，只给 /print/jobs 用，页面上不展示完整串。 */
 var PFILE={
@@ -142,7 +147,7 @@ var PFILE={
   mimeType:'application/pdf',
   sizeBytes:214016,
   pageCount:3,
-  signedUrl:'一次性签名链接（预览 / 下载用，不展示完整串）',
+  signedUrl:'有时效的下载链接（预览 / 下载用，不展示完整串）',
   expiresAt:'今天 10:24',
   printFileUrl:'系统 HMAC content URL（仅 /print/jobs 可用，不进地址栏）'
 };
@@ -150,7 +155,7 @@ function kb(n){return n<1048576?Math.max(1,Math.round(n/1024))+' KB':(n/1048576)
 function fieldRows(rows,cols){var h='<div class="fields kv'+(cols===3?' kv3':'')+'">';
   for(var i=0;i<rows.length;i++)h+='<div class="field"><small>'+rows[i][0]+'</small><b'+(rows[i][2]?' class="mono"':'')+'>'+rows[i][1]+'</b></div>';
   return h+'</div></div>'}
-/* 静态跳转只带非敏感参数：fileId / 页数 / 打印参数 / 来源。签名链接与 printFileUrl 一律不进 URL。 */
+/* 静态跳转只带非敏感参数：fileId / 页数 / 打印参数 / 来源。有时效的下载链接与 printFileUrl 一律不进 URL。 */
 function printHandoffHref(){
   return '14-print-confirm.html?source=interview-report&fileId='+encodeURIComponent(PFILE.fileId)
     +'&pages='+PFILE.pageCount+'&copies=1&duplex=single&color=bw'}
@@ -186,29 +191,29 @@ function resumePanel(){
       +'<div class="res-acts"><button type="button" class="res-btn" data-res="idle">换一种来源</button></div></div>';
   }else if(RES==='local'){
     h+='<div class="res-panel"><div class="rp-h">本机文件<span>现场一般先用手机扫码</span></div>'
-      +'<p class="res-p">这条来源会打开系统文件选择框，<b>一体机全屏模式下不使用</b>；保留它是为了在桌面浏览器验证同一条上传链路。</p>'
+      +'<p class="res-p">这条来源会打开系统文件选择框，<b>一体机全屏模式下不使用</b>；保留它是为了在桌面浏览器验证同一次上传。</p>'
       +'<div class="res-acts"><button type="button" class="res-btn go" data-res="upload">选择文件（桌面）</button>'
       +'<button type="button" class="res-btn" data-res="idle">换一种来源</button></div></div>';
   }else if(RES==='uploading'){
-    h+='<div class="res-panel"><div class="rp-h">正在上传<span>进度由上传接口返回</span></div>'
+    h+='<div class="res-panel"><div class="rp-h">正在上传<span>进度由系统返回</span></div>'
       +'<p class="res-p">上传完成前不显示文件名、页数和有效期，也不会把这份文件当成本场练习已选用的简历。</p>'
       +'<div class="bar" role="progressbar" aria-label="简历上传进度" aria-valuetext="上传中"><i></i></div>'
       +'<div class="res-acts"><button type="button" class="res-btn" data-res="idle">取消上传</button></div></div>';
   }else if(RES==='ready'){
-    h+='<div class="res-panel"><div class="rp-h">已选用一份简历<span>字段全部来自上传接口</span></div>'
-      +'<div class="filerow"><i>PDF</i><div class="fm"><b>文件名由上传接口返回</b><p>大小 · 页数 · 有效期同样来自服务端，本页不估算</p></div></div>'
+    h+='<div class="res-panel"><div class="rp-h">已选用一份简历<span>内容全部来自这次上传的结果</span></div>'
+      +'<div class="filerow"><i>PDF</i><div class="fm"><b>文件名由系统返回</b><p>大小 · 页数 · 有效期同样来自系统，本页不估算</p></div></div>'
       +'<p class="res-p">这场练习会用这份简历出题。<b>移除后按通用问题练习</b>，不会因此少一道题。</p>'
       +'<div class="res-acts"><button type="button" class="res-btn go" data-res="preview">完整预览</button>'
       +'<button type="button" class="res-btn" data-res="idle">替换这一份</button>'
       +'<button type="button" class="res-btn warn" data-res="idle">移除，不用简历</button></div></div>';
   }else if(RES==='failed'){
-    h+='<div class="res-panel"><div class="rp-h">这份简历没有上传成功<span>失败原因由接口返回</span></div>'
-      +'<p class="res-p">常见原因：超过大小上限、格式不支持、上传会话已过期或网络中断。本页不保留上一次的文件，也不把失败写成「已使用」。</p>'
+    h+='<div class="res-panel"><div class="rp-h">这份简历没有上传成功<span>失败原因由系统返回</span></div>'
+      +'<p class="res-p">常见原因：超过大小上限、格式不支持、这次上传已过期或网络中断。本页不保留上一次的文件，也不把失败写成「已使用」。</p>'
       +'<div class="res-acts"><button type="button" class="res-btn go" data-res="upload">重试上传</button>'
       +'<button type="button" class="res-btn" data-res="idle">换一种来源</button>'
       +'<button type="button" class="res-btn" data-res="idle">不用简历继续</button></div></div>';
   }else{
-    h+='<div class="res-panel"><div class="rp-h">完整预览<span>短期签名链接 · 只对本人开放</span></div>'
+    h+='<div class="res-panel"><div class="rp-h">完整预览<span>有时效的下载链接 · 只对本人开放</span></div>'
       +'<p class="res-p">预览走这份文件的短期签名 URL。下面是<b>分页排版示意</b>，不是文件里的内容。</p>'
       +pvPages(3)
       +'<div class="res-acts"><button type="button" class="res-btn" data-res="ready">关闭预览</button></div></div>';
@@ -247,7 +252,7 @@ function bindResume(){
 function setup(){
   RES=RES_FROM[state]||'idle';
   mark(RES_STATE[RES]);
-  base('面试前，<em>先设置一场练习</em>。','选定岗位、面试官和时长后才创建会话；语音能否使用，还要由服务与麦克风能力实际确认。');
+  base('面试前，<em>先设置一场练习</em>。','选定岗位、面试官和时长后才开始这场练习；语音能否使用，还要由服务与麦克风能力实际确认。');
   body.innerHTML=statusbar('本场练习条件',[['文字回答','可用','ok'],['语音回答','需先检测'],['练习报告','完成后生成']])
     +'<section class="card"><div class="head"><b>本场练习设置</b><span>都设好才开始，中途也能改</span></div>'
     +'<div class="fields"><label class="field"><small>目标岗位（必填，最多 50 字）</small>'
@@ -265,7 +270,7 @@ function setup(){
     +'<section class="card"><div class="head"><b>练习会经历三步</b><span>按实际状态推进</span></div>'
     +steps([['第 1 步','创建配置','记录岗位、难度和时长，不等于已经生成题目。'],
             ['第 2 步','逐题作答','文字是硬兜底；语音需转写后由你确认。'],
-            ['第 3 步','生成练习报告','报告只在真实会话完成后生成，不给固定评分。']])+'</section>'
+            ['第 3 步','生成练习报告','报告只在这场练习真正完成后生成，不给固定评分。']])+'</section>'
     +'<section class="notice"><i>i</i><div><b>模拟面试不是企业面试。</b>不代表任何企业、不会发出面试邀请，也不用于候选人筛选或录用判断。</div></section>'
     +rail();
   paintResume();
@@ -281,7 +286,7 @@ function answerBox(id){return '<textarea class="answer-input" id="'+id+'" maxlen
 
 function sessionText(){
   mark('session-text');
-  base('第 2 题，<em>用真实经历回答</em>。','文字输入始终可用；题目、剩余时间与下一题只能由当前会话返回，不能用静态内容冒充真实进度。');
+  base('第 2 题，<em>用真实经历回答</em>。','文字输入始终可用；题目、剩余时间与下一题只能由这场练习返回，不能用静态内容冒充真实进度。');
   body.innerHTML='<section class="card"><div class="session-head"><div><div class="head"><b>模拟面试 · 前端开发工程师</b></div>'
     +'<p class="copy">业务主管 · 本场第 2 题 / 目标 5 题</p></div><div class="counter"><i></i>剩余 08:42</div></div>'
     +'<div class="question"><small>AI 面试官提问</small><p>'+QUESTION+'</p></div></section>'
@@ -308,7 +313,7 @@ function bindAnswer(ta,cnt,err,sub,next){
 
 function sessionVoice(){
   mark('session-voice');
-  base('现在，<em>说出你的回答</em>。','语音路径是「显式开始录音 → 转写 → 你确认文本 → 提交」；不是后台持续监听，也不会跳过确认。');
+  base('现在，<em>说出你的回答</em>。','语音路径是「显式开始录音 → 转写 → 你确认文本 → 提交」；不会在背后一直听着，也不会跳过确认。');
   face.classList.add('live');
   body.innerHTML=statusbar('语音回答状态',[['麦克风','已检测','ok'],['录音','进行中'],['转写','结束后开始']])
     +'<section class="card"><div class="session-head"><div><div class="head"><b>模拟面试 · 前端开发工程师</b></div>'
@@ -411,13 +416,13 @@ function transcriptFailed(){
   mark('transcript-failed');
   base('这段录音<em>没有转写成功</em>。','转写失败只影响这一次；不能把失败写成「已提交」，也不能把未启用的语音服务说成正在识别。');
   body.innerHTML=statusbar('转写失败后的状态',[['语音转写','请求失败','off'],['本轮回答','未提交'],['文字输入','可用','ok']])
-    +'<section class="card"><div class="head"><b>失败原因决定下一步</b><span>按接口返回区分</span></div>'
+    +'<section class="card"><div class="head"><b>失败原因决定下一步</b><span>按系统返回区分</span></div>'
     +steps([['原因 A','语音服务未启用','本机直接回退文字输入，不再提供录音入口。'],
             ['原因 B','网络或超时','可以重新录音再试一次，音频不会重复上传。'],
             ['原因 C','音频不合要求','时长过短或格式不符时，重新录一段更完整的回答。']])+'</section>'
     +'<section class="card"><div class="head"><b>现在可以做</b><span>都不影响已答的题</span></div>'
     +optlist([{k:'字',t:'改用文字输入这一题',d:'服务未启用时这是唯一可用路径，也是最稳的一条。',href:urlFor('session-text'),go:true},
-              {k:'录',t:'重新录音再转写一次',d:'只重发这一次请求，不重复创建会话。',href:urlFor('session-voice')}])+'</section>'
+              {k:'录',t:'重新录音再转写一次',d:'只重发这一次请求，不会另外开一场练习。',href:urlFor('session-voice')}])+'</section>'
     +'<section class="card"><div class="head"><b>直接用文字答这一题</b><span>不必等语音恢复</span></div>'
     +answerBox('answer-fail')
     +'<div class="tbar"><button type="button" class="res-btn go" id="fail-submit">提交回答</button>'
@@ -436,14 +441,14 @@ function net(){
   base('这一题暂时<em>没有提交成功</em>。','网络中断只影响本次请求；保留你能看到的错误、重试和文字回退，不能假装面试官已经收到回答。');
   body.innerHTML=statusbar('本次提交状态',[['本题回答','提交失败','off'],['下一题','未获取'],['练习报告','未生成']])
     +'<section class="card"><div class="head"><b>重试提交本题</b><span>只重发这一次请求</span></div>'
-    +'<p class="copy">重试不会重复创建会话，也不会重复提交上一题。服务端只会返回下面三种结果之一，本页按结果分流。</p>'
+    +'<p class="copy">重试不会另外开一场练习，也不会重复提交上一题。系统只会返回下面三种结果之一，本页按结果分流。</p>'
     +'<div class="res-acts"><a class="res-btn go" href="'+urlFor('session-text')+'">重试成功 · 取到下一题</a>'
     +'<a class="res-btn" href="'+urlFor('report-pending')+'">重试成功 · 本场已答完</a>'
-    +'<a class="res-btn warn" href="'+urlFor('session-expired')+'">会话已过期</a></div></section>'
+    +'<a class="res-btn warn" href="'+urlFor('session-expired')+'">这场练习已过期</a></div></section>'
     +'<section class="card"><div class="head"><b>这三种结果分别意味着</b><span>页面各走各的路</span></div>'
-    +steps([['取到下一题','回到作答页','本题按服务端返回记为已提交，题号前进一题。'],
+    +steps([['取到下一题','回到作答页','本题按系统返回记为已提交，题号前进一题。'],
             ['本场已答完','进入报告生成','不再出题，转去请求本场练习报告。'],
-            ['会话已过期','回到练习设置','旧会话不能续答，需要重新创建一场练习。']])+'</section>'
+            ['这场练习已过期','回到练习设置','上一场不能接着答，需要重新创建一场练习。']])+'</section>'
     +'<section class="card"><div class="head"><b>不想重试的话</b><span>两条不挑网络的路</span></div>'
     +optlist([{k:'字',t:'改用文字输入重新回答',d:'语音转写连续失败时，文字是不挑网络质量的兜底。',href:urlFor('session-text')},
               {k:'练',t:'先按 STAR 整理这题要点',d:'公开技巧页可以先写清背景、行动和结果，恢复后再提交。',href:urlFor('tips')}])+'</section>'
@@ -453,19 +458,19 @@ function net(){
 }
 function sessionExpired(){
   mark('session-expired');
-  base('这一场练习<em>已经过期</em>。','会话过期由服务端判定。过期后不能续答，也不能把没答完的一场说成已完成。');
-  body.innerHTML=statusbar('会话状态',[['本场会话','已过期','off'],['未提交的回答','已失效'],['已生成的报告','不受影响','ok']])
-    +'<section class="card empty tight bad"><div><div class="e">!</div><h2>会话已过期，需要重新创建</h2>'
-    +'<p>公共终端上的练习会话有有效期。过期之后旧的题目和未提交的回答都不能继续使用。</p></div></section>'
+  base('这一场练习<em>已经过期</em>。','这场练习是否过期，由系统判定。过期后不能续答，也不能把没答完的一场说成已完成。');
+  body.innerHTML=statusbar('这场练习的状态',[['这场练习','已过期','off'],['未提交的回答','已失效'],['已生成的报告','不受影响','ok']])
+    +'<section class="card empty tight bad"><div><div class="e">!</div><h2>这场练习已过期，需要重新开始</h2>'
+    +'<p>公共终端上的这场练习有有效期。过期之后旧的题目和未提交的回答都不能继续使用。</p></div></section>'
     +'<section class="card"><div class="head"><b>接下来</b><span>选一条</span></div>'
     +optlist([{k:'练',t:'重新创建一场练习',d:'岗位、面试官、时长可以沿用刚才的选择，重新填一次即可。',href:urlFor('setup'),go:true},
-              {k:'录',t:'查看本人练习记录',d:'过期前已经生成过的报告仍按服务端留存规则保留。',href:urlFor('reports-loading')}])+'</section>'
-    +'<section class="card"><div class="head"><b>这一场留下了什么</b><span>按服务端记录</span></div>'
-    +'<div class="fields"><div class="field"><small>已提交的回答</small><b>按服务端记录保留</b></div>'
+              {k:'录',t:'查看本人练习记录',d:'过期前已经生成过的报告仍按保存规则保留。',href:urlFor('reports-loading')}])+'</section>'
+    +'<section class="card"><div class="head"><b>这一场留下了什么</b><span>按系统记录</span></div>'
+    +'<div class="fields"><div class="field"><small>已提交的回答</small><b>按系统记录保留</b></div>'
     +'<div class="field"><small>未提交的这一题</small><b>不保留</b></div>'
     +'<div class="field"><small>本场练习报告</small><b>未生成则不会补生成</b></div>'
     +'<div class="field"><small>上传过的简历</small><b>按文件留存期限管理</b></div></div>'
-    +'<p class="res-p">过期只影响能不能继续答题，不代表已提交的内容被删除；具体留存以服务端为准。</p></section>'
+    +'<p class="res-p">过期只影响能不能继续答题，不代表已提交的内容被删除；具体留存以系统为准。</p></section>'
     +'<section class="notice"><i>i</i><div>本页不保留上一场的题目和回答，也不会把它们并进新的一场。</div></section>'
     +rail();
   actions.innerHTML=btn('reports-loading','查看练习记录')+btn('setup','重新创建练习',true);
@@ -474,7 +479,7 @@ function sessionExpired(){
 /* ── 报告 ─────────────────────────────────────────────────────────────────── */
 function pending(){
   mark('report-pending');
-  base('本场结束后，<em>正在生成报告</em>。','只有完成真实会话后才能请求报告；超时或失败要回到可重试状态，而不是展示固定评分。');
+  base('本场结束后，<em>正在生成报告</em>。','只有这场练习真正完成后才能请求报告；超时或失败要回到可重试状态，而不是展示固定评分。');
   body.innerHTML=statusbar('报告生成状态',[['本场作答','已结束','ok'],['练习报告','生成中'],['评分与录用判断','不提供']])
     +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
     +'<div class="record load"><i></i>正在请求本场练习报告</div></div></section>'
@@ -490,11 +495,11 @@ function pending(){
 }
 function reportLoading(){
   mark('report-loading');
-  base('正在核对<em>报告状态</em>。','报告必须由本场会话和当前凭证读取；加载中不展示上一次内容，也不提前放开打印。');
+  base('正在核对<em>报告状态</em>。','报告必须由这场练习和当前凭证读取；加载中不展示上一次内容，也不提前放开打印。');
   body.innerHTML=statusbar('报告读取状态',[['报告内容','读取中'],['打印版','未生成'],['固定评分','不提供']])
     +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
     +'<div class="record load"><i></i>正在读取本场练习报告</div></div></section>'
-    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由服务端决定</span></div>'
+    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由系统决定</span></div>'
     +steps([['结果 A','报告已返回','显示内容，并放开生成打印版。'],
             ['结果 B','报告不可用','未生成、已过期或无权限。'],
             ['结果 C','读取失败','停留在可重试状态。']])+'</section>'
@@ -532,7 +537,7 @@ function reportUnavailable(){
               {k:'权',t:'当前账号没有访问权限',d:'报告只对本人开放，公共设备需重新确认身份。',href:urlFor('reports-guest')}])+'</section>'
     +'<section class="card"><div class="head"><b>不受影响的入口</b><span>随时可用</span></div>'
     +mini([['面试技巧','公开准备方法不依赖报告。'],['文字练习','重新开始一场文字作答。'],['本人记录','登录后查看历史列表。']])+'</section>'
-    +'<section class="notice danger"><i>!</i><div>公共设备直接打开或刷新后，原会话是否仍有效以服务端校验为准；不要把这一页理解为报告已被保存。</div></section>'
+    +'<section class="notice danger"><i>!</i><div>公共设备直接打开或刷新后，这场练习是否还有效以系统校验为准；不要把这一页理解为报告已被保存。</div></section>'
     +rail();
   actions.innerHTML=btn('reports-guest','查看报告历史')+btn('setup','重新开始练习',true);
 }
@@ -543,7 +548,7 @@ function reportPrintPending(){
     +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
     +'<div class="record load"><i></i>正在生成报告打印版</div></div></section>'
     +'<section class="card"><div class="head"><b>生成成功后才往下走</b><span>沿用既有打印流程</span></div>'
-    +steps([['下一步','拿到真实文件','服务端返回文件名、页数、大小和有效期。'],
+    +steps([['下一步','拿到真实文件','系统返回文件名、页数、大小和有效期。'],
             ['再下一步','进入打印确认','由已有 /print/confirm 报价流程接手，本页不确认参数。'],
             ['最后','按真实结果出纸','出纸与取件码由打印流程返回，本页不预告。']])+'</section>'
     +'<section class="card"><div class="head"><b>不想等可以先做</b><span>不影响本次生成</span></div>'
@@ -555,45 +560,45 @@ function reportPrintPending(){
 }
 function reportPrintReady(){
   mark('report-print-ready');
-  base('打印版<em>已经生成</em>。','这一步只证明服务端产出了真实文件；份数、单双面、金额和出纸都由打印确认流程负责，本页不代答。');
+  base('打印版<em>已经生成</em>。','这一步只证明系统产出了真实文件；份数、单双面、金额和出纸都由打印确认流程负责，本页不代答。');
   body.innerHTML=statusbar('打印版文件状态',[['打印文件','已生成','ok'],['打印任务','未创建'],['取件码','未产生']])
-    +'<section class="card"><div class="head"><b>服务端返回的这份文件</b><span>InterviewPrintResponse 字段</span></div>'
-    +'<div class="filerow"><i>PDF</i><div class="fm"><b>filename：'+PFILE.filename+'</b>'
-    +'<p>pageCount '+PFILE.pageCount+' 页 · sizeBytes '+kb(PFILE.sizeBytes)+' · mimeType '+PFILE.mimeType+'</p></div></div>'
-    +fieldRows([['文件编号 fileId',PFILE.fileId,1],['有效期 expiresAt',PFILE.expiresAt],
-                ['预览 signedUrl',PFILE.signedUrl,1],['打印凭证 printFileUrl',PFILE.printFileUrl,1]])
-    +'<p class="res-p">这一组是<b>本原型的合成夹具</b>，只说明字段位置与取值形态；真实取值由 <b>POST /mock-interviews/{sessionId}/report/print</b> 返回。</p>'
-    +'<p class="res-p" style="margin-top:14px">打印版预览（<b>分页排版示意</b>，不是文件里的内容；真实预览走 signedUrl）：</p>'
+    +'<section class="card"><div class="head"><b>系统返回的这份文件</b><span>这份文件里的各项</span></div>'
+    +'<div class="filerow"><i>PDF</i><div class="fm"><b>文件名：'+PFILE.filename+'</b>'
+    +'<p>'+PFILE.pageCount+' 页 · '+kb(PFILE.sizeBytes)+' · '+PFILE.mimeType+'</p></div></div>'
+    +fieldRows([['文件编号',PFILE.fileId,1],['有效期',PFILE.expiresAt],
+                ['预览链接',PFILE.signedUrl,1],['打印凭证',PFILE.printFileUrl,1]])
+    +'<p class="res-p">这里只示范每一项放在哪里、长什么样；<b>真实内容由系统返回</b>。</p>'
+    +'<p class="res-p" style="margin-top:14px">打印版预览（<b>分页排版示意</b>，不是文件里的内容；真实预览走有时效的下载链接）：</p>'
     +pvPages(PFILE.pageCount)+'</section>'
     +'<section class="card"><div class="head"><b>接下来在打印确认页发生</b><span>本页不预告结果</span></div>'
-    +steps([['第 1 步','服务端报价','份数与单双面按当时可用能力显示，金额只认服务端返回。'],
+    +steps([['第 1 步','系统报价','份数与单双面按当时可用能力显示，金额只认系统返回。'],
             ['第 2 步','确认后建单','确认参数才创建打印任务，零元单同样先建单。'],
             ['第 3 步','按真实结果出纸','出纸与取件码由打印流程返回。']])+'</section>'
-    +'<section class="notice"><i>i</i><div><b>expiresAt 是签名预览链接的到期时间</b>，不是文件留存期限；过期后要重新生成打印版。signedUrl 只供你自己预览下载，建单一律走 printFileUrl；本页不缓存旧链接，也不会显示已打印、已出纸或取件码。</div></section>'
+    +'<section class="notice"><i>i</i><div><b>上面的到期时间是预览链接的有效期</b>，不是文件留存期限；过期后要重新生成打印版。预览链接只供你自己查看和下载，去打印一律走打印链接；本页不缓存旧链接，也不会显示已打印、已出纸或取件码。</div></section>'
     +rail();
   actions.innerHTML=btn('report-ready','返回报告')+btn('report-print-pending','重新生成',false,'interview-regenerate')
     +btn('report-print-handoff','查看打印交接内容',true);
 }
 /* 打印交接：把交给 /print/confirm 的那一份摊开给人看。
    对齐 InterviewReportPage.handlePrint —— 真实页面用 navigate('/print/confirm', { state: { file, params } })
-   传对象，签名链接不进地址栏；本页的静态跳转只带 fileId / 页数 / 打印参数，不冒充已接通的打印链路。 */
+   传对象，有时效的下载链接不进地址栏；本页的静态跳转只带 fileId / 页数 / 打印参数，不冒充已接通的打印流程。 */
 function reportPrintHandoff(){
   mark('report-print-handoff');
   base('去打印前，<em>先看清交出去的是什么</em>。','这一屏只是把交接内容摊开；打印任务、金额和取件码都还没有产生，按下去也只是进入打印确认页。');
   body.innerHTML=statusbar('交接前的状态',[['打印文件','已生成','ok'],['交接内容','已列出','ok'],['打印任务','未创建']])
-    +'<section class="card"><div class="head"><b>交给打印确认的 file 对象</b><span>InterviewReportPage.handlePrint</span></div>'
-    +fieldRows([['name',PFILE.filename,1],['size',kb(PFILE.sizeBytes)],['pages',String(PFILE.pageCount)],
-                ['fileId',PFILE.fileId,1],['fileUrl（= printFileUrl）',PFILE.printFileUrl,1],['mimeType',PFILE.mimeType]])
-    +'<p class="res-p">这六个字段来自上一屏那份文件；<b>printFileUrl 没有返回时按钮不放行</b>，页面停在报告页并显示原因，不会拿预览链接顶替。</p></section>'
-    +'<section class="card"><div class="head"><b>同时交出去的打印参数</b><span>makePrintParams({copies:1,duplex:\'single\',color:\'bw\'})</span></div>'
-    +fieldRows([['copies','1 份'],['duplex','simplex（单面）'],['colorMode','black_white（黑白）'],
-                ['paperSize','A4'],['pageRange','all'],['pagesPerSheet','1']],3)
-    +'<p class="res-p">这些只是<b>进入打印确认页时的初值</b>；份数、单双面、颜色在那一页还能改，金额也在那里按真实页数由服务端报价。</p></section>'
-    +'<section class="notice danger"><i>!</i><div><b>正式 React 用路由 state 传这一份，printFileUrl 绝不进地址栏。</b>'
-    +'本原型的跳转只带 <b>fileId、页数与打印参数</b>（source=interview-report），是用来说明交接内容，'
-    +'<b>不是已经接通的打印链路</b>；点进去看到的是打印确认页自己的静态夹具，不代表这份报告已经排进打印。</div></section>'
+    +'<section class="card"><div class="head"><b>交给打印确认的这份文件</b><span>只交这些内容</span></div>'
+    +fieldRows([['文件名',PFILE.filename,1],['大小',kb(PFILE.sizeBytes)],['页数',String(PFILE.pageCount)],
+                ['文件编号',PFILE.fileId,1],['打印用的文件',PFILE.printFileUrl,1],['文件类型',PFILE.mimeType]])
+    +'<p class="res-p">这六项来自上一屏那份文件；<b>打印链接没有返回时按钮不放行</b>，页面停在报告页并显示原因，不会拿预览链接顶替。</p></section>'
+    +'<section class="card"><div class="head"><b>同时交出去的打印参数</b><span>进打印确认前的初值</span></div>'
+    +fieldRows([['份数','1 份'],['单双面','单面'],['颜色','黑白'],
+                ['纸张','A4'],['页码范围','全部'],['每张纸页数','1']],3)
+    +'<p class="res-p">这些只是<b>进入打印确认页时的初值</b>；份数、单双面、颜色在那一页还能改，金额也在那里按真实页数由系统报价。</p></section>'
+    +'<section class="notice danger"><i>!</i><div><b>正式办理时，这份文件不经过地址栏，打印链接也不会出现在地址栏。</b>'
+    +'这一页的跳转只带 <b>文件编号、页数与打印参数</b>，是用来说明交接内容，'
+    +'<b>不是已经接通的打印流程</b>；点进去看到的是打印确认页自己的示例，不代表这份报告已经排进打印。</div></section>'
     +'<section class="card"><div class="head"><b>按下去之后不会发生的事</b><span>三条边界</span></div>'
-    +mini([['不会','立即创建打印任务或扣费。'],['不会','出现取件码或出纸结果。'],['不会','把签名链接留在浏览器地址栏。']])+'</section>'
+    +mini([['不会','立即创建打印任务或扣费。'],['不会','出现取件码或出纸结果。'],['不会','把有时效的下载链接留在浏览器地址栏。']])+'</section>'
     +rail();
   actions.innerHTML=btn('report-print-ready','返回文件')
     +'<a class="btn primary" href="'+printHandoffHref()+'" data-route="/print/confirm" data-testid="interview-primary">去打印确认<em>→</em></a>';
@@ -609,10 +614,10 @@ function reportPrintFailed(){
     +'<section class="card"><div class="head"><b>重试只做三件事</b><span>范围很窄</span></div>'
     +steps([['会做','重新请求文件','只针对这份报告的打印版。'],
             ['会做','保留当前报告','屏幕上的内容不会被清掉。'],
-            ['会做','沿用原有报告','不重新生成本场会话报告。']])+'</section>'
+            ['会做','沿用原有报告','不重新生成这场练习报告。']])+'</section>'
     +'<section class="card"><div class="head"><b>这次失败不会造成</b><span>三条边界</span></div>'
     +mini([['不会','出现取件码或出纸结果。'],['不会','产生支付或扣费。'],['不会','覆盖本场练习报告。']])+'</section>'
-    +'<section class="notice danger"><i>!</i><div>只有服务端返回真实文件后，才会进入已有打印确认流程。</div></section>'
+    +'<section class="notice danger"><i>!</i><div>只有系统返回真实文件后，才会进入已有打印确认流程。</div></section>'
     +rail();
   actions.innerHTML=btn('report-ready','返回报告')+btn('report-print-pending','重试生成',true);
 }
@@ -620,17 +625,17 @@ function reportPrintFailed(){
 /* ── 本人练习记录 ─────────────────────────────────────────────────────────── */
 function reportsGuest(){
   mark('reports-guest');
-  base('你的练习记录，<em>登录后才可长期查看</em>。','游客报告仅按当前会话与短期凭证读取；登录后的本人历史列表是另一条受账号保护的路径。');
+  base('你的练习记录，<em>登录后才可长期查看</em>。','游客报告仅按这场练习与短期凭证读取；登录后的本人历史列表是另一条受账号保护的路径。');
   body.innerHTML='<section class="card empty tight"><div><div class="e">⌁</div><h2>登录后可保存练习报告</h2>'
-    +'<p>游客模式的报告短期有效（约 2 小时）；登录后报告按服务端规则保存 7 天。</p></div></section>'
+    +'<p>游客模式的报告短期有效（约 2 小时）；登录后报告按系统规则保存 7 天。</p></div></section>'
     +'<section class="card"><div class="head"><b>两种身份的差别</b><span>按真实账号确认</span></div>'
     +'<div class="fields"><div class="field"><small>游客模式</small><b>仅本场短期有效</b></div>'
     +'<div class="field"><small>登录之后</small><b>本人记录可回看</b></div></div>'
-    +mini([['当前练习','以本场短期会话凭证读取。'],['本人历史','登录后才请求并显示列表。'],['查看与打印','仅对服务端确认的报告开放。']])+'</section>'
+    +mini([['当前练习','以这场练习的临时凭证读取。'],['本人历史','登录后才请求并显示列表。'],['查看与打印','仅对系统确认的报告开放。']])+'</section>'
     +'<section class="card"><div class="head"><b>现在可以做</b><span>不登录也能继续</span></div>'
     +optlist([{k:'练',t:'直接开始一场练习',d:'不登录也能用文字完成作答。',href:urlFor('setup'),go:true},
               {k:'录',t:'查看登录后的记录状态',d:'列表是否有内容由真实账号决定。',href:urlFor('reports-loading')}])+'</section>'
-    +'<section class="notice"><i>i</i><div>登录入口、保存期限和是否可查看均由真实账号与服务端决定；本页不把当前会话当作已保存记录。</div></section>'
+    +'<section class="notice"><i>i</i><div>登录入口、保存期限和是否可查看均由真实账号与系统决定；本页不把这场练习当作已保存记录。</div></section>'
     +rail();
   actions.innerHTML=btn('setup','开始新练习',true)+btn('reports-loading','查看登录后状态');
 }
@@ -640,7 +645,7 @@ function reportsLoading(){
   body.innerHTML=statusbar('记录读取状态',[['本人列表','读取中'],['查看报告','未开放'],['删除记录','未开放']])
     +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
     +'<div class="record load"><i></i>正在读取本人练习报告</div></div></section>'
-    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由服务端决定</span></div>'
+    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由系统决定</span></div>'
     +steps([['结果 A','有本人记录','逐条显示，仅本人可见。'],
             ['结果 B','登录后为空','显示空态，不填充演示数据。'],
             ['结果 C','读取失败','显示错误并保留重试入口。']])+'</section>'
@@ -654,11 +659,11 @@ function reportsEmptyMember(){
   mark('reports-empty-member');
   base('登录后，<em>还没有练习报告</em>。','这是「本人已登录但列表为空」的状态，和游客未登录不同；不填充演示成绩或历史记录。');
   body.innerHTML='<section class="card empty tight"><div><div class="e">⌁</div><h2>还没有练习报告</h2>'
-    +'<p>完成一次模拟面试后，这里会显示服务端确认属于当前账号的练习报告。</p></div></section>'
+    +'<p>完成一次模拟面试后，这里会显示系统确认属于当前账号的练习报告。</p></div></section>'
     +'<section class="card"><div class="head"><b>第一份报告怎么来</b><span>三步</span></div>'
     +steps([['第 1 步','设置一场练习','选岗位、面试官类型和时长。'],
             ['第 2 步','逐题完成作答','文字回答即可，语音需另行检测。'],
-            ['第 3 步','生成练习报告','完成后由服务端生成并归入本人记录。']])+'</section>'
+            ['第 3 步','生成练习报告','完成后由系统生成并归入本人记录。']])+'</section>'
     +'<section class="card"><div class="head"><b>现在可以做</b><span>都不依赖历史</span></div>'
     +optlist([{k:'练',t:'开始模拟面试',d:'完成一场后再回到这里查看。',href:urlFor('setup'),go:true},
               {k:'技',t:'先看面试技巧',d:'准备清单可以先勾选整理。',href:urlFor('tips')}])+'</section>'
@@ -682,7 +687,7 @@ function historyRows(mode){
 }
 function reportsReady(){
   mark('reports-ready');
-  base('登录后，<em>只查看自己的报告</em>。','下面展示已加载历史列表的产品结构，不代表当前账号真的有这些成绩或记录；实际内容由服务端返回。');
+  base('登录后，<em>只查看自己的报告</em>。','下面展示已加载历史列表的产品结构，不代表当前账号真的有这些成绩或记录；实际内容由系统返回。');
   body.innerHTML=statusbar('记录列表状态',[['本人列表','已返回','ok'],['查看','仅限有报告的记录'],['删除','需二次确认']])
     +'<section class="card"><div class="head"><b>练习报告</b><span>已登录 · 本人记录</span></div>'
     +'<p class="copy">仅有真实报告的记录显示「查看」。没有报告的记录不应被伪装成可打印或有评分。</p>'
@@ -690,8 +695,8 @@ function reportsReady(){
     +'<section class="card"><div class="head"><b>列表上的三个动作</b><span>各自的前提</span></div>'
     +steps([['动作 1','查看报告','只对已生成报告的记录开放。'],
             ['动作 2','生成打印版','进入报告页后才请求打印文件。'],
-            ['动作 3','删除记录','二次确认后才向服务端发起。']])+'</section>'
-    +'<section class="notice"><i>i</i><div><b>删除需要再次确认。</b>确认后才请求删除本人记录；服务端确认成功才从列表移除，失败时保留原列表并显示实际错误。</div></section>'
+            ['动作 3','删除记录','二次确认后才向系统发起。']])+'</section>'
+    +'<section class="notice"><i>i</i><div><b>删除需要再次确认。</b>确认后才请求删除本人记录；系统确认成功才从列表移除，失败时保留原列表并显示实际错误。</div></section>'
     +rail();
   actions.innerHTML=btn('setup','开始新练习',true)+btn('reports-empty-member','查看空记录状态');
   var remove=body.querySelector('[data-testid="interview-history-delete"]');
@@ -702,50 +707,50 @@ function reportsReady(){
 }
 function reportsDeleting(){
   mark('reports-deleting');
-  base('正在<em>请求删除这条记录</em>。','删除请求已发出，但服务端还没有确认。没确认之前，这条记录仍然留在列表里。');
+  base('正在<em>请求删除这条记录</em>。','删除请求已发出，但系统还没有确认。没确认之前，这条记录仍然留在列表里。');
   body.innerHTML=statusbar('删除进行状态',[['本次操作','请求中'],['目标记录','仍在列表','ok'],['报告文件','未清理']])
     +'<section class="card"><div class="head"><b>练习报告</b><span>删除请求中 · 记录保留</span></div>'
     +'<p class="copy">这条记录暂时不能再点删除或查看，避免重复发起同一次删除；其它记录不受影响。</p>'
     +historyRows('deleting')+'</section>'
     +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
-    +'<div class="record load"><i></i>等待服务端确认删除结果</div></div></section>'
-    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由服务端决定</span></div>'
-    +steps([['结果 A','确认删除','这条记录从本人列表移除，其它记录不动。'],['结果 B','删除失败','记录留在原处，显示服务端返回的原因。'],['结果 C','请求超时','按失败处理，仍需你再次确认后才重发。']])+'</section>'
-    +'<section class="notice"><i>i</i><div>页面不会先把这一行从列表里抹掉。删除是否发生，只以服务端返回为准。</div></section>'
+    +'<div class="record load"><i></i>等待系统确认删除结果</div></div></section>'
+    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由系统决定</span></div>'
+    +steps([['结果 A','确认删除','这条记录从本人列表移除，其它记录不动。'],['结果 B','删除失败','记录留在原处，显示系统返回的原因。'],['结果 C','请求超时','按失败处理，仍需你再次确认后才重发。']])+'</section>'
+    +'<section class="notice"><i>i</i><div>页面不会先把这一行从列表里抹掉。删除是否发生，只以系统返回为准。</div></section>'
     +rail();
   actions.innerHTML=btn('reports-delete-failed','演示删除失败')+btn('reports-delete-done','演示删除成功',true);
 }
 function reportsDeleteDone(){
   mark('reports-delete-done');
-  base('这条记录<em>已经删除</em>。','服务端确认删除后列表才更新。删除只发生在你自己的记录上，不影响其它记录和已打印的纸质件。');
+  base('这条记录<em>已经删除</em>。','系统确认删除后列表才更新。删除只发生在你自己的记录上，不影响其它记录和已打印的纸质件。');
   body.innerHTML=statusbar('删除结果状态',[['本次操作','删除成功','ok'],['目标记录','已从列表移除'],['其它记录','未受影响','ok']])
     +'<section class="card"><div class="head"><b>练习报告</b><span>已登录 · 本人记录</span></div>'
-    +'<p class="copy">刚才那条记录已经不在列表里。剩下的记录按服务端返回顺序显示。</p>'
+    +'<p class="copy">刚才那条记录已经不在列表里。剩下的记录按系统返回顺序显示。</p>'
     +'<div class="history-list"><div class="history-row"><div><small>示例记录结构</small><b>行政专员 · HR 初筛</b>'
     +'<p>这条记录尚未生成报告，因此不展示查看或打印按钮。</p></div>'
     +'<div class="history-controls"><button class="history-action" type="button" aria-disabled="true">报告未生成</button></div></div>'
     +'<div class="history-row"><div><small>示例记录结构</small><b>市场运营 · 技术面试官</b>'
-    +'<p>其它记录不受这次删除影响，顺序仍按服务端返回。</p></div>'
+    +'<p>其它记录不受这次删除影响，顺序仍按系统返回。</p></div>'
     +'<div class="history-controls"><a class="history-action" href="'+urlFor('report-ready')+'">查看</a>'
     +'<button class="history-action remove" type="button" aria-label="删除这条练习记录">删除</button></div></div></div></section>'
     +'<section class="card"><div class="head"><b>接下来可以</b><span>选一条</span></div>'
-    +optlist([{k:'练',t:'再练一场同岗位的面试',d:'配置可以重新选，题目由服务恢复后的会话返回。',href:urlFor('setup'),go:true},{k:'技',t:'先看公开面试技巧',d:'准备清单与 STAR 方法不依赖历史记录。',href:urlFor('tips')}])+'</section>'
+    +optlist([{k:'练',t:'再练一场同岗位的面试',d:'配置可以重新选，题目由服务恢复后按这场练习返回。',href:urlFor('setup'),go:true},{k:'技',t:'先看公开面试技巧',d:'准备清单与 STAR 方法不依赖历史记录。',href:urlFor('tips')}])+'</section>'
     +'<section class="card"><div class="head"><b>删除之后</b><span>三条边界</span></div>'
     +mini([['已删除','这份练习报告不再出现在你的记录里。'],['不影响','已经打印出来的纸质件不会被收回。'],['不撤销','删除无法在本页撤销，需要重新练习才会有新报告。']])+'</section>'
-    +'<section class="notice"><i>i</i><div>删除动作已记入你的账号操作日志；本页不代表服务端清理文件的具体时点。</div></section>'
+    +'<section class="notice"><i>i</i><div>删除动作已记入你的账号操作日志；本页不代表系统清理文件的具体时点。</div></section>'
     +rail();
   actions.innerHTML=btn('setup','开始新练习')+btn('reports-ready','返回记录列表',true);
 }
 function reportsDeleteFailed(){
   mark('reports-delete-failed');
-  base('删除请求<em>没有完成</em>。','服务端没有确认删除前，原记录仍应保留；不能先从列表移除再假装操作已经成功。');
+  base('删除请求<em>没有完成</em>。','系统没有确认删除前，原记录仍应保留；不能先从列表移除再假装操作已经成功。');
   body.innerHTML=statusbar('删除结果状态',[['本次操作','删除失败','off'],['目标记录','仍在列表','ok'],['报告文件','未清理']])
     +'<section class="card"><div class="head"><b>练习报告</b><span>删除失败 · 记录保留</span></div>'
-    +'<p class="copy">服务端未确认前，原记录仍保留在列表中。重试仍需再次确认，真实结果由服务端返回决定。</p>'
+    +'<p class="copy">系统还没确认前，原记录仍保留在列表中。重试仍需再次确认，真实结果由系统返回决定。</p>'
     +historyRows('failed')+'</section>'
     +'<section class="card"><div class="head"><b>重试删除会经历</b><span>三步都要真实结果</span></div>'
     +steps([['第 1 步','再次点击删除','仍需二次确认，不沿用上一次。'],
-            ['第 2 步','等待服务端返回','返回前列表保持原样。'],
+            ['第 2 步','等待系统返回','返回前列表保持原样。'],
             ['第 3 步','按结果更新列表','确认成功才移除这条记录。']])+'</section>'
     +'<section class="card"><div class="head"><b>接下来可以</b><span>选一条</span></div>'
     +optlist([{k:'回',t:'返回记录列表再确认',d:'重试删除仍需二次确认，不自动重复请求。',href:urlFor('reports-ready'),go:true},
@@ -767,7 +772,7 @@ function reportsError(){
     +optlist([{k:'重',t:'重试加载本人记录',d:'按实际响应显示列表、空态或错误。',href:urlFor('reports-loading'),go:true},
               {k:'练',t:'直接开始一场新练习',d:'新练习不依赖历史列表是否可读。',href:urlFor('setup')},
               {k:'技',t:'查看公开面试技巧',d:'准备清单与 STAR 方法离线可读。',href:urlFor('tips')}])+'</section>'
-    +'<section class="notice danger"><i>!</i><div>服务端恢复后重新获取；在此之前不隐藏、不合并、不推断任何本人记录。</div></section>'
+    +'<section class="notice danger"><i>!</i><div>系统恢复后重新获取；在此之前不隐藏、不合并、不推断任何本人记录。</div></section>'
     +rail();
   actions.innerHTML=btn('tips','查看面试技巧')+btn('reports-loading','重试加载',true);
 }
@@ -793,7 +798,7 @@ function tips(){
     +'<div class="faq-row"><button type="button">你为什么想应聘这个岗位？<span>＋</span></button>'
     +'<p hidden><b>回答结构：</b>说明岗位理解、自己的对应能力和希望解决的问题，避免只说「想找一份工作」。</p></div>'
     +mini([['30 秒','身份、核心优势、岗位动机。'],['1 分钟','加上一段真实经历和成果。'],['3 分钟','补充两三段经历与发展方向。']])+'</section>'
-    +'<section class="notice"><i>i</i><div>这份技巧不构成个性化职业建议。想让 AI 根据真实材料辅助练习时，需要先完成可用性检查并在真实流程中创建会话。</div></section>'
+    +'<section class="notice"><i>i</i><div>这份技巧不构成个性化职业建议。想让 AI 根据真实材料辅助练习时，需要先完成可用性检查并在真实流程中开始这场练习。</div></section>'
     +rail();
   actions.innerHTML=btn('setup','设置一场练习',true)+link('05-ai-cockpit.html','AI顾问');
   body.querySelectorAll('.check').forEach(function(x){x.onclick=function(){
@@ -804,19 +809,19 @@ function tips(){
 }
 function down(){
   mark('ai-down');
-  base('AI 面试官暂时<em>不能出题</em>。','AI 不可用时不创建假会话、不生成假报告；仅保留不依赖模型的准备内容与真实的通用题目单路径。');
+  base('AI 面试官暂时<em>不能出题</em>。','AI 不可用时不编造一场练习，也不生成假报告；仅保留不依赖模型的准备内容与真实的通用题目单路径。');
   body.innerHTML=statusbar('当前能力状态',[['AI 出题与追问','不可用','off'],['练习报告','不可生成','off'],['文字练习与技巧','可用','ok']])
     +'<section class="card"><div class="head"><b>不靠 AI 也能练的三件事</b><span>现在就能开始</span></div>'
     +optlist([{k:'1',t:'用 STAR 结构写一题',d:'公开清单可勾选，写完自己核对背景、行动与结果。',href:urlFor('tips'),go:true},
               {k:'2',t:'练 1 分钟自我介绍',d:'照准备清单逐条对照，不需要模型点评。',href:urlFor('tips')},
-              {k:'3',t:'查看练习说明与设置项',d:'服务恢复后可直接按这套配置创建会话。',href:urlFor('setup')}])+'</section>'
+              {k:'3',t:'查看练习说明与设置项',d:'服务恢复后可直接按这套配置开始这场练习。',href:urlFor('setup')}])+'</section>'
     +'<section class="card"><div class="head"><b>恢复后才重新开放</b><span>现在都不做</span></div>'
     +steps([['恢复后','按配置出题','针对岗位和面试官类型生成题目。'],
             ['恢复后','追问与澄清','根据你的回答继续提问。'],
-            ['恢复后','生成练习报告','完成会话后才请求报告。']])+'</section>'
+            ['恢复后','生成练习报告','完成这场练习后才请求报告。']])+'</section>'
     +'<section class="card"><div class="head"><b>能力边界</b><span>恢复前后不同</span></div>'
     +mini([['仍可用','公开技巧、准备清单与文字练习。'],
-           ['受限','通用题目单只在已有真实会话时按规则提供，且不含点评。'],
+           ['受限','通用题目单只在已有这场练习时按规则提供，且不含点评。'],
            ['不可用','针对本场配置的出题、追问与报告。']])+'</section>'
     +'<section class="notice danger"><i>!</i><div>恢复时间以实际服务状态或现场公告为准；「通用题目单」不是模拟面试的等价替代，不展示通过率或评分。</div></section>'
     +rail();
@@ -830,7 +835,7 @@ function illegalState(){
     +'<section class="card"><div class="head"><b>可以继续</b><span>选择一个有效入口</span></div>'
     +optlist([{k:'练',t:'打开练习设置',d:'重新选择岗位、面试官、经验、难度、时长和回答方式。',href:urlFor('setup'),go:true},
               {k:'回',t:'返回面试服务',d:'重新选择模拟面试、技巧或本人报告入口。',href:'../kiosk-redesign-2026-08/16-service-hubs.html?hub=interview'}])+'</section>'
-    +'<section class="notice danger"><i>!</i><div>坏链接不会被解释为真实会话状态，也不会沿用上一位使用者的练习内容。</div></section>'
+    +'<section class="notice danger"><i>!</i><div>坏链接不会被解释为这场练习状态，也不会沿用上一位使用者的练习内容。</div></section>'
     +rail();
   actions.innerHTML=link('16-service-hubs.html?hub=interview','返回面试服务')+btn('setup','打开练习设置',true);
 }

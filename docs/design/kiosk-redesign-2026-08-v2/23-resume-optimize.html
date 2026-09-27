@@ -8,7 +8,7 @@
 - 顶部只保留标题状态，底部补上一步与改写 AI 咨询（规则 1、7）。
 - 技术说明、optimizedResume 等仅从可见文案删去；原交互数据结构保持（规则 4）。
 - 返工：条目卡字数摘要只写待确认，不带数量；逐项事实核对及可访问名仍保留数量（规则 2、7）。
-- AI 帮助采用原顾问页支持的 composer 与会话草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 -->
 <html lang="zh-CN">
 <head>
@@ -32,12 +32,12 @@
       一条一条确认，没确认完 —— 采纳按钮停用，这一条也**进不了裁决草稿**（草稿退回原文）。
    3. 批量动作：可采纳的全部采纳（跳过有待确认事实的）／其余保留原文／清空全部裁决。
    4. 裁决草稿预览：把每条的裁决临时拼成一份阅读草稿，逐条标出用的是哪一版。
-      **它不是简历最终稿**，也不写进 optimizedResume —— 采纳/保留/自己写全是阅读决策。
+      **它不是简历最终稿**，也不写进优化稿 —— 采纳/保留/自己写全是阅读决策。
    5. 上传原件预览（**迁移目标，非已接通能力**）：PDF 多页（首页/末页可达）、缩放、
       适应宽度、适应整页、图片旋转；DOCX 不做忠实渲染，改成诚实替代。
       当前读取端点不返回任何原件凭证，落地前必须补受控预览令牌或按本人身份重新取件，
       不得凭 taskId 猜文件 —— 页面上用「迁移目标」带写明这一点。
-   6. 会话恢复 / 清场：会话里只有编号和一次性令牌 —— 恢复时建议能重新读回，
+   6. 继续这次办理 / 清场：这次办理里只有编号和一次性令牌 —— 恢复时建议能重新读回，
       **裁决不恢复**；清场后编号和令牌一并清掉，页面回到没有上下文。
 
   ── 查询契约（进入时的初始状态；进来之后的切换都在页内，不再跳地址）──────
@@ -50,7 +50,7 @@
                                          1|1.5|2|3 倍、0|90|180|270（旋转只对 image 开放）
     ?export=ready|no-print|failed        editor 的导出结果（未登记值 = 还没导出）
     ?format=pdf|docx|txt|md              导出格式（未登记值按 pdf）；只有 pdf 登记了打印身份
-    ?sess=restored|cleared               会话恢复 / 清场演示
+    ?sess=restored|cleared               继续这次办理 / 清场演示
     ?capture=1 / ?debug=1                夹具可达门 + 技术披露门；?flat=1 截图去动效
     rename（S19 → S25）：state=example → state=ready；新增 empty / read-error /
                         optimize-failed / illegal 四态（S19 的 error 一态拆成三态）
@@ -73,11 +73,11 @@
              （aiHttpAdapter.ts:43，绝不进 URL query）。**query 里的 taskId 不是授权。**
     模块     ResumeOptimizeModule 只有 { title, before, after }
              （packages/shared/src/types/ai.ts:154-161）。
-             **合同里没有的**：reason（改写理由）、单条重生成端点、逐条裁决落库端点、
+             **合同里没有的**：reason（改写理由）、单条重生成端点、逐条裁决保存端点、
              新增事实清单。所以本页把这三样如实标成本页产物：
-               · 「这版改了什么」是本页夹具写死的说明，不是服务端返回的 reason；
+               · 「这版改了什么」是本页夹具写死的说明，不是系统返回的 reason；
                · 没有「换一版」按钮 —— 没有单条重生成端点，画一个点不动的按钮更糟；
-               · 裁决只活在本页变量里，刷新即回待定；结构化编辑区直接使用服务端返回的 optimizedResume。
+               · 裁决只活在本页变量里，刷新即回待定；结构化编辑区直接使用系统返回的优化稿。
     裁决语义 undecided / adopt / keep 三态可反复切换，取自 ResumeOptimizeComparePage.tsx
              的 ModuleDecision；本设计按产品要求补第四种 custom（自己写）。
              该文件顶部的 UNSAVED_NOTICE 是硬要求：不许出现暗示已保存的完成态计数，
@@ -87,7 +87,7 @@
              本静态原型把编辑区、5 组排版、模板、AI 精简 / 调整排版 / 撤销、
              PDF / Word / TXT / Markdown 导出和打印凭证门禁画成**设计目标**；
              未逐项核对当前 React 实现，不写「完整对齐」。版式预览是本页画的示意，不是导出渲染。
-    演示模式 服务端 AI_PROVIDER=mock 时 providerName='mock'，此时左栏那句
+    演示模式 系统 AI_PROVIDER=mock 时 providerName='mock'，此时左栏那句
              「你写的（原件不会被改）」是**关于用户的假断言** —— 演示结果里的原句
              用户根本没写过。本页所有 before 一律标「合成样本」，不写「你写的」。
     失败分治 React 侧把 outage（能力不可用）与本次读取失败分开
@@ -104,7 +104,7 @@
   ── 机械对照的边界 ────────────────────────────────────────────────────
     factTokens / riskOf 只做两件事：① 抽出阿拉伯数字串；② 匹配 FACT_WORDS 这张示例词表。
     词表之外的事实测不出来，所以页面只写「机械对照」，绝不写「已校验」或「事实无误」。
-    真实链路必须由服务端对结构化字段逐项比对（optimizedResume 的防编造校验），
+    真实流程必须由系统对结构化内容逐项比对（optimizedResume 的防编造校验），
     前端不得替代。
 
   ── diff ──────────────────────────────────────────────────────────────
@@ -126,8 +126,8 @@
                     no-context（没有输入）五分，不合并成「再试一次」。
     ai-fallback:    手动改写清单 + 手动逐项修改入口，全程零模型；AI 失败不阻断
                     查看原文、看原件、打印、扫描和返回上传。
-    ai-persistence: 真实链路里优化结果归属服务端 AI 记录；逐条裁决不落库，结构化编辑内容仅在
-                    成功导出时形成真实文件。本页只用会话里的编号和一次性令牌恢复读取，裁决刷新即回待定；
+    ai-persistence: 实际办理时优化结果归属系统 AI 记录；逐条裁决不保存，结构化编辑内容仅在
+                    成功导出时形成真实文件。本页只用这次办理里的编号和一次性令牌恢复读取，裁决刷新即回待定；
                     待机 / 超时清场后编号与令牌一并清掉。本页不写任何本机存储。
 
   ── 边界 ────────────────────────────────────────────────────────────────
@@ -184,7 +184,7 @@ button{font:inherit;color:inherit;border:0;background:none;text-align:left}
 
 .work{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:12px 36px 0;overflow:hidden}
 /* flex 默认允许收缩。卡片被压扁但里面的内容不会跟着缩，结果就是内容顶出卡片边框、
-   被下一张卡盖住半截 —— 会话恢复条一出现，屏幕矮了 90px，这件事就真的发生过。
+   被下一张卡盖住半截 —— 继续这次办理条一出现，屏幕矮了 90px，这件事就真的发生过。
    所以卡片一律不收缩，高度按内容走；要让出空间时，只能由**里面有滚动列表**的那张卡出。 */
 .sec{flex:none;min-height:0;display:flex;flex-direction:column;padding:18px 22px;border:1px solid var(--line);border-radius:24px;background:var(--surface)}
 /* 装着 .mods 列表的那张卡是唯一可伸可缩的：多出来的高度它吃，短了也由它让，
@@ -393,7 +393,7 @@ button.row{width:100%;cursor:not-allowed}
 .export-state{margin-top:10px;padding:10px 12px;border:1px solid #bfe3d7;border-radius:12px;background:var(--soft);font-size:15px;line-height:1.4;color:var(--teal2)}
 .export-state.warn{border-color:#e2d3ae;background:var(--wheatsoft);color:var(--wheat2)}
 
-/* ── 常驻「裁决不落库」告知条：与 ResumeOptimizeComparePage 的 UNSAVED_NOTICE 同义 ──
+/* ── 常驻「裁决不保存」告知条：与 ResumeOptimizeComparePage 的 UNSAVED_NOTICE 同义 ──
    不可关闭、出现在用户做第一个裁决之前，防止「已采纳 4 条」被读成「已经改进简历」。 */
 .unsaved{flex:none;display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;padding:13px 16px;
   border:1px solid #e2d3ae;border-left:4px solid var(--wheat);border-radius:16px;background:var(--wheatsoft);color:var(--wheat2)}
@@ -404,7 +404,7 @@ button.row{width:100%;cursor:not-allowed}
 /* ── 版式预览：14 个排版按钮按下去必须有看得见的结果 ──────────────
    之前这一列只有 4 个输入框，下面 700px 是空的，而排版参数按了没有任何反馈。
    预览按当前 fontScale / lineSpacing / margin / columns / accent 即时重排，
-   内容与上面的字段同源，改一个字这里跟着变。 */
+   内容与上面的内容同源，改一个字这里跟着变。 */
 .epv{flex:1 1 auto;min-height:300px;display:flex;flex-direction:column;padding:17px 19px;border:1px solid var(--line);border-radius:20px;background:var(--surface)}
 .epv-h{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
 .epv-h b{font-size:19px}
@@ -714,8 +714,8 @@ html.debug .demo-tab{font-size:22px}
     <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;src=pdf">原件预览 · PDF</a>
     <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;src=image">原件预览 · 图片</a>
     <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;src=docx">原件预览 · DOCX</a>
-    <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;sess=restored">会话恢复</a>
-    <a href="?debug=1&amp;sess=cleared">会话清场</a>
+    <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;sess=restored">继续这次办理</a>
+    <a href="?debug=1&amp;sess=cleared">清除这次办理</a>
   </div>
 
 </main>
@@ -749,7 +749,7 @@ if (viewBad || stateBad) fallback = true;
 var view  = viewBad ? 'optimize' : (wantView || 'optimize');
 var state = (viewBad || stateBad) ? 'illegal' : (wantState || 'no-context');
 
-/* 编号只接受严格字符集。不合法 == 没带；编号本身不是授权 —— 真实链路按会员登录态
+/* 编号只接受严格字符集。不合法 == 没带；编号本身不是授权 —— 真实流程按会员登录态
    或匿名一次性令牌判本人，地址栏带一个编号读不到别人的结果。 */
 var rawRid = q.get('taskId');
 var RID = rawRid && /^[A-Za-z0-9_-]{1,24}$/.test(rawRid) ? rawRid : null;
@@ -924,9 +924,9 @@ var exportState=['ready','no-print','failed'].indexOf(q.get('export'))>=0?q.get(
 
    **只有 PDF 这一条登记了可以交给打印确认页的文件身份。** 原因写在这里，免得以后
    有人「顺手把另外三种也接上」：真实导出返回的是**原格式**的 fileId（DOCX / TXT / MD），
-   而打印用的是服务端另渲染的一份同内容 PDF，那份 PDF 的 fileId 当前**接口没有返回**
+   而打印用的是系统另渲染的一份同内容 PDF，那份 PDF 的 fileId 当前**系统没有返回**
    （只给了一条 printFileUrl）。把原格式的 fileId 当成那份 PDF 的身份交出去，
-   等于替服务端断言两个不同对象是同一个 —— 下游按编号取到的可能根本不是打印的那一份。
+   等于替系统断言两个不同对象是同一个 —— 下游按编号取到的可能根本不是打印的那一份。
    所以非 PDF 在这里如实禁用打印，并写清缺的是什么；查看与手机保存不受影响。 */
 var EXPORT_FILE={
  pdf: {filename:'优化版简历_张示例.pdf', sizeBytes:118784, pageCount:2,
@@ -1111,16 +1111,16 @@ function unsavedBar(){
  return '<div class="unsaved" data-testid="'+SCREEN+'-unsaved" role="note"><i aria-hidden="true">!</i>'+
  '<p>这里先选改法，离开后不保留；要带走新简历，请回总览进入编辑区，再导出。</p></div>';
 }
-/* 逐条裁决不单独落库；真实落地走 optimizedResume 结构化编辑与导出。 */
+/* 逐条裁决不单独保存；真实落地走 optimizedResume 结构化编辑与导出。 */
 function saveBlock(extra){
   return '<section class="sec"><div class="sec-h"><h2>优化版简历编辑与导出</h2><small>唯一可导出的工作区</small></div>'
     + '<div class="save">'
     + '<button type="button" class="sbtn m-press" id="open-editor" data-testid="'+SCREEN+'-save">'
     + '<span>编辑优化版简历</span><small>排版 · 模板 · 导出</small></button>'
     + '<div class="need" id="'+SCREEN+'-save-need" data-testid="'+SCREEN+'-save-need">'
-    + '<span>· 上面的裁决不会被带进编辑区：编辑区打开的是服务端返回的 optimizedResume 原样内容</span>'
-    + '<span>· 想用的改法要在编辑区里自己改进对应字段 —— 只有编辑区的内容进入导出</span>'
-    + '<span>· PDF / Word / TXT / Markdown 各自生成一份真实文件；打印还要服务端给出 printFileUrl</span>'
+    + '<span>· 上面的裁决不会被带进编辑区：编辑区打开的是系统返回的优化稿原样内容</span>'
+    + '<span>· 想用的改法要在编辑区里自己改进对应内容 —— 只有编辑区的内容进入导出</span>'
+    + '<span>· PDF / Word / TXT / Markdown 各自生成一份真实文件；打印还要系统给出打印链接</span>'
     + '</div></div>' + (extra || '') + '</section>';
 }
 
@@ -1198,7 +1198,7 @@ R['read-error'] = function(){
   tkTag.textContent = '读取失败';
   work.innerHTML =
     '<section class="sec m-fade-in"><div class="sec-h"><h2>这次没能取到优化结果</h2></div>'
-    + '<p class="lead">常见原因：本次办理会话已经结束、结果已按留存期清理，或者读取中途断开。'
+    + '<p class="lead">常见原因：这次办理已经结束、结果已按留存期清理，或者读取中途断开。'
     + '<b>读取失败不会动到你上传的原件，也不会删掉任何已保存的简历。</b>'
     + '拿不到结果和「没有结果」是两件事，这一屏说的是前者。</p></section>'
     + '<section class="sec"><div class="sec-h"><h2>接下来可以做的</h2></div>'
@@ -1212,7 +1212,7 @@ R['read-error'] = function(){
     + btn(withRid(SELF,'state=loading'),'再读一次',true,SCREEN+'-primary','/resume/optimize');
   why.className = 'why show';
   why.textContent = '读取失败时不给逐条对照入口：点进去只会再失败一次。';
-  truthTx.textContent = '静态设计原型：这一屏只表达读取失败，本页不会重试真实接口。';
+  truthTx.textContent = '静态设计原型：这一屏只表达读取失败，本页不会再向系统重试。';
 };
 
 R['optimize-failed'] = function(){
@@ -1220,7 +1220,7 @@ R['optimize-failed'] = function(){
   tkTag.textContent = '生成失败';
   work.innerHTML =
     '<section class="sec m-fade-in"><div class="sec-h"><h2>这次没能生成建议</h2></div>'
-    + '<p class="lead">失败原因由服务端原样带过来（示例：<b>处理超时，请稍后重试</b>）。'
+    + '<p class="lead">失败原因由系统原样带过来（示例：<b>处理超时，请稍后重试</b>）。'
     + '和「读取失败」不同：请求到了，处理没跑完。<b>原文和已上传的文件都保持原样。</b>'
     + '这一屏<b>一条建议都不给</b> —— 没跑出来就是没有，不拿通用话术顶替。</p></section>'
     + '<section class="sec"><div class="sec-h"><h2>接下来可以做的</h2></div>'
@@ -1314,8 +1314,8 @@ function renderOverview(){
   why.className = 'why show';
   why.innerHTML = '「待确认事实」来自本页的机械对照：只比对数字和示例词表命中的词，'
     + '<b>不是通用事实校验</b>，词表之外的编造它测不出来。'
-    + '<span data-testid="'+SCREEN+'-session">本次会话只记住编号和一次性令牌；裁决不写会话，刷新即回待定。</span>';
-  truthTx.textContent = '静态设计原型：建议为合成样本；裁决只是阅读决策，不写入账号、不进 optimizedResume、不生成文件、不打印。';
+    + '<span data-testid="'+SCREEN+'-session">这次办理只记住编号和一次性令牌；裁决不记在这次办理里，刷新即回待定。</span>';
+  truthTx.textContent = '静态设计原型：建议为合成样本；裁决只是阅读决策，不写入账号、不写进优化稿、不生成文件、不打印。';
 }
 
 /* 全部段落一次给出、就地编辑，对齐 React 的 OptimizedResumeEditor（那边也是单栏可滚、
@@ -1334,8 +1334,8 @@ function editorFields(){
 function control(label,key,choices){
   return '<div class="ctl"><span>'+label+'</span><div class="ctl-row">'+choices.map(function(c){return '<button type="button" class="ctl-btn" data-layout="'+key+'" data-value="'+c[0]+'" aria-pressed="'+(String(LAYOUT[key])===String(c[0]))+'">'+c[1]+'</button>';}).join('')+'</div></div>';
 }
-/* 版式预览：14 个排版按钮按下去要看得见结果，内容与上面的字段同源。
-   预览只是把同一份结构化内容按当前参数重排，不是服务端渲染出来的 PDF —— 页内写明这一点。 */
+/* 版式预览：14 个排版按钮按下去要看得见结果，内容与上面的内容同源。
+   预览只是把同一份结构化内容按当前参数重排，不是系统渲染出来的 PDF —— 页内写明这一点。 */
 var PV_FS={compact:15,standard:17,large:19.5},PV_LS={compact:1.3,standard:1.55,relaxed:1.8},
     PV_MG={narrow:14,normal:22,wide:34},PV_AC={blue:'#35608f',green:'#157a67',slate:'#4a5a55'};
 function editorPreview(){
@@ -1357,15 +1357,15 @@ function exportResult(){
   var f=exportFile();
   if(exportState==='ready') return '<div class="export-state" data-testid="'+SCREEN+'-export-file"'
     +' data-file-id="'+esc(f.fileId)+'" data-pages="'+f.pageCount+'"><b>优化版 '+exportFormat.toUpperCase()+' 已生成</b><br>'
-    +esc(fileMetaLine(f))+'<br>文件编号 '+esc(f.fileId)+'（合成夹具，不是真实导出结果）。'
+    +esc(fileMetaLine(f))+'<br>文件编号 '+esc(f.fileId)+'（示例编号，不是真实导出结果）。'
     +(f.printable
-      ?'signedUrl 与 printFileUrl 都不进地址栏，打印交接只带文件编号与打印参数。'
-      :'<b>这一份暂时进不了打印</b>：真实接口这次返回的是 '+exportFormat.toUpperCase()
-        +' 原文件的编号，打印要用的是服务端另渲染的那份同内容 PDF，而那份 PDF 的<b>文件编号接口没有返回</b>。'
+      ?'下载链接和打印链接都不进地址栏，打印交接只带文件编号与打印参数。'
+      :'<b>这一份暂时进不了打印</b>：系统这次返回的是 '+exportFormat.toUpperCase()
+        +' 原文件的编号，打印要用的是系统另渲染的那份同内容 PDF，而那份 PDF 的<b>文件编号没有返回</b>。'
         +'编号对不上就不能交接，所以这里如实关掉打印；查看和手机保存照常。')
     +'</div>';
   if(exportState==='no-print') return '<div class="export-state warn"><b>真实文件已生成，但打印链接未就绪</b><br>'
-    +esc(fileMetaLine(f))+'<br>signedUrl 可用于查看或手机保存；没有 printFileUrl，打印必须保持禁用。</div>';
+    +esc(fileMetaLine(f))+'<br>下载链接可用于查看或手机保存；没有打印链接，打印必须保持禁用。</div>';
   if(exportState==='failed') return '<div class="export-state warn"><b>本次导出失败</b><br>没有真实文件，不显示预览、保存或打印入口；可继续编辑后重试。</div>';
   return '';
 }
@@ -1374,32 +1374,32 @@ function renderEditor(){
   tkTitle.textContent='优化版简历编辑与导出';
   tkSub.textContent='结构化修改内容，调整排版和模板，再选择真实导出格式。';
   tkTag.textContent=exportState==='ready'?'文件已生成':exportState==='no-print'?'打印凭证未就绪':'编辑中';
-  work.innerHTML='<div class="edit-shell"><section class="edit-main"><div class="edit-head"><div class="tx"><b>优化版简历</b><p>这里编辑的是服务端返回的 optimizedResume 原样内容；<b>上一页的裁决不会自动写进来</b>，要用的改法请在这里手工改。修改后旧导出物失效，需重新导出。</p></div><span class="chip" data-d="'+(exportState==='ready'?'adopt':'custom')+'">'+(exportState==='ready'?'与已导出文件一致':exportState==='no-print'?'文件已生成 · 缺打印凭证':'未导出改动')+'</span></div>'+
+  work.innerHTML='<div class="edit-shell"><section class="edit-main"><div class="edit-head"><div class="tx"><b>优化版简历</b><p>这里编辑的是系统返回的优化稿原样内容；<b>上一页的裁决不会自动写进来</b>，要用的改法请在这里手工改。修改后旧导出物失效，需重新导出。</p></div><span class="chip" data-d="'+(exportState==='ready'?'adopt':'custom')+'">'+(exportState==='ready'?'与已导出文件一致':exportState==='no-print'?'文件已生成 · 缺打印凭证':'未导出改动')+'</span></div>'+
     '<div class="edit-tabs">'+EDIT_SECTIONS.map(function(s,i){return '<button type="button" class="edit-tab" data-section="'+i+'" aria-pressed="'+(i===editSection)+'">'+s+'</button>';}).join('')+'</div>'+editorFields()+'</section>'+
     '<aside class="edit-side"><section class="side-card"><h3>排版调整</h3><p>5 组参数对应共享合同 defaultLayout，改动即时反映在下方预览。</p>'+control('字号','fontScale',[['compact','紧凑'],['standard','标准'],['large','放大']])+control('行距','lineSpacing',[['compact','紧凑'],['standard','标准'],['relaxed','舒展']])+control('页边距','margin',[['narrow','窄'],['normal','标准'],['wide','宽']])+control('主色','accent',[['blue','蓝'],['green','绿'],['slate','灰']])+control('栏数','columns',[['1','单栏'],['2','双栏']])+'</section>'+
-    '<section class="side-card"><h3>简历模板</h3><p>模板来自服务端；读取失败仍可用默认排版导出。</p><div class="tpl-list"><button type="button" class="tpl-btn" aria-pressed="'+(selectedTemplate==='resume-template-clean')+'" data-template-id="resume-template-clean">清爽通用简历模板<small>clean · 简历优化与现场打印</small></button></div></section>'+
+    '<section class="side-card"><h3>简历模板</h3><p>模板来自系统；读取失败仍可用默认排版导出。</p><div class="tpl-list"><button type="button" class="tpl-btn" aria-pressed="'+(selectedTemplate==='resume-template-clean')+'" data-template-id="resume-template-clean">清爽通用简历模板<small>clean · 简历优化与现场打印</small></button></div></section>'+
     '<section class="side-card"><h3>AI 辅助调整</h3><p>只调表达密度与排版，不新增经历或事实。</p><div class="ai-grid"><button type="button" class="ai-btn" data-ai="condense">AI 精简</button><button type="button" class="ai-btn" data-ai="reformat">AI 调整排版</button></div>'+(lastAiAction?'<button type="button" class="undo" id="undo-ai">撤销 AI 调整</button><div class="export-state">已执行：'+(lastAiAction==='condense'?'AI 精简':'AI 调整排版')+'。导出物已失效，需要重新导出。</div>':'')+'</section>'+
     '<section class="side-card"><h3>导出格式</h3><div class="fmt-grid">'+[['pdf','PDF'],['docx','Word'],['txt','TXT'],['md','Markdown']].map(function(f){return '<button type="button" class="fmt-btn" data-format="'+f[0]+'" aria-pressed="'+(exportFormat===f[0])+'">'+f[1]+'</button>';}).join('')+'</div><p>PDF 可直接预览，也是当前<b>唯一能交给打印确认</b>的格式；Word / TXT / Markdown 供下载编辑，'
-    +'打印要用服务端另渲染的同内容 PDF，而那份 PDF 的文件编号接口还没返回，所以暂不开放。</p>'+exportResult()+'</section>'+editorPreview()+'</aside></div>';
+    +'打印要用系统另渲染的同内容 PDF，而那份 PDF 的文件编号还没返回，所以暂不开放。</p>'+exportResult()+'</section>'+editorPreview()+'</aside></div>';
   var left='<button type="button" class="btn m-press" id="open-overview" data-testid="'+SCREEN+'-editor-back">返回建议总览</button>';
   if(exportState==='ready'){
     var xf=exportFile();
     /* 裸 href 会落到打印确认页的「没有任务」空态：那一页只认登记过的来源 + 文件编号成对。
        PDF 这一份登记过，所以带齐 source / fileId / pages 和打印参数交过去；
-       另外三种格式的打印身份服务端还没给，按钮如实禁用，理由常驻可见。 */
+       另外三种格式的打印身份系统还没给，按钮如实禁用，理由常驻可见。 */
     cta.innerHTML=left+'<button type="button" class="btn m-press" id="view-export" data-testid="'+SCREEN+'-export-preview">查看或手机保存 '+exportFormat.toUpperCase()+'</button>'
       +(xf.printable
         ?'<a class="btn primary m-press" href="'+esc(printHandoffHref(xf))+'" data-route="/print/confirm" data-testid="'+SCREEN+'-primary">去打印优化版</a>'
-        :'<button type="button" class="btn primary" aria-disabled="true" data-testid="'+SCREEN+'-primary" aria-label="'+esc(exportFormat.toUpperCase()+' 暂不开放打印，待服务端返回打印 PDF 文件编号')+'">'+exportFormat.toUpperCase()+' 暂不开放打印</button>');
+        :'<button type="button" class="btn primary" aria-disabled="true" data-testid="'+SCREEN+'-primary" aria-label="'+esc(exportFormat.toUpperCase()+' 暂不开放打印，等系统返回打印 PDF 文件编号')+'">'+exportFormat.toUpperCase()+' 暂不开放打印</button>');
   }
   else if(exportState==='no-print') cta.innerHTML=left+'<button type="button" class="btn m-press" id="view-export" data-testid="'+SCREEN+'-export-preview">查看或手机保存 '+exportFormat.toUpperCase()+'</button><button type="button" class="btn primary" aria-disabled="true" data-testid="'+SCREEN+'-primary">打印链接未就绪</button>';
   else cta.innerHTML=left+'<button type="button" class="btn primary m-press" id="do-export" data-testid="'+SCREEN+'-primary">导出 '+exportFormat.toUpperCase()+'</button>';
   why.className='why show';
   why.innerHTML='结构化内容、排版、模板或导出格式改变后，都必须重新生成文件。'
     +(exportState==='ready'&&!exportFile().printable
-      ?'<b>'+exportFormat.toUpperCase()+' 暂不开放打印：待服务端返回打印 PDF 的文件编号。</b>现在这条接口只给原格式文件的编号，拿它冒充打印用的那份 PDF，下游按编号取到的可能不是同一个文件。改用 PDF 导出即可现在打印。'
-      :'只有真实 printFileUrl 就绪、并且拿到那份文件自己的编号，才进入打印确认。');
-  truthTx.textContent='静态设计原型：编辑内容为合成样本，版式预览由本页绘制；本屏是设计目标，未逐项核对当前 React 实现，也不代表接口、模型、文件或打印已在线。';
+      ?'<b>'+exportFormat.toUpperCase()+' 暂不开放打印：等系统返回打印 PDF 的文件编号。</b>现在系统这次只给出原格式文件的编号，拿它冒充打印用的那份 PDF，下游按编号取到的可能不是同一个文件。改用 PDF 导出即可现在打印。'
+      :'只有真实打印链接就绪、并且拿到那份文件自己的编号，才进入打印确认。');
+  truthTx.textContent='静态设计原型：编辑内容为合成样本，版式预览由本页绘制；本屏是设计目标，未逐项核对当前 React 实现，也不代表系统、模型、文件或打印已在线。';
 }
 
 /* ════════ 8. ready · 逐条对照 ════════ */
@@ -1567,8 +1567,8 @@ function finalOverlay(){
     + ' data-usable="'+usable+'" data-blocked="'+blocked+'" data-todo="'+c.todo+'">'
     + '<div class="pv-box"><div class="pv-hd"><b>裁决草稿预览</b>'
     + '<button type="button" class="cl m-press" id="final-close" data-testid="'+SCREEN+'-final-close">'+ic('close',22,2.3)+'关闭</button></div>'
-    + '<p class="pv-warn">这是<b>阅读决策草稿，不是简历最终稿</b>：按你当前的裁决临时拼出来，不保存、不写进 optimizedResume，离开本页就没有了。'
-    + '真正能导出的那一版在「优化版简历」编辑区里 —— 你在这里决定要用的改法，还要到编辑区手工改进对应字段。</p>'
+    + '<p class="pv-warn">这是<b>阅读决策草稿，不是简历最终稿</b>：按你当前的裁决临时拼出来，不保存、不写进优化稿，离开本页就没有了。'
+    + '真正能导出的那一版在「优化版简历」编辑区里 —— 你在这里决定要用的改法，还要到编辑区手工改进对应内容。</p>'
     + '<div class="fin" data-clip="1" data-testid="'+SCREEN+'-final-body">'
     + '<div class="fh"><b>按当前裁决临时拼出的阅读草稿</b><span>已决定 '+(MODS.length-c.todo)+' / '+MODS.length
     + ' · 因事实未确认退回原文 '+blocked+' 条</span></div>' + items + '</div>'
@@ -1576,8 +1576,8 @@ function finalOverlay(){
     + '<button type="button" class="sbtn m-press" id="final-editor" data-testid="'+SCREEN+'-final-save"><span>进入优化版编辑</span><small>在那里改才进得了导出</small></button>'
     + '<button type="button" class="sbtn" aria-disabled="true" data-testid="'+SCREEN+'-final-print" aria-describedby="'+SCREEN+'-final-need"><span>打印建议草稿</span><small>没有真实文件</small></button>'
     + '<div class="need" id="'+SCREEN+'-final-need" data-testid="'+SCREEN+'-final-need">'
-    + '<span>· 逐条裁决没有独立落库接口，这份拼接草稿既不算已保存，也不会进 optimizedResume</span>'
-    + '<span>· 真实文件只由编辑区的 optimizedResume 导出，不打印这份阅读草稿</span>'
+    + '<span>· 逐条裁决没有单独保存，这份拼接草稿既不算已保存，也不会写进优化稿</span>'
+    + '<span>· 真实文件只由编辑区里的优化稿导出，不打印这份阅读草稿</span>'
     + '<span>· 本页不显示价格，也不做任何支付；打印计费在打印台按真实文件页数算</span>'
     + '</div></div></div></div>';
 }
@@ -1671,13 +1671,13 @@ function svToolbar(f){
     + zoomBtn(1,'in','放大','zoomin','已经是最大倍数') + '</div></div>';
 }
 /* 原件预览这一层是**迁移目标**，不是已接通的能力：
-   GET /resume/records/:taskId/optimize 只回建议文本，不回原件凭证（packages/shared ResumeOptimizeResponse 里没有文件字段）。
+   GET /resume/records/:taskId/optimize 只回建议文本，不回原件凭证（packages/shared ResumeOptimizeResponse 里没有文件内容）。
    所以这里不画「点一下就能看到你上传的那份」，而是把缺口写在最显眼的位置。 */
 function srcGapNote(inBox){
   return '<div class="srcgap'+(inBox?' inbox':'')+'" data-testid="'+SCREEN+'-source-contract-gap" role="note">'
     + '<i class="tagx">迁移目标</i>'
     + '<p>当前读取端点只返回优化建议，<b>不返回原件的任何文件凭证</b>。要真正打开你上传的那一份，'
-    + '服务端必须另发一个<b>受控的一次性预览令牌</b>，或按你本人的登录态重新取一次自己的文件；'
+    + '系统必须另发一个<b>受控的一次性预览令牌</b>，或按你本人的登录态重新取一次自己的文件；'
     + '<b>地址栏里的 taskId 只是编号，既不是授权，也不能用来定位文件</b> —— 本页不凭它去猜任何文件。</p></div>';
 }
 function sourceViewer(f){
@@ -1710,7 +1710,7 @@ var NOTICE = {
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
     ] },
   'no-file': { icon:'slash', title:'这次没有可预览的原件',
-    why:'优化结果按编号读取，原件预览要另外一份带时效的文件访问凭证，这次进入没有拿到。原件是否还在服务端保留，这一屏看不出来，也不做判断。',
+    why:'优化结果按编号读取，原件预览要另外一份带时效的文件访问凭证，这次进入没有拿到。原件是否还在系统保留，这一屏看不出来，也不做判断。',
     keep:'这<b>不是建议读取失败</b>：候选已经在下面了。',
     rows:[
       ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
@@ -1718,7 +1718,7 @@ var NOTICE = {
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
     ] },
   'expired': { icon:'clock', title:'原件的临时访问链接已过期',
-    why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还在服务端保留，这一屏都看不出来，也不做判断。',
+    why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还在系统保留，这一屏都看不出来，也不做判断。',
     keep:'这<b>不是建议读取失败</b>：候选已经在下面了。',
     rows:[
       ['dead','refresh','再取一次原件','静态原型不会真的重新取件','-source-alt-retry'],
@@ -1726,7 +1726,7 @@ var NOTICE = {
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
     ] },
   'render-failed': { icon:'broken', title:'原件取到了，但这一层没能把它显示出来',
-    why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还在服务端保留。',
+    why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还在系统保留。',
     keep:'<b>优化建议不受影响</b>：候选就在这一层下面。',
     rows:[
       ['dead','refresh','再显示一次','静态原型不会真的重新渲染','-source-alt-retry'],
@@ -1836,11 +1836,11 @@ function render(){
 
   if (sess === 'restored') {
     sessbar.classList.add('show');
-    sessTx.textContent = '会话恢复：这台机器上还留着这次的简历编号和一次性令牌，已按它重新读回建议。'
-      + '逐条裁决没有恢复 —— 裁决不写会话，刷新即回到待定。';
+    sessTx.textContent = '继续这次办理：这台机器上还留着这次的简历编号和一次性令牌，已按它重新读回建议。'
+      + '逐条裁决没有恢复 —— 裁决不记在这次办理里，刷新即回到待定。';
   } else if (sess === 'cleared') {
     sessbar.classList.add('show');
-    sessTx.textContent = '会话已清场：待机 / 超时把编号和一次性令牌一并清掉了，所以这一屏回到没有上下文。'
+    sessTx.textContent = '这次办理已清除：待机 / 超时把编号和一次性令牌一并清掉了，所以这一屏回到没有上下文。'
       + '重新上传或从「我的」里打开一份记录，就能再拿到编号。';
   }
 
@@ -1951,7 +1951,7 @@ function bindMain(){
     var si=Number(this.getAttribute('data-edit-sec')),j=Number(this.getAttribute('data-edit-value'));
     EDIT_DATA[si][j][1]=this.value;
     var cell=work.querySelector('[data-pvv="'+si+'-'+j+'"]');
-    if(cell)cell.textContent=this.value;              /* 版式预览与字段同源，边打字边跟着变 */
+    if(cell)cell.textContent=this.value;              /* 版式预览与内容同源，边打字边跟着变 */
     if(exportState){                                   /* 上一份导出物已经作废，卡片不能继续留在屏幕上 */
       var pos=this.selectionStart,box=work.querySelector('.edit-main'),top=box?box.scrollTop:0;
       exportState=''; render();
@@ -1971,7 +1971,7 @@ function bindMain(){
   for(i=0;i<ai.length;i++)ai[i].addEventListener('click',function(){lastAiAction=this.getAttribute('data-ai');exportState='';render();});
   on('undo-ai',function(){lastAiAction='';exportState='';render();});
   on('do-export',function(){exportState='ready';render();});
-  on('view-export',function(){why.className='why show';why.textContent='真实页面会打开文件预览，并提供手机保存 signedUrl；静态原型不生成二维码或真实文件。';});
+  on('view-export',function(){why.className='why show';why.textContent='办理时会打开文件预览，并给出手机保存用的下载链接；这一页不生成二维码或真实文件。';});
   /* 批量动作：可采纳的全部采纳（跳过事实未确认的）／其余保留原文／清空。 */
   on('bx-adopt', function(){
     var n = 0, skip = 0, k;
