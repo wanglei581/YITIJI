@@ -420,9 +420,11 @@ export class AiService {
   async getResumeOptimize(
     taskId: string,
     requester: AiResultRequester = { endUserId: null, accessToken: null },
+    existingOnly = false,
   ): Promise<OptimizeResumeOutput> {
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
+    if (existingOnly) throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '这份优化稿已删除、已过期或不属于当前账号，无法打开' } })
     return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester))
   }
 

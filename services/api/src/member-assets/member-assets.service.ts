@@ -135,7 +135,7 @@ export class MemberAssetsService {
       ...memberPageArgs(page),
     })
     const visible = await this.omitSystemJobFitFiles(rows, where, total)
-    return buildMemberPage(visible.rows, page, visible.total, (f) => ({
+    const list = buildMemberPage(rows, page, visible.total, (f) => ({
       id: f.id,
       filename: f.filename,
       mimeType: f.mimeType,
@@ -155,6 +155,8 @@ export class MemberAssetsService {
       previewUrlPath: `/files/${f.id}/preview-url`,
       reprintable: f.purpose !== 'contract_review_report',
     }))
+    const visibleIds = new Set(visible.rows.map((row) => row.id))
+    return { ...list, items: list.items.filter((row) => visibleIds.has(row.id)) }
   }
 
   /**
@@ -205,7 +207,8 @@ export class MemberAssetsService {
   /** AI 服务记录：本人 AiResumeResult(parse / optimize / generate) 调用历史元数据（不含 payload）。 */
   async listAiRecords(
     endUserId: string,
-    page: MemberPageQuery
+    page: MemberPageQuery,
+    qaPage: MemberPageQuery = { cursor: null, pageSize: page.pageSize },
   ): Promise<MemberAiRecordPage> {
     const where = {
       endUserId,
@@ -213,7 +216,8 @@ export class MemberAssetsService {
       kind: { notIn: [...HIDDEN_RESUME_RESULT_KINDS] },
     }
     const now = new Date()
-    const [counted, fetched, qaRows] = await Promise.all([
+    const qaWhere = { kind: 'qa_pins', expiresAt: { gt: now }, session: { endUserId, expiresAt: { gt: now } } }
+    const [counted, fetched, qaRows, qaTotal] = await Promise.all([
       this.prisma.aiResumeResult.count({ where }),
       this.prisma.aiResumeResult.findMany({
         where,
@@ -230,13 +234,8 @@ export class MemberAssetsService {
         ...memberPageArgs(page),
       }),
       this.prisma.advisorArtifact.findMany({
-        where: {
-          kind: 'qa_pins',
-          expiresAt: { gt: now },
-          session: { endUserId, expiresAt: { gt: now } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
+        where: qaWhere,
+        ...memberPageArgs(qaPage),
         select: {
           id: true,
           sessionId: true,
@@ -247,13 +246,14 @@ export class MemberAssetsService {
           session: { select: { topic: true } },
         },
       }),
+      this.prisma.advisorArtifact.count({ where: qaWhere }),
     ])
     const visibleAi = await this.omitSystemJobFitRecords(fetched, where, counted)
     const rows = visibleAi.rows
     const total = visibleAi.total
     const parseTaskIds = rows.filter((r) => r.kind === 'parse').map((r) => r.taskId)
     const draftMeta = await loadResumeDraftMeta(this.prisma, endUserId, parseTaskIds)
-    const list = buildMemberPage(rows, page, total, (r): MemberAiRecordItem => {
+    const list = buildMemberPage(fetched, page, total, (r): MemberAiRecordItem => {
       const extra = r.kind === 'parse' ? draftMeta.get(r.taskId) : undefined
       return {
       id: r.id,
@@ -278,7 +278,7 @@ export class MemberAssetsService {
       ref: r.kind === 'fair_visit_plan' ? parseFairVisitPlanRef(r.payloadJson) : null,
       }
     })
-    const qaRecords: MemberQaRecordItem[] = qaRows.map((row) => ({
+    const qaList = buildMemberPage(qaRows, qaPage, qaTotal, (row): MemberQaRecordItem => ({
       id: row.id,
       sessionId: row.sessionId,
       artifactId: row.id,
@@ -288,7 +288,17 @@ export class MemberAssetsService {
       expiresAt: row.expiresAt.toISOString(),
       fileId: row.fileId,
     }))
-    return { ...list, qaRecords }
+    const visibleIds = new Set(rows.map((row) => row.id))
+    return { ...list, items: list.items.filter((row) => visibleIds.has(row.id)), qaRecords: qaList.items, qaNextCursor: qaList.nextCursor, qaTotal }
+  }
+
+  /** 只删除本人这份小青作业；已导出的文件仍可在「我的文档」单独管理。 */
+  async deleteQaRecord(endUserId: string, artifactId: string): Promise<{ deleted: true }> {
+    const result = await this.prisma.advisorArtifact.deleteMany({
+      where: { id: artifactId, kind: 'qa_pins', session: { endUserId } },
+    })
+    if (!result.count) throw new NotFoundException({ error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '小青作业不存在或已删除' } })
+    return { deleted: true }
   }
 
   /**

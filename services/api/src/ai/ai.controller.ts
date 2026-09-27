@@ -267,11 +267,14 @@ export class AiController {
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
     @Query('benefitGrantId') benefitGrantId?: string,
+    @Query('existingOnly') existingOnly?: string,
   ): Promise<ResumeOptimizeResponseDto> {
     const requester = await this.resolveAiResultRequester(req)
     if (requester.endUserId) {
       await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     }
+    // 历史记录回看不懒生成，也不核销权益。
+    if (existingOnly === '1') return this.aiService.getResumeOptimize(taskId, requester, true)
     const result = await this.aiService.getResumeOptimize(taskId, requester)
 
     // 权益核销：仅当优化结果真实生成（completed）且显式传入 benefitGrantId 时才核销；

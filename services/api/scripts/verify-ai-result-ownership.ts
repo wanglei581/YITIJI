@@ -74,14 +74,15 @@ async function main() {
 
   // provider 桩：parseResume 返回固定 mintTask；optimizeResume 返回固定 modules。
   const REPORT = { sections: [{ key: 'basic', label: '基础信息', score: 8, maxScore: 10 }], suggestions: ['x'] }
+  let optimizeCalls = 0
   const mockProvider = {
     name: 'mock',
     parseResume: async () => ({ taskId: mintTask, status: 'completed' as const, report: REPORT }),
-    optimizeResume: async (taskId: string) => ({
+    optimizeResume: async (taskId: string) => { optimizeCalls += 1; return ({
       taskId,
       status: 'completed' as const,
       modules: [{ title: 't', before: 'a', after: 'b' }],
-    }),
+    }) },
     chatAssistant: async () => { throw new Error('chatAssistant not used in this verify') },
     classifyIntent: async () => { throw new Error('classifyIntent not used in this verify') },
   } as unknown as never
@@ -149,6 +150,11 @@ async function main() {
     if (opt?.taskId === mintTask && opt.modules?.length) pass('2. 正确 token 可懒生成 / 读取 optimize')
     else fail('2. 正确 token 读 optimize 失败')
 
+    // W3-a: opening a saved optimization must never invoke lazy generation.
+    const storedOptimize = await ai.getResumeOptimize(mintTask, anon(minted.accessToken ?? null), true)
+    if (storedOptimize.taskId === mintTask) pass('已有优化稿只读恢复准确 taskId')
+    else fail('已有优化稿只读恢复了错误 taskId')
+
     // ── 3. 无 token 读匿名结果 → AI_TASK_NOT_FOUND ──────────────────────────
     await expectNotFound(() => ai.getResumeRecord(mintTask, anon(null)), '3. 无 token 读匿名 parse → AI_TASK_NOT_FOUND')
     await expectNotFound(() => ai.getResumeOptimize(mintTask, anon(null)), '3b. 无 token 读匿名 optimize → AI_TASK_NOT_FOUND')
@@ -166,6 +172,10 @@ async function main() {
     await prisma.aiResumeResult.create({
       data: { taskId: memberTask, kind: 'parse', status: 'completed', payloadJson: parsePayload(memberTask), provider: 'mock', expiresAt: future, endUserId: userA, accessTokenHash: null },
     })
+    const callsBeforeRead = optimizeCalls
+    await expectNotFound(() => ai.getResumeOptimize(memberTask, member(userA), true), '历史优化稿缺失时只读拒绝，不触发生成')
+    if (optimizeCalls === callsBeforeRead) pass('只读拒绝没有调用优化模型')
+    else fail('只读拒绝触发了优化模型')
     const ownRead = await ai.getResumeRecord(memberTask, member(userA))
     if (ownRead?.taskId === memberTask && ownRead.report) pass('6. 会员本人可读会员结果')
     else fail('6. 会员本人读会员结果失败')
