@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-27：3.14 本机构官方渠道三路并入候选（第 20 轮）
+
+- **并入：** Codex 后端 `codex/official-channels-314-20260927`（到 `e0d336027`，四轮返工）与 Claude 两个后台页面 `claude/console-official-channels-20260927`（`ffdbc3c8d`）先后并入候选；一体机页面此前已并入（`de6f5fcc5`）。冲突只在 `docs/graph/*`（重新生成）、`docs/progress/current-progress.md`（两侧都保留）与 `scripts/verify-compliance-copy.mjs`（后端 5c 禁词检查与三端标题检查 6 都保留，5c 的通过判断改用本项计数，不再看全局 `failures`）。
+- **契约对齐（`8a1f0759f`）：** `packages/shared` 的 `RecruitmentEmergencyTargetType` 加 `official_channel`（标签「机构官方渠道」，机构端通知卡片据此显示）；管理员端删掉本地 `AdminOrgOfficialChannel` 与 `AdminEmergency*` 替身，改用 `OfficialChannelAdminItem` 与 shared 的下架类型；机构端 mock 对已下架渠道的拒绝改成服务端原句「该渠道已紧急下架，只能归档」，判断顺序也与 `updateForPartner` 一致（空更新 → 找行 → hold）；一体机 `services/api/officialChannels.ts` 的本地类型改为 shared 的 `OfficialChannelPublicItem / OfficialChannelPublicResponse` 别名。
+- **本地 CI 复刻（`$S/wt-ci2`，34 步）：** 并入后 296 条 verify 有 3 条红——`verify:admin-phone-transfer`、`verify:internal-auth-phone`、`verify:partner-account-action` 都在 `scripts/support/internal-auth-verify-harness.ts` 手写的 `Organization` 建表语句上撞 P2022（缺 3.14 新列 `verifiedOfficialDomainsJson`）。补列后三条重跑通过（`1a652f0ef`）。Codex 报告里没跑这三条，是复刻抓到的。
+- **仍待：** PostgreSQL 实库迁移由 CI 的 `postgres-readiness` 验证；3.4 真实来源全链路演练；政策 `externalUrl` 改用官方域名校验（另排）。
+
 ## 2026-09-27：3.14 本机构官方渠道——两个后台的页面（分支 `claude/console-official-channels-20260927`，本地提交，未推送、未合并）
 
 基于 Codex 第一轮后端 `110c6461e`。只改 `apps/admin/**`、`apps/partner/**`，没有动后端、`packages/shared`、一体机与 Playwright 配置；**只在现有页面上加，不新增页面与导航**。
