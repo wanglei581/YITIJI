@@ -1,9 +1,10 @@
-import { Body, Controller, Post, HttpCode, HttpStatus, Headers, Req, BadRequestException, UnauthorizedException } from '@nestjs/common'
+import { Body, Controller, Post, HttpCode, HttpStatus, Headers, Req, BadRequestException, UnauthorizedException, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { randomBytes } from 'node:crypto'
 import type { Request } from 'express'
 import { TrtcService } from './trtc.service'
 import { RedisService } from '../common/redis/redis.service'
+import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 
 // 对外 taskId 是每会话随机停止能力令牌，Redis 值才是真实腾讯 TaskId。
 // 同厅终端即使 IP/UA 相同，也无法猜到或复用其他会话的停止令牌。
@@ -24,9 +25,12 @@ export class TrtcController {
    * POST /api/v1/trtc/session
    * 启动对话式 AI 会话，返回前端进房凭证 + taskId。
    * SecretKey 全程留在服务端。
+   * 终端必须存在、启用，且 x-terminal-session-token 与 x-terminal-id 一致。
+   * 每 IP 每分钟 5 次不能代替这道身份校验。
    */
   @Post('session')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(TerminalIdentityGuard)
   async startSession(
     @Body() body: { userId?: string },
     @Req() _req: Request,
@@ -51,6 +55,8 @@ export class TrtcController {
   /**
    * POST /api/v1/trtc/session/stop
    * 结束对话式 AI 会话，校验 taskId 归属防止跨会话终止。
+   * 这里只认终端编号和每会话随机停止能力令牌。终端会话过期或终端已停用时，
+   * 已经开着的计费会话仍然要停得掉，所以不挂 TerminalIdentityGuard。
    */
   // stop 是「止损」操作：绝不能被限流挡掉，否则机器人留在房间持续计费。
   // 放宽到 60 次/分钟（仍防恶意刷腾讯 StopAIConversation 接口），覆盖 start 的 5/min。

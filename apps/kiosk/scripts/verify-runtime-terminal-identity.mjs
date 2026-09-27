@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -84,10 +85,27 @@ assert.match(terminalAuth, /RETRY_WINDOW_MS = 60_000/, 'session recovery must re
 assert.match(terminalAuth, /10 \* 60_000/, 'healthy kiosk must refresh its terminal session every ten minutes')
 assert.match(terminalAuth, /API_MODE !== 'http'/, 'mock mode must not request terminal tickets')
 assert.match(terminalAuth, /x-terminal-session-token/, 'protected Kiosk requests must carry the terminal session token')
+const exchangeBody = terminalAuth.slice(
+  terminalAuth.indexOf('async function exchangeBootTicket'),
+  terminalAuth.indexOf('async function requestLocalBootTicket'),
+)
+const clearAt = exchangeBody.indexOf('clearSensitiveStateForNewTerminalSession()')
+const saveAt = exchangeBody.lastIndexOf('saveToken(')
+assert.ok(clearAt > exchangeBody.indexOf('if (!payload.sessionToken)'), 'a failed or empty ticket exchange must not clear the occupant still using the machine')
+assert.ok(saveAt > clearAt, 'the new terminal session token is written after the sensitive-state clear')
+assert.match(advisorCall, /terminalProtectedFetch\([\s\S]*?\/trtc\/session['"`]/, 'TRTC session create must send the terminal session credential')
+const stopBackend = advisorCall.slice(advisorCall.indexOf('function stopBackendTask'), advisorCall.indexOf('export type CallPhase'))
+assert.match(stopBackend, /fetch\(/, 'TRTC stop stays a direct keepalive fetch')
+assert.doesNotMatch(stopBackend, /terminalProtectedFetch/, 'TRTC stop must not wait on a terminal session')
 
 for (const [path, source] of terminalScopedConsumers) {
   assert.match(source, /getTerminalId/, `${path} must use the runtime terminal identity getter`)
   assert.doesNotMatch(source, /VITE_TERMINAL_ID/, `${path} must not read a build-time terminal ID directly`)
 }
+
+const behavior = spawnSync(process.execPath, ['--test', join(ROOT, 'scripts/tests/boot-ticket-clears-sensitive-session.test.mjs')], {
+  stdio: 'inherit',
+})
+if (behavior.status !== 0) process.exit(behavior.status ?? 1)
 
 console.log('verify-runtime-terminal-identity: ok')

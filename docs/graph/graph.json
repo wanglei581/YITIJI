@@ -17794,6 +17794,9 @@
     "apps/kiosk/scripts/lib/visible-copy.mjs": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
     ],
+    "apps/kiosk/scripts/tests/boot-ticket-clears-sensitive-session.test.mjs": [
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
+    ],
     "apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
@@ -22445,6 +22448,7 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
+      "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
@@ -22590,6 +22594,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
+      "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-scene.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts"
     ],
@@ -24247,6 +24252,7 @@
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
       "services/api/scripts/verify-toolbox-review-workflow.ts",
+      "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts",
@@ -24534,7 +24540,8 @@
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-scan-tasks.ts",
-      "services/api/scripts/verify-terminal-identity.ts"
+      "services/api/scripts/verify-terminal-identity.ts",
+      "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/terminals/terminal-placement.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
@@ -24542,7 +24549,8 @@
     "services/api/src/terminals/terminal-session.service.ts": [
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
-      "services/api/scripts/verify-terminal-identity.ts"
+      "services/api/scripts/verify-terminal-identity.ts",
+      "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/terminals/terminal-toolbox.service.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -24659,11 +24667,16 @@
       "services/api/scripts/verify-toolbox-review-workflow.ts"
     ],
     "services/api/src/trtc/trtc.controller.ts": [
-      "services/api/scripts/verify-trtc-ownership.ts"
+      "services/api/scripts/verify-trtc-ownership.ts",
+      "services/api/scripts/verify-trtc-terminal-http.ts"
+    ],
+    "services/api/src/trtc/trtc.module.ts": [
+      "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/trtc/trtc.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
-      "services/api/scripts/verify-llm-input-pii-mask.ts"
+      "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/upload-sessions/upload-scene.ts": [
       "services/api/scripts/verify-upload-scene.ts"
@@ -28038,6 +28051,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/scripts/tests/boot-ticket-clears-sensitive-session.test.mjs",
           "apps/kiosk/src/components/kiosk-shell/KioskAppTopbar.tsx",
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
@@ -37046,6 +37060,29 @@
         "@ai-job-print/api::verify:trtc-ownership"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/trtc/trtc.controller.ts",
+          "services/api/src/trtc/trtc.module.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-trtc-terminal-http.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
