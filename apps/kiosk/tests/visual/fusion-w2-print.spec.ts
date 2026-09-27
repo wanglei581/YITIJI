@@ -1185,10 +1185,11 @@ test('print parameter suggestions are advisory until applied and then flow to co
   })
 
   await page.goto('/print/desk?step=preview')
-  await expect(page.locator('.qpd-stepper output')).toHaveText('1')
+  // 2.0 份数步进器把单位写在读数里（稿 13：「1 份」）。
+  await expect(page.locator('.qpd-stepper output')).toHaveText('1 份')
   await expect(page.getByText('3 份', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '采用这些建议' }).click()
-  await expect(page.locator('.qpd-stepper output')).toHaveText('3')
+  await expect(page.locator('.qpd-stepper output')).toHaveText('3 份')
   await page.getByRole('button', { name: '下一步：核对价格' }).click()
   await page.waitForURL('**/print/confirm')
   // 确认页摘要用 data-sum-row + <b class="v">，报价金额来自 POST /orders/quote。
@@ -1299,9 +1300,11 @@ test('retired params route redirects into preview with real printer fixtures @w2
 
   await page.goto('/print/params')
   await expect(page).toHaveURL(/\/print\/desk\?step=preview/)
-  const preview = page.locator('[data-w2-page="print-preview"]')
-  await expect(preview.getByText('已配置打印机', { exact: true })).toBeVisible()
-  await expect(preview.getByText('打印机在线', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-w2-page="print-preview"]')).toBeVisible()
+  // 2.0 把打印机卡并进页头的只读信息行（稿 13 顶部四格），它是 role=status，不在参数栅格里。
+  const deviceRow = page.getByRole('status').filter({ hasText: '纸张' })
+  await expect(deviceRow.getByText('已配置打印机', { exact: true })).toBeVisible()
+  await expect(deviceRow.getByText('打印机在线', { exact: true })).toBeVisible()
   await expectHealthy(page, errors, 'print-preview')
 })
 
