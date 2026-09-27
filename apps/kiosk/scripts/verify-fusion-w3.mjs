@@ -346,6 +346,10 @@ includes('src/pages/interview/InterviewReportPage.tsx', '也不会发送给任�
 const jobGuidancePresentation = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/CareerPlanPage.tsx')}\n${read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')}`
 for (const forbidden of ['录用概率', '保证录用', '一键投递', '立即投递']) check(!jobGuidancePresentation.includes(forbidden), `job guidance rejects ${forbidden}`)
 for (const forbidden of ['localStorage', 'sessionStorage']) check(!read('src/pages/assistant/AssistantPage.tsx').includes(forbidden), `assistant avoids ${forbidden}`)
+// 其他页交来的问题（v2 草稿约定）只经 services/assistantDraft 读一次就删；顾问页自己不写存储，
+// 所以它只许用收取的那个 hook，不许把用户输入交给写入函数。
+check(read('src/pages/assistant/AssistantPage.tsx').includes('useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)'), 'assistant takes a handed-over draft through the read-once hook')
+check(!read('src/pages/assistant/AssistantPage.tsx').includes('rememberAssistantDraft'), 'assistant never writes its own input to the draft key')
 
 if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   const config = read('playwright.w3.config.ts')

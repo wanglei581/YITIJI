@@ -54,6 +54,7 @@ import {
   type ConsultationTask,
 } from './advisorScenes'
 import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
+import { useAssistantDraftHandoff } from '../../services/assistantDraft'
 import './assistant-inkpaper.css'
 import './assistant-batch8.css'
 import './assistant-advisor.css'
@@ -129,6 +130,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   }, [selectedTask, toolboxScene, toolboxSkill])
   const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage])
   const [input, setInput] = useState('')
+  useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
   const [loading, setLoading] = useState(false)
   const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
 

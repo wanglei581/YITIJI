@@ -4,6 +4,7 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import type { DocumentProcessTaskView } from '../../src/services/api/materials'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 import { seedMaterialSession, setReactRouterState, writeMaterialSession, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
@@ -345,6 +346,36 @@ test('pickup hid guidance is visible before any scan and both draft controls wor
   await askHelp.click()
   await expect(page).toHaveURL(/\/help$/)
   await expect(page.locator('[data-kiosk-screen="help"]')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('pickup 问小青 hands one draft to the assistant: prefilled once, never sent by itself @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  // 顾问页挂载时读终端配置与语音能力；形状同 W3 基线，招聘托管按云上默认关闭。
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'w2-assistant-draft'),
+  })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+
+  await page.goto('/print/pickup-claim')
+  await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
+  await page.getByRole('button', { name: '问小青：到机码怎么找 →' }).click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  // 只填进输入框；发送会清空它，所以草稿还在就说明没有自动发出。
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？')
+  expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
+
+  // 读过一次就没有了：回到到机码页，再从底栏进顾问页，输入框是空的。
+  await page.goBack()
+  await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
+  await page.locator('.qx-nav-item', { hasText: 'AI 顾问' }).first().click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
   expect(errors).toEqual([])
 })
 
