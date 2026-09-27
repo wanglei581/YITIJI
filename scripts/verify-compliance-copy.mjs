@@ -456,6 +456,30 @@ if (miniappOutboundMissing === 0) {
   pass(`5b. 小程序外跳按钮文案使用「复制来源链接」(${MINIAPP_OUTBOUND_FILES.length} 页)`)
 }
 
+// ---------- 6. 三端页面标题与 ICP 备案名一致 ----------
+//
+// 2026-09-23 百度云备案整改通知：网站首页标题要与备案名称「职易达」一致。当时线上一体机
+// 首页是热修，源码没跟上；三端 index.html 仍是旧名，按 full 范围发布会把热修覆盖回去。
+// 一体机首页标题就是备案名本身，两个后台的标题里也要带上备案名。
+
+const FILING_NAME = '职易达'
+const TITLE_RULES = [
+  { rel: 'apps/kiosk/index.html', exact: true },
+  { rel: 'apps/admin/index.html', exact: false },
+  { rel: 'apps/partner/index.html', exact: false },
+]
+let titleMismatch = 0
+for (const { rel, exact } of TITLE_RULES) {
+  const html = fs.readFileSync(path.join(root, rel), 'utf8')
+  const title = (html.match(/<title>([^<]*)<\/title>/) ?? [])[1]?.trim()
+  const ok = exact ? title === FILING_NAME : Boolean(title?.includes(FILING_NAME))
+  if (!ok) {
+    fail(`6. ${rel} 的页面标题「${title ?? '（缺失）'}」${exact ? '必须等于' : '必须包含'}备案名「${FILING_NAME}」`)
+    titleMismatch += 1
+  }
+}
+if (titleMismatch === 0) pass(`6. 三端页面标题与备案名「${FILING_NAME}」一致（${TITLE_RULES.length} 个入口）`)
+
 // ---------- 结果 ----------
 
 if (failures > 0) {
