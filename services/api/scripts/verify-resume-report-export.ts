@@ -19,10 +19,10 @@ import type { ResumeReport } from '../src/ai/interfaces/ai-provider.interface'
 import { FilesService } from '../src/files/files.service'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { StorageService } from '../src/storage/storage.service'
 
 interface UnpdfApi {
-  getDocumentProxy(data: Uint8Array): Promise<unknown>
   extractText(pdf: unknown, options: { mergePages: boolean }): Promise<{ text: string | string[] }>
 }
 // services/api 是 CommonJS；unpdf 的可用运行时入口由 require 导出。
@@ -59,7 +59,7 @@ function hash(value: string): string {
 }
 
 async function pdfText(buffer: Buffer): Promise<string> {
-  const proxy = await unpdf.getDocumentProxy(new Uint8Array(buffer))
+  const proxy = await openUnpdfDocument(new Uint8Array(buffer))
   const extracted = await unpdf.extractText(proxy, { mergePages: true })
   return Array.isArray(extracted.text) ? extracted.text.join('\n') : extracted.text
 }

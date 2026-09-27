@@ -11,6 +11,7 @@
 // ============================================================
 
 import { createCanvas, ImageData, Path2D, DOMMatrix } from '@napi-rs/canvas'
+import { pdfjsPresetDataOptions } from '../../../common/pdf/pdfjs-document'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getResolvedPDFJS } = require('unpdf') as {
   getResolvedPDFJS(): Promise<{
@@ -119,6 +120,7 @@ export async function openPdfForRender(buffer: Buffer): Promise<RenderedPdf> {
   ensureArrayBufferTransferToFixedLength()
   const pdfjs = await getResolvedPDFJS()
   const doc = await pdfjs.getDocument({
+    ...pdfjsPresetDataOptions(),
     data: new Uint8Array(buffer),
     CanvasFactory: NapiCanvasFactory,
     isEvalSupported: false,

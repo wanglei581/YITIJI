@@ -1,3 +1,5 @@
+import { pdfjsPresetDataOptions } from '../common/pdf/pdfjs-document'
+
 // 文件页数识别（materials 体检 + print-jobs 计费页数共用）。
 //
 // 两条路径，优先级明确：
@@ -97,7 +99,11 @@ async function countPdfPagesByParser(buffer: Buffer): Promise<ParserOutcome> {
 
   let doc: { numPages: number; destroy(): Promise<void> } | undefined
   try {
-    doc = await getDocument({ data: new Uint8Array(buffer), isEvalSupported: false }).promise
+    doc = await getDocument({
+      ...pdfjsPresetDataOptions(),
+      data: new Uint8Array(buffer),
+      isEvalSupported: false,
+    }).promise
     const pages = doc.numPages
     if (!Number.isInteger(pages) || pages <= 0 || pages > MAX_PLAUSIBLE_PAGES) {
       return { kind: 'invalid_document' }

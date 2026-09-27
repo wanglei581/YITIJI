@@ -4,6 +4,7 @@ import { FilesService } from '../../files/files.service'
 import type { FilePurpose } from '../../files/file.types'
 import { DocumentConversionService } from '../../document-conversion/document-conversion.service'
 import { OcrService } from './ocr/ocr.service'
+import { openUnpdfDocument } from '../../common/pdf/pdfjs-document'
 import { openPdfForRender } from './ocr/pdf-page-renderer'
 import type {
   ResumeExtractionConfidence,
@@ -20,7 +21,6 @@ import type {
  * 运行期 require('unpdf') 命中 CJS 构建，纯 JS、无原生绑定（Node 26 安全）。
  */
 interface UnpdfApi {
-  getDocumentProxy(data: Uint8Array): Promise<unknown>
   extractText(
     pdf: unknown,
     options?: { mergePages?: boolean },
@@ -186,7 +186,7 @@ export class ResumeExtractionService {
     let pageCount: number | undefined
     let pdf: unknown
     try {
-      pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
+      pdf = await openUnpdfDocument(new Uint8Array(buffer))
     } catch {
       return this.fail(
         fileId,

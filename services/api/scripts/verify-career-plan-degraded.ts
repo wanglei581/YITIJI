@@ -45,10 +45,10 @@ import { PricingService } from '../src/payment/pricing.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const unpdf = require('unpdf') as {
-  getDocumentProxy: (data: Uint8Array) => Promise<unknown>
   extractText: (pdf: unknown, options: { mergePages: boolean }) => Promise<{ text: string }>
 }
 
@@ -77,7 +77,7 @@ async function pdfText(prisma: PrismaService, fileId: string, storage: StorageSe
   if (!file) fail(`读不到 FileObject ${fileId}`)
   const buffer = await storage.getObject(file.storageKey, file.bucket)
   if (buffer.subarray(0, 4).toString('latin1') !== '%PDF') fail('产物不是 PDF')
-  const doc = await unpdf.getDocumentProxy(new Uint8Array(buffer))
+  const doc = await openUnpdfDocument(new Uint8Array(buffer))
   const { text } = await unpdf.extractText(doc, { mergePages: true })
   return text
 }

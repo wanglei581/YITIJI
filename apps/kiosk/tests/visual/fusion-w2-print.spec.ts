@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import type { DocumentProcessTaskView } from '../../src/services/api/materials'
@@ -2344,4 +2346,82 @@ test('print preview paints each PDF page on a canvas and leaves without ERR_ABOR
   expect(consoleAborts, '离开预览后控制台没有 ERR_ABORTED').toEqual([])
   expect(errors.filter((item) => item.includes('ERR_ABORTED')), '离开预览后没有 document 级 ERR_ABORTED').toEqual([])
   await expectHealthy(page, errors, 'print-upload')
+})
+
+test('print preview paints preset-CMap Chinese text @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  const errors = collectRuntimeErrors(page)
+  const cmapStatuses: number[] = []
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname.includes('/pdfjs/cmaps/')) cmapStatuses.push(response.status())
+  })
+  registerShell(api)
+  registerPrice(api)
+  const pdfPath = '/pdf-canvas-fixtures/zh-cmap.pdf'
+  const pdfBytes = readFileSync(fileURLToPath(new URL('../../../../services/api/fixtures/zh-cmap.pdf', import.meta.url)))
+  await page.route(`**${pdfPath}`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: pdfBytes,
+  }))
+  const file = { ...W2_FILE, fileUrl: pdfPath, name: 'zh-cmap.pdf', pages: 1 }
+  await page.addInitScript(({ key, value }) => {
+    window.sessionStorage.setItem(key, JSON.stringify(value))
+  }, {
+    key: 'ai-job-print:current-print-material-check',
+    value: {
+      file,
+      source: 'document',
+      materialCheck: {
+        inspectionTaskId: 'w2-inspection-001',
+        normalizeTaskId: 'w2-normalize-001',
+        piiTaskId: 'w2-pii-001',
+        piiRedactTaskId: 'w2-pii-redact-001',
+        checkedAt: '2026-07-24T00:00:00.000Z',
+        findingCount: 0,
+        redactedCount: 0,
+        keptCount: 0,
+        redaction: {
+          claim: 'nothing_to_redact',
+          redactedFileId: null,
+          appliedRedactedCount: 0,
+          failedNoPositionCount: 0,
+          keptCount: 0,
+          reverifyRemainingCount: null,
+          reverifyRan: false,
+        },
+        mode: 'checked',
+      },
+      printParams: W2_PRINT_PARAMS,
+      updatedAt: '2026-07-24T00:00:00.000Z',
+    },
+  })
+
+  await page.goto('/print/desk?step=preview')
+  const host = page.locator(`[data-pdf-preview-host][data-preview-src="${pdfPath}"]`)
+  await expect(host).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect.poll(() => host.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe('0')
+  const bands = await host.locator('canvas').evaluate((node: HTMLCanvasElement) => {
+    const context = node.getContext('2d')
+    if (!context || node.width < 2 || node.height < 2) return null
+    const { data, width, height } = context.getImageData(0, 0, node.width, node.height)
+    const count = (start: number, end: number) => {
+      const y0 = Math.floor(height * start)
+      const y1 = Math.floor(height * end)
+      let dark = 0
+      for (let y = y0; y < y1; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const index = (y * width + x) * 4
+          if ((data[index] ?? 255) < 160) dark += 1
+        }
+      }
+      return dark
+    }
+    return { zh: count(0.085, 0.135), ascii: count(0.15, 0.19) }
+  })
+  expect(bands?.zh ?? 0, '中文行区域要有深色像素').toBeGreaterThan(30)
+  expect(bands?.ascii ?? 0, '英文对照行也要画出来').toBeGreaterThan(10)
+  expect(cmapStatuses.length, 'CMap 按需请求，不打进首屏脚本').toBeGreaterThan(0)
+  expect(cmapStatuses.every((status) => status === 200), `CMap 请求状态 ${cmapStatuses.join(',')}`).toBe(true)
+  await expectHealthy(page, errors, 'print-preview')
 })

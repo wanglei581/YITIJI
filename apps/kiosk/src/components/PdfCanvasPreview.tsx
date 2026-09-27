@@ -18,6 +18,13 @@ const FAILURE_COPY = '预览没能生成，打印仍按原文件。'
 const MAX_BITMAP_EDGE = 4096
 const MAX_ZOOM = 4
 
+/** 预置 CMap / 标准字体。目录必须带尾斜杠，PDF.js 按「目录 + 文件名」去取 .bcmap。 */
+function pdfjsDataUrl(kind: 'cmaps' | 'standard_fonts'): string {
+  const base = import.meta.env.BASE_URL || '/'
+  const prefix = base.endsWith('/') ? base : `${base}/`
+  return `${prefix}pdfjs/${kind}/`
+}
+
 type PdfjsNamespace = {
   getDocument: (src: {
     data: Uint8Array
@@ -27,6 +34,9 @@ type PdfjsNamespace = {
     disableAutoFetch: boolean
     disableStream: boolean
     verbosity: number
+    cMapUrl: string
+    cMapPacked: boolean
+    standardFontDataUrl: string
   }) => PdfLoadingTask
 }
 
@@ -226,6 +236,9 @@ export function PdfCanvasPreview({
           disableAutoFetch: true,
           disableStream: true,
           verbosity: 0,
+          cMapUrl: pdfjsDataUrl('cmaps'),
+          cMapPacked: true,
+          standardFontDataUrl: pdfjsDataUrl('standard_fonts'),
         })
         session.loadingTask = loadingTask
         loadingTask.onPassword = () => {
