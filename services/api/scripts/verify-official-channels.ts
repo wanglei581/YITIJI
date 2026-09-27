@@ -118,6 +118,8 @@ async function main() {
     }) as unknown as ExecutionContext
     await rejects(async () => roles.canActivate(roleContext(controller.replaceDomains, partnerA)), 'AUTH_ROLE_FORBIDDEN', 'partner cannot register domains')
     ok(roles.canActivate(roleContext(controller.replaceDomains, actor)), 'admin can register domains')
+    await rejects(async () => roles.canActivate(roleContext(controller.listForAdmin, partnerA)), 'AUTH_ROLE_FORBIDDEN', 'partner cannot read admin channel list')
+    ok(roles.canActivate(roleContext(controller.listForAdmin, actor)), 'admin can read organization channel list')
     invalidDto(EmergencyTakedownDto, { targetType: 'official_channel', targetId: 'x', reasonText: 'x' }, 'takedown reason code required')
     const emergencyRoles = new RolesGuard(new Reflector())
     await rejects(async () => emergencyRoles.canActivate({ ...roleContext(controller.replaceDomains, partnerA), getHandler: () => RecruitmentEmergencyController.prototype.takedown, getClass: () => RecruitmentEmergencyController } as ExecutionContext), 'AUTH_ROLE_FORBIDDEN', 'partner cannot emergency takedown')
@@ -131,6 +133,16 @@ async function main() {
       { id: partnerA.userId, username: partnerA.userId, passwordHash: 'x', name: 'Partner A', role: 'partner', orgId: ids.a },
       { id: partnerB.userId, username: partnerB.userId, passwordHash: 'x', name: 'Partner B', role: 'partner', orgId: ids.b },
     ] })
+    const emptyPartner = await controller.listOwn(partnerA)
+    ok(emptyPartner.success && Object.keys(emptyPartner.data).sort().join(',') === 'items,verifiedDomains'
+      && emptyPartner.data.items.length === 0 && emptyPartner.data.verifiedDomains.length === 0, 'partner list has empty verifiedDomains before registration')
+    try {
+      await controller.listForAdmin(`missing_${suffix}`)
+      throw new Error('FAIL missing organization admin list did not reject')
+    } catch (error) {
+      if ((error as Error).message.startsWith('FAIL ')) throw error
+      ok(code(error) === 'ORG_NOT_FOUND' && (error as { getStatus?: () => number }).getStatus?.() === 404, 'admin list returns existing module 404 for missing organization')
+    }
     await rejects(() => service.replaceVerifiedDomains(ids.a, ['github.io'], actor), 'VERIFIED_DOMAIN_INVALID', 'illegal registration rejected')
     const failedAudit = { writeRequired: async () => { throw new Error('injected audit failure') } } as unknown as AuditService
     const failService = new OfficialChannelsService(prisma, failedAudit)
@@ -151,14 +163,22 @@ async function main() {
     ok(txResult.items[0]?.verifiedBy === 'prior-admin' && txWrite.includes('prior-admin'), 'domain replacement reads latest verification inside transaction')
     await service.replaceVerifiedDomains(ids.a, ['example.com.cn'], actor)
     await rejects(() => service.createForPartner(partnerA, { name: '危险跳转', url: 'https://example.com.cn/?url=https%253A%252F%252Fevil.com' }), 'OFFICIAL_CHANNEL_DOMAIN_NOT_VERIFIED', 'encoded redirect cannot be persisted')
-    await service.replaceVerifiedDomains(ids.a, ['example.com.cn', 'example.org'], actor)
+    await service.replaceVerifiedDomains(ids.a, ['EXAMPLE.COM.CN.', 'HTTPS://EXAMPLE.ORG:443'], actor)
     await service.replaceVerifiedDomains(ids.b, ['other.org'], actor)
+    const domainsA = await controller.listOwn(partnerA)
+    const domainsB = await controller.listOwn(partnerB)
+    ok(JSON.stringify(domainsA.data.verifiedDomains) === JSON.stringify(['example.com.cn', 'example.org'])
+      && JSON.stringify(domainsB.data.verifiedDomains) === JSON.stringify(['other.org']), 'partner sees only own registered domains in registration order')
     ok(await prisma.auditLog.count({ where: { action: 'organization.verified_domains_replace', targetId: ids.a } }) === 2, 'each domain replacement has audit')
     const a = await service.createForPartner(partnerA, { name: '  官网  ', url: ' HTTPS://EXAMPLE.COM.CN.:443/path ', displayOrder: 3 })
     const countBeforeFailedCreate = await prisma.onlinePlatformDirectory.count({ where: { organizationId: ids.a } })
     await rollsBack(() => failService.createForPartner(partnerA, { name: '失败创建', url: 'https://example.com.cn/' }), 'channel create rolls back when audit insert fails')
     ok(await prisma.onlinePlatformDirectory.count({ where: { organizationId: ids.a } }) === countBeforeFailedCreate, 'failed create left no channel')
     const b = await service.createForPartner(partnerB, { name: 'B 官网', url: 'https://other.org/', displayOrder: 1 })
+    const adminInitial = await controller.listForAdmin(ids.a)
+    ok(adminInitial.success && Object.keys(adminInitial.data).join(',') === 'items'
+      && adminInitial.data.items.length === 1 && adminInitial.data.items[0]?.id === a.id
+      && Object.keys(adminInitial.data.items[0]!).sort().join(',') === 'displayOrder,emergencyReasonCode,emergencyReasonText,emergencyTakedown,enabled,id,name,url', 'admin list exposes exact read-only channel shape')
     ok(a.name === '官网' && a.url === 'https://example.com.cn/path', 'channel saves trimmed name and canonical URL')
     const stored = await prisma.onlinePlatformDirectory.findUniqueOrThrow({ where: { id: a.id } })
     ok(stored.category === 'official_channel' && stored.operatorLegalName === '机构 A' && stored.officialDomainsJson !== '' && stored.reviewStatus === 'pending' && stored.publishStatus === 'draft', 'reused directory required fields explicitly populated')
@@ -171,12 +191,15 @@ async function main() {
     const oldDirectory = new RecruitmentContentReadService(prisma, {} as never, audit)
     const oldList = await oldDirectory.listDirectories({ page: 1, pageSize: 20 } as never)
     ok(oldList.items.some((item) => item.id === legacyId) && !oldList.items.some((item) => item.id === a.id), 'legacy admin directory excludes official channel')
+    ok(!(await controller.listForAdmin(ids.a)).data.items.some((item) => item.id === legacyId), 'official admin list excludes old platform directory')
     await rejects(() => oldDirectory.getDirectory(a.id), 'RECRUITMENT_DIRECTORY_NOT_FOUND', 'legacy admin detail excludes official channel')
     ok((await service.listForPartner(partnerA)).items.every((item) => item.id !== b.id), 'partner A cannot read B channel')
     await rejects(() => service.updateForPartner(partnerA, b.id, { name: 'cross' }), 'OFFICIAL_CHANNEL_NOT_FOUND', 'partner A cannot edit B')
     await rejects(() => service.archiveForPartner(partnerA, b.id), 'OFFICIAL_CHANNEL_NOT_FOUND', 'partner A cannot archive B')
     await rejects(() => service.createForPartner(partnerA, { name: 'outside', url: 'https://evil.com/' }), 'OFFICIAL_CHANNEL_DOMAIN_NOT_VERIFIED', 'off-domain channel rejected')
     await service.replaceVerifiedDomains(ids.a, [], actor)
+    ok((await controller.listOwn(partnerA)).data.verifiedDomains.length === 0
+      && JSON.stringify((await controller.listOwn(partnerB)).data.verifiedDomains) === JSON.stringify(['other.org']), 'cleared partner domains are empty without changing another organization')
     const reordered = await service.updateForPartner(partnerA, a.id, { displayOrder: 4, name: '新官网' })
     ok(reordered.displayOrder === 4, 'name/sort update does not revalidate old URL')
     await service.updateForPartner(partnerA, a.id, { url: ' HTTPS://EXAMPLE.COM.CN.:443/path ' })
@@ -185,6 +208,11 @@ async function main() {
     await rejects(() => service.updateForPartner(partnerA, a.id, { enabled: true }), 'OFFICIAL_CHANNEL_DOMAIN_NOT_VERIFIED', 'reenable revalidates old URL')
     await service.replaceVerifiedDomains(ids.a, ['example.com.cn'], actor)
     await service.updateForPartner(partnerA, a.id, { enabled: true })
+    const dormant = await service.createForPartner(partnerA, { name: '备选渠道', url: 'https://example.com.cn/other', enabled: false, displayOrder: 1 })
+    const adminSorted = (await controller.listForAdmin(ids.a)).data.items
+    const partnerSorted = (await controller.listOwn(partnerA)).data.items
+    ok(JSON.stringify(adminSorted.map((item) => item.id)) === JSON.stringify(partnerSorted.map((item) => item.id))
+      && adminSorted[0]?.id === dormant.id && !adminSorted[0]?.enabled, 'admin list uses partner order and includes disabled channels')
     const racing = await Promise.allSettled([
       ...Array.from({ length: 25 }, (_, i) => service.updateForPartner(partnerA, a.id, { name: `并发改名 ${i}` })),
       service.updateForPartner(partnerA, a.id, { enabled: false }),
@@ -233,6 +261,9 @@ async function main() {
       && await prisma.recruitmentEmergencyHold.count({ where: { targetType: 'official_channel', targetId: a.id } }) === 0
       && await prisma.partnerOrgNotice.count({ where: { orgId: ids.a } }) === 0, 'failed takedown left no status, hold or notice')
     await emergency.takedown('official_channel', a.id, 'rights_complaint', '机构网站异常', actor)
+    const adminHeld = (await controller.listForAdmin(ids.a)).data.items.find((item) => item.id === a.id)
+    ok(adminHeld?.emergencyTakedown && adminHeld.emergencyReasonCode === 'rights_complaint'
+      && adminHeld.emergencyReasonText === '机构网站异常', 'admin list includes complete emergency reason fields')
     ok((await service.listForTerminal(terminalA)).items.length === 0, 'emergency-held channel absent publicly')
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { status: 'active' } })
     ok((await service.listForTerminal(terminalA)).items.length === 0, 'hold alone excludes a stale active row')
@@ -252,8 +283,10 @@ async function main() {
     ok(await prisma.auditLog.count({ where: { action: 'recruitment.emergency_takedown', targetId: a.id } }) === 2, 'each takedown attempt audited')
     await service.archiveForPartner(partnerA, a.id)
     ok(!(await service.listForPartner(partnerA)).items.some((item) => item.id === a.id), 'held channel can be archived and leaves partner list')
+    ok(!(await controller.listForAdmin(ids.a)).data.items.some((item) => item.id === a.id), 'admin list excludes archived channel')
     await service.archiveForPartner(partnerB, b.id)
     ok((await service.listForPartner(partnerB)).items.length === 0 && (await service.listForTerminal(terminalB)).items.length === 0, 'archived channel absent from partner and terminal lists')
+    ok((await controller.listForAdmin(ids.b)).data.items.length === 0, 'admin list excludes archived channels of another organization')
     ok(await prisma.auditLog.count({ where: { action: 'official_channel.archive', targetId: b.id } }) === 1, 'archive audited')
     const c = await service.createForPartner(partnerA, { name: '第二渠道', url: 'https://jobs.example.com.cn/' })
     await emergency.circuitBreak('org', ids.a, 'authority_order', '机构站点统一停用', actor)
