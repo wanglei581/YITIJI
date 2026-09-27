@@ -14114,7 +14114,6 @@
           "path": "/print/cashier",
           "styles": [
             "apps/kiosk/src/pages/print/styles/cashier-qx.css",
-            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -14149,7 +14148,6 @@
           ],
           "path": "/print/confirm",
           "styles": [
-            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/pages/print/styles/print-confirm-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -14211,7 +14209,6 @@
           "path": "/print/done",
           "styles": [
             "apps/kiosk/src/components/styles/kiosk-feedback-dialog.css",
-            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/pages/print/styles/print-fulfill-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -14270,7 +14267,6 @@
           "styles": [
             "apps/kiosk/src/components/kiosk-numpad/kiosk-numpad.css",
             "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
-            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -14313,7 +14309,6 @@
           ],
           "path": "/print/progress",
           "styles": [
-            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/pages/print/styles/print-fulfill-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -18789,7 +18784,11 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
+    "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx": [
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
@@ -27248,6 +27247,8 @@
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
+          "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx",
+          "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx",
           "apps/kiosk/src/pages/print/components/printFileRetention.ts",

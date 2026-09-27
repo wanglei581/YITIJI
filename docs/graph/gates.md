@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1559 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1560 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -295,7 +295,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 489 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 490 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -493,7 +493,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/cashierStatus.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-payment-codepay.ts` |
 | `apps/kiosk/src/pages/print/components/MaterialCheckPresentation.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-pii-redaction-contract.mjs` |
 | `apps/kiosk/src/pages/print/components/PickupHidGuide.tsx` | `verify-fusion-w2-print-scan.mjs` |
-| `apps/kiosk/src/pages/print/components/PrintConfirmView.tsx` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/print/components/PrintConfirmView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs` |
+| `apps/kiosk/src/pages/print/components/PrintDoneSections.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx` | `verify-print-parameter-capability.mjs`<br/>`verify-word-conversion-ui.mjs` |
