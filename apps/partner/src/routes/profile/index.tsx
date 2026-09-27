@@ -26,6 +26,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../services/api/orgSelf'
+import { OfficialChannelsSection } from './OfficialChannelsSection'
 
 // ─── 机构资料（审计修复：原 MOCK_PROFILE 硬编码已删除，全部走 /partner/profile 真实数据）──
 // 机构自助仅可改 联系人/联系电话；名称、类型、场景模板、启用模块由管理员管理（运营边界）。
@@ -181,6 +182,9 @@ export default function ProfilePage() {
           </p>
         </Card>
       </div>
+
+      {/* 本机构官方渠道（3.14）：二维码只在本机构终端显示；与内容信任无关，单独成块 */}
+      <OfficialChannelsSection />
 
       {/* 内容信任与发布权限（发布闸门依据） */}
       <Card className="mt-6 p-6">
