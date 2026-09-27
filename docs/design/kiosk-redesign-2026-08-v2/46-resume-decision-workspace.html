@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>简历决策工作台 · 职易达</title>
+  <!--
+    宿主：简历决策工作台（一个宿主承接四条真实 route）
+    route: /resume/job-fit          screen=job-fit
+           /resume/job-fit/actions  screen=actions
+           /resume/career-plan      screen=career-plan
+           /resume/templates        screen=templates
+    state: 由 ?screen= 与 ?state= 共同表达；静态状态仅用于验收与原型演示，不请求 API、不推进业务完成。
+    api: JobFitPage / JobFitActionsPage / CareerPlanPage / ResumeTemplateLibraryPage 的真实 React 合同。
+    真话边界：无 taskId、本人授权、来源岗位或服务端返回时，一律不展示个人结果、岗位、企业、匹配分、打印件或完成状态。
+    fallback: 任何无法确认的 AI 或打印状态都保留返回/重试/材料准备的真实下一步；不伪造恢复时间或成功。
+    真话披露：底部 truth-bar 压成单行（本人使用 / 服务端状态 / 本机会话边界 + 使用说明入口），
+              不再用三列等权说明墙，也不在主内容区铺等权治理卡；主内容只放真实产品结构与诚实槽位。
+
+    原型控件可见性（demo-tab / demo-panel）：
+      - 只有 ?debug=1 才显示。JS 读到 debug=1 时设 <html data-debug="1">，
+        再移除下面的 hidden / disabled / aria-hidden 并绑定打开交互。
+      - 普通 state/screen/capture/flat URL 下三重兜底：HTML 的 hidden + disabled +
+        tabindex="-1" 防 JS 执行前闪现；CSS 的 html:not([data-debug="1"]) 段落钉死
+        零尺寸、不可见、不可点、不参与布局；JS 在非 debug 分支不绑定任何交互。
+      - 这两个元素带 data-proto-control="true"，供截图与验收脚本按属性排除。
+  -->
+  <link rel="stylesheet" href="../kiosk-redesign-2026-08/kimi-full-coverage-v2/design-system/kiosk-motion.css">
+  <link rel="stylesheet" href="../kiosk-redesign-2026-08/resume-decision-workspace.css">
+<!--
+青序流光 2.0 · 46 简历对照 / 职业规划（screen=job-fit，state=result-high，对照结果有内容）
+规则 1：英雄区加三步只读说明。返回键仍在顶栏。主体超出时可滑动，底部按钮留在栏外。
+规则 2：页标题 36，说明 21–23，分区标题 30，主按钮 26，导航 21。
+规则 3：带走的是对照档位和下一步；职业规划带走能开始的一件事；模板页带走选定的版式。
+规则 4：英文眉题改成简历对照、行动清单、职业规划、简历模板。服务端、会话改成这次办理 / 实际记录。演示面板默认不出现。
+规则 5：岗位要求只由用户自己写或贴上，不从已发布岗位里选，也不跳到来源岗位列表。
+规则 7：对照本身是小青做的；「问 AI 顾问」保留。结果旁仍是三档参考，不写成已经录用。
+未改：颜色令牌、圆角、深绿英雄区、四条路线、三档不打分、三 Tab。
+原稿脚本复制为同目录 resume-decision-workspace.js，样式仍引用原稿目录。
+-->
+<style id="qx2">
+.status{font-size:21px!important;max-width:680px;height:auto;min-height:54px;white-space:normal}
+.eyebrow{font-size:21px!important;letter-spacing:2px!important;color:rgba(242,239,228,.9)!important}
+.hero{min-height:250px}
+.hero h1{font-size:36px!important}
+.hero p{font-size:23px!important;color:rgba(242,239,228,.9)!important}
+.qx-steps{position:relative;z-index:1;display:flex;gap:14px;list-style:none;width:100%;margin:18px 0 0;padding:0}
+.qx-steps li{flex:1;padding-top:8px;border-top:2px solid rgba(242,239,228,.35);font-size:21px;line-height:1.35;color:rgba(242,239,228,.92)}
+.qx-steps b{display:block;margin-bottom:4px;font-family:"Songti SC","STSong","SimSun",serif;font-size:26px;color:#2ee6a8}
+.hero{flex-wrap:wrap}
+.hero-copy{flex:1;min-width:0}
+.section-head h2{font-size:30px!important}
+.section-head small,.section-head .no{font-size:20px!important}
+.copy,.check .ck-t p,.trace p,.why p,.route-card p,.wait p,.not,.ghost p,.step p,.disclose,.disclose-body li,.card p,.list-row,.notice,.rail p,.decision-flow p,.vc-main>p,.vc-risk,.guardline p,.evi-slot p,.em-note,.ns-t p,.wl-desc,.wl-field span,.pv-page p,.tip-t p,.act-note,.reason,.truth-bar p,.field b,.slot b,.em-row span{font-size:21px!important;line-height:1.45!important}
+.card h3,.check .ck-t b,.trace b,.route-card b,.wait b,.step b,.verdict b,.evi-h b,.evi-slot b,.ns-t b,.wl-top b,.tip-t b,.level,.vc-main>b{font-size:24px!important}
+.ns-no{font-size:20px!important}
+.btn{font-size:26px!important;min-height:72px}
+.navbar a{font-size:21px!important}
+.truth-bar .tb-help{font-size:21px!important}
+.brand{font-size:26px!important}
+.slot small,.trace small,.why .wy-h,.check .ck-s,.ghost .g-tag,.rail small,.decision-flow small,.vc-badge small,.tier-ladder span,.vc-main>small,.evi-slot .g-tag,.em-h small,.wl-chip,.wl-field small,.pv-head small,.pv-head b,.field small,.level span,.card .tag,.route-card .rc-go,.trace .now-tag,.kit small,.kit b,.wait .m-pulse span{font-size:20px!important}
+.workspace{overflow-y:auto}
+.demo-tab,.demo-panel{display:none!important}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <header class="topbar">
+      <a class="back m-press" href="16-service-hubs.html?hub=resume" data-route="/resume-service" aria-label="返回简历服务">‹</a>
+      <div class="brand"><span class="brand-mark">职</span><span>职易达</span></div>
+      <div class="top-space"></div>
+      <div class="status"><i></i><span id="status-copy">以这次办理的结果为准</span></div>
+      <time id="clock" class="clock">--:--</time>
+    </header>
+
+    <section class="hero">
+      <div class="xq m-face-ring">青</div>
+      <div class="hero-copy">
+        <div id="eyebrow" class="eyebrow">简历对照</div>
+        <h1 id="hero-title">先把目标说清，<em>再决定下一步。</em></h1>
+        <p id="hero-copy">对照你自己写下的要求，或把职业方向拆成下一步。都只给你本人用。</p>
+        <ol class="qx-steps"><li><b>1</b>要求自己写，不从列表里选</li><li><b>2</b>小青对照你的简历</li><li><b>3</b>带走下一步，或去打印</li></ol>
+      </div>
+    </section>
+
+    <main id="workspace" class="workspace" data-screen="resume-decision-job-fit" data-state="missing-task" data-testid="resume-decision-job-fit-state-missing-task"></main>
+
+    <footer class="truth-bar" data-testid="resume-decision-truth">
+      <span class="tb-ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v6.2c0 4.4-3.1 7.6-7.5 8.8-4.4-1.2-7.5-4.4-7.5-8.8V6z"/></svg></span>
+      <p><b>只供本人准备</b>不提供给企业 · 结果以实际记录为准 · 结束这次办理会清除本机登录</p>
+      <a class="tb-help m-press" href="06-help.html" data-route="/help" data-testid="resume-decision-truth-help">使用说明</a>
+    </footer>
+    <nav class="navbar" aria-label="全局导航">
+      <a class="m-press" href="01-home.html" data-route="/">首页</a>
+      <a class="m-press" href="05-ai-cockpit.html" data-route="/assistant">AI 顾问</a>
+      <a class="m-press" href="30-my-profile.html" data-route="/profile">我的</a>
+    </nav>
+    <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制" aria-expanded="false" aria-controls="demo-panel" hidden aria-hidden="true" tabindex="-1" disabled>演示</button>
+    <aside class="demo-panel" id="demo-panel" data-proto-control="true" aria-label="原型演示控制" hidden aria-hidden="true" tabindex="-1"></aside>
+  </div>
+  <script src="resume-decision-workspace.js"></script>
+</body>
+</html>

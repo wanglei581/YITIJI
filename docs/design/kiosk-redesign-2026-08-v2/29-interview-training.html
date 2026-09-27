@@ -513,11 +513,11 @@ function reportReady(){
     +'<section class="report-grid"><div class="report"><i>总</i><b>综合表现概览</b><p>只给本人复盘。</p></div>'
     +'<div class="report"><i>5</i><b>五项能力维度</b><p>表达、经历、专业、应变。</p></div>'
     +'<div class="report"><i>问</i><b>下一轮准备</b><p>风险、高频题和 STAR 建议。</p></div></section>'
-    +'<section class="card"><div class="head"><b>报告包含的复盘区</b><span>按服务端返回显示</span></div>'
+    +'<section class="card"><div class="head"><b>报告包含的复盘区</b><span>按实际结果填写</span></div>'
     +mini([['风险点','标出还要补充的说法。'],['高频问题','问题、考察点和答法。'],['STAR 建议','背景、任务、行动、结果。']])
     +'<div class="checklist"><button class="check" type="button"><i>✓</i>面试前准备清单由报告返回</button>'
     +'<button class="check" type="button"><i>✓</i>打印版生成后才进入打印流程</button></div></section>'
-    +'<section class="notice"><i>i</i><div><b>打印不会先假装成功。</b>只有服务端成功生成真实文件后，才会进入已有打印确认流程；失败时仍停留在报告页并显示原因。</div></section>'
+    +'<section class="notice"><i>i</i><div><b>打印不会先假装成功。</b>只有真正生成文件之后，才会进入打印确认；失败时仍停在报告页并写明原因。</div></section>'
     +rail();
   actions.innerHTML=btn('reports-loading','查看历史报告')+btn('report-print-pending','生成打印版',true);
 }
@@ -548,7 +548,7 @@ function reportPrintPending(){
             ['最后','按真实结果出纸','出纸与取件码由打印流程返回，本页不预告。']])+'</section>'
     +'<section class="card"><div class="head"><b>不想等可以先做</b><span>不影响本次生成</span></div>'
     +optlist([{k:'报',t:'返回报告继续复盘',d:'报告内容已读取，可以先看结论区。',href:urlFor('report-ready')},
-              {k:'录',t:'查看本人练习记录',d:'登录后按服务端返回显示历史列表。',href:urlFor('reports-loading')}])+'</section>'
+              {k:'录',t:'查看本人练习记录',d:'登录后按实际结果填写历史列表。',href:urlFor('reports-loading')}])+'</section>'
     +'<section class="notice"><i>i</i><div>生成失败时停留在本页并给出重试，不创建虚假打印任务、取件码或支付成功提示。</div></section>'
     +rail();
   actions.innerHTML=btn('report-print-failed','演示生成失败')+btn('report-print-ready','演示生成成功',true);

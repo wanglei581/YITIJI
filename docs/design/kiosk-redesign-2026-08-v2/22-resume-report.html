@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。另有一版重排结构的提案见 STATUS.md，不是默认。
+<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。另有一版重排结构的提案见 STATUS.md，不是默认。
      原稿：../kiosk-redesign-2026-08/22-resume-report.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
 <html lang="zh-CN">
 <head>
@@ -110,7 +110,7 @@
              报告按 taskId 读，原件要另一份带时效的文件访问凭证（§11 临时签名 URL）。
              所以「取不到原件」有它自己的三种结局 —— no-file / expired / render-failed，
              三者都**不是**报告读取失败：报告已经在下面了，预览层关掉就能接着看。
-             这三屏都不判断原件是否还在服务端保留 —— 客户端看不到那件事。
+             这三屏都不判断原件是否还留着 —— 客户端看不到那件事。
              docx 不做内嵌渲染：终端里没有 Office 排版引擎，硬渲染会改掉字体、
              行距和分页，看到的就不是真正会打印出来的那一份，所以如实说不能预览。
              静态原型里没有真实文件，原件一律是**合成占位页**，预览层内常驻标记。
@@ -1216,8 +1216,8 @@ function zoneStructure(){
     s += '</span></span></div>';
   }
   return s + '</div><p class="zfoot" data-testid="'+SCREEN+'-zone-note">'
-    + '这一块的<b>内容结构与原文片段是本页合成样本</b>：服务端报告里目前没有「原文片段」这个字段，'
-    + '接真之前不会有你自己的原文出现在这里。被问题引用过的那几行用深色标出，共 '+evidenceCount()+' 处。</p></section>';
+    + '这一块的<b>内容结构与原文片段是示例</b>：你的简历接上之前，这里不会出现你自己的原文。'
+    + '被问题引用过的那几行用深色标出，共 '+evidenceCount()+' 处。</p></section>';
 }
 
 /* 一条问题的完整卡片：类型（维度）· 严重度 · 引用的原文 · 影响 · 改法。
@@ -1252,9 +1252,9 @@ function zoneIssues(){
     + '<div class="scroll" data-clip="1" data-testid="'+SCREEN+'-list" data-list="issues">';
   for (i = 0; i < ISSUES.length; i++) s += issueCard(ISSUES[i], i);
   return s + '</div><p class="zfoot" data-testid="'+SCREEN+'-zone-note">'
-    + '问题所属的<b>维度名来自服务端报告里那六个固定维度</b>；<b>严重度由该维分数机械分档</b>（不足一半＝高）；'
-    + '标题、引用的原文、影响与改法是本页合成样本 —— 服务端报告里没有问题对象，也没有证据引用。'
-    + '「可以怎么改」属于这条合成问题自己，和「建议风险」分区里那几条服务端建议是两回事。</p></section>';
+    + '问题所属的<b>维度名来自报告里那六个固定维度</b>；<b>严重度由该维分数分档</b>（不足一半＝高）；'
+    + '标题、引用的原文、影响与改法是示例 —— 这次结果里还没有单独的问题条目。'
+    + '「可以怎么改」属于这条示例，和「建议风险」分区里的建议是两回事。</p></section>';
 }
 
 /* ── 分区三：六维分数 ─────────────────────────────────────────── */
@@ -1291,7 +1291,7 @@ function dimBelow(sections){
     if (!mine.length) {
       return '<div class="dimmap" data-testid="'+SCREEN+'-dim-issues" data-count="0" style="grid-template-columns:1fr">'
         + '<span class="dmc"><b>这一维没有对应的问题条目</b>'
-        + '<span>分数偏低不等于一定有问题条目；问题清单是本页合成样本，不是服务端字段。</span></span></div>';
+        + '<span>分数偏低不等于一定有问题条目；问题清单是示例，不是这次结果里的单独字段。</span></span></div>';
     }
     var h = '<div class="dimissues" data-clip="1" data-testid="'+SCREEN+'-dim-issues" data-count="'+mine.length+'">';
     for (j = 0; j < mine.length; j++) h += issueCard(mine[j], j);
@@ -1396,7 +1396,7 @@ function overviewOverlay(report){
     + ' aria-describedby="'+SCREEN+'-print-reason" aria-label="打印这份报告（当前没有报告打印端点，按钮受限）">'
     + '<span>打印这份报告</span><small>当前受限</small></button>'
     + '<span class="reason" id="'+SCREEN+'-print-reason" data-testid="'+SCREEN+'-print-reason">'
-    + '诊断报告没有打印端点：现有的导出只针对「生成的简历」，不是这份报告。要能打印，需要服务端先出一个报告文件并下发可打印的文件凭证。'
+    + '诊断报告现在还不能打印：现有的导出只针对「生成的简历」，不是这份报告。要能打印，需要先有一份可打印的报告文件。'
     + '在那之前这个按钮保持受限，不做假的打印或下载。</span></div>'
     + '</div></div>';
   return s;
@@ -1587,7 +1587,7 @@ var NOTICE = {
       ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
     ] },
   'no-file': { icon:'slash', title:'这次没有可预览的原件',
-    why:'报告按编号读取，原件预览要另外一份带时效的文件访问凭证，这次进入没有拿到。原件是否还在服务端保留，这一屏看不出来，也不做判断。',
+    why:'报告按编号读取，原件预览要另外一份带时效的文件访问凭证，这次进入没有拿到。原件是否还留着，这一屏看不出来，也不做判断。',
     keep:'这<b>不是报告读取失败</b>：下面那份诊断报告已经读到了。',
     rows:[
       ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
@@ -1595,7 +1595,7 @@ var NOTICE = {
       ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
     ] },
   'expired': { icon:'clock', title:'原件的临时访问链接已过期',
-    why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还在服务端保留，这一屏都看不出来，也不做判断。',
+    why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还留着，这一屏都看不出来，也不做判断。',
     keep:'这<b>不是报告读取失败</b>：下面那份诊断报告已经读到了。',
     rows:[
       ['dead','refresh','再取一次原件','静态原型不会真的重新取件','-source-alt-retry'],
@@ -1603,7 +1603,7 @@ var NOTICE = {
       ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
     ] },
   'render-failed': { icon:'broken', title:'原件取到了，但这一层没能把它显示出来',
-    why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还在服务端保留。',
+    why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还留着。',
     keep:'<b>报告不受影响</b>：诊断结论就在这一层下面。',
     rows:[
       ['dead','refresh','再显示一次','静态原型不会真的重新渲染','-source-alt-retry'],
@@ -1680,7 +1680,7 @@ function layoutSource(){
 
 /* ════════ 6. 九个状态 ════════ */
 var R = {};
-var SESSION_LINE = '本次会话只记住编号和一次性令牌（不存报告正文）；待机或超时清场后一并清掉，本页回到「没有编号」。';
+var SESSION_LINE = '这次办理只记住编号，不留下报告正文。离开或超时之后会清掉，这一页回到「还没有编号」。';
 
 R['no-context'] = function(){
   hdSub.textContent = ridBad
@@ -1752,7 +1752,7 @@ function reportState(kind){
        这一屏不画任何空的分区骨架 —— 撑满高度的空占位比不画更误导。 */
     body.innerHTML = idbar(false) + countBar(report, false)
       + '<section class="card state-b"><h2>报告回来了，但里面是空的</h2>'
-      + '<p>服务端<b>确实返回了这份报告</b>，只是六个维度、建议、优先级和风险提醒都是空的。'
+      + '<p>这次<b>确实读到了这份报告</b>，只是六个维度、建议、优先级和风险提醒都是空的。'
       + '常见原因是这次提取到的简历文字太少，不足以给出有依据的结论。'
       + '这<b>不是读取失败，也不是能力未接通</b> —— 那两种情况长得不一样，各有各的一屏。'
       + '本页不会为了把版面填满而生成任何结论。</p></section>'
@@ -1820,7 +1820,7 @@ R['read-error'] = function(){
   rail(2);
   body.innerHTML =
     '<section class="card state-b"><h2>这次没能取到报告</h2>'
-    + '<p>常见原因：本次办理会话已经结束、结果已按留存期清理，或者读取中途断开。'
+    + '<p>常见原因：这次办理已经结束、结果已按留存期清理，或者读取中途断开。'
     + '<b>读取失败不会动到你上传的原件，也不会删掉任何已保存的简历。</b>'
     + (TECH ? '（GET /resume/records/:taskId 未返回报告或请求失败）' : '') + '</p></section>'
     + '<section class="card exits"><div class="ch"><b>接下来可以做的</b><span>先试一次，再换路径</span></div>'

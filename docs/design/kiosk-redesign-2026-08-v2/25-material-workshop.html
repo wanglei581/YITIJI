@@ -8,6 +8,7 @@
 - 卡片尾部明确带走哪份 PDF；招聘会清单改成求职材料清单（规则 3、5）。
 - 返工：页脚恢复模板按你填的内容排版、不调用 AI 的能力说明；保留小青整理材料亮点这一独立辅助动作（规则 4、5、7）。
 - 底部上一步和 AI 链接不加框；技术词与重复声明精简（规则 1、4）。
+- 模板卡片角标写「模板生成」，不写成 AI 撰写（规则 4、7）。
 - AI 帮助采用原顾问页支持的 composer 与会话草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 -->
 <html lang="zh-CN">
@@ -573,7 +574,7 @@ function templateCard(t){
   return '<button type="button" class="template press" data-template="'+idx+'" aria-pressed="'+on+'" data-testid="'+SCREEN+'-template-'+t.id+'">'
     +'<b>'+esc(t.title)+'</b><p>'+esc(t.desc)+'</p>'
     +'<span class="use">带走：'+esc(t.out)+'</span>'
-    +'<span class="tags"><i>'+esc(t.type)+'</i>'+t.tags.map(function(x){return '<i>'+esc(x)+'</i>';}).join('')+'</span></button>';
+    +'<span class="tags"><i>模板生成</i><i>'+esc(t.type)+'</i>'+t.tags.map(function(x){return '<i>'+esc(x)+'</i>';}).join('')+'</span></button>';
 }
 function othersBlock(list){
   var rest=TEMPLATES.filter(function(t){return list.indexOf(t)<0;});
