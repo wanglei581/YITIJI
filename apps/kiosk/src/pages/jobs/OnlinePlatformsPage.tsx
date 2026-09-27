@@ -1,3 +1,8 @@
+// 【停放，2026-09-27，next-tasks 3.14】源码保留，不注册路由、不打包。
+// 这一页的四个商业招聘网站是写死在前端的常量；3.14 起 /jobs/online-platforms 重定向到
+// 本机构官方渠道（pages/official-channels/OfficialChannelsPage.tsx），b 版本的平台目录改由服务端
+// legacyPlatforms 下发。要恢复：在 routes/index.tsx 把那条 Navigate 换回本页的 lazy 路由。
+// 是否删除本文件等产品负责人确认，不要顺手删。
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ExternalLinkIcon, QrCodeIcon } from 'lucide-react'

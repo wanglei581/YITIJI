@@ -440,7 +440,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/jobs-fairs-prototype.css` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/pages/jobs/JobDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-info-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/jobs/JobsPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-info-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs` |
-| `apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/jobs/components/JobAiConsentModal.tsx` | `verify-job-ai-ui.mjs` |
 | `apps/kiosk/src/pages/jobs/components/JobAiResultPanel.tsx` | `verify-job-ai-ui.mjs` |
 | `apps/kiosk/src/pages/jobs/components/JobDetailSections.tsx` | `verify-fusion-w4.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-job-headcount.ts` |
@@ -452,6 +451,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/jobs/utils/sourceTrust.ts` | `verify-jobfair-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-legal-retention-copy.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/kiosk/src/pages/legal/legal-service-desk.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
+| `apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/kiosk/src/pages/offline-agencies/OfflineAgencyDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/kiosk/src/pages/offline-agencies/OfflineJobDetailPage.tsx` | `verify-fusion-w4.mjs` |

@@ -37,12 +37,14 @@ export const productionRoutePatterns = [
   '/ai/plan',
   '/session-resume',
   '/jobs/online-platforms',
+  // 3.14 本机构官方渠道（稿 45 的运行时宿主；/jobs/online-platforms 改为重定向到这里）
+  '/official-channels',
   // PR #499 合同审查
   '/contract-review',
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan)
+] as const // 110 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
@@ -68,4 +70,6 @@ export const compatibilityRedirects = {
   '/scan/settings': '/scan?stage=settings',
   '/scan/progress': '/scan?stage=progress',
   '/scan/result': '/scan?stage=result',
+  // 2026-09-27（3.14）：线上招聘平台目录并入本机构官方渠道，两种托管状态都转过去。
+  '/jobs/online-platforms': '/official-channels',
 } as const

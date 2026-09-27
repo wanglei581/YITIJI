@@ -18,6 +18,7 @@ export type HomeV6ActionId =
   | 'career-plan'
   | 'jobs-hub'
   | 'fairs-hub'
+  | 'official-channels'
   | 'interview-hub'
   | 'policy-hub'
   | 'toolbox'
@@ -68,6 +69,7 @@ export const HOME_V6_ROUTES: Readonly<Record<HomeV6ActionId, string>> = {
   'career-plan': '/resume/career-plan',
   'jobs-hub': '/jobs-service',
   'fairs-hub': '/fairs-service',
+  'official-channels': '/official-channels',
   'interview-hub': '/interview-service',
   'policy-hub': '/policy-service',
   toolbox: '/toolbox',

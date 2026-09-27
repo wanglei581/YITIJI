@@ -105,20 +105,29 @@ check(/onClick=\{retryApi\}/.test(hubPage), '服务台保留在线服务重新�
 // 青序流光把它收进 serviceHubModel 的 needsBackend()：白名单登记即可离线进，
 // 未登记一律按需要后端。下面两族断言分别钉「白名单里有什么」和「默认是拒绝」。
 const OFFLINE_ENTRIES = [
-  ['/jobs/online-platforms', '线上招聘平台保留离线二维码入口'],
   ['/interview/tips', '面试技巧保留离线阅读入口'],
   ['/renshi?tab=social', '社保指南保留离线指引入口'],
   ['/renshi?tab=register', '档案与登记保留离线指引入口'],
 ]
+// 白名单的**代码面**：只看 OFFLINE_CAPABLE_ROUTES 这一个集合字面量，注释里提到的路由不算登记。
+const offlineSetLiteral = codeOf(hubModel).match(/const OFFLINE_CAPABLE_ROUTES = new Set<string>\(\[([\s\S]*?)\]\)/)?.[1] ?? ''
+check(offlineSetLiteral.includes("'/interview/tips'"), '离线白名单集合可被解析（阳性对照：已知条目 /interview/tips 在册）')
 for (const [route, label] of OFFLINE_ENTRIES) {
   check(
     new RegExp(`route: '${route.replace(/[?]/g, '\\$&')}',\\s*kind: 'info'`).test(hubSpecs) &&
-      new RegExp(`'${route.replace(/[?]/g, '\\$&')}',`).test(
-        hubModel.slice(hubModel.indexOf('OFFLINE_CAPABLE_ROUTES')),
-      ),
+      offlineSetLiteral.includes(`'${route}'`),
     label
   )
 }
+// 3.14：原来的第四条「线上招聘平台保留离线二维码入口」撤出。那一页能离线看，是因为四个平台写死在前端；
+// 现在 /jobs/online-platforms 重定向到本机构官方渠道，渠道要向服务端读，后端断开时只有读取失败页。
+// 判据由正向改为反向（强度不降）：两条地址都不得出现在白名单里，稿 16 的卡片仍按旧地址 kind: 'info' 登记。
+check(
+  /route: '\/jobs\/online-platforms',\s*kind: 'info'/.test(hubSpecs) &&
+    !offlineSetLiteral.includes("'/jobs/online-platforms'") &&
+    !offlineSetLiteral.includes("'/official-channels'"),
+  '线上招聘平台卡片落到要读服务端的官方渠道页，不再登记离线白名单（后端断开时 fail-closed）'
+)
 check(
   /export function needsBackend\(route: string\): boolean \{\s*return !OFFLINE_CAPABLE_ROUTES\.has\(route\)/.test(
     hubModel,
@@ -129,12 +138,12 @@ check(
 // ── 白名单页自己的出口不得成为绕过口 ────────────────────────────────────────
 //
 // OFFLINE_CAPABLE_ROUTES 说的是「不联网也能**读**这一页」，不是「这一页上的每个
-// 按钮都不需要后端」。四条白名单页各自都有通往需要后端的页面的出口
-// （`/jobs/online-platforms` → `/jobs` 与 `/assistant`；`/renshi` → `/assistant`），
+// 按钮都不需要后端」。三条白名单页各自都有通往需要后端的页面的出口
+// （`/renshi` → `/assistant`；`/jobs/online-platforms` 那一条已于 3.14 撤出白名单），
 // 但那些落点都是**只读页**，进去看到的是空态或错误态，用户没有付出任何填写。
 // `/interview/tips` 不同，它是唯一一条出口会**在服务端建会话**的：底部
 // 「开始模拟面试」走 setup → POST /mock-interviews，用户要先选岗位、面试官和时长，
-// 填完才在最后一步撞上错误。所以本段只钉这一条；另外三条属于同类但更轻的缺口，
+// 填完才在最后一步撞上错误。所以本段只钉这一条；另外两条属于同类但更轻的缺口，
 // 已登记在 `docs/progress/next-tasks.md`，不在本段断言范围内（写清楚是为了
 // 下一个读这段的人不会以为它们已经被这条门禁覆盖了）。
 //

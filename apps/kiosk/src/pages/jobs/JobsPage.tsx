@@ -290,7 +290,8 @@ export function JobsPage() {
           <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/offline-agencies')}>
             <StoreIcon aria-hidden="true" />线下招聘机构
           </button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/jobs/online-platforms')}>
+          {/* 3.14：原线上平台目录并入本机构官方渠道（b 版本在同一页另列「其他来源平台」）。 */}
+          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/official-channels')}>
             官方与合作平台目录
           </button>
         </>

@@ -293,7 +293,8 @@ const GATED_URLS: readonly { url: string; topic: string }[] = [
   { url: '/jobs', topic: '岗位信息' },
   { url: '/jobs/job-001', topic: '岗位信息' },
   { url: '/jobs/job-001/offline', topic: '岗位信息' },
-  { url: '/jobs/online-platforms', topic: '岗位信息' },
+  // /jobs/online-platforms 不在这里：3.14 起它两种托管状态都重定向到 /official-channels（本机构官方渠道，
+  // 不属于招聘内容托管），关闭时的落点由 official-channels.spec.ts 断言。
   { url: '/jobs-service', topic: '岗位信息' },
   { url: '/fairs-service', topic: '招聘会信息' },
   { url: '/job-fairs', topic: '招聘会信息' },

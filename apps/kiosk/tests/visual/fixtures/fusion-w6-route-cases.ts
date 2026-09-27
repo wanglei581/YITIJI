@@ -144,7 +144,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("小青的作业面")', featureText: '小青的作业面' },
   { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续打印任务")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
-  { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', marker: 'h1:text-is("线上招聘平台")', featureText: '线上招聘平台' },
+  // 3.14：线上平台目录并入本机构官方渠道，旧地址只做重定向。marker 仍是 h1 精确匹配、featureText 钉二维码下那句
+  // 来源说明的固定部分（夹具是 b 版本：本机构一个渠道 + 其他来源平台两个），强度不降。
+  { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', expectedPath: compatibilityRedirects['/jobs/online-platforms'], marker: 'h1:text-is("本机构官方渠道")', featureText: '提供，信息以其官网为准' },
+  { pattern: '/official-channels', url: '/official-channels', marker: screen('official-channels'), featureText: '本渠道由示例大学就业指导中心提供，信息以其官网为准' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/source', url: '/resume/source', marker: screen('resume-source'), featureText: 'AI 简历诊断' },
@@ -199,7 +202,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("看来源、查条件、备材料")', featureText: 'AI顾问不替主管部门作资格判断。' },
-] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan)
+] as const // 110 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 

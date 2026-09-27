@@ -1,5 +1,35 @@
 # 当前开发进度
 
+## 2026-09-27：一体机「本机构官方渠道」页与首页入口（3.14 一体机侧；分支 `claude/kiosk-official-channels-20260927`，未推送，待协调窗口验收）
+
+从候选 `db754649f` 拉出。只改 `apps/kiosk/**`、`docs/design/kiosk-proto-2026-07-migration-matrix.md`（路由清单门禁的登记处）与本条；没有改 `services/api/**`、`packages/shared/**`（3.14 后端由 Codex 在 `codex/official-channels-314-20260927` 并行收尾）、`docs/design/kiosk-redesign-2026-08/`（只读）与候选分支。
+
+- **新页 `/official-channels`**（`apps/kiosk/src/pages/official-channels/`，稿 45 目录行版式 + 青序壳 + 目录组件）：读 `GET /terminals/:terminalId/official-channels`（`apps/kiosk/src/services/api/officialChannels.ts`，终端鉴权，与 `terminalConfig.ts` 同一个 `terminalProtectedFetch`；响应类型先在本地定义并注明镜像 shared 的 `OfficialChannelPublicResponse`；裸对象与 `{ success, data }` 信封都认；名称、机构名缺失或链接不是 http(s) 的条目丢掉，不生成二维码）。每张卡：渠道名、目标域名、二维码（`SourceUrlQr`），二维码下逐字「本渠道由{机构名}提供，信息以其官网为准」（中文排版，机构名两侧不留空格；放不下一行时只在「，」处断）；整页没有可点的外链。二维码随卡片数放大（1 张 320、2 张 280、3 张及以上 200，手机宽度 200）。
+  - 状态：读取中只说「读取完成前这里不下结论」；没有渠道（含本机没有终端身份——不发请求）只说「本终端暂未配置官方渠道」，不说原因，给就业政策 / AI 求职工具 / 打印扫描三处去处（与招聘托管说明页同一套紧凑行：舞台上 128px、手机 88px，空白留在行下面，不把三项拉成空卡）；读取失败给「重新读取」，不直出原始错误；有渠道时底部给「AI 求职方向探索」（`/assistant?intent=career_explore`）。
+  - b 版本（托管打开）另列「其他来源平台」（服务端 `legacyPlatforms`）；托管没读到「打开」时客户端再兜一层，a 版本即使服务端误发也一条不列。
+- **读取 hook**：`apps/kiosk/src/hooks/useOfficialChannels.ts`，30 秒内存缓存 + 同一终端在途合并（与 `getCachedKioskTerminalConfig` 同形），五分钟内读过的结果同步回填初值；首次失败进 error；读到过之后的后台刷新失败保留上一次结果（首页磁贴不因一次抖动闪出又闪回），读到的新结果（包括「现在没有渠道了」）照常替换。
+- **路由**：新路由在招聘内容托管闸门外，两种托管状态都渲染；`/jobs/online-platforms` 两种状态都重定向到 `/official-channels`（同样放在闸门外，静态段优先于闸门里的 `jobs/:id`）。`KioskRoot` 的 `QX_MIGRATED_ROUTES` 登记新路由，旧地址留在册（重定向那一帧不露旧顶栏）。岗位列表页「官方与合作平台目录」改指新路由（按钮文字是稿 26 原文，没改）；服务台（稿 16）「线上招聘平台」卡片的路由是机械抽取产物（`serviceHubSpecs.ts` 须与稿逐字节一致），仍写旧地址，靠重定向落地。
+- **停放，不是删除**：`apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx` 源码保留、不注册路由、不打包，文件头写了停放说明与恢复方法；按 CI 环境变量做的生产构建里检索不到那四个商业招聘网站的域名。是否删除这份源码等产品负责人确认。
+- **首页**：读到「托管关闭」且本机构至少一个渠道时，在岗位 / 招聘会那一行摆一张通栏「岗位与招聘会」（本机构官方渠道 · 扫码查看，徽标写渠道数），五行与托管打开时同构；托管还没读到、渠道读取中 / 失败 / 为空、无终端身份都不摆，也不先闪出来再收回；托管打开（b）照旧。有这张磁贴时底栏说「岗位与招聘会请看本机构官方渠道，本终端不代收简历。」，其余情形底栏不变。
+- **离线白名单撤出一条（能力变化）**：服务台 `OFFLINE_CAPABLE_ROUTES` 去掉 `/jobs/online-platforms`。它原来能离线看，是因为四个平台写死在前端；现在渠道要向服务端读，后端断开时进去只有读取失败页，按白名单自己的规则必须 fail-closed。只影响 b 版本的岗位服务台：后端断开时这张卡改为不可点并写原因。
+- **门禁与用例改动：**
+  - `verify-fusion-w4.mjs`（锚点过时 + 收严）：稿 45 宿主从停放的旧页改钉 `OfficialChannelsPage.tsx`，青序壳、不说代投、不出现投递 CTA 三条原样保留；正向锚点从按钮文案「扫码打开来源平台」换成「二维码由 SourceUrlQr 按渠道网址生成 + 来源说明逐字固定」；新增「不得出现打开外部网页的写法」；招聘闭环禁词扫描范围加入 `official-channels` 目录；另断言 `KioskRoot` 登记了 `/official-channels`。
+  - `verify-fusion-w6.mjs`（登记）：`/official-channels` 归 W4，路由全覆盖不变量不变。
+  - `verify-service-entry-readiness.mjs`（能力变化）：撤出「线上招聘平台保留离线二维码入口」，改为反向断言 `/jobs/online-platforms` 与 `/official-channels` 都不得进离线白名单；白名单改为只解析集合字面量（注释里提到的路由不算登记），并带阳性对照。
+  - `route-manifest.ts`、W6 route cases、视觉证据清单、迁移矩阵：登记新路由与重定向。W6 的旧地址用例改为断言落到 `/official-channels`，marker 仍是 h1 精确匹配。
+  - `fusion-w4.spec.ts`（锚点过时 + 收严）：旧地址用例改测重定向后的 b 版本（1 个机构渠道 + 2 个平台、3 个二维码、整页无链接、7 个禁词）。`service-hub-qx.spec.ts` 503 用例（随能力变化）：该卡改为断言 fail-closed 并写原因，白名单阳性对照改为常用入口「招聘会」真点到 `/fairs-service`。`recruitment-hosting.spec.ts`（锚点）：直达地址表移走旧地址，关闭时的落点由新 spec 断言。
+  - `api-router.ts` 默认按「没有渠道」应答（既有用例的首页不变）；`fusion-w4-api.ts` 给 b 版本示例渠道与平台（全是示例域名）。新增 `tests/visual/official-channels.spec.ts`（W1，17 条；空态与失败态断言每条去处行 127–180px 且图标、标题、说明靠左，手机空态 87–120px）。
+- **验证：** kiosk `tsc` 通过；`eslint src/` 0 error、改动文件无告警；CI 里的 kiosk `verify:*` 90 条：88 条直接通过，`verify:prod-build-config` 在按 CI 环境变量做生产构建后通过，`verify:qingxu-proto-geometry` 只渲染 51 页原型（本次没动），本地 10 分钟没跑完、未复跑；`verify-compliance-copy`（含日期 / 截断 / 原始错误三条）通过。浏览器全部在私有端口、`reuseExistingServer:false`、不经 pnpm：官方渠道 17/17、W1 46/46、W4 36/36、W6 113/113、冒烟 + 路由扫描 + 服务台 126/126；补跑 W2 118、W3 49、W5 50、隐私 42、会话提醒 35、扫码安全 38、麦克风 4，全过；真实性与走查一组 217 过 3 败：`account-assets-journey` 写死 4177 端口（换回 4177 通过），`qr-login-render.spec.ts` 两条本地失败但 CI 从不执行它（见遗留），与本次改动无关。
+- **变异（先提交再变异，每次原样复原）：** M1 读取中就摆磁贴 → 「请求扣住时不摆」红；M2 来源说明改一个字 → 渠道页 7 条红 + `verify-fusion-w4` 红；M3 b 段只看「托管读到了」不看「打开」→ 「a 版本服务端误发也不列」红；M4 删掉旧地址重定向 → 旧地址用例红 + `verify-fusion-w6` / `verify-fusion-baseline` / `verify-visual-evidence-manifest` / `verify-fusion-w4` 红。反向：改成「托管打开时不去读渠道」（同样合规的另一种实现）→ 16 条全绿；第一次做时发现托管打开那条用例钉了「必须发渠道请求」（照行为写的），已改掉后复验。
+- **截图评审第 1 轮修正（协调窗口）：** ① 来源说明去掉机构名两侧的半角空格（页面、用例、W6 路由用例与 `verify-fusion-w4` 的逐字钉同步改）；② 空态 / 失败态的三条去处改成与招聘托管说明页同一套紧凑行（舞台 128px、手机 88px，空白留在行下面，不再平分余量成三张约 410px 的空卡），用例新增行高断言（每行 127–180px，图标、标题、说明靠左；手机空态 87–120px）。先提交再变异：M5 删掉 128px 行高规则 → 行高 104px，空态、失败态两条红（下界）；M6 把修正前的拉伸加回去（区块吸收余量、行 flex:1）→ 行高 421px，两条红（上界）；两次都原样复原。复跑：W1 46/46（含本 spec 17 条）、W4 36/36、W6 113/113，`verify-fusion-w4` 通过；7 张截图按修正后重拍。
+- **截图（不进仓库）：** `test-results/official-channels-review/`：1080×1920 首页磁贴、两条渠道、空态、失败态、b 版本；390×844 首页磁贴、渠道页。
+- **遗留：**
+  - 响应形状待与后端对齐：本地两种都认，Codex 分支当前控制器用 `ApiResponse.ok` 包了信封。3.14 并入后把本地类型换成 shared 的 `OfficialChannelPublicResponse`。
+  - 服务台卡片仍叫「线上招聘平台」（稿 16 原文，规格逐字节对账），落到的是「本机构官方渠道 + 其他来源平台」；要改名得先改稿再抽取，或走运行时文案覆盖（`RUNTIME_CARD_COPY`）。
+  - `DirectoryBits.tsx` 里 `DirAiAssist` 的 `online-platform` 文案组已无人使用（共享组件，本次不动）。
+  - `test:browser:journeys` 里写的是 `tests/visual/qr-login-render.spec.ts`，文件实际在 `tests/` 下，CI 从未执行它（候选 CI 运行 `36211551829` 的日志里没有它的用例）；`verify:kiosk-browser-spec-coverage` 按文件名比对，所以没发现。本地它现在有两条红（验证码按钮 `:focus-visible`、扫码 500 态「改用手机号登录」匹配到 3 个按钮）。建议单开任务。
+  - `next-tasks.md` 3.14 行未改，留给并入时更新。
+
 ## 2026-09-27：政策招聘分类旁路、紧急下架竞态、简历对照手填放行（`grok/policy-hosting-jobfit-20260927`）
 
 接在候选 `4464925b9` 之后。只改政策读写闸、紧急下架事务、简历对照的岗位板块判断和对应门禁。没有改前端，没有推送。

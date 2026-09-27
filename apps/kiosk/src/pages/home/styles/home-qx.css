@@ -161,9 +161,10 @@
 /* 招聘内容托管关闭（3.13）：岗位、招聘会两张磁贴不渲染。稿 01 的 .tiles 让 fr 行吸收余量，这里照做：
    空出的那一行按比例分给其余四行（每行约放大 1.4 倍，主卡与两张常规卡不被单独拉成空荡的高卡），
    不留空洞；底部只留与行距相同的 14px，和打开时的底边留白一致。只作用于 1080 舞台，≤760 的手机单列排版
-   在 home-qx-mobile.css 里按内容自然排。 */
+   在 home-qx-mobile.css 里按内容自然排。
+   机构终端（3.14）有官方渠道时，那一行由一张通栏「岗位与招聘会」补上，五行与托管打开时逐行同构，沿用上面的默认模板。 */
 @media (min-width: 761px) {
-  .qx-home[data-recruitment='closed'] .qx-home-tiles {
+  .qx-home[data-recruitment='closed']:not([data-official-channels='shown']) .qx-home-tiles {
     grid-template-rows: minmax(204px, 1fr) minmax(196px, 1.2fr) repeat(2, minmax(120px, .55fr));
     align-content: stretch;
     padding-bottom: 14px;
@@ -186,7 +187,8 @@
   box-shadow: 0 12px 32px color-mix(in srgb, var(--qx-deep-2) 24%, transparent);
 }
 .qx-home-tile[data-size='slim'] { min-height: 104px; padding: 16px 112px 16px 94px; justify-content: center; }
-.qx-home-tile[data-action='policy-hub'] { grid-column: 1 / -1; }
+.qx-home-tile[data-action='policy-hub'],
+.qx-home-tile[data-action='official-channels'] { grid-column: 1 / -1; }
 .qx-home-tile:disabled { cursor: not-allowed; opacity: .68; }
 .qx-home-tile:focus-visible,
 .qx-home-host .qx-home :is(button, a):focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; } /* 须压过 service-desk 的全局淡蓝焦点环（0,3,0） */

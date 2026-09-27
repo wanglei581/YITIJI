@@ -4,6 +4,7 @@
 
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
@@ -33,12 +34,17 @@ export function HomePage() {
   const recruitment = useRecruitmentHosting()
   const jobFair = useHomeJobFairHighlight()
   const jobs = useHomeJobHighlight()
+  // 3.14：读到「托管关闭」且本机构至少有一个已启用渠道，才在岗位 / 招聘会的位置摆一张「岗位与招聘会」。
+  // 托管还没读到、渠道读取中 / 失败 / 为空、本机没有终端身份：一律 0，不摆，也不会先闪出来再收回。
+  const channels = useOfficialChannels()
+  const officialChannelCount = recruitment.status === 'ready' && !recruitment.enabled && channels.status === 'ready' ? channels.items.length : 0
   const terminalCode = getTerminalCode() || '设备未绑定'
 
   const handleAction = (actionId: HomeV6ActionId) => {
     if (actionId === 'smart-campus' && !(campus.status === 'ready' && campus.enabled)) return
     if (actionId === 'toolbox' && !(toolbox.status === 'ready' && toolbox.enabled)) return
     if ((actionId === 'jobs-hub' || actionId === 'fairs-hub') && !recruitment.enabled) return
+    if (actionId === 'official-channels' && officialChannelCount === 0) return
 
     if (actionId === 'login') {
       navigate('/login', { state: { from: '/' } })
@@ -72,6 +78,7 @@ export function HomePage() {
           jobFair={jobFair}
           jobs={jobs}
           recruitment={recruitment}
+          officialChannelCount={officialChannelCount}
           terminalCode={terminalCode}
           deviceStatus={deviceStatus}
           continueSlot={<ContinuePanel />}

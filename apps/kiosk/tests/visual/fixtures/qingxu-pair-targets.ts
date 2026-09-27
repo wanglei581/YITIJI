@@ -588,7 +588,8 @@ function directoryRoute(file: string, screen: string): string | null {
     if (screen === 'company') return '/companies/:id'
   }
   if (file.startsWith('44-')) return '/job-fairs/:id/companies/:companyId'
-  if (file.startsWith('45-')) return '/jobs/online-platforms'
+  // 3.14：稿 45 的运行时宿主换成本机构官方渠道（旧地址只做重定向）。
+  if (file.startsWith('45-')) return '/official-channels'
   return null
 }
 
