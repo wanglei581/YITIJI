@@ -21673,6 +21673,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/career-plan.controller.ts": [
+      "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/ai/dto/assistant-chat.dto.ts": [
@@ -31228,6 +31229,7 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/career-plan.controller.ts",
           "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts",
           "services/api/src/ai/resume/career-plan-pdf.service.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
