@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1539 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1542 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -106,6 +106,15 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `.github/workflows/deploy.yml` | `verify-deploy-vite-env-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-deploy-authorization-gate.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-release-bundle.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/admin/index.html/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/admin/index.html` | `verify-compliance-copy.mjs` |
 
 </details>
 
@@ -225,6 +234,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/toolbox.ts` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
 | `apps/admin/src/services/api/types.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs`<br/>`verify-jobfair-checkin.ts`<br/>`verify-print-scan-first-release.ts` |
 | `apps/admin/src/services/auth/index.ts` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-phone-transfer-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/kiosk/index.html/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/kiosk/index.html` | `verify-compliance-copy.mjs` |
 
 </details>
 
@@ -900,6 +918,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/utils/print-order-idempotency.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/utils/request.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/storage.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/partner/index.html/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/partner/index.html` | `verify-compliance-copy.mjs` |
 
 </details>
 

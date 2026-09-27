@@ -17193,6 +17193,9 @@
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-release-bundle.mjs"
     ],
+    "apps/admin/index.html": [
+      "scripts/verify-compliance-copy.mjs"
+    ],
     "apps/admin/package.json": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
@@ -17532,6 +17535,9 @@
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
+    ],
+    "apps/kiosk/index.html": [
+      "scripts/verify-compliance-copy.mjs"
     ],
     "apps/kiosk/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -19968,6 +19974,9 @@
     "apps/miniapp/utils/storage.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
       "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
+    "apps/partner/index.html": [
+      "scripts/verify-compliance-copy.mjs"
     ],
     "apps/partner/src/layouts/PartnerLayoutWrapper.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
@@ -29159,6 +29168,9 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/index.html",
+          "apps/kiosk/index.html",
+          "apps/partner/index.html",
           "docs/compliance/compliance-boundary.md",
           "packages/shared/src/types/complianceCopy.ts"
         ],
