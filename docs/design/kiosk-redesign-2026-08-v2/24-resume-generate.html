@@ -464,7 +464,7 @@ textarea.fin{padding:14px 18px;line-height:1.5;resize:none;min-height:104px}
     <div class="xq-row">
       <div class="xq-face serif" aria-hidden="true">青</div>
       <div class="xq-main">
-        <div class="xq-eyebrow" id="xq-eyebrow">从零生成</div>
+        <div class="xq-eyebrow" id="xq-eyebrow">AI 简历生成</div>
         <div class="xq-ask serif" id="xq-ask">从零写一份简历？</div>
         <div class="xq-doing" id="xq-doing">我分四步问你，问完一次生成。</div>
       </div>
@@ -754,7 +754,7 @@ var ASK={
  'session-lost':['你填的内容<em>已经清掉了</em>','公共设备不留个人资料：刷新、返回或待机之后，<b>这一份要从头填</b>。'],
  illegal:['<em>认不出</em>这个页面状态','地址里的状态没有登记。<b>我不猜你想去哪一步</b>，也不把原始参数回显在屏幕上。']
 };
-var EYEBROW={entry:'从零生成',input:'逐项填写',validate:'必填检查',voice:'语音输入',
+var EYEBROW={entry:'AI 简历生成',input:'AI 简历生成',validate:'必填检查',voice:'语音输入',
  generating:'正在生成',generate:'生成',ai:'AI 暂不可用',draft:'纯文本草稿',
  preview:'预览',export:'导出',session:'本次办理',illegal:'地址认不出',review:'生成前核对'};
 
@@ -1804,7 +1804,7 @@ function render(st){
   (st==='export-ready'&&!curFile().printable)
    ? '<b>扫码存进手机带走</b>。这一份<b>暂不开放打印</b>：打印要用另外生成的同内容 PDF，那份文件还没准备好。'
    : ASK[st][1];
- document.getElementById('xq-eyebrow').textContent=EYEBROW[st.split('-')[0]]||'从零生成';
+ document.getElementById('xq-eyebrow').textContent=EYEBROW[st.split('-')[0]]||'AI 简历生成';
  document.getElementById('truth-tx').innerHTML=TRUTH[TRUTHOF[st]];
  var back=document.getElementById('topback');
  if(PREVIEW_VIEW[st]){back.setAttribute('href','21-resume-triage.html');back.setAttribute('aria-label','返回简历服务（这次结果不会带走）')}

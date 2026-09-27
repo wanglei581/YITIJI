@@ -173,7 +173,8 @@ async function acceptRoute(page: Page, route: W6RouteCase, errors: string[]): Pr
   if (route.expectedPath) await expect(page).toHaveURL((url) => url.pathname === route.expectedPath)
 
   await expect(page.locator(route.marker).first(), `稳定 marker: ${route.marker}`).toBeVisible()
-  if (route.featureText) await expect(page.getByText(route.featureText, { exact: false }).first()).toBeVisible()
+  // 功能名要在屏幕上看得见；同名的无障碍页标题可以是视觉隐藏的，所以取第一个可见的那一处。
+  if (route.featureText) await expect(page.getByText(route.featureText, { exact: false }).filter({ visible: true }).first()).toBeVisible()
   if (route.longText) await expect(page.getByText(route.longText, { exact: true })).toBeVisible()
 
   await page.screenshot({ path: test.info().outputPath('routes', screenshotName(route)), fullPage: true })

@@ -411,7 +411,7 @@ export function ResumeGeneratePage() {
     >
     <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
       <ResumeGenerateAdvisor
-        eyebrow="从零生成"
+        eyebrow="AI 简历生成"
         ask={reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}
         doing={reviewing ? '先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。' : STEPS[step].doing}
       />
