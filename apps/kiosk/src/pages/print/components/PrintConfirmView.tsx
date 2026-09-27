@@ -14,6 +14,7 @@ import {
   PRINT_BENEFIT_REDEEM_DISABLED_REASON,
 } from '../../../services/api/benefits'
 import { ASK, COLOR_MODE_LABEL, DUPLEX_LABEL, type PrintConfirmScreen, type QuoteView } from '../printConfirmModel'
+import { PrintAiHelp } from './PrintAiHelp'
 import type { PrintFileState } from '../printMaterialSession'
 
 // 报价确认页（原型 14-print-confirm.html）的展示件：小青区 → 四步条 → 01 核对打印内容 →
@@ -89,7 +90,7 @@ function Advisor({ screen }: { screen: PrintConfirmScreen }) {
       <div className="pcf-xq-row">
         <div className="pcf-xq-face" aria-hidden="true">青</div>
         <div className="pcf-xq-main">
-          <div className="pcf-xq-eyebrow" aria-hidden="true">QUOTE &amp; CONFIRM</div>
+          <div className="pcf-xq-eyebrow">核对价格</div>
           <p className="pcf-xq-ask">{title[0]}<em>{title[1]}</em>{title[2]}</p>
           <p className="pcf-xq-doing">{doing}</p>
         </div>
@@ -192,7 +193,7 @@ function CouponUnavailable() {
         <span className="c-ic"><TicketIcon size={24} aria-hidden="true" /></span>
         <span className="c-m">
           <b>本单暂无可使用优惠券</b>
-          <span>优惠券功能尚未接通：服务端还没有下发券面值与适用范围，本机不替你预判，也不试算抵扣。</span>
+          <span>优惠券功能尚未接通：系统还没有下发券面值与适用范围，本机不替你预判，也不试算抵扣。</span>
         </span>
         <span className="c-tag">不使用优惠券</span>
       </div>
@@ -296,16 +297,12 @@ function ConfirmCard({
         </div>
       ) : null}
       <div className="pcf-act">{actions}</div>
-    </div>
-  )
-}
-
-function Truth() {
-  return (
-    <div className="pcf-truth" data-disclaimer="true" data-testid="print-confirm-truth">
-      <div><b>金额</b>只认服务端返回的正式报价；拿不到就不显示具体数字。</div>
-      <div><b>权益</b>核销要等服务端结果；没通过就按原价走，不会先按抵扣算给你看。</div>
-      <div><b>建单</b>点确认才会真正建单，零元单也一样先建单，再走后面的流程。</div>
+      <div className="pcf-airow">
+        <PrintAiHelp
+          label="问小青：帮我看费用明细 →"
+          draft="请告诉我打印报价应该核对哪些项目，怎样确认页数、份数和费用是否一致？"
+        />
+      </div>
     </div>
   )
 }
@@ -377,7 +374,7 @@ export function PrintConfirmView(props: Props) {
       {printerBlocked && !idle ? <div className="pcf-alert" role="status">{printerBlockedReason}</div> : null}
       {terminalFailed ? <div className="pcf-alert" data-tone="error" role="alert">{terminalFailedText}</div> : null}
       {paramsWereRestricted && screen !== 'capability-invalid-params' ? (
-        <div className="pcf-alert">参数已按本机已验证能力收口。收口后的参数才参与报价。</div>
+        <div className="pcf-alert">彩色或双面本机暂未开通，已改回目前能打的参数。改回之后的参数才参与报价。</div>
       ) : null}
 
       {screen === 'missing-context' ? (
@@ -397,7 +394,7 @@ export function PrintConfirmView(props: Props) {
                 <Plan items={[
                   '要打印的文件：本机上传、手机传来或扫描生成都行。',
                   '这一份的打印参数：纸张、颜色、单双面、份数。',
-                  '两样齐了才能向服务端要这一单的正式报价。',
+                  '两样齐了才能向系统要这一单的正式报价。',
                 ]} />
               </div>
               <div className="pcf-pgrp">
@@ -466,7 +463,7 @@ export function PrintConfirmView(props: Props) {
               materialDemo={materialDemo}
             />
           </Sec>
-          <Sec no="02" title="费用明细" hint="参数不可用时服务端不出报价">
+          <Sec no="02" title="费用明细" hint="参数不可用时系统不出报价">
             <div className="pcf-fee">
               <AmountCard quote={{ status: 'unavailable', reason: '' }} amountText="金额暂不可用" source="当前参数不可用，请修改后重新获取报价。" />
               <FeeLines rows={[
@@ -479,9 +476,9 @@ export function PrintConfirmView(props: Props) {
             <div className="pcf-grid2">
               <div className="pcf-pgrp">
                 <h4>为什么被挡下</h4>
-                {colorOff ? <p className="pcf-reason">本机彩色打印尚未通过真机验证，暂不能按彩色下单</p> : null}
-                {duplexOff ? <p className="pcf-reason">本机双面尚未通过真机验证，暂不能按双面下单</p> : null}
-                <p>参数已按本机已验证能力收口。改回黑白单面才能继续报价。</p>
+                {colorOff ? <p className="pcf-reason">彩色打印本机暂未开通，暂不能按彩色下单</p> : null}
+                {duplexOff ? <p className="pcf-reason">双面打印本机暂未开通，暂不能按双面下单</p> : null}
+                <p>彩色或双面本机暂未开通，已改回目前能打的参数。改回黑白、单面才能继续报价。</p>
               </div>
               <div className="pcf-pgrp">
                 <h4>改回黑白单面就能继续</h4>
@@ -493,7 +490,7 @@ export function PrintConfirmView(props: Props) {
           <Sec no="03" title="确认并付款" hint="参数修改后才可继续">
             <ConfirmCard
               tone="warn"
-              note={<>当前参数被服务端按本机能力登记拒绝，<b>这一页拿不到金额，也不会创建订单</b>。</>}
+              note={<>当前参数被系统按本机能力登记拒绝，<b>这一页拿不到金额，也不会创建订单</b>。</>}
               reason="参数回到黑白单面再报价，才能确认这一单"
               alert={submitError}
               actions={actions}
@@ -519,10 +516,10 @@ export function PrintConfirmView(props: Props) {
             no="02"
             title="费用明细"
             hint={
-              screen === 'quoting' ? '正在向服务端要这一单的报价'
+              screen === 'quoting' ? '正在核对这一单的价格'
                 : screen === 'quote-failed' ? '这一次没有拿到报价'
                   : screen === 'zero-amount' ? '零元单也要先建单'
-                    : '金额以服务端返回为准'
+                    : '金额以实际结果为准'
             }
           >
             <div className="pcf-fee">
@@ -531,7 +528,7 @@ export function PrintConfirmView(props: Props) {
                 amountText={amountShown.replace(/^¥/, '')}
                 source={
                   quote.status === 'ready'
-                    ? <>金额由服务端报价返回，本机不估价。</>
+                    ? <>金额以实际结果为准，本机不估价。</>
                     : quote.status === 'demo'
                       ? '演示模式不显示金额'
                       : quote.status === 'unavailable'
@@ -548,7 +545,7 @@ export function PrintConfirmView(props: Props) {
                 { label: '计费方式', value: costCalcLabel, slot: quote.status !== 'ready', cost: true },
                 {
                   label: '权益抵扣',
-                  value: screen === 'benefit-unverified' ? '未核销，按原价' : '等报价返回后由服务端裁定',
+                  value: screen === 'benefit-unverified' ? '未核销，按原价' : '等报价返回后按原价显示',
                   slot: true,
                 },
                 {
@@ -565,7 +562,7 @@ export function PrintConfirmView(props: Props) {
               <div className="pcf-grid2">
                 <div className="pcf-pgrp">
                   <h4>可能的原因</h4>
-                  <Plan items={['本机与服务端之间网络中断。', '参数里有本机没验过的项，服务端直接拒绝报价。']} />
+                  <Plan items={['本机与系统之间网络中断。', '参数里有本机暂未开通的项，系统直接拒绝报价。']} />
                 </div>
                 <div className="pcf-pgrp">
                   <h4>这一趟保留了什么</h4>
@@ -579,7 +576,7 @@ export function PrintConfirmView(props: Props) {
               <div className="pcf-grid2">
                 <div className="pcf-pgrp">
                   <h4>计费页数怎么来的</h4>
-                  <p>计费页数和计价依据都由服务端报价返回。本机不按屏幕上看到的页数自己计算。</p>
+                  <p>计费页数和计价依据都以实际结果为准。本机不按屏幕上看到的页数自己计算。</p>
                 </div>
                 <div className="pcf-pgrp" data-testid="print-confirm-fallback">
                   <h4>零元单也要先建单</h4>
@@ -604,7 +601,7 @@ export function PrintConfirmView(props: Props) {
             ) : screen === 'quote-failed' ? (
               <ConfirmCard
                 tone="error"
-                note={<>重新报价只是再问服务端一次，<b>不会重复建单，也不会重复扣款</b>。改过参数之后同样要重新报价。</>}
+                note={<>重新报价只是再问系统一次，<b>不会重复建单，也不会重复扣款</b>。改过参数之后同样要重新报价。</>}
                 alert={submitError}
                 actions={actions}
               />
@@ -624,21 +621,20 @@ export function PrintConfirmView(props: Props) {
             ) : (
               <ConfirmCard
                 flow
-                note={<>确认后会创建订单并进入付款，<b>付款完成后才开始打印</b>。金额以服务端返回为准。</>}
+                note={<>确认后会创建订单并进入付款，<b>付款完成后才开始打印</b>。金额以实际结果为准。</>}
                 alert={submitError}
                 actions={actions}
               />
             )}
           </Sec>
-          {/* 权益卡按稿不占 01→02→03 的主路：本轮权益只展示、不核销，不改变本单金额（金额只认服务端报价，
-              建单时价格变了服务端回 409 要求再确认）。放在 03 之后，1080 首屏才能看到完整的确认卡与主按钮。 */}
+          {/* 权益卡不占 01→02→03 的主路：本轮权益只展示、不核销，不改变本单金额。
+              放在 03 之后，1080 首屏才能看到完整的确认卡与主按钮。 */}
           {benefitView ? <BenefitCard view={benefitView} onLogin={onLogin} /> : null}
           {printNotes}
         </>
       ) : null}
 
       {screen === 'capability-invalid-params' ? printNotes : null}
-      <Truth />
     </div>
   )
 }

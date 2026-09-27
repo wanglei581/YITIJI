@@ -36,7 +36,7 @@ export function PrintDoneXq({ ask, doing, mainClassName }: {
       <div className="pff-xq-row">
         <div className="pff-xq-face" aria-hidden="true">青</div>
         <div className={mainClassName}>
-          <div className="pff-xq-eyebrow">PRINT &amp; PICKUP</div>
+          <div className="pff-xq-eyebrow">出纸 · 取件</div>
           <p className="pff-xq-ask">{ask}</p>
           <p className="pff-xq-doing">{doing}</p>
         </div>
@@ -116,7 +116,7 @@ export function PrintOutOfPaperPanel({
       <section className="pff-sec" aria-label="这一单现在的状态">
         <div className="pff-sec-h">
           <span className="t">这一单现在的状态</span>
-          <span className="hint">服务端登记缺纸 · 订单保留</span>
+          <span className="hint">已经登记缺纸 · 订单保留</span>
         </div>
         <div className="pfp-card" data-testid="print-fulfill-list">
           <PrintJobRow fileName={fileName} subline={jobSubline(file, params)} idLine={idLine} state={{ tone: 'err', label: '缺纸中断' }} />

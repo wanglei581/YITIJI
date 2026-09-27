@@ -5,15 +5,17 @@
 
 .pickup-claim-page { --pcp-ease: cubic-bezier(.22, 1, .36, 1); }
 
-/* ── 页头：ARRIVAL CODE 眉标 → 宋体标题 → 说明句（稿 .head）──────
+/* ── 页头：到机码眉标 → 宋体标题 → 说明句（稿 .head）──────
    共享 .qx-pagehead 是 h1 与说明句同行；稿里三行竖排、标题不带竖条。眉标纯装饰，读屏跳过。 */
-.qx-stage:has(.pickup-claim-page) > .qx-pagehead { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 22px; }
-.qx-stage:has(.pickup-claim-page) > .qx-pagehead::before {
-  content: 'ARRIVAL CODE'; content: 'ARRIVAL CODE' / ''; font-size: 19px; font-weight: 700; letter-spacing: 5px; color: var(--qx-teal-d);
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead {
+  flex-direction: column; align-items: stretch; gap: 8px; margin-top: 26px; min-height: 220px; padding-top: 8px;
 }
-.qx-stage:has(.pickup-claim-page) > .qx-pagehead h1 { font-size: 44px; }
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead::before {
+  content: '到机码'; content: '到机码' / ''; font-size: var(--qx-fs-aux); font-weight: 700; letter-spacing: 2px; color: var(--qx-teal-d);
+}
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead h1 { font-size: 40px; line-height: 1.4; }
 .qx-stage:has(.pickup-claim-page) > .qx-pagehead h1::before { display: none; }
-.qx-stage:has(.pickup-claim-page) > .qx-pagehead p { flex: none; min-width: 0; width: 100%; font-size: 21px; line-height: 1.5; }
+.qx-stage:has(.pickup-claim-page) > .qx-pagehead p { flex: none; min-width: 0; width: 100%; font-size: var(--qx-fs-body-lg); line-height: var(--qx-lh-body); }
 .qx-stage:has(.pickup-claim-page) > .qx-pagehead p :is(b, strong) { color: var(--qx-ink); font-weight: 700; }
 
 /* 本页焦点环：3px 深墨环（稿 33 同口径），压过 service-desk 的全局蓝环（0,3,0）。 */

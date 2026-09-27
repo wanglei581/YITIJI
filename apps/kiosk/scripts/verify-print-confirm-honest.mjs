@@ -248,7 +248,7 @@ if (!/PRICE_BW|PRICE_COLOR|¥0\.20|¥0\.50/.test(previewSrc)) {
 }
 expectMatches(
   confirmSrc,
-  /演示模式不显示金额|页数待服务端确认，以最终计费为准|打印文件尚未就绪，无法报价/,
+  /演示模式不显示金额|页数以实际结果为准，确认前不显示金额|打印文件尚未就绪，无法报价/,
   'PrintConfirmPage 在无可靠报价时不展示具体金额',
 )
 

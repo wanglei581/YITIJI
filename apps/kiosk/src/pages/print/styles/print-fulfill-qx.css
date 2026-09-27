@@ -347,16 +347,27 @@
   gap: 24px;
   color: var(--qx-paper);
 }
-.pff-pickup-t { font-size: 22px; font-weight: 700; }
-.pff-pickup-s { margin-top: 6px; font-size: 18px; color: color-mix(in srgb, var(--qx-paper) 65%, transparent); line-height: 1.5; }
+.pff-pickup-t { font-size: var(--qx-fs-body-lg); font-weight: 700; }
+.pff-pickup-s { margin-top: 6px; font-size: var(--qx-fs-aux-lg); color: color-mix(in srgb, var(--qx-paper) 78%, transparent); line-height: 1.5; }
 .pff-pickup-code {
   flex: none;
-  font-size: 48px;
+  display: flex;
+  gap: 8px;
+  font-size: var(--qx-fs-greeting);
   font-weight: 800;
-  letter-spacing: 6px;
+  letter-spacing: 2px;
   color: var(--qx-emerald);
   font-variant-numeric: tabular-nums;
   font-family: var(--qx-mono);
+}
+.pff-pickup-code span {
+  width: 52px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--qx-emerald) 12%, transparent);
 }
 
 .pff-issue {
@@ -586,9 +597,9 @@
 .pfp-page .pff-xq-row { gap: 24px; }
 .pfp-page .pff-xq-face { width: 104px; height: 104px; font-size: 48px; }
 .pfp-xq-main { flex: 1; min-width: 0; }
-.pfp-page .pff-xq-eyebrow { margin-bottom: 8px; font-size: 18px; letter-spacing: 5px; }
-.pfp-page .pff-xq-ask { font-family: inherit; font-size: 40px; line-height: 1.32; letter-spacing: 1px; }
-.pfp-page .pff-xq-doing { margin: 10px 0 0; font-size: 22px; line-height: 1.55; }
+.pfp-page .pff-xq-eyebrow { margin-bottom: 8px; font-size: var(--qx-fs-aux); letter-spacing: 2px; color: color-mix(in srgb, var(--qx-paper) 86%, transparent); }
+.pfp-page .pff-xq-ask { font-family: var(--qx-serif); font-size: var(--qx-fs-page); line-height: 1.32; letter-spacing: 1px; }
+.pfp-page .pff-xq-doing { margin: 10px 0 0; font-size: var(--qx-fs-body-lg); line-height: 1.55; }
 
 /* 分区标题（稿 .sec-label） */
 .pfp-page .pff-sec-h { margin-bottom: 14px; }

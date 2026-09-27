@@ -45,6 +45,7 @@ import './styles/pickup-claim-qx.css'
 import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupKeypadCard, PickupOutsStrip, PickupSubtitle, PickupWinCard } from './components/PickupHidGuide'
+import { PrintAiHelp } from './components/PrintAiHelp'
 import { PICKUP_LOCKED_MESSAGE, classifyClaimFailure, claimMetaLine, claimSuccessCopy, failureScreen, pickupCells } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 
@@ -277,6 +278,15 @@ export function PrintPickupClaimPage() {
       // 胶囊只标页面用途，不表示任何设备状态，所以 tone 保持 unknown。
       status={{ tone: 'unknown', label: '到机码验证' }}
       terminalLabel="就业服务大厅"
+      ctabar={
+        <div className="qx-print-airow">
+          <button type="button" className="qx-print-ai" onClick={() => navigate('/print-scan')}>上一步</button>
+          <PrintAiHelp
+            label="问小青：到机码怎么找 →"
+            draft="手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？"
+          />
+        </div>
+      }
       navbar={
         <QxAppNavbar
           onHome={() => navigate('/')}
@@ -449,13 +459,10 @@ export function PrintPickupClaimPage() {
             <span className="pcp-hid-entry-t">不用手输：把手机上的码，对准机身侧面的扫码区</span>
             <span className="pcp-hid-entry-d">手机亮度调高，再凑近扫码区</span>
           </button>
-          {/* 有效期不写死日期：本页拿不到服务端的过期时间，只能如实说以服务端为准。 */}
-          <p className="pcp-expire-note">这串码<b>还能用多久，以服务端记录的取件码状态为准</b>；如果已经过期，校验时会直接告诉你，不会让你白输一遍。</p>
-          {/* 三条安心提示说的是本页行为，不是服务端数据，所以可以直接写死。 */}
           <ul className="pcp-easy">
             <li>输错可以改，不作废</li>
             <li>这一步不收钱</li>
-            <li>输满稍停自动校验，也可按「确认校验」</li>
+            <li>输满后核对订单；有效性以校验结果为准</li>
           </ul>
         </>
       )}

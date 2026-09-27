@@ -1523,7 +1523,7 @@ test('Order-only release during a normal session refresh waits instead of failin
   // 钱已经收了。此刻释放必须等换票，而不是把一单已付款的活当场判成安全失败 ——
   // 那会让站在机器前的人看到「打印任务尚未建立」，以为钱付了纸不出。
   paid = true
-  await expect(page.locator('.qx-state-t', { hasText: '付款已由服务端确认' })).toBeVisible()
+  await expect(page.locator('.qx-state-t', { hasText: '付款成功' })).toBeVisible()
   await page.waitForTimeout(700)
   expect(
     api.requestCount('POST', `/api/v1/print/jobs/${W2_ORDER.orderId}/release`),

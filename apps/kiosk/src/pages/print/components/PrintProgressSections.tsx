@@ -64,7 +64,7 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo,
               </span>
             </div>
             <p className="pff-inbar-b">
-              这只是<b>查询超时</b>：服务端的打印任务状态<b>没有被改变</b>，我们不会猜它成功或失败。
+              这只是<b>查询超时</b>：系统的打印任务状态<b>没有被改变</b>，我们不会猜它成功或失败。
               可以先重新查询，或直接找工作人员现场确认。
             </p>
           </div>
@@ -111,7 +111,7 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo,
           </div>
           <div className="pff-step">
             <span className="pff-step-no">2</span>
-            <span className="pff-step-txt">点下方<b>重新查询状态</b>，这只是再问服务端一次，不会重下单、不会重复扣费。</span>
+            <span className="pff-step-txt">点下方<b>重新查询状态</b>，这只是再问系统一次，不会重下单、不会重复扣费。</span>
           </div>
           <div className="pff-step">
             <span className="pff-step-no">3</span>
