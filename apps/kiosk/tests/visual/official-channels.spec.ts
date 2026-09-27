@@ -2,7 +2,7 @@
 //
 // 期望都来自 3.14 的决定（托管 a）：
 //   · /official-channels 两种托管状态都渲染：机构终端只列本机构自己的渠道；每张卡片是名称、二维码和一句逐字固定的
-//     「本渠道由 XX 提供，信息以其官网为准」；一体机不打开外部网页，所以只有二维码，没有可点的外链；
+//     「本渠道由XX提供，信息以其官网为准」（中文排版，机构名两侧不留空格）；一体机不打开外部网页，所以只有二维码，没有可点的外链；
 //   · 客户私有化部署（b）另列「其他来源平台」；我们云上（a）即使服务端误发，也一条都不出现；
 //   · 读取中不下结论；没有渠道（含本机没有终端身份）诚实说「暂未配置」、不说原因，给本机能办的事；失败可重试；
 //   · 首页只在读到「托管关闭」且至少有一个渠道时，在岗位 / 招聘会那一行摆一张「岗位与招聘会」；
@@ -33,7 +33,7 @@ const LEGACY: Channel[] = [
   { name: '示例招聘平台', url: 'https://jobs.example.com/', displayOrder: 1, organizationName: '示例招聘平台运营公司' },
   { name: '示例人才网', url: 'https://talent.example.org/', displayOrder: 2, organizationName: '示例人才网运营公司' },
 ]
-const caption = (organizationName: string) => `本渠道由 ${organizationName} 提供，信息以其官网为准`
+const caption = (organizationName: string) => `本渠道由${organizationName}提供，信息以其官网为准`
 
 /** CLAUDE.md §2 禁词，外加「本机存 / 不存什么」这一类说法（3.14 页面不对存储下任何结论）。 */
 const FORBIDDEN_COPY = ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理', '不记录', '不保存', '不存储', '已保存'] as const
@@ -185,6 +185,38 @@ async function expectChannelCards(page: Page, section: 'org' | 'legacy', expecte
   }
 }
 
+/**
+ * 空态 / 失败态的三条去处是紧凑行（与招聘托管说明页同一套 qx-row）：舞台上 128px 一行，不许被拉成空卡。
+ * 上界防的是 2026-09-27 协调窗口截图里的样子——三项平分余量、每张约 410px、字漂在正中间；
+ * 下界是 128px 行高本身（手机档 88px，按 `minHeight` 传）。图标、标题、说明一律靠左。
+ */
+async function expectCompactAlternatives(page: Page, where: string, { minHeight, maxHeight }: { minHeight: number; maxHeight: number }): Promise<void> {
+  const scale = await stageScale(page)
+  const rows = await page.getByTestId('official-channels-alternatives').locator('.qx-row').evaluateAll((elements) => elements.map((row) => {
+    const rect = (selector: string) => row.querySelector(selector)!.getBoundingClientRect()
+    const box = row.getBoundingClientRect()
+    return {
+      label: row.querySelector('.qx-row-t')?.textContent ?? '',
+      height: box.height,
+      left: box.left,
+      iconLeft: rect('.qx-row-ic').left,
+      iconRight: rect('.qx-row-ic').right,
+      titleLeft: rect('.qx-row-t').left,
+      descLeft: rect('.qx-row-d').left,
+    }
+  }))
+  expect(rows.map((row) => row.label), `${where}：三条去处`).toEqual(['就业政策', 'AI 求职工具', '打印 · 扫描'])
+  for (const row of rows) {
+    expect(row.height / scale, `${where}「${row.label}」不被拉成空卡（≤${maxHeight}px）`).toBeLessThanOrEqual(maxHeight)
+    expect(row.height / scale, `${where}「${row.label}」保持紧凑行高（≥${minHeight}px）`).toBeGreaterThanOrEqual(minHeight)
+    expect((row.iconLeft - row.left) / scale, `${where}「${row.label}」图标靠左`).toBeLessThanOrEqual(32)
+    expect(row.titleLeft, `${where}「${row.label}」标题在图标右边`).toBeGreaterThanOrEqual(row.iconRight)
+    expect((row.titleLeft - row.iconRight) / scale, `${where}「${row.label}」标题紧跟图标，不居中`).toBeLessThanOrEqual(32)
+    expect(Math.abs(row.descLeft - row.titleLeft), `${where}「${row.label}」说明与标题左对齐`).toBeLessThanOrEqual(1)
+  }
+}
+const STAGE_ROWS = { minHeight: 127, maxHeight: 180 }
+
 // ── 渠道页：机构终端 ─────────────────────────────────────────────────────────
 
 test('org terminal: each channel is a card with its own QR and the exact source caption @w1-kiosk', async ({ page, api }) => {
@@ -248,8 +280,9 @@ test('empty: says the terminal has no channel configured, not why, and offers wh
   await expect(empty.locator('.qx-state-d')).toHaveText('可以先办下面这些事。')
   await expect(page.locator('.qx-pill')).toHaveText('暂未配置官方渠道')
   await expect(page.getByTestId('official-channel-card')).toHaveCount(0)
-  const alternatives = page.getByTestId('official-channels-alternatives').locator('.dw-stripitem b')
+  const alternatives = page.getByTestId('official-channels-alternatives').locator('.qx-row-t')
   await expect(alternatives).toHaveText(['就业政策', 'AI 求职工具', '打印 · 扫描'])
+  await expectCompactAlternatives(page, '空态', STAGE_ROWS)
   await expectNoForbiddenCopy(page, '空态')
   await expectTouchTargets(page, '空态')
   await assertNoHorizontalOverflow(page)
@@ -294,6 +327,7 @@ test('error then retry: honest failure with a working retry, no raw error text @
   await expect(page.getByTestId('official-channel-card')).toHaveCount(0)
   await expect(page.getByTestId('official-channels-empty'), '失败不冒充「没有渠道」').toHaveCount(0)
   await expect(page.getByTestId('official-channels-alternatives')).toBeVisible()
+  await expectCompactAlternatives(page, '失败态', STAGE_ROWS)
   const text = await page.locator('body').innerText()
   for (const raw of ['SERVICE_UNAVAILABLE', 'upstream timeout', '503']) expect(text, `不直出原始错误「${raw}」`).not.toContain(raw)
   await expectTouchTargets(page, '失败态')
@@ -521,6 +555,18 @@ test('phone 390x844: the channels page stacks without overflow and keeps touch t
   await assertNoHorizontalOverflow(page)
   await assertNoElementCrossesViewport(page)
   await page.screenshot({ path: test.info().outputPath('official-channels-items-390x844.png'), fullPage: true })
+})
+
+test('phone 390x844: the empty state keeps the alternatives as compact 88px rows @w1-mobile', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  respondChannels(api, [])
+  await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
+  await expect(screenOf(page)).toHaveAttribute('data-state', 'empty')
+  await expectCompactAlternatives(page, '手机空态', { minHeight: 87, maxHeight: 120 })
+  await expectTouchTargets(page, '手机空态')
+  await assertNoHorizontalOverflow(page)
+  await assertNoElementCrossesViewport(page)
+  await page.screenshot({ path: test.info().outputPath('official-channels-empty-390x844.png'), fullPage: true })
 })
 
 test('phone 390x844: the home tile sits in the single column without overflow @w1-mobile', async ({ page, api }) => {

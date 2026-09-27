@@ -391,7 +391,7 @@ test('/jobs/online-platforms 重定向到本机构官方渠道，只给二维码
   await expect(legacy.getByTestId('official-channel-card')).toHaveCount(2)
   await expect(page.locator('[data-testid="official-channel-qr-code"] svg')).toHaveCount(3)
   await expect(legacy.getByText('jobs.example.com', { exact: true })).toBeVisible()
-  await expect(legacy.getByText('本渠道由 示例招聘平台运营公司 提供，信息以其官网为准', { exact: true })).toBeVisible()
+  await expect(legacy.getByText('本渠道由示例招聘平台运营公司提供，信息以其官网为准', { exact: true })).toBeVisible()
   await expect(page.locator('[data-qx-frame="true"] a[href]'), '一体机不打开外部网页：整页没有可点的链接').toHaveCount(0)
   for (const word of ['一键投递', '立即投递', '一键全网分发', '授权代投', '同步投递', '扫码投递', '去来源平台投递']) {
     await expect(page.getByText(word)).toHaveCount(0)

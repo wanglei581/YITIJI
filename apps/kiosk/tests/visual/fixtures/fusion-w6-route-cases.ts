@@ -147,7 +147,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // 3.14：线上平台目录并入本机构官方渠道，旧地址只做重定向。marker 仍是 h1 精确匹配、featureText 钉二维码下那句
   // 来源说明的固定部分（夹具是 b 版本：本机构一个渠道 + 其他来源平台两个），强度不降。
   { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', expectedPath: compatibilityRedirects['/jobs/online-platforms'], marker: 'h1:text-is("本机构官方渠道")', featureText: '提供，信息以其官网为准' },
-  { pattern: '/official-channels', url: '/official-channels', marker: screen('official-channels'), featureText: '本渠道由 示例大学就业指导中心 提供，信息以其官网为准' },
+  { pattern: '/official-channels', url: '/official-channels', marker: screen('official-channels'), featureText: '本渠道由示例大学就业指导中心提供，信息以其官网为准' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/source', url: '/resume/source', marker: screen('resume-source'), featureText: 'AI 简历诊断' },

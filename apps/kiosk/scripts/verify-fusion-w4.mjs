@@ -229,7 +229,7 @@ check('directory pages have left the V6 frame for QxPageFrame', () => {
 // 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。
 check('official channels keep scan-only exits and never claim apply-on-device', () => {
   assert.match(officialChannels, /<SourceUrlQr value=\{item\.url\}/)
-  assert.ok(officialChannels.includes('`本渠道由 ${item.organizationName} 提供，信息以其官网为准`'), 'caption must stay verbatim')
+  assert.ok(officialChannels.includes('`本渠道由${item.organizationName}提供，信息以其官网为准`'), 'caption must stay verbatim (中文排版，机构名两侧不留空格)')
   assert.doesNotMatch(officialChannels, /一键全网分发|授权代投|同步投递|一键投递|立即投递/)
   assert.doesNotMatch(officialChannels, /扫码投递|去来源平台投递/)
   assert.doesNotMatch(officialChannels, /window\.open|location\.(?:assign|href|replace)|<a\s|href=/, 'kiosk must not open external pages')
