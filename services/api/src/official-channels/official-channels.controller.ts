@@ -19,6 +19,13 @@ export class OfficialChannelsController {
     return ApiResponse.ok(await this.channels.listVerifiedDomains(id))
   }
 
+  @Get('admin/orgs/:id/official-channels')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async listForAdmin(@Param('id') id: string) {
+    return ApiResponse.ok(await this.channels.listForAdmin(id))
+  }
+
   @Put('admin/orgs/:id/verified-official-domains')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')

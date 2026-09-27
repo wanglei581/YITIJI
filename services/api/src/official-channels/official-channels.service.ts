@@ -35,6 +35,8 @@ export interface OfficialChannelPartnerItem extends OfficialChannelPublicItem {
   emergencyReasonText: string | null
 }
 
+export type OfficialChannelAdminItem = Omit<OfficialChannelPartnerItem, 'organizationName'>
+
 function fail(status: 'bad' | 'forbidden' | 'missing', code: string, message: string): never {
   const body = { error: { code, message } }
   if (status === 'forbidden') throw new ForbiddenException(body)
@@ -82,10 +84,32 @@ export class OfficialChannelsService {
     })
   }
 
-  async listForPartner(user: AuthedUser): Promise<{ items: OfficialChannelPartnerItem[] }> {
+  async listForPartner(user: AuthedUser): Promise<{ items: OfficialChannelPartnerItem[]; verifiedDomains: string[] }> {
     const org = await this.requirePartnerOrg(user)
+    return {
+      items: await this.listForOrg(org.id, org.name),
+      verifiedDomains: parseVerifiedDomains(org.verifiedOfficialDomainsJson).map((item) => item.domain),
+    }
+  }
+
+  async listForAdmin(orgId: string): Promise<{ items: OfficialChannelAdminItem[] }> {
+    const org = await this.requireOrg(orgId)
+    const rows = await this.listForOrg(org.id, org.name)
+    return { items: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      url: row.url,
+      displayOrder: row.displayOrder,
+      enabled: row.enabled,
+      emergencyTakedown: row.emergencyTakedown,
+      emergencyReasonCode: row.emergencyReasonCode,
+      emergencyReasonText: row.emergencyReasonText,
+    })) }
+  }
+
+  private async listForOrg(orgId: string, orgName: string): Promise<OfficialChannelPartnerItem[]> {
     const rows = await this.prisma.onlinePlatformDirectory.findMany({
-      where: { organizationId: org.id, category: OFFICIAL_CHANNEL_CATEGORY, archivedAt: null },
+      where: { organizationId: orgId, category: OFFICIAL_CHANNEL_CATEGORY, archivedAt: null },
       orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
     })
     const holds = await this.prisma.recruitmentEmergencyHold.findMany({
@@ -93,7 +117,7 @@ export class OfficialChannelsService {
       select: { targetId: true, reasonCode: true, reasonText: true },
     })
     const byId = new Map(holds.map((hold) => [hold.targetId, hold]))
-    return { items: rows.map((row) => this.toPartnerItem(row, org.name, byId.get(row.id))) }
+    return rows.map((row) => this.toPartnerItem(row, orgName, byId.get(row.id)))
   }
 
   async createForPartner(user: AuthedUser, dto: CreateOfficialChannelDto): Promise<OfficialChannelPartnerItem> {

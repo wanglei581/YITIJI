@@ -30,6 +30,23 @@ export interface OfficialChannelPartnerItem {
 
 export interface OfficialChannelPartnerListResponse {
   items: OfficialChannelPartnerItem[]
+  verifiedDomains: string[]
+}
+
+/** 管理员只读机构渠道清单；紧急下架仍走独立的管理员接口。 */
+export interface OfficialChannelAdminItem {
+  id: string
+  name: string
+  url: string
+  displayOrder: number
+  enabled: boolean
+  emergencyTakedown: boolean
+  emergencyReasonCode: string | null
+  emergencyReasonText: string | null
+}
+
+export interface OfficialChannelAdminListResponse {
+  items: OfficialChannelAdminItem[]
 }
 
 /** 管理员在机构资料里登记的已核验官方注册域。 */
