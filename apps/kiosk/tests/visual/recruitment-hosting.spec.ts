@@ -511,7 +511,8 @@ test('hosting off: AI records never ask for job AI sessions and do not list fair
   await expect(page.getByText('2026 青岛高校毕业生招聘会')).toHaveCount(0)
   await expect(list.locator('[data-record-kind="job-ai-session"]')).toHaveCount(0)
   await expect(page.getByText('岗位 AI 参考记录')).toHaveCount(0)
-  await expect(page.getByText('当前 2 行')).toBeVisible()
+  // W3-a 起计数写成「已加载 N 条」（另有一格「小青作业共 N 条」）；数还是这张列表的行数。
+  await expect(page.getByText('已加载 2 条', { exact: true })).toBeVisible()
   expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions'), '托管关闭时不请求岗位 AI 会话').toBe(0)
   await expectNoRecruitmentCopy(page, 'AI 服务记录')
   expect(recruitmentHits).toEqual([])
@@ -538,7 +539,7 @@ test('hosting on: AI records wait for the hosting answer, then list job AI sessi
   await expect(list.locator('[data-record-kind="fair_visit_plan"]')).toContainText('2026 青岛高校毕业生招聘会')
   await expect(list.locator('[data-record-kind="job-ai-session"]')).toContainText('前端工程师')
   await expect(list.locator('[data-record-kind="job_fit"]')).toHaveCount(1)
-  await expect(page.getByText('当前 4 行')).toBeVisible()
+  await expect(page.getByText('已加载 4 条', { exact: true })).toBeVisible()
   expect(api.requestCount('GET', '/api/v1/me/ai-records')).toBe(1)
   expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions')).toBe(1)
 })
