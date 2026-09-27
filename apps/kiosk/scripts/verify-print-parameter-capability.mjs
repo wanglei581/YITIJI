@@ -187,7 +187,7 @@ expect(
   pdfjsImports.length === 2 && pdfjsImports.every((specifier) => specifier.endsWith('?url')) && !/require\(['"]pdfjs-dist['"]\)/.test(cmapPlugin),
   'PDF.js 只以 ?url 引用，不把它的代码打进主包；CMap 插件只读数据目录',
 )
-expect(/createObjectURL/.test(pdfCanvas) && !/import\(\s*['"](?:unpdf|pdfjs-dist)/.test(pdfCanvas), 'PDF.js 用 fetch 取模块再导入，不发会被离页中止的 script 请求')
+expect(/createObjectURL/.test(pdfCanvas) && !/import\(\s*['"](?:unpdf|pdfjs-dist)/.test(pdfCanvas), 'PDF.js 用 fetch 下载、导入内存里的 blob，不发走网络的 script 请求')
 expect(/new AbortController\(/.test(pdfCanvas) && /\.destroy\(/.test(pdfCanvas) && /\.cancel\(/.test(pdfCanvas), '卸载时中止 fetch、销毁文档并取消 render task')
 expect(/devicePixelRatio/.test(pdfCanvas), '按 devicePixelRatio 取缩放，避免字迹发糊')
 expect(/正在准备预览/.test(pdfCanvas) && /预览没能生成，打印仍按原文件/.test(pdfCanvas) && /第 /.test(pdfCanvas) && /共 /.test(pdfCanvas), '加载、失败和页码都如实显示')

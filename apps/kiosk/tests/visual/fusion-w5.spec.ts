@@ -5,6 +5,7 @@ import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW5PaginationRoute } from './fixtures/fusion-w5-pagination-route'
 import { registerPrintConfirm } from './fixtures/fair-workbench-api'
+import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 
 const MEMBER_TOKEN = 'w5-browser-memory-token'
 const MEMBER_PHONE = '13800138000'
@@ -14,6 +15,7 @@ function runtimeErrors(page: Page): string[] {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('requestfailed', (request) => {
+    if (isAbortedPdfjsBlobImport(request)) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} ${request.failure()?.errorText ?? ''}`)
     }

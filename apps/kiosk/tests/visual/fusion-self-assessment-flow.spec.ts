@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
+import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 
 /**
  * 上线前自评估 §1.6 修复：真网络端到端断言。
@@ -67,6 +68,7 @@ function collectRuntimeErrors(page: Page): string[] {
     if (/http proxy error|ECONNREFUSED/i.test(message.text())) errors.push(`console: ${message.text()}`)
   })
   page.on('requestfailed', (request) => {
+    if (isAbortedPdfjsBlobImport(request)) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} ${request.failure()?.errorText ?? 'unknown'}`)
     }

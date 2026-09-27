@@ -7,6 +7,7 @@ import { test, expect } from '../fixtures/kiosk-test'
 import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
+import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 import { seedMaterialSession, setReactRouterState, writeMaterialSession, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
 
 const NOW = '2026-07-24T00:00:00.000Z'
@@ -26,6 +27,7 @@ function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
     if (request.resourceType() === 'document' && new URL(request.url()).pathname === ignoredDocumentPath) return
+    if (isAbortedPdfjsBlobImport(request)) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
     }

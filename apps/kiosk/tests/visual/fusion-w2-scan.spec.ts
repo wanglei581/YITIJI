@@ -4,6 +4,7 @@ import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
 import { setReactRouterState, writeScanWorkbenchSession, SCAN_WORKBENCH_SESSION_KEY, W2_FILE } from './fixtures/fusion-w2-state'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
+import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 
 const SCAN_TASK_ID = 'w2-scan-001'
 const CONTROL_TOKEN = 'w2-scan-control'
@@ -14,6 +15,7 @@ function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
     if (request.resourceType() === 'document' && new URL(request.url()).pathname === ignoredDocumentPath) return
+    if (isAbortedPdfjsBlobImport(request)) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
     }

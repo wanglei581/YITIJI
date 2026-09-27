@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-// 只把 URL 打进包。PDF.js 本体和 worker 都是单独文件，预览出现时才 fetch。
-// 不用 import()：那会变成 script 请求，页面重载或跳走时 Chromium 报 net::ERR_ABORTED。
+// 只把 URL 打进包。PDF.js 本体和 worker 都是单独文件，预览出现时才 fetch，再包成 blob: 模块导入。
+// 不直接 import() 文件 URL：那样下载本身就是 script 请求，离页时 Chromium 报 net::ERR_ABORTED。
+// 现在下载走 fetch；只剩内存里的 blob 导入还算 script 请求，导入没读完就整页跳走时仍会报一次
+// ERR_ABORTED（慢机器上常见，无害；测试侧的放行与理由见 tests/visual/fixtures/pdf-preview-blob-abort.ts）。
 // 用 pdfjs-dist 的 legacy 构建（带兼容补丁，手机浏览器也能跑）。版本不得低于 6.2.108：
 // 更早的 5.6.83 起各版有 GHSA-hq66-cqwq-w95j（恶意 PDF 执行脚本），unpdf 1.6.2 自带的 5.6.205 就在范围内。
 import pdfjsModuleUrl from 'pdfjs-dist/legacy/build/pdf.min.mjs?url'
