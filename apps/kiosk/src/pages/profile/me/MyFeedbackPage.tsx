@@ -1,3 +1,5 @@
+import { useMemberCursorPage } from './useMemberCursorPage'
+import { MemberLoadMore } from './MemberLoadMore'
 // 我的意见反馈 — /me/feedback（本人）。
 // 分类限定为设备 / 打印 / 文件处理 / 一般建议，不涉及招聘闭环承诺。
 
@@ -38,8 +40,6 @@ export function MyFeedbackPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
-  const [items, setItems] = useState<MemberFeedbackTicketItem[]>([])
-  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [form, setForm] = useState<FeedbackFormState>(emptyFeedbackForm)
   const [selected, setSelected] = useState<MemberFeedbackTicketDetail | null>(null)
@@ -53,25 +53,12 @@ export function MyFeedbackPage() {
   const categoryFromQuery = parseFeedbackCategory(searchParams.get('category'))
   const loginFrom = '/me/feedback' // loginFrom="/me/feedback"
 
-  const load = useCallback(() => {
-    if (!isLoggedIn) {
-      setItems([])
-      setSelected(null)
-      setLoadState('ready')
-      return
-    }
-    setLoadState('loading')
-    getMyFeedback(getToken(), { pageSize: 50 })
-      .then((page) => {
-        setItems(page.items)
-        setLoadState('ready')
-      })
-      .catch(() => setLoadState('error'))
-  }, [getToken, isLoggedIn])
+  const token = getToken()
+  const fetchPage = useCallback((cursor?: string) => getMyFeedback(token, { pageSize: 50, cursor }), [token])
+  const pagination = useMemberCursorPage<MemberFeedbackTicketItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
+  const { items, state: loadState } = pagination
 
-  useEffect(() => {
-    load()
-  }, [load, reloadKey])
+  useEffect(() => { setSelected(null) }, [token])
 
   useEffect(() => {
     if (!hint) return
@@ -320,6 +307,7 @@ export function MyFeedbackPage() {
             <b>诚实说明</b>
             本页是登录后的本人工单，与免登录的一体机问题反馈不是同一条链路；不承诺受理结论或回复时限。
           </p>
+          {isLoggedIn && loadState === 'ready' && !selected ? <MemberLoadMore {...pagination} /> : null}
         </div>
       </QxPageFrame>
     </div>
