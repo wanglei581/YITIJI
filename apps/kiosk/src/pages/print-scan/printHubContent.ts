@@ -144,7 +144,7 @@ export const PRINT_HUB_AI_EXPLAINER: readonly PrintHubAiExplainerRow[] = [
     isAi: false,
     help: '不帮。页序由你用「上移 / 下移」自己排，本机不识别方向、不自动排序，合并这一步纯粹是版式处理。',
     aiDown: '不受影响。',
-    deviceOff: '照常可用。合并在服务端做，不经过打印机；合完先存着，出纸换机。',
+    deviceOff: '照常可用。合并文件不需要打印机；合完先保存，需要出纸时换一台机器。',
   },
   {
     cap: 'sign',
@@ -212,11 +212,11 @@ export function capabilityGroupHint(probe: ProbeStatus, mfp: MfpStatus, locked =
   if (probe !== 'ok') return '能力配置读取失败'
   if (mfp === 'unavailable') return '一体机确认离线'
   if (locked) return '部分能力被管理员关闭'
-  return '能力已读取，具体状态进入后确认'
+  return '选一项开始准备材料'
 }
 
 export function recordsGroupHint(): string {
-  return '到机码不受能力配置管辖'
+  return '用已有文件继续'
 }
 
 /** 顶栏胶囊。Hub 页绝不用 tone=ok 把未证实的就绪写成结论（CLAUDE.md §9）。 */
@@ -244,9 +244,7 @@ export const HUB_ASK: Record<HubUiState, { text: string; em: string }> = {
 }
 
 export const HUB_TRUTH = [
-  { k: '价格', v: '以服务端报价为准，本机不预设单价，也不提供促销承诺。' },
-  { k: '纸张', v: '只按 A4 出纸；彩色与自动双面需本机真机验证后由管理员开放。' },
-  { k: '隐私', v: '结束会话或闲置超时清除本机登录态与临时会话信息；文件与订单按服务端留存期限管理。' },
+  { k: '办理提醒', v: '价格在确认页核对；按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理。' },
 ] as const
 
 /**
@@ -296,7 +294,7 @@ export function deriveHubUiState(input: {
 
 /** 轴芯片「彩色 / 双面」：未在本机登记 available 就写未验证，不谎报。 */
 export function colorDuplexChip(colorOn: boolean, duplexOn: boolean): string {
-  if (!colorOn && !duplexOn) return '彩色 / 双面 · 未验证'
+  if (!colorOn && !duplexOn) return '彩色 / 双面 · 本机暂未开通'
   const bits = [colorOn ? '彩色已开放' : null, duplexOn ? '双面已开放' : null].filter(
     (v): v is string => v !== null,
   )

@@ -72,7 +72,7 @@ expectMatches(confirm, /演示模式不显示金额|页数待服务端确认，�
 // 而预览页早已明确「不在此页展示本地估算金额，避免与最终计费不一致」，实付金额只由确认页
 // POST /orders/quote 出。少一个本地估价点＝价格真相源更单一，这里改为守「不得复活」。
 expectAbsent(preview, /estimatePrintCents\(/, '预览页不自行本地估价（金额只由确认页服务端报价出）')
-expectMatches(preview, /应付金额在下一步确认页由服务端/, '预览页写明金额出处是确认页服务端报价')
+expectMatches(preview, /本页先设置参数，下一步核对价格。未确认前不会收费。/, '预览页告知下一步核对价格、确认前不收费（报价来源由上方断言守护）')
 expectMatches(preview, /价格暂不可用|以收银台金额为准|确认页|报价/, 'PrintPreviewPage 取价失败态诚实提示（不显示假价）')
 expectMatches(confirm, /价格暂不可用|以收银台显示为准|以最终计费为准|无法报价|演示模式不显示金额/, 'PrintConfirmPage 取价失败态诚实提示')
 expectAbsent(preview, /请选择优惠券/, 'PrintPreviewPage 不再渲染假的优惠券入口')

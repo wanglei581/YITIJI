@@ -883,6 +883,9 @@ test('print intake keeps three upload sources and a separate scan CTA @w2', asyn
   await expect(primary).toBeVisible()
   await expect(primary).toBeDisabled()
   await expect(primary).toHaveText('下一步：材料检查')
+  await expect(page.getByRole('button', { name: '问小青：这份文件怎么检查 →' })).toBeVisible()
+  const firstSource = await page.locator('.fs-ch').first().boundingBox()
+  expect(firstSource!.y, '2.0 来源按钮位于顶部只读区之后').toBeGreaterThanOrEqual(500)
   await expectHealthy(page, errors, 'print-upload')
 
   await page.getByRole('button', { name: /扫描纸质原件|扫描原件/ }).click()
@@ -1004,6 +1007,8 @@ test('direct preview restores the material session and completes the PDF respons
   const previewHost = page.locator(`[data-pdf-preview-host][data-preview-src="${W2_FILE.fileUrl}"]`)
   await expect(previewHost).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
   await expect(previewHost.locator('canvas')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: '问小青：帮我选打印参数 →' })).toBeVisible()
+  await expect(page.locator('.qpd-guide button, .qpd-guide a')).toHaveCount(0)
   binary.assertPdfCompleted()
   await expectHealthy(page, errors, 'print-preview')
 })
@@ -1019,7 +1024,7 @@ test('direct preview without a completed PII summary is fail-closed @w2', async 
   await expect(preview).toHaveAttribute('data-qx-state', 'check-required')
   await expect(page.getByRole('heading', { name: '不能跳过隐私预检直接打印' })).toBeVisible()
   await expect(page.getByRole('button', { name: '完成材料检查' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '下一步：让服务端报价' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-preview')
 })
 
@@ -1053,8 +1058,8 @@ test('preview rejects task ids without a trustworthy redaction result @w2', asyn
   })
 
   await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'check-required')
-  await expect(page.getByText('页面不会只凭任务编号伪造“已检查”。', { exact: false })).toBeVisible()
-  await expect(page.getByRole('button', { name: '下一步：让服务端报价' })).toHaveCount(0)
+  await expect(page.getByText('这份文件尚未完成材料检查，请检查后再继续。', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-preview')
 })
 
@@ -1098,7 +1103,7 @@ test('print parameter suggestions are advisory until applied and then flow to co
   await expect(page.getByText('3 份', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '采用这些建议' }).click()
   await expect(page.locator('.qpd-stepper output')).toHaveText('3')
-  await page.getByRole('button', { name: '下一步：让服务端报价' }).click()
+  await page.getByRole('button', { name: '下一步：核对价格' }).click()
   await page.waitForURL('**/print/confirm')
   // 确认页摘要用 data-sum-row + <b class="v">，报价金额来自 POST /orders/quote。
   // 预览页才有「3 份」的 dd/strong；不能用它们冒充确认页断言。
@@ -1138,9 +1143,9 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   await page.goto('/print/desk?step=preview')
   const preview = page.locator('[data-w2-page="print-preview"]')
 
-  // 理由必须说「本机尚未通过真机验证」，不能说「不支持」—— 硬件确实支持，说不支持是谎报。
-  await expect(preview.getByText(/本机彩色打印尚未通过真机验证/)).toBeVisible()
-  await expect(preview.getByText(/本机自动双面尚未通过真机验证/)).toBeVisible()
+  // 理由须保留本机未开通的真值、使用用户文案，不能说「不支持」—— 硬件确实支持，说不支持是谎报。
+  await expect(preview.getByText(/本机彩色打印暂未开通/)).toBeVisible()
+  await expect(preview.getByText(/本机自动双面暂未开通/)).toBeVisible()
   await expect(preview.getByText(/不支持/)).toHaveCount(0)
 
   // 禁用态必须是**可聚焦的 aria-disabled**，不是原生 disabled ——
@@ -1185,7 +1190,7 @@ test('terminal verified for color and duplex can actually select them @w2', asyn
 
   const colorBtn = preview.getByRole('button', { name: '彩色', exact: true })
   await expect(colorBtn).not.toHaveAttribute('aria-disabled', 'true')
-  await expect(preview.getByText(/尚未通过真机验证/)).toHaveCount(0)
+  await expect(preview.getByText(/暂未开通/)).toHaveCount(0)
 
   await colorBtn.click()
   await expect(colorBtn).toHaveAttribute('data-selected', 'true')

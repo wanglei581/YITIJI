@@ -3,10 +3,12 @@ import {
   CheckCircleIcon,
   EyeOffIcon,
   FileCheckIcon,
-  FileTextIcon,
   LoaderCircleIcon,
   ShieldCheckIcon,
 } from 'lucide-react'
+
+import { FilePreviewPanel } from './PrintPreviewPanel'
+import type { PrintFileState } from '../printMaterialSession'
 
 export type MaterialCheckStage =
   | 'idle' | 'inspection' | 'normalize_a4' | 'pii_scan'
@@ -23,7 +25,8 @@ export interface MaterialFindingPresentation {
 
 export interface MaterialCheckPresentationProps {
   stage: MaterialCheckStage
-  file: { name: string; size: string; pages: number | null }
+  file: PrintFileState
+  token: string | null
   error: string | null
   inspection: { pageLabel: string; canPrint: boolean | null; messages: readonly string[] } | null
   normalization: { targetPaperSize: string; canNormalize: boolean | null; messages: readonly string[] } | null
@@ -91,11 +94,9 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
   return (
     <div className="qpd-check-grid" data-w2-page="print-material-check" data-qx-state={props.stage}>
       <aside className="qpd-check-left">
-        <div className="qpd-file-sheet" aria-label="待检查文件">
-          <FileTextIcon aria-hidden="true" />
-          <strong>{props.file.name}</strong>
-          <span>{props.file.size}</span>
-          <span>{props.file.pages === null ? '页数识别中' : `${props.file.pages} 页`}</span>
+        <FilePreviewPanel file={props.file} token={props.token} />
+        <div className="qpd-preview-meta" aria-label="待检查文件">
+          <strong>{props.file.name}</strong><span>{props.file.size} · {props.file.pages === null ? '页数待识别' : `${props.file.pages} 页`}</span>
         </div>
 
         <ol className="qpd-steps" aria-label="材料检查进度">
@@ -106,7 +107,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
 
         <div className="qpd-privacy-note">
           <ShieldCheckIcon aria-hidden="true" />
-          <p>文字版文档直接读取文字层；扫描件或图片可能通过第三方 OCR 识别。这里只显示脱敏片段，不展示完整原文。</p>
+          <p>扫描件或图片可能交给第三方识别文字。右侧只显示部分字符，请结合文件预览核对。</p>
         </div>
       </aside>
 
@@ -171,7 +172,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                 <Summary
                   title="文件体检"
                   detail={props.inspection.pageLabel}
-                  state={props.requiresFormatReview ? '需重新上传' : '可继续'}
+                  state={props.inspection.canPrint === true ? '可继续' : props.requiresFormatReview ? '需重新上传' : '请核对文件'}
                   warning={props.requiresFormatReview}
                   messages={props.inspection.messages}
                 />
@@ -187,18 +188,18 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
               ) : null}
             </div>
 
-            {props.findings.length === 0 ? (
+            {props.findings.length === 0 && !props.privacyModeWarning ? (
               <div className="qx-state qpd-clean" data-tone={props.requiresFormatReview ? 'error' : 'info'}>
                 <span className="qx-state-ic">{props.requiresFormatReview ? <AlertCircleIcon /> : <CheckCircleIcon />}</span>
                 <div>
                   <div className="qx-state-t">{props.requiresFormatReview ? '当前文件不能直接打印' : '没有待处理的隐私片段'}</div>
-                  <p className="qx-state-d">{props.requiresFormatReview ? '返回上传页重新选择文件。' : props.privacyModeNotice ? '本次未做内容扫描；下一步仍需逐页核对预览和打印参数。' : '预检已经真实完成；下一步仍需逐页核对预览和打印参数。'}</p>
+                  <p className="qx-state-d">{props.requiresFormatReview ? '返回上传页重新选择文件。' : props.privacyModeNotice ? '本次未做内容扫描；下一步仍需逐页核对预览和打印参数。' : '下一步请逐页核对预览和打印参数。'}</p>
                 </div>
               </div>
-            ) : (
+            ) : props.findings.length > 0 ? (
               <>
                 <div className="qpd-batch">
-                  <div><strong>逐条裁决</strong><span>遮挡会生成派生文件；生成结果以后端返回为准。</span></div>
+                  <div><strong>逐项确认</strong><span>遮挡后请在下一步逐页核对；保留的内容会原样打印。</span></div>
                   <div>
                     <button className="qx-btn" type="button" onClick={props.onApplySuggested}>按风险建议处理</button>
                     <button className="qx-btn" data-variant="ghost" type="button" onClick={props.onKeepAll}>全部保留</button>
@@ -233,7 +234,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                   ))}
                 </div>
               </>
-            )}
+            ) : null}
           </div>
         ) : null}
       </section>

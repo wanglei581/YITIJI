@@ -357,7 +357,7 @@ assert.doesNotMatch(
 )
 assert.match(
   printHubQxCss,
-  /\.ph-cap\s*\{[^}]*min-height:\s*196px/,
+  /\.ph-cap\s*\{[^}]*min-height:\s*200px/,
   'capability cards stay well above the 48px touch floor'
 )
 // 尾部允许再挂参数（2026-08-19 入口直达加了 &mode=transfer）。本断言要守的是两件事：
