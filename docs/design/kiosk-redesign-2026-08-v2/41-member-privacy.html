@@ -9,7 +9,7 @@
   state: login | loading | error | empty | history-ready | revoke-confirm | submitting | success | failure
   api: GET /api/v1/me/data-requests → { items }（本人请求记录）；
        POST /api/v1/me/data-requests { requestType: "revoke_consent" }，请求头带一次性幂等键（前端生成 UUID）→ 新建的请求记录
-  fallback: 未登录只引导登录；未连接真实后端时隐私数据请求直接失败，不做本地假提交；
+  fallback: 未登录只引导登录；未连接真实系统时隐私数据请求直接失败，不做本地假提交；
             提交失败按实际结果信息提示，列表保持原样。
   实际做法（对齐正式实现 apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx
             与 services/api/src/member-privacy/member-data-request.service.ts）：
@@ -18,8 +18,8 @@
             前端 submitRevoke 只在这一次 POST 往返期间置 busy：返回成功即显示已撤回，失败即提示重试。
             因此本原型的 submitting 只能表示「等待 POST 返回」这一段版式，
             不得声称请求已进入系统队列，也不得承诺「离开后仍会有结果返回」。
-  note: 一体机本波只开放「撤回 AI 使用授权」。导出需要完成安全验证（再次验证身份）并由后台生成，一体机不提供提交与下载入口；
-        账号注销暂未开放，后端会直接拒绝该类请求。因此导出与注销在本页是**不可点选的说明项**，不是禁用按钮，也不画任何提交入口。
+  note: 一体机本波只开放「撤回 AI 使用授权」。导出需要完成安全验证（再次验证身份）并由工作人员生成，一体机不提供提交与下载入口；
+        账号注销暂未开放，系统会直接拒绝这类请求。因此导出与注销在本页是**不可点选的说明项**，不是禁用按钮，也不画任何提交入口。
         撤回授权不会删除简历、文档、打印订单或收藏。
         revoke-confirm 点「确认撤回」只能进入 submitting（等待 POST 返回的版式），
         submitting 期间确认与取消都锁定；success / failure 是 POST 返回之后的结果态，
@@ -410,7 +410,7 @@ var TYPE_LABEL = {
 };
 var TYPE_HINT = {
   revoke_consent:'提交后会立即撤回 AI 使用授权；请求会记入处理记录。再次使用时需重新确认授权。',
-  export:'导出需要再验证一次是你本人，并由后台生成一份短期资料。这台机器不提供提交和下载。资料里是文件清单、AI 记录、打印订单和收藏的摘要，不含文件原文和简历全文。',
+  export:'导出需要再验证一次是你本人，并由工作人员生成一份短期资料。这台机器不提供提交和下载。资料里是文件清单、AI 记录、打印订单和收藏的摘要，不含文件原文和简历全文。',
   del:'账号注销暂未开放。系统不会通过此入口删除简历、文档、打印订单或收藏。'
 };
 var STATUS_LABEL = {pending:'待处理', handling:'处理中', ready:'可下载', completed:'已完成', expired:'已过期', failed:'处理失败', rejected:'已驳回', cancelled:'已取消'};
@@ -450,8 +450,8 @@ function previewList(inner, foot, label){
 /* 能力结构行：登录 / 失败态只画「这一页能做什么、不能做什么」，不写任何请求记录 */
 var CAP_STRUCT = [
   ['shieldOff','撤回 AI 使用授权','撤回后再次使用时需要重新确认；不影响简历、文档、订单与收藏','avail'],
-  ['download','导出账号与账号资料清单','需完成安全验证并由后台生成，<b>一体机不提供提交与下载入口</b>','off'],
-  ['trash','账号注销','<b>暂未开放</b>，后端会直接拒绝该类请求','off'],
+  ['download','导出账号与账号资料清单','需完成安全验证并由工作人员生成，<b>一体机不提供提交与下载入口</b>','off'],
+  ['trash','账号注销','<b>暂未开放</b>，系统会直接拒绝这类请求','off'],
   ['list','本人请求记录','提交过的隐私数据请求与当前处理状态','avail']
 ];
 function capSlotRow(s, mode, i){
@@ -494,7 +494,7 @@ function fixtureNote(){
 }
 
 /* 空态不把上面那张能力卡的三行再画一遍（那是「能提交什么」，不是「记录里有什么」）。
-   这里画的是**一条请求记录本身的字段结构**：类型 / 提交时间 / 处理状态 / 可见范围，
+   这里画的是**一条请求记录本身的内容结构**：类型 / 提交时间 / 处理状态 / 可见范围，
    值一律办理后显示，不写任何具体请求。 */
 var RECORD_STRUCT = [
   ['shieldOff','请求类型','一体机只会产生「撤回 AI 使用授权」这一类记录'],
@@ -509,8 +509,8 @@ function emptyHistoryList(){
         +'<span class="row-main"><span class="row-title">'+s[1]+'</span><span class="row-sub">'+s[2]+'</span></span>'
         +'<span class="acts">'+slot(DEV?'办理后显示':'待实际结果')+'</span></div>';
     }).join(''),
-    '还没有提交过隐私数据请求，所以这里是空的。<b>空就是空</b>，本页不会造记录让页面好看。提交上面的「撤回 AI 使用授权」之后，记录会按这几个字段出现在这一页。',
-    '暂无请求记录 · 一条记录会包含的字段');
+    '还没有提交过隐私数据请求，所以这里是空的。<b>空就是空</b>，本页不会造记录让页面好看。提交上面的「撤回 AI 使用授权」之后，记录会按这几项出现在这一页。',
+    '暂无请求记录 · 一条记录会包含的内容');
 }
 /* 导出与注销按真实边界渲染为「不可点选的说明项」：不是禁用按钮，也不提供任何提交入口。
    mode: 'open' 可提交 · 'dialog' 确认弹层已打开 · 'revoked' 结果态里回显撤回后的授权状态。
@@ -542,7 +542,7 @@ function historyRow(item){
   return '<div class="row" data-request-type="'+item.type+'" data-request-status="'+item.status+'">'
     + '<span class="row-ico plum">'+svg('shieldOff')+'</span>'
     /* 顶部 fixture 一条已经说明「提交时间与处理状态都以实际记录为准」，
-       这里不再逐行重复同一句披露，只留把这一行区分开的字段位。 */
+       这里不再逐行重复同一句披露，只留把这一行区分开的内容位。 */
     + '<span class="row-main"><span class="row-title">'+TYPE_LABEL[item.type]+'</span>'
     + '<span class="row-foot">'+slot('提交时间')+slot('请求编号')+'</span></span>'
     + '<span class="st'+(STATUS_TONE[item.status]||' wait')+'">'+STATUS_LABEL[item.status]+'</span></div>';
@@ -619,7 +619,7 @@ function renderBody(state){
   }
   if(state==='error'){
     return {layout:'state', html:
-      banner('warn','warn','请求记录这次没有加载出来','当前记录没有更新。<b>本次加载失败不会撤回或恢复任何授权</b>；字段一律显示「—」，不拿上一次的内容冒充当前账号。',['记录 —','本次未取到'])
+      banner('warn','warn','请求记录这次没有加载出来','当前记录没有更新。<b>本次加载失败不会撤回或恢复任何授权</b>；每一项一律显示「—」，不拿上一次的内容冒充当前账号。',['记录 —','本次未取到'])
       + previewList(capStructList('error'),
           '重试不会重复提交请求。多次重试仍失败时，可以让现场工作人员协助处理。','本次未取到的请求记录结构')
       + guide('error')

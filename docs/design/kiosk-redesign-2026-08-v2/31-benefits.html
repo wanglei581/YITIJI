@@ -20,10 +20,10 @@
   fallback: 领取失败 / 结束 / 领完 → 明确原因 + 返回台账或活动列表，不重试成假成功
   真话边界：
     ① benefits:list 展示完整的 MemberBenefitItem 结构位，不预置真实优惠券名称、次数、金额或有效期；
-       类型、状态、来源、额度与有效期字段全部由系统回填，结构示例只在 debug 模式开放。
+       类型、状态、来源、额度与有效期内容全部由系统回填，结构示例只在 debug 模式开放。
     ② 不承诺「免费打印 / 免费扫描 / 免费优化 / 免费生成」；只有系统实际返回额度时才显示总量与剩余量。
        是否收费、收多少，以活动说明与现场公示价、系统报价为准。
-    ③ 资格由确定性接口与官方规则判定；AI 只解释已经返回的规则，不判定你是否符合条件。
+    ③ 资格由确定性系统与官方规则判定；AI 只解释已经返回的规则，不判定你是否符合条件。
     ④ 补贴类只做说明、清单与官方入口，不承诺补贴到账，不代办申请（compliance §8.2）。
     ⑤ 权益不换取简历、不回流候选人数据；企业赞助只体现为品牌露出（compliance §8.3）。
   ai-mode: AI-EXPLAIN（覆盖矩阵 024 / 032 / 033）
@@ -345,7 +345,7 @@ function activityDetail(){
     +kvRow('权益内容',slot('—','wide'))
     +kvRow('领取与使用',slot('—','wide'))
     +'</div></section>'
-    +'<section class="card"><div class="blk-h">'+svg('check',24)+'参与条件<span class="hint">由接口与官方规则确定性判定</span></div>'
+    +'<section class="card"><div class="blk-h">'+svg('check',24)+'参与条件<span class="hint">由系统和官方规则判定</span></div>'
     +'<div class="rules">'
     +'<span class="rule"><i></i>条件一 '+slot('—','wide')+'</span>'
     +'<span class="rule"><i></i>条件二 '+slot('—','wide')+'</span>'
@@ -468,7 +468,7 @@ var VIEWS={
   },
   'activity:claim-success':function(){
     return '<div class="scroll center">'+stateBlock('info','check','系统确认领取成功',
-      '这条权益已经写进你的台账。<b>具体名称、适用服务和有效期以台账里的字段为准</b>；使用时还要经过一次核销，核销结果同样以实际记录为准。',
+      '这条权益已经写进你的台账。<b>具体名称、适用服务和有效期以台账里的内容为准</b>；使用时还要经过一次核销，核销结果同样以实际记录为准。',
       '<a class="btn ghost press" href="31-benefits.html?screen=activities" data-route="/activities">继续看别的活动</a>'
       +'<a class="btn primary press" href="31-benefits.html" data-route="/me/benefits" data-testid="activity-primary">去我的权益查看</a>','activity')
       +serviceAlts('activity')+'</div>';
@@ -497,7 +497,7 @@ var VIEWS={
 };
 
 var PILL={
-  'benefits:list':['ok','权益台账 · 完整字段结构'],
+  'benefits:list':['ok','权益台账 · 完整内容'],
   'benefits:signed-out':['warn','未登录，不显示任何人的权益'],
   'benefits:loading':['','正在取本人权益台账'],
   'benefits:empty':['','当前没有可用权益'],
@@ -522,10 +522,10 @@ var HEAD={
   'activities:loading':['可参加的活动','未返回前不显示条数。'],
   'activities:empty':['可参加的活动','没有正在进行的活动时保持空态。'],
   'activities:error':['可参加的活动','取不到就不显示，不拿旧活动顶替。'],
-  'activity:detail':['活动详情','条件由系统确定性判定，小青只解释规则。'],
+  'activity:detail':['活动详情','条件由系统和官方规则判定，小青只解释规则。'],
   'activity:signed-out':['活动详情','规则可以先看；领取要确认是你本人。'],
   'activity:claim-pending':['领取中','结果以实际记录为准，不先显示成功。'],
-  'activity:claim-success':['领取成功','以台账字段和核销结果为准。'],
+  'activity:claim-success':['领取成功','以台账里的内容和核销结果为准。'],
   'activity:claim-error':['领取失败','失败原因以实际记录为准，不掩盖。'],
   'activity:ended':['活动已结束','不再提供领取入口。'],
   'activity:sold-out':['名额已领完','不排队、不预约、不承诺补发。']

@@ -6,7 +6,7 @@
 - 返工：删除底部重复的上一步，保留原 CTA 中的上一步；删帮助条的重复 AI 问询，保留让小青帮我整理经历及其上下文问题（规则 1、7）。
 - 生成主按钮明确 AI 整理成新简历，结果头增加 AI 生成供参考标签（规则 3、7）。
 - 技术披露条改成简短示例资料标记，事实边界保留一处（规则 4）。
-- AI 帮助采用原顾问页支持的 composer 与会话草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 -->
 <html lang="zh-CN">
 <head>
@@ -32,17 +32,17 @@
     非法 state / 非法 seg → illegal（不回显原始参数）；夹具态裸地址 → session-lost / preview-no-result
 
   真实合同（来源：代码，不是想象）：
-    字段      ResumeGenerateInput{ basic, intention, education[], experience[], projects[],
+    内容      ResumeGenerateInput{ basic, intention, education[], experience[], projects[],
               skills[], certificates[], selfIntro? }（packages/shared/src/types/ai.ts:289）。
               上限来自 ResumeGeneratePage.tsx：education 6 / experience 8 / projects 6 /
-              skills 20 / certificates 15。四步是本静态宿主对 React 六步的合并，字段一个不少。
+              skills 20 / certificates 15。四步是本静态宿主对 React 六步的合并，内容一个不少。
     必填      只冻结两项：step0 basic.name、step1 intention.position
               （ResumeGeneratePage.tsx canNext）。其余全部可空。
     只提交    buildInput 过滤：教育要 school；经历要 company 且 role；项目要 name。
               半空条目不提交 —— 页面必须把这件事写在行上，不能等提交后才发现少了。
     防编造    LlmResumeGenerateService：LLM 只回按 index 对齐的润色文本
               （summary/educationDesc/experienceDesc/projectDesc/skillsPolished），
-              学校/专业/学位/公司/职务/项目名/证书/时间段由服务端从输入逐字复制。
+              学校/专业/学位/公司/职务/项目名/证书/时间段由系统从输入逐字复制。
               数组长度漂移即判非法。缺项由 computeMissingHints 确定性算出，AI 不代填。
     缺失提示  computeMissingHints(llm-resume-generate.service.ts:81)：无联系方式 / 无教育 /
               无经历且无项目 / 无技能 / 经历描述 <20 字。本页 hintsOf() 是它的逐条镜像，
@@ -51,14 +51,14 @@
               ResumeTranscriptConfirmDialog 的真实状态机：requesting_permission → recording
               → transcribing → ready（可改）→ 确认写入。单次上限 58 秒，不保存原始音频，
               **未确认前一个字都不写进表单**。没有声纹、没有实时通话、没有音量波形含义。
-    生成      POST /resume/generate 单次等待完整 completed/failed。没有字段流式到达，
+    生成      POST /resume/generate 单次等待完整 completed/failed。没有内容流式到达，
               没有百分比。能力未探测前 availability=unknown（aiOutage.ts fail-closed 口径）；
               isAiOutage 只把**能力级**故障判成不可用，限流/参数错只是本次失败，必须留重试。
     草稿      exportResumeDraft → POST /resume/generate/export { draft:true }，不经过模型，
-              服务端只做 pdfkit 排版，文件名前缀「简历草稿（未经AI润色）」。AI 挂掉照常可用，
+              系统只做 pdfkit 排版，文件名前缀「简历草稿（未经AI润色）」。AI 挂掉照常可用，
               但它**不是** AI 润色的等价物：没有润色、没有缺失提示，页面必须写清。
     预览进入  只有两条：submit 返回 completed 且 resume 存在（router state），或带 taskId 由
-              服务端读回（getResumeGenerate，凭登录身份或匿名一次性令牌）。裸地址一律空态。
+              系统读回（getResumeGenerate，凭登录身份或匿名一次性令牌）。裸地址一律空态。
     令牌      accessToken 只在提交响应返回一次（ai.ts:318 注释）。不上屏、不进地址栏、
               不写本机存储 —— 本页对此只做中文陈述，DOM/URL 里不出现任何令牌形状的串。
     导出      POST /resume/generate/export → { fileId, filename, sizeBytes, pageCount,
@@ -75,7 +75,7 @@
               （React 只是置灰按钮）。这是可用性处理，不改变提交条件。
 
   原型演示控制：普通地址完全不渲染；仅 ?debug=1 注入（data-proto-control="true"），保留 debug/capture/flat。
-  技术披露（端点名、DTO 字段、React 文件名）只在 ?debug=1 / ?capture=1 下出现在夹具条里，
+  技术披露（端点名、DTO 内容、React 文件名）只在 ?debug=1 / ?capture=1 下出现在夹具条里，
   普通地址上一个都不显示。
 -->
 <style>
@@ -296,7 +296,7 @@ textarea.fin{padding:14px 18px;line-height:1.5;resize:none;min-height:104px}
 
 /* ---------- 把文件带走：扫码保存到手机 ---------- */
 /* 公共终端不落本机（feature-scope.md §2.2 文件显示与公共终端隐私口径）：
-   PDF 页内看，要带走一律走短时签名链接的二维码，由本人手机保存。
+   PDF 页内看，要带走一律走有时效的下载链接的二维码，由本人手机保存。
    静态稿只画取码位，不生成可扫描图形 —— 与 03-login-gate.html 同一口径。 */
 /* 取件模块是一块**紧凑横向工作区**：左边取码位、右边动作，两列自然高度并排。
    这里刻意不给 flex:1 —— 让它吃掉整张卡的剩余高度，二维码占位就会被 stretch 成一个
@@ -508,7 +508,7 @@ var PREVIEW_VIEW={
  'preview-no-result':1,'preview-loading':1,'preview-failed':1,'preview-ready':1,'preview-hints':1,'preview-editing':1,
  'export-chooser':1,'export-exporting':1,'export-failed':1,'export-ready':1,'export-url-expired':1,'export-print-unavailable':1
 };
-/* 夹具态：画面里出现了「本该由用户敲进去或由服务端返回、但这里是预置的」内容。
+/* 夹具态：画面里出现了「本该由用户敲进去或由系统返回、但这里是预置的」内容。
    只在 ?capture=1 或 ?debug=1 下可达；普通地址一律 fail-closed，
    免得有人把一张静态图当成「已经生成好了 / 已经导出了」的证据。 */
 var FIXTURE={
@@ -527,7 +527,7 @@ var FIXKIND={
  'export-chooser':'server','export-exporting':'server','export-failed':'server',
  'export-ready':'server','export-url-expired':'server','export-print-unavailable':'server'
 };
-/* 只有这三个状态真的握着一份服务端确认过的文件，才允许出现指向打印确认的链接。 */
+/* 只有这三个状态真的握着一份系统确认过的文件，才允许出现指向打印确认的链接。 */
 var CAN_PRINT={'draft-ready':1,'export-ready':1};
 var SEGS={edu:1,exp:1,proj:1};
 var SEG=SEGS[Q.get('seg')]?Q.get('seg'):'exp';
@@ -631,7 +631,7 @@ function splitList(s,cap){
  for(i=0;i<raw.length;i++){t=raw[i].replace(/\s+/g,' ').trim();if(t)out.push(t)}
  return out.slice(0,cap);
 }
-/* buildInput 的镜像：只提交填了关键字段的条目。 */
+/* buildInput 的镜像：只提交填了关键项的条目。 */
 function kept(list,keys){
  var out=[],i,j,ok;
  for(i=0;i<list.length;i++){ok=true;for(j=0;j<keys.length;j++){if(!String(list[i][keys[j]]||'').trim())ok=false}if(ok)out.push(list[i])}
@@ -656,7 +656,7 @@ function hintsOf(){
  return h;
 }
 
-/* 润色映射：只对描述类文本，且逐条对齐；事实字段一个都不动。 */
+/* 润色映射：只对描述类文本，且逐条对齐；事实内容一个都不动。 */
 var POL={
  'main.summary':'用户运营方向。带过 3 个用户社群，负责内容排期与活动执行；习惯把运营动作拆成可复核的步骤。',
  'main.edu.0':'主修市场调研与消费者行为方向课程，参加过校园营销大赛。',
@@ -729,28 +729,28 @@ var ASK={
  'input-strengths':['还有<em>会什么</em>和<em>怎么做事</em>','技能和证书只填你真有的；自我评价写一两句，AI 帮你顺一下。'],
  review:['提交前<em>你先核一遍</em>','先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。'],
  'voice-recording':['你说，<em>我记</em>','正在录音。<b>说完点结束</b>，我把它转成文字给你看，你确认了才写进表单。'],
- 'voice-transcribing':['正在<em>转成文字</em>','这一步在等服务端把这段录音转成文字。<b>没有百分比</b>，结果一次性回来。'],
+ 'voice-transcribing':['正在<em>转成文字</em>','这一步在等系统把这段录音转成文字。<b>没有百分比</b>，结果一次性回来。'],
  'voice-confirm':['转出来是这些，<em>对吗</em>？','可以直接改。<b>点「确认写入」之前，表单里一个字都不会变。</b>'],
  'voice-failed':['这段<em>没转出来</em>','可以重录一次，也可以直接用键盘打。<b>录音没有保存，表单也没有被改。</b>'],
  'voice-denied':['麦克风<em>用不了</em>','这台机器的麦克风没授权或不可用。<b>改用键盘照样能填完</b>，不影响生成。'],
- generating:['正在<em>整理</em>你的资料','这是一次性返回：<b>没有百分比，也不会逐字段蹦出来</b>。结果回来才显示。'],
+ generating:['正在<em>整理</em>你的资料','这是一次性返回：<b>没有百分比，也不会逐项蹦出来</b>。结果回来才显示。'],
  'generate-failed':['这次<em>没生成出来</em>','服务本身是通的，<b>你填的内容一个字都没丢</b>，可以直接再来一次。'],
  'ai-unavailable':['AI 润色<em>没接通</em>','这台机器的生成能力当前不可用。<b>你填的都留着</b>，还能原样排版打印带走。'],
- 'draft-exporting':['正在把你的原话<em>排成 PDF</em>','这条路<b>不经过模型</b>，服务端只做排版，所以 AI 挂了也能用。'],
+ 'draft-exporting':['正在把你的原话<em>排成 PDF</em>','这条路<b>不经过模型</b>，系统只做排版，所以 AI 挂了也能用。'],
  'draft-failed':['草稿<em>没导出来</em>','这次排版或上传没成功。<b>你填的内容还在</b>，可以直接重试。'],
  'draft-ready':['原样草稿<em>已经好了</em>','这份是<b>你自己写的原话</b>，没经过 AI，也没有缺失提示。'],
  'preview-no-result':['这里<em>没有</em>可看的结果','预览要有一次<b>已经完成的生成</b>。这次进来没带结果，我不会拿示例冒充你的简历。'],
- 'preview-loading':['正在<em>读回</em>这条记录','用你的登录身份向服务端要这次结果。<b>读回来之前，不显示任何简历内容。</b>'],
+ 'preview-loading':['正在<em>读回</em>这条记录','用你的登录身份向系统要这次结果。<b>读回来之前，不显示任何简历内容。</b>'],
  'preview-failed':['这条记录<em>没读回来</em>','可能已过留存期、不是本人，或者网络不通。<b>不拿别的结果凑数。</b>'],
- 'preview-ready':['生成好了，<em>你核一遍</em>','事实字段和你填的<b>逐字一致</b>；被润色过的段落都打了标。'],
- 'preview-hints':['还有<em>几处</em>建议补','这些提示是服务端按你填的内容<b>算出来</b>的，AI 不会替你补。'],
+ 'preview-ready':['生成好了，<em>你核一遍</em>','事实内容和你填的<b>逐字一致</b>；被润色过的段落都打了标。'],
+ 'preview-hints':['还有<em>几处</em>建议补','这些提示是系统按你填的内容<b>算出来</b>的，AI 不会替你补。'],
  'preview-editing':['这一段，<em>你说了算</em>','左边是你填的原话，右边是润色后的。<b>改完要点确认才算数。</b>'],
  'export-chooser':['要<em>哪种格式</em>？','<b>四种都能导出</b>；页数、版式和<b>打印入口</b>目前只有 PDF 有。'],
- 'export-exporting':['正在<em>生成文件</em>','服务端在渲染并落库。<b>文件还没有，所以现在还不能下载或打印。</b>'],
+ 'export-exporting':['正在<em>生成文件</em>','系统在渲染并保存。<b>文件还没有，所以现在还不能下载或打印。</b>'],
  'export-failed':['文件<em>没生成出来</em>','这次导出失败了。<b>简历内容还在，可以直接重导出。</b>'],
  'export-ready':['文件<em>好了</em>','<b>扫码存进手机带走</b>，或者直接去打印 —— 下载和打印是两条链接。'],
  'export-url-expired':['<em>扫码取件</em>这条过期了','文件还在，<b>打印那条链接也还在</b>；只有手机取件要重导出一次。'],
- 'export-print-unavailable':['这一份<em>暂时进不了打印</em>','服务端这次没给打印链接，属于异常。<b>PDF 正常导出时能打印</b>，下载还能用。'],
+ 'export-print-unavailable':['这一份<em>暂时进不了打印</em>','系统这次没给打印链接，属于异常。<b>PDF 正常导出时能打印</b>，下载还能用。'],
  'session-lost':['你填的内容<em>已经清掉了</em>','公共设备不留个人资料：刷新、返回或待机之后，<b>这一份要从头填</b>。'],
  illegal:['<em>认不出</em>这个页面状态','地址里的状态没有登记。<b>我不猜你想去哪一步</b>，也不把原始参数回显在屏幕上。']
 };
@@ -762,12 +762,12 @@ var EYEBROW={entry:'从零生成',input:'逐项填写',validate:'必填检查',v
 var TRUTH={
  fill:'AI 只整理你提供的描述；学校、公司和时间请本人核对。',
  voice:'语音只做<b>一次转写</b>，不保存原始音频，没有声纹、实时通话或音量分析；文字你确认过才写进表单。',
- generate:'AI 只把描述说顺、写一段个人简介，<b>事实字段逐字保留</b>；缺的部分由服务端算出来提示你补，AI 不代填。',
+ generate:'AI 只把描述说顺、写一段个人简介，<b>事实内容逐字保留</b>；缺的部分由系统算出来提示你补，AI 不代填。',
  draft:'原样草稿<b>不经过模型</b>：没有润色，也没有缺失提示，文件名里会直接标出来。',
- preview:'这一页只显示服务端返回的<b>这一次结果</b>，不重新生成，也不替你保存。',
+ preview:'这一页只显示系统返回的<b>这一次结果</b>，不重新生成，也不替你保存。',
  exporting:'导出只出文件，<b>不改内容</b>；页数、版式和<b>打印入口</b>目前都只有 PDF 有。',
- file:'文件按<b>服务端留存期限</b>管理（登录后更长、不登录更短），<b>不承诺永久保留</b>；下载与打印是<b>两条各自计时</b>的签名链接。',
- fallback:'公共设备只把填写内容放在内存里，<b>结束会话或闲置超时即清除</b>，不写进本机存储。'
+ file:'文件按<b>保存期限</b>管理（登录后更长、不登录更短），<b>不承诺永久保留</b>；下载与打印是<b>两条各自计时</b>的有时效的下载链接。',
+ fallback:'公共设备只把填写内容放在内存里，<b>结束这次办理，或闲置超时，就清除</b>，不写进本机存储。'
 };
 var TRUTHOF={
  entry:'fill','input-basic':'fill','input-intention':'fill','input-history':'fill','input-strengths':'fill',
@@ -837,7 +837,7 @@ function tiles(tid){
  }
  return '<div class="tiles" data-testid="'+tid+'">'+h+'</div>';
 }
-/* 取件位：二维码由这次导出的短时签名链接渲染，静态稿只画位置，不生成可扫描图形。 */
+/* 取件位：二维码由这次导出的有时效的下载链接渲染，静态稿只画位置，不生成可扫描图形。 */
 function qrSlot(sub){
  return '<div class="qrslot" data-testid="'+SCREEN+'-qr-slot" role="group" aria-label="扫码保存到手机">'+
   '<span class="qi">'+svg('qr',86,1.6)+'</span><b>扫码保存到手机</b>'+
@@ -848,14 +848,14 @@ function qrSlot(sub){
    一次导出会同时产生三样**各自独立**的东西。页面必须分别声明，谁也不许拿另一个推出来：
 
      file      文件本体   services/api/src/ai/ai.service.ts exportGeneratedResume → FilesService.upload
-                          （assetCategory='optimized'）。寿命由**服务端留存期限**决定：登录会员按账号
+                          （assetCategory='optimized'）。寿命由**保存期限**决定：登录会员按账号
                           留存策略管理（可按规则延长），匿名 / system 只留短期。链接过期 ≠ 文件被删。
      download  下载 URL   ResumeGenerateExportResponse.signedUrl + expiresAt
                           （packages/shared/src/types/ai.ts）。对象存储签发，只做预览 / 扫码下载，
                           **进不了 /print/jobs**；expiresAt 只描述这一条链接，不描述另外两样。
      print     打印凭证   ResumeGenerateExportResponse.printFileUrl，由 services/api/src/files/signing.ts
                           的 signFileUrl **另签**的系统 HMAC content URL，自带一套时钟（该模块默认 5 分钟），
-                          而且是可选字段 —— 这次可能压根没给。非 PDF 时它指向的还是**另一份**同内容 PDF。
+                          而且是可选内容 —— 这次可能压根没给。非 PDF 时它指向的还是**另一份**同内容 PDF。
 
    下面这张表就是每一屏真正持有什么。打印入口只读 print，扫码取件位只读 download，
    文件本体的说法只读 file —— 三条各自计时，任何一条都不许当成另一条的依据。 */
@@ -870,10 +870,10 @@ function held(k){var o=HELD[CUR];return o?o[k]:''}
 /* 页面上**唯一**的两个可用性判断，各自只看自己那一条凭证。
    写成 canPrint(){return canTakeaway()}、或者互相取值，就是把两条时钟又焊回一起。
    打印这一条有两种拦法，理由不同，不能混成一句「不能打印」：
-     nocred  这次压根没拿到打印链接（服务端异常）—— 重导出一次通常就有了；
-     noid    链接有，但那份打印 PDF **自己的文件编号**接口没返回（非 PDF 格式的常态）。
+     nocred  这次压根没拿到打印链接（系统异常）—— 重导出一次通常就有了；
+     noid    链接有，但那份打印 PDF **自己的文件编号**系统没返回（非 PDF 格式的常态）。
              下游按「来源 + 文件编号」成对认文件，拿原格式的编号顶上去就是身份造假，
-             所以这一种重导出多少次都不会好，只能等服务端补字段，或者改用 PDF。 */
+             所以这一种重导出多少次都不会好，只能等系统补内容，或者改用 PDF。 */
 function printBlock(){
  if(held('print')!=='live')return 'nocred';
  if(!curFile().printable)return 'noid';
@@ -883,7 +883,7 @@ function canPrint(){return !printBlock()}
 function canTakeaway(){return held('download')==='live'}
 
 var OBJTXT={
- file:{retained:['','file','文件按服务端留存期限保留']},
+ file:{retained:['','file','文件按保存期限保留']},
  download:{live:['ok','down','下载链接可用'],expired:['bad','clock','下载链接已过期']},
  print:{live:['ok','check','打印链接已就绪'],absent:['bad','warn','这次没拿到打印链接']}
 };
@@ -900,9 +900,9 @@ function objChips(over){
  }
  return h;
 }
-var NOID_TX='暂不开放打印：待服务端返回打印 PDF 的文件编号';
+var NOID_TX='暂不开放打印：等系统返回打印 PDF 的文件编号';
 /* 「去打印确认」这颗主按钮只认打印凭证 + 这一份的打印身份；两样齐了才交接，
-   交接只带来源、文件编号、页数和打印参数，签名链接与打印凭证一个都不进地址栏。 */
+   交接只带来源、文件编号、页数和打印参数，有时效的下载链接与打印凭证一个都不进地址栏。 */
 function printPrimary(alt){
  var r=printBlock(),f=curFile();
  if(!r)return a({cls:'btn primary wide',href:printHref(f),route:'/print/confirm',tid:SCREEN+'-primary',label:svg('print',26)+'去打印确认'});
@@ -913,7 +913,7 @@ function printPrimary(alt){
 /* 动作列表里的那条打印入口，同样两样都看，禁用理由也分开写。 */
 function printRow(tid){
  var r=printBlock(),f=curFile();
- if(!r)return orow({icon:'print',t:'去打印这一份',d:'走服务端另签的打印链接，交接只带文件编号和打印参数',href:printHref(f),route:'/print/confirm',tid:tid});
+ if(!r)return orow({icon:'print',t:'去打印这一份',d:'走系统另签的打印链接，交接只带文件编号和打印参数',href:printHref(f),route:'/print/confirm',tid:tid});
  if(r==='noid')return orow({icon:'print',t:'去打印这一份',d:NOID_TX+'；换成 PDF 导出就能打',off:'暂不开放',tid:tid});
  return orow({icon:'print',t:'去打印这一份',d:'没有打印链接，这次不能进打印确认',off:'不可用',tid:tid});
 }
@@ -924,7 +924,7 @@ function takeaway(sub,tid){
   : orow({icon:'qr',t:'扫码保存到手机',d:'这条下载链接已经过期，重导出之后才会有新的码',off:'已过期',tid:tid});
 }
 
-/* ================= 字段渲染 ================= */
+/* ================= 内容渲染 ================= */
 function fval(path){
  var seg=path.split('.'),o=F,i;
  for(i=0;i<seg.length-1;i++)o=o[seg[i]];
@@ -967,7 +967,7 @@ V.entry=function(){
    orow({icon:'star',t:'第 4 步 · 技能与自评',d:'技能最多 20 项、证书最多 15 项，再加一句自我评价',go:'input-strengths',tid:SCREEN+'-plan-4'})+
   '</div></div></div>'+
  '<div class="sec"><div class="split">'+
-   '<div class="mini"><h4>'+svg('check',24)+'AI 只润色，不编造</h4><p>学校、公司、学位、证书、时间和你写的数字，服务端从你的输入里逐字复制。AI 只把描述说顺，不会替你添一段没有的经历。</p></div>'+
+   '<div class="mini"><h4>'+svg('check',24)+'AI 只润色，不编造</h4><p>学校、公司、学位、证书、时间和你写的数字，系统从你的输入里逐字复制。AI 只把描述说顺，不会替你添一段没有的经历。</p></div>'+
    '<div class="mini"><h4>'+svg('print',24)+'不想用 AI 也能出纸</h4><p>随时可以把已填内容<b>原样排成 PDF</b> 打印带走 —— 那条路不经过模型，但也没有润色和补充提示。</p></div>'+
   '</div></div>'+
  '<div class="sec"><div class="split">'+
@@ -1091,7 +1091,7 @@ V['input-history']=function(){
    '<p class="note"><span class="sq"></span><span>空着也能生成，只是预览页会算出一条提示让你回来补 —— 那是按规则算的，不是 AI 编的。</span></p>'+
    '<p class="note"><span class="sq"></span><span>'+(SEG==='proj'?'项目和工作经历只要有一样就行；社团活动、校内比赛、帮亲戚看店，只要是你真做过的都能写。':
      (SEG==='edu'?'没读完也可以写：写到哪一年就是哪一年，AI 不会替你补一个学位。':'第一份工作、实习、寒暑假的兼职都算，写清楚做了什么比写头衔管用。'))+'</span></p>'+
-   '<p class="note"><span class="sq"></span><span>加进来之后，公司 / 职务这类关键字段填齐了才会真的提交，行上会直接标出来。</span></p></div>';
+   '<p class="note"><span class="sq"></span><span>加进来之后，公司 / 职务这类关键项填齐了才会真的提交，行上会直接标出来。</span></p></div>';
  }
  if(list.length<d.cap){
   h+=b({cls:'addbtn',act:'add:'+SEG,tid:SCREEN+'-'+SEG+'-add',label:svg('plus',24)+'添加一段'+d.name+'（最多 '+d.cap+' 段）',al:'添加一段'+d.name});
@@ -1103,7 +1103,7 @@ V['input-history']=function(){
   helperStrip('一段经历不知道怎么讲？先问一句再写，比对着空框发呆快。',SCREEN+'-hist');
  var ctas=b({cls:'btn ghost',go:'input-intention',tid:SCREEN+'-prev',label:svg('back',24)+'上一步'})+
   b({cls:'btn primary wide',go:'input-strengths',tid:SCREEN+'-primary',label:'下一步：技能与自评'});
- return fillShell(3,body,ctas,reason('三类都可以空着。上面标「不会提交」的条目，是关键字段还没填全 —— 提交时会跳过它，不会半截送出去。'));
+ return fillShell(3,body,ctas,reason('三类都可以空着。上面标「不会提交」的条目，是关键项还没填全 —— 提交时会跳过它，不会半截送出去。'));
 };
 
 V['input-strengths']=function(){
@@ -1177,7 +1177,7 @@ V['voice-recording']=function(){
    proc('mic','已录 12 秒 · 单次最长 58 秒','正常说话就行，一句一句说；说完点下面的「结束录音」。',SCREEN+'-voice-elapsed')+
    steps([
     {on:'now',t:'说出这一段',d:'超过 58 秒会自动结束，直接去转写',x:'进行中'},
-    {t:'转成文字',d:'把这一段录音交给服务端转写',x:'下一步'},
+    {t:'转成文字',d:'把这一段录音交给系统转写',x:'下一步'},
     {t:'你看一遍，可以直接改',d:'听着不对就改，或者重录一次',x:'等你'},
     {t:'写进'+VCTX.label+'那一栏',d:'另起一行接在原来的内容后面，不覆盖',x:'之后'}
    ],SCREEN+'-voice-steps')+
@@ -1190,7 +1190,7 @@ V['voice-recording']=function(){
 V['voice-transcribing']=function(){
  return voiceHead()+
   '<div class="sec grow"><div class="card">'+secLabel('01','正在转写','等一个完整结果')+
-   proc('spark','正在把这段录音转成文字','等服务端一次性返回转写结果。',SCREEN+'-voice-proc')+
+   proc('spark','正在把这段录音转成文字','等系统一次性返回转写结果。',SCREEN+'-voice-proc')+
    steps([
     {on:'done',t:'录音已结束',d:'这一段只用于这一次转写，不保存原始音频',x:'完成'},
     {on:'now',t:'转成文字',d:'转写只是把你说的变成字，不是润色',x:'进行中'},
@@ -1231,7 +1231,7 @@ V['voice-confirm']=function(){
 V['voice-failed']=function(){
  return voiceHead()+
   '<div class="sec grow"><div class="card">'+secLabel('01','这段没转出来','表单没有被改')+
-   stateBox('error','warn','没有识别到有效文字','可能是环境太吵、说得太轻，或者服务端这次没转成功。'+
+   stateBox('error','warn','没有识别到有效文字','可能是环境太吵、说得太轻，或者系统这次没转成功。'+
     '<b>录音没有保存，表单也没有写入任何内容。</b>换个方式再来一次就行。',SCREEN+'-voice-error')+
    '<div class="rows3" style="margin-top:14px">'+
     orow({icon:'mic',t:'再录一次',d:'离麦克风近一点，一句一句说，别一口气说完',go:'voice-recording',tid:SCREEN+'-vf-again'})+
@@ -1311,10 +1311,10 @@ V['ai-unavailable']=function(){
    b({cls:'btn primary wide',go:'draft-exporting',tid:SCREEN+'-primary',label:svg('print',26)+'导出原样草稿'}));
 };
 
-/* 匿名导出的文件不会因为事后登录被补绑：服务端是在导出那一刻按当时的身份归档的，
+/* 匿名导出的文件不会因为事后登录被补绑：系统是在导出那一刻按当时的身份归档的，
    之后再登录只对下一次生成 / 导出生效。页面不得暗示「登录后这一份会进我的简历」。 */
 function ownNote(){
- return '<p class="note"><span class="sq"></span><span>没登录的话，这一份就是<b>本次会话的临时文件</b>；文件按<b>服务端留存期限</b>管理（登录后更长、不登录更短），<b>不随链接过期被删</b>。<b>事后登录也不会把它补绑进账号</b> —— 下次先登录再生成、再导出，服务端才能按账号归档。</span></p>';
+ return '<p class="note"><span class="sq"></span><span>没登录的话，这一份就是<b>这次办理的临时文件</b>；文件按<b>保存期限</b>管理（登录后更长、不登录更短），<b>不随链接过期被删</b>。<b>事后登录也不会把它补绑进账号</b> —— 下次先登录再生成、再导出，系统才能按账号归档。</span></p>';
 }
 function loginRow(tid){
  return orow({icon:'user',t:'先登录，对下一次生效',d:'这一份不会因为登录补绑；登录之后再生成、再导出的才会归档',
@@ -1327,11 +1327,11 @@ V['draft-exporting']=function(){
   proc('print','正在排版并上传','排的是你填的原话：'+keptSummary()+'。',SCREEN+'-draft-band')+
   steps([
    {on:'done',t:'已填内容已经交给排版',x:'完成',d:'半空条目同样跳过，和提交生成的口径一致'},
-   {on:'now',t:'服务端排成 A4 黑白 PDF',x:'进行中',d:'文件名里会直接写「未经AI润色」'},
+   {on:'now',t:'系统排成 A4 黑白 PDF',x:'进行中',d:'文件名里会直接写「未经AI润色」'},
    {t:'拿到文件名、页数和链接',x:'下一步',d:'排完才有这些，现在都还不存在'},
    {t:'扫码保存到手机，或去打印',x:'之后',d:'公共机器不落本机，要带走走手机'}
   ],SCREEN+'-draft-steps')+
-  '<p class="note"><span class="sq"></span><span>服务端只做排版，<b>不调用任何模型</b>，所以 AI 没接通时这条路照样能走；文件还没生成完，现在<b>还不能下载，也不能打印</b>。排出来的是你的原话，<b>没有润色，也没有缺失提示</b>。</span></p>'+
+  '<p class="note"><span class="sq"></span><span>系统只做排版，<b>不调用任何模型</b>，所以 AI 没接通时这条路照样能走；文件还没生成完，现在<b>还不能下载，也不能打印</b>。排出来的是你的原话，<b>没有润色，也没有缺失提示</b>。</span></p>'+
   '</div></div>'+
   helperStrip('排版一直不出来，或者反复失败，可以叫工作人员来看一眼。',SCREEN+'-de')+
   ctabar(b({cls:'btn ghost',go:'input-strengths',tid:SCREEN+'-prev',label:svg('back',24)+'回去改内容'})+
@@ -1339,7 +1339,7 @@ V['draft-exporting']=function(){
 };
 V['draft-failed']=function(){
  return '<div class="sec grow"><div class="card">'+secLabel('01','草稿没导出来','内容还在')+
-  stateBox('error','warn','这次排版或上传没成功','服务端<b>没有确认收到这份文件</b>，所以现在<b>没有任何可下载或可打印</b>的东西。'+
+  stateBox('error','warn','这次排版或上传没成功','系统<b>没有确认收到这份文件</b>，所以现在<b>没有任何可下载或可打印</b>的东西。'+
    '你填的<b>内容还在</b>这一页上，直接重试就行。',SCREEN+'-draft-fail-box')+
   '<div class="qh" style="margin-top:16px">这一次排的是<b>这些内容</b><span>重试排的还是它们</span></div>'+
   tiles(SCREEN+'-draft-fail-tiles')+
@@ -1365,9 +1365,9 @@ V['draft-ready']=function(){
   stateBox('warn','warn','这份是你写的原话，不是 AI 成品','里面<b>没有润色</b>，也<b>没有缺失提示</b> —— 那两样只有走生成才有。文件名里就写着「未经AI润色」，'+
    '拿去投的时候你自己心里有数。',SCREEN+'-draft-warn')+
   '<div class="qh">把这一份带走<span>两条路：扫码存进手机，或者直接去打印</span></div>'+
-  '<div class="take">'+takeaway('二维码由这次导出的<b>短时签名链接</b>渲染。',SCREEN+'-draft-qr-blocked')+
+  '<div class="take">'+takeaway('二维码由这次导出的<b>有时效的下载链接</b>渲染。',SCREEN+'-draft-qr-blocked')+
    '<div class="take-m">'+
-    '<p class="note"><span class="sq"></span><span>公共机器<b>不提供下载到本机</b>：要把这份带走，就用手机扫左边这张码。下载链接是一条<b>短时签名链接</b>，到期时间随这次导出由服务端给出；打印走另一条系统链接，<b>两条各自计时</b>。过期不代表文件没了，重导一次就有新链接。</span></p>'+
+    '<p class="note"><span class="sq"></span><span>公共机器<b>不提供下载到本机</b>：要把这份带走，就用手机扫左边这张码。下载链接<b>有时效</b>，到期时间随这次导出由系统给出；打印走另一条系统链接，<b>两条各自计时</b>。过期不代表文件没了，重导一次就有新链接。</span></p>'+
     loginRow(SCREEN+'-draft-login')+
     orow({icon:'spark',t:'还是想要润色版',d:'内容没变，回去提交一次生成就行',go:'generating',tid:SCREEN+'-draft-ai'})+
     orow({icon:'pen',t:'再改改内容',d:'改完重导一次，草稿排的就是新的',go:'input-strengths',tid:SCREEN+'-draft-edit'})+
@@ -1418,11 +1418,11 @@ V['preview-no-result']=function(){
  return '<div class="sec grow"><div class="card">'+secLabel('01','没有可预览的结果','不会拿示例冒充')+
   stateBox('plain','info','这次进来没有带结果','预览要有一次<b>已经完成的生成</b>才能显示。'+
    (withTask
-    ? '这个地址带了一条记录标识，真实链路里会凭你的登录身份或那次提交返回的一次性访问令牌向服务端读回；没有凭证读不回来，所以这一页<b>不显示任何简历内容</b>，也不会拿示例冒充你的简历。'
+    ? '这个地址带了一条记录标识，实际办理时会凭你的登录身份或那次提交返回的一次性访问令牌向系统读回；没有凭证读不回来，所以这一页<b>不显示任何简历内容</b>，也不会拿示例冒充你的简历。'
     : '这次没有带结果，所以这一页<b>不显示任何简历内容</b>，也不会拿示例冒充你的简历。'),SCREEN+'-nores-box')+
   '<div class="rows3" style="margin-top:16px">'+
    orow({icon:'pen',t:'去填资料并生成',d:'四步，只有姓名和目标岗位必填，其余都能空着',go:'input-basic',tid:SCREEN+'-nr-fill'})+
-   orow({icon:'book',t:'打开我的简历',d:'登录之后，服务端留存期内的版本可以直接打开',href:'../kiosk-redesign-2026-08/39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-nr-mine'})+
+   orow({icon:'book',t:'打开我的简历',d:'登录之后，保存期限内的版本可以直接打开',href:'../kiosk-redesign-2026-08/39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-nr-mine'})+
    orow({icon:'file',t:'我已经有简历文件',d:'那边做上传与诊断，不是从零填',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-nr-file'})+
   '</div>'+
   '<div class="split" style="margin-top:14px">'+
@@ -1435,10 +1435,10 @@ V['preview-no-result']=function(){
 };
 V['preview-loading']=function(){
  return '<div class="sec grow"><div class="card">'+secLabel('01','正在读回这条记录','读回来之前不显示内容')+
-  proc('book','正在向服务端要这次结果','读回来之前，这一页不显示任何简历内容。',SCREEN+'-preview-band')+
+  proc('book','正在向系统要这次结果','读回来之前，这一页不显示任何简历内容。',SCREEN+'-preview-band')+
   steps([
    {on:'done',t:'带着这条记录的标识进来',x:'完成',d:'从「我的简历」点进来，或刚提交完'},
-   {on:'now',t:'凭你的身份向服务端读回',x:'进行中',d:'读的是你自己那一条，没有凭证读不回来'},
+   {on:'now',t:'凭你的身份向系统读回',x:'进行中',d:'读的是你自己那一条，没有凭证读不回来'},
    {t:'显示那一次的生成结果',x:'下一步',d:'内容和当时一模一样，不会重新生成一遍'},
    {t:'你核对，再导出或去打印',x:'之后',d:'确认过再导出，这一页不替你保存'}
   ],SCREEN+'-preview-steps')+
@@ -1463,10 +1463,10 @@ V['preview-failed']=function(){
    orow({icon:'book',t:'回我的简历看看别的',d:'其它还在留存期内的版本可以直接打开',href:'../kiosk-redesign-2026-08/39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-pf-mine'})+
   '</div>'+
   '<div class="split" style="margin-top:14px">'+
-   '<div class="mini"><h4>'+svg('clock',24)+'可能是过了留存期</h4><p>生成结果按服务端的留存期限清理，到期是真的没有了。这一页<b>不会假装还留着一份</b>。</p></div>'+
+   '<div class="mini"><h4>'+svg('clock',24)+'可能是过了留存期</h4><p>生成结果按保存期限清理，到期是真的没有了。这一页<b>不会假装还留着一份</b>。</p></div>'+
    '<div class="mini"><h4>'+svg('lock',24)+'也可能不是本人</h4><p>结果只认你的登录身份或那次提交的一次性令牌。换个人、换个账号，一律当它不存在。</p></div>'+
   '</div></div></div>'+
-  helperStrip('留存期是服务端定的，过期就是真的没有了 —— 这一页不会假装还留着一份。',SCREEN+'-pf')+
+  helperStrip('留存期是系统定的，过期就是真的没有了 —— 这一页不会假装还留着一份。',SCREEN+'-pf')+
   ctabar(b({cls:'btn ghost',go:'input-basic',tid:SCREEN+'-pf-fill',label:svg('pen',24)+'重新填一份'})+
    b({cls:'btn primary wide',go:'preview-loading',tid:SCREEN+'-primary',label:svg('refresh',26)+'再读一次'}));
 };
@@ -1482,7 +1482,7 @@ V['preview-ready']=function(){
   helperStrip('这一页只在屏幕上。没登录时导出的文件不会进你的账号，事后登录也不补绑 —— 要留底就先登录，再生成、再导出。',SCREEN+'-pr')+
   ctabar(b({cls:'btn ghost',go:'input-basic',tid:SCREEN+'-pr-back',label:svg('back',24)+'回去改资料'})+
    b({cls:'btn primary wide',go:'export-chooser',tid:SCREEN+'-primary',label:svg('down',26)+'内容没问题，去导出'}))+
-  reason('事实字段要改，得回填写页改 —— 这一页只让你改描述，而且每一次改都要你自己点确认。');
+  reason('事实内容要改，得回填写页改 —— 这一页只让你改描述，而且每一次改都要你自己点确认。');
 };
 V['preview-hints']=function(){
  var h=hintsOf(),i,rows='';
@@ -1490,8 +1490,8 @@ V['preview-hints']=function(){
   rows+='<div class="hrow"><span class="hn">'+(i+1)+'</span><span class="hm">'+h[i].t+'</span>'+
    b({cls:'hgo',go:h[i].go,act:h[i].seg?'seg:'+h[i].seg:'',tid:SCREEN+'-hint-'+(i+1),label:'去补'+GO,al:'去补：'+h[i].t})+'</div>';
  }
- if(!h.length)rows='<div class="hrow"><span class="hn">'+svg('check',22)+'</span><span class="hm">按当前内容算，服务端没有给出缺失提示。</span></div>';
- return '<div class="sec grow"><div class="card">'+secLabel('01','还差这几处','服务端算的，不是 AI 编的')+
+ if(!h.length)rows='<div class="hrow"><span class="hn">'+svg('check',22)+'</span><span class="hm">按当前内容算，系统没有给出缺失提示。</span></div>';
+ return '<div class="sec grow"><div class="card">'+secLabel('01','还差这几处','系统算的，不是 AI 编的')+
   '<div class="hintlist" style="margin-bottom:14px">'+rows+'</div>'+
   stateBox('info','info','这些提示是怎么来的','按几条固定规则从你填的内容里算出来：没写联系方式、没写教育、没写经历也没写项目、没写技能、'+
    '经历描述太短。<b>AI 不会替你把这些补上</b> —— 补了就等于编。',SCREEN+'-hint-why')+
@@ -1509,9 +1509,9 @@ V['preview-hints']=function(){
 };
 V['preview-editing']=function(){
  var x=keptExp()[0]||{company:'—',role:'—',description:''};
- return '<div class="sec grow"><div class="card">'+secLabel('01','改这一段描述','事实字段不在这里改')+
-  '<div class="helper" style="margin-bottom:12px"><span class="ht">'+svg('lock',22)+' <b>'+x.company+' · '+x.role+(x.period?' · '+x.period:'')+'</b> —— 这一行是事实字段，要改得回填写页改</span>'+
-   b({cls:'hbtn',go:'input-history',act:'seg:exp',tid:SCREEN+'-edit-facts',label:svg('pen',22)+'回填写页改',al:'回填写页修改事实字段'})+'</div>'+
+ return '<div class="sec grow"><div class="card">'+secLabel('01','改这一段描述','事实内容不在这里改')+
+  '<div class="helper" style="margin-bottom:12px"><span class="ht">'+svg('lock',22)+' <b>'+x.company+' · '+x.role+(x.period?' · '+x.period:'')+'</b> —— 这一行是事实内容，要改得回填写页改</span>'+
+   b({cls:'hbtn',go:'input-history',act:'seg:exp',tid:SCREEN+'-edit-facts',label:svg('pen',22)+'回填写页改',al:'回填写页修改事实内容'})+'</div>'+
   '<div class="cmp" style="margin-bottom:12px">'+
    '<div class="raw"><h5>'+svg('pen',20)+'你填的原话</h5><p data-testid="'+SCREEN+'-edit-raw">'+(x.description||'（这一段你没写描述）')+'</p></div>'+
    '<div class="pol"><h5>'+svg('spark',20)+'AI 润色后</h5><p data-testid="'+SCREEN+'-edit-pol">'+pol('exp.0',x.description)+'</p></div>'+
@@ -1530,10 +1530,10 @@ V['preview-editing']=function(){
 /* ---------- 导出 ---------- */
 /* 四种格式都能导出，但**只有 PDF 现在能交给打印确认**。
    ai.service.ts 对 pdf 直接签打印凭证；对 docx/txt/md 另渲染一份同内容 PDF 再签，
-   接口回来的却只有一条 printFileUrl —— **那份打印 PDF 自己的 fileId 没有返回**，
+   系统回来的却只有一条 printFileUrl —— **那份打印 PDF 自己的 fileId 没有返回**，
    返回的 fileId 仍是原格式文件的。下游打印确认页按「来源 + 文件编号」成对认文件，
-   拿原格式的编号冒充那份 PDF，等于替服务端断言两个不同对象是同一个。
-   所以这里如实写成「暂不开放打印」，等服务端补上打印 PDF 的文件编号再开。
+   拿原格式的编号冒充那份 PDF，等于替系统断言两个不同对象是同一个。
+   所以这里如实写成「暂不开放打印」，等系统补上打印 PDF 的文件编号再开。
    非 PDF 的 pageCount 恒为 0 —— 那是「没有分页概念」，与能不能打印是两件事，分开写。 */
 var FMTS=[
  {k:'pdf',n:'PDF',d:'排版固定，打印出来就是屏幕上这样',pg:'有页数',p:'能进打印确认',v:'投简历、现场打印'},
@@ -1612,9 +1612,9 @@ V['export-chooser']=function(){
   '<p class="note" style="margin-top:14px"><span class="sq"></span><span data-testid="'+SCREEN+'-fmt-note">'+
    (isPdf?'PDF 会给出<b>真实页数</b>，版式也只对它生效。':
     '<b>'+FMT.toUpperCase()+' 的页数固定是 0</b>，也不套版式 —— 它没有分页概念。'+
-    '<b>这一份暂不开放打印</b>：打印要用服务端另出的一份同内容 PDF，而那份 PDF 的文件编号接口还没返回，编号对不上就不交接。')+
+    '<b>这一份暂不开放打印</b>：打印要用系统另出的一份同内容 PDF，而那份 PDF 的文件编号还没返回，编号对不上就不交接。')+
    '</span></p>'+
-  '<p class="note" style="margin-top:12px"><span class="sq"></span><span>导出后给你的是一条<b>短时签名链接</b>，会过期，重导一次就有新链接；打印走服务端另签的凭证，<b>下载链接进不了打印</b>。</span></p>'+
+  '<p class="note" style="margin-top:12px"><span class="sq"></span><span>导出后给你的是一条<b>有时效的下载链接</b>，会过期，重导一次就有新链接；打印走系统另签的凭证，<b>下载链接进不了打印</b>。</span></p>'+
   '</div></div>'+
   helperStrip('不确定要哪种？要打印或投简历就选 PDF；要回去自己改就选 DOCX。',SCREEN+'-ec')+
   ctabar(b({cls:'btn ghost',go:'preview-ready',tid:SCREEN+'-ex-back',label:svg('back',24)+'回预览再看看'})+
@@ -1623,15 +1623,15 @@ V['export-chooser']=function(){
 V['export-exporting']=function(){
  var f=FMT.toUpperCase(),isPdf=FMT==='pdf';
  return '<div class="sec grow"><div class="card">'+secLabel('01','正在生成文件','完成前没有文件')+
-  proc('down','正在渲染 '+f+' 并落库','渲染、落库、再签一条短时下载链接 —— 这几步做完才有文件。',SCREEN+'-export-band')+
+  proc('down','正在渲染 '+f+' 并保存','渲染、保存、再签一条短时下载链接 —— 这几步做完才有文件。',SCREEN+'-export-band')+
   steps([
    {on:'done',t:'内容你已经核对过',x:'完成',d:'导出不改内容，也不会再过一遍模型'},
-   {on:'now',t:'渲染 '+f+' 并落库',x:'进行中',
-    d:isPdf?'PDF 渲染完会带上真实页数':f+' 的页数固定是 0；打印时服务端另出一份同内容 PDF'},
+   {on:'now',t:'渲染 '+f+' 并保存',x:'进行中',
+    d:isPdf?'PDF 渲染完会带上真实页数':f+' 的页数固定是 0；打印时系统另出一份同内容 PDF'},
    {t:'签出下载链接与打印链接',x:'下一步',d:'两条链接不通用，下载链接进不了打印'},
-   {t:'扫码保存到手机，或去打印',x:'之后',d:isPdf?'PDF 能直接进打印确认':f+' 只能扫码带走；打印要等服务端返回打印 PDF 的文件编号'}
+   {t:'扫码保存到手机，或去打印',x:'之后',d:isPdf?'PDF 能直接进打印确认':f+' 只能扫码带走；打印要等系统返回打印 PDF 的文件编号'}
   ],SCREEN+'-export-steps')+
-  '<p class="note"><span class="sq"></span><span>现在<b>还不能下载，也不能打印</b>；页数和文件大小要等真实结果，<b>这一页不估算</b>。这一步只等服务端出文件，<b>不收钱</b>，也不会自己去排打印队。</span></p>'+
+  '<p class="note"><span class="sq"></span><span>现在<b>还不能下载，也不能打印</b>；页数和文件大小要等真实结果，<b>这一页不估算</b>。这一步只等系统出文件，<b>不收钱</b>，也不会自己去排打印队。</span></p>'+
   '</div></div>'+
   helperStrip('一直不出来？可以回去换个格式，或者叫工作人员来看一眼。',SCREEN+'-ee')+
   ctabar(b({cls:'btn ghost',go:'export-failed',tid:SCREEN+'-ee-fail',label:svg('warn',24)+'这次失败了'})+
@@ -1639,7 +1639,7 @@ V['export-exporting']=function(){
 };
 V['export-failed']=function(){
  return '<div class="sec grow"><div class="card">'+secLabel('01','文件没生成出来','简历内容还在')+
-  stateBox('error','warn','这次导出失败了','服务端<b>没有确认落库</b>，所以这次<b>没有产生任何文件</b>，也没有可用的下载或打印链接。'+
+  stateBox('error','warn','这次导出失败了','系统<b>没有确认已经保存</b>，所以这次<b>没有产生任何文件</b>，也没有可用的下载或打印链接。'+
    '你核对过的简历<b>内容还在</b>这一页上，直接重导就行。',SCREEN+'-exf-box')+
   '<div class="rows3" style="margin-top:16px">'+
    orow({icon:'refresh',t:'用同样的格式重导',d:'内容不变，再试一次；这一步不改内容，也不再过模型',go:'export-exporting',tid:SCREEN+'-xf-retry'})+
@@ -1667,15 +1667,15 @@ V['export-ready']=function(){
    '<span class="chip" data-testid="'+SCREEN+'-export-fileid">'+svg('file',22)+'文件编号 '+f.fileId+'</span>'+
    '<span class="chip">'+svg('file',22)+sizeText(f.sizeBytes)+' · '+f.mimeType+'</span>'+
   '</div></div>'+
-  (f.printable?'':stateBox('warn','warn',FMT.toUpperCase()+' 这一份暂时进不了打印','打印链接服务端签了，'+
+  (f.printable?'':stateBox('warn','warn',FMT.toUpperCase()+' 这一份暂时进不了打印','打印链接系统签了，'+
    '但<b>打印用的是另渲染的一份同内容 PDF</b>，那份 PDF <b>自己的文件编号这次没有返回</b>。'+
    '打印确认页按「来源 + 文件编号」成对认文件，拿这份 '+FMT.toUpperCase()+' 的编号顶上去，'+
    '下游取到的可能根本不是要打印的那一份，所以这里不放行。<b>扫码取件和我的文档照常</b>；'+
    '想现在就打印，回去导一份 PDF。',SCREEN+'-noid-box'))+
   '<div class="qh">把这一份带走<span>'+(f.printable?'两条路：扫码存进手机，或者直接去打印':'扫码存进手机；打印要换 PDF 那一份')+'</span></div>'+
-  '<div class="take">'+takeaway('二维码由这次导出的<b>短时签名链接</b>渲染。',SCREEN+'-export-qr-blocked')+
+  '<div class="take">'+takeaway('二维码由这次导出的<b>有时效的下载链接</b>渲染。',SCREEN+'-export-qr-blocked')+
    '<div class="take-m">'+
-    '<p class="note"><span class="sq"></span><span>公共机器<b>不提供下载到本机</b>：要把文件带走，就用手机扫左边这张码。到期时间随这次导出由服务端给出。打印走<b>另一条系统链接</b>，<b>两条各自计时、互不牵连</b> —— 下载那条过期了照样能打印，<b>下载链接也进不了打印</b>。</span></p>'+
+    '<p class="note"><span class="sq"></span><span>公共机器<b>不提供下载到本机</b>：要把文件带走，就用手机扫左边这张码。到期时间随这次导出由系统给出。打印走<b>另一条系统链接</b>，<b>两条各自计时、互不牵连</b> —— 下载那条过期了照样能打印，<b>下载链接也进不了打印</b>。</span></p>'+
     loginRow(SCREEN+'-export-login')+
     orow({icon:'file',t:'再导一份别的格式',d:FMT==='pdf'?otherFmts(FMT)+' 供下载编辑，暂不开放打印':'换成 PDF 就能直接打印；'+otherFmts(FMT)+' 只供下载编辑',go:'export-chooser',tid:SCREEN+'-export-fmt'})+
     orow({icon:'refresh',t:'重新导出',d:'改过内容，或者链接过期了，都点这里',go:'export-exporting',tid:SCREEN+'-export-again'})+
@@ -1687,7 +1687,7 @@ V['export-ready']=function(){
 };
 /* 这一屏只表示**下载 signedUrl 过期**（storage.service.ts 的下载签名有自己的 TTL）。
    打印走的是另一条系统 HMAC content URL（signing.ts），两条签名各自计时、互不牵连，
-   所以这里**保留真实打印入口**，只关掉扫码取件；文件实体按服务端留存期限管理，没有被删。 */
+   所以这里**保留真实打印入口**，只关掉扫码取件；文件实体按保存期限管理，没有被删。 */
 V['export-url-expired']=function(){
  var f=fileOf(FMT);
  return '<div class="sec grow"><div class="card">'+secLabel('01','扫码取件的链接过期了','打印那条还在')+
@@ -1698,13 +1698,13 @@ V['export-url-expired']=function(){
    '<span class="chip" data-testid="'+SCREEN+'-export-fileid">'+svg('file',22)+'文件编号 '+f.fileId+'</span>'+
    '<span class="chip" data-testid="'+SCREEN+'-export-pages">'+svg('file',22)+f.pages+' · '+sizeText(f.sizeBytes)+'</span>'+
   '</div></div>'+
-  stateBox('warn','clock','过期的是下载那一条，不是文件','下载和打印是<b>两条各自计时的签名链接</b>，一条到期不影响另一条。'+
-   '这次<b>手机扫码取件用不了</b>了，<b>去打印确认照常</b>。文件本身按<b>服务端留存期限</b>管理，'+
+  stateBox('warn','clock','过期的是下载那一条，不是文件','下载和打印是<b>两条各自计时的临时链接</b>，一条到期不影响另一条。'+
+   '这次<b>手机扫码取件用不了</b>了，<b>去打印确认照常</b>。文件本身按<b>保存期限</b>管理，'+
    '<b>不是随链接一起被删</b>；想再扫码带走，重导出一次就有新的下载链接。',SCREEN+'-exp-box')+
   '<div class="qh">现在能做什么<span>打印照旧；要手机取件就重导出</span></div>'+
   '<div class="rows3">'+
    orow({icon:'refresh',t:'重导出，拿新的下载链接',d:'不重新生成，只重新出一次文件；新链接出来就能再扫码带走',go:'export-exporting',tid:SCREEN+'-xe-again'})+
-   takeaway('二维码由这次导出的<b>短时签名链接</b>渲染。',SCREEN+'-xe-qr-blocked')+
+   takeaway('二维码由这次导出的<b>有时效的下载链接</b>渲染。',SCREEN+'-xe-qr-blocked')+
    orow({icon:'eye',t:'先回预览看一眼内容',d:'确认没问题再导，导出的就是你核对过的这一份',go:'preview-ready',tid:SCREEN+'-xe-preview'})+
   '</div>'+
   '</div></div>'+
@@ -1714,7 +1714,7 @@ V['export-url-expired']=function(){
 };
 
 /* 这一屏**显式钉在 TXT 异常夹具**上（路由进入时同时把 FMT 置为 txt）：它演示的是
-   「服务端这次没给打印链接」，不是某个格式的常态。 */
+   「系统这次没给打印链接」，不是某个格式的常态。 */
 V['export-print-unavailable']=function(){
  var f=fileOf('txt');
  return '<div class="sec grow"><div class="card">'+secLabel('01','这次没拿到打印链接','异常兜底，不是常态')+
@@ -1724,13 +1724,13 @@ V['export-print-unavailable']=function(){
   '<div class="meta">'+objChips()+
    '<span class="chip">'+svg('pen',22)+'非 PDF 页数固定是 0</span>'+
   '</div></div>'+
-  stateBox('warn','warn','没有打印链接就不放行','打印只认服务端签的系统链接。这次导出没给，所以这一页<b>不放打印入口</b> —— '+
+  stateBox('warn','warn','没有打印链接就不放行','打印只认系统签的系统链接。这次导出没给，所以这一页<b>不放打印入口</b> —— '+
    '<b>不会拿下载链接顶上去</b>，那条链接打印服务不认。缺的只是打印那一条：<b>手机扫码取件照常能用</b>，'+
-   '文件也按<b>服务端留存期限</b>保留着。<b>这一屏演示的是「连链接都没给」这种异常</b>，'+
+   '文件也按<b>保存期限</b>保留着。<b>这一屏演示的是「连链接都没给」这种异常</b>，'+
    '和 TXT / DOCX / MD <b>平时那种「有链接但没有打印 PDF 编号」是两回事</b>：'+
-   '那一种重导出也不会好，只能换成 PDF，或者等服务端把打印 PDF 的文件编号补上。',SCREEN+'-xp-box')+
+   '那一种重导出也不会好，只能换成 PDF，或者等系统把打印 PDF 的文件编号补上。',SCREEN+'-xp-box')+
   '<div class="qh">这一份还能带走<span>扫码存进手机；打印要等重导出拿到链接</span></div>'+
-  '<div class="take">'+takeaway('下载还能用：二维码由这次导出的<b>短时签名链接</b>渲染。',SCREEN+'-xp-qr-blocked')+
+  '<div class="take">'+takeaway('下载还能用：二维码由这次导出的<b>有时效的下载链接</b>渲染。',SCREEN+'-xp-qr-blocked')+
    '<div class="take-m">'+
     orow({icon:'refresh',t:'重导出一次',d:'再要一次打印链接，通常这次就有了',go:'export-exporting',tid:SCREEN+'-xp-again'})+
     orow({icon:'file',t:'换成 PDF 再导',d:'PDF 是唯一有真实页数、也是当前唯一能进打印确认的格式',go:'export-chooser',tid:SCREEN+'-xp-pdf'})+
@@ -1757,7 +1757,7 @@ V['session-lost']=function(){
   '</div></div>'+
   '<div class="sec"><div class="split">'+
    a({cls:'orow',href:'../kiosk-redesign-2026-08/39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-sl-mine',al:'打开我的简历',
-      html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>打开我的简历</b><span>登录之后，服务端留存期内的版本还在</span></span>'+GO})+
+      html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>打开我的简历</b><span>登录之后，保存期限内的版本还在</span></span>'+GO})+
    a({cls:'orow',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-sl-source',al:'返回简历服务',
       html:'<span class="oi">'+svg('file',26)+'</span><span class="om"><b>返回简历服务</b><span>上传、诊断、优化都在那一页</span></span>'+GO})+
   '</div></div>'+
@@ -1921,7 +1921,7 @@ if(FIXTURE[START]){
 /* 导出格式可以由地址栏指定，方便逐个格式核对「能不能打印」这条判断；
    未登记取值在 resolveState 就已经拦成 illegal，这里只处理登记过的。 */
 if(Q.get('format')!==null&&FMTFILE[Q.get('format')]!==undefined)FMT=Q.get('format');
-/* 这一屏演示的是「服务端没给打印链接」，夹具显式钉在 TXT 上，不受 ?format= 影响。 */
+/* 这一屏演示的是「系统没给打印链接」，夹具显式钉在 TXT 上，不受 ?format= 影响。 */
 if(START==='export-print-unavailable')FMT='txt';
 render(START);
 

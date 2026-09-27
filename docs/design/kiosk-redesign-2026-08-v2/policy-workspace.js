@@ -2,7 +2,7 @@
    48 · /renshi 政策服务共享工作台（台账 034）—— 视图与状态注册表
    依赖 policy-campus-workspaces.js 提供的壳层（片段构造、渲染、二维码弹层、取证模式）。
    五个任务分区对应产品真实 query：?tab=policy|eligibility|social|register|notice。
-   本文件只描述「服务端这次返回了哪一支」，不发请求、不生成结论、不写任何存储。
+   本文件只描述「系统这次返回了哪一支」，不发请求、不生成结论、不写任何存储。
    ============================================================ */
 (function () {
 'use strict'
@@ -11,14 +11,14 @@ var svg = P.svg, slot = P.slot, sec = P.sec, box = P.box, link = P.link, off = P
 var noteline = P.noteline, exit = P.exit, cta = P.cta, rows = P.rows, deadend = P.deadend
 var srcRow = P.srcRow, dsec = P.dsec, qrBtn = P.qrBtn, qrBtnSm = P.qrBtnSm, tid = P.tid, url = P.url
 
-/** 身份筛选：与后端 POLICY_AUDIENCES 对齐（apps/kiosk/src/pages/renshi/shared.ts） */
+/** 身份筛选：与系统 POLICY_AUDIENCES 对齐（apps/kiosk/src/pages/renshi/shared.ts） */
 var AUDIENCES = [
   ['all', '全部', 'users'], ['graduate', '高校毕业生', 'cap'], ['flexible', '灵活就业', 'brief'],
   ['migrant', '返乡务工', 'pin'], ['startup', '创业人员', 'build'], ['hardship', '困难群体', 'heart']
 ]
-/** 政策库只放**一条字段骨架**，用来说明「读到条目时长什么样」——
+/** 政策库只放**一条内容骨架**，用来说明「读到条目时长什么样」——
     不预置标题、原文、来源与条数，也不用多行制造「已经有几条真实政策」的印象。
-    demoAud 仅供原型演示筛选行为，真实运行时由服务端 audience 字段决定。 */
+    demoAud 仅供原型演示筛选行为，真实运行时由系统 audience 内容决定。 */
 var LIBRARY_ROWS = [
   { id: 'lib-result', demoAud: 'graduate' }
 ]
@@ -111,9 +111,9 @@ var QUESTIONS = [
   ['separation_reason', '离职原因', true, ['裁员 / 合同到期', '本人主动辞职', '其他', '不确定']],
   ['prior_subsidy', '领过同类补贴', false, ['没领过', '领过', '不确定']]
 ]
-/** 服务端固定文案，一字不改（types.ts / eligibilityOutcome.ts）。 */
+/** 系统固定文案，一字不改（types.ts / eligibilityOutcome.ts）。 */
 var PRIVACY_NOTICE = '你填写的答案只用于本次条件比对，不保存、不上传给任何政府或第三方系统，' +
-  '结果只在本次会话内展示；任何一项都可以不填，不填的条件会标为「无法判定」。'
+  '结果只在这次办理里展示；任何一项都可以不填，不填的条件会标为「无法判定」。'
 var DISCLAIMER = '本结果是把你填写的信息与已录入的政策条件做机械比对，不是资格认定。' +
   '本机不做资格认定、不代办、不收费；能不能办以经办窗口审核为准。'
 var COPY_NO_PUBLISHED = '政策库里还没有可核对的政策条目。这是本机的内容录入进度，不是你的核对结果 —— ' +
@@ -339,7 +339,7 @@ function policyView (st) {
     policyList(aud, libEmpty, expand, aiMode) + tail
 }
 
-/* ── 条件核对（零 LLM 的服务端确定性比对）───────────────── */
+/* ── 条件核对（零 LLM 的系统确定性比对）───────────────── */
 function stepbar (n) {
   return '<section class="sec"><ol class="steps2" data-testid="' + tid('stepbar') + '">' +
     '<li' + (n === 1 ? ' aria-current="step"' : '') + '><span class="sn">1</span>选你的情况</li>' +
@@ -371,7 +371,7 @@ function questionBlock (answered) {
       }).join('') + '</div></fieldset>'
   }).join('') + '</div>'
 }
-/** 逐条结果只留**一条空槽位**：判定标签、说明、原文与依据全部等服务端返回后填入。
+/** 逐条结果只留**一条空槽位**：判定标签、说明、原文与依据全部等系统返回后填入。
     前端不预置「相符 / 不符 / 无法判定」任何一行，也不拼总体结论。 */
 function condRow () {
   return '<li class="cond" data-cond="server-slot">' + svg('scale', 24) +
@@ -387,7 +387,7 @@ function eligView (st) {
       sec('', '', '', box('info', 'scale', 'probing',
         '正在检查现在有没有可比对的政策 <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>',
         ['先确认库里有没有录了条件的政策，再决定要不要请你填写。这一步<b>不发送任何个人信息</b>。'])) +
-      sec('', '', '', noteline('shield', '条件核对由服务端按政策原文逐条比对，<b>不使用 AI</b>；' +
+      sec('', '', '', noteline('shield', '条件核对由系统按政策原文逐条比对，<b>不使用 AI</b>；' +
         '小青能不能用都不影响它。')) +
       sec('', '', '', noteline('info', '如果没有可比对的条目，本机会直接说明，' +
         '不会先问完九项再用一句像「你不符合」的话收场。')) +
@@ -396,7 +396,7 @@ function eligView (st) {
   }
   if (st === 'eligibility-backend-required') {
     return eligNotice('warn', 'alert', 'backend-required', '本机现在做不了条件核对',
-      ['本机暂时连不上政策服务。问项与判定口径都要由服务端下发，<b>本机不会自己编一套问项或结论</b>。请联系现场工作人员后再试。'],
+      ['本机暂时连不上政策服务。问项与判定口径都要由系统下发，<b>本机不会自己编一套问项或结论</b>。请联系现场工作人员后再试。'],
       noteline('warn', '本机没有向你收集任何信息，也没有给出任何结论。'))
   }
   if (st === 'eligibility-no-policies') {
@@ -411,14 +411,14 @@ function eligView (st) {
     return eligNotice('error', 'alert', 'elig-error', '这次核对没有成功',
       ['这次没有拿到结果，所以本页不显示任何结论。<b>失败不等于「你不符合」</b>，也不代表库里没有政策。',
         '你选过的内容只留在这一页，离开或重来都不会被保存。'],
-      noteline('warn', '你的作答不落库、不进日志，本机也不把它写进网址或浏览器存储。'))
+      noteline('warn', '你的作答不保存、不进日志，本机也不把它写进网址或浏览器存储。'))
   }
   if (st === 'eligibility-result') {
-    /* 结论区全部是**空槽位**：总体说明、逐条判定、原文与免责说明都等服务端返回后原样填入。
+    /* 结论区全部是**空槽位**：总体说明、逐条判定、原文与免责说明都等系统返回后原样填入。
        前端不拼「你符合 / 不符合」，也不预置任何一条判定行。 */
     return stepbar(2) +
       sec('', '', '', '<div class="blk"><p class="state-p"><b>本次比对说明</b>　' +
-        '<span class="item-sub" style="display:inline">服务端返回后原样显示</span><br>' +
+        '<span class="item-sub" style="display:inline">系统返回后原样显示</span><br>' +
         slot('', 'full') + '</p>' +
         '<div class="srcrow" style="margin-top:12px">' +
         '<span class="chip ok">' + svg('scale', 20) + 'E2 · 按政策原文逐条比对</span>' +
@@ -432,7 +432,7 @@ function eligView (st) {
         '<p class="overall">本条总体说明 ' + slot('', 'full') + '</p>' +
         '<ul class="conds">' + condRow() + '</ul></div>') +
       sec('', '', '', '<p class="disclaimer" data-testid="' + tid('disclaimer') + '">' +
-        '服务端返回的免责说明将在这里原样显示，本机与 AI 都不改写。</p>') +
+        '系统返回的免责说明将在这里原样显示，本机与 AI 都不改写。</p>') +
       cta([
         link(url('eligibility', 'eligibility-ask-empty', ''), '/renshi?tab=eligibility', 'primary', 'btn primary',
           svg('refresh', 24) + '重新填写并再比对一次'),
@@ -451,7 +451,7 @@ function eligView (st) {
         svg('scale', 24) + '按政策原文逐条比对</button>'
       : off('primary', 'btn primary', svg('scale', 24) + '按政策原文逐条比对', 'submit-why')
   var tail = submitting
-    ? why('submit-why', '已提交这次比对，等服务端返回逐条结果；本机不猜结论，也不预先显示任何条数。')
+    ? why('submit-why', '已提交这次比对，等系统返回逐条结果；本机不猜结论，也不预先显示任何条数。')
     : n > 0 ? '<span class="why" data-testid="' + tid('submit-hint') + '">选「不确定」等于没填，对应条件会标为「无法判定」，不会算成不符合。</span>'
       : why('submit-why', SUBMIT_WHY)
   return stepbar(1) +
@@ -578,8 +578,8 @@ var PAGES = {
       ['eligibility-no-rules', '有政策但没录可比对条件，本次不做逐条比对。', 'warn', '未录入比对条件'],
       ['eligibility-ask-empty', '先选你的情况再比对；作答只留在本页，不写进网址或浏览器存储。', '', '等待你填写'],
       ['eligibility-ask-partial', '已经可以比对了；没填的项会标为「无法判定」，不算不符合。', 'ok', '可以开始比对'],
-      ['eligibility-submitting', '等服务端返回；本机不猜结论，也不显示任何中间进度。', '', '正在等待比对结果'],
-      ['eligibility-result', '总体说明与逐条判定都由服务端返回后原样显示。', 'ok', '逐条结果已返回'],
+      ['eligibility-submitting', '等系统返回；本机不猜结论，也不显示任何中间进度。', '', '正在等待比对结果'],
+      ['eligibility-result', '总体说明与逐条判定都由系统返回后原样显示。', 'ok', '逐条结果已返回'],
       ['eligibility-error', '这次没有拿到结果，本页不显示任何结论。', 'bad', '核对未成功']
     ]
   },
@@ -623,7 +623,7 @@ P.boot(PAGES, 'policy', { chrome: chrome, qr: QR })
 
 /* ── 就地交互：筛选 / 展开 / 作答 / 提交 ─────────────────── */
 var stage = P.stage, root = P.root
-/** 条件核对计数：与服务端 countAnswered 同口径 —— 选了「不确定」等于没答。 */
+/** 条件核对计数：与系统 countAnswered 同口径 —— 选了「不确定」等于没答。 */
 function recount () {
   var n = 0
   Array.prototype.forEach.call(stage.querySelectorAll('[data-opt][aria-pressed="true"]'), function (b) {

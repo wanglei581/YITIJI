@@ -15,7 +15,7 @@
      类型合同：packages/shared/src/types/selfAssessment.ts
      运行时真源：apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx
                  + apps/kiosk/src/pages/resume/selfAssessmentSession.ts
-     下面 `var SA_V1=` 后面那一段，是该 JSON 的**逐字段等价内嵌副本**（只去掉了缩进空白，
+     下面 `var SA_V1=` 后面那一段，是该 JSON 的**逐项等价内嵌副本**（只去掉了缩进空白，
      连 weight 都原样保留）。单文件静态设计不能 import，所以只能内嵌；为了内嵌不变成
      「另造题库」，门禁 shoot.mjs 会做两件事：
        a. 从本文件正文里抠出这段 JSON，与源文件做**深比较**（version / 5 个维度 key 与
@@ -23,11 +23,11 @@
           weight 全相等），任一不等即 failed；
        b. 真实点着走完 25 题，把**页面渲染出来的**题干与选项文字再逐题与源 JSON 比一次。
      本页不新增、不删减、不改写任何题意或选项，也不另造题库。
-  2) 页面**不读 weight、不计分**。weight 保留在数据里只为与源文件逐字段相等；
+  2) 页面**不读 weight、不计分**。weight 保留在数据里只为与源文件逐项相等；
      静态页给不出分数，也就不许显示分数、百分比、人格类型或岗位适配结论。
   3) 本页不调用任何 API / AI / 模型，不写账号数据，不生成 PDF、打印文件或报告。
      一次作答只存在于当前浏览器标签的 sessionStorage（键 sa_static_proto_v1），关标签即消失。
-  4) 本页**不显示任何完成时间 / 日期**。静态原型没有服务端，也就没有可信的完成时刻；
+  4) 本页**不显示任何完成时间 / 日期**。静态原型没有系统，也就没有可信的完成时刻；
      顶栏那个 HH:MM 是一体机的墙上时钟（全套 45 页统一元素），不是业务时间，
      门禁断言全舞台唯一的 `时:分` 只能出现在 #clock 里，正文出现任何年月日即 failed。
   5) 合规边界与 CLAUDE.md §2 / §9 一致：本页不出现平台内投递、收简历、企业筛选、
@@ -77,7 +77,7 @@
 规则 1：英雄区加三步只读说明，把第一张可点卡片压到返回键以下；底部保留返回、问小青和开始作答。正文超出时在卡片区滑动，主动作留在底栏。
 规则 2：页标题 36，说明 21–23，卡片标题 24–30，主按钮 27，导航 21。
 规则 3：这一步带走的是「完成情况」，不打分、不给类型。
-规则 4：眉题改成「自我探索」。不给用户看题库版本号。服务端、会话改成这次作答 / 实际记录。
+规则 4：眉题改成「自我探索」。不给用户看题库版本号。系统、这次办理改成这次作答 / 实际记录。
 规则 5：去掉去看岗位信息。偏好只留给本人，再问小青或去做模拟面试。
 规则 7：说明页底部和完成页都保留问小青；解读不可用时入口还在，只是先不生成结论。
 未改：颜色令牌、圆角、深绿英雄区、二十五道题原文、三 Tab、不打分的边界。
@@ -126,7 +126,7 @@ function tick(){var d=new Date();clockEl.textContent=String(d.getHours()).padSta
 /* ============================ v1 题库（25 题）内嵌副本 ============================
    源：packages/shared/src/data/selfAssessment/v1.questions.json
    源文件 SHA-256：07870c7da30ee6fc7e53499a8464833dc2132f5b6e716a047aca2bb8f73ddc72
-   下面这一行是该 JSON 的逐字段等价副本（仅去缩进空白，含 weight）。
+   下面这一行是该 JSON 的逐项等价副本（仅去缩进空白，含 weight）。
    单文件静态设计无法 import，只能内嵌；门禁 shoot.mjs 会把它与源文件深比较，不等即 failed。
    页面从不读取 weight，也从不计分 —— 见文件头第 2 条。
    ============================================================================== */
@@ -140,9 +140,9 @@ var Q=[];SA_V1.dimensions.forEach(function(d,di){d.questions.forEach(function(q)
 })});
 var TOTAL=Q.length;                              /* = 25，由题库真值算出，不写死 */
 
-/* ------------------------------------------------------------------ 本次会话
+/* ------------------------------------------------------------------ 这次办理
    只用 sessionStorage，只属于当前浏览器标签；不是账号数据，也不上传。
-   **不存任何时间戳** —— 静态原型没有服务端，存下来也只会诱使页面显示一个假的完成时刻。 */
+   **不存任何时间戳** —— 静态原型没有系统，存下来也只会诱使页面显示一个假的完成时刻。 */
 var KEY='sa_static_proto_v1';
 function blank(){return{v:2,consented:false,answers:{},cursor:1,submitted:false}}
 function load(){
@@ -151,7 +151,7 @@ function load(){
     var raw=sessionStorage.getItem(KEY);if(!raw)return s;
     var o=JSON.parse(raw);if(!o||o.v!==2)return s;
     s.consented=o.consented===true;
-    /* 答案必须是从第 1 题开始的连续前缀：本页不允许跳题，被改坏的会话按前缀截断。 */
+    /* 答案必须是从第 1 题开始的连续前缀：本页不允许跳题，被改坏的这次办理按前缀截断。 */
     var a={},src=o.answers||{};
     for(var i=1;i<=TOTAL;i++){var v=src[i];if(typeof v!=='string'||!Q[i-1].c.some(function(x){return x[0]===v}))break;a[i]=v}
     s.answers=a;
@@ -416,7 +416,7 @@ function viewHistory(){
   bodyEl.innerHTML='<section class="card"><div class="hd">本人评估记录<span>需登录后按账号读取</span></div>'
   +'<div class="blank" data-testid="self-assessment-list"><div class="empty-i">⌁</div><div><h2>这里还没有可查看的记录</h2>'
   +'<p>本页不生成示例历史，也不把本次未提交的答案写成记录。真实记录、保存期限和撤回能力，登录后按实际记录展示。</p></div></div></section>'
-  +'<section class="card"><div class="hd">登录后这里会显示什么<span>字段结构，不是已有数据</span></div><div class="mini">'
+  +'<section class="card"><div class="hd">登录后这里会显示什么<span>会列出哪些内容，不是已有数据</span></div><div class="mini">'
   +'<div><small>作答批次</small><p>每次完成答了多少题。</p></div>'
   +'<div><small>结果描述</small><p>当次生成的偏好描述文本。</p></div>'
   +'<div><small>可否重做</small><p>是否可重新作答、删除或打印。</p></div></div></section>'

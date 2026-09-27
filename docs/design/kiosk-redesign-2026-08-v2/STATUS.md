@@ -15,19 +15,19 @@
 | 14-print-confirm | Codex | 通过（两轮返工） | `flat=1&state=quoting` | 报价中的灰色禁用主按钮沿用原稿，留到实现阶段统一禁用态 |
 | 33-pickup-code | Codex | 通过 | `capture=1` | |
 | 21-resume-triage | Codex | 通过 | `capture=1&state=summary&source=usb` | |
-| 23-resume-optimize | Codex | 通过 | `capture=1&state=ready&screen=compare&taskId=qx2-example&i=1` | |
-| 24-resume-generate | Codex | 通过（一轮返工） | `capture=1&state=review` | |
-| 25-material-workshop | Codex | 通过（两轮返工） | `capture=1&state=select&auth=out` | 「生成后 1→2→3」条放在标题下，顶部只读 |
+| 23-resume-optimize | Codex | 通过 | `capture=1&state=ready&screen=compare&taskId=qx2-example&i=1` | 9/28 清理用词与字号 |
+| 24-resume-generate | Codex | 通过（一轮返工） | `capture=1&state=review` | 9/28 清理用词与字号 |
+| 25-material-workshop | Codex | 通过（两轮返工） | `capture=1&state=select&auth=out` | 「生成后 1→2→3」条放在标题下，顶部只读。9/28 清理用词与字号 |
 | 02-services | Grok | 通过 | `capture=1` | |
 | 05-ai-cockpit | Grok | 通过 | `capture=1&state=reply-real` | |
-| 29-interview-training | Grok | 通过 | `capture=1&state=report-ready` | |
+| 29-interview-training | Grok | 通过 | `capture=1&state=report-ready` | 9/28 清理用词与字号 |
 | 30-my-profile | Grok | 通过 | `capture=1&state=ready` | |
 | 03-login-gate | Grok | 通过（一轮返工） | `capture=1&state=phone-code-sent` | |
 | 06-help | Grok | 通过（一轮返工） | `capture=1&topic=account` | |
 | 16-service-hubs | Grok | 通过（一轮返工） | `capture=1&hub=resume` | 第八项是「简历对照」（AI 对照本人填写的岗位要求） |
 | 32-cashier | Grok | 通过（一轮返工） | `capture=1&state=pending` | |
 | 45-online-platform-directory | Grok | 通过（一轮返工） | `capture=1&state=ready` | 本机构官方渠道；机构名与二维码是标明的示例；带本目录的 `directory-workspaces.js` |
-| 48-policy-workspace | Grok | 通过（一轮返工） | `capture=1&state=policy-ready` | 带本目录的 `policy-workspace.js` |
+| 48-policy-workspace | Grok | 通过（一轮返工） | `capture=1&state=policy-ready` | 带本目录的 `policy-workspace.js`。9/28 清理用词与字号 |
 | 18-scan-workbench | Grok G1 | 通过 | `capture=1&flat=1` | 内部链路说明换成用户三步：放纸 → 面板上按扫描 → 文件回到这台机器 |
 | 19-img2pdf | Grok G1 | 通过（一轮返工） | `capture=1&flat=1&state=ready-three` | |
 | 20-sign-stamp | Grok G1 | 通过（一轮返工） | `capture=1&flat=1&state=placement-default` | 只引导本人手写签名；预览工具条在画面下方，顶部只读 |
@@ -39,17 +39,17 @@
 | 09-system-state | Grok G2 | 通过 | `capture=1&state=partial` | 没检测过的项不写成正常 |
 | 51-phone-relay | Grok G2 | 通过 | `capture=1&screen=qr-login&state=code-sent`（390×844） | 手机字阶，不套 27 寸 |
 | 00–03、05、06 用词 | Grok G2 | 通过 | | 03 协议勾选挪到首屏；工程词换白话 |
-| 31-benefits | Grok G3 | 通过 | `capture=1&state=list` | |
+| 31-benefits | Grok G3 | 通过 | `capture=1&state=list` | 9/28 清理用词与字号 |
 | 35-notifications | Grok G3 | 通过（一轮返工） | `capture=1&state=ready-all` | 底部操作条在首屏 |
-| 38-member-assets | Grok G3 | 通过 | `capture=1&state=documents-ready` | 文档 / 订单切换在 y=517 |
-| 39-member-records | Grok G3 | 通过（一轮返工） | `capture=1&view=ai-records&state=ready` | 失败、处理中只留删除并写原因；**实现时「我的」分类页签统一按 38 放在 y≥500**（本稿在 y≈324） |
+| 38-member-assets | Grok G3 | 通过 | `capture=1&state=documents-ready` | 文档 / 订单切换在 y=517。9/28 清理用词与字号 |
+| 39-member-records | Grok G3 | 通过（一轮返工） | `capture=1&view=ai-records&state=ready` | 失败、处理中只留删除并写原因；**实现时「我的」分类页签统一按 38 放在 y≥500**（本稿在 y≈324）。9/28 清理用词与字号 |
 | 40-member-feedback | Grok G3 | 通过（一轮返工） | `capture=1&state=form-list` | 「提交反馈」在首屏，未填够时灰掉并写原因 |
-| 41-member-privacy | Grok G3 | 通过 | `capture=1&state=history-ready` | |
+| 41-member-privacy | Grok G3 | 通过 | `capture=1&state=history-ready` | 9/28 清理用词与字号 |
 | 30 用词 | Grok G3 | 通过 | | |
-| 34-self-assessment | Grok G4 | 通过 | `capture=1&state=intro` | 不显示题库版本 |
-| 46-resume-decision-workspace | Grok G4 | 通过 | `capture=1&screen=job-fit&state=result-high` | 岗位要求只由本人填写或粘贴 |
-| 47-contract-review-workspace | Grok G4 | 通过 | `capture=1&screen=result&state=ready` | 功能开关默认关 |
-| 50-capability-zone-workspace | Grok G4 | 通过 | `capture=1&screen=toolbox&state=ready` | 不展示终端编号 |
+| 34-self-assessment | Grok G4 | 通过 | `capture=1&state=intro` | 不显示题库版本。9/28 清理用词与字号 |
+| 46-resume-decision-workspace | Grok G4 | 通过 | `capture=1&screen=job-fit&state=result-high` | 岗位要求只由本人填写或粘贴。9/28 清理用词与字号；版式怎么选不再叠字 |
+| 47-contract-review-workspace | Grok G4 | 通过 | `capture=1&screen=result&state=ready` | 功能开关默认关。9/28 清理用词与字号 |
+| 50-capability-zone-workspace | Grok G4 | 通过 | `capture=1&screen=toolbox&state=ready` | 不展示终端编号。9/28 清理用词与字号 |
 | 52-advisor-artifact | Grok G4 | 通过 | `capture=1&state=qa-pins` | 「打印带走」进打印；底部导航统一为「AI 顾问」（协调方合并时改） |
 | 16、21–25、29、45、48 用词 | Grok G4 | 通过 | | |
 | 其余 | 不做 | | | 托管 a 下 26、27、28、42、43、44（岗位、招聘会、企业、线下机构）与 49（校园招聘）在我们云上不显示，不做 2.0；36 是原型索引页 |
