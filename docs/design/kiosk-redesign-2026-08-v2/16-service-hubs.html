@@ -64,6 +64,7 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offse
 青序流光 2.0 · 16 服务中心（hub=resume，default 有八张卡）
 规则 1：未展开的「先选目标」层用 display:none，避免顶上藏着可点链接；底部三 Tab 可回首页。
 规则 2：卡片标题 28，说明 21，眉题和状态 20–21，导航本来就是 21。
+规则 4：求职材料角标改为「模板生成」。隐私条里的会话改成这次办理。
 规则 5：简历中心不放「机构官方渠道」。第八张卡改回不引用系统内岗位的 AI 能力「简历对照」。
 规则 7：八项里的 AI 卡都保留。简历对照角标「AI 对照」，收尾「带走：对照报告」。
 未改：颜色令牌、圆角、八格结构、三 Tab、hero 在上。
@@ -113,7 +114,7 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offse
     <span class="state-only device-only"><b>本机设备当前不可用。</b> 当前入口中的信息浏览和AI服务仍可进入；涉及出纸或扫描的具体步骤请稍后再试。</span>
   </div>
   <section class="hub"><div class="section-head"><h2 id="sectionTitle">可办理事项</h2><span id="sectionHint"></span><b id="count">0项</b></div><div class="cap-chips" id="capChips"></div><div class="grid" id="grid"></div><div class="quick-label"><b>常用入口</b><span>继续查看与管理</span></div><div class="quick" id="quick"></div></section>
-  <div class="truth"><div><b id="truthTitle"></b><span id="truthCopy"></span></div><div><b>能力</b><span>进入具体服务后按实际状态确认，不以本页为准。</span></div><div><b>隐私</b><span>结束会话或闲置超时清除本机登录态与临时会话信息。</span></div></div>
+  <div class="truth"><div><b id="truthTitle"></b><span id="truthCopy"></span></div><div><b>能力</b><span>进入具体服务后按实际状态确认，不以本页为准。</span></div><div><b>隐私</b><span>结束这次办理或闲置超时，会清除本机登录和临时信息。</span></div></div>
   <nav class="navbar" aria-label="全局导航">
     <a class="nav-item" href="01-home.html?state=context" data-route="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span>首页</span></a>
     <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>AI 顾问</span></a>
@@ -146,7 +147,7 @@ const H={
  ['从零生成简历','带走一份可核对的草稿','file','AI 起草简历','24-resume-generate.html','/resume/generate','ai'],
  ['简历素材库','按分类查看真实模板、标签与适用场景','file','模板目录','46-resume-decision-workspace.html?screen=templates&state=list','/resume/templates','info'],
  ['职业规划','带走下一步可以做的事','map','AI 行动建议','46-resume-decision-workspace.html?screen=career-plan&state=missing-task','/resume/career-plan','ai'],
- ['求职材料','带走求职信和自我介绍草稿','brief','AI 起草材料','25-material-workshop.html','/resume/materials','ai'],
+ ['求职材料','按模板套填，带走求职信和自我介绍','brief','模板生成','25-material-workshop.html','/resume/materials','info'],
  ['简历打印','选择文件、核价后在本机打印','printer','依赖打印机','12-file-source.html?source=resume','/print/upload?source=resume','device'],
  ['简历对照','填一份岗位要求，AI 对照你的简历','chart','AI 对照','46-resume-decision-workspace.html?screen=job-fit&state=missing-task','/resume/job-fit','ai','带走：对照报告']],
  quick:[['我的简历','查看你名下的简历','user','39-member-records.html?view=resumes','/me/resumes'],['AI服务记录','查看诊断与优化记录','bot','39-member-records.html?view=ai-records','/me/ai-records'],['自我探索','完成职业倾向参考','chart','34-self-assessment.html?state=intro','/resume/self-assessment/intro']]},
