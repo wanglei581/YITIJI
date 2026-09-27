@@ -21,7 +21,7 @@ export default defineConfig({
     { name: 'contract-kiosk', use: { viewport: { width: 1080, height: 1920 } } },
   ],
   webServer: {
-    command: 'VITE_API_MODE=mock VITE_ENABLE_CONTRACT_REVIEW=true VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT=true VITE_TERMINAL_ID=KSK-001 pnpm exec vite --host 127.0.0.1 --port 4191 --strictPort',
+    command: 'VITE_API_MODE=mock VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_ENABLE_CONTRACT_REVIEW=true VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT=true VITE_TERMINAL_ID=KSK-001 pnpm exec vite --host 127.0.0.1 --port 4191 --strictPort',
     url: 'http://127.0.0.1:4191',
     reuseExistingServer: false,
     timeout: 180_000,
