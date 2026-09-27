@@ -6,6 +6,7 @@
 - 规则 2：字阶按已有 2.0 稿上调。颜色、圆角、宋体标题、三 Tab 不动。
 - 规则 3：眉题和说明写明带走的是一份按顺序排好的 PDF。
 - 规则 4：英文眉题改为「图片转 PDF」。工程用词改成人话。原型演示条隐藏。固定示例数据的提示保留，避免把示例说成真实文件。
+- 返工：示例数据角标由「演示」改为「示例」，其余不动。
 - 规则 5：不写已保存、已打印。未登录不进「我的文档」仍按原稿说明。
 - 规则 6：只写字体栈。
 - 规则 7：底部「问小青：这几张图怎么排」。
@@ -568,7 +569,7 @@ function initModel(st){
 }
 /* ================= 公共构件 ================= */
 function fxBar(){
- return '<div class="fxbar" role="note" data-testid="'+SCREEN+'-fixture"><span class="fx-b">演示</span>'+
+ return '<div class="fxbar" role="note" data-testid="'+SCREEN+'-fixture"><span class="fx-b">示例</span>'+
   '<span>固定原型数据 —— 这一屏上的图片、文件名、请求标识和转换结果都写死在原型里，<b>不是真实用户文件</b>，也不是真实办理结果。</span></div>';
 }
 function fitBox(w,h,rot,bw,bh){
@@ -1293,7 +1294,7 @@ function pvBtn(tid,label,al,cls){
  return '<button type="button" class="pvb'+(cls?' '+cls:'')+' press" data-testid="'+SCREEN+'-preview-'+tid+'" aria-label="'+(al||label)+'">'+label+'</button>';
 }
 function pvFixtureBar(){
- return '<div class="pv-fx" data-testid="'+SCREEN+'-preview-fixture" role="note"><span class="fx-b">演示</span>'+
+ return '<div class="pv-fx" data-testid="'+SCREEN+'-preview-fixture" role="note"><span class="fx-b">示例</span>'+
   '<span>固定原型数据 / 演示图片，<b>不是真实用户文件</b>。这幅画面写死在原型里，不是真实办理结果，也不是这台机器此刻真读到的内容。</span></div>';
 }
 /* 预览失败：还是同一个阅读器 —— 纸的位置、页数、文件事实和退出口都在原位，

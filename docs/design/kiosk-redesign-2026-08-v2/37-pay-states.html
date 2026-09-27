@@ -6,6 +6,7 @@
 - 规则 2：字阶上调。英文眉题改为「付款」。颜色、圆角、深绿说明区、三 Tab 不动。
 - 规则 3：各状态写清下一步能带走什么（继续付、去看出纸、或回订单），不写空泛的「进入支付服务」。
 - 规则 4：工程用词改成人话。金额仍是待回填的空位，不编一个假价格。原型演示条隐藏。
+- 返工：右栏操作卡下移到够得着的位置。顶部「排版示例」提示改到页底，缩成一行。出口说明直接列按钮。
 - 规则 5：已支付只作为版式示例，文案写明不是支付凭证。不写未扣款这种本页给不出的结论。
 - 规则 6：只写字体栈。
 - 规则 7：底部「问小青：这一步付完会怎样」，不替用户判断付没付成。
@@ -243,6 +244,11 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .card-h .hint,.card-p,.slot,.qrslot span,.step-d,.act-d,.guide-p,.guide-k,.fallback p,.result-main span,.fixture,.fxbar,.imeta span,.ordline,.rotnote,.ep-cap,.epstep .sb,.lb-n,.srcnote>div,.ub-d,.ub-note,.pv-s,.pv-fx,.pv-reason,.lhead .sub{font-size:21px!important;line-height:1.4!important}
 .step-t,.act-t,.guide-t,.ep-h{font-size:24px!important}
 .dbanner,.demo-tab,.demo-panel{display:none!important}
+/* 返工规则 1、4：排版示例条改到页底并保持一行；右栏操作按钮落到 y≥500 */
+.body{grid-template-rows:minmax(0,1fr) auto auto auto!important}
+.paygrid{margin-top:28px}
+.paygrid>.card .acts{padding-top:80px}
+.fixture{white-space:nowrap}
 .chain{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch}
 .chain .arrow{display:none!important}
 .link{min-height:148px}
@@ -387,7 +393,7 @@ function resultCard(title, hint, tone, ico, head, desc, rows){
 }
 function actsCard(title, hint, items){
   return '<section class="card" data-testid="'+SCREEN+'-next">'
-    + '<div class="card-h"><span class="t">'+esc(title)+'</span><span class="hint">'+esc(hint)+'</span></div>'
+    + '<div class="card-h"><span class="t">'+esc(title)+'</span>'+(hint?'<span class="hint">'+esc(hint)+'</span>':'')+'</div>'
     + '<div class="acts">'+items.map(function(a){
         return '<a class="act press" href="'+esc(keep(a[0]))+'" data-route="'+esc(a[1])+'" data-testid="'+SCREEN+'-next-'+a[2]+'">'
           + '<span class="act-ic"'+(a[5]?' data-tone="'+a[5]+'"':'')+'>'+svg(a[4])+'</span>'
@@ -456,13 +462,13 @@ function bodyFor(state, fallback){
         + (fallback ? fallbackCard() : qrCard(false,'收款码','不可扫描'))
         + '</div>'
         + (fallback
-            ? actsCard('付不了怎么办','都是可点的实体出口',[
+            ? actsCard('付不了怎么办','',[
                 ['06-help.html','/help','help',['找现场工作人员','报订单号，由工作人员协助处理'],'help','clay'],
                 ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','通道恢复后可以重新出码'],'refresh','slate'],
                 ['14-print-confirm.html','/print/confirm','confirm',['先改份数或参数','改动后会重新核价'],'order','slate'],
                 ['10-print-hub.html','/print-scan','hub',['先回打印扫描','订单是否保留以实际结果为准'],'print','slate']
               ])
-            : actsCard('付款时可以做什么','都是可点的实体出口',[
+            : actsCard('付款时可以做什么','',[
                 ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','通道选择与重新出码都在收银台完成'],'refresh',''],
                 ['14-print-confirm.html','/print/confirm','confirm',['返回修改份数或参数','改动后会重新核价'],'order','slate'],
                 ['06-help.html','/help','help',['扫不出来找工作人员','报订单号即可，不要重复扫码'],'help','clay'],
@@ -487,7 +493,7 @@ function bodyFor(state, fallback){
         + resultCard('本次支付尝试',dev('不显示金额','结构位，不含金额'),'clay','clock','结果未知','支付平台结果还没有到；页面不会替系统提前判定成功或失败。',
             [['订单号',''],['支付尝试',''],['当前状态',dev('等实际结果','结果回来后再显示')]])
         + '</div>'
-        + actsCard('等待时可以做什么','都是可点的实体出口',[
+        + actsCard('等待时可以做什么','',[
             ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['主动查单','按支付平台账单核对，结果以系统为准'],'refresh','slate'],
             ['32-cashier.html','/print/cashier','cashier',['返回收银台查看最新结果','收银台会继续等实际给出的支付结果'],'order',''],
             ['06-help.html','/help','help',['等太久找工作人员','报订单号即可，不要重复扫码'],'help','clay'],
@@ -515,7 +521,7 @@ function bodyFor(state, fallback){
             ['出纸与取件','进度以打印设备回流为准']
           ])
         + '</div>'
-        + actsCard('接下来去哪儿','都是可点的实体出口',[
+        + actsCard('接下来去哪儿','',[
             ['15-print-fulfill.html','/print/progress','progress',['查看打印进度','进度以系统与设备回流为准'],'print',''],
             ['33-pickup-code.html','/print/pickup','pickup',['取件码页面','取件码只在实际有码时展示'],'ticket','slate'],
             ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'order','slate'],
@@ -534,7 +540,7 @@ function bodyFor(state, fallback){
       main:'<div class="paygrid"><div class="paycol">'+amountCard()
         + qrCard(true,'已失效的收款码','不可扫描')
         + '</div>'
-        + actsCard('重新支付怎么走','都是可点的实体出口',[
+        + actsCard('重新支付怎么走','',[
             ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','新的收款码与有效期以实际结果为准'],'refresh',''],
             ['14-print-confirm.html','/print/confirm','confirm',['先改份数或参数','改动后会重新核价'],'order','slate'],
             ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['已经付过了？先查单','不要直接重付，先核对支付平台账单'],'ticket','clay'],
@@ -560,7 +566,7 @@ function bodyFor(state, fallback){
             '本页不显示查单结论。是否已支付、是否需要重新出码，都以实际结果为准。',
             [['订单号',''],['查单方式','支付平台账单核对'],['当前状态',dev('等实际结果','结果回来后再显示')]])
         + '</div>'
-        + actsCard('查单之后','都是可点的实体出口',[
+        + actsCard('查单之后','',[
             ['32-cashier.html','/print/cashier','cashier',['返回收银台查看最新结果','查单结果与是否重新出码都在收银台确认'],'refresh',''],
             ['06-help.html','/help','help',['有争议找工作人员','报订单号，由工作人员协助核对'],'help','clay'],
             ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'order','slate'],
@@ -584,7 +590,7 @@ function bodyFor(state, fallback){
       + '<p>先去查单，按支付平台账单核对；核对结果以实际结果为准。有争议请联系现场工作人员，报订单号即可。</p>'
       + slot(dev('等实际结果','订单号结果回来后再显示'))+'</div></aside>'
       + '</div>'
-      + actsCard('还能怎么办','都是可点的实体出口',[
+      + actsCard('还能怎么办','',[
           ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['我已扣款，去查单','按支付平台账单核对，不要重复支付'],'refresh','clay'],
           ['10-print-hub.html','/print-scan','hub',['重新下单打印','重新选文件并重新核价，会建立新订单'],'print',''],
           ['06-help.html','/help','help',['联系现场工作人员','报订单号即可，由工作人员协助处理'],'help','slate'],
@@ -605,7 +611,7 @@ function render(state, fallback){
   var root = document.getElementById('body-root');
   root.dataset.state = state;
   root.dataset.testid = SCREEN + '-state-' + state;
-  root.innerHTML = fixtureNote() + out.main + guide(out.guide) + ctaBar(out.cta);
+  root.innerHTML = out.main + guide(out.guide) + ctaBar(out.cta) + fixtureNote();
 
   var pill = document.getElementById('pill');
   pill.setAttribute('data-tone', h[0]);

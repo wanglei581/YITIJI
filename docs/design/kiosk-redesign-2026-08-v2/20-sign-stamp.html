@@ -6,6 +6,7 @@
 - 规则 2：字阶上调。页标题改为 34。颜色、圆角、三 Tab 不动。
 - 规则 3：写明带走的是签好的 PDF，原件不改写。
 - 规则 4：底部只留一句边界——只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。工程用词改成人话。原型演示条隐藏。
+- 返工：翻页和缩放改到预览画面下方；右栏页码下移到够得着的位置。顶部状态胶囊只读。底部标记改成「示例」。能力状态改成人话。
 - 规则 5：不把排好的图片写成可靠电子签名，也不写成已经签署生效。
 - 规则 6：只写字体栈。
 - 规则 7：底部「问小青：签名放在哪一页」。原稿的签名位置操作保留。
@@ -345,7 +346,13 @@ a:focus-visible,button:focus-visible,[role=checkbox]:focus-visible{outline:3px s
 .cta-reason{font-size:21px!important}
 .truth,.truth div,.truth span{font-size:21px!important;line-height:1.45!important;color:var(--ink-2)!important}
 .nav-item,.nav-item .ni{font-size:21px!important}
-.chip,.mini{font-size:20px!important}
+.chip,.seal,.mini{font-size:20px!important}
+/* 返工规则 1：右栏从页码按钮起整体下移，顶边落到 y≥500；状态胶囊用 seal，不再算可点 */
+.ctrlcol{padding-top:32px}
+.aside{height:204px}
+.seal{min-height:48px;padding:0 16px;border-radius:var(--r-sm);background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:8px;font-size:20px!important;color:var(--ink-2);font-weight:600}
+.seal.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.seal.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
 .ty-n{font-size:28px!important}
 .ty-d{font-size:22px!important;line-height:1.4!important}
 .kv>div,.kv li{font-size:22px!important}
@@ -603,7 +610,7 @@ function blockReason(){
    ['没有拿到登录状态，也没有拿到「未登录」的确定答复。','这种情况一律当作不允许，而不是先放行再补检查。'],
    null,['去登录','03-login-gate.html','/login']);
  if(M.auth==='anonymous')return B('lock','先登录才能做签名盖章',
-   '签名 / 印章图片属于<b>高敏个人材料</b>，只允许本人在登录后上传与合成。未登录不提供这项能力。',
+   '签名 / 印章图片属于<b>高敏个人材料</b>，只允许本人在登录后上传与合成。未登录不能在这里签名。',
    ['登录后才能确认这份文档和这张签名图都属于你本人。','普通打印、扫描、格式转换不受影响，可以直接去用。'],
    null,['去登录','03-login-gate.html','/login']);
  if(M.auth==='expired')return B('warn','登录已过期',
@@ -614,12 +621,12 @@ function blockReason(){
    '没有拿到这次办理的来路，无法判断该回到哪里，也无法确认要处理哪一份材料。<b>请从打印扫描重新进入</b>。',
    ['不猜上一步是什么，也不放示例文件。','这一步不会替你上传或保存任何文件。'],
    ['我的文档','38-member-assets.html?state=documents-ready','/me/documents','sign-stamp-docs'],null);
- if(M.terminal==='missing')return B('error','这台机器还没登记终端编号',
-   '签名盖章要按终端校验能力开关。读不到终端编号就<b>无法确认这台机器是否被允许使用</b>，因此不放行。',
+ if(M.terminal==='missing')return B('error','这台机器还没登记',
+   '签名盖章要先确认这台机器能不能用。读不到登记信息就<b>无法确认是否允许使用</b>，因此不放行。',
    ['不假设「读不到就是可用」。','请联系现场工作人员登记这台机器。'],
    ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
- if(M.cap==='loading')return B('info','正在读取这台机器的能力开关',
-   '还没拿到「签名盖章」在这台机器上是否开放的答复。<b>拿到之前不提供上传，也不显示任何文件</b>。',
+ if(M.cap==='loading')return B('info','正在确认这台机器能不能签名',
+   '还没拿到这台机器是否开放「签名盖章」的答复。<b>拿到之前不提供上传，也不显示任何文件</b>。',
    ['读取中不等于可用，也不等于不可用。','这里不画进度条：系统不回传进度。'],
    ['联系工作人员','06-help.html','/help','sign-stamp-help'],null,true);
  if(M.cap==='disabled')return B('lock','这台机器没有开放签名盖章',
@@ -630,9 +637,9 @@ function blockReason(){
    '这台机器的签名盖章被管理员置为维护状态，<b>暂时不受理新的合成</b>。已生成的文件不受影响。',
    ['维护是管理员登记的真实状态，不是这一页猜的。','恢复时间请问现场工作人员。'],
    ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
- if(M.cap==='error')return B('error','能力开关读取失败',
-   '没能读到这台机器的能力开关。<b>读不到就不放行</b>——不说可用，也不说不可用。',
-   ['不把一次读取失败当成能力已关闭。','重试仍失败请联系现场工作人员。'],
+ if(M.cap==='error')return B('error','还没确认能不能签名',
+   '没能确认这台机器能不能签名。<b>确认之前不放行</b>——不说能用，也不说不能用。',
+   ['这一次没确认，先不当成不能用。','重试仍失败请联系现场工作人员。'],
    ['联系工作人员','06-help.html','/help','sign-stamp-help'],['重试读取',null,null]);
  if(M.fromUnknown)return B('warn','认不出你是从哪里进来的',
    '来路参数不在允许的内部白名单里，<b>返回已安全回落到「打印扫描」</b>。原始来路值既不接受，也不回显。',
@@ -657,18 +664,18 @@ function renderCtx(){
  else if(M.auth==='expired')h+=tag('bad',svg('user','currentColor',22)+'登录已过期','sign-stamp-auth');
  else if(M.auth==='anonymous')h+=tag('warn',svg('user','currentColor',22)+'未登录','sign-stamp-auth');
  else h+=tag('warn',svg('user','currentColor',22)+'身份未确认','sign-stamp-auth');
- if(M.terminal==='missing')h+=tag('bad','终端未登记','sign-stamp-cap');
- else if(M.cap==='ready')h+=tag('ok','能力已开放','sign-stamp-cap');
- else if(M.cap==='loading')h+=tag('','能力读取中','sign-stamp-cap');
- else if(M.cap==='disabled')h+=tag('bad','能力未开放','sign-stamp-cap');
- else if(M.cap==='maintenance')h+=tag('warn','能力维护中','sign-stamp-cap');
- else h+=tag('bad','能力读取失败','sign-stamp-cap');
+ if(M.terminal==='missing')h+=tag('bad','这台还没登记','sign-stamp-cap');
+ else if(M.cap==='ready')h+=tag('ok','可以签名','sign-stamp-cap');
+ else if(M.cap==='loading')h+=tag('','正在确认','sign-stamp-cap');
+ else if(M.cap==='disabled')h+=tag('bad','暂不能签名','sign-stamp-cap');
+ else if(M.cap==='maintenance')h+=tag('warn','签名暂停','sign-stamp-cap');
+ else h+=tag('bad','还没确认','sign-stamp-cap');
  if(M.doc)h+=tag('',svg('pdf','currentColor',22)+'<b>'+M.doc.name+'</b> · '+M.doc.pages+' 页','sign-stamp-doc-tag');
  if(M.stamp)h+=tag('',svg('stamp','currentColor',22)+'<b>'+M.stamp.name+'</b>','sign-stamp-stamp-tag');
  h+='<span class="sp"></span>';
  document.getElementById('ctxbar').innerHTML=h;
  var fx=document.getElementById('fxbar');
- if(FIXTURE){fx.innerHTML='<b>演示</b>固定原型数据，不是真实用户文件';fx.hidden=false}else{fx.innerHTML='';fx.hidden=true}
+ if(FIXTURE){fx.innerHTML='<b>示例</b>固定原型数据，不是真实用户文件';fx.hidden=false}else{fx.innerHTML='';fx.hidden=true}
 }
 
 /* ── 完整页预览 ───────────────────────────────────────── */
@@ -814,8 +821,9 @@ function renderPreview(){
   pvDraw();
   return;
  }
- col.innerHTML=pvToolbar()+
+ col.innerHTML=
   '<div class="pv-view" id="pv-view" data-testid="sign-stamp-pv-view" tabindex="0" aria-label="'+(burned?'签好的 PDF':'原 PDF')+'完整页预览，可拖动平移"></div>'+
+  pvToolbar()+
   '<div class="pv-cap" data-testid="sign-stamp-pv-caption">'+(burned?'签好的 PDF · 签章已印在纸上':'原 PDF · 框是标记，原件不改写')+'</div>';
  bindPreview();
  pvDraw();
@@ -1097,7 +1105,7 @@ function stateBlock(kind,icon,title,desc,more,chips){
  return '<div class="state" data-kind="'+kind+'" data-testid="sign-stamp-fallback">'+
   '<div class="state-h">'+svg(icon,'currentColor',28)+title+'</div>'+
   '<div class="state-p">'+desc+'</div>'+(more?'<div class="state-p">'+more+'</div>':'')+
-  '<div class="metarow">'+chips.map(function(c){return '<span class="chip'+(c[1]?' '+c[1]:'')+'">'+c[0]+'</span>'}).join('')+'</div></div>';
+  '<div class="metarow">'+chips.map(function(c){return '<span class="seal'+(c[1]?' '+c[1]:'')+'">'+c[0]+'</span>'}).join('')+'</div></div>';
 }
 function statusFor(){
  var P='第 '+M.place.page+' 页 · '+POSLABEL[M.place.position]+' · '+SIZELABEL[M.place.size];
@@ -1281,7 +1289,7 @@ function render(st){
    '<div class="state" data-kind="'+b.kind+'" data-testid="sign-stamp-fallback">'+
     '<div class="state-h">'+svg(b.kind==='lock'?'lock':(b.kind==='info'?'info':'warn'),'currentColor',28)+b.t+'</div>'+
     '<div class="state-p">'+b.p+'</div>'+
-    '<div class="metarow"><span class="chip">这一页不显示任何文件</span><span class="chip">不生成、不保存、不上传</span><span class="chip">签名图不跨这次办理保留</span></div>'+
+    '<div class="metarow"><span class="seal">这一页不显示任何文件</span><span class="seal">不生成、不保存、不上传</span><span class="seal">签名图不跨这次办理保留</span></div>'+
    '</div>';
   document.getElementById('work').innerHTML=gateOptions();
   document.getElementById('aside').innerHTML=gateAside(b);
