@@ -47,7 +47,6 @@ import {
   type PrintMaterialContentCategory,
   type PrintMaterialSource,
 } from './printMaterialSession'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { FileSourceView } from './file-source/FileSourceView'
 import {
@@ -226,7 +225,7 @@ export function PrintUploadPage() {
           setUsbAgentOffline(false)
           setUsbReadFailed(true)
         }
-        setUsbError(userMessageOf(err, 'U 盘状态查询失败，请确认终端服务正在运行后重试'))
+        setUsbError(userMessageOf(err, '暂时无法读取 U 盘，请重试或联系工作人员'))
       }
     }
 
@@ -254,7 +253,7 @@ export function PrintUploadPage() {
 
   const handleQrUploaded = useCallback((uploaded: PhoneUploadedFile) => {
     if (!uploaded.fileUrl) {
-      setUploadError('文件签名链接生成失败，请刷新二维码重试')
+      setUploadError('暂时无法打开这份文件，请刷新二维码重试')
       return
     }
     setUploadError(null)
@@ -416,7 +415,6 @@ export function PrintUploadPage() {
   }
 
   const exitPath = isTransferMode ? '/print-scan' : '/'
-  const terminalCode = getTerminalCode()
   const screen = deriveFileSourceScreen({
     channelActive,
     tab,
@@ -459,7 +457,7 @@ export function PrintUploadPage() {
       screen={screen}
       pageTitle={pageTitle}
       pageSubtitle={pageSubtitle}
-      terminalLabel={terminalCode ? `就业服务大厅 · ${terminalCode}` : '就业服务大厅'}
+      terminalLabel=""
       status={qxStatusFromDevice(device)}
       isResumePrint={isResumePrint}
       showFileChannel={showFileChannel}
@@ -498,6 +496,9 @@ export function PrintUploadPage() {
         else inputRef.current?.click()
       }}
       onNext={handleNext}
+      onHome={() => navigate('/')}
+      onAdvisor={() => navigate('/assistant')}
+      onProfile={() => navigate('/profile')}
       // 稿 12-file-source 的返回键 data-route="/print-scan"：回服务 Hub，
       // 不用 navigate(-1) —— 一体机上「上一步」是确定的业务落点，不是浏览器历史。
       onBack={() => navigate('/print-scan')}

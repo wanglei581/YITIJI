@@ -1,6 +1,6 @@
 // QxPrintHubView — 打印扫描 Hub 表现层。
 //
-// 结构对照 docs/design/kiosk-redesign-2026-08/10-print-hub.html：
+// 结构对照 docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html：
 //   小青横幅 → （异常态）状态块 → 01 要办什么（能力卡栅格）→ 02 已下过单（到机码 + 三张记录卡）→ 底注。
 // 置灰口径不变：能力门禁型停用一律 aria-disabled + 常显原因 + onClick 短路，
 // 不用原生 disabled、不用 title（触屏没有 hover）。
@@ -9,14 +9,12 @@
 // 不驱动任何业务状态；prefers-reduced-motion 下由 shell 与本页样式一并关掉。
 
 import { type CSSProperties, type ReactNode } from 'react'
+import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import {
   ArrowRightIcon,
   CopyIcon,
-  HomeIcon,
   InfoIcon,
   LockIcon,
-  SparklesIcon,
-  UserIcon,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -78,34 +76,11 @@ interface QxPrintHubViewProps {
   onCapability: (key: string) => void
   onArrivalCode: () => void
   onQuickLink: (key: string) => void
+  onBack: () => void
+  onAdvisor: () => void
 }
 
-export function PrintHubNavbar({
-  onHome,
-  onAdvisor,
-  onProfile,
-}: {
-  onHome: () => void
-  onAdvisor: () => void
-  onProfile: () => void
-}) {
-  return (
-    <>
-      <button type="button" className="qx-nav-item" onClick={onHome} data-route="/">
-        <HomeIcon size={34} aria-hidden />
-        首页
-      </button>
-      <button type="button" className="qx-nav-item" onClick={onAdvisor} data-route="/assistant">
-        <SparklesIcon size={34} aria-hidden />
-        AI 顾问
-      </button>
-      <button type="button" className="qx-nav-item" onClick={onProfile} data-route="/profile">
-        <UserIcon size={34} aria-hidden />
-        我的
-      </button>
-    </>
-  )
-}
+export const PrintHubNavbar = QxAppNavbar
 
 export function PrintHubHero({ state, doing }: { state: HubUiState; doing: ReactNode }) {
   const ask = HUB_ASK[state]
@@ -115,7 +90,7 @@ export function PrintHubHero({ state, doing }: { state: HubUiState; doing: React
       <div className="ph-xq-row">
         <div className="ph-xq-face" aria-hidden="true">青</div>
         <div className="ph-xq-main">
-          <div className="ph-xq-eyebrow">PRINT &amp; SCAN</div>
+          <div className="ph-xq-eyebrow">打印扫描</div>
           {/* key 随状态换：探测结果回来时标题整句淡入，而不是原地跳字。 */}
           <h2 className="ph-xq-ask" key={state}>
             {i < 0 ? (
@@ -223,7 +198,7 @@ export function PrintHubRecordNotes({
           </span>
           <b>复印</b>
         </span>
-        <span className="d">请直接在奔图机器面板上操作。本机网页没有复印流程，也不代收费。</span>
+        <span className="d">在打印机面板上操作，取走纸质复印件。</span>
       </div>
     </div>
   )
@@ -247,9 +222,9 @@ function emphasize(text: string, marks: readonly string[] = []): ReactNode {
 function hubDoing(state: HubPageState): ReactNode {
   switch (state) {
     case 'capability-loading':
-      return '读到配置之前八项一律不开。到机码核销不受影响。'
+      return '正在确认可用服务，请稍候。已有订单仍可使用到机码。'
     case 'capability-error':
-      return '读不到就不放行 —— 八项全关。到机码核销的是已有订单，不受影响。'
+      return '暂时无法确认可用服务，请重试。已有订单仍可使用到机码。'
     case 'locked':
       return '理由直接来自能力配置，不是我猜的。'
     case 'device-off':
@@ -257,8 +232,7 @@ function hubDoing(state: HubPageState): ReactNode {
     default:
       return (
         <>
-          打印、扫描、图片转 PDF、签名盖章都在这台机器上。
-          <b>能不能办，进入后按真实状态确认。</b>
+          选好材料，一步步做成<b>打印件或 PDF</b>。
         </>
       )
   }
@@ -266,18 +240,9 @@ function hubDoing(state: HubPageState): ReactNode {
 
 function HubBanner({
   hubState,
-  onRetry,
-  onHelp,
 }: {
   hubState: HubPageState
-  onRetry: () => void
-  onHelp: () => void
 }) {
-  const help = (
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>
-      联系工作人员
-    </button>
-  )
   switch (hubState) {
     case 'capability-loading':
       return (
@@ -288,7 +253,7 @@ function HubBanner({
           testId="print-hub-fallback"
         >
           <p className="ph-state-p">
-            读到配置之前，八项能力<b>一律不开</b>。这不是坏了，是不想让你点进去才发现办不了。到机码核销不受影响。
+            正在确认本机有哪些可用服务。确认前<b>暂不能进入</b>，已有订单仍可使用到机码。
           </p>
         </PrintHubState>
       )
@@ -299,14 +264,7 @@ function HubBanner({
           icon={<InfoIcon size={28} />}
           heading="服务状态无法确认"
           testId="print-hub-fallback"
-          actions={
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={onRetry}>
-                重新检测
-              </button>
-              {help}
-            </>
-          }
+
         >
           <p className="ph-state-p">
             暂时无法确认这台机器开放了哪些服务，因此<b>八项能力先不开放</b>，避免你点进去后才发现办不了。
@@ -317,7 +275,7 @@ function HubBanner({
     case 'locked':
       return (
         <PrintHubState kind="lock" icon={<LockIcon size={28} />} heading="有几项被管理员关掉了" testId="print-hub-fallback">
-          <p className="ph-state-p">卡面上的理由直接来自能力配置，不是本机猜的。不受影响的项照常进。</p>
+          <p className="ph-state-p">请查看卡片上的停用原因，其他服务可以继续办理。</p>
         </PrintHubState>
       )
     case 'device-off':
@@ -327,10 +285,9 @@ function HubBanner({
           icon={<InfoIcon size={28} />}
           heading="打印扫描一体机离线 —— 要出纸的停了，其余照常"
           testId="print-hub-fallback"
-          actions={help}
         >
           <p className="ph-state-p">
-            这一条来自设备状态轮询的<b>确定离线</b>结果。手机扫码上传、格式转换、签名盖章不经过这台打印机，照常可用。
+            打印机当前<b>无法连接</b>。手机扫码上传、格式转换、签名盖章仍可使用。
           </p>
         </PrintHubState>
       )
@@ -340,23 +297,10 @@ function HubBanner({
 }
 
 function axisChips(probe: ProbeStatus, mfp: MfpStatus, colorDuplexLabel: string) {
-  const capTone = probe === 'ok' ? 'ok' : probe === 'error' ? 'bad' : undefined
-  const capText =
-    probe === 'ok' ? '能力配置 · 已读取' : probe === 'loading' ? '能力配置 · 读取中' : '能力配置 · 读不到'
-  const mfpTone = probe !== 'ok' ? undefined : mfp === 'unavailable' ? 'warn' : undefined
-  const mfpText =
-    probe !== 'ok'
-      ? '一体机状态 · 未查询'
-      : mfp === 'unavailable'
-        ? '一体机 · 确认离线'
-        : '一体机状态 · 以办理时确认'
   return (
-    <div className="ph-axes" data-testid="print-hub-axes">
-      <span className="ph-chip" data-tone={capTone}>{capText}</span>
-      <span className="ph-chip" data-tone={mfpTone}>{mfpText}</span>
-      <span className="ph-chip">纸张 · 仅 A4</span>
-      <span className="ph-chip">{colorDuplexLabel}</span>
-      <span className="ph-chip">U 盘网桥 · Windows 真机未验收</span>
+    <div className="ph-axes" data-testid="print-hub-axes" data-probe={probe} data-mfp={mfp}>
+      <span>文件检查 → 设置参数 → 确认价格</span>
+      <span>按 A4 出纸 · {colorDuplexLabel}</span>
     </div>
   )
 }
@@ -377,6 +321,8 @@ export function QxPrintHubView({
   onCapability,
   onArrivalCode,
   onQuickLink,
+  onBack,
+  onAdvisor,
 }: QxPrintHubViewProps) {
   const ArrivalIcon = arrivalCode.icon
   const showBanner = hubState !== 'default'
@@ -387,6 +333,7 @@ export function QxPrintHubView({
       className="qx-scroll ph-page"
       data-w2-page="print-scan-home"
       data-qx-page="print-hub"
+      data-takeaway="打印件或 PDF"
       data-state={hubState}
       data-testid={`print-hub-state-${hubState}`}
     >
@@ -394,7 +341,7 @@ export function QxPrintHubView({
 
       {showBanner ? (
         <section className="ph-fallback" key={hubState}>
-          <HubBanner hubState={hubState} onRetry={onRetry} onHelp={onHelp} />
+          <HubBanner hubState={hubState} />
         </section>
       ) : null}
 
@@ -497,6 +444,12 @@ export function QxPrintHubView({
         <PrintHubRecordNotes links={quickLinks.filter((link) => !link.compact)} onOpen={onQuickLink} />
       </section>
 
+      <div className="ph-actions">
+        <button type="button" onClick={onBack}>上一步</button>
+        {hubState === 'capability-error' ? <button type="button" onClick={onRetry}>重新检测</button> : null}
+        {showBanner ? <button type="button" onClick={onHelp}>联系工作人员</button> : null}
+        <button type="button" onClick={onAdvisor}>问小青：怎么选打印方式 →</button>
+      </div>
       <footer className="ph-foot">
         <PrintHubTruth />
         {notices.length > 0 ? (

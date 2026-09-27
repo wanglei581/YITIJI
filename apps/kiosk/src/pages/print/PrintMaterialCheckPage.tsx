@@ -36,6 +36,7 @@ import {
   MaterialCheckPresentation,
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
+import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
 import './styles/print-desk-qx.css'
 
 interface LocationState {
@@ -284,7 +285,7 @@ export function PrintMaterialCheckPage({
   const runChecks = async ({ retry = false }: { retry?: boolean } = {}) => {
     if (!file?.fileId) {
       setStage('error')
-      setError('缺少上传文件编号，请重新上传后再检查')
+      setError('暂时无法找到这份文件，请重新上传后再检查')
       return
     }
 
@@ -480,34 +481,21 @@ export function PrintMaterialCheckPage({
   if (!file) {
     return (
       <QxPageFrame
+        navbar={<PrintDeskNavbar />}
         back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
         title="材料检查"
         subtitle="先完成文件体检和隐私预检，再进入打印参数"
         status={{ tone: 'warn', label: '没有待处理的文件' }}
         ctabar={(
-          <>
+          <PrintDeskFooter onBack={() => navigate(uploadPath)}>
             <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print-scan')}>返回打印扫描</button>
             <p className="why">没有文件时不显示文件名、页数或检查结论，也不会产生订单。</p>
             <button className="qx-btn" data-variant="primary" type="button" onClick={() => navigate(uploadPath)}>去选文件</button>
-          </>
+          </PrintDeskFooter>
         )}
       >
+        <PrintDeskGuide step={1} title={<>这一页<em>没有文件</em>。</>} detail="先选好要打印的材料，再检查文件与个人信息。" />
         <div className="qpd-context-empty" data-w2-page="print-material-check" data-qx-state="missing-context">
-          <div className="qpd-empty-hero">
-            <div className="qpd-empty-hero-head">
-              <span className="qpd-empty-hero-face" aria-hidden="true">青</span>
-              <div>
-                <strong>这一页没有文件。</strong>
-                <p>先选一份真实文件，才能进行材料检查与打印参数设置。</p>
-              </div>
-            </div>
-            <ol className="qpd-empty-flow" aria-label="打印流程">
-              <li aria-current="step">选文件</li>
-              <li>材料检查</li>
-              <li>预览与参数</li>
-              <li>报价确认</li>
-            </ol>
-          </div>
           <div className="qx-state" data-tone="empty">
             <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
             <div>
@@ -536,7 +524,7 @@ export function PrintMaterialCheckPage({
               <div className="qx-sec-h"><span className="t">为什么会看到这一屏</span></div>
               <ul>
                 <li>从旧链接直接进入，没有完成选文件步骤。</li>
-                <li>公共终端的上一次办理已经结束或上下文已清除。</li>
+                <li>上一次办理已经结束，临时文件信息已清除。</li>
                 <li>本页不会用示例文件冒充真实待打印文件。</li>
               </ul>
               <section className="qpd-empty-next">
@@ -544,7 +532,7 @@ export function PrintMaterialCheckPage({
                 <ul>
                   <li>去选文件，把真实文件带入本次办理。</li>
                   <li>返回材料检查，逐项完成文件体检和隐私检查。</li>
-                  <li>检查通过后进入预览参数，费用由服务端报价。</li>
+                  <li>检查通过后进入预览参数，下一步核对价格。</li>
                 </ul>
               </section>
               <section className="qpd-empty-facts">
@@ -574,18 +562,20 @@ export function PrintMaterialCheckPage({
         : piiScanIncomplete
           ? { tone: 'bad' as const, label: '隐私检查未完整完成' }
           : !allFindingsDecided
-          ? { tone: 'warn' as const, label: `还有 ${findings.filter((finding) => decisions[finding.id] !== 'keep' && decisions[finding.id] !== 'redact').length} 处待裁决` }
+          ? { tone: 'warn' as const, label: `还有 ${findings.filter((finding) => decisions[finding.id] !== 'keep' && decisions[finding.id] !== 'redact').length} 处待确认` }
           : { tone: 'ok' as const, label: '材料检查完成' }
 
   // Legacy gate markers: PrintPageFrame, KioskActionBar, step={2}.
   // The route now renders QxPageFrame and its qx-ctabar; these names only document the replaced contract.
   return (
     <QxPageFrame
+      navbar={<PrintDeskNavbar />}
+      back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
       title="材料检查"
-      subtitle="第 2 步 / 共 4 步 · 检查格式、大小、页数与图片质量，并完成隐私裁决"
+      subtitle="第 2 步 / 共 4 步 · 检查格式、大小、页数与图片质量，并完成隐私选择"
       status={status}
       ctabar={(
-        <>
+        <PrintDeskFooter onBack={() => navigate(uploadPath)}>
           <button className="qx-btn" data-variant="ghost" type="button" disabled={isWorking} onClick={() => navigate(uploadPath)}>返回选文件</button>
           <p className="why">
             {stage === 'error'
@@ -602,7 +592,7 @@ export function PrintMaterialCheckPage({
                   ? '隐私检查没有完整覆盖这份文件，不能继续。请重新检查或返回选择文件。'
                   : !allFindingsDecided
                   ? '每一处隐私片段都必须由你选择保留或遮挡。'
-                  : '继续后会保存选择，并按真实处理结果生成或选用打印文件。'}
+                  : '继续后会保存选择，并按处理结果准备打印文件。'}
           </p>
           <button
             className="qx-btn"
@@ -613,9 +603,13 @@ export function PrintMaterialCheckPage({
           >
             {stage === 'submitting' ? '保存选择中…' : requiresFormatReview ? '请重新上传文件' : '下一步：预览与参数'}
           </button>
-        </>
+        </PrintDeskFooter>
       )}
     >
+      <PrintDeskGuide step={2}
+        title={stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>先<em>看清楚</em>再出纸。</>}
+        detail={stage === 'error' ? '请重试检查，或返回选择其他文件。' : '检查格式、页数和个人信息，逐项确认后再设打印参数。'}
+      />
       <div className="qpd-check-page">
         <div className="qpd-check-intro" data-feature="文件预检">
           <strong>文件预检</strong>
@@ -624,6 +618,7 @@ export function PrintMaterialCheckPage({
         <MaterialCheckPresentation
           stage={stage}
           file={file}
+          token={getToken()}
           error={error}
           inspection={inspectionSummary ? {
             pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',

@@ -1,7 +1,7 @@
 // ============================================================
 // verify:p39-print-hub-fidelity — 打印扫描 Hub 青序流光保真门禁
 //
-// 视觉真值：docs/design/kiosk-redesign-2026-08/10-print-hub.html
+// 视觉真值：docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html
 // 守的是「生产页有没有从原型漂走」：
 //   A. 文案保真（原型 ∩ 生产）
 //   B. 结构：八张能力卡 + 到机码不在能力键里
@@ -17,7 +17,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(root, '..', '..')
 const read = (p) => readFileSync(join(root, p), 'utf8')
 
-const PROTOTYPE = join(repoRoot, 'docs/design/kiosk-redesign-2026-08/10-print-hub.html')
+const PROTOTYPE = join(repoRoot, 'docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html')
 
 let failures = 0
 const pass = (m) => console.log(`  PASS ${m}`)
@@ -52,8 +52,8 @@ const COPY = [
   '有几项被管理员关掉了',
   '证件照：本机尚未开放',
   '没有这项能力说明',
-  '请直接在奔图机器面板上操作',
-  '本机网页没有复印流程',
+  '在打印机面板上操作',
+  '取走纸质复印件',
   '能力与设备状态以办理时确认',
 ]
 for (const line of COPY) {
@@ -161,7 +161,7 @@ must(
   '停用态在 onClick 内短路'
 )
 must(/--qx-tap-min/.test(cssSrc), '触控下限走 --qx-tap-min')
-must(/min-height:\s*196px/.test(cssSrc), '能力卡高度远高于 48px')
+must(/min-height:\s*200px/.test(cssSrc), '能力卡高度远高于 48px')
 must(/QxPageFrame/.test(featureSrc), '说明页同样使用 QxPageFrame')
 must(/feature-id-photo/.test(featureSrc) && /feature-not-found/.test(featureSrc), '说明页覆盖两个 feature 态')
 

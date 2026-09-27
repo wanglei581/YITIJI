@@ -64,52 +64,52 @@ export interface FileSourceAsk {
 }
 
 export const FILE_SOURCE_ASK: Record<FileSourceScreen, FileSourceAsk> = {
-  'source-chooser': { lead: '文件', em: '怎么进来', tail: '？', doing: '本机、手机、U 盘、纸质扫描都能进来；登录后还能直接用「我的文档」里存过的材料。第三方网盘不接入。' },
+  'source-chooser': { lead: '文件', em: '怎么进来', tail: '？', doing: '选好文件，检查后带走打印件。也可以使用「我的文档」里存过的材料。' },
   'missing-file': { lead: '这一步', em: '没有文件', tail: '。', doing: '我不替你挑一份，也不凭地址就说已经传好了。' },
-  unknown: { lead: '这个状态', em: '我不认识', tail: '。', doing: '不猜你想去哪一步，也不把地址里的原始参数抄到屏幕上。' },
-  'local-guide': { lead: '本机选文件是', em: '兼容路径', tail: '。', doing: '会弹系统窗口。一体机上优先手机扫码，这条留给桌面验证。' },
-  'local-picking': { lead: '挑', em: '一份', tail: '就行。', doing: '一次只能选一个。选中即上传，服务端校验格式和大小。' },
+  unknown: { lead: '这个状态', em: '我不认识', tail: '。', doing: '请返回打印扫描，重新选择文件来源。' },
+  'local-guide': { lead: '从电脑里', em: '选一份文件', tail: '。', doing: '打开文件窗口，选好后会开始上传。' },
+  'local-picking': { lead: '挑', em: '一份', tail: '就行。', doing: '一次只能选一个。选中即上传，支持的格式和大小见下方。' },
   'local-cancelled': { lead: '窗口', em: '关掉了', tail: '。', doing: '上传还没开始，没有产生任何上传。再打开一次，或者换条通道。' },
   'local-rejected': { lead: '这份', em: '格式不收', tail: '。', doing: '只收 PDF / JPG / PNG。Word 先另存为 PDF。' },
   'local-oversize': { lead: '这份', em: '太大了', tail: '。', doing: '本机与 U 盘单份 15MB 以内，手机通道是 10MB。' },
   'local-unreadable': { lead: '这份', em: '读不出来', tail: '。', doing: '大小都取不到，不会硬着头皮上传。' },
-  'local-uploading': { lead: '正在', em: '送上去', tail: '。', doing: '一次性上传，没有进度百分比。这一步没有取消动作，等服务端给结果。' },
-  'local-upload-failed': { lead: '', em: '没送上去', tail: '。', doing: '服务端没确认收到。刚才挑的那份还在，直接重试。' },
-  'local-ready': { lead: '收到了，', em: '就这一份', tail: '。', doing: '服务端确认落库后回给本机的结果。可以去材料检查了。' },
-  'phone-generating': { lead: '正在', em: '要一张码', tail: '。', doing: '还没拿到就不先放假图。稍等一下。' },
+  'local-uploading': { lead: '正在', em: '送上去', tail: '。', doing: '请稍候，上传结果会显示在这里。' },
+  'local-upload-failed': { lead: '', em: '没送上去', tail: '。', doing: '还没有收到文件。可以重试刚才选的那一份。' },
+  'local-ready': { lead: '收到了，', em: '就这一份', tail: '。', doing: '先核对文件，下一步检查页数和个人信息。' },
+  'phone-generating': { lead: '正在', em: '要一张码', tail: '。', doing: '请稍候，二维码准备好后就能扫码上传。' },
   'phone-gen-failed': { lead: '码', em: '没出来', tail: '。', doing: '没有任何文件被接收。重试，或者换条通道。' },
-  'phone-ready': { lead: '', em: '扫这张码', tail: '。', doing: '本机看不到你扫没扫，只认服务端收到文件。' },
+  'phone-ready': { lead: '', em: '扫这张码', tail: '。', doing: '扫码选文件，传好后回来确认。' },
   'phone-waiting': { lead: '在', em: '等你手机', tail: '。', doing: '手机上传完，下面会出现文件名。' },
   'phone-uploading': { lead: '手机', em: '正在传', tail: '。', doing: '没有百分比可显示。传完还要你回来点确认。' },
   'phone-status-unknown': { lead: '状态', em: '问不到了', tail: '。', doing: '这不等于已过期。可以再问一次，或者重新出码。' },
-  'phone-expired': { lead: '这张码', em: '过期了', tail: '。', doing: '按服务端结果判定。重新出一张就行。' },
-  'phone-uploaded': { lead: '传上来了，', em: '等你确认', tail: '。', doing: 'uploaded 还不算数，确认之后才进这次办理。' },
+  'phone-expired': { lead: '这张码', em: '过期了', tail: '。', doing: '重新生成二维码，再用手机上传。' },
+  'phone-uploaded': { lead: '传上来了，', em: '等你确认', tail: '。', doing: '确认使用这份文件后，才能继续材料检查。' },
   'phone-confirming': { lead: '正在', em: '确认', tail: '。', doing: '结果没回来之前，它还不是当前文件。' },
   'phone-confirm-failed': { lead: '', em: '确认失败', tail: '。', doing: '这份没进本次办理。重试确认，或者重新出码。' },
-  'phone-confirmed': { lead: '确认了，', em: '就这一份', tail: '。', doing: '这是本次办理要打的文件。可以去材料检查了。' },
+  'phone-confirmed': { lead: '确认了，', em: '就这一份', tail: '。', doing: '文件已放入本次办理，可以继续材料检查。' },
   'phone-cancel-requesting': { lead: '正在', em: '取消', tail: '。', doing: '答复没回来之前，这份还挂着，我不说已经作废。' },
   'phone-cancel-failed': { lead: '', em: '没取消掉', tail: '。', doing: '这份还留着。可以重试，也可以回去把它确认掉。' },
-  'phone-cancelled': { lead: '会话', em: '已作废', tail: '。', doing: '旧码不再收文件。本次办理里还是没有文件。' },
-  'usb-unavailable': { lead: 'U 盘这条', em: '锁着', tail: '。', doing: '本机没配这条通道的令牌，重试也没用。' },
-  'usb-agent-offline': { lead: '本地服务', em: '连不上', tail: '。', doing: '和「未配置」不是一回事，这个可以重试。' },
+  'phone-cancelled': { lead: '这次上传', em: '已取消', tail: '。', doing: '旧码不再收文件。本次办理里还是没有文件。' },
+  'usb-unavailable': { lead: 'U 盘这条', em: '锁着', tail: '。', doing: '本机暂未开通 U 盘导入，可以改用手机上传。' },
+  'usb-agent-offline': { lead: 'U 盘读取', em: '暂不可用', tail: '。', doing: '读盘暂时不可用，可以重试或改用手机上传。' },
   'usb-wait': { lead: '把 U 盘', em: '插进来', tail: '。', doing: '只读根目录，不进子文件夹，也不自动读整盘。' },
-  'usb-detecting': { lead: '正在', em: '读盘', tail: '。', doing: '不画进度条。读完之前不显示任何文件名。' },
+  'usb-detecting': { lead: '正在', em: '读盘', tail: '。', doing: '读好后会显示可用文件，请稍候。' },
   'usb-empty': { lead: '盘里', em: '没有能用的', tail: '。', doing: '根目录没有 PDF / JPG / PNG。多半是格式或位置的问题。' },
-  'usb-list': { lead: '挑', em: '一份', tail: '就行。', doing: '每份带一个一次性标识，重新读盘会换一批。' },
+  'usb-list': { lead: '挑', em: '一份', tail: '就行。', doing: '从列表中选一份文件，确认后再导入。' },
   'usb-read-failed': { lead: '', em: '没读出来', tail: '。', doing: '重新插一次。我不显示上一次的列表。' },
   'usb-selected': { lead: '选中了，', em: '还没导入', tail: '。', doing: '只动这一份，盘上其它文件不会被读走。' },
-  'usb-safeid-expired': { lead: '这份的标识', em: '失效了', tail: '。', doing: '没有文件被导入。重新读盘再选一次。' },
+  'usb-safeid-expired': { lead: '这份文件', em: '需要重新选择', tail: '。', doing: '没有文件被导入。重新读盘再选一次。' },
   'usb-importing': { lead: '正在', em: '导入', tail: '。', doing: '这期间别拔 U 盘。没有中间进度可显示。' },
-  'usb-import-failed': { lead: '', em: '没导进来', tail: '。', doing: '多半是一次性标识失效了。重新读盘再选一次。' },
+  'usb-import-failed': { lead: '', em: '没导进来', tail: '。', doing: '没有导入成功。重新读盘再选一次。' },
   'usb-ready': { lead: '导好了，', em: '就这一份', tail: '。', doing: '可以拔 U 盘了。本机没有「安全弹出」按钮。' },
 }
 
 export function fileSourceEyebrow(screen: FileSourceScreen): string {
   const prefix = screen.split('-')[0]
-  if (prefix === 'local') return 'LOCAL FILE'
-  if (prefix === 'phone') return 'PHONE UPLOAD'
-  if (prefix === 'usb') return 'USB IMPORT'
-  return 'FILE SOURCE'
+  if (prefix === 'local') return '本机选文件'
+  if (prefix === 'phone') return '手机上传'
+  if (prefix === 'usb') return 'U 盘导入'
+  return '选文件'
 }
 
 export interface PhoneSessionView {

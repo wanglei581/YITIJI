@@ -1,7 +1,7 @@
 // ============================================================
 // PrintScanHomePage — 打印扫描 Hub（青序流光 10-print-hub）。
 //
-// 视觉真值：docs/design/kiosk-redesign-2026-08/10-print-hub.html
+// 视觉真值：docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html
 // 本文件只做容器：读真实状态、算每张卡能不能点，把结果交给 QxPrintHubView。
 //
 // ══ 两条独立的状态轴 ══
@@ -96,19 +96,19 @@ interface CapabilityDefinition {
 /**
  * 文档打印卡的描述行：彩色 / 双面只有在**本机**登记为 available 时才敢写进文案。
  * 未登记的机器上写「彩色、双面可选」= 谎报能力（CLAUDE.md §9「不伪造能力」）。
- * 卡面描述按稿 10 的密度只留一行半；「彩色 / 双面未验证」的披露挪到状态行（describeDocPrintFoot），不删。
+ * 卡面描述按稿 10 的密度只留一行半；「彩色 / 双面暂未开通」的披露挪到状态行（describeDocPrintFoot），不删。
  */
 function describeDocPrint(map: ConfiguredCapabilityMap): string {
   const extras = docPrintExtras(map)
   return extras.on.length > 0
-    ? `PDF / JPG / PNG 上传，先过材料检查再设参数；${extras.on.join(' / ')}可选`
-    : 'PDF / JPG / PNG 上传，先过材料检查再设参数。'
+    ? `选文件，检查后设参数；${extras.on.join(' / ')}可选`
+    : '选文件，检查后设参数'
 }
 
-/** 文档打印卡的状态行：未登记的彩色 / 双面如实写「未验证」，与轴芯片同一口径。 */
+/** 文档打印卡的状态行：未登记的彩色 / 双面如实写「暂未开通」，与轴芯片同一口径。 */
 function describeDocPrintFoot(map: ConfiguredCapabilityMap): string {
   const extras = docPrintExtras(map)
-  return extras.off.length > 0 ? `A4 黑白 · ${extras.off.join(' / ')}未验证` : 'A4 · 黑白 / 彩色 · 单双面'
+  return extras.off.length > 0 ? `带走：打印件 · ${extras.off.join(' / ')}暂未开通` : '带走：打印件'
 }
 
 function docPrintExtras(map: ConfiguredCapabilityMap): { on: string[]; off: string[] } {
@@ -129,14 +129,14 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'doc',
     icon: FileTextIcon,
     title: '文档打印',
-    description: 'PDF / JPG / PNG 上传，先过材料检查再设参数。',
+    description: '选文件，检查后设参数',
     to: '/print/upload?source=document&tab=file',
     aiRole: 'ai',
     needsMfp: true,
     available: true,
     iconTone: 'teal',
     // 运行时由 describeDocPrintFoot 按本机彩色 / 双面登记改写；这里是未登记时的口径。
-    stateNote: 'A4 黑白 · 彩色 / 双面未验证',
+    stateNote: 'A4 黑白 · 彩色 / 双面暂未开通',
     mfpOffBadge: '这台机器现在出不了纸',
     mfpOffNote: '文件可以先传上来存着，换一台再打。',
   },
@@ -145,13 +145,13 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'phone',
     icon: SmartphoneIcon,
     title: '手机扫码上传',
-    description: '手机扫屏幕上的码，把文件传进这台机器。',
+    description: '扫码把手机文件传过来',
     to: '/print/upload?source=document&tab=qr&mode=transfer',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'slate',
-    stateNote: '不用登录 · 不占打印机',
+    stateNote: '带走：打印件',
     mfpOffStateNote: '照常可用 · 传上来先存着',
   },
   {
@@ -159,13 +159,13 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'usb',
     icon: UsbIcon,
     title: 'U 盘导入打印',
-    description: '从 U 盘根目录选一份文件，导入后继续材料检查与打印。',
+    description: '从 U 盘选文件打印',
     to: '/print/upload?source=document&tab=usb&mode=transfer',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'slate',
-    stateNote: '本地网桥已实现 · Windows 真机未验收',
+    stateNote: '带走：打印件',
     mfpOffStateNote: '照常可用 · 导入后先存着',
   },
   {
@@ -173,29 +173,29 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'photo',
     icon: ImageIcon,
     title: '照片打印',
-    description: '照片上传后设参数打印，与文档同一条流程。',
+    description: '选照片，检查后设参数',
     to: '/print/upload?source=document&tab=file&category=photo',
     state: { category: 'photo' },
     aiRole: 'ai',
     needsMfp: true,
     available: true,
     iconTone: 'clay',
-    stateNote: '与文档打印同链路',
+    stateNote: '带走：照片打印件',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '与文档打印同一条出纸链路，一起停。',
+    mfpOffNote: '打印暂时不可用，请稍后再试。',
   },
   {
     key: 'scan',
     cap: 'scan',
     icon: ScanLineIcon,
     title: '材料扫描',
-    description: '在奔图面板上扫描纸质材料，回传后可打印、可识别。',
+    description: '到打印机面板扫描',
     to: '/scan',
     aiRole: 'ai',
     needsMfp: true,
     available: true,
     iconTone: 'slate',
-    stateNote: '面板手动扫描 · 无一键启动',
+    stateNote: '带走：扫描文件',
     mfpOffBadge: '这台机器现在出不了纸',
     mfpOffNote: '扫描和打印是同一台机器，一起停。',
   },
@@ -204,13 +204,13 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'convert',
     icon: LayersIcon,
     title: '格式转换',
-    description: '多张 JPG / PNG 合并成一份 PDF，顺序自己排。',
+    description: '多张图片合成 PDF',
     to: '/print-scan/convert',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'teal',
-    stateNote: '最多 20 张 · 单张 ≤10MB',
+    stateNote: '带走：合并 PDF',
     mfpOffStateNote: '照常可用 · 合完先存着',
   },
   {
@@ -218,13 +218,13 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'sign',
     icon: PenToolIcon,
     title: '签名盖章',
-    description: '本人手写签名图片叠到 PDF 指定位置，生成新 PDF。',
+    description: '放入本人手写签名',
     to: '/print-scan/sign',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'clay',
-    stateNote: '图像合成，不是电子签名',
+    stateNote: '带走：签好的 PDF',
     mfpOffStateNote: '照常可用 · 出纸要换机',
   },
   {
@@ -232,7 +232,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'idphoto',
     icon: UserSquareIcon,
     title: '证件照',
-    description: '本机尚未开放，先看说明和替代路径。',
+    description: '尚未开放，可查看说明',
     to: '/print-scan/feature/id-photo',
     aiRole: 'ai',
     needsMfp: false,
@@ -265,7 +265,7 @@ const ARRIVAL_CODE_ENTRY = {
   icon: TicketIcon,
   title: '到机码核销',
   description:
-    '手机上下过单拿到的 8 位数字到机码；早期发出的 10 位字母数字历史码同样能用。扫码或手输都行。不是付款后的取件凭证码',
+    '输入 8 位数字到机码（10 位字母数字历史码也支持），核对订单后领取打印件。不是付款后的取件凭证码',
   to: '/print/pickup-claim',
   emphasis: ['8 位数字到机码', '10 位字母数字历史码'],
 } as const
@@ -285,8 +285,8 @@ const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> 
   available: null,
   testing: '测试中，暂未对用户开放',
   maintenance: '维护中，暂时不可用',
-  unsupported: '本终端不支持该能力',
-  not_verified: '待验收，暂未开放',
+  unsupported: '本机不支持此项服务',
+  not_verified: '本机暂未开通',
 }
 
 /** 反馈入口的 key。它不跳路由，而是就地打开匿名反馈弹层（见 handleQuickLink）。 */
@@ -297,14 +297,14 @@ const QUICK_LINKS: readonly (QxPrintQuickLinkView & { to?: string })[] = [
     key: 'documents',
     icon: FilesIcon,
     title: '我的文档',
-    description: '已上传 / 生成的文件',
+    description: '选文件，带走打印件',
     to: '/me/documents',
   },
   {
     key: 'print-orders',
     icon: PrinterIcon,
     title: '打印订单',
-    description: '任务状态与取件凭证码',
+    description: '查看订单与取件凭证码',
     to: '/me/print-orders',
   },
   {
@@ -509,6 +509,8 @@ export function PrintScanHomePage() {
         onCapability={handleCapability}
         onArrivalCode={() => navigate(ARRIVAL_CODE_ENTRY.to)}
         onQuickLink={handleQuickLink}
+        onBack={() => navigate('/')}
+        onAdvisor={() => navigate('/assistant')}
       />
       <KioskFeedbackDialog
         open={feedbackOpen}

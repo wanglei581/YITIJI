@@ -124,25 +124,27 @@ expect(
 // 在 1080×1920 竖屏上被拉成与 A4 完全不成比例的长条。
 console.log('\n--- 预览框高度约束 ---')
 
-const previewBox = preview.match(/<div className="relative flex ([^"]*)rounded-xl border border-neutral-200 bg-neutral-50">/)
-expect(Boolean(previewBox), '预览容器仍是可被守卫定位的单一节点')
-expect(/max-h-\[/.test(previewBox[1]), `预览容器有 max-height 约束（实际 class：${previewBox[1].trim()}）`)
-expect(/min-h-\[/.test(previewBox[1]), '预览容器保留 min-height 下限')
+const previewPanel = read(kioskRoot, 'src/pages/print/components/PrintPreviewPanel.tsx')
+const deskCss = read(kioskRoot, 'src/pages/print/styles/print-desk-qx.css')
+const previewBox = deskCss.match(/\.qpd-preview-shell\s*\{([^}]+)\}/)
+expect(previewPanel.includes('className="qpd-preview-shell"') && Boolean(previewBox), '预览容器仍是可被守卫定位的单一节点')
+expect(/max-height:/.test(previewBox[1]), '预览容器有 max-height 约束')
+expect(/min-height:/.test(previewBox[1]), '预览容器保留 min-height 下限')
 expect(
-  /max-h-\[min\(\d+vh,\s*(\d+)px\)\]/.test(previewBox[1]),
+  /max-height:\s*min\(\d+vh,\s*(\d+)px\)/.test(previewBox[1]),
   '预览高度上限同时按视口与绝对像素封顶（矮屏不顶出视口，竖屏不超 A4 比例）',
 )
-const capPx = Number(previewBox[1].match(/max-h-\[min\(\d+vh,\s*(\d+)px\)\]/)[1])
-// 竖屏可用列宽 ≈ 1080 − 48(p-6) − 400(参数栏) − 24(gap) = 608px；A4 对应高 608×297/210 ≈ 860px
+const capPx = Number(previewBox[1].match(/max-height:\s*min\(\d+vh,\s*(\d+)px\)/)[1])
+// 2.0 稿 13：左列 352px，A4 高约 498px；图像与 canvas 在壳内等比缩放，不拉伸。
 expect(
-  capPx >= 780 && capPx <= 940,
-  `高度上限按 1080×1920 竖屏的 A4 比例取值（608px 宽 → ≈860px 高，实际 ${capPx}px）`,
+  capPx >= 440 && capPx <= 520,
+  `高度上限按 2.0 左列 A4 比例取值（352px 宽 → ≈498px 高，实际 ${capPx}px）`,
 )
-const img = preview.match(/<img[^>]*?className="([^"]*)"/s)
+const img = previewPanel.match(/<img[^>]*?className="([^"]*)"/s)
 expect(Boolean(img) && /max-h-full/.test(img[1]), '预览 <img> 有 max-h-full，不撑破容器')
 const pdfFrame = read(kioskRoot, 'src/pages/print/PdfPreviewFrame.tsx')
 const pdfCanvas = read(kioskRoot, 'src/components/PdfCanvasPreview.tsx')
-expect(/<PdfPreviewFrame className="max-h-full"/.test(preview), '预览 PDF 把 max-h-full 传给 PdfPreviewFrame')
+expect(/<PdfPreviewFrame className="max-h-full"/.test(previewPanel), '预览 PDF 把 max-h-full 传给 PdfPreviewFrame')
 expect(/<PdfCanvasPreview[\s\S]*className=\{className\}/.test(pdfFrame), 'PdfPreviewFrame 把 max-h-full 落到画布预览根节点，不撑破容器')
 expect(!/createElement\(['"]iframe['"]\)/.test(pdfFrame) && !/<iframe/.test(pdfFrame), '打印预览不再创建 iframe')
 expect(!/<iframe/.test(pdfCanvas) && !/<embed/.test(pdfCanvas) && !/<object/.test(pdfCanvas) && !/window\.open/.test(pdfCanvas), '画布预览不把 PDF 当成文档打开')

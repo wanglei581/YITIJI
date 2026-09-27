@@ -11,7 +11,7 @@ const paths = {
   phone: join(kioskRoot, 'src/pages/upload/PhoneUploadPage.tsx'),
   printUpload: join(kioskRoot, 'src/pages/print/PrintUploadPage.tsx'),
   preview: join(kioskRoot, 'src/components/FileContentPreview.tsx'),
-  printPreview: join(kioskRoot, 'src/pages/print/PrintPreviewPage.tsx'),
+  printPreview: join(kioskRoot, 'src/pages/print/components/PrintPreviewPanel.tsx'),
   miniapp: join(repoRoot, 'apps/miniapp/pages/resume-upload/resume-upload.js'),
   miniappWxml: join(repoRoot, 'apps/miniapp/pages/resume-upload/resume-upload.wxml'),
   documentsPage: join(kioskRoot, 'src/pages/profile/me/MyDocumentsPage.tsx'),
