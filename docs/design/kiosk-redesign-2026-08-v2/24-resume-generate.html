@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 逐状态检查修压字
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 选择预填资料的 review 内容态，七行资料与返回编辑能力保持；仅调字阶和必要留白，触达待复测（规则 1、2、3）。
@@ -447,6 +448,12 @@ textarea.fin{padding:14px 18px;line-height:1.5;resize:none;min-height:104px}
 #body-root{padding-top:52px}.fx{font-size:22px;line-height:1.4;min-height:56px}.fx .fx-b{font-size:20px}.sec-label .t{font-size:30px;line-height:1.4}.sec-label .hint{font-size:20px}
 .orow{min-height:84px;padding:6px 18px}.orow .om>b{font-size:26px;line-height:1.4}.orow .om>span{font-size:22px;line-height:1.4;margin-top:4px}.vlist{gap:8px}.card{padding:18px 22px}
 .note{font-size:22px;line-height:1.45}.helper .ht{font-size:22px;line-height:1.45}.hbtn{font-size:22px;min-height:60px}.btn{font-size:26px;line-height:1.4}.truth span{font-size:20px}.qx2-actions{min-height:64px;justify-content:flex-end}.fin{font-size:24px;line-height:1.45}
+/* 缺打印链接这一屏：说明卡按内容撑开，帮助条接在卡片下面，不再盖住「渲染」那一句。 */
+#body-root[data-state="export-print-unavailable"] .sec.grow{flex:0 0 auto;min-height:min-content;overflow:visible}
+#body-root[data-state="export-print-unavailable"] .sec.grow>.card{flex:none;min-height:min-content;overflow:visible;height:auto}
+.xq{min-height:0}
+#body-root{padding-top:16px}
+.helper{margin-top:8px}
 
 </style>
 </head>

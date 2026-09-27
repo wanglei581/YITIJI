@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!--
 青序流光 2.0 · 19 图片转 PDF（2026-09-28）
+9/28 逐状态检查修压字
 原稿：../kiosk-redesign-2026-08/19-img2pdf.html（只读，未改）。本页无图片资源。脚本随原稿内嵌。
 - 规则 1：顶栏只留返回；底部补「返回打印扫描」。主操作仍在原稿的列表和底栏。
 - 规则 2：字阶按已有 2.0 稿上调。颜色、圆角、宋体标题、三 Tab 不动。
@@ -365,6 +366,33 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .fx-b,.truth .fx,.truth .fx b,.stampmark,.nine button,.sizes button,.pgbtn,.pvlabel,.mini{font-size:20px!important}
 .pgrp .foot{font-size:20px!important}
 .grow-r .gm,.grow-r .gm b,.grow-r.more .gm,.epstep .sn,.ub-node i,.ub-cut,.ep-h .r,.limitbar .lb-h .r,.ghostbar span,.pvf-paper .ps,.pvf-paper .pn,.pvf-card .kv>div,.pvf-card .plan li,.ub-to,.ub-to span,.ub-wh span,.ub-src .ub-to{font-size:21px!important;line-height:1.4!important}
+/* 两栏说明按内容撑开，不再被底栏按钮盖住；列表行仍放下缩略图，少占一截高度。 */
+.sec{margin-top:10px}
+.sec.grow>.grid2,.sec.grow>.grid3{flex:0 0 auto;min-height:min-content;grid-auto-rows:auto;align-content:start}
+.pgrp{justify-content:flex-start;min-height:min-content;padding:10px 14px;gap:4px}
+.pgrp .plan,.pgrp .kv{flex:none;justify-content:flex-start}
+.plan{gap:4px;margin-top:6px}
+.irow{height:104px}
+.truth{padding:8px 36px}
+.xq{padding:12px 36px 10px}
+.ctabar{padding:10px 44px}
+.cta-reason{padding-bottom:4px}
+.sec.grow{flex:0 0 auto;min-height:min-content;overflow:visible}
+.lrows{max-height:200px!important}
+.ub-ways{overflow:visible;height:auto;flex:0 0 auto}
+.ub-way{flex:0 0 auto;min-height:min-content;justify-content:flex-start;overflow:visible;gap:8px;padding:12px 18px}
+.ub-flow{flex-wrap:wrap}
+/* 底栏按钮停在底部说明之上：说明条、英雄区和底部问句收一档，把高度还给按钮。 */
+.truth{padding:4px 28px}
+.xq{padding:6px 28px}
+.fxbar{padding:4px 10px}
+.qx-airow{min-height:48px;padding:2px 36px}
+.sec{margin-top:6px}
+/* 这四屏的失败说明更长，列表少留一行高度，按钮才回到底部说明上面。列表本身仍可滑动。 */
+#body-root[data-state="upload-failed"] .lrows,
+#body-root[data-state="source-expired"] .lrows,
+#body-root[data-state="image-dimensions-invalid"] .lrows,
+#body-root[data-state="output-too-large"] .lrows{max-height:140px!important}
 </style>
 </head>
 <body>
@@ -610,7 +638,7 @@ function listCard(hint,maxRows){
  var n=M.items.length,h='',i;
  for(i=0;i<n;i++)h+=row(M.items[i],i);
  var vis=Math.min(maxRows||5,Math.max(1,n));
- var hgt=vis*116-(vis===n?1:0);
+ var hgt=vis*104-(vis===n?1:0);
  return '<div class="lwrap" data-testid="'+SCREEN+'-list" data-count="'+n+'">'+
   '<div class="lhead"><span>待合并图片</span><span class="sub" data-testid="'+SCREEN+'-counts">'+n+' / '+LIM.imgs+' 张 · 合计 '+totBytes().toFixed(1)+' MB / '+LIM.total+' MB · '+totPx()+' 万 / 2 亿像素</span></div>'+
   '<div class="lrows" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="待合并图片列表，可上下滚动" style="height:'+hgt+'px">'+h+'</div>'+

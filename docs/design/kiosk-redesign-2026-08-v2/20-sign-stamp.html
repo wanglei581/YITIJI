@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!--
 青序流光 2.0 · 20 签名盖章（2026-09-28）
+9/28 逐状态检查修压字
 原稿：../kiosk-redesign-2026-08/20-sign-stamp.html（只读，未改）。本页无图片资源。脚本随原稿内嵌。
 - 规则 1：顶栏返回保留；底部补「返回打印扫描」。选页、选位置仍在原稿的操作列。
 - 规则 2：字阶上调。页标题改为 34。颜色、圆角、三 Tab 不动。
@@ -714,14 +715,29 @@ function pageInner(n,scale,burned){
  /* 四角角标 / 页脚 / 旋转提示：直接按 CSS 像素排，字号有 15px 下限，
     所以横向页、缩得很小的时候也不会把字挤出框、也不会被纸边裁掉。 */
  var pw=v.w*scale,ph=v.h*scale,px=function(x){return x.toFixed(1)+'px'};
- var fs=Math.max(15,ph*0.021);
- var bh=Math.max(fs*1.75,ph*0.035),bwid=Math.max(fs*3,pw*0.13),bm=Math.max(7,pw*0.02),bw=Math.max(1,scale*2);
- var C=[['tl','左上',bm,bm],['tr','右上',pw-bm-bwid,bm],['bl','左下',bm,ph-bm-bh],['br','右下',pw-bm-bwid,ph-bm-bh]];
+ var fs=Math.max(20,ph*0.021);
+ var ffs=Math.max(20,ph*0.019);
+ var footH=Math.max(ffs*1.8,32);
+ var bh=Math.max(fs*1.9,ph*0.038),bwid=Math.max(fs*3.4,pw*0.16),bm=Math.max(8,pw*0.02),bw=Math.max(1,scale*2);
+ var bottomTop=Math.max(ph*0.55,ph-bm-bh-footH);
+ var stamp=null;
+ if(M.stamp&&n===M.place.page){var sb0=stampBox(n);stamp={x:sb0.x*scale,y:sb0.y*scale,w:sb0.w*scale,h:sb0.h*scale}}
+ function nudge(left,top){
+  if(!stamp)return {l:left,t:top};
+  var hit=stamp.x<left+bwid&&stamp.x+stamp.w>left&&stamp.y<top+bh&&stamp.y+stamp.h>top;
+  if(!hit)return {l:left,t:top};
+  var below=stamp.y+stamp.h+6,right=stamp.x+stamp.w+6,above=stamp.y-bh-6;
+  if(below+bh<ph-footH-4)return {l:left,t:below};
+  if(right+bwid<pw-bm)return {l:right,t:top};
+  if(above>=bm)return {l:left,t:above};
+  return {l:left,t:top};
+ }
+ var tl=nudge(bm,bm),tr=nudge(pw-bm-bwid,bm),bl=nudge(bm,bottomTop),br=nudge(pw-bm-bwid,bottomTop);
+ var C=[['tl','左上',tl.l,tl.t],['tr','右上',tr.l,tr.t],['bl','左下',bl.l,bl.t],['br','右下',br.l,br.t]];
  for(i=0;i<C.length;i++){
   html+='<span class="pmark" data-corner="'+C[i][0]+'" style="left:'+px(C[i][2])+';top:'+px(C[i][3])+';width:'+px(bwid)+';height:'+px(bh)+';font-size:'+fs.toFixed(1)+'px;border-width:'+bw.toFixed(1)+'px">'+C[i][1]+'</span>';
  }
- var ffs=Math.max(15,ph*0.019);
- html+='<span class="pfoot" style="top:'+px(ph-ffs*1.5)+';font-size:'+ffs.toFixed(1)+'px">第 '+n+' 页 / 共 '+(M.doc?M.doc.pages:1)+' 页</span>';
+ html+='<span class="pfoot" style="top:'+px(ph-footH)+';height:'+px(footH)+';line-height:'+px(footH)+';font-size:'+ffs.toFixed(1)+'px">第 '+n+' 页 / 共 '+(M.doc?M.doc.pages:1)+' 页</span>';
  if(pageIsRotated(n)){
   var rw=Math.max(fs*9.5,pw*0.28),rh=Math.max(fs*1.75,ph*0.042);
   html+='<span class="protchip" style="left:'+px((pw-rw)/2)+';top:'+px(bm+bh+Math.max(5,ph*0.012))+';width:'+px(rw)+';height:'+px(rh)+';font-size:'+fs.toFixed(1)+'px">本页 /Rotate 90</span>';

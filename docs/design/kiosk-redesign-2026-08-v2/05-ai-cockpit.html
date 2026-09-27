@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI 顾问 · 职易达</title>
 <!--
+  9/28 逐状态检查修压字
   route: /assistant（工作台类型：AI 驾驶舱。单页多状态，不新增路由）
   页面名：AI 顾问。旧稿的「问小青」称呼已在本页可见文案中全部下线（含底栏导航项）。
 
@@ -490,6 +491,24 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .ment-go small,.rail-route .rr-x{font-size:20px!important}
 .demo-tab,.demo-panel{display:none!important}
 .ment-sub span,.mrail.big .ment-sub span,.mrail.big.dense .ment-sub span,.ment-go,.mini-list li,.mini-list b,.spec span,.spec b,.cc-h,.task-f,.task-d{font-size:21px!important;line-height:1.4!important}
+/* 等待态：占位句跟在进度条下面，不再居中钻进「服务来源」那一行。 */
+#body-root[data-state="submitting"] .sec.grow{flex:none;overflow:visible}
+#body-root[data-state="submitting"] .ans{flex:none;height:auto;min-height:0;overflow:visible}
+#body-root[data-state="submitting"] .slot{flex:none;align-items:flex-start;justify-content:flex-start;text-align:left;min-height:0;padding:12px 4px 8px}
+#body-root[data-state="submitting"] .ans-foot{margin-top:10px}
+/* 非 AI / 失败：四张卡按内容撑开，底部「进入…」不再被下一张卡盖住。上面的说明收一档留白，把高度让给这四张卡。 */
+#body-root[data-state="reply-not-ai"] .sec.grow,
+#body-root[data-state="reply-error"] .sec.grow{flex:none;overflow:visible}
+#body-root[data-state="reply-not-ai"] .mrail.big,
+#body-root[data-state="reply-error"] .mrail.big{grid-template-rows:auto auto;flex:none;align-content:start;overflow:visible}
+#body-root[data-state="reply-not-ai"] .mrail.big .ment,
+#body-root[data-state="reply-error"] .mrail.big .ment{height:auto;min-height:min-content;overflow:visible;justify-content:flex-start}
+#body-root[data-state="reply-not-ai"] .state.fit,
+#body-root[data-state="reply-error"] .state.fit{padding:12px 18px}
+#stage:has(#body-root[data-state="reply-not-ai"]) .truth,
+#stage:has(#body-root[data-state="reply-error"]) .truth{padding-top:8px;padding-bottom:8px}
+#stage:has(#body-root[data-state="reply-not-ai"]) .dock textarea,
+#stage:has(#body-root[data-state="reply-error"]) .dock textarea{min-height:72px}
 </style>
 </head>
 <body>

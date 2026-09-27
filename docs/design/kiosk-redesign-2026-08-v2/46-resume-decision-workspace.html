@@ -29,6 +29,7 @@
   <link rel="stylesheet" href="../kiosk-redesign-2026-08/resume-decision-workspace.css">
 <!--
 青序流光 2.0 · 46 简历对照 / 职业规划（screen=job-fit，state=result-high，对照结果有内容）
+9/28 逐状态检查修压字
 规则 1：英雄区加三步只读说明。返回键仍在顶栏。主体超出时可滑动，底部按钮留在栏外。
 规则 2：页标题 36，说明 21–23，分区标题 30，主按钮 26，导航 21。
 规则 3：带走的是对照档位和下一步；职业规划带走能开始的一件事；模板页带走选定的版式。
@@ -72,6 +73,37 @@
 #workspace[data-screen="resume-decision-templates"] .tip-row{flex:none;min-height:auto;align-items:flex-start}
 #workspace[data-screen="resume-decision-templates"] .pv-body{min-height:0;overflow:hidden}
 #workspace[data-screen="resume-decision-templates"] .pv-page{aspect-ratio:auto;width:min(100%,220px);height:auto;max-height:100%}
+/* 对照结果和行动清单按内容往下排，标签不再压住上一段说明。 */
+.hero{min-height:0}
+.section{padding:12px 16px}
+.section.grow>.ghosts,
+.section.grow>.ghosts>*,
+.section.grow>.list,
+.section.grow>.list>*,
+.section.grow>.steps,
+.section.grow>.steps>*,
+.section.grow>.checks,
+.section.grow>.checks>*,
+.section.grow>.why,
+.section.grow>.why>*,
+.section.grow>.nots,
+.section.grow>.nots>*,
+.section.grow>.trace,
+.section.grow>.trace>*,
+.section.grow>.routes,
+.section.grow>.routes>*,
+.section.grow>.grid2,
+.section.grow>.grid2>*,
+.section.grow>.grid3,
+.section.grow>.grid3>*,
+.ghost,.ghosts,.wl-group,.wl-fields,.ns-row,.em-row,.evi-slot,.step{
+  height:auto!important;flex:0 0 auto!important;min-height:min-content!important;overflow:visible!important
+}
+.ghost .g-tag{margin-top:12px}
+.wl-fields{justify-content:flex-start;margin-top:8px}
+.em-row span{min-height:48px;height:auto}
+.section.grow{flex:0 0 auto!important;min-height:min-content!important;height:auto!important;overflow:visible!important}
+.workspace{display:flex;flex-direction:column;gap:12px}
 </style>
 </head>
 <body>

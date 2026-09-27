@@ -61,6 +61,7 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offse
 .hero-note,.hero-note b,.first-copy p,.seg,.cap-chip,.card p,.badge,.is-unavailable .go,.quick-label,.quick span{font-size:16px}
 </style>
 <!--
+9/28 逐状态检查修压字
 青序流光 2.0 · 16 服务中心（hub=resume，default 有八张卡）
 规则 1：未展开的「先选目标」层用 display:none，避免顶上藏着可点链接；底部三 Tab 可回首页。
 规则 2：卡片标题 28，说明 21，眉题和状态 20–21，导航本来就是 21。
@@ -97,6 +98,17 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offse
 .first-actions{max-width:none!important}
 .screen[data-state="first"] .first-panel{height:auto!important}
 .first-inner{height:auto!important;min-height:122px}
+/* 岗位中心九张卡加上「先选目标」后，常用入口被底部说明盖住。收回卡高和留白，说明回到入口下面。 */
+.screen[data-card-count="9"][data-state="first"] .grid{--card-row-height:204px}
+.screen[data-card-count="9"][data-state="first"] .card{padding:10px 14px;gap:4px}
+.screen[data-card-count="9"][data-state="first"] .hero{padding:14px 28px 12px;min-height:0}
+.screen[data-card-count="9"][data-state="first"] .first-inner{margin-top:10px;padding:10px 16px;min-height:0}
+.screen[data-card-count="9"][data-state="first"] .notice{margin-top:8px;min-height:0;padding-top:8px;padding-bottom:8px}
+.screen[data-card-count="9"][data-state="first"] .hub{padding:10px 44px 8px}
+.screen[data-card-count="9"][data-state="first"] .cap-chips{margin-bottom:6px;height:auto}
+.screen[data-card-count="9"][data-state="first"] .quick-label{margin-top:6px;height:auto}
+.screen[data-card-count="9"][data-state="first"] .quick{margin-top:6px;height:auto;min-height:80px}
+.screen[data-card-count="9"][data-state="first"] .truth{padding:10px 36px;min-height:0}
 </style>
 </head>
 <body>

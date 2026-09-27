@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!--
 青序流光 2.0 · 37 支付各状态（2026-09-28）
+9/28 逐状态检查修压字
 原稿：../kiosk-redesign-2026-08/37-pay-states.html（只读，未改）。本页无图片资源。脚本随原稿内嵌。
 - 规则 1：顶栏返回保留；底部补「返回收银台」。付款操作仍在原稿的中下部。
 - 规则 2：字阶上调。英文眉题改为「付款」。颜色、圆角、深绿说明区、三 Tab 不动。
@@ -261,6 +262,10 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .fx-b,.truth .fx,.truth .fx b,.stampmark,.nine button,.sizes button,.pgbtn,.pvlabel,.mini{font-size:20px!important}
 .pgrp .foot{font-size:20px!important}
 .qrstamp{font-size:21px!important;letter-spacing:2px!important}
+/* 步骤说明按内容占高，不再被下一步的标题盖住。按钮上方的空档收回来给步骤。 */
+.steps{justify-content:flex-start;gap:10px;overflow:visible}
+.step{max-height:none;height:auto;flex:0 0 auto;align-items:flex-start;padding:8px 0;overflow:visible}
+.paygrid>.card .acts{padding-top:16px}
 </style>
 </head>
 <body><div id="viewport"><div id="stage">
