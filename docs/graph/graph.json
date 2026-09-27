@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 554,
+    "endpointCount": 555,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -2798,6 +2798,29 @@
         ],
         "services": [
           "AdminOrgContentTrustService"
+        ]
+      },
+      {
+        "controller": "services/api/src/official-channels/official-channels.controller.ts",
+        "handler": "OfficialChannelsController.listForAdmin",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "OnlinePlatformDirectory",
+          "Organization",
+          "RecruitmentCircuitBreak",
+          "RecruitmentEmergencyHold",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/orgs/:id/official-channels",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/official-channels/official-channels.service.ts"
+        ],
+        "services": [
+          "OfficialChannelsService"
         ]
       },
       {

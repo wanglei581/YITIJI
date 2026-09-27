@@ -11,6 +11,8 @@
 - 本轮本地验证：API typecheck、lint；`verify:official-channels` 132/132、`verify:career-plan` 16/16、`verify:job-fit` 24/24、`verify:companies` 22/22、`verify:job-ai-backend`、`verify:recruitment-content-http`、`verify:recruitment-emergency-scope` 15 项、`verify:recruitment-hosting-default-off` 2 项、`verify:recruitment-p1-schema`（SQLite 全新/升级）、`verify:content-trust-publish-gate` 87 项、`db:pg:sync:check`、合规文案、仓库完整性和 CI 门禁接线均通过；岗位板块子门禁 `verify-kiosk-job-board-switch.ts` 直接运行通过。R1–R10 各一项变异均使对应断言变红，随后逐字节还原。
 - 未完成：PostgreSQL 实库迁移与 CI 运行、前端接线、设备和线上验收仍由协调方及后续流程完成；本地 `verify:terminal-device-config` 总门禁因工作树缺少其基础夹具 `prisma/dev.db` 未能运行，岗位板块子门禁已独立通过。本轮没有部署或推送。
 
+**第三轮后台只读接口（本地候选）：** 新增管理员按机构查看未归档官方渠道的只读接口，返回下架状态及事由；机构端渠道列表附本机构按登记顺序规范化的 `verifiedDomains`，同步 shared 类型。`verify:official-channels` 144/144，通过管理员角色、404、归档、下架事由、机构隔离和空域名断言；R11、R12 两项变异均使对应断言变红并逐字节还原。未推送、未合并或部署。
+
 ## 2026-09-26（晚，续）：托管 a 版大屏两轮验收通过并入候选；第 18 轮全绿
 
 - **并入：** 托管 a 版大屏第一轮（`e27fefa02`，第 18 轮 CI 三个必需作业与安装包全绿）与第二轮返工（`222e00a09`）。协调窗口两轮逐张看展示模式与桌面整页截图后放行。
