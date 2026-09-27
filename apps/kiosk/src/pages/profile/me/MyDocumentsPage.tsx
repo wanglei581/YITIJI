@@ -1,3 +1,5 @@
+import { useMemberCursorPage } from './useMemberCursorPage'
+import { MemberLoadMore } from './MemberLoadMore'
 // ============================================================
 // 我的文档 — /me/documents（本人，只读元数据）。视觉真值：稿 38-member-assets（青序流光）。
 // 列表只给 downloadUrlPath/previewUrlPath；查看时凭本人 token 现换 TTL 受控签名 URL
@@ -45,7 +47,6 @@ const RETENTION_LABELS: Record<FileRetentionPolicy, string> = {
 const SIGNABLE_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan', 'cover_letter'])
 
 type SelectableRetentionPolicy = FileRetentionUpdateRequest['retentionPolicy']
-type LoadState = 'loading' | 'error' | 'ready'
 type Hint = { tone: 'ok' | 'bad'; text: string }
 
 function retentionLabel(policy: FileRetentionPolicy | null | undefined, expiresAt: string | null): string {
@@ -97,8 +98,6 @@ function documentForConvertedPdf(
 export function MyDocumentsPage() {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
-  const [items, setItems] = useState<MemberDocumentItem[]>([])
-  const [state, setState] = useState<LoadState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [hint, setHint] = useState<Hint | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
@@ -112,24 +111,10 @@ export function MyDocumentsPage() {
   const [retentionConfirm, setRetentionConfirm] = useState<{ fileId: string; policy: SelectableRetentionPolicy } | null>(null)
   const [convertingId, setConvertingId] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    if (!isLoggedIn) {
-      setItems([])
-      setState('ready')
-      return
-    }
-    setState('loading')
-    getMyDocuments(getToken(), { pageSize: 50 })
-      .then((r) => {
-        setItems(r.items)
-        setState('ready')
-      })
-      .catch(() => setState('error'))
-  }, [isLoggedIn, getToken])
-
-  useEffect(() => {
-    load()
-  }, [load, reloadKey])
+  const token = getToken()
+  const fetchPage = useCallback((cursor?: string) => getMyDocuments(token, { pageSize: 50, cursor }), [token])
+  const pagination = useMemberCursorPage<MemberDocumentItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
+  const { items, state: state, setItems } = pagination
 
   useEffect(() => {
     if (!hint) return
@@ -234,6 +219,7 @@ export function MyDocumentsPage() {
     try {
       await deleteMyDocument(token, doc.id)
       setItems((prev) => prev.filter((item) => item.id !== doc.id))
+      setReloadKey((key) => key + 1)
       setHint({ tone: 'ok', text: '文档已删除' })
     } catch {
       setHint({ tone: 'bad', text: '删除失败，文档可能已到期或被清理' })
@@ -276,7 +262,7 @@ export function MyDocumentsPage() {
   const now = Date.now()
   const isAnyPending = Boolean(opening || printingId || signingId || busyId || retentionBusy || convertingId)
   const confirmDoc = retentionConfirm ? items.find((item) => item.id === retentionConfirm.fileId) : null
-  const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
+  const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 && !pagination.nextCursor ? 'empty' : 'ready'
   const availableCount = items.filter((doc) => doc.expiresAt === null || new Date(doc.expiresAt).getTime() >= now).length
 
   const summary = (
@@ -305,7 +291,7 @@ export function MyDocumentsPage() {
     body = <QxMeLoadingBlock title="正在加载我的文档" />
   } else if (state === 'error') {
     body = <QxMeErrorBlock title="文档这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已保存的文件不会因为这次失败而消失。" struct={struct} />
-  } else if (items.length === 0) {
+  } else if (items.length === 0 && !pagination.nextCursor) {
     body = (
       <>
         {summary}
@@ -429,7 +415,7 @@ export function MyDocumentsPage() {
                   token={getToken()}
                   busy={isAnyPending}
                   reprintable={isDocumentReprintable(doc)}
-                  onConverted={() => { void getMyDocuments(getToken(), { pageSize: 50 }).then((r) => setItems(r.items)).catch(() => undefined) }}
+                  onConverted={() => setReloadKey((key) => key + 1)}
                   onError={(text) => setHint({ tone: 'bad', text })}
                   onBusyChange={(next) => setConvertingId(next ? doc.id : null)}
                   onPreview={(convertedId) => void open(documentForConvertedPdf(items, convertedId, doc))}
@@ -460,6 +446,7 @@ export function MyDocumentsPage() {
       ctabar={ctabar}
     >
       {body}
+      {isLoggedIn && state === 'ready' ? <MemberLoadMore {...pagination} /> : null}
       {preview && (
         <div className="qx-me-asset-overlay">
           <section role="dialog" aria-modal="true" aria-labelledby="document-preview-title" className="qx-me-asset-dialog">

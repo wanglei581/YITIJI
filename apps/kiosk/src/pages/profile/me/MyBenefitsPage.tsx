@@ -1,7 +1,9 @@
+import { useMemberCursorPage } from './useMemberCursorPage'
+import { MemberLoadMore } from './MemberLoadMore'
 // 我的权益 — /me/benefits（本人，只读）。
 // 只展示 BenefitGrant 元数据；不接支付、不核销、不承诺补贴办理结果。
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { BenefitStatus, BenefitType, MemberBenefitItem } from '@ai-job-print/shared'
 import { FlagIcon, GiftIcon, PrinterIcon, SparklesIcon, BookOpenIcon } from 'lucide-react'
@@ -53,28 +55,12 @@ type BenefitsUiState = 'signed-out' | 'loading' | 'error' | 'empty' | 'list'
 export function MyBenefitsPage() {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
-  const [items, setItems] = useState<MemberBenefitItem[]>([])
-  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [reloadKey, setReloadKey] = useState(0)
 
-  const load = useCallback(() => {
-    if (!isLoggedIn) {
-      setItems([])
-      setLoadState('ready')
-      return
-    }
-    setLoadState('loading')
-    getMyBenefits(getToken(), { pageSize: 50 })
-      .then((result) => {
-        setItems(result.items)
-        setLoadState('ready')
-      })
-      .catch(() => setLoadState('error'))
-  }, [isLoggedIn, getToken])
-
-  useEffect(() => {
-    load()
-  }, [load, reloadKey])
+  const token = getToken()
+  const fetchPage = useCallback((cursor?: string) => getMyBenefits(token, { pageSize: 50, cursor }), [token])
+  const pagination = useMemberCursorPage<MemberBenefitItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
+  const { items, state: loadState } = pagination
 
   const uiState: BenefitsUiState = !isLoggedIn
     ? 'signed-out'
@@ -192,6 +178,7 @@ export function MyBenefitsPage() {
             <b>权益只对应本机服务与打印，不等于政府补贴已经发放。</b>
             政策资格提示只提供信息指引，具体办理与结果以官方平台为准。本机不代办、不收取额外费用。
           </p>
+          {isLoggedIn && loadState === 'ready' ? <MemberLoadMore {...pagination} /> : null}
         </div>
       </QxPageFrame>
     </div>
