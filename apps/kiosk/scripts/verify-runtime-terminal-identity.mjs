@@ -1,5 +1,6 @@
+import ts from 'typescript'
+import { execFileSync, spawnSync } from 'node:child_process'
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -108,4 +109,47 @@ const behavior = spawnSync(process.execPath, ['--test', join(ROOT, 'scripts/test
 })
 if (behavior.status !== 0) process.exit(behavior.status ?? 1)
 
+// Every file picker must be inside its terminal-mode render guard, including phone links
+// accidentally opened on the terminal. Parse JSX so a guard in a comment cannot pass.
+const filePickers = new Map([
+  ['src/pages/resume/ResumeSourcePage.tsx', '!kiosk'],
+  ['src/pages/print-scan/ConvertImagesView.tsx', '!kiosk'],
+  ['src/pages/print-scan/SignStampPage.tsx', '!flow.localDisabled'],
+  ['src/pages/print/file-source/FileSourceView.tsx', 'showFileChannel'],
+  ['src/pages/contract-review/ContractReviewHomePage.tsx', '!kiosk'],
+  ['src/pages/interview/InterviewSetupPage.tsx', '!kiosk'],
+  ['src/pages/upload/PhoneUploadPage.tsx', '!kiosk'],
+])
+for (const [file, guard] of filePickers) {
+  const ast = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let count = 0
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'input'
+      && node.attributes.properties.some((prop) => ts.isJsxAttribute(prop) && prop.name.getText(ast) === 'type' && prop.initializer?.text === 'file')) {
+      count++
+      let parent = node.parent
+      let guarded = false
+      while (parent) {
+        if (ts.isBinaryExpression(parent) && parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+          && parent.left.getText(ast) === guard) guarded = true
+        parent = parent.parent
+      }
+      assert.ok(guarded, `${file}: file input must be conditionally absent on terminals`)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.equal(count, file.endsWith('SignStampPage.tsx') ? 2 : 1, `${file}: retain desktop/E2E upload coverage`)
+}
+assert.match(read('src/pages/resume/ResumeSourcePage.tsx'), /isTerminalKiosk\(\) \? 'phone' : 'cloud'/, 'terminal resume source defaults to an allowed channel')
+assert.match(read('src/pages/print/PrintUploadPage.tsx'), /if \(!isTerminalKiosk\(\)\) inputRef\.current\?\.click\(\)/, 'delayed replace-file callback rechecks terminal identity')
+for (const file of ['src/pages/home/components/QxHomeView.tsx', 'src/pages/help/HelpCenterPage.tsx']) {
+  const source = read(file)
+  assert.match(source, /kiosk \? <span>鲁ICP备[^<]+<\/span> : \(<a href="https:\/\/beian\.miit\.gov\.cn\//)
+  assert.match(source, /kiosk \? <span>鲁公网安备[^<]+<\/span> : \(<a href="https:\/\/beian\.mps\.gov\.cn\//)
+}
+console.log('PASS terminal pickers are absent; website filing links are preserved')
+
+// W1: production, DEV and E2E exercise the real query parsers, including the fetch decision.
+execFileSync(process.execPath, ['--test', join(ROOT, 'tests/w1-a-build-mode.test.mjs')], { stdio: 'inherit' })
 console.log('verify-runtime-terminal-identity: ok')

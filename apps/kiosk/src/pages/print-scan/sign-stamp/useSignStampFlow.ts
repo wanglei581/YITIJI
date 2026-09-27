@@ -5,7 +5,7 @@ import { useAuth } from '../../../auth/useAuth'
 import { loginPathForCurrentLocation } from '../../../auth/returnPath'
 import { useBusyLock } from '../../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../../services/api/files'
-import { getTerminalId, isTerminalKiosk } from '../../../services/api/screensaver'
+import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../../services/api/screensaver'
 import { loadConfiguredCapabilities } from '../../../services/api/printScanCapabilities'
 import { signCompose, signInspect } from '../../../services/api/printSign'
 import { errorCodeOf, userMessageOf } from '../../../services/api/userErrorMessage'
@@ -170,6 +170,7 @@ export function useSignStampFlow() {
   }, [])
 
   const handleLocalDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isTerminalKiosk()) return
     const selected = e.target.files?.[0]
     e.target.value = ''
     if (!selected) return
@@ -202,6 +203,7 @@ export function useSignStampFlow() {
   }
 
   const handleLocalStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isTerminalKiosk()) return
     const selected = e.target.files?.[0]
     e.target.value = ''
     if (!selected) return
@@ -390,11 +392,11 @@ export function useSignStampFlow() {
   const pill = pillOf(viewState, displayLive)
   const from = query.fromUnknown ? 'hub' : query.from
   const back = FROM_WHITELIST[from]
-  const localDisabled = isTerminalKiosk()
+  const localDisabled = useTerminalKiosk()
   const locked = isLockedPhase(displayLive.phase)
 
   const openLocal = (kind: 'document' | 'stamp') => {
-    if (localDisabled || synthetic) return
+    if (isTerminalKiosk() || synthetic) return
     if (kind === 'document') docInputRef.current?.click()
     else stampInputRef.current?.click()
   }
@@ -531,7 +533,7 @@ function resolveCta(args: {
     return { primary: '选好 PDF 再继续', primaryDisabled: true, reason: '还没有选文档，没有文档就没法选页码和位置', action: 'none' }
   }
   if (!live.stamp) {
-    return { primary: '传好签名 / 印章图再继续', primaryDisabled: true, reason: '还没有这次的签名 / 印章图片，没有图就没有可叠加的内容', action: 'none' }
+    return { primary: '传好本人手写签名图再继续', primaryDisabled: true, reason: '还没有这次的本人手写签名图片，没有图就没有可叠加的内容', action: 'none' }
   }
   if (live.placeErr) {
     return { primary: '先改成有效页码', primaryDisabled: true, reason: '页码超出这份文档的范围，服务端会直接拒绝', action: 'none' }

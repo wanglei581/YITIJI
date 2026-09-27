@@ -1,3 +1,4 @@
+import { ALLOW_FIXTURES } from '../../utils/buildMode'
 // 报价确认页地址栏契约。
 //
 // 金额只认服务端 POST /orders/quote。地址栏里的取值不是报价、不是文件本身。
@@ -95,9 +96,9 @@ export function scanPrintConfirmQuery(search: string, hash: string, href: string
   let requestedState: string | null = null
 
   for (const [key, value] of pairs) {
-    if (key === 'debug' && value === '1') debug = true
+    if (ALLOW_FIXTURES && key === 'debug' && value === '1') debug = true
     if (key === 'flat' && value === '1') flat = true
-    if (key === 'capture' && value === '1') capture = true
+    if (ALLOW_FIXTURES && key === 'capture' && value === '1') capture = true
     if (key === 'state') requestedState = value
 
     if (!(QUERY_ALLOW as readonly string[]).includes(key)) {

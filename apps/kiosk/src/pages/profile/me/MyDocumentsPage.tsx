@@ -386,7 +386,7 @@ export function MyDocumentsPage() {
                       {reprintBlocked ? '重新打印' : printingThis ? '准备中' : '打印'}
                     </button>
                     {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) && (
-                      <button type="button" disabled={isAnyPending} onClick={() => void signStamp(doc)} title="在该文档上叠加签名或印章图片" className="qx-me-small">
+                      <button type="button" disabled={isAnyPending} onClick={() => void signStamp(doc)} title="在该文档上叠加本人手写签名图片" className="qx-me-small">
                         <PenToolIcon size={19} aria-hidden="true" />
                         {signingId === doc.id ? '准备中' : '签名盖章'}
                       </button>

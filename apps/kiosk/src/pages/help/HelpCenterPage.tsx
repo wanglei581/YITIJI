@@ -1,3 +1,4 @@
+import { useTerminalKiosk } from '../../services/api/screensaver'
 // ============================================================
 // 帮助中心 — /help（静态信息页）。
 //
@@ -161,6 +162,7 @@ function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onN
 }
 
 export function HelpCenterPage() {
+  const kiosk = useTerminalKiosk()
   const navigate = useNavigate()
   const [activeFilter, setActiveFilter] = useState<FilterKey | null>(null)
   // 招聘内容托管（3.13）关闭时本机没有岗位与招聘会：这一类问题与分类卡不摆，「全部」按钮独占一行补齐双列。
@@ -284,13 +286,13 @@ export function HelpCenterPage() {
 
           {/* 网站备案信息 */}
           <p className="k1-help-footer k1-help-filing" aria-label="网站备案信息">
-            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
+            {kiosk ? <span>鲁ICP备2026023517号-2</span> : (<a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
               鲁ICP备2026023517号-2
-            </a>
+            </a>)}
             {' · '}
-            <a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">
+            {kiosk ? <span>鲁公网安备37021402007308号</span> : (<a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">
               鲁公网安备37021402007308号
-            </a>
+            </a>)}
             {' · 职易达AI'}
           </p>
         </section>
