@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 555,
+    "endpointCount": 556,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -7529,6 +7529,16 @@
       },
       {
         "controller": "services/api/src/member-assets/member-assets.controller.ts",
+        "handler": "MemberAssetsController.deleteQaRecord",
+        "method": "DELETE",
+        "models": [],
+        "path": "/api/v1/me/qa-records/:id",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/member-assets/member-assets.controller.ts",
         "handler": "MemberAssetsController.resumes",
         "method": "GET",
         "models": [
@@ -12483,7 +12493,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 577,
+      "reachableFileCount": 582,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15454,7 +15464,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 656
+      "sourceFileCount": 661
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17824,6 +17834,9 @@
     "apps/kiosk/scripts/tests/scan-workbench-session-durability.test.mjs": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
+    "apps/kiosk/scripts/tests/w3a-ai-records.test.mjs": [
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
+    ],
     "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
@@ -17924,7 +17937,8 @@
       "apps/kiosk/scripts/verify-member-login-dialog.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
-      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/auth/KioskSessionControlContext.tsx": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
@@ -18882,6 +18896,11 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
@@ -18920,6 +18939,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -18967,7 +18987,8 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-      "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
@@ -18982,11 +19003,20 @@
       "apps/kiosk/scripts/verify-user-center-wave0.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/QaRecords.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/activityPresentation.ts": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-activity-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "services/api/scripts/verify-job-application-track.ts"
+    ],
+    "apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -19127,6 +19157,13 @@
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
+    ],
     "apps/kiosk/src/pages/profile/profile-inkpaper.css": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
@@ -19209,7 +19246,8 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -19300,6 +19338,7 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
       "services/api/scripts/verify-compliance.ts"
     ],
     "apps/kiosk/src/pages/resume/aiResumeSession.ts": [
@@ -21949,6 +21988,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-official-channels.ts"
     ],
     "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
@@ -21989,7 +22029,8 @@
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
       "services/api/scripts/verify-job-fit-print.ts",
-      "services/api/scripts/verify-job-fit.ts"
+      "services/api/scripts/verify-job-fit.ts",
+      "services/api/scripts/verify-member-qa-records.ts"
     ],
     "services/api/src/ai/resume/llm-career-plan.service.ts": [
       "services/api/scripts/verify-ai-feature-keys.ts",
@@ -23379,6 +23420,7 @@
     ],
     "services/api/src/member-assets/member-assets.controller.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-assets/member-assets.service.ts": [
@@ -23391,6 +23433,7 @@
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-member-assets.ts",
       "services/api/scripts/verify-member-data-retention.ts",
+      "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts",
@@ -24209,6 +24252,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -26894,6 +26938,7 @@
           "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MeListShell.tsx",
+          "apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx",
           "apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
@@ -26906,7 +26951,9 @@
           "apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/QaRecords.tsx",
           "apps/kiosk/src/pages/profile/me/activityPresentation.ts",
+          "apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts",
           "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
@@ -26931,6 +26978,7 @@
           "apps/kiosk/src/pages/profile/me/styles/notifications-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/privacy-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+          "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
           "apps/kiosk/src/pages/profile/profile-inkpaper.css",
           "apps/kiosk/src/pages/profile/profile-lightflow-directory.css",
           "apps/kiosk/src/pages/profile/profile-lightflow-shell.css",
@@ -27569,6 +27617,7 @@
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+          "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
           "apps/kiosk/src/routes/index.tsx"
         ],
         "missing": []
@@ -27600,6 +27649,7 @@
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
+          "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
           "services/api/package.json",
           "services/api/scripts/verify-benefit-redemption.ts",
           "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -27652,6 +27702,7 @@
           "apps/kiosk/src/pages/profile/components/QxMemberNavbar.tsx",
           "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MeListShell.tsx",
+          "apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx",
           "apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
@@ -27664,7 +27715,9 @@
           "apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/QaRecords.tsx",
           "apps/kiosk/src/pages/profile/me/activityPresentation.ts",
+          "apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts",
           "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
@@ -27691,6 +27744,7 @@
           "apps/kiosk/src/pages/profile/me/styles/notifications-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/privacy-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+          "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
           "apps/kiosk/src/pages/profile/profile-inkpaper.css",
           "apps/kiosk/src/pages/profile/profile-lightflow-directory.css",
           "apps/kiosk/src/pages/profile/profile-lightflow-shell.css",
@@ -27780,6 +27834,7 @@
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
           "apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
+          "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
           "services/api/package.json",
           "services/api/scripts/verify-benefit-redemption.ts",
           "services/api/scripts/verify-job-application-track.ts",
@@ -28313,6 +28368,31 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:visual-evidence-manifest"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/scripts/tests/w3a-ai-records.test.mjs",
+          "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
+          "apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx",
+          "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
+          "apps/kiosk/src/pages/profile/me/QaRecords.tsx",
+          "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
+          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:w3a-ai-records"
       ],
       "wired": true
     },
@@ -34036,6 +34116,28 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:member-print-orders"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/ai/resume/job-fit.service.ts",
+          "services/api/src/member-assets/member-assets.controller.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-member-qa-records.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:member-assets"
       ],
       "wired": true
     },

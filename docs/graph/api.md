@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`555` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`556` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -559,6 +559,7 @@
 | DELETE | `/api/v1/me/ai-records/:id` | MemberAssetsController.deleteAiRecord | — | — | — |
 | GET | `/api/v1/me/documents` | MemberAssetsController.documents | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | GET | `/api/v1/me/documents/deleted` | MemberAssetsController.deletedDocuments | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| DELETE | `/api/v1/me/qa-records/:id` | MemberAssetsController.deleteQaRecord | — | — | — |
 | GET | `/api/v1/me/resumes` | MemberAssetsController.resumes | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/resumes/:id` | MemberAssetsController.deleteResume | — | — | — |
 
