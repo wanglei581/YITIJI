@@ -1,3 +1,4 @@
+import { resumeUserReason } from '../../resumeUserCopy'
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import type { GeneratedResume, ResumeOptimizeModule, ResumeTemplate } from '@ai-job-print/shared'
 import { getResumeOptimize, type ResumeReadAccess } from '../../../../services/api'
@@ -92,7 +93,7 @@ export function useOptimizeLoad(opts: {
         } else {
           const reason = res.failReason ?? ''
           setFailKind(reason.includes('重新上传') ? 'expired' : 'retry')
-          setFailMsg(reason.includes('重新上传') ? '文件已过期，请重新上传简历' : (reason || '本次没有生成优化建议，可重试或返回重新解析'))
+          setFailMsg(reason.includes('重新上传') ? '文件已过期，请重新上传简历' : resumeUserReason(reason, '本次没有生成优化建议，可重试或返回重新解析'))
         }
       })
       .catch((err: unknown) => {

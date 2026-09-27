@@ -95,6 +95,7 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   })
   await page.goto('/resume/source')
   await assertKioskShellFillsViewport(page)
+  await page.locator('.qx-rt-settings > summary').click()
   await page.getByRole('button', { name: '选择行业方向' }).click()
   const diagnosisIndustryDialog = page.getByRole('dialog', { name: '选择行业门类' })
   await expect(diagnosisIndustryDialog).toBeVisible()
@@ -110,13 +111,14 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   await degree.getByRole('button', { name: '本科', exact: true }).click()
   await expect(degree.getByRole('button', { name: '本科', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="pdf"]')
   await expect(preview).toBeVisible()
   await expect(preview.locator('[data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/w3-fixtures/resume.pdf')
   await expect.poll(() => previewLoaded).toBe(true)
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await expect(page.getByText('处理内容说明 · 非实时阶段', { exact: true })).toBeVisible()
-  await expect(page.getByText('不代表服务端实时阶段', { exact: false })).toBeVisible()
+  await expect(page.getByText('不代表实时进度', { exact: false })).toBeVisible()
   await expect(page.getByText(/进行中…|已完成|逐项点亮/)).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
   await page.waitForURL('/resume/report')
@@ -170,6 +172,7 @@ test('USB resume keeps its purpose and reaches AI parsing @w3-kiosk', async ({ p
   await page.goto('/resume/source')
   await page.getByRole('button', { name: /U盘上传/ }).click()
   await page.getByRole('button', { name: /U盘简历\.pdf/ }).click()
+  await page.locator('.qx-rt-preview > summary').click()
   await expect(page.locator('[data-file-preview-kind="pdf"]')).toBeVisible()
   expect(uploadBody).toEqual({ safeId: 'usb-safe-resume', purpose: 'resume_upload' })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
@@ -234,6 +237,7 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   await expect(page.getByRole('button', { name: /my_pdf_resume\.jpg/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /too-large\.pdf/ })).toHaveCount(0)
   await page.getByRole('button', { name: /my_pdf_resume\.jpg/ }).click()
+  await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="image"]')
   await expect(preview).toBeVisible()
   await expect(preview.locator('img')).toHaveAttribute('src', '/w3-fixtures/my_pdf_resume.jpg')
@@ -279,6 +283,7 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
 
   await page.goto('/resume/optimize?taskId=resume-w3-inline-preview')
   await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
+  await page.getByRole('tab', { name: '编辑与导出', exact: true }).click()
   await page.getByRole('button', { name: '导出 PDF', exact: true }).first().click()
   await page.getByRole('checkbox', { name: /测试大学/ }).click()
   await page.getByRole('button', { name: '确认导出' }).click()
@@ -328,11 +333,14 @@ test('resume preview recovers after replacing a failed file @w3-kiosk', async ({
   await page.goto('/resume/source')
   const input = page.getByLabel('选择本机简历文件')
   await input.setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('broken') })
+  await page.locator('.qx-rt-preview > summary').click()
   await expect(page.locator('[data-file-preview-kind="unavailable"]')).toBeVisible()
   await input.setInputFiles({ name: 'recovered.pdf', mimeType: 'application/pdf', buffer: Buffer.from(VISIBLE_PDF) })
+  await page.locator('.qx-rt-preview > summary').click()
   await expect(page.locator('[data-file-preview-kind="pdf"]')).toBeVisible()
   await expect(page.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/w3-fixtures/recovered.pdf')
   await input.setInputFiles({ name: 'resume_pdf_final.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('synthetic-docx') })
+  await page.locator('.qx-rt-preview > summary').click()
   await expect(page.locator('[data-file-preview-kind="unsupported"]')).toBeVisible()
   await expect(page.locator('[data-file-preview-kind="unsupported"] iframe')).toHaveCount(0)
 })
@@ -390,6 +398,7 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   await page.clock.install()
   await page.goto('/resume/source')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="pdf"]')
   await expect(preview).toBeVisible()
   await expect(preview.locator('[data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/w3-fixtures/resume.pdf')
@@ -1031,9 +1040,9 @@ test('Qingxu topbar stays on one line at 390 and 1080 keeps its full layout @w3-
 
   await page.setViewportSize({ width: 390, height: 844 })
   // 本批两页 + 相邻的已迁青序页（报告页在 KioskRoot 内、岗位匹配是整屏路由），都走同一条共用顶栏规则。
-  // 报告页的返回键在它自己的深底页头里（不走顶栏），所以只对有顶栏返回键的页量尺寸。
+  // 稿 22 的任务头只读；返回移到共享顶栏，仍检查同一触摸尺寸下限。
   // 岗位匹配页不在这里量：它有自己页内的手机顶栏规则（.jfq-root，胶囊按设计省略号截断），不走这条共用规则。
-  for (const [route, hasTopbarBack] of [['/resume/source', true], ['/resume/parse', true], ['/resume/report', false], ['/resume-service', null]] as const) {
+  for (const [route, hasTopbarBack] of [['/resume/source', true], ['/resume/parse', true], ['/resume/report', true], ['/resume-service', null]] as Array<[string, boolean | null]>) {
     await page.goto(route)
     const metrics = await qxTopbarMetrics(page)
     expect(metrics.stageFit, route).toBe('off')
@@ -1069,6 +1078,42 @@ test('Qingxu topbar stays on one line at 390 and 1080 keeps its full layout @w3-
     .filter((item) => item.lines > 1))
   expect(brokenChips).toEqual([])
   await assertNoHorizontalOverflow(page)
+})
+
+test('R1 2.0 keeps resume controls below the read-only header and preserves the direction width @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  const taskId = 'qx2-r1-layout'
+  api.respond('GET', `/api/v1/resume/records/${taskId}`, { status: 200, json: { ...diagnosis, taskId } })
+  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
+  api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
+    status: 200,
+    json: {
+      taskId, status: 'completed', providerName: 'llm',
+      modules: [{ title: '个人简介', before: '参与项目沟通。', after: '参与项目沟通，跟进需求。' }],
+      optimizedResume: { basic: { name: '版式测试' }, intention: {}, summary: '参与项目沟通，跟进需求。', education: [], experience: [], projects: [], skills: [], certificates: [] },
+    },
+  })
+  for (const [route, ready] of [
+    ['/resume/source', '.qx-rt-settings'],
+    [`/resume/report?taskId=${taskId}`, '[data-testid="resume-report-counts"]'],
+    [`/resume/optimize?taskId=${taskId}`, '[role="tablist"][aria-label="优化工作区"]'],
+    [`/resume/optimize/compare?taskId=${taskId}`, '[aria-label="改写选择统计"]'],
+  ]) {
+    await page.goto(route)
+    await expect(page.locator(ready)).toBeVisible()
+    const highControls = await page.locator('.qx-body').evaluate((root) => Array.from(root.querySelectorAll<HTMLElement>('button, summary, a[href], input:not([type="file"]), textarea, select'))
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' && r.top < 500 })
+      .map((el) => ({ label: el.textContent?.trim(), y: el.getBoundingClientRect().top })))
+    expect(highControls, route).toEqual([])
+    await assertNoHorizontalOverflow(page)
+    await expect(page.locator('.qx-body')).not.toContainText(/服务端|能力探测|未验收|终端编号|内部文件号/)
+    await expect(page.getByRole('button', { name: /^问小青：/ })).toBeVisible()
+    if (route === '/resume/source') {
+      const direction = await page.locator('.qx-rt-side').boundingBox()
+      expect(direction!.width).toBeGreaterThanOrEqual(440)
+    }
+  }
 })
 
 test('assistant first screen keeps composer and send above the Qingxu navbar @w3-kiosk', async ({ page, api }) => {

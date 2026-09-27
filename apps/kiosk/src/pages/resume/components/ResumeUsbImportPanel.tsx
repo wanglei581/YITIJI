@@ -86,7 +86,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
         if (cancelled) return
         setStatus(null)
         setFiles(null)
-        setError(userMessageOf(err, 'U盘读取失败，请确认 Terminal Agent 正在运行'))
+        setError(userMessageOf(err, 'U盘读取失败，请重新插入或联系现场工作人员'))
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -133,8 +133,8 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       <KioskStatePanel
         compact
         tone="empty"
-        title="当前终端未配置U盘导入"
-        description="请联系工作人员检查 Terminal Agent 本地网桥配置。"
+        title="这台机器暂未开通 U 盘导入"
+        description="请改用手机扫码上传，或联系现场工作人员。"
       />
     )
   }

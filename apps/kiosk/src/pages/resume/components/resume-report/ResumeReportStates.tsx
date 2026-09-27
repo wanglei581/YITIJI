@@ -14,7 +14,7 @@ interface Exit {
 const COPY: Record<StateView, { h: string; p: string; exits: Exit[] }> = {
   'no-context': {
     h: '还没有诊断报告',
-    p: '诊断结果按简历任务编号读取，并且要凭本人凭证才读得到 —— 地址栏里带一个编号不等于有权限。没有编号就读不到，本页也不会拿通用结论顶替。',
+    p: '请先上传一份本人简历完成诊断，或从我的诊断记录继续查看。',
     exits: [
       { title: '返回简历来源', desc: '重新上传或扫描一份简历，交给解析', to: '/resume/source', testid: 'resume-report-exit-source' },
       { title: '打开我的诊断记录', desc: '从已保存的记录里挑一份继续', to: '/me/ai-records', testid: 'resume-report-exit-records' },
@@ -32,11 +32,11 @@ const COPY: Record<StateView, { h: string; p: string; exits: Exit[] }> = {
   },
   'read-error': {
     h: '这次没能取到报告',
-    p: '常见原因：本次办理会话已经结束、结果已按留存期清理，或者读取中途断开。读取失败不会动到你上传的原件，也不会删掉任何已保存的简历。',
+    p: '常见原因：本次办理已经结束、结果已按留存期清理，或者读取中途断开。读取失败不会动到你上传的原件，也不会删掉任何已保存的简历。',
     exits: [
       { title: '返回简历来源', desc: '换一份文件重新提交解析', to: '/resume/source', testid: 'resume-report-exit-source' },
       { title: '打开我的诊断记录', desc: '看看有没有别的可用记录', to: '/me/ai-records', testid: 'resume-report-exit-records' },
-      { title: '去打印 / 扫描', desc: '不依赖报告的现成链路', to: '/print-scan', testid: 'resume-report-exit-print' },
+      { title: '去打印 / 扫描', desc: '不用报告，也能办理打印扫描', to: '/print-scan', testid: 'resume-report-exit-print' },
     ],
   },
   unavailable: {
@@ -46,11 +46,13 @@ const COPY: Record<StateView, { h: string; p: string; exits: Exit[] }> = {
       { title: '打印简历或材料', desc: '选好份数和单双面就能出纸', to: '/print-scan', testid: 'resume-report-exit-print' },
       { title: '扫描纸质简历', desc: '在奔图面板扫描，回传成 PDF', to: '/scan', testid: 'resume-report-exit-scan' },
       { title: '打开我的简历', desc: '查看和整理已保存的版本', to: '/me/ai-records', testid: 'resume-report-exit-records' },
+      { title: '查政策', desc: '查看本机构发布的政策与办理说明', to: '/policy-service', testid: 'resume-report-exit-policies' },
+      { title: '本机构官方渠道', desc: '扫码查看官网或官方账号', to: '/official-channels', testid: 'resume-report-exit-channels' },
     ],
   },
   illegal: {
     h: '这个地址不能用来打开报告',
-    p: '本页只认登记过的状态与编号格式。收到没登记的值时一律按不可用处理，也不会把地址里的原文显示出来。',
+    p: '这个地址无法打开报告，请从简历来源或我的诊断记录重新进入。',
     exits: [
       { title: '返回简历来源', desc: '从上传或扫描重新开始', to: '/resume/source', testid: 'resume-report-exit-source' },
       { title: '打开我的诊断记录', desc: '从记录里选一条正常打开', to: '/me/ai-records', testid: 'resume-report-exit-records' },

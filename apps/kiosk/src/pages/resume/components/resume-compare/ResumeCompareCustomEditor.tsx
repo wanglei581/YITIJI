@@ -48,7 +48,7 @@ export function ResumeCompareCustomEditor(props: {
           aria-label="自己改写这一条"
         />
       </label>
-      <p>只留在本页，不写进优化稿，刷新即丢。没有字段路径，不能自动套进编辑区。</p>
+      <p>这段只留在本页，刷新后不保留。要放进新简历，请回编辑区填写。</p>
       <div className="qxc-custom-actions">
         <button
           type="button"

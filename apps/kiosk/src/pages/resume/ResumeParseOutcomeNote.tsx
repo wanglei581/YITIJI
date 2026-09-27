@@ -1,3 +1,4 @@
+import { resumeProcessCopy } from './resumeUserCopy'
 import type { ReactNode } from 'react'
 import type { RailMark } from './components/ResumeTriageHero'
 import type { ResumeParseTerminalCopy, ResumeParseTerminalKind } from '../../services/resumeParseIntent'
@@ -49,7 +50,7 @@ const VIEW: Record<ParseView, FrameCopy> = {
   },
   failed: {
     ask: <>这次<em>没能读出内容</em>。</>,
-    doing: '文件已经传到服务端了，正在转到失败说明页，可以直接重新解析，不用再传一遍。',
+    doing: '正在打开失败说明。文件仍可用时，可重新解析，不用再传一遍。',
     flag: '解析失败', warn: true,
     status: { tone: 'bad', label: '解析失败 · 可重试' },
     rail: ['done', 'bad', 'todo', 'todo'],
@@ -105,18 +106,18 @@ export function ResumeParseUnknownNote(props: {
 }) {
   const { terminal, pendingTask, recheck, blockNote, storageBlocked, confirmFresh, loggedIn, onFresh } = props
   if (terminal?.mode === 'blocked') {
-    return <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-terminal">{terminal.note}</p>
+    return <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-terminal">{resumeProcessCopy(terminal.note)}</p>
   }
   if (terminal) {
     return (
       <>
         <p className="qx-rt-note resume-parse-terminal" data-tone="warn" data-testid="resume-parse-terminal">
-          <b>{terminal.copy.title}</b>{terminal.copy.lead}
+          <b>{terminal.copy.title}</b>{resumeProcessCopy(terminal.copy.lead)}
         </p>
         <dl className="qx-rt-kv">
-          <div><dt>服务端确认</dt><dd>{terminal.copy.happened}</dd></div>
-          <div><dt>本机标识</dt><dd>{terminal.copy.kept}</dd></div>
-          <div><dt>建议这样做</dt><dd data-testid="resume-parse-terminal-next">{terminal.copy.next}</dd></div>
+          <div><dt>已确认的情况</dt><dd>{resumeProcessCopy(terminal.copy.happened)}</dd></div>
+          <div><dt>本机标识</dt><dd>{resumeProcessCopy(terminal.copy.kept)}</dd></div>
+          <div><dt>建议这样做</dt><dd data-testid="resume-parse-terminal-next">{resumeProcessCopy(terminal.copy.next)}</dd></div>
         </dl>
       </>
     )
@@ -124,10 +125,10 @@ export function ResumeParseUnknownNote(props: {
   return (
     <>
       <p className="qx-rt-note resume-parse-unknown" data-tone="warn">
-        <b>结果未知</b>{pendingTask ? '服务端已经登记了这一次解析，但还没给出最终结果。' : '暂时无法确认这一次解析有没有完成。'}本页不会自动再提交，也不会把它当成失败。
+        <b>结果未知</b>{pendingTask ? '已经收到这一次解析，但还没给出最终结果。' : '暂时无法确认这一次解析有没有完成。'}本页不会自动再提交，也不会把它当成失败。
       </p>
       <dl className="qx-rt-kv">
-        <div><dt>发生了什么</dt><dd>{pendingTask ? '解析已经提交并拿到了编号，服务端还没返回最终结果。' : '提交解析后网络或服务出了问题，这台机器没能确认结果。'}</dd></div>
+        <div><dt>发生了什么</dt><dd>{pendingTask ? '解析已经提交并拿到了编号，还没有最终结果。' : '提交解析后网络或服务出了问题，这台机器没能确认结果。'}</dd></div>
         <div><dt>还不确定的</dt><dd>这一次解析可能已经完成，也可能没有。</dd></div>
         {pendingTask ? (
           <div><dt>按编号再查</dt><dd>只是读取这一次的结果，不会重新解析，也不会多出记录。</dd></div>
@@ -155,7 +156,7 @@ export function ResumeParseUnknownNote(props: {
         <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-recheck-result">这次没查到结果，可能是网络问题或编号已失效；可以稍后再查，或返回简历来源。</p>
       )}
       {blockNote && (
-        <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-intent-note">{blockNote}</p>
+        <p className="qx-rt-note" data-tone="warn" role="status" data-testid="resume-parse-intent-note">{resumeProcessCopy(blockNote)}</p>
       )}
       {!storageBlocked && confirmFresh === 0 && (!pendingTask || recheck === 'not-found') && (
         <button type="button" className="qx-btn" data-variant="ghost" onClick={onFresh}>

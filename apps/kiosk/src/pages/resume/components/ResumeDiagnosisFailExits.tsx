@@ -17,8 +17,7 @@
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { makePrintParams } from '@ai-job-print/shared'
-import { BriefcaseIcon, CalendarDaysIcon, PrinterIcon } from 'lucide-react'
-import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
+import { BookOpenIcon, QrCodeIcon, PrinterIcon } from 'lucide-react'
 import { MANUAL_CHECKS } from '../resume-report-model'
 
 export interface ResumeDiagnosisFailFile {
@@ -36,7 +35,7 @@ interface Props {
 
 /** 拿不到打印链接时的真实原因。写在按钮旁边常驻可见，不放 tooltip。 */
 const NO_PRINT_URL_REASON =
-  '这一屏刷新过，本次上传的文件访问凭证只在内存里，已经随刷新丢了 —— 不是文件被删了。重新上传一次就能直接打印原件。'
+  '这里没有可用的原件打印链接。请回到来源选择重新选取文件，再确认打印。'
 
 /** 置灰行：沿用 rrp-row 的尺寸，只换虚线与弱化色，读得出「点不动」。 */
 const DEAD_ROW: CSSProperties = { borderStyle: 'dashed', color: 'var(--qx-ink-3)', cursor: 'not-allowed' }
@@ -44,8 +43,6 @@ const DEAD_ROW: CSSProperties = { borderStyle: 'dashed', color: 'var(--qx-ink-3)
 export function ResumeDiagnosisFailExits({ file }: Props) {
   const navigate = useNavigate()
   const canPrintOriginal = Boolean(file?.fileUrl)
-  // 招聘内容托管（3.13）关闭时没有岗位与招聘会可看，这两条出路不摆。
-  const hostingOpen = useRecruitmentHosting().enabled
 
   const printOriginal = () => {
     if (!file?.fileUrl) return
@@ -68,7 +65,7 @@ export function ResumeDiagnosisFailExits({ file }: Props) {
       <section className="rrp-exits resume-report-fail-exits" data-testid="resume-report-fail-exits">
         <div className="rrp-zh">这些都不需要 AI<span>现在就能做</span></div>
         <p className="rrp-export-reason" style={{ marginBottom: 12 }}>
-          {file?.name ? `「${file.name}」已经传到服务端，文件没有丢。` : '你上传的文件没有丢。'}
+          {file?.name ? `「${file.name}」的解析没有完成。` : '这次没有生成诊断报告。'}
           这一屏不给任何诊断结论 —— 没跑出来就是没有，不拿通用建议顶替。
         </p>
         <div className="rows" style={{ display: 'grid', gap: 10 }}>
@@ -103,18 +100,16 @@ export function ResumeDiagnosisFailExits({ file }: Props) {
             <PrinterIcon size={26} aria-hidden="true" />
             <span className="tx"><b>去打印 / 扫描其他材料</b><span>打印扫描不依赖 AI，照常可用</span></span>
           </button>
-          {hostingOpen ? (
-            <>
-              <button type="button" className="rrp-row" onClick={() => navigate('/jobs')} data-route="/jobs">
-                <BriefcaseIcon size={26} aria-hidden="true" />
-                <span className="tx"><b>查看岗位</b><span>来源平台的岗位信息照常可看</span></span>
+          <>
+              <button type="button" className="rrp-row" onClick={() => navigate('/policy-service')} data-route="/policy-service">
+                <BookOpenIcon size={26} aria-hidden="true" />
+                <span className="tx"><b>查政策</b><span>查看本机构发布的政策与办理说明</span></span>
               </button>
-              <button type="button" className="rrp-row" onClick={() => navigate('/job-fairs')} data-route="/job-fairs">
-                <CalendarDaysIcon size={26} aria-hidden="true" />
-                <span className="tx"><b>查看招聘会</b><span>现场活动信息照常可看</span></span>
+              <button type="button" className="rrp-row" onClick={() => navigate('/official-channels')} data-route="/official-channels">
+                <QrCodeIcon size={26} aria-hidden="true" />
+                <span className="tx"><b>本机构官方渠道</b><span>扫码查看本机构官网或官方账号</span></span>
               </button>
-            </>
-          ) : null}
+</>
         </div>
       </section>
       <section className="rrp-checks" data-testid="resume-report-fallback">

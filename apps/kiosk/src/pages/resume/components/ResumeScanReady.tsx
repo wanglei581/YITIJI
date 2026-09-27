@@ -35,8 +35,8 @@ export function ResumeScanReady({ name, size, format, onDrop, onRescan }: Resume
       </div>
       <dl className="qx-rt-kv">
         <div><dt>来路</dt><dd>扫描工作台交接过来的，不是本页去扫的</dd></div>
-        <div><dt>本页没做什么</dt><dd>没有重新扫描，也没有改动这份文件</dd></div>
-        <div><dt>保存期限</dt><dd>归属在建扫描会话时已定，本页读不到</dd></div>
+        <div><dt>文件状态</dt><dd>原件保持不变</dd></div>
+        <div><dt>保存期限</dt><dd>沿用扫描时的保存期限，本页不延长</dd></div>
       </dl>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={onRescan}>
         回扫描台重扫一份

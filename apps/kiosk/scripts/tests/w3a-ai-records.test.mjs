@@ -132,6 +132,7 @@ function optimizeHarness() {
   const h = hooks(), request = deferred(), state = {}, locks = { active: 0 }
   const { useOptimizeLoad, OPTIMIZE_LOAD_LIMIT_MS } = load('src/pages/resume/components/resume-deliver/useOptimizeLoad.ts', {
     react: h.react,
+    '../../resumeUserCopy': load('src/pages/resume/resumeUserCopy.ts'),
     '../../../../services/api': { getResumeOptimize: (_task, _access, existingOnly) => { state.ExistingOnly = existingOnly; return request.promise } },
     '../../../../services/api/jobMaterials': { getResumeTemplates: async () => [] },
     '../../../../services/api/userErrorMessage': { errorCodeOf: (error) => error.code ?? 'FAILED', userMessageOf: (_e, text) => text },
@@ -143,6 +144,18 @@ function optimizeHarness() {
   h.render(() => useOptimizeLoad(opts))
   return { h, request, state, locks, opts, limit: OPTIMIZE_LOAD_LIMIT_MS }
 }
+
+test('resume failure reasons never echo arbitrary technical or injected text', () => {
+  const { resumeUserReason } = load('src/pages/resume/resumeUserCopy.ts')
+  const fallback = '这次没有生成优化建议，请稍后再试。'
+  for (const reason of ['服务端字段 pending / uploaded / 内部文件号 abc', '<script>alert(1)</script>', '未验收：能力探测失败', 'unknown provider detail']) {
+    assert.equal(resumeUserReason(reason, fallback), fallback)
+  }
+  assert.match(resumeUserReason('服务端超时 trace-id:abc', fallback), /稍后再试/)
+  assert.doesNotMatch(resumeUserReason('服务端超时 trace-id:abc', fallback), /服务端|trace-id|abc/)
+  assert.match(resumeUserReason('文件已清理，请重新上传', fallback), /重新上传/)
+  assert.match(resumeUserReason('今日配额已用完', fallback), /次数已用完/)
+})
 
 test('optimize holds a lock through 95s, succeeds before 100s, releases on failure and unmount', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })

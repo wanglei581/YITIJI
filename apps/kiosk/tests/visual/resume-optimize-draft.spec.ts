@@ -10,7 +10,7 @@ const W6_MEMBER_CODE = '123456'
 const EMPTY_TASK_ID = 'optimize-empty-2099'
 const EMPTY_ACCESS_TOKEN = 'optimize-empty-access-token'
 const OPTIMIZE_PROTOTYPE = readFileSync(
-  new URL('../../../../docs/design/kiosk-redesign-2026-08/23-resume-optimize.html', import.meta.url),
+  new URL('../../../../docs/design/kiosk-redesign-2026-08-v2/23-resume-optimize.html', import.meta.url),
   'utf8',
 )
 

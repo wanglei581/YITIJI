@@ -10,7 +10,7 @@ export function ResumeCompareDraft(props: {
   const stats = decisionStats(props.items, props.decisions)
   return (
     <details className="qx-card qxc-draft">
-      <summary>裁决草稿</summary>
+      <summary>选择草稿</summary>
       <p>
         这是阅读草稿，不是简历最终稿；只有优化页编辑区的内容会进入导出。
       </p>

@@ -12,7 +12,7 @@ export function optimizeStateTitle(view: OptimizeViewState): string {
 
 export function optimizeStateDescription(view: OptimizeViewState, failMsg: string | null): string {
   if (view === 'loading') return '正在读取优化结果，读回来之前不展示任何简历内容。'
-  if (view === 'illegal') return '查询参数无法识别，已按失败关闭处理，不回显原始地址。'
-  if (view === 'unavailable') return failMsg ?? '能力未接通。可打印原件或返回上传。'
+  if (view === 'illegal') return '这个地址暂时无法打开，请从诊断报告或我的简历重新进入。'
+  if (view === 'unavailable') return failMsg ?? '暂时无法生成优化建议，可以先手动整理或返回上传。'
   return failMsg ?? '优化建议基于诊断结果生成。回到 AI 简历服务上传简历并完成诊断后，再进入本页。'
 }
