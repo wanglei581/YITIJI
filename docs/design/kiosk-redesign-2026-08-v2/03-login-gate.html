@@ -220,9 +220,9 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 </style>
 <!--
 青序流光 2.0 · 03 登录（state=phone-code-sent）
-规则 1：两种登录方式仍在 y≥500；底部另有「返回首页」。标题和三步之间不留超过 120px 的空档，三步说明用本页原有句子拆成两行。
+规则 1：两种登录方式仍在 y≥500；协议勾选放在方式切换下面、底部按钮上面，首屏看得见。底部另有「返回首页」。
 规则 2：页标题 38，方式名 28，说明 21–23，主按钮 27。
-规则 4：去掉 SIGN IN；「服务端回执」改成「验证码已发出」。验证码卡内边距收一档。
+规则 4：去掉 SIGN IN、服务端、回执、会话、链路。验证码发出后写「请在下面填验证码」。
 规则 5：「不登录也能办」只留打印与扫描、到机码核销两行，不放岗位与招聘会。
 规则 7：本步不让 AI 核验身份。「登录之后可以问小青能办什么」放在底部按钮条上方，不核验身份。
 未改：颜色令牌、圆角、手机号 / 扫码两条路径、验证码规则。
@@ -276,10 +276,18 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .logo-name{font-size:26px!important}
 #kbpad .kbfor{font-size:21px!important}
 #kbpad .kbdone{font-size:22px!important}
-#qx-airow{flex:none;display:flex;justify-content:flex-end;padding:0 44px}
+#qx-airow{flex:none;display:flex;justify-content:flex-end;padding:0 44px;order:3}
+.ctabar{order:4!important}
 #qx-airow:empty{display:none}
 .qx-aiwrap{margin:0}
-.qx-ai,.qx-back{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;color:var(--teal-d);font-size:22px;font-weight:650;text-decoration:none}
+.qx-ai,.qx-back{display:inline-flex;align-items:center;min-height:48px;padding:0 8px;color:var(--teal-d);font-size:22px;font-weight:650;text-decoration:none}
+.qx-fill{margin:0 0 8px;font-size:26px;line-height:1.35;font-weight:700;color:var(--ink)}
+.agree{order:0}
+.body{display:flex;flex-direction:column}
+.scrollarea{order:2}
+.agree{order:1}
+.gate-note{order:1}
+.ctabar{order:3}
 .demo-tab,.demo-panel{display:none!important}
 </style>
 </head>
@@ -298,7 +306,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
     <a class="back" id="back" href="01-home.html" data-route="/" aria-label="返回首页"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
     <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
     <div class="sp"></div>
-    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">登录结果以服务端返回为准</span></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">登录是否成功，看这台机器怎么跳</span></div>
     <div class="clock" id="clock">--:--</div>
   </header>
 
@@ -314,7 +322,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
   <nav class="tabs" aria-label="登录方式">
     <a class="tab" id="tab-phone" href="?mode=phone" data-route="/login" data-testid="login-gate-tab-phone">
       <span class="ti"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></span>
-      <span class="tb"><span class="tn">手机号登录</span><span class="td">输入手机号，用服务端下发的短信验证码登录</span></span>
+      <span class="tb"><span class="tn">手机号登录</span><span class="td">输入手机号，用短信里的验证码登录</span></span>
     </a>
     <a class="tab" id="tab-qr" href="?mode=qr" data-route="/login" data-testid="login-gate-tab-qr">
       <span class="ti"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><path d="M14 14h3v3h-3zM20.5 14v1M14 20.5h1M17.5 17.5h3.5"/></svg></span>
@@ -327,17 +335,15 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
     <div class="agree">
       <input type="checkbox" id="agree" data-testid="login-gate-agree" aria-label="我已阅读并同意用户服务协议与隐私政策" aria-describedby="gate-note">
       <label for="agree">我已阅读并同意</label>
-      <a href="../kiosk-redesign-2026-08/08-legal.html?doc=user" data-route="/legal/terms">用户服务协议</a>
-      <a href="../kiosk-redesign-2026-08/08-legal.html?doc=privacy" data-route="/legal/privacy">隐私政策</a>
+      <a href="08-legal.html?doc=user" data-route="/legal/terms">用户服务协议</a>
+      <a href="08-legal.html?doc=privacy" data-route="/legal/privacy">隐私政策</a>
     </div>
     <div class="gate-note" id="gate-note" role="status" data-testid="login-gate-reason">未勾选协议：不会发码，也不会创建二维码。</div>
     <div class="ctabar" id="ctabar"></div>
   </main>
 
   <div class="truth" data-disclaimer="true" data-testid="login-gate-truth">
-    <div><b>验证码</b>由服务端短信通道下发，本机不生成、不预填，也不判断它是否有效。</div>
-    <div><b>扫码</b>手机确认只代表确认了这次请求，一体机还要换取登录态才算登录。</div>
-    <div><b>公共终端</b>结束会话或闲置超时清除本机登录态与临时会话信息；账号内数据按服务端留存期限管理。</div>
+    <div>验证码由短信发到你的手机。这台机器不生成、不代填，也不判断对不对。手机上点了确认，还要这台机器换成登录才算登录。离开或超时会退出，并清掉这台机器上的临时内容。</div>
   </div>
 
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
@@ -408,6 +414,7 @@ function phoneFields(opt){
   '<span class="side" id="send-btn" role="button" tabindex="0" aria-disabled="true" data-label="'+opt.sendPlain+'" data-testid="login-gate-send">'+opt.sendLabel+'</span>'+
   '</div>'+(opt.phoneEcho?'<div class="echo">本次输入：<b id="phone-echo">未获取到本次输入的手机号</b></div>':'')+
   (opt.phoneNote?'<div class="reason">'+opt.phoneNote+'</div>':'')+'</div>'+
+  (codeOn?'<div class="qx-fill">请在下面填验证码</div>':'')+
   '<div class="field"><label for="code">短信验证码</label><div class="row">'+
   '<input id="code" type="text" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="'+(codeOn?'短信验证码（6 位数字）':'短信验证码（现在没有可填的验证码，输入框已关闭）')+'" placeholder="'+(codeOn?'输入短信里的 6 位验证码':'还没有可填的验证码')+'"'+(codeOn?'':' disabled')+'>'+
   '</div>'+'<div class="reason">'+opt.codeNote+'</div></div></section>';
@@ -416,7 +423,7 @@ function whyLogin(){
  return '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">登录之后多出什么</span><span class="hint">不登录也能办的事见下一栏</span></div>'+
   '<div class="grid2">'+
   '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('files','currentColor',26)+'</span>本人资产按账号归集</h3>'+
-  '<p>我的文档、打印订单、AI 服务记录归到你名下，<b>只有本人可见</b>。删除与留存按服务端规则执行。</p></div>'+
+  '<p>我的文档、打印订单、AI 服务记录归到你名下，<b>只有本人可见</b>。要删、要留，按各自的保存期限。</p></div>'+
   '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('link','currentColor',26)+'</span>手机与这台机器接得上</h3>'+
   '<p>手机上下单拿到的到机码、手机传上来的文件，<b>能和这台机器对上号</b>，不用重新传一遍。</p></div>'+
   '</div></section>';
@@ -464,37 +471,36 @@ V['phone-idle']=function(){
 V['phone-sending']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h"><span class="dot16 breathe"></span>正在请求发送验证码</div>'+
-   '<div class="state-p">请求已发出，<b>结果由服务端返回</b>。它可能成功，也可能被频控挡下，或者短信通道本身没发出去 —— 三种结果的下一步不一样，本页不提前替它下结论。</div>'+
-   '<div class="state-p">这一步不会自动跳过。没有拿到成功回执之前，验证码输入框保持不可用。</div></div></section>'+
-   phoneFields({hint:'等待服务端返回',sendLabel:'请求中',sendPlain:'请求中',codeInput:'off',phoneLocked:true,phoneEcho:true,
-    codeNote:'只有拿到成功回执才会锁号、起 60 秒冷却、开放验证码输入框。'})+anonRow(),
-  cta:btnA('ghost','01-home.html','/','返回首页')+btnDead('等待服务端返回','请求进行中')};
+   '<div class="state-p">请求已发出，<b>结果看这台机器怎么说</b>。可能发出去了，也可能太频繁，或者短信没走通。三种下一步不一样，这里不提前下结论。</div>'+
+   '<div class="state-p">这一步不会自动跳过。没确认发出去之前，验证码先不能填。</div></div></section>'+
+   phoneFields({hint:'正在等待结果',sendLabel:'请求中',sendPlain:'请求中',codeInput:'off',phoneLocked:true,phoneEcho:true,
+    codeNote:'只有确认发出去，才会锁住号码、开始 60 秒等待，并打开验证码。'})+anonRow(),
+  cta:btnA('ghost','01-home.html','/','返回首页')+btnDead('正在等待结果','请求进行中')};
 };
 V['phone-code-sent']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
-   '<div class="state-h">'+svg('check','currentColor',28)+'验证码已发出</div>'+
-   '<div class="state-p">这条状态<b>只在拿到成功回执后</b>出现。回执同时带来两个数：重新获取的冷却（默认 60 秒）和验证码有效期（300 秒）。</div>'+
-   '<div class="state-p">短信到达手机的时间由运营商决定，本机看不到，也不会替它保证。</div></div></section>'+
-   phoneFields({hint:'填短信里的 6 位验证码',sendLabel:'<span id="resend-label">重新获取</span>',sendPlain:'重新获取验证码',codeInput:'on',phoneLocked:true,phoneEcho:true,
+   '<div class="state-h">'+svg('check','currentColor',28)+'验证码已发出，请在下面填验证码</div>'+
+   '<div class="state-p">短信已按这个号码发出。重新获取通常要等 <b>60 秒</b>，验证码 <b>5 分钟</b>内有效。短信何时到达由运营商决定，这台机器看不到。</div></div></section>'+
+   phoneFields({hint:'填短信里的 6 位',sendLabel:'<span id="resend-label">重新获取</span>',sendPlain:'重新获取验证码',codeInput:'on',phoneLocked:true,phoneEcho:true,
     phoneNote:'已按这个号码发码；要换号请先重新获取。',
-    codeNote:'验证码有效期以服务端为准；填错、过期、试太多次是三种不同结果，服务端会分别告诉你。'})+anonRow()+'<p class="qx-aiwrap"><a class="qx-ai" href="05-ai-cockpit.html">登录之后可以问小青能办什么</a></p>',
+    codeNote:'填错、过期、试太多次是三种不同结果，这台机器会分别告诉你。'})+anonRow()+'<p class="qx-aiwrap"><a class="qx-ai" href="05-ai-cockpit.html">登录之后可以问小青能办什么</a></p>',
   cta:'<a class="qx-back" href="01-home.html">返回首页</a>'+btnA('ghost',P('qr','qr-loading'),'/login','改用扫码登录')+
    '<span class="btn primary" role="button" tabindex="0" id="primary-confirm" aria-disabled="true" data-testid="login-gate-primary" style="flex:1.6">确认登录</span>'};
 };
 V['phone-send-limited']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('clock','currentColor',28)+'这次发码被频率限制挡下了</div>'+
-   '<div class="state-p">服务端判定发得太频繁（按号码、IP 或本机分别限制）。<b>这一次请求什么都没有改变</b>：之前那条验证码是否还在、还剩多久，本页读不到，也不猜。</div>'+
-   '<div class="state-p">还要等多少秒本页同样读不到 —— 冷却是在上一次请求时开始算的，回执里没有剩余值，写一个数字出来就是编的。</div></div></section>'+
+   '<div class="state-p">发得太频繁了（这个号码、这个网络或这台机器都可能被限制）。<b>这一次请求什么都没有改变</b>：之前那条验证码是否还在、还剩多久，本页读不到，也不猜。</div>'+
+   '<div class="state-p">还要等多少秒本页同样读不到 —— 冷却是在上一次请求时开始算的，这次没有告诉你还要等多久，写一个数字就是编的。</div></div></section>'+
    phoneFields({hint:'可以换一个本人手机号，或稍后再试',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneEcho:true,
-    codeNote:'如果你手上还有一条没过期的验证码，可以直接回上一步继续填；本页不替服务端保证它此刻一定有效。'})+anonRow(),
+    codeNote:'如果你手上还有一条没过期的验证码，可以直接回上一步继续填；这里不能保证它现在一定还能用。'})+anonRow(),
   cta:btnA('ghost',P('qr','qr-loading'),'/login','改用扫码登录')+
    btnGate('primary','再试一次发码',P('phone','phone-sending'),'login-gate-primary','1.6')};
 };
 V['phone-send-failed']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('warn','currentColor',28)+'短信通道没把这条码发出去</div>'+
-   '<div class="state-p">服务端明确回了发送失败。它会把<b>刚写进去的验证码和冷却一起删掉</b>，所以之前收到的码同样作废，必须重新获取；也正因为冷却被删了，可以立刻重试。</div>'+
+   '<div class="state-p">短信没发出去。刚准备好的验证码和等待时间<b>会一起作废</b>，所以之前收到的码同样作废，必须重新获取；也正因为冷却被删了，可以立刻重试。</div>'+
    '<div class="state-p">这不是你填错了，也不是账号问题。连着几次都失败，请找现场工作人员。</div></div></section>'+
    phoneFields({hint:'可以立刻重试，冷却已被清掉',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneEcho:true,
     codeNote:'旧码已作废，重新获取之前这里没有可填的内容。'})+anonRow(),
@@ -503,17 +509,17 @@ V['phone-send-failed']=function(){
 };
 V['phone-verifying']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
-   '<div class="state-h"><span class="dot16 breathe"></span>验证码已提交，等待服务端核验</div>'+
-   '<div class="state-p">核验通过与否<b>只有服务端说了算</b>。本页不显示「登录成功」：真正登录成功时，页面会直接回到你进来之前那一页。</div>'+
-   '<div class="state-p">核验不通过时，服务端会分成「填错了」「过期或不存在」「试太多次被作废」三种结论，各自的下一步不一样。</div></div></section>'+
-   phoneFields({hint:'等待服务端核验',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneLocked:true,phoneEcho:true,
+   '<div class="state-h"><span class="dot16 breathe"></span>验证码已提交，正在核对验证码</div>'+
+   '<div class="state-p">对不对<b>只有核对结果说了算</b>。本页不显示「登录成功」：真正登录成功时，页面会直接回到你进来之前那一页。</div>'+
+   '<div class="state-p">没通过时，会分成「填错了」「过期或不存在」「试太多次被作废」三种结论，各自的下一步不一样。</div></div></section>'+
+   phoneFields({hint:'正在核对验证码',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneLocked:true,phoneEcho:true,
     codeNote:'核验期间不重复提交；结果回来之前不清空、也不改写你填过的内容。'})+anonRow(),
   cta:btnA('ghost','01-home.html','/','返回首页')+btnDead('等待核验结果','核验进行中')};
 };
 V['phone-code-invalid']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('warn','currentColor',28)+'验证码不正确</div>'+
-   '<div class="state-p">服务端比对没通过。这一次比对<b>没有消费掉那条验证码</b>，所以可以核对短信里最新的一条再试一次 —— 但它仍然受有效期和尝试次数限制，本页不替服务端保证它此刻一定还有效。</div>'+
+   '<div class="state-p">这次没对上。这条验证码<b>还没被用掉</b>，可以核对短信里最新的一条再试 —— 它仍受有效期和次数限制，这里不能保证它现在一定还能用。</div>'+
    '<div class="state-p">重新获取照旧受冷却约束，不是多余的一步。</div></div></section>'+
    phoneFields({hint:'核对短信里最新的一条',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'on',phoneLocked:true,phoneEcho:true,
     codeNote:'已清空刚才填错的内容；手机号保持不变，不用重填。'})+anonRow()+'<p class="qx-aiwrap"><a class="qx-ai" href="05-ai-cockpit.html">登录之后可以问小青能办什么</a></p>',
@@ -523,7 +529,7 @@ V['phone-code-invalid']=function(){
 V['phone-code-expired']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('clock','currentColor',28)+'这条验证码已经不能用了</div>'+
-   '<div class="state-p">服务端那边已经没有这条码：可能超过有效期，可能已经用过一次，也可能因为试的次数太多被主动作废。<b>重填同一条只会再失败</b>，所以这里的输入框先关掉。</div>'+
+   '<div class="state-p">这条验证码已经不能用了：可能过了时间，可能已经用过，也可能试得太多被作废。<b>重填同一条只会再失败</b>，所以这里的输入框先关掉。</div>'+
    '<div class="state-p">这不是封号。重新获取一条就能继续。</div></div></section>'+
    phoneFields({hint:'必须重新获取一条',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneLocked:true,phoneEcho:true,
     codeNote:'输入框已清空并关闭，避免你把作废的码再填一遍。'})+anonRow(),
@@ -542,16 +548,16 @@ function qrSide(items,foot){
  return '<div class="qrside">'+h+(foot?'<div class="card"><p>'+foot+'</p></div>':'')+'</div>';
 }
 V['qr-loading']=function(){
- return {body:'<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">扫码登录</span><span class="hint" id="qr-hint">勾选协议后才会向服务端申请票据</span></div>'+
-   '<div class="qrwrap">'+qrSlot('等待你勾选协议','没有勾选协议之前，这台机器<b>不会</b>向服务端申请票据，这里也不会出现任何可扫的图形。')+
-   qrSide(['勾选下面的协议，这台机器才会去申请登录票据。','服务端返回票据后，二维码显示在左边这块区域。','拿手机相机或微信扫它，在手机上完成手机号验证并确认。'],
+ return {body:'<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">扫码登录</span><span class="hint" id="qr-hint">勾选协议后才会去取登录二维码</span></div>'+
+   '<div class="qrwrap">'+qrSlot('等待你勾选协议','没有勾选协议之前，这台机器<b>不会</b>去取登录二维码，这里也不会出现任何可扫的图形。')+
+   qrSide(['勾选下面的协议，这台机器才会去申请登录票据。','取到之后，二维码显示在左边。','拿手机相机或微信扫它，在手机上完成手机号验证并确认。'],
     '票据自一体机生成起共 <b>180 秒</b>。手机上看到的剩余秒数会比 180 少 —— 看屏、举手机、扫码都要花时间。')+'</div></section>'+
    anonRow('02'),
-  cta:btnA('ghost',P('phone','phone-idle'),'/login','改用手机号登录')+btnDead('等待服务端返回票据','需要先勾协议，结果由服务端返回')};
+  cta:btnA('ghost',P('phone','phone-idle'),'/login','改用手机号登录')+btnDead('正在取二维码','需要先勾协议，结果还没到')};
 };
 V['qr-ready']=function(){
  return {body:'<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">扫码登录</span><span class="hint">票据有效期内可扫</span></div>'+
-   '<div class="qrwrap">'+qrSlot('二维码显示区','二维码由服务端返回的票据内容渲染。<b>静态设计稿不生成可扫描图形</b>，也不放示意图案冒充。')+
+   '<div class="qrwrap">'+qrSlot('二维码显示区','二维码要等取到之后才画。<b>这一页不画可扫描的假图</b>，也不拿示意图冒充。')+
    qrSide(['用手机相机或微信扫左边的二维码。','在手机上填手机号和短信验证码，确认<b>你面前这台机器</b>的登录请求。','手机提示已确认后回到这台机器 —— 登录还要这台机器再换一次登录态。'],
     '手机上的确认<b>不等于你已经登录</b>；短信验证码能证明的只是这个号码收得到码，不能证明人站在机器前。')+'</div></section>'+
    '<section class="sec last"><div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('clock','currentColor',26)+'</span>过期了怎么办</h3>'+
@@ -563,7 +569,7 @@ V['qr-ready']=function(){
 V['qr-expired']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('clock','currentColor',28)+'这张二维码已经过期</div>'+
-   '<div class="state-p">票据从生成起只活 <b>180 秒</b>，现在服务端已经不认它了。手机上继续操作也不会成功。</div>'+
+   '<div class="state-p">票据从生成起只活 <b>180 秒</b>，现在已经不能用了。手机上继续操作也不会成功。</div>'+
    '<div class="state-p">重新生成一张再扫即可，不影响你的账号，也不需要联系工作人员。</div></div></section>'+
    '<section class="sec last"><div class="qrwrap">'+qrSlot('二维码已失效','重新生成后，新的二维码会显示在这里。')+
    qrSide(['点下面的「重新生成二维码」。','用手机重新扫新的二维码。','在手机上确认后回到这台机器继续。'],
@@ -574,19 +580,19 @@ V['qr-expired']=function(){
 V['qr-confirmed']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('check','currentColor',28)+'手机已确认这次请求</div>'+
-   '<div class="state-p">服务端返回的状态是 <b>confirmed</b> —— 手机那一侧做完了。接下来这台机器要拿票据去换登录态，<b>换成功才算登录</b>。</div>'+
+   '<div class="state-p">手机上已经确认。接下来这台机器还要换成登录，<b>换成了才算登录</b>。</div>'+
    '<div class="state-p">这一步会失败（票据被用过、已过期、网络中断都可能）。失败时二维码会作废并要求重扫，本页不会替它写成「已登录」。<b>协议没勾时，这一步同样不会写入登录态。</b></div></div></section>'+
    '<section class="sec last"><div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('info','currentColor',26)+'</span>请留在这台机器前</h3>'+
    '<p>换取登录态由这台机器发起，结果只显示在这块屏幕上。手机那一侧看不到这一步，也不会代替你完成。</p></div></section>'+
    anonRow('02'),
   cta:btnGate('ghost','重新生成二维码',P('qr','qr-loading'),'login-gate-regen')+
-   btnDead('正在换取登录态','结果由服务端返回')};
+   btnDead('正在换取登录态','结果还没到')};
 };
 V['qr-error']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('warn','currentColor',28)+'扫码登录这条路暂时走不通</div>'+
    '<div class="state-p">申请票据或查询状态的请求没有成功。<b>本页不推测原因</b>，也不显示一张可能已经失效的二维码让你白扫。</div>'+
-   '<div class="state-p">手机号登录不经过这条链路，通常仍然可用。</div></div></section>'+
+   '<div class="state-p">手机号登录不走扫码，通常还能用。</div></div></section>'+
    '<section class="sec last"><div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('phone','currentColor',26)+'</span>建议先走手机号登录</h3>'+
    '<p>两条路进的是同一个账号。如果手机号登录也失败，多半是这台机器和服务器之间断了 —— 那时请找现场工作人员。</p></div></section>'+
    anonRow('02'),
@@ -595,7 +601,7 @@ V['qr-error']=function(){
 };
 
 var PILL={
- 'phone-idle':['','登录结果以服务端返回为准'],
+ 'phone-idle':['','登录是否成功，看这台机器怎么跳'],
  'phone-sending':['','正在请求发送验证码'],
  'phone-code-sent':['ok','验证码已发出'],
  'phone-send-limited':['warn','发码被频率限制挡下'],
@@ -603,7 +609,7 @@ var PILL={
  'phone-verifying':['','验证码已提交，等待核验'],
  'phone-code-invalid':['warn','验证码不正确'],
  'phone-code-expired':['warn','验证码已失效'],
- 'qr-loading':['warn','未勾协议 · 尚未申请票据'],
+ 'qr-loading':['warn','未勾协议 · 还没去取二维码'],
  'qr-ready':['ok','二维码有效期 180 秒'],
  'qr-expired':['warn','二维码已过期'],
  'qr-confirmed':['ok','手机已确认 · 尚未登录'],
@@ -611,18 +617,18 @@ var PILL={
 };
 var TITLE={
  'phone-idle':['登录后继续办理','登录成功后回到 <b id="return-to">首页</b>。不登录也能用公开与无需账户的服务。'],
- 'phone-sending':['正在发送验证码','结果由服务端返回。成功、频控、通道失败三种下一步不一样。'],
+ 'phone-sending':['正在发送验证码','结果看这台机器怎么说。发出去、太频繁、短信没走通，下一步不一样。'],
  'phone-code-sent':['填写短信验证码','验证码有 <b>300 秒</b>有效期；重新获取默认要等 <b>60 秒</b>。'],
  'phone-send-limited':['稍后再获取验证码','这一次请求什么都没有改变，本页读不到还要等多久。'],
  'phone-send-failed':['短信没发出去','旧码已被一起作废，可以立刻重新获取。'],
- 'phone-verifying':['正在核验验证码','结果只由服务端决定；登录成功会直接回到你进来之前那一页。'],
+ 'phone-verifying':['正在核验验证码','对不对只看核对结果；通过后会直接回到你进来之前那一页。'],
  'phone-code-invalid':['验证码不正确','可以核对最新一条再试；它仍受有效期和尝试次数限制。'],
- 'phone-code-expired':['需要重新获取验证码','服务端那边已经没有这条码，重填同一条只会再失败。'],
+ 'phone-code-expired':['需要重新获取验证码','这条验证码已经不能用了，重填同一条只会再失败。'],
  'qr-loading':['扫码登录','先勾协议，这台机器才会去要票据；拿到之前不显示任何可扫图形。'],
  'qr-ready':['扫码登录','用手机扫码并在手机上确认；确认之后要回到这台机器。'],
  'qr-expired':['二维码已过期','票据从生成起只活 180 秒，刷新动作在这台机器上。'],
  'qr-confirmed':['手机已确认','这台机器正在换取登录态，换成功才算登录。'],
- 'qr-error':['扫码登录暂不可用','请求没有成功；手机号登录不经过这条链路。']
+ 'qr-error':['扫码登录暂不可用','请求没有成功；手机号登录不走扫码。']
 };
 
 var root=document.getElementById('body-root');
@@ -676,6 +682,7 @@ function wire(state){
      echo=document.getElementById('phone-echo'),note=document.getElementById('gate-note');
  var gates=[].slice.call(document.querySelectorAll('[data-gate=agree]'));
  var stored=readPhone();
+ if(!stored && q.get('capture')==='1' && (state==='phone-code-sent'||state==='phone-code-invalid')) stored='13800138000';
  if(phone){phone.value=stored;phone.addEventListener('input',function(){phone.value=phone.value.replace(/\D/g,'');savePhone(phone.value);refresh()})}
  if(echo)echo.textContent=mask(stored)||'未获取到本次输入的手机号';
  if(code)code.addEventListener('input',function(){code.value=code.value.replace(/\D/g,'');refresh()});
@@ -692,22 +699,22 @@ function wire(state){
   if(!t||!d)return;
   if(agreed){
    t.textContent='正在申请登录二维码';
-   d.innerHTML='请求已发出，<b>票据由服务端返回</b>。没有拿到票据之前，这里不会出现任何可扫的图形。';
-   if(h)h.textContent='已勾协议，正在向服务端申请票据';
+   d.innerHTML='请求已发出，<b>二维码还没取到</b>。取到之前，这里不会出现任何可扫的图形。';
+   if(h)h.textContent='已勾协议，正在取登录二维码';
   }else{
    t.textContent='等待你勾选协议';
-   d.innerHTML='没有勾选协议之前，这台机器<b>不会</b>向服务端申请票据，这里也不会出现任何可扫的图形。';
-   if(h)h.textContent='勾选协议后才会向服务端申请票据';
+   d.innerHTML='没有勾选协议之前，这台机器<b>不会</b>去取登录二维码，这里也不会出现任何可扫的图形。';
+   if(h)h.textContent='勾选协议后才会去取登录二维码';
   }
   var pill=document.getElementById('pill');
   pill.className='pill'+(agreed?'':' warn');
-  document.getElementById('pill-txt').textContent=agreed?'正在申请登录二维码':'未勾协议 · 尚未申请票据';
+  document.getElementById('pill-txt').textContent=agreed?'正在申请登录二维码':'未勾协议 · 还没去取二维码';
   document.getElementById('pill-dot').className='dot'+(agreed?' breathe':'');
  }
  function paintNote(agreed,phoneOk,codeOk){
   var t,cls='';
   if(PENDING[state]&&!(state==='qr-loading'&&!agreed)){
-   t='请求已经发出，结果由服务端返回；这一步不会因为多点几下而提前结束。';
+   t='请求已经发出，结果还没到；多点几下也不会提前结束。';
   }else if(!agreed){
    t='未勾选协议：不会发码、不会创建二维码，也不会写入登录态。请先勾选上面的协议。';
   }else if(send&&!phoneOk){
@@ -715,7 +722,7 @@ function wire(state){
   }else if(pConfirm&&!codeOk){
    t='已勾选协议。填完 6 位验证码后才能提交核验。';
   }else{
-   t='已勾选协议。发码、生成二维码与提交核验都由服务端执行，本页不预判结果。';cls=' ok';
+   t='已勾选协议。发码、生成二维码和提交核对都由这台机器去办，这一页不提前判断结果。';cls=' ok';
   }
   note.className='gate-note'+cls;
   note.textContent=t;
