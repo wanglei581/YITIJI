@@ -17,6 +17,7 @@ import {
   recruitmentHostingDisabledException,
 } from '../recruitment-hosting/recruitment-hosting'
 import {
+  KIOSK_JOB_BOARD_DISABLED_CODE,
   KioskJobBoardService,
   kioskJobBoardTerminalRef,
   type KioskJobBoardRequest,
@@ -91,13 +92,25 @@ export class JobFitController {
   ) {}
 
   /**
-   * 岗位板块关闭时，匹配请求、已保存的结果和打印稿都不再返回岗位标题或来源链接。
+   * 岗位板块只拦系统内岗位。手填岗位要求和手填存档在板块关闭时仍可用。
    * 运行时探针若没注入开关服务，assertOpen 不存在，保持原配额测试路径。
    */
   private async assertJobBoard(req: ReqLike): Promise<void> {
     const gate = this.jobBoard as { assertOpen?: (terminalRef: string | null) => Promise<void> } | undefined
     if (!gate || typeof gate.assertOpen !== 'function') return
     await gate.assertOpen(kioskJobBoardTerminalRef(req as KioskJobBoardRequest))
+  }
+
+  /** 板块开着，或这台终端没有开关服务。关闭时返回 false，其它错误原样抛出。 */
+  private async jobBoardOpen(req: ReqLike): Promise<boolean> {
+    try {
+      await this.assertJobBoard(req)
+      return true
+    } catch (error) {
+      const response = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+      if (response?.error?.code === KIOSK_JOB_BOARD_DISABLED_CODE) return false
+      throw error
+    }
   }
 
   private async requesterOf(req: ReqLike) {
@@ -126,8 +139,8 @@ export class JobFitController {
   @Post()
   @PaidAiThrottle(6)
   async analyze(@Body() dto: JobFitRequestDto, @Req() req: ReqLike) {
-    // 逐台岗位板块与托管开关独立：板块关闭时手填也拒绝。托管关闭只挡系统内 jobId。
-    await this.assertJobBoard(req)
+    // 两道开关都只拦系统内 jobId。手填岗位要求在板块关闭、托管关闭时都照常可用。
+    if (dto.jobId) await this.assertJobBoard(req)
     if (!isRecruitmentContentHostingEnabled() && dto.jobId) throw recruitmentHostingDisabledException()
     if (!dto.jobId && !dto.manualJob) {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
@@ -157,13 +170,12 @@ export class JobFitController {
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    await this.assertJobBoard(req)
-    return this.service.printReport(taskId, await this.requesterOf(req))
+    // 先把板块是否打开交给服务；服务读完存档再决定。手填放行，系统内岗位拒绝。
+    return this.service.printReport(taskId, await this.requesterOf(req), await this.jobBoardOpen(req))
   }
 
   @Get(':taskId')
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    await this.assertJobBoard(req)
-    return this.service.getLatest(taskId, await this.requesterOf(req))
+    return this.service.getLatest(taskId, await this.requesterOf(req), await this.jobBoardOpen(req))
   }
 }

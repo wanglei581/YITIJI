@@ -18,7 +18,8 @@
  *   POST /activity/external-jump     （仅 targetType=job）
  *   GET  /companies/:id/jobs         （空列表，企业详情仍返回）
  *   GET  /companies                  （去掉代表岗位标题，不再按岗位标题搜索）
- *   POST /resume/job-fit、GET /resume/job-fit/:taskId、POST .../print
+ *   POST /resume/job-fit（仅带 jobId；手填 manualJob 仍可分析）
+ *   GET /resume/job-fit/:taskId、POST .../print（仅系统内岗位存档；手填存档仍可看、可打印）
  *   GET/POST/DELETE /me/favorites    （仅 targetType=job；混合列表去掉岗位）
  *   GET  /kiosk/campus/recruitment-stats （岗位计数为 null，招聘会统计仍在）
  *   GET  /me/browse-logs、/me/external-jump-logs （去掉岗位行；?targetType=job 拒绝）
@@ -54,6 +55,7 @@ import { CompaniesController } from '../src/companies/companies.controller'
 import { KioskOfflineJobsController } from '../src/offline-agencies/kiosk-offline-jobs.controller'
 import { JobAiController, MemberJobAiSessionsController } from '../src/job-ai/job-ai.controller'
 import { JobFitController } from '../src/ai/job-fit.controller'
+import { assertStoredJobFitJobBoardOpen } from '../src/ai/resume/job-fit-hosting'
 import { CareerPlanController } from '../src/ai/career-plan.controller'
 import { KioskCampusRecruitmentStatsController } from '../src/jobs/kiosk-campus-recruitment-stats.controller'
 import { CampusRecruitmentStatsService } from '../src/jobs/campus-recruitment-stats.service'
@@ -168,10 +170,21 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
   const history = new MeActivityController(new ActivityService(prisma), audit, board)
   const applications = new JobApplicationsController(new JobApplicationsService(prisma), board)
   let jobFitReads = 0
+  let storedJobFitPayload = JSON.stringify({ job: { id: 'system-job', title: 'leaked' } })
+  const guardStored = (jobBoardOpen: boolean) => {
+    assertStoredJobFitJobBoardOpen(storedJobFitPayload, jobBoardOpen)
+    jobFitReads += 1
+  }
   const jobFit = new JobFitController(
     {
-      getLatest: async () => { jobFitReads += 1; return { job: { title: 'leaked' } } },
-      printReport: async () => { jobFitReads += 1; return { fileId: 'leaked' } },
+      getLatest: async (_taskId: string, _requester: unknown, jobBoardOpen = true) => {
+        guardStored(jobBoardOpen)
+        return { job: { title: 'leaked' } }
+      },
+      printReport: async (_taskId: string, _requester: unknown, jobBoardOpen = true) => {
+        guardStored(jobBoardOpen)
+        return { fileId: 'leaked' }
+      },
     } as never,
     new JwtService({ secret: 'verify-job-board-secret-0123456789' }),
     { get: async () => null } as never,
@@ -484,12 +497,20 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
     await expectCode(
       () => jobFit.analyze({ taskId: 't', jobId }, {}),
       'KIOSK_JOB_BOARD_DISABLED',
-      '12. 全局关时 POST /resume/job-fit 拒绝',
+      '12. 全局关时带系统岗位的 POST /resume/job-fit 拒绝',
     )
-    await expectCode(() => jobFit.latest('t', {}), 'KIOSK_JOB_BOARD_DISABLED', '12b. 全局关时岗位匹配结果拒绝')
-    await expectCode(() => jobFit.print('t', {}), 'KIOSK_JOB_BOARD_DISABLED', '12c. 全局关时岗位匹配打印拒绝')
-    if (jobFitReads !== 0) fail('12d. 关闭后仍读了岗位匹配')
-    pass('12d. 关闭后没有进入岗位匹配读写')
+    await expectCode(() => jobFit.latest('t', {}), 'KIOSK_JOB_BOARD_DISABLED', '12b. 全局关时系统岗位存档拒绝查看')
+    await expectCode(() => jobFit.print('t', {}), 'KIOSK_JOB_BOARD_DISABLED', '12c. 全局关时系统岗位存档拒绝打印')
+    if (jobFitReads !== 0) fail('12d. 关闭后仍读了系统岗位匹配')
+    pass('12d. 关闭后没有进入系统岗位匹配读写')
+    storedJobFitPayload = JSON.stringify({ job: { title: '手填岗位' } })
+    const manualLatest = await jobFit.latest('t', {})
+    const manualPrint = await jobFit.print('t', {})
+    if (!manualLatest || !manualPrint || jobFitReads !== 2) fail('12e. 全局关时手填存档应可查看、可打印')
+    const manualAnalyze = await jobFit.analyze({ taskId: 't', manualJob: { title: '手填岗位' } }, {})
+    if (!manualAnalyze || jobFitReads !== 3) fail('12f. 全局关时手填岗位匹配没有放行')
+    pass('12f. 全局关时手填岗位匹配可分析，手填存档可查看、可打印')
+    storedJobFitPayload = JSON.stringify({ job: { id: 'system-job', title: 'leaked' } })
 
     await expectCode(
       () => favorites.list(memberUser, 'job'),
@@ -593,13 +614,17 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
     if (!anonJobs.data.items.some((row) => row.id === jobId)) fail('19c. 无终端身份被逐台关误伤')
     pass('19c. 逐台关只作用于带该终端身份的企业岗位列表')
 
+    const readsBeforeTerminal = jobFitReads
+    const manualOnClosed = await jobFit.analyze({ taskId: 't', manualJob: { title: '手填岗位' } }, reqOf(codeB))
+    if (!manualOnClosed || jobFitReads !== readsBeforeTerminal + 1) fail('20. 逐台关时手填岗位匹配没有放行')
+    pass('20. 逐台关时手填岗位匹配仍可分析')
     await expectCode(
-      () => jobFit.analyze({ taskId: 't', manualJob: { title: '手填岗位' } }, reqOf(codeB)),
+      () => jobFit.analyze({ taskId: 't', jobId }, reqOf(codeB)),
       'KIOSK_JOB_BOARD_DISABLED',
-      '20. 逐台关时该终端岗位匹配拒绝',
+      '20a. 逐台关时带系统岗位的匹配拒绝',
     )
     const openedFit = await jobFit.analyze({ taskId: 't', jobId }, reqOf(codeA))
-    if (!openedFit || jobFitReads !== 1) fail('20b. 其它终端的岗位匹配没有放行')
+    if (!openedFit || jobFitReads !== readsBeforeTerminal + 2) fail('20b. 其它终端的岗位匹配没有放行')
     pass('20b. 逐台关不误伤其它终端的岗位匹配')
 
     const terminalStats = await campus.getRecruitmentStats(reqOf(codeB))

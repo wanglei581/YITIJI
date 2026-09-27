@@ -1,7 +1,9 @@
+import { ForbiddenException } from '@nestjs/common'
 import {
   isRecruitmentContentHostingEnabled,
   recruitmentHostingDisabledException,
 } from '../../recruitment-hosting/recruitment-hosting'
+import { KIOSK_JOB_BOARD_DISABLED_CODE } from '../../terminals/kiosk-job-board.service'
 
 /**
  * 岗位匹配存档是否引用了系统内岗位。
@@ -21,6 +23,21 @@ export function storedJobFitUsesSystemJob(payloadJson: string | null | undefined
 export function assertStoredJobFitReadable(payloadJson: string | null | undefined): void {
   if (isRecruitmentContentHostingEnabled()) return
   if (storedJobFitUsesSystemJob(payloadJson)) throw recruitmentHostingDisabledException()
+}
+
+/**
+ * 岗位板块关闭时，同样只拒绝系统内岗位存档。手填存档始终放行。
+ * 与上面的托管判断放在一起：都是先读存档，再按来源决定。
+ */
+export function assertStoredJobFitJobBoardOpen(
+  payloadJson: string | null | undefined,
+  jobBoardOpen: boolean,
+): void {
+  if (jobBoardOpen) return
+  if (!storedJobFitUsesSystemJob(payloadJson)) return
+  throw new ForbiddenException({
+    error: { code: KIOSK_JOB_BOARD_DISABLED_CODE, message: '岗位板块已关闭' },
+  })
 }
 
 type JobFitFileReadPrisma = {
