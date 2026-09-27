@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 逐状态检查修压字
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
@@ -372,6 +373,26 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 #body-root[data-state=quoting] .cfm-note{margin-top:10px}
 #body-root[data-state=quoting] .cfm-reason{margin-top:8px}
 #body-root[data-state=quoting] .cfm-act{margin-top:12px}
+/* 内容在底部导航之上结束：收回英雄区强制高度和段间距，底部按钮整排露出。 */
+.xq{min-height:0;padding:12px 32px 10px}
+.steps-bar{margin:8px 44px 0}
+.sec{margin-top:8px}
+.sec-label{margin-bottom:4px}
+.state{padding:12px 18px}
+.state-p{margin-top:6px}
+.pgrp{padding:10px 14px}
+.plan{margin-top:6px;gap:4px}
+.card{padding:12px 16px}
+.cfm{padding:10px 18px}
+.cfm-flow .cs{min-height:56px}
+.cfm-note{margin-top:6px}
+.cfm-reason{margin-top:4px}
+.cfm-act{margin-top:8px}
+.cfm .qx2-actions{margin-top:4px;min-height:48px}
+.line{padding:8px 0}
+.sec.last{margin-bottom:4px}
+.grid2{gap:10px}
+.amount{padding:12px 8px 8px}
 
 </style>
 </head>

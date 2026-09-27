@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 逐状态检查修压字
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 2026-09-28 按运行能力修订：材料检查必须做完才能继续；选遮挡会另出一份用于打印的文件，上传的原件不改。
 - 2026-09-28 第二遍：遮挡的完整解释只留在「两个选项分别是什么意思」；决定列表底部标签不再被下一张卡盖住。
@@ -490,6 +491,11 @@ input{font:inherit}
 .thumb{min-height:220px}.thumb-cap{font-size:20px;line-height:1.4}.fileid b{font-size:24px;line-height:1.4}.fileid span,.fileid em{font-size:22px}
 .sugbox h4{font-size:24px;flex-wrap:wrap}.sugbox h4 span:last-child{font-size:20px;margin-left:0}.sug-l li{font-size:22px}.ev{font-size:20px}.sug-foot{font-size:20px;line-height:1.4}
 .sum .sn{font-size:20px}.qx2-actions{min-height:64px;padding-left:40px;padding-right:40px}.btn{font-size:26px}
+/* 翻页边标签放到纸框上沿外侧，托盘顶部留出一条，不再压住纸上的姓名。 */
+.thumb[data-view="paper"]:has(.thumb-shell .thumb-tag){padding-top:44px;align-items:flex-start;justify-content:center}
+.thumb[data-view="paper"] .thumb-shell{overflow:visible}
+.thumb[data-view="paper"] .thumb-shell .thumb-tag.left,
+.thumb[data-view="paper"] .thumb-shell .thumb-tag.top{top:0;left:8px;right:auto;bottom:auto;transform:translateY(calc(-100% - 6px))}
 
 </style>
 </head>
@@ -2005,7 +2011,8 @@ function fitThumb(){
  var sw=+box.getAttribute('data-sw'),sh=+box.getAttribute('data-sh');
  var px=+paper.getAttribute('data-px'),py=+paper.getAttribute('data-py'),ps=+paper.getAttribute('data-ps');
  var k=(STAGE_SCALE>0?STAGE_SCALE:1),r=box.getBoundingClientRect();
- var availW=r.width/k-22,availH=r.height/k-22;
+ var band=box.querySelector('.thumb-shell .thumb-tag')?44:0;
+ var availW=r.width/k-22,availH=r.height/k-22-band;
  if(!(availW>0&&availH>0&&sw>0&&sh>0))return;
  var z=Math.min(availW/sw,availH/sh);
  shell.style.width=Math.round(sw*z)+'px';

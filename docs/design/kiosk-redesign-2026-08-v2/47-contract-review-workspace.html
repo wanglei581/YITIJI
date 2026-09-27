@@ -84,6 +84,7 @@
 <link rel="stylesheet" href="../kiosk-redesign-2026-08/contract-review-workspace.css">
 <!--
 青序流光 2.0 · 47 合同核查（默认 controlled-off；有内容的态用 screen=result&state=ready）
+9/28 逐状态检查修压字
 规则 1：标题下加三步只读说明，把第一排操作压下去。返回键 64。底栏主动作保留。
 规则 2：页标题 36，说明 22，分区标题 30，主按钮 26，导航 21。
 规则 3：带走的是可对回原文的风险提示；打印开关默认关，不写成已经出纸。
@@ -116,6 +117,28 @@
 .stat .sl{font-size:21px!important}
 .demo-tab,.demo-panel{display:none!important}
 .lawlist b,.lawlist span,.lawlist i,.excerpt .ep,.excerpt .slot,.steps .sn,.detail-sum>span,.ask,.ask .slot,.rows>div>span,.catgrid>span,.nowbar .nbp>span{font-size:20px!important;line-height:1.35}
+/* 三步说明留在标题区里；下面的内容从标题下沿排起，不再居中后翻上去盖住步骤。扫码位和阶段卡收回空高，底栏按钮露在说明下面。 */
+.taskhead{min-height:0;height:auto;padding-bottom:8px}
+.stack{justify-content:flex-start!important}
+.qrbox{width:280px;height:220px}
+.drop{min-height:150px;padding:16px}
+.qrpanel{gap:16px;margin-top:10px}
+.type{min-height:0;padding:12px 14px}
+.sec{margin-top:12px}
+.rstep{min-height:0;padding:8px 14px}
+.rstep .rsi{width:44px;height:44px}
+.sheet{padding:14px 18px;margin-top:8px}
+.catgrid{margin-top:8px}
+.catgrid span{min-height:44px;padding:6px 12px}
+.noteline{min-height:0;margin-top:8px;padding:8px 14px}
+.blk{padding:14px 16px}
+.rows>div{min-height:44px;padding:8px 14px}
+#body-root[data-state="empty"] .sec.grow{flex:0 0 auto;min-height:min-content;overflow:visible}
+#body-root[data-state="empty"] .lawlist{gap:4px;padding-bottom:8px}
+#body-root[data-state="empty"] .lawlist>div{min-height:0;padding:4px 10px}
+#body-root[data-state="empty"] .stat{padding:8px 12px}
+#body-root[data-state="empty"] .state{padding:14px 16px}
+#body-root[data-state="empty"] .catgrid span{min-height:40px}
 </style>
 </head>
 <body>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 逐状态检查修压字
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 选 summary + USB 已选文件的内容态，文件预览与 AI 诊断主动作保留（规则 3、7）。
@@ -951,6 +952,33 @@ html.flat *::after,html[data-flat="1"] *::after{
 .truth{padding:10px 44px}.truth div{font-size:20px;line-height:1.45}.truth [hidden]{display:none}.qx2-actions{min-height:64px}.blk.grow{overflow:visible}
 /* 说明变长后，错误卡按内容撑开，不再压住下一张卡。 */
 .blk:has(> .fail){flex:none}
+/* 吸收剩余高度的那一块不再把卡片压扁：来源卡、格式行、说明行按内容往下排。英雄区不再强制 280。 */
+.xq{min-height:0}
+#body-root{padding-top:12px}
+.blk{gap:8px}
+.blk.grow{flex:0 1 auto;overflow:visible}
+.blk.grow>*:not(.blk-h){flex:0 0 auto;min-height:min-content;height:auto}
+.blk.grow .srcs,.blk.grow .tri,.blk.grow .picks,.blk.grow .duo,.blk.grow .chans,.blk.grow .sbs-grid,.blk.grow .rows,.blk.grow .meta,.blk.grow .card,.blk.grow .list{flex:0 0 auto;min-height:min-content;height:auto;grid-auto-rows:auto}
+.src,.fmt,.row-i,.file,.fail{min-height:min-content;height:auto}
+.fmt{margin-top:8px}
+/* 各块不再被压扁后互相盖住。门类表、步骤条、三张原因卡按内容排，留白收回来给它们。 */
+#body-root>*{flex:0 0 auto!important}
+.blk,.blk.grow{flex:0 0 auto!important}
+.sheet{flex:0 0 auto!important;min-height:min-content;height:auto!important;overflow:visible;align-content:start}
+.sheet a{min-height:56px;height:auto}
+.sb-i{min-height:0;padding:8px 8px}
+.tri-c{padding:10px 12px}
+.xq{padding:8px 28px 6px}
+.rail{margin-top:8px;padding-top:8px}
+#body-root{gap:8px;padding:8px 36px 6px}
+.fail{padding:10px 14px}
+.chan{min-height:0;padding:10px 12px}
+/* 六个字段这一屏的最后一行要露在底部「上一步」之上。 */
+#stage:has(#body-root[data-state="target-context"]) .xq{padding:4px 24px}
+#stage:has(#body-root[data-state="target-context"]) .qx2-actions{min-height:48px;padding:2px 36px}
+#stage:has(#body-root[data-state="target-context"]) .truth{padding:4px 36px}
+#body-root[data-state="target-context"]{gap:6px;padding-top:4px;padding-bottom:2px}
+#body-root[data-state="target-context"] .jnote{margin-top:4px}
 
 </style>
 </head>
