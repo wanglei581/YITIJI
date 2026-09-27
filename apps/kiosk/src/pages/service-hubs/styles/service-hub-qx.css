@@ -26,6 +26,7 @@
   gap: 12px;
   padding-top: 16px;
   padding-bottom: 12px;
+  font-size: var(--qx-fs-body);
 }
 
 .qx-hub-hero {
@@ -98,7 +99,7 @@
   border-radius: 999px;
   background: var(--qx-teal-soft);
   color: var(--qx-teal-d);
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 3px;
 }
@@ -108,7 +109,7 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 19px;
+  font-size: 20px;
   line-height: 1.45;
   color: var(--qx-ink-3);
 }
@@ -159,7 +160,7 @@
   border-radius: var(--qx-r);
   background: var(--qx-paper);
   color: var(--qx-ink);
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -244,7 +245,7 @@
   border-radius: var(--qx-r);
   background: var(--qx-surface);
   color: var(--qx-ink);
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -480,7 +481,7 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 18px;
+  font-size: 21px;
   color: var(--qx-ink-3);
 }
 .qx-hub-quick-label b {
@@ -518,12 +519,12 @@
   gap: 3px;
 }
 .qx-hub-quick-item b {
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 750;
 }
 .qx-hub-quick-item span span,
 .qx-hub-quick-item > span > span {
-  font-size: 17px;
+  font-size: 21px;
   color: var(--qx-ink-3);
 }
 .qx-hub-quick-item.is-unavailable > svg {

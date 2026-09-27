@@ -5,12 +5,14 @@ import { ResumeTranscriptConfirmDialog } from './ResumeTranscriptConfirmDialog'
 
 interface ResumeVoiceInputButtonProps {
   label: string
+  className?: string
   disabled?: boolean
   onConfirm: (text: string) => void
 }
 
 export function ResumeVoiceInputButton({
   label,
+  className,
   disabled,
   onConfirm,
 }: ResumeVoiceInputButtonProps) {
@@ -21,7 +23,7 @@ export function ResumeVoiceInputButton({
       <Button
         size="sm"
         variant="secondary"
-        className="gap-1.5"
+        className={['gap-1.5', className].filter(Boolean).join(' ')}
         disabled={disabled}
         onClick={() => setOpen(true)}
       >

@@ -97,7 +97,7 @@
 }
 .qx-resume-generate .qx-rd-field {
   width: 100%;
-  min-height: var(--qx-tap-min);
+  min-height: 74px;
   padding: 12px 16px;
   border: 1px solid var(--qx-line-2);
   border-radius: 14px;
@@ -106,7 +106,7 @@
   font: inherit;
   font-size: var(--qx-fs-body-lg);
 }
-.qx-resume-generate textarea.qx-rd-field { min-height: 88px; resize: none; }
+.qx-resume-generate textarea.qx-rd-field { min-height: 104px; resize: none; }
 .qx-resume-generate .qx-rd-field:focus {
   outline: 3px solid var(--qx-teal);
   outline-offset: 2px;
@@ -139,7 +139,7 @@
   background: transparent;
   color: var(--qx-ink-2);
   font: inherit;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -150,7 +150,7 @@
   min-height: var(--qx-tap-min);
   margin-bottom: 12px;
 }
-.qx-resume-generate .qx-rd-heading b { font-size: 20px; }
+.qx-resume-generate .qx-rd-heading b { font-size: var(--qx-fs-sec); }
 
 /* 本页单栏：覆盖 resume-optimize-qx.css 的双栏 grid，不改那份共享文件。 */
 .qx-resume-generate .qx-rd-work {
@@ -209,7 +209,7 @@
   color: var(--qx-paper);
 }
 .qx-resume-generate .qx-rd-lead b { display: block; font-size: 26px; line-height: 1.3; }
-.qx-resume-generate .qx-rd-lead p { margin: 6px 0 0; font-size: 17px; line-height: 1.5; opacity: .85; }
+.qx-resume-generate .qx-rd-lead p { margin: 6px 0 0; font-size: 22px; line-height: 1.5; opacity: .85; }
 .qx-resume-generate .qx-rd-lead em { font-style: normal; font-weight: 700; color: var(--qx-teal-soft); }
 
 .qx-resume-generate .qx-rd-notes {
@@ -218,8 +218,8 @@
   gap: 16px;
   margin-top: 20px;
 }
-.qx-resume-generate .qx-rd-notes .qx-card b { display: block; font-size: 19px; margin-bottom: 6px; }
-.qx-resume-generate .qx-rd-notes .qx-card p { margin: 0; font-size: 16px; line-height: 1.55; }
+.qx-resume-generate .qx-rd-notes .qx-card b { display: block; font-size: 24px; margin-bottom: 6px; }
+.qx-resume-generate .qx-rd-notes .qx-card p { margin: 0; font-size: 22px; line-height: 1.45; }
 
 .qx-resume-generate .qx-rd-selfcheck {
   margin: 18px 0 0;
@@ -227,7 +227,7 @@
   border-radius: 14px;
   background: var(--qx-wheat-soft);
   color: var(--qx-wheat-d);
-  font-size: 16px;
+  font-size: 22px;
   line-height: 1.5;
 }
 
@@ -244,10 +244,13 @@
   min-height: 0;
 }
 .qx-resume-generate .qx-rd-main > .qx-card {
-  flex: none;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  justify-content: space-evenly;
   gap: 18px;
+  overflow-y: auto;
 }
 .qx-resume-generate .qx-rd-main > .qx-card > .grid {
   flex: none;

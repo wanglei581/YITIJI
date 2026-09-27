@@ -9,7 +9,6 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Stepper } from '@ai-job-print/ui'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import type {
@@ -39,8 +38,10 @@ import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
+import { ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import './resume-generate-qx.css'
+import './resume-generate-flow-qx.css'
 
 const STEPS = [
   { title: '基本信息', description: '姓名与联系方式', ask: '先留下能联系上你的方式', doing: '这一步只有姓名必填。城市和联系方式可以空着。' },
@@ -86,7 +87,7 @@ function EntryList<T>({
   return (
     <div className="space-y-4">
       {items.length === 0 && (
-        <p className="rounded-xl bg-neutral-50 py-6 text-center text-sm text-neutral-400">{emptyHint}</p>
+        <p className="qx-rd-empty">{emptyHint}</p>
       )}
       {items.map((item, i) => (
         <div key={i} className="qx-card qx-rd-entry">
@@ -129,6 +130,7 @@ export function ResumeGeneratePage() {
   const consent = useResumeAiConsent()
   const [showConsent, setShowConsent] = useState(false)
   const [step, setStep] = useState(0)
+  const [reviewing, setReviewing] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** AI 能力级不可用的**真实原因**（原样透出后端 message）；null 表示未观测到不可用。 */
@@ -306,7 +308,7 @@ export function ResumeGeneratePage() {
     + '导出与打印不经过 AI：下面这条可以把你填的原话直接排成 A4 PDF 打印带走（未经润色，也没有缺失提示）。'
   const fallback: AiTaskFallback = aiOutage
     ? {
-        // 能力级不可用：底部「生成我的简历」这次按了也没用，置灰它并写清原因。
+        // 能力级不可用：底部「让 AI 整理成新简历」这次按了也没用，置灰它并写清原因。
         mode: 'blocked',
         reason: aiOutage,
         blockedActionLabel: 'AI 润色成文',
@@ -318,13 +320,18 @@ export function ResumeGeneratePage() {
         // 这里若也用 blocked，就会出现「灰按钮说不可用」和「底部生成按钮仍可点」自相矛盾。
         mode: 'result-unavailable',
         reason: error ?? '本次没能生成简历。',
-        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「生成我的简历」；不想等的话，${STILL_AVAILABLE}`,
+        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「让 AI 整理成新简历」；不想等的话，${STILL_AVAILABLE}`,
         action: draftAction,
       }
 
   const stepIcon = [UserRoundIcon, BriefcaseIcon, GraduationCapIcon, BriefcaseIcon, FolderGitIcon, WrenchIcon][step]
   const StepIcon = stepIcon
 
+  const openReview = () => setReviewing(true)
+  const editStep = (next: number) => {
+    setReviewing(false)
+    setStep(next)
+  }
   const ctabar = (
     <>
       <button
@@ -332,16 +339,35 @@ export function ResumeGeneratePage() {
         className="qx-btn"
         data-variant="ghost"
         disabled={generating}
-        onClick={() => (step === 0 ? navigate('/resume/source') : setStep((s) => s - 1))}
+        onClick={() => {
+          if (reviewing) {
+            setReviewing(false)
+            return
+          }
+          if (step === 0) navigate('/resume/source')
+          else setStep((s) => s - 1)
+        }}
       >
-        {step === 0 ? '返回简历服务' : '上一步'}
+        {reviewing || step > 0 ? '上一步' : '返回简历服务'}
       </button>
-      {step < STEPS.length - 1 ? (
+      {reviewing ? (
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="primary"
+          disabled={generating}
+          onClick={() => void handleGenerate()}
+        >
+          <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+          {generating ? '正在整理…' : '让 AI 整理成新简历'}
+        </button>
+      ) : step < STEPS.length - 1 ? (
         <button
           type="button"
           className="qx-btn"
           data-variant="primary"
           disabled={!canNext}
+          aria-describedby={step === 0 && !canNext ? 'resume-generate-name-reason' : undefined}
           onClick={() => setStep((s) => s + 1)}
         >
           下一步：{STEPS[step + 1].title}
@@ -352,10 +378,9 @@ export function ResumeGeneratePage() {
           className="qx-btn"
           data-variant="primary"
           disabled={generating}
-          onClick={() => void handleGenerate()}
+          onClick={openReview}
         >
-          <SparklesIcon className="h-5 w-5" />
-          {generating ? '正在整理…' : '生成我的简历'}
+          去核对
         </button>
       )}
       <ResumeGenerateAiRow />
@@ -367,7 +392,7 @@ export function ResumeGeneratePage() {
       title="从零生成简历"
       subtitle="分步问完，一次整理。只整理你说的，不替你编。"
       status={{
-        tone: aiOutage || error ? 'bad' : generating || exportingDraft ? 'warn' : 'unknown',
+        tone: aiOutage || error ? 'bad' : generating || exportingDraft ? 'warn' : reviewing ? 'ok' : 'unknown',
         label: generating
           ? '正在整理你的资料'
           : exportingDraft
@@ -376,7 +401,9 @@ export function ResumeGeneratePage() {
               ? '整理暂时不可用'
               : error
                 ? '这次没整理出来'
-                : `第 ${step + 1} 步 / 共 ${STEPS.length} 步 · ${STEPS[step].title}`,
+                : reviewing
+                  ? '核对 · 准备提交一次'
+                  : `第 ${step + 1} 步 / 共 ${STEPS.length} 步 · ${STEPS[step].title}`,
       }}
       back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
       navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
@@ -385,15 +412,38 @@ export function ResumeGeneratePage() {
     <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
       <ResumeGenerateAdvisor
         eyebrow="从零生成"
-        ask={STEPS[step].ask}
-        doing={STEPS[step].doing}
+        ask={reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}
+        doing={reviewing ? '先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。' : STEPS[step].doing}
       />
+      {!reviewing && (
+        <ol className="qx-rg-prog" aria-label={`填写进度：第 ${step + 1} 步，共 ${STEPS.length} 步`}>
+          {STEPS.map((item, index) => {
+            const mark = index < step ? 'done' : index === step ? 'now' : undefined
+            return (
+              <li key={item.title} data-on={mark} aria-current={mark === 'now' ? 'step' : undefined}>
+                <u aria-hidden="true" />
+                {index + 1} {item.title}
+              </li>
+            )
+          })}
+        </ol>
+      )}
+      {reviewing ? (
+        <ResumeGenerateReview
+          basic={basic}
+          intention={intention}
+          education={education}
+          experience={experience}
+          projects={projects}
+          skillsText={skillsText}
+          certsText={certsText}
+          selfIntro={selfIntro}
+          onEdit={editStep}
+        />
+      ) : (
       <div className="qx-rd-work">
-        <div className="qx-rd-steps">
-          <Stepper steps={[...STEPS]} currentIndex={step} />
-        </div>
         <div className="qx-rd-main">
-            <div className="qx-card">
+            <div className="qx-card qx-rg-card" key={step}>
               <div className="qx-rd-heading">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
                   <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
@@ -489,6 +539,7 @@ export function ResumeGeneratePage() {
                       <div className="mt-2 flex justify-end">
                         <ResumeVoiceInputButton
                           label="在校情况"
+                          className="qx-rd-voice"
                           disabled={generating}
                           onConfirm={(text) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
                         />
@@ -527,6 +578,7 @@ export function ResumeGeneratePage() {
                       <div className="mt-2 flex justify-end">
                         <ResumeVoiceInputButton
                           label="工作内容"
+                          className="qx-rd-voice"
                           disabled={generating}
                           onConfirm={(text) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
                         />
@@ -560,6 +612,7 @@ export function ResumeGeneratePage() {
                       <div className="mt-2 flex justify-end">
                         <ResumeVoiceInputButton
                           label="项目内容"
+                          className="qx-rd-voice"
                           disabled={generating}
                           onConfirm={(text) => setProjects((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
                         />
@@ -576,42 +629,57 @@ export function ResumeGeneratePage() {
               <Field label="技能(用逗号或换行分隔)">
                 <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 JavaScript, Excel, 英语六级" value={skillsText} onChange={(e) => setSkillsText(e.target.value)} />
                 <div className="mt-2 flex justify-end">
-                  <ResumeVoiceInputButton label="技能" disabled={generating} onConfirm={(text) => setSkillsText((current) => appendVoiceText(current, text))} />
+                  <ResumeVoiceInputButton className="qx-rd-voice" label="技能" disabled={generating} onConfirm={(text) => setSkillsText((current) => appendVoiceText(current, text))} />
                 </div>
               </Field>
               <Field label="证书 / 资质(用逗号或换行分隔;只填真实持有的)">
                 <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 普通话二级甲等, 机动车驾驶证 C1" value={certsText} onChange={(e) => setCertsText(e.target.value)} />
                 <div className="mt-2 flex justify-end">
-                  <ResumeVoiceInputButton label="证书资质" disabled={generating} onConfirm={(text) => setCertsText((current) => appendVoiceText(current, text))} />
+                  <ResumeVoiceInputButton className="qx-rd-voice" label="证书资质" disabled={generating} onConfirm={(text) => setCertsText((current) => appendVoiceText(current, text))} />
                 </div>
               </Field>
               <Field label="自我评价草稿(选填,AI 会基于它润色个人简介)">
                 <textarea className={`${inputCls} h-24 resize-none`} value={selfIntro} onChange={(e) => setSelfIntro(e.target.value)} />
                 <div className="mt-2 flex justify-end">
-                  <ResumeVoiceInputButton label="自我评价" disabled={generating} onConfirm={(text) => setSelfIntro((current) => appendVoiceText(current, text))} />
+                  <ResumeVoiceInputButton className="qx-rd-voice" label="自我评价" disabled={generating} onConfirm={(text) => setSelfIntro((current) => appendVoiceText(current, text))} />
                 </div>
               </Field>
             </div>
           )}
             </div>
-
-            {/*
-              失败态不再只剩一行红字。红字保留（它是原因），下面挂上不依赖 AI 的出路：
-              内容没丢 + 可以把已填内容原样导出打印带走。AiTaskRegion 的 fallback 是
-              必填 prop，由类型系统保证这条支线不会在后续改动里被悄悄摘掉。
-            */}
-            {error && (
-              <p className="qx-rd-error" role="alert">{error}</p>
-            )}
-            <AiTaskRegion
-              className="resume-generate-fallback mt-3"
-              task={aiTask}
-              label="AI 简历润色成文"
-              fallback={fallback}
-            />
-            <p className="rg-truth">AI 只整理你提供的描述；学校、公司和时间请本人核对。</p>
         </div>
       </div>
+      )}
+      {(reviewing || step === 0) && (
+        <div className="qx-rg-helper">
+          <span>
+            {reviewing
+              ? '可以慢慢核对，准备好后再点生成。'
+              : '姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。'}
+          </span>
+          <button type="button" onClick={() => navigate('/help')}>找工作人员</button>
+        </div>
+      )}
+      {!reviewing && step === 0 && !basic.name.trim() && (
+        <p className="qx-rg-reason" id="resume-generate-name-reason">
+          姓名还没填，填完才能进下一步。其余三项可以空着。
+        </p>
+      )}
+      {/*
+        失败态不再只剩一行红字。红字保留（它是原因），下面挂上不依赖 AI 的出路：
+        内容没丢 + 可以把已填内容原样导出打印带走。AiTaskRegion 的 fallback 是
+        必填 prop，由类型系统保证这条支线不会在后续改动里被悄悄摘掉。
+      */}
+      {error && (
+        <p className="qx-rd-error" role="alert">{error}</p>
+      )}
+      <AiTaskRegion
+        className="resume-generate-fallback"
+        task={aiTask}
+        label="AI 简历润色成文"
+        fallback={fallback}
+      />
+      <p className="rg-truth">AI 只整理你提供的描述；学校、公司和时间请本人核对。</p>
     </section>
     {showConsent && (
       <ResumeAiConsentDialog

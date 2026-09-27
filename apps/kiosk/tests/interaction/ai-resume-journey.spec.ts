@@ -382,11 +382,13 @@ test('J3 匿名 · AI 帮你生成一份 → 预览 → 导出 PDF @interaction'
     await waitReady(page)
     const skills = page.getByLabel(/技能/)
     if (await skills.count()) await skills.fill('TypeScript, React')
+    // 稿 24 最后一步先「去核对」，核对屏主按钮才是「让 AI 整理成新简历」。仍用按钮角色点击，并等到预览页。
+    await page.getByRole('button', { name: '去核对' }).click()
     await recordStep({
-      page, journey, step: 'generate-submit', control: '生成我的简历', selectorHint: 'button:生成我的简历',
+      page, journey, step: 'generate-submit', control: '让 AI 整理成新简历', selectorHint: 'button:让 AI 整理成新简历',
       kind: 'click', collectors,
       act: async () => {
-        await page.getByRole('button', { name: /生成我的简历/ }).click()
+        await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
         await confirmAiConsent(page, journey, collectors)
         await page.waitForURL((url) => url.pathname === '/resume/generate/preview', { timeout: 60_000 })
       },
