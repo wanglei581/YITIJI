@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 保留左右预览与参数结构、页码计算和权限门控，步骤带增高让参数操作进入可触达区（规则 1、2）。
 - 设备状态不再用示例数据声称正常；示例来源与原文件提示合并为一处（规则 4、5）。
 - 参数建议明确是按纸张计算，保留检查能力并新增打印参数 AI 咨询（规则 7）。
-- CTA 改为核对价格，底部补上一步；删除服务端与真机验收工程文案（规则 1、3、4）。
-- AI 帮助采用原顾问页支持的 composer 与会话草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- CTA 改为核对价格，底部补上一步；删除系统与现场开通工程文案（规则 1、3、4）。
+- AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 -->
 <html lang="zh-CN">
 <head>
@@ -19,14 +20,14 @@
          capability-* / device-*）。/print/params 是指向 /print/preview 的兼容重定向，不单列状态。
 
   本页只做一件事：把上一步搬进来的那**一份**文件，从「检查」走到「参数设好、能力和设备都确认过」，
-  然后交给 14-print-confirm.html 由服务端报价。**本页不显示任何金额、权益抵扣、支付或成功结论**。
+  然后交给 14-print-confirm.html 由下一步的实际价格。**本页不显示任何金额、权益抵扣、支付或成功结论**。
 
   查询契约：
-    ?state=<下方 22 态之一>   —— 仅本原型使用；夹具态必须带 capture=1 或 debug=1
-    ?capture=1 / ?debug=1     —— 夹具可达门；?flat=1 截图去动效并隐藏输入光标（光标闪烁会让两次截图不一致）
+    ?state=<下方 22 态之一>   —— 仅本原型使用；示例态必须带 capture=1 或 debug=1
+    ?capture=1 / ?debug=1     —— 示例可达门；?flat=1 截图去动效并隐藏输入光标（光标闪烁会让两次截图不一致）
     ?from=upload|hub|home|docs —— 真实来源，决定返回落点；**未知值一律安全回落 /print/upload**，
                                  且原值绝不进入 DOM（外部 URL 既不接受也不回显）
-    ?pick=0..4                —— 这次握着的是哪一份夹具文件。缺省 0
+    ?pick=0..4                —— 这次握着的是哪一份示例文件。缺省 0
     ?preview=open|page2|last|fit-page|fit-width|zoom|rotate|unavailable|expired
                               —— 完整预览入口，只在 capture=1 / debug=1 且真的握着文件时生效
     ?sug=loading|ready|unavailable —— 检查建议子态，缺省 ready
@@ -42,11 +43,11 @@
 
   fail-closed（本页最重要的一条）：
     除 missing-context / illegal-context 外，**每一个状态都会说出文件名、页数或检查片段**，
-    那些都是服务端才拥有的事实。所以它们全部是夹具态：普通产品地址一律回落 missing-context，
+    那些都是系统才拥有的事实。所以它们全部是示例态：普通产品地址一律回落 missing-context，
     看不到「求职简历-王雷.pdf」、看不到页数、看不到任何可识别片段。
     ?state= 写了不认识的值 → illegal-context，原值保留在地址里但**绝不回显到屏幕上**。
 
-  真实合同（来源：代码，不是想象）：
+  真实规则（来源：代码，不是想象）：
     页范围      services/api/src/print-jobs/page-range.util.ts `countPagesInRange`：
                 空 / all = 全部；段落写法 `\d+(-\d+)?`，逗号分隔，最多 64 段；
                 start<1 或 end<start 判非法；**整段落在文档之后按打印机行为忽略**（5 页文档写
@@ -57,18 +58,18 @@
     每页版数    packages/shared `restrictToAllowedPrintParams`：pagesPerSheet 是**全局产品边界**，
                 与终端能力无关，恒收口到 1。所以本页**不提供** 2 版 / 4 版选项，只留一枚常显原因的锁定项。
     彩色 / 双面 packages/shared DEFAULT_DENY_CAPABILITY_KEYS = color_print / duplex_print：
-                未登记 = 拒绝；只有管理员在真机验过后显式登记 available 才放行。
-                CAPABILITY_DENIAL_REASON 原文即本页锁定理由，措辞是「本机未通过真机验证」而不是「不支持」。
-                能力被收回时必须把已选的未验证值拉回基线，并**明确告诉用户参数变了**，不静默降级。
+                未登记 = 拒绝；只有管理员在本机验过后显式登记 available 才放行。
+                CAPABILITY_DENIAL_REASON 原文即本页锁定理由，措辞是「本机暂未开通」而不是「不支持」。
+                能力被收回时必须把已选的本机暂未开通值拉回基线，并**明确告诉用户参数变了**，不静默降级。
     页面方向    PrintOrientation = auto | portrait | landscape；Terminal Agent 已映射到驱动 orientation，auto 省略交给驱动。
-    缩放方式    PrintScale = fit | actual；Terminal Agent 已映射到 fit | noscale。两项仍待 Windows / 奔图真机验收。
+    缩放方式    PrintScale = fit | actual；Terminal Agent 已映射到 fit | noscale。两项仍待 Windows / 奔图现场开通。
     设备        useTerminalDeviceStatus kind = ready | offline | error | low_paper | unknown。
                 读不到就是 unknown —— 不说离线，也不说正常。
     遮挡        当前版本只记录裁决并做遮挡评估，**不生成遮挡后的新文件**，打印用的仍是原文件。
     纸张        本机固定 A4，没有 A3，也不提供其它幅面选项。
-    金额        本页不显示、不预估任何金额；报价由下一步服务端返回。
+    金额        本页不显示、不预估任何金额；价格到下一步再看。
 
-  完整预览合同（与 12-file-source.html 同一条口径）：
+  完整预览规则（与 12-file-source.html 同一条口径）：
     宿主与隔离  near-full-stage 模态覆盖整屏；打开时顶栏 / 引导条 / 正文 / 事实条 / 底栏全部 inert +
                 aria-hidden，既点不到也 Tab 不到；焦点进入模态并在模态内循环；Esc 或「关闭」退出，
                 焦点回到原来那个按钮。预览**不导航、不改地址、不写任何存储**。
@@ -194,7 +195,7 @@ input{font:inherit}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;position:relative}
 .nav-item .ni{font-size:20px;color:var(--ink-3);font-weight:600}
 
-/* ---------- 夹具标记 ---------- */
+/* ---------- 示例标记 ---------- */
 .fx{display:flex;align-items:center;gap:12px;background:var(--wheat-soft);color:var(--wheat-d);border-radius:var(--r-md);padding:12px 18px;font-size:18px;font-weight:600;line-height:1.36}
 .fx .fx-b{flex:none;background:var(--wheat-d);color:#fff;border-radius:8px;padding:4px 11px;font-size:15px;letter-spacing:1px;white-space:nowrap}
 
@@ -535,7 +536,7 @@ var STATES=[
  'capability-loading','capability-error','capability-doc-locked','capability-color-locked','capability-duplex-locked',
  'device-loading','device-unknown','device-offline','device-error'
 ];
-/* 夹具态：屏幕上会出现服务端才拥有的事实（文件名 / 页数 / 检查片段 / 能力登记 / 设备状态）。
+/* 示例态：屏幕上会出现系统才拥有的事实（文件名 / 页数 / 检查片段 / 能力登记 / 设备状态）。
    普通产品地址一律 fail-closed 到 missing-context —— 静态页不许把这些当成真的。 */
 var NON_FIXTURE={'missing-context':1,'illegal-context':1};
 function isFixture(st){return !NON_FIXTURE[st]}
@@ -552,7 +553,7 @@ var FROMQ=Q.get('from');
 var FROM_KNOWN=Object.prototype.hasOwnProperty.call(FROM,FROMQ||'')?FROMQ:null;
 var BACK=FROM[FROM_KNOWN||'upload'];
 
-/* 这次握着的是哪一份夹具文件。缺省 0；越界回落 0。 */
+/* 这次握着的是哪一份示例文件。缺省 0；越界回落 0。 */
 var PICKQ=Q.get('pick');
 var PICK=/^[0-4]$/.test(PICKQ||'')?parseInt(PICKQ,10):0;
 
@@ -587,7 +588,7 @@ var ICO={
 };
 function svg(n,s,w,sw){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+s+'" stroke-width="'+(sw||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
 
-/* ================= 夹具文件 ================= */
+/* ================= 示例文件 ================= */
 /* 一份「演示文件」= 名字 + 大小 + 类型 + 页数 + 预览时的自然尺寸。名字、大小、页数和预览内容
    共用同一个来源，免得卡片写 3 页、预览里能翻到第 5 页。w/h 是自然像素：PDF 用 96dpi 的 A4
    （794x1123），图片用二寸证件照比例（827x1063）。前四份与 12-file-source.html 的移交清单一致；
@@ -605,12 +606,12 @@ function docOf(st){
  return DOCS[PICKS[PICK]];
 }
 
-/* ================= 能力与设备（服务端事实，本页只呈现） ================= */
-var DENY_COLOR='彩色暂未开放，请选黑白';
-var DENY_DUPLEX='双面暂未开放，请选单面';
+/* ================= 能力与设备（系统事实，本页只呈现） ================= */
+var DENY_COLOR='彩色本机暂未开通，请选黑白';
+var DENY_DUPLEX='双面本机暂未开通，请选单面';
 var DENY_DOC='管理员把这台机器的文档打印置为维护中';
 var CAP_LOADING='正在确认本机打印能力…';
-var CAP_ERROR='暂时读不到本机打印能力，已按未验证处理';
+var CAP_ERROR='暂时读不到本机打印能力，已按本机暂未开通处理';
 var NUP_REASON='A4 纸，每张印 1 页内容。';
 
 /* cap：doc / color / duplex 各自 ok | denied | loading | error */
@@ -817,7 +818,7 @@ function initModel(st){
  else if(st==='check-flagged-partial')M.decisions=['redact','keep','pending'];
  else if(st==='check-flagged-decided')M.decisions=['redact','keep','redact'];
  else M.decisions=['pending','pending','pending'];
- /* 能力被收回的两态：上一台机器上选过的未验证值还挂在参数里。按合同必须**明确告诉用户参数变了**，
+ /* 能力被收回的两态：上一台机器上选过的本机暂未开通值还挂在参数里。按规则必须**明确告诉用户参数变了**，
     所以这里不静默改回基线，而是把冲突摆在屏幕上，由用户点一下改回来。 */
  if(st==='capability-color-locked')M.color='color';
  if(st==='capability-duplex-locked')M.duplex='duplex_long_edge';
@@ -940,7 +941,7 @@ function optBtn(o){
  if(o.locked){
   /* 锁住但**当前就是这一项**时仍然要显示为已选：否则摘要写着彩色、按钮却看不出选中，冲突就藏起来了。 */
   return '<span class="opt'+(o.on?' conflict':'')+'" role="button" aria-disabled="true"'+(o.on?' aria-pressed="true"':'')+' data-testid="'+o.tid+'"'+
-   (o.desc?' aria-describedby="'+o.desc+'"':'')+' aria-label="'+o.al+(o.on?'（这是你带过来的参数，本机没验过，现在不能用）':'')+'">'+o.label+svg('lock','currentColor',18,2.1)+'</span>';
+   (o.desc?' aria-describedby="'+o.desc+'"':'')+' aria-label="'+o.al+(o.on?'（这是你带过来的参数，本机暂未开通，现在不能用）':'')+'">'+o.label+svg('lock','currentColor',18,2.1)+'</span>';
  }
  return '<button type="button" class="opt press" data-testid="'+o.tid+'" data-act="'+o.act+'" aria-pressed="'+(o.on?'true':'false')+'" aria-label="'+o.al+'">'+o.label+'</button>';
 }
@@ -948,7 +949,7 @@ function reasonLine(id,tid,text,cls){
  return '<div class="reason'+(cls?' '+cls:'')+'" id="'+id+'" data-testid="'+tid+'">'+text+'</div>';
 }
 
-/* ---------- 设备与能力条：四格，全部来自服务端登记，本页只呈现 ---------- */
+/* ---------- 设备与能力条：四格，全部来自系统登记，本页只呈现 ---------- */
 function devCell(tid,label,value,tone,reason){
  return '<div class="devcell" data-testid="'+tid+'" data-tone="'+tone+'">'+
   '<span class="dl">'+label+'</span>'+
@@ -1328,7 +1329,7 @@ function checkRight(st){
  if(st==='check-loading'){
   return '<div class="wright">'+
    '<div class="state" data-kind="info" data-testid="'+SCREEN+'-status"><div class="state-h"><span class="dot16 breathe"></span>正在检查这份材料</div>'+
-   '<div class="state-p">服务端在读这份文件，看有没有身份证号、手机号、银行卡号这类可识别片段。<b>结果没回来之前，屏幕上不会出现任何结论。</b></div></div>'+
+   '<div class="state-p">系统在读这份文件，看有没有身份证号、手机号、银行卡号这类可识别片段。<b>结果没回来之前，屏幕上不会出现任何结论。</b></div></div>'+
    '<div class="card" style="flex:1;min-height:0;justify-content:space-evenly"><div><div class="sec-label" style="margin-bottom:8px"><span class="t" style="font-size:23px">这一步在查什么</span></div>'+
    '<ul class="steps"><li><span class="n">1</span><span>身份证号、手机号、银行卡号等可识别片段，逐页扫一遍。</span></li>'+
    '<li><span class="n">2</span><span>页面能不能按 A4 正常排版，有没有整页空白。</span></li>'+
@@ -1357,7 +1358,7 @@ function checkRight(st){
    '<div class="note"><span class="sq"></span><span>打印将使用<b>你上传的这一份原文件</b>，本页没有生成任何派生文件。</span></div></div></div>'+
    '<div><div class="sec-label" style="margin-bottom:8px"><span class="t" style="font-size:23px">下一步做什么</span></div>'+
    '<div class="notes"><div class="note"><span class="sq"></span><span>确认版面、份数和页范围，再看一眼这台机器的能力和状态。</span></div>'+
-   '<div class="note"><span class="sq"></span><span>报价由下一步的服务端给出，<b>在那之前不产生任何费用</b>。</span></div></div></div></div></div>';
+   '<div class="note"><span class="sq"></span><span>报价由下一步的系统给出，<b>在那之前不产生任何费用</b>。</span></div></div></div></div></div>';
  }
  if(st==='check-failed'){
   return '<div class="wright">'+
@@ -1445,7 +1446,7 @@ V['missing-context']=function(){
   b2t:'回去之后怎么走',
   b2:['在选文件那一步，把要打印的那一份搬进这次办理。',
       '回到这一页做材料检查，逐条决定要不要遮挡。',
-      '设好份数、颜色、单双面和页范围，再由服务端报价。'],
+      '设好份数、颜色、单双面和页范围，再由下一步的实际价格。'],
   b3t:'两条事实',
   b3:['到这里为止<b>没有产生订单，也没有扣任何费用</b>。',
       '之前存过的文件在<b>「我的文档」</b>里；这一页本身不保存文件。']
@@ -1478,18 +1479,18 @@ V['expired-context']=function(){
   title:'这次办理的文件上下文已经过期',
   thumb:'办理上下文已过期<br><b>本机不再持有这次的文件</b>',thumbAl:'办理上下文已过期，不显示任何页面',
   fileNote:'过期只清掉本机这次办理的上下文，和你的账号无关。',
-  p1:'这台机器是公共设备，办理会话有有效期。<b>过期之后本机就不再持有这次的文件</b>，所以这一页不再显示文件名、页数或上一次的检查结论。',
-  p2:'服务端那边的文件按它自己的留存规则处理，<b>本页不替它宣布已删除，也不承诺还留着</b>。',
+  p1:'这台机器是公共设备，办理这次办理有有效期。<b>过期之后本机就不再持有这次的文件</b>，所以这一页不再显示文件名、页数或上一次的检查结论。',
+  p2:'系统那边的文件按它自己的留存规则处理，<b>本页不替它宣布已删除，也不承诺还留着</b>。',
   b1t:'过期意味着什么',
   b1:['本机这次办理的<b>文件上下文和参数</b>都不在了，需要重新搬一份进来。',
       '过期<b>不等于出错，也不等于扣了钱</b> —— 没有产生订单，也没有开始打印。',
-      '服务端的文件按留存规则处理：本页<b>既不宣布已删除，也不承诺一定还在</b>。'],
+      '系统的文件按留存规则处理：本页<b>既不宣布已删除，也不承诺一定还在</b>。'],
   b2t:'接下来可以',
   b2:['重新走一遍选文件，把要打印的那一份再搬进来。',
       '之前保存过的，可以到「我的文档」里挑一份。',
       '不确定上一趟办到哪一步，可以叫工作人员帮你查一下。'],
   b3t:'两条事实',
-  b3:['会话过期只影响<b>本机这一次办理</b>，不影响你的账号或已保存文档。',
+  b3:['这次办理过期只影响<b>本机这一次办理</b>，不影响你的账号或已保存文档。',
       '这一页<b>不保存文件</b>，也不会因为过期而替你删掉什么。']
  });
 };
@@ -1554,8 +1555,8 @@ var PILL={
  'capability-loading':['warn','正在确认本机打印能力'],
  'capability-error':['bad','读不到本机打印能力'],
  'capability-doc-locked':['warn','文档打印维护中'],
- 'capability-color-locked':['warn','参数含未验证的彩色'],
- 'capability-duplex-locked':['warn','参数含未验证的双面'],
+ 'capability-color-locked':['warn','参数含本机暂未开通的彩色'],
+ 'capability-duplex-locked':['warn','参数含本机暂未开通的双面'],
  'device-loading':['warn','正在读打印机状态'],
  'device-unknown':['warn','打印机状态读不到'],
  'device-offline':['bad','打印机离线'],
@@ -1576,10 +1577,10 @@ var ASK={
  'preview':['纸上<em>会长这样</em>。','核对内容与参数，下一步看价格，最后带走打印件。'],
  'file-unsupported':['这份文件<em>印不了</em>。','打印只收 PDF / JPG / PNG，Word 既不上传也不转换。'],
  'capability-loading':['本机能力<em>还在确认</em>。','确认完才知道彩色和双面能不能选，之前不放行。'],
- 'capability-error':['读不到<em>本机能力</em>。','按未验证处理，不放行 —— 宁可白等，也不让你按必被拒绝的参数下单。'],
+ 'capability-error':['读不到<em>本机能力</em>。','按本机暂未开通处理，不放行 —— 宁可白等，也不让你按必被拒绝的参数下单。'],
  'capability-doc-locked':['这台机器<em>暂时不出纸</em>。','管理员把文档打印置为维护中，参数只读。'],
- 'capability-color-locked':['你的参数里是<em>彩色</em>。','这台机器的彩色没验过。点一下「黑白」改回来就能继续。'],
- 'capability-duplex-locked':['你的参数里是<em>双面</em>。','这台机器的双面打印没验过。点一下「单面」改回来就能继续。'],
+ 'capability-color-locked':['你的参数里是<em>彩色</em>。','彩色本机暂未开通。点一下「黑白」改回来就能继续。'],
+ 'capability-duplex-locked':['你的参数里是<em>双面</em>。','双面本机暂未开通。点一下「单面」改回来就能继续。'],
  'device-loading':['正在<em>读设备状态</em>。','读到之前不放行，免得你白跑一趟。'],
  'device-unknown':['打印机状态<em>读不到</em>。','不说它离线，也不说它正常 —— 确实不知道，所以不放行。'],
  'device-offline':['打印机<em>离线</em>。','现在联系不上这台打印机，出不了纸。'],
@@ -1780,12 +1781,12 @@ function pvBtn(tid,label,al,cls){
 }
 function pvFixtureBar(){
  return '<div class="pv-fx" data-testid="'+SCREEN+'-preview-fixture" role="note"><span class="fx-b">演示</span>'+
-  '<span>固定原型数据 / 演示文件，<b>不是真实用户文件</b>。这里的页面和图片写死在原型里，不是接口返回值，也不是这台机器此刻真读到的东西。</span></div>';
+  '<span>固定原型数据 / 演示文件，<b>不是真实用户文件</b>。这里的页面和图片写死在原型里，不是真实办理结果，也不是这台机器此刻真读到的东西。</span></div>';
 }
 function pvFailCard(){
  var na=pv.fail==='unavailable';
  var title=na?'这份文件暂时看不了预览':'预览链接已经过期';
- var p1=na?'预览要向服务端另取一份用来看的内容，<b>刚才这一次没取到</b>。可能是这台机器到服务端的网络断了，也可能是预览服务正忙。'
+ var p1=na?'预览要向系统另取一份用来看的内容，<b>刚才这一次没取到</b>。可能是这台机器到系统的网络断了，也可能是预览服务正忙。'
           :'为了不让文件被随手转发，预览用的是<b>有有效期的临时链接</b>，时间到了就打不开了。重新打开预览会再取一条新的。';
  return '<div class="pv-card" data-testid="'+SCREEN+'-preview-state" data-kind="'+pv.fail+'">'+
   '<div><div class="state-h">'+svg('warn','currentColor',30,2.1)+'<span>'+title+'</span></div>'+
@@ -1989,7 +1990,7 @@ document.getElementById('body-root').addEventListener('click',function(e){
   h+='<div class="dp-t">完整预览</div>';
   var modes=['open','page2','last','fit-page','fit-width','zoom','rotate','unavailable','expired'];
   for(i=0;i<modes.length;i++)h+='<a href="?state=preview&preview='+modes[i]+keep+'" data-s="pv-'+modes[i]+'">预览 · '+modes[i]+'</a>';
-  h+='<div class="dp-t">文件夹具</div>';
+  h+='<div class="dp-t">文件示例</div>';
   for(i=0;i<PICKS.length;i++)h+='<a href="?state=preview&pick='+i+'&debug=1'+(CAPTURE?'&capture=1':'')+(FLAT?'&flat=1':'')+'" data-s="pick-'+i+'">'+DOCS[PICKS[i]].n+'</a>';
   panel.innerHTML=h;
   var stage=document.getElementById('stage');

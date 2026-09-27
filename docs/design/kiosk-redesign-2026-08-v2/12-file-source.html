@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 文件区保留完整预览、更换、删除和下一步，内容态使用 local-ready（规则 1、3）。
 - 删除技术来源解释；示例文件只用一条人话说明，不展示上传成功结论（规则 4、5）。
 - 底部增加上一步和文件检查 AI 帮助，保留下一步隐私预检（规则 1、7）。
 - 当前文件名取消挤压，操作允许换行；未改变三 Tab 与预览交互（规则 2）。
-- AI 帮助采用原顾问页支持的 composer 与会话草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 -->
 <html lang="zh-CN">
 <head>
@@ -26,21 +27,21 @@
     ?tab=file|qr|usb          —— 初始通道，非法值回落 file
     ?mode=transfer            —— 入口已选定通道，直达该通道，不再问第二遍
     ?category=photo           —— 照片打印入口（PrintUploadPage 也接受 router state）
-    ?state=<下方 38 态之一>    —— 仅本原型使用；夹具态必须带 capture=1 或 debug=1
-    ?capture=1 / ?debug=1     —— 夹具可达门；?flat=1 截图去动效
-    ?cancel=ok|fail           —— 取消会话的**服务端答复夹具**。phone-cancelled 只认 ok，
+    ?state=<下方 38 态之一>    —— 仅本原型使用；示例态必须带 capture=1 或 debug=1
+    ?capture=1 / ?debug=1     —— 示例可达门；?flat=1 截图去动效
+    ?cancel=ok|fail           —— 取消这次办理的**系统答复示例**。phone-cancelled 只认 ok，
                                 phone-cancel-failed 只认 fail；缺这个参数一律 fail-closed 到
                                 missing-file，静态页不许自己「取消成功」。
     ?pick=0|1|2               —— 这次拿到的是哪一份（本机 0=PDF / 1=图片；U 盘 0/1/2）。缺省 0，
                                 所以不带这个参数时页面与改版前完全一致。
-    ?preview=<下表之一>        —— **预览夹具入口**，只在 capture=1 / debug=1 下生效，且只在真的
+    ?preview=<下表之一>        —— **预览示例入口**，只在 capture=1 / debug=1 下生效，且只在真的
                                 握着（或挂着）一份文件的状态上生效：local-ready / usb-ready /
                                 phone-confirmed / phone-uploaded / phone-cancel-failed /
                                 local-rejected。其余一律不开预览。
                                 open | page2 | last | fit-page | fit-width | zoom | rotate
                                 unavailable（预览取不到）| expired（预览链接过期）| unsupported（不收的格式）
 
-  完整预览合同（本轮返修的主题）：
+  完整预览规则（本轮返修的主题）：
     为什么要有      只给文件名和大小，用户没法确认「带走的是不是这一份、有没有传错页、照片是不是歪的」。
                   所以本页必须能在**同一个 HTML 宿主**里把这份文件**完整**看一遍，再决定要不要往下走。
     宿主与隔离      near-full-stage 模态覆盖整屏；打开时顶栏 / 小青条 / 正文 / 页脚 / 底栏全部 inert +
@@ -53,33 +54,33 @@
     DOCX          这条打印上传路由**只收 PDF / JPG / PNG**，Word 既不上传也不预览，更**不做格式转换渲染**——
                   不拿一个转出来的样子冒充你的原文件。只诚实说明，并给出「另存为 PDF / JPG / PNG」的做法。
     预览失败       取不到预览 / 预览链接过期只说**暂时看不了**，并明确保留事实：文件还在本次办理里，
-                  上传没有失败，文件没有丢，也没有被删除。**不借预览失败改写文件或会话状态。**
+                  上传没有失败，文件没有丢，也没有被删除。**不借预览失败改写文件或这次办理状态。**
     演示内容       预览里的页面和图片是**固定原型数据 / 演示文件，不是真实用户文件**：模态内常驻标记，
                   每一页页脚和水印再标一次；普通产品地址一律 fail-closed，看不到这些内容。
     不做什么       不解析、不判页数结论、不做隐私检查、不做 AI 诊断、不出签名链接、不显示任何凭据。
 
-  真实合同（来源：代码，不是想象）：
+  真实规则（来源：代码，不是想象）：
     单文件      PrintUploadPage useState<UploadedFile|null> —— 本次办理只持有一个已选文件，
                 没有多文件队列，也不存在「一次传 2 份」。
     体积上限    本机 / U 盘 15MB（PRINT_UPLOAD_MAX_MB=15 = min(print_doc 20MB, 代理 15MB)）；
                 手机上传 10MB（uploadSessions.ts: FILE_TOO_LARGE = 「文件超过 10MB」）。两个数不一样。
-    手机会话    packages/shared UploadSessionStatus = pending|uploading|uploaded|confirmed|expired|cancelled。
-                **没有「已扫码」这个服务端信号**；本机看不到用户扫没扫。
+    手机上传    packages/shared UploadSessionStatus = pending|uploading|uploaded|confirmed|expired|cancelled。
+                **没有「已扫码」这个系统信号**；本机看不到用户扫没扫。
                 uploaded 之后必须在一体机点确认（POST /upload-sessions/:id/confirm）才算数。
-                刷新二维码前先 DELETE 撤销旧会话（UploadSessionQrPanel: revokePreviousSession）。
+                刷新二维码前先 DELETE 撤销旧这次办理（UploadSessionQrPanel: revokePreviousSession）。
                 连续 3 次轮询失败或 NOT_FOUND/EXPIRED → 本机按已过期处理。
-    取消语义    upload-sessions.service.ts cancel()：已 confirmed 的会话**不能取消**（400
-                UPLOAD_SESSION_CONFIRMED）；未 confirmed 的会话取消时会走 cleanupAbandonedFile()，
+    取消语义    upload-sessions.service.ts cancel()：已 confirmed 的这次办理**不能取消**（400
+                UPLOAD_SESSION_CONFIRMED）；未 confirmed 的这次办理取消时会走 cleanupAbandonedFile()，
                 对**匿名 / 未归属**的本次临时上传调 files.forceDelete()（best-effort，.catch 吞错），
                 对已有 endUserId / ownerType='user' 的文件**直接跳过不删**。expire 路径（同文件
                 第 173、282 行）走的是同一个 cleanupAbandonedFile。所以本页对取消 / 过期的唯一诚实
-                说法是**「按服务端清理规则处理」**：既不能承诺必删或立即删，也不能承诺不删。
-    取消失败    **静态原型只定义正确产品合同，不代表 React 已经这么做。** 现状 React
+                说法是**「按系统清理规则处理」**：既不能承诺必删或立即删，也不能承诺不删。
+    取消失败    **静态原型只定义正确产品规则，不代表 React 已经这么做。** 现状 React
                 UploadSessionQrPanel.tsx:281-290 的 handleCancel 用 `catch {}` 吞掉 DELETE 失败，
                 并在 finally 里无条件 setQr(null)/setStatus(null)/setError(null) —— 取消失败也会
-                清掉本机会话与待确认文件。这是**后续对接阻塞项**，不是本页已修好的东西。
+                清掉本机这次办理与待确认文件。这是**后续对接阻塞项**，不是本页已修好的东西。
     本机上传    本机通道是一次整份往返，**没有任何取消/中止通道**：请求送出之后，没有一个前端
-                动作能让服务端停下来，也没有服务端答复能证明它停下来了。所以 local-uploading
+                动作能让系统停下来，也没有系统答复能证明它停下来了。所以 local-uploading
                 **不提供「取消本次上传」**，只留等待 / 求助 / 退出本页；local-cancelled **只对应
                 一种情况**：系统文件窗口被关掉、上传还没开始。两者不共用一个出口。
                 现状 React PrintUploadPage.tsx:748-756 的次按钮在 uploading 期间仍写「取消」且
@@ -89,19 +90,19 @@
                 未配置 VITE_TERMINAL_AGENT_BRIDGE_TOKEN → 未接通；配置了但连不上 → Agent 离线。这两件事不一样。
     系统文件框  <input type=file> 只是桌面浏览器的验证 / 兼容路径，**不是公共一体机的首选**
                 （CLAUDE.md §17 禁止一体机出现系统级弹窗）。
-    云盘        没有任何真实 OAuth 合同 —— 本页把它标成「尚未接入」，只给「先下到手机再扫码上传」的老实办法。
-    纸质原件    React 已有 /scan/start 入口；这不是第四种上传 tab，而是先建立扫描会话、去奔图面板扫描，完成后取得文件。
+    云盘        没有任何真实 OAuth 规则 —— 本页把它标成「尚未接入」，只给「先下到手机再扫码上传」的老实办法。
+    纸质原件    React 已有 /scan/start 入口；这不是第四种上传 tab，而是先开始这次扫描、去奔图面板扫描，完成后取得文件。
     已有材料    登录用户可从 /me/documents 查看已保存文档，也可从最近打印文件继续；未登录、空、加载失败和链接过期由会员宿主处理。
     出口        navigate('/print/material-check', { state:{ file, source } }) 必须带 file，
                 所以**没有当前文件时主操作一律禁用**。
 
   本页不伪造：有效二维码、设备在线、上传百分比、剩余秒数、安全弹出 U 盘、AI 结果、
-              任务号、文件、成功结论，也不说「会话结束即删除服务端文件」。
+              任务号、文件、成功结论，也不说「这次办理结束即删除系统文件」。
   解析 / 页数 / PII 检查属于第 13 页，本页不预告结论。
 
   原型演示控制：普通地址完全不渲染；仅 ?debug=1 注入（data-proto-control="true"），并保留 debug/capture/flat。
   旧地址兼容：13-print-desk.html 的返回键仍指向 ?state=received（该文件不在本批白名单内），
-              经 LEGACY 映射后按夹具态门禁处理。
+              经 LEGACY 映射后按示例态门禁处理。
 -->
 <style>
 :root{
@@ -260,7 +261,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .outrow{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap}
 .outrow .sbtn{flex:1 1 0;min-width:0}
 
-/* ---------- 说明 / 夹具 ---------- */
+/* ---------- 说明 / 示例 ---------- */
 .emptybox{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;font-size:22px;line-height:1.6;color:var(--ink-2);padding:16px 0}
 .emptybox .ei{width:92px;height:92px;border-radius:28px;background:var(--paper);border:1px dashed var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
 .emptybox b{color:var(--ink)}
@@ -405,7 +406,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
     <div class="xq-row">
       <div class="xq-face serif" aria-hidden="true">青</div>
       <div class="xq-main">
-        <div class="xq-eyebrow" id="xq-eyebrow">FILE SOURCE</div>
+        <div class="xq-eyebrow" id="xq-eyebrow">选文件</div>
         <div class="xq-ask serif" id="xq-ask">文件<em>怎么进来</em>？</div>
         <div class="xq-doing" id="xq-doing">本机选、手机扫码传、U 盘导入，选一条就行。</div>
       </div>
@@ -433,14 +434,14 @@ var IS_RESUME=SRC==='resume';
 var TABQ=Q.get('tab');
 var TAB=(TABQ==='qr'||TABQ==='usb')?TABQ:'file';
 var TRANSFER=!IS_RESUME&&Q.get('mode')==='transfer';
-/* 取消会话的服务端答复夹具：只有 ok / fail 两个合法值，其它一律当没给。 */
+/* 取消这次办理的系统答复示例：只有 ok / fail 两个合法值，其它一律当没给。 */
 var CANCELQ=Q.get('cancel');
 var CANCEL_FX=(CANCELQ==='ok'||CANCELQ==='fail')?CANCELQ:null;
 var PHOTO=Q.get('category')==='photo';
 /* 这次拿到的是哪一份（本机 0/1，U 盘 0/1/2）。缺省 0 —— 不带这个参数时与改版前完全一致。 */
 var PICKQ=Q.get('pick');
 var PICK=/^[0-9]$/.test(PICKQ||'')?parseInt(PICKQ,10):0;
-/* 预览夹具入口：只在原型演示模式下生效，普通产品地址一律看不到演示文件内容。 */
+/* 预览示例入口：只在原型演示模式下生效，普通产品地址一律看不到演示文件内容。 */
 var PV_MODES={open:1,page2:1,last:1,'fit-page':1,'fit-width':1,zoom:1,rotate:1,unavailable:1,expired:1,unsupported:1};
 var PREVQ=Q.get('preview');
 var PREVIEW=(PREVQ&&PV_MODES[PREVQ]&&(CAPTURE||DEBUG))?PREVQ:null;
@@ -453,7 +454,7 @@ var STATES=[
  'usb-unavailable','usb-agent-offline','usb-wait','usb-detecting','usb-empty','usb-list','usb-read-failed','usb-selected','usb-safeid-expired','usb-importing','usb-import-failed','usb-ready'
 ];
 
-/* 夹具态：画面里出现了「服务端本该返回、但这里是写死的」文件名 / 列表 / 会话值。
+/* 示例态：画面里出现了「系统本该返回、但这里是写死的」文件名 / 列表 / 这次办理值。
    这些状态只在 ?capture=1 或 ?debug=1 下可达；普通地址一律 fail-closed 到 missing-file，
    免得有人把一个静态页当成「已经传上去了」的证据。 */
 var FIXTURE={
@@ -516,7 +517,7 @@ function qr(kind){
  if(kind==='blank'){
   return '<div class="qr blank" role="img" aria-label="尚未生成上传二维码（本页不画占位码图形）" data-testid="'+SCREEN+'-qr">'+
    svg('phone','currentColor',72,1.6)+'<span class="qb-t">码还没出来</span>'+
-   '<span class="qb-s">拿到服务端下发的一次性链接之后<br>这里才会出现二维码</span></div>';
+   '<span class="qb-s">拿到系统给出的一次性链接之后<br>这里才会出现二维码</span></div>';
  }
  var label=kind==='dim'?'已失效的上传二维码（原型示意图形，不可扫描，不编码真实内容）'
    :'手机上传二维码（原型示意图形，不可扫描，不编码真实内容）';
@@ -527,7 +528,7 @@ function qr(kind){
  '</div>';
 }
 
-/* ================= 固定演示数据（不是接口返回值） ================= */
+/* ================= 固定演示数据（不是真实办理结果） ================= */
 /* 一份「演示文件」= 名字 + 大小 + 能不能预览 + 预览时的自然尺寸。文件名、大小和预览内容
    共用同一个来源，免得列表里写 PDF、预览里画成别的东西。w/h 是自然像素尺寸：PDF 用 96dpi
    的 A4（794x1123），图片用二寸证件照比例（827x1063）。 */
@@ -646,15 +647,15 @@ function tailCard(icon,title,body,stepsTitle,steps,foot){
   nextSteps(stepsTitle,steps)+
   '<div class="note"><span class="sq"></span><span>'+foot+'</span></div></div></section>';
 }
-/* 取消的结果由服务端给出，不是用户在屏幕上选的。这一行是**原型演示**：让审阅者分别看到
-   两种答复各自的屏幕。静态页自己不会走到「已作废」——必须显式带上答复夹具。 */
+/* 取消的结果由系统给出，不是用户在屏幕上选的。这一行是**原型演示**：让审阅者分别看到
+   两种答复各自的屏幕。静态页自己不会走到「已作废」——必须显式带上答复示例。 */
 function cancelOutcomeRow(){
  return '<div class="mini" data-testid="'+SCREEN+'-cancel-outcome">'+
-  '<h4>'+svg('info','currentColor',22)+'<span>这一步的结果由服务端给出</span></h4>'+
+  '<h4>'+svg('info','currentColor',22)+'<span>这一步的结果由系统给出</span></h4>'+
   '<p>不是你在这一屏选的。下面两个是<b>原型演示按钮</b>，只用来分别看到两种答复的屏幕；本页<b>不会自己变成「已作废」</b>。</p>'+
   '<div class="outrow">'+
-   a({cls:'sbtn warn',href:to('phone-cancel-failed',{cancel:'fail'}),tid:SCREEN+'-outcome-fail',label:svg('warn','currentColor',22)+'演示：没能作废',al:'原型演示：服务端答复没能作废'})+
-   a({cls:'sbtn',href:to('phone-cancelled',{cancel:'ok'}),tid:SCREEN+'-outcome-ok',label:svg('check','currentColor',22)+'演示：确认已作废',al:'原型演示：服务端答复确认已作废'})+
+   a({cls:'sbtn warn',href:to('phone-cancel-failed',{cancel:'fail'}),tid:SCREEN+'-outcome-fail',label:svg('warn','currentColor',22)+'演示：没能作废',al:'原型演示：系统答复没能作废'})+
+   a({cls:'sbtn',href:to('phone-cancelled',{cancel:'ok'}),tid:SCREEN+'-outcome-ok',label:svg('check','currentColor',22)+'演示：确认已作废',al:'原型演示：系统答复确认已作废'})+
   '</div></div>';
 }
 var EXIT=function(){return ghost('退出 · 回打印扫描','10-print-hub.html','/print-scan',SCREEN+'-exit','退出选文件，回到打印扫描')};
@@ -669,7 +670,7 @@ function switchRow(active){
 function existingSourceLinks(no){
  return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">文件不在手机或 U 盘？</span><span class="hint">两条真实入口</span></div><div class="split">'+
   a({cls:'mini',href:'../kiosk-redesign-2026-08/18-scan-workbench.html',route:'/scan/start',tid:SCREEN+'-scan-source',al:'扫描纸质原件',
-    html:'<h4>'+svg('scan','currentColor',22)+'<span>扫描纸质原件</span></h4><p>先建扫描会话，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>'})+
+    html:'<h4>'+svg('scan','currentColor',22)+'<span>扫描纸质原件</span></h4><p>先开始这次扫描，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>'})+
   a({cls:'mini',href:'../kiosk-redesign-2026-08/38-member-assets.html?state=documents-login',route:'/me/documents',tid:SCREEN+'-member-source',al:'从我的文档或最近打印文件选择',
     html:'<h4>'+svg('file','currentColor',22)+'<span>我的文档 / 最近打印</span></h4><p>登录后查看已保存材料和最近打印文件。进入打印前会重新取得<b>有效访问链接</b>，过期或失败会明确提示。</p>'})+
   '</div></section>';
@@ -703,11 +704,11 @@ V['source-chooser']=function(){
 V['missing-file']=function(){
  return '<section class="sec">'+statusCard('warn','warn','这一步没有可用的文件上下文',[
   '你打开的地址要求的是一个<b>需要真实文件</b>的状态，但本次办理里没有文件 —— 静态原型不会替你挑一份，也不会凭地址就说「已经传好了」。',
-  '这<b>不代表服务端删了什么</b>。重新从下面任一条通道搬一份进来就能接着走。'
+  '这<b>不代表系统删了什么</b>。重新从下面任一条通道搬一份进来就能接着走。'
  ],[['warn','fail-closed · 不放行到材料检查','lock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">重新选一条通道</span><span class="hint">三条都能走</span></div>'+
   channels(null,'ok')+'</section>'+
-  tailCard('info','为什么会看到这一屏','本页把<b>带文件名 / 文件列表 / 会话结果</b>的状态当成演示夹具，<b>只在原型演示模式下渲染</b>。普通地址直接要这些状态，一律落到这里。','重新搬一份进来要几步',['上面挑一条通道。','按那条通道的提示把文件送到服务端。','服务端确认之后它成为当前文件。'],'这一屏<b>不代表出错</b>，只代表本次办理里现在是空的。')+
+  tailCard('info','为什么会看到这一屏','本页把<b>带文件名 / 文件列表 / 这次办理结果</b>的状态当成演示示例，<b>只在原型演示模式下渲染</b>。普通地址直接要这些状态，一律落到这里。','重新搬一份进来要几步',['上面挑一条通道。','按那条通道的提示把文件送到系统。','已经确认之后它成为当前文件。'],'这一屏<b>不代表出错</b>，只代表本次办理里现在是空的。')+
   reasonLine('本次办理里没有文件，材料检查按住不放')+
   ctaBar(EXIT(),primaryOff('下一步：材料检查','缺少文件上下文'));
 };
@@ -733,8 +734,8 @@ V['local-guide']=function(){
   '<section class="sec grow"><div class="card spread" style="flex:1">'+
    '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">点下面这一下会发生什么</span></div>'+
    '<ul class="steps"><li><span class="n">1</span><span>浏览器弹出系统文件窗口，你挑<b>一份</b>文件。</span></li>'+
-   '<li><span class="n">2</span><span>选中即上传，服务端校验格式和大小。</span></li>'+
-   '<li><span class="n">3</span><span>服务端确认后，文件名出现在「当前文件」里。</span></li></ul></div>'+
+   '<li><span class="n">2</span><span>选中即上传，系统校验格式和大小。</span></li>'+
+   '<li><span class="n">3</span><span>已经确认后，文件名出现在「当前文件」里。</span></li></ul></div>'+
    '<div class="notes"><div class="note"><span class="sq"></span><span><b>第三方网盘尚未接入</b>：公共终端不做网盘授权登录。你自己传过或生成过的材料在「我的文档」里，登录即可直接选用；其余先下到手机再扫码上传。</span></div>'+
    '<div class="note"><span class="sq"></span><span><b>关掉这个系统窗口</b>不会上传任何东西，也不会改变本次办理里已经有的当前文件。</span></div></div>'+
   '</div></section>'+
@@ -752,17 +753,17 @@ V['local-picking']=function(){
  return '<section class="sec">'+fixtureBar('下面这个目录和五份文件')+'</section>'+
   '<section class="sec"><div class="note"><span class="sq"></span><span>真实一体机这一步是<b>系统文件窗口</b>；静态原型不能弹系统窗口，所以用同页受控列表演示「你挑了哪一份」。<b>一次只能选一个。</b></span></div></section>'+
   '<section class="sec grow">'+listCard('系统文件窗口（演示目录：下载）','5 项 · 一次选一个',
-   rows+nextSteps('挑中之后会怎样',['选中即上传，服务端校验格式和大小。','不合格的当场说清楚为什么，不会偷偷收下。','合格的落库成功后成为当前文件。']))+'</section>'+
+   rows+nextSteps('挑中之后会怎样',['选中即上传，系统校验格式和大小。','不合格的当场说清楚为什么，不会偷偷收下。','合格的落库成功后成为当前文件。']))+'</section>'+
   reasonLine('还没选定文件，材料检查按住不放')+
   ctaBar(ghost('取消这次选择',to('local-cancelled'),'/print/upload',SCREEN+'-cancel-pick','取消这次选择'),primaryOff('下一步：材料检查','还没选定文件'));
 };
 
 /* 这一屏只有一个来源：local-picking 的「取消这次选择」，也就是系统文件窗口被关掉、上传还没开始。
-   上传一旦开始就不再有出口通到这里 —— 那时候一次点击证明不了服务端已经停手。 */
+   上传一旦开始就不再有出口通到这里 —— 那时候一次点击证明不了系统已经停手。 */
 V['local-cancelled']=function(){
  return '<section class="sec">'+statusCard('plain','info','你取消了文件窗口',[
-  '这一屏只对应<b>一种情况</b>：系统文件窗口被关掉，<b>上传还没开始</b>。所以这一步<b>还是没有文件</b>，也<b>没有产生任何上传</b>，服务端那边什么也没发生。',
-  '<b>上传一旦开始就到不了这一屏</b> —— 那一步本页没有取消动作，只能等服务端给结果。现在可以再打开一次窗口，或者换一条通道，手机扫码通常比在一体机上翻目录快。'
+  '这一屏只对应<b>一种情况</b>：系统文件窗口被关掉，<b>上传还没开始</b>。所以这一步<b>还是没有文件</b>，也<b>没有产生任何上传</b>，系统那边什么也没发生。',
+  '<b>上传一旦开始就到不了这一屏</b> —— 那一步本页没有取消动作，只能等系统给结果。现在可以再打开一次窗口，或者换一条通道，手机扫码通常比在一体机上翻目录快。'
  ],[['','关掉窗口 · 未开始上传','check']],SCREEN+'-status')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">接着走哪条</span><span class="hint">三条都还在</span></div>'+
   channels('file','ok')+'</section>'+
@@ -774,7 +775,7 @@ V['local-cancelled']=function(){
 function localReject(kind){
  var map={
   rejected:{f:fx(FX_LOCAL[2]),h:'这份格式不收',k:'error',
-    p1:'服务端只收 <b>PDF、JPG、PNG</b>。Word / Excel / PPT / 压缩包一律不收，<b>这一份没有被上传</b>。',
+    p1:'系统只收 <b>PDF、JPG、PNG</b>。Word / Excel / PPT / 压缩包一律不收，<b>这一份没有被上传</b>。',
     p2:'Word 先另存为 PDF 再传就行。',c:[['bad','DOCX 不在收件范围','warn']]},
   oversize:{f:fx(FX_LOCAL[3]),h:'这份超过 15MB',k:'warn',
     p1:'本机与 U 盘通道单份上限 <b>15MB</b>，这一份 18.6MB，<b>没有被上传</b>。',
@@ -798,18 +799,18 @@ V['local-rejected']=function(){return localReject('rejected')};
 V['local-oversize']=function(){return localReject('oversize')};
 V['local-unreadable']=function(){return localReject('unreadable')};
 
-/* 上传请求已经送出去了：本页没有取消通道，也没有服务端答复能证明它停下来了。所以这一屏
+/* 上传请求已经送出去了：本页没有取消通道，也没有系统答复能证明它停下来了。所以这一屏
    不摆「取消本次上传」，更不通向 local-cancelled（那一屏说的是「没有产生任何上传」）。
    留下的三条路都是真的：等结果、叫人、退出本页。 */
 V['local-uploading']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','dot','正在上传，请稍候',[
-   '这一份是<b>一次性整份送出</b>，<b>服务端不回传进度</b>。所以这里不画进度条，也不说还剩几秒 —— 那种数字只能是编的。',
-   '<b>这一步没有「取消本次上传」这个动作</b>：请求已经送出去了，能不能停下来只有服务端知道，本机<b>不拿一次点击冒充服务端已经停手</b>。<b>结果出来之前我不说已经成功</b>，成功或失败都会明确告诉你，失败那一屏可以直接重试。'
+   '这一份是<b>一次性整份送出</b>，<b>系统不回传进度</b>。所以这里不画进度条，也不说还剩几秒 —— 那种数字只能是编的。',
+   '<b>这一步没有「取消本次上传」这个动作</b>：请求已经送出去了，能不能停下来只有系统知道，本机<b>不拿一次点击冒充系统已经停手</b>。<b>结果出来之前我不说已经成功</b>，成功或失败都会明确告诉你，失败那一屏可以直接重试。'
   ],[['','没有可确认的百分比','info'],['warn','本页无取消动作','lock'],['','上传中别拔 U 盘、别关手机页','warn']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','上传中',
     frow({n:LDOC().n,s:LDOC().s,tag:'正在上传',tagCls:'doing',tid:SCREEN+'-uploading-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>服务端确认落库之前，<b>当前文件仍然是空的</b>。<br>退出这一页<b>不会</b>让服务端停下来，也不会让它更快。</span></div>'+nextSteps('接下来只有三种结果',['成功：服务端确认落库，文件名进入「当前文件」。','失败：明确说没送上去，那一屏可以直接重试。','一直不结束：叫工作人员来看，别反复点。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>已经确认落库之前，<b>当前文件仍然是空的</b>。<br>退出这一页<b>不会</b>让系统停下来，也不会让它更快。</span></div>'+nextSteps('接下来只有三种结果',['成功：已经确认落库，文件名进入「当前文件」。','失败：明确说没送上去，那一屏可以直接重试。','一直不结束：叫工作人员来看，别反复点。']))+'</section>'+
   '<section class="sec">'+helpMini('上传一直不结束，或者反复失败，可以叫工作人员来看一眼。')+'</section>'+
   reasonLine('上传结果还没确认，材料检查按住不放')+
   ctaBar(EXIT(),primaryOff('下一步：材料检查','上传结果未确认'));
@@ -818,9 +819,9 @@ V['local-uploading']=function(){
 V['local-upload-failed']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('error','warn','上传没成功',[
-   '服务端<b>没有确认收到</b>这一份，所以当前文件还是空的。常见原因是本机网络断了，或者服务端暂时不可用。',
+   '系统<b>没有确认收到</b>这一份，所以当前文件还是空的。常见原因是本机网络断了，或者系统暂时不可用。',
    '<b>你刚才挑的那一份还在</b>，直接重试就行，不用重新翻目录。'
-  ],[['bad','服务端未确认','warn'],['','当前文件仍为空','info']],SCREEN+'-fallback')+'</section>'+
+  ],[['bad','系统未确认','warn'],['','当前文件仍为空','info']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','上传失败',
     frow({n:LDOC().n,s:LDOC().s,tag:'上传失败',tagCls:'bad',bad:1,tid:SCREEN+'-failed-file'})+
     '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>重试还是不行的话，换手机扫码那条通道往往能绕开本机网络问题。</span></div>'+nextSteps('重试会怎么走',['还是用你刚才挑的那一份。','把刚才那一份重新整份送一次。','成功就直接出现在当前文件里。']))+'</section>'+
@@ -841,16 +842,16 @@ V['local-ready']=function(){
 
 /* ---------- 手机通道 ---------- */
 V['phone-generating']=function(){
- return '<section class="sec">'+statusCard('plain','dot','正在向服务端要一张上传码',[
-  '还没拿到码，所以<b>这里不先放一张假的图</b>。真实页面画的是服务端下发的一次性链接。',
+ return '<section class="sec">'+statusCard('plain','dot','正在向系统要一张上传码',[
+  '还没拿到码，所以<b>这里不先放一张假的图</b>。真实页面画的是系统给出的一次性链接。',
   '拿到之后用手机相机或微信扫一扫对准屏幕就行，不用登录，也不用装软件。'
- ],[['','正在向服务端要码','link'],['','单份 ≤ 10MB','phone']],SCREEN+'-status')+'</section>'+
+ ],[['','正在向系统要码','link'],['','单份 ≤ 10MB','phone']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow"><div class="card" style="flex:1"><div class="qr-wrap">'+qr('blank')+
    '<div class="qr-side"><div><h3>码还没出来</h3>'+
-   '<ul class="steps"><li><span class="n">1</span><span>服务端生成会话与一次性上传链接。</span></li>'+
+   '<ul class="steps"><li><span class="n">1</span><span>系统生成这次办理与一次性上传链接。</span></li>'+
    '<li><span class="n">2</span><span>本机把链接画成二维码。</span></li>'+
    '<li><span class="n">3</span><span>你扫码、选文件、点上传。</span></li></ul></div>'+
-   '<div class="meta"><span class="chip">'+svg('clock','currentColor',22)+'有效期以服务端返回时间为准</span><span class="chip">PDF / JPG / PNG</span></div></div>'+
+   '<div class="meta"><span class="chip">'+svg('clock','currentColor',22)+'有效期以实际结果为准</span><span class="chip">PDF / JPG / PNG</span></div></div>'+
   '</div></div></section>'+
   '<section class="sec">'+switchRow('qr')+'</section>'+
   reasonLine('码还没出来，材料检查按住不放')+
@@ -859,18 +860,18 @@ V['phone-generating']=function(){
 
 V['phone-gen-failed']=function(){
  return '<section class="sec">'+statusCard('error','warn','二维码没生成出来',[
-  '向服务端要上传会话失败了，所以<b>这里没有码</b>。本机<b>不会先出一张假码</b>再补 —— 那会让你白扫一次。',
+  '向系统要上传这次办理失败了，所以<b>这里没有码</b>。本机<b>不会先出一张假码</b>再补 —— 那会让你白扫一次。',
   '<b>没有任何文件被接收</b>。重试一次，或者改用本机 / U 盘那两条通道。'
- ],[['bad','会话创建失败','warn'],['','没有文件被接收','check']],SCREEN+'-fallback')+'</section>'+
+ ],[['bad','这次没准备好','warn'],['','没有文件被接收','check']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow"><div class="card spread" style="flex:1">'+
    '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">可能是什么原因</span></div>'+
-   '<div class="notes"><div class="note"><span class="sq"></span><span>这台机器到服务端的网络断了。</span></div>'+
-   '<div class="note"><span class="sq"></span><span>服务端上传会话服务暂时不可用。</span></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>这台机器到系统的网络断了。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>系统上传这次办理服务暂时不可用。</span></div>'+
    '<div class="note"><span class="sq"></span><span>会员态失效，需要回一体机重新登录或改用临时上传。</span></div></div></div>'+
    '<div class="note"><span class="sq"></span><span>重试是安全的：<b>这一步不会产生重复文件</b>，因为还没有任何文件进来。</span></div>'+
   '</div></section>'+
   '<section class="sec">'+switchRow('qr')+'</section>'+
-  reasonLine('还没有上传会话，材料检查按住不放')+
+  reasonLine('还没有上传这次办理，材料检查按住不放')+
   ctaBar(HELP(),primaryLink('重新生成二维码',to('phone-generating'),'/print/upload'));
 };
 
@@ -880,73 +881,73 @@ function phoneQrCard(kind,title,sideHtml){
   '<div class="meta"><span class="chip">'+svg('phone','currentColor',22)+'单份 ≤ 10MB</span><span class="chip">PDF / JPG / PNG</span></div></div></div></div>';
 }
 V['phone-ready']=function(){
- return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的这次办理状态')+'</section>'+
   '<section class="sec">'+statusCard('plain','phone','用手机对准左边这张码',[
-   '本机<b>看不到你扫没扫</b> —— 服务端根本不给这种信号。只有它真收到文件，下面才会变。',
-   '有效期以<b>服务端返回的到期时间</b>为准，不由屏幕自己倒数判定。'
-  ],[['','会话状态：pending','clock']],SCREEN+'-status')+'</section>'+
+   '本机<b>看不到你扫没扫</b> —— 系统根本不给这种信号。只有它真收到文件，下面才会变。',
+   '有效期以<b>实际给出的到期时间</b>为准，不由屏幕自己倒数判定。'
+  ],[['','这次办理状态：等待上传','clock']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+phoneQrCard('live','扫码 → 选文件 → 上传',
    '<ul class="steps"><li><span class="n">1</span><span>手机打开相机或微信扫一扫，对准屏幕。</span></li>'+
    '<li><span class="n">2</span><span>在手机上选好文件，点「上传」。</span></li>'+
-   '<li><span class="n">3</span><span>服务端收到后，<b>回到这台机器点确认</b>才算数。</span></li></ul>'+
+   '<li><span class="n">3</span><span>系统收到后，<b>回到这台机器点确认</b>才算数。</span></li></ul>'+
    '<div class="note" style="margin-top:12px"><span class="sq"></span><span>码是<b>原型示意图形，不可扫描</b>，不编码任何真实内容。</span></div>')+'</section>'+
   '<section class="sec">'+helpMini('手机扫不出来、或者扫开之后打不开页面，找工作人员帮忙。')+'</section>'+
   reasonLine('还没有文件上来，材料检查按住不放')+
-  ctaBar(ghost('刷新二维码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','刷新二维码（先撤销旧会话）'),primaryOff('下一步：材料检查','还没有文件'));
+  ctaBar(ghost('刷新二维码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','刷新二维码（先撤销旧这次办理）'),primaryOff('下一步：材料检查','还没有文件'));
 };
 
 V['phone-waiting']=function(){
- return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
-  '<section class="sec">'+statusCard('plain','dot','码已经出来了，在等服务端的消息',[
-   '本机在轮询会话状态。<b>看不到你扫没扫</b>，也<b>不模拟手机端的动作</b>——手机那边点了什么，这台机器一概不知道。',
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的这次办理状态')+'</section>'+
+  '<section class="sec">'+statusCard('plain','dot','码已经出来了，在等系统的消息',[
+   '本机在轮询这次办理状态。<b>看不到你扫没扫</b>，也<b>不模拟手机端的动作</b>——手机那边点了什么，这台机器一概不知道。',
    '手机上传完，下面会出现文件名，那时候才需要你回来点确认。'
-  ],[['','会话状态：pending','clock'],['','扫没扫这件事本机不知道','info']],SCREEN+'-status')+'</section>'+
+  ],[['','这次办理状态：等待上传','clock'],['','扫没扫这件事本机不知道','info']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+phoneQrCard('live','等手机把文件送上来',
-   '<div class="notes"><div class="note"><span class="sq"></span><span>手机端选文件、上传，都发生在<b>你的手机上</b>，本机只等服务端结果。</span></div>'+
-   '<div class="note"><span class="sq"></span><span>刷新会<b>先撤销旧会话</b>再出新码，旧码立刻作废，不会同时有两张有效码。</span></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>手机端选文件、上传，都发生在<b>你的手机上</b>，本机只等系统结果。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>刷新会<b>先撤销旧这次办理</b>再出新码，旧码立刻作废，不会同时有两张有效码。</span></div>'+
    '<div class="note"><span class="sq"></span><span>码是<b>原型示意图形，不可扫描</b>。</span></div></div>')+'</section>'+
   '<section class="sec">'+helpMini('等太久没反应，或者手机那边报错，找工作人员帮忙。')+'</section>'+
   reasonLine('还没有文件上来，材料检查按住不放')+
-  ctaBar(ghost('取消这次上传会话',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传会话'),primaryOff('下一步：材料检查','还没有文件'));
+  ctaBar(ghost('取消这次上传这次办理',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传这次办理'),primaryOff('下一步：材料检查','还没有文件'));
 };
 
 V['phone-uploading']=function(){
- return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的这次办理状态')+'</section>'+
   '<section class="sec">'+statusCard('info','dot','手机正在上传',[
-   '服务端把这次会话标成 uploading。文件还在路上，<b>没有可确认的百分比</b>，所以不画进度条，也不说还剩几秒。',
+   '系统把这次办理标成正在上传。文件还在路上，<b>没有可确认的百分比</b>，所以不画进度条，也不说还剩几秒。',
    '这时候<b>别关手机上那个页面</b>。传完之后，你还要在这台机器上点一次确认。'
-  ],[['','会话状态：uploading','clock'],['','没有进度百分比','info']],SCREEN+'-status')+'</section>'+
+  ],[['','这次办理状态：uploading','clock'],['','没有进度百分比','info']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+phoneQrCard('live','传完之后要回这台机器确认',
-   '<ul class="steps"><li><span class="n">1</span><span>手机把文件送到服务端。</span></li>'+
-   '<li><span class="n">2</span><span>服务端确认落库，状态转为 uploaded。</span></li>'+
+   '<ul class="steps"><li><span class="n">1</span><span>手机把文件送到系统。</span></li>'+
+   '<li><span class="n">2</span><span>已经确认落库，状态变为已上传。</span></li>'+
    '<li><span class="n">3</span><span><b>你在这台机器上点确认</b>，才成为当前文件。</span></li></ul>'+
-   '<div class="note" style="margin-top:12px"><span class="sq"></span><span>uploaded 不等于可以继续 —— <b>没确认就不放行</b>。</span></div>')+'</section>'+
+   '<div class="note" style="margin-top:12px"><span class="sq"></span><span>传到了也不等于可以继续 —— <b>没确认就不放行</b>。</span></div>')+'</section>'+
   '<section class="sec">'+helpMini('手机上传卡住不动，可以取消重来，也可以叫工作人员。')+'</section>'+
   reasonLine('文件还在路上，材料检查按住不放')+
-  ctaBar(ghost('取消这次上传会话',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传会话'),primaryOff('下一步：材料检查','上传还没完成'));
+  ctaBar(ghost('取消这次上传这次办理',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传这次办理'),primaryOff('下一步：材料检查','上传还没完成'));
 };
 
 V['phone-status-unknown']=function(){
- return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
-  '<section class="sec">'+statusCard('warn','warn','会话状态取不到了',[
-   '本机连着几次问不到这次会话的状态。<b>这不代表码已经失效</b>，也<b>不等于已过期</b>——只是本机现在不知道。',
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的这次办理状态')+'</section>'+
+  '<section class="sec">'+statusCard('warn','warn','这次办理状态取不到了',[
+   '本机连着几次问不到这次办理的状态。<b>这不代表码已经失效</b>，也<b>不等于已过期</b>——只是本机现在不知道。',
    '可以再问一次；连着问不到，本机就按已过期处理，重新出一张码更省事。'
   ],[['warn','状态未知 ≠ 已过期','info'],['','连续 3 次失败按过期处理','clock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow">'+phoneQrCard('live','这张码可能还活着，也可能没了',
    '<div class="notes"><div class="note"><span class="sq"></span><span>本机<b>不猜</b>。屏幕上不会因为问不到就写「已失效」。</span></div>'+
-   '<div class="note"><span class="sq"></span><span>本机<b>没有因此取消或作废任何东西</b>；这一屏也<b>不替服务端说</b>文件现在是什么状态。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>本机<b>没有因此取消或作废任何东西</b>；这一屏也<b>不替结果显示</b>文件现在是什么状态。</span></div>'+
    '<div class="note"><span class="sq"></span><span>重新出码会<b>先撤销这一张</b>，不会留两张有效码。</span></div></div>')+'</section>'+
   '<section class="sec">'+helpMini('二维码扫不出来、或者一直问不到状态，找工作人员帮忙。')+'</section>'+
   reasonLine('状态未知，材料检查按住不放')+
-  ctaBar(ghost('重新出一张码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','重新出一张码（先撤销旧会话）'),primaryLink('再查一次状态',to('phone-waiting'),'/print/upload'));
+  ctaBar(ghost('重新出一张码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','重新出一张码（先撤销旧这次办理）'),primaryLink('再查一次状态',to('phone-waiting'),'/print/upload'));
 };
 
 V['phone-expired']=function(){
- return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的这次办理状态')+'</section>'+
   '<section class="sec">'+statusCard('warn','clock','这张上传码过期了',[
-   '服务端确认这次会话已到期，<b>旧二维码不再接收文件</b>。过期由服务端结果判定，不是屏幕自己数到零。',
-   '重新出一张就行。过期前<b>还没确认</b>的那份临时上传，<b>按服务端的清理规则处理</b>；<b>此前已确认、已归档的文件不受影响</b>。'
-  ],[['warn','会话状态：expired','clock']],SCREEN+'-fallback')+'</section>'+
+   '已经确认这次办理已到期，<b>旧二维码不再接收文件</b>。过期由系统结果判定，不是屏幕自己数到零。',
+   '重新出一张就行。过期前<b>还没确认</b>的那份临时上传，<b>按系统的清理规则处理</b>；<b>此前已确认、已归档的文件不受影响</b>。'
+  ],[['warn','这次办理状态：expired','clock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow">'+phoneQrCard('dim','这张已经不能用了',
    '<div class="notes"><div class="note"><span class="sq"></span><span>本次办理里<b>还没有当前文件</b>，所以下一步仍然按住不放。</span></div>'+
    '<div class="note"><span class="sq"></span><span>重新出码会先把这一张<b>作废掉</b>，避免两张码同时有效。</span></div>'+
@@ -959,104 +960,104 @@ V['phone-expired']=function(){
 V['phone-uploaded']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','check','手机传上来一份，等你确认',[
-   '文件名和大小是<b>服务端回给本机的结果</b>。<b>uploaded 还不算数</b>——必须你在这台机器上确认，它才成为本次办理的当前文件。',
+   '文件名和大小是<b>系统回给本机的结果</b>。<b>传到了还不算数</b>——必须你在这台机器上确认，它才成为本次办理的当前文件。',
    '不是你要的那一份？点取消，回手机重新传。'
-  ],[['ok','会话状态：uploaded','check'],['warn','未确认 · 不能继续','lock']],SCREEN+'-status')+'</section>'+
+  ],[['ok','这次办理状态：已上传，待确认','check'],['warn','未确认 · 不能继续','lock']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow"><div class="card" data-testid="'+SCREEN+'-file-card" style="flex:1"><div class="now">'+
    '<span class="now-ic">'+svg('file','currentColor',38)+'</span>'+
    '<span class="now-m"><span class="now-n">'+FX_PHONE.n+'</span><span class="now-s">'+FX_PHONE.s+' · 手机扫码上传</span></span>'+
-   '<span class="now-act">'+a({cls:'sbtn warn',href:to('phone-cancel-requesting'),tid:SCREEN+'-delete',label:svg('x','currentColor',22)+'不要这份',al:'不要这份，取消本次上传会话'})+'</span>'+
+   '<span class="now-act">'+a({cls:'sbtn warn',href:to('phone-cancel-requesting'),tid:SCREEN+'-delete',label:svg('x','currentColor',22)+'不要这份',al:'不要这份，取消本次上传这次办理'})+'</span>'+
    '</div>'+pvOpenBtn('打开完整预览 · 先看清是不是这一份','打开完整预览：'+FX_PHONE.n)+'<div class="hr"></div>'+
    '<div class="notes"><div class="note"><span class="sq"></span><span>确认这一下<b>要你在这台机器上点</b>；确认之前它<b>不进这次办理</b>。</span></div>'+
    '<div class="note"><span class="sq"></span><span>本次办理只带一份。确认后想换，得先在当前文件卡上删掉。</span></div>'+
    '<div class="note"><span class="sq"></span><span>页数和敏感信息检查在<b>下一步</b>做，这里不预告结论。</span></div></div>'+
-   nextSteps('点「确认使用这份文件」之后',['本机请服务端把它收进本次办理。','它成为唯一当前文件，手机端那页可以关了。','下一步「材料检查」才会亮起来。'])+
+   nextSteps('点「确认使用这份文件」之后',['本机请系统把它收进本次办理。','它成为唯一当前文件，手机端那页可以关了。','下一步「材料检查」才会亮起来。'])+
   '</div></section>'+
   reasonLine('还没确认，材料检查按住不放')+
-  ctaBar(ghost('取消这次上传会话',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传会话'),primaryLink('确认使用这份文件',to('phone-confirming'),'/print/upload'));
+  ctaBar(ghost('取消这次上传这次办理',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传这次办理'),primaryLink('确认使用这份文件',to('phone-confirming'),'/print/upload'));
 };
 
 V['phone-confirming']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','dot','正在确认这份文件',[
-   '本机正在请服务端把这份文件收进本次办理。<b>结果没回来之前，它还不是当前文件。</b>',
+   '本机正在请系统把这份文件收进本次办理。<b>结果没回来之前，它还不是当前文件。</b>',
    '这一步<b>没有百分比</b>可显示，成功或失败都会明确告诉你。'
-  ],[['','正在向服务端确认','link']],SCREEN+'-status')+'</section>'+
+  ],[['','正在向已经确认','link']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('等待确认结果','确认中',
     frow({n:FX_PHONE.n,s:FX_PHONE.s+' · 手机扫码上传',tag:'确认中',tagCls:'doing',tid:SCREEN+'-confirming-file'})+
     '<div class="emptybox"><span class="ei">'+svg('check','currentColor',38)+'</span><span>确认成功后它才成为<b>唯一当前文件</b>，<br>那时下一步才会亮起来。</span></div>'+nextSteps('确认成功之后',['这份文件进入本次办理。','手机上那个上传页就可以关了。','下一步「材料检查」才会亮起来。']))+'</section>'+
   '<section class="sec">'+helpMini('确认一直转圈，多半是网络问题，可以叫工作人员。')+'</section>'+
   reasonLine('确认结果还没回来，材料检查按住不放')+
-  ctaBar(ghost('取消这次上传会话',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传会话'),primaryOff('下一步：材料检查','确认结果未返回'));
+  ctaBar(ghost('取消这次上传这次办理',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传这次办理'),primaryOff('下一步：材料检查','确认结果未返回'));
 };
 
 V['phone-confirm-failed']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('error','warn','确认失败',[
-   '这份文件<b>没有进入本次办理</b>。多半是会话已经过期或被占用，也可能是本机到服务端的网络断了。',
+   '这份文件<b>没有进入本次办理</b>。多半是这次办理已经过期或被占用，也可能是本机到系统的网络断了。',
    '可以直接重试确认；还是不行就<b>刷新二维码重新传</b>一次。'
   ],[['bad','确认未成功','warn'],['','当前文件仍为空','info']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','确认失败',
     frow({n:FX_PHONE.n,s:FX_PHONE.s+' · 手机扫码上传',tag:'确认失败',tagCls:'bad',bad:1,tid:SCREEN+'-failed-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>重试确认<b>不会产生第二份文件</b>。<br>会话若已失效，重新出码是更快的路。</span></div>'+nextSteps('两条路',['直接重试确认，不会多出一份文件。','会话已经失效的话，重新出码再传一次。','两条都不通就叫工作人员。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>重试确认<b>不会产生第二份文件</b>。<br>这次办理若已失效，重新出码是更快的路。</span></div>'+nextSteps('两条路',['直接重试确认，不会多出一份文件。','这次办理已经失效的话，重新出码再传一次。','两条都不通就叫工作人员。']))+'</section>'+
   reasonLine('确认失败，当前文件仍然是空的')+
-  ctaBar(ghost('重新出一张码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','重新出一张码（先撤销旧会话）'),primaryLink('重试确认',to('phone-confirming'),'/print/upload'));
+  ctaBar(ghost('重新出一张码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','重新出一张码（先撤销旧这次办理）'),primaryLink('重试确认',to('phone-confirming'),'/print/upload'));
 };
 
 V['phone-confirmed']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','check','已确认，这就是本次办理要打的文件',[
-   '文件名和大小是<b>服务端回给本机的结果</b>，确认动作也已经落到服务端。',
+   '文件名和大小是<b>系统回给本机的结果</b>，确认动作也已经落到系统。',
    '这是本次办理的<b>唯一当前文件</b>。要换就先删掉，不做静默替换。'
-  ],[['ok','会话状态：confirmed','check'],['','手机扫码上传','phone']],SCREEN+'-status')+'</section>'+
+  ],[['ok','这次办理状态：confirmed','check'],['','手机扫码上传','phone']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+nowFile({doc:FX_PHONE,from:'手机扫码上传',back:'phone-generating',backName:'手机扫码通道'})+'</section>'+
-  '<section class="sec"><div class="mini"><h4>'+svg('info','currentColor',22)+'<span>手机那边可以关了</span></h4><p>确认之后手机上那个上传页就没用了。<b>本机不会再从那个会话拿第二份文件。</b></p></div></section>'+
+  '<section class="sec"><div class="mini"><h4>'+svg('info','currentColor',22)+'<span>手机那边可以关了</span></h4><p>确认之后手机上那个上传页就没用了。<b>本机不会再从那个这次办理拿第二份文件。</b></p></div></section>'+
   ctaBar(EXIT(),primaryLink('下一步：材料检查','13-print-desk.html','/print/material-check'));
 };
 
-/* 取消是一次请求，不是一个按钮效果。答复回来之前，这份文件还挂在会话上。 */
+/* 取消是一次请求，不是一个按钮效果。答复回来之前，这份文件还挂在这次办理上。 */
 V['phone-cancel-requesting']=function(){
- return '<section class="sec">'+fixtureBar('下面这个文件名和会话结果')+'</section>'+
-  '<section class="sec">'+statusCard('info','dot','正在取消这次上传会话',[
-   '本机已经把取消请求发给服务端，<b>答复还没回来</b>。这期间刚才那份文件<b>仍然挂在这次会话上</b>，本机不替服务端下结论。',
+ return '<section class="sec">'+fixtureBar('下面这个文件名和这次办理结果')+'</section>'+
+  '<section class="sec">'+statusCard('info','dot','正在取消这次上传这次办理',[
+   '本机已经把取消请求发给系统，<b>答复还没回来</b>。这期间刚才那份文件<b>仍然挂在这次办理上</b>，本机不替系统下结论。',
    '成功或失败都会明确告诉你。<b>没成功，这一屏就不宣布作废</b>；这份文件也不会从屏幕上无声消失。'
-  ],[['','等服务端答复','clock'],['warn','未作废 · 也未确认','lock']],SCREEN+'-status')+'</section>'+
+  ],[['','等系统答复','clock'],['warn','未作废 · 也未确认','lock']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('这一份还挂着','取消处理中',
     frow({n:FX_PHONE.n,s:FX_PHONE.s+' · 手机扫码上传',tag:'等答复',tagCls:'doing',tid:SCREEN+'-pending-file'})+
     '<div class="emptybox"><span class="ei">'+svg('clock','currentColor',38)+'</span><span>答复回来之前，这一屏<b>既不说已经作废</b>，<br>也不说这份已经进了本次办理。</span></div>'+
-    nextSteps('两种答复各自会怎样',['服务端确认作废：旧码不再收文件，这份不进本次办理。','服务端没能作废：这份仍旧留着，你可以重试，也可以回去把它确认掉。','两种都不会让本次办理里凭空多出一份文件。']))+'</section>'+
+    nextSteps('两种答复各自会怎样',['已经确认作废：旧码不再收文件，这份不进本次办理。','系统没能作废：这份仍旧留着，你可以重试，也可以回去把它确认掉。','两种都不会让本次办理里凭空多出一份文件。']))+'</section>'+
   '<section class="sec">'+cancelOutcomeRow()+'</section>'+
   reasonLine('取消结果还没回来，材料检查按住不放')+
   ctaBar(EXIT(),primaryOff('下一步：材料检查','取消结果未返回'));
 };
 
-/* 取消失败：不清会话、不清待确认文件、不宣称旧码失效、不许直接开新会话。 */
+/* 取消失败：不清这次办理、不清待确认文件、不宣称旧码失效、不许直接开新这次办理。 */
 V['phone-cancel-failed']=function(){
- return '<section class="sec">'+fixtureBar('下面这个文件名和会话结果')+'</section>'+
-  '<section class="sec">'+statusCard('error','warn','这次会话没能取消',[
-   '服务端<b>没有确认作废</b>。所以本机<b>不说旧二维码已经失效</b>，也<b>不清掉这次会话</b> —— 刚才传上来的那份<b>还留着，等你处理</b>。',
-   '这时候<b>先不要开新的码</b>。旧会话到底作废没有还不知道，这会儿再建一个，容易出现两张码同时有效。'
+ return '<section class="sec">'+fixtureBar('下面这个文件名和这次办理结果')+'</section>'+
+  '<section class="sec">'+statusCard('error','warn','这次办理没能取消',[
+   '系统<b>没有确认作废</b>。所以本机<b>不说旧二维码已经失效</b>，也<b>不清掉这次办理</b> —— 刚才传上来的那份<b>还留着，等你处理</b>。',
+   '这时候<b>先不要开新的码</b>。旧这次办理到底作废没有还不知道，这会儿再建一个，容易出现两张码同时有效。'
   ],[['bad','取消未成功','warn'],['warn','这份仍待确认','clock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow">'+listCard('这一份还留着','未作废',
     frow({n:FX_PHONE.n,s:FX_PHONE.s+' · 手机扫码上传',tag:'仍待确认',tagCls:'doing',tid:SCREEN+'-kept-file'})+
     pvOpenBtn('打开完整预览 · 看清楚再决定','打开完整预览：'+FX_PHONE.n)+
     '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>重试取消<b>不会把这一份弄丢</b>。<br>还是失败的话，它照样留在这里等你决定。</span></div>'+
     nextSteps('你可以走两条路',['再试一次取消。还是不行，这一份也不会丢。','或者不取消了，回去把这一份确认成本次办理要打的文件。','两条都不通就叫工作人员，别在这里反复点。']))+'</section>'+
-  '<section class="sec">'+helpMini('取消一直不成功，多半是本机到服务端的网络断了，可以叫工作人员来看。')+'</section>'+
+  '<section class="sec">'+helpMini('取消一直不成功，多半是本机到系统的网络断了，可以叫工作人员来看。')+'</section>'+
   reasonLine('这一份还没确认，材料检查按住不放')+
   ctaBar(ghost('保留这份 · 回去确认',to('phone-uploaded'),'/print/upload',SCREEN+'-keep','保留这份文件，回去确认它'),primaryLink('重试取消',to('phone-cancel-requesting'),'/print/upload'));
 };
 
 V['phone-cancelled']=function(){
- return '<section class="sec">'+fixtureBar('下面这个会话结果')+'</section>'+
-  '<section class="sec">'+statusCard('plain','info','这次上传会话已作废',[
-   '服务端确认这次会话<b>已经作废</b>，<b>旧二维码不再接收文件</b>。本次办理里<b>还是没有文件</b>。',
-   '这次<b>还没确认</b>的那份临时上传，<b>按服务端的清理规则处理</b> —— 可能被清掉，也可能按归属留着。本机<b>不替服务端下结论</b> —— 这一屏既不宣布它已经没了，也不保证它一定还留着。',
-   '<b>此前已确认、已归档的文件不受影响</b> —— 已经确认过的会话本来就取消不了。'
-  ],[['','会话状态：cancelled','check']],SCREEN+'-status')+'</section>'+
+ return '<section class="sec">'+fixtureBar('下面这次办理结果')+'</section>'+
+  '<section class="sec">'+statusCard('plain','info','这次上传这次办理已作废',[
+   '已经确认这次办理<b>已经作废</b>，<b>旧二维码不再接收文件</b>。本次办理里<b>还是没有文件</b>。',
+   '这次<b>还没确认</b>的那份临时上传，<b>按系统的清理规则处理</b> —— 可能被清掉，也可能按归属留着。本机<b>不替系统下结论</b> —— 这一屏既不宣布它已经没了，也不保证它一定还留着。',
+   '<b>此前已确认、已归档的文件不受影响</b> —— 已经确认过的这次办理本来就取消不了。'
+  ],[['','这次办理状态：cancelled','check']],SCREEN+'-status')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">接着走哪条</span><span class="hint">三条都还在</span></div>'+
   channels('qr','ok')+'</section>'+
-  tailCard('phone','再来一次也行','重新出码会建一个<b>新的会话</b>，和刚才作废的那个没有关系，不会串文件。','重新出码之后',['服务端建一个全新的上传会话。','本机把新链接画成新的二维码。','旧码就算还没到期也已经作废了。'],'这次没确认的临时上传<b>按服务端清理规则处理</b>；<b>此前已确认、已归档的文件不受影响</b>。')+
+  tailCard('phone','再来一次也行','重新出码会建一个<b>新的这次办理</b>，和刚才作废的那个没有关系，不会串文件。','重新出码之后',['系统建一个全新的上传这次办理。','本机把新链接画成新的二维码。','旧码就算还没到期也已经作废了。'],'这次没确认的临时上传<b>按系统清理规则处理</b>；<b>此前已确认、已归档的文件不受影响</b>。')+
   reasonLine('这一步还没有文件，材料检查按住不放')+
   ctaBar(EXIT(),primaryLink('重新出一张码',to('phone-generating'),'/print/upload'));
 };
@@ -1095,7 +1096,7 @@ V['usb-wait']=function(){
    '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">插上之后会发生什么</span></div>'+
    '<ul class="steps"><li><span class="n">1</span><span>本地服务发现可移动磁盘。</span></li>'+
    '<li><span class="n">2</span><span>列出根目录里的 PDF / JPG / PNG，每份配一个<b>一次性标识</b>。</span></li>'+
-   '<li><span class="n">3</span><span>你选一份，本地服务把它上传到服务端。</span></li></ul></div>'+
+   '<li><span class="n">3</span><span>你选一份，本地服务把它上传到系统。</span></li></ul></div>'+
    '<div class="notes"><div class="note"><span class="sq"></span><span>网页<b>不直接访问磁盘</b>，也拿不到你盘上的绝对路径。</span></div>'+
    '<div class="note"><span class="sq"></span><span>整个过程<b>只读不写</b>，不会往你的 U 盘里放东西。</span></div></div>'+
   '</div></section>'+
@@ -1144,7 +1145,7 @@ V['usb-list']=function(){
  for(var i=0;i<FX_USB.length;i++){var u=fx(FX_USB[i]);
   rows+=frow({n:u.n,s:u.s,tag:'选这份',tagCls:'pickable',href:to('usb-selected',{pick:String(i)}),tid:SCREEN+'-usb-file-'+i});
  }
- rows+=nextSteps('选中之后会怎样',['这一份被标为已选中，其它的不动。','点「导入这一份」，本地服务才开始读字节。','读完传到服务端，落库成功才算数。'])+
+ rows+=nextSteps('选中之后会怎样',['这一份被标为已选中，其它的不动。','点「导入这一份」，本地服务才开始读字节。','读完传到系统，落库成功才算数。'])+
   '<div class="note"><span class="sq"></span><span>只列<b>根目录</b>里的 PDF / JPG / PNG，最多 200 个；超过 15MB 的不列。子文件夹里的东西不在这里。</span></div>';
  return '<section class="sec">'+fixtureBar('下面这个盘名和三份文件')+'</section>'+
   '<section class="sec"><div class="note"><span class="sq"></span><span>每一份都带一个<b>一次性标识</b>。选中即消费，<b>重新读盘会换一批</b>，旧的当场作废。一次只能选一个。</span></div></section>'+
@@ -1174,11 +1175,11 @@ V['usb-selected']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('plain','check','选中了这一份，还没导入',[
    '<b>只导入这一份</b>，U 盘上其它文件不会被读走，也不会发给任何人。',
-   '点导入之后，本地服务把它读出来传到服务端。<b>导入完成前它还不是当前文件。</b>'
+   '点导入之后，本地服务把它读出来传到系统。<b>导入完成前它还不是当前文件。</b>'
   ],[['','一次性标识已锁定','lock'],['','只动这一份','check']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('准备导入','1 项 · 选中',
     frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'已选中',tagCls:'ok',on:1,tid:SCREEN+'-selected-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('usb','currentColor',38)+'</span><span>选错了？回列表<b>重选一份</b>就行，<br>这一步还没有任何东西被上传。</span></div>'+nextSteps('点「导入这一份」之后',['本地服务用一次性标识把它读出来。','读出来的字节传到服务端校验落库。','落库成功它才成为当前文件。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('usb','currentColor',38)+'</span><span>选错了？回列表<b>重选一份</b>就行，<br>这一步还没有任何东西被上传。</span></div>'+nextSteps('点「导入这一份」之后',['本地服务用一次性标识把它读出来。','读出来的字节传到系统校验落库。','落库成功它才成为当前文件。']))+'</section>'+
   reasonLine('还没导入，材料检查按住不放')+
   ctaBar(ghost('回列表重选',to('usb-list'),'/print/upload',SCREEN+'-back-list','回 U 盘列表重选'),primaryLink('导入这一份',to('usb-importing'),'/print/upload'));
 };
@@ -1199,12 +1200,12 @@ V['usb-safeid-expired']=function(){
 V['usb-importing']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','dot','正在从 U 盘导入',[
-   '本地服务在把这一份读出来传到服务端。<b>没有可确认的中间进度</b>，所以不画百分比，也不说还剩几秒。',
+   '本地服务在把这一份读出来传到系统。<b>没有可确认的中间进度</b>，所以不画百分比，也不说还剩几秒。',
    '<b>这期间不要拔 U 盘。</b>结果出来之前它还不是当前文件。'
   ],[['','导入中','clock'],['warn','别拔 U 盘','usb']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','导入中',
     frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'导入中',tagCls:'doing',tid:SCREEN+'-importing-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>服务端确认之前，<b>当前文件仍然是空的</b>。<br>这一步不解析内容，也不看页数。</span></div>'+nextSteps('导入完成之后',['服务端确认落库并回文件名。','它成为本次办理的唯一当前文件。','那时候才可以拔 U 盘。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>已经确认之前，<b>当前文件仍然是空的</b>。<br>这一步不解析内容，也不看页数。</span></div>'+nextSteps('导入完成之后',['已经确认落库并回文件名。','它成为本次办理的唯一当前文件。','那时候才可以拔 U 盘。']))+'</section>'+
   '<section class="sec">'+helpMini('导入长时间不结束，先别拔盘，叫工作人员来处理。')+'</section>'+
   reasonLine('导入结果还没确认，材料检查按住不放')+
   ctaBar(ghost('取消，回列表',to('usb-list'),'/print/upload',SCREEN+'-cancel','取消导入，回 U 盘列表'),primaryOff('下一步：材料检查','导入结果未确认'));
@@ -1213,7 +1214,7 @@ V['usb-importing']=function(){
 V['usb-import-failed']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('error','warn','这一份没导进来',[
-   '服务端<b>没有确认收到</b>。多半是这份的<b>一次性标识已经失效</b>（读盘刷新过），也可能是本机到服务端的网络断了。',
+   '系统<b>没有确认收到</b>。多半是这份的<b>一次性标识已经失效</b>（读盘刷新过），也可能是本机到系统的网络断了。',
    '<b>还没有发起任何解析。</b>重新读一次盘，在新列表里再选一次最稳。'
   ],[['bad','导入失败','warn'],['','当前文件仍为空','info']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','导入失败',
@@ -1226,11 +1227,11 @@ V['usb-import-failed']=function(){
 V['usb-ready']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','check','导入完成，可以拔 U 盘了',[
-   '文件名和大小是<b>服务端确认落库后回给本机的结果</b>。系统已经读完这份文件，<b>可以拔出 U 盘</b>。',
+   '文件名和大小是<b>已经确认落库后回给本机的结果</b>。系统已经读完这份文件，<b>可以拔出 U 盘</b>。',
    '本机<b>没有「安全弹出」按钮</b>——网页管不了操作系统的卷挂载，给一个假按钮不如说清楚。'
-  ],[['ok','服务端已确认','check'],['','可以拔出 U 盘','usb']],SCREEN+'-status')+'</section>'+
+  ],[['ok','系统已确认','check'],['','可以拔出 U 盘','usb']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+nowFile({doc:UDOC(),from:'U 盘导入 · '+USB_VOL,back:'usb-list',backName:'U 盘列表'})+'</section>'+
-  '<section class="sec"><div class="mini"><h4>'+svg('usb','currentColor',22)+'<span>U 盘上的东西没被改</span></h4><p>整个过程<b>只读不写</b>。这一份被复制到服务端，你盘上的原件<b>还在原地</b>。</p></div></section>'+
+  '<section class="sec"><div class="mini"><h4>'+svg('usb','currentColor',22)+'<span>U 盘上的东西没被改</span></h4><p>整个过程<b>只读不写</b>。这一份被复制到系统，你盘上的原件<b>还在原地</b>。</p></div></section>'+
   ctaBar(EXIT(),primaryLink('下一步：材料检查','13-print-desk.html','/print/material-check'));
 };
 
@@ -1399,7 +1400,7 @@ function pvFixtureBar(){
 function pvFailCard(){
  var na=pv.fail==='unavailable';
  var title=na?'这份文件暂时看不了预览':'预览链接已经过期';
- var p1=na?'预览要向服务端另取一份用来看的内容，<b>刚才这一次没取到</b>。可能是这台机器到服务端的网络断了，也可能是预览服务正忙。'
+ var p1=na?'预览要向系统另取一份用来看的内容，<b>刚才这一次没取到</b>。可能是这台机器到系统的网络断了，也可能是预览服务正忙。'
           :'为了不让文件被随手转发，预览用的是<b>有有效期的临时链接</b>，时间到了就打不开了。重新打开预览会再取一条新的。';
  return '<div class="pv-card" data-testid="'+SCREEN+'-preview-state" data-kind="'+pv.fail+'">'+
   '<div><div class="state-h">'+svg('warn','currentColor',30,2.1)+'<span>'+title+'</span></div>'+
@@ -1412,7 +1413,7 @@ function pvFailCard(){
    '过一会儿再打开一次预览，本机会重新取一次预览内容。',
    '不放心这一份，也可以在上一屏直接删掉，重新搬一份进来。'])+
   '<div class="mini" data-testid="'+SCREEN+'-preview-outcome">'+
-   '<h4>'+svg('info','currentColor',22)+'<span>这一步的结果由服务端给出</span></h4>'+
+   '<h4>'+svg('info','currentColor',22)+'<span>这一步的结果由系统给出</span></h4>'+
    '<p>不是你在这一屏选的。下面两个是<b>原型演示按钮</b>，只用来分别看到两种答复的屏幕。</p>'+
    '<div class="outrow">'+
     '<button type="button" class="sbtn warn press" data-testid="'+SCREEN+'-preview-retry-fail" aria-label="原型演示：再取一次仍然取不到预览">'+svg('warn','currentColor',22)+'演示：还是取不到</button>'+
@@ -1607,7 +1608,7 @@ var PILL={
  'phone-confirmed':['ok','已确认 1 份 · 可继续'],
  'phone-cancel-requesting':['','取消中 · 答复未返回'],
  'phone-cancel-failed':['bad','取消失败 · 这份还留着'],
- 'phone-cancelled':['','会话已作废 · 无文件'],
+ 'phone-cancelled':['','这次办理已作废 · 无文件'],
  'usb-unavailable':['warn','U 盘未接通 · 重试无效'],
  'usb-agent-offline':['bad','Agent 离线 · 可重试'],
  'usb-wait':['','等待插入 U 盘'],
@@ -1626,28 +1627,28 @@ var ASK={
  'missing-file':['这一步<em>没有文件</em>。','我不替你挑一份，也不凭地址就说已经传好了。'],
  'unknown':['这个状态<em>我不认识</em>。','不猜你想去哪一步，也不把地址里的原始参数抄到屏幕上。'],
  'local-guide':['本机选文件是<em>兼容路径</em>。','会弹系统窗口。一体机上优先手机扫码，这条留给桌面验证。'],
- 'local-picking':['挑<em>一份</em>就行。','一次只能选一个。选中即上传，服务端校验格式和大小。'],
+ 'local-picking':['挑<em>一份</em>就行。','一次只能选一个。选中即上传，系统校验格式和大小。'],
  'local-cancelled':['窗口<em>关掉了</em>。','上传还没开始，没有产生任何上传。再打开一次，或者换条通道。'],
  'local-rejected':['这份<em>格式不收</em>。','只收 PDF / JPG / PNG。Word 先另存为 PDF。'],
  'local-oversize':['这份<em>太大了</em>。','本机与 U 盘单份 15MB 以内，手机通道是 10MB。'],
  'local-unreadable':['这份<em>读不出来</em>。','大小都取不到，不会硬着头皮上传。'],
- 'local-uploading':['正在<em>送上去</em>。','一次性上传，没有进度百分比。这一步没有取消动作，等服务端给结果。'],
- 'local-upload-failed':['<em>没送上去</em>。','服务端没确认收到。刚才挑的那份还在，直接重试。'],
+ 'local-uploading':['正在<em>送上去</em>。','一次性上传，没有进度百分比。这一步没有取消动作，等系统给结果。'],
+ 'local-upload-failed':['<em>没送上去</em>。','系统没确认收到。刚才挑的那份还在，直接重试。'],
  'local-ready':['看清楚，<em>是不是这一份</em>？','确认内容，再检查隐私与打印参数，最后带走打印件。'],
  'phone-generating':['正在<em>要一张码</em>。','还没拿到就不先放假图。稍等一下。'],
  'phone-gen-failed':['码<em>没出来</em>。','没有任何文件被接收。重试，或者换条通道。'],
- 'phone-ready':['<em>扫这张码</em>。','本机看不到你扫没扫，只认服务端收到文件。'],
+ 'phone-ready':['<em>扫这张码</em>。','本机看不到你扫没扫，只认系统收到文件。'],
  'phone-waiting':['在<em>等你手机</em>。','手机上传完，下面会出现文件名。'],
  'phone-uploading':['手机<em>正在传</em>。','没有百分比可显示。传完还要你回来点确认。'],
  'phone-status-unknown':['状态<em>问不到了</em>。','这不等于已过期。可以再问一次，或者重新出码。'],
- 'phone-expired':['这张码<em>过期了</em>。','按服务端结果判定。重新出一张就行。'],
- 'phone-uploaded':['传上来了，<em>等你确认</em>。','uploaded 还不算数，确认之后才进这次办理。'],
+ 'phone-expired':['这张码<em>过期了</em>。','按系统结果判定。重新出一张就行。'],
+ 'phone-uploaded':['传上来了，<em>等你确认</em>。','传到了还不算数，确认之后才进这次办理。'],
  'phone-confirming':['正在<em>确认</em>。','结果没回来之前，它还不是当前文件。'],
  'phone-confirm-failed':['<em>确认失败</em>。','这份没进本次办理。重试确认，或者重新出码。'],
  'phone-confirmed':['确认了，<em>就这一份</em>。','这是本次办理要打的文件。可以去材料检查了。'],
  'phone-cancel-requesting':['正在<em>取消</em>。','答复没回来之前，这份还挂着，我不说已经作废。'],
  'phone-cancel-failed':['<em>没取消掉</em>。','这份还留着。可以重试，也可以回去把它确认掉。'],
- 'phone-cancelled':['会话<em>已作废</em>。','旧码不再收文件。本次办理里还是没有文件。'],
+ 'phone-cancelled':['这次办理<em>已作废</em>。','旧码不再收文件。本次办理里还是没有文件。'],
  'usb-unavailable':['U 盘这条<em>锁着</em>。','本机没配这条通道的令牌，重试也没用。'],
  'usb-agent-offline':['本地服务<em>连不上</em>。','和「未配置」不是一回事，这个可以重试。'],
  'usb-wait':['把 U 盘<em>插进来</em>。','只读根目录，不进子文件夹，也不自动读整盘。'],
@@ -1661,7 +1662,7 @@ var ASK={
  'usb-import-failed':['<em>没导进来</em>。','多半是一次性标识失效了。重新读盘再选一次。'],
  'usb-ready':['导好了，<em>就这一份</em>。','可以拔 U 盘了。本机没有「安全弹出」按钮。']
 };
-var EYEBROW={local:'LOCAL FILE',phone:'PHONE UPLOAD',usb:'USB IMPORT'};
+var EYEBROW={local:'本机文件',phone:'手机上传',usb:'U 盘导入'};
 
 /* ================= 渲染 ================= */
 function render(st){
@@ -1678,7 +1679,7 @@ function render(st){
  if(IS_RESUME&&st==='source-chooser')doing='这里只是<b>把简历文件搬进来打印</b>，不做 AI 诊断 —— 诊断在简历服务那条线上。';
  document.getElementById('xq-doing').innerHTML=doing;
  var pre=st.split('-')[0];
- document.getElementById('xq-eyebrow').textContent=EYEBROW[pre]||'FILE SOURCE';
+ document.getElementById('xq-eyebrow').textContent=EYEBROW[pre]||'选文件';
  var back=document.getElementById('topback');
  back.setAttribute('aria-label',HAS_FILE[st]?'返回打印扫描（当前文件不会带走）':'返回打印扫描');
  /* 完整预览入口：只在本页开模态，不导航、不改地址，所以关掉之后这一屏原样还在。 */
@@ -1686,7 +1687,7 @@ function render(st){
  if(ob)ob.addEventListener('click',function(e){e.preventDefault();pvOpen('open',st)});
 }
 
-/* ================= 路由：夹具门 + fail-closed ================= */
+/* ================= 路由：示例门 + fail-closed ================= */
 function resolveState(){
  var raw=Q.get('state');
  if(raw===null||raw===''){
@@ -1697,7 +1698,7 @@ function resolveState(){
  var st=LEGACY[raw]||raw;
  if(STATES.indexOf(st)<0)return 'unknown';
  if(FIXTURE[st]&&!(CAPTURE||DEBUG))return 'missing-file';
- /* 取消结果由服务端给出。没有明确答复夹具就不给「已作废」，也不给「作废失败」——
+ /* 取消结果由系统给出。没有明确答复示例就不给「已作废」，也不给「作废失败」——
     刷新、直链、非法参数都不能让静态页自造一个成功或失败的结论。 */
  if(st==='phone-cancelled'&&CANCEL_FX!=='ok')return 'missing-file';
  if(st==='phone-cancel-failed'&&CANCEL_FX!=='fail')return 'missing-file';
@@ -1705,7 +1706,7 @@ function resolveState(){
 }
 var STATE=resolveState();
 render(STATE);
-/* 预览夹具入口：普通产品地址到不了这里（PREVIEW 已在上面按 capture/debug 归一为 null）。 */
+/* 预览示例入口：普通产品地址到不了这里（PREVIEW 已在上面按 capture/debug 归一为 null）。 */
 if(PREVIEW)pvOpen(PREVIEW==='unsupported'?'open':PREVIEW,STATE,true);
 
 /* ================= 原型演示控制：仅 debug=1 才注入 DOM ================= */

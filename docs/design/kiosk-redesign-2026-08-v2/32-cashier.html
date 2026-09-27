@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!--
+- 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
+-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -15,16 +18,16 @@
         POST /api/v1/orders/:id/code-pay        —— 提交用户付款码（付款码只随本次请求提交）
         GET  /api/v1/orders/:id/pay-status      —— 每 2.5s 轮询 PayStatusView（含惰性过期/关单，paid 后返回 pickupCode）
         POST /api/v1/orders/:id/pay/reconcile   —— 真实通道兜底对账（回调丢失/延迟时按渠道账本核实）
-        POST /api/v1/print/jobs/:orderId/release—— 仅在服务端终态 paid（或零元单已建单）后释放出纸
+        POST /api/v1/print/jobs/:orderId/release—— 仅在系统终态 paid（或零元单已建单）后释放出纸
   状态映射真值（对齐 apps/kiosk/src/pages/print/cashierStatus.ts deriveCashierView）：
         canProceed 仅 payStatus==='paid' 为 true；unpaid/paying/closed/failed/refunded/refunding/partial_refunded 一律不放行
         attempt.status=expired（收款码过期，可重新出码） ≠ order.payStatus=closed（订单关闭，禁止重新出码）
         付款码尝试 expired → 「支付状态待核实」，不判成败、禁止重复扫码
         本地 expiresAt 到点 → 「收款码到期核验中」，不等于渠道已关单
-        pending 只负责选择服务端已启用通道；channel-selected 再选择屏上收款码 / 付款码
+        pending 只负责选择系统已启用通道；channel-selected 再选择屏上收款码 / 付款码
         两层选择的锁定时点按**真实 React 行为**定，不按「点了哪个按钮」定：
           选「屏上收款码」立刻 POST /orders/:id/pay 出码 → pending-qr：尝试已创建，此后同时锁定通道与方式
-          选「扫付款码」只是开始等本机扫码器读数 → pending-scan：**服务端尚未创建任何支付尝试**
+          选「扫付款码」只是开始等本机扫码器读数 → pending-scan：**系统尚未创建任何支付尝试**
             （对齐 PrintCashierPage.selectPaymentMethod：只有 qr 分支调 issue()，code 分支只 setPaymentMethod
               并清空 snapshot，isPaymentAttemptSelectionLocked(null) 恒为 false）
             所以 pending-scan 只能说「通道已选」，不能说「尝试已创建 / 两者已锁定」；
@@ -33,7 +36,7 @@
             尝试已创建，从这一刻起通道与方式一起锁定
         未决态「刷新付款结果」只重新查询当前订单，不预判跳到 paid / expired / failed
   金额与优惠锁（对齐 cashierStatus.ts isOrderAmountLocked；与「支付方式锁」是两把锁）：
-        支付尝试一经创建，服务端就把订单金额与优惠快照进这次尝试 → 金额与优惠**单调锁定**：
+        支付尝试一经创建，系统就把订单金额与优惠快照进这次尝试 → 金额与优惠**单调锁定**：
         expired / attempt-failed / closed / 通道未知一律保持锁定，绝不因为「这次没付成」解锁
         支付方式锁（PICKER_OFF）不同：屏上码显示到期后仍可重选通道与方式、重新出码
         所以失败或过期之后允许在**同一订单内**重新出码 / 重试支付，但只能沿用已锁定的金额与优惠
@@ -43,15 +46,15 @@
   通道契约真值（对齐 services/api/src/payment/online-payment.service.ts availableChannels / requireChannel）：
         availableChannels() 可能返回 0 / 1 / 多个通道；枚举取值只有 sandbox | wechat | alipay
         零通道 → ONLINE_PAYMENT_DISABLED：一律不出码，落到 channel-empty
-        单通道 → 服务端直接用该通道（requireChannel 的 only 分支），页面不摆一个假的「二选一」
+        单通道 → 系统直接用该通道（requireChannel 的 only 分支），页面不摆一个假的「二选一」
         多通道 → PAY_CHANNEL_REQUIRED：必须用户显式选择，前端绝不替用户默认选一个真实资金通道
         指定了未启用通道 → PAY_CHANNEL_NOT_ENABLED：页面不渲染、不提及该通道
         sandbox 必须明示「非真实收款」，不得伪装成线上收款（对齐 cashierStatus.ts PAY_CHANNEL_LABEL）
-  原型通道 fixture（静态原型模拟服务端事实，不是产品参数）：
+  原型通道 fixture（静态原型模拟系统事实，不是产品参数）：
         ?channels=wechat,alipay | wechat | alipay | sandbox | none（缺省=微信+支付宝两通道都已启用）
-        ?channel=<通道>  —— 模拟「服务端返回的本次支付尝试所属通道」，不是用户偏好
+        ?channel=<通道>  —— 模拟「实际给出的本次支付尝试所属通道」，不是用户偏好
         ?order=free      —— 模拟零元单（amountCents<=0），只对 release-failed 生效；free-order 恒为零元
-        ?attempted=1     —— 模拟「服务端这一单已经创建过支付尝试」，用于失败/过期之后的重试出码路径
+        ?attempted=1     —— 模拟「系统这一单已经创建过支付尝试」，用于失败/过期之后的重试出码路径
                             （pending / channel-selected）；它只会让金额与优惠更锁，不会解锁任何东西
         已创建支付尝试的状态（pending-qr / awaiting-code-confirmation / pending-verification /
         display-expired-reconciling / expired / attempt-failed / release-failed）缺 ?channel 时 fail closed →
@@ -59,8 +62,8 @@
         通道已选但尚未创建尝试的状态（channel-selected / pending-scan）缺 ?channel 时回落到 pending
         （单通道时直接取唯一通道）：它们没有尝试可谈，不许谎称「本次通道未确认」；自链接同样必须带走通道
   两种扫码分治（不得合成同一状态/同一动画）：
-        A 用户手机扫本机屏幕二维码 —— 本机**没有「已扫码」可观测态**，只能等服务端终态
-        B 本机嵌入式扫码器（USB HID 键盘）读用户付款码 —— 信号是 keydown/input，提交后仍只认服务端结果
+        A 用户手机扫本机屏幕二维码 —— 本机**没有「已扫码」可观测态**，只能等系统终态
+        B 本机嵌入式扫码器（USB HID 键盘）读用户付款码 —— 信号是 keydown/input，提交后仍只认系统结果
   付款码安全: 付款码是 18 位纯数字、等同现金，只存在于内存 ref 中；
         **绝不进入 DOM、URL、日志或本地存储**，页面只显示「已读多少位」，本原型连位数占位符都不用数字表示
   零元单:   amountCents<=0 不经过支付，但**订单已经真实建立**，收银页只负责 release，不存在「未建单直接出纸」
@@ -263,7 +266,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 青序流光 2.0 · 32 收银台（state=pending，通道和金额都在）
 规则 1：支付通道仍在 y≥500。头卡下半截用原稿「接下来怎么办」的三条只读步骤填上，不另做一张卡。
 规则 2：说明 21–23，通道名 26，金额从 62 收到 48，导航 21。
-规则 4：眉题去掉 CASHIER。
+规则 4：眉题去掉 付款。
 规则 5：这一屏是还没付款的示例，不写已支付。金额卡和订单卡按内容排，余白收到「尚未选择支付通道」之前。
 规则 7：「这笔账看不懂，问小青」在底部按钮条上方右对齐，不判断付没付成。
 未改：颜色令牌、圆角、先选通道再选扫码、三 Tab。
@@ -335,8 +338,8 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
       <div class="xq-face serif" aria-hidden="true">青</div>
       <div class="xq-main">
         <div class="xq-eyebrow">付款</div>
-        <div class="xq-ask serif" id="xq-ask">付款<em>成没成</em>，服务端说了算。</div>
-        <div class="xq-doing" id="xq-doing">屏幕上这张码，<b>本机看不到你扫没扫</b>。只有服务端支付状态变成已付，才会去出纸。</div>
+        <div class="xq-ask serif" id="xq-ask">付款<em>成没成</em>，以实际结果为准。</div>
+        <div class="xq-doing" id="xq-doing">屏幕上这张码，<b>本机看不到你扫没扫</b>。只有系统支付状态变成已付，才会去出纸。</div>
       </div>
     </div>
     <ol class="qx-steps">
@@ -408,7 +411,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 var SCREEN='cashier';
 var STATES=['no-order','session-expired','free-order','channel-loading','channel-empty','channel-failed','pending','channel-selected','pending-qr','pending-scan','awaiting-code-confirmation','pending-verification','paid','release-failed','display-expired-reconciling','expired','attempt-failed','attempt-channel-unknown','order-failed','closed','refunding','partial-refunded','refunded'];
 var q=new URLSearchParams(location.search);
-/* 通道枚举与展示名对齐服务端 ONLINE_PAYMENT_CHANNELS 与 cashierStatus.ts PAY_CHANNEL_LABEL。
+/* 通道枚举与展示名对齐系统 ONLINE_PAYMENT_CHANNELS 与 cashierStatus.ts PAY_CHANNEL_LABEL。
    顺序即渲染顺序；sandbox 必须自带「非真实收款」说明。 */
 var ALL_CHANNELS=['wechat','alipay','sandbox'];
 var CHANNEL_LABEL={wechat:'微信支付',alipay:'支付宝',sandbox:'测试支付通道'};
@@ -420,9 +423,9 @@ var NEEDS_CHANNEL={'pending':1,'channel-selected':1,'pending-qr':1,'pending-scan
 /* 支付尝试已经创建（不论它还在跑、已过期还是已失败）：通道未知就 fail closed
    （attempt-channel-unknown），绝不默认微信。
    expired 也在表内 —— 屏上那张码是 POST /orders/:id/pay 出的，码能过期就证明尝试真的创建过，
-   金额与优惠在那一刻已被服务端快照；此前漏登记，导致 expired 缺通道时不 fail closed，
+   金额与优惠在那一刻已被系统快照；此前漏登记，导致 expired 缺通道时不 fail closed，
    也导致它不被当成「已锁定」，一路留着回确认页换券的后门。
-   pending-scan 不在表内 —— 那时只是在等扫码器读数，服务端还没有任何支付尝试。 */
+   pending-scan 不在表内 —— 那时只是在等扫码器读数，系统还没有任何支付尝试。 */
 var ATTEMPT_CREATED={'pending-qr':1,'awaiting-code-confirmation':1,'pending-verification':1,'display-expired-reconciling':1,'expired':1,'attempt-failed':1,'release-failed':1};
 /* 订单已经离开「从未支付过」的初始态，或本机根本证明不了它没付过 → 一律按锁定处理（fail-closed）：
    session-expired 读不到 pay-status（不知道 ≠ 没有），attempt-channel-unknown 已有尝试只是通道不明。 */
@@ -437,7 +440,7 @@ function parseChannels(raw){
  var picked=String(raw).split(',').map(function(s){return s.trim()});
  return ALL_CHANNELS.filter(function(c){return picked.indexOf(c)>=0});
 }
-/* 单一真值：先定 fixture（服务端事实），再定这一页能渲染什么。
+/* 单一真值：先定 fixture（系统事实），再定这一页能渲染什么。
    任何「缺参数就猜一个通道」的写法都必须走到这里 fail closed。 */
 function resolveFixture(){
  var st=q.get('state');
@@ -458,7 +461,7 @@ function resolveFixture(){
  if(!CHANNEL_SHOWN[st]) ch='';
  /* 金额与优惠锁：单调 + fail-closed。用 st0（进页时声明的状态）和 st（回落之后的状态）**一起**判断 ——
     `?state=expired&channels=none` 会回落成 channel-empty，但那一单确确实实创建过支付尝试，
-    锁不能跟着状态一起回落掉。?attempted=1 与 debug 下的 ?coupon=locked 都是「服务端已有尝试」
+    锁不能跟着状态一起回落掉。?attempted=1 与 debug 下的 ?coupon=locked 都是「系统已有尝试」
     的显式声明：只会让锁更紧，没有任何一条分支能解锁。 */
  var locked=!!(ATTEMPT_CREATED[st0]||ORDER_SETTLED[st0]||ATTEMPT_CREATED[st]||ORDER_SETTLED[st]||
   q.get('attempted')==='1'||(q.get('debug')==='1'&&q.get('coupon')==='locked'));
@@ -478,7 +481,7 @@ function selfLink(state,opts){
  /* 锁必须跟着链接走：重新出码 / 重试支付会跳回 pending，锁要是丢在上一页，
     下一屏就会重新长出「返回改参数」，等于换券后门原地复活。 */
  if(FIX.locked) parts.push('attempted=1');
- /* 券夹具同样原样带走：否则「已锁定的优惠」会在重试一次之后凭空消失，
+ /* 券示例同样原样带走：否则「已锁定的优惠」会在重试一次之后凭空消失，
     演示出来的正好是这次要禁掉的行为。 */
  if(DEBUG) parts.push('debug=1');
  if(COUPON!=='none') parts.push('coupon='+COUPON);
@@ -506,7 +509,7 @@ function qrBlock(dim,label){
  return '<div class="qr" role="img" aria-label="'+label+'"'+(dim?' style="opacity:.24"':'')+'><div class="qr-grid">'+qrGrid()+'</div>'+
   (dim?'':'<span class="qr-corner tl"></span><span class="qr-corner tr"></span><span class="qr-corner bl"></span><span class="qr-corner br"></span>')+'</div>';
 }
-/* 两层选择：先选服务端**已启用**通道，再选扫码方式；**支付尝试创建之后**两层才一起锁定。
+/* 两层选择：先选系统**已启用**通道，再选扫码方式；**支付尝试创建之后**两层才一起锁定。
    locked 由 PICKER_OFF 决定，pending-scan 故意不在其中：等扫码器读数时尚未创建尝试，两层都还能改。
    只渲染 FIX.list 里的通道 —— 没启用的通道既不出按钮，也不出现在文案里。 */
 function channelPicker(locked){
@@ -548,7 +551,7 @@ function modePicker(active,off){
 function paymentPicker(method,locked,methodsOff){
  return channelPicker(locked)+modePicker(method,locked||methodsOff);
 }
-/* 本次通道只在服务端已确认时才写进订单信息，未确认就整行不出现 */
+/* 本次通道只在系统已确认时才写进订单信息，未确认就整行不出现 */
 function channelRow(){
  return FIX.label?'<div><span>支付通道</span><b data-testid="cashier-selected-channel">'+FIX.label+'</b></div>':'';
 }
@@ -560,19 +563,19 @@ function amountCard(num,lb,src){
   '<div class="amount-src" data-disclaimer="true" data-testid="cashier-amount-source">'+src+'</div>'+couponLedger(known)+'</div>';
 }
 /* ---------------------------------------------------------------- 优惠券（只读）
-   收银台不提供选券入口：支付尝试一旦创建，服务端已把金额快照进尝试，换券会让
+   收银台不提供选券入口：支付尝试一旦创建，系统已把金额快照进尝试，换券会让
    用户确认过的金额与实际扣款对不上。所以这里只承载「原价 / 抵扣 / 最终应付」三行只读摘要。
 
-   默认（无 ?coupon= 或非 debug）**不渲染任何抵扣行** —— 服务端订单没有优惠快照
+   默认（无 ?coupon= 或非 debug）**不渲染任何抵扣行** —— 系统订单没有优惠快照
    （没有 quoteId、没有券预占），凭空画一行「已抵扣」就是虚构优惠。
-   `?debug=1&coupon=selected|locked` 只作为**设计状态**演示未来合同的版面。
+   `?debug=1&coupon=selected|locked` 只作为**设计状态**演示未来规则的版面。
    三个金额同源于 COUPON_FIXTURE 这一个对象，不做 原价-面值 的本地算式。
 
    状态词与 14-print-confirm.html 和 React `PrintCouponState` 统一为 `selected`
    （原来这里叫 `applied`，同一件事两个名字，截图器按 `selected` 取图就会拍到没变化的
    默认屏，人以为"设计没做"）。全站只保留 selected 一个词。 */
 var COUPON_STATES=['none','selected','locked','zero-payable'];
-var COUPON_FIXTURE={source:'mock',couponId:'CPN-DEMO-8',originalAmountCents:200,discountCents:100,payableAmountCents:100};
+var COUPON_FIXTURE={source:'mock',couponId:'CPN-示例-8',originalAmountCents:200,discountCents:100,payableAmountCents:100};
 var rawCoupon=q.get('coupon');
 var DEBUG=q.get('debug')==='1';
 var COUPON=(rawCoupon!==null&&COUPON_STATES.indexOf(rawCoupon)>=0&&(DEBUG||rawCoupon==='none'))?rawCoupon:'none';
@@ -592,7 +595,7 @@ function mainAmount(){
 }
 /* 只读价目明细：原价 / 抵扣 / 最终应付，三个数同源于 COUPON_FIXTURE，渲染在金额卡内部。
    none 一行都不画（没有真实优惠）；零元单也不画（0 元没有可抵扣的原价，那一单只需要一句结论）。
-   「（设计态夹具，非真实优惠）」原先跟在抵扣数字后面，那串字在 372px 的金额卡里放不下会被
+   「（设计态示例，非真实优惠）」原先跟在抵扣数字后面，那串字在 372px 的金额卡里放不下会被
    overflow:hidden 静默切掉，所以改成明细底部的一行注脚 —— 它现在管的是上面三个数，
    比只标注抵扣一行更严：这一组金额整组都不是真实优惠。 */
 function couponLedger(known){
@@ -608,7 +611,7 @@ function couponLedger(known){
   '<div data-coupon-row="original"><span>原价</span><b>'+yuan(f.originalAmountCents)+'</b></div>'+
   '<div data-coupon-row="discount"><span>优惠券抵扣</span><b>−'+yuan(f.discountCents)+'</b></div>'+
   '<div data-coupon-row="payable"><span>最终应付</span><b>'+yuan(f.payableAmountCents)+'</b></div>'+
-  '<span class="lg-fix" data-disclaimer="true">以上三个金额是设计态夹具，非真实优惠</span></div>';
+  '<span class="lg-fix" data-disclaimer="true">以上三个金额是设计态示例，非真实优惠</span></div>';
 }
 /* 只读优惠状态行。none 时返回空串 —— 没有真实优惠就一行都不画。
    「这张券现在还能不能换」是订单属性，和支付通道 / 支付状态并排读最自然，所以它留在
@@ -617,9 +620,9 @@ function couponRows(){
  if(COUPON==='none')return '';
  if(COUPON==='zero-payable')
   return '<div data-coupon-row="zero"><span>优惠券</span><b>本单应付 0 元，无需使用优惠券</b></div>';
- /* 这一行认的是 FIX.locked（服务端有没有创建过支付尝试），不是券夹具那个词：
-    `?state=expired&coupon=selected` 这类组合下，夹具说「已选可改」而订单其实已锁，
-    照夹具画就会在一个已经出过码的订单上写「可返回确认页修改优惠券」。 */
+ /* 这一行认的是 FIX.locked（系统有没有创建过支付尝试），不是券示例那个词：
+    `?state=expired&coupon=selected` 这类组合下，示例说「已选可改」而订单其实已锁，
+    照示例画就会在一个已经出过码的订单上写「可返回确认页修改优惠券」。 */
  return (FIX.locked
   ? '<div data-coupon-row="locked"><span>优惠状态</span><b>已锁定 · 本单已创建支付尝试，不可更换优惠券；改券只能重新下单</b></div>'
   : '<div data-coupon-row="editable"><span>优惠状态</span><b>尚未出码 · 可返回确认页修改优惠券</b></div>');
@@ -638,7 +641,7 @@ function orderInfo(extra){
   '<div><span>参数</span><b>A4 · 黑白 · 单面</b></div>'+couponRows()+(extra||'')+'</div></div>';
 }
 /* 「改参数 / 改券」的唯一出口。锁定后**不给**回确认页这条路：确认页会重新报价、重新建单，
-   而这一单的金额与优惠已经被服务端快照进支付尝试，回去改只会让用户确认过的价和实际扣款对不上。
+   而这一单的金额与优惠已经被系统快照进支付尝试，回去改只会让用户确认过的价和实际扣款对不上。
    锁定态给的是诚实出路 —— 重新下单，从文件源重走一遍（对齐 PrintCashierPage：
    amountLocked 时顶栏走 uploadPath，不透传旧订单 state）。 */
 function paramsBackCta(){
@@ -650,7 +653,7 @@ function paramsBackCta(){
    一段讲完「还能改什么 / 不能改什么 / 想改怎么办」—— 锁定态的侧栏解释卡因此整块让位，
    讲两遍会把收尾卡压到底部事实说明条上（1080x1920 探针实测 -76.8px）。 */
 function lockedNote(){
- return '<div class="state-p">这一单<b>已经创建过支付尝试</b>：可以换支付通道和扫码方式重新发起，但金额与优惠已被服务端锁定，只能沿用；要改打印参数或换优惠券，只能<b>重新下单</b>，从选文件那一步重走一遍。</div>';
+ return '<div class="state-p">这一单<b>已经创建过支付尝试</b>：可以换支付通道和扫码方式重新发起，但金额与优惠已被系统锁定，只能沿用；要改打印参数或换优惠券，只能<b>重新下单</b>，从选文件那一步重走一遍。</div>';
 }
 function ctaDisabled(label,reason,secondary){
  return '<div class="cta-reason" data-testid="'+SCREEN+'-disabled-reason">'+reason+'</div>'+
@@ -867,11 +870,11 @@ V['release-failed']=function(){
    '<a class="btn primary press" style="flex:1.6" href="'+selfLink('release-failed')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">重试创建打印任务</a></div>';
  }
  return terminalView('warn','warn','付款已确认，打印任务尚未建立',
-  '<div class="state-p">服务端已经确认这笔'+FIX.label+'付款成功，但本次创建打印任务没有完成。<b>不要重新付款</b>，请重试创建同一打印任务。</div>',
+  '<div class="state-p">系统已经确认这笔'+FIX.label+'付款成功，但本次创建打印任务没有完成。<b>不要重新付款</b>，请重试创建同一打印任务。</div>',
   '<span class="chip ok">已付款</span><span class="chip warn">打印任务待恢复</span>',
-  channelRow()+'<div><span>支付状态</span><b>已付款（服务端确认）</b></div><div><span>打印任务</span><b>尚未建立</b></div>',
+  channelRow()+'<div><span>支付状态</span><b>已付款（已经确认）</b></div><div><span>打印任务</span><b>尚未建立</b></div>',
   '已付金额','当前为界面示例，实际已付金额以支付结果为准。',mainAmount(),
-  '<div class="pgrp"><h4>为什么不会重新收款</h4><div class="state-p">这里只重试服务端的幂等任务释放，不会再次创建支付尝试。</div></div>',
+  '<div class="pgrp"><h4>为什么不会重新收款</h4><div class="state-p">这里只重试系统的幂等任务释放，不会再次创建支付尝试。</div></div>',
   '付款已经完成；当前只恢复打印任务，不再进入收款流程。')+
   '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
   '<a class="btn primary press" style="flex:1.6" href="'+selfLink('release-failed')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">重试创建打印任务</a></div>';
@@ -895,11 +898,11 @@ V['display-expired-reconciling']=function(){
 };
 V['expired']=function(){
  return terminalView('warn','clock','屏上收款码已过期',
-  '<div class="state-p">服务端确认这次收款码已经过期，并且没有收到这笔钱。<b>订单本身还在，可以重新出一张码。</b></div>'+
+  '<div class="state-p">已经确认这次收款码已经过期，并且没有收到这笔钱。<b>订单本身还在，可以重新出一张码。</b></div>'+
   '<div class="state-p">这和「订单已超时关闭」不是一回事：那种情况订单已经关了，不能再出码。</div>'+
   lockedNote(),
   '<span class="chip warn">收款码过期</span><span class="chip ok">订单未关闭</span><span class="chip">可重新出码</span><span class="chip">金额与优惠已锁定</span>',
-  channelRow()+'<div><span>收款码状态</span><b>已过期（服务端确认）</b></div><div><span>订单状态</span><b>未关闭，可重新出码</b></div>',
+  channelRow()+'<div><span>收款码状态</span><b>已过期（已经确认）</b></div><div><span>订单状态</span><b>未关闭，可重新出码</b></div>',
   '本次应付','金额暂不可用；重新出码仍按本单已锁定的应付金额收款。')+
   '<div class="ctabar">'+paramsBackCta()+
   '<a class="btn primary press" style="flex:1.6" href="'+selfLink('pending',{channel:''})+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">重新出一张收款码</a></div>';
@@ -907,10 +910,10 @@ V['expired']=function(){
 V['attempt-failed']=function(){
  var multi=FIX.list.length>1;
  return terminalView('error','warn','这次支付尝试没有完成',
-  '<div class="state-p">服务端确认上一次'+FIX.label+'支付尝试已经失败，<b>旧码不能再扣款</b>。订单本身仍未关闭，可以重新发起一次。</div>'+
+  '<div class="state-p">已经确认上一次'+FIX.label+'支付尝试已经失败，<b>旧码不能再扣款</b>。订单本身仍未关闭，可以重新发起一次。</div>'+
   lockedNote(),
   '<span class="chip bad">旧尝试已失败</span><span class="chip ok">订单未关闭</span><span class="chip">可重新支付</span><span class="chip">金额与优惠已锁定</span>',
-  channelRow()+'<div><span>支付尝试</span><b>失败（服务端确认）</b></div><div><span>订单状态</span><b>未关闭，可重试</b></div>',
+  channelRow()+'<div><span>支付尝试</span><b>失败（已经确认）</b></div><div><span>订单状态</span><b>未关闭，可重试</b></div>',
   '本次应付','金额暂不可用；重试仍按本单已锁定的应付金额收款。')+
   /* 三个动作对应三件不同的事，缺一件就会把用户逼回确认页：重试（沿用锁定金额）、
      换通道或找人、以及唯一能改参数换券的诚实出路 —— 重新下单。 */
@@ -933,58 +936,58 @@ V['attempt-channel-unknown']=function(){
 };
 V['order-failed']=function(){
  return terminalView('error','warn','订单支付已失败',
-  '<div class="state-p">服务端把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>如支付账单有扣款记录，请联系工作人员核对。</div>',
+  '<div class="state-p">系统把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>如支付账单有扣款记录，请联系工作人员核对。</div>',
   '<span class="chip bad">订单支付失败</span><span class="chip">禁止重新付款</span>',
-  channelRow()+'<div><span>订单支付状态</span><b>失败（服务端确认）</b></div><div><span>能否再付</span><b>不能，需重新下单</b></div>',
+  channelRow()+'<div><span>订单支付状态</span><b>失败（已经确认）</b></div><div><span>能否再付</span><b>不能，需重新下单</b></div>',
   '原应付金额','金额暂不可用，请到订单详情查看记录。')+
   '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
   '<a class="btn primary press" style="flex:1.6" href="12-file-source.html" data-route="/print/upload" data-testid="'+SCREEN+'-primary">重新发起打印</a></div>';
 };
 V['closed']=function(){
  return terminalView('error','warn','订单已超时关闭',
-  '<div class="state-p">服务端确认这张订单已经关闭。这张订单不能再出收款码，也不能继续支付。</div>'+
+  '<div class="state-p">已经确认这张订单已经关闭。这张订单不能再出收款码，也不能继续支付。</div>'+
   '<div class="state-p">要打的话，回去重新发起一次打印，重新报价、重新下单。如果你的支付账单里确实有这一笔，请拿订单号找工作人员核对。</div>',
   '<span class="chip bad">订单已关闭</span><span class="chip">不能再出码</span>',
-  channelRow()+'<div><span>订单状态</span><b>已关闭（服务端确认）</b></div><div><span>能否再付</span><b>不能，需重新下单</b></div>',
+  channelRow()+'<div><span>订单状态</span><b>已关闭（已经确认）</b></div><div><span>能否再付</span><b>不能，需重新下单</b></div>',
   '原应付金额','金额暂不可用，请到订单详情查看记录。')+
   '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">拿订单号找工作人员</a>'+
   '<a class="btn primary press" style="flex:1.6" href="12-file-source.html" data-route="/print/upload" data-testid="'+SCREEN+'-primary">重新发起打印</a></div>';
 };
 V['refunding']=function(){
  return terminalView('warn','back','这一单正在退款',
-  '<div class="state-p">服务端返回订单处于<b>退款处理中</b>。退款尚未完成，这类订单一律不放行出纸。</div>'+
+  '<div class="state-p">这笔订单处于<b>退款处理中</b>。退款尚未完成，这类订单一律不放行出纸。</div>'+
   '<div class="state-p">退款到账时间以支付渠道为准，本机不预告到账时间，也不代为催办。</div>',
   '<span class="chip warn">退款处理中</span><span class="chip">不放行出纸</span>',
-  channelRow()+'<div><span>订单状态</span><b>退款处理中（服务端确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
+  channelRow()+'<div><span>订单状态</span><b>退款处理中（已经确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
   '原订单金额','退款金额与到账时间以支付渠道账单为准，本机不预告。')+
   '<div class="ctabar"><a class="btn ghost press" href="../kiosk-redesign-2026-08/38-member-assets.html?state=orders-ready" data-route="/me/print-orders">我的打印订单</a>'+
   '<a class="btn primary press" style="flex:1.6" href="06-help.html" data-route="/help" data-testid="'+SCREEN+'-primary">联系工作人员</a></div>';
 };
 V['partial-refunded']=function(){
  return terminalView('warn','back','这一单发生了部分退款',
-  '<div class="state-p">服务端返回订单处于<b>部分退款</b>状态。订单金额只退回了一部分，但这类订单仍然一律不放行出纸。</div>'+
+  '<div class="state-p">这笔订单处于<b>部分退款</b>状态。订单金额只退回了一部分，但这类订单仍然一律不放行出纸。</div>'+
   '<div class="state-p">具体退款金额、剩余金额与到账结果以订单详情和支付渠道账单为准。本机不自行计算，也不提供继续支付或继续打印入口。</div>',
   '<span class="chip warn">部分退款</span><span class="chip">不放行出纸</span>',
-  channelRow()+'<div><span>订单状态</span><b>部分退款（服务端确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
-  '原订单金额','已退金额与剩余金额以服务端订单详情为准，本机不估算。')+
+  channelRow()+'<div><span>订单状态</span><b>部分退款（已经确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
+  '原订单金额','已退金额与剩余金额以系统订单详情为准，本机不估算。')+
   '<div class="ctabar"><a class="btn ghost press" href="../kiosk-redesign-2026-08/38-member-assets.html?state=orders-ready" data-route="/me/print-orders">查看订单详情</a>'+
   '<a class="btn primary press" style="flex:1.6" href="06-help.html" data-route="/help" data-testid="'+SCREEN+'-primary">联系工作人员</a></div>';
 };
 V['refunded']=function(){
  return terminalView('error','back','这一单已经退款',
-  '<div class="state-p">服务端返回订单<b>退款已完成</b>。这张订单不能再出纸；如需打印，请重新发起一张新订单。</div>'+
+  '<div class="state-p">这笔订单<b>退款已完成</b>。这张订单不能再出纸；如需打印，请重新发起一张新订单。</div>'+
   '<div class="state-p">实际到账以支付渠道账单为准，本机不预告到账时间。</div>',
   '<span class="chip bad">退款已完成</span><span class="chip">不放行出纸</span>',
-  channelRow()+'<div><span>订单状态</span><b>已退款（服务端确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
+  channelRow()+'<div><span>订单状态</span><b>已退款（已经确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
   '原订单金额','退款结果以支付渠道账单为准，本机不预告到账时间。')+
   '<div class="ctabar"><a class="btn ghost press" href="../kiosk-redesign-2026-08/38-member-assets.html?state=orders-ready" data-route="/me/print-orders">我的打印订单</a>'+
   '<a class="btn primary press" style="flex:1.6" href="12-file-source.html" data-route="/print/upload" data-testid="'+SCREEN+'-primary">重新发起打印</a></div>';
 };
 var PILL={
- 'no-order':['warn','没有待支付的订单'],'session-expired':['warn','支付会话已过期'],'free-order':['ok','无需付款 · 订单已建立'],
+ 'no-order':['warn','没有待支付的订单'],'session-expired':['warn','支付这次办理已过期'],'free-order':['ok','无需付款 · 订单已建立'],
  'channel-loading':['','正在读支付通道'],'channel-empty':['bad','未启用任何支付通道'],'channel-failed':['bad','支付通道读取失败'],
  'pending':['','请选择支付通道'],'channel-selected':['','通道已选 · 请选择扫码方式'],'pending-qr':['','等待支付 · 未确认'],'pending-scan':['','等待读取付款码 · 未发起支付'],'awaiting-code-confirmation':['','渠道确认中 · 未确认'],
- 'pending-verification':['warn','支付状态待核实'],'paid':['ok','服务端确认已付'],'release-failed':['warn','已付款 · 打印任务待恢复'],'display-expired-reconciling':['warn','收款码到期核验中'],
+ 'pending-verification':['warn','支付状态待核实'],'paid':['ok','已经确认已付'],'release-failed':['warn','已付款 · 打印任务待恢复'],'display-expired-reconciling':['warn','收款码到期核验中'],
  'expired':['warn','收款码已过期'],'attempt-failed':['bad','旧支付尝试已失败'],'attempt-channel-unknown':['warn','支付通道未确认'],'order-failed':['bad','订单支付已失败'],'closed':['bad','订单已超时关闭'],'refunding':['warn','退款处理中'],'partial-refunded':['warn','订单已部分退款'],'refunded':['bad','退款已完成']
 };
 /* 随 fixture 变化的顶栏文案：零元单不能顶着「已付款」 */
@@ -996,27 +999,27 @@ function pillFor(st){
 }
 var ASK={
  'no-order':['这里<em>没有订单</em>。','没有订单就没有收款。回上一步重新发起，或去我的打印订单查。'],
- 'session-expired':['这单的<em>会话过期了</em>。','订单还在服务端，只是这台机器暂时查不到。重新进一次就行。'],
- 'free-order':['这一单<em>不用付款</em>。','服务端报价为 0。<b>订单已经建好了</b>，我只负责把任务释放给打印机。'],
+ 'session-expired':['这单的<em>这次办理过期了</em>。','订单还在系统，只是这台机器暂时查不到。重新进一次就行。'],
+ 'free-order':['这一单<em>不用付款</em>。','下一步的实际价格为 0。<b>订单已经建好了</b>，我只负责把任务释放给打印机。'],
  'channel-loading':['正在看<em>能怎么付</em>。','读到已启用的通道之前不出码，免得你扫到一张废码。'],
  'channel-empty':['这台机器<em>收不了款</em>。','管理员还没开通任何收款方式。订单在，钱没扣。'],
  'channel-failed':['支付通道<em>没读到</em>。','读不到就不出码。这个状态下没有任何扣款发生。'],
  'pending':['先选<em>支付通道</em>。','选完通道再选扫码方式。创建尝试前都可以改。'],
  'channel-selected':['再选<em>扫码方式</em>。','通道已经选好。选屏幕上的码会立刻出码并锁定；选付款码要等机器读满并提交后才锁定。'],
- 'pending-qr':['付款<em>成没成</em>，服务端说了算。','屏幕上这张码，<b>本机看不到你扫没扫</b>。只有服务端支付状态变成已付，才会去出纸。'],
+ 'pending-qr':['付款<em>成没成</em>，以实际结果为准。','屏幕上这张码，<b>本机看不到你扫没扫</b>。只有系统支付状态变成已付，才会去出纸。'],
  'pending-scan':['这次是<em>机器扫你</em>。','把手机付款码对准扫码窗口。<b>现在还没有发起支付</b>，读满并提交后才送出，送出也不代表付成了。'],
- 'awaiting-code-confirmation':['码送出去了，<em>等回话</em>。','别重复出示，也别重新下单。结果只认服务端。'],
+ 'awaiting-code-confirmation':['码送出去了，<em>等回话</em>。','别重复出示，也别重新下单。结果只认系统。'],
  'pending-verification':['结果<em>还没定</em>。','渠道可能还在处理。<b>先核实，别重复扫码。</b>'],
- 'paid':['服务端说<em>已付</em>。','这是服务端确认的最终结果，不是我猜的。接下来创建并查看打印任务。'],
+ 'paid':['结果显示<em>已付</em>。','这是已经确认的最终结果，不是我猜的。接下来创建并查看打印任务。'],
  'release-failed':['钱已付，<em>任务没建成</em>。','不要再付款。这里只重试创建同一打印任务。'],
  'attempt-channel-unknown':['这一单<em>走哪个通道，我没确认</em>。','没确认就不出码、不判成败。从我的打印订单重新进这一单。'],
  'display-expired-reconciling':['这张码<em>不显示了</em>。','但不代表渠道已经关单。<b>先对账，未确认前别重复支付。</b>'],
  'expired':['收款码<em>过期了</em>。','订单还在，重新出一张码就行。'],
- 'attempt-failed':['旧尝试<em>已经失败</em>。','服务端确认旧码不能再扣款，订单还在，可以重新选择。'],
+ 'attempt-failed':['旧尝试<em>已经失败</em>。','已经确认旧码不能再扣款，订单还在，可以重新选择。'],
  'order-failed':['订单支付<em>已经失败</em>。','这是订单终态，不能再付；要打印请重新下单。'],
  'closed':['订单<em>已经关了</em>。','不能再付。要打的话重新来一次。'],
  'refunding':['这单<em>正在退款</em>。','退款尚未完成，不能出纸。到账时间以渠道为准。'],
- 'partial-refunded':['这单<em>只退了一部分</em>。','部分退款后同样不能出纸。金额只认服务端订单详情与支付渠道账单。'],
+ 'partial-refunded':['这单<em>只退了一部分</em>。','部分退款后同样不能出纸。金额只认系统订单详情与支付渠道账单。'],
  'refunded':['这单<em>已经退款</em>。','退款完成，不能出纸；需要打印请重新下单。']
 };
 /* 随 fixture 变化的小青台词：零元单不能说「钱已付」，单通道不能说「选一个」 */
@@ -1029,7 +1032,7 @@ function askFor(st){
 }
 var MODE={'pending':'','channel-selected':'','pending-qr':'qr','pending-scan':'code','awaiting-code-confirmation':'code','pending-verification':'code','display-expired-reconciling':'qr','expired':'qr','attempt-failed':'qr','channel-loading':''};
 /* 两层选择的锁定表：只有支付尝试真的创建之后（pending-qr / 付款码已提交），或订单已进终态，才锁。
-   pending-scan 故意不在表内 —— 那时只是在等扫码器读数，服务端还没有任何支付尝试。 */
+   pending-scan 故意不在表内 —— 那时只是在等扫码器读数，系统还没有任何支付尝试。 */
 var PICKER_OFF={'no-order':1,'session-expired':1,'free-order':1,'channel-loading':1,'channel-empty':1,'channel-failed':1,'pending-qr':1,'awaiting-code-confirmation':1,'pending-verification':1,'paid':1,'release-failed':1,'display-expired-reconciling':1,'expired':1,'attempt-failed':1,'attempt-channel-unknown':1,'order-failed':1,'closed':1,'refunding':1,'partial-refunded':1,'refunded':1};
 function render(){
  var st=FIX.state;

@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 使用有文件的等待报价态，不生成示例金额，也不放开确认或付款（规则 5）。
-- 返工：文件卡移除两段夹具说明，改为文件名、页数来自上一步；末格保留打印件产物（规则 3、4）。
+- 返工：文件卡移除两段示例说明，改为文件名、页数来自上一步；末格保留打印件产物（规则 3、4）。
 - 保留一处金额未确认不会扣款的声明，删去底部重复三栏（规则 4）。
 - 第二轮返工：删除 CTA 第二行重复的上一步，只保留右对齐的费用 AI 帮助；主行保留上一步：改参数，沿用卡内正常布局与现有间距、字号，实际画面未自验、待协调方复核（规则 1、2、7）。
-- AI 帮助采用原顾问页支持的 composer 与会话草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 -->
 <html lang="zh-CN">
 <head>
@@ -18,17 +19,17 @@
   state: 正常访问可达 —— missing-context | invalid-context | quoting | quote-failed | capability-invalid-params
          仅 ?debug=1 可达 —— quoted | benefit-unverified | zero-amount（合成排版演示，CTA 全禁用）
   api:  POST /api/v1/orders/quote → PrintOrderQuote { amountCents, billablePages, billingPageSource, priceLines }
-        —— 报价不落库；金额与计费页数**只认服务端返回**，前端绝不本地估算
+        —— 报价不落库；金额与计费页数**只认实际结果**，前端绝不本地估算
         POST /api/v1/print/jobs  → 确认后真实建单（返回 taskId / orderId），零元单同样先建单
         GET  /api/v1/print/price-config → 公开只读价目，仅用于口径说明
-        彩色 / 双面报价必带 terminalId：后端按该终端能力登记 fail-closed 复核，未验证参数直接拒绝报价
+        彩色 / 双面报价必带 terminalId：后端按该终端能力登记 fail-closed 复核，本机暂未开通参数直接拒绝报价
   金额边界: 所有金额位在 [data-quote-slot] 内；未知金额显示自然状态文案且禁止建单。
             静态原型里**没有任何真实报价**，所以会摆出金额的三屏（quoted / benefit-unverified / zero-amount）
             只在 ?debug=1 下作为合成排版演示渲染：金额位带 data-quote-demo="layout-only"，
-            旁边常驻「不是服务端报价」，所有可能建单 / 付款的 CTA 一律禁用且不指向 32-cashier。
-            每个金额位旁常驻来源说明（真实链路的金额来自服务端 orders/quote）
+            旁边常驻「不是下一步的实际价格」，所有可能建单 / 付款的 CTA 一律禁用且不指向 32-cashier。
+            每个金额位旁常驻来源说明（真实步骤的金额来自系统 orders/quote）
   权益边界: 核销结果未通过时按原价显示，绝不先按抵扣后的价格呈现
-  出口:    金额 > 0 → /print/cashier；服务端报价为 0 → 仍然先建单，再由收银页 releasePickupOrder 释放，
+  出口:    金额 > 0 → /print/cashier；下一步的实际价格为 0 → 仍然先建单，再由收银页 releasePickupOrder 释放，
            不存在「不建单直接出纸」的路径
   fallback: quote 失败 → quote-failed，可重试或改参数；无 file/params 上下文 → missing-context；
             交接参数没通过登记核对 → invalid-context（绝不回落 quoted/default）
@@ -47,22 +48,22 @@
             地址栏里不留 #；它的原文与解码结果不进 DOM、不进属性、不进错误文案、不进 console。
             登记表两条：
               1) source=interview-report + fileId=iv_rep_5c1d8f2a
-                 → 模拟面试练习报告_前端开发工程师.pdf · PDF · 209 KB · 3 页（对齐 29-interview-training.html 的 PFILE 夹具）
+                 → 模拟面试练习报告_前端开发工程师.pdf · PDF · 209 KB · 3 页（对齐 29-interview-training.html 的 PFILE 示例）
               2) 打印台默认文档 求职简历.pdf · PDF · 3 页（未登记文件编号与大小）——
-                 只在显式 ?state= 请求某一屏时当**排版夹具**用，不再是无参进入的默认结果
+                 只在显式 ?state= 请求某一屏时当**排版示例**用，不再是无参进入的默认结果
             登记表以外的来源 / 文件编号、只给半边的交接、与登记不符的页数、非 1 的份数、
             越界的 duplex（single|double）或 color（bw|color）、未登记的 ?state= 取值
             → 一律 invalid-context，不按地址栏猜文件名 / 页数 / 大小，也不静默回落到默认那一份。
-            duplex=double 或 color=color 属登记取值但本机未通过真机验证 → 强制 capability-invalid-params。
+            duplex=double 或 color=color 属登记取值但本机暂未开通 → 强制 capability-invalid-params。
             带交接参数且未显式指定 ?state= 时落 quoting（刚交接进来，这一单还没有报价）；
-            不带交接参数且未指定 ?state= 时落 missing-context —— 静态原型没有服务端报价，
+            不带交接参数且未指定 ?state= 时落 missing-context —— 静态原型没有下一步的实际价格，
             无参进入不能自己摆出一份文件加一个金额。13/18/19/20/23/37/38 的无参入口因此都改落空态，
             38-member-assets 的 ?state=quoted 与 s3-print-scan 的 quoted / zero-amount 跳转断言会随之变红，
             这是「静态页不冒充真实报价」的代价，不是回归。
-  真实合同: 正式 React 由 apps/kiosk/src/pages/print/PrintConfirmPage.tsx 从 location.state 读
+  真实规则: 正式 React 由 apps/kiosk/src/pages/print/PrintConfirmPage.tsx 从 location.state 读
             file(PrintFileState) + params(PrintJobParams)，InterviewReportPage.handlePrint 用
             navigate('/print/confirm',{state:{file,params}}) 交接。本页地址栏里的取值只是
-            **静态登记夹具的选择键**，不是文件本身；printFileUrl / signedUrl 一律不进地址栏、
+            **静态登记示例的选择键**，不是文件本身；printFileUrl / signedUrl 一律不进地址栏、
             不进任何可见文本、不进 data 属性。本页不建单、不扣费、不支付、不出纸、不产生取件码。
   内部链接: 所有演示 / 重试 / 状态切换链接都带走已通过核对的交接参数；面试报告来源的返回口是
             29-interview-training.html?state=report-print-handoff（不是通用上传 / 预览）。
@@ -187,9 +188,9 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .rev-grid>div>b{font-size:26px;font-weight:700;line-height:1.26}
 .rev-grid>div.off{background:var(--cinnabar-soft);border-color:#e8c9c3}
 .rev-grid>div.off>span,.rev-grid>div.off>b{color:var(--cinnabar-d)}
-/* 文件编号是登记夹具值，按可读的等宽偏好排，但不缩到看不清 */
+/* 文件编号是登记示例值，按可读的等宽偏好排，但不缩到看不清 */
 .rev-grid>div>b.id{font-size:22px;letter-spacing:.5px;word-break:break-all}
-/* 夹具声明常驻在文件条里：说清屏幕上的文件名/大小/页数/编号是本页登记的，不是真实链路结果 */
+/* 示例声明常驻在文件条里：说清屏幕上的文件名/大小/页数/编号是本页登记的，不是真实步骤结果 */
 .rf-m .fx{display:block;margin-top:6px;font-size:17px;line-height:1.4;color:var(--ink-3)}
 .rf-m .fx b{font-weight:700;color:var(--ink-2)}
 /* ---------------------------------------------------------------- 费用区 */
@@ -388,9 +389,9 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
     <div class="xq-row">
       <div class="xq-face serif" aria-hidden="true">青</div>
       <div class="xq-main">
-        <div class="xq-eyebrow">QUOTE &amp; CONFIRM</div>
-        <div class="xq-ask serif" id="xq-ask">这笔<em>多少钱</em>，服务端说了算。</div>
-        <div class="xq-doing" id="xq-doing">金额和计费页数都由服务端返回。<b>本机不估价、不打折、不替你承诺优惠。</b></div>
+        <div class="xq-eyebrow">核对价格</div>
+        <div class="xq-ask serif" id="xq-ask">这笔<em>多少钱</em>，以实际结果为准。</div>
+        <div class="xq-doing" id="xq-doing">金额和计费页数都以实际结果为准。<b>本机不估价、不打折、不替你承诺优惠。</b></div>
       </div>
     </div>
   </section>
@@ -427,7 +428,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
     <a href="?state=quoted&amp;debug=1&amp;coupon=reprice-failed" data-s="coupon-reprice-failed">coupon:reprice-failed</a>
     <a href="?state=quoted&amp;debug=1&amp;coupon=locked" data-s="coupon-locked">coupon:locked</a>
     <a href="?state=zero-amount&amp;debug=1&amp;coupon=zero-payable" data-s="coupon-zero">coupon:zero-payable</a>
-    <div class="dp-t">交接夹具</div>
+    <div class="dp-t">交接示例</div>
     <a href="?source=interview-report&amp;fileId=iv_rep_5c1d8f2a&amp;pages=3&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">面试报告交接</a>
     <a href="?source=resume-optimize&amp;fileId=rsm_opt_9d4b71e6&amp;pages=2&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">简历优化导出</a>
     <a href="?source=resume-generate&amp;fileId=rsm_draft_3a17c9f2&amp;pages=1&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">生成 · 原样草稿</a>
@@ -445,17 +446,17 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 <script>
 var SCREEN='print-confirm';
 var STATES=['missing-context','invalid-context','quoting','quoted','quote-failed','capability-invalid-params','benefit-unverified','zero-amount'];
-/* 这三屏会在屏幕上摆出金额和一单「可以确认」的订单。静态原型拿不到服务端报价，
-   摆出来就是替服务端下结论，所以它们只在 ?debug=1 下作为合成排版演示渲染：
+/* 这三屏会在屏幕上摆出金额和一单「可以确认」的订单。静态原型拿不到下一步的实际价格，
+   摆出来就是替系统下结论，所以它们只在 ?debug=1 下作为合成排版演示渲染：
    金额标 layout-only，可能建单 / 付款的 CTA 全部禁用，也不指向收银台。 */
 var SYNTHETIC_STATES=['quoted','benefit-unverified','zero-amount'];
 
-/* ── 交接夹具登记表 ───────────────────────────────────────────────────────────
-   本页是打印链路的**消费者**：文件与打印参数由上一步交进来，不由本页自己造。
+/* ── 交接示例登记表 ───────────────────────────────────────────────────────────
+   本页是打印步骤的**消费者**：文件与打印参数由上一步交进来，不由本页自己造。
    静态原型没有真实的路由传参，所以只认下面这张登记表 —— 地址栏里的 source/fileId
-   只是**选哪一条登记夹具**的键，不是文件本身。表外的来源与文件编号一律停在
+   只是**选哪一条登记示例**的键，不是文件本身。表外的来源与文件编号一律停在
    invalid-context：不按地址栏猜文件名、页数、大小，也不静默回落到默认那一份。
-   两条登记都是本原型的合成夹具，不是任何一次真实上传或真实生成的结果。 */
+   两条登记都是本原型的合成示例，不是任何一次真实上传或真实生成的结果。 */
 var DOC_DEFAULT={
  key:'print-desk',
  name:'求职简历.pdf',
@@ -476,9 +477,9 @@ var DOC_DEFAULT={
    就有五个模板各出一份），所以只按 source 命中一条是错的 —— 那等于让「材料工坊」这个
    词自己决定屏幕上显示哪一份文件名和页数。docs 里的键就是该来源登记过的文件编号，
    地址栏里的 fileId 必须逐字命中其中一个，否则一律 invalid-context。
-   每条的 filename / size / pages 都与上游那一页显示的同一份合成夹具逐字段对齐；
+   每条的 filename / size / pages 都与上游那一页显示的同一份合成示例逐字段对齐；
    signedUrl 与 printFileUrl 不在这里，也不该在这里。
-   backHref 指回**交进来的那一屏**；上游那几屏是原型的受控夹具态（只在 debug=1 / capture=1
+   backHref 指回**交进来的那一屏**；上游那几屏是原型的受控示例态（只在 debug=1 / capture=1
    下可达），所以回链带 debug=1 —— 这是那一屏真实的可达方式，不是给它伪造一个正式入口。 */
 var HANDOFF_SOURCES={
  'interview-report':{
@@ -505,7 +506,7 @@ var HANDOFF_SOURCES={
  },
  /* 与 23-resume-optimize.html 的 EXPORT_FILE 逐字段对齐：sizeBytes 118784(=116 KB)、pageCount 2。
     那一页只有 **PDF** 这一种格式登记了打印身份：DOCX / TXT / MD 的导出返回的是原格式 fileId，
-    真实合同里打印用的是服务端另渲染的一份同内容 PDF，两者的文件编号不是同一个，
+    真实规则里打印用的是系统另渲染的一份同内容 PDF，两者的文件编号不是同一个，
     所以那三种格式在上游就禁用打印，这里也没有对应登记。 */
  'resume-optimize':{
   label:'简历优化导出交接',
@@ -527,7 +528,7 @@ var HANDOFF_SOURCES={
    }
   }
  },
- /* 与 24-resume-generate.html 的两份 PDF 夹具逐字段对齐：原样草稿 79872(=78 KB)、1 页；
+ /* 与 24-resume-generate.html 的两份 PDF 示例逐字段对齐：原样草稿 79872(=78 KB)、1 页；
     AI 生成导出 98304(=96 KB)、1 页。「导出成功」和「下载链接过期」握的是**同一份文件**
     （过期的只是下载那条签名链接），所以共用同一个文件编号，不另编一个。 */
  'resume-generate':{
@@ -635,13 +636,13 @@ var Q=new URLSearchParams(location.search);
 var DEBUG=Q.get('debug')==='1',FLAT=Q.get('flat')==='1';
 
 /* ── 地址栏 fragment（#...）─────────────────────────────────────────────────────
-   # 后面的内容不会发到服务端、也不进服务端日志，所以它是签名链接、打印凭证和一次性
+   # 后面的内容不会发到系统、也不进系统日志，所以它是签名链接、打印凭证和一次性
    令牌最常被塞进去的地方（#token=... / #signedUrl=... / #printFileUrl=...）。
    本页对它只做一件事：**只要非空就整条判为不可信输入** —— 不解析、不按 key=value 拆、
    不做白名单，也不因为它看着像锚点、像人畜无害的短词就放行（「看着无害」本身就是
    最常见的伪装）。这里只算出一个布尔值：fragment 的原文与解码结果一律不落全局变量、
    不进 DOM、不进属性、不进错误文案、不进 console。
-   空 fragment（地址只以一个 # 结尾）不算非空，按原样放过，不动既有合同。 */
+   空 fragment（地址只以一个 # 结尾）不算非空，按原样放过，不动既有规则。 */
 var HAS_FRAGMENT=(function(){
  var h=location.hash;
  if(typeof h==='string'&&h.length>1) return true;
@@ -659,7 +660,7 @@ var HAS_FRAGMENT=(function(){
 var QUERY_ALLOW=['source','fileId','pages','copies','duplex','color','state','debug','flat','coupon'];
 /* 只用来把「像凭证的键名」这件事说清楚；拦截由白名单负责，这条正则不承担拦截职责。 */
 var SENSITIVE_KEY=/token|secret|sign|url|uri|href|link|key|pass|auth|credential|cookie|session|jwt|otp|ticket|access|bearer/i;
-/* 取值安全线：登记夹具的选择键都是短标识（interview-report / iv_rep_5c1d8f2a /
+/* 取值安全线：登记示例的选择键都是短标识（interview-report / iv_rep_5c1d8f2a /
    jm_experienced_cover_letter_8f31c0 / quote-failed / 3 / bw ...）。超出这个形状的取值
    一律既不回显、也不留在地址栏 —— 长数字串可能是付款码，带 / : ? . % = 的可能是签名链接。
    上限 40 是按**已登记的最长文件编号 34 字符**定的（jm_experienced_cover_letter_8f31c0），
@@ -696,7 +697,7 @@ if(QSCAN.dirty||HAS_FRAGMENT){
    # 后面的键名本身也可能是凭证的一半。 */
 function fragmentReason(){
  return '地址里带了 # 之后的内容。本页把<b>任何非空 # 片段</b>都当作不可信输入：不解析、不做白名单，也不按它的内容判断该显示哪一份文件。'+
-  '# 后面的东西不会发给服务端、也不进服务端日志，正是签名链接、打印凭证和一次性令牌最常被塞进去的地方，所以这里一律停住，而不是挑出「看着无害」的那几个放行。'+
+  '# 后面的东西不会发给系统、也不进系统日志，正是签名链接、打印凭证和一次性令牌最常被塞进去的地方，所以这里一律停住，而不是挑出「看着无害」的那几个放行。'+
   (URL_CLEANED
    ?'地址栏已经就地换成不带 # 的安全地址，它的原文不会显示在屏幕上，也不会带去下一步。'
    :'它的原文不会显示在屏幕上，也不会带去下一步。');
@@ -719,7 +720,7 @@ function parseContext(){
  var used=[],i;
  for(i=0;i<HANDOFF_KEYS.length;i++) if(Q.get(HANDOFF_KEYS[i])!==null) used.push(HANDOFF_KEYS[i]);
  function bad(reason){return {ok:false,reason:reason}}
- /* 完全不带交接参数 = 打印台既有默认流程，用默认登记夹具（13/18/19/20/23/37/38 都走这条）。 */
+ /* 完全不带交接参数 = 打印台既有默认流程，用默认登记示例（13/18/19/20/23/37/38 都走这条）。 */
  if(!used.length) return {ok:true,handoff:false,doc:DOC_DEFAULT,copies:'1',duplex:'single',color:'bw'};
  var src=Q.get('source'),fid=Q.get('fileId');
  if(!src||!fid) return bad('这次的交接只给了一半：来源与文件编号必须同时给出，本页才知道该显示哪一份文件。');
@@ -733,9 +734,9 @@ function parseContext(){
  if(!Object.prototype.hasOwnProperty.call(grp.docs,fid)) return bad('文件编号「'+shown(fid)+'」不在来源「'+shown(src)+'」登记的文件里，本页不会按编号去猜文件名和页数。');
  var doc=grp.docs[fid];
  var pages=Q.get('pages');
- if(pages!==null&&pages!==String(doc.pages)) return bad('地址里的页数「'+shown(pages)+'」与登记夹具的 '+doc.pages+' 页对不上。');
+ if(pages!==null&&pages!==String(doc.pages)) return bad('地址里的页数「'+shown(pages)+'」与登记示例的 '+doc.pages+' 页对不上。');
  var copies=Q.get('copies');if(copies===null)copies='1';
- if(COPIES_REGISTERED.indexOf(copies)<0) return bad('本页只登记了 1 份的排版夹具，没有「'+shown(copies)+' 份」对应的登记结果。');
+ if(COPIES_REGISTERED.indexOf(copies)<0) return bad('本页只登记了 1 份的排版示例，没有「'+shown(copies)+' 份」对应的登记结果。');
  var duplex=Q.get('duplex');if(duplex===null)duplex='single';
  if(!Object.prototype.hasOwnProperty.call(DUPLEX_LABEL,duplex)) return bad('单双面取值「'+shown(duplex)+'」不在登记范围（single / double）内。');
  var color=Q.get('color');if(color===null)color='bw';
@@ -823,8 +824,8 @@ function lines(rows){
  var h='';for(var i=0;i<rows.length;i++)h+='<div class="line"><span class="lb">'+rows[i][0]+'</span><span class="vl'+(rows[i][2]?' slot':'')+'"'+(rows[i][2]?' data-quote-slot="true"':'')+'>'+rows[i][1]+'</span></div>';
  return '<div class="lines" data-testid="'+SCREEN+'-list">'+h+'</div>';
 }
-/* 核对区：文件身份一行 + 参数网格一屏扫完。文件与参数取值全部来自本次交接的**登记夹具**，
-   本页只做核对与呈现，不在这里改参数，也不替服务端判断哪一项能不能打。
+/* 核对区：文件身份一行 + 参数网格一屏扫完。文件与参数取值全部来自本次交接的**登记示例**，
+   本页只做核对与呈现，不在这里改参数，也不替系统判断哪一项能不能打。
    cells 里带 off 的项是按本机已验证能力拒绝的那几项，就地标红，不另开说明段。
    最后一格是文件编号：登记过就写编号，没登记就写「未登记」，绝不为了版式好看编一个出来。 */
 function paramCells(state){
@@ -852,20 +853,20 @@ function sec(no,title,hint,inner,cls){
 }
 function feeBlock(card,rows){return '<div class="fee">'+card+lines(rows)+'</div>'}
 function pageSrcCard(){
- return '<div class="pgrp"><h4>计费页数怎么来的</h4><div class="state-p">计费页数和计价依据都由服务端报价返回。本机不按屏幕上看到的页数自己计算。</div></div>';
+ return '<div class="pgrp"><h4>计费页数怎么来的</h4><div class="state-p">计费页数和计价依据都由下一步的实际价格返回。本机不按屏幕上看到的页数自己计算。</div></div>';
 }
 /* warn=true 那一版演示的是「核销没通过时按原价显示」的排版。本屏没有真的核销过，
-   所以文案只说这是排版演示，绝不写成「服务端返回核销未通过」那种既成结论。 */
+   所以文案只说这是排版演示，绝不写成「结果说抵扣没通过」那种既成结论。 */
 /* ---------------------------------------------------------------- 优惠券
-   产品要求「付款时留出优惠券入口」。但服务端 BenefitGrant 没有打印适用范围、
+   产品要求「付款时留出优惠券入口」。但系统 BenefitGrant 没有打印适用范围、
    券面值、折扣率、门槛或上限，打印订单核销还是 REDEEM_PRINT_ORDER_UNSUPPORTED
    fail-closed。所以：
      - 默认（含正常打开、非 debug）恒为 unavailable：说「尚未接通」，不给可点减价；
      - available / selected / repricing / reprice-failed / locked / zero-payable
        只在 ?debug=1&coupon=<state> 下出现，且屏上明写这是**设计状态**；
      - 未登录只说「看不到」，绝不说成「你没有券」。
-   金额三元组（原价/抵扣/实付）在设计态里也整组写死在同一个夹具对象里，
-   不做 原价-面值 这种本地算式 —— 正式前端同样只允许整组读服务端响应。 */
+   金额三元组（原价/抵扣/实付）在设计态里也整组写死在同一个示例对象里，
+   不做 原价-面值 这种本地算式 —— 正式前端同样只允许整组读系统响应。 */
 /* 主金额（大字）与明细小计 = 用户这一单**实际要付**的钱。
    选中优惠（selected）时必须等于 COUPON_FIXTURE.payableAmountCents，否则会出现
    「大字 ¥2.00，券行却写原价 2.00 / 抵扣 1.00 / 实付 1.00」的自相矛盾。
@@ -874,12 +875,12 @@ function fxYuan(c){return (c/100).toFixed(2)}
 function mainAmount(){
  return COUPON==='selected'?fxYuan(COUPON_FIXTURE.payableAmountCents):fxYuan(COUPON_FIXTURE.originalAmountCents);
 }
-/* 设计态夹具：三个金额同源于这一个对象。 */
-var COUPON_FIXTURE={source:'mock',couponId:'CPN-DEMO-8',originalAmountCents:200,discountCents:100,payableAmountCents:100};
+/* 设计态示例：三个金额同源于这一个对象。 */
+var COUPON_FIXTURE={source:'mock',couponId:'CPN-示例-8',originalAmountCents:200,discountCents:100,payableAmountCents:100};
 var COUPON_OPTIONS=[
- {id:'CPN-DEMO-8',kind:'优惠券',title:'打印立减 1 元',sub:'面值 ¥1.00 · 有效期至 2026-12-31',ok:true,why:null},
- {id:'FQ-DEMO-2',kind:'免费次数',title:'免费打印 2 次',sub:'剩余 2 次 · 有效期至 2026-10-01',ok:true,why:null},
- {id:'PKG-DEMO-1',kind:'服务额度',title:'求职服务包额度',sub:'剩余 3 次',ok:false,why:'服务端裁定本单不适用（品类不符）'},
+ {id:'CPN-示例-8',kind:'优惠券',title:'打印立减 1 元',sub:'面值 ¥1.00 · 有效期至 2026-12-31',ok:true,why:null},
+ {id:'FQ-示例-2',kind:'免费次数',title:'免费打印 2 次',sub:'剩余 2 次 · 有效期至 2026-10-01',ok:true,why:null},
+ {id:'PKG-示例-1',kind:'服务额度',title:'求职服务包额度',sub:'剩余 3 次',ok:false,why:'系统裁定本单不适用（品类不符）'},
  {id:'CPN-OLD-3',kind:'优惠券',title:'开学季立减 2 元',sub:'面值 ¥2.00',ok:false,why:'有效期已于 2026-06-30 结束',expired:true}
 ];
 function couponText(k){
@@ -887,13 +888,13 @@ function couponText(k){
   case 'guest':return ['登录后查看你的优惠券','券挂在你本人账号下；未登录只是看不到，不代表没有。'];
   case 'empty':return ['本单暂无可使用优惠券','你名下没有仍在有效期、且可用于打印的券。'];
   case 'expired':return ['名下 1 张券已过期','过期的券不会被扣掉，可在「我的 · 我的权益」查看。'];
-  case 'available':return ['本单有 2 张券可用','能否用于本单由服务端裁定，本机不预判抵扣金额。'];
+  case 'available':return ['本单有 2 张券可用','能否用于本单由系统裁定，本机不预判抵扣金额。'];
   case 'selected':return ['打印立减 1 元','原价 ¥2.00 · 实付 ¥1.00'];
   case 'repricing':return ['正在按新的优惠重新核价…','核价完成前不能付款，避免按旧金额扣款。'];
   case 'reprice-failed':return ['重新核价失败，付款已暂停','仍按上一次已确认的 ¥2.00 显示；可重试，不会按未确认的金额扣款。'];
-  case 'locked':return ['优惠已锁定','本单已开始支付，金额与优惠在服务端锁定；如需更换请先关闭当前支付码。'];
-  case 'zero-payable':return ['本单无需优惠','本单应付 0 元，服务端对免费单不接受核销，你的权益不会被扣。'];
-  default:return ['本单暂无可使用优惠券','优惠券功能尚未接通：服务端还没有下发券面值与适用范围，本机不替你预判，也不试算抵扣。'];
+  case 'locked':return ['优惠已锁定','本单已开始支付，金额与优惠在系统锁定；如需更换请先关闭当前支付码。'];
+  case 'zero-payable':return ['本单无需优惠','本单应付 0 元，系统对免费单不接受核销，你的权益不会被扣。'];
+  default:return ['本单暂无可使用优惠券','优惠券功能尚未接通：系统还没有下发券面值与适用范围，本机不替你预判，也不试算抵扣。'];
  }
 }
 function couponRight(k){
@@ -939,7 +940,7 @@ function couponBlock(){
 }
 function benefitCard(warn){
  return '<div class="benefit'+(warn?' warn':'')+'"><span class="b-ic">'+svg('gift','currentColor',24)+'</span>'+
-  '<span class="b-m"><b>'+(warn?'演示：权益没能核销的版面':'会员权益')+'</b><span>'+(warn?'这一屏演示的是核销没通过时该怎么显示。本屏没有查过、也没有核销过任何权益，屏幕上的结果不代表你的权益真实状态。':'登录后由服务端核销。核销结果没回来之前，按原价显示。')+'</span></span></div>';
+  '<span class="b-m"><b>'+(warn?'演示：权益没能核销的版面':'会员权益')+'</b><span>'+(warn?'这一屏演示的是核销没通过时该怎么显示。本屏没有查过、也没有核销过任何权益，屏幕上的结果不代表你的权益真实状态。':'登录后由系统核销。核销结果没回来之前，按原价显示。')+'</span></span></div>';
 }
 var ARROW='<span class="ar">'+svg('chev','currentColor',20)+'</span>';
 function flow(steps){
@@ -964,7 +965,7 @@ function confirmBlock(opt){
   (opt.reason?'<div class="cfm-reason" data-testid="'+SCREEN+'-disabled-reason">'+opt.reason+'</div>':'')+
   '<div class="cfm-act">'+ghost+prim+'</div>'+document.getElementById('qx2-confirm-actions').innerHTML+'</div>';
 }
-/* 01 区右上角的来源提示：把「这一份是哪来的、是不是登记夹具」写在标题行，不额外占一行高度。 */
+/* 01 区右上角的来源提示：把「这一份是哪来的、是不是登记示例」写在标题行，不额外占一行高度。 */
 function fixtureHint(extra){
  var from=CTX.ok&&CTX.handoff?('来自'+DOC.sourceLabel):'打印台默认文档';
  return '示例文件 · 核对内容与参数';
@@ -1000,13 +1001,13 @@ V['missing-context']=function(){
   '<div class="pgrp" style="margin-top:16px"><h4>常见的三种情况</h4><ul class="plan">'+
   '<li><span class="sq"></span><span>从旧链接或收藏夹直接打开这一页，中间那几步没走。</span></li>'+
   '<li><span class="sq"></span><span>上一趟已经办完，这台机器把上一位用户的文件和参数清掉了。</span></li>'+
-  '<li><span class="sq"></span><span>离开太久，本机按公共终端规则清了会话，需要重新开始。</span></li></ul></div>')+
+  '<li><span class="sq"></span><span>离开太久，本机按公共终端规则清了这次办理，需要重新开始。</span></li></ul></div>')+
   sec('02','重新走一遍要准备什么','回上一步就能补齐',
   '<div class="grid2">'+
   '<div class="pgrp"><h4>需要的两样上下文</h4><ul class="plan">'+
   '<li><span class="sq"></span><span>要打印的文件：本机上传、手机传来或扫描生成都行。</span></li>'+
   '<li><span class="sq"></span><span>这一份的打印参数：纸张、页面方向、颜色、单双面、版式、缩放、页范围和份数。</span></li>'+
-  '<li><span class="sq"></span><span>两样齐了才能向服务端要这一单的正式报价。</span></li></ul></div>'+
+  '<li><span class="sq"></span><span>两样齐了才能向系统要这一单的正式报价。</span></li></ul></div>'+
   '<div class="pgrp"><h4>回去重走不会重复收费</h4>'+
   '<div class="state-p">刚才这一趟<b>没有创建订单，也没有扣款</b>，所以重新选文件不会产生第二笔费用。</div>'+
   '<div class="state-p">想核对以前的单子，可以去「我的打印订单」按订单号查。</div></div></div>')+
@@ -1030,7 +1031,7 @@ V['invalid-context']=function(){
   '<div class="meta"><span class="chip">未建单</span><span class="chip">未扣费</span><span class="chip">没有金额可显示</span><span class="chip">没有文件信息可显示</span></div></div>'+
   '<div class="pgrp" style="margin-top:16px"><h4>本页登记了哪几种进来的方式</h4><ul class="plan">'+
   registeredList()+
-  '<li><span class="sq"></span><span>不带交接参数进来：直接停在空态；打印台默认文档只在演示里当排版夹具，没有登记编号与大小。</span></li>'+
+  '<li><span class="sq"></span><span>不带交接参数进来：直接停在空态；打印台默认文档只在演示里当排版示例，没有登记编号与大小。</span></li>'+
   '<li><span class="sq"></span><span>其余取值一律停在这一屏。</span></li></ul></div>')+
   sec('02','这一趟没有发生什么','停在这里只花时间，不花钱',
   '<div class="grid2">'+
@@ -1069,16 +1070,16 @@ V['quoting']=function(){
 V['quoted']=function(){
  var sheetOpen=couponSheetOpen();
  return sec('01','核对打印内容',fixtureHint('合成排版演示'),reviewCard('quoted'))+
-  sec('02','费用明细','演示排版 · 屏上金额是写死的夹具',
+  sec('02','费用明细','演示排版 · 屏上金额是写死的示例',
    '<div data-evidence-fixture="synthetic">'+
-   feeBlock(amountCard(mainAmount(),'演示金额（不是报价）','这个数字是本页写死的<b>排版夹具</b>，不是服务端报价。本屏不会建单，也不会进入付款。',true),
-    [['计费页数',DOC.pages+' 页（夹具）',true],['计价来源','排版夹具，未向服务端要过价',true],
+   feeBlock(amountCard(mainAmount(),'演示金额（不是报价）','这个数字是本页写死的<b>排版示例</b>，不是下一步的实际价格。本屏不会建单，也不会进入付款。',true),
+    [['计费页数',DOC.pages+' 页（示例）',true],['计价来源','排版示例，未向系统要过价',true],
      /* 选中券时把原价与抵扣拆开摆明细，主金额只显示实付 —— 三个数同源于 COUPON_FIXTURE。 */
-     ['原价',fxYuan(COUPON_FIXTURE.originalAmountCents)+'（夹具）',true],
+     ['原价',fxYuan(COUPON_FIXTURE.originalAmountCents)+'（示例）',true],
      (COUPON==='selected'
-      ? ['优惠券抵扣','−'+fxYuan(COUPON_FIXTURE.discountCents)+'（设计态夹具，非真实优惠）',true]
+      ? ['优惠券抵扣','−'+fxYuan(COUPON_FIXTURE.discountCents)+'（设计态示例，非真实优惠）',true]
       : ['单价','演示中不显示',true]),
-     ['小计',mainAmount()+'（夹具）',true]])+'</div>'+
+     ['小计',mainAmount()+'（示例）',true]])+'</div>'+
    '<div style="margin-top:16px">'+couponBlock()+'</div>',
    /* 券折叠行挂上来之后，这一屏放不下「计费口径 + 会员权益」那排次要卡片：
       收起态它把 sec03 的两个按钮顶到事实说明条下面，展开态更是直接挤掉确认按钮。
@@ -1094,8 +1095,8 @@ V['quoted']=function(){
      面板收起后 sec03 原样恢复，一个字都不改。 */
   (sheetOpen?'':sec('03','确认并付款','演示排版 · 这一步点不动',confirmBlock({
    tone:'warn',
-   note:'真实链路里，确认后会创建订单并进入付款，<b>付款完成后才开始打印</b>。<b>本屏是排版演示，这一步点不动。</b>',
-   reason:'合成排版演示 —— 屏上金额不是服务端报价，本屏不能建单，也不会进入付款',
+   note:'真实步骤里，确认后会创建订单并进入付款，<b>付款完成后才开始打印</b>。<b>本屏是排版演示，这一步点不动。</b>',
+   reason:'合成排版演示 —— 屏上金额不是下一步的实际价格，本屏不能建单，也不会进入付款',
    secondary:backSecondary(),
    primary:{label:'确认并去付款（演示中不可点）'}}),'last'));
 };
@@ -1106,14 +1107,14 @@ V['quote-failed']=function(){
     [['计费页数','未获取',true],['计价来源','未获取',true],['权益抵扣','未获取',true],['小计','无法显示',true]])+
    '<div class="grid2" style="margin-top:16px">'+
    '<div class="pgrp"><h4>可能的原因</h4><ul class="plan">'+
-   '<li><span class="sq"></span><span>本机与服务端之间网络中断。</span></li>'+
-   '<li><span class="sq"></span><span>参数里有本机没验过的项，服务端直接拒绝报价。</span></li></ul></div>'+
+   '<li><span class="sq"></span><span>本机与系统之间网络中断。</span></li>'+
+   '<li><span class="sq"></span><span>参数里有本机暂未开通的项，系统直接拒绝报价。</span></li></ul></div>'+
    '<div class="pgrp"><h4>这一趟保留了什么</h4>'+
    '<div class="state-p">文件、参数和这一步的上下文都还在。<b>本次没有创建订单，也不会扣款。</b></div>'+
    '<div class="meta"><span class="chip">未建单</span><span class="chip">未扣费</span><span class="chip">文件与参数保留</span></div></div></div>')+
   sec('03','现在可以怎么办','重试或改参数',confirmBlock({
    tone:'error',
-   note:'重新报价只是再问服务端一次，<b>不会重复建单，也不会重复扣款</b>。改过参数之后同样要重新报价。',
+   note:'重新报价只是再问系统一次，<b>不会重复建单，也不会重复扣款</b>。改过参数之后同样要重新报价。',
    secondary:backSecondary(),
    primary:{href:selfPage('quoting'),route:'/print/confirm',label:'重新报价'}}),'last');
 };
@@ -1124,57 +1125,57 @@ V['capability-invalid-params']=function(){
  if(p.duplexOff)rows.push(['单双面',DUPLEX_LABEL[p.duplex]+' · 暂不可用']);
  rows.push(['计价来源','未出报价',true]);rows.push(['小计','无法显示',true]);
  return sec('01','核对打印内容',p.demo?'演示：按登记的越界取值展示拦截':'标红的项本机暂不可用',reviewCard('capability-invalid-params'))+
-  sec('02','费用明细','参数不可用时服务端不出报价',
+  sec('02','费用明细','参数不可用时系统不出报价',
    feeBlock(amountCard('金额暂不可用','本次应付','当前参数不可用，请修改后重新获取报价。'),rows)+
    '<div class="grid2" style="margin-top:16px">'+
    '<div class="pgrp"><h4>为什么'+(p.colorOff&&p.duplexOff?'这两项':'这一项')+'被挡下</h4>'+
-   (p.colorOff?'<div class="reason">本机彩色打印尚未通过真机验证，暂不能按彩色下单</div>':'')+
-   (p.duplexOff?'<div class="reason">本机长边双面尚未通过真机验证，暂不能按双面下单；短边双面同样必须以终端能力返回为准</div>':'')+'</div>'+
+   (p.colorOff?'<div class="reason">本机彩色打印本机暂未开通，暂不能按彩色下单</div>':'')+
+   (p.duplexOff?'<div class="reason">本机长边双面本机暂未开通，暂不能按双面下单；短边双面同样必须以终端能力返回为准</div>':'')+'</div>'+
    '<div class="pgrp"><h4>'+DOC.fixTitle+'</h4>'+
    '<div class="state-p">'+DOC.fixNote+'</div>'+
    '<div class="meta"><span class="chip">未建单</span><span class="chip">未扣费</span><span class="chip warn">回到黑白单面可继续</span></div></div></div>')+
   sec('03','确认并付款','参数修改后才可继续',confirmBlock({
    tone:'warn',
-   note:'当前参数被服务端按本机能力登记拒绝，<b>这一页拿不到金额，也不会创建订单</b>。',
+   note:'当前参数被系统按本机能力登记拒绝，<b>这一页拿不到金额，也不会创建订单</b>。',
    reason:'参数回到黑白单面再报价，才能确认这一单',
    secondary:backSecondary(DOC.changeLabel),
    primary:{label:'参数回到黑白单面后可确认'}}),'last');
 };
 /* 只在 ?debug=1 下可达：演示「核销没通过就按原价显示」的排版。本屏没有查过权益，
-   所以既不说「服务端返回核销未通过」，也不给一个能按原价付款的按钮。
+   所以既不说「结果说抵扣没通过」，也不给一个能按原价付款的按钮。
    「去我的权益」保留可点 —— 它只是去看权益状态，既不建单也不付款。 */
 V['benefit-unverified']=function(){
  return sec('01','核对打印内容',fixtureHint('合成排版演示'),reviewCard('benefit-unverified'))+
   sec('02','费用明细','演示排版 · 按原价显示的版面',
    '<div data-evidence-fixture="synthetic">'+
-   feeBlock(amountCard('2.00','演示金额（不是报价）','这个数字是本页写死的<b>排版夹具</b>，不是服务端报价。本屏没有做过权益核销，也不能建单。',true),
-    [['计费页数',DOC.pages+' 页（夹具）',true],['计价来源','排版夹具，未向服务端要过价',true],['权益抵扣','本屏没有核销过',true],['小计','2.00（夹具）',true]])+'</div>'+
+   feeBlock(amountCard('2.00','演示金额（不是报价）','这个数字是本页写死的<b>排版示例</b>，不是下一步的实际价格。本屏没有做过权益核销，也不能建单。',true),
+    [['计费页数',DOC.pages+' 页（示例）',true],['计价来源','排版示例，未向系统要过价',true],['权益抵扣','本屏没有核销过',true],['小计','2.00（示例）',true]])+'</div>'+
    '<div class="grid2" style="margin-top:16px">'+benefitCard(true)+
    '<div class="pgrp" data-disclaimer="true"><h4>为什么不先按抵扣后的价显示</h4>'+
-   '<div class="state-p">真实链路里核销没通过时，本机<b>不会先按抵扣后的价格显示给你看</b> —— 免得你以为便宜了才下单，付款时又变回原价。</div></div></div>')+
+   '<div class="state-p">真实步骤里核销没通过时，本机<b>不会先按抵扣后的价格显示给你看</b> —— 免得你以为便宜了才下单，付款时又变回原价。</div></div></div>')+
   sec('03','确认并付款','演示排版 · 这一步点不动',confirmBlock({
    tone:'warn',
-   note:'真实链路里可以<b>按实际原价</b>继续付款。<b>本屏是排版演示，这一步点不动。</b>',
-   reason:'合成排版演示 —— 本屏没有核销结果，屏上金额也不是服务端报价，不能建单',
+   note:'真实步骤里可以<b>按实际原价</b>继续付款。<b>本屏是排版演示，这一步点不动。</b>',
+   reason:'合成排版演示 —— 本屏没有核销结果，屏上金额也不是下一步的实际价格，不能建单',
    secondary:{href:'../kiosk-redesign-2026-08/31-benefits.html',route:'/me/benefits',label:'去我的权益',testid:'print-confirm-benefits'},
    primary:{label:'按实际原价继续（演示中不可点）'}}),'last');
 };
-/* 只在 ?debug=1 下可达：演示零金额那一屏的版面。屏上的 0 是写死的夹具，
-   不是服务端返回的零金额结果 —— 所以这里既不建单，也不释放任何打印任务。 */
+/* 只在 ?debug=1 下可达：演示零金额那一屏的版面。屏上的 0 是写死的示例，
+   不是实际给出的零金额结果 —— 所以这里既不建单，也不释放任何打印任务。 */
 V['zero-amount']=function(){
  return sec('01','核对打印内容',fixtureHint('合成排版演示'),reviewCard('zero-amount'))+
   sec('02','费用明细','演示排版 · 零金额的版面',
    '<div data-evidence-fixture="synthetic">'+
-   feeBlock(amountCard('0.00','演示金额（不是报价）','屏上这个 0 是本页写死的<b>排版夹具</b>，不是服务端返回的零金额结果。本屏不会建单，也不会释放打印。',true),
-    [['计费页数','演示中不显示',true],['计价来源','排版夹具，未向服务端要过价',true],['明细','演示：零金额的版面',true],['小计','0.00（夹具）',true]])+'</div>'+
+   feeBlock(amountCard('0.00','演示金额（不是报价）','屏上这个 0 是本页写死的<b>排版示例</b>，不是实际给出的零金额结果。本屏不会建单，也不会释放打印。',true),
+    [['计费页数','演示中不显示',true],['计价来源','排版示例，未向系统要过价',true],['明细','演示：零金额的版面',true],['小计','0.00（示例）',true]])+'</div>'+
    '<div style="margin-top:16px">'+couponBlock()+'</div>'+
    '<div class="grid2" style="margin-top:16px">'+pageSrcCard()+
    '<div class="pgrp" data-testid="'+SCREEN+'-fallback"><h4>零元单也要先建单</h4>'+
-   '<div class="state-p">真实链路里确认后仍会建单再释放打印，<b>不存在「不建单直接出纸」的路径</b>。本屏是排版演示，不建单。</div></div></div>')+
+   '<div class="state-p">真实步骤里确认后仍会建单再释放打印，<b>不存在「不建单直接出纸」的路径</b>。本屏是排版演示，不建单。</div></div></div>')+
   sec('03','确认并建单','演示排版 · 这一步点不动',confirmBlock({
    tone:'warn',
-   note:'真实链路里金额为 0 时，<b>确认后仍会创建打印订单</b>，再直接进入打印流程。<b>本屏是排版演示，这一步点不动。</b>',
-   reason:'合成排版演示 —— 屏上的 0 不是服务端结果，本屏不会建单，也不会释放打印',
+   note:'真实步骤里金额为 0 时，<b>确认后仍会创建打印订单</b>，再直接进入打印流程。<b>本屏是排版演示，这一步点不动。</b>',
+   reason:'合成排版演示 —— 屏上的 0 不是系统结果，本屏不会建单，也不会释放打印',
    secondary:backSecondary(),
    primary:{label:'确认并建单（演示中不可点）'}}),'last');
 };
@@ -1192,11 +1193,11 @@ var ASK={
  'missing-context':['这一页<em>没有任务</em>。','没有选好的文件和参数，我没法要价。回上一步重新走一遍。'],
  'invalid-context':['这一单<em>没法确认</em>。','交接内容没通过登记核对：我不猜是哪一份文件，也不会退回默认那一份。'],
  'quoting':['先看<em>价格</em>，再决定。','核对打印内容与费用，确认后再付款、领取打印件。'],
- 'quoted':['这一屏是<em>排版演示</em>。','屏幕上的金额是写死的夹具，不是服务端报价；这里不能建单，也不会进入付款。'],
+ 'quoted':['这一屏是<em>排版演示</em>。','屏幕上的金额是写死的示例，不是下一步的实际价格；这里不能建单，也不会进入付款。'],
  'quote-failed':['暂时<em>无法获取报价</em>。','文件和参数已保留，本次没有创建订单。'],
  'capability-invalid-params':['这些参数<em>暂不可用</em>。','请改为黑白、单面后重新获取报价。'],
- 'benefit-unverified':['这一屏演示<em>权益没抵扣</em>时的版面。','本屏没有核销过任何权益，屏上金额也不是服务端报价，这里不能建单。'],
- 'zero-amount':['这一屏是<em>零金额排版演示</em>。','屏幕上的 0 是写死的夹具，不是服务端返回的结果；本屏不会建单。']
+ 'benefit-unverified':['这一屏演示<em>权益没抵扣</em>时的版面。','本屏没有核销过任何权益，屏上金额也不是下一步的实际价格，这里不能建单。'],
+ 'zero-amount':['这一屏是<em>零金额排版演示</em>。','屏幕上的 0 是写死的示例，不是实际给出的结果；本屏不会建单。']
 };
 function render(st){
  var root=document.getElementById('body-root');
@@ -1223,7 +1224,7 @@ function render(st){
 /* 版面自检：只读几何，只挂一个收紧档。invalid-context 的失败理由长短不一，默认留白
    放不下最长那条时，行动卡会压到底部说明条上。这里量的是「行动区连同它的下边距是否
    还在正文框里」，超了就收一档留白（见样式表末尾的 fit-compact）。
-   不改 data-state、不改文案、不碰交接核对与报价链路，其余状态一律原样。 */
+   不改 data-state、不改文案、不碰交接核对与报价步骤，其余状态一律原样。 */
 function fitBody(st){
  var root=document.getElementById('body-root');
  root.classList.remove('fit-compact');

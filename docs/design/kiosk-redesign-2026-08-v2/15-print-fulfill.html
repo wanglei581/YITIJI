@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<!-- 青序流光 2.0 · 出纸页：只改字阶（规则 2）与两句断行；英文眉题改「出纸 · 取件」；去掉「服务端」一词（规则 4）。版式不动。
+<!--
+- 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
+-->
+<!-- 青序流光 2.0 · 出纸页：只改字阶（规则 2）与两句断行；英文眉题改「出纸 · 取件」；去掉「系统」一词（规则 4）。版式不动。
      原稿：../kiosk-redesign-2026-08/15-print-fulfill.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
 <html lang="zh-CN">
 <head>
@@ -13,8 +16,8 @@
          paid-no-output | client-status-timeout | result-unconfirmed | refund-info
   api: GET /print/jobs/:taskId（轮询 3 秒，Agent 硬件回流为唯一进度真值）
        页数仅当真实 file.pages / billablePages 存在时展示「共 N 页」，无字段只显示「正在打印」
-       client-status-timeout = 前端连续查询 10 分钟无终态（仅前端表现层，不改服务端状态）
-       result-unconfirmed   = 服务端返回 failed + errorCode=PRINT_JOB_UNCONFIRMED
+       client-status-timeout = 前端连续查询 10 分钟无终态（仅前端表现层，不改系统状态）
+       result-unconfirmed   = 结果是 failed + errorCode=PRINT_JOB_UNCONFIRMED
        取件码仅在接口真实返回时展示；「再印一份」必须重新核价（orders/quote）
   fallback: 任何异常态保留「联系工作人员/报障」实体出口（≥56px）
   原型演示控制：本页状态仅通过 ?state= 切换，标注「原型演示控制」，不含生产业务逻辑
@@ -372,12 +375,12 @@ document.getElementById('demo-tab').onclick=function(){document.getElementById('
    以下取值只服务 ?state= 演示，不是生产默认值，也不是接口失败时的回退值。
    生产环境全部字段来自 GET /print/jobs/:taskId 与 orders 域真实响应。 */
 var DEMO_DATA={
-  order:{amountYuan:'¥3.50',amountCents:350,no:'DEMO-20260824-001'},
+  order:{amountYuan:'¥3.50',amountCents:350,no:'示例-20260824-001'},
   jobs:[
     {name:'简历_2026.pdf',sub:'A4 单面 · 普通纸 · 2 页 × 1 份',pages:2,ico:'doc',tone:'teal'},
     {name:'身份证 · 已加水印',sub:'1:1 居中 · A4 · 1 页 × 1 份 · 「仅供求职使用」',pages:1,ico:'id',tone:'clay'}
   ],
-  totalPages:3,        // 演示用：服务端 file.pages 之和；无该字段时界面只显示「正在打印」
+  totalPages:3,        // 演示用：系统 file.pages 之和；无该字段时界面只显示「正在打印」
   pickupCode:'48291637'  // 演示用：仅当 /print/jobs/:taskId 返回取件码字段时才渲染
 };
 var ORDER=DEMO_DATA.order, JOBS=DEMO_DATA.jobs, TOTAL_PAGES=DEMO_DATA.totalPages, PICKUP_CODE=DEMO_DATA.pickupCode;
@@ -476,7 +479,7 @@ function rPrinting(){
     '<div class="out-sub">纸从<b>屏幕正下方出纸口</b>出来，可以出来一张拿一张。<br>页数按这份文件计算，不逐页播报。</div></div></div></div>'+
   '<div class="sec"><div class="sec-label"><span class="t">你的文件，走完就清</span></div>'+
     '<div class="wipe-card idle"><div class="wipe-main"><div class="wipe-title">'+ICO.shield+'打印期间不会清空</div>'+
-    '<div class="wipe-sub">全部打完、你拿走之后，才开始会话清空计时。倒计时不是催你走，你可以核对完再离开。</div></div></div></div>'+
+    '<div class="wipe-sub">全部打完、你拿走之后，才开始这次办理清空计时。倒计时不是催你走，你可以核对完再离开。</div></div></div></div>'+
   helpStrip('卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。',true)+
   endBar('<a class="end-btn again m-press" href="12-file-source.html" data-route="/print/upload" data-testid="print-fulfill-reprint">再印一份<small>重新选文件、核价并支付 · 不免费</small></a>'+
          '<button type="button" class="end-btn finish off" disabled aria-disabled="true">还在打印，完成后才能结束清空</button>');
@@ -573,7 +576,7 @@ function rFault(cfg){
          '<a class="end-btn staff m-press" href="06-help.html" data-testid="'+SCREEN+'-primary">联系工作人员处理<em>→</em></a>');
 }
 
-/* ---- 状态：client-status-timeout 查询超时（前端判定，不改服务端） ---- */
+/* ---- 状态：client-status-timeout 查询超时（前端判定，不改系统） ---- */
 function rTimeout(){
   mark('client-status-timeout');
   setPill('warn','已付 '+ORDER.amountYuan+' · 状态查询中');
@@ -584,18 +587,18 @@ function rTimeout(){
   taskArea('这一单现在的状态','本机连续查询 10 分钟没有拿到最终结果',
     jobRow(JOBS[0],'状态查询中','wait')+jobRow(JOBS[1],'状态查询中','wait'),
     inbar('wheat',ICO.warn,'状态暂未确认，请联系工作人员','本机连续查询 10 分钟没有拿到最终结果',
-      '这只是<b>查询超时</b>：服务端的打印任务状态<b>没有被改变</b>，我们不会猜它成功或失败。可以先重新查询，或直接找工作人员现场确认。',
+      '这只是<b>查询超时</b>：系统的打印任务状态<b>没有被改变</b>，我们不会猜它成功或失败。可以先重新查询，或直接找工作人员现场确认。',
       '','',SCREEN+'-fallback')+
     moneyBar('这次到底出没出纸、要不要补打或退费，<b>都等工作人员现场核查</b>。'))+
   stepsCard('这一刻你可以做的三件','赶时间就直接找人',
     ['看一眼出纸口：<b>已经出来的纸先取走收好</b>，它和这次查询结果无关。',
-     '点右下角<b>重新查询状态</b>，这只是再问服务端一次，不会重下单、不会重复扣费。',
+     '点右下角<b>重新查询状态</b>，这只是再问系统一次，不会重下单、不会重复扣费。',
      '还是查不到就把<b>订单号 '+ORDER.no+'</b> 告诉工作人员，后台能直接查这台机器。'])+
   endBar('<a class="end-btn ghost m-press" href="?state=printing" data-testid="'+SCREEN+'-primary">重新查询状态</a>'+
          '<a class="end-btn staff m-press" href="06-help.html">联系工作人员<em>→</em></a>');
 }
 
-/* ---- 状态：result-unconfirmed 结果未确认（服务端已登记） ---- */
+/* ---- 状态：result-unconfirmed 结果未确认（系统已登记） ---- */
 function rUnconfirmed(){
   mark('result-unconfirmed');
   setPill('bad','已付 '+ORDER.amountYuan+' · 结果未确认');
@@ -603,9 +606,9 @@ function rUnconfirmed(){
   doing.innerHTML='系统已经正式登记，工作人员核查后给出结论，不会让你自认倒霉。';
   root.style.justifyContent='space-between';
   root.innerHTML=
-  taskArea('这一单现在的状态','服务端已明确登记，等待人工核查',
+  taskArea('这一单现在的状态','系统已明确登记，等待人工核查',
     jobRow(JOBS[0],'结果未确认','wait')+jobRow(JOBS[1],'结果未确认','wait'),
-    inbar('deep',ICO.jam,'打印结果未确认','服务端已明确登记，与「查询超时」不同',
+    inbar('deep',ICO.jam,'打印结果未确认','系统已明确登记，与「查询超时」不同',
       '设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。系统不猜成功也不猜失败，已登记等待人工核查。你可以先离开，订单和登记记录都在。',
       '','errorCode = PRINT_JOB_UNCONFIRMED',SCREEN+'-fallback')+
     moneyBar('工作人员核查后会按真实结果处理：<b>补打或退款</b>。'))+

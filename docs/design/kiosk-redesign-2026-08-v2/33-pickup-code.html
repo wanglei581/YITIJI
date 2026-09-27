@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 保留原取件码与键盘结构，输入区下移；底部补上一步和取件 AI 帮助（规则 1、7）。
@@ -7,7 +8,7 @@
 - 删除自动填码和自动成功计时器；核对按钮只检查位数并提示尚未核验，不伪造出纸订单（规则 5）。
 - 页标题补回宋体，扫码区公文包图标改成线性扫码图标（规则 2、6）。
 - 收尾明确领取打印件，有效期只认手机订单，删除固定 24 小时承诺（规则 3、4）。
-- AI 帮助采用原顾问页支持的 composer 与会话草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 -->
 <html lang="zh-CN">
 <head>
@@ -224,7 +225,7 @@ a{color:inherit;text-decoration:none}.xq{height:250px;padding:24px 40px}.xq-row{
     <div class="xq-row">
       <div class="xq-face serif">青</div>
       <div class="xq-main">
-        <div class="xq-eyebrow">PICKUP CODE</div>
+        <div class="xq-eyebrow">取件码</div>
         <div class="xq-ask serif">输入取件码，<em>领取打印件</em>。</div>
         <div class="xq-doing">在手机订单里找到 8 位取件码，<b>输好后核对</b>。领取时请确认文件和页数。</div>
       </div>
@@ -363,7 +364,7 @@ var demoCode='48291637';   // 8 位纯数字，与 2026-08-18 方案 A 及后端
 
 // 2.0：不自动填码，不用计时器生成核销或打印结果。
 
-// 键盘输入 —— 只负责把数字填进格子；是否核销由服务端返回决定，本页不伪造结果。
+// 键盘输入 —— 只负责把数字填进格子；是否核销以实际结果为准决定，本页不伪造结果。
 function pressDigit(d){
   if(currentIdx>=cells.length) return;
   cells[currentIdx].textContent=d;
