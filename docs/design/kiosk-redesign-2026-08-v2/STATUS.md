@@ -18,7 +18,11 @@
 | 23-resume-optimize | Codex | 通过 | `capture=1&state=ready&screen=compare&taskId=qx2-example&i=1` | |
 | 24-resume-generate | Codex | 通过（一轮返工） | `capture=1&state=review` | |
 | 25-material-workshop | Codex | 通过（两轮返工） | `capture=1&state=select&auth=out` | 「生成后 1→2→3」条放在标题下，顶部只读 |
-| 02、03、05、06、16、29、30、32、45、48 | Grok | 进行中 | | |
+| 02-services | Grok | 通过 | `capture=1` | |
+| 05-ai-cockpit | Grok | 通过 | `capture=1&state=reply-real` | |
+| 29-interview-training | Grok | 通过 | `capture=1&state=report-ready` | |
+| 30-my-profile | Grok | 通过 | `capture=1&state=ready` | |
+| 03、06、16、32、45、48 | Grok | 返工中 | | 协调方复拍后退回：03 少两行内容、06 裁切与折行、16 误删「简历对照」AI 卡、32/45/48 留白超过 120px |
 | 其余 | 未开始 | | | 托管 a 下 26、27、28、42、43、44（岗位、招聘会、企业）在我们云上不显示，不做 2.0 |
 
 没有列在这里的页面以原稿目录为准。
