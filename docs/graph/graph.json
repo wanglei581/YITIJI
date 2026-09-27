@@ -12483,7 +12483,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 576,
+      "reachableFileCount": 577,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15454,7 +15454,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 655
+      "sourceFileCount": 656
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17958,6 +17958,9 @@
     ],
     "apps/kiosk/src/components/KioskFeedbackDialog.tsx": [
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs"
+    ],
+    "apps/kiosk/src/components/PdfCanvasPreview.tsx": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/components/hid-guard/KioskHidScanGuard.tsx": [
       "apps/kiosk/scripts/verify-scan-input-safety.mjs"
@@ -27266,6 +27269,7 @@
           "apps"
         ],
         "files": [
+          "apps/kiosk/src/components/PdfCanvasPreview.tsx",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/print/PdfPreviewFrame.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
