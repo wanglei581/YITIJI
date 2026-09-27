@@ -15,7 +15,7 @@
   五个语音态的面板另带 data-screen="ai-cockpit-voice"，便于与文字态分开断言。
 
   真实性合同（对齐 pages/assistant/advisorProvider.ts）：
-    · 只有 providerLabel 以 `llm:` 开头 **且** aiGenerated===true，才允许把正文当 AI 回答渲染；
+    · 只有 服务来源 以 `llm:` 开头 **且** 是否由 AI 写出===true，才允许把正文当 AI 回答渲染；
       任一缺失一律 fail-closed 走 reply-not-ai，后端预置话术**不进 UI、不进 state**。
     · reply-real 是**布局示例 / 合成数据**，正文为排版占位，页面上持续标记，不得读作模型输出。
     · submitting 只表达「请求在飞」：无百分比、无阶段点、无预计时间（MOTION-SPEC M2）。
@@ -439,7 +439,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 <!--
 青序流光 2.0 · 05 AI 顾问（state=reply-real，回答区有内容）
 规则 2：辅助文字提到 20–22，卡片标题 28，导航 21；页标题保持 36 上下。
-规则 4：去掉驾驶舱英文、路径、providerLabel、llm、原型、白名单。
+规则 4：去掉驾驶舱英文、路径、服务来源、llm、原型、白名单。
 规则 5：能力带里的岗位推荐 / 招聘会拜访改为职业规划等本机能力，不放招聘入口。
 规则 5 / 7：排版占位不贴「AI 生成 · 供参考」；文案写明真接到模型才会贴。
 未改：颜色令牌、圆角、三 Tab、回答区在上、输入在下。
@@ -508,7 +508,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
       <h1 class="ck-title serif" id="ck-title">你想解决什么？</h1>
       <p class="ck-copy" id="ck-copy">选一件事，或直接点常见问题；不打字也能用。</p>
     </div>
-    <div class="ck-tel" id="ck-tel" aria-label="会话状态读数"></div>
+    <div class="ck-tel" id="ck-tel" aria-label="这次咨询的状态"></div>
     <div class="rail" id="rail" aria-label="本机 AI 能力状态"><span class="sweep" id="sweep" aria-hidden="true"></span></div>
   </section>
 
@@ -612,7 +612,7 @@ var HERO={
  'composer':['这条问题<em>还没有发出</em>。','可以接着改，也可以换一条再发。'],
  'submitting':['已发出，<em>等服务返回</em>。','不显示百分比和阶段，只等真实结果。'],
  'reply-real':['这是回答区的<em>排版示例</em>。','正文是合成文本，不是模型输出。'],
- 'reply-not-ai':['这一轮<em>不是 AI 生成</em>。','服务标识不带 llm: 前缀，正文不展示。'],
+ 'reply-not-ai':['这一轮<em>不是 AI 生成</em>。','这次不是模型写出的，正文不展示。'],
  'reply-error':['这一轮<em>没连上</em>。','可以重试，也可以直接走下面四个入口。'],
  'ai-unavailable':['AI 顾问<em>暂不可用</em>。','四个入口不经过 AI，照常能办。'],
  'voice-gate':['语音<em>默认关闭</em>。','按下开启之前，本页不申请麦克风。'],
@@ -637,7 +637,7 @@ var PILL={
 };
 var TEL={
  'default':['未请求','默认关闭'],'composer':['未请求','默认关闭'],'submitting':['等待返回','默认关闭'],
- 'reply-real':['示例 · 无标识','默认关闭'],'reply-not-ai':['非 llm: 前缀','默认关闭'],
+ 'reply-real':['排版样子','默认关闭'],'reply-not-ai':['不是模型写出','默认关闭'],
  'reply-error':['本轮失败','默认关闭'],'ai-unavailable':['未接真实模型','默认关闭'],
  'voice-gate':['未请求','等待你开启'],'voice-connecting':['未请求','尝试建立中'],
  'voice-live':['未请求','示例 · 未接通'],'mic-denied':['未请求','权限被拒'],
@@ -744,7 +744,7 @@ V['composer']=function(){
  return '<section class="sec">'+head('01','这条还没发出','改完按右下角发送')+chipRow()
   +'<div class="state"><div class="state-h">'+svg('edit','currentColor',26)+(d?'将要发送的内容':'输入框还是空的')+'</div>'
   +'<div class="state-p">'+(d?esc(d):'点下面的问题填进去，或者直接在输入框里打字。')+'</div>'
-  +'<div class="state-p" style="font-size:17px;color:var(--ink-3)">草稿只留在本机这次会话，离开本页即清；地址栏不会带上你输入的内容。</div></div></section>'
+  +'<div class="state-p" style="font-size:17px;color:var(--ink-3)">草稿只留在这台机器上，离开本页即清；地址栏不会带上你输入的内容。</div></div></section>'
   /* 正在写问题时不再铺降级出口：用户此刻的焦点是这一条，
      「不经过 AI 也能办」在 default 与 ai-unavailable 态给足即可。
      仪表带撑高舱面后，三个区块会在 1080x1920 上互相压叠。 */
@@ -756,9 +756,9 @@ V['submitting']=function(){
   +'<div class="wait-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>正在等待服务返回 · 没有百分比、阶段和预计时间可显示</div>'
   +'<div class="slot">回答会出现在这一区。返回之前这里保持空白，不预演内容、不逐字打字。</div>'
   +'<div class="ans-foot">'
-  +'<div class="kv2"><span>providerLabel</span><b>未取得</b></div>'
-  +'<div class="kv2"><span>aiGenerated</span><b>未取得</b></div>'
-  +'<p class="gate">返回后先过双门禁：providerLabel 以 <code>llm:</code> 开头 <b>且</b> aiGenerated=true 才渲染正文，否则如实说明并不展示。</p>'
+  +'<div class="kv2"><span>服务来源</span><b>未取得</b></div>'
+  +'<div class="kv2"><span>是否由 AI 写出</span><b>未取得</b></div>'
+  +'<p class="gate">结果回来之后，要同时确认接到了模型、并且正文是 AI 写的，才会显示回答。缺任何一项，就说明原因，不拿别的话顶上。</p>'
   +'</div></div></section>'
   +railSec('02');
 };
@@ -788,10 +788,10 @@ V['reply-real']=function(){
 V['reply-not-ai']=function(){
  return '<section class="sec">'+head('01','这一轮不是 AI 生成','正文不予展示')+askBubble()
   +'<div class="state fit" data-kind="warn" style="margin-top:14px" data-testid="cockpit-not-ai">'
-  +'<div class="state-h">'+svg('alert','currentColor',26)+'服务标识不带 llm: 前缀</div>'
+  +'<div class="state-h">'+svg('alert','currentColor',26)+'这次不是模型写出的</div>'
   +'<div class="state-p">后端这次返回的是<b>未接模型时的预置话术</b>。页面不会拿它冒充 AI 回答，所以正文一个字都不显示。</div>'
-  +'<div class="kvrow"><div class="kv2"><span>providerLabel</span><b>mock（示例取值）</b></div>'
-  +'<div class="kv2"><span>aiGenerated</span><b>false</b></div></div>'
+  +'<div class="kvrow"><div class="kv2"><span>服务来源</span><b>还没接到模型</b></div>'
+  +'<div class="kv2"><span>是否由 AI 写出</span><b>不是</b></div></div>'
   +'<p class="gate">双门禁任一不满足即走本状态；同一轮返回里的建议动作也一并丢弃，不当作「AI 建议的下一步」。</p>'
   +'<div class="acts"><button type="button" class="act press" data-act="recheck">'+svg('refresh','currentColor',22)+'重新检查 AI 顾问</button>'
   +'<button type="button" class="act press" data-act="go" data-state="default">回到提问</button></div>'
@@ -826,9 +826,9 @@ V['voice-gate']=function(){
   +'<b>先由你决定要不要用麦克风</b>'
   +'<p>在你按下开启之前，本页不会请求麦克风权限，也不采集任何声音。</p></div>'
   +'<div class="twocol"><div class="mini-list"><b>按下开启后会发生</b>'
-  +'<li><i></i>浏览器弹出麦克风授权询问</li><li><i></i>向服务端申请一次语音会话</li><li><i></i>结果由真实服务返回确认</li></div>'
+  +'<li><i></i>浏览器弹出麦克风授权询问</li><li><i></i>向这台机器申请一次语音</li><li><i></i>结果由真实服务返回确认</li></div>'
   +'<div class="mini-list"><b>现在不会发生</b>'
-  +'<li><i></i>不采集声音、不加载通话 SDK</li><li><i></i>不显示转写、时长或识别结果</li><li><i></i>不把原型状态当成已接通</li></div></div>'
+  +'<li><i></i>不采集声音、不加载通话组件</li><li><i></i>不显示转写、时长或识别结果</li><li><i></i>不把这一页的样子当成已接通</li></div></div>'
   +'</div></section>'
   +railSec('02',false);
 };
@@ -837,30 +837,30 @@ V['voice-connecting']=function(){
   +'<div class="panel deep flow" data-testid="cockpit-voice-connecting">'
   +'<div class="pband"><div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>'
   +'<div><b>请求已发出，等真实服务结果</b>'
-  +'<p>能不能用由服务端返回确认。此时不显示转写、计时或任何对话内容。</p></div></div>'
+  +'<p>能不能用，等这次申请的结果。此时不显示转写、计时或任何对话内容。</p></div></div>'
   +'<div class="twocol">'
-  +miniList('这一步在等什么',['服务端下发进房凭证','通话模块加载完成','本地麦克风开启结果'])
+  +miniList('这一步在等什么',['语音通话准备好','通话模块加载完成','本地麦克风开启结果'])
   +miniList('失败会怎样',['直接说没建立，不猜原因','文字咨询照常可用','四个非 AI 入口不受影响'])
   +'</div></div></section>'
   +railFull('02','等结果的这段时间，这四项照常可用');
 };
 V['voice-live']=function(){
- return '<section class="sec grow" data-screen="ai-cockpit-voice">'+head('01','语音会话控制区','合成布局示例，未接通')
+ return '<section class="sec grow" data-screen="ai-cockpit-voice">'+head('01','语音控制区','排版样子，还没接通')
   +'<div class="panel deep" data-testid="cockpit-voice-live"><div class="pcenter" style="gap:14px">'
   +'<div class="orb syn">'+svg('wave','currentColor',52)+'</div>'
-  +'<b><span class="tag syn">合成示例</span> 真实会话建立后，这里显示通话状态</b>'
+  +'<b><span class="tag syn">合成示例</span> 真的接通之后，这里显示通话状态</b>'
   +'<p>示例静止不动：没有真实音量信号，就不做声波动画，避免看起来像正在听。</p></div>'
   +'<div class="cc" id="cc-box"'+(ccOn?'':' hidden')+'><div class="cc-h">'+svg('cc','currentColor',22)+'字幕区 · 合成示例文本，不是识别结果</div>'
   +'<p>「你可以先说要办的事，比如把简历改到一页。」</p></div>'
-  +'<div class="twocol" style="margin-top:16px"><div class="mini-list"><b>真机由什么承担</b>'
-  +'<li><i></i>TRTC 进房与音频收发</li><li><i></i>云端 ASR / LLM / TTS</li><li><i></i>离开页面即结束会话</li></div>'
+  +'<div class="twocol" style="margin-top:16px"><div class="mini-list"><b>接通之后由什么承担</b>'
+  +'<li><i></i>语音通话的收发</li><li><i></i>听写、回答和朗读</li><li><i></i>离开页面就结束通话</li></div>'
   +'<div class="mini-list"><b>本页不做</b>'
-  +'<li><i></i>不加载 SDK、不进房、不申请麦克风</li><li><i></i>不显示真实字幕、时长与音量</li><li><i></i>不声称已接通</li></div></div>'
+  +'<li><i></i>不加载通话组件、不进入通话、不申请麦克风</li><li><i></i>不显示真实字幕、时长与音量</li><li><i></i>不声称已接通</li></div></div>'
   +'</div></section>'
-  +'<section class="sec">'+head('02','下面四个控制在真机做什么','本页只切原型状态')
+  +'<section class="sec">'+head('02','下面四个控制接通后做什么','这一页先只展示样子')
   +'<div class="spec">'
   +'<div><b>字幕</b><span>开关 AI 回复字幕显示</span></div>'
-  +'<div><b>静音</b><span>关掉本地麦克风上行</span></div>'
+  +'<div><b>静音</b><span>关掉这台机器上的麦克风</span></div>'
   +'<div><b>切换文字</b><span>结束语音，回到输入框</span></div>'
   +'<div><b>结束通话</b><span>释放房间并停止计费</span></div></div></section>'
   +railSec('03',false);
@@ -897,7 +897,7 @@ function composerDock(){
  return '<label class="sr-only" for="draft">咨询内容</label>'
   +'<textarea id="draft" placeholder="'+esc(ph)+'" '+(locked?'readonly aria-disabled="true"':'')+(busy?' disabled':'')+' data-testid="cockpit-composer">'+esc(d)+'</textarea>'
   +'<div class="dock-row">'
-  +'<span class="dock-meta"><b id="count">'+n+'</b> 字 · 草稿只留在本机这次会话，离开本页即清 · 真机用屏幕拼音键盘输入</span>'
+  +'<span class="dock-meta"><b id="count">'+n+'</b> 字 · 草稿只留在这台机器上，离开本页即清 · 用屏幕键盘输入</span>'
   +'<button type="button" class="mini press" data-act="clear" data-testid="cockpit-clear">清空草稿</button>'
   +'<button type="button" class="btn ghost press" data-act="go" data-state="voice-gate" data-testid="cockpit-voice-entry">'+svg('mic','currentColor',24)+'语音咨询</button>'
   +'<button type="button" class="btn primary press" id="send" data-act="send" aria-disabled="'+(canSend?'false':'true')+'" data-testid="cockpit-send">'+svg('send','currentColor',24)+(busy?'等待返回':'发送')+'</button>'
@@ -910,12 +910,12 @@ function voiceDock(){
  if(state==='voice-gate') return '<div class="vdock">'
   +'<button type="button" class="btn primary press" data-act="go" data-state="voice-connecting" data-testid="cockpit-voice-accept">我同意，开启语音</button>'
   +'<button type="button" class="btn ghost press" data-act="go" data-state="default">继续用文字</button></div>'
-  +'<p class="dock-note"><b>说明</b><span>本原型不会真的请求麦克风；按下只切换到「尝试建立」这一态的布局。</span></p>';
+  +'<p class="dock-note"><b>说明</b><span>这一页不会真的请求麦克风；按下只是看「正在尝试」时长什么样。</span></p>';
  if(state==='voice-connecting') return '<div class="vdock">'
   +'<button type="button" class="btn ghost press" data-act="go" data-state="voice-gate">取消尝试</button>'
   +'<button type="button" class="btn ghost press" data-act="go" data-state="voice-live">看控制区示例</button>'
   +'<button type="button" class="btn primary press" data-act="go" data-state="default">回到文字</button></div>'
-  +'<p class="dock-note"><b>说明</b><span>真机在这一步等服务端结果；原型不计时、不自动跳成功。</span></p>';
+  +'<p class="dock-note"><b>说明</b><span>真的接通时，这一步要等结果；这一页不计时，也不会自己跳成成功。</span></p>';
  if(state==='voice-live') return '<div class="vdock">'
   +'<button type="button" class="btn ghost press" data-act="cc" aria-pressed="'+(ccOn?'true':'false')+'" data-testid="cockpit-cc">'+svg('cc','currentColor',24)+(ccOn?'字幕已开':'字幕已关')+'</button>'
   +'<button type="button" class="btn ghost press" data-act="mute" aria-pressed="'+(muted?'true':'false')+'" data-testid="cockpit-mute">'+svg(muted?'micoff':'mic','currentColor',24)+(muted?'已静音':'静音')+'</button>'
@@ -1041,7 +1041,7 @@ function routeTo(text){
    if(rr){
      rr.className='rail-route on';
      rr.innerHTML= usable
-      ? '这件事会交给 <b>'+CAP_NAME[key]+'</b> 处理<span class="rr-x">结果仍以服务端返回为准</span>'
+      ? '这件事会交给 <b>'+CAP_NAME[key]+'</b> 处理<span class="rr-x">以实际办理结果为准</span>'
       : '这件事对应 <b>'+CAP_NAME[key]+'</b>，但它在本机<b>暂时用不了</b><span class="rr-x">下面四条路照常可用</span>';
    }
  }

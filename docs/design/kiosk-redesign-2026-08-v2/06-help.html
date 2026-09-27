@@ -238,7 +238,7 @@ var TOPICS=[
   brief:'要不要登录、为什么会退出、怎么换账号',
   items:[
    ['一定要登录才能用吗？','不用。大部分服务可以直接办。用手机验证码登录之后，这一趟的简历记录、文档、打印订单和收藏才会归到你的账号，<b>只有本人能看到</b>。'],
-   ['为什么离开一下就变回未登录了？','这台机器是公共设备，登录态只保存在<b>当前这次会话</b>里。刷新、离开或闲置超时会退出登录并清掉会话信息，这是保护，不是故障。'],
+   ['为什么离开一下就变回未登录了？','这台机器是公共设备，登录只留在<b>当前这一次</b>。刷新、离开或放着不管，都会退出并清掉这次留下的内容。这是保护，不是故障。'],
    ['怎么换成另一个账号？','到「我的 · 账号设置」退出当前账号，再用另一个手机号登录。一次只能登一个号。']
   ],
   links:[['去登录','03-login-gate.html','lock'],['我的','30-my-profile.html','user']]},
@@ -329,7 +329,7 @@ V['default']=function(){
     topicGrid('')+'</section>'+
    selfHelp('02')+humanDesk('03'),
   cta:'<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
-   '<a class="btn ghost" href="../kiosk-redesign-2026-08/09-system-state.html" data-route="/error-offline">看设备状态</a>'+
+   '<a class="btn ghost" href="09-system-state.html" data-route="/error-offline">看设备状态</a>'+
    '<a class="btn primary" style="flex:1.4" href="05-ai-cockpit.html" data-route="/assistant" data-testid="help-primary">问小青：这里没看懂</a>'
  };
 };
@@ -386,7 +386,7 @@ V['unavailable']=function(){
   pill:['warn','帮助内容没显示出来'],
   body:'<section class="sec"><div class="state" data-kind="warn" data-testid="help-fallback">'+
     '<div class="state-h">'+svg('warn','28')+'帮助内容没显示出来</div>'+
-    '<div class="state-p">帮助条目是<b>随应用一起发布的</b>，不依赖实时接口。这里空白通常说明本机这一页没加载完整 —— 不是你操作错了，也不代表机器整体坏了。</div>'+
+    '<div class="state-p">帮助内容是<b>装在这台机器上的</b>，不用再去取一份新的。这里空白通常说明这一页没打开完整 —— 不是你操作错了，也不代表机器整体坏了。</div>'+
     '<div class="state-p">本页<b>不会自动上报这次异常</b>；要人排查请按下面第三条找现场工作人员。</div></div></section>'+
    '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">按顺序试这三条</span><span class="hint">前两条自己就能做</span></div>'+
     '<div class="grid3">'+
@@ -397,7 +397,7 @@ V['unavailable']=function(){
    '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">这不影响你办事</span><span class="hint">帮助页只是补充</span></div>'+
     '<div class="grid2">'+
     '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('file',26)+'</span>正在办的事照常</h3>'+
-    '<p>打印任务、订单和到机码都在服务端。<b>帮助页打不开不会影响它们</b>，回首页接着办即可。</p></div>'+
+    '<p>打印任务、订单和到机码都还在。<b>帮助页打不开不会影响它们</b>，回首页接着办即可。</p></div>'+
     '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('info',26)+'</span>业务页上的提示更直接</h3>'+
     '<p>真出错时，<b>业务页面自己会写清卡在哪一步</b>，那是最直接的指引；帮助页只是补充说明。</p></div>'+
     '</div></section>'+
