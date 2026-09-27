@@ -19,6 +19,7 @@ import {
   ADMIN_POLICY_PUBLISH_DISABLED_CODE,
   assertEmergencyReason,
   assertNotEmergencyHeld,
+  isRecruitmentContentHostingEnabled,
   POLICY_RESPONSIBILITY_ACK_REQUIRED_CODE,
 } from '../recruitment-hosting/recruitment-hosting'
 import {
@@ -26,6 +27,12 @@ import {
   parsePublishStatusFilter,
   parseReviewStatusFilter,
 } from '../jobs/jobs-shared'
+import {
+  assertRecruitmentPolicyCategoryAllowed,
+  assertRecruitmentPolicyWriteAllowed,
+  publicPolicyLookupWhere,
+  RECRUITMENT_POLICY_CATEGORY,
+} from './policy-public-visibility'
 
 // ============================================================
 // PoliciesService — 阶段1D:政策服务(政策扶持条目 + 政策公告)
@@ -61,6 +68,11 @@ export interface PolicyPostDto {
   publishConfirmedContentVersion: number | null
   syncTime: string
   updatedAt: string
+  /**
+   * 托管关闭后仍留在库里的招聘分类政策。只在这种行上出现，供 3.15 认存量。
+   * 不改已有字段。
+   */
+  hostingStock?: true
 }
 
 export interface AdminPolicySourceListParams {
@@ -115,7 +127,7 @@ interface PrismaPolicyRow {
 }
 
 function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
-  return {
+  const dto: PolicyPostDto = {
     id: p.id,
     kind: p.kind,
     title: p.title,
@@ -138,6 +150,10 @@ function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
     syncTime: p.syncTime.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   }
+  if (!isRecruitmentContentHostingEnabled() && p.category === RECRUITMENT_POLICY_CATEGORY) {
+    dto.hostingStock = true
+  }
+  return dto
 }
 
 @Injectable()
@@ -149,7 +165,7 @@ export class PoliciesService {
     private readonly audit: AuditService,
   ) {}
 
-  // ── Kiosk 公开读(只放出 approved+published)──────────────────────────────
+  // ── Kiosk 公开读(approved+published；托管关闭时不含招聘分类；不含下架留痕)──
 
   async getPublishedPolicies(params?: {
     kind?: string; audience?: string; category?: string; page?: number | string; pageSize?: number | string
@@ -158,13 +174,13 @@ export class PoliciesService {
     const page = Math.min(10_000, Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1)
     const parsedPageSize = Number.parseInt(String(params?.pageSize ?? 200), 10)
     const pageSize = Math.min(200, Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 200)
-    const where = {
-        reviewStatus: 'approved',
-        publishStatus: 'published',
-        ...(params?.kind ? { kind: params.kind } : {}),
-        ...(params?.audience ? { audience: params.audience } : {}),
-        ...(params?.category ? { category: params.category } : {}),
-    }
+    const where = await publicPolicyLookupWhere(this.prisma, {
+      reviewStatus: 'approved',
+      publishStatus: 'published',
+      ...(params?.kind ? { kind: params.kind } : {}),
+      ...(params?.audience ? { audience: params.audience } : {}),
+      ...(params?.category ? { category: params.category } : {}),
+    })
     const [rows, total] = await Promise.all([
       this.prisma.policyPost.findMany({
         where,
@@ -182,7 +198,11 @@ export class PoliciesService {
 
   async getPublishedPolicyById(id: string): Promise<{ data: PolicyPostDto; success: true }> {
     const row = await this.prisma.policyPost.findFirst({
-      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+      where: await publicPolicyLookupWhere(this.prisma, {
+        id,
+        reviewStatus: 'approved',
+        publishStatus: 'published',
+      }),
     })
     if (!row) {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
@@ -247,6 +267,7 @@ export class PoliciesService {
     const org = await this.assertPartnerOrg(user)
     this.assertPolicyCapableOrgType(org)
     this.assertKindFields(dto.kind, dto.audience, dto.category)
+    assertRecruitmentPolicyCategoryAllowed(dto.category)
     const created = await this.prisma.policyPost.create({
       data: {
         sourceOrgId: org.id,
@@ -281,7 +302,9 @@ export class PoliciesService {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
     }
     const kind = dto.kind ?? post.kind
-    this.assertKindFields(kind, dto.audience ?? post.audience ?? undefined, dto.category ?? post.category ?? undefined)
+    const nextCategory = dto.category !== undefined ? dto.category : post.category
+    this.assertKindFields(kind, dto.audience ?? post.audience ?? undefined, nextCategory ?? undefined)
+    assertRecruitmentPolicyWriteAllowed(post.category, nextCategory)
 
     const changedFields = Object.keys(dto).filter((k) => (dto as Record<string, unknown>)[k] !== undefined)
     const updated = await this.prisma.policyPost.update({
@@ -404,6 +427,7 @@ export class PoliciesService {
     if (action === 'reviewing') {
       data = { reviewStatus: 'reviewing' }
     } else if (action === 'approve') {
+      assertRecruitmentPolicyCategoryAllowed(post.category)
       data = { reviewStatus: 'approved', publishStatus: 'draft', rejectReason: null }
     } else {
       const trimmed = (reason ?? '').trim()
@@ -444,30 +468,33 @@ export class PoliciesService {
     }
     if (user.role === 'admin' && action === 'unpublish') {
       const reason = assertEmergencyReason(options?.reasonCode, options?.reasonText)
-      await this.prisma.policyPost.update({ where: { id }, data: { publishStatus: 'unpublished' } })
-      await this.prisma.recruitmentEmergencyHold.upsert({
-        where: { targetType_targetId: { targetType: 'policy', targetId: id } },
-        create: {
-          targetType: 'policy',
-          targetId: id,
-          orgId: post.sourceOrgId,
-          reasonCode: reason.reasonCode,
-          reasonText: reason.reasonText,
-          actorId: user.userId,
-        },
-        update: {},
-      })
-      if (this.prisma.partnerOrgNotice) {
-        await this.prisma.partnerOrgNotice.create({
-          data: {
+      // 状态和留痕必须一起提交。拆开的话，中间机构发布会留下「有 hold 且 published」。
+      await this.prisma.$transaction(async (tx) => {
+        await tx.policyPost.update({ where: { id }, data: { publishStatus: 'unpublished' } })
+        await tx.recruitmentEmergencyHold.upsert({
+          where: { targetType_targetId: { targetType: 'policy', targetId: id } },
+          create: {
+            targetType: 'policy',
+            targetId: id,
             orgId: post.sourceOrgId,
-            kind: 'recruitment_emergency_takedown',
-            title: '政策已紧急下架',
-            body: `「${post.title}」已紧急下架。事由：${reason.reasonText}。此下架不能由管理员恢复。`,
-            payloadJson: JSON.stringify({ targetType: 'policy', targetId: id, reasonCode: reason.reasonCode }),
+            reasonCode: reason.reasonCode,
+            reasonText: reason.reasonText,
+            actorId: user.userId,
           },
+          update: {},
         })
-      }
+        if (tx.partnerOrgNotice) {
+          await tx.partnerOrgNotice.create({
+            data: {
+              orgId: post.sourceOrgId,
+              kind: 'recruitment_emergency_takedown',
+              title: '政策已紧急下架',
+              body: `「${post.title}」已紧急下架。事由：${reason.reasonText}。此下架不能由管理员恢复。`,
+              payloadJson: JSON.stringify({ targetType: 'policy', targetId: id, reasonCode: reason.reasonCode }),
+            },
+          })
+        }
+      })
       const updated = await this.prisma.policyPost.findUnique({ where: { id } })
       await this.audit.write({
         actorId: user.userId,
@@ -480,6 +507,7 @@ export class PoliciesService {
       return mapPolicy(updated!)
     }
     if (action === 'unpublish') return this.unpublishPartnerPolicy(id, user)
+    assertRecruitmentPolicyCategoryAllowed(post.category)
     if (post.reviewStatus !== 'approved') {
       throw new BadRequestException({
         error: { code: 'PUBLISH_REQUIRES_APPROVAL', message: '未通过审核的政策内容不得发布' },
@@ -495,23 +523,29 @@ export class PoliciesService {
       contentType: '政策内容',
       contentId: id,
     })
-    await assertNotEmergencyHeld(this.prisma, 'policy', id)
     const version = post.contentVersion ?? 1
     const confirmedAt = new Date()
-    const cas = await this.prisma.policyPost.updateMany({
-      where: { id, reviewStatus: 'approved' },
-      data: {
-        publishStatus: 'published',
-        publishConfirmedBy: user.userId,
-        publishConfirmedAt: confirmedAt,
-        publishConfirmedContentVersion: version,
-      },
-    })
-    if (cas.count !== 1) {
-      throw new ConflictException({
-        error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
+    // 查 hold 和改成 published 在同一个事务里。写完再查一次：
+    // 延迟事务的第一次查询可能发生在下架提交之前，第二次是拿到写锁之后。
+    // 第二次看到 hold 就抛错回滚，不能留下「有 hold 且 published」。
+    await this.prisma.$transaction(async (tx) => {
+      await assertNotEmergencyHeld(tx, 'policy', id)
+      const cas = await tx.policyPost.updateMany({
+        where: { id, reviewStatus: 'approved' },
+        data: {
+          publishStatus: 'published',
+          publishConfirmedBy: user.userId,
+          publishConfirmedAt: confirmedAt,
+          publishConfirmedContentVersion: version,
+        },
       })
-    }
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
+        })
+      }
+      await assertNotEmergencyHeld(tx, 'policy', id)
+    })
     const updated = await this.prisma.policyPost.findUnique({ where: { id } })
     if (!updated) {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })

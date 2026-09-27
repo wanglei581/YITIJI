@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
+import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
 import { RedisService } from '../common/redis/redis.service'
 
 const CACHE_TTL_SECONDS = 15 * 60
@@ -100,13 +101,17 @@ export class DailyBriefService {
   }
 
   private async cityNew(city: string, date: string): Promise<Extract<DailyReportModule, { type: 'city_new' }>> {
-    const cacheKey = `daily-brief:city-new:v1:${date}:${encodeURIComponent(city)}`
+    const hostingKey = isRecruitmentContentHostingEnabled() ? 'hosting' : 'closed'
+    const cacheKey = `daily-brief:city-new:v2:${hostingKey}:${date}:${encodeURIComponent(city)}`
     const load = async () => {
       const { start, end } = shanghaiDayRange(date)
       const [newJobs, newPolicies] = await Promise.all([
         this.prisma.job.count({ where: { ...PUBLISHED, city, syncTime: { gte: start, lt: end } } }),
         // PolicyPost 没有城市字段；这里如实统计当日已发布全局政策，不能伪造本地归属。
-        this.prisma.policyPost.count({ where: { ...PUBLISHED, syncTime: { gte: start, lt: end } } }),
+        // 托管关闭时不把招聘分类算进「新政策」；有下架留痕的也不算。
+        this.prisma.policyPost.count({
+          where: await publicPolicyLookupWhere(this.prisma, { ...PUBLISHED, syncTime: { gte: start, lt: end } }),
+        }),
       ])
       return { newJobs, newPolicies }
     }

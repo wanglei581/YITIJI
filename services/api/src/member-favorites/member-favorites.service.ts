@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import type { AddFavoriteInput, FavoriteTargetType, MemberFavoriteItem } from './member-favorites.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
 
 // ============================================================
 // 会员收藏服务（Phase C-2C）。
@@ -36,7 +37,7 @@ export class MemberFavoritesService {
       return fair?.title ?? null
     }
     const policy = await this.prisma.policyPost.findFirst({
-      where: { id: targetId, ...published },
+      where: await publicPolicyLookupWhere(this.prisma, { id: targetId, ...published }),
       select: { title: true },
     })
     return policy?.title ?? null
