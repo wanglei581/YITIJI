@@ -38701,6 +38701,24 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/design/kiosk-redesign-2026-08-v2/README.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/design/kiosk-redesign-2026-08-v2/STATUS.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/design/kiosk-redesign-2026-08/DESIGN-PHASE2-RESUME.md",
         "kind": "doc",
         "mentions": [],

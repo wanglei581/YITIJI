@@ -50,7 +50,7 @@ node scripts/project-graph-query.mjs model PrintTask
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 55 |
 | 孤儿候选 · medium（仅文档提及） | 16 |
-| 孤儿候选 · low（全仓零提及） | 94 |
+| 孤儿候选 · low（全仓零提及） | 96 |
 
 ## 分册
 
