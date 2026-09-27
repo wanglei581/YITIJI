@@ -34,7 +34,7 @@ const FILE_KIND: Record<string, string> = {
   'image/png': 'PNG 图片',
 }
 
-export type SummaryRow = { label: string; value: string }
+export type SummaryRow = { label: string; value: string; fileId?: string }
 
 type Props = {
   step: 4
@@ -140,9 +140,14 @@ function Review({
       </div>
       <div className="pcf-rev-grid">
         {summaryRows.map((row) => (
-          <div key={row.label} data-sum-row={row.label} className={offFor(row.label) ? 'off' : undefined}>
+          <div
+            key={row.label}
+            data-sum-row={row.label}
+            data-file-id={row.fileId}
+            className={offFor(row.label) ? 'off' : undefined}
+          >
             <span>{row.label}</span>
-            <b className={`v${row.label === '文件编号' ? ' id' : ''}`}>{row.value}</b>
+            <b className="v">{row.value}</b>
           </div>
         ))}
       </div>

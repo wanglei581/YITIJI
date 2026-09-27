@@ -12,9 +12,9 @@ const ACTOR_LABEL: Record<MemberDeletedDocumentItem['deletedByKind'], string> = 
 }
 
 const STORAGE_LABEL: Record<MemberDeletedDocumentItem['storageObjectState'], string> = {
-  removed: '云端对象已删除',
-  pending: '删除已登记，云端对象仍待清理',
-  unknown: '云端对象状态未知（历史记录未记账）',
+  removed: '文件已经删掉',
+  pending: '删除已经记下，文件还在清理',
+  unknown: '这条记录没有写明文件是否已经删掉',
 }
 
 export function PrintFileDeletionRecords() {
@@ -62,7 +62,7 @@ export function PrintFileDeletionRecords() {
         </p>
       ) : (
         <p className="print-done-card-sub">
-          这里只显示已经删除的文件名称和删除时间，不含文件内容。记录来自真实删除结果，不是前台编造。
+          这里只显示已经删除的文件名称和删除时间，不含文件内容。这些记录来自真实的删除结果。
         </p>
       )}
       <div className="print-done-fb-group">

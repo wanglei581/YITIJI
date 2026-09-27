@@ -27,12 +27,10 @@ import { printUploadPathForSource, clearPrintMaterialSession, type PrintMaterial
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { PrintAiHelp } from './components/PrintAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { PrintFileDeletionRecords } from './components/PrintFileDeletionRecords'
-import { PrintFileRetentionNotice } from './components/PrintFileRetentionNotice'
 import {
+  PrintDoneRecordSection,
   PrintDoneXq,
   PrintFeeBoundaryBar,
-  PrintJobSummaryCard,
   PrintOutOfPaperPanel,
 } from './components/PrintDoneSections'
 import { outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill } from './printProgressModel'
@@ -670,11 +668,10 @@ export function PrintDonePage() {
         <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing="拿走前记得核一下页数和水印，少页当场能处理。" />
 
         <div className="qx-card">
-          <div className="pff-done-title">
+          <div className="pff-done-title" role="status">
             <span className="pff-ok"><CheckIcon aria-hidden="true" /></span>
-            请取走文件
+            都打好了，拿走前核一下
           </div>
-          <div className="pff-paper" role="status">请取走纸张</div>
           <p className="pff-out-sub">
             {totalFaces != null
               ? `共 ${totalFaces} 面已全部打印，请在出纸口取走并核对页数`
@@ -749,20 +746,14 @@ export function PrintDonePage() {
           </div>
         </div>
 
-        <PrintFileRetentionNotice
-          retention={{
-            fileRetentionAvailable: verification?.fileRetentionAvailable,
-            fileExpiresAt: verification?.fileExpiresAt,
-            fileRetentionPolicy: verification?.fileRetentionPolicy,
-            fileDeletedAt: verification?.fileDeletedAt,
-            fileDeleteReason: verification?.fileDeleteReason,
-            fileStorageDeletedAt: verification?.fileStorageDeletedAt,
-          }}
+        <div className="pff-help" data-testid="print-fulfill-fallback">
+          <span className="txt">少了页、印花了、对内容有疑问？<b>现在处理最方便</b>。</span>
+          <button type="button" className="pff-help-btn" onClick={() => navigate('/help')}>联系工作人员</button>
+        </div>
+        <PrintAiHelp
+          label="问小青：取纸或异常怎么办 →"
+          draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
         />
-
-        <PrintFileDeletionRecords />
-
-        {file && params && <PrintJobSummaryCard file={file} params={params} />}
 
         <div className="qx-card">
           <b className="pff-info-hd">打印遇到问题？</b>
@@ -782,13 +773,17 @@ export function PrintDonePage() {
           </div>
         </div>
 
-        <div className="pff-help" data-testid="print-fulfill-fallback">
-          <span className="txt">少了页、印花了、对内容有疑问？<b>现在处理最方便</b>。</span>
-          <button type="button" className="pff-help-btn" onClick={() => navigate('/help')}>联系工作人员</button>
-        </div>
-        <PrintAiHelp
-          label="问小青：取纸或异常怎么办 →"
-          draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
+        <PrintDoneRecordSection
+          file={file}
+          params={params}
+          retention={{
+            fileRetentionAvailable: verification?.fileRetentionAvailable,
+            fileExpiresAt: verification?.fileExpiresAt,
+            fileRetentionPolicy: verification?.fileRetentionPolicy,
+            fileDeletedAt: verification?.fileDeletedAt,
+            fileDeleteReason: verification?.fileDeleteReason,
+            fileStorageDeletedAt: verification?.fileStorageDeletedAt,
+          }}
         />
       </div>
       {feedbackDialog}

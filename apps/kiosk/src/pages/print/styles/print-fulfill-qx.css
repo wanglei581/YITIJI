@@ -558,6 +558,22 @@
 }
 .pff-chip b { color: var(--qx-ink); font-weight: 600; }
 
+.pff-record { display: flex; flex-direction: column; gap: 12px; }
+.pff-record-toggle {
+  min-height: 64px;
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid var(--qx-line-2);
+  background: var(--qx-surface);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--qx-ink);
+  cursor: pointer;
+}
+.pff-record-extra { display: flex; flex-direction: column; gap: 16px; }
+.pff-record-extra[hidden] { display: none; }
+
 .pff-info { padding: 16px 20px; }
 .pff-info-hd { display: block; font-size: 20px; font-weight: 700; margin-bottom: 8px; }
 .pff-i-row {

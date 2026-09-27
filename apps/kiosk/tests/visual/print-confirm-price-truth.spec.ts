@@ -144,6 +144,9 @@ test('print confirm shows the same color mode it prices (color) @kiosk', async (
   await expect(summaryValue(page, '色彩模式')).not.toContainText(COLOR_MODE_TEXT.black_white)
   await expect(summaryValue(page, '打印份数')).toHaveText(`${W2_PRINT_PARAMS.copies} 份`)
   await expect(summaryValue(page, '单双面')).toHaveText('单面')
+  await expect(page.locator('[data-sum-row="本次产物"]')).toHaveAttribute('data-file-id', W2_FILE.fileId)
+  await expect(summaryValue(page, '本次产物')).toHaveText('打印件')
+  await expect(page.getByText(W2_FILE.fileId, { exact: true })).toHaveCount(0)
   expect(pageErrors).toEqual([])
 })
 
@@ -165,6 +168,8 @@ test('print confirm blocks unverified color instead of quoting it @kiosk', async
   await expect(page.locator('[data-testid="print-confirm-state-capability-invalid-params"]')).toBeVisible()
   await expect(summaryValue(page, '色彩模式')).toContainText('彩色')
   await expect(summaryValue(page, '色彩模式')).toContainText('暂不可用')
+  await expect(page.locator('[data-sum-row="本次产物"]')).toHaveAttribute('data-file-id', W2_FILE.fileId)
+  await expect(summaryValue(page, '本次产物')).toHaveText('打印件')
   await expect(page.getByText('金额暂不可用')).toBeVisible()
   expect(seen.colorMode).toBeUndefined()
   expect(pageErrors).toEqual([])
