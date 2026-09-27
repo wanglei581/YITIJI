@@ -149,7 +149,7 @@
   - 不成立：「去来源平台投递」含「平台投递」——这是 CLAUDE.md §2 规定的白名单按钮文案；工作台「查看」在托管关闭时本来就直接去政策页（`dashboard/index.tsx` 的 `onView`）。
 - **AIGC 生产方名称（`390f956a4`）：** 生产启动闸门新增 `PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING`，空值、纯空白、产品名「职易达」一律拒绝；三处生产环境夹具补上该键；`.env.example` 两处与部署清单同步。部署脚本 3c 预检用同一闸门、排在 pg_dump 与 PM2 重启之前，所以未配置只会让发布提前中止。
 - **验证（本机）：** api / admin / partner 三处 tsc 通过，改动文件 eslint 零告警；`verify:production-runtime-gates`（74 条，含新增 4 条）、`verify:production-real-services`、`verify:cjk-font` 通过；变异两处（删掉整条检查、只删产品名判断）均按预期变红。
-- **待产品负责人：** 下一次部署前在服务器 `.env` 写入 `AIGC_CONTENT_PRODUCER`（公司全称或统一社会信用代码）。
+- **产品负责人已处理（2026-09-27）：** 服务器 `.env` 已写入 `AIGC_CONTENT_PRODUCER`，取统一社会信用代码，校验位按 GB 32100 核过（值不写入仓库）；下一次发布的 3c 预检会实际校验。
 
 ## 2026-09-26：3.13 两个后台页面（分支 `claude/console-hosting-pages-20260926`，已并入候选，未部署）
 
