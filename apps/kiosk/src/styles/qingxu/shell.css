@@ -42,22 +42,41 @@
   display: flex; align-items: center; justify-content: center;
   font-family: var(--qx-serif); font-size: 24px; font-weight: 700;
 }
-.qx-topbar-sub { font-size: 18px; opacity: .72; }
+.qx-topbar-sub { font-size: var(--qx-fs-aux); opacity: .72; }
 .qx-topbar-spacer { flex: 1; }
-.qx-topbar-clock { font-family: var(--qx-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
+.qx-topbar-clock { font-family: var(--qx-mono); font-size: var(--qx-fs-body-lg); font-variant-numeric: tabular-nums; }
+
+/* 内页顶栏是浅色纸面（原稿 51 张里内页无一例外：surface 底 + 一道细线，品牌章深底翠字）。
+   运行页此前把它画成了深色色带，和下面那张深色任务头叠成两层深色，是「看起来不像原稿」的第一眼来源。
+   首页不走这一条：它的顶行嵌在深色 hero 里（.qx-home-hero-top），保持深底。 */
+.qx-topbar:not(.qx-home-hero-top) {
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  border-bottom: 1px solid var(--qx-line);
+}
+.qx-topbar:not(.qx-home-hero-top) .qx-topbar-mark { background: var(--qx-deep); color: var(--qx-emerald); }
+.qx-topbar:not(.qx-home-hero-top) .qx-topbar-sub { opacity: 1; color: var(--qx-ink-3); }
 
 .qx-pill {
   display: inline-flex; align-items: center; gap: 8px;
   min-height: var(--qx-tap-min);
   padding: 0 18px; border-radius: 999px;
   background: rgb(255 255 255 / 10%);
-  font-size: 19px; font-weight: 650;
+  font-size: var(--qx-fs-aux-lg); font-weight: 650;
 }
 .qx-pill::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
 .qx-pill[data-tone='ok']      { color: var(--qx-emerald); }
 .qx-pill[data-tone='warn']    { color: var(--qx-on-deep-warn); }
 .qx-pill[data-tone='bad']     { color: var(--qx-on-deep-bad); }
 .qx-pill[data-tone='unknown'] { color: var(--qx-paper); opacity: .7; }
+
+/* 浅色顶栏上的状态胶囊：语义色本来就是为浅底设计的，这里直接用；
+   提亮版（--qx-on-deep-*）只留给深底。未知态不降透明度——浅底上再降就读不清了。 */
+.qx-topbar:not(.qx-home-hero-top) .qx-pill { border: 1px solid var(--qx-line-2); background: var(--qx-paper); }
+.qx-topbar:not(.qx-home-hero-top) .qx-pill[data-tone='ok']      { color: var(--qx-teal-d); background: var(--qx-teal-soft); border-color: var(--qx-teal-line); }
+.qx-topbar:not(.qx-home-hero-top) .qx-pill[data-tone='warn']    { color: var(--qx-wheat-d); background: var(--qx-wheat-soft); border-color: var(--qx-line-2); }
+.qx-topbar:not(.qx-home-hero-top) .qx-pill[data-tone='bad']     { color: var(--qx-cinnabar-d); background: var(--qx-cinnabar-soft); border-color: var(--qx-cinnabar-line); }
+.qx-topbar:not(.qx-home-hero-top) .qx-pill[data-tone='unknown'] { color: var(--qx-ink-2); opacity: 1; }
 
 /* ── 页头：分区名 + 一句话说明 ───────────────────────────────── */
 .qx-pagehead {
@@ -66,13 +85,13 @@
   display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
 }
 .qx-pagehead h1 {
-  margin: 0; font-family: var(--qx-serif); font-size: 38px; font-weight: 700;
+  margin: 0; font-family: var(--qx-serif); font-size: var(--qx-fs-page); font-weight: 700;
   letter-spacing: 1px; display: flex; align-items: center; gap: 14px;
 }
 .qx-pagehead h1::before {
   content: ''; width: 6px; height: 34px; border-radius: 3px; background: var(--qx-emerald);
 }
-.qx-pagehead p { flex: 1; min-width: 260px; margin: 0; font-size: 20px; line-height: 1.4; color: var(--qx-ink-2); }
+.qx-pagehead p { flex: 1; min-width: 260px; margin: 0; font-size: var(--qx-fs-body); line-height: 1.4; color: var(--qx-ink-2); }
 
 /* ── 正文与滚动区 ───────────────────────────────────────────── */
 .qx-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 var(--qx-gutter); }
@@ -94,7 +113,7 @@
 .qx-nav-item {
   flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  font-size: 20px; color: var(--qx-ink-3);
+  font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-3);
   border: 0; background: transparent; cursor: pointer;
 }
 .qx-nav-item[aria-current='page'] { color: var(--qx-teal-d); font-weight: 700; }
