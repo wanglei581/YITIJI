@@ -37,23 +37,6 @@ function expectAbsent(source, pattern, message) {
 function git(args) {
   return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
-function listChangedFiles() {
-  const committed = git(['diff', '--name-only', 'origin/main...HEAD'])
-    .split('\n')
-    .filter(Boolean)
-  const unstaged = git(['diff', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const staged = git(['diff', '--cached', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const untracked = git(['ls-files', '--others', '--exclude-standard'])
-    .split('\n')
-    .filter(Boolean)
-
-  return [...new Set([...committed, ...unstaged, ...staged, ...untracked])]
-}
-
 console.log('\n=== Profile 简历与消息明细页墨青纸感守卫 ===')
 
 const resumes = read('src/pages/profile/me/MyResumesPage.tsx')
@@ -113,9 +96,33 @@ expectIncludes(ci, 'verify:profile-resumes-notifications-inkpaper', 'CI Verify s
 expectIncludes(homeVerify, 'MyResumesPage.tsx', 'profile-inkpaper-home 范围守卫允许本批简历页换装')
 expectIncludes(homeVerify, 'MyNotificationsPage.tsx', 'profile-inkpaper-home 范围守卫允许本批消息页换装')
 
+// 范围基线（2026-09-28，接着下面「条件触发」那次根因修复）：本守卫的本意是「换装这两页的那批改动
+// 不夹带硬冻结后端、共享类型、Agent 或数据库」，不该拦截其它批次。集成分支 #1042 长期累积很多批次，
+// origin/main...HEAD 会把其它批次的改动全算进来（实测 364 个文件），一碰本页就误红。改为只看
+// 「碰了这两页的那些提交」各自改了什么；工作区未提交改动若碰了这两页，整体计入。禁止清单与判定不变。
+function isOwnedResumesNotificationsFile(file) {
+  return file === 'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx' ||
+    file === 'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx'
+}
+function listScopeChangedFiles(isOwned) {
+  const lines = (text) => text.split('\n').filter(Boolean)
+  const files = new Set()
+  for (const sha of lines(git(['rev-list', '--no-merges', 'origin/main..HEAD']))) {
+    const changed = lines(git(['diff-tree', '--no-commit-id', '--name-only', '-r', sha]))
+    if (changed.some(isOwned)) for (const file of changed) files.add(file)
+  }
+  const local = [
+    ...lines(git(['diff', '--name-only'])),
+    ...lines(git(['diff', '--cached', '--name-only'])),
+    ...lines(git(['ls-files', '--others', '--exclude-standard'])),
+  ]
+  if (local.some(isOwned)) for (const file of local) files.add(file)
+  return [...files]
+}
+
 let changedFiles = []
 try {
-  changedFiles = listChangedFiles()
+  changedFiles = listScopeChangedFiles(isOwnedResumesNotificationsFile)
 } catch (error) {
   if (error instanceof Error) console.error(`  ${error.message}`)
   fail('范围守卫无法读取 git diff')
