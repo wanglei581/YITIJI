@@ -1,5 +1,20 @@
 # 当前开发进度
 
+## 2026-09-27：3.14 本机构官方渠道后端收尾（本地候选，未合并、未部署）
+
+- 分支 `codex/official-channels-314-20260927` 提交 `1079fc372`：官方渠道与原平台目录按 category 隔离；机构域名登记按身份核验留审计；渠道写入、归档和审计同事务；终端按认证身份与所属机构只读展示字段；管理员可单向紧急下架并通知机构，机构熔断也覆盖渠道。补两套 schema 的机构核验域字段、复合索引及 SQLite/PostgreSQL 迁移；职业规划旧存档按自身 `basedOn` 清理系统岗位引用，查看与 PDF 共用逻辑。
+- 本地门禁：API typecheck、lint、`verify:official-channels` 96/96、`verify:job-fit` 24/24、`verify:career-plan` 12/12、`verify:recruitment-p1-schema`（SQLite 全新库/升级库）、`db:pg:sync:check`、`verify:job-ai-backend`、`verify:recruitment-content-http`、`verify:recruitment-emergency-scope`、`verify:companies`、`verify:job-review`、`verify:recruitment-hosting-default-off`、`verify:compliance-copy`、CI 接线覆盖与 workflow 语法检查通过。7 项变异反证均使对应断言变红，源文件按字节还原。
+- 未完成：本机没有 PostgreSQL 服务，PostgreSQL 实库迁移/升级门禁留待 CI；一体机、机构端、管理员端页面由协调方接线；3.15 存量清理由后续任务处理。以上均为本地证据，不代表线上或真机验收。
+
+**第二轮返工（交叉审查后，本地候选）：** 引入精确锁版 `tldts@7.4.15`，按公共及私有后缀校验官方域，并允许盖章核验范围收窄到机构子域；URL 查询和片段中的跳转值经控制字符清理、多层解码及反斜杠归一后递归校验。渠道下架后冻结修改及同链接重建，更新与域名替换在事务内读取最新状态；机构归档或内容不可信时终端不展示渠道；熔断规则、逐条下架、通知与必需审计同事务。旧职业规划按自身来源区分手填和系统岗位，板块关闭时查看与打印共用清理，未标明的本人正文保留；移除终端控制器的无用机构查询参数。终端路径身份校验已由既有 Guard 完成，本轮未改。
+
+- 本轮本地验证：API typecheck、lint；`verify:official-channels` 132/132、`verify:career-plan` 16/16、`verify:job-fit` 24/24、`verify:companies` 22/22、`verify:job-ai-backend`、`verify:recruitment-content-http`、`verify:recruitment-emergency-scope` 15 项、`verify:recruitment-hosting-default-off` 2 项、`verify:recruitment-p1-schema`（SQLite 全新/升级）、`verify:content-trust-publish-gate` 87 项、`db:pg:sync:check`、合规文案、仓库完整性和 CI 门禁接线均通过；岗位板块子门禁 `verify-kiosk-job-board-switch.ts` 直接运行通过。R1–R10 各一项变异均使对应断言变红，随后逐字节还原。
+- 未完成：PostgreSQL 实库迁移与 CI 运行、前端接线、设备和线上验收仍由协调方及后续流程完成；本地 `verify:terminal-device-config` 总门禁因工作树缺少其基础夹具 `prisma/dev.db` 未能运行，岗位板块子门禁已独立通过。本轮没有部署或推送。
+
+**第三轮后台只读接口（本地候选）：** 新增管理员按机构查看未归档官方渠道的只读接口，返回下架状态及事由；机构端渠道列表附本机构按登记顺序规范化的 `verifiedDomains`，同步 shared 类型。`verify:official-channels` 144/144，通过管理员角色、404、归档、下架事由、机构隔离和空域名断言；R11、R12 两项变异均使对应断言变红并逐字节还原。未推送、未合并或部署。
+
+**第四轮终审返工（本地候选）：** 官方渠道紧急下架按规范化链接覆盖跨机构相同目标、尾斜杠及片段变体，逐条停用、留 hold、通知和审计同事务，新增与改链接及公开读取也按同一比对形拦截；对象存储地域根只允许登记具体桶名，内网穿透和在线开发域名拒绝登记；片段整体及最多八层编码、零宽格式字符均纳入跳转检查；手填旧规划的查看与 PDF 渲染均过滤空数组项。`verify:official-channels` 187/187、`verify:career-plan` 18/18、`verify:job-fit` 24/24、紧急下架范围、招聘内容 HTTP、托管默认关闭、企业、岗位审核、职业规划降级、PDF 元数据、typecheck、lint 与合规文案本机通过。F1–F5 变异反证均使相应断言转红，并按字节还原。仅本地候选，未推送、合并或部署。
+
 ## 2026-09-27：一体机「本机构官方渠道」页与首页入口（3.14 一体机侧；分支 `claude/kiosk-official-channels-20260927`，未推送，待协调窗口验收）
 
 从候选 `db754649f` 拉出。只改 `apps/kiosk/**`、`docs/design/kiosk-proto-2026-07-migration-matrix.md`（路由清单门禁的登记处）与本条；没有改 `services/api/**`、`packages/shared/**`（3.14 后端由 Codex 在 `codex/official-channels-314-20260927` 并行收尾）、`docs/design/kiosk-redesign-2026-08/`（只读）与候选分支。

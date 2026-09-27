@@ -24,7 +24,7 @@
  *   GET  /kiosk/campus/recruitment-stats （岗位计数为 null，招聘会统计仍在）
  *   GET  /me/browse-logs、/me/external-jump-logs （去掉岗位行；?targetType=job 拒绝）
  *   GET  /me/job-ai-sessions
- *   POST/GET /resume/career-plan/:taskId 与打印（带岗位标题的结果拒绝；新生成不附标题）
+ *   POST/GET /resume/career-plan/:taskId 与打印（新生成不附系统岗位标题；旧结果清理后可读可印）
  *   GET/POST/PATCH /me/job-applications （仅关联了本站岗位的记录）
  * 岗位详情里的 sourceUrl 是扫码投递二维码的内容，没有单独的二维码接口。
  * 机构详情在关闭时去掉内嵌岗位列表，机构本身仍返回。
@@ -199,14 +199,23 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
   )
   let careerIncludeTitle: boolean | undefined
   let careerPrints = 0
+  let careerLatestBoardOpen: boolean | undefined
+  let careerPrintBoardOpen: boolean | undefined
   const career = new CareerPlanController(
     {
       generate: async (_taskId: string, _requester: unknown, options?: { includeJobFitTitle?: boolean }) => {
         careerIncludeTitle = options?.includeJobFitTitle
         return { basedOn: { jobFit: null } }
       },
-      getLatest: async () => ({ basedOn: { jobFit: 'KJB career job', resume: true, interview: null, selfAssessment: null } }),
-      printPlan: async () => { careerPrints += 1; return { fileId: 'career' } },
+      getLatest: async (_taskId: string, _requester: unknown, options?: { jobBoardOpen?: boolean }) => {
+        careerLatestBoardOpen = options?.jobBoardOpen
+        return { basedOn: { jobFit: options?.jobBoardOpen === false ? null : 'KJB career job', resume: true, interview: null, selfAssessment: null } }
+      },
+      printPlan: async (_taskId: string, _requester: unknown, options?: { jobBoardOpen?: boolean }) => {
+        careerPrintBoardOpen = options?.jobBoardOpen
+        careerPrints += 1
+        return { fileId: 'career' }
+      },
     } as never,
     new JwtService({ secret: 'verify-job-board-secret-0123456789' }),
     { get: async () => null } as never,
@@ -575,10 +584,12 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
     const generated = await career.generate('career-task', {})
     if (careerIncludeTitle !== false || generated.basedOn?.jobFit) fail('17. 全局关时新职业规划仍附岗位标题')
     pass('17. 全局关时新职业规划不附岗位标题')
-    await expectCode(() => career.latest('career-task', {}), 'KIOSK_JOB_BOARD_DISABLED', '17b. 全局关时已保存的带标题规划拒绝')
-    await expectCode(() => career.print('career-task', {}), 'KIOSK_JOB_BOARD_DISABLED', '17c. 全局关时带标题规划的打印拒绝')
-    if (careerPrints !== 0) fail('17d. 关闭后仍生成了带岗位标题的规划打印')
-    pass('17d. 关闭后没有打印带岗位标题的规划')
+    const oldCareer = await career.latest('career-task', {})
+    if (careerLatestBoardOpen !== false || oldCareer.basedOn.jobFit !== null) fail('17b. 全局关时旧规划未按关闭状态清理')
+    pass('17b. 全局关时已保存的系统岗位规划清理后可读')
+    await career.print('career-task', {})
+    if (careerPrintBoardOpen !== false || careerPrints !== 1) fail('17c. 全局关时旧规划未按关闭状态打印')
+    pass('17c. 全局关时旧规划清理后可打印')
 
     const apps = await applications.list(memberUser)
     if (apps.data.items.some((row) => row.jobId === jobId || row.positionTitle === `KJB Job ${suffix}`)) {

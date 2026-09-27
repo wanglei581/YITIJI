@@ -456,6 +456,24 @@ if (miniappOutboundMissing === 0) {
   pass(`5b. 小程序外跳按钮文案使用「复制来源链接」(${MINIAPP_OUTBOUND_FILES.length} 页)`)
 }
 
+// 3.14: official-channel API errors and takedown notices are shown by partner/admin clients.
+// Keep this targeted: the whole API contains historical audit strings and test fixtures.
+const officialBackendFiles = [
+  'services/api/src/official-channels/official-channels.service.ts',
+  'services/api/src/recruitment-hosting/recruitment-emergency.service.ts',
+]
+let officialBackendHits = 0
+for (const rel of officialBackendFiles) {
+  const body = fs.readFileSync(path.join(root, rel), 'utf8')
+  for (const forbidden of ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理']) {
+    if (body.includes(forbidden)) {
+      fail(`5c. ${rel} 出现禁用文案「${forbidden}」`)
+      officialBackendHits += 1
+    }
+  }
+}
+if (officialBackendHits === 0) pass('5c. 官方渠道与下架通知后端文案无禁词')
+
 // ---------- 6. 三端页面标题与 ICP 备案名一致 ----------
 //
 // 2026-09-23 百度云备案整改通知：网站首页标题要与备案名称「职易达」一致。当时线上一体机

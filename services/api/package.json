@@ -274,6 +274,7 @@
     "verify:ai-user-text-retention": "node -r @swc-node/register scripts/verify-ai-user-text-retention.ts",
     "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts",
     "verify:recruitment-emergency-scope": "node -r @swc-node/register scripts/verify-recruitment-emergency-scope.ts",
+    "verify:official-channels": "node -r @swc-node/register scripts/verify-official-channels.ts",
     "verify:recruitment-hosting-default-off": "node -r @swc-node/register scripts/verify-recruitment-hosting-default-off.ts",
     "verify:offline-agencies-page": "node -r @swc-node/register scripts/verify-offline-agencies-page.ts",
     "verify:offline-agencies-contract": "node -r @swc-node/register scripts/verify-offline-agencies-contract.ts",
@@ -346,6 +347,7 @@
     "pdfkit": "^0.15.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "tldts": "7.4.15",
     "unpdf": "^1.6.2"
   },
   "devDependencies": {

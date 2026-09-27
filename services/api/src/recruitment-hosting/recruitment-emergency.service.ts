@@ -1,13 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import {
   assertEmergencyReason,
   type EmergencyReasonCode,
 } from './recruitment-hosting'
+import { officialChannelLinkKey } from '../official-channels/registrable-domain'
 
-export type EmergencyTargetType = 'job' | 'job_fair' | 'company' | 'policy' | 'fair_material' | 'offline_agency'
+export type EmergencyTargetType = 'job' | 'job_fair' | 'company' | 'policy' | 'fair_material' | 'offline_agency' | 'official_channel'
 
 const TARGET_LABEL: Record<EmergencyTargetType, string> = {
   job: '岗位',
@@ -16,6 +17,7 @@ const TARGET_LABEL: Record<EmergencyTargetType, string> = {
   policy: '政策',
   fair_material: '招聘会资料',
   offline_agency: '线下机构',
+  official_channel: '本机构官方渠道',
 }
 
 interface TargetRow {
@@ -41,6 +43,24 @@ export class RecruitmentEmergencyService {
     actor: AuthedUser,
   ) {
     const reason = assertEmergencyReason(reasonCode, reasonText)
+    if (targetType === 'official_channel') {
+      await this.prisma.$transaction(async (tx) => {
+        const channel = await tx.onlinePlatformDirectory.findFirst({
+          where: { id: targetId, category: 'official_channel', archivedAt: null, organizationId: { not: null } },
+          select: { id: true, organizationId: true, name: true, status: true },
+        })
+        if (!channel?.organizationId) {
+          throw new NotFoundException({ error: { code: 'CONTENT_NOT_FOUND', message: '内容不存在' } })
+        }
+        const row: TargetRow = {
+          id: channel.id, orgId: channel.organizationId, sourceId: null, title: channel.name,
+          publishStatus: channel.status === 'active' ? 'published' : 'unpublished',
+        }
+        const matches = await this.expandOfficialChannelMatches(tx, [{ targetType, row }])
+        for (const item of matches) await this.applyOneInTx(tx, item.targetType, item.row, reason, actor, 'single')
+      })
+      return { targetType, targetId, publishStatus: 'unpublished', irreversible: true }
+    }
     const row = await this.loadOne(targetType, targetId)
     await this.applyOne(targetType, row, reason, actor, 'single')
     return { targetType, targetId, publishStatus: 'unpublished', irreversible: true }
@@ -58,45 +78,30 @@ export class RecruitmentEmergencyService {
     if (!trimmed) {
       throw new BadRequestException({ error: { code: 'CIRCUIT_BREAK_TARGET_REQUIRED', message: '请指定机构或来源' } })
     }
-    if (scope === 'org') {
-      const org = await this.prisma.organization.findUnique({ where: { id: trimmed }, select: { id: true } })
-      if (!org) throw new NotFoundException({ error: { code: 'CONTENT_NOT_FOUND', message: '机构不存在' } })
-    } else {
-      const source = await this.prisma.jobSource.findUnique({ where: { id: trimmed }, select: { id: true } })
-      if (!source) throw new NotFoundException({ error: { code: 'CONTENT_NOT_FOUND', message: '来源不存在' } })
-      await this.prisma.jobSource.update({ where: { id: trimmed }, data: { enabled: false } })
-    }
-    await this.prisma.recruitmentCircuitBreak.upsert({
-      where: { scope_targetId: { scope, targetId: trimmed } },
-      create: {
-        scope,
-        targetId: trimmed,
-        reasonCode: reason.reasonCode,
-        reasonText: reason.reasonText,
-        actorId: actor.userId,
-      },
-      update: {},
+    return this.prisma.$transaction(async (tx) => {
+      if (scope === 'org') {
+        const org = await tx.organization.findUnique({ where: { id: trimmed }, select: { id: true } })
+        if (!org) throw new NotFoundException({ error: { code: 'CONTENT_NOT_FOUND', message: '机构不存在' } })
+      } else {
+        const source = await tx.jobSource.findUnique({ where: { id: trimmed }, select: { id: true } })
+        if (!source) throw new NotFoundException({ error: { code: 'CONTENT_NOT_FOUND', message: '来源不存在' } })
+        await tx.jobSource.update({ where: { id: trimmed }, data: { enabled: false } })
+      }
+      await tx.recruitmentCircuitBreak.upsert({
+        where: { scope_targetId: { scope, targetId: trimmed } },
+        create: { scope, targetId: trimmed, reasonCode: reason.reasonCode, reasonText: reason.reasonText, actorId: actor.userId },
+        update: {},
+      })
+      const rows = await this.expandOfficialChannelMatches(tx, await this.loadScope(tx, scope, trimmed))
+      for (const item of rows) await this.applyOneInTx(tx, item.targetType, item.row, reason, actor, 'circuit_break')
+      await this.audit.writeRequired(tx, {
+        actorId: actor.userId, actorRole: 'admin', action: 'recruitment.circuit_break',
+        targetType: scope === 'org' ? 'organization' : 'job_source', targetId: trimmed,
+        payload: { scope, reasonCode: reason.reasonCode, reasonText: reason.reasonText,
+          count: rows.length, orgIds: [...new Set(rows.map((item) => item.row.orgId))] },
+      })
+      return { scope, id: trimmed, unpublished: rows.length, irreversible: true }
     })
-    const rows = await this.loadScope(scope, trimmed)
-    for (const item of rows) {
-      await this.applyOne(item.targetType, item.row, reason, actor, 'circuit_break')
-    }
-    const orgIds = [...new Set(rows.map((item) => item.row.orgId))]
-    await this.audit.write({
-      actorId: actor.userId,
-      actorRole: 'admin',
-      action: 'recruitment.circuit_break',
-      targetType: scope === 'org' ? 'organization' : 'job_source',
-      targetId: trimmed,
-      payload: {
-        scope,
-        reasonCode: reason.reasonCode,
-        reasonText: reason.reasonText,
-        count: rows.length,
-        orgIds,
-      },
-    })
-    return { scope, id: trimmed, unpublished: rows.length, irreversible: true }
   }
 
   /** 机构看到的下架 / 熔断通知，最新 50 条；超过时如实返回总数与截断标记，不让前端以为这就是全部。 */
@@ -123,6 +128,15 @@ export class RecruitmentEmergencyService {
   }
 
   private async findRow(targetType: EmergencyTargetType, targetId: string): Promise<TargetRow | null> {
+    if (targetType === 'official_channel') {
+      const row = await this.prisma.onlinePlatformDirectory.findFirst({
+        where: { id: targetId, category: 'official_channel', archivedAt: null, organizationId: { not: null } },
+        select: { id: true, organizationId: true, name: true, status: true },
+      })
+      return row && row.organizationId
+        ? { id: row.id, orgId: row.organizationId, sourceId: null, title: row.name, publishStatus: row.status === 'active' ? 'published' : 'unpublished' }
+        : null
+    }
     if (targetType === 'job') {
       const row = await this.prisma.job.findUnique({
         where: { id: targetId },
@@ -172,31 +186,31 @@ export class RecruitmentEmergencyService {
     return row ? { id: row.id, orgId: row.sourceOrgId, sourceId: null, title: row.title, publishStatus: row.publishStatus } : null
   }
 
-  private async loadScope(scope: 'org' | 'source', id: string): Promise<Array<{ targetType: EmergencyTargetType; row: TargetRow }>> {
+  private async loadScope(tx: PrismaTransactionClient, scope: 'org' | 'source', id: string): Promise<Array<{ targetType: EmergencyTargetType; row: TargetRow }>> {
     const orgWhere = scope === 'org' ? { sourceOrgId: id } : undefined
     const sourceWhere = scope === 'source' ? { sourceId: id } : undefined
-    const [jobs, fairs, companies, policies, materials, agencies] = await Promise.all([
-      this.prisma.job.findMany({
+    const [jobs, fairs, companies, policies, materials, agencies, channels] = await Promise.all([
+      tx.job.findMany({
         where: { ...(orgWhere ?? sourceWhere) },
         select: { id: true, sourceOrgId: true, sourceId: true, title: true, publishStatus: true },
       }),
-      this.prisma.jobFair.findMany({
+      tx.jobFair.findMany({
         where: { ...(orgWhere ?? sourceWhere) },
         select: { id: true, sourceOrgId: true, sourceId: true, title: true, publishStatus: true },
       }),
       scope === 'org'
-        ? this.prisma.companyProfile.findMany({
+        ? tx.companyProfile.findMany({
             where: { sourceOrgId: id },
             select: { id: true, sourceOrgId: true, name: true, publishStatus: true },
           })
         : Promise.resolve([]),
       scope === 'org'
-        ? this.prisma.policyPost.findMany({
+        ? tx.policyPost.findMany({
             where: { sourceOrgId: id },
             select: { id: true, sourceOrgId: true, title: true, publishStatus: true },
           })
         : Promise.resolve([]),
-      this.prisma.fairMaterial.findMany({
+      tx.fairMaterial.findMany({
         where: {
           deletedAt: null,
           jobFair: scope === 'org' ? { sourceOrgId: id } : { sourceId: id },
@@ -207,9 +221,15 @@ export class RecruitmentEmergencyService {
         },
       }),
       scope === 'org'
-        ? this.prisma.offlineAgency.findMany({
+        ? tx.offlineAgency.findMany({
             where: { sourceOrgId: id },
             select: { id: true, name: true, publishStatus: true, sourceOrgId: true },
+          })
+        : Promise.resolve([]),
+      scope === 'org'
+        ? tx.onlinePlatformDirectory.findMany({
+            where: { organizationId: id, category: 'official_channel', archivedAt: null },
+            select: { id: true, organizationId: true, name: true, status: true },
           })
         : Promise.resolve([]),
     ])
@@ -250,7 +270,41 @@ export class RecruitmentEmergencyService {
           publishStatus: row.publishStatus,
         },
       })),
+      ...channels.filter((row) => row.organizationId !== null).map((row) => ({
+        targetType: 'official_channel' as const,
+        row: {
+          id: row.id, orgId: row.organizationId!, sourceId: null, title: row.name,
+          publishStatus: row.status === 'active' ? 'published' : 'unpublished',
+        },
+      })),
     ]
+  }
+
+  /** One compromised destination is removed everywhere, with a hold and notice for every owner. */
+  private async expandOfficialChannelMatches(
+    tx: PrismaTransactionClient,
+    items: Array<{ targetType: EmergencyTargetType; row: TargetRow }>,
+  ): Promise<Array<{ targetType: EmergencyTargetType; row: TargetRow }>> {
+    const seedIds = items.filter((item) => item.targetType === 'official_channel').map((item) => item.row.id)
+    if (!seedIds.length) return items
+    const seeds = await tx.onlinePlatformDirectory.findMany({
+      where: { id: { in: seedIds } }, select: { landingUrl: true },
+    })
+    const keys = new Set(seeds.map((row) => officialChannelLinkKey(row.landingUrl)).filter((key): key is string => !!key))
+    const all = await tx.onlinePlatformDirectory.findMany({
+      where: { category: 'official_channel', organizationId: { not: null } },
+      select: { id: true, organizationId: true, name: true, status: true, landingUrl: true },
+    })
+    const known = new Set(items.map((item) => item.row.id))
+    const extra = all.filter((row) => !known.has(row.id) && keys.has(officialChannelLinkKey(row.landingUrl) ?? ''))
+      .map((row) => ({
+        targetType: 'official_channel' as const,
+        row: {
+          id: row.id, orgId: row.organizationId!, sourceId: null, title: row.name,
+          publishStatus: row.status === 'active' ? 'published' : 'unpublished',
+        },
+      }))
+    return [...items, ...extra]
   }
 
   private async applyOne(
@@ -260,15 +314,29 @@ export class RecruitmentEmergencyService {
     actor: AuthedUser,
     mode: 'single' | 'circuit_break',
   ) {
-    const existing = await this.prisma.recruitmentEmergencyHold.findFirst({
+    await this.prisma.$transaction((tx) => this.applyOneInTx(tx, targetType, row, reason, actor, mode))
+  }
+
+  private async applyOneInTx(
+    tx: PrismaTransactionClient,
+    targetType: EmergencyTargetType,
+    row: TargetRow,
+    reason: { reasonCode: EmergencyReasonCode; reasonText: string },
+    actor: AuthedUser,
+    mode: 'single' | 'circuit_break',
+  ) {
+    if (targetType === 'official_channel') {
+      await tx.onlinePlatformDirectory.update({ where: { id: row.id }, data: { status: 'inactive' } })
+    }
+    const existing = await tx.recruitmentEmergencyHold.findFirst({
       where: { targetType, targetId: row.id },
       select: { id: true },
     })
-    if (row.publishStatus !== 'unpublished') {
-      await this.markUnpublished(targetType, row.id)
+    if (targetType !== 'official_channel' && row.publishStatus !== 'unpublished') {
+      await this.markUnpublished(tx, targetType, row.id)
     }
     if (!existing) {
-      await this.prisma.recruitmentEmergencyHold.create({
+      await tx.recruitmentEmergencyHold.create({
         data: {
           targetType,
           targetId: row.id,
@@ -279,7 +347,7 @@ export class RecruitmentEmergencyService {
           actorId: actor.userId,
         },
       })
-      await this.prisma.partnerOrgNotice.create({
+      await tx.partnerOrgNotice.create({
         data: {
           orgId: row.orgId,
           kind: 'recruitment_emergency_takedown',
@@ -294,7 +362,7 @@ export class RecruitmentEmergencyService {
         },
       })
     }
-    await this.audit.write({
+    await this.audit.writeRequired(tx, {
       actorId: actor.userId,
       actorRole: 'admin',
       action: 'recruitment.emergency_takedown',
@@ -310,13 +378,13 @@ export class RecruitmentEmergencyService {
     })
   }
 
-  private async markUnpublished(targetType: EmergencyTargetType, id: string) {
+  private async markUnpublished(tx: PrismaTransactionClient, targetType: EmergencyTargetType, id: string) {
     const data = { publishStatus: 'unpublished' }
-    if (targetType === 'job') await this.prisma.job.update({ where: { id }, data })
-    else if (targetType === 'job_fair') await this.prisma.jobFair.update({ where: { id }, data })
-    else if (targetType === 'company') await this.prisma.companyProfile.update({ where: { id }, data })
-    else if (targetType === 'fair_material') await this.prisma.fairMaterial.update({ where: { id }, data })
-    else if (targetType === 'offline_agency') await this.prisma.offlineAgency.update({ where: { id }, data })
-    else await this.prisma.policyPost.update({ where: { id }, data })
+    if (targetType === 'job') await tx.job.update({ where: { id }, data })
+    else if (targetType === 'job_fair') await tx.jobFair.update({ where: { id }, data })
+    else if (targetType === 'company') await tx.companyProfile.update({ where: { id }, data })
+    else if (targetType === 'fair_material') await tx.fairMaterial.update({ where: { id }, data })
+    else if (targetType === 'offline_agency') await tx.offlineAgency.update({ where: { id }, data })
+    else await tx.policyPost.update({ where: { id }, data })
   }
 }

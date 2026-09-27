@@ -174,6 +174,22 @@ async function main() {
       '5. 线下机构下架后不能再发布',
     )
 
+    const failSummaryAudit = { writeRequired: async (...args: Parameters<AuditService['writeRequired']>) => {
+      if (args[1].action === 'recruitment.circuit_break') throw new Error('injected summary audit failure')
+      return audit.writeRequired(...args)
+    } } as AuditService
+    const failingCircuit = new RecruitmentEmergencyService(prisma, failSummaryAudit)
+    const noticeCountBefore = await prisma.partnerOrgNotice.count({ where: { orgId } })
+    let rolledBack = false
+    try { await failingCircuit.circuitBreak('org', orgId, 'authority_order', '回滚验证', actor) }
+    catch (error) { rolledBack = (error as Error).message.includes('injected summary audit failure') }
+    if (!rolledBack) fail('6a. 摘要审计失败未向调用方抛错')
+    if (await prisma.recruitmentCircuitBreak.findUnique({ where: { scope_targetId: { scope: 'org', targetId: orgId } } })
+      || (await prisma.fairMaterial.findUniqueOrThrow({ where: { id: circuitMaterialId } })).publishStatus !== 'published'
+      || await prisma.recruitmentEmergencyHold.count({ where: { targetType: 'fair_material', targetId: circuitMaterialId } }) !== 0
+      || await prisma.partnerOrgNotice.count({ where: { orgId } }) !== noticeCountBefore) fail('6a. 摘要审计失败后仍留有部分熔断数据')
+    pass('6a. 摘要审计失败使规则、逐条下架、通知和审计一起回滚')
+
     await emergency.circuitBreak('org', orgId, 'authority_order', '机构范围熔断', actor)
     const circuitMaterial = await prisma.fairMaterial.findUnique({ where: { id: circuitMaterialId } })
     const circuitAgency = await prisma.offlineAgency.findUnique({ where: { id: circuitAgencyId } })
