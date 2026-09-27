@@ -1,3 +1,4 @@
+import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from '../auth/kioskSensitiveSession'
 import { API_BASE_URL, API_MODE } from './api/client'
 import { ApiHttpError } from './api/httpAdapter'
 import { getTerminalId } from './api/screensaver'
@@ -78,6 +79,17 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   }
 }
 
+/**
+ * 引导票已经换成新的终端会话。同一标签页里上一位的打印材料、简历、问卷、
+ * 材料草稿、面试、扫描和收藏还在。清场只调用 kioskSensitiveSession 那一份清单。
+ * 新令牌在清完之后写入：清单不含终端会话键；引导票在服务端已被一次性核销，
+ * 清场若抛错也要把新令牌留下，否则这台机器既没有旧会话也换不回这张票。
+ */
+function clearSensitiveStateForNewTerminalSession(): void {
+  clearKioskSensitiveSession()
+  clearKioskSharedDeviceResidue()
+}
+
 async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promise<void> {
   const response = await fetchWithTimeout(url('/terminals/session-token'), {
     method: 'POST',
@@ -87,7 +99,12 @@ async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promis
   if (!response.ok) throw await asHttpError(response)
   const payload = (await response.json()) as { sessionToken?: string }
   if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
-  saveToken(payload.sessionToken)
+  const sessionToken = payload.sessionToken
+  try {
+    clearSensitiveStateForNewTerminalSession()
+  } finally {
+    saveToken(sessionToken)
+  }
 }
 
 /**

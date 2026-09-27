@@ -24,6 +24,8 @@
  *   7. 成功终止后令牌失效，重放不会二次调用腾讯云（防重复计费）
  */
 import 'dotenv/config'
+import { execFileSync } from 'node:child_process'
+import path from 'node:path'
 import { NestFactory } from '@nestjs/core'
 import type { Request } from 'express'
 import { AppModule } from '../src/app.module'
@@ -46,6 +48,11 @@ function mockReq(): Request {
 
 async function main() {
   console.log('\n=== TRTC 会话归属（Redis 停止令牌）— 后端 E2E 验证 ===')
+  execFileSync(process.execPath, ['-r', '@swc-node/register', path.join(__dirname, 'verify-trtc-terminal-http.ts')], {
+    cwd: path.resolve(__dirname, '..'),
+    stdio: 'inherit',
+    timeout: 60_000,
+  })
   console.log(`Redis: ${process.env['REDIS_URL'] ?? '(未设置)'}\n`)
   if (!process.env['REDIS_URL']) { fail('REDIS_URL 未设置'); process.exit(1) }
 
