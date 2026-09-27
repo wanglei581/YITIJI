@@ -26,7 +26,6 @@ import { kioskUploadFile } from '../../services/api'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { ResumeSourceSummary } from './components/ResumeSourceSummary'
-import { resumeUserReason } from './resumeUserCopy'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
 import {
@@ -207,7 +206,7 @@ function uploadOutcomeOf(err: unknown): 'rejected' | 'unknown' {
  */
 function uploadErrorMessage(err: unknown): string {
   if (err instanceof ApiHttpError && ['UNSUPPORTED_FILE_TYPE', 'FILE_TYPE_NOT_ALLOWED'].includes(err.code)) {
-    return resumeUserReason('不支持的文件类型', '请改用 PDF 或图片。')
+    return '不支持的文件类型，请改用 PDF 或清晰图片。'
   }
   return userMessageOf(err, '上传失败，请重新选择文件或更换上传方式。')
 }

@@ -1,13 +1,9 @@
-/** 无错误码的简历结果只映射已知原因，不把任意 reason 或 warning 原文展示出来。 */
+/** 错误信封仍由 userMessageOf 处理；这里只筛结果中的工程原因，不改写用户提示的原意。 */
 export function resumeUserReason(reason: string | undefined | null, fallback: string): string {
-  if (!reason) return fallback
-  if (/过期|已清理|重新上传/.test(reason)) return '这份文件已无法继续使用，请重新上传简历。'
-  if (/额度|配额|次数.*用完|次数.*上限/.test(reason)) return '今日 AI 解析次数已用完，可以先手动整理或打印材料。'
-  if (/演示模式/.test(reason)) return '当前为演示模式，未连接真实 AI 服务。'
-  if (/不支持.*格式|不支持.*类型|格式.*不支持/.test(reason)) return '不支持的文件类型，请改用 PDF 或清晰图片。'
-  if (/文字.*不足|文字.*失败|识别失败|不清晰/.test(reason)) return '没有读出足够清晰的文字，请换一份清晰的简历。'
-  if (/超时|繁忙/.test(reason)) return '处理暂时未能完成，请稍后再试。'
-  return fallback
+  if (!reason?.trim() || !/[\u4e00-\u9fff]/.test(reason)) return fallback
+  if (/服务端|服务器|后端|前台|后台|会话|字段|接口|落库|链路|回执|引擎|能力探测|真机|未验收|终端编号|内部文件号|元数据|网桥/.test(reason)) return fallback
+  if (/\b(?:pending|uploaded|HTTP|TypeError|ReferenceError|SyntaxError|Error|ECONNREFUSED|ETIMEDOUT|ENOENT|trace[-_ ]?id|taskId|fileId)\b|\b[A-Z][A-Z\d]*_[A-Z\d_]+\b|<[^>]+>/i.test(reason)) return fallback
+  return reason
 }
 
 /** 本地已有的意图保护文案：只替换技术称呼，不改变已扣次、复查和双确认等事实。 */
