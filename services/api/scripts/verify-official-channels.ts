@@ -17,7 +17,7 @@ import { EmergencyTakedownDto } from '../src/recruitment-hosting/recruitment-eme
 import { RecruitmentEmergencyController } from '../src/recruitment-hosting/recruitment-emergency.controller'
 import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
-import { verifiedDomainFromInput, verifiedHttpsUrl, hostMatchesVerifiedDomain } from '../src/official-channels/registrable-domain'
+import { verifiedDomainFromInput, verifiedHttpsUrl, hostMatchesVerifiedDomain, officialChannelLinkKey } from '../src/official-channels/registrable-domain'
 import { redactCareerPlanSystemJobTitle } from '../src/ai/resume/career-plan.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
@@ -69,6 +69,16 @@ async function main() {
     for (const domain of ['com.cn', 'gov.cn', 'edu.cn', 'org.cn', 'net.cn', 'ac.cn', 'sd.gov.cn', 'github.io', 'gitee.io', 'pages.dev', 'vercel.app', 'netlify.app', 'workers.dev', 'herokuapp.com', 'azurewebsites.net', 'blogspot.com', 'firebaseapp.com', 'web.app', 'cloudfront.net', 'myqcloud.com', 'aliyuncs.com', 'gitlab.io', 'appspot.com', 'fly.dev', 'bitbucket.io', 'ngrok.io']) {
       ok(verifiedDomainFromInput(domain) === null, `forbid public/shared root ${domain}`)
     }
+    for (const suffix of ['lhr.life', 'localhost.run', 'loca.lt', 'serveo.net', 'pagekite.me', 'github.dev', 'ngrok-free.app', 'trycloudflare.com', 'vscode.dev', 'githubcodespaces.com', 'codespaces.new', 'codespaces.github.com']) {
+      ok(verifiedDomainFromInput(suffix) === null && verifiedDomainFromInput(`evil.${suffix}`) === null,
+        `forbid entire tunnel/development namespace ${suffix}`)
+    }
+    for (const root of ['oss-cn-hangzhou.aliyuncs.com', 'oss.cn-hangzhou.aliyuncs.com', 'cos.ap-guangzhou.myqcloud.com', 'cos-ap-guangzhou.myqcloud.com', 's3-ap-southeast-1.amazonaws.com', 's3.ap-southeast-1.amazonaws.com', 'storage.googleapis.com']) {
+      ok(verifiedDomainFromInput(root) === null, `storage regional root cannot be registered ${root}`)
+      ok(verifiedDomainFromInput(`mybucket.${root}`) === `mybucket.${root}`
+        && verifiedDomainFromInput(`deeper.mybucket.${root}`) === null
+        && !hostMatchesVerifiedDomain(`evil.${root}`, `mybucket.${root}`), `storage bucket registration is narrow ${root}`)
+    }
     ok(verifiedDomainFromInput('alice.github.io') === 'alice.github.io', 'private suffix tenant can verify only its own host')
     ok(verifiedDomainFromInput('qingdao.sd.gov.cn') === 'qingdao.sd.gov.cn', 'provincial gov.cn suffix needs another label')
     ok(verifiedDomainFromInput('hrss.qingdao.gov.cn') === 'hrss.qingdao.gov.cn', 'agency may register a narrow official subdomain')
@@ -90,9 +100,16 @@ async function main() {
       'https://example.com.cn/?url=https%253A%252F%252Fevil.com',
       'https://example.com.cn/?target=http://example.com.cn',
       'https://example.com.cn/?target=https://user:pass@example.com.cn:8443',
+      'https://example.com.cn/#https://evil.com',
+      'https://example.com.cn/#javascript:alert(1)',
+      `https://example.com.cn/?next=${encodeURIComponent(encodeURIComponent(encodeURIComponent(encodeURIComponent(encodeURIComponent('https://evil.com')))))}`,
+      `https://example.com.cn/?next=${Array.from({ length: 10 }).reduce((value) => encodeURIComponent(value), 'https://evil.com')}`,
+      'https://example.com.cn/?next=%E2%80%8Bjavascript:alert(1)',
     ]) ok(verifiedHttpsUrl(url, allowed) === null, `reject unsafe URL ${url}`)
     ok(verifiedHttpsUrl(' HTTPS://JOBS.EXAMPLE.COM.CN.:443/path?next=https%3A%2F%2Fjobs.example.com.cn%2Fx ', allowed)?.toString().startsWith('https://jobs.example.com.cn/path?'), 'save canonical HTTPS URL and same-domain redirect')
     ok(!!verifiedHttpsUrl('https://example.com.cn/?next=/internal#section=hello', allowed), 'ordinary text and internal relative path remain valid')
+    ok(officialChannelLinkKey('HTTPS://EXAMPLE.COM.CN:443/jobs/?b=2&a=1#top')
+      === officialChannelLinkKey('https://example.com.cn/jobs?a=1&b=2'), 'hold identity ignores host case, default port, trailing slash, fragment and query order')
     ok(hostMatchesVerifiedDomain('jobs.example.com.cn', 'example.com.cn'), 'verified child domain allowed')
     ok(!hostMatchesVerifiedDomain('alice.github.io', 'github.io')
       && verifiedHttpsUrl('https://github.io/', ['github.io']) === null, 'public suffix cannot match or enter a channel URL')
@@ -254,20 +271,62 @@ async function main() {
     await service.updateForPartner(partnerA, a.id, { enabled: false })
     ok((await service.listForTerminal(terminalA)).items.length === 0, 'disabled channel absent publicly')
     await service.updateForPartner(partnerA, a.id, { enabled: true })
+    await service.replaceVerifiedDomains(ids.b, ['other.org', 'example.com.cn'], actor)
+    const sameA = await service.createForPartner(partnerA, { name: 'A 同链接', url: a.url })
+    const sameB = await service.createForPartner(partnerB, { name: 'B 同链接', url: a.url })
+    const slashA = await service.createForPartner(partnerA, { name: '斜杠变体', url: `${a.url}/` })
+    const fragmentB = await service.createForPartner(partnerB, { name: '片段变体', url: `${a.url}#top` })
+    ok((await service.listForTerminal(terminalA)).items.filter((item) => item.url === a.url).length === 2
+      && (await service.listForTerminal(terminalA)).items.some((item) => item.url === slashA.url)
+      && (await service.listForTerminal(terminalB)).items.some((item) => item.url === sameB.url)
+      && (await service.listForTerminal(terminalB)).items.some((item) => item.url === fragmentB.url),
+    'same destination exact and variant links are public before takedown')
     await rejects(() => emergency.takedown('official_channel', a.id, undefined, 'reason', actor), 'TAKEDOWN_REASON_REQUIRED', 'takedown requires reason code')
     const failEmergency = new RecruitmentEmergencyService(prisma, failedAudit)
     await rollsBack(() => failEmergency.takedown('official_channel', a.id, 'rights_complaint', '失败注入', actor), 'emergency takedown rolls back when audit insert fails')
     ok((await prisma.onlinePlatformDirectory.findUniqueOrThrow({ where: { id: a.id } })).status === 'active'
       && await prisma.recruitmentEmergencyHold.count({ where: { targetType: 'official_channel', targetId: a.id } }) === 0
-      && await prisma.partnerOrgNotice.count({ where: { orgId: ids.a } }) === 0, 'failed takedown left no status, hold or notice')
+      && (await prisma.onlinePlatformDirectory.findUniqueOrThrow({ where: { id: sameB.id } })).status === 'active'
+      && await prisma.partnerOrgNotice.count({ where: { orgId: { in: [ids.a, ids.b] } } }) === 0, 'failed takedown left no status, hold or notice across organizations')
+    let auditWrites = 0
+    const lateFailure = new RecruitmentEmergencyService(prisma, {
+      writeRequired: async (tx: never, entry: never) => {
+        auditWrites++
+        if (auditWrites === 3) throw new Error('late audit failure')
+        return audit.writeRequired(tx, entry)
+      },
+    } as AuditService)
+    await rollsBack(() => lateFailure.takedown('official_channel', a.id, 'rights_complaint', '后段失败', actor),
+      'cross-organization takedown rolls back when a later audit fails')
+    ok(await prisma.recruitmentEmergencyHold.count({ where: { targetType: 'official_channel', targetId: { in: [a.id, sameA.id, sameB.id, slashA.id, fragmentB.id] } } }) === 0
+      && await prisma.partnerOrgNotice.count({ where: { orgId: { in: [ids.a, ids.b] } } }) === 0
+      && await prisma.onlinePlatformDirectory.count({ where: { id: { in: [a.id, sameA.id, sameB.id, slashA.id, fragmentB.id] }, status: 'active' } }) === 5,
+    'late audit failure rolls back every matching channel, hold and notice')
     await emergency.takedown('official_channel', a.id, 'rights_complaint', '机构网站异常', actor)
+    ok((await prisma.recruitmentEmergencyHold.count({ where: { targetType: 'official_channel', targetId: { in: [a.id, sameA.id, sameB.id, slashA.id, fragmentB.id] } } })) === 5
+      && (await prisma.onlinePlatformDirectory.count({ where: { id: { in: [a.id, sameA.id, sameB.id, slashA.id, fragmentB.id] }, status: 'inactive' } })) === 5,
+    'same destination variants across organizations all receive holds and become inactive')
+    ok(await prisma.partnerOrgNotice.count({ where: { orgId: ids.a } }) === 3
+      && await prisma.partnerOrgNotice.count({ where: { orgId: ids.b } }) === 2, 'each affected organization receives a notice per channel')
     const adminHeld = (await controller.listForAdmin(ids.a)).data.items.find((item) => item.id === a.id)
     ok(adminHeld?.emergencyTakedown && adminHeld.emergencyReasonCode === 'rights_complaint'
       && adminHeld.emergencyReasonText === '机构网站异常', 'admin list includes complete emergency reason fields')
     ok((await service.listForTerminal(terminalA)).items.length === 0, 'emergency-held channel absent publicly')
+    ok(!(await service.listForTerminal(terminalB)).items.some((item) => item.url === sameB.url), 'cross-organization duplicate absent publicly')
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { status: 'active' } })
     ok((await service.listForTerminal(terminalA)).items.length === 0, 'hold alone excludes a stale active row')
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { status: 'inactive' } })
+    await prisma.onlinePlatformDirectory.update({ where: { id: sameB.id }, data: { status: 'active' } })
+    ok(!(await service.listForTerminal(terminalB)).items.some((item) => item.url === sameB.url), 'global hold link key excludes stale active duplicate')
+    await prisma.onlinePlatformDirectory.update({ where: { id: sameB.id }, data: { status: 'inactive' } })
+    const staleId = `oc_stale_${suffix}`
+    await prisma.onlinePlatformDirectory.create({ data: {
+      id: staleId, slug: staleId, organizationId: ids.b, category: 'official_channel',
+      name: '遗留重复链接', landingUrl: `${a.url}#late`, operatorLegalName: '机构 B', status: 'active',
+    } })
+    ok(!(await service.listForTerminal(terminalB)).items.some((item) => item.url === `${a.url}#late`),
+      'global hold key excludes an active legacy duplicate without its own hold')
+    await prisma.onlinePlatformDirectory.delete({ where: { id: staleId } })
     const held = (await service.listForPartner(partnerA)).items.find((item) => item.id === a.id)
     ok(held?.emergencyTakedown && held.emergencyReasonCode === 'rights_complaint' && held.emergencyReasonText === '机构网站异常', 'partner sees hold and reason')
     await rejects(() => service.updateForPartner(partnerA, a.id, { name: '下架后改名' }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held channel name frozen')
@@ -275,16 +334,22 @@ async function main() {
     await rejects(() => service.updateForPartner(partnerA, a.id, { url: 'https://example.com.cn/new' }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held channel link frozen')
     await rejects(() => service.updateForPartner(partnerA, a.id, { enabled: true }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'hold cannot be reenabled')
     await rejects(() => service.createForPartner(partnerA, { name: '重建同一链接', url: a.url }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held link cannot be recreated')
-    await service.replaceVerifiedDomains(ids.b, ['other.org', 'example.com.cn'], actor)
+    await rejects(() => service.createForPartner(partnerA, { name: '路径变体', url: `${a.url}/` }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held trailing slash cannot be recreated')
+    await rejects(() => service.createForPartner(partnerA, { name: '片段变体', url: `${a.url}#top` }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held fragment cannot be recreated')
+    await rejects(() => service.updateForPartner(partnerA, dormant.id, { url: `${a.url}#top` }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'existing channel cannot switch to held link variant')
     await rejects(() => service.createForPartner(partnerB, { name: '跨机构重建', url: a.url }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held link blocked across organizations')
     await emergency.takedown('official_channel', a.id, 'other', '重复下架', actor)
-    ok(await prisma.partnerOrgNotice.count({ where: { orgId: ids.a, kind: 'recruitment_emergency_takedown' } }) === 1, 'repeat takedown creates one notice')
+    ok(await prisma.partnerOrgNotice.count({ where: { orgId: ids.a, kind: 'recruitment_emergency_takedown' } }) === 3, 'repeat takedown creates no duplicate notices')
     ok(await prisma.recruitmentEmergencyHold.count({ where: { targetType: 'official_channel', targetId: a.id } }) === 1, 'takedown has one irreversible hold')
     ok(await prisma.auditLog.count({ where: { action: 'recruitment.emergency_takedown', targetId: a.id } }) === 2, 'each takedown attempt audited')
     await service.archiveForPartner(partnerA, a.id)
+    await service.archiveForPartner(partnerA, sameA.id)
+    await service.archiveForPartner(partnerA, slashA.id)
     ok(!(await service.listForPartner(partnerA)).items.some((item) => item.id === a.id), 'held channel can be archived and leaves partner list')
     ok(!(await controller.listForAdmin(ids.a)).data.items.some((item) => item.id === a.id), 'admin list excludes archived channel')
     await service.archiveForPartner(partnerB, b.id)
+    await service.archiveForPartner(partnerB, sameB.id)
+    await service.archiveForPartner(partnerB, fragmentB.id)
     ok((await service.listForPartner(partnerB)).items.length === 0 && (await service.listForTerminal(terminalB)).items.length === 0, 'archived channel absent from partner and terminal lists')
     ok((await controller.listForAdmin(ids.b)).data.items.length === 0, 'admin list excludes archived channels of another organization')
     ok(await prisma.auditLog.count({ where: { action: 'official_channel.archive', targetId: b.id } }) === 1, 'archive audited')

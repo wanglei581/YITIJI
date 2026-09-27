@@ -15,6 +15,7 @@ import { OFFICIAL_CHANNEL_CATEGORY, OFFICIAL_CHANNEL_CODES as CODE } from './off
 import {
   httpsHostnameOf,
   isCommercialRecruitmentHost,
+  officialChannelLinkKey,
   verifiedHttpsUrl,
 } from './registrable-domain'
 import { normalizeVerifiedDomainList, parseVerifiedDomains, type VerifiedDomainRecord } from './verified-domains'
@@ -269,12 +270,17 @@ export class OfficialChannelsService {
       select: { id: true, name: true, landingUrl: true, displayOrder: true },
     })
     const holds = await this.prisma.recruitmentEmergencyHold.findMany({
-      where: { targetType: 'official_channel', targetId: { in: rows.map((row) => row.id) } },
+      where: { targetType: 'official_channel' },
       select: { targetId: true },
     })
     const held = new Set(holds.map((hold) => hold.targetId))
+    const heldRows = await this.prisma.onlinePlatformDirectory.findMany({
+      where: { id: { in: [...held] }, category: OFFICIAL_CHANNEL_CATEGORY },
+      select: { landingUrl: true },
+    })
+    const heldLinks = new Set(heldRows.map((row) => officialChannelLinkKey(row.landingUrl)).filter((key): key is string => !!key))
     return rows
-      .filter((row) => !held.has(row.id))
+      .filter((row) => !held.has(row.id) && !heldLinks.has(officialChannelLinkKey(row.landingUrl) ?? ''))
       .filter((row) => this.publicUrlAllowed(row.landingUrl, verified))
       .map((row) => ({
         name: row.name,
@@ -336,14 +342,19 @@ export class OfficialChannelsService {
 
   /** A permanent hold follows the canonical link across channels and organizations. */
   private async assertLinkNotHeld(tx: PrismaTransactionClient, url: string): Promise<void> {
+    const key = officialChannelLinkKey(url)
+    if (!key) fail('bad', CODE.urlInvalid, '链接必须是不带账号的 https 地址')
+    const holds = await tx.recruitmentEmergencyHold.findMany({
+      where: { targetType: 'official_channel' }, select: { targetId: true },
+    })
+    if (!holds.length) return
     const rows = await tx.onlinePlatformDirectory.findMany({
-      where: { category: OFFICIAL_CHANNEL_CATEGORY, landingUrl: url }, select: { id: true },
+      where: { category: OFFICIAL_CHANNEL_CATEGORY, id: { in: holds.map((hold) => hold.targetId) } },
+      select: { landingUrl: true },
     })
-    if (!rows.length) return
-    const hold = await tx.recruitmentEmergencyHold.findFirst({
-      where: { targetType: 'official_channel', targetId: { in: rows.map((row) => row.id) } }, select: { id: true },
-    })
-    if (hold) fail('forbidden', CODE.emergencyHeld, '该链接已紧急下架，不能再次创建或使用')
+    if (rows.some((row) => officialChannelLinkKey(row.landingUrl) === key)) {
+      fail('forbidden', CODE.emergencyHeld, '该链接已紧急下架，不能再次创建或使用')
+    }
   }
 
   private cleanName(raw: string): string {

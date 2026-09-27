@@ -303,7 +303,10 @@ async function main() {
         fail('9a. PDF 未使用同一份清理结果')
       }
       pass('9a. 旧规划查看与 PDF 共用 basedOn 清理，最新手填 job_fit 不覆盖来源')
-      const manualPlan = { ...oldPlan, basedOn: { ...oldPlan.basedOn, jobFitSource: 'manual' } }
+      const manualPlan = { ...oldPlan,
+        payload: { ...oldPlan.payload, directions: [null, ...oldPlan.payload.directions],
+          currentSnapshot: [null, ...oldPlan.payload.currentSnapshot], skillPlan: [null, ...oldPlan.payload.skillPlan] },
+        basedOn: { ...oldPlan.basedOn, jobFitSource: 'manual' } }
       await prisma.aiResumeResult.update({
         where: { taskId_kind: { taskId: taskAnon, kind: 'career_plan' } },
         data: { payloadJson: JSON.stringify(manualPlan) },
@@ -312,7 +315,16 @@ async function main() {
       if (manualLatest.basedOn.jobFit !== '高级财务会计' || !manualLatest.summary.includes('「高级财务会计」')) {
         fail('9b. 手填来源规划在板块关闭时应完整可读')
       }
+      if (manualLatest.directions.some((item: unknown) => item === null)
+        || manualLatest.currentSnapshot.some((item: unknown) => item === null)) fail('9b. 手填存档查看未清理空数组项')
       pass('9b. 手填规划在板块关闭时可读，按规划自身来源判定')
+      const manualPrinted = await svc.printPlan(taskAnon, anonReq, { jobBoardOpen: false })
+      if (manualPrinted.pageCount < 1) fail('9b. 手填存档空方向项导致真实 PDF 打印失败')
+      pass('9b. 手填存档含空方向项仍可真实打印')
+      const defensivePdf = await pdf.render({ date: '2026-09-27', basedOn: { jobFit: null, interview: null }, contentId: 'null-direction' },
+        { ...VALID, directions: [null] } as unknown as CareerPlanPayload)
+      if (!defensivePdf.buffer.toString('latin1', 0, 4).startsWith('%PDF')) fail('9b. PDF 渲染器未独立过滤空项')
+      pass('9b. PDF 渲染器独立过滤空项')
       const closedController = new CareerPlanController(svc, {} as never, {} as never, prisma,
         { resolve: async () => ({ enabled: false }) } as never)
       const manualHttp = await closedController.latest(taskAnon, { headers: { 'x-resume-access-token': accessToken } })

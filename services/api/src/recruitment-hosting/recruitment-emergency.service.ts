@@ -6,6 +6,7 @@ import {
   assertEmergencyReason,
   type EmergencyReasonCode,
 } from './recruitment-hosting'
+import { officialChannelLinkKey } from '../official-channels/registrable-domain'
 
 export type EmergencyTargetType = 'job' | 'job_fair' | 'company' | 'policy' | 'fair_material' | 'offline_agency' | 'official_channel'
 
@@ -42,6 +43,24 @@ export class RecruitmentEmergencyService {
     actor: AuthedUser,
   ) {
     const reason = assertEmergencyReason(reasonCode, reasonText)
+    if (targetType === 'official_channel') {
+      await this.prisma.$transaction(async (tx) => {
+        const channel = await tx.onlinePlatformDirectory.findFirst({
+          where: { id: targetId, category: 'official_channel', archivedAt: null, organizationId: { not: null } },
+          select: { id: true, organizationId: true, name: true, status: true },
+        })
+        if (!channel?.organizationId) {
+          throw new NotFoundException({ error: { code: 'CONTENT_NOT_FOUND', message: '内容不存在' } })
+        }
+        const row: TargetRow = {
+          id: channel.id, orgId: channel.organizationId, sourceId: null, title: channel.name,
+          publishStatus: channel.status === 'active' ? 'published' : 'unpublished',
+        }
+        const matches = await this.expandOfficialChannelMatches(tx, [{ targetType, row }])
+        for (const item of matches) await this.applyOneInTx(tx, item.targetType, item.row, reason, actor, 'single')
+      })
+      return { targetType, targetId, publishStatus: 'unpublished', irreversible: true }
+    }
     const row = await this.loadOne(targetType, targetId)
     await this.applyOne(targetType, row, reason, actor, 'single')
     return { targetType, targetId, publishStatus: 'unpublished', irreversible: true }
@@ -73,7 +92,7 @@ export class RecruitmentEmergencyService {
         create: { scope, targetId: trimmed, reasonCode: reason.reasonCode, reasonText: reason.reasonText, actorId: actor.userId },
         update: {},
       })
-      const rows = await this.loadScope(tx, scope, trimmed)
+      const rows = await this.expandOfficialChannelMatches(tx, await this.loadScope(tx, scope, trimmed))
       for (const item of rows) await this.applyOneInTx(tx, item.targetType, item.row, reason, actor, 'circuit_break')
       await this.audit.writeRequired(tx, {
         actorId: actor.userId, actorRole: 'admin', action: 'recruitment.circuit_break',
@@ -259,6 +278,33 @@ export class RecruitmentEmergencyService {
         },
       })),
     ]
+  }
+
+  /** One compromised destination is removed everywhere, with a hold and notice for every owner. */
+  private async expandOfficialChannelMatches(
+    tx: PrismaTransactionClient,
+    items: Array<{ targetType: EmergencyTargetType; row: TargetRow }>,
+  ): Promise<Array<{ targetType: EmergencyTargetType; row: TargetRow }>> {
+    const seedIds = items.filter((item) => item.targetType === 'official_channel').map((item) => item.row.id)
+    if (!seedIds.length) return items
+    const seeds = await tx.onlinePlatformDirectory.findMany({
+      where: { id: { in: seedIds } }, select: { landingUrl: true },
+    })
+    const keys = new Set(seeds.map((row) => officialChannelLinkKey(row.landingUrl)).filter((key): key is string => !!key))
+    const all = await tx.onlinePlatformDirectory.findMany({
+      where: { category: 'official_channel', organizationId: { not: null } },
+      select: { id: true, organizationId: true, name: true, status: true, landingUrl: true },
+    })
+    const known = new Set(items.map((item) => item.row.id))
+    const extra = all.filter((row) => !known.has(row.id) && keys.has(officialChannelLinkKey(row.landingUrl) ?? ''))
+      .map((row) => ({
+        targetType: 'official_channel' as const,
+        row: {
+          id: row.id, orgId: row.organizationId!, sourceId: null, title: row.name,
+          publishStatus: row.status === 'active' ? 'published' : 'unpublished',
+        },
+      }))
+    return [...items, ...extra]
   }
 
   private async applyOne(

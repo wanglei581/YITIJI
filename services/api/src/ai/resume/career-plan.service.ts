@@ -18,6 +18,7 @@ import {
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
 import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
 import { storedJobFitUsesSystemJob } from './job-fit-hosting'
+import { sanitizeCareerPlanPayload } from './career-plan-payload-safety'
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -80,15 +81,16 @@ function scrubSystemJobTitle(value: string, title: string): string {
 
 /** 去掉系统岗位标题，保留规划正文。basedOn.jobFit 清空，避免标题从依据栏漏出。 */
 export function redactCareerPlanSystemJobTitle(stored: StoredCareerPlan, title: string): StoredCareerPlan {
-  if (!stored.basedOn?.jobFit || stored.basedOn.jobFitSource === 'manual') return stored
+  const safeStored = { ...stored, payload: sanitizeCareerPlanPayload(stored.payload) }
+  if (!safeStored.basedOn?.jobFit || safeStored.basedOn.jobFitSource === 'manual') return safeStored
   const clean = (value: string | undefined) => scrubSystemJobTitle(value ?? '', title)
   const cleanStructured = (value: string | undefined) => value === title && !!title.trim() ? '目标岗位' : clean(value)
-  const payload = stored.payload
+  const payload = safeStored.payload
   const objects = <T extends object>(items: T[] | undefined): T[] => Array.isArray(items)
     ? items.filter((item): item is T => !!item && typeof item === 'object' && !Array.isArray(item)) : []
   return {
-    ...stored,
-    basedOn: { ...stored.basedOn, jobFit: null, jobFitSource: null },
+    ...safeStored,
+    basedOn: { ...safeStored.basedOn, jobFit: null, jobFitSource: null },
     payload: {
       ...payload,
       summary: clean(payload?.summary),
@@ -325,7 +327,9 @@ export class CareerPlanService {
    * 旧存档无来源字段时，只要有 basedOn.jobFit 就保守按系统引用清理。
    */
   private withoutSystemJobTitle(stored: StoredCareerPlan, options?: { jobBoardOpen?: boolean }): StoredCareerPlan {
-    if (isRecruitmentContentHostingEnabled() && options?.jobBoardOpen !== false) return stored
+    if (isRecruitmentContentHostingEnabled() && options?.jobBoardOpen !== false) {
+      return { ...stored, payload: sanitizeCareerPlanPayload(stored.payload) }
+    }
     return redactCareerPlanSystemJobTitle(stored, stored.basedOn?.jobFit ?? '')
   }
 

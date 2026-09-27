@@ -7,8 +7,28 @@ const PSL_OPTIONS = { allowPrivateDomains: true } as const
 // These delegated hosting roots are not yet in the bundled PSL. Treat each as
 // a suffix until tldts includes it; a tenant may verify only its own child.
 const PSL_GAP_SUFFIXES = ['gitee.io', 'myqcloud.com', 'aliyuncs.com'] as const
+const FORBIDDEN_SHARED_HOSTS = [
+  'lhr.life', 'localhost.run', 'loca.lt', 'serveo.net', 'pagekite.me',
+  'github.dev', 'ngrok-free.app', 'trycloudflare.com', 'vscode.dev',
+  'githubcodespaces.com', 'codespaces.new', 'codespaces.github.com', 'githubpreview.dev',
+] as const
+
+function storageRegionSuffix(host: string): string | null {
+  const labels = host.split('.')
+  const tail = (n: number) => labels.slice(-n).join('.')
+  if (labels.length >= 3 && /^oss(?:-[a-z0-9-]+)?$/.test(labels.at(-3) ?? '') && tail(2) === 'aliyuncs.com') return tail(3)
+  if (labels.length >= 4 && labels.at(-4) === 'oss' && /^[a-z0-9-]+$/.test(labels.at(-3) ?? '') && tail(2) === 'aliyuncs.com') return tail(4)
+  if (labels.length >= 4 && labels.at(-4) === 'cos' && /^[a-z0-9-]+$/.test(labels.at(-3) ?? '') && tail(2) === 'myqcloud.com') return tail(4)
+  if (labels.length >= 3 && /^cos-[a-z0-9-]+$/.test(labels.at(-3) ?? '') && tail(2) === 'myqcloud.com') return tail(3)
+  if (labels.length >= 3 && /^s3[.-][a-z0-9-]+$/.test(labels.at(-3) ?? '') && tail(2) === 'amazonaws.com') return tail(3)
+  if (labels.length >= 4 && labels.at(-4) === 's3' && /^[a-z0-9-]+$/.test(labels.at(-3) ?? '') && tail(2) === 'amazonaws.com') return tail(4)
+  if (host === 'storage.googleapis.com' || host.endsWith('.storage.googleapis.com')) return 'storage.googleapis.com'
+  return null
+}
 
 function effectiveSuffix(host: string): string | null {
+  const storage = storageRegionSuffix(host)
+  if (storage) return storage
   const listed = getPublicSuffix(host, PSL_OPTIONS)
   const gap = PSL_GAP_SUFFIXES.find((suffix) => host === suffix || host.endsWith(`.${suffix}`))
   if (gap) return gap
@@ -23,6 +43,7 @@ function effectiveSuffix(host: string): string | null {
 function normalizedHostname(raw: string): string | null {
   const host = domainToASCII(raw.trim().toLowerCase().replace(/\.$/, ''))
   if (!host || host === 'localhost' || host.endsWith('.local') || isIP(host) || !HOST_RE.test(host)) return null
+  if (FORBIDDEN_SHARED_HOSTS.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) return null
   return host
 }
 
@@ -49,25 +70,29 @@ export function isCommercialRecruitmentHost(hostname: string): boolean {
   return domain !== null && (COMMERCIAL_RECRUITMENT_REGISTRABLE_DOMAINS as readonly string[]).includes(domain)
 }
 
-/** Values can be decoded by a later redirect handler. Inspect three further encoding layers. */
+/** Redirect handlers may decode repeatedly or ignore invisible format characters. */
 function withoutControls(value: string): string {
-  return [...value].filter((char) => char.charCodeAt(0) > 31 && char.charCodeAt(0) !== 127).join('')
+  return [...value].filter((char) => char.charCodeAt(0) > 31 && char.charCodeAt(0) !== 127 && !/\p{Cf}/u.test(char)).join('')
 }
 
-function redirectValue(raw: string): string {
+function redirectValue(raw: string): { value: string; leadingBackslash: boolean } | null {
   let value = withoutControls(raw)
-  for (let i = 0; i < 3; i++) {
+  let stable = false
+  for (let i = 0; i < 8; i++) {
     let decoded: string
     try { decoded = decodeURIComponent(value) } catch { break }
-    if (decoded === value) break
+    if (decoded === value) { stable = true; break }
     value = withoutControls(decoded)
   }
-  return value.trim().replace(/\\/g, '/')
+  if (!stable && /%[0-9a-f]{2}/i.test(value)) return null
+  const trimmed = value.trim()
+  return { value: trimmed.replace(/\\/g, '/'), leadingBackslash: trimmed.startsWith('\\') }
 }
 
 function redirectValues(url: URL): string[] {
   const values = [...url.searchParams.values()]
   const fragment = url.hash.slice(1)
+  if (fragment) values.push(fragment)
   if (fragment.includes('=')) values.push(...new URLSearchParams(fragment).values())
   return values
 }
@@ -85,12 +110,14 @@ function inspectUrl(raw: string, allowedDomains: readonly string[] | undefined, 
   if (allowedDomains && !allowedDomains.some((domain) => hostMatchesVerifiedDomain(host, domain))) return null
   if (!allowedDomains) return url
   for (const rawValue of redirectValues(url)) {
-    const target = redirectValue(rawValue)
+    const decoded = redirectValue(rawValue)
+    if (!decoded) return null
+    const target = decoded.value
     const scheme = /^[a-z][a-z\d+.-]*:/i.exec(target)
-    if (!target.startsWith('/') && !scheme && !rawValue.trim().startsWith('\\')) continue
+    if (!target.startsWith('/') && !scheme && !decoded.leadingBackslash) continue
     // A leading backslash or a noncanonical scheme can be interpreted differently
     // by redirect handlers. Fail closed even if URL resolves it as a local path.
-    if (rawValue.trim().startsWith('\\') || (scheme && !/^https:\/\//i.test(target))) return null
+    if (decoded.leadingBackslash || (scheme && !/^https:\/\//i.test(target))) return null
     if (!inspectUrl(target, allowedDomains, url, depth + 1)) return null
   }
   return url
@@ -99,6 +126,15 @@ function inspectUrl(raw: string, allowedDomains: readonly string[] | undefined, 
 /** Canonical HTTPS URL, including every redirect-looking query and fragment value. */
 export function verifiedHttpsUrl(raw: string, allowedDomains?: readonly string[]): URL | null {
   return inspectUrl(raw, allowedDomains, undefined, 0)
+}
+
+/** Comparison identity for permanent holds; the displayed URL keeps its original path and fragment. */
+export function officialChannelLinkKey(raw: string): string | null {
+  const url = verifiedHttpsUrl(raw)
+  if (!url) return null
+  url.hash = ''
+  url.searchParams.sort()
+  return `${url.origin}${url.pathname.replace(/\/+$/, '')}${url.search}`
 }
 
 export function httpsHostnameOf(raw: string): string | null {
@@ -112,7 +148,10 @@ export function verifiedDomainFromInput(raw: string): string | null {
   const host = text.includes('://') || text.includes('/')
     ? verifiedHttpsUrl(text)?.hostname ?? null
     : normalizedHostname(text)
-  return host && registrableDomainOf(host) ? host : null
+  if (!host || !registrableDomainOf(host)) return null
+  const storage = storageRegionSuffix(host)
+  if (storage && host.split('.').length !== storage.split('.').length + 1) return null
+  return host
 }
 
 export function hostMatchesVerifiedDomain(hostname: string, verifiedDomain: string): boolean {

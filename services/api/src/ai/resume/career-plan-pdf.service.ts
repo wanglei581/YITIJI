@@ -4,6 +4,7 @@ import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import { stampAigcPageHeader } from '../../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont as registerCommonCjkFont } from '../../common/pdf/cjk-font'
 import type { CareerPlanPayload } from './llm-career-plan.service'
+import { sanitizeCareerPlanPayload } from './career-plan-payload-safety'
 
 // ============================================================
 // 职业规划建议单 PDF（2E）：专属版式（非面试报告复用——语境与分节不同）。
@@ -37,6 +38,7 @@ export class CareerPlanPdfService {
     },
     plan: CareerPlanPayload,
   ): Promise<{ buffer: Buffer; pageCount: number }> {
+    plan = sanitizeCareerPlanPayload(plan)
     const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     applyAigcPdfMetadata(doc, {
       title: 'AI 职业规划建议',
