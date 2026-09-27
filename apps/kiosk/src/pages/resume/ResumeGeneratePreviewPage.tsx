@@ -10,6 +10,7 @@ import type {
   ResumeTemplate,
 } from '@ai-job-print/shared'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -185,15 +186,30 @@ export function ResumeGeneratePreviewPage() {
   })
 
   return (
-    <QxPageFrame title="简历预览" subtitle="核对内容后带走 · 语音生成的结果同样走这一套导出" navbar={<GeneratePreviewNavbar onNavigate={go} />} ctabar={ctabar ?? undefined}>
+    <QxPageFrame
+      title="简历预览"
+      subtitle="核对内容后带走"
+      status={{
+        tone: view === 'preview-failed' || view === 'illegal' ? 'bad' : view === 'preview-loading' ? 'warn' : view === 'preview-ready' || view === 'export-ready' ? 'ok' : 'unknown',
+        label: view === 'preview-loading' ? '正在读回这次结果' : view === 'preview-failed' ? '这次没读回来' : view === 'preview-ready' ? '核对这一次的结果' : '预览',
+      }}
+      back={{ label: '返回填写', onBack: () => go('/resume/generate') }}
+      navbar={<GeneratePreviewNavbar onNavigate={go} />}
+      ctabar={ctabar || showWorkspace ? <>{ctabar}{showWorkspace ? <ResumeGenerateAiRow /> : null}</> : undefined}
+    >
       <section
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-generate-preview"
-        className="qx-resume-generate"
+        className="qx-resume-generate qx-scroll"
         data-generate-state={view}
         data-fallback={resolved.fallback ? '1' : undefined}
         data-synthetic={resolved.synthetic ? '1' : undefined}
       >
+        <ResumeGenerateAdvisor
+          eyebrow="核对结果"
+          ask={showWorkspace ? '生成好了，你核一遍' : emptyCopy.title}
+          doing={showWorkspace ? '事实和你填的一致。被整理过的段落会标明供参考。' : emptyCopy.description}
+        />
         <ResumeAigcBadge synthetic={resolved.synthetic} />
         {!showWorkspace && (
           <>

@@ -1,6 +1,71 @@
 /* 简历生成预览 · 青序流光。共用优化页交付样式，只补本页差异。 */
 @import './resume-optimize-qx.css';
 
+/* 稿 24 的页头是小青区，不再另放一套标题。 */
+.qx-stage:has(.qx-resume-generate) > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.qx-stage:has(.qx-resume-generate) > .qx-ctabar { flex-wrap: wrap; }
+.qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-step-actions { flex: 1 0 100%; }
+
+.qx-resume-generate .rg-xq {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 16px;
+  padding: 18px 28px;
+  border-radius: 32px;
+  background: linear-gradient(158deg, var(--qx-deep-2) 0%, var(--qx-deep) 68%);
+  color: var(--qx-paper);
+}
+.qx-resume-generate .rg-xq-face {
+  flex: none;
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--qx-emerald) 40%, transparent);
+  background: color-mix(in srgb, var(--qx-emerald) 12%, transparent);
+  color: var(--qx-emerald);
+  font-family: var(--qx-serif);
+  font-size: 38px;
+  font-weight: 700;
+}
+.qx-resume-generate .rg-xq-main { flex: 1; min-width: 0; }
+.qx-resume-generate .rg-xq-eyebrow {
+  margin: 0 0 4px;
+  font-size: var(--qx-fs-aux);
+  letter-spacing: 2px;
+  color: color-mix(in srgb, var(--qx-paper) 88%, transparent);
+}
+.qx-resume-generate .rg-xq-ask {
+  margin: 0;
+  font-family: var(--qx-serif);
+  font-size: var(--qx-fs-greeting);
+  font-weight: 700;
+  line-height: 1.25;
+}
+.qx-resume-generate .rg-xq-doing {
+  margin: 8px 0 0;
+  font-size: var(--qx-fs-body);
+  line-height: var(--qx-lh-body);
+  color: color-mix(in srgb, var(--qx-paper) 86%, transparent);
+}
+.qx-resume-generate .rg-truth {
+  margin: 8px 0 0;
+  font-size: var(--qx-fs-aux);
+  line-height: 1.45;
+  color: var(--qx-ink-2);
+}
+
 .qx-resume-generate .qx-rd-hints {
   display: flex;
   flex-direction: column;
@@ -12,7 +77,7 @@
   border-radius: 14px;
   background: var(--qx-wheat-soft);
   color: var(--qx-wheat-d);
-  font-size: 16px;
+  font-size: var(--qx-fs-aux);
   font-weight: 700;
   line-height: 1.4;
 }
@@ -26,7 +91,7 @@
 .qx-resume-generate .qx-rd-label > span {
   display: block;
   margin-bottom: 8px;
-  font-size: 16px;
+  font-size: var(--qx-fs-body);
   font-weight: 700;
   color: var(--qx-ink-2);
 }
@@ -39,7 +104,7 @@
   background: var(--qx-paper);
   color: var(--qx-ink);
   font: inherit;
-  font-size: 18px;
+  font-size: var(--qx-fs-body-lg);
 }
 .qx-resume-generate textarea.qx-rd-field { min-height: 88px; resize: none; }
 .qx-resume-generate .qx-rd-field:focus {
@@ -179,13 +244,12 @@
   min-height: 0;
 }
 .qx-resume-generate .qx-rd-main > .qx-card {
-  flex: 1;
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
-/* 字段区吃掉多余空间，说明卡与自查行自然沉到卡片下部 */
 .qx-resume-generate .qx-rd-main > .qx-card > .grid {
-  flex: 1;
+  flex: none;
   align-content: start;
 }

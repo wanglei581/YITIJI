@@ -14,11 +14,13 @@ import type { ResumeTemplate, ResumeTemplateSectionKey } from '@ai-job-print/sha
 import { CheckCircle2Icon, FileTextIcon, LayoutTemplateIcon, LockIcon, PenLineIcon, PrinterIcon, TargetIcon, UserIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { Checks, CtaNote, Ghosts, KitRows, ListRows, Nots, RouteCards, Sec, Verdict, Waiting } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
+import './resume-templates-qx.css'
 
 const FILTERS = ['全部', '简历模板', '通用'] as const
 
@@ -112,6 +114,15 @@ export function ResumeTemplateLibraryPage() {
   }
   const reload = () => setReloadKey((key) => key + 1)
   const goResumeHub = () => navigate('/resume-service')
+  const aiRow = (
+    <QxStepActions onPrev={goResumeHub}>
+      <QxAiHelp
+        label="让小青帮我选版式 →"
+        draft="我想挑一份简历版式，请根据经历长短告诉我更适合单栏还是双栏。"
+        testId="resume-templates-ai-help"
+      />
+    </QxStepActions>
+  )
 
   const screen: TemplatesScreen = loading
     ? 'loading'
@@ -134,23 +145,23 @@ export function ResumeTemplateLibraryPage() {
   function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; body: ReactNode; cta: ReactNode } {
     if (screen === 'loading') return {
       title: '正在读取版式，还没有列表',
-      subtitle: '简历素材库的模板列表由服务端发布。读取完成前不显示任何模板名称、数量或已选状态。',
+      subtitle: '简历素材库的模板由已发布的列表决定。读取完成前不显示任何模板名称、数量或已选状态。',
       pill: { tone: 'unknown', label: '正在读取简历模板列表' },
       body: (
         <>
           <Sec title="正在读取可用的简历模板" hint="无进度条 · 无预计时间">
-            <Waiting icon={<LayoutTemplateIcon size={34} />} title="读取请求已提交，等待服务端返回" desc="只显示服务端已发布的模板。读取失败或没有模板时会直接说明，不用内置默认模板顶替。" tag="整体等待中，没有百分比" />
+            <Waiting icon={<LayoutTemplateIcon size={34} />} title="读取请求已提交，等待列表返回" desc="只显示已经发布的模板。读取失败或没有模板时会直接说明，不用内置默认模板顶替。" tag="整体等待中，没有百分比" />
           </Sec>
           <Sec title="这一步会做什么、不会做什么" hint="读取范围写在前面" grow>
             <Checks items={[
               { tone: 'ok', icon: <UserIcon size={24} />, title: '只读列表', desc: '这一步只读取模板列表，不读取你的简历内容。', chip: '已确认' },
-              { tone: 'wait', icon: <LayoutTemplateIcon size={24} />, title: '模板数量', desc: '有几个模板由服务端发布结果决定，本页不预设。', chip: '等待返回' },
+              { tone: 'wait', icon: <LayoutTemplateIcon size={24} />, title: '模板数量', desc: '有几个模板由已发布的列表决定，本页不预设。', chip: '等待返回' },
               { tone: 'ok', icon: <LockIcon size={24} />, title: '不自动应用', desc: '读到列表也不会自动套用到你的简历上。', chip: '已固定' },
             ]} />
           </Sec>
           <Sec title="还没有返回的内容" hint="返回前一律留空">
             <Ghosts items={[
-              { title: '模板名称', desc: '标题与适用场景由服务端提供。', tag: '等待返回' },
+              { title: '模板名称', desc: '标题与适用场景随列表一起返回。', tag: '等待返回' },
               { title: '版式结构', desc: '栏数与分区顺序随模板返回。', tag: '等待返回' },
               { title: '适用说明', desc: '适合哪类经历由发布方说明。', tag: '等待返回' },
             ]} />
@@ -162,13 +173,14 @@ export function ResumeTemplateLibraryPage() {
           <CtaNote>读取期间不显示任何模板，也不保存任何选择。</CtaNote>
           <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
           <QxAction label="不等模板，直接去简历优化" variant="primary" onClick={handleUseResumeTemplate} />
+          {aiRow}
         </>
       ),
     }
 
     if (screen === 'error') return {
       title: '模板列表这次没读到',
-      subtitle: '读取失败。系统不会用内置默认模板冒充服务端列表，也不显示上一次的缓存内容。',
+      subtitle: '读取失败。系统不会用内置默认模板冒充已发布列表，也不显示上一次的内容。',
       pill: { tone: 'bad', label: '简历模板列表读取失败' },
       body: (
         <>
@@ -182,7 +194,7 @@ export function ResumeTemplateLibraryPage() {
           <Sec title="这次没有发生的事" hint="失败不影响你已有的内容" grow>
             <Nots items={[
               '没有显示任何模板名称或版式',
-              '没有用内置默认模板冒充服务端列表',
+              '没有用内置默认模板冒充已发布列表',
               '没有把任何版式套用到你的简历上',
               '没有修改或保存你的简历内容',
             ]} />
@@ -200,13 +212,14 @@ export function ResumeTemplateLibraryPage() {
           <CtaNote>模板只影响排版，不影响你已有的简历内容。</CtaNote>
           <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
           <QxAction label="重新读取模板" variant="primary" onClick={reload} />
+          {aiRow}
         </>
       ),
     }
 
     if (screen === 'empty') return {
       title: '当前没有已发布的简历模板',
-      subtitle: '服务端这次没有返回任何已发布模板。这不影响你继续准备简历 —— 内容比版式更重要。',
+      subtitle: '这次没有已发布的模板。这不影响你继续准备简历 —— 内容比版式更重要。',
       pill: { tone: 'warn', label: '当前没有可用的简历模板' },
       body: (
         <>
@@ -234,6 +247,7 @@ export function ResumeTemplateLibraryPage() {
           <CtaNote>模板列表为空不代表服务异常；发布后会出现在这一页。</CtaNote>
           <QxAction label="重新读取模板" variant="ghost" onClick={reload} />
           <QxAction label="去简历优化" variant="primary" onClick={handleUseResumeTemplate} />
+          {aiRow}
         </>
       ),
     }
@@ -254,10 +268,10 @@ export function ResumeTemplateLibraryPage() {
       title: selected ? '版式选好了，再核对内容' : '先挑一个版式，内容仍由你决定',
       subtitle: selected
         ? '选中只是这次的版式参考。正式简历在后续流程结合你的真实内容生成，这里不冒充已生成。'
-        : '简历素材库：模板由服务端发布。选中后可以看版式结构，不会自动应用，也不会直接生成简历。',
+        : '简历素材库：模板来自已发布的列表。选中后可以看版式结构，不会自动应用，也不会直接生成简历。',
       pill: selected
         ? { tone: 'ok', label: '已选中一个版式 · 未保存' }
-        : { tone: 'ok', label: '模板列表以服务端返回为准' },
+        : { tone: 'ok', label: '以实际发布的模板为准' },
       body: (
         <>
           <Sec title="选择一个版式参考" hint={selected ? '已选中 1 个' : '按真实分类筛选'}>
@@ -304,7 +318,7 @@ export function ResumeTemplateLibraryPage() {
                 {selected ? (
                   <>
                     <p className="jfq-sec-copy">
-                      {STYLE_LABELS[selected.resumeLayoutPreset.style]}风格 · {columnsLabel(selected)} · 分区顺序来自该模板的服务端预设：
+                      {STYLE_LABELS[selected.resumeLayoutPreset.style]}风格 · {columnsLabel(selected)} · 分区顺序来自这份模板：
                     </p>
                     <ol className="rdq-sections">
                       {selected.resumeLayoutPreset.sectionOrder.map((key) => <li key={key}>{SECTION_LABELS[key] ?? key}</li>)}
@@ -331,7 +345,8 @@ export function ResumeTemplateLibraryPage() {
       ),
       cta: (
         <>
-          <CtaNote>{selected ? '此页不会保存模板选择，也不会直接生成简历。' : '模板由服务端发布；此页不会保存模板选择，也不会直接生成简历。'}</CtaNote>
+          <CtaNote>{selected ? '此页不会保存模板选择，也不会直接生成简历。' : '模板来自已发布的列表；此页不会保存模板选择，也不会直接生成简历。'}</CtaNote>
+          {aiRow}
           {selected
             ? <QxAction label="换一个版式" variant="ghost" onClick={() => setSelectedId(null)} />
             : <QxAction label="重新读取模板" variant="ghost" onClick={reload} />}

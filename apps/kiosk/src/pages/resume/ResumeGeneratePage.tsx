@@ -38,16 +38,17 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
+import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import './resume-generate-qx.css'
 
 const STEPS = [
-  { title: '基本信息', description: '姓名与联系方式' },
-  { title: '求职意向', description: '目标岗位' },
-  { title: '教育经历', description: '学校与专业' },
-  { title: '工作经历', description: '实习 / 工作' },
-  { title: '项目经历', description: '可选' },
-  { title: '技能证书', description: '技能与自我评价' },
+  { title: '基本信息', description: '姓名与联系方式', ask: '先留下能联系上你的方式', doing: '这一步只有姓名必填。城市和联系方式可以空着。' },
+  { title: '求职意向', description: '目标岗位', ask: '你想找什么方向的工作？', doing: '这一步只有目标岗位必填。' },
+  { title: '教育经历', description: '学校与专业', ask: '把上过的学校说清楚', doing: '学校、专业和学历由你填写，整理时这些事实一个字都不会改。' },
+  { title: '工作经历', description: '实习 / 工作', ask: '把做过的事说清楚', doing: '公司和职务由你填写。描述可以直接说，不用打字。' },
+  { title: '项目经历', description: '可选', ask: '有项目就写一段', doing: '没有项目可以跳过。有的话，项目名由你填写。' },
+  { title: '技能证书', description: '技能与自我评价', ask: '还有会什么，和怎么做事', doing: '技能和证书只填你真有的。自我评价写一两句，整理时帮你顺一下。' },
 ] as const
 
 const inputCls = 'qx-rd-field'
@@ -333,7 +334,7 @@ export function ResumeGeneratePage() {
         disabled={generating}
         onClick={() => (step === 0 ? navigate('/resume/source') : setStep((s) => s - 1))}
       >
-        {step === 0 ? '返回' : '上一步'}
+        {step === 0 ? '返回简历服务' : '上一步'}
       </button>
       {step < STEPS.length - 1 ? (
         <button
@@ -354,21 +355,39 @@ export function ResumeGeneratePage() {
           onClick={() => void handleGenerate()}
         >
           <SparklesIcon className="h-5 w-5" />
-          {generating ? 'AI 生成中…' : '生成我的简历'}
+          {generating ? '正在整理…' : '生成我的简历'}
         </button>
       )}
+      <ResumeGenerateAiRow />
     </>
   )
 
   return (
     <QxPageFrame
-      title="AI 简历生成"
-      subtitle="填写你的真实信息，AI 帮你润色成一份结构化简历"
+      title="从零生成简历"
+      subtitle="分步问完，一次整理。只整理你说的，不替你编。"
+      status={{
+        tone: aiOutage || error ? 'bad' : generating || exportingDraft ? 'warn' : 'unknown',
+        label: generating
+          ? '正在整理你的资料'
+          : exportingDraft
+            ? '正在把你填的内容排成 PDF'
+            : aiOutage
+              ? '整理暂时不可用'
+              : error
+                ? '这次没整理出来'
+                : `第 ${step + 1} 步 / 共 ${STEPS.length} 步 · ${STEPS[step].title}`,
+      }}
       back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
       navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
       ctabar={ctabar}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
+      <ResumeGenerateAdvisor
+        eyebrow="从零生成"
+        ask={STEPS[step].ask}
+        doing={STEPS[step].doing}
+      />
       <div className="qx-rd-work">
         <div className="qx-rd-steps">
           <Stepper steps={[...STEPS]} currentIndex={step} />
@@ -390,10 +409,6 @@ export function ResumeGeneratePage() {
               两张「为什么要填」卡和一条底部自查行；正是它们把 1080×1920 竖屏填满。
               删掉稿里没有的右侧「填写进度」面板之后，这些必须补上，否则下半屏是空的。
             */}
-            <div className="qx-rd-lead">
-              <b>先留下能联系上你的方式</b>
-              <p>这一步只有<em>姓名必填</em>，其余三项可以空着，生成后会提示你回来补。</p>
-            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="姓名" required>
                 <input className={inputCls} value={basic.name} onChange={(e) => setBasic((b) => ({ ...b, name: e.target.value }))} />
@@ -418,9 +433,6 @@ export function ResumeGeneratePage() {
                 <p>城市、手机号、邮箱空着也能往下走。空着的话，生成之后会算一条提示让你回来补，AI 不会替你编一个。</p>
               </div>
             </div>
-            <p className="qx-rd-selfcheck">
-              姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。需要帮忙可以找现场工作人员，或问 AI 顾问。
-            </p>
             </>
           )}
 
@@ -597,6 +609,7 @@ export function ResumeGeneratePage() {
               label="AI 简历润色成文"
               fallback={fallback}
             />
+            <p className="rg-truth">AI 只整理你提供的描述；学校、公司和时间请本人核对。</p>
         </div>
       </div>
     </section>
