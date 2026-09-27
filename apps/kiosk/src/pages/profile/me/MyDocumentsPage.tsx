@@ -219,7 +219,9 @@ export function MyDocumentsPage() {
     try {
       await deleteMyDocument(token, doc.id)
       setItems((prev) => prev.filter((item) => item.id !== doc.id))
-      setReloadKey((key) => key + 1)
+      // 游标就是已加载的最后一条的 id；删掉的正是它时，「加载更多」会拿到空页，只好整表重拉。
+      // 其余情况游标照样有效，就地移除即可，不闪骨架、也不把已加载的几页收回第一页。
+      if (pagination.nextCursor === doc.id) setReloadKey((key) => key + 1)
       setHint({ tone: 'ok', text: '文档已删除' })
     } catch {
       setHint({ tone: 'bad', text: '删除失败，文档可能已到期或被清理' })
