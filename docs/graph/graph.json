@@ -12493,7 +12493,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 582,
+      "reachableFileCount": 588,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14114,6 +14114,7 @@
           "path": "/print/cashier",
           "styles": [
             "apps/kiosk/src/pages/print/styles/cashier-qx.css",
+            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -14148,6 +14149,7 @@
           ],
           "path": "/print/confirm",
           "styles": [
+            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/pages/print/styles/print-confirm-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -14209,6 +14211,7 @@
           "path": "/print/done",
           "styles": [
             "apps/kiosk/src/components/styles/kiosk-feedback-dialog.css",
+            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/pages/print/styles/print-fulfill-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -14267,6 +14270,7 @@
           "styles": [
             "apps/kiosk/src/components/kiosk-numpad/kiosk-numpad.css",
             "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
+            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -14309,6 +14313,7 @@
           ],
           "path": "/print/progress",
           "styles": [
+            "apps/kiosk/src/pages/print/styles/print-ai-help.css",
             "apps/kiosk/src/pages/print/styles/print-fulfill-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -15464,7 +15469,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 661
+      "sourceFileCount": 667
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18747,7 +18752,6 @@
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
-      "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "apps/kiosk/src/pages/print/PrintProgressPage.tsx": [
@@ -18792,6 +18796,10 @@
     ],
     "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
+    "apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/print/components/printFileRetention.ts": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
@@ -18841,6 +18849,9 @@
     "apps/kiosk/src/pages/print/styles/print-cashier.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
       "apps/kiosk/scripts/verify-print-cta-contrast.mjs"
+    ],
+    "apps/kiosk/src/pages/print/styles/print-desk-qx.css": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/pages/print/styles/print-pickup-claim.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
@@ -20665,7 +20676,7 @@
     "docs/design/kiosk-proto-2026-07/73-assistant-call.html": [
       "apps/kiosk/scripts/verify-visual-evidence-manifest.mjs"
     ],
-    "docs/design/kiosk-redesign-2026-08/10-print-hub.html": [
+    "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
     "docs/design/kiosk-redesign-2026-08/16-service-hubs.html": [
@@ -27137,7 +27148,7 @@
           "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx",
           "apps/kiosk/src/pages/print-scan/printHubContent.ts",
           "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
-          "docs/design/kiosk-redesign-2026-08/10-print-hub.html"
+          "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html"
         ],
         "missing": []
       },
@@ -27341,6 +27352,8 @@
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
           "apps/kiosk/src/pages/print/PrintPrototypeLayout.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx",
+          "apps/kiosk/src/pages/print/styles/print-desk-qx.css",
           "apps/kiosk/src/routes/index.tsx",
           "packages/shared/src/types/print.ts"
         ],
@@ -28417,8 +28430,8 @@
         ],
         "files": [
           "apps/kiosk/src/components/FileContentPreview.tsx",
-          "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx",
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
