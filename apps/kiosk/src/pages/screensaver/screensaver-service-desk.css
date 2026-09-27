@@ -1,5 +1,6 @@
 /* 青序流光 2.0 · 00-standby。根选择器保持 .k1-screensaver，供既有门禁识别。
-   胶囊不是按钮；三条「不…」收成一行边界声明。底图不打包原稿照片。 */
+   胶囊不是按钮；三条「不…」收成一行边界声明。
+   底图是稿的光带和光点（public/assets/bg-standby.jpg），再叠一条会漂移的光带。 */
 .k1-screensaver {
   position: relative;
   width: 100%;
@@ -15,9 +16,35 @@
   height: 100%;
   overflow: hidden;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--qx-deep) 55%, transparent), var(--qx-deep) 78%),
-    radial-gradient(900px 520px at 78% 12%, color-mix(in srgb, var(--qx-emerald) 18%, transparent), transparent 66%),
+    linear-gradient(180deg, rgb(5 25 20 / 28%), rgb(5 25 20 / 80%)),
+    url('/assets/bg-standby.jpg') center / cover no-repeat,
     var(--qx-deep);
+}
+.k1-screensaver .sb-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: .045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+}
+.k1-screensaver .sb-stage::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  width: 1400px;
+  height: 360px;
+  left: -160px;
+  top: 720px;
+  pointer-events: none;
+  filter: blur(60px);
+  background: linear-gradient(90deg, transparent, rgb(53 230 173 / 18%), transparent);
+  animation: k1-screensaver-drift 12s ease-in-out infinite;
+}
+@keyframes k1-screensaver-drift {
+  0%, 100% { transform: translateX(-90px) rotate(-12deg); }
+  50% { transform: translateX(90px) rotate(-12deg); }
 }
 .k1-screensaver .sb-topbar {
   position: absolute;
@@ -74,7 +101,14 @@
 .k1-screensaver .sb-media {
   position: absolute; z-index: 3; top: 560px; left: 96px; right: 96px; height: 500px;
   border: 1px solid color-mix(in srgb, var(--qx-paper) 22%, transparent); border-radius: 28px; overflow: hidden;
-  background: var(--qx-deep-2);
+  background: linear-gradient(150deg, rgb(20 69 57 / 82%), rgb(7 31 25 / 88%));
+}
+.k1-screensaver .sb-media::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(620px 320px at 75% 10%, rgb(53 230 173 / 17%), transparent 66%);
 }
 .k1-screensaver .sb-media img,
 .k1-screensaver .sb-media video { width: 100%; height: 100%; object-fit: cover; }
@@ -169,6 +203,9 @@
 }
 .k1-screensaver .wake-target:focus-visible { outline: 6px solid var(--qx-on-deep-warn); outline-offset: -12px; }
 @media (prefers-reduced-motion: reduce) {
-  .k1-screensaver, .k1-screensaver * { animation: none !important; transition: none !important; }
+  .k1-screensaver,
+  .k1-screensaver *,
+  .k1-screensaver .sb-stage::before,
+  .k1-screensaver .sb-stage::after { animation: none !important; transition: none !important; }
   .k1-screensaver .sb-halo { display: none; }
 }

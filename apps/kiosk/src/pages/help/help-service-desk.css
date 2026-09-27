@@ -207,6 +207,36 @@
 .k1-help-center .k1-help-truth div { flex: 1; color: var(--qx-ink-2); font-size: var(--qx-fs-aux-lg); line-height: 1.45; }
 .k1-help-center .k1-help-truth b { display: block; margin-bottom: 4px; color: var(--qx-ink); font-weight: 700; }
 .k1-help-center .k1-help-filing { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 4px 0 0; color: var(--qx-ink-3); font-size: var(--qx-fs-note); line-height: 1.5; text-align: center; }
+
+/* 默认态多一张「我的记录」，两列会多出一行孤卡，把找人区顶到动作条后面。
+   七张排成 2+2+3，八张（托管打开、岗位类也在）排成 3+3+2。字号不动。 */
+.k1-help-center[data-help-view='default'] .k1-help-scroll { gap: 8px; padding: 6px 0 4px; }
+.k1-help-center[data-help-view='default'] .k1-help-sec-head { margin-top: 0; }
+.k1-help-center[data-help-view='default'] .k1-help-filters { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.k1-help-center[data-help-view='default'] .k1-help-filters > button {
+  grid-column: span 3;
+  min-height: 120px;
+  padding: 10px 16px;
+  gap: 4px;
+}
+.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(7):last-child) > button:nth-child(n + 5) { grid-column: span 2; }
+.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(7):last-child) > button:nth-child(n + 5) .k1-help-cat-top { gap: 8px; }
+.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(7):last-child) > button:nth-child(n + 5) .k1-help-cat-icon { width: 40px; height: 40px; border-radius: 14px; }
+.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(7):last-child) > button:nth-child(n + 5) strong { white-space: nowrap; }
+.k1-help-center[data-help-view='default'] .k1-help-filters button small { word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty; }
+.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(8):last-child) > button { grid-column: span 2; }
+.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(8):last-child) > button:nth-child(n + 7) { grid-column: span 3; }
+.k1-help-center[data-help-view='default'] .k1-help-cat-icon { width: 48px; height: 48px; border-radius: 16px; }
+.k1-help-center[data-help-view='default'] .k1-help-cat-icon svg { width: 24px; height: 24px; }
+.k1-help-center[data-help-view='default'] .k1-help-steps,
+.k1-help-center[data-help-view='default'] .k1-help-people { gap: 10px; }
+.k1-help-center[data-help-view='default'] .k1-help-steps li,
+.k1-help-center[data-help-view='default'] .k1-help-contact { padding: 10px 14px; }
+.k1-help-center[data-help-view='default'] .k1-help-steps p,
+.k1-help-center[data-help-view='default'] .k1-help-contact p { margin-top: 4px; line-height: 1.35; }
+.k1-help-center[data-help-view='default'] .k1-help-filing { margin: 0; }
+.k1-help-center[data-help-view='default'] .qx-pagehead { margin-top: 10px; padding: 18px 28px 14px; gap: 8px; }
+.k1-help-center[data-help-view='default'] .qx-pagehead p { gap: 8px; }
 .k1-help-center .k1-help-filing a { display: inline-flex; align-items: center; min-height: var(--qx-tap-min); color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 760px) {
@@ -222,6 +252,8 @@
   .k1-help-center .k1-help-filters,
   .k1-help-center .k1-help-steps,
   .k1-help-center .k1-help-people { display: grid; grid-template-columns: 1fr; }
+  .k1-help-center[data-help-view='default'] .k1-help-filters { grid-template-columns: 1fr; }
+  .k1-help-center[data-help-view='default'] .k1-help-filters > button { grid-column: auto; min-height: 88px; }
   .k1-help-center .k1-help-actions button,
   .k1-help-center .k1-help-actions .qx-ai-help { min-height: 56px; font-size: var(--qx-fs-body); }
   .k1-help-center .k1-help-sec-head { flex-direction: column; align-items: flex-start; }

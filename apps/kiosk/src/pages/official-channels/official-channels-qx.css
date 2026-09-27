@@ -47,6 +47,60 @@
 .oc-page .dw-sec-h .t { font-size: var(--qx-fs-sec); }
 .oc-page .dw-sec-h .no,
 .oc-page .dw-sec-h .hint { font-size: var(--qx-fs-aux-lg); }
+/* 共享 .dw-stripitem span 是 17px，低于 --qx-fs-aux。这一区提到辅助字以上。 */
+.oc-page .oc-assist .dw-stripitem b { font-size: var(--qx-fs-btn); }
+.oc-page .oc-assist .dw-stripitem .si-tx > span {
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.4;
+  color: var(--qx-ink-2);
+}
+.oc-ask {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 96px;
+  padding: 12px 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+}
+.oc-ask-ic {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--qx-teal-d);
+  background: var(--qx-teal-soft);
+}
+.oc-ask-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.oc-page .oc-ask .qx-step-actions { min-height: 0; justify-content: flex-start; }
+.oc-page .oc-ask .qx-ai-help {
+  margin: 0;
+  padding: 0;
+  min-height: 48px;
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  font-size: var(--qx-fs-btn);
+  font-weight: 700;
+}
+.oc-ask-desc { font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-2); }
+.qx-stage:has(.oc-page) > .qx-ctabar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-top: 12px;
+  padding-bottom: 10px;
+}
+.oc-cta { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.oc-cta-btns { display: flex; gap: 14px; }
+.oc-cta-btns .qx-btn { flex: 1; min-height: var(--qx-btn-h); }
+.oc-cta-btns .qx-btn[data-variant='primary'] { flex: 1.6; min-height: var(--qx-btn-h-lg); }
+.oc-privacy { margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.oc-privacy b { margin-right: 8px; color: var(--qx-ink); font-weight: 700; }
 .oc-steps { display: flex; gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
 .oc-steps li {
   flex: 1; padding-top: 8px; border-top: 2px solid var(--qx-line);
@@ -90,6 +144,12 @@
   [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem .si-ic { width: 48px; height: 48px; border-radius: 14px; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem b { font-size: 19px; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem .si-tx span { margin-top: 4px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem b,
+  [data-kiosk-stage-fit='off'] .oc-page .oc-ask .qx-ai-help { font-size: 21px; }
+  [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem .si-tx > span,
+  [data-kiosk-stage-fit='off'] .oc-ask-desc { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .oc-cta-btns { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .oc-privacy { font-size: 15px; }
   /* 去处行在手机上收到 88px（与 .rh-off-actions 的手机档一致）。 */
   [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row { min-height: 88px; gap: 12px; padding: 12px 14px; }
   [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row-ic { width: 44px; height: 44px; }
