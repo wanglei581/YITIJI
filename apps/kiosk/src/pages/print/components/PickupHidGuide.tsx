@@ -23,9 +23,9 @@ import { LEGACY_KEYS, type ClaimSuccessCopy, type PickupFailure, type PickupScre
 export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
   switch (screen) {
     case 'legacy':
-      return <>旧码在这里输：<b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位带字母的历史码</b>（早前下单拿到的）。新码（{PICKUP_CODE_LENGTH} 位纯数字）请回新码键盘。</>
+      return <>输入早前订单中的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位到机码</b>。核对订单、完成后续步骤，领取打印件。</>
     case 'verifying':
-      return <>正在请服务端校验这串码，<b>稍等片刻</b>。</>
+      return <>正在请系统校验这串码，<b>稍等片刻</b>。</>
     case 'invalid-or-expired':
       return <>这串码<b>没通过校验</b>。</>
     case 'locked':
@@ -37,7 +37,7 @@ export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
     case 'success':
       return <>校验通过，<b>打印订单已认领</b>。</>
     default:
-      return <>在手机小程序<b>「我的 → 打印订单」</b>里拿到的那串码，新码是 <b>{PICKUP_CODE_LENGTH} 位纯数字</b>。输入后这台机器会认领你的打印订单。</>
+      return <>打开手机小程序<b>「我的 → 打印订单」</b>，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
   }
 }
 
@@ -112,11 +112,11 @@ export function PickupThreeCodeCard() {
         </div>
         <div className="pcp-ab-col">
           <b>上传码 · 手机传文件用</b>
-          <span>在手机上传页出示，有效期以服务端返回为准。</span>
+          <span>用于把手机文件传到本机。</span>
         </div>
         <div className="pcp-ab-col">
           <b>取件凭证码 · 取纸/补打用</b>
-          <span>打印完成后才有，给工作人员核验或代取——本页不输它。</span>
+          <span>取纸时出示给工作人员，不在本页输入。</span>
         </div>
       </div>
     </section>
@@ -309,14 +309,14 @@ export function PickupFailurePanel({
           </span>
           <p className="pcp-block-t">
             {locked ? '本机输码暂时停用' : '本次校验结果尚未确认'}
-            <small>{locked ? '这台机器连续输错次数过多，服务端临时停用了取件' : '可能是网络或服务暂时不可用；请勿据此认为订单已认领'}</small>
+            <small>{locked ? '这台机器连续输错次数过多，取件暂时停用' : '可能是网络或服务暂时不可用；请勿据此认为订单已认领'}</small>
           </p>
         </div>
         <p className="pcp-block-body">
           {locked ? (
             <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行；着急的话请找现场工作人员。</>
           ) : (
-            <>可以用<b>同一串码重试校验</b>，服务端会按同一终端核对已认领状态，不会因此重复出纸；如果仍拿不到结果，请找工作人员核实订单。</>
+            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸；如果仍拿不到结果，请找工作人员核实订单。</>
           )}
         </p>
         <div className="pcp-actions">
@@ -409,7 +409,7 @@ export function PickupWinCard({
       </section>
       <p className="pcp-safe">
         <ShieldCheckIcon size={24} aria-hidden="true" />
-        <span>结束会话或闲置超时后，会<b>清除本机登录态和临时会话信息</b>，下一个人无法查看。订单与文件按服务端留存期限管理。</span>
+        <span>办完离开或闲置超时后，会<b>清除本机登录态和临时信息</b>，下一个人无法查看。订单与文件按系统留存期限管理。</span>
       </p>
     </>
   )

@@ -62,7 +62,7 @@ export function PrintFileDeletionRecords() {
         </p>
       ) : (
         <p className="print-done-card-sub">
-          这里只显示已经删除的本人文件元数据，不含文件内容。删除记录来自服务端 tombstone，不是前台编造。
+          这里只显示已经删除的文件名称和删除时间，不含文件内容。记录来自真实删除结果，不是前台编造。
         </p>
       )}
       <div className="print-done-fb-group">

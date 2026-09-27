@@ -328,7 +328,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
             <ShieldCheckIcon aria-hidden="true" />
             {snapshot?.attempt?.channel === 'sandbox'
               ? '测试支付通道 · 非真实收款'
-              : `${PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '线上支付'} · 支付结果以服务端确认为准`}
+              : `${PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '线上支付'} · 支付结果以实际到账为准`}
           </div>
           {remainSec !== null && (
             <p className="cashier-countdown">

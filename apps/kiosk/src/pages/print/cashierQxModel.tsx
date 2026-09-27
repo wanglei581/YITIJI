@@ -152,7 +152,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         paras: [<>订单仍然保留，请从「我的打印订单」重新进入。<b>重新进入不会重复扣款。</b></>],
         chips: [['warn', '当前页面已失效'], [undefined, '订单仍保留']],
         rows: [['下一步', '从订单列表重新进入']],
-        ask: [<>这单的<em>会话过期了</em>。</>, '订单还在服务端，只是这台机器暂时查不到。重新进一次就行。'],
+        ask: [<>这单的<em>这次办理过期了</em>。</>, '订单还在系统里，只是这台机器暂时查不到。重新进一次就行。'],
       }
     case 'free-order':
       return {
@@ -160,7 +160,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         paras: ['订单已经创建，可以直接开始打印。'],
         chips: [['ok', '订单已建立'], [undefined, '无需付款'], [undefined, '本次未收款']],
         rows: [['收款情况', '本次未收款'], ['下一步', '开始打印']],
-        ask: [<>这一单<em>不用付款</em>。</>, <>服务端报价为 0。<b>订单已经建好了</b>，我只负责把任务释放给打印机。</>],
+        ask: [<>这一单<em>不用付款</em>。</>, <>下一步的实际价格为 0。<b>订单已经建好了</b>，我只负责把任务交给打印机。</>],
       }
     case 'channel-loading':
       return {
@@ -227,7 +227,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         kind: 'info', icon: <QrCodeIcon aria-hidden="true" />, title: '请扫码支付',
         paras: [<>支付尝试已经创建。<b>请勿切换方式、重复付款或重新下单。</b></>],
         chips: [], rows: [['支付状态', '等待付款']],
-        ask: [<>付款<em>成没成</em>，服务端说了算。</>, <>屏幕上这张码，<b>本机看不到你扫没扫</b>。只有服务端支付状态变成已付，才会去出纸。</>],
+        ask: [<>付款<em>成没成</em>，以实际结果为准。</>, <>屏幕上这张码，<b>本机看不到你扫没扫</b>。只有系统支付状态变成已付，才会去出纸。</>],
       }
     case 'pending-scan':
       return {
@@ -242,7 +242,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         paras: [<>付款码已提交，支付平台正在确认。<b>请勿重复出示付款码或重新下单。</b></>],
         chips: [[undefined, '确认中'], ['warn', '请勿重复出示']],
         rows: [['付款码', '已提交，不会保存在页面'], ['支付状态', '正在确认']],
-        ask: [<>码送出去了，<em>等回话</em>。</>, '别重复出示，也别重新下单。结果只认服务端。'],
+        ask: [<>码送出去了，<em>等回话</em>。</>, '别重复出示，也别重新下单。结果只认系统。'],
       }
     case 'pending-verification':
       return {
@@ -254,11 +254,11 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
       }
     case 'paid':
       return {
-        kind: 'info', icon: <CheckCircle2Icon aria-hidden="true" />, title: '付款已由服务端确认',
-        paras: ['系统正在创建或恢复同一打印任务，不会再次发起收款。'],
-        chips: [['ok', '已付款（服务端确认）'], [undefined, '正在准备打印']],
-        rows: [['支付状态', '已付款（服务端确认）'], ['下一步', '进入打印进度']],
-        ask: [<>服务端说<em>已付</em>。</>, '这是服务端确认的最终结果，不是我猜的。接下来创建并查看打印任务。'],
+        kind: 'info', icon: <CheckCircle2Icon aria-hidden="true" />, title: '付款成功',
+        paras: ['系统已确认付款，正在准备打印。'],
+        chips: [['ok', '已付款'], [undefined, '正在准备打印']],
+        rows: [['支付状态', '已付款'], ['下一步', '开始打印']],
+        ask: [<>结果显示<em>已付</em>。</>, '这是已经确认的最终结果，不是我猜的。接下来创建并查看打印任务。'],
       }
     case 'release-failed':
       return c.free
@@ -274,9 +274,9 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
           }
         : {
             kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '付款已确认，打印任务尚未建立',
-            paras: [<>服务端已经确认这笔{ch}付款成功，但本次创建打印任务没有完成。<b>不要重新付款</b>，请重试创建同一打印任务。</>],
+            paras: [<>系统已经确认这笔{ch}付款成功，但本次创建打印任务没有完成。<b>不要重新付款</b>，请重试创建同一打印任务。</>],
             chips: [['ok', '已付款'], ['warn', '打印任务待恢复']],
-            rows: [['支付状态', '已付款（服务端确认）'], ['打印任务', '尚未建立']],
+            rows: [['支付状态', '已付款（已经确认）'], ['打印任务', '尚未建立']],
             ask: [<>钱已付，<em>任务没建成</em>。</>, '不要再付款。这里只重试创建同一打印任务。'],
           }
     case 'display-expired-reconciling':
@@ -291,24 +291,24 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
       return {
         kind: 'warn', icon: <Clock3Icon aria-hidden="true" />, title: '屏上收款码已过期',
         paras: [
-          <>服务端确认这张收款码已经失效。<b>订单本身还在，可以重新出一张码。</b></>,
+          <>已经确认这张收款码已经失效。<b>订单本身还在，可以重新出一张码。</b></>,
           '这和「订单已超时关闭」不是一回事：那种情况订单已经关了，不能再出码。',
           LOCKED_NOTE,
         ],
         chips: [['warn', '收款码过期'], ['ok', '订单未关闭'], [undefined, '可重新出码'], [undefined, '金额已锁定']],
-        rows: [['收款码状态', '已过期（服务端确认）'], ['订单状态', '未关闭，可重新出码']],
+        rows: [['收款码状态', '已过期（已经确认）'], ['订单状态', '未关闭，可重新出码']],
         ask: [<>收款码<em>过期了</em>。</>, '订单还在，重新出一张码就行。'],
       }
     case 'attempt-failed':
       return {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '这次支付尝试没有完成',
         paras: [
-          <>服务端确认上一次{ch}支付尝试已经失败，<b>旧码不能再扣款</b>。订单本身仍未关闭，可以重新发起一次。</>,
+          <>已经确认上一次{ch}支付尝试已经失败，<b>旧码不能再扣款</b>。订单本身仍未关闭，可以重新发起一次。</>,
           LOCKED_NOTE,
         ],
         chips: [['bad', '旧尝试已失败'], ['ok', '订单未关闭'], [undefined, '可重新支付'], [undefined, '金额已锁定']],
-        rows: [['支付尝试', '失败（服务端确认）'], ['订单状态', '未关闭，可重试']],
-        ask: [<>旧尝试<em>已经失败</em>。</>, c.multi ? '服务端确认旧码不能再扣款，订单还在，可以重新发起或换个通道。' : '服务端确认旧码不能再扣款，订单还在，可以重新发起。'],
+        rows: [['支付尝试', '失败（已经确认）'], ['订单状态', '未关闭，可重试']],
+        ask: [<>旧尝试<em>已经失败</em>。</>, '已经确认旧码不能再扣款，订单还在，可以重新选择。'],
       }
     case 'attempt-channel-unknown':
       return {
@@ -324,54 +324,54 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'order-failed':
       return {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '订单支付已失败',
-        paras: [<>服务端把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>如支付账单有扣款记录，请联系工作人员核对。</>],
+        paras: [<>系统把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>如支付账单有扣款记录，请联系工作人员核对。</>],
         chips: [['bad', '订单支付失败'], [undefined, '禁止重新付款']],
-        rows: [['订单支付状态', '失败（服务端确认）'], ['能否再付', '不能，需重新下单']],
+        rows: [['订单支付状态', '失败（已经确认）'], ['能否再付', '不能，需重新下单']],
         ask: [<>订单支付<em>已经失败</em>。</>, '这是订单终态，不能再付；要打印请重新下单。'],
       }
     case 'closed':
       return {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '订单已超时关闭',
         paras: [
-          '服务端确认这张订单已经关闭。这张订单不能再出收款码，也不能继续支付。',
+          '已经确认这张订单已经关闭。这张订单不能再出收款码，也不能继续支付。',
           '要打的话，回去重新发起一次打印，重新报价、重新下单。如果你的支付账单里确实有这一笔，请拿订单号找工作人员核对。',
         ],
         chips: [['bad', '订单已关闭'], [undefined, '不能再出码']],
-        rows: [['订单状态', '已关闭（服务端确认）'], ['能否再付', '不能，需重新下单']],
+        rows: [['订单状态', '已关闭（已经确认）'], ['能否再付', '不能，需重新下单']],
         ask: [<>订单<em>已经关了</em>。</>, '不能再付。要打的话重新来一次。'],
       }
     case 'refunding':
       return {
         kind: 'warn', icon: <Undo2Icon aria-hidden="true" />, title: '这一单正在退款',
         paras: [
-          <>服务端返回订单处于<b>退款处理中</b>。退款尚未完成，这类订单一律不放行出纸。</>,
+          <>这笔订单处于<b>退款处理中</b>。退款尚未完成，这类订单一律不放行出纸。</>,
           '退款到账时间以支付渠道为准，本机不预告到账时间，也不代为催办。',
         ],
         chips: [['warn', '退款处理中'], [undefined, '不放行出纸']],
-        rows: [['订单状态', '退款处理中（服务端确认）'], ['能否出纸', '否']],
+        rows: [['订单状态', '退款处理中（已经确认）'], ['能否出纸', '否']],
         ask: [<>这单<em>正在退款</em>。</>, '退款尚未完成，不能出纸。到账时间以渠道为准。'],
       }
     case 'partial-refunded':
       return {
         // 稿 32 留有此态；产品只做整单退款，服务端不再写入 partial_refunded，出现即异常。
-        kind: 'warn', icon: <Undo2Icon aria-hidden="true" />, title: '这一单的退款需要人工核对',
+        kind: 'warn', icon: <Undo2Icon aria-hidden="true" />, title: '这一单发生了部分退款',
         paras: [
-          <>服务端返回的退款状态<b>不是整单退款</b>。本机只做整单退款，这类订单一律不放行出纸。</>,
-          '请到「我的打印订单」查看，或找现场工作人员核对。金额只认服务端订单详情与支付渠道账单，本机不自行计算，也不提供继续支付或继续打印入口。',
+          <>这笔订单处于<b>部分退款</b>。订单金额只退回了一部分，这类订单仍然一律不放行出纸。</>,
+          '请到「我的打印订单」查看，或找现场工作人员核对。金额只认系统订单详情与支付渠道账单，本机不自行计算，也不提供继续支付或继续打印入口。',
         ],
         chips: [['warn', '退款待核对'], [undefined, '不放行出纸']],
-        rows: [['订单状态', '退款待人工核对（服务端返回）'], ['能否出纸', '否']],
-        ask: [<>这单的<em>退款要人工核对</em>。</>, '不能出纸。金额只认服务端订单详情与支付渠道账单。'],
+        rows: [['订单状态', '部分退款（已经确认）'], ['能否出纸', '否']],
+        ask: [<>这单<em>只退了一部分</em>。</>, '部分退款后同样不能出纸。金额只认系统订单详情与支付渠道账单。'],
       }
     case 'refunded':
       return {
         kind: 'error', icon: <Undo2Icon aria-hidden="true" />, title: '这一单已经退款',
         paras: [
-          <>服务端返回订单<b>退款已完成</b>。这张订单不能再出纸；如需打印，请重新发起一张新订单。</>,
+          <>这笔订单<b>退款已完成</b>。这张订单不能再出纸；如需打印，请重新发起一张新订单。</>,
           '实际到账以支付渠道账单为准，本机不预告到账时间。',
         ],
         chips: [['bad', '退款已完成'], [undefined, '不放行出纸']],
-        rows: [['订单状态', '已退款（服务端确认）'], ['能否出纸', '否']],
+        rows: [['订单状态', '已退款（已经确认）'], ['能否出纸', '否']],
         ask: [<>这单<em>已经退款</em>。</>, '退款完成，不能出纸；需要打印请重新下单。'],
       }
   }
@@ -387,7 +387,7 @@ export function cashierQxPill(state: CashierQxState, opts: { locked: boolean; fr
   if (state === 'channel-selected' && opts.single) return { tone: 'unknown', label: '唯一可用通道 · 请选择扫码方式' }
   const PILL: Record<CashierQxState, readonly ['ok' | 'warn' | 'bad' | 'unknown', string]> = {
     'no-order': ['warn', '没有待支付的订单'],
-    'session-expired': ['warn', '支付会话已过期'],
+    'session-expired': ['warn', '支付这次办理已过期'],
     'free-order': ['ok', '无需付款 · 订单已建立'],
     'channel-loading': ['unknown', '正在读取支付通道'],
     'channel-empty': ['bad', '未启用任何支付通道'],
@@ -398,7 +398,7 @@ export function cashierQxPill(state: CashierQxState, opts: { locked: boolean; fr
     'pending-scan': ['unknown', '等待读取付款码 · 未发起支付'],
     'awaiting-code-confirmation': ['unknown', '渠道确认中 · 未确认'],
     'pending-verification': ['warn', '支付状态待核实'],
-    paid: ['ok', '服务端确认已付'],
+    paid: ['ok', '已经确认已付'],
     'release-failed': ['warn', '已付款 · 打印任务待恢复'],
     'display-expired-reconciling': ['warn', '收款码到期核验中'],
     expired: ['warn', '收款码已过期'],
@@ -438,9 +438,9 @@ export function pickerNote(state: CashierQxState, free: boolean, channelCount: n
 
 /** 付款列里那张「已经不能用的码 / 尝试」卡：页面状态块讲结论，这张卡只讲这张码本身。 */
 export const TERMINAL_CARD: Partial<Record<CashierQxState, readonly [string, string]>> = {
-  expired: ['这张收款码已失效', '服务端已确认这张码不能再付款，屏幕上不再显示可扫的码。重新出码沿用本单金额。'],
+  expired: ['这张收款码已失效', '已经确认这张码不能再付款，屏幕上不再显示可扫的码。重新出码沿用本单金额。'],
   'display-expired-reconciling': ['收款码已停止显示', '显示有效期已到，屏幕上不再显示这张码；渠道是否已经关单仍在核实，确认前请勿重复支付。'],
-  'attempt-failed': ['上一次支付尝试已结束', '服务端确认这次尝试已失败，旧码不能再扣款。'],
+  'attempt-failed': ['上一次支付尝试已结束', '已经确认这次尝试已失败，旧码不能再扣款。'],
 }
 
 export function channelLabelOf(key: string | null | undefined): string {

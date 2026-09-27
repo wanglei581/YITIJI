@@ -30,6 +30,7 @@ import {
   ShieldIcon,
 } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PrintAiHelp } from './components/PrintAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_COMPACT } from '../../lib/fileName'
@@ -108,7 +109,7 @@ function realStatusPresentation(status: BackendJobStatus | null) {
         stageTitle: '正在确认任务状态',
         stageSubtitle: '尚未收到终端处理状态',
         queueLabel: '等待状态更新',
-        queueDesc: '正在向服务端确认任务是否已被终端领取',
+        queueDesc: '正在确认这台机器有没有领到任务',
         activeHint: '正在读取状态…',
         askPhase: '正在确认状态',
         badge: '状态确认中',
@@ -424,7 +425,7 @@ export function PrintProgressPage() {
       label: isSim ? '演示结束' : '完成取件',
       desc: isSim
         ? '演示：无真实取件结果'
-        : '服务端确认完成后自动转到取件核对',
+        : '确认完成后自动转到取件核对',
     },
   ] as const
 
@@ -450,7 +451,7 @@ export function PrintProgressPage() {
     : timedOut
       ? '这不代表成功或失败，只是本机暂时没拿到最新状态。'
       : failed
-        ? '马上转到结果页，按服务端登记说明原因和下一步。'
+        ? '马上转到结果页，按已经登记的原因说明下一步。'
         : backendStatus === 'printing'
           ? `${copiesText}你可以先在旁边等，不用贴着机器。`
           : realStatus.headerSubtitle
@@ -530,7 +531,7 @@ export function PrintProgressPage() {
         <div className="pff-xq-row">
           <div className="pff-xq-face" aria-hidden="true">青</div>
           <div className="pfp-xq-main">
-            <div className="pff-xq-eyebrow">PRINT &amp; PICKUP</div>
+            <div className="pff-xq-eyebrow">出纸 · 取件</div>
             <p className="pff-xq-ask">{askTitle}</p>
             <p className="pff-xq-doing">{askDoing}</p>
           </div>
@@ -611,7 +612,7 @@ export function PrintProgressPage() {
                   <span className="pff-inbar-ic"><AlertCircleIcon aria-hidden="true" /></span>
                   <span>
                     打印遇到问题
-                    <small>正在转到结果页，按服务端登记说明原因</small>
+                    <small>正在转到结果页，按已经登记的原因说明</small>
                   </span>
                 </div>
               </div>
@@ -682,7 +683,7 @@ export function PrintProgressPage() {
           <div className="pff-wipe" data-live="false">
             <div>
               <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />打印期间不会清空</div>
-              <p className="pff-wipe-s">全部打完、你拿走之后，才开始会话清空计时。倒计时不是催你走，你可以核对完再离开。</p>
+              <p className="pff-wipe-s">全部打完、你拿走之后，才开始这次办理清空计时。倒计时不是催你走，你可以核对完再离开。</p>
             </div>
           </div>
         </section>
@@ -715,6 +716,10 @@ export function PrintProgressPage() {
                 联系工作人员
               </button>
             </div>
+            <PrintAiHelp
+              label="问小青：取纸或异常怎么办 →"
+              draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
+            />
           </div>
         </section>
         </>

@@ -523,7 +523,7 @@ export function PrintCashierPage() {
     if (qxState === 'order-failed' || qxState === 'closed' || qxState === 'refunded') return { label: '重新发起打印', run: () => navigate(uploadPath), disabled: false }
     // 以下都是「还在等用户或等服务端」的禁用态：按钮上写清在等什么，原因行写清为什么点不了。
     if (qxState === 'pending-scan') return { label: codeSubmitting ? '正在提交付款码' : '等待读取付款码', run: () => undefined, disabled: true, reason: codeSubmitting ? '付款码已读满并提交，正在等支付平台受理' : '读满十八位后自动提交；提交前不会发起收款' }
-    if (qxState === 'channel-selected') return { label: issuing ? '正在生成收款码' : '选择上方扫码方式', run: () => undefined, disabled: true, reason: issuing ? '正在向服务端申请这一单的收款码，请稍候' : '尚未选择扫码方式' }
+    if (qxState === 'channel-selected') return { label: issuing ? '正在生成收款码' : '选择上方扫码方式', run: () => undefined, disabled: true, reason: issuing ? '正在生成这一单的收款码，请稍候' : '尚未选择扫码方式' }
     if (qxState === 'channel-loading') return { label: '支付方式加载后可继续', run: () => undefined, disabled: true, reason: '支付方式仍在加载' }
     return { label: '选择上方支付通道', run: () => undefined, disabled: true, reason: '尚未选择支付通道' }
   })()
@@ -546,7 +546,7 @@ export function PrintCashierPage() {
        *  退出支付=放弃这次支付回首页。两个都要，缺一都会让人在收银台里困住。 */
       back={{ label: '返回我的打印订单', onBack: () => navigate('/me/print-orders') }}
       title="订单支付"
-      subtitle="选择服务端已启用通道；支付确认到账后才会释放打印任务"
+      subtitle="选择已开通的支付通道；确认到账后才会开始打印"
       terminalLabel={state.orderNo ? `订单 ${state.orderNo}` : '就业服务大厅'}
       status={status}
       ctabar={

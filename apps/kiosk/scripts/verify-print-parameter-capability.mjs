@@ -55,7 +55,7 @@ for (const [name, source] of [['PrintPreviewPage', preview]]) {
 expect(
   confirm.includes('restrictToAllowedPrintParams') &&
     confirm.includes('hasParamsBeyondCapability') &&
-    confirm.includes('参数已按本机已验证能力收口') &&
+    confirm.includes('彩色或双面本机暂未开通，已改回目前能打的参数') &&
     confirm.indexOf('restrictToAllowedPrintParams') < confirm.indexOf('quotePrintOrder('),
   'PrintConfirmPage 在报价前按本机能力收口，避免按未验证参数计价',
 )

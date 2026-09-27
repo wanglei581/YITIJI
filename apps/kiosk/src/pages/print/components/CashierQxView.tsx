@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { PrintAiHelp } from './PrintAiHelp'
 import { AlertTriangleIcon, FileXIcon, QrCodeIcon, ScanLineIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import type { CashierView } from '../cashierStatus'
@@ -90,11 +91,16 @@ export function CashierQxView(props: CashierQxViewProps) {
           <div className="cashier-qx-xq-row">
             <div className="cashier-qx-xq-face" aria-hidden="true">青</div>
             <div className="cashier-qx-xq-main">
-              <div className="cashier-qx-xq-eyebrow">CASHIER · 打印第 {props.step} 步 · 支付</div>
+              <div className="cashier-qx-xq-eyebrow">付款</div>
               <p className="cashier-qx-xq-ask">{copy.ask[0]}</p>
               <p className="cashier-qx-xq-doing">{copy.ask[1]}</p>
             </div>
           </div>
+          <ol className="cashier-qx-xq-steps">
+            <li><b>1</b>看清本页结果<small>先确认是等待、成功、失败、关闭还是退款。</small></li>
+            <li><b>2</b>不重复付款<small>结果异常或长时间未更新时，先查看支付账单。</small></li>
+            <li><b>3</b>按底部按钮继续<small>当前可用的处理动作已经放在屏幕下方。</small></li>
+          </ol>
         </section>
 
         <Pickers
@@ -217,12 +223,12 @@ function AmountCard(props: CashierQxViewProps & { free: boolean }) {
     : !known
       ? '金额暂不可用，请从我的打印订单重新进入查看。'
       : props.free
-        ? '本单实付 0 元 · 服务端报价为 0，本次未收款'
+        ? '本单实付 0 元 · 下一步的实际价格为 0，本次未收款'
         : state === 'refunding' || state === 'partial-refunded' || state === 'refunded'
-          ? '本单实付金额来自服务端订单；退款金额与到账时间以支付渠道账单为准，本机不估算'
+          ? '本单实付金额来自已建订单；退款金额与到账时间以支付渠道账单为准，本机不估算'
           : state === 'expired' || state === 'attempt-failed'
-            ? '本单实付金额来自服务端已建订单；重新发起仍按这一金额收款'
-            : '本单实付金额 · 来自服务端已建订单，前端不重新计算'
+            ? '本单实付金额来自已建订单；重新发起仍按这一金额收款'
+            : '本单实付金额来自已建订单，本机不重新计算'
   return (
     <div className="cashier-qx-amount">
       <div className="cashier-qx-amount-lb">{label}</div>
@@ -330,14 +336,14 @@ function Instrument(props: CashierQxViewProps & { ctx: CopyContext }) {
 /** 到账进度（稿 37 confirming）。三步的状态只由「已有支付尝试、尚未 paid」这两个服务端事实推出。 */
 function ProgressSteps({ state }: { state: CashierQxState }) {
   const steps = [
-    { title: '付款码已提交', desc: '本次支付尝试已由服务端创建', status: 'done', text: '已提交' },
+    { title: '付款码已提交', desc: '这次付款已经送出去了', status: 'done', text: '已提交' },
     {
-      title: '等待支付平台回执',
-      desc: state === 'pending-verification' ? '渠道结果暂未确认，请先查账单' : '回执到达前不显示任何支付结论',
+      title: '等待支付平台确认',
+      desc: state === 'pending-verification' ? '渠道结果暂未确认，请先查账单' : '确认之前不显示任何付款结论',
       status: 'now',
       text: state === 'pending-verification' ? '待核实' : '等待中',
     },
-    { title: '服务端确认后释放出纸', desc: '只有服务端确认已付才会创建打印任务', status: 'todo', text: '未开始' },
+    { title: '确认已付后才出纸', desc: '只有确认已付才会创建打印任务', status: 'todo', text: '未开始' },
   ] as const
   return (
     <section className="cashier-qx-group" aria-label="到账进度">
@@ -373,7 +379,7 @@ function SideNote({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
               : state === 'release-failed'
                 ? ctx.free
                   ? ['会不会扣钱', '这一单报价为 0，本来就不收款；重试只重新创建打印任务。']
-                  : ['为什么不会重新收款', '这里只重试服务端的幂等任务释放，不会再次创建支付尝试。']
+                  : ['为什么不会重新收款', '这里只重试创建同一打印任务，不会再次收款。']
                 : state === 'attempt-channel-unknown'
                   ? ['为什么不替你挑一个', '猜错会让你扫到一张不属于这一单的码，也可能把别人的付款结果当成你的。宁可这里停住。']
                   : null
@@ -418,7 +424,7 @@ function Closure({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
     : state === 'free-order' || state === 'release-failed'
       ? '本次只恢复或创建打印任务，不进入收款流程。'
       : state === 'paid'
-        ? '付款已由服务端确认；接下来去打印进度页查看出纸。'
+        ? '付款已经确认；接下来去打印进度页查看出纸。'
         : '请按页面提示处理；支付结果长时间未更新时，先查看支付账单。'
   const flow = scan
     ? [['1. 核对金额', '只认当前订单返回的实际金额。'], ['2. 只操作一次', '请勿重复扫码或重复出示手机付款码。'], ['3. 等待结果确认', '付款码不会完整显示或保存在这台机器上。']]
@@ -447,11 +453,17 @@ export function CashierQxDock({
 }) {
   return (
     <>
-      {reason ? <p className="cashier-qx-cta-reason">{reason}</p> : null}
+      <div className="cashier-qx-cta-reason">
+        {reason ? <p>{reason}</p> : <span />}
+        <PrintAiHelp
+          label="这笔账看不懂，问小青"
+          draft="我在付款这一步。请用白话告诉我：现在是在等付款、已经付好，还是需要再看支付账单。不要替我判断有没有扣款。"
+        />
+      </div>
       <div className="cashier-qx-cta-row">{children}</div>
       <div className="cashier-qx-truth" data-disclaimer="true">
         <p><b>付款安全</b>请勿重复付款；页面会在系统确认结果后更新。付款码不会在屏幕上完整显示或保存。</p>
-        <p><b>金额确认</b>只有订单金额明确后才会生成收款码或读取付款码。</p>
+        <p><b>金额确认</b>只有这笔账的金额明确后，才会出收款码。</p>
         <p>
           <b>异常处理</b>
           {billingChannel === 'sandbox'

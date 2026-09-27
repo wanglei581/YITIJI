@@ -32,7 +32,8 @@ export const PILL: Record<PrintConfirmScreen, { tone: 'ok' | 'warn' | 'bad' | 'u
 
 /**
  * 稿 14 小青区：标题分三段 [前, 强调, 后]，强调段按稿渲染成翡翠色 <em>；拼起来就是整句。
- * doing 是一句话说明本屏在做什么，只描述本机行为与服务端回执，不预告任何金额。
+ * doing 是一句话说明本屏在做什么，只描述本机已经知道的事实，不预告任何金额。
+ * 有真实报价时说「以实际结果为准」；静态稿里的「排版演示」三屏不会出现在这一页。
  */
 export const ASK: Record<PrintConfirmScreen, { title: readonly [string, string, string]; doing: string }> = {
   'missing-context': {
@@ -44,12 +45,12 @@ export const ASK: Record<PrintConfirmScreen, { title: readonly [string, string, 
     doing: '交接内容没通过登记核对：我不猜是哪一份文件，也不会退回默认那一份。',
   },
   quoting: {
-    title: ['正在', '计算本次费用', '。'],
-    doing: '金额确认前不会创建订单，也不会扣款。金额和计费页数都由服务端返回。',
+    title: ['先看', '价格', '，再决定。'],
+    doing: '核对打印内容与费用，确认后再付款、领取打印件。',
   },
   quoted: {
-    title: ['这笔多少钱，', '服务端说了算', '。'],
-    doing: '金额和计费页数都由服务端返回。本机不估价、不打折、不替你承诺优惠。',
+    title: ['这笔', '多少钱', '，以实际结果为准。'],
+    doing: '金额和计费页数都以实际结果为准。本机不估价、不打折、不替你承诺优惠。',
   },
   'quote-failed': {
     title: ['暂时', '无法获取报价', '。'],
@@ -57,11 +58,11 @@ export const ASK: Record<PrintConfirmScreen, { title: readonly [string, string, 
   },
   'capability-invalid-params': {
     title: ['这些参数', '暂不可用', '。'],
-    doing: '请改为黑白、单面后重新获取报价。参数已按本机已验证能力收口。',
+    doing: '请改为黑白、单面后重新获取报价。',
   },
   'benefit-unverified': {
     title: ['核销没通过时', '按原价', '显示。'],
-    doing: '本机不会先按抵扣后的价格显示。没核销过就按服务端原价走。',
+    doing: '本机不会先按抵扣后的价格显示。没核销过就按原价走。',
   },
   'zero-amount': {
     title: ['零元单', '也要先建单', '。'],

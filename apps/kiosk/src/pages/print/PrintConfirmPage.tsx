@@ -202,7 +202,7 @@ export function PrintConfirmPage() {
   useEffect(() => {
     if (API_MODE !== 'http') return
     if (paramsWereRestricted) {
-      setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason: '参数已按本机已验证能力收口' } })
+      setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason: '彩色或双面本机暂未开通，已改回目前能打的参数' } })
       return
     }
     if (!file.fileUrl) {
@@ -224,7 +224,7 @@ export function PrintConfirmPage() {
         const reason =
           errorCodeOf(err) === 'PRINTER_UNAVAILABLE'
             ? userMessageOf(err, '本机打印机当前不可用，请联系现场工作人员')
-            : '页数待服务端确认，以最终计费为准'
+            : '页数以实际结果为准，确认前不显示金额'
         setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason } })
       })
     return () => {
@@ -459,12 +459,12 @@ export function PrintConfirmPage() {
     quote.status === 'ready'
       ? `${formatCents(quote.unitCents)}/页 × ${quote.quantity} 页`
       : quote.status === 'loading'
-        ? '正在向服务端确认页数与价目…'
+        ? '正在核对页数与价目…'
         : quote.status === 'demo'
           ? '演示模式不显示金额'
           : quote.status === 'unavailable'
             ? quote.reason
-            : '页数待服务端确认，以最终计费为准'
+            : '页数以实际结果为准，确认前不显示金额'
 
   const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
   const amountText = quote.status === 'ready' ? formatCents(quote.amountCents).replace(/^¥/, '') : ''

@@ -25,6 +25,7 @@ import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import { printUploadPathForSource, clearPrintMaterialSession, type PrintMaterialSource } from './printMaterialSession'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PrintAiHelp } from './components/PrintAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintFileDeletionRecords } from './components/PrintFileDeletionRecords'
 import { PrintFileRetentionNotice } from './components/PrintFileRetentionNotice'
@@ -337,7 +338,7 @@ export function PrintDonePage() {
       <QxPageFrame
         title="这趟办完了"
         subtitle="本机上的本次打印文件预览和记录已清除"
-        status={{ tone: 'ok', label: '会话已清空' }}
+        status={{ tone: 'ok', label: '这次办理已清空' }}
         terminalLabel="就业服务大厅"
         ctabar={
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/')}>
@@ -393,6 +394,10 @@ export function PrintDonePage() {
             <span className="txt">本机<b>不会自动处理费用</b>，也不会把支付异常写成打印状态。</span>
             <button type="button" className="pff-help-btn" onClick={() => navigate('/help')}>联系工作人员</button>
           </div>
+          <PrintAiHelp
+            label="问小青：取纸或异常怎么办 →"
+            draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
+          />
         </div>
         {feedbackDialog}
       </QxPageFrame>
@@ -492,7 +497,7 @@ export function PrintDonePage() {
         <QxPageFrame
           back={{ label: '返回首页', onBack: () => navigate('/') }}
           title="打印机缺纸"
-          subtitle="服务端登记缺纸，这次打印不会在加纸后自动续打"
+          subtitle="已经登记缺纸，这次打印不会在加纸后自动续打"
           status={{ tone: 'bad', label: outOfPaperPill(money) }}
           terminalLabel="就业服务大厅"
           ctabar={
@@ -526,6 +531,10 @@ export function PrintDonePage() {
               canRetry={Boolean(takeaway?.canRetry)}
               takeaway={takeawayNotices}
             />
+            <PrintAiHelp
+              label="问小青：取纸或异常怎么办 →"
+              draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
+            />
           </div>
           {feedbackDialog}
         </QxPageFrame>
@@ -545,14 +554,14 @@ export function PrintDonePage() {
         ? '硬拉可能撕坏纸、伤到机器，交给我们来处理。'
         : '订单和支付记录都在，请凭订单找现场工作人员处理。'
     const issueSub = isUnconfirmed
-      ? '服务端已明确登记，等待人工核查'
+      ? '系统已明确登记，等待人工核查'
       : jam
         ? '你的订单和已付金额都保留着'
-        : '打印任务已由服务端确认失败'
+        : '打印任务已经确认失败'
     return (
       <QxPageFrame
         title={issueTitle}
-        subtitle={isUnconfirmed ? '服务端无法确认本次是否已出纸' : '打印任务已由服务端确认失败'}
+        subtitle={isUnconfirmed ? '这次无法确认是否已经出纸' : '打印任务已经确认失败'}
         status={{ tone: 'bad', label: `${paidLabel} · ${issueTitle}` }}
         terminalLabel="就业服务大厅"
         ctabar={
@@ -570,6 +579,7 @@ export function PrintDonePage() {
       >
         <div
           data-w2-page="print-done" data-print-flow-step={6}
+          data-pff-head="xq"
           data-testid={
             isUnconfirmed
               ? 'print-fulfill-state-result-unconfirmed'
@@ -656,7 +666,7 @@ export function PrintDonePage() {
       }
       navbar={navbar}
     >
-      <div data-w2-page="print-done" data-print-flow-step={6} data-testid="print-fulfill-state-completed" className="qx-scroll pff-page">
+      <div data-w2-page="print-done" data-print-flow-step={6} data-pff-head="xq" data-testid="print-fulfill-state-completed" className="qx-scroll pff-page">
         <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing="拿走前记得核一下页数和水印，少页当场能处理。" />
 
         <div className="qx-card">
@@ -687,10 +697,14 @@ export function PrintDonePage() {
           {pickupCode && (
             <div className="pff-pickup">
               <div>
-                <div className="pff-pickup-t">取件码（仅接口返回时展示）</div>
-                <div className="pff-pickup-s">离开后再来取，或请工作人员凭码取。请勿拍照外传。</div>
+                <div className="pff-pickup-t">取件码</div>
+                <div className="pff-pickup-s">有效期以手机订单为准。领取时核对文件和页数，请勿拍照外传。</div>
               </div>
-              <div className="pff-pickup-code">{pickupCode}</div>
+              <div className="pff-pickup-code" aria-label={`取件码 ${pickupCode}`}>
+                {/^\d{8}$/.test(pickupCode)
+                  ? pickupCode.split('').map((digit, index) => <span key={index}>{digit}</span>)
+                  : pickupCode}
+              </div>
             </div>
           )}
           {pickupCodeError && (
@@ -772,6 +786,10 @@ export function PrintDonePage() {
           <span className="txt">少了页、印花了、对内容有疑问？<b>现在处理最方便</b>。</span>
           <button type="button" className="pff-help-btn" onClick={() => navigate('/help')}>联系工作人员</button>
         </div>
+        <PrintAiHelp
+          label="问小青：取纸或异常怎么办 →"
+          draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
+        />
       </div>
       {feedbackDialog}
     </QxPageFrame>
