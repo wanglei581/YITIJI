@@ -192,6 +192,8 @@ async function main() {
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { status: 'inactive' } })
     const held = (await service.listForPartner(partnerA)).items.find((item) => item.id === a.id)
     ok(held?.emergencyTakedown && held.emergencyReasonCode === 'rights_complaint' && held.emergencyReasonText === '机构网站异常', 'partner sees hold and reason')
+    const heldUpdated = await service.updateForPartner(partnerA, a.id, { name: '下架后改名' })
+    ok(heldUpdated.emergencyTakedown && heldUpdated.emergencyReasonCode === 'rights_complaint', 'held-channel update response retains hold state')
     await rejects(() => service.updateForPartner(partnerA, a.id, { enabled: true }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'hold cannot be reenabled')
     await emergency.takedown('official_channel', a.id, 'other', '重复下架', actor)
     ok(await prisma.partnerOrgNotice.count({ where: { orgId: ids.a, kind: 'recruitment_emergency_takedown' } }) === 1, 'repeat takedown creates one notice')
@@ -204,6 +206,12 @@ async function main() {
     await emergency.circuitBreak('org', ids.a, 'authority_order', '机构站点统一停用', actor)
     ok((await service.listForTerminal(terminalA)).items.length === 0
       && await prisma.recruitmentEmergencyHold.count({ where: { targetType: 'official_channel', targetId: c.id } }) === 1, 'organization circuit break holds existing official channels')
+    await prisma.onlinePlatformDirectory.create({ data: {
+      id: `oc_race_${suffix}`, slug: `oc_race_${suffix}`, name: '并发遗留渠道',
+      organizationId: ids.a, category: 'official_channel', status: 'active',
+      landingUrl: 'https://example.com.cn/', operatorLegalName: '机构 A',
+    } })
+    ok((await service.listForTerminal(terminalA)).items.length === 0, 'persistent org circuit hides a concurrently created channel')
     await rejects(() => service.createForPartner(partnerA, { name: '熔断后新增', url: 'https://example.com.cn/' }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'circuit break blocks new official channels')
 
     const plan = (title: string, source: 'system' | 'manual' = 'system') => ({

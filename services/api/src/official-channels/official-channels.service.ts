@@ -175,9 +175,9 @@ export class OfficialChannelsService {
         actorId: user.userId, actorRole: user.role, action: 'official_channel.update',
         targetType: 'official_channel', targetId: row.id, payload: { orgId: org.id, enabled, linkChanged },
       })
-      return next
+      return { row: next, hold }
     })
-    return this.toPartnerItem(updated, org.name)
+    return this.toPartnerItem(updated.row, org.name, updated.hold ?? undefined)
   }
 
   async archiveForPartner(user: AuthedUser, channelId: string): Promise<{ archived: true }> {
@@ -224,6 +224,11 @@ export class OfficialChannelsService {
     organizationName: string,
     verifiedJson: string,
   ): Promise<OfficialChannelPublicItem[]> {
+    const circuit = await this.prisma.recruitmentCircuitBreak.findUnique({
+      where: { scope_targetId: { scope: 'org', targetId: orgId } },
+      select: { id: true },
+    })
+    if (circuit) return []
     const verified = parseVerifiedDomains(verifiedJson)
     const rows = await this.prisma.onlinePlatformDirectory.findMany({
       where: {

@@ -3,7 +3,7 @@
 ## 2026-09-27：3.14 本机构官方渠道后端收尾（本地候选，未合并、未部署）
 
 - 分支 `codex/official-channels-314-20260927` 提交 `1079fc372`：官方渠道与原平台目录按 category 隔离；机构域名登记按身份核验留审计；渠道写入、归档和审计同事务；终端按认证身份与所属机构只读展示字段；管理员可单向紧急下架并通知机构，机构熔断也覆盖渠道。补两套 schema 的机构核验域字段、复合索引及 SQLite/PostgreSQL 迁移；职业规划旧存档按自身 `basedOn` 清理系统岗位引用，查看与 PDF 共用逻辑。
-- 本地门禁：API typecheck、lint、`verify:official-channels` 94/94、`verify:job-fit` 24/24、`verify:career-plan` 12/12、`verify:recruitment-p1-schema`（SQLite 全新库/升级库）、`db:pg:sync:check`、`verify:job-ai-backend`、`verify:recruitment-content-http`、`verify:recruitment-emergency-scope`、`verify:companies`、`verify:job-review`、`verify:recruitment-hosting-default-off`、`verify:compliance-copy`、CI 接线覆盖与 workflow 语法检查通过。6 项变异反证均使对应断言变红，源文件按字节还原。
+- 本地门禁：API typecheck、lint、`verify:official-channels` 96/96、`verify:job-fit` 24/24、`verify:career-plan` 12/12、`verify:recruitment-p1-schema`（SQLite 全新库/升级库）、`db:pg:sync:check`、`verify:job-ai-backend`、`verify:recruitment-content-http`、`verify:recruitment-emergency-scope`、`verify:companies`、`verify:job-review`、`verify:recruitment-hosting-default-off`、`verify:compliance-copy`、CI 接线覆盖与 workflow 语法检查通过。7 项变异反证均使对应断言变红，源文件按字节还原。
 - 未完成：本机没有 PostgreSQL 服务，PostgreSQL 实库迁移/升级门禁留待 CI；一体机、机构端、管理员端页面由协调方接线；3.15 存量清理由后续任务处理。以上均为本地证据，不代表线上或真机验收。
 
 ## 2026-09-26（晚，续）：托管 a 版大屏两轮验收通过并入候选；第 18 轮全绿
