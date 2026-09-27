@@ -497,7 +497,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/components/PrintDoneSections.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx` | `verify-print-confirm-honest.mjs` |
-| `apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx` | `verify-print-parameter-capability.mjs`<br/>`verify-word-conversion-ui.mjs` |
+| `apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx` | `verify-file-display-truth.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/pages/print/components/printFileRetention.ts` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourceView.tsx` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-runtime-terminal-identity.mjs` |

@@ -14379,6 +14379,7 @@
           "path": "/print/upload",
           "styles": [
             "apps/kiosk/src/pages/print/styles/file-source-qx.css",
+            "apps/kiosk/src/pages/print/styles/print-desk-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -18797,6 +18798,7 @@
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx": [
+      "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
@@ -25731,6 +25733,7 @@
           "apps/kiosk/src/lib/fileName.ts",
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx",
           "apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx",
           "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
           "apps/kiosk/src/pages/print/printUsageEstimate.ts"
