@@ -59,7 +59,7 @@ export function ScoresZone({
         {selected ? (
           <>
             <b>{selected.label}</b>
-            <p style={{ margin: '4px 0 0', fontSize: 18, color: 'var(--qx-ink-2)' }}>
+            <p style={{ margin: '4px 0 0', fontSize: 'var(--qx-fs-body)', color: 'var(--qx-ink-2)' }}>
               {DIM_ABOUT[selected.key as ResumeScoringDimensionKey] ?? ''}
               {mine.length
                 ? ` 本维在「问题证据」里对应 ${mine.length} 条（${sevOf(sections, selected.key).word}）。`
@@ -67,7 +67,7 @@ export function ScoresZone({
             </p>
           </>
         ) : (
-          <p style={{ margin: 0, fontSize: 18, color: 'var(--qx-ink-2)' }}>点上面任意一项，看它在看什么。六项各自打分、互不换算，只描述这份简历的表达。</p>
+          <p style={{ margin: 0, fontSize: 'var(--qx-fs-body)', color: 'var(--qx-ink-2)' }}>点上面任意一项，看它在看什么。六项各自打分、互不换算，只描述这份简历的表达。</p>
         )}
       </div>
       {activeDim && mine.length > 0 ? (

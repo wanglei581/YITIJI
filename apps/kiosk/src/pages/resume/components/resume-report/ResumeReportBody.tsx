@@ -10,8 +10,7 @@ import { IssuesZone, StructureZone } from './ResumeReportIssues'
 import { DimensionTalk, ScoresZone } from './ResumeReportScores'
 
 function Prov({ kind }: { kind: 'contract' | 'derived' | 'fixture' }) {
-  const label = kind === 'contract' ? '合同' : kind === 'derived' ? '本页算' : '夹具'
-  return <span className="rrp-prov" data-p={kind}>{label}</span>
+  return <span className="rrp-prov" data-p={kind} aria-hidden="true" />
 }
 
 export function ResumeReportBody({
@@ -45,27 +44,6 @@ export function ResumeReportBody({
 
   return (
     <>
-      <section className="rrp-score-note" data-testid="resume-report-not-admission">
-        这不是录取分
-        <span>六项各自打分，本页不求和、不换算百分比，也不代表录用、面试或投递结果。</span>
-      </section>
-
-      {priorities.length > 0 ? (
-        <section className="rrp-pri" data-testid="resume-report-priorities">
-          <div className="rrp-zh">先改这几处<span>{prioritiesFromReport ? '报告自带' : '按低分分项机械列出'} <Prov kind={prioritiesFromReport ? 'contract' : 'derived'} /></span></div>
-          <ol>
-            {priorities.map((item, i) => (
-              <li key={`${item.focus}-${i}`}>
-                <span className="no">{i + 1}</span>
-                <span><b>{item.focus}</b>{item.reason ? ` ${item.reason}` : ''}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-
-      <DimensionTalk sections={report.sections} />
-
       <section className="rrp-cbar" data-testid="resume-report-counts">
         <div className="rrp-cgrid">
           {[
@@ -82,7 +60,6 @@ export function ResumeReportBody({
             </span>
           ))}
         </div>
-        <p className="rrp-legend">合同＝服务端报告里就有；本页算＝由报告机械推出；夹具＝合成样本，只在夹具门内出现。</p>
       </section>
 
       <div className="rrp-segs" role="tablist" aria-label="报告主内容分区" data-testid="resume-report-segs">
@@ -117,6 +94,29 @@ export function ResumeReportBody({
         <ScoresZone sections={report.sections} issues={issues} activeDim={dim} onDim={onDim} />
       ) : null}
       {activeSeg === 'conclusions' && conclN > 0 ? <ConclusionsZone report={report} /> : null}
+      <details className="rrp-explanation"><summary>先改这几处 · 六维解读</summary>
+      <section className="rrp-score-note" data-testid="resume-report-not-admission">
+        这不是录取分
+        <span>六项各自打分，本页不求和、不换算百分比，也不代表录用、面试或投递结果。</span>
+      </section>
+
+      {priorities.length > 0 ? (
+        <section className="rrp-pri" data-testid="resume-report-priorities">
+          <div className="rrp-zh">先改这几处<span>{prioritiesFromReport ? '报告自带' : '按低分分项机械列出'} <Prov kind={prioritiesFromReport ? 'contract' : 'derived'} /></span></div>
+          <ol>
+            {priorities.map((item, i) => (
+              <li key={`${item.focus}-${i}`}>
+                <span className="no">{i + 1}</span>
+                <span><b>{item.focus}</b>{item.reason ? ` ${item.reason}` : ''}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      <DimensionTalk sections={report.sections} />
+
+      </details>
     </>
   )
 }
@@ -155,7 +155,7 @@ function ConclusionsZone({ report }: { report: ResumeReport }) {
       <p className="rrp-zfoot">
         {hasP && hasR
           ? '三栏都按报告给出的顺序原样排列。建议只针对简历表达，不涉及录用、面试或投递结果，也不会发给任何企业。'
-          : '这是一份早期报告：只有分数和建议，没有「先改这几处」「表达风险」两项字段 —— 这不是读取失败。'}
+          : '这是一份早期报告：只有分数和建议，没有「先改这几处」「表达风险」两项内容 —— 这不是读取失败。'}
       </p>
     </section>
   )
@@ -167,7 +167,7 @@ export function EmptyReportBody() {
       <section className="rrp-state">
         <h2>报告回来了，但里面是空的</h2>
         <p>
-          服务端确实返回了这份报告，只是六个维度、建议、优先级和风险提醒都是空的。
+          这次确实读到了报告，只是六个维度、建议、优先级和风险提醒都是空的。
           常见原因是这次提取到的简历文字太少，不足以给出有依据的结论。
           这不是读取失败，也不是能力未接通。本页不会为了把版面填满而生成任何结论，也不出总分。
         </p>

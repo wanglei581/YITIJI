@@ -8,6 +8,8 @@ import {
 import { Button, Card } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { resumeProcessCopy } from './resumeUserCopy'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
@@ -39,6 +41,7 @@ import {
 } from '@ai-job-print/shared'
 import './resume-triage-qx.css'
 import './resume-triage-panels-qx.css'
+import './resume-r1-qx2.css'
 
 const STEPS = [
   { key: 'reading',    label: '读取上传文件',    hint: '校验格式与页数' },
@@ -174,7 +177,7 @@ export function ResumeParsePage() {
     if (!samePerson(ownerId)) return
     if (!result || typeof result !== 'object') {
       setOutcome('unknown')
-      setBlockNote('服务端的答复不完整，这台机器没能确认这一次解析的结果。')
+      setBlockNote('没有收到完整结果，暂时无法确认这次解析是否完成。')
       return
     }
     if (knownTaskId && result.taskId && result.taskId !== knownTaskId) {
@@ -230,14 +233,14 @@ export function ResumeParsePage() {
       if (result.status !== 'pending' && result.status !== 'processing') {
         setBlockNote(result.taskId
           ? '解析已经提交并拿到了编号，但收到的答复不完整。'
-          : '服务端的答复不完整，这台机器没能确认这一次解析的结果。')
+          : '没有收到完整结果，暂时无法确认这次解析是否完成。')
       }
       setOutcome('unknown')
       return
     }
     if (!result.taskId) {
       setOutcome('unknown')
-      setBlockNote('服务端的答复不完整，这台机器没能确认这一次解析的结果。')
+      setBlockNote('没有收到完整结果，暂时无法确认这次解析是否完成。')
       return
     }
     if (!await dropHeldIntent(ownerId, '本机解析标识已不在，没有打开结果，也没有另起一次解析。')) return
@@ -545,15 +548,15 @@ export function ResumeParsePage() {
   const renderFrame = (body: ReactNode, ctabar?: ReactNode) => (
     <QxPageFrame
       title="AI 解析"
-      subtitle="等待服务端返回真实解析结果"
+      subtitle="读懂简历，带走诊断报告"
       status={copy.status}
       terminalLabel="AI 简历服务"
       back={{ label: '返回简历来源', onBack: leaveToSource }}
-      ctabar={ctabar}
+      ctabar={<><QxStepActions><QxAiHelp label="问小青：解析没完成怎么办 →" draft="我的简历解析还没有完成，请说明等待、复查和重新提交有什么区别，不要替我重新提交。" /></QxStepActions>{ctabar}</>}
     >
-      <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} className="qx-resume-triage">
+      <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} className="qx-resume-triage" data-takeaway="简历诊断报告">
         <ResumeTriageHero
-          eyebrow={state?.intent === 'optimize' ? 'AI RESUME OPTIMIZE' : 'AI RESUME DIAGNOSE'}
+          eyebrow={state?.intent === 'optimize' ? 'AI 简历优化' : 'AI 简历诊断'}
           ask={copy.ask}
           doing={copy.doing}
           flag={copy.flag}
@@ -646,11 +649,11 @@ export function ResumeParsePage() {
         )}
 
         <p className="qx-rt-note" role="note">
-          <b>说明</b>当前服务仅返回最终解析结果。以下为本次处理内容说明，不代表服务端实时阶段。
+          <b>说明</b>以下列出这次要处理的内容，不代表实时进度。结果返回后会自动打开报告。
         </p>
         {consent.guestNotice && (
           <p className="qx-rt-note" role="note" data-testid="resume-ai-guest-notice">
-            未登录使用简历 AI：本次结果只在本机会话内可见，离场即清，不进入任何账号；AI 建议仅供参考，不替你投递。
+            未登录使用简历 AI：本次结果只在这次办理中可见，离场即清，不进入任何账号；AI 建议仅供参考，不替你投递。
           </p>
         )}
 
@@ -678,7 +681,7 @@ export function ResumeParsePage() {
 
         {!terminal && (
           <p className="qx-rt-note" data-tone="warn">
-            解析通常在 90 秒内完成；若格式不支持、识别失败或服务不可用，将如实提示失败原因，可重试或重新上传。诊断结果由 AI 生成，仅供参考。
+            识别不清或解析失败时会说明下一步怎么做。诊断结果由 AI 生成，仅供参考。
           </p>
         )}
       </div>
@@ -743,7 +746,7 @@ export function ResumeParsePage() {
       {page}
       {confirmFresh > 0 && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
+          className="resume-r1-dialog fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
           role="dialog"
           aria-modal="true"
           aria-labelledby="resume-parse-fresh-title"
@@ -755,7 +758,7 @@ export function ResumeParsePage() {
             <p className="mt-3 text-sm leading-relaxed text-neutral-600" data-testid="resume-parse-fresh-copy">
               {confirmFresh === 1
                 ? (terminal?.mode === 'charged'
-                  ? terminal.copy.confirm
+                  ? resumeProcessCopy(terminal.copy.confirm)
                   : '刚才那次解析可能已经完成。重新提交会再调用一次 AI，生成新的一次解析，不会取消或覆盖刚才那次；如果刚才那次其实已经完成，就等于重复解析了一次。')
                 : terminal?.mode === 'charged'
                   ? '将清除本机这一次已结束的解析标识，并开始新的一次 AI 解析。'

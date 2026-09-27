@@ -121,8 +121,8 @@ mustHandler('reportExits', 'printOriginal', [
   ['makePrintParams', '必须给出真实打印参数，不构造裸对象'],
 ])
 
-// 其余三条出路（原型 09 的 ai-down 支线：去打印 / 看岗位 / 看招聘会）必须真的通到路由。
-for (const route of ['/print-scan', '/jobs', '/job-fairs']) {
+// 其余三条出路（2.0 稿 22 托管 a 的 ai-down 支线：去打印 / 查政策 / 本机构官方渠道）必须真的通到路由。
+for (const route of ['/print-scan', '/policy-service', '/official-channels']) {
   must('reportExits', `navigate('${route}')`, `诊断失败态必须保留通往 ${route} 的非 AI 出路`)
 }
 

@@ -132,6 +132,7 @@ function optimizeHarness() {
   const h = hooks(), request = deferred(), state = {}, locks = { active: 0 }
   const { useOptimizeLoad, OPTIMIZE_LOAD_LIMIT_MS } = load('src/pages/resume/components/resume-deliver/useOptimizeLoad.ts', {
     react: h.react,
+    '../../resumeUserCopy': load('src/pages/resume/resumeUserCopy.ts'),
     '../../../../services/api': { getResumeOptimize: (_task, _access, existingOnly) => { state.ExistingOnly = existingOnly; return request.promise } },
     '../../../../services/api/jobMaterials': { getResumeTemplates: async () => [] },
     '../../../../services/api/userErrorMessage': { errorCodeOf: (error) => error.code ?? 'FAILED', userMessageOf: (_e, text) => text },
@@ -143,6 +144,80 @@ function optimizeHarness() {
   h.render(() => useOptimizeLoad(opts))
   return { h, request, state, locks, opts, limit: OPTIMIZE_LOAD_LIMIT_MS }
 }
+
+test('resume failure reasons preserve user messages and shared rate-limit copy verbatim', () => {
+  const { resumeUserReason } = load('src/pages/resume/resumeUserCopy.ts')
+  const fallback = '这次没有生成优化建议，请稍后再试。'
+  for (const reason of ['文字识别失败，请确保文件清晰', '当前使用的人较多，请稍后再试', '文件已清理，请重新上传', '今日配额已用完', 'AI 服务繁忙，请稍后再试', '请上传清晰的 PDF 或 JPG 文件']) {
+    assert.equal(resumeUserReason(reason, fallback), reason)
+  }
+  // 执行既有 userMessageOf：HTTP 429 的统一提示不能再被结果页改成“额度用完”。
+  class ApiHttpError extends Error {}
+  const { userMessageOf } = load('src/services/api/userErrorMessage.ts', { './httpAdapter': { ApiHttpError } })
+  const error = Object.assign(new ApiHttpError('今日次数已用完'), { code: 'AI_PUBLIC_QUOTA_EXCEEDED', status: 429 })
+  assert.equal(resumeUserReason(userMessageOf(error, fallback), fallback), '当前使用的人较多，请稍后再试')
+})
+
+test('resume failure reasons fall back exactly for empty, technical or injected text', () => {
+  const { resumeUserReason } = load('src/pages/resume/resumeUserCopy.ts')
+  const fallback = '这次没有生成优化建议，请稍后再试。'
+  for (const reason of [undefined, null, '', '   ', '服务端字段 pending / uploaded / 内部文件号 abc', '<script>alert(1)</script>', '未验收：能力探测失败', 'unknown provider detail', '服务端超时 trace-id:abc', '后端会话已过期，请重新上传', '接口落库失败，链路无回执', '处理中：pending', '上传状态 uploaded', '解析失败 AI_PROVIDER_ERROR', 'HTTP 500：处理失败']) {
+    assert.equal(resumeUserReason(reason, fallback), fallback)
+  }
+  assert.doesNotMatch(resumeUserReason('服务端超时 trace-id:abc', fallback), /服务端|trace-id|abc/)
+})
+
+test('optimization preserves user failure reasons and filters technical reasons before choosing an exit', async () => {
+  for (const reason of ['文字识别失败，请确保文件清晰', '当前使用的人较多，请稍后再试', '文件已清理，请重新上传', '后端会话已过期，请重新上传']) {
+    const box = optimizeHarness(); await box.h.flush()
+    box.request.resolve({ status: 'failed', failReason: reason }); await box.h.flush()
+    const technical = reason.startsWith('后端')
+    assert.equal(box.state.FailMsg, technical ? '本次没有生成优化建议，可重试或返回重新解析' : reason)
+    assert.equal(box.state.FailKind, !technical && reason.includes('重新上传') ? 'expired' : 'retry')
+    assert.equal(box.locks.active, 0); box.h.unmount()
+  }
+})
+
+test('USB files render as named buttons and retain size, MIME, purpose and busy contracts', async () => {
+  const h = hooks(), upload = deferred(), imported = [], requests = [], busy = []
+  const files = [
+    { safeId: 'pdf', filename: 'U盘简历.pdf', sizeBytes: 2048 },
+    { safeId: 'image', filename: 'my_pdf_resume.jpg', sizeBytes: 2048 },
+    { safeId: 'oversize', filename: 'too-large.pdf', sizeBytes: 11 * 1024 * 1024 },
+  ]
+  const { ResumeUsbImportPanel } = load('src/pages/resume/components/ResumeUsbImportPanel.tsx', {
+    react: h.react,
+    '../../../services/api/userErrorMessage': { userMessageOf: (_err, fallback) => fallback },
+    '../../../auth/useAuth': { useAuth: () => ({ getToken: () => 'test-member-token' }) },
+    '@ai-job-print/ui': { Button: 'button', KioskStatePanel: 'aside' },
+    'lucide-react': { FileTextIcon: 'svg', LoaderIcon: 'svg', RefreshCwIcon: 'svg', UsbIcon: 'svg' },
+    '../../../services/files/usbImportApi': {
+      isUsbImportConfigured: () => true,
+      getUsbStatus: async () => ({ present: true, driveLabel: 'TEST-USB' }),
+      listUsbFiles: async () => ({ files }),
+      uploadUsbFile: (...args) => { requests.push(args); return upload.promise },
+    },
+  }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
+  const props = { onUploaded: (file) => imported.push(file), onBusyChange: (value) => busy.push(value) }
+  const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []
+  const text = (node) => Array.isArray(node) ? node.map(text).join('') : node && typeof node === 'object' ? text(node.props?.children) : typeof node === 'string' ? node : ''
+  const rows = () => nodes(h.value).filter((node) => node.type === 'button' && node.props.className?.includes('resume-usb-panel__row'))
+  h.render(() => ResumeUsbImportPanel(props)); await h.flush()
+  assert.equal(rows().length, 2)
+  for (const file of files.slice(0, 2)) {
+    const row = rows().find((node) => text(node).includes(file.filename))
+    assert.ok(row, `named file button: ${file.filename}`)
+    assert.equal(row.props.type, 'button'); assert.equal(row.props.disabled, false)
+  }
+  assert.equal(nodes(h.value).some((node) => node.type === 'details'), false)
+  assert.equal(text(h.value).includes('too-large.pdf'), false)
+  rows()[1].props.onClick(); await h.flush()
+  assert.deepEqual(requests, [['image', 'resume_upload', 'test-member-token']])
+  assert.ok(rows().every((node) => node.props.disabled)); assert.equal(busy.at(-1), true)
+  upload.resolve({ filename: 'my_pdf_resume.jpg', sizeBytes: 2048, mimeType: 'image/jpeg', fileId: 'file-image', fileUrl: '/fixture.jpg' }); await h.flush()
+  assert.deepEqual(plain(imported), [{ name: 'my_pdf_resume.jpg', size: '2 KB', format: 'jpg', fileId: 'file-image', fileUrl: '/fixture.jpg', mimeType: 'image/jpeg', channel: 'usb' }])
+  assert.equal(busy.at(-1), false); h.unmount()
+})
 
 test('optimize holds a lock through 95s, succeeds before 100s, releases on failure and unmount', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })

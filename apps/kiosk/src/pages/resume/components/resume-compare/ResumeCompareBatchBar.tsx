@@ -16,7 +16,7 @@ export function ResumeCompareBatchBar(props: {
           <small>把还没决定的都记为保留</small>
         </button>
         <button type="button" className="qx-btn" data-tone="danger" onClick={props.onClear}>
-          清空全部裁决
+          清空全部选择
           <small>全部回到待定</small>
         </button>
       </div>

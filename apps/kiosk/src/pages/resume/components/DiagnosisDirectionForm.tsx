@@ -58,7 +58,7 @@ export function DiagnosisDirectionForm({
       <KioskFilterPickerModal
         open={showIndustryPicker}
         title="选择行业门类"
-        description="覆盖 GB/T 4754-2017 的 20 个行业门类；更细行业将在后续分级字典中选择。"
+        description="选择与你目标方向接近的行业，也可以暂不指定。"
         sections={[{
           id: 'industry',
           label: '行业门类',

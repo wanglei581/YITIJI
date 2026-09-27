@@ -255,14 +255,16 @@ for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerP
   check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
 }
 
-// 2026-09-23 迁入青序流光（稿 21）：双栏布局的五条断言从旧 fusion-youth 入口改锚到本页的
-// resume-triage-qx.css，判据不变（grid / 440px 下限 / 近均衡比例 / 方向标题不逐字折行）。
+// 2026-09-28 稿 21 v2 summary 明确为文件 → 办理摘要 → 可展开的方向设置。
+// 旧双栏 / 0.9 比例是被稿替换的结构；440px 方向区下限与标题不逐字折行不放宽。
 const resumeSource = read('src/pages/resume/ResumeSourcePage.tsx')
 const resumeTriageCss = stripCssComments(read('src/pages/resume/resume-triage-qx.css'))
-check(resumeSource.includes('className="qx-rt-split"') && /(?:^|;)\s*display:\s*grid\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses a grid for its two-column stage')
+check(resumeSource.includes('className="qx-rt-split"') && /(?:^|;)\s*display:\s*flex\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses the design-21 vertical summary stage')
 check(!resumeSource.includes('lg:w-[348px]'), 'resume source removes the undersized 348px direction rail')
 check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-side')), 'resume source direction rail keeps a 440px minimum at 1080')
-check(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(440px,\s*0\.9fr\)/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses a near-balanced 1080 two-column ratio')
+check(/flex-direction:\s*column/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source keeps file and summary in one vertical column')
+check(resumeSource.indexOf('<ResumeSourceSummary') < resumeSource.indexOf('<DiagnosisDirectionForm'), 'read-only summary precedes editable direction settings')
+check(resumeSource.includes('<details className="qx-rt-settings">'), 'direction settings remain accessible through the design disclosure')
 check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-direction h2')), 'resume direction title cannot wrap character by character')
 for (const route of ['/resume/source', '/resume/parse']) includes('src/layouts/KioskRoot.tsx', `'${route}'`, `${route} is registered as Qingxu-migrated`)
 // 稿 25-material-workshop 迁入青序流光（2026-09-23）：此前这里钉的是「materials 不在本批」，

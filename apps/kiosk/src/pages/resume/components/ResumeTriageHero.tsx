@@ -33,7 +33,7 @@ export function ResumeTriageHero({ eyebrow, ask, doing, flag, warn = false, rail
       <div className="qx-rt-xq-row">
         <span className="qx-rt-face" aria-hidden="true">青</span>
         <div className="qx-rt-xq-main">
-          <p className="qx-rt-eyebrow">{eyebrow}</p>
+          <h1 className="qx-rt-eyebrow">{eyebrow}</h1>
           <p className="qx-rt-title">{ask}</p>
           <p className="qx-rt-doing">{doing}</p>
         </div>

@@ -502,6 +502,11 @@ export async function clickProfileEntry(page: Page, label: string, path: string)
 
 export async function fillDiagnosisDirection(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
   await recordStep({
+    page, journey, step: 'open-direction-settings', control: '改诊断方向', selectorHint: '.qx-rt-settings > summary',
+    kind: 'click', collectors,
+    act: async () => { await page.locator('.qx-rt-settings > summary').click() },
+  })
+  await recordStep({
     page, journey, step: 'fill-target-job', control: '目标岗位', selectorHint: 'input[placeholder*=前端工程师]',
     kind: 'fill', collectors,
     act: async () => {
