@@ -58,6 +58,7 @@ import {
   SELF_ASSESSMENT_CONSENT_VERSION,
   SENSITIVE_QUESTIONS,
   clearSession,
+  sessionForAssessmentRecord,
   flattenAnswers,
   formatBytes,
   formatDateTime,
@@ -613,11 +614,18 @@ export function SelfAssessmentQuizPage() {
 // 3) 结果页
 // ============================================================
 export function SelfAssessmentResultPage() {
+  const [searchParams] = useSearchParams()
+  const linkedTaskId = searchParams.get('taskId')
+  return <SelfAssessmentResultContent key={linkedTaskId ?? 'current'} linkedTaskId={linkedTaskId} />
+}
+
+function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | null }) {
   const navigate = useNavigate()
   const { getToken } = useAuth()
-  const [searchParams] = useSearchParams()
-  const [session, setSession] = useState<SelfAssessmentSession>(() => loadSession())
-  const linkedTaskId = searchParams.get('taskId')
+  const [session, setSession] = useState<SelfAssessmentSession>(() => {
+    const saved = loadSession()
+    return sessionForAssessmentRecord(linkedTaskId, saved)
+  })
   /** 请求在飞：`running` 的唯一来源，永远等于「后端已受理且这次调用还没回来」。 */
   const [inflight, setInflight] = useState<'submit' | 'fetch' | null>(null)
   const [taskError, setTaskError] = useState<string | null>(null)
@@ -663,7 +671,7 @@ export function SelfAssessmentResultPage() {
   useEffect(() => {
     if (result) return
     const mode: 'submit' | 'fetch' | null =
-      consentOk && pendingComplete ? 'submit' : linkedTaskId ? 'fetch' : null
+      linkedTaskId ? 'fetch' : consentOk && pendingComplete ? 'submit' : null
     if (!mode) return
     const runKey = `${mode}:${linkedTaskId ?? 'session'}:${attempt}`
     if (startedRef.current === runKey) return

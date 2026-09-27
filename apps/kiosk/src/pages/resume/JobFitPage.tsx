@@ -112,7 +112,8 @@ export function JobFitPage() {
   const session = useMemo(() => readAiResumeSession(), [])
   const queryTaskId = useMemo(() => new URLSearchParams(location.search).get('taskId') ?? undefined, [location.search])
   const stateTaskId = typeof state.taskId === 'string' ? state.taskId : undefined
-  const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
+  const taskId = queryTaskId ?? stateTaskId ?? session?.taskId
+  const resumeName = new URLSearchParams(location.search).get('resumeName') || `上传诊断简历 · ${taskId?.slice(-8) ?? ''}`
   const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
   const accessToken = state.accessToken ?? (usingSessionTask ? session?.accessToken : undefined)
   const currentToken = getToken()
@@ -225,6 +226,7 @@ export function JobFitPage() {
           return
         }
         setResult(null)
+        setNotice(err instanceof JobFitApiError && err.code === 'JOB_FIT_NOT_FOUND' ? '这份简历还没有可查看的对照结果，原结果可能已过期或删除；可填写要求重新对照。' : '对照结果这次没有读到，请检查网络后重试。')
       })
       .finally(() => {
         if (!cancelled) setLoadingLatest(false)
@@ -553,6 +555,7 @@ export function JobFitPage() {
             data-state="result"
             data-testid="resume-job-fit-state-result"
           >
+            <p className="jfq-sec-copy" data-testid="job-fit-resume-name">正在用：{resumeName}</p>
             <Sec title="对照概要" hint="仅供本人准备使用">
               <DecisionSummaryBar
                 jobTitle={result.job?.title ?? '目标岗位'}
@@ -621,14 +624,14 @@ export function JobFitPage() {
   return (
     <JobFitStage>
       <QxPageFrame
-        title="先把目标说清，再决定下一步"
-        subtitle="对照结果只给本人看，不分档、不打分；岗位要求、授权与结果全部以服务端返回为准。"
-        status={{ tone: 'unknown', label: '匹配前需要真实任务与本人授权' }}
+        title="简历对照"
+        subtitle="对照结果只给本人看，不分档、不打分。请核对简历和岗位要求后再开始。"
+        status={{ tone: 'unknown', label: '对照前请选好简历并确认授权' }}
         back={{ label: '返回简历服务', onBack: exits.resumeHub }}
         navbar={navbar}
         ctabar={
           <>
-            <CtaNote>匹配结果不代表录用判断，也不会提供给企业；本平台不提供投递功能。</CtaNote>
+            <CtaNote>对照结果不代表录用判断，也不会提供给企业；本平台不提供投递功能。</CtaNote>
             <button type="button" className="qx-btn" data-variant="ghost" onClick={exits.resumeHub}>
               返回简历服务
             </button>
@@ -664,6 +667,7 @@ export function JobFitPage() {
           data-state="pick"
           data-testid="resume-job-fit-state-pick"
         >
+          <p className="jfq-sec-copy" data-testid="job-fit-resume-name">正在用：{resumeName}</p>
           <Sec no="01" title={hosting.enabled ? '选择目标岗位' : '填一份岗位要求'} hint={hosting.enabled ? '系统岗位或手填目标，二选一' : 'AI 对照你的简历，只供本人分析'}>
             {hosting.enabled ? (<div className="jfq-choices">
               <button
@@ -673,7 +677,7 @@ export function JobFitPage() {
                 aria-pressed={tab === 'pick'}
               >
                 <h3>从已发布岗位中选择</h3>
-                <p>只有服务端返回已发布岗位后，才会显示标题、来源与详情。</p>
+                <p>这里只展示已发布岗位的标题、来源与详情。</p>
                 <span>按来源数据选择</span>
               </button>
               <button

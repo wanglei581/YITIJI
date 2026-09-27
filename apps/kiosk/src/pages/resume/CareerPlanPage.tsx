@@ -124,8 +124,9 @@ export function CareerPlanPage() {
   const session = useMemo(() => readAiResumeSession(), [])
   // 登出 / 过期 / 换人 / 清场之后本路由会话永久结束（判据见 useRouteIdentityGuard）。
   const { ended: identityEnded, begin, settle, isLive } = useRouteIdentityGuard({ user, getToken })
-  const taskId = state.taskId ?? session?.taskId
-  const accessToken = state.accessToken ?? session?.accessToken
+  const queryTaskId = new URLSearchParams(location.search).get('taskId') ?? undefined
+  const taskId = queryTaskId ?? state.taskId ?? session?.taskId
+  const accessToken = state.accessToken ?? (!queryTaskId && !state.taskId ? session?.accessToken : undefined)
   const [storedPlan, setPlan] = useState<CareerPlanResponse | null>(null)
   /** 渲染闸：会话一结束，同一次渲染里就不再读存着的规划（存值随后在 layout effect 里清掉）。 */
   const plan = identityEnded ? null : storedPlan
@@ -170,6 +171,10 @@ export function CareerPlanPage() {
 
   useEffect(() => {
     if (identityEnded) return
+    setPlan(null)
+    setRejectedTask(false)
+    setError(null)
+    setLoading(Boolean(taskId))
     if (!taskId) { setLoading(false); return }
     const run = begin()
     if (!run) return
@@ -184,7 +189,7 @@ export function CareerPlanPage() {
         if (cancelled || !isLive(run)) return
         const code = errorCodeOf(err)
         // 没有规划记录是正常态：说明还没生成过，但这一趟证明了后端可达。
-        if (code === 'CAREER_PLAN_NOT_FOUND') { setProbed(true); return }
+        if (code === 'CAREER_PLAN_NOT_FOUND') { setProbed(true); setError('这份简历还没有可查看的职业规划，原结果可能已过期或删除；可重新生成。'); return }
         // 前置校验的落点：后端不认这个 taskId，继续留在本页只会让用户白点一次生成。
         if (code === 'AI_TASK_NOT_FOUND') { setRejectedTask(true); return }
         if (AI_OUTAGE_CODES.has(code)) {

@@ -80,6 +80,7 @@ export function ResumeOptimizePage() {
   const syntheticReady = query.capture || query.debug
   useOptimizeLoad({
     taskId, access, syntheticReady, requested: query.requested,
+    existingOnly: new URLSearchParams(location.search).get('saved') === '1',
     consentChecking: consent.checking, consentNeedsPrompt: consent.needsPrompt, consentReady: consent.ready, retryNonce,
     setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume,
     setTemplatesError, setResumeTemplates, setSelectedTemplateId,
