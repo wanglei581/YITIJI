@@ -38,6 +38,15 @@ export const PROTO_V2_DIR = path.resolve(here, '../../../../../docs/design/kiosk
 
 /** 稿文件（含同目录的 .js / .css 附件）的实际路径：v2 有就用 v2，否则用原稿。越出两个目录的返回 null。 */
 export function protoFile(name: string): string | null {
+  // v2 稿用 `../kiosk-redesign-2026-08/…` 引原稿目录的附件（48、50 的共用脚本就是这样引的）；经本地服务
+  // 取时路径变成 `kiosk-redesign-2026-08/…`，按带目录名的路径在那一个目录里找，不再走 v2 优先。
+  for (const dir of [PROTO_V2_DIR, PROTO_DIR]) {
+    const prefix = `${path.basename(dir)}/`
+    if (!name.startsWith(prefix)) continue
+    const file = path.join(dir, name.slice(prefix.length))
+    if (!file.startsWith(dir + path.sep)) return null
+    return fs.existsSync(file) && fs.statSync(file).isFile() ? file : null
+  }
   for (const dir of [PROTO_V2_DIR, PROTO_DIR]) {
     const file = path.join(dir, name)
     if (!file.startsWith(dir + path.sep)) return null
