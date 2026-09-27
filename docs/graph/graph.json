@@ -11697,7 +11697,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 166,
+      "reachableFileCount": 171,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -11856,6 +11856,8 @@
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
             "PATCH /admin/companies/:param",
             "PATCH /admin/companies/:param/publish",
@@ -11880,7 +11882,8 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "PUT /admin/orgs/:param/accounts/:param/email"
+            "PUT /admin/orgs/:param/accounts/:param/email",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/companies/index.tsx",
           "layout": [
@@ -11915,6 +11918,8 @@
             "GET /admin/ai/usage",
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
             "GET /files",
             "GET /files/:param/url",
@@ -11927,7 +11932,8 @@
             "POST /admin/bulk-publish/preview",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "POST /files/cleanup-expired"
+            "POST /files/cleanup-expired",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/fair-sources/index.tsx",
           "layout": [
@@ -11949,6 +11955,8 @@
             "GET /admin/fairs/:param/stats",
             "GET /admin/fairs/:param/venue-guide",
             "GET /admin/import-batches",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
@@ -11963,7 +11971,8 @@
             "POST /admin/fairs/:param/zones",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "PUT /admin/fairs/:param/venue-guide"
+            "PUT /admin/fairs/:param/venue-guide",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/fairs/index.tsx",
           "layout": [
@@ -12006,6 +12015,8 @@
             "GET /admin/ai/usage",
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
             "GET /files",
             "GET /files/:param/url",
@@ -12016,7 +12027,8 @@
             "PATCH /admin/job-sources/:param/review",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "POST /files/cleanup-expired"
+            "POST /files/cleanup-expired",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/import-batches/index.tsx",
           "layout": [
@@ -12045,6 +12057,8 @@
             "GET /admin/ai/usage",
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
             "GET /files",
             "GET /files/:param/url",
@@ -12057,7 +12071,8 @@
             "POST /admin/bulk-publish/preview",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "POST /files/cleanup-expired"
+            "POST /files/cleanup-expired",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/job-sources/index.tsx",
           "layout": [
@@ -12142,6 +12157,8 @@
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
@@ -12161,7 +12178,8 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "PUT /admin/orgs/:param/accounts/:param/email"
+            "PUT /admin/orgs/:param/accounts/:param/email",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/offline-agencies/index.tsx",
           "layout": [
@@ -12198,6 +12216,8 @@
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
@@ -12217,7 +12237,8 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "PUT /admin/orgs/:param/accounts/:param/email"
+            "PUT /admin/orgs/:param/accounts/:param/email",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/partners/index.tsx",
           "layout": [
@@ -12257,6 +12278,8 @@
             "GET /admin/ai/usage",
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/policy-sources/:param/eligibility-rules",
             "GET /admin/system/recruitment-hosting",
             "GET /files",
@@ -12269,7 +12292,8 @@
             "PATCH /admin/job-sources/:param/review",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "POST /files/cleanup-expired"
+            "POST /files/cleanup-expired",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/policy-sources/index.tsx",
           "layout": [
@@ -12381,13 +12405,16 @@
           "component": "SyncSourcesPage",
           "endpoints": [
             "GET /admin/import-batches",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
             "POST /admin/recruitment-emergency/circuit-break",
-            "POST /admin/recruitment-emergency/takedown"
+            "POST /admin/recruitment-emergency/takedown",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/sync-sources/index.tsx",
           "layout": [
@@ -12452,7 +12479,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 171
+      "sourceFileCount": 176
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15431,7 +15458,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 64,
+      "reachableFileCount": 69,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -15642,6 +15669,10 @@
         {
           "component": "ProfilePage",
           "endpoints": [
+            "DELETE /partner/official-channels/:param",
+            "GET /partner/official-channels",
+            "PATCH /partner/official-channels/:param",
+            "POST /partner/official-channels",
             "PUT /partner/profile"
           ],
           "file": "apps/partner/src/routes/profile/index.tsx",
@@ -15822,7 +15853,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 65
+      "sourceFileCount": 70
     }
   },
   "dataModel": {
