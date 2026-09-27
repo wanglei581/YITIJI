@@ -19,6 +19,8 @@ export interface PolicyPostView {
   audience?: string
   category?: string
   externalUrl?: string
+  /** 发布方给的外部编号。没有就是空，页面写「—」，不编。 */
+  externalId?: string | null
   publishedDate?: string
   sourceName: string
   syncTime: string

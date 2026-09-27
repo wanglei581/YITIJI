@@ -182,6 +182,8 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   /* 稿 06-help（帮助中心），2026-09-24 迁入：页面自带 QxPageFrame 顶栏与 QxAppNavbar，
    * 漏登记会让旧 KioskLayout 顶栏 / 底栏叠在青序页上。 */
   '/help',
+  /* 稿 48-policy-workspace（政策服务），2026-09-28 迁入。漏登记会让旧顶栏叠在青序页上。 */
+  '/renshi',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
