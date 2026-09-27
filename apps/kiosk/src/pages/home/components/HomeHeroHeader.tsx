@@ -32,14 +32,14 @@ function QxHomeClock() {
   )
 }
 
-export function HomeHeroHeader({ terminalCode, deviceStatus }: HomeHeroHeaderProps) {
+// 2.0 首页头：品牌 + 「就业服务大厅」+ 状态胶囊与时钟（v2 01-home）。终端编号不上屏，报修时在帮助页找。
+export function HomeHeroHeader({ deviceStatus }: HomeHeroHeaderProps) {
   return (
     <header className="qx-topbar qx-home-hero-top">
       <span className="qx-topbar-mark" aria-hidden="true">职</span>
       <div className="qx-home-brand">
         <h1 className="qx-topbar-brand">职易达</h1>
-        <span className="qx-topbar-sub">职易达AI求职操作系统</span>
-        <span className="qx-home-terminal"><span className="qx-home-terminal-prefix">就业服务大厅 · </span>{terminalCode}</span>
+        <span className="qx-topbar-sub">就业服务大厅</span>
       </div>
       <span className="qx-topbar-spacer" />
       {/* 状态未知时照实显示「状态未知」而不是隐藏——公共终端上"没显示"会被读成"一切正常"。 */}

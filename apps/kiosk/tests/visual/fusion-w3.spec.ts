@@ -1024,8 +1024,9 @@ test('Qingxu topbar stays on one line at 390 and 1080 keeps its full layout @w3-
   api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
   await page.goto('/resume/source')
-  // 1080：窄屏规则一条都不许吃到（顶栏 104、返回键 64、副标题在）。
-  expect(await qxTopbarMetrics(page)).toMatchObject({ height: 104, backW: 64, subShown: true, brandLines: 1, pillLines: 1, pillClipped: false })
+  // 1080：窄屏规则一条都不许吃到（顶栏 104、返回键 64）。2026-09-28 起 2.0 顶栏只留品牌、状态胶囊与时钟，
+  // 不再显示副标题 / 终端编号（v2 README 规则 4），所以 1080 也是 subShown: false。
+  expect(await qxTopbarMetrics(page)).toMatchObject({ height: 104, backW: 64, subShown: false, brandLines: 1, pillLines: 1, pillClipped: false })
   await assertQxPillReadable(page, '/resume/source 1080')
 
   await page.setViewportSize({ width: 390, height: 844 })
