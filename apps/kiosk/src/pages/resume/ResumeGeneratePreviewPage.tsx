@@ -169,6 +169,17 @@ export function ResumeGeneratePreviewPage() {
           ? { title: '正在读取生成结果…', description: '读回来之前，这一页不显示任何简历内容。' }
           : { title: '生成结果已清除', description: '公共设备不保留个人信息。请重新填写后生成简历预览。' }
 
+  // 小青这一行说下一步怎么办；事实（发生了什么）只由下面的状态卡说一遍，不重复同一句。
+  const emptyNext = view === 'preview-failed'
+    ? { ask: '换条路继续', doing: '可以再读一次，或者回去重填一遍。' }
+    : view === 'preview-no-result'
+      ? { ask: '先完成一次生成', doing: '回去填写，生成之后再到这里逐段核对。' }
+      : view === 'illegal'
+        ? { ask: '从简历服务重新进来', doing: '回到简历服务，再点一次「从零生成简历」。' }
+        : view === 'preview-loading'
+          ? { ask: '稍等一下', doing: '结果读回来后，就能逐段核对。' }
+          : { ask: '需要重新生成', doing: '回去重新填写，就能再生成一份预览。' }
+
   const showWorkspace = Boolean(resume && result) && !['session-lost', 'preview-no-result', 'preview-loading', 'preview-failed', 'illegal'].includes(view)
   const canRetry = Boolean(restoreTaskId) && !synthetic
   const go = (to: string) => navigate(to)
@@ -207,8 +218,8 @@ export function ResumeGeneratePreviewPage() {
       >
         <ResumeGenerateAdvisor
           eyebrow="核对结果"
-          ask={showWorkspace ? '生成好了，你核一遍' : emptyCopy.title}
-          doing={showWorkspace ? '事实和你填的一致。被整理过的段落会标明供参考。' : emptyCopy.description}
+          ask={showWorkspace ? '生成好了，你核一遍' : emptyNext.ask}
+          doing={showWorkspace ? '事实和你填的一致。被整理过的段落会标明供参考。' : emptyNext.doing}
         />
         <ResumeAigcBadge synthetic={resolved.synthetic} />
         {!showWorkspace && (
