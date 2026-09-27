@@ -142,7 +142,8 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "7.18.2",
     "recharts": "^3.8.1",
-    "trtc-sdk-v5": "^5.17.1"
+    "trtc-sdk-v5": "^5.17.1",
+    "unpdf": "1.6.2"
   },
   "devDependencies": {
     "@playwright/test": "1.55.1",
