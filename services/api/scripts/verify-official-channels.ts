@@ -1,6 +1,7 @@
 /** 3.14 official channels: domain, tenant, terminal, hold, audit, and old plan regression. */
 import 'dotenv/config'
 import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { validateSync } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
 import { Reflector } from '@nestjs/core'
@@ -64,11 +65,17 @@ async function main() {
   try {
     // Registered root, URL host, redirect parameter, public suffix and shared hosting matrix.
     ok(verifiedDomainFromInput(' 学校.中国. ') === 'xn--48s290a.xn--fiqs8s', 'Unicode domain is punycoded and trailing dot removed')
-    ok(verifiedDomainFromInput('HTTPS://JOBS.EXAMPLE.COM.CN:443/path') === 'example.com.cn', 'registration URL resolves to canonical root')
-    for (const domain of ['com.cn', 'gov.cn', 'edu.cn', 'org.cn', 'net.cn', 'ac.cn', 'sd.gov.cn', 'github.io', 'gitee.io', 'pages.dev', 'vercel.app', 'netlify.app', 'workers.dev', 'herokuapp.com', 'azurewebsites.net', 'blogspot.com', 'firebaseapp.com', 'web.app', 'cloudfront.net', 'myqcloud.com', 'aliyuncs.com', 'alice.github.io']) {
+    ok(verifiedDomainFromInput('HTTPS://JOBS.EXAMPLE.COM.CN:443/path') === 'jobs.example.com.cn', 'registration URL preserves verified subdomain')
+    for (const domain of ['com.cn', 'gov.cn', 'edu.cn', 'org.cn', 'net.cn', 'ac.cn', 'sd.gov.cn', 'github.io', 'gitee.io', 'pages.dev', 'vercel.app', 'netlify.app', 'workers.dev', 'herokuapp.com', 'azurewebsites.net', 'blogspot.com', 'firebaseapp.com', 'web.app', 'cloudfront.net', 'myqcloud.com', 'aliyuncs.com', 'gitlab.io', 'appspot.com', 'fly.dev', 'bitbucket.io', 'ngrok.io']) {
       ok(verifiedDomainFromInput(domain) === null, `forbid public/shared root ${domain}`)
     }
+    ok(verifiedDomainFromInput('alice.github.io') === 'alice.github.io', 'private suffix tenant can verify only its own host')
     ok(verifiedDomainFromInput('qingdao.sd.gov.cn') === 'qingdao.sd.gov.cn', 'provincial gov.cn suffix needs another label')
+    ok(verifiedDomainFromInput('hrss.qingdao.gov.cn') === 'hrss.qingdao.gov.cn', 'agency may register a narrow official subdomain')
+    ok(hostMatchesVerifiedDomain('jobs.hrss.qingdao.gov.cn', 'hrss.qingdao.gov.cn')
+      && !hostMatchesVerifiedDomain('other.qingdao.gov.cn', 'hrss.qingdao.gov.cn')
+      && !hostMatchesVerifiedDomain('qingdao.gov.cn', 'hrss.qingdao.gov.cn'), 'verified subdomain excludes siblings and parent')
+    ok(hostMatchesVerifiedDomain('hrss.qingdao.gov.cn', 'qingdao.gov.cn'), 'verified root permits child')
     const allowed = ['example.com.cn']
     for (const url of [
       'http://example.com.cn', 'https://user@example.com.cn', 'https://user:pass@example.com.cn',
@@ -77,9 +84,22 @@ async function main() {
       'https://example.com.cn/?next=https%3A%2F%2Fevil.com%2Fx',
       'https://example.com.cn/?next=%2F%2Fevil.com%2Fx',
       'https://example.com.cn/?next=http%3A%2F%2Fevil.com%2Fx',
+      'https://example.com.cn/?next=/\\evil.com', 'https://example.com.cn/?next=\\evil.com',
+      'https://example.com.cn/?next=https:\\evil.com', 'https://example.com.cn/?next=%00https://evil.com',
+      'https://example.com.cn/?next=javascript:alert(1)', 'https://example.com.cn/#redirect=https://evil.com',
+      'https://example.com.cn/?url=https%253A%252F%252Fevil.com',
+      'https://example.com.cn/?target=http://example.com.cn',
+      'https://example.com.cn/?target=https://user:pass@example.com.cn:8443',
     ]) ok(verifiedHttpsUrl(url, allowed) === null, `reject unsafe URL ${url}`)
     ok(verifiedHttpsUrl(' HTTPS://JOBS.EXAMPLE.COM.CN.:443/path?next=https%3A%2F%2Fjobs.example.com.cn%2Fx ', allowed)?.toString().startsWith('https://jobs.example.com.cn/path?'), 'save canonical HTTPS URL and same-domain redirect')
+    ok(!!verifiedHttpsUrl('https://example.com.cn/?next=/internal#section=hello', allowed), 'ordinary text and internal relative path remain valid')
     ok(hostMatchesVerifiedDomain('jobs.example.com.cn', 'example.com.cn'), 'verified child domain allowed')
+    ok(!hostMatchesVerifiedDomain('alice.github.io', 'github.io')
+      && verifiedHttpsUrl('https://github.io/', ['github.io']) === null, 'public suffix cannot match or enter a channel URL')
+    const controllerSource = readFileSync(`${process.cwd()}/src/official-channels/official-channels.controller.ts`, 'utf8')
+    ok(!controllerSource.includes("@Query('organizationId')"), 'terminal controller has no unused organizationId parameter')
+    const serviceSource = readFileSync(`${process.cwd()}/src/official-channels/official-channels.service.ts`, 'utf8')
+    ok(serviceSource.includes('dto.enabled === undefined ? {} : { status:'), 'name-only update does not write status column')
 
     invalidDto(ReplaceVerifiedDomainsDto, { domains: Array(11).fill('example.com') }, 'domain registration capped at ten')
     invalidDto(ReplaceVerifiedDomainsDto, { domains: ['  '] }, 'empty domain rejected after trim')
@@ -103,7 +123,8 @@ async function main() {
     await rejects(async () => emergencyRoles.canActivate({ ...roleContext(controller.replaceDomains, partnerA), getHandler: () => RecruitmentEmergencyController.prototype.takedown, getClass: () => RecruitmentEmergencyController } as ExecutionContext), 'AUTH_ROLE_FORBIDDEN', 'partner cannot emergency takedown')
 
     await prisma.organization.createMany({ data: [
-      { id: ids.a, name: '机构 A', type: 'public' }, { id: ids.b, name: '机构 B', type: 'public' },
+      { id: ids.a, name: '机构 A', type: 'public', contentTrustStatus: 'active' },
+      { id: ids.b, name: '机构 B', type: 'public', contentTrustStatus: 'active' },
     ] })
     await prisma.user.createMany({ data: [
       { id: actor.userId, username: actor.userId, passwordHash: 'x', name: 'Admin', role: 'admin' },
@@ -115,7 +136,21 @@ async function main() {
     const failService = new OfficialChannelsService(prisma, failedAudit)
     await rollsBack(() => failService.replaceVerifiedDomains(ids.a, ['example.com.cn'], actor), 'domain registration rolls back when audit insert fails')
     ok((await prisma.organization.findUniqueOrThrow({ where: { id: ids.a } })).verifiedOfficialDomainsJson === '[]', 'failed domain registration left no write')
+    const priorRecord = { domain: 'example.com.cn', verifiedAt: '2026-01-01T00:00:00.000Z', verifiedBy: 'prior-admin' }
+    let txWrite = ''
+    const txReader = new OfficialChannelsService({
+      organization: { findUnique: async () => ({ id: ids.a, name: 'stale', verifiedOfficialDomainsJson: '[]' }) },
+      $transaction: async (work: (tx: unknown) => Promise<unknown>) => work({
+        organization: {
+          findUnique: async () => ({ verifiedOfficialDomainsJson: JSON.stringify([priorRecord]) }),
+          update: async (args: { data: { verifiedOfficialDomainsJson: string } }) => { txWrite = args.data.verifiedOfficialDomainsJson },
+        },
+      }),
+    } as never, { writeRequired: async () => 'audit' } as never)
+    const txResult = await txReader.replaceVerifiedDomains(ids.a, ['example.com.cn'], actor)
+    ok(txResult.items[0]?.verifiedBy === 'prior-admin' && txWrite.includes('prior-admin'), 'domain replacement reads latest verification inside transaction')
     await service.replaceVerifiedDomains(ids.a, ['example.com.cn'], actor)
+    await rejects(() => service.createForPartner(partnerA, { name: '危险跳转', url: 'https://example.com.cn/?url=https%253A%252F%252Fevil.com' }), 'OFFICIAL_CHANNEL_DOMAIN_NOT_VERIFIED', 'encoded redirect cannot be persisted')
     await service.replaceVerifiedDomains(ids.a, ['example.com.cn', 'example.org'], actor)
     await service.replaceVerifiedDomains(ids.b, ['other.org'], actor)
     ok(await prisma.auditLog.count({ where: { action: 'organization.verified_domains_replace', targetId: ids.a } }) === 2, 'each domain replacement has audit')
@@ -150,6 +185,13 @@ async function main() {
     await rejects(() => service.updateForPartner(partnerA, a.id, { enabled: true }), 'OFFICIAL_CHANNEL_DOMAIN_NOT_VERIFIED', 'reenable revalidates old URL')
     await service.replaceVerifiedDomains(ids.a, ['example.com.cn'], actor)
     await service.updateForPartner(partnerA, a.id, { enabled: true })
+    const racing = await Promise.allSettled([
+      ...Array.from({ length: 25 }, (_, i) => service.updateForPartner(partnerA, a.id, { name: `并发改名 ${i}` })),
+      service.updateForPartner(partnerA, a.id, { enabled: false }),
+    ])
+    ok(racing[25]?.status === 'fulfilled', 'concurrent disable completed')
+    ok((await prisma.onlinePlatformDirectory.findUniqueOrThrow({ where: { id: a.id } })).status === 'inactive', '25 name edits cannot restore active status')
+    await service.updateForPartner(partnerA, a.id, { enabled: true })
 
     for (const [id, orgId] of [[terminalA, ids.a], [terminalB, ids.b], [terminalEmpty, null]] as const) {
       await prisma.terminal.create({ data: { id, terminalCode: id, agentToken: `${id}_token`, deviceFingerprint: id, orgId } })
@@ -160,6 +202,11 @@ async function main() {
     ok(!publicA.items.some((item) => item.url === b.url), 'terminal A cannot read B channel')
     ok((await service.listForTerminal(terminalB)).items[0]?.url === b.url, 'terminal B gets B channel')
     ok((await service.listForTerminal(terminalEmpty)).items.length === 0, 'unbound terminal has no channel')
+    await prisma.organization.update({ where: { id: ids.a }, data: { contentTrustStatus: 'suspended' } })
+    ok((await service.listForTerminal(terminalA)).items.length === 0, 'untrusted organization has no public channels')
+    await prisma.organization.update({ where: { id: ids.a }, data: { contentTrustStatus: 'active', archivedAt: new Date() } })
+    ok((await service.listForTerminal(terminalA)).items.length === 0, 'archived organization has no public channels')
+    await prisma.organization.update({ where: { id: ids.a }, data: { archivedAt: null } })
     ok(publicA.legacyPlatforms.length === 0, 'hosting off returns no legacy platforms')
     process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
     const hostingOn = await service.listForTerminal(terminalA)
@@ -192,13 +239,19 @@ async function main() {
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { status: 'inactive' } })
     const held = (await service.listForPartner(partnerA)).items.find((item) => item.id === a.id)
     ok(held?.emergencyTakedown && held.emergencyReasonCode === 'rights_complaint' && held.emergencyReasonText === '机构网站异常', 'partner sees hold and reason')
-    const heldUpdated = await service.updateForPartner(partnerA, a.id, { name: '下架后改名' })
-    ok(heldUpdated.emergencyTakedown && heldUpdated.emergencyReasonCode === 'rights_complaint', 'held-channel update response retains hold state')
+    await rejects(() => service.updateForPartner(partnerA, a.id, { name: '下架后改名' }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held channel name frozen')
+    await rejects(() => service.updateForPartner(partnerA, a.id, { displayOrder: 8 }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held channel sort frozen')
+    await rejects(() => service.updateForPartner(partnerA, a.id, { url: 'https://example.com.cn/new' }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held channel link frozen')
     await rejects(() => service.updateForPartner(partnerA, a.id, { enabled: true }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'hold cannot be reenabled')
+    await rejects(() => service.createForPartner(partnerA, { name: '重建同一链接', url: a.url }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held link cannot be recreated')
+    await service.replaceVerifiedDomains(ids.b, ['other.org', 'example.com.cn'], actor)
+    await rejects(() => service.createForPartner(partnerB, { name: '跨机构重建', url: a.url }), 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', 'held link blocked across organizations')
     await emergency.takedown('official_channel', a.id, 'other', '重复下架', actor)
     ok(await prisma.partnerOrgNotice.count({ where: { orgId: ids.a, kind: 'recruitment_emergency_takedown' } }) === 1, 'repeat takedown creates one notice')
     ok(await prisma.recruitmentEmergencyHold.count({ where: { targetType: 'official_channel', targetId: a.id } }) === 1, 'takedown has one irreversible hold')
     ok(await prisma.auditLog.count({ where: { action: 'recruitment.emergency_takedown', targetId: a.id } }) === 2, 'each takedown attempt audited')
+    await service.archiveForPartner(partnerA, a.id)
+    ok(!(await service.listForPartner(partnerA)).items.some((item) => item.id === a.id), 'held channel can be archived and leaves partner list')
     await service.archiveForPartner(partnerB, b.id)
     ok((await service.listForPartner(partnerB)).items.length === 0 && (await service.listForTerminal(terminalB)).items.length === 0, 'archived channel absent from partner and terminal lists')
     ok(await prisma.auditLog.count({ where: { action: 'official_channel.archive', targetId: b.id } }) === 1, 'archive audited')
@@ -222,12 +275,26 @@ async function main() {
         skillPlan: [], actionChecklist: [] },
     })
     const short = redactCareerPlanSystemJobTitle(plan('会计'), '会计')
-    ok(short.basedOn.jobFit === null && short.payload.summary.includes('我做会计工作') && short.payload.summary.includes('「会计」'), 'short title clears structured source without cutting prose')
+    ok(short.basedOn.jobFit === null && short.payload.summary.includes('我做会计工作') && short.payload.summary.includes('「会计」')
+      && short.payload.currentSnapshot[0]?.point === '目标岗位', 'short title clears structured source without cutting prose')
+    ok(redactCareerPlanSystemJobTitle(plan('高级财务会计'), '  ').payload.summary === plan('高级财务会计').payload.summary, 'blank title leaves free text untouched')
     const long = redactCareerPlanSystemJobTitle(plan('高级财务会计'), '高级财务会计')
-    ok(long.payload.summary.includes('「目标岗位」') && long.payload.summary.includes('目标岗位：目标岗位。') && long.payload.directions[0]?.why.includes('《目标岗位》'), 'quoted and labelled long title redacted')
+    ok(long.payload.summary.includes('「目标岗位」') && long.payload.summary.includes('目标岗位。') && !long.payload.summary.includes('目标岗位：目标岗位') && long.payload.directions[0]?.why.includes('《目标岗位》'), 'quoted and labelled long title redacted')
     ok(long.payload.summary.includes('销售经验') && long.payload.currentSnapshot[0]?.point === '目标岗位', 'unmarked prose retained and structured exact title removed')
+    const bare = plan('高级财务会计')
+    bare.payload.summary = '高级财务会计'
+    ok(redactCareerPlanSystemJobTitle(bare, '高级财务会计').payload.summary === '高级财务会计', 'unmarked whole prose title stays unchanged')
     const manual = redactCareerPlanSystemJobTitle(plan('高级财务会计', 'manual'), '高级财务会计')
     ok(manual.basedOn.jobFit === '高级财务会计', 'planning own manual source is retained')
+    const malformed = plan('高级财务会计') as unknown as { payload: { directions: Array<unknown>; currentSnapshot: Array<unknown>; skillPlan: Array<unknown> }; basedOn: unknown }
+    malformed.payload.directions = [null, 'broken', { title: '高级财务会计', why: '保留正文', firstStep: '行动' }]
+    malformed.payload.currentSnapshot = [null, 2]
+    malformed.payload.skillPlan = [null, false]
+    const safe = redactCareerPlanSystemJobTitle(malformed as never, '高级财务会计')
+    ok(safe.payload.directions.length === 1 && safe.payload.currentSnapshot.length === 0 && safe.payload.skillPlan.length === 0, 'malformed plan array entries are skipped')
+    const old = plan('高级财务会计') as { basedOn: { jobFitSource?: 'system' | 'manual' } }
+    delete old.basedOn.jobFitSource
+    ok(redactCareerPlanSystemJobTitle(old as never, '高级财务会计').basedOn.jobFit === null, 'legacy plan with unknown source is conservatively redacted')
     console.log(`\n=== ALL PASS (${checks} checks) ===`)
   } finally {
     await prisma.partnerOrgNotice.deleteMany({ where: { orgId: { in: [ids.a, ids.b] } } }).catch(() => undefined)

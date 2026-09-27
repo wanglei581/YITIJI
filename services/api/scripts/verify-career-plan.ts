@@ -23,6 +23,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { LlmCareerPlanService, type CareerPlanPayload } from '../src/ai/resume/llm-career-plan.service'
 import { CareerPlanService } from '../src/ai/resume/career-plan.service'
+import { CareerPlanController } from '../src/ai/career-plan.controller'
 import { CareerPlanPdfService } from '../src/ai/resume/career-plan-pdf.service'
 import { CareerPlanDegradedPdfService } from '../src/ai/resume/career-plan-degraded-pdf.service'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
@@ -285,7 +286,7 @@ async function main() {
     try {
       const latestRedacted = await svc.getLatest(taskAnon, anonReq)
       if (latestRedacted.basedOn.jobFit !== null || !latestRedacted.summary.includes('我做会计工作')
-        || !latestRedacted.summary.includes('「目标岗位」') || !latestRedacted.summary.includes('目标岗位：目标岗位。')) {
+        || !latestRedacted.summary.includes('「目标岗位」') || latestRedacted.summary.includes('目标岗位：目标岗位。')) {
         fail('9a. 旧规划读取应按自身 basedOn 清理，正文不能被切烂')
       }
       let pdfPayload: CareerPlanPayload | undefined
@@ -302,10 +303,40 @@ async function main() {
         fail('9a. PDF 未使用同一份清理结果')
       }
       pass('9a. 旧规划查看与 PDF 共用 basedOn 清理，最新手填 job_fit 不覆盖来源')
+      const manualPlan = { ...oldPlan, basedOn: { ...oldPlan.basedOn, jobFitSource: 'manual' } }
+      await prisma.aiResumeResult.update({
+        where: { taskId_kind: { taskId: taskAnon, kind: 'career_plan' } },
+        data: { payloadJson: JSON.stringify(manualPlan) },
+      })
+      const manualLatest = await svc.getLatest(taskAnon, anonReq, { jobBoardOpen: false })
+      if (manualLatest.basedOn.jobFit !== '高级财务会计' || !manualLatest.summary.includes('「高级财务会计」')) {
+        fail('9b. 手填来源规划在板块关闭时应完整可读')
+      }
+      pass('9b. 手填规划在板块关闭时可读，按规划自身来源判定')
+      const closedController = new CareerPlanController(svc, {} as never, {} as never, prisma,
+        { resolve: async () => ({ enabled: false }) } as never)
+      const manualHttp = await closedController.latest(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
+      if (manualHttp.basedOn.jobFit !== '高级财务会计') fail('9b. 手填来源被 controller 拒绝或清理')
+      pass('9b. controller 在板块关闭时放行手填旧规划')
     } finally {
       if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
       else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
     }
+    await prisma.aiResumeResult.update({
+      where: { taskId_kind: { taskId: taskAnon, kind: 'career_plan' } },
+      data: { payloadJson: JSON.stringify({ ...oldPlan, basedOn: { ...oldPlan.basedOn, jobFitSource: 'system' } }) },
+    })
+    const closedLatest = await svc.getLatest(taskAnon, anonReq, { jobBoardOpen: false })
+    if (closedLatest.basedOn.jobFit !== null || closedLatest.summary.includes('高级财务会计')) {
+      fail('9c. 板块关闭时系统来源旧规划应清理后可读')
+    }
+    pass('9c. 系统来源规划在板块关闭时清理后可读')
+    const closedController = new CareerPlanController(svc, {} as never, {} as never, prisma,
+      { resolve: async () => ({ enabled: false }) } as never)
+    const systemHttp = await closedController.latest(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
+    const systemPrint = await closedController.print(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
+    if (systemHttp.basedOn.jobFit !== null || systemPrint.pageCount < 1) fail('9c. controller 查看或打印系统来源旧规划失败')
+    pass('9c. controller 在板块关闭时清理并放行系统旧规划的查看与打印')
 
     // ── 10. 日志脱敏 ──────────────────────────────────────────────────────────
     const joined = capturedLogs.join('\n')
