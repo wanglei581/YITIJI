@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1555 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1557 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1801,6 +1801,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>services/api/fixtures/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `services/api/fixtures/zh-cmap.pdf` | `verify-pdf-cmap.ts` |
+
+</details>
+
+<details>
 <summary><code>services/api/package.json/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
@@ -1944,7 +1953,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 519 个文件</summary>
+<summary><code>services/api/src/</code> — 520 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2033,7 +2042,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/ocr/baidu-ocr.provider.ts` | `verify-ai-throttle-dimension.ts`<br/>`verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-resume-extraction.ts` |
 | `services/api/src/ai/resume/ocr/disabled-ocr.provider.ts` | `verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-resume-extraction.ts` |
 | `services/api/src/ai/resume/ocr/ocr.service.ts` | `verify-materials-processing.ts`<br/>`verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-resume-extraction.ts` |
-| `services/api/src/ai/resume/ocr/pdf-page-renderer.ts` | `verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts` |
+| `services/api/src/ai/resume/ocr/pdf-page-renderer.ts` | `verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-pdf-cmap.ts` |
 | `services/api/src/ai/resume/ocr/tencent-ocr.provider.stub.ts` | `verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-resume-extraction.ts` |
 | `services/api/src/ai/resume/resume-docx.service.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-template-fill.ts` |
 | `services/api/src/ai/resume/resume-draft.store.ts` | `verify-member-data-retention.ts`<br/>`verify-resume-draft-versions.ts` |
@@ -2098,6 +2107,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/pdf/aigc-label.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/common/pdf/aigc-pdf-metadata.ts` | `verify-aigc-pdf-metadata.ts` |
 | `services/api/src/common/pdf/cjk-font.ts` | `verify-cjk-font.ts` |
+| `services/api/src/common/pdf/pdfjs-document.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-pdf-cmap.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-resume-report-export.ts` |
 | `services/api/src/common/pickup-code.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-idempotency.ts` |
 | `services/api/src/common/pii/llm-input-mask.ts` | `verify-llm-input-pii-mask.ts` |
 | `services/api/src/common/pii/pii-masker.ts` | `verify-llm-input-pii-mask.ts` |
@@ -2244,11 +2254,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/legal/legal.service.ts` | `verify-legal-doc-version.ts` |
 | `services/api/src/materials/image-print-quality.util.ts` | `verify-file-display-truth.ts` |
 | `services/api/src/materials/materials.controller.ts` | `verify-material-task-token-transport.ts`<br/>`verify-throttle-dimension.ts` |
-| `services/api/src/materials/materials.service.ts` | `verify-materials-processing.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-print-param-suggestion.ts` |
+| `services/api/src/materials/materials.service.ts` | `verify-materials-processing.ts`<br/>`verify-pdf-cmap.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-print-param-suggestion.ts` |
 | `services/api/src/materials/materials.types.ts` | `verify-print-param-suggestion.ts` |
 | `services/api/src/materials/pii-redaction.service.ts` | `verify-materials-processing.ts`<br/>`verify-pii-redaction.ts` |
 | `services/api/src/materials/pii-redaction.util.ts` | `verify-pii-redaction.ts` |
-| `services/api/src/materials/pii-scan.util.ts` | `verify-pii-redaction.ts` |
+| `services/api/src/materials/pii-scan.util.ts` | `verify-pdf-cmap.ts`<br/>`verify-pii-redaction.ts` |
 | `services/api/src/materials/print-param-suggestion.rules.ts` | `verify-print-param-suggestion.ts` |
 | `services/api/src/materials/print-param-suggestion.service.ts` | `verify-print-param-suggestion.ts` |
 | `services/api/src/materials/print-param-suggestion.types.ts` | `verify-print-param-suggestion.ts` |

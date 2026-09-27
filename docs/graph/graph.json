@@ -21106,6 +21106,9 @@
     "services/api/.env.example": [
       "services/api/scripts/d2-same-host/verify-cleanup-contract.mjs"
     ],
+    "services/api/fixtures/zh-cmap.pdf": [
+      "services/api/scripts/verify-pdf-cmap.ts"
+    ],
     "services/api/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -22108,7 +22111,8 @@
     ],
     "services/api/src/ai/resume/ocr/pdf-page-renderer.ts": [
       "services/api/scripts/verify-ocr-baidu-live.ts",
-      "services/api/scripts/verify-ocr-baidu.ts"
+      "services/api/scripts/verify-ocr-baidu.ts",
+      "services/api/scripts/verify-pdf-cmap.ts"
     ],
     "services/api/src/ai/resume/ocr/tencent-ocr.provider.stub.ts": [
       "services/api/scripts/verify-ocr-baidu-live.ts",
@@ -22584,6 +22588,13 @@
     ],
     "services/api/src/common/pdf/cjk-font.ts": [
       "services/api/scripts/verify-cjk-font.ts"
+    ],
+    "services/api/src/common/pdf/pdfjs-document.ts": [
+      "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-pdf-cmap.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/common/pickup-code.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -23393,6 +23404,7 @@
     ],
     "services/api/src/materials/materials.service.ts": [
       "services/api/scripts/verify-materials-processing.ts",
+      "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
@@ -23407,6 +23419,7 @@
       "services/api/scripts/verify-pii-redaction.ts"
     ],
     "services/api/src/materials/pii-scan.util.ts": [
+      "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pii-redaction.ts"
     ],
     "services/api/src/materials/print-param-suggestion.rules.ts": [
@@ -30948,6 +30961,7 @@
           "services/api/src/ai/resume/self-assessment-pdf.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pdf/aigc-label.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/contract-review/contract-review-provider.service.ts",
           "services/api/src/contract-review/contract-review-report-pdf.service.ts",
           "services/api/src/files/files.service.ts",
@@ -31409,6 +31423,7 @@
           "services/api/src/ai/resume/career-plan-pdf.service.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/price-config.seed.ts",
@@ -35138,6 +35153,30 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "services/api/src"
+        ],
+        "files": [
+          "services/api/fixtures/zh-cmap.pdf",
+          "services/api/src/ai/resume/ocr/pdf-page-renderer.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/materials/materials.service.ts",
+          "services/api/src/materials/pii-scan.util.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pdf-cmap.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:materials-processing"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
@@ -35211,6 +35250,7 @@
         "files": [
           "services/api/src/ai/resume/ocr/ocr.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/materials/materials.service.ts",
@@ -36531,6 +36571,7 @@
           "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/resume/diagnosis-report-pdf.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",
