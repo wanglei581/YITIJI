@@ -248,6 +248,9 @@ export class JobFitService {
       filename: '简历对照.pdf',
       mimeType: 'application/pdf',
       purpose: 'print_doc',
+      // AI 生成的派生稿，不是用户手里的原件：生产隐私闸门（PRINT_REQUIRE_PII_SCAN）按类别放行，
+      // 否则一体机直达报价页后建单会被拒 PRINT_PII_SCAN_REQUIRED（商用收口 P0-5）。
+      assetCategory: 'derived',
       uploaderId: null,
       endUserId: parse.endUserId,
       createdBy: 'job_fit',

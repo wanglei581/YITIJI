@@ -108,6 +108,9 @@ export class AdvisorArtifactService {
       filename: `${this.filenameOf(payload)}.pdf`,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
+      // 小青生成的派生稿：生产隐私闸门（PRINT_REQUIRE_PII_SCAN）按类别放行，
+      // 否则进打印后建单会被拒 PRINT_PII_SCAN_REQUIRED（商用收口 P0-5）。
+      assetCategory: 'derived',
       uploaderId: null,
       endUserId: owner.endUserId,
       createdBy: 'advisor_work',
