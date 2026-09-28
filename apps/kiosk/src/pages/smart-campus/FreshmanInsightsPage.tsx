@@ -33,7 +33,7 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     key: 'print',
     icon: PrinterIcon,
     title: '打印材料',
-    description: '上传报到表、承诺书等 PDF 或图片，本机预览后打印。Word 需转换引擎开放后才能转 PDF。',
+    description: '上传报到表、承诺书等 PDF 或图片，本机预览后打印。',
     to: '/print/upload',
   },
   {

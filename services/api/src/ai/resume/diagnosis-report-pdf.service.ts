@@ -13,6 +13,16 @@ import type {
 export type ResumeReportExportKind = 'diagnosis_report' | 'change_list'
 export type ResumeIssueSeverity = 'high' | 'medium' | 'low'
 
+// 纸上只印求职者读得懂的话：文字来源与识别置信度按下表翻成中文，
+// 没有对应项时印「未说明」，绝不把 pdf_ocr / low 这类内部键原样印出去。
+const TEXT_SOURCE_LABEL: Record<string, string> = {
+  docx: 'Word',
+  pdf_text: '可选中文字的 PDF',
+  image_ocr: '图片识别',
+  pdf_ocr: '扫描识别',
+}
+const CONFIDENCE_LABEL: Record<string, string> = { high: '高', medium: '中', low: '低' }
+
 interface FontCandidate {
   path: string
   family?: string
@@ -201,15 +211,17 @@ export class DiagnosisReportPdfService {
 
     this.section(doc, '七、截断与识别说明')
     if (input.report.truncatedInput) {
-      this.bullet(doc, '本次诊断只处理了简历前部内容，后部内容未送入模型，请人工补充核对。', '#9a3412')
+      this.bullet(doc, '本次诊断只处理了简历前部内容，后面的内容没有交给 AI 分析，请自己补充核对。', '#9a3412')
     } else {
       this.bullet(doc, '本次报告未提示只分析了部分简历。')
     }
     if (input.extractionNotice) {
-      this.bullet(doc, `文字来源：${input.extractionNotice.textSource}；识别置信度：${input.extractionNotice.confidence}`)
+      const source = TEXT_SOURCE_LABEL[input.extractionNotice.textSource] ?? '未说明'
+      const confidence = CONFIDENCE_LABEL[input.extractionNotice.confidence] ?? '未说明'
+      this.bullet(doc, `文字来源：${source}；识别置信度：${confidence}`)
       input.extractionNotice.warnings.forEach((warning) => this.bullet(doc, warning, '#9a3412'))
     } else {
-      this.bullet(doc, '该历史报告没有额外的 OCR 或文字提取提示。')
+      this.bullet(doc, '该历史报告没有额外的文字识别提示。')
     }
   }
 

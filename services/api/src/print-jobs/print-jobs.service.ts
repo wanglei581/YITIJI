@@ -420,7 +420,7 @@ export class PrintJobsService {
     if (sourceFile && WORD_MIME_TYPES.includes(sourceFile.mimeType as (typeof WORD_MIME_TYPES)[number])) {
       if (!this.documentConversion) {
         throw new ServiceUnavailableException({
-          error: { code: 'CONVERSION_UNAVAILABLE', message: '服务端未配置转换引擎' },
+          error: { code: 'CONVERSION_UNAVAILABLE', message: 'Word 转 PDF 暂未开通，请另存为 PDF 上传' },
         })
       }
       const converted = await this.documentConversion.convertForPrint(requestedFileId)

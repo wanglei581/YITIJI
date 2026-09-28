@@ -193,7 +193,7 @@ export function PrintUploadPage() {
 
   const showFileChannel = !useTerminalKiosk()
   const tab = !showFileChannel && selectedTab === 'file' ? 'qr' : selectedTab
-  const wordHint = (wordConversionAvailable ? wordOpenCopy : wordClosedCopy).replace('由转换引擎生成', '转换后')
+  const wordHint = wordConversionAvailable ? wordOpenCopy : wordClosedCopy
 
   useEffect(() => {
     if (tab !== 'usb' || !usbConfigured || file || usbUploading || usbSelected) return undefined

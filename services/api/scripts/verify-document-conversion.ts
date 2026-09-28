@@ -164,7 +164,9 @@ async function verifyRuntime(): Promise<void> {
   assert.equal(converted.mimeType, 'application/pdf')
   assert.equal(converted.pageCount, 1)
   assert.equal(converted.engine, 'soffice')
-  assert.match(converted.warnings.join('\n'), /复杂版式可能有偏差，请预览核对/u)
+  // 这句会原样上屏：整句钉死，且不得再出现「转换引擎」一类工程说法。
+  assert.deepEqual(converted.warnings, ['转为 PDF 后，复杂版式可能有偏差，请预览核对'])
+  assert.doesNotMatch(converted.warnings.join('\n'), /转换引擎|服务端|接口/u)
   assert.equal(files.uploadedArgs?.assetCategory, 'derived')
   assert.equal(files.uploadedArgs?.sourceFileId, source.id)
   assert.equal(files.uploadedArgs?.createdBy, 'document_conversion')

@@ -38,7 +38,9 @@ const execFileAsync = promisify(execFile)
 const PDF_MIME = 'application/pdf' as const
 const TIMEOUT_MS = 60_000
 const MAX_OUTPUT_BYTES = 15 * 1024 * 1024
-const CONVERSION_WARNING = '由转换引擎生成，复杂版式可能有偏差，请预览核对'
+// 原样显示给用户（一体机「我的文档」、小程序文档页都会列出 warnings），
+// 必须与一体机 WORD_CONVERSION_DISCLOSURE 是同一句用户话，不提「转换引擎」。
+const CONVERSION_WARNING = '转为 PDF 后，复杂版式可能有偏差，请预览核对'
 
 export interface DocumentConversionRuntimeOptions {
   concurrency?: number

@@ -228,6 +228,12 @@ async function main(): Promise<void> {
       diagnosisText.includes('扫描文字置信度有限，请人工核对') && diagnosisText.includes('本次诊断只处理了简历前部内容')
     )
     assert(memberPathOk, '会员路径：真实 PDF + 派生血缘 + 我的文档 + 文件名/页眉/严重度/OCR/截断说明')
+    // 来源与置信度印成中文；内部键（pdf_ocr / low）不许上纸。
+    assert(
+      diagnosisText.includes('文字来源：扫描识别') && diagnosisText.includes('识别置信度：低') &&
+        !diagnosisText.includes('pdf_ocr') && !diagnosisText.includes('识别置信度：low'),
+      '诊断 PDF：文字来源与识别置信度印成中文，不印内部键',
+    )
 
     const changeResult = await controller.export(memberTask, { kind: 'change_list' }, {
       headers: { authorization: 'Bearer member-a' },

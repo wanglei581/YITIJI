@@ -76,7 +76,7 @@ export function FilePreviewPanel({ file, token, caption, children }: {
       <button className="qx-btn qpd-open-preview" data-variant="primary" type="button" onClick={() => setPreviewOpen(true)}><EyeIcon aria-hidden="true" />打开完整预览 · 逐页看清</button>
       <div className="qpd-conversion-note">
         {capabilities.wordToPdf
-          ? `PDF、图片和 Word 可预览；${WORD_CONVERSION_DISCLOSURE.replace('由转换引擎生成', '转换后')}`
+          ? `PDF、图片和 Word 可预览；${WORD_CONVERSION_DISCLOSURE}`
           : 'Word 转换暂未开放，请另存为 PDF 再上传。'}
       </div>
       {previewOpen ? <PrintFilePreviewModal file={file} token={token} onClose={() => setPreviewOpen(false)} /> : null}
