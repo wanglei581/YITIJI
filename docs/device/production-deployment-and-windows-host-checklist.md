@@ -606,7 +606,7 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 ### 5.1 Windows 环境
 
-- [ ] Windows 10/11 x64，版本记录清楚。
+- [ ] 系统版本按[母盘清单](windows-golden-image-and-install-checklist.md) A1：Windows 11 IoT 企业版 LTSC 2024（首选）/ Windows 11 专业版 25H2 及以后（兜底）/ Windows 10 IoT 企业版 LTSC 2021（兼容）；普通 Windows 10 已于 2025-10-14 停止支持，不合格；版本记录清楚。
 - [ ] 系统时区为 `Asia/Shanghai`。
 - [ ] 自动登录/开机启动策略符合现场 kiosk 使用方式。
 - [ ] Edge/Chrome 已安装并可进入全屏 Kiosk 模式。
