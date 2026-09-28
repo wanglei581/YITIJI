@@ -13,6 +13,13 @@ await assert.rejects(llmFetchJson('http://test', { method: 'POST', headers: {}, 
 assert.equal(calls, 1)
 const clean = await llmFetchJson('http://test', { method: 'POST', headers: {}, body: JSON.stringify({ messages: [{ role: 'user', content: '正常' }] }) }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: [] } })
 assert.equal((clean.data as any).choices[0].message.content, '干净回复')
+// 只查最新一条用户消息：历史里的旧消息不再二次拦截（词表热更新后也不会锁死会话）
+const history = JSON.stringify({ messages: [{ role: 'user', content: '旧话含输入禁词' }, { role: 'assistant', content: '好' }, { role: 'user', content: '新的一句' }] })
+const beforeHistory = calls
+await llmFetchJson('http://test', { method: 'POST', headers: {}, body: history }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } })
+assert.equal(calls, beforeHistory + 1, '历史里的旧消息命中不应再拦本轮')
+const latestHit = JSON.stringify({ messages: [{ role: 'user', content: '旧话' }, { role: 'assistant', content: '好' }, { role: 'user', content: '新的一句含输入禁词' }] })
+await assert.rejects(llmFetchJson('http://test', { method: 'POST', headers: {}, body: latestHit }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } }), (e: unknown) => e instanceof AiContentBlockedError && e.direction === 'input')
 const malformed = await llmFetchJson('http://test', { method: 'POST', headers: {}, body: 'not-json' }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } })
 assert.equal(malformed.ok, true)
 // 小青：命中给礼貌拒答、不报错；输入侧命中的原话不能留在会话历史里——
@@ -41,6 +48,20 @@ try {
   modelReply = '正常回答'
   const fourth = await chat.chat({ message: '继续', sessionId: first.sessionId, channel: 'kiosk' } as never)
   assert.equal(fourth.reply, '正常回答', '输出命中也不应毒化会话')
+  // 词表热更新：早先说过的话后来成了禁词，之后的新消息仍应照常回答（不能永久锁死会话）
+  chatConfig.forbiddenWords.push('继续')
+  const fifth = await chat.chat({ message: '那就这样吧', sessionId: first.sessionId, channel: 'kiosk' } as never)
+  assert.equal(fifth.reply, '正常回答', '历史里的旧话命中新加的禁词，不应让本轮合规的新消息被拒答')
+  chatConfig.forbiddenWords.pop()
+  // C12：托管关闭时，一体机渠道的动作里不出现岗位类入口；托管开启时保持原样
+  const savedHosting = process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+  process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+  const offJob = await chat.chat({ message: '我想找份工作', channel: 'kiosk' } as never)
+  assert.ok(!(offJob.actions ?? []).some((action: { route: string }) => /^\/(jobs|job-fairs|companies)(\/|$)/.test(action.route)), '托管关闭时一体机动作里不应有岗位类入口')
+  process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
+  const onJob = await chat.chat({ message: '我想找份工作', channel: 'kiosk' } as never)
+  assert.ok((onJob.actions ?? []).some((action: { route: string }) => action.route === '/jobs'), '托管开启时一体机动作保持原样（有查看岗位）')
+  if (savedHosting === undefined) delete process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']; else process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = savedHosting
 } finally {
   ;(globalThis as { fetch: unknown }).fetch = savedFetch
 }

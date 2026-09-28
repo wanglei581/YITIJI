@@ -218,11 +218,11 @@ export async function llmFetchJson(
   }
   try {
     const payload = JSON.parse(init.body) as { messages?: Array<{ role?: string; content?: unknown }> }
-    for (const message of payload.messages ?? []) {
-      if (message.role === 'user' && typeof message.content === 'string') {
-        assertContentAllowed(message.content, 'input', words, moderation)
-      }
-    }
+    // 只查本轮最新的一条用户消息：历史里的旧消息当时已经查过。若词表后来热更新、旧消息命中新词，
+    // 全量检查会把本轮的新消息判成违规、却撤不掉那句旧的，多轮会话从此每句都被拒答。
+    const userMessages = (payload.messages ?? []).filter((message) => message.role === 'user' && typeof message.content === 'string')
+    const latest = userMessages[userMessages.length - 1]
+    if (latest) assertContentAllowed(latest.content as string, 'input', words, moderation)
   } catch (error) {
     if (error instanceof AiContentBlockedError) return block(error)
     // A malformed body is left to the upstream/caller's existing handling.
