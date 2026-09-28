@@ -1,7 +1,7 @@
 import type { ServiceHubKey, ServiceHubSpec } from './serviceHubModel'
 
 /**
- * 五份规格**机械抽自** docs/design/kiosk-redesign-2026-08/16-service-hubs.html 的 `const H`。
+ * 五份规格**机械抽自** docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html（2.0 稿）的 `const H`。
  * 抽取脚本：apps/kiosk/scripts/extract-service-hub-specs.mjs。稿改了重跑它，别手改本文件。
  *
  * 手抄是漏掉诚实性声明最常见的来源——这批迁移里已经因为手抄漏过多次。
@@ -26,24 +26,24 @@ export const SERVICE_HUB_SPECS: Record<ServiceHubKey, ServiceHubSpec> = {
     sectionTitle: '八项简历能力',
     sectionHint: '先选目标，再进入真实流程',
     capabilities: [
-      { title: 'AI简历诊断', description: '先选简历来源，再查看结构与问题', badge: 'AI · 仅供参考', route: '/resume/source?intent=diagnose', kind: 'ai', icon: 'search' },
-      { title: 'AI简历优化', description: '选择目标岗位后逐条查看改写建议', badge: 'AI · 仅供参考', route: '/resume/source?intent=optimize', kind: 'ai', icon: 'edit' },
-      { title: '从零生成简历', description: '按引导补充信息，生成可核对草稿', badge: 'AI · 需核对', route: '/resume/generate', kind: 'ai', icon: 'file' },
+      { title: 'AI简历诊断', description: '带走问题清单和改法', badge: 'AI 诊断改写', route: '/resume/source?intent=diagnose', kind: 'ai', icon: 'search' },
+      { title: 'AI简历优化', description: '对着你的方向逐条看改写', badge: 'AI 优化改写', route: '/resume/source?intent=optimize', kind: 'ai', icon: 'edit' },
+      { title: '从零生成简历', description: '带走一份可核对的草稿', badge: 'AI 起草简历', route: '/resume/generate', kind: 'ai', icon: 'file' },
       { title: '简历素材库', description: '按分类查看真实模板、标签与适用场景', badge: '模板目录', route: '/resume/templates', kind: 'info', icon: 'file' },
-      { title: '职业规划', description: '基于真实经历与目标生成行动建议', badge: 'AI · 仅供参考', route: '/resume/career-plan', kind: 'ai', icon: 'map' },
-      { title: '求职材料', description: '准备求职信、自我介绍与材料清单', badge: 'AI · 需核对', route: '/resume/materials', kind: 'ai', icon: 'brief' },
+      { title: '职业规划', description: '带走下一步可以做的事', badge: 'AI 行动建议', route: '/resume/career-plan', kind: 'ai', icon: 'map' },
+      { title: '求职材料', description: '按模板套填，带走求职信和自我介绍', badge: '模板生成', route: '/resume/materials', kind: 'info', icon: 'brief' },
       { title: '简历打印', description: '选择文件、核价后在本机打印', badge: '依赖打印机', route: '/print/upload?source=resume', kind: 'device', icon: 'printer' },
-      { title: '岗位匹配参考', description: '简历与岗位逐项对照，不给录用结论', badge: 'AI · 不给百分比', route: '/resume/job-fit', kind: 'ai', icon: 'chart' },
+      { title: '简历对照', description: '填一份岗位要求，AI 对照你的简历', badge: 'AI 对照', route: '/resume/job-fit', kind: 'ai', icon: 'chart', go: '带走：对照报告' },
     ],
     quickLinks: [
-      { title: '我的简历', description: '查看本人已保存版本', route: '/me/resumes', kind: 'account', icon: 'user' },
+      { title: '我的简历', description: '查看你名下的简历', route: '/me/resumes', kind: 'account', icon: 'user' },
       { title: 'AI服务记录', description: '查看诊断与优化记录', route: '/me/ai-records', kind: 'account', icon: 'bot' },
       { title: '自我探索', description: '完成职业倾向参考', route: '/resume/self-assessment/intro', kind: 'info', icon: 'chart' },
     ],
-    truthTitle: '简历是否使用、投给谁，由你本人决定。',
+    truthTitle: '简历用不用，由你本人决定。',
     truth: '系统不代投、不替企业筛选或邀约。',
     noteTitle: '原件始终由你掌控',
-    note: 'AI建议仅供参考，新版本不会覆盖原文件。',
+    note: '生成的内容会标明供参考，不会覆盖原文件。',
   },
   jobs: {
     eyebrow: '岗位信息',
@@ -92,7 +92,7 @@ export const SERVICE_HUB_SPECS: Record<ServiceHubKey, ServiceHubSpec> = {
     capabilities: [
       { title: '招聘会列表', description: '查看真实场次、时间、地点与来源', badge: '真实加载', route: '/job-fairs', kind: 'info', icon: 'calendar' },
       { title: '校园招聘', description: '查看校园相关场次与企业信息', badge: '真实加载', route: '/campus', kind: 'info', icon: 'building' },
-      { title: '到场指引', description: '核对来源预约与现场流程', badge: '无签到回执', route: '/job-fairs/checkin', kind: 'info', icon: 'map' },
+      { title: '到场指引', description: '核对来源预约与现场流程', badge: '无签到结果', route: '/job-fairs/checkin', kind: 'info', icon: 'map' },
       { title: '问AI顾问', description: '了解参会准备与现场沟通建议', badge: 'AI · 仅供参考', route: '/assistant', kind: 'ai', icon: 'bot' },
       { title: '简历服务', description: '诊断、优化或准备多份简历', badge: '进入简历中心', route: '/resume-service', kind: 'info', icon: 'file' },
       { title: '打印扫描', description: '先查看文件、格式与办理入口；出纸或扫描步骤进入后确认', badge: '进入后确认', route: '/print-scan', kind: 'info', icon: 'printer' },

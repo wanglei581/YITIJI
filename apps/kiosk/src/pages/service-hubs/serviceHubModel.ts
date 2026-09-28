@@ -59,6 +59,8 @@ export interface HubCapability {
   kind: CapabilityKind
   /** 稿里标的图标键。不是按标题猜出来的。 */
   icon: HubIconKey
+  /** 2.0 稿给部分卡写的「带走什么」（例如「带走：对照报告」）；没写就显示「进入」。 */
+  go?: string
 }
 
 export interface HubGoal {

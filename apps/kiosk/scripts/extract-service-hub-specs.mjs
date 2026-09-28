@@ -21,7 +21,8 @@ import vm from 'node:vm'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(kioskRoot, '..', '..')
-const DRAFT = join(repoRoot, 'docs/design/kiosk-redesign-2026-08/16-service-hubs.html')
+// 2.0 稿（v2 目录）有这一张就以它为准；原稿目录只读、不再作为抽取源（CLAUDE.md §9 2026-09-27 裁决）。
+const DRAFT = join(repoRoot, 'docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html')
 const OUT = join(kioskRoot, 'src/pages/service-hubs/serviceHubSpecs.ts')
 
 const html = readFileSync(DRAFT, 'utf8')
@@ -66,8 +67,9 @@ const body = HUBS.map((key) => {
     .join('\n')
   const caps = h.cards
     .map(
-      ([title, description, iconKey, badge, , route, kind]) =>
-        `      { title: ${q(title)}, description: ${q(description)}, badge: ${q(badge)}, route: ${q(route)}, kind: ${q(kind)}, icon: ${icon(iconKey, `${key}.cards ${title}`)} },`,
+      // 2.0 稿给部分卡加了第 8 位「带走什么」（例如「带走：对照报告」），有就带出为 go。
+      ([title, description, iconKey, badge, , route, kind, go]) =>
+        `      { title: ${q(title)}, description: ${q(description)}, badge: ${q(badge)}, route: ${q(route)}, kind: ${q(kind)}, icon: ${icon(iconKey, `${key}.cards ${title}`)}${go ? `, go: ${q(go)}` : ''} },`,
     )
     .join('\n')
   const quick = h.quick
@@ -101,7 +103,7 @@ ${quick}
 const header = `import type { ServiceHubKey, ServiceHubSpec } from './serviceHubModel'
 
 /**
- * 五份规格**机械抽自** docs/design/kiosk-redesign-2026-08/16-service-hubs.html 的 \`const H\`。
+ * 五份规格**机械抽自** docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html（2.0 稿）的 \`const H\`。
  * 抽取脚本：apps/kiosk/scripts/extract-service-hub-specs.mjs。稿改了重跑它，别手改本文件。
  *
  * 手抄是漏掉诚实性声明最常见的来源——这批迁移里已经因为手抄漏过多次。

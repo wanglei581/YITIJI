@@ -207,7 +207,8 @@ check(
 )
 {
   const draft = fs.readFileSync(
-    path.join(root, '..', '..', 'docs/design/kiosk-redesign-2026-08/16-service-hubs.html'),
+    // 抽取源已换成 2.0 稿（v2 目录）；原稿只读，规格与页面都以 v2 为准。
+    path.join(root, '..', '..', 'docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html'),
     'utf8',
   )
   check(
@@ -344,7 +345,7 @@ check(
   '目标分段用稿的固定说明，不再拼 sectionHint（那会让同一句话在一屏里出现两次）'
 )
 
-// 规格表 ↔ 稿 16-service-hubs.html 的转录对账。
+// 规格表 ↔ 2.0 稿 16-service-hubs.html（v2 目录）的转录对账。
 // 这份 36 张卡 / 17 个目标 / 15 条常用入口的规格是机械抽取产物；2026-09-10 那版
 // 漏掉稿里的 quick，15 条通往「我的」台账的入口静默消失过一次。手改 specs、
 // 或改了稿没重跑抽取，在这里当场变红。

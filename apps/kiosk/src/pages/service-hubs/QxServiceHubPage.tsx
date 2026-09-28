@@ -97,35 +97,16 @@ const CONTRACT_REVIEW_CAPABILITY: HubCapability = {
  * 运行时文案（next-tasks 2.4：能力口径不对的地方改运行时文案，不改编号原稿）。
  *
  * 3.14 起「岗位匹配参考」改为「简历对照」：只对照用户自填的岗位要求，不分档。
- * serviceHubSpecs 必须与稿 16 逐字节一致，所以改名放在这里、按路由覆盖，图标与徽标仍取稿。
+ * 2.0 稿 16 只在简历中心改了名，别的服务台上同一路由的卡仍是旧名；改名是产品口径，
+ * 所以按路由覆盖到所有服务台，图标与徽标仍取稿。
  */
 const RUNTIME_CARD_COPY: Partial<Record<string, Pick<HubCapability, 'title' | 'description'>>> = {
   '/resume/job-fit': { title: '简历对照', description: '填一份岗位要求，AI 对照你的简历' },
 }
 
-/**
- * 稿 16 的 2.0 只改了简历中心这一屏的可见文案（角标、带走什么、求职材料改为模板生成）。
- * serviceHubSpecs 仍与原稿逐字节对账，所以覆盖放在这里，不手改规格表。
- * 岗位 / 招聘会服务台不套这层：它们的卡面仍用规格表原文。
- */
-const RESUME_V2_CARD: Partial<Record<string, Partial<HubCapability> & { go?: string }>> = {
-  '/resume/source?intent=diagnose': { description: '带走问题清单和改法', badge: 'AI 诊断改写' },
-  '/resume/source?intent=optimize': { description: '对着你的方向逐条看改写', badge: 'AI 优化改写' },
-  '/resume/generate': { description: '带走一份可核对的草稿', badge: 'AI 起草简历' },
-  '/resume/career-plan': { description: '带走下一步可以做的事', badge: 'AI 行动建议' },
-  '/resume/materials': {
-    description: '按模板套填，带走求职信和自我介绍',
-    badge: '模板生成',
-    // 材料是固定模板套填，不调用模型。AI 不可用时这张卡仍按「要联网」拦截，不说成 AI 能力。
-    kind: 'info',
-  },
-  '/resume/job-fit': { badge: 'AI 对照', go: '带走：对照报告' },
-}
-
-function shownCapability(hub: ServiceHubKey, source: HubCapability): HubCapability & { go?: string } {
-  const base = { ...source, ...RUNTIME_CARD_COPY[source.route] }
-  if (hub !== 'resume') return base
-  return { ...base, ...RESUME_V2_CARD[source.route] }
+// 规格表已直接抽自 2.0 稿（角标、带走什么、求职材料为模板生成都在稿里），不再逐卡覆盖。
+function shownCapability(source: HubCapability): HubCapability {
+  return { ...source, ...RUNTIME_CARD_COPY[source.route] }
 }
 
 function capChips(state: HubAvailability): string[] {
@@ -249,7 +230,7 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   const showContractReview = hub === 'resume' && contractReviewEnabled
 
   const renderCard = (source: HubCapability, slot: 'grid' | 'contract') => {
-    const cap = shownCapability(hub, source)
+    const cap = shownCapability(source)
     const reason = unavailableReason(cap.kind, cap.route, availability)
     const Icon = HUB_ICON[cap.icon]
     const head = (
