@@ -3,6 +3,7 @@
 青序流光 2.0 · 18 材料扫描（2026-09-28）
 9/28 去掉内部英文键名
 9/28 逐状态检查修压字
+9/28 留白：扫描到 U 盘、刷新后接不上、链接不算数三屏把余量用 margin-top:auto 分成三段，说明卡用正文字阶（U 盘那屏 24）、放宽内边距；卡片按内容高，无新增内容。
 原稿：../kiosk-redesign-2026-08/18-scan-workbench.html（只读，未改）。本页无图片资源。脚本随原稿内嵌，不另抄 js。
 - 规则 1：三步说明放在类型选择前面，只读；可点的类型卡和主按钮留在中下部。顶栏返回保留，底部有「返回打印扫描」。
 - 规则 2：正文、辅助字、卡片标题、主按钮、导航按已有 2.0 稿的字阶上调，颜色、圆角、字体栈不动。
@@ -476,6 +477,26 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer;text-a
 .link{min-height:108px!important}
 .fx-b,.truth .fx,.truth .fx b,.stampmark,.nine button,.sizes button,.pgbtn,.pvlabel,.mini{font-size:20px!important}
 .pgrp .foot{font-size:20px!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白；不加区块、不改结构、字阶不做大）
+   扫描到 U 盘 / 刷新后接不上 / 链接不算数这三屏：底部三条说明按设计只在第一步出现，这三屏的正文区因此高出一截，
+   原来的 space-between 把余量全堆成两段 220–300px 的空。改成 margin-top:auto 分三段（问句下、两块之间、按钮上）；
+   说明卡用正文字阶 22（U 盘这一屏卡片就是主任务，用 24、标题 30），内边距放宽。卡片按内容高，不拉伸。 */
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]){justify-content:flex-start}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"])>.sec,
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"])>.ctabar{margin-top:auto}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"])>.sec{padding-top:18px}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]) .pgrp{padding:22px 26px}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]) .pgrp h4{font-size:28px!important}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]) .pgrp .state-p{font-size:22px!important;line-height:1.55!important;margin-top:10px}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]) .plan{gap:12px;margin-top:14px}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]) .plan li{line-height:1.55!important}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]) .pgrp .foot{font-size:21px!important;margin-top:16px;padding-top:14px}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]) .grid2{gap:18px}
+#body-root:is([data-state="usb-panel"],[data-state="session-lost"],[data-state="blocked"]) :is(.plan li,.pgrp .state-p,.pgrp .foot){text-wrap:pretty}
+#body-root[data-state="usb-panel"] .pgrp{padding:28px 30px}
+#body-root[data-state="usb-panel"] .pgrp h4{font-size:30px!important}
+#body-root[data-state="usb-panel"] :is(.pgrp .state-p,.plan li){font-size:24px!important;line-height:1.6!important}
+#body-root[data-state="usb-panel"] .plan{gap:14px}
 </style>
 </head>
 <body>

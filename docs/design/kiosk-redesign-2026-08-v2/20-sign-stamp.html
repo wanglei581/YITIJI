@@ -2,6 +2,7 @@
 <!--
 青序流光 2.0 · 20 签名盖章（2026-09-28）
 9/28 逐状态检查修压字
+9/28 留白：选位置右栏整列放进可视区（「确认授权」不再被裁）；门禁态四个出口改 2×2；选签名这一步的说明卡跨两栏、四步排成一行放进屏内；预览取不到时预览列收窄。只改样式，无新增内容。
 原稿：../kiosk-redesign-2026-08/20-sign-stamp.html（只读，未改）。本页无图片资源。脚本随原稿内嵌。
 - 规则 1：顶栏返回保留；底部补「返回打印扫描」。选页、选位置仍在原稿的操作列。
 - 规则 2：字阶上调。页标题改为 34。颜色、圆角、三 Tab 不动。
@@ -381,6 +382,64 @@ a:focus-visible,button:focus-visible,[role=checkbox]:focus-visible{outline:3px s
 .pgrp .foot{font-size:20px!important}
 .pickcard .d,.pickcard span.f,h3 span.r,.protchip{font-size:20px!important;line-height:1.35!important}
 .protchip{height:auto!important;min-height:28px;padding:2px 8px}
+/* 9/28 留白与被裁（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 选位置 / 预览 / 合成这些态：右栏原来比可视区高 113–247px，「确认授权」卡的底部（那段免责说明）
+      藏在滚动里。预览列 600→520（页面预览按高度适配，大小不变），页码六个一行放下，右栏间距收一档，
+      位置按钮 62→58（仍 ≥56），侧栏按内容高——右栏整列放得下，页码按钮仍在 y≥500。 */
+.body[data-shape=work] .pvcol{width:520px}
+.pages{gap:5px}
+.body[data-shape=work] .aside{height:auto;margin-top:10px}
+.body[data-shape=work] .ctrlcol{gap:8px}
+.body[data-shape=work] .grp{padding:13px 16px}
+.nine button{height:58px}
+.consent{padding:12px 14px;min-height:0}
+.body[data-shape=work] .pvbtn{padding:0 9px}
+/* 页码超出的那一态：页码下面那句原因挪到页码按钮上方（它不可点），右栏顶部不用再空 32px，状态卡按内容高 */
+#root[data-state="placement-invalid-page"] .statusrow{min-height:0}
+#root[data-state="placement-invalid-page"] .ctrlcol{padding-top:0}
+#root[data-state="placement-invalid-page"] .grp:has(>.pages){display:flex;flex-direction:column}
+#root[data-state="placement-invalid-page"] .grp:has(>.pages)>.pages{order:2}
+#root[data-state="placement-invalid-page"] .grp:has(>.pages)>.note{order:1;margin:0 0 10px}
+/* 2. 门禁态（未登录、能力不可用等）：「这些还能用」四个出口由一列四条（内容全挤在左半边，右半边空 940px）
+      改成 2×2 四块；块内说明在上、条件在下；三块之间用 margin-top:auto 分开剩余高度。 */
+.body[data-shape=block] .statusrow{min-height:0}
+.body[data-shape=block] .work{flex:none;margin-top:auto}
+.body[data-shape=block] .aside{margin-top:auto;height:auto;margin-bottom:auto}
+.body[data-shape=block] .gatecol{flex:1;padding:20px 22px;gap:14px}
+.body[data-shape=block] .gatecol h3{font-size:26px}
+.body[data-shape=block] .gaterow{flex:none;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:auto;gap:14px}
+.body[data-shape=block] .gaterow .pickcard{flex-direction:column;align-items:flex-start;gap:16px;padding:24px 24px 22px;min-height:330px}
+.body[data-shape=block] .gaterow .pickcard .pi{width:88px;height:88px;border-radius:24px}
+.body[data-shape=block] .gaterow .pickcard .pt{flex:1;display:flex;flex-direction:column}
+.body[data-shape=block] .gaterow .pickcard b{font-size:24px}
+.body[data-shape=block] .gaterow .pickcard .d{font-size:22px!important;margin-top:8px}
+.body[data-shape=block] .gaterow .pickcard .f{margin-top:auto;padding-top:14px}
+.body[data-shape=block] .acol h4{font-size:24px}
+/* 3. 选文档 / 传签名这一步：签名组只有五格，最后一行的说明卡独占左格、右格空着 → 跨两栏、三条说明横排。
+      右栏的「这一趟四步」原来整块在滚动区下面看不到：缩略图列 400→280（缩略图按高度适配，大小不变），
+      四步排成一行、标题同行，状态胶囊 40 高（只读），顶部问句与分区间距收一档，状态卡和四步都在屏内。 */
+.pickrow>.picknote:last-child:nth-child(odd){grid-column:1/-1}
+.pickrow>.picknote:last-child:nth-child(odd) .plan{flex-direction:row;gap:18px}
+.pickrow>.picknote:last-child:nth-child(odd) .plan li{flex:1 1 0;min-width:0}
+.body[data-shape=pick] .pvcol{width:280px}
+.body[data-shape=pick] .xq{margin-top:18px;padding:20px 38px 18px}
+.body[data-shape=pick] .xq-face{width:88px;height:88px;font-size:40px}
+.body[data-shape=pick] .sec{margin-top:16px}
+.body[data-shape=pick] .sec-label{margin-bottom:8px}
+.body[data-shape=pick] .work{margin-top:10px}
+.body[data-shape=pick] .picknote{padding:18px 22px}
+.body[data-shape=pick] .statusrow{min-height:0}
+.body[data-shape=pick] .ctrlcol{gap:8px}
+.body[data-shape=pick] .ctrlcol .state{padding:16px 18px;gap:8px}
+.body[data-shape=pick] .ctrlcol .seal{padding:0 12px;min-height:40px}
+.body[data-shape=pick] .ctrlcol .grp{padding:12px 16px}
+.body[data-shape=pick] .grp:has(>.steps){display:flex;align-items:center;gap:14px}
+.body[data-shape=pick] .grp:has(>.steps) h3{margin:0;flex:none}
+.body[data-shape=pick] .grp>.steps{flex:1;min-width:0;flex-direction:row;gap:8px}
+.body[data-shape=pick] .step{flex:1 1 0;min-width:0;min-height:64px;padding:8px 10px;gap:8px;justify-content:center;text-align:center}
+.body[data-shape=pick] .step i{display:none}
+/* 4. 签好的 PDF 预览取不到 / 链接过期：左边没有画面可看，预览列收窄到 400，右边三块文件事实放宽，不再一半屏空着。 */
+#root[data-state="output-expired"] .pvcol,#root[data-state="output-preview-failed"] .pvcol{width:400px}
 </style>
 </head>
 <body>

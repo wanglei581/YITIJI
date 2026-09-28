@@ -2,6 +2,7 @@
 <!--
 青序流光 2.0 · 37 支付各状态（2026-09-28）
 9/28 逐状态检查修压字
+9/28 留白：到账确认中、已支付版式、主动查单三态的进度三步改成通栏横条，下面结果卡与出口卡左右等高，结果字段不再被裁；卡片标题 28px，出口标题断行均衡。
 原稿：../kiosk-redesign-2026-08/37-pay-states.html（只读，未改）。本页无图片资源。脚本随原稿内嵌。
 - 规则 1：顶栏返回保留；底部补「返回收银台」。付款操作仍在原稿的中下部。
 - 规则 2：字阶上调。英文眉题改为「付款」。颜色、圆角、深绿说明区、三 Tab 不动。
@@ -266,6 +267,35 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .steps{justify-content:flex-start;gap:10px;overflow:visible}
 .step{max-height:none;height:auto;flex:0 0 auto;align-items:flex-start;padding:8px 0;overflow:visible}
 .paygrid>.card .acts{padding-top:16px}
+/* 9/28 留白与被裁（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕）
+   到账确认中 / 已支付版式 / 主动查单三态：左栏原来叠着「进度」「结果」两张卡，步骤标题被挤成一列四五个字，
+   结果卡的字段（订单号、支付尝试……）被裁掉；右栏四个出口却撑得很松。
+   改成：三步进度做成通栏横条放最上面，下面左边结果卡、右边出口卡，两栏等高。 */
+.paygrid:has([data-testid="cashier-steps"]){grid-template-rows:auto minmax(0,1fr)}
+.paygrid:has([data-testid="cashier-steps"])>.paycol{display:contents}
+.paygrid [data-testid="cashier-steps"]{grid-column:1/-1;grid-row:1}
+.paygrid:has([data-testid="cashier-steps"]) [data-testid="cashier-result"]{grid-column:1;grid-row:2}
+.paygrid:has([data-testid="cashier-steps"]) [data-testid="cashier-next"]{grid-column:2;grid-row:2}
+[data-testid="cashier-steps"] .steps{flex:none;flex-direction:row;gap:0}
+[data-testid="cashier-steps"] .step{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:2px 22px 4px}
+[data-testid="cashier-steps"] .step:first-child{padding-left:0}
+[data-testid="cashier-steps"] .step:last-child{padding-right:0}
+[data-testid="cashier-steps"] .step+.step{border-top:0;border-left:1px dashed var(--line)}
+[data-testid="cashier-steps"] .step-ic{width:46px;height:46px}
+[data-testid="cashier-steps"] .step-main{width:100%}
+[data-testid="cashier-steps"] .step>.slot{margin-top:auto}
+/* 结果是这三态的主角：图标与结论放大 */
+.paygrid:has([data-testid="cashier-steps"]) .result-ic{width:104px;height:104px}
+.paygrid:has([data-testid="cashier-steps"]) .result-ic svg{width:48px;height:48px}
+.paygrid:has([data-testid="cashier-steps"]) .result-main b{font-size:30px}
+.paygrid:has([data-testid="cashier-steps"]) .result-main span{font-size:23px!important;line-height:1.5!important}
+/* 卡片标题回到规则 2 的卡片标题字阶；出口标题断行均衡，不留一个字单独掉到第二行 */
+.card-h .t{font-size:28px}
+.act-t,.result-main b{text-wrap:balance}
+.step-d,.act-d,.result-main span,.guide-p{text-wrap:pretty}
+.act{gap:14px;padding:16px 14px 16px 20px}
+.act-go{width:24px}
+.result-ic[data-tone=slate]{background:var(--slate-soft);color:var(--slate-d)}
 </style>
 </head>
 <body><div id="viewport"><div id="stage">

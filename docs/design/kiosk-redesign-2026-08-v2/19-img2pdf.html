@@ -3,6 +3,7 @@
 青序流光 2.0 · 19 图片转 PDF（2026-09-28）
 9/28 去掉内部英文键名
 9/28 逐状态检查修压字
+9/28 留白：待合并图片有几张露几张（原来压到 200px，三张只露两张），行高不变、文件名 24；剩余空白用 margin-top:auto 分到区块之间；两张说明卡按字数分宽配平；空列表的「加进来之后」示意区按原稿撑开；底部三条说明按字数分宽（131→100px）。无新增内容。
 原稿：../kiosk-redesign-2026-08/19-img2pdf.html（只读，未改）。本页无图片资源。脚本随原稿内嵌。
 - 规则 1：顶栏只留返回；底部补「返回打印扫描」。主操作仍在原稿的列表和底栏。
 - 规则 2：字阶按已有 2.0 稿上调。颜色、圆角、宋体标题、三 Tab 不动。
@@ -394,6 +395,40 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 #body-root[data-state="source-expired"] .lrows,
 #body-root[data-state="image-dimensions-invalid"] .lrows,
 #body-root[data-state="output-too-large"] .lrows{max-height:140px!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 列表有几张露几张：原来统一压到 200px，三张只露两张、第 3 张藏在滚动里。列表框高度由脚本按「露几行 × 104」给出，
+      行高不变；文件名 24、尺寸 22。
+   2. 剩下的空白用 margin-top:auto 分到区块之间，不再全堆在按钮上方；满屏的态分到 0，版面不变。
+      按钮不可用的原因跟着按钮走，不和按钮隔开。
+   3. 两栏配平：两张说明卡按字数分宽，字少的一栏窄一些，两卡差不多高，不留半张空卡。
+   4. 空列表首屏：「加进来之后」示意区按原稿撑开（空位示意行和三件事分布开），不再缩成一截、下面空一大片。 */
+.lrows{max-height:none!important}
+.ipick{gap:16px}
+.imeta b{font-size:24px}
+.imeta span{font-size:22px!important;margin-top:6px}
+.body>.sec,.body>.cta-reason,.body>.ctabar{margin-top:auto}
+.body>.sec{padding-top:6px}
+.body>.cta-reason+.ctabar{margin-top:0}
+.grid2:has(>[data-testid="img2pdf-retention"]+[data-testid="img2pdf-rules"]){grid-template-columns:minmax(0,.74fr) minmax(0,1.26fr)}
+.grid2:has(>[data-testid="img2pdf-outfacts"]+[data-testid="img2pdf-retention"]){grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr)}
+#body-root[data-state="empty"] .sec.grow{flex:1 1 auto}
+/* 底部三条说明按字数分宽：第三条原来折成四行，整条说明 131px；分宽后三行、100px，省下的高度还给正文 */
+.truth>div:nth-child(1){flex:1.1}
+.truth>div:nth-child(2){flex:.8}
+.truth>div:nth-child(3){flex:1.3}
+#body-root[data-state="idempotency-conflict"] .grid2{grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr)}
+.pgrp .state-p,.pgrp .plan li,.pgrp .kv b{text-wrap:pretty}
+/* 只有一张图时版面最空：各区块回到原稿的内边距，剩下的再分到区块之间 */
+#stage:has(#body-root[data-state="ready-one"]) .xq{padding:20px 34px 18px}
+#body-root[data-state="ready-one"] .lwrap{padding:20px 24px 16px;gap:14px}
+#body-root[data-state="ready-one"] .pgrp{padding:18px 22px;gap:10px}
+#body-root[data-state="ready-one"] .sec-label{margin-bottom:16px}
+#body-root[data-state="ready-one"] .selbar{margin-top:16px}
+#body-root[data-state="ready-one"] .rotnote{margin-top:12px}
+#body-root[data-state="ready-one"] .addrow{margin-top:20px}
+/* 这两个出错态说明最长，列表仍按改前的 200px 露两行（其余在滚动里），按钮不压底部说明 */
+#body-root[data-state="source-unavailable"] .lrows,
+#body-root[data-state="total-input-too-large"] .lrows{max-height:200px!important}
 </style>
 </head>
 <body>
@@ -545,6 +580,8 @@ var FX=[
  {n:'成绩单-2026.jpg',t:'JPG',w:1240,h:1754,b:1.6}
 ];
 var LIM={imgs:20,single:10,total:40,px1:2500,pxAll:20000,out:15};
+/* 9/28 留白：列表一行的高度（和样式里的 .irow 同一个数），列表框按「露几行」乘出来，不再写死 104。 */
+var ROWH=104;
 function nameFor(k){
  var f=k%3,r=Math.floor(k/3),base=FX[f].n;
  if(r===0)return base;
@@ -639,7 +676,7 @@ function listCard(hint,maxRows){
  var n=M.items.length,h='',i;
  for(i=0;i<n;i++)h+=row(M.items[i],i);
  var vis=Math.min(maxRows||5,Math.max(1,n));
- var hgt=vis*104-(vis===n?1:0);
+ var hgt=vis*ROWH-(vis===n?1:0);
  return '<div class="lwrap" data-testid="'+SCREEN+'-list" data-count="'+n+'">'+
   '<div class="lhead"><span>待合并图片</span><span class="sub" data-testid="'+SCREEN+'-counts">'+n+' / '+LIM.imgs+' 张 · 合计 '+totBytes().toFixed(1)+' MB / '+LIM.total+' MB · '+totPx()+' 万 / 2 亿像素</span></div>'+
   '<div class="lrows" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="待合并图片列表，可上下滚动" style="height:'+hgt+'px">'+h+'</div>'+
@@ -999,7 +1036,7 @@ function doneView(loggedIn,st){
   ['系统已返回结果','一张图一页 · A4',loggedIn?'已进我的文档 · 约 24 小时':'未登录 · 不进我的文档'])+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">这份 PDF 的每一页</span><span class="hint">'+o.pages+' 页 · 点开可逐页看完整</span></div>'+
   '<div class="lwrap" data-testid="'+SCREEN+'-outlist"><div class="lhead"><span>页序与来源</span><span class="sub">'+o.pages+' 页 · 与提交顺序一致</span></div>'+
-  '<div class="lrows" style="height:348px" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="PDF 页序列表，可上下滚动">'+outRows()+'</div>'+
+  '<div class="lrows" style="height:'+(M.items.length*ROWH-1)+'px" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="PDF 页序列表，可上下滚动">'+outRows()+'</div>'+
   orderLine()+'</div>'+
   '<div class="selbar"><button type="button" class="selbtn press" data-act="open-out" data-testid="'+SCREEN+'-preview-open" aria-label="逐页完整查看这份 PDF">'+svg('eye','currentColor',24)+'逐页完整查看这份 PDF</button></div></section>'+
   '<section class="sec grow last"><div class="grid2">'+outPanel()+retention(loggedIn)+'</div></section>'+
@@ -1032,7 +1069,7 @@ V['recovered-completed']=function(){
   ['同一标识命中已完成结果','没有生成第二份','重新签发打印链接'])+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">这份 PDF 的每一页</span><span class="hint">'+o.pages+' 页 · 与当初提交的顺序一致</span></div>'+
   '<div class="lwrap" data-testid="'+SCREEN+'-outlist"><div class="lhead"><span>页序与来源</span><span class="sub">'+o.pages+' 页 · 与提交顺序一致</span></div>'+
-  '<div class="lrows" style="height:348px" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="PDF 页序列表，可上下滚动">'+outRows()+'</div>'+
+  '<div class="lrows" style="height:'+(M.items.length*ROWH-1)+'px" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="PDF 页序列表，可上下滚动">'+outRows()+'</div>'+
   orderLine()+'</div>'+
   '<div class="selbar"><button type="button" class="selbtn press" data-act="open-out" data-testid="'+SCREEN+'-preview-open" aria-label="逐页完整查看这份 PDF">'+svg('eye','currentColor',24)+'逐页完整查看这份 PDF</button></div></section>'+
   '<section class="sec grow last"><div class="grid2">'+outPanel()+reqPanel('恢复用的就是原来那个标识。它的结果缓存约 <b>10 分钟</b>，过了这个窗口再查就查不到了，那时才需要重新提交。')+'</div></section>'+
@@ -1071,7 +1108,7 @@ V['idempotency-conflict']=function(){
    '本页<b>就停在这里</b>：不自动换标识、不自动改回旧顺序，也不把这一批悄悄合并进上一次的结果。要继续，必须你自己挑一条路。'],
   ['系统已拒绝','没有生成任何 PDF','不自动替你决定'])+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">现在这一批的顺序</span><span class="hint">'+M.items.length+' / '+LIM.imgs+' 张 · 与上一次不同</span></div>'+
-  listCard(null,2)+'</section>'+
+  listCard(null,3)+'</section>'+
   '<section class="sec grow last"><div class="grid2">'+
   '<div class="pgrp"><h4>两批的差别</h4><div class="kv">'+
   '<div><span>请求标识</span><b data-testid="'+SCREEN+'-reqid" data-req="'+M.req+'">'+M.req+'</b></div>'+
