@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`557` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`559` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -81,6 +81,13 @@
 | POST | `/api/v1/advisor/sessions/:sessionId/run` | CreateAdvisorSessionDto.run | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
 | PATCH | `/api/v1/advisor/sessions/:sessionId/skill` | CreateAdvisorSessionDto.switchSkill | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
 | POST | `/api/v1/advisor/sessions/:sessionId/slots` | CreateAdvisorSessionDto.fillSlot | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+
+## `services/api/src/ai-access/admin-ai-access.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/ai-access` | AdminAiAccessController.get | admin | AiAccessService | AuditLog<br/>UserAiConsent |
+| PUT | `/api/v1/admin/ai-access` | AdminAiAccessController.update | admin | AiAccessService | AuditLog<br/>UserAiConsent |
 
 ## `services/api/src/ai/ai.controller.ts`
 

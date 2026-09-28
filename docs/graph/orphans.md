@@ -207,7 +207,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/jobs-fairs-prototype.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/reviews/launch-audit-2026-09-05.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md |
 | `apps/kiosk/src/pages/jobs/components/JobAiEntryPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
 | `apps/kiosk/src/pages/jobs/components/JobFilterAssistant.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md |
-| `apps/kiosk/src/pages/jobs/components/JobListInsights.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
+| `apps/kiosk/src/pages/jobs/components/JobListInsights.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/reviews/kiosk-runtime-engineering-words-2026-09-28.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
 
 ### 样式（17）
 
