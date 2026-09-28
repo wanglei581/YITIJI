@@ -899,7 +899,7 @@ function errorState(view, state, title, desc){
 function emptyState(view, ico, title, desc, starts, cta){
   return {layout:'state', html:
     banner('','empty', title, desc + '还没有任何记录。办过之后会列在这里。', ['共 0'])
-    + previewList(structRows(view,'empty') + starts, '按上面任一条办完之后，记录会出现在这一页；<b>本机不代收简历，也不记录来源平台的处理结果</b>。','从这里开始')
+    + previewList(structRows(view,'empty') + starts, '按上面任一条打开之后，这一页会记下你打开过的入口；<b>本机不代收简历，也不记录来源平台的处理结果</b>。','从这里开始')
     + guide('empty-'+view)
     + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
               askLink(),
