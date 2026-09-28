@@ -1089,7 +1089,9 @@ assert.match(
 )
 
 const scanResult = read('src/pages/scan/ScanResultPage.tsx')
-for (const target of ['/print/confirm', '/me/documents', '/resume/parse']) {
+// 打印出口 2026-09-28 起落在材料检查（商用收口 P0-5）：扫描件是本人原件，生产强制
+// PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒，所以不再直达 /print/confirm。
+for (const target of ['/print/material-check', '/me/documents', '/resume/parse']) {
   assert.match(
     scanResult,
     new RegExp(target.replaceAll('/', '\\\/')),

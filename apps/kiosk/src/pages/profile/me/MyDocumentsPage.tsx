@@ -22,8 +22,14 @@ import {
 import { useAuth } from '../../../auth/useAuth'
 import { FileContentPreview } from '../../../components/FileContentPreview'
 import { formatTime } from '../assets/format'
+import { savePrintMaterialSession } from '../../print/printMaterialSession'
 import { DocumentConvertAction } from './components/DocumentConvertAction'
-import { DOCUMENT_NOT_REPRINTABLE_COPY, isDocumentReprintable } from './components/documentReprint'
+import {
+  DOCUMENT_NOT_REPRINTABLE_COPY,
+  documentNeedsPrintMaterialCheck,
+  documentPrintSource,
+  isDocumentReprintable,
+} from './components/documentReprint'
 import { RetentionConfirmOverlay } from './components/RetentionConfirmOverlay'
 import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome'
 import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStartRow, QxMeStructRow } from './qx/QxMeStateBits'
@@ -162,18 +168,28 @@ export function MyDocumentsPage() {
     try {
       const res = await fetchAccessUrl(doc.previewUrlPath, token)
       if (!res.printFileUrl) throw new Error('打印链接未就绪')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: doc.filename,
-            size: formatBytes(doc.sizeBytes),
-            pages: null,
-            fileUrl: res.printFileUrl,
-            mimeType: doc.mimeType,
+      const file = {
+        name: doc.filename,
+        size: formatBytes(doc.sizeBytes),
+        pages: null,
+        fileId: doc.id,
+        fileUrl: res.printFileUrl,
+        mimeType: doc.mimeType,
+      }
+      if (documentNeedsPrintMaterialCheck(doc)) {
+        // 本人原件：生产隐私闸门要求先做完隐私检查才建单，检查只在打印台材料检查里做。
+        // 写法与打印上传页相同：先整份写打印材料会话（旧检查结论、旧参数一并作废），再去检查。
+        const source = documentPrintSource(doc)
+        savePrintMaterialSession({ file, source })
+        navigate('/print/material-check', { state: { file, source } })
+      } else {
+        navigate('/print/confirm', {
+          state: {
+            file,
+            params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
           },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-        },
-      })
+        })
+      }
     } catch (error) {
       setHint({ tone: 'bad', text: userMessageOf(error, '打印链接生成失败，可能已到期或被清理') })
     } finally {

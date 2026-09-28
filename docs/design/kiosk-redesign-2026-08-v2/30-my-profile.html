@@ -238,6 +238,7 @@ button.row{width:100%}
 </style>
 <!--
 青序流光 2.0 · 30 我的（state=ready，有待办和数量示例）
+9/28 留白：装不满一屏的状态区块间用 margin-top:auto 分开、最后一块下面也分一份（有内容的主状态像素不变）；空账号复用主状态的「简历、文档与订单」六项（数量 0，放在「会列在上面这几项里」那张卡上面）；「我的」读取中把底部那句读取说明挪到骨架卡正下方，六项格子 194→256、入口 76→96；账号设置读取中条目照常显示已登录时的说明，只有行尾状态位是骨架；清场中两屏和读取失败的键值格子 14→20、值 21→22。无新写文字，新增内容只有空账号那一屏复用的六项。
 规则 1：头顶「账号设置」改成只读说明，按钮挪到页面下方；待办卡下移到 y≥500。
 规则 2：名字和卡片标题 28–32，说明 21，数量从 56 收到 36。
 规则 4：「演示状态」改为「不是你的记录」。2026-09-28 再用词：顶栏、副标题和页内说法改为实际记录、这次办理。顶栏胶囊只写「有一笔待付款」。
@@ -276,6 +277,29 @@ button.row{width:100%}
 .card.live{margin-top:56px}
 .logo-name{font-size:26px!important}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 内容装不满一屏的状态（未登录、读取失败、换绑的发送 / 失败 / 过期、清场中……）：区块之间用
+      margin-top:auto 平均分开，不再把 200–500px 的空白全堆在底部按钮上方。内容本来就满的状态 auto 为 0，
+      版面不变；有待办时那张卡为了落在 y≥500 的 56px 上边距、示例提示条的 12px 上边距都保留。
+   2. 两个清场中的状态（换账号、换绑成功后）和「我的」读取失败，键值清单是主要内容：格子内边距 14→20、值 21→22，
+      按内容排舒展。只动这三屏——别的状态要么本来就排得下，要么内容已经超出一屏，再放大只会把下面的内容挤得更远。 */
+.scroll:not(.center)>*+*:not(.live):not(.fixnote){margin-top:auto}
+.scroll:not(.center)>:last-child:not(:first-child){margin-bottom:auto}
+/* 3. 「我的」读取中：骨架卡本身是浅色的，四周再分到空白就连成一大片空。原来压在最底下的那句读取说明
+      （同一句话）挪到骨架卡正下方，和账号卡、骨架卡连成一组；余高分到「六项」前、「正在读取什么」前后。
+      六项的格子和它下面三条入口按读取中的版面排舒展一点（格子 194→256、入口 76→96），不拉成空卡。 */
+#body-root[data-screen="profile"][data-state="loading"] .scroll>.idcard{order:0}
+#body-root[data-screen="profile"][data-state="loading"] .scroll>.card{order:1;margin-top:0!important}
+#body-root[data-screen="profile"][data-state="loading"] .scroll>p{order:2;margin:0!important}
+#body-root[data-screen="profile"][data-state="loading"] .scroll>section:not(.idcard){order:3}
+#body-root[data-screen="profile"][data-state="loading"] .scroll>section:last-of-type{order:4;margin-bottom:auto}
+#body-root[data-screen="profile"][data-state="loading"] .asset{min-height:256px}
+#body-root[data-screen="profile"][data-state="loading"] .mlink{min-height:96px}
+#body-root[data-screen="profile"][data-state="loading"] section>.meta2 div{padding:24px 22px}
+#body-root[data-state="switching"] section>.meta2 div,#body-root[data-state="phone-clearing"] section>.meta2 div,
+#body-root[data-screen="profile"][data-state="error"] section>.meta2 div{padding:20px}
+#body-root[data-state="switching"] section>.meta2 b,#body-root[data-state="phone-clearing"] section>.meta2 b,
+#body-root[data-screen="profile"][data-state="error"] section>.meta2 b{font-size:22px;line-height:1.4}
 </style>
 </head>
 <body>
@@ -557,6 +581,9 @@ function sessionRecords(kind){
 }
 
 var COUNTS={resumes:3,documents:7,orders:2,favorites:12,benefits:1,ai:9};
+/* 9/28 留白：空账号那一屏复用主状态的「简历、文档与订单」六项，数量是 0（运行页空账号也照样列这六项、显示 0）。
+   状态卡原文「办过之后，会列在上面这几项里」指的就是它，所以放在状态卡上面。 */
+var ZERO={resumes:0,documents:0,orders:0,favorites:0,benefits:0,ai:0};
 var VIEWS={
   'profile:member':function(){
     return '<div class="scroll">'+idCard(false)+todoCard('none')+assetGrid('profile')
@@ -631,7 +658,7 @@ var VIEWS={
       +'<div class="ctabar"><a class="btn ghost press" href="01-home.html" data-route="/" data-testid="profile-primary">回首页</a></div>';
   },
   'profile:empty':function(){
-    return '<div class="scroll">'+idCard(false)+todoCard('none')
+    return '<div class="scroll">'+idCard(false)+todoCard('none')+assetGrid('profile',ZERO)
       +stateBlock('info','empty','这个账号下还没有任何记录',
         '你还没有保存过简历、生成过文档或下过打印订单。办过之后，会列在上面这几项里。','')
       +'<section><div class="sec-h"><span class="t">从这里开始</span></div><div class="rows" style="margin-top:12px">'
@@ -704,10 +731,15 @@ var VIEWS={
     return '<div class="scroll">'+idCard(false)
       +'<section><div class="sec-h"><span class="t">账号</span><span class="hint">正在读取当前账号的设置状态</span></div>'
       +'<div class="rows" style="margin-top:12px">'
-      /* 条目本身是本页固定结构，未返回的是每项的授权 / 开关状态，所以只有状态位留骨架。 */
-      +[['msg','换绑手机号',34],['swap','换一个账号登录',46],['shield','隐私请求与授权撤回',40],['bell','消息通知',30]].map(function(r){
+      /* 条目本身是本页固定结构，未返回的是每项的授权 / 开关状态，所以只有状态位留骨架。
+         9/28 留白：条目说明是固定文字（与已登录那一屏逐字相同），照常显示；只有行尾的状态位是骨架。 */
+      +[['msg','换绑手机号','验证旧手机号后，再验证新手机号；成功后退出并重新登录。'],
+        ['swap','换一个账号登录','先二次确认，再退出并清除本机这一次的登录，然后才去登录页。'],
+        ['shield','隐私请求与授权撤回','当前可提交 AI 使用授权的撤回；数据导出与账号注销还没开放。'],
+        ['bell','消息通知','系统下发的会员通知。']].map(function(r){
         return '<div class="row"><span class="row-ic">'+svg(r[0],24)+'</span>'
-          +'<span class="row-tx"><span class="row-t">'+r[1]+'</span><span class="row-d">'+skel(r[2])+'</span></span></div>';
+          +'<span class="row-tx"><span class="row-t">'+r[1]+'</span><span class="row-d">'+r[2]+'</span></span>'
+          +'<span class="skel-num sm" aria-hidden="true"></span></div>';
       }).join('')
       +'</div></section>'
       +factSection('读取中 / 不受读取影响','分开说，避免整页卡住',[

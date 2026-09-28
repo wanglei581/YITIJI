@@ -2,6 +2,7 @@
 <!-- 青序流光 2.0 改动清单
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 2026-09-28 修重叠：带顶部提示的状态里，能力卡改成横排，把高度让给证件照横卡，不再压住「已下过单」标题。
+- 9/28 留白：证件照横卡挪到第三行、占签名盖章右边两格，八张卡排满 3×3；带提示条的四态横排小卡定高 180，余高分到区块之间；证件照说明、能力说明不存在两态不再把末张卡拉成空盒，按内容定高、放大替代路径与去处，空白分到区块之间。只改样式，文字与标记未改。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 只读步骤说明保留在卡片前，通过必要高度和留白调整触达；位置待复测（规则 1）。
@@ -246,6 +247,43 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 #body-root[data-state="capability-loading"] .cap:not(.wide) .cap-foot,
 #body-root[data-state="capability-error"] .cap:not(.wide) .cap-foot,
 #body-root[data-state="locked"] .cap:not(.wide) .cap-foot{grid-area:foot;margin-top:0}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、文字一个字不改）
+   1. 八张能力卡排成 3×3：证件照横卡挪到第三行，占签名盖章右边两格，第三行不再空着右边两格；
+      三行等高分掉整块高度（默认态每张卡约 256px）。
+   2. 带提示条的四个态（检查中 / 读取失败 / 被关掉 / 离线）：横排小卡定高 180，多出的高度分到提示条、01、02 三段之间。
+   3. 证件照说明、能力说明不存在两态：不再把「开放后会做什么」「证件照说明」拉成空盒，按内容定高；
+      两条替代路径和三个去处放大成主角，剩下的空白用 margin-top:auto 分到区块之间。 */
+.sec.grow .grid3{grid-template-rows:repeat(3,1fr)!important;align-content:stretch!important}
+.cap.wide{grid-column:2/-1}
+#body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.grow{flex:none;margin-top:auto!important;padding-top:20px}
+#body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.grow .grid3{flex:none;grid-template-rows:repeat(3,minmax(180px,auto))!important}
+#body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .cap:not(.wide){align-content:center}
+#body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.last{margin-top:auto!important;padding-top:36px}
+#body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .sec{margin-top:auto!important;padding-top:20px}
+#body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .sec.fill,
+#body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .sec.grow{flex:none}
+#body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .pgrp,
+#body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .blk{height:auto!important;flex:none!important}
+#body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .state{padding:34px 38px}
+#body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .state-p{font-size:23px;line-height:1.6}
+#body-root[data-state="feature-id-photo"] .src{padding:34px 30px;gap:26px}
+#body-root[data-state="feature-id-photo"] .src-icon{width:96px;height:96px;border-radius:28px}
+#body-root[data-state="feature-id-photo"] .src-desc{font-size:23px;line-height:1.55;margin-top:8px}
+#body-root[data-state="feature-id-photo"] .pgrp{padding:30px 32px}
+#body-root[data-state="feature-id-photo"] .pgrp h4{font-size:28px}
+#body-root[data-state="feature-id-photo"] .pgrp h4 span{font-size:21px}
+#body-root[data-state="feature-id-photo"] .plan{margin-top:22px;gap:22px}
+#body-root[data-state="feature-id-photo"] .plan li{font-size:23px;line-height:1.55}
+#body-root[data-state="feature-id-photo"] .plan .sq{margin-top:13px}
+#body-root[data-state="feature-not-found"] .notecard{flex-direction:column;gap:20px;padding:32px 26px 30px;min-height:0}
+#body-root[data-state="feature-not-found"] .note-ic{width:64px;height:64px;border-radius:20px}
+#body-root[data-state="feature-not-found"] .notecard b{font-size:28px}
+#body-root[data-state="feature-not-found"] .notecard span.d{margin-top:8px;line-height:1.5}
+#body-root[data-state="feature-not-found"] .note-go{margin-top:14px}
+#body-root[data-state="feature-not-found"] .blk{padding:32px 36px}
+#body-root[data-state="feature-not-found"] .blk .state-h{font-size:28px}
+#body-root[data-state="feature-not-found"] .blk .meta{margin-top:22px;gap:16px}
+#body-root[data-state="feature-not-found"] .blk .chip{flex:1;justify-content:center;min-height:64px;padding:0 22px}
 
 </style>
 </head>
