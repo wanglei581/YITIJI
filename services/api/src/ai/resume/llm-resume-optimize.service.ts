@@ -1,4 +1,5 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { AiContentBlockedError } from '../llm/llm-guard'
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import type {
   GeneratedResume,
   ResumeOptimizeModule,
@@ -226,7 +227,7 @@ export class LlmResumeOptimizeService {
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: OPTIMIZE_RETRY_HINT }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
-        `llm:${cfg.vendor}:${cfg.model}`, onLlmCall,
+        `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, onLlmCall,
       )
       const result = this.parseAndValidate(raw, text, cfg.forbiddenWords)
       if (result) return restoreOptimizeResult(result, masked.restore)
@@ -302,7 +303,7 @@ export class LlmResumeOptimizeService {
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: LAYOUT_ADJUST_RETRY_HINT }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
-        `llm:${cfg.vendor}:${cfg.model}`, input.onLlmCall,
+        `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, input.onLlmCall,
       )
       const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume)
       if (result) {
@@ -328,6 +329,7 @@ export class LlmResumeOptimizeService {
     messages: ChatMessage[],
     /** AI-COST-TRUTH：真实厂商标识（`llm:<vendor>:<model>`）。**不含任何凭证**。 */
     providerLabel: string,
+    forbiddenWords: readonly string[],
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
@@ -341,9 +343,10 @@ export class LlmResumeOptimizeService {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
           body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        { timeoutMs: LLM_LONG_TIMEOUT_MS },
+        { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_optimize', forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       if (error instanceof LlmBusyError) {
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
       }

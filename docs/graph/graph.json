@@ -17182,6 +17182,7 @@
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/policies/policy-scope.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
@@ -21722,7 +21723,8 @@
     ],
     "services/api/src/activity/me-activity.controller.ts": [
       "services/api/scripts/verify-activity-logs.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/admin-ops/admin-alert-actions.service.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -21949,6 +21951,7 @@
       "services/api/scripts/verify-ai-config.ts"
     ],
     "services/api/src/ai/llm/llm-chat.service.ts": [
+      "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
@@ -21967,10 +21970,12 @@
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
     "services/api/src/ai/llm/llm-guard.ts": [
+      "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-guard.ts"
     ],
     "services/api/src/ai/llm/llm-http.ts": [
+      "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
@@ -22758,9 +22763,13 @@
     "services/api/src/community/community.controller.ts": [
       "services/api/scripts/verify-community-daily-brief.ts"
     ],
+    "services/api/src/community/community.module.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
+    ],
     "services/api/src/community/community.service.ts": [
       "services/api/scripts/verify-community-daily-brief.ts",
-      "services/api/scripts/verify-policies.ts"
+      "services/api/scripts/verify-policies.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/companies/companies.controller.ts": [
       "services/api/scripts/verify-companies.ts",
@@ -23607,7 +23616,8 @@
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
     "services/api/src/member-favorites/member-favorites.controller.ts": [
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/member-favorites/member-favorites.service.ts": [
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
@@ -24099,7 +24109,11 @@
       "services/api/scripts/verify-policy-eligibility.ts"
     ],
     "services/api/src/policies/policies.controller.ts": [
-      "services/api/scripts/verify-policies.ts"
+      "services/api/scripts/verify-policies.ts",
+      "services/api/scripts/verify-policy-scope.ts"
+    ],
+    "services/api/src/policies/policies.module.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policies.service.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
@@ -24122,6 +24136,12 @@
     "services/api/src/policies/policy-eligibility.types.ts": [
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts"
+    ],
+    "services/api/src/policies/policy-public-visibility.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
+    ],
+    "services/api/src/policies/policy-scope.service.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/print-conversion/print-conversion.controller.ts": [
       "services/api/scripts/verify-print-conversion.ts"
@@ -30960,6 +30980,26 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-guard.ts",
+          "services/api/src/ai/llm/llm-http.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-content-moderation.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-content-moderation"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "packages/shared/src/types/ai.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
           "services/api/src/ai/llm/ai-config-audit.ts"
@@ -35564,6 +35604,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:policy-eligibility"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/activity/me-activity.controller.ts",
+          "services/api/src/community/community.module.ts",
+          "services/api/src/community/community.service.ts",
+          "services/api/src/member-favorites/member-favorites.controller.ts",
+          "services/api/src/policies/policies.controller.ts",
+          "services/api/src/policies/policies.module.ts",
+          "services/api/src/policies/policy-public-visibility.ts",
+          "services/api/src/policies/policy-scope.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-policy-scope.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:policy-scope"
       ],
       "wired": true
     },

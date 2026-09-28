@@ -32,6 +32,7 @@ import {
   assertRecruitmentPolicyWriteAllowed,
   publicPolicyLookupWhere,
   RECRUITMENT_POLICY_CATEGORY,
+  type PolicyPublicScope,
 } from './policy-public-visibility'
 
 // ============================================================
@@ -168,8 +169,8 @@ export class PoliciesService {
   // ── Kiosk 公开读(approved+published；托管关闭时不含招聘分类；不含下架留痕)──
 
   async getPublishedPolicies(params?: {
-    kind?: string; audience?: string; category?: string; page?: number | string; pageSize?: number | string
-  }): Promise<{ data: PolicyPostDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+    kind?: string; audience?: string; category?: string; page?: number | string; pageSize?: number | string; scope?: PolicyPublicScope
+  }): Promise<{ data: PolicyPostDto[]; scope?: 'bound' | 'unbound' | 'missing'; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
     const parsedPage = Number.parseInt(String(params?.page ?? 1), 10)
     const page = Math.min(10_000, Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1)
     const parsedPageSize = Number.parseInt(String(params?.pageSize ?? 200), 10)
@@ -180,7 +181,7 @@ export class PoliciesService {
       ...(params?.kind ? { kind: params.kind } : {}),
       ...(params?.audience ? { audience: params.audience } : {}),
       ...(params?.category ? { category: params.category } : {}),
-    })
+    }, params?.scope)
     const [rows, total] = await Promise.all([
       this.prisma.policyPost.findMany({
         where,
@@ -192,22 +193,23 @@ export class PoliciesService {
     ])
     return {
       data: rows.map(mapPolicy),
+      ...(params?.scope?.mode === 'org' ? { scope: params.scope.state } : {}),
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
     }
   }
 
-  async getPublishedPolicyById(id: string): Promise<{ data: PolicyPostDto; success: true }> {
+  async getPublishedPolicyById(id: string, scope: PolicyPublicScope = { mode: 'all' }): Promise<{ data: PolicyPostDto; success: true; scope?: 'bound' | 'unbound' | 'missing' }> {
     const row = await this.prisma.policyPost.findFirst({
       where: await publicPolicyLookupWhere(this.prisma, {
         id,
         reviewStatus: 'approved',
         publishStatus: 'published',
-      }),
+      }, scope),
     })
     if (!row) {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
     }
-    return { data: mapPolicy(row), success: true }
+    return { data: mapPolicy(row), success: true, ...(scope.mode === 'org' ? { scope: scope.state } : {}) }
   }
 
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────

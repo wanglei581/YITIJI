@@ -223,14 +223,15 @@ export class MockAiProvider implements AiProvider {
     }
     const sceneReply = input.skill ? sceneReplies[input.skill] : undefined
     if (sceneReply) {
-      return applyAssistantChannel<ChatOutput>({
+      const output = applyAssistantChannel<ChatOutput>({
         sessionId: input.sessionId ?? `mock-session-${Date.now()}`,
         reply: sceneReply.reply,
         intent: 'general',
         actions: sceneReply.actions,
       }, input.channel)
+      return output
     }
-    return applyAssistantChannel<ChatOutput>({
+    const output = applyAssistantChannel<ChatOutput>({
       sessionId: input.sessionId ?? `mock-session-${Date.now()}`,
       reply: '您好！我是 AI 就业服务助手，可以为您提供简历建议、求职指导和打印帮助。请问有什么需要帮忙的？',
       intent: 'general',
@@ -239,6 +240,7 @@ export class MockAiProvider implements AiProvider {
         { label: '浏览岗位信息', route: '/jobs' },
       ],
     }, input.channel)
+    return output
   }
 
   async classifyIntent(message: string): Promise<ClassifyIntentOutput> {
