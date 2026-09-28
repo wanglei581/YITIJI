@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'r
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { Button } from '@ai-job-print/ui'
 import {
@@ -355,19 +355,22 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       status={{ tone: aiOutage ? 'bad' : 'ok', label: aiOutage ? 'AI 暂时不能出题' : 'AI 模拟面试' }}
       ctabar={
         <div className="interview-qx-cta">
-          <QxStepActions onPrev={goTips} prevLabel="先看面试技巧">
-            <QxAiHelp label="问小青：这场练习怎么设" draft={SETUP_AI_DRAFT} />
-          </QxStepActions>
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="primary"
-            data-testid="interview-primary"
-            disabled={creating || uploading}
-            onClick={() => void handleStart()}
-          >
-            {creating ? '正在为你准备面试官…' : '创建并开始练习'}
-          </button>
+          <QxAiHelp label="问小青：这场练习怎么设" draft={SETUP_AI_DRAFT} />
+          <div className="iv-cta-row">
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={goTips}>
+              先看面试技巧
+            </button>
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="primary"
+              data-testid="interview-primary"
+              disabled={creating || uploading}
+              onClick={() => void handleStart()}
+            >
+              {creating ? '正在为你准备面试官…' : <>创建并开始练习<em>→</em></>}
+            </button>
+          </div>
         </div>
       }
     >

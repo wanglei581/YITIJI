@@ -1,6 +1,6 @@
-import type { RefObject } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { AI_LABEL_COPY } from '@ai-job-print/shared'
-import { InterviewCardHead, InterviewStatus, InterviewSteps } from '../interviewQxParts'
+import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus, InterviewSteps } from '../interviewQxParts'
 import {
   Loader2Icon,
   ShieldCheckIcon,
@@ -31,6 +31,7 @@ interface InterviewSessionPanelsProps {
   lastInterviewerMessageIndex: number
   phase: InterviewSessionPhase
   listRef: RefObject<HTMLDivElement>
+  children?: ReactNode
 }
 
 export function InterviewSessionPanels({
@@ -53,6 +54,7 @@ export function InterviewSessionPanels({
   lastInterviewerMessageIndex,
   phase,
   listRef,
+  children,
 }: InterviewSessionPanelsProps) {
   const previousQuestion = messages
     .filter((message) => message.role === 'interviewer')
@@ -91,6 +93,7 @@ export function InterviewSessionPanels({
           </p>
           {previousQuestion && <p className="interview-session__previous-question"><b>上一题</b>{previousQuestion}</p>}
         </section>
+        {children}
         <section className="iv-card">
           <InterviewCardHead title="回答时可以这样组织" hint="只作本题提示" />
           <InterviewSteps rows={[
@@ -99,13 +102,15 @@ export function InterviewSessionPanels({
             ['结果', '只说能核实的', '数字和成果由你自己核对。'],
           ]} />
         </section>
-
+        <InterviewNotice>
+          提交后才会进入下一题。这次没发出去时，页面会留下原因，你可以再试一次。
+        </InterviewNotice>
         {(voiceHint || timeUp) && (
           <section className="interview-session__notice" role="status">
             <ShieldCheckIcon aria-hidden="true" />
             <div>
               {voiceHint && <p>{voiceHint}</p>}
-              {timeUp && phase !== 'finishing' && <p>练习时长已到，建议回答完当前问题后点击「结束面试」。</p>}
+              {timeUp && phase !== 'finishing' && <p>练习时长已到，回答完当前问题后点「结束本场练习」。</p>}
             </div>
           </section>
         )}
@@ -133,6 +138,7 @@ export function InterviewSessionPanels({
             </div>
           )}
         </div>
+        <InterviewRail />
       </div>
     </>
   )

@@ -587,3 +587,77 @@
     font-size: var(--qx-fs-aux) !important;
   }
 }
+
+/* 作答卡按稿排在题目下面，按钮用 2.0 的 qx-btn，不再用旧的深蓝主按钮和红色下划线。 */
+[data-qx-interview] .interview-session__question-card,
+[data-qx-interview] .interview-session__answer-dock {
+  border-top: 1px solid var(--qx-line);
+}
+[data-qx-interview] .interview-session__card-icon {
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+[data-qx-interview] .interview-session__voice-status,
+[data-qx-interview] .interview-session__answer-head > span:last-child,
+[data-qx-interview] .interview-session__thinking,
+[data-qx-interview] .interview-session__mic-recheck {
+  color: var(--qx-ink-2);
+  font-size: var(--qx-fs-aux);
+  line-height: 1.4;
+}
+[data-qx-interview] .iv-tbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+}
+[data-qx-interview] .iv-tbar .qx-btn {
+  flex: 1 1 160px;
+  min-height: 56px;
+  padding: 0 16px;
+  border-radius: 17px;
+  font-size: var(--qx-fs-aux-lg);
+}
+[data-qx-interview] .iv-tbar .cnt {
+  margin-left: auto;
+  color: var(--qx-ink-3);
+  font-size: var(--qx-fs-aux);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+[data-qx-interview] .interview-session__answer-dock .is-danger,
+[data-qx-interview] .interview-session__answer-dock button.is-danger {
+  color: inherit;
+  text-decoration: none;
+}
+[data-qx-interview] .qx-btn[aria-disabled='true'] {
+  opacity: 0.48;
+}
+
+/* 报告维度卡：去掉旧的紫色上沿，字号提到辅助阶以上。 */
+[data-qx-interview] .interview-report__section,
+[data-qx-interview] .interview-report__hero {
+  border-top: 1px solid var(--qx-line) !important;
+  background: var(--qx-surface) !important;
+  box-shadow: none;
+}
+[data-qx-interview] .interview-report__section > div:first-child svg {
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+[data-qx-interview] .interview-report__section li > span:first-child {
+  background: var(--qx-teal);
+}
+[data-qx-interview] .interview-report__risk > div:first-child svg {
+  background: var(--qx-wheat-soft);
+  color: var(--qx-wheat-d);
+}
+[data-qx-interview] .interview-report__hero p,
+[data-qx-interview] .interview-report__section p,
+[data-qx-interview] .interview-report__section li,
+[data-qx-interview] .interview-report__questions p,
+[data-qx-interview] [aria-label='合规提示'] {
+  font-size: var(--qx-fs-aux) !important;
+  line-height: 1.45;
+}

@@ -1485,8 +1485,8 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await page.reload()
   await expect(page).toHaveURL(/\/interview\?stage=session/)
   await page.getByRole('textbox').fill('我基于真实经历完成了一个可访问性项目。')
-  await page.getByRole('button', { name: '提交回答' }).click()
-  await page.getByRole('button', { name: '结束面试' }).click()
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
   await page.waitForURL(/\/interview\?stage=report/)
   // 3.5c：横幅以 AI 可见标识开头（审计表一「模拟面试报告（一体机）」），不发给企业的边界不变。
   const reportNote = page.getByRole('note', { name: '合规提示' })
