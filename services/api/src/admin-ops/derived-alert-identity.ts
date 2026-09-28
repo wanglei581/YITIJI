@@ -14,7 +14,7 @@
  *   3. 退款消警必须读 Order.payStatus；禁止为了让红条消失去写 printOutcome。
  */
 
-export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable'] as const
+export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable', 'feedback_pending'] as const
 export type DerivedAlertType = (typeof ALERT_TYPES)[number]
 
 export const ALERT_ACTIONS = ['acknowledge', 'silence', 'close', 'reopen'] as const
@@ -116,6 +116,10 @@ export function paidPendingFileUnavailableEpisodeToken(args: {
     args.expiresAt?.toISOString() ?? 'null',
     args.observedAt.toISOString(),
   ].join(':')
+}
+
+export function feedbackPendingEpisodeToken(count: number, earliest: Date): string {
+  return `${count}:${earliest.toISOString()}`
 }
 
 /**

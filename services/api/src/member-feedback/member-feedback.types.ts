@@ -1,4 +1,4 @@
-export type FeedbackCategory = 'device' | 'print' | 'file_process' | 'general'
+export type FeedbackCategory = 'device' | 'print' | 'file_process' | 'general' | 'ai_content'
 export type FeedbackStatus = 'pending' | 'processing' | 'replied' | 'closed'
 export type FeedbackSenderType = 'user' | 'admin' | 'system'
 

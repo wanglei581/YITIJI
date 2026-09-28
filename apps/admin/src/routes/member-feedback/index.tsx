@@ -18,6 +18,7 @@ const CATEGORIES: { value: FeedbackCategory | 'all'; label: string }[] = [
   { value: 'print', label: '打印处理' },
   { value: 'file_process', label: '文件处理' },
   { value: 'general', label: '其他事项' },
+  { value: 'ai_content', label: 'AI 内容投诉' },
 ]
 
 const STATUSES: { value: FeedbackStatus | 'all'; label: string }[] = [
@@ -60,6 +61,7 @@ const CATEGORY_LABEL: Record<FeedbackCategory, string> = {
   print: '打印处理',
   file_process: '文件处理',
   general: '其他事项',
+  ai_content: 'AI 内容投诉',
 }
 
 const REPLY_SENDER_LABEL: Record<AdminFeedbackTicketDetail['replies'][number]['senderType'], string> = {
@@ -102,6 +104,8 @@ export default function MemberFeedbackPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [reply, setReply] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // 查看完整联系电话（每次服务端留痕）；换一条工单就清掉。
+  const [revealedPhone, setRevealedPhone] = useState<{ id: string; phone: string } | null>(null)
 
   const loadList = useCallback(async () => {
     setListState('loading')
@@ -133,6 +137,7 @@ export default function MemberFeedbackPage() {
     setSelectedId(id)
     setDetailState('loading')
     setMessage(null)
+    setRevealedPhone(null)
     try {
       const next = await memberFeedbackAdminApi.get(id)
       setDetail(next)
@@ -140,6 +145,17 @@ export default function MemberFeedbackPage() {
     } catch (error) {
       setDetailState('error')
       setMessage(error instanceof Error ? error.message : '反馈详情加载失败')
+    }
+  }
+
+  const revealPhone = async () => {
+    if (!detail) return
+    setMessage(null)
+    try {
+      const res = await memberFeedbackAdminApi.revealContactPhone(detail.id)
+      setRevealedPhone({ id: detail.id, phone: res.phone })
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '联系电话查看失败')
     }
   }
 
@@ -288,12 +304,19 @@ export default function MemberFeedbackPage() {
                   </p>
                   <p className="mt-1 text-sm text-neutral-500">
                     {detail.submitterType === 'anonymous_kiosk'
-                      ? `${submitterLabel(detail)} · 联系号码 ${detail.contactPhoneMasked ?? '未填写'}`
-                      : `用户 ${submitterLabel(detail)} · 联系号码 ${detail.contactPhoneMasked ?? '未填写'}`}
+                      ? `${submitterLabel(detail)} · 联系号码 ${revealedPhone?.id === detail.id ? revealedPhone.phone : detail.contactPhoneMasked ?? '未填写'}`
+                      : `用户 ${submitterLabel(detail)} · 联系号码 ${revealedPhone?.id === detail.id ? revealedPhone.phone : detail.contactPhoneMasked ?? '未填写'}`}
+                    {detail.contactPhoneMasked && revealedPhone?.id !== detail.id && (
+                      <button type="button" onClick={() => void revealPhone()} className="ml-2 min-h-12 px-2 text-sm font-medium text-primary-700 underline">
+                        查看完整号码（会留痕）
+                      </button>
+                    )}
                   </p>
                   {detail.submitterType === 'anonymous_kiosk' && (
                     <p className="mt-1 text-sm text-amber-700">
-                      匿名工单没有账号归属：回复不会送达、也不会推通知，只能在该终端现场处置。
+                      {detail.contactPhoneMasked
+                        ? '匿名工单没有账号归属：这里的回复不会送达。提交人留了手机号，请电话告知处理结果，再把结果记在回复里。'
+                        : '匿名工单没有账号归属：回复不会送达、也不会推通知，只能在该终端现场处置。'}
                     </p>
                   )}
                 </div>

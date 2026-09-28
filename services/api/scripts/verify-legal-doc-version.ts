@@ -22,6 +22,8 @@ import { validate } from 'class-validator'
 import { LegalController } from '../src/legal/legal.controller'
 import { CreateLegalDocDto } from '../src/legal/dto/admin-legal-doc.dto'
 import { LEGAL_DOC_TYPES, LegalService } from '../src/legal/legal.service'
+import { LEGAL_DRAFT_FALLBACK_VERSION } from '../src/legal/legal-constants'
+import { assertLegalDocsPublished } from '../src/member-auth/legal-docs-published-guard'
 
 const ROOT = path.resolve(__dirname, '../../..')
 
@@ -80,6 +82,52 @@ async function main() {
       fail('legal.service.ts 创建法务文档时必须保持草稿未激活')
     }
     pass('shared / legal.service.ts 包含 operator_info，且新文档保持未激活')
+  }
+
+  // C4：生产环境没有正式发布的协议就拒绝登录；开发、测试、E2E 照旧回落；显式开关可覆盖。
+  // 真调判定函数（不是搜源码字符串），把四种环境组合与三种「未发布」形态各跑一遍。
+  {
+    const published = { termsVersion: 'v1.0', privacyVersion: 'v1.0', termsDocVersionId: 'doc-t', privacyDocVersionId: 'doc-p', termsPublishedAt: new Date(), privacyPublishedAt: new Date() }
+    const draft = { termsVersion: LEGAL_DRAFT_FALLBACK_VERSION, privacyVersion: LEGAL_DRAFT_FALLBACK_VERSION, termsDocVersionId: null, privacyDocVersionId: null, termsPublishedAt: null, privacyPublishedAt: null }
+    const unpublishedPrivacy = { ...published, privacyPublishedAt: null }
+    const missingTermsDoc = { ...published, termsDocVersionId: null }
+    const saved = { nodeEnv: process.env['NODE_ENV'], flag: process.env['LEGAL_DOCS_REQUIRE_PUBLISHED'] }
+    const setEnv = (nodeEnv: string | undefined, flag: string | undefined) => {
+      if (nodeEnv === undefined) delete process.env['NODE_ENV']; else process.env['NODE_ENV'] = nodeEnv
+      if (flag === undefined) delete process.env['LEGAL_DOCS_REQUIRE_PUBLISHED']; else process.env['LEGAL_DOCS_REQUIRE_PUBLISHED'] = flag
+    }
+    const rejectCode = (resolved: typeof published | typeof draft): string | null => {
+      try {
+        assertLegalDocsPublished(resolved as never)
+        return null
+      } catch (error) {
+        const body = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+        return body?.error?.code ?? 'UNKNOWN'
+      }
+    }
+    try {
+      setEnv(undefined, undefined)
+      if (rejectCode(draft) !== null) fail('开发环境（NODE_ENV 未设）不应拒绝草稿回落版本')
+      setEnv('production', undefined)
+      if (rejectCode(draft) !== 'LEGAL_DOCS_NOT_PUBLISHED') fail('生产环境没有拒绝草稿回落版本')
+      if (rejectCode(unpublishedPrivacy) !== 'LEGAL_DOCS_NOT_PUBLISHED') fail('生产环境没有拒绝「已激活但没有发布时间」的隐私政策')
+      if (rejectCode(missingTermsDoc) !== 'LEGAL_DOCS_NOT_PUBLISHED') fail('生产环境没有拒绝缺少协议文档编号的版本')
+      if (rejectCode(published) !== null) fail('生产环境拒绝了两份都已发布的正式协议')
+      setEnv('production', 'false')
+      if (rejectCode(draft) !== null) fail('LEGAL_DOCS_REQUIRE_PUBLISHED=false 没能在生产放开（应急口失效）')
+      setEnv(undefined, 'true')
+      if (rejectCode(draft) !== 'LEGAL_DOCS_NOT_PUBLISHED') fail('LEGAL_DOCS_REQUIRE_PUBLISHED=true 没能在非生产环境生效')
+    } finally {
+      setEnv(saved.nodeEnv, saved.flag)
+    }
+    const auth = readFile('services/api/src/member-auth/member-auth.service.ts')
+    const resolverBody = auth.slice(auth.indexOf('async resolveActiveLegalVersions('), auth.indexOf('private assertConsentMatches('))
+    if (!resolverBody.includes('assertLegalDocsPublished(resolved)')) fail('resolveActiveLegalVersions 没有调用协议发布闸门')
+    if ((auth.match(/await this\.resolveActiveLegalVersions\(\)/g) ?? []).length < 3) fail('短信、扫码、微信三条登录路径没有全部经过 resolveActiveLegalVersions')
+    // 判定只在服务端做一处：一体机保留回落，否则 LEGAL_DOCS_REQUIRE_PUBLISHED=false 的应急口对一体机无效。
+    const kioskVersions = readFile('apps/kiosk/src/services/auth/legalConsentVersions.ts')
+    if (!kioskVersions.includes('LEGAL_DRAFT_FALLBACK_VERSION')) fail('一体机取版本失败时的回落被删了，应急口会对一体机失效')
+    pass('C4 协议发布闸门：生产默认拒绝草稿与未发布版本，开发照旧，显式开关两向可覆盖，三条登录路径都经过')
   }
 
   // ── 3. admin 控制器使用鉴权守卫 ──────────────────────────────────────────

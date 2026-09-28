@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
+import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator'
 import type { FeedbackCategory } from '../member-feedback.types'
 
 /**
@@ -7,10 +7,13 @@ import type { FeedbackCategory } from '../member-feedback.types'
  * 为什么不让客户端直接传 category：一体机是公共位设备、免登录，提交面越窄越好。
  * 客户端只能从下面这张表里选一个 issueCode，category 由服务端映射得到 ——
  * 匿名面因此在协议层就无法表达打印/扫描域以外的诉求，比「校验 category 白名单」更紧。
+ * 唯一例外是 ai_content_complaint（C3）：生成式 AI 服务须设便捷的投诉入口
+ * （《生成式人工智能服务管理暂行办法》第十五条），没登录的人也要能投诉。
  *
- * 词表覆盖两处真实入口：
+ * 词表覆盖三处真实入口：
  *   - P06 s7 打印完成页问题上报：页数不对 / 发黑发花 / 卡住没出完 / 其他
  *   - P39 打印 Hub 反馈弹层：缺纸 / 质量 / 扫描 / 上传 / 费用 / 其他
+ *   - AI 内容投诉（C3，页面入口另排）
  */
 export const KIOSK_FEEDBACK_ISSUE_CODES = [
   'print_page_count_mismatch',
@@ -22,6 +25,7 @@ export const KIOSK_FEEDBACK_ISSUE_CODES = [
   'upload_issue',
   'billing_issue',
   'other',
+  'ai_content_complaint',
 ] as const
 
 export type KioskFeedbackIssueCode = typeof KIOSK_FEEDBACK_ISSUE_CODES[number]
@@ -40,7 +44,11 @@ export const KIOSK_FEEDBACK_ISSUE_MAP: Record<
   upload_issue: { category: 'file_process', label: '上传问题' },
   billing_issue: { category: 'general', label: '费用问题' },
   other: { category: 'general', label: '其他问题' },
+  ai_content_complaint: { category: 'ai_content', label: 'AI 内容投诉' },
 }
+
+/** 匿名面唯一允许留手机号的问题类型：投诉人要能收到处理结果；其余类型仍一律不收联系方式。 */
+export const KIOSK_FEEDBACK_CONTACT_ALLOWED: readonly KioskFeedbackIssueCode[] = ['ai_content_complaint']
 
 /** 打印完成页满意度三档。 */
 export const KIOSK_FEEDBACK_SATISFACTIONS = ['good', 'fair', 'bad'] as const
@@ -75,6 +83,11 @@ export class CreateKioskFeedbackDto {
   @IsString()
   @MaxLength(KIOSK_FEEDBACK_CONTENT_MAX)
   content?: string
+
+  /** 选填，只对 KIOSK_FEEDBACK_CONTACT_ALLOWED 里的类型接收（service 校验），加密落库。 */
+  @IsOptional()
+  @Matches(/^1[3-9]\d{9}$/)
+  contactPhone?: string
 
   @IsOptional()
   @IsString()

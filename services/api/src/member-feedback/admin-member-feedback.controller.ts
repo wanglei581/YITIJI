@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Header, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import type { AdminFeedbackTicketDetail, AdminFeedbackTicketItem } from './member-feedback.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
@@ -29,6 +29,16 @@ export class AdminMemberFeedbackController {
     @Param('id') id: string,
   ): Promise<ApiResponse<AdminFeedbackTicketDetail>> {
     return ApiResponse.ok(await this.feedback.getForAdmin(admin, id))
+  }
+
+  /** C3：查看提交人留的完整联系电话。用 POST：每次都要留痕，不该被缓存或预取。 */
+  @Post(':id/contact-phone')
+  @Header('Cache-Control', 'no-store')
+  async revealContactPhone(
+    @CurrentUser() admin: AuthedUser,
+    @Param('id') id: string,
+  ): Promise<ApiResponse<{ phone: string }>> {
+    return ApiResponse.ok(await this.feedback.revealContactPhoneForAdmin(admin, id))
   }
 
   @Post(':id/replies')

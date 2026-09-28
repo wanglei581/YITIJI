@@ -10,6 +10,7 @@ import {
 import { JwtService } from '@nestjs/jwt'
 import { encryptPhone, hashPhone, maskPhone, maskPhoneFromEnc } from '../common/crypto/phone-identity'
 import { LEGAL_DRAFT_FALLBACK_VERSION } from '../legal/legal-constants'
+import { assertLegalDocsPublished, type ResolvedLegalVersions } from './legal-docs-published-guard'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
@@ -163,28 +164,28 @@ export class MemberAuthService {
     })
   }
 
-  async resolveActiveLegalVersions(): Promise<{
-    termsVersion: string
-    privacyVersion: string
-    termsDocVersionId: string | null
-    privacyDocVersionId: string | null
-  }> {
+  async resolveActiveLegalVersions(): Promise<ResolvedLegalVersions> {
     const [terms, privacy] = await Promise.all([
       this.prisma.legalDocVersion.findFirst({
         where: { docType: 'terms_of_service', isActive: true },
-        select: { id: true, version: true },
+        select: { id: true, version: true, publishedAt: true },
       }),
       this.prisma.legalDocVersion.findFirst({
         where: { docType: 'privacy_policy', isActive: true },
-        select: { id: true, version: true },
+        select: { id: true, version: true, publishedAt: true },
       }),
     ])
-    return {
+    const resolved: ResolvedLegalVersions = {
       termsVersion: terms?.version ?? LEGAL_DRAFT_FALLBACK_VERSION,
       privacyVersion: privacy?.version ?? LEGAL_DRAFT_FALLBACK_VERSION,
       termsDocVersionId: terms?.id ?? null,
       privacyDocVersionId: privacy?.id ?? null,
+      termsPublishedAt: terms?.publishedAt ?? null,
+      privacyPublishedAt: privacy?.publishedAt ?? null,
     }
+    // C4：生产环境没有正式发布的协议就拒绝登录（LEGAL_DOCS_REQUIRE_PUBLISHED 可显式覆盖）。
+    assertLegalDocsPublished(resolved)
+    return resolved
   }
 
   private assertConsentMatches(

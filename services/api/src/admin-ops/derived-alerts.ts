@@ -5,6 +5,7 @@ import {
   buildSubjectKey,
   offlineEpisodeToken,
   paidPendingFileUnavailableEpisodeToken,
+  feedbackPendingEpisodeToken,
   printerIssueEpisodeToken,
   printFailedEpisodeToken,
   type DerivedAlertType,
@@ -89,6 +90,11 @@ type PaidPendingFileUnavailableTaskRow = {
     updatedAt: Date
   } | null
 }
+
+type PendingFeedbackSummary = { count: number; earliest: Date | null }
+
+/** C3：待处理的 AI 内容投诉（新提交或处理中）。只取提交时间，不取正文与手机号。 */
+const PENDING_AI_CONTENT_FEEDBACK = { category: 'ai_content', status: { in: ['pending', 'processing'] } }
 
 const TERMINAL_SELECT = {
   id: true,
@@ -272,6 +278,24 @@ function buildPaidPendingFileUnavailableAlert(
   }
 }
 
+function buildPendingFeedbackAlert(summary: PendingFeedbackSummary): DerivedAlert | null {
+  if (!summary.earliest || summary.count <= 0) return null
+  const subjectId = 'ai-content'
+  const subjectKey = buildSubjectKey('feedback_pending', subjectId)
+  return {
+    id: subjectKey,
+    subjectKey,
+    subjectId,
+    episodeToken: feedbackPendingEpisodeToken(summary.count, summary.earliest),
+    type: 'feedback_pending',
+    severity: 'warning',
+    title: '有待处理的 AI 内容投诉',
+    detail: `共 ${summary.count} 条，最早提交于 ${summary.earliest.toISOString().slice(0, 16).replace('T', ' ')}`,
+    terminalCode: null,
+    occurredAt: summary.earliest.toISOString(),
+  }
+}
+
 /** 最近一次健康心跳时间;用于 printer_issue 的 episodeToken。 */
 async function lastHealthyHeartbeatAt(prisma: PrismaService, terminalId: string): Promise<Date | null> {
   const row = await prisma.terminalHeartbeat.findFirst({
@@ -357,6 +381,14 @@ export async function collectDerivedAlerts(
     if (alert) alerts.push(alert)
   }
 
+  const pendingFeedbackRows = await prisma.feedbackTicket.findMany({
+    where: PENDING_AI_CONTENT_FEEDBACK,
+    orderBy: { createdAt: 'asc' },
+    select: { createdAt: true },
+  })
+  const feedbackAlert = buildPendingFeedbackAlert({ count: pendingFeedbackRows.length, earliest: pendingFeedbackRows[0]?.createdAt ?? null })
+  if (feedbackAlert) alerts.push(feedbackAlert)
+
   alerts.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
   // count() 与 findMany 之间可能有新失败写入,omitted 用 max(0,…) 兜底,不出现负数。
   const omitted = Math.max(0, failedTotal - failedTasks.length)
@@ -364,7 +396,7 @@ export async function collectDerivedAlerts(
     alerts,
     firingTotal: terminalAlertCount + Math.max(failedTotal, failedTasks.length) + unavailableTasks.reduce((count, task) => (
       count + (buildPaidPendingFileUnavailableAlert(task, nowMs) ? 1 : 0)
-    ), 0),
+    ), 0) + (feedbackAlert ? 1 : 0),
     omitted,
     cap: PRINT_FAILED_LIST_CAP,
   }
@@ -402,6 +434,15 @@ export async function resolveDerivedAlert(
       select: PAID_PENDING_FILE_UNAVAILABLE_SELECT,
     })) as unknown as PaidPendingFileUnavailableTaskRow | null
     return task ? buildPaidPendingFileUnavailableAlert(task, nowMs) : null
+  }
+
+  if (type === 'feedback_pending') {
+    const rows = await prisma.feedbackTicket.findMany({
+      where: PENDING_AI_CONTENT_FEEDBACK,
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    })
+    return buildPendingFeedbackAlert({ count: rows.length, earliest: rows[0]?.createdAt ?? null })
   }
 
   const terminal = (await prisma.terminal.findUnique({

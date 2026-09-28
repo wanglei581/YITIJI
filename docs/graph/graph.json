@@ -573,6 +573,7 @@
         "method": "GET",
         "models": [
           "AlertDisposition",
+          "FeedbackTicket",
           "PrintTask",
           "Terminal",
           "TerminalHeartbeat"
@@ -595,6 +596,7 @@
         "models": [
           "AlertDisposition",
           "AuditLog",
+          "FeedbackTicket",
           "PrintTask",
           "Terminal",
           "TerminalHeartbeat",
@@ -3295,6 +3297,7 @@
         "method": "GET",
         "models": [
           "AlertDisposition",
+          "FeedbackTicket",
           "PrintTask",
           "Terminal",
           "TerminalHeartbeat"
@@ -16380,6 +16383,7 @@
           "FeedbackReply"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-feedback/member-feedback.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
