@@ -179,6 +179,19 @@ const legalConsentApi = {
   },
 
   /**
+   * 页面自己已经用勾选框问过录音同意（语音说简历的同意页）：录音同意直接记下，
+   * 年满 14 周岁仍要问一次（没声明过的话）。登录着就写账号，与模拟面试、小青共用这一次。
+   */
+  confirmVoiceConsent() {
+    return ensureScopes([aiAccess.AGE_SCOPE]).then(() => {
+      const fresh = !aiAccess.isDeclared(aiAccess.VOICE_SCOPE);
+      aiAccess.markDeclared(aiAccess.VOICE_SCOPE);
+      if (fresh && auth.isLoggedIn()) return grantAiConsent(aiAccess.VOICE_SCOPE).catch(() => null);
+      return null;
+    });
+  },
+
+  /**
    * 登录成功之后对一次账：登录页的勾选行写着「并确认已年满 14 周岁」，登录即声明。
    *   - 服务端已同意 → 本机也记上；
    *   - 服务端记着录音同意已撤回 → 以撤回为准，清掉本机旧记录，不替用户重新同意；

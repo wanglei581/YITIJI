@@ -25,14 +25,13 @@
     <view class="card rise-d2"><view class="card-inner">
       <view class="cs-head">
         <text class="ficon i-info cs-ic"></text>
-        <text class="cs-title">录音只做这四件事</text>
+        <text class="cs-title">录音前先说清楚这五件事</text>
       </view>
+      <!-- 与模拟面试、小青共用同一份录音同意（utils/ai-access.js 的 VOICE_CONSENT_ITEMS），同意一次三处都算。 -->
       <view class="cs-list">
-        <view class="cs-item"><text class="ficon i-check cs-dot"></text><text class="cs-text">只把你说的话转成文字，方便填简历。</text></view>
-        <view class="cs-item"><text class="ficon i-check cs-dot"></text><text class="cs-text">不保存音频。转写完这段录音就丢掉。</text></view>
-        <view class="cs-item"><text class="ficon i-check cs-dot"></text><text class="cs-text">不给企业。本平台不代收简历，也不代为投递。</text></view>
-        <view class="cs-item"><text class="ficon i-check cs-dot"></text><text class="cs-text">不用于声纹识别，也不拿去训练。</text></view>
+        <view class="cs-item" wx:for="{{voiceItems}}" wx:key="*this"><text class="ficon i-check cs-dot"></text><text class="cs-text">{{item}}</text></view>
       </view>
+      <view wx:if="{{voiceAgreedBefore}}" class="cs-before">你之前已经同意过录音（在模拟面试或小青那里），不想用了可以到「隐私与数据」撤回。</view>
     </view></view>
 
     <view class="card rise-d3"><view class="card-inner">
@@ -41,7 +40,7 @@
             aria-label="{{consentChecked ? '已同意录音转写' : '同意录音转写，必选才能试音'}}">
         <view class="cb {{consentChecked ? 'on' : ''}}"><text wx:if="{{consentChecked}}" class="ficon i-check"></text></view>
         <view class="cb-body">
-          <view class="cb-title">我同意按上面四条使用麦克风（必选才能录音）</view>
+          <view class="cb-title">我同意按上面五条使用麦克风（必选才能录音）</view>
           <view class="cb-desc">这是录音同意，不是隐私政策。不勾选就用手打，简历照样能做。</view>
         </view>
       </view>

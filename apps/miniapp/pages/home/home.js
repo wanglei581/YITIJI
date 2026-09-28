@@ -94,6 +94,13 @@ Page({
     wx.switchTab({ url: '/pages/ai/ai' })
   },
 
+  // 页脚两条法务文档：只放这两类，别的类型不从首页开。
+  tapLegal(e) {
+    const type = e.currentTarget.dataset.type
+    if (type !== 'operator_info' && type !== 'ai_disclaimer') return
+    wx.navigateTo({ url: `/pages/legal/legal?type=${type}` })
+  },
+
   onShareAppMessage() {
     return {
       title: '职易达 · AI 简历与打印服务',

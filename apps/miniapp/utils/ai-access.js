@@ -79,6 +79,13 @@ function isDeclared(scope) {
   return !!meta && !!item && item.version === meta.version;
 }
 
+/** 本机按当前版本声明的时间（毫秒），没有则 0。只用于显示。 */
+function declaredAt(scope) {
+  if (!isDeclared(scope)) return 0;
+  const at = Number(readAll()[scope].at);
+  return Number.isFinite(at) && at > 0 ? at : 0;
+}
+
 /** @returns {boolean} 写进去并读回来才算记下 */
 function markDeclared(scope) {
   const meta = SCOPES[scope];
@@ -213,6 +220,7 @@ module.exports = {
   DECLINED_CODES,
   isDeclined,
   isDeclared,
+  declaredAt,
   markDeclared,
   clearDeclared,
   declarationHeaders,

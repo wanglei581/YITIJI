@@ -80,6 +80,10 @@ page { height: 100%; background: #eef4ff; }
 .launch-back-icon { width: 20rpx; height: 20rpx; margin-right: 9rpx; transform: rotate(180deg); }
 
 .launch-legal { padding-top: 4rpx; color: var(--faint); font-size: 20rpx; line-height: 1.7; text-align: center; }
+/* 协议未发布（C4）：按钮上方一张说明卡，写清为什么不能登录、不登录还能做什么 */
+.launch-blocked { margin-bottom: 18rpx; padding: 20rpx 22rpx; border-radius: var(--r-sm); background: var(--warn-soft); }
+.lb-t { font-size: var(--fs-base); font-weight: 700; color: var(--wheat-deep); line-height: 1.5; }
+.lb-d { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.6; }
 /* 实测 348x23 → 96rpx=48px */
 .launch-agree { min-height: 96rpx; display: flex; align-items: center; justify-content: center; gap: 10rpx; color: var(--muted); }
 .launch-check { width: 30rpx; height: 30rpx; border-radius: 9rpx; border: 2rpx solid var(--ghost); display: flex; align-items: center; justify-content: center; }
