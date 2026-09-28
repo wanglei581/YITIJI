@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Headers, Optional, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { Equals, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -17,7 +17,7 @@ import {
 import { POLICY_RULE_MANUAL_MODE, type PolicyRuleMatchMode } from './policy-eligibility.types'
 import { ReviewActionDto } from '../jobs/dto/review.dto'
 import { PartnerUnpublishActionDto } from '../jobs/dto/publish.dto'
-import { PolicyScopeService } from './policy-scope.service'
+import { PolicyScopeService, resolvePolicyScope } from './policy-scope.service'
 
 /**
  * 政策服务(阶段1D)。
@@ -100,7 +100,7 @@ export class PoliciesController {
   constructor(
     private readonly policies: PoliciesService,
     private readonly eligibility: PolicyEligibilityService,
-    private readonly policyScope: PolicyScopeService,
+    @Optional() private readonly policyScope?: PolicyScopeService,
   ) {}
 
 
@@ -116,7 +116,7 @@ export class PoliciesController {
     @Headers('x-terminal-id') terminalId?: string,
     @Headers('x-terminal-session-token') sessionToken?: string,
   ) {
-    return this.policyScope.resolve({ headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } }).then((scope) => this.policies.getPublishedPolicies({ kind, audience, category, page, pageSize, scope }))
+    return resolvePolicyScope(this.policyScope, { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } }).then((scope) => this.policies.getPublishedPolicies({ kind, audience, category, page, pageSize, scope }))
   }
 
   /**
@@ -144,7 +144,7 @@ export class PoliciesController {
     @Headers('x-terminal-id') terminalId?: string,
     @Headers('x-terminal-session-token') sessionToken?: string,
   ) {
-    const scope = await this.policyScope.resolve({ headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } })
+    const scope = await resolvePolicyScope(this.policyScope, { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } })
     return this.eligibility.checkEligibility({ answers: dto.answers, policyIds: dto.policyIds, scope })
   }
 
@@ -157,7 +157,7 @@ export class PoliciesController {
     @Headers('x-terminal-id') terminalId?: string,
     @Headers('x-terminal-session-token') sessionToken?: string,
   ) {
-    return this.policies.getPublishedPolicyById(id, await this.policyScope.resolve({ headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } }))
+    return this.policies.getPublishedPolicyById(id, await resolvePolicyScope(this.policyScope, { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } }))
   }
 
   // ── Partner ─────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Optional, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
 import {
   isRecruitmentContentHostingEnabled,
   recruitmentHostingDisabledException,
@@ -15,7 +15,7 @@ import {
   kioskJobBoardTerminalRef,
   type KioskJobBoardRequest,
 } from '../terminals/kiosk-job-board.service'
-import { PolicyScopeService } from '../policies/policy-scope.service'
+import { PolicyScopeService, resolvePolicyScope } from '../policies/policy-scope.service'
 
 /**
  * 会员收藏接口（Phase C-2C）。路由前缀 /api/v1/me/favorites。
@@ -34,7 +34,7 @@ export class MemberFavoritesController {
   constructor(
     private readonly favorites: MemberFavoritesService,
     private readonly jobBoard: KioskJobBoardService,
-    private readonly policyScopeService: PolicyScopeService,
+    @Optional() private readonly policyScopeService?: PolicyScopeService,
   ) {}
 
 
@@ -71,7 +71,7 @@ export class MemberFavoritesController {
         user.endUserId,
         parseMemberPageQuery(cursor, pageSize),
         targetType,
-        { ...(exclude ? { excludeTargetTypes: exclude } : {}), policyScope: await this.policyScopeService.resolve(req) },
+        { ...(exclude ? { excludeTargetTypes: exclude } : {}), policyScope: await resolvePolicyScope(this.policyScopeService, req) },
       ),
     )
   }

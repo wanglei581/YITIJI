@@ -25,3 +25,14 @@ export class PolicyScopeService {
     return terminal?.orgId ? { mode: 'org', orgId: terminal.orgId, state: 'bound' } : { mode: 'org', orgId: null, state: 'unbound' }
   }
 }
+
+/**
+ * 控制器上的 PolicyScopeService 是可选注入（与同文件的 jobBoard 一样，方便门禁按旧签名手动构造）：
+ * 缺省时按 all 处理，即合入前的行为。生产装配里四个模块都提供了它（verify:policy-scope 有断言）。
+ */
+export function resolvePolicyScope(
+  service: PolicyScopeService | undefined,
+  req?: KioskJobBoardRequest | { headers?: Record<string, string | string[] | undefined> },
+): Promise<PolicyPublicScope> {
+  return service ? service.resolve(req) : Promise.resolve({ mode: 'all' })
+}

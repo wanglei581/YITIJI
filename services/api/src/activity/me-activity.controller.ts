@@ -9,7 +9,7 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { AuditService } from '../audit/audit.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { ActivityService } from './activity.service'
-import { PolicyScopeService } from '../policies/policy-scope.service'
+import { PolicyScopeService, resolvePolicyScope } from '../policies/policy-scope.service'
 
 import { resolveClientIp } from '../common/client-ip'
 import {
@@ -45,7 +45,7 @@ export class MeActivityController {
   constructor(
     private readonly activity: ActivityService,
     private readonly audit: AuditService,
-    private readonly policyScopeService: PolicyScopeService,
+    @Optional() private readonly policyScopeService?: PolicyScopeService,
     @Optional() private readonly jobBoard?: KioskJobBoardService,
   ) {}
 
@@ -75,7 +75,7 @@ export class MeActivityController {
         user.endUserId,
         parseMemberPageQuery(cursor, pageSize),
         type,
-        { ...(exclude ? { excludeTargetTypes: exclude } : {}), policyScope: await this.policyScopeService.resolve(req) },
+        { ...(exclude ? { excludeTargetTypes: exclude } : {}), policyScope: await resolvePolicyScope(this.policyScopeService, req) },
       ),
     )
   }
@@ -99,7 +99,7 @@ export class MeActivityController {
         user.endUserId,
         parseMemberPageQuery(cursor, pageSize),
         type,
-        { ...(exclude ? { excludeTargetTypes: exclude } : {}), policyScope: await this.policyScopeService.resolve(req) },
+        { ...(exclude ? { excludeTargetTypes: exclude } : {}), policyScope: await resolvePolicyScope(this.policyScopeService, req) },
       ),
     )
   }
