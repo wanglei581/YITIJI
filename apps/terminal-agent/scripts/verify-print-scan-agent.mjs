@@ -71,40 +71,15 @@ mustContain(
 
 mustContain(
   instanceLock,
-  [
-    "openSync(pidFile, 'wx'",
-    'TASKLIST_FAIL_CLOSED',
-    'SUCCESSOR_PID_GUARD',
-    'OWNED_INODE_STILL_AT_PATH',
-    'UNPROVEN_PID_FAIL_CLOSED',
-    'STRICT_PID_PARSE',
-    'PUBLICATION_FAIL_NO_UNLINK',
-    'COMPLETE_PID_WRITE',
-    'STALE_LOCK_REQUIRES_OPERATOR',
-    'writeStartupDiagnosticSafely',
-    '不要先删除',
-    'diagnose-production-agent.ps1',
-    'failClosedOnLock',
-  ],
-  'instance lock must exclusive-create, fail-closed on unproven/foreign-stale pid, and never release a successor',
+  ['createServer(', 'server.listen', 'EADDRINUSE', 'ECONNREFUSED', 'agent.pid', 'machine_identity_unavailable', 'writeStartupDiagnosticSafely'],
+  'instance lock must use process-lifetime named pipe / Unix socket and fail closed',
 )
 
 mustNotContain(
   instanceLock,
-  ['If this is incorrect, delete'],
-  'duplicate/unavailable lock errors must not induce deleting the lock first',
+  ['stale_lock_requires_operator', 'renameSync', 'tasklist'],
+  'instance lock must not use PID stale-lock takeover or path rename',
 )
-
-{
-  const failClosed = instanceLock.indexOf('function failClosedOnLock')
-  const writeDiag = instanceLock.indexOf('writeStartupDiagnosticSafely', failClosed)
-  const exitCall = instanceLock.indexOf('process.exit(1)', failClosed)
-  if (failClosed >= 0 && writeDiag > failClosed && exitCall > writeDiag) {
-    pass('lock fail-closed must write startup diagnostic before exiting')
-  } else {
-    fail('lock fail-closed must write startup diagnostic before exiting')
-  }
-}
 
 mustContain(
   tempCleanup,
@@ -141,7 +116,7 @@ mustNotContain(
   const fieldRunbook = read('../../docs/acceptance/print-scan-field-execution-runbook.md')
   mustNotContain(
     recoveryRunsheet,
-    ['新进程可以接管', '崩溃后 PID 失效'],
+    ['新进程可以接管', '崩溃后 PID 失效', 'stale_lock_requires_operator'],
     'onsite recovery runsheet must not claim crash auto-takeover of the instance lock',
   )
   mustNotContain(
@@ -151,17 +126,17 @@ mustNotContain(
   )
   mustContain(
     recoveryRunsheet,
-    ['不要先删除', 'stale_lock_requires_operator', 'DEVICE', 'NO-GO', 'diagnose-production-agent.ps1'],
+    ['进程退出后由操作系统释放', 'agent.pid', 'DEVICE', 'NO-GO'],
     'onsite recovery runsheet must describe fail-closed lock recovery and remaining DEVICE NO-GO',
   )
   mustContain(
     fieldRunbook,
-    ['不要先删除', 'diagnose-production-agent.ps1', 'stale_lock_requires_operator'],
+    ['进程退出后由操作系统释放', 'agent.pid'],
     'print-scan field runbook must require diagnosis before any operator lock removal',
   )
   mustContain(
     hostRunbook,
-    ['不要先删除', 'stale_lock_requires_operator', 'NO-GO'],
+    ['进程退出后由操作系统释放', 'agent.pid', 'NO-GO'],
     'host acceptance runbook must keep lock recovery fail-closed and DEVICE unproven',
   )
 }

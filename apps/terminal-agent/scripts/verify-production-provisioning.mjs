@@ -142,28 +142,13 @@ assert.match(
 )
 assert.match(
   fieldEvidence,
-  /5\.3-11L/,
-  'field evidence collector must capture instance-lock evidence',
+  /agent\.pid/,
+  'field evidence collector must capture the diagnostic agent.pid path',
 )
-assert.match(
+assert.doesNotMatch(
   fieldEvidence,
-  /不要先删除/,
-  'field evidence collector must tell the operator not to delete the lock first',
-)
-assert.match(
-  fieldEvidence,
-  /tasklist\.exe/,
-  'field evidence collector must record tasklist result for the lock PID',
-)
-assert.match(
-  fieldEvidence,
-  /Get-StrictLockPidParse/,
-  'field evidence collector must strictly parse the lock PID',
-)
-assert.match(
-  fieldEvidence,
-  /Get-LockPathKind/,
-  'field evidence collector must record lock path kind',
+  /stale_lock_requires_operator/,
+  'field evidence collector must not prescribe PID stale-lock cleanup',
 )
 assert.doesNotMatch(
   fieldEvidence,

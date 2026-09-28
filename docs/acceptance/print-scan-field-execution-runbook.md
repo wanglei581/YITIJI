@@ -418,43 +418,15 @@ pnpm --filter terminal-agent agent 2>&1 | Tee-Object (Join-Path $EvidenceRoot "P
 
 恢复：
 
-先在窗口 B 中按 `Ctrl+C` 停止降级 Agent，确认该进程退出后再执行恢复。正常退出应自行释放
-`agent.pid`；强杀、断电或崩溃可能留下外来死 PID 锁，新 Agent 会以
-`stale_lock_requires_operator` 拒绝启动，**不会自动接管**。**不要先删除。** 先核验服务/进程，
-运行 `diagnose-production-agent.ps1`。目录 / junction / symlink 占用锁路径时保持不动并升级。
-只有诊断输出 `lockClearanceEligibility=eligible_for_operator_review`，且服务已停止、锁路径是普通文件、
-严格 PID 可解析、`tasklist` 退出码 0 且 PID 未列出时，才允许人工清锁。`tasklist` 失败不得当成可删。
-干净 `Stop-Service` 是否留下锁是条件 P0，必须 Windows 实测，不得在 macOS 推断。本项 **DEVICE 仍 NO-GO**，
-直到 `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯留下证据。
+先停止降级 Agent，确认进程退出后再启动服务。进程生命周期锁由 Windows 命名管道释放；POSIX 开发环境使用 Unix 域套接字，残留套接字由启动时探测并清理。`agent.pid` 仅记录启动 PID，残留文件不参与互斥，也不需要删除。启动失败时检查服务状态、命名管道或 Unix 套接字，并保留诊断文件。
+
+Windows 管道名包含 `%ProgramData%\AIJobPrintAgent\instance-id` 中的安装随机标识；标识缺失或无效时 fail-closed。DEVICE 仍 NO-GO，直到真机完成强杀、断电、重启和双开验证。
 
 ```powershell
-# Read-only first. Do not delete the lock in this step.
+# 只读取证：不要删除 agent.pid。
+Get-Service | Where-Object { $_.Name -match 'AIJob|aijobprintagent' } | Format-List Name, Status, StartType
+Get-Process | Where-Object { $_.ProcessName -match 'node|WinSW|aijobprint' } | Format-Table Id, ProcessName
 powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\diagnose-production-agent.ps1
-$AgentDataDir = Join-Path $env:PROGRAMDATA "AIJobPrintAgent"
-$AgentPidPath = Join-Path $AgentDataDir "agent.pid"
-$Services = Get-CimInstance Win32_Service | Where-Object {
-  $_.Name -in @("AIJobPrintAgent", "aijobprintagent.exe") -or $_.DisplayName -eq "AIJobPrintAgent"
-}
-if ($Services | Where-Object { $_.State -ne "Stopped" }) {
-  throw "Stop every AIJobPrintAgent service before removing $AgentPidPath"
-}
-$LockItem = Get-Item -LiteralPath $AgentPidPath -Force -ErrorAction Stop
-if ($LockItem.PSIsContainer -or ($LockItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-  throw "Lock path is not a regular file; leave it untouched and escalate: $AgentPidPath"
-}
-$LockPidRaw = [System.IO.File]::ReadAllText($AgentPidPath)
-if ($LockPidRaw -cnotmatch '^[1-9][0-9]{0,9}\n?$') {
-  throw "Lock PID is not strictly valid; preserve the file and escalate: $AgentPidPath"
-}
-$LockPid = [int64]$Matches[1]
-$Tasklist = & "$env:SystemRoot\System32\tasklist.exe" /FI "PID eq $LockPid" /FO CSV /NH 2>&1 | Out-String
-if ($LASTEXITCODE -ne 0) {
-  throw "tasklist failed; do not remove $AgentPidPath"
-}
-if ($Tasklist.Contains(',' + '"' + $LockPid + '"' + ',')) {
-  throw "PID $LockPid still exists; do not remove $AgentPidPath"
-}
-Remove-Item -LiteralPath $AgentPidPath
 ```
 
 不得同时删除 `agent.db`、`agent.token` 或配置文件；清锁后只启动一个 Agent，并保存服务状态、锁内
@@ -555,3 +527,6 @@ Mac：只能证明代码、CI、迁移脚本和证据包准备就绪。
 Windows：证明 Terminal Agent、奔图真机、降级恢复、隐私删除和异常恢复。
 未完成 Windows 主机 PS-G3 / PS-G4 前，不得宣称打印扫描商用全闭环完成。
 ```
+
+
+> 2026-09-28 真机-8：单实例互斥由 Windows 命名管道或 POSIX Unix 域套接字持有，进程退出后由操作系统释放（包括强杀、断电后的系统回收）。`agent.pid` 仅写入启动 PID 供诊断，残留文件不阻止启动，也不应手工删除。Windows 管道名包含安装时写入 `%ProgramData%\AIJobPrintAgent\instance-id` 的随机标识；读取不到标识时 fail-closed。现场验证应记录第二实例被拒、强杀后自动启动、双开只有一个成功，以及残留 `agent.pid` 仍能启动。

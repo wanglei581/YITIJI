@@ -173,6 +173,11 @@ jobs:
           & apps/terminal-agent/installer/build-msi.ps1
           & apps/terminal-agent/installer/build-exe.ps1
 
+      - name: Verify process lifetime singleton
+        shell: pwsh
+        working-directory: apps/terminal-agent
+        run: pnpm verify:singleton-process
+
       - name: Verify Windows PrintService completion correlation
         shell: powershell
         working-directory: apps/terminal-agent
