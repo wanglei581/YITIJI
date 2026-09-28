@@ -637,7 +637,9 @@ test('legal document returns to the page it was opened from @w5-kiosk', async ({
   const back = page.getByRole('button', { name: '返回上一页', exact: true }).first()
   await expect(back).toBeVisible()
   await back.click()
-  await expect(page).toHaveURL(/\/help$/)
+  // 帮助页照稿 06 把所选分类写进地址（?topic=）；「打开时的那一页」就是隐私分类，不是帮助首页。
+  await expect(page).toHaveURL(/\/help\?topic=privacy$/)
+  await expect(page.getByRole('button', { name: /文件会保存多久/ })).toBeVisible()
   expect(errors).toEqual([])
 })
 
