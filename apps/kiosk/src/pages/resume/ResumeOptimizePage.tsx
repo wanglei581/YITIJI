@@ -147,7 +147,9 @@ export function ResumeOptimizePage() {
     setDecisions(applied.decisions)
     markEdited()
   }
-  const openCompare = () => requestLeave(() => navigate('/resume/optimize/compare', { state: { taskId, accessToken, decisions, existingOnly } }))
+  const openCompare = (focusIndex?: number) => requestLeave(() => navigate('/resume/optimize/compare', {
+    state: { taskId, accessToken, decisions, existingOnly, ...(typeof focusIndex === 'number' ? { focusIndex } : {}) },
+  }))
   const compareReturn = useCompareDecisionsReturn({
     state, modules, optimizedResume, decisions, ready: editorOpen,
     apply: (changes) => {
@@ -237,7 +239,7 @@ export function ResumeOptimizePage() {
       {editorOpen && showOverview && (
         <div className="qx-opt-cta">
           <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('editor')}>编辑并导出</button>
-          <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-optimize-primary" onClick={openCompare}>
+          <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-optimize-primary" onClick={() => openCompare()}>
             逐条处理这 {modules.length} 条<em aria-hidden="true">→</em>
           </button>
         </div>
@@ -308,7 +310,7 @@ export function ResumeOptimizePage() {
             choicePending={choicePending}
             draftUpdatedAt={draft.remoteDraft?.updatedAt}
             onContinue={handleContinueDraft}
-            onRestart={() => { setDecisions({}); draft.requestOverwrite(); setDraftAccepted(true); setWorkView('editor') }}
+            onRestart={() => { setDecisions({}); draft.requestOverwrite(); setDraftAccepted(true); setWorkView('overview') }}
             saveStatus={draft.status}
             savedAt={draft.savedAt}
           />
@@ -326,6 +328,9 @@ export function ResumeOptimizePage() {
             onManual={() => requestLeave(() => navigate('/resume/generate'))}
             onReport={() => requestLeave(goToReport)}
           />
+        )}
+        {editorOpen && resume && assembled && !showOverview && modules.length === 0 && (
+          <p className="qx-opt-nomods" role="note">这份结果没有需要逐条对照的建议，下面直接是优化版全文，核对后导出。</p>
         )}
         {editorOpen && resume && assembled && !showOverview && (
           <OptimizeWorkArea
@@ -364,7 +369,7 @@ export function ResumeOptimizePage() {
             token={token}
             onDecisionChange={handleDecisionChange}
             onResumeChange={(next) => { markEdited(); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setOptimizedResume(next) }}
-            onCompare={openCompare}
+            onCompare={() => openCompare()}
             onAiAdjust={(action) => { void handleAiAdjust(action) }}
             onUndoAi={() => { setOptimizedResume(lastResumeBeforeAiAdjust!); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setExported(null); setIsDirty(true) }}
             onLayoutChange={handleLayoutChange}

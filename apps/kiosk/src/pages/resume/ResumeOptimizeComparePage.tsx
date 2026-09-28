@@ -56,7 +56,11 @@ export function ResumeOptimizeComparePage() {
   const [outage, setOutage] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [retryNonce, setRetryNonce] = useState(0)
-  const [currentIndex, setCurrentIndex] = useState(0)
+  // 从总览点某一条进来时，直接停在那一条（state.focusIndex）；没带或越界就从第 1 条开始。
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const focus = typeof state?.focusIndex === 'number' ? Math.floor(state.focusIndex) : 0
+    return focus > 0 ? focus : 0
+  })
   const [decisions, setDecisions] = useState<ResumeCompareDecisions>(() => initialDecisionsFrom(state))
   const [confirmedByModule, setConfirmedByModule] = useState<Record<string, string[]>>({})
   const [customByModule, setCustomByModule] = useState<Record<string, string>>({})
@@ -112,6 +116,9 @@ export function ResumeOptimizeComparePage() {
     [loadedTaskId, modules, taskId],
   )
   const stats = decisionStats(items, decisions)
+  useEffect(() => {
+    if (items.length > 0 && currentIndex >= items.length) setCurrentIndex(0)
+  }, [items.length, currentIndex])
   const current = items[currentIndex]
   const keyAt = (index: number) => moduleKeyOf(items[index], index)
   const isDemoResult = providerName === 'mock'

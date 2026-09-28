@@ -23,7 +23,7 @@ export function OptimizeOverview(props: {
   disabled: boolean
   onDecisionChange: (key: string, next: ResumeModuleDecision) => void
   onBatch: (next: ResumeModuleDecision) => void
-  onCompare: () => void
+  onCompare: (focusIndex?: number) => void
   onEditor: () => void
   onManual: () => void
   onReport: () => void
@@ -72,7 +72,7 @@ export function OptimizeOverview(props: {
             disabled={props.disabled || originalCount === total}
             onClick={() => props.onBatch('original')}
           >
-            全部保留原文<small>导出时全部用你原来的句子</small>
+            全部保留原文<small>这几条都换回你原来的句子</small>
           </button>
         </div>
       </section>
@@ -93,7 +93,7 @@ export function OptimizeOverview(props: {
                 <button
                   type="button"
                   className="qx-opt-mod-open"
-                  onClick={props.onCompare}
+                  onClick={() => props.onCompare(row.index)}
                   aria-label={`第 ${row.index + 1} 条 ${title}，当前${DECISION_LABEL[row.decision]}，去逐条对照`}
                 >
                   <i className="no" aria-hidden="true">{row.index + 1}</i>
@@ -140,8 +140,8 @@ export function OptimizeOverview(props: {
             <small>排版 · 模板 · 导出</small>
           </button>
           <div className="qx-opt-need">
-            <span>· 上面的选择会带进编辑区：选了「保留原文」的，导出时用你原来的句子</span>
-            <span>· 只有编辑区里的内容进入导出，导出前要逐项确认事实</span>
+            <span>· 上面的选择已经写进编辑区里的这一份：选了「保留原文」的几条，用你原来的句子</span>
+            <span>· 导出的就是编辑区里的这一份，你还可以再改；导出前要逐项确认事实</span>
             <span>· PDF 可以进打印确认；Word、TXT、Markdown 先保存到手机</span>
           </div>
         </div>

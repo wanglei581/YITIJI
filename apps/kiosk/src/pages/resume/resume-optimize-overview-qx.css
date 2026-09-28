@@ -271,6 +271,18 @@
 .qx-opt-row .tx b { display: block; font-size: var(--qx-fs-body); font-weight: 800; }
 .qx-opt-row .tx span { display: block; margin-top: 4px; color: var(--qx-ink-3); font-size: var(--qx-fs-aux); line-height: 1.4; }
 
+/* 没有可对照条目时直接进编辑区，这一句说明为什么这里没有总览。 */
+.qx-opt-nomods {
+  margin: 0;
+  padding: 12px 18px;
+  border: 1px solid var(--qx-teal-line);
+  border-radius: 16px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  font-size: var(--qx-fs-body);
+  line-height: 1.45;
+}
+
 /* 底部：总览是「编辑并导出」+「逐条处理这 N 条」，编辑区是「返回建议总览」+ 导出。整行排开。 */
 .qx-opt-cta {
   display: flex;

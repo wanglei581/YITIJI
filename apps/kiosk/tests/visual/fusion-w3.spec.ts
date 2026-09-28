@@ -1102,7 +1102,8 @@ test('R1 2.0 keeps resume controls below the read-only header and preserves the 
   for (const [route, ready] of [
     ['/resume/source', '.qx-rt-settings'],
     [`/resume/report?taskId=${taskId}`, '[data-testid="resume-report-counts"]'],
-    [`/resume/optimize?taskId=${taskId}`, '[role="tablist"][aria-label="优化工作区"]'],
+    // 稿 23（2.0）：总览与编辑区用按钮切换，没有页签；有可对照的条目时先落在总览。
+    [`/resume/optimize?taskId=${taskId}`, '[data-testid="resume-optimize-overview"]'],
     [`/resume/optimize/compare?taskId=${taskId}`, '[aria-label="改写选择统计"]'],
   ]) {
     await page.goto(route)
