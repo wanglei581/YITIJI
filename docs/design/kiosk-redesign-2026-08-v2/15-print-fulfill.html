@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!--
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
+- 9/28 留白：打印中态出纸示意卡里，「正在打印」贴示意图上沿、取纸说明贴下沿，右半边不再空一整段。只改样式。
 -->
 <!-- 青序流光 2.0 · 出纸页：只改字阶（规则 2）与两句断行；英文眉题改「出纸 · 取件」；去掉「系统」一词（规则 4）。版式不动。
      原稿：../kiosk-redesign-2026-08/15-print-fulfill.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
@@ -287,6 +288,11 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important;}
 .clear-s{font-size:24px!important}
 .demo-tab,.demo-panel{display:none!important}
 .help-ai{display:flex;align-items:center;justify-content:flex-end;min-height:56px;margin-top:6px;padding:0 8px;color:var(--teal-d,#157a67);font-size:22px;font-weight:650;text-decoration:none}
+/* 9/28 留白（产品负责人：一屏不许留大片空白；不加区块、不改结构、字阶不做大）
+   打印中：出纸示意卡右边的两段字原来挤在正中，下面连着「你的文件，走完就清」一整段右半边都空着（285px）。
+   改成「正在打印」贴出纸示意图上沿、取纸说明贴下沿，和左边的示意图上下对齐。 */
+#body-root[data-state="printing"] .out-card{align-items:stretch}
+#body-root[data-state="printing"] .out-main{display:flex;flex-direction:column;justify-content:space-between;padding:6px 0 4px}
 </style>
 </head>
 <body>

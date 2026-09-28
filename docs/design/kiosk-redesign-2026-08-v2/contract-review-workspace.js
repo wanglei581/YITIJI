@@ -179,7 +179,7 @@ function channelSeg (active) {
 function qrPanel () {
   return '<div class="qrpanel">' +
     '<div class="qrbox" data-testid="' + tid('qr-slot') + '">' + svg('qr', 148) +
-    '<span>二维码在运行时由扫码这次上传生成<br>静态原型不生成可扫描图形</span></div>' +
+    '<span>二维码在办理时生成<br>这里是示例码，扫不出来</span></div>' +
     '<div class="qrside"><h3>用手机把合同传上来</h3>' +
     steps([
       '手机扫码，打开本次这次上传',

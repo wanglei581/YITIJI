@@ -62,6 +62,7 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offse
 </style>
 <!--
 9/28 逐状态检查修压字
+9/28 留白：卡片行高按内容定（八、九张卡 250px，「先选目标」态 220–236px），剩余高度平分到「可办事项」上方、卡片与常用入口之间、常用入口下方；六张卡的服务台改两列三行（原来一行 400px 的空盒没了），七张卡的最后一张占满一行；岗位中心「先选目标」态深色导言与卡片内边距恢复常态。只动样式，卡片文字与 const H 一个字没改（服务台规格由此抽取）。
 青序流光 2.0 · 16 服务中心（hub=resume，default 有八张卡）
 规则 1：未展开的「先选目标」层用 display:none，避免顶上藏着可点链接；底部三 Tab 可回首页。
 规则 2：卡片标题 28，说明 21，眉题和状态 20–21，导航本来就是 21。
@@ -109,6 +110,25 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offse
 .screen[data-card-count="9"][data-state="first"] .quick-label{margin-top:6px;height:auto}
 .screen[data-card-count="9"][data-state="first"] .quick{margin-top:6px;height:auto;min-height:80px}
 .screen[data-card-count="9"][data-state="first"] .truth{padding:10px 36px;min-height:0}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间；卡片不许拉成空盒）
+   原先卡片行高写死（六张卡的服务台一行 400px），卡里文字下面空一大截，剩下的高度又堆在常用入口下面。
+   现在卡片按内容定高；剩下的高度平分到三处：可办事项上方、卡片与常用入口之间、常用入口下方。
+   六张卡改两列三行（与首页两列卡片同一种排法），七张卡的最后一张占满一行，不留空格子。卡片文字一个字没改。 */
+.section-head,.quick-label{flex:none}
+.section-head{margin-top:auto}
+.grid{margin-bottom:auto}
+.quick{margin-bottom:auto}
+.screen[data-card-count] .grid{--card-row-height:250px}
+.screen[data-card-count][data-state="first"] .grid{--card-row-height:220px}
+.screen[data-card-count="6"] .grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,var(--card-row-height));--card-row-height:236px}
+.screen[data-card-count="6"][data-state="first"] .grid{--card-row-height:220px}
+.grid .card:nth-child(7):last-child{grid-column:1/-1}
+.screen[data-card-count="7"] .grid{grid-template-rows:repeat(2,var(--card-row-height)) 180px}
+.screen[data-card-count="7"][data-state="first"] .grid{grid-template-rows:repeat(2,var(--card-row-height)) 170px}
+/* 岗位中心「先选目标」：保留上一轮收紧的提示条、说明条与常用入口；深色导言与卡片内边距恢复成和其它态一样 */
+.screen[data-card-count="9"][data-state="first"] .hero{padding:28px 42px 26px;min-height:216px}
+.screen[data-card-count="9"][data-state="first"] .card{padding:18px;gap:9px}
+.screen[data-card-count="9"][data-state="first"] .grid{--card-row-height:236px}
 </style>
 </head>
 <body>
