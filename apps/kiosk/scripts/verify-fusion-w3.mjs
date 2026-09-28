@@ -247,7 +247,19 @@ for (const path of ['src/pages/resume/CareerPlanPage.tsx', 'src/pages/resume/Job
 }
 includes('src/pages/resume/JobFitActionsPage.tsx', 'data-kiosk-screen="resume-job-fit-actions"', 'resume-job-fit-actions exposes its stable landmark')
 check(!/KioskPageFrame|fusion-w3--assistant/.test(read('src/pages/assistant/AssistantPage.tsx')), 'assistant has left the V6 blue page frame')
-check(!read('src/pages/assistant/assistant-lightflow-shell.css').includes('.ui-kiosk-page-content'), 'assistant shell CSS no longer patches the V6 frame gutter')
+// 顾问页实际在用的样式：页面直接 import 的 css，加上它们各自 @import 的分片。按导入关系取，
+// 不写死文件名 —— 2026-09-28 换成青序样式后，这条曾经还在查一份已经没人引用的旧 shell css。
+const assistantDir = 'src/pages/assistant'
+const assistantCss = [...read(`${assistantDir}/AssistantPage.tsx`).matchAll(/import '\.\/([\w-]+\.css)'/g)].map((m) => m[1])
+const assistantActiveCss = [...new Set(assistantCss.flatMap((file) => [
+  file,
+  ...[...read(`${assistantDir}/${file}`).matchAll(/@import '\.\/([\w-]+\.css)'/g)].map((m) => m[1]),
+]))]
+check(assistantActiveCss.length > 0, 'assistant page imports its own stylesheet')
+check(
+  assistantActiveCss.every((file) => !read(`${assistantDir}/${file}`).includes('.ui-kiosk-page-content')),
+  `assistant CSS in use (${assistantActiveCss.join(', ')}) does not patch the V6 frame gutter`,
+)
 includes('src/layouts/KioskRoot.tsx', "'/assistant'", 'assistant route is registered as Qingxu-migrated')
 includes('src/layouts/KioskRoot.tsx', "'/resume/templates'", 'templates route is registered as Qingxu-migrated')
 check(!read('src/pages/resume/ResumeTemplateLibraryPage.tsx').includes('KioskStageFit'), 'templates does not scale the stage a second time inside KioskRoot')

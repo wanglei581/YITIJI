@@ -1199,7 +1199,10 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   api.abort('POST', '/api/v1/assistant/chat', 'internetdisconnected')
   await input.fill('再给一个建议')
   await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
-  await expect(page.getByText('AI 服务暂不可用，请稍后再试', { exact: true })).toBeVisible()
+  // 稿 05 的 reply-error 标题；断网时说的是断网，不笼统说「AI 暂不可用」
+  // （「AI 服务暂不可用」留给服务器只回了工程串的情况，见下面的用户话用例）。
+  await expect(page.getByText('请求失败，没有回答', { exact: true })).toBeVisible()
+  await expect(page.getByText('网络连接失败，请检查网络后重试', { exact: true })).toBeVisible()
 
   // 失败停在 failed，且降级是 ① manual —— 功能不消失，四条不依赖 AI 的真实入口在。
   await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'failed')
@@ -1399,7 +1402,10 @@ test('assistant submitting waits for a response and preserves manual entries @w3
   await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
   try {
     await expect(page.getByTestId('ai-cockpit-state-submitting')).toBeVisible()
-    await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'running')
+    // 第一问时还没有哪一次回答确认过 AI 可用（availability 为 unknown）。共享 useAiTask 的约定
+    // （src/ai/useAiTask.ts）是这时停在 idle，不把「在等回答」说成「AI 正在算」；等待由驾驶舱的
+    // submitting 态表达。确认可用之后的 running 在下面第二问里验。
+    await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'idle')
     await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(0)
     await expect(page.getByRole('progressbar')).toHaveCount(0)
     await expect(page.locator('.assistant-send')).toBeDisabled()
@@ -1408,6 +1414,25 @@ test('assistant submitting waits for a response and preserves manual entries @w3
     release()
   }
   await expect(page.getByTestId('ai-cockpit-state-reply-real')).toBeVisible()
+
+  // 第二问：上一轮是真 AI 回答，可用已确认，这时在等的回答才是 running。
+  let releaseSecond!: () => void
+  const waitingSecond = new Promise<void>((resolve) => { releaseSecond = resolve })
+  api.respondWith('POST', '/api/v1/assistant/chat', async () => {
+    await waitingSecond
+    return { status: 200, json: assistantReply }
+  })
+  await page.getByLabel('输入咨询问题').fill('还有别的写法吗？')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  try {
+    await expect(page.getByTestId('ai-cockpit-state-submitting')).toBeVisible()
+    await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'running')
+    await expect(page.locator('.assistant-ai-status')).toHaveAttribute('aria-busy', 'true')
+    await expect(page.getByRole('progressbar')).toHaveCount(0)
+  } finally {
+    releaseSecond()
+  }
+  await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'done')
 })
 
 test('assistant voice connecting can cancel and stops a late room response @w3-kiosk', async ({ page, api }) => {
