@@ -73,6 +73,18 @@ const PLAN_URL_STATES = new Set([
   'compare-all-covered', 'print-unavailable', 'expired',
 ])
 const ASSISTANT_DRIVEN = new Set(['default', 'composer', 'submitting', 'reply-real', 'reply-not-ai', 'reply-error'])
+// 这几态在稿里要另带参数才画得出来，不带就回落成别的态（9/28 收稿时各实现方报的漏检）：
+// 06 的主题页要 topic=，不带显示「没找到」；12 的取消两态要 cancel=ok|fail，不带显示「没有文件」；
+// 32 选定通道之后的各态要 channel=，不带回落成「待支付」或「通道不明」。
+const PAY_CHANNEL_STATES = [
+  'channel-selected', 'pending-scan', 'pending-qr', 'awaiting-code-confirmation', 'pending-verification',
+  'display-expired-reconciling', 'expired', 'attempt-failed', 'release-failed',
+]
+const STATE_QUERY: Record<string, Record<string, Record<string, string>>> = {
+  '06-help.html': { topic: { topic: 'print' } },
+  '12-file-source.html': { 'phone-cancel-failed': { cancel: 'fail' }, 'phone-cancelled': { cancel: 'ok' } },
+  '32-cashier.html': Object.fromEntries(PAY_CHANNEL_STATES.map((state) => [state, { channel: 'wechat' }])),
+}
 
 const CANONICAL_ROUTE: Record<string, string> = {
   '/print/material-check': '/print/desk?step=check',
@@ -344,9 +356,12 @@ function headerPipes(comment: string): string[] {
 function bundleOf(file: string): { html: string; source: string } {
   const html = fs.readFileSync(protoFile(file) ?? path.join(PROTO_DIR, file), 'utf8')
   let source = html
-  for (const match of html.matchAll(/src="([a-z0-9_-]+\.js)"/gi)) {
-    const side = protoFile(match[1])
-    if (side) source += `\n${fs.readFileSync(side, 'utf8')}`
+  // 同目录的脚本（v2 优先、缺的读原稿）和 v2 稿引用的原稿目录脚本（../kiosk-redesign-2026-08/x.js）都要读：
+  // 分区参数常写在原稿的共用脚本里，只读同目录的会把 48 这类页的参数名判错（9/28：48 一直被当成 ?screen=，实际是 ?tab=）。
+  for (const match of html.matchAll(/src="((?:\.\.\/kiosk-redesign-2026-08\/)?[a-z0-9_-]+\.js)"/gi)) {
+    const rel = match[1]
+    const side = rel.startsWith('../') ? path.join(PROTO_DIR, path.basename(rel)) : protoFile(rel)
+    if (side && fs.existsSync(side)) source += `\n${fs.readFileSync(side, 'utf8')}`
   }
   return { html, source }
 }
@@ -761,6 +776,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
       }
       // 07 的带内容态要 fixture=1 才渲染示例订单，不带时一律停在「正在读取」（9/28 留白整改时发现量错了态）。
       if (file.startsWith('07-')) extra.fixture = '1'
+      Object.assign(extra, STATE_QUERY[file]?.[pair.state] ?? {})
       targets.push({
         file,
         nn: file.slice(0, 2),
