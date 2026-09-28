@@ -1127,23 +1127,33 @@ assert.match(
  * sessionStorage 里 —— 里面有上一位的 live.controlToken 明文，以及 result.file
  * （文件名 + 那条签名内容链接）。下一位在这台机器上进 /scan，阶段直接从登记复水到
  * result，他看到的是上一位的扫描件。 */
+// 2026-09-28 商用收口 P0-5：打印出口的落点从 /print/confirm 改到 /print/material-check。
+// 扫描件是本人原件，生产强制 PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒；
+// 检查只在打印台材料检查里做。窗口从 200 放到 400 字符，是因为打印出口在离开前要先组文件、
+// 写打印材料会话（见下一条断言）；落点仍逐个钉死，放宽窗口不会让别的出口顶替这一处。
 for (const [handler, destination] of [
-  ['handlePrint', '/print/confirm'],
+  ['handlePrint', '/print/material-check'],
   ['handleDocuments', '/me/documents'],
   ['handleResumeAI', '/resume/parse'],
 ]) {
   assert.match(
     scanResult,
-    new RegExp(`const ${handler} = \\(\\) => \\{[\\s\\S]{0,200}?leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'`),
+    new RegExp(`const ${handler} = \\(\\) => \\{[\\s\\S]{0,400}?leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'`),
     `${handler}（落点 ${destination}）必须走 leaveScanFlow：撤服务端任务 → 清本机登记 → `
       + '再带着文件跳过去。裸 navigate 会把上一位的凭证与扫描件留在登记里给下一位复水',
   )
 }
 assert.match(
   scanResult,
-  /leaveScanFlow\('\/print\/confirm', \{\s*\n\s*state: \{/,
-  '清登记的同时必须把文件从路由 state 带过去：打印页读的是 location.state.file，'
-    + '不读扫描登记 —— 少了 state，清场就把这条去向弄断了',
+  /savePrintMaterialSession\(\{ file: printFile, source \}\)\s*\n\s*leaveScanFlow\('\/print\/material-check', \{\s*\n\s*state: \{ file: printFile, source \}/,
+  '清登记的同时必须把文件交给打印台：/print/material-check 会 replace 重定向到 /print/desk?step=check，'
+    + '重定向不转发路由 state，打印台只认打印材料会话 —— 所以离开之前先整份写会话，'
+    + '少了这一步或顺序反过来，清场就把这条去向弄断了',
+)
+assert.doesNotMatch(
+  scanResult,
+  /leaveScanFlow\('\/print\/confirm'/,
+  '扫描件是本人原件：生产隐私闸门要求先做完材料检查才建单，打印出口不得直达报价确认页',
 )
 assert.match(
   scanResult,

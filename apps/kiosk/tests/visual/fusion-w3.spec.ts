@@ -739,15 +739,11 @@ test('diagnosis failure prints the uploaded original through the print desk mate
   await page.getByTestId('resume-report-fail-exits').getByRole('button', { name: /打印我上传的原件/ }).click()
   await page.waitForURL(/\/print\/desk\?step=check$/)
   await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
+  // 带过去的是**这一份**：体检任务按上传结果的 fileId 建，预览画的是上传时那条签名内容链接。
+  // （W3 用例只走真实界面、不读写浏览器存储 —— verify-fusion-w3 钉着这一条，会话内容由 W2 / W5 用例核对。）
   expect((await inspectionCreated).postDataJSON()).toMatchObject({ kind: 'inspection', sourceFileId: uploadedResume.data.fileId })
   await expect(page.locator('.qpd-preview-meta strong')).toHaveText('求职简历.pdf')
-  const stored = await page.evaluate(() =>
-    JSON.parse(window.sessionStorage.getItem('ai-job-print:current-print-material-check') ?? 'null') as Record<string, unknown> | null,
-  )
-  expect(stored).toMatchObject({
-    source: 'resume',
-    file: { fileId: uploadedResume.data.fileId, fileUrl: uploadedResume.data.signedUrl, name: '求职简历.pdf', mimeType: 'application/pdf' },
-  })
+  await expect(page.getByTitle('求职简历.pdf 预览')).toHaveAttribute('data-preview-src', uploadedResume.data.signedUrl)
   expect(api.requestCount('POST', '/api/v1/orders/quote'), '原件检查完之前不报价').toBe(0)
 })
 
