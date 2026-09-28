@@ -172,6 +172,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
           pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
+          pnpm --filter @ai-job-print/kiosk verify:scan-quiet-period
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
           pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
           pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
@@ -354,6 +355,8 @@ jobs:
           pnpm run verify:scan-deletion-audit
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
           pnpm run verify:task-reliability
+          # Real child processes race for the process-lifetime singleton (Unix socket here, named pipe on Windows).
+          pnpm run verify:singleton-process
           # Injected download/wait seams only: download retry backoff, monitor window scaling, log masking contract.
           pnpm run verify:print-truth-hardening
           # Pure in-process scheduler control; proves wake coalescing without HTTP, DB, or hardware.
@@ -574,6 +577,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-device-config
           pnpm --filter @ai-job-print/api verify:device-fleet-overview
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:scan-quiet-period
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font
@@ -1019,6 +1023,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:scan-quiet-period
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font

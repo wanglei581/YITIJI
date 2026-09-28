@@ -1,229 +1,151 @@
 /**
- * agent/instance-lock.ts — Phase 8.1C (patched 8.2C-fix + exclusive create)
+ * Process-lifetime singleton.
  *
- * Single-instance guarantee using a PID file lock.
+ * Windows owns a named pipe for the lifetime of the process. POSIX development
+ * hosts use a Unix domain socket; a socket left by a crashed process is probed
+ * before it is removed. agent.pid is diagnostic data only and never gates startup.
  *
- * acquireLock() creates the PID file with wx (O_CREAT|O_EXCL). Concurrent
- * starters cannot both succeed. A live foreign pid is duplicate. A strictly
- * parsed dead foreign pid is fail-closed (`stale_lock_requires_operator`):
- * this process never unlinks, renames, truncates, overwrites, or retry-deletes
- * that directory entry. Empty, prefix, or corrupt PID bytes are unproven and
- * are never auto-removed. A leftover whose pid equals currentPid may be
- * reclaimed: one OS pid cannot name two live processes.
- *
- * Windows: `tasklist /FI "PID eq <pid>"` is authoritative. If tasklist
- * errors or exits nonzero, the pid is treated as alive (fail-closed).
- *
- * releaseLock() unlinks only when the path still names this process's
- * inode and pid. Foreign starters no longer delete a live entry to republish,
- * so owner release stays a guarded path unlink. A pid overwrite at the same
- * inode is still refused (SUCCESSOR_PID_GUARD).
- *
- * macOS/Linux tests do not prove Windows NTFS, share-delete, or inode uniqueness.
- *
- * Lock file paths:
- *   Windows: %ProgramData%\AIJobPrintAgent\agent.pid
- *   macOS:   $TMPDIR/AIJobPrintAgent/agent.pid
+ * Only the Windows path is the production guarantee: libuv creates the pipe with
+ * FILE_FLAG_FIRST_PIPE_INSTANCE, so a second server fails atomically (EADDRINUSE).
+ * The POSIX probe-unlink-listen sequence has a small race between two processes
+ * that both see a stale socket; it serves development hosts only.
  */
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import net from 'node:net'
+import os from 'node:os'
+import path from 'node:path'
+import { err, log } from '../logger'
+import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
-import { spawnSync } from 'child_process'
-import { log, err } from '../logger'
-import {
-  writeStartupDiagnosticSafely,
-  type StartupLockDiagnosticDetails,
-} from './startup-diagnostics'
+const PROGRAM_DATA_DIR = 'AIJobPrintAgent'
+const INSTANCE_ID_FILE = 'instance-id'
+const PID_FILE = 'agent.pid'
+const UNIX_SOCKET_FILE = 'agent.sock'
+const MACHINE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$/
 
-const MAX_ACQUIRE_ATTEMPTS = 8
-const STALE_RETRY_DELAY_MS = 20
-const LOCK_OPERATOR_DO_NOT_DELETE_FIRST = '不要先删除'
-const LOCK_OPERATOR_DIAGNOSE_SCRIPT = 'diagnose-production-agent.ps1'
-
-export interface InstanceLockTestHooks {
-  pid?: number
-  platform?: NodeJS.Platform
-  lockPath?: string
-  spawnSync?: typeof spawnSync
-  sleep?: (ms: number) => void
-  writeSync?: (fd: number, data: string) => number
-  fsyncSync?: (fd: number) => void
-}
-
-interface OwnedLock {
-  path: string
-  pid: number
-  fd: number
-  dev: number
-  ino: number
-}
-
+interface OwnedLock { endpoint: string; pidPath: string; unixSocket: boolean; server: net.Server }
 let ownedLock: OwnedLock | null = null
-let testHooks: InstanceLockTestHooks | undefined
 
-export function getLockPath(): string {
-  if (testHooks?.lockPath) return testHooks.lockPath
-  const base = process.env['PROGRAMDATA']
-    ? path.join(process.env['PROGRAMDATA'], 'AIJobPrintAgent')
-    : path.join(os.tmpdir(), 'AIJobPrintAgent')
-  return path.join(base, 'agent.pid')
+function stateDir(): string {
+  return path.join(process.env['PROGRAMDATA'] || os.tmpdir(), PROGRAM_DATA_DIR)
 }
 
-export function __setInstanceLockHooksForTests(hooks?: InstanceLockTestHooks): void {
-  testHooks = hooks
-}
+export function getLockPath(): string { return path.join(stateDir(), PID_FILE) }
+export function getInstanceIdentityPath(): string { return path.join(stateDir(), INSTANCE_ID_FILE) }
 
-export function __resetInstanceLockForTests(): void {
-  if (ownedLock) {
-    try {
-      fs.closeSync(ownedLock.fd)
-    } catch {
-      // ignore
+// 首次启动时由服务（LocalSystem）在只有 SYSTEM 与管理员可写的状态目录里生成随机标识。
+// 缺文件就生成；两个进程同时生成时独占创建只有一个成功，另一个读取它写好的那份；
+// 读得到但格式不对（被改过）仍然拒绝启动，绝不退回固定管道名。
+function createMachineIdentity(file: string): string {
+  const value = crypto.randomBytes(16).toString('hex')
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, `${value}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
+    return value
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      try { return fs.readFileSync(file, 'utf8').trim() } catch { /* fall through to fail-closed */ }
     }
-    ownedLock = null
+    throw new Error(`machine_identity_unavailable: cannot create ${file}`)
   }
-  testHooks = undefined
 }
 
-function currentPid(): number {
-  return testHooks?.pid ?? process.pid
-}
-
-function sleepSync(ms: number): void {
-  if (testHooks?.sleep) {
-    testHooks.sleep(ms)
-    return
+function readMachineIdentity(): string {
+  const file = getInstanceIdentityPath()
+  let value: string
+  try { value = fs.readFileSync(file, 'utf8').trim() }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error(`machine_identity_unavailable: cannot read ${file}`)
+    value = createMachineIdentity(file)
   }
-  if (ms <= 0) return
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+  if (!MACHINE_ID_RE.test(value)) throw new Error(`machine_identity_invalid: ${file}`)
+  return value
 }
 
-/**
- * Check whether a PID corresponds to a running process using OS-level tools.
- *
- * Windows: uses `tasklist /FI "PID eq <pid>"` — reliable regardless of privilege.
- * macOS/Linux: uses process.kill(pid, 0) which is accurate on POSIX.
- *
- * Returns true if the process is alive, false if dead / not found.
- */
-function isProcessAlive(pid: number): boolean {
-  const platform = testHooks?.platform ?? process.platform
-  if (platform === 'win32') {
-    const spawn = testHooks?.spawnSync ?? spawnSync
-    const result = spawn(
-      'tasklist',
-      ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'],
-      { encoding: 'utf-8', timeout: 4_000 },
-    )
-    if (result.error || result.status !== 0) {
-      // TASKLIST_FAIL_CLOSED: unavailable tasklist must never look like a dead pid.
-      return true
+// Unix 套接字路径有长度上限（macOS sun_path 104 字节、Linux 108 字节，含结尾 NUL）。超长时 libuv
+// 会静默截断路径再绑定，而清理残留时 unlink 用的是完整路径——删不到截断后的真文件，崩溃后
+// 就永远判成「重复实例」、再也起不来（2026-09-28 验收时在 107 字节的临时路径上实测复现）。
+// 所以超长时换成临时目录里按状态目录哈希命名的短路径；都放不下就明确拒绝，绝不静默截断。
+const MAX_UNIX_SOCKET_PATH_BYTES = 100
+
+function unixSocketPath(): string {
+  const preferred = path.join(stateDir(), UNIX_SOCKET_FILE)
+  const digest = crypto.createHash('sha256').update(stateDir()).digest('hex').slice(0, 16)
+  const shortName = `aijobprintagent-${digest}.sock`
+  for (const candidate of [preferred, path.join(os.tmpdir(), shortName), path.join('/tmp', shortName)]) {
+    if (Buffer.byteLength(candidate) <= MAX_UNIX_SOCKET_PATH_BYTES) return candidate
+  }
+  throw new Error(`socket_path_too_long: ${preferred}`)
+}
+
+function endpointFor(): { endpoint: string; unixSocket: boolean } {
+  if (process.platform === 'win32') {
+    // Never fall back to a fixed pipe name on an unprovisioned host.
+    return { endpoint: `\\\\.\\pipe\\AIJobPrintAgent-${readMachineIdentity()}`, unixSocket: false }
+  }
+  return { endpoint: unixSocketPath(), unixSocket: true }
+}
+
+function writePidDiagnostic(): void {
+  try {
+    fs.mkdirSync(stateDir(), { recursive: true })
+    fs.writeFileSync(getLockPath(), `${process.pid}\n`, { encoding: 'utf8', mode: 0o600 })
+  } catch (error) {
+    err(`instance-lock: could not write diagnostic agent.pid: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+function listen(server: net.Server, endpoint: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onError = (error: Error) => { server.removeListener('listening', onListening); reject(error) }
+    const onListening = () => { server.removeListener('error', onError); resolve() }
+    server.once('error', onError)
+    server.once('listening', onListening)
+    server.listen(endpoint)
+  })
+}
+
+function probeUnixSocket(endpoint: string): Promise<'live' | 'stale' | 'missing' | 'unavailable'> {
+  return new Promise((resolve) => {
+    const socket = net.createConnection(endpoint)
+    let settled = false
+    const finish = (result: 'live' | 'stale' | 'missing' | 'unavailable') => {
+      if (settled) return
+      settled = true
+      socket.destroy()
+      resolve(result)
     }
-    const stdout = (result.stdout ?? '').trim()
-    return stdout.includes(`,"${pid}",`)
-  }
-
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (e: unknown) {
-    const code = (e as NodeJS.ErrnoException).code
-    return code !== 'ESRCH'
-  }
+    socket.once('connect', () => finish('live'))
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ECONNREFUSED') finish('stale')
+      else if (error.code === 'ENOENT') finish('missing')
+      else finish('unavailable')
+    })
+  })
 }
 
-type LockInspection =
-  | { kind: 'missing' }
-  | { kind: 'not-regular' }
-  | { kind: 'file'; pid: number | null; dev: number; ino: number }
-
-function parseStrictLockPid(raw: string): number | null {
-  // STRICT_PID_PARSE: the whole file is one decimal pid, optional one trailing newline.
-  const match = /^([1-9][0-9]{0,9})\n?$/.exec(raw)
-  if (!match || match[1] === undefined) return null
-  const pid = Number(match[1])
-  if (!Number.isSafeInteger(pid) || pid <= 0) return null
-  return pid
-}
-
-function hasProvenRemovablePid(pid: number | null): pid is number {
-  // UNPROVEN_PID_FAIL_CLOSED: empty/corrupt/prefix pid is not a dead owner.
-  return pid !== null
-}
-
-function inspectLockFile(pidFile: string): LockInspection {
-  let stat: fs.Stats
-  try {
-    stat = fs.lstatSync(pidFile)
-  } catch (e: unknown) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { kind: 'missing' }
-    throw e
-  }
-  if (stat.isSymbolicLink() || !stat.isFile()) return { kind: 'not-regular' }
-
-  const nofollow = typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0
-  let fd: number | undefined
-  try {
-    fd = fs.openSync(pidFile, fs.constants.O_RDONLY | nofollow)
-    const opened = fs.fstatSync(fd)
-    if (!opened.isFile()) return { kind: 'not-regular' }
-    const raw = fs.readFileSync(fd, 'utf8')
-    return { kind: 'file', pid: parseStrictLockPid(raw), dev: opened.dev, ino: opened.ino }
-  } catch (e: unknown) {
-    const code = (e as NodeJS.ErrnoException).code
-    if (code === 'ENOENT') return { kind: 'missing' }
-    if (code === 'ELOOP') return { kind: 'not-regular' }
-    throw e
-  } finally {
-    if (fd !== undefined) fs.closeSync(fd)
-  }
-}
-
-function tryExclusiveCreate(pidFile: string, pid: number): OwnedLock | 'exists' | 'publication-failed' {
-  let fd: number | undefined
-  try {
-    fd = fs.openSync(pidFile, 'wx', 0o600)
-    const writeSync = testHooks?.writeSync ?? ((handle: number, data: string) => fs.writeSync(handle, data))
-    const fsyncSync = testHooks?.fsyncSync ?? ((handle: number) => fs.fsyncSync(handle))
-    const payload = `${pid}\n`
-    const written = writeSync(fd, payload)
-    // COMPLETE_PID_WRITE: a short write is publication failure, never a stale owner.
-    if (written !== Buffer.byteLength(payload, 'utf8')) {
-      const incomplete = new Error('incomplete pid write') as NodeJS.ErrnoException
-      incomplete.code = 'EIO'
-      throw incomplete
+// 绑定之后核对所有权：连回端点，读服务端报出的本进程令牌。POSIX 上「探测残留 → 删除 → 监听」
+// 两个进程同时做时，后到者会删掉先到者刚建好的套接字文件，两边都 listen 成功；核对时先到者
+// 连到的是后到者，令牌对不上就自行退出，于是只有真正占住路径的一个成功。
+function verifyOwnership(endpoint: string, token: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.createConnection(endpoint)
+    let data = ''
+    let settled = false
+    const finish = (owned: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      socket.destroy()
+      resolve(owned)
     }
-    fsyncSync(fd)
-    const st = fs.fstatSync(fd)
-    const owned: OwnedLock = { path: pidFile, pid, fd, dev: st.dev, ino: st.ino }
-    fd = undefined
-    return owned
-  } catch (e: unknown) {
-    if (fd !== undefined) {
-      try {
-        fs.closeSync(fd)
-      } catch {
-        // ignore
-      }
-    }
-    // PUBLICATION_FAIL_NO_UNLINK: never path-unlink an unproven entry.
-    const code = (e as NodeJS.ErrnoException).code
-    if (code === 'EEXIST' || code === 'EISDIR') return 'exists'
-    return 'publication-failed'
-  }
-}
-
-function tryRemoveOwnLock(pidFile: string, pid: number): boolean {
-  const again = inspectLockFile(pidFile)
-  if (again.kind === 'missing') return true
-  if (again.kind !== 'file' || again.pid !== pid) return false
-  try {
-    fs.unlinkSync(pidFile)
-    return true
-  } catch (e: unknown) {
-    return (e as NodeJS.ErrnoException).code === 'ENOENT'
-  }
+    const timer = setTimeout(() => finish(false), 2_000)
+    socket.setEncoding('utf8')
+    socket.on('data', (chunk: string) => { data += chunk })
+    socket.once('end', () => finish(data === token))
+    socket.once('error', () => finish(false))
+  })
 }
 
 export type LockAcquireResult =
@@ -231,167 +153,119 @@ export type LockAcquireResult =
   | { status: 'duplicate'; lockPath: string; existingPid: number }
   | { status: 'unavailable'; lockPath: string; reason: string }
 
-export function tryAcquireLock(): LockAcquireResult {
-  const pidFile = getLockPath()
-  const pid = currentPid()
-  if (ownedLock && ownedLock.path === pidFile && ownedLock.pid === pid) {
-    return { status: 'acquired', lockPath: pidFile }
-  }
-
-  fs.mkdirSync(path.dirname(pidFile), { recursive: true })
-
-  for (let attempt = 0; attempt < MAX_ACQUIRE_ATTEMPTS; attempt++) {
-    const created = tryExclusiveCreate(pidFile, pid)
-    if (created === 'publication-failed') {
-      return { status: 'unavailable', lockPath: pidFile, reason: 'lock_publication_failed' }
-    }
-    if (created !== 'exists') {
-      // OWNED_INODE_STILL_AT_PATH: only publish ownership if the path still
-      // names the inode we hold open after wx succeeded.
-      let disk: fs.Stats | undefined
-      try {
-        disk = fs.lstatSync(pidFile)
-      } catch {
-        disk = undefined
-      }
-      if (
-        !disk
-        || disk.isSymbolicLink()
-        || !disk.isFile()
-        || disk.dev !== created.dev
-        || disk.ino !== created.ino
-      ) {
-        try {
-          fs.closeSync(created.fd)
-        } catch {
-          // ignore
-        }
-        continue
-      }
-      ownedLock = created
-      return { status: 'acquired', lockPath: pidFile }
-    }
-
-    const existing = inspectLockFile(pidFile)
-    if (existing.kind === 'missing') continue
-    if (existing.kind === 'not-regular') {
-      return { status: 'unavailable', lockPath: pidFile, reason: 'lock_path_not_regular_file' }
-    }
-    if (!hasProvenRemovablePid(existing.pid)) {
-      return { status: 'unavailable', lockPath: pidFile, reason: 'lock_pid_unproven' }
-    }
-    if (existing.pid !== pid && isProcessAlive(existing.pid)) {
-      return { status: 'duplicate', lockPath: pidFile, existingPid: existing.pid }
-    }
-    if (existing.pid !== pid) {
-      // STALE_LOCK_REQUIRES_OPERATOR: never auto-remove a foreign dead pid file.
-      return { status: 'unavailable', lockPath: pidFile, reason: 'stale_lock_requires_operator' }
-    }
-
-    tryRemoveOwnLock(pidFile, pid)
-    sleepSync(STALE_RETRY_DELAY_MS)
-  }
-
-  return { status: 'unavailable', lockPath: pidFile, reason: 'acquire_attempts_exhausted' }
-}
-
-function collectLockDiagnosticDetails(
-  lockPath: string,
-  reason: string,
-): StartupLockDiagnosticDetails {
-  const fallback: StartupLockDiagnosticDetails = {
-    reason,
-    pathPresent: false,
-    pathKind: 'unavailable',
-    pidParsed: false,
-  }
+async function bindAndVerify(endpoint: string, unixSocket: boolean): Promise<LockAcquireResult> {
+  const token = crypto.randomBytes(16).toString('hex')
+  // 连接方随时可能在读令牌之前就断开（重复实例的探测就是连上即断），这时回令牌会报 EPIPE / ECONNRESET。
+  // 连接上的错误必须就地吞掉：没人接的 socket 错误会冒成 uncaughtException，Agent 主程序据此退出——
+  // 等于本机任何进程连一下管道再断开就能把持有者打挂（2026-09-29 Linux CI 实测，本机连续探测可复现）。
+  const server = net.createServer((socket) => {
+    socket.on('error', () => { /* client left before reading the token */ })
+    socket.end(token)
+  })
   try {
-    const st = fs.lstatSync(lockPath)
-    if (st.isSymbolicLink()) {
-      return { reason, pathPresent: true, pathKind: 'symlink', pidParsed: false }
-    }
-    if (st.isDirectory()) {
-      return { reason, pathPresent: true, pathKind: 'directory', pidParsed: false }
-    }
-    if (!st.isFile()) {
-      return { reason, pathPresent: true, pathKind: 'not_regular', pidParsed: false }
-    }
-    const existing = inspectLockFile(lockPath)
-    return {
-      reason,
-      pathPresent: true,
-      pathKind: 'regular_file',
-      pidParsed: existing.kind === 'file' && existing.pid !== null,
-    }
-  } catch (e: unknown) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { reason, pathPresent: false, pathKind: 'missing', pidParsed: false }
-    }
-    return fallback
+    await listen(server, endpoint)
+  } catch (error) {
+    server.close()
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'EADDRINUSE') return { status: 'duplicate', lockPath: endpoint, existingPid: 0 }
+    return { status: 'unavailable', lockPath: endpoint, reason: `listen_${code ?? 'failed'}` }
   }
+  // listen() 建立后已摘掉临时的 error 监听；此后端点自身的错误（如 accept 失败）只记日志，不能把 Agent 带崩。
+  server.on('error', (error) => err(`instance-lock: singleton endpoint error: ${error.message}`))
+  if (!(await verifyOwnership(endpoint, token))) {
+    // 路径已归别的实例：只关自己的监听，不删路径（它属于胜出者）。
+    server.close()
+    return { status: 'duplicate', lockPath: endpoint, existingPid: 0 }
+  }
+  ownedLock = { server, endpoint, pidPath: getLockPath(), unixSocket }
+  writePidDiagnostic()
+  return { status: 'acquired', lockPath: endpoint }
 }
 
-function failClosedOnLock(result: Exclude<LockAcquireResult, { status: 'acquired' }>): never {
+async function acquireUnixSocket(endpoint: string): Promise<LockAcquireResult> {
+  const probe = await probeUnixSocket(endpoint)
+  if (probe === 'live') return { status: 'duplicate', lockPath: endpoint, existingPid: 0 }
+  if (probe === 'unavailable') return { status: 'unavailable', lockPath: endpoint, reason: 'socket_probe_failed' }
+  if (probe === 'stale') {
+    try { fs.unlinkSync(endpoint) }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        return { status: 'unavailable', lockPath: endpoint, reason: 'stale_socket_remove_failed' }
+      }
+    }
+  }
+  return bindAndVerify(endpoint, true)
+}
+
+// POSIX 的「探测 → 删残留 → 监听 → 核对」必须串行：用独占创建的守护文件做一个很短的互斥区，
+// 否则两个同时启动的进程会互删对方刚建好的套接字文件（2026-09-28 实测 5 次 4 次两个都拿到锁）。
+// 守护文件只在这一小段里存在；持有者若恰好在这一段崩溃，超过 10 秒视为残留。Windows 不走这里。
+const UNIX_GUARD_STALE_MS = 10_000
+const UNIX_GUARD_ATTEMPTS = 50
+const UNIX_GUARD_RETRY_MS = 100
+
+async function withUnixGuard(endpoint: string, fn: () => Promise<LockAcquireResult>): Promise<LockAcquireResult> {
+  const guard = `${endpoint}.lock`
+  for (let attempt = 0; attempt < UNIX_GUARD_ATTEMPTS; attempt += 1) {
+    let fd: number
+    try {
+      fd = fs.openSync(guard, 'wx')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        return { status: 'unavailable', lockPath: endpoint, reason: 'socket_guard_failed' }
+      }
+      try { if (Date.now() - fs.statSync(guard).mtimeMs > UNIX_GUARD_STALE_MS) fs.unlinkSync(guard) } catch { /* raced with the holder */ }
+      await new Promise((resolve) => setTimeout(resolve, UNIX_GUARD_RETRY_MS))
+      continue
+    }
+    fs.closeSync(fd)
+    try { return await fn() } finally { try { fs.unlinkSync(guard) } catch { /* already gone */ } }
+  }
+  return { status: 'unavailable', lockPath: endpoint, reason: 'socket_guard_busy' }
+}
+
+export async function tryAcquireLock(): Promise<LockAcquireResult> {
+  if (ownedLock) return { status: 'acquired', lockPath: ownedLock.endpoint }
+  let endpointInfo: { endpoint: string; unixSocket: boolean }
+  try { endpointInfo = endpointFor() }
+  catch (error) {
+    return { status: 'unavailable', lockPath: getLockPath(), reason: error instanceof Error ? error.message : String(error) }
+  }
+  fs.mkdirSync(stateDir(), { recursive: true })
+  if (endpointInfo.unixSocket) return withUnixGuard(endpointInfo.endpoint, () => acquireUnixSocket(endpointInfo.endpoint))
+  return bindAndVerify(endpointInfo.endpoint, false)
+}
+
+function failClosed(result: Exclude<LockAcquireResult, { status: 'acquired' }>): never {
   const reason = result.status === 'duplicate' ? 'duplicate' : result.reason
   const code = result.status === 'duplicate' ? 'DUPLICATE_INSTANCE' : 'INSTANCE_LOCK_UNAVAILABLE'
   writeStartupDiagnosticSafely(code, {
-    details: collectLockDiagnosticDetails(result.lockPath, reason),
-    onFailure: () => {
-      err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.')
-    },
+    details: { reason, pathPresent: true, pathKind: 'unavailable', pidParsed: false },
+    onFailure: () => err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.'),
   })
-  const existingPid = result.status === 'duplicate' ? ` existingPid=${result.existingPid}.` : ''
-  const nextStep =
-    reason === 'lock_path_not_regular_file'
-      ? 'If the lock path is a directory, junction, or symlink, leave it untouched and escalate.'
-      : reason === 'stale_lock_requires_operator'
-        ? 'After the service is stopped and the lock PID is confirmed absent, an operator may remove only the exact agent.pid leaf.'
-        : 'First verify the Agent service and processes; a live instance is not a stale lock.'
-  err(
-    `${code}: reason=${reason} lockPath=${result.lockPath}. ` +
-      `Do not delete first / ${LOCK_OPERATOR_DO_NOT_DELETE_FIRST}. ` +
-      `First verify the Agent service and lock PID, then run ${LOCK_OPERATOR_DIAGNOSE_SCRIPT}. ` +
-      `${nextStep}${existingPid}`,
-  )
+  err(`${code}: reason=${reason} lockPath=${result.lockPath}. The process-lifetime singleton is unavailable; do not delete agent.pid.`)
   process.exit(1)
+  throw new Error('unreachable')
 }
 
-export function acquireLock(): void {
-  const result = tryAcquireLock()
-  if (result.status === 'acquired') {
-    log(`instance-lock: acquired (pid=${currentPid()})`)
-    return
-  }
-  failClosedOnLock(result)
+export async function acquireLock(): Promise<void> {
+  const result = await tryAcquireLock()
+  if (result.status !== 'acquired') failClosed(result)
+  log(`instance-lock: acquired (${result.lockPath})`)
 }
 
 export function releaseLock(): void {
   const owned = ownedLock
   ownedLock = null
   if (!owned) return
-  try {
-    const fdStat = fs.fstatSync(owned.fd)
-    if (fdStat.dev !== owned.dev || fdStat.ino !== owned.ino) return
-    let disk: fs.Stats
-    try {
-      disk = fs.lstatSync(owned.path)
-    } catch {
-      return
-    }
-    if (disk.isSymbolicLink() || !disk.isFile()) return
-    if (disk.dev !== owned.dev || disk.ino !== owned.ino) return
-    const raw = fs.readFileSync(owned.path, 'utf8').trim()
-    // SUCCESSOR_PID_GUARD: never unlink a lock file whose pid is not ours.
-    if (raw !== String(owned.pid)) return
-    fs.unlinkSync(owned.path)
-    log('instance-lock: released')
-  } catch {
-    // missing or raced; never unlink a successor
-  } finally {
-    try {
-      fs.closeSync(owned.fd)
-    } catch {
-      // ignore
-    }
+  owned.server.close()
+  if (owned.unixSocket) {
+    try { fs.unlinkSync(owned.endpoint) } catch { /* already removed or OS-cleaned */ }
   }
+  log('instance-lock: released')
 }
+
+export function __resetInstanceLockForTests(): void { releaseLock() }
+
+/** 测试入口：跨平台验证机器标识的生成、复用与防篡改（生产只在 Windows 管道名里用到它）。 */
+export function __readMachineIdentityForTests(): string { return readMachineIdentity() }

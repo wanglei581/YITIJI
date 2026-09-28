@@ -19687,10 +19687,12 @@
     "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx": [
+      "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/ScanStartPage.tsx": [
@@ -19718,6 +19720,7 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/scanRescanRecovery.ts": [
+      "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/scanSessionRevoke.ts": [
@@ -20564,7 +20567,8 @@
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
     "apps/terminal-agent/src/agent/instance-lock.ts": [
-      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
+      "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
+      "apps/terminal-agent/scripts/verify-singleton-process.mjs"
     ],
     "apps/terminal-agent/src/agent/network-diagnostics.ts": [
       "apps/terminal-agent/scripts/verify-network-diagnostics.ts"
@@ -24621,6 +24625,7 @@
     "services/api/src/scan-tasks/scan-tasks.service.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-scan-quiet-period.ts",
       "services/api/scripts/verify-scan-tasks.ts"
     ],
     "services/api/src/smart-campus/dto/save-smart-campus-config.dto.ts": [
@@ -28458,6 +28463,26 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx",
+          "apps/kiosk/src/pages/scan/scanRescanRecovery.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:scan-quiet-period"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "apps"
         ],
@@ -29477,6 +29502,24 @@
       "package": "terminal-agent",
       "scriptNames": [
         "terminal-agent::verify:scan-watcher"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/src/agent/instance-lock.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-singleton-process.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:singleton-process"
       ],
       "wired": true
     },
@@ -37162,6 +37205,24 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:scan-input-lockout-telemetry"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/scan-tasks/scan-tasks.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-quiet-period.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-quiet-period"
       ],
       "wired": true
     },

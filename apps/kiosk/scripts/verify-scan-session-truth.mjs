@@ -1296,8 +1296,8 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding\]\)/,
-  '五个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
+  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding, quietPeriodBlocked\]\)/,
+  '（2026-09-28 起多一个终端静默期标志 quietPeriodBlocked：倒计时结束、用户点「重新开始」时它变 false，同样要触发这条 effect。）五个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
     + '它们变 false，这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生。\n'
     + 'rescanRefusedByServer 这一位尤其容易被判成冗余 —— 服务端拒绝那条路径上'
     + 'rescanCredentialsLost 从头到尾都是 false，复位它不构成依赖变化。\n'

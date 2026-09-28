@@ -108,6 +108,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const [scanTaskId, setScanTaskId] = useState<string | null>(restoredLive?.scanTaskId ?? null)
   const [expiresAt, setExpiresAt] = useState<string | null>(restoredLive?.expiresAt ?? null)
   const [countdown, setCountdown] = useState('--:--')
+  const [quietPeriodRemaining, setQuietPeriodRemaining] = useState(0)
+  const [quietPeriodBlocked, setQuietPeriodBlocked] = useState(false)
   const [controlToken, setControlToken] = useState<string | null>(restoredLive?.controlToken ?? null)
   /**
    * 这一场的状态位（性质标注 / 进度 / fail-closed / 终端身份 / 收尾闸）连同推进后两位的
@@ -256,6 +258,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
      * 页面刚刚对用户宣告过结论，重不重开由他按「重新开始一次扫描」决定。
      * 那一按会把这一位复位，effect 随之重跑并发出那一次新的创建。 */
     if (ackRefused) return
+    // 服务端静默期是隐私闸门：倒计时未结束前不重发创建请求。
+    if (quietPeriodBlocked) return
     /* fail-closed：带着安全重扫意图进来，凭据却已经不在内存里（整页重载抹掉的）。
      * 这一条必须排在终端会话那两个分支**之前** —— 页面此刻要说的是「凭据没了」，
      * 不是「正在做终端安全校验」。它是这次修复的核心：这里 return 掉的正是那一个
@@ -489,6 +493,10 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         // 结论文案按失败码翻译，纯函数、不碰状态（scanRescanRecovery）。
         // 「服务端不认」那一支的授权已在上面丢弃，这里只负责把出路切成普通新会话。
         const verdict = classifyCreateFailure(error)
+        if (verdict.quietPeriodSeconds !== undefined) {
+          setQuietPeriodRemaining(verdict.quietPeriodSeconds)
+          setQuietPeriodBlocked(true)
+        }
         if (verdict.refusedRescan) setRescanRefusedByServer(true)
         setFailure(verdict.failure)
         setPhase('error')
@@ -520,7 +528,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     // 订阅把它打回 false，这一次创建才发得出去。不进依赖的话页面会永远停在
     // 「还在收上一场的尾」，而收尾其实早就结束了。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding])
+  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding, quietPeriodBlocked])
+
+  useEffect(() => {
+    if (!quietPeriodBlocked || quietPeriodRemaining <= 0) return undefined
+    const timer = window.setInterval(() => {
+      setQuietPeriodRemaining((seconds) => Math.max(0, seconds - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [quietPeriodBlocked, quietPeriodRemaining])
 
   /**
    * 投递确认（ACK）：唯一一处让这一场在服务端变得可投递的地方（见 scanDeliveryAck）。
@@ -667,6 +683,14 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     setPhase('loading')
   }
 
+  const handleQuietPeriodRetry = () => {
+    if (!scanType || quietPeriodRemaining > 0) return
+    sessionPromiseRef.current = null
+    setQuietPeriodBlocked(false)
+    setFailure(null)
+    setPhase('loading')
+  }
+
   /**
    * 「再确认一次」——把那一次投递确认原样重发。
    *
@@ -728,8 +752,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     return <ScanSettingsStatusView {...{
       phase, ackState, scanType, terminalSession, failure, replayingLostCreate,
       rescanRetryable, rescanCredentialsLost, rescanRefusedByServer, ackRefused, liveNotDurable,
-      cleanupHolding,
-      handleSafeReturn, handlePlainRestart, handleRescanRetry, handleAckRetry,
+      cleanupHolding, quietPeriodRemaining, quietPeriodBlocked,
+      handleSafeReturn, handlePlainRestart, handleRescanRetry, handleAckRetry, handleQuietPeriodRetry,
     }} />
   }
 

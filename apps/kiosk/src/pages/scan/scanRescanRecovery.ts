@@ -135,6 +135,20 @@ export interface CreateFailureVerdict {
   refusedRescan: boolean
   /** 连「服务端收没收到」都不知道（断网 / status 0）。 */
   outcomeUnknown: boolean
+  /** 终端静默期剩余秒数；仅服务端 SCAN_TERMINAL_QUIET_PERIOD 返回。 */
+  quietPeriodSeconds?: number
+}
+
+// 与本文件其它错误码一样写字面量：行为测试把本文件转译后内联加载，只认相对路径引用，
+// 引 @ai-job-print/shared 会让 scan-create-replay 行为测试整体加载失败。
+const SCAN_TERMINAL_QUIET_PERIOD = 'SCAN_TERMINAL_QUIET_PERIOD'
+
+function quietPeriodSecondsOf(error: unknown): number | undefined {
+  if (errorCodeOf(error) !== SCAN_TERMINAL_QUIET_PERIOD) return undefined
+  const message = error instanceof ApiHttpError ? error.message : ''
+  const match = message.match(/等约\s*(\d+)\s*秒/)
+  const seconds = match ? Number(match[1]) : NaN
+  return Number.isFinite(seconds) ? Math.max(1, Math.floor(seconds)) : 90
 }
 
 /**
@@ -148,6 +162,7 @@ export interface CreateFailureVerdict {
  */
 export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
   const code = errorCodeOf(error)
+  const quietPeriodSeconds = quietPeriodSecondsOf(error)
   /* 重放到头仍未知。必须排在下面那条通用 outcomeUnknown **之前**：两者都是 status 0，
    * 但要说的话完全不同 —— 通用那条说「本页不会自动重发，要不要再发由你按」，
    * 而这一条的重发已经发过五次了，说那句就是假话。
@@ -195,6 +210,13 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
     }
   }
   const failure = ((): SessionFailure => {
+    if (code === SCAN_TERMINAL_QUIET_PERIOD) {
+      const seconds = quietPeriodSeconds ?? 90
+      return {
+        title: '上一场扫描还在收尾',
+        description: `上一位的扫描可能还在出纸，请等约 ${seconds} 秒再开始。倒计时结束后可以重新建立扫描。`,
+      }
+    }
     if (code === 'SCAN_TERMINAL_BUSY') {
       return { title: '本机正在扫描中', description: userMessageOf(error, '请等待当前扫描任务完成后再试。') }
     }
@@ -215,5 +237,5 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
       description: userMessageOf(error, '系统没能建立这次扫描。请返回重试，或联系现场工作人员。'),
     }
   })()
-  return { outcomeUnknown: false, refusedRescan: false, failure }
+  return { outcomeUnknown: false, refusedRescan: false, failure, quietPeriodSeconds }
 }

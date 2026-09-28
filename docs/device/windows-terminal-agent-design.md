@@ -208,18 +208,9 @@ Agent 首次启动时向后端注册本终端，获取 `terminalId` 和 `agentTo
 
 ### 2.12 单实例锁
 
-当前实现使用 `%ProgramData%\AIJobPrintAgent\agent.pid` PID 文件锁，并以 `wx`
-独占创建目录项：
-
-- 创建成功且路径仍指向本进程持有的文件：继续启动。
-- 文件记录的是仍存活的外来 PID：写 `DUPLICATE_INSTANCE` 并退出。
-- 文件记录的是已死亡的外来 PID：返回 `stale_lock_requires_operator`，不自动删除、重命名、
-  截断或覆盖；操作者**不要先删除**。先核验服务/进程，运行 `diagnose-production-agent.ps1`，
-  确认服务已停止、锁路径是普通文件、且 `tasklist` 证明该 PID 不存在后，再删除精确 `agent.pid` 叶子。
-- 空、损坏、符号链接、目录、junction 或无法确认的 PID 一律 fail-closed；非叶子路径保持不动并升级。
-- 锁启动失败写入 `%ProgramData%\AIJobPrintAgent\last-startup-diagnostic.json`（机器码 / 原因 / 路径类型，不含 token、配置、用户名或文件内容）。诊断写失败不得改变 fail-closed 退出。
-- 正常退出只在 fd、路径 inode 与 PID 均仍属于本进程时释放；异常终止可能留下需要人工清理的锁。
-- same-PID reclaim 与 owner `releaseLock()` 保持现有行为；不得用路径 check/unlink 恢复自动 stale 接管。
+Windows 使用带安装时随机 `instance-id` 的命名管道；开发与 CI 使用 Unix 域套接字。对象由进程生命周期持有，服务端收到连接立即关闭；已占用时返回 `DUPLICATE_INSTANCE`。
+Unix 套接字残留时先尝试连接，连接成功表示已有实例，`ECONNREFUSED` 才删除残留文件并重试。权限或监听失败一律 fail-closed。
+`agent.pid` 只记录启动 PID 供诊断，残留文件不参与互斥，也不需要删除。Windows 读不到 `%ProgramData%\AIJobPrintAgent\instance-id` 时拒绝启动并写明确诊断。
 
 ---
 
@@ -823,7 +814,7 @@ Kiosk 轮询到 completed，展示扫描结果预览
 ```
 方式 A（推荐）：注册为 Windows Service
   工具：node-windows 或 NSSM
-  优点：系统级启动，无需用户登录；SCM 可尝试拉起，但外来死 PID 锁仍 fail-closed
+  优点：系统级启动，无需用户登录；进程退出后命名管道由系统释放，残留 agent.pid 仅作诊断
   
 方式 B（备用）：任务计划程序
   触发器：系统启动时
@@ -838,10 +829,7 @@ Session Helper 由 Service 在用户登录事件后（监听 `WTS_SESSION_LOGON`
 ### 8.3 崩溃后的服务拉起与锁恢复
 
 生产安装脚本写入的 SCM 失败操作是两次有限重启（约 60 秒、300 秒）后停止，不是“30 秒后必然 Running”。
-WinSW / SCM 只会**尝试**再拉起进程。若异常退出留下外来 `agent.pid`，新进程会
-`stale_lock_requires_operator` fail-closed，**不会自动接管锁**。
-
-现场不得把 `taskkill /F` 后的自然 Running、30 秒恢复或崩溃后自动接管写成已验收。
+WinSW / SCM 只会**尝试**再拉起进程。进程退出后命名管道由系统释放；Unix 套接字由启动器探测残留并清理。残留 `agent.pid` 只作诊断，不阻止新实例，也不需要人工删除。
 `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须在
 Windows 实测；干净停止是否留下锁是条件 P0，不得在 macOS 推断。DEVICE 在该阶梯完成前保持 NO-GO。
 
@@ -895,18 +883,16 @@ Agent 内部捕获 `uncaughtException` / `unhandledRejection`，写日志后 `pr
 ### 8.8 单实例锁
 
 ```
-Agent 启动 → open(%ProgramData%\AIJobPrintAgent\agent.pid, "wx")
-    │
-    ├─ 独占创建成功且路径仍指向自有 inode → 继续启动
-    ├─ 外来 PID 存活 → DUPLICATE_INSTANCE → process.exit(1)
-    ├─ 外来 PID 已死亡 → stale_lock_requires_operator → process.exit(1)
-    └─ PID / 文件类型 / 发布状态不可证明 → fail-closed → process.exit(1)
+Agent 启动
+    ├─ Windows：读取 instance-id → 监听命名管道
+    └─ macOS/Linux：探测并按需清理 agent.sock → 监听 Unix 套接字
+        ├─ 监听成功 → 写入 agent.pid 诊断 → 继续启动
+        ├─ 已占用 / 可连接 → DUPLICATE_INSTANCE → process.exit(1)
+        └─ 标识缺失、权限或监听失败 → fail-closed → process.exit(1)
 ```
 
-不再自动接管外来陈旧锁。这样牺牲异常退出后的自动恢复，换取不让两个并发启动者通过
-`inspect(path) -> unlink(path)` 竞态同时获得所有权。正常退出会释放自有锁；强杀、断电、系统崩溃或
-原生崩溃后，**不要先删除**。先运行 `diagnose-production-agent.ps1`，核实服务已停、锁路径是普通文件、
-`tasklist` 证明 PID 不存在，再人工删除精确 `agent.pid` 叶子。目录 / junction / symlink 保持不动并升级。
+单实例互斥由进程生命周期对象负责；`agent.pid` 只记录启动 PID 供诊断，残留文件不参与互斥，也不需要删除。启动失败时检查服务状态、命名管道或 Unix 套接字，并保留诊断文件。
+正常退出、强杀、断电、系统崩溃和原生崩溃都由操作系统释放进程生命周期对象。`agent.pid` 不参与互斥，现场保留它用于诊断即可。
 
 ---
 
@@ -925,14 +911,14 @@ Agent 启动 → open(%ProgramData%\AIJobPrintAgent\agent.pid, "wx")
 | V05 | **Claim lease 超时重新领取** | Agent claim 任务后不 PATCH，等待 claimExpiresAt 过期，另一进程重新 claim | 原任务重置为 pending，可被重新 claim |
 | V06 | **`node-printer` 调用奔图打印机** | 打印测试 PDF（1 页，A4，彩色） | 打印成功，状态正确回传 |
 | V07 | **PowerShell 打印备用方案** | `Start-Process ... -Verb Print` 调用同一打印机 | 打印成功（V06 失败时的备用验证） |
-| V08 | **Windows 服务开机自启 + 崩溃重启** | 注册服务，重启机器验证自启；`taskkill /F` 后记录 SCM 是否尝试拉起、锁是否 fail-closed | 不得把 30s 内 Running 或自动接管写成通过；须留下 Windows 阶梯证据 |
+| V08 | **Windows 服务开机自启 + 崩溃重启** | 注册服务，重启机器、`taskkill /F`、断电后记录管道释放与新进程启动 | 第二实例被拒；强杀/断电后可启动；须留下 Windows 阶梯证据 |
 | V09 | **`CreateProcessAsUser` 启动 Helper** | Service 以 LocalSystem 调用 API 在当前登录用户 Session 启动子进程 | Helper 进程出现在用户 Session 的任务管理器中 |
 | V10 | **打包方案对比（pkg / nexe / electron-builder / .NET wrapper）** | 各方案分别打包，测试：启动时间、文件大小、原生 addon 加载、Windows 服务兼容性 | 选定最优方案，记录结论 |
 | V11 | **DPAPI 加密存储** | 加密写入 agent.token，在本机解密；拷贝 agent.token 到其他机器尝试解密；验证文件 ACL 拒绝普通用户读取 | 原机可解密；换机不可解密；普通用户收到拒绝访问错误 |
 | V12 | **PDF 合并性能（50 页 ADF 扫描）** | 生成 50 张 A4 JPEG，合并为 PDF，记录耗时 | ≤ 10 秒 |
 | V13 | **磁盘 ACL 验证** | 以普通用户账号尝试读写 `%ProgramData%\AIJobPrintAgent\temp\` | 普通用户收到拒绝访问错误 |
 | V14 | **断网重连幂等** | 断网时完成打印，网络恢复后观察 PATCH 行为 | completed 只上报一次，不重复计费 |
-| V15 | **单实例 PID 锁** | 同时启动两个 Agent；再模拟异常退出留下外来死 PID 锁 | 第二个实例立即退出；死 PID 锁拒绝自动接管并给出人工清理提示 |
+| V15 | **单实例进程生命周期锁** | 同时启动两个 Agent；强杀第一个后立即启动第三个；留下 agent.pid 再启动 | 第二个立即退出；强杀后可启动；残留 agent.pid 不阻止启动 |
 
 ### Phase 8.1 — MVP（技术验证通过后实现）
 
@@ -941,7 +927,7 @@ Agent 启动 → open(%ProgramData%\AIJobPrintAgent\agent.pid, "wx")
 | 能力 | 说明 | 状态 |
 |------|------|------|
 | 终端注册 | 注册获取 terminalId + agentToken（`POST /auth/terminal/register`） | ✅ Phase 8.1B |
-| 单实例锁 | PID 文件锁（`%ProgramData%\AIJobPrintAgent\agent.pid`）；活外来 PID 重复启动 exit 1，死外来 PID `stale_lock_requires_operator` 且不自动删除 | ✅ Phase 8.1C；新 Windows 主机需复验人工恢复 |
+| 单实例锁 | Windows 命名管道；POSIX Unix 套接字；agent.pid 仅诊断 | ✅ 真机-8 代码完成，待 Windows 阶梯验证 |
 | 心跳上报 | 每 30s（`PUT /terminals/:id/heartbeat`） | ✅ Phase 8.1B |
 | 打印任务 Claim | `POST /terminals/:id/tasks/claim`，5s 轮询 | ✅ Phase 8.1B |
 | 打印任务执行 | 下载 → MD5 校验 → pdf-to-printer/SumatraPDF → 状态回传 | ✅ Phase 8.1B |
@@ -953,7 +939,7 @@ Agent 启动 → open(%ProgramData%\AIJobPrintAgent\agent.pid, "wx")
 | 临时文件清理 | try/finally 任务结束立即删除临时 PDF | ✅ Phase 8.1B |
 | image-to-pdf 路由 | pdfkit 将 JPG/PNG 转为临时 PDF → Method B | ✅ Phase 8.1A |
 | 断网重试专项验证 | 真机断网条件下验证 pending_patches 入队与自动重试 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
-| 单实例锁专项验证 | 同时启动两个 Agent 验证 DUPLICATE_INSTANCE；异常终止后验证死 PID 锁 fail-closed 与人工恢复 | ✅ Phase 8.2C 双启动基线完成；死锁人工恢复需在新 Windows 主机复验 |
+| 单实例锁专项验证 | 双进程并发、强杀后立即启动、残留 agent.pid 启动 | 📋 真机-8：待 Windows 阶梯验证 |
 | Windows 服务专项验证 | 安装→重启自启→心跳持续→卸载全流程 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
 | local-api-server | 127.0.0.1:9527，localAuthToken + actionToken 全部鉴权 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
 | actionToken HMAC | HMAC-SHA256 签名校验 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
@@ -1122,3 +1108,6 @@ Agent 启动 → open(%ProgramData%\AIJobPrintAgent\agent.pid, "wx")
 | PDF 合并 | `pdf-lib` | Ghostscript CLI |
 | HTTP 客户端 | `axios` + 自定义重试 | `got` |
 | 日志 | `winston` + 日志滚动 | `pino` |
+
+
+> 2026-09-28 真机-8：单实例互斥由 Windows 命名管道或 POSIX Unix 域套接字持有，进程退出后由操作系统释放（包括强杀、断电后的系统回收）。`agent.pid` 仅写入启动 PID 供诊断，残留文件不阻止启动，也不应手工删除。Windows 管道名包含安装时写入 `%ProgramData%\AIJobPrintAgent\instance-id` 的随机标识；读取不到标识时 fail-closed。现场验证应记录第二实例被拒、强杀后自动启动、双开只有一个成功，以及残留 `agent.pid` 仍能启动。
