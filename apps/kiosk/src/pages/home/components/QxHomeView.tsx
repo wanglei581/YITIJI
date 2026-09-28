@@ -156,7 +156,7 @@ export function QxHomeView({
   const toolboxReady = toolboxKnown && toolbox.enabled
   const campusReady = campusKnown && campus.enabled
   const extraCount = (toolboxReady ? 1 : 0) + (campusReady ? 1 : 0)
-  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '先看价格，付了再打 · 带走：打印件' : device.printerLabel
+  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '先看价格再出纸 · 带走：打印件' : device.printerLabel
   const recruitmentOpen = recruitment.enabled
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
@@ -241,7 +241,7 @@ export function QxHomeView({
           <HomeTile
             actionId="print-hub"
             title="打印 · 扫描"
-            description="手机扫码、U 盘或扫描原件，先看价格再出纸"
+            description="手机扫码传文件、插 U 盘，或扫描原件"
             foot="开始选择材料"
             badge={printEyebrow}
             statusText={device.loading ? undefined : printStatus.note}

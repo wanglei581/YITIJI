@@ -443,6 +443,7 @@
 [data-qx-interview] .interview-session__history-item,
 [data-qx-interview] .interview-session__privacy-note,
 [data-qx-interview] .interview-session__mic-reason,
+[data-qx-interview] .interview-session__mic-error strong,
 [data-qx-interview] .interview-session__mic-error span,
 [data-qx-interview] .interview-session__error,
 [data-qx-interview] .interview-session__notice,

@@ -257,9 +257,12 @@ test('home ready state defers capability claims to entry without hiding the real
   const home = page.getByTestId('qx-home')
   const printTile = home.locator('[data-action="print-hub"]')
   await expect(printTile).toHaveAttribute('data-panel-state', 'ready')
-  // 真实设备态仍在顶栏胶囊；主卡按 2.0 稿写「先看价格，付了再打」，不重复报「打印机在线」。
+  // 真实设备态仍在顶栏胶囊；主卡不重复报「打印机在线」。稿 01 写「先看价格，付了再打」，
+  // 但单价可以配成 0（免费试运营，订单记为 free、不进收银台），那时「付了再打」是假话；
+  // 改成价格为 0 时也成立的「先看价格再出纸」。
+  await expect(printTile.getByText(/付了再打/)).toHaveCount(0)
   await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('打印机在线')
-  await expect(printTile.getByText('先看价格，付了再打 · 带走：打印件', { exact: true })).toBeVisible()
+  await expect(printTile.getByText('先看价格再出纸 · 带走：打印件', { exact: true })).toBeVisible()
   await expect(printTile.getByText('打印机在线')).toHaveCount(0)
   await expectReadableFeature(page)
   // 智慧校园开通只凭终端配置，首页不宣称「已授权」；开通后可点。
