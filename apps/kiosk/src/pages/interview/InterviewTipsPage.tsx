@@ -18,7 +18,8 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, ComplianceBanner } from '@ai-job-print/ui'
+import { Card } from '@ai-job-print/ui'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import {
   CheckSquareIcon,
   ChevronDownIcon,
@@ -29,10 +30,12 @@ import {
 } from 'lucide-react'
 import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { InterviewShell } from './InterviewShell'
+import { InterviewNotice, InterviewRail } from './interviewQxParts'
 import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
+import './styles/interview-qx2.css'
 
 const CHECKLIST: Array<{ title: string; desc: string }> = [
   { title: '背景调研', desc: '了解公司核心业务、近期动态、企业文化，并在面试中自然地表达出来' },
@@ -125,13 +128,13 @@ const INTRO_STRUCTURES: Array<{ duration: string; points: string[] }> = [
 function startGate(status: 'checking' | 'ready' | 'unavailable'): { reason: string; code: string } | null {
   if (status === 'unavailable') {
     return {
-      reason: '在线服务当前不可用，模拟面试需要联网创建练习会话；本页的准备清单、高频问题和 STAR 说明不依赖联网，可以继续看。',
+      reason: '在线服务当前不可用，模拟面试需要联网才能开始；本页的准备清单、高频问题和 STAR 说明不依赖联网，可以继续看。',
       code: 'api:unavailable',
     }
   }
   if (status === 'checking') {
     return {
-      reason: '正在确认在线服务，确认完成前不创建练习会话；本页的准备内容不依赖联网，可以继续看。',
+      reason: '正在确认在线服务，确认完成前不开始这场练习；本页的准备内容不依赖联网，可以继续看。',
       code: 'api:checking',
     }
   }
@@ -179,48 +182,53 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
             : undefined
       }
       ctabar={
-        gate ? (
-          <>
-            <p className="why" id="interview-tips-start-why">{gate.reason}</p>
-            {apiStatus === 'unavailable' ? (
+        <div className="interview-qx-cta">
+          <QxStepActions>
+            <QxAiHelp label="问小青：面试前先准备什么" draft="我想准备一场面试。请根据公开的准备方法告诉我先做哪几步，不要假装已经看过我的简历。" />
+          </QxStepActions>
+          {gate ? (
+            <>
+              <p className="why" id="interview-tips-start-why">{gate.reason}</p>
+              {apiStatus === 'unavailable' ? (
+                <button
+                  type="button"
+                  className="qx-btn"
+                  data-variant="ghost"
+                  data-testid="interview-tips-recheck"
+                  onClick={retryApi}
+                >
+                  重新检测
+                </button>
+              ) : null}
+              {/* 不可用时不是「灰掉的按钮」：它必须说得出为什么，并且真的不导航。
+                  data-disabled-reason 与服务台同名，走查按同一个钩子取证。 */}
               <button
                 type="button"
                 className="qx-btn"
-                data-variant="ghost"
-                data-testid="interview-tips-recheck"
-                onClick={retryApi}
+                data-variant="primary"
+                aria-disabled="true"
+                aria-describedby="interview-tips-start-why"
+                data-disabled-reason={gate.code}
+                data-testid="interview-primary"
+                onClick={goSetup}
               >
-                重新检测
+                设置一场练习
               </button>
-            ) : null}
-            {/* 不可用时不是「灰掉的按钮」：它必须说得出为什么，并且真的不导航。
-                data-disabled-reason 与服务台同名，走查按同一个钩子取证。 */}
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              aria-disabled="true"
-              aria-describedby="interview-tips-start-why"
-              data-disabled-reason={gate.code}
-              data-testid="interview-primary"
-              onClick={goSetup}
-            >
-              开始模拟面试
+            </>
+          ) : (
+            <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
+              设置一场练习
             </button>
-          </>
-        ) : (
-          <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
-            开始模拟面试
-          </button>
-        )
+          )}
+        </div>
       }
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-tips" data-qx-interview="" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
 
-      <div className="interview-flow__scroll flex-1 overflow-y-auto pb-32">
-        <ComplianceBanner tone="info">
-          面试是展示自我、与企业双向选择的过程。以下内容为通用准备建议，仅供参考。
-        </ComplianceBanner>
+      <div className="interview-flow__scroll">
+        <InterviewNotice>
+          想按你自己的材料来练，先到下一页设置一场练习。
+        </InterviewNotice>
 
         {/* 2 列并排（原型 41：左: 准备清单+STAR，右: 高频问题+自我介绍结构）*/}
         <div className="interview-tips__cols">
@@ -358,12 +366,7 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
         </div>
       </div>
 
-      <p className="mt-2 text-center text-[11px] text-neutral-400">完成一次模拟面试后，练习报告将附带个性化准备清单，可直接打印</p>
-      <div className="interview-rail" aria-label="练习边界">
-        <span>只供本人练习参考</span>
-        <span>不发送给任何企业</span>
-        <span>不预测录用结果</span>
-      </div>
+      <InterviewRail />
     </div>
     </InterviewShell>
   )

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { InterviewHero, InterviewScrollCue } from './interviewQxParts'
 
 /**
  * 模拟面试域外壳：青序流光 QxPageFrame + 共享 QxAppNavbar。
@@ -19,6 +20,7 @@ export function InterviewShell({
   status,
   ctabar,
   navbar = true,
+  live = false,
   children,
 }: {
   title: ReactNode
@@ -26,6 +28,8 @@ export function InterviewShell({
   status?: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   ctabar?: ReactNode
   navbar?: boolean
+  /** 正在录音时，头卡圆章按稿做一下呼吸，不自动开麦。 */
+  live?: boolean
   children: ReactNode
 }) {
   const navigate = useNavigate()
@@ -33,13 +37,13 @@ export function InterviewShell({
     <QxPageFrame
       title={title}
       subtitle={subtitle}
-      status={status ?? { tone: 'ok', label: '模拟练习' }}
+      status={status ?? { tone: 'ok', label: 'AI 模拟面试' }}
       back={{ label: '返回面试服务', onBack: () => navigate('/interview-service') }}
-      terminalLabel="就业服务大厅"
       ctabar={ctabar}
       navbar={
         navbar ? (
           <QxAppNavbar
+            current="advisor"
             onHome={() => navigate('/')}
             onAdvisor={() => navigate('/assistant')}
             onProfile={() => navigate('/profile')}
@@ -47,7 +51,11 @@ export function InterviewShell({
         ) : undefined
       }
     >
-      {children}
+      <div className="iv-shell">
+        <InterviewHero ask={title} doing={subtitle} live={live} />
+        {children}
+        <InterviewScrollCue />
+      </div>
     </QxPageFrame>
   )
 }

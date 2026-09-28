@@ -1,19 +1,4 @@
-import { Button } from '@ai-job-print/ui'
-import {
-  AlertCircleIcon,
-  CheckCircle2Icon,
-  ClockIcon,
-  FileTextIcon,
-  KeyboardIcon,
-  Loader2Icon,
-  MicIcon,
-  PencilLineIcon,
-  RefreshCwIcon,
-  RotateCcwIcon,
-  SendIcon,
-  SkipForwardIcon,
-  SquareIcon,
-} from 'lucide-react'
+import { AlertCircleIcon, ClockIcon, PencilLineIcon } from 'lucide-react'
 import type { InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
 
@@ -75,10 +60,10 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
           {/* 文案来自按 error.name 归因的结果：没有设备就说没有设备，
               不再统一说成「请检查浏览器权限」。 */}
           <div><AlertCircleIcon aria-hidden="true" /><p><strong>{error ?? '麦克风调用失败'}</strong>{micBlockedReason && <span>{micBlockedReason}</span>}</p></div>
-          <div>
-            <Button size="lg" disabled={voiceLocked || busyTurn} onClick={onRetryVoice}><RotateCcwIcon aria-hidden="true" />重新尝试语音</Button>
-            <Button size="lg" variant="secondary" disabled={voiceLocked || busyTurn} onClick={onRecheckMic}><RefreshCwIcon aria-hidden="true" />重新检测麦克风</Button>
-            <Button size="lg" variant="secondary" disabled={voiceLocked || busyTurn} onClick={onUseText}><KeyboardIcon aria-hidden="true" />改用文字输入</Button>
+          <div className="iv-tbar">
+            <button type="button" className="qx-btn" data-variant="teal" disabled={voiceLocked || busyTurn} onClick={onRetryVoice}>重新尝试语音</button>
+            <button type="button" className="qx-btn" disabled={voiceLocked || busyTurn} onClick={onRecheckMic}>重新检测麦克风</button>
+            <button type="button" className="qx-btn" disabled={voiceLocked || busyTurn} onClick={onUseText}>改用文字输入</button>
           </div>
         </div>
       )}
@@ -93,58 +78,58 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
         <span>不打印我的回答（报告仍可在屏幕上回看问答摘录）</span>
       </label>
       {phase === 'done_suggest' ? (
-        <Button size="lg" className="interview-session__primary-action" disabled={voiceLocked} onClick={onFinish}>
-          <FileTextIcon aria-hidden="true" />结束并生成练习报告
-        </Button>
+        <button type="button" className="qx-btn" data-variant="primary" disabled={voiceLocked} onClick={onFinish}>
+          结束并生成练习报告
+        </button>
       ) : mode === 'voice' && voice.kind === 'review' ? (
         <div className="interview-session__review-grid">
           <label>
             <span><PencilLineIcon aria-hidden="true" />转写结果（可编辑，确认后提交）</span>
             <textarea value={voice.edited} onChange={(event) => onReviewChange(event.target.value)} rows={3} maxLength={2000} />
           </label>
-          <div>
-            <Button size="lg" disabled={busyTurn} onClick={onReviewSubmit}><CheckCircle2Icon aria-hidden="true" />确认提交</Button>
-            <Button size="lg" variant="secondary" disabled={busyTurn} onClick={onRetryVoice}><MicIcon aria-hidden="true" />重新录音</Button>
-            <Button size="lg" variant="secondary" disabled={busyTurn} onClick={onUseText}><KeyboardIcon aria-hidden="true" />改用文字输入</Button>
+          <div className="iv-tbar">
+            <button type="button" className="qx-btn" data-variant="teal" disabled={busyTurn} onClick={onReviewSubmit}>确认提交</button>
+            <button type="button" className="qx-btn" disabled={busyTurn} onClick={onRetryVoice}>重新录音</button>
+            <button type="button" className="qx-btn" disabled={busyTurn} onClick={onUseText}>改用文字输入</button>
           </div>
         </div>
       ) : mode === 'voice' ? (
         <>
           {voice.kind === 'requesting_permission' ? (
-            <Button size="lg" className="interview-session__primary-action" disabled><Loader2Icon className="animate-spin" aria-hidden="true" />正在请求麦克风权限…</Button>
+            <button type="button" className="qx-btn" data-variant="primary" disabled>正在请求麦克风权限…</button>
           ) : voice.kind === 'recording' ? (
-            <Button size="lg" className="interview-session__primary-action is-recording" onClick={onStopRecording}><SquareIcon aria-hidden="true" />结束回答（已录 {formatInterviewClock(recordSec)}，{formatInterviewClock(maxRecordSec - recordSec)} 后自动结束）</Button>
+            <button type="button" className="qx-btn" data-variant="primary" onClick={onStopRecording}>结束回答（已录 {formatInterviewClock(recordSec)}，{formatInterviewClock(maxRecordSec - recordSec)} 后自动结束）</button>
           ) : voice.kind === 'transcribing' ? (
-            <Button size="lg" className="interview-session__primary-action" disabled><Loader2Icon className="animate-spin" aria-hidden="true" />正在转写你的回答…</Button>
+            <button type="button" className="qx-btn" data-variant="primary" disabled>正在转写你的回答…</button>
           ) : (
-            <Button size="lg" className="interview-session__primary-action" disabled={busyTurn} onClick={onRetryVoice}><MicIcon aria-hidden="true" />开始回答（语音）</Button>
+            <button type="button" className="qx-btn" data-variant="primary" disabled={busyTurn} onClick={onRetryVoice}>开始回答（语音）</button>
           )}
-          <div className="interview-session__secondary-actions">
-            <Button size="lg" variant="secondary" disabled={busyTurn || voice.kind === 'recording' || voiceLocked} onClick={onUseText}><KeyboardIcon aria-hidden="true" />改用文字输入</Button>
-            <Button size="lg" variant="secondary" disabled={busyTurn || voice.kind !== 'idle'} onClick={onSkip}><SkipForwardIcon aria-hidden="true" />跳过</Button>
-            <Button size="lg" variant="secondary" className="is-danger" disabled={busyTurn || voiceLocked} onClick={onFinish}><SquareIcon aria-hidden="true" />结束面试</Button>
+          <div className="iv-tbar">
+            <button type="button" className="qx-btn" disabled={busyTurn || voice.kind === 'recording' || voiceLocked} onClick={onUseText}>改用文字输入</button>
+            <button type="button" className="qx-btn" disabled={busyTurn || voice.kind !== 'idle'} onClick={onSkip}>跳过此题</button>
+            <button type="button" className="qx-btn" disabled={busyTurn || voiceLocked} onClick={onFinish}>结束本场</button>
           </div>
         </>
       ) : (
         <div className="interview-session__text-grid">
-          <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} disabled={busyTurn} rows={3} maxLength={2000} placeholder="在这里输入你的回答…" />
-          <div>
-            <Button size="lg" disabled={busyTurn} onClick={onSubmitText}><SendIcon aria-hidden="true" />提交回答</Button>
+          <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} disabled={busyTurn} rows={3} maxLength={2000} aria-label="本题回答" placeholder="在这里输入你的回答，最多 2000 字" />
+          <div className="iv-tbar">
+            <button type="button" className="qx-btn" data-variant="teal" disabled={busyTurn} onClick={onSubmitText}>提交回答</button>
             {/* 能力门禁：不隐藏入口（用户可能后插 USB 麦克风），用 aria-disabled
                 置灰 + 下方常显原因。触屏没有 hover，禁止用 title 承载原因。 */}
-            <Button
-              size="lg"
-              variant="secondary"
+            <button
+              type="button"
+              className="qx-btn"
               disabled={busyTurn}
               aria-disabled={!voiceAvailable || undefined}
               data-mic-gated={!voiceAvailable || undefined}
-              className={!voiceAvailable ? 'opacity-50' : undefined}
               onClick={onUseVoice}
             >
-              <MicIcon aria-hidden="true" />改用语音回答
-            </Button>
-            <Button size="lg" variant="secondary" disabled={busyTurn} onClick={onSkip}><SkipForwardIcon aria-hidden="true" />跳过</Button>
-            <Button size="lg" variant="secondary" className="is-danger" disabled={busyTurn} onClick={onFinish}><SquareIcon aria-hidden="true" />结束面试</Button>
+              改用语音回答
+            </button>
+            <button type="button" className="qx-btn" disabled={busyTurn} onClick={onSkip}>跳过此题</button>
+            <button type="button" className="qx-btn" disabled={busyTurn} onClick={onFinish}>结束本场</button>
+            <span className="cnt">{draft.length} / 2000</span>
           </div>
           {!voiceAvailable && micBlockedReason && (
             <p className="interview-session__mic-reason" data-mic-reason role="status">
