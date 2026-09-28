@@ -7,6 +7,7 @@
 规则 4：去掉英文眉题。条款来源改成「运营方发布」。三行边界并成一句。
 规则 7：「用大白话讲这一章」仍在，不让它改条款效力。
 未改：颜色、圆角、两份文档的章节结构、取不到正文不拿旧文本顶上。
+9/28 留白：页首原来 90px 全堆在标题上方，改为分进标题、两段说明、三步之间（文档切换仍在 y≥500）；加载态骨架按阅读区实际尺寸排，「为什么不先显示点什么」挪进右栏占「条款正文由运营方发布」那一格，下面复用主状态的两张卡；找不到文档态两张选择卡图标挪到标题左边、卡片内边距收一点，最后一张卡不再被挤到按钮下面。无新增内容（加载态骨架目录上方的「章节目录」四字与主状态目录标题相同）。
 原稿：../kiosk-redesign-2026-08/08-legal.html（只读）。
 -->
 <html lang="zh-CN">
@@ -218,6 +219,27 @@ a.inbtn[data-testid="legal-ai-explain"]{display:none!important}
 .btn{font-size:27px!important;min-height:88px!important}
 .truth div{font-size:21px!important;line-height:1.45!important;color:var(--ink-2)!important}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   页首：文档切换仍要落在 y≥500（规则 1），原来这段高度全堆在标题上方（90px）；
+   现在把它分进标题、两段说明、三步之间，说明字放到 23；标题上方不再空一截，右边那块也收小了。
+   加载态：骨架按主状态阅读区的实际尺寸排，「为什么不先显示点什么」挪进右栏，
+   占主状态「条款正文由运营方发布」那一格；下面接主状态同一组两张卡。没有新写内容。 */
+.qx-intro{padding:44px 44px 20px}
+.qx-intro p{margin-top:16px;font-size:23px;line-height:1.55}
+.qx-intro p+p{margin-top:14px}
+.qx-steps{margin-top:28px}
+#body-root[data-state="loading"] .sktoc{gap:8px}
+#body-root[data-state="loading"] .sktoc .r{height:48px;border-radius:14px}
+#body-root[data-state="loading"] .sk .state{margin-top:8px;padding:20px 24px;border-radius:var(--r-md)}
+/* 找不到文档：原来最后一张「这一页不影响你办事」被挤到按钮下面。两张选择卡的图标挪到标题左边，
+   几张卡的内边距收一点，整屏放得下。 */
+.pick{display:grid;grid-template-columns:64px minmax(0,1fr);column-gap:18px;row-gap:10px;align-items:center;min-height:0;padding:24px 28px}
+.pick .ci{grid-column:1;grid-row:1}
+.pick-t{grid-column:2;grid-row:1}
+.pick-d,.pick-secs{grid-column:1 / span 2}
+.pick-secs{margin-top:2px;padding-top:12px;gap:5px}
+.grid3 .card{min-height:0;padding:20px 24px}
+#body-root[data-state="not-found"] .state{padding:24px 32px}
 </style>
 </head>
 <body>
@@ -371,6 +393,18 @@ function pickCard(key,tone){
   '<span class="pick-secs">'+pre+'</span></a>';
 }
 
+/* 「哪一版算数 / 看不懂这一章」两张卡：主状态与加载态共用同一份（9/28 留白：加载态复用主状态已有的说明，不另写）。 */
+function aboutCards(){
+ return '<section class="sec"><div class="grid2">'+
+  '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>哪一版算数</h3>'+
+  '<p>以<b>运营方正式发布</b>的版本为准。本机显示的更新日期来自发布记录，不由本页写死。</p>'+
+  '<p class="fine">对条款有疑问，可以找现场工作人员，或按「联系我们」里的方式联系运营方。</p></div>'+
+  '<div class="card"><h3><span class="ci" style="background:var(--plum-soft);color:var(--plum-d)">'+svg('spark',26)+'</span>看不懂这一章</h3>'+
+  '<p class="fine">AI 顾问只做<b>通俗转述</b>：不改条款效力，不构成法律结论，也不判定你符不符合某一条。</p>'+
+  '<a class="inbtn" href="05-ai-cockpit.html" data-route="/assistant" data-testid="legal-ai-explain">用大白话讲这一章'+svg('arrow',22)+'</a></div>'+
+  '</div></section>';
+}
+
 var V={};
 V['ready']=function(sec){
  return {
@@ -379,14 +413,7 @@ V['ready']=function(sec){
    '<section class="sec">'+docHead(DOC)+'</section>'+
    '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">按章节读</span><span class="hint">点左边换一章</span></div>'+
     reader(DOC,sec)+'</section>'+
-   '<section class="sec"><div class="grid2">'+
-    '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>哪一版算数</h3>'+
-    '<p>以<b>运营方正式发布</b>的版本为准。本机显示的更新日期来自发布记录，不由本页写死。</p>'+
-    '<p class="fine">对条款有疑问，可以找现场工作人员，或按「联系我们」里的方式联系运营方。</p></div>'+
-    '<div class="card"><h3><span class="ci" style="background:var(--plum-soft);color:var(--plum-d)">'+svg('spark',26)+'</span>看不懂这一章</h3>'+
-    '<p class="fine">AI 顾问只做<b>通俗转述</b>：不改条款效力，不构成法律结论，也不判定你符不符合某一条。</p>'+
-    '<a class="inbtn" href="05-ai-cockpit.html" data-route="/assistant" data-testid="legal-ai-explain">用大白话讲这一章'+svg('arrow',22)+'</a></div>'+
-    '</div></section>',
+   aboutCards(),
   cta:'<a class="btn ghost" href="'+BACK.href+'" data-route="'+BACK.route+'">'+BACK.label+'</a>'+
    '<a class="btn primary" style="flex:1.3" href="?doc='+(DOC.key==='user'?'privacy':'user')+'&from='+fromKey+'" data-testid="legal-primary">'+
    (DOC.key==='user'?'去读隐私政策':'去读用户服务协议')+'</a>'
@@ -398,13 +425,14 @@ V['loading']=function(){
   body:'<section class="sec">'+tabs(DOC.key)+'</section>'+
    '<section class="sec">'+docHead(DOC,'正在取正文，<b>取到之前不显示任何条款</b>')+'</section>'+
    '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">正在取正文</span><span class="hint">还没取到，先不显示条款</span></div>'+
-    '<div class="reader"><div class="sktoc">'+
+    '<div class="reader"><div class="sktoc"><div class="toc-t">章节目录</div>'+
     '<div class="r"></div><div class="r"></div><div class="r"></div><div class="r"></div><div class="r"></div><div class="r"></div>'+
-    '</div><div class="sk" style="flex:1"><span class="b h"></span><span class="b l w90"></span><span class="b l w82"></span><span class="b l w76"></span><span class="b l w90"></span><span class="b l w64"></span><span class="b l w82"></span><span class="b l w76"></span></div></div></section>'+
-   '<section class="sec"><div class="state" data-kind="warn">'+
+    '</div><div class="sk" style="flex:1"><span class="b h"></span><span class="b l w90"></span><span class="b l w64"></span>'+
+    '<div class="state" data-kind="warn">'+
     '<div class="state-h"><span class="'+(q.get('capture')==='1'?'':'breathe')+'">'+svg('clock','28')+'</span>为什么不先显示点什么</div>'+
     '<div class="state-p">法律文本<b>不能拿旧版本或示意文字先顶上</b>：你会以为自己读到了现行条款。所以取到之前这里只放槽位。</div>'+
-    '<div class="state-p">取不到会明确告诉你取不到，并给一个重试入口。</div></div></section>',
+    '<div class="state-p">取不到会明确告诉你取不到，并给一个重试入口。</div></div></div></div></section>'+
+   aboutCards(),
   cta:'<a class="btn ghost" href="'+BACK.href+'" data-route="'+BACK.route+'">'+BACK.label+'</a>'+
    '<a class="btn ghost" style="flex:1.3" href="?doc='+DOC.key+'&state=ready&from='+fromKey+'" data-testid="legal-primary">已取到，进入阅读</a>'
  };

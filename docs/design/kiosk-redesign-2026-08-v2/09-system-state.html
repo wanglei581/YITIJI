@@ -8,6 +8,7 @@
 规则 5：原来的「岗位与招聘会信息」改成「机构官方渠道」，不在我们云上做招聘入口。
 规则 7：底部「问小青：现在还能办什么」不判断机器好坏。
 未改：颜色、圆角、深绿状态区、五项状态、不伪造在线。
+9/28 留白：八项状态卡的判定挪到名称同一行右侧、说明在名称下排满整行，间距放宽，三张小卡下面不再空一截；排版示例态收起英雄区里与顶部横幅同义的那句提示，整屏放得下。无新增内容。
 原稿：../kiosk-redesign-2026-08/09-system-state.html（只读）。
 -->
 <html lang="zh-CN">
@@ -169,6 +170,29 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .qx-aiwrap{flex:none;display:flex;justify-content:flex-end;padding:6px 44px 0;background:var(--surface)}
 .qx-ai{display:inline-flex;align-items:center;min-height:48px;color:var(--teal-d);font-size:22px;font-weight:650}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   八项状态是这一页的主角：判定挪到名称同一行的右侧，说明在名称下面排满整行，
+   不再挤在判定左边一列八个字折三四行；内边距、间距放宽，三张小卡下面不再空一截。
+   排版示例态多一条「不是现在的读数」横幅，英雄区里那句同义提示收起，整屏放得下。 */
+.sec{margin-top:26px}
+.caps{gap:16px}
+.cap{display:grid!important;grid-template-columns:64px minmax(0,1fr) auto;grid-template-rows:auto auto;
+  column-gap:18px;row-gap:12px;align-items:center;min-height:0!important;padding:20px 24px!important}
+.cap .ci{grid-column:1;grid-row:1}
+.cap-main{display:contents}
+.cap-name{grid-column:2;grid-row:1;line-height:1.3}
+.cap-dep{grid-column:2 / span 2;grid-row:2;margin-top:0!important;align-self:start;font-size:23px!important;line-height:1.5!important;color:var(--ink-2)}
+.verdict{grid-column:3;grid-row:1;min-width:0!important;min-height:56px!important;padding:0 20px!important;font-size:22px!important}
+.grid3 .card{min-height:0!important;padding:22px 26px 24px!important}
+.card p{line-height:1.5!important}
+#body-root[data-state="ready-example"] .hero-note{display:none}
+#body-root[data-state="ready-example"] .sec{margin-top:20px}
+#body-root[data-state="ready-example"] .hero{padding:24px 36px!important}
+#body-root[data-state="ready-example"] .hero-glyph{width:132px!important;height:132px!important}
+#body-root[data-state="ready-example"] .caps{gap:12px}
+#body-root[data-state="ready-example"] .cap{padding:15px 24px!important;row-gap:10px;column-gap:14px}
+#body-root[data-state="ready-example"] .verdict{padding:0 14px!important}
+#body-root[data-state="ready-example"] .cap-dep{font-size:22px!important;line-height:1.5!important}
 </style>
 </head>
 <body>

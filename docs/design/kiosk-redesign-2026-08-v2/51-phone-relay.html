@@ -7,6 +7,7 @@
 规则 4：屏上不写服务端、会话、回执、链路、终端编号。机器名用「大厅里的这台机器」，不用 A03。
 规则 7：页脚加一句「回到这台机器后，可以让小青接着看」，不另开一条办理路径。
 未改：颜色、深绿顶栏、两条路径的状态拆分、不画假二维码。
+9/28 留白：只有一张状态卡的三屏（正在检查二维码、链接不能用来上传、签名暂不支持手机上传），余量不再全压在中间一段，改为分到状态卡与说明表的上下；其余 26 屏逐像素不变。无新增内容。
 原稿：../kiosk-redesign-2026-08/51-phone-relay.html。
 样式与脚本复制自原稿目录的 phone-relay.css、phone-relay.js（2026-09-28），本目录各留一份，原稿未改。
 -->
@@ -341,6 +342,13 @@
 .alertblock b,.fb-head,.filerow .meta b,.pg-head{font-size:16px!important}
 .qx-ai{margin:0 18px 8px;font-size:15px;line-height:1.45;color:#157a67}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（手机页，390×844，不套 27 寸字阶）
+   只有一张状态卡的三屏（正在检查二维码 / 链接不能用来上传 / 签名暂不支持手机上传），
+   原来 .grow 把说明表压到最底、中间空出 100–230px 一整段。改成把余量分到状态卡上下与说明表上下，
+   不集中成一片；内容放不下时自动边距归零，照常滚动，不会把上面的内容推出去。 */
+#stage:is([data-state="checking"],[data-state="invalid"],[data-state="signature-blocked"]) .flow>.grow{display:none}
+#stage[data-state="checking"] .flow>.statecard{margin-top:auto;margin-bottom:auto}
+#stage:is([data-state="invalid"],[data-state="signature-blocked"]) .flow>.facts{margin-top:auto;margin-bottom:auto}
 </style>
 </head>
 <body>
