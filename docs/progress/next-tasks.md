@@ -116,6 +116,8 @@
   - 32 收银台（`cashier-qx.css`、`CashierQxView.tsx`）：按钮条贴底、余高按 5:4 分给两栏与按钮条上方、两栏等高；`noteInPaycol` 把 pending-qr、display-expired-reconciling 算进左栏；运行页 `.cashier-qx-closure{display:none}` 把 no-order 空状态卡和到期核验「请勿重复付款」一起藏了，稿里显示。
   - 45 本机构官方渠道（`OfficialChannelsPage.tsx`、`official-channels-qx.css`）：码的尺寸、余量分三处、问小青行加「›」；运行页只有「回首页」一颗按钮，稿是「返回全部服务」加「回首页」。
   - 48 政策（`RenshiPage.tsx`、`renshi-policy-fusion.css`、`EligibilityResults.tsx`、`EligibilityPanel.tsx`）：任务头余高、分区头说明靠右、结果行左右并排、核对字号不低于 20；原稿壳层放大档（fit-3/4）把标题放到 43–46px，超出 2.0 字阶，运行页别照抄。
+  - 19 图片转 PDF 运行页（`apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx`、`ConvertImagesView.tsx`）：仍直接显示服务端原话「该请求标识已用于另一批图片，请更换标识重试」，并把请求编号（`requestKey`）显示在屏上；按稿 19 改成「这一批和刚才那一次对不上」这套说法，编号只留在数据属性里。
+  - 待定（稿 20 签名合成）：侧栏「审计失败会报错，但派生文件可能已存在」是工程话，改成人话会和同屏「明确失败：这一次没有生成文件」冲突——先确认服务端在审计写失败时到底留不留下签好的文件，再定口径；冲突态主按钮是禁用的，说明却写「只能当作新的一次」，页面上除了返回没有真正重新开始的入口，按稿实现时补一个「重新开始」。
   - 稿里仍有的小问题：05 输入中「换一条问题」第三条被正文区下沿切掉一半（在滚动区里，检查工具不算）；13 用合订本示例（`?pick=4`）时检查四态整行空白 178–216px（用户文件本身的留白，检查工具只按默认示例查）；16 ai-down 窄卡片角标折成两行。
 - 实现方（9/28 下午起）：Grok 额度用完（402），产品负责人定「Claude、Codex、agy 一起」；Codex 恢复可用（`-m gpt-6-astra`、medium），agy 只做纯推理评审。9/28 晚：Codex 沙箱起不了 Chromium、不能开本地端口，排版类工作改由 Claude 子代理做，Codex 做代码层核对与运行页 React 实现；Codex 两次报「模型满载」中途退出（退出码 0、无报告），派活后必验产出。
 - 上线：候选验收通过后，经产品负责人授权发布；发布后线上只剩新页面。

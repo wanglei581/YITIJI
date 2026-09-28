@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <!--
+- 9/28 用词：写稿人用语（原型、内部服务名、页面地址、请求标识）换成用户的话。
+- 9/28 用词：防重复提交的说法（标识、指纹、请求）换成用户的话，屏上不再显示编号。
 青序流光 2.0 · 19 图片转 PDF（2026-09-28）
 9/28 去掉内部英文键名
 9/28 逐状态检查修压字
@@ -637,7 +639,7 @@ function initModel(st){
 /* ================= 公共构件 ================= */
 function fxBar(){
  return '<div class="fxbar" role="note" data-testid="'+SCREEN+'-fixture"><span class="fx-b">示例</span>'+
-  '<span>固定原型数据 —— 这一屏上的图片、文件名、请求标识和转换结果都写死在原型里，<b>不是真实用户文件</b>，也不是真实办理结果。</span></div>';
+  '<span>这一屏是示例：图片、文件名和转换结果都是示例，<b>不是哪位用户的文件</b>。</span></div>';
 }
 function fitBox(w,h,rot,bw,bh){
  var q=(rot%180)!==0,nw=q?h:w,nh=q?w:h,s=Math.min(bw/nw,bh/nh);
@@ -654,7 +656,7 @@ function row(it,i){
  return '<div class="irow'+(sel?' on':'')+'" data-testid="'+SCREEN+'-row-'+i+'" data-name="'+it.n+'" data-rot="'+it.rot+'" data-bad="'+(it.bad||'')+'">'+
   '<button type="button" class="ipick press" data-act="pick:'+i+'" aria-pressed="'+(sel?'true':'false')+'" aria-label="选中第 '+(i+1)+' 张：'+it.n+'">'+
    '<span class="idx">'+(i+1)+'</span>'+
-   '<span class="ithumb"><img data-testid="'+SCREEN+'-thumb-'+i+'" src="'+fxSrc(it.f)+'" alt="第 '+(i+1)+' 张 '+it.n+'（固定原型图）" style="width:'+box.w+'px;height:'+box.h+'px;transform:rotate('+it.rot+'deg)"></span>'+
+   '<span class="ithumb"><img data-testid="'+SCREEN+'-thumb-'+i+'" src="'+fxSrc(it.f)+'" alt="第 '+(i+1)+' 张 '+it.n+'（示例图）" style="width:'+box.w+'px;height:'+box.h+'px;transform:rotate('+it.rot+'deg)"></span>'+
    '<span class="imeta"><b>'+it.n+'</b><span>'+szText(it)+(it.rot?' · 本机已转 '+it.rot+'°':'')+'</span></span>'+
    badTag(it)+
   '</button>'+
@@ -741,11 +743,11 @@ function rulesShort(){
   '<li><span class="sq"></span><span>一张图一页，按 A4 排版；生成的 PDF ≤ '+LIM.out+' MB。</span></li></ul></div>';
 }
 function reqPanel(note){
- return '<div class="pgrp" data-testid="'+SCREEN+'-req"><h4>本次请求标识</h4>'+
-  '<div class="kv"><div><span>请求标识</span><b data-testid="'+SCREEN+'-reqid" data-req="'+M.req+'">'+M.req+'</b></div>'+
-  '<div><span>输入指纹</span><b data-testid="'+SCREEN+'-fp" data-fp="'+fpOf()+'">'+fpOf()+'</b></div>'+
+ return '<div class="pgrp" data-testid="'+SCREEN+'-req"><h4>同一批只算一次</h4>'+
+  '<div class="kv"><div><span>重试、再查</span><b data-testid="'+SCREEN+'-reqid" data-req="'+M.req+'">还算同一次</b></div>'+
+  '<div><span>顺序一变</span><b data-testid="'+SCREEN+'-fp" data-fp="'+fpOf()+'">就算新的一批</b></div>'+
   '<div><span>这批图片</span><b>'+M.items.length+' 张，按上面的顺序</b></div></div>'+
-  '<div class="state-p">指纹只由<b>有序</b>的文件名算出：顺序一变，指纹就变。'+(note||'同一批图片、同一个顺序，<b>始终用这一个标识</b>：重试、断线重连、恢复结果都靠它，系统不会因此多生成一份。')+'</div></div>';
+  '<div class="state-p">系统认这一批图，只看<b>有哪几张、谁先谁后</b>。'+(note||'同一批图片、同一个顺序，<b>始终算同一次</b>：重试、断线重连、找回结果都按这一次算，系统不会因此多生成一份。')+'</div></div>';
 }
 function outPanel(){
  var o=M.out;
@@ -754,7 +756,7 @@ function outPanel(){
   '<div><span>怎么认</span><b data-testid="'+SCREEN+'-fileid">看文件名和页数</b></div>'+
   '<div><span>页数</span><b>'+o.pages+' 页（每张图一页）</b></div>'+
   '<div><span>大小</span><b>'+o.mb.toFixed(1)+' MB（上限 '+LIM.out+' MB）</b></div>'+
-  '<div><span>校验值</span><b>'+o.md5+'…（实际给出的前 12 位）</b></div>'+
+  '<div><span>排版</span><b data-md5="'+o.md5+'">A4，一张图一页，不裁切</b></div>'+
   '<div><span>打印链接</span><b>临时下载链接，'+o.ttl+' 分钟内有效</b></div></div></div>';
 }
 function band(kind,ico,title,ps,chips,breathe){
@@ -860,7 +862,7 @@ V['local-uploading']=function(){
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">'+(M.items.length?'已经在列表里的还在':'列表还是空的')+'</span><span class="hint">'+M.items.length+' / '+LIM.imgs+' 张</span></div>'+
   (M.items.length?listCard(null,2):'<div class="card"><div class="state-p">列表里还没有别的图片。<b>这一张传成功之后会成为第 1 页</b>；没成功就什么都不会加进来。</div></div>')+
   addRow(true,'这一张还在上传')+'</section>'+
-  '<section class="sec grow last"><div class="grid2">'+rules()+reqPanel('这一批还没提交，请求标识会在你点「合成」时随第一次请求一起用上。')+'</div></section>'+
+  '<section class="sec grow last"><div class="grid2">'+rules()+reqPanel('这一批还没提交；你点「合成」那一下，才算正式交了这一次。')+'</div></section>'+
   ctaOff('上传完成后可合成','这一张还在上传，结果没确认前不合成','<button type="button" class="btn ghost press" data-act="cancel-upload">取消这一张</button>'+GHOST_HUB);
 };
 /* 能力边界工作台：先说清三个入口里接了哪两个，再把 U 盘里的图片**现在**真正能走的两条路画出来。
@@ -1013,25 +1015,25 @@ function waitView(opts){
 V['merging']=function(){
  return waitView({title:'正在合成的就是这个顺序',
   band:band('info','info','正在合成 PDF',
-   ['请求<b>已经发出去了</b>，按你排好的顺序合成一份 PDF，一张图一页。',
-    '这是一次性请求，<b>系统不回传中间进度</b>，所以这里没有百分比、没有进度条，也没有「还需几秒」。结果回来之前，这一屏不会自己变。'],
-   ['一次性请求','无进度回传','结果回来才算完成'],true),
-  reqNote:'离开这一页<b>不会取消</b>这次合成；回来之后用<b>同一个请求标识</b>再查一次就行，不要另起一次新的。',
+   ['这一批<b>已经交给系统了</b>，按你排好的顺序合成一份 PDF，一张图一页。',
+    '合成要一次做完，<b>系统不回传中间进度</b>，所以这里没有百分比、没有进度条，也没有「还需几秒」。结果回来之前，这一屏不会自己变。'],
+   ['已交给系统','无进度回传','结果回来才算完成'],true),
+  reqNote:'离开这一页<b>不会取消</b>这次合成；回来之后<b>再查刚才那一次</b>就行，不要另起一次新的。',
   cta:ctaOff('合成完成后可继续','系统还没返回合成结果',GHOST_HUB)});
 };
 V['conversion-in-progress']=function(){
  return waitView({title:'这一批的顺序没有变',
-  band:band('lock','lock','上一次同标识的生成还在跑',
-   ['系统回的是 <b>「上一次生成仍在进行中，请稍候重试」</b>：<b>'+M.req+'</b> 这个标识下已经有一次合成在跑了。',
-    '这时候<b>不能另起一次新的请求</b> —— 那会变成两次转换。正确做法是拿同一个标识<b>再查一次</b>，等它把结果给出来。'],
-   ['系统：正在进行中','不新建请求','用同一标识再查']),
-  reqNote:'锁的有效期约 <b>120 秒</b>，结果缓存约 <b>10 分钟</b>。在这段时间里，同一个标识 + 同一批顺序<b>只会有一份结果</b>。',
-  cta:ctaAct(GHOST_HUB,'用同一个标识再查一次','recheck')});
+  band:band('lock','lock','刚才那一次的合成还在跑',
+   ['系统回的是 <b>「上一次生成仍在进行中，请稍候重试」</b>：<b>刚才那一次</b>已经在合成了。',
+    '这时候<b>不能当作新的一次再交</b> —— 那会变成两次转换。正确做法是<b>再查刚才那一次</b>，等它把结果给出来。'],
+   ['系统：正在进行中','不重新提交','再查刚才那一次']),
+  reqNote:'正在跑的这一批，约 <b>120 秒</b>内不会被重复开始；做好的结果保留约 <b>10 分钟</b>。这段时间里，同一批图片、同一个顺序<b>只会有一份结果</b>。',
+  cta:ctaAct(GHOST_HUB,'再查刚才那一次','recheck')});
 };
 function doneView(loggedIn,st){
  var o=M.out;
  return '<section class="sec">'+band('info','check','PDF 已生成',
-  ['结果回来了合成结果：<b>'+o.n+'，共 '+o.pages+' 页</b>，页序与你排的顺序一致。'+
+  ['合成结果回来了：<b>'+o.n+'，共 '+o.pages+' 页</b>，页序与你排的顺序一致。'+
    (loggedIn?'':'<b>你现在没登录，这份 PDF 不会进「我的文档」</b>，建议在这一趟里直接接着走完打印。')],
   ['系统已返回结果','一张图一页 · A4',loggedIn?'已进我的文档 · 约 24 小时':'未登录 · 不进我的文档'])+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">这份 PDF 的每一页</span><span class="hint">'+o.pages+' 页 · 点开可逐页看完整</span></div>'+
@@ -1049,7 +1051,7 @@ function outRows(){
   h+='<div class="irow" data-testid="'+SCREEN+'-outrow-'+i+'" data-name="'+it.n+'">'+
    '<button type="button" class="ipick press" data-act="open-out:'+(i+1)+'" aria-label="打开这份 PDF 的第 '+(i+1)+' 页（来自 '+it.n+'）">'+
    '<span class="idx">'+(i+1)+'</span>'+
-   '<span class="ithumb"><img data-testid="'+SCREEN+'-outthumb-'+i+'" src="'+fxSrc(it.f)+'" alt="第 '+(i+1)+' 页，来自 '+it.n+'（固定原型图）" style="width:'+box.w+'px;height:'+box.h+'px"></span>'+
+   '<span class="ithumb"><img data-testid="'+SCREEN+'-outthumb-'+i+'" src="'+fxSrc(it.f)+'" alt="第 '+(i+1)+' 页，来自 '+it.n+'（示例图）" style="width:'+box.w+'px;height:'+box.h+'px"></span>'+
    '<span class="imeta"><b>第 '+(i+1)+' 页</b><span>来自 '+it.n+' · 按 A4 居中放大，不裁切</span></span></button>'+
    '<button type="button" class="ibtn press" data-act="open-out:'+(i+1)+'" aria-label="完整查看第 '+(i+1)+' 页">'+svg('eye','currentColor',26)+'</button></div>';
  }
@@ -1063,64 +1065,64 @@ V['output-preview-zoomed']=function(){return doneView(true,'output-preview-zoome
 V['output-preview-failed']=function(){return doneView(true,'output-preview-failed')};
 V['recovered-completed']=function(){
  var o=M.out;
- return '<section class="sec">'+band('info','check','用同一个标识把结果找回来了',
-  ['系统在 <b>'+M.req+'</b> 这个标识下<b>已经有一份完成的结果</b>，刚才那一次其实做完了，只是结果没送到这台机器。',
+ return '<section class="sec">'+band('info','check','刚才那一次的结果找回来了',
+  ['系统那边<b>已经有一份完成的结果</b>：刚才那一次其实做完了，只是结果没送到这台机器。',
    '所以这里<b>没有生成第二份</b>：文件名、页数、页序都和原来那一次完全一样，只是重新签发了一条新的临时打印链接。'],
-  ['同一标识命中已完成结果','没有生成第二份','重新签发打印链接'])+'</section>'+
+  ['刚才那一次已经做完','没有生成第二份','重新签发打印链接'])+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">这份 PDF 的每一页</span><span class="hint">'+o.pages+' 页 · 与当初提交的顺序一致</span></div>'+
   '<div class="lwrap" data-testid="'+SCREEN+'-outlist"><div class="lhead"><span>页序与来源</span><span class="sub">'+o.pages+' 页 · 与提交顺序一致</span></div>'+
   '<div class="lrows" style="height:'+(M.items.length*ROWH-1)+'px" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="PDF 页序列表，可上下滚动">'+outRows()+'</div>'+
   orderLine()+'</div>'+
   '<div class="selbar"><button type="button" class="selbtn press" data-act="open-out" data-testid="'+SCREEN+'-preview-open" aria-label="逐页完整查看这份 PDF">'+svg('eye','currentColor',24)+'逐页完整查看这份 PDF</button></div></section>'+
-  '<section class="sec grow last"><div class="grid2">'+outPanel()+reqPanel('恢复用的就是原来那个标识。它的结果缓存约 <b>10 分钟</b>，过了这个窗口再查就查不到了，那时才需要重新提交。')+'</div></section>'+
+  '<section class="sec grow last"><div class="grid2">'+outPanel()+reqPanel('找回的就是刚才那一次。结果只保留约 <b>10 分钟</b>，过了这段时间就查不到了，那时才需要重新提交。')+'</div></section>'+
   ctaOpen(GHOST_DOCS,EXIT_LABEL,EXIT_HREF,EXIT_ROUTE);
 };
 V['known-failed']=function(){
  return waitView({title:'图片和顺序都保留着',
   band:band('error','warn','这一次明确失败了',
    ['系统给了明确的失败结果：<b>「PDF 生成校验失败，请重试」</b>。<b>没有生成 PDF</b>，也没有半成品留在系统。',
-    '你排好的 '+M.items.length+' 张图片和顺序<b>都还在</b>，不用重新传。明确失败之后这个标识已经被系统释放，可以原样再提交一次。'],
+    '你排好的 '+M.items.length+' 张图片和顺序<b>都还在</b>，不用重新传。明确失败不会挡着你，可以原样再提交一次。'],
    ['系统已明确失败','没有生成 PDF','列表和顺序保留']),
-  reqNote:'明确失败会把这个标识的占用<b>清掉</b>，所以用<b>同一个标识</b>原样重试是安全的，不会撞上「已被占用」。',
-  cta:ctaAct(GHOST_HELP,'用同一个标识重试合成','convert')});
+  reqNote:'明确失败之后，刚才那一次<b>不再占着</b>，所以<b>原样重试</b>是安全的，不会被当成重复提交挡回来。',
+  cta:ctaAct(GHOST_HELP,'按原样重试合成','convert')});
 };
 V['result-unknown']=function(){
  return waitView({title:'图片和顺序都保留着',
   band:band('warn','warn','这一次的结果不知道',
-   ['请求发出去了，但<b>结果没有送到这台机器</b>（网络断了，或者等待超时）。所以现在有两种可能：系统已经做完了，或者根本没做成。',
-    '在弄清楚之前，<b>不能直接再发一次新的请求</b> —— 如果上一次其实成功了，那就会变成两份 PDF。正确做法是拿<b>同一个请求标识</b>去查这一次的结果。'],
-   ['结果未知','不新建请求','用同一标识查询']),
-  reqNote:'系统按这个标识缓存结果约 <b>10 分钟</b>：这段时间里查得到就说明上一次成功了，查不到才需要重新提交。',
-  cta:ctaAct(GHOST_HELP,'用同一个请求标识查这一次的结果','recheck')});
+   ['这一批交出去了，但<b>结果没有送到这台机器</b>（网络断了，或者等待超时）。所以现在有两种可能：系统已经做完了，或者根本没做成。',
+    '在弄清楚之前，<b>不能当作新的一次再交</b> —— 如果上一次其实成功了，那就会变成两份 PDF。正确做法是<b>再查刚才那一次</b>的结果。'],
+   ['结果未知','不重新提交','只查刚才那一次']),
+  reqNote:'刚才那一次的结果保留约 <b>10 分钟</b>：这段时间里查得到就说明上一次成功了，查不到再重新提交。',
+  cta:ctaAct(GHOST_HELP,'再查一下刚才那一次的结果','recheck')});
 };
 V['retrying-same-request']=function(){
  return waitView({title:'图片和顺序都保留着',
-  band:band('info','info','正在用同一个标识再查一次',
-   ['正在拿 <b>'+M.req+'</b> 去问系统这一次的结果。<b>没有新建请求</b>，也没有换标识，所以不会多出第二份 PDF。',
+  band:band('info','info','正在再查刚才那一次',
+   ['正在问系统<b>刚才那一次</b>的结果。<b>没有当作新的一次再交</b>，所以不会多出第二份 PDF。',
     '这一屏<b>不会自己变成完成</b>：没有百分比，也没有计时器。只有你再点一次、系统真的把结果给出来，它才会变。'],
-   ['同一请求标识','没有新建请求','不会自动变完成'],true),
-  reqNote:'查询用的标识和当初提交时<b>完全一样</b>：'+M.req+'。同一个标识 + 同一批顺序，系统只会给出同一份结果。',
+   ['还是刚才那一次','没有重新提交','不会自动变完成'],true),
+  reqNote:'查的就是<b>当初交的那一次</b>，图片和顺序都没动。同一批图片、同一个顺序，只会给出同一份结果。',
   cta:ctaAct(GHOST_HELP,'再查一次这次的结果','recovered')});
 };
 V['idempotency-conflict']=function(){
- return '<section class="sec">'+band('error','lock','这个标识已经用在另一批图片上了',
-  ['系统拒绝了：<b>「该请求标识已用于另一批图片，请更换标识重试」</b>。<b>'+M.req+'</b> 之前提交的是另一个顺序，现在这一批和它对不上。',
-   '本页<b>就停在这里</b>：不自动换标识、不自动改回旧顺序，也不把这一批悄悄合并进上一次的结果。要继续，必须你自己挑一条路。'],
+ return '<section class="sec">'+band('error','lock','这一批和刚才那一次对不上',
+  ['系统拒绝了这一批：<b>刚才那一次交的是另一个顺序</b>，同样的图片换了先后，和它对不上。',
+   '本页<b>就停在这里</b>：不自动重新开始、不自动改回旧顺序，也不把这一批悄悄合并进上一次的结果。要继续，必须你自己挑一条路。'],
   ['系统已拒绝','没有生成任何 PDF','不自动替你决定'])+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">现在这一批的顺序</span><span class="hint">'+M.items.length+' / '+LIM.imgs+' 张 · 与上一次不同</span></div>'+
   listCard(null,3)+'</section>'+
   '<section class="sec grow last"><div class="grid2">'+
   '<div class="pgrp"><h4>两批的差别</h4><div class="kv">'+
-  '<div><span>请求标识</span><b data-testid="'+SCREEN+'-reqid" data-req="'+M.req+'">'+M.req+'</b></div>'+
-  '<div><span>上一次</span><b>第 1 页 '+FX[0].n+' → 第 3 页 '+FX[2].n+'　指纹 '+fpOfNames([FX[0].n,FX[1].n,FX[2].n])+'</b></div>'+
-  '<div><span>这一次</span><b data-testid="'+SCREEN+'-fp" data-fp="'+fpOf()+'">第 1 页 '+M.items[0].n+' → 第 3 页 '+M.items[2].n+'　指纹 '+fpOf()+'</b></div>'+
-  '<div><span>系统判定</span><b>同一个标识、两份不同的有序输入 —— 冲突</b></div></div>'+
-  '<div class="state-p">顺序不同就是不同的输入：第 1 页和第 3 页换了位置，指纹跟着变了。</div></div>'+
+  '<div><span>图片</span><b data-testid="'+SCREEN+'-reqid" data-req="'+M.req+'">还是这 '+M.items.length+' 张，没有增减</b></div>'+
+  '<div><span>上一次</span><b data-prev-fp="'+fpOfNames([FX[0].n,FX[1].n,FX[2].n])+'">第 1 页 '+FX[0].n+' → 第 3 页 '+FX[2].n+'</b></div>'+
+  '<div><span>这一次</span><b data-testid="'+SCREEN+'-fp" data-fp="'+fpOf()+'">第 1 页 '+M.items[0].n+' → 第 3 页 '+M.items[2].n+'</b></div>'+
+  '<div><span>系统判定</span><b>不是同一批，和刚才那一次对不上</b></div></div>'+
+  '<div class="state-p">第 1 页和第 3 页换了位置，就算另一批，不是刚才那一次了。</div></div>'+
   '<div class="pgrp"><h4>你可以怎么办</h4><ul class="plan">'+
-  '<li><span class="sq"></span><span><b>恢复上一次的顺序</b>，再用这个标识去查那一次的结果。</span></li>'+
-  '<li><span class="sq"></span><span>或者<b>换一个新的请求标识</b>，把现在这一批当成新的一次提交。</span></li>'+
+  '<li><span class="sq"></span><span><b>恢复上一次的顺序</b>，再去查刚才那一次的结果。</span></li>'+
+  '<li><span class="sq"></span><span>或者<b>重新开始</b>，把现在这一批当成新的一次提交。</span></li>'+
   '<li><span class="sq"></span><span>两条路都要你点一下 —— 本页不会替你选。</span></li></ul></div></div></section>'+
-  '<div class="ctabar"><button type="button" class="btn ghost press" data-act="new-key" style="flex:1">换一个新标识重新提交</button>'+
+  '<div class="ctabar"><button type="button" class="btn ghost press" data-act="new-key" style="flex:1">重新开始，当作新的一次</button>'+
   '<button type="button" class="btn primary press" style="flex:1.6" data-act="restore-order" data-testid="'+SCREEN+'-primary">恢复上一次的顺序</button></div>';
 };
 /* ================= 顶栏状态与顾问文案 ================= */
@@ -1141,7 +1143,7 @@ var PILL={
  'image-dimensions-invalid':['bad','有图片像素超出上限'],
  'output-too-large':['warn','合成结果超过 15 MB'],
  'merging':['','正在合成 · 无进度回传'],
- 'conversion-in-progress':['warn','同标识的生成还在跑'],
+ 'conversion-in-progress':['warn','上一次的合成还在跑'],
  'completed-auth':['ok','PDF 已生成 · 已进我的文档'],
  'completed-anonymous':['warn','已生成 · 未登录不留存'],
  'output-preview-page2':['ok','逐页查看 · 第 2 页'],
@@ -1149,10 +1151,10 @@ var PILL={
  'output-preview-zoomed':['ok','逐页查看 · 放大'],
  'output-preview-failed':['warn','预览取不到 · 文件还在'],
  'known-failed':['bad','明确失败 · 可原样重试'],
- 'result-unknown':['warn','结果未知 · 需同标识查询'],
- 'retrying-same-request':['','正在用同一标识再查'],
+ 'result-unknown':['warn','结果未知 · 先查刚才那一次'],
+ 'retrying-same-request':['','正在再查刚才那一次'],
  'recovered-completed':['ok','已恢复 · 没有生成第二份'],
- 'idempotency-conflict':['bad','同标识、不同输入 · 冲突']
+ 'idempotency-conflict':['bad','顺序和刚才那一次对不上']
 };
 var ASK={
  'empty':['几张图，<em>拼成一份 PDF</em>。','只收 JPG / PNG，单张不超过 10 MB，一次最多 20 张。<b>先加第一张。</b>'],
@@ -1170,19 +1172,19 @@ var ASK={
  'total-input-too-large':['这一批<em>加起来太大</em>。','单张都没超，合计超了 40 MB。<b>一张都没转，顺序还在。</b>'],
  'image-dimensions-invalid':['第 2 张<em>像素太多</em>。','6000×5000 超过单张 2500 万像素。<b>整批都没转。</b>'],
  'output-too-large':['合出来的<em>太大了</em>。','输出超过 15 MB，系统没留下这份 PDF。<b>分两批通常就能过。</b>'],
- 'merging':['正在<em>合成</em>。','一次性请求，没有进度回传。<b>结果出来之前我不说做完了。</b>'],
- 'conversion-in-progress':['上一次<em>还在跑</em>。','同一个标识下已经有一次在合成。<b>不新建请求，拿同一个标识再查。</b>'],
+ 'merging':['正在<em>合成</em>。','已经交给系统，没有进度回传。<b>结果出来之前我不说做完了。</b>'],
+ 'conversion-in-progress':['上一次<em>还在跑</em>。','刚才那一次已经在合成了。<b>不重新提交，过一会儿再查它。</b>'],
  'completed-auth':['<em>合好了</em>。','3 张图 3 页，页序和你排的一样，已经进「我的文档」。'],
  'completed-anonymous':['<em>合好了</em>。','但<b>没登录，这份不会进「我的文档」</b>，这一趟里直接接着走完打印。'],
  'output-preview-page2':['正在看<em>第 2 页</em>。','每一页显示的就是那一张原图，页码在下面的工具条上。'],
  'output-preview-last':['这是<em>最后一页</em>。','到底了，「下一页」已经停用并说明了原因。'],
  'output-preview-zoomed':['<em>放大</em>看细节。','按住画面拖动，四个角都能看到。'],
  'output-preview-failed':['预览<em>取不到</em>。','<b>只是看不了这一眼</b>：文件在、页数在、打印链接也在。'],
- 'known-failed':['这次<em>明确失败</em>。','图片和顺序都还在，不用重传。<b>用同一个标识原样重试。</b>'],
- 'result-unknown':['结果<em>不知道</em>。','结果没送到。<b>不能直接再发一次，得拿同一个标识去查。</b>'],
- 'retrying-same-request':['正在<em>再查一次</em>。','同一个请求标识，没有新建请求。<b>这一屏不会自己变成完成。</b>'],
+ 'known-failed':['这次<em>明确失败</em>。','图片和顺序都还在，不用重传。<b>直接原样重试就行。</b>'],
+ 'result-unknown':['结果<em>不知道</em>。','结果没送到。<b>不能当新的一次再交，得再查刚才那一次。</b>'],
+ 'retrying-same-request':['正在<em>再查一次</em>。','查的是刚才那一次，没有重新提交。<b>这一屏不会自己变成完成。</b>'],
  'recovered-completed':['<em>找回来了</em>。','上一次其实成功了。<b>没有生成第二份，页序一模一样。</b>'],
- 'idempotency-conflict':['这个标识<em>对不上</em>。','同一个标识，顺序变了就是另一批输入。<b>我停在这里，等你决定。</b>']
+ 'idempotency-conflict':['这一批<em>对不上</em>。','顺序变了，就不是刚才那一批了。<b>我停在这里，等你决定。</b>']
 };
 /* ================= 渲染 ================= */
 function render(st){
@@ -1354,15 +1356,15 @@ function pvSetPage(no){
 }
 function pvPaperInner(){
  var d=pv.doc;
- if(d.kind==='input')return '<img class="pp-img" data-testid="'+SCREEN+'-preview-img" src="'+d.src+'" alt="'+d.n+' 的完整画面（固定原型图）">';
- return '<img class="pp-img" data-testid="'+SCREEN+'-preview-img" src="'+d.srcs[pv.page-1]+'" alt="第 '+pv.page+' 页，来自 '+d.srcNames[pv.page-1]+'（固定原型图）">';
+ if(d.kind==='input')return '<img class="pp-img" data-testid="'+SCREEN+'-preview-img" src="'+d.src+'" alt="'+d.n+' 的完整画面（示例图）">';
+ return '<img class="pp-img" data-testid="'+SCREEN+'-preview-img" src="'+d.srcs[pv.page-1]+'" alt="第 '+pv.page+' 页，来自 '+d.srcNames[pv.page-1]+'（示例图）">';
 }
 function pvBtn(tid,label,al,cls){
  return '<button type="button" class="pvb'+(cls?' '+cls:'')+' press" data-testid="'+SCREEN+'-preview-'+tid+'" aria-label="'+(al||label)+'">'+label+'</button>';
 }
 function pvFixtureBar(){
  return '<div class="pv-fx" data-testid="'+SCREEN+'-preview-fixture" role="note"><span class="fx-b">示例</span>'+
-  '<span>固定原型数据 / 演示图片，<b>不是真实用户文件</b>。这幅画面写死在原型里，不是真实办理结果，也不是这台机器此刻真读到的内容。</span></div>';
+  '<span>示例图片，<b>不是哪位用户的文件</b>。这幅画面不是真实办理结果，也不是这台机器此刻真读到的内容。</span></div>';
 }
 /* 预览失败：还是同一个阅读器 —— 纸的位置、页数、文件事实和退出口都在原位，
    只有"这一页画什么"取不到。绝不改写成果文件的状态，也不假装看到了内容。 */
