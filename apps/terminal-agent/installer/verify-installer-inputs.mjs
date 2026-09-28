@@ -457,6 +457,15 @@ for (const policy of ['LocalNetworkAccessAllowedForUrls', 'AudioCaptureAllowedUr
   assert.ok(productionInstaller.includes(policy), `Edge kiosk policy ${policy} must be provisioned`)
 }
 assert.match(productionInstaller, /RemoveEdgeKioskPolicies/, 'Edge kiosk policies must be removable')
+// 2026-09-29：测试兼工作机（如 KSK-001）可显式不禁用文件选择框（整机策略会让那台电脑的普通 Edge 也选不了文件）；
+// 默认（专用一体机）必须照旧禁用，开关分支只许删除该值并打印警告。
+assert.match(productionInstaller, /\[switch\]\$KeepFileSelectionDialogs/, 'keeping file dialogs must be an explicit opt-in switch')
+assert.match(productionInstaller, /-KeepFileDialogs:\$KeepFileSelectionDialogs/, 'the opt-out switch must reach Set-EdgeKioskPolicies')
+assert.match(
+  productionInstaller,
+  /if \(\$KeepFileDialogs\) \{[\s\S]*?Remove-ItemProperty -LiteralPath \$edgePolicyPath -Name "AllowFileSelectionDialogs"[\s\S]*?Write-WarnLine "[^"\r\n]*never a dedicated kiosk"\s*\} else \{\s*New-ItemProperty -LiteralPath \$edgePolicyPath -Name "AllowFileSelectionDialogs" -Value 0 -PropertyType DWord/,
+  'the default (dedicated kiosk) must still disable file selection dialogs; the opt-out only removes the value, with a warning',
+)
 assert.match(productionInstaller, /\$listKey = Join-Path \$edgePolicyPath \$policyName[\s\S]*-Name \(\[string\]\(\$index \+ 1\)\)/, 'Edge list policies are a subkey with numbered values, not suffixed values on the Edge key')
 assert.doesNotMatch(productionInstaller, /"\$policyName" \+ \(\$index \+ 1\)/, 'suffixed values such as AudioCaptureAllowedUrls1 are ignored by Edge')
 assert.match(productionInstaller, /Bound" -Value 1/, 'binding must record the upgrade marker the MSI searches for')
