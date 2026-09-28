@@ -343,7 +343,7 @@ export function PrintConfirmPage() {
     if (terminalSession === 'failed') {
       setSubmitError(userMessageOf(
         { code: 'TERMINAL_SESSION_INVALID' },
-        '终端安全校验失败，请联系现场工作人员',
+        '这台机器的安全校验没通过，请联系现场工作人员',
       ))
       return
     }
@@ -481,7 +481,7 @@ export function PrintConfirmPage() {
   const primaryLabel = terminalSession === 'checking'
     ? '安全校验中…'
     : terminalSession === 'failed'
-      ? '终端安全校验失败'
+      ? '这台机器的安全校验没通过'
       : submitting
         ? '提交中…'
         : printerLoading
@@ -630,7 +630,7 @@ export function PrintConfirmPage() {
         printerBlocked={printerBlocked}
         printerBlockedReason={printerBlockedReason}
         terminalFailed={terminalSession === 'failed'}
-        terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, '终端安全校验失败，请联系现场工作人员')}
+        terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, '这台机器的安全校验没通过，请联系现场工作人员')}
         paramsWereRestricted={paramsWereRestricted}
         selfAssessment={selfAssessment}
         printNotes={printNotes}

@@ -454,8 +454,8 @@ test('a revoked terminal session fails the creation closed and is not retried @k
   await enterSettingsFromVisibleStart(page)
   // 换票失败后还会向本机 Agent 要一张新引导票（默认配置里配了桥接令牌），
   // 连不上要等一次 4 秒超时才落到 fail-closed —— 这条断言要能等过那一段。
-  await expect(page.getByText('终端安全校验失败', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('终端安全校验失败，请联系现场工作人员', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('这台机器的安全校验没通过，请联系现场工作人员', { exact: false }).first()).toBeVisible()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   await page.waitForTimeout(500)
@@ -864,7 +864,7 @@ test('a terminal session that recovers after the abandoned task was revoked neve
 
   // 创建还在飞的那一刻终端身份被吊销：页面据此对用户宣告失败。
   await startTerminalSessionRefresh(page)
-  await expect(page.getByText('终端安全校验失败', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
   expect(await terminalSessionStateOf(page), '换票 401 且本机 Agent 取不到票时必须 fail-closed').toBe('failed')
 
   // 迟到的创建响应：任务撤掉、不回写本机登记（已有闸门，先确认它成立，后半段才谈得上）。
@@ -882,7 +882,7 @@ test('a terminal session that recovers after the abandoned task was revoked neve
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   // 2) 已经对用户说过的失败结论仍然在屏上：恢复的是终端身份，不是这一场扫描。
-  await expect(page.getByText('终端安全校验失败', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible()
   // 3) 作废的凭证不得写回本机登记 —— 写回去，下一次进 /scan 会复水到一个已被撤销的任务。
   const stored = await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '')
   expect(stored).not.toContain(SCAN_TASK_ID)
@@ -932,7 +932,7 @@ test('a create deferred by a terminal refresh still goes out once the new ticket
   await page.getByRole('button', { name: /下一步/ }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
   // 换票没出结果之前：不抢跑创建请求（抢跑只会拿回 401），也不谎称正在建扫描会话。
-  await expect(page.getByText('正在做终端安全校验', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('正在做这台机器的安全校验', { exact: true }).first()).toBeVisible()
   expect(createRequests(), '终端会话还在换票时不许发创建请求').toBe(0)
 
   openRefresh()

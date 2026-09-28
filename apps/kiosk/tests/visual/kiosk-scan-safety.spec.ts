@@ -2037,7 +2037,7 @@ test('a rescan deferred past its local window sends no unsigned create @scan-saf
 
   await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).dispatchEvent('click')
   await page.waitForURL(/\/scan\?stage=settings/)
-  await expect(page.getByText('正在做终端安全校验', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('正在做这台机器的安全校验', { exact: true }).first()).toBeVisible()
   expect(server.creates, '换票没出结果之前一个创建请求都不许发').toHaveLength(0)
 
   // 等在 checking 的这段时间里，本地那 15 分钟窗口走完了。

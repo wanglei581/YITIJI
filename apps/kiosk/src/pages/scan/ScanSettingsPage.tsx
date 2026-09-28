@@ -292,10 +292,10 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         // 它回来时就是个没人认领的任务 —— 登记这一笔，让它到时候把自己撤掉。
         terminalFailClosedRef.current = true
         setFailure({
-          title: '终端安全校验失败',
+          title: '这台机器的安全校验没通过',
           description: userMessageOf(
             { code: 'TERMINAL_SESSION_INVALID' },
-            '终端安全校验失败，请联系现场工作人员',
+            '这台机器的安全校验没通过，请联系现场工作人员',
           ),
         })
         setPhase('error')

@@ -271,11 +271,9 @@ export function ResumeOptimizePage() {
           {modules.length > 0 && (
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('overview')}>返回建议总览</button>
           )}
-          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => {
-            if (exportBlocked) return
-            if (assembledResult?.failures.length) { setDecisionFailures(assembledResult.failures); return }
-            setFactOpen('resume')
-          }}>
+          {/* 导出的就是编辑区里的这一份：用户在编辑区亲手改过的段落以他改的为准，
+              不因为和某条「保留原文」的选择对不上就拦住导出。 */}
+          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => { if (!exportBlocked) setFactOpen('resume') }}>
             {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
           </button>
         </div>
@@ -321,8 +319,9 @@ export function ResumeOptimizePage() {
         data-synthetic={resolved.synthetic ? '1' : undefined}
       >
         <ResumeAigcBadge synthetic={resolved.synthetic} />
-        {Object.values(decisionIssues).length > 0 && (
-          <div className="qx-opt-decision-status" role="status" style={{ fontSize: 'var(--qx-fs-aux)' }}>{Object.values(decisionIssues).map((message) => <p key={message}>{message}</p>)}</div>
+        {/* 总览里原因写在对应那一条下面；编辑区（从对照页带回、或没有总览时）在这里集中说一次。 */}
+        {!showOverview && Object.values(decisionIssues).length > 0 && (
+          <div className="qx-opt-decision-status" role="status">{Object.values(decisionIssues).map((message) => <p key={message}>{message}</p>)}</div>
         )}
         {stateBody}
         {view !== 'ready' && (

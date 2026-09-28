@@ -271,6 +271,27 @@
 .qx-opt-row .tx b { display: block; font-size: var(--qx-fs-body); font-weight: 800; }
 .qx-opt-row .tx span { display: block; margin-top: 4px; color: var(--qx-ink-3); font-size: var(--qx-fs-aux); line-height: 1.4; }
 
+/* 某一条没能自动切换时的原因：总览写在那一条下面（整行），编辑区在顶部集中一次。 */
+.qx-opt-mod { flex-wrap: wrap; }
+.qx-opt-decision-row-status {
+  flex: 1 0 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--qx-wheat-soft);
+  color: var(--qx-wheat-d);
+  font-size: var(--qx-fs-aux);
+  line-height: 1.45;
+}
+.qx-opt-decision-status {
+  padding: 10px 16px;
+  border: 1px solid color-mix(in srgb, var(--qx-wheat) 30%, var(--qx-line));
+  border-radius: 16px;
+  background: var(--qx-wheat-soft);
+  color: var(--qx-wheat-d);
+}
+.qx-opt-decision-status p { margin: 0; font-size: var(--qx-fs-aux); line-height: 1.45; }
+
 /* 没有可对照条目时直接进编辑区，这一句说明为什么这里没有总览。 */
 .qx-opt-nomods {
   margin: 0;
