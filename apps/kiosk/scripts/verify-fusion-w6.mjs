@@ -456,8 +456,9 @@ check('W2-W5 state coverage', () => {
   ])
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'profile permission state uses the canonical fusion shell @w5-kiosk'", [
     "page.goto('/profile')",
-    "page.getByRole('button', { name: '手机号登录', exact: true })",
+    "page.getByRole('button', { name: '去登录', exact: true })",
     "page.getByRole('region', { name: '我的资产' })",
+    "page.getByRole('region', { name: '登录与不登录的分界' })",
   ])
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'mobile QR login renders a real API error and touch-safe retry @w5-mobile'", [
     "status: 410",

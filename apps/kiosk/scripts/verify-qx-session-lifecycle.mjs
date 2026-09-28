@@ -12,6 +12,8 @@ const files = {
   standbyView: read('src/pages/screensaver/StandbyView.tsx'),
   standbyModel: read('src/pages/screensaver/standbyModel.ts'),
   loginPage: read('src/pages/auth/LoginPage.tsx'),
+  profilePage: read('src/pages/profile/ProfilePage.tsx'),
+  settingsPage: read('src/pages/profile/me/MySettingsPage.tsx'),
   loginModel: read('src/pages/auth/loginGateModel.ts'),
   loginFields: read('src/pages/auth/components/LoginGatePhoneFields.tsx'),
   sessionPage: read('src/pages/placeholders/SessionTimeoutPage.tsx'),
@@ -64,9 +66,13 @@ check('standby empty playlist still exits home and does not invent media', () =>
 
 check('login gate has a leave-without-login exit and no 已登录 overlay', () => {
   assert.match(files.loginPage, /QxPageFrame/)
-  // 03 v2 顶部不放可点；同一个返回首页动作移到下方 QxStepActions。
+  // 规则 1：顶栏返回键保留，底部也要有回退。03 / 30 三张稿顶栏都有返回键。
   assert.match(files.loginPage, /<QxStepActions onPrev=\{goHome\} prevLabel="返回首页"/)
-  assert.doesNotMatch(files.loginPage, /back=\{\{/)
+  assert.match(files.loginPage, /back=\{\{\s*label:\s*'返回首页',\s*onBack:\s*goHome\s*\}\}/)
+  assert.match(files.profilePage, /back=\{\{\s*label:\s*'返回首页'/)
+  assert.match(files.profilePage, /<QxStepActions onPrev=/)
+  assert.match(files.settingsPage, /back=\{\{\s*label:\s*'返回我的'/)
+  assert.match(files.settingsPage, /<QxStepActions onPrev=/)
   assert.match(files.loginPage, /不登录，继续使用/)
   assert.match(files.loginPage, /useMemberPhoneLogin\(/)
   assert.match(files.loginPage, /phoneLogin\.paneProps/)

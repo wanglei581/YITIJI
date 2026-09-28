@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ScanLineIcon, SmartphoneIcon } from 'lucide-react'
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  FilesIcon,
+  LandmarkIcon,
+  Link2Icon,
+  PrinterIcon,
+  ScanLineIcon,
+  SmartphoneIcon,
+  TicketIcon,
+  type LucideIcon,
+} from 'lucide-react'
 import { isSafeInternalPath } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -28,6 +39,12 @@ import {
 import './styles/login-gate-qx.css'
 
 type LoginTab = 'phone' | 'scan'
+
+const ANON_ICONS: Record<string, LucideIcon> = {
+  print: PrinterIcon,
+  code: TicketIcon,
+  policy: LandmarkIcon,
+}
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -124,6 +141,7 @@ export function LoginPage() {
           title={copy.title}
           subtitle={<>{copy.sub} 回来后会到 <b>{loginReturnLabel(returnTo)}</b>。</>}
           status={pill}
+          back={{ label: '返回首页', onBack: goHome }}
           ctabar={
             <>
               {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying') ? (
@@ -213,6 +231,16 @@ export function LoginPage() {
             </div>
 
             <MemberAgreement agreed={agreed} onAgreedChange={setAgreed} />
+            {mode === 'phone' && state === 'phone-code-sent' ? (
+              <div className="lg-sent" role="status" data-testid="login-gate-sent">
+                <div className="lg-sent-h"><CheckIcon size={28} aria-hidden />验证码已发出，请在下面填验证码</div>
+                <p>
+                  短信已按这个号码发出。重新获取要等 <b>{phoneLogin.countdownTotal} 秒</b>
+                  {phoneLogin.expiresInSeconds !== null ? <>，有效期 <b>{phoneLogin.expiresInSeconds} 秒</b></> : null}
+                  。短信何时到达由运营商决定，这台机器看不到。
+                </p>
+              </div>
+            ) : null}
             {mode === 'phone' ? (
               <LoginGatePhoneFields {...phoneLogin.paneProps} state={phoneState} />
             ) : (
@@ -231,34 +259,44 @@ export function LoginPage() {
               <section className="lg-benefits">
                 <div className="qx-sec-h"><span className="t">登录之后多出什么</span></div>
                 <div className="lg-grid2">
-                  <div className="qx-card"><h3>本人资产按账号归集</h3><p>我的文档、打印订单、AI 服务记录归到你名下，只有本人可见。</p></div>
-                  <div className="qx-card"><h3>手机与这台机器接得上</h3><p>手机上的到机码、传上来的文件，不用重新传一遍。</p></div>
+                  <div className="qx-card lg-benefit">
+                    <h3><span className="lg-benefit-ic" data-tone="teal"><FilesIcon size={26} aria-hidden /></span>本人资产按账号归集</h3>
+                    <p>我的文档、打印订单、AI 服务记录归到你名下，<b>只有本人可见</b>。要删、要留，按各自的保存期限。</p>
+                  </div>
+                  <div className="qx-card lg-benefit">
+                    <h3><span className="lg-benefit-ic" data-tone="slate"><Link2Icon size={26} aria-hidden /></span>手机与这台机器接得上</h3>
+                    <p>手机上下单拿到的到机码、手机传上来的文件，能和这台机器对上号，不用重新传一遍。</p>
+                  </div>
                 </div>
               </section>
             ) : null}
 
-            <section style={{ marginTop: 18 }}>
+            <section className="lg-anon">
               <div className="qx-sec-h"><span className="t">不登录也能办</span></div>
               <div className="lg-entries">
-                {loginAnonEntries().map((entry, index) => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    className="lg-entry"
-                    data-testid={`login-gate-anon-${index}`}
-                    onClick={() => navigate(entry.route)}
-                  >
-                    <span className="eb">
-                      <span className="en">{entry.title}</span>
-                      <span className="ed">{entry.desc}</span>
-                    </span>
-                  </button>
-                ))}
+                {loginAnonEntries().map((entry, index) => {
+                  const Icon = ANON_ICONS[entry.id] ?? PrinterIcon
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      className="lg-entry"
+                      data-testid={`login-gate-anon-${index}`}
+                      onClick={() => navigate(entry.route)}
+                    >
+                      <span className="ei" data-tone={entry.id} aria-hidden="true"><Icon size={26} /></span>
+                      <span className="eb">
+                        <span className="en">{entry.title}</span>
+                        <span className="ed">{entry.desc}</span>
+                      </span>
+                      <span className="ego" aria-hidden="true"><ChevronRightIcon size={22} /></span>
+                    </button>
+                  )
+                })}
               </div>
             </section>
-
-            <p className="lg-truth" data-disclaimer="true">登录只用于本人服务记录，身份与验证码由登录服务核验。</p>
           </div>
+          <p className="lg-truth" data-disclaimer="true">登录只用于本人服务记录，身份与验证码由登录服务核验。</p>
           <QxStepActions onPrev={goHome} prevLabel="返回首页">
             <QxAiHelp label="问小青：登录后能办什么？" draft="登录后可以办理哪些服务？不登录还能做什么？" />
           </QxStepActions>

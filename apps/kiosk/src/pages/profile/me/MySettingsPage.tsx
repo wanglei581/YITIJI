@@ -8,6 +8,7 @@ import {
   RepeatIcon,
   ShieldCheckIcon,
   ShieldQuestionIcon,
+  UserIcon,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
@@ -23,6 +24,8 @@ import './styles/settings-qx2.css'
 
 // AI 使用授权只认服务端返回：读不到就是「本次未取到」，绝不退回成「未授权」。
 type JobAiConsent = 'idle' | 'loading' | 'granted' | 'not-granted' | 'error'
+
+const ACCOUNT_CLOSURE_NOTE = '账号注销和数据导出尚未开放。如需协助，请联系现场工作人员；如后续提供导出，内容包含文件、订单等业务摘要清单。'
 
 const CONSENT_BADGE: Record<JobAiConsent, { text: string; tone?: 'run' | 'bad' | 'off' }> = {
   idle: { text: '—', tone: 'off' },
@@ -189,34 +192,50 @@ export function MySettingsPage() {
     <div className="settings-page fusion-w5" data-kiosk-screen="member-settings" data-qx-view="settings" data-state={screenState} data-testid={`member-settings-state-${screenState}`} data-takeaway="本人账号设置与授权状态">
     <QxPageFrame title="账号设置" subtitle="换号、管理授权或结束使用，都在这里。"
       status={{ tone: jobAi === 'error' ? 'warn' : 'unknown', label: isLoggedIn ? '公共设备，请保护个人信息' : '当前是游客' }}
+      back={{ label: '返回我的', onBack: () => navigate('/profile') }}
       ctabar={ctabar} navbar={<QxMemberNavbar current="profile" />}>
       <div className="qx-scroll qx-grow settings-body">
-        <section className="settings-identity" aria-label={isLoggedIn ? '会员账号概览' : '登录引导'}><span>{isLoggedIn ? '会员账号' : '还没有登录'}</span><b>{isLoggedIn ? phoneMasked || '本人账号' : '登录后管理本人账号'}</b><p>公共终端默认遮挡个人信息</p></section>
+        <section className="settings-identity" aria-label={isLoggedIn ? '会员账号概览' : '登录引导'}>
+          <span className="settings-avatar" aria-hidden="true"><UserIcon size={36} /></span>
+          <span className="settings-idtx">
+            <b>{isLoggedIn ? '本人账号' : '还没有登录'}</b>
+            <span className="settings-idsub">
+              {isLoggedIn
+                ? `手机号 ${phoneMasked || '已遮挡'} · 公共终端默认不显示完整个人信息`
+                : '这台机器是公共终端，不登录就不会显示任何人的简历、订单和文件。'}
+            </span>
+          </span>
+          <span className="settings-idstat">{isLoggedIn ? '账号设置在页面下方' : '登录后管理本人账号'}</span>
+        </section>
         {hint ? <p data-testid="member-settings-toast" role="status" className="settings-note">{hint.text}</p> : null}
         {/* 账号操作（仅登录态）；游客只看到登录后会出现哪几项（稿 30 settings:anonymous），不可点、不读数据 */}
         {!isLoggedIn && (
-          <section className="qx-me-list" aria-label="登录后才出现的账号操作">
-            <div className="qx-me-legal">登录后才会出现 · 需要先确认是你本人</div>
-            <SettingsRow icon={PhoneIcon} title="换绑手机号" desc="旧号验证 + 新号验证，双重确认" testid="member-settings-locked-rebind" />
-            <SettingsRow icon={RepeatIcon} title="切换账号" desc="当前未登录，可以直接去登录" testid="member-settings-locked-switch" />
-            <SettingsRow icon={ShieldQuestionIcon} title="隐私与 AI 授权管理" desc="登录后可以查看与撤回 AI 使用授权" testid="member-settings-locked-consent" />
-          </section>
+          <>
+            <h2 className="settings-section-title">账号</h2>
+            <section className="qx-me-list" aria-label="登录后才出现的账号操作">
+              <SettingsRow icon={PhoneIcon} title="换绑手机号" desc="旧号验证 + 新号验证，双重确认" testid="member-settings-locked-rebind" />
+              <SettingsRow icon={RepeatIcon} title="切换账号" desc="当前未登录，可以直接去登录" testid="member-settings-locked-switch" />
+              <SettingsRow icon={ShieldQuestionIcon} title="隐私与 AI 授权管理" desc={`登录后可以查看与撤回 AI 使用授权。${ACCOUNT_CLOSURE_NOTE}`} testid="member-settings-locked-consent" />
+            </section>
+          </>
         )}
         {isLoggedIn && (
-          <section className="qx-me-list" aria-label="账号操作">
+          <>
             <h2 className="settings-section-title">账号</h2>
-            <SettingsRow icon={PhoneIcon} tone="wheat" title="换绑手机号" desc="旧号验证 + 新号验证，双重确认" testid="member-settings-rebind" onClick={() => setShowRebind(true)} />
-            <SettingsRow icon={RepeatIcon} tone="plum" title="换一个账号登录" desc="先确认退出并清除本机登录，然后前往登录页" testid="member-settings-switch" onClick={() => setConfirm('switch')} />
-            <SettingsRow
-              icon={ShieldQuestionIcon}
-              tone="plum"
-              title="隐私与数据请求"
-              desc="撤回 AI 使用授权；导出与注销暂未开放"
-              route="/me/privacy-requests"
-              testid="member-settings-privacy"
-              onClick={() => navigate('/me/privacy-requests')}
-            />
-          </section>
+            <section className="qx-me-list" aria-label="账号操作">
+              <SettingsRow icon={PhoneIcon} tone="wheat" title="换绑手机号" desc="验证旧手机号后，再验证新手机号；成功后退出并重新登录。" testid="member-settings-rebind" onClick={() => setShowRebind(true)} />
+              <SettingsRow icon={RepeatIcon} tone="plum" title="换一个账号登录" desc="先二次确认，再退出并清除本机这一次的登录，然后才去登录页。" testid="member-settings-switch" onClick={() => setConfirm('switch')} />
+              <SettingsRow
+                icon={ShieldQuestionIcon}
+                tone="plum"
+                title="隐私与数据请求"
+                desc={`当前可提交 AI 使用授权的撤回。${ACCOUNT_CLOSURE_NOTE}`}
+                route="/me/privacy-requests"
+                testid="member-settings-privacy"
+                onClick={() => navigate('/me/privacy-requests')}
+              />
+            </section>
+          </>
         )}
 
         {isLoggedIn && (
@@ -245,8 +264,8 @@ export function MySettingsPage() {
         )}
 
         {/* 协议 / 隐私入口：不登录也能读 */}
-        <section className="qx-me-list" aria-label="协议与隐私">
-          <h2 className="settings-section-title">协议与隐私</h2>
+        <h2 className="settings-section-title">协议与帮助</h2>
+        <section className="qx-me-list" aria-label="协议与帮助">
           <SettingsRow icon={FileTextIcon} title="用户服务协议" desc="服务范围、账号、收费与打印说明" route="/legal/terms" testid="member-settings-terms" onClick={() => navigate('/legal/terms')} />
           <SettingsRow icon={ShieldCheckIcon} tone="slate" title="隐私政策" desc="信息收集、使用与文件留存说明" route="/legal/privacy" testid="member-settings-privacy-doc" onClick={() => navigate('/legal/privacy')} />
         </section>
@@ -255,7 +274,6 @@ export function MySettingsPage() {
           <h2>结束使用之后会发生什么</h2>
           <p>结束使用或闲置超时，会退出本机登录并清除这一次的临时信息。已经提交的订单、文件和记录按各自的保存期限管理。</p>
         </section>
-        <p className="settings-note">账号注销和数据导出尚未开放。如需协助，请联系现场工作人员；如后续提供导出，内容包含文件、订单等业务摘要清单。</p>
       </div>
 
       {confirm === 'logout' && (

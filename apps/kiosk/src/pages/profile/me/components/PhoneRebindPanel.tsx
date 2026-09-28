@@ -131,6 +131,7 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
   return (
     <div className="settings-page settings-rebind fusion-w5" data-kiosk-screen="member-settings" data-state={state} data-step={step} data-testid={`settings-state-${state}`} data-takeaway="更新本人绑定手机号">
       <QxPageFrame title="换绑手机号" subtitle="先验证旧手机号，再验证新手机号；完成后重新登录。"
+        back={{ label: '返回账号设置', onBack: cancel }}
         status={{ tone: err ? 'warn' : 'unknown', label: step === 'done' ? '正在结束本次使用' : `第 ${stepIndex + 1} 步 / 共 4 步` }}
         ctabar={<><button type="button" className="qx-btn" data-variant="ghost" disabled={busy || step === 'done'} onClick={cancel}>取消换绑</button>
           {step === 'done' ? <button type="button" className="qx-btn" data-variant="primary" disabled={!err} onClick={onDone}>{err ? '重新前往登录' : '正在清除本机登录'}</button>

@@ -46,6 +46,9 @@
 
 .pf-idbtn {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 60px;
   padding: 0 22px;
   border-radius: var(--qx-r);
@@ -266,7 +269,7 @@
 /* 30 v2：身份卡只读，第一处操作从 y=500 以下开始。 */
 .pf-root .qx-pagehead { min-height: 80px; }
 .pf-root .qx-body { padding-top: 12px; }
-.pf-root .pf-idcard { min-height: 160px; margin-bottom: 110px; }
+.pf-root .pf-idcard { min-height: 132px; margin-bottom: 0; }
 .pf-root .pf-idstat { flex: none; max-width: 200px; text-align: right; font-size: var(--qx-fs-aux-lg); }
 .pf-root .pf-page > * { flex-shrink: 0; }
 .pf-root .qx-card { padding: 16px 20px; }
@@ -277,6 +280,7 @@
 .pf-root .qx-row { min-height: 76px; padding-top: 10px; padding-bottom: 10px; }
 .pf-root .qx-ctabar .why { flex: 1; font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
 .pf-root .qx-ctabar .qx-btn { flex: none; }
+.pf-root .qx-ctabar .qx-btn[data-grow='1'] { flex: 1 1 auto; }
 .pf-root .pf-truth { margin: 0; }
 
 @media (max-width: 640px) {

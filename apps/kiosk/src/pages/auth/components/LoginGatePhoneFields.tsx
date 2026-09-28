@@ -92,7 +92,7 @@ export function LoginGatePhoneFields({
             : '先获取验证码，收到后这里会打开。'}
         </div>
       </div>
-      {notice ? <p className="lg-echo" role="status">{notice}{expiresInSeconds !== null ? `，有效期 ${expiresInSeconds} 秒。` : null}</p> : null}
+      {notice && state !== 'phone-code-sent' ? <p className="lg-echo" role="status">{notice}{expiresInSeconds !== null ? `，有效期 ${expiresInSeconds} 秒。` : null}</p> : null}
       {error ? <p className="lg-reason" role="alert">{error}</p> : null}
       {keyboardOpen && !loading ? <div className="lg-keyboard-cover">
       <button type="button" className="lg-keyboard-mask" aria-label="关闭数字键盘" onClick={() => setKeyboardOpen(false)} />

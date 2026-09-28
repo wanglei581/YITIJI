@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { BellIcon, HelpCircleIcon, MessageSquareIcon, ShieldIcon } from 'lucide-react'
+import { BellIcon, FileTextIcon, GiftIcon, HelpCircleIcon, LockIcon, MessageSquareIcon, PrinterIcon, ShieldIcon } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
@@ -125,6 +125,7 @@ function ProfileContent() {
         title="我的"
         subtitle="简历、文档、订单、收藏与权益都在这里；以实际记录为准。"
         status={status}
+        back={{ label: '返回首页', onBack: () => navigate('/') }}
         ctabar={
           <ProfileCta
             uiState={uiState}
@@ -200,9 +201,7 @@ function ProfileContent() {
 
           {isLoggedIn ? (
             <ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} />
-          ) : (
-            <ProfileAssetGrid counts={assetOverview.counts} loading={false} />
-          )}
+          ) : null}
 
           {uiState === 'empty' ? <EmptyStartRows /> : null}
 
@@ -302,10 +301,23 @@ function AccountRows() {
 
 function SignedOutBody() {
   const navigate = useNavigate()
+  const rows = [
+    { icon: FileTextIcon, title: '你自己的简历与文档', desc: '解析过的简历、生成的材料与扫描件。', from: '/me/resumes' },
+    { icon: PrinterIcon, title: '打印订单与办理进度', desc: '订单状态以系统记录为准，可继续办理。', from: '/me/print-orders' },
+    { icon: GiftIcon, title: '权益台账与活动记录', desc: '是否有可用权益由系统判定。', from: '/me/benefits' },
+  ]
+  const bounds = [
+    ['不需要账号', '打印、扫描、复印与文件转换'],
+    ['不需要账号', '机构官方渠道与政策查询'],
+    ['需要登录', '跨设备保存的简历、文档与打印订单'],
+    ['需要登录', '会员权益、隐私请求与消息通知'],
+    ['现在显示的数量', '没有 —— 未登录时本机不预渲染任何人的数据'],
+    ['登录之后', '数量与待办按你本人的账号显示'],
+  ]
   return (
     <>
       <div className="pf-note">
-        <div className="pf-note-t">不登录也能用的服务</div>
+        <div className="pf-note-t"><LockIcon size={24} aria-hidden />不登录也能用的服务</div>
         <p>
           打印、扫描、政策查询都<b>不需要账号</b>。需要本人身份、跨设备保存或会员权益的功能，会在进入时再要求登录。
         </p>
@@ -313,27 +325,35 @@ function SignedOutBody() {
       <section>
         <div className="qx-sec-h">
           <span className="t">登录之后会出现</span>
-          <span className="hint">只显示你本人的记录</span>
+          <span className="hint">现在不预渲染任何人的数据</span>
         </div>
         <div className="qx-rows">
-          <button type="button" className="qx-row" onClick={() => navigate('/login', { state: { from: '/me/resumes' } })}>
-            <span className="qx-row-tx">
-              <span className="qx-row-t">你自己的简历与文档</span>
-              <span className="qx-row-d">解析过的简历、生成的材料与扫描件。</span>
-            </span>
-          </button>
-          <button type="button" className="qx-row" onClick={() => navigate('/login', { state: { from: '/me/print-orders' } })}>
-            <span className="qx-row-tx">
-              <span className="qx-row-t">打印订单与办理进度</span>
-              <span className="qx-row-d">查看订单状态，接着办理。</span>
-            </span>
-          </button>
-          <button type="button" className="qx-row" onClick={() => navigate('/login', { state: { from: '/me/benefits' } })}>
-            <span className="qx-row-tx">
-              <span className="qx-row-t">权益台账与活动记录</span>
-              <span className="qx-row-d">可用权益以账号里的记录为准。</span>
-            </span>
-          </button>
+          {rows.map((row) => (
+            <button
+              type="button"
+              key={row.from}
+              className="qx-row"
+              onClick={() => navigate('/login', { state: { from: row.from } })}
+            >
+              <span className="qx-row-ic" aria-hidden="true"><row.icon size={24} /></span>
+              <span className="qx-row-tx">
+                <span className="qx-row-t">{row.title}</span>
+                <span className="qx-row-d">{row.desc}</span>
+              </span>
+              <span className="qx-row-go" aria-hidden="true">›</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <section aria-label="登录与不登录的分界">
+        <div className="qx-sec-h">
+          <span className="t">登录与不登录的分界</span>
+          <span className="hint">按功能划线，不按页面划线</span>
+        </div>
+        <div className="pf-meta2">
+          {bounds.map(([label, value]) => (
+            <div key={value}><small>{label}</small><b>{value}</b></div>
+          ))}
         </div>
       </section>
     </>
@@ -393,8 +413,8 @@ function ProfileCta({
     return (
       <>
         <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>回首页</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onLogin}>
-          <span data-testid="profile-login">手机号登录</span>
+        <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" onClick={onLogin}>
+          <span data-testid="profile-login">去登录</span>
         </button>
       </>
     )
