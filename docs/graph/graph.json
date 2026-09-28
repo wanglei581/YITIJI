@@ -21828,6 +21828,9 @@
     "services/api/src/ai-access/ai-access.guard.ts": [
       "services/api/scripts/verify-ai-access.ts"
     ],
+    "services/api/src/ai-access/ai-access.module.ts": [
+      "services/api/scripts/verify-ai-access.ts"
+    ],
     "services/api/src/ai-access/ai-access.service.ts": [
       "services/api/scripts/verify-ai-access.ts"
     ],
@@ -22288,6 +22291,7 @@
     ],
     "services/api/src/app.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -30958,6 +30962,7 @@
           "services/api/src/ai-access/admin-ai-access.controller.ts",
           "services/api/src/ai-access/ai-access.decorator.ts",
           "services/api/src/ai-access/ai-access.guard.ts",
+          "services/api/src/ai-access/ai-access.module.ts",
           "services/api/src/ai-access/ai-access.service.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/career-plan.controller.ts",
@@ -30966,6 +30971,7 @@
           "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
           "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/self-assessment.controller.ts",
+          "services/api/src/app.module.ts",
           "services/api/src/assistant/daily-brief.controller.ts",
           "services/api/src/common/decorators/roles.decorator.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
