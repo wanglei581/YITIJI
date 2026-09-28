@@ -12493,7 +12493,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 596,
+      "reachableFileCount": 593,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -12658,19 +12658,10 @@
           "path": "/assistant",
           "styles": [
             "apps/kiosk/src/components/kiosk-keyboard/kiosk-keyboard.css",
-            "apps/kiosk/src/pages/assistant/assistant-advisor.css",
-            "apps/kiosk/src/pages/assistant/assistant-batch8.css",
-            "apps/kiosk/src/pages/assistant/assistant-cockpit-body.css",
-            "apps/kiosk/src/pages/assistant/assistant-cockpit.css",
-            "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
-            "apps/kiosk/src/pages/assistant/assistant-lightflow-call-gate.css",
-            "apps/kiosk/src/pages/assistant/assistant-lightflow-call-live.css",
-            "apps/kiosk/src/pages/assistant/assistant-lightflow-call-responsive.css",
-            "apps/kiosk/src/pages/assistant/assistant-lightflow-call-shell.css",
-            "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
-            "apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css",
-            "apps/kiosk/src/pages/assistant/assistant-lightflow-content.css",
-            "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css",
+            "apps/kiosk/src/pages/assistant/assistant-qingxu-call.css",
+            "apps/kiosk/src/pages/assistant/assistant-qingxu-content.css",
+            "apps/kiosk/src/pages/assistant/assistant-qingxu-input.css",
+            "apps/kiosk/src/pages/assistant/assistant-qingxu.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -13960,7 +13951,7 @@
           ],
           "path": "/me/settings",
           "styles": [
-            "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+            "apps/kiosk/src/pages/profile/me/styles/settings-qx2.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -14429,7 +14420,11 @@
           ],
           "path": "/renshi",
           "styles": [
-            "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css"
+            "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -15472,7 +15467,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 675
+      "sourceFileCount": 685
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17908,6 +17903,9 @@
     "apps/kiosk/scripts/verify-user-center-wave0.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs": [
+      "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
+    ],
     "apps/kiosk/src/ai/AiEvidence.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
@@ -17965,7 +17963,8 @@
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/auth/returnPath.ts": [
-      "apps/kiosk/scripts/verify-member-session-closure.mjs"
+      "apps/kiosk/scripts/verify-member-session-closure.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
     ],
     "apps/kiosk/src/components/FileContentPreview.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
@@ -18126,6 +18125,9 @@
     "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
+    ],
     "apps/kiosk/src/pages/assistant/advisorProvider.ts": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
@@ -18136,37 +18138,24 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
+    "apps/kiosk/src/pages/assistant/advisorUserCopy.ts": [
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs"
+    ],
     "apps/kiosk/src/pages/assistant/assistant-advisor.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
-    "apps/kiosk/src/pages/assistant/assistant-inkpaper.css": [
-      "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
-    ],
-    "apps/kiosk/src/pages/assistant/assistant-lightflow-call-gate.css": [
-      "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs"
-    ],
-    "apps/kiosk/src/pages/assistant/assistant-lightflow-call-live.css": [
-      "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs"
-    ],
-    "apps/kiosk/src/pages/assistant/assistant-lightflow-call-responsive.css": [
-      "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs"
-    ],
-    "apps/kiosk/src/pages/assistant/assistant-lightflow-call-shell.css": [
-      "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs"
-    ],
-    "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css": [
+    "apps/kiosk/src/pages/assistant/assistant-qingxu-call.css": [
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
-    "apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css": [
-      "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
-      "services/api/scripts/verify-assistant-voice.ts"
-    ],
-    "apps/kiosk/src/pages/assistant/assistant-lightflow-content.css": [
+    "apps/kiosk/src/pages/assistant/assistant-qingxu-content.css": [
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
-    "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css": [
-      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+    "apps/kiosk/src/pages/assistant/assistant-qingxu-input.css": [
+      "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
+    ],
+    "apps/kiosk/src/pages/assistant/assistant-qingxu.css": [
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
     "apps/kiosk/src/pages/auth/LoginPage.tsx": [
@@ -18193,6 +18182,9 @@
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-qr-login-ui.mjs"
     ],
+    "apps/kiosk/src/pages/auth/accountUserMessage.ts": [
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
+    ],
     "apps/kiosk/src/pages/auth/components/LoginGatePhoneFields.tsx": [
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
     ],
@@ -18213,6 +18205,7 @@
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-member-login-dialog.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/auth/login.css": [
@@ -18220,7 +18213,8 @@
     ],
     "apps/kiosk/src/pages/auth/loginGateModel.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
-      "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
+      "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
     ],
     "apps/kiosk/src/pages/auth/mobile-qr-service-desk.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -18872,13 +18866,16 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs",
       "services/api/scripts/verify-activity-logs.ts"
     ],
     "apps/kiosk/src/pages/profile/assets/format.ts": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/profile/assets/useMemberAssetCounts.ts": [
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
     ],
     "apps/kiosk/src/pages/profile/assets/useMemberProfileOverview.ts": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
@@ -19019,6 +19016,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-user-center-wave0.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -19043,10 +19041,20 @@
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-member-session-closure.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx": [
       "apps/kiosk/scripts/verify-file-retention-ui.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/components/documentReprint.ts": [
@@ -19175,6 +19183,10 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/styles/settings-qx2.css": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -19998,6 +20010,7 @@
     "apps/kiosk/src/services/auth/memberAuthApi.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/services/auth/memberAuthDevice.ts": [
@@ -20052,6 +20065,10 @@
     "apps/kiosk/src/styles/warm-professional-override.css": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+    ],
+    "apps/kiosk/src/utils/maskPii.ts": [
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
     ],
     "apps/kiosk/src/utils/micCapability.ts": [
       "apps/kiosk/scripts/verify-mic-capability-truth.mjs"
@@ -25334,6 +25351,22 @@
       "asserts": {
         "absent": [],
         "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/audit-qingxu-v2-drafts.mjs",
+      "helper": false,
+      "inCi": false,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::audit:qingxu-v2-drafts"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
         "files": [
           "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts",
           "docs/design/kiosk-redesign-2026-08/16-service-hubs.html"
@@ -25439,7 +25472,9 @@
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/advisorProvider.ts",
           "apps/kiosk/src/pages/assistant/advisorScenes.ts",
-          "apps/kiosk/src/routes/index.tsx"
+          "apps/kiosk/src/pages/assistant/advisorUserCopy.ts",
+          "apps/kiosk/src/routes/index.tsx",
+          "apps/kiosk/src/utils/maskPii.ts"
         ],
         "missing": []
       },
@@ -25548,11 +25583,8 @@
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call-gate.css",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call-live.css",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call-responsive.css",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call-shell.css",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
+          "apps/kiosk/src/pages/assistant/assistant-qingxu-call.css",
+          "apps/kiosk/src/pages/assistant/assistant-qingxu-input.css",
           "apps/kiosk/src/vite-env.d.ts"
         ],
         "missing": []
@@ -25940,7 +25972,9 @@
         "absent": [
           "src/pages/resume/ResumeExportPage.tsx"
         ],
-        "dirs": [],
+        "dirs": [
+          "apps/kiosk/src/pages/assistant"
+        ],
         "files": [
           "apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx",
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
@@ -25950,7 +25984,6 @@
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
@@ -26845,13 +26878,13 @@
           "apps/kiosk/src/pages/assistant/AdvisorConversation.tsx",
           "apps/kiosk/src/pages/assistant/AdvisorTools.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx",
           "apps/kiosk/src/pages/assistant/advisorProvider.ts",
           "apps/kiosk/src/pages/assistant/advisorScenes.ts",
-          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-content.css",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css"
+          "apps/kiosk/src/pages/assistant/assistant-qingxu-call.css",
+          "apps/kiosk/src/pages/assistant/assistant-qingxu-content.css",
+          "apps/kiosk/src/pages/assistant/assistant-qingxu-input.css",
+          "apps/kiosk/src/pages/assistant/assistant-qingxu.css"
         ],
         "missing": []
       },
@@ -26988,7 +27021,9 @@
           "apps/kiosk/src/pages/profile/me/activityPresentation.ts",
           "apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts",
           "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
+          "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx",
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
+          "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx",
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
@@ -27011,6 +27046,7 @@
           "apps/kiosk/src/pages/profile/me/styles/notifications-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/privacy-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+          "apps/kiosk/src/pages/profile/me/styles/settings-qx2.css",
           "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
           "apps/kiosk/src/pages/profile/profile-inkpaper.css",
           "apps/kiosk/src/pages/profile/profile-lightflow-directory.css",
@@ -27093,6 +27129,7 @@
           "apps/kiosk/src/pages/auth/loginGateModel.ts",
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx",
           "apps/kiosk/src/pages/session-resume/SessionResumePage.tsx",
           "apps/kiosk/src/pages/session-resume/sessionResumeModel.ts",
           "apps/kiosk/src/services/api/activity.ts",
@@ -27756,7 +27793,9 @@
           "apps/kiosk/src/pages/profile/me/activityPresentation.ts",
           "apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts",
           "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
+          "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx",
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
+          "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx",
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
@@ -27781,6 +27820,7 @@
           "apps/kiosk/src/pages/profile/me/styles/notifications-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/privacy-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
+          "apps/kiosk/src/pages/profile/me/styles/settings-qx2.css",
           "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
           "apps/kiosk/src/pages/profile/profile-inkpaper.css",
           "apps/kiosk/src/pages/profile/profile-lightflow-directory.css",
@@ -27940,6 +27980,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs",
           "apps/kiosk/src/auth/KioskClearingOverlay.tsx",
           "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
           "apps/kiosk/src/auth/kioskSensitiveSession.ts",
@@ -27948,6 +27989,8 @@
           "apps/kiosk/src/pages/auth/components/LoginGatePhoneFields.tsx",
           "apps/kiosk/src/pages/auth/loginGateModel.ts",
           "apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx",
+          "apps/kiosk/src/pages/profile/ProfilePage.tsx",
+          "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
           "apps/kiosk/src/pages/screensaver/StandbyView.tsx",
           "apps/kiosk/src/pages/screensaver/standbyModel.ts",
@@ -28432,6 +28475,30 @@
         "@ai-job-print/kiosk::verify:w3a-ai-records"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/auth/returnPath.ts",
+          "apps/kiosk/src/pages/auth/accountUserMessage.ts",
+          "apps/kiosk/src/pages/auth/hooks/useMemberPhoneLogin.ts",
+          "apps/kiosk/src/pages/auth/loginGateModel.ts",
+          "apps/kiosk/src/pages/profile/ProfilePage.tsx",
+          "apps/kiosk/src/pages/profile/assets/useMemberAssetCounts.ts",
+          "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx",
+          "apps/kiosk/src/services/auth/memberAuthApi.ts",
+          "apps/kiosk/src/utils/maskPii.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/kiosk",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -31185,11 +31252,12 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps/kiosk/src/pages/assistant"
+        ],
         "files": [
           "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css",
           "apps/miniapp/pages/assistant/assistant.js",
           "apps/miniapp/pages/assistant/assistant.wxml",
           "apps/miniapp/utils/api.js",
@@ -37622,6 +37690,170 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-advisor.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
+          "apps/kiosk/src/ai/AiEvidence.tsx"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-batch8.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/src/pages/assistant/assistant-advisor.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md",
+          "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md、docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-cockpit-body.css",
+        "kind": "style",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-cockpit.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/src/pages/assistant/assistant-cockpit-body.css"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-cockpit-body.css"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+          "docs/progress/next-tasks.md",
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md",
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2-ai-resume-interview.md",
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2a-ai-career.md",
+          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-advisor-provider-gate.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call-gate.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call-live.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call-responsive.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call-shell.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
+        "kind": "style",
+        "mentions": [
+          ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
+          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css",
+        "kind": "style",
+        "mentions": [
+          ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
+          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
+          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-content.css",
+        "kind": "style",
+        "mentions": [
+          ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
+          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
+          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css",
+        "kind": "style",
+        "mentions": [
+          ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
+          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
+          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
