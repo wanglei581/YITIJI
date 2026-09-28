@@ -3,7 +3,7 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
-import { AlertTriangleIcon, FileWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
+import { AlertTriangleIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
 import {
   adminOpsService,
   type AdminAlertItem,
@@ -23,6 +23,12 @@ const TYPE_META: Record<AdminAlertItem['type'], { label: string; icon: typeof Al
     icon: FileWarningIcon,
     guidance: '订单已支付，但打印文件当前不可用（原因见上一行），任务无法正常出纸，需人工核对订单后处置。确认 / 静默 / 关闭只记录处理，不会退款，也不会恢复文件。',
   },
+  // C3：只给条数与最早提交时间，不带投诉正文与手机号；处理在「意见反馈」页。
+  feedback_pending: {
+    label: 'AI 内容投诉待处理',
+    icon: MessageSquareWarningIcon,
+    guidance: '有 AI 内容投诉等待处理（条数与最早提交时间见上一行）。请到「意见反馈」按「AI 内容投诉」筛选并答复，答复后这条告警自动消失；有新投诉进来会再次提醒。确认 / 静默只记录处理。',
+  },
 }
 
 const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
@@ -41,6 +47,7 @@ const TYPE_FILTERS = [
   { label: '打印机异常', value: 'printer_issue' },
   { label: '打印失败', value: 'print_failed' },
   { label: '已支付文件不可用', value: 'paid_pending_file_unavailable' },
+  { label: 'AI 内容投诉', value: 'feedback_pending' },
 ] as const
 
 const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [
