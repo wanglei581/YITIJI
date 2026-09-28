@@ -1341,11 +1341,10 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>docs/design/kiosk-redesign-2026-08/</code> — 4 个文件</summary>
+<summary><code>docs/design/kiosk-redesign-2026-08/</code> — 3 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `docs/design/kiosk-redesign-2026-08/16-service-hubs.html` | `extract-service-hub-specs.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `docs/design/kiosk-redesign-2026-08/28-jobfair-enhanced.html` | `verify-fair-workbench-qx.mjs` |
 | `docs/design/kiosk-redesign-2026-08/assets/bg-hero.jpg` | `verify-repository-integrity.mjs` |
 | `docs/design/kiosk-redesign-2026-08/assets/bg-standby.jpg` | `verify-repository-integrity.mjs` |
@@ -1353,11 +1352,12 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>docs/design/kiosk-redesign-2026-08-v2/</code> — 1 个文件</summary>
+<summary><code>docs/design/kiosk-redesign-2026-08-v2/</code> — 2 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html` | `verify-p39-print-hub-fidelity.mjs` |
+| `docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html` | `extract-service-hub-specs.mjs`<br/>`verify-service-entry-readiness.mjs` |
 
 </details>
 
