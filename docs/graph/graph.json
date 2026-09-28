@@ -29209,6 +29209,22 @@
         "files": [],
         "missing": []
       },
+      "file": "apps/terminal-agent/scripts/verify-field-day-evidence.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:field-day-evidence"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
       "file": "apps/terminal-agent/scripts/verify-form-data-security.mjs",
       "helper": false,
       "inCi": true,
