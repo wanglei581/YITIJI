@@ -1,7 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
-import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
+import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
@@ -10,6 +10,7 @@ import {
 } from './fixtures/fusion-w3-states'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
+import { mockAssistantVoice } from './fixtures/assistant-voice'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -950,11 +951,14 @@ test('resume parse consent gate pauses the rail and sends nothing until granted 
   })
   await page.goto(`/login?from=${encodeURIComponent('/resume/source')}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
@@ -1144,7 +1148,7 @@ test('assistant first screen keeps composer and send above the Qingxu navbar @w3
       greeting: box('.assistant-prototype-head h2'),
       disclosure: box('.assistant-advisor-disclosure'),
       disclosureDisplay: getComputedStyle(document.querySelector('.assistant-advisor-disclosure')!).display,
-      firstTopic: box('.assistant-task-grid > *'),
+      firstTopic: box('.assistant-topic-choices summary'),
       navTop: box('.qx-navbar').top,
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
     }
@@ -1185,10 +1189,10 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   await expect(page.getByRole('button', { name: '去做简历诊断' })).toBeVisible()
   await expect(page.getByText('禁止动作', { exact: true })).toHaveCount(0)
 
-  // S2-5：providerLabel 是 `llm:*` 时才允许呈现为 AI 回答，且必须挂 E3 与来源标识。
+  // S2-5：providerLabel 是 `llm:*` 时才允许呈现为 AI 回答，且必须挂 E3 与 AI 生成可见标识。
   await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(1)
   await expect(page.locator('[data-message-kind="ai"] [data-evidence="E3"]')).toBeVisible()
-  await expect(page.getByText('由真实模型生成 · 服务标识：llm:deepseek')).toBeVisible()
+  await expect(page.getByText('AI 生成 · 供参考', { exact: true })).toBeVisible()
   // 四态：真的拿到结果才是 done。
   await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'done')
 
@@ -1230,7 +1234,7 @@ test('assistant refuses to present mock fallback as an AI answer @w3-kiosk', asy
   // 不冒充 AI，也就不许挂 E3「AI 判断」徽章。
   await expect(page.locator('.assistant-transcript [data-evidence="E3"]')).toHaveCount(0)
   // mock 的 action 同样是预置的，不该被当成「AI 建议的下一步」。
-  await expect(page.getByText('服务标识：mock').first()).toBeVisible()
+  await expect(page.getByText('未确认是 AI 回答', { exact: true })).toBeVisible()
 
   // ai-down 硬钳位：四态恒为 failed。
   await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'failed')
@@ -1259,6 +1263,11 @@ test('assistant refuses to present mock fallback as an AI answer @w3-kiosk', asy
   await expect(page.locator('[data-message-kind="not-ai"]')).toHaveCount(1)
   expect(extraChatCalls).toBe(0)
 
+  // 返回提问仍受不可用事实约束，不能靠切换画面解除锁定。
+  await page.getByRole('button', { name: '回到提问', exact: true }).click()
+  await expect(page.getByTestId('ai-cockpit-state-ai-unavailable')).toBeVisible()
+  await expect(send).toHaveAttribute('aria-disabled', 'true')
+
   // 但不是死局：可以显式重新检查。
   await page.getByRole('button', { name: '重新检查 AI 顾问' }).click()
   await expect(send).not.toHaveAttribute('aria-disabled', 'true')
@@ -1282,6 +1291,149 @@ test('TRTC explicit gate fails back to text safely @w3-kiosk', async ({ page, ap
   await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
+})
+
+for (const provenance of [
+  { providerLabel: 'mock', aiGenerated: true },
+  { providerLabel: 'llm:test', aiGenerated: false },
+  { providerLabel: 'llm:test', aiGenerated: undefined },
+  { providerLabel: undefined, aiGenerated: true },
+]) {
+  test(`assistant double provenance gate rejects ${JSON.stringify(provenance)} @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    api.respond('POST', '/api/v1/assistant/chat', { status: 200, json: { ...assistantMockFallbackReply, ...provenance } })
+    await page.goto('/assistant')
+    await page.getByLabel('输入咨询问题').fill('帮我准备一份材料清单')
+    await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+    await expect(page.getByTestId('ai-cockpit-state-reply-not-ai')).toBeVisible()
+    await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(0)
+    await expect(page.locator('.assistant-transcript [data-evidence="E3"]')).toHaveCount(0)
+    await expect(page.getByText(ASSISTANT_MOCK_FALLBACK_REPLY_TEXT)).toHaveCount(0)
+    await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
+  })
+}
+
+for (const [message, expected] of [
+  ['当前使用的人较多，请稍后再试', '当前使用的人较多，请稍后再试'],
+  ['服务端能力探测失败：AI_BUSY pending', 'AI 服务暂不可用，请稍后再试'],
+]) {
+  test(`assistant preserves user error meaning and filters technical text: ${message} @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF) })
+    api.respond('POST', '/api/v1/assistant/chat', { status: 503, json: { error: { code: 'AI_BUSY', message } } })
+    await page.goto('/assistant')
+    await page.getByLabel('输入咨询问题').fill('帮我准备面试')
+    await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+    await expect(page.getByTestId('ai-cockpit-state-reply-error')).toBeVisible()
+    await expect(page.getByText(expected, { exact: true })).toHaveCount(1)
+    await expect(page.getByText(expected, { exact: true })).toBeVisible()
+    await expect(page.getByText('今日次数已用完', { exact: true })).toHaveCount(0)
+    if (message !== expected) await expect(page.getByText(message, { exact: true })).toHaveCount(0)
+    const manual = page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })
+    await expect(manual.getByRole('button')).toHaveCount(4)
+    await expect(manual.getByRole('button', { name: /^帮助中心/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /查看岗位信息|查看招聘会|找企业/ })).toHaveCount(0)
+    await expect(page.locator('.assistant-send')).not.toHaveAttribute('aria-disabled', 'true')
+  })
+}
+
+test('assistant masks displayed contact details while sending original input @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  const raw = '我的电话 13812345678，邮箱 user@example.com，请帮我写自我介绍。'
+  let sent = ''
+  await page.route('**/api/v1/assistant/chat', async (route) => {
+    sent = route.request().postDataJSON().message
+    await route.fulfill({ json: { ...assistantReply, reply: raw } })
+  })
+  await page.goto('/assistant')
+  await page.getByLabel('输入咨询问题').fill(raw)
+  await expect(page.getByTestId('cockpit-draft')).toContainText('138****5678')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.locator('[data-message-kind="ai"]')).toContainText('u***@example.com')
+  await expect(page.locator('[data-message-kind="user"]')).toContainText('138****5678')
+  await expect(page.locator('.assistant-transcript')).not.toContainText('13812345678')
+  expect(sent).toBe(raw)
+})
+
+for (const micDenied of [false, true]) {
+  test(`assistant voice controls retain consent and cleanup (mic denied: ${micDenied}) @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    await mockAssistantVoice(page, api, micDenied)
+    await page.goto('/assistant')
+    await page.getByRole('button', { name: '语音咨询', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
+    await expect(dialog).toHaveAttribute('data-state', 'voice-gate')
+    expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(0)
+    await dialog.getByRole('button', { name: /直接语音通话/ }).click()
+    await expect(dialog).toHaveAttribute('data-state', micDenied ? 'mic-denied' : 'voice-live')
+    await expect(dialog.getByText('可以先说说你最想解决的问题。', { exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: '字幕已开', exact: true }).click()
+    await expect(dialog.getByText('可以先说说你最想解决的问题。', { exact: true })).toHaveCount(0)
+    await dialog.getByRole('button', { name: '字幕已关', exact: true }).click()
+    await expect(dialog.getByText('可以先说说你最想解决的问题。', { exact: true })).toBeVisible()
+    if (micDenied) {
+      await expect(dialog.getByRole('button', { name: '重新尝试授权', exact: true })).toBeVisible()
+      await dialog.getByRole('button', { name: '改用文字咨询', exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+    } else {
+      await dialog.getByRole('button', { name: '静音', exact: true }).click()
+      await expect(dialog.getByRole('button', { name: '取消静音', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      await dialog.getByRole('button', { name: '结束通话', exact: true }).click()
+      await expect(dialog).toHaveAttribute('data-state', 'voice-gate')
+    }
+    await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+    expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(1)
+  })
+}
+
+test('assistant submitting waits for a response and preserves manual entries @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  let release!: () => void
+  const waiting = new Promise<void>((resolve) => { release = resolve })
+  api.respondWith('POST', '/api/v1/assistant/chat', async () => {
+    await waiting
+    return { status: 200, json: assistantReply }
+  })
+  await page.goto('/assistant')
+  await page.getByLabel('输入咨询问题').fill('简历怎么排到一页？')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  try {
+    await expect(page.getByTestId('ai-cockpit-state-submitting')).toBeVisible()
+    await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'running')
+    await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(0)
+    await expect(page.getByRole('progressbar')).toHaveCount(0)
+    await expect(page.locator('.assistant-send')).toBeDisabled()
+    await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' }).getByRole('button')).toHaveCount(4)
+  } finally {
+    release()
+  }
+  await expect(page.getByTestId('ai-cockpit-state-reply-real')).toBeVisible()
+})
+
+test('assistant voice connecting can cancel and stops a late room response @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api)
+  let release!: () => void
+  const waiting = new Promise<void>((resolve) => { release = resolve })
+  api.respondWith('POST', '/api/v1/trtc/session', async () => {
+    await waiting
+    return { status: 200, json: { sdkAppId: 1, roomId: 'late-room', userId: 'fixture-user', userSig: 'synthetic', taskId: 'late-task' } }
+  })
+  await page.goto('/assistant')
+  await page.getByRole('button', { name: '语音咨询', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
+  await dialog.getByRole('button', { name: /直接语音通话/ }).click()
+  try {
+    await expect(dialog).toHaveAttribute('data-state', 'voice-connecting')
+    await expect(dialog.locator('time')).toHaveCount(0)
+    await expect(dialog.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
+    await dialog.getByRole('button', { name: '取消尝试', exact: true }).click()
+    await expect(dialog).toHaveAttribute('data-state', 'voice-gate')
+  } finally {
+    release()
+  }
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+  await expect(dialog).toHaveAttribute('data-state', 'voice-gate')
 })
 
 test('interview setup → text answer → report @w3-kiosk', async ({ page, api }) => {

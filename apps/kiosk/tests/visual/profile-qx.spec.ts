@@ -84,11 +84,14 @@ function registerAssetCounts(api: ApiRouter, totals: Record<string, number>): vo
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
@@ -110,6 +113,7 @@ test('profile signed-out reads no member totals and keeps recruitment copy at ze
 
   await page.goto('/profile')
   await expect(page.getByTestId('profile-state-signed-out')).toBeVisible()
+  await expect(page.locator('.qx-topbar button, .qx-topbar a[href]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '手机号登录', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('region', { name: '我的资产' })).toBeVisible()
   await expect(page.getByText('这台机器是公共终端')).toBeVisible()
@@ -164,6 +168,8 @@ test('profile payment todo is driven by pending-tasks payload @w5-kiosk', async 
 
   const continueBtn = page.getByTestId('profile-resume')
   await expect(continueBtn).toHaveText('继续付款')
+  expect((await continueBtn.boundingBox())!.y, '2.0 待办操作位于 y≥500').toBeGreaterThanOrEqual(500)
+  expect(await page.locator('.pf-page').evaluate((el) => el.scrollHeight - el.clientHeight), '默认待办态首屏放得下').toBeLessThanOrEqual(1)
   await assertTapTargetPointerHit(continueBtn)
   await page.screenshot({ path: test.info().outputPath('profile-payment.png'), fullPage: true })
   expect(errors).toEqual([])

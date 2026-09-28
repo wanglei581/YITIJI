@@ -177,8 +177,8 @@ export function AiToolSection({ degraded, degradedReason, availability, activeSk
                 <Icon />
               </span>
               <span className="aat-body">
-                <strong>{tool.title.replace(/^AI /, '')}</strong>
-                <small>{active ? '当前会话 · ' : ''}{tool.description}</small>
+                <strong>{tool.title}</strong>
+                <small>{active ? '当前咨询 · ' : ''}{tool.description}</small>
               </span>
               <span className="kassist-sr-only">（{LAMP_LABEL[lamp]}）</span>
             </button>

@@ -673,6 +673,7 @@ export async function loginMemberViaSms(
       await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
     },
   })
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of MEMBER_PHONE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
@@ -682,6 +683,7 @@ export async function loginMemberViaSms(
     page, journey, step: 'send-sms', control: '获取验证码', selectorHint: 'button:获取验证码',
     kind: 'click', collectors,
     act: async () => {
+      await page.getByRole('button', { name: '收起键盘', exact: true }).click()
       await page.getByRole('button', { name: '获取验证码', exact: true }).click()
     },
   })
@@ -705,10 +707,11 @@ export async function loginMemberViaSms(
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
   await recordStep({
-    page, journey, step: 'verify-login', control: '验证并登录', selectorHint: 'button:验证并登录',
+    page, journey, step: 'verify-login', control: '确认登录', selectorHint: 'button:确认登录',
     kind: 'click', collectors, note: `sms-code-source=${source}`,
     act: async () => {
-      await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+      await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+      await page.getByRole('button', { name: '确认登录', exact: true }).click()
       await page.waitForTimeout(1200)
     },
   })

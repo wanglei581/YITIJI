@@ -1,0 +1,70 @@
+/* 语音沿用真实 hook，独立滚动内容区与固定控制区；背景文字工作台 inert。 */
+.kassist .assistant-voice-backdrop { position: absolute; z-index: 30; inset: 16px 0 24px; display: flex; align-items: stretch; justify-content: center; background: var(--qx-paper); border-radius: 32px; }
+.kassist .assistant-voice-loading { margin: auto; padding: 32px; font-size: var(--qx-fs-sec); }
+.kassist .assistant-voice-dialog { width: 100%; min-width: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--qx-line); border-radius: 32px; background: var(--qx-paper); }
+.kassist .assistant-voice-header { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 44px 36px; min-height: 340px; background: radial-gradient(ellipse at 80% 0%, rgb(46 230 168 / 12%), transparent 60%), linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep) 68%); color: var(--qx-paper); }
+.kassist .assistant-voice-header > div { flex: 1; min-width: 0; }
+.kassist .assistant-voice-header > div > span { font-size: var(--qx-fs-aux-lg); color: var(--qx-emerald); }
+.kassist .assistant-voice-header h2 { font: 700 var(--qx-fs-page)/1.4 var(--qx-serif); margin: 12px 0; }
+.kassist .assistant-voice-header p { font-size: var(--qx-fs-body); }
+.kassist .assistant-voice-header .assistant-voice-ai-disclosure { margin-top: 20px; font-size: var(--qx-fs-aux-lg); }
+.kassist .assistant-voice-footer { flex: none; display: flex; justify-content: flex-end; padding: 12px 28px; border-top: 1px solid var(--qx-line); }
+.kassist .assistant-voice-close { align-self: flex-end; flex: none; display: grid; place-items: center; min-width: 64px; min-height: 64px; padding: 12px 20px; font-size: var(--qx-fs-body); border: 1px solid var(--qx-line-2); border-radius: 20px; background: var(--qx-surface); color: var(--qx-ink); grid-auto-flow: column; gap: 12px; }
+.kassist .assistant-voice-stage { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 28px; display: flex; flex-direction: column; gap: 24px; }
+.kassist .assistant-voice-stage > * { flex-shrink: 0; }
+.kassist .assistant-voice-panel { border: 1px solid var(--qx-line); border-radius: 32px; padding: 32px; background: var(--qx-surface); }
+.kassist .assistant-voice-center { text-align: center; padding: 24px 40px; }
+.kassist .assistant-voice-orb { display: grid; place-items: center; width: 96px; height: 96px; margin: 0 auto 22px; border-radius: 32px; background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.kassist .assistant-voice-orb svg { width: 42px; height: 42px; }
+.kassist .assistant-voice-center h3 { font-size: var(--qx-fs-sec); margin-bottom: 16px; }
+.kassist .assistant-voice-center p { color: var(--qx-ink-2); }
+.kassist .assistant-voice-twocol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 20px; }
+.kassist .assistant-voice-mini { padding: 22px 26px; border: 1px solid var(--qx-line); border-radius: 24px; background: var(--qx-paper); }
+.kassist .assistant-voice-mini b { font-size: var(--qx-fs-body); }
+.kassist .assistant-voice-mini ul { margin: 14px 0 0; padding-left: 24px; display: grid; gap: 12px; }
+.kassist .assistant-voice-mini li { font-size: var(--qx-fs-aux-lg); }
+.kassist :is(.assistant-voice-dock, .assistant-voice-controls) { display: flex; flex-wrap: wrap; gap: 14px; margin-top: auto; padding-top: 12px; }
+.kassist :is(.assistant-voice-choice, .assistant-voice-control, .assistant-voice-resume) { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 76px; padding: 16px 22px; border: 1px solid var(--qx-line-2); border-radius: 22px; background: var(--qx-surface); color: var(--qx-ink); font-size: var(--qx-fs-btn); }
+.kassist .assistant-voice-choice { flex: 1; }
+.kassist .assistant-voice-choice-copy { display: flex; flex-direction: column; text-align: left; }
+.kassist .assistant-voice-choice small { font-size: var(--qx-fs-aux-lg); }
+.kassist :is(.assistant-voice-choice--primary, .assistant-voice-control--primary) { background: var(--qx-teal-d); color: var(--qx-on-solid); border-color: var(--qx-teal-d); }
+.kassist .assistant-voice-control--hangup { background: var(--qx-cinnabar); color: var(--qx-on-solid); border-color: var(--qx-cinnabar); }
+.kassist .assistant-voice-control.is-active { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
+.kassist .assistant-voice-privacy { font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-2); }
+.kassist .assistant-voice-live-status { display: flex; align-items: center; justify-content: center; gap: 16px; font-size: var(--qx-fs-body-lg); }
+.kassist .assistant-voice-live-status time { font-variant-numeric: tabular-nums; color: var(--qx-teal-d); }
+.kassist .assistant-voice-avatar { width: 220px; height: 280px; margin: 28px auto; border: 1px solid var(--qx-line); border-radius: 32px; overflow: hidden; }
+.kassist .assistant-voice-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.kassist .assistant-voice-wave { height: 40px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.kassist .assistant-voice-wave i { width: 6px; height: 24px; border-radius: 6px; background: var(--qx-teal); animation: kassist-qingxu-wave .9s ease-in-out infinite alternate; }
+.kassist .assistant-voice-wave i:nth-child(2n) { animation-delay: -.4s; }
+.kassist .assistant-voice-wave.is-quiet i { animation: none; height: 6px; }
+.kassist .assistant-voice-caption { margin-top: 24px; border-top: 1px solid var(--qx-line); padding-top: 20px; }
+.kassist .assistant-voice-caption > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: var(--qx-fs-aux-lg); }
+.kassist .assistant-voice-caption p { margin-top: 12px; min-height: 64px; overflow-wrap: anywhere; }
+.kassist .assistant-voice-card { padding: 24px 28px; border: 1px solid var(--qx-cinnabar-line); border-radius: 28px; background: var(--qx-cinnabar-soft); }
+.kassist .assistant-voice-card h3 { display: flex; align-items: center; gap: 12px; font-size: var(--qx-fs-sec); }
+.kassist .assistant-voice-card p { margin-top: 14px; overflow-wrap: anywhere; }
+.kassist .assistant-voice-card[data-kind='warn'] { background: var(--qx-wheat-soft); border-color: var(--qx-line-2); }
+.kassist .assistant-voice-resume { margin: 16px auto; }
+@keyframes kassist-qingxu-wave { to { transform: scaleY(.25); } }
+@media (max-width: 600px) {
+  .kassist .assistant-voice-backdrop { position: fixed; inset: 0; border-radius: 0; }
+  .kassist .assistant-voice-dialog { border-radius: 0; }
+  .kassist .assistant-voice-header { min-height: 0; padding: 22px; gap: 12px; }
+  .kassist .assistant-voice-header h2 { font-size: var(--qx-fs-sec); }
+  .kassist .assistant-voice-stage { padding: 18px; gap: 18px; }
+  .kassist .assistant-voice-panel { padding: 18px; }
+  .kassist .assistant-voice-center { padding: 12px 0; }
+  .kassist .assistant-voice-twocol { grid-template-columns: minmax(0, 1fr); }
+  .kassist .assistant-voice-choice { flex-basis: 100%; }
+  .kassist .assistant-voice-control { flex: 1 1 130px; font-size: var(--qx-fs-body); }
+}
+@media (max-height: 740px) {
+  .kassist .assistant-voice-header { min-height: 0; padding: 18px 24px; }
+  .kassist .assistant-voice-avatar { width: 140px; height: 180px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kassist .assistant-voice-wave i { animation: none; }
+}

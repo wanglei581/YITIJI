@@ -316,8 +316,8 @@ expectAbsent(favoritesPage, /KioskPageFrame/, 'MyFavoritesPage 已离开 V6 Kios
 // MyFavoritesPage（#934）先后迁走；2026-09-23 最后一页 MySettingsPage 也迁入青序会员壳
 // 的 settings 视图，表空了，换成下面的同位青序断言。能力断言（授权查询/撤回、登录、会话说明、
 // 退出、未开放说明）在本文件下方一条不删。
-expectIncludes(settingsPage, "from './qx/QxMeChrome'", 'MySettingsPage 复用青序会员共享壳')
-expectMatches(settingsPage, /<QxMePage[\s\S]{0,120}?view="settings"/, 'MySettingsPage 使用青序会员壳的「账号设置」视图')
+expectIncludes(settingsPage, "from '../../../components/qingxu/QxPageFrame'", 'MySettingsPage 复用青序共享页框')
+expectMatches(settingsPage, /data-qx-view="settings"[\s\S]*<QxPageFrame/, 'MySettingsPage 使用青序会员壳的「账号设置」视图')
 expectAbsent(settingsPage, /KioskPageFrame|me-detail-inkpaper|useInkRipple|me-inkdetail/, 'MySettingsPage 已离开墨青纸感 / V6 旧壳')
 expectIncludes(settingsPage, "navigate('/login', { state: { from: '/me/settings' } })", '账号设置保留登录回跳 /me/settings')
 expectIncludes(settingsPage, "error: { text: '本次未取到'", '账号设置授权读取失败显示「本次未取到」，不猜成未授权')
@@ -350,7 +350,7 @@ expectAbsent(benefitsPage, /立即支付|去支付|确认核销|核销成功|办
 expectIncludes(settingsPage, 'getJobAiConsentStatus', '账号设置保留岗位 AI 授权状态查询')
 expectIncludes(settingsPage, 'revokeJobAiConsent', '账号设置保留撤回岗位 AI 授权能力')
 expectIncludes(settingsPage, '手机号登录', '账号设置保留游客登录按钮')
-expectIncludes(settingsPage, '公共终端会话说明', '账号设置保留公共终端会话说明')
+expectIncludes(settingsPage, '公共终端使用说明', '账号设置保留公共终端使用说明')
 expectIncludes(settingsPage, '退出登录', '账号设置保留退出登录操作')
 // Wave 2 已实现换绑，只有注销和数据导出仍未开放
 expectIncludes(settingsPage, '账号注销和数据导出尚未开放', '账号设置明确尚未开放的账户能力')
@@ -402,6 +402,10 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  // W4 L1：设置页拆分四步表单和确认框，CSS 仅限本页。
+  'apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx',
+  'apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx',
+  'apps/kiosk/src/pages/profile/me/styles/settings-qx2.css',
   'apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx',
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx',
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx',

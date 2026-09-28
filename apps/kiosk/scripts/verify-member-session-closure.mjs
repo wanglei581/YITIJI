@@ -405,25 +405,26 @@ assert(
   'MySettings 退出、切换账号、换绑完成均走同一隐私边界，并保留 /profile 与 /login 目的地语义',
 )
 
+const phoneRebindPanel = read('src/pages/profile/me/components/PhoneRebindPanel.tsx')
 assert(
-  /value=\{oldOtp\}/.test(mySettingsPage) &&
-    /value=\{newOtp\}/.test(mySettingsPage) &&
-    /type="password"/.test(mySettingsPage) &&
-    /me-otp-mask/.test(mySettingsPage) &&
-    /aria-label="当前手机号验证码，已隐藏显示"/.test(mySettingsPage) &&
-    /aria-label="新手机号验证码，已隐藏显示"/.test(mySettingsPage),
+  /value=\{oldOtp\}/.test(phoneRebindPanel) &&
+    /value=\{newOtp\}/.test(phoneRebindPanel) &&
+    /type="password"/.test(phoneRebindPanel) &&
+    /me-otp-mask/.test(phoneRebindPanel) &&
+    /aria-label="当前手机号验证码，已隐藏显示"/.test(phoneRebindPanel) &&
+    /aria-label="新手机号验证码，已隐藏显示"/.test(phoneRebindPanel),
   '换绑验证码在公共屏隐藏显示，不把 6 位码打在大厅屏幕上',
 )
 assert(
-  !/<input[^>]*type="tel"[^>]*value=\{oldOtp\}/.test(mySettingsPage) &&
-    !/<input[^>]*type="tel"[^>]*value=\{newOtp\}/.test(mySettingsPage) &&
-    !/<input[^>]*value=\{oldOtp\}[^>]*type="tel"/.test(mySettingsPage),
+  !/<input[^>]*type="tel"[^>]*value=\{oldOtp\}/.test(phoneRebindPanel) &&
+    !/<input[^>]*type="tel"[^>]*value=\{newOtp\}/.test(phoneRebindPanel) &&
+    !/<input[^>]*value=\{oldOtp\}[^>]*type="tel"/.test(phoneRebindPanel),
   '换绑验证码输入不再用可见 tel 明文',
 )
 assert(
-  /timeoutMs:\s*45_000/.test(mySettingsPage) &&
-    /enabled:\s*step !== 'done'/.test(mySettingsPage) &&
-    /onIdle:\s*onCancel/.test(mySettingsPage),
+  /timeoutMs:\s*45_000/.test(phoneRebindPanel) &&
+    /enabled:\s*step !== 'done' && !busy/.test(phoneRebindPanel) &&
+    /onIdle:\s*onCancel/.test(phoneRebindPanel),
   '换绑弹层 45 秒无操作自动关闭并清内存',
 )
 {

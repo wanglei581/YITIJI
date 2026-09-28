@@ -64,7 +64,9 @@ check('standby empty playlist still exits home and does not invent media', () =>
 
 check('login gate has a leave-without-login exit and no 已登录 overlay', () => {
   assert.match(files.loginPage, /QxPageFrame/)
-  assert.match(files.loginPage, /back=\{\{\s*label:\s*'返回首页'/)
+  // 03 v2 顶部不放可点；同一个返回首页动作移到下方 QxStepActions。
+  assert.match(files.loginPage, /<QxStepActions onPrev=\{goHome\} prevLabel="返回首页"/)
+  assert.doesNotMatch(files.loginPage, /back=\{\{/)
   assert.match(files.loginPage, /不登录，继续使用/)
   assert.match(files.loginPage, /useMemberPhoneLogin\(/)
   assert.match(files.loginPage, /phoneLogin\.paneProps/)
@@ -135,3 +137,6 @@ if (failures) {
   process.exit(1)
 }
 console.log('\nALL PASS qx session lifecycle')
+
+// W4 L1: real return-path/error-copy/phone-hook regression; runs in the existing CI gate.
+await import('./verify-w4-login-profile-l1.mjs')

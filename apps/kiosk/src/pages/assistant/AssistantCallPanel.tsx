@@ -7,6 +7,7 @@ import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import { KIcon } from '../../components/kiosk-icon'
 import { useAiAdvisorCallSession } from '../../hooks/useAiAdvisorCallSession'
 import { AdvisorManualEntries } from './AdvisorConversation'
+import { advisorDisplayText, advisorUserReason } from './advisorUserCopy'
 import { COCKPIT_COPY, type CockpitVoiceState } from './advisorScenes'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
@@ -30,6 +31,7 @@ function MiniList({ title, items }: { title: string; items: readonly string[] })
 export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: AssistantCallPanelProps) {
   const call = useAiAdvisorCallSession()
   const [ending, setEnding] = useState(false)
+  const [captionsOn, setCaptionsOn] = useState(true)
   const endingRef = useRef(false)
   const dialogRef = useRef<HTMLElement>(null)
   const directCallRef = useRef<HTMLButtonElement>(null)
@@ -172,16 +174,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
             */}
             <p id="assistant-voice-ai-disclosure" className="assistant-voice-ai-disclosure">{AI_LABEL_COPY.DIGITAL_HUMAN}</p>
           </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="assistant-voice-close"
-            aria-label="关闭语音咨询"
-            disabled={ending}
-            onClick={closeDialog}
-          >
-            <KIcon name="close" />
-          </button>
+
         </header>
 
         {call.phase === 'gate' ? (
@@ -193,8 +186,8 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                 <p>在你按下「直接语音通话」之前，本页不会请求麦克风权限，也不采集任何声音。</p>
               </div>
               <div className="assistant-voice-twocol">
-                <MiniList title="按下开启后会发生" items={['浏览器弹出麦克风授权询问', '向服务端申请一次语音会话', '能不能接通由真实服务返回确认']} />
-                <MiniList title="现在不会发生" items={['不采集声音、不进通话房间', '不显示转写、时长或识别结果', '不把未接通说成已接通']} />
+                <MiniList title="按下开启后会发生" items={['请在提示中允许使用麦克风', '连接后可看字幕，也可静音', '随时结束或切回文字咨询']} />
+                <MiniList title="现在不会发生" items={['现在不会打开麦克风', '关闭此窗口可继续打字', '没有准备好可以稍后再聊']} />
               </div>
             </div>
             <div className="assistant-voice-dock" aria-label="语音咨询方式">
@@ -226,19 +219,19 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               </button>
             </div>
             <p className="assistant-voice-privacy">
-              通话内容不保存音频；挂断、关闭或离开本页时会自动结束会话，不持续计费。
+              通话不保存音频；结束、关闭或离开本页时停止通话。
             </p>
           </div>
         ) : call.phase === 'error' ? (
           <div className="assistant-voice-stage assistant-voice-error" role="alert">
             <div className="assistant-voice-card" data-kind="error">
               <h3><KIcon name="close" />这次没连上语音服务</h3>
-              <p>连接失败，页面不推测原因，也不展示任何模拟对话。文字咨询和四个非 AI 入口都不受影响。</p>
-              {call.errMsg ? <p className="assistant-voice-error-message">服务返回：{call.errMsg}</p> : null}
+              <p>可以重新连接，或切回文字继续咨询。</p>
+              {call.errMsg ? <p className="assistant-voice-error-message">{advisorUserReason(call.errMsg, '语音暂不可用，请稍后再试。')}</p> : null}
             </div>
             <div className="assistant-voice-twocol">
-              <MiniList title="现在可做什么" items={['「重新连接」会重新走一次真实申请', '「改用文字咨询」回到输入框', '连续失败请找现场工作人员']} />
-              <MiniList title="这次没有发生" items={['没有进入通话房间', '没有采集或上传声音', '没有生成任何对话记录']} />
+              <MiniList title="现在可做什么" items={['重新连接，再试一次', '改用文字，继续提问', '连续失败请找现场工作人员']} />
+              <MiniList title="也可以直接办理" items={['打印或扫描自己的材料', '查看政策和办事说明', '管理已有的简历文件']} />
             </div>
             {/* 稿 05：语音没建立不影响这四项。点进去会卸载本面板，会话清理由 useAiAdvisorCallSession 负责。 */}
             <AdvisorManualEntries variant="rail" />
@@ -252,7 +245,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                 改用文字咨询
               </button>
             </div>
-            <p className="assistant-voice-privacy">语音暂不可用时，文字咨询不受影响。</p>
+
           </div>
         ) : (
           <div className={`assistant-voice-stage assistant-voice-live${call.phase === 'connecting' ? ' is-connecting' : ''}`}>
@@ -261,15 +254,15 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               {call.phase === 'live'
                 ? <span className="is-live" aria-hidden="true" />
                 : <span className="assistant-voice-dots" aria-hidden="true"><i /><i /><i /></span>}
-              <strong>{call.phase === 'connecting' ? '请求已发出，等真实服务结果' : statusText}</strong>
+              <strong>{call.phase === 'connecting' ? '正在连接，请稍候' : statusText}</strong>
               {/* 只有真的进了房间才计时；连接中不显示任何时长。 */}
               {call.phase === 'live' ? <time>{`${mm}:${ss}`}</time> : null}
             </div>
 
             {call.phase === 'connecting' ? (
               <div className="assistant-voice-twocol">
-                <MiniList title="这一步在等什么" items={['服务端下发进房凭证', '通话模块加载完成', '本地麦克风开启结果']} />
-                <MiniList title="失败会怎样" items={['直接说没建立，不猜原因', '文字咨询照常可用', '四个非 AI 入口不受影响']} />
+                <MiniList title="这一步在等什么" items={['连接语音服务', '准备播放小青的声音', '检查麦克风是否能使用']} />
+                <MiniList title="失败会怎样" items={['可以重新连接或取消', '文字咨询照常可用', '下面的办事入口照常可用']} />
               </div>
             ) : (
               <>
@@ -289,14 +282,14 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               </button>
             )}
 
-            {call.phase === 'live' && (
+            {call.phase === 'live' && captionsOn && (
               <div className="assistant-voice-caption" aria-live="polite">
                 <div>
                   <strong>实时字幕</strong>
-                  <span>来自服务端 · {AI_LABEL_COPY.BASE}</span>
+                  <span>{AI_LABEL_COPY.BASE}</span>
                 </div>
                 <p>
-                  {call.subtitle ||
+                  {advisorDisplayText(call.subtitle) ||
                     (call.aiState === 'listening'
                       ? call.muted ? '麦克风已关闭' : '请讲，我在听…'
                       : '通话字幕将在这里显示')}
@@ -315,6 +308,11 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
             )}
 
             <div className="assistant-voice-controls" aria-label="通话操作">
+              {call.phase === 'live' && (
+                <button type="button" className="assistant-voice-control" aria-pressed={captionsOn} disabled={ending} onClick={() => setCaptionsOn((value) => !value)}>
+                  {captionsOn ? '字幕已开' : '字幕已关'}
+                </button>
+              )}
               {call.phase === 'live' && !call.micBlocked && (
                 <button
                   type="button"
@@ -351,15 +349,27 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                 onClick={returnToChoices}
               >
                 <KIcon name="phone" />
-                {call.phase === 'connecting' ? '取消尝试' : '挂断'}
+                {call.phase === 'connecting' ? '取消尝试' : '结束通话'}
               </button>
             </div>
 
             <p className="assistant-voice-privacy">
-              通话内容不保存音频；挂断、关闭或离开本页时会自动结束会话，不持续计费。
+              通话不保存音频；结束、关闭或离开本页时停止通话。
             </p>
           </div>
         )}
+        <footer className="assistant-voice-footer">
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="assistant-voice-close"
+            aria-label="关闭语音咨询"
+            disabled={ending}
+            onClick={closeDialog}
+          >
+            <KIcon name="close" />关闭语音咨询
+          </button>
+        </footer>
       </section>
     </div>
   )

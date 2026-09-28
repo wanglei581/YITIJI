@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoginResult,
   memberLogin,
-  resolveMemberApiErrorMessage,
+  MemberApiError,
   sendSmsCode,
 } from '../../../services/auth/memberAuthApi'
+import { accountErrorMessage } from '../accountUserMessage'
+import { maskPhone } from '../../../utils/maskPii'
 import { getMemberAuthDeviceId } from '../../../services/auth/memberAuthDevice'
 import { fetchLegalConsentVersions } from '../../../services/auth/legalConsentVersions'
 
@@ -37,6 +39,8 @@ export interface MemberPhoneLoginPaneProps {
   onLogin: () => void
   notice: string | null
   error: string | null
+  errorCode: string | null
+  expiresInSeconds: number | null
 }
 
 export interface MemberPhoneLoginController extends MemberPhoneLoginPaneProps {
@@ -58,7 +62,7 @@ export function formatMemberPhone(raw: string): string {
 
 function useCountdown() {
   const [seconds, setSeconds] = useState(0)
-  const [total, setTotal] = useState(60)
+  const [total, setTotal] = useState(0)
 
   useEffect(() => {
     if (seconds <= 0) return undefined
@@ -67,13 +71,13 @@ function useCountdown() {
   }, [seconds])
 
   const start = useCallback((value: number) => {
-    setTotal(value > 0 ? value : 60)
+    setTotal(Math.max(0, value))
     setSeconds(value)
   }, [])
 
   const reset = useCallback(() => {
     setSeconds(0)
-    setTotal(60)
+    setTotal(0)
   }, [])
 
   return useMemo(() => ({ seconds, total, start, reset }), [reset, seconds, start, total])
@@ -90,6 +94,8 @@ export function useMemberPhoneLogin(
   const [submitting, setSubmitting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorCode, setErrorCode] = useState<string | null>(null)
+  const [expiresInSeconds, setExpiresInSeconds] = useState<number | null>(null)
   const [shaking, setShaking] = useState(false)
   const countdown = useCountdown()
   const previousPhoneLengthRef = useRef(0)
@@ -114,6 +120,7 @@ export function useMemberPhoneLogin(
   const clearFeedback = useCallback(() => {
     setNotice(null)
     setError(null)
+    setErrorCode(null)
   }, [])
 
   const requireAgreement = useCallback(() => {
@@ -173,6 +180,7 @@ export function useMemberPhoneLogin(
     setSubmitting(false)
     setNotice(null)
     setError(null)
+    setErrorCode(null)
     setShaking(false)
     if (shakeTimerRef.current !== null) {
       window.clearTimeout(shakeTimerRef.current)
@@ -186,6 +194,7 @@ export function useMemberPhoneLogin(
     setActiveInput('phone')
     previousPhoneLengthRef.current = 0
     resetCountdown()
+    setExpiresInSeconds(null)
   }, [resetCountdown])
 
   const handleSendCode = async () => {
@@ -203,17 +212,26 @@ export function useMemberPhoneLogin(
     setLoading(true)
     setSendingCode(true)
     setError(null)
+    setErrorCode(null)
     setNotice(null)
     try {
       const deviceId = getMemberAuthDeviceId()
       const result = await sendSmsCode(phone, deviceId)
       if (!isCurrentRequest(requestGeneration)) return
-      countdown.start(result.cooldownSeconds > 0 ? result.cooldownSeconds : 60)
-      setNotice(`验证码已发送至 ${formatMemberPhone(phone)}`)
+      countdown.start(Math.max(0, result.cooldownSeconds))
+      setExpiresInSeconds(result.expiresInSeconds)
+      setCode('')
+      setNotice(`验证码已发送至 ${maskPhone(phone)}`)
       setActiveInput('code')
     } catch (cause) {
       if (!isCurrentRequest(requestGeneration)) return
-      raiseError(resolveMemberApiErrorMessage(cause, '验证码发送失败，请稍后重试'))
+      setErrorCode(cause instanceof MemberApiError ? cause.code : null)
+      if (cause instanceof MemberApiError && cause.code === 'SMS_SEND_FAILED') {
+        countdown.reset()
+        setCode('')
+        setExpiresInSeconds(null)
+      }
+      raiseError(accountErrorMessage(cause, '验证码发送失败，请稍后重试'))
     } finally {
       if (isCurrentRequest(requestGeneration)) {
         setLoading(false)
@@ -237,6 +255,7 @@ export function useMemberPhoneLogin(
     setLoading(true)
     setSubmitting(true)
     setError(null)
+    setErrorCode(null)
     setNotice(null)
     try {
       const deviceId = getMemberAuthDeviceId()
@@ -247,7 +266,8 @@ export function useMemberPhoneLogin(
       await options.onAuthenticated(result)
     } catch (cause) {
       if (!isCurrentRequest(requestGeneration)) return
-      raiseError(resolveMemberApiErrorMessage(cause, '登录验证失败，请稍后重试'))
+      setErrorCode(cause instanceof MemberApiError ? cause.code : null)
+      raiseError(accountErrorMessage(cause, '登录验证失败，请稍后重试'))
       setCode('')
     } finally {
       if (isCurrentRequest(requestGeneration)) {
@@ -273,6 +293,8 @@ export function useMemberPhoneLogin(
     onLogin: handleLogin,
     notice,
     error,
+    errorCode,
+    expiresInSeconds,
   }
 
   return {

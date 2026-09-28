@@ -76,6 +76,7 @@ export function useMemberAssetCounts(isLoggedIn: boolean, getToken: () => string
     }).finally(() => {
       if (gen === requestGen.current) setLoading(false)
     })
+    return () => { requestGen.current += 1 }
   }, [isLoggedIn, getToken, refreshKey])
 
   const allMissing = Object.values(counts).every((value) => value === null)
