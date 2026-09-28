@@ -10,6 +10,7 @@ import {
   CalendarIcon,
   FileWarningIcon,
   FolderIcon,
+  MessageSquareWarningIcon,
   MonitorIcon,
   PrinterIcon,
   RefreshCwIcon,
@@ -485,6 +486,7 @@ const ALERT_ROW_ICON: Record<AdminAlertItem['type'], ElementType> = {
   printer_issue: PrinterIcon,
   print_failed: PrinterIcon,
   paid_pending_file_unavailable: FileWarningIcon,
+  feedback_pending: MessageSquareWarningIcon,
 }
 
 /**

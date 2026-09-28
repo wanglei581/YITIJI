@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 556,
+    "endpointCount": 557,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -573,6 +573,7 @@
         "method": "GET",
         "models": [
           "AlertDisposition",
+          "FeedbackTicket",
           "PrintTask",
           "Terminal",
           "TerminalHeartbeat"
@@ -595,6 +596,7 @@
         "models": [
           "AlertDisposition",
           "AuditLog",
+          "FeedbackTicket",
           "PrintTask",
           "Terminal",
           "TerminalHeartbeat",
@@ -1683,6 +1685,18 @@
         "services": [
           "MemberFeedbackService"
         ]
+      },
+      {
+        "controller": "services/api/src/member-feedback/admin-member-feedback.controller.ts",
+        "handler": "AdminMemberFeedbackController.revealContactPhone",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/feedback/:id/contact-phone",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/member-feedback/admin-member-feedback.controller.ts",
@@ -3295,6 +3309,7 @@
         "method": "GET",
         "models": [
           "AlertDisposition",
+          "FeedbackTicket",
           "PrintTask",
           "Terminal",
           "TerminalHeartbeat"
@@ -12132,6 +12147,7 @@
           "component": "MemberFeedbackPage",
           "endpoints": [
             "PATCH /admin/feedback/:param/status",
+            "POST /admin/feedback/:param/contact-phone",
             "POST /admin/feedback/:param/replies"
           ],
           "file": "apps/admin/src/routes/member-feedback/index.tsx",
@@ -16380,6 +16396,7 @@
           "FeedbackReply"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-feedback/member-feedback.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
@@ -22495,6 +22512,7 @@
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
@@ -23530,6 +23548,9 @@
     ],
     "services/api/src/member-auth/dto/phone-rebind.dto.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+    ],
+    "services/api/src/member-auth/legal-docs-published-guard.ts": [
+      "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "services/api/src/member-auth/member-auth.controller.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -33578,6 +33599,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/member-feedback/dto/kiosk-feedback.dto.ts",
           "services/api/src/member-feedback/dto/member-feedback.dto.ts",
@@ -33749,6 +33771,7 @@
           "services/api/src/legal/legal.controller.ts",
           "services/api/src/legal/legal.service.ts",
           "services/api/src/member-auth/dto/member-login.dto.ts",
+          "services/api/src/member-auth/legal-docs-published-guard.ts",
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/member-auth/member-qr-login.service.ts"
         ],

@@ -57,11 +57,19 @@ function errorCode(err: unknown): string | undefined {
   return e.response?.error?.code ?? e.getResponse?.()?.error?.code ?? e.message
 }
 
+type FeedbackQuery = { where?: { category?: string; status?: { in?: string[] } }; orderBy?: { createdAt?: 'asc' | 'desc' } }
+function matchFeedback(rows: unknown[], args?: FeedbackQuery): Array<{ category: string; status: string; createdAt: Date }> {
+  return (rows as Array<{ category: string; status: string; createdAt: Date }>)
+    .filter((row) => args?.where?.category === undefined || row.category === args.where.category)
+    .filter((row) => !args?.where?.status?.in || args.where.status.in.includes(row.status))
+}
+
 function mockOpsPrisma(
   terminalRows: unknown[],
   printRows: unknown[] = [],
   dispositionRows: unknown[] = [],
   unavailableRows: unknown[] = [],
+  feedbackRows: unknown[] = [],
 ): PrismaService {
   return {
     terminal: { findMany: async () => terminalRows },
@@ -71,6 +79,18 @@ function mockOpsPrisma(
       findFirst: async () => unavailableRows[0] ?? null,
     },
     terminalHeartbeat: { groupBy: async () => [], findFirst: async () => null },
+    // 按真实 where 过滤、按真实 orderBy 排序（不自带排序），否则「只算 AI 内容投诉」「取最早 / 最新」都测不出来。
+    feedbackTicket: {
+      count: async (args?: FeedbackQuery) => matchFeedback(feedbackRows, args).length,
+      findFirst: async (args?: FeedbackQuery) => {
+        const rows = matchFeedback(feedbackRows, args)
+        const direction = args?.orderBy?.createdAt
+        if (!direction) return rows[0] ?? null
+        const sorted = [...rows].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime())
+        return (direction === 'asc' ? sorted[0] : sorted[sorted.length - 1]) ?? null
+      },
+      findMany: async () => { throw new Error('待处理投诉告警不得全表拉取（用 count + findFirst）') },
+    },
     alertDisposition: {
       findMany: async () => dispositionRows,
       updateMany: async () => {
@@ -115,6 +135,33 @@ async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
     }
   }
   pass('3a. 健康打印机状态(ok/ready/idle)不产生 printer_issue 告警')
+}
+
+async function verifyPendingFeedbackAlert(): Promise<void> {
+  const feedbackRows: Array<{ createdAt: Date; category: string; status: string; contactPhoneEnc: string; content: string }> = [
+    { createdAt: new Date('2026-09-28T08:00:00.000Z'), category: 'ai_content', status: 'pending', contactPhoneEnc: 'secret-phone', content: 'secret-content' },
+    { createdAt: new Date('2026-09-28T08:01:00.000Z'), category: 'ai_content', status: 'processing', contactPhoneEnc: 'secret-phone-2', content: 'secret-content-2' },
+    { createdAt: new Date('2026-09-28T07:00:00.000Z'), category: 'print', status: 'pending', contactPhoneEnc: '', content: '打印问题' },
+    { createdAt: new Date('2026-09-28T06:00:00.000Z'), category: 'ai_content', status: 'closed', contactPhoneEnc: '', content: '已处理' },
+  ]
+  const service = new AdminOpsService(mockOpsPrisma([], [], [], [], feedbackRows))
+  const first = await service.listDerivedAlerts()
+  const alert = first.data.find((item) => item.type === 'feedback_pending')
+  if (!alert || !alert.detail.includes('共 2 条')) fail('3c. 待处理 AI 内容投诉告警缺失，或把打印问题、已关闭工单也算进去了')
+  if (alert && alert.occurredAt !== '2026-09-28T08:00:00.000Z') fail('3c. 告警时间不是最早一条待处理 AI 内容投诉的提交时间')
+  const encoded = JSON.stringify(alert)
+  if (encoded.includes('secret-phone') || encoded.includes('secret-content')) fail('3c. 告警泄露手机号或投诉正文')
+  // 提醒时机：答复较早的一条不换 episode（不打扰已确认的告警）；有新投诉进来才换（重新提醒）。
+  feedbackRows[0].status = 'replied'
+  const afterOldAnswered = (await service.listDerivedAlerts()).data.find((item) => item.type === 'feedback_pending')
+  if (!afterOldAnswered || afterOldAnswered.episodeToken !== alert?.episodeToken) fail('3c. 答复旧投诉不该让告警换 episode（会把已确认的告警重新弹出来）')
+  feedbackRows.push({ createdAt: new Date('2026-09-28T09:00:00.000Z'), category: 'ai_content', status: 'pending', contactPhoneEnc: '', content: '新投诉' })
+  const afterNew = (await service.listDerivedAlerts()).data.find((item) => item.type === 'feedback_pending')
+  if (!afterNew || afterNew.episodeToken === alert?.episodeToken) fail('3c. 有新投诉进来告警没有换 episode（已确认的告警不会重新提醒）')
+  for (const row of feedbackRows) row.status = row.category === 'ai_content' ? 'replied' : row.status
+  const after = await service.listDerivedAlerts()
+  if (after.data.some((item) => item.type === 'feedback_pending')) fail('3c. AI 内容投诉都答复后派生告警未消失')
+  pass('3c. 只按待处理 AI 内容投诉派生告警（条数与最早时间，不全表拉取），新投诉才重新提醒，不含个人信息，答复后消失')
 }
 
 async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
@@ -211,6 +258,7 @@ async function main() {
   pass('SES-07 终端在线窗口统一为五分钟心跳常量')
 
   await verifyHealthyPrinterStatusesDoNotAlert()
+  await verifyPendingFeedbackAlert()
   await verifyPaidPendingFileUnavailableAlert()
   if (process.env.ADMIN_OPS_ALERT_HEALTH_ONLY === '1') return
 

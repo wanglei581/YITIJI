@@ -93,7 +93,7 @@ flowchart TD
 | **FairZone** | 11 | JobFair | 4 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`jobs/admin-fairs.service.ts`<br/>`jobs/fair-company-zone.service.ts`<br/>… |
 | **Favorite** | 7 | EndUser | 4 个文件<br/>`assistant/daily-brief.service.ts`<br/>`console-screen/console-screen.usage.queries.ts`<br/>`member-favorites/member-favorites.service.ts`<br/>… |
 | **FeedbackReply** | 8 | FeedbackTicket、User | 1 个文件<br/>`member-feedback/member-feedback.service.ts` |
-| **FeedbackTicket** | 17 | EndUser、FeedbackReply | 3 个文件<br/>`member-feedback/kiosk-feedback.service.ts`<br/>`member-feedback/member-feedback.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
+| **FeedbackTicket** | 17 | EndUser、FeedbackReply | 4 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`member-feedback/kiosk-feedback.service.ts`<br/>`member-feedback/member-feedback.service.ts`<br/>… |
 | **FieldMappingRule** | 9 | JobSource | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
 | **FileObject** | 48 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 35 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
 | **HelpItem** | 8 | — | **无代码读写** |

@@ -14,7 +14,7 @@
  *   3. 退款消警必须读 Order.payStatus；禁止为了让红条消失去写 printOutcome。
  */
 
-export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable'] as const
+export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable', 'feedback_pending'] as const
 export type DerivedAlertType = (typeof ALERT_TYPES)[number]
 
 export const ALERT_ACTIONS = ['acknowledge', 'silence', 'close', 'reopen'] as const
@@ -116,6 +116,14 @@ export function paidPendingFileUnavailableEpisodeToken(args: {
     args.expiresAt?.toISOString() ?? 'null',
     args.observedAt.toISOString(),
   ].join(':')
+}
+
+/**
+ * 待处理 AI 内容投诉的 episode 只跟「最新一条待处理投诉的提交时间」走：
+ * 有新投诉进来才换 episode、已确认或静音的告警重新提醒；答复旧工单不打扰。
+ */
+export function feedbackPendingEpisodeToken(latest: Date): string {
+  return latest.toISOString()
 }
 
 /**

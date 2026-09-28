@@ -77,11 +77,12 @@ expectMatches(hubSrc, /KioskFeedbackDialog/, '打印 Hub 挂载匿名反馈弹�
 expectMatches(doneSrc, /反馈问题/, '打印完成页出现「反馈问题」入口文案')
 expectMatches(hubSrc, /反馈问题/, '打印 Hub 出现「反馈问题」入口文案')
 
-// ── 2. 匿名边界：不带凭证、不收联系方式 ──
+// ── 2. 匿名边界：不带凭证；只有 AI 内容投诉可选填联系方式 ──
 console.log('\n[2] 匿名边界与最小收集')
 expectNoMatch(clientSrc, /Authorization/, '匿名提交不带 Authorization 头')
 expectMatches(clientSrc, /credentials:\s*'omit'/, "匿名提交显式 credentials: 'omit'，不捎带会话 Cookie")
-expectNoMatch(clientSrc, /contactPhone/, '匿名提交面不含联系方式字段')
+expectMatches(clientSrc, /contactPhone/, '匿名提交面为 AI 内容投诉保留选填联系电话字段')
+expectNoMatch(clientSrc, /input\.category|category\?:\s*'/, '匿名提交面不传 category（由服务端从 issueCode 映射）')
 expectNoMatch(dialogSrc, /contactPhone|type="tel"|联系电话|手机号码/, '弹层不提供联系方式输入框')
 expectMatches(
   dialogSrc,

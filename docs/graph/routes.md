@@ -302,7 +302,7 @@ flowchart LR
   app --> legal_docs["/legal-docs<br/>1 页 · 0 端点"]
   app --> login["/login<br/>1 页 · 0 端点"]
   app --> member_benefits["/member-benefits<br/>1 页 · 2 端点"]
-  app --> member_feedback["/member-feedback<br/>1 页 · 2 端点"]
+  app --> member_feedback["/member-feedback<br/>1 页 · 3 端点"]
   app --> member_notifications["/member-notifications<br/>1 页 · 2 端点"]
   app --> offline_agencies["/offline-agencies<br/>1 页 · 31 端点"]
   app --> orders["/orders<br/>1 页 · 4 端点"]
@@ -343,7 +343,7 @@ flowchart LR
 | `/legal-docs` | LegalDocsPage | `apps/admin/src/routes/legal-docs/index.tsx` | 0 | — |
 | `/login` | LoginPage | `apps/admin/src/routes/login/index.tsx` | 0 | 1 |
 | `/member-benefits` | MemberBenefitsPage | `apps/admin/src/routes/member-benefits/index.tsx` | 2 | — |
-| `/member-feedback` | MemberFeedbackPage | `apps/admin/src/routes/member-feedback/index.tsx` | 2 | — |
+| `/member-feedback` | MemberFeedbackPage | `apps/admin/src/routes/member-feedback/index.tsx` | 3 | — |
 | `/member-notifications` | MemberNotificationsPage | `apps/admin/src/routes/member-notifications/index.tsx` | 2 | — |
 | `/offline-agencies` | OfflineAgenciesPage | `apps/admin/src/routes/offline-agencies/index.tsx` | 31 | — |
 | `/orders` | OrdersPage | `apps/admin/src/routes/orders/index.tsx` | 4 | — |
@@ -396,7 +396,7 @@ flowchart LR
 
 **`/member-benefits`** → `PATCH /admin/member-benefits/:param/revoke`、`POST /admin/member-benefits`
 
-**`/member-feedback`** → `PATCH /admin/feedback/:param/status`、`POST /admin/feedback/:param/replies`
+**`/member-feedback`** → `PATCH /admin/feedback/:param/status`、`POST /admin/feedback/:param/contact-phone`、`POST /admin/feedback/:param/replies`
 
 **`/member-notifications`** → `DELETE /admin/notifications/broadcasts/:param`、`POST /admin/notifications/broadcasts`
 

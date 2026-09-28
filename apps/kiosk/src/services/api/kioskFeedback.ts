@@ -8,9 +8,8 @@
 // 与 memberFeedback.ts（/me/feedback）的区别，三条都是硬约束：
 //   1. 不带 Authorization，且 credentials: 'omit' —— 不捎带会话 Cookie。
 //      匿名就要是真的匿名，不能因为用户碰巧登录过就把工单挂到他账号上。
-//   2. 不收联系方式。后端 CreateKioskFeedbackDto 根本没有 contactPhone 字段，
-//      前端也不提供输入框 —— 匿名工单没有账号归属，一旦落进手机号就是无主敏感数据
-//      （CLAUDE.md §11）。自由文本里的 PII 由服务端拒绝（不是脱敏）。
+//   2. 只有「AI 内容投诉」可以选填手机号（投诉人要能收到处理结果），后端加密保存；
+//      现场报障一律不收联系方式，带了服务端就 400。自由文本里的 PII 由服务端拒绝（不是脱敏）。
 //   3. 只有「提交」一个动作。没有列表 / 详情 / 追加回复 / 关单 ——
 //      匿名调用方不应拿到任何可枚举的工单读能力，处置只能走 Admin 侧。
 //
@@ -36,6 +35,7 @@ export const KIOSK_FEEDBACK_ISSUE_CODES = [
   'upload_issue',
   'billing_issue',
   'other',
+  'ai_content_complaint',
 ] as const
 
 export type KioskFeedbackIssueCode = typeof KIOSK_FEEDBACK_ISSUE_CODES[number]
@@ -88,6 +88,8 @@ export interface SubmitKioskFeedbackInput {
   issueCode?: KioskFeedbackIssueCode
   satisfaction?: KioskFeedbackSatisfaction
   content?: string
+  /** 只有 issueCode = ai_content_complaint 时可带（选填）。 */
+  contactPhone?: string
   relatedPrintTaskId?: string
   relatedScanTaskId?: string
 }
@@ -140,6 +142,7 @@ export async function submitKioskFeedback(
     ...(input.issueCode ? { issueCode: input.issueCode } : {}),
     ...(input.satisfaction ? { satisfaction: input.satisfaction } : {}),
     ...(content ? { content } : {}),
+    ...(input.contactPhone ? { contactPhone: input.contactPhone } : {}),
     ...(input.relatedPrintTaskId ? { relatedPrintTaskId: input.relatedPrintTaskId } : {}),
     ...(input.relatedScanTaskId ? { relatedScanTaskId: input.relatedScanTaskId } : {}),
   }
