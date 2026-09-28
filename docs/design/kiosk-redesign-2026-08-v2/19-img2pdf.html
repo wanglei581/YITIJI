@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!--
 青序流光 2.0 · 19 图片转 PDF（2026-09-28）
+9/28 去掉内部英文键名
 9/28 逐状态检查修压字
 原稿：../kiosk-redesign-2026-08/19-img2pdf.html（只读，未改）。本页无图片资源。脚本随原稿内嵌。
 - 规则 1：顶栏只留返回；底部补「返回打印扫描」。主操作仍在原稿的列表和底栏。
@@ -713,7 +714,7 @@ function outPanel(){
  var o=M.out;
  return '<div class="pgrp" data-testid="'+SCREEN+'-outfacts"><h4>这份文件</h4><div class="kv">'+
   '<div><span>文件名</span><b>'+o.n+'</b></div>'+
-  '<div><span>文件标识</span><b data-testid="'+SCREEN+'-fileid">'+o.fid+'</b></div>'+
+  '<div><span>怎么认</span><b data-testid="'+SCREEN+'-fileid">看文件名和页数</b></div>'+
   '<div><span>页数</span><b>'+o.pages+' 页（每张图一页）</b></div>'+
   '<div><span>大小</span><b>'+o.mb.toFixed(1)+' MB（上限 '+LIM.out+' MB）</b></div>'+
   '<div><span>校验值</span><b>'+o.md5+'…（实际给出的前 12 位）</b></div>'+

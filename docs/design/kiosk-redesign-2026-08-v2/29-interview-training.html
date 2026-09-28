@@ -25,6 +25,7 @@
    初始视口不要求看到 rail，由已有的 scrollcue 提示「下面还有内容」。 */
 .rail{flex:none;margin-bottom:8px}.body{scroll-padding-bottom:28px}</style><!--
 青序流光 2.0 · 29 模拟面试（state=report-ready，报告结构有内容）
+9/28 去掉内部英文键名
 规则 2：说明提到 21–23，卡片标题 28–30，主按钮 27，导航 21。
 规则 5：状态不写「已返回」，这一屏是结构示例，不是这场已经生成的结论。
 规则 7：眉题与状态写成「AI 模拟面试」；真反馈才会贴「AI 生成 · 供参考」，示例上不贴。
@@ -565,7 +566,7 @@ function reportPrintReady(){
     +'<section class="card"><div class="head"><b>系统返回的这份文件</b><span>这份文件里的各项</span></div>'
     +'<div class="filerow"><i>PDF</i><div class="fm"><b>文件名：'+PFILE.filename+'</b>'
     +'<p>'+PFILE.pageCount+' 页 · '+kb(PFILE.sizeBytes)+' · '+PFILE.mimeType+'</p></div></div>'
-    +fieldRows([['文件编号',PFILE.fileId,1],['有效期',PFILE.expiresAt],
+    +fieldRows([['怎么认','看文件名和页数'],['有效期',PFILE.expiresAt],
                 ['预览链接',PFILE.signedUrl,1],['打印凭证',PFILE.printFileUrl,1]])
     +'<p class="res-p">这里只示范每一项放在哪里、长什么样；<b>真实内容由系统返回</b>。</p>'
     +'<p class="res-p" style="margin-top:14px">打印版预览（<b>分页排版示意</b>，不是文件里的内容；真实预览走有时效的下载链接）：</p>'
@@ -588,7 +589,7 @@ function reportPrintHandoff(){
   body.innerHTML=statusbar('交接前的状态',[['打印文件','已生成','ok'],['交接内容','已列出','ok'],['打印任务','未创建']])
     +'<section class="card"><div class="head"><b>交给打印确认的这份文件</b><span>只交这些内容</span></div>'
     +fieldRows([['文件名',PFILE.filename,1],['大小',kb(PFILE.sizeBytes)],['页数',String(PFILE.pageCount)],
-                ['文件编号',PFILE.fileId,1],['打印用的文件',PFILE.printFileUrl,1],['文件类型',PFILE.mimeType]])
+                ['怎么认','看文件名和页数'],['打印用的文件',PFILE.printFileUrl,1],['文件类型','PDF']])
     +'<p class="res-p">这六项来自上一屏那份文件；<b>打印链接没有返回时按钮不放行</b>，页面停在报告页并显示原因，不会拿预览链接顶替。</p></section>'
     +'<section class="card"><div class="head"><b>同时交出去的打印参数</b><span>进打印确认前的初值</span></div>'
     +fieldRows([['份数','1 份'],['单双面','单面'],['颜色','黑白'],

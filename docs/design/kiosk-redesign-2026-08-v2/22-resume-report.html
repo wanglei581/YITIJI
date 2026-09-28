@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。另有一版重排结构的提案见 STATUS.md，不是默认。
+<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。9/28 去掉内部英文键名。另有一版重排结构的提案见 STATUS.md，不是默认。
      原稿：../kiosk-redesign-2026-08/22-resume-report.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
 <html lang="zh-CN">
 <head>
@@ -1692,8 +1692,7 @@ R['no-context'] = function(){
   body.innerHTML =
     '<section class="card state-b"><h2>当前没有可展示的报告</h2>'
     + '<p>诊断结果按<b>简历任务编号</b>读取，并且要凭本人凭证才读得到 —— 地址栏里带一个编号不等于有权限。'
-    + '没有编号就读不到，本页也不会拿通用结论顶替。'
-    + (TECH ? '（读取端点 GET /resume/records/:taskId，匿名走 x-resume-access-token 请求头）' : '') + '</p></section>'
+    + '没有编号就读不到，本页也不会拿通用结论顶替。</p></section>'
     + '<section class="card exits"><div class="ch"><b>接下来可以做的</b><span>四条都不会动你已上传的文件</span></div>'
     + '<div class="rows">'
     + rowLink('21-resume-triage.html','upload','返回简历来源','重新上传或扫描一份简历，交给解析',SCREEN+'-exit-source','/resume/source')
@@ -1716,8 +1715,7 @@ R['loading'] = function(){
   rail(2);
   body.innerHTML =
     '<section class="card state-b"><h2>正在读取诊断报告</h2>'
-    + '<p>这是一次<b>整体等待</b>：结果要么回来，要么失败，中间没有可显示的阶段或百分比，所以这里不画进度条。'
-    + (TECH ? '（GET /resume/records/:taskId 单次请求）' : '') + '</p></section>'
+    + '<p>这是一次<b>整体等待</b>：结果要么回来，要么失败，中间没有可显示的阶段或百分比，所以这里不画进度条。</p></section>'
     + '<section class="card exits"><div class="ch"><b>等待期间</b><span>三条随时可以走</span></div>'
     + '<div class="rows">'
     + rowLink('21-resume-triage.html','upload','返回简历来源','换一份文件重新提交解析',SCREEN+'-exit-source','/resume/source')
@@ -1821,8 +1819,7 @@ R['read-error'] = function(){
   body.innerHTML =
     '<section class="card state-b"><h2>这次没能取到报告</h2>'
     + '<p>常见原因：这次办理已经结束、结果已按留存期清理，或者读取中途断开。'
-    + '<b>读取失败不会动到你上传的原件，也不会删掉任何已保存的简历。</b>'
-    + (TECH ? '（GET /resume/records/:taskId 未返回报告或请求失败）' : '') + '</p></section>'
+    + '<b>读取失败不会动到你上传的原件，也不会删掉任何已保存的简历。</b></p></section>'
     + '<section class="card exits"><div class="ch"><b>接下来可以做的</b><span>先试一次，再换路径</span></div>'
     + '<div class="rows">'
     + rowLink(withRid(SELF,'state=loading'),'refresh','再读一次','重新向这台机器要一次结果',SCREEN+'-exit-retry','/resume/report')
@@ -1870,8 +1867,7 @@ R['unavailable'] = function(){
   body.innerHTML =
     '<section class="card state-b"><h2>诊断报告能力当前不可用</h2>'
     + '<p>没有接通真实 AI 服务时，读取报告会被<b>直接拒绝</b>，不会返回任何「读过你简历」的结论 —— '
-    + '这是有意为之，避免把演示分数当成真实评价。'
-    + (TECH ? '（apps/kiosk/src/services/api/aiMockAdapter.ts：演示模式下 getResumeRecord 直接拒绝）' : '') + '</p></section>'
+    + '这是有意为之，避免把演示分数当成真实评价。</p></section>'
     + '<section class="card exits"><div class="ch"><b>不靠 AI，这些照常能用</b><span>四条都是现成流程</span></div>'
     + '<div class="rows">'
     + rowLink('10-print-hub.html','print','打印简历或材料','选好份数和单双面就能出纸',SCREEN+'-exit-print','/print-scan')

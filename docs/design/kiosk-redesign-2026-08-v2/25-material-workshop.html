@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 去掉内部英文键名
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 选择有五份模板的 select 内容态，保留真实空表单与登录校验，不展示假生成结果（规则 5）。
@@ -637,12 +638,12 @@ function fileCard(mode){
     :['真实 PDF 已生成 · 已进入我的文档','下面每一项都取自 这次生成返回的内容。'];
   var rows=[
     ['文件名',esc(f.filename),0],['页数',f.pageCount+' 页',0],
-    ['大小',kb(f.sizeBytes),0],['类型',esc(f.mimeType),0],
-    ['文件编号 fileId',esc(f.fileId),0],
+    ['大小',kb(f.sizeBytes),0],['类型','PDF',0],
+    ['怎么认','看文件名和页数',0],
     ['查看链接',demo?'演示对象没有下载链接':esc(f.signedUrl),demo?1:0],
     ['下载链接到期时间',demo?'—':esc(f.signedUrlExpiresAt),demo?1:0],
-    ['文件留存到 fileExpiresAt',demo?'不保存':esc(f.fileExpiresAt),demo?1:0],
-    ['预览路径 previewUrlPath',demo?'—':esc(f.previewUrlPath),demo?1:0],
+    ['文件留存到',demo?'不保存':esc(f.fileExpiresAt),demo?1:0],
+    ['预览',demo?'—':'在这一页打开',demo?1:0],
     ['打印凭证',f.printFileUrl?esc(f.printFileUrl):'系统没有发回（打印保持禁用）',f.printFileUrl?0:1]
   ];
   var grid=rows.map(function(r){return '<div><u>'+r[0]+'</u><b'+(r[2]?' class="off"':'')+'>'+r[1]+'</b></div>';}).join('');
@@ -831,10 +832,10 @@ var VIEWS={
       ['本页不会','代投递，也不会把这份材料发给任何单位']
     ],'submitting-facts')
     +factBlock('这次用的是哪一份模板',t.type,[
-      ['模板编号 templateId',t.id],
-      ['模板名称 templateTitle',t.title],
-      ['文档类型 documentType',t.id],
-      ['预期输出',t.out+'（最终文件名以系统返回为准）'],
+      ['模板名称',t.title],
+      ['材料类型',t.type],
+      ['输出文件名',t.out],
+      ['文件名何时定','系统返回之后才定'],
       ['适用场景',t.for],
       ['本次不发送','简历原文与历史材料，只发上面这几项']
     ],'submitting-template')
@@ -981,7 +982,7 @@ function previewLayer(){
     +'<span class="tx"><b>'+esc(f.filename)+'</b><span>'+f.pageCount+' 页 · '+kb(f.sizeBytes)+' · '+esc(f.mimeType)+'</span></span>'
     +'<button type="button" class="ly-cl press" id="ly-close" data-testid="'+SCREEN+'-pv-close">'+svg('close',20,2.3)+'关闭</button></div>'
     +'<div class="ly-note"><i>合成占位</i><p>这是按页数画出来的版面占位，不是你那份 PDF 的真实渲染。'
-    +'真实页面用 previewUrlPath 换一次性链接后再渲染，链接不进地址栏。</p></div>'
+    +'打开预览时只用一次有效的查看链接，链接不进地址栏。</p></div>'
     +'<div class="ly-tb"><div class="ly-tr">'
     +nav(pageNo>1,'prev','上一页','prev',last===1?'这份材料只有一页':'已经是第一页')
     +'<span class="tread" data-testid="'+SCREEN+'-pv-page" data-page="'+pageNo+'" data-pages="'+last+'" aria-live="polite">第 '+pageNo+' 页 / 共 '+last+' 页</span>'
@@ -990,7 +991,7 @@ function previewLayer(){
     +'<div class="ly-tr">'+zoom(-1,'out','缩小','zoomout','已经是最小倍数')
     +'<span class="tread" data-testid="'+SCREEN+'-pv-zoom" data-zoom="'+zoomLv+'">'+zoomLv.toFixed(1)+' 倍</span>'
     +zoom(1,'in','放大','zoomin','已经是最大倍数')+'<span class="sp2"></span>'
-    +'<span class="tread">'+esc(f.previewUrlPath)+'</span></div></div>'
+    +'<span class="tread">在这一页查看</span></div></div>'
     +'<div class="ly-view"><div class="ly-canvas" data-testid="'+SCREEN+'-pv-canvas"><div class="ly-pad">'
     +'<div class="ly-doc" data-testid="'+SCREEN+'-pv-doc"><div class="ly-sheet">'+sheetBars(pageNo)+'</div></div>'
     +'</div></div></div>'
@@ -1004,7 +1005,7 @@ function previewLayer(){
 function printLayer(){
   var f=fileOf();
   var pairs=[['文件名',f.filename],['大小',kb(f.sizeBytes)],['页数',f.pageCount],
-    ['文件编号',f.fileId],['打印凭证',f.printFileUrl||'系统没有发回'],['类型',f.mimeType]];
+    ['认这一份','看文件名和页数'],['打印凭证',f.printFileUrl||'系统没有发回'],['类型','PDF']];
   /* 单双面固定走**单面**：黑白单面是本机当前唯一已验证的组合，打印确认页也只按这一组
      登记了报价夹具。拿「2 页所以默认双面」把材料送过去，只会撞在那一页的能力受限屏上，
      用户看到的是一句「这台机器暂不支持」，而不是报价 —— 那不是更真实，是白跑一趟。
