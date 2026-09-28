@@ -29,9 +29,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/me/browse-logs` | MeActivityController.browseLogs | — | ActivityService<br/>PolicyScopeService | BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
+| GET | `/api/v1/me/browse-logs` | MeActivityController.browseLogs | — | ActivityService | BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
 | DELETE | `/api/v1/me/browse-logs/:id` | MeActivityController.deleteBrowseLog | — | ActivityService<br/>AuditService | AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
-| GET | `/api/v1/me/external-jump-logs` | MeActivityController.jumpLogs | — | ActivityService<br/>PolicyScopeService | BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
+| GET | `/api/v1/me/external-jump-logs` | MeActivityController.jumpLogs | — | ActivityService | BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
 | DELETE | `/api/v1/me/external-jump-logs/:id` | MeActivityController.deleteJumpLog | — | ActivityService<br/>AuditService | AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
 
 ## `services/api/src/admin-ops/admin-ops.controller.ts`
@@ -248,7 +248,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/community/feeds` | CommunityController.listFeeds | — | CommunityService<br/>PolicyScopeService | BenefitActivity<br/>PolicyPost<br/>SystemBroadcast |
+| GET | `/api/v1/community/feeds` | CommunityController.listFeeds | — | CommunityService | BenefitActivity<br/>PolicyPost<br/>SystemBroadcast |
 
 ## `services/api/src/companies/companies.controller.ts`
 
@@ -865,9 +865,9 @@
 | PATCH | `/api/v1/partner/policies/:id/publish` | PoliciesController.unpublishPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
 | PATCH | `/api/v1/partner/policies/:id/release` | PoliciesController.releasePartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
 | PATCH | `/api/v1/partner/policies/:id/review` | PoliciesController.reviewPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
-| GET | `/api/v1/policies` | PoliciesController.getPolicies | — | PoliciesService<br/>PolicyScopeService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
-| GET | `/api/v1/policies/:id` | PoliciesController.getPublishedPolicy | — | PoliciesService<br/>PolicyScopeService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
-| POST | `/api/v1/policies/eligibility-check` | PoliciesController.checkEligibility | — | PolicyEligibilityService<br/>PolicyScopeService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
+| GET | `/api/v1/policies` | PoliciesController.getPolicies | — | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
+| GET | `/api/v1/policies/:id` | PoliciesController.getPublishedPolicy | — | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
+| POST | `/api/v1/policies/eligibility-check` | PoliciesController.checkEligibility | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 | GET | `/api/v1/policies/eligibility-questions` | PoliciesController.getEligibilityQuestions | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 
 ## `services/api/src/print-conversion/print-conversion.controller.ts`
