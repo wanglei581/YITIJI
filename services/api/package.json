@@ -129,6 +129,8 @@
     "verify:job-materials": "node -r @swc-node/register scripts/verify-job-materials.ts",
     "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts",
     "verify:llm-guard": "tsx scripts/verify-llm-guard.ts",
+    "verify:ai-content-moderation": "node -r @swc-node/register scripts/verify-ai-content-moderation.ts",
+    "verify:policy-scope": "node -r @swc-node/register scripts/verify-policy-scope.ts",
     "verify:llm-connectivity": "node -r @swc-node/register scripts/verify-llm-connectivity.ts",
     "verify:cos": "tsx scripts/verify-cos-storage.ts",
     "verify:cos:files": "tsx scripts/verify-cos-files.ts",

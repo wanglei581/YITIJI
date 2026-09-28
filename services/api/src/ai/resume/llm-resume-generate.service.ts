@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import type { GeneratedResume, ResumeGenerateInput } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from '../llm/llm-config.service'
 import {
@@ -10,7 +10,7 @@ import {
   llmTimeoutMessage,
 } from '../llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
-import { containsForbiddenWord } from '../llm/llm-guard'
+import { AiContentBlockedError, containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
@@ -128,7 +128,7 @@ export class LlmResumeGenerateService {
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: GENERATE_RETRY_HINT }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, GENERATE_TEMPERATURE, messages,
-        `llm:${cfg.vendor}:${cfg.model}`, onLlmCall,
+        `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, onLlmCall,
       )
       const polish = this.parsePolish(raw, input)
       if (polish) return assembleResume(input, polish, cfg.forbiddenWords)
@@ -150,6 +150,7 @@ export class LlmResumeGenerateService {
     messages: ChatMessage[],
     /** AI-COST-TRUTH：真实厂商标识（`llm:<vendor>:<model>`）。**不含任何凭证**。 */
     providerLabel: string,
+    forbiddenWords: readonly string[],
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
@@ -166,9 +167,10 @@ export class LlmResumeGenerateService {
           },
           body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        { timeoutMs: LLM_LONG_TIMEOUT_MS },
+        { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_generate', forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       if (error instanceof LlmBusyError) {
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
       }

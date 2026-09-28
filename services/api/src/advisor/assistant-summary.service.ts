@@ -1,4 +1,6 @@
+import { AiContentBlockedError } from '../ai/llm/llm-guard'
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -268,9 +270,10 @@ export class AssistantSummaryService {
             stream: false,
           }),
         },
-        { timeoutMs: LLM_TIMEOUT_MS },
+        { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'assistant_summary', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       if (error instanceof LlmBusyError) {
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
       }

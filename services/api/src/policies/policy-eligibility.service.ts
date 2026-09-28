@@ -8,7 +8,7 @@ import {
   sanitizeAnswers,
   validatePolicyEligibilityRules,
 } from './policy-eligibility.engine'
-import { publicPolicyLookupWhere } from './policy-public-visibility'
+import { publicPolicyLookupWhere, type PolicyPublicScope } from './policy-public-visibility'
 import {
   POLICY_ELIGIBILITY_DISCLAIMER,
   POLICY_ELIGIBILITY_PRIVACY_NOTICE,
@@ -96,6 +96,7 @@ export class PolicyEligibilityService {
   async checkEligibility(input: {
     answers?: Record<string, unknown>
     policyIds?: string[]
+    scope?: PolicyPublicScope
   }): Promise<PolicyEligibilityCheckResult> {
     const { answers, ignoredQuestionKeys } = sanitizeAnswers(input.answers ?? {})
 
@@ -110,7 +111,7 @@ export class PolicyEligibilityService {
           ? { id: { in: requestedIds } }
           : // 未指定时只取「政策扶持条目」：notice 是公告，没有申领条件
             { kind: 'policy_guide' }),
-      }),
+      }, input.scope),
       orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       take: MAX_POLICIES_PER_CHECK,
       include: { eligibilityRules: { orderBy: { orderIndex: 'asc' } } },

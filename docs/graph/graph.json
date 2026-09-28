@@ -5252,7 +5252,8 @@
           "services/api/src/community/community.service.ts"
         ],
         "services": [
-          "CommunityService"
+          "CommunityService",
+          "PolicyScopeService"
         ]
       },
       {
@@ -6998,7 +6999,8 @@
           "services/api/src/activity/activity.service.ts"
         ],
         "services": [
-          "ActivityService"
+          "ActivityService",
+          "PolicyScopeService"
         ]
       },
       {
@@ -7083,7 +7085,8 @@
           "services/api/src/activity/activity.service.ts"
         ],
         "services": [
-          "ActivityService"
+          "ActivityService",
+          "PolicyScopeService"
         ]
       },
       {
@@ -10024,7 +10027,8 @@
           "services/api/src/policies/policies.service.ts"
         ],
         "services": [
-          "PoliciesService"
+          "PoliciesService",
+          "PolicyScopeService"
         ]
       },
       {
@@ -10044,7 +10048,8 @@
           "services/api/src/policies/policies.service.ts"
         ],
         "services": [
-          "PoliciesService"
+          "PoliciesService",
+          "PolicyScopeService"
         ]
       },
       {
@@ -10062,7 +10067,8 @@
           "services/api/src/policies/policy-eligibility.service.ts"
         ],
         "services": [
-          "PolicyEligibilityService"
+          "PolicyEligibilityService",
+          "PolicyScopeService"
         ]
       },
       {

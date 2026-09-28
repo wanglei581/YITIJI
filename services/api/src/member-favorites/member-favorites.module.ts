@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { TerminalsModule } from '../terminals/terminals.module'
+import { PolicyScopeService } from '../policies/policy-scope.service'
 import { MemberFavoritesController } from './member-favorites.controller'
 import { MemberFavoritesService } from './member-favorites.service'
 
@@ -29,6 +30,6 @@ import { MemberFavoritesService } from './member-favorites.service'
     }),
   ],
   controllers: [MemberFavoritesController],
-  providers: [MemberFavoritesService, EndUserAuthGuard],
+  providers: [MemberFavoritesService, EndUserAuthGuard, PolicyScopeService],
 })
 export class MemberFavoritesModule {}
