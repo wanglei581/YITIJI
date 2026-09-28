@@ -93,6 +93,7 @@
 规则 7：结果上保留「由 AI 生成」，并加「问小青这些提示怎么看」。不判断合同效力。
 未改：颜色令牌、圆角、三屏结构、知情同意、打印默认关闭、三 Tab。
 原稿脚本复制为同目录 contract-review-workspace.js，样式仍引用原稿目录。
+9/28 留白：副标题排回标题右边（标题行右侧不再空着）；风险提示结果概览三格改横排、清单行按内容高（条目 24），「报告打印暂未开放」和「问小青」并成一行，优先核查 / 关注 / 信息不足三组都在第一屏（之前信息不足整组滑到列表下面）；上传合同各态余高平分到各区块上方；收起的「完整免责声明」关着时不占位。无新增内容。
 -->
 <style id="qx2">
 .back{width:64px!important;height:64px!important}
@@ -139,6 +140,32 @@
 #body-root[data-state="empty"] .stat{padding:8px 12px}
 #body-root[data-state="empty"] .state{padding:14px 16px}
 #body-root[data-state="empty"] .catgrid span{min-height:40px}
+/* 9/28 留白（产品负责人：不留大片空白，也不把内容挤出屏幕）
+   1. 收起的「完整免责声明」关着时不占位（原本就不显示，只是还被当成被裁的字）；
+   2. 标题行：副标题排到标题右边（原稿就是这样），标题行右侧不再空着，列表多出一行；
+   3. 风险提示结果：概览三格改横排、清单行按内容高（条目 24），「报告打印暂未开放」和「问小青」并成一行，
+      优先核查 / 关注 / 信息不足三组都在第一屏里。 */
+details:not([open])>:not(summary){display:none}
+.taskhead{align-items:baseline}
+.th-s{flex:1 1 0!important;min-width:320px}
+#body-root[data-screen="contract-result"] .stat{display:flex;align-items:center;gap:14px;padding:14px 20px}
+#body-root[data-screen="contract-result"] .stat .sv{font-size:36px}
+#body-root[data-screen="contract-result"] .stat .sl{margin-top:0}
+#body-root[data-screen="contract-result"] .find-head{min-height:68px;padding:8px 20px}
+#body-root[data-screen="contract-result"] .find-t{font-size:24px!important}
+#body-root[data-screen="contract-result"] .findlist{gap:9px}
+#body-root[data-screen="contract-result"] .findbox{padding:16px 22px}
+#body-root[data-screen="contract-result"] .stack:has(>.strip){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;column-gap:14px}
+#body-root[data-screen="contract-result"] .stack:has(>.strip)>.sec{grid-column:1 / -1}
+#body-root[data-screen="contract-result"] .stack:has(>.strip)>.noteline{margin:14px 0 14px 44px}
+#body-root[data-screen="contract-result"] .stack:has(>.strip)>.strip{margin:14px 44px 14px 0}
+#body-root[data-screen="contract-result"] .stack:has(>.strip)>.strip>*{height:100%}
+/* 没有「随余高长高」区块的屏（上传合同各态、结果为 0 条）：余下的高度平分到各区块上方，不再全堆在底部按钮上面 */
+#body-root .stack:not(:has(>.sec.grow)),#body-root[data-state="empty"] .stack{row-gap:22px}
+#body-root .stack:not(:has(>.sec.grow))>*,#body-root[data-state="empty"] .stack>*{margin-top:auto}
+#body-root .stack:not(:has(>.sec.grow))>:last-child,#body-root[data-state="empty"] .stack>:last-child{margin-bottom:18px}
+/* 上传合同各态：标题行收紧后，第一排可点的上传通道仍尽量留在原来的高度（y≈430），不往够不着的顶部挪；内容多的态这段让出来 */
+#body-root[data-screen="contract-home"] .stack:not(:has(>.sec.grow))::before{content:"";flex:0 1 72px;margin-bottom:-22px}
 </style>
 </head>
 <body>
