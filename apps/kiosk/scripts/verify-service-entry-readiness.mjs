@@ -312,20 +312,45 @@ check(
   )
 }
 
-// 3) 主能力板吸收整页余量的判据必须是显式类名。
-//    修复前写的是 `.qx-hub-board:first-of-type`——`:first-of-type` 按标签名算，
-//    `.qx-hub` 里第一个 <section> 是目标分段，这条规则一次都没命中：
-//    六卡页（招聘会 / 面试）底部留下约 400px 死白。
+// 3) 一屏余高怎么分：照 2.0 稿 16（9/28）——卡片行高按内容规划，余高平分到三处 auto 外边距。
+//    两段历史都要防：
+//    · 更早的 `.qx-hub-board:first-of-type` 按标签名算，一次都没命中，六卡页底部约 400px 死白；
+//    · 其后改成主能力板与网格 `flex: 1 0 auto`、行高 `minmax(196px, 1fr)` 吃掉全部余量——死白没了，
+//      却把六张卡的服务台每张拉到约 400px 高（稿里叫「空盒」）。这里原先钉的正是那条 `flex: 1 0 auto`，
+//      2026-09-28 按稿改掉，断言随之改钉新做法：主能力板仍由显式类名命中（它上方是余高的一处落点），
+//      余高落在「可办理事项」上方、卡片与常用入口之间、常用入口下方，行高不再按 1fr 吃余量。
 {
   const hubCss = read('src/pages/service-hubs/styles/service-hub-qx.css')
+  const hubCssCode = codeOf(hubCss)
   check(
-    !/\.qx-hub-board:first-of-type/.test(codeOf(hubCss)),
-    '主能力板不靠 :first-of-type 命中（它按标签名算，第一个 <section> 是目标分段）'
+    !/\.qx-hub-board:first-of-type/.test(hubCssCode),
+    '主能力板不靠 :first-of-type 命中（它按标签名算，第一个 <section> 是深色导言）'
+  )
+  const autoTopSelectors = [...hubCssCode.matchAll(/([^{}]+)\{[^{}]*\bmargin-top:\s*auto\b[^{}]*\}/g)]
+    .flatMap((match) => match[1].split(',').map((selector) => selector.trim()))
+  check(
+    /className="qx-hub-board qx-hub-board--primary"/.test(hubPage) &&
+      ['.qx-hub-board--primary', '.qx-hub-quick-section', '.qx-hub-goals'].every((selector) =>
+        autoTopSelectors.includes(selector)
+      ),
+    '余高平分到三处（主能力板上方、常用入口上方、目标分段上方），主能力板由显式类名 qx-hub-board--primary 命中'
+  )
+  // 只看「行」的声明：列本来就是 minmax(0, 1fr) 等分，那是对的。
+  const gridRowValues = [...hubCssCode.matchAll(/\.qx-hub-grid[^{,]*\{([^}]*)\}/g)].flatMap((rule) =>
+    [...rule[1].matchAll(/grid-(?:auto|template)-rows:\s*([^;]+)/g)].map((decl) => decl[1])
   )
   check(
-    /\.qx-hub-board--primary\s*\{[^}]*flex: 1 0 auto/.test(hubCss) &&
-      /className="qx-hub-board qx-hub-board--primary"/.test(hubPage),
-    '主能力板由显式类名 qx-hub-board--primary 吸收余量（可长不可缩）'
+    gridRowValues.length > 0 &&
+      gridRowValues.every((value) => !/\b1fr\b/.test(value)) &&
+      /\.qx-hub-grid\s*\{[^}]*grid-auto-rows:\s*minmax\(auto,\s*var\(--qx-hub-row\)\)/.test(hubCssCode) &&
+      !/\.qx-hub-(?:grid|board--primary)\s*\{[^}]*\bflex:\s*1\b/.test(hubCssCode),
+    `能力卡不被拉成空盒：行高按内容、至多长到稿的规划高度，不按 1fr 吃余量；网格与主能力板都不 flex 拉伸（行声明 ${gridRowValues.length} 条）`
+  )
+  check(
+    /className="qx-hub-grid" data-card-count=\{spec\.capabilities\.length\}/.test(hubPage) &&
+      /\.qx-hub-grid\[data-card-count='6'\]\s*\{[^}]*grid-template-columns:\s*repeat\(2,/.test(hubCssCode) &&
+      /\.qx-hub-grid > :nth-child\(7\):last-child\s*\{[^}]*grid-column:\s*1 \/ -1/.test(hubCssCode),
+    '卡片按张数照稿排：六张两列三行、七张末张占满一行（不留空格子）'
   )
 }
 
