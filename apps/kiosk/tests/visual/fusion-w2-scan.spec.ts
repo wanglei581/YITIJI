@@ -411,32 +411,37 @@ const resultState = {
   },
 }
 
-test('successful scan result can continue to printing @w2', async ({ page, api }) => {
+/**
+ * 扫描件是用户本人原件（resume_scan / id_scan / print_doc · original）。生产强制
+ * PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查的原件建单会被拒 PRINT_PII_SCAN_REQUIRED；
+ * 隐私检查只在打印台的材料检查里做。所以结果页的打印出口必须带着**这一份**扫描件去材料检查，
+ * 不再直达报价确认页（商用收口 P0-5）。检查停在体检进行中：本用例只钉落点和带过去的文件。
+ */
+const scanInspectionTask = {
+  id: 'w2-scan-inspection',
+  kind: 'inspection',
+  status: 'processing',
+  requesterMode: 'anonymous',
+  accessToken: 'w2-scan-inspection-token',
+  sourceFileId: 'w2-scan-file',
+  resultFileId: null,
+  endUserId: null,
+  params: {},
+  result: null,
+  errorCode: null,
+  errorMessage: null,
+  expiresAt: LATER,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+}
+
+test('successful scan result takes this scanned original to the print desk material check @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
   registerShell(api)
-  api.respond('GET', '/api/v1/print/price-config', {
-    status: 200,
-    json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] },
-  })
-  api.respond('POST', '/api/v1/orders/quote', {
-    status: 200,
-    json: {
-      amountCents: 200,
-      billablePages: 2,
-      billingPageSource: 'detected',
-      priceLines: [
-        {
-          serviceKey: 'print_bw_page',
-          description: '黑白打印',
-          unitCents: 100,
-          quantity: 2,
-          amountCents: 200,
-        },
-      ],
-    },
-  })
+  api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: scanInspectionTask } })
+  api.respond('GET', `/api/v1/materials/tasks/${scanInspectionTask.id}`, { status: 200, json: { success: true, data: scanInspectionTask } })
 
   await seedScanResult(page, resultState)
   await page.goto('/scan?stage=result')
@@ -444,16 +449,28 @@ test('successful scan result can continue to printing @w2', async ({ page, api }
   await expect(preview).toBeVisible()
   await expect(preview.locator('[data-pdf-preview-host]')).toHaveAttribute('data-preview-src', W2_FILE.fileUrl)
   await expectPdfCompleted(binary)
-  const quoteResponse = page.waitForResponse((response) =>
-    response.request().method() === 'POST'
-      && new URL(response.url()).pathname === '/api/v1/orders/quote',
+
+  // 按操作条主按钮点（不按文字找）：这一条钉的是落点，文案另有一句软断言。
+  // 它先去材料检查，就不能再叫「直接打印」；名字照稿 18 的出口名「拿去打印」。
+  const printAction = page.locator('.sw-cta-row .qx-btn[data-variant="primary"]')
+  await expect.soft(printAction, '打印出口先去材料检查，按钮不能再说「直接」').toHaveText('拿去打印')
+  const inspectionCreated = page.waitForRequest((request) =>
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
   )
-  await page.getByRole('button', { name: /直接打印/ }).first().click()
-  await page.waitForURL('**/print/confirm')
-  await quoteResponse
-  await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
-  await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
-  await expect(page.locator('[data-w2-page="print-confirm"] .print-file-name')).toHaveText('w2-scan.pdf')
+  await printAction.click()
+  await page.waitForURL(/\/print\/desk\?step=check$/)
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
+  expect((await inspectionCreated).postDataJSON()).toMatchObject({ kind: 'inspection', sourceFileId: 'w2-scan-file' })
+  await expect(page.locator('.qpd-preview-meta strong')).toHaveText('w2-scan.pdf')
+  const stored = await page.evaluate(() =>
+    JSON.parse(window.sessionStorage.getItem('ai-job-print:current-print-material-check') ?? 'null') as Record<string, unknown> | null,
+  )
+  expect(stored).toMatchObject({
+    source: 'resume',
+    file: { fileId: 'w2-scan-file', fileUrl: W2_FILE.fileUrl, name: 'w2-scan.pdf', mimeType: 'application/pdf' },
+  })
+  expect(stored, '新交接不得带着上一份文件的检查结论').not.toHaveProperty('materialCheck')
+  expect(api.requestCount('POST', '/api/v1/orders/quote'), '原件检查完之前不报价').toBe(0)
   await expectHealthy(page, errors)
 })
 
@@ -554,10 +571,10 @@ test.describe('scan result at 390x844', () => {
     const aiButton = page.getByRole('button', { name: /AI 简历识别/ })
     await expect(aiButton).toBeEnabled()
 
-    // 顶栏、操作条、底栏不许被横幅盖住（修复前 .sw-xq 溢出正文区，压在「直接打印」上）。
+    // 顶栏、操作条、底栏不许被横幅盖住（修复前 .sw-xq 溢出正文区，压在打印主按钮上）。
     await assertTapTargetPointerHit(page.getByRole('button', { name: '返回打印扫描' }))
     await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '重新扫描' }))
-    await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '直接打印' }))
+    await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '拿去打印' }))
     for (const item of await navbar.getByRole('button').all()) await assertTapTargetPointerHit(item)
 
     // 横幅一字不删，只是随正文一起滚，整块露得出来；结果页不再复读底注。

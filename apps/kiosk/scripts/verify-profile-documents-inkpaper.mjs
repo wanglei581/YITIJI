@@ -100,11 +100,32 @@ expectIncludes(page, '<FileContentPreview', '我的文档使用页内真实文�
 expectIncludes(page, 'aria-labelledby="document-preview-title"', '文档预览弹层保留可访问标题')
 expectIncludes(page, 'aria-modal="true"', '文档预览弹层保留 aria-modal')
 expectAbsent(page, /window\.open\(/, '我的文档不打开会逃逸公共终端隐私清场的新窗口')
+// 2026-09-28 商用收口 P0-5：生产强制 PRINT_REQUIRE_PII_SCAN=true，本人原件没做完隐私检查
+// 就建单会被拒。所以这里先组好带 fileId 的文件（doc.id 就是 FileObject id），按与服务端闸门
+// 同一判据分流：原件整份写打印材料会话后去材料检查；派生 / 优化产物照旧直达 /print/confirm，
+// state 结构和默认打印参数不变。原先「printFileUrl 之后紧跟 navigate('/print/confirm')」的
+// 顺序断言随分流改成下面这组；它要守的三件事（只传内部 printFileUrl、派生直达确认页、
+// 默认黑白单面）一条没少，另加了「原件不许绕过检查」。
 expectMatches(
   page,
-  /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?navigate\('\/print\/confirm'[\s\S]*?fileUrl:\s*res\.printFileUrl[\s\S]*?mimeType:\s*doc\.mimeType[\s\S]*?makePrintParams\(\{\s*copies:\s*1,\s*duplex:\s*'single',\s*color:\s*'bw'\s*\}\)/,
-  '打印文档使用内部 printFileUrl，并保留 /print/confirm state 结构和默认打印参数',
+  /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?fileId:\s*doc\.id,\s*\n\s*fileUrl:\s*res\.printFileUrl,\s*\n\s*mimeType:\s*doc\.mimeType[\s\S]*?if\s*\(documentNeedsPrintMaterialCheck\(doc\)\)\s*\{[\s\S]*?savePrintMaterialSession\(\{\s*file,\s*source\s*\}\)\s*\n\s*navigate\('\/print\/material-check',\s*\{\s*state:\s*\{\s*file,\s*source\s*\}\s*\}\)[\s\S]*?\}\s*else\s*\{\s*\n\s*navigate\('\/print\/confirm',\s*\{\s*\n\s*state:\s*\{\s*\n\s*file,\s*\n\s*params:\s*makePrintParams\(\{\s*copies:\s*1,\s*duplex:\s*'single',\s*color:\s*'bw'\s*\}\)/,
+  '打印文档只传内部 printFileUrl 并带 fileId：本人原件先整份写会话去材料检查，派生产物保留 /print/confirm state 结构和默认打印参数',
 )
+{
+  // 分流判据必须与服务端建单闸门同一份用途清单：服务端多管一种用途而这里没跟上，
+  // 那种原件会直达报价页、在建单时被拒；反过来则是派生之外的文件被白送去检查。
+  const setItems = (source, name) => {
+    const match = source.match(new RegExp(`${name}\\s*=\\s*new Set\\(\\[([^\\]]*)\\]\\)`))
+    return match ? [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort() : null
+  }
+  const server = setItems(readFileSync(join(repoRoot, 'services/api/src/print-jobs/pii-scan-gate.ts'), 'utf8'), 'PII_SCAN_REQUIRED_PURPOSES')
+  const kiosk = setItems(read('src/pages/profile/me/components/documentReprint.ts'), 'PRINT_PII_CHECK_PURPOSES')
+  if (server && kiosk && JSON.stringify(server) === JSON.stringify(kiosk)) {
+    pass(`我的文档的原件分流判据与服务端 PII_SCAN_REQUIRED_PURPOSES 同一份用途清单（${kiosk.join(' / ')}）`)
+  } else {
+    fail(`我的文档的原件分流判据与服务端建单闸门不一致 — 服务端 ${JSON.stringify(server)}，一体机 ${JSON.stringify(kiosk)}`)
+  }
+}
 expectIncludes(page, "doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'", '我的文档保留可打印 MIME 白名单')
 expectIncludes(page, '该文件格式暂不支持打印', '我的文档保留不可打印格式说明')
 

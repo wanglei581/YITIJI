@@ -19063,6 +19063,7 @@
     ],
     "apps/kiosk/src/pages/profile/me/components/documentReprint.ts": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx": [
@@ -21468,6 +21469,9 @@
     ],
     "services/api/scripts/support/admin-phone-transfer-static-contract.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts"
+    ],
+    "services/api/scripts/support/ai-artifact-print-pii-gate.ts": [
+      "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/scripts/support/boot-api-child.ts": [
       "services/api/scripts/verify-error-observability.ts",
@@ -24130,6 +24134,9 @@
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts"
+    ],
+    "services/api/src/print-jobs/pii-scan-gate.ts": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -27691,12 +27698,14 @@
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
+          "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
           "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
-          "apps/kiosk/src/routes/index.tsx"
+          "apps/kiosk/src/routes/index.tsx",
+          "services/api/src/print-jobs/pii-scan-gate.ts"
         ],
         "missing": []
       },
@@ -35542,6 +35551,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/ai-artifact-print-pii-gate.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
@@ -38004,6 +38014,7 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
+          "docs/reviews/print-handoff-unification-2026-09-28.md",
           "docs/reviews/result-layer-2026-09-06-packets.md"
         ],
         "risk": "high",
@@ -39172,15 +39183,6 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/design/kiosk-migration-capability-contracts.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/design/kiosk-redesign-2026-08-v2/STATUS.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
