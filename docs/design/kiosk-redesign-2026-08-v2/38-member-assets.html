@@ -192,6 +192,7 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 规则 4：英文眉题改为「我的文档和订单」；工程词改人话。有内容的这一屏在 capture=1 下可看，演示面板仍隐藏。
 规则 7：底部增加「问小青：怎么打」，生成材料这一行的原有动作保留。
 列表：行高随内容，末尾有「加载更多」。
+9/28 留白：各状态区块按内容高度排，余下高度分到横幅 / 列表 / 说明 / 操作条之间；加载态改用登录 / 失败态同款结构行（写「读取中」）；取访问链接四态把主状态其余三行照排在下面（运行页取链接时不离开列表，其余行按钮锁住）；登录 / 加载 / 空 / 失败 / 过期态操作条带「问小青：怎么打」。另修两处：分类筛选按钮恢复 60px（被 34px 小标签样式压低于触控下限）；订单行两个按钮并排（原来折两行，把说明和整条操作条挤出屏幕）。
 未改：颜色令牌、圆角、深绿头图、三 Tab、文档与订单分域。
 -->
 <style id="qx2">
@@ -235,6 +236,13 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .truth{height:auto!important;min-height:64px;padding:12px 44px!important;align-items:flex-start}
 .qx-more{min-height:56px;width:100%;margin-top:4px;padding:0 18px;border-radius:18px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;text-align:center;font-size:22px;font-weight:750;flex:none;cursor:pointer}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   区块都按内容高度排，余下的高度用 space-between 分到横幅 / 列表 / 说明 / 操作条之间，不再全堆在操作条下面。
+   分类筛选按钮恢复原稿的 60px：上面 .chip 小标签那条把它压成了 34px，低于 48px 触控下限。 */
+#stage>.body{justify-content:space-between}
+.chips .chip{min-height:60px!important}
+/* 订单行的两个按钮并排（原来折成两行，四行订单把说明和整条操作条挤出了屏幕）。 */
+.row[data-server-slot="print-order"] .row-actions{max-width:none;flex-wrap:nowrap}
 </style>
 </head>
 <body><div id="viewport"><div id="stage">
@@ -325,29 +333,35 @@ function link(label, target, route, testid, opts){
   return '<a class="btn press'+(opts.primary?' primary':'')+'" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+testid+'">'
     + (opts.icon?svg(opts.icon):'')+label+'</a>';
 }
+/* 9/28 留白：登录 / 加载 / 空 / 失败 / 过期态的操作条也带主状态那个「问小青：怎么打」出口。 */
+function askLink(){ return link('问小青：怎么打','05-ai-cockpit.html','/assistant',SCREEN+'-ask',{icon:'spark'}); }
 function deadPrimary(label, reason, testid){
   return '<span class="btn primary" aria-disabled="true" aria-label="'+esc(label+'（'+reason+'）')+'" data-testid="'+testid+'">'+label+'</span>';
 }
+/* 9/28 留白：取访问链接发生在文档列表上（运行页不跳走：这一行的按钮换成「打开中 / 准备中」，
+   取链接期间其余行的按钮一起锁住；失败只在列表上方提示）。所以访问链接四态把主状态的其余三行照排在下面，
+   不再只剩一行、下面空半屏。第一行仍是这一次办理的那份文件。 */
+function otherDocRows(lock){ return [1,2,3].map(function(i){ return readyRow('documents',i,lock?{lock:true}:null); }).join(''); }
 function accessState(suffix, intent){
   var isPrint=intent==='print', action=isPrint?'用于打印':'预览';
   var back=link('返回文档列表',href('documents-ready'),'/me/documents',SCREEN+'-back-documents',{icon:'back'});
   if(suffix==='access-loading') return {layout:'state',html:
     banner('calm','clock','正在为这份文件取得新的访问链接','列表里<b>不保存长期可用的文件地址</b>。每次'+action+'前都要凭本人登录态向系统重新取得短期链接。',['用途：'+action,'文件身份不进 URL'])+
-    listWrap([0,1,2].map(skelRow).join(''),'获取期间不会建立打印订单，也不会修改文件。','访问链接获取中')+
+    listWrap(readyRow('documents',0,{lock:true,pending:isPrint?'准备中':'打开中'})+otherDocRows(true),'获取期间不会建立打印订单，也不会修改文件。','访问链接获取中')+
     guide('loading')+ctaBar([back,deadPrimary('正在取得访问链接','系统尚未返回，不能继续',SCREEN+'-primary')])};
   if(suffix==='access-expired') return {layout:'state',html:
     banner('warn','warn','刚取得的访问链接已经过期','短期链接过期不等于文件一定被删除。页面会<b>重新向系统申请</b>，不会继续使用旧地址。',['用途：'+action,'旧链接已弃用'])+
-    listWrap(slotRow('documents',0,'error'),'文件是否仍在、能否重新签发，只以这次实际结果为准。','链接过期后的处理')+
-    guide('error')+ctaBar([back,link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
+    listWrap(slotRow('documents',0,'error')+otherDocRows(false),'文件是否仍在、能否重新签发，只以这次实际结果为准。','链接过期后的处理')+
+    guide('error')+ctaBar([back,askLink(),link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
   if(suffix==='access-error') return {layout:'state',html:
     banner('warn','warn','这次没有取得可用链接','可能是网络失败、文件已到期或已被清理；本页<b>这里不猜测具体原因</b>，也不沿用上一次的链接。',['用途：'+action,'未创建新订单'])+
-    listWrap(slotRow('documents',0,'error'),'失败不会删除文件；反复失败时可联系现场工作人员核对。','访问链接获取失败')+
-    guide('error')+ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
+    listWrap(slotRow('documents',0,'error')+otherDocRows(false),'失败不会删除文件；反复失败时可联系现场工作人员核对。','访问链接获取失败')+
+    guide('error')+ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),askLink(),link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
   return {layout:'state',html:
     banner('calm','info',isPrint?'打印凭证已就绪':'预览链接已就绪',isPrint
       ? '文件编号、打印凭证和默认打印参数会交给打印确认页；<b>这些内容不出现在地址栏</b>。'
       : '会在当前页面打开短期预览链接；关闭预览后仍停留在本人文档列表。',['用途：'+action,'短期有效'])+
-    listWrap(readyRow('documents',0),isPrint?'进入打印确认后仍会重新报价；此刻还没有订单。':'预览只读，不改变文件保存期限。','访问链接交接成功')+
+    listWrap(readyRow('documents',0)+otherDocRows(false),isPrint?'进入打印确认后仍会重新报价；此刻还没有订单。':'预览只读，不改变文件保存期限。','访问链接交接成功')+
     guide('ready-documents')+ctaBar([back,isPrint
       ? link('进入打印确认','14-print-confirm.html?state=quoted','/print/confirm',SCREEN+'-primary',{primary:true,icon:'print'})
       : link('返回文档列表',href('documents-ready'),'/me/documents',SCREEN+'-primary',{primary:true,icon:'eye'})])};
@@ -414,8 +428,9 @@ var READY_ROLES = {
     {role:'已结束', tone:'', ico:'order', title:'打印内容 · 办理后显示', subs:['订单号','结束原因'], act:'again'}
   ]
 };
-function readyRow(kind, i){
-  var r = READY_ROLES[kind][i], docs = kind==='documents';
+/* opt.lock：取访问链接期间整张列表的按钮锁住（运行页 isAnyPending）；opt.pending：这一行换成「打开中 / 准备中」。 */
+function readyRow(kind, i, opt){
+  var r = READY_ROLES[kind][i], docs = kind==='documents', lock = opt && opt.lock;
   var first = docs
     ? '<a class="small press" href="'+href('documents-access-loading','intent=preview')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-preview">'+svg('eye')+'预览</a>'
     : '<a class="small press" href="'+keep('15-print-fulfill.html')+'" data-route="/print/progress" data-testid="'+SCREEN+'-row-'+i+'-progress">'+svg('clock')+'查看进度</a>';
@@ -424,17 +439,24 @@ function readyRow(kind, i){
     : r.act==='print'
     ? '<a class="small primary press" href="'+href('documents-access-loading','intent=print')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-print">'+svg('print')+'用于打印</a>'
     : '<a class="small primary press" href="'+href('documents-ready')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-again">'+svg('print')+'从文档发起新打印</a>';
+  var acts = first+second;
+  if(lock) acts = opt.pending
+    ? '<span class="small" aria-disabled="true" data-testid="'+SCREEN+'-row-'+i+'-pending">'+svg('clock')+opt.pending+'</span>'
+    : acts.replace(/<a class="small( primary)? press" href="[^"]*" data-route="[^"]*"/g,'<span class="small" aria-disabled="true"').replace(/<\/a>/g,'</span>');
   return '<div class="row" data-server-slot="'+(docs?'document':'print-order')+'" data-slot-role="'+esc(r.role)+'" data-testid="'+SCREEN+'-row-'+i+'">'
     + '<span class="row-ico" data-tone="'+(docs?'':'clay')+'">'+svg(r.ico)+'</span>'
     + '<span class="row-main"><span class="row-title"><span class="role" data-tone="'+r.tone+'">'+esc(r.role)+'</span>'+slot(r.title,'wide')+'</span>'
     + '<span class="row-sub">'+r.subs.map(function(s){return slot(s);}).join('')+'</span></span>'
-    + '<span class="row-actions">'+first+second+'</span></div>';
+    + '<span class="row-actions">'+acts+'</span></div>';
 }
-function skelRow(i){
-  return '<div class="row" aria-hidden="true" data-testid="'+SCREEN+'-skeleton-'+i+'">'
-    + '<span class="row-ico" data-tone="off"></span>'
-    + '<span class="row-main"><span class="skel t"></span><span class="skel s" style="display:block"></span></span>'
-    + '<span class="row-actions"><span class="skel" style="width:120px;height:52px;border-radius:16px"></span></span></div>';
+/* 9/28 留白：加载态沿用登录 / 失败态那一种结构行（值一律「—」，右侧写「读取中」）；
+   原来的骨架条没有字，整片算空白。testid 沿用原骨架行。 */
+function skelRow(i, kind){
+  var docs = kind!=='orders';
+  return '<div class="row off" aria-hidden="true" data-slot-mode="loading" data-testid="'+SCREEN+'-skeleton-'+i+'">'
+    + '<span class="row-ico" data-tone="off">'+svg(docs?'doc':'order')+'</span>'
+    + '<span class="row-main"><span class="row-title">'+slot('—')+'</span><span class="row-sub">'+slot('—')+slot('—')+'</span></span>'
+    + '<span class="row-actions"><span class="small" aria-disabled="true">'+svg('clock')+'读取中</span></span></div>';
 }
 function stepRow(i, ico, tone, title, desc, label, target, route, testid){
   return '<a class="row press" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+testid+'">'
@@ -482,16 +504,16 @@ function viewFor(kind, suffix, filter){
       + listWrap([0,1,2,3].map(function(i){return slotRow(kind,i,'lock');}).join(''),
           '登录只用来确认「是你本人」。<b>结束这次办理只清除本机登录状态和这一次的临时信息</b>，已提交到系统的文件与订单按各自留存期限管理。','登录后会出现的内容结构')
       + guide('login')
-      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),askLink(),
                 '<a class="btn primary press" href="'+keep('03-login-gate.html?from='+encodeURIComponent(d.route))+'" data-route="/login" data-login-from="'+esc(d.route)+'" data-testid="'+SCREEN+'-primary">手机号登录</a>'])};
   }
   if(suffix==='loading'){
     return {layout:'state', html:
       banner('calm','clock','正在加载'+d.label, '正在读取本人记录。<b>返回前一律显示「—」</b>，不会闪回上一位用户的列表。', ['共 —','正在安全读取'])
-      + listWrap([0,1,2,3,4].map(skelRow).join(''),
+      + listWrap([0,1,2,3].map(function(i){return skelRow(i,kind);}).join(''),
           '读取失败不会删除任何文件或订单；页面也不会用上一次的数字冒充当前账号。','正在加载的列表占位')
       + guide('loading')
-      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),askLink(),
                 deadPrimary('记录还未加载完成','数据尚未返回，暂时不可操作',SCREEN+'-primary')])};
   }
   if(suffix==='empty'){
@@ -512,7 +534,7 @@ function viewFor(kind, suffix, filter){
       + listWrap(steps, docs?'添加或扫描之后，可以回到这里继续预览、打印和签名盖章。':'确认打印并建单后，可以回到这里查看处理进度与结果。',
           docs?'从这里开始添加文件':'从这里开始打印')
       + guide('empty-'+kind)
-      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),askLink(),
                 docs ? link('添加文件','12-file-source.html','/print/upload',SCREEN+'-primary',{primary:true,icon:'up'})
                      : link('发起打印','10-print-hub.html','/print-scan',SCREEN+'-primary',{primary:true,icon:'print'})])};
   }
@@ -523,7 +545,7 @@ function viewFor(kind, suffix, filter){
       + listWrap([0,1,2,3].map(function(i){return slotRow(kind,i,'error');}).join(''),
           '重试不会重复创建订单，也不会改动已有文件。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的列表结构')
       + guide('error')
-      + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+      + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),askLink(),
                 link('重新加载', href(kind+'-loading'), d.route, SCREEN+'-primary',{primary:true,icon:'refresh'})])};
   }
   /* ready：主内容优先，四行是四类**结果位**（角色不同、内容组合不同），值一律办理后显示 */

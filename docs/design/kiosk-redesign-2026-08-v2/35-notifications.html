@@ -238,6 +238,7 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 规则 4：英文眉题改为「消息通知」；工程词改为实际记录和这次办理。头图只留副标题这一句边界，不再加六格说明。
 规则 7：底部增加「问小青」，原有「查看相关反馈」保留。
 列表在中间自己滚动，末尾有「加载更多」。底部说明卡和操作条留在原稿位置，1080×1920 首屏能看到「返回我的」和「全部标记为已读」。
+9/28 留白：登录 / 加载 / 失败 / 空态的分类卡按内容高度排，不再拉成下半截空着的盒子，余下高度分到各区块之间；加载态改用本页的六类分类行（右侧写「读取中」），不再是没有字的骨架条；这些态的操作条也带「问小青」。
 未改：颜色令牌、圆角、深绿头图高度、三 Tab、消息分类。
 -->
 <style id="qx2">
@@ -275,6 +276,10 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .truth{height:auto!important;min-height:58px;padding:8px 44px!important;align-items:center}
 .qx-more{min-height:56px;width:100%;margin-top:4px;padding:0 18px;border-radius:18px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;text-align:center;font-size:22px;font-weight:750;flex:none;cursor:pointer}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   登录 / 加载 / 失败 / 空态：分类卡按内容高度排，不再被拉成下半截空着的大盒子；
+   多出来的高度用 space-between 分到横幅、分类卡、说明、操作条之间。加载态复用本页的分类行。 */
+.body.state-layout,.body.empty-layout{grid-template-rows:none!important;grid-auto-rows:auto;align-content:space-between}
 </style>
 </head>
 <body><div id="viewport"><div id="stage">
@@ -379,23 +384,20 @@ function banner(tone, ico, title, desc, minis){
     +'</section>';
 }
 function slot(text, cls){ return '<span class="slot'+(cls?' '+cls:'')+'">'+esc(text)+'</span>'; }
-/* 分类结构行：登录 / 失败态展示「本页会显示哪几类消息」，但不写任何条目内容 */
-function catRow(cat, mode){
+/* 分类结构行：登录 / 加载 / 失败态展示「本页会显示哪几类消息」，但不写任何条目内容。
+   9/28 留白：加载态也用这一种行（右侧标签写「读取中」），不再画一排没有字的骨架条；testid 沿用原骨架行的编号。 */
+function catRow(cat, mode, idx){
   var meta = CAT[cat], tid = SCREEN+'-cat-'+cat;
   var tail = mode==='lock'
     ? '<span class="small" aria-disabled="true" data-testid="'+tid+'-locked" aria-label="'+esc(meta[0]+'消息：登录后才会显示')+'">'+svg('lock')+'登录后显示</span>'
+    : mode==='loading'
+    ? '<span class="small" aria-disabled="true" aria-label="'+esc(meta[0]+'消息：正在读取')+'">'+svg('clock')+'读取中</span>'
     : '<span class="small" aria-disabled="true" data-testid="'+tid+'-off" aria-label="'+esc(meta[0]+'消息：本次没有取到')+'">'+svg('warn')+'本次未取到</span>';
-  return '<div class="row off" data-notification-category="'+cat+'" data-slot-mode="'+mode+'" data-testid="'+tid+'">'
+  return '<div class="row off" data-notification-category="'+cat+'" data-slot-mode="'+mode+'" data-testid="'+(mode==='loading'?SCREEN+'-skeleton-'+idx:tid)+'">'
     +'<span class="row-ico" data-tone="off">'+svg(meta[1])+'</span>'
     +'<span class="row-main"><span class="row-title">'+meta[0]+'消息</span>'
     +'<span class="row-sub" style="display:flex;gap:9px;flex-wrap:wrap;margin-top:9px">'+slot(mode==='lock'?'标题登录后显示':'—','lock')+slot('时间','lock')+'</span></span>'
     +'<span class="acts">'+tail+'</span></div>';
-}
-function skelRow(i){
-  return '<div class="row" aria-hidden="true" data-testid="'+SCREEN+'-skeleton-'+i+'">'
-    +'<span class="row-ico" data-tone="off"></span>'
-    +'<span class="row-main"><span class="skel t"></span><span class="skel s"></span></span>'
-    +'<span class="acts"><span class="skel" style="width:110px;height:50px;border-radius:16px"></span></span></div>';
 }
 function previewList(inner, foot, label){
   return '<section class="list" data-testid="'+SCREEN+'-list" aria-label="'+esc(label)+'">'+inner
@@ -505,6 +507,7 @@ function emptyBody(state){
         '会出现在这里的消息类型')
     + guide('empty') + ctaBar([
       link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+      link('问小青','05-ai-cockpit.html','/assistant',SCREEN+'-ask',{icon:'spark'}),
       unreadOnly
         ? link('看全部消息', href('all-empty'), '/me/notifications', SCREEN+'-primary',{primary:true,icon:'bell'})
         : link('去我的记录','39-member-records.html?view=ai-records','/me/ai-records',SCREEN+'-primary',{primary:true,icon:'arrow'})
@@ -522,16 +525,18 @@ function renderBody(state, compat){
       + guide('login')
       + ctaBar([
         link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+        link('问小青','05-ai-cockpit.html','/assistant',SCREEN+'-ask',{icon:'spark'}),
         '<a class="btn primary press" href="'+esc(keep('03-login-gate.html?from='+encodeURIComponent(from)))+'" data-route="/login" data-login-from="'+esc(from)+'" data-testid="'+SCREEN+'-primary">手机号登录</a>'
       ])};
   }
   if(state==='loading'){
     return {layout:'state', html:
       banner('calm','clock','正在加载本人消息','正在读取当前账号的消息。<b>返回前一律显示「—」</b>，不会闪回上一位用户的消息。',['未读 —','正在安全读取'])
-      + previewList([0,1,2,3,4].map(skelRow).join(''),
-          '这次读取失败不会改动任何已读状态，也不会删除消息。','正在加载的消息占位')
+      + previewList(CAT_ORDER.map(function(c,i){return catRow(c,'loading',i);}).join(''),
+          '这次读取失败不会改动任何已读状态，也不会删除消息。','正在读取的消息类型')
       + guide('loading')
       + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                link('问小青','05-ai-cockpit.html','/assistant',SCREEN+'-ask',{icon:'spark'}),
                 deadPrimary('消息还未加载完成','数据尚未返回，暂时不可操作',SCREEN+'-primary')])};
   }
   if(state==='error'){
@@ -541,6 +546,7 @@ function renderBody(state, compat){
           '重试不会重复标记已读，也不会删除消息。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的消息类型')
       + guide('error')
       + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+                link('问小青','05-ai-cockpit.html','/assistant',SCREEN+'-ask',{icon:'spark'}),
                 link('重新加载', href('loading'), '/me/notifications', SCREEN+'-primary',{primary:true})])};
   }
   if(state==='all-empty' || state==='unread-empty') return {layout:'empty', html: emptyBody(state)};
