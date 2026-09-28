@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1565 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1566 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1969,7 +1969,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 521 个文件</summary>
+<summary><code>services/api/src/</code> — 522 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1979,6 +1979,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/activity/activity.types.ts` | `probe-activity-favorites-44.mjs`<br/>`verify-activity-logs.ts`<br/>`verify-jobfair-checkin.ts` |
 | `services/api/src/activity/me-activity.controller.ts` | `verify-activity-logs.ts`<br/>`verify-kiosk-job-board-switch.ts` |
 | `services/api/src/admin-ops/admin-alert-actions.service.ts` | `verify-admin-ops.ts` |
+| `services/api/src/admin-ops/admin-alert-push.service.ts` | `verify-alert-push.cjs` |
 | `services/api/src/admin-ops/admin-ops.controller.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/admin-ops/derived-alert-identity.ts` | `verify-service-desk-dashboard-ui.mjs` |
@@ -2132,7 +2133,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/redis/member-data-export-redis.service.ts` | `verify-member-data-export-download.ts` |
 | `services/api/src/common/redis/partner-account-action-redis.service.ts` | `verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-redis.ts`<br/>`verify-partner-account-action.ts` |
 | `services/api/src/common/redis/redis-degradation.ts` | `verify-admin-orgs.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-redis-degradation-truth.ts` |
-| `services/api/src/common/redis/redis.service.ts` | `verify-activity-logs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-change-password.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-quota-once.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts`<br/>`verify-upload-scene.ts`<br/>`verify-upload-sessions-faults.ts` |
+| `services/api/src/common/redis/redis.service.ts` | `verify-activity-logs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-alert-push.cjs`<br/>`verify-backend-p0-http.ts`<br/>`verify-change-password.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-quota-once.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts`<br/>`verify-upload-scene.ts`<br/>`verify-upload-sessions-faults.ts` |
 | `services/api/src/common/throttler/terminal-throttle.ts` | `verify-ai-throttle-dimension.ts`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-throttle-dimension.ts` |
 | `services/api/src/community/community.controller.ts` | `verify-community-daily-brief.ts` |
 | `services/api/src/community/community.service.ts` | `verify-community-daily-brief.ts`<br/>`verify-policies.ts` |

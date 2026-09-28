@@ -113,6 +113,7 @@ jobs:
           pnpm verify:prod-readonly-probe
           pnpm verify:ci-gate-coverage
           pnpm verify:fixture-time-bombs
+          pnpm --filter @ai-job-print/api verify:backup-ops
 
       - name: Deploy authorization gate
         # 纯静态检查：未显式授权时 Deploy job 必须在建立 SSH 前整体跳过。
@@ -377,6 +378,10 @@ jobs:
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
+
+      - name: Verify alert push runtime gate
+        working-directory: services/api
+        run: pnpm verify:alert-push
 
       - name: Recruitment P1 read-only preflight contract
         working-directory: services/api

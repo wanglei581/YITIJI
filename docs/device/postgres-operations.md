@@ -98,3 +98,18 @@ cp services/api/prisma/dev.db backups/dev_$(date +%Y%m%d).db
   可逐类守恒对账且获得具名授权的领域迁移工具。
 - SQLite 仍是开发默认；两库行为差异（如大小写排序、并发语义）由核心 verify 套件
   在 CI 双 job 上持续回归。生产恢复目标始终是 PostgreSQL，不设计 PG→SQLite 回滚。
+
+## 8. 每日备份、恢复演练与日志留存（E2）
+
+生产服务器由产品负责人安装依赖并执行，仓库脚本不会连接真实环境。先把 `backup-postgres.sh`、`restore-postgres-drill.sh` 复制到服务器并赋予执行权限；脚本优先使用环境里的连接串，没有时读取 `${API_ENV_FILE:-/srv/ai-job-print/services/api/.env}`。每日任务可选 `cron-backup.example` 或 systemd 的 `.service` / `.timer`；systemd 的 `EnvironmentFile=-...` 只是可选覆盖，脚本仍会自行读 `.env`。脚本先写 `.partial`，以 `pg_restore -l` 校验后原子改名，默认保留 30 天；失败会推送企业微信（若有 `ALERT_WEBHOOK_URL`）并返回非零，成功写 `LAST_SUCCESS`。
+
+恢复演练必须指向临时 PostgreSQL 库，库名必须含 `drill` 或 `verify`，例如：
+
+```bash
+POSTGRES_URL='postgresql://.../backup-drill-20260928' \
+  services/api/scripts/restore-postgres-drill.sh /var/backups/ai-job-print/postgres_2026-09-28.dump
+```
+
+脚本会拒绝其他库名，运行 `pg_restore` 后执行 Prisma migration status；验收输出以 `RESTORE_OK: restored ...; migration status checked` 开头，并且迁移状态命令成功。不得把生产库作为目标。
+
+日志留存：产品负责人在服务器执行 `pm2-logrotate-setup.sh`（它通过 `pm2 set` 配置按日轮转、压缩、保留 180 天），PM2 日志不再交给 logrotate。将 `logrotate/nginx` **替换** `/etc/logrotate.d/nginx`，不要与系统自带那份并存；它只管理 `/var/log/nginx/*.log`，按日压缩保留 180 天。安装后由产品负责人用 `logrotate -d /etc/logrotate.d/nginx` 预演。企业微信群机器人告警由 API 复用后台派生告警的每分钟节奏；服务器可设置 `ALERT_WEBHOOK_URL`，未设置时不发送。告警消息只含标题、级别、终端编号和发生 / 恢复状态，不含详情；发送失败只记录 `ALERT_PUSH_FAILED`，不影响业务请求。

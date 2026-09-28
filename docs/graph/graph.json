@@ -21708,6 +21708,9 @@
     "services/api/src/admin-ops/admin-alert-actions.service.ts": [
       "services/api/scripts/verify-admin-ops.ts"
     ],
+    "services/api/src/admin-ops/admin-alert-push.service.ts": [
+      "services/api/scripts/verify-alert-push.cjs"
+    ],
     "services/api/src/admin-ops/admin-ops.controller.ts": [
       "services/api/scripts/verify-admin-ops.ts"
     ],
@@ -22682,6 +22685,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-alert-push.cjs",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -31198,6 +31202,25 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/admin-ops/admin-alert-push.service.ts",
+          "services/api/src/common/redis/redis.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-alert-push.cjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:alert-push"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "services"
         ],
@@ -31419,6 +31442,22 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:backend-p0-http"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-backup-ops.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:backup-ops"
       ],
       "wired": true
     },

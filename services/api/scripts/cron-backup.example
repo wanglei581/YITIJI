@@ -1,0 +1,2 @@
+# The script reads DATABASE_URL and ALERT_WEBHOOK_URL from API_ENV_FILE itself.
+15 2 * * * API_ENV_FILE=/srv/ai-job-print/services/api/.env /srv/ai-job-print/services/api/scripts/backup-postgres.sh >> /var/log/ai-job-print/backup.log 2>&1
