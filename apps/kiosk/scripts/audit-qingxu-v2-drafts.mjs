@@ -1,6 +1,7 @@
 // audit:qingxu-v2-drafts — 按需检查「青序流光 2.0」稿（docs/design/kiosk-redesign-2026-08-v2）的每一个状态，
 // 对应 v2 目录 README 的规则 2、规则 4，外加文字被压住：
-//   1. 用词：可见文字（含读屏文字）不出现写给用户看的工程词；
+//   1. 用词：可见文字（含读屏文字）不出现写给用户看的工程词，也不出现内部英文键名
+//      （interview-report、x-resume-access-token、taskId 这类）；
 //   2. 字号：可见文字不小于 20px（备案号那一行除外；51 是手机页，按手机字阶，不查字号）；
 //   3. 压字：一段文字上有别的元素压着（卡片盖住标签、两段字叠在一起、内容钻到底部导航下面）。
 //      弹层（role=dialog / aria-modal、铺满整屏的遮罩）盖住底下的页面不算，透明无字的点击层不算；
@@ -32,6 +33,11 @@ const JSON_OUT = jsonArg ? path.resolve(jsonArg.slice('--json='.length)) : null
 
 // 规则 4 的用词：写给用户看的页面上不该出现的工程词。
 const BANNED = /服务端|后端|前台|后台|落库|会话|元数据|回执|链路|网桥|真机|未验收|pending|uploaded|签名链接|字段|接口/
+// 规则 4 的另一半：内部英文键名（来源键 interview-report、请求头 x-resume-access-token、taskId 这类
+// 短横线 / 下划线 / 驼峰标识符）。网址、邮箱、文件名前后带 . / @ 的不算。
+const ENGLISH_KEY = /(?<![\w./@-])[a-z]+(?:[-_][a-z0-9]+)+(?![\w./@-])|(?<![\w./@])[a-z]+[A-Z][A-Za-z0-9]*(?![\w./@])/g
+// 长得像键名、其实是用户认得的产品名或格式名。
+const KEY_ALLOW = new Set(['exFAT', 'iPhone', 'iPad', 'iOS', 'macOS'])
 const MIN_FONT = 20
 const FONT_EXEMPT = new Set(['51-phone-relay.html'])
 const ICP_LINE = /备案|ICP|公网安备/
@@ -72,13 +78,14 @@ async function loadPairTargets() {
 }
 
 // 在页面里跑：返回工程词、小字、被压住的文字。
-const PROBE = ({ bannedSource, minFont, checkFont, icpSource }) => {
+const PROBE = ({ bannedSource, minFont, checkFont, icpSource, keySource }) => {
   const banned = new RegExp(bannedSource)
   const icp = new RegExp(icpSource)
   const VW = window.innerWidth
   const VH = window.innerHeight
   const lines = document.body.innerText.split('\n').map((l) => l.trim()).filter(Boolean)
   const words = [...new Set(lines.filter((l) => banned.test(l)))]
+  const keys = [...new Set([...document.body.innerText.matchAll(new RegExp(keySource, 'g'))].map((m) => m[0]))]
 
   const cs = (el) => getComputedStyle(el)
   const hidden = (el) => {
@@ -167,7 +174,7 @@ const PROBE = ({ bannedSource, minFont, checkFont, icpSource }) => {
     }
     if (hit) covered.push(hit)
   }
-  return { words, small: [...new Set(small)], covered: [...new Set(covered)] }
+  return { words, keys, small: [...new Set(small)], covered: [...new Set(covered)] }
 }
 
 async function main() {
@@ -208,7 +215,8 @@ async function main() {
           await page.waitForTimeout(200)
         }
         await page.evaluate(() => document.fonts && document.fonts.ready)
-        const r = await page.evaluate(PROBE, { bannedSource: BANNED.source, minFont: MIN_FONT, checkFont: !FONT_EXEMPT.has(t.file), icpSource: ICP_LINE.source })
+        const r = await page.evaluate(PROBE, { bannedSource: BANNED.source, minFont: MIN_FONT, checkFont: !FONT_EXEMPT.has(t.file), icpSource: ICP_LINE.source, keySource: ENGLISH_KEY.source })
+        r.keys = r.keys.filter((key) => !KEY_ALLOW.has(key))
         rows.push({ file: t.file, screen: t.screen, state: t.state, query: t.protoQuery, ...r, pageErrors })
       } catch (e) {
         rows.push({ file: t.file, screen: t.screen, state: t.state, query: t.protoQuery, error: String(e.message).slice(0, 160) })
@@ -230,7 +238,7 @@ async function main() {
     byFile.set(row.file, list)
   }
   for (const [file, list] of [...byFile].sort()) {
-    const bad = list.filter((r) => r.error || r.pageErrors?.length || r.words?.length || r.small?.length || r.covered?.length)
+    const bad = list.filter((r) => r.error || r.pageErrors?.length || r.words?.length || r.keys?.length || r.small?.length || r.covered?.length)
     console.log(`${bad.length ? 'FAIL' : 'ok  '} ${file.padEnd(40)} ${list.length} 个状态${bad.length ? `，${bad.length} 个有问题` : ''}`)
     for (const r of bad) {
       problems++
@@ -238,6 +246,7 @@ async function main() {
       if (r.error) console.log(`${tag}：打不开 ${r.error}`)
       if (r.pageErrors?.length) console.log(`${tag}：脚本报错 ${r.pageErrors[0]}`)
       if (r.words?.length) console.log(`${tag}：工程词 ${r.words.slice(0, 3).join(' / ')}`)
+      if (r.keys?.length) console.log(`${tag}：英文键名 ${r.keys.slice(0, 4).join(' / ')}`)
       if (r.small?.length) console.log(`${tag}：小于 ${MIN_FONT}px ${r.small.length} 处，如 ${r.small.slice(0, 3).join('、')}`)
       if (r.covered?.length) console.log(`${tag}：压字 ${r.covered.length} 处，如 ${r.covered.slice(0, 2).join('；')}`)
     }
