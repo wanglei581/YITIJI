@@ -822,6 +822,31 @@ async function main() {
     setPrintScanCapabilityModeForTest('managed')
     pass('配置为 available → managed/strict 两种模式下门禁均放行')
 
+    // D3（2026-09-28 拍板）：签名盖章是默认拒绝键 —— 未配置即关闭，不看模式；
+    // 上面 document_print 在 managed 下放行是阳性对照，证明默认拒绝没有外溢到其他键。
+    if (!(apiContract.DEFAULT_DENY_CAPABILITY_KEYS as readonly string[]).includes('signature_stamp')) {
+      fail('signature_stamp 必须在 DEFAULT_DENY_CAPABILITY_KEYS 里（D3：试点与新机器默认关闭）')
+    }
+    assertDeepEqual(apiContract.DEFAULT_DENY_CAPABILITY_KEYS, sharedContract.DEFAULT_DENY_CAPABILITY_KEYS, '默认拒绝能力键')
+    for (const mode of ['managed', 'strict'] as const) {
+      setPrintScanCapabilityModeForTest(mode)
+      await expectHttpErrorCode(
+        () => capabilities.assertUserTaskAllowed(terminalId, 'signature_stamp'),
+        403, 'CAPABILITY_NOT_CONFIGURED',
+        `签名盖章未配置 + ${mode} 模式 → 默认关闭`,
+      )
+    }
+    setPrintScanCapabilityModeForTest('managed')
+    await capabilities.upsert(terminalId, 'signature_stamp', 'unsupported', '试点暂不开放', 'admin_1')
+    await expectHttpErrorCode(
+      () => capabilities.assertUserTaskAllowed(terminalId, 'signature_stamp'),
+      403, 'CAPABILITY_UNAVAILABLE',
+      '签名盖章配为不支持 → 拒绝',
+    )
+    await capabilities.upsert(terminalId, 'signature_stamp', 'available', undefined, 'admin_1')
+    await capabilities.assertUserTaskAllowed(terminalId, 'signature_stamp')
+    pass('签名盖章只有管理员逐台配成可用后才放行')
+
     // 真实集成：ScanTasksService.create 在 scan 配为非 available 时拒绝
     await capabilities.upsert(terminalId, 'scan', 'maintenance', '扫描仪送修', 'admin_1')
     const scanSvc = new ScanTasksService(prisma, null as never, capabilities)

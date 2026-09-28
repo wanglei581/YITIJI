@@ -105,7 +105,8 @@ const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
   copy: '复印',
   id_photo: '证件照',
   format_convert: '格式转换',
-  signature_stamp: '签名盖章',
+  // 未配置 = 关闭（2026-09-28 D3）：签名与印章共用一个图片位，试点先关，要开须逐台配成「可用」。
+  signature_stamp: '签名盖章（默认关闭）',
   // 这两项未配置 = 拒绝（fail-closed）：必须在该终端真机验过彩色/双面出纸，
   // 再配成「可用」才对用户放开。配错的代价是用户按彩色付费拿到黑白纸。
   color_print: '彩色打印（需真机验证）',
@@ -633,7 +634,7 @@ function CapabilityCenter() {
 
       <p className="text-[12px] leading-relaxed text-neutral-500">
         fail-closed 口径：只有「可用」状态对普通用户开放正式任务；「测试中」仅运维语境可见；其余状态一律在
-        Kiosk 上不可用。未配置的能力由 Kiosk 按各自保守默认处理，配置后以此处为准。
+        Kiosk 上不可用。彩色、自动双面、签名盖章未配置即关闭；其余未配置的能力由 Kiosk 按各自保守默认处理。配置后以此处为准。
       </p>
 
       {saveError && <div className="rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{saveError}</div>}
