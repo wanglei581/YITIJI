@@ -27,6 +27,12 @@ on:
           - api-only
           - full
 
+# 同一时间只跑一个生产发布：两次合并紧挨着时不并发改同一个运行目录；进行中的不取消（回退要走完），
+# 排队的只保留最新一次。
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to server
@@ -56,10 +62,10 @@ jobs:
             CONCL="$(printf '%s' "$RUN_JSON" | jq -r '.conclusion')"
             SHA="$(printf '%s' "$RUN_JSON" | jq -r '.head_sha')"
             if [ "$NAME" != "CI" ] || [ "$BRANCH" != "main" ] || [ "$CONCL" != "success" ]; then
-              echo "::error::运行号 $INPUT_RUN_ID 不满足发布前提（name=$NAME branch=$BRANCH conclusion=$CONCL），必须是 main 上 conclusion=success 的 CI" >&2
+              echo "::error::运行号 $INPUT_RUN_ID 不满足发布前提（name=$NAME branch=$BRANCH conclusion=${CONCL}），必须是 main 上 conclusion=success 的 CI" >&2
               exit 1
             fi
-            echo "手动补发：CI run $INPUT_RUN_ID（main，success）→ $SHA"
+            echo "手动补发：CI run ${INPUT_RUN_ID}（main，success）→ $SHA"
             RUN_ID="$INPUT_RUN_ID"
           else
             SHA="$RUN_SHA"
@@ -128,7 +134,7 @@ jobs:
             case "$DEPLOY_SCOPE" in
               api-only | full) ;;
               *)
-                echo "::error::非法发布范围：$DEPLOY_SCOPE（只允许 api-only 或 full）" >&2
+                echo "::error::非法发布范围：${DEPLOY_SCOPE}（只允许 api-only 或 full）" >&2
                 exit 1
                 ;;
             esac
@@ -154,7 +160,7 @@ jobs:
             EXPECTED_SHA='${{ steps.target.outputs.sha }}'
             CURRENT_SHA="$(git rev-parse HEAD)"
             if [ "$CURRENT_SHA" = "$EXPECTED_SHA" ]; then
-              echo "服务器已在目标提交 $EXPECTED_SHA，跳过拉取"
+              echo "服务器已在目标提交 ${EXPECTED_SHA}，跳过拉取"
             else
               FETCH_OK=0
               if [ ! -f /srv/ai-job-print-secrets/bos-release.env ]; then
@@ -272,30 +278,90 @@ jobs:
               exit 0
             fi
 
-            echo "=== 部署到 nginx 目录 ==="
-            rm -rf ${{ secrets.DEPLOY_WEB_ROOT }}/*
-            cp -r apps/kiosk/dist/. ${{ secrets.DEPLOY_WEB_ROOT }}/
-
-            echo "=== 部署 admin 到 nginx 目录（未配置 DEPLOY_ADMIN_WEB_ROOT 时跳过）==="
-            if [ -n "${DEPLOY_ADMIN_WEB_ROOT:-}" ]; then
-              rm -rf "$DEPLOY_ADMIN_WEB_ROOT"/*
-              cp -r apps/admin/dist/. "$DEPLOY_ADMIN_WEB_ROOT"/
-              echo "admin dist 已同步到 $DEPLOY_ADMIN_WEB_ROOT"
-            else
-              echo "DEPLOY_ADMIN_WEB_ROOT 未配置，跳过 admin 前端发布（线上保持现状）"
+            if [ -z "${DEPLOY_ADMIN_WEB_ROOT:-}" ] || [ -z "${DEPLOY_PARTNER_WEB_ROOT:-}" ]; then
+              echo "::error::full 发布必须同时配置 DEPLOY_ADMIN_WEB_ROOT 与 DEPLOY_PARTNER_WEB_ROOT" >&2
+              exit 1
             fi
 
-            echo "=== 部署 partner 到 nginx 目录（未配置 DEPLOY_PARTNER_WEB_ROOT 时跳过）==="
-            if [ -n "${DEPLOY_PARTNER_WEB_ROOT:-}" ]; then
-              rm -rf "$DEPLOY_PARTNER_WEB_ROOT"/*
-              cp -r apps/partner/dist/. "$DEPLOY_PARTNER_WEB_ROOT"/
-              echo "partner dist 已同步到 $DEPLOY_PARTNER_WEB_ROOT"
-            else
-              echo "DEPLOY_PARTNER_WEB_ROOT 未配置，跳过 partner 前端发布（线上保持现状）"
-            fi
+            echo "=== 备份并准备三端静态目录 ==="
+            DEPLOY_WEB_ROOT='${{ secrets.DEPLOY_WEB_ROOT }}'
+            STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"
+            STATIC_RELEASE_STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$EXPECTED_SHA"
+            STATIC_BACKUP_DIR="$STATIC_BACKUP_ROOT/$STATIC_RELEASE_STAMP"
+            STATIC_STAGE_ROOT="${RUNNER_TEMP:-/tmp}/ai-job-print-static-$EXPECTED_SHA"
+            STATIC_BACKED_UP=""
+            STATIC_SWAPPED=""
+            mkdir -p "$STATIC_BACKUP_DIR" "$STATIC_STAGE_ROOT"
+            backup_static_root() {
+              local label="$1" root="$2"
+              test -n "$root" && test "$root" != "/"
+              test -d "$root"
+              mkdir -p "$STATIC_BACKUP_DIR/$label"
+              cp -a "$root/." "$STATIC_BACKUP_DIR/$label/"
+              STATIC_BACKED_UP="$STATIC_BACKED_UP $label"
+            }
+            stage_static_root() {
+              local label="$1" source="$2"
+              mkdir -p "$STATIC_STAGE_ROOT/$label"
+              cp -a "$source/." "$STATIC_STAGE_ROOT/$label/"
+            }
+            # 失败处理：已切换过任何一个目录就逐端恢复并保留备份（恢复中途失败时它是唯一的回退锚点）；
+            # 还没切换：线上没动过，只删掉不完整的备份与暂存目录。
+            # 先撤陷阱、关 errexit：某一端恢复失败不能打断其余几端的恢复；最后一律以失败结束。
+            on_static_failure() {
+              local label root
+              trap - ERR
+              set +e
+              if [ -n "$STATIC_SWAPPED" ]; then
+                echo "::error::静态目录切换失败，恢复 full 发布前备份（备份保留在 ${STATIC_BACKUP_DIR}）" >&2
+                for label in $STATIC_SWAPPED; do
+                  case "$label" in
+                    kiosk) root="${DEPLOY_WEB_ROOT}" ;;
+                    admin) root="${DEPLOY_ADMIN_WEB_ROOT}" ;;
+                    partner) root="${DEPLOY_PARTNER_WEB_ROOT}" ;;
+                  esac
+                  if [ -n "$root" ] && [ "$root" != "/" ] && rm -rf -- "$root" && mkdir -p "$root" && cp -a "$STATIC_BACKUP_DIR/$label/." "$root/"; then
+                    echo "已恢复 ${label} 静态目录" >&2
+                  else
+                    echo "::error::${label} 静态目录恢复失败，请用 ${STATIC_BACKUP_DIR}/${label} 人工恢复" >&2
+                  fi
+                done
+              else
+                rm -rf -- "$STATIC_BACKUP_DIR"
+              fi
+              rm -rf -- "$STATIC_STAGE_ROOT"
+              exit 1
+            }
+            # set -E：没有它，函数（backup/stage/deploy_static_root）里的失败不会触发 ERR 陷阱，
+            # 删空目录后拷贝失败会直接退出、站点一直空着（agy 评审指出，bash 实测确认）。
+            set -E
+            trap on_static_failure ERR
+            backup_static_root kiosk "${DEPLOY_WEB_ROOT:?}"
+            backup_static_root admin "$DEPLOY_ADMIN_WEB_ROOT"
+            backup_static_root partner "$DEPLOY_PARTNER_WEB_ROOT"
+            stage_static_root kiosk apps/kiosk/dist
+            stage_static_root admin apps/admin/dist
+            stage_static_root partner apps/partner/dist
+
+            deploy_static_root() {
+              local label="$1" root="$2"
+              STATIC_SWAPPED="$STATIC_SWAPPED $label"
+              rm -rf -- "$root"
+              mkdir -p "$root"
+              cp -a "$STATIC_STAGE_ROOT/$label/." "$root/"
+            }
+            deploy_static_root kiosk "${DEPLOY_WEB_ROOT:?}"
+            deploy_static_root admin "$DEPLOY_ADMIN_WEB_ROOT"
+            deploy_static_root partner "$DEPLOY_PARTNER_WEB_ROOT"
+            rm -rf -- "$STATIC_STAGE_ROOT"
 
             echo "=== 重载 nginx ==="
             nginx -s reload || systemctl reload nginx
+            trap - ERR
+            # 重载成功、撤掉陷阱之后才清理旧备份：只保留最近 3 组完整备份（当前组最新，必然保留）。
+            find "$STATIC_BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+              | sort -rn | awk 'NR > 3 { sub(/^[^ ]+ /, ""); print }' \
+              | xargs -r rm -rf --
 
             if test -f scripts/release-bundle/bos-object.mjs; then
               (

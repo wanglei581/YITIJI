@@ -106,7 +106,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/deploy.yml` | `verify-deploy-vite-env-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-deploy-authorization-gate.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-release-bundle.mjs` |
+| `.github/workflows/deploy.yml` | `verify-deploy-vite-env-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-deploy-authorization-gate.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-release-bundle.mjs` |
 
 </details>
 
@@ -1910,7 +1910,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/lib/recruitment-hosting-default-probe.ts` | `verify-recruitment-hosting-default-off.ts` |
 | `services/api/scripts/lib/verify-fair-residue.ts` | `verify-activity-logs.ts`<br/>`verify-admin-fairs.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-partner-edit.ts`<br/>`verify-public-fair-demo-guard.ts` |
 | `services/api/scripts/lib/verify-governed-job-fit-runtime.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-governed-job-fit.ts` |
-| `services/api/scripts/preflight-production-gates.mjs` | `verify-deploy-gates-in-sync.mjs` |
+| `services/api/scripts/preflight-production-gates.mjs` | `verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs` |
 | `services/api/scripts/recruitment-wave2-restored-dry-run.ts` | `verify-recruitment-wave2-readonly.ts` |
 | `services/api/scripts/release-provenance-fixture.ts` | `verify-release-genesis.ts`<br/>`verify-release-provenance.ts` |
 | `services/api/scripts/scan-lease-contract.helper.ts` | `verify-scan-tasks.ts` |
@@ -2140,7 +2140,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/companies/companies.service.ts` | `verify-companies.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-job-validity-expiry.ts`<br/>`verify-kiosk-job-board-switch.ts` |
 | `services/api/src/companies/companies.types.ts` | `verify-companies.ts` |
 | `services/api/src/config/body-parsers.ts` | `verify-payment-real-channels.ts` |
-| `services/api/src/config/production-runtime-gates.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-cjk-font.ts`<br/>`verify-payment-flow.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-production-real-services.ts`<br/>`verify-production-runtime-gates.ts` |
+| `services/api/src/config/production-runtime-gates.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-cjk-font.ts`<br/>`verify-payment-flow.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-production-real-services.ts`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/config/trust-proxy.ts` | `verify-trust-proxy.ts` |
 | `services/api/src/console-screen/console-screen.admin.controller.ts` | `verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.assemble.ts` | `verify-console-screen-snapshot.ts` |
