@@ -80,10 +80,22 @@ const PAY_CHANNEL_STATES = [
   'channel-selected', 'pending-scan', 'pending-qr', 'awaiting-code-confirmation', 'pending-verification',
   'display-expired-reconciling', 'expired', 'attempt-failed', 'release-failed',
 ]
+// 稿 14 的地址白名单不认 capture：一带 capture=1，8 个状态全落到「交接内容未通过核对」那一屏，
+// 审计与并排截图查到的其实都是同一屏（9/29 定稿 A 实测）。14 只带 flat 与 state。
+const NO_CAPTURE_FILES = new Set(['14-print-confirm.html'])
+function withoutCaptureFor(file: string, query: string): string {
+  if (!NO_CAPTURE_FILES.has(file) || !query.startsWith('?')) return query
+  const params = new URLSearchParams(query.slice(1))
+  params.delete('capture')
+  const rest = params.toString()
+  return rest ? `?${rest}` : ''
+}
 const STATE_QUERY: Record<string, Record<string, Record<string, string>>> = {
   '06-help.html': { topic: { topic: 'print' } },
   '12-file-source.html': { 'phone-cancel-failed': { cancel: 'fail' }, 'phone-cancelled': { cancel: 'ok' } },
   '32-cashier.html': Object.fromEntries(PAY_CHANNEL_STATES.map((state) => [state, { channel: 'wechat' }])),
+  // 14 的「已报价 / 权益未抵扣 / 零元单」摆的是示例金额，只在演示模式（debug=1）里画；不带就停在一屏说明。
+  '14-print-confirm.html': Object.fromEntries(['quoted', 'benefit-unverified', 'zero-amount'].map((state) => [state, { debug: '1' }])),
 }
 
 const CANONICAL_ROUTE: Record<string, string> = {
@@ -782,7 +794,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
         nn: file.slice(0, 2),
         screen: pair.screen,
         state: pair.state,
-        protoQuery: pair.protoQuery ?? queryFor(pair.axis, pair.screen, pair.state, extra),
+        protoQuery: withoutCaptureFor(file, pair.protoQuery ?? queryFor(pair.axis, pair.screen, pair.state, extra)),
         waitProtoState: Boolean(pair.waitProtoState),
         protoSessionLost: Boolean(pair.protoSessionLost),
         route: runtimeRoute,
