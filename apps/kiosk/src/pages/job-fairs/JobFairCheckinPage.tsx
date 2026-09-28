@@ -33,10 +33,11 @@ import { FAIR_NOTICE_RULES } from './fairWorkbenchSpecs'
 import { FairQrOverlay, FairSkeletonList } from './components/FairWorkbenchBits'
 import { fmtFairDateTime } from './fairFormat'
 import {
+  DirExitList,
   DirKv,
   DirNote,
-  DirSteps,
   DirState,
+  DirSteps,
   DirStrip,
   DirStripItem,
 } from '../../components/qingxu/directory/DirectoryBits'
@@ -273,16 +274,18 @@ export function JobFairCheckinPage() {
             <DirSteps items={[...FAIR_NOTICE_RULES]} />
           </section>
 
-          <DirStrip>
-            <DirStripItem icon={PrinterIcon} title="现在去打印简历" desc="A4 黑白或彩色，参数在打印页选" onClick={() => navigate('/print-scan')} />
-            <DirStripItem icon={UsersIcon} tone="slate" title="回场次列表" desc="换一场看看时间地点和参展名单" onClick={() => navigate('/job-fairs')} />
-            <DirStripItem icon={BuildingIcon} tone="wheat" title="企业目录" desc="按用人单位查看在招岗位与来源" onClick={() => navigate('/companies')} />
-          </DirStrip>
-
           <DirKv rows={[
             ['可用入场入口', `${availableFairs.length} 场`],
             ['怎么算可用', '来源平台提供了入场入口，且场次进行中或即将开始'],
           ]} />
+
+          {/* 稿 28 到场指引：出口是一列纵向行、排在最后。用可吸收余量的 DirExitList——
+              场次少时余量变成更大的触控行，而不是屏幕下半截成片空白。 */}
+          <DirExitList>
+            <DirStripItem icon={PrinterIcon} title="现在去打印简历" desc="A4 黑白或彩色，参数在打印页选" onClick={() => navigate('/print-scan')} />
+            <DirStripItem icon={UsersIcon} tone="slate" title="回场次列表" desc="换一场看看时间地点和参展名单" onClick={() => navigate('/job-fairs')} />
+            <DirStripItem icon={BuildingIcon} tone="wheat" title="企业目录" desc="按用人单位查看在招岗位与来源" onClick={() => navigate('/companies')} />
+          </DirExitList>
         </>
       )}
     </QxFairWorkbench>
