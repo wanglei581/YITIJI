@@ -1,3 +1,4 @@
+import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import { Body, Controller, Get, Header, Headers, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common'
 import type { MemberPendingTaskItem, MemberPrintOrderItem } from './member-print-orders.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
@@ -44,6 +45,7 @@ export class MemberPrintOrdersController {
 
   /** M2 第一片：创建 Order-only 待到机订单；不会提前创建 Agent 可领取的 PrintTask。 */
   @Post()
+  @MaintenanceBlocked()
   async create(
     @CurrentEndUser() user: AuthedEndUser,
     @Body() dto: CreateMemberPrintOrderDto,

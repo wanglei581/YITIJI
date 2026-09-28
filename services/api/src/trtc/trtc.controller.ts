@@ -1,4 +1,5 @@
 import { Body, Controller, Post, HttpCode, HttpStatus, Headers, Req, BadRequestException, UnauthorizedException, UseGuards } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { randomBytes } from 'node:crypto'
 import type { Request } from 'express'
@@ -28,6 +29,7 @@ export class TrtcController {
    * 终端必须存在、启用，且 x-terminal-session-token 与 x-terminal-id 一致。
    * 每 IP 每分钟 5 次不能代替这道身份校验。
    */
+  @AiUse('voice')
   @Post('session')
   @HttpCode(HttpStatus.OK)
   @UseGuards(TerminalIdentityGuard)
@@ -60,6 +62,7 @@ export class TrtcController {
    */
   // stop 是「止损」操作：绝不能被限流挡掉，否则机器人留在房间持续计费。
   // 放宽到 60 次/分钟（仍防恶意刷腾讯 StopAIConversation 接口），覆盖 start 的 5/min。
+  @AiUseExempt('结束语音会话止损：AI 暂停、维护期间也必须能停，否则房间持续计费')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
   @Post('session/stop')
   @HttpCode(HttpStatus.OK)

@@ -41,6 +41,7 @@ import { terminalPlacementPatch } from './terminal-placement'
 import { DEFAULT_SMART_CAMPUS_MODULES } from '../smart-campus/smart-campus.types'
 import { ReleaseObservationService, type AdminReleaseObservationView } from './release-observation.service'
 import { KioskJobBoardService } from './kiosk-job-board.service'
+import { AiAccessService } from '../ai-access/ai-access.service'
 
 // ── Admin view types ───────────────────────────────────────────────────────────
 
@@ -199,6 +200,7 @@ export class TerminalAdminService {
     private readonly toolbox: TerminalToolboxService,
     private readonly releases: ReleaseObservationService,
     @Optional() jobBoard?: KioskJobBoardService,
+    @Optional() private readonly aiAccess?: AiAccessService,
   ) {
     this.jobBoard = jobBoard ?? new KioskJobBoardService(prisma)
   }
@@ -710,6 +712,9 @@ export class TerminalAdminService {
     const smartCampusEnabled = terminalEnabled && !!smartCampusConfig?.enabled
     const serverTime = new Date().toISOString()
     const deploymentEnabled = isRecruitmentContentHostingEnabled()
+    const ai = this.aiAccess ? await this.aiAccess.getConfig() : {
+      loginGate: 'off' as const, declarationEnforced: false, paused: false, maintenance: false,
+    }
 
     return {
       smartCampus: {
@@ -741,11 +746,14 @@ export class TerminalAdminService {
         deploymentEnabled,
         reason: deploymentEnabled ? 'open' as const : 'deployment_off' as const,
       },
+      ai: { loginGate: ai.loginGate, declarationEnforced: ai.declarationEnforced, paused: ai.paused },
+      maintenance: ai.maintenance,
       configVersion: [
         terminal?.lastSeenAt.toISOString() ?? 'unregistered',
         smartCampusConfig?.updatedAt.toISOString() ?? 'smart-campus:none',
         toolboxConfig.version,
         jobBoard.version,
+        JSON.stringify(ai),
       ].join('|'),
       refreshIntervalMs: CONFIG_REFRESH_INTERVAL_MS,
       serverTime,

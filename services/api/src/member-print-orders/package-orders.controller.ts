@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -14,6 +15,7 @@ export class PackageOrdersController {
   constructor(private readonly packages: PackageOrderService) {}
 
   @Post()
+  @MaintenanceBlocked()
   async create(
     @CurrentEndUser() user: AuthedEndUser,
     @Body() dto: CreatePackageOrderDto,

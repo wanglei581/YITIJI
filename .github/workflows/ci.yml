@@ -618,6 +618,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ad-asset-range
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:ai-config
+          # C6/C7/C14：AI 使用门禁（声明、登录档位、AI 暂停、全机维护）的运行时矩阵与接口覆盖
+          pnpm --filter @ai-job-print/api verify:ai-access
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:job-review
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:jobfair-review
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide

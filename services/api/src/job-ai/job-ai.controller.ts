@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { JwtService } from '@nestjs/jwt'
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
@@ -116,6 +117,7 @@ export class JobAiController {
   }
 
   @Post('ai/recommendations')
+  @AiUse('generate')
   @PaidAiThrottle(6)
   async recommendations(@Body() dto: JobRecommendationsDto, @Req() req: ReqLike) {
     if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
@@ -132,6 +134,7 @@ export class JobAiController {
   }
 
   @Post(':id/ai/explain')
+  @AiUse('generate')
   @PaidAiThrottle(10)
   async explain(@Param('id') id: string, @Req() req: ReqLike) {
     if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
@@ -143,6 +146,8 @@ export class JobAiController {
 
   @Post(':id/ai/match')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async match(@Param('id') id: string, @Body() dto: JobAiMatchDto, @Req() req: ReqLike) {
     if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
@@ -173,6 +178,8 @@ export class MemberJobAiSessionsController {
   ) {}
 
   @Get()
+  @AiUse('read')
+
   async list(
     @CurrentEndUser() user: AuthedEndUser,
     @Query('cursor') cursor?: string,
@@ -187,6 +194,7 @@ export class MemberJobAiSessionsController {
   }
 
   @Delete(':id')
+  @AiUseExempt('删除本人记录或文件，不调模型；AI 暂停、维护期间也必须能删')
   async remove(@CurrentEndUser() user: AuthedEndUser, @Param('id') id: string) {
     return ApiResponse.ok(await this.service.deleteMine(user.endUserId, id))
   }

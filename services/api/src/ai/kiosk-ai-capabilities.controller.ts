@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common'
+import { AiUse } from '../ai-access/ai-access.decorator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
 import { LlmConfigService } from './llm/llm-config.service'
@@ -16,6 +17,8 @@ export class KioskAiCapabilitiesController {
 
   @Get('capabilities')
   @TerminalScopedThrottle(30)
+  @AiUse('read')
+
   listCapabilities(): ApiResponse<KioskAiCapabilitiesResponse> {
     return ApiResponse.ok(listKioskAiCapabilities(this.llmConfig))
   }

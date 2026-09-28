@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Req } from '@nestjs/common'
+import { AiUse } from '../ai-access/ai-access.decorator'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -25,6 +26,8 @@ export class MaterialsController {
 
   @Post('tasks')
   @PaidAiThrottle(30)
+  @AiUse('generate')
+
   async createTask(
     @Body() dto: CreateMaterialTaskDto,
     @Req() req: ReqLike,
@@ -37,6 +40,8 @@ export class MaterialsController {
   // 按 IP 计数时同一大厅两台机器同时做材料检查就会撞线，故按台计数。
   @Get('tasks/:id')
   @TerminalScopedThrottle(90)
+  @AiUse('read')
+
   async getTask(
     @Param('id') id: string,
     @Req() req: ReqLike,
@@ -53,6 +58,8 @@ export class MaterialsController {
    */
   @Get('tasks/:id/print-param-suggestions')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  @AiUse('read')
+
   async getPrintParamSuggestions(
     @Param('id') id: string,
     @Req() req: ReqLike,
@@ -63,6 +70,8 @@ export class MaterialsController {
 
   @Post('tasks/:id/pii-findings/decisions')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  @AiUse('generate')
+
   async decidePiiFindings(
     @Param('id') id: string,
     @Body() dto: DecidePiiFindingsDto,

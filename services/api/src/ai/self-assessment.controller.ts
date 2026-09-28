@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { RedisService } from '../common/redis/redis.service'
@@ -75,6 +76,8 @@ export class SelfAssessmentController {
    * 显式带旧版本 ⇒ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，要求重新确认。
    * 判定逻辑集中在 service，controller 不做第二份版本比较（避免两处口径漂移）。
    */
+  @AiUse('generate')
+
   async submit(
     @Body() body: SubmitSelfAssessmentDto,
     @Req() req: ReqLike,
@@ -97,6 +100,8 @@ export class SelfAssessmentController {
    * 只返回题目与同意版本，不含任何本人数据。
    */
   @Get('questions')
+  @AiUse('read')
+
   questions() {
     return {
       version: SELF_ASSESSMENT_QUESTIONS_V1.version,
@@ -106,12 +111,16 @@ export class SelfAssessmentController {
   }
 
   @Get(':taskId')
+  @AiUse('read')
+
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     return this.service.getLatest(taskId, await this.requesterOf(req), auditContextOf(req))
   }
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('export')
+
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     return this.service.printReport(taskId, await this.requesterOf(req), auditContextOf(req))
   }
@@ -122,6 +131,8 @@ export class SelfAssessmentController {
    */
   @Post(':taskId/append')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('generate')
+
   async appendToResume(
     @Param('taskId') taskId: string,
     @Body() body: AppendSelfAssessmentDto,
@@ -134,8 +145,8 @@ export class SelfAssessmentController {
       auditCtx: auditContextOf(req),
     })
   }
-
   @Delete(':taskId')
+  @AiUseExempt('撤回或删除本人数据，不调模型；AI 暂停、维护期间也必须能做')
   async withdraw(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     return this.service.withdraw(taskId, await this.requesterOf(req), auditContextOf(req))
   }

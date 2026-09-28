@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator'
@@ -138,6 +139,8 @@ export class JobFitController {
 
   @Post()
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async analyze(@Body() dto: JobFitRequestDto, @Req() req: ReqLike) {
     // 两道开关都只拦系统内 jobId。手填岗位要求在板块关闭、托管关闭时都照常可用。
     if (dto.jobId) await this.assertJobBoard(req)
@@ -150,18 +153,22 @@ export class JobFitController {
   }
 
   @Post('consent')
+  @AiUse('read')
+
   async grantConsent(@Body() dto: JobFitConsentDto, @Req() req: ReqLike) {
     const requester = this.anonymousConsentRequesterOf(req)
     return this.service.grantJobFitConsent(dto.taskId, requester)
   }
 
   @Get('consent/:taskId')
+  @AiUse('read')
+
   async consentStatus(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     const requester = this.anonymousConsentRequesterOf(req)
     return this.service.getJobFitConsentStatus(taskId, requester)
   }
-
   @Delete('consent/:taskId')
+  @AiUseExempt('撤回或删除本人数据，不调模型；AI 暂停、维护期间也必须能做')
   async revokeConsent(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     const requester = this.anonymousConsentRequesterOf(req)
     return this.service.revokeJobFitConsent(taskId, requester)
@@ -169,12 +176,16 @@ export class JobFitController {
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('export')
+
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     // 先把板块是否打开交给服务；服务读完存档再决定。手填放行，系统内岗位拒绝。
     return this.service.printReport(taskId, await this.requesterOf(req), await this.jobBoardOpen(req))
   }
 
   @Get(':taskId')
+  @AiUse('read')
+
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     return this.service.getLatest(taskId, await this.requesterOf(req), await this.jobBoardOpen(req))
   }

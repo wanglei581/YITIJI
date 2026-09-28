@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -167,6 +168,8 @@ export class AiController {
    */
   @Post('resume/parse')
   @TerminalScopedThrottle(6) // 触发 LLM/OCR，与兄弟 LLM 路由同档；按台计数以免整个大厅共用 6 次
+  @AiUse('generate')
+
   async submitResumeParse(
     @Body() dto: ResumeParseRequestDto,
     @Req() req: ReqLike,
@@ -250,6 +253,8 @@ export class AiController {
    * 越权 / 无 token / 错 token 一律 AI_TASK_NOT_FOUND（service 层校验）。
    */
   @Get('resume/records/:taskId')
+  @AiUse('read')
+
   async getResumeRecord(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -265,6 +270,8 @@ export class AiController {
   // no-store：本端点可触发权益核销状态变更（benefitGrantId），禁止中间层缓存吞掉真实核销结果。
   @Get('resume/records/:taskId/optimize')
   @Header('Cache-Control', 'no-store')
+  @AiUse('generate')
+
   async getResumeOptimize(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -316,10 +323,10 @@ export class AiController {
     })
     return result
   }
-
   @Put('resume/records/:taskId/draft')
   @Header('Cache-Control', 'no-store')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  @AiUseExempt('保存本人草稿，不调模型')
   async putResumeDraft(
     @Param('taskId') taskId: string,
     @Body() dto: ResumeDraftPutDto,
@@ -335,6 +342,8 @@ export class AiController {
 
   @Get('resume/records/:taskId/draft')
   @Header('Cache-Control', 'no-store')
+  @AiUse('read')
+
   async getResumeDraft(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -348,6 +357,8 @@ export class AiController {
 
   @Get('resume/records/:taskId/versions')
   @Header('Cache-Control', 'no-store')
+  @AiUse('read')
+
   async listResumeVersions(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -361,6 +372,8 @@ export class AiController {
 
   @Post('resume/records/:taskId/fact-check')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async factCheckResume(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -374,6 +387,8 @@ export class AiController {
 
   @Post('resume/records/:taskId/layout-adjust')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async adjustResumeLayout(
     @Param('taskId') taskId: string,
     @Body() dto: ResumeLayoutAdjustDto,
@@ -408,6 +423,8 @@ export class AiController {
    */
   @Post('resume/generate')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async submitResumeGenerate(
     @Body() dto: ResumeGenerateRequestDto,
     @Req() req: ReqLike,
@@ -441,6 +458,8 @@ export class AiController {
 
   /** 阶段2A — 读取生成结果(归属/令牌门禁同 parse)。 */
   @Get('resume/generate/:taskId')
+  @AiUse('read')
+
   async getResumeGenerate(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -460,6 +479,8 @@ export class AiController {
   // 人说话物理上到不了 20 次/分；每 IP 每小时 AI_IP_HOURLY_CEILING（默认 300）的天花板仍在。
   @PaidAiThrottle(20)
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @AiUse('voice')
+
   async transcribeResumeVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
     @Req() req: ReqLike,
@@ -505,6 +526,8 @@ export class AiController {
    */
   @Get('resume/export/pricing')
   @Header('Cache-Control', 'no-store')
+  @AiUse('read')
+
   async getResumeExportPricing(@Req() req: ReqLike) {
     const requester = await this.resolveAiResultRequester(req)
     return this.aiService.getResumeExportPricing(requester.endUserId)
@@ -516,6 +539,8 @@ export class AiController {
    */
   @Post('resume/generate/export')
   @Throttle({ default: { ttl: 60_000, limit: 10 } }) // 服务端 PDF 渲染 + 对象存储写入,防滥用
+  @AiUse('export')
+
   async exportGeneratedResume(
     @Body() dto: ResumeGenerateExportDto,
     @Req() req: ReqLike,
@@ -563,6 +588,8 @@ export class AiController {
 
   @Post('assistant/chat')
   @TerminalScopedThrottle(12) // 对话式调用比单次生成频繁，但远低于此前落进的 60 次/分钟公共桶
+  @AiUse('generate')
+
   async chatWithAssistant(
     @Body() dto: AssistantChatRequestDto,
     @Req() req: ReqLike,
@@ -612,6 +639,8 @@ export class AiController {
   @Post('assistant/voice')
   @TerminalScopedThrottle(12)
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @AiUse('voice')
+
   async transcribeAssistantVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
     @Req() req: ReqLike,
@@ -679,6 +708,8 @@ export class AiController {
    */
   @Post('assistant/sessions/:sessionId/summary')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async summarizeAssistantSession(
     @Param('sessionId') sessionId: string,
     @Req() req: ReqLike,

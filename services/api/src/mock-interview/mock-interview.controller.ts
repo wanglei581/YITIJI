@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
@@ -119,6 +120,8 @@ export class MockInterviewController {
 
   @Post()
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async create(@Body() dto: CreateInterviewDto, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     return ApiResponse.ok(await this.service.createSession(dto, requester))
@@ -126,12 +129,16 @@ export class MockInterviewController {
 
   @Post(':id/start')
   @PaidAiThrottle(10)
+  @AiUse('generate')
+
   async start(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.start(id, await this.requesterOf(req)))
   }
 
   @Post(':id/answer')
   @PaidAiThrottle(20)
+  @AiUse('generate')
+
   async answer(@Param('id') id: string, @Body() dto: InterviewAnswerDto, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.answer(id, {
       answer: dto.answer,
@@ -150,6 +157,8 @@ export class MockInterviewController {
   @Post(':id/transcribe')
   @PaidAiThrottle(12)
   @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: ASR_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @AiUse('voice')
+
   async transcribe(
     @Param('id') id: string,
     @UploadedFile() audio: Express.Multer.File | undefined,
@@ -188,6 +197,8 @@ export class MockInterviewController {
    */
   @Post(':id/turns/:idx/audio')
   @PaidAiThrottle(20)
+  @AiUse('voice')
+
   async questionAudio(@Param('id') id: string, @Param('idx') idx: string, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     const session = await this.service.getSession(id, requester)
@@ -219,12 +230,16 @@ export class MockInterviewController {
 
   /** 语音能力可用性(前端进入会话页时探测;不可用自动回退文字输入) */
   @Get('capabilities/voice')
+  @AiUse('read')
+
   voiceCapability() {
     return ApiResponse.ok({ asrEnabled: this.asr.enabled, ttsEnabled: this.tts.enabled })
   }
 
   @Post(':id/end')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async end(@Param('id') id: string, @Body() dto: EndInterviewDto, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.end(id, await this.requesterOf(req), {
       includeAnswersInPrint: dto?.includeAnswersInPrint !== false,
@@ -232,17 +247,23 @@ export class MockInterviewController {
   }
 
   @Get(':id')
+  @AiUse('read')
+
   async get(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.getSession(id, await this.requesterOf(req)))
   }
 
   @Get(':id/report')
+  @AiUse('read')
+
   async report(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.getReport(id, await this.requesterOf(req)))
   }
 
   @Post(':id/report/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('export')
+
   async print(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.printReport(id, await this.requesterOf(req)))
   }
@@ -254,6 +275,8 @@ export class MockInterviewController {
    */
   @Post(':id/practice-sheet')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('export')
+
   async practiceSheet(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.printPracticeSheet(id, await this.requesterOf(req)))
   }
@@ -266,6 +289,8 @@ export class MemberMockInterviewController {
   constructor(private readonly service: MockInterviewService) {}
 
   @Get()
+  @AiUse('read')
+
   async list(
     @CurrentEndUser() user: AuthedEndUser,
     @Query('cursor') cursor?: string,
@@ -276,6 +301,8 @@ export class MemberMockInterviewController {
   }
 
   @Delete(':id')
+  @AiUseExempt('删除本人记录或文件，不调模型；AI 暂停、维护期间也必须能删')
+
   async remove(@CurrentEndUser() user: AuthedEndUser, @Param('id') id: string) {
     return ApiResponse.ok(await this.service.deleteMine(user.endUserId, id))
   }
