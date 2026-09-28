@@ -40,7 +40,10 @@ const shotsArg = process.argv.find((a) => a.startsWith('--shots='))
 const SHOTS_DIR = shotsArg ? path.resolve(shotsArg.slice('--shots='.length)) : null
 
 // 规则 4 的用词：写给用户看的页面上不该出现的工程词。
-const BANNED = /服务端|后端|前台|后台|落库|会话|元数据|回执|链路|网桥|真机|未验收|pending|uploaded|签名链接|字段|接口/
+// 9/28 补：接口地址（/api/…、GET /…）写在屏上也是工程词——英文键名规则会跳过「/」后面的词，所以单独列。
+// 9/28 再补：「原型」是写稿人的话（规则 4 要藏起来的出处标记），用户看到的应是「示例」；
+// 本机服务的内部名 Terminal Agent、手机页地址 /upload/…、防重复提交用的「请求标识 / 一次性标识」同理。
+const BANNED = /服务端|后端|前台|后台|落库|会话|元数据|回执|链路|网桥|真机|未验收|pending|uploaded|签名链接|字段|接口|原型|Terminal Agent|请求标识|一次性标识|\/upload\/|\/api\/|\b(?:GET|POST|PUT|PATCH|DELETE)\s+\//
 // 规则 4 的另一半：内部英文键名（来源键 interview-report、请求头 x-resume-access-token、taskId 这类
 // 短横线 / 下划线 / 驼峰标识符）。网址、邮箱、文件名前后带 . / @ 的不算。
 const ENGLISH_KEY = /(?<![\w./@-])[a-z]+(?:[-_][a-z0-9]+)+(?![\w./@-])|(?<![\w./@])[a-z]+[A-Z][A-Za-z0-9]*(?![\w./@])/g
@@ -297,12 +300,33 @@ const blankText = (b) => [['整行', b.full], ['左半', b.left], ['右半', b.r
   .filter(([name, v]) => v[0] >= (name === '整行' ? BLANK_FULL : BLANK_HALF))
   .map(([name, v]) => `${name} ${v[0]}px（y ${v[1]}–${v[2]}）`).join('，')
 
+// 稿内变体：同一态换一个参数画法就不同，清单只取默认画法，审计另外各查一遍（不进并排截图，那边一态对一屏运行页）。
+// 9/28 收稿时报的漏检：21 的非通道态带上 ?source= 才画出来源行和请求编号（手机来源会绕开「结果未知」两条支线，
+// 所以用 U 盘）；22 报告主内容的另外三个分区（?seg=）；06 的其余几个帮助主题。
+const DRAFT_VARIANTS = [
+  { file: '21-resume-triage.html', when: (state) => !/^(usb|local|phone|scan)-/.test(state), queries: [{ source: 'usb' }] },
+  { file: '22-resume-report.html', when: (state) => state === 'report' || state === 'report-minimal', queries: ['issues', 'scores', 'conclusions'].map((seg) => ({ seg })) },
+  { file: '06-help.html', when: (state) => state === 'topic', queries: ['account', 'resume', 'policy', 'jobs', 'privacy'].map((topic) => ({ topic })) },
+]
+function withVariants(targets) {
+  return targets.flatMap((t) => {
+    const rule = DRAFT_VARIANTS.find((v) => v.file === t.file && v.when(t.state))
+    if (!rule || !t.protoQuery) return [t]
+    return [t, ...rule.queries.map((q) => {
+      const params = new URLSearchParams(t.protoQuery.slice(1))
+      for (const [key, value] of Object.entries(q)) params.set(key, value)
+      const label = Object.entries(q).map(([key, value]) => `${key}=${value}`).join('&')
+      return { ...t, state: `${t.state}（${label}）`, protoQuery: `?${params}`, waitProtoState: false }
+    })]
+  })
+}
+
 async function main() {
   const { buildQingxuPairs, protoFile, PROTO_V2_DIR } = await loadPairTargets()
-  const targets = buildQingxuPairs().filter((t) => {
+  const targets = withVariants(buildQingxuPairs().filter((t) => {
     const file = protoFile(t.file)
     return file && file.startsWith(PROTO_V2_DIR + path.sep) && (!ONLY || ONLY.test(t.file))
-  })
+  }))
   // 与 qingxu-pairs.spec.ts 的稿服务一致：v2 优先，其余读原稿，越出两个目录的一律 404。
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1')

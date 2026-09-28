@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <!--
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
+- 9/28 留白：按钮条贴底；余高按 5:4 分给「金额 / 订单」两栏与按钮条上方；两栏等高（左栏只有金额卡时金额卡拉齐、内容上中下分布，右栏矮时订单行均分）；
+  付款成功、加载失败两态标题与说明同一行；付款成功补运行页已有的「已付款 / 正在准备打印」两枚标签；
+  已付款的「取件凭证码」、屏上收款码的「付款完成后」、到期核验的「请稍候」三张卡从右栏挪到左栏（两栏配平；到期核验态原来被挤出屏幕）；
+  到期核验态收款码示意缩到 300；付款码、收款码说明小字提到 21px。没有订单态内容本来就少，仍有两段约 220px 的空白，已报告。
 -->
 <html lang="zh-CN">
 <head>
@@ -320,6 +324,40 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .ctabar{margin-top:0!important}
 .demo-tab,.demo-panel{display:none!important}
 .picker-note{font-size:21px!important;line-height:1.4!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 按钮条贴底：没有禁用原因行的态，「问小青」行和按钮条原来跟在内容后面浮在屏幕中段，下面空三四百像素。
+   2. 余高按 5:4 分给「金额 / 订单」两栏和按钮条上方，不再全堆在一处。
+   3. 两栏等高：左栏只有金额卡的态，金额卡跟右栏拉齐，标签在上、金额居中、说明压到底线下；
+      右栏订单信息比左栏矮的态，订单行按高度均分。左栏两张卡时，两张卡分贴上下沿。
+   4. 付款成功、支付方式加载失败两态说明只有一句：标题和说明排在同一行，右半边不再空着。
+   5. 收款码到期核验中：「请稍候」卡挪到左栏后仍差一截，本态收款码示意缩到 300、卡片内边距收一档，
+      「请勿重复付款」块不再被挤到按钮条下面。
+   6. 没有订单：空状态卡不再拉满整屏，按内容定高，空白分到上下两段（这一态内容本来就少，见交付说明）。 */
+.body>.sec:has(>.paywrap){flex:1.25 1 auto;display:flex;flex-direction:column}
+.body>.sec>.paywrap{flex:1 1 auto;align-items:stretch!important}
+.qx-airow,.cta-reason{flex:1 1 auto!important;align-items:flex-end!important;margin-top:0!important}
+.paycol{display:flex;flex-direction:column;justify-content:space-between}
+.paycol>.amount-card:only-child{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-between}
+.paycol>.amount-card:only-child .amount-src{padding-top:16px;border-top:1px solid rgba(46,230,168,.24)}
+.side>.pgrp:last-child{flex:1 1 auto;display:flex;flex-direction:column}
+.side>.pgrp:last-child>.kv{flex:1 1 auto;justify-content:space-evenly}
+.qr-cap,.reason{font-size:21px!important}
+#body-root:is([data-state="channel-failed"],[data-state="paid"]) .sec>.state{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:30px;align-items:center}
+#body-root:is([data-state="channel-failed"],[data-state="paid"]) .sec>.state>.state-p{margin-top:0}
+#body-root:is([data-state="channel-failed"],[data-state="paid"]) .sec>.state>.meta{grid-column:1/-1}
+#body-root[data-state="display-expired-reconciling"]>.sec{margin-top:28px!important}
+#body-root[data-state="display-expired-reconciling"]>.sec.grow{flex:none}
+#body-root[data-state="display-expired-reconciling"] .qr{width:300px;height:300px;padding:22px;align-self:center}
+#body-root[data-state="display-expired-reconciling"] .paycol>.pgrp{padding:22px 24px}
+#body-root[data-state="display-expired-reconciling"] .amount-card{padding:26px 28px 28px}
+#body-root[data-state="display-expired-reconciling"] .side>.pgrp{padding:24px 26px}
+#body-root[data-state="display-expired-reconciling"] .kv{gap:18px!important}
+#body-root[data-state="display-expired-reconciling"] .sec.grow>.state{padding:26px 34px!important}
+#body-root[data-state="no-order"]>.sec.grow{flex:none;margin-top:auto!important}
+#body-root[data-state="no-order"] .emptybox{padding:40px 0;gap:20px;font-size:23px}
+#body-root[data-state="no-order"] .emptybox .ei{width:120px;height:120px;border-radius:36px}
+#body-root[data-state="no-order"] .emptybox .ei svg{width:52px;height:52px}
+#body-root[data-state="no-order"] .qx-airow{flex:none!important;margin-top:auto!important}
 </style>
 </head>
 <body>
@@ -790,12 +828,13 @@ V['channel-selected']=function(){
 };
 V['pending-qr']=function(){
  return '<section class="sec"><div class="paywrap" data-evidence-fixture="synthetic"><div class="paycol">'+qrBlock(false,'收款码排版示例，不可扫码')+
-  '<div class="qr-cap"><b>订单信息预览 · 不可扫码</b><br>这张码属于'+FIX.label+'，只能用'+FIX.label+'扫；接入真实支付接口后显示可用收款码</div></div>'+
+  '<div class="qr-cap"><b>订单信息预览 · 不可扫码</b><br>这张码属于'+FIX.label+'，只能用'+FIX.label+'扫；开通支付后，这里显示能扫的收款码</div>'+
+  /* 底部事实说明条已经写着「页面会在系统确认结果后更新」，主按钮本身就是「刷新付款结果」，
+     所以券摘要在场时这张卡整块让位。
+     9/28 留白：这张卡从右栏挪到左栏收款码下面 —— 右栏叠着金额卡和订单信息，左栏收款码下面原来空着一截。 */
+  aside('<div class="pgrp"><h4>付款完成后</h4><div class="state-p">页面会自动确认结果。长时间未更新时，可以手动刷新，刷新仍然查这一次'+FIX.label+'的结果。</div></div>')+'</div>'+
   '<div class="side">'+amountCard(mainAmount(),'本次应付','当前为界面示例，实际应付金额以订单结算结果为准。')+
   orderInfo(channelRow()+'<div><span>支付状态</span><b>等待付款</b></div>')+
-  /* 底部事实说明条已经写着「页面会在系统确认结果后更新」，主按钮本身就是「刷新付款结果」，
-     所以券摘要在场时这张卡整块让位。这一屏的金额卡在右栏，让位的高度正好抵掉明细的高度。 */
-  aside('<div class="pgrp"><h4>付款完成后</h4><div class="state-p">页面会自动确认结果。长时间未更新时，可以手动刷新，刷新仍然查这一次'+FIX.label+'的结果。</div></div>')+
   '</div></div></section>'+
   closerScan('支付尝试已经创建。请勿切换方式、重复付款或重新下单。')+
   '<div class="ctabar"><a class="btn ghost press" href="../kiosk-redesign-2026-08/38-member-assets.html?state=orders-ready" data-route="/me/print-orders">查看我的订单</a>'+
@@ -845,12 +884,15 @@ V['pending-verification']=function(){
 V['paid']=function(){
  return '<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
   '<div class="state-h">'+svg('check','currentColor',28)+'付款成功</div>'+
-  '<div class="state-p">系统已确认付款，正在准备打印。</div></div></section>'+
+  '<div class="state-p">系统已确认付款，正在准备打印。</div>'+
+  /* 9/28 留白：补上运行页这一态已有的两枚状态标签（cashierQxModel.tsx paid.chips），稿与运行页一致。 */
+  '<div class="meta"><span class="chip ok">已付款</span><span class="chip">正在准备打印</span></div></div></section>'+
   '<section class="sec"><div class="paywrap" data-evidence-fixture="synthetic"><div class="paycol">'+
-  amountCard(mainAmount(),'已付金额','当前为界面示例，实际已付金额以支付结果为准。')+'</div>'+
-  '<div class="side">'+orderInfo(channelRow()+'<div><span>支付状态</span><b>已付款</b></div><div><span>下一步</span><b>开始打印</b></div>')+
+  amountCard(mainAmount(),'已付金额','当前为界面示例，实际已付金额以支付结果为准。')+
+  /* 9/28 留白：取件凭证码卡从右栏挪到左栏金额卡下面，两栏配平（原来左栏只有金额卡，下面空 400 多像素）。 */
   '<div class="pgrp"><h4>取件凭证码</h4>'+
-  '<div class="state-p" data-testid="cashier-pickup-code" data-pickup-status="pending"><b>取件凭证正在生成</b><br>生成后会显示在订单详情中；暂未生成时也可以查看打印进度。</div></div>'+
+  '<div class="state-p" data-testid="cashier-pickup-code" data-pickup-status="pending"><b>取件凭证正在生成</b><br>生成后会显示在订单详情中；暂未生成时也可以查看打印进度。</div></div></div>'+
+  '<div class="side">'+orderInfo(channelRow()+'<div><span>支付状态</span><b>已付款</b></div><div><span>下一步</span><b>开始打印</b></div>')+
   '</div></div></section>'+
   closerCard('可以直接查看打印进度；取件凭证生成后会同步显示在订单详情中。')+
   '<div class="ctabar"><a class="btn ghost press" href="../kiosk-redesign-2026-08/38-member-assets.html?state=orders-ready" data-route="/me/print-orders">我的打印订单</a>'+
@@ -884,11 +926,12 @@ V['display-expired-reconciling']=function(){
  return '<section class="sec"><div class="bignote" data-testid="'+SCREEN+'-fallback">'+svg('clock','currentColor',30)+
   '正在确认付款结果，请勿重复支付。</div></section>'+
   '<section class="sec"><div class="paywrap"><div class="paycol">'+qrBlock(true,'收款码显示期已过，正在核验')+
-  '<div class="qr-cap">收款码已停止显示</div></div>'+
+  '<div class="qr-cap">收款码已停止显示</div>'+
+  /* 「请勿重复付款」在下面那张 grow 状态块里已经是整屏最大的一句，这里让位不丢信息。
+     9/28 留白：这张卡从右栏挪到左栏收款码下面。原来右栏叠了三张卡，把下面的「请勿重复付款」块挤出屏幕、压在按钮条上。 */
+  aside('<div class="pgrp"><h4>请稍候</h4><div class="state-p">你可能刚好在最后一秒完成付款。确认结果前，请勿再次支付。</div></div>')+'</div>'+
   '<div class="side" data-evidence-fixture="synthetic">'+amountCard(mainAmount(),'本次应付','当前为界面示例，实际应付金额以订单结算结果为准。')+
   orderInfo(channelRow()+'<div><span>支付状态</span><b>正在确认</b></div>')+
-  /* 「请勿重复付款」在下面那张 grow 状态块里已经是整屏最大的一句，这里让位不丢信息。 */
-  aside('<div class="pgrp"><h4>请稍候</h4><div class="state-p">你可能刚好在最后一秒完成付款。确认结果前，请勿再次支付。</div></div>')+
   '</div></div></section>'+
   '<section class="sec grow last"><div class="state" data-kind="warn" data-disclaimer="true">'+
   '<div class="state-h">'+svg('warn','currentColor',26)+'请勿重复付款</div>'+

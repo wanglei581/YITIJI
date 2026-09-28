@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>隐私与数据请求 ｜ 职易达</title>
 <!--
+- 9/28 用词：写稿人用语（原型、内部服务名、页面地址、请求标识）换成用户的话。
   route: /me/privacy-requests
   state: login | loading | error | empty | history-ready | revoke-confirm | submitting | success | failure
   api: GET /api/v1/me/data-requests → { items }（本人请求记录）；
@@ -702,7 +703,7 @@ function render(state){
   document.getElementById('pill-dot').className = 'dot' + (state==='loading' || state==='submitting' ? ' breathe' : '');
   document.getElementById('doing').innerHTML =
       (state==='success'||state==='failure'||state==='submitting')
-        ? '这一屏是<b>界面示例</b>：静态原型不会真的撤回授权，也不会写入任何请求记录。'
+        ? '这一屏是<b>界面示例</b>：不会真的撤回授权，也不写入任何记录。'
         : '一体机本页只开放<b>撤回 AI 使用授权</b>；撤回不会删除简历、文档、打印订单或收藏。';
 }
 
