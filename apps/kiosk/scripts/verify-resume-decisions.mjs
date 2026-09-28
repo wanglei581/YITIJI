@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const src = readFileSync(new URL('../src/pages/resume/components/resume-deliver/resumeDecisions.ts', import.meta.url), 'utf8')
 
@@ -9,33 +10,12 @@ assert.match(src, /let replaced = false/, 'replaceResumeText stops after the fir
 assert.match(src, /value\.indexOf\(from\)/, 'replaceResumeText finds the first hit with indexOf')
 assert.match(src, /value\.slice\(0, index\) \+ to \+ value\.slice\(index \+ from\.length\)/, 'replaceResumeText rewrites only the first occurrence in that field')
 
-function extractFunction(source, name) {
-  const start = source.indexOf(`export function ${name}`)
-  if (start < 0) throw new Error(`missing ${name}`)
-  const open = source.indexOf('{', start)
-  let depth = 0
-  for (let i = open; i < source.length; i += 1) {
-    if (source[i] === '{') depth += 1
-    else if (source[i] === '}') {
-      depth -= 1
-      if (depth === 0) return source.slice(start, i + 1)
-    }
-  }
-  throw new Error(`unclosed ${name}`)
-}
-
-function stripTypes(ts) {
-  return ts
-    .replace(/export function/, 'function')
-    .replace(/ as GeneratedResume/g, '')
-    .replace(/ as Record<string, unknown>/g, '')
-    .replace(/: Record<string, unknown>/g, '')
-    .replace(/: GeneratedResume/g, '')
-    .replace(/: unknown/g, '')
-    .replace(/: string/g, '')
-}
-
-const replaceResumeText = new Function(`${stripTypes(extractFunction(src, 'replaceResumeText'))}; return replaceResumeText;`)()
+const transpiled = ts.transpileModule(src, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const runtimeModule = { exports: {} }
+new Function('exports', 'module', transpiled)(runtimeModule.exports, runtimeModule)
+const { replaceResumeText } = runtimeModule.exports
 
 const sample = {
   basic: { name: 'hello', phone: '13800000000', city: '青岛' },

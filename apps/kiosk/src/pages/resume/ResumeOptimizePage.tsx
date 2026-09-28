@@ -37,9 +37,11 @@ import { printFileSizeLabel, useOptimizeSession } from './components/resume-deli
 import {
   applyDecisionChanges,
   applyResumeDecisions,
+  applyResumeDecisionsWithStatus,
   moduleKeyOf,
   parseDecisionMap,
   toggleModuleDecision,
+  type ResumeDecisionFailure,
   type ResumeModuleDecision,
 } from './components/resume-deliver/resumeDecisions'
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
@@ -83,6 +85,7 @@ export function ResumeOptimizePage() {
     adjustError, setAdjustError, factOpen, setFactOpen, savedToDocuments, setSavedToDocuments,
     decisions, setDecisions, draftAccepted, setDraftAccepted,
   } = useOptimizeSession(query.format, Boolean(token))
+  const [decisionIssues, setDecisionIssues] = useState<Record<string, string>>({})
 
   useBusyLock(exporting || printNavigating || Boolean(adjusting))
   const syntheticReady = query.capture || query.debug
@@ -115,7 +118,8 @@ export function ResumeOptimizePage() {
   const resolved = resolveOptimizeView(query, live)
   const view = resolved.view
   const resume = optimizedResume
-  const assembled = resume ? applyResumeDecisions(resume, modules, decisions) : null
+  const assembledResult = resume ? applyResumeDecisionsWithStatus(resume, modules, decisions) : null
+  const assembled = assembledResult?.resume ?? null
   const unconfirmed = assembled ? detectUnconfirmedAdditions(assembled, modules) : []
   const facts = assembled ? extractConfirmableFacts(assembled) : []
   const exportBlocked = pricing.unavailable || pricing.chargedBlocked || !assembled || exporting
@@ -124,6 +128,16 @@ export function ResumeOptimizePage() {
   const choicePending = Boolean(token && draft.hasDraft && !draftAccepted && view === 'ready')
 
   const markEdited = () => { setIsDirty(true); setPreviewOpen(false); if (exported) setExported(null) }
+  const issueMessage = (failure: ResumeDecisionFailure) => {
+    const index = modules.findIndex((module, i) => moduleKeyOf(module, i) === failure.key)
+    const number = index + 1
+    return failure.reason === 'original-empty'
+      ? `第 ${number} 条原文是空的，换回改写要在编辑区里手动加上。`
+      : `第 ${number} 条在编辑区里改过，没法自动换回这一版，请在编辑区里手动改。`
+  }
+  const setDecisionFailures = (failures: ResumeDecisionFailure[]) => {
+    setDecisionIssues(Object.fromEntries(failures.map((failure) => [failure.key, issueMessage(failure)])))
+  }
   const requestLeave = (action: LeaveAction) => {
     if (draft.unsaved || (isDirty && !exported && !token)) { setConfirmLeave(() => action); return }
     action()
@@ -134,8 +148,14 @@ export function ResumeOptimizePage() {
   const handleDecisionChange = (key: string, next: ResumeModuleDecision) => {
     const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
     if (index < 0 || !optimizedResume) return
-    setOptimizedResume(toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next))
+    const result = toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next)
+    if (!result.applied) {
+      setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [])
+      return
+    }
+    setOptimizedResume(result.resume)
     setDecisions((prev) => ({ ...prev, [key]: next }))
+    setDecisionIssues((prev) => { const nextIssues = { ...prev }; delete nextIssues[key]; return nextIssues })
     markEdited()
   }
   /** 总览的两个批量动作：全部用改写 / 全部保留原文。与逐条切换走同一个替换函数，结果一致。 */
@@ -145,7 +165,8 @@ export function ResumeOptimizePage() {
     const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes)
     setOptimizedResume(applied.resume)
     setDecisions(applied.decisions)
-    markEdited()
+    setDecisionFailures(applied.failures)
+    if (applied.failures.length < changes.length) markEdited()
   }
   const openCompare = (focusIndex?: number) => requestLeave(() => navigate('/resume/optimize/compare', {
     state: { taskId, accessToken, decisions, existingOnly, ...(typeof focusIndex === 'number' ? { focusIndex } : {}) },
@@ -155,7 +176,8 @@ export function ResumeOptimizePage() {
     apply: (changes) => {
       if (!optimizedResume) return
       const next = applyDecisionChanges(optimizedResume, modules, decisions, changes)
-      setOptimizedResume(next.resume); setDecisions(next.decisions); markEdited()
+      setOptimizedResume(next.resume); setDecisions(next.decisions); setDecisionFailures(next.failures)
+      if (next.failures.length < changes.length) markEdited()
     },
   })
   const handleContinueDraft = () => {
@@ -249,7 +271,11 @@ export function ResumeOptimizePage() {
           {modules.length > 0 && (
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('overview')}>返回建议总览</button>
           )}
-          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => { if (!exportBlocked) setFactOpen('resume') }}>
+          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => {
+            if (exportBlocked) return
+            if (assembledResult?.failures.length) { setDecisionFailures(assembledResult.failures); return }
+            setFactOpen('resume')
+          }}>
             {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
           </button>
         </div>
@@ -295,6 +321,9 @@ export function ResumeOptimizePage() {
         data-synthetic={resolved.synthetic ? '1' : undefined}
       >
         <ResumeAigcBadge synthetic={resolved.synthetic} />
+        {Object.values(decisionIssues).length > 0 && (
+          <div className="qx-opt-decision-status" role="status" style={{ fontSize: 'var(--qx-fs-aux)' }}>{Object.values(decisionIssues).map((message) => <p key={message}>{message}</p>)}</div>
+        )}
         {stateBody}
         {view !== 'ready' && (
           <OptimizeEmptyState
@@ -321,6 +350,7 @@ export function ResumeOptimizePage() {
             decisions={decisions}
             synthetic={resolved.synthetic}
             disabled={loading || exporting || Boolean(adjusting)}
+            decisionIssues={decisionIssues}
             onDecisionChange={handleDecisionChange}
             onBatch={handleBatch}
             onCompare={openCompare}

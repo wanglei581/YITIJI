@@ -23,6 +23,7 @@ export function OptimizeOverview(props: {
   disabled: boolean
   onDecisionChange: (key: string, next: ResumeModuleDecision) => void
   onBatch: (next: ResumeModuleDecision) => void
+  decisionIssues: Record<string, string>
   onCompare: (focusIndex?: number) => void
   onEditor: () => void
   onManual: () => void
@@ -123,6 +124,7 @@ export function OptimizeOverview(props: {
                     保留原文
                   </button>
                 </div>
+                {props.decisionIssues[row.key] && <p className="qx-opt-decision-row-status" role="status" style={{ fontSize: 'var(--qx-fs-aux)' }}>{props.decisionIssues[row.key]}</p>}
               </li>
             )
           })}
