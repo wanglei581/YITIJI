@@ -294,6 +294,8 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 规则 7：底部增加「问小青：怎么写」。
 列表在中间自己滚动，末尾有「加载更多」。沟通记录不再撑满整屏。未填够时「提交反馈」灰掉，并在按钮上写原因。1080×1920 首屏能看到回退、「问小青：怎么写」和「提交反馈」。
 未改：颜色令牌、圆角、深绿头图高度、三 Tab、四类反馈。
+9/28 留白：登录 / 不可用 / 加载 / 出错 / 详情加载的列表卡余量分到行间（行内边距 26、副标题 22），骨架条改成看得见的墨色并补上一直没显示的标题条，详情读取中骨架 4 条改 5 条；
+  详情里工单信息排两列、值靠右，补充描述框用回原稿 128px，两条沟通记录都完整露出；还没有回复时沟通记录按内容高，余量分到各段标题之前。不加区块、不改文字。
 -->
 <style id="qx2">
 #stage{font-size:22px;line-height:1.45}
@@ -340,6 +342,25 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .btn.qx-hold{flex-direction:column;gap:2px;line-height:1.25;padding-top:8px;padding-bottom:8px}
 .btn.qx-hold small{font-size:21px;font-weight:700;color:#2c332c;letter-spacing:0}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：不许留大片空白，也不许改乱）：不加区块、不改文字。
+   登录 / 不可用 / 加载 / 出错 / 详情加载：分类行（或骨架行）排舒展一些，列表卡里剩下的高度分到行与行之间，不再全堆在卡底。
+   骨架条改成看得见的墨色（同 07），原来的 #ece7d9 在屏上几乎等于空白。 */
+.body.state-layout .list{justify-content:space-between}
+.body.state-layout .list>.row{padding-top:26px;padding-bottom:26px}
+.body.state-layout .row-sub{font-size:22px!important}
+.skel{background:#b3ac99;display:block}
+/* 详情：工单信息四项排成两列、值靠右，右半边不再空一条；补充描述框用回原稿的 128px。
+   省下来的高度给沟通记录，两条回复都能完整看到（原来「服务回复」被截在看不见滚动条的框里）。
+   还没有回复时沟通记录按内容高，不再拉成一个只有一句话的空框，余量分到各段之间。 */
+.dl{grid-template-columns:1fr 1fr}
+.dl>div{justify-content:space-between}
+.detail-scroll .textarea{min-height:128px!important;max-height:128px!important}
+.thread[data-reply-count="0"]{flex:0 0 auto!important}
+.detail-scroll:has(.thread[data-reply-count="0"])>.sec-h,
+.detail-scroll:has(.thread[data-reply-count="0"])>.field,
+.detail-scroll:has(.thread[data-reply-count="0"])>.closed-note,
+.detail-scroll:has(.thread[data-reply-count="0"])>.new-ticket{margin-top:auto}
+.closed-note{text-align:center}
 </style>
 </head>
 <body><div id="viewport"><div id="stage">
@@ -678,7 +699,8 @@ function renderBody(state, related, reason, ticketId){
   if(state==='detail-loading'){
     return {layout:'state', html:
       banner('calm','clock','正在读取反馈详情','正在读取这条工单的正文与沟通记录。<b>返回前不显示任何内容</b>。',['—','正在安全读取'])
-      + previewList([0,1,2,3].map(skelRow).join(''),'读取失败不会改动这条工单的状态，也不会丢失已提交的内容。','正在加载的详情占位')
+      /* 9/28 留白：骨架行与列表读取中同为 5 条，4 条分到整张卡里行距过大。 */
+      + previewList([0,1,2,3,4].map(skelRow).join(''),'读取失败不会改动这条工单的状态，也不会丢失已提交的内容。','正在加载的详情占位')
       + guide('loading')
       + ctaBar([link('返回列表', href('form-list'), '/me/feedback', SCREEN+'-back-list',{icon:'back'}),
           deadBtn('详情还未加载完成','数据尚未返回，暂时不可操作',SCREEN+'-primary', true)])};

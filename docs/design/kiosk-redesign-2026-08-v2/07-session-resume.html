@@ -7,6 +7,8 @@
 规则 4：空列表改人话。去掉「服务端、会话、演示数据、凭证、终端回流」。底栏不放两个文案相同的按钮，也不再放和列表里同一句的按钮。
 规则 7：底部保留「问小青：这一单接下来该付款还是去取」，不让它决定付款或出纸。
 未改：颜色、圆角、任务行结构、必须登录、只回收银台或打印进度。
+9/28 留白：页头三步（主状态原有）在读取中、空、读不到、登录失效也显示，并贴页头底边；出口行不再拉到 300px，改为封顶 196px、余量分到行间；
+  列表行不再被压扁（举例排版改 6 条，原来 7 条被压到内容以下）；修掉 invalid-task 缺订单号那行让整页不渲染的脚本错误。
 原稿：../kiosk-redesign-2026-08/07-session-resume.html（只读）。
 -->
 <html lang="zh-CN">
@@ -306,6 +308,17 @@ h1.head-t{font-size:36px!important;line-height:1.25!important}
 .qx-aiwrap{display:flex;justify-content:flex-end;padding:0 8px}
 .qx-ai{display:inline-flex;align-items:center;min-height:48px;color:var(--teal-d);font-size:22px;font-weight:650}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白：页头 300px 高是为了让第一行按钮落在够得着的位置（规则 1）。原来三步排在说明下面、底下空一截，
+   其余状态连三步都没有、整块只有一句话。现在所有状态都显示三步，三步贴页头底边，余量落在说明和三步之间。 */
+.head{align-content:space-between!important}
+.head>.qx-steps{order:9;margin-top:0}
+/* 空 / 读不到 / 登录失效：出口行原来被拉伸到 260–300px、内容只占中间一条（空盒）。改成按内容高，
+   列表卡里的余量用 space-between 分到各行之间。文件名外包一层 span 只为让检查工具认出省略号的裁切，版面不变。 */
+.list>.row.link{max-height:196px!important}
+.list:has(>.row.link){justify-content:space-between}
+.row.link .row-sub{font-size:22px!important}
+/* 20 条的滚动列表里，行被压到 132px、内容 150px，文件名和「更新于」顶到行框外。列表本来就能滚动，行不再被压缩。 */
+.list>.row{flex-shrink:0!important}
 </style>
 </head>
 <body>
@@ -421,7 +434,8 @@ function taskRow(t){
  chips.push('更新于 '+esc(t.updated));
  var tail = t.orderNo ? String(t.orderNo).slice(-4) : '';
  var verb = v.dest===DEST.payment ? '去付款' : '看进度';
- var rowLabel = tail ? verb+' · 尾号 '+tail : v.dest.label;
+ /* 不可继续的行没有 dest：只在可继续时取去向文案（invalid-task 里缺订单号的那行原来会在这里报错，整页不渲染）。 */
+ var rowLabel = v.ok ? (tail ? verb+' · 尾号 '+tail : v.dest.label) : '';
  var act = v.ok
    ? '<a class="small primary press" href="'+v.dest.href+'" data-route="'+v.dest.route+'" data-testid="'+SCREEN+'-continue-'+t.id+'"'
      + ' aria-label="'+esc(rowLabel+'：'+(t.name||'未命名打印任务'))+'">'+rowLabel+svg('arrow',19)+'</a>'
@@ -435,7 +449,7 @@ function taskRow(t){
    + ' data-kind="'+(v.ok?(v.dest===DEST.payment?'payment':'print-progress'):'blocked')+'"'
    + ' data-blocked="'+(v.ok?'0':'1')+'" data-legacy="'+(v.legacy?'1':'0')+'" data-testid="'+SCREEN+'-task-'+t.id+'">'
    + '<span class="row-ico" data-tone="'+l.tone+'">'+svg(l.ic,28)+'</span>'
-   + '<span class="row-main"><span class="row-head"><span class="fn">'+esc(t.name||'未命名打印任务')+'</span>'
+   + '<span class="row-main"><span class="row-head"><span class="fn"><span>'+esc(t.name||'未命名打印任务')+'</span></span>'
    + '<span class="st '+l.st[1]+'">'+l.st[0]+'</span></span>'
    + '<span class="row-sub">'+l.sub+'</span>'
    + '<span class="row-meta"><span class="chip">'+chips.join('</span><span class="chip">')+'</span></span></span>'
@@ -484,12 +498,13 @@ function sameKind(prefix,status,pay,n){
  return rows;
 }
 var FIX = {};
-/* 7 条：正好铺满释放出来的列表区，行不会被撑到上限、也不留尾部空档。 */
-FIX['payment-unpaid']        = sameKind('a','pending','unpaid',7);
-FIX['payment-paying']        = sameKind('b','pending','paying',7);
-FIX['progress-pending-paid'] = sameKind('c','pending','paid',7);
-FIX['progress-claimed']      = sameKind('d','claimed','paid',7);
-FIX['progress-printing']     = sameKind('e','printing','paid',7);
+/* 6 条：2.0 页头加高到 300px 后，列表区按行的自然高度正好放下 6 条（原稿页头矮，放 7 条；
+   9/28 前这里仍是 7 条，行被压到 159px、内容 186px，标题和「更新于」顶到行框）。 */
+FIX['payment-unpaid']        = sameKind('a','pending','unpaid',6);
+FIX['payment-paying']        = sameKind('b','pending','paying',6);
+FIX['progress-pending-paid'] = sameKind('c','pending','paid',6);
+FIX['progress-claimed']      = sameKind('d','claimed','paid',6);
+FIX['progress-printing']     = sameKind('e','printing','paid',6);
 FIX['invalid-task'] = [
  T({id:'x1',name:'求职材料-缺订单号.pdf',   status:'pending', pay:'unpaid', orderNo:null,   updated:'8 分钟前',spec:SPEC[0]}),
  T({id:'x2',name:'求职材料-金额为零.pdf',   status:'pending', pay:'unpaid', amountCents:0,  updated:'11 分钟前',spec:SPEC[1]}),
@@ -527,6 +542,9 @@ function btn(kind,href,route,label,testid){
 }
 
 /* ── 各状态视图 ───────────────────────────────────────────────────────────────── */
+/* 页头三步（主状态原有）。9/28 留白：读取中、空、读不到、登录失效也照常显示这三步，
+   不再只在列表态出现，页头不会只剩一句话下面空一截。 */
+var STEPS = '<ol class="qx-steps"><li><b>核对</b>是不是你的单</li><li><b>接着办</b>付款或看进度</li><li><b>带走</b>打印件</li></ol>';
 var V={};
 function listView(state,pill,desc,rows){
  return {
@@ -536,7 +554,7 @@ function listView(state,pill,desc,rows){
    + '<span class="count" data-testid="'+SCREEN+'-count">共 '+rows.length+' 条</span>'
    + '<span class="fx" data-testid="'+SCREEN+'-fixture">举例排版 · 不是你的真实任务</span></span>'
    + '<span class="head-p">'+desc+'</span></span>'
-   + '<ol class="qx-steps"><li><b>核对</b>是不是你的单</li><li><b>接着办</b>付款或看进度</li><li><b>带走</b>打印件</li></ol>',
+   + STEPS,
   list:taskList(rows),
   /* 底栏只留一个按钮。回首页用顶栏返回，避免和底栏再放一个一样的「返回」。 */
   cta: '<a class="btn quiet press" href="?state='+state+'&fixture=1" data-route="'+ROUTE+'" data-testid="'+SCREEN+'-primary">'+svg('refresh',26)+'重新读取</a>'
@@ -574,7 +592,8 @@ V['loading']=function(){
   pill:['','正在读取'],
   head:'<span class="head-ico">'+svg('clock',28)+'</span>'
    + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续上次办理</h1></span>'
-   + '<span class="head-p">先确认<b>登录还在不在</b>，再找你名下没办完的打印。<b>找不到就说找不到</b>，不会先画一份任务出来。</span></span>',
+   + '<span class="head-p">先确认<b>登录还在不在</b>，再找你名下没办完的打印。<b>找不到就说找不到</b>，不会先画一份任务出来。</span></span>'
+   + STEPS,
   list:sk,
   cta: '<a class="btn primary press" href="10-print-hub.html" data-route="/print-scan" data-testid="'+SCREEN+'-primary">去打印扫描，办一份新的</a>'
  };
@@ -585,7 +604,8 @@ V['empty']=function(){
   head:'<span class="head-ico">'+svg('check',28)+'</span>'
    + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续上次办理</h1>'
    + '<span class="count" data-testid="'+SCREEN+'-count">共 0 条</span></span>'
-   + '<span class="head-p">查过了：你名下没有没办完的打印。不是这一页打不开。以前办完的在「我的记录」里。</span></span>',
+   + '<span class="head-p">查过了：你名下没有没办完的打印。不是这一页打不开。以前办完的在「我的记录」里。</span></span>'
+   + STEPS,
   list: banner({id:'empty',tone:'calm',icon:'check',title:'名下没有未完成的打印任务',
         desc:'你名下现在<b>没有待付款、等待领取或正在打印</b>的任务。'})
    + linkRow({id:'print',tone:'slate',icon:'printer',href:'10-print-hub.html',route:'/print-scan',
@@ -609,7 +629,8 @@ V['unavailable']=function(){
   pill:['bad','没读到未完成任务'],
   head:'<span class="head-ico" data-tone="bad">'+svg('warn',28)+'</span>'
    + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续上次办理</h1></span>'
-   + '<span class="head-p">这次<b>没能把列表读回来</b>。本页不猜原因，也<b>不拿空列表冒充「你没有任务」</b>。</span></span>',
+   + '<span class="head-p">这次<b>没能把列表读回来</b>。本页不猜原因，也<b>不拿空列表冒充「你没有任务」</b>。</span></span>'
+   + STEPS,
   list: banner({id:'unavailable',tone:'bad',icon:'warn',title:'没读到未完成任务',
         desc:'读不出列表<b>不等于任务没了</b>；已经建好的单继续排队或出纸。'})
    + '<div class="note" data-kind="warn" data-testid="'+SCREEN+'-no-reorder"><div class="note-h">'+svg('info',26)+'先别重新下单</div>'
@@ -635,7 +656,8 @@ V['session-expired']=function(){
   pill:['bad','登录已失效'],
   head:'<span class="head-ico" data-tone="bad">'+svg('lock',28)+'</span>'
    + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续上次办理</h1></span>'
-   + '<span class="head-p">这一页<b>必须登录</b>才能看你的单。重新登录后会回到这里。</span></span>',
+   + '<span class="head-p">这一页<b>必须登录</b>才能看你的单。重新登录后会回到这里。</span></span>'
+   + STEPS,
   list: banner({id:'session-expired',tone:'warn',icon:'lock',title:'登录已失效，请重新登录',
         desc:'重新登录后会<b>回到这一页</b>，列出的就是你名下的未完成任务。'})
    + '<div class="note" data-kind="info" data-testid="'+SCREEN+'-tasks-safe"><div class="note-h">'+svg('server',26)+'任务不受影响</div>'

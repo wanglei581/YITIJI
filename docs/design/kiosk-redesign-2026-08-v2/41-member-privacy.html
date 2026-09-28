@@ -290,6 +290,8 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 规则 7：底部增加「问小青：撤回会怎样」。
 列表：记录按内容高度，末尾有「加载更多」。
 未改：颜色令牌、圆角、深绿头图、三 Tab。导出和注销仍是说明，不能提交。
+9/28 留白：列表卡回到原稿做法、由它吃掉剩余高度——登录 / 加载 / 出错时行内边距 26、副标题 22、余量分到行间；请求记录高度不够时在卡内滚动，
+  撤回成功 / 失败两态头图的六格要点收起，两态的底部按钮回到屏内（原来整页滚动、按钮在屏幕外）。骨架条改成看得见的墨色并补上标题条。不加区块、不改文字。
 -->
 <style id="qx2">
 #stage{font-size:22px;line-height:1.45}
@@ -332,6 +334,20 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .truth{height:auto!important;min-height:64px;padding:12px 44px!important;align-items:flex-start}
 .qx-more{min-height:56px;width:100%;margin-top:4px;padding:0 18px;border-radius:18px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;text-align:center;font-size:22px;font-weight:750;flex:none;cursor:pointer}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：不许留大片空白，也不许把底部按钮挤出屏幕，也不许改乱）：不加区块、不改文字。
+   列表卡回到原稿的做法：由它吃掉剩余高度。登录 / 加载 / 出错时行排舒展一些、余量分到行间；
+   请求记录在高度不够时在卡内自己滚动（原来是整页滚动，撤回成功 / 失败两态的底部按钮被挤到屏幕外）。
+   骨架条改成看得见的墨色（同 07），并补上一直没显示的标题条。 */
+#stage>.body .list{flex:1 1 auto!important;min-height:0!important}
+#stage>.body.state-layout .list{justify-content:space-between}
+#stage>.body.state-layout .list-foot{margin-top:0}
+#stage>.body.state-layout .list>.row{padding-top:26px;padding-bottom:26px}
+#stage>.body.state-layout .row-sub{font-size:22px!important}
+#stage>.body.privacy-layout .list{overflow-y:auto!important}
+.skel{background:#b3ac99;display:block}
+/* 撤回成功 / 失败是界面示例，头图那一句已换成示例说明；六格要点在这两态收起，给结果和记录让出高度。 */
+#stage:has(#body-root[data-state="success"]) .xq .qx-take,
+#stage:has(#body-root[data-state="failure"]) .xq .qx-take{display:none}
 </style>
 </head>
 <body><div id="viewport"><div id="stage">

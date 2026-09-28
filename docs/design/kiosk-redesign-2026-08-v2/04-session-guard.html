@@ -7,6 +7,7 @@
 规则 4：三行边界并成一句。去掉「会话、服务端、exitTo、函数名、路径」。来源只写页面名，不写路径。
 规则 7：底部保留「问小青：离开前纸和文件要不要先带走」，不让它决定要不要清场。
 未改：颜色、圆角、深绿倒计时区、五态、清场只动这台机器。
+9/28 留白：「不能继续 / 正在清 / 已清场」三态倒计时区用回原稿尺寸，「为什么没有继续办理」卡用回原稿内边距，区块用 space-around 均分剩余高度。不加区块、不改文字；warning 与 continue-failed 未动。
 原稿：../kiosk-redesign-2026-08/04-session-guard.html（只读）。
 -->
 <html lang="zh-CN">
@@ -177,6 +178,22 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .qx-aiwrap{flex:none;display:flex;justify-content:flex-end;padding:8px 44px 0;background:var(--surface)}
 .qx-ai{display:inline-flex;align-items:center;min-height:48px;color:var(--teal-d);font-size:22px;font-weight:650;text-decoration:none}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：不许留大片空白，也不许改乱）：不加区块、不改文字。
+   「不能继续 / 正在清 / 已清场」三态内容比 warning 少一到两块：倒计时区用回原稿尺寸（原稿 padding 94/54、圆 360），
+   剩下的高度用 space-around 分到区块之间和上下两端，而不是全堆在最后一块下面。warning、continue-failed 内容已满，不动。 */
+#body-root[data-state="warning-no-continue"] .scrollarea,
+#body-root[data-state="clearing"] .scrollarea,
+#body-root[data-state="cleared"] .scrollarea{justify-content:space-around}
+#body-root[data-state="warning-no-continue"] .guard,
+#body-root[data-state="clearing"] .guard,
+#body-root[data-state="cleared"] .guard{padding:94px 54px!important;gap:48px!important}
+#body-root[data-state="warning-no-continue"] .guard-num,
+#body-root[data-state="clearing"] .guard-num,
+#body-root[data-state="cleared"] .guard-num{width:360px!important;height:360px!important}
+#body-root[data-state="warning-no-continue"] .guard-num b{font-size:168px!important}
+/* 「为什么没有继续办理」这张说明卡用回原稿的内边距与段距（2.0 为了 warning 一屏装下才压紧的）。 */
+#body-root[data-state="warning-no-continue"] .state{padding:30px 36px!important}
+#body-root[data-state="warning-no-continue"] .state-p{margin-top:12px!important}
 </style>
 </head>
 <body>
