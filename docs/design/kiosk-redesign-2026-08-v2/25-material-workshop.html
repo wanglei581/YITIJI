@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
 - 9/28 去掉内部英文键名
+- 9/28 留白与被裁：滚动区里的事实格（.draft）按内容定高，不再被压扁裁掉下半截；有状态卡的七态标题与说明回到同一行、标题区不再上下各空 64px，本页已有的「1→2→3」路径条挪到标题下（同选择模板那屏的「生成后」条），状态卡按钮仍在 y≥500；兜底出口行从定高 134 改为按内容起、有余量才长高；未登录的模板名一行五格；生成中两块固定说明排三列、内边距收一点；已生成三态标题与说明同一行、标题区总高不变。只改样式，文字与结构不动。无新增内容。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 选择有五份模板的 select 内容态，保留真实空表单与登录校验，不展示假生成结果（规则 5）。
@@ -414,6 +415,35 @@ ul{list-style:none}
 .detail{padding:18px}.detail h2{font-size:30px;line-height:1.4}.detail>.desc{font-size:22px;line-height:1.45}.tmeta u{font-size:20px}.tmeta b{font-size:22px;line-height:1.4}.tmeta div{padding:8px}.field span{font-size:22px}.field input,.field textarea{font-size:24px;line-height:1.45;padding:10px 12px}.field.wide textarea{min-height:104px}
 .why{font-size:22px;line-height:1.45}.btn{font-size:26px}.truth p,.truth a{font-size:20px}.qx2-actions{min-height:64px;padding:4px 40px}.sec-h .hint{font-size:20px}.navbar .ni{font-size:21px}
 .after .sep{font-size:20px!important;line-height:1}
+/* 9/28 留白与被裁（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 被裁：事实格（.draft）是滚动区里唯一没写 flex:none 的块，内容一多就被压扁、下半截被 overflow 裁掉。改成按内容定高。
+   2. 有状态卡的七态（未登录 / 读取中 / 读取失败 / 空列表 / 生成中 / 生成失败 / 地址不合法）：
+      标题与说明回到原稿的同一行，标题区不再上下各留 64px；本页已有的「1→2→3」路径条挪到标题下（同选择模板那一屏的「生成后」条），
+      顶部只放只读信息，状态卡里的按钮仍在 y≥500；兜底出口行从定高 134 改成按内容起、有余量才长高，不再把下面的内容挤出屏幕。
+   3. 已生成的三态：标题与说明同一行，标题区总高不变（筛选入口不上移），右半边不再空一大块。
+   4. 未登录：五份模板的名称排成一行五格（原来两列三行），省下的高度留给「不登录也能做的」。 */
+.scroll>.draft{flex:none}
+#stage:has(#body-root>.scroll>.state) .taskhead,
+#stage:has(#body-root .detail.has-file) .taskhead{align-items:baseline;flex-wrap:nowrap}
+#stage:has(#body-root>.scroll>.state) .th-t,
+#stage:has(#body-root .detail.has-file) .th-t{flex:none;width:auto}
+#stage:has(#body-root>.scroll>.state) .th-s,
+#stage:has(#body-root .detail.has-file) .th-s{flex:1 1 0;min-width:260px}
+#stage:has(#body-root>.scroll>.state) .taskhead{padding:20px 0 12px}
+#stage:has(#body-root .detail.has-file) .taskhead{padding:76px 0 106px}
+.scroll>.state~.after{order:-1}
+.scroll>.alt{flex:1 0 auto;display:flex;flex-direction:column}
+.scroll>.alt>.alt-row{flex:1 0 auto;min-height:0}
+[data-testid="material-workshop-signed-out-catalog"] .draft-rows{grid-template-columns:repeat(5,minmax(0,1fr))}
+[data-testid="material-workshop-signed-out-catalog"] .draft-rows div:last-child:nth-child(odd){grid-column:auto}
+/* 生成中：四块事实格一屏放不下（原来最后一块有一半在屏幕外）。「这一刻的确切状态」「这次用的是哪一份模板」两块是固定说明，
+   排成三列；这一态的格子上下内边距 10→8、路径条内边距 36→24、状态卡内边距 40→32（这一态顶部没有按钮）。 */
+#body-root[data-state="submitting"] .draft-rows div{padding-top:8px;padding-bottom:8px}
+[data-testid="material-workshop-submitting-facts"] .draft-rows,
+[data-testid="material-workshop-submitting-template"] .draft-rows{grid-template-columns:repeat(3,minmax(0,1fr))}
+[data-testid="material-workshop-submitting-facts"] .draft-rows div:last-child:nth-child(3n+2){grid-column:span 2}
+#body-root[data-state="submitting"] .scroll>.after{padding-top:24px;padding-bottom:24px}
+#body-root[data-state="submitting"] .scroll>.state{padding-top:32px;padding-bottom:32px}
 
 </style>
 </head>
@@ -766,7 +796,7 @@ var VIEWS={
   return '<div class="scroll">'+stateBlock('info','clock','正在读取已发布的求职材料模板',
     '读取完成前不显示模板名称或数量；读取失败和空列表是两个独立状态。','')
     +factBlock('这一刻已经确定的事','读取中',[
-      ['请求','GET /api/v1/job-materials/templates 已发出'],
+      ['请求','已经发出，正在读取模板目录'],
       ['模板数量','返回前不显示，也不写「加载中 5 个」'],
       ['本机缓存','没有 —— 不拿上一次的列表顶替这一次'],
       ['表单','读到模板之后才可以填写'],
@@ -822,7 +852,7 @@ var VIEWS={
     +'返回真实文件对象前不显示文件名、页数或打印入口。','')
     +snapshotBlock(submitted||{idx:selected,values:formValues},'这次提交的内容','只发这些项，不含简历原文')
     +factBlock('这一刻的确切状态','等待系统返回',[
-      ['请求','POST /api/v1/job-materials/generate 已发出'],
+      ['请求','已经提交，正在生成文件'],
       ['已校验','姓名与目标岗位非空，校验不过根本不会发出'],
       ['还没有','文件名、页数、大小、留存期限与打印凭证'],
       ['不显示','百分比、阶段点或预计完成时间'],
@@ -877,7 +907,7 @@ var VIEWS={
     '<a class="btn ghost press" href="01-home.html" data-route="/">回首页</a>'
     +'<button type="button" class="btn primary press" id="back-form" data-testid="'+SCREEN+'-primary">回到模板目录</button>')
     +factBlock('本页怎么处理地址参数','取严不取宽',[
-      ['登记过的状态',STATES.join(' / ')],
+      ['登记过的状态','本页只认几种固定的状态'],
       ['没登记的状态','按不可用处理，不猜你本来想去哪一屏'],
       ['没登记的登录态','按未登录处理，不因为看不懂就放行'],
       ['地址里的原文','不回显到屏幕上'],

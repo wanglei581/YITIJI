@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>消息通知 ｜ 职易达</title>
 <!--
+- 9/28 用词：写稿人用语（原型、内部服务名、页面地址、请求标识）换成用户的话。
   route: /me/notifications | /notifications
   state: login | loading | error | all-empty | unread-empty | ready-all | ready-unread | operation-busy | operation-toast
   api: GET /api/v1/me/notifications?pageSize=50[&unreadOnly=true] → { items, nextCursor, total, unreadCount }；
@@ -579,8 +580,8 @@ function render(state, compat){
       : '') + out.html;
   document.getElementById('pill-dot').className = 'dot' + (state==='loading' || state==='operation-busy' ? ' breathe' : '');
   document.getElementById('doing').innerHTML =
-      state==='operation-toast' ? '这一屏是<b>界面示例</b>：静态原型不会真的标记已读，也不会改动系统状态。'
-    : state==='operation-busy'  ? '这一屏是<b>界面示例</b>：静态原型没有发出请求，也不会改动系统的已读状态。'
+      state==='operation-toast' ? '这一屏是<b>界面示例</b>：不会真的标记已读，也不改任何状态。'
+    : state==='operation-busy'  ? '这一屏是<b>界面示例</b>：不会真的标记已读，也不改任何状态。'
     : '只显示<b>本人的打印、AI、文件与系统消息</b>；本页没有实时推送。';
 }
 
