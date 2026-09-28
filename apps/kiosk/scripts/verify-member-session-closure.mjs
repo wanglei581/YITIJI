@@ -157,6 +157,34 @@ assert(
   '会员会话失效事件 helper 已定义，并要求会员 token 前提与失败 token 透传',
 )
 
+/* ── 哪些 401 算「登录失效」要真跑判定函数（2026-09-28）────────────────────────
+ * 服务端对二次验证、换绑的验证码错 / 过期 / 锁定也回 401。此前任何 401 都清场，
+ * 换绑时新号验证码填错一位就被整个登出。这里把真实的 TS 函数转译后逐条喂参数，
+ * 两个方向都钉住：本步失败码不清场；会话失效码、无码、未知码的 401 照旧清场（公共终端宁可多清）。 */
+{
+  const { default: ts } = await import('typescript')
+  const code = ts.transpileModule(memberSessionEvents, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  const events = {}
+  new Function('exports', code)(events)
+  const invalid = (status, errorCode, usedToken = true) => events.isMemberSessionInvalidError(status, errorCode, usedToken)
+  const stepFailures = ['STEP_UP_CHALLENGE_INVALID', 'STEP_UP_CODE_INVALID', 'STEP_UP_TOKEN_INVALID', 'REBIND_CODE_INVALID', 'REBIND_CODE_EXPIRED', 'REBIND_CODE_LOCKED']
+  assert(
+    stepFailures.every((errorCode) => invalid(401, errorCode) === false),
+    '二次验证与换绑的验证码失败（401）不当作登录失效，留在本步重来',
+  )
+  assert(
+    ['MEMBER_TOKEN_INVALID', 'MEMBER_SESSION_EXPIRED', 'AUTH_TOKEN_INVALID', 'SOME_FUTURE_CODE', undefined].every((errorCode) => invalid(401, errorCode) === true) &&
+      invalid(403, 'ACCOUNT_DISABLED') === true,
+    '会话失效码、没有码或不认识的码的 401，以及 ACCOUNT_DISABLED，仍然清场',
+  )
+  assert(
+    invalid(401, 'MEMBER_TOKEN_INVALID', false) === false && invalid(500, undefined) === false && invalid(409, 'PHONE_CONFLICT') === false,
+    '没带会员 token 的请求、5xx 与普通业务错误不触发清场',
+  )
+}
+
 assert(
   authContext.includes('onMemberSessionExpired') &&
     authContext.includes('sessionExpiryExit.expire(logout)') &&

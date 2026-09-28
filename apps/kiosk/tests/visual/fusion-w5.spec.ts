@@ -1648,10 +1648,14 @@ test('settings: phone rebind hides both codes, closes after 45s idle and clears 
   await expectTokenNotPersisted(page)
 })
 
+// 服务端对新号验证码错 / 过期 / 锁定回 401，但登录仍有效：只让换绑从旧号验证重来，不清场
+// （memberSessionEvents 的 STEP_FAILURE_CODES）。一次性的旧号凭证已被消费，所以都不许重放。
 for (const failure of [
   { code: 'PHONE_CONFLICT', status: 409, message: '该手机号已绑定其他账号，无法换绑', recovery: 'restart' },
   { code: 'UNKNOWN_ERROR', status: 500, message: 'HTTP 500', recovery: 'relogin' },
-  { code: 'REBIND_CODE_INVALID', status: 401, message: '新手机验证码不正确', recovery: 'auth-reset' },
+  { code: 'REBIND_CODE_INVALID', status: 401, message: '新手机验证码不正确', recovery: 'restart' },
+  { code: 'REBIND_CODE_EXPIRED', status: 401, message: '新手机验证码已过期，请重新获取', recovery: 'restart' },
+  { code: 'REBIND_CODE_LOCKED', status: 401, message: '新手机验证码尝试次数过多，请重新获取', recovery: 'restart' },
 ]) test(`settings: rebind ${failure.code} never replays a consumed old-phone proof @w5-kiosk`, async ({ page, api }) => {
   registerMemberLogin(api)
   registerAuthenticatedShell(api)
@@ -1670,29 +1674,45 @@ for (const failure of [
   await panel.getByRole('button', { name: '发送验证码', exact: true }).click()
   await panel.getByLabel('新手机号验证码，已隐藏显示').fill('112233')
   await panel.getByRole('button', { name: '确认换绑', exact: true }).click()
-  if (failure.recovery === 'auth-reset') {
-    // 真实接口的业务 401 会触发既有全局清场；不以 400 夹具冒充此链路已留在原页。
-    await page.waitForURL((url) => url.pathname === '/login')
-    await expect(panel).toHaveCount(0)
-    await expectTokenNotPersisted(page)
+  await expect(panel.getByRole('button', { name: '确认换绑', exact: true })).toHaveCount(0)
+  await expect(panel.getByLabel('新手机号验证码，已隐藏显示')).toBeDisabled()
+  await expect(panel.getByLabel('新手机号验证码，已隐藏显示')).toHaveValue('')
+  if (failure.recovery === 'restart') {
+    await expect(panel.getByRole('alert')).toHaveText(failure.message)
+    await panel.getByRole('button', { name: '重新验证旧手机号', exact: true }).click()
+    await expect(panel).toHaveAttribute('data-step', 'send_old')
+    await expect(panel.getByRole('button', { name: '发送验证码', exact: true })).toBeEnabled()
+    // 仍在账号设置、仍是登录态：没有被当成登录失效清场。
+    await expect(page).toHaveURL((url) => url.pathname === '/me/settings')
+    expect(api.requestCount('POST', LOGOUT)).toBe(0)
   } else {
-    await expect(panel.getByRole('button', { name: '确认换绑', exact: true })).toHaveCount(0)
-    await expect(panel.getByLabel('新手机号验证码，已隐藏显示')).toBeDisabled()
-    await expect(panel.getByLabel('新手机号验证码，已隐藏显示')).toHaveValue('')
-    if (failure.recovery === 'restart') {
-      await expect(panel.getByRole('alert')).toHaveText(failure.message)
-      await panel.getByRole('button', { name: '重新验证旧手机号', exact: true }).click()
-      await expect(panel).toHaveAttribute('data-step', 'send_old')
-      await expect(panel.getByRole('button', { name: '发送验证码', exact: true })).toBeEnabled()
-    } else {
-      await expect(panel).not.toContainText('HTTP 500')
-      await panel.getByRole('button', { name: '重新登录核对', exact: true }).click()
-      await page.waitForURL((url) => url.pathname === '/login')
-      await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。')).toBeVisible()
-      await expectTokenNotPersisted(page)
-    }
+    await expect(panel).not.toContainText('HTTP 500')
+    await panel.getByRole('button', { name: '重新登录核对', exact: true }).click()
+    await page.waitForURL((url) => url.pathname === '/login')
+    await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。')).toBeVisible()
+    await expectTokenNotPersisted(page)
   }
   expect(api.requestCount('POST', PHONE_REBIND)).toBe(1)
+})
+
+test('settings: a wrong old-phone code (401 STEP_UP_CODE_INVALID) stays on the step and keeps the login @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', CONSENT_STATUS, consentRows(false))
+  api.respond('POST', STEP_UP_SMS, { status: 200, json: { success: true, data: { challengeId: 'wrong-code-challenge', phoneMasked: '138****8000', expiresInSeconds: 91, cooldownSeconds: 17 } } })
+  api.respond('POST', STEP_UP_VERIFY, { status: 401, json: { error: { code: 'STEP_UP_CODE_INVALID', message: '验证码无效' } } })
+  api.respond('POST', LOGOUT, { status: 200, json: { success: true, data: { loggedOut: true } } })
+  await loginThroughVisibleUi(page, '/me/settings')
+  await page.getByTestId('member-settings-rebind').click()
+  const panel = page.locator('.settings-rebind')
+  await panel.getByRole('button', { name: '发送验证码', exact: true }).click()
+  await panel.getByLabel('当前手机号验证码，已隐藏显示').fill('000000')
+  await panel.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(panel.getByRole('alert')).toHaveText('验证码无效')
+  await expect(panel).toHaveAttribute('data-step', 'verify_old')
+  await expect(page).toHaveURL((url) => url.pathname === '/me/settings')
+  expect(api.requestCount('POST', LOGOUT)).toBe(0)
+  expect(api.requestCount('POST', PHONE_REBIND)).toBe(0)
 })
 
 test('settings: switch-account cancel keeps the session, logout confirms first and clears it @w5-kiosk', async ({ page, api }) => {
