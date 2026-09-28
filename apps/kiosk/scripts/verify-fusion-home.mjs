@@ -208,17 +208,17 @@ check(
 )
 check(
   !view.includes('.filter((tile)') && !view.includes('visibleTiles'),
-  '智慧校园关闭时不从首页消失'
+  '主服务卡不靠 visibleTiles 过滤丢入口'
+)
+// 2026-09-28 稿 01：未开通的百宝箱 / 智慧校园不占首页（开通才显示）。
+// 断言从「关闭时仍可见并写原因」改成「确认开通才渲染，未开通不渲染成死按钮」；条数不减。
+check(
+  view.includes('campusReady ?') && view.includes('actionId="smart-campus"'),
+  '智慧校园确认开通后才渲染，并仍映射真实 action'
 )
 check(
-  view.includes('disabled={!campusReady}') &&
-    view.includes('需终端或机构授权后使用'),
-  '智慧校园默认 visible-but-disabled 并显示原因'
-)
-check(
-  view.includes('disabled={!toolboxReady}') &&
-    view.includes('本机尚未上架扩展服务'),
-  '百宝箱无配置时 visible-but-disabled 并显示原因'
+  view.includes('toolboxReady ?') && view.includes('actionId="toolbox"'),
+  '百宝箱确认开通后才渲染，并仍映射真实 action'
 )
 check(
   view.includes('disabled={disabled}') && view.includes('aria-describedby='),
@@ -253,8 +253,8 @@ check(
 )
 check(
   /\.qx-home-voice[\s\S]{0,220}min-height:\s*76px/.test(css) &&
-    /\.qx-home-quick button[\s\S]{0,180}min-height:\s*48px/.test(css),
-  '首页主按钮与快捷入口达到 56px / 48px 触控下限'
+    /\.qx-home-identity[\s\S]{0,220}min-height:\s*48px/.test(css),
+  '首页主按钮与身份入口达到 76px / 48px 触控下限'
 )
 check(
   /@media\s*\(max-width:\s*760px\)/.test(css) &&

@@ -121,20 +121,21 @@ if (
   fail('C2. 百宝箱外部 H5 必须先展示离场提示，不得点击时直接跳转')
 }
 
-// D. 青序首页保留两个域的位置，但配置关闭时必须 disabled + 可见原因，不能隐藏或放行。
+// D. 2026-09-28 稿 01：首页未开通不占位。确认开通才渲染；点击守卫仍在 HomePage（没读到或关闭时 onAction 直接返回）。
 if (
   home.includes('useSmartCampusCapabilityState()') &&
   home.includes('useToolboxCapabilityState()') &&
   home.includes("campus.status === 'ready' && campus.enabled") &&
   home.includes("toolbox.status === 'ready' && toolbox.enabled") &&
-  homeView.includes('disabled={!toolboxReady}') &&
-  homeView.includes('disabled={!campusReady}') &&
-  homeView.includes('需终端或机构授权后使用') &&
-  homeView.includes('本机尚未上架扩展服务')
+  homeView.includes('toolboxReady ?') &&
+  homeView.includes('campusReady ?') &&
+  homeView.includes('actionId="toolbox"') &&
+  homeView.includes('actionId="smart-campus"') &&
+  homeView.indexOf('actionId="toolbox"') < homeView.indexOf('actionId="smart-campus"')
 ) {
-  pass('D. 青序首页保留百宝箱/智慧校园位置，关闭时真实禁用并说明原因')
+  pass('D. 青序首页百宝箱/智慧校园确认开通后才渲染，百宝箱仍排在智慧校园前')
 } else {
-  fail('D. 青序首页百宝箱/智慧校园必须可见但关闭时 fail-closed')
+  fail('D. 青序首页百宝箱/智慧校园必须在确认开通后才渲染，且百宝箱在前')
 }
 
 // E. 终端底层兼容默认不能成为路由授权；能力边界必须只接受 ready+有效启动项。

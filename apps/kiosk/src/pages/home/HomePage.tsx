@@ -1,5 +1,4 @@
-// HomePage — 青序流光首页运行时纵切。
-// 视觉真值：docs/design/kiosk-redesign-2026-08/01-home.html。
+// HomePage — 青序流光 2.0 首页。视觉真值：docs/design/kiosk-redesign-2026-08-v2/01-home.html。
 // 本页只负责读取真实状态与执行封闭 action；展示细节交给 QxHomeView。
 
 import { useNavigate, useOutletContext } from 'react-router-dom'
@@ -9,7 +8,6 @@ import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 import { ContinuePanel } from './components/ContinuePanel'
 import { QxHomeNavbar, QxHomeView } from './components/QxHomeView'
 import { HOME_V6_ROUTES, type HomeV6ActionId } from './homeV6Domains'
@@ -34,11 +32,10 @@ export function HomePage() {
   const recruitment = useRecruitmentHosting()
   const jobFair = useHomeJobFairHighlight()
   const jobs = useHomeJobHighlight()
-  // 3.14：读到「托管关闭」且本机构至少有一个已启用渠道，才在岗位 / 招聘会的位置摆一张「岗位与招聘会」。
+  // 3.14：读到「托管关闭」且本机构至少有一个已启用渠道，才摆「机构官方渠道」。
   // 托管还没读到、渠道读取中 / 失败 / 为空、本机没有终端身份：一律 0，不摆，也不会先闪出来再收回。
   const channels = useOfficialChannels()
   const officialChannelCount = recruitment.status === 'ready' && !recruitment.enabled && channels.status === 'ready' ? channels.items.length : 0
-  const terminalCode = getTerminalCode() || '设备未绑定'
 
   const handleAction = (actionId: HomeV6ActionId) => {
     if (actionId === 'smart-campus' && !(campus.status === 'ready' && campus.enabled)) return
@@ -79,10 +76,10 @@ export function HomePage() {
           jobs={jobs}
           recruitment={recruitment}
           officialChannelCount={officialChannelCount}
-          terminalCode={terminalCode}
           deviceStatus={deviceStatus}
           continueSlot={<ContinuePanel />}
           onAction={handleAction}
+          onOpenDevice={() => navigate('/error-offline')}
         />
         <nav className="qx-navbar" aria-label="主导航">
           <QxHomeNavbar onAction={handleAction} />

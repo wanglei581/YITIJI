@@ -764,7 +764,7 @@ test('direct visit to /session-timeout without a pending warning fails closed to
   await expect(page.getByRole('button', { name: /我还在，继续使用/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '结束并清除本机会话', exact: true })).toHaveCount(0)
   await expect(page.getByText('秒后自动退出', { exact: true })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: /你好，我是小青/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(errors).toEqual([])

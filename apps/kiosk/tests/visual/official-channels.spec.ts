@@ -166,8 +166,8 @@ async function homeTileGeometry(page: Page) {
   })
 }
 
-const CLOSED_ROWS = [['print-hub'], ['resume-hub', 'interview-hub'], ['policy-hub'], ['toolbox', 'smart-campus']]
-const CHANNEL_ROWS = [['print-hub'], ['resume-hub', 'interview-hub'], ['official-channels'], ['policy-hub'], ['toolbox', 'smart-campus']]
+const CLOSED_ROWS = [['resume-hub', 'interview-hub'], ['print-hub'], ['policy-hub']]
+const CHANNEL_ROWS = [['resume-hub', 'interview-hub'], ['print-hub'], ['policy-hub', 'official-channels']]
 
 const screenOf = (page: Page) => page.locator('[data-kiosk-screen="official-channels"]')
 const cardsOf = (page: Page, section: 'org' | 'legacy') => page.getByTestId(`official-channels-${section}`).getByTestId('official-channel-card')
@@ -441,9 +441,10 @@ test('home: an org terminal with channels gets one 岗位与招聘会 tile in th
   const tile = home.locator('[data-action="official-channels"]')
   await expect(tile).toBeVisible()
   await expect(home).toHaveAttribute('data-official-channels', 'shown')
-  await expect(tile.locator('strong')).toHaveText('岗位与招聘会')
-  await expect(tile.locator('.qx-home-tile-desc')).toHaveText('本机构官方渠道 · 扫码查看')
-  await expect(tile.locator('.qx-home-tile-badge')).toHaveText('2 个渠道')
+  await expect(tile.locator('strong')).toHaveText('机构官方渠道')
+  await expect(tile.locator('.qx-home-tile-desc')).toHaveText('本机有 2 个渠道，扫码到机构官网')
+  await expect(tile.locator('.qx-home-tile-badge')).toHaveText('机构提供')
+  await expect(tile.locator('.qx-home-tile-foot')).toContainText('扫码前往')
   for (const action of ['jobs-hub', 'fairs-hub', 'jobs-retry', 'fairs-retry']) {
     await expect(home.locator(`[data-action="${action}"]`), `托管关闭时首页不摆 ${action}`).toHaveCount(0)
   }
@@ -483,7 +484,7 @@ test('home: no tile while the channels request is held, and it appears exactly o
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const home = page.getByTestId('qx-home')
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
-  await expect(home.getByText('本机尚未上架扩展服务')).toBeVisible()
+  await expect(home).toHaveAttribute('data-toolbox', 'off')
   await page.waitForTimeout(600)
   await expect(home.locator('[data-action="official-channels"]')).toHaveCount(0)
   expect((await homeTileGeometry(page)).rows.map((row) => row.actions)).toEqual(CLOSED_ROWS)
@@ -510,7 +511,7 @@ test('home: no tile when the channels request fails or the org has none @w1-kios
     await page.waitForTimeout(400)
     await expect(home.locator('[data-action="official-channels"]'), `${label}：不摆磁贴`).toHaveCount(0)
     await expect(home).not.toHaveAttribute('data-official-channels', 'shown')
-    expect((await homeTileGeometry(page)).rows.map((row) => row.actions), `${label}：仍是托管关闭时的四行`).toEqual(CLOSED_ROWS)
+    expect((await homeTileGeometry(page)).rows.map((row) => row.actions), `${label}：仍是托管关闭、没有渠道时的三行`).toEqual(CLOSED_ROWS)
     await expect(home.locator('.qx-home-truth')).toContainText('本终端未开放岗位与招聘会信息，也不代收简历。')
     respondChannels(api, [])
   }
@@ -530,11 +531,10 @@ test('home: hosting on keeps the job and fair tiles, even when the org has chann
   await page.waitForTimeout(400)
   await expect(home.locator('[data-action="official-channels"]')).toHaveCount(0)
   expect((await homeTileGeometry(page)).rows.map((row) => row.actions)).toEqual([
-    ['print-hub'],
     ['resume-hub', 'interview-hub'],
+    ['print-hub'],
     ['jobs-hub', 'fairs-hub'],
     ['policy-hub'],
-    ['toolbox', 'smart-campus'],
   ])
 })
 

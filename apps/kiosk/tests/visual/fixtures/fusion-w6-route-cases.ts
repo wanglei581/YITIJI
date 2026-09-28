@@ -72,7 +72,7 @@ async function seedResumeCompare(page: Page): Promise<void> {
 }
 
 const w6RouteDefinitions: readonly W6RouteDefinition[] = [
-  { pattern: '/', url: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
+  { pattern: '/', url: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后继续办理', landmark: 'none' },
   { pattern: '/member/qr-login', url: '/member/qr-login?ticketId=w6-ticket', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '这个链接不能用来上传' },
@@ -88,7 +88,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/interview/tips', url: '/interview/tips', expectedPath: '/interview', marker: screen('interview-tips'), featureText: '面试' },
   { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '练习报告' },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '轻触屏幕，开始办事', landmark: 'presentation', seed: seedScreensaver },
-  { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
+  { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   // 2026-09-25 迁入稿 09-system-state：锚点换成稿里常驻的八项状态区块标题（旧页标题「网络连接中断」已随稿替换）。
   { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '这台机器的八项状态' },
   { pattern: '/assistant', url: '/assistant', marker: screen('assistant'), featureText: '小青' },
@@ -198,9 +198,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
   { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("把表达练熟，不替你下结论")', featureText: '不进行录用判断，不向企业推荐候选人。' },
   // 合同审查 production_default=false；默认构建直接访问也必须安全回首页。
-  { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
-  { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
-  { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
+  { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
+  { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
+  { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("看来源、查条件、备材料")', featureText: 'AI顾问不替主管部门作资格判断。' },
 ] as const // 110 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels)
 
