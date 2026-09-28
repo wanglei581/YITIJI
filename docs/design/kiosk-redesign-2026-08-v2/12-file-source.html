@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 去掉内部英文键名
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 2026-09-28 修重叠：来源选择和取消相关状态里，把步骤说明折成三列，避免和下一行叠字。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
@@ -719,7 +720,7 @@ V['missing-file']=function(){
  return '<section class="sec">'+statusCard('warn','warn','这一步没有可用的文件上下文',[
   '你打开的地址要求的是一个<b>需要真实文件</b>的状态，但本次办理里没有文件 —— 静态原型不会替你挑一份，也不会凭地址就说「已经传好了」。',
   '这<b>不代表系统删了什么</b>。重新从下面任一条通道搬一份进来就能接着走。'
- ],[['warn','fail-closed · 不放行到材料检查','lock']],SCREEN+'-fallback')+'</section>'+
+ ],[['warn','没有文件，先不往下走','lock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">重新选一条通道</span><span class="hint">三条都能走</span></div>'+
   channels(null,'ok')+'</section>'+
   tailCard('info','为什么会看到这一屏','本页把<b>带文件名 / 文件列表 / 这次办理结果</b>的状态当成演示示例，<b>只在原型演示模式下渲染</b>。普通地址直接要这些状态，一律落到这里。','重新搬一份进来要几步',['上面挑一条通道。','按那条通道的提示把文件送到系统。','已经确认之后它成为当前文件。'],'这一屏<b>不代表出错</b>，只代表本次办理里现在是空的。')+
@@ -731,7 +732,7 @@ V['unknown']=function(){
  return '<section class="sec">'+statusCard('error','x','无法识别的页面状态',[
   '地址里给的状态本页不认识。<b>我不猜你想去哪一步</b>，也<b>不把地址里的原始参数回显到屏幕上</b>。',
   '当前办理类型已经归一为「'+(IS_RESUME?'简历打印':'文档打印')+'」，其余不合法的参数直接丢掉。'
- ],[['bad','fail-closed','lock']],SCREEN+'-fallback')+'</section>'+
+ ],[['bad','判断不了就按不能办处理','lock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">从头选一条通道</span><span class="hint">这是本页唯一的正经入口</span></div>'+
   channels(null,'ok')+'</section>'+
   tailCard('info','本页只做搬运','把要打印的文件搬进这次办理，确认成<b>唯一当前文件</b>，然后交给材料检查。<b>不做 AI 简历诊断</b>，也不在这里解析内容。','本页在整条打印流程里的位置',['第 1 步（就是这一页）：把文件搬进来。','第 2 步：材料检查，看页数与敏感信息。','第 3 步设打印参数，第 4 步确认出纸。'],'简历诊断、优化、生成是另一条业务线，<b>不从这一页进</b>。')+

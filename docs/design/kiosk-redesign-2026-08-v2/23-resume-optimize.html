@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 去掉内部英文键名
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 使用 ready + compare 内容态，保留完整原文与 AI 改写对照、采纳/保留/自己写和事实确认门控（规则 7）。
@@ -943,7 +944,7 @@ function exportFile(){return EXPORT_FILE[exportFormat]||EXPORT_FILE.pdf;}
 function sizeText(n){return n<1024*1024?Math.max(1,Math.round(n/1024))+' KB':(n/1024/1024).toFixed(1)+' MB';}
 function fileMetaLine(f){
  return f.filename+'　·　'+sizeText(f.sizeBytes)+'　·　'
-  +(f.pageCount>0?f.pageCount+' 页':'无分页概念（pageCount 0）')+'　·　'+f.mimeType;
+  +(f.pageCount>0?f.pageCount+' 页':'这一格式不按页数算');
 }
 /* 打印交接只带**登记过的**这几项：来源、文件编号、页数和打印参数。
    signedUrl / printFileUrl 一个都不进地址栏 —— 真实页面用路由 state 传文件对象。
@@ -1137,7 +1138,6 @@ R['no-context'] = function(){
     + '<p class="lead">优化建议基于一份<b>已完成解析的本人简历</b>，并且要凭本人凭证才读得到 —— '
     + '地址栏里带一个编号不等于有权限。这次进入没有可用的编号，所以没有原文可以对照，也不会凭空生成建议。'
     + (ridBad ? '（地址里的编号不在允许的字符范围内，已按没有编号处理，也不会把它显示出来。）' : '')
-    + (TECH ? '（读取端点 GET /resume/records/:taskId/optimize，匿名走 x-resume-access-token 请求头）' : '')
     + '</p></section>'
     + exits('empty') + howto();
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source')
@@ -1244,7 +1244,6 @@ R['unavailable'] = function(){
     '<section class="sec m-fade-in"><div class="sec-h"><h2>AI 优化建议当前不可用</h2></div>'
     + '<p class="lead">这台机器还没有接通优化能力，<b>不是你的简历有问题</b>。'
     + '逐条改写候选只能由模型产出，这次产不出来；但诊断报告、手动修改、查看原件、打印和扫描都不受影响。'
-    + (TECH ? '（演示模式下 aiMockAdapter 直接拒绝，不返回任何「读过你简历」的结论）' : '')
     + '</p></section>'
     + exits('down') + howto();
   cta.innerHTML = btn(withRid('22-resume-report.html'),'返回诊断报告',false,SCREEN+'-secondary','/resume/report')
@@ -1357,7 +1356,7 @@ function exportResult(){
   var f=exportFile();
   if(exportState==='ready') return '<div class="export-state" data-testid="'+SCREEN+'-export-file"'
     +' data-file-id="'+esc(f.fileId)+'" data-pages="'+f.pageCount+'"><b>优化版 '+exportFormat.toUpperCase()+' 已生成</b><br>'
-    +esc(fileMetaLine(f))+'<br>文件编号 '+esc(f.fileId)+'（示例编号，不是真实导出结果）。'
+    +esc(fileMetaLine(f))+'<br>按文件名和页数认这一份。'
     +(f.printable
       ?'下载链接和打印链接都不进地址栏，打印交接只带文件编号与打印参数。'
       :'<b>这一份暂时进不了打印</b>：系统这次返回的是 '+exportFormat.toUpperCase()
@@ -1376,7 +1375,7 @@ function renderEditor(){
   tkTag.textContent=exportState==='ready'?'文件已生成':exportState==='no-print'?'打印凭证未就绪':'编辑中';
   work.innerHTML='<div class="edit-shell"><section class="edit-main"><div class="edit-head"><div class="tx"><b>优化版简历</b><p>这里编辑的是系统返回的优化稿原样内容；<b>上一页的裁决不会自动写进来</b>，要用的改法请在这里手工改。修改后旧导出物失效，需重新导出。</p></div><span class="chip" data-d="'+(exportState==='ready'?'adopt':'custom')+'">'+(exportState==='ready'?'与已导出文件一致':exportState==='no-print'?'文件已生成 · 缺打印凭证':'未导出改动')+'</span></div>'+
     '<div class="edit-tabs">'+EDIT_SECTIONS.map(function(s,i){return '<button type="button" class="edit-tab" data-section="'+i+'" aria-pressed="'+(i===editSection)+'">'+s+'</button>';}).join('')+'</div>'+editorFields()+'</section>'+
-    '<aside class="edit-side"><section class="side-card"><h3>排版调整</h3><p>5 组参数对应共享合同 defaultLayout，改动即时反映在下方预览。</p>'+control('字号','fontScale',[['compact','紧凑'],['standard','标准'],['large','放大']])+control('行距','lineSpacing',[['compact','紧凑'],['standard','标准'],['relaxed','舒展']])+control('页边距','margin',[['narrow','窄'],['normal','标准'],['wide','宽']])+control('主色','accent',[['blue','蓝'],['green','绿'],['slate','灰']])+control('栏数','columns',[['1','单栏'],['2','双栏']])+'</section>'+
+    '<aside class="edit-side"><section class="side-card"><h3>排版调整</h3><p>下面 5 组排版可以改，改完马上出现在预览里。</p>'+control('字号','fontScale',[['compact','紧凑'],['standard','标准'],['large','放大']])+control('行距','lineSpacing',[['compact','紧凑'],['standard','标准'],['relaxed','舒展']])+control('页边距','margin',[['narrow','窄'],['normal','标准'],['wide','宽']])+control('主色','accent',[['blue','蓝'],['green','绿'],['slate','灰']])+control('栏数','columns',[['1','单栏'],['2','双栏']])+'</section>'+
     '<section class="side-card"><h3>简历模板</h3><p>模板来自系统；读取失败仍可用默认排版导出。</p><div class="tpl-list"><button type="button" class="tpl-btn" aria-pressed="'+(selectedTemplate==='resume-template-clean')+'" data-template-id="resume-template-clean">清爽通用简历模板<small>clean · 简历优化与现场打印</small></button></div></section>'+
     '<section class="side-card"><h3>AI 辅助调整</h3><p>只调表达密度与排版，不新增经历或事实。</p><div class="ai-grid"><button type="button" class="ai-btn" data-ai="condense">AI 精简</button><button type="button" class="ai-btn" data-ai="reformat">AI 调整排版</button></div>'+(lastAiAction?'<button type="button" class="undo" id="undo-ai">撤销 AI 调整</button><div class="export-state">已执行：'+(lastAiAction==='condense'?'AI 精简':'AI 调整排版')+'。导出物已失效，需要重新导出。</div>':'')+'</section>'+
     '<section class="side-card"><h3>导出格式</h3><div class="fmt-grid">'+[['pdf','PDF'],['docx','Word'],['txt','TXT'],['md','Markdown']].map(function(f){return '<button type="button" class="fmt-btn" data-format="'+f[0]+'" aria-pressed="'+(exportFormat===f[0])+'">'+f[1]+'</button>';}).join('')+'</div><p>PDF 可直接预览，也是当前<b>唯一能交给打印确认</b>的格式；Word / TXT / Markdown 供下载编辑，'

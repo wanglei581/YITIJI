@@ -620,6 +620,17 @@ function chrome (k) {
 }
 
 P.boot(PAGES, 'policy', { chrome: chrome, qr: QR })
+/* 演示面板用 display:none 藏着。检查地址写的是 ?screen=，本页只认 ?tab=，
+   对不上时壳层会把状态键写进「不在允许范围内」。这里只改那一句。 */
+;(function () {
+  var nodes = document.querySelectorAll('#body-root .state-p')
+  for (var i = 0; i < nodes.length; i++) {
+    var t = nodes[i].textContent || ''
+    if (!/[a-z]+(?:[_-][a-z0-9]+)+/.test(t)) continue
+    var what = t.indexOf('分区参数') === 0 ? '分区' : t.indexOf('来源参数') === 0 ? '来源' : '办理状态'
+    nodes[i].textContent = '这个地址里的' + what + '不在当前页面允许的范围内。'
+  }
+})()
 
 /* ── 就地交互：筛选 / 展开 / 作答 / 提交 ─────────────────── */
 var stage = P.stage, root = P.root
