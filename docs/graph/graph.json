@@ -19065,6 +19065,7 @@
     ],
     "apps/kiosk/src/pages/profile/me/components/documentReprint.ts": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx": [
@@ -21472,6 +21473,9 @@
     ],
     "services/api/scripts/support/admin-phone-transfer-static-contract.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts"
+    ],
+    "services/api/scripts/support/ai-artifact-print-pii-gate.ts": [
+      "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/scripts/support/boot-api-child.ts": [
       "services/api/scripts/verify-error-observability.ts",
@@ -24134,6 +24138,9 @@
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts"
+    ],
+    "services/api/src/print-jobs/pii-scan-gate.ts": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -27716,12 +27723,14 @@
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
+          "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
           "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
-          "apps/kiosk/src/routes/index.tsx"
+          "apps/kiosk/src/routes/index.tsx",
+          "services/api/src/print-jobs/pii-scan-gate.ts"
         ],
         "missing": []
       },
@@ -35567,6 +35576,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/ai-artifact-print-pii-gate.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",

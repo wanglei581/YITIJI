@@ -35,6 +35,8 @@ interface ReportState {
   intent?: string
   source?: string
   file?: { name: string; size: string; format: string; fileUrl?: string; mimeType?: string }
+  /** 上传结果的 fileId：来源页放在解析页 state 顶层，解析失败时随整份 state 转过来（打印原件要用）。 */
+  fileId?: string
   taskId?: string
   accessToken?: string
   providerName?: string
@@ -211,7 +213,7 @@ export function ResumeReportPage() {
           <h2>解析中断，中断的只是「读懂它」这一步</h2>
           <p>失败原因：{resumeUserReason(failReason, '这次未能完成解析，请重试或换一份清晰的简历。')}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>
         </section>
-        <ResumeDiagnosisFailExits file={state.file} />
+        <ResumeDiagnosisFailExits file={state.file} fileId={typeof state.fileId === 'string' ? state.fileId : undefined} />
       </section>
     </QxPageFrame>
   )

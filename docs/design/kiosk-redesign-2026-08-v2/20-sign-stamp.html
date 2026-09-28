@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <!--
+- 9/28 用词：写稿人用语（原型、内部服务名、页面地址、请求标识）换成用户的话。
+- 9/28 用词：防重复提交的说法（标识、指纹、请求）换成用户的话，屏上不再显示编号。
 青序流光 2.0 · 20 签名盖章（2026-09-28）
 9/28 逐状态检查修压字
 9/28 留白：选位置右栏整列放进可视区（「确认授权」不再被裁）；门禁态四个出口改 2×2；选签名这一步的说明卡跨两栏、四步排成一行放进屏内；预览取不到时预览列收窄。只改样式，无新增内容。
@@ -36,7 +38,7 @@
 
   查询契约（仅本原型使用）：
     ?state=<下方 62 态之一>      —— 示例态一律要求 capture=1 或 debug=1
-    ?capture=1 / ?debug=1        —— 示例可达门；常显「固定原型数据，不是真实用户文件」
+    ?capture=1 / ?debug=1        —— 示例可达门；常显「示例文件，不是哪位用户的文件」
     ?flat=1                      —— 截图去动效
     ?from=hub|home|docs          —— 真实来源决定返回落点；**未知 / 外部值一律安全回落
                                     /print-scan，且原值绝不进入 DOM**
@@ -627,7 +629,7 @@ var SETUP={
  'placement-top-left-small':function(){withStamp();at(1,'top-left','small')},
  'placement-center-medium':function(){withStamp();at(1,'center','medium')},
  'placement-bottom-right-large':function(){withStamp();at(1,'bottom-right','large')},
- 'placement-invalid-page':function(){withStamp();at(1,'bottom-right','medium');M.placeErr='这份文档共 6 页，第 7 页不存在。页码必须在 1–6 之间，超出的请求系统会直接拒绝。'},
+ 'placement-invalid-page':function(){withStamp();at(1,'bottom-right','medium');M.placeErr='这份文档共 6 页，第 7 页不存在。页码必须在 1–6 之间，超出的页码系统会直接拒绝。'},
 
  /* 预览四态统一落在第 3 页 · 中 · 中档，只有取景方式不同，与位置三件套不撞图 */
  'preview-fit-page':function(){withStamp();at(3,'center','medium');M.view.mode='page'},
@@ -737,7 +739,7 @@ function renderCtx(){
  h+='<span class="sp"></span>';
  document.getElementById('ctxbar').innerHTML=h;
  var fx=document.getElementById('fxbar');
- if(FIXTURE){fx.innerHTML='<b>示例</b>固定原型数据，不是真实用户文件';fx.hidden=false}else{fx.innerHTML='';fx.hidden=true}
+ if(FIXTURE){fx.innerHTML='<b>示例</b>示例文件，不是哪位用户的文件';fx.hidden=false}else{fx.innerHTML='';fx.hidden=true}
 }
 
 /* ── 完整页预览 ───────────────────────────────────────── */
@@ -1029,7 +1031,7 @@ function retainedBlock(){
   '<div><span>原文档</span><b>'+(M.doc?M.doc.name+' · '+M.doc.pages+' 页':'—')+'</b></div>'+
   '<div><span>签名图</span><b>'+(M.stamp?M.stamp.name+' · 这次办理':'—')+'</b></div>'+
   '<div><span>授权</span><b>'+(M.authorized?'已确认':'未确认')+'</b></div>'+
-  '<div><span>请求标识</span><b>'+(M.bound?'已绑定 · 不上屏':'尚未生成')+'</b></div>'+
+  '<div><span>参数一改</span><b>'+(M.bound?'就算新的一次':'还没提交过')+'</b></div>'+
   '</div></div>';
 }
 function outputBlock(){
@@ -1039,12 +1041,12 @@ function outputBlock(){
   '<div><span>大小</span><b>'+M.result.bytes+'</b></div>'+
   '<div><span>身份</span><b>新文件 · 原件未改写</b></div>'+
   '<div><span>预览链接</span><b>'+(M.outErr==='expired'?'已过期 · 30 分钟有效':'有效期 30 分钟')+'</b></div>'+
-  '</div><div class="note">交接的就是<b>这份签好的 PDF</b>，标识<b>不进地址栏</b>。<span data-disclaimer="true">原件没有被改写。</span></div></div>';
+  '</div><div class="note">下一步用的是<b>这份签好的 PDF</b>，<b>不是原件</b>。<br><span data-disclaimer="true">原件没有被改写。</span></div></div>';
 }
 function lockReason(){
  if(!isLocked())return '';
  return M.phase==='result-unknown'
-  ? '结果还没确认，参数已锁定：改一个字节就是另一次请求，可能真的生成两份。'
+  ? '结果还没确认，参数已锁定：改一点就算新的一次，可能真的生成两份。'
   : '正在提交这一次合成，参数与再次提交都已锁定，避免生成两份。';
 }
 function usedInputsBlock(){
@@ -1189,13 +1191,13 @@ function statusFor(){
  if(M.docErr)return stateBlock('warn','warn',M.docErr.t,M.docErr.p,'',[[M.docErr.f],['原文档未被改写','ok'],['没有生成任何文件','ok']]);
  if(M.stampErr)return stateBlock('warn','warn',M.stampErr.t,M.stampErr.p,'',[[M.stampErr.f],['已选文档不受影响','ok'],['没有生成任何文件','ok']]);
  if(M.phase==='composing')return stateBlock('info','clock','正在提交这一次合成',
-  '按<b>'+P+'</b>把图片叠上去，生成一份新 PDF。一次性请求，<b>系统不回传进度</b>，所以没有百分比也没有阶段。','',
+  '按<b>'+P+'</b>把图片叠上去，生成一份新 PDF。交出去之后<b>系统不回传进度</b>，所以没有百分比也没有阶段。','',
   [['参数已锁定'],['不会自动重复提交','ok'],['原 PDF 不被改写','ok']]);
  if(M.phase==='rate-limited')return stateBlock('warn','clock','提交太频繁了',
-  '合成一分钟内最多三次。<b>你的文档、签名图和位置都还在</b>，等一会儿用<b>同一次请求标识</b>重试即可。','',
+  '合成一分钟内最多三次。<b>你的文档、签名图和位置都还在</b>，等一会儿<b>原样重试</b>一次即可。','',
   [['一分钟内 3 次上限'],['输入已全部保留','ok'],['没有重复生成','ok']]);
  if(M.phase==='in-progress')return stateBlock('warn','clock','上一次合成还没结束',
-  '同一个请求标识上还有一次<b>正在进行</b>的合成。为避免生成两份，这次不受理，<b>稍候用同一次请求重试</b>。','',
+  '刚才那一次的合成<b>还在进行</b>。为避免生成两份，这次先不受理，<b>稍候原样重试</b>。','',
   [['系统登记为进行中'],['输入已全部保留','ok'],['不会另开一份','ok']]);
  if(M.phase==='known-failed')return stateBlock('error','warn',M.oversize?'合成结果超出大小限制':'这一次明确失败了',
   M.oversize
@@ -1203,18 +1205,18 @@ function statusFor(){
    : '系统给了<b>明确的失败答复</b>：这一次<b>没有生成文件</b>。文档、签名图、页码、位置、大小和授权全部保留，重试不用重传。','',
   [['系统明确拒绝'],['输入已全部保留','ok'],['原 PDF 不被改写','ok']]);
  if(M.phase==='result-unknown')return stateBlock('warn','warn','这一次的结果<b>没有确认</b>',
-  '请求中断了，<b>不知道系统有没有执行</b>。所以这里<b>不说已生成，也不说没生成</b>。',
-  '只能用<b>同一请求标识 + 同一份输入</b>重试。参数一改就是另一次请求，可能真生成两份。',
-  [['结果未确认'],['输入与请求标识已保留','ok'],['只允许同一请求重试','ok']]);
- if(M.phase==='retrying')return stateBlock('info','clock','正在用<b>同一次请求</b>重试',
-  '复用<b>同一次请求标识</b>，并且文档、签名图、页码、位置、大小<b>一个字节都没有改</b>。如果系统上一次已经做完，会把那一份直接还回来，不会再生成一份。','',
-  [['同一请求标识'],['同一份输入','ok'],['参数已锁定','ok']]);
- if(M.phase==='conflict')return stateBlock('error','warn','这个请求标识已经用过了',
-  '同一个请求标识上一次绑定的是<b>另一组参数</b>。系统拒绝覆盖，<b>上一次的结果原样保留</b>。要换参数，就得是一次新的请求。','',
-  [['请求标识已被占用'],['上一次结果未被覆盖','ok'],['未生成新文件','ok']]);
+  '刚才那一次中途断了，<b>不知道系统做了没有</b>。所以这里<b>不说已生成，也不说没生成</b>。',
+  '只能<b>原样重试刚才那一次</b>。文档、签名图或位置一改就算新的一次，可能真生成两份。',
+  [['结果未确认'],['输入已全部保留','ok'],['只能原样重试那一次','ok']]);
+ if(M.phase==='retrying')return stateBlock('info','clock','正在原样重试<b>刚才那一次</b>',
+  '还是<b>刚才那一次</b>：文档、签名图、页码、位置、大小<b>一点都没改</b>。如果系统上一次已经做完，会把那一份直接还回来，不会再生成一份。','',
+  [['不算新的一次'],['同一份输入','ok'],['参数已锁定','ok']]);
+ if(M.phase==='conflict')return stateBlock('error','warn','和刚才那一次的参数对不上',
+  '刚才那一次交的是<b>另一组参数</b>，系统拒绝覆盖，<b>上一次的结果原样保留</b>。换参数就得重新开始。','',
+  [['系统拒绝覆盖'],['上一次结果未被覆盖','ok'],['未生成新文件','ok']]);
  if(M.phase==='recovered')return stateBlock('info','check','这一份是<b>恢复出来的已完成结果</b>',
-  '已经确认<b>同一次请求标识、同一份输入</b>上已经有完成的结果，于是把那一份还回来了。<b>没有重复生成</b>。','',
-  [['同一请求已完成'],['没有重复生成','ok'],['原 PDF 不被改写','ok']]);
+  '已经确认<b>刚才那一次、同一份输入</b>其实已经做完，于是把那一份还回来了。<b>没有重复生成</b>。','',
+  [['刚才那一次已完成'],['没有重复生成','ok'],['原 PDF 不被改写','ok']]);
  if(M.phase==='completed'){
   if(M.outErr==='expired')return stateBlock('warn','clock','签好的 PDF 已生成，但预览链接过期了',
    '访问链接<b>有效期 30 分钟</b>，已到期。<b>文件没丢，但现在打不了</b>——要重新取一次。','',
@@ -1223,7 +1225,7 @@ function statusFor(){
    '浏览器没能把这份 PDF 画出来。<b>这不代表文件损坏或丢失</b>，可以重新取一次预览链接，或直接去材料检查。','',
    [['预览渲染失败','warn'],['文件仍在','ok'],['可继续下一步','ok']]);
   return stateBlock('info','check','新的签好的 PDF 已生成',
-   '结果回来了<b>一份新文件</b>。<b>原 PDF 一个字节没改</b>。下一步去<b>材料检查</b>，那一步才决定能不能打印。','',
+   '结果回来了<b>一份新文件</b>。<b>原 PDF 一点没改</b>。下一步去<b>材料检查</b>，那一步才决定能不能打印。','',
    [[M.result.pages+' 页 · '+M.result.bytes],['原 PDF 未被改写','ok'],['下一步：材料检查','ok']]);
  }
  if(M.derived)return stateBlock('info','stamp','以刚才的合成结果继续叠加',
@@ -1274,7 +1276,7 @@ function asideFor(){
   left=['接下来',['去<b>材料检查</b>核对隐私与可打印性，那之后才谈报价。','也可以拿它<b>再叠一处</b>。','再叠要<b>重新传签名图</b>。']];
   right=['不会做什么',['不代表材料已生效。','不下单、不出纸、不显示金额。']];
  }else if(M.phase!=='idle'){
-  left=['这一次的边界',['一次性请求，<b>没有进度也没有阶段</b>。','结果未确认只许<b>同请求同参数</b>重试。','审计失败会报错，但派生文件<b>可能已存在</b>。']];
+  left=['这一次的边界',['交出去之后只等结果，<b>没有进度也没有阶段</b>。','结果没确认时，只许<b>原样重试刚才那一次</b>。','审计失败会报错，但派生文件<b>可能已存在</b>。']];
   right=['不会做什么',['不画进度条，也不自动重试。','不覆盖原 PDF。']];
  }else{
   left=['三份文件分开',['<b>原 PDF</b>：永不改写。','<b>签名图</b>：只能这次新传，约 1 小时，不进我的文档。','<b>签好的 PDF</b>：每次都是新文件。']];
@@ -1316,9 +1318,9 @@ function renderCta(){
  else if(M.docErr)h+=priOff('换一份 PDF 再继续','刚才那份没有进入流程，先换一份符合要求的 PDF');
  else if(M.stampErr)h+=priOff('换一张图片再继续','刚才那张没有进入流程，先换一张 JPG / PNG');
  else if(M.phase==='composing'||M.phase==='retrying')h+=priOff('正在生成…','这一次合成还没有回来，重复提交可能生成两份');
- else if(M.phase==='result-unknown')h+=priBtn('用同一次请求重试');
+ else if(M.phase==='result-unknown')h+=priBtn('重试刚才那一次');
  else if(M.phase==='known-failed'||M.phase==='rate-limited'||M.phase==='in-progress')h+=priBtn('重试生成');
- else if(M.phase==='conflict')h+=priOff('换一次新请求再生成','这个请求标识已绑定另一组参数，必须换一次新的请求，不能覆盖上一次');
+ else if(M.phase==='conflict')h+=priOff('当作新的一次再生成','刚才那一次用的是另一组参数，只能当作新的一次，不能覆盖上一次');
  else if(!M.doc)h+=priOff('选好 PDF 再继续','还没有选文档，没有文档就没法选页码和位置');
  else if(!M.stamp)h+=priOff('传好签名 / 印章图再继续','还没有这次的签名 / 印章图片，没有图就没有可叠加的内容');
  else if(M.placeErr)h+=priOff('先改成 1–6 页之间','页码超出这份文档的范围，系统会直接拒绝');
