@@ -58,6 +58,7 @@
 </style>
 <!--
 青序流光 2.0 · 45 本机构官方渠道（state=ready）
+9/28 留白：示例码的图形按码位放大（看得见的码约 170→430px，码位 640→680、描边变细），码位里不再是小图标四周空一圈；两段写死的 100px 上边距改成 margin-top:auto，余高平均分到三步说明、码卡、问小青之间；问小青一行行高 96→120，右端补「›」。无新增内容。
 规则 1：标题下用卡片里原有的三句说明做只读步骤，把顶部空档填上；二维码卡下移，占掉下方空档。
 规则 2：页标题 36，说明 22，按钮 26，导航 21。
 规则 5：去掉四个商业招聘网站。顶栏仍是「示例渠道 · 不可扫描」。卡内保留机构名、示例码，以及「本渠道由…提供，信息以其官网为准」。
@@ -93,6 +94,19 @@
 .nav-item .ni{font-size:21px!important}
 .logo-name{font-size:26px!important}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 码卡是这一屏的主角：示例码的图形按码位放大（看得见的码约 170→430px），码位里不再是一个小图标、四周空一大圈；
+      码位 640→680，和运行页一张渠道时 460px 的真码同一量级。
+   2. 原来用两段写死的 100px 上边距撑开版面，改成 margin-top:auto：剩下的空白平均分到
+      「三步说明→码卡」「码卡→问小青」「问小青→底部按钮」三处，不再堆在一处。 */
+.sec.grow.qr-primary{margin-top:auto!important}
+.body>.sec.last{margin-top:auto!important}
+.qrbox{width:680px!important;height:680px!important;gap:24px}
+/* 图标四周自带约 10% 的空边（含描边），用负边距抵掉，码位里看到的码约 430px 见方 */
+.qrbox>svg{width:560px;height:560px;margin:-60px;stroke-width:1.4}
+/* 3. 问小青这一行：按内容排舒展（行高 96→120），右端补上与其它入口行一致的「›」，说明整行可点 */
+.sec.last .stripitem{min-height:120px}
+.sec.last .stripitem::after{content:"›";flex:none;font-size:40px;line-height:1;color:var(--ink-3)}
 </style>
 </head>
 <body>

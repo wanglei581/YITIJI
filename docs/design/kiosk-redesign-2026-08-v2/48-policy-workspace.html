@@ -169,6 +169,43 @@
 .logo-name{font-size:26px!important}
 .demo-tab,.demo-panel{display:none!important}
 .dsec .sn,.qrslot>span,.qrcard .rows>div>span,.qr-note,.qr-note b{font-size:20px!important;line-height:1.35}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 任务头：为了让分区页签落在 y≥500，任务头定高 392px；只有「就业政策」把政策库来源行搬进来，
+      其余分区和状态在三步说明下面空出 190px。改成网格：标题行、补充说明贴在上面，剩下的高度平均分成
+      「补充说明→三步」「三步→页签」两段，页签位置不变。
+   2. 条件核对、就业登记、公告这几个分区此前检查地址对不上、从没被逐状态检查过：
+      小于 20px 的字按规则 2 提到辅助字阶（步骤序号、隐私说明、选项、这项可以不填、已填几项、
+      结果里的判定说明 / 政策原文 / 依据、免责说明、办理地点）。
+   3. 逐条结果：一条结果里的几项在右半边一个字都没有，右半空 470px。「判定」标签放到这一行右端，
+      判定说明与政策原文左右并排，依据你填的仍在下面一行；字一个没加。 */
+.taskhead{display:grid;grid-template-columns:auto minmax(0,1fr);
+  grid-template-rows:auto auto minmax(0,1fr) auto minmax(0,1fr) auto;column-gap:18px;row-gap:0}
+.taskhead>.th-t{grid-column:1;grid-row:1;align-self:baseline}
+.taskhead>.th-s{grid-column:2;grid-row:1;align-self:baseline;min-width:0}
+.taskhead>.th-more{grid-column:1/-1;grid-row:2}
+.taskhead>.qx-steps{grid-column:1/-1;grid-row:4;margin-top:0}
+.taskhead>#qx-src-host{grid-column:1/-1;grid-row:6}
+.steps2 li .sn{font-size:20px!important}
+.privacy{font-size:21px!important;line-height:1.5!important}
+.opt{font-size:21px!important}
+.q .qh small{font-size:20px!important}
+.ctabar .count{font-size:21px!important}
+.disclaimer{font-size:21px!important;line-height:1.5!important}
+.overall{font-size:21px!important}
+.cond .cr{font-size:21px!important}
+.cond .cb{font-size:20px!important}
+.rows>div{font-size:21px!important}
+.rows>div>span:first-child{font-size:21px!important}
+.cond .ct{justify-content:space-between}
+.cond .cm{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:24px}
+.cond .cm>.ct,.cond .cm>.cb:last-child{grid-column:1/-1}
+/* 4. 内容不满一屏的两个状态：「筛选无匹配」原来整块居中、底下空 196px，改成余高平均分到区块之间和上下；
+      「正在检查」原来上空 117、下空 188，整块往下挪 36px，上下各约 150。 */
+#body-root[data-state="filtered-empty"] .scroll.fit{justify-content:space-evenly}
+#body-root[data-state="eligibility-probing"] .scroll.fit{padding-top:72px}
+/* 5. 「政策库」「通用办事指引」两个分区头的说明按设计方案的区块头写法靠右（编号 + 标题 + 右侧说明），
+      筛选无匹配时右半边不再从身份筛选一路空到空态卡的第二行。 */
+.grp[data-section] span{text-align:right}
 </style>
 </head>
 <body data-host="policy">

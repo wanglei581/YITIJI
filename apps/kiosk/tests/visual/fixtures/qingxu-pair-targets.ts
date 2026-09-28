@@ -344,9 +344,12 @@ function headerPipes(comment: string): string[] {
 function bundleOf(file: string): { html: string; source: string } {
   const html = fs.readFileSync(protoFile(file) ?? path.join(PROTO_DIR, file), 'utf8')
   let source = html
-  for (const match of html.matchAll(/src="([a-z0-9_-]+\.js)"/gi)) {
-    const side = protoFile(match[1])
-    if (side) source += `\n${fs.readFileSync(side, 'utf8')}`
+  // 同目录的脚本（v2 优先、缺的读原稿）和 v2 稿引用的原稿目录脚本（../kiosk-redesign-2026-08/x.js）都要读：
+  // 分区参数常写在原稿的共用脚本里，只读同目录的会把 48 这类页的参数名判错（9/28：48 一直被当成 ?screen=，实际是 ?tab=）。
+  for (const match of html.matchAll(/src="((?:\.\.\/kiosk-redesign-2026-08\/)?[a-z0-9_-]+\.js)"/gi)) {
+    const rel = match[1]
+    const side = rel.startsWith('../') ? path.join(PROTO_DIR, path.basename(rel)) : protoFile(rel)
+    if (side && fs.existsSync(side)) source += `\n${fs.readFileSync(side, 'utf8')}`
   }
   return { html, source }
 }
