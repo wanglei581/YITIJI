@@ -102,3 +102,16 @@
 @media (prefers-reduced-motion: reduce) {
   .kassist *, .kassist *::before, .kassist *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* 稿 05（2.0）顶栏下直接是小青工作台，没有独立页头。页头 h1「AI 顾问」仍是全页唯一 h1，
+ * 只留给读屏与导航核对，视觉上收起（clip-path，不用 margin:-1px，避免越界门禁）。 */
+.qx-stage:has(.kassist-qingxu) > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

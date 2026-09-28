@@ -24,7 +24,7 @@ export function AdvisorHero({
     <section className="aa-hero">
       <span className="aa-avatar" aria-hidden="true">青</span>
       <span>
-        <span className="aa-hero-kicker">ADVISOR OUTPUT</span>
+        <span className="aa-hero-kicker">小青的作业</span>
         <p className="aa-hero-q">
           {heroBefore}
           <em>{heroEm}</em>

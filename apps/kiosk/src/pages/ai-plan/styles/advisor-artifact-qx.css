@@ -37,9 +37,20 @@
   color: var(--qx-emerald);
 }
 .aa-hero-kicker {
-  font-size: 17px;
-  letter-spacing: 3px;
-  color: color-mix(in srgb, var(--qx-paper) 62%, transparent);
+  font-size: var(--qx-fs-aux-lg);
+  letter-spacing: 2px;
+  color: color-mix(in srgb, var(--qx-paper) 90%, transparent);
+}
+/* 稿 52（2.0）顶栏下直接是小青横幅，没有独立页头。页头的 h1 只留给读屏与导航核对，不占版面。 */
+.qx-stage:has(.aa-root) > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .aa-hero-q {
   margin: 8px 0 0;
