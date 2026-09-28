@@ -542,6 +542,9 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     }
     expect(page.url(), '会员未走到优化页').toContain('/resume/optimize')
     {
+      // 稿 23（2.0）：有可对照的条目时先落在建议总览，导出在编辑区。
+      const toEditor = page.getByRole('button', { name: '编辑并导出', exact: true })
+      if (await toEditor.count()) await toEditor.click()
       const exportBtn = page.getByRole('button', { name: /确认优化版，导出 PDF|导出 PDF/ })
       expect(await exportBtn.count(), '优化页没有导出按钮 —— 会员导出闭环无法验证').toBeGreaterThan(0)
       {

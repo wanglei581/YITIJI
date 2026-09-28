@@ -284,7 +284,8 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
 
   await page.goto('/resume/optimize?taskId=resume-w3-inline-preview')
   await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
-  await page.getByRole('tab', { name: '编辑与导出', exact: true }).click()
+  // 稿 23（2.0）：总览与编辑区用按钮切换，没有页签；这份结果没有可对照的条目，直接进编辑区。
+  await expect(page.getByTestId('resume-optimize-overview')).toHaveCount(0)
   await page.getByRole('button', { name: '导出 PDF', exact: true }).first().click()
   await page.getByRole('checkbox', { name: /测试大学/ }).click()
   await page.getByRole('button', { name: '确认导出' }).click()
