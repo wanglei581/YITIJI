@@ -73,6 +73,18 @@ const PLAN_URL_STATES = new Set([
   'compare-all-covered', 'print-unavailable', 'expired',
 ])
 const ASSISTANT_DRIVEN = new Set(['default', 'composer', 'submitting', 'reply-real', 'reply-not-ai', 'reply-error'])
+// 这几态在稿里要另带参数才画得出来，不带就回落成别的态（9/28 收稿时各实现方报的漏检）：
+// 06 的主题页要 topic=，不带显示「没找到」；12 的取消两态要 cancel=ok|fail，不带显示「没有文件」；
+// 32 选定通道之后的各态要 channel=，不带回落成「待支付」或「通道不明」。
+const PAY_CHANNEL_STATES = [
+  'channel-selected', 'pending-scan', 'pending-qr', 'awaiting-code-confirmation', 'pending-verification',
+  'display-expired-reconciling', 'expired', 'attempt-failed', 'release-failed',
+]
+const STATE_QUERY: Record<string, Record<string, Record<string, string>>> = {
+  '06-help.html': { topic: { topic: 'print' } },
+  '12-file-source.html': { 'phone-cancel-failed': { cancel: 'fail' }, 'phone-cancelled': { cancel: 'ok' } },
+  '32-cashier.html': Object.fromEntries(PAY_CHANNEL_STATES.map((state) => [state, { channel: 'wechat' }])),
+}
 
 const CANONICAL_ROUTE: Record<string, string> = {
   '/print/material-check': '/print/desk?step=check',
@@ -764,6 +776,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
       }
       // 07 的带内容态要 fixture=1 才渲染示例订单，不带时一律停在「正在读取」（9/28 留白整改时发现量错了态）。
       if (file.startsWith('07-')) extra.fixture = '1'
+      Object.assign(extra, STATE_QUERY[file]?.[pair.state] ?? {})
       targets.push({
         file,
         nn: file.slice(0, 2),
