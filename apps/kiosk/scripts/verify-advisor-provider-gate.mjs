@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 /**
  * P25 AI 顾问接线静态合同（接线矩阵 §四 S2-5，依赖 S0-1）。
@@ -110,6 +111,44 @@ for (const key of ['page', 'conversation', 'tools', 'scenes']) {
     mustNot(key, forbidden, `禁用文案：${forbidden}`)
   }
 }
+
+// 2.0 双向回归：运行真实纯函数，既不改变用户提示原意，也不把技术串上屏。
+function loadPureModule(path, dependencies = {}) {
+  const source = ts.transpileModule(read(path), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+  const exports = {}
+  new Function('exports', 'require', source)(exports, (name) => {
+    if (!(name in dependencies)) throw new Error(`Unexpected pure-module dependency: ${name}`)
+    return dependencies[name]
+  })
+  return exports
+}
+const provider = loadPureModule('src/pages/assistant/advisorProvider.ts')
+for (const [response, expected] of [
+  [{ providerLabel: 'llm:test', aiGenerated: true }, true],
+  [{ providerLabel: 'mock', aiGenerated: true }, false],
+  [{ providerLabel: 'llm:test', aiGenerated: false }, false],
+  [{ providerLabel: 'llm:test' }, false],
+  [{ aiGenerated: true }, false],
+  [{}, false],
+]) {
+  assert(provider.isAiGeneratedReply(response) === expected, `provider: double gate ${JSON.stringify(response)}`)
+}
+const copy = loadPureModule('src/pages/assistant/advisorUserCopy.ts', {
+  '../../utils/maskPii': loadPureModule('src/utils/maskPii.ts'),
+})
+const fallback = '这次未能完成，请稍后再试。'
+for (const message of ['当前使用的人较多，请稍后再试', '今日可用次数已用完，请明天再来', '麦克风正被其他程序使用，请关闭后重试']) {
+  assert(copy.advisorUserReason(message, fallback) === message, `copy: preserve user message ${message}`)
+  assert(copy.advisorErrorMessage(new Error(message), fallback) === message, `copy: preserve error envelope ${message}`)
+}
+for (const message of [undefined, '', 'AI_BUSY', 'HTTP 503', '服务端能力探测失败', '当前会话 pending', '上传状态 uploaded', '引擎错误 E_CONN', 'TRTC 进房失败']) {
+  assert(copy.advisorUserReason(message, fallback) === fallback, `copy: redact engineering reason ${message}`)
+}
+assert(copy.advisorDisplayText('电话 13812345678，邮箱 user@example.com') === '电话 138****5678，邮箱 u***@example.com', 'copy: mask phone and email on display')
+must('page', 'advisorErrorMessage(error,', '文字请求失败必须保留用户话并过滤技术串')
+must('conversation', 'advisorDisplayText(msg.text)', '对话展示必须掩码，不改请求原文')
+must('conversation', 'AI 生成 · 供参考', '真实回答必须显示 2.0 AI 标识')
+mustNot('page', "import './assistant-inkpaper.css'", '2.0 不得继续加载停放的旧样式')
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`FAIL ${failure}`)

@@ -1,22 +1,4 @@
-// ============================================================
-// AssistantPage — 稿 05-ai-cockpit（AI 驾驶舱）+ 腾讯 TRTC 页内通话（P25 AI 顾问）
-//
-// 页面语法（2026-09-25 按稿 05 重排）：深色舱面（标题 · 读数 · 能力仪表带）→
-// 编号分区主体（任务选择 → 真实对话 → 可去的地方 → 不经过 AI 也能办）→ 输入坞 → 边界说明。
-// 稿里的 12 态在这里**只由真实信号推出**（deriveCockpitState），不接受 URL 指定。
-// TRTC 仍由 feature gate 条件式懒加载；共享终端的文字会话离开即清空，路由 action 只走白名单。
-//
-// S2-5 接线（2026-08-16）：
-//  · `/assistant/chat` 的 `providerLabel` / `aiGenerated` 决定这轮回答**能不能
-//    当成 AI 回答呈现**（风险 R1）。非 `llm:` 前缀时正文根本不进 state。
-//  · AI 状态、加载、失败、降级全部走 `src/ai/` 的共享原语，不在本页另造一套。
-//  · AI 不可用时功能不消失：本页降级为 ① `manual` —— 用户来这里的目标是
-//    「不知道该用哪个功能」，这个目标不依赖模型，退化成自己点四个真实入口即可。
-//
-// 呈现层已拆到同目录 AdvisorCockpit / AdvisorConversation / AdvisorTools / advisorScenes /
-// advisorProvider（CLAUDE.md §8），本文件只留状态、请求与页面语法。
-// ============================================================
-
+// 稿 05 青序流光 2.0；状态只由真实请求、草稿与语音相位派生。
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HomeIcon, KeyboardIcon, SparklesIcon, UserIcon } from 'lucide-react'
@@ -28,7 +10,7 @@ import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
 import { useAuth } from '../../auth/useAuth'
-import { AiDisclaimerLine, AiTaskRegion, useAiTask } from '../../ai'
+import { AiTaskRegion, useAiTask } from '../../ai'
 import { AssistantHoldToTalk } from './AssistantHoldToTalk'
 import { AssistantSessionSummaryBar } from './AssistantSessionSummaryBar'
 import type { AiAvailability, AiTaskFallback } from '../../ai'
@@ -41,7 +23,7 @@ import {
   type Message,
 } from './AdvisorConversation'
 import { AiToolSection } from './AdvisorTools'
-import { buildNonAiNotice, describeProviderLabel, isAiGeneratedReply } from './advisorProvider'
+import { buildNonAiNotice, isAiGeneratedReply } from './advisorProvider'
 import {
   COCKPIT_COPY,
   CONSULTATION_TASKS,
@@ -55,11 +37,9 @@ import {
 } from './advisorScenes'
 import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
-import './assistant-inkpaper.css'
-import './assistant-batch8.css'
-import './assistant-advisor.css'
-import './assistant-cockpit.css'
-import './assistant-cockpit-body.css'
+import { AssistantTaskPicker } from './AssistantTaskPicker'
+import { advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
+import './assistant-qingxu.css'
 
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
 
@@ -133,15 +113,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
   const [loading, setLoading] = useState(false)
   const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
-
-  /*
-   * AI 可用性只能来自实测，不得写死。
-   *
-   * 本域**没有**助手就绪探测端点（S1-4 就绪门控尚未落地），所以唯一的真值来源是
-   * `/assistant/chat` 实际返回的 `providerLabel`：
-   *   `llm:*` → available；其它 provider 名（mock 回落）→ unavailable。
-   * 首次进入时状态是诚实的 `unknown` —— 页面既不声称 AI 可用，也不声称它挂了。
-   */
   const [aiAvailability, setAiAvailability] = useState<AiAvailability>('unknown')
   const [turnFailed, setTurnFailed] = useState(false)
   const [providerLabel, setProviderLabel] = useState<string | undefined>(undefined)
@@ -256,13 +227,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       sessionIdRef.current = response.sessionId
       setProviderLabel(response.providerLabel)
-
-      /*
-       * 风险 R1 的唯一闸门。判为非 AI 时：
-       *   · `response.reply` **不进 state**，一个字也不显示；
-       *   · 可用性钉成 unavailable，输入条随即锁上，不再产生下一轮假回答；
-       *   · actions 一并丢弃 —— 它们同样来自预置话术，不该被当成「AI 建议的下一步」。
-       */
       if (!isAiGeneratedReply(response)) {
         setAiAvailability('unavailable')
         // 输入条随即锁上，虚拟键盘也一并收起 —— 留着一个按不出结果的发送键更糟。
@@ -294,13 +258,13 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           droppedActions: (response.actions?.length ?? 0) - (safeActions?.length ?? 0),
         },
       ])
-    } catch {
+    } catch (error) {
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       setTurnFailed(true)
       setMessages((current) => [
         ...current,
-        { id: `err-${Date.now()}`, role: 'assistant', kind: 'error', text: 'AI 服务暂不可用，请稍后再试' },
+        { id: `err-${Date.now()}`, role: 'assistant', kind: 'error', text: advisorErrorMessage(error, 'AI 服务暂不可用，请稍后再试') },
       ])
     } finally {
       if (!cancelledRef.current && requestTokenRef.current === requestToken) setLoading(false)
@@ -348,20 +312,16 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     hasDraft: input.trim().length > 0,
   })
   const cockpitCopy = COCKPIT_COPY[cockpitState]
-  const lastDropped = lastMessage?.kind === 'ai' ? lastMessage.droppedActions ?? 0 : 0
 
-  const degradedReason = aiLocked
-    ? `模型未接入（服务标识：${describeProviderLabel(providerLabel)}）：这些专项的产出只能由模型生成，暂停使用。`
-    : '刚才这一轮没有连上 AI 顾问。'
-
+  const degradedReason = aiLocked ? '这些专项需要 AI 作答，恢复后可重新选择。' : '刚才这一轮没有连上 AI 顾问。'
   const advisorFallback: AiTaskFallback = useMemo(() => ({
     mode: 'manual',
     reason: aiAvailability === 'unavailable'
-      ? `本机 AI 顾问还没有接上真实模型（服务标识：${describeProviderLabel(providerLabel)}），这一轮和之后的提问都不会有 AI 回答。`
-      : '刚才这一轮没有连上 AI 顾问，这次没有回答。页面不会用编出来的回答顶上。',
-    manualPath: `不用等 AI：打印扫描、${hostingOpen ? '招聘会信息' : '帮助中心'}、政策服务、AI简历服务这四个入口都不经过对话，可以直接进去自己办 —— 就是下面这四个按钮。`,
+      ? '先选一项继续办理，也可以重新检查后再提问。'
+      : '重试会再次发送刚才的问题，不用重新输入。',
+    manualPath: '打印扫描、政策说明和已有简历都可以自己办理。',
     action: { label: '去打印扫描', onClick: () => navigate('/print-scan') },
-  }), [aiAvailability, hostingOpen, navigate, providerLabel])
+  }), [aiAvailability, navigate])
 
   const focusComposer = () => {
     window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
@@ -431,17 +391,14 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   // 主体分区按实际渲染依次编号（稿 05 的 01 / 02 / 03）。
   let sectionNo = 0
   const nextNo = () => { sectionNo += 1; return sectionNo }
-  const showPicker = !hasUserTurn && cockpitState !== 'ai-unavailable'
+  const showPicker = (!hasUserTurn || cockpitState === 'composer') && !aiLocked
   const showConversation = hasUserTurn || Boolean(toolboxScene || selectedTask) || advisorTask.isFailed
   const draftLength = input.trim().length
 
   return (
-    /* 稿 05-ai-cockpit：青序顶栏 + 底部主导航，页面名与导航项为「AI 顾问」（稿内「问小青」称呼已下线，小青只留在对话里）；状态胶囊只报真实信号推出的 12 态之一，未问过即「待本轮返回确认」。 */
     <QxPageFrame
       back={{ label: '返回首页', onBack: () => navigate('/') }}
       title="AI 顾问"
-      subtitle="求职咨询 · 简历建议 · 打印帮助 · 政策问答"
-      terminalLabel="就业服务大厅"
       status={cockpitCopy.pill}
       navbar={
         <>
@@ -451,8 +408,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
         </>
       }
     >
-    {/* 页面唯一 h1 由 QxPageFrame 的「AI 顾问」承担（稿 05 页面名）；这里只给区域一个可访问名称。 */}
-    <section className="kassist kassist-lightflow" aria-label="AI 顾问咨询工作台">
+    <section className="kassist kassist-qingxu" aria-label="AI 顾问咨询工作台">
       <div
         ref={workbenchRef}
         data-kiosk-domain="assistant"
@@ -480,65 +436,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           data-testid={`ai-cockpit-state-${cockpitState}`}
         >
           {showPicker && (
-            <section className="assistant-task-picker" aria-labelledby="assistant-task-picker-title">
-              <AdvisorSectionLabel
-                no={nextNo()}
-                id="assistant-task-picker-title"
-                title={cockpitCopy.section[0]}
-                hint={toolboxScene ? `专项 · ${toolboxScene.title}` : cockpitCopy.section[1]}
-              />
-              <div className="assistant-task-grid" role="group" aria-label="咨询主题">
-                {CONSULTATION_TASKS.map((task) => (
-                  <button
-                    type="button"
-                    data-task-id={task.id}
-                    className="assistant-task"
-                    aria-pressed={selectedTaskId === task.id}
-                    key={task.id}
-                    onClick={() => setSelectedTaskId(task.id)}
-                  >
-                    <span className="assistant-task-icon" aria-hidden="true"><KIcon name={task.icon} /></span>
-                    <span className="assistant-task-copy">
-                      <strong>{task.label}</strong>
-                      <small>{task.description}</small>
-                    </span>
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="assistant-direct-question"
-                  aria-pressed={!selectedTask && !toolboxScene}
-                  onClick={clearTask}
-                >
-                  <strong>直接提问</strong>
-                  <small>不选主题</small>
-                </button>
-              </div>
-
-              {cockpitState === 'composer' ? (
-                <div className="assistant-draft-card" data-testid="cockpit-draft">
-                  <p className="assistant-draft-head"><KIcon name="chat" />将要发送的内容 · {draftLength} / {ASSISTANT_USER_MESSAGE_MAX_LENGTH} 字</p>
-                  <p className="assistant-draft-text">{input.trim()}</p>
-                  <p className="assistant-draft-note">草稿只留在本页，离开即清；地址栏不会带上你输入的内容。点下面的问题会替换它。</p>
-                </div>
-              ) : null}
-
-              <div className="assistant-quick-questions" aria-label="快捷问题">
-                {quickQuestions.map((question) => (
-                  <button
-                    type="button"
-                    key={question}
-                    disabled={!aiLocked && loading}
-                    aria-disabled={aiLocked || undefined}
-                    onClick={() => chooseQuickQuestion(question)}
-                  >
-                    <span className="assistant-quick-icon" aria-hidden="true"><KIcon name="help" /></span>
-                    <span className="assistant-quick-text">{question}</span>
-                    <span className="assistant-quick-go" aria-hidden="true">{cockpitState === 'composer' ? '替换输入框' : '填入输入框'}<KIcon name="arrow" /></span>
-                  </button>
-                ))}
-              </div>
-            </section>
+            <AssistantTaskPicker no={nextNo()} composing={cockpitState === 'composer'} input={input}
+              selectedTask={selectedTask} contextLabel={contextLabel} questions={quickQuestions}
+              loading={loading} aiLocked={aiLocked} onSelect={setSelectedTaskId}
+              onClear={clearTask} onQuestion={chooseQuickQuestion} />
           )}
 
           {showConversation && (
@@ -547,7 +448,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 no={nextNo()}
                 id="assistant-conversation-title"
                 title={hasUserTurn || cockpitState === 'ai-unavailable' ? cockpitCopy.section[0] : '开场说明'}
-                hint={hasUserTurn || cockpitState === 'ai-unavailable' ? cockpitCopy.section[1] : '共享终端 · 离开本页自动清空'}
+                hint={hasUserTurn || cockpitState === 'ai-unavailable' ? cockpitCopy.section[1] : '补充具体情况，再发送问题'}
               />
               {(toolboxScene || selectedTask) && (
                 <div className="assistant-context-row">
@@ -563,7 +464,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 aria-busy={loading}
                 aria-relevant="additions text"
               >
-                {messages.map((message) => <ChatBubble key={message.id} msg={message} />)}
+                {messages.filter((message) => !hasUserTurn || message.kind !== 'system').map((message) => <ChatBubble key={message.id} msg={message} />)}
               </div>
 
               {(cockpitState === 'reply-error' || cockpitState === 'reply-not-ai' || cockpitState === 'ai-unavailable') && (
@@ -590,11 +491,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                   )}
                 </div>
               )}
-
-              {/*
-                S1-1 四态区。running 之外不挂载进度子树 —— 「看起来在算」恒等于「真的在算」。
-                failed 时给 ① manual 降级：AI 只是本页的加速器，用户的目标不依赖它。
-              */}
               <AiTaskRegion
                 task={advisorTask}
                 label="AI 顾问回答"
@@ -603,20 +499,12 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 idle={(
                   <p className="assistant-ai-idle">
                     {aiAvailability === 'unknown'
-                      ? 'AI 顾问的服务状态会在你问出第一句时确认；在此之前本页不声称它可用。'
+                      ? '写下你的具体情况，小青会帮你梳理下一步。'
                       : '可以继续问，也可以直接点下面的服务入口自己办。'}
                   </p>
                 )}
                 fallback={advisorFallback}
-              >
-                <AiDisclaimerLine>
-                  {AI_LABEL_COPY.BASE}。这一轮回答来自真实模型（服务标识：{describeProviderLabel(providerLabel)}），
-                  不构成录用、薪资或办理结果的承诺。
-                </AiDisclaimerLine>
-                <p className="assistant-nodo"><b>这一轮不决定</b><span>身份 · 支付 · 设备状态 · 打印扫描成败 · 岗位来源真伪 · 政策资格 · 录用结果</span></p>
-              </AiTaskRegion>
-
-              {/* 自动滚动的落点放在「这一轮之后可以做什么」之后：失败时重试键必须进视野，不能停在气泡末尾。 */}
+              />
               <div ref={bottomRef} />
 
               {advisorTask.isFailed && <AdvisorManualEntries />}
@@ -634,19 +522,17 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
           {goActions && goActions.length > 0 && (hasUserTurn || selectedTask) && !advisorTask.isFailed && (
             <section className="assistant-go-section" aria-labelledby="assistant-go-title">
-              <AdvisorSectionLabel no={nextNo()} id="assistant-go-title" title="可以直接去的地方" hint="只列路由白名单内的入口" />
+              <AdvisorSectionLabel no={nextNo()} id="assistant-go-title" title="可以直接去的地方" hint="能办的下一步" />
               <div className="action-chips" aria-label="回答后的操作">
                 {goActions.map((action) => (
                   <button key={action.route} type="button" className="action-chip" onClick={() => navigate(action.route)}>
-                    {action.label}
-                    <small aria-hidden="true">{action.route}</small>
+                    {advisorUserReason(action.label, '去办理')}
+                    <small aria-hidden="true">去办理</small>
                     <KIcon name="arrow" />
                   </button>
                 ))}
               </div>
-              {lastDropped > 0 && (
-                <p className="assistant-drop-note">这一轮另有 {lastDropped} 条白名单外的动作已直接丢弃、不渲染。岗位与招聘会只到来源入口为止，本机不做站内投递。</p>
-              )}
+
             </section>
           )}
 
@@ -671,12 +557,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             inputMode="none"
             aria-label="输入咨询问题"
             placeholder={aiLocked
-              ? 'AI 顾问未接真实模型，暂时不能发送'
+              ? 'AI 顾问暂不可用，请先选择办事入口'
               : toolboxScene?.placeholder ?? (selectedTask ? `请补充“${selectedTask.label}”相关情况` : '说说你想解决什么，例如：我想把简历压到一页')}
             rows={3}
             maxLength={ASSISTANT_USER_MESSAGE_MAX_LENGTH}
-            /* AI 不可用时用 readOnly + aria-disabled 而不是原生 disabled：
-               原生 disabled 会把输入框踢出 Tab 序，读屏用户读不到旁边那句「为什么锁」。 */
             readOnly={aiLocked}
             aria-disabled={aiLocked || undefined}
             disabled={!aiLocked && loading}
@@ -686,7 +570,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             <AssistantHoldToTalk
               unavailable={aiLocked || loading}
               unavailableReason={aiLocked
-                ? `AI 顾问答不了话，按住说话也暂停了（服务标识：${describeProviderLabel(providerLabel)}）。`
+                ? '按住说话暂时停用，可选择上方的办事入口。'
                 : loading ? '正在等这一轮返回，请稍候再录音。' : undefined}
               sendDirect={sendVoiceDirect}
               onSendDirectChange={setSendVoiceDirect}
@@ -748,18 +632,14 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
           {aiLocked ? (
             <div className="assistant-composer-lock" role="status">
-              <p>
-                <b>已锁</b>
-                本机 AI 顾问还没有接上真实模型（服务标识：{describeProviderLabel(providerLabel)}），
-                页面不会用预置话术冒充 AI 回答。可在上方「重新检查 AI 顾问」再试。
-              </p>
+              <p><b>暂不能发送</b>恢复后可点「重新检查 AI 顾问」再试。</p>
             </div>
           ) : (
             <p className="assistant-dock-note">
               <b>{loading ? '等待中' : draftLength > 0 ? '草稿' : '提示'}</b>
               <span>
                 {loading
-                  ? '这一轮还没返回，发送键先停用；下面四个非 AI 入口照常可点。'
+                  ? '这一轮还在等待，办事入口照常可用。'
                   : `${draftLength} / ${ASSISTANT_USER_MESSAGE_MAX_LENGTH} 字 · 草稿只留在本页，离开即清${draftLength > 0 ? '' : ' · 不想打字就点上面的问题'}`}
               </span>
             </p>
@@ -767,9 +647,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
         </section>
 
         <footer className="assistant-truth" data-disclaimer="true">
-          <p><b>回答来源</b>只有服务标识以 llm: 开头且标记为模型生成时，正文才会显示；否则如实说明、不展示正文。</p>
-          <p><b>AI 不做的判定</b>{toolboxScene?.disclaimer ?? `${AI_LABEL_COPY.BASE}，不构成正式建议`}；身份、支付、设备、打印扫描成败、岗位来源真伪、政策资格、录用结果一律不由 AI 决定。</p>
-          <p><b>隐私与边界</b>本机草稿离场即清；对话、文件与订单按服务端各自留存期限管理。岗位投递与招聘会预约请前往来源平台完成，本机不代收简历。</p>
+          <p>{toolboxScene?.disclaimer ?? `${AI_LABEL_COPY.BASE}，身份、付款、打印、政策资格和录用结果都不由 AI 决定。`}</p>
         </footer>
       </div>
 

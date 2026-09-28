@@ -190,10 +190,10 @@ export function newSessionId(): string {
  * 路由均来自 `routes/index.tsx` 的真实注册路径，不是占位。
  */
 export const ADVISOR_MANUAL_ENTRIES = [
-  { label: '打印扫描', route: '/print-scan', hint: '上传、扫描、复印，全程不经过 AI', icon: 'printer' },
+  { label: '打印扫描', route: '/print-scan', hint: '上传文件、打印或扫描材料', icon: 'printer' },
   { label: '查看招聘会', route: '/job-fairs', hint: '场次、展位与来源平台预约入口', icon: 'fair' },
-  { label: '政策服务', route: '/policy-service', hint: '人社政策与办事材料说明', icon: 'policy' },
-  { label: 'AI简历服务', route: '/resume-service', hint: '简历上传与打印等不依赖模型的步骤照常', icon: 'resume' },
+  { label: '政策服务', route: '/policy-service', hint: '查政策与办事材料说明', icon: 'policy' },
+  { label: 'AI简历服务', route: '/resume-service', hint: '已有简历可继续上传、打印', icon: 'resume' },
 ] as const satisfies readonly { label: string; route: string; hint: string; icon: KioskIconName }[]
 
 // ============================================================
@@ -264,34 +264,34 @@ export const COCKPIT_COPY: Record<CockpitState, CockpitCopy> = {
     section: ['这条还没发出', '改完按右下角发送'],
   },
   submitting: {
-    title: ['已发出，', '等服务返回', '。'],
-    lede: '不显示百分比和阶段，只等真实结果。',
+    title: ['已发出，', '等小青回答', '。'],
+    lede: '你的问题已发出，请稍候。',
     pill: { tone: 'unknown', label: '等待本轮返回' },
-    section: ['已发出，等真实结果', '请求在飞，没有阶段可报'],
+    section: ['已发出的问题', '回答后可继续追问'],
   },
   'reply-real': {
-    title: ['这一轮', '由真实模型回答', '。'],
-    lede: '仅供参考；身份、资格与录用结果不由 AI 决定。',
+    title: ['小青的回答', '到了', '。'],
+    lede: '看看建议，再选下一步要办的事。',
     pill: { tone: 'ok', label: '真实模型已应答' },
-    section: ['本次咨询', '回答带服务标识，仅供参考'],
+    section: ['本次咨询', '可保存要点，稍后继续看'],
   },
   'reply-not-ai': {
     title: ['这一轮', '不是 AI 生成', '。'],
-    lede: '服务标识不带 llm: 前缀，正文不展示。',
+    lede: '请先选择办事入口，或稍后重新提问。',
     pill: { tone: 'warn', label: '非 AI 回复 · 正文不展示' },
-    section: ['这一轮不是 AI 生成', '正文不予展示'],
+    section: ['本次咨询', '你的问题已保留'],
   },
   'reply-error': {
     title: ['这一轮', '没连上', '。'],
     lede: '可以重试，也可以直接走下面四个入口。',
     pill: { tone: 'bad', label: '本轮失败 · 可重试' },
-    section: ['这一轮没连上', '不猜原因，也不编回答'],
+    section: ['刚才的问题', '可重试，或选择其他办事入口'],
   },
   'ai-unavailable': {
     title: ['AI 顾问', '暂不可用', '。'],
     lede: '四个入口不经过 AI，照常能办。',
     pill: { tone: 'bad', label: '模型未接入' },
-    section: ['AI 顾问暂不可用', '下面四项不经过 AI'],
+    section: ['继续办理', '下面四项不经过 AI'],
   },
   'voice-gate': {
     title: ['语音', '默认关闭', '。'],
@@ -307,9 +307,9 @@ export const COCKPIT_COPY: Record<CockpitState, CockpitCopy> = {
   },
   'voice-live': {
     title: ['语音通道', '已接通', '。'],
-    lede: '字幕来自服务端，仅供参考；挂断即结束会话。',
+    lede: '可以看字幕、静音，或随时结束通话。',
     pill: { tone: 'ok', label: '语音已接通' },
-    section: ['语音会话控制区', '挂断、切换文字都会结束会话'],
+    section: ['语音咨询', '结束或切回文字都会停止通话'],
   },
   'mic-denied': {
     title: ['没拿到', '麦克风权限', '。'],
@@ -343,7 +343,7 @@ export const ADVISOR_MANUAL_DETAILS: Record<(typeof ADVISOR_MANUAL_ENTRIES)[numb
  * 招聘内容托管（next-tasks 3.13）关闭时，「查看招聘会」那一格换成同样不经过 AI 的帮助中心，
  * 四格不留空。子项取自 /help 首屏已有的分类卡与三步自助（稿 06），不编造能力。
  */
-const ADVISOR_HELP_ENTRY = { label: '帮助中心', route: '/help', hint: '常见问题与服务边界，不经过 AI', icon: 'help' } as const
+const ADVISOR_HELP_ENTRY = { label: '帮助中心', route: '/help', hint: '查常见问题与操作方法', icon: 'help' } as const
 const ADVISOR_HELP_DETAILS: readonly string[] = ['按要办的事找：登录、简历、打印、政策', '常见问题：点开就有做法和对应入口', '卡住了先自己试三步，再找工作人员']
 
 export function advisorManualEntries(hostingOpen: boolean): ReadonlyArray<{ label: string; route: string; hint: string; icon: KioskIconName }> {

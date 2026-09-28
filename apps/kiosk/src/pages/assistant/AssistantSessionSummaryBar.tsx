@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AssistantSessionSummaryResponse } from '@ai-job-print/shared'
 import { summarizeAssistantSession } from '../../services/api'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { advisorDisplayText, advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
 
 interface AssistantSessionSummaryBarProps {
   sessionId: string
@@ -63,7 +63,7 @@ export function AssistantSessionSummaryBar({
         },
       })
     } catch (err) {
-      setError(userMessageOf(err, '本次要点暂时保存不了，请稍后重试'))
+      setError(advisorErrorMessage(err, '本次要点暂时保存不了，请稍后重试'))
     } finally {
       setBusy(false)
     }
@@ -86,19 +86,19 @@ export function AssistantSessionSummaryBar({
           <p>
             {result.document
               ? '本次要点已保存到我的文档，可打印。'
-              : `本次要点已保存。${result.printUnavailableReason ?? '打印稿尚未生成。'}`}
+              : `本次要点已保存。${advisorUserReason(result.printUnavailableReason, '打印稿尚未生成。')}`}
           </p>
           {result.highlights.length > 0 && (
             <ol>
-              {result.highlights.map((item) => <li key={item}>{item}</li>)}
+              {result.highlights.map((item) => <li key={item}>{advisorDisplayText(item)}</li>)}
             </ol>
           )}
           {result.todos.length > 0 && (
             <ul>
-              {result.todos.map((item) => <li key={item}>{item}</li>)}
+              {result.todos.map((item) => <li key={item}>{advisorDisplayText(item)}</li>)}
             </ul>
           )}
-          <p className="assistant-summary-disclaimer">{result.disclaimer}。不构成录用、薪资或办理结果的承诺。</p>
+          <p className="assistant-summary-disclaimer">{advisorUserReason(result.disclaimer, '内容请本人核对后使用')}。不构成录用、薪资或办理结果的承诺。</p>
         </div>
       )}
     </div>

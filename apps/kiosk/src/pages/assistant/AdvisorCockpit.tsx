@@ -9,7 +9,6 @@
 import type { ReactNode } from 'react'
 import { AigcMark } from '../../ai'
 import { COCKPIT_COPY, type CockpitState } from './advisorScenes'
-import { describeProviderLabel } from './advisorProvider'
 
 export type CockpitReadingTone = 'plain' | 'hi' | 'amber' | 'bad'
 
@@ -29,18 +28,18 @@ interface CockpitReadingSignals {
 }
 
 function buildCockpitReadings(args: CockpitReadingSignals): CockpitReading[] {
-  const { loading, lastTurn, providerLabel, aiLocked, voiceAvailable, cockpitState } = args
+  const { loading, lastTurn, aiLocked, voiceAvailable, cockpitState } = args
   return [
     {
       label: '回答来源',
       ...(loading
         ? { value: '等待返回' }
         : lastTurn === 'ai'
-          ? { value: describeProviderLabel(providerLabel), tone: 'hi' as const }
+          ? { value: '模型已回答', tone: 'hi' as const }
           : lastTurn === 'error'
             ? { value: '本轮失败', tone: 'bad' as const }
             : aiLocked
-              ? { value: `非 llm: · ${describeProviderLabel(providerLabel)}`, tone: 'amber' as const }
+              ? { value: '未取得 AI 回答', tone: 'amber' as const }
               : { value: '未请求' }),
     },
     {
@@ -85,7 +84,7 @@ export function AdvisorCockpit({ state, contextLabel, readingSignals, children }
 
         <div className="assistant-cockpit-copy">
           <p className="assistant-cockpit-eyebrow">
-            AI COCKPIT · AI 驾驶舱{contextLabel ? <span> · {contextLabel}</span> : null}
+            问小青{contextLabel ? <span> · {contextLabel}</span> : null}
           </p>
           {/* 标题与说明随真实状态切换；polite 播报，不抢读屏正在读的内容。 */}
           <div className="assistant-cockpit-headline" aria-live="polite" aria-atomic="true">
@@ -98,12 +97,12 @@ export function AdvisorCockpit({ state, contextLabel, readingSignals, children }
             {/* AIGC 可见标识：每页恰好一次（interface-handoff.md §3），常驻不藏弹窗。 */}
             <AigcMark />
             <p className="assistant-advisor-disclosure">
-              对话里的小青是虚拟形象，<b>不是真人在跟你说话</b> · 回答可能出错 · 本机草稿离场即清
+              小青是 AI 顾问，<b>不是真人在跟你说话</b>
             </p>
           </div>
         </div>
 
-        <dl className="assistant-cockpit-telemetry" aria-label="会话状态读数">
+        <dl className="assistant-cockpit-telemetry" aria-label="这次咨询的状态">
           {readings.map((reading) => (
             <div key={reading.label}>
               <dt>{reading.label}</dt>

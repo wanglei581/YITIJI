@@ -16,7 +16,7 @@ import { EvidenceBadge } from '../../ai'
 import { KIcon } from '../../components/kiosk-icon'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { advisorManualDetails, advisorManualEntries } from './advisorScenes'
-import { describeProviderLabel } from './advisorProvider'
+import { advisorDisplayText } from './advisorUserCopy'
 
 /**
  * 一条消息的性质。混在一起会出人命的是 `ai` 与 `not-ai`：
@@ -74,16 +74,9 @@ export function AdvisorThinking() {
     <div className="assistant-thinking" role="status">
       <p className="assistant-thinking-bar">
         <span className="assistant-thinking-dots" data-ai-progress="true" aria-hidden="true"><i /><i /><i /></span>
-        <span>正在等待服务返回 · 没有百分比、阶段和预计时间可显示</span>
+        <span>小青正在等候回答</span>
       </p>
-      <p className="assistant-thinking-slot">回答会出现在这一区。返回之前保持空白，不预演内容、不逐字打字。</p>
-      <dl className="assistant-provenance">
-        <div><dt>providerLabel</dt><dd>未取得</dd></div>
-        <div><dt>aiGenerated</dt><dd>未取得</dd></div>
-      </dl>
-      <p className="assistant-gate-note">
-        返回后先过双门禁：服务标识以 <code>llm:</code> 开头<b>且</b>标记为模型生成，才显示正文；否则如实说明、不展示。
-      </p>
+      <p className="assistant-thinking-slot">回答会出现在这里，你也可以先去办理其他事情。</p>
     </div>
   )
 }
@@ -102,7 +95,7 @@ export function ChatBubble({ msg }: { msg: Message }) {
       {msg.kind === 'error' ? (
         <div className="assistant-message-bubble assistant-message-bubble--error" role="alert">
           <strong>请求失败，没有回答</strong>
-          <p>{msg.text}</p>
+          <p>{advisorDisplayText(msg.text)}</p>
         </div>
       ) : msg.kind === 'not-ai' ? (
         /*
@@ -112,12 +105,10 @@ export function ChatBubble({ msg }: { msg: Message }) {
          */
         <div className="assistant-message-bubble assistant-message-bubble--not-ai" role="status">
           <strong>这一轮没有 AI 回答</strong>
-          <p>{msg.text}</p>
+          <p>这次没有取得模型写出的回答，已为你保留问题。</p>
           <dl className="assistant-provenance">
-            <div><dt>providerLabel</dt><dd className="assistant-message-provider">服务标识：{describeProviderLabel(msg.providerLabel)}</dd></div>
-            <div><dt>aiGenerated</dt><dd>否</dd></div>
+            <div><dt>回答来源</dt><dd>未确认是 AI 回答</dd></div>
           </dl>
-          <span className="assistant-gate-note">同一轮返回里的建议动作也一并丢弃，不当作「AI 建议的下一步」。</span>
         </div>
       ) : (
         <div className="assistant-message-bubble">
@@ -128,10 +119,10 @@ export function ChatBubble({ msg }: { msg: Message }) {
               <EvidenceBadge level="E3" />
             </span>
           )}
-          <p>{msg.text}</p>
+          <p>{advisorDisplayText(msg.text)}</p>
           {msg.kind === 'ai' && (
             <span className="assistant-message-provider">
-              由真实模型生成 · 服务标识：{describeProviderLabel(msg.providerLabel)}
+              AI 生成 · 供参考
             </span>
           )}
         </div>

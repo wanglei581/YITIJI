@@ -38,13 +38,8 @@ const viteConfig = read('vite.config.ts')
 const assistantPage = read('src/pages/assistant/AssistantPage.tsx')
 const callPanel = read('src/pages/assistant/AssistantCallPanel.tsx')
 const callHook = read('src/hooks/useAiAdvisorCallSession.ts')
-const callStyles = [
-  'src/pages/assistant/assistant-lightflow-call.css',
-  'src/pages/assistant/assistant-lightflow-call-shell.css',
-  'src/pages/assistant/assistant-lightflow-call-gate.css',
-  'src/pages/assistant/assistant-lightflow-call-live.css',
-  'src/pages/assistant/assistant-lightflow-call-responsive.css',
-].map(read).join('\n')
+const callStyles = read('src/pages/assistant/assistant-qingxu-call.css')
+const inputStyles = read('src/pages/assistant/assistant-qingxu-input.css')
 const envTypes = read('src/vite-env.d.ts')
 const envExample = read('.env.example')
 const kioskPkg = JSON.parse(read('package.json'))
@@ -120,6 +115,10 @@ expectMatches(
   'hold-to-talk remains honestly disabled',
 )
 expectIncludes(callPanel, 'call.endCall()', 'voice exits use the explicit idempotent end action')
+expectIncludes(callPanel, 'aria-pressed={captionsOn}', 'caption toggle exposes its actual state')
+expectIncludes(callPanel, "call.phase === 'live' && captionsOn", 'captions only render during a connected call with captions enabled')
+expectIncludes(callPanel, 'advisorUserReason(call.errMsg,', 'voice errors keep user-facing reasons and filter technical strings')
+expectMatches(inputStyles, /\.assistant-hold-talk-btn\s*\{[^}]*min-height:\s*56px/, 'active 2.0 hold-to-talk style preserves the 56px target')
 expectIncludes(callHook, 'const endCall = useCallback', 'TRTC hook exposes an explicit end-and-reset action')
 expectIncludes(callHook, 'startedRef.current = false', 'ending a call allows a deliberate retry')
 expectIncludes(callHook, 'const failCall = useCallback', 'TRTC hook centralizes failure cleanup')
