@@ -12493,7 +12493,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 596,
+      "reachableFileCount": 599,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -12855,6 +12855,7 @@
             "apps/kiosk/src/pages/interview/styles/interview-session.css",
             "apps/kiosk/src/pages/interview/styles/interview-shell-ext.css",
             "apps/kiosk/src/pages/interview/styles/interview-shell.css",
+            "apps/kiosk/src/pages/interview/styles/interview-tips-qx2.css",
             "apps/kiosk/src/pages/interview/styles/interview-workbench-qx.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -14617,6 +14618,7 @@
           ],
           "path": "/resume/generate/preview",
           "styles": [
+            "apps/kiosk/src/pages/resume/resume-generate-preview-qx.css",
             "apps/kiosk/src/pages/resume/resume-generate-qx.css",
             "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15468,7 +15470,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 689
+      "sourceFileCount": 692
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
