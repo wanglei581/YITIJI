@@ -54,6 +54,7 @@ async function expectDatabaseRejected(
 
 async function main(): Promise<void> {
   console.log('\n=== terminal planned provisioning verification ===')
+  await verifyPublicTerminalNames()
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const suffix = crypto.randomBytes(6).toString('hex')
@@ -628,6 +629,42 @@ async function main(): Promise<void> {
     await prisma.user.deleteMany({ where: { id: actorId } })
     await prisma.onModuleDestroy()
   }
+}
+
+async function verifyPublicTerminalNames(): Promise<void> {
+  const now = new Date()
+  const cases = [
+    { displayName: '  学校打印点  ', locationLabel: ' 一楼 ', expected: '学校打印点' },
+    { displayName: null, locationLabel: ' 一楼服务大厅 ', expected: '一楼服务大厅' },
+    { displayName: '', locationLabel: ' 二楼 ', expected: '二楼' },
+    { displayName: '  ', locationLabel: ' 三楼 ', expected: '三楼' },
+    { displayName: null, locationLabel: null, expected: '打印服务点（位置待补充）' },
+    { displayName: '', locationLabel: '', expected: '打印服务点（位置待补充）' },
+    { displayName: '  ', locationLabel: '  ', expected: '打印服务点（位置待补充）' },
+  ]
+  const rows = cases.map((item, index) => ({
+    ...item, id: `public-name-${index}`, terminalCode: `KSK-${index}`,
+    enabled: true, lifecycleStatus: 'active', registeredAt: now,
+    credentials: [], releaseTargets: [],
+    heartbeats: [{ createdAt: now, localTaskDatabaseAvailable: true }],
+  }))
+  const prisma = {
+    terminal: { findMany: async () => rows },
+  } as unknown as PrismaService
+  const admin = new TerminalAdminService(prisma, {} as TerminalAgentService, new TerminalToolboxService(prisma))
+  const service = new TerminalsService({} as TerminalAgentService, admin)
+  const publicRows = await service.listPublicTerminals()
+  assert(publicRows.length === cases.length, 'public names: all online fixtures remain visible')
+  cases.forEach((item, index) => {
+    assert(publicRows[index].displayName === item.expected, `public names: name/location/fallback case ${index}`)
+    assert(publicRows[index].terminalCode === rows[index].terminalCode, `public names: terminal identifier retained for case ${index}`)
+  })
+  const adminRows = (await service.listTerminalsForAdmin()).terminals
+  assert(adminRows.length === cases.length, 'admin names: terminal list remains complete')
+  cases.forEach((item, index) => {
+    assert(adminRows[index].displayName === item.displayName, `admin names: raw display name unchanged for case ${index}`)
+    assert(adminRows[index].terminalCode === rows[index].terminalCode, `admin names: terminal code unchanged for case ${index}`)
+  })
 }
 
 void main().catch((error: unknown) => {

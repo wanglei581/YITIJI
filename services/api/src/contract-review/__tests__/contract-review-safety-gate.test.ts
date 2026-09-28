@@ -497,7 +497,7 @@ test('preserves authoritative rule findings by id and rejects rule impersonation
 test('adds mandatory uncertainty notices only from context in fixed order and without duplicates', () => {
   assert.equal(CONTRACT_SAFETY_LOW_OCR_NOTICE, '文字识别置信度较低，请以合同原件为准。')
   assert.equal(CONTRACT_SAFETY_TRUNCATED_NOTICE, '本次仅分析了部分内容，未覆盖部分需要人工核对。')
-  assert.equal(CONTRACT_SAFETY_FIELD_CONFLICT_NOTICE, '提取字段存在冲突，请结合合同原件人工核对。')
+  assert.equal(CONTRACT_SAFETY_FIELD_CONFLICT_NOTICE, '提取出的信息有不一致之处，请对照合同原件逐项核对。')
   const cases = [
     [context({ expectedOcrConfidence: 'low' }), CONTRACT_SAFETY_LOW_OCR_NOTICE],
     [context({ expectedCoverage: 'truncated' }), CONTRACT_SAFETY_TRUNCATED_NOTICE],
@@ -541,7 +541,7 @@ test('adds mandatory uncertainty notices only from context in fixed order and wi
     gate.validate(reverseAndRepeated, canonicalPages, context({
       expectedOcrConfidence: 'low', expectedCoverage: 'truncated', hasFieldConflict: true,
     })).findings[0]?.uncertainty,
-    `普通基础说明；文字识别置信度较低，请以合同原件为准。；本次仅分析了部分内容，未覆盖部分需要人工核对。；提取字段存在冲突，请结合合同原件人工核对。`,
+    `普通基础说明；文字识别置信度较低，请以合同原件为准。；本次仅分析了部分内容，未覆盖部分需要人工核对。；提取出的信息有不一致之处，请对照合同原件逐项核对。`,
   )
   const mixed = result({
     coverage: 'truncated',

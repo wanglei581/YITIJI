@@ -13,14 +13,14 @@ export class SofficeConversionAdapter implements ConversionEngineAdapter {
 
   async probe(): Promise<{ available: boolean; reason?: string }> {
     if (!this.executable) {
-      return { available: false, reason: '服务端未配置 SOFFICE_PATH' }
+      return { available: false, reason: 'Word 转 PDF 尚未准备好，请先另存为 PDF 上传。' }
     }
     try {
       await access(resolve(this.executable))
       await runProcess(this.executable, ['--version'], PROBE_TIMEOUT_MS)
       return { available: true }
     } catch {
-      return { available: false, reason: '服务端转换引擎探测失败，请检查 SOFFICE_PATH' }
+      return { available: false, reason: 'Word 转 PDF 暂时不可用，请联系工作人员；也可另存为 PDF 上传。' }
     }
   }
 

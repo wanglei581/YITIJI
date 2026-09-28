@@ -11,7 +11,7 @@ export class GotenbergConversionAdapter implements ConversionEngineAdapter {
 
   async probe(): Promise<{ available: boolean; reason?: string }> {
     if (!this.baseUrl) {
-      return { available: false, reason: '服务端未配置 GOTENBERG_URL' }
+      return { available: false, reason: 'Word 转 PDF 尚未准备好，请先另存为 PDF 上传。' }
     }
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)

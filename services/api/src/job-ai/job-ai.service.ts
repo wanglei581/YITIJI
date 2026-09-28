@@ -437,7 +437,7 @@ export class JobAiService {
   }
 
   private dataQualityWarning(job: TargetJobContext): string | undefined {
-    if (!job.description && !job.requirements) return '来源平台未提供岗位描述或任职要求，AI 解读仅能基于标题和基础字段。'
+    if (!job.description && !job.requirements) return '来源平台未提供岗位描述或任职要求，AI 解读只能参考岗位标题和基本信息。'
     if (job.skills.length === 0) return '来源平台未提供技能标签，AI 解读可能不够完整。'
     return undefined
   }

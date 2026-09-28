@@ -133,8 +133,6 @@ export function FileContentPreview({
     onKindChange?.(kind)
   }, [kind, onKindChange])
 
-  const wordUnavailableReason = capabilities.reason?.trim() || WORD_CONVERSION_UNAVAILABLE_COPY
-
   return (
     <section
       className={`relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 ${compact ? 'min-h-[240px]' : 'min-h-[360px]'} ${className}`}
@@ -173,16 +171,16 @@ export function FileContentPreview({
               {capabilitiesLoading
                 ? '正在确认 Word 转换能力，PDF 和图片仍可正常预览。'
                 : !capabilities.wordToPdf
-                  ? `${WORD_CONVERSION_UNAVAILABLE_COPY}。${wordUnavailableReason}`
+                  ? WORD_CONVERSION_UNAVAILABLE_COPY
                   : !fileId
-                    ? '缺少文件标识，无法生成 Word 页内预览；文件本身是否可用以页面文件状态为准。'
+                    ? '暂时无法为这份 Word 文件生成预览；文件本身是否可用以页面文件状态为准。'
                     : conversionError
                       ? `Word 页内预览生成失败：${conversionError}`
-                      : '正在由转换引擎生成 PDF 预览，请稍候。'}
+                      : '正在将 Word 转为 PDF 预览，请稍候。'}
             </p>
             {!capabilities.wordToPdf && (
               <span aria-disabled="true" className="sr-only">
-                Word 页内预览不可用：{wordUnavailableReason}
+                {WORD_CONVERSION_UNAVAILABLE_COPY}
               </span>
             )}
           </div>
@@ -204,7 +202,7 @@ export function FileContentPreview({
             <p className="max-w-lg text-xs leading-5 text-neutral-500">
               {kind === 'unsupported'
                 ? sourceKind === 'word'
-                  ? `Word 文档暂不能页内预览（${wordUnavailableReason}）；可扫码到手机打开原件，或另存为 PDF 后上传。`
+                  ? WORD_CONVERSION_UNAVAILABLE_COPY
                   : '该格式不能在当前浏览器内直接显示，请更换为 PDF、JPG、PNG 或 WebP 文件后预览。'
                 : '这份文件无法在本页内嵌预览；预览失败不代表文件本身有问题，文件状态以页面上的文件卡为准。'}
             </p>

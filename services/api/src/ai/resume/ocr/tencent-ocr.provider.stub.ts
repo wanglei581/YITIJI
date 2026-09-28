@@ -35,7 +35,7 @@ export class TencentOcrProvider implements OcrProvider {
       ok: false,
       errorCode: 'OCR_FAILED',
       errorMessage:
-        '腾讯云 OCR 为占位实现，真实识别接口待二期接入；当前请上传带文字层的 PDF 或 DOCX',
+        '当前尚未开通图片和扫描件的文字识别，请上传可选中文字的 PDF 或 DOCX。',
     })
   }
 }

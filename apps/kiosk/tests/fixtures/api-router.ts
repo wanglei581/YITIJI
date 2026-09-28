@@ -35,7 +35,7 @@ export class ApiRouter {
     // 默认按「引擎未配置」应答，让所有既有用例保持 Word 入口置灰、不中断；需要开放态的用例自行 respond 覆盖。
     this.respond('GET', '/api/v1/document-conversion/capabilities', {
       status: 200,
-      json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: '服务端未配置转换引擎' } },
+      json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。' } },
     })
     // 生成预览 / 优化页挂载时都会读模板列表。默认空列表，不伪造模板；需要模板的用例自行覆盖。
     this.respond('GET', '/api/v1/job-materials/templates', {

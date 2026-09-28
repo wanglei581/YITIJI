@@ -54,7 +54,7 @@ function registerHomeShellApi(api: ApiRouter) {
   // 包 K2：上传/预览页挂载时探测文档转换能力；基线按未配置处理（Word 入口置灰，不打断页面）。
   api.respond('GET', '/api/v1/document-conversion/capabilities', {
     status: 200,
-    json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: '服务端未配置转换引擎' } },
+    json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。' } },
   })
   api.respond('GET', '/api/v1/terminals/KSK-001/smart-campus', {
     status: 200,
@@ -81,7 +81,7 @@ function registerPrivacyRuntimeApi(api: ApiRouter) {
   // 包 K2：上传/预览页挂载时探测文档转换能力；基线按未配置处理（Word 入口置灰，不打断页面）。
   api.respond('GET', '/api/v1/document-conversion/capabilities', {
     status: 200,
-    json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: '服务端未配置转换引擎' } },
+    json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。' } },
   })
 }
 

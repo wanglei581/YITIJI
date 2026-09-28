@@ -56,7 +56,7 @@ export class DocumentConversionService implements OnModuleInit {
   private capabilities: DocumentConversionCapabilities = {
     wordToPdf: false,
     engine: 'none',
-    reason: '服务端未配置转换引擎',
+    reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。',
     cjkFonts: false,
   }
 
@@ -85,7 +85,7 @@ export class DocumentConversionService implements OnModuleInit {
       this.capabilities = {
         wordToPdf: false,
         engine: 'none',
-        reason: '服务端未配置转换引擎',
+        reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。',
         cjkFonts,
       }
       setWordToPdfUploadAvailable(false)
@@ -99,14 +99,14 @@ export class DocumentConversionService implements OnModuleInit {
       timeoutMs: PROBE_TIMEOUT_MS,
     }).catch(() => ({
       available: false,
-      reason: '服务端转换引擎探测失败',
+      reason: '暂时无法确认 Word 转 PDF 是否可用，请先另存为 PDF 上传。',
     }))
     const wordToPdf = probe.available && cjkFonts
     this.capabilities = {
       wordToPdf,
       engine: this.adapter.engine,
       ...(!wordToPdf
-        ? { reason: probe.available ? '服务端未安装可用中文字体' : (probe.reason ?? '服务端转换引擎探测失败') }
+        ? { reason: probe.available ? '转换所需的中文字体尚未准备好，请先另存为 PDF 上传。' : (probe.reason ?? '暂时无法确认 Word 转 PDF 是否可用，请先另存为 PDF 上传。') }
         : {}),
       cjkFonts,
     }
@@ -235,7 +235,7 @@ export class DocumentConversionService implements OnModuleInit {
       throw new ServiceUnavailableException({
         error: {
           code: 'CONVERSION_UNAVAILABLE',
-          message: this.capabilities.reason ?? '服务端未配置转换引擎',
+          message: this.capabilities.reason ?? 'Word 转 PDF 暂未开通，请另存为 PDF 上传。',
         },
       })
     }

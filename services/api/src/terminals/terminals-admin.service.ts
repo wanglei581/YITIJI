@@ -857,7 +857,7 @@ export class TerminalAdminService {
       return [{
         id: row.id,
         terminalCode: row.terminalCode,
-        displayName: row.displayName?.trim() || row.terminalCode,
+        displayName: row.displayName?.trim() || row.locationLabel?.trim() || '打印服务点（位置待补充）',
         locationLabel: row.locationLabel ?? null,
         isOnline,
         lastSeenAt: latest?.createdAt.toISOString() ?? null,

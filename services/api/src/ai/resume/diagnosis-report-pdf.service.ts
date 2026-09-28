@@ -164,7 +164,7 @@ export class DiagnosisReportPdfService {
     const normalized = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0
     this.section(doc, '一、综合参考分与六维明细')
     doc.fontSize(22).fillColor('#0f766e').text(`${normalized} / 100`, { continued: false })
-    doc.fontSize(9).fillColor('#6b7280').text(`按服务端报告现有维度合计 ${totalScore} / ${totalMax} 归一化计算。`, { lineGap: 2 })
+    doc.fontSize(9).fillColor('#6b7280').text(`各项合计 ${totalScore} / ${totalMax}，换算为百分制得分。`, { lineGap: 2 })
     input.report.sections.forEach((item) => {
       const severity = severityForDimension(input.report, item.key as ResumeScoringDimensionKey)
       this.bullet(doc, `${item.label}：${item.score} / ${item.maxScore}（对应问题严重度 ${severityLabel(severity)}）`)
@@ -203,7 +203,7 @@ export class DiagnosisReportPdfService {
     if (input.report.truncatedInput) {
       this.bullet(doc, '本次诊断只处理了简历前部内容，后部内容未送入模型，请人工补充核对。', '#9a3412')
     } else {
-      this.bullet(doc, '服务端报告未标记输入截断。')
+      this.bullet(doc, '本次报告未提示只分析了部分简历。')
     }
     if (input.extractionNotice) {
       this.bullet(doc, `文字来源：${input.extractionNotice.textSource}；识别置信度：${input.extractionNotice.confidence}`)

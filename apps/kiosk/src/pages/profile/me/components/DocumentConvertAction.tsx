@@ -59,7 +59,7 @@ export function DocumentConvertAction({
   const printBlocked = previewBlocked || !reprintable
   const unavailableReason = available
     ? null
-    : `${WORD_CONVERSION_UNAVAILABLE_COPY}${capabilities.reason?.trim() ? `；${capabilities.reason.trim()}` : ''}`
+    : WORD_CONVERSION_UNAVAILABLE_COPY
 
   const convert = async () => {
     if (!available || converting || busy) return
