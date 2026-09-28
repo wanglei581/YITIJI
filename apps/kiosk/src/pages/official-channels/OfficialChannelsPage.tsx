@@ -99,11 +99,11 @@ function ChannelBar({
   onHome: () => void
   onRetry: () => void
 }) {
-  // 稿的「返回全部服务」指向服务目录。运行时没有这条路由，首页就是服务入口。
+  // 稿另有一颗「返回全部服务」指向服务目录。运行时没有那一页，首页就是选服务的地方，
+  // 两颗按钮会去同一处，所以只留「回首页」；读取失败时它让位给「重新读取」，退成次按钮。
   return (
     <div className="oc-cta">
       <div className="oc-cta-btns">
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>返回全部服务</button>
         {view === 'error' ? (
           <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>回首页</button>
         ) : null}
