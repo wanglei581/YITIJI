@@ -1,3 +1,4 @@
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import {
   Body,
   Controller,
@@ -58,6 +59,8 @@ export class ContractReviewController {
 
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('generate')
+
   async create(@Body() dto: CreateContractReviewDto, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.createAndEnqueue(
       dto,
@@ -66,11 +69,13 @@ export class ContractReviewController {
   }
 
   @Get('consent-scope')
+  @AiUse('read')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
   async consentScope() {
     return ApiResponse.ok(await this.consent.getConsentScope())
   }
 
+  @AiUse('read')
   @Get(':id')
   async get(@Param('id') id: string, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.get(id, await this.requesterOf(req)))
@@ -79,6 +84,8 @@ export class ContractReviewController {
   @Post(':id/confirm')
   @HttpCode(HttpStatus.ACCEPTED)
   @Throttle({ default: { ttl: 60_000, limit: 8 } })
+  @AiUse('generate')
+
   async confirm(
     @Param('id') id: string,
     @Body() dto: ConfirmContractReviewDto,
@@ -91,12 +98,14 @@ export class ContractReviewController {
     ))
   }
 
+  @AiUse('generate')
   @Post(':id/report')
   @Throttle({ default: { ttl: 60_000, limit: 4 } })
   async report(@Param('id') id: string, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.createReport(id, await this.requesterOf(req)))
   }
 
+  @AiUse('export')
   @Post(':id/report/keep')
   @Throttle({ default: { ttl: 60_000, limit: 4 } })
   async keepReport(@Param('id') id: string, @Req() req: RequestLike) {
@@ -104,6 +113,7 @@ export class ContractReviewController {
   }
 
   @Delete('reports/:fileId')
+  @AiUseExempt('删除本人记录或文件，不调模型；AI 暂停、维护期间也必须能删')
   @Throttle({ default: { ttl: 60_000, limit: 8 } })
   async abandonReport(@Param('fileId') fileId: string, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.abandonReport(
@@ -113,6 +123,7 @@ export class ContractReviewController {
   }
 
   @Delete(':id')
+  @AiUseExempt('删除本人记录或文件，不调模型；AI 暂停、维护期间也必须能删')
   async remove(@Param('id') id: string, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.remove(id, await this.requesterOf(req)))
   }

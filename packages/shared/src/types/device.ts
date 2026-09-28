@@ -86,6 +86,8 @@ export interface KioskTerminalConfig {
   jobBoard?: KioskJobBoardConfig
   /** 3.13 招聘内容托管。未下发时旧客户端只看 jobBoard。 */
   recruitmentHosting?: RecruitmentHostingPublicConfig
+  ai?: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean }
+  maintenance?: boolean
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

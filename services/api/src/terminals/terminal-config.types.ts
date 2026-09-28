@@ -39,6 +39,8 @@ export interface KioskTerminalConfigView {
   toolbox: KioskToolboxConfigView
   jobBoard: KioskJobBoardConfigView
   recruitmentHosting: RecruitmentHostingPublicView
+  ai: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean }
+  maintenance: boolean
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

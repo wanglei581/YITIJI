@@ -1,3 +1,4 @@
+import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import {
   Body,
   Controller,
@@ -40,6 +41,7 @@ export class UploadSessionsController {
 
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @MaintenanceBlocked()
   async create(@Body() body: CreateUploadSessionDto, @Req() req: Request): Promise<ApiResponse<UploadSessionCreateResponse>> {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.sessions.create({

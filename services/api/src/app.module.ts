@@ -68,6 +68,7 @@ import { OfficialChannelsModule } from './official-channels/official-channels.mo
 import { CommunityModule } from './community/community.module'
 import { AssistantModule } from './assistant/assistant.module'
 import { DocumentConversionModule } from './document-conversion/document-conversion.module'
+import { AiAccessModule } from './ai-access/ai-access.module'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
   const u = new URL(url)
@@ -127,6 +128,7 @@ const redisUrl = process.env['REDIS_URL']
     MemberPrivacyModule,
     JobAiModule,
     AiModule,
+    AiAccessModule,
     // S3-3 · P26 顾问作业面（/ai/plan）。放在 AiModule 之后：依赖它导出的
     // LlmConfigService（advisor_work 功能位）与 AiLogService。
     AdvisorModule,
