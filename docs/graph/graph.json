@@ -16663,6 +16663,7 @@
           "EndUser"
         ],
         "usedBy": [
+          "services/api/src/ai/resume/resume-unlabeled-export.ts",
           "services/api/src/member-auth/member-auth.service.ts"
         ]
       },
@@ -21817,6 +21818,7 @@
       "services/api/scripts/verify-resume-diagnosis-context.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
@@ -21842,6 +21844,7 @@
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
@@ -22163,6 +22166,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
@@ -22187,6 +22191,7 @@
       "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
@@ -22195,8 +22200,12 @@
     "services/api/src/ai/resume/resume-text.service.ts": [
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
+    ],
+    "services/api/src/ai/resume/resume-unlabeled-export.ts": [
+      "services/api/scripts/verify-resume-export-label.ts"
     ],
     "services/api/src/ai/resume/self-assessment-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -22621,7 +22630,8 @@
     ],
     "services/api/src/common/pdf/aigc-label.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
-      "services/api/scripts/verify-production-runtime-gates.ts"
+      "services/api/scripts/verify-production-runtime-gates.ts",
+      "services/api/scripts/verify-resume-export-label.ts"
     ],
     "services/api/src/common/pdf/aigc-pdf-metadata.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts"
@@ -22634,6 +22644,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/common/pickup-code.ts": [
@@ -36426,6 +36437,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:resume-export-formats"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume/resume-docx.service.ts",
+          "services/api/src/ai/resume/resume-pdf.service.ts",
+          "services/api/src/ai/resume/resume-text.service.ts",
+          "services/api/src/ai/resume/resume-unlabeled-export.ts",
+          "services/api/src/common/pdf/aigc-label.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-export-label.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-export-label"
       ],
       "wired": true
     },
