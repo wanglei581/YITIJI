@@ -1606,7 +1606,7 @@ test('an ack that succeeds after the user left forces a second revoke when the f
 
 /* ══ 成功页那三个去向也是「离开整条扫描流程」（第二轮，P1-B） ═════════════════
  *
- * 直接打印 / AI 简历识别 / 前往我的文档，此前都是裸 navigate：本机登记原封不动留在
+ * 打印（当时叫「直接打印」，现为「拿去打印」）/ AI 简历识别 / 前往我的文档，此前都是裸 navigate：本机登记原封不动留在
  * sessionStorage 里 —— 里面有上一位的 live.controlToken 明文，还有 result.file
  * （文件名 + 那条签名内容链接）。下一位在这台机器上进 /scan，阶段直接从登记复水到
  * result：他看到的是上一位的扫描件，随后那一次创建还会带上上一位的重扫血缘。
@@ -1666,35 +1666,33 @@ async function settleOnScanStart(page: Page): Promise<void> {
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
 }
 
-/** 打印确认页与 AI 解析页挂载时会真的问服务端，别让它们撞成未注册请求。 */
+/** 打印台材料检查与 AI 解析页挂载时会真的问服务端，别让它们撞成未注册请求。 */
 function registerCompletedExitDestinations(api: ApiRouter): void {
-  api.respond('GET', '/api/v1/print/price-config', {
-    status: 200,
-    json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] },
+  // 扫描件是原件：打印出口落在打印台材料检查，挂载就会建体检任务。
+  // 检查真的跑起来是另一条长链路，这里只要证明「离开时清干净了」，所以让它当场停下
+  // （503 不会触发材料检查页的清场，那只认 403 / 404 / 410）。
+  api.respond('POST', '/api/v1/materials/tasks', {
+    status: 503,
+    json: { success: false, error: { code: 'SCAN_EXIT_FIXTURE_STOP', message: '用例只验证离开语义' } },
   })
-  api.respond('POST', '/api/v1/orders/quote', {
-    status: 200,
-    json: {
-      amountCents: 100,
-      billablePages: 1,
-      billingPageSource: 'detected',
-      priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 1, amountCents: 100 }],
-    },
-  })
-  // 解析真的发起会走进另一条长链路，这里只要证明「离开时清干净了」，所以让它当场停下。
+  // 解析真的发起会走进另一条长链路，同理当场停下。
   api.respond('POST', '/api/v1/resume/parse', {
     status: 503,
     json: { success: false, error: { code: 'SCAN_EXIT_FIXTURE_STOP', message: '用例只验证离开语义' } },
   })
 }
 
-// carriesFile：这个去向要不要把文件随路由 state 一起带过去。
-// 打印确认页读 `state.file`、解析页读 `state.fileId`；「我的文档」不带文件（它自己去查）。
+// handover：这个去向怎么把文件交给落点。
+// · print-session：打印台材料检查读「打印材料会话」（sessionStorage）。/print/material-check 是
+//   replace 重定向到 /print/desk?step=check 的旧地址，重定向不转发路由 state，所以文件必须在
+//   离开之前写进会话 —— 和打印上传页、图片转 PDF、签名盖章同一种写法。
+// · route-state：解析页读 `state.fileId`。
+// · none：「我的文档」不带文件（它自己去查）。
 // 这一位是「清场不许连落点一起清掉」的判据 —— 见下面 history 那一组的断言 ①。
 const COMPLETED_EXITS = [
-  { key: 'print', button: '直接打印', url: /\/print\/confirm$/, needsLogin: false, carriesFile: true },
-  { key: 'resume-ai', button: 'AI 简历识别', url: /\/resume\/parse$/, needsLogin: false, carriesFile: true },
-  { key: 'documents', button: '前往我的文档', url: /\/me\/documents$/, needsLogin: true, carriesFile: false },
+  { key: 'print', button: '拿去打印', url: /\/print\/desk\?step=check$/, needsLogin: false, handover: 'print-session' },
+  { key: 'resume-ai', button: 'AI 简历识别', url: /\/resume\/parse$/, needsLogin: false, handover: 'route-state' },
+  { key: 'documents', button: '前往我的文档', url: /\/me\/documents$/, needsLogin: true, handover: 'none' },
 ] as const
 
 for (const exit of COMPLETED_EXITS) {
@@ -1815,15 +1813,23 @@ for (const exit of COMPLETED_EXITS) {
 
     /* ① 落点必须**立刻就能用**那份文件。
      *
-     * replace 换掉的是扫描结果那一条历史，不是落点这一条：路由 state 原样送达。
-     * 这条断言防的是「为了清干净把落点也一起清掉」—— 那样打印确认页会退回
-     * 「未知文件」、解析页拿不到 fileId，用户扫完的东西当场就废了。 */
+     * replace 换掉的是扫描结果那一条历史，不是落点这一条：解析页的路由 state 原样送达；
+     * 打印台读的是离开前写好的打印材料会话。这条断言防的是「为了清干净把落点也一起清掉」
+     * —— 那样材料检查会落到「这一页没有待处理的文件」、解析页拿不到 fileId，
+     * 用户扫完的东西当场就废了。 */
     const handedOverState = await page.evaluate(() => {
       const usr = (window.history.state as { usr?: unknown } | null)?.usr ?? null
       return usr === null ? null : JSON.stringify(usr)
     })
-    if (exit.carriesFile) {
+    if (exit.handover === 'route-state') {
       expect(handedOverState, '带文件的去向必须在落点那一条历史里收到 fileId').toContain(SAME_SHEET_FILE.fileId)
+    }
+    if (exit.handover === 'print-session') {
+      const printMaterial = await page.evaluate(
+        () => window.sessionStorage.getItem('ai-job-print:current-print-material-check'),
+      )
+      expect(printMaterial, '打印出口必须在离开前把这份扫描件写进打印材料会话').toContain(SAME_SHEET_FILE.fileId)
+      await expect(page.locator('.qpd-preview-meta strong')).toHaveText(SAME_SHEET_FILE.filename)
     }
 
     // ② 后退：越过整条扫描流程，第一站就是扫描之前那一页。

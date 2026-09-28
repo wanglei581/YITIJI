@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 留白：只改 2.0 覆盖样式（末尾「9/28 留白」一段），文案、结构、状态切换都不动；预览与参数、能力、设备 11 态逐像素未变。兜底三态右栏三段不再顶到上下两头，余量分到每段下面；材料检查各态左栏页面示意 352→430 宽，三组按列高分开；正在查 / 查完 / 查不成 / 重查的结论排舒展（状态图标放大单独一行，正文 24、小标题 28）。21 态逐态检查 0 问题。无新增内容。
 - 9/28 逐状态检查修压字
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 2026-09-28 按运行能力修订：材料检查必须做完才能继续；选遮挡会另出一份用于打印的文件，上传的原件不改。
@@ -496,6 +497,30 @@ input{font:inherit}
 .thumb[data-view="paper"] .thumb-shell{overflow:visible}
 .thumb[data-view="paper"] .thumb-shell .thumb-tag.left,
 .thumb[data-view="paper"] .thumb-shell .thumb-tag.top{top:0;left:8px;right:auto;bottom:auto;transform:translateY(calc(-100% - 6px))}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   只动「没有文件 / 认不出 / 过期」三个兜底态和材料检查各态；预览与参数、能力、设备 11 态一个像素没变。
+   1. 兜底三态：右栏三段原来用 space-between 顶到上下两头，段与段之间空 230–310px；改成按内容排，余量分到每段下面。
+   2. 材料检查各态：左栏页面示意 352→430 宽（示意页 500→600 高，看得更清楚），右栏跟着变窄；左栏三组
+      （示意页 / 文件与预览按钮 / 两个选项）按列高分开，不再在底下空一截。
+   3. 正在查 / 查完 / 查不成 / 重查：右栏的结论是这一屏的主角，状态卡的图标放大、单独一行，
+      结论卡片内正文 24、小标题 28（兜底三态右栏同样），都在规则 2 的范围内。 */
+/* 1. 兜底三态 */
+#body-root[data-state$="-context"] .wright>.card{justify-content:flex-start!important}
+#body-root[data-state$="-context"] .wright>.card>*{margin-bottom:auto}
+/* 2. 材料检查：左栏放宽、三组按列高分开 */
+#body-root[data-state^="check-"] .wleft{width:430px}
+#body-root[data-state^="check-"] .wleft>.thumb{width:430px;flex-basis:600px;max-height:600px}
+#body-root[data-state^="check-"] .wleft>.fileid,#body-root[data-state^="check-"] .wleft>.mini{margin-top:auto}
+/* 3. 结论排舒展 */
+#body-root:is([data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.state{padding:30px 32px}
+#body-root:is([data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.state .state-h{font-size:30px;flex-direction:column;align-items:flex-start;gap:16px}
+#body-root:is([data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.state .state-h>svg{width:56px;height:56px}
+#body-root:is([data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.state .state-h>.dot16{width:40px;height:40px}
+#body-root:is([data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.state .state-p{font-size:23px;line-height:1.6}
+#body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card{padding:28px 30px}
+#body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .sec-label .t{font-size:28px!important}
+#body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .note,#body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .steps li{font-size:24px;line-height:1.6}
+#body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .notes,#body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .steps{gap:18px}
 
 </style>
 </head>

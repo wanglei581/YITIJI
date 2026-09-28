@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>我的简历 · 收藏 · AI记录 · 足迹 ｜ 职易达</title>
 <!--
+- 9/28 用词：写稿人用语（原型、内部服务名、页面地址、请求标识）换成用户的话。
   route: /me/resumes | /me/favorites | /me/ai-records | /me/activity | /me/activity/:id
   state: resumes-{login,loading,error,empty,ready} | favorites-{login,loading,error,empty,ready}
          | ai-records-{login,loading,error,empty,ready,delete-confirm,delete-expired,deleting,delete-success,delete-failure}
@@ -747,7 +748,7 @@ function aiRecordsBody(mode){
       : mode==='delete-failure'
       ? '删除失败，记录可能已到期或被清理。列表保持原样，可稍后重试。'
       : mode==='deleting'
-      ? '这一屏演示删除请求发出后、结果返回前的版式。<b>静态原型没有发出请求</b>，系统记录不会被删除。'
+      ? '这一屏是删除处理中、结果返回前的样子。<b>系统记录不会被删除</b>。'
       : '删除需要两步确认；未在确认时限内再次点击，会回到未确认状态。删除简历诊断记录会同时删除同一任务的派生记录与AI 使用记录。';
   return fixtureNote('时间由办理后显示')
     + summary('','robot','AI 服务记录','—','只显示名称和状态，不显示原文',['数量以实际记录为准','当前显示 '+total+' 行'])
