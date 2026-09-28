@@ -2212,7 +2212,7 @@ R['usb-list']=function(){
       '<span class="lg">选这一份 →</span></a>';
   }).join('');
   root.innerHTML=
-    trackBar('第 3 步：从盘上选一份（演示盘名：KINGSTON 32G）')+
+    trackBar('第 3 步：从盘上选一份（示例盘名：KINGSTON 32G）')+
     stepBoard('usb',2,'','点一份看清楚再确认')+
     '<div class="blk grow m-fade-in">'+head('U 盘最外层可用的简历文件','3 份 · 只列 PDF / JPG / PNG 且 ≤10MB',true)+
       '<div class="list" data-testid="rs-usb-list">'+rows+
@@ -2372,13 +2372,13 @@ R['usb-importing']=function(){
     '<div class="blk m-fade-in">'+head('正在导入','来自 U 盘',true)+fileCard(pulse('正在导入'),'doing')+'</div>'+
     '<div class="blk grow">'+head('这份文件接下来会怎么走')+
       tri([
-        {no:'1',n:'正在导入，别拔盘',d:'本机把这一份交给上传请求，一次性完成，中途没有可以叫停的开关。'+
+        {no:'1',n:'正在导入，别拔盘',d:'本机把这一份交给系统上传，一次做完，中途没有可以叫停的开关。'+
           '<b>导入没结束前请不要拔 U 盘</b>，拔了会断在半路。',go:'当前这一步'},
         {no:'2',n:'导入成功后确认',d:'会先给你看文件卡，你确认了才开始解析。<b>没有可确认的中间进度</b>，所以不画进度条。',go:'还没开始'},
         {no:'3',n:'看诊断结果',d:'出结果才展示；没有结果时不会先给你一个数字。',go:'还没有结果'}
       ])+'</div>'+
     rowsCard([
-      {v:'<b>这一步没有取消入口</b>：本机把文件交给上传请求之后就没有可以叫停的开关，'+
+      {v:'<b>这一步没有取消入口</b>：本机把文件交给系统上传之后就没有可以叫停的开关，'+
          '离开这一页<b>不会撤回</b>已经发出的导入请求，也不会让它更快结束。'},
       {v:'盘上这一份已经导入过了，中途离开也不能再导一次 —— 要重新读盘再选。'+
          '这一屏不会真的读 U 盘，<b>不产生任何真实导入结果</b>。'}
@@ -2496,7 +2496,7 @@ R['local-picking']=function(){
       '<span class="lg">'+f.go+'</span></a>';
   }).join('');
   root.innerHTML=
-    trackBar('第 2 步：在本机目录里选一份（演示目录：下载）')+
+    trackBar('第 2 步：在本机目录里选一份（示例目录：下载）')+
     stepBoard('local',2,'','从目录里点一份')+
     '<div class="blk grow m-fade-in">'+head('本机「下载」目录','5 项 · 其中 3 项本机收不了',true)+
       '<div class="list" data-testid="rs-local-list">'+rows+
@@ -2668,7 +2668,7 @@ R['phone-generating']=function(){
     '<div class="blk grow m-fade-in"><div class="stat doing band" data-testid="rs-phone-generating">'+
       '<span class="si">'+svg(I_QR,44,'#157a67',1.8)+'</span>'+
       '<span class="sm"><span class="st">'+pulse('正在生成上传码')+'</span>'+
-      '<span class="sd">要先向系统申请一个<b>这一次上传</b>，拿到之后才画码。'+
+      '<span class="sd">要先向系统<b>申请一次性上传码</b>，拿到之后才画码。'+
       '出码之前这里<b>不放一张假的图</b>，免得你对着一个还不能用的码扫。</span>'+
       '<span class="ticks"><span class="tick">一次性上传码</span>'+
       '<span class="tick">'+svg(I_CLOCK,18,'currentColor',2)+'有效期 10 分钟</span>'+
@@ -2680,9 +2680,9 @@ R['phone-generating']=function(){
     ])+'</div>'+
     rowsCard([
       {v:'手机上是独立的<b>上传页</b>，只做「选文件、上传、提示回一体机确认」三件事。'},
-      {v:'<b>这一步没有取消入口</b>：申请这次上传的请求已经发出，离开这一页<b>不会撤回</b>它；'+
-         '万一系统最后还是建出了这次上传，它<b>10 分钟后自行到期</b>，也可以出码后再撤销。'},
-      {v:'本页<b>不发起任何网络请求</b>，也不会生成真实的上传。'}
+      {v:'<b>这一步没有取消入口</b>：上传码的申请已经发出去了，离开这一页<b>不会撤回</b>它；'+
+         '万一系统那边最后还是开好了这次上传，它<b>10 分钟后自行到期</b>，也可以出码后再撤销。'},
+      {v:'界面示例：这一屏<b>不会真的生成上传码</b>。'}
     ])+
     acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
           {k:'ghost',n:'先离开这一步<br>已发出的出码请求不受影响',href:url({state:'source'})}]);
@@ -2699,7 +2699,7 @@ R['phone-gen-failed']=function(){
       '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'二维码生成失败，请稍后重试。</div>'+
       '<div class="fbdy">常见原因：<b>本机网络中断</b>、<b>系统暂时不可用</b>，'+
       '或者<b>上一张码还没能在系统确认作废</b> —— 最后这种情况下本机<b>不会先出新码</b>，'+
-      '否则旁人手里的旧码还能继续往这次上传里传文件。</div></div></div>'+
+      '否则旁人手里的旧码还能继续往那次上传里传文件。</div></div></div>'+
     '<div class="blk grow">'+head('可以这样处理','',true)+
       '<div class="picks">'+
       pickCard({ico:I_REFRESH,n:'再出一次码',d:'网络恢复后重试一次通常就好。',go:'重试 →',href:url({state:'phone-generating'})})+
@@ -2759,7 +2759,7 @@ R['phone-ready']=function(){
       '<span class="tick">PDF / Word / JPG / PNG / WEBP</span>'+
       '<span class="tick">单份 ≤ 10MB</span></div>'+
       '<div class="qrp" style="font-size:17px;color:var(--ink-3);">左边是<b>示例码，扫不出来</b>；'+
-      '09:42 是<b>固定演示值</b>。有效期以<b>系统给出的到期时间</b>为准，真实页面画的是系统给出的临时链接。</div>',
+      '09:42 是<b>固定示例值</b>。有效期以<b>系统给出的到期时间</b>为准，真实页面画的是系统给出的临时链接。</div>',
     mid:rowsCard([
       {v:'这张码<b>只能传这一次</b>，手机端<b>不会拿到一体机的会员登录凭证</b>，也不要求注册或登录。'},
       {v:'手机传上来之后<b>不会自动往下走</b>：必须回到这一页，由你确认这份文件，才进入 AI '+INTENT_COPY[intent].verb+'。'},
@@ -2791,7 +2791,7 @@ R['phone-waiting']=function(){
       '<span class="tick">每 2 秒查一次</span></div>',
     mid:rowsCard([
       {v:'手机传完后，这一页<b>会自动显示出来</b>，所以没有「我传好了」按钮 —— 那会是一个假信号。'},
-      {v:'剩余 03:18 是<b>固定演示值</b>；真实倒计时按系统给出的到期时间来算，到点转为已过期。'},
+      {v:'剩余 03:18 是<b>固定示例值</b>；真实倒计时按系统给出的到期时间来算，到点转为已过期。'},
       {v:'等太久想换：先<b>撤销这张码</b>，本机请求系统把这次上传作废并<b>清掉未确认的临时文件</b>，'+
          '<b>拿到撤销结果之后</b>才换来源或出新码；<b>撤销没成功就不给新码</b>。'},
       PROTO_STATIC_QR
@@ -3370,7 +3370,7 @@ function unknownRows(kind){
 }
 R['upload-unknown']=function(){
   rail(0);pill('上传结果未知 · 不重发','warn');
-  hero('这一次上传<em>有没有成，本机没拿到答复</em>。',
+  hero('这一次上传<em>有没有成功，本机没拿到答复</em>。',
        '所以这一步<b>不会再传一次</b>，只去查<b>刚才这一次</b>的结果。',
        svg(I_WARN,19,'currentColor',2.2)+'结果未知',true);
   root.innerHTML=
@@ -3613,10 +3613,10 @@ var PV_FAIL_COPY={
       {ico:I_FOLDER,n:'换一份文件',d:'反复过期多半是这一步停留太久；重新取一次文件也可以。',g:'去换一份 →',r:true},
       {ico:I_SHIELD,n:'链接过期不等于文件没了',d:'本页<b>不声称系统那一份还在</b>，也不声称它已经被清掉 —— 这两句都要有证据才能说。'}]},
   render:{ico:I_WARN,col:'#963227',h:'内容拿到了，但没能显示出来',
-    b:'预览内容取回来了，<b>在这台机器上渲染失败</b>。失败发生在<b>显示这一步</b>，'+
+    b:'预览内容取回来了，<b>在这台机器上没能显示出来</b>。失败发生在<b>显示这一步</b>，'+
       '<b>不是上传，也不是解析</b>；本次办理里的这一份没有被改动，也没有被撤回。',
     alts:[{ico:I_REFRESH,n:'再请求一次预览',d:'重新渲染一次。<b>不放半张图、不放占位缩略图</b>：显示不出来就说显示不出来。',g:'再试一次 →',pv:true},
-      {ico:I_CHECK,n:'不看预览，直接继续',d:'渲染失败只影响<b>看</b>，不影响<b>办</b>：这一份照样能送去解析。',g:'继续办理 →',p:true},
+      {ico:I_CHECK,n:'不看预览，直接继续',d:'显示不出来只影响<b>看</b>，不影响<b>办</b>：这一份照样能送去解析。',g:'继续办理 →',p:true},
       {ico:I_FOLDER,n:'换一份文件再看',d:'走到这一步的本来就是 <b>PDF 或图片</b>，所以这里<b>不会让你「再换成 PDF」</b>。'+
         '想换的话，<b>重新导出一份</b>再送一次：加密、超大页面或异常字体最容易卡在渲染这一步。',g:'去换一份 →',r:true},
       {ico:I_SHIELD,n:'本页不替文件下结论',d:'<b>不下结论说文件坏了</b>，也<b>不下结论说系统已经删了它</b>：本页只知道这一次没渲染出来。'}]}
@@ -3668,7 +3668,7 @@ function pvViewport(f,geo){
      这里显示的是**固定演示文件渲染出来的页**，不是「示意图形」。 */
   var canvasLabel=PV_FROZEN
     ? (f.kind==='image'?'扫描件示意图':'第 '+pvPage+' 页 / 共 '+pvPages+' 页')+' · 示例，不显示真实文件内容'
-    : (f.kind==='image'?'演示扫描件整页':'第 '+pvPage+' 页 / 共 '+pvPages+' 页')+' · 固定演示文件渲染出来的页面，不是你的文件内容';
+    : (f.kind==='image'?'示例扫描件整页':'第 '+pvPage+' 页 / 共 '+pvPages+' 页')+' · 固定示例文件渲染出来的页面，不是你的文件内容';
   var canvas='<div class="pv-canvas" data-pan-canvas="1" data-testid="rs-pv-canvas" data-rot="'+geo.rot+'" role="img" aria-label="'+
     canvasLabel+'" style="width:'+geo.w+'px;height:'+geo.h+'px;">';
   if(f.kind==='image'){
