@@ -183,6 +183,7 @@ ul{list-style:none}
 规则 7：底部保留「问小青：这条怎么用」；活动详情里原有的问 AI 说明仍在。
 9/28 留白：不再用居中小卡（上下各空一大截）。未登录 / 空 / 失败态在状态卡下面挪上主状态的「资格、核销与收费由谁说了算」；领取中 / 成功 / 失败 / 已结束 / 领完各态保留活动详情卡（运行页领取时详情不动），活动名右侧标本次状态；加载态用本页列表行做占位、标「读取中」；这些态都带「问小青」。余下高度分到各卡之间。另修三处替换留下的错句（「实际结果的结果」「实际结果了失败」「实际结果已无可领名额」）。
 未改：颜色令牌、圆角、深绿标题条、三 Tab、权益和活动的信息结构。
+9/29 定稿：按运行页如实写「抵扣功能尚未开放」（BenefitActivityDetailPage.tsx 使用步骤第 2 步；MyBenefitsPage.tsx 只读台账）。删去「用的时候再核销」「权益可以用在这些服务上」「核销时的实际结果」「仍按有效期使用」这类可用、可核销的说法；服务列表标题改为运行页的「没有权益也照常可用的服务」；活动说明「领取与使用」一行写明领取后记入我的权益、抵扣尚未开放；领取、查看、登录后领取这些运行页能做的不变。台账示例提示去掉「结构演示」字样；读取失败态「万一被核销」改「万一失效」。
 -->
 <style id="qx2">
 #stage{font-size:22px;line-height:1.45}
@@ -302,16 +303,16 @@ function benefitContractRow(type,status,tone,loading){
 }
 
 function tabs(cur){
-  return '<section class="qx-lead"><p>权益记在你的账号上。名称、能不能用、还剩多少，都以实际记录为准；收费以活动说明和现场公示为准。</p><ol class="qx-facts"><li><b>已有权益</b>只在登录后显示，没有就是没有</li><li><b>活动</b>先看条件再领取，小青不替你判定资格</li><li><b>补贴</b>只给说明和官方入口，机器不代办</li><li><b>打印</b>没有权益也能打，价格看现场公示</li><li><b>带走</b>领到的写进台账，用的时候再核销</li><li><b>问小青</b>规则看不懂，用下面的按钮问</li></ol></section><div class="tabs">'
+  return '<section class="qx-lead"><p>权益记在你的账号上。名称、能不能用、还剩多少，都以实际记录为准；收费以活动说明和现场公示为准。</p><ol class="qx-facts"><li><b>已有权益</b>只在登录后显示，没有就是没有</li><li><b>活动</b>先看条件再领取，小青不替你判定资格</li><li><b>补贴</b>只给说明和官方入口，机器不代办</li><li><b>打印</b>没有权益也能打，价格看现场公示</li><li><b>带走</b>领到的记进台账，暂不能抵扣</li><li><b>问小青</b>规则看不懂，用下面的按钮问</li></ol></section><div class="tabs">'
     +'<a class="tab press" href="31-benefits.html" data-route="/me/benefits"'+(cur==='benefits'?' aria-current="page"':'')+' data-testid="tab-benefits">'+svg('gift',24)+'我的权益</a>'
     +'<a class="tab press" href="31-benefits.html?screen=activities" data-route="/activities"'+(cur==='activities'?' aria-current="page"':'')+' data-testid="tab-activities">'+svg('flag',24)+'可参加的活动</a>'
     +'</div>';
 }
 function ledgerRules(){
-  return '<section class="card"><div class="blk-h">'+svg('check',24)+'资格、核销与收费由谁说了算<span class="hint">与本机是否有权益无关</span></div>'
+  return '<section class="card"><div class="blk-h">'+svg('check',24)+'资格、抵扣与收费由谁说了算<span class="hint">与本机是否有权益无关</span></div>'
     +'<div class="rules">'
     +'<span class="rule"><i></i><span>是否符合条件：由系统按主办方的官方规则逐条比对后返回，本机与小青都<b>不替你判定资格</b>。</span></span>'
-    +'<span class="rule"><i></i><span>能不能用、还能不能再用：以<b>核销时的实际结果</b>为准，本页不预判、不写「剩余 N 次」。</span></span>'
+    +'<span class="rule"><i></i><span>能不能抵扣：<b>抵扣功能尚未开放</b>，领到的权益先记在台账里；开放后以使用时的实际结果为准。</span></span>'
     +'<span class="rule no"><i></i><span>是否收费、收多少：以活动说明与现场公示价为准；补贴类只给说明与官方入口，<b>本机不代办</b>。</span></span>'
     +'</div></section>';
 }
@@ -342,7 +343,7 @@ function altRow(ic,href,route,t,d,tid,sc){
 }
 function altList(head,rows,compact,cls){return '<div class="alt'+(compact?' compact':'')+(cls?' '+cls:'')+'"><div class="alt-h">'+head+'</div>'+rows+'</div>';}
 function serviceAlts(sc){
-  return altList('权益可以用在这些服务上',
+  return altList('没有权益也照常可用的服务',
     altRow('print','10-print-hub.html','/print-scan','打印与扫描','实际价格以现场公示与系统报价为准。','print',sc)
     +altRow('spark','16-service-hubs.html?hub=resume','/resume-service','AI 简历服务','诊断、优化、生成与材料工坊。','resume',sc)
     +altRow('policy','48-policy-workspace.html','/renshi','就业政策与补贴指引','政策原文与官方申请入口，本机不代办。','policy',sc),true);
@@ -363,7 +364,7 @@ function detailDesc(){
   return '<section class="card qx-d-desc"><div class="blk-h">'+svg('book',24)+'活动说明<span class="hint">说明由运营方发布</span></div><div class="kv">'
     +kvRow('活动内容',slot('—','wide'))
     +kvRow('权益内容',slot('—','wide'))
-    +kvRow('领取与使用',slot('—','wide'))
+    +kvRow('领取与使用','领取后记入「我的权益」；<b>抵扣功能尚未开放</b>，开放后可在下单时选择使用。')
     +'</div></section>';
 }
 function detailRules(){
@@ -399,7 +400,7 @@ var VIEWS={
     return tabs('benefits')
       +'<div class="scroll" data-testid="benefits-ledger">'
       +'<div class="sec-h"><span class="t">权益台账完整结构</span><span class="hint">四类权益 · 四种状态 · 五类来源都有对应位置</span></div>'
-      +'<div class="fixture" data-testid="benefits-fixture-note">'+svg('info',22)+'结构演示：名称、描述、额度、来源和有效期不使用任何真实账号数据，全部保留为办理后显示位。</div>'
+      +'<div class="fixture" data-testid="benefits-fixture-note">'+svg('info',22)+'示例：名称、描述、额度、来源和有效期不用任何真实账号数据，都留作办理后显示。</div>'
       +'<ul class="list" data-testid="benefits-list">'
       +benefitContractRow('coupon','active','teal')
       +benefitContractRow('free_quota','used_up','wheat')
@@ -409,7 +410,7 @@ var VIEWS={
       +'<button type="button" class="qx-more" data-testid="benefits-more">加载更多</button>'
       +ledgerRules()
       +'</div>'
-      +'<div class="ctabar"><p class="why">列表只读；能不能用，以核销当时的结果为准。</p>'
+      +'<div class="ctabar"><p class="why">列表只读；抵扣功能尚未开放，打印按现场公示价付费。</p>'
       +'<a class="btn ghost narrow press" href="05-ai-cockpit.html" data-route="/assistant" data-testid="benefits-ask">问小青：这条怎么用</a>'
       +'<a class="btn primary press" href="31-benefits.html?screen=activities" data-route="/activities" data-testid="benefits-primary">'+svg('flag',22)+'看可参加的活动</a></div>';
   },
@@ -447,7 +448,7 @@ var VIEWS={
   'benefits:error':function(){
     return tabs('benefits')
       +'<div class="scroll center">'+stateBlock('error','alert','权益台账这次没取到',
-        '请求失败了。本机<b>不显示上一次缓存的权益</b>——万一它已经过期或被核销，你会白跑一趟。',
+        '请求失败了。本机<b>不显示上一次缓存的权益</b>——万一它已经过期或失效，你会白跑一趟。',
         '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员</a>'
         +askBtn('benefits')
         +'<a class="btn primary press" href="31-benefits.html?state=loading" data-route="/me/benefits" data-testid="benefits-primary">重新加载</a>')
@@ -514,7 +515,7 @@ var VIEWS={
   },
   'activity:claim-success':function(){
     return '<div class="scroll center">'+stateBlock('info','check','系统确认领取成功',
-      '这条权益已经写进你的台账。<b>具体名称、适用服务和有效期以台账里的内容为准</b>；使用时还要经过一次核销，核销结果同样以实际记录为准。',
+      '这条权益已经写进你的台账，具体名称和有效期以台账里的内容为准。<b>抵扣功能尚未开放</b>，开放后可在下单时选择使用。',
       '<a class="btn ghost press" href="31-benefits.html?screen=activities" data-route="/activities">继续看别的活动</a>'
       +'<a class="btn primary press" href="31-benefits.html" data-route="/me/benefits" data-testid="activity-primary">去我的权益查看</a>','activity')
       +detailInfo(['已领取','teal'])+detailDesc()+detailRules()
@@ -531,7 +532,7 @@ var VIEWS={
   },
   'activity:ended':function(){
     return '<div class="scroll center">'+stateBlock('warn','clock','这个活动已经结束',
-      '主办方标注的活动时间已经过去，所以<b>不再提供领取入口</b>。已经领到的权益不受影响，仍按它自己的有效期使用。',
+      '主办方标注的活动时间已经过去，所以<b>不再提供领取入口</b>。已经领到的权益不受影响，仍按它自己的有效期留在台账里。',
       '<a class="btn ghost press" href="31-benefits.html" data-route="/me/benefits">看我已有的权益</a>'
       +askBtn('activity')
       +'<a class="btn primary press" href="31-benefits.html?screen=activities" data-route="/activities" data-testid="activity-primary">看还在进行的活动</a>','activity')
@@ -578,7 +579,7 @@ var HEAD={
   'activity:detail':['活动详情','条件由系统和官方规则判定，小青只解释规则。'],
   'activity:signed-out':['活动详情','规则可以先看；领取要确认是你本人。'],
   'activity:claim-pending':['领取中','结果以实际记录为准，不先显示成功。'],
-  'activity:claim-success':['领取成功','以台账里的内容和核销结果为准。'],
+  'activity:claim-success':['领取成功','以台账里的内容为准；抵扣功能尚未开放。'],
   'activity:claim-error':['领取失败','失败原因以实际记录为准，不掩盖。'],
   'activity:ended':['活动已结束','不再提供领取入口。'],
   'activity:sold-out':['名额已领完','不排队、不预约、不承诺补发。']

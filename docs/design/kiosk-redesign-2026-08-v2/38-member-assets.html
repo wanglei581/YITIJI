@@ -186,6 +186,7 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 </style>
 <!--
 青序流光 2.0 · 38 我的文档与打印订单（capture=1&state=documents-ready）
+9/29 定稿：签名只保留本人手写签名。「签名盖章」改「签名」，「已签章文件 / 签章时间 / 继续签章 / 去签章」改「已签名文件 / 签名时间 / 继续签名 / 去签名」，「在文件上放签名或印章后再打印」改「在文件上放本人手写签名后再打印」；「继续办理」说明改「预览、打印、签名共用一份」（去掉「文件」二字，免得末字单独折一行）。去处、状态键、data-testid 不改。
 规则 1：文档 / 订单切换在只读头图下面。
 规则 2：页标题 36，行标题 26，正文 22，主按钮 26。
 规则 3：每一行写明预览或接着打印能带走什么。
@@ -419,7 +420,7 @@ var READY_ROLES = {
     {role:'最近保存', tone:'', ico:'doc', title:'文件名 · 办理后显示', subs:['格式与页数','保存时间','留存期限'], act:'print'},
     {role:'生成的材料', tone:'teal', ico:'spark', title:'材料名称 · 办理后显示', subs:['生成方式','保存时间','留存期限'], act:'print'},
     {role:'扫描件', tone:'clay', ico:'scan', title:'扫描件名称 · 办理后显示', subs:['扫描页数','保存时间'], act:'print'},
-    {role:'已签章文件', tone:'wheat', ico:'sign', title:'文件名 · 办理后显示', subs:['签章时间','留存期限'], act:'sign'}
+    {role:'已签名文件', tone:'wheat', ico:'sign', title:'文件名 · 办理后显示', subs:['签名时间','留存期限'], act:'sign'}
   ],
   orders:[
     {role:'进行中', tone:'clay', ico:'clock', title:'打印内容 · 办理后显示', subs:['订单号','打印参数','处理状态'], act:'again'},
@@ -435,7 +436,7 @@ function readyRow(kind, i, opt){
     ? '<a class="small press" href="'+href('documents-access-loading','intent=preview')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-preview">'+svg('eye')+'预览</a>'
     : '<a class="small press" href="'+keep('15-print-fulfill.html')+'" data-route="/print/progress" data-testid="'+SCREEN+'-row-'+i+'-progress">'+svg('clock')+'查看进度</a>';
   var second = r.act==='sign'
-    ? '<a class="small primary press" href="'+keep('../kiosk-redesign-2026-08/20-sign-stamp.html?state=placing')+'" data-route="/print-scan/sign" data-testid="'+SCREEN+'-row-'+i+'-sign">'+svg('sign')+'继续签章</a>'
+    ? '<a class="small primary press" href="'+keep('../kiosk-redesign-2026-08/20-sign-stamp.html?state=placing')+'" data-route="/print-scan/sign" data-testid="'+SCREEN+'-row-'+i+'-sign">'+svg('sign')+'继续签名</a>'
     : r.act==='print'
     ? '<a class="small primary press" href="'+href('documents-access-loading','intent=print')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-print">'+svg('print')+'用于打印</a>'
     : '<a class="small primary press" href="'+href('documents-ready')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-again">'+svg('print')+'从文档发起新打印</a>';
@@ -483,9 +484,9 @@ var GUIDE = {
   login:[['隐私','未登录不显示','公共终端不会展示文件名、订单号或取件凭证'],['登录方式','手机号 + 验证码','也可以在登录页用手机扫码登录'],['不登录也能用','打印与扫描','当场办完的打印、扫描不需要账号']],
   loading:[['读取范围','只读当前账号','不会展示其他账号的文件与订单'],['显示规则','不闪回旧列表','上一位用户的内容不会残留在屏幕上'],['失败怎么办','保留重试入口','读取失败不会删除任何文件或订单']],
   error:[['数据','已有内容不受影响','这次加载失败不会删除任何文件或订单'],['先试这个','检查网络后重试','重试不会重复创建订单'],['仍不行','联系现场工作人员','可在帮助页找到联系方式']],
-  'empty-documents':[['怎么产生','上传或扫描之后','手机传输、U 盘、本机扫描都可以'],['能做什么','预览、打印、签名盖章','从同一份文件继续办'],['留存','按系统期限管理','到期后无法恢复，需要请提前打印']],
+  'empty-documents':[['怎么产生','上传或扫描之后','手机传输、U 盘、本机扫描都可以'],['能做什么','预览、打印、签名','从同一份文件继续办'],['留存','按系统期限管理','到期后无法恢复，需要请提前打印']],
   'empty-orders':[['怎么产生','确认打印并建单后','订单在收银台确认后建立'],['能看到什么','处理进度与结果','状态一律以实际记录为准'],['再打印','会新建订单','重新核价后建立一笔新订单']],
-  'ready-documents':[['会显示什么','办完才出现','不写死文件名或时间'],['继续办理','从同一文件接着办','预览、打印、签名盖章共用一份文件'],['留存','按保存期限','到期或删除后无法再打开']],
+  'ready-documents':[['会显示什么','办完才出现','不写死文件名或时间'],['继续办理','从同一文件接着办','预览、打印、签名共用一份'],['留存','按保存期限','到期或删除后无法再打开']],
   'ready-orders':[['会显示什么','办完才出现','不写死订单号或状态'],['状态','以实际记录为准','支付、打印和退款都要再查一次'],['再打印','会新建订单','重新选参数并重新核价']]
 };
 function guide(key){
@@ -521,7 +522,7 @@ function viewFor(kind, suffix, filter){
     var steps = docs
       ? stepRow(0,'up','','从手机或 U 盘添加文件','支持常见文档与图片，添加后可预览和打印','添加文件','12-file-source.html','/print/upload',SCREEN+'-start-upload')
         + stepRow(1,'scan','clay','扫描纸质材料','把纸质简历或证明扫成 PDF，留在我的文档里','去扫描','../kiosk-redesign-2026-08/18-scan-workbench.html?state=setup','/scan/start',SCREEN+'-start-scan')
-        + stepRow(2,'sign','teal','给已有文件签名盖章','在文件上放签名或印章后再打印','去签章','../kiosk-redesign-2026-08/20-sign-stamp.html?state=placing','/print-scan/sign',SCREEN+'-start-sign')
+        + stepRow(2,'sign','teal','给已有文件签名','在文件上放本人手写签名后再打印','去签名','../kiosk-redesign-2026-08/20-sign-stamp.html?state=placing','/print-scan/sign',SCREEN+'-start-sign')
         + stepRow(3,'qr','','用职易达小程序扫码上传到这台机器','用职易达小程序扫屏幕上的码，在手机上选好文件上传，文件直接落到这台机器','去扫码','12-file-source.html?state=phone-generating','/print/upload',SCREEN+'-start-relay')
       : stepRow(0,'print','clay','发起一次打印','选文件、定参数、确认价格后建立订单','去打印','10-print-hub.html','/print-scan',SCREEN+'-start-print')
         + stepRow(1,'doc','','先从我的文档选文件','已保存的文件可以直接拿来打印','去文档',href('documents-ready'),'/me/documents',SCREEN+'-start-docs')
@@ -531,7 +532,7 @@ function viewFor(kind, suffix, filter){
       banner('','empty', docs?'还没有保存的文档':'还没有打印订单',
         docs?'这个账号下没有已保存的文件。还没有任何记录。办过之后会列在这里。'
             :'这个账号下没有建立过打印订单。还没有任何记录。办过之后会列在这里。', ['共 0'])
-      + listWrap(steps, docs?'添加或扫描之后，可以回到这里继续预览、打印和签名盖章。':'确认打印并建单后，可以回到这里查看处理进度与结果。',
+      + listWrap(steps, docs?'添加或扫描之后，可以回到这里继续预览、打印和签名。':'确认打印并建单后，可以回到这里查看处理进度与结果。',
           docs?'从这里开始添加文件':'从这里开始打印')
       + guide('empty-'+kind)
       + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),askLink(),
@@ -551,7 +552,7 @@ function viewFor(kind, suffix, filter){
   /* ready：主内容优先，四行是四类**结果位**（角色不同、内容组合不同），值一律办理后显示 */
   return {layout:'ready', html:
     fixtureNote(docs
-      ? '结构演示：下面四行是「最近保存 / 生成的材料 / 扫描件 / 已签章文件」四类结果位，文件名、时间与留存期限都由办理后显示，本页不显示任何真实账号数据。'
+      ? '结构演示：下面四行是「最近保存 / 生成的材料 / 扫描件 / 已签名文件」四类结果位，文件名、时间与留存期限都由办理后显示，本页不显示任何真实账号数据。'
       : '结构演示：下面四行是「进行中 / 计费待确认 / 已完成 / 已结束」四类结果位，订单号、参数与状态都由办理后显示，本页不显示任何真实账号数据。')
     + chips(kind, filter)
     + listWrap([0,1,2,3].map(function(i){return readyRow(kind,i);}).join('')+'<button type="button" class="qx-more" data-testid="member-assets-more">加载更多</button>',
@@ -588,7 +589,7 @@ function render(state, filter){
     : suffix==='loading'  ? '正在读取最新记录，<b>返回前一律显示「—」</b>。'
     : suffix==='empty'    ? (kind==='documents' ? '还没有保存的文件。<b>先添加或扫描一份</b>，之后可以从这里继续办。' : '还没有打印订单。<b>确认打印并建单后</b>，可以从这里查看进度。')
     : suffix==='error'    ? '列表这次没有更新，<b>重试不会重复创建记录</b>。'
-    : (kind==='documents' ? '预览、打印和签名盖章，<b>从同一份文件继续</b>。' : '进行中的订单优先显示，<b>完成后仍可查看结果</b>。');
+    : (kind==='documents' ? '预览、打印和签名，<b>从同一份文件继续</b>。' : '进行中的订单优先显示，<b>完成后仍可查看结果</b>。');
 }
 
 if(q.get('flat')==='1') document.documentElement.classList.add('flat');

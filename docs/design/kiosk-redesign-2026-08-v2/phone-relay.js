@@ -2,6 +2,8 @@
    phone-relay.js · 手机接力
    复制自 ../kiosk-redesign-2026-08/phone-relay.js（2026-09-28）。原稿未改。
    本份只改了屏上机器名（不用终端编号）。宿主 51-phone-relay.html。
+   9/29 定稿：签名只保留本人手写签名。「签名暂不支持手机上传」这一屏与签名用途的名称去掉「印章」，
+   功能名「签名盖章」改「签名」，回一体机的做法改成选一张本人手写签名照片。状态键与 data-testid 不改。
 
    这份文件里有两类代码，取证与迁移时要分清：
    ① 真前端逻辑（可以直接搬进 React）：手机号 11 位数字约束、验证码 6 位数字约束、
@@ -176,8 +178,8 @@ var PURPOSES = {
     demo: { name: '劳动合同（待审）.pdf', size: 2.4 * 1024 * 1024, type: 'application/pdf' }
   },
   signature_image: {
-    noun: '签名或印章图片',
-    label: '签名 / 印章上传',
+    noun: '签名图片',
+    label: '签名上传',
     chips: ['JPG', 'PNG'],
     blocked: true,
     target: '',
@@ -1079,13 +1081,13 @@ function renderUpload () {
        （accept="image/jpeg,image/png"，走 kioskUploadFile）。同一步里的签名画布当前
        还是预留区（那一页自己写着「触屏手写将在校准后开放」），把印章放进扫描仪盖章
        这条链路在代码里根本不存在 —— 两条都未验证，不得写进用户可见文案。 */
-    out += statecard('warn', 'ban', 'upload-state-signature-blocked', '签名 / 印章暂不支持手机上传',
-      '请回到一体机，在「签名盖章」的第 2 步用「本机上传」选一张已有的 JPG / PNG 图片。')
+    out += statecard('warn', 'ban', 'upload-state-signature-blocked', '签名暂不支持手机上传',
+      '请回到一体机，在「签名」的第 2 步用「本机上传」选一张本人手写签名照片（JPG / PNG）。')
     out += '<div class="grow"></div>'
     out += facts([
-      ['为什么不可用', '手机上传当前只接受 <b>简历 / 打印文件 / 合同</b>，签名与印章不在其中，系统不会为它开出上传链接。'],
+      ['为什么不可用', '手机上传当前只接受 <b>简历 / 打印文件 / 合同</b>，签名图片不在其中，系统不会为它开出上传链接。'],
       ['不是你的问题', '不是文件格式不对，也不是网络问题，换张图或换台手机都不会变。'],
-      ['现场怎么办', '回一体机在「签名盖章」的第 2 步点<b>本机上传</b>，选一张已有的 JPG / PNG 图片。'],
+      ['现场怎么办', '回一体机在「签名」的第 2 步点<b>本机上传</b>，选一张本人手写签名照片（JPG / PNG）。'],
       ['还是不行', '返回上一步，或请现场工作人员协助；本页没有别的上传方式可试。']
     ])
     return out
@@ -1289,10 +1291,10 @@ function chromeCopy () {
      顶栏再写「传完回一体机确认」、页脚再写「一次性上传链接」，
      等于整屏其他位置仍在承诺一个做不到的上传。 */
   if (S.state === 'signature-blocked') {
-    rbSub.textContent = '签名 / 印章 · 手机端不可用'
+    rbSub.textContent = '签名 · 手机端不可用'
     rbTag.textContent = '需回一体机'
     footIc.innerHTML = svg('ban', 16)
-    footCopy.innerHTML = '本页当前没有可用的上传入口，也不会发送任何文件；签名 / 印章图片请回一体机在原步骤上传。'
+    footCopy.innerHTML = '本页当前没有可用的上传入口，也不会发送任何文件；签名图片请回一体机在原步骤上传。'
     return
   }
   if (S.state === 'invalid' || S.state === 'session-expired') {

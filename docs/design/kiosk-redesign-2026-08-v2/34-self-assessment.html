@@ -82,6 +82,7 @@
 规则 7：说明页底部和完成页都保留问小青；解读不可用时入口还在，只是先不生成结论。
 未改：颜色令牌、圆角、深绿英雄区、二十五道题原文、三 Tab、不打分的边界。
 9/28 留白：英雄区不再钉死 360px 高（三步下面空着一截深色），改为按内容高；省下的高度还给卡片区，说明页首屏多露出「还没有勾选…」那条提示。无新增内容。
+9/29 定稿：按运行页实际做的事改写（SelfAssessmentFlow.tsx + 服务端 self-assessment*）。完成页画五个方向的强弱（与服务端同一算法：所选选项的 weight 相加，0–5，本页据此当场算出）、「小青写的解读 · AI 生成 · 仅供参考」和打印、撤回；ai-down 改画运行页的 result-ai-down（完成页的一种：强弱与打印照常，只缺解读），route 随之改为 /result；同意书第 3、5 条、提交前三件事、记录页按真实保存口径（已登录记进「我的 · AI 服务记录」保留 24 小时，未登录只在这次办理里）重写；「不评分」改「不打总分」；完成页方向格小字和答题页方向小标补到 20px（2.0 字阶）。文件里其它写着「不读 weight / 不计分 / 不写账号 / 不出打印文件 / ai-down 是 intro 降级态」的旧注释，一律以本行为准。无新增区块。
 -->
 <style id="qx2">
 .pill{font-size:21px!important}
@@ -118,9 +119,12 @@
    深绿英雄区原来钉死 360px 高，三步下面空着 70–110px 一截深色。改成按内容高，
    省下的高度还给下面的卡片区，首屏多露出一截正文；各态第一个可点元素仍在 y≥700。 */
 .hero{min-height:0}
+.cov p{font-size:20px!important;line-height:1.4!important}
+#body[data-state="ai-down"]{justify-content:space-between}
+.qnum em{font-size:20px!important}
 </style>
 </head><body>
-<div id="stage"><header class="top"><a class="back m-press" href="16-service-hubs.html?hub=resume" aria-label="返回简历服务"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></a><div class="logo"><div class="mark">职</div><div class="brand">职易达</div></div><div class="space"></div><div class="pill"><i class="m-dot breathe"></i>自我探索</div><time class="clock" id="clock" aria-label="终端墙上时钟">--:--</time></header><section class="hero"><div class="hero-row"><div class="face m-face-ring">青</div><div><div class="eyebrow">自我探索</div><div class="ask" id="ask"></div><div class="doing" id="doing"></div></div></div><ol class="qx-steps"><li><b>1</b>先读说明，勾选后再开始</li><li><b>2</b>二十五道题，按平时的习惯选</li><li><b>3</b>带走的是完成情况，不打分</li></ol></section><main id="body" data-screen="self-assessment" data-state="intro" data-testid="self-assessment-state-intro"></main><div class="scrollcue" id="scrollcue">下面还有内容，手指往上滑</div><div class="actions" id="actions"></div><nav class="nav" aria-label="全局导航"><a href="01-home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 10 9-7 9 7v11H3z"/><path d="M9 21v-8h6v8"/></svg>首页</a><a href="05-ai-cockpit.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a><a href="30-my-profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a></nav></div>
+<div id="stage"><header class="top"><a class="back m-press" href="16-service-hubs.html?hub=resume" aria-label="返回简历服务"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></a><div class="logo"><div class="mark">职</div><div class="brand">职易达</div></div><div class="space"></div><div class="pill"><i class="m-dot breathe"></i>自我探索</div><time class="clock" id="clock" aria-label="终端墙上时钟">--:--</time></header><section class="hero"><div class="hero-row"><div class="face m-face-ring">青</div><div><div class="eyebrow">自我探索</div><div class="ask" id="ask"></div><div class="doing" id="doing"></div></div></div><ol class="qx-steps"><li><b>1</b>先读说明，勾选后再开始</li><li><b>2</b>二十五道题，按平时的习惯选</li><li><b>3</b>带走强弱和 AI 解读，可打印</li></ol></section><main id="body" data-screen="self-assessment" data-state="intro" data-testid="self-assessment-state-intro"></main><div class="scrollcue" id="scrollcue">下面还有内容，手指往上滑</div><div class="actions" id="actions"></div><nav class="nav" aria-label="全局导航"><a href="01-home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 10 9-7 9 7v11H3z"/><path d="M9 21v-8h6v8"/></svg>首页</a><a href="05-ai-cockpit.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a><a href="30-my-profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a></nav></div>
 <script>
 /* ---------------------------------------------------------------- 舞台与时钟 */
 var stageEl=document.getElementById('stage'),bodyEl=document.getElementById('body'),actionsEl=document.getElementById('actions'),askEl=document.getElementById('ask'),doingEl=document.getElementById('doing'),clockEl=document.getElementById('clock');
@@ -171,6 +175,7 @@ function wipe(){try{sessionStorage.removeItem(KEY)}catch(e){}}
 function answered(s){var n=0;for(var i=1;i<=TOTAL;i++){if(s.answers[i])n++;else break}return n}
 function dimDone(s,key){var n=0;Q.forEach(function(q){if(q.dimKey===key&&s.answers[q.n])n++});return n}
 function dimOf(n){return Q[n-1]}
+function strengthOf(s,key){var n=0;Q.forEach(function(q){if(q.dimKey!==key||!s.answers[q.n])return;var src=SA_V1.dimensions[q.dimIndex].questions.filter(function(x){return x.idx===q.idx})[0];var c=src?src.choices.filter(function(x){return x.key===s.answers[q.n]})[0]:null;if(c)n+=Number(c.weight)||0});return Math.max(0,Math.min(5,Math.round(n)))}
 
 /* -------------------------------------------------------------------- 路由 */
 var ALLOWED=['state','q','debug','flat','capture'],STATES=['intro','questions','review','result','history','ai-down'];
@@ -178,7 +183,7 @@ var ALLOWED=['state','q','debug','flat','capture'],STATES=['intro','questions','
    questions / result 在本页是同一页内的真实状态迁移，不另起 HTML；review 仍在答题流程内（提交前复核，
    React 侧同样没有独立 review 路由）；ai-down 是 intro 的降级态。
    recover-* / invalid 是 fail-closed 拦截面，不属于任何生产 route，故不进本表，也不写 data-route。 */
-var ROUTE={intro:'/resume/self-assessment/intro',questions:'/resume/self-assessment/questions',review:'/resume/self-assessment/questions',result:'/resume/self-assessment/result',history:'/resume/self-assessment/history','ai-down':'/resume/self-assessment/intro'};
+var ROUTE={intro:'/resume/self-assessment/intro',questions:'/resume/self-assessment/questions',review:'/resume/self-assessment/questions',result:'/resume/self-assessment/result',history:'/resume/self-assessment/history','ai-down':'/resume/self-assessment/result'};
 function routeOf(state){return ROUTE[state]||null}
 var qs=new URLSearchParams(location.search);
 var DEBUG=qs.get('debug')==='1',FLAT=qs.get('flat')==='1',CAPTURE=qs.get('capture');
@@ -241,7 +246,7 @@ function mark(state,extra){
   if(extra&&extra.fixture)bodyEl.dataset.fixture=extra.fixture;else bodyEl.removeAttribute('data-fixture');
 }
 function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function rail(){return '<div class="rail"><span>结果仅供自我参考</span><span>不评分不排名</span><span>不替代能力证明</span></div>'}
+function rail(){return '<div class="rail"><span>结果仅供自我参考</span><span>不打总分不排名</span><span>不替代能力证明</span></div>'}
 function gate(warn,text){return '<div class="gate'+(warn?' warn':'')+'" data-testid="sa-gate"'+(warn?' role="status"':'')+'><i>'+(warn?'!':'✓')+'</i><div>'+text+'</div></div>'}
 function pick(o){
   var inner='<i>'+o.icon+'</i><div><b>'+o.title+'</b><p>'+o.desc+'</p></div>';
@@ -264,7 +269,7 @@ function statusMini(){
   return '<section class="card"><div class="hd">这次作答现在的状态<span>页面按这次作答如实显示</span></div><div class="mini">'
   +'<div><small>是否已确认说明</small><p>'+(session.consented?'已确认，可以作答。':'尚未确认，不能开始作答。')+'</p></div>'
   +'<div><small>已作答题数</small><p>'+done+' / '+TOTAL+' 题'+(done===TOTAL?'，已答满。':'，未答满不进入确认。')+'</p></div>'
-  +'<div><small>是否已提交</small><p>'+(session.submitted?'已提交，可查看完成情况。':'未提交，不生成任何结果。')+'</p></div>'
+  +'<div><small>是否已提交</small><p>'+(session.submitted?'已提交，可查看结果。':'未提交，不生成任何结果。')+'</p></div>'
   +'</div></section>';
 }
 
@@ -272,21 +277,21 @@ function statusMini(){
 function viewIntro(){
   mark('intro');
   askEl.innerHTML='把职业倾向，<em>说得更明白</em>。';
-  doingEl.innerHTML=TOTAL+' 道选择题，覆盖 '+DIMS.length+' 个方向；<b>不评分、不排名，结果只给你自己看。</b>';
+  doingEl.innerHTML=TOTAL+' 道选择题，覆盖 '+DIMS.length+' 个方向；<b>算出各方向的强弱，不打总分、不排名，只给你自己看。</b>';
   var ok=session.consented;
   bodyEl.innerHTML='<section class="card"><div class="hd">这次要做的事<span>约 6 分钟 · 不需登录</span></div>'
-  +'<div class="task"><span><b>'+TOTAL+'</b> 道选择题</span><span>覆盖 <b>'+DIMS.length+'</b> 个方向</span><span>随时可返回修改</span><span>不评分、不排名</span></div>'
+  +'<div class="task"><span><b>'+TOTAL+'</b> 道选择题</span><span>覆盖 <b>'+DIMS.length+'</b> 个方向</span><span>随时可返回修改</span><span>不打总分、不排名</span></div>'
   +'<div class="sub">题目问的是你更愿意怎么工作，不是考你会不会。'+TOTAL+' 道题按'+dimNames()+'五个方向排列，题目和选项都是固定的，这一页不改题、也不另出一套。</div></section>'
   +'<section class="card"><div class="hd">你会经历哪三步<span>每一步都要你自己确认</span></div><div class="flow-grid">'
   +'<div class="flow current"><small>第 1 步</small><b>逐题作答</b><p>'+TOTAL+' 道选择题分属'+dimNames(' / ')+'，一次一题，可随时回上一题改。</p></div>'
   +'<div class="flow"><small>第 2 步</small><b>提交前确认</b><p>答满 '+TOTAL+' 题后，先按方向看一遍你的选择，再决定是否提交。</p></div>'
-  +'<div class="flow"><small>第 3 步</small><b>查看完成情况</b><p>只显示你完成了什么，不生成评分、人格类型或岗位结论。</p></div></div></section>'
+  +'<div class="flow"><small>第 3 步</small><b>看结果、可打印</b><p>强弱按固定规则算出，AI 写解读，仅供参考。</p></div></div></section>'
   +'<section class="card"><div class="hd">开始前请先确认<span>勾选后才能作答</span></div><ul class="consent-list">'
   +'<li><em>1</em><div>本工具基于本人作答提供倾向参考，<b>不是临床、心理或人格诊断</b>。</div></li>'
   +'<li><em>2</em><div>结果只对本人可见，不向企业、合作机构或第三方推送。</div></li>'
-  +'<li><em>3</em><div>不评分、不排名，不生成人格类型或百分比标签。</div></li>'
+  +'<li><em>3</em><div>作答后可在结果页撤回，撤回即删除；<b>不保存你的答案原文</b>。</div></li>'
   +'<li><em>4</em><div>不判定你是否适合某个岗位，也不构成能力证明。</div></li>'
-  +'<li><em>5</em><div>答案只留在这一次办理里，<b>不写入账号</b>。</div></li>'
+  +'<li><em>5</em><div>五个方向的强弱按固定规则算出，不经过 AI；解读文字由 AI 生成，<b>仅供参考</b>。</div></li>'
   +'</ul><button type="button" class="cbox m-press'+(ok?' on':'')+'" role="checkbox" aria-checked="'+(ok?'true':'false')+'" data-act="consent" data-testid="sa-consent"><span class="box" aria-hidden="true">✓</span>我已读完上面 5 条，了解这不是诊断也不会给我贴标签</button></section>'
   +gate(!ok,ok?'<b>已确认说明。</b>现在可以开始作答，答题过程中随时可以返回修改或退出。':'<b>还没有勾选上面的确认，暂时不能开始作答。</b>先读完 5 条说明并勾选，按钮才会变为可用。')
   +'<section class="notice"><i>i</i><div><b>本页是自我探索，不是心理、临床或能力测评。</b>它不会参与岗位排序，也不会把你的答案提供给企业或合作机构。</div></section>'
@@ -348,7 +353,7 @@ function viewReview(){
   askEl.innerHTML=submitted?'这是你<em>已提交的 '+TOTAL+' 个选择</em>。':'提交前，<em>先检查这 '+TOTAL+' 个选择</em>。';
   doingEl.innerHTML=submitted
     ?'本次已提交，页面不再改动这些答案；<b>要换答案只能重新开始一次新的作答。</b>'
-    :TOTAL+' 题已全部作答。<b>确认提交后只记录本次已完成，不生成评分、人格类型或岗位结论。</b>';
+    :TOTAL+' 题已全部作答。<b>确认提交后才算强弱、写解读，之前不出任何结果。</b>';
   /* 与答题页同一套「一行一个维度」布局：既是五维度完成情况，也是逐题回改入口。 */
   var grid='';
   DIMS.forEach(function(d,di){
@@ -364,13 +369,13 @@ function viewReview(){
     }
   });
   bodyEl.innerHTML='<section class="card result-lead"><div class="hd">'+(submitted?'本次作答已提交':'本次 '+TOTAL+' 题已全部作答')+'<span>'+(submitted?'这次作答已提交':'提交前可以逐题回去改')+'</span></div>'
-  +'<div class="task"><span>已答 <b>'+TOTAL+'</b> 题</span><span>'+DIMS.length+' 个方向各 <b>5</b> 题</span><span>'+(submitted?'已提交':'尚未提交')+'</span><span>只存在于这次作答</span></div></section>'
+  +'<div class="task"><span>已答 <b>'+TOTAL+'</b> 题</span><span>'+DIMS.length+' 个方向各 <b>5</b> 题</span><span>'+(submitted?'已提交':'尚未提交')+'</span><span>答案只在这台机器上</span></div></section>'
   +'<section class="card"><div class="hd">你这次选了什么<span>'+(submitted?'只读回看，按方向分行':'点任意一项即可回去修改')+'</span></div><div class="dimgrid" data-testid="sa-review-grid">'+grid+'</div></section>'
   /* 两个分支用同一张「三件事」卡，只换时态：避免提交后出现两条长得几乎一样的 ✓ 提示条。 */
   +'<section class="card"><div class="hd">'+(submitted?'这次提交做了什么':'确认提交会发生什么')+'<span>只有这三件事</span></div><div class="flow-grid">'
-  +'<div class="flow current"><small>'+(submitted?'已发生':'会发生')+'</small><b>标记本次已完成</b><p>'+(submitted?'这次作答已记为已提交，完成页按此显示。':'把这次作答记为已提交，然后进入完成页。')+'</p></div>'
-  +'<div class="flow"><small>'+(submitted?'未发生':'不会发生')+'</small><b>不生成任何结论</b><p>不打分、不给人格类型、不判断适不适合某个岗位。</p></div>'
-  +'<div class="flow"><small>'+(submitted?'未发生':'不会发生')+'</small><b>不上传、不入账号</b><p>答案不写入账号，关掉页面就没有了。</p></div></div></section>'
+  +'<div class="flow current"><small>'+(submitted?'已发生':'会发生')+'</small><b>算强弱，写解读</b><p>'+(submitted?'强弱已按固定规则算出；解读由 AI 写，写不出来会如实缺。':'强弱按固定规则当场算出；解读由 AI 写，写不出来会如实缺。')+'</p></div>'
+  +'<div class="flow"><small>'+(submitted?'未发生':'不会发生')+'</small><b>不下结论</b><p>不打总分、不排名、不贴类型，不判断适不适合岗位。</p></div>'
+  +'<div class="flow"><small>'+(submitted?'未发生':'不会发生')+'</small><b>不留存答案原文</b><p>只留一串还原不出答案的校验码；企业、合作机构和工作人员都看不到。</p></div></div></section>'
   +(submitted?'':gate(false,'<b>'+TOTAL+' 题都已作答。</b>确认无误后再提交；现在取消也不会丢掉这些选择。'))
   +rail();
   actionsEl.innerHTML=(submitted
@@ -385,54 +390,55 @@ function viewResult(synthetic){
   askEl.innerHTML=synthetic?'这是<em>版式示例</em>，不是结果。':'本次 '+TOTAL+' 题<em>已完成并提交</em>。';
   doingEl.innerHTML=synthetic
     ?'仅在 debug 模式下渲染的 synthetic fixture；<b>页面上的数字是合成占位样例，不是任何人的作答。</b>'
-    :'这次作答已提交。<b>本页只记录你完成了什么，不生成评分、人格类型或岗位结论，也不显示完成时间。</b>';
-  var cov=DIMS.map(function(d){
-    return '<div><small>'+esc(d.label)+'</small><b>'+dimDone(s,d.key)+' / '+d.count+' 题</b><p>已作答</p></div>';
+    :'强弱按固定规则算出，解读由 AI 写，仅供参考。<b>不打总分、不排名、不贴类型，也不判断适不适合某个岗位。</b>';
+  var cov=DIMS.map(function(d,di){
+    return '<div><small>'+esc(d.label)+'</small><b>强度 '+strengthOf(s,d.key)+' / 5</b><p>依据 '+(di*d.count+1)+'–'+(di*d.count+d.count)+' 题</p></div>';
   }).join('');
-  bodyEl.innerHTML=(synthetic?'<section class="synthetic" data-testid="synthetic-fixture-banner"><i>!</i><div>版式示例，不是真实结果<p>仅在 ?debug=1 下渲染：本页没有真实完成记录，题数为占位值，页面也不展示任何完成时间，不得截图当作真实完成证据。</p></div></section>':'')
-  +'<section class="card result-lead"><div class="hd">本次自我探索已完成<span>'+(synthetic?'合成数据 · 仅版式':'这次作答已提交')+'</span></div>'
-  +'<div class="task"><span>已作答 <b>'+TOTAL+'</b> 题</span><span>'+DIMS.length+' 个方向已覆盖</span><span>已提交</span><span>不评分、不排名</span></div>'
+  bodyEl.innerHTML=(synthetic?'<section class="synthetic" data-testid="synthetic-fixture-banner"><i>!</i><div>版式示例，不是真实结果<p>仅在 ?debug=1 下渲染：本页没有真实完成记录，强弱与题数都是占位值，页面也不展示任何完成时间，不得截图当作真实完成证据。</p></div></section>':'')
+  +'<section class="card result-lead"><div class="hd">本次自我探索已完成<span>'+(synthetic?'合成数据 · 仅版式':'仅供本人参考')+'</span></div>'
+  +'<div class="task"><span>覆盖 <b>'+DIMS.length+'</b> 个方向</span><span>不打总分、不排名</span><span>仅本人可见</span><span>AI 解读已生成</span></div>'
   /* synthetic 下这段由顶部横幅承担，重复一遍只会把版式挤到行动条底下。 */
-  +(synthetic?'':'<div class="sub">这一屏只陈述本次作答的完成情况与覆盖范围。这一页不展示完成时间。倾向说明要等解读接上才显示，现在不拿空话冒充。</div>')+'</section>'
-  +'<section class="card"><div class="hd">本次作答覆盖<span>按你实际答完的题统计</span></div><div class="cov" data-testid="sa-coverage">'+cov+'</div></section>'
-  +'<section class="card"><div class="hd">本页现在不做什么<span>没接通就不假装</span></div><div class="flow-grid">'
-  +'<div class="flow"><small>不生成</small><b>评分与人格类型</b><p>不给分数、不贴类型标签、不显示固定百分比。</p></div>'
-  +'<div class="flow"><small>不保存</small><b>账号记录与完成时间</b><p>答案不写入账号，关掉页面就没有了。</p></div>'
-  +'<div class="flow"><small>不产出</small><b>报告与打印文件</b><p>还没有可打印的结果，现在不能打印。</p></div></div></section>'
+  +(synthetic?'':'<div class="sub">只描述这次作答的倾向，不是心理或能力测评，不向企业或合作机构推送。已登录时记进「我的 · AI 服务记录」，保留 24 小时；没登录只留在这次办理里。</div>')+'</section>'
+  +'<section class="card"><div class="hd">五个方向的倾向强弱<span>按固定规则算出 · 不经过 AI</span></div><div class="cov" data-testid="sa-coverage">'+cov+'</div></section>'
+  +'<section class="card"><div class="hd">小青写的解读<span>AI 生成 · 仅供参考</span></div><div class="flow-grid">'
+  +'<div class="flow current"><small>整体解读</small><b>一段陈述</b><p>只描述这次作答，不打分、不排名，也不说适不适合哪类岗位。</p></div>'
+  +'<div class="flow"><small>五个方向</small><b>各一段陈述</b><p>跟着上面的强弱写；打印件里也有，标明 AI 生成。</p></div>'
+  +'<div class="flow"><small>写不出来时</small><b>强弱照常有</b><p>只缺这几段文字，强弱照常能看、能打印。</p></div></div></section>'
   +'<section class="card"><div class="hd">接下来可以做什么<span>都是现在就能打开的功能</span></div><div class="picks three">'
   +pick({link:'05-ai-cockpit.html',icon:'青',title:'问小青怎么用这些偏好',desc:'把这次的选择说给小青，整理成能写进简历的话。',cls:'lead'})
   +pick({link:'29-interview-training.html',icon:'练',title:'做一次模拟面试',desc:'把偏好换成能说出口的表达，练完可以复盘。'})
   +pick({link:'16-service-hubs.html?hub=resume',icon:'简',title:'回简历服务',desc:'改简历、生成材料或安排打印，按各自页面的实际状态确认。'})
   +pick({link:href('review'),icon:'查',title:'查看本次 '+TOTAL+' 个选择',desc:'按方向逐题回看这次选了什么；已提交后只读，不再改动。'})
-  +pick({link:href('history'),icon:'录',title:'查看评估记录',desc:'账号记录需要登录后按实际结果展示，这次作答不算记录。'})
-  +pick({icon:'印',title:'打印本次结果',desc:'还没有可打印的结果，现在不能打印。'})
+  +pick({link:href('history'),icon:'录',title:'查看评估记录',desc:'看这台机器上的这次记录；已登录的也记在「我的」里。'})
+  +pick({link:'39-member-records.html?view=ai-records',icon:'我',title:'去 AI 服务记录',desc:'已登录时，结果在这里保留 24 小时。'})
   +'</div></section>'
   +rail();
-  actionsEl.innerHTML=actionBtn({act:'restart-all',label:'重新开始一次'})
-  +actionBtn({primary:true,link:'05-ai-cockpit.html',label:'问小青怎么用'});
+  actionsEl.innerHTML=actionBtn({act:'exit',label:'撤回本次探索'})
+  +actionBtn({link:'05-ai-cockpit.html',label:'问小青'})
+  +actionBtn({primary:true,link:'14-print-confirm.html',label:'打印本次结果'});
 }
 function syntheticSession(){var s=blank();s.consented=true;s.submitted=true;Q.forEach(function(q){s.answers[q.n]=q.c[0][0]});return s}
 
 /* ------------------------------------------------------------------ history */
 function viewHistory(){
   mark('history');
-  askEl.innerHTML='需要登录后，<em>才可查看记录</em>。';
-  doingEl.innerHTML='这里不编造以往的作答；<b>没有记录时会如实显示为空。</b>';
-  bodyEl.innerHTML='<section class="card"><div class="hd">本人评估记录<span>需登录后按账号读取</span></div>'
+  askEl.innerHTML='这台机器上<em>还没有记录</em>。';
+  doingEl.innerHTML='这里不编造以往的作答；<b>已登录时做的，结果在「我的 · AI 服务记录」里保留 24 小时。</b>';
+  bodyEl.innerHTML='<section class="card"><div class="hd">这台机器上的本次记录<span>只对本人可见</span></div>'
   +'<div class="blank" data-testid="self-assessment-list"><div class="empty-i">⌁</div><div><h2>这里还没有可查看的记录</h2>'
-  +'<p>本页不生成示例历史，也不把本次未提交的答案写成记录。真实记录、保存期限和撤回能力，登录后按实际记录展示。</p></div></div></section>'
-  +'<section class="card"><div class="hd">登录后这里会显示什么<span>会列出哪些内容，不是已有数据</span></div><div class="mini">'
-  +'<div><small>作答批次</small><p>每次完成答了多少题。</p></div>'
-  +'<div><small>结果描述</small><p>当次生成的偏好描述文本。</p></div>'
-  +'<div><small>可否重做</small><p>是否可重新作答、删除或打印。</p></div></div></section>'
+  +'<p>不生成示例历史，没提交的答案不算记录。没登录时结果不存进账号，这次办理结束就清掉。</p></div></div></section>'
+  +'<section class="card"><div class="hd">有记录时这里显示什么<span>会列出哪些内容，不是已有数据</span></div><div class="mini">'
+  +'<div><small>完成情况</small><p>是否五个方向都已算出。</p></div>'
+  +'<div><small>保留期限</small><p>结果保留 24 小时，到期自动清理。</p></div>'
+  +'<div><small>还能做什么</small><p>回看结果、打印或撤回。</p></div></div></section>'
   +statusMini()
   +'<section class="card"><div class="hd">现在可以做什么<span>不必等记录恢复</span></div><div class="picks">'
-  +pick({link:href(session.consented?'questions':'intro'),icon:'答',title:session.consented?'继续本次作答':'开始一次作答',desc:'不登录也能做完 '+TOTAL+' 道题，完成情况当场就能看。',cls:'lead'})
-  +pick({link:'03-login-gate.html',icon:'登',title:'先登录账号',desc:'登录后才请求本人记录；能否查看以实际记录为准。'})
+  +pick({link:href(session.consented?'questions':'intro'),icon:'答',title:session.consented?'继续本次作答':'开始一次作答',desc:'不登录也能做完 '+TOTAL+' 道题，结果当场就能看。',cls:'lead'})
+  +pick({link:'03-login-gate.html',icon:'登',title:'先登录账号',desc:'登录后再作答，结果才记进账号。'})
   +pick({link:'30-my-profile.html',icon:'我',title:'去我的记录',desc:'在“我的”里查看已经产生的服务与文档记录。'})
   +pick({link:'16-service-hubs.html?hub=resume',icon:'简',title:'回简历服务',desc:'继续改简历、生成材料或安排打印。'})
   +'</div></section>'
-  +'<section class="notice"><i>i</i><div>本次作答只存在于这台机器的这一次办理，<b>不是账号记录</b>，也不会出现在上面的列表里。</div></section>'
+  +'<section class="notice"><i>i</i><div>你的答案只在这台机器的这次办理里，<b>不存进账号</b>；离开或闲置 60 秒就清掉，不留给下一位。</div></section>'
   +rail();
   actionsEl.innerHTML=actionBtn({link:href('intro'),label:'返回介绍'})
   +actionBtn({primary:true,link:'03-login-gate.html',label:'去登录查看记录'});
@@ -441,26 +447,27 @@ function viewHistory(){
 /* ------------------------------------------------------------------ ai-down */
 function viewDown(){
   mark('ai-down');
-  askEl.innerHTML='现在可以答题，<em>暂不生成解读</em>。';
-  doingEl.innerHTML='AI 服务不可用时不假装已生成结果；<b>本页仅保留不依赖 AI 的介绍和作答说明。</b>';
-  bodyEl.innerHTML='<section class="card down"><div class="hd">AI 解读暂时不可用<span>不伪造恢复状态</span></div>'
-  +'<div class="task"><span class="warn">解读与建议<b>本次不能生成</b></span><span>'+TOTAL+' 道题与作答不依赖 AI，可照常进行</span><span>不预报恢复时间</span></div>'
-  +'<div class="sub">本次不能承诺生成职业倾向描述或建议。恢复时间以现场公告或实际服务状态为准。</div></section>'
-  +'<section class="card"><div class="hd">不依赖 AI 也能做的事<span>现在就能打开</span></div><div class="picks">'
-  +pick({link:href(session.consented?'questions':'intro'),icon:'答',title:'照常做完 '+TOTAL+' 道题',desc:'题目本身不依赖 AI；答完后先不生成解读。',cls:'lead'})
-  +pick({link:'29-interview-training.html?state=tips',icon:'备',title:'看面试准备清单',desc:'公开的准备方法和 STAR 结构，不需要模型参与。'})
+  var has=session.submitted&&answered(session)===TOTAL;
+  askEl.innerHTML='强弱照常算出，<em>这次缺 AI 解读</em>。';
+  doingEl.innerHTML='AI 解读暂时不可用。<b>作答、强弱和依据都不经过 AI，照样能看、能打印；缺的只是解读文字。</b>';
+  var cov=DIMS.map(function(d,di){
+    return '<div><small>'+esc(d.label)+'</small><b>强度 '+(has?strengthOf(session,d.key):'—')+' / 5</b><p>依据 '+(di*d.count+1)+'–'+(di*d.count+d.count)+' 题</p></div>';
+  }).join('');
+  bodyEl.innerHTML='<section class="card down"><div class="hd">AI 解读这次没有生成<span>强弱与打印照常</span></div>'
+  +'<div class="task"><span class="warn">AI 解读<b>本次未生成</b></span><span>强弱与依据<b>已算出</b></span><span>照常能打印</span><span>不预报恢复时间</span></div>'
+  +'<div class="sub">这几段解读这次没有写出来，也不拿别的内容顶上。答案原文不保存，恢复后补不回这一次；想要解读，需要重新作答（约 6 分钟）。</div></section>'
+  +'<section class="card"><div class="hd">五个方向的倾向强弱<span>按固定规则算出 · 不经过 AI</span></div><div class="cov" data-testid="sa-coverage">'+cov+'</div></section>'
+  +'<section class="card"><div class="hd">不依赖这次解读也能做的事<span>现在就能打开</span></div><div class="picks">'
+  +pick({link:'29-interview-training.html?state=tips',icon:'备',title:'看面试准备清单',desc:'公开的准备方法和 STAR 结构，不需要 AI 参与。',cls:'lead'})
   +pick({link:'05-ai-cockpit.html',icon:'青',title:'问小青别的问题',desc:'解读暂时不可用时，仍可以问打印、材料和怎么准备。'})
-  +pick({link:'10-print-hub.html',icon:'印',title:'打印与扫描',desc:'打印、扫描等硬件服务按设备实际状态执行。'})
+  +pick({link:href('history'),icon:'录',title:'查看评估记录',desc:'看这台机器上的这次记录；已登录的也记在「我的」里。'})
+  +pick({link:'16-service-hubs.html?hub=resume',icon:'简',title:'回简历服务',desc:'改简历、生成材料或安排打印，按各自页面的实际状态确认。'})
   +'</div></section>'
-  +'<section class="card"><div class="hd">恢复之后会怎样<span>按实际状态放开</span></div><div class="flow-grid">'
-  +'<div class="flow"><small>恢复判断</small><b>以服务状态为准</b><p>不按倒计时提示，恢复由实际检测结果决定。</p></div>'
-  +'<div class="flow"><small>恢复之后</small><b>才出现生成入口</b><p>确认可用前，页面不展示“查看解读”按钮。</p></div>'
-  +'<div class="flow"><small>本次答案</small><b>不当作已出结果</b><p>未生成描述前，不写成已完成的评估记录。</p></div></div></section>'
-  +statusMini()
-  +'<section class="notice"><i>i</i><div><b>不把“能答题”说成“能出报告”。</b>待真实 AI 服务恢复并由流程确认后，才展示可生成解读的入口。</div></section>'
+  +'<section class="notice"><i>i</i><div><b>AI 是帮手，不是前提。</b>它不可用时，作答、强弱和打印都照常；打印件里写明解读这次未生成。</div></section>'
   +rail();
-  actionsEl.innerHTML=actionBtn({link:'16-service-hubs.html?hub=resume',label:'返回简历服务'})
-  +actionBtn({primary:true,link:href(session.consented?'questions':'intro'),label:'先照常作答'});
+  actionsEl.innerHTML=actionBtn({act:'exit',label:'撤回本次探索'})
+  +actionBtn({act:'restart-all',label:'重新作答'})
+  +actionBtn({primary:true,link:'14-print-confirm.html',label:'打印本次结果'});
 }
 
 /* ---------------------------------------------------------- fail-closed 恢复 */
@@ -475,8 +482,8 @@ var RECOVER={
     facts:['完成页只在本次 '+TOTAL+' 题答满并明确提交后才显示。','直接打开完成页的链接不会放行，也不会补一个结果给你看。','之前的作答如果还在，可以接着答完再提交。'],
     primary:{link:href('intro'),label:'从说明开始'},secondary:{link:'16-service-hubs.html?hub=resume',label:'返回简历服务'}},
   submitted:{title:'本次作答已经提交',why:'已提交的答案不再改动',
-    facts:['本次 '+TOTAL+' 题已提交，答题页不再打开以免答案与提交不一致。','可以回完成页查看这次完成了什么。','想换答案就重新开始一次新的作答。'],
-    primary:{link:href('result'),label:'查看本次完成情况'},secondary:{act:'restart-all',label:'重新开始一次'}}
+    facts:['本次 '+TOTAL+' 题已提交，答题页不再打开以免答案与提交不一致。','可以回完成页查看这次的结果。','想换答案就重新开始一次新的作答。'],
+    primary:{link:href('result'),label:'查看本次结果'},secondary:{act:'restart-all',label:'重新开始一次'}}
 };
 function viewRecover(kind){
   var r=RECOVER[kind];
@@ -518,7 +525,7 @@ function viewInvalid(kind){
   +'<section class="card"><div class="hd">本页支持哪些入口<span>其余一律不放行</span></div><div class="flow-grid">'
   +'<div class="flow current"><small>说明页</small><b>先确认再作答</b><p>普通入口都从这里开始，读完 5 条前提并勾选。</p></div>'
   +'<div class="flow"><small>答题页</small><b>确认后才开放</b><p>逐题作答，题号 1 到 '+TOTAL+'，可回去修改。</p></div>'
-  +'<div class="flow"><small>完成页</small><b>提交后才开放</b><p>答满 '+TOTAL+' 题并明确提交后，才显示完成情况。</p></div></div></section>'
+  +'<div class="flow"><small>完成页</small><b>提交后才开放</b><p>答满 '+TOTAL+' 题并明确提交后，才显示结果。</p></div></div></section>'
   +statusMini()
   +'<section class="card"><div class="hd">现在可以做什么<span>都是现在就能打开的入口</span></div><div class="picks">'
   +pick({link:href('intro'),icon:'说',title:'返回自我探索说明',desc:'从正常入口重新开始，前面已作答的内容不会丢。',cls:'lead'})

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/29 定稿：签名只保留本人手写签名，能力卡「签名盖章」改名「签名」（卡内说明「放入本人手写签名」、去处「带走：签好的 PDF」不变），一体机离线那一态说明里的「签名盖章」同改「签名」。能力键、路由、data-testid 不改。
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 2026-09-28 修重叠：带顶部提示的状态里，能力卡改成横排，把高度让给证件照横卡，不再压住「已下过单」标题。
 - 9/28 留白：证件照横卡挪到第三行、占签名盖章右边两格，八张卡排满 3×3；带提示条的四态横排小卡定高 180，余高分到区块之间；证件照说明、能力说明不存在两态不再把末张卡拉成空盒，按内容定高、放大替代路径与去处，空白分到区块之间。只改样式，文字与标记未改。
@@ -370,7 +371,7 @@ var CAPS=[
  {key:'convert',capKey:'format_convert',n:'格式转换',ic:'img',bg:'var(--teal-soft)',st:'#157a67',
   d:'多张图片合成 PDF',foot:'带走：合并 PDF',
   href:'19-img2pdf.html',route:'/print-scan/convert',mfp:false},
- {key:'sign',capKey:'signature_stamp',n:'签名盖章',ic:'sign',bg:'var(--clay-soft)',st:'#9e5330',
+ {key:'sign',capKey:'signature_stamp',n:'签名',ic:'sign',bg:'var(--clay-soft)',st:'#9e5330',
   d:'放入本人手写签名',foot:'带走：签好的 PDF',
   href:'20-sign-stamp.html',route:'/print-scan/sign',mfp:false},
  {key:'id-photo',capKey:'id_photo',n:'证件照',ic:'idcard',bg:'var(--wheat-soft)',st:'#8a6219',
@@ -461,7 +462,7 @@ V['device-off']=function(){
   mfpNote:'这台机器现在出不了纸；到机码可以核销，但要等能出纸时再取。'},
   '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
   '<div class="state-h">'+svg('info','currentColor',28)+'打印扫描一体机离线 —— 要出纸的停了，其余照常</div>'+
-  '<div class="state-p">这一条来自设备状态轮询的<b>确定离线</b>结果。手机扫码上传、格式转换、签名盖章不经过这台打印机，照常可用。</div></div></section>');
+  '<div class="state-p">这一条来自设备状态轮询的<b>确定离线</b>结果。手机扫码上传、格式转换、签名不经过这台打印机，照常可用。</div></div></section>');
 };
 V['feature-id-photo']=function(){
  return '<section class="sec"><div class="state" data-kind="warn" data-testid="print-hub-idphoto-unavailable">'+

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/29 定稿：capability-invalid-params 不再拦截（状态键不改）。带进来的彩色 / 双面本机暂未开通时，按本机能用的参数（黑白、单面）照常报价、主按钮「确认并去付款」可点（去 32 收银台）；「核对打印内容」里被改的那一项画灰（虚线、弱化色，同稿 13 不可用样式）并就地写「彩色 / 双面本机暂未开通，已按黑白 / 单面报价」；价格旁写「已按本机能用的参数报价，比原来多用 N 张纸」（N 按示例文件页数与份数算，1 页文件写「用纸张数不变」）；金额是示例值，标「界面示例」（与 32 收银台同一说法）。删去「为什么被挡下」两卡，余高分到三段之间。页内旧注释里「本机暂未开通 → 强制拦截 / 拒绝报价」的说法以这一条为准。
 - 9/28 去掉内部英文键名
 - 9/28 逐状态检查修压字
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
@@ -394,6 +395,12 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .sec.last{margin-bottom:4px}
 .grid2{gap:10px}
 .amount{padding:12px 8px 8px}
+.rev-grid>div.off{background:var(--paper);border:1.5px dashed var(--line-2)}
+.rev-grid>div.off>span{color:var(--ink-3)}
+.rev-grid>div.off>b{display:flex;align-items:center;gap:6px;font-size:22px;font-weight:600;line-height:1.35;color:var(--ink-3)}
+.rev-grid>div.off>b svg{flex:none}
+.rev-grid>div.off>em{font-style:normal;font-size:24px;font-weight:700;line-height:1.3;color:var(--wheat-d)}
+#body-root[data-state=capability-invalid-params] .sec{margin-top:auto}
 
 </style>
 </head>
@@ -853,8 +860,8 @@ function lines(rows){
 function paramCells(state){
  var p=effParams(state);
  return [['纸张','A4'],['页面方向','纵向'],
-  ['颜色',COLOR_LABEL[p.color]+(p.colorOff?' · 暂不可用':''),p.colorOff],
-  ['单双面',DUPLEX_LABEL[p.duplex]+(p.duplexOff?' · 暂不可用':''),p.duplexOff],
+  ['颜色',p.colorOff?'彩色本机暂未开通，':COLOR_LABEL[p.color],p.colorOff,false,'已按黑白报价'],
+  ['单双面',p.duplexOff?'双面本机暂未开通，':DUPLEX_LABEL[p.duplex],p.duplexOff,false,'已按单面报价'],
   ['版式','1 版/页'],['缩放','适合页面'],
   ['页范围','全部 '+DOC.pages+' 页'],['份数',(CTX.ok?CTX.copies:'1')+' 份'],
   ['本次产物','打印件',false,false]];
@@ -862,7 +869,7 @@ function paramCells(state){
 function reviewCard(state){
  var cells=paramCells(state),h='',i;
  for(i=0;i<cells.length;i++)
-  h+='<div'+(cells[i][2]?' class="off"':'')+'><span>'+cells[i][0]+'</span><b'+(cells[i][3]?' class="id"':'')+'>'+cells[i][1]+'</b></div>';
+  h+='<div'+(cells[i][2]?' class="off"':'')+'><span>'+cells[i][0]+'</span><b'+(cells[i][3]?' class="id"':'')+'>'+(cells[i][2]?svg('lock','currentColor',22):'')+cells[i][1]+'</b>'+(cells[i][2]?'<em>'+cells[i][4]+'</em>':'')+'</div>';
  return '<div class="rev" data-evidence-fixture="synthetic" data-fixture-key="'+DOC.key+'" data-testid="'+SCREEN+'-review">'+
   '<div class="rev-file"><span class="rf-ic">'+svg('file','currentColor',36)+'</span>'+
   '<span class="rf-m"><b>'+DOC.name+'</b><span>'+DOC.kind+(DOC.size?' · '+DOC.size:'')+' · 全部 '+DOC.pages+' 页 · '+DOC.from+'</span>'+
@@ -1140,28 +1147,25 @@ V['quote-failed']=function(){
    secondary:backSecondary(),
    primary:{href:selfPage('quoting'),route:'/print/confirm',label:'重新报价'}}),'last');
 };
+function capAdjust(){
+ var p=effParams('capability-invalid-params'),off=[],to=[];
+ if(p.colorOff){off.push('彩色');to.push('黑白')}
+ if(p.duplexOff){off.push('双面');to.push('单面')}
+ var copies=parseInt(CTX.ok?CTX.copies:'1',10)||1,now=DOC.pages*copies,was=p.duplexOff?Math.ceil(DOC.pages/2)*copies:now;
+ return {p:p,off:off.join('、'),to:to.join('、'),now:now,was:was,paper:now>was?'比原来多用 '+(now-was)+' 张纸':'用纸张数不变'};
+}
 V['capability-invalid-params']=function(){
- var p=effParams('capability-invalid-params');
- var rows=[];
- if(p.colorOff)rows.push(['颜色',COLOR_LABEL[p.color]+' · 暂不可用']);
- if(p.duplexOff)rows.push(['单双面',DUPLEX_LABEL[p.duplex]+' · 暂不可用']);
- rows.push(['计价来源','未出报价',true]);rows.push(['小计','无法显示',true]);
- return sec('01','核对打印内容',p.demo?'演示：按登记的越界取值展示拦截':'标红的项本机暂不可用',reviewCard('capability-invalid-params'))+
-  sec('02','费用明细','参数不可用时系统不出报价',
-   feeBlock(amountCard('金额暂不可用','本次应付','当前参数不可用，请修改后重新获取报价。'),rows)+
-   '<div class="grid2" style="margin-top:16px">'+
-   '<div class="pgrp"><h4>为什么'+(p.colorOff&&p.duplexOff?'这两项':'这一项')+'被挡下</h4>'+
-   (p.colorOff?'<div class="reason">本机彩色打印本机暂未开通，暂不能按彩色下单</div>':'')+
-   (p.duplexOff?'<div class="reason">本机长边双面本机暂未开通，暂不能按双面下单；短边双面同样必须以终端能力返回为准</div>':'')+'</div>'+
-   '<div class="pgrp"><h4>'+DOC.fixTitle+'</h4>'+
-   '<div class="state-p">'+DOC.fixNote+'</div>'+
-   '<div class="meta"><span class="chip">未建单</span><span class="chip">未扣费</span><span class="chip warn">回到黑白单面可继续</span></div></div></div>')+
-  sec('03','确认并付款','参数修改后才可继续',confirmBlock({
-   tone:'warn',
-   note:'当前参数被系统按本机能力登记拒绝，<b>这一页拿不到金额，也不会创建订单</b>。',
-   reason:'参数回到黑白单面再报价，才能确认这一单',
+ var a=capAdjust(),amt=fxYuan(COUPON_FIXTURE.originalAmountCents);
+ return sec('01','核对打印内容','示例文件 · 灰色的项本机暂未开通，已按能用的参数报价',reviewCard('capability-invalid-params'))+
+  sec('02','费用明细','按本机能用的参数计价',
+   feeBlock(amountCard(amt,'本次应付（界面示例）','已按本机能用的参数报价，<br>'+a.paper+'。',true),
+    [['计费页数',DOC.pages+' 页（示例）',true],['计价参数',COLOR_LABEL.bw+' · '+DUPLEX_LABEL.single],
+     ['用纸',a.now+' 张'+(a.now>a.was?'（原来 '+a.was+' 张）':'')],['小计',amt+'（示例）',true]]))+
+  sec('03','确认并付款','确认后进入付款',confirmBlock({
+   flow:FLOW_PAY,
+   note:'价格已按<b>'+a.to+'</b>算好。确认后进入付款，<b>付款完成后才开始打印</b>。',
    secondary:backSecondary(DOC.changeLabel),
-   primary:{label:'参数回到黑白单面后可确认'}}),'last');
+   primary:{href:'32-cashier.html?state=pending',route:'/print/cashier',label:'确认并去付款'}}),'last');
 };
 /* 只在 ?debug=1 下可达：演示「核销没通过就按原价显示」的排版。本屏没有查过权益，
    所以既不说「结果说抵扣没通过」，也不给一个能按原价付款的按钮。
@@ -1207,7 +1211,7 @@ var PILL={
  'quoting':['','正在计算本次费用'],
  'quoted':['warn','演示排版 · 不是真实报价'],
  'quote-failed':['bad','报价失败 · 未建单'],
- 'capability-invalid-params':['bad','打印参数暂不可用'],
+ 'capability-invalid-params':['warn','已按本机能用的参数报价'],
  'benefit-unverified':['warn','演示排版 · 权益未抵扣的版面'],
  'zero-amount':['warn','演示排版 · 零金额的版面']
 };
@@ -1217,7 +1221,7 @@ var ASK={
  'quoting':['先看<em>价格</em>，再决定。','核对打印内容与费用，确认后再付款、领取打印件。'],
  'quoted':['这一屏是<em>排版演示</em>。','屏幕上的金额是写死的示例，不是下一步的实际价格；这里不能建单，也不会进入付款。'],
  'quote-failed':['暂时<em>无法获取报价</em>。','文件和参数已保留，本次没有创建订单。'],
- 'capability-invalid-params':['这些参数<em>暂不可用</em>。','请改为黑白、单面后重新获取报价。'],
+ 'capability-invalid-params':['已按<em>本机能用的参数</em>报价。',capAdjust().off+'本机暂未开通，已改成'+capAdjust().to+'。价格以这组参数为准。'],
  'benefit-unverified':['这一屏演示<em>权益没抵扣</em>时的版面。','本屏没有核销过任何权益，屏上金额也不是下一步的实际价格，这里不能建单。'],
  'zero-amount':['这一屏是<em>零金额排版演示</em>。','屏幕上的 0 是写死的示例，不是实际给出的结果；本屏不会建单。']
 };

@@ -39,6 +39,7 @@
 未改：颜色令牌、圆角、深绿英雄区、四条路线、三档不打分、三 Tab。
 原稿脚本复制为同目录 resume-decision-workspace.js，样式仍引用原稿目录。
 9/28 留白：三步说明挪到小青意图区底部通栏（数字与说明一行），区块内边距与间距收紧一档，对照结果三档、授权两态、填写要求、任务读不出来、行动清单、职业规划共 9 个状态连底部按钮都在一屏里（之前按钮被挤到屏外，要滑才看得到）；短条目清单、清单分组字段、行动清单四步、模板卡两栏配平；放不满的屏把余高平分到各区块上方；等待面板按卡片标题字阶排。无新增内容。
+9/29 定稿：简历对照按运行页（JobFitPage.tsx，9/26 起不分档）改：result-high / result-mid / result-low 三个状态键保留、画同一屏——对照概要（AI 生成 · 仅供参考，对照依据是你写的要求）、简历里已经写到 / 还没体现的要求、关键词覆盖、下一步建议，底部打印报告 / 换个岗位分析 / 优化简历；删去准备程度徽章、三档梯子和按档换色，概要卡统一青色。「岗位匹配 / 匹配参考 / 匹配结果」改叫「简历对照 / 对照结果」。要求只由本人填写或粘贴不变。上面「三档参考 / 带走的是对照档位」的旧说法以本行为准。
 -->
 <style id="qx2">
 .status{font-size:21px!important;max-width:680px;height:auto;min-height:54px;white-space:normal}
@@ -166,6 +167,11 @@
 #workspace[data-screen="resume-decision-career-plan"][data-state="print-pending"] .list>.list-row:first-child{grid-column:1 / -1}
 #workspace[data-screen="resume-decision-career-plan"][data-state="print-pending"] .list-row{min-height:84px!important;align-items:center}
 #workspace[data-screen="resume-decision-career-plan"][data-state="print-pending"] .ghosts{margin-top:22px}
+.verdict-card{border-left-color:var(--teal)}
+.verdict-card .vc-badge{background:var(--soft)}
+.verdict-card .vc-badge b{color:var(--teal2)}
+.vc-badge b+small{margin-top:10px;letter-spacing:0;font-weight:700;line-height:1.4}
+.verdict-card .vc-risk{background:var(--soft);color:var(--teal2)}
 </style>
 </head>
 <body>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!--
+- 9/29 定稿：签名只保留本人手写签名（产品负责人定，专家评审 #20 / P0-8）。屏上功能名「签名盖章」「签名 / 印章」一律改「签名」（标题、顶栏、英雄区眉题、各状态、按钮、步骤条）；「选一张印章图片」这类印章模式与说明删去或改成只讲签名，示例图片名、签好的 PDF 示例名去掉「印章 / 签章」，代表签名图的图标由印章换成笔；保留「只接受本人手写签名，不接受单位公章或圆形章」「不要拍公章或圆形章」「伪造印章或冒用他人签名违法」这类规则说明。文件名、路径、状态键、data-testid、id 都不改。
 - 9/28 用词：写稿人用语（原型、内部服务名、页面地址、请求标识）换成用户的话。
 - 9/28 用词：防重复提交的说法（标识、指纹、请求）换成用户的话，屏上不再显示编号。
 青序流光 2.0 · 20 签名盖章（2026-09-28）
@@ -20,7 +21,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>签名盖章 · 职易达</title>
+<title>签名 · 职易达</title>
 <!--
   S23 · 签名 / 印章图片叠加 PDF 工作台（青序流光，1080x1920 单 HTML 宿主，零外部资源）
 
@@ -449,7 +450,7 @@ a:focus-visible,button:focus-visible,[role=checkbox]:focus-visible{outline:3px s
   <header class="topbar">
     <a class="back press" id="back" href="10-print-hub.html" data-route="/print-scan" data-testid="sign-stamp-back" aria-label="返回打印扫描"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
     <span class="logo-mark serif" aria-hidden="true">职</span>
-    <h1 class="h1">签名盖章</h1>
+    <h1 class="h1">签名</h1>
     <span class="sp"></span>
     <span class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">身份未确认</span></span>
     <span class="clock" id="clock">--:--</span>
@@ -560,7 +561,7 @@ var PAGE_W=840,PAGE_H=1188; /* 纸面自然单位，A4 比例 */
 var FX={
  doc:{name:'就业协议书-示例.pdf',bytes:'1.8 MB',pages:6,rotate:{4:90}},
  stamp:{name:'签名-示例.png',bytes:'240 KB',w:900,h:360},
- out:{name:'就业协议书-示例-签章合成.pdf',bytes:'2.1 MB',pages:6}
+ out:{name:'就业协议书-示例-已签名.pdf',bytes:'2.1 MB',pages:6}
 };
 
 /* ── 模型 ─────────────────────────────────────────────── */
@@ -602,7 +603,7 @@ var SETUP={
  'document-phone-entry':function(){M.docStage='phone'},
  'document-inspecting':function(){M.docStage='inspecting'},
  'document-ready':function(){withDoc();M.docJustRead=true},
- 'document-format-rejected':function(){M.docErr={t:'这份不是 PDF',p:'签名盖章只收 PDF。刚才那份是图片，<b>没有进入流程</b>；图片要盖章，先用「格式转换」拼成 PDF。',f:'讲义扫描.jpg · image/jpeg'}},
+ 'document-format-rejected':function(){M.docErr={t:'这份不是 PDF',p:'签名只能放在 PDF 上。刚才那份是图片，<b>没有进入流程</b>；图片要签名，先用「格式转换」拼成 PDF。',f:'讲义扫描.jpg · image/jpeg'}},
  'document-too-large':function(){M.docErr={t:'这份 PDF 太大',p:'原文档上限 <b>15 MB</b>，这份 18.4 MB，系统不接收，<b>没有进入流程</b>。',f:'就业协议书-高清扫描.pdf · 18.4 MB'}},
  'document-encrypted':function(){M.docErr={t:'这份 PDF 加了密',p:'系统<b>不解密</b>任何文档，加密文档一律拒绝。请换一份未加密的 PDF 再来。',f:'劳动合同-加密.pdf · 已设置打开口令'}},
  'document-corrupt':function(){M.docErr={t:'这份 PDF 读不开',p:'文件结构损坏或不是有效 PDF，系统<b>解析不了</b>，<b>没有进入流程</b>。',f:'就业协议书-截断.pdf · 结构损坏'}},
@@ -615,12 +616,12 @@ var SETUP={
  'stamp-local-uploading':function(){withDoc();M.stampStage='uploading'},
  'stamp-phone-entry':function(){withDoc();M.stampStage='phone'},
  'stamp-ready':function(){withStamp();M.stampJustAdded=true},
- 'stamp-format-rejected':function(){withDoc();M.stampErr={t:'这张图不能用',p:'签名 / 印章图片<b>只支持 JPG / PNG</b>。刚才那份是 PDF，<b>没有进入流程</b>，已选的文档不受影响。',f:'签名扫描件.pdf · application/pdf'}},
- 'stamp-too-large':function(){withDoc();M.stampErr={t:'这张图太大',p:'签名 / 印章图片上限 <b>10 MB</b>，这张 12.6 MB。请压缩后重传。',f:'印章-原图.png · 12.6 MB'}},
- 'stamp-pixels-too-large':function(){withDoc();M.stampErr={t:'这张图像素太多',p:'像素总量上限 <b>2500 万</b>，这张 6000×4500 = 2700 万。请缩小分辨率后重传。',f:'印章-单反直出.jpg · 6000×4500'}},
+ 'stamp-format-rejected':function(){withDoc();M.stampErr={t:'这张图不能用',p:'签名图片<b>只支持 JPG / PNG</b>。刚才那份是 PDF，<b>没有进入流程</b>，已选的文档不受影响。',f:'签名扫描件.pdf · application/pdf'}},
+ 'stamp-too-large':function(){withDoc();M.stampErr={t:'这张图太大',p:'签名图片上限 <b>10 MB</b>，这张 12.6 MB。请压缩后重传。',f:'签名-原图.png · 12.6 MB'}},
+ 'stamp-pixels-too-large':function(){withDoc();M.stampErr={t:'这张图像素太多',p:'像素总量上限 <b>2500 万</b>，这张 6000×4500 = 2700 万。请缩小分辨率后重传。',f:'签名-单反直出.jpg · 6000×4500'}},
  'stamp-corrupt':function(){withDoc();M.stampErr={t:'这张图读不出来',p:'文件内容与声明的格式不符，或图片已损坏，系统<b>解析不了</b>。',f:'签名.png · 内容不是 PNG'}},
- 'stamp-encoding-unsupported':function(){withDoc();M.stampErr={t:'这张图的编码暂不支持',p:'系统嵌入这张图时失败（常见于 CMYK JPEG）。请另存为普通 PNG / JPG 后重试。',f:'印章.jpg · CMYK 编码'}},
- 'stamp-source-expired':function(){withDoc();M.stampErr={t:'签名图的访问凭证过期了',p:'签名 / 印章图片<b>只在这次办理短期保留</b>（约 1 小时），过期后必须重新上传，<b>不能从历史复用</b>。',f:'来源：这次办理上传 · 凭证已过期'}},
+ 'stamp-encoding-unsupported':function(){withDoc();M.stampErr={t:'这张图的编码暂不支持',p:'系统嵌入这张图时失败（常见于 CMYK JPEG）。请另存为普通 PNG / JPG 后重试。',f:'签名.jpg · CMYK 编码'}},
+ 'stamp-source-expired':function(){withDoc();M.stampErr={t:'签名图的访问凭证过期了',p:'签名图片<b>只在这次办理短期保留</b>（约 1 小时），过期后必须重新上传，<b>不能从历史复用</b>。',f:'来源：这次办理上传 · 凭证已过期'}},
 
  /* 位置三件套各自可辨：页码 / 九宫格 / 大小各改一维，屏幕上都不一样 */
  'placement-default':function(){withStamp();at(1,'bottom-right','medium')},
@@ -670,15 +671,15 @@ var SETUP={
 function blockReason(){
  var B=function(kind,t,p,li,sec,pri){return {kind:kind,t:t,p:p,li:li,sec:sec,pri:pri}};
  if(M.auth==='unknown')return B('lock','还没确认你是谁',
-   '签名和印章是<b>高敏材料</b>，在确认身份之前，这一页不提供上传、不显示任何文件，也不合成。',
+   '签名是<b>高敏材料</b>，在确认身份之前，这一页不提供上传、不显示任何文件，也不合成。',
    ['没有拿到登录状态，也没有拿到「未登录」的确定答复。','这种情况一律当作不允许，而不是先放行再补检查。'],
    null,['去登录','03-login-gate.html','/login']);
- if(M.auth==='anonymous')return B('lock','先登录才能做签名盖章',
-   '签名 / 印章图片属于<b>高敏个人材料</b>，只允许本人在登录后上传与合成。未登录不能在这里签名。',
+ if(M.auth==='anonymous')return B('lock','先登录才能签名',
+   '签名图片属于<b>高敏个人材料</b>，只允许本人在登录后上传与合成。未登录不能在这里签名。',
    ['登录后才能确认这份文档和这张签名图都属于你本人。','普通打印、扫描、格式转换不受影响，可以直接去用。'],
    null,['去登录','03-login-gate.html','/login']);
  if(M.auth==='expired')return B('warn','登录已过期',
-   '为保护高敏材料，登录过期时<b>已上传的签名 / 印章图片会被丢弃</b>，需要重新登录后重新上传。原文档还在你的账号里。',
+   '为保护高敏材料，登录过期时<b>已上传的签名图片会被丢弃</b>，需要重新登录后重新上传。原文档还在你的账号里。',
    ['签名图不做跨这次办理保留，过期即不可复用。','这一步不会替你自动重传，也不会替你自动合成。'],
    null,['重新登录','03-login-gate.html','/login']);
  if(M.ctx==='missing')return B('warn','没有可用的办理上下文',
@@ -686,19 +687,19 @@ function blockReason(){
    ['不猜上一步是什么，也不放示例文件。','这一步不会替你上传或保存任何文件。'],
    ['我的文档','38-member-assets.html?state=documents-ready','/me/documents','sign-stamp-docs'],null);
  if(M.terminal==='missing')return B('error','这台机器还没登记',
-   '签名盖章要先确认这台机器能不能用。读不到登记信息就<b>无法确认是否允许使用</b>，因此不放行。',
+   '签名要先确认这台机器能不能用。读不到登记信息就<b>无法确认是否允许使用</b>，因此不放行。',
    ['不假设「读不到就是可用」。','请联系现场工作人员登记这台机器。'],
    ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
  if(M.cap==='loading')return B('info','正在确认这台机器能不能签名',
-   '还没拿到这台机器是否开放「签名盖章」的答复。<b>拿到之前不提供上传，也不显示任何文件</b>。',
+   '还没拿到这台机器是否开放「签名」的答复。<b>拿到之前不提供上传，也不显示任何文件</b>。',
    ['读取中不等于可用，也不等于不可用。','这里不画进度条：系统不回传进度。'],
    ['联系工作人员','06-help.html','/help','sign-stamp-help'],null,true);
- if(M.cap==='disabled')return B('lock','这台机器没有开放签名盖章',
-   '管理员没有为这台机器开放「签名盖章」。<b>未登记一律按不允许处理</b>，不做静默降级。',
+ if(M.cap==='disabled')return B('lock','这台机器没有开放签名',
+   '管理员没有为这台机器开放「签名」。<b>未登记一律按不允许处理</b>，不做静默降级。',
    ['文档打印、材料扫描、格式转换不受影响。','需要开放请联系现场工作人员。'],
    ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
- if(M.cap==='maintenance')return B('warn','签名盖章正在维护',
-   '这台机器的签名盖章被管理员置为维护状态，<b>暂时不受理新的合成</b>。已生成的文件不受影响。',
+ if(M.cap==='maintenance')return B('warn','签名正在维护',
+   '这台机器的签名功能被管理员置为维护状态，<b>暂时不受理新的合成</b>。已生成的文件不受影响。',
    ['维护是管理员登记的真实状态，不是这一页猜的。','恢复时间请问现场工作人员。'],
    ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
  if(M.cap==='error')return B('error','还没确认能不能签名',
@@ -735,7 +736,7 @@ function renderCtx(){
  else if(M.cap==='maintenance')h+=tag('warn','签名暂停','sign-stamp-cap');
  else h+=tag('bad','还没确认','sign-stamp-cap');
  if(M.doc)h+=tag('',svg('pdf','currentColor',22)+'<b>'+M.doc.name+'</b> · '+M.doc.pages+' 页','sign-stamp-doc-tag');
- if(M.stamp)h+=tag('',svg('stamp','currentColor',22)+'<b>'+M.stamp.name+'</b>','sign-stamp-stamp-tag');
+ if(M.stamp)h+=tag('',svg('pen','currentColor',22)+'<b>'+M.stamp.name+'</b>','sign-stamp-stamp-tag');
  h+='<span class="sp"></span>';
  document.getElementById('ctxbar').innerHTML=h;
  var fx=document.getElementById('fxbar');
@@ -903,7 +904,7 @@ function renderPreview(){
  col.innerHTML=
   '<div class="pv-view" id="pv-view" data-testid="sign-stamp-pv-view" tabindex="0" aria-label="'+(burned?'签好的 PDF':'原 PDF')+'完整页预览，可拖动平移"></div>'+
   pvToolbar()+
-  '<div class="pv-cap" data-testid="sign-stamp-pv-caption">'+(burned?'签好的 PDF · 签章已印在纸上':'原 PDF · 框是标记，原件不改写')+'</div>';
+  '<div class="pv-cap" data-testid="sign-stamp-pv-caption">'+(burned?'签好的 PDF · 签名已印在纸上':'原 PDF · 框是标记，原件不改写')+'</div>';
  bindPreview();
  pvDraw();
  if(M.view.pan==='br'){var v=viewEl();v.scrollLeft=v.scrollWidth;v.scrollTop=v.scrollHeight}
@@ -990,7 +991,7 @@ function docPickers(){
   pick({n:'从 U 盘选 PDF',ic:'usb',bg:'var(--paper)',fg:'#526b62',d:'U 盘那条路还没通到这一步。',f:'暂时用不了 · 原因见下方',tid:'sign-stamp-pick-doc-usb',disabled:true,rid:'sign-stamp-doc-note'})+
   checkCard('选好之后当场检查',['是不是真的 PDF。','有没有加密、损坏或数字签名域。','页数在不在 1–30 之间。','<b>原文件全程不改写。</b>'])+
   /* 禁用卡的常驻原因：占的是这一行本来空着的第二格，高度低于同组的手机卡，不会把它比下去 */
-  checkCard('U 盘为什么用不了',['U 盘导入能用来打印，但还没通到签名盖章这一步。','先用上面三种方式选这份 PDF。'],'sign-stamp-doc-note')+
+  checkCard('U 盘为什么用不了',['U 盘导入能用来打印，但还没通到签名这一步。','先用上面三种方式选这份 PDF。'],'sign-stamp-doc-note')+
   '</div>';
 }
 function stampPickers(){
@@ -1058,7 +1059,7 @@ function usedInputsBlock(){
   '</div></div>';
 }
 function nextRoundBlock(){
- return '<div class="grp"><h3>'+svg('stamp','var(--clay-d)',24)+'想再叠一处</h3><div class="kv" data-testid="sign-stamp-next-round">'+
+ return '<div class="grp"><h3>'+svg('pen','var(--clay-d)',24)+'想再叠一处</h3><div class="kv" data-testid="sign-stamp-next-round">'+
   '<div><span>原文档</span><b>换成这份签好的 PDF</b></div>'+
   '<div><span>签名图</span><b>清空 · 要重新传</b></div>'+
   '<div><span>授权</span><b>复位 · 要重新确认</b></div>'+
@@ -1074,13 +1075,13 @@ function askFor(phase){
   if(M.docStage==='uploading')return ['正在<em>传这份 PDF</em>。','单次上传，<b>没有进度回传</b>，传完立刻读页数。'];
   if(M.docStage==='phone')return ['用<em>手机</em>把 PDF 传进来。','扫屏幕上的码；<b>手机上确认之后</b>才进下一步。'];
   if(M.docStage==='inspecting')return ['正在<em>读这份 PDF 的页数</em>。','加密、损坏、含数字签名域的，<b>这一步就会被拒</b>。'];
-  return ['先选一份<em>要盖章的 PDF</em>。','把签名图叠上去，生成<b>一份新的 PDF</b>，原件不动。'];
+  return ['先选一份<em>要签名的 PDF</em>。','把签名图叠上去，生成<b>一份新的 PDF</b>，原件不动。'];
  }
  if(M.stampErr)return ['这张图<em>没收下</em>。','原因在右边，<b>换一张就行</b>。'];
  if(M.stampStage==='uploading')return ['正在<em>传这张签名图</em>。','按高敏材料短期保留，<b>不进「我的文档」</b>。'];
- if(M.stampStage==='phone')return ['用<em>手机</em>传签名 / 印章图。','手机上确认之后才进下一步，<b>这一页不替你确认</b>。'];
+ if(M.stampStage==='phone')return ['用<em>手机</em>传签名图。','手机上确认之后才进下一步，<b>这一页不替你确认</b>。'];
  if(M.derived)return ['接着叠<em>第二处</em>。','刚才那份签好的 PDF 成了新原文档，<b>签名图要重传</b>。'];
- if(M.docJustRead)return ['这份 PDF <em>读好了</em>。','接下来传<b>这次要用的</b>签名或印章图片。'];
+ if(M.docJustRead)return ['这份 PDF <em>读好了</em>。','接下来传<b>这次要用的</b>签名图片。'];
  return ['传一张<em>这次要用的</em>签名图。','只能这次新传，<b>不进「我的文档」，也不能复用历史</b>。'];
 }
 function xqBand(){
@@ -1088,7 +1089,7 @@ function xqBand(){
  return '<section class="xq"><div class="xq-row">'+
   '<div class="xq-face serif" aria-hidden="true">青</div>'+
   '<div class="xq-main">'+
-   '<div class="xq-eyebrow">签名盖章</div>'+
+   '<div class="xq-eyebrow">签名</div>'+
    '<div class="xq-ask serif">'+a[0]+'</div>'+
    '<div class="xq-doing">'+a[1]+'</div>'+
   '</div></div></section>';
@@ -1104,7 +1105,7 @@ function pickPhase(){
 /* 四步进度轨：选择这一步的右列靠它把「现在在哪一步、后面还有什么」说清楚，
    同时把这一列填满 —— 不靠堆解释文字来占位。 */
 function stepRail(active){
- var S=['选文档','传签名 / 印章图','选位置','合成结果'],h='',i;
+ var S=['选文档','传签名图','选位置','合成结果'],h='',i;
  for(i=0;i<S.length;i++)h+='<div class="step'+(i<active?' done':(i===active?' on':''))+'"><i aria-hidden="true"></i><span>'+S[i]+'</span></div>';
  return '<div class="grp"><h3>这一趟四步</h3><div class="steps" data-testid="sign-stamp-steps">'+h+'</div></div>';
 }
@@ -1228,7 +1229,7 @@ function statusFor(){
    '结果回来了<b>一份新文件</b>。<b>原 PDF 一点没改</b>。下一步去<b>材料检查</b>，那一步才决定能不能打印。','',
    [[M.result.pages+' 页 · '+M.result.bytes],['原 PDF 未被改写','ok'],['下一步：材料检查','ok']]);
  }
- if(M.derived)return stateBlock('info','stamp','以刚才的合成结果继续叠加',
+ if(M.derived)return stateBlock('info','pen','以刚才的合成结果继续叠加',
   '旧签名图和授权<b>已清空</b>，<b>得重新传一张</b>才能接着叠。','',
   [[M.doc.name+' · '+M.doc.pages+' 页'],['旧签名图已清空','warn'],['授权已复位','warn']]);
  if(M.docStage==='uploading')return stateBlock('info','pdf','正在把这份 PDF 传进本机',
@@ -1240,19 +1241,19 @@ function statusFor(){
  if(M.docStage==='inspecting')return stateBlock('info','pdf','正在读这份 PDF 的页数',
   '系统打开文档，读出<b>一共几页</b>，好让你选放在第几页。<b>加密、损坏、含数字签名域的会在这一步被拒绝</b>。','',
   [['读取页数'],['没有进度回传'],['原文件不被改写','ok']]);
- if(M.stampStage==='uploading')return stateBlock('info','img','正在传这张签名 / 印章图',
+ if(M.stampStage==='uploading')return stateBlock('info','img','正在传这张签名图',
   '这张图按<b>高敏材料</b>处理：短期保留（约 1 小时），<b>不进「我的文档」</b>，这次办理结束即不可再用。','',
   [['单次上传'],['高敏 · 约 1 小时','warn'],['不进我的文档','warn']]);
- if(M.stampStage==='phone')return stateBlock('info','phone','用手机传签名 / 印章图',
-  '手机拍一张签名，或选一张印章图片。<b>确认之后才会进入下一步</b>。这张图同样只在这次办理短期保留。','',
+ if(M.stampStage==='phone')return stateBlock('info','phone','用手机传签名图',
+  '用手机拍一张本人手写签名。<b>确认之后才会进入下一步</b>。这张图同样只在这次办理短期保留。','',
   [['手机扫屏幕码'],['需你在手机上确认','warn'],['高敏 · 约 1 小时','warn']]);
- if(!M.doc)return stateBlock('info','pdf','先选一份要盖章的 PDF',
-  '把签名或印章<b>图片</b>叠到 PDF 的指定位置，生成<b>一份新的 PDF</b>。原文件不会被改写。','',
+ if(!M.doc)return stateBlock('info','pdf','先选一份要签名的 PDF',
+  '把本人手写签名的<b>图片</b>叠到 PDF 的指定位置，生成<b>一份新的 PDF</b>。原文件不会被改写。','',
   [['原 PDF ≤ 15MB · 1–30 页'],['产物是新文件','ok'],['原文件不被改写','ok']]);
  if(M.docJustRead)return stateBlock('info','check','这份 PDF 读好了：共 '+M.doc.pages+' 页',
   '读到 <b>'+M.doc.pages+' 页</b>；没加密、没损坏、没有数字签名域。接下来传<b>这次要用的</b>签名图。','',
   [[M.doc.name+' · '+M.doc.bytes],[M.doc.pages+' 页 · 在 1–30 内','ok'],['原文件不被改写','ok']]);
- if(!M.stamp)return stateBlock('info','stamp','传一张这次要用的签名 / 印章图',
+ if(!M.stamp)return stateBlock('info','pen','传一张这次要用的签名图',
   '只能用<b>这次新传的图</b>：按高敏材料保留约 1 小时，<b>不进我的文档</b>。','',
   [['JPG / PNG ≤ 10MB'],['≤ 2500 万像素'],['高敏 · 约 1 小时','warn']]);
  if(M.stampJustAdded)return stateBlock('info','check','签名图收到了',
@@ -1310,7 +1311,7 @@ function renderCta(){
   bar.innerHTML=h;return;
  }
  if(M.phase==='completed'||M.phase==='recovered'){
-  h+=ghostBtn('再加一处签名 / 印章','sign-stamp-add-another');
+  h+=ghostBtn('再加一处签名','sign-stamp-add-another');
   h+=(M.outErr==='expired')
     ? priOff('去材料检查（先重新取链接）','链接已过期，重新取一次才能交给材料检查')
     : priLink('去材料检查','13-print-desk.html','/print/material-check');
@@ -1322,7 +1323,7 @@ function renderCta(){
  else if(M.phase==='known-failed'||M.phase==='rate-limited'||M.phase==='in-progress')h+=priBtn('重试生成');
  else if(M.phase==='conflict')h+=priOff('当作新的一次再生成','刚才那一次用的是另一组参数，只能当作新的一次，不能覆盖上一次');
  else if(!M.doc)h+=priOff('选好 PDF 再继续','还没有选文档，没有文档就没法选页码和位置');
- else if(!M.stamp)h+=priOff('传好签名 / 印章图再继续','还没有这次的签名 / 印章图片，没有图就没有可叠加的内容');
+ else if(!M.stamp)h+=priOff('传好签名图再继续','还没有这次的签名图片，没有图就没有可叠加的内容');
  else if(M.placeErr)h+=priOff('先改成 1–6 页之间','页码超出这份文档的范围，系统会直接拒绝');
  else if(!M.authorized)h+=priOff('生成合成 PDF（请先确认授权）','还没有勾选授权确认，勾选后才能生成');
  else h+=priBtn('生成合成 PDF');
