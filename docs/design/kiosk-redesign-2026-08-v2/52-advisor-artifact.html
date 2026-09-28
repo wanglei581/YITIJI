@@ -244,6 +244,78 @@ a.btn[data-v="primary"]{color:#fff}
 .qx-find{flex:none;margin:8px 36px 0;font-size:21px;line-height:1.45;color:var(--ink-2)}
 .qx-find a{color:var(--teal-d);font-weight:700}
 #demo-tab,#demo-panel,.demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   空态与过期：提示卡横排、下面说清三种作业；有内容的态：下面「带走这一页」放打印纸缩略样子与三步。 */
+.body{gap:20px;flex:1 1 auto!important;min-height:0}
+.sec.state{flex:none!important;flex-direction:row;align-items:center;justify-content:flex-start;text-align:left;gap:28px;padding:30px 32px}
+.sec.state .state-ic{flex:none;width:104px;height:104px;border-radius:30px}
+.state-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.state-d{max-width:none!important}
+.qx52-kinds{padding:28px 30px 20px}
+.qx52-kind{display:flex;gap:24px;align-items:flex-start;padding:26px 0;border-top:1px solid var(--line)}
+.qx52-kind:first-of-type{border-top:0;padding-top:4px}
+.qx52-kind-ic{flex:none;width:80px;height:80px;border-radius:24px;display:flex;align-items:center;justify-content:center}
+.qx52-kind-ic[data-k="qa"]{background:var(--teal-soft);color:var(--teal-d)}
+.qx52-kind-ic[data-k="slot"]{background:var(--slate-soft);color:var(--slate-d)}
+.qx52-kind-ic[data-k="cmp"]{background:var(--wheat-soft);color:var(--wheat-d)}
+.qx52-kind-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.qx52-kind-tx b{font-size:28px;font-weight:700}
+.qx52-kind-tx span{font-size:23px;line-height:1.55;color:var(--ink-2)}
+.qx52-kind-h{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.qx52-kind-tx em{font-style:normal;align-self:flex-start;font-size:21px;font-weight:700;color:var(--teal-d);padding:6px 16px;border-radius:999px;background:var(--teal-soft)}
+.qx52-take{display:flex;gap:30px;align-items:stretch;padding:28px 30px}
+.qx52-paper{flex:none;width:280px;aspect-ratio:210/297;background:#fff;border:1px solid var(--line-2);border-radius:10px;
+  box-shadow:0 10px 24px rgba(16,48,43,.12);padding:26px 22px;display:flex;flex-direction:column;gap:16px}
+.qx52-paper .pp-t{display:block;height:16px;width:62%;border-radius:4px;background:var(--ink)}
+.qx52-paper .pp-m{display:block;height:9px;width:40%;border-radius:4px;background:#b3ab98;margin-bottom:6px}
+.qx52-paper .pp-r{display:grid;grid-template-columns:26px 1fr;gap:7px 10px;align-items:center}
+.qx52-paper .pp-e{grid-row:span 2;width:26px;height:26px;border-radius:7px}
+.qx52-paper .pp-r[data-e="E1"] .pp-e{background:var(--teal)}
+.qx52-paper .pp-r[data-e="E2"] .pp-e{background:var(--slate)}
+.qx52-paper .pp-r[data-e="E3"] .pp-e{background:var(--wheat)}
+.qx52-paper .pp-l{display:block;height:9px;border-radius:4px;background:#a39b87;width:100%}
+.qx52-paper .pp-l.w6{width:60%}.qx52-paper .pp-l.w7{width:70%}.qx52-paper .pp-l.w8{width:80%}.qx52-paper .pp-l.w9{width:90%}
+.qx52-paper .pp-f{display:block;height:8px;width:55%;border-radius:4px;background:#a39b87}
+.qx52-take-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.qx52-take-tx .sec-h{margin-bottom:16px}
+.qx52-steps{list-style:none;display:flex;flex-direction:column;gap:18px}
+.qx52-steps li{display:flex;gap:16px;align-items:flex-start;font-size:23px;line-height:1.5}
+.qx52-steps li b{flex:none;width:44px;height:44px;border-radius:50%;background:var(--deep);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px}
+.qx52-steps a{color:var(--teal-d);font-weight:700}
+.qx52-warn{padding:20px 22px;border-radius:18px;background:var(--wheat-soft);border:1px solid #e6d8b4}
+.qx52-warn b{display:block;font-size:24px;color:var(--wheat-d)}
+.qx52-warn p{margin-top:8px;font-size:22px;line-height:1.55;color:var(--ink-2)}
+.qx52-warn{margin-top:4px}
+.qx52-has{margin-top:auto;padding-top:18px;border-top:1px dashed var(--line-2);font-size:22px;line-height:1.55;color:var(--ink-2)}
+.qx52-paper{width:300px!important}
+#stage[data-state="no-artifact"] .qx52-paper,#stage[data-state="expired"] .qx52-paper{width:250px!important;padding:22px 20px;gap:14px}
+#stage[data-state="no-artifact"] .qx52-kind,#stage[data-state="expired"] .qx52-kind{padding:32px 0}
+/* 正文长的态：带走区按剩余空间分档，不许把正文或按钮挤出屏幕 */
+#stage[data-state="slot-draft-blanks"] .qx52-paper,#stage[data-state="compare-all-covered"] .qx52-paper{width:220px!important;padding:20px 18px;gap:12px}
+#stage[data-state="compare-report"] .qx52-paper{display:none}
+#stage[data-state="compare-report"] .qx52-steps{flex-direction:row;gap:24px}
+#stage[data-state="compare-report"] .qx52-steps li{flex:1}
+.qx52-paper .pp-body{flex:1;display:flex;flex-direction:column;justify-content:space-evenly;gap:12px}
+.qx52-paper .pp-e.sm{grid-row:auto;width:20px;height:20px;border-radius:6px}
+.qx52-paper .pp-r[data-v="ok"] .pp-e{background:var(--teal)}
+.qx52-paper .pp-r[data-v="miss"] .pp-e{background:var(--cinnabar)}
+.qx52-paper .pp-r[data-v="na"] .pp-e{background:var(--plum)}
+.qx52-paper .pp-r:has(.pp-e.sm){grid-template-columns:20px 1fr}
+.qx52-paper .pp-sub{margin:8px 0 0}
+/* 正文条目放大：一屏里这些是主角 */
+.pin{padding:26px 0!important}
+.pin-e{width:52px!important;height:52px!important;border-radius:14px!important}
+.pin-c{font-size:27px!important;line-height:1.5!important}
+.pin-s{margin-top:10px!important}
+.draft{font-size:27px!important;line-height:1.6!important;padding:26px 28px!important}
+.cmp{padding:24px 0!important}
+.cmp-r{font-size:26px!important}
+.sec{padding:30px 32px}
+/* 成稿依据的原话：打印时一并带出，是这一态的重点之一，按正文字号排 */
+.based{margin-top:22px}
+.based-t{font-size:22px!important;margin-bottom:6px}
+.based-i{padding:18px 0!important;font-size:23px!important;line-height:1.5!important}
+.based-k{width:240px}
 </style>
 </head>
 <body>
@@ -288,7 +360,7 @@ a.btn[data-v="primary"]{color:#fff}
     </span>
   </section>
 
-  <section class="legend" data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered"
+  <section class="legend" data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered print-unavailable"
           >
     <span class="lg" data-e="E1"><b>E1</b>你自己说过的原话</span>
     <span class="lg" data-e="E2"><b>E2</b>本机已有的数据</span>
@@ -304,9 +376,11 @@ a.btn[data-v="primary"]{color:#fff}
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="1.9"
              stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       </span>
-      <p class="state-t">这一页只显示刚做出来的产物</p>
-      <p class="state-d">小青的问答、填槽、比对做完之后，结果会回到这一页，能看也能打印。
-        现在没有可显示的产物 —— 不会拿旧的或编的顶上。</p>
+      <span class="state-tx">
+        <p class="state-t">这一页只显示刚做出来的产物</p>
+        <p class="state-d">小青的问答、填槽、比对做完之后，结果会回到这一页，能看也能打印。
+          现在没有可显示的产物 —— 不会拿旧的或编的顶上。</p>
+      </span>
     </section>
 
     <section class="sec grow state" data-tone="warn" data-show="expired"
@@ -315,24 +389,42 @@ a.btn[data-v="primary"]{color:#fff}
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#8a6219" stroke-width="1.9"
              stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       </span>
-      <p class="state-t">产物已过留存期</p>
-      <p class="state-d">公共终端不长期保存个人材料。过期后正文不再展示，也无法再打印；
-        需要的话回去重做一次，很快。</p>
+      <span class="state-tx">
+        <p class="state-t">产物已过留存期</p>
+        <p class="state-d">公共终端不长期保存个人材料。过期后正文不再展示，也无法再打印；
+          需要的话回去重做一次，很快。</p>
+      </span>
     </section>
 
-    <section class="sec grow state" data-tone="warn" data-show="print-unavailable"
-             data-testid="advisor-artifact-print-unavailable">
-      <span class="state-ic">
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#8a6219" stroke-width="1.9"
-             stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-      </span>
-      <p class="state-t">读不到打印能力，先不放打印按钮</p>
-      <p class="state-d">这台机器的打印状态暂时确认不了。产物正文还在，可以先看；
-        能力恢复后再打印，或者去问工作人员。</p>
+    <!-- 空态与过期：说清小青能做的三种作业，做完回到这一页（不留大片空白） -->
+    <section class="sec qx52-kinds" data-show="no-artifact expired" data-testid="advisor-artifact-kinds">
+      <div class="sec-h"><span class="sec-n">01</span><span class="sec-t">小青能帮你做的三种作业</span>
+        <span class="sec-hint">做完都会回到这一页</span></div>
+      <div class="qx52-kind">
+        <span class="qx52-kind-ic" data-k="qa"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l3 3.2H6z"/></svg></span>
+        <span class="qx52-kind-tx">
+          <span class="qx52-kind-h"><b>边问边钉住</b><em>带走：钉住的条目单</em></span>
+          <span>问什么都行，觉得有用的那句点「钉住」。对话本身不保存，钉住的条目整理成一页。</span>
+        </span>
+      </div>
+      <div class="qx52-kind">
+        <span class="qx52-kind-ic" data-k="slot"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h7"/><path d="M17 15l2 2 3-4"/></svg></span>
+        <span class="qx52-kind-tx">
+          <span class="qx52-kind-h"><b>她问，你答，拼成一段话</b><em>带走：成稿和它依据的原话</em></span>
+          <span>小青按顺序问几个问题，你照实回答，最后拼成一段可以直接念的话；没答的地方留空，不替你编。</span>
+        </span>
+      </div>
+      <div class="qx52-kind">
+        <span class="qx52-kind-ic" data-k="cmp"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg></span>
+        <span class="qx52-kind-tx">
+          <span class="qx52-kind-h"><b>逐条比：有没有写到</b><em>带走：逐条比对单</em></span>
+          <span>把你自己写下的要求和你的材料逐条对照，只比有没有写到，不评价写得好不好。</span>
+        </span>
+      </div>
     </section>
 
     <!-- 问答型：钉住条目单 -->
-    <section class="sec grow" data-show="qa-pins" data-testid="advisor-artifact-qa">
+    <section class="sec grow" data-show="qa-pins print-unavailable" data-testid="advisor-artifact-qa">
       <div class="sec-h"><span class="sec-n">01</span><span class="sec-t">你钉住的条目</span>
         <span class="sec-hint">共 4 条 · 对话未保存</span></div>
       <div class="scroll">
@@ -410,17 +502,63 @@ a.btn[data-v="primary"]{color:#fff}
         </div>
       </div>
     </section>
-    <section class="sec" data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered print-unavailable">
-      <div class="sec-h"><span class="sec-n">02</span><span class="sec-t">怎么带走</span>
-        <span class="sec-hint">两件事都做得到</span></div>
-      <p class="pin-c">点下面的「打印带走」进入打印。之后在 <a href="30-my-profile.html">我的 AI 记录</a> 里还能再打开这份内容。标成 E3 的句子只是建议，说不说由你定。</p>
+    <section class="sec qx52-take" data-testid="advisor-artifact-take">
+      <div class="qx52-paper" aria-hidden="true">
+        <span class="pp-t"></span><span class="pp-m"></span>
+        <span class="pp-body" data-show="qa-pins print-unavailable no-artifact expired">
+          <span class="pp-r" data-e="E1"><span class="pp-e"></span><span class="pp-l"></span><span class="pp-l w6"></span></span>
+          <span class="pp-r" data-e="E2"><span class="pp-e"></span><span class="pp-l"></span><span class="pp-l w8"></span></span>
+          <span class="pp-r" data-e="E3"><span class="pp-e"></span><span class="pp-l"></span><span class="pp-l w7"></span></span>
+          <span class="pp-r" data-e="E1"><span class="pp-e"></span><span class="pp-l w9"></span></span>
+        </span>
+        <span class="pp-body" data-show="slot-draft slot-draft-blanks">
+          <span class="pp-l"></span><span class="pp-l w9"></span><span class="pp-l"></span><span class="pp-l w8"></span><span class="pp-l w6"></span>
+          <span class="pp-m pp-sub"></span>
+          <span class="pp-r" data-e="E1"><span class="pp-e sm"></span><span class="pp-l w8"></span></span>
+          <span class="pp-r" data-e="E1"><span class="pp-e sm"></span><span class="pp-l w7"></span></span>
+          <span class="pp-r" data-e="E1"><span class="pp-e sm"></span><span class="pp-l w9"></span></span>
+        </span>
+        <span class="pp-body" data-show="compare-report compare-all-covered">
+          <span class="pp-r" data-v="ok"><span class="pp-e sm"></span><span class="pp-l w8"></span></span>
+          <span class="pp-r" data-v="ok"><span class="pp-e sm"></span><span class="pp-l w7"></span></span>
+          <span class="pp-r" data-v="miss"><span class="pp-e sm"></span><span class="pp-l w9"></span></span>
+          <span class="pp-r" data-v="miss"><span class="pp-e sm"></span><span class="pp-l w6"></span></span>
+          <span class="pp-r" data-v="na"><span class="pp-e sm"></span><span class="pp-l w7"></span></span>
+        </span>
+        <span class="pp-f"></span>
+      </div>
+      <div class="qx52-take-tx">
+        <div class="sec-h"><span class="sec-n">02</span>
+          <span class="sec-t" data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered print-unavailable">带走这一页</span>
+          <span class="sec-t" data-show="no-artifact expired">做完以后怎么带走</span>
+          <span class="sec-hint">A4 打印稿</span></div>
+        <ol class="qx52-steps" data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered">
+          <li><b>1</b><span>点下面「打印带走」，生成一份 PDF 打印稿，存进<a href="38-member-assets.html">我的文档</a>。</span></li>
+          <li><b>2</b><span>在「我的文档」点「用于打印」，先看预览和价格，确认了再出纸。</span></li>
+        </ol>
+        <ol class="qx52-steps" data-show="no-artifact expired">
+          <li><b>1</b><span>作业做完会回到这一页，能看也能打印。</span></li>
+          <li><b>2</b><span>点「打印带走」，生成一份 PDF 打印稿，存进「我的文档」。</span></li>
+          <li><b>3</b><span>在「我的文档」点「用于打印」，看过预览和价格再出纸。</span></li>
+        </ol>
+        <p class="qx52-has" data-show="qa-pins print-unavailable">打印稿上有：你钉住的每一条，每条后面附出处和 E1 / E2 / E3。E3 是 AI 的判断，说不说由你定。</p>
+        <p class="qx52-has" data-show="slot-draft slot-draft-blanks">打印稿上有：这段话、留空的地方，以及它依据的每一句原话。</p>
+        <p class="qx52-has" data-show="compare-report compare-all-covered">打印稿上有：每条要求写没写到，写到的附你材料里的原文。</p>
+        <div class="qx52-warn" data-show="print-unavailable">
+          <b>这台机器的打印暂时读不到</b>
+          <p>正文照常可看，打印按钮先不放出来。等打印恢复后回到这里再打，或者问现场工作人员。</p>
+        </div>
+      </div>
     </section>
   </div>
   <div class="cta">
-    <a class="btn" data-v="ghost" href="05-ai-cockpit.html" data-testid="advisor-artifact-cta-back">
+    <a class="btn" data-v="ghost" href="05-ai-cockpit.html" data-testid="advisor-artifact-cta-back"
+       data-show="no-artifact qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered print-unavailable">
       <span data-show="no-artifact">去问小青</span>
-      <span data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered expired print-unavailable">再问一轮</span>
+      <span data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered print-unavailable">再问一轮</span>
     </a>
+    <a class="btn" data-v="primary" href="05-ai-cockpit.html" data-show="expired"
+       data-testid="advisor-artifact-cta-redo">回去重做一次</a>
     <a class="btn" data-v="primary" href="10-print-hub.html"
             data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered"
             data-testid="advisor-artifact-cta-print">

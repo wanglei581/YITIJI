@@ -6,12 +6,16 @@
 //   3. 压字：一段文字上有别的元素压着（卡片盖住标签、两段字叠在一起、内容钻到底部导航下面）。
 //      弹层（role=dialog / aria-modal、铺满整屏的遮罩）盖住底下的页面不算，透明无字的点击层不算；
 //      水印、印章这类装饰用 aria-hidden 或 pointer-events:none 标出来，不参与判断。
+//   4. 留白（产品负责人 9/28：不许留大片空白）：整行连续空白 ≥ 160px，或左 / 右半边 ≥ 240px 算问题；
+//      只量第一屏；手机页 51 不按 1080 宽量。
+//   5. 被裁：文字上下边超出 overflow:hidden 的外框（含 1920 高的舞台），也就是被裁掉或挤出屏幕。
+//      填留白时最容易把底部按钮和导航挤下去，所以和留白一起查；可滚动区与多行截断不算。
 //
 // 状态清单与并排截图工具（tests/visual/qingxu-pairs.spec.ts）共用 tests/visual/fixtures/qingxu-pair-targets.ts
 // 的 buildQingxuPairs()：用 vite 自带的 esbuild 临时打包后导入，两边不会各数各的。稿的取法也一样：
 // v2 目录里有的稿（及其 .js / .css 附件）以 v2 为准，其余读原稿。只检查解析到 v2 目录的稿。
 //
-// 用法（在 apps/kiosk 下）：node scripts/audit-qingxu-v2-drafts.mjs [--only=<正则，匹配稿文件名>] [--json=<输出文件>]
+// 用法（在 apps/kiosk 下）：node scripts/audit-qingxu-v2-drafts.mjs [--only=<正则，匹配稿文件名>] [--json=<输出文件>] [--shots=<目录>]
 // 有问题退出码为 1。不进 CI：v2 稿还在陆续补，改稿后自己跑。
 
 import fs from 'node:fs'
@@ -30,6 +34,9 @@ const onlyArg = process.argv.find((a) => a.startsWith('--only='))
 const ONLY = onlyArg ? new RegExp(onlyArg.slice('--only='.length)) : null
 const jsonArg = process.argv.find((a) => a.startsWith('--json='))
 const JSON_OUT = jsonArg ? path.resolve(jsonArg.slice('--json='.length)) : null
+// --shots=<目录>：把有大片留白的状态截图存下来，文件名是「稿名__屏__状态.png」，改稿时对着看。
+const shotsArg = process.argv.find((a) => a.startsWith('--shots='))
+const SHOTS_DIR = shotsArg ? path.resolve(shotsArg.slice('--shots='.length)) : null
 
 // 规则 4 的用词：写给用户看的页面上不该出现的工程词。
 const BANNED = /服务端|后端|前台|后台|落库|会话|元数据|回执|链路|网桥|真机|未验收|pending|uploaded|签名链接|字段|接口/
@@ -136,9 +143,26 @@ const PROBE = ({ bannedSource, minFont, checkFont, icpSource, keySource }) => {
     return box
   }
   const label = (el) => `${el.tagName.toLowerCase()}${el.classList[0] ? '.' + el.classList[0] : ''}`
+  // 被裁：文字的上下边超出了 overflow:hidden / clip 的祖先（包括整张 1920 高的舞台）。
+  // 可滚动区域里暂时滚出去的内容不算；-webkit-line-clamp 的多行截断是有意的，不算；横向省略号只影响左右，这里只看上下。
+  const hardClip = (el) => {
+    let box = { t: 0, b: VH }
+    for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+      const st = cs(e)
+      if (st.webkitLineClamp && st.webkitLineClamp !== 'none') return null
+      if (e === el) continue
+      if (/auto|scroll/.test(st.overflowY) && e.scrollHeight > e.clientHeight + 1) return null
+      if (st.overflowY === 'hidden' || st.overflowY === 'clip') {
+        const r = e.getBoundingClientRect()
+        box = { t: Math.max(box.t, r.top), b: Math.min(box.b, r.bottom) }
+      }
+    }
+    return box
+  }
 
   const small = []
   const covered = []
+  const clipped = []
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
   let node
   while ((node = walker.nextNode())) {
@@ -148,7 +172,13 @@ const PROBE = ({ bannedSource, minFont, checkFont, icpSource, keySource }) => {
     if (!el || hidden(el)) continue
     const range = document.createRange()
     range.selectNodeContents(node)
-    const rects = [...range.getClientRects()].filter((r) => r.width >= 3 && r.height >= 3 && r.bottom > 0 && r.top < VH && r.right > 0 && r.left < VW)
+    const allRects = [...range.getClientRects()].filter((r) => r.width >= 3 && r.height >= 3)
+    if (allRects.length && !decoration(el) && !visuallyHiddenText(el)) {
+      const hc = hardClip(el)
+      const cut = hc && allRects.find((r) => r.bottom > hc.b + 2 || r.top < hc.t - 2)
+      if (cut) clipped.push(`「${text.slice(0, 16)}」(${label(el)}) 被裁在 y=${Math.round(cut.top)}–${Math.round(cut.bottom)}（可见到 ${Math.round(hc.b)}）`)
+    }
+    const rects = allRects.filter((r) => r.bottom > 0 && r.top < VH && r.right > 0 && r.left < VW)
     if (!rects.length) continue
     const px = parseFloat(cs(el).fontSize)
     if (checkFont && px < minFont && !icp.test(text)) small.push(`${px}px「${text.slice(0, 16)}」`)
@@ -174,8 +204,65 @@ const PROBE = ({ bannedSource, minFont, checkFont, icpSource, keySource }) => {
     }
     if (hit) covered.push(hit)
   }
-  return { words, keys, small: [...new Set(small)], covered: [...new Set(covered)] }
+  return { words, keys, small: [...new Set(small)], covered: [...new Set(covered)], clipped: [...new Set(clipped)] }
 }
+
+// 规则（产品负责人 9/28）：一屏里不许留大片空白，空间要按内容规划好。
+// 口径同原稿空白门禁的 pixel 口径：min(r,g,b)<165，或 (max-min>45 且 min<220) 才算有内容；
+// 卡片边框、浅底、纸色都不算。量整行、左半、右半三段里最长的连续空白（两栏布局常是一栏空着）。
+// 两张卡之间的正常节奏（上卡下内边距 + 间隔 + 下卡上内边距）本身就有 110–130px，门槛取 160 / 240，
+// 抓的是 9/28 那批 300–500px 的大片空白，不误伤正常间距。
+const BLANK_FULL = 160
+const BLANK_HALF = 240
+const BLANK_EXEMPT = new Set(['51-phone-relay.html'])
+const BLANK_PROBE = async ({ b64, top, bottom }) => {
+  const img = new Image()
+  img.src = `data:image/png;base64,${b64}`
+  await img.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = img.width
+  canvas.height = img.height
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0)
+  const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height)
+  const half = width >> 1
+  const left = new Uint8Array(height)
+  const right = new Uint8Array(height)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4
+      const lo = Math.min(data[i], data[i + 1], data[i + 2])
+      const hi = Math.max(data[i], data[i + 1], data[i + 2])
+      if (lo < 165 || (hi - lo > 45 && lo < 220)) {
+        if (x < half) left[y] = 1
+        else right[y] = 1
+        if (left[y] && right[y]) break
+      }
+    }
+  }
+  const longest = (ink) => {
+    let best = [0, 0, 0]
+    let start = -1
+    for (let y = top; y <= Math.min(bottom, height); y++) {
+      const blank = y < Math.min(bottom, height) && !ink(y)
+      if (blank && start < 0) start = y
+      if (!blank && start >= 0) {
+        if (y - start > best[0]) best = [y - start, start, y]
+        start = -1
+      }
+    }
+    return best
+  }
+  return {
+    full: longest((y) => left[y] || right[y]),
+    left: longest((y) => left[y]),
+    right: longest((y) => right[y]),
+  }
+}
+const blankProblem = (b) => b && (b.full[0] >= BLANK_FULL || b.left[0] >= BLANK_HALF || b.right[0] >= BLANK_HALF)
+const blankText = (b) => [['整行', b.full], ['左半', b.left], ['右半', b.right]]
+  .filter(([name, v]) => v[0] >= (name === '整行' ? BLANK_FULL : BLANK_HALF))
+  .map(([name, v]) => `${name} ${v[0]}px（y ${v[1]}–${v[2]}）`).join('，')
 
 async function main() {
   const { buildQingxuPairs, protoFile, PROTO_V2_DIR } = await loadPairTargets()
@@ -217,6 +304,14 @@ async function main() {
         await page.evaluate(() => document.fonts && document.fonts.ready)
         const r = await page.evaluate(PROBE, { bannedSource: BANNED.source, minFont: MIN_FONT, checkFont: !FONT_EXEMPT.has(t.file), icpSource: ICP_LINE.source, keySource: ENGLISH_KEY.source })
         r.keys = r.keys.filter((key) => !KEY_ALLOW.has(key))
+        if (!BLANK_EXEMPT.has(t.file)) {
+          const shot = await page.screenshot()
+          r.blank = await page.evaluate(BLANK_PROBE, { b64: shot.toString('base64'), top: 60, bottom: 1900 })
+          if (SHOTS_DIR && blankProblem(r.blank)) {
+            fs.mkdirSync(SHOTS_DIR, { recursive: true })
+            fs.writeFileSync(path.join(SHOTS_DIR, `${t.file.replace(/\.html$/, '')}__${t.screen}__${t.state}.png`), shot)
+          }
+        }
         rows.push({ file: t.file, screen: t.screen, state: t.state, query: t.protoQuery, ...r, pageErrors })
       } catch (e) {
         rows.push({ file: t.file, screen: t.screen, state: t.state, query: t.protoQuery, error: String(e.message).slice(0, 160) })
@@ -238,7 +333,7 @@ async function main() {
     byFile.set(row.file, list)
   }
   for (const [file, list] of [...byFile].sort()) {
-    const bad = list.filter((r) => r.error || r.pageErrors?.length || r.words?.length || r.keys?.length || r.small?.length || r.covered?.length)
+    const bad = list.filter((r) => r.error || r.pageErrors?.length || r.words?.length || r.keys?.length || r.small?.length || r.covered?.length || r.clipped?.length || blankProblem(r.blank))
     console.log(`${bad.length ? 'FAIL' : 'ok  '} ${file.padEnd(40)} ${list.length} 个状态${bad.length ? `，${bad.length} 个有问题` : ''}`)
     for (const r of bad) {
       problems++
@@ -249,6 +344,8 @@ async function main() {
       if (r.keys?.length) console.log(`${tag}：英文键名 ${r.keys.slice(0, 4).join(' / ')}`)
       if (r.small?.length) console.log(`${tag}：小于 ${MIN_FONT}px ${r.small.length} 处，如 ${r.small.slice(0, 3).join('、')}`)
       if (r.covered?.length) console.log(`${tag}：压字 ${r.covered.length} 处，如 ${r.covered.slice(0, 2).join('；')}`)
+      if (r.clipped?.length) console.log(`${tag}：文字被裁或挤出屏幕 ${r.clipped.length} 处，如 ${r.clipped.slice(0, 2).join('；')}`)
+      if (blankProblem(r.blank)) console.log(`${tag}：大片留白 ${blankText(r.blank)}`)
     }
   }
   console.log(`\n${byFile.size} 张 v2 稿、${rows.length} 个状态；有问题的状态 ${problems} 个。`)
