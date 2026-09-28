@@ -35,7 +35,7 @@ node scripts/project-graph-query.mjs model PrintTask
 | --- | --- | --- | --- | --- |
 | kiosk | `apps/kiosk` | 90 | 693 | 600 |
 | admin | `apps/admin` | 38 | 176 | 171 |
-| partner | `apps/partner` | 15 | 70 | 69 |
+| partner | `apps/partner` | 15 | 71 | 70 |
 
 | 维度 | 数量 |
 | --- | --- |

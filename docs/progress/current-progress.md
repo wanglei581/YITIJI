@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
+
+- **P-01（机构政策列表）：** 平台紧急下架的政策此前和机构自己下架的一样显示「已下架」，还给「编辑」「审核通过」「发布」（发布会被服务端以 `EMERGENCY_TAKEDOWN_IRREVERSIBLE` 拒绝，编辑后永远发不出去）。服务端 `getPartnerPolicies` 给本机构列表每行附上 `emergencyTakedown` / `emergencyReasonCode` / `emergencyReasonText` / `emergencyTakedownAt`（只按本机构 `orgId` 加本页 id 查 `RecruitmentEmergencyHold`，公开读取不带；改动前已告知后端窗口，对方同意并提了按机构过滤、跨机构断言两条，均照做）。机构后台对这类行显示「平台已紧急下架」、下方整行写事由、说明、下架时间与「已冻结」，只留删除；与官方渠道面板同一口径。门禁 `verify:policies` 加一段：被下架行带出事由、其余行为 false、A/B 两个机构互相看不到对方的事由、公开列表不带这几个字段；变异「不附下架信息」即红。演示模式补一条被下架的示例，演示发布与服务端同样拒绝。
+- **P-02（机构登录页）与管理员登录页：** 品牌由「AI求职打印一体机」改为备案名「职易达」，去掉「Partner Console」「Admin Console」；机构端不再写「你的岗位与招聘会，从这里走进终端」「审核通过后即在终端展示」「仅管理岗位与招聘会等展示信息」，改为本机构资料、官方渠道与政策公告，由本机构审核发布；管理员端不再写「岗位与招聘会信息源审核」，改为机构入驻与紧急下架。管理员后台演示模式的协议示例正文同步改口径。
+- **P-03（机构资料页）：** 副标题的对应前端按托管状态写：托管关（本平台默认）写「本机构官方渠道」与政策的来源机构，托管开（私有化部署）才提「找企业」与岗位；内容信任卡里的「岗位、招聘会与政策内容」同样按托管状态只写政策。`verify:partner-refresh-safe` 钉的副标题映射随口径更新。
+- **顺手：** 机构政策表标题列加最小宽度，窄屏下不再被压成一字一行（其它后台表格的同类问题记进 3.8 走查清单）。
+- **验证：** api / admin / partner `tsc --noEmit` 通过，admin / partner lint 0 错误（新文件无新增警告）；`verify:policies`（41 条）、`verify:bulk-publish`、`verify:content-trust-publish-gate`、`verify:assess-isolation`、`verify:policy-eligibility-authoring`、`verify:policy-eligibility`、`verify:publish-expiry-completeness`、`verify:legal-doc-version`、`verify:partner-refresh-safe`、`verify:admin-account-settings-ui`、`verify:console-screen-ui`、`verify:no-raw-error-render` 通过；浏览器（演示模式）在 1280×800、1440×900、768×1024 看过两个登录页与机构政策列表。
+
 ## 2026-09-29 凌晨：2.0 稿定为最终版（收尾中）；第三波试点 16、06 运行页对齐稿
 
 - **产品负责人定：** 「这一遍就是最终版本，然后后续前端所有页面都按照这个最终版更新到线上」。这一轮收尾完成后冻结 `docs/design/kiosk-redesign-2026-08-v2/`，之后运行页和稿不一致时改运行页、不改稿（冻结门禁随定稿提交）；运行页全部照最终版实现、验收后发布（发布前按次确认）。同时拍板：打印参数全部放上页面，本机不可用的按钮灰色、可用的白色可点，报价页不再拦截；签名只保留本人手写签名；稿 34 自我探索改成与运行页一致（AI 解读、打印、记录保留）；稿 52 新加的「带走这一页」「三种作业」保留。按推荐默认：46 不分档、31 写「抵扣功能尚未开放」、08 取不到协议正文如实说、上线时正在办理的旧打印会话清掉、会员原件转成的 PDF 按原件过隐私检查。
