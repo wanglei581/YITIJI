@@ -210,8 +210,18 @@ async function main() {
     if (leaked) fail('C3-e. 审计写不进去时仍返回了完整号码')
     else pass('C3-e. 审计写不进去就不返回完整号码')
     const revealGuards = guardNames(AdminMemberFeedbackController)
+    const revealRoles = Reflect.getMetadata(ROLES_KEY, AdminMemberFeedbackController) as UserRole[] | undefined
+    const revealLimit = Reflect.getMetadata('THROTTLER:LIMITdefault', AdminMemberFeedbackController.prototype.revealContactPhone) as number | undefined
     if (!revealGuards.includes(JwtAuthGuard.name) || !revealGuards.includes(RolesGuard.name)) fail('C3-f. 查看完整号码所在控制器缺少管理员鉴权')
-    else pass('C3-f. 查看完整号码挂在管理员鉴权控制器上')
+    else if (JSON.stringify(revealRoles) !== JSON.stringify(['admin'])) fail(`C3-f. 查看完整号码只许 admin 角色，实际 ${JSON.stringify(revealRoles)}`)
+    else if (!revealLimit || revealLimit > 10) fail(`C3-f. 查看完整号码缺少限流（每分钟不超过 10 次），实际 ${revealLimit}`)
+    else pass('C3-f. 查看完整号码只许 admin 角色，且每分钟限 10 次')
+    const generalWithPhone = await feedback.create(userA, {
+      category: 'general', contactPhone: phoneB, content: '会员一般反馈也留了联系电话',
+    })
+    await expectReject('FEEDBACK_CONTACT_NOT_REVEALABLE', 'C3-g. 非 AI 内容投诉不开放查看完整号码（会员回复在「我的反馈」送达）', () =>
+      feedback.revealContactPhoneForAdmin(admin, generalWithPhone.id),
+    )
 
     const extraFeedbacks = await Promise.all(Array.from({ length: 101 }, (_, index) => feedback.create(userA, {
       category: 'general',

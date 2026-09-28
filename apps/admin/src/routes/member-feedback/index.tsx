@@ -306,7 +306,7 @@ export default function MemberFeedbackPage() {
                     {detail.submitterType === 'anonymous_kiosk'
                       ? `${submitterLabel(detail)} · 联系号码 ${revealedPhone?.id === detail.id ? revealedPhone.phone : detail.contactPhoneMasked ?? '未填写'}`
                       : `用户 ${submitterLabel(detail)} · 联系号码 ${revealedPhone?.id === detail.id ? revealedPhone.phone : detail.contactPhoneMasked ?? '未填写'}`}
-                    {detail.contactPhoneMasked && revealedPhone?.id !== detail.id && (
+                    {detail.category === 'ai_content' && detail.contactPhoneMasked && revealedPhone?.id !== detail.id && (
                       <button type="button" onClick={() => void revealPhone()} className="ml-2 min-h-12 px-2 text-sm font-medium text-primary-700 underline">
                         查看完整号码（会留痕）
                       </button>
@@ -315,7 +315,7 @@ export default function MemberFeedbackPage() {
                   {detail.submitterType === 'anonymous_kiosk' && (
                     <p className="mt-1 text-sm text-amber-700">
                       {detail.contactPhoneMasked
-                        ? '匿名工单没有账号归属：这里的回复不会送达。提交人留了手机号，请电话告知处理结果，再把结果记在回复里。'
+                        ? '匿名工单没有账号归属：这里的回复不会送达。提交人留了手机号，请电话告知处理结果，再在回复里记下处理结果（不要写手机号）。'
                         : '匿名工单没有账号归属：回复不会送达、也不会推通知，只能在该终端现场处置。'}
                     </p>
                   )}

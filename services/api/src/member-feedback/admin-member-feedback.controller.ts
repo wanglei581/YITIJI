@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Header, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import type { AdminFeedbackTicketDetail, AdminFeedbackTicketItem } from './member-feedback.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
@@ -31,8 +32,9 @@ export class AdminMemberFeedbackController {
     return ApiResponse.ok(await this.feedback.getForAdmin(admin, id))
   }
 
-  /** C3：查看提交人留的完整联系电话。用 POST：每次都要留痕，不该被缓存或预取。 */
+  /** C3：查看 AI 内容投诉提交人留的完整号码。用 POST：每次都要留痕，不该被缓存或预取；限流防批量拉取。 */
   @Post(':id/contact-phone')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Header('Cache-Control', 'no-store')
   async revealContactPhone(
     @CurrentUser() admin: AuthedUser,

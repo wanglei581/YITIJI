@@ -150,9 +150,10 @@ export class MemberFeedbackService {
    * C3：查看工单上「提交人自己留的联系电话」完整号码。匿名 AI 内容投诉没有账号，
    * 只能电话告知处理结果，打码号码打不出去。
    *
-   * 这是「API 不返回明文手机号」的唯一例外，范围收在：只有管理员、只有工单上提交人为被联系而
-   * 主动填写的 contactPhoneEnc（会员账号手机号 EndUser.phoneEnc 仍然只给打码）、每次查看都先写
-   * 必须成功的审计（写不进去就不给号码）。
+   * 这是「API 不返回明文手机号」的唯一例外，范围收在：只有管理员、只有 AI 内容投诉、只有工单上
+   * 提交人为被联系而主动填写的 contactPhoneEnc（会员账号手机号 EndUser.phoneEnc 仍然只给打码）、
+   * 每次查看都先写必须成功的审计（写不进去就不给号码），接口另有限流。
+   * 会员工单的回复在「我的反馈」里就能送达，用不着打电话，所以不开放。
    */
   async revealContactPhoneForAdmin(admin: AuthedUser, id: string): Promise<{ phone: string }> {
     const ticket = await this.prisma.feedbackTicket.findUnique({
@@ -160,6 +161,9 @@ export class MemberFeedbackService {
       select: { id: true, category: true, submitterType: true, contactPhoneEnc: true },
     })
     if (!ticket) throw new NotFoundException({ error: { code: 'FEEDBACK_NOT_FOUND', message: '反馈记录不存在' } })
+    if (ticket.category !== 'ai_content') {
+      throw new BadRequestException({ error: { code: 'FEEDBACK_CONTACT_NOT_REVEALABLE', message: '只有 AI 内容投诉可以查看完整号码' } })
+    }
     if (!ticket.contactPhoneEnc) {
       throw new NotFoundException({ error: { code: 'FEEDBACK_CONTACT_NOT_FOUND', message: '这条反馈没有留联系电话' } })
     }

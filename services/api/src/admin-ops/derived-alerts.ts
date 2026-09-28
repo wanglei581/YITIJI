@@ -91,10 +91,20 @@ type PaidPendingFileUnavailableTaskRow = {
   } | null
 }
 
-type PendingFeedbackSummary = { count: number; earliest: Date | null }
+type PendingFeedbackSummary = { count: number; earliest: Date | null; latest: Date | null }
 
-/** C3：待处理的 AI 内容投诉（新提交或处理中）。只取提交时间，不取正文与手机号。 */
+/** C3：待处理的 AI 内容投诉（新提交或处理中）。只取条数与提交时间，不取正文与手机号。 */
 const PENDING_AI_CONTENT_FEEDBACK = { category: 'ai_content', status: { in: ['pending', 'processing'] } }
+
+/** 计数 + 最早、最新各一条：不全表拉取，积压或被刷单时也不拖垮整张告警列表。 */
+async function pendingAiContentFeedback(prisma: PrismaService): Promise<PendingFeedbackSummary> {
+  const [count, oldest, newest] = await Promise.all([
+    prisma.feedbackTicket.count({ where: PENDING_AI_CONTENT_FEEDBACK }),
+    prisma.feedbackTicket.findFirst({ where: PENDING_AI_CONTENT_FEEDBACK, orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
+    prisma.feedbackTicket.findFirst({ where: PENDING_AI_CONTENT_FEEDBACK, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+  ])
+  return { count, earliest: oldest?.createdAt ?? null, latest: newest?.createdAt ?? null }
+}
 
 const TERMINAL_SELECT = {
   id: true,
@@ -279,14 +289,14 @@ function buildPaidPendingFileUnavailableAlert(
 }
 
 function buildPendingFeedbackAlert(summary: PendingFeedbackSummary): DerivedAlert | null {
-  if (!summary.earliest || summary.count <= 0) return null
+  if (!summary.earliest || !summary.latest || summary.count <= 0) return null
   const subjectId = 'ai-content'
   const subjectKey = buildSubjectKey('feedback_pending', subjectId)
   return {
     id: subjectKey,
     subjectKey,
     subjectId,
-    episodeToken: feedbackPendingEpisodeToken(summary.count, summary.earliest),
+    episodeToken: feedbackPendingEpisodeToken(summary.latest),
     type: 'feedback_pending',
     severity: 'warning',
     title: '有待处理的 AI 内容投诉',
@@ -381,12 +391,7 @@ export async function collectDerivedAlerts(
     if (alert) alerts.push(alert)
   }
 
-  const pendingFeedbackRows = await prisma.feedbackTicket.findMany({
-    where: PENDING_AI_CONTENT_FEEDBACK,
-    orderBy: { createdAt: 'asc' },
-    select: { createdAt: true },
-  })
-  const feedbackAlert = buildPendingFeedbackAlert({ count: pendingFeedbackRows.length, earliest: pendingFeedbackRows[0]?.createdAt ?? null })
+  const feedbackAlert = buildPendingFeedbackAlert(await pendingAiContentFeedback(prisma))
   if (feedbackAlert) alerts.push(feedbackAlert)
 
   alerts.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
@@ -437,12 +442,7 @@ export async function resolveDerivedAlert(
   }
 
   if (type === 'feedback_pending') {
-    const rows = await prisma.feedbackTicket.findMany({
-      where: PENDING_AI_CONTENT_FEEDBACK,
-      orderBy: { createdAt: 'asc' },
-      select: { createdAt: true },
-    })
-    return buildPendingFeedbackAlert({ count: rows.length, earliest: rows[0]?.createdAt ?? null })
+    return buildPendingFeedbackAlert(await pendingAiContentFeedback(prisma))
   }
 
   const terminal = (await prisma.terminal.findUnique({

@@ -118,8 +118,12 @@ export function paidPendingFileUnavailableEpisodeToken(args: {
   ].join(':')
 }
 
-export function feedbackPendingEpisodeToken(count: number, earliest: Date): string {
-  return `${count}:${earliest.toISOString()}`
+/**
+ * 待处理 AI 内容投诉的 episode 只跟「最新一条待处理投诉的提交时间」走：
+ * 有新投诉进来才换 episode、已确认或静音的告警重新提醒；答复旧工单不打扰。
+ */
+export function feedbackPendingEpisodeToken(latest: Date): string {
+  return latest.toISOString()
 }
 
 /**
