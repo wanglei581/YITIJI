@@ -679,8 +679,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts` | `verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/pages/scan/ScanProgressPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/scan/ScanResultPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
-| `apps/kiosk/src/pages/scan/ScanSettingsPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
-| `apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/ScanSettingsPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx` | `verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanStartPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanWorkbenchChrome.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
@@ -688,7 +688,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/scan/scanCreateReplay.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanDeliveryAck.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanOutputFormat.ts` | `verify-scan-session-truth.mjs` |
-| `apps/kiosk/src/pages/scan/scanRescanRecovery.ts` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/scanRescanRecovery.ts` | `verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanSessionRevoke.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanSettingsModel.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanSettingsTeardown.ts` | `verify-scan-session-truth.mjs` |
@@ -1024,7 +1024,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/db.ts` | `verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/dead-letter-operator.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/heartbeat.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-local-qr-proxy.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-input-lockout-telemetry.ts` |
-| `apps/terminal-agent/src/agent/instance-lock.ts` | `verify-print-scan-agent.mjs` |
+| `apps/terminal-agent/src/agent/instance-lock.ts` | `verify-print-scan-agent.mjs`<br/>`verify-singleton-process.mjs` |
 | `apps/terminal-agent/src/agent/network-diagnostics.ts` | `verify-network-diagnostics.ts` |
 | `apps/terminal-agent/src/agent/offline-queue.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/print-task-temp-cleanup.ts` | `verify-print-scan-agent.mjs` |
@@ -2438,7 +2438,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/scan-tasks/dto/create-scan-task.dto.ts` | `verify-scan-session-truth.mjs`<br/>`verify-scan-tasks.ts` |
 | `services/api/src/scan-tasks/scan-task-reaper.task.ts` | `verify-scan-tasks.ts` |
 | `services/api/src/scan-tasks/scan-tasks.controller.ts` | `verify-scan-session-truth.mjs`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-throttle-dimension.ts` |
-| `services/api/src/scan-tasks/scan-tasks.service.ts` | `verify-scan-session-truth.mjs`<br/>`verify-admin-print-scan.ts`<br/>`verify-scan-tasks.ts` |
+| `services/api/src/scan-tasks/scan-tasks.service.ts` | `verify-scan-session-truth.mjs`<br/>`verify-admin-print-scan.ts`<br/>`verify-scan-quiet-period.ts`<br/>`verify-scan-tasks.ts` |
 | `services/api/src/smart-campus/dto/save-smart-campus-config.dto.ts` | `verify-partner-smart-campus.ts` |
 | `services/api/src/smart-campus/smart-campus.module.ts` | `verify-terminal-device-config.ts` |
 | `services/api/src/smart-campus/smart-campus.service.ts` | `verify-partner-smart-campus.ts`<br/>`verify-terminal-device-config.ts` |

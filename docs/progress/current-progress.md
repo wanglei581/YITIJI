@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-28 深夜：真机-8 单实例锁与真机-13 扫描静默期（第二个 PR；Codex 实现、Claude 验收返工）
+
+- **做了什么：** 三家（Claude、Codex、agy）一致选定「进程退出即由系统释放」的单实例方案。Windows 用带机器标识的命名管道：libuv 以 FILE_FLAG_FIRST_PIPE_INSTANCE 创建，第二个服务端原子失败（EADDRINUSE），崩溃或断电后系统释放，不再需要人工删 agent.pid。扫描：同一终端上一场以取消或过期结束后 90 秒内（`SCAN_TERMINAL_QUIET_PERIOD_SECONDS` 可配），建立与确认扫描会话都返回 409 `SCAN_TERMINAL_QUIET_PERIOD`；完成结束不触发；终端之间互不影响；一体机如实提示「上一位的扫描可能还在出纸」并倒计时。
+- **验收返工（Codex 初稿的问题）：** ①机器标识只读不生成、读不到就拒绝启动——装到任何 Windows 上都起不来；测试预写了标识文件，把这个缺陷盖住了。改为首次启动独占创建、并发创建取同一份、被改坏仍拒绝，测试不再预写。②Unix 套接字路径超过 sun_path 上限时 libuv 静默截断，清残留删不到真文件，崩溃后永远判重复（107 字节临时路径实测）；超长改用临时目录的哈希短名，放不下明确拒绝。③POSIX「探测→删残留→监听」两进程并发会互删对方的套接字（实测 5 次 4 次两个都拿到锁），加守护文件互斥区并在绑定后核对所有权令牌；Windows 路径不走互斥区。④测试本身：竞争者拿到锁就退出（测不出互斥）、固定 800ms 猜存活、「非零退出」即算被拒；改为持有锁、等子进程报「已持有」、必须报 DUPLICATE_INSTANCE。⑤变异锚点还是旧代码原文；「占用端点放行」在新设计下有备份防线、单改不破坏不变式，改为真实回退「抢占活端点」。⑥一体机从 `@ai-job-print/shared` 引错误码，导致 scan-create-replay 行为测试整体加载失败，改字面量（与同文件其它错误码一致）。⑦静默期源码约定只查「create 之后某处出现过调用」，删掉 create 里那一行照样绿；改为在 create、ack 方法体内查。⑧三条新门禁没注册、没进 CI，已注册并接入 CI（`verify:singleton-process` 进 Linux 主 CI，Windows 工作流原已有一步）。
+- **验证：** terminal-agent tsc、lint 与相关门禁全过；`verify:singleton-process` 连续 6 次全过；`verify:task-reliability` 两遍全过（含两项变异）；api tsc、`verify:scan-tasks`、`verify:scan-quiet-period` 过；一体机 tsc、lint、扫描相关门禁过；`verify:repository-integrity`、`verify-ci-gate-coverage` 过。反向变异：标识只读不生成、建会话不查静默期、确认会话不查静默期、抢占活端点、残留套接字不删，全部会红。
+- **已知限制：** 一体机倒计时的剩余秒数从服务端提示文字里解析（前端错误对象只保留错误码、提示与状态码，服务端另给的 `remainingSeconds` 传不过来），解析不出按 90 秒；Windows 命名管道行为以 PR 上 Windows 工作流的进程级测试为准；未在真机安装。
+
 ## 2026-09-28 夜：Windows 真机 KSK-001 远程审查与第一批修复（UU 远程；Codex 实现、Claude 验收返工）
 
 - **怎么做的：** 产品负责人授权经 UU 远程控制真机。Codex 命令行拿不到 UU 的应用授权（headless 弹不出授权框），改由 Claude 直接操作：只读探测系统、服务、打印机、日志与浏览器策略，做了一次一体机浏览器重启。两个 Claude 审查员与 Codex 各自只读核对 main、候选与真机 Agent 提交，协调方逐条核对代码后定级。结论与待办写在 `next-tasks.md` 顶部「Windows 真机 KSK-001 远程审查增补」。
@@ -7,7 +14,7 @@
 - **最要紧的一条（真机已证实）：** Edge 153 每次一体机浏览器重启都弹 Chromium 本地网络访问权限框「访问此设备上的其他应用和服务」，几秒后收起、kiosk 找不回来，没人点就一直「设备未绑定」（实测 3 分钟以上不自愈）。这也让「终端模式本机文件入口都有守卫」的结论失效：守卫依赖本机身份，缺身份时入口会出现。
 - **第一批修复（分支 `claude/field-fix-0928`）：** 一体机前端（启动标记、缺身份按一体机处理、设备状态订阅身份、打印扫描页失败态如实说明并自动恢复、按住说话松手即停、麦克风无权限文案、取件码不召系统键盘）；Agent（白名单来源 + 桥接令牌可取引导票、本机服务先于注册启动、取票失败回 503）；安装与装机（Edge 三项整机策略、看门狗 5 次约 57 秒并带 `kiosk_launch=1`、生产默认不放行开发来源、MSI 同版本升级、版本 0.4.12、母盘清单）。
 - **验收中改掉的 Codex 问题：** ①手机扫码上传页的 `!kiosk` 守卫被拆掉，还加了断言禁止守卫存在（照错误行为写断言），已恢复并反过来断言守卫必须在；②给云端客户端加的拦截器会把 U 盘简历上传换上的会员令牌覆盖成 Agent 令牌（`verify:usb-import-agent` 拦下），改为按当前配置取客户端；③单实例锁「自动接管陈旧锁」有先查后改名的竞态、判断出错时放行，整段撤回另立任务；④Edge 列表型策略写成 `AudioCaptureAllowedUrls1` 这类 Edge 不认的格式，改为同名子键加编号值；⑤WiX 条件用了 WiX 3 的 `<Condition>` 子元素，改为 WiX 4 属性写法；⑥「示例配置版本号必须等于产品版本号」被放松成只查格式，已恢复严格断言；⑦按住说话的新检查只查变量名，把判断改成 `if (false)` 也是绿的，改为断言行为；⑧新门禁没注册、CI 不跑，已改名 `verify:kiosk-field-safety` 接入 CI，另三个未接入 CI 的重复门禁并入 `verify-installer-inputs.mjs`；⑨打印能力读取超时被从 4 秒改成 20 秒，已改回；⑩MSI 在安装时启动服务，PR 的 Windows CI 实测 Error 1920 → 安装回滚 1603，服务部分整体撤回、另立任务；⑪打印扫描页失败态标题被改掉，浏览器用例红，候选原有文案本就诚实，已恢复；⑫取件码 `inputMode` 被改成 none，与后端 P0 契约、浏览器用例和页面里的现场结论冲突，已恢复 numeric。Codex 在沙箱里跑不了需要监听端口的门禁，把两条真红当成环境问题带过，协调方在本机复跑才发现。
-- **验证：** 一体机 tsc、lint 0 error，受影响的 20 余条一体机门禁与新门禁全过；terminal-agent tsc、lint、test 与 13 条门禁全过（含沙箱里跑不了的 local-qr-proxy、usb-import-agent、task-reliability、local-print-wake）；`verify:repository-integrity`、`verify-ci-gate-coverage` 通过。反向变异：拆手机页守卫、去启动标记、状态不订阅身份、按住说话条件改 `if (false)`、松手不置标记、去来源白名单、去令牌校验、拦截器强覆盖认证头，全部会红。另把 `verify-local-qr-proxy.ts` 里钉死的 `'0.4.11'` 改为读 package.json 版本。
+- **验证：** 一体机 tsc、lint 0 error，受影响的 20 余条一体机门禁与新门禁全过；terminal-agent tsc、lint 与 13 条门禁全过（更正：terminal-agent 没有 `test` 脚本，此前在仓库根用 `pnpm --filter terminal-agent test` 得到的「通过」是找不到脚本、什么都没执行；Codex 报告里的同一条亦然）（含沙箱里跑不了的 local-qr-proxy、usb-import-agent、task-reliability、local-print-wake）；`verify:repository-integrity`、`verify-ci-gate-coverage` 通过。反向变异：拆手机页守卫、去启动标记、状态不订阅身份、按住说话条件改 `if (false)`、松手不置标记、去来源白名单、去令牌校验、拦截器强覆盖认证头，全部会红。另把 `verify-local-qr-proxy.ts` 里钉死的 `'0.4.11'` 改为读 package.json 版本。
 - **没做与边界：** 没有部署、没有在真机安装新 Agent；真机-7 撤回另立任务；真机-8、真机-13 已派实现中；真机-3、真机-12 未修。远程操作中 Claude 连点关闭按钮时误关了真机上的微信主窗口（进程仍在、未退出登录、未发消息）；17:57 一体机浏览器退出一次后由看门狗重启，不能排除与该次点击有关。
 
 ## 2026-09-28 晚：20 张补稿按「不留大片空白」整改；稿件检查加留白与被裁
