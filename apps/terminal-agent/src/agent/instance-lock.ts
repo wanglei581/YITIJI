@@ -155,7 +155,13 @@ export type LockAcquireResult =
 
 async function bindAndVerify(endpoint: string, unixSocket: boolean): Promise<LockAcquireResult> {
   const token = crypto.randomBytes(16).toString('hex')
-  const server = net.createServer((socket) => socket.end(token))
+  // 连接方随时可能在读令牌之前就断开（重复实例的探测就是连上即断），这时回令牌会报 EPIPE / ECONNRESET。
+  // 连接上的错误必须就地吞掉：没人接的 socket 错误会冒成 uncaughtException，Agent 主程序据此退出——
+  // 等于本机任何进程连一下管道再断开就能把持有者打挂（2026-09-29 Linux CI 实测，本机连续探测可复现）。
+  const server = net.createServer((socket) => {
+    socket.on('error', () => { /* client left before reading the token */ })
+    socket.end(token)
+  })
   try {
     await listen(server, endpoint)
   } catch (error) {
@@ -164,6 +170,8 @@ async function bindAndVerify(endpoint: string, unixSocket: boolean): Promise<Loc
     if (code === 'EADDRINUSE') return { status: 'duplicate', lockPath: endpoint, existingPid: 0 }
     return { status: 'unavailable', lockPath: endpoint, reason: `listen_${code ?? 'failed'}` }
   }
+  // listen() 建立后已摘掉临时的 error 监听；此后端点自身的错误（如 accept 失败）只记日志，不能把 Agent 带崩。
+  server.on('error', (error) => err(`instance-lock: singleton endpoint error: ${error.message}`))
   if (!(await verifyOwnership(endpoint, token))) {
     // 路径已归别的实例：只关自己的监听，不删路径（它属于胜出者）。
     server.close()

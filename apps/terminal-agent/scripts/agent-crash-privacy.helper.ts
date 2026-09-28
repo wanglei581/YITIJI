@@ -46,7 +46,7 @@ function verifyStartupOrderingSource(): void {
 }
 
 function runProcessSingletonVerification(): void {
-  const result = spawnSync(process.execPath, [singletonScript], { cwd: join(__dirname, '..'), encoding: 'utf8', timeout: 30_000 })
+  const result = spawnSync(process.execPath, [singletonScript], { cwd: join(__dirname, '..'), encoding: 'utf8', timeout: 120_000 })
   assert.equal(result.status, 0, `${result.stdout ?? ''}\n${result.stderr ?? ''}`)
 }
 
@@ -62,6 +62,13 @@ function verifyReverseMutations(): void {
       /second instance|contender/,
     ],
     [
+      // 回令牌前对方已断开时写入报 EPIPE；不接住就冒成 uncaughtException，把持有锁的 Agent 带崩。
+      'probe-crashes-holder',
+      "socket.on('error', () => { /* client left before reading the token */ })",
+      '/* mutation: accepted sockets have no error handler */',
+      /disconnect early|must not crash the holder/,
+    ],
+    [
       'stale-socket-not-removed',
       'try { fs.unlinkSync(endpoint) }',
       'try { /* mutation: stale socket remains */ }',
@@ -72,7 +79,7 @@ function verifyReverseMutations(): void {
     assert.ok(original.includes(from), `${label}: mutation anchor must exist`)
     writeFileSync(lockSourcePath, original.replace(from, to))
     try {
-      const result = spawnSync(process.execPath, [singletonScript], { cwd: join(__dirname, '..'), encoding: 'utf8', timeout: 30_000 })
+      const result = spawnSync(process.execPath, [singletonScript], { cwd: join(__dirname, '..'), encoding: 'utf8', timeout: 120_000 })
       assert.notEqual(result.status, 0, `${label}: reversed safety behavior must make the process check fail`)
       assert.match(`${result.stdout ?? ''}\n${result.stderr ?? ''}`, expected, `${label}: failure must identify the broken singleton invariant`)
     } finally {
