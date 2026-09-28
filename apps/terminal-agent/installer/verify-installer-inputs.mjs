@@ -95,6 +95,8 @@ assert.match(wix, /Account="LocalSystem"/)
 assert.match(wix, /Permanent="yes"/)
 assert.match(wix, /NeverOverwrite="yes"/)
 const customActionElements = wix.match(/<CustomAction\b[^>]*\/>/g) ?? []
+// 数全所有写法：带内容的 <CustomAction>…</CustomAction>（内联脚本）不是自闭合，上面的匹配数不到，必须单独拦下。
+assert.equal((wix.match(/<CustomAction\b/g) ?? []).length, customActionElements.length, 'every CustomAction must be a self-closing element covered by the fixed-action rules')
 const customActionAttributes = (element) => {
   const attributes = new Map()
   for (const match of element.matchAll(/([A-Za-z][A-Za-z0-9]*)="([^"]*)"/g)) attributes.set(match[1], match[2])
@@ -127,6 +129,8 @@ for (const attributes of customActions) {
   assert.doesNotMatch(command, /node|powershell|pwsh|\.ps1|\.js|\.cmd|\.bat|\.vbs|provision|cmd\.exe|msiexec/i, `CustomAction ${attributes.get('Id')} must not shell out to provisioning code`)
 }
 const actionSchedules = [...wix.matchAll(/<Custom\s+Action="([^"]+)"\s+After="([^"]+)"\s+Condition="([^"]+)"\s*\/>/g)]
+// 同理：Before 写法、扩展里现成的动作（如 QuietExec）的调度也是 <Custom>，都必须落在上面的固定格式里。
+assert.equal((wix.match(/<Custom\s/g) ?? []).length, actionSchedules.length, 'every <Custom> scheduling element must use the fixed After/Condition form checked below')
 assert.equal(actionSchedules.length, expectedCustomActionIds.length, 'all fixed CustomActions must be scheduled exactly once')
 for (let index = 0; index < expectedCustomActionIds.length; index += 1) {
   const [id, after, condition] = actionSchedules[index].slice(1)

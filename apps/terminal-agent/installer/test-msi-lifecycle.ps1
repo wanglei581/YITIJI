@@ -377,10 +377,13 @@ if (Test-Path -LiteralPath $diagnosticPath -PathType Leaf) {
 New-Item -Path $boundRegistryPath -Force | Out-Null
 New-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -Value 1 -PropertyType DWord -Force | Out-Null
 $boundMarkerWritten = $true
-& "$env:SystemRoot\System32\sc.exe" failure $serviceName reset= 0 actions= '""/0' | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not clear the service failure policy before bound repair (sc failure exit code $LASTEXITCODE)" }
+# Put a distinct, unambiguous policy in place first, so the policy seen after the repair can only
+# have come from the installer. Do not "clear" with actions= '""/0': how Windows PowerShell 5.1
+# hands embedded quotes to sc.exe is not something this test should depend on.
+& "$env:SystemRoot\System32\sc.exe" failure $serviceName reset= 1 actions= restart/7777 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not set the pre-repair failure policy (sc failure exit code $LASTEXITCODE)" }
 & "$env:SystemRoot\System32\sc.exe" failureflag $serviceName 0 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not clear the service failure flag before bound repair (sc failureflag exit code $LASTEXITCODE)" }
+if ($LASTEXITCODE -ne 0) { throw "Could not set the pre-repair failure flag (sc failureflag exit code $LASTEXITCODE)" }
 if (Test-Path -LiteralPath $diagnosticPath -PathType Leaf) {
   Remove-Item -LiteralPath $diagnosticPath -Force
 }
@@ -415,10 +418,11 @@ Remove-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -ErrorAction S
 if ($null -eq (Get-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -ErrorAction SilentlyContinue)) {
   $boundMarkerWritten = $false
 }
-& "$env:SystemRoot\System32\sc.exe" failure $serviceName reset= 0 actions= '""/0' | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not clear the service failure policy after bound repair (sc failure exit code $LASTEXITCODE)" }
-& "$env:SystemRoot\System32\sc.exe" failureflag $serviceName 0 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not clear the service failure flag after bound repair (sc failureflag exit code $LASTEXITCODE)" }
+# The failed best-effort start above makes SCM schedule a restart 60 seconds later under the policy
+# the repair just restored; that restart can land inside the uninstall below and leave the service
+# briefly present. Disable the service first so a late restart attempt fails harmlessly.
+& "$env:SystemRoot\System32\sc.exe" config $serviceName start= disabled | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not disable the service before uninstall (sc config exit code $LASTEXITCODE)" }
 
 Invoke-Msi -Arguments @("/x", $resolvedMsi) -LogName "uninstall.log"
 if ($null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)) {
