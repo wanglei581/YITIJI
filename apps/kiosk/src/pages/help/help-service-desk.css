@@ -258,6 +258,15 @@
   .k1-help-center .k1-help-actions .qx-ai-help { min-height: 56px; font-size: var(--qx-fs-body); }
   .k1-help-center .k1-help-sec-head { flex-direction: column; align-items: flex-start; }
   .k1-help-center .k1-help-sec-head small { margin-left: 0; }
+  /* 手机上头图和动作条（三颗按钮加两段说明）占的高度比 27 寸屏大得多，只让中间一格滚动时
+     它会被挤成零高，分类卡压在动作条下面点不到（2026-09-28 fusion-smoke 手机用例实测）。
+     改成整页一起滚：中间内容按自身高度排开，动作条排在内容后面，底部导航贴底。 */
+  .k1-help-center .qx-stage { overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: 96px; }
+  .k1-help-center .qx-pagehead,
+  .k1-help-center .qx-body,
+  .k1-help-center .qx-ctabar { flex: none; }
+  .k1-help-center .k1-help-scroll { flex: none; overflow: visible; }
+  .k1-help-center .qx-navbar { position: sticky; bottom: 0; z-index: 2; }
 }
 
 @media (prefers-reduced-motion: reduce) {

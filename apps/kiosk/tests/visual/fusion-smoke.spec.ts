@@ -131,7 +131,9 @@ test('login gate can leave without logging in @kiosk', async ({ page, api }) => 
   registerHomeShellApi(api)
   const runtimeErrors = collectRuntimeErrors(page)
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
-  await expect(page.getByRole('button', { name: '返回首页' })).toBeVisible()
+  // 稿 03：顶栏留返回键（规则 1），底部「上一步」一排也能回首页 —— 两处都在。
+  await expect(page.getByRole('button', { name: '返回首页' })).toHaveCount(2)
+  await expect(page.locator('.qx-topbar').getByRole('button', { name: '返回首页' })).toBeVisible()
   await expect(page.getByRole('button', { name: '不登录，继续使用' })).toBeVisible()
   await expect(page.getByText('已登录', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '不登录，继续使用' }).click()
@@ -144,7 +146,8 @@ test('session resume without login goes to login gate @kiosk', async ({ page, ap
   registerHomeShellApi(api)
   await page.goto('/session-resume', { waitUntil: 'domcontentloaded' })
   await expect(page).toHaveURL(/\/login/)
-  await expect(page.getByRole('button', { name: '返回首页' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '返回首页' })).toHaveCount(2)
+  await expect(page.locator('.qx-topbar').getByRole('button', { name: '返回首页' })).toBeVisible()
 })
 
 for (const projectTag of ['@kiosk', '@mobile'] as const) {
