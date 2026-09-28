@@ -34,19 +34,19 @@ node scripts/project-graph-query.mjs model PrintTask
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
 | kiosk | `apps/kiosk` | 90 | 693 | 600 |
-| admin | `apps/admin` | 38 | 176 | 171 |
+| admin | `apps/admin` | 38 | 178 | 173 |
 | partner | `apps/partner` | 15 | 70 | 69 |
 
 | 维度 | 数量 |
 | --- | --- |
 | HTTP 端点（services/api） | 559 |
 | Prisma 模型 | 106 |
-| 门禁脚本文件 | 507 |
+| 门禁脚本文件 | 508 |
 | ├ 其中辅助库（被别的门禁 import） | 98 |
-| ├ 已在 package.json 里有脚本名 | 464 |
-| ├ 在 CI 执行闭包里 | 451 |
+| ├ 已在 package.json 里有脚本名 | 465 |
+| ├ 在 CI 执行闭包里 | 452 |
 | └ **无脚本名，从未被执行** | 0 |
-| 被至少一条门禁断言的文件 | 1580 |
+| 被至少一条门禁断言的文件 | 1583 |
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 57 |
 | 孤儿候选 · medium（仅文档提及） | 26 |
@@ -72,13 +72,13 @@ flowchart LR
   partner["apps/partner<br/>合作机构后台<br/>15 路由"]
   api["services/api<br/>NestJS<br/>559 端点"]
   db[("Prisma<br/>106 模型")]
-  gates{{"verify 门禁<br/>507 个脚本"}}
+  gates{{"verify 门禁<br/>508 个脚本"}}
 
   kiosk -->|"/api/v1"| api
   admin -->|"/api/v1"| api
   partner -->|"/api/v1"| api
   api --> db
-  gates -.->|"断言 1580 个文件"| kiosk
+  gates -.->|"断言 1583 个文件"| kiosk
   gates -.-> admin
   gates -.-> partner
   gates -.-> api
