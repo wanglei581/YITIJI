@@ -574,9 +574,11 @@ expectPattern(
   /section\.items\.map\(\(item,\s*itemIndex\)\s*=>[\s\S]*?<QaRow\s+key=\{item\.q\}\s+item=\{item\}\s+answerId=\{`help-answer-\$\{section\.key\}-\$\{itemIndex\}`\}/,
   'HelpCenterPage FAQ a11y ID 必须使用无空白的 section key 与索引',
 )
+// 这条钉的是 answerId（稳定的 a11y ID）。2026-09-28 起入口按钮照 2.0 稿 06 从答案里挪到「02 直接去办」一排，
+// QaRow 不再需要 onNavigate，所以只要求 answerId 仍是它接收的属性，不再要求参数表里恰好有 onNavigate。
 expectPattern(
   helpCenterPage,
-  /function QaRow\(\{\s*item,\s*answerId,\s*onNavigate\s*\}/,
+  /function QaRow\(\{\s*item,\s*answerId\b[^}]*\}:\s*\{\s*item:\s*QA;\s*answerId:\s*string\b/,
   'HelpCenterPage QaRow 必须接收稳定 FAQ answerId',
 )
 
