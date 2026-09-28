@@ -503,15 +503,18 @@
   font-weight: 700;
   text-align: left;
 }
-/* 跨列的宽卡（七张的末张、八张的末张）放得下：原因照稿回到「进入」的位置，右侧同一行。
-   否则整行宽卡只有左边一列字，右半边空成一片。只在有跨列的宽度生效（窄屏单列时仍独占一行）。 */
+/* 宽卡放得下：跨列的卡（七张的末张、八张的末张）和六张卡两列时的每一张，原因照稿回到「进入」的位置，
+   与角标同一行、靠右。否则整行宽卡只有左边一列字，右半边空成一片。
+   三列的窄卡仍让原因独占一行（稿在那里把角标和原因挤成两行半，那一处不照搬）；窄屏单列时同样独占一行。 */
 @media (min-width: 901px) {
   .qx-hub-grid > :nth-child(7):last-child .qx-hub-card-foot,
-  .qx-hub-grid > :nth-child(8):last-child .qx-hub-card-foot {
+  .qx-hub-grid > :nth-child(8):last-child .qx-hub-card-foot,
+  .qx-hub-grid[data-card-count='6'] .qx-hub-card-foot {
     flex-wrap: nowrap;
   }
   .qx-hub-grid > :nth-child(7):last-child .qx-hub-why,
-  .qx-hub-grid > :nth-child(8):last-child .qx-hub-why {
+  .qx-hub-grid > :nth-child(8):last-child .qx-hub-why,
+  .qx-hub-grid[data-card-count='6'] .qx-hub-why {
     flex: 0 1 auto;
     margin-left: auto;
     text-align: right;
