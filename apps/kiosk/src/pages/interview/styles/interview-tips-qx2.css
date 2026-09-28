@@ -1,0 +1,130 @@
+/* 面试技巧 · 青序流光 2.0（稿 29 tips 态）。
+ * 尺寸取自稿里的 .checklist / .check / .faq-row / .mini-list 与 qx2 覆盖层（说明 21、卡片标题 30、问题 24），
+ * 颜色一律用青序令牌，不再用旧页的紫色。 */
+
+[data-qx-interview] .iv-head h2 {
+  margin: 0;
+  font-size: var(--qx-fs-sec);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+[data-qx-interview] .iv-checklist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+  margin-top: 14px;
+}
+[data-qx-interview] .iv-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-height: 64px;
+  padding: 12px;
+  border: 1px solid var(--qx-line);
+  border-radius: 17px;
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font-size: var(--qx-fs-aux-lg);
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: left;
+}
+[data-qx-interview] .iv-check i {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  border: 2px solid var(--qx-line-2);
+  border-radius: 8px;
+  font-style: normal;
+  font-size: var(--qx-fs-aux);
+  line-height: 1;
+}
+[data-qx-interview] .iv-check[aria-pressed='true'] {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+[data-qx-interview] .iv-check[aria-pressed='true'] i {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal);
+  color: var(--qx-surface);
+}
+
+[data-qx-interview] .iv-faq-row {
+  margin-top: 12px;
+  border-top: 1px solid var(--qx-line);
+}
+[data-qx-interview] .iv-faq-row > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 58px;
+  border: 0;
+  background: transparent;
+  color: var(--qx-ink);
+  font-size: var(--qx-fs-body-lg);
+  font-weight: 800;
+  text-align: left;
+}
+[data-qx-interview] .iv-faq-row > button span { flex: none; color: var(--qx-teal-d); }
+[data-qx-interview] .iv-faq-row p {
+  margin: 0;
+  padding: 0 0 8px;
+  color: var(--qx-ink-2);
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.52;
+}
+[data-qx-interview] .iv-faq-row p:last-child { padding-bottom: 15px; }
+[data-qx-interview] .iv-faq-row p b { color: var(--qx-ink); }
+
+[data-qx-interview] .iv-subhead {
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--qx-line);
+  color: var(--qx-ink);
+  font-size: var(--qx-fs-body-lg);
+  font-weight: 800;
+}
+[data-qx-interview] .iv-mini-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+[data-qx-interview] .iv-mini-list > div {
+  padding: 14px;
+  border: 1px solid var(--qx-line);
+  border-radius: 18px;
+  background: var(--qx-paper);
+}
+[data-qx-interview] .iv-mini-list small {
+  display: block;
+  color: var(--qx-teal-d);
+  font-size: var(--qx-fs-aux);
+  font-weight: 800;
+}
+[data-qx-interview] .iv-mini-list p {
+  margin: 7px 0 0;
+  color: var(--qx-ink-2);
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.45;
+}
+
+.interview-qx-cta > .qx-btn[data-variant='primary'] em {
+  margin-left: 8px;
+  font-style: normal;
+  color: var(--qx-emerald);
+}
+
+@media (max-width: 720px) {
+  [data-qx-interview] .iv-checklist,
+  [data-qx-interview] .iv-mini-list {
+    grid-template-columns: 1fr;
+  }
+}

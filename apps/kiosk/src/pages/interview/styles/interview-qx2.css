@@ -443,6 +443,7 @@
 [data-qx-interview] .interview-session__history-item,
 [data-qx-interview] .interview-session__privacy-note,
 [data-qx-interview] .interview-session__mic-reason,
+[data-qx-interview] .interview-session__mic-error span,
 [data-qx-interview] .interview-session__error,
 [data-qx-interview] .interview-session__notice,
 [data-qx-interview] .interview-session__omit-print {
@@ -512,39 +513,17 @@
   font-size: var(--qx-fs-body-lg);
 }
 
-[data-qx-interview].interview-tips .interview-tips__cols {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
 [data-qx-interview] .interview-section-title h2,
-[data-qx-interview] .interview-tips__ck-title,
-[data-qx-interview] .interview-tips__star-name,
-[data-qx-interview] .interview-tips__faq-q,
 [data-qx-interview] .interview-report__section h2,
 [data-qx-interview] .interview-report__hero h2 {
   font-size: var(--qx-fs-sec);
 }
 [data-qx-interview] .interview-section-title p,
-[data-qx-interview] .interview-tips__ck-desc,
-[data-qx-interview] .interview-tips__star-desc,
-[data-qx-interview] .interview-tips__faq-a,
-[data-qx-interview] .interview-tips__intro,
 [data-qx-interview] .interview-report__section li,
 [data-qx-interview] .interview-report__hero p,
 [data-qx-interview] .interview-report__questions p {
   font-size: var(--qx-fs-aux-lg) !important;
   line-height: 1.45;
-}
-[data-qx-interview] .interview-tips__checklist .flex.flex-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 11px;
-}
-[data-qx-interview] .interview-tips__ck-item {
-  min-height: 64px;
-  border-radius: 17px;
-  font-size: var(--qx-fs-aux-lg);
 }
 [data-qx-interview] .interview-report__abilities,
 [data-qx-interview] .interview-report__two-col {
@@ -576,12 +555,10 @@
   [data-qx-interview] .iv-choice-row,
   [data-qx-interview] .iv-steps,
   [data-qx-interview] .iv-tabs,
-  [data-qx-interview] .iv-status,
-  [data-qx-interview] .interview-tips__checklist .flex.flex-col {
+  [data-qx-interview] .iv-status {
     grid-template-columns: 1fr;
   }
   [data-qx-interview] .interview-section-title p,
-  [data-qx-interview] .interview-tips__ck-desc,
   [data-qx-interview] .interview-session__card-head p,
   [data-qx-interview] .interview-pagehead p {
     font-size: var(--qx-fs-aux) !important;

@@ -280,9 +280,11 @@ test('在线服务 503：面试技巧可读，但不能从技巧页绕进模拟�
   await page.waitForURL((url) => url.searchParams.get('stage') === 'tips')
 
   // 白名单的用意是「断网也有东西可读」，所以本地内容必须一条不少。
+  // 2.0 稿 tips 态：STAR 那张卡的标题是「回答一题的基本结构」，右侧注「STAR 练习法」。
   await expect(page.getByRole('heading', { name: '面试前准备清单' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '高频问题应对' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /STAR/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '回答一题的基本结构' })).toBeVisible()
+  await expect(page.getByText('STAR 练习法', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '自我介绍结构建议' })).toBeVisible()
 
   // 出口则必须关上：它要 POST /mock-interviews，不是本地内容。

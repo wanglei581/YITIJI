@@ -114,10 +114,12 @@ export function InterviewScrollCue() {
   )
 }
 
-export function InterviewCardHead({ title, hint }: { title: string; hint?: string }) {
+/** 卡片头：标题 + 右侧一句提示。`as="h2"` 时标题是真正的标题（读屏与测试都按标题找）。 */
+export function InterviewCardHead({ title, hint, as = 'b', id }: { title: string; hint?: string; as?: 'b' | 'h2'; id?: string }) {
+  const Title = as
   return (
     <div className="iv-head">
-      <b>{title}</b>
+      <Title id={id}>{title}</Title>
       {hint ? <span>{hint}</span> : null}
     </div>
   )

@@ -240,7 +240,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
         <InterviewStatus
           label="报告与打印状态"
           items={[
-            { k: '报告内容', v: '已返回', tone: 'ok' },
+            { k: '报告内容', v: '可以查看', tone: 'ok' },
             { k: '打印版', v: printing ? '生成中' : printError ? '没有生成' : '还没有', tone: printError ? 'off' : undefined },
             { k: '录用预测', v: '不提供' },
           ]}

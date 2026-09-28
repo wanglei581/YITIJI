@@ -491,7 +491,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 {([
                   { key: 'phone' as const, label: '手机扫码上传', hint: '把简历传到这台机器', icon: QrCodeIcon },
                   { key: 'usb' as const, label: 'U 盘导入', hint: '只读取你插入的这只盘', icon: UsbIcon },
-                  { key: 'desktop' as const, label: '本机文件', hint: '桌面验证时挑选', icon: MonitorSmartphoneIcon },
+                  { key: 'desktop' as const, label: '本机文件', hint: '从这台设备里选一份', icon: MonitorSmartphoneIcon },
                 ]).filter((channel) => channel.key !== 'desktop' || !isTerminalKiosk()).map((channel) => (
                   <button
                     key={channel.key}
@@ -523,7 +523,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 ) : resumeChannel === 'desktop' && !kiosk ? (
                   <Button variant="secondary" className="min-h-[56px] w-full text-base" disabled={uploading} onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}>
                     {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
-                    本机文件（桌面验证）
+                    选择本设备上的文件
                   </Button>
                 ) : uploading ? (
                   <p className="iv-copy">正在上传。完成前不把这份文件算进本场练习。</p>
