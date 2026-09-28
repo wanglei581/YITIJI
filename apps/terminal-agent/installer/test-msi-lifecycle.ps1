@@ -7,6 +7,8 @@ $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
 $stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $diagnosticPath = Join-Path $stateRoot "last-startup-diagnostic.json"
 $serviceName = "aijobprintagent.exe"
+$boundRegistryPath = "HKLM:\SOFTWARE\AIJobPrint\Agent"
+$boundMarkerWritten = $false
 $programMenuRoot = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal"
 $panelShortcutPath = Join-Path $programMenuRoot "AI Job Print Terminal.url"
 $desktopShortcutName = -join ([char[]](0x0041, 0x0049, 0x0020, 0x6C42, 0x804C, 0x6253, 0x5370, 0x670D, 0x52A1, 0x7EC8, 0x7AEF))
@@ -351,15 +353,76 @@ if ($null -eq $service -or $service.State -ne "Stopped") {
   throw "Unprovisioned service did not return to Stopped after writing its diagnostic"
 }
 
+if (Test-Path -LiteralPath $diagnosticPath -PathType Leaf) {
+  Remove-Item -LiteralPath $diagnosticPath -Force
+}
 Invoke-Msi -Arguments @("/fa", $resolvedMsi) -LogName "repair.log"
 Assert-PanelShortcut
 Assert-DesktopShortcut
 Assert-ControlCenterSmoke
 Assert-InstalledRuntimeAcl
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
-if ($null -eq $service -or $service.State -ne "Stopped") {
+if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
   throw "Repair must preserve the unprovisioned stopped service"
 }
+$unboundRepairDeadline = [DateTime]::UtcNow.AddSeconds(10)
+while (-not (Test-Path -LiteralPath $diagnosticPath -PathType Leaf) -and [DateTime]::UtcNow -lt $unboundRepairDeadline) {
+  Start-Sleep -Milliseconds 500
+}
+if (Test-Path -LiteralPath $diagnosticPath -PathType Leaf) {
+  throw "Unbound repair must not start the service or recreate its startup diagnostic"
+}
+
+# A bound repair must restore the service policy and make one best-effort start.
+New-Item -Path $boundRegistryPath -Force | Out-Null
+New-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -Value 1 -PropertyType DWord -Force | Out-Null
+$boundMarkerWritten = $true
+# Put a distinct, unambiguous policy in place first, so the policy seen after the repair can only
+# have come from the installer. Do not "clear" with actions= '""/0': how Windows PowerShell 5.1
+# hands embedded quotes to sc.exe is not something this test should depend on.
+& "$env:SystemRoot\System32\sc.exe" failure $serviceName reset= 1 actions= restart/7777 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not set the pre-repair failure policy (sc failure exit code $LASTEXITCODE)" }
+& "$env:SystemRoot\System32\sc.exe" failureflag $serviceName 0 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not set the pre-repair failure flag (sc failureflag exit code $LASTEXITCODE)" }
+if (Test-Path -LiteralPath $diagnosticPath -PathType Leaf) {
+  Remove-Item -LiteralPath $diagnosticPath -Force
+}
+Invoke-Msi -Arguments @("/fa", $resolvedMsi) -LogName "repair-bound.log"
+$service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+if ($null -eq $service -or $service.StartMode -ne "Auto") {
+  throw "Bound repair did not restore Automatic service startup"
+}
+$failurePolicy = (& "$env:SystemRoot\System32\sc.exe" qfailure $serviceName 2>&1 | Out-String)
+if ($failurePolicy -notmatch 'RESET_PERIOD[^:]*:\s*86400' -or
+    $failurePolicy -notmatch 'RESTART -- Delay = 60000' -or
+    $failurePolicy -notmatch 'RESTART -- Delay = 300000') {
+  throw "Bound repair did not restore the expected service failure policy: $failurePolicy"
+}
+$failureFlagPolicy = (& "$env:SystemRoot\System32\sc.exe" qfailureflag $serviceName 2>&1 | Out-String)
+if ($failureFlagPolicy -notmatch 'FAILURE_ACTIONS_ON_NONCRASH_FAILURES\s*:\s*TRUE') {
+  throw "Bound repair did not restore the service failure flag: $failureFlagPolicy"
+}
+$boundDiagnosticDeadline = [DateTime]::UtcNow.AddSeconds(20)
+while (-not (Test-Path -LiteralPath $diagnosticPath -PathType Leaf) -and [DateTime]::UtcNow -lt $boundDiagnosticDeadline) {
+  Start-Sleep -Milliseconds 500
+}
+if (-not (Test-Path -LiteralPath $diagnosticPath -PathType Leaf)) {
+  throw "Bound repair did not attempt to start the unconfigured service"
+}
+$boundDiagnostic = Get-Content -Raw -Encoding UTF8 -LiteralPath $diagnosticPath | ConvertFrom-Json
+if ([string]$boundDiagnostic.code -ne "AGENT_CONFIG_NOT_FOUND") {
+  throw "Bound repair startup diagnostic was not AGENT_CONFIG_NOT_FOUND"
+}
+Export-LifecycleEvidence -Phase "post-bound-repair"
+Remove-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -ErrorAction SilentlyContinue
+if ($null -eq (Get-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -ErrorAction SilentlyContinue)) {
+  $boundMarkerWritten = $false
+}
+# The failed best-effort start above makes SCM schedule a restart 60 seconds later under the policy
+# the repair just restored; that restart can land inside the uninstall below and leave the service
+# briefly present. Disable the service first so a late restart attempt fails harmlessly.
+& "$env:SystemRoot\System32\sc.exe" config $serviceName start= disabled | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not disable the service before uninstall (sc config exit code $LASTEXITCODE)" }
 
 Invoke-Msi -Arguments @("/x", $resolvedMsi) -LogName "uninstall.log"
 if ($null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)) {
@@ -378,7 +441,10 @@ if (Test-Path -LiteralPath $desktopShortcutPath) {
   throw "Terminal control center desktop shortcut remains after uninstall"
 }
 
-Write-Host "MSI_LIFECYCLE_PASS service=$serviceName stateRetained=true"
+Write-Host "MSI_LIFECYCLE_PASS service=$serviceName stateRetained=true boundRepairRestored=true"
 } finally {
   Export-LifecycleEvidence -Phase "final"
+  if ($boundMarkerWritten) {
+    Remove-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -ErrorAction SilentlyContinue
+  }
 }

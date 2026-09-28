@@ -94,7 +94,78 @@ assert.doesNotMatch(wix, /Start="install"/, 'MSI must not start the service duri
 assert.match(wix, /Account="LocalSystem"/)
 assert.match(wix, /Permanent="yes"/)
 assert.match(wix, /NeverOverwrite="yes"/)
-assert.doesNotMatch(wix, /CustomAction/i, 'MSI must not shell out to node-windows or provisioning code')
+const customActionElements = wix.match(/<CustomAction\b[^>]*\/>/g) ?? []
+// 数全所有写法：带内容的 <CustomAction>…</CustomAction>（内联脚本）不是自闭合，上面的匹配数不到，必须单独拦下。
+assert.equal((wix.match(/<CustomAction\b/g) ?? []).length, customActionElements.length, 'every CustomAction must be a self-closing element covered by the fixed-action rules')
+const customActionAttributes = (element) => {
+  const attributes = new Map()
+  for (const match of element.matchAll(/([A-Za-z][A-Za-z0-9]*)="([^"]*)"/g)) attributes.set(match[1], match[2])
+  return attributes
+}
+const customActions = customActionElements.map(customActionAttributes)
+const expectedCustomActionIds = [
+  'AgentServiceRestoreAutoStart',
+  'AgentServiceRestoreRecovery',
+  'AgentServiceRestoreFailureFlag',
+  'AgentServiceBestEffortStart',
+]
+assert.deepEqual(
+  customActions.map((attributes) => attributes.get('Id')),
+  expectedCustomActionIds,
+  'MSI CustomAction set must contain exactly the four fixed service recovery actions, in order',
+)
+for (const attributes of customActions) {
+  assert.deepEqual(
+    [...attributes.keys()].sort(),
+    ['Directory', 'ExeCommand', 'Execute', 'Id', 'Impersonate', 'Return'].sort(),
+    `CustomAction ${attributes.get('Id')} contains an unapproved attribute; MSI must not run provisioning code`,
+  )
+  assert.equal(attributes.get('Execute'), 'deferred', `CustomAction ${attributes.get('Id')} must be deferred`)
+  assert.equal(attributes.get('Impersonate'), 'no', `CustomAction ${attributes.get('Id')} must run elevated`)
+  assert.equal(attributes.get('Return'), 'ignore', `CustomAction ${attributes.get('Id')} must not make install fail on start error`)
+  const command = attributes.get('ExeCommand')
+  assert.match(command, /^&quot;\[System64Folder\]sc\.exe&quot; /, `CustomAction ${attributes.get('Id')} must call system sc.exe`)
+  assert.match(command, /\baijobprintagent\.exe\b/i, `CustomAction ${attributes.get('Id')} must target the Agent service`)
+  assert.doesNotMatch(command, /node|powershell|pwsh|\.ps1|\.js|\.cmd|\.bat|\.vbs|provision|cmd\.exe|msiexec/i, `CustomAction ${attributes.get('Id')} must not shell out to provisioning code`)
+}
+const actionSchedules = [...wix.matchAll(/<Custom\s+Action="([^"]+)"\s+After="([^"]+)"\s+Condition="([^"]+)"\s*\/>/g)]
+// 同理：Before 写法、扩展里现成的动作（如 QuietExec）的调度也是 <Custom>，都必须落在上面的固定格式里。
+assert.equal((wix.match(/<Custom\s/g) ?? []).length, actionSchedules.length, 'every <Custom> scheduling element must use the fixed After/Condition form checked below')
+assert.equal(actionSchedules.length, expectedCustomActionIds.length, 'all fixed CustomActions must be scheduled exactly once')
+for (let index = 0; index < expectedCustomActionIds.length; index += 1) {
+  const [id, after, condition] = actionSchedules[index].slice(1)
+  assert.equal(id, expectedCustomActionIds[index], `CustomAction ${expectedCustomActionIds[index]} must be scheduled in order`)
+  assert.equal(after, index === 0 ? 'StartServices' : expectedCustomActionIds[index - 1], `CustomAction ${id} has the wrong sequence predecessor`)
+  assert.match(condition, /AGENTBOUND = &quot;#1&quot;/, `CustomAction ${id} must require the bound marker`)
+  assert.match(condition, /NOT \(REMOVE~=&quot;ALL&quot;\)/, `CustomAction ${id} must be excluded during uninstall`)
+}
+const boundProperty = wix.match(/<Property\s+Id="AGENTBOUND"[\s\S]*?<\/Property>/)?.[0]
+assert.ok(boundProperty, 'AGENTBOUND property must search the binding marker')
+const boundSearch = boundProperty.match(/<RegistrySearch\b[^>]*\/>/)?.[0]
+assert.ok(boundSearch, 'AGENTBOUND property must contain a RegistrySearch')
+const boundSearchAttributes = customActionAttributes(boundSearch)
+for (const [name, value] of [['Root', 'HKLM'], ['Type', 'raw'], ['Bitness', 'always64'], ['Key', 'SOFTWARE\\AIJobPrint\\Agent'], ['Name', 'Bound']]) {
+  assert.equal(boundSearchAttributes.get(name), value, `AGENTBOUND RegistrySearch ${name} must match the production marker`)
+}
+const boundRegistryPath = productionInstaller.match(/\$boundRegistryPath\s*=\s*"HKLM:\\([^"\r\n]+)"/)?.[1]
+const boundName = productionInstaller.match(/New-ItemProperty\s+-LiteralPath\s+\$boundRegistryPath\s+-Name\s+"([^"]+)"\s+-Value\s+1\s+-PropertyType\s+DWord/)?.[1]
+assert.equal(boundRegistryPath, 'SOFTWARE\\AIJobPrint\\Agent', 'production binding marker path must remain parseable')
+assert.equal(boundSearchAttributes.get('Key'), boundRegistryPath, 'MSI marker key must match install-production-agent.ps1')
+assert.equal(boundName, 'Bound', 'production binding marker name must remain parseable')
+assert.equal(boundSearchAttributes.get('Name'), boundName, 'MSI marker value name must match install-production-agent.ps1')
+const autoStartCommand = customActions.find((attributes) => attributes.get('Id') === 'AgentServiceRestoreAutoStart').get('ExeCommand').replaceAll('&quot;', '"')
+assert.match(productionInstaller, /Set-Service[\s\S]*?-StartupType\s+Automatic/, 'binding must set the service to Automatic')
+assert.match(autoStartCommand, /\bconfig\s+aijobprintagent\.exe\s+start=\s+auto$/i, 'MSI must restore the same Automatic startup mode as binding')
+const recoveryCommand = customActions.find((attributes) => attributes.get('Id') === 'AgentServiceRestoreRecovery').get('ExeCommand').replaceAll('&quot;', '"')
+const failureFlagCommand = customActions.find((attributes) => attributes.get('Id') === 'AgentServiceRestoreFailureFlag').get('ExeCommand').replaceAll('&quot;', '"')
+const recoveryReset = productionInstaller.match(/Invoke-Sc\s+@\("failure",\s*\$ServiceName,\s*"reset=",\s*"([^"]+)"/)?.[1]
+const recoveryActions = productionInstaller.match(/'restart\/60000\/restart\/300000\/""\/0'/)?.[0]
+assert.equal(recoveryReset, '86400', 'MSI recovery reset period must match install-production-agent.ps1')
+assert.equal(recoveryActions, "'restart/60000/restart/300000/\"\"/0'", 'MSI recovery actions must match install-production-agent.ps1')
+assert.match(recoveryCommand, new RegExp(`reset=\\s+${recoveryReset}\\s+actions=\\s+${recoveryActions.slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'), 'MSI recovery command must match binding recovery policy')
+const failureFlag = productionInstaller.match(/Invoke-Sc\s+@\("failureflag",\s*\$ServiceName,\s*"([01])"/)?.[1]
+assert.equal(failureFlag, '1', 'binding failureflag value must remain parseable')
+assert.match(failureFlagCommand, new RegExp(`failureflag\\s+aijobprintagent\\.exe\\s+${failureFlag}$`, 'i'), 'MSI failureflag command must match binding policy')
 assert.match(project, /InstallerSourceRoot=\$\(MSBuildProjectDirectory\)/)
 assert.match(wix, /StandardDirectory Id="CommonAppDataFolder"/)
 assert.match(wix, /Name="Microsoft"[\s\S]*Name="Windows"[\s\S]*Name="Start Menu"[\s\S]*Name="Programs"/)
