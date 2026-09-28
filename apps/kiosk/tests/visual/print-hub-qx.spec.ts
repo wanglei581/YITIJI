@@ -217,6 +217,44 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
   expect(errors).toEqual([])
 })
 
+// D3（2026-09-28）：签名盖章默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS）。
+// 能力读取成功、但本机没有已配置的 signature_stamp 行时，这张卡必须和管理员配成 not_verified 一样
+// 整卡停用、写明「本机暂未开通」—— 不能让人点进去、传完文件才被服务端拒绝。两种形状都要覆盖：
+//   · 列表里根本没有这一行；
+//   · 真实后端的形状：每个键都下发，没配置过的是 configured=false（listForTerminal）。
+const WITHOUT_SIGNATURE = AVAILABLE.filter((row) => row.capabilityKey !== 'signature_stamp')
+for (const variant of [
+  { name: 'row absent', capabilities: WITHOUT_SIGNATURE },
+  {
+    name: 'row configured=false',
+    capabilities: [
+      ...WITHOUT_SIGNATURE,
+      { capabilityKey: 'signature_stamp', status: 'not_verified', note: null, configured: false, updatedAt: null },
+    ],
+  },
+]) {
+  test(`print hub keeps the signature card closed on a terminal that never enabled it (${variant.name}) @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+      status: 200,
+      json: { capabilities: variant.capabilities },
+    })
+
+    await page.goto('/print-scan')
+    const sign = page.getByTestId('print-hub-cap-sign')
+    await expect(sign).toBeDisabled()
+    await expect(sign).toContainText('本机暂未开通')
+    // 停用要真的点不进去，不只是换个样子。
+    await sign.click({ force: true })
+    await expect(page).toHaveURL(/\/print-scan$/)
+    // 阳性对照：读取本身是成功的 —— 同样不经过打印机、已登记可用的格式转换照常可点。
+    await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
+    await expectNoForgedReady(page)
+    expect(errors).toEqual([])
+  })
+}
+
 test('print hub device-off pauses paper paths and keeps software paths @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api, { isOnline: false, printerStatus: 'offline' })

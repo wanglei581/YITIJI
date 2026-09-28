@@ -4,10 +4,12 @@
 // 未配置的键由页面保持各自的保守硬编码默认。请求失败 / mock 模式 / 未配置
 // terminalId 时：getConfiguredCapabilities 仍返回空覆盖集（兼容服务中心旧行为）；
 // ScanStart 等深链门禁应使用 loadConfiguredCapabilities，把失败与「未配置」区分开。
-import type {
-  PrintScanCapabilityKey,
-  PrintScanCapabilityStatus,
-  TerminalCapabilityView,
+// 例外：DEFAULT_DENY_CAPABILITY_KEYS 里的键未配置不能当放行，见 resolveCapabilityOverride。
+import {
+  DEFAULT_DENY_CAPABILITY_KEYS,
+  type PrintScanCapabilityKey,
+  type PrintScanCapabilityStatus,
+  type TerminalCapabilityView,
 } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
 import { getTerminalId } from './screensaver'
@@ -69,4 +71,29 @@ export async function loadConfiguredCapabilities(): Promise<CapabilitiesLoadResu
 export async function getConfiguredCapabilities(): Promise<ConfiguredCapabilityMap> {
   const result = await loadConfiguredCapabilities()
   return result.map
+}
+
+/**
+ * 页面要按哪条能力配置处理某个键：管理员配置过的行照用；否则返回 undefined，
+ * 由页面按各自的默认处理 —— 只有一种例外。
+ *
+ * 例外（2026-09-28 D3）：DEFAULT_DENY_CAPABILITY_KEYS 里的键（签名盖章等）服务端
+ * 「未配置即拒绝」（TerminalCapabilitiesService.assertUserTaskAllowed），没有可兼容的
+ * 既有闭环。所以拉取成功（status='ok'）而这个键没有已配置的行时，按「本机暂未开通」
+ * （not_verified）处理，与管理员显式配成 not_verified 效果一致；否则用户能进页面、
+ * 传完文件才被服务端拒绝。
+ *
+ * skipped（非 http 的演示 / mock 模式）与 error、loading 不在这里改口径，
+ * 仍由调用方按原有规则处理；其余键「未配置」的含义也不变。
+ */
+export function resolveCapabilityOverride(
+  load: { readonly status: CapabilitiesLoadResult['status'] | 'loading'; readonly map: ConfiguredCapabilityMap },
+  key: PrintScanCapabilityKey,
+): ConfiguredCapability | undefined {
+  const configured = load.map[key]
+  if (configured) return configured
+  if (load.status === 'ok' && DEFAULT_DENY_CAPABILITY_KEYS.includes(key)) {
+    return { status: 'not_verified', note: null }
+  }
+  return undefined
 }

@@ -13,7 +13,7 @@
  * 改完搜 git diff 确认两边一致。
  *
  * 未配置行默认放行既有已验证闭环；
- * 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print 未配置 = 拒绝。
+ * 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print / signature_stamp 未配置 = 拒绝。
  */
 
 export type PrintScanCapabilityKey =
@@ -96,10 +96,17 @@ export const DEPRECATED_CAPABILITY_ALIAS: Partial<Record<PrintScanCapabilityKey,
  *
  * 该默认**不受 PRINT_SCAN_CAPABILITY_MODE 影响**：managed 模式放行的是既有闭环，
  * 不含这两个键。放行只有一条路径 —— 管理员在真机验过后显式配成 available。
+ *
+ * signature_stamp（签名盖章）列入本名单的理由不同，不是「没验过」而是合规
+ * （2026-09-28 产品负责人拍板 D3）：现在只有一个图片位，本人签名与单位印章分不开，
+ * 服务端又识别不了印章，存在为伪造印章提供便利的风险。试点终端先关，新机器默认关；
+ * 以后是加图片检查还是整体下线另行拍板。开通同样只有一条路径 —— 管理员逐台显式配成 available。
+ * 服务端判定在 TerminalCapabilitiesService.assertUserTaskAllowed。
  */
 export const DEFAULT_DENY_CAPABILITY_KEYS: readonly PrintScanCapabilityKey[] = [
   'color_print',
   'duplex_print',
+  'signature_stamp',
 ] as const
 
 /**

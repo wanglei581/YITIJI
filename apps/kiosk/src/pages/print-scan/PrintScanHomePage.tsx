@@ -38,6 +38,7 @@ import {
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import {
   loadConfiguredCapabilities,
+  resolveCapabilityOverride,
   type CapabilitiesLoadResult,
   type ConfiguredCapabilityMap,
 } from '../../services/api/printScanCapabilities'
@@ -383,8 +384,9 @@ export function PrintScanHomePage() {
           }
         }
 
-        // ② 管理员后台的能力配置覆盖。
-        const override = capabilityKey ? capabilityLoad.map[capabilityKey] : undefined
+        // ② 管理员后台的能力配置覆盖。签名盖章这类默认拒绝的键：读取成功但没登记 =
+        //    本机暂未开通，按 not_verified 整卡停用（resolveCapabilityOverride），与服务端一致。
+        const override = capabilityKey ? resolveCapabilityOverride(capabilityLoad, capabilityKey) : undefined
         let resolved = capability
         if (override) {
           const available = canCreateFormalPrintScanTask(override.status)
@@ -420,7 +422,7 @@ export function PrintScanHomePage() {
         return resolved
       }),
     [
-      capabilityLoad.map,
+      capabilityLoad,
       confirmed,
       device.printerLabel,
       mfp,
@@ -443,6 +445,8 @@ export function PrintScanHomePage() {
     if (link?.to) navigate(link.to)
   }
 
+  // 只数管理员真配置过的行：签名盖章没登记是默认关，不是「被管理员关闭」，
+  // 不因它把整页切到 locked 态（那张卡已在 ② 里单独停用）。
   const locked =
     confirmed &&
     Object.values(capabilityLoad.map).some(

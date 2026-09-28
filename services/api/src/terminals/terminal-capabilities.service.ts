@@ -15,6 +15,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import {
   CAPABILITY_DENIAL_REASON,
+  DEFAULT_DENY_CAPABILITY_KEYS,
   DEPRECATED_CAPABILITY_ALIAS,
   PRINT_SCAN_CAPABILITY_KEYS,
   PRINT_SCAN_CAPABILITY_STATUSES,
@@ -145,6 +146,8 @@ export class TerminalCapabilitiesService {
    *     生产必须显式声明，见 config/production-runtime-gates.ts）：
    *       managed（默认，兼容既有部署）= 管理员未接管 → 放行既有已验证闭环；
    *       strict = 未配置行 fail-closed 拒绝（全部能力必须显式验收后配置）。
+   *   - DEFAULT_DENY_CAPABILITY_KEYS 里的键（目前走到这里的只有 signature_stamp）
+   *     未配置一律拒绝，不看模式：它们没有可兼容的既有闭环。
    * 直达路由、绕过 Kiosk 的 API 调用同样被本门禁拦截。
    */
   async assertUserTaskAllowed(terminalId: string, capabilityKey: PrintScanCapabilityKey): Promise<void> {
@@ -162,6 +165,14 @@ export class TerminalCapabilitiesService {
           })
         : null)
     if (!effectiveRow) {
+      if ((DEFAULT_DENY_CAPABILITY_KEYS as readonly string[]).includes(capabilityKey)) {
+        throw new ForbiddenException({
+          error: {
+            code: 'CAPABILITY_NOT_CONFIGURED',
+            message: '该终端暂未开通此服务，请咨询现场工作人员',
+          },
+        })
+      }
       if (resolvePrintScanCapabilityMode() === 'strict') {
         throw new ForbiddenException({
           error: {

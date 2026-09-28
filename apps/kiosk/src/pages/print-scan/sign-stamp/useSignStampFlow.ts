@@ -6,7 +6,11 @@ import { loginPathForCurrentLocation } from '../../../auth/returnPath'
 import { useBusyLock } from '../../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../../services/api/files'
 import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../../services/api/screensaver'
-import { loadConfiguredCapabilities } from '../../../services/api/printScanCapabilities'
+import {
+  loadConfiguredCapabilities,
+  resolveCapabilityOverride,
+  type CapabilitiesLoadResult,
+} from '../../../services/api/printScanCapabilities'
 import { signCompose, signInspect } from '../../../services/api/printSign'
 import { errorCodeOf, userMessageOf } from '../../../services/api/userErrorMessage'
 import { savePrintMaterialSession } from '../../print/printMaterialSession'
@@ -47,6 +51,22 @@ export { AUTHORIZATION_LABEL }
 
 interface PresetDocumentState {
   presetDocument?: { fileId: string; fileAccessUrl: string; name: string; sizeBytes: number }
+}
+
+/**
+ * 能力拉取结果 → 本页的能力态。首次加载与「重试读取」共用这一个函数，两处不再各写一套。
+ *
+ * signature_stamp 属于默认拒绝的键（2026-09-28 D3）：读取成功却没有已配置的行，
+ * resolveCapabilityOverride 按 not_verified 给出，这里落到 disabled，与服务端
+ * 「未配置即拒绝」一致，用户进不了上传。skipped（演示 / mock）仍按可用、error 仍是 error。
+ */
+function capStatusOf(result: CapabilitiesLoadResult): CapStatus {
+  if (result.status === 'error') return 'error'
+  const override = resolveCapabilityOverride(result, 'signature_stamp')
+  if (!override) return 'ready'
+  if (override.status === 'maintenance') return 'maintenance'
+  if (canCreateFormalPrintScanTask(override.status)) return 'ready'
+  return 'disabled'
 }
 
 export function useSignStampFlow() {
@@ -100,18 +120,7 @@ export function useSignStampFlow() {
     let cancelled = false
     void loadConfiguredCapabilities().then((result) => {
       if (cancelled) return
-      if (result.status === 'error') {
-        setCap('error')
-        return
-      }
-      const override = result.map.signature_stamp
-      if (!override) {
-        setCap('ready')
-        return
-      }
-      if (override.status === 'maintenance') setCap('maintenance')
-      else if (canCreateFormalPrintScanTask(override.status)) setCap('ready')
-      else setCap('disabled')
+      setCap(capStatusOf(result))
     })
     return () => {
       cancelled = true
@@ -469,13 +478,7 @@ export function useSignStampFlow() {
     openLocal,
     retryCap: () => {
       setCap('loading')
-      void loadConfiguredCapabilities().then((result) => {
-        if (result.status === 'error') setCap('error')
-        else if (!result.map.signature_stamp) setCap('ready')
-        else if (result.map.signature_stamp.status === 'maintenance') setCap('maintenance')
-        else if (canCreateFormalPrintScanTask(result.map.signature_stamp.status)) setCap('ready')
-        else setCap('disabled')
-      })
+      void loadConfiguredCapabilities().then((result) => setCap(capStatusOf(result)))
     },
     goBack: () => navigate(back.path),
     goLogin: () => navigate(loginPathForCurrentLocation()),
