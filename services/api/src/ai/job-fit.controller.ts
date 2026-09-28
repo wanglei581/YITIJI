@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
-import { AiUse } from '../ai-access/ai-access.decorator'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator'
@@ -167,10 +167,8 @@ export class JobFitController {
     const requester = this.anonymousConsentRequesterOf(req)
     return this.service.getJobFitConsentStatus(taskId, requester)
   }
-
   @Delete('consent/:taskId')
-  @AiUse('generate')
-
+  @AiUseExempt('撤回或删除本人数据，不调模型；AI 暂停、维护期间也必须能做')
   async revokeConsent(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     const requester = this.anonymousConsentRequesterOf(req)
     return this.service.revokeJobFitConsent(taskId, requester)

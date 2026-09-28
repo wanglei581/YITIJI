@@ -14,8 +14,10 @@
  * 运行：pnpm --filter @ai-job-print/api verify:ai-access
  */
 import 'reflect-metadata'
-import { METHOD_METADATA } from '@nestjs/common/constants'
-import { Reflector } from '@nestjs/core'
+import { RequestMethod } from '@nestjs/common'
+import { METHOD_METADATA, MODULE_METADATA } from '@nestjs/common/constants'
+import { APP_GUARD, NestFactory, Reflector } from '@nestjs/core'
+import { AiAccessModule } from '../src/ai-access/ai-access.module'
 import { JwtService } from '@nestjs/jwt'
 import { AiAccessGuard } from '../src/ai-access/ai-access.guard'
 import { AiAccessService, type AiAccessConfig } from '../src/ai-access/ai-access.service'
@@ -145,7 +147,7 @@ async function serviceMatrix(): Promise<void> {
     ['维护：只读放行', 'read', false, ANON, { ...OFF, maintenance: true }, 'PASS'],
     ['开始 AI 前登录：匿名生成被拦', 'generate', false, ANON, { ...OFF, loginGate: 'before_generate' }, 'AI_LOGIN_REQUIRED'],
     ['开始 AI 前登录：匿名语音被拦', 'voice', false, ANON, { ...OFF, loginGate: 'before_generate' }, 'AI_LOGIN_REQUIRED'],
-    ['开始 AI 前登录：匿名导出放行', 'export', false, ANON, { ...OFF, loginGate: 'before_generate' }, 'PASS'],
+    ['开始 AI 前登录：匿名导出也被拦（更严的一档覆盖导出）', 'export', false, ANON, { ...OFF, loginGate: 'before_generate' }, 'AI_LOGIN_REQUIRED'],
     ['开始 AI 前登录：会员生成放行', 'generate', false, MEMBER, { ...OFF, loginGate: 'before_generate' }, 'PASS'],
     ['导出前登录：匿名导出被拦', 'export', false, ANON, { ...OFF, loginGate: 'before_export' }, 'AI_LOGIN_REQUIRED'],
     ['导出前登录：匿名生成放行', 'generate', false, ANON, { ...OFF, loginGate: 'before_export' }, 'PASS'],
@@ -178,6 +180,12 @@ async function redisFailure(): Promise<void> {
     check('redis:故障时仍按环境变量生效（AI_PAUSED=on）', (await codeOf(() => paused.enforce('generate', false, ANON as never))) === 'AI_PAUSED')
     const override = makeService({ redisValues: { 'system:ai-access:paused': 'off' } }).service
     check('redis:后台切换值优先于环境变量', (await codeOf(() => override.enforce('generate', false, ANON as never))) === 'PASS')
+    const savedGate = process.env['AI_LOGIN_GATE']
+    process.env['AI_LOGIN_GATE'] = 'before_generate'
+    delete process.env['AI_PAUSED']
+    const gateOff = makeService({ redisValues: { 'system:ai-access:loginGate': 'off' } }).service
+    check('redis:环境设了登录档位、后台切成 off 也要生效', (await codeOf(() => gateOff.enforce('generate', false, ANON as never))) === 'PASS')
+    if (savedGate === undefined) delete process.env['AI_LOGIN_GATE']; else process.env['AI_LOGIN_GATE'] = savedGate
   } finally {
     if (saved === undefined) delete process.env['AI_PAUSED']; else process.env['AI_PAUSED'] = saved
   }
@@ -280,6 +288,16 @@ function coverage(): void {
     check(`coverage:${ctor.name} 只有新建入口受维护拦截`, JSON.stringify(marked) === JSON.stringify([...expected].sort())
       && classMeta(ctor, MAINTENANCE_BLOCKED_METADATA) === undefined, `实际：${marked.join('、') || '无'}`)
   }
+  // AI 控制器里所有 DELETE（撤回、删除本人数据）都必须显式豁免：暂停、维护、登录档位、声明都不能挡用户删自己的东西
+  for (const ctor of aiControllers) {
+    const blockedDeletes = routesOf(ctor).filter((method) =>
+      methodMeta(ctor, method, METHOD_METADATA) === RequestMethod.DELETE && typeof methodMeta(ctor, method, AI_USE_EXEMPT_METADATA) !== 'string')
+    check(`coverage:${ctor.name} 的删除 / 撤回接口全部显式豁免`, blockedDeletes.length === 0, `未豁免：${blockedDeletes.join('、')}`)
+  }
+  check('coverage:结束语音会话（止损）显式豁免', typeof methodMeta(TrtcController as unknown as Ctor, 'stopSession', AI_USE_EXEMPT_METADATA) === 'string')
+  const providers = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AiAccessModule) ?? []) as Array<{ provide?: unknown; useClass?: unknown; useExisting?: unknown }>
+  check('wiring:AiAccessGuard 注册为全局守卫（APP_GUARD）', providers.some((p) => p && p.provide === APP_GUARD && (p.useClass === AiAccessGuard || p.useExisting === AiAccessGuard)),
+    '没有 APP_GUARD 时守卫只是一个没人调用的类，整套拦截在线上都不生效')
   const exemptDeletes: Array<[Ctor, string]> = [
     [MemberMockInterviewController as unknown as Ctor, 'remove'],
     [MemberJobAiSessionsController as unknown as Ctor, 'remove'],
@@ -313,6 +331,32 @@ async function adminSwitch(): Promise<void> {
   check('admin:改完清缓存，立即读到新值', before.paused === false && after.paused === true)
 }
 
+/** 真起完整 AppModule 发 HTTP：证明线上装配里守卫确实在拦（手动 new 守卫的测试测不出「没注册」）。 */
+async function realApp(): Promise<void> {
+  const saved = process.env['MAINTENANCE_MODE']
+  process.env['MAINTENANCE_MODE'] = 'on'
+  const { AppModule } = await import('../src/app.module')
+  const app = await NestFactory.create(AppModule, { logger: false })
+  app.setGlobalPrefix('api/v1')
+  try {
+    await app.listen(0)
+    const base = `${(await app.getUrl()).replace('[::1]', '127.0.0.1')}/api/v1`
+    const post = (path: string, body: unknown) => fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    const codeOfResponse = async (res: Response) => ((await res.json().catch(() => ({}))) as { error?: { code?: string } }).error?.code ?? ''
+    const chat = await post('/assistant/chat', { message: '你好' })
+    check('app:维护模式下小青对话被拦（503 MAINTENANCE_MODE）', chat.status === 503 && (await codeOfResponse(chat)) === 'MAINTENANCE_MODE', `实际 ${chat.status}`)
+    const print = await post('/print/jobs', {})
+    check('app:维护模式下打印下单被拦', print.status === 503 && (await codeOfResponse(print)) === 'MAINTENANCE_MODE', `实际 ${print.status}`)
+    const callback = await post('/payment/callback/wechat', {})
+    check('app:维护模式下支付回调不被维护拦截', (await codeOfResponse(callback)) !== 'MAINTENANCE_MODE', `实际 ${callback.status}`)
+    const health = await fetch(`${base}/health`)
+    check('app:维护模式下健康检查照常', health.status !== 503 || (await codeOfResponse(health)) !== 'MAINTENANCE_MODE', `实际 ${health.status}`)
+  } finally {
+    await app.close()
+    if (saved === undefined) delete process.env['MAINTENANCE_MODE']; else process.env['MAINTENANCE_MODE'] = saved
+  }
+}
+
 void (async () => {
   try {
     await serviceMatrix()
@@ -320,6 +364,7 @@ void (async () => {
     await guardOnRealRoutes()
     coverage()
     await adminSwitch()
+    await realApp()
   } catch (error) {
     fail('runtime', error instanceof Error ? error.stack ?? error.message : String(error))
   }

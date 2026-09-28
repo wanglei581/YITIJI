@@ -29,7 +29,8 @@ export class AiAccessService {
     try {
       const values = await Promise.all(Object.values(KEYS).map((key) => this.redis.get(key)))
       const value: AiAccessConfig = {
-        loginGate: values[0] === 'before_export' || values[0] === 'before_generate' ? values[0] : fallback.loginGate,
+        // 后台显式切到 off 也要认（此前只认两档，off 会被当成没设置、回落到环境变量）
+        loginGate: values[0] === 'off' || values[0] === 'before_export' || values[0] === 'before_generate' ? values[0] : fallback.loginGate,
         declarationEnforced: values[1] == null ? fallback.declarationEnforced : values[1] === 'on',
         paused: values[2] == null ? fallback.paused : values[2] === 'on',
         maintenance: values[3] == null ? fallback.maintenance : values[3] === 'on',
@@ -59,6 +60,10 @@ export class AiAccessService {
     if (patch.maintenance !== undefined) entries.push([KEYS.maintenance, patch.maintenance ? 'on' : 'off'])
     try {
       await Promise.all(entries.map(([key, value]) => this.redis.setEx(key, 60 * 60 * 24 * 365, value)))
+    } catch (error) {
+      // 审计已写「要切换」，Redis 没写进去：补一条失败记录，免得台账与线上状态对不上
+      await this.audit.write({ actorId, actorRole: 'admin', action: 'ai.access_switch_failed', targetType: 'system', targetId: 'ai-access', payload: { attempted: after, reason: 'redis_write_failed' }, ipAddress })
+      throw error
     } finally { this.clearCache() }
     return this.getConfig()
   }
@@ -69,7 +74,9 @@ export class AiAccessService {
     if (current.maintenance && (maintenanceBlocked || (kind && kind !== 'read'))) throw new ServiceUnavailableException({ error: { code: 'MAINTENANCE_MODE', message: '设备维护中，请稍后再来' } })
     if (!kind || kind === 'read') return
     if (current.paused) throw new ServiceUnavailableException({ error: { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' } })
-    const needsLogin = (current.loginGate === 'before_generate' && (kind === 'generate' || kind === 'voice')) || (current.loginGate === 'before_export' && kind === 'export')
+    // 「开始 AI 前」是更严的一档，导出与打印同样要登录
+    const needsLogin = (current.loginGate === 'before_generate' && (kind === 'generate' || kind === 'voice' || kind === 'export'))
+      || (current.loginGate === 'before_export' && kind === 'export')
     const declaration = current.declarationEnforced && (kind === 'generate' || kind === 'voice')
     if (!needsLogin && !declaration) return
     const auth = req.headers?.authorization

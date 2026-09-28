@@ -1,5 +1,5 @@
 import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
-import { AiUse } from '../ai-access/ai-access.decorator'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -321,12 +321,10 @@ export class AiController {
     })
     return result
   }
-
   @Put('resume/records/:taskId/draft')
   @Header('Cache-Control', 'no-store')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
-  @AiUse('generate')
-
+  @AiUseExempt('保存本人草稿，不调模型')
   async putResumeDraft(
     @Param('taskId') taskId: string,
     @Body() dto: ResumeDraftPutDto,

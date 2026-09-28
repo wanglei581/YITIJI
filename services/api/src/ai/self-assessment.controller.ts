@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
-import { AiUse } from '../ai-access/ai-access.decorator'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { RedisService } from '../common/redis/redis.service'
@@ -145,10 +145,8 @@ export class SelfAssessmentController {
       auditCtx: auditContextOf(req),
     })
   }
-
   @Delete(':taskId')
-  @AiUse('generate')
-
+  @AiUseExempt('撤回或删除本人数据，不调模型；AI 暂停、维护期间也必须能做')
   async withdraw(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     return this.service.withdraw(taskId, await this.requesterOf(req), auditContextOf(req))
   }

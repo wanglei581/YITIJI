@@ -1,5 +1,5 @@
 import { Body, Controller, Post, HttpCode, HttpStatus, Headers, Req, BadRequestException, UnauthorizedException, UseGuards } from '@nestjs/common'
-import { AiUse } from '../ai-access/ai-access.decorator'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { randomBytes } from 'node:crypto'
 import type { Request } from 'express'
@@ -62,7 +62,7 @@ export class TrtcController {
    */
   // stop 是「止损」操作：绝不能被限流挡掉，否则机器人留在房间持续计费。
   // 放宽到 60 次/分钟（仍防恶意刷腾讯 StopAIConversation 接口），覆盖 start 的 5/min。
-  @AiUse('voice')
+  @AiUseExempt('结束语音会话止损：AI 暂停、维护期间也必须能停，否则房间持续计费')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
   @Post('session/stop')
   @HttpCode(HttpStatus.OK)
