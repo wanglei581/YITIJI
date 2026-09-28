@@ -246,7 +246,7 @@ export function MyFeedbackPage() {
                 <div className="qx-state-t">{uiState === 'login' ? '请先登录' : '当前无法提交反馈'}</div>
                 <p className="qx-state-d">
                   {uiState === 'login'
-                    ? '登录后可查看和提交本人反馈。本页是会员工单，与免登录的一体机问题反馈不是同一条链路。'
+                    ? '登录后可查看和提交本人反馈。本页是登录后的反馈，与不用登录的一体机问题反馈不是同一条流程。'
                     : '连接真实服务并登录后，可查看和提交本人反馈'}
                 </p>
               </span>
@@ -305,7 +305,7 @@ export function MyFeedbackPage() {
 
           <p className="fb-legal">
             <b>诚实说明</b>
-            本页是登录后的本人工单，与免登录的一体机问题反馈不是同一条链路；不承诺受理结论或回复时限。
+            本页是登录后的本人反馈，与不用登录的一体机问题反馈不是同一条流程；不承诺受理结论或回复时限。
           </p>
           {isLoggedIn && loadState === 'ready' && !selected ? <MemberLoadMore {...pagination} /> : null}
         </div>
