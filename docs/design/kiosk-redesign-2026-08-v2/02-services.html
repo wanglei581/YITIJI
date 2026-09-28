@@ -17,6 +17,7 @@
 </style>
 <!--
 青序流光 2.0 · 02 全部服务
+9/28 留白：标题区右半边原先整段空着（299px），导语两句并成一行横跨整宽，「带走」四项放在导语与列表正中；13 行服务每行放宽到 80px，吃掉底部空档。标题区高度、文字、结构都没动。
 规则 1：标题区加高，第一条服务落在够得着的位置；顶栏返回保留，底部三 Tab 可回首页。
 规则 2：页标题收到 38，行标题 28，说明 20–22，导航 21，日期 20。
 规则 3：每行说明写明带走什么。
@@ -49,6 +50,12 @@
 .nav-item{font-size:21px!important}
 .clock small{font-size:20px!important;color:var(--ink)!important}
 .brand-name{font-size:26px!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   标题区右半边整段空着：导语两句并成一行，横跨整宽；标题区高度不变，第一条服务仍在 y≥500。
+   底部剩下的一截分给 13 行服务，每行略放宽，不加内容。 */
+.qx-lead br{display:none}
+.qx-steps{margin-bottom:auto}
+.service-row,.yours .service-row{min-height:80px}
 </style>
 </head>
 <body>
