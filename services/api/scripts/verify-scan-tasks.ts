@@ -558,12 +558,19 @@ function assertTerminalQuietPeriodContracts(apiRoot: string): void {
     'quiet period must return the stable SCAN_TERMINAL_QUIET_PERIOD error code')
   assert.match(source, /remainingSeconds[\s\S]*details:\s*\{\s*remainingSeconds\s*\}/,
     'quiet period error must expose remaining seconds')
-  const createStart = source.indexOf('async create(')
-  const ackStart = source.indexOf('async ack(')
-  const quietStart = source.indexOf('assertTerminalQuietPeriod(')
-  assert.ok(createStart >= 0 && quietStart > createStart, 'create must enforce terminal quiet period')
-  assert.ok(ackStart >= 0 && source.indexOf('assertTerminalQuietPeriod(task.terminalId)', ackStart) > ackStart,
-    'ACK must enforce terminal quiet period')
+  // 必须在方法体内部找调用：只看「create 之后某处出现过」的话，删掉 create 里那一行，
+  // 后面 ack 的调用和方法定义本身照样满足条件（2026-09-28 反向变异实测放行）。
+  const methodBody = (signature: string): string => {
+    const start = source.indexOf(signature)
+    assert.ok(start >= 0, `${signature} must exist`)
+    const rest = source.slice(start + signature.length)
+    const next = rest.search(/\n  (?:async |private |public |protected |static )/)
+    return next >= 0 ? rest.slice(0, next) : rest
+  }
+  assert.match(methodBody('async create('), /await this\.assertTerminalQuietPeriod\(/,
+    'create must enforce terminal quiet period inside create itself')
+  assert.match(methodBody('async ack('), /await this\.assertTerminalQuietPeriod\(task\.terminalId\)/,
+    'ACK must enforce terminal quiet period inside ack itself')
   assert.match(source, /status:\s*\{\s*in:\s*\['cancelled',\s*'expired'\]/,
     'quiet period must only follow cancelled or expired tasks')
   assert.match(source, /const endedAt = recent\.updatedAt\.getTime\(\)/,
