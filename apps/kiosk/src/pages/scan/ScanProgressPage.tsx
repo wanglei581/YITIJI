@@ -473,7 +473,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           <p data-testid="scan-ack-pending-notice">
             这一场<b>已经建好</b>，但系统还没确认这台机器可以收它的文件。
             没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
-            它也<b>不会</b>被别人收走：没确认的任务对谁都不会交文件。
+            它也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
             {ackRetryable ? '上一次确认没成，点右下角「再确认一次」重来。' : '确认通常就是一两秒。'}
           </p>
         ) : cancelling ? (
@@ -513,7 +513,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
               ['保存策略', '按设备回传的原格式保存，系统不做转换'],
             ]}
           />
-          <ScanNoteCard title="这一屏现在会做什么" foot="自动检查只是读一次：不会重扫，也不会改变系统里的任何东西。">
+          <ScanNoteCard title="这一屏现在会做什么" foot="自动检查只是查一下状态：不会重扫，也不会改变系统里的任何东西。">
             {/* 指路跟着主按钮走：没拿到投递授权时右下角是「再确认一次」，写「立即检查」就是指向一颗不存在的按钮。 */}
             <ScanPlan items={deliveryAcked ? [
               '本机每隔几秒自动查一次，你什么都不用做。',

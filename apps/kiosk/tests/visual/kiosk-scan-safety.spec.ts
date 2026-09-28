@@ -1146,7 +1146,7 @@ test('a reload while the paired create is in flight fails closed @scan-safety', 
   expect(server.creates).toHaveLength(2)
   expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[1]!.headers['x-scan-retry-control']).toBeUndefined()
-  await expect(page.getByText('普通的一次扫描：你已确认这一次不是把同一份内容再扫一遍')).toBeVisible()
+  await expect(page.getByText('普通扫描：你已确认这一次不是把同一份内容再扫一遍')).toBeVisible()
 
   expect(errors).toEqual([])
 })
@@ -1326,7 +1326,7 @@ test('a child that is no longer recoverable offers only an honest plain restart 
   expect(server.creates).toHaveLength(3)
   expect(server.creates[2]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[2]!.headers['x-scan-retry-control']).toBeUndefined()
-  await expect(page.getByText('普通的一次扫描：你已确认这一次不是把同一份内容再扫一遍')).toBeVisible()
+  await expect(page.getByText('普通扫描：你已确认这一次不是把同一份内容再扫一遍')).toBeVisible()
 
   expect(errors).toEqual([])
 })

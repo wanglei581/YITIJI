@@ -8,7 +8,7 @@ import {
 /**
  * 清场遮罩。两种形态，判据只有一个：**服务端那一头收完尾了没有**。
  *
- * · 收完了（绝大多数情况，包括压根没有扫描任务）—— 只有一句「正在清除这台机器上的这次使用」，
+ * · 收完了（绝大多数情况，包括压根没有扫描任务）—— 只有一句「正在清除这台机器上的这次使用记录」，
  *   和这条闸出现之前一模一样，一帧都不多留；
  * · 没收完 —— 多出下面这块「锁住等确认」的说明。它**不是**一个进度动画，
  *   它要回答用户此刻真正会问的三件事：我的东西清了没有、这机器为什么不让我用、
@@ -83,7 +83,7 @@ export function KioskClearingOverlay({ cleanup }: { cleanup: ScanCleanupStatus }
       role="status"
       aria-live="assertive"
     >
-      <p>正在清除这台机器上的这次使用</p>
+      <p>正在清除这台机器上的这次使用记录</p>
       <span className="sr-only">正在清除本次使用记录</span>
       {cleanup.holding ? <CleanupHoldPanel status={cleanup} /> : null}
     </div>

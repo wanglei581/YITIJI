@@ -71,7 +71,7 @@ export function frameCopy(view: ParseView, terminal: ShownTerminal | null): Fram
     return {
       ...base,
       ask: <>这份文件<em>已停止使用</em>。</>,
-      doing: '内容在调用模型之前就被拒绝了。这次没有调用模型。',
+      doing: '系统在这次开始 AI 解析之前，已停止使用这份文件。',
       flag: '请重新上传',
       status: { tone: 'warn', label: '文件内容已变化' },
     }
@@ -88,7 +88,7 @@ export function frameCopy(view: ParseView, terminal: ShownTerminal | null): Fram
   return {
     ...base,
     ask: <>这次解析<em>不能沿用原标识</em>。</>,
-    doing: '同一标识不能恢复结果。本页不会自动再调用 AI。',
+    doing: '同一标记不能恢复结果。本页不会自动再调用 AI。',
     flag: '标识已结束',
     status: { tone: 'warn', label: '原标识不能恢复' },
   }
@@ -134,7 +134,7 @@ export function ResumeParseUnknownNote(props: {
           <div><dt>按编号再查</dt><dd>只是读取这一次的结果，不会重新解析，也不会多出记录。</dd></div>
         ) : (
           <>
-            <div><dt>同一次重查</dt><dd>用已经保存的同一次标识再问一次，不会另起一次解析。</dd></div>
+            <div><dt>原样再试一次</dt><dd>用已经保存的同一次标识再问一次，不会另起一次解析。</dd></div>
             <div><dt>重新提交</dt><dd>会作为新的一次解析重新调用 AI；如果刚才那次其实已经完成，记录里可能多出一条。</dd></div>
           </>
         )}
@@ -144,8 +144,8 @@ export function ResumeParseUnknownNote(props: {
             {pendingTask
               ? '稍后点下方「按同一编号再查结果」；也可以返回简历来源换一份文件。'
               : loggedIn
-                ? '可先到「我的 → 我的简历」核对；暂时没看到时可稍后刷新。先按同一次重查。若决定重新提交，这是新的一次解析。'
-                : '当前未登录，暂时无法核对这一次的结果。需要继续时，先按同一次重查；重新提交会是新的一次解析。也可以返回简历来源。'}
+                ? '可先到「我的 → 我的简历」核对；暂时没看到时可稍后刷新。先原样再试一次。若决定重新提交，这是新的一次解析。'
+                : '当前未登录，暂时无法核对这一次的结果。需要继续时，先原样再试一次；重新提交会是新的一次解析。也可以返回简历来源。'}
           </dd>
         </div>
       </dl>

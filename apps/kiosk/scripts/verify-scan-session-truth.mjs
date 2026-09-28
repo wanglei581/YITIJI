@@ -34,7 +34,7 @@ const scanSettingsTeardown = read('src/pages/scan/scanSettingsTeardown.ts')
 /* 清场收尾闸本身：等服务端确认之前不许换人。这一轮 P1 的本体。 */
 const scanCleanupGate = read('src/pages/scan/scanCleanupGate.ts')
 const privacyGuard = read('src/auth/KioskPrivacyGuard.tsx')
-/* 清场遮罩自己的组件：它现在除了「正在清除这台机器上的这次使用」，还要如实说出收尾闸在等什么。 */
+/* 清场遮罩自己的组件：它现在除了「正在清除这台机器上的这次使用记录」，还要如实说出收尾闸在等什么。 */
 const clearingOverlay = read('src/auth/KioskClearingOverlay.tsx')
 
 assert.doesNotMatch(
@@ -1251,7 +1251,7 @@ assert.match(
 )
 assert.match(
   scanSettingsModel,
-  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通的一次扫描：你已确认这一次不是把同一份内容再扫一遍'\]/,
+  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通扫描：你已确认这一次不是把同一份内容再扫一遍'\]/,
   '用户在 fail-closed 那一屏选的普通扫描要记在屏幕上：否则下一屏看起来像是本页悄悄降级的',
 )
 
@@ -1766,7 +1766,7 @@ assert.match(
 )
 assert.match(
   scanSettingsView,
-  /liveNotDurable\s*\n?\s*\? '本机记不住，无法建立这次扫描'[\s\S]{0,300}?cleanupHolding \? '等本机收完上一场的尾' : '未创建扫描任务'/,
+  /liveNotDurable\s*\n?\s*\? '本机暂时存不下扫描记录，无法开始这次扫描'[\s\S]{0,300}?cleanupHolding \? '等本机收完上一场的尾' : '未创建扫描任务'/,
   '这一支上任务**建过**（随后被本页撤掉）：禁用按钮写死「未创建扫描任务」就是句假话，'
     + '必须按 liveNotDurable 分开说。\n'
     + '2026-09-15 再多一支：收尾闸挡住时本页**一个请求都没发**，'

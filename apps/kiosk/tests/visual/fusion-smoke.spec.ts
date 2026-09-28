@@ -120,7 +120,7 @@ test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ pag
   await expect(page.getByRole('heading', { name: /还在用吗/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /我还在，继续使用/ })).toHaveCount(0)
   await expect(
-    page.getByRole('button', { name: '结束并清除这台机器上的这次使用', exact: true })
+    page.getByRole('button', { name: '结束并清除这台机器上的这次使用记录', exact: true })
   ).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])

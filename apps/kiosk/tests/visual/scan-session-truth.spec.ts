@@ -1222,6 +1222,6 @@ test('a created session whose credentials never reach storage is revoked, never 
   await expect(page.getByRole('button', { name: '再确认一次' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '安全返回扫描首页', exact: true })).toBeVisible()
   // 那颗禁用按钮也不许说「未创建扫描任务」：任务**建过**，随后被本页撤掉了。
-  await expect(page.getByRole('button', { name: '本机记不住，无法建立这次扫描', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '本机暂时存不下扫描记录，无法开始这次扫描', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '未创建扫描任务' })).toHaveCount(0)
 })

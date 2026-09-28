@@ -171,9 +171,9 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
     return {
       ...base,
       state: 'repriced',
-      title: '机构刚调过价，本屏报价已不是现价',
+      title: '价格刚更新过，本屏报价已不是现价',
       detail:
-        '本机取到的公示价与本单报价单价不一致，说明机构在这两次读取之间改过价。'
+        '本机取到的公示价与本单报价单价不一致，说明价格在这两次读取之间更新过。'
         + '请返回上一步重新核价后再继续，不要按本屏金额付款。',
       repricedUnits: { quoteUnitCents: input.quote.unitCents, configUnitCents },
     }

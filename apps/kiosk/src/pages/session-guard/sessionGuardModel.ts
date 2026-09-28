@@ -16,7 +16,7 @@ export function remainingSeconds(deadlineAt: number, now: number): number {
 export const SESSION_GUARD_PILL: Record<SessionGuardState, { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }> = {
   warning: { tone: 'warn', label: '闲置提醒 · 本机计时' },
   'warning-no-continue': { tone: 'warn', label: '已到最长安全时限' },
-  clearing: { tone: 'unknown', label: '正在清除这台机器上的这次使用' },
+  clearing: { tone: 'unknown', label: '正在清除这台机器上的这次使用记录' },
 }
 
 /**

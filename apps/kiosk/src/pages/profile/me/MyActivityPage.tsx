@@ -82,7 +82,7 @@ export function MyActivityPage() {
     <>
       <QxMeStructRow icon={EyeIcon} title="浏览记录" desc={hostingOpen ? '看过哪些岗位、招聘会与政策' : '看过哪些政策'} mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-0" />
       <QxMeStructRow icon={ExternalLinkIcon} title="外部跳转记录" desc="打开过哪些来源平台或官方入口" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-1" />
-      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由系统返回，本机不在这台机器上留存明细" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-2" />
+      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由系统返回，这台机器上不留存明细" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-2" />
     </>
   )
 

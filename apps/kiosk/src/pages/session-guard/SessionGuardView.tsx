@@ -33,7 +33,7 @@ export function SessionGuardView({
     ? '这一次不允许再点「继续使用」。你可以立刻结束并清场，也可以等计时走完。'
     : state === 'clearing'
       ? '清的是这台机器上的登录状态和这次的临时使用记录。结果要等清除做完才算数，本页不提前写成已完成。'
-      : '这是公共使用的隐私保护。时间一到，本机上这趟留下的东西会被清掉；已经交给系统的任务和账号数据不受影响。'
+      : '这是公用设备的隐私保护。时间一到，本机上这趟留下的东西会被清掉；已经交给系统的任务和账号数据不受影响。'
 
   return (
     <div className="sg-page qx-grow qx-scroll" data-screen="session-guard" data-state={state} data-testid={`session-guard-state-${state}`}>

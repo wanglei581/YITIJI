@@ -38,9 +38,9 @@ const FROZEN = new Map([
   // 冻结契约不放宽，仍逐字节校验；入口标签与地址另有 verify:profile-inkpaper-home /
   // verify:lightflow-profile-entry 的 22 条对照表钉死。
   // 旧哈希 dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae。
-  // 2026-09-28 用词：账号设置说明「登录状态与会话说明」改为「登录状态与这次使用的说明」。
+  // 2026-09-28 用词：账号设置说明「登录状态与会话说明」改为「登录状态与公共设备使用说明」。
   // 入口条数、路由、图标都没变。旧哈希 3b05eac00356d5e5c59912752a105bdb268c2bec5b0b57bc455a2a69d63103e0。
-  ['src/pages/profile/profileEntries.ts', 'b7d4728b2cd87d640f3dbc4c2d6d386d0416bade483a01ef1dbcdfcabfd9d703'],
+  ['src/pages/profile/profileEntries.ts', 'c3eab9286546efab60ec8e3e5dfe9f1a4724c0e17e27f09e159a541ac4ef83e3'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
   ['src/pages/profile/me/feedback/types.ts', 'a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f'],

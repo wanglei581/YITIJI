@@ -82,7 +82,7 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   LOCAL_USB_BRIDGE_TOKEN_MISSING: '这台机器还没配好 U 盘导入，请联系现场工作人员',
   CONVERT_TOO_MANY_IMAGES: '一次转换的图片过多，请减少张数后重试',
   SIGN_SOURCE_NOT_FOUND: '文件访问凭证已过期或文件已清理，请重新选择文件',
-  NO_TERMINAL_IDENTITY: '这台机器还没确认是哪一台，请联系现场工作人员',
+  NO_TERMINAL_IDENTITY: '这台机器还没完成登记，请联系现场工作人员',
   KIOSK_FEEDBACK_RATE_LIMITED: '反馈提交过于频繁，请稍后再试',
   KIOSK_FEEDBACK_PII_REJECTED: '反馈内容含不宜提交的个人信息，请删改后再试',
   KIOSK_FEEDBACK_EMPTY: '请填写问题说明后再提交',

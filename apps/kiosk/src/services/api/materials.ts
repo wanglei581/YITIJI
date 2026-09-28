@@ -153,11 +153,11 @@ async function parseEnvelope<T>(res: Response, failedToken?: string): Promise<T>
     throw new ApiHttpError(error.code, error.message, res.status)
   }
   if (body.success === false) {
-    const error = extractError(body, '这次没读到材料检查结果')
+    const error = extractError(body, '材料检查这次没做成')
     throw new ApiHttpError(error.code, error.message, res.status)
   }
   if (!body.data) {
-    throw new ApiHttpError('MATERIAL_TASK_EMPTY', '这次没读到材料检查结果', res.status)
+    throw new ApiHttpError('MATERIAL_TASK_EMPTY', '这次没有查到材料检查结果', res.status)
   }
   return body.data
 }

@@ -43,7 +43,7 @@ const BENEFITS: Entry[] = [
 const ACCOUNT: Entry[] = [
   { icon: 'bell', tone: 'ink', label: '消息通知', desc: '查看本人消息', route: '/me/notifications' },
   // 账号设置轻量版：登录/游客状态、脱敏手机号、会话说明、协议入口、退出登录；不做换绑/注销。
-  { icon: 'settings', tone: 'ink', label: '账号设置', desc: '登录状态与这次使用的说明', route: '/me/settings' },
+  { icon: 'settings', tone: 'ink', label: '账号设置', desc: '登录状态与公共设备使用说明', route: '/me/settings' },
   { icon: 'help', tone: 'ink', label: '帮助中心', desc: '使用说明与服务边界', route: '/help' },
   { icon: 'feedback', tone: 'ink', label: '意见反馈', desc: '提交本人服务反馈', route: '/me/feedback' },
 ]

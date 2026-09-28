@@ -413,7 +413,7 @@ export function resumeParseTerminalCopy(terminal: ResumeParseTerminalKind): Resu
   if (terminal.kind === 'file_changed') {
     return {
       title: '文件内容已变化',
-      lead: '系统在这次调用模型之前停止使用这份文件。',
+      lead: '系统在这次开始 AI 解析之前，已停止使用这份文件。',
       happened: '文件内容已变化，已停止使用。这次没有调用模型。',
       kept: '本机这次的标记已经放开。稍后可以换一份新文件，不会自动开始解析。',
       next: '请重新上传一份新文件。不要用这份已停用的文件再解析。',

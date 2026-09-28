@@ -119,7 +119,7 @@ export function ScanSettingsStatusView({
     : phase === 'invalid'
       ? '当前页面没有来自扫描首页的合法类型信息，本次不会发起创建请求。'
       : phase === 'loading'
-        ? '正在等待系统返回这次真实的扫描，成功前不会显示任务信息或操作指引。'
+        ? '正在等系统建好这次扫描，成功前不会显示任务信息或操作指引。'
         : failure?.description ?? '这次没有可用的扫描。'
   const status = awaitingAck
     ? ackRetryable
@@ -214,7 +214,7 @@ export function ScanSettingsStatusView({
                 ? '等系统返回这次扫描'
                 /* 这一支上任务**建过**（随后被本页撤掉），说「未创建」就是句假话。 */
                 : liveNotDurable
-                  ? '本机记不住，无法建立这次扫描'
+                  ? '本机暂时存不下扫描记录，无法开始这次扫描'
                   /* 这一支上一个请求都没发过，说「未创建扫描任务」不算错，但没说出
                      为什么按不了 —— 用户会以为是自己哪一步做漏了。 */
                   : cleanupHolding ? '等本机收完上一场的尾' : '未创建扫描任务'}
@@ -262,7 +262,7 @@ export function ScanSettingsStatusView({
           <p data-testid="scan-ack-pending-notice">
             这次扫描<b>已经建好</b>，但系统还没确认这台机器可以收它的文件。
             没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
-            这一场也<b>不会</b>被别人收走：没确认的任务对谁都不会交文件。
+            这一场也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
           </p>
         ) : null}
         {/* 重放窗口必须说出「会话可能已经建成」。不说的话用户以为什么都没发生，
@@ -321,7 +321,7 @@ export function ScanSettingsStatusView({
               <ScanPlan items={[
                 '系统给出的任务编号，用来认领待会儿回来的文件。',
                 '按扫描类型写好的面板操作说明，本机原样转达。',
-                '一份只留在这一次打开的页面里的控制凭证，用来查询和取消。',
+                '一份只留在当前页面里的控制凭证，用来查询和取消。',
               ]} />
             </ScanNoteCard>
             <ScanNoteCard title="这一刻你可以做什么" foot="这一刻页面还没有任何结论可写。">
@@ -401,7 +401,7 @@ export function ScanSettingsSessionFacts({
             ['剩余时间', countdown],
             ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
             ...(natureRow ? [natureRow] : []),
-            ['控制凭证', '不显示在屏幕上、不放进链接；只留在这一次打开的页面里，换人清场会清掉'],
+            ['控制凭证', '不显示在屏幕上、不放进链接；只留在当前页面里，换人清场会清掉'],
           ]}
         />
         <ScanNoteCard title="按完面板之后" foot={<><ClockIcon size={16} aria-hidden /> 任务剩余 {countdown}。只在这一次有效。点击返回会取消这个还没确认的任务。</>}>

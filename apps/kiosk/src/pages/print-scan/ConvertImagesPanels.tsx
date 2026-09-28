@@ -450,14 +450,14 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
   }
   if (error.kind === 'in-progress') {
     return (
-      <Band kind="lock" title="上一次同标识的生成还在跑" chips={['系统：正在进行中', '不新建请求', '用同一标识再查']}>
-        <div className="i2p-band-p">系统回的是 <b>「上一次生成仍在进行中，请稍候重试」</b>。这时候<b>不能另起一次新的请求</b>。正确做法是拿同一个标识<b>再查一次</b>。</div>
+      <Band kind="lock" title="上一次用同一标记的生成还在进行" chips={['系统：正在进行中', '不发起新的生成', '用同一标记再查']}>
+        <div className="i2p-band-p">系统回的是 <b>「上一次生成仍在进行中，请稍候重试」</b>。这时候<b>不发起新的生成</b>。正确做法是拿同一个标记<b>再查一次</b>。</div>
       </Band>
     )
   }
   if (error.kind === 'result-unknown') {
     return (
-      <Band kind="warn" title="这一次的结果不知道" chips={['结果未知', '不新建请求', '用同一标识查询']}>
+      <Band kind="warn" title="这一次的结果不知道" chips={['结果未知', '不发起新的生成', '用同一标记查询']}>
         <div className="i2p-band-p">请求发出去了，但<b>结果没有送到这台机器</b>。所以现在有两种可能：系统已经做完了，或者根本没做成。</div>
         <div className="i2p-band-p">在弄清楚之前，<b>不能直接再发一次</b>。正确做法是拿<b>同一个标记</b>去查这一次的结果。</div>
       </Band>

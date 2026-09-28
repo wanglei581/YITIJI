@@ -218,7 +218,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     needsMfp: false,
     available: true,
     iconTone: 'clay',
-    stateNote: '带走：签好的 PDF',
+    stateNote: '带走：生成的新 PDF',
     mfpOffStateNote: '照常可用 · 出纸要换机',
   },
   {

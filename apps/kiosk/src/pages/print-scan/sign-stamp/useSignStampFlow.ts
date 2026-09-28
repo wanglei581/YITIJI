@@ -521,7 +521,7 @@ function resolveCta(args: {
     return { primary: '正在生成…', primaryDisabled: true, reason: '这一次合成还没有回来，重复提交可能生成两份', action: 'none' }
   }
   if (live.phase === 'result-unknown') {
-    return { primary: '用同一次再试', primaryDisabled: synthetic, reason: null, action: 'retry' }
+    return { primary: '原样再试一次', primaryDisabled: synthetic, reason: null, action: 'retry' }
   }
   if (live.phase === 'known-failed' || live.phase === 'rate-limited' || live.phase === 'in-progress') {
     return { primary: '重试生成', primaryDisabled: synthetic, reason: live.phase === 'rate-limited' ? '请稍候用同一个标记再试，不会自己再发一次' : null, action: 'retry' }

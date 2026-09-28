@@ -645,7 +645,7 @@ test('resume parse first POST carries both intent headers and a lost reply repla
   expect(calls[0].proof).toMatch(/^[A-Za-z0-9_-]{43}$/)
   expect(calls[0].intent).not.toBe(calls[0].proof)
   await expect(page.locator('b').filter({ hasText: /^结果未知$/ })).toBeVisible()
-  await expect(page.getByTestId('resume-parse-replay')).toHaveText('按同一次重查')
+  await expect(page.getByTestId('resume-parse-replay')).toHaveText('原样再试一次')
   await page.getByTestId('resume-parse-replay').click()
   await page.waitForURL('/resume/report')
   expect(calls).toHaveLength(2)

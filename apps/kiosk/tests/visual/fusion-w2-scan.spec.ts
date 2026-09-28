@@ -640,7 +640,7 @@ test('resume scan return keeps the file and an unresolved parse never auto-posts
   // 再次进入仍是同一份扫描件；第一次结果未知时，不能自动再发一次 AI 请求。
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('**/resume/parse')
-  await expect(page.getByRole('button', { name: '按同一次重查' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '原样再试一次' })).toBeVisible()
   expect(parseBodies).toHaveLength(1)
   await expectHealthy(page, errors)
 })

@@ -341,10 +341,10 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           title={isNoFile ? '系统说已完成，但这次结果里没有可用文件' : isExpired ? '等待超时，这次没有拿到文件' : '扫描未完成'}
           /* 不写「编号已作废」：本机放弃那两条路上的撤销没有回执，本机不知道服务端作没作废。 */
           chips={isNoFile
-            ? [{ label: '状态：已完成', tone: 'ok' }, { label: '这一次没有文件', tone: 'warn' }, { label: '这一次到此收尾' }]
+            ? [{ label: '状态：已完成', tone: 'ok' }, { label: '这次扫描没有文件', tone: 'warn' }, { label: '这次扫描到此结束' }]
             : [
                 ...(isExpired ? [{ label: '等待已超时', tone: 'warn' as const }] : []),
-                { label: '这一次没有文件', tone: isExpired ? undefined : 'warn' as const },
+                { label: '这次扫描没有文件', tone: isExpired ? undefined : 'warn' as const },
                 { label: '不自动重扫' },
               ]}
         >
@@ -359,7 +359,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           {safeRescanLost ? (
             <p data-testid="scan-safe-rescan-lost">
               <b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。
-              本页<b>没有</b>替你改成普通重扫 —— 同一张纸走普通的一次扫描，系统会按重复件拒收，
+              本页<b>没有</b>替你改成普通重扫 —— 同一张纸如果走普通扫描，系统会按重复件拒收，
               你会在机器前白等到这次扫描过期。要继续，请自己按右下角<b>「重新开始一次扫描」</b>，
               并且换一份材料或找工作人员。
             </p>

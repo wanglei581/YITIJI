@@ -102,7 +102,7 @@ export function SignStampWorkbench({
               <div className="ss-grp">
                 <h3>
                   <CheckCircleIcon size={24} />
-                  这份签好的 PDF
+                  这份生成的新 PDF
                 </h3>
                 <div className="ss-kv" data-testid="sign-stamp-output">
                   <div>
@@ -126,7 +126,7 @@ export function SignStampWorkbench({
                     <b>{outErr === 'expired' ? '已过期 · 30 分钟有效' : '有效期 30 分钟'}</b>
                   </div>
                 </div>
-                <p className="note">交出去的就是这份签好的 PDF，标记不放进地址栏。图片排版，不是电子签名。</p>
+                <p className="note">交出去的就是这份生成的新 PDF，标记不放进地址栏。图片排版，不是电子签名。</p>
               </div>
               <div className="ss-grp">
                 <h3>这一次用的输入</h3>
@@ -159,7 +159,7 @@ export function SignStampWorkbench({
                 <div className="ss-kv" data-testid="sign-stamp-next-round">
                   <div>
                     <span>原文档</span>
-                    <b>换成这份签好的 PDF</b>
+                    <b>换成这份生成的新 PDF</b>
                   </div>
                   <div>
                     <span>签名图</span>
@@ -183,7 +183,7 @@ export function SignStampWorkbench({
                 <p className="ss-reason lockline" id="sign-stamp-lock-reason" data-testid="sign-stamp-lock-reason">
                   {phase === 'result-unknown'
                     ? '结果还没确认，页码、位置和大小已锁定：改一点就是另一次，可能真的生成两份。'
-                    : '正在提交这一次合成，页码、位置、大小和再次提交都已锁定，避免生成两份。'}
+                    : '正在提交这一次合成，页码、位置和大小已锁定，也不能再次提交，避免生成两份。'}
                 </p>
               )}
               <div className="ss-grp">
@@ -344,11 +344,11 @@ export function SignStampWorkbench({
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>结果还没确认时，只能用同一次、同一组页码位置大小再试。</span>
+                  <span>结果还没确认时，只能原样再试一次，并保持同一组页码、位置和大小。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>记录这次操作如果失败会报错，但签好的文件可能已经有了。</span>
+                  <span>记录这次操作如果失败会报错，但生成的新 PDF可能已经有了。</span>
                 </li>
               </>
             ) : (
@@ -363,7 +363,7 @@ export function SignStampWorkbench({
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>签好的 PDF：每次都是新文件。</span>
+                  <span>生成的新 PDF：每次都是新文件。</span>
                 </li>
               </>
             )}

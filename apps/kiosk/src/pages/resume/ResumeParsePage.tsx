@@ -133,7 +133,7 @@ export function ResumeParsePage() {
           setPendingTask(task)
           setStorageBlocked(true)
           setOutcome('unknown')
-          setBlockNote('本机没有把这次解析的读取凭证存牢。请留在此页，用同一次重查；退出后匿名结果可能无法找回。')
+          setBlockNote('本机没有把这次解析的读取凭证存牢。请留在此页，原样再试一次；退出后匿名结果可能无法找回。')
           return
         }
       }
@@ -164,7 +164,7 @@ export function ResumeParsePage() {
         setOutcome('unknown')
         setRecheck('replay')
         setStorageBlocked(true)
-        setBlockNote('本机没能安全释放这次解析标识。请用同一次重查，不要开始新的解析。')
+        setBlockNote('本机没能安全释放这次解析标识。请原样再试一次，不要开始新的解析。')
       }
       return false
     }
@@ -194,7 +194,7 @@ export function ResumeParsePage() {
         setPendingTask({ taskId: result.taskId })
         setOutcome('unknown')
         setRecheck('replay')
-        setBlockNote('这次解析有了编号，但答复里没有匿名读取凭证。请用同一次重查，不要开始新的解析。')
+        setBlockNote('这次解析有了编号，但答复里没有匿名读取凭证。请原样再试一次，不要开始新的解析。')
         return
       }
       if (!kept) {
@@ -208,7 +208,7 @@ export function ResumeParsePage() {
         setPendingTask({ taskId: result.taskId, accessToken })
         setStorageBlocked(true)
         setOutcome('unknown')
-        setBlockNote('本机没有把这次解析的读取凭证存牢。请留在此页，用同一次重查；退出后匿名结果可能无法找回。')
+        setBlockNote('本机没有把这次解析的读取凭证存牢。请留在此页，原样再试一次；退出后匿名结果可能无法找回。')
         return
       }
       keptTokenRef.current = { taskId: result.taskId, accessToken }
@@ -316,7 +316,7 @@ export function ResumeParsePage() {
         setOutcome('unknown')
         if (knownTaskId) setRecheck('replay')
         if (aiErrorCodeOf(err) === 'RESUME_PARSE_OUTCOME_UNKNOWN') {
-          setBlockNote('这次解析是否已经完成无法确认。请用同一次重查，不要开始新的解析。')
+          setBlockNote('这次解析是否已经完成无法确认。请原样再试一次，不要开始新的解析。')
         }
         return
       }
@@ -460,7 +460,7 @@ export function ResumeParsePage() {
       }) !== 'absent'
       if (isTaskNotFound(err) && held) {
         setRecheck('replay')
-        setBlockNote('解析已经提交并拿到了编号，但结果还没有写入完成。请用同一次重查，不要开始新的解析。')
+        setBlockNote('解析已经提交并拿到了编号，但结果还没有写入完成。请原样再试一次，不要开始新的解析。')
         return
       }
       if (isTaskNotFound(err)) {
@@ -470,7 +470,7 @@ export function ResumeParsePage() {
       }
       if (held && parseErrorOutcome(err) === 'unknown') {
         setRecheck('replay')
-        setBlockNote('查询结果时没有拿到可信答复。请用同一次重查，不要开始新的解析。')
+        setBlockNote('查询结果时没有拿到可信答复。请原样再试一次，不要开始新的解析。')
         return
       }
       setRecheck('error')
@@ -719,7 +719,7 @@ export function ResumeParsePage() {
             </button>
           ) : (
             <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-parse-replay" onClick={replaySame}>
-              按同一次重查
+              原样再试一次
             </button>
           )}
         </>

@@ -751,7 +751,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         </ScanCta>
       }
     >
-      <ScanSec no="01" title="照着做：全在机器面板上" hint="下面是原文，本机不改写" grow>
+      <ScanSec no="01" title="照着做：全在机器面板上" hint="以下是系统给的原文，本机不改写" grow>
         <ScanPanelMock
           instructions={instructions.map((instruction) => instruction)}
           scanLabel={SCAN_TYPE_LABELS[scanType]}

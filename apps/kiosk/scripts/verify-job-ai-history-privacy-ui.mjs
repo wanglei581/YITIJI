@@ -101,7 +101,7 @@ mustContain(
     'deleteMyJobAiSession',
     '岗位 AI 参考记录',
     'recommendationCount',
-    '只展示这次岗位解读的摘要',
+    '只展示这次岗位解读的记录（时间、岗位名等）',
     '不展示简历原文',
     '分析结果仅供参考',
   ],

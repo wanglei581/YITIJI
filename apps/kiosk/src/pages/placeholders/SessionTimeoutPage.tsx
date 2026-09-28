@@ -57,7 +57,7 @@ export default function SessionTimeoutPage() {
     ? '已创建的打印/扫描任务会继续运行，这台机器上的页面将清除'
     : isAiWork
       ? '未保存的填写、编辑或练习内容会清除'
-      : '登录状态和这台机器上的这次使用将清除'
+      : '登录状态和这台机器上的这次使用记录将清除'
   const { user } = useAuth()
   const canContinue = warning?.canContinue === true
   // 匿名与已登录的后果**不一样**，必须分开说：匿名这一趟的任务清掉就没了，
@@ -92,7 +92,7 @@ export default function SessionTimeoutPage() {
                 data-testid="session-guard-clear"
                 onClick={hardClear}
               >
-                结束并清除这台机器上的这次使用
+                结束并清除这台机器上的这次使用记录
               </button>
               {canContinue ? (
                 <button

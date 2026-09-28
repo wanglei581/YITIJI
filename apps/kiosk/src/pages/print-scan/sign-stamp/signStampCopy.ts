@@ -109,7 +109,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'document-inspecting': {
       kind: 'info',
       title: '正在读这份 PDF 的页数',
-      body: '系统打开文档，读出一共几页，好让你选放在第几页。加密、损坏、带电子签名的会在这一步被拒绝。',
+      body: '系统打开文档，读出一共几页，好让你选放在第几页。加密、损坏、已经带数字签名的会在这一步被拒绝。',
       chips: [{ text: '读取页数' }, { text: '没有进度回传' }, { text: '原文件不被改写', tone: 'ok' }],
     },
     'document-ready': {
@@ -294,7 +294,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'conversion-in-progress': {
       kind: 'warn',
       title: '上一次合成还没结束',
-      body: '同一个标记上还有一次正在进行的合成。为避免生成两份，这次不受理，稍候用同一次重试。',
+      body: '同一个标记上还有一次正在进行的合成。为避免生成两份，这次不受理，稍候原样再试一次。',
       chips: [
         { text: '系统登记为进行中' },
         { text: '输入已全部保留', tone: 'ok' },
@@ -323,7 +323,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'retrying-same-request': {
       kind: 'info',
-      title: '正在用同一次再试',
+      title: '正在原样再试一次',
       body: '还是用同一个标记，并且文档、签名图、页码、位置、大小一个字节都没有改。如果系统上一次已经做完，会把那一份直接还回来，不会再生成一份。',
       chips: [{ text: '同一个标记' }, { text: '同一份输入', tone: 'ok' }, { text: '页码位置大小已锁定', tone: 'ok' }],
     },
@@ -352,7 +352,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       title: '新的 PDF 已生成',
       body: '系统返回了一份新文件。原 PDF 一个字节没改。下一步去材料检查，那一步才决定能不能打印。',
       chips: [
-        { text: live.result ? `${live.result.pages} 页 · ${formatResultSize(live.result)}` : '签好的 PDF' },
+        { text: live.result ? `${live.result.pages} 页 · ${formatResultSize(live.result)}` : '生成的新 PDF' },
         { text: '原 PDF 未被改写', tone: 'ok' },
         { text: '下一步：材料检查', tone: 'ok' },
       ],
@@ -388,7 +388,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       title: '以刚才的合成结果继续叠加',
       body: '旧签名图和授权已清空，得重新传一张才能接着叠。',
       chips: [
-        { text: live.doc ? `${live.doc.name} · ${live.pages ?? ''} 页` : '签好的 PDF 已作为原文档' },
+        { text: live.doc ? `${live.doc.name} · ${live.pages ?? ''} 页` : '生成的新 PDF 已作为原文档' },
         { text: '旧签名图已清空', tone: 'warn' },
         { text: '授权已复位', tone: 'warn' },
       ],

@@ -103,7 +103,7 @@ export function MyBenefitsPage() {
               <span>
                 <div className="qx-state-t">权益台账需要先登录</div>
                 <p className="qx-state-d">
-                  权益绑定在<b>你本人的账号</b>上。这台机器不会凭没登录的这次使用显示任何人的权益，也不会替你领取。
+                  权益绑定在<b>你本人的账号</b>上。没登录时，这台机器不会显示任何人的权益，也不会替你领取。
                 </p>
               </span>
             </div>

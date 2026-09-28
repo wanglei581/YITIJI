@@ -56,7 +56,7 @@ const ALTERNATIVES: { key: string; icon: ReactNode; title: string; desc: string;
 const FACTS: { key: string; icon: ReactNode; title: string; desc: string }[] = [
   { key: 'operator', icon: <UsersIcon size={24} />, title: '由运营方决定', desc: '这台终端提不提供岗位、招聘会与企业信息，由它的运营方决定。' },
   { key: 'resume', icon: <ShieldCheckIcon size={24} />, title: '不代收简历', desc: '本机不收简历，也不把你的资料转交给任何企业。' },
-  { key: 'privacy', icon: <LockIcon size={24} />, title: '资料只给本人', desc: '登录后的记录只你本人可见；结束使用会清除这台机器上的这次使用。' },
+  { key: 'privacy', icon: <LockIcon size={24} />, title: '资料只给本人', desc: '登录后的记录只你本人可见；结束使用会清除这台机器上的这次使用记录。' },
 ]
 
 export function RecruitmentHostingOffPage({ pathname, checking }: { pathname: string; checking: boolean }) {

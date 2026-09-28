@@ -117,7 +117,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         ) : null}
 
         {phase === 'rechecking' ? (
-          <Band kind="info" title="正在用同一个标识再查一次" breathe chips={['同一个标记', '没有另起一次', '不会自动变完成']}>
+          <Band kind="info" title="正在用同一个标记再查一次" breathe chips={['同一个标记', '没有另起一次', '不会自动变完成']}>
             <div className="i2p-band-p">正在拿同一个标记去问系统这一次的结果。<b>没有另起一次</b>，也没有换标记，所以不会多出第二份 PDF。</div>
           </Band>
         ) : null}
@@ -125,7 +125,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         {phase === 'completed' && result ? (
           <Band
             kind="info"
-            title={recovered ? '用同一个标识把结果找回来了' : 'PDF 已生成'}
+            title={recovered ? '用同一个标记把结果找回来了' : 'PDF 已生成'}
             chips={[
               '系统已返回结果',
               '一张图一页 · A4',

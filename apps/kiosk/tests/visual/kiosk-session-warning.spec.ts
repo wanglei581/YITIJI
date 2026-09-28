@@ -145,12 +145,12 @@ test('image-to-pdf editing warns that unsaved work is lost, not the generic clea
 }) => {
   // /print-scan/convert 上放着用户已经挑好、还没转换的图片。它不在 /print /scan 域内
   // （/print-scan 是另一个前缀），也不在 /resume /interview 里，以前会落到
-  // 「登录状态和这台机器上的这次使用将清除」——那句话没提用户会丢掉刚挑的图。
+  // 「登录状态和这台机器上的这次使用记录将清除」——那句话没提用户会丢掉刚挑的图。
   registerKioskShell(api, { screensaverEnabled: false })
   await page.goto('/print-scan/convert')
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
-  await expect(page.getByText('登录状态和这台机器上的这次使用将清除', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('登录状态和这台机器上的这次使用记录将清除', { exact: true })).toHaveCount(0)
 })
 
 test('hardware warning tells anonymous users that background work continues without recovery', async ({
@@ -270,7 +270,7 @@ test('session warning actions remain touch-safe without horizontal overflow', as
   await expectWarningWithinThreeSeconds(page)
 
   const continueButton = page.getByRole('button', { name: /我还在，继续使用/ })
-  const exitButton = page.getByRole('button', { name: '结束并清除这台机器上的这次使用', exact: true })
+  const exitButton = page.getByRole('button', { name: '结束并清除这台机器上的这次使用记录', exact: true })
   await expect(continueButton).toBeVisible()
   await expect(exitButton).toBeVisible()
 
@@ -316,7 +316,7 @@ test('immediate exit hard-clears the session and blocks back-forward task recove
   })
 
   await expectWarningWithinThreeSeconds(page)
-  await page.getByRole('button', { name: '结束并清除这台机器上的这次使用', exact: true }).click()
+  await page.getByRole('button', { name: '结束并清除这台机器上的这次使用记录', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
   await expectSensitiveSessionCleared(page)
@@ -345,7 +345,7 @@ test('screensaver-mode immediate exit always hard-clears and never falls into th
   await expectWarningWithinThreeSeconds(page)
   // 屏保模式预警倒计时自然结束应进 /screensaver,但用户点击"立即退出并清除本机会话"
   // 必须立即 hardClear 回干净首页——按钮共享倒计时动作会把用户带进屏保。
-  await page.getByRole('button', { name: '结束并清除这台机器上的这次使用', exact: true }).click()
+  await page.getByRole('button', { name: '结束并清除这台机器上的这次使用记录', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
   await expectSensitiveSessionCleared(page)
@@ -424,10 +424,10 @@ test('orphan /session-timeout shows the clearing overlay on first frame and neve
       const heading = document.querySelector('#session-timeout-title')
       const buttons = Array.from(document.querySelectorAll('button'))
       const exitButton = buttons.find((button) =>
-        /结束并清除这台机器上的这次使用/.test(button.textContent ?? '')
+        /结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
       )
       const continueButton = buttons.find((button) =>
-        /我还在，继续使用|结束并清除这台机器上的这次使用/.test(button.textContent ?? '')
+        /我还在，继续使用|结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
       )
       const accountLabel = Array.from(document.querySelectorAll('p, span, b')).find((el) =>
         /当前登录：|当前会话：/.test(el.textContent ?? '')

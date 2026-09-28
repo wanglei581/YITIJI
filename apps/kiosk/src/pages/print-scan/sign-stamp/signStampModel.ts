@@ -283,7 +283,7 @@ export function pillOf(
     return { tone: 'warn', label: '暂不受理 · 可稍后重试' }
   }
   if (live.phase === 'completed' || live.phase === 'recovered') {
-    return { tone: live.outErr ? 'warn' : 'ok', label: live.outErr ? '已生成 · 预览受限' : '签好的 PDF 已生成' }
+    return { tone: live.outErr ? 'warn' : 'ok', label: live.outErr ? '已生成 · 预览受限' : '生成的新 PDF 已生成' }
   }
   if (!live.doc) return { tone: 'unknown', label: '第 1 步 · 选 PDF' }
   if (!live.stamp) return { tone: 'unknown', label: '第 2 步 · 传签名图' }

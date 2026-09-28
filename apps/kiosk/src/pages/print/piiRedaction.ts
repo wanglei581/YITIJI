@@ -247,7 +247,7 @@ function notSupportedTitle(reason: PiiRedactionNotSupportedReason | null): strin
 const UNKNOWN_COPY: PiiRedactionCopy = {
   tone: 'danger',
   title: '本机无法确认这次遮挡的结果',
-  detail: '系统没有返回能看懂的处理结论。为避免误导，这里不给出任何遮挡结论 —— 打印仍使用原文件。',
+  detail: '系统没有返回明确的处理结果。为避免误导，这里不给出任何遮挡结论 —— 打印仍使用原文件。',
   requiresPreviewConfirm: false,
   confirmLabel: null,
   continueLabel: '返回重新选择',

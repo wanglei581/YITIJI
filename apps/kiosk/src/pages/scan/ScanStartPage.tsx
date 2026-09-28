@@ -91,7 +91,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             : { tone: 'ok' as const, label: '可创建扫描任务 · 需面板操作' }
 
   const subtitle = usbPanel
-    ? '这是打印机自己的独立能力，不经过这台机器上的扫描'
+    ? '这是打印机自己的独立能力，不经过屏幕上的扫描流程'
     : blocked
       ? '当前无法创建扫描任务，请查看说明或改用其他方式'
       : '请先选择扫描类型；本页尚未创建任务。下一步会真实建立这次扫描'
@@ -174,7 +174,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
     >
       {usbPanel ? (
         <>
-          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过这台机器上的扫描" grow>
+          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过屏幕上的扫描流程" grow>
             <div className="sw-grid2">
               <ScanNoteCard
                 title="面板上怎么做"
@@ -236,7 +236,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 <ScanPlan items={[
                   '上传文件打印：手机 / U 盘里的现成文件仍可打印。',
                   '本机扫描：这台机器的扫描还没开通，或状态还不知道。',
-                  '改用面板扫描到 U 盘：不经过这台机器上的扫描，文件只进你的 U 盘。',
+                  '改用面板扫描到 U 盘：不经过屏幕上的扫描流程，文件只进你的 U 盘。',
                 ]} />
               </ScanNoteCard>
               <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查这台机器是否开通了扫描。">

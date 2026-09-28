@@ -131,7 +131,7 @@ export default function MeActivityDetailPage() {
             <span className="qx-me-row-ico" data-tone="wheat" aria-hidden="true"><ClockIcon size={28} /></span>
             <span className="qx-me-row-main">
               <span className="qx-me-row-title">记录时间</span>
-              <span className="qx-me-row-sub">由系统返回，本机不在这台机器上留存明细</span>
+              <span className="qx-me-row-sub">由系统返回，这台机器上不留存明细</span>
             </span>
             <span className="qx-me-acts"><span className="qx-me-chip">{formatTime(item.createdAt)}</span></span>
           </div>

@@ -54,7 +54,7 @@ export function resumeRowCopy(task: PendingTask): { label: string; sub: string; 
     return { label: '支付处理中', sub: '支付正在处理，本页不判定成功或失败', tone: 'clay' }
   }
   if (task.status === 'pending' && task.payStatus === 'paid') {
-    return { label: '等待领取', sub: '已付款，等待这台机器开始打印', tone: 'wheat' }
+    return { label: '等待领取', sub: '已付款，等待这台机器接收这一单', tone: 'wheat' }
   }
   if (task.status === 'pending' && task.payStatus === null) {
     return { label: '早期任务', sub: '这一单没有关联订单记录，继续会回到打印进度', tone: 'sage' }
