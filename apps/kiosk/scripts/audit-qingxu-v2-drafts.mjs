@@ -40,7 +40,8 @@ const shotsArg = process.argv.find((a) => a.startsWith('--shots='))
 const SHOTS_DIR = shotsArg ? path.resolve(shotsArg.slice('--shots='.length)) : null
 
 // 规则 4 的用词：写给用户看的页面上不该出现的工程词。
-const BANNED = /服务端|后端|前台|后台|落库|会话|元数据|回执|链路|网桥|真机|未验收|pending|uploaded|签名链接|字段|接口/
+// 9/28 补：接口地址（/api/…、GET /…）写在屏上也是工程词——英文键名规则会跳过「/」后面的词，所以单独列。
+const BANNED = /服务端|后端|前台|后台|落库|会话|元数据|回执|链路|网桥|真机|未验收|pending|uploaded|签名链接|字段|接口|\/api\/|\b(?:GET|POST|PUT|PATCH|DELETE)\s+\//
 // 规则 4 的另一半：内部英文键名（来源键 interview-report、请求头 x-resume-access-token、taskId 这类
 // 短横线 / 下划线 / 驼峰标识符）。网址、邮箱、文件名前后带 . / @ 的不算。
 const ENGLISH_KEY = /(?<![\w./@-])[a-z]+(?:[-_][a-z0-9]+)+(?![\w./@-])|(?<![\w./@])[a-z]+[A-Z][A-Za-z0-9]*(?![\w./@])/g

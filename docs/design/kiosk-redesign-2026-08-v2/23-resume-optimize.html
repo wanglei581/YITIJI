@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
 - 9/28 去掉内部英文键名
+- 9/28 留白：没有建议的七态（四屏共用）把「不用 AI，也能自己改」8 步排成两栏四行（与运行页同为两栏），不再按 8 等分拉伸最后一张卡；步骤行 66→88、出口行 88→108，卡片内边距 14/22→20/24，剩余高度用 space-evenly 分到三张卡上下。只改样式，文字与 data-testid 一个不动。无新增内容。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 使用 ready + compare 内容态，保留完整原文与 AI 改写对照、采纳/保留/自己写和事实确认门控（规则 7）。
@@ -647,6 +648,18 @@ html.debug .demo-tab{font-size:22px}
 .guard{font-size:22px;line-height:1.4;padding:8px 14px}.act{font-size:26px;min-height:80px}.act small{font-size:20px}.jcard{min-height:104px;padding:8px 10px;gap:8px;flex-wrap:wrap}.jcard .jt b{font-size:24px}.jcard .jt span{font-size:20px;line-height:1.4}.jcard .chip{font-size:20px;min-height:36px;padding:0 10px}
 .why{font-size:20px;line-height:1.4}.btn{font-size:26px}.truth:has(#truth-tx:empty){display:none}.qx2-actions{min-height:64px;padding:4px 36px}.navbar a{font-size:21px}
 .jcard{align-items:flex-start}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、不改文字、字阶不做大）
+   没有建议的七态（没有编号 / 生成中 / 无候选 / 读取失败 / 生成失败 / 不可用 / 参数不合法）四屏共用同一版式：
+   1. 「不用 AI，也能自己改」8 步改成两栏四行（运行页 OptimizeEmptyState 本来就是两栏），右半屏不再只有浅底空行；
+   2. 八步不再按 8 等分拉伸最后一张卡；步骤行 66→88、出口行 88→108，卡片内边距放宽一点，字号不动；
+   3. 剩下的高度用 space-evenly 分到三张卡的上下，不再全堆给最后一张卡。 */
+#stage:not([data-state="ready"]) .work{justify-content:space-evenly}
+#stage:not([data-state="ready"]) .work>.sec:last-child:not(.jumpsec){flex:none}
+#stage:not([data-state="ready"]) .work>.sec{padding:20px 24px}
+#stage:not([data-state="ready"]) .checks{flex:none;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none!important;grid-auto-rows:auto;gap:12px 14px}
+#stage:not([data-state="ready"]) .check{min-height:88px;padding:10px 18px}
+#stage:not([data-state="ready"]) .rows{flex:none;grid-template-rows:none!important;grid-auto-rows:auto;gap:12px}
+#stage:not([data-state="ready"]) .row{min-height:108px}
 
 </style>
 </head>

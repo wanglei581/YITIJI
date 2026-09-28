@@ -2,6 +2,7 @@
 <!-- 青序流光 2.0 改动清单
 - 9/28 去掉内部英文键名
 - 9/28 逐状态检查修压字
+- 9/28 留白：候选词每组标题行的「点第二次取消 / 可以多选」靠右（同卡片标题右侧提示），短候选组不再只占左半边；基本信息（含姓名未填）卡片余量改 space-around；语音转写失败 / 麦克风不可用三条出路按内容定高 140、出错说明框内边距放宽，余量交给卡片均分；生成结果纸面各段的「事实原样 / 描述润色」标签靠右；改一段描述把卡片底边距和说明句上边距并进均分余量。只改样式，文字与结构不动。无新增内容。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
 - 选择预填资料的 review 内容态，七行资料与返回编辑能力保持；仅调字阶和必要留白，触达待复测（规则 1、2、3）。
@@ -455,6 +456,25 @@ textarea.fin{padding:14px 18px;line-height:1.5;resize:none;min-height:104px}
 .xq{min-height:0}
 #body-root{padding-top:16px}
 .helper{margin-top:8px}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、不改文字、字阶不做大）
+   1. 候选词每组标题行的「点第二次取消 / 可以多选」靠右（同卡片标题右侧提示的做法），只有两三个候选的组不再只占左半边；只动候选词组，别处的同类说明行不动。
+   2. 基本信息（含姓名未填）：卡片余量从 space-evenly 改 space-around，首尾只留半份，不再在卡片底部堆一整条空带。
+      改一段描述：余量照旧均分；卡片底边距（18→0）和「改完点确认」那句的上边距（12→0）并进均分的余量里，
+      说明句贴近输入框、卡片底部那条空带收回来。
+   3. 语音转写失败 / 麦克风不可用：三条出路按内容定高 140，不再各拉到 150 再用大缝隔开；出错说明框内边距放宽一点；余量交给卡片上下均分。
+   4. 生成结果预览：纸面各段标题的「事实原样 / 描述润色」标签靠右，像页边批注，右半边不再空一大块。 */
+.qh:has(+.chips) span{margin-left:auto}
+#body-root[data-state="input-basic"] .sec.grow>.card,
+#body-root[data-state="validate-name"] .sec.grow>.card{justify-content:space-around}
+#body-root[data-state="preview-editing"] .sec.grow>.card{padding-bottom:0}
+#body-root[data-state="preview-editing"] .sec.grow>.card>.note{margin-top:0!important}
+#body-root[data-state="voice-failed"] .rows3,
+#body-root[data-state="voice-denied"] .rows3{flex:none;justify-content:flex-start}
+#body-root[data-state="voice-failed"] .rows3>*,
+#body-root[data-state="voice-denied"] .rows3>*{flex:none;min-height:140px}
+#body-root[data-state="voice-failed"] .sec.grow .state,
+#body-root[data-state="voice-denied"] .sec.grow .state{padding:28px 32px}
+#body-root[data-state="preview-ready"] .sh-b h3>.tg:first-of-type{margin-left:auto}
 
 </style>
 </head>
