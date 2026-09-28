@@ -33,13 +33,13 @@ export function InterviewShell({
     <QxPageFrame
       title={title}
       subtitle={subtitle}
-      status={status ?? { tone: 'ok', label: '模拟练习' }}
+      status={status ?? { tone: 'ok', label: 'AI 模拟面试' }}
       back={{ label: '返回面试服务', onBack: () => navigate('/interview-service') }}
-      terminalLabel="就业服务大厅"
       ctabar={ctabar}
       navbar={
         navbar ? (
           <QxAppNavbar
+            current="advisor"
             onHome={() => navigate('/')}
             onAdvisor={() => navigate('/assistant')}
             onProfile={() => navigate('/profile')}

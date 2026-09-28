@@ -1480,7 +1480,7 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await interviewIndustryDialog.getByRole('button', { name: '制造业', exact: true }).click()
   await interviewIndustryDialog.getByRole('button', { name: '完成' }).click()
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
-  await page.getByRole('button', { name: '开始模拟面试' }).click()
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
   await page.waitForURL(/\/interview\?stage=session/)
   await page.reload()
   await expect(page).toHaveURL(/\/interview\?stage=session/)

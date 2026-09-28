@@ -7,16 +7,19 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { Button } from '@ai-job-print/ui'
 import type { MemberInterviewItem } from '@ai-job-print/shared'
-import { EyeIcon, FileSearchIcon, LogInIcon, Trash2Icon } from 'lucide-react'
+import { LogInIcon } from 'lucide-react'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
 import { InterviewShell } from './InterviewShell'
-import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus } from './interviewQxParts'
+import { INTERVIEW_STAGE_COPY, type InterviewStage } from './interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
+import './styles/interview-qx2.css'
 
 function formatTime(iso: string) {
   const d = new Date(iso)
@@ -72,7 +75,6 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
   }
 
   const copy = INTERVIEW_STAGE_COPY.reports
-  const titleParts = emphasizedTitle(copy)
   const goSetup = () => {
     patchInterviewWorkbenchSession({ stage: 'setup' })
     if (onGoStage) onGoStage('setup')
@@ -86,107 +88,113 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
 
   return (
     <InterviewShell
-      title={<>{isLoggedIn ? '登录后，' : '你的练习记录，'}<em>{titleParts.em}</em>。</>}
+      title={isLoggedIn
+        ? <>登录后，<em>只查看自己的报告</em>。</>
+        : <>你的练习记录，<em>登录后才可长期查看</em>。</>}
       subtitle={copy.subtitle}
       ctabar={
-        <>
-          {isLoggedIn && (
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/ai-records')}>
-              AI服务记录
+        <div className="interview-qx-cta">
+          <QxStepActions onPrev={() => onGoStage ? onGoStage('tips') : navigate('/interview/tips')} prevLabel="先看面试技巧">
+            <QxAiHelp label="问小青：练习记录在哪里" draft="我想查看自己的模拟面试练习报告。请说明未登录和登录后有什么差别，不要列出别人的记录。" />
+          </QxStepActions>
+          <div className="iv-history-actions">
+            {isLoggedIn && (
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/ai-records')}>
+                AI服务记录
+              </button>
+            )}
+            <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
+              {!isLoggedIn || items.length > 0 ? '开始新练习' : '开始模拟面试'}
             </button>
-          )}
-          <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
-            开始模拟面试
-          </button>
-        </>
+          </div>
+        </div>
       }
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-reports" data-qx-interview="" className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
 
-      {hint && (
-        <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
-          {hint}
-        </div>
-      )}
-
-      <div className="interview-flow__scroll flex-1 overflow-y-auto pb-8">
+      <div className="interview-flow__scroll">
         {!isLoggedIn ? (
-          <Card className="interview-card interview-reports__guest flex flex-col items-center gap-4 p-10 text-center">
-            <FileSearchIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
-            <div>
-              <p className="text-base font-semibold text-neutral-900">登录后可保存练习报告</p>
-              <p className="mt-1 text-sm text-neutral-500">
-                游客模式的练习报告短期有效（约 2 小时）；登录后报告保存 7 天，可随时回看与打印
-              </p>
-            </div>
-            <div className="flex gap-3">
+          <>
+            <section className="iv-card iv-empty">
+              <div>
+                <h2>登录后可保存练习报告</h2>
+                <p>登录后，完成的练习报告会留在这里，方便你自己回看。</p>
+              </div>
+            </section>
+            <section className="iv-card">
+              <InterviewCardHead title="两种身份的差别" hint="按真实账号确认" />
+              <div className="iv-fields">
+                <div className="iv-field"><small>未登录</small><b>大约保留 2 小时</b></div>
+                <div className="iv-field"><small>登录之后</small><b>本人记录保留 7 天</b></div>
+              </div>
+            </section>
+            <section className="iv-card">
+              <InterviewCardHead title="现在可以做" hint="不登录也能继续" />
               <Button size="lg" className="h-14 px-6" onClick={() => navigate('/login', { state: { from: '/interview?stage=reports' } })}>
                 <LogInIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
                 手机号登录
               </Button>
-              <Button size="lg" variant="secondary" className="h-14 px-6" onClick={goSetup}>
-                开始模拟面试
-              </Button>
-            </div>
-          </Card>
+            </section>
+          </>
         ) : state === 'loading' ? (
-          <LoadingState className="py-20" />
+          <>
+            <InterviewStatus label="记录读取状态" items={[{ k: '本人列表', v: '读取中' }, { k: '查看报告', v: '未开放' }, { k: '删除记录', v: '未开放' }]} />
+            <section className="iv-card iv-empty"><div><h2>正在读取本人练习报告</h2><p>列表返回前，这里不放示例记录。</p></div></section>
+          </>
         ) : state === 'error' ? (
-          <ErrorState className="py-20" onRetry={() => setReloadKey((k) => k + 1)} />
+          <>
+            <section className="iv-card iv-empty is-bad">
+              <div>
+                <h2>暂时无法加载练习报告</h2>
+                <p>请检查网络后重试。没有拿到本人列表时，不显示任何固定历史。</p>
+              </div>
+            </section>
+            <button type="button" className="qx-btn" data-variant="primary" onClick={() => setReloadKey((k) => k + 1)}>重试加载</button>
+          </>
         ) : items.length === 0 ? (
-          <Card className="interview-card p-4">
-            <EmptyState
-              icon={FileSearchIcon}
-              title="还没有练习报告"
-              description="完成一次模拟面试后，这里会展示你的练习报告"
-              className="py-12"
-              action={<Button size="lg" className="h-14 px-8" onClick={goSetup}>开始模拟面试</Button>}
-            />
-          </Card>
+          <>
+            <section className="iv-card iv-empty">
+              <div>
+                <h2>还没有练习报告</h2>
+                <p>完成一次模拟面试后，这里会显示属于当前账号的练习报告。</p>
+              </div>
+            </section>
+          </>
         ) : (
-          <div className="interview-reports__list flex flex-col gap-3">
-            {items.map((it) => (
-              <Card key={it.sessionId} className="interview-card interview-reports__row flex items-center gap-4 p-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-plum-soft">
-                  <FileSearchIcon className="h-6 w-6 text-plum" aria-hidden="true" />
+          <section className="iv-card">
+            <InterviewCardHead title="练习报告" hint="已登录 · 本人记录" />
+            <p className="iv-copy">只有已经生成报告的记录可以查看。没有报告的记录不能当成可打印。</p>
+            <div className="iv-history">
+              {items.map((it) => (
+                <div key={it.sessionId} className="iv-history-row">
+                  <div>
+                    <small>{formatTime(it.createdAt)}</small>
+                    <b>{it.position} · {it.interviewerLabel}</b>
+                    <p>{it.industry} · {it.durationMin} 分钟练习</p>
+                  </div>
+                  <div className="iv-history-actions">
+                    {it.hasReport ? (
+                      <button type="button" className="is-go" onClick={() => openReport(it.sessionId)}>查看</button>
+                    ) : (
+                      <button type="button" aria-disabled="true">报告未生成</button>
+                    )}
+                    <button
+                      type="button"
+                      className={confirmId === it.sessionId ? 'is-remove is-confirm' : 'is-remove'}
+                      aria-label={confirmId === it.sessionId ? '再次点击确认删除这条练习记录' : '删除这条练习记录'}
+                      onClick={() => void handleDelete(it.sessionId)}
+                    >
+                      {confirmId === it.sessionId ? '再次确认删除' : '删除'}
+                    </button>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-neutral-900">{it.position} · {it.interviewerLabel}</p>
-                  <p className="mt-0.5 text-xs text-neutral-400">
-                    {it.industry} · {it.durationMin} 分钟练习 · {formatTime(it.createdAt)}
-                  </p>
-                </div>
-                {it.hasReport && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-12 shrink-0"
-                    onClick={() => openReport(it.sessionId)}
-                  >
-                    <EyeIcon className="mr-1 h-4 w-4" aria-hidden="true" />
-                    查看
-                  </Button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(it.sessionId)}
-                  title={confirmId === it.sessionId ? '再次点击确认删除' : '删除'}
-                  aria-label="删除练习记录"
-                  className={[
-                    'flex h-12 shrink-0 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors',
-                    confirmId === it.sessionId
-                      ? 'border-error/40 bg-error-bg text-error-fg'
-                      : 'border-neutral-200 text-neutral-400 hover:bg-error-bg hover:text-error-fg',
-                  ].join(' ')}
-                >
-                  <Trash2Icon className="h-4 w-4" aria-hidden="true" />
-                  {confirmId === it.sessionId && <span className="ml-1">确认删除</span>}
-                </button>
-              </Card>
-            ))}
-            <p className="mt-1 text-center text-xs text-neutral-400">报告保存 7 天后自动清理；删除为物理删除并留删除日志</p>
-          </div>
+              ))}
+            </div>
+            <InterviewNotice>删除需要再次确认。确认后才会删掉这条本人记录；失败时记录仍留在列表里。</InterviewNotice>
+          </section>
         )}
+        {hint && <p className="iv-alert" role="status">{hint}</p>}
+        <InterviewRail />
       </div>
     </div>
     </InterviewShell>

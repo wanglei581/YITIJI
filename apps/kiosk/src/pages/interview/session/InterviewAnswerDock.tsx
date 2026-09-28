@@ -121,13 +121,14 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
           )}
           <div className="interview-session__secondary-actions">
             <Button size="lg" variant="secondary" disabled={busyTurn || voice.kind === 'recording' || voiceLocked} onClick={onUseText}><KeyboardIcon aria-hidden="true" />改用文字输入</Button>
-            <Button size="lg" variant="secondary" disabled={busyTurn || voice.kind !== 'idle'} onClick={onSkip}><SkipForwardIcon aria-hidden="true" />跳过</Button>
+            <Button size="lg" variant="secondary" disabled={busyTurn || voice.kind !== 'idle'} onClick={onSkip}><SkipForwardIcon aria-hidden="true" />跳过此题</Button>
             <Button size="lg" variant="secondary" className="is-danger" disabled={busyTurn || voiceLocked} onClick={onFinish}><SquareIcon aria-hidden="true" />结束面试</Button>
           </div>
         </>
       ) : (
         <div className="interview-session__text-grid">
-          <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} disabled={busyTurn} rows={3} maxLength={2000} placeholder="在这里输入你的回答…" />
+          <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} disabled={busyTurn} rows={3} maxLength={2000} aria-label="本题回答" placeholder="在这里输入你的回答，最多 2000 字" />
+          <p className="interview-session__count">{draft.length} / 2000</p>
           <div>
             <Button size="lg" disabled={busyTurn} onClick={onSubmitText}><SendIcon aria-hidden="true" />提交回答</Button>
             {/* 能力门禁：不隐藏入口（用户可能后插 USB 麦克风），用 aria-disabled
@@ -143,7 +144,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
             >
               <MicIcon aria-hidden="true" />改用语音回答
             </Button>
-            <Button size="lg" variant="secondary" disabled={busyTurn} onClick={onSkip}><SkipForwardIcon aria-hidden="true" />跳过</Button>
+            <Button size="lg" variant="secondary" disabled={busyTurn} onClick={onSkip}><SkipForwardIcon aria-hidden="true" />跳过此题</Button>
             <Button size="lg" variant="secondary" className="is-danger" disabled={busyTurn} onClick={onFinish}><SquareIcon aria-hidden="true" />结束面试</Button>
           </div>
           {!voiceAvailable && micBlockedReason && (

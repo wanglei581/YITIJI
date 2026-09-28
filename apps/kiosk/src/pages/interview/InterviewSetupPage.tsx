@@ -5,13 +5,13 @@
 // 合规：仅供本人练习参考，不代表任何招聘结果承诺。
 // ============================================================
 
-import { useEffect, useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
-import { AiDriverBanner } from '../../components/AiDriverBanner'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
-import { Button, Card, ComplianceBanner } from '@ai-job-print/ui'
+import { Button } from '@ai-job-print/ui'
 import {
   DEFAULT_EMPLOYMENT_INDUSTRY,
   EMPLOYMENT_INDUSTRY_SECTORS,
@@ -22,17 +22,12 @@ import {
   type InterviewerType,
 } from '@ai-job-print/shared'
 import {
-  BriefcaseIcon,
-  ClockIcon,
   FileTextIcon,
-  GraduationCapIcon,
-  ListFilterIcon,
   Loader2Icon,
   MonitorSmartphoneIcon,
   NotebookPenIcon,
   QrCodeIcon,
   UsbIcon,
-  UserRoundCheckIcon,
   XIcon,
 } from 'lucide-react'
 import { makePrintParams } from '@ai-job-print/shared'
@@ -51,6 +46,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
 import { ResumeUsbImportPanel } from '../resume/components/ResumeUsbImportPanel'
 import { InterviewShell } from './InterviewShell'
+import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus, InterviewSteps } from './interviewQxParts'
 import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
 import {
   patchInterviewWorkbenchSession,
@@ -60,6 +56,9 @@ import {
 type ResumeChannel = 'phone' | 'usb' | 'desktop'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
+import './styles/interview-qx2.css'
+
+const SETUP_AI_DRAFT = '我想开始一场模拟面试。请先问我的目标岗位，再说明岗位、面试官和时长怎么选。不要替我创建练习。'
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }> = [
   { key: 'hr', label: 'HR 初筛', desc: '自我介绍 · 求职动机 · 稳定性 · 薪资沟通' },
@@ -68,11 +67,6 @@ const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }>
   { key: 'campus', label: '校招面试官', desc: '校园经历 · 学习能力 · 职业规划' },
   { key: 'final', label: '终面负责人', desc: '价值观 · 长期发展 · 综合判断' },
 ]
-
-const POPULAR_INDUSTRY_CODES = new Set(['I', 'C', 'P', 'Q', 'J', 'S'])
-const POPULAR_INDUSTRIES = EMPLOYMENT_INDUSTRY_SECTORS
-  .filter((item) => POPULAR_INDUSTRY_CODES.has(item.code))
-  .map<string>((item) => item.label)
 
 const EXPERIENCES: Array<{ key: InterviewExperience; label: string }> = [
   { key: 'fresh', label: '应届生' },
@@ -111,19 +105,6 @@ function OptionButton({ active, onClick, children, className = '' }: { active: b
     >
       {children}
     </button>
-  )
-}
-
-function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: string; desc?: string }) {
-  return (
-    <div className="interview-section-title mb-4 flex items-start gap-4">
-      {/* icon box — CSS (.interview-section-title svg) 已处理 56px/plum 配色，不加 text-* 避免冲突 */}
-      <Icon aria-hidden="true" />
-      <div>
-        <h2 className="font-semibold">{title}</h2>
-        {desc && <p className="mt-1">{desc}</p>}
-      </div>
-    </div>
   )
 }
 
@@ -187,11 +168,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       },
     })
   }, [interviewerType, industry, position, experience, difficulty, duration, resumeFile, pendingSession, aiOutage, startFailed, probed])
-
-  const positionReady = position.trim().length > 0
-  const visibleIndustries = POPULAR_INDUSTRIES.includes(industry)
-    ? POPULAR_INDUSTRIES
-    : [...POPULAR_INDUSTRIES.slice(0, 5), industry]
 
   const handleFileChosen = async (e: ChangeEvent<HTMLInputElement>) => {
     if (isTerminalKiosk()) return
@@ -338,9 +314,9 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     hasResult: false,
   })
   const STILL_AVAILABLE = pendingSession
-    ? '题目本身不依赖 AI：本机有一份写死的通用题库，可以按你选的面试官身份印一张「题目与答案单」带走，用笔作答。'
+    ? '题目本身不依赖 AI：本机有一份通用题库，可以按你选的面试官身份印一张「题目与答案单」带走，用笔作答。'
       + '这张单子不含任何点评、评分或通过率 —— 点评依赖 AI，本次没有，也不会拿通用建议冒充。'
-    : '本次连练习会话都没建起来，因此印不出按本场配置取题的题目单。面试准备要点是本机固定内容，不依赖 AI，现在照常可看。'
+    : '这次还没建立起这场练习，因此印不出按本场配置取题的题目单。面试准备要点是本机固定内容，不依赖 AI，现在照常可看。'
   const sheetAction = pendingSession
     ? {
         action: {
@@ -354,7 +330,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         // 能力级不可用：底部「开始模拟面试」这次按了也没用，置灰它并写清原因。
         mode: 'blocked',
         reason: aiOutage,
-        blockedActionLabel: '开始模拟面试（AI 面试官）',
+        blockedActionLabel: '创建并开始练习（AI 面试官）',
         stillAvailable: STILL_AVAILABLE,
         ...sheetAction,
       }
@@ -363,34 +339,42 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         // 用 blocked 会和底部仍可点的「开始模拟面试」自相矛盾。
         mode: 'result-unavailable',
         reason: (startFailed ? error : null) ?? '本次没能进入 AI 面试间。',
-        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「开始模拟面试」；不想等的话，${STILL_AVAILABLE}`,
+        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`,
         ...sheetAction,
       }
 
   const copy = INTERVIEW_STAGE_COPY.setup
   const titleParts = emphasizedTitle(copy)
+  const goTips = () => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))
+  const interviewerDesc = INTERVIEWERS.find((it) => it.key === interviewerType)?.desc
 
   return (
     <InterviewShell
       title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
       subtitle={copy.subtitle}
+      status={{ tone: aiOutage ? 'bad' : 'ok', label: aiOutage ? 'AI 暂时不能出题' : 'AI 模拟面试' }}
       ctabar={
-        <button
-          type="button"
-          className="qx-btn"
-          data-variant="primary"
-          data-testid="interview-primary"
-          disabled={creating || uploading}
-          onClick={() => void handleStart()}
-        >
-          {creating ? '正在为你准备面试官…' : positionReady ? '开始模拟面试' : '填写目标岗位后开始'}
-        </button>
+        <div className="interview-qx-cta">
+          <QxStepActions onPrev={goTips} prevLabel="先看面试技巧">
+            <QxAiHelp label="问小青：这场练习怎么设" draft={SETUP_AI_DRAFT} />
+          </QxStepActions>
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="primary"
+            data-testid="interview-primary"
+            disabled={creating || uploading}
+            onClick={() => void handleStart()}
+          >
+            {creating ? '正在为你准备面试官…' : '创建并开始练习'}
+          </button>
+        </div>
       }
     >
     <KioskFilterPickerModal
       open={showIndustryPicker}
       title="选择面试行业"
-      description="覆盖 GB/T 4754-2017 的 20 个行业门类；用于调整模拟题目方向。"
+      description="从就业行业清单里选一个，用来调整这套练习题的方向。"
       sections={[{
         id: 'industry',
         label: '行业门类',
@@ -404,30 +388,21 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       onClose={() => setShowIndustryPicker(false)}
     />
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-setup" data-qx-interview="" className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
-      <AiDriverBanner feature="AI模拟面试反馈" description="面试后即时给出评分与改进建议" />
+      <div className="interview-flow__scroll">
+        <InterviewStatus
+          label="本场练习条件"
+          items={[
+            { k: '文字回答', v: '可用', tone: 'ok' },
+            { k: '语音回答', v: '进入后检测' },
+            { k: '练习报告', v: '完成后生成' },
+          ]}
+        />
 
-      <div className="interview-flow__scroll min-h-0 flex-1 overflow-y-auto pb-28">
-        <ComplianceBanner tone="info">
-          本功能仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
-        </ComplianceBanner>
-
-        <div className="interview-setup__stack mt-4">
-            <Card className="interview-card interview-setup__job p-5">
-              <SectionTitle icon={BriefcaseIcon} title="岗位与行业" desc="先确定目标岗位，后续题目会围绕这个方向展开。" />
-              <div className="flex flex-wrap gap-2">
-                {visibleIndustries.map((name) => (
-                  <OptionButton key={name} active={industry === name} onClick={() => setIndustry(name)}>{name}</OptionButton>
-                ))}
-                <button
-                  type="button"
-                  aria-haspopup="dialog"
-                  onClick={() => setShowIndustryPicker(true)}
-                  className="interview-option inline-flex min-h-[52px] items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 hover:border-neutral-300"
-                >
-                  <ListFilterIcon className="h-4 w-4" aria-hidden="true" />
-                  选择行业 ({EMPLOYMENT_INDUSTRY_SECTORS.length})
-                </button>
-              </div>
+        <section className="iv-card interview-setup__stack">
+          <InterviewCardHead title="本场练习设置" hint="都设好才开始" />
+          <div className="iv-fields">
+            <label className="iv-field">
+              <small>目标岗位（必填，最多 50 字）</small>
               <input
                 value={position}
                 onChange={(e) => {
@@ -435,157 +410,154 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                   if (error?.includes('目标岗位')) setError(null)
                 }}
                 maxLength={50}
-                placeholder="输入目标岗位，如：前端开发工程师"
-                className={[
-                  'mt-4 min-h-[56px] w-full rounded-xl border px-4 text-base focus:outline-none focus:ring-2',
-                  positionReady
-                    ? 'border-neutral-200 focus:border-primary-500 focus:ring-primary-100'
-                    : 'border-warning/30 bg-warning-bg/40 focus:border-warning focus:ring-warning-bg',
-                ].join(' ')}
+                placeholder="输入目标岗位，例：前端开发工程师"
               />
-              <div className="mt-3 flex flex-wrap gap-2">
-                {POSITION_EXAMPLES.map((example) => (
-                  <button
-                    key={example}
-                    type="button"
-                    onClick={() => { setPosition(example); setError(null) }}
-                    className="min-h-[48px] rounded-full bg-neutral-100 px-4 text-sm text-neutral-600 hover:bg-neutral-200"
-                  >
-                    {example}
-                  </button>
-                ))}
-              </div>
-            </Card>
-
-            <Card className="interview-card interview-setup__interviewer p-5">
-              <SectionTitle icon={UserRoundCheckIcon} title="面试官与难度" desc="先选择面试官身份，再选择练习压力。" />
-              <div className="grid gap-2 lg:grid-cols-2">
-                {INTERVIEWERS.map((it) => (
-                  <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)} className="text-left">
-                    <span className="block font-semibold">{it.label}</span>
-                    <span className="mt-0.5 block text-xs font-normal leading-relaxed text-neutral-500">{it.desc}</span>
-                  </OptionButton>
-                ))}
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {DIFFICULTIES.map((d) => (
-                  <OptionButton key={d.key} active={difficulty === d.key} onClick={() => setDifficulty(d.key)} className="text-center">
-                    <span className="block font-semibold">{d.label}</span>
-                    <span className="mt-0.5 block text-[11px] font-normal leading-tight text-neutral-500">{d.desc}</span>
-                  </OptionButton>
-                ))}
-              </div>
-            </Card>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="interview-card interview-setup__experience p-5">
-                <SectionTitle icon={GraduationCapIcon} title="经验" />
-                <div className="grid grid-cols-3 gap-2">
-                  {EXPERIENCES.map((e) => (
-                    <OptionButton key={e.key} active={experience === e.key} onClick={() => setExperience(e.key)}>{e.label}</OptionButton>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="interview-card interview-setup__duration p-5">
-                <SectionTitle icon={ClockIcon} title="时长" />
-                <div className="grid grid-cols-3 gap-2">
-                  {DURATIONS.map((d) => (
-                    <OptionButton key={d.key} active={duration === d.key} onClick={() => setDuration(d.key)} className="text-center">
-                      <span className="block font-semibold">{d.label}</span>
-                      <span className="mt-0.5 block text-xs font-normal text-neutral-500">{d.desc}</span>
-                    </OptionButton>
-                  ))}
-                </div>
-              </Card>
+            </label>
+            <div className="iv-field">
+              <small>行业（必填，从就业行业清单选择）</small>
+              <b>{industry}</b>
+              <button type="button" className="iv-mini-btn" aria-haspopup="dialog" onClick={() => setShowIndustryPicker(true)}>
+                选择行业 ({EMPLOYMENT_INDUSTRY_SECTORS.length})
+              </button>
             </div>
+          </div>
+          <div className="iv-choice">
+            <p>岗位快捷项</p>
+            <div className="iv-chips">
+              {POSITION_EXAMPLES.map((example) => (
+                <OptionButton key={example} active={position === example} onClick={() => { setPosition(example); setError(null) }}>{example}</OptionButton>
+              ))}
+            </div>
+          </div>
+          <div className="iv-choice interview-setup__interviewer">
+            <p>面试官类型</p>
+            <div className="iv-chips">
+              {INTERVIEWERS.map((it) => (
+                <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)}>{it.label}</OptionButton>
+              ))}
+            </div>
+            <p className="iv-hint">{interviewerDesc}</p>
+          </div>
+          <div className="iv-choice">
+            <p>经验</p>
+            <div className="iv-chips">
+              {EXPERIENCES.map((item) => (
+                <OptionButton key={item.key} active={experience === item.key} onClick={() => setExperience(item.key)}>{item.label}</OptionButton>
+              ))}
+            </div>
+          </div>
+          <div className="iv-choice-row">
+            <div className="iv-choice">
+              <p>难度</p>
+              <div className="iv-chips">
+                {DIFFICULTIES.map((item) => (
+                  <OptionButton key={item.key} active={difficulty === item.key} onClick={() => setDifficulty(item.key)}>{item.label}</OptionButton>
+                ))}
+              </div>
+            </div>
+            <div className="iv-choice">
+              <p>时长</p>
+              <div className="iv-chips">
+                {DURATIONS.map((item) => (
+                  <OptionButton key={item.key} active={duration === item.key} onClick={() => setDuration(item.key)}>{item.label}</OptionButton>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
 
-            <Card className="interview-card p-5">
-              <SectionTitle icon={FileTextIcon} title="简历（可选）" desc="一体机请用手机扫码或 U 盘；不上传则按通用问题练习。" />
-              {resumeFile ? (
-                <div className="interview-resume-chip flex items-center justify-between rounded-xl border px-4 py-3">
-                  <span className="truncate text-sm font-medium">{resumeFile.name}</span>
+        <section className="iv-card">
+          <InterviewCardHead title="简历（可选）" hint={resumeFile ? '已选用 1 份' : '不上传也能开始'} />
+          {resumeFile ? (
+            <div className="iv-panel">
+              <div className="iv-head"><b>{resumeFile.name}</b><span>这场练习会用这份简历出题</span></div>
+              <p className="iv-copy">移除后按通用问题练习，不会因此少一道题。</p>
+              <button
+                type="button"
+                onClick={() => setResumeFile(null)}
+                aria-label="移除简历"
+                className="flex h-12 w-12 items-center justify-center rounded-xl"
+              >
+                <XIcon className="h-4 w-4" aria-hidden="true" />
+                移除，不用简历
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="iv-tabs" role="group" aria-label="简历来源">
+                {([
+                  { key: 'phone' as const, label: '手机扫码上传', hint: '把简历传到这台机器', icon: QrCodeIcon },
+                  { key: 'usb' as const, label: 'U 盘导入', hint: '只读取你插入的这只盘', icon: UsbIcon },
+                  { key: 'desktop' as const, label: '本机文件', hint: '桌面验证时挑选', icon: MonitorSmartphoneIcon },
+                ]).filter((channel) => channel.key !== 'desktop' || !isTerminalKiosk()).map((channel) => (
                   <button
+                    key={channel.key}
                     type="button"
-                    onClick={() => setResumeFile(null)}
-                    aria-label="移除简历"
-                    className="flex h-12 w-12 items-center justify-center rounded-xl text-neutral-400 hover:bg-white"
+                    aria-pressed={resumeChannel === channel.key}
+                    onClick={() => setResumeChannel(resumeChannel === channel.key ? null : channel.key)}
                   >
-                    <XIcon className="h-4 w-4" aria-hidden="true" />
+                    <channel.icon className="h-4 w-4" aria-hidden="true" />
+                    <b>{channel.label}</b>
+                    <small>{channel.hint}</small>
                   </button>
-                </div>
-              ) : (
-                <>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    {([
-                      { key: 'phone' as const, label: '手机扫码上传', icon: QrCodeIcon },
-                      { key: 'usb' as const, label: 'U盘导入', icon: UsbIcon },
-                      { key: 'desktop' as const, label: '本机文件（桌面验证）', icon: MonitorSmartphoneIcon },
-                    ]).filter((channel) => channel.key !== 'desktop' || !isTerminalKiosk()).map((channel) => (
-                      <button
-                        key={channel.key}
-                        type="button"
-                        aria-pressed={resumeChannel === channel.key}
-                        onClick={() => setResumeChannel(channel.key)}
-                        className={[
-                          'flex min-h-[56px] items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium',
-                          resumeChannel === channel.key
-                            ? 'border-primary-500 bg-primary-50 text-primary-700'
-                            : 'border-neutral-200 bg-white text-neutral-700',
-                        ].join(' ')}
-                      >
-                        <channel.icon className="h-4 w-4" aria-hidden="true" />
-                        {channel.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-3">
-                    {resumeChannel === 'phone' ? (
-                      <UploadSessionQrPanel
-                        purpose="resume_upload"
-                        title="手机扫码上传简历"
-                        description="手机只负责上传；一体机确认后才会带进本次练习。不上传也可以开始。"
-                        confirmLabel="确认使用这份简历"
-                        onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
-                        onBusyChange={setQrBusy}
-                      />
-                    ) : resumeChannel === 'usb' ? (
-                      <ResumeUsbImportPanel
-                        onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
-                        onBusyChange={setUsbBusy}
-                      />
-                    ) : resumeChannel === 'desktop' && !kiosk ? (
-                      <Button variant="secondary" className="min-h-[56px] w-full text-base" disabled={uploading} onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}>
-                        {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
-                        本机文件（桌面验证）
-                      </Button>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 text-sm text-neutral-500">不上传也可以开始练习</p>
-                </>
-              )}
-              {!kiosk && (
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-                  className="hidden"
-                  onChange={handleFileChosen}
-                />
-              )}
-            </Card>
-        </div>
+                ))}
+              </div>
+              <div className="iv-panel">
+                {resumeChannel === 'phone' ? (
+                  <UploadSessionQrPanel
+                    purpose="resume_upload"
+                    title="手机扫码上传简历"
+                    description="手机只负责上传；这台机器确认后才会带进本次练习。不上传也可以开始。"
+                    confirmLabel="确认使用这份简历"
+                    onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
+                    onBusyChange={setQrBusy}
+                  />
+                ) : resumeChannel === 'usb' ? (
+                  <ResumeUsbImportPanel
+                    onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
+                    onBusyChange={setUsbBusy}
+                  />
+                ) : resumeChannel === 'desktop' && !kiosk ? (
+                  <Button variant="secondary" className="min-h-[56px] w-full text-base" disabled={uploading} onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}>
+                    {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
+                    本机文件（桌面验证）
+                  </Button>
+                ) : uploading ? (
+                  <p className="iv-copy">正在上传。完成前不把这份文件算进本场练习。</p>
+                ) : (
+                  <p className="iv-copy">选一条来源，本机才会去取文件。没有简历时按通用问题练习，不会因此少一道题。</p>
+                )}
+              </div>
+            </>
+          )}
+          {!kiosk && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+              className="hidden"
+              onChange={handleFileChosen}
+            />
+          )}
+        </section>
 
-        {error && (
-          <p className="mt-4 rounded-xl bg-error-bg px-4 py-3 text-sm font-medium text-error-fg" role="alert">{error}</p>
-        )}
+        <section className="iv-card">
+          <InterviewCardHead title="练习会经历三步" hint="按实际状态推进" />
+          <InterviewSteps rows={[
+            ['第 1 步', '创建配置', '记录岗位、难度和时长，不等于已经生成题目。'],
+            ['第 2 步', '逐题作答', '文字始终可以作答；语音要转写后由你确认。'],
+            ['第 3 步', '生成练习报告', '报告只在这场练习真正完成后生成。'],
+          ]} />
+        </section>
 
-        {/*
-          失败态不再只剩「创建练习失败」一行。红字保留（它是原因），下面挂上不依赖 AI 的出路。
-          AiTaskRegion 的 fallback 是必填 prop，由类型系统保证这条支线不会被悄悄摘掉。
-        */}
+        <InterviewNotice>
+          <b>模拟面试不是企业面试。</b>不代表任何招聘结果承诺，不会发出面试邀请，也不用于候选人筛选或录用判断。
+        </InterviewNotice>
+
+        {error && <p className="iv-alert" role="alert">{error}</p>}
+
         <AiTaskRegion
-          className="interview-setup-fallback mt-4"
+          className="interview-setup-fallback"
           task={aiTask}
           label="AI 面试官出题与点评"
           fallback={fallback}
@@ -594,18 +566,14 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         {aiTask.isFailed && (
           <Button
             variant="secondary"
-            className="mt-3 flex min-h-[56px] w-full items-center justify-center gap-2 text-base"
+            className="min-h-[56px] w-full text-base"
             onClick={() => onGoStage ? onGoStage('tips') : navigate('/interview/tips')}
           >
-            <NotebookPenIcon className="h-5 w-5" aria-hidden="true" />
+            <NotebookPenIcon className="mr-2 h-5 w-5" aria-hidden="true" />
             查看面试准备要点（本机固定内容，不依赖 AI）
           </Button>
         )}
-        <div className="interview-rail" aria-label="练习边界">
-          <span>只供本人练习参考</span>
-          <span>不发送给任何企业</span>
-          <span>不预测录用结果</span>
-        </div>
+        <InterviewRail />
       </div>
     </div>
     </InterviewShell>

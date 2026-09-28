@@ -23,6 +23,7 @@ import {
 } from '../../utils/micCapability'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
 import { useInterviewLivePersist } from './session/useInterviewLivePersist'
@@ -35,6 +36,7 @@ import {
 } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
+import './styles/interview-qx2.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const advisorPortrait = '/assets/ai-advisor.png'
@@ -388,7 +390,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const timeUp = remainingSec === 0
   const busyTurn = phase === 'thinking' || phase === 'finishing'
   const voiceLocked = voice.kind === 'requesting_permission' || voice.kind === 'transcribing'
-  const ttsLabel = ttsOfficial ? '官方语音播报' : '浏览器语音兜底'
+  const ttsLabel = ttsOfficial ? '官方语音播报' : '本机语音播报'
   // 状态胶囊直述硬件事实：探测中不下结论，只有确实探到设备才敢说「可用」。
   const micStatusLabel = micCapability === null ? '正在检测麦克风…' : MIC_STATUS_LABEL[micCapability]
   const micStatusTone =
@@ -409,8 +411,12 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     <InterviewShell
       title={<>第 {questionIndex} 题，<em>{titleParts.em}</em>。</>}
       subtitle={copy.subtitle}
-      status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : '模拟练习' }}
-      navbar={false}
+      status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : 'AI 模拟面试' }}
+      ctabar={(
+        <QxStepActions>
+          <QxAiHelp label="问小青：这一题怎么答" draft="我正在做模拟面试。请先问我这一题的原文，再帮我按真实经历组织回答，不要替我编造经历。" />
+        </QxStepActions>
+      )}
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-session" data-qx-interview="" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewSessionPanels

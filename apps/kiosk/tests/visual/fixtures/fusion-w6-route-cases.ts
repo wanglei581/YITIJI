@@ -83,7 +83,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '求职方案', requiresFusionRoot: false },
   { pattern: '/interview', url: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
   { pattern: '/interview/setup', url: '/interview/setup', expectedPath: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
-  { pattern: '/interview/session', url: '/interview/session', expectedPath: '/interview', marker: screen('interview-session'), featureText: '会话已失效' },
+  { pattern: '/interview/session', url: '/interview/session', expectedPath: '/interview', marker: screen('interview-session'), featureText: '这场练习已过期，需要重新开始' },
   { pattern: '/interview/report', url: '/interview/report', expectedPath: '/interview', marker: screen('interview-report'), featureText: '报告不存在或已过期' },
   { pattern: '/interview/tips', url: '/interview/tips', expectedPath: '/interview', marker: screen('interview-tips'), featureText: '面试' },
   { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '练习报告' },
