@@ -1,5 +1,44 @@
 # 下一步任务
 
+## 2026-09-28 深夜：合规小改实现进度与上线配置清单
+
+**实现状态**（六个 PR 都进候选 `claude/codex-task-history-progress-0de1dc`，由主执行窗口合并；**合入后行为与今天一致**，开关在上线时按下表配置）：
+
+| 项 | PR | 开关（默认 = 今天的行为） | 推荐上线值 / 前提 |
+|---|---|---|---|
+| C3 AI 内容投诉 | #1045 | 无（新增类别，页面上线后才有入口） | — |
+| C4 协议必须已发布 | #1045 | `LEGAL_DOCS_REQUIRE_PUBLISHED`：生产（`NODE_ENV=production`）默认要求，可显式 true / false | 先在后台发布试运行版协议与隐私政策，**再部署** |
+| C6 年满 14 周岁与录音声明 | #1048 | `AI_DECLARATION_ENFORCEMENT=off` | on |
+| C7 AI 登录档位 | #1048 | `AI_LOGIN_GATE=off` | 待拍板 D1（方案推荐 `before_generate`） |
+| C14 AI 一键暂停 / 全机维护 | #1048 | `AI_PAUSED`、`MAINTENANCE_MODE` = off，后台可一键切换（必须填事由、先写留痕） | 按需 |
+| C8 简历导出显式标识 | #1044 | `RESUME_EXPORT_VISIBLE_LABEL=false`、`RESUME_EXPORT_UNLABELED_OPTION=false` | 前者 true（待拍板 D2）；后者律师确认协议条款后再开 |
+| C9 面试报告改字 | #1044 | 无（直接生效，方案已定） | — |
+| C10 内容双向检查 | #1049 | 词表为空即不检查 | 配置 `AI_FORBIDDEN_WORDS_FILE`（云审核兜底本轮未接） |
+| C11 政策只显示本机构 | #1049 | `POLICY_SCOPE=all` | `org`（待拍板 D4） |
+| C12 小青不提岗位 | #1049 | 跟随招聘内容托管开关 | 托管关闭（我们云上）即生效 |
+| P0-3 发布失败回退 | #1047 | — | 见下方 1、2 |
+| P0-2 备份、日志、告警推送 | #1050 | `ALERT_WEBHOOK_URL` 为空即不推送 | 见下方 4、5 |
+
+**上线前由产品负责人执行**（仓库不代做，不碰生产）：
+1. GitHub 配置里 `DEPLOY_ADMIN_WEB_ROOT`、`DEPLOY_PARTNER_WEB_ROOT` 都已设置——full 发布缺任何一个会直接失败（原来是静默跳过）。
+2. 发布前看一次 `/api/v1/health` 的 `data.degraded` 为空——发布的就绪检查改用 `/api/v1/health/ready`，Redis、数据库、会员隐私调度任一降级都会判失败并自动回退。
+3. 后台「法务文档」发布试运行版《用户服务协议》《隐私政策》、AI 服务说明、经营者信息——**先发布，再部署**（C4 生产默认拒绝未发布协议的登录；临时放开用 `LEGAL_DOCS_REQUIRE_PUBLISHED=false`）。
+4. 服务器 `.env`：按上表推荐值配置；`ALERT_WEBHOOK_URL` 填企业微信群机器人地址（新增的待处理 AI 内容投诉、终端离线等派生告警和每日备份失败都会推到群里）。
+5. 服务器安装（步骤见 `docs/device/postgres-operations.md` 第 8 节）：每日备份的 systemd timer 或 cron；用 `services/api/scripts/logrotate/nginx` 替换 `/etc/logrotate.d/nginx`；执行 `services/api/scripts/pm2-logrotate-setup.sh`；做一次恢复演练（临时库名必须含 `drill`）。
+
+**需要页面配合**（一体机等 2.0 稿定稿后改；后台就地改；小程序交小程序窗口）：
+- 一体机：导出页写明「含人工智能辅助生成内容」，第二个开关打开后提供「不带标识」申请入口并提示隐式标识仍在；面试报告页去掉等级与匹配度；反馈弹层加「AI 内容投诉」与选填手机号（届时同步改 `verify:kiosk-feedback-entry` 里「弹层不提供联系方式输入框」那条）；登录页 `LEGAL_DOCS_NOT_PUBLISHED` 的提示；AI 与语音按钮下的声明行并带上声明请求头；`AI_LOGIN_REQUIRED` 的登录引导；读终端配置里的 `ai.paused` / `maintenance`，显示暂停提示与维护页；政策与社区请求带终端身份，「本终端未绑定机构」空态；`AI_CONTENT_BLOCKED` 的提示。
+- 后台：AI 服务管理页加暂停 / 维护 / 登录档位 / 声明开关（就地改现有页，必须填事由）。反馈页的新类别、「查看完整号码（会留痕）」和告警页的新告警类型已随 #1045 就地改完。
+- 小程序：会员反馈新类别、登录错误码、声明请求头、`AI_CONTENT_BLOCKED` 等按同一契约处理。
+
+**新发现的原有问题**（本批未改，入待办）：
+- `services/api/src/print-jobs/print-jobs.service.ts:664,806` 审计写 `actorId: ctx.endUserId ?? null`：该列外键指向运营账号表，会员 ID 写进去在 PostgreSQL 上违反外键，被 `AuditService.write` 静默吞掉——会员发起的取件链接与重试没有审计。
+- 简历导出的 `draft` 标记完全信任客户端：自称原样草稿即可拿到不带标识、元数据写成「非 AI」的文件。根治要让草稿导出只能导出服务端保存的用户原始填写。
+- 模拟面试最后一题的作答直接写库，之后若报告被内容检查拦下就拿不到报告；合同审查的模型回复若引用原文里的禁词，报告会被拦。
+- `verify-feedback-notifications` 在不设 `DATABASE_URL` 时自建库的建表语句已过时（缺 `passwordProofState`）；CI 走 `DATABASE_URL` 所以没暴露。
+
+**产品负责人知悉：**「查看完整号码（会留痕）」是「API 不返回明文手机号」的唯一例外：只对 AI 内容投诉、只给管理员、每次先写必须成功的审计、每分钟限 10 次；不同意可以直接不用这个按钮。
+
 ## 2026-09-28：全面商用收口评审（专家团：Claude 主持，Codex 核代码，agy 反方）
 
 **来源与范围：** 产品负责人要求在已有结论（60 步方案、9/26 全面审查、9/27 四方评审与一体机走查）之上，找出离全面商用还差什么，并补上他没提到的。对象是候选 `856129b4c`（#1042 三个必需作业全绿，CI 运行 36397276655）。Codex（`gpt-6-astra`，medium）两路只读按行号核查（后端、安全、运维、资金；一体机、两个后台、Agent、发布与工程）；agy（`gemini-3.8-flash-high`）两轮反方评审；Claude 复核每条关键结论并补查官方原文。完整报告（拍板推荐、产品负责人执行清单、排期判断）是私有报告页，已交产品负责人，报价、客户、竞争判断与律师问题不进仓库。本节只记确定的待办，**拍板前不改 60 步正文**。
