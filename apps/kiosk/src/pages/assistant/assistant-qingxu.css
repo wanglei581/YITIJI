@@ -48,7 +48,9 @@
 .kassist .assistant-cockpit-lede { font-size: var(--qx-fs-body); color: var(--qx-paper); }
 .kassist .assistant-cockpit-disclosure { margin-top: 14px; }
 .kassist .assistant-advisor-disclosure { display: block; margin-top: 8px; font-size: var(--qx-fs-aux); }
-.kassist .kiosk-aigc-mark { font-size: var(--qx-fs-aux); color: var(--qx-paper); border-color: rgb(255 255 255 / 35%); }
+/* 深色头卡上的 AI 标识：共享层给的是浅米底（给浅色页用），这里配浅色字会整块看不清。
+   换成半透明白底 + 浅色字，标识必须读得出来（AI 生成内容可见标识）。 */
+.kassist .kiosk-aigc-mark { font-size: var(--qx-fs-aux); color: var(--qx-paper); background: rgb(255 255 255 / 12%); border-color: rgb(255 255 255 / 35%); }
 .kassist .assistant-cockpit-telemetry { flex: none; width: 250px; padding-left: 22px; border-left: 1px solid rgb(255 255 255 / 20%); display: grid; gap: 14px; }
 .kassist .assistant-cockpit-telemetry div { display: flex; gap: 12px; }
 .kassist .assistant-cockpit-telemetry dt { flex: none; font-size: var(--qx-fs-aux); }
