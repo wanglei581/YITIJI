@@ -759,6 +759,8 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
       if (file.startsWith('22-') || file.startsWith('23-') || (file.startsWith('24-') && PREVIEW_STATES.has(pair.state))) {
         extra.taskId = 'paircapture01'
       }
+      // 07 的带内容态要 fixture=1 才渲染示例订单，不带时一律停在「正在读取」（9/28 留白整改时发现量错了态）。
+      if (file.startsWith('07-')) extra.fixture = '1'
       targets.push({
         file,
         nn: file.slice(0, 2),

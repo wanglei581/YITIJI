@@ -10,6 +10,7 @@
 //      只量第一屏；手机页 51 不按 1080 宽量。
 //   5. 被裁：文字上下边超出 overflow:hidden 的外框（含 1920 高的舞台），也就是被裁掉或挤出屏幕。
 //      填留白时最容易把底部按钮和导航挤下去，所以和留白一起查；可滚动区与多行截断不算。
+//      按钮落在所在滚动区可见底边以下（被遮住或要滑才看得到）也算；列表条目里的按钮不算。
 //
 // 状态清单与并排截图工具（tests/visual/qingxu-pairs.spec.ts）共用 tests/visual/fixtures/qingxu-pair-targets.ts
 // 的 buildQingxuPairs()：用 vite 自带的 esbuild 临时打包后导入，两边不会各数各的。稿的取法也一样：
@@ -134,7 +135,8 @@ const PROBE = ({ bannedSource, minFont, checkFont, icpSource, keySource }) => {
   // 文字所在的可见框：视口与各级裁切祖先（overflow 不是 visible）的交集。
   const clipBox = (el) => {
     let box = { l: 0, t: 0, r: VW, b: VH }
-    for (let e = el.parentElement; e && e !== document.documentElement; e = e.parentElement) {
+    // 从文字所在元素本身算起：单行省略号的文字，range 的矩形比元素宽，超出的部分本来就看不见，不算被压。
+    for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
       const st = cs(e)
       if (st.overflowX === 'visible' && st.overflowY === 'visible') continue
       const r = e.getBoundingClientRect()
@@ -203,6 +205,37 @@ const PROBE = ({ bannedSource, minFont, checkFont, icpSource, keySource }) => {
       if (hit) break
     }
     if (hit) covered.push(hit)
+  }
+  // 按钮在第一屏看不到：落在它所在滚动区（没有就是屏幕）的可见底边以下——被遮住，或要滑才看得到。
+  // 列表条目里的按钮（li、role=listitem、或同一父元素下 ≥3 个同类兄弟里的一个）不算：第 N 条的「查看」本来就要滑。
+  // 手机页（51，checkFont 为假的那张）不查：手机网页往下滑是正常操作，这条只管 27 寸一体机。
+  const inList = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      if (e.tagName === 'LI' || e.getAttribute('role') === 'listitem') return true
+      const p = e.parentElement
+      if (p && e.className && typeof e.className === 'string' && [...p.children].filter((c) => c.className === e.className).length >= 3) return true
+    }
+    return false
+  }
+  const scrollerOf = (el) => {
+    for (let e = el.parentElement; e && e !== document.documentElement; e = e.parentElement) {
+      const st = cs(e)
+      if (/auto|scroll/.test(st.overflowY) && e.scrollHeight > e.clientHeight + 1) return e
+    }
+    return null
+  }
+  for (const b of checkFont ? document.querySelectorAll('button, a.btn, [role="button"]') : []) {
+    if (hidden(b) || decoration(b)) continue
+    const r = b.getBoundingClientRect()
+    if (r.width < 8 || r.height < 8) continue
+    const sc = scrollerOf(b)
+    const sr = sc && sc.getBoundingClientRect()
+    // 卡片内部的小滚动区（列表卡、记录卡）里滑到最后才出现的按钮（如「加载更多」）不算；
+    // 只管整块正文区在滚（滚动区高于屏高 55%，例如顶部卡下面整个 main 在滚）或内容被舞台裁掉的情形。
+    if (sr && sr.height < VH * 0.55) continue
+    const limit = sr ? Math.min(VH, sr.bottom) : VH
+    if (r.bottom <= limit + 2 || inList(b)) continue
+    clipped.push(`按钮「${(b.textContent || b.getAttribute('aria-label') || '').trim().slice(0, 14)}」在第一屏看不到 y=${Math.round(r.top)}–${Math.round(r.bottom)}（可见到 ${Math.round(limit)}）`)
   }
   return { words, keys, small: [...new Set(small)], covered: [...new Set(covered)], clipped: [...new Set(clipped)] }
 }
