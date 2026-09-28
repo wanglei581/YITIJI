@@ -5,6 +5,34 @@
 import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFString } from 'pdf-lib'
 
 export const AIGC_VISIBLE_HEADER = 'AI 生成，仅供参考'
+export const AIGC_VISIBLE_FOOTER = '含人工智能辅助生成内容'
+
+/**
+ * 简历导出的页脚显式标识开关（RESUME_EXPORT_VISIBLE_LABEL）。
+ * 默认关：与合入前行为一致（简历正文不印可见标识），上线时按产品负责人拍板打开。
+ * 标识办法第四条要求导出文件默认带显式标识，推荐的上线配置是 true。
+ */
+export function resumeVisibleLabelEnabled(): boolean {
+  return process.env['RESUME_EXPORT_VISIBLE_LABEL'] === 'true'
+}
+
+/**
+ * 用户申请「不带显式标识」的开关（RESUME_EXPORT_UNLABELED_OPTION），默认关。
+ * 只在页脚标识开启时才有意义；打开前须律师确认协议条款（标识办法第九条）。
+ */
+export function resumeUnlabeledOptionEnabled(): boolean {
+  return resumeVisibleLabelEnabled() && process.env['RESUME_EXPORT_UNLABELED_OPTION'] === 'true'
+}
+
+/**
+ * 这一份简历导出要不要印显式标识：页脚标识开关已开、不是原样草稿（草稿不是 AI 产物），
+ * 且用户没有经「不带标识」开关申请去掉。PDF、DOCX、TXT/MD 与打印副本共用这一个判定。
+ * unlabeled 须是控制器已按准入规则放行后的结果（见 resume-unlabeled-export.ts），不是请求原值。
+ */
+export function resumeExportShowsVisibleLabel(input: { draft?: boolean; unlabeled?: boolean }): boolean {
+  if (!resumeVisibleLabelEnabled() || input.draft === true) return false
+  return !(resumeUnlabeledOptionEnabled() && input.unlabeled === true)
+}
 
 export const AIGC_DEFAULT_PRODUCER = '职易达'
 
@@ -91,6 +119,34 @@ export function stampAigcPageHeader(
       lineBreak: false,
     })
     doc.page.margins.top = previousTop
+    doc.restore()
+    doc.x = savedX
+    doc.y = savedY
+  }
+}
+
+/** 每页页脚显式标识。只在 AI 简历导出且用户未申请去标识时调用。 */
+export function stampAigcPageFooter(
+  doc: PDFKit.PDFDocument,
+  text: string = AIGC_VISIBLE_FOOTER,
+): void {
+  const range = doc.bufferedPageRange()
+  for (let index = 0; index < range.count; index += 1) {
+    doc.switchToPage(range.start + index)
+    const savedX = doc.x
+    const savedY = doc.y
+    doc.save()
+    const left = doc.page.margins.left
+    const right = doc.page.margins.right
+    const previousBottom = doc.page.margins.bottom
+    doc.page.margins.bottom = 0
+    doc.font('cjk').fontSize(8).fillColor('#64748b')
+    doc.text(text, left, doc.page.height - 30, {
+      width: doc.page.width - left - right,
+      align: 'center',
+      lineBreak: false,
+    })
+    doc.page.margins.bottom = previousBottom
     doc.restore()
     doc.x = savedX
     doc.y = savedY

@@ -481,7 +481,7 @@ async function main(): Promise<void> {
       {
         overall: { level: 'pass', summary: sample },
         expression: ['说清楚了'],
-        positionFit: ['提到了项目'],
+        positionFit: ['岗位匹配度 80%'],
         credibility: ['有具体事'],
         professional: ['讲了职责'],
         adaptability: ['能接着说'],
@@ -553,6 +553,12 @@ async function main(): Promise<void> {
     const text = squash(await visibleText(item.buffer))
     const info = await readPdfInfo(item.buffer)
     const aigc = parseAigcLabelJson(info['AIGC'] ?? '')
+    if (item.id === 'interview') {
+      const banned = ['练习表现等级', '匹配度', '岗位匹配']
+      const hit = banned.find((phrase) => text.includes(phrase))
+      if (hit) fail('pdf:interview:neutral-copy', `模拟面试报告仍出现禁词「${hit}」`)
+      else pass('pdf:interview:neutral-copy')
+    }
     if (item.wantVisible) {
       // 审计表第 11–36、103 行：每一页都要同时有「AI 生成」和「仅供参考」。合并全文会让第二页丢页眉也通过。
       const pages = await visiblePages(item.buffer)
@@ -567,8 +573,9 @@ async function main(): Promise<void> {
         } else pass(`pdf:${item.id}:visible`)
       }
     } else if (text.includes('AI生成') || text.includes('仅供参考')) {
-      // 简历正文是否印标识待拍板（审计表第 15 行，本路明确先不做）。
-      fail(`pdf:${item.id}:visible`, '简历 PDF 正文出现了可见标识，这一项还没拍板')
+      // 简历不印页眉式「AI 生成，仅供参考」；页脚标识由 RESUME_EXPORT_VISIBLE_LABEL 控制，
+      // 开关各档位的逐页断言在 verify:resume-export-label。
+      fail(`pdf:${item.id}:visible`, '简历 PDF 正文出现了页眉式「AI 生成 / 仅供参考」')
     } else pass(`pdf:${item.id}:no-visible`)
     if (!aigc || aigc.ProduceID !== item.produceId || aigc.ContentProducer !== AIGC_DEFAULT_PRODUCER) {
       fail(`pdf:${item.id}:aigc`, `Info 里没有合法 AIGC 或 ProduceID 不是任务号（next-tasks 第 4 条），实际 ${info['AIGC'] ?? '缺失'}`)
@@ -637,8 +644,9 @@ async function main(): Promise<void> {
   if (!docxAigc || docxAigc.ProduceID !== 'task-resume-docx') {
     fail('docx:aigc', 'customProperties 没有合法 AIGC（next-tasks 第 4 条）')
   } else pass('docx:aigc')
+  // 页脚标识（C8）受 RESUME_EXPORT_VISIBLE_LABEL 控制，开关各档位在 verify:resume-export-label 断言。
   if (body.includes('AI 生成') || body.includes('仅供参考')) {
-    fail('docx:body', '简历 DOCX 正文印了可见标识，这一项还没拍板（审计表第 16 行）')
+    fail('docx:body', '简历 DOCX 正文印了「AI 生成 / 仅供参考」，应只在页脚按开关印标识')
   } else pass('docx:body')
 
   // 追加页保持原简历 Title，并把 AIGC.Label 置为 1。草稿原来 AIGenerated=false，追加后必须改成 true。

@@ -18,6 +18,7 @@ import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
 import { ResumeDocxService } from './resume/resume-docx.service'
 import { ResumeTextService } from './resume/resume-text.service'
+import { resumeExportShowsVisibleLabel } from '../common/pdf/aigc-label'
 import type { ResumeExportFormat, ResumeLayoutAdjustAction } from './dto/resume-generate.dto'
 import { canAccessFile, FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
@@ -776,7 +777,7 @@ export class AiService {
      * 只影响 PDF 元数据诚实性（AIGenerated='false'），排版与既有导出逐字一致。
      */
     draft = false,
-    charge?: { taskId?: string | null; benefitGrantId?: string | null; factsConfirmedAt?: string },
+    charge?: { taskId?: string | null; benefitGrantId?: string | null; factsConfirmedAt?: string; unlabeled?: boolean },
   ): Promise<{
     fileId: string
     filename: string
@@ -825,9 +826,11 @@ export class AiService {
     let pageCount: number
     let mimeType: string
     let ext: string
+    const unlabeled = charge?.unlabeled === true
+    const visibleLabel = resumeExportShowsVisibleLabel({ draft, unlabeled })
     switch (format) {
       case 'docx': {
-        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : produceId })
+        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : produceId, unlabeled })
         buffer = rendered.buffer
         pageCount = 0
         mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -835,14 +838,14 @@ export class AiService {
         break
       }
       case 'txt': {
-        buffer = Buffer.from(this.resumeText.renderTxt(resume), 'utf-8')
+        buffer = Buffer.from(this.resumeText.renderTxt(resume, { visibleLabel }), 'utf-8')
         pageCount = 0
         mimeType = 'text/plain'
         ext = 'txt'
         break
       }
       case 'md': {
-        buffer = Buffer.from(this.resumeText.renderMarkdown(resume), 'utf-8')
+        buffer = Buffer.from(this.resumeText.renderMarkdown(resume, { visibleLabel }), 'utf-8')
         pageCount = 0
         mimeType = 'text/markdown'
         ext = 'md'
@@ -855,6 +858,7 @@ export class AiService {
           templatePreset: template?.resumeLayoutPreset,
           draft,
           contentId: draft ? null : produceId,
+          unlabeled,
         })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
@@ -888,7 +892,7 @@ export class AiService {
     // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
     let printFileId = uploaded.fileId
     if (format !== 'pdf') {
-      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : printProduceId })
+      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : printProduceId, unlabeled })
       const pdfUploaded = await this.files.upload({
         buffer: pdfRendered.buffer,
         filename: `${namePrefix}_${safeName}.pdf`,

@@ -110,8 +110,8 @@ flowchart TD
 | **KioskActivity** | 12 | — | **无代码读写** |
 | **KioskJobBoardConfig** | 6 | — | 1 个文件<br/>`terminals/kiosk-job-board.service.ts` |
 | **KioskSession** | 9 | — | **无代码读写** |
-| **LegalDocVersion** | 10 | — | 2 个文件<br/>`legal/legal.service.ts`<br/>`member-auth/member-auth.service.ts` |
-| **MemberLegalConsent** | 10 | EndUser | 1 个文件<br/>`member-auth/member-auth.service.ts` |
+| **LegalDocVersion** | 10 | — | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`legal/legal.service.ts`<br/>`member-auth/member-auth.service.ts` |
+| **MemberLegalConsent** | 10 | EndUser | 2 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
 | **MockInterviewReport** | 6 | MockInterviewSession | 1 个文件<br/>`mock-interview/mock-interview.service.ts` |
 | **MockInterviewSession** | 21 | MockInterviewReport、MockInterviewTurn | 3 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>`mock-interview/mock-interview.service.ts` |

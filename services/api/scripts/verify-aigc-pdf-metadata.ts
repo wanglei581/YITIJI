@@ -7,9 +7,9 @@
  *   自我探索 / 面试报告 5 个 PDF 只有首页一行免责声明，metadata 里没有任何 AIGC 字段，
  *   简历 PDF 更是只有一个 Title。打印出去的纸质件事后无从判定是否 AI 生成。
  *
- * 本批次范围：**只加隐式 metadata，不加可见水印**。
- *   简历 PDF 是否加可见标识需产品裁决（用户要拿去投递），本脚本因此
- *   **不断言可见水印**，只断言元数据 —— 未来产品裁决后另加断言。
+ * 本脚本只断言隐式 metadata。简历的每页页脚显式标识（C8）由 RESUME_EXPORT_VISIBLE_LABEL
+ *   控制（默认关），「不带标识」申请由 RESUME_EXPORT_UNLABELED_OPTION 控制；两者的逐页
+ *   运行时断言在 verify:resume-export-label（本脚本的 npm 命令会接着跑它）。
  *
  * 覆盖：
  *   1. applyAigcPdfMetadata 写入的键与合同审查那套一致
@@ -253,9 +253,8 @@ for (const [rel, label] of services) {
   }
 }
 
-// 本批次刻意不加可见水印：如果哪天要加，应先有产品裁决再改本断言。
 const resumePdfSrc = read('src/ai/resume/resume-pdf.service.ts')
-assertContains(resumePdfSrc, '不加任何可见水印', '边界: 简历 PDF 明确记录「可见标识待产品裁决」')
+assertContains(resumePdfSrc, 'resumeExportShowsVisibleLabel(', '简历 PDF 页脚标识走统一开关判定（C8，运行时断言见 verify:resume-export-label）')
 
 // ─── 结果 ────────────────────────────────────────────────────────────────────
 
