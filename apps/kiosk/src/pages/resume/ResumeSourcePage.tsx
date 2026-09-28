@@ -638,7 +638,7 @@ export function ResumeSourcePage() {
           <summary>{copy.infoTitle}</summary>
           <p>{copy.infoBody}</p>
           {intent === 'optimize' && (
-            <ol className="qx-rt-chain" aria-label="优化链路">
+            <ol className="qx-rt-chain" aria-label="优化流程">
               {OPTIMIZE_FLOW_STEPS.map((step) => <li key={step}>{step}</li>)}
             </ol>
           )}

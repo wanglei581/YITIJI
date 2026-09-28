@@ -131,15 +131,15 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
   if (state === 'rejected-task') {
     return {
       title: '这份任务现在读不出来',
-      subtitle: '服务端没有返回这份简历任务的内容。系统不会用其他人的任务或历史结果替代它。',
+      subtitle: '这次没有返回这份简历任务的内容。系统不会用其他人的任务或历史结果替代它。',
       pill: { tone: 'bad', label: '任务不可读取，需重新准备' },
       body: (
         <>
-          <Sec title="读不出来的三种可能" hint="具体原因以服务端返回为准">
+          <Sec title="读不出来的三种可能" hint="具体原因以这次读到的说明为准">
             <Why items={[
               { head: '可能原因', title: '任务已过期', desc: '临时任务有保存期限，过期后不再返回原文，也不保留分析结果。' },
-              { head: '可能原因', title: '不属于当前会话', desc: '换人使用或重新登录后，上一次的任务不会带到这次会话里。' },
-              { head: '可能原因', title: '服务端已停止读取', desc: '服务端可以主动停止某份任务的读取，此时不展示任何原文片段。' },
+              { head: '可能原因', title: '不属于这次使用', desc: '换人使用或重新登录后，上一次的任务不会带到这次使用里。' },
+              { head: '可能原因', title: '已经停止读取', desc: '系统可以主动停止某份任务的读取，此时不展示任何原文片段。' },
             ]} />
           </Sec>
           <Sec title="让它重新可用的三步" hint="每一步都在既有流程里" grow>
@@ -171,21 +171,21 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
     return {
       title: '正在读取，还没有结果',
       subtitle: '读取请求已经提交。读到历史报告才显示内容；没有报告或读取失败会直接转到对应状态。',
-      pill: { tone: 'unknown', label: '正在等待服务端返回' },
+      pill: { tone: 'unknown', label: '正在等待返回' },
       body: (
         <>
           <Sec title="正在读取历史岗位匹配报告" hint="无进度条 · 无预计时间">
             <Waiting
               icon={<ClockIcon size={34} />}
-              title="请求已提交，等待服务端返回"
+              title="请求已提交，等待返回"
               desc="读取的是你本人此前的简历对照报告。返回之前，不显示对照要点或建议。"
               tag="只表达整体等待，没有百分比"
             />
           </Sec>
           <Sec title="已经确认并提交的内容" hint="本次读取用到的真实条件" grow>
             <ListRows items={[
-              '当前会话身份已校验，只读取本人的任务与报告',
-              '读取请求已发送给服务端，等待确认这份任务是否仍然可用',
+              '这次使用的身份已核对，只读取本人的任务与报告',
+              '读取请求已发出，等待确认这份任务是否仍然可用',
               '如果历史报告存在，其目标岗位会随报告一起返回',
               '如果不存在历史报告，会转到目标岗位选择，而不是显示一份空结果',
               '等待期间不放开打印，也不提前展示任何结论',
@@ -194,7 +194,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec title="还没有返回的内容" hint="返回前一律留空">
             <Ghosts items={[
               { title: '对照要点', desc: '已写到与还没体现的要求，只在结果返回后显示。', tag: '等待返回' },
-              { title: '匹配依据', desc: '岗位要求与简历依据由服务端逐条给出。', tag: '等待返回' },
+              { title: '匹配依据', desc: '岗位要求与简历依据由系统逐条给出。', tag: '等待返回' },
               { title: '行动建议', desc: '差距与准备建议只出现在真实结果里。', tag: '等待返回' },
             ]} />
           </Sec>
@@ -211,14 +211,14 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
   if (state === 'analyzing') {
     return {
       title: '已提交分析，等待返回',
-      subtitle: '目标岗位与本人授权已确认。服务端返回之前，不显示对照要点、百分比或任何录用相关结论。',
-      pill: { tone: 'unknown', label: '分析进行中，等待服务端返回' },
+      subtitle: '目标岗位与本人授权已确认。返回之前，不显示对照要点、百分比或任何录用相关结论。',
+      pill: { tone: 'unknown', label: '分析进行中，等待返回' },
       body: (
         <>
           <Sec title="正在等待岗位匹配结果" hint="无阶段名 · 无百分比">
             <Waiting
               icon={<BotIcon size={34} />}
-              title="分析请求已提交给服务端"
+              title="分析请求已提交"
               desc="本页只表达整体等待。没有阶段进度，也不预告结果会是什么。"
               tag="等待中，可随时取消并返回"
             />
@@ -226,7 +226,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec title="当前停在哪一步" hint="只标位置，不画进度">
             <Trace items={[
               { phase: '输入', title: '已确认输入', desc: '目标岗位与本人授权都已确认。' },
-              { phase: '当前', title: '等待服务端返回', desc: '对照要点与建议全部由服务端给出。', now: true },
+              { phase: '当前', title: '等待返回', desc: '对照要点与建议全部由系统给出。', now: true },
               { phase: '之后', title: '由本人决定下一步', desc: '看完参考后，是否优化、准备材料或打印由你决定。' },
             ]} />
           </Sec>
@@ -276,9 +276,9 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec title="不可用期间，这些仍然成立" hint="不因故障降低标准" grow>
             <Why items={[
               { head: '状态', title: '不做假降级', desc: '不会用模板结论或历史报告冒充这一次的分析结果。' },
-              { head: '恢复', title: '不承诺恢复时间', desc: '服务端没有给出可用时间，本页也不写「稍后自动恢复」。' },
+              { head: '恢复', title: '不承诺恢复时间', desc: '没有给出可用时间，本页也不写「稍后自动恢复」。' },
               { head: '数据', title: '材料仍在你这边', desc: '分析不可用不影响你查看、修改和打印自己的材料。' },
-              { head: '费用', title: '本页没有发起支付', desc: '这条流程不含支付步骤；服务端是否已计入当日次数，本页无法确认。' },
+              { head: '费用', title: '本页没有发起支付', desc: '这条流程不含支付步骤；是否已计入当日次数，本页无法确认。' },
               { head: '边界', title: '仍不提供给企业', desc: '无论服务是否可用，简历都不会提供给企业或第三方。' },
             ]} />
           </Sec>
@@ -308,8 +308,8 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
         <Sec title="重试之前，先确认这几件事" hint="确认后再决定要不要重来" grow>
           <Checks items={[
             { tone: 'wait', icon: <FileTextIcon size={24} />, title: '这次失败没有指向简历任务', desc: '本次返回的不是任务失效。重试沿用同一个任务；若它其实已失效，重试会转到「重新上传简历」。', chip: '未确认' },
-            { tone: 'wait', icon: <TargetIcon size={24} />, title: '目标岗位保持不变', desc: '上一次选择的目标仍在本次会话内，重试会沿用它。', chip: '待确认' },
-            { tone: 'wait', icon: <RefreshCwIcon size={24} />, title: '重试次数由你决定', desc: '系统不会自动重复请求，也不会在后台悄悄重跑。', chip: '手动' },
+            { tone: 'wait', icon: <TargetIcon size={24} />, title: '目标岗位保持不变', desc: '上一次选择的目标仍在这次使用里，重试会沿用它。', chip: '待确认' },
+            { tone: 'wait', icon: <RefreshCwIcon size={24} />, title: '重试次数由你决定', desc: '系统不会自动重复请求，也不会在你没点的时候自己再跑一次。', chip: '手动' },
             { tone: 'off', icon: <XIcon size={24} />, title: '没有部分结果', desc: '不保留半截结论，也不把上一次的报告当成这次的结果。', chip: '无' },
             { tone: 'ok', icon: <LockIcon size={24} />, title: '记录只留在你这边', desc: '失败记录只用于本人排查，不提供给企业或第三方。', chip: '已固定' },
           ]} />

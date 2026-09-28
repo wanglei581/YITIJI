@@ -191,7 +191,7 @@ export function ContractReviewProcessingPage() {
     : STAGES.find((stage) => stage.key === task?.status)?.label ?? '处理中'
   const pageProgress = task?.totalPages
     ? `已处理 ${task.progress.completedPages} / ${task.totalPages} 页`
-    : '等待服务端返回页数'
+    : '等待返回页数'
 
   if (error) {
     return (

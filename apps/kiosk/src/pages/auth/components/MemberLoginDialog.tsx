@@ -175,7 +175,7 @@ export function MemberLoginDialog({
           </button>
           <p className="member-dialog-idle-note">
             <ShieldCheckIcon size={17} aria-hidden="true" />
-            公共设备长时间无操作将自动退出并清理本次会话。
+            公共设备长时间无操作将自动退出并清理这次办理。
           </p>
         </div>
       </section>

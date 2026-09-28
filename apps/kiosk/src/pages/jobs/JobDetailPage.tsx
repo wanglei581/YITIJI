@@ -93,7 +93,7 @@ export function JobDetailPage() {
     return (
       <QxPageFrame
         title="岗位详情"
-        subtitle="字段返回前不展示任何岗位内容。"
+        subtitle="内容返回前不展示任何岗位内容。"
         status={{ tone: 'unknown', label: '正在取岗位原文与来源四要素' }}
         terminalLabel="就业服务大厅"
         navbar={appNavbar}
@@ -102,7 +102,7 @@ export function JobDetailPage() {
         <div className="qx-scroll qx-job-detail-page" data-screen="job-detail" data-state="loading" data-testid="job-detail-state-loading">
           <section className="qx-state qx-grow" data-tone="info" aria-live="polite">
             <span className="qx-state-ic"><FileQuestionIcon aria-hidden="true" /></span>
-            <span><span className="qx-state-t">正在读取岗位标题、原文与来源信息</span><span className="qx-state-d">真实字段返回前不显示示例内容，也不预估剩余时间。</span></span>
+            <span><span className="qx-state-t">正在读取岗位标题、原文与来源信息</span><span className="qx-state-d">真实内容返回前不显示示例内容，也不预估剩余时间。</span></span>
           </section>
         </div>
       </QxPageFrame>
@@ -397,7 +397,7 @@ function formatJobAiError(err: unknown): string {
     if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
     if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
     if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
-    if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连接真实后端服务后使用。'
+    if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
     return err.message
   }
   return userMessageOf(err, 'AI 辅助暂时不可用，请稍后重试。')

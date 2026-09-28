@@ -276,9 +276,9 @@ export function JobFitActionsPage() {
     // 出口一律不带 taskId / accessToken：会话已经不属于现在站在屏幕前的这一位。
     if (screen === 'session-ended') {
       return {
-        title: '这次会话已结束',
-        subtitle: '登录状态或本机会话刚刚变化（退出、过期或清场）。刚才的行动清单和还在路上的请求都不再显示或继续。',
-        pill: { tone: 'warn', label: '会话已结束 · 内容已隐藏' },
+        title: '这次办理已结束',
+        subtitle: '登录状态或这台机器上的这次使用刚刚变化（退出、过期或清场）。刚才的行动清单和还在路上的请求都不再显示或继续。',
+        pill: { tone: 'warn', label: '这次办理已结束 · 内容已隐藏' },
         body: (
           <Sec title="这次没有发生的事" hint="明确否定，避免误解" grow>
             <Nots items={[
@@ -343,23 +343,23 @@ export function JobFitActionsPage() {
     if (screen === 'loading') {
       return {
         title: '正在读取，清单还没到',
-        subtitle: '读取请求已提交。只有服务端确认存在真实差距与建议，才会出现行动项。',
+        subtitle: '读取请求已提交。只有系统确认存在真实差距与建议，才会出现行动项。',
         pill: { tone: 'unknown', label: '正在读取行动清单' },
         body: (
           <>
             <Sec title="正在读取本人的行动清单" hint="无进度条 · 无预计时间">
               <Waiting
                 icon={<ListIcon size={34} />}
-                title="读取请求已提交，等待服务端返回"
+                title="读取请求已提交，等待返回"
                 desc="清单内容全部来自这次匹配结果。读取失败或没有内容会直接说明，不补造行动项。"
                 tag="整体等待中，没有百分比"
               />
             </Sec>
             <Sec title="这次读取用到的条件" hint="每一项都可核对" grow>
               <Checks items={[
-                { tone: 'ok', icon: <UserIcon size={24} />, title: '本人凭证', desc: '请求带着本机当前会话的凭证，服务端据此只返回属于你本人的清单。', chip: '已提交' },
+                { tone: 'ok', icon: <UserIcon size={24} />, title: '本人凭证', desc: '请求带着你这次登录的身份，系统据此只返回属于你本人的清单。', chip: '已提交' },
                 { tone: 'wait', icon: <FileTextIcon size={24} />, title: '匹配结果', desc: '按这次匹配的任务读取；任务失效或不属于你时会直接说明。', chip: '等待返回' },
-                { tone: 'wait', icon: <ListIcon size={24} />, title: '行动项内容', desc: '差距与准备建议由服务端逐条给出。', chip: '等待返回' },
+                { tone: 'wait', icon: <ListIcon size={24} />, title: '行动项内容', desc: '差距与准备建议由系统逐条给出。', chip: '等待返回' },
                 { tone: 'wait', icon: <PrinterIcon size={24} />, title: '打印版文件', desc: '清单可读之后才谈打印，本页现在不生成任何文件。', chip: '未开始' },
               ]} />
             </Sec>
@@ -485,8 +485,8 @@ export function JobFitActionsPage() {
     if (screen === 'print-pending') {
       return {
         title: '打印版还没有生成',
-        subtitle: '文件正在等待服务端生成。生成成功才进入既有打印确认流程；本页不代表已打印或已出纸。',
-        pill: { tone: 'unknown', label: '等待服务端生成打印版文件' },
+        subtitle: '文件正在等待生成。生成成功才进入既有打印确认流程；本页不代表已打印或已出纸。',
+        pill: { tone: 'unknown', label: '等待生成打印版文件' },
         body: (
           <>
             <Sec title="已提交生成打印版" hint="生成 ≠ 打印">
@@ -500,7 +500,7 @@ export function JobFitActionsPage() {
             <Sec title="打印这件事现在到哪一步" hint="只标位置，不画进度">
               <Trace items={[
                 { phase: '第一步', title: '清单已可读', desc: '行动项来自这次真实的匹配结果。' },
-                { phase: '第二步', title: '等待生成文件', desc: '服务端生成文件之前不进入打印。', now: true },
+                { phase: '第二步', title: '等待生成文件', desc: '生成文件之前不进入打印。', now: true },
                 { phase: '第三步', title: '进入打印确认', desc: '份数、单双面与费用在确认页由你决定。' },
               ]} />
             </Sec>
@@ -670,7 +670,7 @@ export function JobFitActionsPage() {
           )}
 
           {isAnonymous && (
-            <Guardline head="本机会话" body="未登录时，本次结果只保留在这台机器的当前会话里，离场即清。" />
+            <Guardline head="这次使用" body="未登录时，本次结果只保留在这台机器的这次使用里，离场即清。" />
           )}
         </>
       ),

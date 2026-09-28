@@ -22,9 +22,9 @@ export const BUILTIN_GUIDES: PolicyItem[] = [
     summary: '面向毕业学年内有就业意愿、积极求职且符合困难条件的毕业生，先判断是否符合，再按官方/学校入口准备材料。',
     conditions: ['毕业学年学生或当地政策规定的高校毕业生', '有就业创业意愿，且符合困难家庭、残疾、助学贷款等条件之一', '以学校或发布方公布的申报周期为准'],
     materials: ['身份证明', '学生身份或毕业信息证明', '困难类型证明材料', '本人银行卡或学校要求的账户信息'],
-    steps: ['阅读本地政策口径与申报时间', '按学校或发布方要求准备材料', '通过发布方提供的来源入口或学校渠道提交', '等待发布方审核结果'],
+    steps: ['阅读本地政策说明与申报时间', '按学校或发布方要求准备材料', '通过发布方提供的来源入口或学校渠道提交', '等待发布方审核结果'],
     officialUrl: 'https://gjzwfw.www.gov.cn/col/col1110/',
-    sourceName: '综合整理 · 国家政务服务平台口径',
+    sourceName: '综合整理 · 参照国家政务服务平台的公开说明',
   },
   {
     id: 'builtin-flexible-social',
@@ -63,7 +63,7 @@ export const BUILTIN_GUIDES: PolicyItem[] = [
     materials: ['身份证明', '培训或评价证明', '职业资格 / 技能等级证书', '社保或就业状态材料（按政策要求）'],
     steps: ['查询本地培训目录', '确认培训机构与补贴标准', '完成培训 / 评价', '通过来源入口申领或查询'],
     officialUrl: 'https://www.12333.gov.cn/job/?channel=12333',
-    sourceName: '综合整理 · 人社培训补贴口径',
+    sourceName: '综合整理 · 人社培训补贴的公开说明',
   },
   {
     id: 'builtin-startup-loan',

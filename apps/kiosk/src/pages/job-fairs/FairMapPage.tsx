@@ -174,7 +174,7 @@ export function FairMapPage() {
             这不代表主办方没有提供展位图——<b>是这次没取到</b>，可以重新加载再看。
           </DirState>
           <DirStrip>
-            <DirStripItem icon={FileTextIcon} title="活动物料" desc="手册与名单是另一份接口，可能还能打开" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />
+            <DirStripItem icon={FileTextIcon} title="活动物料" desc="手册与名单是另一页，可能还能打开" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />
             <DirStripItem icon={BuildingIcon} tone="wheat" title="返回招聘会" desc="时间地点仍可查看" onClick={() => navigate(`/job-fairs/${fairId}`)} />
           </DirStrip>
         </>

@@ -63,7 +63,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const KEEP_RETENTION_COPY =
-  '保存后仅本人可在「我的文档」查看，保存期限 90 天，可随时删除。报告不会进入打印链路，也不会发给企业或合作机构。合同原件仍按短期策略删除。'
+  '保存后仅本人可在「我的文档」查看，保存期限 90 天，可随时删除。报告不会进入打印流程，也不会发给企业或合作机构。合同原件仍按短期策略删除。'
 
 function PriorityBadge({ priority }: { priority: string }) {
   return (

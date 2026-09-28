@@ -182,9 +182,9 @@ test('列表 ready：服务端总数与本屏渲染数分开说，筛选口径�
   await expect(page.getByTestId('fair-list')).toBeVisible()
   await expectQxWorkbench(page, 'list', 'ready')
   // 两个数不许合并成一个——服务端查到的和这一屏显示的不是一回事。
-  await expect(page.getByText(/服务端结果 \d+ 场/)).toBeVisible()
+  await expect(page.getByText(/查到的结果 \d+ 场/)).toBeVisible()
   await expect(page.getByText(/当前展示 \d+ 场/)).toBeVisible()
-  await expect(page.getByText('关键字与状态交给服务端查询；地区、日期和收藏只在本次已加载的场次集合内筛选，不代表全库结果。')).toBeVisible()
+  await expect(page.getByText('关键字和状态会按全部场次来查；地区、日期和收藏只在这次已经加载出来的场次里筛选，不代表全部结果。')).toBeVisible()
   await expect(page.getByRole('button', { name: '扫码预约' })).toHaveCount(1)
   await expect(page.getByText(/一键投递|立即投递|平台投递|报名成功/)).toHaveCount(0)
   await expectKioskLayout(page)
@@ -196,7 +196,7 @@ test('列表 loading：不显示条数、不画阶段进度 @kiosk', async ({ pa
   await page.goto('/job-fairs')
   await expectQxWorkbench(page, 'list', 'loading')
   await expect(page.getByText('未返回前不显示条数')).toBeVisible()
-  await expect(page.getByText(/服务端结果/)).toHaveCount(0)
+  await expect(page.getByText(/查到的结果/)).toHaveCount(0)
   await shot(page, 'qx-fair-list-loading')
 })
 
@@ -288,7 +288,7 @@ test('详情 loading：字段返回前一个字都不显示 @kiosk', async ({ pa
   registerFairApi(api, { detail: 'pending' })
   await page.goto(`/job-fairs/${FAIR_ID}`)
   await expectQxWorkbench(page, 'detail', 'loading')
-  await expect(page.getByText('字段返回前不展示任何内容')).toBeVisible()
+  await expect(page.getByText('内容返回前不展示任何内容')).toBeVisible()
   await shot(page, 'qx-fair-detail-loading')
 })
 

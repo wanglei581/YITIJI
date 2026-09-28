@@ -114,7 +114,7 @@ export function FairStatsPage() {
           请求失败。本机<b>不显示上一次的数字</b>——统计一旦过时就会误导人。
         </DirState>
         <DirStrip>
-          <DirStripItem icon={UsersIcon} title="看参展名单" desc="名单是另一个接口，可能还能打开" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
+          <DirStripItem icon={UsersIcon} title="看参展名单" desc="名单是另一页，可能还能打开" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
           <DirStripItem icon={InfoIcon} tone="slate" title="找工作人员" desc="需要官方数据可以到服务台咨询" onClick={() => navigate('/help')} />
         </DirStrip>
       </QxFairWorkbench>
@@ -183,11 +183,11 @@ export function FairStatsPage() {
       <section className="dw-blk">
         <div className="dw-sec-h"><span className="t">这些数字是怎么来的</span></div>
         <p className="dw-ai-d">
-          全部来自<b>主办方回传的统计接口</b>。本机不做人流统计、不接摄像头、也不按签到推算——没有回传就显示为空，不会拿估算值补上。
+          全部来自<b>主办方回传的统计</b>。本机不做人流统计、不接摄像头、也不按签到推算——没有回传就显示为空，不会拿估算值补上。
         </p>
         <DirKv rows={[
           ['数据来源', dataSourceLabel],
-          ['统计口径', '主办方回传口径；本机不重新计算'],
+          ['怎么算', '按主办方回传的规则；本机不重新计算'],
           ['更新时间', stats.lastUpdated ? formatClock(stats.lastUpdated) : '主办方未回传更新时间'],
         ]} />
       </section>

@@ -172,12 +172,12 @@ export default function OfflineAgencyDetailPage() {
                   ['机构类型', agency.type],
                   ['服务项目', (Array.isArray(agency.services) ? agency.services : []).join('、') || '以门店公示为准'],
                   ['营业时间', agency.hours || '服务时间以机构公示为准'],
-                  ['联系电话', agency.phone || '请至前台咨询'],
+                  ['联系电话', agency.phone || '请向门店工作人员咨询'],
                   ['机构地址', agency.address],
                   ['来源编号', agency.orgCode || '来源平台未提供'],
                   ['收录状态', '机构信息已审核'],
                 ]} />
-                <div className="dw-reason">没有可核对的资质字段时，这里不展示资质核验或收录状态结论。</div>
+                <div className="dw-reason">没有可核对的资质项时，这里不展示资质核验或收录状态结论。</div>
               </div>
             </DirSec>
             <DirSec no="02" title="该机构的岗位" hint={jobsEmpty ? '真实返回 0 条' : '只列已发布岗位'} grow>

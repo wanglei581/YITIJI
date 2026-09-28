@@ -32,7 +32,7 @@ const required = [
   ['jobsPage', 'TopTagsPanel'],
   ['components', '客户数据接入提示'],
   ['jobsPage', 'DataReadinessPanel'],
-  ['components', '字段完整度'],
+  ['components', '内容完整度'],
   ['jobsPage', /searchParams\.get\(['"]sourceOrgId['"]\)\?\.trim\(\)/],
   ['jobsPage', /useState\(\s*\(\s*\)\s*=>\s*sourceOrgIdParam\s*\)/],
   ['jobsPage', /setSourceOrgId\(\s*sourceOrgIdParam\s*\)/],

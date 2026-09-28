@@ -122,8 +122,8 @@ export function CareerPlanGenerateRegion({ task, fallback, error, regenerate = f
         running={(
           <Waiting
             icon={<BotIcon size={34} />}
-            title="生成请求已提交给服务端"
-            desc="正在读你的简历，整理方向与缺口。进度由后端任务状态决定，本页不会自己把它走完。"
+            title="生成请求已提交"
+            desc="正在读你的简历，整理方向与缺口。进度由系统里的处理状态决定，本页不会自己把它走完。"
             tag="整体等待中，没有百分比"
           />
         )}

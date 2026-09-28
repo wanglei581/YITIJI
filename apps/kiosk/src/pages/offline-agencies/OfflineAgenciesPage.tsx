@@ -188,7 +188,7 @@ export function OfflineAgenciesPage() {
       navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <div className="dw-page qx-grow" data-screen="offline-agency" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
-        <DirSec no="01" title="先缩小范围" hint="四项均为真实接口参数，可单选也可组合">
+        <DirSec no="01" title="先缩小范围" hint="四项都会真正用来筛选，可单选也可组合">
           <form id="offline-agency-search" className="dw-qbar" role="search" onSubmit={handleSearch}>
             <span className="qi"><SearchIcon size={26} aria-hidden /></span>
             <input
@@ -227,7 +227,7 @@ export function OfflineAgenciesPage() {
               </label>
             </div>
             <div className="dw-filter-actions">
-              <span className="dw-filter-note">区县、服务项目和机构类型是接口支持的精确条件；输入不存在的值时显示真实空态。</span>
+              <span className="dw-filter-note">区县、服务项目和机构类型会按你输入的内容精确筛选；输入不存在的值时，就如实显示没有结果。</span>
               <button type="button" className="dw-chip" onClick={clearSearch}>清除全部</button>
             </div>
           </div>
@@ -244,7 +244,7 @@ export function OfflineAgenciesPage() {
             ) : error ? (
               <>
                 <DirState tone="error" testId="offline-agency-result-error" title="机构名单没取到">
-                  这次请求失败了。本机不会用示例机构顶替真实结果，所以目录先空着。可以重试；重试仍失败时，请到前台找工作人员。
+                  这次请求失败了。本机不会用示例机构顶替真实结果，所以目录先空着。可以重试；重试仍失败时，请找现场工作人员。
                 </DirState>
                 <div className="dw-filter-actions">
                   <button type="button" className="dw-chip" onClick={() => setRetryKey((k) => k + 1)}>重试</button>
@@ -254,7 +254,7 @@ export function OfflineAgenciesPage() {
             ) : !data ? null : data.items.length === 0 ? (
               <>
                 <DirState tone="empty" testId="offline-agency-result-empty" title="当前条件没有匹配的机构">
-                  换个关键词或检索方式再试一次。机构信息需要管理员审核发布后才会出现在目录里。也可以到前台，让工作人员按纸质名单帮你找。
+                  换个关键词或检索方式再试一次。机构信息需要管理员审核发布后才会出现在目录里。也可以找现场工作人员，按纸质名单帮你找。
                 </DirState>
                 <div className="dw-filter-actions">
                   <button type="button" className="dw-chip" onClick={clearSearch}>清除条件重新查询</button>

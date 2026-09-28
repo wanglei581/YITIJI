@@ -301,7 +301,7 @@ export function JobFairDetailPage() {
       {uiState === 'loading' ? (
         <>
           <FairSkeletonList rows={2} />
-          <p className="dw-why">正在取这场的详情与来源三要素。字段返回前不展示任何内容。</p>
+          <p className="dw-why">正在取这场的详情与来源三要素。内容返回前不展示任何内容。</p>
         </>
       ) : uiState === 'error' || !fair ? (
         <>
@@ -310,7 +310,7 @@ export function JobFairDetailPage() {
           </DirState>
           <DirStrip>
             <DirStripItem icon={CalendarIcon} tone="wheat" title="回场次列表" desc="列表还能打开，可以先看别的场次" onClick={() => navigate('/job-fairs')} />
-            <DirStripItem icon={QrCodeIcon} title="到场指引" desc="通用指引不依赖这场的详情接口" onClick={() => navigate('/job-fairs/checkin')} />
+            <DirStripItem icon={QrCodeIcon} title="到场指引" desc="通用指引不依赖这场的详情" onClick={() => navigate('/job-fairs/checkin')} />
           </DirStrip>
         </>
       ) : uiState === 'unpublished' ? (

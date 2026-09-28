@@ -28,7 +28,7 @@ export function ResumeAiConsentDialog({
           确认使用简历 AI
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-          诊断、优化和生成会把你上传或填写的简历内容发送到服务端大模型进行分析。
+          诊断、优化和生成会把你上传或填写的简历内容发送到系统里的 AI 进行分析。
         </p>
         <p className="mt-2 text-sm leading-relaxed text-neutral-600">
           结果只给你本人看，不会发送给企业或合作机构，也不进入平台候选人简历库。

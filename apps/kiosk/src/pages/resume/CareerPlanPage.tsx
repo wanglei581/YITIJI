@@ -193,7 +193,7 @@ export function CareerPlanPage() {
         // 前置校验的落点：后端不认这个 taskId，继续留在本页只会让用户白点一次生成。
         if (code === 'AI_TASK_NOT_FOUND') { setRejectedTask(true); return }
         if (AI_OUTAGE_CODES.has(code)) {
-          setAiOutage(errorMessageOf(err, '后端服务当前不可达'))
+          setAiOutage(errorMessageOf(err, '系统当前暂时连不上'))
           return
         }
         // 其余错误不足以判定能力不可用，标记已探测，让用户能真的点一次生成看结果。
@@ -382,7 +382,7 @@ export function CareerPlanPage() {
           <Sec title="规划会用到、也只会用到这些" hint="输入范围写在前面" grow>
             <ListRows items={[
               '当前本人简历任务里的经历、技能与教育信息',
-              '本人此前的岗位匹配参考或模拟面试摘要（服务端有记录时才会用到）',
+              '本人此前的岗位匹配参考或模拟面试摘要（有记录时才会用到）',
               '不使用他人材料，不引入企业侧数据，不做录用或收入承诺',
             ]} />
           </Sec>
@@ -405,9 +405,9 @@ export function CareerPlanPage() {
 
     // 出口一律不带 taskId / accessToken：会话已经不属于现在站在屏幕前的这一位。
     if (screen === 'session-ended') return {
-      title: '这次会话已结束',
-      subtitle: '登录状态或本机会话刚刚变化（退出、过期或清场）。刚才的求职方案、打印件和还在路上的请求都不再显示或继续。',
-      pill: { tone: 'warn', label: '会话已结束 · 内容已隐藏' },
+      title: '这次办理已结束',
+      subtitle: '登录状态或这台机器上的这次使用刚刚变化（退出、过期或清场）。刚才的求职方案、打印件和还在路上的请求都不再显示或继续。',
+      pill: { tone: 'warn', label: '这次办理已结束 · 内容已隐藏' },
       body: (
         <Sec title="这次没有发生的事" hint="明确否定，避免误解" grow>
           <Nots items={['不再显示刚才的规划、依据或材料', '不再用刚才的登录凭证读取、生成或打印', '还在路上的返回结果不会再进入打印确认']} />
@@ -456,11 +456,11 @@ export function CareerPlanPage() {
       body: (
         <>
           <Sec title="正在确认是否存在可继续查看的真实规划结果" hint="无进度条 · 无预计时间">
-            <Waiting icon={<RouteIcon size={34} />} title="读取请求已提交，等待服务端返回" desc="读取成功才显示方向、技能计划和行动清单；没有已有规划时会转到生成入口，不显示空壳内容。" tag="整体等待中，没有百分比" />
+            <Waiting icon={<RouteIcon size={34} />} title="读取请求已提交，等待返回" desc="读取成功才显示方向、技能计划和行动清单；没有已有规划时会转到生成入口，不显示空壳内容。" tag="整体等待中，没有百分比" />
           </Sec>
           <Sec title="读取之后会怎么走" hint="三种结果都写清楚" grow>
             <Steps items={[
-              { title: '读到已有规划', desc: '直接显示上一次生成的内容，全部由服务端提供。' },
+              { title: '读到已有规划', desc: '直接显示上一次生成的内容，全部由系统提供。' },
               { title: '没有已有规划', desc: '转到生成入口，由你确认后再开始，不会自动替你生成。' },
               { title: '读取失败', desc: '直接显示失败状态，不用模板内容或他人内容顶替。' },
             ]} />
@@ -486,7 +486,7 @@ export function CareerPlanPage() {
     if (screen === 'print-pending') return {
       title: '打印件还在等生成',
       subtitle: '文件真实生成后才进入既有打印确认流程；本页不代表已经打印。',
-      pill: { tone: 'unknown', label: '等待服务端生成打印文件' },
+      pill: { tone: 'unknown', label: '等待生成打印文件' },
       body: (
         <>
           <Sec title="已提交生成打印件" hint="生成 ≠ 打印">
@@ -559,7 +559,7 @@ export function CareerPlanPage() {
             </div>
             <Verdict items={[
               { tone: 'warn', label: '本次打印件', value: '未含 AI 规划' },
-              { tone: 'warn', label: '屏幕上的规划', value: '服务端已清理' },
+              { tone: 'warn', label: '屏幕上的规划', value: '已按期限清理' },
               { tone: 'ok', label: '打印机', value: '未收到任务' },
             ]} />
           </Sec>
@@ -642,15 +642,15 @@ export function CareerPlanPage() {
 
     if (screen === 'generating') return {
       title: '已提交生成，等待返回',
-      subtitle: '生成请求已提交。服务端返回之前，不显示方向、技能计划或行动清单。',
-      pill: { tone: 'unknown', label: '规划生成中，等待服务端返回' },
+      subtitle: '生成请求已提交。返回之前，不显示方向、技能计划或行动清单。',
+      pill: { tone: 'unknown', label: '规划生成中，等待返回' },
       body: (
         <>
           <Sec title="正在等待求职方案结果" hint="无阶段名 · 无百分比">{generationRegion}</Sec>
           <Sec title="本次生成提交的输入" hint="只用你本人的材料">
             <Slots items={[
               { label: '本人简历任务', value: '已随请求提交' },
-              { label: '可选上下文', value: '以服务端已有记录为准' },
+              { label: '可选上下文', value: '以已有记录为准' },
               { label: '结果归属', value: '仅本人可见', fixed: true },
             ]} />
           </Sec>

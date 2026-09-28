@@ -37,7 +37,7 @@ import {
 import { getTerminalCode } from '../../services/api/terminalConfig'
 
 const BOUNDARY = '本机不接收简历、不代投递：投递扫码去来源平台，或现场到展位当面咨询。'
-const PRINT_NOTE = '打印企业资料与岗位清单需要后台支持；演示模式未接入后端时入口会置灰并写明原因。'
+const PRINT_NOTE = '打印企业资料与岗位清单需要系统支持；演示模式还没接上时，入口会置灰并写明原因。'
 
 function formatSize(bytes: number): string {
   const kb = Math.max(1, Math.round(bytes / 1024))
@@ -227,7 +227,7 @@ export function FairCompanyDetailPage() {
                 '在来源平台登录并投递，简历不经过这台机器。',
                 '面试与结果由来源平台和企业通知你。',
               ]}
-              reason="二维码按服务端返回的来源链接生成。本机不接收简历、不代投递，也拿不到你的投递结果；离开前请关掉二维码，不把账号留在公共终端。"
+              reason="二维码按读到的来源链接生成。本机不接收简历、不代投递，也拿不到你的投递结果；离开前请关掉二维码，不把账号留在公共终端。"
             />
             <DirStrip>
               <DirStripItem icon={BuildingIcon} tone="wheat" title="回企业详情看展位" desc="展位号与岗位清单都在详情页" onClick={() => setShowQr(false)} />
@@ -280,7 +280,7 @@ export function FairCompanyDetailPage() {
               )}
             </DirSec>
 
-            {printError ? <DirState tone="error" testId="fair-company-print-error" title={printError}>打印文件必须由后端返回真实链接，本机不伪造页数。</DirState> : null}
+            {printError ? <DirState tone="error" testId="fair-company-print-error" title={printError}>打印文件必须读到真实链接，本机不伪造页数。</DirState> : null}
 
             <ActionBar
               sourceCanApply={sourceOk}
@@ -293,7 +293,7 @@ export function FairCompanyDetailPage() {
               canPrintPositions={printBackendReady && company.positions.length > 0}
               printDisabledHint={
                 !printBackendReady
-                  ? '演示模式未接入后端，无法生成真实企业资料文件'
+                  ? '演示模式还没接上，无法生成真实企业资料文件'
                   : '该企业暂无可打印的岗位信息'
               }
             />

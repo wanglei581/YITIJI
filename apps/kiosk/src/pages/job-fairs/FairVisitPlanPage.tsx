@@ -370,7 +370,7 @@ export function FairVisitPlanPage() {
             <div className="dw-sec-h"><span className="t">当前上下文</span></div>
             <DirKv rows={[
               ['本人简历', taskId ? '已确认' : '还没有选'],
-              ['参展企业上下文', '生成时按服务端返回的本场名单计算'],
+              ['参展企业上下文', '生成时按读到的本场名单计算'],
               ['是否发给企业', '不会。系统不代投、不替企业筛选或邀约。'],
             ]} />
           </section>
@@ -395,8 +395,8 @@ export function FairVisitPlanPage() {
             <div className="dw-sec-h"><span className="t">当前上下文</span></div>
             <DirKv rows={[
               ['本人简历', '已确认'],
-              ['本场是否已生成', '服务端没有这场的结果，可以现在生成'],
-              ['参展企业上下文', '生成时按服务端返回的本场名单计算'],
+              ['本场是否已生成', '还没有这场的结果，可以现在生成'],
+              ['参展企业上下文', '生成时按读到的本场名单计算'],
               ['是否发给企业', '不会。系统不代投、不替企业筛选或邀约。'],
             ]} />
           </section>
@@ -423,7 +423,7 @@ export function FairVisitPlanPage() {
       ) : uiState === 'generating' ? (
         <>
           <DirState tone="info" testId="fair-visit-plan-generating" title="正在按你的简历和这场名单生成清单">
-            任务已经提交，结果由服务端返回后才会显示。这中间<b>没有百分比可以给你</b>，本机不会编一个进度条。
+            任务已经提交，结果返回后才会显示。这中间<b>没有百分比可以给你</b>，本机不会编一个进度条。
           </DirState>
           <FairSkeletonList rows={2} />
           {exits}
@@ -467,7 +467,7 @@ export function FairVisitPlanPage() {
 
           <DirStrip>
             <DirStripItem icon={UsersIcon} title="对照参展名单核一遍" desc="清单里的每家单位都能在名单里找到" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
-            <DirStripItem icon={FileTextIcon} tone="slate" title="我的文档" desc="是否入库以服务端返回为准" onClick={() => navigate('/me/documents')} />
+            <DirStripItem icon={FileTextIcon} tone="slate" title="我的文档" desc="是否已保存，以实际记录为准" onClick={() => navigate('/me/documents')} />
             <DirStripItem icon={SparklesIcon} tone="wheat" title="AI服务记录" desc="本人 AI 服务记录" onClick={() => navigate('/me/ai-records')} />
           </DirStrip>
         </>

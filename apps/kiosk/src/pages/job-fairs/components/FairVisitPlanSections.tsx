@@ -138,9 +138,9 @@ export function FairVisitPlanBody({
         <DirKv rows={[
           // basedOn.resume 是 `true` 字面量，服务端不回传简历文件名。
           // 不编一个「本次会话确认的简历」当名字——那是在纸面上冒充可追溯。
-          ['使用的简历', plan.basedOn?.resume ? '本人在本机确认的简历（服务端不回传文件名）' : '服务端未回传依据'],
+          ['使用的简历', plan.basedOn?.resume ? '本人在本机确认的简历（文件名没有一并返回）' : '没有返回这份依据'],
           ['参展名单版本', `${plan.basedOn?.companyCount ?? 0} 家企业 / ${plan.basedOn?.positionCount ?? 0} 个岗位`],
-          ['是否已入库', '以服务端返回为准，本页不代为确认'],
+          ['是否已保存', '以实际记录为准，本页不代为确认'],
         ]} />
       </section>
     </>

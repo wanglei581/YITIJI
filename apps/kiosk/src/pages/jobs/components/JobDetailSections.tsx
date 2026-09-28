@@ -131,7 +131,7 @@ export function JobSummarySection({
         */}
         {job.educationRequirement && <SummaryMetric label="学历要求" value={job.educationRequirement} />}
         {job.experienceRequirement && <SummaryMetric label="工作经验" value={job.experienceRequirement} />}
-        <SummaryMetric label="字段完整度" value={`${completeness}%`} />
+        <SummaryMetric label="内容完整度" value={`${completeness}%`} />
       </div>
 
       <div className="jf-meta-chips mt-4">
@@ -183,7 +183,7 @@ export function JobDescriptionSection({ job }: { job: ExternalJobDTO }) {
 
       <div className="jf-desc-grid">
         <TextList title="岗位职责" items={descriptions} fallback="来源平台暂未提供岗位职责，建议通过来源链接查看完整 JD。" />
-        <TextList title="任职要求" items={requirements} fallback="来源平台暂未提供任职要求，客户可在导入时补充 requirements 字段。" />
+        <TextList title="任职要求" items={requirements} fallback="来源平台暂未提供任职要求。" />
         {/*
           技能要求 / 福利待遇：27-browse-detail.html 没画这两项（原型的岗位内容块只有
           工作内容 / 任职要求 / 工作地点），所以不自创版式 —— 复用本卡已有的 jf-desc-grid 栅格

@@ -164,7 +164,7 @@ export function ArtifactStatePanel({
       <section className="aa-sec aa-state" data-tone="error" data-testid="advisor-artifact-error">
         <span className="aa-state-ic"><MessageSquareIcon size={56} aria-hidden /></span>
         <p className="aa-state-t">产物这次没读到</p>
-        <p className="aa-state-d">网络或服务端没有把这一份带回来。可以再试一次，或回去问小青重做。</p>
+        <p className="aa-state-d">网络不稳，或这次没有把这一份带回来。可以再试一次，或回去问小青重做。</p>
         {onRetry ? (
           <button type="button" className="qx-btn" data-variant="teal" onClick={onRetry}>再读一次</button>
         ) : null}

@@ -73,7 +73,7 @@ const STATUS_SCREENS = {
     kind: 'error', icon: <AlertTriangleIcon size={32} aria-hidden="true" />, title: '模板列表读取失败', action: '重新读取',
     desc: '这次没有读到模板，不会拿内置默认模板或上一次的列表冒充当前目录。', why: '重新读取只再要一次目录，不改动你填过的内容。',
     facts: ['这次失败没有造成什么', '范围很窄', [['没有', '用内置默认模板或示例模板顶替'], ['没有', '生成文件、打印任务或费用'],
-      ['仍可用', '打印、扫描与简历诊断三条链路'], ['仍可用', '我的文档里此前生成过的材料'],
+      ['仍可用', '打印、扫描与简历诊断三条流程'], ['仍可用', '我的文档里此前生成过的材料'],
       ['自动重试', '没有 —— 只有点「重新读取」才会再请求一次'], ['失败原因', '不显示在屏幕上，只说明这次读不到']]],
   },
   empty: {
@@ -134,7 +134,7 @@ function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
     ['大小', formatBytes(file.sizeBytes)],
     ['类型', fileKindLabel(file.mimeType)],
     ['文件编号', demo ? '演示对象不会保存' : file.fileId, demo],
-    ['查看链接有效至', demo ? '演示对象无签名链接' : formatTime(file.signedUrlExpiresAt), demo],
+    ['查看链接有效至', demo ? '演示对象没有临时链接' : formatTime(file.signedUrlExpiresAt), demo],
     ['文件留存到', demo ? '不保存' : formatTime(file.fileExpiresAt), demo || !file.fileExpiresAt],
     ['打印凭证', canPrint ? '已就绪（只交给打印确认页）' : '未返回（打印保持禁用）', !canPrint],
   ]
@@ -342,7 +342,7 @@ export function JobMaterialLibraryPage() {
       <div className="qx-rows">
         {[
           { to: '/print/upload', icon: <PrinterIcon size={26} />, t: '打印已有材料', d: 'U 盘、手机传输或扫描原件都可以，不依赖模板目录。' },
-          { to: '/resume/source', icon: <SparklesIcon size={26} />, t: '先做一次简历诊断', d: '诊断和材料模板是两条链路，这条照常可用。' },
+          { to: '/resume/source', icon: <SparklesIcon size={26} />, t: '先做一次简历诊断', d: '诊断和材料模板是两条流程，这条照常可用。' },
           { to: '/me/documents', icon: <FolderOpenIcon size={26} />, t: '翻我的文档里已有的材料', d: '此前生成过的材料不受影响；登录后可以查看和打印。' },
           { to: '/assistant', icon: <PenLineIcon size={26} />, t: '向 AI 顾问要通用写作建议', d: '顾问建议不等于生成文件，也不会自动保存。' },
         ].map((row) => (

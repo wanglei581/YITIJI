@@ -312,7 +312,7 @@ export function PreflightChecklist({ targetLabel, hasTarget, consentConfirmed, m
         { label: '结果归属', value: '仅本人可见', fixed: true },
       ]} />
       <Checks items={[
-        { tone: 'ok', icon: <FileTextIcon size={24} />, title: '本人简历任务', desc: '必须存在，且通过当前会话校验；不会读取别人的任务。', chip: '已确认' },
+        { tone: 'ok', icon: <FileTextIcon size={24} />, title: '本人简历任务', desc: '必须存在，且属于这次使用的本人；不会读取别人的任务。', chip: '已确认' },
         { tone: hasTarget ? 'ok' : 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: manualOnly ? '手填岗位名称与要求，至少要有名称，不补默认内容。' : '系统岗位或手填目标，至少要有名称，不补默认内容。', chip: hasTarget ? '已选择' : '待选择' },
         { tone: consentConfirmed ? 'ok' : 'wait', icon: <ShieldCheckIcon size={24} />, title: '本人授权', desc: '匿名与会员按各自规则确认；未授权不分析。', chip: consentConfirmed ? '已确认' : '待确认' },
         { tone: 'ok', icon: <LockIcon size={24} />, title: '结果去向', desc: '对照结果只供本人准备，不提供给企业，也不形成投递记录。', chip: '已固定' },

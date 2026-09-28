@@ -184,7 +184,7 @@ check('offline agency list navigates to real detail route', () => {
   assert.match(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
 })
 check('offline agency presentation does not invent unavailable metrics or live status', () => {
-  // 青序 42 号稿：没有可核对的资质字段就不展示「已核验 / 正常收录」。
+  // 青序 42 号稿：没有可核对的资质项就不展示「已核验 / 正常收录」。
   // 仍禁止把服务端没有的距离、营业中、全部区域写进目录。
   assert.doesNotMatch(offlineAgencies, /distanceKm|按直线距离/)
   assert.doesNotMatch(offlineAgencies, /'营业中'|"营业中"/)

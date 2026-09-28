@@ -20,7 +20,7 @@ export function FitSkillMap({ matchPoints, gapPoints, keywordCoverage }: FitSkil
   const hasKeywords = Boolean(keywordCoverage && (keywordCoverage.matched.length > 0 || keywordCoverage.missing.length > 0))
 
   return (
-    <Sec title="结果明细" hint="服务端逐条返回后填入" grow>
+    <Sec title="结果明细" hint="逐条返回后填入" grow>
       <div className="jfq-evi">
         <section className="jfq-evi-col" aria-label="简历里已经写到的要求">
           <div className="jfq-evi-h">

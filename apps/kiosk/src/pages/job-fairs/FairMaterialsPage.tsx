@@ -294,7 +294,7 @@ export function FairMaterialsPage() {
             <div className="dw-sec-h"><span className="t">关于打印这些物料</span></div>
             <DirSteps items={[
               '物料链接有有效期，过期后需要重新获取，不能用旧链接直接打印。',
-              '打印份数、单双面与黑白彩色在打印页选择，价格以现场公示与服务端报价为准。',
+              '打印份数、单双面与黑白彩色在打印页选择，价格以现场公示与系统报价为准。',
               '打印是否成功以打印机回流的状态为准；本页不显示逐页进度。',
             ]} />
           </section>

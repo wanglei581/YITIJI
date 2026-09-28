@@ -165,7 +165,7 @@ function saExits(go: NavigateFunction, from: string, resumable: boolean) {
     { key: 'start', icon: '答', title: resume ? '继续本次作答' : '开始一次作答', desc: '不登录也能做完全部题目，完成情况当场就能看。', lead: true, route: start, onClick: () => go(start) },
     { key: 'hub', icon: '简', title: '回简历服务', desc: '改简历、生成材料或安排打印，按各自页面的实际状态确认。', route: SA_BACK_ROUTE, onClick: () => go(SA_BACK_ROUTE) },
     { key: 'records', icon: '我', title: '去 AI 服务记录', desc: '在「我的」里查看已经产生的服务与文档记录。', route: '/me/ai-records', onClick: () => go('/me/ai-records') },
-    { key: 'login', icon: '登', title: '先登录账号', desc: '登录后账号侧记录才会归到本人名下；能否查看以服务端返回为准。', route: '/login', onClick: () => go('/login', { state: { from } }) },
+    { key: 'login', icon: '登', title: '先登录账号', desc: '登录后账号侧记录才会归到本人名下；能否查看以实际记录为准。', route: '/login', onClick: () => go('/login', { state: { from } }) },
   ]
 }
 
@@ -397,7 +397,7 @@ export function SelfAssessmentQuizPage() {
           ask: <>本次作答<em>已经提交</em>。</>,
           doing: <>已提交的答案不再改动。<b>想换答案就重新开始一次新的作答。</b></>,
           head: '答题页已关闭',
-          hint: '本次会话已提交',
+          hint: '这次办理已提交',
           chips: [
             { key: 'blocked', text: <>答题入口<b>不放行</b></>, tone: 'warn' as const },
             { key: 'kept', text: '本次结果仍可查看' },
@@ -492,7 +492,7 @@ export function SelfAssessmentQuizPage() {
             items={[
               { key: 'send', step: '会发生', title: '把作答送去记分与解读', desc: '维度强度由固定权重当场算出；解读由 AI 写，写不出来会如实缺。', current: true },
               { key: 'no-label', step: '不会发生', title: '不生成评分或人格类型', desc: '不打分、不贴类型标签、不判断适不适合某个岗位。' },
-              { key: 'no-raw', step: '不会发生', title: '不留存答案原文', desc: '服务端只存作答的哈希；企业、合作机构与管理后台都看不到。' },
+              { key: 'no-raw', step: '不会发生', title: '不留存答案原文', desc: '系统不保存答案原文，只留一串无法还原出答案的校验码；企业、合作机构与工作人员都看不到。' },
             ]}
           />
         </SaCard>
@@ -739,7 +739,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
   })
 
   if (!result || !taskId || !dimensions) {
-    const failure = taskError ?? (malformed ? '服务端这次返回的结果缺少维度数据，本页不展示不完整结果。' : null)
+    const failure = taskError ?? (malformed ? '这次返回的结果缺少维度数据，本页不展示不完整结果。' : null)
     const state = inflight === 'submit' ? 'submitting' : inflight === 'fetch' ? 'fetching' : failure ? 'result-error' : 'result-empty'
     const status: SaStatus = inflight
       ? { tone: 'unknown', label: inflight === 'submit' ? '正在生成' : '正在读取' }
@@ -752,9 +752,9 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         screen="resume-self-assessment-result"
         state={state}
           status={status}
-          ask={inflight ? <>请稍候，<em>这一步在等服务端</em>。</> : failure ? <>这次<em>没能拿到结果</em>。</> : <>还没有<em>可查看的结果</em>。</>}
+          ask={inflight ? <>请稍候，<em>这一步还在等结果</em>。</> : failure ? <>这次<em>没能拿到结果</em>。</> : <>还没有<em>可查看的结果</em>。</>}
         doing={inflight
-          ? <>页面不设倒计时，也不会自己变成「完成」；<b>只有服务端真实返回才会换屏。</b></>
+          ? <>页面不设倒计时，也不会自己变成「完成」；<b>只有系统真实返回才会换屏。</b></>
           : failure
             ? <>失败原因写在下面。<b>页面不会用别的东西顶上，也不会假装已完成。</b></>
             : <>完成页只在本次答满并提交后才有内容。<b>直接打开这个地址不会补一个结果给你看。</b></>}
@@ -774,11 +774,11 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
             action: { label: '重试这一次', onClick: () => { startedRef.current = null; setAttempt((n) => n + 1) } },
           }}
           running={
-            <SaCard head={inflight === 'submit' ? '正在生成本次解读' : '正在读取这次结果'} hint="等服务端真实返回">
+            <SaCard head={inflight === 'submit' ? '正在生成本次解读' : '正在读取这次结果'} hint="等系统真实返回">
               <p className="sa-sub" data-ai-progress="true">
                 {inflight === 'submit'
-                  ? '维度强度由固定权重当场算出，解读由 AI 写 —— 这一步在等服务端的真实返回，页面不设倒计时，也不会自己变成「完成」。'
-                  : '正在按记录编号向服务端读回本次结果。'}
+                  ? '维度强度由固定权重当场算出，解读由 AI 写 —— 这一步在等系统的真实返回，页面不设倒计时，也不会自己变成「完成」。'
+                  : '正在按记录编号读回本次结果。'}
               </p>
             </SaCard>
           }
@@ -786,7 +786,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
             <SaCard head="暂无最近结果" hint="不是没加载出来，是本来就不存" tone="down">
               <SaChips
                 items={[
-                  { key: 'none', text: <>本次会话<b>没有已提交的作答</b></>, tone: 'warn' },
+                  { key: 'none', text: <>这次办理<b>没有已提交的作答</b></>, tone: 'warn' },
                   { key: 'ttl', text: '结果只在本机保留 24 小时' },
                   { key: 'noguess', text: '不补一个示例结果' },
                 ]}
@@ -865,7 +865,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
   // 匿名 + 整体拒答时服务端不签发 accessToken（`self-assessment.service.ts:240-247`），
   // 后续 print / withdraw 必然 403 —— 与其让用户点了才报错，不如当面说清。
   const hasAccess = Boolean(getToken() || session.accessToken)
-  const accessReason = hasAccess ? null : '本次未拿到访问凭证（AI 解读整体失败时服务端不签发），无法生成打印件或撤回；记录会在到期后自动清理。'
+  const accessReason = hasAccess ? null : '本次未拿到访问凭证（AI 解读整体失败时系统不提供），无法生成打印件或撤回；记录会在到期后自动清理。'
 
   const fallback: AiTaskFallback = {
     // AI 是这几段解读的唯一产出源，且没有「点一下重试」的入口 —— 结果区直接说办不到，
@@ -920,8 +920,8 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         <SaMeta
           items={[
             { key: 'task', label: '记录编号', value: taskId, mono: true },
-            { key: 'consented', label: '同意时间', value: completedAt ?? '本机会话未记录' },
-            { key: 'version', label: '同意版本', value: session.consentVersion ?? '本机会话未记录（本次结果由记录编号读回）' },
+            { key: 'consented', label: '同意时间', value: completedAt ?? '这台机器上的这次使用未记录' },
+            { key: 'version', label: '同意版本', value: session.consentVersion ?? '这台机器上的这次使用未记录（本次结果由记录编号读回）' },
             { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间（撤回后或整体拒答时无到期）' },
           ]}
         />
@@ -1069,13 +1069,13 @@ export function SelfAssessmentHistoryPage() {
         <SaCard head="这里还没有可查看的记录" hint="不是没加载出来，是本来就不存" testId="self-assessment-list">
           <SaChips
             items={[
-              { key: 'none', text: <>本机会话<b>没有记录</b></>, tone: 'warn' },
+              { key: 'none', text: <>这台机器上的这次使用<b>没有记录</b></>, tone: 'warn' },
               { key: 'nofake', text: '不生成示例历史' },
               { key: 'nodraft', text: '未提交的答案不算记录' },
             ]}
           />
           <p className="sa-sub">
-            匿名会话不留库，会话退出后本机记录自动清理；会员本人历史可在「我的 → AI 服务记录 → 自我探索」查看与管理。
+            不登录时不会保存；这次使用结束后，本机记录会自动清理。会员本人的历史可在「我的 → AI 服务记录 → 自我探索」查看与管理。
           </p>
         </SaCard>
       )}
@@ -1083,10 +1083,10 @@ export function SelfAssessmentHistoryPage() {
       <SaCard head="这里没有什么" hint="每一条都可核对">
         <SaMeta
           items={[
-            { key: 'raw', label: '答案原文', value: '从未入库' },
+            { key: 'raw', label: '答案原文', value: '没有保存' },
             { key: 'expired', label: '过期的解读', value: '到期自动清理' },
             { key: 'withdrawn', label: '撤回的那次', value: '已物理删除，不可恢复' },
-            { key: 'enterprise', label: '企业 / 合作机构 / 管理后台', value: '都看不到，也不参与岗位排序' },
+            { key: 'enterprise', label: '企业 / 合作机构 / 工作人员', value: '都看不到，也不参与岗位排序' },
           ]}
         />
         <p className="sa-sub">
@@ -1099,7 +1099,7 @@ export function SelfAssessmentHistoryPage() {
       </SaCard>
 
       <SaNotice>
-        本次作答只存在于这台机器的当前浏览器会话，<b>不是账号记录</b>，退出或闲置 60 秒会被清掉，不会留给下一位使用者。
+        本次作答只存在于这台机器的这次使用里，<b>不是账号记录</b>，退出或闲置 60 秒会被清掉，不会留给下一位使用者。
       </SaNotice>
     </SaFrame>
   )

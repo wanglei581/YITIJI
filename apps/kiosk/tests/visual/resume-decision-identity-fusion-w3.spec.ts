@@ -140,7 +140,7 @@ const ROUTE_OF = { 'resume-career-plan': '/resume/career-plan', 'resume-job-fit-
 
 async function expectEnded(page: Page, screen: keyof typeof ROUTE_OF, hidden: string[]): Promise<void> {
   await expect(page.locator(`[data-kiosk-screen="${screen}"]`)).toHaveAttribute('data-state', 'session-ended')
-  await expect(page.getByRole('heading', { name: '这次会话已结束' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这次办理已结束' })).toBeVisible()
   for (const text of hidden) await expect(page.getByText(text, { exact: false })).toHaveCount(0)
   // 回登录页那一步被扫描收尾按住：路由仍然挂着（没去 /login，也没被晚到的返回带去 /print/confirm）。
   expect(new URL(page.url()).pathname).toBe(ROUTE_OF[screen])

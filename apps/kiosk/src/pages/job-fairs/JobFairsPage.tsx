@@ -156,7 +156,7 @@ export function JobFairsPage() {
             请求失败了。本机<b>不显示上一次的缓存场次</b>，避免你按已经结束的时间地点白跑一趟。
           </DirState>
           <DirStrip>
-            <DirStripItem icon={UsersIcon} title="岗位信息" desc="岗位和招聘会不是同一个接口" onClick={() => navigate('/jobs')} />
+            <DirStripItem icon={UsersIcon} title="岗位信息" desc="岗位和招聘会不是同一份名单，可能还能打开" onClick={() => navigate('/jobs')} />
             <DirStripItem icon={Building2Icon} tone="slate" title="企业目录" desc="按用人单位查看在招岗位与来源" onClick={() => navigate('/companies')} />
           </DirStrip>
         </>
@@ -207,7 +207,7 @@ export function JobFairsPage() {
             </div>
           </div>
           <p className="dw-filter-note">
-            关键字与状态交给服务端查询；地区、日期和收藏只在本次已加载的场次集合内筛选，不代表全库结果。
+            关键字和状态会按全部场次来查；地区、日期和收藏只在这次已经加载出来的场次里筛选，不代表全部结果。
           </p>
 
           {uiState === 'favorites-empty' ? (
@@ -233,7 +233,7 @@ export function JobFairsPage() {
           ) : (
             <>
               <p className="dw-rhead">
-                <span className="rn">服务端结果 {total} 场</span>
+                <span className="rn">查到的结果 {total} 场</span>
                 <span>当前展示 {visible.length} 场</span>
                 {upcomingCount > 0 ? <span>即将开始 {upcomingCount}</span> : null}
                 {ongoingCount > 0 ? <span>进行中 {ongoingCount}</span> : null}
