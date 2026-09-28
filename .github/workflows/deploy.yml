@@ -272,30 +272,75 @@ jobs:
               exit 0
             fi
 
-            echo "=== 部署到 nginx 目录 ==="
-            rm -rf ${{ secrets.DEPLOY_WEB_ROOT }}/*
-            cp -r apps/kiosk/dist/. ${{ secrets.DEPLOY_WEB_ROOT }}/
-
-            echo "=== 部署 admin 到 nginx 目录（未配置 DEPLOY_ADMIN_WEB_ROOT 时跳过）==="
-            if [ -n "${DEPLOY_ADMIN_WEB_ROOT:-}" ]; then
-              rm -rf "$DEPLOY_ADMIN_WEB_ROOT"/*
-              cp -r apps/admin/dist/. "$DEPLOY_ADMIN_WEB_ROOT"/
-              echo "admin dist 已同步到 $DEPLOY_ADMIN_WEB_ROOT"
-            else
-              echo "DEPLOY_ADMIN_WEB_ROOT 未配置，跳过 admin 前端发布（线上保持现状）"
+            if [ -z "${DEPLOY_ADMIN_WEB_ROOT:-}" ] || [ -z "${DEPLOY_PARTNER_WEB_ROOT:-}" ]; then
+              echo "::error::full 发布必须同时配置 DEPLOY_ADMIN_WEB_ROOT 与 DEPLOY_PARTNER_WEB_ROOT" >&2
+              exit 1
             fi
 
-            echo "=== 部署 partner 到 nginx 目录（未配置 DEPLOY_PARTNER_WEB_ROOT 时跳过）==="
-            if [ -n "${DEPLOY_PARTNER_WEB_ROOT:-}" ]; then
-              rm -rf "$DEPLOY_PARTNER_WEB_ROOT"/*
-              cp -r apps/partner/dist/. "$DEPLOY_PARTNER_WEB_ROOT"/
-              echo "partner dist 已同步到 $DEPLOY_PARTNER_WEB_ROOT"
-            else
-              echo "DEPLOY_PARTNER_WEB_ROOT 未配置，跳过 partner 前端发布（线上保持现状）"
-            fi
+            echo "=== 备份并准备三端静态目录 ==="
+            DEPLOY_WEB_ROOT='${{ secrets.DEPLOY_WEB_ROOT }}'
+            STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"
+            STATIC_RELEASE_STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$EXPECTED_SHA"
+            STATIC_BACKUP_DIR="$STATIC_BACKUP_ROOT/$STATIC_RELEASE_STAMP"
+            STATIC_STAGE_ROOT="${RUNNER_TEMP:-/tmp}/ai-job-print-static-$EXPECTED_SHA"
+            STATIC_BACKED_UP=""
+            STATIC_SWAPPED=""
+            mkdir -p "$STATIC_BACKUP_DIR" "$STATIC_STAGE_ROOT"
+            backup_static_root() {
+              local label="$1" root="$2"
+              test -n "$root" && test "$root" != "/"
+              test -d "$root"
+              mkdir -p "$STATIC_BACKUP_DIR/$label"
+              cp -a "$root/." "$STATIC_BACKUP_DIR/$label/"
+              STATIC_BACKED_UP="$STATIC_BACKED_UP $label"
+            }
+            stage_static_root() {
+              local label="$1" source="$2"
+              mkdir -p "$STATIC_STAGE_ROOT/$label"
+              cp -a "$source/." "$STATIC_STAGE_ROOT/$label/"
+            }
+            restore_static_roots() {
+              local label root
+              for label in $STATIC_SWAPPED; do
+                case "$label" in
+                  kiosk) root="${DEPLOY_WEB_ROOT:?}" ;;
+                  admin) root="$DEPLOY_ADMIN_WEB_ROOT" ;;
+                  partner) root="$DEPLOY_PARTNER_WEB_ROOT" ;;
+                esac
+                rm -rf -- "$root"
+                mkdir -p "$root"
+                cp -a "$STATIC_BACKUP_DIR/$label/." "$root/"
+              done
+            }
+            # 已切换过任何一个目录：恢复并保留备份（恢复中途失败时它是唯一的回退锚点）；
+            # 还没切换：线上没动过，只删掉不完整的备份与暂存目录。
+            trap 'if [ -n "$STATIC_SWAPPED" ]; then echo "::error::静态目录切换失败，恢复 full 发布前备份（备份保留在 $STATIC_BACKUP_DIR）" >&2; restore_static_roots; else rm -rf -- "$STATIC_BACKUP_DIR"; fi; rm -rf -- "$STATIC_STAGE_ROOT"' ERR
+            backup_static_root kiosk "${DEPLOY_WEB_ROOT:?}"
+            backup_static_root admin "$DEPLOY_ADMIN_WEB_ROOT"
+            backup_static_root partner "$DEPLOY_PARTNER_WEB_ROOT"
+            stage_static_root kiosk apps/kiosk/dist
+            stage_static_root admin apps/admin/dist
+            stage_static_root partner apps/partner/dist
+
+            deploy_static_root() {
+              local label="$1" root="$2"
+              STATIC_SWAPPED="$STATIC_SWAPPED $label"
+              rm -rf -- "$root"
+              mkdir -p "$root"
+              cp -a "$STATIC_STAGE_ROOT/$label/." "$root/"
+            }
+            deploy_static_root kiosk "${DEPLOY_WEB_ROOT:?}"
+            deploy_static_root admin "$DEPLOY_ADMIN_WEB_ROOT"
+            deploy_static_root partner "$DEPLOY_PARTNER_WEB_ROOT"
+            rm -rf -- "$STATIC_STAGE_ROOT"
+            # 静态发布成功后只保留最近 3 组完整备份；当前组也必须保留。
+            find "$STATIC_BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+              | sort -rn | awk 'NR > 3 { sub(/^[^ ]+ /, ""); print }' \
+              | xargs -r rm -rf --
 
             echo "=== 重载 nginx ==="
             nginx -s reload || systemctl reload nginx
+            trap - ERR
 
             if test -f scripts/release-bundle/bos-object.mjs; then
               (

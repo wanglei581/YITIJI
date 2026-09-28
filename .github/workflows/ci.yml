@@ -106,6 +106,8 @@ jobs:
           pnpm verify:repository-integrity
           # 生产闸门 ↔ 部署脚本持久化清单必须同步（2026-09-06 缺一个键让发布在 PM2 重启后失败）
           pnpm verify:deploy-gates-in-sync
+          # 真跑发布脚本的回退演练（P0-3）：就绪失败 / 迁移失败都要把运行目录恢复到发布前，备份按组保留
+          pnpm verify:deploy-rollback
           pnpm verify:ci-main-runs-complete
           pnpm verify:release-bundle
           pnpm verify:prod-readonly-probe

@@ -84,7 +84,8 @@ if (!arrayMatch) {
   else fail('3b 写入的值不是 "=true" —— 闸门用精确 === \'true\' 判定，带空格或大小写变体会通不过')
 
   // 五、PM2 重启前每个键都要 export（--update-env 把 shell 环境带进进程；与 .env 持久化互为兜底）
-  const restartAt = deploySource.indexOf('pm2 restart "$PM2_NAME" --update-env')
+  // 回退分支也会重启 PM2；门禁要检查正常发布的最后一次重启，而不是函数定义中的回退重启。
+  const restartAt = deploySource.lastIndexOf('pm2 restart "$PM2_NAME" --update-env')
   if (restartAt < 0) fail(`${DEPLOY_SH} 里没找到 pm2 restart "$PM2_NAME" --update-env`)
   else {
     const beforeRestart = deploySource.slice(0, restartAt)
@@ -184,7 +185,7 @@ if (deploySource.includes('--force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GA
 
   const apiOnlyExitAt = deployWorkflow.indexOf('✅ API-only 部署完成')
   const staticMarkers = [
-    'rm -rf ${{ secrets.DEPLOY_WEB_ROOT }}/*',
+    'STATIC_BACKUP_ROOT',
     'nginx -s reload',
     'latest-deployed.txt',
   ]

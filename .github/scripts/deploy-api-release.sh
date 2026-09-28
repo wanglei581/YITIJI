@@ -3,9 +3,10 @@
 #
 # 硬约束：
 # - 仅在 API_RELEASE_ENABLED=true 时执行（发布授权闸门）。
-# - 不打印任何密钥/连接串；失败即退出并保留备份与现场，不自动回滚迁移。
+# - 不打印任何密钥/连接串；运行目录备份建好后任何一步失败，都把运行目录就地恢复到发布前备份
+#   （已重启过新版本时再重启回旧版），保留全部备份；数据库迁移不回退（迁移只做 additive）。
 # - 遵循仓库“同一目标提交整体切换、迁移前备份并校验、additive migrate deploy”规则。
-set -euo pipefail
+set -Eeuo pipefail
 
 if [ "${API_RELEASE_ENABLED:-}" != "true" ]; then
   echo "::error::API release skipped because API_RELEASE_ENABLED != true" >&2
@@ -34,7 +35,9 @@ fi
 RUNTIME_ROOT="${DEPLOY_API_DIR:-/srv/ai-job-print}"
 PM2_NAME="${DEPLOY_PM2_NAME:-ai-job-print-api}"
 BACKUP_ROOT="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
-HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3010/api/v1/health}"
+HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3010/api/v1/health/ready}"
+HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-30}"
+HEALTH_DELAY_SECONDS="${DEPLOY_HEALTH_DELAY_SECONDS:-2}"
 
 API_DIR="$RUNTIME_ROOT/services/api"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -60,7 +63,8 @@ REQUIRED_PRODUCTION_GATES=(
 # 安全设计：
 # · 只在健康检查通过后调用（见步骤 9）。发布失败时保留全部备份 —— 那正是回滚锚点。
 # · 本次刚生成的一组、以及最新的一组，永不删除。
-# · 每次发布产生 <prefix>.dump 与 <prefix>.runtime，按 prefix 归组，不拆开算。
+# · 每次发布产生 <prefix>.dump、<prefix>.runtime 与 <prefix>.migrations.log，按 prefix 归组，
+#   不拆开算（迁移日志若单算一组，会占掉保留名额，把上一次发布的备份挤出去删掉）。
 # · 只操作 BACKUP_ROOT（DEPLOY_BACKUP_ROOT，默认 /srv/ai-job-print-backups），
 #   路径不接受外部传入；目录不存在时跳过而非报错。
 # · 仓库为 public、Actions 日志公开 —— 只输出组数与目录总大小，不打印路径与文件名。
@@ -89,7 +93,7 @@ prune_old_backups() {
   stems="$(find "$BACKUP_ROOT" -maxdepth 1 -mindepth 1 -printf '%T@\t%f\n' 2>/dev/null \
     | sort -rn \
     | cut -f2- \
-    | sed -E 's/\.(dump|runtime)$//' \
+    | sed -E 's/\.(dump|runtime|migrations\.log)$//' \
     | awk 'NF && !seen[$0]++')"
 
   idx=0
@@ -121,7 +125,7 @@ prune_old_backups() {
     if [ "$stem" = "$current_stem" ]; then
       continue
     fi
-    rm -rf -- "$BACKUP_ROOT/$stem.dump" "$BACKUP_ROOT/$stem.runtime" 2>/dev/null || true
+    rm -rf -- "$BACKUP_ROOT/$stem.dump" "$BACKUP_ROOT/$stem.runtime" "$BACKUP_ROOT/$stem.migrations.log" 2>/dev/null || true
   done
 
   echo "清理完成，备份目录当前占用 $(du -sm "$BACKUP_ROOT" 2>/dev/null | cut -f1)MB"
@@ -213,6 +217,57 @@ pg_restore -l "$BACKUP_PREFIX.dump" >/dev/null
 echo "=== 3. 备份当前运行目录（回滚锚点）==="
 cp -a "$RUNTIME_ROOT" "$BACKUP_PREFIX.runtime"
 
+# ── 从这里起任何一步失败，都把运行目录恢复到上面的备份 ──────────────────────
+# 3b 改 .env、5 同步代码、6 装依赖与迁移、7 重启：哪一步失败，运行目录都已不是发布前的样子。
+# 恢复只动运行目录：不回退数据库（迁移只做 additive，旧代码忽略新增列），也不动
+# services/api/storage（发布期间用户新传的文件要留着）。PM2 只在「已经重启过新版本」时
+# 才需要再重启回旧版；在那之前线上进程本来就还是旧代码。
+PM2_RESTARTED=false
+MIGRATION_LOG="$BACKUP_PREFIX.migrations.log"
+
+check_ready() {
+  curl -fsS "$HEALTH_URL" 2>/dev/null \
+    | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ready"'
+}
+
+restore_runtime_and_exit() {
+  local reason="$1" rollback_version ok=false
+  trap - ERR
+  set +e
+  echo "::error::${reason}；开始把运行目录恢复到发布前备份（数据库迁移不回退）。" >&2
+  if [ ! -d "$BACKUP_PREFIX.runtime" ]; then
+    echo "::error::找不到回退运行目录：$BACKUP_PREFIX.runtime，请人工处理" >&2
+    exit 1
+  fi
+  # 就地 rsync，而不是先删再拷：恢复中途失败也不会出现「运行目录整个不见了」的窗口。
+  if ! rsync -a --delete --exclude 'services/api/storage' "$BACKUP_PREFIX.runtime/" "$RUNTIME_ROOT/"; then
+    echo "::error::运行目录恢复失败，备份仍在 $BACKUP_PREFIX.runtime，请人工恢复" >&2
+    exit 1
+  fi
+  rollback_version="$(sed -n 's/^source=origin\/main@//p' "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" 2>/dev/null | head -n1)"
+  rollback_version="${rollback_version:-发布前备份}"
+  if [ -f "$MIGRATION_LOG" ]; then
+    echo "本次迁移记录保留在 $MIGRATION_LOG；数据库不回退，请人工判断迁移影响。" >&2
+  fi
+  if [ "$PM2_RESTARTED" = true ]; then
+    export COMMIT="$rollback_version"
+    pm2 restart "$PM2_NAME" --update-env
+    for _ in $(seq 1 "$HEALTH_ATTEMPTS"); do
+      if check_ready; then ok=true; break; fi
+      sleep "$HEALTH_DELAY_SECONDS"
+    done
+    if [ "$ok" = true ]; then
+      echo "已回退到 $rollback_version，回退后的就绪检查通过；本次发布仍记为失败。" >&2
+    else
+      echo "::error::已回退到 $rollback_version，但回退后的就绪检查仍失败，请人工处理。" >&2
+    fi
+  else
+    echo "线上进程尚未重启，仍在运行发布前的版本；运行目录已恢复一致。" >&2
+  fi
+  exit 1
+}
+trap 'restore_runtime_and_exit "发布在第 $LINENO 行失败"' ERR
+
 echo "=== 3b. 持久化全部生产运行闸门（不打印 .env）==="
 # 键清单见上方 REQUIRED_PRODUCTION_GATES（3c 预检已按同一数组 --force-true）。
 # 此处才写运行目录 .env：必须在步骤 3 回滚锚点之后、迁移之前。
@@ -295,35 +350,38 @@ echo "=== 6. 收敛运行目录依赖并执行 additive 迁移 ==="
 cd "$RUNTIME_ROOT"
 pnpm install --frozen-lockfile
 cd "$RUNTIME_ROOT/services/api"
-pnpm db:pg:deploy
+echo "本次执行的 PostgreSQL 迁移（数据库不回退，供人工判断）：" | tee "$MIGRATION_LOG"
+pnpm db:pg:deploy 2>&1 | tee -a "$MIGRATION_LOG"
 
-echo "=== 7. 写 DEPLOY_SOURCE（不含秘密）==="
-cat > "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" <<EOF
+echo "=== 7. 重启 PM2 并就绪检查（$HEALTH_URL） ==="
+# 先置位再重启：pm2 restart 本身失败时进程状态不确定，恢复后要按「已重启过」处理
+PM2_RESTARTED=true
+export COMMIT="$TARGET_SHA"
+export PRINT_REQUIRE_PRINTER_ONLINE=true
+export PRINT_REQUIRE_PII_SCAN=true
+pm2 restart "$PM2_NAME" --update-env
+for _ in $(seq 1 "$HEALTH_ATTEMPTS"); do
+  if check_ready; then
+    echo "API readiness OK: $HEALTH_URL"
+    # 新版本已就绪：之后写发布指针或清理备份失败都只告警，不能把一个健康的版本回退掉。
+    trap - ERR
+    echo "=== 8. 写 DEPLOY_SOURCE（就绪检查通过后，不含秘密） ==="
+    cat > "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" <<EOF || echo "::warning::DEPLOY_SOURCE.txt 写入失败（本次发布已成功），请人工补写"
 source=origin/main@$TARGET_SHA
 deployed_at=$(date -Is)
 ci_run=$CI_RUN
 control_plane_helper_sha256=$CONTROL_PLANE_DEPLOY_HELPER_SHA256
 backup=$BACKUP_PREFIX.dump
 runtime_backup=$BACKUP_PREFIX.runtime
-rollback=restore $BACKUP_PREFIX.runtime then if migration rollback required restore $BACKUP_PREFIX.dump
+migrations=$MIGRATION_LOG
+rollback=restore $BACKUP_PREFIX.runtime; database migrations are not rolled back
 api_database=postgresql
 EOF
-
-echo "=== 8. 重启 PM2 并健康检查 ==="
-export COMMIT="$TARGET_SHA"
-export PRINT_REQUIRE_PRINTER_ONLINE=true
-export PRINT_REQUIRE_PII_SCAN=true
-pm2 restart "$PM2_NAME" --update-env
-for _ in $(seq 1 30); do
-  if curl -fsS "$HEALTH_URL" 2>/dev/null | grep -q '"status":"ok"'; then
-    echo "API health OK: $HEALTH_URL"
     echo "=== 9. 发布成功，清理历史备份 ==="
     # 清理失败不影响本次发布结果（发布已经成功），只记 warning。
-    # 放在 || 右侧同时确保函数体内的错误不会被 set -e 带崩整个脚本。
     prune_old_backups || echo "::warning::备份清理失败，已跳过（不影响本次发布）"
     exit 0
   fi
-  sleep 2
+  sleep "$HEALTH_DELAY_SECONDS"
 done
-echo "::error::API health check failed after restart: $HEALTH_URL" >&2
-exit 1
+restore_runtime_and_exit "API 就绪检查在 $HEALTH_ATTEMPTS 次内没有通过"
