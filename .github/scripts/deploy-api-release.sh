@@ -111,7 +111,7 @@ prune_old_backups() {
   done <<<"$stems"
 
   del_count="$(printf '%s' "$del_list" | wc -w | tr -d ' ')"
-  echo "备份共 $idx 组（DEPLOY_BACKUP_KEEP=$keep）：将保留 $((idx - del_count)) 组，将删除 $del_count 组"
+  echo "备份共 $idx 组（DEPLOY_BACKUP_KEEP=${keep}）：将保留 $((idx - del_count)) 组，将删除 $del_count 组"
   if [ "$del_count" -eq 0 ]; then
     echo "未超过保留数，无需清理"
     return 0
@@ -247,7 +247,7 @@ restore_runtime_and_exit() {
   rollback_version="$(sed -n 's/^source=origin\/main@//p' "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" 2>/dev/null | head -n1)"
   rollback_version="${rollback_version:-发布前备份}"
   if [ -f "$MIGRATION_LOG" ]; then
-    echo "本次迁移记录保留在 $MIGRATION_LOG；数据库不回退，请人工判断迁移影响。" >&2
+    echo "本次迁移记录保留在 ${MIGRATION_LOG}；数据库不回退，请人工判断迁移影响。" >&2
   fi
   if [ "$PM2_RESTARTED" = true ]; then
     export COMMIT="$rollback_version"
@@ -257,9 +257,9 @@ restore_runtime_and_exit() {
       sleep "$HEALTH_DELAY_SECONDS"
     done
     if [ "$ok" = true ]; then
-      echo "已回退到 $rollback_version，回退后的就绪检查通过；本次发布仍记为失败。" >&2
+      echo "已回退到 ${rollback_version}，回退后的就绪检查通过；本次发布仍记为失败。" >&2
     else
-      echo "::error::已回退到 $rollback_version，但回退后的就绪检查仍失败，请人工处理。" >&2
+      echo "::error::已回退到 ${rollback_version}，但回退后的就绪检查仍失败，请人工处理。" >&2
     fi
   else
     echo "线上进程尚未重启，仍在运行发布前的版本；运行目录已恢复一致。" >&2
@@ -353,7 +353,7 @@ cd "$RUNTIME_ROOT/services/api"
 echo "本次执行的 PostgreSQL 迁移（数据库不回退，供人工判断）：" | tee "$MIGRATION_LOG"
 pnpm db:pg:deploy 2>&1 | tee -a "$MIGRATION_LOG"
 
-echo "=== 7. 重启 PM2 并就绪检查（$HEALTH_URL） ==="
+echo "=== 7. 重启 PM2 并就绪检查（${HEALTH_URL}） ==="
 # 先置位再重启：pm2 restart 本身失败时进程状态不确定，恢复后要按「已重启过」处理
 PM2_RESTARTED=true
 export COMMIT="$TARGET_SHA"

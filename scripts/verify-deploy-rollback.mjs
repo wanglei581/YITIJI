@@ -38,6 +38,12 @@ check(Boolean(trapLine) && !/rm -rf -- "\$STATIC_STAGE_ROOT" "\$STATIC_BACKUP_DI
   '静态目录切换失败时恢复并保留备份（只在尚未切换时删掉不完整的备份）')
 check(workflow.indexOf('✅ API-only 部署完成') >= 0 && workflow.indexOf('✅ API-only 部署完成') < workflow.indexOf('STATIC_BACKUP_ROOT'),
   'API-only 在静态目录备份之前退出')
+// 变量名后面紧跟中文标点（如 "$HEALTH_URL）"）：非 UTF-8 语言环境下 bash 会把那个字节当成变量名的一部分，
+// set -u 之下直接「unbound variable」退出。服务器经 SSH 执行时的语言环境不由我们保证，一律写成 ${VAR}。
+for (const [label, text] of [['deploy-api-release.sh', readFileSync(deployScript, 'utf8')], ['deploy.yml', workflow]]) {
+  const hits = text.split('\n').map((line, i) => [i + 1, line]).filter(([, line]) => /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7f]/.test(line))
+  check(hits.length === 0, `${label}：变量后不紧跟非 ASCII 字符（一律写成 \${VAR}）`, hits.map(([n]) => `第 ${n} 行`).join('、'))
+}
 
 // ── 真跑发布脚本 ────────────────────────────────────────────────────────────────
 const isDarwin = process.platform === 'darwin'
@@ -174,6 +180,9 @@ function runDeploy(box, extraEnv) {
     DRILL_CALLS: box.calls,
     DRILL_DEPLOY: box.checkout,
     DRILL_RUNTIME: box.runtime,
+    // 固定用 C 语言环境跑：服务器经 SSH 执行时语言环境不由我们保证，脚本必须在最差情况下也正确
+    LC_ALL: 'C',
+    LANG: 'C',
     ...extraEnv,
   }
   const result = spawnSync('bash', [deployScript], { env, encoding: 'utf8' })

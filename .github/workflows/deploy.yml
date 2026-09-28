@@ -56,10 +56,10 @@ jobs:
             CONCL="$(printf '%s' "$RUN_JSON" | jq -r '.conclusion')"
             SHA="$(printf '%s' "$RUN_JSON" | jq -r '.head_sha')"
             if [ "$NAME" != "CI" ] || [ "$BRANCH" != "main" ] || [ "$CONCL" != "success" ]; then
-              echo "::error::运行号 $INPUT_RUN_ID 不满足发布前提（name=$NAME branch=$BRANCH conclusion=$CONCL），必须是 main 上 conclusion=success 的 CI" >&2
+              echo "::error::运行号 $INPUT_RUN_ID 不满足发布前提（name=$NAME branch=$BRANCH conclusion=${CONCL}），必须是 main 上 conclusion=success 的 CI" >&2
               exit 1
             fi
-            echo "手动补发：CI run $INPUT_RUN_ID（main，success）→ $SHA"
+            echo "手动补发：CI run ${INPUT_RUN_ID}（main，success）→ $SHA"
             RUN_ID="$INPUT_RUN_ID"
           else
             SHA="$RUN_SHA"
@@ -128,7 +128,7 @@ jobs:
             case "$DEPLOY_SCOPE" in
               api-only | full) ;;
               *)
-                echo "::error::非法发布范围：$DEPLOY_SCOPE（只允许 api-only 或 full）" >&2
+                echo "::error::非法发布范围：${DEPLOY_SCOPE}（只允许 api-only 或 full）" >&2
                 exit 1
                 ;;
             esac
@@ -154,7 +154,7 @@ jobs:
             EXPECTED_SHA='${{ steps.target.outputs.sha }}'
             CURRENT_SHA="$(git rev-parse HEAD)"
             if [ "$CURRENT_SHA" = "$EXPECTED_SHA" ]; then
-              echo "服务器已在目标提交 $EXPECTED_SHA，跳过拉取"
+              echo "服务器已在目标提交 ${EXPECTED_SHA}，跳过拉取"
             else
               FETCH_OK=0
               if [ ! -f /srv/ai-job-print-secrets/bos-release.env ]; then
@@ -314,7 +314,7 @@ jobs:
             }
             # 已切换过任何一个目录：恢复并保留备份（恢复中途失败时它是唯一的回退锚点）；
             # 还没切换：线上没动过，只删掉不完整的备份与暂存目录。
-            trap 'if [ -n "$STATIC_SWAPPED" ]; then echo "::error::静态目录切换失败，恢复 full 发布前备份（备份保留在 $STATIC_BACKUP_DIR）" >&2; restore_static_roots; else rm -rf -- "$STATIC_BACKUP_DIR"; fi; rm -rf -- "$STATIC_STAGE_ROOT"' ERR
+            trap 'if [ -n "$STATIC_SWAPPED" ]; then echo "::error::静态目录切换失败，恢复 full 发布前备份（备份保留在 ${STATIC_BACKUP_DIR}）" >&2; restore_static_roots; else rm -rf -- "$STATIC_BACKUP_DIR"; fi; rm -rf -- "$STATIC_STAGE_ROOT"' ERR
             backup_static_root kiosk "${DEPLOY_WEB_ROOT:?}"
             backup_static_root admin "$DEPLOY_ADMIN_WEB_ROOT"
             backup_static_root partner "$DEPLOY_PARTNER_WEB_ROOT"
