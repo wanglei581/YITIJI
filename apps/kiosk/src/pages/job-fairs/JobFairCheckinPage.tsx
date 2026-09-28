@@ -223,7 +223,7 @@ export function JobFairCheckinPage() {
 
       <DirNote warn>
         <b>本机不做签到，也拿不到签到结果。</b>
-        这里只列出进行中或即将开始、且服务端已返回 checkinUrl 的场次；不查个人预约记录。
+        这里只列出进行中或即将开始、且来源平台提供了入场入口的场次；不查个人预约记录。
       </DirNote>
 
       {loading ? (
@@ -231,7 +231,7 @@ export function JobFairCheckinPage() {
       ) : error ? (
         <>
           <DirState tone="error" testId="fair-checkin-error" title="入场入口列表这次没取到">
-            招聘会列表请求失败，所以无法判断哪些场次有可用的 checkinUrl。本机不显示缓存二维码，也不判断你的预约或签到状态。
+            招聘会列表这次没读到，所以无法判断哪些场次有可用的入场入口。本机不显示缓存二维码，也不判断你的预约或签到状态。
           </DirState>
           <DirStrip>
             <DirStripItem icon={CalendarIcon} tone="wheat" title="回场次列表" desc="换一场看看时间地点和参展名单" onClick={() => navigate('/job-fairs')} />
@@ -241,7 +241,7 @@ export function JobFairCheckinPage() {
       ) : availableFairs.length === 0 ? (
         <>
           <DirState tone="empty" testId="fair-checkin-empty" title="暂无可展示的来源入场入口">
-            当前没有进行中或即将开始、且配置了 checkinUrl 的招聘会。<b>这不代表你未预约</b>，本机不查个人记录。
+            当前没有进行中或即将开始、且来源平台提供了入场入口的招聘会。<b>这不代表你未预约</b>，本机不查个人记录。
           </DirState>
           <DirStrip>
             <DirStripItem icon={CalendarIcon} tone="wheat" title="查看招聘会" desc="先看时间地点和参展名单" onClick={() => navigate('/job-fairs')} />
@@ -281,7 +281,7 @@ export function JobFairCheckinPage() {
 
           <DirKv rows={[
             ['可用入场入口', `${availableFairs.length} 场`],
-            ['判定口径', '服务端返回 checkinUrl 且状态为进行中 / 即将开始'],
+            ['怎么算可用', '来源平台提供了入场入口，且场次进行中或即将开始'],
           ]} />
         </>
       )}
