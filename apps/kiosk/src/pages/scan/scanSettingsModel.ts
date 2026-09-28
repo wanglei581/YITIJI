@@ -114,7 +114,7 @@ export function sessionNatureRow(args: {
   return args.rescanRequested
     ? ['本次性质', '安全重扫：系统已放行同一份材料再扫一次']
     : args.plainRestartChosen
-      ? ['本次性质', '普通扫描：你已确认这一次不是把同一份内容再扫一遍']
+      ? ['本次性质', '普通扫描：你已确认这一次不是免查重的重扫']
       : args.restoredFromStorage
         ? ['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断']
         : null

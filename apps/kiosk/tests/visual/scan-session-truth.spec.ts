@@ -149,7 +149,7 @@ test('scan start does not probe a nonexistent device endpoint and carries explic
   })
 
   await page.goto('/scan/start')
-  await expect(page.getByText('\u4e0b\u4e00\u6b65\u4f1a\u521b\u5efa\u771f\u5b9e\u626b\u63cf\u4f1a\u8bdd', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
   const next = page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ })
   await expect(next).toBeEnabled()
   expect(deviceRequests()).toBe(0)
@@ -1121,7 +1121,7 @@ test('the wait page tells the truth when the ack is definitively refused @kiosk'
   await page.goto('/scan?stage=progress')
 
   // ① 如实落一个失败结果，不在这一屏继续假装还在等文件。
-  await expect(page.getByText(/服务端没有给这一场投递授权/).first()).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText(/系统没有给这一场投递授权/).first()).toBeVisible({ timeout: 10_000 })
   // ② 这一屏绝不许再出现那句把人支到面板上的话。
   await expect(page.getByText(/请在打印机面板完成扫描/)).toHaveCount(0)
   // ③ 服务端那条任务被撤掉（localGiveUp），用的是本机登记里那份控制凭证。

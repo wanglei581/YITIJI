@@ -1251,7 +1251,7 @@ assert.match(
 )
 assert.match(
   scanSettingsModel,
-  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通扫描：你已确认这一次不是把同一份内容再扫一遍'\]/,
+  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通扫描：你已确认这一次不是免查重的重扫'\]/,
   '用户在 fail-closed 那一屏选的普通扫描要记在屏幕上：否则下一屏看起来像是本页悄悄降级的',
 )
 

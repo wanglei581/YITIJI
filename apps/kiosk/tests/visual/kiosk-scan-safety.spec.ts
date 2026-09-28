@@ -1068,7 +1068,7 @@ test('a stale safe rescan is refused at click time and creates nothing @scan-saf
   await expect(page.getByText('扫描未完成', { exact: true }).first()).toBeVisible()
   // ③ 把「为什么什么都没发生」说出来，并且把出路交回给用户。
   await expect(page.getByTestId('scan-safe-rescan-lost')).toBeVisible()
-  await expect(page.getByText(/没有[\s\S]{0,8}替你改发一次普通重扫/)).toBeVisible()
+  await expect(page.getByText(/没有[\s\S]{0,8}替你改成普通重扫/)).toBeVisible()
   await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true })).toHaveCount(0)
 
@@ -1146,7 +1146,7 @@ test('a reload while the paired create is in flight fails closed @scan-safety', 
   expect(server.creates).toHaveLength(2)
   expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[1]!.headers['x-scan-retry-control']).toBeUndefined()
-  await expect(page.getByText('普通扫描：你已确认这一次不是把同一份内容再扫一遍')).toBeVisible()
+  await expect(page.getByText('普通扫描：你已确认这一次不是免查重的重扫')).toBeVisible()
 
   expect(errors).toEqual([])
 })
@@ -1304,7 +1304,7 @@ test('a child that is no longer recoverable offers only an honest plain restart 
   await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
 
   // ① 拿到 409 就当场收工，不再继续退避：确定的答案不许被拖成一屏无意义的等待。
-  await expect(page.getByText('那次安全重扫的会话已经失效', { exact: true }).first())
+  await expect(page.getByText('那次安全重扫已经失效', { exact: true }).first())
     .toBeVisible({ timeout: 20_000 })
   expect(server.creates).toHaveLength(2)
 
@@ -1326,7 +1326,7 @@ test('a child that is no longer recoverable offers only an honest plain restart 
   expect(server.creates).toHaveLength(3)
   expect(server.creates[2]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[2]!.headers['x-scan-retry-control']).toBeUndefined()
-  await expect(page.getByText('普通扫描：你已确认这一次不是把同一份内容再扫一遍')).toBeVisible()
+  await expect(page.getByText('普通扫描：你已确认这一次不是免查重的重扫')).toBeVisible()
 
   expect(errors).toEqual([])
 })
@@ -1988,7 +1988,7 @@ test('a refused rescan authority is reported honestly and never falls back to a 
   expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[1]!.headers['x-scan-retry-control']).toBeUndefined()
   // ⑥ 这一场的性质要如实标注：是用户自己选的普通会话，不是本页悄悄降级的。
-  await expect(page.getByText(/你已确认这一次不是安全同字节重扫/).first()).toBeVisible()
+  await expect(page.getByText(/你已确认这一次不是免查重的重扫/).first()).toBeVisible()
 
   expect(errors).toEqual([])
 })
@@ -2275,7 +2275,7 @@ test('a server refusal after an interrupted create still only offers a plain res
   expect(server.creates).toHaveLength(3)
   expect(server.creates[2]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[2]!.headers['x-scan-retry-control']).toBeUndefined()
-  await expect(page.getByText(/你已确认这一次不是安全同字节重扫/).first()).toBeVisible()
+  await expect(page.getByText(/你已确认这一次不是免查重的重扫/).first()).toBeVisible()
 
   expect(errors).toEqual([])
 })
