@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation, type NavigateOptions } from 'react-router-dom'
-import { makePrintParams } from '@ai-job-print/shared'
 import {
   ExpandIcon,
   FileTextIcon,
@@ -26,6 +25,7 @@ import {
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import { revokeLiveScanSession } from './scanSessionRevoke'
+import { savePrintMaterialSession, type PrintMaterialSource } from '../print/printMaterialSession'
 import {
   armScanRescanAuthority,
   beginPlainScanRestart,
@@ -240,8 +240,9 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
    * replace 把**这一条**直接换成落点：
    *   · 后退：越过整条扫描流程，落在进 /scan 之前那一页，永远回不到结果屏；
    *   · 前进：那条结果条目已经不存在，前进也无从复现。
-   * 落点自己那一条仍然带着 `file`（打印确认页 / 解析页靠它工作，这是「保留落点
-   * 立即可用文件」的要求），它由各自页面的生命周期与隐私边界管，不在本页职责内。
+   * 落点照样立即能用这份文件（这是「保留落点立即可用文件」的要求）：解析页那一条历史
+   * 带着 `fileId`；打印台读的是离开前写好的打印材料会话（见 handlePrint）。
+   * 它们由各自页面的生命周期与隐私边界管，不在本页职责内。
    */
   const leaveScanFlow = (destination: string, options?: NavigateOptions): void => {
     revokeLiveScanSession(getToken())
@@ -251,21 +252,31 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
 
   /* ── 成功页那三个去向也是「离开整条扫描流程」 ──────────────────────────────
    *
-   * 直接打印 / AI 简历识别 / 前往我的文档，此前都是裸 navigate：本机登记原封不动留在
+   * 打印（当时叫「直接打印」）/ AI 简历识别 / 前往我的文档，此前都是裸 navigate：本机登记原封不动留在
    * sessionStorage 里 —— 里面有上一位的 `live.controlToken` 明文，还有
    * `result.file`（文件名 + 那条签名内容链接）。下一位在这台机器上进 /scan，
    * 阶段直接从登记复水到 result，他看到的是**上一位的扫描件**。
    *
    * 所以三个都走 leaveScanFlow：撤服务端任务（已终态时是 no-op）→ 清本机登记 →
-   * 带着文件跳过去。打印页与解析页读的都是路由 state（`location.state.file` /
-   * `state.fileId`），不读扫描登记，所以清掉登记不影响它们拿到这份文件。 */
+   * 带着文件跳过去。解析页读路由 state（`state.fileId`），打印台读打印材料会话，
+   * 都不读扫描登记，所以清掉登记不影响它们拿到这份文件。 */
+
+  /**
+   * 「拿去打印」：扫描件是用户本人原件（resume_scan / id_scan / print_doc · original）。
+   * 生产强制 PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒 PRINT_PII_SCAN_REQUIRED，
+   * 而隐私检查只在打印台的材料检查里做 —— 所以去材料检查，不直达报价确认页（商用收口 P0-5）。
+   *
+   * 写法与打印上传页相同：先把这份扫描件**整份**写进打印材料会话（旧文件的检查结论、参数一并作废），
+   * 再离开。/print/material-check 会 replace 重定向到 /print/desk?step=check，重定向不转发路由
+   * state，打印台只认会话 —— 所以必须先写，再走。
+   */
   const handlePrint = () => {
     if (!file) return
-    leaveScanFlow('/print/confirm', {
-      state: {
-        file: { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, pages: file.pages, mimeType: file.mimeType },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-      },
+    const printFile = { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, pages: file.pages, mimeType: file.mimeType }
+    const source: PrintMaterialSource = scanType === 'resume' ? 'resume' : 'document'
+    savePrintMaterialSession({ file: printFile, source })
+    leaveScanFlow('/print/material-check', {
+      state: { file: printFile, source },
     })
   }
 
@@ -429,8 +440,9 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             <RotateCcwIcon aria-hidden />
             重新扫描
           </button>
+          {/* 名字照稿 18 的出口名：它先去材料检查（原件要先过隐私检查），不能再叫「直接打印」。 */}
           <button type="button" className="qx-btn" data-variant="primary" disabled={!printEnabled} onClick={handlePrint}>
-            直接打印
+            拿去打印
           </button>
         </ScanCta>
       }
@@ -507,8 +519,8 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
         <button type="button" className="sw-exit" disabled={!printEnabled} onClick={handlePrint}>
           <span className="sw-exit-ic"><PrinterIcon size={20} aria-hidden /></span>
           <span className="sw-exit-body">
-            <span className="sw-exit-title">直接打印</span>
-            <small>按默认设置进入确认打印，可再修改。金额由系统报价决定，本页不给价格。</small>
+            <span className="sw-exit-title">拿去打印</span>
+            <small>先检查文件和个人信息，再选打印参数。金额由系统报价决定，本页不给价格。</small>
           </span>
         </button>
         <button
