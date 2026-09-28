@@ -174,18 +174,23 @@ test('hardware warning tells anonymous users that background work continues with
     page.getByText('已创建的打印/扫描任务会继续运行，这台机器上的页面将清除', { exact: true })
   ).toBeVisible()
   await expect(page.getByText('匿名任务退出后无法恢复', { exact: true })).toBeVisible()
-  await expect(page.getByText(/已保存到.*我的|可恢复/)).toHaveCount(0)
-
-  // anonymous users must not see login-related labels
-  await expect(page.getByText('当前登录', { exact: false })).toHaveCount(0)
-  await expect(page.getByText('登录状态', { exact: false })).toHaveCount(0)
-  await expect(page.getByText('退出账号', { exact: false })).toHaveCount(0)
-  await expect(page.getByText('下次需重新验证', { exact: false })).toHaveCount(0)
 
   // anonymous branch shows session-appropriate labels
   await expect(page.getByText('这次使用：', { exact: false })).toBeVisible()
   await expect(page.getByText('匿名使用', { exact: false })).toBeVisible()
   await expect(page.getByText('清掉这次留下的内容', { exact: false })).toBeVisible()
+
+  // anonymous users must not see login-related labels.
+  // 这一屏在本套件里只亮 2 秒。toHaveCount(0) 会一直重试到成立：屏幕一换回首页它就「通过」了，
+  // 真问题被藏住、失败却报在下一句（2026-09-28 实测：「清除范围」写成「登录状态」时就是这样）。
+  // 所以「不应出现」一律在这一屏还在时立即取数，取完再确认它仍在。
+  const guard = page.locator('[data-screen="session-guard"]')
+  await expect(guard).toBeVisible()
+  for (const label of [/已保存到.*我的|可恢复/, '当前登录', '登录状态', '退出账号', '下次需重新验证']) {
+    const hits = typeof label === 'string' ? guard.getByText(label, { exact: false }) : guard.getByText(label)
+    expect(await hits.count(), `匿名用户不应看到「${label}」`).toBe(0)
+  }
+  await expect(guard).toBeVisible()
 })
 
 test('ordinary idle warns before clearing and can resume the previous route', async ({
