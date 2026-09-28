@@ -62,9 +62,9 @@ async function enterResumeHub(page: Page, journey: string, collectors: ReturnTyp
     page, journey, step: 'home-resume-hub', control: 'AI 简历服务', selectorHint: '[data-domain-id=resume] .v6-home-domain__main',
     kind: 'click', collectors,
     act: async () => {
-      const card = page.locator('[data-domain-id="resume"] .v6-home-domain__main')
+      const card = page.locator('[data-action="resume-hub"]')
       if (await card.count()) await card.click()
-      else await clickNamed(page, /AI 简历服务/)
+      else await clickNamed(page, /改简历/)
       await page.waitForURL((url) => url.pathname === '/resume-service', { timeout: 15_000 })
     },
   })

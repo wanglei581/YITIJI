@@ -359,12 +359,12 @@ test('member report hard-replaces a clean homepage after the privacy deadline @p
   // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
   //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
   //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
-  // 2) 问候语精确等于未登录态那句（登录态为 `${displayName}，你好，我是小青`）
-  //    —— 抓「姓名残留」。
+  // 2) 问候语精确等于未登录态的时段问候（登录态为 `${displayName}，时段，我是小青`）
+  //    —— 抓「姓名残留」。稿 01 把「你好」改成上午好 / 下午好这一类，整句仍必须无姓名。
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '你好，我是小青', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
 })
 
 test('member privacy clear sends the original bearer and blocks authenticated re-entry @privacy-kiosk', async ({ page, api }) => {
@@ -429,12 +429,12 @@ test('legal documents cannot suspend an authenticated kiosk privacy deadline @pr
   // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
   //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
   //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
-  // 2) 问候语精确等于未登录态那句（登录态为 `${displayName}，你好，我是小青`）
-  //    —— 抓「姓名残留」。
+  // 2) 问候语精确等于未登录态的时段问候（登录态为 `${displayName}，时段，我是小青`）
+  //    —— 抓「姓名残留」。稿 01 把「你好」改成上午好 / 下午好这一类，整句仍必须无姓名。
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '你好，我是小青', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
 })
 
 test('anonymous interview state is hard-cleared and browser back cannot restore it @privacy-kiosk', async ({ page, api }) => {
@@ -646,12 +646,12 @@ test('an unknown terminal route remains inside the privacy guard @privacy-kiosk'
   // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
   //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
   //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
-  // 2) 问候语精确等于未登录态那句（登录态为 `${displayName}，你好，我是小青`）
-  //    —— 抓「姓名残留」。
+  // 2) 问候语精确等于未登录态的时段问候（登录态为 `${displayName}，时段，我是小青`）
+  //    —— 抓「姓名残留」。稿 01 把「你好」改成上午好 / 下午好这一类，整句仍必须无姓名。
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '你好，我是小青', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
 })
 
 // 2026-09-13 口径反转：清场以前**不撤**服务端扫描任务，理由是「任务在服务端，离开这一屏

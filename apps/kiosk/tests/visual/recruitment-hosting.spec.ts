@@ -156,13 +156,12 @@ test('hosting off: home shows no recruitment entry and the grid reflows without 
   await expect(home.getByText('本终端未开放岗位与招聘会信息，也不代收简历。', { exact: false })).toBeVisible()
   await expectNoRecruitmentCopy(page, '首页')
 
-  // 六张磁贴：打印主卡 / AI 简历 + 模拟面试 / 就业政策 / 百宝箱 + 智慧校园。每行铺满、不留空格、不在底部留一截空白。
+  // 稿 01：改简历 + 练面试 / 打印主卡 / 查政策。未开通的百宝箱与智慧校园不占行。每行铺满、不留空格、底部不留空白。
   const geometry = await homeTileGeometry(page)
   expect(geometry.rows.map((row) => row.actions)).toEqual([
-    ['print-hub'],
     ['resume-hub', 'interview-hub'],
+    ['print-hub'],
     ['policy-hub'],
-    ['toolbox', 'smart-campus'],
   ])
   for (const row of geometry.rows) {
     expect(row.left, `${row.actions.join('+')} 贴住左边`).toBeLessThanOrEqual(geometry.grid.left + 1)
@@ -188,18 +187,17 @@ test('hosting off: the phone home keeps the quick row whole @w1-mobile', async (
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const home = page.getByTestId('qx-home')
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
-  const quick = await home.locator('.qx-home-quick').evaluate((row) => {
-    const rowBox = row.getBoundingClientRect()
-    const buttons = [...row.querySelectorAll('button')].map((button) => {
-      const box = button.getBoundingClientRect()
-      return { text: button.textContent?.trim() ?? '', width: box.width, height: box.height }
-    })
-    return { width: rowBox.width, buttons }
-  })
-  expect(quick.buttons.map((button) => button.text)).toEqual(['改简历', '查政策', '登录后查看本人记录'])
-  // 2×2 快捷区少了「找工作」：身份入口独占第二行，不在右下角留一个空格。
-  expect(quick.buttons[2]!.width).toBeGreaterThanOrEqual(quick.width - 1)
-  for (const button of quick.buttons) expect(button.height).toBeGreaterThanOrEqual(48)
+  // 稿 01 去掉头图里的快捷行。改简历 / 查政策在服务卡上，登录仍是独立按钮。触控高度下限仍是 48。
+  const phoneButtons = [
+    home.getByRole('button', { name: '改简历', exact: true }),
+    home.getByRole('button', { name: '查政策', exact: true }),
+    home.getByRole('button', { name: '登录后查看本人记录', exact: true }),
+  ]
+  for (const button of phoneButtons) {
+    await expect(button).toBeVisible()
+    const box = await button.boundingBox()
+    expect(box!.height).toBeGreaterThanOrEqual(48)
+  }
   await expectNoRecruitmentCopy(page, '手机首页')
   await assertNoHorizontalOverflow(page)
   await page.screenshot({ path: test.info().outputPath('home-hosting-off-390x844.png'), fullPage: true })
@@ -217,15 +215,15 @@ test('hosting on: home keeps the job and fair entries exactly as today @w1-kiosk
   await expect(home).toHaveAttribute('data-recruitment', 'open')
   await expect(home.locator('[data-action="jobs-hub"]')).toContainText('12 个在招')
   await expect(home.locator('[data-action="fairs-hub"]')).toContainText('暂无进行中或即将开始的场次')
-  await expect(home.getByRole('button', { name: '找工作', exact: true })).toBeVisible()
+  await expect(home.getByRole('button', { name: '岗位信息', exact: true })).toBeVisible()
+  await expect(home.getByRole('button', { name: '找工作', exact: true })).toHaveCount(0)
   await expect(home.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   const geometry = await homeTileGeometry(page)
   expect(geometry.rows.map((row) => row.actions)).toEqual([
-    ['print-hub'],
     ['resume-hub', 'interview-hub'],
+    ['print-hub'],
     ['jobs-hub', 'fairs-hub'],
     ['policy-hub'],
-    ['toolbox', 'smart-campus'],
   ])
   await page.screenshot({ path: test.info().outputPath('home-hosting-on-1080x1920.png') })
 })
@@ -247,9 +245,9 @@ test('an older server without recruitmentHosting falls back to jobBoard, and to 
   api.respond('GET', CONFIG, { status: 200, json: neither })
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const home = page.getByTestId('qx-home')
-  // 「关闭」也是没读到配置时的样子：先等这份配置真的读完（百宝箱磁贴离开「读取中」），
+  // 「关闭」也是没读到配置时的样子：先等这份配置真的读完（百宝箱判定落到 off，不再是 loading），
   // 再留两帧让同一份配置的托管判定落地，然后才断言仍按关闭处理。
-  await expect(home.getByText('本机尚未上架扩展服务')).toBeVisible()
+  await expect(home).toHaveAttribute('data-toolbox', 'off')
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
   await expect(page.locator('[data-action="jobs-hub"]')).toHaveCount(0)

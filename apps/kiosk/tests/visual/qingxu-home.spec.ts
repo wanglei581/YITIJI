@@ -186,10 +186,12 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(printTile.getByText('状态未知', { exact: true })).toBeVisible()
   await expect(printTile.getByText(/出纸与扫描暂停/)).toBeVisible()
   await expectReadableFeature(page)
-  // 百宝箱 / 智慧校园是**能力闸门**：本机没开通就该点不动，浏览器不是绑定终端，
-  // 所以这里必须 disabled。这两条钉的是 fail-closed，不是钉「当前恰好是灰的」。
-  await expect(home.getByRole('button', { name: /百宝箱/ })).toBeDisabled()
-  await expect(home.getByRole('button', { name: /智慧校园/ })).toBeDisabled()
+  // 2026-09-28 稿 01：没开通的百宝箱 / 智慧校园不占首页。配置读到「关闭」后磁贴次数为 0，
+  // 不是一颗点不动的按钮。data-* 钉的是「已经读完并且判定为关」，不是「还没渲染」。
+  await expect(home).toHaveAttribute('data-toolbox', 'off')
+  await expect(home).toHaveAttribute('data-campus', 'off')
+  await expect(home.getByRole('button', { name: /百宝箱/ })).toHaveCount(0)
+  await expect(home.getByRole('button', { name: /智慧校园/ })).toHaveCount(0)
 
   // 空态是陈述不是动作：它不能是按钮（无论 disabled 与否）。
   await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
@@ -223,9 +225,10 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(home.getByRole('link', { name: '鲁公网安备37021402007308号' })).toHaveAttribute('href', /beian\.mps\.gov\.cn/)
 
   const primary = home.getByTestId('home-primary')
-  // 主 CTA 只是打开 AI 顾问，不在首页开麦：文案不得写「点这里说话」。
-  // W1 构建带 VITE_USE_TRTC_CALL=true 只说明助手页显示语音入口；首页不能承诺本机此刻可开麦。
-  await expect(primary).toContainText('打开 AI 顾问，咨询求职问题')
+  // 主 CTA 只是打开 AI 顾问并预填一句，不在首页开麦：文案不得写「点这里说话」。
+  // 稿 01 的按钮文案是「问小青：说一句你想办的事」。W1 构建带 VITE_USE_TRTC_CALL=true
+  // 只说明助手页显示语音入口；首页不能承诺本机此刻可开麦。
+  await expect(primary).toContainText('问小青：说一句你想办的事')
   await expect(primary).toContainText('语音以本机检测为准')
   await expect(primary).not.toContainText('点这里说话')
   await expectTouchFloor(primary, 56)
@@ -260,11 +263,12 @@ test('home ready state defers capability claims to entry without hiding the real
   await expect(printTile.getByText('打印机在线')).toHaveCount(0)
   await expectReadableFeature(page)
   // 智慧校园开通只凭终端配置，首页不宣称「已授权」；开通后可点。
-  const campus = home.getByRole('button', { name: /智慧校园/ })
+  const campus = home.getByRole('button', { name: '智慧校园', exact: true })
   await expect(campus).toBeEnabled()
   await expect(campus.getByText('受控开放', { exact: true })).toBeVisible()
   await expect(home.getByText('已授权', { exact: true })).toHaveCount(0)
-  await expect(home.getByRole('button', { name: /百宝箱/ })).toBeDisabled()
+  await expect(home).toHaveAttribute('data-toolbox', 'off')
+  await expect(home.getByRole('button', { name: /百宝箱/ })).toHaveCount(0)
   await expect(home.getByRole('button', { name: /查看全部服务|更多服务/ })).toHaveCount(0)
   await page.screenshot({ path: test.info().outputPath('home-ready-1080x1920.png') })
 })
@@ -302,14 +306,15 @@ test('home keeps one shell and a usable narrow layout @w1-mobile', async ({ page
   await expect(page.getByTestId('home-identity')).toBeVisible()
   await expectTouchFloor(page.getByTestId('qx-home').locator('button:visible, a:visible'), 48)
   const status = await page.locator('.qx-home-hero-top .qx-pill').boundingBox()
-  const print = await page.getByTestId('qx-home').locator('[data-action="print-hub"]').boundingBox()
+  // 稿 01 把改简历放到第一张。96px 露出阈值不变，锚点从打印卡改到现在的首张。
+  const firstTile = await page.getByTestId('qx-home').locator('[data-action="resume-hub"]').boundingBox()
   const nav = await page.locator('.qx-navbar').boundingBox()
   expect(status, '设备状态需完整落在手机屏幕内').not.toBeNull()
-  expect(print, '首张服务卡需实际渲染').not.toBeNull()
+  expect(firstTile, '首张服务卡需实际渲染').not.toBeNull()
   expect(nav, '底部导航需实际渲染').not.toBeNull()
   expect(status!.x).toBeGreaterThanOrEqual(0)
   expect(status!.x + status!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
-  expect(print!.y + 96, '首张服务卡至少露出 96px，不能被底栏盖住').toBeLessThan(nav!.y)
+  expect(firstTile!.y + 96, '首张服务卡至少露出 96px，不能被底栏盖住').toBeLessThan(nav!.y)
   await page.screenshot({ path: test.info().outputPath('home-390x844.png'), fullPage: true })
   expect(runtimeErrors).toEqual([])
 })
@@ -346,17 +351,19 @@ test('home plays a one-shot entrance and light sweep, then settles with honest s
   expect(await printTile.locator('.qx-home-tile-badge').evaluate((el) => getComputedStyle(el).color)).not.toBe('rgb(46, 230, 168)')
 
   // 键盘焦点：磁贴有描边并上浮；深色 hero 上的描边改用纸色，才看得见。
-  await printTile.focus()
-  await page.keyboard.press('Tab')
+  // 稿 01：头图里没有可点控件；Tab 顺序跟着视觉顺序（改简历 → 练面试）。描边与上浮阈值不变。
+  await expect(home.locator('.qx-home-hero button, .qx-home-hero a')).toHaveCount(0)
   const resumeTile = home.locator('[data-action="resume-hub"]')
-  await expect(resumeTile).toBeFocused()
-  // 青序 teal 描边，而不是全局 service-desk 主题那圈 42% 透明度的淡蓝（此前它一直压着首页自己的焦点样式）。
-  expect(await resumeTile.evaluate((el) => [el.matches(':focus-visible'), getComputedStyle(el).outlineStyle, getComputedStyle(el).outlineWidth, getComputedStyle(el).outlineColor])).toEqual([true, 'solid', '3px', 'rgb(31, 158, 134)'])
-  await expect.poll(() => resumeTile.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m42)).toBeLessThan(-2)
-  await printTile.focus()
+  await resumeTile.focus()
+  await page.keyboard.press('Tab')
+  const interviewTile = home.locator('[data-action="interview-hub"]')
+  await expect(interviewTile).toBeFocused()
+  expect(await interviewTile.evaluate((el) => [el.matches(':focus-visible'), getComputedStyle(el).outlineStyle, getComputedStyle(el).outlineWidth, getComputedStyle(el).outlineColor])).toEqual([true, 'solid', '3px', 'rgb(31, 158, 134)'])
+  await expect.poll(() => interviewTile.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m42)).toBeLessThan(-2)
+  await resumeTile.focus()
   await page.keyboard.press('Shift+Tab')
-  await expect(page.getByTestId('home-identity')).toBeFocused()
-  expect(await page.getByTestId('home-identity').evaluate((el) => getComputedStyle(el).outlineColor)).toBe('rgb(245, 242, 233)')
+  await expect(page.getByTestId('home-device-status')).toBeFocused()
+  expect(await page.getByTestId('home-device-status').evaluate((el) => getComputedStyle(el).outlineColor)).toBe('rgb(31, 158, 134)')
 
   // 岗位读取失败 → 重试会让磁贴重挂载；入场已放完，重挂载的磁贴不许再闪一遍。
   // 先给旧节点打标，等它被卸载——证明确实重挂载过，再断言；否则会在 React 重渲染前就判「没动画」（空转）。
@@ -379,11 +386,12 @@ test('home is fully static under reduced motion yet keeps focus feedback @w1-kio
   expect(await homeAnimations(page)).toEqual([])
   const primary = page.getByTestId('home-primary')
   expect(await primary.evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('none')
-  await home.locator('[data-action="print-hub"]').focus()
-  await page.keyboard.press('Tab')
   const resumeTile = home.locator('[data-action="resume-hub"]')
-  await expect(resumeTile).toBeFocused()
-  expect(await resumeTile.evaluate((el) => [getComputedStyle(el).outlineStyle, getComputedStyle(el).transform])).toEqual(['solid', 'none'])
+  await resumeTile.focus()
+  await page.keyboard.press('Tab')
+  const interviewTile = home.locator('[data-action="interview-hub"]')
+  await expect(interviewTile).toBeFocused()
+  expect(await interviewTile.evaluate((el) => [getComputedStyle(el).outlineStyle, getComputedStyle(el).transform])).toEqual(['solid', 'none'])
 })
 
 test('home entrance stays inside the narrow layout and settles fully @w1-mobile', async ({ page, api }) => {

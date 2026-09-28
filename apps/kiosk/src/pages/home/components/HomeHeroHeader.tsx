@@ -10,9 +10,7 @@ export interface HomeDeviceStatus {
 }
 
 interface HomeHeroHeaderProps {
-  /** 真实终端码；未绑定时由容器传「设备未绑定」，这里照实显示，不补示例机号。 */
-  terminalCode: string
-  /** 真实设备状态；拿不到时由容器传 unknown，不得默认 ok。 */
+  /** 真实设备状态；拿不到时由容器传 unknown，不得默认 ok。终端编号不上屏。 */
   deviceStatus: HomeDeviceStatus
 }
 
