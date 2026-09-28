@@ -1,10 +1,11 @@
-import { UserIcon } from 'lucide-react'
+import { ChevronRightIcon, UserIcon } from 'lucide-react'
 
 export function ProfileHeader({
   isLoggedIn,
   displayName,
   phoneMasked,
   reserveBannerSpace,
+  onLogin,
 }: {
   isLoggedIn: boolean
   displayName: string
@@ -30,7 +31,14 @@ export function ProfileHeader({
             : '这台机器是公共终端，不登录就不会显示任何人的简历、订单和文件。'}
         </span>
       </span>
-      <span className="pf-idstat">{isLoggedIn ? '账号设置在页面下方' : '登录后查看本人记录'}</span>
+      {isLoggedIn ? (
+        <span className="pf-idstat">账号设置在页面下方</span>
+      ) : (
+        <button type="button" className="pf-idbtn" onClick={onLogin}>
+          去登录
+          <ChevronRightIcon size={22} aria-hidden />
+        </button>
+      )}
     </section>
   )
 }

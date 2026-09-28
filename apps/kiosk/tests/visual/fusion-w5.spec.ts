@@ -319,8 +319,9 @@ test('profile permission state uses the canonical fusion shell @w5-kiosk', async
   })
   await page.goto('/profile')
   await expect(page.locator('[data-kiosk-screen="profile"]')).toBeVisible()
-  await expect(page.getByRole('button', { name: '手机号登录', exact: true })).toBeVisible()
-  await expect(page.getByRole('region', { name: '我的资产' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '去登录', exact: true })).toHaveCount(2)
+  await expect(page.getByRole('region', { name: '我的资产' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '登录与不登录的分界' })).toBeVisible()
   await expectFusionAcceptance(page, errors)
 })
 
@@ -1484,7 +1485,9 @@ function serverDown(code: string): { status: number; json: unknown } {
 /** 旧壳（深藏青顶栏 + 底栏 + 墨青纸感页框）不得叠在青序页上；QX 登记漏掉时这里第一个红。 */
 async function expectQxSettingsShell(page: Page, state: string): Promise<void> {
   await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
-  await expect(page.locator('.qx-topbar button, .qx-topbar a[href]')).toHaveCount(0)
+  await expect(page.locator('.qx-topbar button')).toHaveCount(1)
+  await expect(page.locator('.qx-topbar button')).toHaveAccessibleName('返回我的')
+  await expect(page.locator('.qx-step-prev')).toHaveText('上一步')
   await expect(page.getByTestId(`member-settings-state-${state}`)).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="member-settings"]')).toBeVisible()
   await expect(page.locator('.ui-kiosk-topbar'), '青序页不得再挂旧顶栏').toHaveCount(0)
@@ -1512,7 +1515,7 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   await page.goto('/me/settings')
   await expectQxSettingsShell(page, 'anonymous')
   await expect(page.getByRole('region', { name: '登录引导' })).toBeVisible()
-  await expect(page.getByRole('region', { name: '协议与隐私' }).getByRole('button')).toHaveCount(2)
+  await expect(page.getByRole('region', { name: '协议与帮助' }).getByRole('button')).toHaveCount(2)
   await expect(page.getByRole('region', { name: '隐私与 AI 授权管理' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /换绑手机号|切换账号|隐私与数据请求/ })).toHaveCount(0)
   // 游客只看到登录后会出现哪几项：不可点、明确「登录后可用」。
@@ -1719,7 +1722,7 @@ test('settings: switch-account cancel keeps the session, logout confirms first a
   await logoutDialog.getByRole('button', { name: '退出登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/profile')
   await expect(page.locator('[data-kiosk-screen="profile"]')).toBeVisible()
-  await expect(page.getByRole('button', { name: '手机号登录', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '去登录', exact: true })).toHaveCount(2)
   expect(api.requestCount('POST', LOGOUT)).toBe(1)
   await expectTokenNotPersisted(page)
   expect(errors).toEqual([])

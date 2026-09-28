@@ -189,7 +189,9 @@ test('手机号验证码按钮交互态可读且通用错误使用场景提示 @
     await expectReadableButton(sendButton)
     await attachViewportScreenshot(page, testInfo, 'login-send-hover-1080x1920')
 
-    await sendButton.focus()
+    await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).focus()
+    await page.keyboard.press('Tab')
+    await expect(sendButton).toBeFocused()
     expect(await sendButton.evaluate((element) => element.matches(':focus-visible'))).toBe(true)
     await attachViewportScreenshot(page, testInfo, 'login-send-focus-1080x1920')
 
@@ -440,7 +442,9 @@ for (const scenario of [
     registerKioskShell(api)
     api.respond('POST', '/api/v1/member/auth/sms-code', { status: scenario.status, json: { success: false, error: { code: scenario.code, message: scenario.message } } })
     await page.goto('/login')
-    await expect(page.locator('.qx-topbar button, .qx-topbar a[href]')).toHaveCount(0)
+    await expect(page.locator('.qx-topbar button')).toHaveCount(1)
+    await expect(page.locator('.qx-topbar button')).toHaveAccessibleName('返回首页')
+    await expect(page.locator('.qx-step-prev')).toHaveText('返回首页')
     await expect(page.getByTestId('login-gate-keypad')).toHaveCount(0)
     if (scenario.code === 'SMS_SEND_FAILED') {
       expect((await page.getByTestId('login-gate-tab-phone').boundingBox())!.y).toBeGreaterThanOrEqual(500)
