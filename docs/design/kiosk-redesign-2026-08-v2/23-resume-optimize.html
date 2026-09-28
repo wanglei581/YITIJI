@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 用词：写稿人用语（原型、内部服务名、页面地址、请求标识）换成用户的话。
 - 9/28 去掉内部英文键名
 - 9/28 留白：没有建议的七态（四屏共用）把「不用 AI，也能自己改」8 步排成两栏四行（与运行页同为两栏），不再按 8 等分拉伸最后一张卡；步骤行 66→88、出口行 88→108，卡片内边距 14/22→20/24，剩余高度用 space-evenly 分到三张卡上下。只改样式，文字与 data-testid 一个不动。无新增内容。
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
@@ -694,7 +695,7 @@ html.debug .demo-tab{font-size:22px}
   <div class="cta" id="cta" data-testid="resume-optimize-cta"></div>
 
   <div class="qx2-actions"><button type="button" class="qx2-prev" onclick="document.getElementById('back').click()">上一步</button><a class="qx2-ai" href="../kiosk-redesign-2026-08/05-ai-cockpit.html?state=composer&amp;intent=resume" onclick="try{sessionStorage.setItem('kiosk-assistant-draft','我想把简历中的一句经历换个改法。请先让我提供原句，只整理真实内容，不添加数字或成果。')}catch(e){}">问小青：这句还能怎么改 →</a></div>
-  <p class="truth" data-disclaimer="true" data-testid="resume-optimize-truth"><i aria-hidden="true">i</i><span id="truth-tx">静态设计原型：本页不连接真实简历或模型，裁决只留在本页，不写入账号、不生成文件。</span></p>
+  <p class="truth" data-disclaimer="true" data-testid="resume-optimize-truth"><i aria-hidden="true">i</i><span id="truth-tx">界面示例：本页不连接真实简历或模型，裁决只留在本页，不写入账号、不生成文件。</span></p>
 
   <nav class="navbar" aria-label="全局导航">
     <a href="01-home.html" data-route="/" data-testid="resume-optimize-nav-home">
@@ -1156,7 +1157,7 @@ R['no-context'] = function(){
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source')
     + btn('24-resume-generate.html','手动逐项修改',false,SCREEN+'-secondary','/resume/generate');
   why.className = 'why';
-  truthTx.textContent = '静态设计原型：本页不连接真实简历或模型，也不会自动出现建议。';
+  truthTx.textContent = '界面示例：这里没有真实简历或模型，也不会自动出现建议。';
 };
 
 R['loading'] = function(){
@@ -1180,7 +1181,7 @@ R['loading'] = function(){
     + btnAct('noop-loading','正在生成建议',true,SCREEN+'-primary',true);
   why.className = 'why show';
   why.textContent = '结果还没回来，现在还不知道有没有候选，所以下一步先不给出口。';
-  truthTx.textContent = '静态设计原型：这一屏只表达等待状态，不会因为时间过去就自动出现结果。';
+  truthTx.textContent = '界面示例：这是等待中的样子，不会因为时间过去就自动出现结果。';
 };
 
 R['empty'] = function(){
@@ -1203,7 +1204,7 @@ R['empty'] = function(){
     + btn('24-resume-generate.html','手动逐项修改',true,SCREEN+'-primary','/resume/generate');
   why.className = 'why show';
   why.textContent = '没有候选就没有可裁决的东西：逐条对照、批量动作和裁决草稿这一路都先不给入口。';
-  truthTx.textContent = '静态设计原型：这一屏表达「本次无候选」，本页不连接真实简历或模型。';
+  truthTx.textContent = '界面示例：这是暂时没有合适内容时的样子。';
 };
 
 R['read-error'] = function(){
@@ -1225,7 +1226,7 @@ R['read-error'] = function(){
     + btn(withRid(SELF,'state=loading'),'再读一次',true,SCREEN+'-primary','/resume/optimize');
   why.className = 'why show';
   why.textContent = '读取失败时不给逐条对照入口：点进去只会再失败一次。';
-  truthTx.textContent = '静态设计原型：这一屏只表达读取失败，本页不会再向系统重试。';
+  truthTx.textContent = '界面示例：这是读取没成时的样子，本页不会自动重试。';
 };
 
 R['optimize-failed'] = function(){
@@ -1247,7 +1248,7 @@ R['optimize-failed'] = function(){
     + btn(withRid(SELF,'state=loading'),'再试一次',true,SCREEN+'-primary','/resume/optimize');
   why.className = 'why show';
   why.textContent = '生成失败不影响你自己动手改：手动逐项修改这条路全程不经过模型。';
-  truthTx.textContent = '静态设计原型：这一屏只表达生成失败，本页不连接真实模型。';
+  truthTx.textContent = '界面示例：这是生成没成时的样子，不是真的出了错。';
 };
 
 R['unavailable'] = function(){
@@ -1263,7 +1264,7 @@ R['unavailable'] = function(){
     + btn('24-resume-generate.html','手动逐项修改',true,SCREEN+'-primary','/resume/generate');
   why.className = 'why show';
   why.textContent = '这里不套「手动也能得到同一份候选」的说法：没有等价的手动路径，只有「自己动手改」这条另一条路。';
-  truthTx.textContent = '静态设计原型：这一屏表达能力未接通，本页不会探测真实服务，也不代表线上状态。';
+  truthTx.textContent = '界面示例：这是功能暂时不可用时的样子。';
 };
 
 R['illegal'] = function(){
@@ -1277,7 +1278,7 @@ R['illegal'] = function(){
   cta.innerHTML = btn('01-home.html','返回首页',false,SCREEN+'-secondary','/')
     + btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source');
   why.className = 'why';
-  truthTx.textContent = '静态设计原型：这一屏是参数兜底，本页不连接真实简历或模型。';
+  truthTx.textContent = '界面示例：这是参数不合适时的样子。';
 };
 
 /* ════════ 7. ready · 建议总览 ════════ */
@@ -1327,7 +1328,7 @@ function renderOverview(){
   why.innerHTML = '「待确认事实」来自本页的机械对照：只比对数字和示例词表命中的词，'
     + '<b>不是通用事实校验</b>，词表之外的编造它测不出来。'
     + '<span data-testid="'+SCREEN+'-session">这次办理只记住编号和一次性令牌；裁决不记在这次办理里，刷新即回待定。</span>';
-  truthTx.textContent = '静态设计原型：建议为合成样本；裁决只是阅读决策，不写入账号、不写进优化稿、不生成文件、不打印。';
+  truthTx.textContent = '界面示例：建议是示例内容；裁决只是阅读决策，不写入账号、不写进优化稿、不生成文件、不打印。';
 }
 
 /* 全部段落一次给出、就地编辑，对齐 React 的 OptimizedResumeEditor（那边也是单栏可滚、
@@ -1411,7 +1412,7 @@ function renderEditor(){
     +(exportState==='ready'&&!exportFile().printable
       ?'<b>'+exportFormat.toUpperCase()+' 暂不开放打印：等系统返回打印 PDF 的文件编号。</b>现在系统这次只给出原格式文件的编号，拿它冒充打印用的那份 PDF，下游按编号取到的可能不是同一个文件。改用 PDF 导出即可现在打印。'
       :'只有真实打印链接就绪、并且拿到那份文件自己的编号，才进入打印确认。');
-  truthTx.textContent='静态设计原型：编辑内容为合成样本，版式预览由本页绘制；本屏是设计目标，未逐项核对当前 React 实现，也不代表系统、模型、文件或打印已在线。';
+  truthTx.textContent='界面示例：编辑内容是示例，版式预览由本页绘制；这屏是设计目标，不代表系统、模型、文件或打印已在线。';
 }
 
 /* ════════ 8. ready · 逐条对照 ════════ */
@@ -1716,7 +1717,7 @@ var NOTICE = {
     why:'终端里没有 Office 排版引擎。硬渲染会改掉字体、行距和分页，你在这儿看到的就不是真正会打印出来的那一份，所以这里不做假预览。',
     keep:'<b>优化建议不受影响</b>：候选已经读出来了，就在这一层下面。',
     rows:[
-      ['dead','print','打印这份原件','静态原型没有真实文件凭证','-source-alt-print'],
+      ['dead','print','打印这份原件','现在没有真实文件','-source-alt-print'],
       ['link','21-resume-triage.html','upload','返回简历来源，转成 PDF 再上传一次','PDF 能直接翻页预览','/resume/source','-source-alt-source'],
       ['link','10-print-hub.html','print','去打印 / 扫描其他材料','打印扫描不依赖预览，照常可用','/print-scan','-source-alt-print-hub'],
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
@@ -1733,7 +1734,7 @@ var NOTICE = {
     why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还在系统保留，这一屏都看不出来，也不做判断。',
     keep:'这<b>不是建议读取失败</b>：候选已经在下面了。',
     rows:[
-      ['dead','refresh','再取一次原件','静态原型不会真的重新取件','-source-alt-retry'],
+      ['dead','refresh','再取一次原件','现在不会真的重新取件','-source-alt-retry'],
       ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
     ] },
@@ -1741,7 +1742,7 @@ var NOTICE = {
     why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还在系统保留。',
     keep:'<b>优化建议不受影响</b>：候选就在这一层下面。',
     rows:[
-      ['dead','refresh','再显示一次','静态原型不会真的重新渲染','-source-alt-retry'],
+      ['dead','refresh','再显示一次','现在不会真的重新渲染','-source-alt-retry'],
       ['link','10-print-hub.html','print','去打印 / 扫描','不经过预览也能把材料出纸','/print-scan','-source-alt-print-hub'],
       ['link','21-resume-triage.html','upload','返回简历来源','换一份文件重新提交解析','/resume/source','-source-alt-source'],
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
@@ -1751,7 +1752,7 @@ function sourceNotice(mode){
   var N = NOTICE[mode], rows = '', i;
   for (i = 0; i < N.rows.length; i++) {
     var r = N.rows[i];
-    if (r[0] === 'dead') rows += rowDead(r[1], r[2], r[3], SCREEN + r[4], '静态原型没有真实文件');
+    if (r[0] === 'dead') rows += rowDead(r[1], r[2], r[3], SCREEN + r[4], '现在没有真实文件');
     else if (r[0] === 'close') rows += '<button type="button" class="row m-press" id="src-close-row" data-testid="'+SCREEN+r[5]+'">'
       + '<i class="ic">'+ic(r[2],24)+'</i><span class="tx"><b>'+r[3]+'</b><span>'+r[4]+'</span></span>'+GO+'</button>';
     else rows += rowLink(r[1], r[2], r[3], r[4], SCREEN + r[6], r[5]);
