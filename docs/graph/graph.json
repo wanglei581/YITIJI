@@ -12493,7 +12493,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 593,
+      "reachableFileCount": 596,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -12848,6 +12848,7 @@
           "path": "/interview",
           "styles": [
             "apps/kiosk/src/pages/interview/interview-service-desk.css",
+            "apps/kiosk/src/pages/interview/styles/interview-qx2.css",
             "apps/kiosk/src/pages/interview/styles/interview-report.css",
             "apps/kiosk/src/pages/interview/styles/interview-responsive.css",
             "apps/kiosk/src/pages/interview/styles/interview-session-ext.css",
@@ -15467,7 +15468,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 685
+      "sourceFileCount": 689
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -37653,6 +37654,17 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/reviews/legacy-capability-inventory-2026-08-16.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/components/AiDriverBanner.tsx",
+        "kind": "component",
+        "mentions": [
+          "docs/reviews/kiosk-resume-context-ai-assist-audit-2026-08-06.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/reviews/kiosk-resume-context-ai-assist-audit-2026-08-06.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

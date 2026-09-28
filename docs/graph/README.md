@@ -33,7 +33,7 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 90 | 685 | 593 |
+| kiosk | `apps/kiosk` | 90 | 689 | 596 |
 | admin | `apps/admin` | 38 | 176 | 171 |
 | partner | `apps/partner` | 15 | 70 | 69 |
 
@@ -49,7 +49,7 @@ node scripts/project-graph-query.mjs model PrintTask
 | 被至少一条门禁断言的文件 | 1563 |
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 57 |
-| 孤儿候选 · medium（仅文档提及） | 26 |
+| 孤儿候选 · medium（仅文档提及） | 27 |
 | 孤儿候选 · low（全仓零提及） | 96 |
 
 ## 分册

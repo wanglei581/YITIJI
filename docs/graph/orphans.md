@@ -42,7 +42,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
 | **high** | 仍被 CI / 门禁 / 包脚本引用 | 57 |
-| **medium** | 只被文档或其它文件提及 | 26 |
+| **medium** | 只被文档或其它文件提及 | 27 |
 | **low** | 全仓零提及 | 96 |
 
 
@@ -193,13 +193,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## medium — 只被文档或其它文件提及（26）
+## medium — 只被文档或其它文件提及（27）
 
-### 页面/组件（9）
+### 页面/组件（10）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/App.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/legacy-capability-inventory-2026-08-16.md |
+| `apps/kiosk/src/components/AiDriverBanner.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/kiosk-resume-context-ai-assist-audit-2026-08-06.md |
 | `apps/kiosk/src/components/KioskNumPad.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md |
 | `apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/home/components/QxHomeView.tsx |
 | `apps/kiosk/src/pages/home/components/V6HomeView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/current-progress.md |
