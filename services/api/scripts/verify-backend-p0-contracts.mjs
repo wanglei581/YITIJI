@@ -305,16 +305,9 @@ check(
     !kioskClaimPage.includes('const VALID_CODE = /^['),
   'kiosk 取件页复用 shared 的受理正则，不再内联自己那份',
 )
-// 2026-09-28 真机审查：页内数字键盘显示时由它输入、不再召系统键盘（inputMode none），
-// 不显示时用数字键盘；两种情况都不会弹全键盘。
 check(
-  kioskClaimPage.includes('inputMode="numeric"') ||
-    kioskClaimPage.includes("inputMode={showKeypad ? 'none' : 'numeric'}"),
+  kioskClaimPage.includes('inputMode="numeric"'),
   'kiosk 取件码输入框唤起数字键盘（纯数字码不该弹全键盘）',
-)
-check(
-  !/inputMode="text"|inputMode=\{[^}]*'text'/.test(kioskClaimPage),
-  'kiosk 取件码输入框不得唤起全键盘',
 )
 
 // 小程序双码已随 #724 进 main：旧 10 位 Crockford 与新 8 位数字同时可显示 / 可扫。

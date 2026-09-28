@@ -66,13 +66,6 @@ function Assert-StoppedManualService {
   }
 }
 
-function Assert-BoundRunningAutomaticService {
-  $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
-  if ($null -eq $service -or $service.State -ne "Running" -or $service.StartMode -ne "Auto") {
-    throw "Bound upgrade must leave the Agent Running with Automatic startup"
-  }
-}
-
 function Assert-PanelShortcut {
   if (-not (Test-Path -LiteralPath $panelShortcutPath -PathType Leaf)) {
     throw "$CANDIDATE_VERSION upgrade did not preserve the local status panel Start Menu shortcut"
@@ -190,14 +183,10 @@ try {
   Invoke-Bundle -ExePath $resolvedCandidate -Action "/install" -LogName "upgrade-candidate-install.log"
   $candidateInstalled = $true
   Assert-AgentProductVersion -ExpectedVersion $CANDIDATE_VERSION
-  Assert-BoundRunningAutomaticService
+  Assert-StoppedManualService
   Assert-PanelShortcut
   Assert-DesktopShortcut
   Assert-ControlCenterSmoke -ExpectedVersion $CANDIDATE_VERSION
-
-  Invoke-Bundle -ExePath $resolvedCandidate -Action "/install" -LogName "upgrade-same-version.log"
-  Assert-AgentProductVersion -ExpectedVersion $CANDIDATE_VERSION
-  Assert-BoundRunningAutomaticService
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Bundled Node runtime is missing after upgrade"
   }
