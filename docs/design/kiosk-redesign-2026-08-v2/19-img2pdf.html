@@ -33,7 +33,7 @@
         同 key + 不同输入 = IDEMPOTENCY_KEY_REUSED 冲突；进行中 = CONVERSION_IN_PROGRESS
   留存:  已登录 → PDF 进「我的文档」，默认约 24 小时可手动延长；
         未登录 → 后端以空 endUserId 落库，**不进「我的文档」**，只能在本次操作内直接继续；
-        公用终端**不提供下载到本机**
+        公共终端**不提供下载到本机**
   出口:  生成成功后进入 13-print-desk.html（/print/material-check），**不直达报价、支付或出纸**
   目标设计（尚未接线，页面必须写明）：
         · 列表选择 / 上移下移 / 旋转 90° / 删除 —— 旋转在当前接口里**没有字段**，
@@ -459,7 +459,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
   <div class="truth" data-disclaimer="true" data-testid="img2pdf-truth">
     <div><b>顺序</b>列表顺序就是提交顺序，也是 PDF 的页序：一张图一页，按 A4 排版，不裁切、不拼版。</div>
     <div><b>进度</b>合成需要一点时间，做完才会告诉你。这里不显示百分比。</div>
-    <div><b>留存</b>登录后 PDF 进「我的文档」，默认约 24 小时可延长；未登录不进「我的文档」，也不下载到这台公用机器。</div>
+    <div><b>留存</b>登录后 PDF 进「我的文档」，默认约 24 小时可延长；未登录不进「我的文档」，也不下载到这台机器。</div>
   </div>
     <div class="qx-airow"><a class="qx-prev" href="10-print-hub.html">返回打印扫描</a><a class="qx-ai" href="05-ai-cockpit.html?state=composer" onclick="try{sessionStorage.setItem('kiosk-assistant-draft','我有几张图片，想按我排的顺序合成一份 PDF。请告诉我怎么排、排完能带走什么。')}catch(e){}">问小青：这几张图怎么排 →</a></div>
 <nav class="navbar" aria-label="全局导航">
@@ -715,13 +715,13 @@ function addRow(disabled,reason){
 function retention(loggedIn){
  return '<div class="pgrp" data-testid="'+SCREEN+'-retention" data-auth="'+(loggedIn?'in':'out')+'"><h4>生成之后放哪</h4><div class="state-p">'+(loggedIn
   ? '转换生成的 PDF 会进<b>「我的文档」</b>，默认保存约 24 小时，可以在那一页手动延长保存期限。'
-  : '<b>未登录状态下生成的 PDF 不会进入「我的文档」</b>，只能在本次操作内直接继续；这是公用终端，也<b>不会下载到本机</b>。')+
+  : '<b>未登录状态下生成的 PDF 不会进入「我的文档」</b>，只能在本次操作内直接继续；这是公共终端，也<b>不会下载到本机</b>。')+
   '</div><div class="state-p">打印用的临时链接 <b>30 分钟内有效</b>，过期后回到这一页重新取一次。</div></div>';
 }
 function retentionShort(loggedIn){
  return '<div class="pgrp" data-testid="'+SCREEN+'-retention" data-auth="'+(loggedIn?'in':'out')+'"><h4>生成之后放哪</h4><div class="state-p">'+(loggedIn
   ? '生成的 PDF 会进<b>「我的文档」</b>，默认保存约 24 小时，可以在那一页手动延长。'
-  : '<b>未登录状态下生成的 PDF 不会进入「我的文档」</b>，只能在本次操作内直接继续；这是公用终端，也<b>不会下载到本机</b>。')+
+  : '<b>未登录状态下生成的 PDF 不会进入「我的文档」</b>，只能在本次操作内直接继续；这是公共终端，也<b>不会下载到本机</b>。')+
   '</div><div class="state-p">打印用的临时链接 <b>30 分钟内有效</b>。</div></div>';
 }
 function rules(){
