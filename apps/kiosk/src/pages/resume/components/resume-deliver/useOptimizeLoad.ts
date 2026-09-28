@@ -30,13 +30,14 @@ export function useOptimizeLoad(opts: {
   setFailMsg: Dispatch<SetStateAction<string | null>>
   setModules: Dispatch<SetStateAction<ResumeOptimizeModule[]>>
   setOptimizedResume: Dispatch<SetStateAction<GeneratedResume | null>>
+  setBaseResume?: Dispatch<SetStateAction<GeneratedResume | null>>
   setTemplatesError: Dispatch<SetStateAction<boolean>>
   setResumeTemplates: Dispatch<SetStateAction<ResumeTemplate[]>>
   setSelectedTemplateId: Dispatch<SetStateAction<string>>
 }) {
   const {
     taskId, existingOnly = false, access, syntheticReady, requested, consentChecking, consentNeedsPrompt, consentReady, retryNonce,
-    setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume,
+    setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume, setBaseResume,
     setTemplatesError, setResumeTemplates, setSelectedTemplateId,
   } = opts
   const [requestBusy, setRequestBusy] = useState(false)
@@ -62,7 +63,9 @@ export function useOptimizeLoad(opts: {
       setLoading(false)
       setFailMsg(null)
       setModules(requested === 'ready' ? SYNTHETIC_MODULES : [])
-      setOptimizedResume(requested === 'ready' ? SYNTHETIC_RESUME : null)
+      const nextResume = requested === 'ready' ? SYNTHETIC_RESUME : null
+      setOptimizedResume(nextResume)
+      setBaseResume?.(nextResume)
       return
     }
     if (!taskId) { setLoading(false); setFailKind('reparse'); setFailMsg('优化建议基于诊断结果生成。回到 AI 简历服务上传简历并完成诊断后，再进入本页。'); return }
@@ -78,6 +81,7 @@ export function useOptimizeLoad(opts: {
     }, OPTIMIZE_LOAD_LIMIT_MS)
     setModules([])
     setOptimizedResume(null)
+    setBaseResume?.(null)
     setLoading(true)
     setFailMsg(null)
     getResumeOptimize(taskId, { token, accessToken }, existingOnly)
@@ -86,6 +90,7 @@ export function useOptimizeLoad(opts: {
         if (res.status === 'completed') {
           setModules(res.modules ?? [])
           setOptimizedResume(res.optimizedResume ?? null)
+          setBaseResume?.(res.optimizedResume ?? null)
           if (!res.optimizedResume && (res.modules ?? []).length === 0) {
             setFailKind('retry')
             setFailMsg('暂无优化建议，可重试一次；若仍没有内容请返回重新解析')
@@ -112,5 +117,5 @@ export function useOptimizeLoad(opts: {
       })
       .finally(() => { if (!cancelled) { clearTimeout(timer); setLoading(false); setRequestBusy(false) } })
     return () => { cancelled = true; clearTimeout(timer); setRequestBusy(false) }
-  }, [taskId, existingOnly, token, accessToken, consentChecking, consentNeedsPrompt, consentReady, retryNonce, syntheticReady, requested, setFailKind, setFailMsg, setLoading, setModules, setOptimizedResume])
+  }, [taskId, existingOnly, token, accessToken, consentChecking, consentNeedsPrompt, consentReady, retryNonce, syntheticReady, requested, setBaseResume, setFailKind, setFailMsg, setLoading, setModules, setOptimizedResume])
 }

@@ -2,7 +2,9 @@ import type { GeneratedResume, ResumeOptimizeModule } from '@ai-job-print/shared
 
 export type ResumeModuleDecision = 'original' | 'optimized'
 export type ResumeDecisionMap = Record<string, ResumeModuleDecision>
-export type ResumeDecisionFailureReason = 'original-empty' | 'edited'
+export type ResumeDecisionFailureReason = 'original-empty' | 'edited' | 'not-found'
+/** 按基准稿就能判定、与编辑区无关的「切换不了」原因。 */
+export type ResumeSwitchBlock = Extract<ResumeDecisionFailureReason, 'not-found' | 'original-empty'>
 export type ResumeDecisionFailure = { key: string; reason: ResumeDecisionFailureReason }
 export type ResumeTextReplacement = { resume: GeneratedResume; applied: boolean }
 
@@ -55,13 +57,36 @@ function resumeContainsText(resume: unknown, text: string): boolean {
   return false
 }
 
+/**
+ * 这一条能不能在页面上来回切换，按刚加载的优化稿（基准稿）判断，不看编辑区：
+ * - 'not-found'：改写没有原样写进优化稿（服务端不校验这一点，演示模式的建议句也不在正文里），换不了；
+ * - 'original-empty'：原文为空的新增句，删掉后没有位置能换回来，不给单向的开关；
+ * - null：可以切换。没有基准稿时（尚未加载）按可以切换处理。
+ */
+export function moduleSwitchBlock(
+  base: GeneratedResume | null | undefined,
+  module: ResumeOptimizeModule,
+): ResumeSwitchBlock | null {
+  if (!base) return null
+  if (!module.after || !resumeContainsText(base, module.after)) return 'not-found'
+  if (!module.before.trim()) return 'original-empty'
+  return null
+}
+
+export function isModuleSwitchable(base: GeneratedResume | null | undefined, module: ResumeOptimizeModule): boolean {
+  return moduleSwitchBlock(base, module) === null
+}
+
 export function toggleModuleDecision(
   resume: GeneratedResume,
   module: ResumeOptimizeModule,
   current: ResumeModuleDecision,
   next: ResumeModuleDecision,
+  base?: GeneratedResume | null,
 ): { resume: GeneratedResume; applied: boolean; reason?: ResumeDecisionFailureReason } {
   if (current === next) return { resume, applied: true }
+  const block = moduleSwitchBlock(base, module)
+  if (block) return { resume, applied: false, reason: block }
   const from = next === 'original' ? module.after : module.before
   const to = next === 'original' ? module.before : module.after
   const result = replaceResumeTextWithStatus(resume, from, to)
@@ -74,6 +99,7 @@ export function applyDecisionChanges(
   modules: ResumeOptimizeModule[],
   current: ResumeDecisionMap,
   changes: Array<[string, ResumeModuleDecision]>,
+  base?: GeneratedResume | null,
 ): { resume: GeneratedResume; decisions: ResumeDecisionMap; failures: ResumeDecisionFailure[] } {
   let nextResume = resume
   const nextDecisions = { ...current }
@@ -81,7 +107,7 @@ export function applyDecisionChanges(
   for (const [key, next] of changes) {
     const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
     if (index < 0) continue
-    const result = toggleModuleDecision(nextResume, modules[index], nextDecisions[key] ?? 'optimized', next)
+    const result = toggleModuleDecision(nextResume, modules[index], nextDecisions[key] ?? 'optimized', next, base)
     nextResume = result.resume
     if (result.applied) nextDecisions[key] = next
     else if (result.reason) failures.push({ key, reason: result.reason })

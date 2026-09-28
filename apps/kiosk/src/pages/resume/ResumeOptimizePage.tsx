@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { makePrintParams, type ResumeExportFormat } from '@ai-job-print/shared'
+import { makePrintParams, type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
@@ -41,6 +41,8 @@ import {
   moduleKeyOf,
   parseDecisionMap,
   toggleModuleDecision,
+  isModuleSwitchable,
+  moduleSwitchBlock,
   type ResumeDecisionFailure,
   type ResumeModuleDecision,
 } from './components/resume-deliver/resumeDecisions'
@@ -86,6 +88,7 @@ export function ResumeOptimizePage() {
     decisions, setDecisions, draftAccepted, setDraftAccepted,
   } = useOptimizeSession(query.format, Boolean(token))
   const [decisionIssues, setDecisionIssues] = useState<Record<string, string>>({})
+  const [baseResume, setBaseResume] = useState<GeneratedResume | null>(null)
 
   useBusyLock(exporting || printNavigating || Boolean(adjusting))
   const syntheticReady = query.capture || query.debug
@@ -93,7 +96,7 @@ export function ResumeOptimizePage() {
     taskId, access, syntheticReady, requested: query.requested,
     existingOnly,
     consentChecking: consent.checking, consentNeedsPrompt: consent.needsPrompt, consentReady: consent.ready, retryNonce,
-    setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume,
+    setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume, setBaseResume,
     setTemplatesError, setResumeTemplates, setSelectedTemplateId,
   })
 
@@ -131,9 +134,11 @@ export function ResumeOptimizePage() {
   const issueMessage = (failure: ResumeDecisionFailure) => {
     const index = modules.findIndex((module, i) => moduleKeyOf(module, i) === failure.key)
     const number = index + 1
-    return failure.reason === 'original-empty'
-      ? `第 ${number} 条原文是空的，换回改写要在编辑区里手动加上。`
-      : `第 ${number} 条在编辑区里改过，没法自动换回这一版，请在编辑区里手动改。`
+    return failure.reason === 'not-found'
+      ? `第 ${number} 条的改写在优化稿里找不到原句，这里没法替你换，请在编辑区里对照着改。`
+      : failure.reason === 'original-empty'
+      ? `第 ${number} 条是新加的一句，原文里没有对应的句子，这里没法替你换，请在编辑区里对照着改。`
+      : `第 ${number} 条那段文字在编辑区里已经变了，没法自动换，请在编辑区里对照着改。`
   }
   const setDecisionFailures = (failures: ResumeDecisionFailure[]) => {
     setDecisionIssues(Object.fromEntries(failures.map((failure) => [failure.key, issueMessage(failure)])))
@@ -148,7 +153,7 @@ export function ResumeOptimizePage() {
   const handleDecisionChange = (key: string, next: ResumeModuleDecision) => {
     const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
     if (index < 0 || !optimizedResume) return
-    const result = toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next)
+    const result = toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next, baseResume)
     if (!result.applied) {
       setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [])
       return
@@ -161,8 +166,11 @@ export function ResumeOptimizePage() {
   /** 总览的两个批量动作：全部用改写 / 全部保留原文。与逐条切换走同一个替换函数，结果一致。 */
   const handleBatch = (next: ResumeModuleDecision) => {
     if (!optimizedResume) return
-    const changes = modules.map((module, index): [string, ResumeModuleDecision] => [moduleKeyOf(module, index), next])
-    const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes)
+    const changes = modules.flatMap((module, index): Array<[string, ResumeModuleDecision]> => {
+      if (!isModuleSwitchable(baseResume, module)) return []
+      return [[moduleKeyOf(module, index), next]]
+    })
+    const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
     setOptimizedResume(applied.resume)
     setDecisions(applied.decisions)
     setDecisionFailures(applied.failures)
@@ -175,7 +183,7 @@ export function ResumeOptimizePage() {
     state, modules, optimizedResume, decisions, ready: editorOpen,
     apply: (changes) => {
       if (!optimizedResume) return
-      const next = applyDecisionChanges(optimizedResume, modules, decisions, changes)
+      const next = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
       setOptimizedResume(next.resume); setDecisions(next.decisions); setDecisionFailures(next.failures)
       if (next.failures.length < changes.length) markEdited()
     },
@@ -347,6 +355,7 @@ export function ResumeOptimizePage() {
           <OptimizeOverview
             modules={modules}
             decisions={decisions}
+            switchBlocks={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), moduleSwitchBlock(baseResume, module)]))}
             synthetic={resolved.synthetic}
             disabled={loading || exporting || Boolean(adjusting)}
             decisionIssues={decisionIssues}
