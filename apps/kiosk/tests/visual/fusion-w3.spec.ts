@@ -701,6 +701,56 @@ test('resume parse server failure is labelled failed, never as the running step 
   await expect(page.getByRole('button', { name: /重试|重新/ })).toBeVisible()
 })
 
+/**
+ * 诊断失败屏上的「打印我上传的原件」：用户自己的简历原件（resume_upload · original）。
+ * 生产强制 PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒 PRINT_PII_SCAN_REQUIRED，
+ * 所以它必须带着**这一份文件的 fileId** 去打印台材料检查，不直达报价确认页（商用收口 P0-5）。
+ * fileId 来自上传结果：来源页把它放在解析页 state 顶层，失败时整份 state 转给报告页。
+ */
+test('diagnosis failure prints the uploaded original through the print desk material check @w3-kiosk', async ({ page, api }) => {
+  const inspection = {
+    id: 'w3-original-inspection', kind: 'inspection', status: 'processing', requesterMode: 'anonymous',
+    accessToken: 'w3-original-inspection-token', sourceFileId: uploadedResume.data.fileId, resultFileId: null, endUserId: null,
+    params: {}, result: null, errorCode: null, errorMessage: null,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  }
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: inspection } })
+  api.respond('GET', `/api/v1/materials/tasks/${inspection.id}`, { status: 200, json: { success: true, data: inspection } })
+  await page.route('**/w3-fixtures/resume.pdf', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  await page.route('**/api/v1/resume/parse', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ taskId: 'resume-w3-failed', status: 'failed', failReason: '文字识别失败，请确保文件清晰', accessToken: 'w3-failed-access' }),
+  }))
+
+  await page.goto('/resume/source')
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.waitForURL('/resume/report')
+  await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
+
+  const inspectionCreated = page.waitForRequest((request) =>
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
+  )
+  await page.getByTestId('resume-report-fail-exits').getByRole('button', { name: /打印我上传的原件/ }).click()
+  await page.waitForURL(/\/print\/desk\?step=check$/)
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
+  expect((await inspectionCreated).postDataJSON()).toMatchObject({ kind: 'inspection', sourceFileId: uploadedResume.data.fileId })
+  await expect(page.locator('.qpd-preview-meta strong')).toHaveText('求职简历.pdf')
+  const stored = await page.evaluate(() =>
+    JSON.parse(window.sessionStorage.getItem('ai-job-print:current-print-material-check') ?? 'null') as Record<string, unknown> | null,
+  )
+  expect(stored).toMatchObject({
+    source: 'resume',
+    file: { fileId: uploadedResume.data.fileId, fileUrl: uploadedResume.data.signedUrl, name: '求职简历.pdf', mimeType: 'application/pdf' },
+  })
+  expect(api.requestCount('POST', '/api/v1/orders/quote'), '原件检查完之前不报价').toBe(0)
+})
+
 test('resume parse public quota rejection clears the local intent before the failure report @w3-kiosk', async ({ page, api }) => {
   const posts: Array<{ intent: string; proof: string }> = []
   terminalBaseline(api)

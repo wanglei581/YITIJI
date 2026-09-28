@@ -10,6 +10,8 @@
  *   6. 状态查询：getStatus 反映终态；不存在任务 → 404 PRINT_TASK_NOT_FOUND。
  *   9. 动态价格二次确认：quotedAmountCents 与服务端重算不一致 → 409 PRICE_CHANGED 且零建单副作用。
  *   1d. 有效 HMAC 仍拒绝 uploading（含 resume_export_pending）/ quarantined / deleted / expired，active 对照可建单。
+ *   P0-5. PRINT_REQUIRE_PII_SCAN=true（生产强制）下：6 类 AI 生成打印稿按源码上传实参建文件后可建单；
+ *         未做隐私检查的 print_doc 原件被拒 PRINT_PII_SCAN_REQUIRED（阳性对照）。见 support/ai-artifact-print-pii-gate.ts。
  *
  * 1–8 与 9 的 service 段直调真库（prisma），不起 HTTP server——确定性、CI 友好。
  * 9 的 HTTP 段另起进程内 Nest：真实 PrintJobsController + main.ts 同款 ValidationPipe
@@ -48,6 +50,7 @@ import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import type { CreatePrintJobDto } from '../src/print-jobs/dto/create-print-job.dto'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { buildRealPdf } from './support/minimal-pdf'
+import { verifyAiArtifactPrintPiiGate } from './support/ai-artifact-print-pii-gate'
 
 // 静态门禁按源码顺序要求本调用先于任何 Prisma 客户端构造，含下方 claim 屏障的辅助连接。
 assertIsolatedVerificationDatabase()
@@ -780,6 +783,21 @@ async function main() {
       'PII_SCAN_STALE',
       'API-27c 建单比对 sha256 不一致 → 409 PII_SCAN_STALE',
     )
+
+    // ── P0-5. 生产开关 PRINT_REQUIRE_PII_SCAN=true：AI 产物可建单，未检查的原件被拒 ──
+    // 实现与判据写在 support 里（本文件已超千行，只留调用）；夹具随本文件的 cleanup 一起清。
+    await verifyAiArtifactPrintPiiGate({
+      apiRoot: process.cwd(),
+      prisma,
+      files: new FilesService(prisma, audit, storage),
+      printJobs,
+      terminalId,
+      pdfBytes,
+      trackFile: (id, key) => { fixtureFileIds.push(id); fixtureStorageKeys.push(key) },
+      trackTask: (id) => { createdTaskIds.push(id) },
+      pass,
+      fail,
+    })
 
     async function sessionFor(taskId: string): Promise<string> {
       const order = await prisma.order.findFirst({ where: { printTaskId: taskId } })
