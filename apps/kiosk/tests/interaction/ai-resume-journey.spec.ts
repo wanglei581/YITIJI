@@ -401,6 +401,8 @@ test('J3 匿名 · AI 帮你生成一份 → 预览 → 导出 PDF @interaction'
         const cta = page.getByTestId('resume-generate-preview-cta-export')
         if (await cta.count()) await cta.click()
         else await page.getByRole('button', { name: /去导出|导出 PDF/ }).click()
+        const confirm = page.getByTestId('resume-generate-preview-cta-confirm-export')
+        if (await confirm.count()) await confirm.click()
         await confirmFactsIfOpen(page, journey, collectors)
         await page.waitForTimeout(1500)
       },

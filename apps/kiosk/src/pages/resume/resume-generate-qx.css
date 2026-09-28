@@ -238,12 +238,14 @@
   设计稿 input-basic 的表单卡是撑满可用高度、内部元素分散排布的。
   只在本页作用域内做，不动共享的 .qx-card。
 */
-.qx-resume-generate .qx-rd-main {
+/* 只作用于填写步。预览屏若套上同一条 flex:1 + min-height:0 + overflow，
+   简历卡会被压成一条空白（2026-09-28 并排图）。 */
+.qx-resume-generate[data-kiosk-screen="resume-generate"] .qx-rd-main {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-.qx-resume-generate .qx-rd-main > .qx-card {
+.qx-resume-generate[data-kiosk-screen="resume-generate"] .qx-rd-main > .qx-card {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -254,8 +256,8 @@
 }
 /* 标题和字段贴顶，说明卡压到卡片底部（稿 24 input-basic）；
    余量只留在字段与说明之间一处，不再均摊成标题上下三道空隙。 */
-.qx-resume-generate .qx-rd-main > .qx-card > .qx-rd-notes { margin-top: auto; }
-.qx-resume-generate .qx-rd-main > .qx-card > .grid {
+.qx-resume-generate[data-kiosk-screen="resume-generate"] .qx-rd-main > .qx-card > .qx-rd-notes { margin-top: auto; }
+.qx-resume-generate[data-kiosk-screen="resume-generate"] .qx-rd-main > .qx-card > .grid {
   flex: none;
   align-content: start;
 }

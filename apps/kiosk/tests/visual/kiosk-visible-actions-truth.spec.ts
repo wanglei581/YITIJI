@@ -316,12 +316,22 @@ test('生成预览读回真实结果后导出 payload 正确 @kiosk', async ({ p
   await expect(page.getByText('未填写联系邮箱，招聘方可能无法联系你')).toBeVisible()
   await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('回去改资料')
   await expect(page.getByTestId('resume-generate-preview-cta-export')).toHaveText('内容没问题，去导出')
+  const summary = page.getByLabel('个人简介')
+  await summary.fill('核对时改过的简介。')
   await page.screenshot({ path: test.info().outputPath('generate-preview-ready-1080x1920.png') })
+
+  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await expect(page.getByRole('heading', { name: '选导出格式' })).toBeVisible()
+  await expect(page.getByTestId('resume-generate-preview-cta-confirm-export')).toHaveText('导出这一份')
+  await page.getByRole('button', { name: '返回预览' }).click()
+  await expect(page.getByRole('heading', { name: '生成结果' })).toBeVisible()
+  await expect(summary).toHaveValue('核对时改过的简介。')
+  await page.getByTestId('resume-generate-preview-cta-export').click()
 
   const exportRequest = page.waitForRequest((request) => (
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
   ))
-  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
   for (const box of await page.getByRole('checkbox').all()) {
     await box.check()
   }
