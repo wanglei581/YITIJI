@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。9/28 去掉内部英文键名。另有一版重排结构的提案见 STATUS.md，不是默认。
+<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。9/28 去掉内部英文键名。9/28 留白：内容结构每块的「命中几条问题」标签挪到标题行右端；非报告态的出口行按内容定高（不再拉成空盒），剩余高度分到卡片之间，解析中断与空报告两屏出口行、自查清单放宽一档；早期报告的「报告结论」建议条均匀排开。只改样式，无新增内容。另有一版重排结构的提案见 STATUS.md，不是默认。
      原稿：../kiosk-redesign-2026-08/22-resume-report.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
 <html lang="zh-CN">
 <head>
@@ -635,6 +635,20 @@ html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after
 .idbar,.prov,.provlegend,.proto-tab,.proto-panel,.truth{display:none!important}
 /* 报告的显式 AI 标识贴在结果旁（原 head-tag 只说「已读取」） */
 .head-tag::after{content:" · AI 生成"}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 内容结构的每一块：「命中几条问题 · 几条证据」标签挪到这一块标题行的右端，右半屏不再空出一长条。
+   2. 非报告态（没有编号 / 读取中 / 空报告 / 读取失败 / 解析中断 / 未接通 / 参数不合法）：出口行按内容定高
+      （原来被拉满整张卡，解析中断那一屏一行 180px 只有两行字），剩下的高度平均分到卡片之间和上下两头；
+      卡片最少的两态（解析中断、空报告）出口行和自查清单各放宽一档。
+   3. 早期报告的「报告结论」分区：建议条按内容定高、在列表里均匀排开，不再上面一排、下面空一截。 */
+.blk .bhd .tag{margin-left:auto}
+.exits{flex:0 0 auto}
+.exits .rows{flex:none;grid-auto-rows:auto}
+.body{justify-content:space-evenly}
+#body-root:is([data-state="diagnose-failed"],[data-state="report-empty"]) .row{min-height:104px}
+#body-root:is([data-state="diagnose-failed"],[data-state="report-empty"]) .checks .list>div{min-height:84px}
+#body-root[data-state="report-minimal"] .scroll[data-fill="1"]{justify-content:space-evenly}
+#body-root[data-state="report-minimal"] .scroll[data-fill="1"]>.it{flex:none;min-height:88px}
 </style>
 </head>
 <body>

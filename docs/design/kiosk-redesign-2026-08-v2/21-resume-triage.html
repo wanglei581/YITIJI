@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/28 留白：正文区剩下的高度平均分到区块之间（不再全堆在「上一步」上方）；目标设置工作台恢复自己滚，摘要条与「用这些设置，去取文件」回到屏内；手机扫码几态二维码右边的说明卡不再跑出屏幕右边；出错卡、要点卡、步骤格、通道卡内边距回到接近原稿；内容最多的九态各收一档让主按钮回到屏内；最空的四态与确认页把原因卡、事实行放宽。只改样式，无新增内容。
 - 9/28 逐状态检查修压字
 - 验证状态：未自验，协调方复核。review/findings.md 为返工前实拍发现；返工后的触达、溢出、字号和框数尚待协调方再次实测。
 - 保留原稿主体与脚本；追加样式并做下列精确替换，颜色、圆角、字体栈不变（规则 2、6）。
@@ -979,6 +980,44 @@ html.flat *::after,html[data-flat="1"] *::after{
 #stage:has(#body-root[data-state="target-context"]) .truth{padding:4px 36px}
 #body-root[data-state="target-context"]{gap:6px;padding-top:4px;padding-bottom:2px}
 #body-root[data-state="target-context"] .jnote{margin-top:4px}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容或按钮挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 正文区剩下的高度平均分到区块之间和上下两头（space-evenly），不再全堆在「上一步」上方；
+      满屏的态分到 0，版面不变；内容超出时仍从顶端排，不会把上面的区块推出去。
+   2. 目标设置工作台恢复「工作台自己滚」：上一轮给正文区所有子块加了 flex:0 0 auto，工作台不再滚，
+      摘要条和「用这些设置，去取文件」被挤出屏幕。工作台一滚，这一屏也不用再单独压英雄区、
+      底部问句和说明条，回到和其他状态一样。
+   3. 手机扫码几态：二维码右边的说明卡按剩余宽度排。上一轮「按内容定高」让它按一整行字的宽度排开，
+      文字跑出屏幕右边。
+   4. 出错卡、三列要点卡、步骤格、通道卡的内边距回到接近原稿；出错说明行高 1.6 → 1.5（规则 2）。
+   5. 内容最多的九态（scan-ready、usb-importing、usb-import-failed、usb-ready、phone-cancel-failed、
+      upload-unknown、upload-rechecking、parse-unknown、parse-rechecking）：区块间距、通道条、事实行、
+      文件卡、出口卡、按钮各收一档，主按钮一排回到屏内（会员账号、扫描件来源也放得下）；这九态不吃第 4 条。
+   6. 内容最少的四态（unknown、scan-expired、scan-unavailable、scan-failed）与确认页 summary：
+      原因卡、事实行放宽，剩下的再分到区块之间。 */
+#body-root{justify-content:space-evenly}
+#body-root>.wb{flex:1 1 auto!important;min-height:0}
+#stage:has(#body-root[data-state="target-context"]) .xq{padding:8px 28px 6px}
+#stage:has(#body-root[data-state="target-context"]) .qx2-actions{min-height:64px;padding:8px 44px}
+#stage:has(#body-root[data-state="target-context"]) .truth{padding:10px 44px}
+#body-root[data-state="target-context"]{gap:8px;padding-top:8px;padding-bottom:6px}
+.blk.grow .qrside .card{flex:1 1 0;min-width:0}
+.fail .fbdy{line-height:1.5}
+#body-root:not(:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"])) .fail{padding:18px 24px}
+#body-root:not(:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"])) .tri-c{padding:16px 18px}
+#body-root:not(:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"])) .sb-i{padding:10px 12px}
+#body-root:not(:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"])) .chan{padding:12px 16px}
+#body-root:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"]){gap:6px}
+#body-root:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"]) .track{padding:8px 20px}
+#body-root:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"]) .row-i{padding:10px 0}
+#body-root:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"]) [data-testid="rs-file-card"]{padding:16px 22px}
+#body-root:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"]) .meta{margin-top:12px;padding-top:10px;row-gap:8px}
+#body-root:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"]) .out{min-height:80px}
+#body-root:is([data-state="scan-ready"],[data-state="usb-importing"],[data-state="usb-import-failed"],[data-state="usb-ready"],[data-state="phone-cancel-failed"],[data-state="upload-unknown"],[data-state="upload-rechecking"],[data-state="parse-unknown"],[data-state="parse-rechecking"]) .btn{min-height:88px}
+#body-root[data-state="phone-cancel-failed"] .qrbox{padding:14px;gap:8px}
+#body-root:is([data-state="unknown"],[data-state="scan-expired"],[data-state="scan-unavailable"],[data-state="scan-failed"]) .stop{padding:30px 32px}
+#body-root:is([data-state="unknown"],[data-state="scan-expired"],[data-state="scan-unavailable"],[data-state="scan-failed"]) .row-i{padding:18px 0}
+#body-root:is([data-state="unknown"],[data-state="scan-expired"],[data-state="scan-unavailable"],[data-state="scan-failed"]) .blk{gap:12px}
+#body-root[data-state="summary"] .rows.kv .row-i{padding:18px 0}
 
 </style>
 </head>
