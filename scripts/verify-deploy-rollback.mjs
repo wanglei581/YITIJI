@@ -33,9 +33,7 @@ const check = (ok, message, detail = '') => (ok ? pass(message) : fail(detail ? 
 // ── deploy.yml 静态检查（静态目录那一段没法在本机真跑：它要 nginx 与 secrets）───────────
 check(workflow.includes('if [ -z "${DEPLOY_ADMIN_WEB_ROOT:-}" ] || [ -z "${DEPLOY_PARTNER_WEB_ROOT:-}" ]; then'),
   'full 发布缺后台目录配置时直接失败，不再静默跳过')
-const trapLine = workflow.split('\n').find((line) => line.includes("trap '") && line.includes('STATIC_SWAPPED')) ?? ''
-check(Boolean(trapLine) && !/rm -rf -- "\$STATIC_STAGE_ROOT" "\$STATIC_BACKUP_DIR"/.test(trapLine) && /restore_static_roots; else rm -rf -- "\$STATIC_BACKUP_DIR"; fi/.test(trapLine),
-  '静态目录切换失败时恢复并保留备份（只在尚未切换时删掉不完整的备份）')
+check(/\nconcurrency:\n  group: production-deploy\n  cancel-in-progress: false\n/.test(workflow), '生产发布串行：concurrency 组、不取消进行中的发布')
 check(workflow.indexOf('✅ API-only 部署完成') >= 0 && workflow.indexOf('✅ API-only 部署完成') < workflow.indexOf('STATIC_BACKUP_ROOT'),
   'API-only 在静态目录备份之前退出')
 // 变量名后面紧跟中文标点（如 "$HEALTH_URL）"）：非 UTF-8 语言环境下 bash 会把那个字节当成变量名的一部分，
@@ -275,8 +273,102 @@ try {
   for (const box of boxes) rmSync(box.dir, { recursive: true, force: true })
 }
 
+// ── deploy.yml 三端静态目录：按标记抽出这段脚本，替换 secrets 与服务器路径，在沙箱里真跑 ─────────
+function staticBlock(paths) {
+  const lines = workflow.split('\n')
+  const start = lines.findIndex((line) => line.includes('echo "=== 备份并准备三端静态目录 ==="'))
+  let end = lines.findIndex((line, index) => index > start && line.includes('xargs -r rm -rf --'))
+  if (start < 0 || end < 0) throw new Error('deploy.yml 里找不到静态目录那一段的起止标记')
+  const block = lines.slice(start, end + 1)
+  const indent = block[0].match(/^\s*/)[0].length
+  return block.map((line) => line.slice(Math.min(indent, line.match(/^\s*/)[0].length))).join('\n')
+    .replace(/\$\{\{ secrets\.DEPLOY_WEB_ROOT \}\}/g, paths.kiosk)
+    .replace('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"', `STATIC_BACKUP_ROOT="${paths.backups}"`)
+}
+
+function staticSandbox({ oldBackups = 0 } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'static-drill-'))
+  const bin = join(dir, 'bin'); mkdirSync(bin)
+  makeShims(bin)
+  // cp 替身：切换某一端时（目标是这端的线上目录）失败一次，之后放行（恢复要能拷回去）
+  writeExec(join(bin, 'cp'), `#!/usr/bin/env bash
+last="\${!#}"
+if [ -n "\${DRILL_CP_FAIL_TO:-}" ] && [ "\${last%/}" = "\${DRILL_CP_FAIL_TO%/}" ] && [ ! -f "$DRILL_DIR/cp-failed-once" ]; then
+  touch "$DRILL_DIR/cp-failed-once"; echo "drill: cp 注入失败" >&2; exit 1
+fi
+exec /bin/cp "$@"
+`)
+  writeExec(join(bin, 'nginx'), '#!/usr/bin/env bash\n[ "${DRILL_NGINX_FAIL:-}" = 1 ] && exit 1\nexit 0\n')
+  writeExec(join(bin, 'systemctl'), '#!/usr/bin/env bash\n[ "${DRILL_NGINX_FAIL:-}" = 1 ] && exit 1\nexit 0\n')
+  const checkout = join(dir, 'checkout')
+  const live = { kiosk: join(dir, 'www/kiosk'), admin: join(dir, 'www/admin'), partner: join(dir, 'www/partner') }
+  for (const app of ['kiosk', 'admin', 'partner']) {
+    mkdirSync(join(checkout, 'apps', app, 'dist'), { recursive: true })
+    writeFileSync(join(checkout, 'apps', app, 'dist', 'index.html'), `new-${app}-release\n`)
+    mkdirSync(live[app], { recursive: true })
+    writeFileSync(join(live[app], 'index.html'), `old-${app}\n`)
+  }
+  const backups = join(dir, 'static-backups')
+  mkdirSync(backups)
+  for (let i = 0; i < oldBackups; i += 1) {
+    const d = join(backups, `2026090${i}T000000Z-old${i}`)
+    mkdirSync(d)
+    const t = new Date(Date.UTC(2026, 8, 1 + i))
+    utimesSync(d, t, t)
+  }
+  const script = join(dir, 'static.sh')
+  writeFileSync(script, `set -euo pipefail\ncd "${checkout}"\n${staticBlock({ kiosk: live.kiosk, backups })}\necho STATIC_OK\n`)
+  return { dir, bin, live, backups, script }
+}
+
+function runStatic(box, extraEnv) {
+  const env = {
+    ...process.env,
+    PATH: `${box.bin}:${process.env.PATH}`,
+    LC_ALL: 'C',
+    LANG: 'C',
+    EXPECTED_SHA: 'drillsha',
+    RUNNER_TEMP: join(box.dir, 'runner-temp'),
+    DEPLOY_ADMIN_WEB_ROOT: box.live.admin,
+    DEPLOY_PARTNER_WEB_ROOT: box.live.partner,
+    DRILL_DIR: box.dir,
+    ...extraEnv,
+  }
+  mkdirSync(env.RUNNER_TEMP, { recursive: true })
+  const result = spawnSync('bash', [box.script], { env, encoding: 'utf8' })
+  return { code: result.status, out: `${result.stdout}\n${result.stderr}` }
+}
+
+const staticBoxes = []
+try {
+  const content = (box) => ['kiosk', 'admin', 'partner'].map((app) => read(join(box.live[app], 'index.html'))).join(' ')
+  {
+    const box = staticSandbox({ oldBackups: 4 }); staticBoxes.push(box)
+    const r = runStatic(box, {})
+    check(r.code === 0 && content(box) === 'new-kiosk-release new-admin-release new-partner-release', '静态 1：切换成功，三端都是新版本', `退出码 ${r.code} 内容 ${content(box)}\n${r.out.slice(-600)}`)
+    check(readdirSync(box.backups).length === 3, '静态 1：成功后旧备份按组清理到 3 组', `剩 ${readdirSync(box.backups).length} 组`)
+  }
+  {
+    const box = staticSandbox({ oldBackups: 4 }); staticBoxes.push(box)
+    const r = runStatic(box, { DRILL_CP_FAIL_TO: box.live.admin })
+    check(r.code !== 0, '静态 2：admin 切换中途失败时以失败结束', `退出码 ${r.code}`)
+    check(content(box) === 'old-kiosk old-admin old-partner', '静态 2：已切换的 kiosk 与切到一半的 admin 都恢复成旧版本（函数内失败也要触发恢复）', `实际 ${content(box)}\n${r.out.slice(-600)}`)
+    check(readdirSync(box.backups).length === 5, '静态 2：失败时本次备份保留、旧备份不清理', `剩 ${readdirSync(box.backups).length} 组`)
+  }
+  {
+    const box = staticSandbox({ oldBackups: 4 }); staticBoxes.push(box)
+    const r = runStatic(box, { DRILL_NGINX_FAIL: '1' })
+    check(r.code !== 0 && content(box) === 'old-kiosk old-admin old-partner', '静态 3：nginx 重载失败时三端都恢复成旧版本', `退出码 ${r.code} 内容 ${content(box)}`)
+    check(readdirSync(box.backups).length === 5, '静态 3：重载失败时不清理任何备份', `剩 ${readdirSync(box.backups).length} 组`)
+  }
+} catch (error) {
+  fail(`静态目录演练无法运行：${error instanceof Error ? error.message : String(error)}`)
+} finally {
+  for (const box of staticBoxes) rmSync(box.dir, { recursive: true, force: true })
+}
+
 if (failures) {
   console.error(`\nverify:deploy-rollback：${failures} 项失败`)
   process.exit(1)
 }
-console.log('\nverify:deploy-rollback 通过（真跑发布脚本 5 个场景）')
+console.log('\nverify:deploy-rollback 通过（真跑发布脚本 5 个场景 + 静态目录 3 个场景）')

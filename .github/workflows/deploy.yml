@@ -27,6 +27,12 @@ on:
           - api-only
           - full
 
+# 同一时间只跑一个生产发布：两次合并紧挨着时不并发改同一个运行目录；进行中的不取消（回退要走完），
+# 排队的只保留最新一次。
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to server
@@ -299,22 +305,37 @@ jobs:
               mkdir -p "$STATIC_STAGE_ROOT/$label"
               cp -a "$source/." "$STATIC_STAGE_ROOT/$label/"
             }
-            restore_static_roots() {
-              local label root
-              for label in $STATIC_SWAPPED; do
-                case "$label" in
-                  kiosk) root="${DEPLOY_WEB_ROOT:?}" ;;
-                  admin) root="$DEPLOY_ADMIN_WEB_ROOT" ;;
-                  partner) root="$DEPLOY_PARTNER_WEB_ROOT" ;;
-                esac
-                rm -rf -- "$root"
-                mkdir -p "$root"
-                cp -a "$STATIC_BACKUP_DIR/$label/." "$root/"
-              done
-            }
-            # 已切换过任何一个目录：恢复并保留备份（恢复中途失败时它是唯一的回退锚点）；
+            # 失败处理：已切换过任何一个目录就逐端恢复并保留备份（恢复中途失败时它是唯一的回退锚点）；
             # 还没切换：线上没动过，只删掉不完整的备份与暂存目录。
-            trap 'if [ -n "$STATIC_SWAPPED" ]; then echo "::error::静态目录切换失败，恢复 full 发布前备份（备份保留在 ${STATIC_BACKUP_DIR}）" >&2; restore_static_roots; else rm -rf -- "$STATIC_BACKUP_DIR"; fi; rm -rf -- "$STATIC_STAGE_ROOT"' ERR
+            # 先撤陷阱、关 errexit：某一端恢复失败不能打断其余几端的恢复；最后一律以失败结束。
+            on_static_failure() {
+              local label root
+              trap - ERR
+              set +e
+              if [ -n "$STATIC_SWAPPED" ]; then
+                echo "::error::静态目录切换失败，恢复 full 发布前备份（备份保留在 ${STATIC_BACKUP_DIR}）" >&2
+                for label in $STATIC_SWAPPED; do
+                  case "$label" in
+                    kiosk) root="${DEPLOY_WEB_ROOT}" ;;
+                    admin) root="${DEPLOY_ADMIN_WEB_ROOT}" ;;
+                    partner) root="${DEPLOY_PARTNER_WEB_ROOT}" ;;
+                  esac
+                  if [ -n "$root" ] && [ "$root" != "/" ] && rm -rf -- "$root" && mkdir -p "$root" && cp -a "$STATIC_BACKUP_DIR/$label/." "$root/"; then
+                    echo "已恢复 ${label} 静态目录" >&2
+                  else
+                    echo "::error::${label} 静态目录恢复失败，请用 ${STATIC_BACKUP_DIR}/${label} 人工恢复" >&2
+                  fi
+                done
+              else
+                rm -rf -- "$STATIC_BACKUP_DIR"
+              fi
+              rm -rf -- "$STATIC_STAGE_ROOT"
+              exit 1
+            }
+            # set -E：没有它，函数（backup/stage/deploy_static_root）里的失败不会触发 ERR 陷阱，
+            # 删空目录后拷贝失败会直接退出、站点一直空着（agy 评审指出，bash 实测确认）。
+            set -E
+            trap on_static_failure ERR
             backup_static_root kiosk "${DEPLOY_WEB_ROOT:?}"
             backup_static_root admin "$DEPLOY_ADMIN_WEB_ROOT"
             backup_static_root partner "$DEPLOY_PARTNER_WEB_ROOT"
@@ -333,14 +354,14 @@ jobs:
             deploy_static_root admin "$DEPLOY_ADMIN_WEB_ROOT"
             deploy_static_root partner "$DEPLOY_PARTNER_WEB_ROOT"
             rm -rf -- "$STATIC_STAGE_ROOT"
-            # 静态发布成功后只保留最近 3 组完整备份；当前组也必须保留。
-            find "$STATIC_BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
-              | sort -rn | awk 'NR > 3 { sub(/^[^ ]+ /, ""); print }' \
-              | xargs -r rm -rf --
 
             echo "=== 重载 nginx ==="
             nginx -s reload || systemctl reload nginx
             trap - ERR
+            # 重载成功、撤掉陷阱之后才清理旧备份：只保留最近 3 组完整备份（当前组最新，必然保留）。
+            find "$STATIC_BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+              | sort -rn | awk 'NR > 3 { sub(/^[^ ]+ /, ""); print }' \
+              | xargs -r rm -rf --
 
             if test -f scripts/release-bundle/bos-object.mjs; then
               (
