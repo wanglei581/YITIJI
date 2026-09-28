@@ -85,6 +85,9 @@ async function main(): Promise<void> {
     adminRace: `vah-admin-race-${suffix}`,
     adminTemp: `vah-admin-temp-${suffix}`,
     adminTempNoAudit: `vah-admin-temp-noaudit-${suffix}`,
+    adminReset: `vah-admin-reset-${suffix}`,
+    adminTiming: `vah-admin-timing-${suffix}`,
+    partnerReset: `vah-partner-reset-${suffix}`,
     partner: `vah-partner-${suffix}`,
   }
   const usernames = Object.fromEntries(Object.entries(ids).map(([k, v]) => [k, `u-${v}`])) as Record<keyof typeof ids, string>
@@ -130,6 +133,16 @@ async function main(): Promise<void> {
       passwordProofState: 'temporary', phoneHash: hashPhone(phoneOf(2)), phoneEnc: encryptPhone(phoneOf(2)), phoneVerifiedAt: new Date(),
     } })
     await prisma.user.create({ data: { ...base, id: ids.partner, username: usernames.partner, name: '门禁机构账号', role: 'partner', orgId } })
+    await prisma.user.create({ data: {
+      ...base, id: ids.adminReset, username: usernames.adminReset, name: '找回密码用管理员',
+      phoneHash: hashPhone(phoneOf(3)), phoneEnc: encryptPhone(phoneOf(3)), phoneVerifiedAt: new Date(),
+    } })
+    await prisma.user.create({ data: {
+      ...base, id: ids.partnerReset, username: usernames.partnerReset, name: '找回密码用机构账号', role: 'partner', orgId,
+      phoneHash: hashPhone(phoneOf(4)), phoneEnc: encryptPhone(phoneOf(4)), phoneVerifiedAt: new Date(),
+    } })
+    // 计时对照要和真实账号同成本（cost 10，与 auth.service 写入一致）。
+    await prisma.user.create({ data: { ...base, id: ids.adminTiming, username: usernames.adminTiming, name: '计时用管理员', passwordHash: await bcrypt.hash(password, 10) } })
 
     const build = (redis: unknown) => {
       const sms = new CapturingSmsSender()
@@ -318,16 +331,28 @@ async function main(): Promise<void> {
       const partner = await outcome(() => on.auth.login(usernames.partner, password, 'partner', '127.0.0.1'))
       check('开关打开：合作机构密码登录不受影响', partner.ok && typeof (partner.value as { token?: unknown }).token === 'string', describe(partner))
 
-      // 60 秒冷却内（刚给同一号码发过别的验证码）：凭证照发、codeSent=false；冷却后重发成功。
+      // 别人拿管理员手机号反复点「找回密码」：共用冷却与当日次数被占满，第二步照样能发码（agy 9/29 反例 3.1、3.2）。
       const cooldownRedis = new MemoryRedis()
       const cd = build(cooldownRedis)
-      await cooldownRedis.setNxEx(`internal:sms:cooldown:global:${hashPhone(adminPhone)}`, 'other-purpose', 60)
+      const adminHash = hashPhone(adminPhone)
+      await cooldownRedis.setNxEx(`internal:sms:cooldown:global:${adminHash}`, 'reset-spam', 60)
+      await cooldownRedis.setEx(`internal:sms:daily:${adminHash}:${new Date().toISOString().slice(0, 10)}`, 86_400, '10')
       const cdLogin = await outcome(() => cd.auth.login(usernames.admin, password, 'admin', '127.0.0.1'))
       const cdChallenge = cdLogin.ok ? cdLogin.value as { codeSent?: boolean; challengeTicket?: string } : null
-      check('冷却中：仍返回第二步凭证但如实标 codeSent=false', cdChallenge?.codeSent === false && typeof cdChallenge.challengeTicket === 'string', describe(cdLogin))
+      check('共用冷却与当日次数被别的用途占满时，第二步照样发出验证码', cdChallenge?.codeSent === true && cd.sms.deliveries === 1, describe(cdLogin))
+      const firstCode = cd.sms.lastCode ?? ''
+      // 60 秒内又输了一次密码：凭证照发、如实标 codeSent=false，刚才那条第二步验证码仍然有效。
+      const again2 = await outcome(() => cd.auth.login(usernames.admin, password, 'admin', '127.0.0.1'))
+      const again2Challenge = again2.ok ? again2.value as { codeSent?: boolean; challengeTicket?: string } : null
+      check('60 秒内重复输密码：返回新凭证、如实标 codeSent=false、不重发', again2Challenge?.codeSent === false && cd.sms.deliveries === 1, describe(again2))
+      const withFirst = await outcome(() => cd.auth.completeAdminSecondFactor(again2Challenge?.challengeTicket ?? '', firstCode, '127.0.0.1'))
+      check('刚发出的第二步验证码配最新凭证能完成登录', withFirst.ok && typeof (withFirst.value as { token?: unknown }).token === 'string', describe(withFirst))
       cooldownRedis.advanceSeconds(61)
-      const resend = await outcome(() => cd.auth.resendAdminSecondFactor(cdChallenge?.challengeTicket ?? '', '127.0.0.1'))
-      check('冷却结束后「重新发送」真的发出验证码', resend.ok && (resend.value as { codeSent?: boolean }).codeSent === true && cd.sms.deliveries === 1, describe(resend))
+      const again3 = await outcome(() => cd.auth.login(usernames.admin, password, 'admin', '127.0.0.1'))
+      const ticket3 = again3.ok ? (again3.value as { challengeTicket?: string }).challengeTicket ?? '' : ''
+      cooldownRedis.advanceSeconds(61)
+      const resend = await outcome(() => cd.auth.resendAdminSecondFactor(ticket3, '127.0.0.1'))
+      check('冷却结束后「重新发送」真的发出验证码', resend.ok && (resend.value as { codeSent?: boolean }).codeSent === true && cd.sms.deliveries === 3, describe(resend) + ` deliveries=${cd.sms.deliveries}`)
       const badResend = await outcome(() => cd.auth.resendAdminSecondFactor(`${ids.admin}.${randomBytes(32).toString('base64url')}`, '127.0.0.1'))
       check('无效凭证不能触发重发', !badResend.ok && badResend.code === 'AUTH_SECOND_FACTOR_CHALLENGE_INVALID', describe(badResend))
 
@@ -345,6 +370,51 @@ async function main(): Promise<void> {
       if (envBackup.nodeEnv === undefined) delete process.env['NODE_ENV']
       else process.env['NODE_ENV'] = envBackup.nodeEnv
       setEnv(undefined, undefined)
+    }
+
+    // ── [E] 找回密码也受管理员地址名单约束；未知账号不靠耗时暴露 ─────────────
+    console.log('\n[E] 找回密码与计时')
+    {
+      setEnv('203.0.113.0/24', undefined)
+      const redis = new MemoryRedis()
+      // 共享内存 Redis 没有 getDel（重置凭证一次性消费用），这里按生产语义补上：读出即删。
+      Object.assign(redis, { getDel: async (key: string) => { const value = await redis.get(key); await redis.del(key); return value } })
+      const r = build(redis)
+      const outsideStart = await outcome(() => r.auth.startPasswordReset(usernames.adminReset, '198.51.100.9'))
+      check('名单外地址找回管理员密码：回通用结果（不暴露角色）但不发码',
+        outsideStart.ok && r.sms.deliveries === 0, `${describe(outsideStart)} deliveries=${r.sms.deliveries}`)
+      redis.advanceSeconds(61)
+      await r.auth.startPasswordReset(usernames.adminReset, '203.0.113.9')
+      const code = r.sms.lastCode ?? ''
+      check('名单内地址找回管理员密码照常发码（阳性对照）', r.sms.deliveries === 1 && !!code, `deliveries=${r.sms.deliveries}`)
+      const outsideVerify = await outcome(() => r.auth.verifyPasswordReset(usernames.adminReset, code, '198.51.100.9'))
+      check('名单外地址提交找回验证码：通用失败（AUTH_RESET_FAILED）', !outsideVerify.ok && outsideVerify.code === 'AUTH_RESET_FAILED', describe(outsideVerify))
+      const insideVerify = await outcome(() => r.auth.verifyPasswordReset(usernames.adminReset, code, '203.0.113.9'))
+      const resetTicket = insideVerify.ok ? (insideVerify.value as { resetTicket?: string }).resetTicket ?? '' : ''
+      check('名单内地址提交找回验证码拿到重置凭证', !!resetTicket, describe(insideVerify))
+      const before = await prisma.user.findUniqueOrThrow({ where: { id: ids.adminReset } })
+      const outsideComplete = await outcome(() => r.auth.completePasswordReset(resetTicket, `New-${suffix}-Bb2@`, '198.51.100.9'))
+      const after = await prisma.user.findUniqueOrThrow({ where: { id: ids.adminReset } })
+      check('名单外地址拿着重置凭证也改不了管理员密码', !outsideComplete.ok && outsideComplete.code === 'AUTH_RESET_FAILED' && after.passwordHash === before.passwordHash, describe(outsideComplete))
+      const partnerRedis = new MemoryRedis()
+      const pr = build(partnerRedis)
+      await pr.auth.startPasswordReset(usernames.partnerReset, '198.51.100.9')
+      check('合作机构账号找回密码不受管理员名单影响', pr.sms.deliveries === 1, `deliveries=${pr.sms.deliveries}`)
+      setEnv(undefined, undefined)
+    }
+    {
+      const { auth } = build(new MemoryRedis())
+      const median = (xs: number[]) => xs.sort((a, b) => a - b)[Math.floor(xs.length / 2)]!
+      const time = async (op: () => Promise<unknown>) => { const t = performance.now(); await outcome(op); return performance.now() - t }
+      const known: number[] = []
+      const unknown: number[] = []
+      for (let i = 0; i < 3; i += 1) {
+        known.push(await time(() => auth.login(usernames.adminTiming, 'wrong-password', 'admin', '127.0.0.1')))
+        unknown.push(await time(() => auth.login(`nobody-${suffix}-${i}`, 'wrong-password', 'admin', '127.0.0.1')))
+      }
+      const k = median(known)
+      const u = median(unknown)
+      check(`账号不存在也做一次同成本的比对（耗时中位数：不存在 ${u.toFixed(0)}ms / 存在 ${k.toFixed(0)}ms）`, u >= k * 0.5, `known=${known.map((x) => x.toFixed(0))} unknown=${unknown.map((x) => x.toFixed(0))}`)
     }
 
     // ── [D] /health 影响声明 ─────────────────────────────────────────────────

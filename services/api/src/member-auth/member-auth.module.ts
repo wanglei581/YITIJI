@@ -9,7 +9,7 @@ import { MemberPhoneRebindService } from './member-phone-rebind.service'
 import { MemberQrLoginService } from './member-qr-login.service'
 import { MemberStepUpService } from './member-step-up.service'
 import { SMS_SENDER } from './sms/sms-sender'
-import { createBudgetedSmsSender } from './sms/sms-budget'
+import { createMemberBudgetedSmsSender } from './sms/sms-budget'
 import { RedisService } from '../common/redis/redis.service'
 
 /**
@@ -45,8 +45,8 @@ import { RedisService } from '../common/redis/redis.service'
     MemberPhoneRebindService,
     EndUserAuthGuard,
     MemberClosureReceiptGuard,
-    // P1-5：真实发送器外包额度层（全站每日总量 / 单终端每日上限），见 sms-budget.ts。
-    { provide: SMS_SENDER, useFactory: createBudgetedSmsSender, inject: [RedisService] },
+    // P1-5：真实发送器外包额度层（会员桶每日总量 / 单终端每日上限），见 sms-budget.ts。
+    { provide: SMS_SENDER, useFactory: createMemberBudgetedSmsSender, inject: [RedisService] },
   ],
   exports: [EndUserAuthGuard, MemberClosureReceiptGuard, MemberStepUpService],
 })

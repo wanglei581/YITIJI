@@ -88,6 +88,16 @@ export function decideAdminIp(clientIp: string | null | undefined): AdminIpDecis
   return state.list.check(normalized.address, normalized.type) ? 'allowed' : 'denied'
 }
 
+/**
+ * 针对某个账号角色的放行判定（不抛错）：非管理员一律放行；管理员按名单。
+ * 给「找回密码」这类不能泄露账号角色的入口用——拒绝时由调用方回通用失败，不回 403。
+ */
+export function isAdminIpAllowedForRole(role: string, clientIp: string | null | undefined): boolean {
+  if (role !== 'admin') return true
+  const decision = decideAdminIp(clientIp)
+  return decision === 'unrestricted' || decision === 'allowed'
+}
+
 /** 管理员请求的来源地址不在名单内时抛 403；未配置名单时不做任何事。 */
 export function assertAdminIpAllowed(clientIp: string | null | undefined): void {
   const decision = decideAdminIp(clientIp)

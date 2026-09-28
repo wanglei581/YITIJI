@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RedisModule } from '../common/redis/redis.module'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { SMS_SENDER } from '../member-auth/sms/sms-sender'
-import { createBudgetedSmsSender } from '../member-auth/sms/sms-budget'
+import { createInternalBudgetedSmsSender } from '../member-auth/sms/sms-budget'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AdminInitialPhoneBindService } from './admin-initial-phone-bind.service'
@@ -46,8 +46,8 @@ const JWT_TTL = '24h'
     InternalOtpService,
     JwtAuthGuard,
     RolesGuard,
-    // P1-5：真实发送器外包额度层（全站每日总量 / 单终端每日上限），见 sms-budget.ts。
-    { provide: SMS_SENDER, useFactory: createBudgetedSmsSender, inject: [RedisService] },
+    // P1-5：真实发送器外包额度层（内部账号桶每日总量），见 sms-budget.ts。
+    { provide: SMS_SENDER, useFactory: createInternalBudgetedSmsSender, inject: [RedisService] },
   ],
   exports:     [JwtModule, JwtAuthGuard, RolesGuard, AuthService, InternalOtpService],
 })

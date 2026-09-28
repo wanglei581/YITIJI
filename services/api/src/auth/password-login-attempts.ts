@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, type Logger } from '@nestjs/common'
+import * as bcrypt from 'bcryptjs'
 import { createHash } from 'crypto'
 import { tryRedis } from '../common/redis/redis-degradation'
 import type { RedisService } from '../common/redis/redis.service'
@@ -24,6 +25,17 @@ export const PASSWORD_LOGIN_FAILURE_LIMIT = 5
 export const PASSWORD_LOGIN_FAILURE_TTL_SECONDS = 15 * 60
 
 export type PasswordLoginPortal = 'admin' | 'partner' | 'kiosk'
+
+/**
+ * 与真实账号同成本（bcrypt cost 10，见 auth.service 的 bcrypt.hash(…, 10)）的一份固定哈希，
+ * 对应的原文随机生成后丢弃，任何输入都比对不上。账号不存在 / 不可用时也做一次比对，
+ * 让两条路径耗时相近：否则「查无此人几毫秒、有人一百毫秒」本身就能拿来枚举账号（agy 9/29 反例 6.2）。
+ */
+const PASSWORD_TIMING_EQUALIZER_HASH = '$2b$10$P0PZrHfaRf9HkDF00nbWmOaR0i.a2yMw2x1JPFsEF8HHft8U4TXEW'
+
+export async function equalizePasswordCompareTiming(password: string): Promise<void> {
+  await bcrypt.compare(password, PASSWORD_TIMING_EQUALIZER_HASH)
+}
 
 export function passwordLoginIdentityKey(loginId: string, portal: PasswordLoginPortal): string {
   const normalized = loginId.trim().toLowerCase()

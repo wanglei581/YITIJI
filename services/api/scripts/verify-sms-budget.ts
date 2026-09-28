@@ -48,9 +48,11 @@ class MetaCapturingSender extends CapturingSmsSender {
 async function main(): Promise<void> {
   process.env['SECRET_ENCRYPTION_KEY'] ??= 'verify-sms-budget-secret-key-32-bytes-minimum'
   const {
-    BudgetedSmsSender, readSmsBudgetLimits, shanghaiDay, smsBudgetGlobalKey, smsBudgetTerminalKey,
-    createBudgetedSmsSender, DEFAULT_SMS_DAILY_TOTAL_LIMIT, DEFAULT_SMS_TERMINAL_DAILY_LIMIT,
+    BudgetedSmsSender, readSmsBudgetLimits, shanghaiDay, smsBudgetChannelKey, smsBudgetTerminalKey,
+    createMemberBudgetedSmsSender, createInternalBudgetedSmsSender,
+    DEFAULT_SMS_MEMBER_DAILY_LIMIT, DEFAULT_SMS_INTERNAL_DAILY_LIMIT, DEFAULT_SMS_TERMINAL_DAILY_LIMIT,
   } = await import('../src/member-auth/sms/sms-budget')
+  const smsBudgetGlobalKey = (d: string) => smsBudgetChannelKey('member', d)
   const { SMS_SENDER, SmsSendError } = await import('../src/member-auth/sms/sms-sender')
   const { resetRedisCooldownForTests } = await import('../src/common/redis/redis-degradation')
   const { RedisService } = await import('../src/common/redis/redis.service')
@@ -64,7 +66,7 @@ async function main(): Promise<void> {
   {
     const redis = new MemoryRedis()
     const inner = new MetaCapturingSender()
-    const sender = new BudgetedSmsSender(inner, redis as never, { dailyTotal: 3, terminalDaily: 2 }, now)
+    const sender = new BudgetedSmsSender(inner, redis as never, 'member', { dailyTotal: 3, terminalDaily: 2 }, now)
     for (let i = 0; i < 3; i += 1) await sender.sendCode(`1380000000${i}`, '123456')
     const fourth = await outcome(() => sender.sendCode('13800000009', '123456'))
     check('全站每日总量满了第 4 条不发（429 SMS_DAILY_TOTAL_LIMIT）', !fourth.ok && fourth.status === 429 && fourth.code === 'SMS_DAILY_TOTAL_LIMIT', describe(fourth))
@@ -73,7 +75,7 @@ async function main(): Promise<void> {
   {
     const redis = new MemoryRedis()
     const inner = new MetaCapturingSender()
-    const sender = new BudgetedSmsSender(inner, redis as never, { dailyTotal: 50, terminalDaily: 2 }, now)
+    const sender = new BudgetedSmsSender(inner, redis as never, 'member', { dailyTotal: 50, terminalDaily: 2 }, now)
     await sender.sendCode('13800000001', '111111', { terminalId: 'KSK-A' })
     await sender.sendCode('13800000002', '111111', { terminalId: 'KSK-A' })
     const third = await outcome(() => sender.sendCode('13800000003', '111111', { terminalId: 'KSK-A' }))
@@ -90,22 +92,26 @@ async function main(): Promise<void> {
     const failing = {
       sendCode: async (_p: string, _c: string) => { throw new SmsSendError('LimitExceeded.PhoneNumberDailyLimit') },
     }
-    const sender = new BudgetedSmsSender(failing, redis as never, { dailyTotal: 5, terminalDaily: 5 }, now)
+    const sender = new BudgetedSmsSender(failing, redis as never, 'member', { dailyTotal: 5, terminalDaily: 5 }, now)
     await outcome(() => sender.sendCode('13800000001', '1', { terminalId: 'KSK-A' }))
     check('服务商明确拒发（带错误码）：退回全站与终端额度',
       redis.raw(smsBudgetGlobalKey(day)) === null && redis.raw(smsBudgetTerminalKey('KSK-A', day)) === null,
       `global=${redis.raw(smsBudgetGlobalKey(day))} terminal=${redis.raw(smsBudgetTerminalKey('KSK-A', day))}`)
     const timeout = { sendCode: async () => { throw new SmsSendError('timeout') } }
-    const sender2 = new BudgetedSmsSender(timeout, redis as never, { dailyTotal: 5, terminalDaily: 5 }, now)
+    const sender2 = new BudgetedSmsSender(timeout, redis as never, 'member', { dailyTotal: 5, terminalDaily: 5 }, now)
     await outcome(() => sender2.sendCode('13800000001', '1', { terminalId: 'KSK-A' }))
     check('超时（短信可能已发出并计费）：不退回额度', redis.raw(smsBudgetGlobalKey(day)) === '1' && redis.raw(smsBudgetTerminalKey('KSK-A', day)) === '1',
       `global=${redis.raw(smsBudgetGlobalKey(day))}`)
+    const unknown = { sendCode: async () => { throw new Error('ECONNRESET') } }
+    const sender3 = new BudgetedSmsSender(unknown, redis as never, 'member', { dailyTotal: 5, terminalDaily: 5 }, now)
+    await outcome(() => sender3.sendCode('13800000002', '1'))
+    check('认不出的异常（不是服务商给的明确错误码）：不退回额度', redis.raw(smsBudgetGlobalKey(day)) === '2', `global=${redis.raw(smsBudgetGlobalKey(day))}`)
   }
   {
     const dead = new Proxy({}, { get: () => async () => { throw new Error('connect ECONNREFUSED') } })
     const inner = new MetaCapturingSender()
     resetRedisCooldownForTests()
-    const sender = new BudgetedSmsSender(inner, dead as never, { dailyTotal: 5, terminalDaily: 5 }, now)
+    const sender = new BudgetedSmsSender(inner, dead as never, 'member', { dailyTotal: 5, terminalDaily: 5 }, now)
     const result = await outcome(() => sender.sendCode('13800000001', '1'))
     check('Redis 核不了额度时不发（503 SMS_BUDGET_UNAVAILABLE）', !result.ok && result.status === 503 && result.code === 'SMS_BUDGET_UNAVAILABLE', describe(result))
     check('Redis 核不了额度时服务商一条都没发', inner.deliveries === 0, `deliveries=${inner.deliveries}`)
@@ -115,7 +121,7 @@ async function main(): Promise<void> {
     const redis = new MemoryRedis()
     let current = new Date('2026-09-29T15:59:59Z') // 北京时间 23:59:59
     const inner = new MetaCapturingSender()
-    const sender = new BudgetedSmsSender(inner, redis as never, { dailyTotal: 1, terminalDaily: 1 }, () => current)
+    const sender = new BudgetedSmsSender(inner, redis as never, 'member', { dailyTotal: 1, terminalDaily: 1 }, () => current)
     await sender.sendCode('13800000001', '1')
     const sameDay = await outcome(() => sender.sendCode('13800000002', '1'))
     current = new Date('2026-09-29T16:00:00Z') // 北京时间次日 00:00
@@ -125,16 +131,21 @@ async function main(): Promise<void> {
     check('shanghaiDay 取北京日期', shanghaiDay(new Date('2026-09-29T16:00:00Z')) === '2026-09-30', shanghaiDay(new Date('2026-09-29T16:00:00Z')))
   }
   {
-    const defaults = readSmsBudgetLimits({})
-    const zero = readSmsBudgetLimits({ SMS_DAILY_TOTAL_LIMIT: '0', SMS_TERMINAL_DAILY_LIMIT: '-3' })
-    const junk = readSmsBudgetLimits({ SMS_DAILY_TOTAL_LIMIT: 'abc', SMS_TERMINAL_DAILY_LIMIT: '1.5' })
-    const custom = readSmsBudgetLimits({ SMS_DAILY_TOTAL_LIMIT: '20', SMS_TERMINAL_DAILY_LIMIT: '7' })
-    check('未配置时用默认额度', defaults.dailyTotal === DEFAULT_SMS_DAILY_TOTAL_LIMIT && defaults.terminalDaily === DEFAULT_SMS_TERMINAL_DAILY_LIMIT, JSON.stringify(defaults))
+    const defaults = readSmsBudgetLimits('member', {})
+    const internalDefaults = readSmsBudgetLimits('internal', {})
+    const zero = readSmsBudgetLimits('member', { SMS_MEMBER_DAILY_LIMIT: '0', SMS_TERMINAL_DAILY_LIMIT: '-3' })
+    const junk = readSmsBudgetLimits('internal', { SMS_INTERNAL_DAILY_LIMIT: 'abc', SMS_TERMINAL_DAILY_LIMIT: '1.5' })
+    const custom = readSmsBudgetLimits('member', { SMS_MEMBER_DAILY_LIMIT: '20', SMS_INTERNAL_DAILY_LIMIT: '9', SMS_TERMINAL_DAILY_LIMIT: '7' })
+    const customInternal = readSmsBudgetLimits('internal', { SMS_MEMBER_DAILY_LIMIT: '20', SMS_INTERNAL_DAILY_LIMIT: '9' })
+    check('未配置时两桶各用默认额度',
+      defaults.dailyTotal === DEFAULT_SMS_MEMBER_DAILY_LIMIT && defaults.terminalDaily === DEFAULT_SMS_TERMINAL_DAILY_LIMIT
+      && internalDefaults.dailyTotal === DEFAULT_SMS_INTERNAL_DAILY_LIMIT, `${JSON.stringify(defaults)} ${JSON.stringify(internalDefaults)}`)
     check('配成 0、负数、非整数、非数字都回落默认值，不会变成「不限」',
-      zero.dailyTotal === DEFAULT_SMS_DAILY_TOTAL_LIMIT && zero.terminalDaily === DEFAULT_SMS_TERMINAL_DAILY_LIMIT
-      && junk.dailyTotal === DEFAULT_SMS_DAILY_TOTAL_LIMIT && junk.terminalDaily === DEFAULT_SMS_TERMINAL_DAILY_LIMIT,
+      zero.dailyTotal === DEFAULT_SMS_MEMBER_DAILY_LIMIT && zero.terminalDaily === DEFAULT_SMS_TERMINAL_DAILY_LIMIT
+      && junk.dailyTotal === DEFAULT_SMS_INTERNAL_DAILY_LIMIT && junk.terminalDaily === DEFAULT_SMS_TERMINAL_DAILY_LIMIT,
       `${JSON.stringify(zero)} ${JSON.stringify(junk)}`)
-    check('合法配置生效', custom.dailyTotal === 20 && custom.terminalDaily === 7, JSON.stringify(custom))
+    check('合法配置按桶生效（会员读会员的、内部读内部的）',
+      custom.dailyTotal === 20 && custom.terminalDaily === 7 && customInternal.dailyTotal === 9, `${JSON.stringify(custom)} ${JSON.stringify(customInternal)}`)
   }
 
   // ── [B] 接线 ───────────────────────────────────────────────────────────────
@@ -142,15 +153,20 @@ async function main(): Promise<void> {
   {
     const { AuthModule } = await import('../src/auth/auth.module')
     const { MemberAuthModule } = await import('../src/member-auth/member-auth.module')
-    for (const [name, mod] of [['AuthModule', AuthModule], ['MemberAuthModule', MemberAuthModule]] as const) {
+    const wiring = [
+      ['AuthModule', AuthModule, createInternalBudgetedSmsSender, 'internal'],
+      ['MemberAuthModule', MemberAuthModule, createMemberBudgetedSmsSender, 'member'],
+    ] as const
+    for (const [name, mod, factory, channel] of wiring) {
       const providers = (Reflect.getMetadata('providers', mod) ?? []) as Array<{ provide?: unknown; useFactory?: unknown; inject?: unknown[] }>
       const sms = providers.find((p) => p && typeof p === 'object' && p.provide === SMS_SENDER)
-      check(`${name} 的 SMS_SENDER 由带额度的工厂创建并注入 RedisService`,
-        !!sms && sms.useFactory === createBudgetedSmsSender && Array.isArray(sms.inject) && sms.inject.includes(RedisService),
+      check(`${name} 的 SMS_SENDER 由「${channel}」桶的额度工厂创建并注入 RedisService`,
+        !!sms && sms.useFactory === factory && Array.isArray(sms.inject) && sms.inject.includes(RedisService),
         sms ? `factory=${String((sms.useFactory as { name?: string })?.name)}` : '未找到 SMS_SENDER')
+      const built = factory(new MemoryRedis() as never)
+      check(`${name} 的工厂产出 ${channel} 桶的 BudgetedSmsSender`,
+        built instanceof BudgetedSmsSender && built.channel === channel, built.constructor.name)
     }
-    const built = createBudgetedSmsSender(new MemoryRedis() as never)
-    check('工厂产出的是 BudgetedSmsSender', built instanceof BudgetedSmsSender, built.constructor.name)
   }
   {
     const { MemberAuthController } = await import('../src/member-auth/member-auth.controller')
@@ -185,7 +201,7 @@ async function main(): Promise<void> {
     const { hashPhone } = await import('../src/common/crypto/phone-identity')
     const redis = new MemoryRedis()
     const inner = new MetaCapturingSender()
-    const sender = new BudgetedSmsSender(inner, redis as never, { dailyTotal: 50, terminalDaily: 1 }, now)
+    const sender = new BudgetedSmsSender(inner, redis as never, 'member', { dailyTotal: 50, terminalDaily: 1 }, now)
     const service = new MemberAuthService({} as never, redis as never, {} as never, sender)
     await service.sendSmsCode('13800000001', undefined, '127.0.0.1', 'KSK-E2E')
     check('会员发码把终端编号交给发送器', inner.metas[0]?.terminalId === 'KSK-E2E', JSON.stringify(inner.metas))
@@ -198,14 +214,28 @@ async function main(): Promise<void> {
     const { InternalOtpService } = await import('../src/auth/internal-otp.service')
     const redis = new MemoryRedis()
     const inner = new MetaCapturingSender()
-    const sender = new BudgetedSmsSender(inner, redis as never, { dailyTotal: 1, terminalDaily: 5 }, now)
+    const sender = new BudgetedSmsSender(inner, redis as never, 'internal', { dailyTotal: 1, terminalDaily: 5 }, now)
     const otp = new InternalOtpService(redis as never, sender)
+    const internalKey = smsBudgetChannelKey('internal', day)
     await otp.sendCode({ phone: '13900000001', purpose: 'login', ip: '127.0.0.1', shouldDeliver: false })
-    check('未知号码走「不下发」分支时不占额度', redis.raw(smsBudgetGlobalKey(day)) === null, `global=${redis.raw(smsBudgetGlobalKey(day))}`)
+    check('未知号码走「不下发」分支时不占额度', redis.raw(internalKey) === null, `internal=${redis.raw(internalKey)}`)
     await otp.sendCode({ phone: '13900000002', purpose: 'login', ip: '127.0.0.1', shouldDeliver: true })
     const over = await outcome(() => otp.sendCode({ phone: '13900000003', purpose: 'reset_password', ip: '127.0.0.1', shouldDeliver: true }))
-    check('内部账号验证码同样受全站总量约束（429 SMS_DAILY_TOTAL_LIMIT）', !over.ok && over.code === 'SMS_DAILY_TOTAL_LIMIT', describe(over))
+    check('内部账号验证码受内部桶每日总量约束（429 SMS_DAILY_TOTAL_LIMIT）', !over.ok && over.code === 'SMS_DAILY_TOTAL_LIMIT', describe(over))
     check('内部账号撞上限时服务商只发了额度内的那一条', inner.deliveries === 1, `deliveries=${inner.deliveries}`)
+  }
+  {
+    // 会员桶被刷光，不连累内部账号（管理员第二步、找回密码）发码（agy 9/29 反例 4.1）。
+    const redis = new MemoryRedis()
+    const inner = new MetaCapturingSender()
+    const member = new BudgetedSmsSender(inner, redis as never, 'member', { dailyTotal: 2, terminalDaily: 5 }, now)
+    const internal = new BudgetedSmsSender(inner, redis as never, 'internal', { dailyTotal: 2, terminalDaily: 5 }, now)
+    await member.sendCode('13800000001', '1')
+    await member.sendCode('13800000002', '1')
+    const memberOver = await outcome(() => member.sendCode('13800000003', '1'))
+    const internalStill = await outcome(() => internal.sendCode('13900000009', '1'))
+    check('会员桶满了（429）时内部账号桶照常发', !memberOver.ok && memberOver.code === 'SMS_DAILY_TOTAL_LIMIT' && internalStill.ok,
+      `${describe(memberOver)} / ${describe(internalStill)}`)
   }
 
   console.log(`\nverify:sms-budget：${checks - failures}/${checks} 通过`)

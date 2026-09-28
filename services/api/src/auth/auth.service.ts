@@ -21,7 +21,7 @@ import {
 } from '../common/crypto/phone-identity'
 import type { UserRole } from '../common/decorators/roles.decorator'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
-import { assertAdminIpAllowed } from '../common/auth/admin-ip-allowlist'
+import { assertAdminIpAllowed, isAdminIpAllowedForRole } from '../common/auth/admin-ip-allowlist'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { SendInternalSmsCodeDto } from './dto/internal-auth.dto'
@@ -35,7 +35,7 @@ import { FIRST_ADMIN_BOOTSTRAP_AUDIT_ACTION } from './first-admin-bootstrap'
 import { AdminLoginSecondFactor, adminSecondFactorRequired, assertAdminSecondFactorRoute } from './admin-login-second-factor'
 import { assertAdminSmsOnlyLoginAllowed, type AdminSecondFactorChallenge } from './admin-login-second-factor'
 import { clearPasswordLoginAttempts, passwordLoginAccountKey, passwordLoginIdentityKey } from './password-login-attempts'
-import { reservePasswordLoginAttempt, type PasswordLoginPortal } from './password-login-attempts'
+import { equalizePasswordCompareTiming, reservePasswordLoginAttempt, type PasswordLoginPortal } from './password-login-attempts'
 
 type LoginPortal = PasswordLoginPortal
 type SmsPortal = 'admin' | 'partner'
@@ -131,7 +131,10 @@ export class AuthService {
     const user = await this.findUserByLoginId(loginId)
     const accountFailureKey = user ? passwordLoginAccountKey(user.id, portal) : null
     if (accountFailureKey) await reservePasswordLoginAttempt(this.redis, accountFailureKey, this.logger)
-    if (!user || !(await this.canUseAccount(user, portal))) throw this.loginFailed()
+    if (!user || !(await this.canUseAccount(user, portal))) {
+      await equalizePasswordCompareTiming(password) // 未知 / 不可用账号也花同样的比对时间，不靠耗时暴露账号是否存在
+      throw this.loginFailed()
+    }
 
     const ok = await bcrypt.compare(password, user.passwordHash)
     if (!ok) throw this.loginFailed()
@@ -218,7 +221,8 @@ export class AuthService {
       return result
     }
 
-    const shouldDeliver = await this.canUseAccount(target.user)
+    // 管理员账号从名单外地址找回密码：照常回通用结果但不发码（不暴露账号角色，P1-4）。
+    const shouldDeliver = (await this.canUseAccount(target.user)) && isAdminIpAllowedForRole(target.user.role, ip)
     const result = await this.sendResetCodeOrGeneric(target.phone, ip, shouldDeliver)
     await this.writeAudit(target.user.id, target.user.role, 'auth.password_reset_start', {
       phoneMasked: maskPhone(target.phone),
@@ -226,9 +230,9 @@ export class AuthService {
     return result
   }
 
-  async verifyPasswordReset(loginIdOrPhone: string, code: string): Promise<{ resetTicket: string; expiresInSeconds: number }> {
+  async verifyPasswordReset(loginIdOrPhone: string, code: string, ip: string | null = null): Promise<{ resetTicket: string; expiresInSeconds: number }> {
     const target = await this.resolveResetTarget(loginIdOrPhone)
-    if (!target || !(await this.canUseAccount(target.user))) {
+    if (!target || !(await this.canUseAccount(target.user)) || !isAdminIpAllowedForRole(target.user.role, ip)) {
       throw this.resetFailed()
     }
 
@@ -242,7 +246,7 @@ export class AuthService {
     return { resetTicket, expiresInSeconds: RESET_TICKET_TTL }
   }
 
-  async completePasswordReset(resetTicket: string, newPassword: string): Promise<{ success: true }> {
+  async completePasswordReset(resetTicket: string, newPassword: string, ip: string | null = null): Promise<{ success: true }> {
     const userId = await this.redis.getDel(this.resetTicketKey(resetTicket))
     if (!userId) {
       throw this.resetFailed()
@@ -250,7 +254,7 @@ export class AuthService {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
     })
-    if (!user) throw this.resetFailed()
+    if (!user || !isAdminIpAllowedForRole(user.role, ip)) throw this.resetFailed()
     const passwordHash = await bcrypt.hash(newPassword, 10)
     const updated = await this.prisma.user.updateMany({
       where: { id: userId, deletedAt: null, passwordHash: user.passwordHash },

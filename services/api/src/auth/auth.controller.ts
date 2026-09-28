@@ -105,14 +105,15 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async verifyPasswordReset(
     @Body() dto: PasswordResetVerifyDto,
+    @Ip() ip: string,
   ): Promise<ApiResponse<{ resetTicket: string; expiresInSeconds: number }>> {
-    return ApiResponse.ok(await this.authService.verifyPasswordReset(dto.loginIdOrPhone, dto.code))
+    return ApiResponse.ok(await this.authService.verifyPasswordReset(dto.loginIdOrPhone, dto.code, ip || null))
   }
 
   @Post('password/reset/complete')
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
-  async completePasswordReset(@Body() dto: PasswordResetCompleteDto): Promise<ApiResponse<{ success: true }>> {
-    return ApiResponse.ok(await this.authService.completePasswordReset(dto.resetTicket, dto.newPassword))
+  async completePasswordReset(@Body() dto: PasswordResetCompleteDto, @Ip() ip: string): Promise<ApiResponse<{ success: true }>> {
+    return ApiResponse.ok(await this.authService.completePasswordReset(dto.resetTicket, dto.newPassword, ip || null))
   }
 
   @Post('password/first-admin-change')
