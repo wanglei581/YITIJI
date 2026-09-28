@@ -964,7 +964,7 @@ var FIXTURE = {
   riskNotes: [
     '「精通」「资深」这类程度词如果没有具体例子支撑，建议换成你实际做过的事。',
     '简历里出现多套联系方式时，读的人不知道该联系哪一个，建议只留一套。',
-    '与目标岗位无关的个人信息可以不写，公共终端上尤其不建议留身份证号一类信息。',
+    '与目标岗位无关的个人信息可以不写，公用机器上尤其不建议留身份证号一类信息。',
     '经历之间存在时间空档时，与其留白，不如用一行如实说明那段时间在做什么。'
   ]
 };
@@ -976,7 +976,7 @@ var FIXTURE = {
 var STRUCT = [
   { key:'basic', name:'基础信息', lines:[
       '某某（合成示例姓名） · 求职者',
-      '手机 138****0000（公共终端默认遮挡）',
+      '手机 138****0000（公用机器默认遮挡）',
       '邮箱：这一行在原文里是空的' ] },
   { key:'objective', name:'求职目标', lines:[
       '希望找一份稳定的工作，用户运营或者社群运营都可以。' ] },
@@ -1425,7 +1425,7 @@ function overviewOverlay(report){
    不含任何真实个人信息；每页自带水印与页脚。 */
 var SHEET_DOC = {
   1: '<div class="nm"><b>张示例</b><i>求职者 · 合成示例姓名</i></div>'
-   + '<div class="ct">手机 138****0000（示例号段 · 公共终端默认遮挡）　·　现居地 上海</div>'
+   + '<div class="ct">手机 138****0000（示例号段 · 公用机器默认遮挡）　·　现居地 上海</div>'
    + '<div class="hr"></div>'
    + '<h3>求职意向</h3>'
    + '<p>希望找一份稳定的工作，用户运营或者社群运营都可以。</p>'
@@ -1490,7 +1490,7 @@ var SHEET_PAGES = 3;
 function sheetPage(n, photo){
   return '<div class="wm" aria-hidden="true">合成示例</div>'
     + '<div class="pg">' + (SHEET_DOC[n] || SHEET_DOC[1])
-    + '<div class="ft"><b>合成预览内容</b><span>本页由原型自带的示例简历排出，不是你上传的真实文件</span>'
+    + '<div class="ft"><b>合成预览内容</b><span>本页由自带的示例简历排出，不是你上传的真实文件</span>'
     + '<u>' + (photo ? '手机拍摄 · 单页' : '第 ' + n + ' 页 / 共 ' + SHEET_PAGES + ' 页') + '</u></div></div>';
 }
 function sheetInner(mode, pageNo){
@@ -1592,7 +1592,7 @@ function sourceViewer(sections, f){
 
 var NOTICE = {
   'docx': { icon:'doc', title:'这份原件是 DOCX，屏幕上不做翻页预览',
-    why:'终端里没有 Office 排版引擎。硬渲染会改掉字体、行距和分页，你在这儿看到的就不是真正会打印出来的那一份，所以这里不做假预览。',
+    why:'这台机器里没有 Office 排版引擎。硬渲染会改掉字体、行距和分页，你在这儿看到的就不是真正会打印出来的那一份，所以这里不做假预览。',
     keep:'<b>报告本身不受影响</b>：诊断结论已经读出来了，就在这一层下面。',
     rows:[
       ['dead','print','打印这份原件','这里没有真实文件','-source-alt-print'],
@@ -1698,14 +1698,14 @@ var SESSION_LINE = '这次办理只记住编号，不留下报告正文。离开
 
 R['no-context'] = function(){
   hdSub.textContent = ridBad
-    ? '地址里的编号不合法，已按没有编号处理，所以没有可展示的报告。'
+    ? '这份报告的编号不对，已按没有编号处理，所以没有可展示的报告。'
     : '这次进入没有带简历编号，所以没有可展示的报告。';
   hdTag.textContent = '无报告';
   stepTx.textContent = '诊断报告 · 无报告';
   rail(0);
   body.innerHTML =
     '<section class="card state-b"><h2>当前没有可展示的报告</h2>'
-    + '<p>诊断结果按<b>简历任务编号</b>读取，并且要凭本人凭证才读得到 —— 地址栏里带一个编号不等于有权限。'
+    + '<p>诊断结果按<b>简历任务编号</b>读取，并且要凭本人凭证才读得到 —— 光有一个编号不等于有权限。'
     + '没有编号就读不到，本页也不会拿通用结论顶替。</p></section>'
     + '<section class="card exits"><div class="ch"><b>接下来可以做的</b><span>四条都不会动你已上传的文件</span></div>'
     + '<div class="rows">'
@@ -1718,7 +1718,7 @@ R['no-context'] = function(){
     + checklist('不等 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
   cta.innerHTML = btn('39-member-records.html','我的诊断记录',false,SCREEN+'-secondary','/me/ai-records')
     + btn('21-resume-triage.html','去上传简历',true,SCREEN+'-primary','/resume/source');
-  why.textContent = ridBad ? '地址里的编号不在允许的字符范围内，本页按「没有编号」处理，也不会把它显示出来。' : '';
+  why.textContent = ridBad ? '这个编号的格式不对，本页按「没有编号」处理，也不会把它显示出来。' : '';
   truthTx.textContent = '界面示例：本页不连接真实简历、模型或打印，也不会自动出现结果。';
 };
 
@@ -1741,7 +1741,7 @@ R['loading'] = function(){
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
     + btnDead('正在读取结果', SCREEN+'-primary');
   why.innerHTML = '<span id="'+SCREEN+'-why">读取还没有结束，现在还不知道有没有报告，所以下一步先不给出口。结果回来后这里会换成「继续优化」或失败说明。</span>';
-  truthTx.textContent = '界面示例：这一屏只表达等待状态，不会因为时间过去就自动出现结果。';
+  truthTx.textContent = '界面示例：这是等待中的样子，不会因为时间过去就自动出现结果。';
 };
 
 function reportState(kind){
@@ -1779,7 +1779,7 @@ function reportState(kind){
       + btn('21-resume-triage.html','重新诊断',true,SCREEN+'-primary','/resume/source');
     why.innerHTML = '<span id="'+SCREEN+'-why">报告里没有内容，优化那一步就没有可对照的原文片段，所以下一步先不给入口。'
       + SESSION_LINE + '</span>';
-    truthTx.textContent = '界面示例：这一屏表达「报告为空」，本页不连接真实简历、模型或打印，也不生成任何结论。';
+    truthTx.textContent = '界面示例：这是报告为空时的样子，本页不生成任何结论。';
     return;
   }
 
@@ -1846,7 +1846,7 @@ R['read-error'] = function(){
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
     + btn(withRid(SELF,'state=loading'),'再读一次',true,SCREEN+'-primary','/resume/report');
   why.textContent = '优化那一步要用同一份报告作输入，报告没取到就先不给入口，避免点进去再失败一次。';
-  truthTx.textContent = '界面示例：这一屏只表达读取失败，本页不会重试真实接口，也不会自动出现结果。';
+  truthTx.textContent = '界面示例：这是读取没成功时的样子，不会自动重新读取。';
 };
 
 R['diagnose-failed'] = function(){
@@ -1894,18 +1894,18 @@ R['unavailable'] = function(){
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
     + btn('10-print-hub.html','去打印 / 扫描',true,SCREEN+'-primary','/print-scan');
   why.textContent = '能力没接通时不提供优化入口：优化和诊断走同一套 AI 流程，这时候点进去只会再失败一次。';
-  truthTx.textContent = '界面示例：这一屏表达能力未接通，本页不会探测真实服务，也不代表线上状态。';
+  truthTx.textContent = '界面示例：这是功能暂时不可用时的样子。';
 };
 
 R['illegal'] = function(){
-  hdSub.textContent = '地址里的参数不在登记范围内，已按不可用处理。';
-  hdTag.textContent = '参数不合法';
-  stepTx.textContent = '诊断报告 · 参数不合法';
+  hdSub.textContent = '这次打开的方式不对，已按不可用处理。';
+  hdTag.textContent = '打开方式不对';
+  stepTx.textContent = '诊断报告 · 打开方式不对';
   rail(0);
   body.innerHTML =
-    '<section class="card state-b"><h2>这个地址不能用来打开报告</h2>'
-    + '<p>本页只认登记过的状态与编号格式。收到没登记的值时一律按不可用处理，'
-    + '<b>也不会把地址里的原文显示出来</b>，避免把外部输入原样搬到屏幕上。</p></section>'
+    '<section class="card state-b"><h2>这样打开不了诊断报告</h2>'
+    + '<p>本页只认登记过的打开方式。认不出的内容一律按不可用处理，'
+    + '<b>也不会把它原样显示出来</b>，避免把外部输入原样搬到屏幕上。</p></section>'
     + '<section class="card exits"><div class="ch"><b>回到正常入口</b><span>四条都能继续</span></div>'
     + '<div class="rows">'
     + rowLink('21-resume-triage.html','upload','返回简历来源','从上传或扫描重新开始',SCREEN+'-exit-source','/resume/source')
@@ -1918,7 +1918,7 @@ R['illegal'] = function(){
   cta.innerHTML = btn('01-home.html','返回首页',false,SCREEN+'-secondary','/')
     + btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source');
   why.textContent = '';
-  truthTx.textContent = '界面示例：这一屏是参数兜底，本页不连接真实简历、模型或打印。';
+  truthTx.textContent = '界面示例：这是打开方式不对时的样子。';
 };
 
 /* ════════ 7. 渲染 ════════ */

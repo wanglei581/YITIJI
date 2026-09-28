@@ -1682,7 +1682,7 @@ function mark(st){
 var R={};
 /* ---------- source：来源工作台 ---------- */
 var SRCS=[
-  {k:'usb',n:'U 盘',d:'插在机器上的 U 盘里挑一份。本地服务读盘，网页不碰磁盘。',go:'插好后选择 →',st:'usb-wait'},
+  {k:'usb',n:'U 盘',d:'插在机器上的 U 盘里挑一份，这台机器直接读 U 盘。',go:'插好后选择 →',st:'usb-wait'},
   {k:'local',n:'本机文件 / 云盘下载目录',d:'先把云盘文件下载到这台机器，再从本机目录里选。不登录云盘账号。',go:'打开文件选择 →',st:'local-guide'},
   {k:'phone',n:'手机扫码上传',d:'手机扫一次性上传码打开上传页，传完回一体机确认。',go:'显示上传码 →',st:'phone-generating'}
 ];
@@ -1697,7 +1697,7 @@ function srcCards(){
 /* 通道盘：三条取件通道各自的当前状态。任何一步都能直接换一条，
    换通道不会丢掉已经点好的诊断方向和目标背景。 */
 var CHAN_D={
-  usb:'插上盘，从根目录挑一份。',
+  usb:'插上盘，从最外层挑一份。',
   local:'先下载到本机，再从目录选。',
   phone:'手机扫码打开上传页再传。'
 };
@@ -1733,8 +1733,8 @@ function stepBoard(k,idx,tone,hereText){
     }).join('')+'</div>';
 }
 /* 静态原型的统一交代：这一页没有硬件、没有网络、没有会话 */
-var PROTO_STATIC_USB={v:'这一屏是<b>示例</b>：上面的 U 盘状态是示例，不是这台机器此刻真读到的。'};
-var PROTO_STATIC_QR={v:'这一屏是<b>示例</b>：上面的状态和倒计时都是<b>示例值</b>。'};
+var PROTO_STATIC_USB={v:'<b>界面示例</b>：上面的 U 盘状态不是这台机器此刻真读到的。'};
+var PROTO_STATIC_QR={v:'<b>界面示例</b>：上面的状态和倒计时都是<b>示例值</b>。'};
 var PROTO_STATIC_FILE={v:'文件名、类型与大小是<b>示例</b>，不是系统返回的，也不是任何账号里的数据。'};
 
 R['source']=function(){
@@ -2052,7 +2052,7 @@ function workbench(compat){
   /* 兼容说明放在滚动区**外面**：下面会把「专业与学历」直接滚进视野，
      那句解释不能跟着滚走，否则就成了「说给你展开了，你却找不到」。 */
   return (compat?'<div class="compat" data-testid="rs-profile-compat">'+svg(I_CHECK,22,'currentColor',2.6)+
-      '<span><b>「专业与学历」已并入这一页</b>，不再单开一屏。这条旧地址照样打得开，'+
+      '<span><b>「专业与学历」已并入这一页</b>，不再单开一屏。从旧入口进来照样打得开，'+
       '落到的就是同一块目标设置工作台，已经为你展开这两项。</span></div>':'')+
     '<div class="wb m-fade-in" data-testid="rs-target-workbench">'+
     (g?'<div class="fail warnf" data-testid="rs-ctx-disabled">'+
@@ -2137,7 +2137,7 @@ R['summary']=function(){
 R['usb-wait']=function(){
   rail(0);pill('U 盘 · 等待插入');
   hero('把 U 盘<em>插在屏幕右侧</em>。',
-       '插好之后本机每 <b>2 秒</b>问一次本地服务；<b>没插上就不会有列表</b>。',
+       '插好之后这台机器每 <b>2 秒</b>看一次有没有盘；<b>没插上就不会有列表</b>。',
        svg(I_USB,19,'currentColor',2)+'等待插入');
   root.innerHTML=
     trackBar('第 1 步：插入 U 盘')+
@@ -2147,16 +2147,16 @@ R['usb-wait']=function(){
       '<span class="sm"><span class="st">还没有检测到 U 盘</span>'+
       '<span class="sd">插入后文件列表会自动出现。这台机器<b>不会自动读整盘</b>，也不显示上一位使用者的列表；'+
       '要用哪一份，由你在列表里点。</span>'+
-      '<span class="ticks"><span class="tick">'+svg(I_CLOCK,18,'currentColor',2)+'每 2 秒问一次本地服务</span>'+
-      '<span class="tick">只读根目录</span><span class="tick">只列 PDF / JPG / PNG</span>'+
+      '<span class="ticks"><span class="tick">'+svg(I_CLOCK,18,'currentColor',2)+'每 2 秒看一次有没有盘</span>'+
+      '<span class="tick">只看最外层</span><span class="tick">只列 PDF / JPG / PNG</span>'+
       demoFlag()+'</span></span></div>'+
       tri([
-        {no:'1',n:'插在屏幕右侧 USB 口',d:'插到底再等两三秒，本地服务每 2 秒问一次有没有盘。',go:'需要你操作'},
-        {no:'2',n:'把简历放在盘的根目录',d:'只读 U 盘根目录，不进子文件夹 —— 免得翻你别的文件。',go:'需要你确认'},
+        {no:'1',n:'插在屏幕右侧 USB 口',d:'插到底再等两三秒，这台机器每 2 秒看一次有没有盘。',go:'需要你操作'},
+        {no:'2',n:'把简历放在盘的最外层',d:'只看 U 盘最外层，不进子文件夹 —— 免得翻你别的文件。',go:'需要你确认'},
         {no:'3',n:'只列 PDF / JPG / PNG',d:'U 盘通道不列 DOCX 和 WEBP；单份超过 10MB 的也不列。',go:'系统行为'}
       ])+'</div>'+
     rowsCard([
-      {v:'U 盘由这台终端的<b>本地服务</b>读取；网页不直接访问磁盘，也不弹系统文件框。'},
+      {v:'这台机器<b>直接读 U 盘</b>，屏上不会弹出系统的选文件窗口。'},
       {v:'本机<b>只读取你点的那一个文件</b>，不复制整盘，也不往 U 盘里写东西。'},
       PROTO_STATIC_USB
     ])+
@@ -2167,7 +2167,7 @@ R['usb-wait']=function(){
 R['usb-detecting']=function(){
   rail(0);pill('U 盘 · 读取中');
   hero('正在<em>读 U 盘目录</em>。',
-       '本地服务在列可用文件；<b>读盘一次性返回结果</b>，读完直接出列表。',
+       '这台机器在读 U 盘里的文件；<b>一次读完才出结果</b>，读完直接出列表。',
        svg(I_USB,19,'currentColor',2)+'读取中');
   root.innerHTML=
     trackBar('第 2 步：读取盘上的文件')+
@@ -2177,13 +2177,13 @@ R['usb-detecting']=function(){
       '<span class="sm"><span class="st">'+pulse('正在读取 U 盘')+'</span>'+
       '<span class="sd">读盘没有可播报的中间步骤，所以这里<b>不画进度条，也不说还要多久</b>。'+
       '读到了就出文件列表，读不到会如实写明原因。</span>'+
-      '<span class="ticks"><span class="tick">只读根目录</span>'+
+      '<span class="ticks"><span class="tick">只看最外层</span>'+
       '<span class="tick">只列 PDF / JPG / PNG</span>'+
       '<span class="tick">每份只能导一次 · 10 分钟内有效</span>'+demoFlag()+'</span></span></div>'+
     duoCards(
       {t:'这会儿在做的事',items:[
-        '问本地服务：有没有盘、盘名是什么。',
-        '列出<b>根目录</b>里 PDF / JPG / PNG 且不超过 10MB 的那些。',
+        '看看有没有盘、盘名是什么。',
+        '列出<b>最外层</b> PDF / JPG / PNG 且不超过 10MB 的那些。',
         '每份文件<b>只能导一次，10 分钟内有效</b>，用完即不能再导。'
       ]},
       {t:'这会儿不会做的事',items:[
@@ -2193,7 +2193,7 @@ R['usb-detecting']=function(){
       ]})+'</div>'+
     rowsCard([
       {v:'<b>读盘期间请不要拔 U 盘</b>：拔了会停在读取失败，需要重新插一次。'},
-      {v:'这一屏是<b>示例</b>：真实读盘由本地服务完成。'}
+      {v:'<b>界面示例</b>：这是读 U 盘时的样子。'}
     ])+
     chanBlock('usb')+
     acts([{k:'ghost',n:'换一种来源',href:url({state:'source'})},
@@ -2214,12 +2214,12 @@ R['usb-list']=function(){
   root.innerHTML=
     trackBar('第 3 步：从盘上选一份（演示盘名：KINGSTON 32G）')+
     stepBoard('usb',2,'','点一份看清楚再确认')+
-    '<div class="blk grow m-fade-in">'+head('U 盘根目录里可用的简历文件','3 份 · 只列 PDF / JPG / PNG 且 ≤10MB',true)+
+    '<div class="blk grow m-fade-in">'+head('U 盘最外层可用的简历文件','3 份 · 只列 PDF / JPG / PNG 且 ≤10MB',true)+
       '<div class="list" data-testid="rs-usb-list">'+rows+
       '<div class="lhint">'+svg(I_WARN,18,'#8a6219',2.2)+'<span>以上盘名、文件名与大小都是<b>示例</b>，'+
       '不是真实读盘结果，也不是任何账号里的数据。</span></div></div></div>'+
     rowsCard([
-      {v:'<b>最多列 200 个文件</b>，只看根目录。文件多的话，把简历单独拷到根目录再读一次更快。'},
+      {v:'<b>最多列 200 个文件</b>，只看最外层。文件多的话，把简历单独拷到最外层再读一次更快。'},
       {v:'不符合条件的不会出现在这张表里：<b>不是 PDF / JPG / PNG 的、超过 10MB 的、0 字节的、隐藏或系统文件</b>都被过滤掉了。'},
       {v:'点中的那一份会先给你看<b>文件名、类型、大小和来源</b>，确认之后才导入。'}
     ])+
@@ -2230,7 +2230,7 @@ R['usb-list']=function(){
 R['usb-empty']=function(){
   rail(0);pill('U 盘 · 没有可用文件','warn');
   hero('盘读到了，<em>但没有能用的文件</em>。',
-       'U 盘这条通道只收 <b>PDF / JPG / PNG</b>，<b>只看根目录</b>，单份不超过 <b>10MB</b>。',
+       'U 盘这条通道只收 <b>PDF / JPG / PNG</b>，<b>只看最外层</b>，单份不超过 <b>10MB</b>。',
        svg(I_WARN,19,'currentColor',2.2)+'空列表',true);
   root.innerHTML=
     trackBar('第 3 步：盘上没有符合条件的文件','warnt')+
@@ -2243,7 +2243,7 @@ R['usb-empty']=function(){
       tri([
         {no:'1',n:'简历是 DOCX',d:'U 盘通道只读 PDF / JPG / PNG。DOCX 请改走本机文件或手机扫码，两条都收 DOCX。',
          go:'改用手机扫码 →',href:url({state:'phone-generating'}),warn:true},
-        {no:'2',n:'文件在子文件夹里',d:'只读根目录、不进文件夹，是为了不去翻你 U 盘上的其他资料。把简历拖到盘的根目录再读一次。',
+        {no:'2',n:'文件在子文件夹里',d:'只看最外层、不进文件夹，是为了不去翻你 U 盘上的其他资料。把简历拖到盘的最外层再读一次。',
          go:'重新读一次 →',href:url({state:'usb-detecting'}),warn:true},
         {no:'3',n:'文件超过 10MB',d:'扫描原图最容易超。可以在手机上选较小尺寸重发，或合成 PDF 后再放进盘里。',
          go:'改用本机文件 →',href:url({state:'local-guide'}),warn:true}
@@ -2257,7 +2257,7 @@ R['usb-empty']=function(){
 R['usb-read-failed']=function(){
   rail(0);pill('U 盘 · 读取失败','bad');
   hero('这次<em>没读出 U 盘</em>。',
-       '本地服务在，但这一次没能列出盘上的文件。',
+       '这台机器能读 U 盘，但这一次没能列出盘上的文件。',
        svg(I_WARN,19,'currentColor',2.2)+'读取失败',true);
   root.innerHTML=
     trackBar('第 3 步：读取失败，可以重来','badt')+
@@ -2265,7 +2265,7 @@ R['usb-read-failed']=function(){
     '<div class="blk m-fade-in"><div class="fail" data-testid="rs-usb-read-failed">'+
       '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'U盘读取失败</div>'+
       '<div class="fbdy">常见原因：<b>U 盘没插稳</b>、<b>分区格式不识别</b>、<b>刚才被拔掉了</b>，'+
-      '或者本地服务这一刻没响应。<b>本机不会去猜盘里有什么，也不显示上一次的列表</b> —— '+
+      '或者读 U 盘的功能这一刻没响应。<b>本机不会去猜盘里有什么，也不显示上一次的列表</b> —— '+
       '免得你选了一份其实已经不在盘上的。</div></div></div>'+
     '<div class="blk grow">'+head('先按这三条试一遍','都能在现场自己做',true)+
       tri([
@@ -2290,7 +2290,7 @@ R['usb-unavailable']=function(){
   root.innerHTML=
     trackBar('U 盘通道未开通','warnt')+
     '<div class="blk m-fade-in"><div class="fail lockf" data-testid="rs-usb-unavailable">'+
-      '<div class="ft">'+svg(I_LOCK,22,'currentColor',2)+'当前终端未配置U盘导入</div>'+
+      '<div class="ft">'+svg(I_LOCK,22,'currentColor',2)+'这台机器没开通读 U 盘</div>'+
       '<div class="fbdy">请联系工作人员检查<b>这台机器的 U 盘读取</b>。'+
       '这是这台机器的<b>配置缺失，不是你的操作问题，也不是重试能解决的</b>；'+
       '在此之前，插着的 U 盘不会被本机读取，也不会有文件被复制走。另外两条通道照常可用。</div></div></div>'+
@@ -2311,31 +2311,31 @@ R['usb-unavailable']=function(){
           {k:'primary',n:'改用手机扫码上传',href:url({state:'phone-generating'}),tid:'rs-primary'}]);
 };
 R['usb-agent-offline']=function(){
-  rail(0);pill('U 盘 · 本机服务没响应','bad');
-  hero('本机服务<em>没有响应</em>。',
-       'U 盘导入是开通的，但这台机器上的本地服务这会儿连不上。',
+  rail(0);pill('U 盘 · 暂时没连上','bad');
+  hero('读 U 盘<em>暂时没连上</em>。',
+       'U 盘导入是开通的，读 U 盘的功能也装好了，只是这会儿没连上。',
        svg(I_PLUG,19,'currentColor',2.2)+'连接失败',true);
   root.innerHTML=
-    trackBar('本地服务连接失败','badt')+
-    stepBoard('usb',1,'bad','本机服务连不上，这一步没结果')+
+    trackBar('读 U 盘暂时没连上','badt')+
+    stepBoard('usb',1,'bad','读 U 盘没连上，这一步没结果')+
     '<div class="blk m-fade-in"><div class="fail" data-testid="rs-usb-agent-offline">'+
-      '<div class="ft">'+svg(I_PLUG,22,'currentColor',2)+'无法连接本机的本地服务，可以找现场工作人员看一下</div>'+
-      '<div class="fbdy">和「未配置」不是一回事：这台机器<b>是开通了 U 盘导入的</b>，只是本地服务这一刻没起来或刚重启。'+
-      '<b>可以重试；工作人员现场重启服务通常几十秒就能恢复。</b></div></div></div>'+
+      '<div class="ft">'+svg(I_PLUG,22,'currentColor',2)+'这台机器读 U 盘暂时没连上，可以找现场工作人员看一下</div>'+
+      '<div class="fbdy">和「没开通」不是一回事：这台机器<b>是开通了 U 盘导入的</b>，读 U 盘的功能只是这一刻没起来或刚重启。'+
+      '<b>可以重试；工作人员现场重启一下通常几十秒就能恢复。</b></div></div></div>'+
     '<div class="blk grow">'+head('三条路，按顺序试','',true)+
       tri([
-        {no:'1',n:'先重试一次连接',d:'服务刚重启的话，等几秒再试一次通常就通了。',go:'重试连接 →',href:url({state:'usb-detecting'}),warn:true},
-        {no:'2',n:'叫工作人员看一眼',d:'本地服务要在这台机器上重启，你在页面上做不了。',go:'去求助 →',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help',warn:true},
-        {no:'3',n:'先用另外两条通道',d:'手机扫码和本机文件不经过本地服务，现在就能用。',go:'改用手机扫码 →',href:url({state:'phone-generating'}),warn:true}
+        {no:'1',n:'先重试一次连接',d:'刚重启的话，等几秒再试一次通常就通了。',go:'重试连接 →',href:url({state:'usb-detecting'}),warn:true},
+        {no:'2',n:'叫工作人员看一眼',d:'读 U 盘的功能要在这台机器上重启，你在页面上做不了。',go:'去求助 →',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help',warn:true},
+        {no:'3',n:'先用另外两条通道',d:'手机扫码和本机文件不用读 U 盘，现在就能用。',go:'改用手机扫码 →',href:url({state:'phone-generating'}),warn:true}
       ])+'</div>'+
     rowsCard([
-      {v:'本地服务不通时，本机<b>既读不到盘，也不会显示任何缓存过的文件列表</b>。'},
+      {v:'没连上的时候，本机<b>既读不到盘，也不会显示任何缓存过的文件列表</b>。'},
       {v:'<b>没有任何文件被读取或上传</b>；插着的 U 盘不受影响。'},
       PROTO_STATIC_USB
     ])+
     chanBlock('usb')+
     acts([{k:'ghost',n:'改用本机文件',href:url({state:'local-guide'})},
-          {k:'primary',n:'重试连接本机服务',href:url({state:'usb-detecting'}),tid:'rs-primary'}]);
+          {k:'primary',n:'重试读 U 盘',href:url({state:'usb-detecting'}),tid:'rs-primary'}]);
 };
 R['usb-selected']=function(){
   var H=pvHost();
@@ -2380,8 +2380,8 @@ R['usb-importing']=function(){
     rowsCard([
       {v:'<b>这一步没有取消入口</b>：本机把文件交给上传请求之后就没有可以叫停的开关，'+
          '离开这一页<b>不会撤回</b>已经发出的导入请求，也不会让它更快结束。'},
-      {v:'盘上这一份已经导过一次了，中途离开也不能再导同一次 —— 要重新读盘再选。'+
-         '这一屏不连接本地服务，<b>不产生任何真实导入结果</b>。'}
+      {v:'盘上这一份已经导入过了，中途离开也不能再导一次 —— 要重新读盘再选。'+
+         '这一屏不会真的读 U 盘，<b>不产生任何真实导入结果</b>。'}
     ])+
     acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
           {k:'ghost',n:'先离开这一步<br>已发出的导入不受影响',href:url({state:'source'})}]);
@@ -2398,13 +2398,13 @@ R['usb-import-failed']=function(){
     '<div class="blk"><div class="fail" data-testid="rs-usb-import-failed">'+
       '<div class="ft">'+svg(I_WARN,22,'currentColor',2)+'U盘文件导入失败，请重试</div>'+
       '<div class="fbdy">常见原因：<b>读取过程中盘被拔出</b>、<b>文件被改名或删除</b>、<b>本机与系统网络中断</b>，'+
-      '或者<b>这份文件已经不能再导入</b>（每份只用一次、10 分钟有效，重新列盘也会作废）。'+
+      '或者<b>这份文件已经不能再导入</b>（每份只用一次、10 分钟有效，重新读盘也要重选）。'+
       '所以这一页<b>没有「再导一次」</b>：上面那句提示里的「重试」，在 U 盘通道指的是'+
       '<b>重新读一次盘、重新选一份</b>，而不是把同一份原地再导一遍。</div></div></div>'+
     '<div class="blk grow">'+head('三条路都能走','按你的情况挑一条')+
       tri([
         {no:'1',n:'先确认盘还插着',d:'中途拔过就先插回去，重新读才读得到。',go:'需要你确认',warn:true},
-        {no:'2',n:'重新读一次 U 盘',d:'本页唯一的重来方式：重新列盘会换一份可导文件，再选同一份也行。',
+        {no:'2',n:'重新读一次 U 盘',d:'本页唯一的重来方式：重新读一次 U 盘就能再选，选同一份也行。',
          go:'重新读盘 →',href:url({state:'usb-detecting'}),warn:true},
         {no:'3',n:'换一条通道',d:'本机文件或手机扫码都不受 U 盘这边影响。',
          go:'改用本机文件 →',href:url({state:'local-guide'}),warn:true}
@@ -2670,12 +2670,12 @@ R['phone-generating']=function(){
       '<span class="sm"><span class="st">'+pulse('正在生成上传码')+'</span>'+
       '<span class="sd">要先向系统申请一个<b>这一次上传</b>，拿到之后才画码。'+
       '出码之前这里<b>不放一张假的图</b>，免得你对着一个还不能用的码扫。</span>'+
-      '<span class="ticks"><span class="tick">一次性上传令牌</span>'+
+      '<span class="ticks"><span class="tick">一次性上传码</span>'+
       '<span class="tick">'+svg(I_CLOCK,18,'currentColor',2)+'有效期 10 分钟</span>'+
       '<span class="tick">手机上的上传页</span>'+demoFlag()+'</span></span></div>'+
     tri([
       {no:'1',n:'一次办理一张码',d:'换一次办理要重新扫，旧码不会继续可用。',go:'系统行为'},
-      {no:'2',n:'手机端不登录账号',d:'码里只有一次性上传令牌，手机拿不到一体机的会员登录凭证。',go:'系统行为'},
+      {no:'2',n:'手机端不登录账号',d:'这张码只能传这一次，手机拿不到一体机的会员登录凭证。',go:'系统行为'},
       {no:'3',n:'有效期 10 分钟',d:'以系统给出的到期时间为准，不由屏幕自己判定。',go:'系统行为'}
     ])+'</div>'+
     rowsCard([
@@ -2761,7 +2761,7 @@ R['phone-ready']=function(){
       '<div class="qrp" style="font-size:17px;color:var(--ink-3);">左边是<b>示例码，扫不出来</b>；'+
       '09:42 是<b>固定演示值</b>。有效期以<b>系统给出的到期时间</b>为准，真实页面画的是系统给出的临时链接。</div>',
     mid:rowsCard([
-      {v:'码里只带<b>一次性上传令牌</b>，手机端<b>不会拿到一体机的会员登录凭证</b>，也不要求注册或登录。'},
+      {v:'这张码<b>只能传这一次</b>，手机端<b>不会拿到一体机的会员登录凭证</b>，也不要求注册或登录。'},
       {v:'手机传上来之后<b>不会自动往下走</b>：必须回到这一页，由你确认这份文件，才进入 AI '+INTENT_COPY[intent].verb+'。'},
       {v:'不想用这张码了，走<b>「撤销这张码」</b>：本机会请求系统<b>先把这次上传作废</b>，'+
          '<b>撤销拿到结果才换下一步</b>；换新码同理，<b>撤销没成功就不会给你新码</b>，免得两张码同时能用。'},
@@ -2790,7 +2790,7 @@ R['phone-waiting']=function(){
       '<div class="ticks"><span class="tick warn">'+svg(I_CLOCK,18,'currentColor',2)+'剩余 03:18</span>'+
       '<span class="tick">每 2 秒查一次</span></div>',
     mid:rowsCard([
-      {v:'手机传没传完，这一页<b>自己会知道</b>，所以没有「我传好了」这种按钮 —— 那会是一个假信号。'},
+      {v:'手机传完后，这一页<b>会自动显示出来</b>，所以没有「我传好了」按钮 —— 那会是一个假信号。'},
       {v:'剩余 03:18 是<b>固定演示值</b>；真实倒计时按系统给出的到期时间来算，到点转为已过期。'},
       {v:'等太久想换：先<b>撤销这张码</b>，本机请求系统把这次上传作废并<b>清掉未确认的临时文件</b>，'+
          '<b>拿到撤销结果之后</b>才换来源或出新码；<b>撤销没成功就不给新码</b>。'},
@@ -2880,7 +2880,7 @@ R['phone-uploaded']=function(){
         '<b>撤销成功才出新码</b>；<b>撤销没成功就不出新码</b>。</span></span></div>'+
       '</div>'+
       rowsCard([
-        {v:'文件名和大小是<b>系统发回这台机器的结果</b>；这一屏只是<b>示例</b>。'},
+        {v:'上传完成后文件名和大小由<b>系统发回</b>；这一屏里的是<b>示例</b>。'},
         {v:'确认之前<b>还没有发起解析</b>，也没有任何诊断内容被生成或保存。'},
         {v:'<b>确认过就不能再撤销了</b>：这次上传确认之后就不接受取消，'+
            (MEMBER?'那份文件已经进你的账号，要删除请去「我的文档」。':'要停用请在确认前撤销。')},
@@ -3035,7 +3035,7 @@ R['phone-cancel-failed']=function(){
     rowsCard([
       {v:'本页只确认一件事：<b>没有拿到系统的撤销结果</b>。<b>这里没有新码</b> —— 既不说旧码已作废，也不抢先签发一张。'},
       {v:'实在撤不掉也不会卡死你：<b>换 U 盘或本机文件不受这次上传影响</b>，这张码本身<b>最迟 10 分钟到期</b>。'+
-         '这一屏是<b>示例</b>：不显示上传进度。'}
+         '<b>界面示例</b>：这里不显示上传进度。'}
     ])+
     '<div class="picks">'+
       pickCard({ico:I_USB,n:'改用 U 盘',d:'不经过这次上传，现在就能送同一份简历。',go:'去插盘 →',href:url({state:'usb-wait'}),alt:true})+
@@ -3183,13 +3183,13 @@ R['missing-file']=function(){
 R['unknown']=function(){
   rail(0);pill('无法识别的状态','warn');
   hero('这一页<em>没有可展示的状态</em>。',
-       '地址里的状态不在本页支持的范围内，<b>为避免误导，这里不展示任何业务内容</b>。',
+       '这一页认不出你要打开哪一步，<b>为避免误导，不展示任何业务内容</b>。',
        svg(I_WARN,19,'currentColor',2.2)+'已阻断',true);
   root.innerHTML=
     '<div class="stop m-fade-in" data-testid="rs-unknown"><span class="si">'+svg(I_WARN,50,'#526b62',1.8)+'</span>'+
       '<span class="sm"><span class="sh">无法识别的页面状态</span>'+
       '<span class="sp">本页只处理<b>简历取件、诊断方向与解析等待</b>这一段。'+
-      '这里<b>不会猜你想去哪一步</b>，也不回显地址里的原始参数，请从下面挑一个能用的入口。</span></span></div>'+
+      '这里<b>不会猜你想去哪一步</b>，也不把认不出的内容显示出来，请从下面挑一个能用的入口。</span></span></div>'+
     '<div class="blk">'+head('从这三个入口回到正轨','三个都能直接点')+
       tri([
         {no:'1',n:'回到来源选择',d:'从头开始这次简历服务，重新挑一种取件方式。',go:'去选择 →',href:url({state:'source',source:''})},
@@ -3203,7 +3203,7 @@ R['unknown']=function(){
       pickCard({ico:I_CHAT,n:'问一句小青',d:'说不清要办什么，先问它该走哪一步。',go:'去问 →',href:'../kiosk-redesign-2026-08/05-ai-cockpit.html',route:'/assistant',alt:true})+
     '</div></div>'+
     rowsCard([
-      {v:'不回显地址里的原始参数，免得你把它当成页面结论；也<b>不替你跳到某一个中间步骤</b>。'},
+      {v:'不把认不出的内容显示出来，免得你把它当成页面结论；也<b>不替你跳到某一个中间步骤</b>。'},
       {v:'<b>不读取上一位使用者的文件</b>，简历都要本人重新选一次。'}
     ])+
     acts([{k:'ghost',n:'回首页',href:'01-home.html',route:'/'},
@@ -3253,7 +3253,7 @@ R['scan-ready']=function(){
       rowsCard([
         {k:'来路',v:'扫描工作台的<b>结果页</b>把这一份交接过来<em>　带过来的是文件身份，不是一次新的扫描</em>'},
         {k:'文件编号',v:'<b>示例 3C7A</b><em>　和扫描结果页显示的是同一个，中途没有换一份</em>'},
-        {k:'本页没做什么',v:'<b>没有驱动扫描仪</b>，没有走纸，也没有读面板<em>　扫描成没成，看的是扫描工作台那一屏</em>'},
+        {k:'本页没做什么',v:'<b>没有驱动扫描仪</b>，没有走纸，也没有读面板<em>　扫描成功没有，看扫描工作台那一屏</em>'},
         {k:'保存期限',v:retentionValue('scan')+'<em>　'+retentionNote('scan')+'</em>'}
       ],'kv')+'</div>'+
     tri([
@@ -3296,14 +3296,14 @@ R['scan-expired']=function(){
 R['scan-unavailable']=function(){
   rail(0);pill('本机未开通扫描交接','warn');
   hero('这台机器<em>没有开通扫描交接</em>。',
-       '这是<b>终端配置缺失</b>，不是这一次操作出错，<b>重试解决不了</b>。',
+       '这是<b>这台机器没开通</b>，不是这一次操作出错，<b>重试解决不了</b>。',
        svg(I_LOCK,19,'currentColor',2.2)+'未开通',true);
   root.innerHTML=
     scanBar('本机未开通「扫描件送进 AI 简历」这条交接','warnt')+
     '<div class="stop m-fade-in" data-testid="rs-scan-unavailable"><span class="si">'+svg(I_LOCK,50,'#35608f',1.8)+'</span>'+
-      '<span class="sm"><span class="sh">扫描交接在这台终端上没有开通</span>'+
+      '<span class="sm"><span class="sh">扫描交接在这台机器上没有开通</span>'+
       '<span class="sp">扫描本身可能照常能用，但<b>把扫描件送进 AI 简历</b>这条交接需要单独开通。'+
-      '缺的是<b>终端配置</b>，<b>不是你的操作问题</b>，也<b>不是重试能解决的</b>。</span></span></div>'+
+      '缺的是<b>本机设置</b>，<b>不是你的操作问题</b>，也<b>不是重试能解决的</b>。</span></span></div>'+
     '<div class="blk grow">'+head('现在可以怎么办','三条都不依赖这条交接')+
       tri([
         {no:'1',n:'换一种来源送同一份',d:'U 盘、本机文件、手机扫码这三条都在，简历一样能做 AI '+INTENT_COPY[intent].verb+'。',go:'去选择 →',href:url({state:'source',source:''}),warn:true},
@@ -3311,7 +3311,7 @@ R['scan-unavailable']=function(){
         {no:'3',n:'让工作人员开通',d:'这条交接由现场管理端配置，用户侧改不了。',go:'去求助 →',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help',warn:true}
       ])+
       rowsCard([
-        {k:'缺的是什么',v:'把扫描件送进 AI 简历的<b>那一条交接</b>没开通<em>　缺的是终端配置，不是你的操作问题</em>'},
+        {k:'缺的是什么',v:'把扫描件送进 AI 简历的<b>那一条交接</b>没开通<em>　缺的是本机设置，不是你的操作问题</em>'},
         {k:'这一步做了什么',v:'<b>没有任何文件被读取或上传</b><em>　在本机就被拦住了，没有发起解析</em>'},
         {k:'扫描本身',v:'<b>可能照常能用</b><em>　本页不假装扫描仪坏了，也不假装扫描件不存在</em>'},
         {k:'重试有没有用',v:'<b>没有</b><em>　这条交接由现场管理端配置，重试多少次都不会变</em>'}
@@ -3364,7 +3364,7 @@ function unknownRows(kind){
   return rowsCard([
     {k:'现在确定的',v:'本机<b>没有拿到这一次的结果</b><em>　等结果的时候连接断了</em>'},
     {k:'现在不确定的',v:'系统到底<b>收没收下 / 办没办完</b><em>　本页不猜，也不按「大概率成功」显示</em>'},
-    {k:'再查的是',v:'<b>刚才这一次</b><em>　只查它成没成，不另起一次</em>'},
+    {k:'再查的是',v:'<b>刚才这一次</b><em>　只查它成功没有，不另起一次</em>'},
     {k:'为什么不重发',v:'重发可能变成<b>两份'+(isUp?'文件':'解析')+'</b><em>　所以这一步没有「重新'+(isUp?'上传':'解析')+'」入口</em>'}
   ],'kv');
 }
@@ -3393,12 +3393,12 @@ R['upload-unknown']=function(){
           {k:'primary',n:'再查<br>刚才这一次的结果',href:url({state:'upload-rechecking'}),tid:'rs-primary'}]);
 };
 R['upload-rechecking']=function(){
-  rail(0);pill('正在再查刚才这一次','');
-  hero('正在查<em>这一次上传到底成没成</em>。',
+  rail(0);pill('正在重新查刚才这一次','');
+  hero('正在查<em>这一次上传成功没有</em>。',
        '查的是<b>刚才这一次</b>，<b>不是又传了一遍</b>。',
        svg(I_REFRESH,19,'currentColor',2)+'查询中');
   root.innerHTML=
-    trackBar('正在再查刚才这一次的结果','',{busy:true,busyTag:'查询中 · 没有中止入口'})+
+    trackBar('正在重新查刚才这一次的结果','',{busy:true,busyTag:'查询中 · 没有中止入口'})+
     '<div class="blk m-fade-in">'+head('正在查询','来自'+SRC_LABEL[source],true)+
       fileCard(pulse('查询中'),'doing',
         '<div class="rows" style="margin-top:14px;padding:0 20px;">'+
@@ -3433,14 +3433,14 @@ R['parse-unknown']=function(){
       {t:'这一步不会做',items:[
         '<b>不会再提交一次解析</b>：那可能变成两次处理、两条记录。',
         '<b>不会先编一份诊断</b>给你看，也不会拿上一次的结果顶上。',
-        '不会说这次一定成了或一定没成 —— 本页没有这个结果。'
+        '不会说这次一定成功或一定没成功 —— 本页没有这个结果。'
       ]})+
     acts([{k:'ghost',n:'换一份文件重来',href:url({state:'source',source:''})},
           {k:'ghost',n:'先离开这一步<br>已提交的解析不受影响',href:url({state:'source',source:''}),tid:'rs-leave'},
           {k:'primary',n:'再查<br>刚才这一次的结果',href:url({state:'parse-rechecking'}),tid:'rs-primary'}]);
 };
 R['parse-rechecking']=function(){
-  rail(1);pill('正在再查刚才这一次','');
+  rail(1);pill('正在重新查刚才这一次','');
   hero('正在查<em>这一次解析到底出没出结果</em>。',
        '查的是<b>刚才这一次</b>，<b>不是又提交了一次</b>。',
        svg(I_REFRESH,19,'currentColor',2)+'查询中');
@@ -3599,7 +3599,7 @@ function pvPanel(o){
 /* 三种**预览侧**失败。底线写死：不说文件一定还在，也不说文件已经被删。 */
 var PV_FAIL_COPY={
   unavailable:{ico:I_LOCK,col:'#35608f',h:'这台机器暂时打不开预览',
-    b:'预览服务在这台终端上<b>没有开通或暂时不可用</b>，所以这一份<b>看不了内容</b>。'+
+    b:'预览在这台机器上<b>没有开通或暂时不可用</b>，所以这一份<b>看不了内容</b>。'+
       '这和<b>上传失败是两回事</b>：上传失败会在上一步就拦住你，这里只是<b>没能把它显示出来</b>。',
     alts:[{ico:I_REFRESH,n:'再请求一次预览',d:'重新发起一次预览请求。<b>成不成要看这一次的结果</b>，本页不预告。',g:'再试一次 →',pv:true},
       {ico:I_CHECK,n:'不看预览，直接继续',d:'解析读的是<b>系统拿到的那一份</b>，和能不能在这里显示无关。',g:'继续办理 →',p:true},
@@ -3653,13 +3653,13 @@ function pvViewport(f,geo){
   if(!PV_FIXTURE){
     var HN=pvHost();
     return pvPanel({tid:'rs-pv-norender',ico:I_SHIELD,col:'#35608f',
-      h:'静态原型不渲染任何文件内容',
-      b:'这是一张<b>静态原型页</b>：它<b>不读取文件、不请求预览、不渲染任何内容</b>。'+
-        '真实产品在这里显示的是<b>你自己选的那一份</b>；原型宁可什么都不画，也不摆一份编出来的简历。',
-      alts:[{ico:I_EYE,n:'想看这一层的版面',d:'用带 <b>?capture=1</b> 或 <b>?debug=1</b> 的演示地址打开；'+
-          '普通地址一律不画内容。',g:'这是取证与评审用的入口'},
-        {ico:I_SHIELD,n:'演示地址画的也不是简历',d:'演示画的是<b>版式骨架</b>（几条灰条），并且整页标着'+
-          '<b>原型演示内容</b>；<b>不是任何人的真实简历</b>。'},
+      h:'界面示例：这里不显示文件内容',
+      b:'这是<b>预览这一层的样子</b>：这里<b>不读取文件、不请求预览、不渲染任何内容</b>。'+
+        '真实办理时这里显示的是<b>你自己选的那一份</b>；这里宁可什么都不画，也不摆一份编出来的简历。',
+      alts:[{ico:I_EYE,n:'想看这一层的版面',d:'要用<b>评审用的示例入口</b>打开才画示意页面；'+
+          '平常打开一律不画。',g:'这是评审用的入口'},
+        {ico:I_SHIELD,n:'示例入口画的也不是简历',d:'示例画的是<b>版式骨架</b>（几条灰条），整页标着'+
+          '<b>示例内容</b>；<b>不是任何人的真实简历</b>。'},
         {ico:I_CLOSE,n:'关闭预览，回到这一步',d:'文件、来源、诊断方向和继续按钮<b>都还在</b>，关掉就接着办。',
           g:'关闭预览 →',h:pvCloseHref,tid:'rs-pv-alt-close'},
         {ico:I_CHECK,n:'继续办理',d:'看不看预览都不影响这一步能不能往下走。',g:HN.p.n+' →',h:HN.p.h,route:HN.p.route,tid:'rs-pv-alt-continue'}]});
@@ -3674,7 +3674,7 @@ function pvViewport(f,geo){
   if(f.kind==='image'){
     var bw=geo.rot%180?geo.h:geo.w,bh=geo.rot%180?geo.w:geo.h;
     canvas+='<img class="pv-img" data-testid="rs-pv-img" src="'+pvImgSrc()+'" '+
-      'alt="固定演示扫描件的整页栅格图，由本证据目录的夹具 PDF 渲染，非真实文件" '+
+      'alt="示例扫描件的整页图，非真实文件" '+
       'style="width:'+bw+'px;height:'+bh+'px;margin-left:'+(-bw/2)+'px;margin-top:'+(-bh/2)+'px;'+
       'transform:rotate('+geo.rot+'deg);">';
   }else if(PV_FROZEN){
@@ -3685,11 +3685,11 @@ function pvViewport(f,geo){
        画进去的是**真的 PDF 渲染页**（pdftoppm 出的 PNG），不是版式骨架。 */
     var pw=geo.rot%180?geo.h:geo.w,ph=geo.rot%180?geo.w:geo.h;
     canvas+='<img class="pv-pgimg" data-testid="rs-pv-page-img" src="'+pvFixSrc(f,pvPage)+'" '+
-      'alt="固定演示文件第 '+pvPage+' 页 / 共 '+pvPages+' 页，由本证据目录的夹具 PDF 渲染，非真实简历内容" '+
+      'alt="示例文件第 '+pvPage+' 页 / 共 '+pvPages+' 页，非真实简历内容" '+
       'style="width:'+pw+'px;height:'+ph+'px;margin-left:'+(-pw/2)+'px;margin-top:'+(-ph/2)+'px;'+
       'transform:rotate('+geo.rot+'deg);">';
   }
-  canvas+='<span class="pv-wm">原型演示内容 · 非真实文件</span>'+
+  canvas+='<span class="pv-wm">示例内容 · 非真实文件</span>'+
     '<span class="pv-pgno">'+(f.kind==='image'?'整图 · 共 1 页':'第 '+pvPage+' 页 / 共 '+pvPages+' 页')+'</span></div>';
   return canvas;
 }
@@ -3740,11 +3740,11 @@ function pvNote(f){
   if(pvFail)return '这是<b>预览这一步</b>没成功，<b>不是上传失败</b>；本次办理里的文件、来源与方向都没有变。';
   if(!pvCanRender(f))return '<b>能不能内嵌预览，不影响能不能解析</b>：这一份照样能继续办，'+
     '本页只是<b>不假装</b>浏览器能打开 DOCX。';
-  if(!PV_FIXTURE)return '普通地址下这一层<b>只给你看文件信息，不画任何内容</b>；这是原型的取舍，不是产品能力缺失。';
+  if(!PV_FIXTURE)return '<b>界面示例</b>：这一层<b>只给你看文件信息，不画任何内容</b>；真实办理时这里显示你选的那一份。';
   /* 手机通道是本轮冻结面：这句话按施工前原样返回，一个字不改。 */
   if(PV_FROZEN)return '这里画的是<b>固定演示页面</b>，只有版式骨架，<b>不是你的文件内容</b>；'+
     '翻页、缩放、方向<b>只改这里的显示</b>，<b>不改原件，也不影响解析</b>。';
-  return '这里显示的是<b>固定演示文件</b>真实渲染出来的页面（原型自带的脱敏夹具），'+
+  return '这里显示的是<b>固定示例文件</b>真实渲染出来的页面（脱敏样本），'+
     '<b>不是你的文件内容</b>；翻页、缩放、方向<b>只改这里的显示</b>，<b>不改原件，也不影响解析</b>。';
 }
 function pvTruthLine(){
@@ -3771,7 +3771,7 @@ function renderPreview(){
         (pvFail?'预览未成功':(pvCanRender(f)?(PV_FIXTURE?(f.kind==='image'?'整图 · 共 1 页':'第 '+pvPage+' 页 / 共 '+pvPages+' 页')
           :'本页不渲染内容'):'不能内嵌预览'))+'</span></span>'+
         '<span class="pv-demo" data-testid="rs-pv-badge">'+svg(I_WARN,18,'currentColor',2.2)+
-          (PV_FIXTURE?'原型演示内容<br>非真实文件':'静态原型<br>不渲染文件内容')+'</span>'+
+          (PV_FIXTURE?'示例内容<br>非真实文件':'界面示例<br>不渲染文件内容')+'</span>'+
         '<a class="pv-close m-press" href="'+pvCloseHref+'"'+rt()+' data-testid="rs-pv-close" aria-label="关闭预览，回到这一步">'+
           svg(I_CLOSE,32,'currentColor',2.4)+'</a>'+
       '</div>'+

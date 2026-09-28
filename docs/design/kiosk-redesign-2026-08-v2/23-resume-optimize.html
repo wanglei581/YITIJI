@@ -1144,14 +1144,14 @@ var R = {};
 
 R['no-context'] = function(){
   tkSub.textContent = sess === 'cleared'
-    ? '这台机器刚做过清场，编号和一次性令牌都已清掉。'
+    ? '这台机器刚做过清场，编号和一次性凭证都已清掉。'
     : '还没有可优化的建议，先给我一份已解析的简历。';
   tkTag.textContent = '无建议';
   work.innerHTML =
     '<section class="sec m-fade-in"><div class="sec-h"><h2>当前没有可优化的建议</h2></div>'
     + '<p class="lead">优化建议基于一份<b>已完成解析的本人简历</b>，并且要凭本人凭证才读得到 —— '
-    + '地址栏里带一个编号不等于有权限。这次进入没有可用的编号，所以没有原文可以对照，也不会凭空生成建议。'
-    + (ridBad ? '（地址里的编号不在允许的字符范围内，已按没有编号处理，也不会把它显示出来。）' : '')
+    + '光有一个编号不等于有权限。这次进入没有可用的编号，所以没有原文可以对照，也不会凭空生成建议。'
+    + (ridBad ? '（这个编号的格式不对，已按没有编号处理，也不会把它显示出来。）' : '')
     + '</p></section>'
     + exits('empty') + howto();
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source')
@@ -1226,7 +1226,7 @@ R['read-error'] = function(){
     + btn(withRid(SELF,'state=loading'),'再读一次',true,SCREEN+'-primary','/resume/optimize');
   why.className = 'why show';
   why.textContent = '读取失败时不给逐条对照入口：点进去只会再失败一次。';
-  truthTx.textContent = '界面示例：这是读取没成时的样子，本页不会自动重试。';
+  truthTx.textContent = '界面示例：这是读取没成功时的样子，本页不会自动重试。';
 };
 
 R['optimize-failed'] = function(){
@@ -1248,7 +1248,7 @@ R['optimize-failed'] = function(){
     + btn(withRid(SELF,'state=loading'),'再试一次',true,SCREEN+'-primary','/resume/optimize');
   why.className = 'why show';
   why.textContent = '生成失败不影响你自己动手改：手动逐项修改这条路全程不经过模型。';
-  truthTx.textContent = '界面示例：这是生成没成时的样子，不是真的出了错。';
+  truthTx.textContent = '界面示例：这是生成没成功时的样子。';
 };
 
 R['unavailable'] = function(){
@@ -1268,17 +1268,17 @@ R['unavailable'] = function(){
 };
 
 R['illegal'] = function(){
-  tkSub.textContent = '地址里的参数不在登记范围内，已按不可用处理。';
-  tkTag.textContent = '参数不合法';
+  tkSub.textContent = '这次打开的方式不对，已按不可用处理。';
+  tkTag.textContent = '打开方式不对';
   work.innerHTML =
-    '<section class="sec m-fade-in"><div class="sec-h"><h2>这个地址不能用来打开优化建议</h2></div>'
-    + '<p class="lead">本页只认登记过的页面、状态与编号格式。收到没登记的值时一律按不可用处理，'
-    + '<b>也不会把地址里的原文显示出来</b>，避免把外部输入原样搬到屏幕上。</p></section>'
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>这样打开不了优化建议</h2></div>'
+    + '<p class="lead">本页只认登记过的打开方式。认不出的内容一律按不可用处理，'
+    + '<b>也不会把它原样显示出来</b>，避免把外部输入原样搬到屏幕上。</p></section>'
     + exits('bad') + howto();
   cta.innerHTML = btn('01-home.html','返回首页',false,SCREEN+'-secondary','/')
     + btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source');
   why.className = 'why';
-  truthTx.textContent = '界面示例：这是参数不合适时的样子。';
+  truthTx.textContent = '界面示例：这是打开方式不对时的样子。';
 };
 
 /* ════════ 7. ready · 建议总览 ════════ */
@@ -1327,7 +1327,7 @@ function renderOverview(){
   why.className = 'why show';
   why.innerHTML = '「待确认事实」来自本页的机械对照：只比对数字和示例词表命中的词，'
     + '<b>不是通用事实校验</b>，词表之外的编造它测不出来。'
-    + '<span data-testid="'+SCREEN+'-session">这次办理只记住编号和一次性令牌；裁决不记在这次办理里，刷新即回待定。</span>';
+    + '<span data-testid="'+SCREEN+'-session">这次办理只记住编号和一次性凭证；裁决不记在这次办理里，刷新即回待定。</span>';
   truthTx.textContent = '界面示例：建议是示例内容；裁决只是阅读决策，不写入账号、不写进优化稿、不生成文件、不打印。';
 }
 
@@ -1372,7 +1372,7 @@ function exportResult(){
     +' data-file-id="'+esc(f.fileId)+'" data-pages="'+f.pageCount+'"><b>优化版 '+exportFormat.toUpperCase()+' 已生成</b><br>'
     +esc(fileMetaLine(f))+'<br>按文件名和页数认这一份。'
     +(f.printable
-      ?'下载链接和打印链接都不进地址栏，打印交接只带文件编号与打印参数。'
+      ?'下载和打印用的链接不会显示出来，交给打印的只有这份文件和打印参数。'
       :'<b>这一份暂时进不了打印</b>：系统这次返回的是 '+exportFormat.toUpperCase()
         +' 原文件的编号，打印要用的是系统另渲染的那份同内容 PDF，而那份 PDF 的<b>文件编号没有返回</b>。'
         +'编号对不上就不能交接，所以这里如实关掉打印；查看和手机保存照常。')
@@ -1688,10 +1688,10 @@ function svToolbar(f){
    所以这里不画「点一下就能看到你上传的那份」，而是把缺口写在最显眼的位置。 */
 function srcGapNote(inBox){
   return '<div class="srcgap'+(inBox?' inbox':'')+'" data-testid="'+SCREEN+'-source-contract-gap" role="note">'
-    + '<i class="tagx">迁移目标</i>'
-    + '<p>当前读取端点只返回优化建议，<b>不返回原件的任何文件凭证</b>。要真正打开你上传的那一份，'
-    + '系统必须另发一个<b>受控的一次性预览令牌</b>，或按你本人的登录态重新取一次自己的文件；'
-    + '<b>地址栏里的 taskId 只是编号，既不是授权，也不能用来定位文件</b> —— 本页不凭它去猜任何文件。</p></div>';
+    + '<i class="tagx">还没接通</i>'
+    + '<p>现在系统只给回优化建议，<b>不给回原件的任何访问凭证</b>。要真正打开你上传的那一份，'
+    + '系统得另给一次<b>只能看这一次的预览凭证</b>，或按你本人的登录重新取一次自己的文件；'
+    + '<b>光有一个编号既不是授权，也找不到文件</b> —— 本页不凭它去猜任何文件。</p></div>';
 }
 function sourceViewer(f){
   var marks = '', i;
@@ -1714,10 +1714,10 @@ function sourceViewer(f){
 }
 var NOTICE = {
   'docx': { icon:'doc', title:'这份原件是 DOCX，屏幕上不做翻页预览',
-    why:'终端里没有 Office 排版引擎。硬渲染会改掉字体、行距和分页，你在这儿看到的就不是真正会打印出来的那一份，所以这里不做假预览。',
+    why:'这台机器里没有 Office 排版引擎。硬渲染会改掉字体、行距和分页，你在这儿看到的就不是真正会打印出来的那一份，所以这里不做假预览。',
     keep:'<b>优化建议不受影响</b>：候选已经读出来了，就在这一层下面。',
     rows:[
-      ['dead','print','打印这份原件','现在没有真实文件','-source-alt-print'],
+      ['dead','print','打印这份原件','这里没有真实文件','-source-alt-print'],
       ['link','21-resume-triage.html','upload','返回简历来源，转成 PDF 再上传一次','PDF 能直接翻页预览','/resume/source','-source-alt-source'],
       ['link','10-print-hub.html','print','去打印 / 扫描其他材料','打印扫描不依赖预览，照常可用','/print-scan','-source-alt-print-hub'],
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
@@ -1734,7 +1734,7 @@ var NOTICE = {
     why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还在系统保留，这一屏都看不出来，也不做判断。',
     keep:'这<b>不是建议读取失败</b>：候选已经在下面了。',
     rows:[
-      ['dead','refresh','再取一次原件','现在不会真的重新取件','-source-alt-retry'],
+      ['dead','refresh','再取一次原件','这里不会真的重新取件','-source-alt-retry'],
       ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
     ] },
@@ -1742,7 +1742,7 @@ var NOTICE = {
     why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还在系统保留。',
     keep:'<b>优化建议不受影响</b>：候选就在这一层下面。',
     rows:[
-      ['dead','refresh','再显示一次','现在不会真的重新渲染','-source-alt-retry'],
+      ['dead','refresh','再显示一次','这里不会真的重新渲染','-source-alt-retry'],
       ['link','10-print-hub.html','print','去打印 / 扫描','不经过预览也能把材料出纸','/print-scan','-source-alt-print-hub'],
       ['link','21-resume-triage.html','upload','返回简历来源','换一份文件重新提交解析','/resume/source','-source-alt-source'],
       ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
@@ -1752,7 +1752,7 @@ function sourceNotice(mode){
   var N = NOTICE[mode], rows = '', i;
   for (i = 0; i < N.rows.length; i++) {
     var r = N.rows[i];
-    if (r[0] === 'dead') rows += rowDead(r[1], r[2], r[3], SCREEN + r[4], '现在没有真实文件');
+    if (r[0] === 'dead') rows += rowDead(r[1], r[2], r[3], SCREEN + r[4], '这里没有真实文件');
     else if (r[0] === 'close') rows += '<button type="button" class="row m-press" id="src-close-row" data-testid="'+SCREEN+r[5]+'">'
       + '<i class="ic">'+ic(r[2],24)+'</i><span class="tx"><b>'+r[3]+'</b><span>'+r[4]+'</span></span>'+GO+'</button>';
     else rows += rowLink(r[1], r[2], r[3], r[4], SCREEN + r[6], r[5]);
@@ -1849,11 +1849,11 @@ function render(){
 
   if (sess === 'restored') {
     sessbar.classList.add('show');
-    sessTx.textContent = '继续这次办理：这台机器上还留着这次的简历编号和一次性令牌，已按它重新读回建议。'
+    sessTx.textContent = '继续这次办理：这台机器上还留着这次的简历编号和一次性凭证，已按它重新读回建议。'
       + '逐条裁决没有恢复 —— 裁决不记在这次办理里，刷新即回到待定。';
   } else if (sess === 'cleared') {
     sessbar.classList.add('show');
-    sessTx.textContent = '这次办理已清除：待机 / 超时把编号和一次性令牌一并清掉了，所以这一屏回到没有上下文。'
+    sessTx.textContent = '这次办理已清除：待机 / 超时把编号和一次性凭证一并清掉了，所以这一屏回到没有上下文。'
       + '重新上传或从「我的」里打开一份记录，就能再拿到编号。';
   }
 

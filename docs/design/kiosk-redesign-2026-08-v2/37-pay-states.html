@@ -402,10 +402,10 @@ function qrCard(off, title, hint){
     + '<div class="card-h"><span class="t">'+esc(title)+'</span>'
     + (off?'<span class="qrstamp" data-testid="'+SCREEN+'-qr-stamp">已失效</span>':'')
     + '<span class="hint">'+esc(hint)+'</span></div>'
-    + '<div class="qrslot'+(off?' off':'')+'" role="img" aria-label="收款码占位块：静态原型不生成可扫描的收款码">'
+    + '<div class="qrslot'+(off?' off':'')+'" role="img" aria-label="收款码占位块：示例码，扫不出来">'
     + svg('scanOff')
     + '<b>'+(off?'这个收款码已失效':'收款码占位块')+'</b>'
-    + '<span>这一屏<u>没有可扫描的码</u>。真实收款码由系统实时下发。</span>'
+    + '<span>这一屏<u>没有可扫描的码</u>。真实收款码在付款时当场生成。</span>'
     + '</div>'
     + kv([['剩余有效时间', off?'已过期，需重新出码':'有效期以实际结果为准'],['支付方式',dev('等实际结果','系统已启用通道回填')]], SCREEN+'-qr-meta')
     + '</section>';

@@ -162,7 +162,7 @@ var PFILE={
   pageCount:3,
   signedUrl:'有时效的下载链接（预览 / 下载用，不展示完整串）',
   expiresAt:'今天 10:24',
-  printFileUrl:'系统 HMAC content URL（仅 /print/jobs 可用，不进地址栏）'
+  printFileUrl:'打印专用链接（不展示完整串）'
 };
 function kb(n){return n<1048576?Math.max(1,Math.round(n/1024))+' KB':(n/1048576).toFixed(1)+' MB'}
 function fieldRows(rows,cols){var h='<div class="fields kv'+(cols===3?' kv3':'')+'">';
@@ -186,9 +186,9 @@ function resumePanel(){
       +'<p class="res-p">选一条来源，本机才会真正去取文件。没有简历时按<b>通用问题</b>练习，不会因此少一道题。</p></div>';
   }else if(RES==='phone'){
     h+='<div class="res-panel"><div class="rp-h">手机扫码上传<span>沿用既有手机入口 · 本页不做第二套手机页</span></div>'
-      +'<div class="qrbox"><div class="qrfake">示意图形<br>扫不出结果</div><div class="qsteps">'
+      +'<div class="qrbox"><div class="qrfake">示例码<br>扫不出来</div><div class="qsteps">'
       +'<div class="qstep"><i>1</i><span>手机打开相机或微信扫一扫，对准屏幕上的码。</span></div>'
-      +'<div class="qstep"><i>2</i><span>手机上会打开已有的上传页，在那里选好简历文件。</span></div>'
+      +'<div class="qstep"><i>2</i><span>手机上会打开上传页，在那里选好简历文件。</span></div>'
       +'<div class="qstep"><i>3</i><span>传完后回到这台机器，<b>由你在这一页确认</b>，才带进本场练习。</span></div>'
       +'</div></div>'
       +'<p class="res-p">这台机器不显示「扫了没」——手机走到哪一步本机看不到，只有确认这一下是真的。</p>'
@@ -227,7 +227,7 @@ function resumePanel(){
       +'<button type="button" class="res-btn" data-res="idle">不用简历继续</button></div></div>';
   }else{
     h+='<div class="res-panel"><div class="rp-h">完整预览<span>有时效的下载链接 · 只对本人开放</span></div>'
-      +'<p class="res-p">预览走这份文件的短期签名 URL。下面是<b>分页排版示意</b>，不是文件里的内容。</p>'
+      +'<p class="res-p">预览用的是这份文件的临时链接。下面是<b>分页排版示意</b>，不是文件里的内容。</p>'
       +pvPages(3)
       +'<div class="res-acts"><button type="button" class="res-btn" data-res="ready">关闭预览</button></div></div>';
   }
@@ -483,7 +483,7 @@ function sessionExpired(){
   base('这一场练习<em>已经过期</em>。','这场练习是否过期，由系统判定。过期后不能续答，也不能把没答完的一场说成已完成。');
   body.innerHTML=statusbar('这场练习的状态',[['这场练习','已过期','off'],['未提交的回答','已失效'],['已生成的报告','不受影响','ok']])
     +'<section class="card empty tight bad"><div><div class="e">!</div><h2>这场练习已过期，需要重新开始</h2>'
-    +'<p>公共终端上的这场练习有有效期。过期之后旧的题目和未提交的回答都不能继续使用。</p></div></section>'
+    +'<p>公用机器上的这场练习有有效期。过期之后旧的题目和未提交的回答都不能继续使用。</p></div></section>'
     +'<section class="card"><div class="head"><b>接下来</b><span>选一条</span></div>'
     +optlist([{k:'练',t:'重新创建一场练习',d:'岗位、面试官、时长可以沿用刚才的选择，重新填一次即可。',href:urlFor('setup'),go:true},
               {k:'录',t:'查看本人练习记录',d:'过期前已经生成过的报告仍按保存规则保留。',href:urlFor('reports-loading')}])+'</section>'
@@ -571,7 +571,7 @@ function reportPrintPending(){
     +'<div class="record load"><i></i>正在生成报告打印版</div></div></section>'
     +'<section class="card"><div class="head"><b>生成成功后才往下走</b><span>沿用既有打印流程</span></div>'
     +steps([['下一步','拿到真实文件','系统返回文件名、页数、大小和有效期。'],
-            ['再下一步','进入打印确认','由已有 /print/confirm 报价流程接手，本页不确认参数。'],
+            ['再下一步','进入打印确认','由打印确认页的报价流程接手，本页不确认参数。'],
             ['最后','按真实结果出纸','出纸与取件码由打印流程返回，本页不预告。']])+'</section>'
     +'<section class="card"><div class="head"><b>不想等可以先做</b><span>不影响本次生成</span></div>'
     +optlist([{k:'报',t:'返回报告继续复盘',d:'报告内容已读取，可以先看结论区。',href:urlFor('report-ready')},
@@ -616,11 +616,11 @@ function reportPrintHandoff(){
     +fieldRows([['份数','1 份'],['单双面','单面'],['颜色','黑白'],
                 ['纸张','A4'],['页码范围','全部'],['每张纸页数','1']],3)
     +'<p class="res-p">这些只是<b>进入打印确认页时的初值</b>；份数、单双面、颜色在那一页还能改，金额也在那里按真实页数由系统报价。</p></section>'
-    +'<section class="notice danger"><i>!</i><div><b>正式办理时，这份文件不经过地址栏，打印链接也不会出现在地址栏。</b>'
+    +'<section class="notice danger"><i>!</i><div><b>正式办理时，这份文件直接交给打印，打印链接不会显示出来。</b>'
     +'这一页的跳转只带 <b>文件编号、页数与打印参数</b>，是用来说明交接内容，'
     +'<b>不是已经接通的打印流程</b>；点进去看到的是打印确认页自己的示例，不代表这份报告已经排进打印。</div></section>'
     +'<section class="card"><div class="head"><b>按下去之后不会发生的事</b><span>三条边界</span></div>'
-    +mini([['不会','立即创建打印任务或扣费。'],['不会','出现取件码或出纸结果。'],['不会','把有时效的下载链接留在浏览器地址栏。']])+'</section>'
+    +mini([['不会','立即创建打印任务或扣费。'],['不会','出现取件码或出纸结果。'],['不会','把有时效的下载链接留在这台机器上。']])+'</section>'
     +rail();
   actions.innerHTML=btn('report-print-ready','返回文件')
     +'<a class="btn primary" href="'+printHandoffHref()+'" data-route="/print/confirm" data-testid="interview-primary">去打印确认<em>→</em></a>';
@@ -851,7 +851,7 @@ function down(){
 }
 function illegalState(){
   mark('illegal');
-  base('这个页面链接<em>不能使用</em>。','地址里的状态参数不属于模拟面试工作台；本机不会静默切回设置页，避免把坏链接误看成正常结果。');
+  base('这个页面链接<em>不能使用</em>。','这个链接里的内容不属于模拟面试工作台；本机不会静默切回设置页，避免把坏链接误看成正常结果。');
   body.innerHTML='<section class="card empty tight bad"><div><div class="e">!</div><h2>页面参数无效</h2>'
     +'<p>请从面试服务的有效入口重新进入。当前没有创建练习、提交回答或生成报告。</p></div></section>'
     +'<section class="card"><div class="head"><b>可以继续</b><span>选择一个有效入口</span></div>'

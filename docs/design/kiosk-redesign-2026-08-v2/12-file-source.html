@@ -580,8 +580,8 @@ function qr(kind){
    svg('phone','currentColor',72,1.6)+'<span class="qb-t">码还没出来</span>'+
    '<span class="qb-s">拿到系统给出的一次性链接之后<br>这里才会出现二维码</span></div>';
  }
- var label=kind==='dim'?'已失效的上传二维码（示例码，扫不出来，不编码真实内容）'
-   :'手机上传二维码（示例码，扫不出来，不编码真实内容）';
+ var label=kind==='dim'?'已失效的上传二维码（示例码，扫不出来）'
+   :'手机上传二维码（示例码，扫不出来）';
  return '<div class="qr'+(kind==='dim'?' dim':'')+'" role="img" aria-label="'+label+'" data-testid="'+SCREEN+'-qr">'+
   '<div class="qr-grid">'+qrGrid()+'</div>'+
   (kind==='live'?'<span class="qr-corner tl"></span><span class="qr-corner tr"></span><span class="qr-corner bl"></span><span class="qr-corner br"></span>':'')+
@@ -643,8 +643,8 @@ function channels(active,usbMode,keys){
  var order=keys||['qr','file','usb'],h='<div class="chs" data-testid="'+SCREEN+'-channels">';
  for(var i=0;i<order.length;i++){
   var k=order[i],c=CH_DEF[k],dis=false,d=c.d,f=c.f,tag=c.tag;
-  if(k==='usb'&&usbMode==='unavailable'){dis=true;d='这台终端没有配置 U 盘导入的本地令牌，所以这条通道不能用。';f='本机未接通 · 重试也没用';tag=null}
-  if(k==='usb'&&usbMode==='offline'){dis=true;d='本地服务已配好，但现在连不上这台机器。和「未配置」不是一回事。';f='Agent 离线 · 可以重试';tag=null}
+  if(k==='usb'&&usbMode==='unavailable'){dis=true;d='这台机器没有开通 U 盘导入，所以这条通道不能用。';f='本机没开通 · 重试也没用';tag=null}
+  if(k==='usb'&&usbMode==='offline'){dis=true;d='这台机器读 U 盘的功能装好了，但此刻没连上。和「没开通」不是一回事。';f='暂时没连上 · 可以重试';tag=null}
   var body='<span class="ch-ic" style="background:'+c.bg+'">'+svg(c.ic,c.st,32)+'</span>'+
    '<span class="ch-n"><span>'+c.n+'</span>'+(tag?'<span class="tag">'+tag+'</span>':'')+(k==='file'?'<span class="tag mut">备用通道</span>':'')+'</span>'+
    '<span class="ch-d"><span>'+d+'</span></span><span class="ch-f">'+f+'</span>';
@@ -715,8 +715,8 @@ function cancelOutcomeRow(){
   '<h4>'+svg('info','currentColor',22)+'<span>这一步的结果由系统给出</span></h4>'+
   '<p>不是你在这一屏选的。下面两个是<b>示例按钮</b>，只用来分别看到两种答复的屏幕；本页<b>不会自己变成「已作废」</b>。</p>'+
   '<div class="outrow">'+
-   a({cls:'sbtn warn',href:to('phone-cancel-failed',{cancel:'fail'}),tid:SCREEN+'-outcome-fail',label:svg('warn','currentColor',22)+'演示：没能作废',al:'原型演示：系统答复没能作废'})+
-   a({cls:'sbtn',href:to('phone-cancelled',{cancel:'ok'}),tid:SCREEN+'-outcome-ok',label:svg('check','currentColor',22)+'演示：确认已作废',al:'原型演示：系统答复确认已作废'})+
+   a({cls:'sbtn warn',href:to('phone-cancel-failed',{cancel:'fail'}),tid:SCREEN+'-outcome-fail',label:svg('warn','currentColor',22)+'演示：没能作废',al:'示例：系统答复没能作废'})+
+   a({cls:'sbtn',href:to('phone-cancelled',{cancel:'ok'}),tid:SCREEN+'-outcome-ok',label:svg('check','currentColor',22)+'演示：确认已作废',al:'示例：系统答复确认已作废'})+
   '</div></div>';
 }
 var EXIT=function(){return ghost('退出 · 回打印扫描','10-print-hub.html','/print-scan',SCREEN+'-exit','退出选文件，回到打印扫描')};
@@ -731,7 +731,7 @@ function switchRow(active){
 function existingSourceLinks(no){
  return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">文件不在手机或 U 盘？</span><span class="hint">两条真实入口</span></div><div class="split">'+
   a({cls:'mini',href:'../kiosk-redesign-2026-08/18-scan-workbench.html',route:'/scan/start',tid:SCREEN+'-scan-source',al:'扫描纸质原件',
-    html:'<h4>'+svg('scan','currentColor',22)+'<span>扫描纸质原件</span></h4><p>先开始这次扫描，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>'})+
+    html:'<h4>'+svg('scan','currentColor',22)+'<span>扫描纸质原件</span></h4><p>先开始这次扫描，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；屏幕上启动不了扫描仪。</p>'})+
   a({cls:'mini',href:'../kiosk-redesign-2026-08/38-member-assets.html?state=documents-login',route:'/me/documents',tid:SCREEN+'-member-source',al:'从我的文档或最近打印文件选择',
     html:'<h4>'+svg('file','currentColor',22)+'<span>我的文档 / 最近打印</span></h4><p>登录后查看已保存材料和最近打印文件。进入打印前会重新取得<b>有效访问链接</b>，过期或失败会明确提示。</p>'})+
   '</div></section>';
@@ -763,21 +763,21 @@ V['source-chooser']=function(){
 };
 
 V['missing-file']=function(){
- return '<section class="sec">'+statusCard('warn','warn','这一步没有可用的文件上下文',[
-  '你打开的地址要求的是一个<b>需要真实文件</b>的状态，但本次办理里没有文件 —— 这一屏不会替你挑一份，也不会凭地址就说「已经传好了」。',
+ return '<section class="sec">'+statusCard('warn','warn','这一步还没有可用的文件',[
+  '这一步要先有<b>一份文件</b>，这次办理里还没有 —— 本机不会替你挑一份，也不会没传就说「已经传好了」。',
   '这<b>不代表系统删了什么</b>。重新从下面任一条通道搬一份进来就能接着走。'
  ],[['warn','没有文件，先不往下走','lock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">重新选一条通道</span><span class="hint">三条都能走</span></div>'+
   channels(null,'ok')+'</section>'+
-  tailCard('info','为什么会看到这一屏','本页把<b>带文件名 / 文件列表 / 这次办理结果</b>的状态当成演示示例，<b>这一屏只作示例</b>。普通地址直接要这些状态，一律落到这里。','重新搬一份进来要几步',['上面挑一条通道。','按那条通道的提示把文件送到系统。','已经确认之后它成为当前文件。'],'这一屏<b>不代表出错</b>，只代表本次办理里现在是空的。')+
+  tailCard('info','为什么会看到这一屏','<b>显示文件名、文件列表或办理结果</b>的那几步都得先有一份文件。<b>没有文件时</b>，要文件的那几步都会回到这一屏。','重新搬一份进来要几步',['上面挑一条通道。','按那条通道的提示把文件送到系统。','已经确认之后它成为当前文件。'],'这一屏<b>不代表出错</b>，只代表本次办理里现在是空的。')+
   reasonLine('本次办理里没有文件，材料检查按住不放')+
-  ctaBar(EXIT(),primaryOff('下一步：材料检查','缺少文件上下文'));
+  ctaBar(EXIT(),primaryOff('下一步：材料检查','还没有文件'));
 };
 
 V['unknown']=function(){
  return '<section class="sec">'+statusCard('error','x','无法识别的页面状态',[
-  '地址里给的状态本页不认识。<b>我不猜你想去哪一步</b>，也<b>不把地址里的原始参数回显到屏幕上</b>。',
-  '当前办理类型已经归一为「'+(IS_RESUME?'简历打印':'文档打印')+'」，其余不合法的参数直接丢掉。'
+  '这一页认不出你要打开哪一步。<b>我不猜你想去哪一步</b>，也<b>不把认不出的内容显示出来</b>。',
+  '办理类型按「'+(IS_RESUME?'简历打印':'文档打印')+'」处理，其余认不出的内容一律不用。'
  ],[['bad','判断不了就按不能办处理','lock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">从头选一条通道</span><span class="hint">这是本页唯一的正经入口</span></div>'+
   channels(null,'ok')+'</section>'+
@@ -797,7 +797,7 @@ V['local-guide']=function(){
    '<ul class="steps"><li><span class="n">1</span><span>浏览器弹出系统文件窗口，你挑<b>一份</b>文件。</span></li>'+
    '<li><span class="n">2</span><span>选中即上传，系统校验格式和大小。</span></li>'+
    '<li><span class="n">3</span><span>已经确认后，文件名出现在「当前文件」里。</span></li></ul></div>'+
-   '<div class="notes"><div class="note"><span class="sq"></span><span><b>第三方网盘尚未接入</b>：公共终端不做网盘授权登录。你自己传过或生成过的材料在「我的文档」里，登录即可直接选用；其余先下到手机再扫码上传。</span></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span><b>第三方网盘尚未接入</b>：公共机器不做网盘授权登录。你自己传过或生成过的材料在「我的文档」里，登录即可直接选用；其余先下到手机再扫码上传。</span></div>'+
    '<div class="note"><span class="sq"></span><span><b>关掉这个系统窗口</b>不会上传任何东西，也不会改变本次办理里已经有的当前文件。</span></div></div>'+
   '</div></section>'+
   '<section class="sec">'+switchRow('file')+'</section>'+
@@ -812,7 +812,7 @@ V['local-picking']=function(){
    :{n:f.n,s:f.s,tag:f.bad,tagCls:'bad',bad:1,href:to(f.bad==='格式不收'?'local-rejected':(f.bad==='超过 15MB'?'local-oversize':'local-unreadable')),tid:SCREEN+'-local-file-'+i});
  }
  return '<section class="sec">'+fixtureBar('下面这个目录和五份文件')+'</section>'+
-  '<section class="sec"><div class="note"><span class="sq"></span><span>真实一体机这一步是<b>系统文件窗口</b>；这一屏用同页受控列表示意「你挑了哪一份」。<b>一次只能选一个。</b></span></div></section>'+
+  '<section class="sec"><div class="note"><span class="sq"></span><span>真实办理时这一步会弹出<b>系统的选文件窗口</b>；这里用列表示意你挑了哪一份。<b>一次只能选一份。</b></span></div></section>'+
   '<section class="sec grow">'+listCard('系统文件窗口（演示目录：下载）','5 项 · 一次选一个',
    rows+nextSteps('挑中之后会怎样',['选中即上传，系统校验格式和大小。','不合格的当场说清楚为什么，不会偷偷收下。','合格并保存成功后成为当前文件。']))+'</section>'+
   reasonLine('还没选定文件，材料检查按住不放')+
@@ -951,7 +951,7 @@ V['phone-ready']=function(){
    '<ul class="steps"><li><span class="n">1</span><span>手机打开相机或微信扫一扫，对准屏幕。</span></li>'+
    '<li><span class="n">2</span><span>在手机上选好文件，点「上传」。</span></li>'+
    '<li><span class="n">3</span><span>系统收到后，<b>回到这台机器点确认</b>才算数。</span></li></ul>'+
-   '<div class="note" style="margin-top:12px"><span class="sq"></span><span>码是<b>示例码，扫不出来</b>，不编码任何真实内容。</span></div>')+'</section>'+
+   '<div class="note" style="margin-top:12px"><span class="sq"></span><span>码是<b>示例码，扫不出来</b>。</span></div>')+'</section>'+
   '<section class="sec">'+helpMini('手机扫不出来、或者扫开之后打不开页面，找工作人员帮忙。')+'</section>'+
   reasonLine('还没有文件上来，材料检查按住不放')+
   ctaBar(ghost('刷新二维码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','刷新二维码（先撤销旧这次办理）'),primaryOff('下一步：材料检查','还没有文件'));
@@ -1125,40 +1125,40 @@ V['phone-cancelled']=function(){
 
 /* ---------- U 盘通道 ---------- */
 V['usb-unavailable']=function(){
- return '<section class="sec">'+statusCard('lock','lock','这台机器没接通 U 盘导入',[
-  '本终端<b>没有配置 U 盘导入的本地令牌</b>，所以这条通道锁着。<b>这不是重试能解决的</b>，得由运维在这台机器上补配置。',
+ return '<section class="sec">'+statusCard('lock','lock','这台机器没开通 U 盘导入',[
+  '这台机器<b>没有开通读 U 盘</b>，所以这条通道锁着。<b>这不是重试能解决的</b>，得由工作人员在这台机器上开通。',
   '插着的 U 盘<b>不会被本机读取</b>，也没有任何文件被复制走。'
- ],[['warn','本机未配置 · 重试无效','lock']],SCREEN+'-fallback')+'</section>'+
+ ],[['warn','本机没开通 · 重试无效','lock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">还能用的两条路</span><span class="hint">U 盘那格是锁着的</span></div>'+
   channels(null,'unavailable')+'</section>'+
-  tailCard('info','和「Agent 离线」不是一回事','未配置 = 这台机器从来没打开过这条通道；Agent 离线 = 配置有，但本地服务此刻连不上。<b>后者才值得重试。</b>','这条通道要接通需要什么',['这台机器装好并跑着本地服务。','Kiosk 侧配好与 Agent 一致的本地令牌。','两边对上之后 U 盘那一格才会解锁。'],'这三件事都得由运维在机器上做，<b>你在这一屏点什么都不会改变它</b>。')+
+  tailCard('info','和「暂时没连上」不是一回事','没开通 = 这台机器从来没打开过这条通道；没连上 = 读 U 盘的功能装好了，只是此刻没连上。<b>后者才值得重试。</b>','这条通道要开通需要什么',['这台机器装好读盘的功能并开着。','屏幕这边和读 U 盘的功能配好对。','两边对上之后 U 盘那一格才会解锁。'],'这三件事都得由工作人员在机器上做，<b>你在这一屏点什么都不会改变它</b>。')+
   reasonLine('这一步还没有文件，材料检查按住不放')+
   ctaBar(HELP(),primaryLink('改用手机扫码上传',to('phone-generating'),'/print/upload'));
 };
 
 V['usb-agent-offline']=function(){
- return '<section class="sec">'+statusCard('error','warn','连不上本机的本地服务',[
-  '这台机器<b>配了</b> U 盘导入，但现在连不上本地读盘服务。<b>和「未配置」不是一回事</b>——这个可以重试。',
-  '在 Agent 回来之前，本机<b>不去猜 U 盘里有什么</b>，也不显示上一次的列表。'
- ],[['bad','本地文件服务连不上','warn'],['','可以重试','clock']],SCREEN+'-fallback')+'</section>'+
+ return '<section class="sec">'+statusCard('error','warn','读 U 盘的功能暂时没连上',[
+  '这台机器<b>开通了</b> U 盘导入，读 U 盘的功能也装好了，只是此刻没连上。<b>和「没开通」不是一回事</b>——这个可以重试。',
+  '重新连上之前，本机<b>不去猜 U 盘里有什么</b>，也不显示上一次的列表。'
+ ],[['bad','读 U 盘暂时没连上','warn'],['','可以重试','clock']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">重试，或者换一条</span><span class="hint">两条通道不受影响</span></div>'+
   channels(null,'offline')+'</section>'+
-  tailCard('info','重试是安全的','读盘请求<b>不写 U 盘</b>，只列根目录。重试不会改动你盘上的任何东西。','重试会做什么',['本机再向这台机器的本地文件服务问一次。','连上了就重新列一次 U 盘根目录。','还是连不上，就换手机扫码那条通道。'],'连不上期间本机<b>不去猜 U 盘里有什么</b>，也不显示上一次的列表。')+
+  tailCard('info','重试是安全的','读盘<b>只读不写</b>，只看最外层的文件。重试不会改动你盘上的任何东西。','重试会做什么',['本机再试着连一次读 U 盘的功能。','连上了就重新列一次 U 盘最外层的文件。','还是连不上，就换手机扫码那条通道。'],'连不上期间本机<b>不去猜 U 盘里有什么</b>，也不显示上一次的列表。')+
   reasonLine('这一步还没有文件，材料检查按住不放')+
-  ctaBar(ghost('改用手机扫码上传',to('phone-generating'),'/print/upload',SCREEN+'-switch-source','改用手机扫码上传'),primaryLink('重试连接本地服务',to('usb-detecting'),'/print/upload'));
+  ctaBar(ghost('改用手机扫码上传',to('phone-generating'),'/print/upload',SCREEN+'-switch-source','改用手机扫码上传'),primaryLink('重试读 U 盘',to('usb-detecting'),'/print/upload'));
 };
 
 V['usb-wait']=function(){
  return '<section class="sec">'+statusCard('plain','usb','把 U 盘插进右侧 USB 口',[
-  '还<b>没有检测到 U 盘</b>。插上之后本地服务会列出<b>根目录</b>里能打印的文件，你在屏幕上选一份。',
+  '还<b>没有检测到 U 盘</b>。插上后这台机器列出<b>最外层</b>能打印的文件，你在屏幕上选一份。',
   '本机<b>不会自动读整盘</b>，也不进子文件夹。想传的文件请先放到 U 盘最外层。'
- ],[['','只读根目录','usb'],['','PDF / JPG / PNG · ≤ 15MB','file']],SCREEN+'-status')+'</section>'+
+ ],[['','只看最外层','usb'],['','PDF / JPG / PNG · ≤ 15MB','file']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow"><div class="card spread" style="flex:1">'+
    '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">插上之后会发生什么</span></div>'+
-   '<ul class="steps"><li><span class="n">1</span><span>本地服务发现可移动磁盘。</span></li>'+
-   '<li><span class="n">2</span><span>列出根目录里的 PDF / JPG / PNG，每份配一个<b>只能导一次 · 10 分钟内有效</b>。</span></li>'+
-   '<li><span class="n">3</span><span>你选一份，本地服务把它上传到系统。</span></li></ul></div>'+
-   '<div class="notes"><div class="note"><span class="sq"></span><span>网页<b>不直接访问磁盘</b>，也拿不到你盘上的绝对路径。</span></div>'+
+   '<ul class="steps"><li><span class="n">1</span><span>这台机器认出插上的 U 盘。</span></li>'+
+   '<li><span class="n">2</span><span>列出最外层的 PDF / JPG / PNG，<b>每份文件只能导入一次，10 分钟内有效</b>。</span></li>'+
+   '<li><span class="n">3</span><span>你选一份，这台机器把它读出来传到系统。</span></li></ul></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>屏幕上<b>只列文件名</b>，不显示你盘上的完整路径。</span></div>'+
    '<div class="note"><span class="sq"></span><span>整个过程<b>只读不写</b>，不会往你的 U 盘里放东西。</span></div></div>'+
   '</div></section>'+
   '<section class="sec">'+switchRow('usb')+'</section>'+
@@ -1168,15 +1168,15 @@ V['usb-wait']=function(){
 
 V['usb-detecting']=function(){
  return '<section class="sec">'+statusCard('plain','dot','正在读 U 盘',[
-  '本地服务在列根目录。<b>不画进度条</b>——读盘这件事没有可确认的百分比，编一个只会误导人。',
-  '每份文件都会标记为<b>只能导一次 · 10 分钟内有效</b>；每次重新读都会换一批，旧的当场作废。'
- ],[['','正在读 U 盘根目录','link'],['','只能导一次 · 10 分钟内有效','lock']],SCREEN+'-status')+'</section>'+
+  '这台机器在读 U 盘最外层的文件。<b>不画进度条</b>——读盘这件事没有可确认的百分比，编一个只会误导人。',
+  '<b>每份文件只能导入一次，10 分钟内有效</b>；重新读一次 U 盘，就可以重新选。'
+ ],[['','正在读 U 盘最外层','link'],['','每份只能导入一次 · 10 分钟内有效','lock']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow"><div class="card spread" style="flex:1">'+
    '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">这一步在做什么</span></div>'+
-   '<div class="notes"><div class="note"><span class="sq"></span><span>只列<b>根目录</b>里的 PDF / JPG / PNG，不进子文件夹。</span></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>只列<b>最外层</b>的 PDF / JPG / PNG，不进子文件夹。</span></div>'+
    '<div class="note"><span class="sq"></span><span>超过 15MB 的不列出来 —— 列了你也传不上去。</span></div>'+
    '<div class="note"><span class="sq"></span><span>读盘期间<b>请不要拔盘</b>。</span></div></div></div>'+
-   nextSteps('读完之后',['列表按文件名排序显示出来。','你点其中一份，它被标为已选中。','再点导入，本地服务才开始读字节。'])+
+   nextSteps('读完之后',['列表按文件名排序显示出来。','你点其中一份，它被标为已选中。','再点导入，这台机器才开始读这份文件。'])+
    '<div class="note"><span class="sq"></span><span>读完之前本机<b>不显示任何文件名</b>，也不拿上一次的列表凑数。</span></div>'+
   '</div></section>'+
   '<section class="sec">'+helpMini('读盘一直不出结果，可能是 U 盘或插口的问题，叫工作人员看看。')+'</section>'+
@@ -1186,13 +1186,13 @@ V['usb-detecting']=function(){
 
 V['usb-empty']=function(){
  return '<section class="sec">'+statusCard('warn','warn','这个 U 盘里没有能用的文件',[
-  '根目录里<b>没有找到</b> PDF / JPG / PNG。常见原因：简历是 DOCX、文件放在子文件夹里、或者单份超过 15MB。',
+  '最外层<b>没有找到</b> PDF / JPG / PNG。常见原因：简历是 DOCX、文件放在子文件夹里、或者单份超过 15MB。',
   '在电脑上把文件<b>另存成 PDF 放到最外层</b>，再插一次就能看到了。'
- ],[['warn','根目录 0 个可用文件','usb']],SCREEN+'-fallback')+'</section>'+
+ ],[['warn','最外层 0 个可用文件','usb']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow"><div class="card spread" style="flex:1">'+
    '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">对号入座</span></div>'+
    '<div class="notes"><div class="note"><span class="sq"></span><span><b>简历是 DOCX</b> —— Word 里「另存为 PDF」，再放回 U 盘最外层。</span></div>'+
-   '<div class="note"><span class="sq"></span><span><b>文件在子文件夹里</b> —— 本机只读根目录，拖到最外层。</span></div>'+
+   '<div class="note"><span class="sq"></span><span><b>文件在子文件夹里</b> —— 本机不进子文件夹，拖到最外层。</span></div>'+
    '<div class="note"><span class="sq"></span><span><b>单份超过 15MB</b> —— 降一档分辨率再导出。</span></div></div></div>'+
    '<div class="note"><span class="sq"></span><span>手边没有电脑的话，<b>手机扫码上传</b>通常比折腾 U 盘快。</span></div>'+
   '</div></section>'+
@@ -1206,18 +1206,18 @@ V['usb-list']=function(){
  for(var i=0;i<FX_USB.length;i++){var u=fx(FX_USB[i]);
   rows+=frow({n:u.n,s:u.s,tag:'选这份',tagCls:'pickable',href:to('usb-selected',{pick:String(i)}),tid:SCREEN+'-usb-file-'+i});
  }
- rows+=nextSteps('选中之后会怎样',['这一份被标为已选中，其它的不动。','点「导入这一份」，本地服务才开始读字节。','读完传到系统，保存成功才算数。'])+
-  '<div class="note"><span class="sq"></span><span>只列<b>根目录</b>里的 PDF / JPG / PNG，最多 200 个；超过 15MB 的不列。子文件夹里的东西不在这里。</span></div>';
+ rows+=nextSteps('选中之后会怎样',['这一份被标为已选中，其它的不动。','点「导入这一份」，这台机器才开始读这份文件。','读完传到系统，保存成功才算数。'])+
+  '<div class="note"><span class="sq"></span><span>只列<b>最外层</b>的 PDF / JPG / PNG，最多 200 个；超过 15MB 的不列。子文件夹里的东西不在这里。</span></div>';
  return '<section class="sec">'+fixtureBar('下面这个盘名和三份文件')+'</section>'+
-  '<section class="sec"><div class="note"><span class="sq"></span><span>每一份都<b>只能导一次</b>。选中即消费，<b>重新读盘会换一批</b>，旧的当场作废。一次只能选一个。</span></div></section>'+
-  '<section class="sec grow">'+listCard('U 盘根目录（演示盘名：'+USB_VOL+'）','3 项 · 一次选一个',rows)+'</section>'+
+  '<section class="sec"><div class="note"><span class="sq"></span><span>每一份都<b>只能导入一次</b>，选中就算用掉；<b>重新读一次 U 盘，就可以重新选</b>。一次只能选一份。</span></div></section>'+
+  '<section class="sec grow">'+listCard('U 盘最外层（演示盘名：'+USB_VOL+'）','3 项 · 一次选一个',rows)+'</section>'+
   reasonLine('还没选定文件，材料检查按住不放')+
   ctaBar(ghost('重新读一次盘',to('usb-detecting'),'/print/upload',SCREEN+'-refresh','重新读一次盘'),primaryOff('下一步：材料检查','还没选定文件'));
 };
 
 V['usb-read-failed']=function(){
  return '<section class="sec">'+statusCard('error','warn','读 U 盘失败',[
-  '本地服务连上了，但这次<b>没能列出文件</b>。可能是盘没插稳、文件系统不认识，或者刚才被拔了。',
+  '这台机器连上了 U 盘，但这次<b>没能列出文件</b>。可能是盘没插稳、文件系统不认识，或者刚才被拔了。',
   '重新插一次再读。本机<b>不显示上一次的列表</b>——免得你选中一份其实已经不在盘上的文件。'
  ],[['bad','读盘失败','warn'],['','不显示缓存列表','check']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow"><div class="card spread" style="flex:1">'+
@@ -1236,11 +1236,11 @@ V['usb-selected']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('plain','check','选中了这一份，还没导入',[
    '<b>只导入这一份</b>，U 盘上其它文件不会被读走，也不会发给任何人。',
-   '点导入之后，本地服务把它读出来传到系统。<b>导入完成前它还不是当前文件。</b>'
-  ],[['','这一份只能导一次','lock'],['','只动这一份','check']],SCREEN+'-status')+'</section>'+
+   '点导入之后，这台机器把它读出来传到系统。<b>导入完成前它还不是当前文件。</b>'
+  ],[['','这一份只能导入一次','lock'],['','只动这一份','check']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('准备导入','1 项 · 选中',
     frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'已选中',tagCls:'ok',on:1,tid:SCREEN+'-selected-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('usb','currentColor',38)+'</span><span>选错了？回列表<b>重选一份</b>就行，<br>这一步还没有任何东西被上传。</span></div>'+nextSteps('点「导入这一份」之后',['本地服务把它读出来。','读出来的内容传到系统，校验并保存。','保存成功，它才成为当前文件。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('usb','currentColor',38)+'</span><span>选错了？回列表<b>重选一份</b>就行，<br>这一步还没有任何东西被上传。</span></div>'+nextSteps('点「导入这一份」之后',['这台机器把它读出来。','读出来的内容传到系统，校验并保存。','保存成功，它才成为当前文件。']))+'</section>'+
   reasonLine('还没导入，材料检查按住不放')+
   ctaBar(ghost('回列表重选',to('usb-list'),'/print/upload',SCREEN+'-back-list','回 U 盘列表重选'),primaryLink('导入这一份',to('usb-importing'),'/print/upload'));
 };
@@ -1248,20 +1248,20 @@ V['usb-selected']=function(){
 V['usb-safeid-expired']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('warn','clock','这一份已经不能再导入',[
-   '刚才那次读盘的标识<b>已经作废</b>——每次重新读盘都会换一批，旧的当场失效。这是防止选中一份其实已经不在盘上的文件。',
+   '刚才读出的这份清单<b>已经过期</b>——超过 10 分钟或重新读过 U 盘，旧清单就不能用了。这是防止选中一份其实已经不在盘上的文件。',
    '<b>没有任何文件被导入。</b>重新读一次盘，在新列表里再选一次就行。'
-  ],[['warn','这份已经导过一次','lock'],['','没有文件被导入','check']],SCREEN+'-fallback')+'</section>'+
+  ],[['warn','这一份已失效','lock'],['','没有文件被导入','check']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow">'+listCard('失效的这一份','需要重选',
-    frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'标识失效',tagCls:'bad',bad:1,dim:1,tid:SCREEN+'-expired-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('clock','currentColor',38)+'</span><span>本机<b>不拿旧列表凑数</b>。<br>重新读盘之后你看到的才是盘上此刻真有的东西。</span></div>'+nextSteps('重新读盘之后',['本地服务重新列一次根目录。','每份文件换一份新的可导文件。','你在新列表里重选，旧的彻底作废。']))+'</section>'+
-  reasonLine('标识失效，需要重新读盘再选')+
+    frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'已失效',tagCls:'bad',bad:1,dim:1,tid:SCREEN+'-expired-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('clock','currentColor',38)+'</span><span>本机<b>不拿旧列表凑数</b>。<br>重新读盘之后你看到的才是盘上此刻真有的东西。</span></div>'+nextSteps('重新读盘之后',['这台机器重新列一次最外层的文件。','新列表里的每份文件都可以重新导入。','你在新列表里重选一份就行。']))+'</section>'+
+  reasonLine('这一份已失效，需要重新读 U 盘再选')+
   ctaBar(ghost('改用手机扫码上传',to('phone-generating'),'/print/upload',SCREEN+'-switch-source','改用手机扫码上传'),primaryLink('重新读一次 U 盘',to('usb-detecting'),'/print/upload'));
 };
 
 V['usb-importing']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','dot','正在从 U 盘导入',[
-   '本地服务在把这一份读出来传到系统。<b>没有可确认的中间进度</b>，所以不画百分比，也不说还剩几秒。',
+   '这台机器在把这一份读出来传到系统。<b>没有可确认的中间进度</b>，所以不画百分比，也不说还剩几秒。',
    '<b>这期间不要拔 U 盘。</b>结果出来之前它还不是当前文件。'
   ],[['','导入中','clock'],['warn','别拔 U 盘','usb']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','导入中',
@@ -1275,12 +1275,12 @@ V['usb-importing']=function(){
 V['usb-import-failed']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('error','warn','这一份没导进来',[
-   '系统<b>没有确认收到</b>。多半是这份已经不能再导入（读盘刷新过），也可能是本机到系统的网络断了。',
+   '系统<b>没有确认收到</b>。多半是这份已经不能再导入（重新读过 U 盘），也可能是本机到系统的网络断了。',
    '<b>还没有发起任何解析。</b>重新读一次盘，在新列表里再选一次最稳。'
   ],[['bad','导入失败','warn'],['','当前文件仍为空','info']],SCREEN+'-fallback')+'</section>'+
   '<section class="sec grow">'+listCard('这一份','导入失败',
     frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'导入失败',tagCls:'bad',bad:1,tid:SCREEN+'-failed-file'})+
-    '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>反复失败的话，把文件<b>拷到手机上扫码传</b>往往更快。</span></div>'+nextSteps('重新读盘再选一次',['本地服务重列根目录，换一批可导文件。','你在新列表里重选一份。','这样不会撞上已经失效的旧文件。']))+'</section>'+
+    '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>反复失败的话，把文件<b>拷到手机上扫码传</b>往往更快。</span></div>'+nextSteps('重新读盘再选一次',['这台机器重新列一次最外层的文件。','你在新列表里重选一份。','这样不会撞上已经失效的那一份。']))+'</section>'+
   reasonLine('导入失败，当前文件仍然是空的')+
   ctaBar(ghost('改用手机扫码上传',to('phone-generating'),'/print/upload',SCREEN+'-switch-source','改用手机扫码上传'),primaryLink('重新读盘再选一次',to('usb-detecting'),'/print/upload'));
 };
@@ -1289,7 +1289,7 @@ V['usb-ready']=function(){
  return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
   '<section class="sec">'+statusCard('info','check','导入完成，可以拔 U 盘了',[
    '文件名和大小是<b>已经确认保存后回到这台机器的结果</b>。系统已经读完这份文件，<b>可以拔出 U 盘</b>。',
-   '本机<b>没有「安全弹出」按钮</b>——网页管不了操作系统的卷挂载，给一个假按钮不如说清楚。'
+   '本机<b>没有「安全弹出」按钮</b>——屏幕上弹不出 U 盘，给一个假按钮不如说清楚。'
   ],[['ok','系统已确认','check'],['','可以拔出 U 盘','usb']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow">'+nowFile({doc:UDOC(),from:'U 盘导入 · '+USB_VOL,back:'usb-list',backName:'U 盘列表'})+'</section>'+
   '<section class="sec"><div class="mini"><h4>'+svg('usb','currentColor',22)+'<span>U 盘上的东西没被改</span></h4><p>整个过程<b>只读不写</b>。这一份被复制到系统，你盘上的原件<b>还在原地</b>。</p></div></section>'+
@@ -1309,7 +1309,7 @@ var pv=null,pvEl=null,pvView=null,pvBack=null,STAGE_SCALE=1;
 
 /* ---------- 页面内容：真文字，不是灰色占位块 ---------- */
 function ppFoot(no,total){
- return '<div class="pp-foot"><span>第 '+no+' 页 / 共 '+total+' 页</span><span>原型演示文件 · 不是真实用户文件</span></div>';
+ return '<div class="pp-foot"><span>第 '+no+' 页 / 共 '+total+' 页</span><span>示例文件 · 不是真实用户文件</span></div>';
 }
 function ppBody(no){
  if(no===1){
@@ -1357,7 +1357,7 @@ function ppBody(no){
   '<p class="pp-p">接受从基础工作做起，希望能长期做页面开发这一行。</p>';
 }
 function ppPdf(d,no){
- return '<div class="pp"><div class="pp-wm">原型演示文件</div>'+ppBody(no)+ppFoot(no,d.pages)+'</div>';
+ return '<div class="pp"><div class="pp-wm">示例文件</div>'+ppBody(no)+ppFoot(no,d.pages)+'</div>';
 }
 function ppImage(){
  /* 内联示意图形，零外部资源。深蓝描边是为了让「四边完整」在屏幕上一眼可验。 */
@@ -1375,7 +1375,7 @@ function ppImage(){
   '<path d="M330 786l83 44 84-44 40 20-124 66-123-66z" fill="#f5f7f9"/>'+
   '<path d="M413 830l-26 44 26 30 27-30z" fill="#8e2f2a"/>'+
   '<rect x="4" y="4" width="819" height="1055" fill="none" stroke="#0e2f5e" stroke-width="8"/>'+
-  '<text x="413" y="1014" text-anchor="middle" font-size="31" font-weight="700" fill="#e8f1fb">原型演示图片 · 不是真实用户照片</text>'+
+  '<text x="413" y="1014" text-anchor="middle" font-size="31" font-weight="700" fill="#e8f1fb">示例图片 · 不是真实用户照片</text>'+
   '</svg>';
 }
 
@@ -1475,10 +1475,10 @@ function pvFailCard(){
    '不放心这一份，也可以在上一屏直接删掉，重新搬一份进来。'])+
   '<div class="mini" data-testid="'+SCREEN+'-preview-outcome">'+
    '<h4>'+svg('info','currentColor',22)+'<span>这一步的结果由系统给出</span></h4>'+
-   '<p>不是你在这一屏选的。下面两个是<b>原型演示按钮</b>，只用来分别看到两种答复的屏幕。</p>'+
+   '<p>不是你在这一屏选的。下面两个是<b>示例按钮</b>，只用来分别看到两种答复的屏幕。</p>'+
    '<div class="outrow">'+
-    '<button type="button" class="sbtn warn press" data-testid="'+SCREEN+'-preview-retry-fail" aria-label="原型演示：再取一次仍然取不到预览">'+svg('warn','currentColor',22)+'演示：还是取不到</button>'+
-    '<button type="button" class="sbtn press" data-testid="'+SCREEN+'-preview-retry-ok" aria-label="原型演示：这次取到了预览内容">'+svg('check','currentColor',22)+'演示：这次取到了</button>'+
+    '<button type="button" class="sbtn warn press" data-testid="'+SCREEN+'-preview-retry-fail" aria-label="示例：再取一次仍然取不到预览">'+svg('warn','currentColor',22)+'演示：还是取不到</button>'+
+    '<button type="button" class="sbtn press" data-testid="'+SCREEN+'-preview-retry-ok" aria-label="示例：这次取到了预览内容">'+svg('check','currentColor',22)+'演示：这次取到了</button>'+
    '</div></div></div>';
 }
 function pvDocxCard(){
@@ -1645,7 +1645,7 @@ function pvClose(){
 /* ================= 顶栏胶囊与小青台词 ================= */
 var PILL={
  'source-chooser':['','第 1 步 / 共 4 步 · 选来源'],
- 'missing-file':['warn','缺文件上下文 · 已拦下'],
+ 'missing-file':['warn','还没有文件 · 已拦下'],
  'unknown':['bad','状态无法识别 · 已拦下'],
  'local-guide':['','本机通道 · 桌面验证路径'],
  'local-picking':['','本机通道 · 选一份'],
@@ -1670,11 +1670,11 @@ var PILL={
  'phone-cancel-requesting':['','取消中 · 答复未返回'],
  'phone-cancel-failed':['bad','取消失败 · 这份还留着'],
  'phone-cancelled':['','这次办理已作废 · 无文件'],
- 'usb-unavailable':['warn','U 盘未接通 · 重试无效'],
- 'usb-agent-offline':['bad','Agent 离线 · 可重试'],
+ 'usb-unavailable':['warn','U 盘没开通 · 重试无效'],
+ 'usb-agent-offline':['bad','U 盘暂时没连上 · 可重试'],
  'usb-wait':['','等待插入 U 盘'],
  'usb-detecting':['','正在读盘 · 无百分比'],
- 'usb-empty':['warn','根目录没有可用文件'],
+ 'usb-empty':['warn','最外层没有可用文件'],
  'usb-list':['','U 盘列表 · 一次选一个'],
  'usb-read-failed':['bad','读盘失败 · 不显示旧列表'],
  'usb-selected':['','已选中 · 还没导入'],
@@ -1685,8 +1685,8 @@ var PILL={
 };
 var ASK={
  'source-chooser':['文件<em>怎么进来</em>？','本机、手机、U 盘、纸质扫描都能进来；登录后还能直接用「我的文档」里存过的材料。第三方网盘不接入。'],
- 'missing-file':['这一步<em>没有文件</em>。','我不替你挑一份，也不凭地址就说已经传好了。'],
- 'unknown':['这个状态<em>我不认识</em>。','不猜你想去哪一步，也不把地址里的原始参数抄到屏幕上。'],
+ 'missing-file':['这一步<em>没有文件</em>。','我不替你挑一份，也不会没传就说已经传好了。'],
+ 'unknown':['这个状态<em>我不认识</em>。','不猜你想去哪一步，也不把认不出的内容抄到屏幕上。'],
  'local-guide':['本机选文件是<em>兼容路径</em>。','会弹系统窗口。一体机上优先手机扫码，这条留给桌面验证。'],
  'local-picking':['挑<em>一份</em>就行。','一次只能选一个。选中即上传，系统校验格式和大小。'],
  'local-cancelled':['窗口<em>关掉了</em>。','上传还没开始，没有产生任何上传。再打开一次，或者换条通道。'],
@@ -1710,17 +1710,17 @@ var ASK={
  'phone-cancel-requesting':['正在<em>取消</em>。','答复没回来之前，这份还挂着，我不说已经作废。'],
  'phone-cancel-failed':['<em>没取消掉</em>。','这份还留着。可以重试，也可以回去把它确认掉。'],
  'phone-cancelled':['这次办理<em>已作废</em>。','旧码不再收文件。本次办理里还是没有文件。'],
- 'usb-unavailable':['U 盘这条<em>锁着</em>。','本机没配这条通道的令牌，重试也没用。'],
- 'usb-agent-offline':['本地服务<em>连不上</em>。','和「未配置」不是一回事，这个可以重试。'],
- 'usb-wait':['把 U 盘<em>插进来</em>。','只读根目录，不进子文件夹，也不自动读整盘。'],
+ 'usb-unavailable':['U 盘这条<em>锁着</em>。','这台机器没开通读 U 盘，重试也没用。'],
+ 'usb-agent-offline':['读 U 盘<em>暂时没连上</em>。','和「没开通」不是一回事，这个可以重试。'],
+ 'usb-wait':['把 U 盘<em>插进来</em>。','只看最外层，不进子文件夹，也不自动读整盘。'],
  'usb-detecting':['正在<em>读盘</em>。','不画进度条。读完之前不显示任何文件名。'],
- 'usb-empty':['盘里<em>没有能用的</em>。','根目录没有 PDF / JPG / PNG。多半是格式或位置的问题。'],
- 'usb-list':['挑<em>一份</em>就行。','每份只能导一次，重新读盘会换一批。'],
+ 'usb-empty':['盘里<em>没有能用的</em>。','最外层没有 PDF / JPG / PNG。多半是格式或位置的问题。'],
+ 'usb-list':['挑<em>一份</em>就行。','每份只能导入一次；重新读一次 U 盘就能重选。'],
  'usb-read-failed':['<em>没读出来</em>。','重新插一次。我不显示上一次的列表。'],
  'usb-selected':['选中了，<em>还没导入</em>。','只动这一份，盘上其它文件不会被读走。'],
- 'usb-safeid-expired':['这份的标识<em>失效了</em>。','没有文件被导入。重新读盘再选一次。'],
+ 'usb-safeid-expired':['这一份<em>失效了</em>。','没有文件被导入。重新读一次 U 盘再选。'],
  'usb-importing':['正在<em>导入</em>。','这期间别拔 U 盘。没有中间进度可显示。'],
- 'usb-import-failed':['<em>没导进来</em>。','这份已经不能再导入。重新读盘再选一次。'],
+ 'usb-import-failed':['<em>没导进来</em>。','多半是这份已经不能再导入。重新读一次 U 盘再选。'],
  'usb-ready':['导好了，<em>就这一份</em>。','可以拔 U 盘了。本机没有「安全弹出」按钮。']
 };
 var EYEBROW={local:'本机文件',phone:'手机上传',usb:'U 盘导入'};
