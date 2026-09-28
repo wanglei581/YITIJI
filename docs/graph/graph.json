@@ -16652,6 +16652,7 @@
         "name": "LegalDocVersion",
         "relations": [],
         "usedBy": [
+          "services/api/src/ai/resume/resume-unlabeled-export.ts",
           "services/api/src/legal/legal.service.ts",
           "services/api/src/member-auth/member-auth.service.ts"
         ]
@@ -21966,6 +21967,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
@@ -22348,6 +22350,7 @@
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
@@ -22984,6 +22987,7 @@
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
@@ -23024,6 +23028,7 @@
       "services/api/scripts/verify-print-sign.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -24362,6 +24367,7 @@
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
@@ -24551,6 +24557,7 @@
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
@@ -36447,12 +36454,18 @@
         "files": [
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/providers/mock.provider.ts",
           "services/api/src/ai/resume/resume-docx.service.ts",
           "services/api/src/ai/resume/resume-pdf.service.ts",
           "services/api/src/ai/resume/resume-text.service.ts",
           "services/api/src/ai/resume/resume-unlabeled-export.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pdf/aigc-label.ts",
-          "services/api/src/common/pdf/pdfjs-document.ts"
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
         ],
         "missing": []
       },
