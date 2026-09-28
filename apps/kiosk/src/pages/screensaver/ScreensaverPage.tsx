@@ -7,7 +7,7 @@ import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { getScreensaverPlaylist, getTerminalId } from '../../services/api/screensaver'
 import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
 import { StandbyView } from './StandbyView'
-import { deriveStandbyPhase, formatStandbyClock, standbyShouldExitHome } from './standbyModel'
+import { deriveStandbyPhase, formatStandbyClock, nextPlayableIndex, standbyShouldExitHome } from './standbyModel'
 import '../../styles/qingxu/index.css'
 import './screensaver-service-desk.css'
 
@@ -39,6 +39,10 @@ export function ScreensaverPage() {
   const [fetchFailed, setFetchFailed] = useState(false)
   const [index, setIndex] = useState(0)
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  // 加载失败的素材（链接过期、断网、文件损坏）。只有一条素材时「换下一条」还是它自己，
+  // 画面会停在一个空框上；记下失败的，轮播跳过它们，全都失败就显示稿里的「暂无宣传内容」。
+  const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(() => new Set())
+  const failedRef = useRef<ReadonlySet<string>>(failedIds)
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -55,10 +59,20 @@ export function ScreensaverPage() {
   )
 
   const advance = useCallback(() => {
-    setIndex((i) => (items.length > 0 ? (i + 1) % items.length : 0))
-  }, [items.length])
+    setIndex((i) => nextPlayableIndex(items, i, failedRef.current))
+  }, [items])
   const advanceRef = useRef(advance)
   advanceRef.current = advance
+
+  const markFailed = useCallback((id: string) => {
+    if (failedRef.current.has(id)) return
+    const failed = new Set(failedRef.current).add(id)
+    failedRef.current = failed
+    setFailedIds(failed)
+    setIndex((i) => nextPlayableIndex(items, i, failed))
+  }, [items])
+  const markFailedRef = useRef(markFailed)
+  markFailedRef.current = markFailed
 
   useEffect(() => {
     if (items.length > 0) return
@@ -137,6 +151,7 @@ export function ScreensaverPage() {
     return () => window.clearTimeout(t)
   }, [current, index, items.length])
 
+  const allFailed = items.length > 0 && items.every((item) => failedIds.has(item.id))
   const phase = deriveStandbyPhase({
     fetchSettled,
     fetchFailed,
@@ -167,10 +182,11 @@ export function ScreensaverPage() {
           terminalName={terminalName}
           date={clock.date}
           time={clock.time}
-          current={current}
-          mediaUrl={mediaUrl}
+          current={allFailed ? undefined : current}
+          mediaUrl={allFailed ? null : mediaUrl}
           loopVideo={items.length <= 1}
           onAdvance={() => advanceRef.current()}
+          onMediaError={() => { if (current) markFailedRef.current(current.id) }}
           onWake={exit}
         />
       </KioskStageFit>

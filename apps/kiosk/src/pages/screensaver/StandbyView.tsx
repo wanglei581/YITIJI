@@ -13,6 +13,7 @@ export function StandbyView({
   mediaUrl,
   loopVideo,
   onAdvance,
+  onMediaError,
   onWake,
 }: {
   phase: StandbyPhase
@@ -23,6 +24,8 @@ export function StandbyView({
   mediaUrl: string | null
   loopVideo: boolean
   onAdvance: () => void
+  /** 素材本身加载失败（不是播完）：由页面记下并跳过，全部失败时显示「暂无宣传内容」。 */
+  onMediaError: () => void
   onWake: () => void
 }) {
   const playing = phase === 'playing' && current && mediaUrl
@@ -56,12 +59,12 @@ export function StandbyView({
             playsInline
             loop={loopVideo}
             onEnded={() => { if (!loopVideo) onAdvance() }}
-            onError={() => onAdvance()}
+            onError={() => onMediaError()}
             onCanPlay={(e) => { void e.currentTarget.play().catch(() => onAdvance()) }}
           />
         ) : null}
         {playing && current.type === 'image' ? (
-          <img key={current.id} src={mediaUrl} alt="" onError={() => onAdvance()} />
+          <img key={current.id} src={mediaUrl} alt="" onError={() => onMediaError()} />
         ) : null}
         {!playing ? (
           <div className="sb-fallback" data-testid="standby-material-fallback">

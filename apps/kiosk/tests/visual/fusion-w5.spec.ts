@@ -770,6 +770,51 @@ test('direct visit to /session-timeout without a pending warning fails closed to
   expect(errors).toEqual([])
 })
 
+// 1×1 的 PNG：能真正解码的素材，作阳性对照。
+const LOADABLE_AD = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
+function registerStandby(api: ApiRouter, items: Array<{ id: string; url: string }>): void {
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
+    status: 200,
+    json: {
+      enabled: true,
+      idleTimeoutSec: 180,
+      items: items.map((item) => ({ ...item, type: 'image', mimeType: 'image/png', durationSec: 8, sha256: `sha-${item.id}` })),
+    },
+  })
+}
+
+test('standby shows 暂无宣传内容 when every promo item fails to load, never an empty frame @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  // 签名链接过期或素材被删时服务端回 404。只有一条素材时「换下一条」还是它自己，
+  // 原来画面会停在只剩「宣传内容」四个字的空框上。
+  registerStandby(api, [{ id: 'ad-gone', url: '/api/v1/ad-assets/ad-gone/content' }])
+  api.respond('GET', '/api/v1/ad-assets/ad-gone/content', { status: 404, json: { error: { code: 'NOT_FOUND' } } })
+  await page.goto('/screensaver')
+  const slot = page.getByTestId('standby-material-slot')
+  await expect(slot.getByTestId('standby-material-fallback')).toContainText('暂无宣传内容')
+  await expect(slot.getByTestId('standby-material-fallback')).toContainText('不影响打印、简历与信息查询入口')
+  await expect(slot.locator('img')).toHaveCount(0)
+  expect(api.requestCount('GET', '/api/v1/ad-assets/ad-gone/content')).toBeGreaterThan(0)
+  expect(errors).toEqual([])
+})
+
+test('standby skips a broken promo item and keeps playing the loadable one @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerStandby(api, [
+    { id: 'ad-gone', url: '/api/v1/ad-assets/ad-gone/content' },
+    { id: 'ad-ok', url: LOADABLE_AD },
+  ])
+  api.respond('GET', '/api/v1/ad-assets/ad-gone/content', { status: 404, json: { error: { code: 'NOT_FOUND' } } })
+  await page.goto('/screensaver')
+  const slot = page.getByTestId('standby-material-slot')
+  // 阳性对照：能解码的素材照常播放，不被失败的那条拖成「暂无宣传内容」。
+  await expect(slot.locator('img')).toHaveAttribute('src', LOADABLE_AD)
+  await expect(slot.getByTestId('standby-material-fallback')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
 test('offline page retains the 8177 state after an aborted health request @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
