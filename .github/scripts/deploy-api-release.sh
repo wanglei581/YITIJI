@@ -240,7 +240,9 @@ restore_runtime_and_exit() {
     exit 1
   fi
   # 就地 rsync，而不是先删再拷：恢复中途失败也不会出现「运行目录整个不见了」的窗口。
-  if ! rsync -a --delete --exclude 'services/api/storage' "$BACKUP_PREFIX.runtime/" "$RUNTIME_ROOT/"; then
+  # --ignore-times：不按「大小 + 修改时间」跳过文件，逐个覆盖成备份里的内容——回退罕见而关键，
+  # 不能赌同秒同长度的文件恰好没变（CI 演练里依赖目录的标记文件就这样被跳过过）。
+  if ! rsync -a --delete --ignore-times --exclude 'services/api/storage' "$BACKUP_PREFIX.runtime/" "$RUNTIME_ROOT/"; then
     echo "::error::运行目录恢复失败，备份仍在 $BACKUP_PREFIX.runtime，请人工恢复" >&2
     exit 1
   fi

@@ -64,6 +64,8 @@ case "$*" in
   "install --frozen-lockfile")
     if [ "$PWD" = "$DRILL_RUNTIME" ]; then
       mkdir -p node_modules && echo new > node_modules/marker
+      # 与旧标记同长度、同修改时间：确定地复现「快速比对会跳过」的条件
+      touch -r "$DRILL_MARKER_REF" node_modules/marker
       # 模拟发布期间有人上传了文件：恢复运行目录时不能把它删掉
       echo during > services/api/storage/uploaded-during-release.txt
     fi ;;
@@ -143,9 +145,15 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   mkdirSync(join(runtime, 'node_modules'))
   writeFileSync(join(runtime, 'VERSION'), 'old\n')
   writeFileSync(join(runtime, 'node_modules/marker'), 'old\n')
+  const markerTime = new Date('2026-01-01T00:00:00Z')
+  utimesSync(join(runtime, 'node_modules/marker'), markerTime, markerTime)
+  writeFileSync(join(dir, 'marker-ref'), 'ref\n')
+  utimesSync(join(dir, 'marker-ref'), markerTime, markerTime)
   writeFileSync(join(runtime, 'DEPLOY_SOURCE.txt'), 'source=origin/main@previous-release\n')
   writeFileSync(join(runtime, 'services/api/.env'), 'DATABASE_URL="postgres://drill@127.0.0.1/drill"\n')
   writeFileSync(join(runtime, 'services/api/storage/uploaded-before.txt'), 'before\n')
+  // 旧运行目录的依赖标记与新装的同为 4 字节：若恢复还按「大小 + 修改时间」快速比对，
+  // 同一秒内写出的两份会被当成没变而跳过（CI 机器快时必然撞上）。恢复必须逐个覆盖。
 
   mkdirSync(backups)
   const now = Date.now() / 1000
@@ -160,7 +168,7 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
     utimesSync(`${stem}.runtime`, t, t)
     utimesSync(`${stem}.migrations.log`, t + 60, t + 60)
   }
-  return { dir, bin, checkout, runtime, backups, sha, calls: join(dir, 'calls.log') }
+  return { dir, bin, checkout, runtime, backups, sha, calls: join(dir, 'calls.log'), markerRef: join(dir, 'marker-ref') }
 }
 
 function runDeploy(box, extraEnv) {
@@ -185,6 +193,7 @@ function runDeploy(box, extraEnv) {
     DRILL_CALLS: box.calls,
     DRILL_DEPLOY: box.checkout,
     DRILL_RUNTIME: box.runtime,
+    DRILL_MARKER_REF: box.markerRef,
     // 固定用 C 语言环境跑：服务器经 SSH 执行时语言环境不由我们保证，脚本必须在最差情况下也正确
     LC_ALL: 'C',
     LANG: 'C',
