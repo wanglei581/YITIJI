@@ -262,12 +262,12 @@ function HubBanner({
         <PrintHubState
           kind="error"
           icon={<InfoIcon size={28} />}
-          heading="服务状态无法确认"
+          heading="暂时读不到这台机器的配置"
           testId="print-hub-fallback"
 
         >
           <p className="ph-state-p">
-            暂时无法确认这台机器开放了哪些服务，因此<b>八项能力先不开放</b>，避免你点进去后才发现办不了。
+            暂时读不到这台机器的配置，因此<b>入口先关着</b>，请联系现场工作人员。
           </p>
           <p className="ph-state-p">已经下单的用户仍可使用到机码核销，不受本次读取失败影响。</p>
         </PrintHubState>

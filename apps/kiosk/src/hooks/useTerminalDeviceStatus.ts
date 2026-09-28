@@ -10,10 +10,10 @@
  * - Agent 当前不上报耗材；tonerKnown=false，禁止用假数值触发「墨粉不足」
  * - 「网络正常」只表示本机能连上 API（本次请求成功），不表示打印机侧网络
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { DeviceStatus, PrinterStatus } from '@ai-job-print/shared'
 import { API_BASE_URL, IS_MOCK_MODE } from '../services/api/client'
-import { getTerminalId } from '../services/api/screensaver'
+import { getTerminalId, subscribeTerminalIdentity } from '../services/api/screensaver'
 
 const ZERO_TONER = { black: 0, cyan: 0, magenta: 0, yellow: 0 } as const
 
@@ -178,7 +178,7 @@ function unknownView(partial: Partial<TerminalDeviceStatusView> = {}): TerminalD
 }
 
 export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusView {
-  const terminalId = getTerminalId()
+  const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [view, setView] = useState<TerminalDeviceStatusView>(() =>
     terminalId
       ? {

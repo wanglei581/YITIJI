@@ -209,7 +209,7 @@ export const PRINT_HUB_PROBE_UNKNOWN_TECH_NOTE =
 
 export function capabilityGroupHint(probe: ProbeStatus, mfp: MfpStatus, locked = false): string {
   if (probe === 'loading') return '正在读取本机能力配置'
-  if (probe !== 'ok') return '能力配置读取失败'
+  if (probe !== 'ok') return '暂时读不到这台机器的配置，入口先关着，请联系现场工作人员'
   if (mfp === 'unavailable') return '一体机确认离线'
   if (locked) return '部分能力被管理员关闭'
   return '选一项开始准备材料'

@@ -47,7 +47,7 @@ if (seamAssignments > 0) {
   )
 }
 
-assert.match(identity, /export const isTerminalKiosk = \(\): boolean => getTerminalId\(\) !== '' && !IS_E2E_BUILD/, 'kiosk-only UI gating must be off in E2E builds and on whenever a real terminal identity exists')
+assert.match(identity, /isTerminalKiosk = \(\): boolean => !IS_E2E_BUILD && \(getTerminalId\(\) !== '' \|\| HAS_KIOSK_LAUNCH_MARKER\)/, 'kiosk-only UI gating must be off in E2E builds and on for identity or launch-marked kiosk sessions')
 
 const terminalScopedConsumers = [
   'src/services/print/printJobsApi.ts',

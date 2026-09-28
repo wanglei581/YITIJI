@@ -18,7 +18,7 @@ import {
   type PrintScanCapabilityKey,
   type PrintScanCapabilityStatus,
 } from '@ai-job-print/shared'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FilesIcon,
@@ -36,6 +36,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { getTerminalId, subscribeTerminalIdentity } from '../../services/api/screensaver'
 import {
   loadConfiguredCapabilities,
   type CapabilitiesLoadResult,
@@ -322,6 +323,7 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 export function PrintScanHomePage() {
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
+  const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [capabilityLoad, setCapabilityLoad] = useState<
     CapabilitiesLoadResult | { status: 'loading'; map: ConfiguredCapabilityMap }
@@ -334,13 +336,23 @@ export function PrintScanHomePage() {
 
   useEffect(() => {
     let cancelled = false
-    void loadConfiguredCapabilities().then((result) => {
-      if (!cancelled) setCapabilityLoad(result)
+    let retryTimer: number | null = null
+    const load = () => void loadConfiguredCapabilities().then((result) => {
+      if (cancelled) return
+      setCapabilityLoad(result)
+      // Agent/能力配置可能晚于页面到达；失败态先对用户如实收口，后台短暂重试以便自动恢复。
+      if (result.status === 'error') {
+        retryTimer = window.setTimeout(() => {
+          if (!cancelled) load()
+        }, 5_000)
+      }
     })
+    load()
     return () => {
       cancelled = true
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
     }
-  }, [])
+  }, [terminalId])
 
   const probe = toProbeStatus(capabilityLoad)
   const confirmed = probe === 'ok'

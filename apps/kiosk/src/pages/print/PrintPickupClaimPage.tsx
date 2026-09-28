@@ -349,9 +349,8 @@ export function PrintPickupClaimPage() {
       ref={inputRef}
       className={['pcp-input', state === 'error' ? 'pcp-input--error' : ''].filter(Boolean).join(' ')}
       type="text"
-      // 纯数字码必须唤起数字键盘。用 inputMode 而非 type="number"：
-      // 后者会吞掉前导 0、渲染上下箭头，且过渡期还要能键入 10 位存量码的字母。
-      inputMode="numeric"
+      // 页内数字键盘负责输入；禁止浏览器再召出系统键盘。
+      inputMode="none"
       // 上限取两套长度的较大者（存量 10 位）×3，容纳粘贴进来的分隔符；
       // 真正的长度判定在 normalizeInput + 受理正则，不靠 maxLength。
       maxLength={PICKUP_CODE_MAX_INPUT_LENGTH * 3}
