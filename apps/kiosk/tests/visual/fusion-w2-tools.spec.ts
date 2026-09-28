@@ -343,6 +343,71 @@ test('signature page fails closed for anonymous users @w2', async ({ page, api }
   await expect(page).toHaveURL(/\/login/)
 })
 
+// D3（2026-09-28）：签名盖章默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS，
+// 未配置即以 CAPABILITY_NOT_CONFIGURED 拒绝）。能力读取成功、但本机没有已配置的 signature_stamp 行时，
+// 已登录用户直接进签名页也必须停在「没有开放」，不给任何上传入口 —— 否则传完文件才被拒，
+// 页面还会把那次拒绝说成「PDF 读不开」。
+function capabilityRow(capabilityKey: string, status: string, configured: boolean) {
+  return { capabilityKey, status, note: null, configured, updatedAt: null }
+}
+
+const SIGNATURE_NEVER_ENABLED = [
+  { name: 'row absent', capabilities: [capabilityRow('document_print', 'available', true)] },
+  // 真实后端的形状：每个键都下发，没配置过的是 configured=false（listForTerminal）。
+  {
+    name: 'row configured=false',
+    capabilities: [
+      capabilityRow('document_print', 'available', true),
+      capabilityRow('signature_stamp', 'not_verified', false),
+    ],
+  },
+]
+
+async function expectSignatureNotOpen(page: Page, api: ApiRouter): Promise<void> {
+  await expect(page.locator('[data-testid="sign-stamp-state-capability-disabled"]')).toBeVisible()
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('没有开放签名盖章')
+  // 没有任何上传入口：选 PDF / 传签名图的卡片都不出现，页面上也没有带「上传」的按钮。
+  await expect(page.locator('[data-testid^="sign-stamp-pick-"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /上传/ })).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/files/kiosk-upload')).toBe(0)
+  expect(api.requestCount('POST', '/api/v1/print/sign/inspect')).toBe(0)
+}
+
+for (const variant of SIGNATURE_NEVER_ENABLED) {
+  test(`signature page stays closed on a terminal that never enabled it (${variant.name}) @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    registerMemberLogin(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+      status: 200,
+      json: { capabilities: variant.capabilities },
+    })
+
+    await loginThroughVisibleUi(page, '/print-scan/sign')
+    await expectSignatureNotOpen(page, api)
+    await expectHealthy(page, errors, 'print-scan-sign')
+  })
+}
+
+test('signature page retry after a failed capability read still refuses a terminal that never enabled it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  let capabilityReadOk = false
+  api.respondWith('GET', '/api/v1/terminals/KSK-001/capabilities', () =>
+    capabilityReadOk
+      ? { status: 200, json: { capabilities: [capabilityRow('document_print', 'available', true)] } }
+      : { status: 500, json: { error: { code: 'INTERNAL', message: 'boom' } } },
+  )
+
+  await loginThroughVisibleUi(page, '/print-scan/sign')
+  await expect(page.locator('[data-testid="sign-stamp-state-capability-error"]')).toBeVisible()
+  capabilityReadOk = true
+  await page.getByRole('button', { name: '重试读取', exact: true }).click()
+  await expectSignatureNotOpen(page, api)
+  await expectHealthy(page, errors, 'print-scan-sign')
+})
+
 test('signature inspect renders server pages and compose sends placement payload @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
