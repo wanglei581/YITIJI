@@ -201,7 +201,7 @@ export function MySettingsPage() {
             <b>{isLoggedIn ? '本人账号' : '还没有登录'}</b>
             <span className="settings-idsub">
               {isLoggedIn
-                ? `手机号 ${phoneMasked || '已遮挡'} · 公共终端默认不显示完整个人信息`
+                ? `手机号 ${phoneMasked || '只显示前三后四'} · 公共终端默认不显示完整个人信息`
                 : '这台机器是公共终端，不登录就不会显示任何人的简历、订单和文件。'}
             </span>
           </span>

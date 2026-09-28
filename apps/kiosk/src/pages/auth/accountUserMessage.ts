@@ -39,7 +39,7 @@ export function accountErrorMessage(error: unknown, fallback: string): string {
   return accountDisplayMessage(error instanceof Error ? error.message : resolveMemberApiErrorMessage(error, recovery), recovery)
 }
 
-/** API 已遮挡的号码保持原样；异常返回的完整号码仍须遮挡。 */
+/** 接口已经给出掩码号码（前三后四）就原样用；异常返回的完整号码在这里掩码。 */
 export function accountPhoneDisplay(raw: string): string {
   return /^\d{3}\*{4}\d{4}$/.test(raw.trim()) ? raw.trim() : maskPhone(raw)
 }
