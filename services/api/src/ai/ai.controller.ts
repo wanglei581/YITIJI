@@ -40,6 +40,7 @@ import { assistantOwnerKey } from './llm/llm-chat.service'
 import { AssistantSummaryService } from '../advisor/assistant-summary.service'
 
 import { resolveClientIp } from '../common/client-ip'
+import { prepareUnlabeledExport } from './resume/resume-unlabeled-export'
 interface ReqLike {
   requestId?: string
   headers: Record<string, string | string[] | undefined>
@@ -520,15 +521,21 @@ export class AiController {
   ) {
     const requester = await this.resolveAiResultRequester(req)
     await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
-    const { taskId, format, layout, templateId, draft, ...resume } = dto
+    const { taskId, format, layout, templateId, draft, unlabeled, ...resume } = dto
     delete (resume as { benefitGrantId?: string }).benefitGrantId
     delete (resume as { factsConfirmedAt?: string }).factsConfirmedAt
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt })
+    // C8：不带显式标识只对「开关已开 + 登录会员 + 已同意正式协议」放行，放行前先写必须成功的留痕。
+    const unlabeledPlan = await prepareUnlabeledExport(
+      { prisma: this.prisma, audit: this.audit },
+      { requested: unlabeled === true, draft: draft === true, endUserId: requester.endUserId, taskId: taskId ?? null, format: format ?? 'pdf' },
+      { ipAddress: ipOf(req), userAgent: uaOf(req), requestId: req.requestId ?? null },
+    )
+    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt, unlabeled: unlabeledPlan.applied })
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
-      action: 'resume.generate_exported',
+      action: 'resume.generate_exported', // 上线核验清单按这个动作名判「导出成功」；是否去标识看 payload.unlabeledApplied
       targetType: 'file',
       targetId: result.fileId,
       payload: {
@@ -539,6 +546,7 @@ export class AiController {
         pageCount: result.pageCount,
         sizeBytes: result.sizeBytes,
         hasEndUser: Boolean(requester.endUserId),
+        ...unlabeledPlan.auditPayload,
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
