@@ -10,7 +10,8 @@ import { resumeUnlabeledOptionEnabled } from '../../common/pdf/aigc-label'
 //   1. RESUME_EXPORT_UNLABELED_OPTION 打开（它又要求 RESUME_EXPORT_VISIBLE_LABEL 打开）；
 //   2. 不是原样草稿（草稿本来就不印标识）；
 //   3. 登录会员 —— 匿名导出没有「提供对象」可记，一律照常带标识；
-//   4. 该会员最近一次登录同意的是已激活的正式协议版本（草稿兜底版本不算）。
+//   4. 该会员最近一次登录同意的，正是**当前生效**的正式协议版本 —— 草稿兜底版本不算；
+//      协议改版（例如加进标识义务条款）后还没重新登录同意新版的，也不算。
 // 不满足时不报错，照常导出带标识的版本，并在导出审计里记下没放行的原因。
 //
 // 放行时先写一条必须成功的留痕（writeRequired），写不进去就抛错、不导出。
@@ -23,25 +24,33 @@ export type UnlabeledExportDeniedReason =
   | 'draft'
   | 'anonymous'
   | 'terms_not_accepted'
+  | 'terms_outdated'
 
 export type UnlabeledExportDecision =
   | { applied: true; endUserId: string; termsVersion: string; termsDocVersionId: string }
   | { applied: false; reason: UnlabeledExportDeniedReason }
 
 export async function decideUnlabeledExport(
-  prisma: Pick<PrismaService, 'memberLegalConsent'>,
+  prisma: Pick<PrismaService, 'memberLegalConsent' | 'legalDocVersion'>,
   input: { requested: boolean; draft: boolean; endUserId: string | null },
 ): Promise<UnlabeledExportDecision> {
   if (!input.requested) return { applied: false, reason: 'not_requested' }
   if (!resumeUnlabeledOptionEnabled()) return { applied: false, reason: 'option_off' }
   if (input.draft) return { applied: false, reason: 'draft' }
   if (!input.endUserId) return { applied: false, reason: 'anonymous' }
-  const consent = await prisma.memberLegalConsent.findFirst({
-    where: { endUserId: input.endUserId },
-    orderBy: { createdAt: 'desc' },
-    select: { termsVersion: true, termsDocVersionId: true },
-  })
+  const [consent, activeTerms] = await Promise.all([
+    prisma.memberLegalConsent.findFirst({
+      where: { endUserId: input.endUserId },
+      orderBy: { createdAt: 'desc' },
+      select: { termsVersion: true, termsDocVersionId: true },
+    }),
+    prisma.legalDocVersion.findFirst({
+      where: { docType: 'terms_of_service', isActive: true },
+      select: { id: true },
+    }),
+  ])
   if (!consent?.termsDocVersionId) return { applied: false, reason: 'terms_not_accepted' }
+  if (!activeTerms || consent.termsDocVersionId !== activeTerms.id) return { applied: false, reason: 'terms_outdated' }
   return {
     applied: true,
     endUserId: input.endUserId,

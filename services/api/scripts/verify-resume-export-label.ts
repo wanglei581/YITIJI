@@ -6,16 +6,29 @@
  *   2. RESUME_EXPORT_VISIBLE_LABEL=true：PDF 每一页、DOCX 页脚、TXT / MD 末尾都有标识，
  *      一页的简历加页脚后仍是一页；原样草稿永不印；不带标识选项没开时 unlabeled 无效；
  *   3. 两个开关都开 + unlabeled：不印显式标识，但隐式 AIGC 元数据照旧；
- *   4. 准入：匿名、草稿、没同意正式协议的会员一律不放行；放行时先写 writeRequired 留痕，
- *      actorId 为空、会员 ID 在 payload；留痕写失败则整个请求失败（不导出）；
- *   5. 控制器把「准入后的结果」而不是请求原值交给导出服务，且准入在导出之前。
+ *   4. 准入：匿名、草稿、没同意**当前生效**正式协议的会员一律不放行；放行时先写 writeRequired
+ *      留痕，actorId 为空、会员 ID 在 payload；留痕写失败则整个请求失败（不导出）；
+ *   5. 控制器把「准入后的结果」而不是请求原值交给导出服务，准入在导出之前，
+ *      去标识时最终导出审计也必须写成功；
+ *   6. 走真实 AiService.exportGeneratedResume：docx / txt 主文件与另渲染的打印用 PDF 副本
+ *      在「带标识」「去标识」两档下一致（副本最容易漏）。
  *
- * 不触网、不碰 DB（准入用桩）。依赖系统 CJK 字体（CI 已装 fonts-noto-cjk）。
+ * 不触网。第 1–5 项不碰 DB（准入用桩）；第 6 项用本地 SQLite 与本地文件存储，结束即清理。
+ * 依赖系统 CJK 字体（CI 已装 fonts-noto-cjk）。
  * 运行：pnpm --filter @ai-job-print/api verify:resume-export-label
  */
 import { readFileSync } from 'fs'
 import { createRequire } from 'module'
+import { tmpdir } from 'os'
 import { join } from 'path'
+import { Logger } from '@nestjs/common'
+import { AiService } from '../src/ai/ai.service'
+import { MockAiProvider } from '../src/ai/providers/mock.provider'
+import { AuditService } from '../src/audit/audit.service'
+import { FilesService } from '../src/files/files.service'
+import { parseContentFileId } from '../src/files/signing'
+import { StorageService } from '../src/storage/storage.service'
+import { PrismaService } from '../src/prisma/prisma.service'
 import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
 import { ResumeDocxService } from '../src/ai/resume/resume-docx.service'
 import { ResumeTextService } from '../src/ai/resume/resume-text.service'
@@ -140,8 +153,11 @@ async function renderChecks(): Promise<void> {
 }
 
 type ConsentRow = { termsVersion: string; termsDocVersionId: string | null } | null
-function consentPrisma(row: ConsentRow) {
-  return { memberLegalConsent: { findFirst: async () => row } } as never
+function consentPrisma(row: ConsentRow, activeTermsId: string | null = 'doc-terms-1') {
+  return {
+    memberLegalConsent: { findFirst: async () => row },
+    legalDocVersion: { findFirst: async () => (activeTermsId ? { id: activeTermsId } : null) },
+  } as never
 }
 
 async function admissionChecks(): Promise<void> {
@@ -158,6 +174,10 @@ async function admissionChecks(): Promise<void> {
   check('admit:anonymous', (await reasonOf(accepted, { requested: true, draft: false, endUserId: null })) === 'anonymous', '匿名导出放行了（没有提供对象可记）')
   check('admit:no-consent', (await reasonOf(null, { requested: true, draft: false, endUserId: 'm1' })) === 'terms_not_accepted', '没有协议同意记录却放行了')
   check('admit:draft-terms', (await reasonOf({ termsVersion: 'draft', termsDocVersionId: null }, { requested: true, draft: false, endUserId: 'm1' })) === 'terms_not_accepted', '只同意过草稿兜底协议却放行了')
+  const outdated = await decideUnlabeledExport(consentPrisma(accepted, 'doc-terms-2'), { requested: true, draft: false, endUserId: 'm1' })
+  check('admit:terms-outdated', !outdated.applied && outdated.reason === 'terms_outdated', '协议已改版、会员还没同意新版却放行了')
+  const noActive = await decideUnlabeledExport(consentPrisma(accepted, null), { requested: true, draft: false, endUserId: 'm1' })
+  check('admit:no-active-terms', !noActive.applied && noActive.reason === 'terms_outdated', '当前没有生效协议却放行了')
   check('admit:applied', (await reasonOf(accepted, { requested: true, draft: false, endUserId: 'm1' })) === 'applied', '已同意正式协议的会员没放行')
 
   const calls: Array<{ actorId: string | null; action: string; payload?: Record<string, unknown> }> = []
@@ -187,8 +207,82 @@ function staticChecks(): void {
   check('controller:order', prepareAt > 0 && exportAt > prepareAt, '准入与留痕必须在导出之前')
   check('controller:applied-only', handler.includes('unlabeled: unlabeledPlan.applied') && !/unlabeled:\s*unlabeled\b/u.test(handler) && !handler.includes('unlabeled: unlabeled ==='), '交给导出服务的必须是准入后的结果，不是请求原值')
   check('controller:actor', !/actorId:\s*(requester\.endUserId|unlabeled)/u.test(handler), '导出审计的 actorId 不能填会员 ID（外键指向运营账号，写入会被静默吞掉）')
+  check('controller:final-required', handler.includes('if (unlabeledPlan.applied) await this.audit.writeRequired(this.prisma, exportAudit)'), '去标识导出的最终审计（带文件编号）必须用 writeRequired')
+  check('controller:print-copy', handler.includes('printFileId: result.printFileUrl ? parseContentFileId(result.printFileUrl) : null'), '导出审计没有记打印用 PDF 副本的编号')
   const service = readFileSync(join(__dirname, '../src/ai/ai.service.ts'), 'utf8')
   check('service:txt-md', service.includes('renderTxt(resume, { visibleLabel })') && service.includes('renderMarkdown(resume, { visibleLabel })'), 'TXT / MD 导出没有按同一判定加标识')
+}
+
+async function exportServiceChecks(): Promise<void> {
+  if (!process.env['DATABASE_URL']) process.env['DATABASE_URL'] = `file:${join(__dirname, '../prisma/dev.db')}`
+  if (!process.env['FILE_SIGNING_SECRET'] || process.env['FILE_SIGNING_SECRET'].length < 32) {
+    process.env['FILE_SIGNING_SECRET'] = 'verify-resume-export-label-secret-0123456789'
+  }
+  if (!process.env['FILE_STORAGE_DRIVER']) process.env['FILE_STORAGE_DRIVER'] = 'local'
+  if (!process.env['FILE_STORAGE_DIR']?.trim()) process.env['FILE_STORAGE_DIR'] = join(tmpdir(), 'resume-export-label')
+  process.env['AI_PROVIDER'] = 'mock'
+  Logger.overrideLogger({ log: () => {}, error: () => {}, warn: () => {}, debug: () => {}, verbose: () => {}, fatal: () => {} })
+
+  const prisma = new PrismaService()
+  await prisma.onModuleInit()
+  const storage = new StorageService()
+  const files = new FilesService(prisma, new AuditService(prisma), storage)
+  const emptyStub = {} as never
+  // 位置参数与 verify-ai-safety-aigc 的 assertResumeExportProduceId 一致；这里多传真实 ResumeTextService 以覆盖 txt。
+  const ai = new AiService(
+    new MockAiProvider() as never,
+    emptyStub, emptyStub, emptyStub, emptyStub, emptyStub,
+    emptyStub,
+    { record: () => {} } as never,
+    emptyStub, emptyStub, emptyStub,
+    new ResumePdfService(),
+    files,
+    prisma,
+    new AuditService(prisma) as never,
+    new ResumeDocxService(),
+    new ResumeTextService(),
+  )
+  const created: string[] = []
+  const load = async (fileId: string) => {
+    const row = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    if (!row) throw new Error(`FileObject ${fileId} 未落库`)
+    created.push(row.id)
+    return { row, buffer: await storage.getObject(row.storageKey, row.bucket) }
+  }
+  const exportOnce = async (format: 'docx' | 'txt', unlabeled: boolean) => {
+    const exported = await ai.exportGeneratedResume(SHORT as never, null, null, format, undefined, undefined, false, { unlabeled })
+    const primary = await load(exported.fileId)
+    const printId = exported.printFileUrl ? parseContentFileId(exported.printFileUrl) : null
+    if (!printId) throw new Error(`${format} 导出没有打印用 PDF 副本`)
+    const print = await load(printId)
+    const printPages = await pages(print.buffer)
+    const printAigc = parseAigcLabelJson((await readPdfInfo(print.buffer))['AIGC'] ?? '')
+    const primaryHasLabel = format === 'docx'
+      ? (await docxParts(primary.buffer)).footers.includes(AIGC_VISIBLE_FOOTER)
+      : primary.buffer.toString('utf-8').includes(AIGC_VISIBLE_FOOTER)
+    return { primaryHasLabel, printHasLabel: printPages.every((page) => page.includes(LABEL)), printImplicit: Boolean(printAigc) }
+  }
+  try {
+    setSwitches(true, true)
+    for (const format of ['docx', 'txt'] as const) {
+      const labeled = await exportOnce(format, false)
+      check(`service:${format}:labeled`, labeled.primaryHasLabel && labeled.printHasLabel, `${format} 带标识导出：主文件 ${labeled.primaryHasLabel}、打印副本 ${labeled.printHasLabel}`)
+      const bare = await exportOnce(format, true)
+      check(`service:${format}:unlabeled`, !bare.primaryHasLabel && !bare.printHasLabel && bare.printImplicit, `${format} 去标识导出：主文件 ${bare.primaryHasLabel}、打印副本 ${bare.printHasLabel}、副本隐式标识 ${bare.printImplicit}`)
+    }
+    setSwitches(undefined, undefined)
+    const plain = await exportOnce('docx', false)
+    check('service:default', !plain.primaryHasLabel && !plain.printHasLabel, '默认配置下经导出服务的 DOCX 或打印副本印了标识')
+  } finally {
+    for (const id of created) {
+      const row = await prisma.fileObject.findUnique({ where: { id } })
+      if (row) {
+        try { await storage.deleteObject(row.storageKey, row.bucket) } catch { /* 清理失败不掩盖断言 */ }
+      }
+    }
+    if (created.length > 0) await prisma.fileObject.deleteMany({ where: { id: { in: created } } })
+    await prisma.onModuleDestroy()
+  }
 }
 
 void (async () => {
@@ -197,6 +291,7 @@ void (async () => {
     await renderChecks()
     await admissionChecks()
     staticChecks()
+    await exportServiceChecks()
   } catch (error) {
     fail('runtime', error instanceof Error ? error.message : String(error))
   } finally {

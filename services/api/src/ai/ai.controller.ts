@@ -41,6 +41,7 @@ import { AssistantSummaryService } from '../advisor/assistant-summary.service'
 
 import { resolveClientIp } from '../common/client-ip'
 import { prepareUnlabeledExport } from './resume/resume-unlabeled-export'
+import { parseContentFileId } from '../files/signing'
 interface ReqLike {
   requestId?: string
   headers: Record<string, string | string[] | undefined>
@@ -532,7 +533,7 @@ export class AiController {
       { ipAddress: ipOf(req), userAgent: uaOf(req), requestId: req.requestId ?? null },
     )
     const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt, unlabeled: unlabeledPlan.applied })
-    await this.audit.write({
+    const exportAudit = {
       actorId: null,
       actorRole: 'kiosk',
       action: 'resume.generate_exported', // 上线核验清单按这个动作名判「导出成功」；是否去标识看 payload.unlabeledApplied
@@ -546,12 +547,17 @@ export class AiController {
         pageCount: result.pageCount,
         sizeBytes: result.sizeBytes,
         hasEndUser: Boolean(requester.endUserId),
+        // docx/txt/md 另渲染的打印用 PDF 副本也记下编号（pdf 时与 fileId 相同）
+        printFileId: result.printFileUrl ? parseContentFileId(result.printFileUrl) : null,
         ...unlabeledPlan.auditPayload,
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
       requestId: req.requestId ?? null,
-    })
+    }
+    // 去标识的导出，文件编号这条留痕也必须写成功，写不进去就不把文件交出去
+    if (unlabeledPlan.applied) await this.audit.writeRequired(this.prisma, exportAudit)
+    else await this.audit.write(exportAudit)
     return result
   }
 
