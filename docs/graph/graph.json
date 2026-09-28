@@ -17445,6 +17445,7 @@
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-deploy-authorization-gate.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs",
       "scripts/verify-release-bundle.mjs"
     ],
     "apps/admin/index.html": [
@@ -21451,7 +21452,8 @@
       "services/api/scripts/verify-governed-job-fit.ts"
     ],
     "services/api/scripts/preflight-production-gates.mjs": [
-      "scripts/verify-deploy-gates-in-sync.mjs"
+      "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs"
     ],
     "services/api/scripts/recruitment-wave2-restored-dry-run.ts": [
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
@@ -22740,6 +22742,7 @@
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs",
       "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
@@ -29762,6 +29765,26 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:deploy-gates-in-sync"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/deploy.yml",
+          "services/api/scripts/preflight-production-gates.mjs",
+          "services/api/src/config/production-runtime-gates.ts"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-deploy-rollback.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:deploy-rollback"
       ],
       "wired": true
     },
