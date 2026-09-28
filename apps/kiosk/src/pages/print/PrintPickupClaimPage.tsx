@@ -342,6 +342,8 @@ export function PrintPickupClaimPage() {
     )
   }
 
+  const entering = screen === 'idle' || screen === 'legacy'
+  const showKeypad = entering || screen === 'verifying'
   const describedBy = state === 'error' ? 'pcp-error-msg' : guide === 'hid' ? 'pcp-hid-hint' : 'pcp-hint'
   const pickupCodeInput = (
     <input
@@ -349,8 +351,9 @@ export function PrintPickupClaimPage() {
       ref={inputRef}
       className={['pcp-input', state === 'error' ? 'pcp-input--error' : ''].filter(Boolean).join(' ')}
       type="text"
-      // 页内数字键盘负责输入；禁止浏览器再召出系统键盘。
-      inputMode="none"
+      // 页内数字键盘显示时由它负责输入，不再召出系统键盘（避免两套键盘叠在一起）；
+      // 不显示时仍用数字键盘——纯数字码不该弹全键盘。
+      inputMode={showKeypad ? 'none' : 'numeric'}
       // 上限取两套长度的较大者（存量 10 位）×3，容纳粘贴进来的分隔符；
       // 真正的长度判定在 normalizeInput + 受理正则，不靠 maxLength。
       maxLength={PICKUP_CODE_MAX_INPUT_LENGTH * 3}
@@ -423,8 +426,6 @@ export function PrintPickupClaimPage() {
   // 失败屏回显被拒的那串码（输入框本身已清空、保持聚焦，下一次扫码直接落进来）。
   const display = state === 'error' && failure ? failure.code : code
   const cells = pickupCells(display, legacyMode)
-  const entering = screen === 'idle' || screen === 'legacy'
-  const showKeypad = entering || screen === 'verifying'
   const goHelp = () => navigate('/help')
 
   return frame(
