@@ -256,6 +256,7 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 规则 5：收藏和足迹里的旧入口改为政策和机构官方渠道。
 规则 7：已完成的记录打开进对应的 AI 结果页；底部仍可去 AI 简历服务。
 列表在中间自己滚动，末尾有「加载更多」。操作条留在原稿位置，1080×1920 首屏能看到「返回我的」和「去 AI 简历服务」。
+9/28 留白：列表卡按内容高度排，余下高度分到区块之间（有记录的列表页只分到概览下和操作条上两处，筛选页签贴着列表；加载 / 读取失败 / 找不到多分一处到分类页签下面，操作条仍贴底）。登录态结构行的两个结构位挪到标题同一行，登录态不再有内容被挤到列表外；加载态改用本页结构行（写「读取中」），读取失败 / 找不到只用本页结构行、说明和出口；空态在入口行上方列出这一类会出现哪些记录（标「暂无」）；足迹每行补上页头已写明的时间结构位，跳转记录与浏览记录同样排四条示例；记录详情的抬头卡贴着字段列表。加载 / 空 / 失败态操作条带「问小青」。
 未改：颜色令牌、圆角、深绿头图高度、三 Tab、四个分类的结构。
 -->
 <style id="qx2">
@@ -299,6 +300,32 @@ html.flat *,html.flat *::before,html.flat *::after{animation:none!important;tran
 .truth{height:auto!important;min-height:58px;padding:8px 44px!important;align-items:center}
 .qx-more{min-height:56px;width:100%;margin-top:4px;padding:0 18px;border-radius:18px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;text-align:center;font-size:22px;font-weight:750;flex:none;cursor:pointer}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   列表卡按内容高度排，不再被拉成下半截空着的大盒子；余下的高度用 space-between 分到各区块之间。
+   加载态复用本页的结构行（右侧写「读取中」）；加载 / 空 / 失败态的操作条带「问小青」。
+   「不用登录也能办」两行只在登录态出现（进到加载 / 失败 / 找不到时用户已经登录）。 */
+.body.state-layout:not([data-state$="-login"]),.body.empty-layout{grid-template-rows:none!important;grid-auto-rows:auto;align-content:space-between}
+/* 加载 / 读取失败 / 找不到：列表只有本页三条结构行，余下高度多分一处到分类页签下面（操作条仍贴底），每处间距不至于过大。 */
+.body.state-layout:is([data-state$="-loading"],[data-state$="-error"],[data-state$="-not-found"])::before{content:""}
+/* 有记录的列表页（收藏 / 足迹）：筛选页签贴着列表，余下高度只分到概览下面和操作条上面两处。 */
+.body.list5-layout{display:flex!important;flex-direction:column}
+.body.list5-layout>.list{flex:0 1 auto}
+.body.list5-layout>.tabbar,.body.list5-layout>.ctabar{margin-top:auto}
+.row-foot.qx-time{display:flex;margin-top:9px}
+/* 删除成功后只剩两条：余下高度分到概览、列表、说明、操作条之前，不全堆在列表卡里。 */
+.body.list-layout[data-state="ai-records-delete-success"]{display:flex!important;flex-direction:column}
+.body.list-layout[data-state="ai-records-delete-success"]>.list{flex:0 1 auto}
+.body.list-layout[data-state="ai-records-delete-success"]>.toast,.body.list-layout[data-state="ai-records-delete-success"]>.summary,.body.list-layout[data-state="ai-records-delete-success"]>.qx-foot,.body.list-layout[data-state="ai-records-delete-success"]>.ctabar{margin-top:auto}
+/* 记录详情：抬头卡贴着字段列表（它们是同一条记录），余下高度分到抬头卡上面和操作条上面；
+   五个字段行排松一点；抬头卡里「浏览记录 · 仅本人可见」放到右侧，右半边不再空着。 */
+.body.detail-layout{display:flex!important;flex-direction:column}
+.body.detail-layout>.list{flex:0 1 auto}
+.body.detail-layout>.card,.body.detail-layout>.ctabar{margin-top:auto}
+.body.detail-layout .list>.row{padding-top:34px;padding-bottom:34px}
+.detail-head>div{flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.detail-head>div>p{margin-top:0!important}
+.row.dead .row-head{gap:9px}
+.body.state-layout .list>.legal:not(.list-foot){padding:6px 6px 0}
 </style>
 </head>
 <body><div id="viewport"><div id="stage">
@@ -449,26 +476,30 @@ function previewList(inner, foot, label){
   return '<section class="list" data-testid="'+SCREEN+'-list" aria-label="'+esc(label)+'">'+inner
     +'<div class="list-foot legal">'+foot+'</div></section>';
 }
-/* 结构行：登录 / 失败态只画「这里会出现什么」，不写任何条目内容 */
+/* 结构行：登录 / 加载 / 失败态只画「这里会出现什么」，不写任何条目内容。
+   9/28 留白：加载态也用这一种行（右侧写「读取中」），不再画没有字的骨架条；testid 沿用原骨架行的编号。 */
 function lockRow(mode, ico, tone, title, desc, tid){
+  var word = mode==='lock' ? '登录后显示' : mode==='loading' ? '读取中' : '本次未取到';
   var tail = mode==='lock'
     ? '<span class="small" aria-disabled="true" data-testid="'+tid+'-locked" aria-label="'+esc(title+'：登录后才会显示')+'">'+svg('lock')+'登录后显示</span>'
+    : mode==='loading'
+    ? '<span class="small" aria-disabled="true" aria-label="'+esc(title+'：正在读取')+'">'+svg('clock')+'读取中</span>'
+    : mode==='empty'
+    ? slot('暂无','lock')
     : '<span class="small" aria-disabled="true" data-testid="'+tid+'-off" aria-label="'+esc(title+'：本次没有取到')+'">'+svg('warn')+'本次未取到</span>';
+  /* 失败态原来是两枚光秃秃的「—」，一行里并排两个同样的破折号，看着像没做完的占位。
+     和登录态一样写清这两项位分别是什么。 */
+  var slots = mode==='empty' ? '' : slot('标题'+word,'lock') + slot('时间'+word,'lock');
+  /* 9/28 留白：只有登录态把两个结构位挪到标题同一行（一行省下约 40px），好让它的「不用登录也能办」两行
+     不再被挤到列表外面；加载 / 失败态仍是原来的三行排法。空态（暂无）不画结构位。 */
+  var compact = mode==='lock' || mode==='empty';
   return '<div class="row dead" data-slot-mode="'+mode+'" data-testid="'+tid+'">'
     +'<span class="row-ico" data-tone="off">'+svg(ico)+'</span>'
-    +'<span class="row-main"><span class="row-title">'+title+'</span><span class="row-sub">'+desc+'</span>'
-    +'<span class="row-foot" style="margin-top:9px;display:flex;gap:9px;flex-wrap:wrap">'
-      /* 失败态原来是两枚光秃秃的「—」，一行里并排两个同样的破折号，看着像没做完的占位。
-         和登录态一样写清这两项位分别是什么。 */
-      + slot(mode==='lock'?'标题登录后显示':'标题本次未取到','lock') + slot(mode==='lock'?'时间登录后显示':'时间本次未取到','lock')
-    +'</span></span>'
+    +(compact
+      ? '<span class="row-main"><span class="row-head"><span class="row-title">'+title+'</span>'+slots+'</span><span class="row-sub">'+desc+'</span></span>'
+      : '<span class="row-main"><span class="row-title">'+title+'</span><span class="row-sub">'+desc+'</span>'
+        +'<span class="row-foot" style="margin-top:9px;display:flex;gap:9px;flex-wrap:wrap">'+slots+'</span></span>')
     +'<span class="acts">'+tail+'</span></div>';
-}
-function skelRow(i){
-  return '<div class="row" aria-hidden="true" data-testid="'+SCREEN+'-skeleton-'+i+'">'
-    +'<span class="row-ico" data-tone="off"></span>'
-    +'<span class="row-main"><span class="skel t"></span><span class="skel s"></span></span>'
-    +'<span class="acts"><span class="skel" style="width:110px;height:50px;border-radius:16px"></span></span></div>';
 }
 /* 「怎么产生这类记录」的真实入口行 */
 function startRow(ico, tone, title, desc, label, target, route, tid){
@@ -517,7 +548,7 @@ var VIEW_STRUCT = {
 };
 function structRows(view, mode){
   return VIEW_STRUCT[view].map(function(s, i){
-    return lockRow(mode, s[0], s[1], s[2], s[3], SCREEN+'-struct-'+view+'-'+i);
+    return lockRow(mode, s[0], s[1], s[2], s[3], mode==='loading' ? SCREEN+'-skeleton-'+i : SCREEN+'-struct-'+view+'-'+i);
   }).join('');
 }
 /* 未登录这一屏不能只有「去登录」和「返回」两个落点：看官方渠道和打印扫描在这台机器上
@@ -740,7 +771,9 @@ var BROWSE_ROWS = [
 var JUMP_ROWS = [
   {id:'j1', label:'政策', action:'政策说明', title:'打开政策说明', file:'48-policy-workspace.html?state=policy-ready', route:'/renshi?tab=policy', ico:'policy', tone:'slate'},
   {id:'j2', label:'机构渠道', action:'机构官方渠道', title:'打开机构官方渠道', file:'45-online-platform-directory.html?state=ready', route:'/directory', ico:'route', tone:''},
-  {id:'j3', label:'政策', action:'政策说明', title:'打开另一则政策', file:'48-policy-workspace.html?state=policy-ready', route:'/renshi?tab=policy', ico:'policy', tone:'slate'}
+  {id:'j3', label:'政策', action:'政策说明', title:'打开另一则政策', file:'48-policy-workspace.html?state=policy-ready', route:'/renshi?tab=policy', ico:'policy', tone:'slate'},
+  /* 9/28 留白：跳转记录与浏览记录一样排四条示例（原来只有三条，列表下半截空着）。 */
+  {id:'j4', label:'机构渠道', action:'机构官方渠道', title:'打开办事入口示例', file:'45-online-platform-directory.html?state=ready', route:'/directory', ico:'route', tone:''}
 ];
 function activityRow(r, kind){
   var meta = kind==='browse'
@@ -751,7 +784,9 @@ function activityRow(r, kind){
   }
   return '<a class="row tap press" href="'+esc(keep(r.file))+'" data-route="'+esc(r.route)+'" data-testid="'+SCREEN+'-activity-'+r.id+'" data-activity-kind="'+kind+'">'
     +'<span class="row-ico '+r.tone+'">'+svg(kind==='browse'?'eye':'external')+'</span>'
-    +'<span class="row-main"><span class="row-title">'+r.title+'</span><span class="row-sub">'+meta+'</span></span>'
+    +'<span class="row-main"><span class="row-title">'+r.title+'</span><span class="row-sub">'+meta+'</span>'
+    /* 9/28 留白：页头示例条写了「时间由办理后显示」，运行页每行也显示时间；这里补上时间结构位。 */
+    +'<span class="row-foot qx-time">'+slot('时间 · 办理后显示')+'</span></span>'
     +'<span class="row-arrow">'+svg('arrow')+'</span></a>';
 }
 function activityTabs(tab, empty){
@@ -773,12 +808,13 @@ function activityBody(tab, empty){
     return {layout:'empty', html:
       summary('slate','clock','访问足迹','0','只记录浏览与打开来源入口动作，不记录投递或预约结果',['浏览 0','跳转 0'])
       + activityTabs(tab, true)
-      + previewList(starts,
+      + previewList(structRows('activity','empty') + starts,
           browse ? '看过政策或机构官方渠道之后，会记在这里。现在还没有记录。'
                  : '打开政策或机构官方渠道之后，会记在这里。报名和投递不在这台机器上办。',
           browse?'从这里开始浏览':'从这里打开来源入口')
       + guide('empty-activity')
       + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                askLink(),
                 link(browse?'看政策':'看机构渠道', browse?'48-policy-workspace.html?state=policy-ready':'45-online-platform-directory.html?state=ready', browse?'/renshi?tab=policy':'/directory', SCREEN+'-primary',{primary:true,icon:'arrow'})])};
   }
   var rows = tab==='browse' ? BROWSE_ROWS : JUMP_ROWS;
@@ -837,15 +873,17 @@ function loginState(view, title, desc){
         '登录后会出现的内容结构，以及不用登录也能办的事')
     + guide('login')
     + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              askLink(),
               '<a class="btn primary press" href="'+esc(keep('03-login-gate.html?from='+encodeURIComponent(from)))+'" data-route="/login" data-login-from="'+esc(from)+'" data-testid="'+SCREEN+'-primary">手机号登录</a>'])};
 }
 function loadingState(view, title){
   return {layout:'state', html:
     banner('calm','clock', title, '正在读取当前账号的记录。<b>返回前一律显示「—」</b>，不会闪回上一位用户的内容。', ['共 —','正在安全读取'])
-    + previewList([0,1,2,3].map(skelRow).join(''),
-        '这次读取失败不会删除任何记录，也不会改动任何已保存的内容。','正在加载的记录占位')
+    + previewList(structRows(view,'loading'),
+        '这次读取失败不会删除任何记录，也不会改动任何已保存的内容。','正在读取的内容结构')
     + guide('loading')
     + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              askLink(),
               deadPrimary('记录还未加载完成','数据尚未返回，暂时不可操作',SCREEN+'-primary')])};
 }
 function errorState(view, state, title, desc){
@@ -855,16 +893,20 @@ function errorState(view, state, title, desc){
         '重试不会重复创建记录，也不会改动已保存的内容。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的内容结构')
     + guide('error')
     + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help'),
+              askLink(),
               link('重新加载', href(view, state), VIEWS[view].route, SCREEN+'-primary',{primary:true})])};
 }
 function emptyState(view, ico, title, desc, starts, cta){
   return {layout:'state', html:
     banner('','empty', title, desc + '还没有任何记录。办过之后会列在这里。', ['共 0'])
-    + previewList(starts, '按上面任一条办完之后，记录会出现在这一页；<b>本机不代收简历，也不记录来源平台的处理结果</b>。','从这里开始')
+    + previewList(structRows(view,'empty') + starts, '按上面任一条办完之后，记录会出现在这一页；<b>本机不代收简历，也不记录来源平台的处理结果</b>。','从这里开始')
     + guide('empty-'+view)
     + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              askLink(),
               link(cta[0], cta[1], cta[2], SCREEN+'-primary', {primary:true, icon:cta[3]})])};
 }
+/* 9/28 留白：加载 / 空 / 失败态的操作条带一个「问小青」（与 35、38 同一处理）。 */
+function askLink(){ return link('问小青','05-ai-cockpit.html','/assistant',SCREEN+'-ask',{icon:'spark'}); }
 
 function renderBody(view, state, tab){
   if(view==='resumes'){
@@ -921,6 +963,7 @@ function renderBody(view, state, tab){
           '这条记录没有单独的地址。按编号在浏览和打开两类记录里查找，找不到就是找不到。','这条记录本应包含的内容')
       + guide('not-found')
       + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                askLink(),
                 link('返回记录列表', href('activity','browse-ready'), '/me/activity', SCREEN+'-primary',{primary:true})])};
   return {layout:'detail', html:activityDetailBody()};
 }
