@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`556` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`557` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -612,6 +612,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/feedback` | AdminMemberFeedbackController.list | admin | — | — |
 | GET | `/api/v1/admin/feedback/:id` | AdminMemberFeedbackController.get | admin | MemberFeedbackService | AuditLog<br/>BroadcastReadState<br/>FeedbackReply<br/>FeedbackTicket<br/>MemberNotification<br/>PrintTask<br/>SystemBroadcast |
+| POST | `/api/v1/admin/feedback/:id/contact-phone` | AdminMemberFeedbackController.revealContactPhone | admin | — | — |
 | POST | `/api/v1/admin/feedback/:id/replies` | AdminMemberFeedbackController.reply | admin | MemberFeedbackService | AuditLog<br/>BroadcastReadState<br/>FeedbackReply<br/>FeedbackTicket<br/>MemberNotification<br/>PrintTask<br/>SystemBroadcast |
 | PATCH | `/api/v1/admin/feedback/:id/status` | AdminMemberFeedbackController.status | admin | MemberFeedbackService | AuditLog<br/>BroadcastReadState<br/>FeedbackReply<br/>FeedbackTicket<br/>MemberNotification<br/>PrintTask<br/>SystemBroadcast |
 
