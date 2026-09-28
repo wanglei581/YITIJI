@@ -38,7 +38,9 @@ export function ScreensaverPage() {
   const [fetchSettled, setFetchSettled] = useState(Boolean(statePlaylist))
   const [fetchFailed, setFetchFailed] = useState(false)
   const [index, setIndex] = useState(0)
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  // 地址连同它属于哪一条素材一起记：切到下一条时新地址还没解析出来，这期间照旧显示
+  // 上一条，不能拿上一条的地址去显示新素材（上一条坏了的话，会把好的这条也误记成失败）。
+  const [media, setMedia] = useState<{ id: string; url: string } | null>(null)
   // 加载失败的素材（链接过期、断网、文件损坏）。只有一条素材时「换下一条」还是它自己，
   // 画面会停在一个空框上；记下失败的，轮播跳过它们，全都失败就显示稿里的「暂无宣传内容」。
   const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(() => new Set())
@@ -124,7 +126,7 @@ export function ScreensaverPage() {
         return
       }
       if (url.startsWith('blob:')) objectUrl = url
-      setMediaUrl(url)
+      setMedia({ id: current.id, url })
     })
     if (items.length > 1) {
       const next = items[(index + 1) % items.length]
@@ -151,13 +153,14 @@ export function ScreensaverPage() {
     return () => window.clearTimeout(t)
   }, [current, index, items.length])
 
+  const shown = media ? items.find((item) => item.id === media.id && !failedIds.has(item.id)) : undefined
   const allFailed = items.length > 0 && items.every((item) => failedIds.has(item.id))
   const phase = deriveStandbyPhase({
     fetchSettled,
     fetchFailed,
     enabled,
     itemCount: items.length,
-    mediaReady: Boolean(current && mediaUrl),
+    mediaReady: Boolean(shown),
   })
   if (standbyShouldExitHome(phase) && fetchSettled) {
     // 退出由上面的 effect 发起；这一帧仍画可唤醒壳，禁止纯黑空白。
@@ -178,15 +181,16 @@ export function ScreensaverPage() {
     >
       <KioskStageFit>
         <StandbyView
-          phase={phase === 'empty' ? 'loading' : phase}
+          // 素材全部加载失败：显示「暂无宣传内容」（empty 态的说明），而不是一直「正在读取」。
+          phase={allFailed ? 'empty' : phase === 'empty' ? 'loading' : phase}
           terminalName={terminalName}
           date={clock.date}
           time={clock.time}
-          current={allFailed ? undefined : current}
-          mediaUrl={allFailed ? null : mediaUrl}
+          current={allFailed ? undefined : shown}
+          mediaUrl={allFailed || !shown ? null : media?.url ?? null}
           loopVideo={items.length <= 1}
           onAdvance={() => advanceRef.current()}
-          onMediaError={() => { if (current) markFailedRef.current(current.id) }}
+          onMediaError={() => { if (shown) markFailedRef.current(shown.id) }}
           onWake={exit}
         />
       </KioskStageFit>
