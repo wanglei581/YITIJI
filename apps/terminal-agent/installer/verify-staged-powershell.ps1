@@ -58,12 +58,10 @@ $originUtilities = Join-Path $provisionRoot "provisioning-origin-utils.ps1"
 $mergedOrigins = @(Merge-LocalApiAllowedOrigins `
   -Origins @(
     "https://zyidai.cn",
-    "https://zyidai.cn",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "https://zyidai.cn"
   ) `
   -CanonicalizeOrigin { param($originCandidate) ([System.Uri]$originCandidate).GetLeftPart([System.UriPartial]::Authority) })
-$expectedOrigins = @("https://zyidai.cn", "http://localhost:5173", "http://127.0.0.1:5173")
+$expectedOrigins = @("https://zyidai.cn")
 if ($mergedOrigins.Count -ne $expectedOrigins.Count) {
   throw "Origin merge returned $($mergedOrigins.Count) entries; expected $($expectedOrigins.Count)"
 }

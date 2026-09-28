@@ -5,7 +5,13 @@
     Version="$(var.ProductVersion)"
     UpgradeCode="8B8F74AC-9B68-44B8-88E7-BEB906221919"
     Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer AI Job Print Agent is already installed." />
+    <Property Id="BOUND_AGENT">
+      <RegistrySearch Id="BoundAgentSearch" Bitness="always64" Root="HKLM" Key="Software\AIJobPrint\Agent" Name="Bound" Type="raw" />
+      <DirectorySearch Id="BoundAgentStateSearch" Path="[CommonAppDataFolder]AIJobPrintAgent">
+        <FileSearch Id="BoundAgentTokenSearch" Name="agent.token" />
+      </DirectorySearch>
+    </Property>
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer AI Job Print Agent is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -14,8 +20,11 @@
           <Component Id="AgentServiceComponent" Guid="4BB83A61-04C6-473E-B528-A20F2D0DE494" Bitness="always64">
             <File Id="AgentServiceExecutable" Source="$(var.StagingRoot)\bootstrap\aijobprintagent.exe" KeyPath="yes" Checksum="yes" />
             <File Id="AgentServiceConfiguration" Source="$(var.StagingRoot)\bootstrap\aijobprintagent.xml" Checksum="yes" />
+          </Component>
+          <Component Id="UnboundAgentServiceComponent" Guid="D5D6B9A6-7A3B-48C2-9D36-F7E72A6C4CB1" Bitness="always64" Condition="NOT BOUND_AGENT">
+            <RegistryValue Root="HKLM" Key="Software\AIJobPrint\Agent" Name="UnboundServiceComponent" Type="integer" Value="1" KeyPath="yes" />
             <ServiceInstall
-              Id="AgentServiceInstall"
+              Id="UnboundAgentServiceInstall"
               Name="aijobprintagent.exe"
               DisplayName="AIJobPrintAgent"
               Description="AI Job Print Terminal Agent"
@@ -24,8 +33,27 @@
               ErrorControl="normal"
               Account="LocalSystem" />
             <ServiceControl
-              Id="AgentServiceControl"
+              Id="UnboundAgentServiceControl"
               Name="aijobprintagent.exe"
+              Stop="both"
+              Remove="uninstall"
+              Wait="yes" />
+          </Component>
+          <Component Id="BoundAgentServiceComponent" Guid="A6D88C0F-6B5C-47DB-A1DC-B04CB2C0E4BF" Bitness="always64" Condition="BOUND_AGENT">
+            <RegistryValue Root="HKLM" Key="Software\AIJobPrint\Agent" Name="BoundServiceComponent" Type="integer" Value="1" KeyPath="yes" />
+            <ServiceInstall
+              Id="BoundAgentServiceInstall"
+              Name="aijobprintagent.exe"
+              DisplayName="AIJobPrintAgent"
+              Description="AI Job Print Terminal Agent"
+              Type="ownProcess"
+              Start="auto"
+              ErrorControl="normal"
+              Account="LocalSystem" />
+            <ServiceControl
+              Id="BoundAgentServiceControl"
+              Name="aijobprintagent.exe"
+              Start="install"
               Stop="both"
               Remove="uninstall"
               Wait="yes" />
@@ -93,6 +121,8 @@
 
     <Feature Id="MainFeature" Title="AI Job Print Agent" Level="1">
       <ComponentRef Id="AgentServiceComponent" />
+      <ComponentRef Id="UnboundAgentServiceComponent" />
+      <ComponentRef Id="BoundAgentServiceComponent" />
       <ComponentRef Id="AgentStateDirectoryComponent" />
       <ComponentRef Id="AgentPanelShortcutComponent" />
       <ComponentRef Id="ProvisioningWizardComponent" />

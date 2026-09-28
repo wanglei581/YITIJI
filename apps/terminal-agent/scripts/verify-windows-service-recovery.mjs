@@ -59,6 +59,9 @@ assert.match(installer, /\[Alias\("KioskOrigins"\)\][\s\S]{0,80}?\[string\[\]\]\
 assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\][\s\S]{0,80}?\[switch\]\$ReplaceLocalApiAllowedOrigins/, 'installer must expose one canonical replacement switch with the legacy alias')
 assert.match(installer, /ConvertTo-CanonicalOrigin/, 'installer must validate every local API origin')
 assert.match(installer, /localApiAllowedOrigins\s*=\s*@\(\$effectiveLocalApiAllowedOrigins\)/, 'installer must persist the production Kiosk origins')
+assert.match(installer, /AllowLocalDevelopmentOrigins/, 'development origins require an explicit opt-in')
+assert.match(installer, /Set-EdgeKioskPolicies/, 'production provisioning must configure Edge kiosk policies')
+assert.match(installer, /Bound\" -Value 1/, 'bound provisioning must leave an installer upgrade marker')
 assert.match(installer, /Get-PreservedLocalSettings/, 'installer upgrades must inspect existing local-only settings')
 assert.match(installer, /@\("scanWatchFolder", "localApiBridgeToken"\)/, 'installer upgrades must preserve scan and local bridge settings')
 assert.match(

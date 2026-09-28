@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PREDECESSOR_VERSION = "0.4.10"
-$CANDIDATE_VERSION = "0.4.11"
+$CANDIDATE_VERSION = "0.4.12"
 $resolvedPredecessor = (Resolve-Path -LiteralPath $PredecessorExePath).Path
 $resolvedCandidate = (Resolve-Path -LiteralPath $CandidateExePath).Path
 $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
@@ -63,6 +63,13 @@ function Assert-StoppedManualService {
   $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
   if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
     throw "Upgrade must preserve the unprovisioned Stopped/Manual service contract"
+  }
+}
+
+function Assert-BoundRunningAutomaticService {
+  $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+  if ($null -eq $service -or $service.State -ne "Running" -or $service.StartMode -ne "Auto") {
+    throw "Bound upgrade must leave the Agent Running with Automatic startup"
   }
 }
 
@@ -183,10 +190,14 @@ try {
   Invoke-Bundle -ExePath $resolvedCandidate -Action "/install" -LogName "upgrade-candidate-install.log"
   $candidateInstalled = $true
   Assert-AgentProductVersion -ExpectedVersion $CANDIDATE_VERSION
-  Assert-StoppedManualService
+  Assert-BoundRunningAutomaticService
   Assert-PanelShortcut
   Assert-DesktopShortcut
   Assert-ControlCenterSmoke -ExpectedVersion $CANDIDATE_VERSION
+
+  Invoke-Bundle -ExePath $resolvedCandidate -Action "/install" -LogName "upgrade-same-version.log"
+  Assert-AgentProductVersion -ExpectedVersion $CANDIDATE_VERSION
+  Assert-BoundRunningAutomaticService
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Bundled Node runtime is missing after upgrade"
   }

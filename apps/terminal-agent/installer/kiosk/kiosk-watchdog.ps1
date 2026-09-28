@@ -96,7 +96,7 @@ function Request-BootTicket([bool]$LogFailure = $true, [int]$Attempt = 1) {
 
 function Get-BootTicket {
   $deadline = (Get-Date).AddSeconds(60)
-  $delays = @(2, 5, 10, 20)
+  $delays = @(2, 5, 10, 20, 20)
   $attempt = 0
   while ((Get-Date) -lt $deadline) {
     # Five 4-second attempts plus 2/5/10/20-second backoff stay within 57 seconds.
@@ -113,9 +113,10 @@ function Get-BootTicket {
 }
 
 function Get-BootTicketUrl([AllowNull()][string]$BootTicket) {
-  if ([string]::IsNullOrWhiteSpace($BootTicket)) { return $Url }
   $separator = if ($Url.Contains('?')) { '&' } else { '?' }
-  return "$Url$separator" + "boot_ticket=$([uri]::EscapeDataString($BootTicket))"
+  $launchUrl = "$Url${separator}kiosk_launch=1"
+  if ([string]::IsNullOrWhiteSpace($BootTicket)) { return $launchUrl }
+  return "$launchUrl&boot_ticket=$([uri]::EscapeDataString($BootTicket))"
 }
 
 function Test-AgentIdentityReady {
@@ -186,7 +187,7 @@ while ($true) {
       if ([string]::IsNullOrWhiteSpace($bootTicket)) { $bootTicket = Get-BootTicket }
       $launchUrl = Get-BootTicketUrl -BootTicket $bootTicket
       [void](Start-KioskBrowser -Executable $executable -LaunchUrl $launchUrl)
-      $launchedWithoutTicket = ($launchUrl -eq $Url)
+      $launchedWithoutTicket = [string]::IsNullOrWhiteSpace($bootTicket)
       $lastTicketProbe = Get-Date
       if ($lastStart -ne [DateTime]::MinValue -and ((Get-Date) - $lastStart).TotalSeconds -lt 60) {
         # Crash loop: double the wait, cap at one minute.

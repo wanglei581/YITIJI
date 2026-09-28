@@ -28,6 +28,16 @@ function Invoke-Msi([string[]]$Arguments, [string]$LogName) {
   }
 }
 
+function Assert-ExactlyOneAgentProduct {
+  $entries = @(
+    Get-ItemProperty -Path @(
+      "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+      "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    ) -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq "AI Job Print Agent" }
+  )
+  if ($entries.Count -ne 1) { throw "Expected exactly one installed AI Job Print Agent product, found $($entries.Count)" }
+}
+
 function Write-Utf8File([string]$Path, [string]$Content) {
   [System.IO.File]::WriteAllText($Path, $Content, [System.Text.UTF8Encoding]::new($false))
 }
@@ -94,7 +104,7 @@ function Assert-ControlCenterSmoke {
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $controlCenterScriptPath -SmokeTest -SmokeTestOutput $outputPath
   if ($LASTEXITCODE -ne 0) { throw "Terminal control center smoke test failed" }
   $snapshot = Get-Content -Raw -Encoding UTF8 -LiteralPath $outputPath | ConvertFrom-Json
-  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.11") {
+  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.12") {
     throw "Terminal control center smoke snapshot is invalid"
   }
 }
@@ -280,6 +290,7 @@ Invoke-Msi -Arguments @("/i", $resolvedMsi) -LogName "install.log"
 Assert-PanelShortcut
 Assert-DesktopShortcut
 Assert-ControlCenterSmoke
+Assert-ExactlyOneAgentProduct
 Assert-InstalledRuntimeAcl
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
@@ -330,6 +341,16 @@ try {
   $startServiceError = $_.Exception.Message
 }
 Export-LifecycleEvidence -Phase "post-start"
+
+# Same-version reinstall must not create another uninstall registration. The
+# fresh, unbound contract remains Stopped/Manual; bound Running/Automatic is
+# covered by test-exe-upgrade-lifecycle.ps1 with the protected token fixture.
+Invoke-Msi -Arguments @("/i", $resolvedMsi, "REINSTALL=ALL", "REINSTALLMODE=vomus") -LogName "same-version-reinstall.log"
+Assert-ExactlyOneAgentProduct
+$service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
+  throw "Same-version fresh reinstall must preserve the unprovisioned Stopped/Manual service contract"
+}
 $deadline = [DateTime]::UtcNow.AddSeconds(20)
 while (-not (Test-Path -LiteralPath $diagnosticPath -PathType Leaf) -and [DateTime]::UtcNow -lt $deadline) {
   Start-Sleep -Milliseconds 500
