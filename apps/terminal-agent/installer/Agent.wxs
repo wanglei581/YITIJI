@@ -5,7 +5,7 @@
     Version="$(var.ProductVersion)"
     UpgradeCode="8B8F74AC-9B68-44B8-88E7-BEB906221919"
     Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer AI Job Print Agent is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer AI Job Print Agent is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <StandardDirectory Id="ProgramFiles64Folder">

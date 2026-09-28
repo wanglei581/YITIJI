@@ -18,8 +18,7 @@
 #     -ScanWatchFolder "C:\AIJobPrint\scan-inbox"
 #
 #   # Replace previously preserved cross-origin Kiosk entries. Passing the
-#   # switch with no -LocalApiAllowedOrigins removes all historical extra
-#   # origins while retaining the API origin and loopback development origins.
+#   # switch with no -LocalApiAllowedOrigins removes all historical extra origins.
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-production-agent.ps1 `
 #     -ApiBaseUrl "https://api.example.com/api/v1" `
 #     -TerminalCode "KSK-001" `
@@ -73,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.4.11-production",
+  [string]$AgentVersion = "0.4.12-production",
 
   [Parameter(Mandatory = $false)]
   [string]$InstalledAgentRoot,
@@ -88,6 +87,12 @@ param(
   [Parameter(Mandatory = $false)]
   [Alias("ReplaceKioskOrigins")]
   [switch]$ReplaceLocalApiAllowedOrigins,
+
+  [Parameter(Mandatory = $false)]
+  [switch]$AllowLocalDevelopmentOrigins,
+
+  [Parameter(Mandatory = $false)]
+  [switch]$RemoveEdgeKioskPolicies,
 
   [Parameter(Mandatory = $false)]
   [ValidateRange(1, 65535)]
@@ -113,6 +118,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "provisioning-runtime-security.ps1")
 
 $agentServiceIdentity = "AIJobPrintAgent"
+$edgePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
 
 function Write-Step([string]$Message) {
   Write-Host "`n==> $Message" -ForegroundColor Cyan
@@ -129,6 +135,35 @@ function Write-WarnLine([string]$Message) {
 function Fail([string]$Message) {
   Write-Host "[FAIL] $Message" -ForegroundColor Red
   exit 1
+}
+
+function Set-EdgeKioskPolicies([string[]]$Origins, [switch]$Remove) {
+  if ($Remove) {
+    if (Test-Path -LiteralPath $edgePolicyPath) {
+      foreach ($policyName in @("LocalNetworkAccessAllowedForUrls", "AudioCaptureAllowedUrls")) {
+        $listKey = Join-Path $edgePolicyPath $policyName
+        if (Test-Path -LiteralPath $listKey) { Remove-Item -LiteralPath $listKey -Recurse -Force }
+      }
+      Remove-ItemProperty -LiteralPath $edgePolicyPath -Name "AllowFileSelectionDialogs" -ErrorAction SilentlyContinue
+    }
+    Write-Ok "Edge kiosk policies removed"
+    return
+  }
+  $validOrigins = @($Origins | Where-Object { $_ -match '^https://' } | Select-Object -Unique)
+  if ($validOrigins.Count -eq 0) { Fail "At least one HTTPS Kiosk Origin is required for Edge policies" }
+  New-Item -Path $edgePolicyPath -Force | Out-Null
+  # 列表型策略的注册表格式：Edge 键下建同名子键，值名为 1、2、3……（写成 Edge 键上的
+  # "AudioCaptureAllowedUrls1" 这类值不会被 Edge 识别，策略静默不生效）。
+  foreach ($policyName in @("LocalNetworkAccessAllowedForUrls", "AudioCaptureAllowedUrls")) {
+    $listKey = Join-Path $edgePolicyPath $policyName
+    if (Test-Path -LiteralPath $listKey) { Remove-Item -LiteralPath $listKey -Recurse -Force }
+    New-Item -Path $listKey -Force | Out-Null
+    for ($index = 0; $index -lt $validOrigins.Count; $index++) {
+      New-ItemProperty -LiteralPath $listKey -Name ([string]($index + 1)) -Value $validOrigins[$index] -PropertyType String -Force | Out-Null
+    }
+  }
+  New-ItemProperty -LiteralPath $edgePolicyPath -Name "AllowFileSelectionDialogs" -Value 0 -PropertyType DWord -Force | Out-Null
+  Write-Ok "Edge kiosk policies written for $($validOrigins -join ', ')"
 }
 
 function ConvertFrom-SecureStringToPlainText([System.Security.SecureString]$Value) {
@@ -653,6 +688,10 @@ $tokenPath = Join-Path $programDataDir "agent.token"
 $unauthorizedMarkerPath = Join-Path $programDataDir "agent.unauthorized"
 $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
 $apiOrigin = ([System.Uri]$apiBase).GetLeftPart([System.UriPartial]::Authority)
+$edgeKioskOrigins = @($LocalApiAllowedOrigins | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ConvertTo-CanonicalOrigin $_ })
+if ($edgeKioskOrigins.Count -eq 0) { $edgeKioskOrigins = @($apiOrigin) }
+Set-EdgeKioskPolicies -Origins $edgeKioskOrigins -Remove:$RemoveEdgeKioskPolicies
+if ($RemoveEdgeKioskPolicies) { exit 0 }
 $preservedLocalSettings = Get-PreservedLocalSettings `
   -ConfigPath $configPath `
   -ProgramDataDir $programDataDir `
@@ -662,7 +701,11 @@ $preservedOrigins = if (-not $ReplaceLocalApiAllowedOrigins -and $preservedLocal
 } else {
   @()
 }
-$originCandidates = @($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")
+$developmentOrigins = if ($AllowLocalDevelopmentOrigins) { @("http://localhost:5173", "http://127.0.0.1:5173") } else { @() }
+$preservedOrigins = @($preservedOrigins | Where-Object {
+  $AllowLocalDevelopmentOrigins -or $_ -notin @("http://localhost:5173", "http://127.0.0.1:5173")
+})
+$originCandidates = @($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + $developmentOrigins
 $originCandidates = @($originCandidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 $effectiveLocalApiAllowedOrigins = @(Merge-LocalApiAllowedOrigins `
   -Origins $originCandidates `
@@ -854,6 +897,10 @@ try {
   Fail "Production config was written but its runtime permissions are unsafe; service will not be started: $($_.Exception.Message)"
 }
 Write-Ok "Production config written: $configPath"
+$boundRegistryPath = "HKLM:\SOFTWARE\AIJobPrint\Agent"
+New-Item -Path $boundRegistryPath -Force | Out-Null
+New-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -Value 1 -PropertyType DWord -Force | Out-Null
+Write-Ok "Bound terminal marker written for installer upgrade recovery"
 if ($credentialReplaced) {
   Write-Ok "BindCode exchanged; token protected with DPAPI + ProgramData ACL"
   try {

@@ -9,6 +9,7 @@ import { useAiAdvisorCallSession } from '../../hooks/useAiAdvisorCallSession'
 import { AdvisorManualEntries } from './AdvisorConversation'
 import { advisorDisplayText, advisorUserReason } from './advisorUserCopy'
 import { COCKPIT_COPY, type CockpitVoiceState } from './advisorScenes'
+import { isTerminalKiosk } from '../../services/api/screensaver'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
 
@@ -303,7 +304,9 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
             {call.micBlocked && (
               <div className="assistant-voice-card assistant-voice-mic-warning" data-kind="warn" role="status">
                 <h3><KIcon name="mic-off" />浏览器没有授予麦克风权限</h3>
-                <p>当前为只听模式：小青能说，你这边的声音传不过去。可以在浏览器里允许麦克风后「重新尝试授权」，也可以直接改用文字。</p>
+                <p>{isTerminalKiosk()
+                  ? '当前为只听模式：小青能说，你这边的声音传不过去。可以改用文字；如需语音请联系现场工作人员。'
+                  : '当前为只听模式：小青能说，你这边的声音传不过去。可以在浏览器里允许麦克风后「重新尝试授权」，也可以直接改用文字。'}</p>
               </div>
             )}
 

@@ -12,6 +12,7 @@ import {
   MIC_REASON,
   type MicCapabilityState,
 } from '../../utils/micCapability'
+import { isTerminalKiosk } from '../../services/api/screensaver'
 
 const MAX_RECORD_SECONDS = 58
 
@@ -52,6 +53,7 @@ export function AssistantHoldToTalk({
   const timerRef = useRef<number | null>(null)
   const startedAtRef = useRef<number | null>(null)
   const pointerIdRef = useRef<number | null>(null)
+  const releasedRef = useRef(false)
 
   const refreshMic = useCallback(() => {
     void detectMicCapability().then(setMic)
@@ -85,6 +87,7 @@ export function AssistantHoldToTalk({
     }
     clearTimer()
     pointerIdRef.current = null
+    releasedRef.current = false
     setHoldState('idle')
     setSeconds(0)
   }
@@ -95,6 +98,7 @@ export function AssistantHoldToTalk({
     recorderRef.current = null
     clearTimer()
     pointerIdRef.current = null
+    releasedRef.current = false
     setHoldState('transcribing')
     setError(null)
     try {
@@ -135,10 +139,16 @@ export function AssistantHoldToTalk({
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     pointerIdRef.current = event.pointerId
+    releasedRef.current = false
     setError(null)
     setSeconds(0)
     try {
       const recorder = await startWavRecorder()
+      if (releasedRef.current || pointerIdRef.current !== event.pointerId) {
+        recorder.cancel()
+        pointerIdRef.current = null
+        return
+      }
       recorderRef.current = recorder
       startedAtRef.current = Date.now()
       setHoldState('recording')
@@ -152,7 +162,9 @@ export function AssistantHoldToTalk({
       const failure = classifyMicError(err)
       setError(
         failure === 'permission-denied'
-          ? '麦克风权限未开启，请在地址栏允许麦克风后重试，或改用文字输入'
+          ? isTerminalKiosk()
+            ? '麦克风不可用，可以改用文字输入；如需语音请联系现场工作人员'
+            : '麦克风权限未开启，请在地址栏允许麦克风后重试，或改用文字输入'
           : '麦克风不可用，请改用文字输入',
       )
       refreshMic()
@@ -162,11 +174,13 @@ export function AssistantHoldToTalk({
 
   const onPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (pointerIdRef.current !== event.pointerId) return
+    releasedRef.current = true
     if (holdState === 'recording') void stopAndTranscribe()
   }
 
   const onPointerCancel = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (pointerIdRef.current !== event.pointerId) return
+    releasedRef.current = true
     cancelRecorder()
   }
 
@@ -197,6 +211,7 @@ export function AssistantHoldToTalk({
         onPointerDown={(event) => { if (blocked) return; void onPointerDown(event) }}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onLostPointerCapture={onPointerCancel}
         onContextMenu={(event) => event.preventDefault()}
       >
         <KIcon name="mic" />

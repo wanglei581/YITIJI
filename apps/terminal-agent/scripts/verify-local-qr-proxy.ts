@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
+import { readFileSync } from 'node:fs'
 import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
 import { allowedOrigins } from '../src/local-api/origin-guard'
 import type { AgentConfig } from '../src/agent/types'
@@ -12,6 +13,16 @@ const TICKET_ID = 'qrtest_abcdefghijklmnopqrstuvwxyz012345'
 const CLAIM_TOKEN = 'claim_token_abcdefghijklmnopqrstuvwxyz012345'
 const BRIDGE_TOKEN = 'bridge-token-abcdefghijklmnopqrstuvwxyz012345'
 const WRONG_BRIDGE_TOKEN = 'wrong-token-wrong-token-wrong-token-000'
+
+const qrSource = readFileSync(`${__dirname}/../src/local-api/qr-login-server.ts`, 'utf8')
+// 版本号取自部署的 package.json，不在门禁里钉死：钉死的常量会在正常升版本时转红。
+const packageVersion = (JSON.parse(readFileSync(`${__dirname}/../package.json`, 'utf8')) as { version: string }).version
+assert.match(qrSource, /isOriginAllowed\(origin, origins\).*isLocalBridgeTokenValid/, 'boot ticket must require allowlisted Origin and bridge token')
+assert.match(qrSource, /LOCAL_TERMINAL_BOOT_NOT_READY/, 'boot ticket must expose retryable not-ready state')
+// 取票只请求云端一次（调用方 4 秒超时且自带重试）；失败统一回 503 可重试码，而不是 502。
+assert.match(qrSource, /backendError\(error, 'qr', true\)/, 'boot ticket cloud failure must map to a retryable 503')
+assert.doesNotMatch(qrSource, /BOOT_TICKET_MAX_ATTEMPTS/, 'boot ticket must not retry past the 4-second callers')
+assert.match(qrSource, /BOOT_TICKET_RATE_LIMIT/, 'boot ticket must be rate limited')
 
 interface RecordedRequest {
   method: string
@@ -142,6 +153,7 @@ async function preflight(url: string, origin = ALLOWED_ORIGIN): Promise<Response
       Origin: origin,
       'Access-Control-Request-Method': 'POST',
       'Access-Control-Request-Private-Network': 'true',
+      'Access-Control-Request-Headers': 'X-Local-Bridge-Token',
     },
   })
 }
@@ -164,7 +176,7 @@ async function main(): Promise<void> {
 
   const localServerOptions: NonNullable<Parameters<typeof startQrLoginLocalServer>[1]> = {
     getPanelStatus: () => ({
-      runtimeVersion: '0.4.11',
+      runtimeVersion: packageVersion,
       terminalCode: `${config.terminalCode}<script>alert(1)</script>`,
       serviceState: 'running',
       cloudConnected: true,
@@ -195,7 +207,7 @@ async function main(): Promise<void> {
     assert.match(panel.headers.get('content-security-policy') ?? '', /default-src 'none'/)
     for (const expected of [
       'AI Job Print Terminal',
-      '0.4.11',
+      packageVersion,
       'T-LOCAL-QR',
       '&lt;script&gt;alert(1)&lt;/script&gt;',
       '后台服务运行中',
@@ -216,7 +228,7 @@ async function main(): Promise<void> {
     const panelMutation = await fetch(`${localBase}/local/panel`, { method: 'POST' })
     assert.equal(panelMutation.status, 405, 'local panel must remain read-only')
 
-    assert.equal(AGENT_RUNTIME_VERSION, '0.4.11', 'runtime version must come from the deployed package')
+    assert.equal(AGENT_RUNTIME_VERSION, packageVersion, 'runtime version must come from the deployed package')
     assert.equal(await sendHeartbeat({ config }), true, 'heartbeat fixture must be acknowledged')
     const heartbeatRecord = backend.records.find((record) => record.url.endsWith('/heartbeat'))
     assert.ok(heartbeatRecord, 'heartbeat request should be recorded')
@@ -264,11 +276,26 @@ async function main(): Promise<void> {
     assert.equal(bootRecord.terminalId, 'terminal-qr-1')
 
     const browserBootTicket = await fetch(`${localBase}/local/terminal-boot-ticket`, {
+      method: 'POST', headers: { Origin: ALLOWED_ORIGIN, 'X-Local-Bridge-Token': BRIDGE_TOKEN },
+    })
+    assert.equal(browserBootTicket.status, 200, 'allowlisted browser Origin with bridge token may obtain a boot ticket')
+
+    const missingBootToken = await fetch(`${localBase}/local/terminal-boot-ticket`, {
       method: 'POST', headers: { Origin: ALLOWED_ORIGIN },
     })
-    assert.equal(browserBootTicket.status, 403, 'browser Origin must not obtain a boot ticket')
-    const browserBootTicketError = await browserBootTicket.json() as { error: { code: string } }
-    assert.equal(browserBootTicketError.error.code, 'LOCAL_TERMINAL_BOOT_ORIGIN_FORBIDDEN')
+    assert.equal(missingBootToken.status, 403, 'allowlisted browser Origin without bridge token must be rejected')
+    const missingBootTokenError = await missingBootToken.json() as { error: { code: string } }
+    assert.equal(missingBootTokenError.error.code, 'LOCAL_TERMINAL_BOOT_ORIGIN_FORBIDDEN')
+
+    const wrongBootToken = await fetch(`${localBase}/local/terminal-boot-ticket`, {
+      method: 'POST', headers: { Origin: ALLOWED_ORIGIN, 'X-Local-Bridge-Token': WRONG_BRIDGE_TOKEN },
+    })
+    assert.equal(wrongBootToken.status, 403, 'allowlisted browser Origin with wrong bridge token must be rejected')
+
+    const deniedBootOrigin = await fetch(`${localBase}/local/terminal-boot-ticket`, {
+      method: 'POST', headers: { Origin: DENIED_ORIGIN, 'X-Local-Bridge-Token': BRIDGE_TOKEN },
+    })
+    assert.equal(deniedBootOrigin.status, 403, 'non-allowlisted Origin must be rejected even with a valid bridge token')
 
     const denied = await postJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/qr-login/create`,
@@ -297,6 +324,7 @@ async function main(): Promise<void> {
     const options = await preflight(`${localBase}/local/qr-login/create`)
     assert.equal(options.status, 204)
     assert.equal(options.headers.get('access-control-allow-origin'), ALLOWED_ORIGIN)
+    assert.match(options.headers.get('access-control-allow-headers') ?? '', /X-Local-Bridge-Token/i)
     assert.equal(options.headers.get('access-control-allow-private-network'), 'true')
 
     const nullBody = await postJson<{ success: false; error: { code: string } }>(

@@ -18046,6 +18046,7 @@
     "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
@@ -18136,6 +18137,7 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
       "services/api/scripts/verify-assistant-voice.ts"
     ],
     "apps/kiosk/src/pages/assistant/AssistantPage.tsx": [
@@ -19793,6 +19795,7 @@
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
+      "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
@@ -20006,6 +20009,7 @@
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/services/api/screensaver.ts": [
+      "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts"
     ],
@@ -26704,6 +26708,27 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:kiosk-feedback-entry"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
+          "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx",
+          "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
+          "apps/kiosk/src/services/api/screensaver.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-field-safety"
       ],
       "wired": true
     },
