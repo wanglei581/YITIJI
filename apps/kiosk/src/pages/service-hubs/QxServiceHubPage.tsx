@@ -369,10 +369,11 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
           ) : null}
         </div>
 
-        {/* qx-hub-board--primary 是**显式**的主能力板标记：整页的竖向余量交给它吸收。
+        {/* qx-hub-board--primary 是**显式**的主能力板标记：整页余高的三分之一落在它上方（见样式）。
             这里原本写的是 CSS 选择器 `.qx-hub-board:first-of-type`，而 `:first-of-type`
-            按标签名算——`.qx-hub` 里第一个 <section> 是上面的目标分段，不是本板，
-            于是那条规则一次都没命中：六卡页（招聘会 / 面试）底部留下约 400px 死白。 */}
+            按标签名算——`.qx-hub` 里第一个 <section> 不是本板（当时是目标分段，现在是深色导言），
+            于是那条规则一次都没命中：六卡页（招聘会 / 面试）底部留下约 400px 死白。
+            data-card-count 给样式选排法：稿按卡片数排（六张两列三行、七张末张占满一行、八张末张跨两列）。 */}
         <section className="qx-hub-board qx-hub-board--primary" aria-labelledby="qx-hub-section-title">
           <div className="qx-hub-section-head">
             <h2 id="qx-hub-section-title">{spec.sectionTitle}</h2>
@@ -382,7 +383,9 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
           <div className="qx-hub-chips" aria-label="本页能确认到的范围">
             {chips.map((chip) => <span key={chip} className="qx-hub-chip">{chip}</span>)}
           </div>
-          <div className="qx-hub-grid">{spec.capabilities.map((cap) => renderCard(cap, 'grid'))}</div>
+          <div className="qx-hub-grid" data-card-count={spec.capabilities.length}>
+            {spec.capabilities.map((cap) => renderCard(cap, 'grid'))}
+          </div>
         </section>
 
         {/* 签约与权益：默认关闭（VITE_ENABLE_CONTRACT_REVIEW），开启后与简历能力分组展示，

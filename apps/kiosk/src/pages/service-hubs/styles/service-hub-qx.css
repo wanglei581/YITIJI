@@ -19,23 +19,27 @@
   white-space: nowrap;
 }
 
-/* .qx-body 已经给了左右 --qx-gutter，这里只补下边距，别再加一次左右内距。 */
+/* 左右留白由本页自己给（从 .qx-body 挪到 .qx-hub）：底部说明带照稿是左右贴边的满宽色带，
+   它在滚动容器里，只能在 .qx-hub 的内边距范围里往外伸——留白要是还在 .qx-body 上，色带伸出去就被滚动容器裁掉。 */
+.qx-stage:has([data-qx-page='service-hub']) > .qx-body {
+  padding: 0;
+}
 .qx-hub {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 16px;
-  padding-bottom: 12px;
+  padding: 16px var(--qx-gutter) 0;
   font-size: var(--qx-fs-body);
 }
 
+/* 圆角照稿：导言 36、卡片 30、常用入口与提示条 22、目标分段 24（稿「先选目标」层）。 */
 .qx-hub-hero {
   display: flex;
   align-items: center;
   gap: 20px;
   flex: none;
   padding: 20px 28px;
-  border-radius: 32px;
+  border-radius: 36px;
   background: var(--qx-deep);
   color: var(--qx-paper);
 }
@@ -125,7 +129,7 @@
   gap: 20px;
   padding: 18px 24px;
   border: 1px solid var(--qx-line);
-  border-radius: var(--qx-r);
+  border-radius: 24px;
   background: var(--qx-surface);
 }
 .qx-hub-goals-copy {
@@ -145,19 +149,24 @@
   line-height: 1.4;
   color: var(--qx-ink-3);
 }
+/* 目标按钮照稿（「先选目标」层）收窄内边距、字居中：政策服务台的四个目标一行放下，
+   标题「先告诉我你现在最想完成什么」不再被挤成两行、末字「么」单独掉到第二行。 */
 .qx-hub-goals-row {
   flex: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  max-width: 620px;
+  gap: 8px;
+  max-width: 640px;
 }
 .qx-hub-goal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 58px;
-  min-width: 132px;
-  padding: 0 18px;
+  min-width: 124px;
+  padding: 8px 10px;
   border: 1px solid var(--qx-line-2);
-  border-radius: var(--qx-r);
+  border-radius: 18px;
   background: var(--qx-paper);
   color: var(--qx-ink);
   font-size: 21px;
@@ -190,7 +199,7 @@
   min-height: 64px;
   padding: 12px 22px;
   border: 1px solid var(--qx-line);
-  border-radius: var(--qx-r);
+  border-radius: 22px;
   background: var(--qx-surface);
   color: var(--qx-ink-3);
 }
@@ -223,13 +232,12 @@
 .qx-hub-notice-copy {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
   font-size: var(--qx-fs-aux-lg);
   line-height: 1.45;
 }
+/* 稿里粗体首句与正文接排成一段（一行放得下就一行），不拆成上下两行。 */
 .qx-hub-notice-copy b {
+  margin-right: 8px;
   color: var(--qx-ink);
   font-size: var(--qx-fs-aux-lg);
 }
@@ -242,7 +250,7 @@
   min-width: 132px;
   padding: 0 22px;
   border: 1px solid var(--qx-line-2);
-  border-radius: var(--qx-r);
+  border-radius: 18px;
   background: var(--qx-surface);
   color: var(--qx-ink);
   font-size: 21px;
@@ -250,25 +258,24 @@
   cursor: pointer;
 }
 
-/* 能力网格吸收整页的竖向余量。
-   1080×1920 上固定行高会在底部留一条空带（首版实测约 200px 的空白），
-   看着像「页面没加载完」。把余量交给卡片：行高有下限、上不封顶。 */
 .qx-hub-board {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-/* 主能力板吸收整页余量。
-   判据必须是**显式类名**：此前写的是 `.qx-hub-board:first-of-type`，而 `:first-of-type`
-   按标签名算——`.qx-hub` 里第一个 <section> 是「先告诉我你现在最想完成什么」那块，
-   本板是第二个，于是这条规则一次都没命中。后果在 1080×1920 上直接可见：
-   六卡页（招聘会 / 面试）只排两行 236px，底部留下约 400px 死白。
+/* 余高怎么分（稿 16 的 9/28 做法）：卡片行高按内容规划（见下面 .qx-hub-grid），
+   一屏剩下的高度平分到三处——「可办理事项」上方、卡片与常用入口之间、常用入口下方。
+   三处都是 auto 外边距，不加占位块；内容放不下时 auto 归零，整页照常滚动。
 
-   `flex: 1 0 auto`（而不是 `flex: 1`）：可以长，但**不许缩**。
-   `.qx-hub` 是滚动容器，允许收缩会让九卡页的网格被压进比 grid 最小行高还矮的盒子里，
-   内容溢出后压到下面的「常用入口」上。 */
-.qx-hub-board--primary {
-  flex: 1 0 auto;
+   早先是反过来：主能力板与网格 `flex: 1 0 auto`、行高 `minmax(196px, 1fr)`，整页余量全塞进卡片，
+   六张卡的服务台每张被拉到约 400px 高，文字下面空一大截（稿里叫「空盒」）。
+
+   主能力板的判据仍是**显式类名**：更早写过 `.qx-hub-board:first-of-type`，而 `:first-of-type`
+   按标签名算——`.qx-hub` 里第一个 <section> 是深色导言，这条规则一次都没命中。 */
+.qx-hub-board--primary,
+.qx-hub-quick-section,
+.qx-hub-goals {
+  margin-top: auto;
 }
 .qx-hub-section-head {
   display: flex;
@@ -324,32 +331,44 @@
   color: var(--qx-teal-d);
 }
 
-/* 稿是三列。九张卡正好 3×3；八张时最后一张跨两列，不留孤儿。 */
+/* 卡片排法照稿按张数定（data-card-count 由页面给）：
+   九张 3×3；八张三列、末张跨两列；七张三列、末张占满一行；六张两列三行（三列两行会把每张拉成空盒）。
+   行高「按内容定」：至少装得下内容（auto），有富余时长到稿的规划高度就停——
+   八、九张一行 250，六张 236，七张的末行只有一行说明、180。再多出来的高度归上面三处 auto 外边距。 */
 .qx-hub-grid {
-  flex: 1 0 auto;
+  --qx-hub-row: 250px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: minmax(196px, 1fr);
-  gap: 12px;
+  grid-auto-rows: minmax(auto, var(--qx-hub-row));
+  gap: 16px;
 }
-.qx-hub-grid > :nth-child(8):last-child,
+.qx-hub-grid[data-card-count='6'] {
+  --qx-hub-row: 236px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.qx-hub-grid[data-card-count='7'] {
+  grid-template-rows: repeat(2, minmax(auto, var(--qx-hub-row))) minmax(auto, 180px);
+}
 .qx-hub-grid > :nth-child(7):last-child {
+  grid-column: 1 / -1;
+}
+.qx-hub-grid > :nth-child(8):last-child {
   grid-column: span 2;
 }
 .qx-hub-grid--wide {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* 不设 min-height：卡高交给上面的行高规划，卡里不再垫空白。 */
 .qx-hub-card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  min-height: 196px;
-  padding: 16px;
+  gap: 9px;
+  padding: 18px;
   text-align: left;
   border: 1px solid var(--qx-line);
-  border-radius: var(--qx-r);
+  border-radius: 30px;
   background: var(--qx-surface);
   color: var(--qx-ink);
   cursor: pointer;
@@ -411,11 +430,21 @@
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
-  border-radius: var(--qx-r-s);
-  background: var(--qx-muted-bg);
-  color: var(--qx-ink-2);
+  border-radius: 10px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
   font-weight: 700;
   white-space: nowrap;
+}
+/* 角标与图标同色系（照稿）：AI / 本人台账偏紫、信息偏蓝、设备主青；不可用卡的角标回到中性灰（见下）。 */
+.qx-hub-card[data-kind='ai'] .qx-hub-badge,
+.qx-hub-card[data-kind='account'] .qx-hub-badge {
+  background: var(--qx-plum-soft);
+  color: var(--qx-plum-d);
+}
+.qx-hub-card[data-kind='info'] .qx-hub-badge {
+  background: var(--qx-slate-soft);
+  color: var(--qx-slate-d);
 }
 .qx-hub-go {
   display: inline-flex;
@@ -446,6 +475,10 @@
   background: var(--qx-muted-line);
   color: var(--qx-muted-ink);
 }
+.qx-hub-card.is-unavailable .qx-hub-badge {
+  background: var(--qx-muted-bg);
+  color: var(--qx-ink-2);
+}
 /* 不可用卡的纵向间距收紧一档。
    下面让原因独占一行，每张卡因此多出约 14px；八卡 / 七卡页在降级态会被顶出 1920
    （实测溢出 39px，底部的合规声明被裁掉 12px）。这里收回同样的量，换来
@@ -469,6 +502,23 @@
   font-size: var(--qx-fs-aux);
   font-weight: 700;
   text-align: left;
+}
+/* 宽卡放得下：跨列的卡（七张的末张、八张的末张）和六张卡两列时的每一张，原因照稿回到「进入」的位置，
+   与角标同一行、靠右。否则整行宽卡只有左边一列字，右半边空成一片。
+   三列的窄卡仍让原因独占一行（稿在那里把角标和原因挤成两行半，那一处不照搬）；窄屏单列时同样独占一行。 */
+@media (min-width: 901px) {
+  .qx-hub-grid > :nth-child(7):last-child .qx-hub-card-foot,
+  .qx-hub-grid > :nth-child(8):last-child .qx-hub-card-foot,
+  .qx-hub-grid[data-card-count='6'] .qx-hub-card-foot {
+    flex-wrap: nowrap;
+  }
+  .qx-hub-grid > :nth-child(7):last-child .qx-hub-why,
+  .qx-hub-grid > :nth-child(8):last-child .qx-hub-why,
+  .qx-hub-grid[data-card-count='6'] .qx-hub-why {
+    flex: 0 1 auto;
+    margin-left: auto;
+    text-align: right;
+  }
 }
 
 /* 常用入口：稿的 quick 区，三列虚线卡，通向「我的」台账与邻域服务台。 */
@@ -503,7 +553,7 @@
   padding: 0 20px;
   text-align: left;
   border: 1px dashed var(--qx-line-2);
-  border-radius: var(--qx-r);
+  border-radius: 22px;
   background: var(--qx-surface);
   color: var(--qx-ink);
   cursor: pointer;
@@ -535,16 +585,18 @@
   font-weight: 700;
 }
 
-/* 合规与诚实性声明区：逐字来自稿，三列（合规边界 / 能力口径 / 隐私清场）。 */
+/* 合规与诚实性声明区：逐字来自稿，三列（合规边界 / 能力口径 / 隐私清场）。
+   照稿是压在底部导航上面、左右贴边的满宽色带（负外边距伸进 .qx-hub 的左右内边距）。
+   每列因此宽出约 20px，「隐私」一句两行放下，不再把「息。」单独甩到第三行。 */
 .qx-hub-truth {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
-  gap: 16px;
+  gap: 20px;
   flex: none;
-  padding: 14px 20px;
-  border: 1px solid var(--qx-line);
-  border-radius: var(--qx-r);
-  background: var(--qx-paper);
+  margin: 0 calc(-1 * var(--qx-gutter));
+  padding: 20px var(--qx-gutter);
+  border-top: 1px solid var(--qx-line);
+  background: color-mix(in srgb, var(--qx-paper) 55%, var(--qx-muted-bg));
   color: var(--qx-ink-3);
   font-size: var(--qx-fs-aux-lg);
   line-height: 1.45;
@@ -565,6 +617,16 @@
 
 /* 窄屏（手机 / 桌面浏览器）退化成单列，触控尺寸不变。 */
 @media (max-width: 900px) {
+  /* 导言头像移到文字上方，说明、分区标题与能力标签可换行：此前 390 宽下导言正文被挤成一两字一行、右侧被裁。 */
+  .qx-hub-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .qx-hub-hero-note,
+  .qx-hub-section-head,
+  .qx-hub-chips {
+    flex-wrap: wrap;
+  }
   .qx-hub-goals {
     flex-direction: column;
     align-items: stretch;
@@ -573,17 +635,15 @@
     max-width: none;
   }
   .qx-hub-grid,
+  .qx-hub-grid[data-card-count='6'],
   .qx-hub-quick,
   .qx-hub-truth {
     grid-template-columns: minmax(0, 1fr);
   }
-  /* 窄屏是单列纵向滚动，没有「整页余量」可吸收；再让行高按 1fr 拉伸会把每张卡
-     撑成一屏高。恢复内容高度。 */
-  .qx-hub-board--primary,
-  .qx-hub-grid {
-    flex: none;
-  }
-  .qx-hub-grid {
+  /* 窄屏是单列纵向滚动，没有「一屏余高」可分；卡片一律按内容高，也不再有跨列。 */
+  .qx-hub-grid,
+  .qx-hub-grid[data-card-count='7'] {
+    grid-template-rows: none;
     grid-auto-rows: auto;
   }
   .qx-hub-grid > :nth-child(8):last-child,

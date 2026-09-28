@@ -155,7 +155,8 @@ function resolveView(params: URLSearchParams, keys: readonly string[]): HelpView
   return keys.includes(topic) ? 'topic' : 'no-result'
 }
 
-function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onNavigate: (route: string) => void }) {
+// 答案里不再各挂一颗入口按钮：照稿 06，本类的入口收进下面「02 直接去办」一排（同一批按钮，只挪位置）。
+function QaRow({ item, answerId }: { item: QA; answerId: string }) {
   return (
     <div className="k1-help-row is-open">
       <button type="button" aria-expanded={true} aria-controls={answerId} className="k1-help-toggle">
@@ -164,11 +165,6 @@ function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onN
       </button>
       <div id={answerId} className="k1-help-answer">
         <p>{item.a}</p>
-        {item.link ? (
-          <button type="button" onClick={() => onNavigate(item.link!.route)} className="k1-help-link">
-            {item.link.label}<ChevronRightIcon aria-hidden="true" />
-          </button>
-        ) : null}
       </div>
     </div>
   )
@@ -239,6 +235,10 @@ export function HelpCenterPage() {
   const topicKey = params.get('topic') ?? ''
   const topic = cards.find((card) => card.key === topicKey)
   const visibleFaq = faq.filter((item) => item.categoryKey === topicKey)
+  // 本类问答自带的入口，按出现顺序去重：照稿收进「02 直接去办」一排。
+  const topicLinks = visibleFaq
+    .flatMap((item) => (item.link ? [item.link] : []))
+    .filter((link, index, all) => all.findIndex((other) => other.route === link.route) === index)
   const home = () => navigate('/')
   const clearTopic = () => setParams({})
   const handleNavigate = (route: string) => {
@@ -358,10 +358,22 @@ export function HelpCenterPage() {
               <div className="k1-help-faq-list" aria-label="常见问题">
                 {[{ key: topicKey, items: visibleFaq }].map(section => (
                   section.items.map((item, itemIndex) => (
-                    <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${itemIndex}`} onNavigate={handleNavigate} />
+                    <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${itemIndex}`} />
                   ))
                 ))}
               </div>
+              {topicLinks.length > 0 ? (
+                <>
+                  <SectionHead no="02" title="直接去办" hint="看完就能动手" />
+                  <div className="k1-help-links">
+                    {topicLinks.map((link) => (
+                      <button key={link.route} type="button" onClick={() => handleNavigate(link.route)} className="k1-help-link">
+                        {link.label}<ChevronRightIcon aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
               <div className="k1-help-miss">
                 <h3><InfoIcon aria-hidden="true" />这里没答上你的问题</h3>
                 <p>换一个分类再看看，或者用下面的按钮把问题告诉小青。退费、开票和机器故障只能找现场工作人员，本页不会替你转达。</p>
@@ -397,7 +409,7 @@ export function HelpCenterPage() {
             </>
           ) : null}
 
-          {view === 'default' || view === 'topic' ? <SelfHelp no={view === 'topic' ? '03' : '02'} /> : null}
+          {view === 'default' || view === 'topic' ? <SelfHelp no={view === 'topic' && topicLinks.length > 0 ? '03' : '02'} /> : null}
           {view === 'default' ? <HumanDesk no="03" /> : null}
           {view === 'no-result' ? <HumanDesk no="02" /> : null}
           {view === 'unavailable' ? <HumanDesk no="03" /> : null}

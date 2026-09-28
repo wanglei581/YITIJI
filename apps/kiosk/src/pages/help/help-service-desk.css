@@ -64,7 +64,7 @@
   line-height: 1.35;
   color: color-mix(in srgb, var(--qx-paper) 92%, transparent);
 }
-.k1-help-center .k1-help-hero-steps b {
+.k1-help-center .qx-pagehead .k1-help-hero-steps b {
   display: block;
   margin-bottom: 2px;
   color: var(--qx-emerald);
@@ -133,7 +133,6 @@
   align-items: center;
   gap: 8px;
   min-height: var(--qx-btn-h);
-  margin-top: 12px;
   padding: 0 22px;
   border: 1px solid var(--qx-line-2);
   border-radius: 20px;
@@ -208,41 +207,52 @@
 .k1-help-center .k1-help-truth b { display: block; margin-bottom: 4px; color: var(--qx-ink); font-weight: 700; }
 .k1-help-center .k1-help-filing { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 4px 0 0; color: var(--qx-ink-3); font-size: var(--qx-fs-note); line-height: 1.5; text-align: center; }
 
-/* 默认态多一张「我的记录」，两列会多出一行孤卡，把找人区顶到动作条后面。
-   七张排成 2+2+3，八张（托管打开、岗位类也在）排成 3+3+2。字号不动。 */
-.k1-help-center[data-help-view='default'] .k1-help-scroll { gap: 8px; padding: 6px 0 4px; }
-.k1-help-center[data-help-view='default'] .k1-help-sec-head { margin-top: 0; }
-.k1-help-center[data-help-view='default'] .k1-help-filters { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
-.k1-help-center[data-help-view='default'] .k1-help-filters > button {
-  grid-column: span 3;
-  min-height: 120px;
-  padding: 10px 16px;
-  gap: 4px;
-}
-.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(7):last-child) > button:nth-child(n + 5) { grid-column: span 2; }
-.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(7):last-child) > button:nth-child(n + 5) .k1-help-cat-top { gap: 8px; }
-.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(7):last-child) > button:nth-child(n + 5) .k1-help-cat-icon { width: 40px; height: 40px; border-radius: 14px; }
-.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(7):last-child) > button:nth-child(n + 5) strong { white-space: nowrap; }
-.k1-help-center[data-help-view='default'] .k1-help-filters button small { word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty; }
-.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(8):last-child) > button { grid-column: span 2; }
-.k1-help-center[data-help-view='default'] .k1-help-filters:has(> button:nth-child(8):last-child) > button:nth-child(n + 7) { grid-column: span 3; }
-.k1-help-center[data-help-view='default'] .k1-help-cat-icon { width: 48px; height: 48px; border-radius: 16px; }
-.k1-help-center[data-help-view='default'] .k1-help-cat-icon svg { width: 24px; height: 24px; }
-.k1-help-center[data-help-view='default'] .k1-help-steps,
-.k1-help-center[data-help-view='default'] .k1-help-people { gap: 10px; }
-.k1-help-center[data-help-view='default'] .k1-help-steps li,
-.k1-help-center[data-help-view='default'] .k1-help-contact { padding: 10px 14px; }
+/* 余高分到区块之间（稿 06 的 9/28 做法：各区块竖向均匀拉开，空白不再堆在按钮条上面）：
+   每个分区标题与备案号行上方各分一份；放不下时 auto 归零，照常滚动。不加区块、不放大字。
+   「这里没答上你的问题」紧跟在「直接去办」后面，不单独分一份：两块之间再拉开，右半边就空成一片。 */
+.k1-help-center .k1-help-scroll > .k1-help-sec-head,
+.k1-help-center .k1-help-scroll > .k1-help-filing { margin-top: auto; }
+/* 分类照稿两列；七张（托管 a 多一张「我的记录」）时末张占满一行，不留空格子。 */
+.k1-help-center .k1-help-filters > button:nth-child(7):last-child { grid-column: 1 / -1; }
+.k1-help-center .k1-help-links { display: flex; flex-wrap: wrap; gap: 14px; }
+.k1-help-center .k1-help-miss { padding: 24px 28px; }
+.k1-help-center[data-help-view='topic'] .qx-pagehead { padding: 38px 48px; }
+.k1-help-center[data-help-view='topic'] .qx-pagehead p { max-width: 820px; text-wrap: pretty; }
+/* 没有这个分类 / 帮助没显示出来：页头照稿是一张提醒卡（麦色底、细边、大圆角），不是光秃秃一行标题。 */
+.k1-help-center[data-help-view='no-result'] .qx-pagehead,
+.k1-help-center[data-help-view='unavailable'] .qx-pagehead { flex-direction: column; align-items: stretch; gap: 12px; margin: 14px var(--qx-gutter) 0; padding: 32px 36px; border: 1px solid var(--qx-line-2); border-radius: 32px; background: var(--qx-wheat-soft); }
+.k1-help-center[data-help-view='no-result'] .qx-pagehead h1,
+.k1-help-center[data-help-view='unavailable'] .qx-pagehead h1 { font-family: var(--qx-sans); font-size: 30px; }
+.k1-help-center[data-help-view='no-result'] .qx-pagehead h1::before,
+.k1-help-center[data-help-view='unavailable'] .qx-pagehead h1::before { height: 28px; background: var(--qx-wheat-d); }
+.k1-help-center[data-help-view='no-result'] .qx-pagehead p,
+.k1-help-center[data-help-view='unavailable'] .qx-pagehead p { line-height: 1.62; text-wrap: pretty; }
+/* 默认态：两列四行分类、自助三步、找人两卡都要落在一屏里，卡片内边距收一档（字号不动）。 */
+.k1-help-center[data-help-view='default'] .k1-help-scroll { gap: 10px; padding: 6px 0 8px; }
+.k1-help-center[data-help-view='default'] .k1-help-filters { gap: 12px; }
+.k1-help-center[data-help-view='default'] .k1-help-filters > button { min-height: 120px; padding: 14px 20px; gap: 6px; }
+.k1-help-center[data-help-view='default'] .k1-help-steps li { padding: 14px 16px; }
+.k1-help-center[data-help-view='default'] .k1-help-contact { padding: 16px 18px; }
 .k1-help-center[data-help-view='default'] .k1-help-steps p,
-.k1-help-center[data-help-view='default'] .k1-help-contact p { margin-top: 4px; line-height: 1.35; }
-.k1-help-center[data-help-view='default'] .k1-help-filing { margin: 0; }
+.k1-help-center[data-help-view='default'] .k1-help-contact p { margin-top: 4px; line-height: 1.4; }
 .k1-help-center[data-help-view='default'] .qx-pagehead { margin-top: 10px; padding: 18px 28px 14px; gap: 8px; }
 .k1-help-center[data-help-view='default'] .qx-pagehead p { gap: 8px; }
+/* 没有这个分类 / 帮助没显示出来：卡片按原稿的内边距与行距排舒展。 */
+.k1-help-center[data-help-view='no-result'] .k1-help-contact,
+.k1-help-center[data-help-view='unavailable'] .k1-help-contact { padding: 24px 26px; }
+.k1-help-center[data-help-view='no-result'] .k1-help-contact p,
+.k1-help-center[data-help-view='unavailable'] .k1-help-contact p { line-height: 1.55; }
+.k1-help-center[data-help-view='no-result'] .k1-help-filters { gap: 18px; }
+.k1-help-center[data-help-view='no-result'] .k1-help-filters > button { padding: 28px; gap: 12px; }
+/* 「按顺序试这三条」是先后顺序：排成三行，每行左边步骤名、右边做法。 */
+.k1-help-center[data-help-view='unavailable'] .k1-help-steps { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.k1-help-center[data-help-view='unavailable'] .k1-help-steps li { grid-template-columns: auto 244px minmax(0, 1fr); column-gap: 12px; padding: 26px 30px; }
+.k1-help-center[data-help-view='unavailable'] .k1-help-steps p { grid-column: auto; margin: 0 0 0 14px; line-height: 1.55; }
 .k1-help-center .k1-help-filing a { display: inline-flex; align-items: center; min-height: var(--qx-tap-min); color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 760px) {
   .k1-help-center .qx-body { padding: 0 16px; }
-  .k1-help-center[data-help-view='default'] .qx-pagehead,
-  .k1-help-center[data-help-view='topic'] .qx-pagehead { margin: 12px 16px 0; padding: 20px 16px; }
+  .k1-help-center[data-help-view] .qx-pagehead { margin: 12px 16px 0; padding: 20px 16px; }
   .k1-help-center .k1-help-hero-steps,
   .k1-help-center .k1-help-filters,
   .k1-help-center .k1-help-steps,
@@ -252,8 +262,9 @@
   .k1-help-center .k1-help-filters,
   .k1-help-center .k1-help-steps,
   .k1-help-center .k1-help-people { display: grid; grid-template-columns: 1fr; }
-  .k1-help-center[data-help-view='default'] .k1-help-filters { grid-template-columns: 1fr; }
-  .k1-help-center[data-help-view='default'] .k1-help-filters > button { grid-column: auto; min-height: 88px; }
+  .k1-help-center[data-help-view] .k1-help-filters > button { grid-column: auto; min-height: 88px; }
+  .k1-help-center[data-help-view='unavailable'] .k1-help-steps li { grid-template-columns: auto minmax(0, 1fr); padding: 16px 18px; }
+  .k1-help-center[data-help-view='unavailable'] .k1-help-steps p { grid-column: 1 / -1; margin: 6px 0 0; }
   .k1-help-center .k1-help-actions button,
   .k1-help-center .k1-help-actions .qx-ai-help { min-height: 56px; font-size: var(--qx-fs-body); }
   .k1-help-center .k1-help-sec-head { flex-direction: column; align-items: flex-start; }
