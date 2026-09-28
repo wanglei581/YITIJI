@@ -54,10 +54,10 @@ export default function SessionTimeoutPage() {
     inDomain('/interview') ||
     EDITING_ROUTES.includes(sourcePath)
   const sessionImpact = isHardware
-    ? '已创建的打印/扫描任务会继续运行，终端页面将清除'
+    ? '已创建的打印/扫描任务会继续运行，这台机器上的页面将清除'
     : isAiWork
       ? '未保存的填写、编辑或练习内容会清除'
-      : '登录状态和本机临时会话将清除'
+      : '登录状态和这台机器上的这次使用将清除'
   const { user } = useAuth()
   const canContinue = warning?.canContinue === true
   // 匿名与已登录的后果**不一样**，必须分开说：匿名这一趟的任务清掉就没了，
@@ -66,7 +66,7 @@ export default function SessionTimeoutPage() {
   const isAnonymous = user === null
   const accountLabel = user
     ? [user.nickname, user.phoneMasked].filter(Boolean).join(' · ')
-    : '当前临时会话'
+    : '这次临时使用'
   const sourceKnown = sourcePath !== '' && sourcePath !== '/'
   const state = deriveSessionGuardState({ clearing: false, canContinue })
   const pill = SESSION_GUARD_PILL[state]
@@ -80,8 +80,8 @@ export default function SessionTimeoutPage() {
     >
       <KioskStageFit>
         <QxPageFrame
-          title="会话守卫"
-          subtitle="公共终端闲置后的隐私清场。倒计时由本机时钟执行。"
+          title="使用时限"
+          subtitle="这台机器闲置后会清掉这次使用。倒计时由本机时钟执行。"
           status={pill}
           ctabar={
             <>
@@ -92,7 +92,7 @@ export default function SessionTimeoutPage() {
                 data-testid="session-guard-clear"
                 onClick={hardClear}
               >
-                结束并清除本机会话
+                结束并清除这台机器上的这次使用
               </button>
               {canContinue ? (
                 <button

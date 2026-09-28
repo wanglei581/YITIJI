@@ -42,10 +42,10 @@ async function parseEnvelope<T>(res: Response, token?: string | null): Promise<T
     throw new ApiHttpError(error.code, error.message, res.status)
   }
   if (body.success === false) {
-    const error = extractError(body, '求职材料接口返回失败')
+    const error = extractError(body, '这次没读到求职材料')
     throw new ApiHttpError(error.code, error.message, res.status)
   }
-  if (!body.data) throw new ApiHttpError('JOB_MATERIAL_EMPTY', '求职材料接口返回数据为空', res.status)
+  if (!body.data) throw new ApiHttpError('JOB_MATERIAL_EMPTY', '这次没读到求职材料', res.status)
   return body.data
 }
 

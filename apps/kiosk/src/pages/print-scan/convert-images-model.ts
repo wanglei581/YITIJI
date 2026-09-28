@@ -206,7 +206,7 @@ export function statusForPhase(
     if (error.kind === 'format') return { tone: 'warn', label: '有图片未能加入 · 格式' }
     if (error.kind === 'too-large') return { tone: 'warn', label: '有图片未能加入 · 大小' }
     if (error.kind === 'upload-failed') return { tone: 'bad', label: '有图片没传上去' }
-    if (error.kind === 'source-unavailable') return { tone: 'bad', label: '服务端取不到其中一张' }
+    if (error.kind === 'source-unavailable') return { tone: 'bad', label: '系统取不到其中一张' }
     if (error.kind === 'source-expired') return { tone: 'warn', label: '有图片的访问链接过期' }
     if (error.kind === 'total-too-large') return { tone: 'warn', label: '这一批合计超过 40 MB' }
     if (error.kind === 'dimensions') return { tone: 'bad', label: '有图片像素超出上限' }
@@ -237,7 +237,7 @@ export function advisorCopy(
     return { ask: '正在合成。', doing: '一次性请求，没有进度回传。结果出来之前我不说做完了。' }
   }
   if (phase === 'rechecking') {
-    return { ask: '正在再查一次。', doing: '同一个请求标识，没有新建请求。这一屏不会自己变成完成。' }
+    return { ask: '正在再查一次。', doing: '还是用同一个标识，没有另起一次。这一屏不会自己变成完成。' }
   }
   if (phase === 'completed') {
     return { ask: '合好了。', doing: `${imageCount} 张图 ${imageCount} 页，页序和你排的一样。` }
@@ -252,13 +252,13 @@ export function advisorCopy(
     return { ask: '这张太大了。', doing: '单张 10 MB 以内。它没进列表，顺序没被打乱。' }
   }
   if (error?.kind === 'upload-failed') {
-    return { ask: '这张没传上去。', doing: '没拿到服务端确认。它没进列表，已有的还在。' }
+    return { ask: '这张没传上去。', doing: '没拿到系统确认。它没进列表，已有的还在。' }
   }
   if (error?.kind === 'in-progress') {
     return { ask: '上一次还在跑。', doing: '同一个标识下已经有一次在合成。不新建请求，拿同一个标识再查。' }
   }
   if (error?.kind === 'result-unknown') {
-    return { ask: '结果不知道。', doing: '回执没送到。不能直接再发一次，得拿同一个标识去查。' }
+    return { ask: '结果不知道。', doing: '结果没送到。不能直接再发一次，得拿同一个标识去查。' }
   }
   if (error?.kind === 'known-failed') {
     return { ask: '这次明确失败。', doing: '图片和顺序都还在，不用重传。用同一个标识原样重试。' }

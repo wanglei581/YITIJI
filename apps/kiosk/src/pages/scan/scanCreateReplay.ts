@@ -127,7 +127,7 @@ export async function replayCreateUntilOutcomeKnown(
     }
     throw new ApiHttpError(
       SCAN_CREATE_REPLAY_UNRESOLVED,
-      '无法确认这次安全重扫是否已经建成会话',
+      '无法确认这次安全重扫是否已经建好',
       0,
     )
   }

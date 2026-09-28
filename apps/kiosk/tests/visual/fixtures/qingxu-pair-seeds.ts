@@ -585,7 +585,7 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
     }
     if (state === 'phone-cancel-requesting') api.respondWith('DELETE', `/api/v1/upload-sessions/${UPLOAD_ID}`, () => hang())
     if (state === 'phone-cancel-failed') {
-      api.respond('DELETE', `/api/v1/upload-sessions/${UPLOAD_ID}`, { status: 500, json: { error: { code: 'UPLOAD_CANCEL_FAILED', message: '这次会话没能取消' } } })
+      api.respond('DELETE', `/api/v1/upload-sessions/${UPLOAD_ID}`, { status: 500, json: { error: { code: 'UPLOAD_CANCEL_FAILED', message: '这次上传没能取消' } } })
     }
   }
   if (state.startsWith('usb-') && state !== 'usb-agent-offline') {

@@ -601,8 +601,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         cancelSessionOnce(createdIdRef.current, controlTokenRef.current)
       }
       setFailure({
-        title: '扫描会话已过期',
-        description: '当前会话已超过服务端返回的有效期，本页已停止继续操作。请返回扫描首页重新创建。',
+        title: '这次扫描已过期',
+        description: '这一次已超过系统给出的有效期，本页已停止继续操作。请返回扫描首页重新创建。',
       })
       setPhase('expired')
     }
@@ -738,7 +738,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       page="scan-settings"
       state="panel-instruction"
       title="扫描指引"
-      subtitle={<><b>扫描任务已创建</b>，请仅按服务端返回的当前会话指引操作。</>}
+      subtitle={<><b>扫描任务已创建</b>，请只按系统给出的这一次操作说明来做。</>}
       status={{ tone: 'ok', label: '第 2 步 · 去面板操作' }}
       ctabar={
         <ScanCta>
@@ -751,13 +751,13 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         </ScanCta>
       }
     >
-      <ScanSec no="01" title="照着做：全在机器面板上" hint="服务端下发原文，本机不改写" grow>
+      <ScanSec no="01" title="照着做：全在机器面板上" hint="下面是原文，本机不改写" grow>
         <ScanPanelMock
           instructions={instructions.map((instruction) => instruction)}
           scanLabel={SCAN_TYPE_LABELS[scanType]}
         />
       </ScanSec>
-      <ScanSec no="02" title="现在在第一段" hint="链路位置，不是百分比">
+      <ScanSec no="02" title="现在在第一段" hint="流程走到哪，不是百分比">
         <ScanChain active={0} />
       </ScanSec>
       {/* 「这次会话」整张卡是纯展示，已搬去 ScanSettingsStatusView。restoredFromStorage 必须喂

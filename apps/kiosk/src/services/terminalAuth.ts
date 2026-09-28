@@ -98,7 +98,7 @@ async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promis
   }, timeoutMs)
   if (!response.ok) throw await asHttpError(response)
   const payload = (await response.json()) as { sessionToken?: string }
-  if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
+  if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
   const sessionToken = payload.sessionToken
   try {
     clearSensitiveStateForNewTerminalSession()
@@ -142,7 +142,7 @@ async function refreshOnce(timeoutMs: number): Promise<void> {
   }, timeoutMs)
   if (!response.ok) throw await asHttpError(response)
   const payload = (await response.json()) as { sessionToken?: string }
-  if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
+  if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
   saveToken(payload.sessionToken)
 }
 
@@ -174,7 +174,7 @@ function retryRefresh(): Promise<void> {
 async function retryRefreshOnce(): Promise<void> {
   setState('checking')
   const startedAt = Date.now()
-  let lastError: unknown = new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
+  let lastError: unknown = new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
   for (const delay of [0, ...RETRY_DELAYS_MS]) {
     if (delay > 0) {
       if (Date.now() + delay - startedAt > RETRY_WINDOW_MS) break
@@ -310,7 +310,7 @@ async function awaitReadySessionOrFailClosed(): Promise<void> {
       /* 失败原因不外传，落到下面统一 fail-closed */
     }
   }
-  if (state !== 'ready') throw new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
+  if (state !== 'ready') throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
 }
 
 export interface TerminalProtectedFetchInit extends RequestInit {

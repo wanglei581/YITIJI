@@ -91,10 +91,10 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             : { tone: 'ok' as const, label: '可创建扫描任务 · 需面板操作' }
 
   const subtitle = usbPanel
-    ? '这是打印机自己的独立能力，不经过平台扫描会话'
+    ? '这是打印机自己的独立能力，不经过这台机器上的扫描'
     : blocked
       ? '当前无法创建扫描任务，请查看说明或改用其他方式'
-      : '请先选择扫描类型；本页尚未创建任务。下一步会创建真实扫描会话'
+      : '请先选择扫描类型；本页尚未创建任务。下一步会真实建立这次扫描'
 
   return (
     <ScanWorkbenchShell
@@ -106,7 +106,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       layout={blocked ? 'spread' : 'stack'}
       facts={
         usbPanel
-          ? ['不创建平台任务', '文件只在你的 U 盘', 'Windows / 奔图真机尚未验收']
+          ? ['不创建平台任务', '文件只在你的 U 盘', '暂未开通']
           : blocked
             ? undefined
             : ['这台机器的接收目录已由管理员配好，面板上直接选就行，不用你填任何地址。']
@@ -166,7 +166,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 navigate('/scan?stage=settings', { state: { scanType: selected } })
               }}
             >
-              下一步 · 创建扫描会话
+              下一步 · 建立这次扫描
             </button>
           </ScanCta>
         )
@@ -174,7 +174,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
     >
       {usbPanel ? (
         <>
-          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过平台扫描会话" grow>
+          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过这台机器上的扫描" grow>
             <div className="sw-grid2">
               <ScanNoteCard
                 title="面板上怎么做"
@@ -195,14 +195,14 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   '不创建平台扫描任务，所以本页没有任务编号。',
                   '不显示扫描进度或结果，成功失败只看打印机面板。',
                   '不进入「我的文档」，文件只保存在你的 U 盘。',
-                  '当前尚未完成 Windows / 奔图真机验收，不能把这条说明当成真机通过。',
+                  '这条能力暂未开通，不能把这条说明当成已经可以用。',
                 ]} />
               </ScanNoteCard>
             </div>
           </ScanSec>
           <ScanSec no="02" title="完成之后怎么继续" hint="U 盘里的文件要重新导入才能在本机办理">
             <div className="sw-grid2">
-              <ScanNoteCard title="要打印或继续加工" foot="导入链路仍以 Terminal Agent 与本地令牌状态为准。">
+              <ScanNoteCard title="要打印或继续加工" foot="能不能从 U 盘导入，仍以这台机器的本机程序是否连上为准。">
                 <p>回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。</p>
               </ScanNoteCard>
               <ScanNoteCard title="面板没有这个选项" foot="本页不假设所有奔图固件都提供相同菜单。">
@@ -224,10 +224,10 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           >
             <p>
               {gate === 'loading'
-                ? '正在读取本终端的扫描服务配置。'
+                ? '正在读取这台机器的扫描配置。'
                 : gate === 'unknown'
                   ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
-                  : (blockedNote ?? '管理员尚未对本终端开放扫描服务，或该能力处于维护 / 待验收状态。')}
+                  : (blockedNote ?? '工作人员还没有给这台机器开通扫描，或这项能力正在维护、暂未开通。')}
             </p>
           </ScanStatusPanel>
           <ScanSec no="01" title="下一步" hint="扫描之外的路照常可用">
@@ -235,11 +235,11 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
               <ScanNoteCard title="你现在还能做什么">
                 <ScanPlan items={[
                   '上传文件打印：手机 / U 盘里的现成文件仍可打印。',
-                  '本机扫描任务：当前终端扫描能力未开放或状态未知。',
-                  '改用面板扫描到 U 盘：不经过平台会话，文件只进你的 U 盘。',
+                  '本机扫描：这台机器的扫描还没开通，或状态还不知道。',
+                  '改用面板扫描到 U 盘：不经过这台机器上的扫描，文件只进你的 U 盘。',
                 ]} />
               </ScanNoteCard>
-              <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查终端能力配置。">
+              <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查这台机器是否开通了扫描。">
                 <p>本页不会假装扫描仪已经就绪，也不会在能力未知时创建任务。</p>
                 <div className="sw-cta-row sw-note-actions">
                   <button
@@ -266,7 +266,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           <ScanSec no="01" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
             <ScanTypeCards selected={selected} onPick={setSelected} />
           </ScanSec>
-          <ScanSec no="02" title="这条链路长这样" hint="四段都走完，文件才到你手上">
+          <ScanSec no="02" title="这个流程是这样" hint="四段都走完，文件才到你手上">
             <ScanChain active={-1} />
           </ScanSec>
           <ScanSec no="03" title="动手之前先看两件事" grow>
@@ -275,17 +275,17 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 title="为什么屏幕上没有「开始扫描」"
                 foot="合同类材料的扫描从「合同审阅」工作台发起，本屏不重复开口子。"
               >
-                <p>这台一体机的扫描<b>只能在奔图自己的操作面板上启动</b>，网页不能远程驱动扫描仪。本机负责建会话、转达服务端指引、等文件回传。</p>
+                <p>这台一体机的扫描<b>只能在奔图自己的操作面板上启动</b>，网页不能远程驱动扫描仪。本机负责建立这次扫描、转达系统给出的操作说明、等文件回来。</p>
                 <p>所以这一屏不会有「一键扫描」，也不会有扫到第几张的进度。</p>
               </ScanNoteCard>
               <ScanNoteCard
                 title="扫完之后这份文件能干什么"
-                foot="费用以办理时服务端报价与现场规则为准。未登录扫描件不会进入「我的文档」。"
+                foot="费用以办理时系统报价与现场规则为准。未登录扫描件不会进入「我的文档」。"
               >
                 <ScanPlan items={[
                   '简历扫描件可以进 AI 识别，做诊断与优化。',
-                  '拿去打印：到打印流程重新选定，由服务端报价后出纸。',
-                  '留存按文件类型与服务端规则；本屏无登录步骤，匿名件不进「我的文档」。',
+                  '拿去打印：到打印流程重新选定，由系统报价后出纸。',
+                  '留存按文件类型与系统的规则；本屏无登录步骤，匿名件不进「我的文档」。',
                 ]} />
               </ScanNoteCard>
             </div>

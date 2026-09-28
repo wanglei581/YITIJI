@@ -4,7 +4,7 @@
  */
 
 /** 文件尚未回传时：只能说明保存策略，不能预告具体格式。 */
-export const SCAN_OUTPUT_FORMAT_PENDING = '设备回传原格式（服务端不转换）'
+export const SCAN_OUTPUT_FORMAT_PENDING = '设备回传原格式（系统不转换）'
 
 export function formatLabelFromMime(mimeType: string | null | undefined): string {
   const mime = (mimeType ?? '').split(';', 1)[0]?.trim().toLowerCase() ?? ''

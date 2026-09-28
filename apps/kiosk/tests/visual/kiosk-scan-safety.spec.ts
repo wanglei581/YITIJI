@@ -838,7 +838,7 @@ test('the safe rescan sends the prior task id in the body and its token only in 
   await expect(retry).toBeVisible()
   await expect(page.getByText(/这一次会带上上一场的凭据去申请安全重扫放行/)).toBeVisible()
   await expect(page.getByText(/不会悄悄按普通重扫处理/)).toBeVisible()
-  await expect(page.getByText('服务端已放行', { exact: false })).toHaveCount(0)
+  await expect(page.getByText(/服务端已放行|系统已放行/)).toHaveCount(0)
 
   await retry.click()
   await page.waitForURL(/\/scan\?stage=settings/)
@@ -882,7 +882,7 @@ test('the safe rescan sends the prior task id in the body and its token only in 
   expect(leak).toEqual({ onlyAsLiveControlToken: true, occurrences: 1, inLocal: false, inUrl: false })
 
   // ④ 页面如实说明这一次是什么性质的会话。
-  await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
+  await expect(page.getByText('安全重扫：系统已放行同一份材料再扫一次')).toBeVisible()
 
   // ⑤ 同一张纸再扫一遍真的走通了 —— 这就是接线之前拿不到的结果。
   await page.getByRole('button', { name: '我已操作，开始等待' }).click()
@@ -951,7 +951,7 @@ test('leaving the scan flow drops the rescan authority @scan-safety', async ({ p
   // 页内回退保留同一个 document，授权还在不在内存里，这一次创建请求会如实说出来。
   await page.goBack()
   await page.waitForURL(/\/scan/)
-  await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
   await page.getByRole('button', { name: /下一步/ }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
@@ -987,7 +987,7 @@ test('the result page own exit drops the rescan authority too @scan-safety', asy
   // 必须页内回退：整页加载会把模块内存连授权一起抹掉，那样这条用例无论代码对不对都绿。
   await page.goBack()
   await page.waitForURL(/\/scan/)
-  await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
   await page.getByRole('button', { name: /下一步/ }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
@@ -1104,7 +1104,7 @@ test('a reload after the retry intent never turns into a plain create @scan-safe
   const attempt = server.creates[0]!
   expect(attempt.body.retryOfScanTaskId).toBe(PRIOR_TASK_ID)
   expect(attempt.headers['x-scan-retry-control']).toBe(PRIOR_CONTROL_TOKEN)
-  await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
+  await expect(page.getByText('安全重扫：系统已放行同一份材料再扫一次')).toBeVisible()
 
   expect(errors).toEqual([])
 })
@@ -1146,7 +1146,7 @@ test('a reload while the paired create is in flight fails closed @scan-safety', 
   expect(server.creates).toHaveLength(2)
   expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[1]!.headers['x-scan-retry-control']).toBeUndefined()
-  await expect(page.getByText('普通会话：你已确认这一次不是安全同字节重扫')).toBeVisible()
+  await expect(page.getByText('普通的一次扫描：你已确认这一次不是把同一份内容再扫一遍')).toBeVisible()
 
   expect(errors).toEqual([])
 })
@@ -1210,7 +1210,7 @@ test('a lost create response is recovered into exactly one live session @scan-sa
   // 屏幕上那个编号也必须是它 —— 用户拿着这个号去认领待会儿回传的文件。
   await expect(page.getByText(childId, { exact: true })).toBeVisible()
   // ⑥ 这一场的性质是「安全重扫」：服务端认了那一对，同一张纸可以原样放回去。
-  await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
+  await expect(page.getByText('安全重扫：系统已放行同一份材料再扫一次')).toBeVisible()
 
   /* ⑦ 领回来的那条 child **必须已经确认过投递授权**，而且确认的就是它本身。
    *
@@ -1326,7 +1326,7 @@ test('a child that is no longer recoverable offers only an honest plain restart 
   expect(server.creates).toHaveLength(3)
   expect(server.creates[2]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[2]!.headers['x-scan-retry-control']).toBeUndefined()
-  await expect(page.getByText('普通会话：你已确认这一次不是安全同字节重扫')).toBeVisible()
+  await expect(page.getByText('普通的一次扫描：你已确认这一次不是把同一份内容再扫一遍')).toBeVisible()
 
   expect(errors).toEqual([])
 })
@@ -1663,7 +1663,7 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
  */
 async function settleOnScanStart(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/scan\?stage=start$/)
-  await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
 }
 
 /** 打印确认页与 AI 解析页挂载时会真的问服务端，别让它们撞成未注册请求。 */
@@ -1733,7 +1733,7 @@ for (const exit of COMPLETED_EXITS) {
      * 页面此刻只能靠存储复水，而存储已经在 ① 里被证明是空的。
      * 「页内重新进入」的那一半正是 ① 那条断言（下一位进 /scan 读的就是它）。 */
     await page.goto('/scan')
-    await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+    await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
     await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
     await expect(page.getByText('扫描完成', { exact: true })).toHaveCount(0)
     const residue = await page.evaluate((token) => ({
@@ -1908,7 +1908,7 @@ test('a later member cannot reopen the previous guest scan @scan-safety', async 
   const afterLogin = await page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_SESSION_KEY)
   expect(afterLogin).toBeNull()
   // ② 落在选类型那一屏，看不到上一位的结果与文件。
-  await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
   await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
   await expect(page.getByText('扫描完成', { exact: true })).toHaveCount(0)
   // ③ 任何存储里都不许再有那枚控制凭证。
@@ -2165,7 +2165,7 @@ for (const attempt of INTERRUPTED_CREATES) {
     expect(server.creates[1]!.headers['x-scan-retry-control']).toBe(PRIOR_CONTROL_TOKEN)
 
     // ⑦ 成功之后这一场的性质要如实标注：服务端确实放行了同一份材料。
-    await expect(page.getByText(/服务端已放行同一份材料再扫一次/).first()).toBeVisible()
+    await expect(page.getByText(/系统已放行同一份材料再扫一次/).first()).toBeVisible()
 
     // ⑧ 而且这一次真的能把同一张纸扫回来（桩只对配对创建回 completed）。
     await page.getByRole('button', { name: '我已操作，开始等待' }).click()
@@ -2205,7 +2205,7 @@ test('an offline paired create is recovered automatically without any unsigned f
   }
   // ④ 只落成一场，而且如实标注它是安全重扫。
   expect(server.childIds()).toHaveLength(1)
-  await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
+  await expect(page.getByText('安全重扫：系统已放行同一份材料再扫一次')).toBeVisible()
 
   // ⑤ 同一张纸真的扫得回来（桩只对配对创建回 completed）。
   await page.getByRole('button', { name: '我已操作，开始等待' }).click()
@@ -2231,7 +2231,7 @@ test('a network that never comes back ends bounded and says so honestly @scan-sa
   await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
 
   // ① 重放到头就收工，不会一直转 —— 屏幕上给出确定的结论。
-  await expect(page.getByText('还是没能确认这次扫描会话', { exact: true }).first())
+  await expect(page.getByText('还是没能确认这次扫描', { exact: true }).first())
     .toBeVisible({ timeout: 60_000 })
 
   // ② 不许对一件本机并不知道的事下结论：既不说建成了，也不说没建成。
@@ -2292,7 +2292,7 @@ test('leaving after an interrupted create never resurrects the rescan authority 
 
   // 用户走了。代次推进，寄存格和槽位一起被扔掉 —— 下一位绝不能继承这枚授权。
   await page.getByRole('button', { name: '安全返回扫描首页', exact: true }).click()
-  await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
 
   // 下一位在这台机器上从头选类型开一场：必须是干净的普通创建，一个字节的血缘都不许带。
   await page.getByRole('button', { name: /下一步/ }).click()
@@ -2301,7 +2301,7 @@ test('leaving after an interrupted create never resurrects the rescan authority 
   expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[1]!.headers['x-scan-retry-control']).toBeUndefined()
   // 也不许把这一场说成安全重扫。
-  await expect(page.getByText(/服务端已放行同一份材料再扫一次/)).toHaveCount(0)
+  await expect(page.getByText(/系统已放行同一份材料再扫一次/)).toHaveCount(0)
 
   const residue = await page.evaluate(
     (token) => JSON.stringify(Object.fromEntries(

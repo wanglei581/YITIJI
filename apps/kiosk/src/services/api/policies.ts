@@ -77,7 +77,7 @@ const MOCK_POLICIES: PolicyPostView[] = [
   },
   {
     id: 'kp-3', kind: 'notice', title: '就业服务月活动安排(演示数据)',
-    summary: '演示数据:接入真实后端后,此处展示合作机构发布、管理员审核通过的政策公告。',
+    summary: '演示数据：接上系统后，这里展示合作机构发布、审核通过的政策公告。',
     category: 'notice', sourceName: '演示机构', syncTime: now(), publishedDate: '2026-06-05',
   },
 ]

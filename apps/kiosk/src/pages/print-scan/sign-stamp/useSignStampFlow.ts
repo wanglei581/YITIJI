@@ -521,13 +521,13 @@ function resolveCta(args: {
     return { primary: '正在生成…', primaryDisabled: true, reason: '这一次合成还没有回来，重复提交可能生成两份', action: 'none' }
   }
   if (live.phase === 'result-unknown') {
-    return { primary: '用同一次请求重试', primaryDisabled: synthetic, reason: null, action: 'retry' }
+    return { primary: '用同一次再试', primaryDisabled: synthetic, reason: null, action: 'retry' }
   }
   if (live.phase === 'known-failed' || live.phase === 'rate-limited' || live.phase === 'in-progress') {
-    return { primary: '重试生成', primaryDisabled: synthetic, reason: live.phase === 'rate-limited' ? '请稍候用同一次请求标识重试，不会静默再发' : null, action: 'retry' }
+    return { primary: '重试生成', primaryDisabled: synthetic, reason: live.phase === 'rate-limited' ? '请稍候用同一个标记再试，不会自己再发一次' : null, action: 'retry' }
   }
   if (live.phase === 'conflict') {
-    return { primary: '换一次新请求再生成', primaryDisabled: true, reason: '这个请求标识已绑定另一组参数，必须换一次新的请求，不能覆盖上一次', action: 'none' }
+    return { primary: '重新开始一次再生成', primaryDisabled: true, reason: '这个标记已经对应另一组页码、位置和大小，必须重新开始一次，不能覆盖上一次', action: 'none' }
   }
   if (!live.doc) {
     return { primary: '选好 PDF 再继续', primaryDisabled: true, reason: '还没有选文档，没有文档就没法选页码和位置', action: 'none' }
@@ -536,7 +536,7 @@ function resolveCta(args: {
     return { primary: '传好本人手写签名图再继续', primaryDisabled: true, reason: '还没有这次的本人手写签名图片，没有图就没有可叠加的内容', action: 'none' }
   }
   if (live.placeErr) {
-    return { primary: '先改成有效页码', primaryDisabled: true, reason: '页码超出这份文档的范围，服务端会直接拒绝', action: 'none' }
+    return { primary: '先改成有效页码', primaryDisabled: true, reason: '页码超出这份文档的范围，系统会直接拒绝', action: 'none' }
   }
   if (!live.authorized) {
     return {

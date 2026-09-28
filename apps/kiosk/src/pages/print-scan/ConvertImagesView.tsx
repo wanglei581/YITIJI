@@ -104,7 +104,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
 
         {phase === 'uploading' ? (
           <Band kind="info" title="正在上传这一张" breathe chips={['一次一张', '没有进度回传', '结果未确认前不合成']}>
-            <div className="i2p-band-p">本机一次上传一张。<b>服务端不回传上传进度百分比</b>，所以这里不画进度条，也不写「还需几秒」。传成功之后它才会出现在下面的列表里。</div>
+            <div className="i2p-band-p">本机一次上传一张。<b>系统不回传上传进度百分比</b>，所以这里不画进度条，也不写「还需几秒」。传成功之后它才会出现在下面的列表里。</div>
             <div className="i2p-band-p">这一张没确认成功之前，不会进列表，也不会改变已经排好的顺序。</div>
           </Band>
         ) : null}
@@ -112,13 +112,13 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         {phase === 'converting' ? (
           <Band kind="info" title="正在合成 PDF" breathe chips={['一次性请求', '无进度回传', '结果回来才算完成']}>
             <div className="i2p-band-p">请求<b>已经发出去了</b>，按你排好的顺序合成一份 PDF，一张图一页。</div>
-            <div className="i2p-band-p">这是一次性请求，<b>服务端不回传中间进度</b>，所以这里没有百分比、没有进度条。结果回来之前，这一屏不会自己变。</div>
+            <div className="i2p-band-p">这是一次性请求，<b>系统不回传中间进度</b>，所以这里没有百分比、没有进度条。结果回来之前，这一屏不会自己变。</div>
           </Band>
         ) : null}
 
         {phase === 'rechecking' ? (
-          <Band kind="info" title="正在用同一个标识再查一次" breathe chips={['同一请求标识', '没有新建请求', '不会自动变完成']}>
-            <div className="i2p-band-p">正在拿同一个请求标识去问服务端这一次的结果。<b>没有新建请求</b>，也没有换标识，所以不会多出第二份 PDF。</div>
+          <Band kind="info" title="正在用同一个标识再查一次" breathe chips={['同一个标记', '没有另起一次', '不会自动变完成']}>
+            <div className="i2p-band-p">正在拿同一个标记去问系统这一次的结果。<b>没有另起一次</b>，也没有换标记，所以不会多出第二份 PDF。</div>
           </Band>
         ) : null}
 
@@ -127,7 +127,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
             kind="info"
             title={recovered ? '用同一个标识把结果找回来了' : 'PDF 已生成'}
             chips={[
-              '服务端已返回结果',
+              '系统已返回结果',
               '一张图一页 · A4',
               ...(typeof hasEndUser === 'boolean'
                 ? [hasEndUser ? '已进我的文档 · 约 24 小时' : '未登录 · 不进我的文档']
@@ -135,7 +135,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
             ]}
           >
             <div className="i2p-band-p">
-              服务端返回了合成结果：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
+              系统返回了合成结果：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
               {hasEndUser === false ? <b>你现在没登录，这份 PDF 不会进「我的文档」</b> : null}
               {recovered ? ' 没有生成第二份，只是重新签发了一条新的临时打印链接。' : null}
             </div>
@@ -201,8 +201,8 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
                   <div><span>文件标识</span><b data-testid="img2pdf-fileid">{result.fileId}</b></div>
                   <div><span>页数</span><b>{result.pages} 页（每张图一页）</b></div>
                   <div><span>大小</span><b>{formatBytes(result.sizeBytes)}（上限 {formatBytes(MAX_OUTPUT_BYTES)}）</b></div>
-                  <div><span>校验值</span><b>{result.fileMd5.slice(0, 12)}…（服务端返回的前 12 位）</b></div>
-                  <div><span>打印链接</span><b>临时签名链接，30 分钟内有效</b></div>
+                  <div><span>校验值</span><b>{result.fileMd5.slice(0, 12)}…（系统返回的前 12 位）</b></div>
+                  <div><span>打印链接</span><b>临时链接，30 分钟内有效</b></div>
                 </div>
               </div>
             ) : (
@@ -212,12 +212,12 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
               <Retention loggedIn={loggedIn} />
             ) : requestKey ? (
               <div className="i2p-pgrp" data-testid="img2pdf-req">
-                <h4>本次请求标识</h4>
+                <h4>这一次的标记</h4>
                 <div className="i2p-kv">
-                  <div><span>请求标识</span><b data-testid="img2pdf-reqid">{requestKey}</b></div>
+                  <div><span>标记</span><b data-testid="img2pdf-reqid">{requestKey}</b></div>
                   <div><span>这批图片</span><b>{images.length} 张，按上面的顺序</b></div>
                 </div>
-                <div className="i2p-band-p">同一批图片、同一个顺序，<b>始终用这一个标识</b>：重试、断线重连、恢复结果都靠它，服务端不会因此多生成一份。</div>
+                <div className="i2p-band-p">同一批图片、同一个顺序，<b>始终用这一个标识</b>：重试、断线重连、恢复结果都靠它，系统不会因此多生成一份。</div>
               </div>
             ) : (
               <Rules />
@@ -228,7 +228,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
 
       <div className="i2p-truth" data-testid="img2pdf-truth">
         <div><b>顺序</b>列表顺序就是提交顺序，也是 PDF 的页序：一张图一页，按 A4 排版，不裁切、不拼版。</div>
-        <div><b>进度</b>合成是一次性请求，服务端不回传进度，所以不画百分比，也不用计时器假装做完了。</div>
+        <div><b>进度</b>合成是一次性请求，系统不回传进度，所以不画百分比，也不用计时器假装做完了。</div>
         <div>
           <b>留存</b>
           {loggedIn

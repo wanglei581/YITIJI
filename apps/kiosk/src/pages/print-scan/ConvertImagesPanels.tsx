@@ -203,7 +203,7 @@ export function ImageList({
         data-sent-payload={names.join(' | ')}
       >
         <b>提交顺序</b>
-        下面这个顺序<b>就是</b>提交给服务端的顺序，也是 PDF 的页序：第 1 页 {names[0]}
+        下面这个顺序<b>就是</b>提交给系统的顺序，也是 PDF 的页序：第 1 页 {names[0]}
         {names.length > 1 ? `，最后一项是第 ${names.length} 页 ${names[names.length - 1]}` : ''}
         （共 {names.length} 项）。
       </div>
@@ -250,7 +250,7 @@ export function SelBar({
       </div>
       {reason ? <div className="i2p-rotnote" id="selreason" data-testid="img2pdf-selreason">{reason}</div> : null}
       <div className="i2p-rotnote" id="rotreason" data-testid="img2pdf-rotnote">
-        旋转 90° <b>当前不可用</b>：转换接口没有旋转字段，正式页面也未接线。按钮保持禁用，不会制造“已经旋转但导出没变化”的假操作。
+        旋转 90° <b>当前不可用</b>：格式转换还不能旋转，这一步也还没接上。按钮保持禁用，不会制造“已经旋转但导出没变化”的假操作。
       </div>
     </>
   )
@@ -268,7 +268,7 @@ export function UsbGap() {
           <span className="i2p-ub-ic"><PlusIcon size={30} /></span>
           <span className="i2p-ub-n">本机上传一张</span>
           <span className="i2p-chip ok">已接进这一页</span>
-          <div className="i2p-ub-d">在这台机器上选文件，一次一张；<b>拿到服务端确认</b>之后它才成为列表里的一页。</div>
+          <div className="i2p-ub-d">在这台机器上选文件，一次一张；<b>拿到系统确认</b>之后它才成为列表里的一页。</div>
           <div className="i2p-ub-to"><CheckIcon size={22} /><span>进「待合并图片」列表</span></div>
         </div>
         <div className="i2p-pgrp i2p-ub-src" data-wired="yes">
@@ -364,7 +364,7 @@ export function EmptyBody({
           <div className="i2p-epsteps">
             <div className="i2p-epstep"><span className="i2p-sn">1</span><span className="i2p-sb"><b>选中一张，排顺序</b>选中之后上移 / 下移立刻改写序号；移除之后剩下的序号也会重排，不留空位。</span></div>
             <div className="i2p-epstep"><span className="i2p-sn">2</span><span className="i2p-sb"><b>一张图占一页</b>按 A4 居中放大，不裁切也不拼版。<em>旋转 90° 当前不可用</em>，按钮一直保持禁用。</span></div>
-            <div className="i2p-epstep"><span className="i2p-sn">3</span><span className="i2p-sb"><b>合成一份 PDF</b>一次性提交，服务端不回传中间进度，结果回来才算完成。</span></div>
+            <div className="i2p-epstep"><span className="i2p-sn">3</span><span className="i2p-sb"><b>合成一份 PDF</b>一次性提交，系统不回传中间进度，结果回来才算完成。</span></div>
           </div>
           <div className="i2p-ep-cap">左边是<b>空位示意</b>，不是已有文件。这一页<b>不替你排序</b>，也不按文件名或时间自动排。</div>
         </div>
@@ -379,7 +379,7 @@ export function EmptyBody({
           <span className="i2p-chip">合计 ≤ 40 MB</span>
           <span className="i2p-chip">生成的 PDF ≤ 15 MB</span>
         </div>
-        <div className="i2p-lb-n">上传<b>没拿到服务端确认</b>的那一张不会进列表，已经排好的顺序也不会被打乱。</div>
+        <div className="i2p-lb-n">上传<b>没拿到系统确认</b>的那一张不会进列表，已经排好的顺序也不会被打乱。</div>
       </div>
     </>
   )
@@ -389,7 +389,7 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
   if (error.kind === 'format') {
     return (
       <Band kind="warn" title="这一张格式不收" chips={['仅 JPG / PNG', '本机就挡下了', '没有进列表']}>
-        <div className="i2p-band-p">只收 <b>JPG / PNG</b>。刚才那张是 {error.rejected?.name ?? '不支持的格式'}，<b>本机在上传前就挡下了</b>，没有发给服务端。</div>
+        <div className="i2p-band-p">只收 <b>JPG / PNG</b>。刚才那张是 {error.rejected?.name ?? '不支持的格式'}，<b>本机在上传前就挡下了</b>，没有发给系统。</div>
         <div className="i2p-band-p">{error.message}</div>
       </Band>
     )
@@ -404,15 +404,15 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
   if (error.kind === 'upload-failed') {
     return (
       <Band kind="error" title="这一张没传上去" chips={['没有拿到确认', '没有进列表', '已有顺序不受影响']}>
-        <div className="i2p-band-p">上传这一张的时候<b>没有拿到服务端的确认</b>。这一张<b>没有进列表</b>；已经在列表里的图片和它们的顺序都没受影响。</div>
+        <div className="i2p-band-p">上传这一张的时候<b>没有拿到系统的确认</b>。这一张<b>没有进列表</b>；已经在列表里的图片和它们的顺序都没受影响。</div>
         <div className="i2p-band-p">{error.message}</div>
       </Band>
     )
   }
   if (error.kind === 'source-unavailable') {
     return (
-      <Band kind="error" title="服务端取不到其中一张" chips={['服务端：部分图片不存在或已失效', '列表和顺序保留', '没有生成任何 PDF']}>
-        <div className="i2p-band-p">服务端回的是同一句话：<b>「部分图片不存在或已失效」</b>。本页<b>不替它猜具体原因</b>。</div>
+      <Band kind="error" title="系统取不到其中一张" chips={['系统：部分图片不存在或已失效', '列表和顺序保留', '没有生成任何 PDF']}>
+        <div className="i2p-band-p">系统回的是同一句话：<b>「部分图片不存在或已失效」</b>。本页<b>不替它猜具体原因</b>。</div>
         <div className="i2p-band-p">这 {images.length} 张和你排的顺序<b>都还在</b>。把失效的那一张移除再补传一张，或者直接重试一次。</div>
       </Band>
     )
@@ -420,14 +420,14 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
   if (error.kind === 'source-expired') {
     return (
       <Band kind="warn" title="有图片的访问链接过期了" chips={['临时链接有有效期', '列表和顺序保留', '重新传这一张即可']}>
-        <div className="i2p-band-p">未登录时，每张图片带的是<b>有有效期的临时访问链接</b>。服务端回的仍然是<b>「部分图片不存在或已失效」</b>；本页判断成「过期」，靠的是<b>本机自己持有的那条链接已经到期</b>，不是服务端这么说的。</div>
+        <div className="i2p-band-p">未登录时，每张图片带的是<b>有有效期的临时访问链接</b>。系统回的仍然是<b>「部分图片不存在或已失效」</b>；本页判断成「过期」，靠的是<b>本机自己持有的那条链接已经到期</b>，不是系统这么说的。</div>
       </Band>
     )
   }
   if (error.kind === 'total-too-large') {
     return (
       <Band kind="warn" title="这一批加起来太大了" chips={[`合计 ${formatBytes(totalBytesOf(images))} / ${formatBytes(MAX_TOTAL_INPUT_BYTES)}`, '一张都没转', '列表和顺序保留']}>
-        <div className="i2p-band-p">单张都没超 10 MB，但合计超过了一次转换的 <b>40 MB</b> 上限，所以服务端<b>一张都没转</b>。</div>
+        <div className="i2p-band-p">单张都没超 10 MB，但合计超过了一次转换的 <b>40 MB</b> 上限，所以系统<b>一张都没转</b>。</div>
         <div className="i2p-band-p">{error.message}</div>
       </Band>
     )
@@ -435,7 +435,7 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
   if (error.kind === 'dimensions') {
     return (
       <Band kind="error" title="有图片的像素超出上限" chips={['单张 ≤ 2500 万像素', '整批未转换', '列表和顺序保留']}>
-        <div className="i2p-band-p">同一个错误码也用在「图片文件已损坏或格式不匹配」上；本页只转述服务端回执，<b>不替它断定是坏文件</b>。</div>
+        <div className="i2p-band-p">同一种失败也用在「图片文件已损坏或格式不匹配」上；本页只转述系统返回的结果，<b>不替它断定是坏文件</b>。</div>
         <div className="i2p-band-p">{error.message}</div>
       </Band>
     )
@@ -443,38 +443,38 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
   if (error.kind === 'output-too-large') {
     return (
       <Band kind="warn" title="合出来的 PDF 太大了" chips={[`输出上限 ${formatBytes(MAX_OUTPUT_BYTES)}`, '没有留下这份 PDF', '列表和顺序保留']}>
-        <div className="i2p-band-p">输入没超限，但合成后的 PDF 超过了 15 MB，服务端因此判定失败，<b>没有留下这份 PDF</b>。你的图片和顺序都还在：分两批合成通常就能过。</div>
+        <div className="i2p-band-p">输入没超限，但合成后的 PDF 超过了 15 MB，系统因此判定失败，<b>没有留下这份 PDF</b>。你的图片和顺序都还在：分两批合成通常就能过。</div>
         <div className="i2p-band-p">{error.message}</div>
       </Band>
     )
   }
   if (error.kind === 'in-progress') {
     return (
-      <Band kind="lock" title="上一次同标识的生成还在跑" chips={['服务端：正在进行中', '不新建请求', '用同一标识再查']}>
-        <div className="i2p-band-p">服务端回的是 <b>「上一次生成仍在进行中，请稍候重试」</b>。这时候<b>不能另起一次新的请求</b>。正确做法是拿同一个标识<b>再查一次</b>。</div>
+      <Band kind="lock" title="上一次同标识的生成还在跑" chips={['系统：正在进行中', '不新建请求', '用同一标识再查']}>
+        <div className="i2p-band-p">系统回的是 <b>「上一次生成仍在进行中，请稍候重试」</b>。这时候<b>不能另起一次新的请求</b>。正确做法是拿同一个标识<b>再查一次</b>。</div>
       </Band>
     )
   }
   if (error.kind === 'result-unknown') {
     return (
       <Band kind="warn" title="这一次的结果不知道" chips={['结果未知', '不新建请求', '用同一标识查询']}>
-        <div className="i2p-band-p">请求发出去了，但<b>回执没有送到这台机器</b>。所以现在有两种可能：服务端已经做完了，或者根本没做成。</div>
-        <div className="i2p-band-p">在弄清楚之前，<b>不能直接再发一次新的请求</b>。正确做法是拿<b>同一个请求标识</b>去查这一次的结果。</div>
+        <div className="i2p-band-p">请求发出去了，但<b>结果没有送到这台机器</b>。所以现在有两种可能：系统已经做完了，或者根本没做成。</div>
+        <div className="i2p-band-p">在弄清楚之前，<b>不能直接再发一次</b>。正确做法是拿<b>同一个标记</b>去查这一次的结果。</div>
       </Band>
     )
   }
   if (error.kind === 'known-failed') {
     return (
-      <Band kind="error" title="这一次明确失败了" chips={['服务端已明确失败', '没有生成 PDF', '列表和顺序保留']}>
+      <Band kind="error" title="这一次明确失败了" chips={['系统已明确失败', '没有生成 PDF', '列表和顺序保留']}>
         <div className="i2p-band-p">{error.message}</div>
-        <div className="i2p-band-p">你排好的图片和顺序<b>都还在</b>，不用重新传。明确失败之后这个标识已经被服务端释放，可以原样再提交一次。</div>
+        <div className="i2p-band-p">你排好的图片和顺序<b>都还在</b>，不用重新传。明确失败之后，可以再用这个标识原样提交一次。</div>
       </Band>
     )
   }
   if (error.kind === 'conflict') {
     return (
-      <Band kind="error" title="这个标识已经用在另一批图片上了" chips={['服务端已拒绝', '没有生成任何 PDF', '不自动替你决定']}>
-        <div className="i2p-band-p">服务端拒绝了：<b>「该请求标识已用于另一批图片，请更换标识重试」</b>。本页<b>就停在这里</b>：不自动换标识、不自动改回旧顺序。</div>
+      <Band kind="error" title="这个标识已经用在另一批图片上了" chips={['系统已拒绝', '没有生成任何 PDF', '不自动替你决定']}>
+        <div className="i2p-band-p">系统拒绝了：<b>「该请求标识已用于另一批图片，请更换标识重试」</b>。本页<b>就停在这里</b>：不自动换标识、不自动改回旧顺序。</div>
       </Band>
     )
   }
@@ -557,7 +557,7 @@ export function ConvertImagesCta(props: {
   if (phase === 'converting') {
     return (
       <>
-        <div className="i2p-cta-reason">服务端还没返回合成结果</div>
+        <div className="i2p-cta-reason">系统还没返回合成结果</div>
         {ghostBack}
         <button type="button" className="qx-btn" data-variant="primary" disabled data-testid="img2pdf-primary">
           <LoaderIcon size={22} />合成完成后可继续
@@ -601,7 +601,7 @@ export function ConvertImagesCta(props: {
           disabled={rechecking}
           onClick={props.onRecheck}
         >
-          {rechecking ? '正在查询…' : error?.kind === 'result-unknown' ? '用同一个请求标识查这一次的结果' : '用同一个标识再查一次'}
+          {rechecking ? '正在查询…' : error?.kind === 'result-unknown' ? '用同一个标记查这一次的结果' : '用同一个标记再查一次'}
         </button>
       </>
     )

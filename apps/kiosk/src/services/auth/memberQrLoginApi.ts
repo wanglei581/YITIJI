@@ -11,7 +11,7 @@ function requireLocalAgentHeaders(): HeadersInit {
   if (!BRIDGE_TOKEN) {
     throw new MemberApiError(
       'LOCAL_QR_BRIDGE_TOKEN_MISSING',
-      '当前终端版本未配置扫码登录本地网桥',
+      '这台机器还没配好扫码登录',
       0,
     )
   }

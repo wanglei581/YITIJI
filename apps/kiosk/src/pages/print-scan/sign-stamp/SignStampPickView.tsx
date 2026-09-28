@@ -310,7 +310,7 @@ export function pickAsk(phase: 'doc' | 'stamp', state: string, derived: boolean)
     }
     if (state === 'document-local-uploading') return ['正在传这份 PDF。', '单次上传，没有进度回传，传完立刻读页数。']
     if (state === 'document-phone-entry') return ['用手机把 PDF 传进来。', '扫屏幕上的码；手机上确认之后才进下一步。']
-    if (state === 'document-inspecting') return ['正在读这份 PDF 的页数。', '加密、损坏、含数字签名域的，这一步就会被拒。']
+    if (state === 'document-inspecting') return ['正在读这份 PDF 的页数。', '加密、损坏、带电子签名的，这一步就会被拒。']
     return ['先选一份要签名的 PDF。', '把签名图叠上去，生成一份新的 PDF，原件不动。']
   }
   if (state.startsWith('stamp-') && (state.includes('rejected') || state.includes('too-') || state.includes('corrupt') || state.includes('encoding') || state.includes('source-'))) {
@@ -318,7 +318,7 @@ export function pickAsk(phase: 'doc' | 'stamp', state: string, derived: boolean)
   }
   if (state === 'stamp-local-uploading') return ['正在传这张签名图。', '按高敏材料短期保留，不进「我的文档」。']
   if (state === 'stamp-phone-entry') return ['用手机传本人手写签名图。', '手机上确认之后才进下一步，这一页不替你确认。']
-  if (derived || state === 'add-another-ready') return ['接着叠第二处。', '刚才那份派生 PDF 成了新原文档，签名图要重传。']
+  if (derived || state === 'add-another-ready') return ['接着叠第二处。', '刚才那份签好的 PDF 成了新的原文档，签名图要重传。']
   if (state === 'document-ready') return ['这份 PDF 读好了。', '接下来传这次要用的本人手写签名图片。']
   return ['传一张这次要用的签名图。', '只能这次新传，不进「我的文档」，也不能复用历史。']
 }

@@ -429,7 +429,7 @@ test('signature inspect renders server pages and compose sends placement payload
   await expect(page.getByRole('button', { name: '生成合成 PDF（请先确认授权）' })).toBeDisabled()
   await authorize.click()
   await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
-  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('新的派生 PDF 已生成')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('新的 PDF 已生成')
   expect(composeBodies).toHaveLength(1)
   const payload = JSON.parse(composeBodies[0]) as {
     authorizationConfirmed: boolean
@@ -509,7 +509,7 @@ test('signature compose 429 shows rate-limited and does not silently retry @w2',
   await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
   await expect(page.getByTestId('sign-stamp-fallback')).toContainText('提交太频繁了')
   await expect(page.locator('[data-testid="sign-stamp-state-rate-limited"]')).toBeVisible()
-  await expect(page.getByText('新的派生 PDF 已生成')).toHaveCount(0)
+  await expect(page.getByText('新的 PDF 已生成')).toHaveCount(0)
   expect(api.requestCount('POST', '/api/v1/print/sign/compose')).toBe(1)
   await expectHealthy(page, errors, 'print-scan-sign')
 })

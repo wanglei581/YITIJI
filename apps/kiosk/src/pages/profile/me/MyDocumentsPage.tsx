@@ -310,7 +310,7 @@ export function MyDocumentsPage() {
           <QxMeStartRow icon={ScanLineIcon} tone="slate" title="扫描纸质材料" desc="把纸质简历或证明扫成 PDF；未登录扫描件不会进入我的文档" label="去扫描" route="/scan" testid="member-assets-start-scan" onClick={() => navigate('/scan')} />
           <div className="qx-me-legal">添加或扫描之后，可以回到这里继续预览、打印和签名盖章。</div>
         </section>
-        <QxMeGuide items={[['怎么产生', '登录后上传或扫描', '游客上传不会自动归入你的账号'], ['能做什么', '预览、打印、签名盖章', '从同一份文件继续办'], ['留存', '按服务端期限管理', '到期后无法恢复，需要请提前打印']]} />
+        <QxMeGuide items={[['怎么产生', '登录后上传或扫描', '游客上传不会自动归入你的账号'], ['能做什么', '预览、打印、签名盖章', '从同一份文件继续办'], ['留存', '按系统的保存期限管理', '到期后无法恢复，需要请提前打印']]} />
       </>
     )
   } else {
@@ -443,7 +443,7 @@ export function MyDocumentsPage() {
       eyebrow="MY FILES & ORDERS"
       ask={<>你的文件，<em>随时接着办</em>。</>}
       doing={DOING[uiState]}
-      truth="这里只显示当前登录账号的文档；数量与保存期限一律由服务端返回。"
+      truth="这里只显示当前登录账号的文档；数量与保存期限一律由系统返回。"
       toast={hint}
       ctabar={ctabar}
     >

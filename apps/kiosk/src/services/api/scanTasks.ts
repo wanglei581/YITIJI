@@ -191,7 +191,7 @@ export function ackScanSession(
   if (!hasId || !hasControl) {
     return Promise.reject(new ApiHttpError(
       SCAN_ACK_CREDENTIALS_INCOMPLETE,
-      '扫描会话凭据不完整，本次不会确认投递',
+      '这次扫描的凭据不完整，本次不会确认投递',
       400,
     ))
   }

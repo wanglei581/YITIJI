@@ -153,11 +153,11 @@ async function parseEnvelope<T>(res: Response, failedToken?: string): Promise<T>
     throw new ApiHttpError(error.code, error.message, res.status)
   }
   if (body.success === false) {
-    const error = extractError(body, '材料检查接口返回失败')
+    const error = extractError(body, '这次没读到材料检查结果')
     throw new ApiHttpError(error.code, error.message, res.status)
   }
   if (!body.data) {
-    throw new ApiHttpError('MATERIAL_TASK_EMPTY', '材料检查接口返回数据为空', res.status)
+    throw new ApiHttpError('MATERIAL_TASK_EMPTY', '这次没读到材料检查结果', res.status)
   }
   return body.data
 }
@@ -205,7 +205,7 @@ function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
   if (kind === 'inspection') {
     return {
       mode: 'mock',
-      note: '流程演示，未连接后端材料检查服务',
+      note: '流程演示，还没接上材料检查',
       checks: {
         filePresent: true,
         pageCount: null,
@@ -219,14 +219,14 @@ function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
   if (kind === 'pii_scan') {
     return {
       mode: 'mock',
-      note: '流程演示，未连接后端材料检查服务',
+      note: '流程演示，还没接上材料检查',
       findingCount: 0,
     }
   }
   if (kind === 'pii_redact') {
     return {
       mode: 'mock',
-      note: '流程演示，未连接后端材料检查服务',
+      note: '流程演示，还没接上材料检查',
       checks: {
         canRedact: true,
         redactedFileId: null,
@@ -237,14 +237,14 @@ function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
         keptCount: 0,
         pendingCount: 0,
         warnings: [],
-        messages: [{ code: 'MOCK_PII_REDACT', severity: 'info', text: '流程演示模式，未连接后端，不会生成遮挡后文件，打印仍使用原文件' }],
+        messages: [{ code: 'MOCK_PII_REDACT', severity: 'info', text: '流程演示，还没接上系统，不会生成遮挡后文件，打印仍使用原文件' }],
       },
     }
   }
   if (kind === 'normalize_a4') {
     return {
       mode: 'mock',
-      note: '流程演示，未连接后端材料检查服务',
+      note: '流程演示，还没接上材料检查',
       checks: {
         targetPaperSize: 'A4',
         canNormalize: true,
@@ -258,7 +258,7 @@ function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
   }
   return {
     mode: 'mock',
-    note: '流程演示，未连接后端材料检查服务',
+    note: '流程演示，还没接上材料检查',
   }
 }
 

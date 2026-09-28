@@ -213,7 +213,7 @@ function BenefitCard({ view, onLogin }: { view: PrintBenefitView; onLogin: () =>
       <div className="pcf-benefit-head">
         <TicketIcon size={22} aria-hidden="true" />
         权益与本单价格
-        <span className="pcf-benefit-snap">价目与权益均来自后台配置</span>
+        <span className="pcf-benefit-snap">价目与权益均来自机构配置</span>
       </div>
       <p className="pcf-benefit-title">{view.title}</p>
       <p className="pcf-benefit-detail">{view.detail}</p>

@@ -62,12 +62,12 @@ export interface SessionFailure {
  */
 export const RESCAN_CREDENTIALS_LOST_FAILURE = {
   title: '安全重扫凭据已经不在本机',
-  description: '你刚才选的是「同一份材料」重扫。那份凭据只存在页面内存里（不落存储，'
-    + '换人清场也带不走）：本页重载过、或者它已经超过 15 分钟、或者中间清过场，'
-    + '现在都取不到了，本机无法再向服务端申请放行。'
-    + '本页不会替你改发一次普通重扫 —— 同一张纸走普通会话会被服务端按重复件拒收，'
-    + '你会在机器前白等到会话过期。可以安全返回扫描首页，'
-    + '或者按「重新开始一次扫描」建一个普通会话（那不是安全重扫，建议换一份材料）。',
+  description: '你刚才选的是「同一份材料」重扫。那份凭据只记在这一次打开的页面里（不写到这台机器上，'
+    + '换人清场也带不走）：本页重新加载过、或者它已经超过 15 分钟、或者中间清过场，'
+    + '现在都取不到了，本机无法再向系统申请放行。'
+    + '本页不会替你改成普通重扫 —— 同一张纸走普通的一次扫描会被系统按重复件拒收，'
+    + '你会在机器前白等到这次扫描过期。可以安全返回扫描首页，'
+    + '或者按「重新开始一次扫描」建立一次普通扫描（那不是安全重扫，建议换一份材料）。',
 } as const
 
 /**
@@ -84,10 +84,10 @@ export const RESCAN_CREDENTIALS_LOST_FAILURE = {
  */
 export const RESCAN_REFUSED_FAILURE = {
   title: '安全重扫授权已失效',
-  description: '服务端不认这次的安全重扫凭据（过期、已被用掉，或者上一场根本没走到取件'
-    + '——那种情况服务端不会铸授权）。本页不会自动改用普通重扫。'
-    + '你可以按「重新开始一次扫描」建一个普通会话：那不是同字节重扫，'
-    + '如果放回去的还是同一张纸，服务端可能按重复件拒收（两小时内），'
+  description: '系统不认这次的安全重扫凭据（过期、已被用掉，或者上一场根本没走到取件'
+    + '——那种情况系统不会给出放行）。本页不会自动改用普通重扫。'
+    + '你可以按「重新开始一次扫描」建立一次普通扫描：那不是把同一份内容再扫一遍，'
+    + '如果放回去的还是同一张纸，系统可能按重复件拒收（两小时内），'
     + '建议换一份材料或找工作人员；也可以安全返回扫描首页。',
 } as const
 
@@ -102,14 +102,14 @@ export const RESCAN_REFUSED_FAILURE = {
  * 出路仍然只有显式的普通重启：服务端明确不会再为这枚授权开第二条 child。
  */
 export const RESCAN_CHILD_LOST_FAILURE = {
-  title: '那次安全重扫的会话已经失效',
+  title: '那次安全重扫已经失效',
   // 这些 description 是**纯字符串**，直接渲染进 <p>，没有 markdown。
   // 写 `**粗体**` 会把星号原样打在 27 寸公共屏上（2026-09-14 浏览器用例实测到过）。
-  description: '上一次请求没收到回话，本机用同一份凭据问过服务端了：那一场确实建成过，'
-    + '但它已经过期或被收走，现在不能再用，服务端也不会为同一枚授权再开一条。'
-    + '好消息是服务端那边没有留下还在等文件的任务，你刚才那张纸不会被谁悄悄收走。'
-    + '本页不会替你改发普通重扫。要继续请按「重新开始一次扫描」建一个普通会话：'
-    + '那不是同字节重扫，同一张纸可能按重复件拒收（两小时内），建议换一份材料或找工作人员。',
+  description: '上一次请求没收到回应，本机用同一份凭据问过系统了：那一场确实建成过，'
+    + '但它已经过期或被收走，现在不能再用，系统也不会为同一次放行再开一条。'
+    + '好消息是系统里没有留下还在等文件的任务，你刚才那张纸不会被谁悄悄收走。'
+    + '本页不会替你改成普通重扫。要继续请按「重新开始一次扫描」建立一次普通扫描：'
+    + '那不是把同一份内容再扫一遍，同一张纸可能按重复件拒收（两小时内），建议换一份材料或找工作人员。',
 } as const
 
 /**
@@ -121,11 +121,11 @@ export const RESCAN_CHILD_LOST_FAILURE = {
  * 那条 child 领回来。所以这里要指的是那颗按钮，不是普通重启。
  */
 export const RESCAN_REPLAY_UNRESOLVED_FAILURE = {
-  title: '还是没能确认这次扫描会话',
-  description: '本机已经用同一份凭据重试过几次，网络一直没通，所以到现在也说不准服务端'
-    + '那一场建成了没有。本页不会替你改发普通重扫，也不会假装它已经建成。'
+  title: '还是没能确认这次扫描',
+  description: '本机已经用同一份凭据重试过几次，网络一直没通，所以到现在也说不准系统'
+    + '那一场建成了没有。本页不会替你改成普通重扫，也不会假装它已经建成。'
     + '网络恢复后可以按「再试一次安全重扫」：发出去的仍然是同一对凭据，'
-    + '服务端如果已经建过那一场，会把同一场原样交回来，不会多建一场。'
+    + '系统如果已经建过那一场，会把同一场原样交回来，不会多建一场。'
     + '也可以安全返回扫描首页；这一刻请先别在面板上按开始。',
 } as const
 
@@ -167,7 +167,7 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
       refusedRescan: false,
       failure: {
         title: '无法确认扫描任务状态',
-        description: '网络连接中断，无法确认服务端是否收到请求。为避免重复创建，本页不会自动重发 ——'
+        description: '网络连接中断，无法确认系统是否收到请求。为避免重复创建，本页不会自动重发 ——'
           + '要不要再发一次由你按。请检查网络后重试，或者返回扫描首页。',
       },
     }
@@ -203,8 +203,8 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
     }
     if (code === 'TERMINAL_SESSION_INVALID') {
       return {
-        title: '终端安全校验失败',
-        description: userMessageOf(error, '终端安全校验失败，请联系现场工作人员'),
+        title: '这台机器的安全校验没通过',
+        description: userMessageOf(error, '这台机器的安全校验没通过，请联系现场工作人员'),
       }
     }
     if (code === 'RATE_LIMITED' || (error instanceof ApiHttpError && error.status === 429)) {
@@ -212,7 +212,7 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
     }
     return {
       title: '扫描任务未创建',
-      description: userMessageOf(error, '服务端未能创建扫描会话。请返回重试，或联系现场工作人员。'),
+      description: userMessageOf(error, '系统没能建立这次扫描。请返回重试，或联系现场工作人员。'),
     }
   })()
   return { outcomeUnknown: false, refusedRescan: false, failure }

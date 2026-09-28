@@ -413,18 +413,18 @@ export function resumeParseTerminalCopy(terminal: ResumeParseTerminalKind): Resu
   if (terminal.kind === 'file_changed') {
     return {
       title: '文件内容已变化',
-      lead: '服务端在本次调用模型之前停止使用这份文件。',
+      lead: '系统在这次调用模型之前停止使用这份文件。',
       happened: '文件内容已变化，已停止使用。这次没有调用模型。',
-      kept: '本机这次解析标识已释放。稍后可以换一份新文件，不会自动开始解析。',
+      kept: '本机这次的标记已经放开。稍后可以换一份新文件，不会自动开始解析。',
       next: '请重新上传一份新文件。不要用这份已停用的文件再解析。',
       confirm: '',
     }
   }
   const lead = terminal.code === 'RESUME_PARSE_INTENT_REVOKED'
-    ? '服务端确认这次解析已撤销，同一标识不能恢复结果。'
+    ? '系统确认这次解析已撤销，同一个标记不能恢复结果。'
     : terminal.code === 'RESUME_PARSE_RESULT_EXPIRED'
-      ? '服务端确认这次解析结果已过期，同一标识不能再取回。'
-      : '服务端确认这次解析结果已不在，同一标识不能恢复。'
+      ? '系统确认这次解析结果已过期，同一个标记不能再取回。'
+      : '系统确认这次解析结果已不在，同一个标记不能恢复。'
   return {
     title: terminal.code === 'RESUME_PARSE_INTENT_REVOKED'
       ? '这次解析已撤销'
@@ -432,10 +432,10 @@ export function resumeParseTerminalCopy(terminal: ResumeParseTerminalKind): Resu
         ? '解析结果已过期'
         : '解析结果已不在',
     lead,
-    happened: '这次解析此前已经完成登记。同一标识再提交也不会把结果找回来，也不会再调用模型。',
-    kept: '本机仍保留这次标识。连续确认两次之前不会清除，也不会另起一次。',
-    next: '若要重新解析，请连续确认两次。确认后才会清除本机标识并开始新的一次，那会再次调用 AI。',
-    confirm: `${lead}开始新的一次会再次调用 AI，并清除本机这一次的标识。`,
+    happened: '这次解析此前已经完成登记。再用同一个标记也不会把结果找回来，也不会再调用模型。',
+    kept: '本机仍保留这个标记。连续确认两次之前不会清除，也不会另起一次。',
+    next: '若要重新解析，请连续确认两次。确认后才会清除本机这个标记并开始新的一次，那会再次调用 AI。',
+    confirm: `${lead}开始新的一次会再次调用 AI，并清除本机这一次的标记。`,
   }
 }
 

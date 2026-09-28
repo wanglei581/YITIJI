@@ -267,7 +267,7 @@ test('child 不可恢复被判为「服务端明确不认」，并落到它自�
   )
   assert.equal(verdict.refusedRescan, true, '必须永久丢弃：服务端不会再为这枚授权开第二条 child')
   assert.equal(verdict.outcomeUnknown, false)
-  assert.match(verdict.failure.title, /那次安全重扫的会话已经失效/)
+  assert.match(verdict.failure.title, /那次安全重扫已经失效/)
   // 这一屏比通用那条多交代一件事：服务端没留下还在等文件的任务。
   // 用户据此才知道自己刚才那张纸不会被谁悄悄收走。
   assert.match(verdict.failure.description, /没有留下还在等文件的任务/)

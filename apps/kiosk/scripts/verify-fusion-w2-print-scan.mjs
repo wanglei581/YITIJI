@@ -988,8 +988,8 @@ assert.match(
 )
 assert.match(
   scanStart,
-  /下一步会创建真实扫描会话/,
-  'scan start explains when the real session is created'
+  /下一步会真实建立这次扫描/,
+  'scan start explains when this scan is really created'
 )
 assert.match(
   scanStart,
@@ -1119,8 +1119,8 @@ assert.doesNotMatch(
 )
 assert.match(
   scanResult,
-  /files\/:id\/content/,
-  'scan result preview copy names the anonymous signed content URL',
+  /预览用的是结果里那条临时内容链接，不是另外再申请一条要登录的链接/,
+  'scan result preview copy still says the preview uses the temporary content link and does not request a login-gated one',
 )
 assert.match(scanResult, /completed-no-file/, 'completed with file:null is a distinct honest terminal state')
 assert.match(scanProgress, /立即检查/, 'progress keeps a real manual poll action')
@@ -1177,8 +1177,8 @@ assert.match(
 )
 assert.match(
   convertImages,
-  /终端编号未配置，无法使用格式转换/,
-  'convert must fail closed when terminal id is missing (same as sign-stamp)',
+  /这台机器还没完成登记，无法使用格式转换/,
+  'convert must fail closed when this machine is not registered (same as sign-stamp); the number itself stays off screen',
 )
 assert.match(
   convertImages,
@@ -1253,7 +1253,7 @@ assert.doesNotMatch(
   /catch \{\s*\/\/ best-effort only\s*\}/,
   'upload session hook has no best-effort cancel swallow'
 )
-assert.match(uploadSessionHook, /这次会话没能取消，文件还留着/, 'cancel failure keeps an honest user message')
+assert.match(uploadSessionHook, /这次上传没能取消，文件还留着/, 'cancel failure keeps an honest user message')
 assert.match(
   uploadSessionHook,
   /status: 'cancelled'/,

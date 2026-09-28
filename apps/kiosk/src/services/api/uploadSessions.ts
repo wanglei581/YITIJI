@@ -58,12 +58,12 @@ async function requestJson<T>(path: string, init?: RequestInit & { token?: strin
   const envelope = payload as ResponseEnvelope<T> | null
   if (envelope && typeof envelope === 'object' && 'data' in envelope) {
     if (envelope.data === undefined || envelope.data === null) {
-      throw new ApiHttpError('UPLOAD_SESSION_EMPTY', '上传会话返回数据为空', res.status)
+      throw new ApiHttpError('UPLOAD_SESSION_EMPTY', '这次没读到上传结果', res.status)
     }
     return envelope.data
   }
   if (payload === null) {
-    throw new ApiHttpError('UPLOAD_SESSION_EMPTY', '上传会话返回数据为空', res.status)
+    throw new ApiHttpError('UPLOAD_SESSION_EMPTY', '这次没读到上传结果', res.status)
   }
   return payload as T
 }

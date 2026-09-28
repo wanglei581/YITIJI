@@ -163,7 +163,7 @@ export function QxMeLoginBlock({
         <div className="qx-me-legal">登录后会出现的内容结构 · 现在不显示任何明细</div>
         {struct}
         <QxMeGuestRows onJobs={onJobs} onPrint={onPrint} hostingOpen={hostingOpen} />
-        <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束会话只清除本机登录态与临时会话信息</b>；服务端的记录按各自留存期限管理。</div>
+        <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束这次使用，只清除这台机器上的登录状态和临时使用记录</b>；系统里的记录按各自保存期限管理。</div>
       </section>
       <QxMeGuide items={hostingOpen ? [...QX_ME_GUIDE.login] : [...QX_ME_GUIDE.login.slice(0, 2), guestBoundary(hosting.status)]} />
     </>
@@ -183,7 +183,7 @@ export function QxMeLoadingBlock({ title }: { title: string }) {
 export function QxMeErrorBlock({ title, desc, struct }: { title: string; desc: string; struct: React.ReactNode }) {
   return (
     <>
-      <QxMeBanner tone="warn" title={title} desc={<>{desc}<b>本页不会拿上一次的内容冒充当前账号</b>，所以字段一律显示「—」。</>} minis={['共 —', '本次未取到']} />
+      <QxMeBanner tone="warn" title={title} desc={<>{desc}<b>本页不会拿上一次的内容冒充当前账号</b>，所以每一项都显示「—」。</>} minis={['共 —', '本次未取到']} />
       <section className="qx-me-list qx-me-grow" aria-label="本次未取到的内容结构">
         {struct}
         <div className="qx-me-legal">重试不会重复创建记录，也不会改动已保存的内容。多次重试仍失败时，可以让现场工作人员协助查询。</div>

@@ -76,7 +76,7 @@ export async function printAdvisorArtifact(
   if (!res.ok) await throwHttpError(res, access?.token)
   const body = (await res.json()) as Partial<AdvisorArtifactPrintResult>
   if (!body.fileId || !body.filename) {
-    throw new ApiHttpError('ADVISOR_PRINT_MALFORMED', '打印回执缺少文件编号', 500)
+    throw new ApiHttpError('ADVISOR_PRINT_MALFORMED', '打印结果里缺少文件编号', 500)
   }
   return {
     artifactId: body.artifactId ?? artifactId,

@@ -41,5 +41,5 @@ export const FAIR_CHECKIN_LINK_UNAVAILABLE_REASON = '该来源未提供可用的
 export const COMPANY_NO_OPEN_JOBS_REASON = '该企业当前没有在招岗位'
 
 /** 演示模式：没有连真实后端，不会生成真实文件。 */
-export const DEMO_MODE_NO_REAL_FILE_REASON = '演示模式未接入后端，无法生成真实文件'
+export const DEMO_MODE_NO_REAL_FILE_REASON = '演示模式还没接上系统，无法生成真实文件'
 

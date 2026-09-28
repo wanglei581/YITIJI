@@ -185,7 +185,7 @@ export function PickCard({ doc, sections, onPick }: { doc: DocMeta; sections: Se
 export function LegalTruth() {
   return (
     <div className="legal-doc-truth" data-disclaimer="true" data-testid="legal-truth">
-      <p><b>正文从哪来</b>条款正文由运营方发布、经服务端返回；本机留存文本只在取不到时出现，并标明不作为正式版本。</p>
+      <p><b>正文从哪来</b>条款正文由运营方发布、经系统返回；本机留存文本只在取不到时出现，并标明不作为正式版本。</p>
       <p><b>怎么算数</b>以运营方正式发布的版本为准。取不到正文时这里会明说取不到，不会拿旧文本顶上让你误以为读到了现行条款。</p>
     </div>
   )

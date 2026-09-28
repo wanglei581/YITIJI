@@ -1731,7 +1731,7 @@ test('a cancel conflict makes the cleanup gate ask once more and hand over only 
   expect(new URL(page.url()).pathname).toBe('/session-timeout')
   // 第一次 409 不是「服务端没给结论」：闸在同一次尝试里接着问，屏上不许报一句失败。
   // （交给退避循环的写法会先发布 server-error，这一屏就会说「服务端暂时没有给出结论」。）
-  await expect(page.getByTestId('session-guard-cleanup-status')).toContainText('正在向服务端确认')
+  await expect(page.getByTestId('session-guard-cleanup-status')).toContainText('正在向系统确认')
 
   // 第二次拿到 200（那次投递被撤掉了）：这一刻才交出机器。
   revoke.release(1, 'cancelled')

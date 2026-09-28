@@ -38,7 +38,9 @@ const FROZEN = new Map([
   // 冻结契约不放宽，仍逐字节校验；入口标签与地址另有 verify:profile-inkpaper-home /
   // verify:lightflow-profile-entry 的 22 条对照表钉死。
   // 旧哈希 dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae。
-  ['src/pages/profile/profileEntries.ts', '3b05eac00356d5e5c59912752a105bdb268c2bec5b0b57bc455a2a69d63103e0'],
+  // 2026-09-28 用词：账号设置说明「登录状态与会话说明」改为「登录状态与这次使用的说明」。
+  // 入口条数、路由、图标都没变。旧哈希 3b05eac00356d5e5c59912752a105bdb268c2bec5b0b57bc455a2a69d63103e0。
+  ['src/pages/profile/profileEntries.ts', 'b7d4728b2cd87d640f3dbc4c2d6d386d0416bade483a01ef1dbcdfcabfd9d703'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
   ['src/pages/profile/me/feedback/types.ts', 'a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f'],
@@ -46,7 +48,10 @@ const FROZEN = new Map([
   // 纯追加：原有导出未删；新增 refunding 展示、PENDING_REFUND_* 常量与
   // memberPayStatusLabel（待退款信号优先于「已支付」）。到账时间不以天数承诺。
   // 冻结契约不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'edf85a5efbedc41feefa33097b5b62688af30d0d93b7f0a79dd74a9cd779e846'],
+  // 2026-09-28 用词：实付提示「无独立字段，不按应付减优惠推算」改为
+  // 「没有单独记下实付，不按应付减优惠来推算」。仍然禁止用应付减优惠推算实付。
+  // 旧哈希 edf85a5efbedc41feefa33097b5b62688af30d0d93b7f0a79dd74a9cd779e846。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],

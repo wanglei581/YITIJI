@@ -256,7 +256,7 @@ export function MyPrintOrdersPage() {
     <>
       <QxMeStructRow icon={PrinterIcon} title="打印内容与参数" desc="文件名、份数、彩色/黑白、单双面与幅面" mode={structMode} testid="member-assets-struct-orders-0" />
       <QxMeStructRow icon={ReceiptIcon} title="支付状态与金额" desc="只显示订单真实记录；历史订单没有支付记录时如实说明" mode={structMode} testid="member-assets-struct-orders-1" />
-      <QxMeStructRow icon={TicketIcon} title="处理进度与取件码" desc="取件码只在服务端返回时显示" mode={structMode} testid="member-assets-struct-orders-2" />
+      <QxMeStructRow icon={TicketIcon} title="处理进度与取件码" desc="取件码只在系统返回时显示" mode={structMode} testid="member-assets-struct-orders-2" />
     </>
   )
 
@@ -284,7 +284,7 @@ export function MyPrintOrdersPage() {
           <QxMeStartRow icon={FilesIcon} tone="slate" title="先从我的文档选文件" desc="已保存的文件可以直接拿来打印，会新建一笔订单" label="去文档" route="/me/documents" testid="member-assets-start-docs" onClick={() => navigate('/me/documents')} />
           <div className="qx-me-legal">确认打印并建单后，可以回到这里查看处理进度与结果。</div>
         </section>
-        <QxMeGuide items={[['怎么产生', '确认打印并建单后', '订单在确认打印后建立'], ['能看到什么', '处理进度与支付记录', '状态一律由服务端返回'], ['再打印', '会新建订单', '重新核价后建立一笔新订单']]} />
+        <QxMeGuide items={[['怎么产生', '确认打印并建单后', '订单在确认打印后建立'], ['能看到什么', '处理进度与支付记录', '状态一律由系统返回'], ['再打印', '会新建订单', '重新核价后建立一笔新订单']]} />
       </>
     )
   } else {
@@ -413,7 +413,7 @@ export function MyPrintOrdersPage() {
       eyebrow="MY FILES & ORDERS"
       ask={<>打印到哪一步，<em>一眼看清</em>。</>}
       doing={DOING[uiState]}
-      truth="这里只显示当前登录账号的打印订单；状态、金额与取件码一律由服务端返回。"
+      truth="这里只显示当前登录账号的打印订单；状态、金额与取件码一律由系统返回。"
       ctabar={ctabar}
       live={false}
     >

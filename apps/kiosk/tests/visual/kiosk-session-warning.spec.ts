@@ -145,12 +145,12 @@ test('image-to-pdf editing warns that unsaved work is lost, not the generic clea
 }) => {
   // /print-scan/convert 上放着用户已经挑好、还没转换的图片。它不在 /print /scan 域内
   // （/print-scan 是另一个前缀），也不在 /resume /interview 里，以前会落到
-  // 「登录状态和本机临时会话将清除」——那句话没提用户会丢掉刚挑的图。
+  // 「登录状态和这台机器上的这次使用将清除」——那句话没提用户会丢掉刚挑的图。
   registerKioskShell(api, { screensaverEnabled: false })
   await page.goto('/print-scan/convert')
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
-  await expect(page.getByText('登录状态和本机临时会话将清除', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('登录状态和这台机器上的这次使用将清除', { exact: true })).toHaveCount(0)
 })
 
 test('hardware warning tells anonymous users that background work continues without recovery', async ({
@@ -166,12 +166,12 @@ test('hardware warning tells anonymous users that background work continues with
   // Assert real page rendered (not a wildcard error page)
   await expect(page.getByRole('heading', { name: '材料扫描' })).toBeVisible()
   await expect(
-    page.getByText('请先选择扫描类型；本页尚未创建任务。下一步会创建真实扫描会话')
+    page.getByText('请先选择扫描类型；本页尚未创建任务。下一步会真实建立这次扫描')
   ).toBeVisible()
 
   await expectWarningWithinThreeSeconds(page)
   await expect(
-    page.getByText('已创建的打印/扫描任务会继续运行，终端页面将清除', { exact: true })
+    page.getByText('已创建的打印/扫描任务会继续运行，这台机器上的页面将清除', { exact: true })
   ).toBeVisible()
   await expect(page.getByText('匿名任务退出后无法恢复', { exact: true })).toBeVisible()
   await expect(page.getByText(/已保存到.*我的|可恢复/)).toHaveCount(0)
@@ -183,9 +183,9 @@ test('hardware warning tells anonymous users that background work continues with
   await expect(page.getByText('下次需重新验证', { exact: false })).toHaveCount(0)
 
   // anonymous branch shows session-appropriate labels
-  await expect(page.getByText('当前会话：', { exact: false })).toBeVisible()
+  await expect(page.getByText('这次使用：', { exact: false })).toBeVisible()
   await expect(page.getByText('匿名使用', { exact: false })).toBeVisible()
-  await expect(page.getByText('清除本次匿名会话', { exact: false })).toBeVisible()
+  await expect(page.getByText('清掉这次留下的内容', { exact: false })).toBeVisible()
 })
 
 test('ordinary idle warns before clearing and can resume the previous route', async ({
@@ -270,7 +270,7 @@ test('session warning actions remain touch-safe without horizontal overflow', as
   await expectWarningWithinThreeSeconds(page)
 
   const continueButton = page.getByRole('button', { name: /我还在，继续使用/ })
-  const exitButton = page.getByRole('button', { name: '结束并清除本机会话', exact: true })
+  const exitButton = page.getByRole('button', { name: '结束并清除这台机器上的这次使用', exact: true })
   await expect(continueButton).toBeVisible()
   await expect(exitButton).toBeVisible()
 
@@ -316,7 +316,7 @@ test('immediate exit hard-clears the session and blocks back-forward task recove
   })
 
   await expectWarningWithinThreeSeconds(page)
-  await page.getByRole('button', { name: '结束并清除本机会话', exact: true }).click()
+  await page.getByRole('button', { name: '结束并清除这台机器上的这次使用', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
   await expectSensitiveSessionCleared(page)
@@ -345,7 +345,7 @@ test('screensaver-mode immediate exit always hard-clears and never falls into th
   await expectWarningWithinThreeSeconds(page)
   // 屏保模式预警倒计时自然结束应进 /screensaver,但用户点击"立即退出并清除本机会话"
   // 必须立即 hardClear 回干净首页——按钮共享倒计时动作会把用户带进屏保。
-  await page.getByRole('button', { name: '结束并清除本机会话', exact: true }).click()
+  await page.getByRole('button', { name: '结束并清除这台机器上的这次使用', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
   await expectSensitiveSessionCleared(page)
@@ -424,10 +424,10 @@ test('orphan /session-timeout shows the clearing overlay on first frame and neve
       const heading = document.querySelector('#session-timeout-title')
       const buttons = Array.from(document.querySelectorAll('button'))
       const exitButton = buttons.find((button) =>
-        /结束并清除本机会话/.test(button.textContent ?? '')
+        /结束并清除这台机器上的这次使用/.test(button.textContent ?? '')
       )
       const continueButton = buttons.find((button) =>
-        /我还在，继续使用|结束并清除本机会话/.test(button.textContent ?? '')
+        /我还在，继续使用|结束并清除这台机器上的这次使用/.test(button.textContent ?? '')
       )
       const accountLabel = Array.from(document.querySelectorAll('p, span, b')).find((el) =>
         /当前登录：|当前会话：/.test(el.textContent ?? '')

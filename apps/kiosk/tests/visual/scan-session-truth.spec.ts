@@ -268,7 +268,7 @@ test('a session that expires while visible is cancelled and can no longer contin
 
   await enterSettingsFromVisibleStart(page)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
-  await expect(page.getByText('扫描会话已过期', { exact: true }).first()).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByText('这次扫描已过期', { exact: true }).first()).toBeVisible({ timeout: 5_000 })
   await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
   await expect.poll(cancelRequests).toBe(1)
   // 过期是确认之后才发生的事：这一场确认过一次，且只有那一次。
@@ -503,10 +503,10 @@ function seedScanWorkbenchStage(page: Page, stage: SeedStage): Promise<void> {
 
 /** 四个阶段各自的「已经落到这一屏」判据，避免还没渲染完就去点出口。 */
 const SCAN_STAGE_LANDMARK: Record<SeedStage, string> = {
-  start: '下一步会创建真实扫描会话',
+  start: '下一步会真实建立这次扫描',
   settings: '扫描任务已创建',
   progress: '等待打印机端扫描完成',
-  result: '服务端说已完成，但这次回执里没有可用文件',
+  result: '系统说已完成，但这次结果里没有可用文件',
 }
 
 /**
@@ -986,7 +986,7 @@ test('a definitive ack refusal revokes the session and offers a plain restart, n
   await enterSettingsFromVisibleStart(page)
 
   // ① 屏幕如实说这一场没拿到投递授权，并且**明说别去面板按开始**。
-  await expect(page.getByText('这次扫描会话没能取得投递授权', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('这次扫描没能取得投递授权', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(/现在请先别在面板上按开始/).first()).toBeVisible()
   await expectNoPanelGuidance(page)
 
@@ -1186,7 +1186,7 @@ test('a created session whose credentials never reach storage is revoked, never 
   await enterSettingsFromVisibleStart(page)
 
   // ① 如实说「本机没能记住」，并且这一屏是**结论**，不是还在加载。
-  await expect(page.getByText('本机没能记住这次扫描会话', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('本机没能记住这次扫描', { exact: true }).first()).toBeVisible()
   await expect(page.getByTestId('scan-live-not-durable-notice')).toBeVisible()
   await expect(page.getByText(/先别在面板上按开始/).first()).toBeVisible()
 
@@ -1222,6 +1222,6 @@ test('a created session whose credentials never reach storage is revoked, never 
   await expect(page.getByRole('button', { name: '再确认一次' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '安全返回扫描首页', exact: true })).toBeVisible()
   // 那颗禁用按钮也不许说「未创建扫描任务」：任务**建过**，随后被本页撤掉了。
-  await expect(page.getByRole('button', { name: '本机存储不可用，无法建会话', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '本机记不住，无法建立这次扫描', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '未创建扫描任务' })).toHaveCount(0)
 })

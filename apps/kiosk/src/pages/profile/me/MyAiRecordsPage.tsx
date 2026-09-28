@@ -259,7 +259,7 @@ export function MyAiRecordsPage() {
     <>
       <QxMeStructRow icon={FileCheckIcon} title="简历诊断与优化记录" desc="只存服务记录，不存原文与模型输出" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-0" />
       <QxMeStructRow icon={RouteIcon} title="职业规划建议记录" desc="阶段性行动建议的服务记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-1" />
-      {hostingOpen ? <QxMeStructRow icon={BriefcaseIcon} title="岗位 AI 参考记录" desc="基于公开岗位字段的解读记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-2" /> : null}
+      {hostingOpen ? <QxMeStructRow icon={BriefcaseIcon} title="岗位 AI 参考记录" desc="基于公开岗位内容的解读记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-2" /> : null}
     </>
   )
 
@@ -284,7 +284,7 @@ export function MyAiRecordsPage() {
         <section className="qx-me-list qx-me-grow" aria-label="从这里开始">
           <QxMeStartRow icon={FileCheckIcon} title="做一次简历诊断" desc="诊断结果会生成一条可回看的服务记录" label="去诊断" route="/resume/source?intent=diagnose" testid="member-records-start-diagnose" onClick={() => navigate('/resume/source?intent=diagnose')} />
           {hostingOpen
-            ? <QxMeStartRow icon={BriefcaseIcon} tone="slate" title="让 AI 解读一个岗位" desc="基于来源岗位的公开字段生成参考解读" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
+            ? <QxMeStartRow icon={BriefcaseIcon} tone="slate" title="让 AI 解读一个岗位" desc="基于来源岗位的公开内容生成参考解读" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
             : <QxMeStartRow icon={BriefcaseIcon} tone="slate" title="做一次简历对照" desc="填一份岗位要求，AI 对照你的简历" label="去对照" route="/resume/job-fit" testid="member-records-start-job-fit" onClick={() => navigate('/resume/job-fit')} />}
           <QxMeStartRow icon={RouteIcon} tone="wheat" title="做一次职业规划" desc="阶段性行动建议会存成一条服务记录" label="去规划" route="/resume-service" testid="member-records-start-plan" onClick={() => navigate('/resume-service')} />
           <div className="qx-me-legal">仅展示本人 AI 服务记录，不展示简历原文、诊断正文或模型原始输出。</div>

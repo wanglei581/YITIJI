@@ -61,10 +61,10 @@ function Glyph({ name, size = 28 }: { name: GlyphName; size?: number }) {
 /** 八个状态轴：名字与依赖说明照稿；判定只有「这次」的读数，没有「正常」「在线」这类保证词。 */
 const CAPS: { key: string; glyph: GlyphName; tone: string; name: string; dep: string }[] = [
   { key: 'network', glyph: 'upload', tone: 'slate', name: '联网', dep: '这台机器现在能不能连上服务器' },
-  { key: 'agent', glyph: 'desk', tone: 'teal', name: '机器后台程序', dep: '没有单独的检测口，只能从机器上报的信号间接看' },
+  { key: 'agent', glyph: 'desk', tone: 'teal', name: '这台机器的本机程序', dep: '没有单独的检测口，只能从机器上报的信号间接看' },
   { key: 'printer', glyph: 'printer', tone: 'teal', name: '打印机', dep: '读机器上报的状态；「没读到」和「离线」不合并' },
   { key: 'scan', glyph: 'scan', tone: 'slate', name: '扫描件的存放', dep: '扫出来的文件先存在这台机器上再送走；没有单独的检测口' },
-  { key: 'usb', glyph: 'usb', tone: 'wheat', name: 'U 盘读取', dep: '插盘后由这台机器读取；整条流程还没在正式机器上验收' },
+  { key: 'usb', glyph: 'usb', tone: 'wheat', name: 'U 盘读取', dep: '插盘后由这台机器读取；这条能力暂未开通' },
   { key: 'pay', glyph: 'gauge', tone: 'clay', name: '付款', dep: '没有单独的检测口，到收银台真付一次才知道' },
   { key: 'ai', glyph: 'spark', tone: 'plum', name: 'AI 服务', dep: '没有单独的检测口，用到哪个 AI 功能时当场确认' },
   { key: 'jobs', glyph: 'briefcase', tone: 'slate', name: '岗位与招聘会信息', dep: '打开列表时分别确认；能连上不等于现在有内容' },
@@ -144,17 +144,17 @@ async function readPrinterStatus(signal: AbortSignal): Promise<PrinterReading> {
 function verdictsFor(view: View, result: CheckResult | null): Verdict[] {
   const q = (label: string): Verdict => [label, 'q']
   if (view === 'checking') {
-    return [q('检测中'), q('检测中'), q('检测中'), q('未检测'), q('未验收'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+    return [q('检测中'), q('检测中'), q('检测中'), q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
   }
   if (view === 'offline') {
     const unread: Verdict = ['没读到', 'warn']
-    return [['这次连不上', 'bad'], unread, unread, q('未检测'), q('未验收'), unread, unread, unread]
+    return [['这次连不上', 'bad'], unread, unread, q('未检测'), q('暂未开通'), unread, unread, unread]
   }
   if (view === 'partial' && result?.printer) {
     const agent: Verdict = result.printer.heartbeatOnline ? ['这次连得上', 'ok'] : ['没读到', 'warn']
-    return [['这次连得上', 'ok'], agent, result.printer.verdict, q('未检测'), q('未验收'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+    return [['这次连得上', 'ok'], agent, result.printer.verdict, q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
   }
-  return [q('未检测'), q('未检测'), q('未检测'), q('未检测'), q('未验收'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+  return [q('未检测'), q('未检测'), q('未检测'), q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
 }
 
 const clock = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
@@ -259,7 +259,7 @@ export default function ErrorOfflinePage() {
     checking: {
       glyph: 'radar', label: '正在检测本机状态',
       title: <>正在<em>检测</em></>,
-      copy: <>先检测<b>联网、机器后台程序和打印机</b>这三项；扫描件存放、U 盘、付款、AI、岗位信息没有单独的检测口，照实写成未检测或随请求确认。</>,
+      copy: <>先检测<b>联网、这台机器的本机程序和打印机</b>这三项；扫描件存放、U 盘、付款、AI、岗位信息没有单独的检测口，照实写成未检测或随请求确认。</>,
       note: <>检测<b>不会打断</b>你已经创建的打印任务</>,
     },
     partial: {
@@ -368,11 +368,11 @@ export default function ErrorOfflinePage() {
                 </div>
                 <div className="k9s-card">
                   <h3><span className="k9s-ic" data-tone="wheat"><Glyph name="gauge" size={26} /></span>耗材数值拿不到</h3>
-                  <p>终端不上报墨粉和纸量，这里<b>永远不出现墨粉百分比</b>。缺纸缺粉以打印机面板上的提示为准。</p>
+                  <p>这台机器不上报墨粉和纸量，这里<b>永远不出现墨粉百分比</b>。缺纸缺粉以打印机面板上的提示为准。</p>
                 </div>
                 <div className="k9s-card">
                   <h3><span className="k9s-ic" data-tone="cinnabar"><Glyph name="clockoff" size={26} /></span>不预告什么时候好</h3>
-                  <p>屏幕上<b>不写「预计几点恢复」</b>。什么时候好由现场和服务端决定，写个时间只会让你白等。</p>
+                  <p>屏幕上<b>不写「预计几点恢复」</b>。什么时候好由现场和系统决定，写个时间只会让你白等。</p>
                 </div>
               </div>
             </section>

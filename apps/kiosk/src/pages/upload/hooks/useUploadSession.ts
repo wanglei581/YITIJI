@@ -366,7 +366,7 @@ export function useUploadSession({
         return
       }
       setCancelFailed(true)
-      setError(uploadSessionUserMessage(err, '这次会话没能取消，文件还留着。'))
+      setError(uploadSessionUserMessage(err, '这次上传没能取消，文件还留着。'))
     } finally {
       setCancelling(false)
     }

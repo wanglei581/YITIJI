@@ -44,7 +44,7 @@ async function unwrap<T>(res: Response, token: string): Promise<T> {
 
 function rejectMock<T>(): Promise<T> {
   return Promise.reject(
-    new ApiHttpError('MEMBER_PRIVACY_MOCK_DISABLED', '隐私数据请求需连接真实后端后使用', 503),
+    new ApiHttpError('MEMBER_PRIVACY_MOCK_DISABLED', '隐私数据需要接上系统之后才能查看', 503),
   )
 }
 

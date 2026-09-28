@@ -19,7 +19,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       chips: [
         { text: '这一页不显示任何文件' },
         { text: '不生成、不保存、不上传' },
-        { text: '签名图不跨会话保留' },
+        { text: '签名图不留到下一次' },
       ],
     },
     'login-required': {
@@ -37,21 +37,21 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       title: '登录已过期',
       body: '为保护高敏材料，登录过期时已上传的本人手写签名图片会被丢弃，需要重新登录后重新上传。原文档还在你的账号里。',
       chips: [
-        { text: '签名图不做跨会话保留' },
+        { text: '签名图不留到下一次使用' },
         { text: '不会替你自动重传' },
         { text: '原文档仍在账号里', tone: 'ok' },
       ],
     },
     'context-missing': {
       kind: 'warn',
-      title: '没有可用的办理上下文',
+      title: '没有这次办理的来路',
       body: '没有拿到这次办理的来路，无法判断该回到哪里，也无法确认要处理哪一份材料。请从打印扫描重新进入。',
       chips: [{ text: '不猜上一步是什么' }, { text: '不放示例文件' }],
     },
     'terminal-missing': {
       kind: 'error',
-      title: '这台机器还没登记终端编号',
-      body: '签名盖章要按终端校验能力开关。读不到终端编号就无法确认这台机器是否被允许使用，因此不放行。',
+      title: '这台机器还没完成登记',
+      body: '签名盖章要先确认这台机器是否被允许使用。读不到登记信息就不放行，不把读不到当成可以用。',
       chips: [{ text: '不假设读不到就是可用' }, { text: '请联系现场工作人员' }],
     },
     'capability-loading': {
@@ -81,7 +81,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'return-source-unknown': {
       kind: 'warn',
       title: '认不出你是从哪里进来的',
-      body: '来路参数不在允许的内部白名单里，返回已安全回落到「打印扫描」。原始来路值既不接受，也不回显。',
+      body: '来路不在允许的范围内，返回已安全回到「打印扫描」。原来的来路既不接受，也不显示出来。',
       chips: [{ text: '外部地址一律不作为返回落点' }, { text: '不回显原始来路' }],
     },
     'pick-document': {
@@ -109,7 +109,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'document-inspecting': {
       kind: 'info',
       title: '正在读这份 PDF 的页数',
-      body: '服务端打开文档，读出一共几页，好让你选放在第几页。加密、损坏、含数字签名域的会在这一步被拒绝。',
+      body: '系统打开文档，读出一共几页，好让你选放在第几页。加密、损坏、带电子签名的会在这一步被拒绝。',
       chips: [{ text: '读取页数' }, { text: '没有进度回传' }, { text: '原文件不被改写', tone: 'ok' }],
     },
     'document-ready': {
@@ -133,19 +133,19 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'document-too-large': {
       kind: 'warn',
       title: '这份 PDF 太大',
-      body: '原文档上限 15 MB，服务端不接收，没有进入流程。',
+      body: '原文档上限 15 MB，系统不接收，没有进入流程。',
       chips: [{ text: '原文档未被改写', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'document-encrypted': {
       kind: 'warn',
       title: '这份 PDF 加了密',
-      body: '服务端不解密任何文档，加密文档一律拒绝。请换一份未加密的 PDF 再来。',
+      body: '系统不解密任何文档，加密文档一律拒绝。请换一份未加密的 PDF 再来。',
       chips: [{ text: '原文档未被改写', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'document-corrupt': {
       kind: 'warn',
       title: '这份 PDF 读不开',
-      body: '文件结构损坏、已加密或不是有效 PDF，服务端解析不了，没有进入流程。',
+      body: '文件结构损坏、已加密或不是有效 PDF，系统解析不了，没有进入流程。',
       chips: [{ text: '原文档未被改写', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'document-digital-signature': {
@@ -163,13 +163,13 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'document-source-expired': {
       kind: 'warn',
       title: '这份文件的访问凭证过期了',
-      body: '文件访问凭证有时效，过期后服务端不再受理。重新选一次就行，不用重新做材料。',
+      body: '文件访问凭证有时效，过期后系统不再受理。重新选一次就行，不用重新做材料。',
       chips: [{ text: '重新选择即可', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'document-source-forbidden': {
       kind: 'warn',
       title: '这份文件不在你名下',
-      body: '服务端只接受本人名下且未过期的文件。别人的文件、或已清理的文件，一律按不存在处理。',
+      body: '系统只接受本人名下且未过期的文件。别人的文件、或已清理的文件，一律按不存在处理。',
       chips: [{ text: '归属校验未通过' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'pick-stamp': {
@@ -185,7 +185,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'stamp-local-uploading': {
       kind: 'info',
       title: '正在传这张本人手写签名图',
-      body: '这张图按高敏材料处理：短期保留（约 1 小时），不进「我的文档」，会话结束即不可再用。',
+      body: '这张图按高敏材料处理：短期保留（约 1 小时），不进「我的文档」，这次使用结束就不能再用。',
       chips: [
         { text: '单次上传' },
         { text: '高敏 · 约 1 小时', tone: 'warn' },
@@ -195,7 +195,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'stamp-phone-entry': {
       kind: 'info',
       title: '用手机传本人手写签名图',
-      body: '手机拍摄本人手写签名，或选择本人的手写签名图片。确认之后才会进入下一步。这张图同样只在本次会话短期保留。',
+      body: '手机拍摄本人手写签名，或选择本人的手写签名图片。确认之后才会进入下一步。这张图同样只在这一次使用期间短期保留。',
       chips: [
         { text: '手机扫屏幕码' },
         { text: '需你在手机上确认', tone: 'warn' },
@@ -206,8 +206,8 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       kind: 'info',
       title: '签名图收到了',
       body: live.stamp
-        ? `${live.stamp.name} 已经在本次会话里。接下来选第几页、哪个位置、多大，左边同步画出来。`
-        : '签名图已经在本次会话里。接下来选第几页、哪个位置、多大。',
+        ? `${live.stamp.name} 已经在这一次使用里。接下来选第几页、哪个位置、多大，左边同步画出来。`
+        : '签名图已经在这一次使用里。接下来选第几页、哪个位置、多大。',
       chips: [
         { text: live.stamp ? live.stamp.size : FX.stamp.size },
         { text: '高敏 · 约 1 小时', tone: 'warn' },
@@ -235,28 +235,28 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'stamp-corrupt': {
       kind: 'warn',
       title: '这张图读不出来',
-      body: '文件内容与声明的格式不符，或图片已损坏，服务端解析不了。',
+      body: '文件内容与声明的格式不符，或图片已损坏，系统解析不了。',
       chips: [{ text: '已选文档不受影响', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'stamp-encoding-unsupported': {
       kind: 'warn',
       title: '这张图的编码暂不支持',
-      body: '服务端嵌入这张图时失败（常见于 CMYK JPEG）。请另存为普通 PNG / JPG 后重试。',
+      body: '系统嵌入这张图时失败（常见于 CMYK JPEG）。请另存为普通 PNG / JPG 后重试。',
       chips: [{ text: '已选文档不受影响', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'stamp-source-expired': {
       kind: 'warn',
       title: '签名图的访问凭证过期了',
-      body: '本人手写签名图片只在本次会话短期保留（约 1 小时），过期后必须重新上传，不能从历史复用。',
+      body: '本人手写签名图片只在这一次使用期间短期保留（约 1 小时），过期后必须重新上传，不能从历史复用。',
       chips: [{ text: '不能从历史复用', tone: 'warn' }, { text: '已选文档不受影响', tone: 'ok' }],
     },
     'placement-invalid-page': {
       kind: 'warn',
       title: '页码超出这份文档',
-      body: live.placeErr ?? '页码必须在这份文档的页数范围内，超出的请求服务端会直接拒绝。',
+      body: live.placeErr ?? '页码必须在这份文档的页数范围内，超出的请求系统会直接拒绝。',
       chips: [
         { text: live.pages ? `共 ${live.pages} 页` : '页码越界' },
-        { text: '服务端会直接拒绝', tone: 'warn' },
+        { text: '系统会直接拒绝', tone: 'warn' },
       ],
     },
     'authorization-required': {
@@ -274,9 +274,9 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     composing: {
       kind: 'info',
       title: '正在提交这一次合成',
-      body: `按${place}把图片叠上去，生成一份新 PDF。一次性请求，服务端不回传进度，所以没有百分比也没有阶段。`,
+      body: `按${place}把图片叠上去，生成一份新 PDF。一次性请求，系统不回传进度，所以没有百分比也没有阶段。`,
       chips: [
-        { text: '参数已锁定' },
+        { text: '页码位置大小已锁定' },
         { text: '不会自动重复提交', tone: 'ok' },
         { text: '原 PDF 不被改写', tone: 'ok' },
       ],
@@ -284,7 +284,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'rate-limited': {
       kind: 'warn',
       title: '提交太频繁了',
-      body: '合成一分钟内最多三次。你的文档、签名图和位置都还在，等一会儿用同一次请求标识重试即可。',
+      body: '合成一分钟内最多三次。你的文档、签名图和位置都还在，等一会儿用同一个标记重试即可。',
       chips: [
         { text: '一分钟内 3 次上限' },
         { text: '输入已全部保留', tone: 'ok' },
@@ -294,9 +294,9 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'conversion-in-progress': {
       kind: 'warn',
       title: '上一次合成还没结束',
-      body: '同一个请求标识上还有一次正在进行的合成。为避免生成两份，这次不受理，稍候用同一次请求重试。',
+      body: '同一个标记上还有一次正在进行的合成。为避免生成两份，这次不受理，稍候用同一次重试。',
       chips: [
-        { text: '服务端登记为进行中' },
+        { text: '系统登记为进行中' },
         { text: '输入已全部保留', tone: 'ok' },
         { text: '不会另开一份', tone: 'ok' },
       ],
@@ -304,9 +304,9 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'known-failed': {
       kind: 'error',
       title: '这一次明确失败了',
-      body: '服务端给了明确的失败答复：这一次没有生成文件。文档、签名图、页码、位置、大小和授权全部保留，重试不用重传。',
+      body: '系统给了明确的失败答复：这一次没有生成文件。文档、签名图、页码、位置、大小和授权全部保留，重试不用重传。',
       chips: [
-        { text: '服务端明确拒绝' },
+        { text: '系统明确拒绝' },
         { text: '输入已全部保留', tone: 'ok' },
         { text: '原 PDF 不被改写', tone: 'ok' },
       ],
@@ -314,25 +314,25 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'result-unknown': {
       kind: 'warn',
       title: '这一次的结果没有确认',
-      body: '请求中断了，不知道服务端有没有执行。所以这里不说已生成，也不说没生成。只能用同一请求标识 + 同一份输入重试。',
+      body: '请求中断了，不知道系统有没有执行。所以这里不说已生成，也不说没生成。只能用同一个标记、同一份输入重试。',
       chips: [
         { text: '结果未确认' },
-        { text: '输入与请求标识已保留', tone: 'ok' },
+        { text: '输入和这个标记都还在', tone: 'ok' },
         { text: '只允许同一请求重试', tone: 'ok' },
       ],
     },
     'retrying-same-request': {
       kind: 'info',
-      title: '正在用同一次请求重试',
-      body: '复用同一次请求标识，并且文档、签名图、页码、位置、大小一个字节都没有改。如果服务端上一次已经做完，会把那一份直接还回来，不会再生成一份。',
-      chips: [{ text: '同一请求标识' }, { text: '同一份输入', tone: 'ok' }, { text: '参数已锁定', tone: 'ok' }],
+      title: '正在用同一次再试',
+      body: '还是用同一个标记，并且文档、签名图、页码、位置、大小一个字节都没有改。如果系统上一次已经做完，会把那一份直接还回来，不会再生成一份。',
+      chips: [{ text: '同一个标记' }, { text: '同一份输入', tone: 'ok' }, { text: '页码位置大小已锁定', tone: 'ok' }],
     },
     'idempotency-conflict': {
       kind: 'error',
-      title: '这个请求标识已经用过了',
-      body: '同一个请求标识上一次绑定的是另一组参数。服务端拒绝覆盖，上一次的结果原样保留。要换参数，就得是一次新的请求。',
+      title: '这个标记已经用过了',
+      body: '同一个标记上一次对应的是另一组页码、位置和大小。系统拒绝覆盖，上一次的结果原样保留。要换这些，就得重新开始一次。',
       chips: [
-        { text: '请求标识已被占用' },
+        { text: '这个标记已经用过' },
         { text: '上一次结果未被覆盖', tone: 'ok' },
         { text: '未生成新文件', tone: 'ok' },
       ],
@@ -340,7 +340,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'recovered-completed': {
       kind: 'info',
       title: '这一份是恢复出来的已完成结果',
-      body: '服务端确认同一次请求标识、同一份输入上已经有完成的结果，于是把那一份还回来了。没有重复生成。',
+      body: '系统确认同一个标记、同一份输入上已经有完成的结果，于是把那一份还回来了。没有重复生成。',
       chips: [
         { text: '同一请求已完成' },
         { text: '没有重复生成', tone: 'ok' },
@@ -349,17 +349,17 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     completed: {
       kind: 'info',
-      title: '新的派生 PDF 已生成',
-      body: '服务端返回了一份新文件。原 PDF 一个字节没改。下一步去材料检查，那一步才决定能不能打印。',
+      title: '新的 PDF 已生成',
+      body: '系统返回了一份新文件。原 PDF 一个字节没改。下一步去材料检查，那一步才决定能不能打印。',
       chips: [
-        { text: live.result ? `${live.result.pages} 页 · ${formatResultSize(live.result)}` : '派生 PDF' },
+        { text: live.result ? `${live.result.pages} 页 · ${formatResultSize(live.result)}` : '签好的 PDF' },
         { text: '原 PDF 未被改写', tone: 'ok' },
         { text: '下一步：材料检查', tone: 'ok' },
       ],
     },
     'output-preview-failed': {
       kind: 'warn',
-      title: '派生 PDF 已生成，但这里渲染不出来',
+      title: '新的 PDF 已生成，但这里显示不出来',
       body: '浏览器没能把这份 PDF 画出来。这不代表文件损坏或丢失，可以重新取一次预览链接，或直接去材料检查。',
       chips: [
         { text: '预览渲染失败', tone: 'warn' },
@@ -369,7 +369,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'output-expired': {
       kind: 'warn',
-      title: '派生 PDF 已生成，但预览链接过期了',
+      title: '新的 PDF 已生成，但预览链接过期了',
       body: '访问链接有效期 30 分钟，已到期。文件没丢，但现在打不了——要重新取一次。',
       chips: [
         { text: '链接已过期', tone: 'warn' },
@@ -380,15 +380,15 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'output-too-large': {
       kind: 'error',
       title: '合成结果超出大小限制',
-      body: '叠加后的 PDF 超过 15 MB，服务端拒绝落库，没有生成可用文件。换小一点的签名图，或先压缩原 PDF。',
-      chips: [{ text: '服务端明确拒绝' }, { text: '输入已全部保留', tone: 'ok' }],
+      body: '叠加后的 PDF 超过 15 MB，系统拒绝保存，没有生成可用文件。换小一点的签名图，或先压缩原 PDF。',
+      chips: [{ text: '系统明确拒绝' }, { text: '输入已全部保留', tone: 'ok' }],
     },
     'add-another-ready': {
       kind: 'info',
       title: '以刚才的合成结果继续叠加',
       body: '旧签名图和授权已清空，得重新传一张才能接着叠。',
       chips: [
-        { text: live.doc ? `${live.doc.name} · ${live.pages ?? ''} 页` : '派生 PDF 已作为原文档' },
+        { text: live.doc ? `${live.doc.name} · ${live.pages ?? ''} 页` : '签好的 PDF 已作为原文档' },
         { text: '旧签名图已清空', tone: 'warn' },
         { text: '授权已复位', tone: 'warn' },
       ],
@@ -547,7 +547,7 @@ export function fixtureLive(state: SignStampStateId): Partial<LiveSnapshot> {
     'placement-bottom-right-large': { ...withStamp, size: 'large' },
     'placement-invalid-page': {
       ...withStamp,
-      placeErr: '这份文档共 6 页，第 7 页不存在。页码必须在 1–6 之间，超出的请求服务端会直接拒绝。',
+      placeErr: '这份文档共 6 页，第 7 页不存在。页码必须在 1–6 之间，超出的请求系统会直接拒绝。',
     },
     'preview-fit-page': { ...withStamp, page: 3, viewPage: 3, position: 'center', viewMode: 'page' },
     'preview-fit-width': { ...withStamp, page: 3, viewPage: 3, position: 'center', viewMode: 'width' },

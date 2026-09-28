@@ -34,7 +34,7 @@ const scanSettingsTeardown = read('src/pages/scan/scanSettingsTeardown.ts')
 /* 清场收尾闸本身：等服务端确认之前不许换人。这一轮 P1 的本体。 */
 const scanCleanupGate = read('src/pages/scan/scanCleanupGate.ts')
 const privacyGuard = read('src/auth/KioskPrivacyGuard.tsx')
-/* 清场遮罩自己的组件：它现在除了「正在清除本机会话」，还要如实说出收尾闸在等什么。 */
+/* 清场遮罩自己的组件：它现在除了「正在清除这台机器上的这次使用」，还要如实说出收尾闸在等什么。 */
 const clearingOverlay = read('src/auth/KioskClearingOverlay.tsx')
 
 assert.doesNotMatch(
@@ -44,8 +44,8 @@ assert.doesNotMatch(
 )
 assert.match(
   scanStart,
-  /\u4e0b\u4e00\u6b65\u4f1a\u521b\u5efa\u771f\u5b9e\u626b\u63cf\u4f1a\u8bdd/,
-  'scan start must explain that the real session is created on the next step',
+  /\u4e0b\u4e00\u6b65\u4f1a\u771f\u5b9e\u5efa\u7acb\u8fd9\u6b21\u626b\u63cf/,
+  'scan start must explain that the next step really creates this scan',
 )
 assert.match(
   scanStart,
@@ -207,8 +207,8 @@ assert.doesNotMatch(
 )
 assert.match(
   scanProgress,
-  /服务端不做转换/,
-  'progress must say the server stores the original bytes',
+  /系统不做转换/,
+  'progress must say the system stores the original bytes and does not convert them',
 )
 assert.doesNotMatch(
   scanResult,
@@ -918,7 +918,7 @@ assert.match(
  * 被谁收走，也就不敢开新的一场。 */
 assert.match(
   rescanRecovery,
-  /RESCAN_CHILD_LOST_FAILURE = \{\s*\n\s*title: '那次安全重扫的会话已经失效'/,
+  /RESCAN_CHILD_LOST_FAILURE = \{\s*\n\s*title: '那次安全重扫已经失效'/,
   'child 已提交但不可恢复要有自己的结论屏：它和「上一场根本没走到取件」'
     + '（从来没有任务）的成因正相反，混成一句就有一半的人读到假的诊断',
 )
@@ -1200,8 +1200,8 @@ for (const destination of ['/print-scan', '/help', '/']) {
  * 等于服务端已经把授权消费掉了 —— 所以「已放行」只有它说得出口。 */
 assert.doesNotMatch(
   scanResult,
-  /服务端给的安全重扫放行|服务端已放行/,
-  '结果页不得替服务端下结论：这一刻它只有凭据，没有放行结果',
+  /服务端给的安全重扫放行|服务端已放行|系统已放行/,
+  '结果页不得说已经放行：这一刻它只有凭据，没有放行结果',
 )
 assert.match(
   scanResult,
@@ -1211,8 +1211,8 @@ assert.match(
 )
 assert.match(
   scanSettingsModel,
-  /rescanRequested\s*\n?\s*\? \['本次性质', '安全重扫：服务端已放行同一份材料再扫一次'\]/,
-  '「已放行」只许出现在创建成功之后的设置页：那一刻服务端确实已经消费掉那枚授权',
+  /rescanRequested\s*\n?\s*\? \['本次性质', '安全重扫：系统已放行同一份材料再扫一次'\]/,
+  '「已放行」只许出现在创建成功之后的设置页：那一刻系统确实已经用掉那一次放行',
 )
 assert.match(
   scanSettings,
@@ -1251,8 +1251,8 @@ assert.match(
 )
 assert.match(
   scanSettingsModel,
-  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通会话：你已确认这一次不是安全同字节重扫'\]/,
-  '用户在 fail-closed 那一屏选的普通会话要记在屏幕上：否则下一屏看起来像是本页悄悄降级的',
+  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通的一次扫描：你已确认这一次不是把同一份内容再扫一遍'\]/,
+  '用户在 fail-closed 那一屏选的普通扫描要记在屏幕上：否则下一屏看起来像是本页悄悄降级的',
 )
 
 /* ── 整页重载把内存里那份凭据抹掉之后：fail-closed（2026-09-14 第二轮） ────────
@@ -1443,7 +1443,7 @@ assert.doesNotMatch(
 )
 assert.match(
   rescanRecovery,
-  /本页不会替你改发一次普通重扫/,
+  /不会替你改成普通重扫|不会自动改用普通重扫/,
   '必须对用户明说不会自动降级 —— 降级本身不危险，但它会把用户支到面板前去扫一张'
     + '注定被去重拒收的纸',
 )
@@ -1766,7 +1766,7 @@ assert.match(
 )
 assert.match(
   scanSettingsView,
-  /liveNotDurable\s*\n?\s*\? '本机存储不可用，无法建会话'[\s\S]{0,300}?cleanupHolding \? '等本机收完上一场的尾' : '未创建扫描任务'/,
+  /liveNotDurable\s*\n?\s*\? '本机记不住，无法建立这次扫描'[\s\S]{0,300}?cleanupHolding \? '等本机收完上一场的尾' : '未创建扫描任务'/,
   '这一支上任务**建过**（随后被本页撤掉）：禁用按钮写死「未创建扫描任务」就是句假话，'
     + '必须按 liveNotDurable 分开说。\n'
     + '2026-09-15 再多一支：收尾闸挡住时本页**一个请求都没发**，'

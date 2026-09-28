@@ -101,7 +101,7 @@ mustContain(
     'deleteMyJobAiSession',
     '岗位 AI 参考记录',
     'recommendationCount',
-    '仅展示岗位 AI 会话元数据',
+    '只展示这次岗位解读的摘要',
     '不展示简历原文',
     '分析结果仅供参考',
   ],

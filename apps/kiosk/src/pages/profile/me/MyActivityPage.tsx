@@ -82,7 +82,7 @@ export function MyActivityPage() {
     <>
       <QxMeStructRow icon={EyeIcon} title="浏览记录" desc={hostingOpen ? '看过哪些岗位、招聘会与政策' : '看过哪些政策'} mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-0" />
       <QxMeStructRow icon={ExternalLinkIcon} title="外部跳转记录" desc="打开过哪些来源平台或官方入口" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-1" />
-      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由服务端返回，本机不本地留存明细" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-2" />
+      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由系统返回，本机不在这台机器上留存明细" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-2" />
     </>
   )
 
@@ -102,7 +102,7 @@ export function MyActivityPage() {
 
   let body: ReactNode
   if (!isLoggedIn) {
-    body = <QxMeLoginBlock title="登录后查看本人记录" desc="游客模式不保存跨会话浏览记录，也不保存你自己填写的求职进度；公共一体机不在本机留存这些明细。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
+    body = <QxMeLoginBlock title="登录后查看本人记录" desc="游客模式不把浏览记录留到下一次使用，也不保存你自己填写的求职进度；这台机器不留存这些明细。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载本人记录" />
   } else if (state === 'error') {

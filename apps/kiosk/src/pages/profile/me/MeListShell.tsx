@@ -95,7 +95,7 @@ export function MeListShell({
             title="登录后查看本人记录"
             description={
               signedOutDescription ??
-              '本人记录仅本人可见，登录后绑定；游客模式不留存跨会话明细'
+              '本人记录仅本人可见，登录后绑定；游客模式不把明细留到下一次使用'
             }
             icon={<LogInIcon aria-hidden="true" />}
             actions={

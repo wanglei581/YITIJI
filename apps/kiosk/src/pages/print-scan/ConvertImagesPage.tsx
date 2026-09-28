@@ -143,7 +143,7 @@ export function ConvertImagesPage() {
       setError({
         kind: 'upload-failed',
         message: userMessageOf(err, '上传失败，请重试'),
-        rejected: { name: selectedFile.name, detail: '没有拿到服务端确认' },
+        rejected: { name: selectedFile.name, detail: '没有拿到系统确认' },
       })
     } finally {
       if (gen === uploadGen.current) setUploading(false)
@@ -208,7 +208,7 @@ export function ConvertImagesPage() {
     }
     const terminalId = getTerminalId()
     if (!terminalId) {
-      setError({ kind: 'capability', message: '终端编号未配置，无法使用格式转换' })
+      setError({ kind: 'capability', message: '这台机器还没完成登记，无法使用格式转换' })
       return
     }
     const previousKind = error?.kind

@@ -288,9 +288,9 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   })
 
   await page.goto('/scan/start')
-  await expect(page.getByText(/下一步会创建真实扫描会话/).first()).toBeVisible()
+  await expect(page.getByText(/下一步会真实建立这次扫描/).first()).toBeVisible()
   await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
-  const next = page.getByRole('button', { name: /下一步 · 创建扫描会话/ })
+  const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
   await expect(next).toBeEnabled()
   // 稿 18：底部三列口径是一次性说明，只在选类型这一屏出现，后面各屏不复读。
   await expect(page.getByTestId('scan-workbench-truth')).toBeVisible()
@@ -319,7 +319,7 @@ test('scan start blocks continuation while scan capability is unavailable @w2', 
 
   await page.goto('/scan/start')
   await expect(page.getByText('扫描能力暂未开放', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: /下一步 · 创建扫描会话/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '改用上传文件打印' })).toBeVisible()
   await expectHealthy(page, errors)
 })
@@ -819,7 +819,7 @@ test('expired result never claims a server-confirmed expiry it cannot tell apart
   await expect(page.getByRole('heading', { level: 1, name: '等待超时', exact: true })).toBeVisible()
   await expect(page.getByText('等待超时，这次没有拿到文件', { exact: true })).toBeVisible()
   await expect(page.getByText('扫描超时，请返回重新开始', { exact: true })).toBeVisible()
-  for (const claim of [/会话已过期/, /会话过期了/, /服务端确认/, /编号已作废/]) {
+  for (const claim of [/会话已过期/, /这次扫描已过期/, /会话过期了/, /这次扫描过期了/, /服务端确认/, /系统确认这次.*过期/, /编号已作废/]) {
     await expect(page.getByText(claim), `不得出现 ${claim}`).toHaveCount(0)
   }
   await expect(page.getByTestId('scan-workbench-truth')).toHaveCount(0)
@@ -853,7 +853,7 @@ test('completed scan without a file is a terminal no-file state @w2', async ({ p
   await seedScanLive(page)
   await page.goto('/scan?stage=progress')
   await page.waitForURL(/\/scan\?stage=result/)
-  await expect(page.getByText('服务端说已完成，但这次回执里没有可用文件').first()).toBeVisible()
+  await expect(page.getByText('系统说已完成，但这次结果里没有可用文件').first()).toBeVisible()
   await expect(page.getByText('w2-scan.pdf')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeVisible()
   await ack.expectAcked(1)
@@ -1246,7 +1246,7 @@ test('scan result preview counts pages from the file when the receipt omits them
   await expect(viewer).toHaveAttribute('data-pdf-fit', 'page')
   await expect(dialog.getByTestId('rs-pv-prev')).toBeDisabled()
   await expect(dialog.getByTestId('rs-pv-next')).toBeDisabled()
-  await expect(dialog.getByTestId('rs-pv-note')).toContainText('回执里没有页数')
+  await expect(dialog.getByTestId('rs-pv-note')).toContainText('结果里没有页数')
   // 夹具 PDF 实际只有 1 页。读出来之前不编页码；读出来之后用文件自己的页数，不写成 2 页。
   await expect(viewer).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
   await expect(viewer).toHaveAttribute('data-pdf-page-count', '1')

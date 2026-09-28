@@ -52,7 +52,7 @@ export function SessionResumeView({
         <div className="sr-banner" data-testid="session-resume-empty">
           <div>
             <b>名下没有未完成的打印任务</b>
-            <p>这条结论来自服务端返回的空列表，不是读取失败。历史订单不在这里。</p>
+            <p>这条结论来自系统返回的空列表，不是读取失败。历史订单不在这里。</p>
           </div>
         </div>
         <div className="sr-list" style={{ marginTop: 12 }}>
@@ -164,7 +164,7 @@ function Truth() {
     <div className="sr-truth" data-disclaimer="true" data-testid="session-resume-truth">
       <span><b>去向</b>只回这一单原来那一步：待付款去收银台，其余去打印进度。</span>
       <span><b>归属</b>只列你名下没办完的打印任务；未登录会先去登录页。</span>
-      <span><b>边界</b>不重新建单，也不删除服务端订单或文件。</span>
+      <span><b>边界</b>不重新建单，也不删除系统里的订单或文件。</span>
     </div>
   )
 }

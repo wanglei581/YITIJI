@@ -128,7 +128,7 @@ export const PRINT_HUB_AI_EXPLAINER: readonly PrintHubAiExplainerRow[] = [
     isAi: true,
     help: '和文档打印同一套体检 —— 走的本来就是同一条流程。彩色、纸张这些参数本机不给建议。',
     aiDown: '没有体检结论。彩色、纸张、份数照旧你自己定，照片照常打。',
-    deviceOff: '停。走的是文档打印同一条出纸链路。',
+    deviceOff: '停。走的是文档打印同一条出纸流程。',
   },
   {
     cap: 'idphoto',
