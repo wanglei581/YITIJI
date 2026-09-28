@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, Drawer, EmptyState, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
 import { ClipboardListIcon, FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
 import { PolicyReleaseDialog } from './PolicyReleaseDialog'
+import { PolicyEmergencyNote } from './PolicyEmergencyNote'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
+  isPolicyEmergencyHeld,
   partnerPoliciesService,
   type PartnerPolicyRecord,
   type PolicyAudience,
@@ -356,14 +358,16 @@ export default function PolicyPage() {
                 {rows.map((r) => {
                   const review = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
                   const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
+                  const held = isPolicyEmergencyHeld(r)
                   return (
-                    <tr key={r.id} className="hover:bg-neutral-50">
+                    <Fragment key={r.id}>
+                    <tr className={held ? 'border-b-0 hover:bg-neutral-50' : 'hover:bg-neutral-50'}>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.kind === 'policy_guide' ? 'bg-info-bg text-info-fg' : 'bg-purple-50 text-purple-600'}`}>
                           {KIND_LABELS[r.kind] ?? r.kind}
                         </span>
                       </td>
-                      <td className="max-w-96 px-4 py-3">
+                      <td className="min-w-56 max-w-96 px-4 py-3">
                         <p className="font-medium text-neutral-800">{r.title}</p>
                         {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-400">{r.summary}</p>}
                         {typeof r.contentVersion === 'number' && (
@@ -383,9 +387,14 @@ export default function PolicyPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{r.publishedDate ?? '—'}</td>
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge} label={review.label} /></td>
-                      <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
+                      <td className="px-4 py-3">
+                        {held
+                          ? <StatusBadge dot status="error" label="平台已紧急下架" />
+                          : <StatusBadge dot status={publish.badge} label={publish.label} />}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-1.5">
+                          {!held && (
                           <button
                             type="button"
                             aria-label="编辑"
@@ -394,7 +403,8 @@ export default function PolicyPage() {
                           >
                             <PencilIcon className="h-3.5 w-3.5" />
                           </button>
-                          {r.kind === 'policy_guide' && (
+                          )}
+                          {!held && r.kind === 'policy_guide' && (
                             <button
                               onClick={() => setRulesFor(r)}
                               title="录入可机械比对的申领条件"
@@ -404,7 +414,7 @@ export default function PolicyPage() {
                               申领条件
                             </button>
                           )}
-                          {(r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
+                          {!held && (r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
                             <button
                               type="button"
                               disabled={busyId === r.id}
@@ -414,7 +424,7 @@ export default function PolicyPage() {
                               审核通过
                             </button>
                           )}
-                          {r.reviewStatus === 'approved' && r.publishStatus !== 'published' && (
+                          {!held && r.reviewStatus === 'approved' && r.publishStatus !== 'published' && (
                             <button
                               type="button"
                               disabled={busyId === r.id}
@@ -445,6 +455,14 @@ export default function PolicyPage() {
                         </div>
                       </td>
                     </tr>
+                    {held && (
+                      <tr>
+                        <td colSpan={7} className="px-4 pb-3 pt-0">
+                          <PolicyEmergencyNote row={r} />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   )
                 })}
               </tbody>
