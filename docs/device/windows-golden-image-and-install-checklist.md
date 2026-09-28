@@ -16,7 +16,7 @@
 | A5 | Windows 更新 | 使用时段 08:00–22:00 内不重启；关闭「自动重启通知」 | 更新设置页截图 |
 | A6 | 打印机驱动 | 预装奔图驱动，驱动识别名固定（真机确认为 `Pantum CM2800ADN Series`），设为默认打印机，纸张 A4，双面单元已启用 | `Get-Printer` 能列出该名称；打印测试页出纸 |
 | A7 | 浏览器 | 只需预装 Edge（或 Chrome）并完成一次首次运行；**全屏自启与崩溃拉起由安装包的 Kiosk 看门狗负责**（绑定向导自动注册计划任务 `AIJobPrintKioskWatchdog`，控制中心可查看/停用），镜像里不要再手工配 kiosk 快捷方式或启动项 | B7 重启后自动进入全屏首页，无地址栏；手动关掉 Edge 5 秒内自动回来 |
-| A7a | Edge 整机策略 | 生产安装写入 `LocalNetworkAccessAllowedForUrls`、`AudioCaptureAllowedUrls`（均放行配置的一体机站点 origin）和 `AllowFileSelectionDialogs=0`；这是整机策略，只能用于专用一体机，不得下发到个人电脑 | `edge://policy` 出现三项；重启浏览器后不再弹本地网络/麦克风权限框；页头出现终端号 |
+| A7a | Edge 整机策略 | 生产安装写入 `LocalNetworkAccessAllowedForUrls`、`AudioCaptureAllowedUrls`（均放行配置的一体机站点 origin）和 `AllowFileSelectionDialogs=0`；这是整机策略，只能用于专用一体机，不得下发到个人电脑。**测试机同时是个人工作电脑时**（如 KSK-001）安装脚本加 `-KeepFileSelectionDialogs`：只写前两项、不禁用文件选择框（并去掉已有的禁用值），脚本会打印警告；专用一体机不得加 | `edge://policy` 出现三项；重启浏览器后不再弹本地网络/麦克风权限框；页头出现终端号 |
 | A8 | 触控与显示 | 27 寸竖屏 1080×1920，缩放 100%，触控校准完成，屏幕方向锁定 | 四角点击命中；首页舞台无缩放黑边 |
 | A9 | 外设 | 扫码器为 HID 键盘模式并以 Enter 结尾；扫描目录 `C:\ProgramData\AIJobPrintAgent\scan-inbox` 已建且仅 SYSTEM/Administrators 可写；U 盘自动播放关闭 | 扫一枚码进记事本能回车；插 U 盘不弹窗 |
 | A10 | 网络 | 有线网口；能访问生产 API 域名与 Kiosk 域名（443）；打印机 USB 或同网段有线 | `Test-NetConnection <域名> -Port 443` |
