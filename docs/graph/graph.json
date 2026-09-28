@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 556,
+    "endpointCount": 558,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -334,6 +334,44 @@
         ],
         "services": [
           "ContentService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai-access/admin-ai-access.controller.ts",
+        "handler": "AdminAiAccessController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "UserAiConsent"
+        ],
+        "path": "/api/v1/admin/ai-access",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai-access/ai-access.service.ts"
+        ],
+        "services": [
+          "AiAccessService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai-access/admin-ai-access.controller.ts",
+        "handler": "AdminAiAccessController.update",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "UserAiConsent"
+        ],
+        "path": "/api/v1/admin/ai-access",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai-access/ai-access.service.ts"
+        ],
+        "services": [
+          "AiAccessService"
         ]
       },
       {
@@ -17349,6 +17387,7 @@
           "EndUser"
         ],
         "usedBy": [
+          "services/api/src/ai-access/ai-access.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/member-privacy/member-data-request.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
@@ -21761,6 +21800,9 @@
     "services/api/src/advisor/advisor-skills.ts": [
       "services/api/scripts/verify-advisor-work.ts"
     ],
+    "services/api/src/advisor/advisor.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts"
+    ],
     "services/api/src/advisor/advisor.module.ts": [
       "services/api/scripts/verify-ai-user-text-retention.ts"
     ],
@@ -21776,6 +21818,18 @@
     "services/api/src/advisor/llm-advisor.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts"
+    ],
+    "services/api/src/ai-access/admin-ai-access.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts"
+    ],
+    "services/api/src/ai-access/ai-access.decorator.ts": [
+      "services/api/scripts/verify-ai-access.ts"
+    ],
+    "services/api/src/ai-access/ai-access.guard.ts": [
+      "services/api/scripts/verify-ai-access.ts"
+    ],
+    "services/api/src/ai-access/ai-access.service.ts": [
+      "services/api/scripts/verify-ai-access.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
@@ -21806,6 +21860,7 @@
       "services/api/scripts/verify-job-ai-backend.ts"
     ],
     "services/api/src/ai/ai.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-assess-isolation.ts",
@@ -21851,6 +21906,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/career-plan.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
@@ -21873,6 +21929,7 @@
       "services/api/scripts/verify-resume-voice-generate.ts"
     ],
     "services/api/src/ai/fair-visit-plan.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-fair-visit-plan.ts"
     ],
     "services/api/src/ai/interfaces/ai-provider.interface.ts": [
@@ -21893,6 +21950,7 @@
     ],
     "services/api/src/ai/job-fit.controller.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
       "services/api/scripts/verify-job-fit-print.ts",
@@ -21900,6 +21958,7 @@
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/ai/kiosk-ai-capabilities.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
@@ -22000,6 +22059,7 @@
       "services/api/scripts/verify-resume-parse-submission.ts"
     ],
     "services/api/src/ai/resume-report-export.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -22222,6 +22282,7 @@
       "services/api/scripts/verify-compliance.ts"
     ],
     "services/api/src/ai/self-assessment.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts"
     ],
@@ -22247,6 +22308,7 @@
       "services/api/scripts/verify-resume-voice-generate.ts"
     ],
     "services/api/src/assistant/daily-brief.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-community-daily-brief.ts"
     ],
     "services/api/src/assistant/daily-brief.service.ts": [
@@ -22525,6 +22587,7 @@
     ],
     "services/api/src/common/decorators/roles.decorator.ts": [
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
@@ -22554,6 +22617,7 @@
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/common/guards/end-user-auth.guard.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-content-pipeline-e2e.ts",
@@ -22610,6 +22674,7 @@
       "services/api/scripts/verify-recruitment-content-http.ts"
     ],
     "services/api/src/common/health.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/common/jwt-verifier.module.ts": [
@@ -22858,6 +22923,9 @@
     "services/api/src/contract-review/contract-review-timing.ts": [
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
+    "services/api/src/contract-review/contract-review.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts"
+    ],
     "services/api/src/contract-review/contract-review.queue.ts": [
       "services/api/scripts/verify-contract-review-http.ts"
     ],
@@ -23034,6 +23102,7 @@
     ],
     "services/api/src/job-ai/job-ai.controller.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -23102,6 +23171,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/job-materials/job-materials.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-job-materials.ts"
     ],
     "services/api/src/job-materials/job-materials.module.ts": [
@@ -23418,6 +23488,7 @@
       "services/api/scripts/verify-job-customer-sample-readiness.ts"
     ],
     "services/api/src/kiosk-session/kiosk-session.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/legal/admin-legal-docs.controller.ts": [
@@ -23430,6 +23501,7 @@
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "services/api/src/legal/legal.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "services/api/src/legal/legal.service.ts": [
@@ -23439,6 +23511,7 @@
       "services/api/scripts/verify-file-display-truth.ts"
     ],
     "services/api/src/materials/materials.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-material-task-token-transport.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
@@ -23506,6 +23579,7 @@
     ],
     "services/api/src/member-auth/member-auth.controller.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
@@ -23609,6 +23683,7 @@
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "services/api/src/member-print-orders/member-print-orders.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -23630,6 +23705,7 @@
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/member-print-orders/package-orders.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts"
     ],
     "services/api/src/member-print-orders/pickup-code-reissue.service.ts": [
@@ -23723,6 +23799,7 @@
     ],
     "services/api/src/mock-interview/mock-interview.controller.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
@@ -23843,6 +23920,9 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
+    "services/api/src/payment/order-quote.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts"
+    ],
     "services/api/src/payment/order-quote.service.ts": [
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -23922,6 +24002,7 @@
       "apps/kiosk/scripts/verify-price-single-source.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-payment-codepay.ts"
     ],
     "services/api/src/payment/payment.module.ts": [
@@ -24076,6 +24157,7 @@
       "services/api/scripts/verify-policy-eligibility.ts"
     ],
     "services/api/src/print-conversion/print-conversion.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-print-conversion.ts"
     ],
     "services/api/src/print-conversion/print-conversion.dto.ts": [
@@ -24132,6 +24214,7 @@
       "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -24450,6 +24533,7 @@
     ],
     "services/api/src/scan-tasks/scan-tasks.controller.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
@@ -24557,6 +24641,7 @@
       "services/api/scripts/verify-job-customer-sample-readiness.ts"
     ],
     "services/api/src/sync/sync.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/sync/sync.service.ts": [
@@ -24732,6 +24817,7 @@
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts"
     ],
     "services/api/src/terminals/terminals.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-release-observation-contract.mjs",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
@@ -24780,6 +24866,7 @@
       "services/api/scripts/verify-toolbox-review-workflow.ts"
     ],
     "services/api/src/trtc/trtc.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -24798,6 +24885,7 @@
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/upload-sessions/upload-sessions.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
@@ -30858,6 +30946,58 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:advisor-work"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/advisor/advisor.controller.ts",
+          "services/api/src/ai-access/admin-ai-access.controller.ts",
+          "services/api/src/ai-access/ai-access.decorator.ts",
+          "services/api/src/ai-access/ai-access.guard.ts",
+          "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/career-plan.controller.ts",
+          "services/api/src/ai/fair-visit-plan.controller.ts",
+          "services/api/src/ai/job-fit.controller.ts",
+          "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
+          "services/api/src/ai/resume-report-export.controller.ts",
+          "services/api/src/ai/self-assessment.controller.ts",
+          "services/api/src/assistant/daily-brief.controller.ts",
+          "services/api/src/common/decorators/roles.decorator.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/health.controller.ts",
+          "services/api/src/contract-review/contract-review.controller.ts",
+          "services/api/src/job-ai/job-ai.controller.ts",
+          "services/api/src/job-materials/job-materials.controller.ts",
+          "services/api/src/kiosk-session/kiosk-session.controller.ts",
+          "services/api/src/legal/legal.controller.ts",
+          "services/api/src/materials/materials.controller.ts",
+          "services/api/src/member-auth/member-auth.controller.ts",
+          "services/api/src/member-print-orders/member-print-orders.controller.ts",
+          "services/api/src/member-print-orders/package-orders.controller.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
+          "services/api/src/payment/order-quote.controller.ts",
+          "services/api/src/payment/payment.controller.ts",
+          "services/api/src/print-conversion/print-conversion.controller.ts",
+          "services/api/src/print-jobs/print-jobs.controller.ts",
+          "services/api/src/scan-tasks/scan-tasks.controller.ts",
+          "services/api/src/sync/sync.controller.ts",
+          "services/api/src/terminals/terminals.controller.ts",
+          "services/api/src/trtc/trtc.controller.ts",
+          "services/api/src/upload-sessions/upload-sessions.controller.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-access.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-access"
       ],
       "wired": true
     },
