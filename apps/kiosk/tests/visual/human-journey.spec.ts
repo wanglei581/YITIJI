@@ -519,9 +519,26 @@ test.describe('真人走查（模拟数据）', () => {
     const s: Step = { n: 0 }
     const TASK = 'journey-scan-001'
     let polls = 0
-    // 扫描结果页现在直接接打印核价（迁移后新增的一步）。缺这两条 mock 时
-    // ApiRouter 会以「Unhandled API requests: POST /api/v1/orders/quote」失败 ——
-    // 那是产品新增了能力，不是回归。
+    // 扫描结果页的「拿去打印」先进打印台材料检查（商用收口 P0-5：扫描件是本人原件，生产强制
+    // PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒），检查页一打开就为这份扫描件建
+    // 隐私检查任务。走查走到这一步时，要钉的是「为**这份扫描件**建的」—— 只 respond 不看请求体，
+    // 「拿错文件去检查」在夹具里永远不会红（断言在用例末尾）。任务停在 processing：走查只看去向。
+    const inspectionPosts: Array<Record<string, unknown>> = []
+    page.on('request', (request) => {
+      if (request.method() !== 'POST') return
+      if (new URL(request.url()).pathname !== '/api/v1/materials/tasks') return
+      inspectionPosts.push(request.postDataJSON() as Record<string, unknown>)
+    })
+    const inspection = {
+      id: 'journey-scan-inspection', kind: 'inspection', status: 'processing', requesterMode: 'anonymous',
+      accessToken: 'journey-scan-inspection-token', sourceFileId: 'journey-scan-file', resultFileId: null,
+      endUserId: null, params: {}, result: null, errorCode: null, errorMessage: null,
+      expiresAt: '2099-01-01T00:00:00.000Z', createdAt: '2026-09-29T00:00:00.000Z', updatedAt: '2026-09-29T00:00:00.000Z',
+    }
+    api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: inspection } })
+    api.respond('GET', `/api/v1/materials/tasks/${inspection.id}`, { status: 200, json: { success: true, data: inspection } })
+    // 检查通过之后才会核价、建单（付费单先建单再进收银）。走查的路线由页面当时的可见按钮决定，
+    // 这三条留给走到那一步时用；没走到不算错。
     api.respond('GET', '/api/v1/print/price-config', {
       status: 200,
       json: { success: true, data: { items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] } },
@@ -533,7 +550,6 @@ test.describe('真人走查（模拟数据）', () => {
         priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 1, amountCents: 100 }],
       },
     })
-    // 核价之后还会建单（付费单先建单再进收银），同样是迁移后新增的一步。
     api.respond('POST', '/api/v1/print/jobs', {
       status: 200,
       json: { success: true, data: { orderId: 'journey-scan-order-001', jobId: 'journey-scan-job-001', status: 'pending_payment', amountCents: 100 } },
@@ -642,6 +658,13 @@ test.describe('真人走查（模拟数据）', () => {
       expect(headers['x-terminal-id']).toBe('KSK-001')
       expect(headers['x-terminal-session-token'] ?? '').not.toBe('')
       expect(headers['x-scan-session-control']).toBe('journey-scan-control')
+    }
+    // 走到了打印台（点了结果页的「拿去打印」）：隐私检查必须是为刚扫出来的这份原件建的。
+    if (new URL(page.url()).pathname === '/print/desk') {
+      expect(inspectionPosts.length, '扫描件去打印前必须先建隐私检查任务').toBeGreaterThanOrEqual(1)
+      for (const body of inspectionPosts) {
+        expect(body, '隐私检查的对象必须是刚扫出来的这份文件').toMatchObject({ kind: 'inspection', sourceFileId: 'journey-scan-file' })
+      }
     }
     if (pageErrors.length) console.log(`\n  ⚠ 运行错误 ${pageErrors.length} 条：\n${pageErrors.slice(0, 3).join('\n---\n')}`)
   })
