@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1569 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1567 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1968,16 +1968,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 526 个文件</summary>
+<summary><code>services/api/src/</code> — 524 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `services/api/src/activities/activities.controller.ts` | `verify-backend-p0-contracts.mjs` |
 | `services/api/src/activity/activity.controller.ts` | `verify-activity-logs.ts`<br/>`verify-kiosk-job-board-switch.ts` |
-| `services/api/src/activity/activity.module.ts` | `verify-policy-scope.ts` |
 | `services/api/src/activity/activity.service.ts` | `verify-activity-logs.ts`<br/>`verify-companies.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-policies.ts` |
 | `services/api/src/activity/activity.types.ts` | `probe-activity-favorites-44.mjs`<br/>`verify-activity-logs.ts`<br/>`verify-jobfair-checkin.ts` |
-| `services/api/src/activity/me-activity.controller.ts` | `verify-activity-logs.ts`<br/>`verify-kiosk-job-board-switch.ts` |
+| `services/api/src/activity/me-activity.controller.ts` | `verify-activity-logs.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/admin-ops/admin-alert-actions.service.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.controller.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-console-screen-snapshot.ts` |
@@ -2296,8 +2295,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-benefits/admin-member-benefits.controller.ts` | `verify-member-benefits-admin.ts` |
 | `services/api/src/member-benefits/admin-member-benefits.service.ts` | `verify-member-benefits-admin.ts` |
 | `services/api/src/member-benefits/member-benefits.service.ts` | `verify-benefit-activities.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-favorites-benefits.ts`<br/>`verify-wave3-print-aftercare.ts` |
-| `services/api/src/member-favorites/member-favorites.controller.ts` | `verify-kiosk-job-board-switch.ts` |
-| `services/api/src/member-favorites/member-favorites.module.ts` | `verify-policy-scope.ts` |
+| `services/api/src/member-favorites/member-favorites.controller.ts` | `verify-kiosk-job-board-switch.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/member-favorites/member-favorites.service.ts` | `verify-kiosk-job-board-switch.ts`<br/>`verify-member-favorites-benefits.ts`<br/>`verify-policies.ts` |
 | `services/api/src/member-feedback/admin-member-feedback.controller.ts` | `verify-feedback-notifications.ts` |
 | `services/api/src/member-feedback/dto/kiosk-feedback.dto.ts` | `verify-kiosk-feedback-entry.mjs`<br/>`verify-kiosk-anonymous-feedback.ts` |
@@ -2386,7 +2384,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/refund-convergence.task.ts` | `verify-api20-manual-refund.ts`<br/>`verify-refund-convergence.ts` |
 | `services/api/src/payment/refund.service.ts` | `verify-admin-orders-refund.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-order.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/policies/dto/policy.dto.ts` | `verify-policies.ts`<br/>`verify-policy-eligibility.ts` |
-| `services/api/src/policies/policies.controller.ts` | `verify-policies.ts` |
+| `services/api/src/policies/policies.controller.ts` | `verify-policies.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/policies/policies.module.ts` | `verify-policy-scope.ts` |
 | `services/api/src/policies/policies.service.ts` | `verify-assess-isolation.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-publish-expiry-completeness.ts` |
 | `services/api/src/policies/policy-eligibility.engine.ts` | `verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts` |

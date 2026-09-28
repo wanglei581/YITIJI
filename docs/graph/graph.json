@@ -21683,9 +21683,6 @@
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
-    "services/api/src/activity/activity.module.ts": [
-      "services/api/scripts/verify-policy-scope.ts"
-    ],
     "services/api/src/activity/activity.service.ts": [
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-companies.ts",
@@ -21701,7 +21698,8 @@
     ],
     "services/api/src/activity/me-activity.controller.ts": [
       "services/api/scripts/verify-activity-logs.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/admin-ops/admin-alert-actions.service.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -23570,9 +23568,7 @@
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
     "services/api/src/member-favorites/member-favorites.controller.ts": [
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
-    ],
-    "services/api/src/member-favorites/member-favorites.module.ts": [
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/member-favorites/member-favorites.service.ts": [
@@ -24065,7 +24061,8 @@
       "services/api/scripts/verify-policy-eligibility.ts"
     ],
     "services/api/src/policies/policies.controller.ts": [
-      "services/api/scripts/verify-policies.ts"
+      "services/api/scripts/verify-policies.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policies.module.ts": [
       "services/api/scripts/verify-policy-scope.ts"
@@ -35503,10 +35500,11 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "services/api/src/activity/activity.module.ts",
+          "services/api/src/activity/me-activity.controller.ts",
           "services/api/src/community/community.module.ts",
           "services/api/src/community/community.service.ts",
-          "services/api/src/member-favorites/member-favorites.module.ts",
+          "services/api/src/member-favorites/member-favorites.controller.ts",
+          "services/api/src/policies/policies.controller.ts",
           "services/api/src/policies/policies.module.ts",
           "services/api/src/policies/policy-public-visibility.ts",
           "services/api/src/policies/policy-scope.service.ts"
