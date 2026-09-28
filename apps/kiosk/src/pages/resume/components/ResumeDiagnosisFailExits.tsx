@@ -7,8 +7,10 @@
 //
 // 三条硬约束：
 //   1. 不伪造：这里一条 AI 结论都不给。诊断没跑出来就是没有，不拿通用建议顶替。
-//   2. 出路必须是真的：打印原件走的是 /print/confirm + 真实 HMAC content URL，
-//      和「我的文档」打印同一条链路；拿不到 URL 时按钮如实置灰并写明原因。
+//   2. 出路必须是真的：打印原件带着上传结果的 fileId 与真实 HMAC content URL 进打印台材料检查。
+//      这是用户自己的原件（resume_upload / resume_scan · original），生产强制
+//      PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒 —— 所以不直达报价确认页
+//      （商用收口 P0-5）。拿不到 fileId 或打印链接时按钮如实置灰并写明原因。
 //   3. 置灰一律 aria-disabled，不用原生 disabled ——
 //      原生 disabled 会退出 Tab 序列、读屏跳过，触屏也没有 hover 读不到 title。
 // 样式只用报告页既有的 rrp-exits / rrp-row / rrp-checks（resume-report-qx.css，行高 88px）。
@@ -16,8 +18,8 @@
 
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { makePrintParams } from '@ai-job-print/shared'
 import { BookOpenIcon, QrCodeIcon, PrinterIcon } from 'lucide-react'
+import { savePrintMaterialSession } from '../../print/printMaterialSession'
 import { MANUAL_CHECKS } from '../resume-report-model'
 
 export interface ResumeDiagnosisFailFile {
@@ -31,33 +33,36 @@ export interface ResumeDiagnosisFailFile {
 
 interface Props {
   file?: ResumeDiagnosisFailFile
+  /** 上传结果的 fileId（来源页放在解析页 state 顶层，失败时随整份 state 转到报告页）。刷新丢 state 后为空。 */
+  fileId?: string
 }
 
-/** 拿不到打印链接时的真实原因。写在按钮旁边常驻可见，不放 tooltip。 */
+/** 拿不到这份原件时的真实原因。写在按钮旁边常驻可见，不放 tooltip。 */
 const NO_PRINT_URL_REASON =
-  '这里没有可用的原件打印链接。请回到来源选择重新选取文件，再确认打印。'
+  '这里拿不到这份原件的文件凭证（刷新或重新进入后不会保留）。请回到简历来源重新选取文件，再去打印。'
 
 /** 置灰行：沿用 rrp-row 的尺寸，只换虚线与弱化色，读得出「点不动」。 */
 const DEAD_ROW: CSSProperties = { borderStyle: 'dashed', color: 'var(--qx-ink-3)', cursor: 'not-allowed' }
 
-export function ResumeDiagnosisFailExits({ file }: Props) {
+export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
   const navigate = useNavigate()
-  const canPrintOriginal = Boolean(file?.fileUrl)
+  const canPrintOriginal = Boolean(fileId && file?.fileUrl)
 
   const printOriginal = () => {
     if (!file?.fileUrl) return
-    navigate('/print/confirm', {
-      state: {
-        file: {
-          name: file.name,
-          size: file.size,
-          pages: null,
-          fileUrl: file.fileUrl,
-          mimeType: file.mimeType,
-        },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-      },
-    })
+    if (!fileId) return
+    // 写法与打印上传页相同：先整份写打印材料会话（旧文件的检查结论、参数一并作废），再去材料检查。
+    // /print/material-check 会重定向到 /print/desk?step=check，重定向不转发路由 state，打印台只认会话。
+    const printFile = {
+      name: file.name,
+      size: file.size,
+      pages: null,
+      fileId,
+      fileUrl: file.fileUrl,
+      mimeType: file.mimeType,
+    }
+    savePrintMaterialSession({ file: printFile, source: 'resume' })
+    navigate('/print/material-check', { state: { file: printFile, source: 'resume' } })
   }
 
   return (
@@ -70,9 +75,9 @@ export function ResumeDiagnosisFailExits({ file }: Props) {
         </p>
         <div className="rows" style={{ display: 'grid', gap: 10 }}>
           {canPrintOriginal ? (
-            <button type="button" className="rrp-row" onClick={printOriginal} data-route="/print/confirm">
+            <button type="button" className="rrp-row" onClick={printOriginal} data-route="/print/material-check">
               <PrinterIcon size={26} aria-hidden="true" />
-              <span className="tx"><b>打印我上传的原件</b><span>不需要 AI，按原样进打印确认</span></span>
+              <span className="tx"><b>打印我上传的原件</b><span>不需要 AI，先检查个人信息再打印</span></span>
             </button>
           ) : (
             <div>

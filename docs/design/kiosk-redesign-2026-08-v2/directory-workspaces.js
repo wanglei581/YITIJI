@@ -752,7 +752,7 @@ function fairCompany (state) {
       qrBlock('用手机扫码，在来源平台完成投递', slot('来源地址'),
         ['手机扫码打开来源平台的岗位页。', '在来源平台登录并投递，简历不经过这台机器。',
           '面试与结果由来源平台和企业通知你。'],
-        '二维码按服务端返回的来源链接在运行时生成；静态原型不生成可扫描图形。' +
+        '二维码按来源链接在办理时生成；这里是示例码，扫不出来。' +
         '本机不接收简历、不代投递，也拿不到你的投递结果；离开前请关掉二维码，不把账号留在公共终端。'), 'grow qr-primary', true) +
     sec('01', '现场也可以直接去展位', '扫码不是唯一路径', strip([
       stripItem('?state=ready', '/job-fairs/:id/companies/:companyId', 'qr-back-detail', 'booth', 'wheat',
@@ -904,7 +904,7 @@ function platformDirectoryLegacyUnused (state) {
         '<b>' + picked.d + '</b>',
         ['手机扫码，在浏览器里打开平台官网。', '浏览岗位、登录、投递都在该平台完成。',
           '本机不接收简历，也不记录你在平台上的操作。'],
-        '二维码在运行时按内置官网地址生成；静态原型不生成可扫描图形。本机与这些平台没有数据对接，也不是合作关系；' +
+        '二维码按官网地址在办理时生成；这里是示例码，扫不出来。本机与这些平台没有数据对接，也不是合作关系；' +
         '离开前请关掉二维码，不把账号留在公共终端。'), 'grow qr-primary', true) +
     sec('01', '也可以不扫码', '', strip([
       stripItem('?state=ready', '/jobs/online-platforms', 'qr-back', 'list', 'slate', '回平台入口', '换一个来源平台'),

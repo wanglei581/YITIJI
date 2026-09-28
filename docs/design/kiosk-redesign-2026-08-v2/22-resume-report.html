@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。9/28 去掉内部英文键名。另有一版重排结构的提案见 STATUS.md，不是默认。
+<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：9/28 用词：写稿人用语（原型、内部键名、「字段」）换成用户的话。结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。9/28 去掉内部英文键名。9/28 留白：内容结构每块的「命中几条问题」标签挪到标题行右端；非报告态的出口行按内容定高（不再拉成空盒），剩余高度分到卡片之间，解析中断与空报告两屏出口行、自查清单放宽一档；早期报告的「报告结论」建议条均匀排开。只改样式，无新增内容。另有一版重排结构的提案见 STATUS.md，不是默认。
      原稿：../kiosk-redesign-2026-08/22-resume-report.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
 <html lang="zh-CN">
 <head>
@@ -635,6 +635,20 @@ html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after
 .idbar,.prov,.provlegend,.proto-tab,.proto-panel,.truth{display:none!important}
 /* 报告的显式 AI 标识贴在结果旁（原 head-tag 只说「已读取」） */
 .head-tag::after{content:" · AI 生成"}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、字阶不做大）
+   1. 内容结构的每一块：「命中几条问题 · 几条证据」标签挪到这一块标题行的右端，右半屏不再空出一长条。
+   2. 非报告态（没有编号 / 读取中 / 空报告 / 读取失败 / 解析中断 / 未接通 / 参数不合法）：出口行按内容定高
+      （原来被拉满整张卡，解析中断那一屏一行 180px 只有两行字），剩下的高度平均分到卡片之间和上下两头；
+      卡片最少的两态（解析中断、空报告）出口行和自查清单各放宽一档。
+   3. 早期报告的「报告结论」分区：建议条按内容定高、在列表里均匀排开，不再上面一排、下面空一截。 */
+.blk .bhd .tag{margin-left:auto}
+.exits{flex:0 0 auto}
+.exits .rows{flex:none;grid-auto-rows:auto}
+.body{justify-content:space-evenly}
+#body-root:is([data-state="diagnose-failed"],[data-state="report-empty"]) .row{min-height:104px}
+#body-root:is([data-state="diagnose-failed"],[data-state="report-empty"]) .checks .list>div{min-height:84px}
+#body-root[data-state="report-minimal"] .scroll[data-fill="1"]{justify-content:space-evenly}
+#body-root[data-state="report-minimal"] .scroll[data-fill="1"]>.it{flex:none;min-height:88px}
 </style>
 </head>
 <body>
@@ -1340,18 +1354,18 @@ function zoneConclusions(report){
     + ' · 风险 '+(hasR?report.riskNotes.length:0)+' '+prov('contract','conclusions-head')+'</span></div>'
     + '<div class="scroll" data-clip="1" data-fill="1" data-testid="'+SCREEN+'-list" data-list="conclusions" data-count="'+n+'">';
   if (hasP) {
-    s += '<div class="subh">先改这几处<span>'+report.priorities.length+' 条 · 报告自带'+(TECH?' · priorities':'')+'</span></div>';
+    s += '<div class="subh">先改这几处<span>'+report.priorities.length+' 条 · 报告自带</span></div>';
     for (i = 0; i < report.priorities.length; i++) {
       s += '<div class="it" data-kind="pri"><span class="no">'+(i+1)+'</span><span class="tx"><b>'
         + esc(report.priorities[i].focus)+'</b><p>'+esc(report.priorities[i].reason)+'</p></span></div>';
     }
   }
-  s += '<div class="subh">可执行建议<span>'+report.suggestions.length+' 条 · 报告自带'+(TECH?' · suggestions':'')+'</span></div>';
+  s += '<div class="subh">可执行建议<span>'+report.suggestions.length+' 条 · 报告自带</span></div>';
   for (i = 0; i < report.suggestions.length; i++) {
     s += '<div class="it" data-kind="sug"><span class="no">'+(i+1)+'</span><span class="tx"><b>'+esc(report.suggestions[i])+'</b></span></div>';
   }
   if (hasR) {
-    s += '<div class="subh">表达风险提醒<span>'+report.riskNotes.length+' 条 · 报告自带'+(TECH?' · riskNotes':'')+'</span></div>';
+    s += '<div class="subh">表达风险提醒<span>'+report.riskNotes.length+' 条 · 报告自带</span></div>';
     for (i = 0; i < report.riskNotes.length; i++) {
       s += '<div class="it" data-kind="risk"><span class="no">'+(i+1)+'</span><span class="tx"><b>'+esc(report.riskNotes[i])+'</b></span></div>';
     }
@@ -1359,7 +1373,7 @@ function zoneConclusions(report){
   s += '</div><p class="zfoot" data-testid="'+SCREEN+'-zone-note">'
     + (hasP && hasR
        ? '三栏都<b>按报告给出的顺序原样排列</b>，本页不重新排序、也不按分数替它排。建议只针对<b>简历表达</b>，不涉及录用、面试或投递结果，也不会发给任何企业；风险提醒只看文本表达方式，不对身份信息或真实性作判断。'
-       : '这是一份<b>早期报告</b>：只有分数和建议，没有「先改这几处」「表达风险」两项字段 —— 这不是读取失败；重新诊断会带上。建议只针对简历表达，<b>不涉及录用、面试或投递结果</b>，也不会发给任何企业。')
+       : '这是一份<b>早期报告</b>：只有分数和建议，没有「先改这几处」「表达风险」两项内容 —— 这不是读取失败；重新诊断会带上。建议只针对简历表达，<b>不涉及录用、面试或投递结果</b>，也不会发给任何企业。')
     + '</p></section>';
   return s;
 }
@@ -1581,7 +1595,7 @@ var NOTICE = {
     why:'终端里没有 Office 排版引擎。硬渲染会改掉字体、行距和分页，你在这儿看到的就不是真正会打印出来的那一份，所以这里不做假预览。',
     keep:'<b>报告本身不受影响</b>：诊断结论已经读出来了，就在这一层下面。',
     rows:[
-      ['dead','print','打印这份原件','静态原型没有真实文件凭证','-source-alt-print'],
+      ['dead','print','打印这份原件','这里没有真实文件','-source-alt-print'],
       ['link','21-resume-triage.html','upload','返回简历来源，转成 PDF 再上传一次','PDF 能直接翻页预览','/resume/source','-source-alt-source'],
       ['link','10-print-hub.html','print','去打印 / 扫描其他材料','打印扫描不依赖预览，照常可用','/print-scan','-source-alt-print-hub'],
       ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
@@ -1598,7 +1612,7 @@ var NOTICE = {
     why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还留着，这一屏都看不出来，也不做判断。',
     keep:'这<b>不是报告读取失败</b>：下面那份诊断报告已经读到了。',
     rows:[
-      ['dead','refresh','再取一次原件','静态原型不会真的重新取件','-source-alt-retry'],
+      ['dead','refresh','再取一次原件','这里不会真的重新取件','-source-alt-retry'],
       ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
       ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
     ] },
@@ -1606,7 +1620,7 @@ var NOTICE = {
     why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还留着。',
     keep:'<b>报告不受影响</b>：诊断结论就在这一层下面。',
     rows:[
-      ['dead','refresh','再显示一次','静态原型不会真的重新渲染','-source-alt-retry'],
+      ['dead','refresh','再显示一次','这里不会真的重新渲染','-source-alt-retry'],
       ['link','10-print-hub.html','print','去打印 / 扫描','不经过预览也能把材料出纸','/print-scan','-source-alt-print-hub'],
       ['link','21-resume-triage.html','upload','返回简历来源','换一份文件重新提交解析','/resume/source','-source-alt-source'],
       ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
@@ -1617,7 +1631,7 @@ function sourceNotice(mode){
   var N = NOTICE[mode], rows = '';
   for (var i = 0; i < N.rows.length; i++) {
     var r = N.rows[i];
-    if (r[0] === 'dead')       rows += rowDead(r[1], r[2], r[3], SCREEN + r[4], '静态原型没有真实文件');
+    if (r[0] === 'dead')       rows += rowDead(r[1], r[2], r[3], SCREEN + r[4], '这里没有真实文件');
     else if (r[0] === 'close') rows += rowLink(closeURL(), r[2], r[3], r[4], SCREEN + r[5], '/resume/report');
     else                       rows += rowLink(r[1], r[2], r[3], r[4], SCREEN + r[6], r[5]);
   }
@@ -1705,7 +1719,7 @@ R['no-context'] = function(){
   cta.innerHTML = btn('39-member-records.html','我的诊断记录',false,SCREEN+'-secondary','/me/ai-records')
     + btn('21-resume-triage.html','去上传简历',true,SCREEN+'-primary','/resume/source');
   why.textContent = ridBad ? '地址里的编号不在允许的字符范围内，本页按「没有编号」处理，也不会把它显示出来。' : '';
-  truthTx.textContent = '静态设计原型：本页不连接真实简历、模型或打印，也不会自动出现结果。';
+  truthTx.textContent = '界面示例：本页不连接真实简历、模型或打印，也不会自动出现结果。';
 };
 
 R['loading'] = function(){
@@ -1727,7 +1741,7 @@ R['loading'] = function(){
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
     + btnDead('正在读取结果', SCREEN+'-primary');
   why.innerHTML = '<span id="'+SCREEN+'-why">读取还没有结束，现在还不知道有没有报告，所以下一步先不给出口。结果回来后这里会换成「继续优化」或失败说明。</span>';
-  truthTx.textContent = '静态设计原型：这一屏只表达等待状态，不会因为时间过去就自动出现结果。';
+  truthTx.textContent = '界面示例：这一屏只表达等待状态，不会因为时间过去就自动出现结果。';
 };
 
 function reportState(kind){
@@ -1765,7 +1779,7 @@ function reportState(kind){
       + btn('21-resume-triage.html','重新诊断',true,SCREEN+'-primary','/resume/source');
     why.innerHTML = '<span id="'+SCREEN+'-why">报告里没有内容，优化那一步就没有可对照的原文片段，所以下一步先不给入口。'
       + SESSION_LINE + '</span>';
-    truthTx.textContent = '静态设计原型：这一屏表达「报告为空」，本页不连接真实简历、模型或打印，也不生成任何结论。';
+    truthTx.textContent = '界面示例：这一屏表达「报告为空」，本页不连接真实简历、模型或打印，也不生成任何结论。';
     return;
   }
 
@@ -1804,8 +1818,8 @@ function reportState(kind){
       + ' <span data-testid="'+SCREEN+'-session">'+SESSION_LINE+'</span>';
   }
   truthTx.textContent = srcMode
-    ? '静态设计原型：报告与原件都是合成演示数据，本页不连接真实简历、真实文件、模型或打印，也不生成、保存或导出任何文件。'
-    : '静态设计原型：报告为合成演示数据，本页不连接真实简历、模型或打印，也不生成、保存或导出任何文件。';
+    ? '界面示例：报告与原件都是示例，本页不连接真实简历、真实文件、模型或打印，也不生成、保存或导出任何文件。'
+    : '界面示例：报告是示例，本页不连接真实简历、模型或打印，也不生成、保存或导出任何文件。';
 }
 R['report'] = function(){ reportState('full'); };
 R['report-minimal'] = function(){ reportState('minimal'); };
@@ -1832,7 +1846,7 @@ R['read-error'] = function(){
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
     + btn(withRid(SELF,'state=loading'),'再读一次',true,SCREEN+'-primary','/resume/report');
   why.textContent = '优化那一步要用同一份报告作输入，报告没取到就先不给入口，避免点进去再失败一次。';
-  truthTx.textContent = '静态设计原型：这一屏只表达读取失败，本页不会重试真实接口，也不会自动出现结果。';
+  truthTx.textContent = '界面示例：这一屏只表达读取失败，本页不会重试真实接口，也不会自动出现结果。';
 };
 
 R['diagnose-failed'] = function(){
@@ -1847,7 +1861,7 @@ R['diagnose-failed'] = function(){
     + '<section class="card exits"><div class="ch"><b>这些都不需要 AI</b><span>现在就能做</span></div>'
     + '<div class="rows">'
     + rowDead('print','打印我上传的原件','本次不可用',SCREEN+'-exit-print-original',
-        '静态原型没有真实文件凭证')
+        '这里没有真实文件')
     + rowLink('10-print-hub.html','print','去打印 / 扫描其他材料','打印扫描不依赖 AI，照常可用',SCREEN+'-exit-print','/print-scan')
     + rowLink('48-policy-workspace.html','doc','查政策','政策说明与材料清单照常可看',SCREEN+'-exit-policy','/policy-service')
     + rowLink('45-online-platform-directory.html','list','本机构官方渠道','扫码去机构自己的网站或公众号',SCREEN+'-exit-channels','/official-channels')
@@ -1855,8 +1869,8 @@ R['diagnose-failed'] = function(){
     + checklist('不等 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
   cta.innerHTML = btn('01-home.html','返回首页',false,SCREEN+'-secondary','/')
     + btn('21-resume-triage.html','重新解析',true,SCREEN+'-primary','/resume/source');
-  why.textContent = '打印原件要用这次上传下发的文件访问凭证。静态原型里没有真实文件，所以这条如实置灰，不给一个点了没反应的按钮。';
-  truthTx.textContent = '静态设计原型：本页不给任何诊断结论，也不连接真实文件、模型或打印。';
+  why.textContent = '打印原件要用这次上传的文件。这里没有真实文件，所以这条如实置灰，不给一个点了没反应的按钮。';
+  truthTx.textContent = '界面示例：本页不给任何诊断结论，也不连接真实文件、模型或打印。';
 };
 
 R['unavailable'] = function(){
@@ -1880,7 +1894,7 @@ R['unavailable'] = function(){
   cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
     + btn('10-print-hub.html','去打印 / 扫描',true,SCREEN+'-primary','/print-scan');
   why.textContent = '能力没接通时不提供优化入口：优化和诊断走同一套 AI 流程，这时候点进去只会再失败一次。';
-  truthTx.textContent = '静态设计原型：这一屏表达能力未接通，本页不会探测真实服务，也不代表线上状态。';
+  truthTx.textContent = '界面示例：这一屏表达能力未接通，本页不会探测真实服务，也不代表线上状态。';
 };
 
 R['illegal'] = function(){
@@ -1904,7 +1918,7 @@ R['illegal'] = function(){
   cta.innerHTML = btn('01-home.html','返回首页',false,SCREEN+'-secondary','/')
     + btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source');
   why.textContent = '';
-  truthTx.textContent = '静态设计原型：这一屏是参数兜底，本页不连接真实简历、模型或打印。';
+  truthTx.textContent = '界面示例：这一屏是参数兜底，本页不连接真实简历、模型或打印。';
 };
 
 /* ════════ 7. 渲染 ════════ */

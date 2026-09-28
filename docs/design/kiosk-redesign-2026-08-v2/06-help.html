@@ -143,6 +143,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 </style>
 <!--
 青序流光 2.0 · 06 帮助（分类首页；topic=account 的问答仍在）
+9/28 留白：各态的区块在竖向均匀拉开（放不下时照旧顶端对齐）；「没有这个分类」的六张分类卡与找人两卡按原稿松度排；「帮助没显示出来」的三条改成三行（左步骤名、右做法），另外两组卡片按原稿内边距与行距。文字与区块一个没加没减。
 规则 1：分类卡落到 y≥500。头图里用本页已有的三步标题填高，不留空档。
 规则 2：页标题 38，问题 28，答案 23，辅助 21，主按钮 27，一行写完。
 规则 4：眉题去掉英文 HELP。
@@ -183,6 +184,22 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .truth div{font-size:21px!important;line-height:1.45!important;color:var(--ink-2)!important}
 .logo-name{font-size:26px!important}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   内容少的态（没有这个分类、只有两问的分类、帮助没显示出来）原先把剩下的高度全堆在按钮条上面。
+   现在各区块在竖向均匀拉开，空白分散成区块间距；内容放不下时退回顶端对齐，不裁不挤。
+   「没有这个分类」「帮助没显示出来」两态的卡片按原稿的内边距与行距排舒展，不加内容。 */
+.scrollarea{justify-content:space-between;padding-bottom:18px}
+#body-root[data-state="unavailable"] .sec,#body-root[data-state="no-result"] .sec{margin-top:22px!important}
+#body-root[data-state="unavailable"] .grid2 .card,#body-root[data-state="no-result"] .grid2 .card{padding:24px 26px}
+#body-root[data-state="unavailable"] .card p,#body-root[data-state="no-result"] .card p{margin-top:10px!important;line-height:1.55!important}
+/* 「按顺序试这三条」是先后顺序：排成三行，每行左边步骤名、右边做法 */
+#body-root[data-state="unavailable"] .grid3{grid-template-columns:minmax(0,1fr);gap:14px}
+#body-root[data-state="unavailable"] .grid3 .card{display:flex;align-items:center;gap:26px;padding:26px 30px}
+#body-root[data-state="unavailable"] .grid3 .card h3{flex:none;width:300px}
+#body-root[data-state="unavailable"] .grid3 .card p{flex:1;min-width:0;margin-top:0!important}
+/* 没有这个分类：六个分类是这一态唯一要点的东西，卡片按原稿的松度排 */
+#body-root[data-state="no-result"] .tgrid{gap:18px}
+#body-root[data-state="no-result"] .tcard{padding:28px 28px;gap:12px}
 </style>
 </head>
 <body>

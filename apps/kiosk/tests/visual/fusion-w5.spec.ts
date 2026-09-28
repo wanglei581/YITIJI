@@ -5,6 +5,7 @@ import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW5PaginationRoute } from './fixtures/fusion-w5-pagination-route'
 import { registerPrintConfirm } from './fixtures/fair-workbench-api'
+import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 
 const MEMBER_TOKEN = 'w5-browser-memory-token'
@@ -1218,6 +1219,24 @@ function memberDocument(overrides: Record<string, unknown>): Record<string, unkn
   }
 }
 
+/** 打印台材料检查建出来的体检任务，停在进行中（会员任务，不带匿名令牌）。 */
+const W5_DOC_INSPECTION = {
+  id: 'w5-doc-inspection',
+  kind: 'inspection',
+  status: 'processing',
+  requesterMode: 'member',
+  sourceFileId: 'doc-long',
+  resultFileId: null,
+  endUserId: 'member-w5',
+  params: {},
+  result: null,
+  errorCode: null,
+  errorMessage: null,
+  expiresAt: FUTURE,
+  createdAt: '2026-09-01T08:00:00.000Z',
+  updatedAt: '2026-09-01T08:00:00.000Z',
+}
+
 const MEMBER_DOCUMENTS = [
   memberDocument({ id: 'doc-long', filename: LONG_DOC_NAME }),
   memberDocument({ id: 'doc-photo', filename: '一寸证件照.png', mimeType: 'image/png', allowedRetentionPolicies: ['months_3'] }),
@@ -1321,16 +1340,14 @@ test('documents: real preview, retention, delete and print calls run on the Qing
     status: 200,
     json: { success: true, data: { fileId: 'doc-long', url: '/api/v1/files/doc-long/content?sig=preview', printFileUrl: '/api/v1/files/doc-long/content?sig=print', expiresAt: FUTURE, disposition: 'inline' } },
   })
-  // 以下三条是 /print/confirm 落地时自己要读的（价目、本人权益、报价），与本页无关但 fail-closed 必须登记。
-  api.respond('GET', '/api/v1/print/price-config', {
-    status: 200,
-    json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] },
-  })
-  api.respond('GET', '/api/v1/me/benefits', { status: 200, json: { success: true, data: { items: [], total: 0 } } })
-  api.respond('POST', '/api/v1/orders/quote', {
-    status: 200,
-    json: { amountCents: 200, billablePages: 2, billingPageSource: 'detected', priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }] },
-  })
+  // 原件打印落在打印台材料检查：挂载就建体检任务，并把这份文件画进预览。
+  // 检查停在体检进行中 —— 本用例只钉落点和带过去的文件，不替材料检查背书。
+  api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: W5_DOC_INSPECTION } })
+  api.respond('GET', `/api/v1/materials/tasks/${W5_DOC_INSPECTION.id}`, { status: 200, json: { success: true, data: W5_DOC_INSPECTION } })
+  await page.route(
+    (url) => url.pathname === '/api/v1/files/doc-long/content',
+    (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
 
   await loginThroughVisibleUi(page, '/me/documents')
   await expectQxAssetsShell(page, 'documents-ready', 'documents')
@@ -1374,11 +1391,63 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   await expect(page.getByText('作品集源文件.zip', { exact: true })).toHaveCount(0)
   expect(api.requestCount('DELETE', '/api/v1/files/doc-zip')).toBe(1)
 
-  // 打印：换内部 printFileUrl 后进打印确认页，由确认页重新报价。
+  // 打印：换内部 printFileUrl。这一份是本人原件（print_doc · original），生产强制
+  // PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒 —— 所以带着它去打印台材料检查，
+  // 不直达报价确认页（商用收口 P0-5）。派生产物仍直达报价页，见下一条用例。
+  const inspectionCreated = page.waitForRequest((request) =>
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
+  )
   await longRow.getByRole('button', { name: '打印', exact: true }).click()
+  await page.waitForURL(/\/print\/desk\?step=check$/)
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
+  expect((await inspectionCreated).postDataJSON()).toMatchObject({ kind: 'inspection', sourceFileId: 'doc-long' })
+  const stored = await page.evaluate(() =>
+    JSON.parse(window.sessionStorage.getItem('ai-job-print:current-print-material-check') ?? 'null') as Record<string, unknown> | null,
+  )
+  expect(stored).toMatchObject({
+    source: 'document',
+    file: { fileId: 'doc-long', fileUrl: '/api/v1/files/doc-long/content?sig=print', name: LONG_DOC_NAME, mimeType: 'application/pdf' },
+  })
+  expect(api.requestCount('GET', '/api/v1/files/doc-long/preview-url')).toBe(1)
+  expect(api.requestCount('POST', '/api/v1/orders/quote'), '原件检查完之前不报价').toBe(0)
+  expect(errors).toEqual([])
+})
+
+test('documents: derived AI output skips the material check and goes straight to price confirm @w5-kiosk', async ({ page, api }) => {
+  // 反向守卫：隐私闸门只管用户本人原件。AI 报告等派生产物（assetCategory=derived / optimized）
+  // 服务端本就放行，不许为了「保险」也送去材料检查 —— 那会让用户对着 AI 生成的纸逐条选遮挡。
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  registerPrintConfirm(api)
+  api.respond('GET', '/api/v1/me/documents', memberPage([
+    memberDocument({ id: 'doc-ai-report', filename: '简历对照.pdf', assetCategory: 'derived' }),
+  ]))
+  api.respond('GET', '/api/v1/files/doc-ai-report/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-ai-report', url: '/api/v1/files/doc-ai-report/content?sig=preview', printFileUrl: '/api/v1/files/doc-ai-report/content?sig=print', expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  api.respond('GET', '/api/v1/print/price-config', {
+    status: 200,
+    json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] },
+  })
+  api.respond('GET', '/api/v1/me/benefits', { status: 200, json: { success: true, data: { items: [], total: 0 } } })
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 200,
+    json: { amountCents: 200, billablePages: 2, billingPageSource: 'detected', priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }] },
+  })
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  await expectQxAssetsShell(page, 'documents-ready', 'documents')
+  const quoteRequest = page.waitForRequest((request) =>
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/orders/quote',
+  )
+  await page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' }).getByRole('button', { name: '打印', exact: true }).click()
   await page.waitForURL('**/print/confirm')
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
-  expect(api.requestCount('GET', '/api/v1/files/doc-long/preview-url')).toBe(1)
+  expect((await quoteRequest).postDataJSON()).toMatchObject({ fileUrl: '/api/v1/files/doc-ai-report/content?sig=print' })
+  expect(api.requestCount('POST', '/api/v1/materials/tasks'), '派生产物不进材料检查').toBe(0)
+  expect(errors).toEqual([])
 })
 
 test('documents and orders: error then empty come from the server, never a cached list @w5-kiosk', async ({ page, api }) => {

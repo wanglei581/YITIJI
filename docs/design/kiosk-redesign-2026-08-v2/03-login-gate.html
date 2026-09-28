@@ -220,6 +220,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 </style>
 <!--
 青序流光 2.0 · 03 登录（state=phone-code-sent）
+9/28 留白：状态提示卡、手机号 / 验证码两格、「不登录也能办」两行放回原稿的一部分松度，剩下的高度分给区块之间；验证码格关着时占位字居中；二维码区右栏的说明卡与左边框底对齐。qr-confirmed、qr-error 与运行页一致仍显示二维码区与三步（二维码区标题取运行页原文，原「请留在这台机器前」「建议先走手机号登录」两卡的话挪进右栏底卡），不新增入口。
 规则 1：两种登录方式仍在 y≥500；协议勾选放在方式切换下面、底部按钮上面，首屏看得见。底部另有「返回首页」。
 规则 2：页标题 38，方式名 28，说明 21–23，主按钮 27。
 规则 4：去掉 SIGN IN、服务端、回执、会话、链路。验证码发出后写「请在下面填验证码」。
@@ -289,6 +290,25 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .gate-note{order:1}
 .ctabar{order:3}
 .demo-tab,.demo-panel{display:none!important}
+/* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
+   原先为了塞进首屏把输入框、提示卡、入口行都压到最紧，结果每个态底下又空出 150–430px。
+   现在：状态提示卡、手机号 / 验证码两格、「不登录也能办」两行按原稿松度放回一些；
+   剩下的高度分给区块之间（放不下时退回顶端对齐，不裁不挤）。扫码登录的票据态（qr-ready）本来就满，不动。 */
+.scrollarea{justify-content:space-between;padding-bottom:10px}
+#body-root:not([data-state="qr-ready"]) .sec{margin-top:14px!important}
+#body-root .state{padding:16px 24px!important}
+#body-root .state-p{margin-top:8px!important;line-height:1.5!important}
+#body-root .field{padding:14px 20px!important}
+#body-root .field label{margin-bottom:6px!important}
+#body-root .field+.field{margin-top:12px!important}
+#body-root .field input,#body-root .field .side{height:66px!important;min-height:66px!important}
+#body-root:not([data-state="qr-ready"]) .entry{padding:12px 18px}
+/* 验证码这一格关着的时候（还没发码、发送失败、已作废等），占位字居中，像一个空着的槽，不是一格等你填的框 */
+#body-root #code:disabled{text-align:center}
+/* 扫码区：右栏的说明卡与左边二维码框底边对齐，两栏一样高 */
+#body-root .qrside{justify-content:space-between}
+/* 只有二维码区和「不登录也能办」两块的态：上下也留出同样的间距，不把空白堆在按钮条上面 */
+#body-root[data-state="qr-loading"] .scrollarea{justify-content:space-evenly}
 </style>
 </head>
 <body>
@@ -582,8 +602,10 @@ V['qr-confirmed']=function(){
    '<div class="state-h">'+svg('check','currentColor',28)+'手机已确认这次请求</div>'+
    '<div class="state-p">手机上已经确认。接下来这台机器还要换成登录，<b>换成了才算登录</b>。</div>'+
    '<div class="state-p">这一步会失败（票据被用过、已过期、网络中断都可能）。失败时二维码会作废并要求重扫，本页不会替它写成「已登录」。<b>协议没勾时，这一步同样不会写入登录态。</b></div></div></section>'+
-   '<section class="sec last"><div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('info','currentColor',26)+'</span>请留在这台机器前</h3>'+
-   '<p>换取登录态由这台机器发起，结果只显示在这块屏幕上。手机那一侧看不到这一步，也不会代替你完成。</p></div></section>'+
+   /* 9/28 留白：与运行页（ScanQrLoginPanel）一致，确认后仍显示二维码区与三步；「请留在这台机器前」原卡片的话挪进右栏底卡 */
+   '<section class="sec last"><div class="qrwrap">'+qrSlot('请稍候','手机验证已完成，正在回到刚才的办理。')+
+   qrSide(['用手机相机或微信扫左边的二维码。','在手机上填手机号和短信验证码，确认<b>你面前这台机器</b>的登录请求。','手机提示已确认后回到这台机器 —— 登录还要这台机器再换一次登录态。'],
+    '<b>请留在这台机器前。</b>换取登录态由这台机器发起，结果只显示在这块屏幕上。手机那一侧看不到这一步，也不会代替你完成。')+'</div></section>'+
    anonRow('02'),
   cta:btnGate('ghost','重新生成二维码',P('qr','qr-loading'),'login-gate-regen')+
    btnDead('正在换取登录态','结果还没到')};
@@ -591,10 +613,13 @@ V['qr-confirmed']=function(){
 V['qr-error']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('warn','currentColor',28)+'扫码登录这条路暂时走不通</div>'+
-   '<div class="state-p">申请票据或查询状态的请求没有成功。<b>本页不推测原因</b>，也不显示一张可能已经失效的二维码让你白扫。</div>'+
+   '<div class="state-p">申请票据或查询状态的请求没有成功。</div>'+
    '<div class="state-p">手机号登录不走扫码，通常还能用。</div></div></section>'+
-   '<section class="sec last"><div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('phone','currentColor',26)+'</span>建议先走手机号登录</h3>'+
-   '<p>两条路进的是同一个账号。如果手机号登录也失败，多半是这台机器和服务器之间断了 —— 那时请找现场工作人员。</p></div></section>'+
+   /* 9/28 留白：与运行页（ScanQrLoginPanel）一致，出错时仍显示二维码区与三步；提示卡里「不推测原因」一句挪进二维码区，
+      「建议先走手机号登录」原卡片的话挪进右栏底卡 */
+   '<section class="sec last"><div class="qrwrap">'+qrSlot('二维码未能获取','<b>本页不推测原因</b>，也不显示一张可能已经失效的二维码让你白扫。')+
+   qrSide(['用手机相机或微信扫左边的二维码。','在手机上填手机号和短信验证码，确认<b>你面前这台机器</b>的登录请求。','手机提示已确认后回到这台机器 —— 登录还要这台机器再换一次登录态。'],
+    '<b>建议先走手机号登录。</b>两条路进的是同一个账号。如果手机号登录也失败，多半是这台机器和服务器之间断了 —— 那时请找现场工作人员。')+'</div></section>'+
    anonRow('02'),
   cta:btnA('ghost','06-help.html','/help','联系工作人员')+
    btnA('primary',P('phone','phone-idle'),'/login','改用手机号登录','login-gate-primary','1.6')};
