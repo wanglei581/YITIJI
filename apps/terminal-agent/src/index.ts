@@ -99,19 +99,47 @@ program
       failStartup(error, 'AGENT_PROFILE_REJECTED')
     }
 
+    // Start the loopback API before cloud registration so the watchdog and
+    // Kiosk can obtain identity immediately and receive retryable 503s while
+    // registration/heartbeat are still recovering.
+    let panelCloudConnected = false
+    let panelLastHeartbeatAt: string | null = null
+    let panelPrinterStatus: LocalAgentPanelStatus['printerStatus'] = 'unknown'
+    let heartbeatTimer: NodeJS.Timeout | null = null
+    let taskRunner: ReturnType<typeof startTaskRunner> | null = null
+    let qrLocalServer: LocalQrServerHandle | null = null
+    let panelScanHealth: ReturnType<typeof inspectScanInputFolder> = {
+      status: 'unconfigured',
+      reason: 'not_configured',
+    }
+    try {
+      qrLocalServer = startQrLoginLocalServer(config, {
+        wakePrintQueue: () => taskRunner?.wake() ?? { accepted: false, coalesced: false },
+        getPanelStatus: () => ({
+          runtimeVersion: AGENT_RUNTIME_VERSION,
+          terminalCode: config.terminalCode,
+          serviceState: 'running',
+          cloudConnected: panelCloudConnected,
+          lastHeartbeatAt: panelLastHeartbeatAt,
+          printerStatus: panelPrinterStatus,
+          localTaskDatabaseAvailable,
+          scanInputStatus: panelScanHealth.status,
+          scanInputReason: panelScanHealth.reason,
+          credentialStatus: isUnauthorized() ? 'unauthorized' : 'ready',
+        }),
+      })
+    } catch (e) {
+      warn(`local-qr: disabled — ${e instanceof Error ? e.message : String(e)}`)
+    }
+
     // ── Step 4: Register or load existing credentials ─────────────────────
     try {
-      config = await registerOrLoad(config)
+      Object.assign(config, await registerOrLoad(config))
     } catch (error) {
       failStartup(error, 'AGENT_REGISTRATION_FAILED')
     }
     // ── Step 5: Start heartbeat ───────────────────────────────────────────
-    let panelCloudConnected = false
-    let panelLastHeartbeatAt: string | null = null
-    let panelPrinterStatus: LocalAgentPanelStatus['printerStatus'] = 'unknown'
     // 可重建的定时器句柄（AGT-06：服务端调整轮询间隔时需要重启它们）。
-    let heartbeatTimer: NodeJS.Timeout | null = null
-    let taskRunner: ReturnType<typeof startTaskRunner> | null = null
     const heartbeatOptions: Parameters<typeof sendHeartbeat>[0] = {
       config,
       localTaskDatabaseAvailable,
@@ -156,7 +184,7 @@ program
       warn(`agent started but cloud authentication is not ready — terminalId=${config.terminalId!}`)
     }
     heartbeatTimer = startHeartbeat(heartbeatOptions, false)
-    const panelScanHealth = inspectScanInputFolder(config.scanWatchFolder)
+    panelScanHealth = inspectScanInputFolder(config.scanWatchFolder)
     const scanWatcherHandle = startScanWatcher(config)
 
     // ── Step 6: Start claim / print loop ──────────────────────────────────
@@ -167,30 +195,6 @@ program
 
     // ── Step 8: Report PII-safe expired-scan deletion evidence ────────────
     const scanDeletionAuditReporterTimer = startScanDeletionAuditReporter(config, db)
-
-    // ── Step 9: Start local QR-login bridge (best-effort) ─────────────────
-    let qrLocalServer: LocalQrServerHandle | null = null
-    try {
-      qrLocalServer = startQrLoginLocalServer(config, {
-        wakePrintQueue: () => taskRunner!.wake(),
-        getPanelStatus: () => {
-          return {
-            runtimeVersion: AGENT_RUNTIME_VERSION,
-            terminalCode: config.terminalCode,
-            serviceState: 'running',
-            cloudConnected: panelCloudConnected,
-            lastHeartbeatAt: panelLastHeartbeatAt,
-            printerStatus: panelPrinterStatus,
-            localTaskDatabaseAvailable,
-            scanInputStatus: panelScanHealth.status,
-            scanInputReason: panelScanHealth.reason,
-            credentialStatus: isUnauthorized() ? 'unauthorized' : 'ready',
-          }
-        },
-      })
-    } catch (e) {
-      warn(`local-qr: disabled — ${e instanceof Error ? e.message : String(e)}`)
-    }
 
     log('Agent running. Press Ctrl+C to stop.')
 
