@@ -160,7 +160,7 @@ export class ResumeExtractionService {
       return this.fail(
         fileId,
         'UNSUPPORTED_FILE_TYPE',
-        '暂不支持旧版 .doc 格式，请另存为 PDF 或 DOCX 后重试；服务端未配置转换引擎',
+        '当前无法读取旧版 .doc 文件，请另存为 PDF 或 DOCX 后重试。',
         startedAt,
       )
     }

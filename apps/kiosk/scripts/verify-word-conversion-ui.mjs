@@ -61,6 +61,12 @@ function collectFailures(files) {
   check(!files.resume.includes('conversionCapabilities.reason'), 'resume-no-raw-reason: 简历上传不得显示内部转换原因串')
   check(!files.printPreview.includes('capabilities.reason'), 'print-preview-no-raw-reason: 预览不得显示内部转换原因串')
   check(!files.printUpload.includes('conversionCapabilities.reason'), 'print-upload-no-raw-reason: 上传与 aria 说明不得显示内部转换原因串')
+  check(!files.preview.includes('capabilities.reason'), 'file-preview-no-raw-reason: 文件预览关闭态不得拼接服务端原因')
+  check(!files.documentsConvert.includes('capabilities.reason'), 'documents-no-raw-reason: 我的文档关闭态不得拼接服务端原因')
+  check(
+    files.service.includes("WORD_CONVERSION_DISCLOSURE = '转为 PDF 后，复杂版式可能有偏差，请预览核对'"),
+    'conversion-user-disclosure: 版式偏差提示必须保留，并使用用户话',
+  )
   check(files.printPreview.includes("previewKind === 'word' && capabilities.wordToPdf"), 'print-preview-word-gate: Word 预览仍须能力已开放')
   check(
     files.printUpload.includes('`${WORD_CONVERSION_UNAVAILABLE_COPY}；支持 PDF、JPG、PNG'),

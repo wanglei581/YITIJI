@@ -150,7 +150,7 @@ async function verifyRuntime(): Promise<void> {
   const disabled = serviceWith(disabledFiles, source, null)
   await disabled.onModuleInit()
   assert.deepEqual(disabled.getCapabilities(), {
-    wordToPdf: false, engine: 'none', reason: '服务端未配置转换引擎', cjkFonts: true,
+    wordToPdf: false, engine: 'none', reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。', cjkFonts: true,
   })
   await assert.rejects(() => disabled.convertOwnedFile(source.id, { kind: 'member', endUserId: 'member-1' }), ServiceUnavailableException)
   pass('capabilities disabled 时返回明确 reason，转换 fail-closed')
