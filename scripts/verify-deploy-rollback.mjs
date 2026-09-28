@@ -113,7 +113,7 @@ for name in os.listdir(base):
   }
 }
 
-function makeSandbox({ oldGroups = 0 } = {}) {
+function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'deploy-drill-'))
   const bin = join(dir, 'bin')
   const checkout = join(dir, 'checkout')
@@ -128,6 +128,11 @@ function makeSandbox({ oldGroups = 0 } = {}) {
   writeFileSync(join(checkout, 'VERSION'), 'new-release\n')
   writeFileSync(join(checkout, 'services/api/src/config/production-runtime-gates.ts'), 'PRINT_REQUIRE_PII_SCAN\nPRINT_REQUIRE_PRINTER_ONLINE\n')
   writeFileSync(join(checkout, 'services/api/scripts/preflight-production-gates.mjs'), 'process.exit(0)\n')
+  if (pointerUnwritable) {
+    // 让「写发布指针」这一步失败：同名目录会被 rsync 带进运行目录，cat > 目录必然失败
+    mkdirSync(join(checkout, 'DEPLOY_SOURCE.txt'))
+    writeFileSync(join(checkout, 'DEPLOY_SOURCE.txt/keep'), 'x\n')
+  }
   const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8' }).trim()
   git('init', '-q')
   git('-c', 'user.email=drill@example.invalid', '-c', 'user.name=drill', 'add', '.')
@@ -236,6 +241,14 @@ try {
     check(r.pm2Restarts === 0, '场景 3：PM2 还没重启过，恢复后也不重启', `实际 ${r.pm2Restarts} 次`)
     check(r.out.includes('线上进程尚未重启'), '场景 3：说明线上进程仍是发布前版本')
   }
+  // 5. 就绪之后的收尾失败（写发布指针失败）：发布已成功，只告警，绝不能把健康的新版本回退掉
+  {
+    const box = makeSandbox({ pointerUnwritable: true }); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always' })
+    check(r.code === 0 && read(join(box.runtime, 'VERSION')) === 'new-release' && r.pm2Restarts === 1,
+      '场景 5：就绪后写发布指针失败只告警，不回退、不重启', `退出码 ${r.code} VERSION=${read(join(box.runtime, 'VERSION'))} PM2 ${r.pm2Restarts} 次`)
+    check(r.out.includes('DEPLOY_SOURCE.txt 写入失败'), '场景 5：告警写明发布指针没写上，需要人工补写')
+  }
   // 4. 备份清理按组保留
   {
     const box = makeSandbox({ oldGroups: 4 }); boxes.push(box)
@@ -257,4 +270,4 @@ if (failures) {
   console.error(`\nverify:deploy-rollback：${failures} 项失败`)
   process.exit(1)
 }
-console.log('\nverify:deploy-rollback 通过（真跑发布脚本 4 个场景）')
+console.log('\nverify:deploy-rollback 通过（真跑发布脚本 5 个场景）')
