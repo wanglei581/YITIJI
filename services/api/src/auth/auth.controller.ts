@@ -10,6 +10,8 @@ import { AdminPhoneTransferService, type AdminPhoneTransferStartResult } from '.
 import { AuthService, type LoginResult } from './auth.service'
 import { InitialPhoneBindService } from './initial-phone-bind.service'
 import {
+  AdminSecondFactorResendDto,
+  AdminSecondFactorVerifyDto,
   ChangePasswordDto,
   FirstAdminPasswordChangeDto,
   InitialPhoneBindCancelDto,
@@ -42,12 +44,37 @@ export class AuthController {
    */
   @Post('login')
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
-  async login(@Body() dto: LoginDto): Promise<ApiResponse<LoginResult>> {
+  async login(@Body() dto: LoginDto, @Ip() ip: string): Promise<ApiResponse<LoginResult>> {
     const loginId = dto.loginId ?? dto.username
     if (!loginId) {
       throw new BadRequestException({ error: { code: 'VALIDATION_FAILED', message: 'loginId 或 username 必填' } })
     }
-    return ApiResponse.ok(await this.authService.login(loginId, dto.password, dto.portal))
+    return ApiResponse.ok(await this.authService.login(loginId, dto.password, dto.portal, ip || null))
+  }
+
+  /**
+   * 管理员登录第二步（P1-4，`ADMIN_LOGIN_SECOND_FACTOR=sms` 时启用）：
+   * 密码通过后返回 `{ secondFactorRequired, challengeTicket, phoneMasked, codeSent, cooldownSeconds }`，
+   * 前端再拿短信验证码调这里换登录凭证。验证码错误不作废凭证，错满 5 次由短信验证码锁定。
+   */
+  @Post('login/second-factor')
+  @HttpCode(200)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async completeSecondFactor(
+    @Body() dto: AdminSecondFactorVerifyDto,
+    @Ip() ip: string,
+  ): Promise<ApiResponse<LoginResult>> {
+    return ApiResponse.ok(await this.authService.completeAdminSecondFactor(dto.challengeTicket, dto.code, ip || null))
+  }
+
+  @Post('login/second-factor/resend')
+  @HttpCode(200)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  async resendSecondFactor(
+    @Body() dto: AdminSecondFactorResendDto,
+    @Ip() ip: string,
+  ): Promise<ApiResponse<{ codeSent: boolean; cooldownSeconds: number }>> {
+    return ApiResponse.ok(await this.authService.resendAdminSecondFactor(dto.challengeTicket, ip || null, dto.deviceId))
   }
 
   @Post('sms-code')
@@ -61,8 +88,8 @@ export class AuthController {
 
   @Post('login/sms')
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
-  async smsLogin(@Body() dto: SmsLoginDto): Promise<ApiResponse<LoginResult>> {
-    return ApiResponse.ok(await this.authService.loginWithSms(dto.phone, dto.code, dto.portal))
+  async smsLogin(@Body() dto: SmsLoginDto, @Ip() ip: string): Promise<ApiResponse<LoginResult>> {
+    return ApiResponse.ok(await this.authService.loginWithSms(dto.phone, dto.code, dto.portal, ip || null))
   }
 
   @Post('password/reset/start')

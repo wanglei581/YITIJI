@@ -21,8 +21,8 @@ import {
 } from '../common/crypto/phone-identity'
 import type { UserRole } from '../common/decorators/roles.decorator'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
+import { assertAdminIpAllowed } from '../common/auth/admin-ip-allowlist'
 import { RedisService } from '../common/redis/redis.service'
-import { tryRedis } from '../common/redis/redis-degradation'
 import { PrismaService } from '../prisma/prisma.service'
 import type { SendInternalSmsCodeDto } from './dto/internal-auth.dto'
 import { InternalOtpService, type InternalSendCodeResult } from './internal-otp.service'
@@ -32,15 +32,17 @@ import {
   passwordProofStateAfterSelfChange,
 } from './password-proof-state'
 import { FIRST_ADMIN_BOOTSTRAP_AUDIT_ACTION } from './first-admin-bootstrap'
+import { AdminLoginSecondFactor, adminSecondFactorRequired, assertAdminSecondFactorRoute } from './admin-login-second-factor'
+import { assertAdminSmsOnlyLoginAllowed, type AdminSecondFactorChallenge } from './admin-login-second-factor'
+import { clearPasswordLoginAttempts, passwordLoginAccountKey, passwordLoginIdentityKey } from './password-login-attempts'
+import { reservePasswordLoginAttempt, type PasswordLoginPortal } from './password-login-attempts'
 
-type LoginPortal = 'admin' | 'partner' | 'kiosk'
+type LoginPortal = PasswordLoginPortal
 type SmsPortal = 'admin' | 'partner'
 
 const RESET_TICKET_TTL = 600
 const RESET_UNKNOWN_IP_TTL = 60
 const RESET_UNKNOWN_IP_LIMIT = 5
-const PASSWORD_LOGIN_FAILURE_LIMIT = 5
-const PASSWORD_LOGIN_FAILURE_TTL_SECONDS = 15 * 60
 
 interface FullLoginResult {
   token: string
@@ -62,7 +64,7 @@ interface FirstAdminPasswordChangeRequired {
   expiresInSeconds: number
 }
 
-export type LoginResult = FullLoginResult | FirstAdminPasswordChangeRequired
+export type LoginResult = FullLoginResult | FirstAdminPasswordChangeRequired | AdminSecondFactorChallenge
 
 interface InternalUser {
   id: string
@@ -100,6 +102,9 @@ interface ResetTarget {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name)
 
+  /** 管理员短信第二步（P1-4），惰性创建：不改构造参数（门禁直接 new AuthService）。 */
+  private secondFactorHelper: AdminLoginSecondFactor | null = null
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
@@ -108,26 +113,54 @@ export class AuthService {
     private readonly audit: AuditService,
   ) {}
 
-  async login(loginId: string, password: string, portal: LoginPortal): Promise<LoginResult> {
-    const identityFailureKey = this.passwordLoginIdentityFailureKey(loginId, portal)
-    await this.assertPasswordLoginNotLocked(identityFailureKey)
+  private get secondFactor(): AdminLoginSecondFactor {
+    return (this.secondFactorHelper ??= new AdminLoginSecondFactor(this.redis, this.otp, this.prisma))
+  }
+
+  /** 锁定口径见 password-login-attempts.ts；配了管理员地址名单时 clientIp 缺失即拒（P1-4）。 */
+  async login(
+    loginId: string,
+    password: string,
+    portal: LoginPortal,
+    clientIp: string | null = null,
+    deviceId?: string,
+  ): Promise<LoginResult> {
+    if (portal === 'admin') assertAdminIpAllowed(clientIp)
+    const identityFailureKey = passwordLoginIdentityKey(loginId, portal)
+    await reservePasswordLoginAttempt(this.redis, identityFailureKey, this.logger)
     const user = await this.findUserByLoginId(loginId)
-    const accountFailureKey = user ? this.passwordLoginAccountFailureKey(user.id, portal) : null
-    if (accountFailureKey) await this.assertPasswordLoginNotLocked(accountFailureKey)
-    if (!user || !(await this.canUseAccount(user, portal))) {
-      await this.recordPasswordLoginFailure(identityFailureKey, accountFailureKey)
-      throw this.loginFailed()
-    }
+    const accountFailureKey = user ? passwordLoginAccountKey(user.id, portal) : null
+    if (accountFailureKey) await reservePasswordLoginAttempt(this.redis, accountFailureKey, this.logger)
+    if (!user || !(await this.canUseAccount(user, portal))) throw this.loginFailed()
 
     const ok = await bcrypt.compare(password, user.passwordHash)
-    if (!ok) {
-      await this.recordPasswordLoginFailure(identityFailureKey, accountFailureKey)
-      throw this.loginFailed()
-    }
+    if (!ok) throw this.loginFailed()
 
-    await this.clearPasswordLoginFailures(identityFailureKey, accountFailureKey)
+    const keys = accountFailureKey ? [identityFailureKey, accountFailureKey] : [identityFailureKey]
+    await clearPasswordLoginAttempts(this.redis, keys, this.logger)
+    // 只有首位管理员初始化（临时密码 + 初始化审计）不走第二步：它只换得到受控改密凭证、不签发登录凭证。
+    const bootstrapChange = user.passwordProofState === PASSWORD_PROOF_STATE.TEMPORARY && (await this.hasFirstAdminBootstrapAudit(user.id))
+    if (portal === 'admin' && adminSecondFactorRequired() && !bootstrapChange) {
+      const challenge = await this.secondFactor.start(user, clientIp ?? 'unknown', deviceId)
+      await this.writeAudit(user.id, user.role, 'auth.password_login_second_factor_sent', { portal, codeSent: challenge.codeSent })
+      return challenge
+    }
     await this.writeAudit(user.id, user.role, 'auth.password_login', { portal })
     return this.issueLogin(user)
+  }
+
+  /** 管理员登录第二步：凭证 + 短信验证码 → 登录凭证。 */
+  async completeAdminSecondFactor(challengeTicket: string, code: string, clientIp: string | null): Promise<LoginResult> {
+    assertAdminSecondFactorRoute(clientIp)
+    const user = await this.prisma.user.findFirst({ where: { id: await this.secondFactor.verify(challengeTicket, code), deletedAt: null } })
+    if (!user || !(await this.canUseAccount(user, 'admin'))) throw this.loginFailed()
+    await this.writeAudit(user.id, user.role, 'auth.password_login', { portal: 'admin', secondFactor: 'sms' })
+    return this.issueLogin(user)
+  }
+
+  async resendAdminSecondFactor(ticket: string, clientIp: string | null, deviceId?: string): Promise<{ codeSent: boolean; cooldownSeconds: number }> {
+    assertAdminSecondFactorRoute(clientIp)
+    return this.secondFactor.resend(ticket, clientIp ?? 'unknown', deviceId)
   }
 
   async sendSmsCode(dto: SendInternalSmsCodeDto, ip: string): Promise<InternalSendCodeResult> {
@@ -136,6 +169,7 @@ export class AuthService {
         error: { code: 'AUTH_SMS_PURPOSE_FORBIDDEN', message: '该验证码入口仅用于内部账号登录' },
       })
     }
+    if (dto.portal === 'admin') assertAdminSmsOnlyLoginAllowed(ip)
 
     const user = await this.findVerifiedUserByPhone(dto.phone)
     const shouldDeliver = !!user && (await this.canUseAccount(user, dto.portal))
@@ -154,7 +188,8 @@ export class AuthService {
     return result
   }
 
-  async loginWithSms(phone: string, code: string, portal: SmsPortal): Promise<LoginResult> {
+  async loginWithSms(phone: string, code: string, portal: SmsPortal, clientIp: string | null = null): Promise<LoginResult> {
+    if (portal === 'admin') assertAdminSmsOnlyLoginAllowed(clientIp)
     await this.otp.verifyCode(phone, 'login', code)
     const user = await this.findVerifiedUserByPhone(phone)
     if (!user || !(await this.canUseAccount(user, portal))) {
@@ -734,45 +769,6 @@ export class AuthService {
     return new UnauthorizedException({
       error: { code: 'AUTH_LOGIN_FAILED', message: '账号或密码不正确' },
     })
-  }
-
-  private loginLocked(): HttpException {
-    return new HttpException({
-      error: { code: 'AUTH_LOGIN_LOCKED', message: '账号登录失败次数过多，请 15 分钟后重试' },
-    }, HttpStatus.TOO_MANY_REQUESTS)
-  }
-
-  private passwordLoginIdentityFailureKey(loginId: string, portal: LoginPortal): string {
-    const normalized = loginId.trim().toLowerCase()
-    const digest = createHash('sha256').update(`${portal}:${normalized}`).digest('hex')
-    return `internal:password-login:identity-failures:${digest}`
-  }
-
-  private passwordLoginAccountFailureKey(userId: string, portal: LoginPortal): string {
-    return `internal:password-login:account-failures:${portal}:${userId}`
-  }
-
-  private async assertPasswordLoginNotLocked(key: string): Promise<void> {
-    const failures = await tryRedis('password-login-failures:get', () => this.redis.get(key), this.logger)
-    if (failures.ok && Number(failures.value ?? 0) >= PASSWORD_LOGIN_FAILURE_LIMIT) throw this.loginLocked()
-  }
-
-  private async recordPasswordLoginFailure(identityKey: string, accountKey: string | null): Promise<void> {
-    const keys = accountKey ? [identityKey, accountKey] : [identityKey]
-    await Promise.all(keys.map((key) => tryRedis(
-      'password-login-failures:increment',
-      () => this.redis.incrWithTtl(key, PASSWORD_LOGIN_FAILURE_TTL_SECONDS),
-      this.logger,
-    )))
-  }
-
-  private async clearPasswordLoginFailures(identityKey: string, accountKey: string | null): Promise<void> {
-    const keys = accountKey ? [identityKey, accountKey] : [identityKey]
-    await Promise.all(keys.map((key) => tryRedis(
-      'password-login-failures:del',
-      () => this.redis.del(key),
-      this.logger,
-    )))
   }
 
   private resetFailed(): UnauthorizedException {
