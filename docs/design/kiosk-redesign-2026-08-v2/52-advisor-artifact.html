@@ -246,7 +246,8 @@ a.btn[data-v="primary"]{color:#fff}
 #demo-tab,#demo-panel,.demo-tab,.demo-panel{display:none!important}
 /* 9/28 留白（产品负责人：一屏不许留大片空白，按内容规划好空间）
    空态与过期：提示卡横排、下面说清三种作业；有内容的态：下面「带走这一页」放打印纸缩略样子与三步。 */
-.body{gap:20px;flex:1 1 auto!important;min-height:0}
+.body{gap:20px;flex:1 1 auto!important;min-height:0;justify-content:space-evenly!important}
+/* ↑ 设计方案：下半屏不许大面积空白，把区块在竖向拉开，空白分散成间距，不拉空卡片 */
 .sec.state{flex:none!important;flex-direction:row;align-items:center;justify-content:flex-start;text-align:left;gap:28px;padding:30px 32px}
 .sec.state .state-ic{flex:none;width:104px;height:104px;border-radius:30px}
 .state-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
@@ -292,6 +293,7 @@ a.btn[data-v="primary"]{color:#fff}
 #stage[data-state="no-artifact"] .qx52-kind,#stage[data-state="expired"] .qx52-kind{padding:32px 0}
 /* 正文长的态：带走区按剩余空间分档，不许把正文或按钮挤出屏幕 */
 #stage[data-state="slot-draft-blanks"] .qx52-paper,#stage[data-state="compare-all-covered"] .qx52-paper{width:220px!important;padding:20px 18px;gap:12px}
+#stage[data-state="slot-draft"] .qx52-paper{width:330px!important}
 #stage[data-state="compare-report"] .qx52-paper{display:none}
 #stage[data-state="compare-report"] .qx52-steps{flex-direction:row;gap:24px}
 #stage[data-state="compare-report"] .qx52-steps li{flex:1}
@@ -302,14 +304,14 @@ a.btn[data-v="primary"]{color:#fff}
 .qx52-paper .pp-r[data-v="na"] .pp-e{background:var(--plum)}
 .qx52-paper .pp-r:has(.pp-e.sm){grid-template-columns:20px 1fr}
 .qx52-paper .pp-sub{margin:8px 0 0}
-/* 正文条目放大：一屏里这些是主角 */
+/* 正文条目排舒展（字阶守 2.0 规则 2：条目 24，不做大） */
 .pin{padding:26px 0!important}
 .pin-e{width:52px!important;height:52px!important;border-radius:14px!important}
-.pin-c{font-size:27px!important;line-height:1.5!important}
+.pin-c{font-size:24px!important;line-height:1.5!important}
 .pin-s{margin-top:10px!important}
-.draft{font-size:27px!important;line-height:1.6!important;padding:26px 28px!important}
+.draft{font-size:24px!important;line-height:1.6!important;padding:26px 28px!important}
 .cmp{padding:24px 0!important}
-.cmp-r{font-size:26px!important}
+.cmp-r{font-size:24px!important}
 .sec{padding:30px 32px}
 /* 成稿依据的原话：打印时一并带出，是这一态的重点之一，按正文字号排 */
 .based{margin-top:22px}
