@@ -71,6 +71,10 @@ try {
   }
 
   // ── 单实例：持有期间第二个被拒、强杀后可立即启动、同时启动只有一个成功、残留 agent.pid 不阻止 ──
+  // 状态目录里放一份带假令牌的 agent.token：被拒时写出的诊断文件不得带出它。
+  const tokenCanary = 'SENSITIVE_AGENT_TOKEN_CANARY_XYZ'
+  writeFileSync(join(state, 'agent.token'), `${tokenCanary}\n`)
+  const diagnosticPath = join(state, 'last-startup-diagnostic.json')
   const holder = run(lockSource(true), root)
   assert.equal(await settle(holder), 'held', `first instance must acquire and stay alive\n${holder.stderr}`)
   if (process.platform === 'win32') {
@@ -79,6 +83,27 @@ try {
   const second = run(lockSource(false), root)
   assert.notEqual(await second.exited, 0, 'second instance must be rejected while first owns the endpoint')
   assert.match(second.stderr, /DUPLICATE_INSTANCE/, `second instance must be rejected as a duplicate, not crash for another reason\n${second.stderr}`)
+  assert.match(second.stderr, /do not delete agent\.pid/, 'operator message must not invite deleting the lock')
+  // 现场按诊断文件排障：被拒必须留下失败记录，且只含错误码与脱敏后的原因。
+  assert.ok(existsSync(diagnosticPath), 'lock fail-closed must write last-startup-diagnostic.json')
+  const diagnosticText = readFileSync(diagnosticPath, 'utf8')
+  const diagnostic = JSON.parse(diagnosticText)
+  assert.equal(diagnostic.schemaVersion, 1)
+  assert.equal(diagnostic.state, 'failed')
+  assert.equal(diagnostic.code, 'DUPLICATE_INSTANCE')
+  assert.equal(diagnostic.lock?.reason, 'duplicate')
+  assert.equal('token' in diagnostic, false, 'diagnostic must not carry a token field')
+  for (const leaked of [tokenCanary, 'agentToken', 'adminSecret', 'bindCode']) {
+    assert.equal(diagnosticText.includes(leaked), false, `diagnostic must not persist ${leaked}`)
+  }
+  // 诊断写不出来（路径被目录占住）也照样拒绝，并如实说诊断不可用。
+  rmSync(diagnosticPath, { force: true })
+  mkdirSync(diagnosticPath)
+  const secondNoDiagnostic = run(lockSource(false), root)
+  assert.notEqual(await secondNoDiagnostic.exited, 0, 'duplicate must still be rejected when the diagnostic cannot be written')
+  assert.match(secondNoDiagnostic.stderr, /DUPLICATE_INSTANCE/)
+  assert.match(secondNoDiagnostic.stderr, /AGENT_DIAGNOSTIC_UNAVAILABLE/, `diagnostic write failure must be reported\n${secondNoDiagnostic.stderr}`)
+  rmSync(diagnosticPath, { recursive: true, force: true })
   await kill(holder)
 
   const afterKill = run(lockSource(true), root)

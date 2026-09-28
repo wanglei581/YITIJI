@@ -7,6 +7,7 @@ import { cleanupCrashLeftoverPrintTaskTemps } from '../src/agent/print-task-temp
 
 const lockSourcePath = join(__dirname, '../src/agent/instance-lock.ts')
 const indexSourcePath = join(__dirname, '../src/index.ts')
+const taskRunnerSourcePath = join(__dirname, '../src/agent/task-runner.ts')
 const cleanupSourcePath = join(__dirname, '../src/agent/print-task-temp-cleanup.ts')
 const singletonScript = join(__dirname, 'verify-singleton-process.mjs')
 
@@ -23,6 +24,13 @@ function verifyStartupOrderingSource(): void {
   assert.ok(cleanup > acquire, 'cleanup must run after acquireLock')
   assert.ok(db > cleanup, 'database open must run after leftover cleanup')
   assert.ok(runner > cleanup, 'claim/print must start after leftover cleanup')
+  // 与锁的实现无关，换锁时不能跟着删：领取循环重建时若清扫临时目录，会删掉正在下载的打印件。
+  const runnerSource = readFileSync(taskRunnerSourcePath, 'utf8')
+  assert.equal(
+    runnerSource.includes('cleanupCrashLeftoverPrintTaskTemps'),
+    false,
+    'claim loop rebuild must never sweep temp files (would delete live downloads)',
+  )
   const lock = source()
   assert.match(lock, /createServer\(/)
   assert.match(lock, /server\.listen\(/)
