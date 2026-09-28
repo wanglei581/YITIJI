@@ -87,7 +87,7 @@
 | Edge 白屏或退出全屏 | 看门狗是否在跑；手动重启 Edge | 不要退出 Kiosk 模式给用户用 |
 | 用户能 Alt+Tab 切到桌面 | A11b 的 AssignedAccess / Shell Launcher 是否生效（`Get-AssignedAccess`）；是否用管理员账号登录了（A3 要求标准账号） | 不要只靠看门狗——它只管「被关掉」，不管「被切走」 |
 
-> 换机（同一终端身份迁到新主机）与批量升级/回滚不在本页：按 `terminal-fleet-management-design.md` 的 F2/F3 流程，未落地前换机须先在后台停用旧终端并确认无在途打印任务。
+> 换机（同一终端身份迁到新主机）与批量升级/回滚不在本页：按 `terminal-fleet-management-design.md` 的 F2/F3 流程，未落地前换机须先在后台把该终端设为「维护」并排空在途打印任务，再在现场生成换机绑定码；新主机兑换后旧主机凭证随即失效。**不要「停用」终端**：已停用的终端生成不了绑定码（2026-09-29 按 `terminal-credential-security.service.ts` 核对更正）。冷备主机与耗材见 [现场故障处置单](onsite-failure-recovery-runsheet-2026-09.md)「耗材更换与冷备」。
 
 ## D. 现场测试日一（P0-9 / next-tasks 1.7，一天做完）
 
