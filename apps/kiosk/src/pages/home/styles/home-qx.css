@@ -160,7 +160,7 @@
 .qx-home-truth strong { color: var(--qx-ink); font-weight: 650; }
 .qx-home-legal { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; margin-top: 0 !important; font-size: var(--qx-fs-note); }
 .qx-home-legal a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 6px; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-.qx-home-host .qx-navbar { height: 112px; border-top: 0; box-shadow: none; background: var(--qx-surface); }
+.qx-home-host .qx-navbar { border-top: 0; box-shadow: none; background: var(--qx-surface); }
 .qx-home-host .qx-navbar svg { width: 28px; height: 28px; }
 .qx-home-host .qx-nav-item span { max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

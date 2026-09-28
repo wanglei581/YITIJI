@@ -599,6 +599,3 @@ button.ph-chip { cursor: pointer; }
 .ph-page .ph-notices { width: auto; max-width: 45%; }
 .ph-page .ph-notices > summary { min-height: 48px; flex-direction: row; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 760px) { [data-kiosk-stage-fit='off'] .ph-page .ph-notices { max-width: none; width: 100%; } }
-
-/* 稿 10 底栏为 116px；仅本页采用，不修改公共导航。 */
-.qx-stage:has(.ph-page) > .qx-navbar { height: 116px; }

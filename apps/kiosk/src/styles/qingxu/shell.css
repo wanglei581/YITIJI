@@ -104,8 +104,11 @@
 .qx-scroll::-webkit-scrollbar { display: none; }
 
 /* ── 底部导航：三个固定入口 ─────────────────────────────────── */
+/* 全部页面同一个高度，页面之间切换时底栏不跳。取 112px：v2 稿里用得最多的高度（首页、简历、
+   面试、我的等 15 张），比原来的 132px 给内容区多 20px。稿之间 104–128px 的差别是作图时为配平
+   各自内容留的，运行时以这里为准，页面不要再单独改底栏高度（手机宽度的规则另算）。 */
 .qx-navbar {
-  flex: none; height: 132px;
+  flex: none; height: 112px;
   display: flex; align-items: stretch;
   border-top: 1px solid var(--qx-line);
   background: var(--qx-surface);
