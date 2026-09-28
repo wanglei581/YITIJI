@@ -1,5 +1,7 @@
 # Windows 一体机 · 母盘镜像清单与现场装机 Checklist（一页纸）
 
+> **正式终端以本清单为准（2026-09-29 补注）**：现有真机 KSK-001 是测试笔记本（横屏非触摸显示器、远程工具虚拟屏、管理员账号登录、装着个人微信与远程工具），A3、A8、A11、A11b、A12 基本都不满足。在它上面得出的结论，都要在按本清单装好的正式终端（27 寸竖屏触摸屏）上复验。
+>
 > 2026-09-05 首版。适用对象：现场安装人员（不需要懂代码）。上位文档：[production-agent-onboarding.md](production-agent-onboarding.md)（安装脚本参数）、[windows-host-acceptance-runbook.md](windows-host-acceptance-runbook.md)（真机验收）、[terminal-fleet-management-design.md](terminal-fleet-management-design.md)（批量与换机）。
 > 硬规则：绑定码、桥接令牌、任何 token **只在提示框里输入**，不写进命令、工单、聊天、截图。安装包必须来自受控发布的签名 EXE/MSI，不从 Git 检出目录运行。
 
