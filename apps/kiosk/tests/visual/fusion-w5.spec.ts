@@ -810,7 +810,11 @@ test('standby skips a broken promo item and keeps playing the loadable one @w5-k
   await page.goto('/screensaver')
   const slot = page.getByTestId('standby-material-slot')
   // 阳性对照：能解码的素材照常播放，不被失败的那条拖成「暂无宣传内容」。
-  await expect(slot.locator('img')).toHaveAttribute('src', LOADABLE_AD)
+  // 可播素材会被预缓存，播放时 src 可能是它的 blob: 副本，所以查「真的解码出了图」，不钉 src 字面。
+  const img = slot.locator('img')
+  await expect(img).toHaveCount(1)
+  await expect(img).not.toHaveAttribute('src', '/api/v1/ad-assets/ad-gone/content')
+  await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true)
   await expect(slot.getByTestId('standby-material-fallback')).toHaveCount(0)
   expect(errors).toEqual([])
 })
