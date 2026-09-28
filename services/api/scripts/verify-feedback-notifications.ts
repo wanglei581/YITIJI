@@ -63,6 +63,8 @@ async function main() {
 
   async function cleanup() {
     await prisma.auditLog.deleteMany({ where: { actorId: adminId } }).catch(() => undefined)
+    // 第 7 步建的 105 条广播不挂会员，之前没人删：同一个库第二次跑会在第 5 步把它们当成串号。
+    await prisma.systemBroadcast.deleteMany({ where: { createdBy: adminId } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: { in: [userA, userB] } } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { id: adminId } }).catch(() => undefined)
   }
