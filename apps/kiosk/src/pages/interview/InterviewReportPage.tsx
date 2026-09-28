@@ -185,10 +185,12 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
         subtitle="报告可能还没生成、已经过期，或当前账号不能查看；不能用固定内容替代实际结果。"
         status={{ tone: 'bad', label: '报告不可用' }}
         ctabar={
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={goReports}>查看报告历史</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={goSetup}>重新开始练习</button>
-          </>
+          <div className="interview-qx-cta">
+            <div className="iv-cta-row">
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={goReports}>查看报告历史</button>
+              <button type="button" className="qx-btn" data-variant="primary" onClick={goSetup}>重新开始练习<em aria-hidden="true">→</em></button>
+            </div>
+          </div>
         }
       >
       <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">

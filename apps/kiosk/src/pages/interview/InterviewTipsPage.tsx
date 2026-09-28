@@ -208,7 +208,7 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
             </>
           ) : (
             <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
-              设置一场练习<em>→</em>
+              设置一场练习<em aria-hidden="true">→</em>
             </button>
           )}
         </div>
