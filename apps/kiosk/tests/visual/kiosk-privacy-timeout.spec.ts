@@ -380,11 +380,11 @@ test('member privacy clear sends the original bearer and blocks authenticated re
     status: 200,
     json: { success: true, data: { status: 'ok' } },
   })
-  // 青序流光首页该磁贴叫「模拟面试」（QxHomeView 的 actionId="interview-hub"）；
-  // V6 首页叫「AI 面试训练」。两种写法都容忍，避免文案微调再挂 ——
+  // 青序流光 2.0 首页该磁贴叫「练面试」（QxHomeView 的 actionId="interview-hub"，
+  // 可访问名只取标题）；改版前叫「模拟面试」。两种写法都容忍，避免文案微调再挂 ——
   // 本用例真正的断言在后面的 interview-reports 屏与 bearer 拦截，
   // 这个入口只是到达路径，不依赖它的具体排版。
-  await page.getByRole('button', { name: /模拟面试|AI\s*面试训练/ }).click()
+  await page.getByRole('button', { name: /^(练面试|模拟面试)$/ }).click()
   await page.getByRole('button', { name: /训练报告/ }).click()
   await expect(page.locator('[data-kiosk-screen="interview-reports"]')).toBeVisible()
   expect.soft(requests.reportRequestCount()).toBe(1)

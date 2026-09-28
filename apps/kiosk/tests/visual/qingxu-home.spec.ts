@@ -257,9 +257,9 @@ test('home ready state defers capability claims to entry without hiding the real
   const home = page.getByTestId('qx-home')
   const printTile = home.locator('[data-action="print-hub"]')
   await expect(printTile).toHaveAttribute('data-panel-state', 'ready')
-  // 真实设备态仍在顶栏胶囊；主卡按稿只写「进入后核验」，不重复报「打印机在线」。
+  // 真实设备态仍在顶栏胶囊；主卡按 2.0 稿写「先看价格，付了再打」，不重复报「打印机在线」。
   await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('打印机在线')
-  await expect(printTile.getByText('进入后核验打印与扫描能力', { exact: true })).toBeVisible()
+  await expect(printTile.getByText('先看价格，付了再打 · 带走：打印件', { exact: true })).toBeVisible()
   await expect(printTile.getByText('打印机在线')).toHaveCount(0)
   await expectReadableFeature(page)
   // 智慧校园开通只凭终端配置，首页不宣称「已授权」；开通后可点。

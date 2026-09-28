@@ -379,7 +379,8 @@ test('hosting unknown: the home footer and the member guide stay neutral until t
   // 首页底栏：没读到之前只说不代收简历，不提岗位与招聘会开没开。
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const footer = page.locator('.qx-home-truth')
-  await expect(footer).toContainText('能力状态以真实接口为准。本终端不代收简历。')
+  // 整句钉死：读到配置之前只有这一句，也不带「接口」这类工程词。
+  await expect(footer.locator('p').first()).toHaveText('本终端不代收简历。')
   await page.waitForTimeout(600)
   await expect(footer).not.toContainText('未开放')
   await markConfigReleased(page)

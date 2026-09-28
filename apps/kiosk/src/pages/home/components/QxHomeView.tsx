@@ -10,6 +10,7 @@ import {
   HistoryIcon,
   HomeIcon,
   LandmarkIcon,
+  MessageSquareTextIcon,
   MicIcon,
   PrinterIcon,
   QrCodeIcon,
@@ -155,7 +156,7 @@ export function QxHomeView({
   const toolboxReady = toolboxKnown && toolbox.enabled
   const campusReady = campusKnown && campus.enabled
   const extraCount = (toolboxReady ? 1 : 0) + (campusReady ? 1 : 0)
-  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '进入后核验打印与扫描能力' : device.printerLabel
+  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '先看价格，付了再打 · 带走：打印件' : device.printerLabel
   const recruitmentOpen = recruitment.enabled
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
@@ -195,10 +196,11 @@ export function QxHomeView({
             onAction('assistant')
           }}
         >
-          <span className="qx-home-voice-icon"><MicIcon aria-hidden="true" /></span>
-          <span>问小青：说一句你想办的事</span>
+          {/* 本机没开语音入口时不画麦克风、不说「说一句」：点进去只能打字。 */}
+          <span className="qx-home-voice-icon">{ASSISTANT_VOICE_ENTRY ? <MicIcon aria-hidden="true" /> : <MessageSquareTextIcon aria-hidden="true" />}</span>
+          <span>{ASSISTANT_VOICE_ENTRY ? '问小青：说一句你想办的事' : '问小青：打一句你想办的事'}</span>
           <span className="qx-home-voice-tag">AI 数字人</span>
-          <small>{ASSISTANT_VOICE_ENTRY ? '可打字；语音以本机检测为准' : '打字咨询'}</small>
+          {ASSISTANT_VOICE_ENTRY ? <small>可打字；语音以本机检测为准</small> : null}
         </button>
 
         <div className="qx-home-continue" data-testid="home-context-region">
@@ -235,7 +237,7 @@ export function QxHomeView({
 
         <div className="qx-home-tiles">
           <HomeTile actionId="resume-hub" title="改简历" description="上传或扫描，诊断、优化或生成新简历，改不改你定" foot="带走：新简历" badge="AI 诊断改写" icon={FileTextIcon} onAction={onAction} />
-          <HomeTile actionId="interview-hub" title="练面试" description="回答常见问题，可以跳过此题，当场看反馈，不做录用判断" foot="带走：面试反馈" badge="AI 模拟面试" icon={MicIcon} onAction={onAction} />
+          <HomeTile actionId="interview-hub" title="练面试" description="回答常见问题，当场看反馈，不做录用判断" foot="带走：面试反馈" badge="AI 模拟面试" icon={MicIcon} onAction={onAction} />
           <HomeTile
             actionId="print-hub"
             title="打印 · 扫描"
@@ -292,7 +294,7 @@ export function QxHomeView({
       <footer className="qx-home-truth">
         <ShieldCheckIcon aria-hidden="true" />
         <div>
-          <p><strong>能力状态以真实接口为准。</strong>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : channelsTile ? '岗位与招聘会请看本机构官方渠道，本终端不代收简历。' : recruitment.status === 'ready' ? '本终端未开放岗位与招聘会信息，也不代收简历。' : '本终端不代收简历。'}</p>
+          <p>{recruitmentOpen ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。' : channelsTile ? '岗位与招聘会请看本机构官方渠道，本终端不代收简历。' : recruitment.status === 'ready' ? '本终端未开放岗位与招聘会信息，也不代收简历。' : '本终端不代收简历。'}</p>
           <p className="qx-home-legal">
             {kiosk ? <span>鲁ICP备2026023517号-2</span> : (<a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">鲁ICP备2026023517号-2</a>)}
             <span aria-hidden="true">·</span>
