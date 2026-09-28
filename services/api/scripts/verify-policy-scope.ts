@@ -2,9 +2,10 @@ import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { MODULE_METADATA } from '@nestjs/common/constants'
 import { PoliciesModule } from '../src/policies/policies.module'
+import { PoliciesController } from '../src/policies/policies.controller'
 import { CommunityModule } from '../src/community/community.module'
-import { MemberFavoritesModule } from '../src/member-favorites/member-favorites.module'
-import { ActivityModule } from '../src/activity/activity.module'
+import { MemberFavoritesController } from '../src/member-favorites/member-favorites.controller'
+import { MeActivityController } from '../src/activity/me-activity.controller'
 import { PolicyScopeService, resolvePolicyScope } from '../src/policies/policy-scope.service'
 import { publicPolicyWhere, policyScopeMode } from '../src/policies/policy-public-visibility'
 import { communityFeedCacheKey } from '../src/community/community.service'
@@ -28,11 +29,19 @@ assert.deepEqual(await resolver.resolve({ headers: { 'x-terminal-id': 'terminal-
 assert.deepEqual(await resolver.resolve({ headers: { 'x-terminal-id': 'terminal-b', 'x-terminal-session-token': 'valid-b' } }), { mode: 'org', orgId: null, state: 'unbound' })
 assert.deepEqual(await resolver.resolve({ headers: {} }), { mode: 'org', orgId: null, state: 'missing' })
 assert.deepEqual(await resolver.resolve({ headers: { 'x-terminal-id': 'terminal-a', 'x-terminal-session-token': 'forged' } }), { mode: 'org', orgId: null, state: 'missing' }, '终端会话令牌验不过要判缺失，不能按终端编号直接取机构')
-// 四个控制器上 PolicyScopeService 是可选注入（方便门禁手动构造）；生产装配必须真的提供它，
+// 政策、社区两个控制器上 PolicyScopeService 是可选注入（方便门禁手动构造）；生产装配必须真的提供它，
 // 否则 POLICY_SCOPE=org 会被悄悄当成 all。读 Nest 模块元数据核对，不搜源码字符串。
-for (const [label, mod] of [['PoliciesModule', PoliciesModule], ['CommunityModule', CommunityModule], ['MemberFavoritesModule', MemberFavoritesModule], ['ActivityModule', ActivityModule]] as const) {
+for (const [label, mod] of [['PoliciesModule', PoliciesModule], ['CommunityModule', CommunityModule]] as const) {
   const providers = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, mod) ?? []) as unknown[]
   assert.ok(providers.includes(PolicyScopeService), `${label} 必须提供 PolicyScopeService`)
+}
+// D4 拍板（2026-09-28）：会员本人的收藏、浏览与跳转记录照常显示，不按终端机构过滤；
+// 只有公开的政策列表、详情、条件核对与社区动态按机构过滤（打开详情时再按终端机构判断）。
+// 阳性对照：政策控制器确实注入了它；读不出来说明没有装饰器元数据，下面的「不依赖」断言会恒真
+assert.ok(((Reflect.getMetadata('design:paramtypes', PoliciesController) ?? []) as unknown[]).includes(PolicyScopeService), '读不到 PoliciesController 的构造参数元数据（阳性对照失败）')
+for (const [label, ctor] of [['MemberFavoritesController', MemberFavoritesController], ['MeActivityController', MeActivityController]] as const) {
+  const deps = (Reflect.getMetadata('design:paramtypes', ctor) ?? []) as unknown[]
+  assert.ok(!deps.includes(PolicyScopeService), `${label} 不应按终端机构过滤本人记录（D4：本人记录照常显示）`)
 }
 assert.notEqual(
   communityFeedCacheKey('closed', { mode: 'org', orgId: 'org-a', state: 'bound' }, undefined, 20),

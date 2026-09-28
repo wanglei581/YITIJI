@@ -5,7 +5,6 @@ import { ActivityController } from './activity.controller'
 import { MeActivityController } from './me-activity.controller'
 import { ActivityService } from './activity.service'
 import { TerminalsModule } from '../terminals/terminals.module'
-import { PolicyScopeService } from '../policies/policy-scope.service'
 
 /**
  * 浏览 / 外部跳转记录模块（P1 闭环）。
@@ -35,6 +34,6 @@ import { PolicyScopeService } from '../policies/policy-scope.service'
     }),
   ],
   controllers: [ActivityController, MeActivityController],
-  providers: [ActivityService, EndUserAuthGuard, PolicyScopeService],
+  providers: [ActivityService, EndUserAuthGuard],
 })
 export class ActivityModule {}
