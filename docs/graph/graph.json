@@ -2143,6 +2143,25 @@
       },
       {
         "controller": "services/api/src/legal/admin-legal-docs.controller.ts",
+        "handler": "AdminLegalDocsController.getOne",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "LegalDocVersion"
+        ],
+        "path": "/api/v1/admin/legal-doc-versions/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/legal/legal.service.ts"
+        ],
+        "services": [
+          "LegalService"
+        ]
+      },
+      {
+        "controller": "services/api/src/legal/admin-legal-docs.controller.ts",
         "handler": "AdminLegalDocsController.activate",
         "method": "PATCH",
         "models": [
@@ -11839,7 +11858,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 173,
+      "reachableFileCount": 181,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12622,7 +12641,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 178
+      "sourceFileCount": 186
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17694,6 +17713,7 @@
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/alerts/index.tsx": [
+      "apps/admin/scripts/verify-feedback-sla.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/billing/index.tsx": [
@@ -17747,8 +17767,14 @@
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-job-content-screening.ts"
     ],
+    "apps/admin/src/routes/legal-docs/LegalDocPreview.tsx": [
+      "services/api/scripts/verify-legal-doc-version.ts"
+    ],
     "apps/admin/src/routes/legal-docs/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
+      "services/api/scripts/verify-legal-doc-version.ts"
+    ],
+    "apps/admin/src/routes/legal-docs/legalDocRender.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/admin/src/routes/login/LegalDocsModal.tsx": [
@@ -17758,6 +17784,15 @@
     "apps/admin/src/routes/login/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/member-feedback/FeedbackSlaBadges.tsx": [
+      "apps/admin/scripts/verify-feedback-sla.mjs"
+    ],
+    "apps/admin/src/routes/member-feedback/feedbackSla.ts": [
+      "apps/admin/scripts/verify-feedback-sla.mjs"
+    ],
+    "apps/admin/src/routes/member-feedback/index.tsx": [
+      "apps/admin/scripts/verify-feedback-sla.mjs"
     ],
     "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
@@ -17805,12 +17840,15 @@
       "apps/admin/scripts/verify-source-publish-actions.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/admin/src/routes/print-scan/CapabilityCenter.tsx": [
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
+      "services/api/scripts/verify-print-color-duplex-capability.ts"
+    ],
     "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/index.tsx": [
-      "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
-      "services/api/scripts/verify-print-color-duplex-capability.ts"
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/printers/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
@@ -18801,6 +18839,9 @@
     "apps/kiosk/src/pages/legal/legal-service-desk.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
+    ],
+    "apps/kiosk/src/pages/legal/legalDocModel.ts": [
+      "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
@@ -22003,7 +22044,8 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/admin-ops/derived-alert-identity.ts": [
-      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
+      "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -22935,6 +22977,7 @@
       "services/api/scripts/verify-job-sync.ts",
       "services/api/scripts/verify-jobfair-review.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
+      "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-official-channels.ts",
@@ -22957,6 +23000,7 @@
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-benefits-admin.ts"
     ],
     "services/api/src/common/filters/http-exception.filter.ts": [
@@ -23039,6 +23083,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
@@ -25661,6 +25706,7 @@
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
+          "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
           "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx",
           "apps/admin/src/routes/print-scan/index.tsx",
           "apps/admin/src/services/api/printScan.ts"
@@ -25794,6 +25840,27 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:console-screen-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/alerts/index.tsx",
+          "apps/admin/src/routes/member-feedback/FeedbackSlaBadges.tsx",
+          "apps/admin/src/routes/member-feedback/feedbackSla.ts",
+          "apps/admin/src/routes/member-feedback/index.tsx"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-feedback-sla.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:feedback-sla"
       ],
       "wired": true
     },
@@ -31456,6 +31523,7 @@
           "services/api/src/admin-ops/admin-alert-actions.service.ts",
           "services/api/src/admin-ops/admin-ops.controller.ts",
           "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/admin-ops/derived-alert-identity.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
@@ -34863,16 +34931,22 @@
         "dirs": [],
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/routes/legal-docs/LegalDocPreview.tsx",
           "apps/admin/src/routes/legal-docs/index.tsx",
+          "apps/admin/src/routes/legal-docs/legalDocRender.ts",
           "apps/admin/src/routes/login/LegalDocsModal.tsx",
           "apps/kiosk/src/pages/auth/hooks/useMemberPhoneLogin.ts",
           "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
+          "apps/kiosk/src/pages/legal/legalDocModel.ts",
           "apps/kiosk/src/services/auth/legalConsentVersions.ts",
           "apps/kiosk/src/services/auth/memberAuthApi.ts",
           "apps/partner/src/routes/login/LegalDocsModal.tsx",
           "packages/shared/src/types/legalDocs.ts",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/common/decorators/roles.decorator.ts",
+          "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/legal/admin-legal-docs.controller.ts",
           "services/api/src/legal/dto/admin-legal-doc.dto.ts",
           "services/api/src/legal/legal-constants.ts",
@@ -36825,7 +36899,7 @@
         ],
         "files": [
           "apps/admin/src/routes/billing/index.tsx",
-          "apps/admin/src/routes/print-scan/index.tsx",
+          "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
           "apps/admin/src/services/api/printScan.ts",
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",

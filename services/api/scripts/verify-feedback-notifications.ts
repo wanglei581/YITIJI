@@ -97,7 +97,20 @@ async function main() {
     else fail(`2. 本人隔离异常：A=${JSON.stringify(listA)} B=${JSON.stringify(listB)}`)
     await expectReject('FEEDBACK_NOT_FOUND', '3. 用户B不能关闭用户A反馈', () => feedback.closeByEndUser(userB, ticket.id))
 
+    // C3：没有任何管理员回复记录时，不能手动把状态改成「已回复」（会让答复时限停表、告警消失，而提交人什么都没收到）。
+    await expectReject('FEEDBACK_REPLY_REQUIRED', '3b. 没有回复记录时手动标「已回复」被拒', () => feedback.updateAdminStatus(admin, ticket.id, { status: 'replied' }))
+    const beforeReplyItem = (await feedback.listForAdmin({})).items.find((item) => item.id === ticket.id)
+    if (beforeReplyItem && beforeReplyItem.hasAdminReply === false && beforeReplyItem.status === 'pending') pass('3c. 回复前列表如实给出 hasAdminReply=false，状态未被改动')
+    else fail(`3c. 回复前列表字段异常：${JSON.stringify(beforeReplyItem)}`)
+
     const adminDetail = await feedback.addAdminReply(admin, ticket.id, { content: '已记录，现场工作人员会核对设备状态。' })
+    const afterReplyItem = (await feedback.listForAdmin({})).items.find((item) => item.id === ticket.id)
+    if (afterReplyItem?.hasAdminReply === true) pass('4b. 回复后列表 hasAdminReply=true')
+    else fail(`4b. 回复后列表字段异常：${JSON.stringify(afterReplyItem)}`)
+    const reprocessed = await feedback.updateAdminStatus(admin, ticket.id, { status: 'processing' })
+    const backToReplied = await feedback.updateAdminStatus(admin, ticket.id, { status: 'replied' })
+    if (reprocessed.status === 'processing' && backToReplied.status === 'replied') pass('4c. 已有回复记录时可以在处理中与已回复之间手动切换')
+    else fail(`4c. 有回复记录时状态切换异常：${reprocessed.status} → ${backToReplied.status}`)
     if (adminDetail.status === 'replied' && adminDetail.replies.some((reply) => reply.senderType === 'admin')) pass('4. Admin 回复反馈并流转为已回复')
     else fail(`4. Admin 回复异常：${JSON.stringify(adminDetail)}`)
 

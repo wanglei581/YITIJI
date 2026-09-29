@@ -511,6 +511,9 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:data-request-ui
           pnpm --filter @ai-job-print/admin verify:admin-users-ui
           pnpm --filter @ai-job-print/admin verify:honest-placeholders
+          # C3「AI 内容投诉」答复时限：真执行 feedbackSla.ts 纯函数（typescript transpileModule），
+          # 期望值按 2026 年国务院节假日安排手算；只读 apps/admin 源码，不碰 Prisma、不连库。
+          pnpm --filter @ai-job-print/admin verify:feedback-sla
           pnpm --filter @ai-job-print/admin verify:console-screen-ui
           pnpm --filter @ai-job-print/api verify:admin-users
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui

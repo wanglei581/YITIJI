@@ -550,6 +550,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/legal-doc-versions` | AdminLegalDocsController.list | admin | LegalService | AuditLog<br/>LegalDocVersion |
 | POST | `/api/v1/admin/legal-doc-versions` | AdminLegalDocsController.create | admin | LegalService | AuditLog<br/>LegalDocVersion |
+| GET | `/api/v1/admin/legal-doc-versions/:id` | AdminLegalDocsController.getOne | admin | LegalService | AuditLog<br/>LegalDocVersion |
 | PATCH | `/api/v1/admin/legal-doc-versions/:id/activate` | AdminLegalDocsController.activate | admin | LegalService | AuditLog<br/>LegalDocVersion |
 
 ## `services/api/src/legal/legal.controller.ts`

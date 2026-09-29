@@ -39,6 +39,7 @@ import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.s
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
 import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
+import { offlineEpisodeToken } from '../src/admin-ops/derived-alert-identity'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../src/terminals/printer-availability'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
@@ -57,11 +58,21 @@ function errorCode(err: unknown): string | undefined {
   return e.response?.error?.code ?? e.getResponse?.()?.error?.code ?? e.message
 }
 
-type FeedbackQuery = { where?: { category?: string; status?: { in?: string[] } }; orderBy?: { createdAt?: 'asc' | 'desc' } }
-function matchFeedback(rows: unknown[], args?: FeedbackQuery): Array<{ category: string; status: string; createdAt: Date }> {
-  return (rows as Array<{ category: string; status: string; createdAt: Date }>)
+type FeedbackStatusClause = { status?: string | { in?: string[] }; replies?: { none?: { senderType?: string } } }
+type FeedbackQuery = { where?: { category?: string; OR?: FeedbackStatusClause[] } & FeedbackStatusClause; orderBy?: { createdAt?: 'asc' | 'desc' } }
+type FeedbackRow = { category: string; status: string; createdAt: Date; hasAdminReply?: boolean }
+function matchStatusClause(row: FeedbackRow, clause: FeedbackStatusClause): boolean {
+  const status = clause.status
+  if (typeof status === 'string' && row.status !== status) return false
+  if (status && typeof status === 'object' && status.in && !status.in.includes(row.status)) return false
+  if (clause.replies?.none?.senderType === 'admin' && row.hasAdminReply) return false
+  return true
+}
+function matchFeedback(rows: unknown[], args?: FeedbackQuery): FeedbackRow[] {
+  return (rows as FeedbackRow[])
     .filter((row) => args?.where?.category === undefined || row.category === args.where.category)
-    .filter((row) => !args?.where?.status?.in || args.where.status.in.includes(row.status))
+    .filter((row) => matchStatusClause(row, args?.where ?? {}))
+    .filter((row) => !args?.where?.OR || args.where.OR.some((clause) => matchStatusClause(row, clause)))
 }
 
 function mockOpsPrisma(
@@ -137,8 +148,53 @@ async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
   pass('3a. 健康打印机状态(ok/ready/idle)不产生 printer_issue 告警')
 }
 
+/**
+ * 3a2. Agent 真会上报的 low_paper / unknown（apps/terminal-agent/src/agent/wmi.ts）必须有人话标题，
+ * 不能落到「打印机状态异常(low_paper)」兜底；low_paper 还能出纸 → warning，unknown 一体机打不了 → error。
+ * 同时钉住：告警文案时间按上海时间写，而 occurredAt / episodeToken 仍是原来的 UTC 口径。
+ */
+async function verifyPrinterStatusLabelsAndShanghaiTime(): Promise<void> {
+  const now = new Date()
+  const cases: Array<{ status: string; title: string; severity: 'warning' | 'error' }> = [
+    { status: 'low_paper', title: '纸张或墨粉不足', severity: 'warning' },
+    { status: 'unknown', title: '打印机状态读取不到', severity: 'error' },
+    { status: 'paper_empty', title: '打印机缺纸', severity: 'warning' },
+    { status: 'offline', title: '打印机离线', severity: 'error' },
+  ]
+  for (const { status, title, severity } of cases) {
+    const service = new AdminOpsService(mockOpsPrisma([{
+      id: `term_vop_label_${status}`,
+      terminalCode: `VOP-LABEL-${status}`,
+      registeredAt: now,
+      heartbeats: [{ createdAt: now, printerStatus: status }],
+    }]))
+    const alert = (await service.listDerivedAlerts()).data.find((item) => item.type === 'printer_issue')
+    if (!alert) fail(`3a2. 打印机状态 ${status} 没有产生 printer_issue 告警`)
+    if (!alert.title.includes(title) || alert.title.includes('状态异常(')) {
+      fail(`3a2. 打印机状态 ${status} 的标题应含「${title}」且不落兜底，实际「${alert.title}」`)
+    }
+    if (alert.severity !== severity) fail(`3a2. 打印机状态 ${status} 的级别应为 ${severity}，实际 ${alert.severity}`)
+  }
+
+  const lastSeen = new Date('2026-09-28T08:00:00.000Z')
+  const offlineService = new AdminOpsService(mockOpsPrisma([{
+    id: 'term_vop_shanghai_time',
+    terminalCode: 'VOP-SHANGHAI-TIME',
+    registeredAt: lastSeen,
+    heartbeats: [{ createdAt: lastSeen, printerStatus: 'ready' }],
+  }]))
+  const offline = (await offlineService.listDerivedAlerts()).data.find((item) => item.type === 'terminal_offline')
+  if (!offline || !offline.detail.includes('(2026-09-28 16:00)')) {
+    fail(`3a2. 离线告警里的心跳时间应按上海时间写 2026-09-28 16:00，实际「${offline?.detail}」`)
+  }
+  if (offline.occurredAt !== lastSeen.toISOString() || offline.episodeToken !== offlineEpisodeToken(lastSeen)) {
+    fail('3a2. 改时区只许动文案：occurredAt / episodeToken 必须仍按原 UTC 时刻算')
+  }
+  pass('3a2. low_paper（warning）/ unknown（error）有人话标题不落兜底；告警文案时间按上海时间，身份与 episode 不变')
+}
+
 async function verifyPendingFeedbackAlert(): Promise<void> {
-  const feedbackRows: Array<{ createdAt: Date; category: string; status: string; contactPhoneEnc: string; content: string }> = [
+  const feedbackRows: Array<{ createdAt: Date; category: string; status: string; contactPhoneEnc: string; content: string; hasAdminReply?: boolean }> = [
     { createdAt: new Date('2026-09-28T08:00:00.000Z'), category: 'ai_content', status: 'pending', contactPhoneEnc: 'secret-phone', content: 'secret-content' },
     { createdAt: new Date('2026-09-28T08:01:00.000Z'), category: 'ai_content', status: 'processing', contactPhoneEnc: 'secret-phone-2', content: 'secret-content-2' },
     { createdAt: new Date('2026-09-28T07:00:00.000Z'), category: 'print', status: 'pending', contactPhoneEnc: '', content: '打印问题' },
@@ -149,19 +205,29 @@ async function verifyPendingFeedbackAlert(): Promise<void> {
   const alert = first.data.find((item) => item.type === 'feedback_pending')
   if (!alert || !alert.detail.includes('共 2 条')) fail('3c. 待处理 AI 内容投诉告警缺失，或把打印问题、已关闭工单也算进去了')
   if (alert && alert.occurredAt !== '2026-09-28T08:00:00.000Z') fail('3c. 告警时间不是最早一条待处理 AI 内容投诉的提交时间')
+  // 文案时间按上海时间（UTC 08:00 → 16:00），与意见反馈页显示的提交时间一致，不再差 8 小时。
+  if (alert && !alert.detail.includes('最早提交于 2026-09-28 16:00')) fail(`3c. 告警文案里的最早提交时间应按上海时间写，实际「${alert.detail}」`)
   const encoded = JSON.stringify(alert)
   if (encoded.includes('secret-phone') || encoded.includes('secret-content')) fail('3c. 告警泄露手机号或投诉正文')
   // 提醒时机：答复较早的一条不换 episode（不打扰已确认的告警）；有新投诉进来才换（重新提醒）。
   feedbackRows[0].status = 'replied'
+  feedbackRows[0].hasAdminReply = true
   const afterOldAnswered = (await service.listDerivedAlerts()).data.find((item) => item.type === 'feedback_pending')
   if (!afterOldAnswered || afterOldAnswered.episodeToken !== alert?.episodeToken) fail('3c. 答复旧投诉不该让告警换 episode（会把已确认的告警重新弹出来）')
   feedbackRows.push({ createdAt: new Date('2026-09-28T09:00:00.000Z'), category: 'ai_content', status: 'pending', contactPhoneEnc: '', content: '新投诉' })
   const afterNew = (await service.listDerivedAlerts()).data.find((item) => item.type === 'feedback_pending')
   if (!afterNew || afterNew.episodeToken === alert?.episodeToken) fail('3c. 有新投诉进来告警没有换 episode（已确认的告警不会重新提醒）')
+  // 旧数据：状态被标成「已回复」却没有任何管理员回复记录 —— 提交人什么都没收到，告警不能消失。
   for (const row of feedbackRows) row.status = row.category === 'ai_content' ? 'replied' : row.status
+  const repliedWithoutRecord = (await service.listDerivedAlerts()).data.find((item) => item.type === 'feedback_pending')
+  // 此时 ai_content 共 4 条：第 1 条带回复记录；其余 3 条（含原先已关闭、被改成已回复的一条）都没有回复记录。
+  if (!repliedWithoutRecord || !repliedWithoutRecord.detail.includes('共 3 条')) {
+    fail(`3c. 标成已回复但没有回复记录的 AI 内容投诉必须仍算待处理，实际「${repliedWithoutRecord?.detail ?? '告警消失'}」`)
+  }
+  for (const row of feedbackRows) if (row.category === 'ai_content') row.hasAdminReply = true
   const after = await service.listDerivedAlerts()
   if (after.data.some((item) => item.type === 'feedback_pending')) fail('3c. AI 内容投诉都答复后派生告警未消失')
-  pass('3c. 只按待处理 AI 内容投诉派生告警（条数与最早时间，不全表拉取），新投诉才重新提醒，不含个人信息，答复后消失')
+  pass('3c. 只按待处理 AI 内容投诉派生告警（条数与最早时间，不全表拉取），新投诉才重新提醒，不含个人信息；有回复记录才消失，只改状态不消失')
 }
 
 async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
@@ -258,6 +324,7 @@ async function main() {
   pass('SES-07 终端在线窗口统一为五分钟心跳常量')
 
   await verifyHealthyPrinterStatusesDoNotAlert()
+  await verifyPrinterStatusLabelsAndShanghaiTime()
   await verifyPendingFeedbackAlert()
   await verifyPaidPendingFileUnavailableAlert()
   if (process.env.ADMIN_OPS_ALERT_HEALTH_ONLY === '1') return

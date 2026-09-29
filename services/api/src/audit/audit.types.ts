@@ -78,6 +78,8 @@ export type AuditAction =
   | 'alert.silence'
   | 'alert.close'
   | 'alert.reopen'
+  /** 管理员在后台「法务文档版本」查看某一版本的正文（GET /admin/legal-doc-versions/:id）。 */
+  | 'legal_doc.view'
 
 export type AuditTargetType =
   | 'auth'
