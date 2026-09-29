@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1722 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1723 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1665,11 +1665,12 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/shared/src/</code> — 33 个文件</summary>
+<summary><code>packages/shared/src/</code> — 34 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `packages/shared/src/formatDateTime.ts` | `verify-datetime-honesty.mjs` |
+| `packages/shared/src/formatDateTime.ts` | `verify-partner-terminal-ops-honesty.mjs`<br/>`verify-datetime-honesty.mjs` |
+| `packages/shared/src/formatNumber.ts` | `verify-datetime-honesty.mjs` |
 | `packages/shared/src/index.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-campus-recruitment-stats.ts`<br/>`verify-companies.ts`<br/>`verify-contract-review-contract.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-materials.ts`<br/>`verify-job-requirement-stats.ts`<br/>`verify-toolbox-micro-app-platform.ts` |
 | `packages/shared/src/pickupCode.ts` | `verify-backend-p0-contracts.mjs` |
 | `packages/shared/src/types/adminUsers.ts` | `verify-admin-users-ui.mjs`<br/>`verify-admin-users.ts` |

@@ -21656,6 +21656,10 @@
       "apps/admin/scripts/verify-refresh-safe.mjs"
     ],
     "packages/shared/src/formatDateTime.ts": [
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
+      "scripts/verify-datetime-honesty.mjs"
+    ],
+    "packages/shared/src/formatNumber.ts": [
       "scripts/verify-datetime-honesty.mjs"
     ],
     "packages/shared/src/index.ts": [
@@ -30867,7 +30871,8 @@
           "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
-          "apps/partner/src/routes/terminals/terminalOpsFormat.ts"
+          "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
+          "packages/shared/src/formatDateTime.ts"
         ],
         "missing": []
       },
@@ -31729,6 +31734,7 @@
         "files": [
           "apps/kiosk/src/pages/jobs/utils/sourceTrust.ts",
           "packages/shared/src/formatDateTime.ts",
+          "packages/shared/src/formatNumber.ts",
           "services/api/src/jobs/jobs-shared.ts"
         ],
         "missing": []
