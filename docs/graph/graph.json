@@ -22144,6 +22144,7 @@
     "services/api/src/ai/llm/llm-config.service.ts": [
       "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
@@ -22350,17 +22351,20 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/ai/resume/ocr/baidu-ocr.provider.ts": [
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
       "services/api/scripts/verify-resume-extraction.ts"
     ],
     "services/api/src/ai/resume/ocr/disabled-ocr.provider.ts": [
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
       "services/api/scripts/verify-resume-extraction.ts"
     ],
     "services/api/src/ai/resume/ocr/ocr.service.ts": [
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
@@ -22373,6 +22377,7 @@
       "services/api/scripts/verify-pdf-cmap.ts"
     ],
     "services/api/src/ai/resume/ocr/tencent-ocr.provider.stub.ts": [
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
       "services/api/scripts/verify-resume-extraction.ts"
@@ -22453,6 +22458,7 @@
     "services/api/src/app.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -22692,7 +22698,11 @@
     "services/api/src/common/auth/optional-internal-user.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts"
     ],
+    "services/api/src/common/boot/ai-platform-degradation.ts": [
+      "services/api/scripts/verify-ai-platform-degradation.ts"
+    ],
     "services/api/src/common/boot/boot-readiness.ts": [
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
     "services/api/src/common/client-ip.ts": [
@@ -22775,6 +22785,7 @@
     ],
     "services/api/src/common/filters/http-exception.filter.ts": [
       "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
@@ -22866,6 +22877,7 @@
       "services/api/scripts/verify-error-observability.ts"
     ],
     "services/api/src/common/pdf/aigc-label.ts": [
+      "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-production-runtime-gates.ts",
       "services/api/scripts/verify-resume-export-label.ts"
@@ -22989,6 +23001,9 @@
     ],
     "services/api/src/companies/companies.types.ts": [
       "services/api/scripts/verify-companies.ts"
+    ],
+    "services/api/src/config/ai-platform-config.ts": [
+      "services/api/scripts/verify-ai-platform-degradation.ts"
     ],
     "services/api/src/config/body-parsers.ts": [
       "services/api/scripts/verify-payment-real-channels.ts"
@@ -31587,6 +31602,34 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-persistence-consistency"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/ai/resume/ocr/baidu-ocr.provider.ts",
+          "services/api/src/ai/resume/ocr/disabled-ocr.provider.ts",
+          "services/api/src/ai/resume/ocr/ocr.service.ts",
+          "services/api/src/ai/resume/ocr/tencent-ocr.provider.stub.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/common/boot/ai-platform-degradation.ts",
+          "services/api/src/common/boot/boot-readiness.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/pdf/aigc-label.ts",
+          "services/api/src/config/ai-platform-config.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-platform-degradation.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-platform-degradation"
       ],
       "wired": true
     },

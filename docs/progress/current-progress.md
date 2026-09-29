@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-09-29：P1-18（3.6a）生产缺 AI 配置只降级 AI，不再拖垮打印与支付（分支 `claude/backend-hardening-20260929-ai-degrade`）
+
+- **授权：** 放宽生产启动检查这一处，子代理曾被权限检查拦下，协调方未绕过，交产品负责人本人决定；产品负责人 9/29 在后端窗口亲口回复「同意 P1-18 方案①」。授权边界：只放宽 AI 类四项（OCR、AI_PROVIDER、大模型密钥、AIGC 生产方名称），其余一律不动。
+- **做了什么（Claude 子代理实现、协调方审）：** 这四项缺失或不合法时生产不再拒启动；`/health` 如实 degraded（子系统 `ai-platform`，结构化 impact：AI 生成 / AI 文件导出 / OCR 按缺什么标不可用，打印扫描、支付、两个后台恒不受影响），`/health/ready` 不因此变 503（否则一次漏配 AI 密钥的发布会被当成失败回退）。AI 路由返回 503 `AI_PROVIDER_NOT_CONFIGURED`（生成与语音看大模型与生产方，导出只看生产方，只读放行），生产下 mock / 占位 provider 永不出结果；一体机能力接口如实报 off，只缺 OCR 时简历诊断报 degraded（文字版照常）。写 AI 文件标识处 fail-closed：生产缺生产方或填成产品名拒绝写，是最后一道防线。部署预检对 AI 缺项只打 `AI_PLATFORM_DEGRADED` 告警、不中止。`.env.example` 与两份验收文档（首发验收、生产部署清单）的旧口径同步改正。
+- **没放宽的：** JWT、文件签名、加密密钥、存储、数据库、Redis、短信、支付会话密钥、沙箱支付、终端管理密钥——门禁里 10 条反向用例逐一证明「AI 全缺的同时再缺这一项仍拒启动」。
+- **验证：** 新门禁 `verify:ai-platform-degradation` 115 条（进 CI SQLite 作业）；子代理 11 处反向变异全红、关联门禁 66 条通过（3 条红逐条核过与本改动无关）。协调方逐行审了启动闸门（删掉的正好是四类 AI 项），独立复跑 12 条关联门禁（含 deploy-gates-in-sync、deploy-rollback、prod-readonly-probe、print-scan-first-release）全绿；抽 2 处变异（去掉守卫拦截、支付会话密钥缺失也放行）各自变红。
+- **给前端：** 一体机不用改（`AI_PROVIDER_NOT_CONFIGURED` 已在 aiOutage 里）；小程序 `utils/user-error.js` 建议补这一码的映射。发布前在服务器跑一次预检干跑，看有无 `AI_PLATFORM_DEGRADED`。
+
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
