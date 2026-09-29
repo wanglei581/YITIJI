@@ -22,7 +22,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { JobFitResponse } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import { BriefcaseIcon, FileTextIcon, ListIcon, PenLineIcon, PrinterIcon, UserIcon } from 'lucide-react'
 import {
   AiDisclaimerLine,
@@ -61,6 +60,7 @@ import {
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 const JOB_FIT_ROUTE = '/resume/job-fit'
 
@@ -99,6 +99,7 @@ function QxAction({ label, variant, onClick, icon }: {
 
 export function JobFitActionsPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { user, getToken } = useAuth()
   const state = location.state as Record<string, unknown> | null
@@ -221,20 +222,19 @@ export function JobFitActionsPage() {
       const file = await printJobFit(taskId, { token: getToken(), accessToken })
       if (!isLive(run)) return
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size:
-              file.sizeBytes >= 1024 * 1024
-                ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
-                : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+      startPrint({
+        origin: 'job_fit',
+        returnPath: window.location.pathname,
+        file: {
+          name: file.filename,
+          size:
+            file.sizeBytes >= 1024 * 1024
+              ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
+              : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {

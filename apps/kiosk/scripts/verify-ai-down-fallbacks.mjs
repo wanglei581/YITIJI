@@ -34,6 +34,7 @@ const files = {
   source: kiosk('src/pages/resume/ResumeSourcePage.tsx'),
   report: kiosk('src/pages/resume/ResumeReportPage.tsx'),
   reportExits: kiosk('src/pages/resume/components/ResumeDiagnosisFailExits.tsx'),
+  handoffPolicy: kiosk('src/pages/print/printHandoffPolicy.ts'),
   reportCss: kiosk('src/pages/resume/resume-report-qx.css'),
   generate: kiosk('src/pages/resume/ResumeGeneratePage.tsx'),
   interviewSetup: kiosk('src/pages/interview/InterviewSetupPage.tsx'),
@@ -124,9 +125,10 @@ mustHandler('reportExits', 'printOriginal', [
   [/if \(!file\?\.fileUrl\) return/, '必须在没有打印链接时提前返回，不给一个点了没反应的按钮'],
   [/if \(!fileId\) return/, '必须在没有 fileId 时提前返回：材料检查按 fileId 建任务，没有它只会落到空态'],
   [/fileId,\s*\n\s*fileUrl: file\.fileUrl/, '交给打印链的文件必须同时带上传结果的 fileId 与真实 HMAC content URL'],
-  [/savePrintMaterialSession\(\{ file: printFile, source: 'resume' \}\)/, '必须先整份写打印材料会话：旧地址会重定向，重定向不转发路由 state，打印台只认会话'],
-  ["navigate('/print/material-check'", '打印原件必须走打印台材料检查：原件没做完隐私检查，直达报价页会在建单时被拒'],
+  // 2026-09-29 P0-5：整份写打印交接上下文（startPrint），入口由 printHandoffPolicy 定：resume_original = 打印台材料检查。
+  [/startPrint\(\{ origin: 'resume_original', file: printFile, source: 'resume'/, '必须先整份写打印交接上下文，且按原件（resume_original）走打印台材料检查：原件没做完隐私检查，直达报价页会在建单时被拒'],
 ])
+must('handoffPolicy', /resume_original: REQUIRED/, '入口策略表：诊断失败的原件必须先做材料检查')
 mustNot('reportExits', "navigate('/print/confirm'", '打印原件不得直达报价确认页（生产隐私闸门会拒单）')
 must('report', /fileId=\{typeof state\.fileId === 'string' \? state\.fileId : undefined\}/, '报告页必须把上传结果的 fileId 交给诊断失败出路（它在解析页 state 顶层，失败时随整份 state 转过来）')
 
@@ -175,7 +177,7 @@ must('generate', /onClick: \(\) => void handleExportDraft\(\)/, '降级动作必
 mustHandler('generate', 'handleExportDraft', [
   ['exportResumeDraft', '草稿导出必须走不经过模型的 export 端点'],
   [/if \(!file\.printFileUrl\) throw/, '拿不到打印链接必须如实报错，不静默跳转到一个打不出的页面'],
-  ["navigate('/print/confirm'", '草稿必须进入既有打印链路'],
+  ["origin: 'resume_generate'", '草稿必须写打印交接上下文后进入既有打印链路'],
   [/fileUrl: file\.printFileUrl/, '必须把真实打印链接交给打印链路'],
 ])
 
@@ -222,7 +224,7 @@ must('interviewSetup', "navigate('/interview/tips')", '必须保留一条完全�
 mustHandler('interviewSetup', 'handlePracticeSheet', [
   ['printInterviewPracticeSheet', '题目单必须走不经过模型的题目单端点'],
   [/if \(!file\.printFileUrl\) throw/, '拿不到打印链接必须如实报错'],
-  ["navigate('/print/confirm'", '题目单必须进入既有打印链路'],
+  ["origin: 'interview_practice'", '题目单必须写打印交接上下文后进入既有打印链路'],
   [/fileUrl: file\.printFileUrl/, '必须把真实打印链接交给打印链路'],
 ])
 

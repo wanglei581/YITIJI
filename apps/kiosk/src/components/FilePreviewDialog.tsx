@@ -12,6 +12,8 @@ interface FilePreviewDialogProps {
   expiresAt?: string | null
   onRegenerate?: () => void
   regenerating?: boolean
+  /** 可选主按钮（B-14）：导出后自动弹出的预览层会盖住页面上的「去打印」，所以在层里直接给一个。 */
+  primaryAction?: { label: string; onClick: () => void; disabled?: boolean }
   onClose: () => void
 }
 
@@ -24,6 +26,7 @@ export function FilePreviewDialog({
   expiresAt,
   onRegenerate,
   regenerating = false,
+  primaryAction,
   onClose,
 }: FilePreviewDialogProps) {
   const remaining = useRemainingSeconds(expiresAt)
@@ -44,6 +47,16 @@ export function FilePreviewDialog({
           <h2 id="file-preview-dialog-title" className="min-w-0 flex-1 truncate text-base font-semibold text-neutral-900">
             {fileName}
           </h2>
+          {primaryAction ? (
+            <button
+              type="button"
+              onClick={primaryAction.onClick}
+              disabled={primaryAction.disabled}
+              className="min-h-14 shrink-0 rounded-md bg-primary-600 px-5 text-base font-semibold text-white disabled:opacity-60"
+            >
+              {primaryAction.label}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}

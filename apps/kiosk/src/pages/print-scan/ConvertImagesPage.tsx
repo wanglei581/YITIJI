@@ -16,7 +16,8 @@ import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../services
 import { getTerminalCode } from '../../services/api/terminalConfig'
 import { convertImagesToPdf } from '../../services/api/printConversion'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { savePrintMaterialSession } from '../print/printMaterialSession'
+import { beginPrintHandoff } from '../print/printHandoff'
+import { usePrintHandoffOwner, useStartPrintHandoff } from '../print/usePrintHandoff'
 import type { PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { ConvertImagesCta } from './ConvertImagesPanels'
 import { ConvertImagesView } from './ConvertImagesView'
@@ -42,6 +43,8 @@ const LIMIT_MESSAGE = `最多支持 ${MAX_IMAGES} 张图片，已达上限`
 
 export function ConvertImagesPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
+  const printOwner = usePrintHandoffOwner()
   const { getToken } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const uploadGen = useRef(0)
@@ -243,9 +246,11 @@ export function ConvertImagesPage() {
     }
   }
 
-  const handlePrint = () => {
-    if (!result) return
-    const file = {
+  const printInput = () => (result ? {
+    origin: 'image_convert' as const,
+    source: 'document' as const,
+    returnPath: window.location.pathname,
+    file: {
       name: outputFileName(result.pages),
       size: formatBytes(result.sizeBytes),
       pages: result.pages,
@@ -253,11 +258,21 @@ export function ConvertImagesPage() {
       fileUrl: result.printFileUrl,
       fileMd5: result.fileMd5,
       mimeType: 'application/pdf',
-    }
-    savePrintMaterialSession({ file, source: 'document' })
-    navigate('/print/material-check', {
-      state: { file, source: 'document' },
-    })
+    },
+  } : null)
+
+  // 图片转出来的 PDF 装的是用户原件内容：先去打印台做材料检查（与普通上传同一条路）。
+  const handlePrint = () => {
+    const input = printInput()
+    if (input) startPrint(input)
+  }
+
+  // 「先登录再保存」：登录页是另一条路由，本页内存里的合成结果一离开就没了。
+  // 先把这份 PDF 写成打印交接上下文，登录回来直接落到打印台检查这一份（游客中途登录视为同一人继续办理）。
+  const handleLogin = () => {
+    const input = printInput()
+    const begun = input ? beginPrintHandoff(input, printOwner) : null
+    navigate(begun?.ok ? `/login?from=${encodeURIComponent('/print/desk?step=check')}` : '/login')
   }
 
   const handleRestoreOrder = () => {
@@ -292,7 +307,7 @@ export function ConvertImagesPage() {
           onNewKey={() => void runConvert('convert', true)}
           onRestoreOrder={handleRestoreOrder}
           onPrint={handlePrint}
-          onLogin={() => navigate('/login')}
+          onLogin={handleLogin}
           onDocuments={() => navigate('/me/documents')}
           onHelp={() => navigate('/help')}
           onCancelUpload={() => {
@@ -362,7 +377,7 @@ export function ConvertImagesPage() {
         onNewKey={() => void runConvert('convert', true)}
         onRestoreOrder={handleRestoreOrder}
         onPrint={handlePrint}
-        onLogin={() => navigate('/login')}
+        onLogin={handleLogin}
         onDocuments={() => navigate('/me/documents')}
         onHelp={() => navigate('/help')}
         onBack={() => navigate('/print-scan')}
