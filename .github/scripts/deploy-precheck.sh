@@ -168,10 +168,14 @@ echo "=== 9b. 已付款、未打印完、超过 100 面的订单（只读计数�
 # 终态取 services/api/src/terminals/terminals-agent.service.ts 的 TERMINAL_STATES
 # （completed / failed / cancelled）。面数按 printOrderSideCount：有订单行则各行
 # billablePages × copies 相加；没有行则用订单 billablePages × 参数里的 copies。
-# copies 先看整段是不是 {...} 且能通过 jsonb 校验，再要求 copies 是 JSON 数字里的正整数，
-# 否则按 1。坏 JSON 不让整条查询报错。billablePages 为空或小于 1 按 0 面。
+# copies 不解析 JSON。整段必须是一层对象（键是字符串，值是字符串、数字、true、false 或 null），
+# 再在其中用 substring ... from 取 "copies" 后 1 到 4 位正整数；取不到或整段对不上，都按 1。
+# 字符串、小数、0、负数、超过 4 位、坏 JSON 因此都是 1。这条正则从 PostgreSQL 9.x 起就能跑。
+# billablePages 为空或小于 1 按 0 面。
 OVERSIZE_MAX_SIDES=100
-oversize_sql=$(cat <<SQL
+oversize_sql=""
+# bash 3.2 在 $() 里读不到这份带括号的 heredoc。read -d '' 读到文件尾，退出码 1 是正常的。
+IFS= read -r -d '' oversize_sql <<SQL || true
 BEGIN READ ONLY;
 -- oversize-paid-unfinished-count
 SELECT count(*)::text
@@ -190,16 +194,8 @@ WHERE o."payStatus" = 'paid'
       WHEN o."billablePages" IS NULL OR o."billablePages" < 1 THEN 0
       ELSE o."billablePages"::numeric * (
         CASE
-          WHEN o."printParamsJson" ~ '^[[:space:]]*\{(.|\\n)*\}[[:space:]]*\$'
-           AND pg_input_is_valid(o."printParamsJson", 'jsonb')
-          THEN
-            CASE
-              WHEN jsonb_typeof(o."printParamsJson"::jsonb) = 'object'
-               AND jsonb_typeof(o."printParamsJson"::jsonb -> 'copies') = 'number'
-               AND (o."printParamsJson"::jsonb ->> 'copies') ~ '^[1-9][0-9]*\$'
-              THEN (o."printParamsJson"::jsonb ->> 'copies')::numeric
-              ELSE 1
-            END
+          WHEN o."printParamsJson" ~ \$obj\$^[[:space:]]*\\{[[:space:]]*("([^"\\\\]|\\\\.)*"[[:space:]]*:[[:space:]]*("([^"\\\\]|\\\\.)*"|-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?|true|false|null)[[:space:]]*(,[[:space:]]*"([^"\\\\]|\\\\.)*"[[:space:]]*:[[:space:]]*("([^"\\\\]|\\\\.)*"|-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?|true|false|null)[[:space:]]*)*)?\\}[[:space:]]*\$\$obj\$
+          THEN COALESCE(substring(o."printParamsJson" from \$cpy\$"copies"\\s*:\\s*([1-9][0-9]{0,3})\\s*[,}]\$cpy\$)::numeric, 1)
           ELSE 1
         END
       )
@@ -207,7 +203,6 @@ WHERE o."payStatus" = 'paid'
   ) > ${OVERSIZE_MAX_SIDES};
 ROLLBACK;
 SQL
-)
 oversize_rc=0
 # -q 去掉 BEGIN/ROLLBACK 的命令标签，否则成功时输出不是纯数字，会被收成 unknown。
 oversize_raw="$(printf '%s\n' "$oversize_sql" | sudo -n -u postgres psql -X -q -tA -v ON_ERROR_STOP=1 2>/dev/null)" || oversize_rc=$?

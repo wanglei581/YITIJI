@@ -912,7 +912,7 @@ function runOversizePg(sql) {
   return { skipped: false, out, count: out.trim(), note: '' }
 }
 
-if (want('S-oversize-num', 'S-oversize-err', 'S-oversize-nan', 'S-oversize-leak', 'S-oversize-ro', 'S-oversize-pg')) {
+if (want('S-oversize-num', 'S-oversize-err', 'S-oversize-nan', 'S-oversize-leak', 'S-oversize-ro', 'S-oversize-pg', 'S-oversize-pgver')) {
   const leakText = `${OVERSIZE_LEAK_ORDER}\n${OVERSIZE_LEAK_FILE}`
   const numbered = runPrecheck({ DRILL_PSQL_MODE: 'number', DRILL_PSQL_STDOUT: '17' })
   const failed = runPrecheck({
@@ -969,6 +969,15 @@ if (want('S-oversize-num', 'S-oversize-err', 'S-oversize-nan', 'S-oversize-leak'
       )
     }
   }
+  if (want('S-oversize-pgver')) check(
+    sql.includes('substring(')
+      && sql.includes('"copies"\\s*:\\s*([1-9][0-9]{0,3})\\s*[,}]')
+      && sql.includes('BEGIN READ ONLY')
+      && !sql.includes('pg_input_is_valid')
+      && !precheckSh.includes('pg_input_is_valid'),
+    'S-oversize-pgver 查询文本用 substring 取 copies，不含 pg_input_is_valid',
+    sql.slice(0, 900),
+  )
 }
 
 // —— 清理脚本 ——
