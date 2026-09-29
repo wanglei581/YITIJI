@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（13）
+## 有脚本名但不在 CI 执行闭包里（14）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -35,6 +35,7 @@ _（空）_
 | 门禁脚本 | 脚本名 |
 | --- | --- |
 | `apps/admin/scripts/run-e2e.mjs` | `@ai-job-print/admin::test:e2e`<br/>`@ai-job-print/admin::test:e2e:screen` |
+| `apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs` | `@ai-job-print/admin::verify:admin-partner-contact-phone-ui` |
 | `apps/kiosk/scripts/audit-qingxu-v2-drafts.mjs` | `@ai-job-print/kiosk::audit:qingxu-v2-drafts` |
 | `apps/kiosk/scripts/probe-activity-favorites-44.mjs` | `@ai-job-print/kiosk::verify:probe-activity-favorites-44` |
 | `apps/kiosk/scripts/probe-ai-failure-honesty-45.mjs` | `@ai-job-print/kiosk::verify:probe-ai-failure-honesty-45` |
@@ -68,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1599 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1602 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -139,7 +140,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 95 个文件</summary>
+<summary><code>apps/admin/src/</code> — 98 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -173,13 +174,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/orders/index.tsx` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
 | `apps/admin/src/routes/orders/orderHonestyCopy.ts` | `verify-admin-orders-readonly-ui.mjs` |
 | `apps/admin/src/routes/partners/OrgContentTrustPanel.tsx` | `verify-admin-content-trust-ui.mjs` |
-| `apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx` | `verify-partner-account-action-ui.mjs` |
-| `apps/admin/src/routes/partners/PartnerAccountManager.tsx` | `verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/routes/partners/PartnerAccountManager.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/contentTrustRules.ts` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/partners/index.tsx` | `verify-admin-content-trust-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx` | `verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/PhoneRebindSteps.tsx` | `verify-partner-account-action-ui.mjs` |
-| `apps/admin/src/routes/partners/usePartnerAccountAction.ts` | `verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/routes/partners/partnerContactPhoneEligibility.ts` | `verify-admin-partner-contact-phone-ui.mjs` |
+| `apps/admin/src/routes/partners/usePartnerAccountAction.ts` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/peripherals/index.tsx` | `verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/permissions/index.tsx` | `verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/policy-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs` |
@@ -232,6 +235,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/orgsAdmin.ts` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/services/api/policiesAdmin.ts` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/services/api/printScan.ts` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
+| `apps/admin/src/services/api/registerPartnerContactPhone.ts` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/services/api/screensaver.ts` | `verify-screensaver-content.ts` |
 | `apps/admin/src/services/api/sourcePaging.ts` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/services/api/toolbox.ts` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
