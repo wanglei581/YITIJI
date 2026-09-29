@@ -182,6 +182,10 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
+          # AI 调用与会员发码必须经 terminalAttributedFetch 带终端会话票（服务端按已验签终端
+          # 计 AI 每日额度、短信每台上限）：terminalAuth.ts 编译后真跑取头与换票，另用
+          # TypeScript AST 扫 apps/kiosk/src 全部请求点。只读源码，不连库、不连网。
+          pnpm --filter @ai-job-print/kiosk verify:ai-requests-terminal-session
           pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
           pnpm --filter @ai-job-print/kiosk verify:scan-quiet-period
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell

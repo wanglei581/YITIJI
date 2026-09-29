@@ -353,6 +353,41 @@ export async function terminalProtectedFetch(
   return response
 }
 
+/**
+ * 「按台计」请求：AI 调用与会员发码用。与 terminalProtectedFetch 共用同一份取头（headers()）
+ * 与同一次换票（retryRefresh），区别只在**不 fail-closed**。
+ *
+ * 为什么不能直接用 terminalProtectedFetch：它守的是打印放行、到机认领这类「没有已验签终端就
+ * 必须失败」的请求；会话不在 ready 时直接抛 TERMINAL_SESSION_INVALID。AI 与发码不一样 ——
+ *   · 服务端只拿终端身份记账、按台限额（AI 每日额度、短信每台每日上限），不拿它放行；
+ *   · 手机上打开的扫码确认页、桌面浏览器里没有终端身份，照旧要能发码、能用 AI；
+ *   · AI 是加速器不是前置条件：终端会话一时换不出票，AI 也不能因此从屏幕上消失。
+ *
+ * 规则三条：
+ *   1. 本机没有终端身份（getTerminalId() 为空）：原样 fetch，一个终端头都不加（与改动前一致）。
+ *   2. 有终端身份：续期在飞就先等它（不自己发起、失败不外抛），再用 headers() 带上
+ *      x-terminal-id + x-terminal-session-token 发出；取头在等待之后，发的一定是当前那张票。
+ *   3. 服务端回 401 TERMINAL_SESSION_INVALID：走与 terminalProtectedFetch 同一次换票（并发共享），
+ *      换成功且调用方没取消才重放一次；换不出来就把原 401 交还调用方，由页面按错误码处理。
+ */
+export async function terminalAttributedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  if (!getTerminalId()) return fetch(input, init)
+  const inflight = state === 'checking' ? refreshInflight : null
+  if (inflight) {
+    try { await inflight } catch { /* 续期失败不拦本次请求，照当前能拿到的票发 */ }
+  }
+  const response = await fetch(input, { ...init, headers: headers(init.headers) })
+  if (response.status !== 401) return response
+  if (!sessionInvalid(await asHttpError(response.clone()))) return response
+  try {
+    await retryRefresh()
+  } catch {
+    return response
+  }
+  if (init.signal?.aborted) return response
+  return fetch(input, { ...init, headers: headers(init.headers) })
+}
+
 // ── E2E 测试缝：只在设置了 mock 会话票的构建里挂出 ──────────────────────────
 // 生产 / deploy 构建绝不设置 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN（deploy.yml 那条由
 // verify-runtime-terminal-identity 钉死），所以这段在生产包里永远不会执行。

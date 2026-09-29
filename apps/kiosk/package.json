@@ -132,6 +132,7 @@
     "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs",
     "verify:qingxu-proto-geometry": "node scripts/verify-qingxu-proto-geometry.mjs",
     "verify:terminal-session-self-heal": "node scripts/verify-terminal-session-self-heal.mjs",
+    "verify:ai-requests-terminal-session": "node scripts/verify-ai-requests-terminal-session.mjs",
     "verify:probe-member-session-41": "node scripts/probe-member-session-41.mjs",
     "verify:probe-ai-resume-closure-42": "node scripts/probe-ai-resume-closure-42.mjs",
     "verify:probe-file-closure-43": "node scripts/probe-file-closure-43.mjs",
