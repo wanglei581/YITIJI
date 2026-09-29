@@ -30,7 +30,10 @@ overrides:
   # 所以必须改这里，只刷 lockfile 没用。
   # 载体不是边缘依赖：multer 在**用户文件上传主链路**上（files / ai(简历) / content /
   # jobs / admin-fairs / partner-fairs 六个 controller），简历、证件照、身份证复印件都走它。
-  multer: 2.3.0
+  # 2026-09-29 更新：9/28 夜新发一条 moderate，打在 2.3.0 上、首修 2.4.0 ——
+  #   GHSA-3pph-fpjx-jg34（上传中断后遗留的磁盘写入致 DoS，影响 >= 2.2.0 < 2.4.0）
+  # 改钉 2.4.0（2026-09-14 发布，已过 minimumReleaseAge）。
+  multer: 2.4.0
   # js-yaml: GHSA-2883-xcg3-v3hh（HIGH，2026-09-08 发布）
   # maxTotalMergeKeys 不限制「空合并源」的 CPU 消耗；影响 >=4.0.0 <4.3.2，首修 4.3.2。
   # 原先钉的 4.3.1 当初也是安全修复，被新公告覆盖。取 4.3.2（2026-08-26）不跨大版本；
