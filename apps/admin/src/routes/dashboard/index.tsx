@@ -43,6 +43,8 @@ import {
 } from '../../services/api/adminOps'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { recruitmentStockKpi, recruitmentStockTodo, type StockTodo } from './recruitmentStock'
+import { getAuditActionLabel, getAuditActorLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
+import { getUser } from '../../services/auth'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,32 +109,6 @@ function initialBlock<V>(loading = true): BlockEntry<V> {
   return { value: null, error: null, loading }
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  'ai_resume_result.cleanup_expired': '清理过期 AI 简历结果',
-  'data_source.create': '创建数据源',
-  'data_source.toggle': '启停数据源',
-  'fair.import': '招聘会导入',
-  'fair.publish': '招聘会发布',
-  'fair.review': '招聘会审核',
-  'file.cleanup_expired': '清理过期文件',
-  'file.force_delete': '文件删除',
-  'file.get_signed_url': '访问文件',
-  'file.upload': '文件上传',
-  'job.import': '岗位导入',
-  'job.publish': '岗位发布',
-  'job.review': '岗位审核',
-  'job_source.create': '创建岗位源',
-  'system.config_change': '配置变更',
-  'system.login': '登录',
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: '管理员',
-  kiosk: '一体机',
-  partner: '合作机构',
-  system: '系统',
-}
-
 const PRINT_STATUS_LABELS: Record<string, { label: string; status: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
   pending: { label: '排队中', status: 'info' },
   claimed: { label: '已领取', status: 'info' },
@@ -167,20 +143,6 @@ function avgLevel(values: Array<number | null>): number | null {
   const nums = values.filter((value): value is number => value !== null && Number.isFinite(value))
   if (nums.length === 0) return null
   return Math.round(nums.reduce((sum, value) => sum + value, 0) / nums.length)
-}
-
-function getAuditActionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action
-}
-
-function getActorLabel(log: AuditLogRecord): string {
-  const role = ROLE_LABELS[log.actorRole] ?? log.actorRole
-  return log.actorId ? `${role} · ${log.actorId}` : role
-}
-
-function getTargetLabel(log: AuditLogRecord): string {
-  if (!log.targetType) return ''
-  return log.targetId ? `${log.targetType}/${log.targetId}` : log.targetType
 }
 
 function printTypeLabel(task: AdminPrintTaskItem): string {
@@ -363,7 +325,14 @@ function RecentActivity({ logs }: { logs: AuditLogRecord[] }) {
       ) : (
         <div>
           {logs.map((log, index) => {
-            const target = getTargetLabel(log)
+            const target = getAuditTargetLabel(log.targetType)
+            const actor = getAuditActorLabel({
+              actorRole: log.actorRole,
+              actorId: log.actorId,
+              payloadJson: log.payloadJson,
+              currentUser: getUser(),
+              record: log,
+            })
             return (
               <div
                 key={log.id}
@@ -383,7 +352,7 @@ function RecentActivity({ logs }: { logs: AuditLogRecord[] }) {
                     {getAuditActionLabel(log.action)}
                   </p>
                   <p className="mt-0.5 truncate text-[11.5px] text-neutral-500">
-                    {getActorLabel(log)}
+                    {actor}
                     {target ? ` · ${target}` : ''}
                   </p>
                 </div>
@@ -675,7 +644,7 @@ export default function DashboardPage() {
             icon={BotIcon}
             value={aiUsage !== null ? String(aiUsage.totalCalls) : '0'}
             unit="次"
-            sub={aiUsage !== null ? `成功率 ${aiUsage.successRate}%` : ''}
+            sub={aiUsage === null ? '' : aiUsage.totalCalls === 0 ? '今日暂无调用' : `成功率 ${aiUsage.successRate}%`}
             warn={aiUsage !== null && aiUsage.failCount > 0}
             failed={aiUsage === null}
             onRetry={retry(['aiUsage'])}

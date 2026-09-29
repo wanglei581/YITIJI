@@ -264,7 +264,7 @@ export default function TerminalFleetOverview() {
       </Card>
 
       <div className="flex flex-wrap justify-between gap-2 text-[11px] text-neutral-400">
-        <p>F1/F2 CLOSED_MODE：本页仅开放 F0 只读总览，后续阶段能力未开放。</p>
+        <p>本页只做查看；远程操作暂未开放。</p>
         <p>总览生成时间：{formatTime(data?.generatedAt ?? null)}</p>
       </div>
     </section>
