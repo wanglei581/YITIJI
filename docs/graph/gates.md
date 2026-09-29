@@ -2116,7 +2116,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/ocr/pdf-page-renderer.ts` | `verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-pdf-cmap.ts`<br/>`verify-pdfjs-engine.ts` |
 | `services/api/src/ai/resume/ocr/tencent-ocr.provider.stub.ts` | `verify-ai-platform-degradation.ts`<br/>`verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-resume-extraction.ts` |
 | `services/api/src/ai/resume/resume-docx.service.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-template-fill.ts` |
-| `services/api/src/ai/resume/resume-draft-source.service.ts` | `verify-resume-parse-intent-http.ts` |
+| `services/api/src/ai/resume/resume-draft-source.service.ts` | `verify-ai-usage-coverage.ts`<br/>`verify-resume-parse-intent-http.ts` |
 | `services/api/src/ai/resume/resume-draft.store.ts` | `verify-member-data-retention.ts`<br/>`verify-resume-draft-versions.ts` |
 | `services/api/src/ai/resume/resume-extraction.service.ts` | `verify-document-conversion.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-pdfjs-engine.ts`<br/>`verify-resume-extraction.ts` |
 | `services/api/src/ai/resume/resume-fact-match.ts` | `verify-resume-draft-versions.ts` |

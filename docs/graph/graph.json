@@ -22854,6 +22854,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/resume/resume-draft-source.service.ts": [
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/ai/resume/resume-draft.store.ts": [
@@ -32799,6 +32800,7 @@
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/llm/llm-http.ts",
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/ai/usage/ai-budget.service.ts",
           "services/api/src/ai/usage/ai-pricing.ts",
           "services/api/src/ai/usage/ai-request-context.middleware.ts",
