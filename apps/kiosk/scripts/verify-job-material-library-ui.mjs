@@ -140,7 +140,9 @@ assertNotContains(
   ['useIdleTimer', 'clearKioskSensitiveSession'],
   'Login relies on the shared privacy guard instead of a route-local idle escape hatch',
 )
-assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', "navigate('/print/confirm'", 'Job material page can enter print confirm with generated file')
+assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', "origin: 'job_material'", 'Job material page enters the print chain through the print handoff context')
+assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', 'fileId: file.fileId', 'Job material print handoff carries the file id (required by the handoff context)')
+assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', "paramsSuggestion: file.pageCount > 1 ? { duplex: 'duplex_long_edge' } : undefined", 'Two-page materials only suggest duplex; the terminal capability decides (F02)')
 assertNotContains(
   'src/pages/resume/JobMaterialLibraryPage.tsx',
   ['用于简历优化', 'getResumeTemplates', '清爽通用简历模板'],
@@ -149,7 +151,7 @@ assertNotContains(
 // 2026-09-23 稿 38 迁入青序流光后打印键用 lucide PrinterIcon，不再是墨青 KIcon name="printer"；
 // 改钉按钮本身：可见的「打印」键点击后真的走本页 print(doc)（换短期 printFileUrl → /print/confirm）。
 assertContains('src/pages/profile/me/MyDocumentsPage.tsx', /onClick=\{\(\) => \{ if \(reprintBlocked\) return; void print\(doc\) \}\}[\s\S]{0,200}?<PrinterIcon[\s\S]{0,160}?'打印'/, 'MyDocuments exposes print action')
-assertContains('src/pages/profile/me/MyDocumentsPage.tsx', "navigate('/print/confirm'", 'MyDocuments reuses print confirm route')
+assertContains('src/pages/profile/me/MyDocumentsPage.tsx', "origin: 'my_documents'", 'MyDocuments reuses the print chain through the print handoff context')
 assertNotContains(
   'src/pages/resume/JobMaterialLibraryPage.tsx',
   ['MATERIALS:', '打印(待接入)', /disabled\s*title="模板真实渲染链路接入后开放打印"/],

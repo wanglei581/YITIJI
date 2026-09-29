@@ -164,6 +164,12 @@ export function registerPrintConfirm(api: ApiRouter): void {
     status: 200,
     json: { terminalCode: 'KSK-001', capabilities: UNVERIFIED_CAPABILITIES },
   })
+  // 9/29 定稿（稿 14）：两页以上建议的双面本机没开通时不再拦截，照常报价并显示权益卡，
+  // 权益卡要读公示价目。
+  api.respond('GET', '/api/v1/print/price-config', {
+    status: 200,
+    json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] },
+  })
 }
 
 /** 壳层（KioskRoot）自己会拉的三条，与业务无关但必须登记，否则 fail-closed 会红。 */

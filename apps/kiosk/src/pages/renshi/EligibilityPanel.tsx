@@ -21,9 +21,15 @@ import { type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useIdleTimer } from '../../hooks/useIdleTimer'
 import {
+  AlertTriangleIcon,
   ArrowRightIcon,
+  FileTextIcon,
+  ListChecksIcon,
   LockIcon,
+  RotateCcwIcon,
   ScaleIcon,
+  ShieldCheckIcon,
+  type LucideIcon,
 } from 'lucide-react'
 import {
   ELIGIBILITY_BACKEND_REQUIRED,
@@ -39,8 +45,9 @@ import {
   deriveOutcome,
   isAskable,
 } from './eligibilityOutcome'
-import { EligibilityStepBar } from './components'
+import { EligibilityStepBar, RqDeadEnd } from './components'
 import { EligibilityResults } from './EligibilityResults'
+import type { TabKey } from './shared'
 
 type Phase =
   | { s: 'loading' }
@@ -71,9 +78,11 @@ const RETRY_WHY = '重新检查只是再问一次现在有没有可比对的政�
 export function EligibilityPanel({
   onChrome,
   ctaHost,
+  onTab,
 }: {
   onChrome?: (chrome: EligibilityChrome) => void
   ctaHost: HTMLElement | null
+  onTab: (tab: TabKey) => void
 }) {
   const [phase, setPhase] = useState<Phase>({ s: 'loading' })
   /** 作答只放 React state：不写 localStorage / sessionStorage / URL query。 */
@@ -168,11 +177,22 @@ export function EligibilityPanel({
           <span id="k8-elig-probe-why" className="why">{PROBE_WHY}</span>
         </CtaSlot>
         <EligibilityStepBar step={1} />
-        <div className="rq-state" data-kind="info">
-          <b>正在检查现在有没有可比对的政策</b>
-          <p>先确认有没有录了条件的政策，再决定要不要请你填写。这一步不发送任何个人信息。</p>
-        </div>
-        <p className="rq-note">条件核对按政策原文逐条比对，不使用 AI；小青能不能用都不影响它。</p>
+        {/* 稿 48 eligibility-probing 的状态卡与两句说明；检查的这一会儿，和本页读取中一样给三条不用等的出口
+            （稿 48 loading 的做法），余高分在各段之间，不放大字。 */}
+        <RqDeadEnd
+          tone="info"
+          icon={ScaleIcon}
+          title="正在检查现在有没有可比对的政策"
+          exitsHint="这三条都不等这次检查"
+          exits={[
+            { key: 'policy', icon: FileTextIcon, title: '去看就业政策', desc: '政策条目与办事指引', onClick: () => onTab('policy') },
+            { key: 'social', icon: ShieldCheckIcon, title: '看社保指南', desc: '查询、证明与备案', onClick: () => onTab('social') },
+          ]}
+          uploadDesc="只处理你带来的文件"
+          note="条件核对按政策原文逐条比对，不使用 AI；小青能不能用都不影响它。如果没有可比对的条目，本机会直接说明，不会先问完九项再用一句像「你不符合」的话收场。"
+        >
+          先确认有没有录了条件的政策，再决定要不要请你填写。这一步不发送任何个人信息。
+        </RqDeadEnd>
       </div>
     )
   }
@@ -181,6 +201,8 @@ export function EligibilityPanel({
       <NoticeBlock
         host={ctaHost}
         onRetry={probe}
+        onTab={onTab}
+        kind="error"
         title="这次核对没有成功"
         body="这次没有拿到结果，所以本页不显示任何结论。失败不等于「你不符合」，也不代表库里没有政策。你选过的内容只留在这一页，离开或重来都不会被保存。"
       />
@@ -192,6 +214,8 @@ export function EligibilityPanel({
       <NoticeBlock
         host={ctaHost}
         onRetry={probe}
+        onTab={onTab}
+        kind="backend-required"
         title="本机现在做不了条件核对"
         body="本机暂时连不上政策服务。要问什么、怎么判定，都要由政策服务提供，本机不会自己编一套问项或结论。请联系现场工作人员后再试。"
       />
@@ -203,6 +227,8 @@ export function EligibilityPanel({
       <NoticeBlock
         host={ctaHost}
         onRetry={probe}
+        onTab={onTab}
+        kind={phase.notice === COPY_NO_RECORDED_CONDITIONS ? 'no-rules' : 'no-policies'}
         title={phase.notice === COPY_NO_RECORDED_CONDITIONS ? '已发布政策还没录入可比对条件' : '暂时没有可核对的政策条目'}
         body={phase.notice}
       />
@@ -308,32 +334,57 @@ export function EligibilityPanel({
   )
 }
 
+/** 做不了 / 没东西可比 / 这次失败：稿 48 的死路屏，状态卡 → 三条不依赖条件核对的出口 → 一句就地说明。 */
+const NOTICE_LOOK: Record<NoticeKind, { tone: 'info' | 'error' | 'empty' | 'warn'; icon: LucideIcon; note: string; noteTone: 'info' | 'warn' }> = {
+  'backend-required': { tone: 'warn', icon: AlertTriangleIcon, note: '本机没有向你收集任何信息，也没有给出任何结论。', noteTone: 'warn' },
+  'no-policies': { tone: 'empty', icon: FileTextIcon, note: '本机没有向你收集任何信息，这一屏也不是核对结论。', noteTone: 'info' },
+  'no-rules': { tone: 'empty', icon: ListChecksIcon, note: '有政策但没有可比对的条件时，本机不拿正文猜条件：请看政策原文或向经办窗口核对。', noteTone: 'info' },
+  error: { tone: 'error', icon: AlertTriangleIcon, note: '你的作答不保存、不进日志，本机也不把它写进网址或浏览器存储。', noteTone: 'warn' },
+}
+
+type NoticeKind = 'backend-required' | 'no-policies' | 'no-rules' | 'error'
+
 function NoticeBlock({
   host,
   title,
   body,
+  kind,
   onRetry,
+  onTab,
 }: {
   host: HTMLElement | null
   title: string
   body: string
+  kind: NoticeKind
   onRetry: () => void
+  onTab: (tab: TabKey) => void
 }) {
+  const look = NOTICE_LOOK[kind]
   return (
     <div className="k8-elig">
       <CtaSlot host={host}>
         <button type="button" className="k8-elig-notice-retry" onClick={onRetry}>
+          <RotateCcwIcon className="h-6 w-6" aria-hidden="true" />
           重新检查
         </button>
         <span className="why">{RETRY_WHY}</span>
       </CtaSlot>
       <EligibilityStepBar step={1} />
-      <div className="k8-elig-notice">
-        <div className="min-w-0 flex-1">
-          <b>{title}</b>
-          <p>{body}</p>
-        </div>
-      </div>
+      <RqDeadEnd
+        tone={look.tone}
+        icon={look.icon}
+        title={title}
+        exitsHint="这三条都不依赖条件核对"
+        exits={[
+          { key: 'policy', icon: FileTextIcon, title: '去看就业政策', desc: '政策条目与办事指引', onClick: () => onTab('policy') },
+          { key: 'social', icon: ShieldCheckIcon, title: '看社保指南', desc: '查询、证明与备案', onClick: () => onTab('social') },
+        ]}
+        uploadDesc="只处理你带来的文件"
+        note={look.note}
+        noteTone={look.noteTone}
+      >
+        {body}
+      </RqDeadEnd>
     </div>
   )
 }
