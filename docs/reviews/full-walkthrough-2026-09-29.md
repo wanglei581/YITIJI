@@ -128,7 +128,7 @@
 | W-17 | P1 | 一体机 | OCR 不可用时扫描件在材料检查页让「人工确认」却没有继续按钮（= 9/27 A-04 一体机半边；服务端本人确认 #1068 已备） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F4f-scan-04 | 主执行窗口 / Grok（G1 打印链，grok/kiosk-print-chain-walk-0929） | **已修，K8 在候选 90eb5a21c 复走通过**（`~/.cache/walk0929/evidence/k8/`） |
 | W-18 | P2 | 一体机 | `AI_ENDPOINT_NOT_ALLOWED` 时小青写「这一轮没连上，可以重试」、面试写「AI 服务本身是通的，可以直接再点一次」，与事实相反（人话码表 #1095 已补，页面分支待接） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F3-kiosk-01/02 | 后端窗口（#1095，谁新增错误码谁补人话）/ 待定 | 已派 |
 | W-19 | P1 | 一体机 | 短信额度满后主按钮仍是「重新获取验证码」：单台满应主推扫码登录，总量满应主推「不登录，继续使用」；另一体机发码不带终端头，单台上限实际不生效 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F2e/F2f | 主执行窗口（登录页，本窗口子代理改完短信退路后派）/ 待定 | **已修，K8 在候选 90eb5a21c 复走通过**（`~/.cache/walk0929/evidence/k8/`） |
-| W-20 | P0 | 一体机 | 小青回显用户问题时手机号、邮箱打码，**身份证号原样显示在公共屏** | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F5c-03 | 走查窗口 / Claude 子代理 | 已合入候选 dd8b09c92（#1137，Grok 实现、走查窗口审 diff；前后截图 `~/.cache/walk0929/evidence/fix-mask/`） |
+| W-20 | P0 | 一体机 | 小青回显用户问题时手机号、邮箱打码，**身份证号原样显示在公共屏** | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F5c-03 | 走查窗口 / Claude 子代理 | **已修，K10 复走通过**（#1137 已合；rc 栈 4deeaefec，含 dd8b09c92；`~/.cache/walk0929/evidence/k10/`） |
 | W-21 | P2 | 一体机 | 零元单确认页主按钮可见文字「确认并建单」，读屏名却是「确认并去付款……」（`PrintConfirmPage` primaryAccessible） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` | 主执行窗口 / Grok（G1 打印链，grok/kiosk-print-chain-walk-0929） | **已修，K8 在候选 90eb5a21c 复走通过**（`~/.cache/walk0929/evidence/k8/`） |
 | W-22 | P2 | 一体机 | 诊断报告标题写「简历被读成七块」，正文写「共 5 块」 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F4c-demo-05 | 走查窗口 / Claude 子代理 | **已修，K8 在候选 90eb5a21c 复走通过**（`~/.cache/walk0929/evidence/k8/`） |
 | W-23 | P2 | 一体机 | 打印完成页对模拟面试报告也提示「证件页水印」 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F7b-05 | 主执行窗口 / Grok（G1 打印链，grok/kiosk-print-chain-walk-0929） | **已修，K8 在候选 90eb5a21c 复走通过**（`~/.cache/walk0929/evidence/k8/`） |
@@ -188,13 +188,13 @@
 | W-77 | P2 | 一体机 | 卡纸完成页写「已出的纸你先收好」，实际这一单没出纸（缺纸页没这句）；U 盘里 PDF 与 docx 同在，列表只列 PDF、不说明 docx 为何不在；同一笔 ¥0 缺纸页「本次未收款」、卡纸/未确认/成功页「已付 ¥0.00」（并入 W-51） | Grok K1 续跑，`~/.cache/walk0929/evidence/k1/` 101–246 201、204、207、215、242 | 主执行窗口（打印链）/ Grok | 待派 |
 | W-78 | P2 | 管理员后台 | 告警中心正文里的失败时间用 UTC 截到分钟，比右侧卡片早 8 小时（`services/api/src/admin-ops/derived-alerts.ts` 约 245 行） | Grok K1 续跑，`~/.cache/walk0929/evidence/k1/` 101–246 202、205、208 | 后端窗口 / 待定 | 待派 |
 | W-79 | **P0** | 服务端 | 小青对话把用户原话**明文**送给大模型：手机号、身份证号、邮箱、姓名都未遮盖（`llm-chat.service.ts:317` 入会话、`324-327` 送出）；简历诊断与小青要点摘要已换占位符，简历对照、职业规划里姓名仍是明文。真实服务上线等于把个人信息发给第三方模型 | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl`（假大模型请求日志 #35、#52、#49、#50） | 后端窗口（#1085 送模型前遮盖补齐）/ 待定 | **已修，K8 在候选 90eb5a21c 复走通过**（`~/.cache/walk0929/evidence/k8/`） |
-| W-80 | P1 | 一体机 | 小青「保存本次要点」后作业页（/ai/plan）永远停在「正在读取这一趟的产物」：服务端已生成 1 页 PDF，但页面同一秒对 `GET /advisor/sessions/:id` 发了 445 次被 429——`AiPlanPage.tsx:49` 每次渲染重新解析导航里的要点对象，`65-120` 的读取效果把它当依赖、开头又把状态设回读取中，形成请求风暴 | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl` 264；api.log 22:03:26 `advisor.pdf_ok kind=qa_pins pages=1` | 走查窗口 / Grok | 已合入候选 dd8b09c92（#1137，Grok 实现、走查窗口审 diff；前后截图 `~/.cache/walk0929/evidence/fix-mask/`） |
-| W-81 | P1 | 一体机 | 简历来源页手机二维码还在等人扫时，顶栏就是「接收中」，U 盘入口被禁用，要先点「取消」才能换（等待态也打开了 `sourceBusy`，`ResumeSourcePage.tsx:248,512`；与 W-14 同一忙碌锁，#1107 只修了卸载那一半） | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl` 113、220、229 | 走查窗口 / Grok | 已合入候选 dd8b09c92（#1137，Grok 实现、走查窗口审 diff；前后截图 `~/.cache/walk0929/evidence/fix-mask/`） |
+| W-80 | P1 | 一体机 | 小青「保存本次要点」后作业页（/ai/plan）永远停在「正在读取这一趟的产物」：服务端已生成 1 页 PDF，但页面同一秒对 `GET /advisor/sessions/:id` 发了 445 次被 429——`AiPlanPage.tsx:49` 每次渲染重新解析导航里的要点对象，`65-120` 的读取效果把它当依赖、开头又把状态设回读取中，形成请求风暴 | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl` 264；api.log 22:03:26 `advisor.pdf_ok kind=qa_pins pages=1` | 走查窗口 / Grok | **已修，K10 复走通过**（#1137 已合；rc 栈 4deeaefec，含 dd8b09c92；`~/.cache/walk0929/evidence/k10/`） |
+| W-81 | P1 | 一体机 | 简历来源页手机二维码还在等人扫时，顶栏就是「接收中」，U 盘入口被禁用，要先点「取消」才能换（等待态也打开了 `sourceBusy`，`ResumeSourcePage.tsx:248,512`；与 W-14 同一忙碌锁，#1107 只修了卸载那一半） | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl` 113、220、229 | 走查窗口 / Grok | **已修，K10 复走通过**（#1137 已合；rc 栈 4deeaefec，含 dd8b09c92；`~/.cache/walk0929/evidence/k10/`） |
 | W-82 | P2 | 一体机 | 小青技能条标题带英文「JD」：「AI 简历 JD 匹配」「AI 岗位 JD 解读」；小青对话记录不进「AI 服务记录」（只有保存要点才有，F08 仍在） | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl` 164、263 | 走查窗口 / 并入 W-53 文案批 | 待派 |
-| W-83 | P1 | 一体机 | 导出前核对事实弹窗在公共屏明文显示完整手机号（从 W-55 拆出，agy 评审上调） | K2 043、119 | 走查窗口 / Grok（与 W-20 同批：公共屏统一打码） | 已合入候选 dd8b09c92（#1137，Grok 实现、走查窗口审 diff；前后截图 `~/.cache/walk0929/evidence/fix-mask/`） |
+| W-83 | P1 | 一体机 | 导出前核对事实弹窗在公共屏明文显示完整手机号（从 W-55 拆出，agy 评审上调） | K2 043、119 | 走查窗口 / Grok（与 W-20 同批：公共屏统一打码） | **已修，K10 复走通过**（#1137 已合；rc 栈 4deeaefec，含 dd8b09c92；`~/.cache/walk0929/evidence/k10/`） |
 | W-84 | P2 | 服务端 | 跨租户按 ID 读打印任务状态：`GET /print/jobs/:taskId` 无终端或会员身份校验，只按任务号返回状态、完成时间与文件保存/删除元数据（`print-jobs.controller.ts:83-86`、`print-jobs.service.ts:599-645`）。任务号是 64 位随机，但一体机完成页把任务号原文印在公共屏上（W-46），旁人可据此查询；不泄露文件正文。`POST /print/jobs/:taskId/retry` 有终端守卫但服务层未限定任务终端（防御纵深不足） | Codex C 只读审查；走查窗口 22:50 实测无凭证 `curl` 返回 200 与状态字段 | 后端窗口 / 待定 | 待派 |
 | W-85 | P1 | Windows Agent | 图片转 PDF 的临时文件 `print_<任务号>_<uuid>.pdf` 在 Agent 中途被强杀或断电后会永久留在公共机：清理函数 `cleanupStaleTempPdfs`（`image-to-pdf.ts:285`）没有任何调用点（注释却写启动时调用），开机清理 `print-task-temp-cleanup.ts` 只认 `task_*`。修法：拿到单实例锁后把 `print_*.pdf` 一起清 | Windows 真机路 9/29 22:52 KSK-001 只读 + 候选 90eb5a21c 代码核实 | Windows 窗口 / 待定 | 待派 |
-| W-86 | P1（已运行时证实） | Windows Agent + 服务端 | 缺纸、卡纸后在同一台机「重新提交打印」可能永远打不出来：服务端重试沿用同一任务号只改回 pending（`print-jobs.service.ts:783-793`），Agent 本地任务库见过这个任务号就当已做完（`db.ts:263-266` isTaskDone），只回报一次 failed 不打印（`task-runner.ts:352-355`）；现有门禁只测服务端（`verify-print-jobs.ts:843`、`verify-payment-flow.ts:2185`）。修法方向：重试带序号或新建任务号，Agent 按「任务号+重试序号」判重 | Windows 真机路 9/29 22:52 KSK-001 只读 + 候选 90eb5a21c 代码核实；模拟 Agent 同样按任务号判重，可在本地先复现 | Windows 窗口 / Grok（grok/print-retry-attempt-0929：领任务下发重提次数 attempt、Agent 按任务号+attempt 判重、重报不冲掉 errorCode） | **本地运行时证实**（Grok K9，模拟 Agent 与真 Agent 判重逻辑一致）：23:07:19 缺纸失败 → 23:07:22 点「重新提交打印」→ 同一任务号 0.9 秒后被再领、Agent 按本地已做过只回写 failed 且 errorCode 变空 → 60 秒内一直 failed、没有任何出纸；结果页从「打印机缺纸」变成笼统「打印任务失败」，「重新提交打印」按钮仍在可以再点（死胡同 + 假装可重试）。另：进度页在缺纸已失败后仍写「排队等待中」。证据 `~/.cache/walk0929/evidence/k9/` 014–021，脚本 `journeys/k9/w86-paper-empty-retry.mjs` |
+| W-86 | P1（已运行时证实） | Windows Agent + 服务端 | 缺纸、卡纸后在同一台机「重新提交打印」可能永远打不出来：服务端重试沿用同一任务号只改回 pending（`print-jobs.service.ts:783-793`），Agent 本地任务库见过这个任务号就当已做完（`db.ts:263-266` isTaskDone），只回报一次 failed 不打印（`task-runner.ts:352-355`）；现有门禁只测服务端（`verify-print-jobs.ts:843`、`verify-payment-flow.ts:2185`）。修法方向：重试带序号或新建任务号，Agent 按「任务号+重试序号」判重 | Windows 真机路 9/29 22:52 KSK-001 只读 + 候选 90eb5a21c 代码核实；模拟 Agent 同样按任务号判重，可在本地先复现 | Windows 窗口 / Grok（grok/print-retry-attempt-0929：领任务下发重提次数 attempt、Agent 按任务号+attempt 判重、重报不冲掉 errorCode） | **修复已验证**（#1152 head 4deeaefec，K10）：缺纸失败后「重新提交打印」真的出纸（attempt 0 failed/PAPER_EMPTY、attempt 1 completed），结果页「打印完成」；Agent 低于 0.4.13 时「重新提交」不出现、接口 409 `PRINT_RETRY_AGENT_VERSION`「升级到 0.4.13 后才能重新提交」（预期）。待 #1152 合入候选 |
 | W-87 | P2 | 服务端 + 一体机 | 文件接口返回 `Cache-Control: private, max-age=300`（`files.controller.ts:324-340`，Codex 报、待复核），一体机 Edge 用普通配置目录（kiosk 模式、独立 user-data-dir、非 InPrivate），用户预览过的文件可能在 Edge 缓存里留 5 分钟以上；9/28 记录的「InPrivate」为推断、已更正 | Windows 真机路 9/29 22:52 KSK-001 只读 + 候选 90eb5a21c 代码核实（Edge 进程 19 个、带 kiosk 7 个、带 inprivate 0 个） | 后端窗口（敏感文件 no-store）+ Windows 窗口（发布当天比对缓存）/ 待定 | 待派 |
 | W-88 | P2 | 一体机 | 缺纸已失败后，进度页仍写「订单已建立，等待终端领取」「排队等待中」，没说已发生的缺纸失败（从 W-86 拆出） | Grok K9 `evidence/k9/018-failure.png` | 主执行窗口（打印链进度页）/ 待定 | 待派 |
 | W-89 | P2 | 一体机 | AI 顾问页「发送」按钮被拉成约 260px 高的一大块（y≈1385–1650），原有版式问题 | 主执行窗口看 #1137 修后截图时发现 | 主执行窗口（留白修复包）/ 待定 | 已派 |
@@ -230,6 +230,20 @@
 ### 4.7b 跨端与退出残留（Grok K4）结论
 
 打印进度回流通：手机下单 → 一体机核销 → 打印中 → 完成，小程序详情逐步变中文「待取件 / 打印中 / 已完成」（未核销时英文见 W-72）。退出残留通：「结束使用」和闲置 180 秒清场后，localStorage / sessionStorage / cookie 只剩隐私边界键与终端会话令牌，不含手机号、文件名、问题原文；无 IndexedDB、无 service worker；下一位登录不串号。缺口在「不点结束」的清场前窗口（W-42、W-75）与跨端删除后的一体机旧列表（W-73、W-74）。
+
+### 4.9 一体机浸泡测试（K10，9/30 凌晨，rc 栈 4deeaefec）
+
+同一 Chromium、同一页（`performance.timeOrigin` 全程不变，未整页重载）、1080×1920，按人设连续 100 位（约 70% 匿名、30% 登录，打印/扫描/小青各一段后离开），另做 30 位不清场的纯页内切换。结果文件 `~/.cache/walk0929/soak/results.json`、`results.md`。
+
+| 第 N 位 | JS 堆 MB | DOM 节点 | 事件监听 | 活定时器 | 30 秒内请求 | 本地存储条目/字节 |
+|---|---:|---:|---:|---:|---:|---|
+| 0 | 5.9 | 496 | 206 | 15 | 0 | 1 / 68 |
+| 10 | 15.1 | 1334 | 256 | 15 | 0 | 2 / 2873 |
+| 50 | 14.1 | 1531 | 285 | 15 | 0 | 3 / 343 |
+| 100 | 12.8 | 887 | 239 | 15 | 0 | 3 / 345 |
+
+结论：**未发现内存泄漏**。堆随波动但趋势平（峰值第 80 位 21.6 MB，第 90 位回到 12.5）；30 位纯页内切换 12.4 → 10.4 MB；活定时器始终 15 个、页内切换后 7 个，没有逐位累积；30 秒窗口请求 0–3 次，只有终端会话续期、屏保、打印机状态，没有 W-80 那样的请求风暴；IndexedDB 为空、无 Service Worker、Cache 只有 1 条屏保资源。清场后本地存储只剩终端会话令牌与两条隐私边界键；只「回首页」时 sessionStorage 会留下进行中的材料检查草稿 `ai-job-print:current-print-material-check`，到下一次清场才清（本单草稿，不是跨用户堆积）；「回首页不退出登录」使后几位看到上一位的登录态——即清场组 P0，待状态机。
+**说明**：这次的负载偏向页面切换——脚本在打印里常没点到「确认使用这份文件」，完整出纸只有 3 单（失败 47），扫描完整 2 单，小青 21 次都有回复；因此「大量完整打印链」下的内存还没被充分压测，清场状态机合入后建议用修正后的脚本再跑一次。
 
 ### 4.8 修复对定位与功能的影响（9/29 晚起每项必标）
 

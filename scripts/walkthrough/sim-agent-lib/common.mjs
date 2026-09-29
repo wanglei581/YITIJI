@@ -11,7 +11,7 @@ import { homedir, networkInterfaces } from 'node:os'
 import { dirname, join } from 'node:path'
 
 /** 后台终端列表 / 心跳里显示的版本号：一眼看出不是真终端程序。 */
-export const SIM_AGENT_VERSION = '（走查）模拟 Agent，不会真实出纸'
+export const SIM_AGENT_VERSION = '0.4.13-walk（走查模拟 Agent，不会真实出纸）'
 /** 绑定时写进终端档案的显示名。 */
 export const SIM_DISPLAY_NAME = '测试·模拟终端'
 /** 模拟打印机名：不得写成任何真实型号。 */

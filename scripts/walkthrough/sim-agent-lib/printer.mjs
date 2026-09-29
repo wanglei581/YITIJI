@@ -16,7 +16,7 @@
 // ============================================================================
 
 import { createHash } from 'node:crypto'
-import { rmSync, statfsSync, writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, statfsSync, writeFileSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import {
   HttpError, SIM_AGENT_VERSION, SIM_PRINTER_NAME, apiRequest, errorText, getIpAddress, info, warn, error,
@@ -126,13 +126,51 @@ function freeDiskGB(dir) {
 
 // ── 本机任务状态库（替代真实终端程序的 SQLite：agent/db.ts）──────────────────
 
+function normalizeAttempt(value) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return 0
+  return value
+}
+
+function taskKey(taskId, attempt) {
+  return `${taskId}\u0000${normalizeAttempt(attempt)}`
+}
+
 function loadState(paths) {
   const s = readJson(paths.state, {})
+  const raw = s.tasks && typeof s.tasks === 'object' ? s.tasks : {}
+  const tasks = {}
+  for (const [key, row] of Object.entries(raw)) {
+    if (!row || typeof row !== 'object') continue
+    if (key.includes('\u0000')) {
+      tasks[key] = row
+      continue
+    }
+    // 旧状态文件只按任务号记账，等同 attempt 0，避免升级后把已做过的单再出一遍。
+    const attempt = normalizeAttempt(row.attempt)
+    tasks[taskKey(key, attempt)] = {
+      taskId: key,
+      attempt,
+      status: row.status,
+      at: row.at,
+      errorCode: typeof row.errorCode === 'string' && row.errorCode ? row.errorCode : null,
+    }
+  }
   return {
-    tasks: s.tasks && typeof s.tasks === 'object' ? s.tasks : {},
+    tasks,
     pendingPatches: Array.isArray(s.pendingPatches) ? s.pendingPatches : [],
     deadLetters: Array.isArray(s.deadLetters) ? s.deadLetters : [],
   }
+}
+
+/** 控制文件 agent-version 的第一行覆盖心跳版本；缺省能过服务端 0.4.13 门槛。 */
+function readAgentVersion(dir) {
+  try {
+    const line = readFileSync(join(dir, 'agent-version'), 'utf8').split('\n')[0].trim()
+    if (line) return line
+  } catch {
+    // 没有这份控制文件
+  }
+  return SIM_AGENT_VERSION
 }
 
 /**
@@ -183,7 +221,7 @@ export function startPrinterRuntime(options) {
       status: 'online', // 本机任务库（state.json）始终可用；真实终端程序任务库坏了才报 agent_degraded
       printerStatus,
       diskFreeGB: freeDiskGB(paths.dir),
-      agentVersion: SIM_AGENT_VERSION,
+      agentVersion: readAgentVersion(paths.dir),
       ipAddress: getIpAddress(),
       ...(options.macAddress ? { macAddress: options.macAddress } : {}),
       reportedAt: new Date().toISOString(),
@@ -242,38 +280,44 @@ export function startPrinterRuntime(options) {
   }
 
   // ── 回写 ──────────────────────────────────────────────────────────────────
-  async function patch(taskId, status, errorCode, errorMessage) {
-    const body = { status, ...(errorCode ? { errorCode } : {}), ...(errorMessage ? { errorMessage } : {}) }
+  async function patch(taskId, attempt, status, errorCode, errorMessage) {
+    const n = normalizeAttempt(attempt)
+    const body = { status, attempt: n, ...(errorCode ? { errorCode } : {}), ...(errorMessage ? { errorMessage } : {}) }
     try {
       await api('PATCH', `/print-tasks/${taskId}/status`, body)
-      info('task.patch', `任务 ${taskId}：回写 ${status}${errorCode ? `（${errorCode}）` : ''} 成功`, { taskId, status, errorCode: errorCode ?? null })
+      info('task.patch', `任务 ${taskId}：回写 ${status}${errorCode ? `（${errorCode}）` : ''} 成功`, { taskId, attempt: n, status, errorCode: errorCode ?? null })
       return true
     } catch (err) {
       if (err instanceof HttpError && err.status === 401) {
         markUnauthorized('patch')
         return false
       }
-      if (!closed) warn('task.patch_failed', `任务 ${taskId}：回写 ${status} 未送达（${errorText(err)}）`, { taskId, status, httpStatus: err?.status ?? null, code: err?.code ?? null })
+      if (!closed) warn('task.patch_failed', `任务 ${taskId}：回写 ${status} 未送达（${errorText(err)}）`, { taskId, attempt: n, status, httpStatus: err?.status ?? null, code: err?.code ?? null })
       return false
     }
   }
 
-  function markTask(taskId, status) {
-    state.tasks[taskId] = { status, at: shanghaiIso() }
+  function markTask(taskId, attempt, status, errorCode) {
+    const n = normalizeAttempt(attempt)
+    const key = taskKey(taskId, n)
+    const prev = state.tasks[key] || {}
+    const nextCode = typeof errorCode === 'string' && errorCode.length > 0 ? errorCode : (prev.errorCode || null)
+    state.tasks[key] = { taskId, attempt: n, status, at: shanghaiIso(), errorCode: nextCode }
     saveState()
   }
 
-  function enqueuePatch(taskId, status, errorCode, errorMessage) {
-    state.pendingPatches = state.pendingPatches.filter((p) => p.taskId !== taskId)
-    state.pendingPatches.push({ taskId, status, errorCode: errorCode ?? null, errorMessage: errorMessage ?? null, attempts: 0, nextRetryAt: Date.now(), createdAt: shanghaiIso() })
+  function enqueuePatch(taskId, attempt, status, errorCode, errorMessage) {
+    const n = normalizeAttempt(attempt)
+    state.pendingPatches = state.pendingPatches.filter((p) => !(p.taskId === taskId && normalizeAttempt(p.attempt) === n))
+    state.pendingPatches.push({ taskId, attempt: n, status, errorCode: errorCode ?? null, errorMessage: errorMessage ?? null, attempts: 0, nextRetryAt: Date.now(), createdAt: shanghaiIso() })
     saveState()
-    warn('offline_queue.enqueued', `任务 ${taskId}：终态 ${status} 进本机重试队列`, { taskId, status })
+    warn('offline_queue.enqueued', `任务 ${taskId}：终态 ${status} 进本机重试队列`, { taskId, attempt: n, status })
   }
 
-  async function finish(taskId, status, errorCode, errorMessage) {
-    markTask(taskId, status) // 先记本机终态再回写（task-runner.ts:22），重启重领也不会再「出纸」
-    const ok = await patch(taskId, status, errorCode, errorMessage)
-    if (!ok) enqueuePatch(taskId, status, errorCode, errorMessage)
+  async function finish(taskId, attempt, status, errorCode, errorMessage) {
+    markTask(taskId, attempt, status, errorCode) // 先记本机终态再回写；同一 (任务号, attempt) 不再出纸
+    const ok = await patch(taskId, attempt, status, errorCode, errorMessage)
+    if (!ok) enqueuePatch(taskId, attempt, status, errorCode, errorMessage)
   }
 
   // offline-queue.ts：60 秒一轮，退避 min(30s × 2^attempts, 30min)，10 次或 4xx 进死信。
@@ -288,7 +332,7 @@ export function startPrinterRuntime(options) {
         continue
       }
       try {
-        await api('PATCH', `/print-tasks/${p.taskId}/status`, { status: p.status, ...(p.errorCode ? { errorCode: p.errorCode } : {}), ...(p.errorMessage ? { errorMessage: p.errorMessage } : {}) })
+        await api('PATCH', `/print-tasks/${p.taskId}/status`, { status: p.status, attempt: normalizeAttempt(p.attempt), ...(p.errorCode ? { errorCode: p.errorCode } : {}), ...(p.errorMessage ? { errorMessage: p.errorMessage } : {}) })
         state.pendingPatches = state.pendingPatches.filter((x) => x !== p)
         saveState()
         info('offline_queue.sent', `任务 ${p.taskId}：重试队列里的 ${p.status} 已送达`, { taskId: p.taskId })
@@ -338,28 +382,36 @@ export function startPrinterRuntime(options) {
   // ── 执行一个任务 ──────────────────────────────────────────────────────────
   async function executeTask(task) {
     const taskId = task.taskId
+    const spoolAttempt = normalizeAttempt(task.attempt)
     if (isUnauthorized()) return
 
-    // Step 0：本机幂等（task-runner.ts:331-364）
-    const local = state.tasks[taskId]?.status
+    // Step 0：同一 (任务号, attempt) 才判重。attempt 变大才重新出纸（task-runner.ts 领取绑定）。
+    const localRow = state.tasks[taskKey(taskId, spoolAttempt)]
+    const local = localRow?.status
     if (local) {
       if (local === 'dispatching' || local === 'spooled') {
-        warn('task.replay_unconfirmed', `任务 ${taskId}：上次派发后没收尾（本机记为 ${local}），按「未确认出纸」回写，不重打`, { taskId })
-        await finish(taskId, 'failed', UNCONFIRMED.errorCode, RESTART_UNCONFIRMED_MESSAGE)
-      } else if (local === 'completed' || local === 'failed') {
-        info('task.replay', `任务 ${taskId}：本机已记为 ${local}，重发终态，不再出纸`, { taskId })
-        const ok = await patch(taskId, local)
-        if (!ok) enqueuePatch(taskId, local)
+        warn('task.replay_unconfirmed', `任务 ${taskId} attempt ${spoolAttempt}：上次派发后没收尾（本机记为 ${local}），按「未确认出纸」回写，不重打`, { taskId, attempt: spoolAttempt })
+        await finish(taskId, spoolAttempt, 'failed', UNCONFIRMED.errorCode, RESTART_UNCONFIRMED_MESSAGE)
+      } else if (local === 'completed') {
+        info('task.replay', `任务 ${taskId} attempt ${spoolAttempt}：本机已记为 completed，重发终态，不再出纸`, { taskId, attempt: spoolAttempt })
+        const ok = await patch(taskId, spoolAttempt, 'completed')
+        if (!ok) enqueuePatch(taskId, spoolAttempt, 'completed')
+      } else if (local === 'failed') {
+        const localError = typeof localRow.errorCode === 'string' && localRow.errorCode ? localRow.errorCode : undefined
+        info('task.replay', `任务 ${taskId} attempt ${spoolAttempt}：本机已记为 failed，重发终态并保留 errorCode，不再出纸`, { taskId, attempt: spoolAttempt, errorCode: localError ?? null })
+        const ok = await patch(taskId, spoolAttempt, 'failed', localError)
+        if (!ok) enqueuePatch(taskId, spoolAttempt, 'failed', localError)
       } else {
-        await finish(taskId, 'failed', 'LOCAL_TASK_STATE_UNKNOWN', `本地打印任务状态异常（${local}），为避免重复出纸已停止自动重试，请工作人员核查`)
+        await finish(taskId, spoolAttempt, 'failed', 'LOCAL_TASK_STATE_UNKNOWN', `本地打印任务状态异常（${local}），为避免重复出纸已停止自动重试，请工作人员核查`)
       }
       return
     }
 
     const ext = inferTaskExt(task)
-    const tempFile = join(paths.temp, `task_${taskId}${ext}`)
-    info('task.start', `任务 ${taskId}：开始（扩展名 ${ext}，份数 ${task.params?.copies ?? 1}，计费页数 ${task.billablePages ?? '?'}）`, {
-      taskId, ext, mimeType: task.mimeType ?? null, nameLen: task.fileName ? String(task.fileName).length : 0,
+    const stem = spoolAttempt > 0 ? `${taskId}_a${spoolAttempt}` : taskId
+    const tempFile = join(paths.temp, `task_${stem}${ext}`)
+    info('task.start', `任务 ${taskId}：开始（attempt ${spoolAttempt}，扩展名 ${ext}，份数 ${task.params?.copies ?? 1}，计费页数 ${task.billablePages ?? '?'}）`, {
+      taskId, attempt: spoolAttempt, ext, mimeType: task.mimeType ?? null, nameLen: task.fileName ? String(task.fileName).length : 0,
       params: task.params ?? null, billablePages: task.billablePages ?? null,
     })
     try {
@@ -369,72 +421,73 @@ export function startPrinterRuntime(options) {
         buffer = await download(resolveFileUrl(task.fileUrl, apiBaseUrl))
         writeFileSync(tempFile, buffer, { mode: 0o600 })
       } catch (err) {
-        error('task.download_failed', `任务 ${taskId}：文件下载失败（${errorText(err)}）`, { taskId })
-        await finish(taskId, 'failed', 'PRINT_COMMAND_FAILED', `Download failed: ${errorText(err)}`)
+        error('task.download_failed', `任务 ${taskId}：文件下载失败（${errorText(err)}）`, { taskId, attempt: spoolAttempt })
+        await finish(taskId, spoolAttempt, 'failed', 'PRINT_COMMAND_FAILED', `Download failed: ${errorText(err)}`)
         return
       }
       const sha256 = createHash('sha256').update(buffer).digest('hex')
-      info('task.downloaded', `任务 ${taskId}：已下载 ${(buffer.length / 1024).toFixed(1)} KB`, { taskId, bytes: buffer.length, sha256 })
+      info('task.downloaded', `任务 ${taskId}：已下载 ${(buffer.length / 1024).toFixed(1)} KB`, { taskId, attempt: spoolAttempt, bytes: buffer.length, sha256 })
 
       // Step 2：SHA-256（wire 字段名仍叫 fileMd5）
       if (task.fileMd5) {
         if (sha256 !== task.fileMd5) {
-          error('task.hash_mismatch', `任务 ${taskId}：文件校验失败（SHA-256 不一致）`, { taskId, expected: task.fileMd5, actual: sha256 })
-          saveCopy(paths.rejected, task, ext, buffer, { outcome: 'DOWNLOAD_HASH_MISMATCH' })
-          await finish(taskId, 'failed', 'DOWNLOAD_HASH_MISMATCH', `文件校验失败（SHA-256 不一致）：expected=${task.fileMd5}, got=${sha256}`)
+          error('task.hash_mismatch', `任务 ${taskId}：文件校验失败（SHA-256 不一致）`, { taskId, attempt: spoolAttempt, expected: task.fileMd5, actual: sha256 })
+          saveCopy(paths.rejected, task, ext, buffer, { outcome: 'DOWNLOAD_HASH_MISMATCH', attempt: spoolAttempt })
+          await finish(taskId, spoolAttempt, 'failed', 'DOWNLOAD_HASH_MISMATCH', `文件校验失败（SHA-256 不一致）：expected=${task.fileMd5}, got=${sha256}`)
           return
         }
-        info('task.hash_ok', `任务 ${taskId}：文件哈希校验通过（SHA-256）`, { taskId })
+        info('task.hash_ok', `任务 ${taskId}：文件哈希校验通过（SHA-256）`, { taskId, attempt: spoolAttempt })
       } else {
-        warn('task.hash_missing', `任务 ${taskId}：服务端没给文件哈希，跳过校验`, { taskId })
+        warn('task.hash_missing', `任务 ${taskId}：服务端没给文件哈希，跳过校验`, { taskId, attempt: spoolAttempt })
       }
 
       // Step 2.5：打印机预检
       const mode = currentPrinter()
       const preflight = PREFLIGHT_ERRORS[mode]
       if (preflight) {
-        error('task.preflight_failed', `任务 ${taskId}：${SIM_PRINTER_NAME}预检不通过（${mode}）→ ${preflight.errorCode}，未出纸`, { taskId, mode, errorCode: preflight.errorCode })
-        saveCopy(paths.rejected, task, ext, buffer, { outcome: preflight.errorCode, printerMode: mode })
-        await finish(taskId, 'failed', preflight.errorCode, preflight.errorMessage)
+        error('task.preflight_failed', `任务 ${taskId}：${SIM_PRINTER_NAME}预检不通过（${mode}）→ ${preflight.errorCode}，未出纸`, { taskId, attempt: spoolAttempt, mode, errorCode: preflight.errorCode })
+        saveCopy(paths.rejected, task, ext, buffer, { outcome: preflight.errorCode, printerMode: mode, attempt: spoolAttempt })
+        await finish(taskId, spoolAttempt, 'failed', preflight.errorCode, preflight.errorMessage)
         return
       }
 
       // Step 3：printing（信息性，失败重试一次后继续）
       if (isUnauthorized() || closed) return
-      const acked = (await patch(taskId, 'printing')) || (!isUnauthorized() && (await patch(taskId, 'printing')))
-      if (!acked) warn('task.printing_unacked', `任务 ${taskId}：printing 未确认，继续执行，终态直接回写`, { taskId })
+      const acked = (await patch(taskId, spoolAttempt, 'printing')) || (!isUnauthorized() && (await patch(taskId, spoolAttempt, 'printing')))
+      if (!acked) warn('task.printing_unacked', `任务 ${taskId}：printing 未确认，继续执行，终态直接回写`, { taskId, attempt: spoolAttempt })
       if (isUnauthorized() || closed) return
 
       // Step 4：记 dispatching → 「出纸」→ 记 spooled
-      markTask(taskId, 'dispatching')
-      const saved = saveCopy(paths.printed, task, ext, buffer, { outcome: mode === 'unconfirmed' ? 'PRINT_JOB_UNCONFIRMED' : 'completed', printerMode: mode })
-      markTask(taskId, 'spooled')
-      info('task.sim_output', `${SIM_PRINTER_NAME}：任务 ${taskId} 已模拟出纸${saved.pdfPages ? `（PDF 约 ${saved.pdfPages} 页）` : ''}，未真实打印 → ${saved.file}`, {
-        taskId, savedFile: saved.file, pdfPagesApprox: saved.pdfPages, copies: task.params?.copies ?? 1,
+      markTask(taskId, spoolAttempt, 'dispatching')
+      const saved = saveCopy(paths.printed, task, ext, buffer, { outcome: mode === 'unconfirmed' ? 'PRINT_JOB_UNCONFIRMED' : 'completed', printerMode: mode, attempt: spoolAttempt })
+      markTask(taskId, spoolAttempt, 'spooled')
+      info('task.sim_output', `${SIM_PRINTER_NAME}：任务 ${taskId} attempt ${spoolAttempt} 已模拟出纸${saved.pdfPages ? `（PDF 约 ${saved.pdfPages} 页）` : ''}，未真实打印 → ${saved.file}`, {
+        taskId, attempt: spoolAttempt, savedFile: saved.file, pdfPagesApprox: saved.pdfPages, copies: task.params?.copies ?? 1,
       })
 
       if (mode === 'unconfirmed') {
-        info('task.monitor', `任务 ${taskId}：模拟打印队列一直没确认完成，${unconfirmedMs / 1000} 秒后按 PRINT_JOB_UNCONFIRMED 回写`, { taskId })
+        info('task.monitor', `任务 ${taskId}：模拟打印队列一直没确认完成，${unconfirmedMs / 1000} 秒后按 PRINT_JOB_UNCONFIRMED 回写`, { taskId, attempt: spoolAttempt })
         await sleep(unconfirmedMs)
         if (closed) return
-        await finish(taskId, 'failed', UNCONFIRMED.errorCode, UNCONFIRMED.errorMessage)
+        await finish(taskId, spoolAttempt, 'failed', UNCONFIRMED.errorCode, UNCONFIRMED.errorMessage)
         return
       }
       await sleep(printMs)
       if (closed) return
-      await finish(taskId, 'completed')
+      await finish(taskId, spoolAttempt, 'completed')
     } finally {
       rmSync(tempFile, { force: true }) // task-runner.ts:590-600
     }
   }
 
   function saveCopy(dir, task, ext, buffer, meta) {
-    const name = `${task.taskId}-${safeFileName(task, ext)}`
+    const n = normalizeAttempt(task.attempt ?? meta?.attempt)
+    const name = n > 0 ? `${task.taskId}-a${n}-${safeFileName(task, ext)}` : `${task.taskId}-${safeFileName(task, ext)}`
     const file = join(dir, name)
     writeFileSync(file, buffer, { mode: 0o600 })
     const pdfPages = ext === '.pdf' ? approxPdfPages(buffer) : null
     writeJsonPrivate(`${file}.json`, {
-      taskId: task.taskId, savedAt: shanghaiIso(), ...meta, pdfPagesApprox: pdfPages,
+      taskId: task.taskId, attempt: normalizeAttempt(task.attempt ?? meta?.attempt), savedAt: shanghaiIso(), ...meta, pdfPagesApprox: pdfPages,
       params: task.params ?? null, billablePages: task.billablePages ?? null, mimeType: task.mimeType ?? null, sizeBytes: buffer.length,
     })
     return { file, pdfPages }
@@ -474,19 +527,20 @@ export function startPrinterRuntime(options) {
     }
     for (const task of tasks) {
       if (closed || isUnauthorized()) return
-      if (activeTasks.has(task.taskId)) continue
+      const flightKey = `${task.taskId}#${normalizeAttempt(task.attempt)}`
+      if (activeTasks.has(flightKey)) continue
       if (task?.type !== 'print') {
         warn('claim.unsupported', `任务 ${task?.taskId}：类型 ${task?.type} 不支持，跳过`)
         continue
       }
-      activeTasks.add(task.taskId)
-      info('claim.task', `领到打印任务 ${task.taskId}`, { taskId: task.taskId })
+      activeTasks.add(flightKey)
+      info('claim.task', `领到打印任务 ${task.taskId}（attempt ${normalizeAttempt(task.attempt)}）`, { taskId: task.taskId, attempt: normalizeAttempt(task.attempt) })
       try {
         await executeTask(task)
       } catch (err) {
-        error('task.crashed', `任务 ${task.taskId}：执行出错 — ${errorText(err)}`, { taskId: task.taskId })
+        error('task.crashed', `任务 ${task.taskId}：执行出错 — ${errorText(err)}`, { taskId: task.taskId, attempt: normalizeAttempt(task.attempt) })
       } finally {
-        activeTasks.delete(task.taskId)
+        activeTasks.delete(flightKey)
       }
     }
   }
