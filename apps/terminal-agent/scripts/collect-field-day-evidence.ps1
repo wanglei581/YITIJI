@@ -123,11 +123,17 @@ Invoke-Check "D1-1" "系统版本与支持期" {
 }
 
 Invoke-Check "D1-2" "分配访问与自动登录" {
-  $aaKey = Test-Path -LiteralPath "HKLM:\SOFTWARE\Microsoft\Windows\AssignedAccessConfiguration"
+  # 这个键和它下面的 Configs/Profiles 子键装完系统就在（KSK-001 未配置也有），只看键在不在会误报「已配置」；
+  # 配了分配访问才会在 Profiles 下出现配置文件 GUID、在 Configs 下出现账号 SID。
+  $aaRoot = "HKLM:\SOFTWARE\Microsoft\Windows\AssignedAccessConfiguration"
+  $aaProfiles = @(Get-ChildItem -LiteralPath (Join-Path $aaRoot "Profiles") -ErrorAction SilentlyContinue).Count
+  $aaConfigs = @(Get-ChildItem -LiteralPath (Join-Path $aaRoot "Configs") -ErrorAction SilentlyContinue).Count
   $aaCmdlet = "cmdlet_unavailable"
   if (Get-Command Get-AssignedAccess -ErrorAction SilentlyContinue) {
     try { $aaCmdlet = "entries=" + @(Get-AssignedAccess -ErrorAction Stop).Count } catch { $aaCmdlet = "unavailable" }
   }
+  # 分配访问要求 UAC 开着；KSK-001 上普通打开 PowerShell 就是管理员，疑似关了 UAC
+  $uacEnabled = [string](Get-RegValue "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "EnableLUA") -ne "0"
   $winlogon = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
   $autoLogon = [string](Get-RegValue $winlogon "AutoAdminLogon")
   $defaultUserSet = -not [string]::IsNullOrWhiteSpace([string](Get-RegValue $winlogon "DefaultUserName"))
@@ -140,8 +146,10 @@ Invoke-Check "D1-2" "分配访问与自动登录" {
       $consoleUserIsAdmin = [string]($members -contains $consoleUser)
     }
   } catch { $consoleUserIsAdmin = "unknown" }
-  $value = "assignedAccessConfigKey=$aaKey getAssignedAccess=$aaCmdlet autoAdminLogon=$autoLogon defaultUserNameSet=$defaultUserSet consoleUserIsAdmin=$consoleUserIsAdmin 逃逸键须按清单手测"
-  Add-Row "D1-2" "分配访问与自动登录" $value "MANUAL"
+  $value = "assignedAccessProfiles=$aaProfiles assignedAccessConfigs=$aaConfigs uacEnabled=$uacEnabled getAssignedAccess=$aaCmdlet autoAdminLogon=$autoLogon defaultUserNameSet=$defaultUserSet consoleUserIsAdmin=$consoleUserIsAdmin 逃逸键须按清单手测"
+  if (-not $uacEnabled) { Add-Row "D1-2" "分配访问与自动登录" "$value UAC 已关闭，分配访问要求开启 UAC" "WARN" }
+  elseif ($aaProfiles -eq 0 -and $aaConfigs -eq 0) { Add-Row "D1-2" "分配访问与自动登录" "$value 没有配置分配访问，正式终端必须配置（见清单）" "WARN" }
+  else { Add-Row "D1-2" "分配访问与自动登录" $value "MANUAL" }
 }
 
 Invoke-Check "D1-3" "Shell Launcher / 键盘筛选器 / 写入筛选器" {
@@ -155,7 +163,7 @@ Invoke-Check "D1-3" "Shell Launcher / 键盘筛选器 / 写入筛选器" {
       $blocked = "enabledPredefinedKeys=" + $keys.Count + " ctrlAltDel=" + [string](@($keys | Where-Object { $_.Id -eq "Ctrl+Alt+Del" }).Count -gt 0)
     } catch { $blocked = "unavailable" }
   }
-  Add-Row "D1-3" "Shell Launcher / 键盘筛选器 / 写入筛选器" "shellLauncher=$shell keyboardFilter=$keyboard $blocked unifiedWriteFilter=$uwf（专业版上都是 not_available）" "MANUAL"
+  Add-Row "D1-3" "Shell Launcher / 键盘筛选器 / 写入筛选器" "shellLauncher=$shell keyboardFilter=$keyboard $blocked unifiedWriteFilter=$uwf（Disabled=系统里有但没开，not_available=这个版本没有；专业版显示 Disabled 也不在微软支持范围内，以 D1-1 的版本为准）" "MANUAL"
 }
 
 Invoke-Check "D1-4" "阻止新插入的键盘类设备" {
@@ -190,7 +198,8 @@ Invoke-Check "D1-5" "Edge 一体机策略" {
 }
 
 Invoke-Check "D1-6" "远程工具与远程桌面" {
-  $pattern = "UU远程|uu.?remote|todesk|sunlogin|oray|teamviewer|anydesk|rustdesk|splashtop|parsec"
+  # 网易 UU 远程在 Windows 上的进程与服务都叫 GameViewer*（KSK-001 实测），名字里没有 UU
+  $pattern = "UU远程|uu.?remote|gameviewer|todesk|sunlogin|awesun|oray|teamviewer|anydesk|rustdesk|splashtop|parsec|ultraviewer|screenconnect"
   $services = @(Get-CimInstance Win32_Service -ErrorAction Stop | Where-Object { $_.Name -match $pattern -or $_.DisplayName -match $pattern } | ForEach-Object { "$($_.Name)[$($_.State)/$($_.StartMode)]" })
   $processes = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match $pattern } | ForEach-Object { $_.ProcessName } | Sort-Object -Unique)
   $rdpDenied = Get-RegValue "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server" "fDenyTSConnections"

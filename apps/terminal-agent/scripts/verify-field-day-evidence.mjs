@@ -55,6 +55,19 @@ assert.match(script, /elseif \(\$keyboardDenied -and \$retro\) \{ Add-Row "D1-4"
 assert.match(script, /"AllowDenyLayered"/, 'layered evaluation policy value name')
 assert.match(script, /"DenyDeviceClassesRetroactive"/, 'retroactive deny value name')
 
+// 以下三条来自 KSK-001 真机首跑（2026-09-29）：
+// 分配访问：AssignedAccessConfiguration 及其子键装完系统就在，看键在不在会把未配置报成已配置，必须数子键下的配置项。
+assert.doesNotMatch(script, /Test-Path[^\n]*AssignedAccessConfiguration/, 'D1-2 must not treat the always-present AssignedAccessConfiguration key as configured')
+assert.match(script, /Get-ChildItem -LiteralPath \(Join-Path \$aaRoot "Profiles"\)/, 'D1-2 must count assigned-access profiles')
+assert.match(script, /Get-ChildItem -LiteralPath \(Join-Path \$aaRoot "Configs"\)/, 'D1-2 must count assigned-access account configs')
+assert.match(script, /if \(\$aaProfiles -eq 0 -and \$aaConfigs -eq 0\) \{ Add-Row "D1-2"[^\n]*"WARN" \}/, 'no assigned-access config must be a WARN, not a silent MANUAL')
+assert.match(script, /"EnableLUA"\) -ne "0"/, 'D1-2 must read UAC (assigned access requires it; on KSK-001 a plain PowerShell opened elevated)')
+assert.match(script, /if \(-not \$uacEnabled\) \{ Add-Row "D1-2"[^\n]*"WARN" \}/, 'UAC off must be a WARN')
+// 远程工具：网易 UU 远程的进程与服务叫 GameViewer*，名字里没有 UU。
+assert.match(script, /\$pattern = "[^"]*\bgameviewer\b[^"]*"/, 'D1-6 must detect NetEase UU Remote (GameViewer)')
+// 功能状态：Disabled 与 not_available 是两回事，不能写成「专业版上都是 not_available」。
+assert.doesNotMatch(script, /专业版上都是 not_available/, 'D1-3 note must not claim Pro always reports not_available (KSK-001 reports Disabled)')
+
 // 系统版本：家庭版 FAIL；支持期表里没有的版本只能 UNKNOWN，绝不当通过；过期按今天日期自动转 FAIL。
 assert.match(script, /if \(\$class -eq "home"\) \{ Add-Row "D1-1"[^\n]*"FAIL"/, 'Home edition must fail')
 assert.match(script, /不在已核对的支持期表里[^\n]*"UNKNOWN"/, 'unknown builds must be UNKNOWN, never PASS')
