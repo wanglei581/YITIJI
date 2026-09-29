@@ -111,6 +111,13 @@ class FakeRedis {
     this.store.set(key, String(next))
     return next
   }
+  async decrementFloorKeepTtl(key: string): Promise<number> {
+    const v = Number(this.store.get(key) ?? 'NaN')
+    if (!Number.isFinite(v)) return 0
+    if (v <= 1) { this.store.delete(key); return 0 }
+    this.store.set(key, String(v - 1))
+    return v - 1
+  }
   clearRates(): void { for (const key of [...this.store.keys()]) if (key.startsWith('pickup:claim:rate')) this.store.delete(key) }
 }
 
@@ -658,14 +665,14 @@ async function main(): Promise<void> {
       && (await prisma.order.findUniqueOrThrow({ where: { id: C2.id } })).pickupStatus === 'pending',
     '异机：409 PICKUP_TERMINAL_MISMATCH 带网点名，不计入锁机、不写枚举审计、订单不变', JSON.stringify(mismatch.body))
 
-    // 会员入口成功不清零到机码失败计数（不给枚举续命）；到机码入口成功照旧清零。
+    // 会员入口成功不动到机码失败计数（不给枚举续命）；到机码入口首次认领成功只抵掉一次（1.8 P-2：4 → 3）。
     const C7 = await single(U, fA, T)
     await redis.setEx(failKey, 600, '4')
     await claimHere.claimHere(U, C7.id, T, source())
     const afterMember = await redis.get(failKey)
     const C8 = await single(U, fA, T)
     await pickup.claim(C8.pickupCode!, T, source())
-    check(afterMember === '4' && (await redis.get(failKey)) === null, '会员本机领取成功不清零本机到机码失败计数；到机码成功照旧清零')
+    check(afterMember === '4' && (await redis.get(failKey)) === '3', '会员本机领取成功不动本机到机码失败计数；到机码首次认领成功只抵掉一次')
 
     // 拒绝场景：claim-here 与到机码入口同一判定、同一错误码
     const parity = async (label: string, prepare: (orderId: string) => Promise<void>, expected: string, firstClaim = false) => {
