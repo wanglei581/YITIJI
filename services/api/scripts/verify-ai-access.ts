@@ -310,6 +310,27 @@ function coverage(): void {
   }
 }
 
+/** 经真实全局错误过滤器：缺了哪几项声明要真的出现在响应体里（details），客户端才能只补问缺的那几项。 */
+async function declarationSurvivesFilter(): Promise<void> {
+  const { HttpExceptionFilter } = await import('../src/common/filters/http-exception.filter')
+  const { service } = makeService()
+  let thrown: unknown = null
+  try {
+    await service.enforce('voice', false, ANON as never, { ...OFF, declarationEnforced: true })
+  } catch (error) {
+    thrown = error
+  }
+  let status = 0
+  let body: { error?: { code?: string; details?: unknown } } = {}
+  const response = { status: (s: number) => { status = s; return response }, json: (b: typeof body) => { body = b } }
+  const host = { switchToHttp: () => ({ getResponse: () => response, getRequest: () => ({ headers: {}, method: 'POST', url: '/ai/voice' }) }) }
+  new HttpExceptionFilter().catch(thrown, host as never)
+  check('filter:声明缺失经全局过滤器后仍带出缺哪几项（details）',
+    status === 403 && body.error?.code === 'AI_DECLARATION_REQUIRED'
+      && JSON.stringify(body.error?.details) === JSON.stringify(['age_14_plus', 'voice_recording']),
+    JSON.stringify({ status, body }))
+}
+
 async function adminSwitch(): Promise<void> {
   const roles = Reflect.getMetadata(ROLES_KEY, AdminAiAccessController) as string[] | undefined
   check('admin:切换接口只许 admin', JSON.stringify(roles) === JSON.stringify(['admin']), JSON.stringify(roles))
@@ -364,6 +385,7 @@ void (async () => {
     await guardOnRealRoutes()
     coverage()
     await adminSwitch()
+    await declarationSurvivesFilter()
     await realApp()
   } catch (error) {
     fail('runtime', error instanceof Error ? error.stack ?? error.message : String(error))
