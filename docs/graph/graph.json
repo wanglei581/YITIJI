@@ -21701,6 +21701,9 @@
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
+    "services/api/scripts/support/llm-pii-callsite-checks.ts": [
+      "services/api/scripts/verify-llm-input-pii-mask.ts"
+    ],
     "services/api/scripts/support/minimal-pdf.ts": [
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -34437,6 +34440,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/llm-pii-callsite-checks.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
           "services/api/src/ai/llm/llm-presets.ts",
           "services/api/src/ai/resume/llm-career-plan.service.ts",
