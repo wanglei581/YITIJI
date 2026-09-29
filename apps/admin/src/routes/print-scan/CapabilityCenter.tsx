@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
+import { printerStatusView } from '../terminals/terminalStatusViews'
 import {
   adminPrintScanService,
   DEFAULT_DENY_CAPABILITY_KEYS,
@@ -33,6 +34,13 @@ const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
   // 再配成「可用」才对用户放开。配错的代价是用户按彩色付费拿到黑白纸。
   color_print: '彩色打印（需真机验证）',
   duplex_print: '自动双面（需真机验证）',
+}
+
+function PrinterHeartbeatText({ status }: { status: string | null }) {
+  if (!status) return <>状态未知</>
+  const view = printerStatusView(status)
+  const tone = view.badge === 'error' ? 'font-semibold text-error-fg' : view.badge === 'warning' ? 'font-semibold text-warning-fg' : undefined
+  return <span className={tone}>{view.label}</span>
 }
 
 const CAPABILITY_STATUS_OPTIONS: { value: PrintScanCapabilityStatus; label: string }[] = [
@@ -209,7 +217,7 @@ export function CapabilityCenter() {
           <span className="text-[12px] text-neutral-500">
             Agent {selected.agentVersion ?? '版本未知'} ·{' '}
             {selected.online ? (selected.agentStatus === 'agent_degraded' ? 'Agent 降级' : '在线') : '离线'} · 打印机{' '}
-            {selected.printerStatus ?? '状态未知'}
+            <PrinterHeartbeatText status={selected.printerStatus} />
             {selected.localTaskDatabaseAvailable === false ? ' · 本地任务库不可用' : ''}
           </span>
         )}

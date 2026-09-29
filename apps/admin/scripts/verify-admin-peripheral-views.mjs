@@ -101,6 +101,26 @@ const page = readFileSync(join(root, 'src/routes/peripherals/index.tsx'), 'utf8'
 check('C1 抽屉只在正常时兜底「无需处理」', drawer.includes("item.advice ?? (item.badge === 'success' ? '无需处理' : '—')") && !drawer.includes("item.advice ?? '无需处理'"))
 check('C2 外设页刷新失败保留旧数据时明说', /staleAfterError = status === 'error' && terminals\.length > 0/.test(page) && page.includes('刷新失败，以下为上次成功获取的数据'))
 
+// ─── D. Agent 0.4.13 开机清理：主动停接打印单 ───────────────────────────────
+// 这两个值是 error（不是纸张不足那种 warning），计入「打印机异常 / 只看异常」。
+const QUEUE_PAUSE_ADVICE = '请到机器前看打印机和 Windows 打印队列，恢复后会自动解除。'
+for (const [status, label] of [
+  ['queue_cleanup_failed', '开机清理失败，暂停接打印单'],
+  ['queue_pause_failed', '暂停队列失败，暂停接打印单'],
+]) {
+  const view = statusViews.printerStatusView(status)
+  check(`D1 ${status} → 中文且徽章为 error`, view.label === label && view.badge === 'error', JSON.stringify(view))
+  const printer = item({ printerStatus: status }, 'printer')
+  check(
+    `D2 ${status} → 处置建议、不写成无法识别`,
+    printer.label === label && printer.badge === 'error' && printer.advice === QUEUE_PAUSE_ADVICE && printer.reason === null,
+    JSON.stringify(printer),
+  )
+  check(`D3 ${status} → 计入 hasPrinterIssue`, views.hasPrinterIssue({ ...base, printerStatus: status }) === true)
+}
+const lowPaper = statusViews.printerStatusView('low_paper')
+check('D4 纸张不足仍是 warning，与停接打印单分开', lowPaper.badge === 'warning' && lowPaper.label !== '开机清理失败，暂停接打印单')
+
 if (failures > 0) {
   console.error(`\n${failures} FAIL`)
   process.exit(1)
