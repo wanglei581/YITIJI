@@ -436,6 +436,7 @@ async function main(): Promise<void> {
     const created = await orgs.createOrg({
       name: '新建不记冷却',
       type: 'public_employment_service',
+      sceneTemplate: 'public_employment',
       contactPhone: phoneCreateOrg,
     }, admin)
     const createdRow = await prisma.organization.findUniqueOrThrow({ where: { id: created.id } })
