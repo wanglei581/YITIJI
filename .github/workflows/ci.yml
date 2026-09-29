@@ -600,6 +600,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-anonymous-feedback
           pnpm --filter @ai-job-print/api verify:ai-persistence-consistency
           pnpm --filter @ai-job-print/api verify:materials-processing
+          pnpm --filter @ai-job-print/api verify:pdfjs-engine
           pnpm --filter @ai-job-print/api verify:pii-redaction
           pnpm --filter @ai-job-print/api verify:material-task-token-transport
           pnpm --filter @ai-job-print/api verify:job-materials
