@@ -23,7 +23,7 @@ export function Pagination({ total, page, pageSize, onPageChange, onPageSizeChan
     pages.push(totalPages)
   }
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-100">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-neutral-100 px-4 py-3">
       <div className="flex items-center gap-3">
         <span className="text-sm text-neutral-500"> 共 <span className="font-medium text-neutral-700">{total}</span> 条</span>
         <div className="flex items-center gap-1.5">
