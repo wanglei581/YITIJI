@@ -74,9 +74,9 @@
 ### R.2 升级 Agent
 
 1. **做什么**  
-   产品负责人本人双击安装本次发布的 MSI（U 盘拷入或本机下载后安装，见母盘清单 A14）。发布当天装的 Agent 必须是 **0.4.13 或更高**，并且必须包含「图片临时 PDF 开机清理」与「打印队列空闲暂停 + 开机清理残留作业」两处修复。**从 0.4.11 首次升级时，装完须按 [生产接入说明](production-agent-onboarding.md) 重跑一次生产安装脚本**（这台兼作工作电脑，带 `-KeepFileSelectionDialogs`），否则升级后的自动启动恢复标记还不存在。**发布当天 KSK-001 不加 `-KeepPrinterQueueUnpaused`**（2026-09-29 总指挥定：测到的是生产行为）。后果要先告诉产品负责人：空闲时这台奔图的队列是暂停的，他从别的软件打到这台奔图的文档会一直停在队列里，等 Agent 下次为一体机用户放行时才出，而且会和那位用户的打印件一起出、甚至夹在中间——这本身就是隐私问题。所以不加开关期间，**他不能从别的软件往这台奔图打印**；要打就先临时加开关重跑生产安装脚本，或者用别的打印机。R.5 做完后，按这台电脑是否还兼作工作电脑，再定是否改成带开关。专用一体机一律不加。
+   产品负责人本人双击安装本次发布的 MSI（U 盘拷入或本机下载后安装，见母盘清单 A14）。发布当天装的 Agent 必须是 **0.4.13 或更高**，并且必须包含「图片临时 PDF 开机清理」与「打印队列空闲暂停 + 开机清理残留作业」两处修复。**从 0.4.11 首次升级时，装完须按 [生产接入说明](production-agent-onboarding.md) 重跑一次生产安装脚本**（这台兼作工作电脑，带 `-KeepFileSelectionDialogs`），否则升级后的自动启动恢复标记还不存在。**发布当天 KSK-001 不加 `-KeepPrinterQueueUnpaused`**（2026-09-29 总指挥定：测到的是生产行为）。后果要先告诉产品负责人：空闲时这台奔图的队列是暂停的，他从别的软件打到这台奔图的文档会一直停在队列里，等 Agent 下次为一体机用户放行时才出，而且会和那位用户的打印件一起出、甚至夹在中间——这本身就是隐私问题。所以不加开关期间，**他不能从别的软件往这台奔图打印**；要打就先临时加开关重跑生产安装脚本，或者用别的打印机。R.5 做完后，按这台电脑是否还兼作工作电脑，再定是否改成带开关。专用一体机一律不加。**版本搭配：Agent 0.4.13 需要服务端为第一次发布或更新的版本**（老服务端不认 `queue_cleanup_failed` / `queue_pause_failed` 两个状态值，也不按新时限判未确认），不要单独先升 Agent。
 2. **应该看到什么**  
-   后台同一行「Agent 版本」变成 0.4.13 或更高（来源：`apps/admin/src/routes/terminals/index.tsx:768`），运行状态回到「在线」（来源：同文件 `:91`）；一体机首页「打印 · 扫描」徽章回到「打印机在线」（见 A.7，来源：`apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts:36`）。版本号来源：`apps/terminal-agent/package.json` 的 `version` 与 `apps/terminal-agent/scripts/install-production-agent.ps1:81`。兼作工作电脑的开关来源：同文件 `:23`、`:108`；生产默认写入暂停的来源：同文件 `:900`。
+   Agent 日志里有一行 `print-queue-cleanup: matched by SID (count=N)`（来源：`apps/terminal-agent/src/agent/print-queue-hold.ts:309`，N 可以是 0），说明按账号 SID 比对成功；后台这台终端的打印机状态**不是**「开机清理失败，暂停接打印单」或「暂停队列失败，暂停接打印单」——若是，说明打印闸门合上了，这台机器整机不能打印，属发布阻塞，立即报 Windows 真机路和总指挥。后台同一行「Agent 版本」变成 0.4.13 或更高（来源：`apps/admin/src/routes/terminals/index.tsx:768`），运行状态回到「在线」（来源：同文件 `:91`）；一体机首页「打印 · 扫描」徽章回到「打印机在线」（见 A.7，来源：`apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts:36`）。版本号来源：`apps/terminal-agent/package.json` 的 `version` 与 `apps/terminal-agent/scripts/install-production-agent.ps1:81`。兼作工作电脑的开关来源：同文件 `:23`、`:108`；生产默认写入暂停的来源：同文件 `:900`。
 3. **看不到时属于哪一类**  
    ① 本机装机 / Agent。
 4. **现场立刻能做的补救**  
