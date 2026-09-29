@@ -347,7 +347,7 @@ function PreviewStep({ preview, label }: { preview: BulkPublishPreviewResult; la
         {excluded.orgTrustInactive > 0 && (
           <p className="mt-1 text-xs text-warning-fg">
             另有 {excluded.orgTrustInactive} 条已过审但<strong>来源机构未通过内容信任核验</strong>
-            (未标记 / 已暂停 / 已撤销 / 已归档),按 fail-closed 不进本次发布范围。
+            (未标记 / 已暂停 / 已撤销 / 已归档)，这次不会发布。
             需先完成来源授权核验,再由管理员到「{CONTENT_TRUST_UI_PATH_TEXT}」把该机构标记为内容可信
             (标记时必须填核验依据,依据会进审计日志)。
           </p>

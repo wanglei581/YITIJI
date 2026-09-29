@@ -72,21 +72,38 @@ const checks = [
   ['W6 直达完成页预期为无法确认', () => {
     assert.match(routeCasesSource, /pattern:\s*'\/print\/done'[\s\S]*?featureText:\s*'无法确认打印结果'/)
   }],
-  ['空闲后只收起本次预览，不说已经清场或退出登录', () => {
-    const wipe = doneRuntime.match(/const doWipe = useCallback\(\(\) => \{[\s\S]*?\}, \[\]\)/)
-    assert.ok(wipe, '完成页仍有 doWipe')
-    assert.match(wipe[0], /clearPrintMaterialSession\(\)/)
-    assert.doesNotMatch(wipe[0], /logout\s*\(/)
+  // 2026-09-29 口径变更（产品负责人拍板「两处都堵，30 秒」，W-43）：到点不再只收起预览，
+  // 而是真的结束这次使用 —— 走统一的 endKioskUse，结束人次、清本机数据、退出登录、回首页。
+  // 这不是放宽：旧断言要求「不退出登录」，新断言要求「到点必须调用 endKioskUse 且它会退出登录」。
+  ['60 秒到点真的结束本次使用并退出登录（统一 endKioskUse），文案如实', () => {
+    // 倒计时归零那一刻调用的就是 endKioskUse('print_done_timeout')，不是自己清一半。
+    const timeout = doneRuntime.match(/const endOnTimeout = useCallback\(\(\) => \{[\s\S]*?\}, \[endKioskUse\]\)/)
+    assert.ok(timeout, '完成页有 endOnTimeout')
+    assert.match(timeout[0], /endKioskUse\('print_done_timeout'\)/)
+    assert.match(doneRuntime, /if \(n <= 0\) \{\s*window\.clearInterval\(timer\)\s*endOnTimeout\(\)/)
     assert.match(doneRuntime, /setIdleLeft\(60\)/)
-    assert.match(doneRuntime, /登录还在/)
-    assert.match(doneRuntime, /账号还登录着/)
-    assert.match(doneRuntime, /收起这次预览/)
-    assert.match(doneRuntime, /账号不会因此退出/)
+    // 完成页自己不许 logout / 清数据：半清正是这次要堵的洞。
+    assert.doesNotMatch(doneRuntime, /\blogout\s*\(|clearPrintMaterialSession\s*\(|clearKioskSensitiveSession\s*\(/)
+    assert.doesNotMatch(doneRuntime, /setWiped|登录还在|账号还登录着|账号不会因此退出/)
+    // 主按钮：两步确认后同样走 endKioskUse。
+    assert.match(doneRuntime, /'我拿走了，结束使用'/)
+    assert.match(doneRuntime, /endArmed \? '再按一次，确认结束使用'/)
+    assert.match(doneRuntime, /if \(endArmed\) \{\s*endKioskUse\('end_use'\)/)
+    // 倒计时文案如实：登录着就说会退出登录。
+    assert.match(doneRuntime, /到点会结束本次使用并退出登录/)
+    assert.match(doneRuntime, /秒后结束使用/)
     assert.doesNotMatch(
       doneRuntime,
       /隐私已清除|下一个人看不到|这次办理已清空|结束并清空|空闲超时自动清空|秒空闲后自动清空|已清除/,
     )
-    }],
+    // endKioskUse 这一步真的会退出登录：print_done_timeout 映射到空闲结束，四步里有 logout。
+    const endUse = read('src/auth/kioskEndUse.ts')
+    assert.match(endUse, /print_done_timeout: 'idle_timeout'/)
+    assert.match(endUse, /attempt\(steps\.logout\)/)
+    const guard = withoutComments(read('src/auth/KioskPrivacyGuard.tsx'))
+    assert.match(guard, /runEndKioskUse\(reason, \{[\s\S]{0,400}?logout: \(\) => logout\(\)/)
+    assert.match(guard, /endKioskUse: endKioskUseFromPage/)
+  }],
   ['W-23 证件提醒只在证件件出现，且不声称文件上有水印（本机不盖水印）', () => {
     assert.match(doneRuntime, /const idDocument = state\.idDocument === true/)
     assert.match(doneRuntime, /\{idDocument \? \([\s\S]{0,280}原件和复印件一起带走/)

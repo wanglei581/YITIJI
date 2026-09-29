@@ -8,6 +8,11 @@ export const DEFAULT_RESULT_IDLE_SEC = 90
 export const DEFAULT_SESSION_WARNING_SEC = 30
 /** 结果页（报告 / 优化 / 我的文档）的可见预警，含在总时长里，不另加。 */
 export const RESULT_WARNING_SEC = 15
+/**
+ * 进个人资产页（我的、我的文档、打印订单……）之前，距离上一次点屏幕超过这么久，
+ * 先问一句「还是你吗？」。产品负责人 9/29 定：30 秒（W-75）。
+ */
+export const KIOSK_HANDOVER_CONFIRM_MS = 30_000
 
 const MAX_BROWSER_TIMER_MS = 2_147_483_647
 const MIN_TRIGGER_MS = 1_000

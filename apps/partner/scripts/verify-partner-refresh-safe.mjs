@@ -95,7 +95,7 @@ for (const token of [
   "profileHosted: '对应一体机「本机构官方渠道」「找企业」与岗位、政策的来源机构'",
   "companies: '对应一体机「找企业」与岗位详情来源机构'",
   "terminals: '对应本机构一体机的打印扫描服务与设备运行'",
-  "none: '不直接对应前端页面'",
+  "none: ''",
   'export function withFrontendHint',
   'export function ListPagination',
 ]) {

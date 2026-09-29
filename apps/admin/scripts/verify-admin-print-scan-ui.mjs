@@ -112,10 +112,10 @@ if (
 } else {
   fail('print-scan page must import and render CapabilityCenter from ./CapabilityCenter')
 }
-if (cap.includes('fail-closed') && cap.includes('只有「可用」状态对普通用户开放')) {
-  pass('capability center states the fail-closed rule')
+if (cap.includes('只有标为「可用」的能力对用户开放') && cap.includes('「测试中」只给运维使用') && cap.includes('没有登记的能力一律不开放')) {
+  pass('capability center states that only 可用 is open to users')
 } else {
-  fail('capability center must state the fail-closed rule (only available is user-facing)')
+  fail('capability center must state that only 可用 is open to users, 测试中 is ops-only, and unregistered capabilities stay closed')
 }
 
 // 4. 商业化控制诚实标注

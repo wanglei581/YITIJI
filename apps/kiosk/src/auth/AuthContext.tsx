@@ -5,6 +5,7 @@ import { AuthContext, deriveDisplayName, type AuthContextValue, type AuthUser } 
 import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from './kioskSensitiveSession'
 import { clearGuestScanBeforeMemberLogin } from './kioskClearScope'
 import { getMemberSessionExpiryExit } from './memberSessionExpiryExit'
+import { markKioskPresenceConfirmed } from './kioskPresence'
 
 /**
  * Kiosk C 端会话 Provider（纯内存）。
@@ -64,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userRef.current = next
     setUser(next)
     setGuestMode(false)
+    // 刚登录成功就是本人在场：登录后直接进「我的」不必再问「还是你吗？」（扫码登录时屏幕可能很久没被点过）。
+    markKioskPresenceConfirmed()
     // sessionExpiryExit 取自 ref，identity 恒定：列进依赖不会让 login 每帧重建。
   }, [sessionExpiryExit])
 

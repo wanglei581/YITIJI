@@ -256,7 +256,7 @@ export default function MemberBenefitsPage() {
                   onChange={(event) => setDescription(event.target.value)}
                   className="mt-1 min-h-[84px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
                   maxLength={500}
-                  placeholder={benefitType === 'subsidy_eligibility_hint' ? '仅填写官方入口、材料清单、资格提示等 info-only 文案' : '填写使用范围和现场规则'}
+                  placeholder={benefitType === 'subsidy_eligibility_hint' ? '仅填写官方入口、材料清单、资格提示等说明文字' : '填写使用范围和现场规则'}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

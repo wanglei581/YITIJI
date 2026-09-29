@@ -52,6 +52,9 @@
           </view>
           <view class="cs-ver">同意说明版本：{{consentVersion}}</view>
         </block>
+        <view wx:elif="{{consentUnavailable}}" class="list-state">
+          <view>自我探索暂未开放，其他功能照常使用</view>
+        </view>
         <view wx:else class="list-state">
           <view>同意说明没有取到，请重试。先看到完整说明，才能开始作答。</view>
           <view class="state-retry tap" hover-class="tap-press" bindtap="reload"
