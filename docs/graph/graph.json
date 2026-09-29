@@ -18542,7 +18542,8 @@
       "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs",
-      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "apps/kiosk/src/hooks/useToolboxConfig.ts": [
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
@@ -21171,6 +21172,9 @@
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
+    "apps/terminal-agent/src/agent/boot-print-queue-order.ts": [
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+    ],
     "apps/terminal-agent/src/agent/claim-rate-limit.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
@@ -21210,7 +21214,11 @@
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
+      "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-monitor-timeout.ts": [
+      "apps/terminal-agent/scripts/verify-print-truth-hardening.ts"
     ],
     "apps/terminal-agent/src/agent/print-queue-hold.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
@@ -21251,6 +21259,7 @@
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs"
     ],
     "apps/terminal-agent/src/agent/task-runner-control.ts": [
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-task-runner-wake.ts"
     ],
     "apps/terminal-agent/src/agent/task-runner.ts": [
@@ -22524,7 +22533,8 @@
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
-      "services/api/scripts/verify-admin-ops.ts"
+      "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
       "services/api/scripts/verify-admin-order-filters.ts"
@@ -25887,6 +25897,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "services/api/src/terminals/dto/heartbeat.dto.ts": [
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
@@ -25903,7 +25914,8 @@
     ],
     "services/api/src/terminals/printer-availability.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
-      "services/api/scripts/verify-admin-ops.ts"
+      "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "services/api/src/terminals/printer-status.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
@@ -26014,6 +26026,7 @@
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts"
     ],
     "services/api/src/terminals/terminals-agent.service.ts": [
+      "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -26027,6 +26040,7 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
@@ -30912,6 +30926,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
           "apps/terminal-agent/src/agent/print-queue-hold.ts",
           "apps/terminal-agent/src/agent/wmi.ts"
         ],
@@ -30932,10 +30947,12 @@
         "dirs": [],
         "files": [
           "apps/terminal-agent/config/agent-config.example.json",
+          "apps/terminal-agent/src/agent/boot-print-queue-order.ts",
           "apps/terminal-agent/src/agent/config-manager.ts",
           "apps/terminal-agent/src/agent/heartbeat.ts",
           "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
           "apps/terminal-agent/src/agent/print-queue-hold.ts",
+          "apps/terminal-agent/src/agent/task-runner-control.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/wmi.ts",
           "apps/terminal-agent/src/index.ts"
@@ -30983,8 +31000,10 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/src/agent/print-monitor-timeout.ts",
           "apps/terminal-agent/src/agent/scan-watcher.ts",
-          "apps/terminal-agent/src/agent/task-runner.ts"
+          "apps/terminal-agent/src/agent/task-runner.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []
       },
@@ -38609,6 +38628,28 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:publish-expiry-completeness"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/terminals/dto/heartbeat.dto.ts",
+          "services/api/src/terminals/printer-availability.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-queue-dispatch-printer-status.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:queue-dispatch-printer-status"
       ],
       "wired": true
     },
