@@ -175,3 +175,5 @@ Bundle 不声明可覆盖变量、MSI 属性、命令行透传或自定义动作
 | 周期 | 身份验证加令牌寄送或云签名开通，预留 2–4 周 | 同左 |
 
 买到后：`Release` 模式接上正式证书与 HTTPS 时间戳；**包内我们自己的 exe（WinSW `aijobprintagent.exe`、`secure-scan-reader.exe`）也要签**，「包内 exe/dll 都带我们的签名」做成门禁（优先级低，试点不依赖它，另立任务）；node.exe、SumatraPDF 用各自厂商的签名，发布前逐个核实。首批客户仍会看到「未识别的应用」提示，要提前告知。
+
+**内层文件签名（另立任务，随买证书一起做，不是加一条门禁就行）。** 现在的发布签名只接收一份已通过安装测试、身份冻结（每个文件的 SHA-256 已绑定）的未签名候选包，签 MSI、Burn 引擎与外层 EXE；包内文件在打 MSI 之前就定了。要让包内文件也带我们的签名，就得在发布时：①用正式证书先签 staging 里我们自己的 PE（WinSW `aijobprintagent.exe`、`secure-scan-reader.exe`，以及原生模块 `.node`——它们本质是 DLL，智能应用控制同样会判）；②用签过的 staging 重新打 MSI 与 EXE；③对签过的产物重跑 MSI / EXE 安装生命周期测试；④门禁：包内每个 PE 都带有效签名，且签名者在白名单里（我们自己；Node.js 官方的 OpenJS、SumatraPDF 作者这类厂商签名放行），否则红。已核：SumatraPDF-3.4.6 自带 Authenticode 签名；Node.js 官方 Windows 包带厂商签名；WinSW 2.12.0 发布版是否签名未核（在 Windows 上 `Get-AuthenticodeSignature` 一查即知）。PR CI 拿不到正式证书，所以这条门禁只在 Release 模式与内部签名验证作业里跑。
