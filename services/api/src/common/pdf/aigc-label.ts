@@ -2,6 +2,7 @@
 // 放 PDF Document Information Dictionary 的 /AIGC（next-tasks 2026-09-26 第 4 条）。
 // 值是 JSON 字符串，不是分开的 Info 键。
 
+import { ServiceUnavailableException } from '@nestjs/common'
 import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFString } from 'pdf-lib'
 
 export const AIGC_VISIBLE_HEADER = 'AI 生成，仅供参考'
@@ -59,9 +60,35 @@ export function requireAigcProduceId(produceId: string): string {
   return id
 }
 
-/** 未设置环境变量时用产品名。正式值填公司名称还是统一社会信用代码，待法务给定。 */
+/**
+ * 生产可用的内容制作方：非空，且不是产品名（附录 E 的 ContentProducer 是服务提供者名称或编码）。
+ * 启动期判定（config/ai-platform-config.ts）与下面写标识的这一处共用本函数，不各写一份口径。
+ */
+export function isCompliantAigcProducer(value: string | undefined): boolean {
+  const trimmed = typeof value === 'string' ? value.trim() : ''
+  return trimmed.length > 0 && trimmed !== AIGC_DEFAULT_PRODUCER
+}
+
+/** 生产缺内容制作方时，写 AI 文件的请求如实拒绝。码沿用前端已识别的「AI 未开通」。 */
+export const AIGC_PRODUCER_MISSING_MESSAGE =
+  'AI 服务暂未开通，暂时不能生成带 AI 内容的文件；打印、扫描等其他功能照常'
+
+/**
+ * 开发 / CI 未设置时用产品名。正式值填公司名称还是统一社会信用代码，待法务给定。
+ *
+ * 生产（NODE_ENV=production）缺失或填成产品名时**拒绝写标识**：这里是全仓写隐式标识的
+ * 唯一入口（PDF 元数据、DOCX 自定义属性、追加页都经 buildAigcLabelJson），在这里 fail-closed，
+ * 任何一条导出 / 生成链路都出不了「生产方写成产品名」的 AI 文件。以前靠启动闸门拒启动兜住，
+ * 现在启动闸门只把它登记为 AI 降级（不再拖垮打印与支付），这一道就是最后防线。
+ * 没有 AI 内容的文件（原样草稿、职业规划降级版、面试练习单）本来就不走这里，不受影响。
+ */
 export function aigcContentProducer(): string {
   const raw = process.env['AIGC_CONTENT_PRODUCER']
+  if (process.env['NODE_ENV'] === 'production' && !isCompliantAigcProducer(raw)) {
+    throw new ServiceUnavailableException({
+      error: { code: 'AI_PROVIDER_NOT_CONFIGURED', message: AIGC_PRODUCER_MISSING_MESSAGE },
+    })
+  }
   const trimmed = typeof raw === 'string' ? raw.trim() : ''
   return trimmed.length > 0 ? trimmed : AIGC_DEFAULT_PRODUCER
 }

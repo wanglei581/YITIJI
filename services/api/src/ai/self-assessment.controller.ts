@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
-import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
+import { AiUse, AiUseExempt, MaintenanceBlocked, type AiUseKind } from '../ai-access/ai-access.decorator'
+import { AiAccessService } from '../ai-access/ai-access.service'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { RedisService } from '../common/redis/redis.service'
@@ -13,6 +14,7 @@ import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { AppendSelfAssessmentDto, SubmitSelfAssessmentDto } from './dto/self-assessment.dto'
 import { SELF_ASSESSMENT_CONSENT_VERSION } from './resume/self-assessment.types'
 import { SELF_ASSESSMENT_QUESTIONS_V1 } from './resume/self-assessment-questions'
+import { aiGateRefusal, type SelfAssessmentAiGates } from './resume/self-assessment-interpretation'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
@@ -43,6 +45,18 @@ function auditContextOf(req: ReqLike): AuditContext {
 }
 
 /**
+ * 提交 / 打印 / 附加到简历三处不挂 @AiUse：维度打分是纯函数，AI 被拦时打分照常出。
+ * 这三处的 AI 闸门改在接口里调同一个 AiAccessService.enforce：
+ *   - 提交：解读前问一次，拦下就只回打分（interpretationAvailable=false + aiUnavailableReason）；
+ *   - 打印 / 附加：记录里有 AI 解读时照旧过闸（原错误码原样抛），只有打分时不过 AI 闸门、文件不带 AIGC 标识。
+ * 全机维护照旧拦（@MaintenanceBlocked），那是设备停办，不是 AI 闸门。
+ */
+const SCORING_EXEMPT_REASON =
+  '维度打分是纯函数，不调模型；AI 解读是否调用由接口内按同一 AI 闸门判定，拦下时只回打分'
+const RULE_ONLY_FILE_EXEMPT_REASON =
+  '只有打分的报告不含 AI 内容、不写 AIGC 标识；含 AI 解读时接口内照旧过 AI 闸门'
+
+/**
  * 自我探索 · 倾向参考（/api/v1/resume/self-assessment）。
  *
  * 合规口径（与 docs/compliance/compliance-boundary.md §4.5 同档）：
@@ -61,7 +75,15 @@ export class SelfAssessmentController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    private readonly aiAccess: AiAccessService,
   ) {}
+
+  private aiGates(req: ReqLike, exportKind: AiUseKind): SelfAssessmentAiGates {
+    return {
+      interpretation: () => aiGateRefusal(() => this.aiAccess.enforce('generate', false, req)),
+      aiContentExport: () => this.aiAccess.enforce(exportKind, false, req),
+    }
+  }
 
   private async requesterOf(req: ReqLike) {
     const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
@@ -76,13 +98,13 @@ export class SelfAssessmentController {
    * 显式带旧版本 ⇒ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，要求重新确认。
    * 判定逻辑集中在 service，controller 不做第二份版本比较（避免两处口径漂移）。
    */
-  @AiUse('generate')
-
+  @AiUseExempt(SCORING_EXEMPT_REASON)
+  @MaintenanceBlocked()
   async submit(
     @Body() body: SubmitSelfAssessmentDto,
     @Req() req: ReqLike,
   ) {
-    return this.service.submit(await this.requesterOf(req), body, auditContextOf(req))
+    return this.service.submit(await this.requesterOf(req), body, auditContextOf(req), this.aiGates(req, 'generate'))
   }
 
   /**
@@ -119,10 +141,10 @@ export class SelfAssessmentController {
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
-  @AiUse('export')
-
+  @AiUseExempt(RULE_ONLY_FILE_EXEMPT_REASON)
+  @MaintenanceBlocked()
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    return this.service.printReport(taskId, await this.requesterOf(req), auditContextOf(req))
+    return this.service.printReport(taskId, await this.requesterOf(req), auditContextOf(req), this.aiGates(req, 'export'))
   }
 
   /**
@@ -131,8 +153,8 @@ export class SelfAssessmentController {
    */
   @Post(':taskId/append')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
-  @AiUse('generate')
-
+  @AiUseExempt(RULE_ONLY_FILE_EXEMPT_REASON)
+  @MaintenanceBlocked()
   async appendToResume(
     @Param('taskId') taskId: string,
     @Body() body: AppendSelfAssessmentDto,
@@ -143,6 +165,8 @@ export class SelfAssessmentController {
       requester: await this.requesterOf(req),
       resumeFileId: body.resumeFileId,
       auditCtx: auditContextOf(req),
+      // 含 AI 解读时照旧按改动前的 generate 档过闸（该接口不调模型，档位是否改成 export 待定）
+      gates: this.aiGates(req, 'generate'),
     })
   }
   @Delete(':taskId')

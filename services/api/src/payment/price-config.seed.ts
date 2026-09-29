@@ -78,6 +78,31 @@ export async function ensureResumeExportPriceConfig(prisma: PrismaService): Prom
   })
 }
 
+/** 打印两档目录行在缺行时补上的描述：明示「未定价、已停用」，管理员在计费页设价并启用后才能报价。 */
+export const UNPRICED_PRINT_ROW_DESCRIPTION = {
+  print_bw_page: '黑白打印每页（未定价：请在计费管理设价并启用，启用前报价失败、不会按 0 元放行）',
+  print_color_page: '彩色打印每页（未定价：请在计费管理设价并启用，启用前报价失败、不会按 0 元放行）',
+} as const
+
+/**
+ * 保证打印两档目录行存在，**缺行时插入为「停用、未定价」**，绝不覆盖已有行（update 为空）。
+ *
+ * 为什么需要（走查 W-02，2026-09-29）：全新生产库没有这两行时，计费页只渲染已有行、
+ * 改价接口对不存在的行回 PRICE_CONFIG_NOT_FOUND，运营在后台无从设价，只能手写 SQL。
+ * 为什么停用而不是像 resume_export 那样「启用、0 元」：打印一直是收费能力，缺价必须
+ * fail-closed（PRICE_CONFIG_UNAVAILABLE），不能因为补了目录行就让新库默认免费出纸。
+ * 试点免费时由管理员在计费页设 0 元（需勾「确认 0 元」）并启用 —— 一次有审计的显式动作。
+ */
+export async function ensurePrintPriceCatalogRows(prisma: PrismaService): Promise<void> {
+  for (const serviceKey of ['print_bw_page', 'print_color_page'] as const) {
+    await prisma.priceConfig.upsert({
+      where: { serviceKey },
+      create: { serviceKey, unitCents: 0, unit: 'page', active: false, description: UNPRICED_PRINT_ROW_DESCRIPTION[serviceKey] },
+      update: {},
+    })
+  }
+}
+
 /** 幂等写入开发默认价目（upsert by serviceKey）。仅供 seed / verify 使用。 */
 export async function seedDevDefaultPriceConfig(prisma: PrismaService): Promise<void> {
   assertDevPriceSeedAllowed()

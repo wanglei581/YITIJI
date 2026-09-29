@@ -31,11 +31,36 @@ export const FAILED_LOOKBACK_MS = 24 * 60 * 60 * 1000
  */
 export const PRINT_FAILED_LIST_CAP = 500
 
+/**
+ * 心跳 printerStatus → 告警标题。取值来源：Terminal Agent 上报 ready|offline|error|low_paper|unknown
+ * （apps/terminal-agent/src/agent/wmi.ts mapWin32PrinterQuery），外加历史心跳里的 paper_empty / not_found。
+ * ready / idle / ok 由 isHealthyPrinterStatus 判为健康，根本不会走到这里。
+ *
+ * - low_paper：WMI DetectedErrorState 3（纸少）或 5（墨粉少）都映射到它 —— Agent 分不开，
+ *   标题如实写「纸张或墨粉不足」。还能打印（一体机照常接单），所以只是 warning。
+ * - unknown：Agent 读不到打印机状态（WMI 查询失败或无法判定）。一体机对 unknown 一律显示
+ *   「状态未知」、不当作可打印（apps/kiosk/src/hooks/useTerminalDeviceStatus.ts），用户实际打不了，
+ *   所以仍然出告警、仍是 error，只是标题说人话，不再显示「打印机状态异常(unknown)」。
+ * 未登记的新取值仍走兜底标题，保证新的故障态不会被静默吞掉。
+ */
 const PRINTER_STATUS_LABELS: Record<string, string> = {
   offline: '打印机离线',
   paper_empty: '打印机缺纸',
+  low_paper: '打印机纸张或墨粉不足',
   error: '打印机故障',
   not_found: '打印机未找到',
+  unknown: '打印机状态读取不到',
+}
+
+/** 只是提醒、还能出纸的打印机状态；其余非健康状态按 error。 */
+const PRINTER_WARNING_STATUSES = new Set(['paper_empty', 'low_paper'])
+
+/**
+ * 告警文案里的时间一律按上海时间写（与后台页面 formatDateTime 同一时区）。
+ * 只影响给人看的 detail 文案；occurredAt、episodeToken、去重键仍用 UTC 时刻，不受影响。
+ */
+export function formatShanghaiMinute(date: Date): string {
+  return new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 16).replace('T', ' ')
 }
 
 export interface DerivedAlert {
@@ -93,8 +118,17 @@ type PaidPendingFileUnavailableTaskRow = {
 
 type PendingFeedbackSummary = { count: number; earliest: Date | null; latest: Date | null }
 
-/** C3：待处理的 AI 内容投诉（新提交或处理中）。只取条数与提交时间，不取正文与手机号。 */
-const PENDING_AI_CONTENT_FEEDBACK = { category: 'ai_content', status: { in: ['pending', 'processing'] } }
+/**
+ * C3：待处理的 AI 内容投诉（新提交或处理中；以及旧数据里被标成「已回复」却没有任何管理员回复记录的）。
+ * 只取条数与提交时间，不取正文与手机号。
+ */
+const PENDING_AI_CONTENT_FEEDBACK = {
+  category: 'ai_content',
+  OR: [
+    { status: { in: ['pending', 'processing'] } },
+    { status: 'replied', replies: { none: { senderType: 'admin' } } },
+  ],
+}
 
 /** 计数 + 最早、最新各一条：不全表拉取，积压或被刷单时也不拖垮整张告警列表。 */
 async function pendingAiContentFeedback(prisma: PrismaService): Promise<PendingFeedbackSummary> {
@@ -204,7 +238,7 @@ function buildTerminalAlert(
       type: 'terminal_offline',
       severity: offlineMs >= 30 * 60 * 1000 ? 'error' : 'warning',
       title: `终端 ${terminal.terminalCode} 离线`,
-      detail: `最近一次心跳在 ${minutes} 分钟前(${lastSeen.toISOString().slice(0, 16).replace('T', ' ')})`,
+      detail: `最近一次心跳在 ${minutes} 分钟前(${formatShanghaiMinute(lastSeen)})`,
       terminalCode: terminal.terminalCode,
       occurredAt: lastSeen.toISOString(),
     }
@@ -223,7 +257,7 @@ function buildTerminalAlert(
       subjectId: terminal.id,
       episodeToken: printerIssueEpisodeToken(lastHeartbeat.printerStatus, healthyAt),
       type: 'printer_issue',
-      severity: lowPaper || lastHeartbeat.printerStatus === 'paper_empty' ? 'warning' : 'error',
+      severity: PRINTER_WARNING_STATUSES.has(lastHeartbeat.printerStatus) ? 'warning' : 'error',
       title: `终端 ${terminal.terminalCode} ${label}`,
       detail: lowPaper
         ? '终端在线，纸张不足，仍可打印，请补纸。'
@@ -247,7 +281,7 @@ function buildPrintFailedAlert(task: FailedTaskRow): DerivedAlert {
     type: 'print_failed',
     severity: 'warning',
     title: `打印任务失败${task.errorCode ? `(${task.errorCode})` : ''}`,
-    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${task.updatedAt.toISOString().slice(0, 16).replace('T', ' ')}`,
+    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${formatShanghaiMinute(task.updatedAt)}`,
     terminalCode: task.terminal?.terminalCode ?? null,
     occurredAt: task.updatedAt.toISOString(),
   }
@@ -305,7 +339,7 @@ function buildPendingFeedbackAlert(summary: PendingFeedbackSummary): DerivedAler
     type: 'feedback_pending',
     severity: 'warning',
     title: '有待处理的 AI 内容投诉',
-    detail: `共 ${summary.count} 条，最早提交于 ${summary.earliest.toISOString().slice(0, 16).replace('T', ' ')}`,
+    detail: `共 ${summary.count} 条，最早提交于 ${formatShanghaiMinute(summary.earliest)}`,
     terminalCode: null,
     occurredAt: summary.earliest.toISOString(),
   }

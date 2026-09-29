@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import type { AiProviderName, AiTokenUsage, AiUsageReport } from './interfaces/ai-provider.interface'
 import { PrismaService } from '../prisma/prisma.service'
+// 价目与折算只有一份（P1-2a 起与逐次计量账共用），见 ./usage/ai-pricing.ts
+import { estimateCostCny, roundMoney } from './usage/ai-pricing'
 import {
   clientDeclarationJson,
   currentClientDeclaration,
@@ -642,34 +644,6 @@ function declarationJsonFor(entry: AiLogRecordInput): string | null {
 function toNonNegativeInt(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
-}
-
-/**
- * 按 provider 标签里的厂商名 + token 估算成本。
- *
- * 返回 undefined = **未采集/无法定价**，调用方必须如实留空，绝不回落成 0。
- * 注意：mock / stub 判定必须在「有没有 token」之前 —— 它们压根不打上游，
- * 没花钱是事实（0 是实测），不该被算成「未采集」。
- */
-function estimateCostCny(provider: string, usage: AiLogEntry['tokenUsage']): number | undefined {
-  const normalized = provider.toLowerCase()
-  if (normalized.includes('mock') || normalized.includes('stub')) return 0
-  if (!usage || usage.totalTokens <= 0) return undefined
-  const price = normalized.includes('qwen')
-    ? { input: 20, output: 60 }
-    : normalized.includes('deepseek')
-      ? { input: 1, output: 2 }
-      : normalized.includes('zhipu')
-        ? { input: 5, output: 5 }
-        : normalized.includes('openai')
-          ? { input: 18, output: 54 }
-          : null
-  if (!price) return undefined
-  return roundMoney(((usage.promptTokens * price.input) + (usage.completionTokens * price.output)) / 1_000_000)
-}
-
-function roundMoney(value: number): number {
-  return Math.round(value * 10_000) / 10_000
 }
 
 function roundOperationCosts(costs: Record<AiOperation, AiOperationCost>): Record<AiOperation, AiOperationCost> {

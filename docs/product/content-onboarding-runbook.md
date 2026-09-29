@@ -2,7 +2,7 @@
 
 > **历史材料（2026-09-26 标注）：** 本文是 2026-08 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 
-现行操作见 [托管 a 下的内容录入：机构官方渠道二维码 + 政策](../operations/content-ingestion-operator-guide.md)。
+现行操作见 [机构后台使用指南（托管 a）](../operations/content-ingestion-operator-guide.md)。
 
 > **这不是工程任务,是运营任务。** 工程侧的管道已经端到端验通(27 PASS / 0 FAIL),
 > 批量发布工具也做好了。**卡住的是没有人往里放内容。**

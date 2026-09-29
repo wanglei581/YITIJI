@@ -5,18 +5,9 @@ import { Card, Drawer, StatusBadge, EmptyState, LoadingState } from '@ai-job-pri
 import { Page } from '../Page'
 import { BriefcaseIcon, FilterIcon, XIcon } from 'lucide-react'
 import type { AdminJobSourceRecord, AdminSourcePage, ReviewStatus, PublishStatus } from '../../services/api'
-import {
-  getJobSources,
-  approveJobSource,
-  rejectJobSource,
-  publishJobSource,
-  unpublishJobSource,
-} from '../../services/api'
+import { getJobSources } from '../../services/api'
 import { requireAdminSourcePage } from '../../services/api/sourcePaging'
 import { Pagination, useTableState } from '../components/DataTable'
-import { BulkPublishButton } from '../components/BulkPublishButton'
-import { toOrgOptions } from '../../services/api/bulkPublish'
-import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
@@ -25,7 +16,7 @@ import type { EmergencyTakedownTarget } from '../components/recruitment/emergenc
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
 const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' | 'error'; label: string }> = {
-  pending:   { badge: 'warning', label: '待审核' },
+  pending:   { badge: 'warning', label: '未审核' },
   reviewing: { badge: 'info',    label: '审核中' },
   approved:  { badge: 'success', label: '已通过' },
   rejected:  { badge: 'error',   label: '已拒绝' },
@@ -38,10 +29,14 @@ const PUBLISH_MAP: Record<PublishStatus, { badge: 'success' | 'warning' | 'defau
   expired:     { badge: 'default', label: '已过期' },
 }
 
-const REVIEW_FILTERS = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
+// 3.15：管理员不再审核，「待审核」不再是管理员的待办队列，筛选按数据状态叫「未审核」。
+const REVIEW_FILTERS = ['全部', '未审核', '审核中', '已通过', '已拒绝'] as const
 const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
-  全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected',
+  全部: null, 未审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected',
 }
+
+/** 原审核 / 发布 / 批量发布按钮的位置换成这一句（按钮停放在 JobSourceReviewActions.tsx 与 BulkPublishButton.tsx）。 */
+const NO_PROXY_REVIEW_NOTE = '本平台不代审、不代发招聘内容；如有违法违规内容，请用紧急下架。'
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -67,12 +62,9 @@ export default function JobSourcesPage() {
   const [error,        setError]        = useState(false)
   const [reviewFilter, setReviewFilter] = useState('全部')
   const [viewing,      setViewing]      = useState<AdminJobSourceRecord | null>(null)
-  const [rejectingId,  setRejectingId]  = useState<string | null>(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [actionError,  setActionError]  = useState<string | null>(null)
   const [takedown,     setTakedown]     = useState<EmergencyTakedownTarget | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
-  // 托管关闭（我们云上默认）时只留查看与紧急下架；审核 / 发布 / 批量发布点了也只会 403。
+  // 3.15：审核 / 发布 / 批量发布不论托管开关一律停放，本页只留查看与紧急下架；开关只用于顶部说明。
   const hosting = useRecruitmentHosting()
 
   const listQuery = useMemo(() => ({
@@ -103,46 +95,9 @@ export default function JobSourcesPage() {
     getJobSources(listQuery).then(applyPage).catch(() => setError(true))
   }, [listQuery, applyPage])
 
-  const orgOptions = useMemo(() => toOrgOptions(sources), [sources])
-
-  const handleApprove = (id: string) => {
-    setActionError(null)
-    void approveJobSource(id)
-      .then(() => reload())
-      .catch((e) => setActionError(userMessageOf(e, '审核通过失败，请查看原因后重试')))
-  }
-
-  const handleReject = (id: string) => {
-    if (!rejectReason.trim()) return
-    setActionError(null)
-    void rejectJobSource(id, rejectReason.trim())
-      .then(() => {
-        setRejectingId(null)
-        setRejectReason('')
-        reload()
-      })
-      .catch((e) => setActionError(userMessageOf(e, '驳回失败，请稍后重试')))
-  }
-
-  const handlePublish = (id: string) => {
-    setActionError(null)
-    void publishJobSource(id)
-      .then(() => reload())
-      .catch((e) => setActionError(userMessageOf(e, '发布失败，请查看原因后重试')))
-  }
-
-  const handleUnpublish = (id: string, title: string) => {
-    if (!window.confirm(`确认下架「${title}」？下架后一体机不再展示该岗位。`)) return
-    // 二次确认（#813）与失败可见（任务包 3）都要：误触要拦，真失败也不能静默。
-    setActionError(null)
-    void unpublishJobSource(id)
-      .then(() => reload())
-      .catch((e) => setActionError(userMessageOf(e, '下架失败，请稍后重试')))
-  }
-
   if (loading) {
     return (
-      <Page title="岗位信息源" subtitle="第三方平台同步岗位数据管理">
+      <Page title="岗位信息源" subtitle="第三方来源岗位查看 · 紧急下架">
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -152,7 +107,7 @@ export default function JobSourcesPage() {
 
   if (error) {
     return (
-      <Page title="岗位信息源" subtitle="第三方平台同步岗位数据管理">
+      <Page title="岗位信息源" subtitle="第三方来源岗位查看 · 紧急下架">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <BriefcaseIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -164,15 +119,10 @@ export default function JobSourcesPage() {
   return (
     <Page
       title="岗位信息源"
-      subtitle="第三方平台同步岗位数据管理"
-      actions={hosting.writable ? <BulkPublishButton kind="job" orgOptions={orgOptions} onDone={reload} /> : undefined}
+      subtitle="第三方来源岗位查看 · 紧急下架"
+      actions={<p className="max-w-sm text-right text-xs text-neutral-500">{NO_PROXY_REVIEW_NOTE}</p>}
     >
       <RecruitmentHostingNotice hosting={hosting} subject="岗位" />
-      {actionError && (
-        <div className="mb-4 rounded-lg border border-error/30 bg-error-bg px-4 py-2.5 text-sm text-error-fg" role="alert">
-          {actionError}。请修正后重试，或刷新页面。
-        </div>
-      )}
       {/* 来自 Excel 导入批次的上下文 banner */}
       {sourceIdFilter && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-bg px-4 py-2.5">
@@ -235,7 +185,7 @@ export default function JobSourcesPage() {
                 sources.map((s) => {
                   const review  = REVIEW_MAP[s.reviewStatus]
                   // 过期是后端按 validThrough 实时派生的，与 publishStatus 并列展示：
-                  // 库里仍是「已发布」（所以「下架」按钮还在），但对求职者已不再放出。
+                  // 库里仍是「已发布」，但对求职者已不再放出。
                   const publish = s.expired
                     ? { badge: 'default' as const, label: '已发布 · 已过期' }
                     : PUBLISH_MAP[s.publishStatus]
@@ -266,83 +216,16 @@ export default function JobSourcesPage() {
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        {rejectingId === s.id ? (
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              autoFocus
-                              className="h-7 w-40 rounded border border-error/30 px-2 text-xs focus:border-red-400 focus:outline-none"
-                              placeholder="拒绝原因(必填)"
-                              value={rejectReason}
-                              onChange={(e) => setRejectReason(e.target.value)}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleReject(s.id)}
-                              disabled={!rejectReason.trim()}
-                              className="rounded bg-error px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
-                            >
-                              确认
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setRejectingId(null); setRejectReason('') }}
-                              className="rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100"
-                            >
-                              取消
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex gap-2">
-                            <button type="button" onClick={() => setViewing(s)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看</button>
-                            {hosting.writable && (
-                              <>
-                                {(s.reviewStatus === 'pending' || s.reviewStatus === 'reviewing') && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
-                                      onClick={() => handleApprove(s.id)}
-                                    >
-                                      审核通过
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
-                                      onClick={() => { setRejectingId(s.id); setRejectReason('') }}
-                                    >
-                                      拒绝
-                                    </button>
-                                  </>
-                                )}
-                                {s.reviewStatus === 'approved' && s.publishStatus !== 'published' && (
-                                  <button
-                                    type="button"
-                                    className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                                    onClick={() => handlePublish(s.id)}
-                                  >
-                                    发布
-                                  </button>
-                                )}
-                                {s.publishStatus === 'published' && (
-                                  <button
-                                    type="button"
-                                    className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                                    onClick={() => handleUnpublish(s.id, s.title)}
-                                  >
-                                    下架
-                                  </button>
-                                )}
-                              </>
-                            )}
-                            <button
-                              type="button"
-                              className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
-                              onClick={() => setTakedown({ targetType: 'job', targetId: s.id, title: s.title, orgName: s.sourceName })}
-                            >
-                              紧急下架
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => setViewing(s)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看</button>
+                          <button
+                            type="button"
+                            className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
+                            onClick={() => setTakedown({ targetType: 'job', targetId: s.id, title: s.title, orgName: s.sourceName })}
+                          >
+                            紧急下架
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -390,7 +273,7 @@ export default function JobSourcesPage() {
             <DetailRow
               label="有效期"
               value={viewing.validThrough
-                ? `${viewing.validThrough.slice(0, 10)}${viewing.expired ? '（已过期，求职者端已自动不再展示；请下架或联系来源机构更新）' : ''}`
+                ? `${viewing.validThrough.slice(0, 10)}${viewing.expired ? '（已过期，求职者端已自动不再展示；如需更新请联系来源机构）' : ''}`
                 : '来源未提供'}
             />
             {viewing.reviewStatus === 'rejected' && viewing.rejectReason ? (

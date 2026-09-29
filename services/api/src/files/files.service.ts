@@ -45,14 +45,9 @@ import {
   type UploadValidationMode,
 } from './file-validation'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
-import {
-  RetentionPolicyError,
-  allowedPoliciesForFile,
-  computeRetentionDecision,
-  defaultRetentionForUpload,
-} from './retention-policy'
+import { RetentionPolicyError, allowedPoliciesForFile, computeRetentionDecision, defaultRetentionForUpload } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
-import { parseContentFileId, signFileUrl } from './signing'
+import { parseContentFileId, PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from './signing'
 import { assertFileContentIntegrity, DIRECT_UPLOAD_COMPLETE_ACTION } from './file-content-integrity'
 
 /**
@@ -116,6 +111,7 @@ export class FilesService {
     uploaderId: string | null
     endUserId?: string | null
     assetCategory?: FileAssetCategory
+    derivationKind?: import('../print-jobs/material-check-policy').DerivationKind // 派生件怎么来的（1.8 P-1）：derived / optimized 必传
     sourceFileId?: string | null
     actorRole?: UserRole | null
     actorOrgId?: string | null
@@ -254,6 +250,7 @@ export class FilesService {
           status: staging ? 'uploading' : 'active',
           createdBy: args.createdBy ?? args.uploaderId ?? null,
           assetCategory: args.assetCategory ?? 'original',
+          derivationKind: args.derivationKind ?? null,
           sourceFileId: args.sourceFileId ?? null,
           expiresAt: staging ? staging.expiresAt : (expiresAtOverride ?? retention.expiresAt),
           retentionPolicy: retention.retentionPolicy,
@@ -689,7 +686,7 @@ export class FilesService {
         url: signed.url,
         // printFileUrl 只是应用内部 HMAC 入口；/content 最终读取仍通过
         // requireActive 二次校验 status/deletedAt/expiresAt，不会因签名期越过文件寿命。
-        printFileUrl: signFileUrl(record.id).url,
+        printFileUrl: signFileUrl(record.id, PRINT_ARTIFACT_URL_TTL_MS).url,
         expiresAt: this.ensureSignedExpiryWithinFileLifetime(
           signed.expiresAt,
           record.expiresAt

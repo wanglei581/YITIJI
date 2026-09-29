@@ -332,6 +332,33 @@ async function main(): Promise<void> {
       fail('unexpected create/delete endpoint exposed')
     }
 
+    // ── W-02（2026-09-29）：全新库没有打印两档时，计费页能补出「停用、未定价」目录行，运营设价后才能报价 ──
+    {
+      const PRINT_KEYS = ['print_bw_page', 'print_color_page']
+      await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: PRINT_KEYS } } })
+      const bwQuote = () => pricing.quotePrint({ billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'black_white' })
+      await expectCode('新库缺打印价目：报价失败关闭（不是 0 元放行）', 'PRICE_CONFIG_UNAVAILABLE', bwQuote)
+      const listed = await billing.listPriceConfig()
+      const rows = listed.items.filter((i) => PRINT_KEYS.includes(i.serviceKey))
+      if (rows.length === 2 && rows.every((r) => r.active === false && r.unitCents === 0 && r.unit === 'page' && (r.description ?? '').includes('未定价'))) {
+        pass('计费页列表补出打印两档目录行：停用、未定价（运营可见可改）')
+      } else {
+        fail(`缺行补齐不对: ${JSON.stringify(rows)}`)
+      }
+      await expectCode('补出的目录行仍停用：报价照旧失败关闭', 'PRICE_CONFIG_UNAVAILABLE', bwQuote)
+      await expectCode('试点设 0 元并启用：不勾确认被拒', 'ZERO_PRICE_CONFIRMATION_REQUIRED',
+        () => billing.updatePriceConfig('print_bw_page', { active: true }, operatorId))
+      await billing.updatePriceConfig('print_bw_page', { active: true, confirmZeroPrice: true, description: '试点免费：黑白打印 0 元/页' }, operatorId)
+      const freeQuote = await bwQuote()
+      if (freeQuote.amountCents === 0) pass('确认 0 元并启用后：黑白报价 0 元（有审计的显式动作）')
+      else fail(`试点 0 元报价不对: ${JSON.stringify(freeQuote)}`)
+      await billing.updatePriceConfig('print_bw_page', { unitCents: 30, description: '黑白打印每页' }, operatorId)
+      await billing.listPriceConfig()
+      const kept = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
+      if (kept.unitCents === 30 && kept.active === true) pass('再次打开计费页不覆盖运营已设的价（只补不改）')
+      else fail(`已有价目被补行逻辑覆盖: ${JSON.stringify(kept)}`)
+    }
+
     console.log(`\n  ✅ verify:admin-billing 全部通过（${passCount} checks）\n`)
   } finally {
     await seedDevDefaultPriceConfig(prisma) // 复位开发默认价
