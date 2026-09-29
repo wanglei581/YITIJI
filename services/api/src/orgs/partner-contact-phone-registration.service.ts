@@ -7,6 +7,7 @@
  * 登记成功只写入号码和「管理员登记、本人尚未自证」的时间，不发验证码给管理员。
  * 随后给该号码发一条知会短信。本人之后用找回密码收验证码，成功才算自己证明过这个号码。
  */
+import { maskPhoneFromEnc } from '../common/crypto/phone-identity'
 import { ForbiddenException, HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { PartnerAccountActionService } from '../auth/partner-account-action.service'
@@ -97,6 +98,7 @@ export class PartnerContactPhoneRegistrationService {
         phoneHash: true,
         phoneVerifiedAt: true,
         phoneRegisteredByAdminAt: true,
+        phoneEnc: true,
       },
     })
     if (!org || !account || !this.eligible(account, orgId)) this.notEligible()
@@ -116,6 +118,7 @@ export class PartnerContactPhoneRegistrationService {
     }
 
     const phoneHash = hashPhone(phone)
+    const replacedUnverified = Boolean(account.phoneHash) && account.phoneRegisteredByAdminAt == null && account.phoneHash !== phoneHash
     const phoneMasked = maskPhone(phone)
     const taken = await this.prisma.user.findFirst({
       where: { phoneHash, NOT: { id: accountId } },
@@ -140,11 +143,6 @@ export class PartnerContactPhoneRegistrationService {
             deletedAt: null,
             passwordProofState: PASSWORD_PROOF_STATE.TEMPORARY,
             phoneVerifiedAt: null,
-            OR: [
-              { phoneHash: null },
-              { phoneHash: '' },
-              { phoneRegisteredByAdminAt: { not: null } },
-            ],
           },
           data: {
             phoneHash,
@@ -160,7 +158,15 @@ export class PartnerContactPhoneRegistrationService {
           action: 'partner_account.contact_phone_registered',
           targetType: 'organization',
           targetId: orgId,
-          payload: { orgId, accountId, phoneMasked, confirmationLetterNo },
+          payload: {
+            orgId,
+            accountId,
+            phoneMasked,
+            confirmationLetterNo,
+            // 覆盖了建号时填的、未经验证的号：记下来，只记脱敏号。
+            replacedUnverifiedPhone: replacedUnverified,
+            ...(replacedUnverified && account.phoneEnc ? { previousPhoneMasked: maskPhoneFromEnc(account.phoneEnc) } : {}),
+          },
         })
       })
     } catch (error) {
@@ -193,9 +199,9 @@ export class PartnerContactPhoneRegistrationService {
   ): boolean {
     if (account.role !== 'partner' || account.orgId !== orgId || !account.enabled) return false
     if (account.passwordProofState !== PASSWORD_PROOF_STATE.TEMPORARY) return false
-    if (account.phoneVerifiedAt) return false
-    const noPhone = account.phoneHash == null || account.phoneHash === ''
-    return noPhone || account.phoneRegisteredByAdminAt != null
+    // 与 admin-org-account-view.ts 的 canRegisterContactPhone 同一口径：手机未经本人自证即可登记，
+    // 含建号时填了但未验证的号（登记时用确认函上的号覆盖，审计记下覆盖了什么）。
+    return !account.phoneVerifiedAt
   }
 
   private async revertRegistration(

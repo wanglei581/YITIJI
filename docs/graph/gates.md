@@ -140,7 +140,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 111 个文件</summary>
+<summary><code>apps/admin/src/</code> — 114 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -154,9 +154,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx` | `verify-admin-ai-access-ui.mjs` |
 | `apps/admin/src/routes/ai-services/index.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs` |
 | `apps/admin/src/routes/alerts/index.tsx` | `verify-feedback-sla.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
+| `apps/admin/src/routes/audit/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
-| `apps/admin/src/routes/dashboard/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
+| `apps/admin/src/routes/dashboard/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs` |
 | `apps/admin/src/routes/devices/index.tsx` | `verify-admin-device-fleet-overview-ui.mjs` |
 | `apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx` | `verify-source-publish-actions.mjs` |
@@ -183,13 +184,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/orders/orderHonestyCopy.ts` | `verify-admin-orders-readonly-ui.mjs` |
 | `apps/admin/src/routes/partners/OrgContentTrustPanel.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/partners/OrgQualificationSection.tsx` | `verify-admin-offline-agencies-ui.mjs` |
-| `apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx` | `verify-partner-account-action-ui.mjs` |
-| `apps/admin/src/routes/partners/PartnerAccountManager.tsx` | `verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/routes/partners/PartnerAccountManager.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/contentTrustRules.ts` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/partners/index.tsx` | `verify-admin-content-trust-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx` | `verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/PhoneRebindSteps.tsx` | `verify-partner-account-action-ui.mjs` |
-| `apps/admin/src/routes/partners/usePartnerAccountAction.ts` | `verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/routes/partners/partnerContactPhoneEligibility.ts` | `verify-admin-partner-contact-phone-ui.mjs` |
+| `apps/admin/src/routes/partners/usePartnerAccountAction.ts` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/peripherals/PeripheralDrawer.tsx` | `verify-admin-peripheral-views.mjs` |
 | `apps/admin/src/routes/peripherals/index.tsx` | `verify-admin-peripheral-views.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/peripherals/peripheralViews.ts` | `verify-admin-peripheral-views.mjs` |
@@ -201,7 +204,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/printers/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-data-request-ui.mjs` |
 | `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-screen-ui.mjs` |
-| `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
@@ -245,9 +247,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/jobMaterials.ts` | `verify-admin-job-materials-ui.mjs` |
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | `verify-admin-offline-agencies-ui.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/services/api/offlineAgencyGovernance.ts` | `verify-admin-offline-agencies-ui.mjs` |
-| `apps/admin/src/services/api/orgsAdmin.ts` | `verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/services/api/orgsAdmin.ts` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/services/api/policiesAdmin.ts` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/services/api/printScan.ts` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
+| `apps/admin/src/services/api/registerPartnerContactPhone.ts` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/services/api/screensaver.ts` | `verify-screensaver-content.ts` |
 | `apps/admin/src/services/api/sourcePaging.ts` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/services/api/toolbox.ts` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
@@ -1000,7 +1003,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 44 个文件</summary>
+<summary><code>apps/partner/src/</code> — 42 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1019,9 +1022,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/profile/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/screen/PartnerGrid.tsx` | `verify-console-screen-ui.mjs` |
-| `apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/PartnerUsageView.tsx` | `verify-console-screen-ui.mjs` |
-| `apps/partner/src/routes/screen/PartnerVisitStat.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/metricLabels.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
@@ -1690,7 +1691,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/ui/src/</code> — 28 个文件</summary>
+<summary><code>packages/ui/src/</code> — 27 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1709,7 +1710,6 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/screen/twin/TwinInfoFlow.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinPanel.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinShell.tsx` | `verify-console-screen-ui.mjs` |
-| `packages/ui/src/screen/twin/TwinTerminalBoard.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/fusion-youth.css` | `verify-kiosk-visual-unity.mjs`<br/>`verify-fusion-youth-foundation.mjs` |
 | `packages/ui/src/styles/kiosk-components.css` | `verify-kiosk-visual-unity.mjs` |
 | `packages/ui/src/styles/kiosk-shell.css` | `verify-kiosk-visual-unity.mjs` |
