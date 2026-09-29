@@ -45,6 +45,8 @@ export interface ConsoleTableProps<T> {
   className?: string
   /** 默认 true：表在自己的容器里横向滚动，页面本身不滚。 */
   scrollX?: boolean
+  /** 行状态底色。不传则只有默认行色；固定列 bg-inherit，会跟着这层走。 */
+  rowClassName?: (item: T, index: number) => string | undefined
 }
 
 function alignClass(align: ConsoleColumnAlign | undefined): string {
@@ -60,7 +62,7 @@ function cellText(node: ReactNode): string | undefined {
 
 /**
  * 两后台共用的表格外壳。不传 columns 时仍走 renderHeader / renderRow，外观与原先管理员 DataTable 一致。
- * align、truncate、sticky、loading、error 都是可选项，不传则不生效。
+ * align、truncate、sticky、loading、error、rowClassName 都是可选项，不传则不生效。
  */
 export function ConsoleTable<T>({
   items,
@@ -77,6 +79,7 @@ export function ConsoleTable<T>({
   onPageSizeChange,
   className,
   scrollX = true,
+  rowClassName,
 }: ConsoleTableProps<T>): ReactNode {
   const pager = (
     <ConsolePager
@@ -97,6 +100,7 @@ export function ConsoleTable<T>({
     )
   }
 
+  // legacy renderRow 拿不到列数，colSpan 用 100；大于实际列数时浏览器按实际列数合并。
   const stateColSpan = useColumns ? columns.length : 100
   return (
     <div className={className}>
@@ -136,7 +140,7 @@ export function ConsoleTable<T>({
               </tr>
             ) : useColumns
               ? items.map((item, index) => (
-                  <tr key={index} className="group bg-surface hover:bg-neutral-50">
+                  <tr key={index} className={cn('group bg-surface hover:bg-neutral-50', rowClassName?.(item, index))}>
                     {columns.map((column) => {
                       const content = column.cell(item, index)
                       const title = column.truncate

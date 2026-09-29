@@ -349,7 +349,7 @@ function RecentActivity({ logs }: { logs: AuditLogRecord[] }) {
                     {target ? ` · ${target}` : ''}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs tabular-nums text-neutral-500" title={formatDateTime(log.createdAt)}>
+                <span className="shrink-0 text-xs tabular-nums text-neutral-500" title={log.createdAt ? formatDateTime(log.createdAt) : undefined}>
                   {relTime(log.createdAt)}
                 </span>
               </div>
@@ -434,7 +434,9 @@ function buildAlertRows(alerts: AdminAlertItem[]): TodoRow[] {
         ? `意见反馈 · ${relTime(alert.occurredAt)}`
         : `${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`,
     href: alert.type === 'feedback_pending' ? '/member-feedback?category=ai_content' : '/alerts',
-    timeTitle: formatDateTime(alert.occurredAt),
+    timeTitle: formatDateTime(alert.occurredAt, { fallback: '' })
+      ? `发生时间 ${formatDateTime(alert.occurredAt)}`
+      : undefined,
     actionLabel: '处理',
     warn: true,
   }))

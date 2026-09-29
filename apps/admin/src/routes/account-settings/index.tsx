@@ -355,7 +355,7 @@ export default function AccountSettingsPage() {
                       <MonitorIcon className="h-4 w-4" aria-hidden="true" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold text-neutral-900" title={formatDateTime(log.createdAt)}>{formatLoginTime(log.createdAt)}</p>
+                      <p className="text-[13px] font-semibold text-neutral-900" title={log.createdAt ? formatDateTime(log.createdAt) : undefined}>{formatLoginTime(log.createdAt)}</p>
                       <p className="mt-0.5 text-xs text-neutral-500">
                         {log.ipAddress ?? '未记录 IP'} · {parseDevice(log.userAgent)}
                       </p>

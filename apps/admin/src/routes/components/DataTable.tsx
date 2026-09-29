@@ -53,9 +53,10 @@ export interface DataTableProps<T> {
   onPageSizeChange: (size: number) => void
   className?: string
   scrollX?: boolean
+  rowClassName?: (item: T, index: number) => string | undefined
 }
 
-export function DataTable<T>({ items, empty, renderRow, renderHeader, columns, loading, error, page, pageSize, total, onPageChange, onPageSizeChange, className, scrollX }: DataTableProps<T>) {
+export function DataTable<T>({ items, empty, renderRow, renderHeader, columns, loading, error, page, pageSize, total, onPageChange, onPageSizeChange, className, scrollX, rowClassName }: DataTableProps<T>) {
   return (
     <ConsoleTable
       items={items}
@@ -72,6 +73,7 @@ export function DataTable<T>({ items, empty, renderRow, renderHeader, columns, l
       onPageSizeChange={onPageSizeChange}
       className={className}
       scrollX={scrollX}
+      rowClassName={rowClassName}
     />
   )
 }
