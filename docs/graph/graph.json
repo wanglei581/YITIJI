@@ -12493,7 +12493,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 600,
+      "reachableFileCount": 602,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14422,6 +14422,8 @@
           ],
           "path": "/renshi",
           "styles": [
+            "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
+            "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -15471,7 +15473,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 693
+      "sourceFileCount": 695
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19268,7 +19270,7 @@
     "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
-    "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css": [
+    "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/shared.ts": [
@@ -27252,7 +27254,7 @@
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/renshi/components.tsx",
           "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts",
-          "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
+          "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
           "apps/kiosk/src/pages/renshi/shared.ts",
           "apps/kiosk/src/services/api/policy-eligibility.ts"
         ],
@@ -38200,11 +38202,12 @@
         "kind": "component",
         "mentions": [
           "docs/reviews/ai-capability-wiring-matrix-2026-08-16.md",
+          "docs/reviews/kiosk-runtime-engineering-words-2026-09-28.md",
           "docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md"
+        "why": "仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/reviews/kiosk-runtime-engineering-words-2026-09-28.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

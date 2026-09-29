@@ -120,7 +120,10 @@ function page200(data: unknown[]) {
 
 type PolicyReply = 'hang' | 'error' | { guides: unknown[]; notices: unknown[] }
 
-/** GET /policies 按 kind 分开答：政策库条目只回 policy_guide，公告只回 notice。 */
+/**
+ * GET /policies 按 kind 分开答：政策库条目只回 policy_guide，公告只回 notice。
+ * 带 audience 时和服务端一样只回这一身份的条目（页面选了身份会另发一次 audience=general，一并照此答）。
+ */
 async function routePolicies(page: Page, reply: PolicyReply): Promise<void> {
   await page.route((url) => url.pathname === '/api/v1/policies', async (route: Route) => {
     if (reply === 'hang') return
@@ -128,8 +131,10 @@ async function routePolicies(page: Page, reply: PolicyReply): Promise<void> {
       await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'policy service down' } }) })
       return
     }
-    const kind = new URL(route.request().url()).searchParams.get('kind')
-    const data = kind === 'notice' ? reply.notices : reply.guides
+    const query = new URL(route.request().url()).searchParams
+    const audience = query.get('audience')
+    const rows = query.get('kind') === 'notice' ? reply.notices : reply.guides
+    const data = audience ? rows.filter((row) => (row as { audience?: string }).audience === audience) : rows
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(page200(data)) })
   })
 }
@@ -225,9 +230,10 @@ function noRulesResult() {
 
 const ELIG_WAIT: Record<string, string> = {
   'eligibility-probing': '.k8-elig .rq-state[data-kind="info"]',
-  'eligibility-no-policies': '.k8-elig-notice',
-  'eligibility-no-rules': '.k8-elig-notice',
-  'eligibility-error': '.k8-elig-notice',
+  // 9/29 起这三屏是稿 48 的死路屏（.rq-deadend）；逗号后是改版前的状态卡，两版都认得出。
+  'eligibility-no-policies': '.k8-elig .rq-deadend, .k8-elig-notice',
+  'eligibility-no-rules': '.k8-elig .rq-deadend, .k8-elig-notice',
+  'eligibility-error': '.k8-elig .rq-deadend, .k8-elig-notice',
   'eligibility-ask-empty': '.k8-elig-questions',
   'eligibility-ask-partial': '.k8-elig-opt[aria-pressed="true"]',
   'eligibility-submitting': '.k8-elig-opt[aria-pressed="true"]',
