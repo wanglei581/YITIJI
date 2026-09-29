@@ -31,8 +31,12 @@ const ACTION_LABELS: Record<string, string> = {
   'organization.update':      '机构资料更新（历史记录）',
   'org.update':               '机构资料更新（管理员）',
   'org.self_profile_update':  '机构自助资料更新',
-  'user.create':              '用户创建',
-  'user.disable':             '用户停用（历史记录）',
+  'user.create':              '内部账号创建',
+  'user.disable':             '内部账号停用',
+  'user.enable':              '内部账号启用',
+  'user.step_up_failed':      '本人密码确认失败',
+  'user.backup_admin_challenge_started': '备用管理员验证码已发送',
+  'user.emergency_enable_requested': '备用管理员应急启用',
   'admin.user.disable':       '用户停用',
   'auth.password_login':      '密码登录',
   'auth.sms_login':           '短信登录',
@@ -136,33 +140,33 @@ export default function AuditPage() {
       }
     >
       {/* 筛选栏 */}
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+      <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
           动作
           <select
             value={action}
             onChange={(e) => { setAction(e.target.value); setPage(1) }}
-            className="h-9 w-44 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none sm:w-44"
           >
             {ACTION_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
           起始时间
           <input
             type="datetime-local"
             value={startAt}
             onChange={(e) => { setStartAt(e.target.value); setPage(1) }}
-            className="h-9 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
           结束时间
           <input
             type="datetime-local"
             value={endAt}
             onChange={(e) => { setEndAt(e.target.value); setPage(1) }}
-            className="h-9 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           />
         </label>
         {(action || startAt || endAt) && (

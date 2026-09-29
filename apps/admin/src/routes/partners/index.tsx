@@ -37,6 +37,7 @@ import { OrgCircuitBreakPanel } from './OrgCircuitBreakPanel'
 import { OrgOfficialChannelSections } from './OrgOfficialChannelSections'
 import { OrgQualificationSection } from './OrgQualificationSection'
 import { createOrgTypeOptions, editOrgTypeOptions, isParkedOrgType } from './orgTypeOptions'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import {
   ORG_CONTENT_TRUST_STATUSES,
   ORG_CONTENT_TRUST_STATUS_LABELS,
@@ -337,11 +338,13 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
 function OrgDetailDrawer({
   orgId,
   open,
+  showRecruitment,
   onClose,
   onChanged,
 }: {
   orgId: string | null
   open: boolean
+  showRecruitment: boolean
   onClose: () => void
   onChanged: () => void
 }) {
@@ -350,6 +353,7 @@ function OrgDetailDrawer({
   const [form, setForm] = useState<UpdateOrgInput>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [profileSaved, setProfileSaved] = useState(false)
 
   const load = useCallback(async (showLoading = true) => {
     if (!orgId) return
@@ -374,6 +378,7 @@ function OrgDetailDrawer({
   useEffect(() => {
     if (open) {
       setError(null)
+      setProfileSaved(false)
       void load()
     }
   }, [open, load])
@@ -382,6 +387,7 @@ function OrgDetailDrawer({
     if (!orgId) return
     setSaving(true)
     setError(null)
+    setProfileSaved(false)
     try {
       await orgsAdminService.updateOrg(orgId, {
         ...form,
@@ -389,10 +395,11 @@ function OrgDetailDrawer({
         contact: form.contact?.trim() ?? '',
         contactPhone: form.contactPhone?.trim() ?? '',
       })
+      setProfileSaved(true)
       onChanged()
       await load()
     } catch (e) {
-      setError(errMsg(e))
+      setError(userMessageOf(e, '保存失败，请稍后重试'))
     } finally {
       setSaving(false)
     }
@@ -407,12 +414,16 @@ function OrgDetailDrawer({
           <InlineError message={error} />
 
           {/* 数据概览 */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className={`grid gap-2 ${showRecruitment ? 'grid-cols-4' : 'grid-cols-2'}`}>
             {[
               { label: '登录账号', value: detail.counts.accounts },
               { label: '数据源', value: detail.counts.sources },
-              { label: '岗位', value: detail.counts.jobs },
-              { label: '招聘会', value: detail.counts.fairs },
+              ...(showRecruitment
+                ? [
+                    { label: '岗位', value: detail.counts.jobs },
+                    { label: '招聘会', value: detail.counts.fairs },
+                  ]
+                : []),
             ].map(({ label, value }) => (
               <div key={label} className="rounded-lg bg-neutral-50 p-3 text-center">
                 <p className="text-lg font-bold text-neutral-800">{value}</p>
@@ -463,6 +474,9 @@ function OrgDetailDrawer({
                 {saving ? '保存中…' : '保存档案'}
               </button>
             </div>
+            {profileSaved && !error && (
+              <p className="text-xs text-success-fg" role="status">机构档案已保存</p>
+            )}
           </div>
 
           {/* 内容可信:发布闸门的人工入口。放在档案之后、账号之前 ——
@@ -518,6 +532,8 @@ export default function PartnersPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
+  const hosting = useRecruitmentHosting()
+  const showRecruitment = hosting.status === 'ready' && hosting.enabled
 
   const load = useCallback(async () => {
     setListState('loading')
@@ -563,6 +579,12 @@ export default function PartnersPage() {
     合作中: orgs.filter((o) => o.enabled).length,
     已停用: orgs.filter((o) => !o.enabled).length,
   }
+
+  const tableColumns = [
+    '机构名称', '机构类型', '场景模板', '启用模块', '联系人', '状态', '内容可信', '账号', '数据源',
+    ...(showRecruitment ? ['岗位', '招聘会'] : []),
+    '加入时间', '操作',
+  ]
 
   const TYPE_FILTERS: Array<{ label: string; value: PartnerType | null }> = [
     { label: '全部类型', value: null },
@@ -646,7 +668,7 @@ export default function PartnersPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr>
-                    {['机构名称', '机构类型', '场景模板', '启用模块', '联系人', '状态', '内容可信', '账号', '数据源', '岗位', '招聘会', '加入时间', '操作'].map((h) => (
+                    {tableColumns.map((h) => (
                       <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                     ))}
                   </tr>
@@ -654,7 +676,7 @@ export default function PartnersPage() {
                 <tbody className="divide-y divide-neutral-900/[0.06]">
                   {paginated.length === 0 ? (
                     <tr>
-                      <td colSpan={13}>
+                      <td colSpan={tableColumns.length}>
                         <EmptyState
                           title={search ? '未找到匹配的机构' : '暂无合作机构'}
                           description={search ? '请尝试其他关键词' : '点击右上角"新增机构"录入第一家合作机构'}
@@ -700,8 +722,8 @@ export default function PartnersPage() {
                         </td>
                         <td className="px-4 py-3 text-center text-neutral-700">{o.counts.accounts}</td>
                         <td className="px-4 py-3 text-center text-neutral-700">{o.counts.sources}</td>
-                        <td className="px-4 py-3 text-center text-neutral-700">{o.counts.jobs}</td>
-                        <td className="px-4 py-3 text-center text-neutral-700">{o.counts.fairs}</td>
+                        {showRecruitment && <td className="px-4 py-3 text-center text-neutral-700">{o.counts.jobs}</td>}
+                        {showRecruitment && <td className="px-4 py-3 text-center text-neutral-700">{o.counts.fairs}</td>}
                         <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{o.createdAt.slice(0, 10)}</td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex items-center gap-1.5">
@@ -731,9 +753,13 @@ export default function PartnersPage() {
           </Card>
 
           <p className="mt-3 text-xs text-neutral-400">
-            合作机构是外部岗位/招聘会/政策数据的来源方。停用机构 = 该机构账号禁止登录 + 数据导入接口拒绝(已发布数据需到信息源逐条下架)。
-            「内容可信」是另一件事:它决定该机构的岗位/招聘会/政策**能不能被发布**,判据为状态 active 且机构未归档,在机构详情里核验与变更。
-            所有操作记录审计日志;不存在企业招聘端,不接收求职者简历。
+            {showRecruitment
+              ? '合作机构是外部岗位、招聘会与政策数据的来源方。停用机构后，该机构账号不能登录，数据导入会被拒绝（已发布内容需到信息源逐条下架）。'
+              : '合作机构在本平台维护政策与官方渠道。停用机构后，该机构账号不能登录。'}
+            「内容可信」决定该机构的{showRecruitment ? '岗位、招聘会与政策' : '政策与官方渠道'}
+            <strong>能不能被发布</strong>
+            ：状态为「内容可信」且机构未归档，在机构详情里核验与变更。
+            所有操作记录审计日志；不存在企业招聘端，不接收求职者简历。
           </p>
         </>
       )}
@@ -742,6 +768,7 @@ export default function PartnersPage() {
       <OrgDetailDrawer
         orgId={detailOrgId}
         open={detailOrgId !== null}
+        showRecruitment={showRecruitment}
         onClose={() => setDetailOrgId(null)}
         onChanged={() => void load()}
       />

@@ -486,7 +486,8 @@ function enumerateFile(file: string): RawPair[] {
       screen, state, axis: 'hub' as const, route: null,
     })))
   } else if (file.startsWith('01-')) {
-    raw = ['no-context', 'context'].map((state) => ({ screen: 'main', state, axis: 'state' as const, route: '/' }))
+    // member：9/29 补的登录态（W-75，只写「有人登录着」+「结束上一位的使用」）。运行时要真登录，本对照不配种子。
+    raw = ['no-context', 'context', 'member'].map((state) => ({ screen: 'main', state, axis: 'state' as const, route: '/' }))
   } else if (file.startsWith('51-')) {
     raw = [
       ...arrayByName(source, 'QR_STATES').map((state) => ({ screen: 'qr-login', state, axis: 'screen' as const, route: '/member/qr-login' })),
