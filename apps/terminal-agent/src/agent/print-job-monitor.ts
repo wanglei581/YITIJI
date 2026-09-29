@@ -158,8 +158,9 @@ export async function monitorPrintJob(
           return { failed: false, errorCode: '' }
         }
         if (activeJobSeenOnce) {
-          // The matching job was observed active and then removed. This confirms
-          // the Windows spooler lifecycle only, not physical paper delivery.
+          // 已知边界，保持既有语义：作业曾经出现在队列里，随后查不到，并且没有完成事件，就判为完成。
+          // 这只说明 Windows 假脱机不再留着这份作业，不证明纸已经出来。
+          // 打印过程中被人从队列删掉，或 Spooler 把作业弄丢，也会走到这里，被误判为完成。
           return { failed: false, errorCode: '' }
         }
         notFoundCount++

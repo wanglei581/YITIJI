@@ -23,6 +23,7 @@ import {
   LIST_JOBS_SCRIPT,
   listConfiguredPrintJobs,
   pauseConfiguredPrinterQueue,
+  pauseSignalFromProbeLine,
   PrintQueueHoldError,
   REMOVE_JOBS_SCRIPT,
   resolvePrintJobUserSid,
@@ -34,14 +35,16 @@ import { mapWin32PrinterPreflight, mapWin32PrinterQuery, queryWin32PrinterLine }
 
 const PRINTER_A = 'AIJobResidueA'
 const PRINTER_B = 'AIJobResidueB'
+const CHINESE_PRINTER = '奔图彩色打印机'
 const PORT_A = 'C:\\Windows\\Temp\\aijob-residue-a.prn'
 const PORT_B = 'C:\\Windows\\Temp\\aijob-residue-b.prn'
+const PORT_ZH = 'C:\\Windows\\Temp\\aijob-residue-zh.prn'
 const TASK_NAME = 'AIJobResidueOther'
 const USER_NAME = 'aijobqhold'
 const TEST_PASSWORD = 'Aijob-Queue-Hold-1a'
 const HOLD_SOURCE = join(__dirname, '../src/agent/print-queue-hold.ts')
 const OWNER_ANCHOR = '$owned = $jobSid.Equals($currentSid)'
-const PAUSE_ANCHOR = "await invokePrinterCimMethod(printerName, 'Pause')"
+const PAUSE_ANCHOR = "await applyPrinterQueueMethod({ printerName, method: 'Pause' })"
 const UNREADABLE_SKIP_ANCHOR = `    $skippedUnreadable += 1
     $unreadable = $true`
 
@@ -92,14 +95,6 @@ function runPs(script: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function pauseSignal(line: string | null): boolean {
-  if (!line) return false
-  const parts = line.split(',')
-  const state = parts[3] ? parseInt(parts[3], 10) : Number.NaN
-  const extended = parts[4] ? parseInt(parts[4], 10) : Number.NaN
-  return extended === 8 || (Number.isFinite(state) && (state & 1) !== 0)
 }
 
 async function waitForJob(
@@ -203,14 +198,22 @@ foreach ($name in @('${PRINTER_A}','${PRINTER_B}')) {
     catch { $cleanupError = $_.Exception.Message }
   }
 }
-foreach ($port in @('${PORT_A}','${PORT_B}')) {
+$zhName = $env:AIJOB_ZH_PRINTER
+if (-not [string]::IsNullOrWhiteSpace($zhName)) {
+  $zhPrinter = Get-Printer -Name $zhName -ErrorAction SilentlyContinue
+  if ($zhPrinter) {
+    try { Remove-Printer -Name $zhName -ErrorAction Stop }
+    catch { $cleanupError = $_.Exception.Message }
+  }
+}
+foreach ($port in @('${PORT_A}','${PORT_B}','${PORT_ZH}')) {
   $existing = Get-PrinterPort -Name $port -ErrorAction SilentlyContinue
   if ($existing) {
     try { Remove-PrinterPort -Name $port -ErrorAction Stop }
     catch { $cleanupError = $_.Exception.Message }
   }
 }
-Remove-Item -LiteralPath '${PORT_A}','${PORT_B}','${join(tmpdir(), 'aijob-residue-other.ps1')}' -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath '${PORT_A}','${PORT_B}','${PORT_ZH}','${join(tmpdir(), 'aijob-residue-other.ps1')}' -Force -ErrorAction SilentlyContinue
 if ($null -ne $cleanupError) {
   Write-Error $cleanupError
   exit 1
@@ -218,7 +221,7 @@ if ($null -ne $cleanupError) {
 exit 0
 `,
     ],
-    { encoding: 'utf8', timeout: 90_000 },
+    { encoding: 'utf8', timeout: 90_000, env: { ...process.env, AIJOB_ZH_PRINTER: CHINESE_PRINTER } },
   )
   if (result.status !== 0) {
     throw new Error(scrub(`fixture cleanup failed: ${result.stderr || result.stdout}`))
@@ -305,11 +308,13 @@ exit 0
   await showQueueFailure('resume', PRINTER_A, () => resumeConfiguredPrinterQueue(PRINTER_A))
   const resumed = await queryWin32PrinterLine(PRINTER_A)
   console.log(`resumed-probe ${resumed ?? 'null'}`)
-  assert.equal(pauseSignal(resumed), false, 'resume must clear the pause signal')
+  assert.equal(pauseSignalFromProbeLine(resumed), false, 'resume must clear the pause signal')
   await showQueueFailure('pause', PRINTER_A, () => pauseConfiguredPrinterQueue(PRINTER_A))
   const paused = await queryWin32PrinterLine(PRINTER_A)
   console.log(`paused-probe ${paused ?? 'null'}`)
-  assert.equal(pauseSignal(paused), true, 'idle hold must leave the queue paused')
+  assert.notEqual(paused, 'not_found')
+  assert.notEqual(paused, 'query_failed')
+  assert.equal(pauseSignalFromProbeLine(paused), true, 'idle hold must leave the queue paused')
   assert.equal(mapWin32PrinterQuery(paused), 'ready', 'paused queue must still report ready')
   assert.equal(mapWin32PrinterPreflight(paused), 'ok', 'paused queue must still pass preflight')
 
@@ -340,6 +345,59 @@ exit 0
   )
   assert.equal(claims, 0, 'delete failure must keep the claim gate closed')
   __resetPrintDispatchGateForTests()
+  await verifyChinesePrinter()
+}
+
+function tryCreateChinesePrinter(): boolean {
+  const script = `
+$ErrorActionPreference = 'Stop'
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$name = [Console]::In.ReadLine()
+if ([string]::IsNullOrWhiteSpace($name)) { 'skip empty-name'; exit 2 }
+$driver = 'Generic / Text Only'
+$port = '${PORT_ZH}'
+try {
+  if (-not (Get-PrinterDriver -Name $driver -ErrorAction SilentlyContinue)) {
+    Add-PrinterDriver -Name $driver
+  }
+  if (-not (Get-PrinterPort -Name $port -ErrorAction SilentlyContinue)) {
+    Add-PrinterPort -Name $port
+  }
+  if (-not (Get-Printer -Name $name -ErrorAction SilentlyContinue)) {
+    Add-Printer -Name $name -DriverName $driver -PortName $port
+  }
+  $created = Get-Printer -Name $name -ErrorAction Stop
+  if ([string]$created.Name -ne $name) { 'skip name-mismatch'; exit 2 }
+  'created'
+  exit 0
+} catch {
+  'skip ' + $_.Exception.Message
+  exit 2
+}
+`
+  const result = spawnSync('powershell', ['-NonInteractive', '-NoProfile', '-Command', script], {
+    input: `${CHINESE_PRINTER}\n`,
+    encoding: 'utf8',
+    timeout: 90_000,
+  })
+  const stdout = result.stdout ?? ''
+  if (result.status === 0 && stdout.includes('created')) return true
+  console.log(`chinese-printer-skipped: ${scrub(stdout || result.stderr || result.error?.message || 'create failed')}`)
+  return false
+}
+
+async function verifyChinesePrinter(): Promise<void> {
+  if (!tryCreateChinesePrinter()) return
+  await showQueueFailure('pause', CHINESE_PRINTER, () => pauseConfiguredPrinterQueue(CHINESE_PRINTER))
+  const paused = await queryWin32PrinterLine(CHINESE_PRINTER)
+  assert.notEqual(paused, 'not_found')
+  assert.notEqual(paused, 'query_failed')
+  assert.equal(pauseSignalFromProbeLine(paused), true, 'chinese printer must read back as paused')
+  await showQueueFailure('resume', CHINESE_PRINTER, () => resumeConfiguredPrinterQueue(CHINESE_PRINTER))
+  const resumed = await queryWin32PrinterLine(CHINESE_PRINTER)
+  assert.equal(pauseSignalFromProbeLine(resumed), false, 'chinese printer must read back as resumed')
+  await showQueueFailure('list', CHINESE_PRINTER, () => listConfiguredPrintJobs(CHINESE_PRINTER))
 }
 
 function runSelf(): ReturnType<typeof spawnSync> {

@@ -367,10 +367,15 @@ async function main(): Promise<void> {
   // PrinterStatus once WorkOffline / PrinterStatus=7 have ruled out offline.
   // 第三列是预检。查询失败仍是 unknown；解析成功但心跳 unknown 时预检不拦打印（ok）。
   // 后两列是 PrinterState,ExtendedPrinterStatus。仅暂停视为就绪；离线/缺纸/故障位优先。
+  // 查询抛错和确认不存在各占一行：前者心跳 unknown，后者 error。
+  const probeFailureRows: Array<[string, string, string]> = [
+    ['query_failed', 'unknown', 'unknown'],
+    ['not_found', 'error', 'not_found'],
+  ]
   const printerQueryCases: Array<[string | null, string, string]> = [
     [null, 'unknown', 'unknown'],
     ['', 'unknown', 'unknown'],
-    ['not_found', 'error', 'not_found'],
+    ...probeFailureRows,
     ['3,0,False', 'ready', 'ok'],
     ['4,0,False', 'ready', 'ok'],
     ['5,0,False', 'ready', 'ok'],
@@ -493,6 +498,8 @@ const cases = [
   ['3,2,False,16,0', 'paper_empty', 'paper_empty'],
   ['3,2,False', 'ready', 'ok'],
   ['6,0,False', 'unknown', 'ok'],
+  ['query_failed', 'unknown', 'unknown'],
+  ['not_found', 'error', 'not_found'],
 ]
 for (const [input, heartbeat, preflight] of cases) {
   if (mapWin32PrinterQuery(input) !== heartbeat) process.exit(1)
@@ -537,6 +544,11 @@ function verifyPrinterStatusMutations(): void {
 }
 
 export function mapWin32PrinterQuery`,
+    ],
+    [
+      'query failure reported as missing',
+      "if (output === 'query_failed') return 'unknown' // probe-query-failed",
+      "if (output === 'query_failed') return 'error' // probe-query-failed",
     ],
   ]
   for (const [label, from, to] of mutations) {

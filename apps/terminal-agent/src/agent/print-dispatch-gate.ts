@@ -1,9 +1,9 @@
 /**
  * 打印领取闸门。
  *
- * 开机暂停队列或清残留作业失败，派发前清残留失败，以及任务终态后暂停重试仍失败，
- * 都关上这道闸。关上之后心跳里的 printerStatus 报两个专门的值：
- * queue_cleanup_failed（开机或派发前清理残留失败）、queue_pause_failed（暂停失败）。
+ * 开机暂停队列或清残留作业失败，派发前清残留失败，派发前恢复失败，
+ * 以及任务终态后暂停重试仍失败，都关上这道闸。关上之后心跳里的 printerStatus 报两个专门的值：
+ * queue_cleanup_failed（开机或派发前清理残留失败）、queue_pause_failed（暂停或派发前恢复失败）。
  * 清理失败优先于暂停失败：残留作业还在队列里，恢复时必须先删再暂停。
  * 领取循环不向服务端领打印任务。心跳、本机接口、扫描不受影响。
  *
@@ -166,13 +166,17 @@ export async function preparePrinterForDispatch(options: {
     await options.resume()
     return 'ready'
   } catch {
+    // 恢复失败与终态暂停失败同一道闸。本单仍按失败返回，下一轮不再领。
+    notePauseAfterTerminalFailure() // prepare-resume-failed
+    err('print-queue-hold: queue could not be resumed before dispatch; print claims blocked')
     return 'resume-failed'
   }
 }
 
 /**
  * 任务到失败终态时，在再暂停队列之前，删除配置打印机上属于本进程 SID 的作业。
- * Agent 串行执行，每轮最多一单，此刻队列里本账号的作业只可能是这一单的残余。
+ * Agent 串行执行，每轮最多一单，监控期间不会并发下一单，所以正常路径里这些作业只可能是这一单的残余。
+ * 同 SID 的已完成残留、人工提交或驱动保留记录仍会被一起删掉。这是串行假设剩下的风险，PR 描述里写过，这里不改删除范围。
  * 删掉它，一体机「不会在加纸后自动续打」的承诺才成立。
  * 未确认（UNCONFIRMED）的单删掉作业后结论仍是未确认，不改服务端语义。
  * 完成的单不删。监控尚未结束的单也不删。
@@ -217,5 +221,77 @@ export async function pauseQueueOnProcessStop(options: {
     }
     const timer = setTimeout(finish, timeoutMs)
     options.pause().then(finish, finish)
+  })
+}
+
+type FatalListener = (value: unknown) => void
+
+/**
+ * 未捕获异常退出前尽力暂停一次。总等待不超过 3 秒。
+ * 暂停抛错、卡住或同步抛错都不阻止退出。
+ * 开机清理前的先暂停仍是兜底，这里只补崩溃到下次启动之间的空档。
+ */
+export async function pauseBeforeFatalExit(options: {
+  enabled: boolean
+  pause: () => Promise<unknown>
+  timeoutMs?: number
+}): Promise<void> {
+  if (!options.enabled) return
+  const timeoutMs = options.timeoutMs ?? 3_000
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      Promise.resolve()
+        .then(() => options.pause())
+        .then(() => undefined, () => undefined), // fatal-exit-swallow
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+export function installFatalPrintQueuePause(options: {
+  enabled: boolean
+  pause: () => Promise<unknown>
+  logError: (detail: string) => void
+  exit?: (code: number) => void
+  on?: (event: 'uncaughtException' | 'unhandledRejection', handler: FatalListener) => void
+}): void {
+  const exit = options.exit ?? ((code: number) => {
+    process.exit(code)
+  })
+  const listen = (event: 'uncaughtException' | 'unhandledRejection', handler: FatalListener) => {
+    if (options.on) {
+      options.on(event, handler)
+      return
+    }
+    if (event === 'uncaughtException') {
+      process.on('uncaughtException', (error) => handler(error))
+      return
+    }
+    process.on('unhandledRejection', (reason) => handler(reason))
+  }
+  let started = false
+  const fatalExit = (detail: string) => {
+    options.logError(detail)
+    if (started) return
+    started = true
+    const timer = setTimeout(() => exit(1), 3_000)
+    if (typeof timer.unref === 'function') timer.unref()
+    void pauseBeforeFatalExit({ // fatal-exit-pause
+      enabled: options.enabled,
+      pause: options.pause,
+      timeoutMs: 3_000,
+    }).finally(() => exit(1))
+  }
+  listen('uncaughtException', (value) => {
+    const error = value instanceof Error ? value : new Error(String(value))
+    fatalExit(`uncaughtException: ${error.message}\n${error.stack ?? ''}`)
+  })
+  listen('unhandledRejection', (reason) => {
+    fatalExit(`unhandledRejection: ${String(reason)}`)
   })
 }

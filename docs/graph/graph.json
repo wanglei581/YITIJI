@@ -21224,7 +21224,8 @@
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/network-diagnostics.ts": [
-      "apps/terminal-agent/scripts/verify-network-diagnostics.ts"
+      "apps/terminal-agent/scripts/verify-network-diagnostics.ts",
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
     ],
     "apps/terminal-agent/src/agent/offline-queue.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
@@ -31001,6 +31002,7 @@
           "apps/terminal-agent/src/agent/boot-print-queue-order.ts",
           "apps/terminal-agent/src/agent/config-manager.ts",
           "apps/terminal-agent/src/agent/heartbeat.ts",
+          "apps/terminal-agent/src/agent/network-diagnostics.ts",
           "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
           "apps/terminal-agent/src/agent/print-queue-hold.ts",
           "apps/terminal-agent/src/agent/task-runner-control.ts",

@@ -10,8 +10,10 @@ import { parseConfigText } from '../src/agent/config-manager'
 import { runAgentBoot } from '../src/agent/boot-print-queue-order'
 import {
   claimPrintTasksIfGateOpen,
+  installFatalPrintQueuePause,
   noteStartupPrintQueueFailure,
   PAUSE_RETRY_DELAYS_MS,
+  pauseBeforeFatalExit,
   pauseQueueAfterTerminalState,
   pauseQueueOnProcessStop,
   preparePrinterForDispatch,
@@ -20,17 +22,32 @@ import {
   __resetPrintDispatchGateForTests,
 } from '../src/agent/print-dispatch-gate'
 import {
+  applyPrinterQueueMethod,
   CIM_METHOD_SCRIPT,
   cleanupStaleOwnPrintJobs,
+  confirmPrinterQueueHoldState,
+  LIST_JOBS_SCRIPT,
+  PrintQueueHoldError,
   parsePrintJobListOutput,
   pauseConfiguredPrinterQueue,
+  pauseSignalFromProbeLine,
+  QUEUE_STATE_READBACK_WINDOW_MS,
+  REMOVE_JOBS_SCRIPT,
   resumeConfiguredPrinterQueue,
   selectOwnPrintJobIds,
   type PrintJobSnapshot,
 } from '../src/agent/print-queue-hold'
 import { createTaskRunnerControl } from '../src/agent/task-runner-control'
-import { buildWin32PrinterProbeScript, configuredPrinterNameMatches } from '../src/agent/wmi'
-import { ESCAPE_WQL_LITERAL_FUNCTION, escapeWqlLiteral, win32PrinterNameFilter } from '../src/agent/wql-literal'
+import { PRINTER_NETWORK_SCRIPT } from '../src/agent/network-diagnostics'
+import {
+  buildPrintJobStatusScript,
+  buildPrintServiceCompletionEventScript,
+  buildWin32PrinterProbeScript,
+  configuredPrinterNameMatches,
+  mapWin32PrinterPreflight,
+  mapWin32PrinterQuery,
+} from '../src/agent/wmi'
+import { ESCAPE_WQL_LITERAL_FUNCTION, escapeWqlLiteral, POWERSHELL_STDIN_UTF8, win32PrinterNameFilter } from '../src/agent/wql-literal'
 
 const holdSourcePath = join(__dirname, '../src/agent/print-queue-hold.ts')
 const gateSourcePath = join(__dirname, '../src/agent/print-dispatch-gate.ts')
@@ -51,6 +68,24 @@ const HEARTBEAT_ANCHOR = 'return block?.heartbeat ?? queried'
 const STARTUP_GATE_ANCHOR = "block = { kind: 'startup', heartbeat }"
 const PREPARE_DELETE_ANCHOR = 'await options.removeOwnJobs() // prepare-before-dispatch'
 const PREPARE_NOTE_ANCHOR = 'noteResidualCleanupFailure() // prepare-cleanup-failed'
+const PREPARE_RESUME_ANCHOR = 'notePauseAfterTerminalFailure() // prepare-resume-failed'
+const READBACK_ANCHOR = `  await confirmPrinterQueueHoldState({ // queue-state-readback
+    method: options.method,
+    readPaused: options.readPaused ?? (() => readPausedFromWmi(options.printerName, step)),
+    sleep: options.sleep,
+    now: options.now,
+    windowMs: options.windowMs,
+  })`
+const OWN_JOB_ID_ANCHOR = "throw new PrintQueueHoldError('print job id is unreadable') // own-job-id"
+const QUERY_FAILED_ANCHOR = `} catch { 'query_failed'; exit }`
+const UTF8_ANCHOR = 'export const POWERSHELL_STDIN_UTF8 = "[Console]::InputEncoding = [System.Text.Encoding]::UTF8"'
+const STDIN_UTF8_ANCHOR = "child.stdin.end(stdin, 'utf8')"
+const FATAL_PAUSE_ANCHOR = `    void pauseBeforeFatalExit({ // fatal-exit-pause
+      enabled: options.enabled,
+      pause: options.pause,
+      timeoutMs: 3_000,
+    }).finally(() => exit(1))`
+const FATAL_SWALLOW_ANCHOR = '.then(() => undefined, () => undefined), // fatal-exit-swallow'
 const SETTLE_DELETE_ANCHOR = 'await options.removeOwnJobs() // settle-failed-terminal'
 const BOOT_ORDER_ANCHOR = `  await steps.acquireLock()
   await steps.afterLock()
@@ -71,6 +106,13 @@ function printQueueFailureBranch(index: string): string {
   return end < 0 ? '' : index.slice(start, end)
 }
 
+function firstStdinRead(script: string): number {
+  const reads = ['[Console]::In.ReadLine()', '[Console]::In.ReadToEnd()']
+    .map((token) => script.indexOf(token))
+    .filter((index) => index >= 0)
+  return reads.length === 0 ? -1 : Math.min(...reads)
+}
+
 function job(id: number, owned: boolean): PrintJobSnapshot {
   return { id, ownedByCurrentProcess: owned }
 }
@@ -78,7 +120,22 @@ function job(id: number, owned: boolean): PrintJobSnapshot {
 function verifyComparisonTable(): void {
   assert.deepEqual(selectOwnPrintJobIds([job(1, true), job(2, false), job(3, true)]), [1, 3])
   assert.deepEqual(selectOwnPrintJobIds([job(4, false)]), [])
-  assert.deepEqual(selectOwnPrintJobIds([job(0, true), job(-3, true), job(8, true)]), [8])
+  assert.throws(
+    () => selectOwnPrintJobIds([job(0, true), job(-3, true), job(8, true)]),
+    /print job id is unreadable/,
+  )
+  assert.deepEqual(selectOwnPrintJobIds([job(0, false), job(-3, false), job(8, true)]), [8])
+  assert.throws(
+    () => parsePrintJobListOutput('{"jobs":[{"id":"abc","owned":true}]}'),
+    /print job id is unreadable/,
+  )
+  const foreignBadId = parsePrintJobListOutput('{"jobs":[{"id":"abc","owned":false},{"id":4,"owned":true}]}')
+  assert.deepEqual(selectOwnPrintJobIds(foreignBadId.jobs), [4])
+  const unreadBadId = parsePrintJobListOutput(
+    '{"jobs":[{"id":"nope","unreadable":true,"owned":true}],"unreadable":1}',
+  )
+  assert.equal(unreadBadId.unreadableUserJobs, 1)
+  assert.deepEqual(selectOwnPrintJobIds(unreadBadId.jobs), [])
   assert.throws(
     () => selectOwnPrintJobIds([{ id: 1, ownedByCurrentProcess: undefined as unknown as boolean }]),
     /print job user is unreadable/,
@@ -178,6 +235,40 @@ function verifyPrinterNameComparison(): void {
   assert.equal(probe.includes(weird), false)
   assert.equal(hold.includes(tricky), false)
   assert.equal(probe.includes(tricky), false)
+  const chinese = '奔图彩色打印机'
+  const stdinScripts = [
+    CIM_METHOD_SCRIPT,
+    LIST_JOBS_SCRIPT,
+    REMOVE_JOBS_SCRIPT,
+    probe,
+    buildPrintJobStatusScript(),
+    buildPrintServiceCompletionEventScript(),
+    PRINTER_NETWORK_SCRIPT,
+  ]
+  assert.equal(POWERSHELL_STDIN_UTF8, "[Console]::InputEncoding = [System.Text.Encoding]::UTF8")
+  for (const script of stdinScripts) {
+    const markerAt = script.indexOf(POWERSHELL_STDIN_UTF8)
+    const readAt = firstStdinRead(script)
+    assert.ok(markerAt >= 0 && readAt > markerAt, 'UTF-8 input encoding must be set before reading the printer name')
+  }
+  assert.equal(escapeWqlLiteral(chinese), chinese)
+  assert.equal(win32PrinterNameFilter(chinese), `Name='${chinese}'`)
+  assert.equal(JSON.parse(JSON.stringify({ printerName: chinese })).printerName, chinese)
+  assert.equal(configuredPrinterNameMatches(chinese, chinese), true)
+  assert.equal(configuredPrinterNameMatches(chinese, '奔图彩色'), false)
+  assert.match(hold, /child\.stdin\.end\(stdin, 'utf8'\)/)
+  assert.match(wmi, /child\.stdin\.end\(stdin, 'utf8'\)/)
+  const network = readFileSync(join(__dirname, '../src/agent/network-diagnostics.ts'), 'utf8')
+  assert.match(network, /child\.stdin\.end\(stdin \?\? '', 'utf8'\)/)
+  const probeRows: Array<[string, string, string]> = [
+    ['query_failed', 'unknown', 'unknown'],
+    ['not_found', 'error', 'not_found'],
+  ]
+  for (const [output, heartbeat, preflight] of probeRows) {
+    assert.equal(mapWin32PrinterQuery(output), heartbeat)
+    assert.equal(mapWin32PrinterPreflight(output), preflight)
+  }
+  assert.match(probe, /\} catch \{ 'query_failed'; exit \}/)
   assert.match(hold, /print-queue-cleanup: matched by SID \(count=\$\{ids\.length\}\)/)
   assert.match(hold, /WindowsIdentity\]::GetCurrent\(\)/)
   assert.match(hold, /currentIdentity\.User/)
@@ -214,6 +305,8 @@ function verifyStartupWiring(): void {
   const stop = index.indexOf('pauseQueueOnProcessStop(')
   const exit = index.indexOf('process.exit(0)', stop)
   assert.ok(stop > runner && exit > stop, 'normal stop pauses before exiting')
+  assert.ok(index.includes('installFatalPrintQueuePause('), 'fatal exit still tries to pause')
+  assert.ok(index.includes('先暂停，再删'), 'boot still pauses before deleting jobs')
 
   const taskRunner = readFileSync(taskRunnerSourcePath, 'utf8')
   const prepare = taskRunner.indexOf('preparePrinterForDispatch(')
@@ -235,7 +328,8 @@ function verifyStartupWiring(): void {
 
   const hold = readFileSync(holdSourcePath, 'utf8')
   assert.ok(hold.includes(OWN_ANCHOR))
-  assert.ok(hold.includes("await invokePrinterCimMethod(printerName, 'Pause')"))
+  assert.ok(hold.includes("await applyPrinterQueueMethod({ printerName, method: 'Pause' })"))
+  assert.ok(hold.includes('queue-state-readback'))
 }
 
 async function verifyPrintDispatchGate(): Promise<void> {
@@ -416,7 +510,164 @@ async function verifyPrintDispatchGate(): Promise<void> {
     async () => { claims += 1 },
   )
   assert.equal(claims, 0, 'cleanup failure must not claim')
+
   __resetPrintDispatchGateForTests()
+  const resumeFailed = await preparePrinterForDispatch({
+    holdEnabled: true,
+    removeOwnJobs: async () => undefined,
+    resume: async () => {
+      throw new Error('resume')
+    },
+  })
+  assert.equal(resumeFailed, 'resume-failed')
+  assert.equal(printerStatusForHeartbeat('ready'), 'queue_pause_failed')
+  claims = 0
+  await claimPrintTasksIfGateOpen(
+    {
+      holdEnabled: true,
+      pause: async () => {
+        throw new Error('still')
+      },
+      cleanup: async () => {
+        throw new Error('cleanup')
+      },
+    },
+    async () => {
+      claims += 1
+    },
+  )
+  assert.equal(claims, 0, 'resume failure must not claim the next job')
+  __resetPrintDispatchGateForTests()
+}
+
+async function verifyQueueStateReadback(): Promise<void> {
+  assert.equal(QUEUE_STATE_READBACK_WINDOW_MS, 2_000)
+  const chinese = '奔图彩色打印机'
+  await assert.rejects(
+    () => applyPrinterQueueMethod({
+      printerName: chinese,
+      method: 'Pause',
+      invokeCim: async () => undefined,
+      readPaused: async () => false,
+      windowMs: 0,
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof PrintQueueHoldError)
+      assert.equal(error.step, 'pause')
+      assert.match(error.message, /print queue state did not change/)
+      return true
+    },
+  )
+  await assert.rejects(
+    () => applyPrinterQueueMethod({
+      printerName: chinese,
+      method: 'Resume',
+      invokeCim: async () => undefined,
+      readPaused: async () => true,
+      windowMs: 0,
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof PrintQueueHoldError)
+      assert.equal(error.step, 'resume')
+      assert.match(error.message, /print queue state did not change/)
+      return true
+    },
+  )
+  await applyPrinterQueueMethod({
+    printerName: chinese,
+    method: 'Pause',
+    invokeCim: async () => undefined,
+    readPaused: async () => true,
+    windowMs: 0,
+  })
+
+  let clock = 1_000
+  let reads = 0
+  await applyPrinterQueueMethod({
+    printerName: chinese,
+    method: 'Pause',
+    invokeCim: async () => undefined,
+    readPaused: async () => {
+      reads += 1
+      return reads >= 3
+    },
+    now: () => clock,
+    sleep: async (ms) => {
+      clock += ms
+    },
+  })
+  assert.equal(reads, 3)
+  assert.ok(clock < 1_000 + QUEUE_STATE_READBACK_WINDOW_MS)
+
+  clock = 0
+  await assert.rejects(
+    () => confirmPrinterQueueHoldState({
+      method: 'Resume',
+      readPaused: async () => true,
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms
+      },
+      windowMs: QUEUE_STATE_READBACK_WINDOW_MS,
+    }),
+    /print queue state did not change/,
+  )
+  assert.ok(clock >= QUEUE_STATE_READBACK_WINDOW_MS)
+
+  assert.equal(pauseSignalFromProbeLine('3,0,False,1,0'), true)
+  assert.equal(pauseSignalFromProbeLine('3,0,False,0,8'), true)
+  assert.equal(pauseSignalFromProbeLine('3,0,False,0,0'), false)
+  assert.equal(pauseSignalFromProbeLine('3,0,False,,'), false)
+  assert.equal(pauseSignalFromProbeLine('3,0,False,abc,0'), null)
+  assert.equal(pauseSignalFromProbeLine('query_failed'), null)
+  assert.equal(pauseSignalFromProbeLine('not_found'), null)
+  assert.equal(pauseSignalFromProbeLine(null), null)
+
+  let fatalPauses = 0
+  await pauseBeforeFatalExit({ enabled: false, pause: async () => { fatalPauses += 1 } })
+  assert.equal(fatalPauses, 0)
+  await pauseBeforeFatalExit({
+    enabled: true,
+    pause: async () => {
+      throw new Error('pause')
+    },
+    timeoutMs: 50,
+  })
+  const hungAt = Date.now()
+  await pauseBeforeFatalExit({
+    enabled: true,
+    pause: () => new Promise(() => undefined),
+    timeoutMs: 40,
+  })
+  assert.ok(Date.now() - hungAt < 400, 'fatal exit must not wait on a stuck pause')
+
+  const seen: string[] = []
+  const handlers: Partial<Record<'uncaughtException' | 'unhandledRejection', (value: unknown) => void>> = {}
+  installFatalPrintQueuePause({
+    enabled: true,
+    pause: async () => { seen.push('pause') },
+    logError: () => undefined,
+    exit: (code) => { seen.push(`exit:${code}`) },
+    on: (event, handler) => { handlers[event] = handler },
+  })
+  handlers.uncaughtException?.(new Error('boom'))
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  assert.equal(seen.filter((item) => item === 'pause').length, 1)
+  assert.ok(seen.includes('exit:1'))
+
+  const quiet: string[] = []
+  const quietHandlers: Partial<Record<'uncaughtException' | 'unhandledRejection', (value: unknown) => void>> = {}
+  installFatalPrintQueuePause({
+    enabled: false,
+    pause: async () => { quiet.push('pause') },
+    logError: () => undefined,
+    exit: (code) => { quiet.push(`exit:${code}`) },
+    on: (event, handler) => { quietHandlers[event] = handler },
+  })
+  quietHandlers.unhandledRejection?.('nope')
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  assert.equal(quiet.includes('pause'), false)
+  assert.ok(quiet.includes('exit:1'))
 }
 
 async function verifyInFlightSkipsPreDispatch(): Promise<void> {
@@ -631,6 +882,137 @@ const gate = require('./src/agent/print-dispatch-gate')
 })().catch(() => process.exit(1))
 `
 
+const resumeChild = `
+const gate = require('./src/agent/print-dispatch-gate')
+;(async () => {
+  gate.__resetPrintDispatchGateForTests()
+  const result = await gate.preparePrinterForDispatch({
+    holdEnabled: true,
+    removeOwnJobs: async () => {},
+    resume: async () => { throw new Error('resume') },
+  })
+  let claims = 0
+  await gate.claimPrintTasksIfGateOpen({
+    holdEnabled: true,
+    pause: async () => { throw new Error('still') },
+    cleanup: async () => { throw new Error('cleanup') },
+  }, async () => { claims += 1 })
+  if (result !== 'resume-failed') process.exit(1)
+  if (gate.printerStatusForHeartbeat('ready') !== 'queue_pause_failed') process.exit(1)
+  if (claims !== 0) process.exit(1)
+  process.exit(0)
+})().catch(() => process.exit(1))
+`
+
+const readbackChild = `
+const { applyPrinterQueueMethod } = require('./src/agent/print-queue-hold')
+;(async () => {
+  let threw = false
+  try {
+    await applyPrinterQueueMethod({
+      printerName: '奔图彩色打印机',
+      method: 'Pause',
+      invokeCim: async () => {},
+      readPaused: async () => false,
+      windowMs: 0,
+    })
+  } catch (error) {
+    threw = /print queue state did not change/.test(String(error && error.message))
+  }
+  if (!threw) process.exit(1)
+  process.exit(0)
+})().catch(() => process.exit(1))
+`
+
+const ownJobIdChild = `
+const { selectOwnPrintJobIds } = require('./src/agent/print-queue-hold')
+let threw = false
+try {
+  selectOwnPrintJobIds([{ id: 0, ownedByCurrentProcess: true }])
+} catch (error) {
+  threw = /print job id is unreadable/.test(String(error && error.message))
+}
+if (!threw) process.exit(1)
+const foreign = selectOwnPrintJobIds([
+  { id: 0, ownedByCurrentProcess: false },
+  { id: 4, ownedByCurrentProcess: true },
+])
+if (foreign.join(',') !== '4') process.exit(1)
+process.exit(0)
+`
+
+const queryFailedChild = `
+const { buildWin32PrinterProbeScript, mapWin32PrinterQuery, mapWin32PrinterPreflight } = require('./src/agent/wmi')
+const probe = buildWin32PrinterProbeScript()
+if (!probe.includes("} catch { 'query_failed'; exit }")) process.exit(1)
+if (mapWin32PrinterQuery('query_failed') !== 'unknown') process.exit(1)
+if (mapWin32PrinterPreflight('query_failed') !== 'unknown') process.exit(1)
+if (mapWin32PrinterQuery('not_found') !== 'error') process.exit(1)
+if (mapWin32PrinterPreflight('not_found') !== 'not_found') process.exit(1)
+process.exit(0)
+`
+
+const utf8Child = `
+const fs = require('fs')
+const { POWERSHELL_STDIN_UTF8, escapeWqlLiteral, win32PrinterNameFilter } = require('./src/agent/wql-literal')
+const { CIM_METHOD_SCRIPT, LIST_JOBS_SCRIPT, REMOVE_JOBS_SCRIPT } = require('./src/agent/print-queue-hold')
+const { buildWin32PrinterProbeScript, buildPrintJobStatusScript, buildPrintServiceCompletionEventScript } = require('./src/agent/wmi')
+const { PRINTER_NETWORK_SCRIPT } = require('./src/agent/network-diagnostics')
+const expected = "[Console]::InputEncoding = [System.Text.Encoding]::UTF8"
+if (POWERSHELL_STDIN_UTF8 !== expected) process.exit(1)
+const chinese = '奔图彩色打印机'
+if (escapeWqlLiteral(chinese) !== chinese) process.exit(1)
+if (win32PrinterNameFilter(chinese) !== "Name='" + chinese + "'") process.exit(1)
+function firstRead(script) {
+  const reads = ['[Console]::In.ReadLine()', '[Console]::In.ReadToEnd()']
+    .map((token) => script.indexOf(token))
+    .filter((index) => index >= 0)
+  return reads.length === 0 ? -1 : Math.min(...reads)
+}
+for (const script of [
+  CIM_METHOD_SCRIPT,
+  LIST_JOBS_SCRIPT,
+  REMOVE_JOBS_SCRIPT,
+  buildWin32PrinterProbeScript(),
+  buildPrintJobStatusScript(),
+  buildPrintServiceCompletionEventScript(),
+  PRINTER_NETWORK_SCRIPT,
+]) {
+  const markerAt = script.indexOf(expected)
+  const readAt = firstRead(script)
+  if (markerAt < 0 || readAt <= markerAt) process.exit(1)
+}
+const hold = fs.readFileSync('./src/agent/print-queue-hold.ts', 'utf8')
+const wmi = fs.readFileSync('./src/agent/wmi.ts', 'utf8')
+if (!hold.includes("child.stdin.end(stdin, 'utf8')")) process.exit(1)
+if (!wmi.includes("child.stdin.end(stdin, 'utf8')")) process.exit(1)
+process.exit(0)
+`
+
+const fatalChild = `
+const gate = require('./src/agent/print-dispatch-gate')
+;(async () => {
+  await gate.pauseBeforeFatalExit({
+    enabled: true,
+    timeoutMs: 200,
+    pause: async () => { throw new Error('pause') },
+  })
+  const events = []
+  const handlers = {}
+  gate.installFatalPrintQueuePause({
+    enabled: true,
+    pause: async () => { events.push('pause') },
+    logError: () => {},
+    exit: () => { events.push('exit') },
+    on: (event, handler) => { handlers[event] = handler },
+  })
+  handlers.uncaughtException(new Error('boom'))
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  if (!events.includes('pause') || !events.includes('exit')) process.exit(1)
+  process.exit(0)
+})().catch(() => process.exit(1))
+`
+
 const bootChild = `
 const { runAgentBoot } = require('./src/agent/boot-print-queue-order')
 ;(async () => {
@@ -648,10 +1030,14 @@ const { runAgentBoot } = require('./src/agent/boot-print-queue-order')
 `
 
 function verifyReverseMutations(): void {
+  const wmiSourcePath = join(__dirname, '../src/agent/wmi.ts')
+  const wqlSourcePath = join(__dirname, '../src/agent/wql-literal.ts')
   const hold = readFileSync(holdSourcePath, 'utf8')
   const gate = readFileSync(gateSourcePath, 'utf8')
   const index = readFileSync(indexSourcePath, 'utf8')
   const boot = readFileSync(bootSourcePath, 'utf8')
+  const wmi = readFileSync(wmiSourcePath, 'utf8')
+  const wql = readFileSync(wqlSourcePath, 'utf8')
   assert.equal(runNodeEval(selectorChild).status, 0)
   assert.equal(runNodeEval(claimChild).status, 0)
   assert.equal(runNodeEval(pauseChild).status, 0)
@@ -661,6 +1047,12 @@ function verifyReverseMutations(): void {
   assert.equal(runNodeEval(prepareChild).status, 0)
   assert.equal(runNodeEval(deleteFailureChild).status, 0)
   assert.equal(runNodeEval(bootChild).status, 0)
+  assert.equal(runNodeEval(resumeChild).status, 0, 'resume-failure baseline')
+  assert.equal(runNodeEval(readbackChild).status, 0, 'readback baseline')
+  assert.equal(runNodeEval(ownJobIdChild).status, 0, 'own job id baseline')
+  assert.equal(runNodeEval(queryFailedChild).status, 0, 'query_failed baseline')
+  assert.equal(runNodeEval(utf8Child).status, 0, 'utf8 baseline')
+  assert.equal(runNodeEval(fatalChild).status, 0, 'fatal pause baseline')
 
   const mutations: Array<[string, string, string, string, string]> = [
     ['own-account filter', holdSourcePath, hold, OWN_ANCHOR, 'if (true) ids.push(job.id)'],
@@ -720,6 +1112,14 @@ function verifyReverseMutations(): void {
   await steps.beforeClaim()
   steps.startClaimLoop()`,
     ],
+    ['resume failure leaves the gate open', gateSourcePath, gate, PREPARE_RESUME_ANCHOR, ''],
+    ['readback removed', holdSourcePath, hold, READBACK_ANCHOR, ''],
+    ['own job id skipped', holdSourcePath, hold, OWN_JOB_ID_ANCHOR, 'continue'],
+    ['query failure reported as missing', wmiSourcePath, wmi, QUERY_FAILED_ANCHOR, `} catch { 'not_found'; exit }`],
+    ['stdin utf-8 constant removed', wqlSourcePath, wql, UTF8_ANCHOR, 'export const POWERSHELL_STDIN_UTF8 = ""'],
+    ['stdin written without utf8', holdSourcePath, hold, STDIN_UTF8_ANCHOR, 'child.stdin.end(stdin)'],
+    ['fatal exit skips pause', gateSourcePath, gate, FATAL_PAUSE_ANCHOR, 'exit(1)'],
+    ['fatal pause error blocks exit', gateSourcePath, gate, FATAL_SWALLOW_ANCHOR, ','],
   ]
   const children: Record<string, string> = {
     'own-account filter': selectorChild,
@@ -736,6 +1136,14 @@ function verifyReverseMutations(): void {
     'delete failure still claims': deleteFailureChild,
     'cleanup after claim loop': bootChild,
     'cleanup before the lock': bootChild,
+    'resume failure leaves the gate open': resumeChild,
+    'readback removed': readbackChild,
+    'own job id skipped': ownJobIdChild,
+    'query failure reported as missing': queryFailedChild,
+    'stdin utf-8 constant removed': utf8Child,
+    'stdin written without utf8': utf8Child,
+    'fatal exit skips pause': fatalChild,
+    'fatal pause error blocks exit': fatalChild,
   }
   for (const [label, file, original, from, to] of mutations) {
     assert.ok(original.includes(from), `${label}: anchor missing`)
@@ -755,6 +1163,7 @@ async function main(): Promise<void> {
   verifyPrinterNameComparison()
   verifyStartupWiring()
   await verifyPrintDispatchGate()
+  await verifyQueueStateReadback()
   await verifyInFlightSkipsPreDispatch()
   await verifyBootOrder()
   await verifyNonWindowsNoop()

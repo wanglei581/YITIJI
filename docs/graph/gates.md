@@ -1099,7 +1099,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/heartbeat.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-local-qr-proxy.ts`<br/>`verify-print-queue-residue.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-input-lockout-telemetry.ts` |
 | `apps/terminal-agent/src/agent/instance-lock.ts` | `verify-print-scan-agent.mjs`<br/>`verify-singleton-process.mjs` |
 | `apps/terminal-agent/src/agent/legacy-residue-cleanup.ts` | `verify-task-reliability.ts` |
-| `apps/terminal-agent/src/agent/network-diagnostics.ts` | `verify-network-diagnostics.ts` |
+| `apps/terminal-agent/src/agent/network-diagnostics.ts` | `verify-network-diagnostics.ts`<br/>`verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/offline-queue.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/print-dispatch-gate.ts` | `verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/print-monitor-timeout.ts` | `verify-print-truth-hardening.ts` |

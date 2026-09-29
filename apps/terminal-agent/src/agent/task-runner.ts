@@ -365,7 +365,7 @@ export async function executeTask(
 
   const ext = inferTaskExt(task)
   const tempFilePath = path.join(getTempDir(), `task_${task.taskId}${ext}`)
-  // 只有 resume 成功才在终态再暂停。恢复失败时队列仍是暂停的。
+  // 只有 resume 成功才在终态再暂停。恢复失败时队列仍是暂停的，并合上 queue_pause_failed，下一轮不再领单。
   let releaseQueueAfterTerminalState = false
 
   // AGT-07：日志不落用户原始文件名（简历常以「姓名+简历.pdf」命名，属 CLAUDE.md §11

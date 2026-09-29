@@ -127,6 +127,8 @@ function heartbeatFromParsed(line: ParsedPrinterLine): PrinterStatus {
 
 export function mapWin32PrinterQuery(output: string | null): PrinterStatus {
   if (!output) return 'unknown'
+  // 查询抛错。心跳报未知，不能当成打印机不存在。
+  if (output === 'query_failed') return 'unknown' // probe-query-failed
   if (output === 'not_found') return 'error'
   const parsed = parseWin32PrinterLine(output)
   if (!parsed) return 'unknown'
@@ -135,6 +137,7 @@ export function mapWin32PrinterQuery(output: string | null): PrinterStatus {
 
 export function mapWin32PrinterPreflight(output: string | null): PrinterPreflight {
   if (!output) return 'unknown'
+  if (output === 'query_failed') return 'unknown' // probe-query-failed-preflight
   if (output === 'not_found') return 'not_found'
   const parsed = parseWin32PrinterLine(output)
   if (!parsed) return 'unknown'

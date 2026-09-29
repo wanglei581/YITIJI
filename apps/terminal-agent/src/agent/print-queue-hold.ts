@@ -15,13 +15,20 @@
  * 本进程账号（生产为 SYSTEM，已特判 S-1-5-18；CI 为 runner 账号）一定能解析，
  * 所以不会漏删自己的作业。别的程序、已删账号、服务账号读不出时，若让整次清理失败，
  * 闸门会永久合上、整机停打。这类作业视为不是本进程的：跳过、不删，日志只记跳过数。
- * 只有「列出作业」或「删除作业」命令本身失败才算清理失败、合闸门。
+ * 本账号作业的 ID 不是正整数时，这份作业删不掉，整次清理失败、合闸门。
+ * 别的账号上 ID 异常不影响。读不出账号的作业仍跳过。
+ * 只有「列出作业」或「删除作业」命令本身失败，或本账号作业 ID 无效，才算清理失败。
  * 直接解析某一个用户名仍然失败即抛错，不在这里吞掉。
  * 不把某个服务账号写进删除条件。
  *
  * 打印机名从 stdin 传入，在 PowerShell 里用 Escape-WqlLiteral 组装 WQL 过滤串
  * （先把 `\` 换成 `\\`，再把 `'` 换成 `\'`），查到后再按 Name -eq 对原名核对一次。
- * 名字不写进脚本正文。
+ * 名字不写进脚本正文。经 stdin 读名字的脚本先把输入编码改成 UTF-8。
+ * Node 写 stdin 用 utf8。Windows PowerShell 5.1 否则按系统代码页读，中文名会乱码。
+ *
+ * 暂停和恢复在 CIM 返回 0 之后，再读这台打印机的 PrinterState 暂停位或
+ * ExtendedPrinterStatus=8。暂停后必须处于暂停，恢复后必须不处于暂停。
+ * 状态还没生效时最多再等约 2 秒。对不上就按这次调用失败，走原来的失败路径。
  *
  * 领取是串行的。恢复队列只包住当前这一单的打印和监控。
  * 同一删除还用在两处：任务失败终态（再暂停之前），以及每次派发前（恢复队列之前）。
@@ -31,7 +38,8 @@
 
 import { spawn } from 'child_process'
 import { log } from '../logger'
-import { ESCAPE_WQL_LITERAL_FUNCTION } from './wql-literal'
+import { queryWin32PrinterLine } from './wmi'
+import { ESCAPE_WQL_LITERAL_FUNCTION, POWERSHELL_STDIN_UTF8 } from './wql-literal'
 
 export type PrintQueueCommandStep = 'pause' | 'resume' | 'list' | 'remove'
 
@@ -133,6 +141,7 @@ public static class PrintJobSidLookup {
 `.trim()
 
 export const CIM_METHOD_SCRIPT = `
+${POWERSHELL_STDIN_UTF8}
 $ErrorActionPreference = 'Stop'
 ${ESCAPE_WQL_LITERAL_FUNCTION}
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
@@ -155,6 +164,7 @@ if ($null -eq $result -or $null -eq $result.ReturnValue -or [int]$result.ReturnV
 `.trim()
 
 export const LIST_JOBS_SCRIPT = `
+${POWERSHELL_STDIN_UTF8}
 $ErrorActionPreference = 'Stop'
 ${RESOLVE_PRINT_JOB_USER_SID}
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
@@ -177,16 +187,19 @@ foreach ($job in $raw) {
     $jobSid = New-Object System.Security.Principal.SecurityIdentifier($resolved)
     $owned = $jobSid.Equals($currentSid)
   } catch {
-    # 读不出账号就当不是本进程的：跳过、不删。列出或删除命令失败才算清理失败。
+    # 读不出账号就当不是本进程的：跳过、不删。ID 是否能删由 Node 判断。
     $skippedUnreadable += 1
     $unreadable = $true
   }
-  [void]$jobs.Add([pscustomobject]@{ id = [int]$job.ID; owned = [bool]$owned; unreadable = [bool]$unreadable })
+  $idText = ''
+  if ($null -ne $job.ID) { $idText = [string]$job.ID }
+  [void]$jobs.Add([pscustomobject]@{ id = $idText; owned = [bool]$owned; unreadable = [bool]$unreadable })
 }
 @{ jobs = @($jobs); unreadable = $skippedUnreadable } | ConvertTo-Json -Compress -Depth 4
 `.trim()
 
 export const REMOVE_JOBS_SCRIPT = `
+${POWERSHELL_STDIN_UTF8}
 $ErrorActionPreference = 'Stop'
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
 $name = [string]$payload.printerName
@@ -251,6 +264,63 @@ function tagQueueStep(step: PrintQueueCommandStep, error: unknown): never {
   throw error
 }
 
+const QUEUE_PAUSE_BIT = 0x1
+const EXTENDED_PAUSED = 8
+/** CIM 返回 0 之后，最多再等这么久让暂停位生效。 */
+export const QUEUE_STATE_READBACK_WINDOW_MS = 2_000
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function parseProbeNumber(raw: string | undefined): number | null {
+  if (raw === undefined || raw.trim() === '') return null
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : null
+}
+
+/** 探针行里的暂停位。null 表示这行读不出暂停状态。 */
+export function pauseSignalFromProbeLine(line: string | null): boolean | null {
+  if (!line || line === 'not_found' || line === 'query_failed') return null
+  const parts = line.split(',')
+  if (parts.length < 5) return null
+  const state = parseProbeNumber(parts[3])
+  const extended = parseProbeNumber(parts[4])
+  if (parts[3]?.trim() !== '' && state === null) return null
+  if (parts[4]?.trim() !== '' && extended === null) return null
+  const pauseBit = state !== null && (state & QUEUE_PAUSE_BIT) !== 0
+  return pauseBit || extended === EXTENDED_PAUSED
+}
+
+export async function confirmPrinterQueueHoldState(options: {
+  method: 'Pause' | 'Resume'
+  readPaused: () => Promise<boolean>
+  sleep?: (ms: number) => Promise<void>
+  now?: () => number
+  windowMs?: number
+}): Promise<void> {
+  const wantPaused = options.method === 'Pause'
+  const sleep = options.sleep ?? waitMs
+  const now = options.now ?? Date.now
+  const windowMs = options.windowMs ?? QUEUE_STATE_READBACK_WINDOW_MS
+  const deadline = now() + windowMs
+  const step: PrintQueueCommandStep = options.method === 'Pause' ? 'pause' : 'resume'
+  for (;;) {
+    if ((await options.readPaused()) === wantPaused) return
+    if (now() >= deadline) {
+      throw new PrintQueueHoldError('print queue state did not change', step)
+    }
+    const remaining = deadline - now()
+    await sleep(Math.min(200, Math.max(1, remaining)))
+  }
+}
+
+async function readPausedFromWmi(printerName: string, step: PrintQueueCommandStep): Promise<boolean> {
+  const paused = pauseSignalFromProbeLine(await queryWin32PrinterLine(printerName))
+  if (paused === null) throw new PrintQueueHoldError('print queue state is unreadable', step)
+  return paused
+}
+
 async function invokePrinterCimMethod(printerName: string, method: 'Pause' | 'Resume'): Promise<void> {
   const step: PrintQueueCommandStep = method === 'Pause' ? 'pause' : 'resume'
   let stdout: string
@@ -265,6 +335,39 @@ async function invokePrinterCimMethod(printerName: string, method: 'Pause' | 'Re
   if (stdout !== 'ok') throw new PrintQueueHoldError('print queue command failed', step)
 }
 
+/** CIM 返回 0 之后回读暂停位。测试可注入 invokeCim 与 readPaused。 */
+export async function applyPrinterQueueMethod(options: {
+  printerName: string
+  method: 'Pause' | 'Resume'
+  invokeCim?: () => Promise<void>
+  readPaused?: () => Promise<boolean>
+  sleep?: (ms: number) => Promise<void>
+  now?: () => number
+  windowMs?: number
+}): Promise<void> {
+  const step: PrintQueueCommandStep = options.method === 'Pause' ? 'pause' : 'resume'
+  if (options.invokeCim) {
+    try {
+      await options.invokeCim()
+    } catch (error) {
+      tagQueueStep(step, error)
+    }
+  } else {
+    await invokePrinterCimMethod(options.printerName, options.method)
+  }
+  await confirmPrinterQueueHoldState({ // queue-state-readback
+    method: options.method,
+    readPaused: options.readPaused ?? (() => readPausedFromWmi(options.printerName, step)),
+    sleep: options.sleep,
+    now: options.now,
+    windowMs: options.windowMs,
+  })
+}
+
+function isPositivePrintJobId(id: number): boolean {
+  return Number.isSafeInteger(id) && id > 0
+}
+
 export function selectOwnPrintJobIds(jobs: PrintJobSnapshot[]): number[] {
   const ids: number[] = []
   for (const job of jobs) {
@@ -272,7 +375,10 @@ export function selectOwnPrintJobIds(jobs: PrintJobSnapshot[]): number[] {
     if (typeof job.ownedByCurrentProcess !== 'boolean') {
       throw new PrintQueueHoldError('print job user is unreadable')
     }
-    if (!Number.isInteger(job.id) || job.id <= 0) continue
+    if (!isPositivePrintJobId(job.id)) {
+      if (job.ownedByCurrentProcess) throw new PrintQueueHoldError('print job id is unreadable') // own-job-id
+      continue
+    }
     if (job.ownedByCurrentProcess) ids.push(job.id)
   }
   return ids
@@ -300,7 +406,7 @@ export function parsePrintJobListOutput(raw: string): { jobs: PrintJobSnapshot[]
     const id = typeof job.id === 'number' ? job.id : Number(job.id)
     if (job.unreadable === true) {
       flagged += 1
-      if (!Number.isInteger(id) || id <= 0) continue
+      if (!isPositivePrintJobId(id)) continue
       // 读不出账号优先于 owned。即使 JSON 里写成 owned:true，也不当本进程的作业。
       jobs.push({ id, ownedByCurrentProcess: false, unreadableUser: true })
       continue
@@ -309,7 +415,11 @@ export function parsePrintJobListOutput(raw: string): { jobs: PrintJobSnapshot[]
     if (typeof owned !== 'boolean') {
       throw new PrintQueueHoldError('print job user is unreadable')
     }
-    if (!Number.isInteger(id) || id <= 0) continue
+    if (!isPositivePrintJobId(id)) {
+      // 别的账号 ID 异常不影响。本账号 ID 不是正整数就删不掉，整次清理失败。
+      if (owned) throw new PrintQueueHoldError('print job id is unreadable') // own-job-id
+      continue
+    }
     jobs.push({ id, ownedByCurrentProcess: owned })
   }
   const reported =
@@ -351,13 +461,13 @@ async function removePrintJobs(printerName: string, ids: number[]): Promise<void
 
 export async function pauseConfiguredPrinterQueue(printerName: string): Promise<QueueHoldResult> {
   if (process.platform !== 'win32') return { ok: true, skipped: true }
-  await invokePrinterCimMethod(printerName, 'Pause')
+  await applyPrinterQueueMethod({ printerName, method: 'Pause' })
   return { ok: true, skipped: false }
 }
 
 export async function resumeConfiguredPrinterQueue(printerName: string): Promise<QueueHoldResult> {
   if (process.platform !== 'win32') return { ok: true, skipped: true }
-  await invokePrinterCimMethod(printerName, 'Resume')
+  await applyPrinterQueueMethod({ printerName, method: 'Resume' })
   log('print-queue-hold: queue resumed for dispatch')
   return { ok: true, skipped: false }
 }

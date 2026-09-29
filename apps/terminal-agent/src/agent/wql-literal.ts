@@ -16,6 +16,12 @@ export function win32PrinterNameFilter(printerName: string): string {
   return `Name='${escapeWqlLiteral(printerName)}'`
 }
 
+/**
+ * Windows PowerShell 5.1 默认按系统代码页读 stdin。
+ * 经 stdin 传入的打印机名会乱码，脚本读之前先改成 UTF-8。Node 写 stdin 用 utf8。
+ */
+export const POWERSHELL_STDIN_UTF8 = "[Console]::InputEncoding = [System.Text.Encoding]::UTF8"
+
 /** wmi.ts 与 print-queue-hold.ts 嵌进脚本的是这一份，不各写一遍。 */
 export const ESCAPE_WQL_LITERAL_FUNCTION = `
 function Escape-WqlLiteral([string]$value) {

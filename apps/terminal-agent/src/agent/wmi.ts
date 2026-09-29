@@ -40,8 +40,8 @@
  *   PrinterState / ExtendedPrinterStatus 仅表示暂停（Extended=8 或 PAUSED 位），
  *   且没有离线、缺纸、故障位。粉量低（TONER_LOW）不拦截 → 'ready'
  *   DetectedErrorState=0 with any other PrinterStatus → 'unknown'
- *   Win32_Printer not found                       → 'error'    (distinct from query failure)
- *   query failure / unparseable                   → 'unknown'
+ *   Win32_Printer confirmed missing (not_found)   → 'error'    (distinct from query failure)
+ *   query threw (stdout query_failed) / unparseable → 'unknown'
  *
  * Preflight (getPrinterPreflight) keeps a finer enum: missing printer is
  * 'not_found', and DetectedErrorState=0 still returns 'ok' so a Pantum
@@ -51,7 +51,7 @@
 import { spawn } from 'child_process'
 import { warn } from '../logger'
 import type { PrinterStatus } from './types'
-import { ESCAPE_WQL_LITERAL_FUNCTION } from './wql-literal'
+import { ESCAPE_WQL_LITERAL_FUNCTION, POWERSHELL_STDIN_UTF8 } from './wql-literal'
 import {
   mapWin32PrinterPreflight,
   mapWin32PrinterQuery,
@@ -120,19 +120,21 @@ function runPowerShell(script: string, stdin?: string, timeoutMs = 8_000): Promi
 /**
  * 心跳与预检共用这一条探针。打印机名走 stdin。
  * 在 PowerShell 里用 Escape-WqlLiteral 组装 -Filter（先 `\` 再 `'`），
- * 查到后再按 Name -eq 对原名核对一次。过滤查询失败退出 1，调用方当成未知，
- * 不把查询失败说成「没找到这台打印机」。
+ * 查到后再按 Name -eq 对原名核对一次。查询抛错输出 query_failed（心跳 unknown），
+ * 查完确认没有这台打印机才输出 not_found（心跳 error）。
  * 多读 PrinterState 与 ExtendedPrinterStatus，用来识别「只是被我们暂停」。
+ * 打印机名从 stdin 读，脚本先把输入编码改成 UTF-8。
  */
 export function buildWin32PrinterProbeScript(): string {
   return [
+    POWERSHELL_STDIN_UTF8,
     ESCAPE_WQL_LITERAL_FUNCTION,
     `$name = [Console]::In.ReadLine()`,
     `$filter = "Name='" + (Escape-WqlLiteral $name) + "'"`,
     `$p = $null`,
     `try {`,
     `  $p = @(Get-CimInstance -ClassName Win32_Printer -Filter $filter -ErrorAction Stop) | Where-Object { $_.Name -eq $name } | Select-Object -First 1`,
-    `} catch { exit 1 }`,
+    `} catch { 'query_failed'; exit }`,
     `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline),$($p.PrinterState),$($p.ExtendedPrinterStatus)" } else { "not_found" }`,
   ].join('\n')
 }
@@ -237,6 +239,22 @@ export type PrintJobMonitorStatus =
  * Returns 'unknown' on non-Windows or if the query itself fails.
  * Returns 'not_found' only when the printer is reachable but no matching job exists.
  */
+export function buildPrintJobStatusScript(): string {
+  return [
+    POWERSHELL_STDIN_UTF8,
+    `$line = [Console]::In.ReadLine()`,
+    `$sep = $line.IndexOf('|')`,
+    `if ($sep -lt 0) { 'bad_input'; exit }`,
+    `$pName = $line.Substring(0, $sep)`,
+    `$tId = $line.Substring($sep + 1)`,
+    `$jobs = Get-PrintJob -PrinterName $pName -ErrorAction SilentlyContinue`,
+    `if ($null -eq $jobs) { 'not_found'; exit }`,
+    `$job = @($jobs) | Where-Object { $_.DocumentName -like "*$tId*" } | Select-Object -First 1`,
+    `if ($null -eq $job) { 'not_found'; exit }`,
+    `$job.JobStatus`,
+  ].join('\n')
+}
+
 export async function getPrintJobStatus(
   printerName: string,
   taskId: string,
@@ -247,19 +265,7 @@ export async function getPrintJobStatus(
   const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '')
 
   // Script reads one stdin line: "printerName|taskId"
-  const script =
-    `$line = [Console]::In.ReadLine(); ` +
-    `$sep = $line.IndexOf('|'); ` +
-    `if ($sep -lt 0) { 'bad_input'; exit }; ` +
-    `$pName = $line.Substring(0, $sep); ` +
-    `$tId   = $line.Substring($sep + 1); ` +
-    `$jobs  = Get-PrintJob -PrinterName $pName -ErrorAction SilentlyContinue; ` +
-    `if ($null -eq $jobs) { 'not_found'; exit }; ` +
-    `$job = @($jobs) | Where-Object { $_.DocumentName -like "*$tId*" } | Select-Object -First 1; ` +
-    `if ($null -eq $job) { 'not_found'; exit }; ` +
-    `$job.JobStatus`
-
-  const output = await runPowerShell(script, `${printerName}|${safeTaskId}`)
+  const output = await runPowerShell(buildPrintJobStatusScript(), `${printerName}|${safeTaskId}`)
   return parsePrintJobStatus(output)
 }
 
@@ -279,6 +285,7 @@ export async function getPrintJobStatus(
  */
 export function buildPrintServiceCompletionEventScript(): string {
   return (
+    `${POWERSHELL_STDIN_UTF8}\n` +
     `$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json; ` +
     `$tId = [string]$payload.taskId; ` +
     `$pName = [string]$payload.printerName; ` +

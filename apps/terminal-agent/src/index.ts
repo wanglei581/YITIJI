@@ -31,7 +31,7 @@ import {
   cleanupStaleOwnPrintJobs,
   pauseConfiguredPrinterQueue,
 } from './agent/print-queue-hold'
-import { noteStartupPrintQueueFailure, pauseQueueOnProcessStop } from './agent/print-dispatch-gate'
+import { installFatalPrintQueuePause, noteStartupPrintQueueFailure, pauseQueueOnProcessStop } from './agent/print-dispatch-gate'
 import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/db'
 import { startOfflineRetry } from './agent/offline-queue'
 import { startScanDeletionAuditReporter } from './agent/scan-deletion-audit-reporter'
@@ -263,13 +263,11 @@ program
     }
     process.on('SIGINT', () => shutdown('SIGINT'))
     process.on('SIGTERM', () => shutdown('SIGTERM'))
-    process.on('uncaughtException', (e) => {
-      err(`uncaughtException: ${e.message}\n${e.stack ?? ''}`)
-      process.exit(1)
-    })
-    process.on('unhandledRejection', (reason) => {
-      err(`unhandledRejection: ${String(reason)}`)
-      process.exit(1)
+    // 崩溃退出前尽力暂停。开机清理前的先暂停仍保留。
+    installFatalPrintQueuePause({
+      enabled: config.holdPrinterQueueWhenIdle === true,
+      pause: () => pauseConfiguredPrinterQueue(config.printerName),
+      logError: (detail) => err(detail),
     })
       },
     })
