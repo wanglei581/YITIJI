@@ -77,7 +77,7 @@
 | W-02 | P1 | 管理员后台 | 新生产库上后台建不出黑白/彩色打印价目：计费页只渲染已有行，服务端只自动补 `resume_export`（`admin-billing.service.ts:40`），不存在的行返回 `PRICE_CONFIG_NOT_FOUND`（:121）→ 报价失败。本地按 `docs/operations/price-config-production.md` 的 SQL 补齐 | UI 实操截图 setup/ 第 3 项 | 后端窗口（接口）+ 两后台窗口（新建入口） / 待定 | 已派 |
 | W-03 | P1（优先） | 机构后台 | 管理员新建的机构账号永远验证不了手机号：每次登录弹「手机号本人验证」，获取验证码 409 `ACCOUNT_PASSWORD_PROOF_NOT_READY`，只能「稍后验证」（`password-proof-state.ts:16`、`auth.service.ts:648-656`）；也不强制首登改密 | UI 实操截图 61–62、89–90 | 后端窗口（接口）+ 两后台窗口（登记手机号按钮） / 待定 | 已派 |
 | W-04 | P2 | 管理员后台 | 从没连过的终端显示「最近心跳 刚刚」：心跳空时回落 `lastSeenAt`（`@updatedAt`，任何编辑都刷新）（`terminals/index.tsx:767`） | 截图 22、25 | 两后台窗口（前端）+ 后端窗口 / 待定 | 已派 |
-| W-05 | P2 | 管理员后台 | 绑定码兑换时 Agent 上报的名称覆盖管理员设的终端名（`terminal-credential-security.service.ts:248`） | 截图 60 | 后端窗口 / 待定 | 已派 |
+| W-05 | P2 | 管理员后台 + 小程序 | 绑定码兑换时 Agent 上报的名称覆盖管理员设的终端名（小程序选终端页因此显示「测试·模拟终端」而不是管理员设的「测试·崂山零工之家 1 号机」）（`terminal-credential-security.service.ts:248`） | 截图 60 | 后端窗口 / 待定 | 已派 |
 | W-06 | P1 | 两后台 | 工程词与原始 ID 给运营看：工作台「最近操作」`policy.publish`、`terminal.bind_code.exchange`、账号 ID；「contentTrustStatus=active」；设备总览「F1/F2 CLOSED_MODE」；「fail-closed 口径」；机构端每页「不直接对应前端页面」；「info-only」；星号原样显示（`partners/index.tsx:725`）；AI 调用 0 次显示成功率 0% | 截图 58、107 等 | 两后台窗口 / 待定 | 已派 |
 | W-07 | P2 | 两后台 | 托管 a 下管理员导航仍有岗位/招聘会/企业/Excel 导入/数据接入；机构类型默认模块含岗位招聘会；法务类型名「AI 免责声明」与「AI 服务免责声明」两叫法；设备能力页仍叫「签名盖章」；保存成功无提示（机构档案、屏保终端配置） | UI 实操 | 两后台窗口 / 待定 | 已派 |
 | W-08 | P2 | 一体机 | 读不到能力配置时的开发者口吻长文案（`printHubContent.ts:205-206`）；「签名盖章」用户可见约 22 行，2.0 定稿要求改「签名」 | 代码核对 | 走查窗口 / Claude 子代理（并入 R4 面板复印 PR） | 已派 |
@@ -98,6 +98,11 @@
 | W-23 | P2 | 一体机 | 打印完成页对模拟面试报告也提示「证件页水印」 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F7b-05 | 主执行窗口（打印链） | 待本栈复现 |
 | W-24 | P2 | 一体机 | dev 构建下 inspection、normalize_a4、pii_scan 各 POST 两次（正式构建待验，与「进手机扫码上传建两个会话」同类） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` | K1 路在正式构建上核实 | 待本栈复现 |
 | W-25 | P2 | 演示包 | 演示包网桥没有 `/local/qr-login/*`，扫码登录在演示环境走不通；`AI_PROVIDER=mock` 写死且清掉 AI_ 前缀变量，验不了真实诊断与白名单；起 API 的命令行含 `src/main.ts`，会被 `pkill -f` 误杀（走查栈的模拟 Agent 已实现 qr-login 两条，可回移） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` | 演示包归属窗口（合规与运维） | 已派 |
+| W-26 | P1 | 小程序 | 「我的文档」列表有文件时下方同时出现「暂无文件」空态卡（无下一页时必现）：`documents.wxml:121` 的「加载更多」提示插在 loading/error/list 链与 `wx:else`（:125）之间，wx:else 配错了对象 | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 11-docs-after-upload | 小程序窗口 / 小程序窗口 | 已派 |
+| W-27 | P1 | 小程序 | 选终端页、确认到机打印页的文件名与终端名显示成 URL 编码（%E6%B5%8B…）：查询串参数没 `decodeURIComponent`（上一页 print-upload 解了码） | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 13-print-store、14-print-pay | 小程序窗口 / 小程序窗口 | 已派 |
+| W-28 | P1 | 小程序 | 确认到机打印页说明写「到机确认前不会创建 Agent 可领取的 PrintTask」，工程用语 | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 14-print-pay | 小程序窗口 / 小程序窗口 | 已派 |
+| W-29 | P3 | 小程序 | 同一步骤一会儿叫「门店」（页标题「选择门店」、步骤条「选门店」）一会儿叫「终端」（确认页「选终端」） | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 13、14 | 小程序窗口 / 小程序窗口 | 已派 |
+| W-30 | P3 | 小程序 | Word 文件提示同一句话说两遍（本地文案 + 服务端 reason 拼接，`documents.js:61`） | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` | 小程序窗口 / 小程序窗口 | 已派 |
 
 ## 五、闭环矩阵
 
