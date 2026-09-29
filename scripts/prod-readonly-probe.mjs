@@ -20,7 +20,15 @@
 // 岗位、招聘会、政策、线下机构另做第一页检查：只在用户看得见的名称、标题、来源名、
 //   机构名白名单里找全角「（演示）」字面量。命中 WARN 并列出前 3 个名字；
 //   total=0 为 INFO；未命中 PASS，注明「无演示标记」。
-// 法务 GET /kiosk/legal/:type；未知类型 400（#835）。
+// 不带 --strict 时上面几句就是全部口径，退出码只看 FAIL。
+// 带 --strict（发布后核对，须在 #1115 下架演示企业之后跑）：
+//   岗位、招聘会、企业条数非 0 → FAIL；这三项为 0 且无标记 → PASS（不再是 INFO）。
+//   任一列表有演示标记 → FAIL（企业仍用上面的宽正则，其余四项仍只用全角「（演示）」）。
+//   政策、线下机构条数不为 0 本身不 FAIL。有 FAIL 则退出码非 0。
+// 法务 GET /kiosk/legal/:type。privacy_policy、terms_of_service、ai_disclaimer 都在
+//   LEGAL_DOC_TYPES（services/api/src/legal/legal.service.ts）里。未激活时 getActive
+//   返回 null，控制器仍 200 { success:true, data:null }（legal.controller.ts），不是 404。
+//   三份同一判据：200 且 data 非空，否则 FAIL。未知类型 400（#835）。
 // POST /terminals/session-token 空体 400（#833，存在而非 404）。
 // GET /admin/alerts 无鉴权 401（#841）。
 
@@ -42,6 +50,7 @@ const PATH_COMPANIES = '/api/v1/companies?pageSize=50'
 const PATH_OFFLINE_AGENCIES = '/api/v1/kiosk/offline-agencies?pageSize=50'
 const PATH_PRIVACY = '/api/v1/kiosk/legal/privacy_policy'
 const PATH_TERMS = '/api/v1/kiosk/legal/terms_of_service'
+const PATH_AI_DISCLAIMER = '/api/v1/kiosk/legal/ai_disclaimer'
 const PATH_UNKNOWN_LEGAL = '/api/v1/kiosk/legal/unknown_type'
 const PATH_SESSION_TOKEN = '/api/v1/terminals/session-token'
 const PATH_ALERTS = '/api/v1/admin/alerts?limit=5'
@@ -58,6 +67,12 @@ const HELP = `生产只读巡检（不登录服务器、不读密钥、不写数
   --json                 只输出 JSON
   --scheme http|https    默认 https。http 仅供本地桩测试
   --port <n>             默认 https=443、http=80
+  --strict               发布后核对（须在演示企业用 #1115 下架之后跑）。
+                         岗位、招聘会、企业三个公开列表条数非 0 即 FAIL；
+                         任一公开列表出现演示标记也 FAIL（企业用现有宽正则，
+                         岗位、招聘会、政策、线下机构用全角「（演示）」）。
+                         有 FAIL 时退出码非 0。不带本参数时，条数为 0 仍是 INFO、
+                         演示标记仍是 WARN。
   --help                 显示本说明
 
 本机 DNS 把 *.sslip.io 劫持到 198.18.1.0，必须按 IP 建连并用 servername/Host
@@ -80,6 +95,7 @@ function parseCli(argv) {
         json: { type: 'boolean', default: false },
         scheme: { type: 'string', default: 'https' },
         port: { type: 'string' },
+        strict: { type: 'boolean', default: false },
         help: { type: 'boolean', default: false, short: 'h' },
       },
       allowPositionals: false,
@@ -124,6 +140,7 @@ function parseCli(argv) {
     json: Boolean(values.json),
     scheme,
     port,
+    strict: Boolean(values.strict),
   }
 }
 
@@ -268,24 +285,28 @@ const PAREN_DEMO_LISTS = [
     path: PATH_JOBS,
     fields: ['title', 'company', 'sourceName'],
     nameField: 'title',
+    countMustBeZero: true,
   },
   {
     label: '招聘会',
     path: PATH_FAIRS,
     fields: ['name', 'organizer', 'sourceName', 'venue'],
     nameField: 'name',
+    countMustBeZero: true,
   },
   {
     label: '政策',
     path: PATH_POLICIES,
     fields: ['title', 'summary', 'sourceName'],
     nameField: 'title',
+    countMustBeZero: false,
   },
   {
     label: '线下机构',
     path: PATH_OFFLINE_AGENCIES,
     fields: ['name', 'address', 'district', 'description', 'openHours', 'services'],
     nameField: 'name',
+    countMustBeZero: false,
   },
 ]
 
@@ -324,25 +345,45 @@ function hitLabel(entry, spec) {
   return primary || '?'
 }
 
-function judgeParenDemoList(spec, res) {
+/**
+ * 公开列表的最终一档。不带 strict 时，INFO / WARN / PASS 三句与原来逐字相同。
+ * strict 只加严：要清零的列表条数非 0 改 FAIL，演示标记从 WARN 改 FAIL，条数 0 改 PASS。
+ */
+function judgePublicList({ item, total, markerDetail, countMustBeZero, strict }) {
+  if (total === 0) {
+    if (strict && countMustBeZero) return row(item, 'PASS', 'total=0，无演示标记')
+    return row(item, 'INFO', 'total=0（内容录入是负责人的事）')
+  }
+  if (markerDetail) return row(item, strict ? 'FAIL' : 'WARN', markerDetail)
+  if (strict && countMustBeZero) {
+    return row(item, 'FAIL', `total=${total}；--strict 要求岗位、招聘会、企业公开列表为 0`)
+  }
+  return row(item, 'PASS', `total=${total}，无演示标记`)
+}
+
+function judgeParenDemoList(spec, res, strict) {
   const item = `GET ${spec.path}（${spec.label}）`
   if (res.error) return row(item, 'FAIL', res.error)
   if (res.status !== 200) return row(item, 'FAIL', `HTTP ${res.status} ${snippet(res.body)}`)
   const parsed = parseJson(res.body)
   const total = listTotal(parsed)
   if (total == null) return row(item, 'FAIL', `无法读取 total / items.length；${snippet(res.body)}`)
-  if (total === 0) return row(item, 'INFO', 'total=0（内容录入是负责人的事）')
-  const hits = listRows(parsed).filter((entry) => rowHaystack(entry, spec.fields).includes(PAREN_DEMO_MARKER))
-  if (hits.length > 0) {
-    const names = hits.slice(0, 3).map((entry) => hitLabel(entry, spec)).join('、')
-    return row(
-      item,
-      'WARN',
-      `total=${total}，其中 ${hits.length} 条带「（演示）」（${names}${hits.length > 3 ? '…' : ''}）`
-        + '；这些名字会原样显示给终端用户，上线前需替换或下架',
-    )
+  let markerDetail = null
+  if (total !== 0) {
+    const hits = listRows(parsed).filter((entry) => rowHaystack(entry, spec.fields).includes(PAREN_DEMO_MARKER))
+    if (hits.length > 0) {
+      const names = hits.slice(0, 3).map((entry) => hitLabel(entry, spec)).join('、')
+      markerDetail = `total=${total}，其中 ${hits.length} 条带「（演示）」（${names}${hits.length > 3 ? '…' : ''}）`
+        + '；这些名字会原样显示给终端用户，上线前需替换或下架'
+    }
   }
-  return row(item, 'PASS', `total=${total}，无演示标记`)
+  return judgePublicList({
+    item,
+    total,
+    markerDetail,
+    countMustBeZero: Boolean(spec.countMustBeZero),
+    strict,
+  })
 }
 
 function row(item, result, detail, extra = {}) {
@@ -415,7 +456,7 @@ async function runChecks(cli) {
   }
 
   for (const spec of PAREN_DEMO_LISTS) {
-    tasks.push((async () => judgeParenDemoList(spec, await get(spec.path)))())
+    tasks.push((async () => judgeParenDemoList(spec, await get(spec.path), cli.strict))())
   }
 
   tasks.push(
@@ -430,19 +471,26 @@ async function runChecks(cli) {
       const rows = listRows(parsed)
       // 只认「摆在用户眼前的那几个字段」：name / sourceName。
       // 不猜 id 前缀、不按 createdAt 推断 —— 那些用户看不到，判错了也没人能复核。
-      const demo = rows.filter((r) => DEMO_MARKER.test(String(r?.name ?? '') + String(r?.sourceName ?? '')))
-      if (total === 0) return row(item, 'INFO', 'total=0（内容录入是负责人的事）')
-      if (demo.length > 0) {
-        const names = demo.slice(0, 3).map((r) => String(r?.name ?? '?')).join('、')
-        return row(item, 'WARN',
-          `total=${total}，其中 ${demo.length} 条带演示标记（${names}${demo.length > 3 ? '…' : ''}）`
-          + '；这些名字会原样显示给终端用户，上线前需替换或下架')
+      let markerDetail = null
+      if (total !== 0) {
+        const demo = rows.filter((r) => DEMO_MARKER.test(String(r?.name ?? '') + String(r?.sourceName ?? '')))
+        if (demo.length > 0) {
+          const names = demo.slice(0, 3).map((r) => String(r?.name ?? '?')).join('、')
+          markerDetail = `total=${total}，其中 ${demo.length} 条带演示标记（${names}${demo.length > 3 ? '…' : ''}）`
+            + '；这些名字会原样显示给终端用户，上线前需替换或下架'
+        }
       }
-      return row(item, 'PASS', `total=${total}，无演示标记`)
+      return judgePublicList({
+        item,
+        total,
+        markerDetail,
+        countMustBeZero: true,
+        strict: cli.strict,
+      })
     })(),
   )
 
-  for (const path of [PATH_PRIVACY, PATH_TERMS]) {
+  for (const path of [PATH_PRIVACY, PATH_TERMS, PATH_AI_DISCLAIMER]) {
     tasks.push(
       (async () => {
         const item = `GET ${path}`
@@ -539,6 +587,9 @@ function printHuman(cli, items, summary) {
   lines.push('# 生产只读巡检')
   lines.push(`host=${cli.host} scheme=${cli.scheme} port=${cli.port}`)
   lines.push(`domains=${cli.domains.join(',')}`)
+  if (cli.strict) {
+    lines.push('strict=on（岗位/招聘会/企业条数非 0，或任一列表有演示标记，即 FAIL）')
+  }
   if (cli.expectSha) {
     lines.push(`expect-sha=${cli.expectSha}  （请与服务器 DEPLOY_SOURCE.txt 人工核对；本脚本不登录服务器）`)
   }
