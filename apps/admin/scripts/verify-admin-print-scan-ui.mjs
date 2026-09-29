@@ -7,7 +7,7 @@
 //   4. 商业化控制不伪造补贴标签/退款工作流配置项，复用 billing/benefit 入口。
 //   5. 路由与导航已注册。
 
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const root = process.cwd()
@@ -58,11 +58,35 @@ if (
   page.includes('已完成现场核查，仍禁止重新排队') &&
   page.includes('<Link to="/orders"') &&
   service.includes("item.errorCode === 'PRINT_JOB_UNCONFIRMED'") &&
-  service.includes("'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN'")
+  service.includes("'PRINT_RETRY_UNCONFIRMED_FORBIDDEN'")
 ) {
   pass('unconfirmed print tasks hide retry, guide to orders, and mock mode mirrors the backend hard rejection')
 } else {
   fail('PRINT_JOB_UNCONFIRMED retry suppression and orders guidance must stay aligned')
+}
+// 旧前缀已由服务端改成 PRINT_RETRY_。这里拆开拼，避免本文件自己带上那段连续旧前缀。
+const retiredRetryCode = ['PRINT', 'SCAN', 'RETRY', ''].join('_')
+const retiredRetryHits = []
+const skipScanDirs = new Set(['node_modules', 'dist', 'coverage', 'test-results', 'playwright-report', 'blob-report'])
+function scanRetiredRetryCode(dir) {
+  for (const name of readdirSync(dir)) {
+    if (skipScanDirs.has(name)) continue
+    const full = join(dir, name)
+    const info = statSync(full)
+    if (info.isDirectory()) {
+      scanRetiredRetryCode(full)
+      continue
+    }
+    if (!info.isFile() || info.size > 2_000_000) continue
+    const text = readFileSync(full, 'utf8')
+    if (text.includes(retiredRetryCode)) retiredRetryHits.push(full.slice(root.length + 1))
+  }
+}
+scanRetiredRetryCode(root)
+if (retiredRetryHits.length === 0) {
+  pass('apps/admin source no longer contains the retired retry code prefix')
+} else {
+  fail(`apps/admin source still contains the retired retry code prefix: ${retiredRetryHits.join(', ')}`)
 }
 for (const forbidden of ['release', 'forceRelease', '强制释放', '标记已支付', '标记退款', 'DELETE']) {
   if (service.includes(forbidden)) fail(`service contains forbidden operation: ${forbidden}`)
