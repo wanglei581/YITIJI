@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1699 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1700 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1936,7 +1936,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 91 个文件</summary>
+<summary><code>services/api/scripts/</code> — 92 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1979,6 +1979,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/boot-api-child.ts` | `verify-error-observability.ts`<br/>`verify-internal-login-real-redis.ts`<br/>`verify-redis-degradation-truth.ts` |
 | `services/api/scripts/support/content-pipeline-fixtures.ts` | `verify-content-pipeline-e2e.ts` |
 | `services/api/scripts/support/content-pipeline-harness.ts` | `verify-content-pipeline-e2e.ts` |
+| `services/api/scripts/support/ephemeral-redis-self-check.ts` | `verify-internal-login-real-redis.ts` |
 | `services/api/scripts/support/ephemeral-redis-server.ts` | `verify-internal-login-real-redis.ts` |
 | `services/api/scripts/support/inmemory-redis-server.ts` | `verify-upload-scene.ts` |
 | `services/api/scripts/support/internal-auth-verify-harness.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-pii-manual-confirm.ts`<br/>`verify-sms-budget.ts`<br/>`verify-sms-egress-limits.ts` |

@@ -22181,6 +22181,9 @@
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
+    "services/api/scripts/support/ephemeral-redis-self-check.ts": [
+      "services/api/scripts/verify-internal-login-real-redis.ts"
+    ],
     "services/api/scripts/support/ephemeral-redis-server.ts": [
       "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
@@ -35092,6 +35095,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/ephemeral-redis-self-check.ts",
           "services/api/scripts/support/ephemeral-redis-server.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/auth/password-login-attempts.ts",

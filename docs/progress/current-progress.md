@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-29：真 Redis 登录门禁加固与提速（#1122 跟进；分支 `claude/backend-hardening-20260929-ephemeral-redis-hardening`）
+
+- **问题（Codex 复核、总指挥核实）：** 临时 redis-server 起不来时，停进程只等 exit 事件，可能永远卡住；CI 取消或 SIGTERM 时没有统一清理；用的是共享 dev.db。另外这条门禁每次要真等 68 秒登录 IP 窗口，#1074 的 build-and-verify 跑满 31 分钟被 30 分钟时限截断，它是最后一根稻草。
+- **修法：** Grok 实现加固：启停同时听 error / exit / close，10 秒超时后 SIGKILL；exit、SIGINT、SIGTERM、uncaughtException 上登记可重复调用的清理；每次自建临时 SQLite；新增 7 条自检（缺 redis-server 二进制 15 秒内失败、忽略 SIGTERM 的子进程会被停掉等）。协调方提速：子进程开 `TRUST_PROXY_HOPS=1`，每次登录带不同的 X-Forwarded-For，路由 IP 限流插不进来，按账号计、存在 Redis 的密码锁定照样生效，不再真等窗口。
+- **验证：** 25/25；**本机改前约 72 秒、改后 7 秒**；变异「锁定阈值改 100」变红（换 IP 后仍在测账号锁定），Grok 两处变异（去 error 监听、去超时）不卡住、非 0 退出；redis-degradation-truth、ai-platform-degradation、error-observability、ci-gate-coverage 全绿。另记一笔：redis-degradation-truth 本机 91 秒，是下一个可提速的门禁。
+
 ## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
