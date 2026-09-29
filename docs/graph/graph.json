@@ -40780,10 +40780,13 @@
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/screensaver/terminalConfigState.test.ts",
         "kind": "test",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/admin/package.json",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
         "scope": "admin",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -40805,10 +40808,13 @@
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/toolbox/toolboxActionState.test.ts",
         "kind": "test",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/admin/package.json",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
         "scope": "admin",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
