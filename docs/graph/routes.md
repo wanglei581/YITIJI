@@ -310,13 +310,13 @@ flowchart LR
   app --> orders["/orders<br/>1 页 · 4 端点"]
   app --> partners["/partners<br/>1 页 · 31 端点"]
   app --> peripherals["/peripherals<br/>1 页 · 0 端点"]
-  app --> permissions["/permissions<br/>1 页 · 0 端点"]
+  app --> permissions["/permissions<br/>1 页 · 4 端点"]
   app --> policy_sources["/policy-sources<br/>1 页 · 21 端点"]
   app --> print_scan["/print-scan<br/>1 页 · 5 端点"]
   app --> printers["/printers<br/>1 页 · 0 端点"]
   app --> privacy_requests["/privacy-requests<br/>1 页 · 0 端点"]
   app --> screen["/screen<br/>2 页 · 0 端点"]
-  app --> screensaver["/screensaver<br/>1 页 · 11 端点"]
+  app --> screensaver["/screensaver<br/>1 页 · 16 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 2 端点"]
   app --> sync_sources["/sync-sources<br/>1 页 · 11 端点"]
   app --> terminals["/terminals<br/>1 页 · 0 端点"]
@@ -351,14 +351,14 @@ flowchart LR
 | `/orders` | OrdersPage | `apps/admin/src/routes/orders/index.tsx` | 4 | — |
 | `/partners` | PartnersPage | `apps/admin/src/routes/partners/index.tsx` | 31 | — |
 | `/peripherals` | Navigate | — _(重定向)_ | 0 | — |
-| `/permissions` | PermissionsPage | `apps/admin/src/routes/permissions/index.tsx` | 0 | — |
+| `/permissions` | PermissionsPage | `apps/admin/src/routes/permissions/index.tsx` | 4 | — |
 | `/policy-sources` | PolicySourcesPage | `apps/admin/src/routes/policy-sources/index.tsx` | 21 | — |
 | `/print-scan` | PrintScanOpsPage | `apps/admin/src/routes/print-scan/index.tsx` | 5 | — |
 | `/printers` | Navigate | — _(重定向)_ | 0 | — |
 | `/privacy-requests` | PrivacyRequestsPage | `apps/admin/src/routes/privacy-requests/index.tsx` | 0 | — |
 | `/screen` | ScreenPage | `apps/admin/src/routes/screen/index.tsx` | 0 | — |
 | `/screen/:tab` | ScreenPage | `apps/admin/src/routes/screen/index.tsx` | 0 | — |
-| `/screensaver` | ScreensaverPage | `apps/admin/src/routes/screensaver/index.tsx` | 11 | — |
+| `/screensaver` | ScreensaverPage | `apps/admin/src/routes/screensaver/index.tsx` | 16 | — |
 | `/smart-campus` | SmartCampusPage | `apps/admin/src/routes/smart-campus/index.tsx` | 2 | — |
 | `/sync-sources` | SyncSourcesPage | `apps/admin/src/routes/sync-sources/index.tsx` | 11 | — |
 | `/terminals` | Navigate | — _(重定向)_ | 0 | — |
@@ -366,7 +366,7 @@ flowchart LR
 | `/users` | UsersPage | `apps/admin/src/routes/users/index.tsx` | 4 | — |
 
 <details>
-<summary>展开：每个路由触达的端点（27 个路由）</summary>
+<summary>展开：每个路由触达的端点（28 个路由）</summary>
 
 **`/`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/alerts`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/print-tasks`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`、`PUT /admin/orgs/:param/verified-official-domains`
 
@@ -408,11 +408,13 @@ flowchart LR
 
 **`/partners`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/import-batches`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/orgs/:param/accounts/:param/email`、`PUT /admin/orgs/:param/verified-official-domains`
 
+**`/permissions`** → `GET /admin/internal-accounts`、`PATCH /admin/internal-accounts/:param/status`、`POST /admin/internal-accounts/backup-admin/start`、`POST /admin/internal-accounts/backup-admin/verify`
+
 **`/policy-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/policy-sources/:param/eligibility-rules`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`GET /policies/eligibility-questions`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`、`PUT /admin/orgs/:param/verified-official-domains`
 
 **`/print-scan`** → `GET /admin/import-batches`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`
 
-**`/screensaver`** → `DELETE /admin/ad-assets/:param`、`DELETE /admin/ad-playlists/:param`、`GET /admin/ad-assets`、`GET /admin/ad-playlists`、`GET /admin/ai-posters/status`、`GET /admin/screensaver/terminals`、`PATCH /admin/ad-assets/:param`、`POST /admin/ad-assets/external-video`、`POST /admin/ad-playlists`、`PUT /admin/ad-playlists/:param`、`PUT /admin/terminals/:param/screensaver-config`
+**`/screensaver`** → `DELETE /admin/ad-assets/:param`、`DELETE /admin/ad-playlists/:param`、`GET /admin/ad-assets`、`GET /admin/ad-playlists`、`GET /admin/ai-posters/status`、`GET /admin/import-batches`、`GET /admin/screensaver/terminals`、`PATCH /admin/ad-assets/:param`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/ad-assets/external-video`、`POST /admin/ad-playlists`、`PUT /admin/ad-playlists/:param`、`PUT /admin/terminals/:param/screensaver-config`
 
 **`/smart-campus`** → `GET /admin/smart-campus/terminals`、`PUT /admin/terminals/:param/smart-campus-config`
 

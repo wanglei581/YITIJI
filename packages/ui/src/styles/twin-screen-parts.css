@@ -52,6 +52,8 @@
   min-width: 0;
 }
 
+.twin-legend-col.is-tight { gap: 6px; }
+
 .twin-legend-col .twin-legend {
   flex-direction: column;
   gap: 10px;

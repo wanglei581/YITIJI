@@ -38,6 +38,11 @@ function isParkedOrgType(type: string | null | undefined): boolean {
   return typeof type === 'string' && PARKED_ORG_TYPES.has(type)
 }
 
+function heartbeatText(iso: string | null): string {
+  if (!iso) return '从未连接'
+  return relativeTime(iso)
+}
+
 function relativeTime(iso: string | null): string {
   if (!iso) return '从未'
   const t = new Date(iso).getTime()
@@ -714,7 +719,7 @@ export default function TerminalsPage() {
                           )}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{relativeTime(t.lastHeartbeatAt ?? t.lastSeenAt)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{heartbeatText(t.lastHeartbeatAt)}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.agentVersion ?? '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
@@ -740,8 +745,8 @@ export default function TerminalsPage() {
         {API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}
       </p>
       <p className="mt-1 text-xs text-neutral-500">
-        「扫描输入」是 Agent 的 fail-closed 闸门：目录身份变化、读取失败或监听器异常时它会锁死扫描输入，
-        保证上一位的扫描件不会投给下一位。锁死在 Agent 进程内不可逆，<b>只能到现场重启 Agent 恢复，后台不提供远程解除</b>。
+        「扫描输入」会在目录身份变化、读取失败或监听器异常时锁死，
+        保证上一位的扫描件不会给到下一位。锁死之后<b>只能到现场重启 Agent 恢复，后台不提供远程解除</b>。
         显示「未上报」表示这台 Agent 还没报这一组字段（旧版本或尚未接入），不等于正常。
       </p>
       <p className="mt-1 text-xs text-neutral-500">

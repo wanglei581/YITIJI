@@ -12055,7 +12055,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 183,
+      "reachableFileCount": 189,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12582,7 +12582,12 @@
         },
         {
           "component": "PermissionsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /admin/internal-accounts",
+            "PATCH /admin/internal-accounts/:param/status",
+            "POST /admin/internal-accounts/backup-admin/start",
+            "POST /admin/internal-accounts/backup-admin/verify"
+          ],
           "file": "apps/admin/src/routes/permissions/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -12693,8 +12698,13 @@
             "GET /admin/ad-assets",
             "GET /admin/ad-playlists",
             "GET /admin/ai-posters/status",
+            "GET /admin/import-batches",
             "GET /admin/screensaver/terminals",
             "PATCH /admin/ad-assets/:param",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "POST /admin/ad-assets/external-video",
             "POST /admin/ad-playlists",
             "PUT /admin/ad-playlists/:param",
@@ -12800,7 +12810,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 208
+      "sourceFileCount": 214
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15811,7 +15821,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 75,
+      "reachableFileCount": 76,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16229,7 +16239,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 76
+      "sourceFileCount": 77
     }
   },
   "dataModel": {
@@ -17902,6 +17912,10 @@
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/admin/src/lib/auditActionLabels.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/main.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -17941,7 +17955,6 @@
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
     ],
     "apps/admin/src/routes/dashboard/index.tsx": [
-      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
@@ -18082,8 +18095,21 @@
     "apps/admin/src/routes/peripherals/peripheralViews.ts": [
       "apps/admin/scripts/verify-admin-peripheral-views.mjs"
     ],
+    "apps/admin/src/routes/permissions/AccountStatusDialog.tsx": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
+    ],
+    "apps/admin/src/routes/permissions/AccountsTable.tsx": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
+    ],
+    "apps/admin/src/routes/permissions/BackupAdminDrawer.tsx": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
+    ],
     "apps/admin/src/routes/permissions/index.tsx": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs",
       "apps/admin/scripts/verify-honest-placeholders.mjs"
+    ],
+    "apps/admin/src/routes/permissions/presentation.ts": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
     ],
     "apps/admin/src/routes/policy-sources/index.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs",
@@ -18106,6 +18132,9 @@
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
     ],
     "apps/admin/src/routes/screen/GovGrid.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/admin/src/routes/screen/UsageView.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/routes/screen/index.tsx": [
@@ -18243,6 +18272,9 @@
     ],
     "apps/admin/src/services/api/files.ts": [
       "apps/admin/scripts/verify-admin-file-lifecycle.mjs"
+    ],
+    "apps/admin/src/services/api/internalAccounts.ts": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
     ],
     "apps/admin/src/services/api/jobMaterials.ts": [
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs"
@@ -21112,7 +21144,13 @@
     "apps/partner/src/routes/screen/PartnerGrid.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
     "apps/partner/src/routes/screen/PartnerUsageView.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/partner/src/routes/screen/PartnerVisitStat.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/partner/src/routes/screen/index.tsx": [
@@ -21840,6 +21878,9 @@
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "packages/ui/src/screen/twin/TwinShell.tsx": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "packages/ui/src/screen/twin/TwinTerminalBoard.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "packages/ui/src/styles/fusion-youth.css": [
@@ -23389,6 +23430,7 @@
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
     "services/api/src/audit/audit.types.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
@@ -26383,6 +26425,29 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/permissions/AccountStatusDialog.tsx",
+          "apps/admin/src/routes/permissions/AccountsTable.tsx",
+          "apps/admin/src/routes/permissions/BackupAdminDrawer.tsx",
+          "apps/admin/src/routes/permissions/index.tsx",
+          "apps/admin/src/routes/permissions/presentation.ts",
+          "apps/admin/src/services/api/internalAccounts.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-internal-accounts-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/job-materials/index.tsx",
@@ -26495,8 +26560,8 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/routes/audit/index.tsx",
-          "apps/admin/src/routes/dashboard/index.tsx",
           "apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx",
           "apps/admin/src/routes/partners/PartnerAccountManager.tsx",
           "apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx",
@@ -26656,11 +26721,33 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          "apps/admin/src/lib/auditActionLabels.ts",
+          "services/api/src/audit/audit.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:console-plain-copy"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/screen/GovGrid.tsx",
+          "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/admin/src/routes/screen/index.tsx",
           "apps/admin/src/routes/screen/screenMeta.ts",
           "apps/admin/src/routes/screen/screenTabs.ts",
@@ -26670,7 +26757,9 @@
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/index.tsx",
           "apps/partner/src/routes/screen/PartnerGrid.tsx",
+          "apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx",
           "apps/partner/src/routes/screen/PartnerUsageView.tsx",
+          "apps/partner/src/routes/screen/PartnerVisitStat.tsx",
           "apps/partner/src/routes/screen/index.tsx",
           "apps/partner/src/routes/screen/metricLabels.ts",
           "apps/partner/src/routes/screen/screenMeta.ts",
@@ -26686,6 +26775,7 @@
           "packages/ui/src/screen/twin/TwinInfoFlow.tsx",
           "packages/ui/src/screen/twin/TwinPanel.tsx",
           "packages/ui/src/screen/twin/TwinShell.tsx",
+          "packages/ui/src/screen/twin/TwinTerminalBoard.tsx",
           "packages/ui/src/styles/ops-screen-blocks.css",
           "packages/ui/src/styles/ops-screen-scale.css",
           "packages/ui/src/styles/ops-screen.css",
@@ -40974,10 +41064,13 @@
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/screensaver/terminalConfigState.test.ts",
         "kind": "test",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/admin/package.json",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
         "scope": "admin",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -40999,10 +41092,13 @@
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/toolbox/toolboxActionState.test.ts",
         "kind": "test",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/admin/package.json",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
         "scope": "admin",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
