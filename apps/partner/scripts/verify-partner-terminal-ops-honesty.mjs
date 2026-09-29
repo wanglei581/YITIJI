@@ -88,6 +88,14 @@ check('A0 常量是一句说明而不是数字', typeof NOT === 'string' && /没
   check('A6 全部静默时导出合计行写明无法统计', totalLine.includes(NOT), totalLine)
 }
 check('A7 没有终端时合计判为无法统计', fmt.totalsFaultsReported(view([])) === false)
+{
+  const now = Date.parse('2026-06-20T01:03:00.000Z')
+  const future = fmt.relativeTime('2099-01-01T00:00:00.000Z', now)
+  const recent = fmt.relativeTime('2026-06-20T01:00:00.000Z', now)
+  check('A8 未来心跳不写成刚刚，改为完整北京时间', future === '2099-01-01 08:00', future)
+  check('A9 三分钟前仍是相对时间', recent === '3 分钟前', recent)
+  check('A10 没有心跳仍写从未上报', fmt.relativeTime(null, now) === '从未上报')
+}
 
 // 页面接线
 const cards = readFileSync(join(root, 'src/routes/terminals/TerminalOpsCards.tsx'), 'utf8')

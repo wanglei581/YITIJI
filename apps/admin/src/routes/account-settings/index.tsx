@@ -4,7 +4,7 @@
 // 修改密码走登录态自助改密 POST /auth/password/change（须校验当前密码），
 // 成功后后端旧 token 立即失效，前端主动 logout() 并跳登录页重新登录。
 
-import { formatDate, formatDateTime } from '@ai-job-print/shared'
+import { formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Card, Button } from '@ai-job-print/ui'
 import {
@@ -39,13 +39,7 @@ function parseDevice(ua: string | null): string {
 }
 
 function formatLoginTime(iso: string): string {
-  const d = new Date(iso)
-  const diff = Date.now() - d.getTime()
-  if (Number.isNaN(diff)) return formatDateTime(iso)
-  if (diff < 60_000) return '刚刚'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
-  return formatDateTime(iso)
+  return formatRelativeTime(iso)
 }
 
 const labelCls = 'block text-sm font-medium text-neutral-700 mb-1.5'

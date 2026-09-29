@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { ConsolePager, ConsoleTable, type ConsoleColumn } from '@ai-job-print/ui'
+import { ConsolePager, ConsoleTable, type ConsoleColumn, type ConsoleTableError } from '@ai-job-print/ui'
 
 export interface PaginationProps {
   total: number
@@ -41,9 +41,11 @@ export function FilterPills({ filters, active, counts, onChange }: FilterPillsPr
 export interface DataTableProps<T> {
   items: T[]
   empty?: { title: string; description?: string; action?: ReactNode }
-  renderRow: (item: T, index: number) => ReactNode
-  renderHeader: () => ReactNode
+  renderRow?: (item: T, index: number) => ReactNode
+  renderHeader?: () => ReactNode
   columns?: ConsoleColumn<T>[]
+  loading?: boolean
+  error?: ConsoleTableError | null
   page: number
   pageSize: number
   total: number
@@ -53,7 +55,7 @@ export interface DataTableProps<T> {
   scrollX?: boolean
 }
 
-export function DataTable<T>({ items, empty, renderRow, renderHeader, columns, page, pageSize, total, onPageChange, onPageSizeChange, className, scrollX }: DataTableProps<T>) {
+export function DataTable<T>({ items, empty, renderRow, renderHeader, columns, loading, error, page, pageSize, total, onPageChange, onPageSizeChange, className, scrollX }: DataTableProps<T>) {
   return (
     <ConsoleTable
       items={items}
@@ -61,6 +63,8 @@ export function DataTable<T>({ items, empty, renderRow, renderHeader, columns, p
       renderRow={renderRow}
       renderHeader={renderHeader}
       columns={columns}
+      loading={loading}
+      error={error}
       page={page}
       pageSize={pageSize}
       total={total}

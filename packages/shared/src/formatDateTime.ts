@@ -16,7 +16,10 @@ export type DateTimeDisplayStyle =
   | 'time'
   | 'zh-date'
   | 'zh-datetime'
+  | 'zh-date-weekday'
   | 'month-day'
+
+const WEEKDAY_ZH = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const
 
 export interface ShanghaiWallParts {
   year: number
@@ -25,6 +28,7 @@ export interface ShanghaiWallParts {
   hour: number
   minute: number
   second: number
+  weekday: (typeof WEEKDAY_ZH)[number]
   dateKey: string
 }
 
@@ -85,6 +89,7 @@ export function shanghaiParts(instant: Date): ShanghaiWallParts {
     hour,
     minute,
     second,
+    weekday: WEEKDAY_ZH[shifted.getUTCDay()],
     dateKey: `${year}-${pad(month)}-${pad(day)}`,
   }
 }
@@ -103,6 +108,8 @@ function renderParts(parts: ShanghaiWallParts, style: DateTimeDisplayStyle): str
       return `${pad(parts.month)}-${pad(parts.day)}`
     case 'zh-date':
       return `${parts.year}年${parts.month}月${parts.day}日`
+    case 'zh-date-weekday':
+      return `${parts.year}年${parts.month}月${parts.day}日 ${parts.weekday}`
     case 'zh-datetime':
       return `${parts.year}年${parts.month}月${parts.day}日 ${pad(parts.hour)}:${pad(parts.minute)}`
     case 'datetime':

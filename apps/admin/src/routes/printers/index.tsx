@@ -1,4 +1,4 @@
-import { formatDateTime } from '@ai-job-print/shared'
+import { formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { useState } from 'react'
 import { mergeById, useRefreshable } from '@ai-job-print/refresh'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
@@ -35,14 +35,7 @@ const FILTER_STATUS: Record<string, AdminPrinterRecord['status'] | null> = {
 
 function relativeTime(iso: string | null): string {
   if (!iso) return '从未'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return '—'
-  const diffMin = Math.floor((Date.now() - t) / 60_000)
-  if (diffMin < 1) return '刚刚'
-  if (diffMin < 60) return `${diffMin} 分钟前`
-  const hours = Math.floor(diffMin / 60)
-  if (hours < 24) return `${hours} 小时前`
-  return `${Math.floor(hours / 24)} 天前`
+  return formatRelativeTime(iso)
 }
 
 /**

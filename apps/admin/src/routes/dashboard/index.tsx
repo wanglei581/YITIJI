@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime, formatTime } from '@ai-job-print/shared'
+import { formatDateTime, formatRelativeTime, formatTime } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState, type ElementType, type ReactNode } from 'react'
 import { ErrorState, LoadingState, Meter, SectionCard, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -124,14 +124,7 @@ const PRINT_STATUS_LABELS: Record<string, { label: string; status: 'success' | '
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function relTime(iso: string): string {
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return iso
-
-  const diff = Date.now() - time
-  if (diff < 60_000) return '刚刚'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
-  return `${Math.floor(diff / 86_400_000)} 天前`
+  return formatRelativeTime(iso)
 }
 
 function clockTime(iso: string): string {
@@ -504,7 +497,7 @@ export default function DashboardPage() {
     void loadBlocks(ALL_BLOCKS).finally(() => setInitialLoading(false))
   }, [loadBlocks])
 
-  const today = formatDate(new Date())
+  const today = formatDateTime(new Date(), { style: 'zh-date-weekday' })
 
   const entry = <K extends BlockKey>(key: K): BlockEntry =>
     blocks[key] ?? { value: null, error: null, loading: true }

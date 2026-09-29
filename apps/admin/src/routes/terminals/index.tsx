@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from '@ai-job-print/shared'
+import { formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
@@ -46,14 +46,7 @@ function heartbeatText(iso: string | null): string {
 
 function relativeTime(iso: string | null): string {
   if (!iso) return '从未'
-  const t = new Date(iso).getTime()
-  if (isNaN(t)) return '—'
-  const diffMin = Math.floor((Date.now() - t) / 60_000)
-  if (diffMin < 1) return '刚刚'
-  if (diffMin < 60) return `${diffMin} 分钟前`
-  const h = Math.floor(diffMin / 60)
-  if (h < 24) return `${h} 小时前`
-  return `${Math.floor(h / 24)} 天前`
+  return formatRelativeTime(iso)
 }
 
 function runtimeStatusView(t: AdminTerminalRecord) {

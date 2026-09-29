@@ -29,6 +29,7 @@ import {
   formatPercent,
   formatYuan,
 } from '../packages/shared/src/formatNumber.ts'
+import { buildPageList } from '../packages/ui/src/components/consolePageList.ts'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -166,6 +167,12 @@ for (const sample of [utcIso, naiveUtc, shanghaiIso]) {
   else fail(`formatDateTime(${JSON.stringify(sample)}) 得到 ${got}，期望 ${expected}`)
 }
 
+const weekday = formatDateTime('2026-09-29T16:00:00.000Z', { style: 'zh-date-weekday' })
+if (weekday === '2026年9月30日 星期三') pass(`带星期的中文长日期 → ${weekday}`)
+else fail(`zh-date-weekday 得到 ${weekday}，期望 2026年9月30日 星期三`)
+if (sharedSrc.includes('getUTCDay()')) pass('星期取自上海墙钟的 getUTCDay')
+else fail('星期必须按 Asia/Shanghai 的 getUTCDay 计算，不能用本地 getDay')
+
 if (!isParseableInstant('') && !isParseableInstant('从未同步') && formatDateTime('从未同步') === '从未同步') {
   pass('空串 / 「从未同步」不冒充已解析时间')
 } else {
@@ -205,8 +212,73 @@ const LOCAL_TIME_RULES = [
   { label: 'toLocaleTimeString(', pattern: /toLocaleTimeString\s*\(/ },
   { label: 'new Date(...).toLocaleString(', pattern: /new Date\([^)\n]*\)\.toLocaleString\s*\(/ },
   { label: 'toLocaleString(locale, options)', pattern: /toLocaleString\s*\(\s*['"][^'"]*['"]\s*,/ },
-  { label: '.slice(0, 10) 截 ISO 当日期', pattern: /\.slice\s*\(\s*0\s*,\s*10\s*\)/ },
 ]
+
+const DATE_TIME_NAME = /At|Date|Time|time|date/
+
+/** 只看 .slice 左边那个表达式，避免把上一行的日期字段算进来。 */
+function receiverBeforeSlice(source, sliceAt) {
+  let i = sliceAt - 1
+  while (i >= 0 && /\s/.test(source[i])) i -= 1
+  if (i < 0) return ''
+  const end = i + 1
+  if (source[i] === ')') {
+    let depth = 0
+    while (i >= 0) {
+      const ch = source[i]
+      if (ch === ')') depth += 1
+      else if (ch === '(') {
+        depth -= 1
+        if (depth === 0) {
+          i -= 1
+          break
+        }
+      }
+      i -= 1
+    }
+    while (i >= 0 && /[\w$]/.test(source[i])) i -= 1
+    return source.slice(i + 1, end)
+  }
+  while (i >= 0 && /[\w$.?[\]'"]/.test(source[i])) i -= 1
+  return source.slice(i + 1, end)
+}
+
+function sliceTargetsDateTime(receiver) {
+  if (/toISOString\s*\(/.test(receiver)) return true
+  const names = receiver.match(/[A-Za-z_$][\w$]*/g) ?? []
+  return names.some((name) => DATE_TIME_NAME.test(name))
+}
+
+/** 只拦对日期时间字段或 toISOString() 结果做 slice(0, 10)。编号前缀不算。 */
+function datetimeSliceViolations(source) {
+  const hits = []
+  const re = /\.slice\s*\(\s*0\s*,\s*10\s*\)/g
+  let match
+  while ((match = re.exec(source))) {
+    const receiver = receiverBeforeSlice(source, match.index)
+    if (!sliceTargetsDateTime(receiver)) continue
+    const line = source.slice(0, match.index).split('\n').length
+    hits.push({ line, receiver })
+  }
+  return hits
+}
+
+const benignSlice = [
+  'const prefix = orderNo.slice(0, 10)',
+  'const head = serial.slice(0, 10)',
+].join('\n')
+const datedSlice = [
+  'const day = createdAt.slice(0, 10)',
+  'const iso = value.toISOString().slice(0, 10)',
+  'const start = row.startDate.slice(0, 10)',
+  'const seen = updatedAt?.slice(0, 10)',
+].join('\n')
+const benignHits = datetimeSliceViolations(benignSlice)
+const datedHits = datetimeSliceViolations(datedSlice)
+if (benignHits.length === 0) pass('普通字符串 slice(0, 10)（编号前缀）不误报')
+else fail(`普通编号前缀被误报：${benignHits.map((hit) => hit.receiver).join(', ')}`)
+if (datedHits.length === 4) pass('日期字段与 toISOString() 的 slice(0, 10) 仍会拦')
+else fail(`日期字段 slice 应拦 4 处，实际 ${datedHits.length}：${datedHits.map((hit) => hit.receiver).join(', ')}`)
 
 function intlConstructors(source) {
   const found = []
@@ -240,6 +312,9 @@ for (const spec of CONSOLE_DIRS) {
     const rel = relative(repoRoot, file)
     for (const rule of LOCAL_TIME_RULES) {
       if (rule.pattern.test(stripped)) localHits.push(`${rel} · ${rule.label}`)
+    }
+    for (const hit of datetimeSliceViolations(stripped)) {
+      localHits.push(`${rel}:${hit.line} · 对日期时间做 slice(0, 10)（${hit.receiver}）`)
     }
     for (const ctor of intlConstructors(stripped)) {
       if (!/timeZone\s*:/.test(ctor)) localHits.push(`${rel} · Intl.DateTimeFormat 未指定 timeZone`)
@@ -287,6 +362,73 @@ if (formatPercent(5, 0) === '—' && formatPercent(5, 0, '暂无') === '暂无')
   pass('分母为 0 时不给百分比')
 } else {
   fail(`分母为 0 得到 ${formatPercent(5, 0)} / ${formatPercent(5, 0, '暂无')}`)
+}
+if (
+  formatYuan(-0.004) === '¥0.00' &&
+  formatYuan(-0.004, { precision: 4 }) === '-¥0.0040' &&
+  formatCents(-0.4) === '¥0.00' &&
+  formatCents(-40) === '-¥0.40' &&
+  formatCount(-0.5) === '0' &&
+  formatCount(-1.2) === '-1'
+) {
+  pass('取整后为 0 不带负号，金额可指定 4 位小数')
+} else {
+  fail(`负零或精度异常：${formatYuan(-0.004)} / ${formatYuan(-0.004, { precision: 4 })} / ${formatCents(-0.4)} / ${formatCount(-0.5)}`)
+}
+
+const relativeCallers = [
+  'apps/admin/src/routes/dashboard/index.tsx',
+  'apps/admin/src/routes/account-settings/index.tsx',
+  'apps/admin/src/routes/printers/index.tsx',
+  'apps/admin/src/routes/peripherals/index.tsx',
+  'apps/admin/src/routes/terminals/index.tsx',
+  'apps/partner/src/routes/terminals/terminalOpsFormat.ts',
+]
+for (const rel of relativeCallers) {
+  const src = readFileSync(join(repoRoot, rel), 'utf8')
+  if (src.includes('formatRelativeTime(')) pass(`${rel} 相对时间走 formatRelativeTime`)
+  else fail(`${rel} 仍在本地计算相对时间`)
+}
+
+console.log('\n── F. 分页页码与表格固定列 ────────────────────────────────────')
+
+const pageCases = [
+  [7, 1, '1,2,3,4,5,6,7'],
+  [7, 2, '1,2,3,4,5,6,7'],
+  [7, 4, '1,2,3,4,5,6,7'],
+  [7, 7, '1,2,3,4,5,6,7'],
+  [8, 1, '1,2,3,4,5,ellipsis,8'],
+  [8, 2, '1,2,3,4,5,ellipsis,8'],
+  [8, 4, '1,2,3,4,5,ellipsis,8'],
+  [8, 8, '1,ellipsis,4,5,6,7,8'],
+  [20, 1, '1,2,3,4,5,ellipsis,20'],
+  [20, 2, '1,2,3,4,5,ellipsis,20'],
+  [20, 4, '1,2,3,4,5,ellipsis,20'],
+  [20, 10, '1,ellipsis,9,10,11,ellipsis,20'],
+  [20, 20, '1,ellipsis,16,17,18,19,20'],
+]
+let pageMismatch = 0
+for (const [total, current, expectedPages] of pageCases) {
+  const gotPages = buildPageList(current, total).join(',')
+  if (gotPages !== expectedPages) {
+    pageMismatch += 1
+    fail(`buildPageList(${current}, ${total}) = ${gotPages}，期望 ${expectedPages}`)
+  }
+}
+if (pageMismatch === 0) pass(`页码列表 ${pageCases.length} 组（7/8/20 页的首页、第 2 页、第 4 页、中间、末页）`)
+
+const tableSrc = readFileSync(join(repoRoot, 'packages/ui/src/components/ConsoleTable.tsx'), 'utf8')
+const stickyLines = tableSrc.split('\n').filter((line) => line.includes('column.sticky'))
+const inheritLine = stickyLines.find((line) => line.includes('bg-inherit'))
+if (inheritLine && inheritLine.includes('border-neutral-900/[0.06]') && !inheritLine.includes('bg-surface')) {
+  pass('固定列继承行背景，并用现有淡分隔')
+} else {
+  fail(`固定列背景不符合：${inheritLine ?? stickyLines.join(' | ')}`)
+}
+if (tableSrc.includes("column.truncate && 'max-w-64 truncate'") && !tableSrc.includes('max-w-[16rem]')) {
+  pass('截断写在单元格内层 div 的 max-w-64')
+} else {
+  fail('截断应是内层 div 的 max-w-64，而不是单元格上的任意宽度')
 }
 
 if (failures > 0) {

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { cn } from '../lib/cn'
+import { buildPageList } from './consolePageList'
 
 const DEFAULT_PAGE_SIZES = [10, 20, 50, 100] as const
 
@@ -53,7 +55,7 @@ export function ConsolePager({
                 onPageSizeChange(Number(e.target.value))
                 onPageChange(1)
               }}
-              className="rounded border border-neutral-200 bg-surface px-2 py-1 text-xs text-neutral-600 focus:border-primary-300 focus:outline-none"
+              className="rounded-md border border-neutral-200 bg-surface px-2 py-1 text-xs text-neutral-600 focus:border-primary-300 focus:outline-none"
             >
               {pageSizeOptions.map((size) => (
                 <option key={size} value={size}>{size}</option>
@@ -69,20 +71,20 @@ export function ConsolePager({
             onClick={() => onPageChange(current - 1)}
             disabled={current === 1}
             aria-label="上一页"
-            className="flex h-7 min-w-[2rem] items-center justify-center rounded text-xs text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-7 min-w-8 items-center justify-center rounded-md text-xs text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            ‹
+            <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
           </button>
           {pages.map((item, index) => (
             item === 'ellipsis' ? (
-              <span key={`ellipsis-${index}`} className="flex h-7 min-w-[2rem] items-center justify-center text-xs text-neutral-300">…</span>
+              <span key={`ellipsis-${index}`} className="flex h-7 min-w-8 items-center justify-center text-xs text-neutral-300">…</span>
             ) : (
               <button
                 key={item}
                 type="button"
                 onClick={() => onPageChange(item)}
                 className={
-                  'flex h-7 min-w-[2rem] items-center justify-center rounded text-xs ' +
+                  'flex h-7 min-w-8 items-center justify-center rounded-md text-xs ' +
                   (item === current ? 'bg-primary-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100')
                 }
               >
@@ -95,24 +97,12 @@ export function ConsolePager({
             onClick={() => onPageChange(current + 1)}
             disabled={current === totalPages}
             aria-label="下一页"
-            className="flex h-7 min-w-[2rem] items-center justify-center rounded text-xs text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-7 min-w-8 items-center justify-center rounded-md text-xs text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            ›
+            <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       )}
     </div>
   )
-}
-
-function buildPageList(current: number, total: number): Array<number | 'ellipsis'> {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, index) => index + 1)
-  }
-  const pages: Array<number | 'ellipsis'> = [1]
-  if (current > 3) pages.push('ellipsis')
-  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i)
-  if (current < total - 2) pages.push('ellipsis')
-  pages.push(total)
-  return pages
 }

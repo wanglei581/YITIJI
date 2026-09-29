@@ -1,6 +1,6 @@
 // 终端数据页的文案与格式化。所有数字都来自服务端，这里只决定怎么说。
 
-import { formatDate, formatDateTime } from '@ai-job-print/shared'
+import { formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { buildCsv } from '../../lib/csv'
 import type {
   PartnerTerminalOpsView,
@@ -61,14 +61,7 @@ export function windowText(data: PartnerTerminalOpsView): string {
 
 export function relativeTime(iso: string | null, nowMs: number = Date.now()): string {
   if (!iso) return '从未上报'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return '—'
-  const diffMin = Math.floor((nowMs - t) / 60_000)
-  if (diffMin < 1) return '刚刚'
-  if (diffMin < 60) return `${diffMin} 分钟前`
-  const hours = Math.floor(diffMin / 60)
-  if (hours < 24) return `${hours} 小时前`
-  return `${Math.floor(hours / 24)} 天前`
+  return formatRelativeTime(iso, new Date(nowMs))
 }
 
 export function terminalName(row: TerminalOpsRow): string {
