@@ -112,7 +112,7 @@ const SCRUBBED_ENV_PREFIXES = [
   'WECHAT_', 'ALIPAY_', 'PAYMENT_', 'SANDBOX_', 'CONTRACT_REVIEW_', 'SMS_', 'FILE_', 'COS_',
   'RECRUITMENT_', 'TERMINAL_', 'JWT_', 'SECRET_', 'ALERT_', 'DEMO_SEED_', 'DOTENV_', 'CORS_',
   'PRINT_', 'SCAN_', 'CONVERSION_', 'GOTENBERG_', 'SOFFICE_', 'LEGAL_', 'RESUME_', 'POLICY_',
-  'MEMBER_', 'DATA_DELETION_', 'MAINTENANCE_', 'ENABLE_TEST_',
+  'MEMBER_', 'DATA_DELETION_', 'MAINTENANCE_', 'ENABLE_TEST_', 'KIOSK_',
 ]
 
 export function inheritedEnv(parentEnv = process.env) {
@@ -157,6 +157,10 @@ export function buildApiEnv({ paths, ports, redisUrl, secrets, parentEnv = proce
     TENCENT_COS_SECRET_ID: '',
     TENCENT_COS_SECRET_KEY: '',
     TENCENT_COS_BUCKET: '',
+
+    // 手机扫码上传的二维码指向一体机前端的 /upload/phone；不设时服务端会用自己的地址，
+    // 那里没有这个页面（404）。演示只在本机，所以是 127.0.0.1。
+    KIOSK_PUBLIC_BASE_URL: `http://127.0.0.1:${ports.kiosk}`,
 
     // 招聘内容托管：我们云上的默认口径是关闭，演示同样关闭。
     RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false',

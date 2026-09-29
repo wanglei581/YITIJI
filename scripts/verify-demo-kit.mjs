@@ -103,6 +103,8 @@ console.log('2. 演示库路径')
   check('服务端 DATABASE_URL 指向 .demo/demo.db（父环境的开发库地址被覆盖）', apiEnv.DATABASE_URL === expected && !apiEnv.DATABASE_URL.includes('dev.db'), apiEnv.DATABASE_URL)
   const inDemo = (p) => !relative(paths.demoDir, p).startsWith('..')
   check('上传目录与 dotenv 文件都在 .demo/ 内', inDemo(apiEnv.FILE_STORAGE_DIR) && inDemo(apiEnv.DOTENV_CONFIG_PATH))
+  // 不设时二维码会指向服务端自己的 /upload/phone（那里是 404），手机上传整条走不通。
+  check('手机上传二维码指向演示一体机前端', apiEnv.KIOSK_PUBLIC_BASE_URL === `http://127.0.0.1:${ports.kiosk}`, apiEnv.KIOSK_PUBLIC_BASE_URL)
   const ignored = read('.gitignore').split(/\r?\n/).map((l) => l.trim())
   check('.gitignore 忽略 /.demo/', ignored.includes('/.demo/'))
   const seed = codeOnly(read('scripts/demo/seed-demo.ts'))
@@ -131,6 +133,10 @@ console.log('3. 演示数据都带「演示」标记')
   check('政策不用招聘分类', (data.policies ?? []).every((p) => p.category !== 'recruitment'))
   const seed = codeOnly(read('scripts/demo/seed-demo.ts'))
   check('种子运行时再校验一次标记', seed.includes("const DEMO_MARK = '演示'") && seed.includes('assertDemoMarkers(data)'))
+  // 试点免费（9/29 拍板）：演示价目一律 0 元，否则打印会停在付款前，且和试点口径不一致。
+  const priceLoop = seed.slice(seed.indexOf('for (const price of DEV_DEFAULT_PRICE_CONFIG)'))
+  check('演示价目写 0 元（试点免费）', /unitCents:\s*0,/.test(priceLoop.slice(0, 400)) && !/unitCents:\s*price\.unitCents/.test(seed))
+  check('价目说明写明免费试运营', String(data.priceDescriptionPrefix).includes('免费试运营'))
 }
 
 // ── 4. AI 模拟、托管关闭、外部密钥全空 ─────────────────────────────────────

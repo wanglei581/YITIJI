@@ -185,9 +185,11 @@ async function main(): Promise<void> {
     await prisma.legalDocVersion.upsert({ where: { id }, update: fields, create: { id, ...fields } })
   }
 
+  // 试点免费（2026-09-29 产品负责人拍板）：演示价目与试点一致，全部 0 元，
+  // 报价为 0 时服务端直接按免费单建单，打印流程不会停在付款前。
   for (const price of DEV_DEFAULT_PRICE_CONFIG) {
     const fields = {
-      unitCents: price.unitCents,
+      unitCents: 0,
       unit: price.unit,
       active: true,
       description: `${data.priceDescriptionPrefix}${price.description}`,
