@@ -51,6 +51,7 @@ import { readAiResumeSession } from './aiResumeSession'
 import { JobFitStage } from './JobFitPage'
 import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import { CareerPlanExistingMaterials } from './components/career-plan/CareerPlanExistingMaterials'
+import { CareerPlanSelfAssessmentExcluded } from './components/career-plan/CareerPlanSelfAssessmentExcluded'
 import { CareerPlanColumns, CareerPlanGenerateRegion, CareerPlanSelfCheck } from './components/career-plan/CareerPlanSection'
 import {
   CtaNote, Ghosts, Guardline, KitRows, ListRows, Nots, RouteCards, Sec, Slots, Steps, Verdict, Waiting,
@@ -607,6 +608,7 @@ export function CareerPlanPage() {
               head="只供本人参考"
               body="本机不预测前景、不预测薪资、不说「三年后你能到什么岗」—— 那些本机没有依据。本机不代收简历、不代为投递；是否转方向、是否考证，由你自己决定。"
             />
+            <CareerPlanSelfAssessmentExcluded excluded={plan.selfAssessmentExcluded} onGo={goSelfAssessment} />
           </Sec>
 
           <CareerPlanExistingMaterials />
