@@ -533,7 +533,7 @@ export function ResumeSourcePage() {
               <div className="qx-rt-filecard"><FileTextIcon size={32} aria-hidden="true" /><span className="fx"><b>{uploadedFile.name}</b><small>{uploadedFile.size} · {uploadedFile.format.toUpperCase()} · {channelLabel(uploadedFile.channel)}</small></span><span className="fb">待你确认</span></div>
             ) : selected === 'phone' ? (
               <div className="resume-source-phone-session qx-rt-phone">
-                <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
+                <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} busyWhen="received" />
               </div>
             ) : selected === 'usb' ? (
               <div className="qx-rt-usb">

@@ -6,7 +6,8 @@
 //  A. 【版本化同意】旧版本同意**不得**被当成新版本同意。
 //     只存一个布尔 `consented:true` 的系统，在同意书改版后会把用户对旧说明的
 //     同意当成对新说明的同意 —— 用户从未看过新条款，系统却按「已同意」放行。
-//     这里逐条钉死：显式旧版本被拒、缺省版本不被静默升级、回读不粉饰。
+//     这里逐条钉死：已提交的非当前版本一律拒绝（没有旧版本清单）、缺省版本
+//     不被静默升级、回读不粉饰。已落库的旧版本仍可查看、打印、撤回。
 //
 //  B. 【记录追加】`/append` 不得成为覆盖写，并发追加不得互相丢失。
 //     并附带证明 append 产出带 `printFileUrl`（内部 HMAC URL），
@@ -18,7 +19,7 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { BadRequestException } from '@nestjs/common'
 import { PDFDocument } from 'pdf-lib'
@@ -31,12 +32,34 @@ import {
   type SelfAssessmentSubmitInput,
 } from '../self-assessment.service'
 import { AppendedSelfAssessmentService } from '../appended-self-assessment.service'
+import { SelfAssessmentController } from '../../self-assessment.controller'
 import { SELF_ASSESSMENT_CONSENT_VERSION } from '../self-assessment.types'
 
 const repoRoot = resolve(__dirname, '../../../../../..')
 const CURRENT = SELF_ASSESSMENT_CONSENT_VERSION
-/** 一个「上一版同意书」的版本号。它必须永远打不开当前的门。 */
+/** 冻结的当前版本。测试不得改用导入常量，否则把常量改回旧值时请求会跟着变绿。 */
+const NEW_VERSION = 'sa-consent-v2.2026-09-29'
+/** #1119 下发过的版本。取消过渡期后，用它提交必须 400。 */
+const PREVIOUS_VERSION = 'sa-consent-v1.2026-09-29'
+/** 更早的一体机版本。同样必须 400，不能再进白名单。 */
+const LEGACY_VERSION = 'sa-consent-v1.2026-08-16'
+const AGE_ITEM = '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。'
+const CHECKBOX_LABEL =
+  '我已阅读上述说明和《隐私政策》中的未成年人个人信息处理规则，确认本人已满 14 周岁；未满 14 周岁的，已取得监护人同意并由监护人陪同。'
+const CONSENT_LINK = {
+  label: '《隐私政策》中的未成年人个人信息处理规则',
+  legalDocType: 'privacy_policy' as const,
+  sectionTitle: '未满十四周岁未成年人个人信息处理规则',
+}
+const STALE_MESSAGE = '知情同意说明已更新，请重新阅读并确认后再提交'
+/** 一个从未下发过的版本。它必须永远打不开门。 */
 const STALE = 'sa-consent-v0.2026-01-01'
+
+function resultTtlMs(): number {
+  const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
+  const hours = Number.isFinite(raw) && raw > 0 ? raw : 24
+  return hours * 60 * 60 * 1000
+}
 
 // ── mock 基础设施 ────────────────────────────────────────────────────
 
@@ -49,6 +72,7 @@ interface StoredRow {
   endUserId: string | null
   accessTokenHash: string | null
   expiresAt: Date
+  createdAt: Date
 }
 
 interface AuditEvent {
@@ -57,18 +81,23 @@ interface AuditEvent {
   payload: unknown
 }
 
-function makeHarness(opts: { resumePages?: number; reportPages?: number } = {}) {
+function makeHarness(opts: { resumePages?: number; reportPages?: number; llm?: 'ok' | 'rejected' | 'throw' } = {}) {
   const resumePages = opts.resumePages ?? 1
   const reportPages = opts.reportPages ?? 2
   const rows: StoredRow[] = []
   const audits: AuditEvent[] = []
+  const aiLogs: Array<Record<string, unknown>> = []
   const uploads: Array<{ fileId: string; filename: string; buffer: Buffer }> = []
   let uploadSeq = 0
 
   const prisma = {
     aiResumeResult: {
-      create: async ({ data }: { data: Omit<StoredRow, 'id'> }) => {
-        const row: StoredRow = { id: `row-${rows.length + 1}`, ...data }
+      create: async ({ data }: { data: Omit<StoredRow, 'id' | 'createdAt'> & { createdAt?: Date } }) => {
+        const row: StoredRow = {
+          id: `row-${rows.length + 1}`,
+          ...data,
+          createdAt: data.createdAt ?? new Date(),
+        }
         rows.push(row)
         return row
       },
@@ -112,16 +141,32 @@ function makeHarness(opts: { resumePages?: number; reportPages?: number } = {}) 
   }
 
   const llm = {
-    summarize: async ({ scored }: { scored: { dimensions: unknown[] } }) => ({
-      status: 'completed' as const,
-      dimensions: scored.dimensions,
-      summary: '解读摘要',
-      providerName: 'mock-llm',
-    }),
+    summarize: async (input: {
+      scored: { dimensions: unknown[] }
+      onLlmCall?: (meta: { provider: string; tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } }) => void
+    }) => {
+      if (opts.llm === 'throw') throw new Error('boom')
+      input.onLlmCall?.({ provider: 'mock-llm', tokenUsage: { promptTokens: 3, completionTokens: 2, totalTokens: 5 } })
+      if (opts.llm === 'rejected') {
+        return {
+          status: 'rejected' as const,
+          failReason: '本次解读未能生成合规结果，请重新作答或稍后重试',
+          dimensions: [],
+          summary: null,
+          providerName: 'mock-llm',
+        }
+      }
+      return {
+        status: 'completed' as const,
+        dimensions: input.scored.dimensions,
+        summary: '解读摘要',
+        providerName: 'mock-llm',
+      }
+    },
   }
 
   const pdf = { render: async () => ({ buffer: await makePdf(reportPages), pageCount: reportPages }) }
-  const log = { record: () => {} }
+  const log = { record: (row: Record<string, unknown>) => { aiLogs.push(row) } }
 
   const service = new SelfAssessmentService(
     prisma as never, llm as never, pdf as never, files as never, audit as never, log as never,
@@ -129,7 +174,7 @@ function makeHarness(opts: { resumePages?: number; reportPages?: number } = {}) 
   const appendService = new AppendedSelfAssessmentService(
     prisma as never, service, files as never, audit as never,
   )
-  return { service, appendService, rows, audits, uploads }
+  return { service, appendService, rows, audits, uploads, aiLogs }
 }
 
 async function makePdf(pages: number): Promise<Buffer> {
@@ -146,6 +191,64 @@ function answers(): SelfAssessmentSubmitInput['answers'] {
 }
 
 const anon = { endUserId: null, accessToken: null }
+
+function assertAnonymousShortRetention(row: StoredRow, label: string): void {
+  assert.equal(row.endUserId, null, `${label}：endUserId 必须为空`)
+  assert.ok(row.expiresAt.getTime() > row.createdAt.getTime(), `${label}：保存期必须为正`)
+  assert.ok(
+    row.expiresAt.getTime() <= row.createdAt.getTime() + resultTtlMs(),
+    `${label}：expiresAt 不得超过 createdAt + AI_RESUME_RESULT_TTL_HOURS`,
+  )
+  const payload = JSON.parse(row.payloadJson) as Record<string, unknown>
+  for (const key of ['terminalId', 'memberId', 'memberNo', 'endUserId', 'phone', 'answers']) {
+    assert.equal(Object.prototype.hasOwnProperty.call(payload, key), false, `${label}：payload 不得含 ${key}`)
+  }
+  assert.equal(JSON.stringify(payload).includes('long_term'), false, `${label}：不得进长期保存`)
+  assert.equal(JSON.stringify(payload).includes('months_6'), false, `${label}：不得进延长期限`)
+}
+
+function readConstStrings(src: string, name: string): string[] {
+  const matched = src.match(new RegExp(`(?:export\\s+)?const\\s+${name}\\b[\\s\\S]*?=\\s*\\[([\\s\\S]*?)\\n\\]`))
+  assert.ok(matched, `必须能读到 ${name}`)
+  const items = [...matched![1]!.matchAll(/'([^'\\]*)'/g)].map((item) => item[1]!)
+  assert.ok(items.length > 0, `${name} 不能是空数组`)
+  return items
+}
+
+function readStringConst(src: string, name: string): string {
+  const matched = src.match(new RegExp(`(?:export\\s+)?const\\s+${name}\\s*=\\s*'([^']*)'`))
+  assert.ok(matched, `必须能读到 ${name}`)
+  return matched![1]!
+}
+
+function readConsentLinks(src: string): Array<{ label: string; legalDocType: string; sectionTitle: string }> {
+  const matched = src.match(/const\s+SELF_ASSESSMENT_CONSENT_LINKS\b[\s\S]*?=\s*\[([\s\S]*?)\n\]/)
+  assert.ok(matched, '必须能读到 SELF_ASSESSMENT_CONSENT_LINKS')
+  return [...matched![1]!.matchAll(/\{([\s\S]*?)\}/g)].map((hit) => {
+    const body = hit[1]!
+    const pick = (key: string) => {
+      const field = body.match(new RegExp(`${key}\\s*:\\s*'([^']*)'`))
+      assert.ok(field, `链接缺少 ${key}`)
+      return field![1]!
+    }
+    return { label: pick('label'), legalDocType: pick('legalDocType'), sectionTitle: pick('sectionTitle') }
+  })
+}
+
+function listMiniappSources(): string[] {
+  const root = resolve(repoRoot, 'apps/miniapp')
+  const out: string[] = []
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'node_modules' || name === 'dist' || name === 'miniprogram_npm') continue
+      const full = resolve(dir, name)
+      if (statSync(full).isDirectory()) walk(full)
+      else if (/\.(js|ts|json|wxml)$/.test(name)) out.push(full)
+    }
+  }
+  walk(root)
+  return out
+}
 
 // ════════════════════════════════════════════════════════════════════
 // A. 版本化同意
@@ -173,35 +276,94 @@ test('A1 持旧版本同意的提交被拒绝，而不是静默放行', async ()
   assert.equal(audits.length, 0, '旧版本同意不得产生 create 审计')
 })
 
-test('A2 旧版本同意不会被「就近升级」成当前版本', async () => {
-  const { service } = makeHarness()
-  // 反向证明：把当前版本号交进去可以通过 —— 说明 A1 的失败来自版本不符，
-  // 而不是别的什么原因（比如答案格式）让所有提交都失败。
-  const ok = await service.submit(anon, {
-    answers: answers(),
-    consent: { nonSensitive: true, sensitive: false, consentVersion: CURRENT },
-  })
-  assert.equal(ok.consentVersion, CURRENT)
-  assert.equal(ok.consentCurrent, true)
-  assert.notEqual(ok.consentVersion, STALE, '不得把旧版本号原样存下来当成有效同意')
+test('A1b 不是当前版本的字符串一律 400，不能因为「看起来更早」就收下', async () => {
+  const outsiders = [
+    'sa-consent-v1.2026-08-15',
+    'sa-consent-v1.2020-01-01',
+    'sa-consent-v1.2026-09-28',
+    'sa-consent-v1.2026-09-30',
+    `${LEGACY_VERSION}.1`,
+    LEGACY_VERSION.toUpperCase(),
+  ]
+  for (const version of outsiders) {
+    const { service, rows } = makeHarness()
+    await assert.rejects(
+      () => service.submit(anon, {
+        answers: answers(),
+        consent: { nonSensitive: true, sensitive: false, consentVersion: version },
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof BadRequestException)
+        assert.match(JSON.stringify(error.getResponse()), /SELF_ASSESSMENT_CONSENT_VERSION_STALE/)
+        return true
+      },
+      `${version} 不是当前版本，必须 400`,
+    )
+    assert.equal(rows.length, 0, `${version} 不得落库`)
+  }
 })
 
-test('A3 未带版本号的提交如实记为 null，不被补写成当前版本', async () => {
+test('A2 新版本提交通过，并按新版本落库', async () => {
   const { service, rows } = makeHarness()
-  // 现网 S2-7 前端只发两个布尔。这一条守的是最隐蔽的那个洞：
-  // 服务端「顺手」把当前版本号补上，等于凭空制造一份用户没做过的同意。
-  const res = await service.submit(anon, {
+  const ok = await service.submit(anon, {
     answers: answers(),
-    consent: { nonSensitive: true, sensitive: false },
+    consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION },
   })
+  assert.equal(ok.status, 'completed')
+  assert.equal(ok.consentVersion, NEW_VERSION)
+  assert.equal(ok.consentCurrent, true)
+  assert.equal(CURRENT, NEW_VERSION, '服务端当前版本常量必须等于冻结的新版本')
+  const stored = JSON.parse(rows[0]!.payloadJson) as { consentVersion: string }
+  assert.equal(stored.consentVersion, NEW_VERSION, '落库存的必须是实际提交的新版本')
+  assertAnonymousShortRetention(rows[0]!, '新版本匿名')
+})
 
-  assert.equal(res.consentVersion, null, '缺省版本必须记为 null')
-  assert.notEqual(res.consentVersion, CURRENT, '缺省版本绝不能被补写成当前版本')
-  assert.equal(res.consentCurrent, false, '未版本化同意不算「已同意当前说明」')
-  assert.equal(res.consentedAt, null)
+test('A2b #1119 版本与更早版本一律 400，不落库、不写创建审计', async () => {
+  for (const version of [PREVIOUS_VERSION, LEGACY_VERSION]) {
+    const { service, rows, audits } = makeHarness()
+    await assert.rejects(
+      () => service.submit(anon, {
+        answers: answers(),
+        consent: { nonSensitive: true, sensitive: false, consentVersion: version },
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof BadRequestException, `${version} 必须是 400`)
+        const body = error.getResponse() as { error?: { code?: string; message?: string } }
+        assert.equal(body.error?.code, 'SELF_ASSESSMENT_CONSENT_VERSION_STALE')
+        assert.equal(body.error?.message, STALE_MESSAGE)
+        return true
+      },
+      `${version} 已不是当前版本，必须拒绝`,
+    )
+    assert.equal(rows.length, 0, `${version} 不得留下任何结果行`)
+    assert.equal(
+      audits.filter((event) => event.action === 'resume.self_assessment_create').length,
+      0,
+      `${version} 不得产生 create 审计`,
+    )
+  }
+})
 
-  const stored = JSON.parse(rows[0]!.payloadJson) as { consentVersion: string | null }
-  assert.equal(stored.consentVersion, null, '落库里也必须是 null，不能是当前版本')
+test('A3 缺版本号、空字符串、带首尾空格的当前版本一律 400，不落库（走真实 submit）', async () => {
+  const { service, rows } = makeHarness()
+  const cases: Array<{ label: string; consent: { nonSensitive: boolean; sensitive: boolean; consentVersion?: string } }> = [
+    { label: '缺版本号', consent: { nonSensitive: true, sensitive: false } },
+    { label: '空字符串', consent: { nonSensitive: true, sensitive: false, consentVersion: '' } },
+    { label: '前后带空格的当前版本', consent: { nonSensitive: true, sensitive: false, consentVersion: ` ${CURRENT} ` } },
+    { label: '大小写不同的当前版本', consent: { nonSensitive: true, sensitive: false, consentVersion: CURRENT.toUpperCase() } },
+  ]
+  for (const c of cases) {
+    await assert.rejects(
+      () => service.submit(anon, { answers: answers(), consent: c.consent }),
+      (error: unknown) => {
+        const body = (error as { getResponse?: () => unknown }).getResponse?.() as { error?: { code?: string } } | undefined
+        assert.equal((error as { getStatus?: () => number }).getStatus?.(), 400, c.label)
+        assert.equal(body?.error?.code, 'SELF_ASSESSMENT_CONSENT_VERSION_STALE', c.label)
+        return true
+      },
+    )
+  }
+  assert.equal(rows.length, 0, '被拒的提交一条都不落库')
 })
 
 test('A4 回读旧版本记录时 consentCurrent=false（同意书改版后不继承）', async () => {
@@ -249,6 +411,29 @@ test('A4b 回读「本次改动之前落库的老行」不得被粉饰成已同�
   assert.equal(read.consentCurrent, false, '老行不得被判定为「已同意当前说明」')
 })
 
+test('A4c 会员名下的旧版本记录仍可查看、打印、撤回', async () => {
+  const member = { endUserId: 'member-1', accessToken: null }
+  const h = makeHarness()
+  await h.service.submit(member, {
+    answers: answers(),
+    consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION },
+  })
+  const row = h.rows[0]!
+  const payload = JSON.parse(row.payloadJson) as Record<string, unknown>
+  payload['consentVersion'] = PREVIOUS_VERSION
+  row.payloadJson = JSON.stringify(payload)
+
+  const read = await h.service.getLatest(row.taskId, member)
+  assert.equal(read.consentVersion, PREVIOUS_VERSION, '查看必须回报存下来的旧版本')
+  assert.equal(read.consentCurrent, false)
+
+  const printed = await h.service.printReport(row.taskId, member)
+  assert.match(printed.printFileUrl, /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]{64}$/)
+
+  const withdrawn = await h.service.withdraw(row.taskId, member)
+  assert.deepEqual(withdrawn, { deleted: true })
+})
+
 test('A5 版本判定是严格相等，不做前缀/大小写/子串兼容', () => {
   assert.equal(isConsentCurrent(CURRENT), true)
   for (const near of [
@@ -262,20 +447,145 @@ test('A5 版本判定是严格相等，不做前缀/大小写/子串兼容', () 
   }
 })
 
-test('A6 同意版本号三处逐字相等（单一真源，不多处硬编码）', () => {
-  const read = (p: string) => readFileSync(resolve(repoRoot, p), 'utf8')
-  const pick = (src: string, file: string) => {
-    const m = src.match(/SELF_ASSESSMENT_CONSENT_VERSION\s*=\s*'([^']+)'/)
-    assert.ok(m, `${file} 必须声明 SELF_ASSESSMENT_CONSENT_VERSION`)
-    return m![1]
-  }
-  const shared = pick(read('packages/shared/src/types/selfAssessment.ts'), 'packages/shared')
-  const api = pick(read('services/api/src/ai/resume/self-assessment.types.ts'), 'services/api')
-  const kiosk = pick(read('apps/kiosk/src/pages/resume/selfAssessmentSession.ts'), 'apps/kiosk')
+test(
+  'A6 一体机、小程序、shared、服务端四处版本号全部相等',
+  {
+    skip: '等一体机与小程序同批升版后开启：一体机仍写死旧版本，本批不改 apps。打开前须确认两端版本与条款都等于服务端当前版本，且页面用题目接口下发的 consentLinks、consentCheckboxLabel 渲染。小程序源码里没有写死版本号时，本断言不会因此变红，不能单独当成页面已升版。',
+  },
+  () => {
+    const read = (p: string) => readFileSync(resolve(repoRoot, p), 'utf8')
+    const pick = (src: string, file: string) => {
+      const m = src.match(/SELF_ASSESSMENT_CONSENT_VERSION\s*=\s*'([^']+)'/)
+      assert.ok(m, `${file} 必须声明 SELF_ASSESSMENT_CONSENT_VERSION`)
+      return m![1]
+    }
+    const sharedSrc = read('packages/shared/src/types/selfAssessment.ts')
+    const apiSrc = read('services/api/src/ai/resume/self-assessment.types.ts')
+    const kioskSrc = read('apps/kiosk/src/pages/resume/selfAssessmentSession.ts')
+    const shared = pick(sharedSrc, 'packages/shared')
+    const api = pick(apiSrc, 'services/api')
+    const kiosk = pick(kioskSrc, 'apps/kiosk')
+    assert.equal(shared, NEW_VERSION)
+    assert.equal(api, NEW_VERSION)
+    assert.equal(kiosk, NEW_VERSION, '一体机版本必须等于当前版本')
+    assert.equal(api, shared)
 
-  assert.equal(api, shared, '服务端 CJS 镜像与 packages/shared 真源必须逐字相等')
-  assert.equal(kiosk, shared, '前端同意版本号与 packages/shared 真源必须逐字相等')
-  assert.equal(shared, CURRENT)
+    const sharedItems = readConstStrings(sharedSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
+    assert.deepEqual(readConstStrings(apiSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS'), sharedItems)
+    assert.deepEqual(readConstStrings(kioskSrc, 'CONSENT_ITEMS'), sharedItems, '一体机条款必须与 shared 逐字相同')
+
+    const versionRe = /sa-consent-v\d+\.\d{4}-\d{2}-\d{2}/g
+    for (const file of listMiniappSources()) {
+      const text = readFileSync(file, 'utf8')
+      for (const hit of text.match(versionRe) ?? []) {
+        assert.equal(hit, NEW_VERSION, `小程序写死的同意版本 ${hit} 必须等于当前版本`)
+      }
+    }
+  },
+)
+
+test('A6b shared 与服务端的版本、条款、链接、勾选框文字逐字一致，并随题目下发', () => {
+  const read = (p: string) => readFileSync(resolve(repoRoot, p), 'utf8')
+  const sharedSrc = read('packages/shared/src/types/selfAssessment.ts')
+  const apiSrc = read('services/api/src/ai/resume/self-assessment.types.ts')
+  assert.equal(readStringConst(sharedSrc, 'SELF_ASSESSMENT_CONSENT_VERSION'), NEW_VERSION)
+  assert.equal(readStringConst(apiSrc, 'SELF_ASSESSMENT_CONSENT_VERSION'), NEW_VERSION)
+  assert.equal(CURRENT, NEW_VERSION, '运行中的服务端常量必须等于冻结的当前版本')
+
+  const sharedItems = readConstStrings(sharedSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
+  const apiItems = readConstStrings(apiSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
+  assert.deepEqual(apiItems, sharedItems, '服务端条款必须与 shared 逐字相同')
+  assert.equal(sharedItems.at(-1), AGE_ITEM)
+  assert.equal(sharedItems.length, 6)
+  assert.equal(readStringConst(sharedSrc, 'SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL'), CHECKBOX_LABEL)
+  assert.equal(readStringConst(apiSrc, 'SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL'), CHECKBOX_LABEL)
+  assert.deepEqual(readConsentLinks(sharedSrc), [CONSENT_LINK])
+  assert.deepEqual(readConsentLinks(apiSrc), [CONSENT_LINK])
+
+  const legalSrc = read('services/api/src/legal/legal.service.ts')
+  const legalController = read('services/api/src/legal/legal.controller.ts')
+  assert.match(legalSrc, /'privacy_policy'/, 'privacy_policy 必须是现有法务文档类型')
+  assert.match(legalController, /@Controller\('kiosk\/legal'\)/)
+
+  const controller = new SelfAssessmentController(
+    null as never, null as never, null as never, null as never, null as never, null as never,
+  )
+  const questions = controller.questions()
+  assert.equal(questions.consentVersion, NEW_VERSION, '链接和勾选框必须配当前版本下发')
+  assert.deepEqual([...questions.consentItems], sharedItems)
+  assert.deepEqual(questions.consentLinks, [CONSENT_LINK])
+  assert.equal(questions.consentCheckboxLabel, CHECKBOX_LABEL)
+})
+
+test('A8 题目接口下发的 consentItems 等于 shared 当前条款，且含年龄这一条', () => {
+  const controller = new SelfAssessmentController(
+    null as never, null as never, null as never, null as never, null as never, null as never,
+  )
+  const questions = controller.questions()
+  const sharedSrc = readFileSync(resolve(repoRoot, 'packages/shared/src/types/selfAssessment.ts'), 'utf8')
+  const sharedItems = readConstStrings(sharedSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
+  assert.equal(questions.consentVersion, NEW_VERSION)
+  assert.deepEqual([...questions.consentItems], sharedItems)
+  assert.ok(questions.consentItems.includes(AGE_ITEM), '下发条款必须含年龄这一条')
+})
+
+test('A9 模型整体拒答：会员落完成行，只回打分，审计记码', async () => {
+  const h = makeHarness({ llm: 'rejected' })
+  const res = await h.service.submit(
+    { endUserId: 'member-1', accessToken: null },
+    { answers: answers(), consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION } },
+  )
+  assert.equal(res.status, 'completed')
+  assert.equal(res.interpretationAvailable, false)
+  assert.equal(res.aiUnavailableReason, 'COMPLIANCE_REJECT')
+  assert.equal(res.failReason, undefined)
+  assert.equal(res.providerName, 'llm_unavailable')
+  assert.equal(res.summary, null)
+  assert.equal(res.dimensions.length, 5)
+  assert.ok(res.dimensions.every((d) => d.note === null && d.strength >= 0))
+  assert.equal(JSON.stringify(res).includes('请重新作答'), false)
+  assert.equal(h.rows.length, 1)
+  assert.equal(h.rows[0]!.status, 'completed')
+  assert.equal(h.rows[0]!.endUserId, 'member-1')
+  const stored = JSON.parse(h.rows[0]!.payloadJson) as { dimensions: unknown[]; aiUnavailableReason?: string }
+  assert.equal(stored.dimensions.length, 5, '不得改用模型返回的空维度')
+  assert.equal(stored.aiUnavailableReason, 'COMPLIANCE_REJECT')
+  const created = h.audits.find((a) => a.action === 'resume.self_assessment_create')
+  const payload = created?.payload as { status?: string; aiUnavailableReason?: string }
+  assert.equal(payload.status, 'completed')
+  assert.equal(payload.aiUnavailableReason, 'COMPLIANCE_REJECT')
+  assert.equal(h.aiLogs[0]?.['status'], 'failed')
+  assert.equal(h.aiLogs[0]?.['errorCode'], 'COMPLIANCE_REJECT')
+  const printed = await h.service.printReport(res.taskId, { endUserId: 'member-1', accessToken: null })
+  assert.match(printed.printFileUrl, /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]{64}$/)
+})
+
+test('A10 模型整体拒答：匿名按 TTL 短期保存，拿到打分和打印凭证', async () => {
+  const h = makeHarness({ llm: 'rejected' })
+  const res = await h.service.submit(anon, {
+    answers: answers(),
+    consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION },
+  })
+  assert.equal(res.status, 'completed')
+  assert.equal(res.aiUnavailableReason, 'COMPLIANCE_REJECT')
+  assert.equal(res.dimensions.length, 5)
+  assert.equal(typeof res.accessToken, 'string')
+  assert.notEqual(res.expiresAt, null)
+  assertAnonymousShortRetention(h.rows[0]!, '合规拒答匿名')
+  assert.equal(h.rows[0]!.status, 'completed')
+  const printed = await h.service.printReport(res.taskId, { endUserId: null, accessToken: res.accessToken! })
+  assert.ok(printed.printFileUrl)
+})
+
+test('A11 模型抛错仍是未完成，不伪装成合规拒答的打分结果', async () => {
+  const h = makeHarness({ llm: 'throw' })
+  const res = await h.service.submit(anon, {
+    answers: answers(),
+    consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION },
+  })
+  assert.equal(res.status, 'rejected')
+  assert.equal(res.expiresAt, null)
+  assert.equal(res.accessToken, undefined)
 })
 
 test('A7 审计只记「同意了哪个版本」，不记作答内容', async () => {

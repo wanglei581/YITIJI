@@ -747,6 +747,11 @@ export interface CareerPlanResponse {
   skillPlan?: Array<{ skill: string; action: string; timeframe: string }>
   actionChecklist?: string[]
   providerName?: string
+  /**
+   * 这次没纳入自我探索的原因。'consent_outdated' = 之前的自我探索是在旧版说明下做的，这次没有送进模型；
+   * 前端在依据栏旁提示「你之前的自我探索结果因说明已更新，这次没有纳入；重新确认说明后可以纳入。」并给去自我探索的入口。
+   */
+  selfAssessmentExcluded?: 'consent_outdated' | null
 }
 
 /**

@@ -6,10 +6,32 @@
 - **改了什么：** 拿到单实例锁之后、领任务之前，临时目录的直接子项里符合严格文件名的图片临时 PDF 一并删除，不看年龄，不进子目录，不跟随符号链接，失败则拒绝领新任务，日志只记数量。新增 `holdPrinterQueueWhenIdle`：代码与示例配置默认 false；生产安装脚本默认写成 true，兼作工作电脑（KSK-001）加 `-KeepPrinterQueueUnpaused`，因为暂停也会挡住这台电脑上别的程序打印。开启后，启动完成开机清理就暂停配置打印机的队列；每次派发前恢复，任务到终态后立刻再暂停；进程若在「已恢复、还没再暂停」时崩溃，下次开机先暂停再清理。开机删除的作业必须同时满足：提交者是 Agent 进程自己的账号（不写死某个账号）、提交时间早于本次进程启动。别的打印机、别的账号、启动后提交的作业不碰。日志只记数量。同一开机步骤另按写死路径清掉四项早期遗留（agent-debug.log、agent-out.log、logs 下未签名的 0.4.8 安装包、scan-test-backup），符号链接和联接点不进入，删除失败不拒绝启动；W-85 若失败，会在队列清理和这项都跑完之后才拒绝领新任务。本地已是 dispatching / spooled 的任务仍报 `PRINT_JOB_UNCONFIRMED`。暂停可能让 Win32 状态离开 3/4/5；心跳和打印前预检在「仅因我们暂停、没有故障位」时仍报就绪，离线、缺纸、卡纸、故障仍按原判断。版本升到 0.4.13。
 - **奔图真机还没验证：** 暂停 / 恢复在奔图驱动上是否稳定，暂停状态断电后是否还在，上电后残留作业会不会自己出纸。这些要发布当天按现场验收脚本 R.5 实测。正在出纸的那一小段（队列已恢复）拔电，打印服务仍可能在 Agent 起来之前把纸送出，本条修的是空闲断电，不覆盖这一窗。本机是 macOS，Windows 上真建队列、真删作业的门禁没有在这台机器跑过。没有宣称 Windows CI 或奔图真机已通过。
 
+> **2026-09-29 一体机自我探索同意条款三端对齐（一体机半，随 #1119；候选写入方）**：同意页的条款（6 条，含年龄一条）、确认式勾选框文字（含《隐私政策》未成年人专章链接）、同意版本（sa-consent-v2.2026-09-29）全部来自同一次 GET /resume/self-assessment/questions 响应，源码不再写死；取不到说明时如实提示「同意说明没有取到，请重试」、不放行；旧版本提交 400 SELF_ASSESSMENT_CONSENT_VERSION_STALE 回到重新确认、已答不清空、确认后自动重交。法务文档页支持 ?section= 按章节标题「包含」定位，找不到停在开头、不做近似兜底。结果页按 interpretationAvailable / aiUnavailableReason 说明 AI 解读缺失原因，维度打分始终显示；职业规划 selfAssessmentExcluded='consent_outdated' 时在依据旁说明并给重新确认入口。门禁 verify:self-assessment-consent-source（进 CI）+ 10 条单测，14 个反向变异全红；本地独立 API + 正式构建走通正常提交与旧版本重确认两条路。待办：①声明开关打开后一体机不会主动问年满 14 周岁（提交接口是 exempt），须在第二次发布前补主动确认；②重新确认拦截面约 750px 留白；③服务端 A6「四端一致」测试打开时改为「一体机按下发渲染、无写死常量」口径。小程序半边 #1124 由小程序窗口并新基线后紧跟合入，三端须同一次发布上线（发布清单 #1127 第 4c 条）。
+## 2026-09-29：一体机公共屏打码，并修通小青作业页与扫码等待（分支 `grok/kiosk-public-screen-mask-20260929`）
+
+- **W-20：** 小青回显原先只打码手机号和邮箱。身份证、银行卡并进已有的 `maskPii`，回显改为走这一处。请求和保存仍用原文。
+- **W-83：** 导出前核对弹窗屏幕上的学校、证书、电话经同一套打码显示。勾选仍按事实编号，不改比对。
+- **W-80：** 作业页把导航里的要点收成稳定字符串再解析，读取失败最多 3 次，并给出「重新读取」。不再每次渲染都把会话重新读一遍。
+- **W-81：** 简历来源页在二维码还在等人、文件没到时不再把整页标成忙，U 盘可以点。手机已传上或正在确认才算忙。其它使用同一二维码面板的页面仍按「会话还在」报忙。
+- **验证：** 新门禁 `verify:public-screen-mask`（含 maskPii 单测）已进 CI。把小青回显改回直接显示原文，门禁变红。关联门禁、一体机类型检查与改动文件的 lint 在本机通过。修复前画面在第一套走查栈 4310，修复后在本分支 4388；证据在走查缓存 `fix-mask/before-*.png` 与 `after-*.png`。未部署。
+
+## 2026-09-29 夜：KSK-001 残留只读底子（Agent 0.4.11）与漏链 1、8 的代码核实
+
+- **真机只读（22:52，UU 远程，只数数量与时间，不列文件名）：** 开机 9/22 11:07 后未重启。Agent 临时目录只有 6/3、7/5 两件 `task_*` 旧遗留，`print_*.pdf` 0；扫描目录与 `_unclaimed` 0；`spool\PRINTERS` 0；用户 `%TEMP%` 与「下载」里的 PDF 0；`C:\Windows\SystemTemp` 18 个系统文件。一体机 Edge 由看门狗以 `--kiosk` + 独立 `--user-data-dir` 启动，**不带 inprivate 参数**（9/28 记录的「InPrivate」是推断，更正）；配置目录 452 MB 多为 Edge 自带组件，`Default\Cache` 6 个缓存块、`Local Storage` 最后写入 9/28 23:24。
+- **代码核实（Codex 只读分析为线索，协调方逐条对代码确认）：** ①图片转 PDF 的 `print_*.pdf` 开机不清理——`cleanupStaleTempPdfs` 定义了但没有调用点（W-85）；②租约到期一律「未确认」，服务端不自动重排、Agent 重启不重打，「系统自己把上一位的文件打出来」在代码里不存在；③但 Agent 从不清理 Windows 打印队列，主机断电后已进队列的作业可能开机续打，后台却显示「未确认」——推断，未实测，已报总指挥建议发布前处理；④「重新提交打印」沿用同一任务号，Agent 本地有记录就只回报 failed，同机重提很可能打不出（W-86，走查窗口先用模拟 Agent 复现）。
+- **空间与内存底子（23:3x 同一次只读）：** Agent 连续运行 180 小时，node 工作集 78 MB、峰值 84 MB，无内存上涨迹象；一体机 Edge 281 MB；可用内存 5.3 GB、C 盘剩余 130 GB。服务日志已按 10 MB 滚动、保留 5 个。**发现约 130 MB 早期遗留物**（都在 `C:\ProgramData\AIJobPrintAgent`，不在滚动范围内）：`agent-debug.log` 48 MB（6/9 后未再写）、`agent-out.log` 38 MB（6/2 后未再写）、`logs\AIJobPrintTerminalSetup.exe` 43 MB（0.4.8 旧安装包、未签名），以及 `scan-test-backup\` 里 1 个扫描件 PDF（9/10，可能含个人信息）。按规矩删除由产品负责人本人做；是否让安装包升级时顺带清掉这几类已知旧文件，交总指挥定。
+- **发布当天：** 现场验收单新增 R.5（用户走后残留、打印中强杀与拔电、重提能否出纸、缓存比对 W-87），一页纸改为约 110 分钟。
+
 ## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
 - **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
+## 2026-09-29：自我探索同意条款加年龄一条与版本过渡、条款由服务端下发（分支 `claude/backend-hardening-20260929-selfassess-consent`）
+
+- **做了什么（Grok 实现、协调方审）：** 合规窗口裁定：同意条款加「本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。」当前版本升到 `sa-consent-v1.2026-09-29`；服务端另收一份明确列出的旧版本清单 `SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS`（只有 `sa-consent-v1.2026-08-16`），清单外仍 400；落库存实际提交的版本号。`GET /resume/self-assessment/questions` 下发 `consentItems`（与版本配套的同一份条款）。匿名结果只按 `AI_RESUME_RESULT_TTL_HOURS` 短期保存（门禁断言 expiresAt 与 endUserId 为空），「匿名不留库」的错注释已改。#1112 后续：附加到简历改按 export 档过闸；整体合规拒答改为只回打分、不让用户重答。过渡期结束的待办已写进 next-tasks（触发条件：小程序带新条款的版本全量）。
+- **验证：** self-assessment-consent、self-assessment-ai-gate（106 条）、self-assessment、assess-isolation 全绿；协调方抽变异「旧版本移出清单」变红；shared、kiosk 类型检查与小程序契约通过。一体机那半（加条款、发新版本号）由主执行窗口同批合，小程序在它自己的 PR 里升版。
+
+- **合规终裁后改（9/29 晚）：** 不设过渡期，只收当前版本 `sa-consent-v2.2026-09-29`（勾选框文字也算同意内容，所以再升一版），旧版本一律 400；题目接口另下发 `consentLinks`（`{ label, legalDocType: 'privacy_policy', sectionTitle: '未满十四周岁未成年人个人信息处理规则' }`，前端选中标题包含它的一章，找不到停在开头；法务文档没有锚点 id）与确认式 `consentCheckboxLabel`。核实发现职业规划生成会把最近一次自我探索记分送进模型：同意不是当前版本时这次不纳入、规划照常生成（依据栏如实不写），不整单拒绝；查看、打印、降级纸不受影响。四端版本一致断言先 skip，待一体机与小程序升版后打开（已记 next-tasks）。Grok 起草到一半余额用完，协调方接手完成；变异（旧版本又被接受、旧同意记分送进模型、不下发链接）全红。
 ## 2026-09-29：小程序「我的文档」页数恒为 0——文件表加识别页数列（分支 `claude/backend-hardening-20260929-doc-pagecount`）
 
 - **根因：** `FileObject` 原来没有页数列，`GET /me/documents` 的 select 也没选，字段缺失传到小程序被收成 0。
