@@ -315,7 +315,8 @@ cmd /c "net user ${USER_NAME} %AIJOB_RESIDUE_PW% /add"
 if ($LASTEXITCODE -ne 0) { throw 'local user was not created' }
 # 任务可能还不存在。Windows PowerShell 5.1 在 Stop 模式下会把被 2> 重定向的原生 stderr 当成异常，所以交给 cmd 吞掉。
 cmd /c "schtasks /Delete /TN ${TASK_NAME} /F >nul 2>&1"
-schtasks /Create /TN ${TASK_NAME} /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${scriptPath}" /SC ONCE /ST 23:59 /RU ".\\${USER_NAME}" /RP $env:AIJOB_RESIDUE_PW /F /RL LIMITED
+# schtasks /RU 不认 .\\用户名（No mapping between account names and security IDs），要写机器名\\用户名。
+schtasks /Create /TN ${TASK_NAME} /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${scriptPath}" /SC ONCE /ST 23:59 /RU "$env:COMPUTERNAME\\${USER_NAME}" /RP $env:AIJOB_RESIDUE_PW /F /RL LIMITED
 if ($LASTEXITCODE -ne 0) { throw 'scheduled task was not created' }
 schtasks /Run /TN ${TASK_NAME}
 if ($LASTEXITCODE -ne 0) { throw 'scheduled task did not start' }
