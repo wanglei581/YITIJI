@@ -5,6 +5,13 @@ import type { PrintFileState as PrintFile } from '../printMaterialSession'
 export const ENCRYPTED_PDF_BLOCK_COPY =
   '这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传'
 
+/** 加密 PDF 打不开时，右栏用这三步填上「怎么去掉打开密码」。本机不收密码。 */
+export const ENCRYPTED_PDF_UNLOCK_STEPS = [
+  { title: '在电脑上打开', body: '用 WPS 或 Acrobat 打开这份 PDF。' },
+  { title: '另存为不带打开密码的 PDF', body: '保存时不要再设打开密码。' },
+  { title: '重新上传', body: '回到这里，用「重新选择文件」再传一次。' },
+] as const
+
 /**
  * 体检消息里这些码表示文件加了打开密码。
  * 当前服务端把 pdf.js 的 PasswordException 收成 PDF_PAGE_COUNT_NOT_DETECTED，

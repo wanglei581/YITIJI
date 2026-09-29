@@ -236,12 +236,15 @@ export function progressStatusFingerprint(result: {
   ].join('\u001f')
 }
 
-/** 已经知道失败之后的进度页文案。不再套用排队或「等待领取」。 */
+/** 已经知道失败之后的进度页文案。不再套用排队或「等待领取」。
+ *  ask 只放顶栏和出错的那一步；红条只用 wayOut，不再把原因写第三遍。
+ */
 export function progressFailurePresentation(reason: string): {
   headerTitle: string
   badge: string
   ask: string
   doing: string
+  wayOut: string
 } {
   const text = reason.trim()
   return {
@@ -249,5 +252,6 @@ export function progressFailurePresentation(reason: string): {
     badge: '打印未完成',
     ask: text || '打印没有完成，请联系现场工作人员核对。',
     doing: '可以联系现场工作人员，查看打印订单，或重新选文件再印。',
+    wayOut: '请用下面的按钮联系工作人员、查看订单，或重新打印。',
   }
 }

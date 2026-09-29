@@ -41,7 +41,7 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
 import { formatCents } from './cashierStatus'
-import { PrintJobRow, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
+import { PrintJobRow, PrintProgressFailureActions, PrintProgressFailureNote, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
 import './styles/print-fulfill-qx.css'
 import {
   FAIL_REASONS,
@@ -554,24 +554,12 @@ export function PrintProgressPage() {
             </button>
           </>
         ) : showFailure ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-              联系工作人员
-            </button>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>
-              查看订单
-            </button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              data-testid="print-fulfill-reprint"
-              onClick={() => navigate(uploadPath)}
-            >
-              重新打印
-              <small>{reprintHint(amountCents)}</small>
-            </button>
-          </>
+          <PrintProgressFailureActions
+            hint={reprintHint(amountCents)}
+            onHelp={() => navigate('/help')}
+            onOrders={() => navigate('/me/print-orders')}
+            onReprint={() => navigate(uploadPath)}
+          />
         ) : (
           <>
             <button
@@ -680,17 +668,7 @@ export function PrintProgressPage() {
                 </div>
               </div>
             )}
-            {showFailure && (
-              <div className="pff-inbar" data-tone="bad" data-testid="print-progress-failure">
-                <div className="pff-inbar-h">
-                  <span className="pff-inbar-ic"><AlertCircleIcon aria-hidden="true" /></span>
-                  <span>
-                    {failureView.ask}
-                    <small>{failureView.doing}</small>
-                  </span>
-                </div>
-              </div>
-            )}
+            {showFailure ? <PrintProgressFailureNote wayOut={failureView.wayOut} /> : null}
           </div>
         </section>
       )}
