@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-29：小程序「我的文档」页数恒为 0——文件表加识别页数列（分支 `claude/backend-hardening-20260929-doc-pagecount`）
+
+- **根因：** `FileObject` 原来没有页数列，`GET /me/documents` 的 select 也没选，字段缺失传到小程序被收成 0。
+- **修法（Grok 实现、协调方审）：** 新增 `FileObject.pageCount Int?`（两套迁移 `20260929220000_file_object_recognized_page_count`，存量保持 null）；上传时只从已通过类型校验的文件字节识别（图片 1 页、PDF 走现有解析；Word、文本、解析失败、直传未读到字节为 null），识别失败不影响上传，上传参数夹带的页数一律忽略；列表返回 `pageCount: number | null`，null 表示没识别出来、不是 0 页。打印报价仍按计费页数，不改用这一列。`files.service.ts` 管理端元数据映射挪到新文件 `file-metadata.ts`，1631→1579 行。
+- **验证：** 新门禁 `verify:document-page-count` 21 条（CI SQLite 与 postgres-readiness）；协调方在最新候选上复跑 member-assets、member-assets-c2d、file-display-truth、print-sign、file-lifecycle-summary、contract-review:file-policy 与 api tsc、PG schema 同步校验全绿，变异「select 不选 pageCount」变红。
+- **交付单（小程序）：** `pageCount` 为 null 时不要显示成 0 页，写「页数待识别」或不显示。
+
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。
