@@ -15,6 +15,7 @@
 9. **P2 路由数三处对不上**：注册 111、测试清单 110、进度 112。
 11. **试点「服务人次」一体机上报挂钩**（9/29 总指挥补）：`KioskSession` 接口一直返回 501，数据源从没写过；服务端写入与按机构聚合由两个后台窗口做，接口契约它发来后再做。一体机接在现有生命周期上（`useIdleLogout`、`KioskPrivacyGuard` 的清场与超时）：从待机屏唤醒记开始，清场或超时记结束，至少一次有效操作才上报；只报匿名的开始、结束、服务大类，不带个人信息，失败静默不影响操作。契约 v1（两个后台窗口 9/29）：终端身份头 `x-terminal-id` + `x-terminal-session-token`；`POST /api/v1/kiosk/session/start {clientSessionId(UUID v4), wokeAt, category}` 在一个周期内第一次有效操作时调（进入任一服务页或开始登录）、幂等；`POST .../heartbeat {clientSessionId, category?}` 进入新大类时调、同大类 5 分钟节流、404 忽略；`POST .../end {clientSessionId, endedAt, endReason: idle_timeout|user_exit|privacy_clear|handover|other}` 挂在清场回调、幂等；category 白名单 print / scan / resume / interview / assistant / career / policy / official_channel / member / help / other，多余字段 400；失败最多重试 1 次、离线直接丢。本窗口补充（已回对方）：任何一次清场之后也开始新周期（先 end 再换新 clientSessionId）。依赖对方服务端 PR 先合入候选。
 10. **#1042 合 main（N1）**：普通合并（不 squash），合并前打 `prod-api-20260917` → `50483cd28`、`prod-web-20260909` → `a8a521cb`；`DEPLOY_API_ENABLED=false`，合并不上线；等候选三作业同一 SHA 全绿、并经产品负责人本人在本窗口确认后执行；合完开新整合 PR，main CI 跑时停合并。发布分两次、每次仍要产品负责人授权：10 月中旬发当前候选（招聘内容默认关），10 月底发最终版页面并同批打开 `AI_DECLARATION_ENFORCEMENT` / `AI_LOGIN_GATE` / `POLICY_SCOPE`。
+11. **一体机「我的打印订单」跨端打通**（9/29 产品负责人：同账号同一套订单）：一体机现在只读 `GET /me/print-orders`，看不到手机上下单未到机的单和材料包；材料包逐份派发的打印任务还会混进列表，显示「未命名文件」。契约 v1 已发后端窗口：`GET /me/print-orders/timeline`（三来源归并、不下发到机码明文、带网点与 `claimableHere`）+ `POST /me/print-orders/:orderId/claim-here`（会员加终端双身份；终端不一致回 409 并附网点名，不计锁机）。接口合进候选后，一体机做页面：卡片按类型渲染，本机可取的给「在本机取件」，不在本机的写「请到 {网点} 取件」。
 
 ## 2026-09-28 深夜：合规小改实现进度与上线配置清单
 
