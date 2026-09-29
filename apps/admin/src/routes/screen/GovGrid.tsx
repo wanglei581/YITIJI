@@ -261,7 +261,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
           sub="近 14 天 · 页"
           scope={cityScope}
           metric={g.printTrend14d}
-          source="按订单支付时间落入的上海自然日聚合已支付打印订单的内容页数；不乘份数，不代表物理出纸张数。「今日」是今天零点到现在的累计。"
+          source="近 14 个上海自然日，只统计已经出纸的任务：页数按打印页数乘以份数，记在出纸完成的那一天。付了款但没出纸的不算。双面打印时这是面数，用纸会少一些。「今日」是今天 0 点到明天 0 点已经出纸的页数。"
           render={(value) => {
             const days = value.days
             const today = days.length ? days[days.length - 1].pages : null

@@ -43,6 +43,14 @@ export function na<T = never>(source: string, window: string, reason: string): S
   return { available: false, source, window, reason }
 }
 
+/** 与服务端 PRINTED_PAGES_SOURCE 逐字一致。 */
+const PRINTED_PAGES_SOURCE =
+  'PrintTask(completed|printOutcome=printed) × copies; OrderItem/Order.billablePages'
+
+/** 与服务端 PRINTED_PAGES_BY_COMPLETION_SOURCE 逐字一致。 */
+const PRINTED_PAGES_TREND_SOURCE =
+  'PrintTask.completedAt(completed|printOutcome=printed) × copies; OrderItem/Order.billablePages'
+
 export const WINDOW: ScreenSnapshotWindow = {
   timezone: 'Asia/Shanghai',
   onlineWindowSeconds: 180,
@@ -177,7 +185,7 @@ export function govFull(): ScreenSnapshot {
     metrics: {
       terminalsOnline: ok('Terminal+TerminalHeartbeat / device-fleet', '180s', f),
       fleetWall: ok('Terminal+TerminalHeartbeat / device-fleet', '180s', f),
-      printPagesCumulative: ok('Order.payStatus=paid,billablePages', 'cumulative', {
+      printPagesCumulative: ok(PRINTED_PAGES_SOURCE, 'cumulative', {
         totalPages: 128431,
         byColor: na('Order.itemsJson', 'cumulative', 'color_split_not_indexed'),
       }),
@@ -199,7 +207,7 @@ export function govFull(): ScreenSnapshot {
         totalCalls: 671,
       }),
       printTrend14d: ok(
-        'Order.payStatus=paid,paidAt+billablePages',
+        PRINTED_PAGES_TREND_SOURCE,
         '14d',
         trendDays([620, 780, 720, 1180, 1040, 1480, 1320, 1640, 1390, 1750, 1520, 1842, 1610, 1780]),
       ),
@@ -268,7 +276,7 @@ export function govEmpty(): ScreenSnapshot {
   const emptyFleet = fleetFromCells([], 0, 0)
   base.metrics.terminalsOnline = ok('Terminal+TerminalHeartbeat / device-fleet', '180s', emptyFleet)
   base.metrics.fleetWall = ok('Terminal+TerminalHeartbeat / device-fleet', '180s', emptyFleet)
-  base.metrics.printPagesCumulative = ok('Order.payStatus=paid,billablePages', 'cumulative', {
+  base.metrics.printPagesCumulative = ok(PRINTED_PAGES_SOURCE, 'cumulative', {
     totalPages: 0,
     byColor: na('Order.itemsJson', 'cumulative', 'color_split_not_indexed'),
   })
@@ -285,7 +293,7 @@ export function govEmpty(): ScreenSnapshot {
     companiesPending: 0,
   })
   base.metrics.aiBreakdown24h = ok('AiServiceLog.groupBy(operation,status)', '24h', { byOperation: {}, failedCalls: 0, totalCalls: 0 })
-  base.metrics.printTrend14d = ok('Order.payStatus=paid,paidAt+billablePages', '14d', trendDays(Array.from({ length: 14 }, () => 0)))
+  base.metrics.printTrend14d = ok(PRINTED_PAGES_TREND_SOURCE, '14d', trendDays(Array.from({ length: 14 }, () => 0)))
   base.metrics.taskFlow24h = ok('PrintTask/ScanTask.groupBy(status)', '24h', { printByStatus: {}, scanByStatus: {} })
   base.metrics.alertsRealtime = ok('derived-alerts', 'current', { firingCount: 0, listedCount: 0, truncated: false, items: [] })
   base.metrics.visitCount = ok('KioskSession.startedAt', 'shanghai-day', 0)
@@ -315,9 +323,9 @@ export function govDegraded(): ScreenSnapshot {
   const base = govFull()
   base.status = 'degraded'
   base.degraded = true
-  base.metrics.printPagesCumulative = na('Order.payStatus=paid,billablePages', 'cumulative', 'source_query_failed')
+  base.metrics.printPagesCumulative = na(PRINTED_PAGES_SOURCE, 'cumulative', 'source_query_failed')
   base.metrics.aiBreakdown24h = na('AiServiceLog.groupBy(operation,status)', '24h', 'source_query_failed')
-  base.metrics.printTrend14d = na('Order.payStatus=paid,paidAt+billablePages', '14d', 'source_query_failed')
+  base.metrics.printTrend14d = na(PRINTED_PAGES_TREND_SOURCE, '14d', 'source_query_failed')
   return base
 }
 
@@ -352,7 +360,7 @@ function allFailed(snapshot: ScreenSnapshot): ScreenSnapshot {
  */
 export function govStructuralGap(): ScreenSnapshot {
   const base = govFull()
-  base.metrics.printPagesCumulative = na('Order.payStatus=paid,billablePages', 'cumulative', 'missing_org_id_on_ai_and_orders')
+  base.metrics.printPagesCumulative = na(PRINTED_PAGES_SOURCE, 'cumulative', 'missing_org_id_on_ai_and_orders')
   return base
 }
 
