@@ -12,6 +12,7 @@ import type {
   SelfAssessmentSubmitResponse,
 } from '@ai-job-print/shared'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class SelfAssessmentApiError extends Error {
@@ -33,7 +34,7 @@ export interface SelfAssessmentAccess {
 async function call<T>(path: string, access: SelfAssessmentAccess, init?: { method?: string; body?: unknown }): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method: init?.method ?? 'GET',
       headers: {
         Accept: 'application/json',
