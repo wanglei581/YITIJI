@@ -17907,6 +17907,9 @@
       "apps/admin/scripts/verify-feedback-sla.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
+    "apps/admin/src/routes/audit/index.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
+    ],
     "apps/admin/src/routes/billing/index.tsx": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/kiosk/scripts/verify-price-single-source.mjs",
@@ -17916,6 +17919,7 @@
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
     ],
     "apps/admin/src/routes/dashboard/index.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
@@ -26266,6 +26270,8 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/audit/index.tsx",
+          "apps/admin/src/routes/dashboard/index.tsx",
           "apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx",
           "apps/admin/src/routes/partners/PartnerAccountManager.tsx",
           "apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx",
