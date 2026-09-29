@@ -18,14 +18,26 @@
  *      且仍是默认 fail-closed（assertComplete 默认 true）
  *   8. 静态：4 个 LLM 调用点确实把遮盖后的文本喂进 prompt，
  *      且 job-fit / career-plan 的防编造校验用的是**送出去的那一份**
+ *   9. 小青对话用的「保留姓名」档：号码类照遮，姓名不遮；合同 / 简历链默认仍遮姓名
+ *  10. 多段遮盖：占位符跨段编号一致，一个 restore() 对所有段有效
+ *  11. 按调用点（运行时，scripts/support/llm-pii-callsite-checks.ts）：模拟面试 / 小青对话 /
+ *      简历生成三处，截获**真正发给模型的请求体**，断言原文不在里面；小青姓名仍在；
+ *      简历生成产物里是真值不是占位符
  *
- * 不触网、不碰 DB。
+ * 不触网（只连本机假模型）、不碰 DB（库操作用内存桩）。
  * 运行：pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
  */
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { maskUserTextForLlm, maskUserTextForLlmText, maskUserTextForLlmReversible } from '../src/common/pii/llm-input-mask'
+import {
+  maskUserTextForLlm,
+  maskUserTextForLlmText,
+  maskUserTextForLlmReversible,
+  maskUserTextsForLlmReversible,
+  maskUserTextsForLlmText,
+} from '../src/common/pii/llm-input-mask'
 import { maskContractText } from '../src/common/pii/pii-masker'
+import { runLlmPiiCallsiteChecks } from './support/llm-pii-callsite-checks'
 import { maskContractText as maskViaShim } from '../src/contract-review/contract-review-pii-masker'
 
 const ROOT = join(__dirname, '..')
@@ -44,12 +56,14 @@ function read(rel: string): string {
 
 function assertContains(src: string, pattern: string | RegExp, label: string) {
   const ok = typeof pattern === 'string' ? src.includes(pattern) : pattern.test(src)
-  ok ? pass(label) : fail(label)
+  if (ok) pass(label)
+  else fail(label)
 }
 
 function assertNotContains(src: string, pattern: string | RegExp, label: string) {
   const bad = typeof pattern === 'string' ? src.includes(pattern) : pattern.test(src)
-  bad ? fail(label) : pass(label)
+  if (bad) fail(label)
+  else pass(label)
 }
 
 // 全部为构造数据，不是真实个人信息。
@@ -297,35 +311,13 @@ const NO_MASK_REGISTRY: Record<string, RegistryEntry> = {
     reason: '仅声明各厂商 baseURL/model 常量，没有任何请求与 prompt 拼装（注释里出现 chat/completions 字样）',
     mustNotContain: ['fetch(', 'role:'],
   },
-  'src/ai/resume/llm-resume-generate.service.ts': {
-    reason: '简历生成按设计不把身份字段送模型：姓名/电话/邮箱由服务端直接复制，prompt 只含意向/经历/技能等非身份内容',
-    // 身份字段一旦进 prompt，登记理由即失效。
-    // 注意只能扫 prompt 构造函数体：文件别处（如「未填写联系方式」提示）合法引用这些字段。
-    mustNotContainInFn: {
-      fn: 'buildGenerateUserPrompt',
-      needles: ['input.basic.name', 'input.basic.phone', 'input.basic.email', 'basic:'],
-    },
-  },
   'src/ai/resume/llm-self-assessment.service.ts': {
     reason: '自我探索只送维度 key/label/strength 分值，答案原文与身份信息都不进 prompt',
     mustNotContain: ['简历原文', 'resumeText', 'input.answers'],
   },
-  // ── 已知缺口（本批次未修，不得当成已覆盖）──────────────────────────────
-  'src/ai/llm/llm-chat.service.ts': {
-    reason:
-      '【已知缺口】AI 助手对话把用户输入原文送模型且未遮盖。与简历链不同，' +
-      '对话里遮盖姓名会影响称呼与上下文连贯，需产品先定降级口径，故本批次未改。' +
-      '登记在此是为了让它可见、可追踪，不是判定它安全。',
-  },
-  'src/mock-interview/mock-interview-llm.service.ts': {
-    reason:
-      '【已知缺口】模拟面试把候选人作答 transcript 原文送模型且未遮盖，' +
-      '自我介绍环节常含姓名/学校。属独立范围（语音+文本双入口），本批次未改。' +
-      '登记在此是为了让它可见、可追踪，不是判定它安全。',
-  },
 }
 
-const MASK_HELPERS = ['maskUserTextForLlmText', 'maskUserTextForLlmReversible', 'maskUserTextForLlm', 'maskContractPages']
+const MASK_HELPERS = ['maskUserTextForLlmText', 'maskUserTextForLlmReversible', 'maskUserTextForLlm', 'maskUserTextsForLlmText', 'maskUserTextsForLlmReversible', 'maskContractPages']
 
 function walkTsFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
@@ -418,7 +410,69 @@ else fail('可还原: 无占位符输入被改写')
 const maskModule = read('src/common/pii/llm-input-mask.ts')
 assertNotContains(maskModule, /logger\.(warn|log|error)\([^)]*\$\{(raw|normalized|text)\}/u, '日志: 遮盖模块不打印文本原文')
 
-// ─── 结果 ────────────────────────────────────────────────────────────────────
+// ─── 9. 小青对话「保留姓名」档 ───────────────────────────────────────────────
+//
+// 小青要求：号码类与地址照遮，姓名不遮（称呼被遮掉，对话就接不上了）。
+// 这是给遮盖引擎加的一个开关，不是另一套实现 —— 所以还要守住「不传开关时行为逐字不变」。
 
-console.log(`\nS0-2 简历链 PII 遮盖验证: ${passCount} PASS, ${failCount} FAIL`)
-if (failCount > 0) process.exit(1)
+const keep = maskUserTextForLlm(RESUME, 'verify-keep-names', { keepNames: true })
+for (const label of ['idNumber', 'phone', 'email', 'bankCard', 'address'] as const) {
+  if (keep.text.includes(FAKE[label])) fail(`保留姓名档: ${label} 仍出现在送模型文本中`)
+  else pass(`保留姓名档: ${label} 已被替换`)
+}
+if (keep.text.includes(`姓名：${FAKE.name}`)) pass('保留姓名档: 姓名原样保留')
+else fail('保留姓名档: 姓名被遮了（小青对话会丢称呼）')
+if (!masked.text.includes(FAKE.name)) pass('保留姓名档: 不传开关时（简历链）姓名仍被遮')
+else fail('保留姓名档: 默认档也不遮姓名了 —— 简历链被连带放宽')
+const contractAgain = maskContractText(CONTRACT)
+if (contractAgain.text === viaDirect.text) pass('保留姓名档: 合同链路输出逐字不变')
+else fail('保留姓名档: 合同链路输出变了')
+
+// ─── 10. 多段遮盖：编号跨段一致 ──────────────────────────────────────────────
+
+const segs = [`热线 ${FAKE.phone}`, '', `再说一遍 ${FAKE.phone}，邮箱 ${FAKE.email}`]
+const many = maskUserTextsForLlmReversible(segs, 'verify-many')
+if (many.texts.length === segs.length) pass('多段: 输出段数与输入一致')
+else fail(`多段: 输出段数 ${many.texts.length} ≠ 输入 ${segs.length}`)
+if (many.texts.every((t) => !t.includes(FAKE.phone) && !t.includes(FAKE.email))) pass('多段: 每段都已遮盖')
+else fail('多段: 有段落残留原文')
+const phoneTok = many.texts[0]?.match(/\[手机号_\d+\]/u)?.[0]
+if (phoneTok && many.texts[2]?.includes(phoneTok)) pass('多段: 同一号码在不同段里是同一个占位符')
+else fail('多段: 同一号码跨段编号不一致')
+if (many.texts.every((t, i) => many.restore(t) === segs[i])) pass('多段: restore() 逐段往返无损')
+else fail('多段: restore() 未能逐段还原')
+if (maskUserTextsForLlmText(segs, 'verify-many-text').join('|') === many.texts.join('|')) pass('多段: 不可还原便捷形态与可还原形态结果一致')
+else fail('多段: 两个多段入口结果不一致')
+
+// ─── 11. 按调用点：截获真正发给模型的请求体 ──────────────────────────────────
+
+// 运行时断言真跑的调用点。路径写死在本文件里还有一个作用：项目图谱只认门禁文件里的
+// 静态路径，不跟进 scripts/support 的 import —— 不写在这里，改这几个文件时图谱就不会
+// 提示要跑本门禁。
+const RUNTIME_CALLSITES = [
+  'src/mock-interview/mock-interview.service.ts',
+  'src/mock-interview/mock-interview-llm.service.ts',
+  'src/ai/llm/llm-chat.service.ts',
+  'src/ai/resume/llm-resume-generate.service.ts',
+]
+for (const rel of RUNTIME_CALLSITES) {
+  const src = read(rel)
+  if (MASK_HELPERS.some((helper) => src.includes(helper))) pass(`调用点: ${rel} 引入了遮盖函数（是否真用上由下面的运行时断言判）`)
+  else fail(`调用点: ${rel} 没有引入遮盖函数`)
+}
+
+async function finish(): Promise<void> {
+  const callsite = await runLlmPiiCallsiteChecks()
+  passCount += callsite.pass
+  failCount += callsite.fail
+  if (callsite.pass === 0) fail('调用点: 一条运行时断言都没跑到（检查器本身失效）')
+
+  // ─── 结果 ──────────────────────────────────────────────────────────────────
+  console.log(`\nS0-2 LLM 入参 PII 遮盖验证: ${passCount} PASS, ${failCount} FAIL`)
+  process.exit(failCount > 0 ? 1 : 0)
+}
+
+void finish().catch((error) => {
+  console.error(`  FAIL 调用点检查崩溃 ${error instanceof Error ? error.message : String(error)}`)
+  process.exit(1)
+})

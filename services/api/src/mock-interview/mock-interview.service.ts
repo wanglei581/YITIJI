@@ -23,6 +23,7 @@ import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.se
 import { InflightCoalescer } from '../ai/ai-inflight'
 import { RedisInflightLock } from '../ai/redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
+import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 
 // ============================================================
 // 2C 模拟面试会话服务。
@@ -116,7 +117,10 @@ export class MockInterviewService {
           error: { code: 'INTERVIEW_RESUME_EXTRACT_FAILED', message: extraction.errorMessage ?? '简历文件无法提取，请更换文件或选择「暂不使用简历」' },
         })
       }
-      resumeDigest = extraction.text?.slice(0, 6000) ?? null
+      // 摘要只给模型出题用，用户看不到它 —— 在生成时就遮掉，库里只存遮盖后的那份，
+      // 简历原文（手机 / 证件 / 邮箱 / 姓名 / 住址）不随练习会话落库。不可还原即可。
+      const digest = maskUserTextForLlmText(extraction.text?.slice(0, 6000) ?? '', 'mock_interview_resume_digest')
+      resumeDigest = digest.trim() ? digest : null
     }
 
     const isAnonymous = !requester.endUserId

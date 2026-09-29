@@ -13,6 +13,7 @@ import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llm
 import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
+import { maskUserTextsForLlmText } from '../common/pii/llm-input-mask'
 
 // ============================================================
 // 2C 模拟面试 LLM 服务：面试官提问 + 练习报告生成。
@@ -154,6 +155,23 @@ function basePersona(input: InterviewPersonaInput): string {
   )
 }
 
+/**
+ * 送模型前遮盖：简历摘要与各轮对话一起遮（占位符编号一致），不可还原。
+ *
+ * 面试问题和练习报告都不需要把真值填回去，所以用不可还原遮盖；
+ * 姓名照遮（引擎只认「姓名：」这类带标签的写法）—— 姓名和联系方式对出题、点评都没有用。
+ * 摘要在建会话时已经遮过一次（库里存的是遮盖后的），这里再遮一次是给
+ * 存量会话（改造前建的、库里仍是原文）兜底；对已遮文本重复遮盖是无害的。
+ */
+function maskInterviewMaterial(
+  digest: string | null,
+  contents: string[],
+  scene: string,
+): { digest: string | null; contents: string[] } {
+  const [maskedDigest = '', ...maskedContents] = maskUserTextsForLlmText([digest ?? '', ...contents], scene)
+  return { digest: digest ? maskedDigest : null, contents: contents.map((_, i) => maskedContents[i] ?? '') }
+}
+
 @Injectable()
 export class MockInterviewLlmService {
   private readonly logger = new Logger(MockInterviewLlmService.name)
@@ -170,11 +188,17 @@ export class MockInterviewLlmService {
     const isLast = input.askedCount >= input.questionTarget - 1
     const sys = interviewQuestionSystemPrompt(input)
 
+    const recentTurns = input.transcript.slice(-10)
+    const masked = maskInterviewMaterial(
+      input.resumeDigest ? input.resumeDigest.slice(0, 3000) : null,
+      recentTurns.map((t) => (t.skipped ? '' : t.content.slice(0, 500))),
+      'mock_interview_question',
+    )
     const userParts: string[] = []
-    if (input.resumeDigest) userParts.push(`【求职者简历摘要（仅练习用）】\n${input.resumeDigest.slice(0, 3000)}`)
-    if (input.transcript.length > 0) {
-      const recent = input.transcript.slice(-10)
-        .map((t) => `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过了这个问题）' : t.content.slice(0, 500)}`)
+    if (masked.digest) userParts.push(`【求职者简历摘要（仅练习用）】\n${masked.digest}`)
+    if (recentTurns.length > 0) {
+      const recent = recentTurns
+        .map((t, i) => `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过了这个问题）' : masked.contents[i]}`)
         .join('\n')
       userParts.push(`【已进行的对话】\n${recent}`)
     }
@@ -205,14 +229,21 @@ export class MockInterviewLlmService {
   async buildReport(input: ReportInput, onLlmCall?: AiLlmCallSink): Promise<InterviewReportPayload> {
     const sys = interviewReportSystemPrompt(input)
 
+    // 送模型的是遮盖后的对话；报告页 / 打印稿里展示的「你的回答」取自库里本人原话
+    // （buildQaExcerpts(turns)），不取模型产物，所以这里遮盖不影响用户看到自己的原话。
+    const masked = maskInterviewMaterial(
+      input.resumeDigest ? input.resumeDigest.slice(0, 3000) : null,
+      input.transcript.map((t) => (t.skipped ? '' : t.content.slice(0, 800))),
+      'mock_interview_report',
+    )
     const transcript = input.transcript
-      .map((t) => {
+      .map((t, i) => {
         const meta = t.role === 'candidate' && typeof t.durationSec === 'number' ? `（回答耗时 ${t.durationSec} 秒）` : ''
-        return `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过）' : t.content.slice(0, 800)}${meta}`
+        return `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过）' : masked.contents[i]}${meta}`
       })
       .join('\n')
     const user =
-      (input.resumeDigest ? `【简历摘要】\n${input.resumeDigest.slice(0, 3000)}\n\n` : '') +
+      (masked.digest ? `【简历摘要】\n${masked.digest}\n\n` : '') +
       `【完整对话】\n${transcript || '（用户未回答任何问题）'}`
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
