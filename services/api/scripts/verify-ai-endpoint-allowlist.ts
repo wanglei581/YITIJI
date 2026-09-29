@@ -423,6 +423,15 @@ async function main(): Promise<void> {
   const legacyTestError = await caught(() => legacyController.test({ feature: 'career_plan' }))
   check('D3d POST /admin/ai-config/test（旧端点）同样拒绝且未调用测试',
     httpErrorOf(legacyTestError).code === 'AI_BASE_URL_NOT_ALLOWED' && chatTests === 0, JSON.stringify(httpErrorOf(legacyTestError)))
+  // 存量地址不在单内时：停用、清掉疑似泄露的密钥必须能保存（不会让请求发往新地址），改成另一个单外地址仍拒绝。
+  const disableStale = caughtSync(() => config.update({ enabled: false }, 'career_plan'))
+  check('D3p 存量地址不在单内：停用该功能照常保存（不被地址校验挡住）',
+    disableStale === null && config.getConfig('career_plan').enabled === false, JSON.stringify(httpErrorOf(disableStale)))
+  const clearKeyStale = caughtSync(() => config.update({ apiKey: '' }, 'career_plan'))
+  check('D3q 存量地址不在单内：清空密钥照常保存', clearKeyStale === null && !config.getApiKey('career_plan'), JSON.stringify(httpErrorOf(clearKeyStale)))
+  const moveStale = caughtSync(() => config.update({ baseURL: DISALLOWED_LLM_BASE }, 'career_plan'))
+  check('D3r 存量地址不在单内：改成另一个单外地址仍拒绝（AI_BASE_URL_NOT_ALLOWED）',
+    httpErrorOf(moveStale).code === 'AI_BASE_URL_NOT_ALLOWED' && config.getConfig('career_plan').baseURL === 'https://api.moonshot.cn/v1', JSON.stringify(httpErrorOf(moveStale)))
   chatTests = 0
   const okTest = await controller.testOne('assistant_chat')
   check('D3e 阳性对照：核准地址的连通性测试照常进入测试', (okTest as { ok?: boolean }).ok === true && chatTests === 1)
@@ -544,6 +553,36 @@ async function main(): Promise<void> {
   resetFetchCount()
   await new TencentSmsSender(smsConfig('sms.tencentcloudapi.com')).sendCode('13800000000', '123456')
   check('E6c 短信阳性对照：默认主机照常发出', fetchedHosts.length === 1)
+
+  // ── 腾讯云地域（主机名白名单管不到 X-TC-Region）：境外地域一律不发 ──
+  {
+    const { isTencentRegionAllowed } = await import('../src/common/outbound/ai-endpoint-allowlist')
+    check('E7r 地域名单：境内放行、境外 / 空值拒绝',
+      isTencentRegionAllowed('ap-guangzhou', 'sms') && isTencentRegionAllowed(' AP-Shanghai ', 'tts')
+        && !isTencentRegionAllowed('ap-hongkong', 'sms') && !isTencentRegionAllowed('ap-singapore', 'trtc') && !isTencentRegionAllowed('', 'tts'))
+    resetFetchCount()
+    const smsRegionError = await caught(() => new TencentSmsSender({ ...smsConfig('sms.tencentcloudapi.com'), region: 'ap-hongkong' }).sendCode('13800000000', '123456'))
+    check('E7s 短信：地域改成境外被拒，手机号没有发出',
+      smsRegionError instanceof SmsSendError && fetchedHosts.length === 0, `fetched=${fetchedHosts.length}`)
+    resetFetchCount()
+    const { TtsService } = await import('../src/mock-interview/asr/tts.service')
+    const ttsRegion = await withEnv({ TENCENT_SECRET_ID: 'stub-id', TENCENT_SECRET_KEY: 'stub-key', TENCENT_TTS_REGION: 'ap-singapore' }, () => new TtsService().synthesize('你好。'))
+    check('E7t 语音合成：地域改成境外被拒，一段都没发', !ttsRegion.ok && fetchedHosts.length === 0, `${JSON.stringify(ttsRegion)} fetched=${fetchedHosts.length}`)
+    resetFetchCount()
+    const { callTencentApi } = await import('../src/trtc/tencent-api.util')
+    const trtcRegion = await caught(() => callTencentApi({ secretId: 'stub-id', secretKey: 'stub-key', region: 'ap-singapore', action: 'StartAIConversation', payload: {} } as never))
+    check('E7u 数字人：地域改成境外被拒（AiEndpointNotAllowedError），未发出请求',
+      trtcRegion instanceof AiEndpointNotAllowedError && (trtcRegion as { reason?: string }).reason === 'region_not_allowed' && fetchedHosts.length === 0,
+      `fetched=${fetchedHosts.length}`)
+  }
+
+  // ── llmFetchJson 不跟随跳转（跳转目标不会再过白名单）──
+  {
+    let seenRedirect: RequestRedirect | undefined
+    const capture = (async (_url: string, init?: RequestInit) => { seenRedirect = init?.redirect; return jsonResponse({ choices: [{ message: { content: '好的' } }] }) }) as unknown as typeof fetch
+    await llmFetchJson('https://api.deepseek.com/chat/completions', { method: 'POST', headers: {}, body: '{}' }, { timeoutMs: 5_000, gate: new LlmConcurrencyGate(1), fetchImpl: capture })
+    check('E7v llmFetchJson 设 redirect:error（上游 30x 到别的主机不跟）', seenRedirect === 'error', String(seenRedirect))
+  }
 
   // ── 合同审查 ──
   const provider = await import('../src/contract-review/contract-review-provider.service')

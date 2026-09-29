@@ -514,6 +514,7 @@ export class LlmConfigService {
     // 而不是它自己那份从未生效过的 env 兜底 —— 否则管理员只改一个字段就会把
     // 父键上的其它设置悄悄丢掉。写入后本键即固化为独立配置，不再跟随父键。
     const next: PersistedConfig = { ...this.cache[this.resolveFeature(feature)], explicitlyConfigured: true }
+    const previousBaseURL = next.baseURL
 
     if (patch.vendor && isLlmVendor(patch.vendor) && patch.vendor !== next.vendor) {
       next.vendor = patch.vendor
@@ -543,7 +544,9 @@ export class LlmConfigService {
     // 落盘前核对「生效后」的模型地址是否在出站白名单里：显式改地址、切厂商时套用的
     // 预设地址（MiniMax、鱼人不在默认单里）都要拦。判的是 next 而不是 patch，
     // 否则「只传 vendor 不传 baseURL」就能把未核准的预设地址存进去。
-    assertApprovedLlmBaseUrl(next.baseURL, '保存')
+    // 只在生效地址**变了**时判：白名单收紧前存下的地址不在单内时，管理员仍须能停用该功能、
+    // 清掉疑似泄露的密钥、改提示词——这些不会让请求发往新地址；运行时 llmFetchJson 第一行照样拒绝单外地址。
+    if (next.baseURL !== previousBaseURL) assertApprovedLlmBaseUrl(next.baseURL, '保存')
 
     this.cache = { ...this.cache, [feature]: next }
     this.save()

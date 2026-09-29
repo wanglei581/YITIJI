@@ -258,7 +258,8 @@ export async function llmFetchJson(
   const usage = startLlmUsageMeter(url, init.body, moderation?.feature)
 
   try {
-    const res = await doFetch(url, { ...init, signal: controller.signal })
+    // redirect:'error'：上游若 30x 到别的主机，跳转目标不会再过出站白名单——一律不跟（与合同审查一致）。
+    const res = await doFetch(url, { ...init, redirect: 'error', signal: controller.signal })
     let data: unknown = null
     try {
       data = await res.json()
