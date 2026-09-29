@@ -21,6 +21,11 @@
 - **问题（合规窗口查出）：** `probe:llm-thinking-live` 只从进程环境变量读密钥，不读服务的 .env 与后台 AI 槽位；服务器上一缺密钥就打印「跳过」并退出码 0，看上去通过，其实没验。
 - **修法（Grok 实现、协调方审）：** 取密钥与 API 进程同一处（先后台 AI 槽位，再服务 .env）；缺密钥或任何一项被跳过都非 0 退出并打印「未验证」，只有显式 `--allow-skip` 才允许跳过；上游失败即使带 `--allow-skip` 也非 0；全程不打印密钥。TTS 读取密钥与目标地址的逻辑抽成共用函数，服务与探针同一份。发布清单与运维手册写明新行为。
 - **验证：** 新离线自检 `verify:llm-thinking-live-gate` 37 条（挂 CI）；协调方在候选 840ea7d31 上复跑 llm-thinking-off、ai-endpoint-allowlist、llm-input-pii-mask、mock-interview、trtc-ownership、ai-safety-aigc、d2-same-host-contract、ai-throttle-dimension 与 api tsc 全绿，变异「探针恒退出 0」变红。解冲突时保留了候选里 TTS 的出站白名单与地域校验，发布清单保留候选较新的 AIGC 条目。
+## 2026-09-29：补 CI 缺口——真 Redis 下走真实密码登录再拿业务数据（分支 `claude/backend-hardening-20260929-internal-login-real-redis`）
+
+- **缺口（总指挥问、协调方核实）：** CI 里原来没有一条门禁在真 Redis 下走过真实密码登录：`verify:redis-degradation-truth` 只测 Redis 挂掉时登录被拒，`verify:admin-login-hardening` 用内存桩，content-pipeline 门禁已改用内部签发令牌。
+- **补法（Grok 实现、协调方审）：** 新门禁 `verify:internal-login-real-redis`（18 条，挂 CI SQLite 作业，并钉进 ci-gate-coverage 的必跑清单）：起真实 `src/main.ts` 与临时 redis-server；管理员、机构账号用真实密码登录后各自读到业务数据，机构凭证调管理员接口被拒；连续 5 次错误密码后正确密码也登不上，锁定计数在真 Redis 里查得到；改密后旧凭证被拒。只加门禁，不改登录逻辑。
+- **验证：** Grok 三处反向变异（不签发凭证、锁定阈值失效、守卫不校验版本）全红；协调方在候选 840ea7d31 上复跑本门禁与 redis-degradation-truth、ci-gate-coverage 全绿。门禁约 70 秒（要等一个登录限流窗口）。
 
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
