@@ -313,7 +313,8 @@ $ErrorActionPreference = 'Stop'
 cmd /c "net user ${USER_NAME} /delete" | Out-Null
 cmd /c "net user ${USER_NAME} %AIJOB_RESIDUE_PW% /add"
 if ($LASTEXITCODE -ne 0) { throw 'local user was not created' }
-schtasks /Delete /TN ${TASK_NAME} /F 2>$null | Out-Null
+# 任务可能还不存在。Windows PowerShell 5.1 在 Stop 模式下会把被 2> 重定向的原生 stderr 当成异常，所以交给 cmd 吞掉。
+cmd /c "schtasks /Delete /TN ${TASK_NAME} /F >nul 2>&1"
 schtasks /Create /TN ${TASK_NAME} /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${scriptPath}" /SC ONCE /ST 23:59 /RU ".\\${USER_NAME}" /RP $env:AIJOB_RESIDUE_PW /F /RL LIMITED
 if ($LASTEXITCODE -ne 0) { throw 'scheduled task was not created' }
 schtasks /Run /TN ${TASK_NAME}
@@ -330,12 +331,13 @@ function removeFixtures(): void {
       '-Command',
       `
 $ErrorActionPreference = 'Continue'
-schtasks /Delete /TN ${TASK_NAME} /F 2>$null | Out-Null
+cmd /c "schtasks /Delete /TN ${TASK_NAME} /F >nul 2>&1"
 cmd /c "net user ${USER_NAME} /delete >nul 2>&1"
 $cleanupError = $null
 foreach ($name in @('${PRINTER_A}','${PRINTER_B}')) {
   $printer = Get-Printer -Name $name -ErrorAction SilentlyContinue
   if ($printer) {
+    Get-PrintJob -PrinterName $name -ErrorAction SilentlyContinue | Remove-PrintJob -ErrorAction SilentlyContinue
     try { Remove-Printer -Name $name -ErrorAction Stop }
     catch { $cleanupError = $_.Exception.Message }
   }
@@ -344,6 +346,7 @@ $zhName = $env:AIJOB_ZH_PRINTER
 if (-not [string]::IsNullOrWhiteSpace($zhName)) {
   $zhPrinter = Get-Printer -Name $zhName -ErrorAction SilentlyContinue
   if ($zhPrinter) {
+    Get-PrintJob -PrinterName $zhName -ErrorAction SilentlyContinue | Remove-PrintJob -ErrorAction SilentlyContinue
     try { Remove-Printer -Name $zhName -ErrorAction Stop }
     catch { $cleanupError = $_.Exception.Message }
   }
@@ -351,8 +354,9 @@ if (-not [string]::IsNullOrWhiteSpace($zhName)) {
 foreach ($port in @('${PORT_A}','${PORT_B}','${PORT_ZH}')) {
   $existing = Get-PrinterPort -Name $port -ErrorAction SilentlyContinue
   if ($existing) {
+    # 文件路径端口名带反斜杠，Remove-PrinterPort 在 CI 上报名字非法（含反斜杠）。端口留在一次性 runner 上无害，只警告。
     try { Remove-PrinterPort -Name $port -ErrorAction Stop }
-    catch { $cleanupError = $_.Exception.Message }
+    catch { Write-Warning ('printer port not removed: ' + $_.Exception.Message) }
   }
 }
 Remove-Item -LiteralPath '${PORT_A}','${PORT_B}','${PORT_ZH}','${join(tmpdir(), 'aijob-residue-other.ps1')}' -Force -ErrorAction SilentlyContinue
