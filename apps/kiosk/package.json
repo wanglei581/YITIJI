@@ -44,7 +44,7 @@
     "verify:kiosk-session-reporting": "node scripts/verify-kiosk-session-reporting.mjs && node --test scripts/tests/kiosk-session-reporting.test.mjs",
     "verify:p39-print-hub-fidelity": "node scripts/verify-p39-print-hub-fidelity.mjs",
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
-    "verify:pii-redaction-contract": "node --experimental-strip-types scripts/verify-pii-redaction-contract.mjs",
+    "verify:pii-redaction-contract": "node --experimental-strip-types scripts/verify-pii-redaction-contract.mjs && node --test scripts/tests/print-manual-ack.test.mjs",
     "verify:file-display-truth": "node scripts/verify-file-display-truth.mjs",
     "verify:word-conversion-ui": "node scripts/verify-word-conversion-ui.mjs",
     "verify:kiosk-feedback-entry": "node scripts/verify-kiosk-feedback-entry.mjs",

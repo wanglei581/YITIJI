@@ -63,8 +63,10 @@ const frozenHashes = new Map([
     // 归属与有效期判定在 printHandoff.ts（有单元测试）。旧结构（v1）一律不认、当场清掉（9/29 拍板）。
     // 保存时仍按白名单过滤字段。冻结契约不放宽，仍逐字节校验。
     // 旧哈希 2e3dc36bc95ad4c48dfedc6d84957210de5e6115389f7cfe44da7cf771ad2f39。
+    // 2026-09-29 再次冻结：交接上下文增加证件件标记 idDocument（只有 true 才写入）。
+    // 旧哈希 10867e065d20081231c4738d3d56ce0ca70862d8108001b99d7791944be7bebe。
     'src/pages/print/printMaterialSession.ts',
-    '10867e065d20081231c4738d3d56ce0ca70862d8108001b99d7791944be7bebe',
+    '6d76cd193bb3d98032ae6b44a36c3b8bb302da1bacd917452afc80dc7d22fd38',
   ],
 ])
 
