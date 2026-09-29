@@ -645,6 +645,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-config
           # C6/C7/C14：AI 使用门禁（声明、登录档位、AI 暂停、全机维护）的运行时矩阵与接口覆盖
           pnpm --filter @ai-job-print/api verify:ai-access
+          # F-11：生产缺 AI 配置只降级 AI（503 AI_PROVIDER_NOT_CONFIGURED、/health degraded、ready 200），打印与支付照常
+          pnpm --filter @ai-job-print/api verify:ai-platform-degradation
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:job-review
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:jobfair-review
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide

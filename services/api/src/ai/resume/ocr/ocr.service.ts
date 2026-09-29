@@ -3,6 +3,7 @@ import { DisabledOcrProvider } from './disabled-ocr.provider'
 import { TencentOcrProvider } from './tencent-ocr.provider.stub'
 import { BaiduOcrProvider } from './baidu-ocr.provider'
 import type { OcrInput, OcrProvider, OcrProviderName, OcrResult } from './ocr-provider.interface'
+import { resolveOcrProviderName } from '../../../config/ai-platform-config'
 
 const KNOWN_OCR_PROVIDERS = ['disabled', 'tencent', 'baidu'] as const
 
@@ -16,6 +17,8 @@ const KNOWN_OCR_PROVIDERS = ['disabled', 'tencent', 'baidu'] as const
  *
  * 非法 OCR_PROVIDER 值启动即抛 OCR_PROVIDER_INVALID，不静默回退
  * （对齐 AiService 对 AI_PROVIDER 的处理范式）。
+ * 例外（F-11）：生产环境按去空白 + 小写取值，认不出的落到 disabled（如实 OCR_NOT_CONFIGURED），
+ * 不让一个填错的 OCR 取值在依赖注入阶段拖垮整站；缺项由 /health 的 ai-platform 降级如实报出。
  */
 @Injectable()
 export class OcrService {
@@ -27,7 +30,7 @@ export class OcrService {
     private readonly tencentProvider: TencentOcrProvider,
     private readonly baiduProvider: BaiduOcrProvider,
   ) {
-    const rawName = process.env['OCR_PROVIDER'] ?? 'disabled'
+    const rawName = resolveOcrProviderName()
     if (!(KNOWN_OCR_PROVIDERS as readonly string[]).includes(rawName)) {
       throw new InternalServerErrorException({
         error: {

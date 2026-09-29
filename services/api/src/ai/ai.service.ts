@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
-import type { AiProvider, AiProviderName, AssistantChatResult, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
-import { isLlmProviderLabel } from './interfaces/ai-provider.interface'
+import { isLlmProviderLabel, type AiProvider, type AiProviderName, type AssistantChatResult, type GeneratedResume, type GenerateResumeOutput, type ParseResumeInput, type ParseResumeOutput, type OptimizeResumeOutput, type ChatInput, type ResumeGenerateInput, type ResumeLayoutSettings } from './interfaces/ai-provider.interface'
+import { resolveAiProviderName } from '../config/ai-platform-config'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -163,7 +163,7 @@ export class AiService {
     @Optional() private readonly jobMaterials?: JobMaterialsService,
   ) {
     this.optimizeLock = new RedisInflightLock(redis)
-    const rawName = process.env['AI_PROVIDER'] ?? 'mock'
+    const rawName = resolveAiProviderName() // 生产恒为 llm：mock / stub 不在生产出结果（F-11）
     if (!(KNOWN_PROVIDERS as readonly string[]).includes(rawName)) {
       throw new InternalServerErrorException({
         error: {

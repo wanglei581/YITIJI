@@ -8,10 +8,6 @@
  *     verify:production-db-guard 共用同一判定，避免双份口径漂移）
  *   - REDIS_URL 必须存在（会员会话、队列、幂等和防重放依赖 Redis）
  *   - SMS_PROVIDER 必须为 tencent，且腾讯短信生产参数齐全（生产不得日志打印验证码）
- *   - OCR_PROVIDER 必须为 baidu，且百度 OCR 生产参数齐全（生产不得关闭真实简历识别）
- *   - AI_PROVIDER 必须为 llm，且真实 LLM 密钥齐全（生产不得回退 mock / stub provider）
- *   - AIGC_CONTENT_PRODUCER 必须显式设置且不是产品名（GB 45438 附录 E 的内容制作方是
- *     服务提供者名称或编码；未设置时导出文件会回落到产品名）
  *   - FILE_SIGNING_SECRET / SECRET_ENCRYPTION_KEY / PAYMENT_SESSION_SECRET /
  *     TERMINAL_ADMIN_SECRET / TERMINAL_ACTION_TOKEN_SECRET 必须存在、
  *     长度 >= 32，且不得使用 .env.example 的样值前缀（dev- / test- / replace-with- 等）
@@ -30,11 +26,17 @@
  *     false，所有 API 实例升级且旧 binary 退出后再切 true
  *   - 中文 PDF 字体必须可由 PDFKit 实际注册；生产缺失即拒绝启动
  *
+ * AI 类配置**不在此列**（2026-09-29 F-11）：OCR_PROVIDER / 百度 OCR 密钥、AI_PROVIDER / 大模型密钥、
+ * AIGC_CONTENT_PRODUCER 缺失或不合法时不再拒启动 —— 那会让打印、扫描、支付、两个后台跟着停。
+ * 现在只把 AI 登记为降级（判定见 ai-platform-config.ts，登记与影响面声明见
+ * common/boot/ai-platform-degradation.ts），AI 路由如实返回 503，绝不回退 mock。
+ * 本函数照常评估它们并放进返回值，由 main.ts 登记到 /health。
+ *
  * 非生产环境一律放行：开发 / CI 用本地 SQLite + local 存储 + 测试密钥，不受此门禁约束。
  */
 import { assertRuntimeDatabaseAllowed } from '../prisma/create-client'
 import { probeCjkFont, type CjkFontProbeResult } from '../common/pdf/cjk-font'
-import { AIGC_DEFAULT_PRODUCER } from '../common/pdf/aigc-label'
+import { evaluateAiPlatform, type AiPlatformState } from './ai-platform-config'
 import { assertProductionTrustProxyHops } from './trust-proxy'
 
 export interface ProductionRuntimeEnv {
@@ -103,17 +105,22 @@ function hasValue(value: string | undefined): boolean {
   return Boolean(value?.trim())
 }
 
+export interface ProductionRuntimeGateReport {
+  /** AI 类配置的开通状态。生产缺失时只降级 AI（main.ts 登记到 /health），不拒启动。 */
+  aiPlatform: AiPlatformState
+}
+
 export function assertProductionRuntimeGates(
   env: ProductionRuntimeEnv = process.env,
   cjkFontProbe: CjkFontProbeResult = probeCjkFont(),
-): void {
+): ProductionRuntimeGateReport {
   const nodeEnv = env.NODE_ENV
   if (nodeEnv !== 'production' && !cjkFontProbe.ok) {
     console.warn(
       `[WARN] CJK_FONT_MISSING: 非生产环境未找到可用中文字体；PDF 导出将失败。tried=${cjkFontProbe.tried.join(',')}`,
     )
   }
-  if (nodeEnv !== 'production') return
+  if (nodeEnv !== 'production') return { aiPlatform: evaluateAiPlatform(env) }
 
   if (!cjkFontProbe.ok) {
     throw new Error(
@@ -183,39 +190,10 @@ export function assertProductionRuntimeGates(
     )
   }
 
-  const ocrProvider = env.OCR_PROVIDER?.trim().toLowerCase()
-  if (ocrProvider !== 'baidu') {
-    throw new Error(
-      `PRODUCTION_OCR_PROVIDER_NOT_BAIDU: NODE_ENV=production 时 OCR_PROVIDER 必须为 baidu（当前: ${ocrProvider || '未设置'}）`,
-    )
-  }
-  if (!hasValue(env.BAIDU_OCR_API_KEY) || !hasValue(env.BAIDU_OCR_SECRET_KEY)) {
-    throw new Error(
-      'PRODUCTION_BAIDU_OCR_CONFIG_MISSING: OCR_PROVIDER=baidu 时必须配置 BAIDU_OCR_API_KEY 和 BAIDU_OCR_SECRET_KEY',
-    )
-  }
-
-  const aiProvider = env.AI_PROVIDER?.trim().toLowerCase()
-  if (aiProvider !== 'llm') {
-    throw new Error(
-      `PRODUCTION_AI_PROVIDER_NOT_LLM: NODE_ENV=production 时 AI_PROVIDER 必须为 llm（当前: ${aiProvider || '未设置'}）`,
-    )
-  }
-  if (!hasValue(env.AI_LLM_API_KEY) && !hasValue(env.TRTC_LLM_API_KEY)) {
-    throw new Error(
-      'PRODUCTION_LLM_CONFIG_MISSING: AI_PROVIDER=llm 时必须配置 AI_LLM_API_KEY 或 TRTC_LLM_API_KEY',
-    )
-  }
-
-  // 导出的 PDF / DOCX 把它写进隐式标识 ContentProducer。未设置时 aigc-label.ts 回落到
-  // 产品名，而产品名不是服务提供者。填公司全称还是统一社会信用代码由产品负责人定，
-  // 这里只拒绝空值和产品名。
-  const aigcProducer = env.AIGC_CONTENT_PRODUCER?.trim() ?? ''
-  if (!aigcProducer || aigcProducer === AIGC_DEFAULT_PRODUCER) {
-    throw new Error(
-      `PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING: NODE_ENV=production 时必须把 AIGC_CONTENT_PRODUCER 设为公司全称或统一社会信用代码（不能为空，也不能是产品名「${AIGC_DEFAULT_PRODUCER}」）`,
-    )
-  }
+  // OCR / AI_PROVIDER / 大模型密钥 / AIGC_CONTENT_PRODUCER 曾在这里逐项 throw（拒启动）。
+  // 2026-09-29 起改为只降级 AI：判定挪到 ai-platform-config.ts，本函数末尾随返回值带出，
+  // 由 main.ts 登记到 /health。AIGC 的「不出产品名做生产方的 AI 文件」由
+  // common/pdf/aigc-label.ts 写标识处 fail-closed 兜住。后面的密钥与部署开关一律照旧拒启动。
 
   const paymentSessionSecret = env.PAYMENT_SESSION_SECRET
   if (!paymentSessionSecret || paymentSessionSecret.length < MIN_PAYMENT_SESSION_SECRET_LENGTH) {
@@ -306,4 +284,7 @@ export function assertProductionRuntimeGates(
       'PRODUCTION_TERMINAL_PLANNED_PROVISIONING_UNDECLARED: NODE_ENV=production 时 TERMINAL_PLANNED_PROVISIONING_ENABLED 必须显式为 true|false（滚动部署阶段必须保持 false，全实例升级后才切 true）',
     )
   }
+
+  // 走到这里说明非 AI 的底线全部满足。AI 类配置只评估、不拒启动（F-11）。
+  return { aiPlatform: evaluateAiPlatform(env) }
 }

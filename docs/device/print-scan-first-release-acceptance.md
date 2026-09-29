@@ -60,8 +60,8 @@ pnpm --filter terminal-agent verify:local-qr-proxy
 | 拒绝条件 | 门禁位置 | 错误码 / 断言 |
 |----------|----------|---------------|
 | mock API 模式 | Kiosk 构建期硬门禁（vite.config）+ `verify:production-real-services` / `verify:prod-build-config` A1 | 拒绝 `VITE_API_MODE` ≠ http |
-| mock AI provider | API 启动门禁 | `PRODUCTION_AI_PROVIDER_NOT_LLM` / `PRODUCTION_LLM_CONFIG_MISSING` |
-| 关闭 OCR | API 启动门禁 | `PRODUCTION_OCR_PROVIDER_NOT_BAIDU` / `PRODUCTION_BAIDU_OCR_CONFIG_MISSING` |
+| mock AI provider / 缺大模型密钥 | **不拒启动**（P1-18，2026-09-29）：`/health` degraded（`ai-platform`），AI 路由 503 | `AI_PROVIDER_NOT_CONFIGURED`；打印、扫描、支付照常；部署预检打 `AI_PLATFORM_DEGRADED` 告警 |
+| 关闭 OCR / 缺百度密钥 | **不拒启动**（同上）：图片与扫描件识别降级 | `OCR_NOT_CONFIGURED`；文字版 PDF / Word 简历照常 |
 | 缺 Redis | API 启动门禁 | `PRODUCTION_REDIS_URL_MISSING` |
 | 缺 COS | API 启动门禁 | `PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS` |
 | 缺运行时终端身份 | Kiosk 必须通过本机 Agent `http://127.0.0.1:9527/local/terminal-identity` 取得身份；生产构建禁止读取或回退到 `VITE_TERMINAL_ID`，避免克隆机器共用终端号；文字助手模式不豁免该运行时身份要求 | `verify:runtime-terminal-identity` 通过；本机 identity 返回已绑定终端 |
