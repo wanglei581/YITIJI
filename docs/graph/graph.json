@@ -16201,7 +16201,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 107,
+    "modelCount": 108,
     "models": [
       {
         "fieldCount": 7,
@@ -16356,14 +16356,24 @@
         ]
       },
       {
-        "fieldCount": 17,
+        "fieldCount": 10,
+        "name": "AiUsageMonthlySummary",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/ai/usage/ai-usage-retention.ts"
+        ]
+      },
+      {
+        "fieldCount": 18,
         "name": "AiUsageRecord",
         "relations": [
           "EndUser"
         ],
         "usedBy": [
           "services/api/src/ai/usage/ai-budget.service.ts",
-          "services/api/src/ai/usage/ai-usage-summary.ts"
+          "services/api/src/ai/usage/ai-usage-retention.ts",
+          "services/api/src/ai/usage/ai-usage-summary.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
       {
@@ -21229,6 +21239,7 @@
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs"
     ],
     "docs/compliance/member-personal-data-retention.md": [
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts"
     ],
@@ -21308,6 +21319,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "scripts/verify-repository-integrity.mjs",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
@@ -21498,7 +21510,9 @@
       "services/api/scripts/verify-member-order-timeline.ts"
     ],
     "packages/shared/src/types/memberPrivacy.ts": [
-      "apps/kiosk/scripts/verify-data-request-ui.mjs"
+      "apps/kiosk/scripts/verify-data-request-ui.mjs",
+      "services/api/scripts/verify-ai-usage-retention.ts",
+      "services/api/scripts/verify-member-data-request-contract.ts"
     ],
     "packages/shared/src/types/mockInterview.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -21760,6 +21774,9 @@
     "services/api/prisma/migrations/20260925143000_add_terminal_area_geo/migration.sql": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
+      "services/api/scripts/verify-ai-usage-retention.ts"
+    ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
@@ -21806,9 +21823,13 @@
     "services/api/prisma/postgres/migrations/20260925143000_add_terminal_area_geo/migration.sql": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
+      "services/api/scripts/verify-ai-usage-retention.ts"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-job-ai.ts",
@@ -21834,6 +21855,7 @@
     "services/api/prisma/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
@@ -22047,6 +22069,7 @@
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-console-screen-printed-visits.ts",
@@ -22441,6 +22464,7 @@
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
     "services/api/src/ai/ai-result.cleanup.task.ts": [
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-job-ai-backend.ts"
     ],
@@ -22951,6 +22975,10 @@
     "services/api/src/ai/usage/ai-usage-meter.ts": [
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
+    ],
+    "services/api/src/ai/usage/ai-usage-retention.ts": [
+      "services/api/scripts/verify-ai-usage-retention.ts",
+      "services/api/scripts/verify-member-data-request-contract.ts"
     ],
     "services/api/src/ai/usage/ai-usage-summary.ts": [
       "services/api/scripts/verify-ai-usage-budget.ts"
@@ -24601,8 +24629,10 @@
     ],
     "services/api/src/member-privacy/member-data-export.mapper.ts": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-job-application-track.ts",
-      "services/api/scripts/verify-member-data-export.ts"
+      "services/api/scripts/verify-member-data-export.ts",
+      "services/api/scripts/verify-member-data-request-contract.ts"
     ],
     "services/api/src/member-privacy/member-data-export.service.ts": [
       "services/api/scripts/verify-member-data-export.ts"
@@ -25250,6 +25280,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
@@ -32839,6 +32870,35 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "docs/compliance/member-personal-data-retention.md",
+          "docs/progress/current-progress.md",
+          "packages/shared/src/types/memberPrivacy.ts",
+          "services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql",
+          "services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql",
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/ai-result.cleanup.task.ts",
+          "services/api/src/ai/usage/ai-usage-retention.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-usage-retention.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-usage-retention"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "services"
         ],
@@ -36020,13 +36080,16 @@
         "dirs": [],
         "files": [
           "packages/shared/src/types/member-privacy.ts",
+          "packages/shared/src/types/memberPrivacy.ts",
           "services/api/prisma/migrations/20260717130000_extend_user_data_requests/migration.sql",
           "services/api/prisma/migrations/20260717140000_complete_member_data_export/migration.sql",
           "services/api/prisma/postgres/migrations/20260717130000_extend_user_data_requests/migration.sql",
           "services/api/prisma/postgres/migrations/20260717140000_complete_member_data_export/migration.sql",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
+          "services/api/src/ai/usage/ai-usage-retention.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []

@@ -185,7 +185,9 @@ const NO_TTL_REGISTRY: Record<string, string> = {
   UserAiConsent:
     '同意记录必须与账号同生命周期，撤回写 revokedAt 而不是删除；不含用户自由文本',
   AiUsageRecord:
-    'P1-2a 逐次计量账（额度与将来收费的底座），只落功能/厂商/型号/状态/tokens/金额/终端/机构/会员号等元数据，无任何用户文本字段；会员注销时 endUserId 经外键 SetNull 置空；留存期待产品负责人定。只记大模型调用（llmFetchJson + 合同审查）；TRTC 数字人、ASR、TTS、OCR 本期不计量、不写本表，只靠入口额度兜底（TRTC 开会话是 voice 类，会被额度拦）',
+    'P1-2a 逐次计量账，只落功能/厂商/型号/状态/tokens/金额与已验签终端、机构、会员号，无用户文本。留存与 AiServiceLog 相同：AI_SERVICE_LOG_RETENTION_DAYS 默认 90 天，由 AiResultCleanupTask 到期先按月汇总再硬删。会员注销只把 endUserId 置空（外键 SetNull，且 detachMemberAiUsageRecords），不删未到期的金额行。TRTC 数字人、ASR、TTS、OCR 本期不计量、不写本表。',
+  AiUsageMonthlySummary:
+    '按月费用汇总，只存北京时间月份、功能、厂商、型号、状态、调用次数、已计量金额与未计量次数；不含会员、终端、机构或任何用户文本，长期保留，不随明细到期删除。',
 }
 
 const writtenModels = new Map<string, string[]>()

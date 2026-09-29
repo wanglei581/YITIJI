@@ -6,6 +6,10 @@
 - **修法（Grok 实现、协调方审）：** 新增 `FileObject.pageCount Int?`（两套迁移 `20260929220000_file_object_recognized_page_count`，存量保持 null）；上传时只从已通过类型校验的文件字节识别（图片 1 页、PDF 走现有解析；Word、文本、解析失败、直传未读到字节为 null），识别失败不影响上传，上传参数夹带的页数一律忽略；列表返回 `pageCount: number | null`，null 表示没识别出来、不是 0 页。打印报价仍按计费页数，不改用这一列。`files.service.ts` 管理端元数据映射挪到新文件 `file-metadata.ts`，1631→1579 行。
 - **验证：** 新门禁 `verify:document-page-count` 21 条（CI SQLite 与 postgres-readiness）；协调方在最新候选上复跑 member-assets、member-assets-c2d、file-display-truth、print-sign、file-lifecycle-summary、contract-review:file-policy 与 api tsc、PG schema 同步校验全绿，变异「select 不选 pageCount」变红。
 - **交付单（小程序）：** `pageCount` 为 null 时不要显示成 0 页，写「页数待识别」或不显示。
+## 2026-09-29：AI 用量账到期自动清理、按月汇总、纳入会员导出（分支 `claude/backend-hardening-20260929-ai-usage-retention`）
+
+- **做了什么（Grok 实现、协调方审，产品负责人 9/29 拍板）：** `AiUsageRecord` 接进每小时清理任务，保留期与 `AiServiceLog` 同读 `AI_SERVICE_LOG_RETENTION_DAYS`（默认 90 天）；删除前先把即将删除的行按北京时间月份、功能、厂商、型号、结局汇总进新表 `AiUsageMonthlySummary`（两套迁移 `20260929230000_ai_usage_retention_summary`），只存次数、已计量金额与未计量次数，**不存会员、终端、机构**，长期保留；汇总与打标同一事务，重复跑结果不变。会员数据导出加 `aiUsage` 段（本人的功能、时间、状态、金额）；注销处置定为置空（`detachMemberAiUsageRecords`，等注销执行器接入）。留存矩阵与数据清单同步。
+- **验证：** 新门禁 `verify:ai-usage-retention` 66 条（CI SQLite 与 postgres-readiness）；Grok 6 处、协调方抽 1 处（每小时任务不清用量账）变异全红；ai-usage-budget、ai-user-text-retention、member-data-export / request-contract / retention、recruitment-p1-schema 等 10 条与 PG schema 同步校验全绿。法务草稿里「到期自动清理」那句，本 PR 合入后即可发布。
 
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
@@ -36,7 +40,7 @@
 - **验证：** 新门禁 `verify:ai-usage-budget` 82 条（CI SQLite 与 postgres-readiness 两个作业）；子代理 16 处反向变异全红。协调方审出一处：触顶范围原先放在 `error.scope`，全局错误过滤器会丢掉，前端根本拿不到——改放 `details` 并加一条经真实过滤器的断言；独立复跑 13 条关联门禁全绿，抽 3 处变异（去掉守卫额度检查、范围放回 scope、读不到花费放行）全红。
 - **已知限制：** 一体机 AI 请求目前不带终端会话令牌，单机上限对一体机暂不生效（交付单已发主执行窗口）；多进程下 10 秒缓存期内可能冲过上限约 10 秒的量；合同审查、TRTC 数字人、OCR、语音本期不计量；`ai.service.ts` 一处落账标签不带型号，会按 V4-Pro 价高估。
 - **主执行窗口审查后补（9/29）：** ②合同审查的大模型调用原来不记账（走自己的 transport，不经 `llmFetchJson`），现在接同一个计量器；队列作业里用 `backgroundJobAiContext` 按任务属主记会员、终端与机构如实为空，显式覆盖可能从别的请求漏进来的上下文，花费计入全站与属主会员额度。③TRTC 数字人、语音识别、语音合成、OCR 本期不计量，只靠入口额度兜底（当天触顶后它们的入口一起被拦，打印前材料检查里的 OCR 除外），写进价目文件头、`.env.example` 与数据清单。④额度是软上限：只在入口查一次，并发请求可一起越过，幅度约「并发数 x 单次花费」，已写明。新门禁段 `verify-ai-usage-coverage.ts`（21 条，串在 `verify:ai-usage-budget` 后面）；子代理 6 处、协调方抽 2 处反向变异全红，关联门禁 16 条本机全绿。合同审查两个文件原本就超过 500 行（现 549 / 578 行），本次只加计量几行，拆分留到合同审查下一次改动。
-- **待产品负责人拍板：** 三档金额与未计量调用的保守单价（现为 100 / 30 / 5 / 0.05 元）；计量表留存期（推荐按财务留存期）；匿名请求只受全站上限约束是否可接受。
+- **待产品负责人拍板：** 三档金额与未计量调用的保守单价（现为 100 / 30 / 5 / 0.05 元）；计量表留存期（已定：与 AiServiceLog 同，默认 90 天到期自动清理；按月汇总只存金额和次数、长期保留）；匿名请求只受全站上限约束是否可接受。
 
 ## 2026-09-29：P1-3 模型、OCR、语音、数字人、短信的出站端点白名单（分支 `claude/backend-hardening-20260929-ai-guard`）
 

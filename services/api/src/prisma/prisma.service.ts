@@ -335,6 +335,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiUsageRecord
   }
 
+  // 月汇总没有个人字段。getter 必须写在这里：模型委托是手写的，拆到别的文件 PrismaService 仍然看不见。
+  get aiUsageMonthlySummary() {
+    return this.client.aiUsageMonthlySummary
+  }
+
   get userAiConsent() {
     return this.client.userAiConsent
   }
