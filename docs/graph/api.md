@@ -564,6 +564,7 @@
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/materials/tasks` | MaterialsController.createTask | — | MaterialsService | DocumentProcessTask<br/>FileObject<br/>PiiFinding |
 | GET | `/api/v1/materials/tasks/:id` | MaterialsController.getTask | — | MaterialsService | DocumentProcessTask<br/>FileObject<br/>PiiFinding |
+| POST | `/api/v1/materials/tasks/:id/manual-confirmation` | MaterialsController.confirmManualCheck | — | MaterialsManualConfirmationService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>PiiFinding |
 | POST | `/api/v1/materials/tasks/:id/pii-findings/decisions` | MaterialsController.decidePiiFindings | — | MaterialsService | DocumentProcessTask<br/>FileObject<br/>PiiFinding |
 | GET | `/api/v1/materials/tasks/:id/print-param-suggestions` | MaterialsController.getPrintParamSuggestions | — | PrintParamSuggestionService | DocumentProcessTask<br/>FileObject<br/>PiiFinding |
 

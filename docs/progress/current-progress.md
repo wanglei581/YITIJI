@@ -40,6 +40,13 @@
 - **走查阻塞（总指挥 9/29 转合规窗口发现）：** 后台保存 / 测试模型地址还有一道 `assertPublicLlmBaseUrl`，不分环境拒绝回环，走查窗口没法在后台把地址配到本机假大模型。现改为非生产放行 127.x、localhost、::1（与白名单同一个判定函数），内网段、链路本地、0.0.0.0、v4-mapped 回环任何环境都拒；生产照旧拒绝回环，且白名单那一关会再拒一次。门禁 `verify:ai-config` 加 7e / 7e2 / 7e3，`verify:ai-endpoint-allowlist` 加控制器层 D2b / D2c / D2d（126 条）；三处变异（生产也放行、去掉放行、非生产放行全部内网）全红。
 - **主执行窗口审查后补（9/29）：** ①后台保存只在生效地址变化时校验白名单——白名单收紧前存下的单外地址，停用、清疑似泄露的密钥、改提示词都能保存（运行时照样拒绝单外地址），改成另一个单外地址仍拒绝；⑤腾讯云地域另判，只放行境内（`TENCENT_MAINLAND_REGIONS`：广州 / 上海 / 北京 / 南京 / 成都 / 重庆），TRTC、短信、语音合成改成境外地域一律不发；`llmFetchJson` 设 `redirect:'error'`。门禁 134 条，四处变异全红。下一行「看到未做」里的地域一条因此已做。
 - **看到未做：** 腾讯云地域参数仍可指向境外（主机名白名单管不到）；顾问可用性探针不看白名单；一体机可把 `AI_ENDPOINT_NOT_ALLOWED` 加进能力级停用码（交付单已写）。
+## 2026-09-29：A-04 隐私检查不完整时的「本人确认」服务端留痕（分支 `claude/backend-hardening-20260929-pii-confirm`，叠在上一条之上）
+
+- **口径（主执行窗口采纳提案 B 及四个条件）：** 隐私扫描结论为 `partial`（页数截断）/ `degraded`（识别不可用）/ `unsupported_format` 时，不一刀切拒绝打印，由本人确认后继续，服务端留痕。新增 `POST /materials/tasks/:id/manual-confirmation`（body `{confirmed:true}`，与逐项裁决同鉴权），在该次扫描任务上记 `result.manualConfirmedAt`；重复确认 200 且时间不变，并发只写一次；审计 `material_task.pii_manual_confirmed` 只记任务号、mode、请求方类型、时间。
+- **建单闸门（`print-jobs/pii-scan-gate.ts`）：** 开关 `PRINT_PII_MANUAL_CONFIRM_ENFORCED` 默认关——小程序会员订单、材料包、到机码取件与一体机打印共用这道闸，目前只有一体机会做确认步骤；一体机材料检查页接好「我已确认，继续打印」后与 `AI_DECLARATION_ENFORCEMENT` 同批打开。开时未确认回 400 `PRINT_PII_MANUAL_CONFIRM_REQUIRED`；以该原件最新一次扫描为准，重扫后旧确认不继承；派生件与非生产不受影响。
+- **验证：** 新门禁 `verify:pii-manual-confirm`（18 条，进 CI SQLite 作业）；6 处反向变异全红；建单四个调用方与材料模块的关联门禁 17 条全绿（含小程序云打印、材料包履约、支付流程、生产闸门）。
+- **交付：** 一体机按钮与调用由主执行窗口在 P0-5 打印链改完后接。
+
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
