@@ -10,6 +10,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # labeled：给分路 PR 打 full-ci 标签时重新触发，跑完整三作业（N3，2026-09-29）
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 # PR 分支上「新推送取消旧运行」是对的，省 CI 时间；
@@ -40,6 +42,29 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # N3（2026-09-29）：PR 只改了与大作业无关的目录时，跳过浏览器与 PostgreSQL 两个大作业，省 CI 分钟。
+  # 判定见 scripts/ci-changed-scopes.mjs（白名单式跳过；推送到 main、手动触发、拿不到改动清单一律全跑），
+  # 自测见 verify:ci-changed-scopes。本作业失败时两个大作业照跑（下方 if 里的 result != 'success'）。
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      browser: ${{ steps.scopes.outputs.browser }}
+      postgres: ${{ steps.scopes.outputs.postgres }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decide which heavy jobs this change needs
+        id: scopes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.base_ref }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: node scripts/ci-changed-scopes.mjs --event "$EVENT" --base "$BASE_SHA" --head "$HEAD_SHA" --base-ref "$BASE_REF" --labels "$LABELS" >> "$GITHUB_OUTPUT"
+
   build-and-verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -108,6 +133,8 @@ jobs:
           pnpm verify:deploy-gates-in-sync
           # 真跑发布脚本的回退演练（P0-3）：就绪失败 / 迁移失败都要把运行目录恢复到发布前，备份按组保留
           pnpm verify:deploy-rollback
+          # N3 省 CI 分钟：改动范围判定的自测（白名单式跳过、推送与异常一律全跑、ci.yml 接线）
+          pnpm verify:ci-changed-scopes
           # 发布前法务文档预检（3d，C4 口径）：本地起服务模拟线上接口，缺一份、读不到、超时都必须失败
           pnpm verify:legal-docs-preflight
           pnpm verify:ci-main-runs-complete
@@ -897,6 +924,8 @@ jobs:
   # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。
   # 未通过此 job 不得宣称生产数据库已支持 PostgreSQL。
   postgres-readiness:
+    needs: [changes]
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.postgres == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -1174,6 +1203,8 @@ jobs:
           CI_SERIAL_COMMANDS
 
   kiosk-browser-smoke:
+    needs: [changes]
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.browser == 'true') }}
     runs-on: ubuntu-latest
     # 本 job 现在同时跑 kiosk 多套 + admin + partner 三家浏览器用例，取较大的上限。
     #
