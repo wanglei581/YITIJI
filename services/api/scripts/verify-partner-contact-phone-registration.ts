@@ -382,7 +382,7 @@ async function main(): Promise<void> {
       { id: orgLock, name: '锁机构', contactPhone: phoneA },
     ]
     await prisma.organization.createMany({
-      data: orgRows.map((row) => ({ ...row, type: 'enterprise_source' })),
+      data: orgRows.map((row) => ({ ...row, type: 'public_employment_service' })),
     })
     await prisma.user.createMany({
       data: [
@@ -435,7 +435,7 @@ async function main(): Promise<void> {
 
     const created = await orgs.createOrg({
       name: '新建不记冷却',
-      type: 'enterprise_source',
+      type: 'public_employment_service',
       contactPhone: phoneCreateOrg,
     }, admin)
     const createdRow = await prisma.organization.findUniqueOrThrow({ where: { id: created.id } })
