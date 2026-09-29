@@ -16,6 +16,7 @@
  * 而「哪些错误码算能力不可用」一旦各页漂移，降级行为就会各不相同。
  */
 import { userMessageOf } from '../services/api/userErrorMessage'
+import { aiDeclarationDeclineMessage } from './aiDeclarationErrors'
 import type { AiAvailability } from './useAiTask'
 
 /**
@@ -72,6 +73,12 @@ export const AI_OUTAGE_CODES: ReadonlySet<string> = new Set([
   'AI_BUDGET_EXHAUSTED',
   // 读不到当日花费，服务端为防超支先停 AI（失败关闭）。
   'AI_BUDGET_UNAVAILABLE',
+  // 问 AI 闸门时闸门自己出错（services/api/src/ai/resume/self-assessment-interpretation.ts）：
+  // 与 AI_BUDGET_UNAVAILABLE 同一性质 —— 判定本身做不了，服务端失败关闭、不调模型。
+  // 目前只出现在自我探索结果的 aiUnavailableReason 里（打分照常返回，只缺解读）。
+  // 不收 AI_INTERPRETATION_UNAVAILABLE：那是「说不出原因」的兜底码，可能只是这一次没写出来，
+  // 进表会把可以重新作答的情况说成停用（verify-ai-down-fallbacks 的分类口径）。
+  'AI_ACCESS_CHECK_FAILED',
 ])
 
 /** 从任意 API error 上取错误码；取不到时归为 `UNKNOWN_ERROR`（= 不判定能力不可用）。 */
@@ -99,7 +106,7 @@ export function isAiOutage(error: unknown): boolean {
  * 环境变量名和字体路径的中文报错，见该模块头部注释）。
  */
 export function aiErrorMessageOf(error: unknown, fallback: string): string {
-  return userMessageOf(error, fallback)
+  return aiDeclarationDeclineMessage(error) ?? userMessageOf(error, fallback)
 }
 
 /**

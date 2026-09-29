@@ -451,6 +451,20 @@ for (const relative of [
   })
 }
 
+const deskModel = read('src/pages/print/printDeskModel.ts')
+check('W-17 文字识别没覆盖时可以确认按原件继续，不编造遮挡任务', () => {
+  assert.match(pageCode, /我已确认，继续打印/)
+  assert.match(pageCode, /manualOriginalPrintCheck\(/)
+  assert.match(pageCode, /canManualAck/)
+  assert.match(pageCode, /文字识别这次没覆盖这份文件/)
+  assert.ok(!pageCode.includes('隐私检查没有完整覆盖这份文件，不能继续'))
+  assert.match(deskModel, /export function manualOriginalPrintCheck/)
+  assert.match(deskModel, /claim: 'not_supported'/)
+  assert.match(deskModel, /unredactedAcknowledgedAt: input\.acknowledgedAt/)
+  assert.ok(!deskModel.includes('piiRedactTaskId:'))
+  assert.match(deskModel, /materialCheck\.piiRedactTaskId \|\| acknowledgedOriginal\(materialCheck\)/)
+})
+
 const sessionSrc = read('src/pages/print/printMaterialSession.ts')
 check('会话摘要以 claim 为真值,不再持久化 resultFileCreated', () => {
   assert.match(sessionSrc, /MaterialRedactionSummary/)

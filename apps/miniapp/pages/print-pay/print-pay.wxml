@@ -21,7 +21,7 @@
   <view class="card flat store-mini rise-d2">
     <view class="sm-ic a-teal"><text class="ficon i-location"></text></view>
     <view class="sm-main">
-      <view class="sm-name">{{q.store || '未选择终端'}}</view>
+      <view class="sm-name">{{storeName || '未选择终端'}}</view>
       <view class="sm-sub">{{isFreeOrder ? '免费试运营：到机核验后直接进入打印队列' : '到机核验后再进入现场支付与打印'}}</view>
     </view>
   </view>
@@ -82,7 +82,7 @@
 
   <view class="notice info rise-d6">
     <text class="ficon i-info n-ic"></text>
-    <text>{{isFreeOrder ? '当前订单为免费试运营。到机确认前不会创建 Agent 可领取的 PrintTask；核验成功后才进入真实打印队列。' : '本期方案为小程序预提交、到机码核验、机端支付。到机确认前不会创建 Agent 可领取的 PrintTask，页面也不会伪造支付或打印成功。'}}</text>
+    <text>{{isFreeOrder ? '当前订单为免费试运营。在终端扫码或输入到机码之前，不会开始打印；核验成功后才进入打印队列。' : '在终端扫码或输入到机码之前，不会开始打印；页面不会提前显示打印成功。'}}</text>
   </view>
 </view>
 

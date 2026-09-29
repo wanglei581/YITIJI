@@ -18,7 +18,7 @@ export function MemberAgreement({ agreed, onAgreedChange }: MemberAgreementProps
           aria-checked={agreed}
         >
           <span className="box">
-            <CheckIcon size={18} aria-hidden="true" />
+            {agreed ? <CheckIcon size={18} aria-hidden="true" /> : null}
           </span>
           <span>我已阅读并同意</span>
         </button>

@@ -41,7 +41,7 @@ Page({
     savedFiles: [],
 
     // 年龄声明与录音同意（C6）。登录着读服务端，没登录读本机，见 ./consents.js。
-    consents: { loaded: false, error: '', age: {}, voice: {} },
+    consents: { loaded: false, error: '', age: {}, voice: {}, resume: null },
     privacyRequestDays: consents.PRIVACY_REQUEST_DAYS,
 
     busy: '',
@@ -427,6 +427,8 @@ Page({
   loadConsents() { consents.load().then((view) => this.setData({ consents: view })) },
 
   tapVoiceConsent() { if (!this.data.busy) consents.promptVoice(this) },
+
+  tapResumeConsent() { if (!this.data.busy) consents.promptResume(this) },
 
   openPrivacyGuide() { consents.openPrivacyGuide() },
 

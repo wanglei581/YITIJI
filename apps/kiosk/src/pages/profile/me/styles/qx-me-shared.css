@@ -416,7 +416,8 @@ button.qx-me-row { cursor: pointer; }
   color: var(--qx-ink-3);
   font-size: 17px;
 }
-.qx-me-truth b { color: var(--qx-ink-2); }
+.qx-me-truth b { color: var(--qx-ink-2); flex: none; white-space: nowrap; }
+.qx-me-truth span { min-width: 0; }
 
 .qx-me-fav-next {
   flex: none;

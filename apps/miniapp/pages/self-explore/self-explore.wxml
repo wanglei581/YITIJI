@@ -149,7 +149,7 @@
       <!-- 解读缺失要说清缺的是哪一半：缺的只是文字，强度是纯函数算的，不受影响 -->
       <view wx:if="{{result.status === 'rejected' || result.providerUnavailable}}" class="notice warn rise-d1">
         <text class="ficon i-warning n-ic"></text>
-        <text wx:if="{{result.providerUnavailable}}">AI 解读服务本次不可用，五段文字解读没有生成。五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
+        <text wx:if="{{result.providerUnavailable}}">{{result.aiReasonText}}五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
         <text wx:else>本次 AI 解读未通过服务端校验{{result.failReason ? '（' + result.failReason + '）' : ''}}，文字解读没有生成。五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
       </view>
 

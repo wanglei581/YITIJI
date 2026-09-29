@@ -24,7 +24,7 @@ export const W2_PRINT_PARAMS = {
 
 export const W2_ORDER = {
   orderId: 'w2-order-001',
-  orderNo: 'W2-ORDER-001',
+  orderNo: 'ORD-20260929-W2ORDER01',
   amountCents: 200,
   paymentSessionToken: 'fixture-payment-session',
   taskId: 'w2-task-001',

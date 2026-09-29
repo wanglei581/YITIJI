@@ -28,6 +28,11 @@ function envNumber(name: string, fallback: number): number {
   return Number.isFinite(value) ? value : fallback
 }
 
+/** 小青音色 ID。buildTtsConfig 与思考模式在线探针共用，避免默认值 1008 写两处。 */
+export function readXiaoqingVoiceType(): number {
+  return envNumber('TRTC_TTS_VOICE', 1008)
+}
+
 function envForbiddenWords(primaryName: string, fallbackName: string): string[] {
   const raw = process.env[primaryName] || process.env[fallbackName]
   if (!raw) return DEFAULT_FORBIDDEN_WORDS
@@ -118,7 +123,7 @@ export class TrtcService {
         AppId:           appId,
         SecretId:        secretId,
         SecretKey:       cloudKey,
-        VoiceType:       envNumber('TRTC_TTS_VOICE', 1008),
+        VoiceType:       readXiaoqingVoiceType(),
         Volume:          envNumber('TRTC_TTS_VOLUME', 5),
         Speed:           envNumber('TRTC_TTS_SPEED', 0),
         PrimaryLanguage: envNumber('TRTC_TTS_PRIMARY_LANGUAGE', 1),

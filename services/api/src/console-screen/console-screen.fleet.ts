@@ -16,7 +16,7 @@ const PRINTER_FAULT_TITLES: Record<string, string> = {
   not_found: '未检测到打印机',
   toner_empty: '打印机缺墨',
   toner_low: '打印机墨粉不足',
-  low_paper: '纸张不足，可打印、需补纸',
+  low_paper: '纸张或墨粉不足，可打印、需补充',
 }
 
 export interface FleetTerminalRow {

@@ -49,6 +49,6 @@ const JWT_TTL = '24h'
     // P1-5：真实发送器外包额度层（内部账号桶每日总量），见 sms-budget.ts。
     { provide: SMS_SENDER, useFactory: createInternalBudgetedSmsSender, inject: [RedisService] },
   ],
-  exports:     [JwtModule, JwtAuthGuard, RolesGuard, AuthService, InternalOtpService],
+  exports:     [JwtModule, JwtAuthGuard, RolesGuard, AuthService, InternalOtpService, SMS_SENDER],
 })
 export class AuthModule {}

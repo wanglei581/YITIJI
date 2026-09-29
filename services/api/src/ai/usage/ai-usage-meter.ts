@@ -81,6 +81,11 @@ export function beijingDayKey(at: Date): string {
   return new Date(at.getTime() + BEIJING_OFFSET_MS).toISOString().slice(0, 10)
 }
 
+/** 北京时间自然月 YYYY-MM。与 beijingDayKey 同一时差，月份边界跟自然日走。 */
+export function beijingMonthKey(at: Date): string {
+  return new Date(at.getTime() + BEIJING_OFFSET_MS).toISOString().slice(0, 7)
+}
+
 const VENDOR_BY_HOST: Record<string, string> = {
   'api.deepseek.com': 'deepseek',
   'dashscope.aliyuncs.com': 'qwen',

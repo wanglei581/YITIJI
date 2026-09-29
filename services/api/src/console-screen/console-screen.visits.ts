@@ -13,7 +13,7 @@
  *     （复用 countKioskVisitsByTerminal，终端改绑不带走历史）。单台：只数该终端；
  *     机构看单台时同样要求快照为本机构。
  *   - 小样本：面向机构的数、服务调用里的数、单台的数，大于 0 且小于 5 时不给数，
- *     标「样本不足」（与这些页面其它计数的最小聚合口径一致）；0 就是 0。
+ *     标「少于 5」（原因码 sample_below_threshold，界面显示「少于 5」）（与这些页面其它计数的最小聚合口径一致）；0 就是 0。
  *     政务版整体快照与同屏「累计打印」「AI 调用」一样给原数。
  *   - 原始记录只保留 180 天（KIOSK_SESSION_RETENTION_DAYS），因此不提供「累计服务人次」。
  */
@@ -72,7 +72,7 @@ export async function countTerminalVisits(
   })
 }
 
-/** 取数失败如实标「本次没有取到」；suppressSmall 时 1–4 标样本不足。 */
+/** 取数失败如实标「本次没有取到」；suppressSmall 时 1–4 标「少于 5」。 */
 export function visitMetric(loaded: VisitLoaded, window: string, suppressSmall: boolean): ScreenMetric<number> {
   if (!loaded.ok) return unavailableMetric(VISIT_SOURCE, window, loaded.reason)
   const count = loaded.value
