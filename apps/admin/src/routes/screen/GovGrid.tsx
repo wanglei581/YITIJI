@@ -175,6 +175,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
     >
       <TwinSlot slot="l1">
         <TwinMetricPanel
+          className={chrome.presenting ? 'is-dense' : undefined}
           title={focus === null ? '终端与服务' : `${focus}终端`}
           sub="实时"
           metric={g.terminalsOnline}
@@ -183,19 +184,20 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
             (g.terminalsOnline?.available
               ? `最近 ${g.terminalsOnline.value.onlineWindowSeconds} 秒有心跳算在线。${screenFleetScopeNote(g.terminalsOnline.value, '')}。`
               : '') +
-            (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在区统计，由机队样本算出。')
+            (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在区统计，由机队样本算出。') +
+            '今日服务人次按一体机会话开始时间计入上海自然日，是会话数，不是人数。累计打印按已出纸任务乘以份数计印面，双面时实际用纸更少。'
           }
           render={(value) => {
             const online = focus === null ? value.healthy : counts.ok + counts.pr
             const total = focus === null ? value.sampledCount : inView.length
             return (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                  <TwinRing value={online} total={total}>
+                <div className="twin-ring-row">
+                  <TwinRing value={online} total={total} size={chrome.presenting ? 120 : 168}>
                     <span className="twin-big">{screenCount(online)}</span>
-                    <span className="twin-muted" style={{ marginTop: 6 }}>正常 · 共 {screenCount(total)} 台</span>
+                    <span className="twin-muted twin-ring-cap">正常 · 共 {screenCount(total)} 台</span>
                   </TwinRing>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div className="twin-legend-col is-tight">
                     <div className="twin-kv">
                       <span>累计打印</span>
                       {g.printPagesCumulative?.available ? (
@@ -206,6 +208,19 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                       ) : (
                         <TwinUnavailable reason={metricReason(g.printPagesCumulative)} inline />
                       )}
+                      <p className="twin-cap">按出纸任务 × 份数计，双面时实际用纸更少</p>
+                    </div>
+                    <div className="twin-kv">
+                      <span>今日服务人次</span>
+                      {g.visitCount?.available ? (
+                        <b>
+                          {screenCount(g.visitCount.value)}
+                          <span className="twin-unit">人次</span>
+                        </b>
+                      ) : (
+                        <TwinUnavailable reason={metricReason(g.visitCount)} inline />
+                      )}
+                      <p className="twin-cap">是会话数，不是人数</p>
                     </div>
                     <div className="twin-kv">
                       <span>AI 服务调用</span>
@@ -246,7 +261,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
           sub="近 14 天 · 页"
           scope={cityScope}
           metric={g.printTrend14d}
-          source="按订单支付时间落入的上海自然日聚合已支付打印订单的内容页数；不乘份数，不代表物理出纸张数。「今日」是今天零点到现在的累计。"
+          source="近 14 个上海自然日，只统计已经出纸的任务：页数按打印页数乘以份数，记在出纸完成的那一天。付了款但没出纸的不算。双面打印时这是面数，用纸会少一些。「今日」是今天 0 点到明天 0 点已经出纸的页数。"
           render={(value) => {
             const days = value.days
             const today = days.length ? days[days.length - 1].pages : null

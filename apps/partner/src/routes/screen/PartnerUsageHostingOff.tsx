@@ -6,7 +6,8 @@ import {
   TwinMetricPanel,
   TwinPanel,
   TwinRankList,
-  twinSmall,
+  screenCount,
+  screenReasonCopy,
   twinTrendHasGaps,
 } from '@ai-job-print/ui'
 
@@ -15,19 +16,21 @@ import {
  *
  * 每屏一个数只出现一次：浏览、收藏、打开来源入口三个合计只在左上「使用概况」里写，
  * 场景牌子不写数、不再单列收藏；「打开来源平台入口」按类型的条形图只剩一类、与概况重复，不渲染。
- *   - 左下「统计口径」：访问人次写成一条说明，不再挂一枚「未接入」小牌子；
+ *   - 左下「统计口径」：服务人次写成一条说明（会话数，不是人数），不再挂一枚小牌子；
  *   - 中栏底部「每日趋势」：宽图，少于 5 的日子画斜纹带；选「今日」时只剩一行状态，不把概况的数放大重写一遍；
  *   - 右栏「热门政策」：竖排 Top 5，标题写全（最多两行），并在这里说一次边界。
  */
 
 type UsageMetrics = ScreenUsageSnapshot['metrics']
 
-/** 访问人次这一条：数据层缺口与取数失败分开说；接入后（契约放开）直接写数。 */
+/** 服务人次这一条：有数写数；1–4 次与取数失败都用原因表的中文，不补具体数字。 */
 function visitsLine(metric: UsageMetrics['visits']): string {
-  if (!metric || (metric.available === false && metric.reason === 'kiosk_session_unwritten')) return '访问人次暂未统计（一体机会话尚未记录）'
-  if (metric.available === false) return '访问人次本次没有取到，稍后自动重试'
-  const value = (metric as { value: unknown }).value
-  return typeof value === 'number' ? `访问人次 ${twinSmall(value)} 人次` : '访问人次本次没有取到，稍后自动重试'
+  if (!metric || metric.available === false) {
+    const reason = metric && metric.available === false ? metric.reason : 'source_query_failed'
+    const copy = screenReasonCopy(reason)
+    return `服务人次${copy.short ?? copy.title}（是会话数，不是人数）`
+  }
+  return `服务人次 ${screenCount(metric.value)} 人次（是会话数，不是人数）`
 }
 
 export function OrgUsageNotesPanel({ visits, membersNote }: { visits: UsageMetrics['visits']; membersNote: string }) {
