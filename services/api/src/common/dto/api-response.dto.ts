@@ -26,6 +26,8 @@ export interface ErrorResponseBody {
     memberFileRetained?: true
     /** 仅 PICKUP_TERMINAL_MISMATCH（会员本机领取走错机器）：该单绑定的网点，给本人看。 */
     terminal?: { id: string; displayName: string | null; locationLabel: string | null } | null
+    /** 前端可用的下一步标识（小写蛇形），如 export_ai_labeled；只在拒绝时附带。 */
+    nextAction?: string
   }
   requestId?: string
 }

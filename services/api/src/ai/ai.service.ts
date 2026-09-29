@@ -123,7 +123,7 @@ function hashAccessToken(token: string): string {
 }
 
 /** 恒定时间比较 token 与已存 hash，避免计时侧信道（对齐 materials 任务机制）。 */
-function verifyAccessToken(token: string | null, expectedHash: string): boolean {
+export function verifyAccessToken(token: string | null, expectedHash: string): boolean {
   if (!token) return false
   const actual = Buffer.from(hashAccessToken(token), 'hex')
   const expected = Buffer.from(expectedHash, 'hex')

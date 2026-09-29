@@ -57,6 +57,7 @@ import { ResumeReportExportController } from './resume-report-export.controller'
 import { DiagnosisReportPdfService } from './resume/diagnosis-report-pdf.service'
 import { KioskAiCapabilitiesController } from './kiosk-ai-capabilities.controller'
 import { TerminalsModule } from '../terminals/terminals.module'
+import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
@@ -112,6 +113,8 @@ import { TerminalsModule } from '../terminals/terminals.module'
     ResumePdfService,
     ResumeDocxService,
     ResumeTextService,
+    // 按原样导出的正文来源：留存生成时原话、拒照抄 AI 结果的草稿。
+    ResumeDraftSourceService,
     DiagnosisReportPdfService,
     // ── 阶段2B AI 简历优化真实化(基于原文,防编造) ──
     LlmResumeOptimizeService,

@@ -109,11 +109,17 @@
 - **问题（全功能模拟走查发现）：** 全新库没有 `print_bw_page` / `print_color_page` 两行时，后台计费页只渲染已有行、改价接口对不存在的行回 `PRICE_CONFIG_NOT_FOUND`，运营在后台无从设价，只能照运维文档手写 SQL；否则报价一直失败。
 - **修法：** 计费页列表时补齐缺失的打印两档，**停用、单价 0、描述写明「未定价」**，已有行一律不动。没有照「简历导出」那样补成「启用 0 元」：打印一直是收费能力，缺价必须失败关闭，不能因为补了目录行就让新库默认免费出纸。试点免费由管理员在计费页设 0 元（须勾「确认 0 元」）并启用——一次有审计的显式动作。运维文档同步。
 - **验证：** `verify:admin-billing` 加一段（36 条全过）：缺行 → 报价失败关闭 → 列表补出停用未定价两行 → 仍失败关闭 → 不勾确认设 0 元被拒 → 确认后 0 元报价 → 再开计费页不覆盖已设价。三处变异（不补行、补行直接启用、补行覆盖已有价）各自变红；pricing、payment-flow、order、resume-export-formats、print-jobs 全绿。
+## 2026-09-29：简历「按原样导出」不再被 AI 授权与 AI 闸门挡住（分支 `claude/backend-hardening-20260929-draft-export-no-ai-gate`，总指挥 P0）
+
+- **问题（小程序走查转来，总指挥已对代码）：** `POST ai/resume/generate/export` 在读 `draft` 之前就查 `resume_ai` 授权，路由上的 `@AiUse('export')` 还会被 AI 暂停（#1094 合入后还有「AI 未开通」）挡住。draft=true 导出的是用户逐字填写的内容、不送模型、不带 AI 标识，正是 AI 失败时的手动退路——违背「AI 挂了退化成手动」。
+- **修法：** 新增 `@AiManualPathWhen`：同一接口里不经过模型的手动路径命中时，守卫只保留维护模式这一道，跳过 AI 暂停 / 未开通 / 额度 / 声明 / 登录档位；只认请求体里严格的布尔 `true`，其它一律照常过闸（失败关闭）。导出接口挂 `RESUME_DRAFT_EXPORT_MANUAL_PATH`（单独成文件，`ai.controller.ts` 已超 800 行，本次行数未增加）；控制器只在 draft=false 时查授权。
+- **验证：** `verify:ai-access` 加 8 条：AI 暂停与登录档位下 draft=true 放行、draft=false 与字符串 "true" 照拦、维护模式照拦；没有授权时 draft=true 完成、draft=false 403。三处反向变异（守卫不认手动路径、控制器无条件查授权、判定放宽成真值）各自变红；resume-export-formats、resume-export-label、resume-generate、aigc-pdf-metadata、materials-processing 全绿。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
 
+- **审查后补 A+B（9/29，总指挥裁定）：** 「按原样导出」的正文来源改由服务端决定。带 taskId：按生成时留存的本人原始填写渲染（`AiResumeResult` kind=`generate_input`，与生成结果同一留存期，纳入删除级联与留存矩阵），取不到回 404 `RESUME_DRAFT_SOURCE_NOT_FOUND` 并给下一步「用当前表格重新导出」。不带 taskId：客户端正文与可比对范围内的 AI 结果规范化比对（会员本人、已验签一体机本次使用期间，匿名离机时比对保留期内全部），含 AI 段落回 409 `RESUME_DRAFT_CONTAINS_AI_OUTPUT`，`error.nextAction=export_ai_labeled`；本人原话豁免、≥20 汉字当量才比对。`AiResumeResult` 加 `terminalId` 列（两套迁移）。新门禁 `verify:resume-export-draft-source` 30 条（旧代码上红 12 条），子代理 9 处反向变异全红；协调方复跑 11 条关联门禁全绿。待拍板：小程序草稿导出带 taskId 时导出的是生成时原话（推荐生成后改过表格就不带 taskId）；排版调整的 AI 输出未落库，比对不到（推荐另开一项）。
 ## 2026-09-29：content-pipeline-e2e 自签令牌改为 15 分钟，并核对与登录签发一致（PR #1097，未合入）
 
 - **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。
