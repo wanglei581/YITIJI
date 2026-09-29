@@ -87,9 +87,21 @@ async function main(): Promise<void> {
     const entries = audit.entries.filter((e) => e.action === 'material_task.pii_manual_confirmed' && e.targetId === t1.task.id)
     check('审计只写一条', entries.length === 1, `条数 ${entries.length}`)
     const payload = entries[0]?.payload ?? {}
-    check('审计只记元数据（mode、请求方类型、时间），不记文件名与识别文字',
-      JSON.stringify(Object.keys(payload).sort()) === JSON.stringify(['confirmedAt', 'mode', 'requesterKind'])
+    check('审计只记元数据（mode、请求方类型、会员号、时间），不记文件名与识别文字；actorId 为空（外键指向运营账号）',
+      JSON.stringify(Object.keys(payload).sort()) === JSON.stringify(['confirmedAt', 'endUserId', 'mode', 'requesterKind'])
+      && entries[0]?.actorId === null
       && !JSON.stringify(payload).includes('身份证'), JSON.stringify(payload))
+    {
+      // 审计写不进（事务里抛错）：确认必须失败、库里不留「已确认」——它是隐私检查不完整也放行打印的唯一依据。
+      const failingAudit = { write: async () => 'x', writeRequired: async () => { throw new Error('audit store down') } }
+      const confirmNoAudit = new MaterialsManualConfirmationService(prisma, failingAudit as never, materials)
+      const fx = await makeFile(9)
+      const tx9 = await makeTask(fx.id, 9, 'degraded')
+      const rejected = await outcome(() => confirmNoAudit.confirm(tx9.task.id, tx9.requester))
+      const after = await prisma.documentProcessTask.findUniqueOrThrow({ where: { id: tx9.task.id }, select: { resultJson: true } })
+      check('审计写不进：确认失败，库里不留「已确认」（整体回滚）',
+        !rejected.ok && !String(after.resultJson).includes('manualConfirmedAt'), `${describe(rejected)} ${after.resultJson}`)
+    }
     const intruder = await outcome(() => confirm.confirm(t1.task.id, { kind: 'anonymous', accessToken: 'someone-else' }))
     check('别人的任务令牌不能替本人确认（403）', !intruder.ok && intruder.status === 403, describe(intruder))
     for (const mode of ['partial', 'unsupported_format']) {
