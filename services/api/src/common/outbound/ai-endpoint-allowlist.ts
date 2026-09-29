@@ -73,6 +73,8 @@ export type AiEndpointRejectReason =
   | 'host_not_allowed'
   /** 配置里看不出请求会发到哪里（例如交给腾讯云代调的配置没写地址）。 */
   | 'unverifiable'
+  /** 腾讯云地域不在境内名单里（主机名白名单管不到地域参数，见 TENCENT_MAINLAND_REGIONS）。 */
+  | 'region_not_allowed'
 
 export const AI_ENDPOINT_ALLOWLIST_ENV = 'AI_ENDPOINT_ALLOWLIST'
 export const AI_ENDPOINT_ALLOWLIST_EXTRA_ENV = 'AI_ENDPOINT_ALLOWLIST_EXTRA'
@@ -281,6 +283,34 @@ export function isAiEndpointAllowed(url: string, service: AiOutboundService): bo
   if (verdict.allowed) return true
   logRejection(service, verdict.host, verdict.reason ?? 'host_not_allowed')
   return false
+}
+
+/**
+ * 腾讯云境内地域。主机名白名单只认 `*.tencentcloudapi.com` 的具体主机，管不到请求头里的
+ * `X-TC-Region`：把 TRTC_REGION / TENCENT_SMS_REGION / TENCENT_TTS_REGION 改成境外地域
+ * （如 ap-hongkong、ap-singapore），同一个主机名就会把数据送到境外处理。所以地域另判一次。
+ * 名单取腾讯云中国内地公有云地域；要增减改这里（改了要同步门禁 verify:ai-endpoint-allowlist）。
+ */
+export const TENCENT_MAINLAND_REGIONS: readonly string[] = Object.freeze([
+  'ap-guangzhou', 'ap-shanghai', 'ap-beijing', 'ap-nanjing', 'ap-chengdu', 'ap-chongqing',
+])
+
+function normalizeRegion(region: string | undefined): string {
+  return typeof region === 'string' ? region.trim().toLowerCase() : ''
+}
+
+/** 腾讯云地域是否在境内名单里（拒绝时记一行只含服务与地域的日志）。给「失败走结果对象」的调用点用。 */
+export function isTencentRegionAllowed(region: string | undefined, service: AiOutboundService): boolean {
+  const normalized = normalizeRegion(region)
+  if (TENCENT_MAINLAND_REGIONS.includes(normalized)) return true
+  logger.warn(`outbound.region_not_allowed service=${service} region=${normalized || '(empty)'}`)
+  return false
+}
+
+/** 同上，不在名单就抛 AiEndpointNotAllowedError（reason=region_not_allowed）。给「失败走异常」的调用点用。 */
+export function assertTencentRegionAllowed(region: string | undefined, service: AiOutboundService): void {
+  if (isTencentRegionAllowed(region, service)) return
+  throw new AiEndpointNotAllowedError(service, '', 'region_not_allowed')
 }
 
 /**

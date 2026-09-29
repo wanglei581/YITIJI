@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { tc3Sign } from '../../common/tencent/tc3'
-import { isAiEndpointAllowed } from '../../common/outbound/ai-endpoint-allowlist'
+import { isAiEndpointAllowed, isTencentRegionAllowed } from '../../common/outbound/ai-endpoint-allowlist'
 
 // ============================================================
 // 2C+ 面试官语音播报（腾讯云 TTS TextToVoice，官方语音包）。
@@ -97,7 +97,7 @@ export class TtsService {
     const clean = text.trim().slice(0, 600)
     if (!clean) return { ok: false, errorMessage: '播报内容为空' }
     // 出站白名单：地址不在单内就一段都不合成（前端照常降级本地播报）。
-    if (!isAiEndpointAllowed(this.endpoint, 'tts')) {
+    if (!isAiEndpointAllowed(this.endpoint, 'tts') || !isTencentRegionAllowed(process.env['TENCENT_TTS_REGION'] ?? 'ap-guangzhou', 'tts')) {
       return { ok: false, errorMessage: '语音播报服务地址未通过核准，本次没有发出请求' }
     }
     const t0 = Date.now()
