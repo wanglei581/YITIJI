@@ -210,10 +210,12 @@ if ((page.match(/<PrintRetryButton/g) ?? []).length === 2 && page.includes('lega
 } else {
   fail('list and detail must both render PrintRetryButton, detail legacyVisible={canRetry}, list legacyVisible={false}')
 }
+const disabledAttr = retryUi.match(/(^|\n)[ \t]*disabled=\{busy \|\| retryBlocked\}/)
+const ariaDisabledAttr = retryUi.match(/(^|\n)[ \t]*aria-disabled=\{busy \|\| retryBlocked\}/)
 if (
   retryUi.includes("const retryBlocked = typeof retryBlockedReason === 'string'") &&
-  retryUi.includes('disabled={busy || retryBlocked}') &&
-  retryUi.includes('aria-disabled={busy || retryBlocked}') &&
+  disabledAttr &&
+  ariaDisabledAttr &&
   retryUi.includes('if (retryBlockedReason === undefined && !legacyVisible) return null') &&
   !/disabled=\{[^}]*retryBlockedReason == null/.test(retryUi) &&
   !/disabled=\{[^}]*!retryBlockedReason/.test(retryUi) &&
