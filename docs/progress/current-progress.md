@@ -8,6 +8,11 @@
 - **W-80：** 作业页把导航里的要点收成稳定字符串再解析，读取失败最多 3 次，并给出「重新读取」。不再每次渲染都把会话重新读一遍。
 - **W-81：** 简历来源页在二维码还在等人、文件没到时不再把整页标成忙，U 盘可以点。手机已传上或正在确认才算忙。其它使用同一二维码面板的页面仍按「会话还在」报忙。
 - **验证：** 新门禁 `verify:public-screen-mask`（含 maskPii 单测）已进 CI。把小青回显改回直接显示原文，门禁变红。关联门禁、一体机类型检查与改动文件的 lint 在本机通过。修复前画面在第一套走查栈 4310，修复后在本分支 4388；证据在走查缓存 `fix-mask/before-*.png` 与 `after-*.png`。未部署。
+## 2026-09-29：修 #1074 build-and-verify 红——机构账号列表不再下发原始密码状态（分支 `claude/backend-hardening-20260929-w03-no-proof-state`）
+
+- **原因：** #1128（W-03）为让后台判断「能否登记手机号」，把 `passwordProofState` 放进了 `AdminOrgAccount`，违反 `verify:partner-account-action:schema`「后台账号响应不得暴露 passwordProofState」（run 36584114028 第 180 步）。协调方推 #1128 前没跑这条 schema 门禁，漏了。
+- **修法：** 门禁不放宽。去掉该字段，后台只看服务端算好的 `canRegisterContactPhone` 与 `phoneRegisteredByAdminAt`；W-03 门禁改为断言不下发原始状态。两个后台窗口前端同步改读法。
+- **验证：** schema 门禁通过；反向变异「把 passwordProofState 放回响应」红在该断言；W-03、机构账号操作（含 otp/redis）、admin-orgs、admin-orgs-delete-schema、partner-org-self、internal-auth-phone 全绿。
 
 ## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
 
