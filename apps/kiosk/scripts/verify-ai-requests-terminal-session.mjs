@@ -1,9 +1,9 @@
 /**
- * 门禁：一体机的「按台计」请求（AI 调用）必须带终端会话票。
+ * 门禁：一体机的「按台计」请求（AI 调用、会员发码）必须带终端会话票。
  *
  * 为什么有这道门：服务端的 AI 每日额度、AI 用量台账、短信每台每日上限，只认
  * x-terminal-id + x-terminal-session-token **验签通过**的终端。一体机此前 AI 请求只带
- * X-Terminal-Id —— 于是单机每日上限对一体机不生效，后台把一体机的 AI
+ * X-Terminal-Id、发码什么终端头都不带 —— 于是单机每日上限对一体机不生效，后台把一体机的 AI
  * 用量记成「无已验签终端」。票只能由 services/terminalAuth.ts 取（它还负责 401 后换票重试），
  * 各封装自己拼 token 会各拼各的、也没有换票。
  *
@@ -16,8 +16,8 @@
  *        · 服务端回 401 TERMINAL_SESSION_INVALID：换一次票，用新票重发，最终拿到重发的结果；
  *        · 别的 401：不换票、不重发，原样交还。
  *
- *   二、接线（TypeScript AST，不按文本猜）：扫 apps/kiosk/src 全部源码，找出所有把 AI 路由
- *      交给「会发请求的函数」的调用点，逐个判定它最终走的是不是终端身份封装：
+ *   二、接线（TypeScript AST，不按文本猜）：扫 apps/kiosk/src 全部源码，找出所有把 AI 路由 /
+ *      发码路由交给「会发请求的函数」的调用点，逐个判定它最终走的是不是终端身份封装：
  *        · 直接调 terminalAttributedFetch / terminalProtectedFetch                 → 合格
  *        · 把这两个之一作为发送函数传进去（call(path, ..., terminalAttributedFetch)）→ 合格
  *        · 调本文件里的封装，封装（连同它调的本文件封装）只经这两个发、不碰裸 fetch → 合格
@@ -133,7 +133,7 @@ async function runtimeChecks() {
       },
     })
     session.setItem(TOKEN_KEY, 'expired-ticket-1')
-    const response = await mod.terminalAttributedFetch('/api/v1/mock-interviews', { method: 'POST' })
+    const response = await mod.terminalAttributedFetch('/api/v1/member/auth/sms-code', { method: 'POST' })
     const urls = calls.map((c) => c.url.replace('http://127.0.0.1:5173', ''))
     const retried = calls[2]?.headers ?? {}
     if (response.status !== 200 || urls.length !== 3 || !urls[1].endsWith('/terminals/session-token/refresh')
@@ -158,7 +158,8 @@ async function runtimeChecks() {
 
 /**
  * 服务端按台计的路由（去掉 ${API_BASE_URL} 前缀后匹配）。
- * 取自服务端 @AiUse 标注的控制器前缀。
+ * AI 部分取自服务端 @AiUse 标注的控制器前缀；发码只有 POST /member/auth/sms-code
+ * （二次验证发码 /member/auth/step-up/sms-code 服务端不按台计，不在此列）。
  * 注意 /resume/parse 等也是一体机页面路由 —— 所以只看「交给会发请求的函数」的调用点，
  * navigate('/resume/parse') 这类不算。
  */
@@ -172,6 +173,7 @@ const METERED_PATH = new RegExp([
   '^/jobs/(?:ai/|[^/]+/ai/)',
   '^/trtc/session',
   '^/kiosk/ai/',
+  '^/member/auth/sms-code$',
 ].join('|'))
 
 const TERMINAL_SENDERS = new Set(['terminalAttributedFetch', 'terminalProtectedFetch'])
@@ -198,6 +200,7 @@ const REQUIRED_FILES = [
   'src/services/api/jobFit.ts',
   'src/services/api/selfAssessment.ts',
   'src/hooks/useAiAdvisorCallSession.ts',
+  'src/services/auth/memberAuthApi.ts',
 ]
 
 function walk(dir) {

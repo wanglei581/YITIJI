@@ -405,7 +405,8 @@ export interface TerminalSessionE2EHooks {
 }
 
 if (HAS_E2E_MOCK_TOKEN) {
-  const host = window as unknown as { __terminalSessionE2E?: TerminalSessionE2EHooks }
+  // typeof window 守卫：发码封装（memberAuthApi）也引本模块，node 里打包它的单测没有 window。
+  const host = (typeof window === 'undefined' ? {} : window) as unknown as { __terminalSessionE2E?: TerminalSessionE2EHooks }
   host.__terminalSessionE2E = {
     startRefresh: () => { void retryRefresh().catch(() => undefined) },
     state: () => state,
