@@ -227,6 +227,48 @@ pnpm --filter @ai-job-print/api bootstrap:first-admin
 - `User=0` 且无匹配审计：数据库未提交，人工删除该 0600 文件后重新申请执行窗口。
 - 其他组合：状态不一致，保持 **NO-GO**，备份并人工审查；不得用 seed 或直接 SQL 补写。
 
+### 备用管理员应急启用（主管理员账号登不上时）
+
+**前提**：平时由主管理员在管理后台「内部账号」里建好备用管理员（`POST /admin/internal-accounts/backup-admin/*`，
+要本人密码 + 备用手机号验证码；建出来是**停用**状态、随机临时密码谁都不知道、手机号已验证）。全系统最多一个。
+
+**什么情况下执行**：主管理员账号登不上（手机丢失、人员离岗、密码与短信都走不通），且后台里已经没有能登录的
+管理员可以去点「启用」。能登录后台时一律在后台启停，不用本命令。
+
+**谁能执行**：同首个管理员 bootstrap —— 受控 Linux 账户 + 生产数据库凭据 + 产品负责人具名同意；
+执行人与核对人各记一份记录。AI 与自动化流程不得执行本命令。
+
+**两步执行**（NODE_ENV / DATABASE_URL / SECRET_ENCRYPTION_KEY 从受控生产环境读取；只认 PostgreSQL）：
+
+```bash
+# 第一步：只查看并签发确认码，不改任何账号。会打印将被启用的用户名与脱敏手机号。
+export BACKUP_ADMIN_EMERGENCY_CONFIRM=ENABLE_BACKUP_ADMIN_IN_EMERGENCY
+export BACKUP_ADMIN_EMERGENCY_REASON='<为什么要应急启用，2-200 字，会写进审计>'
+pnpm --filter @ai-job-print/api backup-admin:emergency-enable
+
+# 第二步：核对第一步打印的账号无误后，10 分钟内带确认码再运行一次
+export BACKUP_ADMIN_EMERGENCY_CODE='<第一步打印的确认码>'
+pnpm --filter @ai-job-print/api backup-admin:emergency-enable
+```
+
+确认码是用 `SECRET_ENCRYPTION_KEY` 派生的签名，绑定「账号 + 当前版本 + 过期时间」，不落库不落文件；
+启用一次后自动作废，超过 10 分钟也作废（重新跑第一步即可）。命令只能启用 `isBackupAdmin=true`、停用中、
+手机号已验证的那一个账号，不接受任何账号参数。第一步写审计 `user.emergency_enable_requested`，第二步在同一事务里
+启用账号（`tokenVersion+1`）并写 `user.enable`，两条审计的 `actorRole` 都是 `system-cli`、payload 带事由。
+
+**执行后必须做**：
+
+1. 持有备用手机号的人打开管理后台登录页 →「找回密码」→ 短信验证码 → 设新密码（完成后密码状态变为 `owner_managed`）。
+   开着管理员短信第二步（`ADMIN_LOGIN_SECOND_FACTOR=sms`）时也照常能登录：第二步的验证码发到同一个备用手机号。
+2. 登录后先处理主账号（在「内部账号」里停用旧主账号或让本人找回），并在审计日志里核对两条 `system-cli` 记录。
+3. 主账号恢复后，**第一件事**是用主账号登录，在「内部账号」里把备用管理员**先停用**，再做别的操作，
+   让它回到「平时停用、应急才启用」的状态。原因：备用管理员启用后就是完整的管理员，也能停用主管理员；
+   两个账号同时可用的时间越长，被人拿备用账号反手停掉主账号的窗口就越大。停用时 `tokenVersion+1`，
+   备用账号已登录的会话下一次请求即 401。
+   停用后在审计日志里按时间段（从第二步 `user.enable` 到本次停用）核对备用管理员做过的 `user.disable` / `user.enable`，
+   如果它停用过主管理员或别的管理员而不在预期内，按安全事件处理并报产品负责人。
+4. 把执行时间、执行人、核对人、事由回填到 `docs/progress/current-progress.md`（不写手机号与确认码）。
+
 > 当前生产已经使用 PostgreSQL。旧 SQLite→PostgreSQL 全库搬数工具已在招聘内容域 P1 Wave 1A
 > 退役并移除，禁止从 Git 历史恢复执行。若未来有外部旧库数据导入，必须另立具名授权的领域迁移
 > 方案、只读 preflight、脱敏演练、逐模型守恒对账和失败恢复步骤；本 runbook 不提供通用搬数命令。

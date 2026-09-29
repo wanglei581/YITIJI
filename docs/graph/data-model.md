@@ -16,7 +16,7 @@ flowchart TD
   Job["Job<br/><small>47 字段</small>"]
   JobFair["JobFair<br/><small>39 字段</small>"]
   JobSource["JobSource<br/><small>30 字段</small>"]
-  User["User<br/><small>26 字段</small>"]
+  User["User<br/><small>27 字段</small>"]
   PrintTask["PrintTask<br/><small>22 字段</small>"]
   AgentReleaseTarget["AgentReleaseTarget<br/><small>10 字段</small>"]
   Order["Order<br/><small>42 字段</small>"]
@@ -71,7 +71,7 @@ flowchart TD
 | **AiServiceLog** | 13 | EndUser | 4 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **AiUsageRecord** | 17 | EndUser | 2 个文件<br/>`ai/usage/ai-budget.service.ts`<br/>`ai/usage/ai-usage-summary.ts` |
 | **AlertDisposition** | 12 | — | 2 个文件<br/>`admin-ops/admin-alert-actions.service.ts`<br/>`admin-ops/admin-ops.service.ts` |
-| **AuditLog** | 12 | User | 21 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`ai/resume/job-fit-hosting.ts`<br/>`audit/audit.service.ts`<br/>… |
+| **AuditLog** | 12 | User | 22 个文件<br/>`admin-internal-accounts/backup-admin-emergency-enable.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`ai/resume/job-fit-hosting.ts`<br/>… |
 | **BenefitActivity** | 19 | BenefitClaim、User | 2 个文件<br/>`benefit-activities/benefit-activities.service.ts`<br/>`community/community.service.ts` |
 | **BenefitClaim** | 8 | BenefitActivity、BenefitGrant、EndUser | 1 个文件<br/>`benefit-activities/benefit-activities.service.ts` |
 | **BenefitGrant** | 16 | BenefitClaim、EndUser | 6 个文件<br/>`benefit-activities/benefit-activities.service.ts`<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>… |
@@ -160,7 +160,7 @@ flowchart TD
 | **ToolboxApp** | 12 | ToolboxAppVersion | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxAppVersion** | 14 | ToolboxApp | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxLaunchEvent** | 10 | — | 1 个文件<br/>`terminals/terminal-toolbox.service.ts` |
-| **User** | 26 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision | 17 个文件<br/>`admin-ops/admin-alert-actions.service.ts`<br/>`auth/admin-initial-phone-bind.service.ts`<br/>`auth/admin-login-second-factor.ts`<br/>… |
+| **User** | 27 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision | 21 个文件<br/>`admin-internal-accounts/admin-internal-accounts.service.ts`<br/>`admin-internal-accounts/admin-step-up.ts`<br/>`admin-internal-accounts/backup-admin-create.service.ts`<br/>… |
 | **UserAiConsent** | 8 | EndUser | 4 个文件<br/>`ai-access/ai-access.service.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>`member-privacy/member-data-request.service.ts`<br/>… |
 | **UserDataRequest** | 22 | EndUser | 6 个文件<br/>`member-privacy/member-data-export-download.service.ts`<br/>`member-privacy/member-data-export-reconciler.service.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserNotification** | 10 | — | **无代码读写** |
