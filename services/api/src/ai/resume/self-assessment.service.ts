@@ -6,8 +6,8 @@
 // - 答案原文不入库：payloadJson.persist 仅含 answersHash + dimensions + summary + note；
 //   答案原文在评分后立即丢弃（不写日志 / 不送 LLM prompt / 不写监控）。
 // - LLM 仅生成自然语言解读（note / summary），禁用"适合 / 不适合 / 推荐岗位"等指令性词。
-// - 命中 LLM 合规词 → 丢弃该条 note；命中"适合 / 不适合"级 → 整体拒答。
-// - 仅本人 / 匿名 token 持有者可访问；匿名结果不留库（仅会话状态）。
+// - 命中 LLM 合规词 → 丢弃该条 note；模型整体拒答时只回打分，原因码 COMPLIANCE_REJECT，不要求重新作答。
+// - 仅本人 / 匿名 token 持有者可访问；匿名结果按 TTL 短期保存，不存答案原文。
 // - 撤回 = 物理删除 answersHash / 维度 / summary；保留行用于删除审计。
 // - 打印文件名带 -self-assessment 前缀；不进分享用途的 FileObject。
 // ============================================================
@@ -17,14 +17,21 @@ import { randomBytes, createHash, timingSafeEqual } from 'node:crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { FilesService } from '../../files/files.service'
-import { signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { SELF_ASSESSMENT_QUESTIONS_V1 } from './self-assessment-questions'
 import type { SelfAssessmentAnswerV1, SelfAssessmentDimensionResult } from './self-assessment.types'
-import { SELF_ASSESSMENT_CONSENT_VERSION } from './self-assessment.types'
+import { isAcceptedSelfAssessmentConsentVersion, SELF_ASSESSMENT_CONSENT_VERSION } from './self-assessment.types'
 import { LlmSelfAssessmentService } from './llm-self-assessment.service'
 import { SelfAssessmentPdfService } from './self-assessment-pdf.service'
 import { scoreSelfAssessment } from './self-assessment-scoring'
 import { AiLogService, AiUsageAccumulator } from '../ai-log.service'
+import {
+  LLM_UNAVAILABLE_PROVIDER,
+  hasAiInterpretation,
+  interpretationStateOf,
+  type SelfAssessmentAiGates,
+  type SelfAssessmentInterpretationState,
+} from './self-assessment-interpretation'
 
 const RESULT_TTL_HOURS = (() => {
   const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
@@ -68,6 +75,8 @@ interface StoredSelfAssessment {
   dimensions: SelfAssessmentDimensionResult[]
   summary: string | null
   aiProvider?: string | null
+  /** 解读缺席的原因码（AI 闸门拦下 / 模型调不通）；有解读时缺省。只存码，不存 message。 */
+  aiUnavailableReason?: string | null
   completedAt: string
   /**
    * 本次作答同意的**说明版本号**。`null` = 未版本化同意（旧前端未上报版本）。
@@ -98,7 +107,7 @@ export function isConsentCurrent(storedVersion: string | null | undefined): bool
   return storedVersion === SELF_ASSESSMENT_CONSENT_VERSION
 }
 
-export interface SelfAssessmentSubmitOutput {
+export interface SelfAssessmentSubmitOutput extends SelfAssessmentInterpretationState {
   taskId: string
   status: 'completed' | 'rejected'
   failReason?: string
@@ -128,13 +137,15 @@ export class SelfAssessmentService {
   ) {}
 
   /**
-   * 提交答案 → 纯函数评分 → LLM 解读 → 落库 → 审计。
+   * 提交答案 → 纯函数评分 → （AI 闸门放行才）LLM 解读 → 落库 → 审计。
+   * 闸门拦下时打分照常落库返回，解读如实缺席（见 self-assessment-interpretation.ts）。
    * 匿名用户铸造一次性 accessTokenHash（明文仅返回一次）。
    */
   async submit(
     requester: SelfAssessmentRequester,
     input: SelfAssessmentSubmitInput,
     ctx: AuditContext = EMPTY_AUDIT_CONTEXT,
+    gates: SelfAssessmentAiGates = {},
   ): Promise<SelfAssessmentSubmitOutput> {
     if (!input.consent.nonSensitive) {
       throw new NotFoundException({
@@ -143,16 +154,11 @@ export class SelfAssessmentService {
     }
 
     // ── 版本化同意门禁 ────────────────────────────────────────────────
-    // 客户端**显式**带上一个非当前版本 ⇒ 它同意的是另一份说明，直接拒绝并要求
-    // 重新确认。这里绝不能「就近升级成当前版本」放行 —— 那正是把旧同意当成
-    // 新同意的实现方式。
-    //
-    // 版本号**缺省**（现网 S2-7 前端只发两个布尔）⇒ 如实记为 null「未版本化同意」，
-    // 同样**不补写当前版本**。null 在 `isConsentCurrent()` 下判 false，
-    // 读回时 `consentCurrent:false`，前端据此请用户重新确认。
-    const suppliedVersion =
-      typeof input.consent.consentVersion === 'string' ? input.consent.consentVersion.trim() : ''
-    if (suppliedVersion && suppliedVersion !== SELF_ASSESSMENT_CONSENT_VERSION) {
+    // 只接受当前版本，原样逐字比对（不 trim、不大小写归一）。没有过渡期，也没有旧版本清单。
+    // 缺版本号、空字符串、带首尾空格、旧版本、未知版本一律 400（合规 9/29 终裁：年龄说明是法定告知前提，
+    // 必须证明用户看到的就是当前这一版）。
+    const suppliedVersion = input.consent.consentVersion
+    if (typeof suppliedVersion !== 'string' || !isAcceptedSelfAssessmentConsentVersion(suppliedVersion)) {
       throw new BadRequestException({
         error: {
           code: 'SELF_ASSESSMENT_CONSENT_VERSION_STALE',
@@ -160,7 +166,7 @@ export class SelfAssessmentService {
         },
       })
     }
-    const consentVersion: string | null = suppliedVersion || null
+    const consentVersion: string | null = suppliedVersion
     const consentedAt: string | null = consentVersion ? new Date().toISOString() : null
 
     const t0 = Date.now()
@@ -186,6 +192,9 @@ export class SelfAssessmentService {
     let providerName: string | null = null
     let overallRejectReason: string | null = null
     let llmErrorCode: string | undefined
+    let aiUnavailableReason: string | null = null
+    // 模型回 status=rejected：打分照常完成，不把用户赶回重答。与抛错路径分开。
+    let complianceRejected = false
 
     // selfAssessment 是**付费**的 token 计费调用。此前这里不收集 token usage，
     // 落账恒为「无 token」，estimateCostCny 返回 undefined → 库里 estimatedCostCny=null，
@@ -193,24 +202,37 @@ export class SelfAssessmentService {
     // 等于对一次真实花钱的调用谎称免费。这里改为与 careerPlan / fairVisitPlan 同一套
     // AiUsageAccumulator 口径：真实 token 落账，成本按 provider 单价估算。
     const usage = new AiUsageAccumulator()
-    try {
-      const llmResult = await this.llm.summarize({
-        scored: { dimensions: scored.dimensions, summary: null },
-        consent,
-        onLlmCall: usage.add,
-      })
-      if (llmResult.status === 'rejected') {
-        overallRejectReason = llmResult.failReason ?? 'LLM 解读命中合规词'
-        llmErrorCode = 'COMPLIANCE_REJECT'
-      } else {
-        dimensions = llmResult.dimensions
-        summary = llmResult.summary
-        providerName = llmResult.providerName
+    // AI 闸门（暂停 / 额度 / 未开通 / 声明 / 登录档位）拦下 ⇒ 不调模型，只回打分。
+    const gateRefusal = gates.interpretation ? await gates.interpretation() : null
+    if (gateRefusal) {
+      providerName = LLM_UNAVAILABLE_PROVIDER
+      aiUnavailableReason = gateRefusal
+    } else {
+      try {
+        const llmResult = await this.llm.summarize({
+          scored: { dimensions: scored.dimensions, summary: null },
+          consent,
+          onLlmCall: usage.add,
+        })
+        if (llmResult.status === 'rejected') {
+          dimensions = scored.dimensions.map((d) => ({ ...d, note: null }))
+          summary = null
+          providerName = LLM_UNAVAILABLE_PROVIDER
+          aiUnavailableReason = 'COMPLIANCE_REJECT'
+          llmErrorCode = 'COMPLIANCE_REJECT'
+          complianceRejected = true
+        } else {
+          dimensions = llmResult.dimensions
+          summary = llmResult.summary
+          providerName = llmResult.providerName
+          aiUnavailableReason = llmResult.unavailableReason ?? null
+        }
+      } catch (err) {
+        overallRejectReason = err instanceof Error ? err.message : 'LLM 调用失败'
+        llmErrorCode = 'LLM_ERROR'
       }
-    } catch (err) {
-      overallRejectReason = err instanceof Error ? err.message : 'LLM 调用失败'
-      llmErrorCode = 'LLM_ERROR'
     }
+    const interpretation = interpretationStateOf(dimensions, summary, aiUnavailableReason)
     // callCount === 0 → 一次都没真的打到模型（未配置 / 已降级），不落账，
     // 免得用一堆零成本行把「分能力成本」稀释成看起来很便宜。
     if (usage.callCount > 0) {
@@ -219,13 +241,13 @@ export class SelfAssessmentService {
         provider: usage.provider ?? providerName ?? 'llm',
         operation: 'selfAssessment',
         latencyMs: Date.now() - t0,
-        status: overallRejectReason ? 'failed' : 'success',
+        status: overallRejectReason || complianceRejected ? 'failed' : 'success',
         tokenUsage: usage.tokenUsage,
         ...(llmErrorCode ? { errorCode: llmErrorCode } : {}),
       })
     }
 
-    // 4) 落库（仅会员：endUserId 归属；匿名不留库，会话由 token 持有）
+    // 4) 落库（会员归属本人；匿名结果按 TTL 短期保存，不存答案原文）
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
     const completedAt = new Date().toISOString()
 
@@ -235,16 +257,15 @@ export class SelfAssessmentService {
       dimensions,
       summary,
       aiProvider: providerName,
+      aiUnavailableReason: interpretation.aiUnavailableReason,
       completedAt,
       consentVersion,
       consentedAt,
     }
 
     if (!overallRejectReason) {
-      // §1.3: 匿名用户的 self-assessment 也落 aiResumeResult(用 accessTokenHash 持有),
-      //       这样 MyAiRecords(本人 endUserId 查询)能正确反映;匿名用户升级到本人后还能
-      //       据 taskId 回溯。会话级持久:同 parse 类的匿名模式。
-      //       拒答场景保留最小行(answersHash + 拒答状态 + accessTokenHash),方便未来查阅。
+      // 匿名结果按 TTL 短期保存（accessTokenHash 持有），不存答案原文。
+      // 模型抛错不走这里。整体合规拒答走这里：打分落完成行。
       await this.prisma.aiResumeResult.create({
         data: {
           taskId,
@@ -258,7 +279,7 @@ export class SelfAssessmentService {
         },
       })
     } else if (isAnonymous && accessToken) {
-      // 拒答也保留最小行,用于未来本人端"拒答历史"展示;带 accessTokenHash 满足 read 校验。
+      // 模型抛错时匿名保留最小拒答行。整体合规拒答不进这个分支。
       const rejectedMinimal: StoredSelfAssessment = {
         version: 'v1',
         answersHash: scored.answersHash,
@@ -295,6 +316,9 @@ export class SelfAssessmentService {
         dimensionCount: scored.dimensions.length,
         unmatchedCount: scored.unmatched.length,
         status: overallRejectReason ? 'rejected' : 'completed',
+        // 只记码：解读有没有、没有的原因（闸门码 / 模型失败码），不记任何文字。
+        aiInterpretation: interpretation.interpretationAvailable ? 'generated' : 'unavailable',
+        aiUnavailableReason: overallRejectReason ? llmErrorCode ?? null : interpretation.aiUnavailableReason,
         // 只记「同意了哪个版本」这一事实；作答内容 / 选项 / 原文一律不进审计正文。
         consentVersion,
         consentVersioned: consentVersion !== null,
@@ -311,6 +335,8 @@ export class SelfAssessmentService {
         failReason: overallRejectReason,
         dimensions: scored.dimensions.map((d) => ({ ...d, note: null })),
         summary: null,
+        interpretationAvailable: false,
+        aiUnavailableReason: llmErrorCode ?? 'COMPLIANCE_REJECT',
         expiresAt: null,
         consentVersion,
         consentedAt,
@@ -323,6 +349,7 @@ export class SelfAssessmentService {
       status: 'completed',
       dimensions,
       summary,
+      ...interpretation,
       providerName: providerName ?? undefined,
       ...(accessToken ? { accessToken } : {}),
       expiresAt: expiresAt.toISOString(),
@@ -332,7 +359,7 @@ export class SelfAssessmentService {
     }
   }
 
-  /** 读回本人历史结果（仅会员；匿名不留库）。 */
+  /** 读回本人或持有匿名凭证的结果（匿名结果按 TTL 短期保存，不存答案原文）。 */
   async getLatest(
     taskId: string,
     requester: SelfAssessmentRequester,
@@ -365,6 +392,7 @@ export class SelfAssessmentService {
       status: 'completed' as const,
       dimensions: stored.dimensions,
       summary: stored.summary,
+      ...interpretationStateOf(stored.dimensions, stored.summary, stored.aiUnavailableReason),
       providerName: stored.aiProvider ?? undefined,
       expiresAt: row.expiresAt?.toISOString() ?? null,
       consentVersion: storedConsentVersion,
@@ -414,11 +442,13 @@ export class SelfAssessmentService {
 
   /**
    * 自我探索报告 PDF（不附加到简历；append 模式由 print.service 提供）。
+   * 含 AI 解读才过 AI 闸门（gates.aiContentExport，拦下原样抛）；只有打分的报告不含 AI 内容，照常出。
    */
   async printReport(
     taskId: string,
     requester: SelfAssessmentRequester,
     ctx: AuditContext = EMPTY_AUDIT_CONTEXT,
+    gates: SelfAssessmentAiGates = {},
   ) {
     const row = await this.loadAuthorizedRow(taskId, requester)
     const stored = JSON.parse(row.payloadJson) as StoredSelfAssessment
@@ -427,6 +457,7 @@ export class SelfAssessmentService {
         error: { code: 'SELF_ASSESSMENT_WITHDRAWN', message: '本次自我探索已撤回，无法打印' },
       })
     }
+    if (hasAiInterpretation(stored.dimensions, stored.summary)) await gates.aiContentExport?.()
     const { buffer, pageCount } = await this.renderReportForAppend({
       date: stored.completedAt.slice(0, 10),
       dimensions: stored.dimensions,
@@ -463,7 +494,7 @@ export class SelfAssessmentService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 

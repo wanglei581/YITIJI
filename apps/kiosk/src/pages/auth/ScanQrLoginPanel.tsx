@@ -7,7 +7,7 @@ import { accountErrorMessage } from './accountUserMessage'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { QrCodeIcon } from 'lucide-react'
-import { deriveQrGateState, type LoginQrState } from './loginGateModel'
+import { cancelQrFetch, deriveQrGateState, type LoginQrState } from './loginGateModel'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   type LoginResult,
@@ -54,7 +54,16 @@ export function ScanQrLoginPanel({
   const claimingRef = useRef(false)
   const refreshingRef = useRef(false)
   const requestGeneration = useRef(0)
-  useEffect(() => () => { requestGeneration.current += 1 }, [])
+  // 卸下时必须放开取码锁。只把代数加一的话，在途请求的收尾对不上代数，锁会一直为真，
+  // 再挂上时 refresh 直接返回，页面停在「正在获取二维码」。
+  useEffect(() => () => {
+    const cancelled = cancelQrFetch({
+      refreshing: refreshingRef.current,
+      generation: requestGeneration.current,
+    })
+    requestGeneration.current = cancelled.generation
+    refreshingRef.current = cancelled.refreshing
+  }, [])
 
   const refresh = useCallback(async () => {
     if (refreshingRef.current) return

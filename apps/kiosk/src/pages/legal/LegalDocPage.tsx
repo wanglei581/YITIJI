@@ -25,7 +25,7 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useKioskStageFit } from '../../hooks/useKioskStageFit'
 import { API_BASE_URL } from '../../services/api'
 import {
-  FROM_TARGETS, formatPublishedAt, readDocLoad, readFromKey, splitLegalSections,
+  FROM_TARGETS, findSectionIndex, formatPublishedAt, readDocLoad, readFromKey, readSectionTitle, splitLegalSections,
   type DocLoad, type Section,
 } from './legalDocModel'
 import {
@@ -159,6 +159,7 @@ export function LegalDocPage() {
   const meta = docKey ? DOCS[docKey] : null
   const other = docKey === 'privacy' ? DOCS.terms : DOCS.privacy
   const fromKey = readFromKey(location.search)
+  const sectionTitle = readSectionTitle(location.search)
   const { viewportW, viewportH } = useKioskStageFit()
   const compact = viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
   const fluid = compact || (viewportW > 960 && viewportW > viewportH)
@@ -207,7 +208,14 @@ export function LegalDocPage() {
   )
   const sections: Section[] = servedSections ?? meta?.sections ?? []
   const chapterKey = `${docKey ?? ''}:${view}`
-  const activeChapter = chapter.key === chapterKey && chapter.index < sections.length ? chapter.index : 0
+  // 没点过目录时，按 `?section=` 打开到标题包含它的那一章；找不到停在开头。
+  const sectionTarget = findSectionIndex(sections, sectionTitle)
+  const activeChapter = chapter.key === chapterKey && chapter.index < sections.length ? chapter.index : sectionTarget
+  useEffect(() => {
+    // 正文到手、且确实按标题找到了那一章时，把它滚进视野（目录较长时那一项可能在下面）。
+    if (!sectionTitle || sectionTarget === 0 || view !== 'ready') return
+    bodyRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [sectionTarget, sectionTitle, view])
 
   // 返回：有站内上一页就回上一页（进来的那一页）；来路不明时回受控来源或首页，不接受任意路径。
   // 按钮上写的必须就是点下去的去处：标签与 goBack 用同一个优先级（先历史，再受控来源，最后首页）。

@@ -47,6 +47,8 @@ import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
+  COPY_GUIDE_KEY,
+  COPY_GUIDE_ROUTE,
   HUB_PILL,
   PRINT_HUB_PRICE_NOTICE,
   arrivalCodeStateNote,
@@ -451,6 +453,11 @@ export function PrintScanHomePage() {
   const handleQuickLink = (key: string) => {
     if (key === FEEDBACK_QUICK_LINK_KEY) {
       setFeedbackOpen(true)
+      return
+    }
+    // R4（2026-09-29）：复印卡改为可点，进「怎么在打印机面板上复印」说明态。
+    if (key === COPY_GUIDE_KEY) {
+      navigate(COPY_GUIDE_ROUTE)
       return
     }
     const link = QUICK_LINKS.find((item) => item.key === key)

@@ -8,6 +8,14 @@
  * 它断言页面不伪造漏斗、不把曝光/跳转写成投递/预约。
  * 其余四页（admin peripherals / permissions、partner terminals / account）继续钉住。
  *
+ * 2026-09-29：admin 外设页（/devices?tab=peripherals）与 partner 终端数据页（/terminals）
+ * 已接真实接口，不再是空壳。两页改钉「读真实接口、不伪造状态」：
+ *   - 外设页只读 GET /admin/terminals；无遥测的 U 盘 / 扫码枪 / 摄像头 / 读卡器写「不上报」；
+ *     不提供远程解除扫描锁死的入口。
+ *   - 终端数据页只读 GET /partner/terminal-operations；http 模式绝不返回演示数据，
+ *     mock 示例在页面上标「演示数据」；服务人次与 AI 可用率照实写「暂不能统计」。
+ * permissions、partner account 两页仍是空壳，继续按原关键字钉住。
+ *
  * Run: pnpm --filter @ai-job-print/admin verify:honest-placeholders
  */
 import { existsSync, readFileSync } from 'node:fs'
@@ -20,7 +28,8 @@ const repoRoot = join(adminRoot, '..', '..')
 const targets = [
   {
     path: join(adminRoot, 'src/routes/peripherals/index.tsx'),
-    must: ['本阶段不开放外设独立管理', 'Terminal Agent'],
+    must: ['getTerminals', '不上报', '终端离线', '后台不提供远程解除', 'Terminal Agent'],
+    mustNot: ['unlockScanInput', 'resetScanInput', 'clearScanLockout', 'overrideScanInput', 'forceScanInput', 'Math.random'],
   },
   {
     path: join(adminRoot, 'src/routes/permissions/index.tsx'),
@@ -28,7 +37,23 @@ const targets = [
   },
   {
     path: join(repoRoot, 'apps/partner/src/routes/terminals/index.tsx'),
-    must: ['终端明细暂由平台统一运营', '伪状态'],
+    must: ['getPartnerTerminalOperations', "data.dataMode === 'demo'", '演示数据', '本机构还没有绑定终端'],
+    mustNot: ['Math.random', 'consoleScreen'],
+  },
+  {
+    // http 模式只走真实接口：演示数据只在 API_MODE 不是 http 时返回
+    path: join(repoRoot, 'apps/partner/src/services/api/terminalOps.ts'),
+    must: [
+      "if (API_MODE !== 'http') return buildDemoTerminalOps(period)",
+      'return fetchTerminalOps(period)',
+      "return { ...body, dataMode: 'live' }",
+    ],
+    mustNot: ['Math.random'],
+    exactCount: { 'buildDemoTerminalOps(': 2 },
+  },
+  {
+    path: join(repoRoot, 'apps/partner/src/routes/terminals/TerminalOpsCards.tsx'),
+    must: ['暂不能统计', '不等于人次', '暂不能按本机构终端统计'],
   },
   {
     path: join(repoRoot, 'apps/partner/src/routes/account/index.tsx'),
@@ -57,6 +82,13 @@ for (const target of targets) {
   }
   for (const token of target.must) {
     if (!source.includes(token)) fail(`${target.path} 缺少诚实关键字「${token}」`)
+  }
+  for (const token of target.mustNot ?? []) {
+    if (source.includes(token)) fail(`${target.path} 不应出现「${token}」`)
+  }
+  for (const [token, expected] of Object.entries(target.exactCount ?? {})) {
+    const actual = source.split(token).length - 1
+    if (actual !== expected) fail(`${target.path} 中「${token}」应出现 ${expected} 次，实际 ${actual} 次`)
   }
   pass(`${target.path.replace(repoRoot + '/', '')} 文案诚实`)
 }

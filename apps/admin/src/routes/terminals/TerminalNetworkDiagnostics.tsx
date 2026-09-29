@@ -52,3 +52,14 @@ export function TerminalNetworkDiagnostics({
     </div>
   )
 }
+
+/** 单项徽标：外设页按列拆开展示时复用同一份词表，离线时同样不把旧观测当成现状。 */
+export function WiredLinkBadge({ online, wiredNetworkStatus }: { online: boolean; wiredNetworkStatus: string | null }) {
+  const view = WIRED_VIEW[online ? wiredStatus(wiredNetworkStatus) : 'unknown']
+  return <StatusBadge dot status={view.status} label={view.label} />
+}
+
+export function PrinterLinkBadge({ online, printerNetworkStatus }: { online: boolean; printerNetworkStatus: string | null }) {
+  const view = PRINTER_VIEW[online ? printerStatus(printerNetworkStatus) : 'unknown']
+  return <StatusBadge dot status={view.status} label={view.label} />
+}

@@ -120,7 +120,7 @@ agent-ctl status | start | stop | restart | logs
 
 验收（checklist §5.3）：
 - [ ] 服务安装成功，可开机自启。重启机器后是否 Running、以及是否留下 `agent.pid`，必须在 **Windows 实测**；不得把设计文档里的 30s 写成已验收。
-单实例互斥由进程生命周期对象负责；`agent.pid` 只记录启动 PID 供诊断，残留文件不参与互斥，也不需要删除。启动失败时检查服务状态、命名管道或 Unix 套接字，并保留诊断文件。
+- [ ] 崩溃恢复：`taskkill /F` 后服务重新 Running，单实例锁随进程退出由系统释放；残留 `agent.pid` 只作诊断、不阻止启动，**不要删除**。启动失败先跑 `diagnose-production-agent.ps1`（只读）并保留 `last-startup-diagnostic.json`。
 - [ ] **单实例保护**：同时启两个实例，第二个写 `DUPLICATE_INSTANCE` 后 exit 1（设计文档 §8.8）；不得诱导“如果不正确就删除锁”。
 - [ ] 日志路径固定 `%ProgramData%\AIJobPrintAgent\logs\`，**不含用户文件正文 / 密钥**（§7.5）
 - [ ] `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须在 Windows 实测。干净停止是否留锁是条件 P0，不得在 macOS 推断。在该阶梯留下证据前，本机 **DEVICE 仍 NO-GO**。

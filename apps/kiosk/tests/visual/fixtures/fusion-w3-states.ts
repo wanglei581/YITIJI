@@ -79,7 +79,7 @@ export const interviewAnswered = {
 export const interviewReport = {
   data: {
     sessionId: 'interview-w3-public-fixture', position: '前端开发工程师', industry: '互联网/科技',
-    interviewerType: 'hr', interviewerLabel: 'HR 初筛', durationMin: 5,
+    interviewerType: 'hr', interviewerLabel: 'HR 面试', durationMin: 5,
     endedAt: '2026-07-24T00:05:00.000Z',
     report: {
       overall: { level: 'pass', summary: '表达结构基本完整，仍需用真实数据补充结果。' },

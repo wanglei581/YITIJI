@@ -4,6 +4,7 @@ import { CheckIcon, MicIcon, RotateCcwIcon, SquareIcon, XIcon } from 'lucide-rea
 import { transcribeResumeVoice } from '../../../services/api'
 import { startWavRecorder, type WavRecorder } from '../../../utils/wavRecorder'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
+import { aiDeclarationDeclineMessage } from '../../../ai/aiDeclarationErrors'
 
 const MAX_RECORD_SECONDS = 58
 
@@ -65,7 +66,7 @@ export function ResumeTranscriptConfirmDialog({
       setStatus('ready')
     } catch (err) {
       setStatus('error')
-      setError(userMessageOf(err, '语音转写失败，请改用文字输入'))
+      setError(aiDeclarationDeclineMessage(err) ?? userMessageOf(err, '语音转写失败，请改用文字输入'))
     }
   }
 

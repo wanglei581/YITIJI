@@ -280,6 +280,41 @@ test('feedback submit posts the visible form payload and shows server failure @w
   expect(errors).toEqual([])
 })
 
+// 走查 W-01：一体机此前点不到 AI 内容投诉（服务端与小程序早就有 ai_content）。
+// 从 AI 服务记录页的文字入口进来，应预选「AI 内容投诉」、显示 5 个工作日答复说明，并按这一类提交。
+test('ai-records complaint entry preselects AI 内容投诉 and posts category ai_content @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/ai-records', { status: 200, json: emptyPage(0) })
+  api.respond('GET', '/api/v1/me/job-ai-sessions', { status: 200, json: emptyPage(0) })
+  api.respond('GET', '/api/v1/me/mock-interviews', { status: 200, json: { success: true, data: { items: [] } } })
+  api.respond('GET', '/api/v1/me/feedback', { status: 200, json: emptyPage(0) })
+  api.respond('POST', '/api/v1/me/feedback', {
+    status: 503,
+    json: { success: false, error: { code: 'W01_FEEDBACK_UNAVAILABLE', message: 'fixture unavailable' } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/ai-records')
+  const entry = page.getByTestId('member-records-ai-complaint').getByRole('button', { name: '投诉 AI 内容', exact: true })
+  await expect(entry).toBeVisible()
+  await assertTapTargetPointerHit(entry)
+  await entry.click()
+  await expect(page).toHaveURL(/\/me\/feedback\?category=ai_content$/)
+  await expect(page.getByRole('button', { name: /^AI 内容投诉/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('member-feedback-ai-content-note')).toContainText('5 个工作日内答复')
+  await page.getByLabel('反馈内容').fill('简历优化建议里把我的实习时间写错了，是合成验收说明。')
+
+  const posted = page.waitForRequest((request) => request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/me/feedback')
+  await page.getByRole('button', { name: '提交反馈', exact: true }).click()
+  expect((await posted).postDataJSON()).toMatchObject({ category: 'ai_content' })
+  await expect(page.getByText('提交失败，请检查登录状态或稍后重试', { exact: true })).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+  await expectComplianceCopy(page)
+  await page.screenshot({ path: test.info().outputPath('feedback-ai-content.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
 test('privacy revoke posts revoke_consent and does not claim account deletion @w5-kiosk', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)

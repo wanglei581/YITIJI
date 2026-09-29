@@ -4,7 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
 import { MockInterviewLlmService, type InterviewReportPayload, type NextQuestionOutput } from './mock-interview-llm.service'
 import {
@@ -23,6 +23,7 @@ import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.se
 import { InflightCoalescer } from '../ai/ai-inflight'
 import { RedisInflightLock } from '../ai/redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
+import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 
 // ============================================================
 // 2C 模拟面试会话服务。
@@ -43,7 +44,7 @@ const MAX_ANSWER_CHARS = 2000
 const DURATION_TARGET: Record<number, number> = { 3: 4, 5: 6, 8: 8 }
 
 export const INTERVIEWER_LABEL: Record<string, string> = {
-  hr: 'HR 初筛', manager: '业务主管', tech: '技术面试官', campus: '校招面试官', final: '终面负责人',
+  hr: 'HR 面试', manager: '业务主管', tech: '技术面试官', campus: '校招面试官', final: '终面负责人',
 }
 
 export interface InterviewRequester {
@@ -116,7 +117,10 @@ export class MockInterviewService {
           error: { code: 'INTERVIEW_RESUME_EXTRACT_FAILED', message: extraction.errorMessage ?? '简历文件无法提取，请更换文件或选择「暂不使用简历」' },
         })
       }
-      resumeDigest = extraction.text?.slice(0, 6000) ?? null
+      // 摘要只给模型出题用，用户看不到它 —— 在生成时就遮掉，库里只存遮盖后的那份，
+      // 简历原文（手机 / 证件 / 邮箱 / 姓名 / 住址）不随练习会话落库。不可还原即可。
+      const digest = maskUserTextForLlmText(extraction.text?.slice(0, 6000) ?? '', 'mock_interview_resume_digest')
+      resumeDigest = digest.trim() ? digest : null
     }
 
     const isAnonymous = !requester.endUserId
@@ -471,8 +475,9 @@ export class MockInterviewService {
       filename: `模拟面试练习报告_${session.position.replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '岗位'}.pdf`,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
-      // AI 生成的派生稿：生产隐私闸门按类别放行，否则直达报价页后建单被拒（商用收口 P0-5）。
+      // AI 生成的派生稿：生产隐私闸门按 derivationKind=ai_generated 放行，否则直达报价页后建单被拒（商用收口 P0-5）。
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       uploaderId: null,
       endUserId: session.endUserId,
       createdBy: 'mock_interview_report',
@@ -493,7 +498,7 @@ export class MockInterviewService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 
@@ -534,8 +539,9 @@ export class MockInterviewService {
       filename: `${PRACTICE_SHEET_FILENAME_PREFIX}_${safePosition}.pdf`,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
-      // 通用题库生成的派生稿（不调模型，也不是用户原件）：同上，生产隐私闸门按类别放行。
+      // 通用题库生成的派生稿（不调模型，也不是用户原件）：同上，生产隐私闸门按 derivationKind=ai_generated 放行。
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       uploaderId: null,
       endUserId: session.endUserId,
       createdBy: 'mock_interview_practice_sheet',
@@ -557,7 +563,7 @@ export class MockInterviewService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
       /** 恒 'degraded'：本单不含任何模型生成内容，前端据此如实提示用户。 */
       variant: 'degraded' as const,
       questionCount: questions.length,

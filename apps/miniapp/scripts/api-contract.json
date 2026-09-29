@@ -11,6 +11,7 @@
     "DELETE /me/mock-interviews/:p",
     "DELETE /resume/job-fit/consent/:p",
     "DELETE /resume/self-assessment/:p",
+    "GET /advisor/sessions/:p",
     "GET /community/feeds",
     "GET /companies",
     "GET /companies/:p",

@@ -10,6 +10,7 @@ import { AdvisorManualEntries } from './AdvisorConversation'
 import { advisorDisplayText, advisorUserReason } from './advisorUserCopy'
 import { COCKPIT_COPY, type CockpitVoiceState } from './advisorScenes'
 import { isTerminalKiosk } from '../../services/api/screensaver'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
 
@@ -219,6 +220,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                 </span>
               </button>
             </div>
+            <AiDeclarationNote />
             <p className="assistant-voice-privacy">
               通话不保存音频；结束、关闭或离开本页时停止通话。
             </p>

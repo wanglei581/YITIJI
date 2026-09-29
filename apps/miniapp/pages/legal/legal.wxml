@@ -5,7 +5,9 @@
       <view class="nav-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
-      <view class="nav-title">{{title}}</view>
+      <!-- 顶栏固定用四类文档的短名：后台发布的标题可能很长，会压到微信胶囊下面（走查 W-13）。
+           后台标题照常出现在正文里。 -->
+      <view class="nav-title">{{navTitle}}</view>
       <view class="nav-right"></view>
     </view>
   </view>
@@ -31,7 +33,7 @@
     <view wx:else class="card legal-card">
       <view class="legal-meta">版本 {{version}}<text wx:if="{{publishedAt}}"> · 发布于 {{publishedAt}}</text></view>
       <block wx:for="{{blocks}}" wx:key="key">
-        <view wx:if="{{item.kind === 'heading'}}" class="legal-heading">{{item.text}}</view>
+        <view wx:if="{{item.kind === 'heading'}}" id="{{item.key}}" class="legal-heading">{{item.text}}</view>
         <view wx:elif="{{item.kind === 'bullet'}}" class="legal-paragraph legal-bullet">
           <text class="legal-bullet-dot"></text><text class="legal-bullet-text">{{item.text}}</text>
         </view>

@@ -33,11 +33,12 @@ import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { isAiOutage } from '../../ai/aiOutage'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 
 const advisorPortrait = '/assets/ai-advisor.png'
 
 const INTERVIEWER_LABEL: Record<string, string> = {
-  hr: 'HR 初筛',
+  hr: 'HR 面试',
   manager: '业务主管',
   tech: '技术面试官',
   campus: '校招面试官',
@@ -281,8 +282,12 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       const { text } = await transcribeAnswer(state.sessionId, wav, access)
       setVoice({ kind: 'review', transcript: text, edited: text, durationSec })
     } catch (err) {
-      const msg = userMessageOf(err, '语音转写失败')
-      if (!isAiOutage(err) && (msg.includes('未启用') || msg.includes('未配置'))) {
+      const declined = aiDeclarationDeclineMessage(err)
+      const msg = declined ?? userMessageOf(err, '语音转写失败')
+      if (declined) {
+        setVoice({ kind: 'idle' })
+        setError(declined)
+      } else if (!isAiOutage(err) && (msg.includes('未启用') || msg.includes('未配置'))) {
         fallbackToText(`${msg}，请使用文字输入完成练习`)
       } else {
         setVoice({ kind: 'idle' })
@@ -327,7 +332,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       setQuestionIndex(res.questionIndex)
       setPhase('answering')
     } catch (err) {
-      setError(isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试'))
+      setError(aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试')))
       setPhase('answering')
     }
   }
@@ -349,7 +354,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       if (onGoStage) onGoStage('report')
       else navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
     } catch (err) {
-      setError(isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '报告生成失败，请重试'))
+      setError(aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '报告生成失败，请重试')))
       setPhase(messages.some((m) => m.role === 'candidate' && !m.skipped) ? 'done_suggest' : 'answering')
     }
   }

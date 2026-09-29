@@ -3,7 +3,7 @@
 //
 // 数据：路由 state（刚结束）或凭 sessionId+凭证从服务端读回（会员历史/刷新）。
 // 操作：打印报告（服务端真实 PDF → 既有打印链路）、重新练习。
-// 合规：等级是练习表现，不是通过率/录用概率；页面明示边界。
+// 合规：不显示等级、不写岗位匹配；固定免责说明，只给本人复盘。
 // ============================================================
 
 import { useEffect, useState } from 'react'
@@ -22,7 +22,7 @@ type InterviewReportView = InterviewReportResponse & {
   qaExcerpts?: InterviewQaExcerpt[]
   includeAnswersInPrint?: boolean
 }
-import { AI_LABEL_COPY } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -54,13 +54,6 @@ interface ReportState {
   sessionId?: string
   accessToken?: string
   report?: InterviewReportView
-}
-
-const LEVEL_META: Record<string, { label: string; cls: string }> = {
-  needs_work: { label: '需要加强', cls: 'bg-warning-bg text-warning-fg' },
-  pass: { label: '基础达标', cls: 'bg-primary-50 text-primary-700' },
-  good: { label: '表现良好', cls: 'bg-success-bg text-success-fg' },
-  excellent: { label: '表现突出', cls: 'bg-success-bg text-success-fg' },
 }
 
 function Section({ icon: Icon, title, children, className = '' }: { icon: React.ElementType; title: string; children: React.ReactNode; className?: string }) {
@@ -208,14 +201,13 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
     )
   }
 
-  const level = LEVEL_META[data.report.overall.level] ?? LEVEL_META['pass']
   const copy = INTERVIEW_STAGE_COPY.report
   const titleParts = emphasizedTitle(copy)
 
   return (
     <InterviewShell
       title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
-      subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}。练习表现等级只用于本人复盘，不代表通过率或录用结果。`}
+      subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}。只用于本人复盘，不代表通过率或录用结果。`}
       ctabar={
         <div className="interview-qx-cta">
           <QxStepActions onPrev={goReports} prevLabel="查看历史报告">
@@ -240,6 +232,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
 
       <div className="interview-flow__scroll">
+        <p className="text-xs text-neutral-400">{COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER}</p>
         <InterviewStatus
           label="报告与打印状态"
           items={[
@@ -255,17 +248,13 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
 
         {/* 综合表现 */}
         <Card className="interview-card interview-report__hero p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-neutral-900">综合表现概览</h2>
-            <span className={['rounded-full px-3 py-1 text-sm font-semibold', level.cls].join(' ')}>{level.label}</span>
-          </div>
+          <h2 className="text-base font-semibold text-neutral-900">综合表现概览</h2>
           <p className="mt-3 text-sm leading-relaxed text-neutral-700">{data.report.overall.summary}</p>
-          <p className="mt-2 text-xs text-neutral-400">「{level.label}」为本次练习表现等级，不代表录用结果</p>
         </Card>
 
         <div className="interview-report__abilities">
           <Section icon={MessageSquareTextIcon} title="表达清晰度"><Bullets items={data.report.expression} /></Section>
-          <Section icon={TargetIcon} title="岗位匹配度参考"><Bullets items={data.report.positionFit} /></Section>
+          <Section icon={TargetIcon} title="和目标岗位要求的对照"><Bullets items={data.report.positionFit} /></Section>
           <Section icon={CheckCircle2Icon} title="经历可信度与细节"><Bullets items={data.report.credibility} /></Section>
           <Section icon={LightbulbIcon} title="专业能力表现"><Bullets items={data.report.professional} /></Section>
           <Section icon={MessageSquareTextIcon} title="沟通与应变能力"><Bullets items={data.report.adaptability} /></Section>

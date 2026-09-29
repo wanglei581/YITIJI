@@ -1829,7 +1829,10 @@ const privacyGuardCode = stripComments(privacyGuard)
 // F1. 本机 PII 一个字节都不多留：清场那几句仍然同步跑在等待之前。
 assert.match(
   privacyGuardCode,
-  /setClearing\(true\)\s*\n\s*clearKioskSensitiveSession\(getToken\(\)\)\s*\n\s*logout\(\)[\s\S]{0,400}?hold\(\(\) => scheduleSanitizedDestination\(nextBoundary, destination\)\)/,
+  // 2026-09-29（W-42/W-43/W-75 统一清场）：四步的顺序搬进了 runEndKioskUse（kioskEndUse.ts），
+  // 这里钉「遮罩先立起来、清本机与 logout 作为同步步骤交给它、等收尾只在最后一步 leave 里」；
+  // runEndKioskUse 里 endVisit → clearLocal → logout → leave 的先后由 scripts/tests/kiosk-end-use.test.mjs 真跑断言。
+  /setClearing\(true\)\s*\n\s*runEndKioskUse\(reason, \{[\s\S]{0,120}?clearLocal: \(\) => clearKioskSensitiveSession\(getToken\(\)\),\s*\n\s*logout: \(\) => logout\(\),\s*\n\s*leave: \(destination\) => \{[\s\S]{0,400}?hold\(\(\) => scheduleSanitizedDestination\(nextBoundary, destination\)\)/,
   '顺序不可调换：先 fail-closed 遮罩 + 同步清本机 + logout，**然后**才是等收尾。\n'
     + '把等待挪到清本机之前，就等于让上一位的 PII 在网络不好时多留在屏幕上几十秒 ——\n'
     + '那是拿一个隐私问题去换另一个隐私问题。',

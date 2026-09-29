@@ -282,7 +282,7 @@ function setup(){
     +'<label class="field"><small>行业（必填，最多 30 字）</small>'
     +'<input id="interview-industry" maxlength="30" placeholder="输入或从就业行业清单选择"></label></div>'
     +choiceGroup('岗位快捷项（只是快捷值，可自由输入）',['前端开发工程师','行政专员','市场运营','机械工程师','会计','销售代表'],'')
-    +choiceGroup('面试官类型',['HR 初筛','业务主管','技术面试官','校招面试官','终面负责人'],'HR 初筛')
+    +choiceGroup('面试官类型',['HR 面试','业务主管','技术面试官','校招面试官','终面负责人'],'HR 面试')
     +choiceGroup('经验',['应届生','1 年以内','1-3 年','3-5 年','5 年以上','转行求职'],'应届生')
     +'<div class="choice-row">'+choiceGroup('难度',['轻松练习','标准面试','压力面试'],'标准面试')
     +choiceGroup('时长',['3 分钟','5 分钟','8 分钟'],'5 分钟')+'</div>'
@@ -702,7 +702,7 @@ function historyRows(mode){
   else one+='<a class="history-action" href="'+urlFor('report-ready')+'">查看</a>'
     +'<a class="history-action" href="'+urlFor('reports-ready')+'">返回列表</a>';
   one+='</div></div>';
-  var two='<div class="history-row"><div><small>示例记录结构</small><b>行政专员 · HR 初筛</b>'
+  var two='<div class="history-row"><div><small>示例记录结构</small><b>行政专员 · HR 面试</b>'
     +'<p>这条记录尚未生成报告，因此不展示查看或打印按钮。</p></div>'
     +'<div class="history-controls"><button class="history-action" type="button" aria-disabled="true">报告未生成</button></div></div>';
   return '<div class="history-list">'+one+(mode==='failed'?'':two)+'</div>';
@@ -748,7 +748,7 @@ function reportsDeleteDone(){
   body.innerHTML=statusbar('删除结果状态',[['本次操作','删除成功','ok'],['目标记录','已从列表移除'],['其它记录','未受影响','ok']])
     +'<section class="card"><div class="head"><b>练习报告</b><span>已登录 · 本人记录</span></div>'
     +'<p class="copy">刚才那条记录已经不在列表里。剩下的记录按系统返回顺序显示。</p>'
-    +'<div class="history-list"><div class="history-row"><div><small>示例记录结构</small><b>行政专员 · HR 初筛</b>'
+    +'<div class="history-list"><div class="history-row"><div><small>示例记录结构</small><b>行政专员 · HR 面试</b>'
     +'<p>这条记录尚未生成报告，因此不展示查看或打印按钮。</p></div>'
     +'<div class="history-controls"><button class="history-action" type="button" aria-disabled="true">报告未生成</button></div></div>'
     +'<div class="history-row"><div><small>示例记录结构</small><b>市场运营 · 技术面试官</b>'

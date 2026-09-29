@@ -27,6 +27,7 @@ import { AiLogService } from '../src/ai/ai-log.service'
 import { AiPublicQuotaService, type AiPublicQuotaContext } from '../src/ai/ai-public-quota.service'
 import { AiService } from '../src/ai/ai.service'
 import { AssistantSummaryService } from '../src/advisor/assistant-summary.service'
+import { ResumeDraftSourceService } from '../src/ai/resume/resume-draft-source.service'
 import { AsrService } from '../src/asr/asr.service'
 import { AuditService } from '../src/audit/audit.service'
 import { BenefitRedemptionService } from '../src/benefit-redemption/benefit-redemption.service'
@@ -384,6 +385,7 @@ let preflightRedis: Redis | null = null
     { provide: AsrService, useValue: {} },
     { provide: BenefitRedemptionService, useValue: {} },
     { provide: AssistantSummaryService, useValue: {} },
+    { provide: ResumeDraftSourceService, useValue: {} },
   ],
 })
 class ResumeParseFilePreflightModule {}

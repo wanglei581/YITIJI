@@ -44,3 +44,54 @@ export function assertVerifiedPrintParameters(params?: CapabilitySensitivePrintP
     },
   })
 }
+
+/**
+ * 一单最多打印的面数。真源在 `packages/shared/src/types/print.ts` 的同名常量；
+ * 本行是 CJS 镜像，必须逐字一致。面数 = 计费页数 × 份数，双面不折算。
+ * Windows Agent 应引用共享包那一份，不要在 Agent 里再抄。
+ */
+export const PRINT_MAX_SIDES_PER_ORDER = 100
+
+const PRINT_JOB_TOO_LARGE_MESSAGE = `每单最多打印 ${PRINT_MAX_SIDES_PER_ORDER} 面，请分几单打印`
+
+/** 超过上限才拒绝。页数不是正整数时交给原有的页数 / 范围错误，不改写成这一码。 */
+export function assertPrintOrderSides(sides: number): void {
+  if (sides > PRINT_MAX_SIDES_PER_ORDER) {
+    throw new BadRequestException({
+      error: {
+        code: 'PRINT_JOB_TOO_LARGE',
+        message: PRINT_JOB_TOO_LARGE_MESSAGE,
+        details: [String(sides), String(PRINT_MAX_SIDES_PER_ORDER)],
+      },
+    })
+  }
+}
+
+/** 无订单行时，从建单写入的打印参数里取份数。读不出就按 1 份，页数本身超限仍会拦住。 */
+export function copiesFromPrintParamsJson(raw: string | null | undefined): number {
+  if (!raw) return 1
+  try {
+    const parsed = JSON.parse(raw) as { copies?: unknown }
+    const copies = parsed.copies
+    if (typeof copies === 'number' && Number.isInteger(copies) && copies > 0) return copies
+  } catch {
+    return 1
+  }
+  return 1
+}
+
+/**
+ * 整单面数。有订单行时按每行「计费页数 × 份数」相加（材料包各行份数相同，口径仍按行乘）；
+ * 没有行时用订单上的计费页数 × 参数里的份数。
+ */
+export function printOrderSideCount(
+  items: ReadonlyArray<{ billablePages: number; copies: number }>,
+  fallback?: { billablePages: number | null; printParamsJson: string | null },
+): number {
+  if (items.length > 0) {
+    return items.reduce((sum, item) => sum + item.billablePages * item.copies, 0)
+  }
+  const pages = fallback?.billablePages
+  if (typeof pages !== 'number' || !Number.isInteger(pages) || pages < 1) return 0
+  return pages * copiesFromPrintParamsJson(fallback?.printParamsJson)
+}

@@ -360,6 +360,36 @@ async function verifyAuditRuntimeBehavior(): Promise<void> {
   assert.equal(loggerCalls, 1)
 }
 
+function verifyAiUsageExportAndClosureDisposition(): void {
+  const sqlite = modelBlock(read('services/api/prisma/schema.prisma'), 'AiUsageRecord')
+  const postgres = modelBlock(read('services/api/prisma/postgres/schema.prisma'), 'AiUsageRecord')
+  assert.ok(sqlite.includes('onDelete: SetNull'), 'SQLite AiUsageRecord 外键 SetNull')
+  assert.ok(postgres.includes('onDelete: SetNull'), 'PostgreSQL AiUsageRecord 外键 SetNull')
+
+  const retention = read('services/api/src/ai/usage/ai-usage-retention.ts')
+  assert.ok(retention.includes("MEMBER_AI_USAGE_ON_CLOSURE = 'set_null'"), '注销处置是置空')
+  const detachAt = retention.indexOf('export async function detachMemberAiUsageRecords')
+  assert.ok(detachAt >= 0, '有 detachMemberAiUsageRecords')
+  const detachBody = retention.slice(detachAt)
+  assert.ok(!detachBody.includes('deleteMany'), '置空函数不删除金额行')
+  assert.ok(detachBody.includes('endUserId.length === 0'), '空会员号不得置空别人的行')
+
+  const mapper = read('services/api/src/member-privacy/member-data-export.mapper.ts')
+  const start = mapper.indexOf('this.prisma.aiUsageRecord.findMany')
+  const end = mapper.indexOf('])', start)
+  const usageSelect = mapper.slice(start, end)
+  assert.ok(start >= 0 && usageSelect.includes('endUserId: input.endUserId'), '导出只查本人用量')
+  for (const field of ['featureKey: true', 'createdAt: true', 'status: true', 'costCny: true']) {
+    assert.ok(usageSelect.includes(field), `用量导出缺少 ${field}`)
+  }
+  for (const forbidden of ['terminalId', 'orgId', 'promptTokens', 'vendor', 'model']) {
+    assert.ok(!usageSelect.includes(forbidden), `用量导出不应包含 ${forbidden}`)
+  }
+
+  const scope = read('packages/shared/src/types/memberPrivacy.ts')
+  assert.ok(scope.includes('AI 用量（功能、时间、状态、金额）'), '数据清单写明 AI 用量')
+}
+
 async function main(): Promise<void> {
   console.log('\n=== Wave 1-B 数据权利请求基础契约 ===')
   await check('shared DTO 编译期形状', verifyTypedSharedFixtures)
@@ -367,6 +397,7 @@ async function main(): Promise<void> {
   await check('双 schema/migration additive parity', verifySchemaAndMigrationSource)
   await check('正式 migrations 的 SQLite nullable unique 真实行为', verifyRealSqliteMigrationBehavior)
   await check('AuditService transaction client / 失败语义', verifyAuditRuntimeBehavior)
+  await check('AI 用量导出字段与注销置空口径', verifyAiUsageExportAndClosureDisposition)
 
   if (failures > 0) {
     console.error(`\n❌ ${failures} 项失败 — Wave 1-B 基础契约不完整\n`)

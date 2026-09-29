@@ -174,6 +174,10 @@ async function main() {
       },
     })
     pass('打印任务夹具已创建（A×3 含1条脏params / B×1 / 匿名×1）')
+    // 小程序对账（2026-09-29）：出纸的那台机器带网点名；没有终端的行为 null。
+    const orderTerminalId = `verify-mpo-term-${suffix}`
+    await prisma.terminal.create({ data: { id: orderTerminalId, terminalCode: `KSK-MPO-${suffix}`, agentToken: `agent-mpo-${suffix}`, deviceFingerprint: `fp-mpo-${suffix}`, displayName: '市民中心打印终端', locationLabel: '市民中心一楼' } })
+    await prisma.printTask.update({ where: { id: t('a2') }, data: { terminalId: orderTerminalId } })
 
     const defaultPage = { cursor: null, pageSize: 50 }
 
@@ -246,7 +250,15 @@ async function main() {
     //   补打与申诉也无法复现参数。
     //   pageRange（2026-09-06）：与 copies/duplex 同类，来自 paramsJson 已保存参数。
     //   refundRequired（API-20）：服务端派生布尔，不回传内部 refundReason。
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents', 'refundRequired'])
+    //   orderId / terminal（2026-09-29 小程序对账契约）：订单号与出纸终端的 id / 名称 / 位置，不含终端其它字段。
+    {
+      const a1 = pageA.items.find((x) => x.id === t('a1'))
+      const a2 = pageA.items.find((x) => x.id === t('a2'))
+      const okTerminal = JSON.stringify(a2?.terminal) === JSON.stringify({ id: orderTerminalId, displayName: '市民中心打印终端', locationLabel: '市民中心一楼' })
+      if (okTerminal && a1?.terminal === null && a1?.orderId === null) pass('小程序对账：出纸终端带网点名与位置；没有终端 / 订单的行为 null')
+      else fail(`订单行终端 / 订单号不对：a1=${JSON.stringify({ t: a1?.terminal, o: a1?.orderId })} a2=${JSON.stringify(a2?.terminal)}`)
+    }
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents', 'refundRequired', 'orderId', 'terminal'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {
@@ -337,6 +349,12 @@ async function main() {
 
     const listD = (await orders.list(userD, defaultPage)).items
     const findD = (id: string) => listD.find((x) => x.id === id)
+    {
+      const paidRow = findD(dPay.paid)
+      const paidOrder = await prisma.order.findFirstOrThrow({ where: { printTaskId: dPay.paid }, select: { id: true } })
+      if (paidRow?.orderId === paidOrder.id) pass('小程序对账：手机单派发出的任务行带订单号（经 Order.printTaskId 关联）')
+      else fail(`订单行缺订单号：${JSON.stringify({ row: paidRow?.orderId, expected: paidOrder.id })}`)
+    }
     const uItem = findD(dPay.unpaid)
     const pItem = findD(dPay.paid)
     const rItem = findD(dPay.refunded)

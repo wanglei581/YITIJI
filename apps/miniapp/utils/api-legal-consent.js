@@ -71,13 +71,23 @@ function ensureScopes(scopes) {
  *   - 403 AI_DECLARATION_REQUIRED：服务端说缺，就以服务端为准 —— 本机那条记录可能早于
  *     在别处的撤回，清掉重新问，问完只重发一次。
  *   - 401 AI_LOGIN_REQUIRED：登录档位打开了，弹一次登录提示；错误照常交给页面。
+ *   - 403 USER_AI_CONSENT_REQUIRED（只认标了 resumeAi 的简历类请求、且已登录）：问一次
+ *     「确认使用简历 AI」，同意就写账号授权 resume_ai，再重发一次；不同意抛
+ *     AI_RESUME_NOT_CONSENTED，页面照常显示原因。岗位类（job_ai）不归这里管。
  */
-function runAi(kind, send) {
+function runAi(kind, send, options) {
   const afterSend = (err) => {
     if (err && err.code === 'AI_LOGIN_REQUIRED') aiAccess.promptLogin();
     throw err;
   };
+  const resumeAi = !!(options && options.resumeAi);
   return ensureScopes(aiAccess.scopesFor(kind)).then(() => send().catch((err) => {
+    if (err && err.code === 'USER_AI_CONSENT_REQUIRED' && resumeAi && auth.isLoggedIn()) {
+      return aiAccess.promptResumeAi()
+        .then(() => grantAiConsent(aiAccess.RESUME_AI_SCOPE))
+        .then(() => send())
+        .catch(afterSend);
+    }
     if (!err || err.code !== 'AI_DECLARATION_REQUIRED') return afterSend(err);
     // 服务端的 missing 目前会被全局异常过滤器丢掉（只透传 code / message / details），
     // 两处都读；都没有就按这一类请求本该有的那几项补问。

@@ -12,6 +12,7 @@ import {
   getTerminalId,
 } from './services/api/screensaver'
 import { initializeTerminalSession } from './services/terminalAuth'
+import './ai/aiDeclarationInstall'
 
 type RouterErrorHandler = NonNullable<ComponentProps<typeof RouterProvider>['onError']>
 

@@ -27,10 +27,14 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from './llm-http'
+import { deepseekThinkingOff } from './deepseek-thinking'
+import { llmEndpointNotAllowedError } from './llm-failure'
+import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords, safeRefusalReply } from './llm-guard'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from './ai-prompt-safety'
 import { applyAssistantChannel, kioskChannelConstraint, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
+import { maskUserTextsForLlmText } from '../../common/pii/llm-input-mask'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -219,6 +223,32 @@ function safeLogValue(value: unknown, maxChars = 80): string {
     .slice(0, maxChars)
 }
 
+/**
+ * 送模型前遮盖用户说的话（本轮 + 历史），只遮高置信项：手机号 / 证件号 / 银行卡 / 邮箱 / 带标签的住址。
+ * **姓名不遮**（keepNames）：称呼被遮掉，对话就接不上了。
+ *
+ * 会话里存的是原话，只在发出去的那一刻遮 —— 二选一选这个，理由：
+ *   - 会话转写会交还给本人：「小青本次要点」（advisor/assistant-summary.service.ts）
+ *     拿它的第一句原话当记录标题存进本人的练习记录；存成遮盖后的，用户会在自己的记录里
+ *     看到「[手机号_1]」。那条链路送模型前自己会再遮一次，不受影响。
+ *   - 历史整体一起遮，占位符编号跨轮一致（第 1 轮和第 3 轮的同一个手机号都是 [手机号_1]），
+ *     模型仍能看懂「用户前后说的是同一个号码」。
+ * 小青自己的回复不遮：模型只见过遮盖后的文本，回复里不会有用户的原始号码。
+ */
+function maskUserTurnsForLlm(messages: readonly ChatMessage[]): ChatMessage[] {
+  const userIndexes: number[] = []
+  messages.forEach((message, index) => { if (message.role === 'user') userIndexes.push(index) })
+  if (userIndexes.length === 0) return messages.map((message) => ({ ...message }))
+  const masked = maskUserTextsForLlmText(
+    userIndexes.map((index) => messages[index]!.content),
+    'assistant_chat',
+    { keepNames: true },
+  )
+  const byIndex = new Map(userIndexes.map((messageIndex, i) => [messageIndex, masked[i] ?? ''] as const))
+  return messages.map((message, index) =>
+    byIndex.has(index) ? { role: message.role, content: byIndex.get(index)! } : { ...message })
+}
+
 function classifyIntent(message: string): AssistantIntent {
   for (const [re, intent] of INTENT_RULES) {
     if (re.test(message)) return intent
@@ -323,7 +353,7 @@ export class LlmChatService {
     const systemPrompt = channelConstraint ? `${guarded}\n\n${channelConstraint}` : guarded
     const payloadMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
-      ...session.messages.slice(-MAX_HISTORY),
+      ...maskUserTurnsForLlm(session.messages.slice(-MAX_HISTORY)),
     ]
 
     let rawReply: string
@@ -396,12 +426,14 @@ export class LlmChatService {
             'Content-Type':  'application/json',
             'Authorization': `Bearer ${apiKey}`,
           },
-          body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
+          body: JSON.stringify({ model, messages, temperature, stream: false, ...deepseekThinkingOff(model) }),
         },
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: featureKey, forbiddenWords } },
       )
     } catch (error) {
       if (error instanceof AiContentBlockedError) throw error
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       // 「AI 正忙」和「超时」都必须能和下面的 network_error 分开报：三者的处置完全不同
       // （加容量 / 查模型端 / 查网络）。糊成一个码就等于把根因抹掉。
       if (error instanceof LlmBusyError) {

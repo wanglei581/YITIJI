@@ -7,6 +7,7 @@ import { StorageModule } from '../storage/storage.module'
 import { MaterialsController } from './materials.controller'
 import { MaterialsCleanupTask } from './materials.cleanup.task'
 import { MaterialsService } from './materials.service'
+import { MaterialsManualConfirmationService } from './materials-manual-confirmation.service'
 import { PiiRedactionService } from './pii-redaction.service'
 import { PrintParamSuggestionService } from './print-param-suggestion.service'
 
@@ -23,7 +24,7 @@ import { PrintParamSuggestionService } from './print-param-suggestion.service'
     FilesModule,
   ],
   controllers: [MaterialsController],
-  providers: [MaterialsService, PiiRedactionService, MaterialsCleanupTask, PrintParamSuggestionService],
+  providers: [MaterialsService, PiiRedactionService, MaterialsCleanupTask, PrintParamSuggestionService, MaterialsManualConfirmationService],
   exports: [MaterialsService],
 })
 export class MaterialsModule {}

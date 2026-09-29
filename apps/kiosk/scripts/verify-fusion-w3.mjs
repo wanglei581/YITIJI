@@ -104,7 +104,15 @@ const frozen = {
   // 按钮不可点（此前一次误触即丢弃已上传文件）。冻结契约不放宽，仍逐字节校验；新行为由
   // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
   // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0',
+  // 2026-09-29 重新冻结：确认使用这份简历后面板卸载，原先只在依赖变化时上报忙碌，
+  // 卸载不补 onBusyChange(false)，来源页一直停在「接收中」，开始诊断和更换文件一直不可点。
+  // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
+  // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
+  // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
+  // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
+  // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
+  // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
@@ -114,10 +122,10 @@ const frozen = {
   // 由 verify:kiosk-frontend-debt ② 反向钉死「不得再传 / 不得再声明」。
   // 旧哈希 f3139d5375df69db492fc9428a3b4d99cc2ab389c081b50093418f71d3d0f369。
   'src/pages/interview/session/types.ts': '76a8a9770e1132b416b74586039e07e4410fa4cf97ac2e7ad4ec1c56bf5d1374',
-  // 2026-09-27 重新冻结：创建语音会话改走 terminalProtectedFetch，带上终端会话票。
-  // 停止接口仍是 keepalive fetch，不挂终端会话，已开的计费会话停得掉。
-  // 旧哈希 75f2bdcc44b03e3c9bcaa505d32139036bc5e0b934d0bace5d6b8237d5bc76f8。
-  'src/hooks/useAiAdvisorCallSession.ts': '365da6215997c51c4f8d4a2f41ca623302431fefe2e463864c42c06c760c3a29',
+  // 2026-09-29 重新冻结（W-16）：语音会话在写成「正在连接」之前先完成使用声明。
+  // 未同意就不发创建请求，也不把画面停在连接中。停止接口仍是 keepalive fetch。
+  // 旧哈希 365da6215997c51c4f8d4a2f41ca623302431fefe2e463864c42c06c760c3a29。
+  'src/hooks/useAiAdvisorCallSession.ts': '25e10fe0aa0d35b7b7733b95089507ca0478880f371c1f6e408371365a4abff9',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 
@@ -357,6 +365,13 @@ for (const marker of ['startCall', 'resumePlay', 'toggleMute', 'endCall', 'needR
 includes('src/pages/interview/InterviewReportPage.tsx', '<b>{AI_LABEL_COPY.INTERVIEW_REPORT}。</b>', 'interview report banner leads with the shared user-only AI label')
 includes('../../packages/shared/src/types/complianceCopy.ts', "INTERVIEW_REPORT: 'AI 生成，仅供参考，只用于本人练习复盘'", 'interview report label keeps the user-only practice wording')
 includes('src/pages/interview/InterviewReportPage.tsx', '也不会发送给任何企业。', 'interview report keeps the user-only privacy boundary')
+includes('src/pages/interview/InterviewReportPage.tsx', '{COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER}', 'interview report renders the shared practice disclaimer')
+includes('src/pages/interview/InterviewReportPage.tsx', '和目标岗位要求的对照', 'interview report uses the C9 comparison title')
+check(!read('src/pages/interview/InterviewReportPage.tsx').includes('LEVEL_META'), 'interview report must not render LEVEL_META')
+check(!read('src/pages/interview/InterviewReportPage.tsx').includes('岗位匹配度参考'), 'interview report must not say 岗位匹配度参考')
+check(!read('src/pages/interview/InterviewReportPage.tsx').includes('练习表现等级'), 'interview report must not say 练习表现等级')
+includes('src/pages/interview/InterviewSetupPage.tsx', "label: 'HR 面试'", 'setup interviewer label is HR 面试')
+includes('src/pages/interview/InterviewSessionPage.tsx', "hr: 'HR 面试'", 'session interviewer label is HR 面试')
 const jobGuidancePresentation = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/CareerPlanPage.tsx')}\n${read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')}`
 for (const forbidden of ['录用概率', '保证录用', '一键投递', '立即投递']) check(!jobGuidancePresentation.includes(forbidden), `job guidance rejects ${forbidden}`)
 for (const forbidden of ['localStorage', 'sessionStorage']) check(!read('src/pages/assistant/AssistantPage.tsx').includes(forbidden), `assistant avoids ${forbidden}`)
@@ -369,7 +384,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   const config = read('playwright.w3.config.ts')
   const spec = read('tests/visual/fusion-w3.spec.ts')
   const selfAssessmentSpec = read('tests/visual/fusion-self-assessment-flow.spec.ts')
-  includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow)\\.spec\\.ts$/', 'W3 browser config collects W3 and the sensitive self-assessment preview scenario')
+  includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
   for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)

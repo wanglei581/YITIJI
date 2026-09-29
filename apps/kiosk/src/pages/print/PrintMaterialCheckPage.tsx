@@ -38,6 +38,7 @@ import {
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
 import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
+import { manualOriginalPrintCheck } from './printDeskModel'
 import './styles/print-desk-qx.css'
 
 /** 检查途中这一份交接已被替换或失效：迟到的结果一律不写，当场停下。 */
@@ -262,6 +263,8 @@ export function PrintMaterialCheckPage({
   const piiModeCopy = useMemo(() => piiScanModeCopy(piiTask), [piiTask])
   const piiScanIncomplete = piiModeCopy?.tone === 'warning'
   const canContinue = stage === 'review' && allDecided && !requiresFormatReview && !piiScanIncomplete
+  const canManualAck = stage === 'review' && allDecided && !requiresFormatReview && piiScanIncomplete
+    && Boolean(file?.fileId && inspectionTask && piiTask)
   const isWorking = stage === 'inspection' || stage === 'normalize_a4' || stage === 'pii_scan' || stage === 'submitting'
   useBusyLock(isWorking)
   const presentationFindings = findings.map((finding) => ({
@@ -415,7 +418,53 @@ export function PrintMaterialCheckPage({
     setDecisions(Object.fromEntries(findings.map((finding) => [finding.id, 'keep'])))
   }
 
+  const acknowledgeOriginalAndContinue = async () => {
+    if (!file?.fileId || !inspectionTask || !piiTask) return
+    setStage('submitting')
+    setError(null)
+    try {
+      const token = getToken()
+      const decidedTask = findings.length > 0
+        ? await decidePiiFindings(piiTask.id, findings.map((finding) => ({
+            findingId: finding.id,
+            action: decisions[finding.id] as PiiFindingDecisionAction,
+          })), { token, accessToken: piiTask.accessToken })
+        : piiTask
+      const latestFindings = decidedTask.piiFindings ?? findings
+      const materialCheck = manualOriginalPrintCheck({
+        inspectionTaskId: inspectionTask.id,
+        normalizeTaskId: normalizeTask?.id,
+        piiTaskId: decidedTask.id,
+        findingCount: latestFindings.length,
+        acknowledgedAt: new Date().toISOString(),
+      })
+      persistSession({
+        inspectionTask,
+        normalizeTask: normalizeTask ?? undefined,
+        piiTask: decidedTask,
+        piiRedactTask: undefined,
+        materialCheck,
+      })
+      setStage('done')
+      if (onAdvanceToPreview) onAdvanceToPreview()
+      else navigate('/print/desk?step=preview')
+    } catch (err) {
+      if (err instanceof PrintHandoffGoneError) {
+        setSession(null)
+        setError(err.message)
+        setStage('error')
+        return
+      }
+      setError(userMessageOf(err, '这次没能继续，请重试'))
+      setStage('review')
+    }
+  }
+
   const handleContinue = async () => {
+    if (canManualAck) {
+      await acknowledgeOriginalAndContinue()
+      return
+    }
     if (
       !file?.fileId ||
       !inspectionTask ||
@@ -575,7 +624,7 @@ export function PrintMaterialCheckPage({
       : requiresFormatReview
         ? { tone: 'bad' as const, label: '文件需要重新上传' }
         : piiScanIncomplete
-          ? { tone: 'bad' as const, label: '隐私检查未完整完成' }
+          ? { tone: 'warn' as const, label: '请你确认后按原件继续' }
           : !allFindingsDecided
           ? { tone: 'warn' as const, label: `还有 ${findings.filter((finding) => decisions[finding.id] !== 'keep' && decisions[finding.id] !== 'redact').length} 处待确认` }
           : { tone: 'ok' as const, label: '材料检查完成' }
@@ -604,7 +653,9 @@ export function PrintMaterialCheckPage({
               : requiresFormatReview
                 ? '文件体检判定当前文件不能直接打印，请返回重新上传。'
                 : piiScanIncomplete
-                  ? '隐私检查没有完整覆盖这份文件，不能继续。请重新检查或返回选择文件。'
+                  ? (allFindingsDecided
+                    ? '文字识别这次没覆盖这份文件。确认后按原件继续，本机不会生成遮挡文件。'
+                    : '每一处已经标出的内容都要先选择保留或遮挡，然后再确认按原件继续。')
                   : !allFindingsDecided
                   ? '每一处隐私片段都必须由你选择保留或遮挡。'
                   : '继续后会保存选择，并按处理结果准备打印文件。'}
@@ -613,10 +664,16 @@ export function PrintMaterialCheckPage({
             className="qx-btn"
             data-variant="primary"
             type="button"
-            disabled={!canContinue}
+            disabled={!(canContinue || canManualAck)}
             onClick={() => void handleContinue()}
           >
-            {stage === 'submitting' ? '保存选择中…' : requiresFormatReview ? '请重新上传文件' : '下一步：预览与参数'}
+            {stage === 'submitting'
+              ? (piiScanIncomplete ? '正在继续…' : '保存选择中…')
+              : requiresFormatReview
+                ? '请重新上传文件'
+                : piiScanIncomplete
+                  ? '我已确认，继续打印'
+                  : '下一步：预览与参数'}
           </button>
         </PrintDeskFooter>
       )}

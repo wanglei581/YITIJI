@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { tc3Sign } from '../common/tencent/tc3'
+import { isAiEndpointAllowed } from '../common/outbound/ai-endpoint-allowlist'
 
 // ============================================================
 // 2C+ 语音转写（ASR）服务：provider 架构（对齐 OCR 范式）。
@@ -28,6 +29,17 @@ export interface AsrResult {
 
 /** 单段回答音频上限：60s 16k16bit 单声道 WAV ≈ 1.9MB，留余量取 4MB（百度限 60s）。 */
 export const ASR_MAX_AUDIO_BYTES = 4 * 1024 * 1024
+
+/**
+ * 识别地址不在出站白名单（common/outbound/ai-endpoint-allowlist.ts）：音频没有发出。
+ * 用 ASR_NOT_CONFIGURED 而不是 ASR_FAILED —— 这是配置问题，重试不会好；
+ * 前端对「未配置」本来就自动回退文字输入。
+ */
+const ASR_ENDPOINT_NOT_ALLOWED: AsrResult = Object.freeze({
+  ok: false,
+  errorCode: 'ASR_NOT_CONFIGURED',
+  errorMessage: '语音转写服务地址未通过核准，本次没有发出请求，请使用文字输入',
+})
 
 const TOKEN_ERROR_CODES = new Set([3302]) // 鉴权失败（含 scope 无语音权限）
 
@@ -86,6 +98,10 @@ export class AsrService {
     if (!apiKey || !secretKey) {
       return { ok: false, errorCode: 'ASR_NOT_CONFIGURED', errorMessage: '语音转写凭证未配置，请使用文字输入' }
     }
+    // 换 token 与识别是两个主机，都要在第一个请求之前核对（换 token 的查询串里就是密钥）。
+    if (!isAiEndpointAllowed(this.baseUrl, 'asr') || !isAiEndpointAllowed(this.vopUrl, 'asr')) {
+      return { ...ASR_ENDPOINT_NOT_ALLOWED }
+    }
     if (!buffer || buffer.length === 0) {
       return { ok: false, errorCode: 'ASR_FAILED', errorMessage: '没有录到声音，请重试或改用文字输入' }
     }
@@ -124,6 +140,9 @@ export class AsrService {
     const t0 = Date.now()
     const host = process.env['TENCENT_ASR_HOST'] ?? 'asr.tencentcloudapi.com'
     const insecure = host.startsWith('127.0.0.1') || host.startsWith('localhost') // verify stub 用
+    const endpoint = `${insecure ? 'http' : 'https'}://${host}`
+    // 判的就是下面 fetch 要连的同一个地址；本机 stub 的 http 只在非生产放行。
+    if (!isAiEndpointAllowed(endpoint, 'asr')) return { ...ASR_ENDPOINT_NOT_ALLOWED }
     const payload = JSON.stringify({
       EngSerViceType: '16k_zh',
       SourceType: 1,
@@ -135,7 +154,7 @@ export class AsrService {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs)
     try {
       const ts = Math.floor(Date.now() / 1000)
-      const res = await fetch(`${insecure ? 'http' : 'https'}://${host}`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

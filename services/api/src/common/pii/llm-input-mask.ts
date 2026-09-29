@@ -101,6 +101,23 @@ function makeRestore(map: ReadonlyMap<string, string>): (value: string) => strin
 }
 
 /**
+ * 遮盖选项。
+ *
+ * keepNames：只遮高置信的号码类与地址（身份证 / 手机号 / 银行卡 / 邮箱 / 详细地址 /
+ * 统一社会信用代码），**不遮**「姓名：」「甲方：」一类名称。
+ * 给小青文字对话用 —— 称呼被遮掉，对话就接不上了；名字本身也不是高置信敏感项。
+ * 简历链、模拟面试不传（名字照遮）。
+ */
+export interface LlmInputMaskOptions {
+  readonly keepNames?: boolean
+}
+
+export interface LlmInputMaskManyResult extends Omit<LlmInputMaskReversibleResult, 'text'> {
+  /** 与输入逐一对应的遮盖后文本。**这就是应当送模型的文本**。 */
+  readonly texts: string[]
+}
+
+/**
  * 送模型前遮盖用户材料里的高置信 PII。
  *
  * 永不抛错、永不返回未处理的原文 —— 上游简历链一旦因为脱敏挂掉，
@@ -109,8 +126,8 @@ function makeRestore(map: ReadonlyMap<string, string>): (value: string) => strin
  * @param raw   用户材料原文（简历正文、扫描 OCR 文本等）
  * @param scene 只用于日志定位的场景标识，**不得**传入任何用户内容
  */
-export function maskUserTextForLlm(raw: string, scene: string): LlmInputMaskResult {
-  return maskUserTextForLlmReversible(raw, scene)
+export function maskUserTextForLlm(raw: string, scene: string, options?: LlmInputMaskOptions): LlmInputMaskResult {
+  return maskUserTextForLlmReversible(raw, scene, options)
 }
 
 /**
@@ -119,53 +136,110 @@ export function maskUserTextForLlm(raw: string, scene: string): LlmInputMaskResu
  * 用于「产物要还给本人」的链路（简历优化 / 排版调整）：模型只看得到占位符，
  * 回包里的占位符在服务端换回原值，用户拿到的简历仍是完整真值。
  */
-export function maskUserTextForLlmReversible(raw: string, scene: string): LlmInputMaskReversibleResult {
-  const normalized = normalizeForMask(raw)
-  if (!normalized) {
-    return { text: '', changed: false, strict: true, degraded: false, restore: (value) => value }
+export function maskUserTextForLlmReversible(
+  raw: string,
+  scene: string,
+  options?: LlmInputMaskOptions,
+): LlmInputMaskReversibleResult {
+  const { texts, ...rest } = maskUserTextsForLlmReversible([raw], scene, options)
+  return { ...rest, text: texts[0] ?? '' }
+}
+
+/**
+ * 多段一起遮：各段分别送回，但**占位符编号全局一致**（同一个手机号在第 1 段和第 5 段
+ * 都是 `[手机号_1]`），restore() 对任一段都有效。
+ *
+ * 为什么不把多段拼成一个字符串再遮：拼接后「地址：」这类带标签的规则会越过段落边界
+ * 把下一段吞进去，再按分隔符拆回时就错位了。这里把每段当作遮盖引擎的一「页」，
+ * 引擎本来就按页处理、跨页共享编号，不存在越界问题。
+ *
+ * 用于：模拟面试（简历摘要 + 每轮作答）、小青对话（多轮历史）、简历生成（多条描述）。
+ * 段数超过引擎页数上限（50）或总量超限时走兜底正则，仍然遮盖，不会退回原文。
+ */
+export function maskUserTextsForLlmReversible(
+  raws: readonly string[],
+  scene: string,
+  options?: LlmInputMaskOptions,
+): LlmInputMaskManyResult {
+  const normalized = (Array.isArray(raws) ? raws : []).map((raw) => normalizeForMask(raw))
+  if (normalized.every((text) => !text)) {
+    return { texts: normalized, changed: false, strict: true, degraded: false, restore: (value) => value }
   }
+  const chars = normalized.reduce((sum, text) => sum + text.length, 0)
 
   try {
     // assertComplete=false：先无条件拿到遮盖结果，断言另算（理由见文件头）
-    const masked = maskContractPages([{ pageNumber: 1, text: normalized }], { assertComplete: false, collectRestoreMap: true })
-    const text = masked.pages[0]!.text
+    const masked = maskContractPages(
+      normalized.map((text, index) => ({ pageNumber: index + 1, text })),
+      { assertComplete: false, collectRestoreMap: true, maskPartyNames: options?.keepNames !== true },
+    )
+    const texts = masked.pages.map((page) => page.text)
     let strict = true
     try {
       assertNoHighConfidencePii(masked.pages)
     } catch {
       strict = false
       // 只报场景与长度，不报原文/摘录/命中值
-      logger.warn(`llm_input_mask.residual scene=${scene} chars=${normalized.length}`)
+      logger.warn(`llm_input_mask.residual scene=${scene} chars=${chars}`)
     }
-    return { text, changed: text !== normalized, strict, degraded: false, restore: makeRestore(masked.restoreMap ?? new Map()) }
+    return {
+      texts,
+      changed: texts.some((text, index) => text !== normalized[index]),
+      strict,
+      degraded: false,
+      restore: makeRestore(masked.restoreMap ?? new Map()),
+    }
   } catch (error) {
     // 引擎异常（超限 / 输入非法等）：退到兜底正则，绝不退到「送原文」
     logger.warn(
-      `llm_input_mask.engine_failed scene=${scene} chars=${normalized.length} ` +
+      `llm_input_mask.engine_failed scene=${scene} chars=${chars} ` +
       `code=${error instanceof Error ? error.message : 'UNKNOWN'}`,
     )
-    let text = normalized
-    // 兜底路径同样产出 `[类别_序号]`，保证 restore() 在降级时依然可用
+    // 兜底路径同样产出 `[类别_序号]`，且跨段共用编号，保证 restore() 在降级时依然可用
     const fallbackMap = new Map<string, string>()
-    for (const [pattern, category] of FALLBACK_PATTERNS) {
-      let seq = 0
-      text = text.replace(pattern, (hit) => {
-        for (const [token, original] of fallbackMap) {
-          if (original === hit && token.startsWith(`[${category}_`)) return token
-        }
-        seq += 1
-        const token = `[${category}_${seq}]`
-        fallbackMap.set(token, hit)
-        return token
-      })
+    const seqByCategory = new Map<string, number>()
+    const texts = normalized.map((segment) => {
+      let text = segment
+      for (const [pattern, category] of FALLBACK_PATTERNS) {
+        text = text.replace(pattern, (hit) => {
+          for (const [token, original] of fallbackMap) {
+            if (original === hit && token.startsWith(`[${category}_`)) return token
+          }
+          const seq = (seqByCategory.get(category) ?? 0) + 1
+          seqByCategory.set(category, seq)
+          const token = `[${category}_${seq}]`
+          fallbackMap.set(token, hit)
+          return token
+        })
+      }
+      return text
+    })
+    return {
+      texts,
+      changed: texts.some((text, index) => text !== normalized[index]),
+      strict: false,
+      degraded: true,
+      restore: makeRestore(fallbackMap),
     }
-    return { text, changed: text !== normalized, strict: false, degraded: true, restore: makeRestore(fallbackMap) }
   }
 }
 
 /** 便捷形态：只要遮盖后的文本。 */
-export function maskUserTextForLlmText(raw: string, scene: string): string {
-  return maskUserTextForLlm(raw, scene).text
+export function maskUserTextForLlmText(raw: string, scene: string, options?: LlmInputMaskOptions): string {
+  return maskUserTextForLlm(raw, scene, options).text
+}
+
+/** 便捷形态（多段、不可还原）：只要遮盖后的各段文本。 */
+export function maskUserTextsForLlmText(raws: readonly string[], scene: string, options?: LlmInputMaskOptions): string[] {
+  return maskUserTextsForLlmReversible(raws, scene, options).texts
+}
+
+/** 是否还残留遮盖占位符（模型编造了不存在的编号时 restore 会原样保留它）。 */
+export function containsMaskPlaceholder(value: string): boolean {
+  PLACEHOLDER_TOKEN.lastIndex = 0
+  const hit = typeof value === 'string' && PLACEHOLDER_TOKEN.test(value)
+  PLACEHOLDER_TOKEN.lastIndex = 0
+  return hit
 }
 
 /**

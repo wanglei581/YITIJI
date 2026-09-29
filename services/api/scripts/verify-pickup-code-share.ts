@@ -100,6 +100,14 @@ class FakeRedis {
     this.store.set(key, String(next))
     return next
   }
+  async decrementFloorKeepTtl(key: string): Promise<number> {
+    this.guard()
+    const v = Number(this.store.get(key) ?? 'NaN')
+    if (!Number.isFinite(v)) return 0
+    if (v <= 1) { this.store.delete(key); return 0 }
+    this.store.set(key, String(v - 1))
+    return v - 1
+  }
   reset(): void { this.store.clear() }
 }
 
@@ -421,6 +429,29 @@ async function main(): Promise<void> {
     if (!usedReissue.thrown || usedReissue.code !== 'PICKUP_CODE_NOT_REISSUABLE') {
       fail(`已核销不得重发，实际 ${JSON.stringify(usedReissue)}`)
     }
+    // 已用过的码（同机、超过 10 分钟）不计入锁机：能走到这一步说明手里是本机的一枚真码，
+    // 不是枚举；计进去会让一位反复重试的本人把整台机器锁 15 分钟、连累后面的人（9/29 总指挥问）。
+    // 也不清零计数：它不是一次成功认领，不能拿来给枚举者洗白。
+    redis.reset()
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD; i += 1) {
+      const again = await capture(() => pickup.claim(reissued.pickupCode!, terminalId, `used-burst-${i}`))
+      if (again.code !== 'PICKUP_CODE_ALREADY_USED') fail(`已用码重复输入应一直如实回 PICKUP_CODE_ALREADY_USED，实际 ${JSON.stringify(again)}`)
+    }
+    const afterUsedBurst = await capture(() => pickup.claim('10000097', terminalId, 'used-burst-probe'))
+    if (afterUsedBurst.code !== 'PICKUP_CODE_INVALID') {
+      fail(`已用码输满 ${PICKUP_LOCKOUT_FAILURE_THRESHOLD} 次不得把本机锁住，实际 ${JSON.stringify(afterUsedBurst)}`)
+    }
+    redis.reset()
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+      await capture(() => pickup.claim(`2000000${i}`.slice(0, 8), terminalId, `mix-src-${i}`))
+    }
+    await capture(() => pickup.claim(reissued.pickupCode!, terminalId, 'mix-used'))
+    await capture(() => pickup.claim('20000099', terminalId, 'mix-last'))
+    const mixedLocked = await capture(() => pickup.claim('20000098', terminalId, 'mix-probe'))
+    if (mixedLocked.code !== 'PICKUP_CLAIM_LOCKED') {
+      fail(`已用码不得清零失败计数（夹在枚举中间照样锁），实际 ${JSON.stringify(mixedLocked)}`)
+    }
+    redis.reset()
     pass('同机 10 分钟内再输已核销码交回原任务且不改状态；其它终端或超过 10 分钟拒绝，事后重发也拒绝')
 
     redis.reset()
@@ -432,6 +463,78 @@ async function main(): Promise<void> {
     const otherOpen = await capture(() => pickup.claim('10000098', terminalId, 'lock-src'))
     if (otherOpen.code === 'PICKUP_CLAIM_LOCKED') fail('锁定不得蔓延到其它终端')
     pass('多次输错仍按终端锁定，其它终端不受影响')
+
+    // 1.8 P-2：成功认领只给本机失败计数「抵一次」，且只在本次把 pending 变成 claimed 的那一次。
+    // 已认领的活租约可以同码幂等重领；整个清零时，一张自己的未付单（试点 0 元、建单无上限）
+    // 就能夹在猜码中间无限清零，或者每新建一张单换一次清零——锁机形同虚设。
+    redis.reset()
+    const newOrder = () => memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
+    // 阳性对照：真用户输错 9 次后输对，抵掉一次；再错一次仍不锁（没有抵扣的话这时已锁）。
+    const ownOrder = await newOrder()
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+      await capture(() => pickup.claim(`3000000${i}`.slice(0, 8), terminalId, `p2-first-${i}`))
+    }
+    const firstClaim = await capture(() => pickup.claim(ownOrder.pickupCode!, terminalId, 'p2-own-first'))
+    if (firstClaim.thrown) fail(`自己的单首次认领应成功，实际 ${JSON.stringify(firstClaim)}`)
+    await capture(() => pickup.claim('31000001', terminalId, 'p2-after-first-1'))
+    const afterFirst = await capture(() => pickup.claim('31000002', terminalId, 'p2-after-first-probe'))
+    if (afterFirst.code !== 'PICKUP_CODE_INVALID') fail(`首次认领真码应抵掉一次失败（正常用户手误不受影响），实际 ${JSON.stringify(afterFirst)}`)
+    // 攻击一：同一张已认领的单反复重输，不再抵扣。
+    redis.reset()
+    let lockedMidway = false
+    for (let round = 0; round < 3 && !lockedMidway; round += 1) {
+      for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+        const guess = await capture(() => pickup.claim(`32${round}0000${i}`.slice(0, 8), terminalId, `p2-r${round}-${i}`))
+        if (guess.code === 'PICKUP_CLAIM_LOCKED') { lockedMidway = true; break }
+      }
+      await capture(() => pickup.claim(ownOrder.pickupCode!, terminalId, `p2-own-${round}`))
+    }
+    const finalProbe = await capture(() => pickup.claim('32999999', terminalId, 'p2-final'))
+    if (!lockedMidway && finalProbe.code !== 'PICKUP_CLAIM_LOCKED') {
+      fail(`重输自己已认领的码不得抵扣失败计数：27 次猜码后必须已锁机，实际 ${JSON.stringify(finalProbe)}`)
+    }
+    // 攻击二：每轮猜 9 次再新建一张自己的单首次认领——整个清零时永远不锁，只抵一次时第二轮就锁。
+    redis.reset()
+    let lockedNewOrders = false
+    for (let round = 0; round < 3 && !lockedNewOrders; round += 1) {
+      for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+        const guess = await capture(() => pickup.claim(`33${round}0000${i}`.slice(0, 8), terminalId, `p2-n${round}-${i}`))
+        if (guess.code === 'PICKUP_CLAIM_LOCKED') { lockedNewOrders = true; break }
+      }
+      if (lockedNewOrders) break
+      const fresh = await newOrder()
+      await capture(() => pickup.claim(fresh.pickupCode!, terminalId, `p2-new-${round}`))
+    }
+    if (!lockedNewOrders) fail('每轮猜 9 次再用一张新单首次认领，三轮内必须锁机（整个清零时永远不锁）')
+    pass('首次认领真码抵掉一次失败；重输已认领的码不抵扣；每轮换新单也挡不住锁机')
+
+    // 真 Redis 直测 decrementFloorKeepTtl 的 Lua：减 1、保留有效期、减到 0 删键、不在返回 0。
+    {
+      const redisUrl = process.env['REDIS_URL']
+      if (!redisUrl) fail('需要 REDIS_URL 直测 decrementFloorKeepTtl（CI 两个作业都有）')
+      const { default: IORedis } = await import('ioredis')
+      const { RedisService } = await import('../src/common/redis/redis.service')
+      const raw = new IORedis(redisUrl!, { maxRetriesPerRequest: 1 })
+      const real = new RedisService(raw as never)
+      const key = `verify:pickup-credit:${randomUUID()}`
+      try {
+        await raw.set(key, '3', 'EX', 600)
+        const afterOne = await real.decrementFloorKeepTtl(key)
+        const ttl = await raw.ttl(key)
+        await raw.set(key, '1', 'EX', 600)
+        const toZero = await real.decrementFloorKeepTtl(key)
+        const gone = await raw.exists(key)
+        const missing = await real.decrementFloorKeepTtl(`${key}:none`)
+        if (afterOne === 2 && ttl > 0 && ttl <= 600 && toZero === 0 && gone === 0 && missing === 0) {
+          pass('真 Redis：失败计数抵扣减 1、保留有效期、减到 0 删键、不存在返回 0')
+        } else {
+          fail(`decrementFloorKeepTtl 语义不对：afterOne=${afterOne} ttl=${ttl} toZero=${toZero} gone=${gone} missing=${missing}`)
+        }
+      } finally {
+        await raw.del(key).catch(() => undefined)
+        raw.disconnect()
+      }
+    }
 
     redis.reset()
     const rateOrder = await memberOrders.create(

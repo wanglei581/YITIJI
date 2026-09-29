@@ -273,11 +273,19 @@ if (
     fail('发布 helper 必须在目标构建和生产写入前比对控制面与目标的生产闸门键')
   }
 
-  const floorDefault = 'DEPLOY_MIN_FREE_FLOOR_MB:-10240'
-  if (deploySource.includes(floorDefault) && deployWorkflow.includes(floorDefault)) {
-    pass('发布脚本与 deploy.yml 的空间下限默认都是 10240MB')
+  if (deploySource.includes('DEPLOY_MIN_FREE_FLOOR_MB:-10240')) {
+    pass('发布脚本的空间下限默认仍是 10240MB')
   } else {
-    fail('deploy-api-release.sh 与 deploy.yml 必须使用同一个 DEPLOY_MIN_FREE_FLOOR_MB 默认值 10240')
+    fail('deploy-api-release.sh 必须保留 DEPLOY_MIN_FREE_FLOOR_MB 默认值 10240')
+  }
+  if (
+    deployWorkflow.includes('DEPLOY_MIN_FREE_FLOOR_MB:-10240') &&
+    deployWorkflow.includes('pnpm store prune') &&
+    !deployWorkflow.includes('DEPLOY_MIN_FREE_BUILD_MB')
+  ) {
+    pass('full 构建前检查用 DEPLOY_MIN_FREE_FLOOR_MB 默认 10240，不够时先 pnpm store prune')
+  } else {
+    fail('deploy.yml 的构建前门槛必须是 DEPLOY_MIN_FREE_FLOOR_MB 默认 10240，并在不够时先 pnpm store prune；不得再使用 DEPLOY_MIN_FREE_BUILD_MB')
   }
 
   const dumpMvAt = deploySource.indexOf('mv -f -- "$DUMP_PARTIAL" "$BACKUP_PREFIX.dump"')

@@ -21,6 +21,11 @@ import { probeCjkFont } from './pdf/cjk-font'
  *   Redis 降级时把一体机整机判成「断网」会掩盖真实故障，也阻断打印链路。
  * - `GET /health/ready` = readiness。任一子系统降级即 503，
  *   供负载均衡 / 部署验收 / 只看状态码的运维脚本使用。
+ *   例外：登记时声明 `blocksReadiness: false` 的子系统（目前只有 AI 平台，F-11）。
+ *   AI 未开通只降级 AI，打印、扫描、支付、两个后台照常 —— 若它让 ready 变 503，
+ *   发布脚本（.github/scripts/deploy-api-release.sh 看的就是 ready）会把一次漏配 AI 密钥
+ *   的发布当成失败回退，与「AI 只降级」矛盾。它仍在 `/health` 的 degraded[] 里如实列出，
+ *   ready 的 subsystems 里也照样显示 degraded。
  */
 @Controller('health')
 export class HealthController {
@@ -44,7 +49,7 @@ export class HealthController {
   @Get('ready')
   async ready() {
     await this.assertDatabase()
-    const degraded = bootReadiness.degraded()
+    const degraded = bootReadiness.readinessBlocking()
     if (degraded.length > 0) {
       // details 必须是字符串数组：HttpExceptionFilter 只透传 string 元素，
       // 传对象会被过滤成空数组 —— 那就成了「说有问题却说不出是什么」。
@@ -103,6 +108,7 @@ function toPublicState(state: BootSubsystemState) {
     code: state.code,
     message: state.message,
     ...(state.impact ? { impact: state.impact } : {}),
+    ...(state.blocksReadiness === false ? { blocksReadiness: false } : {}),
     since: state.since,
   }
 }

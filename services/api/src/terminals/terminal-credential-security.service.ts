@@ -245,13 +245,17 @@ export class TerminalCredentialSecurityService {
           agentToken,
           credentialGeneration: { increment: 1 },
           deviceFingerprint: dto.deviceFingerprint,
-          ...(displayName !== undefined ? { displayName } : {}),
           ...(macAddress !== undefined ? { macAddress } : {}),
           ...(locationLabel !== undefined ? { locationLabel } : {}),
           ...(bind.terminal.lifecycleStatus === 'planned' ? { lifecycleStatus: 'commissioning' } : {}),
         },
         select: { id: true, terminalCode: true, credentialGeneration: true },
       })
+      // W-05：终端名字以管理员起的为准。Agent 上报的名字只在终端还没有名字时补上；
+      // 条件写（displayName: null）保证与管理员并发改名时也不会覆盖。
+      const displayNameApplied = displayName
+        ? (await tx.terminal.updateMany({ where: { id: terminal.id, displayName: null }, data: { displayName } })).count === 1
+        : false
       await this.persistIssuedCredential(tx, {
         credentialId,
         terminalId: terminal.id,
@@ -269,6 +273,7 @@ export class TerminalCredentialSecurityService {
         payload: {
           terminalCode: terminal.terminalCode,
           displayName,
+          displayNameApplied,
           macAddress,
           locationLabel,
           agentVersion: cleanNullable(dto.agentVersion) ?? null,

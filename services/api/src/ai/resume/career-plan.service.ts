@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { FilesService } from '../../files/files.service'
-import { signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmCareerPlanService, type CareerPlanPayload } from './llm-career-plan.service'
 import { CareerPlanPdfService } from './career-plan-pdf.service'
@@ -19,6 +19,7 @@ import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.servi
 import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
 import { storedJobFitUsesSystemJob } from './job-fit-hosting'
 import { sanitizeCareerPlanPayload } from './career-plan-payload-safety'
+import { selfAssessmentForNewAi, type SelfAssessmentExclusion } from './self-assessment-consent-reconfirm'
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -63,10 +64,12 @@ interface StoredCareerPlan {
     /** 旧存档无此字段；旧 basedOn.jobFit 按系统岗位引用保守清理。 */
     jobFitSource?: 'system' | 'manual' | null
     interview: string | null
-    /** self_assessment 仅作可选上下文 hint，不参与签名门禁 / 校验 / 配额。 */
+    /** 自我探索记分仅作可选上下文。不参与签名门禁 / 配额。同意不是当前版本时不送进模型（这次不纳入）。 */
     selfAssessment: string | null
   }
   providerName: string
+  /** 这次没纳入自我探索的原因（如实告知，不悄悄降级）；旧存档无此字段按 null。 */
+  selfAssessmentExcluded?: SelfAssessmentExclusion
 }
 
 function scrubSystemJobTitle(value: string, title: string): string {
@@ -198,10 +201,13 @@ export class CareerPlanService {
       }
     }
 
-    // 3) 最近自我探索（仅作 hint，不参与签名门禁 / 配额 / 校验；
+    // 3) 最近自我探索（仅作 hint，不参与签名门禁 / 配额；
     //    服务端按本人 endUserId 读取，匿名 parse 不强制要求，仅尝试按 accessTokenHash 匹配）。
     //    §1.7: 只读 dimensions,LLM 上轮拒答 summary 不注入下游(防跨轮污染)。
-    const selfAssessmentDims = await this.loadSelfAssessmentDimensions(parse)
+    //    记分会送进本次模型调用。同意不是当前版本时这次不纳入（照常生成，basedOn 如实为 null），
+    //    见 self-assessment-consent-reconfirm.ts。
+    const selfAssessmentUse = selfAssessmentForNewAi(await this.loadSelfAssessmentHint(parse))
+    const selfAssessmentDims = selfAssessmentUse.dimensions
     const selfAssessmentCtx: { dimensions: Array<{ key: string; label: string; strength: number }> } | null =
       selfAssessmentDims.length > 0 ? { dimensions: [...selfAssessmentDims] } : null
 
@@ -227,6 +233,7 @@ export class CareerPlanService {
         selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
       },
       providerName: 'llm',
+      selfAssessmentExcluded: selfAssessmentUse.excluded,
     }
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
     await this.prisma.aiResumeResult.upsert({
@@ -295,9 +302,10 @@ export class CareerPlanService {
       filename: rendered.filename,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
-      // 服务端生成的派生稿（AI 版与降级版都是）：生产隐私闸门按类别放行，
+      // 服务端生成的派生稿（AI 版与降级版都是）：生产隐私闸门按 derivationKind=ai_generated 放行，
       // 否则一体机直达报价页后建单会被拒 PRINT_PII_SCAN_REQUIRED（商用收口 P0-5）。
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       uploaderId: null,
       endUserId: parse.endUserId,
       createdBy: 'career_plan',
@@ -319,7 +327,7 @@ export class CareerPlanService {
       pageCount: rendered.pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
       /** 新增只读字段（加字段不改既有字段语义）：前端据此如实提示用户这次拿到的是哪一版。 */
       variant: rendered.variant,
     }
@@ -386,35 +394,46 @@ export class CareerPlanService {
   }
 
   /**
-   * 自我探索的**确定性记分**（E1）。
+   * 自我探索的**确定性记分**（E1），外加这条记录实际存下的同意版本。
    *
    * 只读 key / label / strength：`scoreSelfAssessment` 是固定权重累加的纯函数，不经过模型。
    * 刻意不读 `note` / `summary` —— 那两个字段由 LLM 生成，把它们印进一份自称
    * 「未含 AI 规划」的纸里会让这张纸的自我标识失真。
    * （§1.7 同款口径：LLM 上轮拒答的 summary 也不注入下游。）
    *
-   * 撤回（withdraw）会把 dimensions 物理清空，因此撤回后这里自然返回 []。
+   * 撤回（withdraw）会把 dimensions 物理清空，因此撤回后这里自然返回空记分。
+   * 降级纸只取记分，不因为同意已过期而拒绝打印。
    */
-  private async loadSelfAssessmentDimensions(
+  private async loadSelfAssessmentHint(
     parse: { endUserId: string | null; accessTokenHash: string | null },
-  ): Promise<DegradedSelfAssessmentDimension[]> {
+  ): Promise<{ dimensions: DegradedSelfAssessmentDimension[]; consentVersion: string | null }> {
     const where = parse.endUserId
       ? { endUserId: parse.endUserId, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
       : { accessTokenHash: parse.accessTokenHash, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
     const row = await this.prisma.aiResumeResult.findFirst({ where, orderBy: { createdAt: 'desc' } })
-    if (!row) return []
+    if (!row) return { dimensions: [], consentVersion: null }
     try {
-      // self-assessment payloadJson 顶层就是 dimensions/summary(StoredSelfAssessment),
-      // 不是 { payload: { ... } }。配套 §1.7 修复:沿用正确 schema 仅读 dimensions。
+      // payloadJson 顶层就是 dimensions/summary，不是 { payload: { ... } }。
       const stored = JSON.parse(row.payloadJson) as {
         dimensions?: Array<{ key: string; label: string; strength: number }>
+        consentVersion?: string | null
       }
-      return (stored.dimensions ?? [])
+      const dimensions = (stored.dimensions ?? [])
         .map((d) => ({ key: String(d.key ?? ''), label: String(d.label ?? ''), strength: Number(d.strength ?? 0) }))
         .filter((d) => d.key && d.label)
+      const rawVersion = stored.consentVersion
+      const consentVersion = typeof rawVersion === 'string' && rawVersion.length > 0 ? rawVersion : null
+      return { dimensions, consentVersion }
     } catch {
-      return [] // 损坏行按无上下文处理
+      return { dimensions: [], consentVersion: null }
     }
+  }
+
+  /** 降级纸只用记分。不在这里拒绝过期同意。 */
+  private async loadSelfAssessmentDimensions(
+    parse: { endUserId: string | null; accessTokenHash: string | null },
+  ): Promise<DegradedSelfAssessmentDimension[]> {
+    return (await this.loadSelfAssessmentHint(parse)).dimensions
   }
 
   /**
@@ -452,6 +471,7 @@ export class CareerPlanService {
       basedOn: stored.basedOn,
       ...stored.payload,
       providerName: stored.providerName,
+      selfAssessmentExcluded: stored.selfAssessmentExcluded ?? null,
     }
   }
 

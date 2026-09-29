@@ -11,12 +11,14 @@ import {
 } from './console-screen.types'
 import { isPrinterIssueStatus, printerFaultTitle, screenGeo } from './console-screen.fleet'
 import { availableMetric, hoursAgo, shanghaiDayStart, unavailableMetric } from './console-screen.metric'
+import { loadTerminalPrintedPagesToday } from './console-screen.printed-pages'
 import {
   TIMELINE_HEARTBEAT_ROW_CAP,
   TIMELINE_PRINT_ROW_CAP,
   deriveTerminalTimeline,
   type TimelinePrintInterval,
 } from './console-screen.timeline'
+import { VISIT_DAY_WINDOW, countTerminalVisits, visitMetric, type VisitLoaded } from './console-screen.visits'
 
 const ONLINE_WINDOW_MS = SCREEN_ONLINE_WINDOW_SECONDS * 1000
 const PRINT_BUSY = ['claimed', 'printing'] as const
@@ -87,6 +89,9 @@ function printerState(input: {
   if (ageMs > ONLINE_WINDOW_MS) return { state: 'offline', errorLabel: null }
   const status = input.heartbeat.printerStatus
   if (status === 'offline') return { state: 'offline', errorLabel: null }
+  if (status === 'low_paper') {
+    return { state: 'ready', errorLabel: printerFaultTitle('low_paper') }
+  }
   if (isPrinterIssueStatus(status)) {
     return { state: 'error', errorLabel: printerFaultTitle(status as string) }
   }
@@ -193,10 +198,11 @@ export async function loadTerminalTwin(
     heartbeatRows,
     heartbeatBefore,
     printTasks,
-    printPages,
+    printedToday,
     printTaskCount,
     scanCount,
     failedCount,
+    visits,
   ] = await Promise.all([
     prisma.terminalHeartbeat.findFirst({
       where: { terminalId },
@@ -268,15 +274,17 @@ export async function loadTerminalTwin(
         },
       },
     }),
-    prisma.order.aggregate({
-      where: { terminalId, payStatus: 'paid', billablePages: { not: null }, paidAt: { gte: dayStart } },
-      _sum: { billablePages: true },
-    }),
+    loadTerminalPrintedPagesToday(prisma, terminalId, now),
     prisma.printTask.count({ where: { terminalId, createdAt: { gte: dayStart } } }),
     prisma.scanTask.count({ where: { terminalId, createdAt: { gte: dayStart } } }),
     prisma.printTaskStatusLog.count({
       where: { toStatus: 'failed', createdAt: { gte: dayStart }, task: { terminalId } },
     }),
+    // 服务人次单独兜底：它取不到只影响这一格，不拖垮整台孪生。
+    countTerminalVisits(prisma, terminalId, expectedOrgId, dayStart, now).then(
+      (value): VisitLoaded => ({ ok: true, value }),
+      (): VisitLoaded => ({ ok: false, reason: SCREEN_UNAVAILABLE_REASON.sourceQueryFailed }),
+    ),
   ])
 
   const overview = buildDeviceFleetOverview(
@@ -357,11 +365,11 @@ export async function loadTerminalTwin(
     scanner: availableMetric('TerminalHeartbeat+ScanTask', 'current', scannerState(scanningCount > 0, heartbeat?.scanInputHealth)),
     currentTask: currentMetric,
     today: {
-      printPages: suppressTerminalTodayCount(printPages._sum.billablePages ?? 0),
+      printPages: suppressTerminalTodayCount(printedToday),
       printTasks: suppressTerminalTodayCount(printTaskCount),
       scans: suppressTerminalTodayCount(scanCount),
       failed: suppressTerminalTodayCount(failedCount),
-      visits: unavailableMetric('KioskSession', 'current', SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten),
+      visits: visitMetric(visits, VISIT_DAY_WINDOW, true),
     },
     consumables: unavailableMetric('TerminalHeartbeat', 'current', SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo),
     timeline24h: timeline.ok

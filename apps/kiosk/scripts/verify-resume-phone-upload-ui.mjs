@@ -219,6 +219,7 @@ assertIncludes(usbApi, "Authorization: `Bearer ${endUserToken}`", 'USB bridge fo
 assertIncludes(source, 'const sourceBusy = uploading || phoneBusy || usbBusy', 'resume upload channels share one navigation lock')
 assertIncludes(usbPanel, 'mountedRef.current = true', 'resume USB panel restores its mounted guard under React StrictMode effect replay')
 assertIncludes(usbPanel, 'onBusyChange?.(false)', 'resume USB panel clears its parent busy state on unmount')
+assertIncludes(panel, 'onBusyChange?.(false)', 'resume QR panel clears its parent busy state on unmount')
 assertIncludes(usbPanel, 'item.sizeBytes <= MAX_RESUME_BYTES', 'resume USB panel enforces its stated 10MB file limit')
 assertNotIncludes(usbPanel, '`${mimeType} ${filename}`', 'resume USB format detection does not use filename substrings')
 assertIncludes(usbPanel, "normalizedMime === 'image/jpeg'", 'resume USB format detection prefers exact image MIME')

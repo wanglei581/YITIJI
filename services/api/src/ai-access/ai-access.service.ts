@@ -5,6 +5,8 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { readClientDeclaration } from '../common/privacy/client-declaration'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
+import { aiPlatformBlockFor } from '../config/ai-platform-config'
+import { AiBudgetService } from '../ai/usage/ai-budget.service'
 
 export type AiLoginGate = 'off' | 'before_export' | 'before_generate'
 export interface AiAccessConfig { loginGate: AiLoginGate; declarationEnforced: boolean; paused: boolean; maintenance: boolean }
@@ -21,7 +23,8 @@ const envGate = (): AiLoginGate => {
 export class AiAccessService {
   private readonly logger = new Logger(AiAccessService.name)
   private cache: { value: AiAccessConfig; expiresAt: number } | null = null
-  constructor(private readonly redis: RedisService, private readonly audit: AuditService, private readonly jwt: JwtService, private readonly prisma: PrismaService) {}
+  // budget 在生产由 Nest 注入（未标 @Optional，缺了启动即报错）；形参可省只为兼容门禁里按旧签名手动构造。
+  constructor(private readonly redis: RedisService, private readonly audit: AuditService, private readonly jwt: JwtService, private readonly prisma: PrismaService, private readonly budget?: AiBudgetService) {}
 
   async getConfig(): Promise<AiAccessConfig> {
     if (this.cache && this.cache.expiresAt > Date.now()) return this.cache.value
@@ -73,7 +76,11 @@ export class AiAccessService {
     const current = config ?? await this.getConfig()
     if (current.maintenance && (maintenanceBlocked || (kind && kind !== 'read'))) throw new ServiceUnavailableException({ error: { code: 'MAINTENANCE_MODE', message: '设备维护中，请稍后再来' } })
     if (!kind || kind === 'read') return
+    const notConfigured = aiPlatformBlockFor(kind); if (notConfigured) throw new ServiceUnavailableException({ error: notConfigured }) // F-11 生产缺 AI 配置：如实 503，绝不回退 mock
     if (current.paused) throw new ServiceUnavailableException({ error: { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' } })
+    // P1-2a 每日金额硬上限：与 AI 暂停同一层，只拦会花钱的生成 / 语音；导出不调模型，不拦。
+    // 超限 503 AI_BUDGET_EXHAUSTED；读不到当日花费 503 AI_BUDGET_UNAVAILABLE（失败关闭）。
+    if (kind === 'generate' || kind === 'voice') await this.budget?.assertWithinBudget()
     // 「开始 AI 前」是更严的一档，导出与打印同样要登录
     const needsLogin = (current.loginGate === 'before_generate' && (kind === 'generate' || kind === 'voice' || kind === 'export'))
       || (current.loginGate === 'before_export' && kind === 'export')
@@ -88,7 +95,8 @@ export class AiAccessService {
       const missing: string[] = []
       if (headers.age14.status !== 'declared' && !(member && await this.hasConsent(member.endUserId, 'age_14_plus'))) missing.push('age_14_plus')
       if (kind === 'voice' && headers.voiceRecording.status !== 'declared' && !(member && await this.hasConsent(member.endUserId, 'voice_recording'))) missing.push('voice_recording')
-      if (missing.length) throw new ForbiddenException({ error: { code: 'AI_DECLARATION_REQUIRED', missing, message: '使用 AI 前请先完成必要声明' } })
+      // 全局错误过滤器只透传字符串数组 details，不透传 missing；两处都给，客户端读哪个都行（小程序窗口 9/29 报）。
+      if (missing.length) throw new ForbiddenException({ error: { code: 'AI_DECLARATION_REQUIRED', missing, details: missing, message: '使用 AI 前请先完成必要声明' } })
     }
   }
   private async hasConsent(endUserId: string, scope: string): Promise<boolean> {

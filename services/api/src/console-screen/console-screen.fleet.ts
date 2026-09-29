@@ -1,7 +1,7 @@
 import { SCREEN_ONLINE_WINDOW_SECONDS, type ScreenFleetAlert, type ScreenFleetCell, type ScreenTerminalActivity } from './console-screen.types'
 import type { DeviceFleetOverview } from '../device-fleet/device-fleet.types'
 import type { PrismaService } from '../prisma/prisma.service'
-import { isHealthyPrinterStatus } from '../terminals/printer-status'
+import { isPrinterFaultStatus } from '../terminals/printer-status'
 
 const ONLINE_WINDOW_MS = SCREEN_ONLINE_WINDOW_SECONDS * 1000
 const PRINT_BUSY = ['claimed', 'printing'] as const
@@ -16,6 +16,7 @@ const PRINTER_FAULT_TITLES: Record<string, string> = {
   not_found: '未检测到打印机',
   toner_empty: '打印机缺墨',
   toner_low: '打印机墨粉不足',
+  low_paper: '纸张或墨粉不足，可打印、需补充',
 }
 
 export interface FleetTerminalRow {
@@ -36,7 +37,7 @@ export function screenGeo(lat: number | null | undefined, lng: number | null | u
 }
 
 export function isPrinterIssueStatus(status: string | null | undefined): boolean {
-  return Boolean(status) && status !== 'unknown' && !isHealthyPrinterStatus(status)
+  return isPrinterFaultStatus(status)
 }
 
 export function printerFaultTitle(status: string): string {
@@ -60,6 +61,13 @@ export function fleetAlertForHeartbeat(
   const ageMs = now.getTime() - heartbeat.createdAt.getTime()
   if (ageMs > ONLINE_WINDOW_MS) {
     return { kind: 'offline', title: offlineAlertTitle(ageMs), since: heartbeat.createdAt.toISOString() }
+  }
+  if (heartbeat.printerStatus === 'low_paper') {
+    return {
+      kind: 'printer_issue',
+      title: printerFaultTitle('low_paper'),
+      since: heartbeat.createdAt.toISOString(),
+    }
   }
   if (isPrinterIssueStatus(heartbeat.printerStatus)) {
     return {

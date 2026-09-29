@@ -604,9 +604,9 @@ async function initFallbackDb(): Promise<void> {
         "id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL,
         "passwordProofState" TEXT NOT NULL DEFAULT 'legacy',
         "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "phoneHash" TEXT, "phoneEnc" TEXT,
-        "phoneVerifiedAt" DATETIME, "emailHash" TEXT, "emailEnc" TEXT, "emailVerifiedAt" DATETIME,
+        "phoneVerifiedAt" DATETIME, "phoneRegisteredByAdminAt" DATETIME, "emailHash" TEXT, "emailEnc" TEXT, "emailVerifiedAt" DATETIME,
         "emailVerifyMethod" TEXT, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME,
-        "enabled" BOOLEAN NOT NULL DEFAULT true, "deletedAt" DATETIME,
+        "enabled" BOOLEAN NOT NULL DEFAULT true, "deletedAt" DATETIME, "isBackupAdmin" BOOLEAN NOT NULL DEFAULT false,
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,

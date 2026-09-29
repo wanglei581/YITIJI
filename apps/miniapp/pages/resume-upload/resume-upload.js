@@ -25,7 +25,8 @@ Page({
           wordConversionAvailable: available,
           wordConversionCopy: available
             ? `支持 DOC / DOCX；${WORD_CONVERSION_DISCLOSURE}`
-            : `${WORD_CONVERSION_UNAVAILABLE_COPY}；${(capabilities && capabilities.reason) || '转换引擎未就绪'}`,
+            // 服务端原因本身是完整说法，只说它一遍（与我的文档页同口径，走查 9/29）。
+            : ((capabilities && capabilities.reason) || WORD_CONVERSION_UNAVAILABLE_COPY),
         })
       })
       .catch((err) => {

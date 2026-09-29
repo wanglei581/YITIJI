@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import PDFDocument from 'pdfkit'
 import { registerInterviewCjkFont } from './interview-report-pdf.service'
 import {
+  INTERVIEW_PRACTICE_RESULT_DISCLAIMER,
   PRACTICE_SHEET_CAVEAT,
   PRACTICE_SHEET_TITLE,
   type PracticeSheetContent,
@@ -52,6 +53,8 @@ export class InterviewPracticeSheetPdfService {
     doc.fontSize(10).fillColor('#6b7280').text(
       `目标岗位：${content.position} ｜ 行业：${content.industry} ｜ 面试官身份：${content.interviewerLabel} ｜ 生成日期：${content.date}`,
     )
+    doc.moveDown(0.15)
+    doc.fontSize(9).fillColor('#6b7280').text(INTERVIEW_PRACTICE_RESULT_DISCLAIMER)
     doc.moveDown(0.2)
     doc.fontSize(10).fillColor('#b45309').text(PRACTICE_SHEET_CAVEAT, { lineGap: 3 })
     doc.moveDown(0.2)

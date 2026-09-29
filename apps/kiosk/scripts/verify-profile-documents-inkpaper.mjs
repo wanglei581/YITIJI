@@ -120,7 +120,8 @@ expectMatches(
     const match = source.match(new RegExp(`${name}\\s*=\\s*new Set\\(\\[([^\\]]*)\\]\\)`))
     return match ? [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort() : null
   }
-  const server = setItems(readFileSync(join(repoRoot, 'services/api/src/print-jobs/pii-scan-gate.ts'), 'utf8'), 'PII_SCAN_REQUIRED_PURPOSES')
+  // 1.8 P-1 起用途清单定义在 material-check-policy.ts（闸门与「我的文档」materialCheckRequired 共用），pii-scan-gate.ts 只再导出。
+  const server = setItems(readFileSync(join(repoRoot, 'services/api/src/print-jobs/material-check-policy.ts'), 'utf8'), 'PII_SCAN_REQUIRED_PURPOSES')
   const kiosk = setItems(read('src/pages/profile/me/components/documentReprint.ts'), 'PRINT_PII_CHECK_PURPOSES')
   if (server && kiosk && JSON.stringify(server) === JSON.stringify(kiosk)) {
     pass(`我的文档的原件分流判据与服务端 PII_SCAN_REQUIRED_PURPOSES 同一份用途清单（${kiosk.join(' / ')}）`)
@@ -168,6 +169,14 @@ expectIncludes(page, '还没有文档', '我的文档保留空态标题')
 expectIncludes(page, '保存简历 / 打印材料等文档后，这里会显示你的文档记录', '我的文档保留空态说明')
 expectIncludes(page, '访问链接短期有效', '我的文档保留短期访问链接合规说明')
 expectIncludes(page, '原始简历/求职材料默认 90 天', '我的文档保留默认保存期限说明')
+expectIncludes(page, 'documentsLoggedInTruth(resultIdleLogoutLabel())', '已登录的文档说明引用结果页空闲时长')
+expectAbsent(page, /不会显示上一位/, '已登录的文档页不承诺看不到上一位的资料')
+const loadingBlock = read('src/pages/profile/me/qx/QxMeStateBits.tsx')
+const meGuide = read('src/pages/profile/me/qx/QxMeChrome.tsx')
+expectIncludes(loadingBlock, '上一位若没点结束使用，读出来的仍是那个账号。', '文档加载说明承认没结束使用时仍是那个账号')
+expectAbsent(loadingBlock, /不会闪回上一位用户的内容/, '文档加载不再写「不会闪回上一位」')
+expectIncludes(meGuide, '离开前请点结束使用，否则一段时间无操作后才会自动退出', '共用加载说明改为离开前结束使用')
+expectAbsent(meGuide, /上一位用户的内容不会残留在屏幕上/, '共用加载说明不再写上一位的内容不会残留')
 
 for (const [label, source] of [
   ['MyDocumentsPage', page],

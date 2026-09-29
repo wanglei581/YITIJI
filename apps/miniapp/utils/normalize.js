@@ -633,13 +633,8 @@ const FIT_LEVELS = {
   reference_low: { label: '参考匹配度较低', tone: 'clay' },
 };
 
-/** 面试练习表现等级(四档)。注释见后端:不是通过率、不是录用概率。 */
-const INTERVIEW_LEVELS = {
-  needs_work: { label: '仍需打磨', tone: 'clay' },
-  pass: { label: '基本达标', tone: 'wheat' },
-  good: { label: '表现良好', tone: 'teal' },
-  excellent: { label: '表现出色', tone: 'teal' },
-};
+// 面试练习表现等级不再给出任何展示用叫法（合规窗口 9/29 裁定：分档读起来像用人单位的结论）。
+// 服务端原始 level 照旧透传在 level 字段里，页面不渲染。
 
 function strList(v) {
   return Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()) : [];
@@ -769,6 +764,9 @@ function careerPlan(raw) {
     directions: objList(raw.directions).map((d) => ({ title: d.title || '', why: d.why || '', firstStep: d.firstStep || '' })),
     skillPlan: objList(raw.skillPlan).map((s) => ({ skill: s.skill || '', action: s.action || '', timeframe: s.timeframe || '' })),
     actionChecklist: strList(raw.actionChecklist),
+    // 自我探索没纳入的原因要如实说（合规 9/29：不许悄悄不纳入）。只认服务端明确给的
+    // 'consent_outdated'；null / 缺字段 / 其他值一律当作没有这回事，页面什么都不显示。
+    selfAssessmentOutdated: raw.selfAssessmentExcluded === 'consent_outdated',
   };
 }
 
@@ -781,12 +779,11 @@ function interviewReport(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw.report && typeof raw.report === 'object' ? raw.report : {};
   const ov = r.overall && typeof r.overall === 'object' ? r.overall : {};
-  const lv = INTERVIEW_LEVELS[ov.level] || null;
   const sa = r.starAdvice && typeof r.starAdvice === 'object' ? r.starAdvice : null;
   // 五个维度都是字符串数组,统一成一组结构便于页面循环渲染
   const dims = [
     { key: 'expression', label: '表达与逻辑', items: strList(r.expression) },
-    { key: 'positionFit', label: '岗位契合', items: strList(r.positionFit) },
+    { key: 'positionFit', label: '和目标岗位要求的对照', items: strList(r.positionFit) },
     { key: 'credibility', label: '可信度', items: strList(r.credibility) },
     { key: 'professional', label: '专业度', items: strList(r.professional) },
     { key: 'adaptability', label: '应变能力', items: strList(r.adaptability) },
@@ -799,8 +796,6 @@ function interviewReport(raw) {
     durationMin: Number(raw.durationMin) || 0,
     endedAt: raw.endedAt || '',
     level: ov.level || '',
-    levelLabel: lv ? lv.label : '',
-    levelTone: lv ? lv.tone : 'slate',
     summary: ov.summary || '',
     dims,
     hasDims: dims.length > 0,

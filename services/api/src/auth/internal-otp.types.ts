@@ -8,6 +8,8 @@ export type InternalOtpPurpose =
   | 'partner_account_delete'
   | 'partner_phone_rebind_authorize'
   | 'partner_phone_rebind_new'
+  /** 建备用管理员时验证备用手机号（3.9）；冷却与日计数仍与其它用途共用，只有 admin_login_2fa 单列。 */
+  | 'backup_admin_create'
 
 export interface InternalOtpVerificationDescriptor {
   codeKey: string

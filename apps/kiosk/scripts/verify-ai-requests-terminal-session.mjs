@@ -178,6 +178,12 @@ const METERED_PATH = new RegExp([
 
 const TERMINAL_SENDERS = new Set(['terminalAttributedFetch', 'terminalProtectedFetch'])
 const RAW_SENDERS = new Set(['fetch', 'sendBeacon'])
+/**
+ * 只拿地址判断 AI 种类、自己不发请求的函数（地址字面量出现在它的参数里不算一个请求点）。
+ * prepareAiDeclaration：C6 使用声明，按地址查 aiUseKindTable 决定要不要先弹年龄 / 录音确认，
+ * 真正的请求随后仍经 terminalAttributedFetch 发出（apps/kiosk/src/ai/aiDeclarationGate.ts）。
+ */
+const NON_REQUEST_CALLEES = new Set(['prepareAiDeclaration'])
 
 /** 豁免：file（相对 apps/kiosk）+ 路由前缀 + 理由。 */
 const EXEMPT = [
@@ -287,6 +293,12 @@ function analyzeFile(abs) {
   const visitCalls = (node) => {
     if (ts.isCallExpression(node)) {
       const callee = calleeName(node.expression)
+      if (callee && NON_REQUEST_CALLEES.has(callee)) {
+        // 这里的地址只用来查种类，不是请求点；记为已判定，免得被下面的「漏网地址」扫描当成绕过封装。
+        for (const arg of node.arguments) if (literalPath(arg)) judged.add(arg)
+        ts.forEachChild(node, visitCalls)
+        return
+      }
       const passesTerminalSender = node.arguments.some((a) => ts.isIdentifier(a) && TERMINAL_SENDERS.has(a.text))
       for (const arg of node.arguments) {
         const lit = literalPath(arg)

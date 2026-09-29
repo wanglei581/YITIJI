@@ -20,79 +20,23 @@ import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 import { ReleaseObservationPanel } from './ReleaseObservationPanel'
+import { fmtDisk, printerStatusView, scanInputView } from './terminalStatusViews'
 
 const TABLE_COLS = 16
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
 
-// ─── 扫描输入闸门（Agent fail-closed 状态，只读）────────────────────────────
-//
-// Agent 在目录身份变化 / 读取失败 / watcher 异常时会把扫描输入锁死，并且**进程内不可逆**
-// ——只有重启 Agent 才恢复。这道闸门保护的是「上一位的扫描件不会投给下一位」，
-// 所以后台只呈现，不提供任何远程解除入口（远程放宽 = 把隐私闸门交给网络）。
-//
-// 原因码来自服务端白名单枚举 SCAN_INPUT_REASONS（heartbeat.dto.ts），不是自由文本；
-// 查不到的码原样显示，既不猜也不拼接任意载荷。
-
-const SCAN_INPUT_REASON_LABELS: Readonly<Record<string, string>> = {
-  not_configured: '未配置扫描目录',
-  reparse_point_unverifiable: '目录重解析点无法核验',
-  reparse_point: '目录是重解析点',
-  not_directory: '目标不是目录',
-  unavailable: '目录不可用',
-  not_readable: '目录不可读',
-  watcher_rebuild: '监听器重建',
-  watcher_error: '监听器异常',
-  identity_unavailable: '目录身份取不到',
-  root_identity_changed: '目录身份已变化',
-  readdir_failed: '目录读取失败',
-  watcher_ready_failed: '监听器启动失败',
-  startup_backlog_failed: '启动积压处理失败',
-  startup_incomplete: '启动检查未完成',
-  unknown: '未知原因',
-}
-
-function scanInputView(t: AdminTerminalRecord) {
-  const health = t.scanInputHealth ?? null
-  // 四个字段同生同死：一个都没有 = 这台 Agent 还没上报这一组（旧版本 / mock）。
-  // 必须说「未上报」——把没测到说成正常，正是这条遥测要防的事。
-  if (!health) return { badge: 'default' as const, label: '未上报', detail: null, restart: false }
-  if (health === 'locked_out') {
-    const reason = t.scanInputReason
-      ? SCAN_INPUT_REASON_LABELS[t.scanInputReason] ?? t.scanInputReason
-      : '原因未上报'
-    return {
-      badge: 'error' as const,
-      label: '已锁死',
-      detail: reason,
-      // 服务端强制 locked_out ⇒ action=restart_required，这里仍按上报值判，不替它断言。
-      restart: t.scanInputAction === 'restart_required',
-    }
-  }
-  if (health === 'healthy') return { badge: 'success' as const, label: '正常', detail: null, restart: false }
-  return { badge: 'warning' as const, label: '未知', detail: null, restart: false }
-}
-
-// ─── 打印机状态映射(契约 C1 printerStatus 枚举)──────────────────────────────
-
-const PRINTER_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'default'; label: string }> = {
-  ok:          { badge: 'success', label: '正常' },
-  offline:     { badge: 'error',   label: '离线' },
-  paper_empty: { badge: 'warning', label: '缺纸' },
-  error:       { badge: 'error',   label: '故障' },
-  not_found:   { badge: 'warning', label: '未检测到' },
-}
-
-function printerStatusView(status: string | null) {
-  if (!status) return { badge: 'default' as const, label: '未知' }
-  return PRINTER_STATUS_MAP[status] ?? { badge: 'default' as const, label: status }
-}
-
-// 在线/离线由 online 字段决定(契约 C1:lastSeenAt 距今 < 3 分钟)
+// 在线/离线由 online 字段决定(契约 C1:lastSeenAt 距今 < 5 分钟，服务端 TERMINAL_ONLINE_WINDOW_MS)
 const ONLINE_VIEW = { badge: 'success' as const, label: '在线' }
 const OFFLINE_VIEW = { badge: 'error' as const, label: '离线' }
 const DEGRADED_VIEW = { badge: 'warning' as const, label: '降级' }
 
 const FILTERS = ['全部', '在线', '离线'] as const
+
+/** 托管 a（3.15）停放的机构类型：服务端已拒绝新绑定（ORG_TYPE_PARKED），存量绑定在这里提示改绑。 */
+const PARKED_ORG_TYPES = new Set(['enterprise_source', 'fair_organizer'])
+function isParkedOrgType(type: string | null | undefined): boolean {
+  return typeof type === 'string' && PARKED_ORG_TYPES.has(type)
+}
 
 function relativeTime(iso: string | null): string {
   if (!iso) return '从未'
@@ -104,11 +48,6 @@ function relativeTime(iso: string | null): string {
   const h = Math.floor(diffMin / 60)
   if (h < 24) return `${h} 小时前`
   return `${Math.floor(h / 24)} 天前`
-}
-
-function fmtDisk(gb: number | null): string {
-  if (gb === null || gb === undefined) return '—'
-  return `${gb.toFixed(1)} GB`
 }
 
 function runtimeStatusView(t: AdminTerminalRecord) {
@@ -629,6 +568,12 @@ export default function TerminalsPage() {
                               aria-label={`设置 ${t.terminalCode} 所属机构`}
                             >
                               <option value="">未绑定（解绑）</option>
+                              {/* 当前归属不在可选列表里（停放类型或已停用）：照实显示，不让下拉框悄悄落到「解绑」 */}
+                              {t.orgId && !orgOptions.some((o) => o.id === t.orgId) && (
+                                <option value={t.orgId} disabled>
+                                  {t.orgName ?? t.orgId}{isParkedOrgType(t.orgType) ? '（类型已停放，请改绑）' : '（当前不可选）'}
+                                </option>
+                              )}
                               {orgOptions.map((o) => (
                                 <option key={o.id} value={o.id}>{o.name}</option>
                               ))}
@@ -663,6 +608,11 @@ export default function TerminalsPage() {
                               </span>
                             ) : (
                               <span className="text-neutral-500">未绑定</span>
+                            )}
+                            {isParkedOrgType(t.orgType) && (
+                              <span className="rounded bg-warning-bg px-1.5 py-0.5 text-[11px] font-bold text-warning-fg" title="企业来源与招聘会主办方两类机构已停放，不再绑定终端；现有绑定保留，建议改绑到运营机构">
+                                该机构类型已停放，建议改绑
+                              </span>
                             )}
                             <button
                               type="button"
