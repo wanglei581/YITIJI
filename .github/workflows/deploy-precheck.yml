@@ -12,7 +12,9 @@ name: Deploy Precheck (read-only)
 # 本工作流即验证这两个默认值是否成立。
 #
 # 安全：仓库为 public，Actions 日志公开可读，
-# 因此**只输出 yes/no 与数量级信息，不打印任何路径、进程名、版本串或环境变量**。
+# 允许输出：yes/no、数量、日期、版本号、证书目录名、终端编号、
+# 点名的残留目录名，以及第 6b 节的一级目录名。
+# 禁止输出：文件名、来源地址、请求内容、密钥、nginx -T、pm2 jlist、访问日志原文。
 
 on:
   workflow_dispatch:
@@ -29,7 +31,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
-          # du -xsm /* 在 35GB 盘上要几分钟，3m 会把整个探测截断（2026-08-17 实测两次）
+          # du -xsm /* 在根分区上要几分钟，3m 会把整个探测截断（2026-08-17 实测两次）
           command_timeout: 20m
           envs: EXPECT_DIR,EXPECT_PM2,EXPECT_BACKUP
           script: |
@@ -101,19 +103,19 @@ jobs:
             echo "NGINX_LOGS_MB=$(du -sm /var/log/nginx 2>/dev/null | cut -f1)"
             echo "JOURNAL_MB=$(journalctl --disk-usage 2>/dev/null | grep -o '[0-9.]*[MG]' | head -1)"
 
-            echo "=== 6b. 磁盘去向分解（回答「88% 用在哪」）==="
-            # 已测项加起来约 8.5GB，而已用约 35GB —— 差的约 27GB 在这里定位。
+            echo "=== 6b. 磁盘去向分解（只读，定位占用在哪些一级目录）==="
+            # 已测项之外的占用也要能对上号，所以这里按一级目录拆开。
             # 只输出目录名与 MB，不输出文件名（本仓库为 public，Actions 日志公开可读）。
-            # 注意：不要跑 `find /` 全盘扫描 —— 2026-08-17 试过一次，35GB 盘上直接把
+            # 注意：不要跑 `find /` 全盘扫描 —— 2026-08-17 试过一次，根分区上直接把
             # drone-ssh 的 command_timeout 跑爆，整个探测无输出。du 一级目录已足够定位。
             echo "--- / 下一级目录（MB，降序前 12）---"
             du -xsm /* 2>/dev/null | sort -rn | head -12 | awk '{printf "  %-24s %s MB\n", $2, $1}'
             echo "--- /var 下（MB，降序前 6）---"
             du -xsm /var/* 2>/dev/null | sort -rn | head -6 | awk '{printf "  %-24s %s MB\n", $2, $1}'
-            echo "--- /srv 下两级（MB，降序前 15）——19.75GB 的去向 ---"
+            echo "--- /srv 下两级（MB，降序前 15）---"
             du -xsm /srv/*/* /srv/* 2>/dev/null | sort -rn | awk '!seen[$2]++' | head -15 | awk '{printf "  %-40s %s MB\n", $2, $1}'
             echo "--- /root 下（MB，降序前 8）---"
-            du -xsm /***/* /***/.[!.]* 2>/dev/null | sort -rn | head -8 | awk '{printf "  %-32s %s MB\n", $2, $1}'
+            du -xsm /root/* /root/.[!.]* 2>/dev/null | sort -rn | head -8 | awk '{printf "  %-32s %s MB\n", $2, $1}'
 
             echo "=== 7. 本次发布需要的空间量级 ==="
             # 注意：这条 SQL 含括号，务必用单引号包住并先赋值再 echo。
@@ -183,6 +185,927 @@ jobs:
               echo "RELEASE_BUNDLE_SIZE_MB=0"
             fi
 
+            echo "=== 12. 运行时版本（只读）==="
+            # 只打版本号、数量、日期、域名目录名、终端编号，以及下面点名的残留目录名。
+            # 不打文件名、来源地址、请求内容、密钥，也不回显 nginx -T、pm2 jlist 或访问日志原文。
+            shopt -s nullglob
+
+            MODE_AWK=$(cat <<'PRECHECK_MODE_AWK'
+            function braces(s,    i, c, n) {
+              n = 0
+              for (i = 1; i <= length(s); i++) {
+                c = substr(s, i, 1)
+                if (c == "{") n++
+                else if (c == "}") n--
+              }
+              return n
+            }
+            function listen_port(line,    t) {
+              if (match(line, /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+/)) {
+                t = substr(line, RSTART, RLENGTH)
+                sub(/.*:/, "", t)
+                return t + 0
+              }
+              if (match(line, /\]:[0-9]+/)) {
+                t = substr(line, RSTART, RLENGTH)
+                sub(/\]:/, "", t)
+                return t + 0
+              }
+              if (match(line, /listen[ \t]+[0-9]+/)) {
+                t = substr(line, RSTART, RLENGTH)
+                sub(/listen[ \t]+/, "", t)
+                return t + 0
+              }
+              return 0
+            }
+            function acc_path(line,    p) {
+              if (line ~ /access_log[ \t]+off[ \t]*;/) return "off"
+              if (match(line, /access_log[ \t]+[^ \t;]+/)) {
+                p = substr(line, RSTART, RLENGTH)
+                sub(/access_log[ \t]+/, "", p)
+                gsub(sprintf("%c", 34), "", p)
+                return p
+              }
+              return ""
+            }
+            function acc_fmt(line,    rest, n, i) {
+              if (line ~ /access_log[ \t]+off[ \t]*;/) return ""
+              if (!match(line, /access_log[ \t]+[^ \t;]+[ \t]*/)) return ""
+              rest = substr(line, RSTART + RLENGTH)
+              sub(/;.*/, "", rest)
+              n = split(rest, a, /[ \t]+/)
+              for (i = 1; i <= n; i++) {
+                if (a[i] == "") continue
+                if (a[i] ~ /=/) continue
+                return a[i]
+              }
+              return "combined"
+            }
+            function add_sq(src,    s, body, piece, q) {
+              q = sprintf("%c", 39)
+              body = ""
+              s = src
+              while (match(s, q "[^" q "]*" q)) {
+                piece = substr(s, RSTART + 1, RLENGTH - 2)
+                body = body piece
+                s = substr(s, RSTART + RLENGTH)
+              }
+              gsub(/[[:space:]]+/, " ", body)
+              sub(/^ /, "", body)
+              sub(/ $/, "", body)
+              return body
+            }
+            function note_listen(text) {
+              if (text ~ /listen[ \t]/) {
+                p = listen_port(text)
+                if (p == 80 || p == 443) server_ports = server_ports " " p
+              }
+            }
+            function note_access(text) {
+              if (text ~ /access_log[ \t]/) {
+                server_log = acc_path(text)
+                server_fmt = acc_fmt(text)
+              }
+            }
+            function flush_server(    i, n, p, fmt, lg) {
+              if (!in_server) return
+              n = split(server_ports, ps, / /)
+              lg = server_log
+              fmt = server_fmt
+              if (lg == "") { lg = http_log; fmt = http_fmt }
+              if (lg != "" && lg != "off") {
+                if (fmt == "") fmt = "combined"
+                for (i = 1; i <= n; i++) {
+                  p = ps[i] + 0
+                  if (p != 80 && p != 443) continue
+                  key = p SUBSEP lg
+                  if (seen_port[key]) continue
+                  seen_port[key] = 1
+                  port_n++
+                  port_p[port_n] = p
+                  port_log[port_n] = lg
+                  port_fmt[port_n] = fmt
+                }
+              }
+              server_ports = ""
+              server_log = ""
+              server_fmt = ""
+            }
+            BEGIN {
+              depth = 0
+              in_server = 0
+              server_base = 0
+              pending = 0
+              cap = 0
+              http_log = ""
+              http_fmt = "combined"
+            }
+            {
+              line = $0
+              sub(/\r$/, "", line)
+              if (cap) {
+                fmtbuf = fmtbuf " " line
+                if (index(line, ";") > 0) {
+                  cap = 0
+                  fmt_body[fmtname] = add_sq(fmtbuf)
+                }
+                next
+              }
+              if (line ~ /^[[:space:]]*#/) next
+              if (match(line, /^[[:space:]]*log_format[ \t]+[A-Za-z0-9_]+/)) {
+                fmtname = substr(line, RSTART, RLENGTH)
+                sub(/^[[:space:]]*log_format[ \t]+/, "", fmtname)
+                if (index(line, ";") > 0) fmt_body[fmtname] = add_sq(line)
+                else { cap = 1; fmtbuf = line }
+                next
+              }
+              pure = line
+              sub(/#.*/, "", pure)
+              depth_before = depth
+              depth += braces(pure)
+              if (!in_server && (pure ~ /^[[:space:]]*server[[:space:]]*\{/ || pure ~ /^[[:space:]]*server[[:space:]]*$/)) {
+                if (pure ~ /\{/) {
+                  in_server = 1
+                  server_base = depth_before + 1
+                  server_ports = ""
+                  server_log = ""
+                  server_fmt = ""
+                  pending = 0
+                } else pending = 1
+              } else if (pending && pure ~ /\{/) {
+                in_server = 1
+                server_base = depth_before + 1
+                server_ports = ""
+                server_log = ""
+                server_fmt = ""
+                pending = 0
+              }
+              if (in_server) {
+                note_listen(pure)
+                note_access(pure)
+                if (depth < server_base) {
+                  flush_server()
+                  in_server = 0
+                }
+              } else if (pure ~ /access_log[ \t]/) {
+                http_log = acc_path(pure)
+                http_fmt = acc_fmt(pure)
+              }
+            }
+
+            function split_fields(line, arr,    i, n, len, c, buf, state) {
+              n = 0
+              buf = ""
+              state = ""
+              len = length(line)
+              for (i = 1; i <= len; i++) {
+                c = substr(line, i, 1)
+                if (state == "") {
+                  if (c == " " || c == "\t") {
+                    if (buf != "") { n++; arr[n] = buf; buf = "" }
+                    continue
+                  }
+                  buf = buf c
+                  if (c == "\"") state = "q"
+                  else if (c == "[") state = "b"
+                } else if (state == "q") {
+                  buf = buf c
+                  if (c == "\"") state = ""
+                } else if (state == "b") {
+                  buf = buf c
+                  if (c == "]") state = ""
+                }
+              }
+              if (buf != "") { n++; arr[n] = buf }
+              return n
+            }
+            function field_index(body, token,    n, i) {
+              n = split_fields(body, fa)
+              for (i = 1; i <= n; i++) if (fa[i] == token) return i
+              return 0
+            }
+            function has_log(port, lg,    i) {
+              for (i = 1; i <= port_n; i++) if (port_p[i] == port && port_log[i] == lg) return 1
+              return 0
+            }
+            END {
+              if (in_server) flush_server()
+              n80 = 0
+              n443 = 0
+              shared = 0
+              for (i = 1; i <= port_n; i++) {
+                if (port_p[i] == 80) n80++
+                if (port_p[i] == 443) n443++
+              }
+              for (i = 1; i <= port_n; i++) {
+                if (port_p[i] != 80) continue
+                if (has_log(443, port_log[i])) shared = 1
+              }
+              if (n80 > 0 && n443 > 0 && !shared) {
+                print "MODE files"
+                for (i = 1; i <= port_n; i++) print "LOG", port_p[i], port_log[i]
+                exit
+              }
+              idx = 0
+              kind = ""
+              for (i = 1; i <= port_n; i++) {
+                body = fmt_body[port_fmt[i]]
+                if (body == "") continue
+                got = field_index(body, "$server_port")
+                if (got > 0) { idx = got; kind = "port"; break }
+              }
+              if (idx == 0) {
+                for (i = 1; i <= port_n; i++) {
+                  body = fmt_body[port_fmt[i]]
+                  if (body == "") continue
+                  got = field_index(body, "$scheme")
+                  if (got > 0) { idx = got; kind = "scheme"; break }
+                }
+              }
+              if (idx > 0) {
+                print "MODE field"
+                print "KIND", kind
+                print "INDEX", idx
+                seen_log[""] = 0
+                for (i = 1; i <= port_n; i++) {
+                  if (seen_log[port_log[i]]) continue
+                  seen_log[port_log[i]] = 1
+                  print "LOG", port_log[i]
+                }
+                exit
+              }
+              print "MODE indeterminate"
+            }
+
+
+            PRECHECK_MODE_AWK
+            )
+            COUNT_AWK=$(cat <<'PRECHECK_COUNT_AWK'
+            function mon(m) {
+              if (m=="Jan") return 1
+              if (m=="Feb") return 2
+              if (m=="Mar") return 3
+              if (m=="Apr") return 4
+              if (m=="May") return 5
+              if (m=="Jun") return 6
+              if (m=="Jul") return 7
+              if (m=="Aug") return 8
+              if (m=="Sep") return 9
+              if (m=="Oct") return 10
+              if (m=="Nov") return 11
+              if (m=="Dec") return 12
+              return 0
+            }
+            function civil_epoch(y, m, d, H, Mi, S,    era, yoe, doy, doe, days) {
+              y += 0; m += 0; d += 0; H += 0; Mi += 0; S += 0
+              if (m <= 2) { y--; m += 12 }
+              era = int((y >= 0 ? y : y - 399) / 400)
+              yoe = y - era * 400
+              doy = int((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1
+              doe = yoe * 365 + int(yoe / 4) - int(yoe / 100) + doy
+              days = era * 146097 + doe - 719468
+              return days * 86400 + H * 3600 + Mi * 60 + S
+            }
+            function off_sec(o,    sign, hh, mm) {
+              sign = 1
+              if (substr(o, 1, 1) == "-") sign = -1
+              hh = substr(o, 2, 2) + 0
+              mm = substr(o, 4, 2) + 0
+              return sign * (hh * 3600 + mm * 60)
+            }
+            function line_epoch(line,    stamp, n, mo, loc) {
+              if (!match(line, /\[[0-9][0-9]\/[A-Za-z][A-Za-z][A-Za-z]\/[0-9][0-9][0-9][0-9]:[0-9][0-9]:[0-9][0-9]:[0-9][0-9] [+-][0-9][0-9][0-9][0-9]\]/)) return -1
+              stamp = substr(line, RSTART + 1, RLENGTH - 2)
+              n = split(stamp, a, /[\/: ]/)
+              if (n < 7) return -1
+              mo = mon(a[2])
+              if (mo == 0) return -1
+              loc = civil_epoch(a[3], mo, a[1], a[4], a[5], a[6])
+              return loc - off_sec(a[7])
+            }
+            function split_fields(line, arr,    i, n, len, c, buf, state) {
+              n = 0
+              buf = ""
+              state = ""
+              len = length(line)
+              for (i = 1; i <= len; i++) {
+                c = substr(line, i, 1)
+                if (state == "") {
+                  if (c == " " || c == "\t") {
+                    if (buf != "") { n++; arr[n] = buf; buf = "" }
+                    continue
+                  }
+                  buf = buf c
+                  if (c == "\"") state = "q"
+                  else if (c == "[") state = "b"
+                } else if (state == "q") {
+                  buf = buf c
+                  if (c == "\"") state = ""
+                } else if (state == "b") {
+                  buf = buf c
+                  if (c == "]") state = ""
+                }
+              }
+              if (buf != "") { n++; arr[n] = buf }
+              return n
+            }
+            function terminal(line,    id, after, c) {
+              if (!match(line, sprintf("/api/v1/terminals/[^/%c%c%c%c]+", 32, 63, 34, 9))) return ""
+              id = substr(line, RSTART, RLENGTH)
+              sub(/.*\//, "", id)
+              after = substr(line, RSTART + RLENGTH)
+              kind = "other"
+              if (index(after, "/heartbeat") == 1) {
+                c = substr(after, 11, 1)
+                if (c == "" || c == "?" || c == " " || c == "\"" || c == "/") kind = "heartbeat"
+              }
+              return id SUBSEP kind
+            }
+            function port_of(line,    n, raw, v) {
+              if (mode == "file") return fixed + 0
+              n = split_fields(line, f)
+              if (idx < 1 || idx > n) return 0
+              raw = f[idx]
+              gsub(sprintf("%c", 34), "", raw)
+              if (kindf == "scheme") {
+                if (raw == "https") return 443
+                if (raw == "http") return 80
+                return 0
+              }
+              v = raw + 0
+              if (raw ~ /^[0-9]+$/ && (v == 80 || v == 443)) return v
+              return 0
+            }
+            BEGIN { SUBSEP = "\t" }
+            {
+              ep = line_epoch($0)
+              if (ep < 0 || ep < cutoff) next
+              info = terminal($0)
+              if (info == "") next
+              split(info, tk, "\t")
+              port = port_of($0)
+              if (port != 80 && port != 443) next
+              print port, tk[1], tk[2]
+            }
+
+            PRECHECK_COUNT_AWK
+            )
+
+            du_mb() {
+              local p="$1" n
+              if [ ! -e "$p" ]; then
+                printf '0\n'
+                return 0
+              fi
+              n="$(du -sm "$p" 2>/dev/null | cut -f1)"
+              case "$n" in
+                ''|*[!0-9]*) printf 'unknown\n' ;;
+                *) printf '%s\n' "$n" ;;
+              esac
+            }
+
+            epoch_of() {
+              local n
+              n="$(stat -c %Y "$1" 2>/dev/null || true)"
+              if [ -z "$n" ]; then
+                n="$(stat -f %m "$1" 2>/dev/null || true)"
+              fi
+              printf '%s\n' "$n"
+            }
+
+            ymd_of() {
+              local e="$1"
+              case "$e" in
+                ''|*[!0-9]*) printf '\n'; return 0 ;;
+              esac
+              date -u -d "@${e}" +%Y-%m-%d 2>/dev/null || date -u -r "$e" +%Y-%m-%d 2>/dev/null || true
+            }
+
+            # 0 = 达到 22.13；1 = 低于；2 = 解析不了。
+            node_ok_for() {
+              local s="$1" rest maj min
+              s="${s#v}"
+              s="${s#V}"
+              maj="${s%%.*}"
+              case "$maj" in
+                ''|*[!0-9]*) return 2 ;;
+              esac
+              rest="${s#*.}"
+              if [ "$rest" = "$s" ]; then
+                return 2
+              fi
+              min="${rest%%.*}"
+              case "$min" in
+                ''|*[!0-9]*) return 2 ;;
+              esac
+              if [ "$maj" -gt 22 ]; then
+                return 0
+              fi
+              if [ "$maj" -eq 22 ] && [ "$min" -ge 13 ]; then
+                return 0
+              fi
+              return 1
+            }
+
+            node_ver="$(node -v 2>/dev/null || true)"
+            pnpm_ver="$(pnpm -v 2>/dev/null || true)"
+            echo "NODE_VERSION=${node_ver:-unknown}"
+            echo "PNPM_VERSION=${pnpm_ver:-unknown}"
+
+            pm2_node="unknown"
+            if command -v pm2 >/dev/null 2>&1; then
+              raw="$(pm2 jlist 2>/dev/null || true)"
+              ver="$(printf '%s\n' "$raw" | grep -oE '"node_version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*"([^"]*)"$/\1/' || true)"
+              if [ -z "$ver" ]; then
+                ver="$(printf '%s\n' "$raw" | grep -oE '"node_version"[[:space:]]*:[[:space:]]*[0-9][^,}[:space:]]*' | head -1 | sed -E 's/.*:[[:space:]]*//' || true)"
+              fi
+              if [ -z "$ver" ]; then
+                interp="$(printf '%s\n' "$raw" | grep -oE '"exec_interpreter"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*"([^"]*)"$/\1/' || true)"
+                case "$interp" in
+                  *node*)
+                    if [ -n "$interp" ] && [ -x "$interp" ]; then
+                      ver="$("$interp" -v 2>/dev/null || true)"
+                    fi
+                    ;;
+                esac
+              fi
+              if [ -n "$ver" ]; then
+                pm2_node="$ver"
+              fi
+            fi
+            echo "PM2_NODE_VERSION=${pm2_node}"
+
+            basis="$pm2_node"
+            node_ok_for "$basis"
+            ok_rc=$?
+            if [ "$ok_rc" -eq 2 ]; then
+              node_ok_for "${node_ver:-}"
+              ok_rc=$?
+            fi
+            if [ "$ok_rc" -eq 0 ]; then
+              echo "NODE_OK_FOR_PDFJS=yes"
+            else
+              echo "NODE_OK_FOR_PDFJS=no"
+            fi
+
+            echo "=== 13. 证书与续期定时器（只读）==="
+            if command -v certbot >/dev/null 2>&1; then
+              echo "CERTBOT_INSTALLED=yes"
+            else
+              echo "CERTBOT_INSTALLED=no"
+            fi
+            timer_present=no
+            timer_next=""
+            if command -v systemctl >/dev/null 2>&1; then
+              timer_line="$(systemctl list-timers --all 2>/dev/null | grep -i certbot | head -1 || true)"
+              if [ -n "$timer_line" ]; then
+                timer_present=yes
+                timer_next="$(printf '%s\n' "$timer_line" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)"
+              fi
+            fi
+            echo "CERTBOT_TIMER_PRESENT=${timer_present}"
+            if [ "$timer_present" = yes ]; then
+              echo "CERTBOT_TIMER_NEXT=${timer_next:-unknown}"
+            else
+              echo "CERTBOT_TIMER_NEXT=none"
+            fi
+
+            cert_ymd() {
+              awk '
+                function mm(m) {
+                  if (m=="Jan") return "01"
+                  if (m=="Feb") return "02"
+                  if (m=="Mar") return "03"
+                  if (m=="Apr") return "04"
+                  if (m=="May") return "05"
+                  if (m=="Jun") return "06"
+                  if (m=="Jul") return "07"
+                  if (m=="Aug") return "08"
+                  if (m=="Sep") return "09"
+                  if (m=="Oct") return "10"
+                  if (m=="Nov") return "11"
+                  if (m=="Dec") return "12"
+                  return ""
+                }
+                {
+                  sub(/^notAfter=/, "", $0)
+                  m = mm($1)
+                  d = $2
+                  y = $4
+                  if (m == "" || y !~ /^[0-9][0-9][0-9][0-9]$/) exit 1
+                  if (length(d) == 1) d = "0" d
+                  if (d !~ /^[0-9][0-9]$/) exit 1
+                  printf "%s-%s-%s\n", y, m, d
+                }
+              '
+            }
+
+            live="${PRECHECK_LE_LIVE:-/etc/letsencrypt/live}"
+            cert_found=no
+            if [ -d "$live" ]; then
+              for cert in "$live"/*/cert.pem; do
+                [ -f "$cert" ] || continue
+                domain="$(basename "$(dirname "$cert")")"
+                if [ "$domain" = "README" ]; then
+                  continue
+                fi
+                endraw="$(openssl x509 -enddate -noout -in "$cert" 2>/dev/null || true)"
+                end="$(printf '%s\n' "$endraw" | cert_ymd 2>/dev/null || true)"
+                if [ -n "$end" ]; then
+                  echo "CERT_EXPIRES domain=${domain} end=${end}"
+                else
+                  echo "CERT_EXPIRES domain=${domain} end=unknown"
+                fi
+                cert_found=yes
+              done
+            fi
+            if [ "$cert_found" != yes ]; then
+              echo "CERT_EXPIRES=unknown"
+            fi
+
+            echo "=== 14. 终端 API 近 7 天按端口（只读）==="
+            now="$(date +%s 2>/dev/null || true)"
+            case "$now" in
+              ''|*[!0-9]*) now=0 ;;
+            esac
+            CUTOFF="$((now - 7 * 86400))"
+            if [ "$CUTOFF" -lt 0 ]; then
+              CUTOFF=0
+            fi
+
+            REF_LOADED=no
+            PM2_PATH_BLOB=""
+            NGINX_PATH_BLOB=""
+
+            load_runtime_refs() {
+              local raw
+              if [ "$REF_LOADED" = yes ]; then
+                return 0
+              fi
+              REF_LOADED=yes
+              if command -v pm2 >/dev/null 2>&1; then
+                raw="$(pm2 jlist 2>/dev/null || true)"
+                PM2_PATH_BLOB="$(printf '%s\n' "$raw" | grep -oE '"(pm_cwd|pm_exec_path|cwd)"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -E 's/^[^:]*:[[:space:]]*"([^"]*)"$/\1/' || true)"
+              fi
+              if command -v nginx >/dev/null 2>&1; then
+                NGINX_PATH_BLOB="$(nginx -T 2>/dev/null | awk '
+                  {
+                    line = $0
+                    sub(/#.*/, "", line)
+                    while (match(line, /(^|[[:space:]])(root|alias|include)[[:space:]]+/)) {
+                      rest = substr(line, RSTART + RLENGTH)
+                      path = rest
+                      sub(/;.*/, "", path)
+                      gsub(/^[[:space:]]+|[[:space:]]+$/, "", path)
+                      gsub(/^"|"$/, "", path)
+                      if (path != "") print path
+                      if (match(rest, /;/)) line = substr(rest, RSTART + 1)
+                      else break
+                    }
+                  }
+                ' || true)"
+              fi
+            }
+
+            reference_of() {
+              local resolved="$1" p hit_pm2=no hit_nginx=no
+              load_runtime_refs
+              while IFS= read -r p; do
+                [ -n "$p" ] || continue
+                p="${p%/}"
+                case "$p" in
+                  "$resolved"|"$resolved"/*) hit_pm2=yes ;;
+                esac
+              done <<EOF
+            $PM2_PATH_BLOB
+            EOF
+              while IFS= read -r p; do
+                [ -n "$p" ] || continue
+                p="${p%/}"
+                case "$p" in
+                  "$resolved"|"$resolved"/*) hit_nginx=yes ;;
+                esac
+              done <<EOF
+            $NGINX_PATH_BLOB
+            EOF
+              if [ "$hit_pm2" = yes ] && [ "$hit_nginx" = yes ]; then
+                printf '%s\n' "pm2,nginx"
+              elif [ "$hit_pm2" = yes ]; then
+                printf '%s\n' "pm2"
+              elif [ "$hit_nginx" = yes ]; then
+                printf '%s\n' "nginx"
+              else
+                printf '%s\n' "none"
+              fi
+            }
+
+            say_indeterminate() {
+              echo "PLAINTEXT_API_COUNT=indeterminate（日志格式不含端口）"
+            }
+
+            COUNTS=""
+            SEEN_LOGS="|"
+            scan_file() {
+              local file="$1" mode="$2" port="$3" chunk
+              if [ ! -f "$file" ]; then
+                return 0
+              fi
+              case "$SEEN_LOGS" in
+                *"|$file|"*) return 0 ;;
+              esac
+              SEEN_LOGS="${SEEN_LOGS}${file}|"
+              chunk=""
+              case "$file" in
+                *.gz)
+                  chunk="$(gzip -dc -- "$file" 2>/dev/null | awk -v cutoff="$CUTOFF" -v mode="$mode" -v fixed="$port" -v idx="${idx:-0}" -v kindf="${kindf:-}" "$COUNT_AWK" || true)"
+                  ;;
+                *)
+                  chunk="$(awk -v cutoff="$CUTOFF" -v mode="$mode" -v fixed="$port" -v idx="${idx:-0}" -v kindf="${kindf:-}" "$COUNT_AWK" "$file" 2>/dev/null || true)"
+                  ;;
+              esac
+              if [ -n "$chunk" ]; then
+                COUNTS="${COUNTS}
+            ${chunk}"
+              fi
+            }
+
+            scan_family() {
+              local base="$1" mode="$2" port="$3" f epoch
+              case "$base" in
+                /*) ;;
+                *) return 0 ;;
+              esac
+              if [ -f "$base" ]; then
+                scan_file "$base" "$mode" "$port"
+              fi
+              for f in "$base".1 "$base".[0-9] "$base".[0-9][0-9] "$base".gz "$base".*.gz "$base".[0-9].gz "$base".[0-9][0-9].gz; do
+                [ -f "$f" ] || continue
+                [ "$f" = "$base" ] && continue
+                epoch="$(epoch_of "$f")"
+                case "$epoch" in
+                  ''|*[!0-9]*) continue ;;
+                esac
+                if [ "$epoch" -ge "$CUTOFF" ]; then
+                  scan_file "$f" "$mode" "$port"
+                fi
+              done
+            }
+
+            emit_counts() {
+              local agg hb
+              agg="$(printf '%s\n' "$COUNTS" | awk '
+                $1 == 80 || $1 == 443 {
+                  if ($3 != "heartbeat" && $3 != "other") next
+                  if ($2 == "") next
+                  key = $1 SUBSEP $2 SUBSEP $3
+                  n[key]++
+                  if ($1 == 443 && $3 == "heartbeat") hb++
+                }
+                END {
+                  for (k in n) {
+                    split(k, a, SUBSEP)
+                    printf "TERMINAL_API port=%s terminal=%s kind=%s count=%s\n", a[1], a[2], a[3], n[k]
+                  }
+                  printf "HTTPS_HEARTBEAT_COUNT_7D=%d\n", hb + 0
+                }
+              ')"
+              printf '%s\n' "$agg"
+              hb="$(printf '%s\n' "$agg" | awk -F= '$1=="HTTPS_HEARTBEAT_COUNT_7D"{print $2; exit}')"
+              case "$hb" in
+                ''|*[!0-9]*) hb=0 ;;
+              esac
+              if [ "$hb" -eq 0 ]; then
+                echo "::warning::HTTPS 心跳近 7 天次数为 0，统计可能没测到"
+              fi
+            }
+
+            conf=""
+            if command -v nginx >/dev/null 2>&1; then
+              conf="$(nginx -T 2>/dev/null || true)"
+            fi
+            if [ -z "$conf" ]; then
+              say_indeterminate
+            else
+              mode_out="$(printf '%s\n' "$conf" | awk "$MODE_AWK")"
+              mode_kind="$(printf '%s\n' "$mode_out" | awk '$1=="MODE"{print $2; exit}')"
+              if [ "$mode_kind" = files ]; then
+                while IFS= read -r line; do
+                  case "$line" in
+                    LOG\ *)
+                      rest="${line#LOG }"
+                      port="${rest%% *}"
+                      path="${rest#* }"
+                      case "$port" in
+                        80|443) scan_family "$path" file "$port" ;;
+                      esac
+                      ;;
+                  esac
+                done <<EOF
+            $mode_out
+            EOF
+                emit_counts
+              elif [ "$mode_kind" = field ]; then
+                kindf="$(printf '%s\n' "$mode_out" | awk '$1=="KIND"{print $2; exit}')"
+                idx="$(printf '%s\n' "$mode_out" | awk '$1=="INDEX"{print $2; exit}')"
+                case "$idx" in
+                  ''|*[!0-9]*) idx=0 ;;
+                esac
+                if [ "$idx" -lt 1 ]; then
+                  say_indeterminate
+                else
+                  while IFS= read -r line; do
+                    case "$line" in
+                      LOG\ *)
+                        path="${line#LOG }"
+                        scan_family "$path" field 0
+                        ;;
+                    esac
+                  done <<EOF
+            $mode_out
+            EOF
+                  emit_counts
+                fi
+              else
+                say_indeterminate
+              fi
+            fi
+
+            echo "=== 15. /srv 根下残留目录（只读）==="
+            srv="${PRECHECK_SRV:-/srv}"
+            for name in node_modules services ai-job-print-api-backups ai-job-print-env-backups ai-job-print-artifacts ai-job-print-static-releases ai-job-print-recovery-artifacts; do
+              dir="${srv}/${name}"
+              if [ -L "$dir" ]; then
+                size=unknown
+                mtime=unknown
+              elif [ -d "$dir" ]; then
+                size="$(du_mb "$dir")"
+                epoch="$(epoch_of "$dir")"
+                mtime="$(ymd_of "$epoch")"
+                if [ -z "$mtime" ]; then
+                  mtime=unknown
+                fi
+              else
+                size=absent
+                mtime=none
+              fi
+              ref="$(reference_of "$dir")"
+              if [ ! -L "$dir" ]; then
+                canon="$(readlink -f "$dir" 2>/dev/null || true)"
+                if [ "$ref" = none ] && [ -n "$canon" ] && [ "$canon" != "$dir" ]; then
+                  ref="$(reference_of "$canon")"
+                fi
+              fi
+              echo "SRV_LEFTOVER name=${name} size_mb=${size} mtime=${mtime} referenced_by=${ref}"
+            done
+
+            echo "=== 16. 其它增长项（只读）==="
+            home="${PRECHECK_HOME:-$HOME}"
+            tmp="${PRECHECK_TMP:-/tmp}"
+
+            cache_mb() {
+              local total=0 n base low d needle matched
+              if [ ! -d "$home/.cache" ]; then
+                printf '0\n'
+                return 0
+              fi
+              for d in "$home/.cache"/* "$home/.cache"/.[!.]* "$home/.cache"/..?*; do
+                [ -e "$d" ] || continue
+                base="$(basename "$d")"
+                low="$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]')"
+                matched=no
+                for needle in "$@"; do
+                  case "$low" in
+                    $needle) matched=yes ;;
+                  esac
+                done
+                if [ "$matched" != yes ]; then
+                  continue
+                fi
+                n="$(du -sm "$d" 2>/dev/null | cut -f1)"
+                case "$n" in
+                  ''|*[!0-9]*) printf 'unknown\n'; return 0 ;;
+                esac
+                total=$((total + n))
+              done
+              printf '%s\n' "$total"
+            }
+
+            echo "CACHE_LIBREOFFICE_MB=$(cache_mb '*libreoffice*')"
+            echo "CACHE_CHROMIUM_MB=$(cache_mb '*chromium*' '*chrome*')"
+            echo "CACHE_PUPPETEER_MB=$(cache_mb '*puppeteer*')"
+
+            tmp_mb=0
+            tmp_unknown=no
+            for d in "$tmp"/lu* "$tmp"/soffice* "$tmp"/.org.chromium*; do
+              [ -e "$d" ] || continue
+              n="$(du -sm "$d" 2>/dev/null | cut -f1)"
+              case "$n" in
+                ''|*[!0-9]*) tmp_unknown=yes ;;
+                *) tmp_mb=$((tmp_mb + n)) ;;
+              esac
+            done
+            if [ "$tmp_unknown" = yes ]; then
+              echo "TMP_LO_CHROME_MB=unknown"
+            else
+              echo "TMP_LO_CHROME_MB=${tmp_mb}"
+            fi
+
+            if command -v redis-cli >/dev/null 2>&1; then
+              redis_dir="$(redis-cli CONFIG GET dir 2>/dev/null | awk 'NR==2 { print; exit }')"
+            else
+              redis_dir=""
+            fi
+            if [ -z "$redis_dir" ]; then
+              echo "REDIS_DUMP_MB=unknown"
+              echo "REDIS_APPENDONLY_MB=unknown"
+            else
+              if [ -f "$redis_dir/dump.rdb" ]; then
+                echo "REDIS_DUMP_MB=$(du_mb "$redis_dir/dump.rdb")"
+              else
+                echo "REDIS_DUMP_MB=0"
+              fi
+              if [ -d "$redis_dir/appendonlydir" ]; then
+                echo "REDIS_APPENDONLY_MB=$(du_mb "$redis_dir/appendonlydir")"
+              elif [ -f "$redis_dir/appendonly.aof" ]; then
+                echo "REDIS_APPENDONLY_MB=$(du_mb "$redis_dir/appendonly.aof")"
+              else
+                echo "REDIS_APPENDONLY_MB=0"
+              fi
+            fi
+
+            logdir="${PRECHECK_SYSLOG_DIR:-/var/log}"
+            sys_mb=0
+            sys_unknown=no
+            sys_any=no
+            for f in "$logdir"/syslog* "$logdir"/auth.log*; do
+              [ -e "$f" ] || continue
+              sys_any=yes
+              n="$(du -sm "$f" 2>/dev/null | cut -f1)"
+              case "$n" in
+                ''|*[!0-9]*) sys_unknown=yes ;;
+                *) sys_mb=$((sys_mb + n)) ;;
+              esac
+            done
+            if [ "$sys_unknown" = yes ]; then
+              echo "SYSLOG_AUTH_MB=unknown"
+            elif [ "$sys_any" = yes ]; then
+              echo "SYSLOG_AUTH_MB=${sys_mb}"
+            else
+              echo "SYSLOG_AUTH_MB=0"
+            fi
+
+            echo "POSTGRESQL_LOG_MB=$(du_mb "${PRECHECK_PG_LOG:-/var/log/postgresql}")"
+            echo "NPM_CACHE_MB=$(du_mb "$home/.npm")"
+            echo "COREPACK_CACHE_MB=$(du_mb "$home/.cache/node/corepack")"
+
+            git_mb=""
+            if [ -n "${EXPECT_DIR:-}" ] && [ -d "${EXPECT_DIR}/.git" ]; then
+              git_mb="$(du_mb "${EXPECT_DIR}/.git")"
+            else
+              best=0
+              found=no
+              for g in "$home"/.git "$home"/*/.git "$home"/*/*/.git "$home"/*/*/*/.git; do
+                [ -d "$g" ] || continue
+                n="$(du_mb "$g")"
+                case "$n" in
+                  ''|*[!0-9]*) continue ;;
+                esac
+                if [ "$found" = no ] || [ "$n" -gt "$best" ]; then
+                  best="$n"
+                  found=yes
+                fi
+              done
+              if [ "$found" = yes ]; then
+                git_mb="$best"
+              else
+                git_mb=0
+              fi
+            fi
+            echo "GIT_DIR_MB=${git_mb}"
+            echo "APT_CACHE_MB=$(du_mb "${PRECHECK_APT:-/var/cache/apt}")"
+
+            jmb="$(journalctl --disk-usage 2>/dev/null | awk '
+              {
+                if (match($0, /[0-9]+([.][0-9]+)?[KMGT]/)) {
+                  tok = substr($0, RSTART, RLENGTH)
+                  unit = substr(tok, length(tok), 1)
+                  num = substr(tok, 1, length(tok) - 1) + 0
+                  if (unit == "K") printf "%d\n", (num >= 512 ? 1 : 0)
+                  else if (unit == "M") printf "%d\n", int(num + 0.5)
+                  else if (unit == "G") printf "%d\n", int(num * 1024 + 0.5)
+                  else if (unit == "T") printf "%d\n", int(num * 1024 * 1024 + 0.5)
+                  exit
+                }
+              }
+            ' || true)"
+            echo "JOURNAL_SIZE_MB=${jmb:-unknown}"
+
+            boots="$(journalctl --list-boots 2>/dev/null || true)"
+            oldest="$(printf '%s\n' "$boots" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sort | head -1 || true)"
+            if [ -z "$oldest" ]; then
+              oldest="$(journalctl --output=short-iso 2>/dev/null | head -1 | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)"
+            fi
+            echo "JOURNAL_OLDEST_DATE=${oldest:-unknown}"
             echo "=== 完成：以上均为只读探测，未做任何修改 ==="
         env:
           EXPECT_DIR: /srv/ai-job-print

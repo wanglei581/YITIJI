@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
-# 清理 /srv 下 7 月手动部署时代遗留的历史发布目录。
+# 清理 /srv 下白名单内的历史发布目录，以及 2026-09-29 只读盘点核对过的残留目录。
 #
-# 设计原则（合成 DeepSeek + antigravity 两份独立审查）：
-#   1. 默认 dry-run：只跑护栏 + 列清单，绝不动任何文件。
-#   2. 精确目录名白名单，**绝不用通配符** —— 一个 rm -rf /srv/ai-job-print-* 就是灾难。
-#   3. 每个待删目录逐项过 preflight：不是当前运行目录、不是软链接目标、无进程持有、
-#      不在 nginx/pm2 引用里、不是挂载点。任一不过即整体中止。
-#   4. execute 用两阶段：先 mv 到隔离区 /srv/.cleanup-trash/<时间戳>，
-#      **不直接 rm** —— 误判也能立刻恢复。真删由人在观察窗口后手动执行。
-#   5. usb-bridge-live / -final- / releases 三类**不在**本白名单，进第二批人工确认。
+# 设计原则（合成 DeepSeek + antigravity 两份独立审查，2026-09-29 补充告急分支）：
+#   1. 默认 dry-run：只跑护栏 + 列清单，绝不动任何文件。按可用空间预告将隔离或将直接删除。
+#   2. 精确目录名白名单，绝不用通配符。
+#   3. 每个待删目录逐项过 preflight。挂载点、当前运行目录、保留锚点不过则整体中止。
+#      被 pm2 的 cwd/exec_path 或 nginx 的 root/alias/include 引用的，只拒绝该目录并说明，其它继续。
+#   4. execute 默认两阶段：先 mv 到隔离区 /srv/.cleanup-trash/<时间戳>，不直接 rm。
+#      若 /srv 所在分区可用低于 STALE_CRITICAL_FREE_MB（默认 5120），
+#      且服务健康检查通过、确认词正确，则对通过全部护栏的目录直接删除。
+#   5. usb-bridge-live / -final- / releases 三类不在本白名单。
 set -uo pipefail
 
 MODE="${CLEANUP_MODE:-dry-run}"          # dry-run | execute
 CONFIRM="${CLEANUP_CONFIRM:-}"           # execute 模式必须等于 EXPECT_CONFIRM
 EXPECT_CONFIRM="${CLEANUP_EXPECT_CONFIRM:-}"
+CRITICAL_FREE_MB="${STALE_CRITICAL_FREE_MB:-5120}"
+case "$CRITICAL_FREE_MB" in
+  ''|*[!0-9]*) CRITICAL_FREE_MB=5120 ;;
+esac
 
 CURRENT="$(readlink -f /srv/ai-job-print 2>/dev/null || echo /srv/ai-job-print)"
 TRASH="/srv/.cleanup-trash/$(date +%Y%m%dT%H%M%S)"
@@ -27,6 +32,11 @@ DELETE_LIST=(
   "/srv/ai-job-print-prev-c859b8e2-20260714T073515Z"
   "/srv/ai-job-print-prev-e62a9789-20260716T143123"
   "/srv/ai-job-print-failed-e2b3858d-20260713T114711Z"
+  "/srv/ai-job-print-api-backups"
+  "/srv/ai-job-print-env-backups"
+  "/srv/ai-job-print-artifacts"
+  "/srv/ai-job-print-static-releases"
+  "/srv/ai-job-print-recovery-artifacts"
 )
 
 # —— 保留锚点：当前运行目录 + 最近两个受控发布 runtime 锚点 ——
@@ -36,6 +46,110 @@ KEEP_LIST=(
 )
 
 refuse() { echo "❌ REFUSE: $*" >&2; exit 1; }
+
+df_avail_mb() {
+  local target="$1" n
+  n="$(df -Pm "$target" 2>/dev/null | awk 'NR==2 { print $4; exit }')"
+  case "$n" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  printf '%s\n' "$n"
+}
+
+# 只探活，不改任何东西。失败时返回 1，由调用方决定拒绝文案。
+service_healthy() {
+  local port path
+  local ok=no
+  for port in 3010 3000 8080; do
+    for path in /api/v1/health /health; do
+      if curl -fsS --max-time 5 "http://127.0.0.1:${port}${path}" 2>/dev/null | grep -q '"status"'; then
+        echo "  API ${path} @:${port} → 可达"
+        ok=yes
+        break 2
+      fi
+    done
+  done
+  if [ "$ok" != yes ]; then
+    echo "  API 健康检查不通过" >&2
+    return 1
+  fi
+  if command -v pm2 >/dev/null 2>&1; then
+    if ! pm2 jlist >/dev/null 2>&1; then
+      echo "  pm2 jlist 异常" >&2
+      return 1
+    fi
+    echo "  pm2 正常"
+  fi
+  return 0
+}
+
+REF_LOADED=no
+PM2_PATH_BLOB=""
+NGINX_PATH_BLOB=""
+
+load_runtime_refs() {
+  local raw
+  if [ "$REF_LOADED" = yes ]; then
+    return 0
+  fi
+  REF_LOADED=yes
+  if command -v pm2 >/dev/null 2>&1; then
+    raw="$(pm2 jlist 2>/dev/null || true)"
+    PM2_PATH_BLOB="$(printf '%s\n' "$raw" | grep -oE '"(pm_cwd|pm_exec_path|cwd)"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -E 's/^[^:]*:[[:space:]]*"([^"]*)"$/\1/' || true)"
+  fi
+  if command -v nginx >/dev/null 2>&1; then
+    # 指令不一定单独成行。去掉注释后抽出 root / alias / include 的路径。
+    NGINX_PATH_BLOB="$(nginx -T 2>/dev/null | awk '
+      {
+        line = $0
+        sub(/#.*/, "", line)
+        while (match(line, /(^|[[:space:]])(root|alias|include)[[:space:]]+/)) {
+          rest = substr(line, RSTART + RLENGTH)
+          path = rest
+          sub(/;.*/, "", path)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", path)
+          gsub(/^"|"$/, "", path)
+          if (path != "") print path
+          if (match(rest, /;/)) line = substr(rest, RSTART + 1)
+          else break
+        }
+      }
+    ' || true)"
+  fi
+}
+
+# 打印 pm2、nginx、pm2,nginx 或 none。路径等于目录或在其下才算引用。
+reference_of() {
+  local resolved="$1" p hit_pm2=no hit_nginx=no
+  load_runtime_refs
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    p="${p%/}"
+    case "$p" in
+      "$resolved"|"$resolved"/*) hit_pm2=yes ;;
+    esac
+  done <<EOF
+$PM2_PATH_BLOB
+EOF
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    p="${p%/}"
+    case "$p" in
+      "$resolved"|"$resolved"/*) hit_nginx=yes ;;
+    esac
+  done <<EOF
+$NGINX_PATH_BLOB
+EOF
+  if [ "$hit_pm2" = yes ] && [ "$hit_nginx" = yes ]; then
+    printf '%s\n' "pm2,nginx"
+  elif [ "$hit_pm2" = yes ]; then
+    printf '%s\n' "pm2"
+  elif [ "$hit_nginx" = yes ]; then
+    printf '%s\n' "nginx"
+  else
+    printf '%s\n' "none"
+  fi
+}
 
 # —— purge-trash 模式：真删指定隔离区，释放空间 ——
 # 为什么需要单独一个模式：execute 只做 mv，而 mv 在同一分区内**不释放任何空间**
@@ -57,26 +171,13 @@ if [ "$MODE" = purge-trash ]; then
   [[ -n "$EXPECT_CONFIRM" && "$CONFIRM" == "$EXPECT_CONFIRM" ]]     || refuse "confirm 不匹配，purge 中止（未删除任何文件）"
 
   echo "=== 删前健康检查（不正常就不删，那时更可能要 mv 回去）==="
-  HEALTH_OK=no
   # 路径必须是 /api/v1/health —— 应用设了全局前缀 api/v1（main.ts setGlobalPrefix）。
-  # 2026-08-17 首次 purge 因为只探了裸 /health 而被自己的护栏拒绝，
-  # 当时公网 https://zyidai.cn/api/v1/health 明明是 ok 的。探错路径 ≠ 服务不健康。
-  for port in 3010 3000 8080; do
-    for path in /api/v1/health /health; do
-      if curl -fsS --max-time 5 "http://127.0.0.1:$port$path" 2>/dev/null | grep -q '"status"'; then
-        echo "  API $path @:$port → 可达"; HEALTH_OK=yes; break 2
-      fi
-    done
-  done
-  [[ "$HEALTH_OK" == yes ]] || refuse "本机 API 健康检查不通过，拒绝删除隔离区"
-  if command -v pm2 >/dev/null 2>&1; then
-    pm2 jlist >/dev/null 2>&1 || refuse "pm2 jlist 异常，拒绝删除隔离区"
-    echo "  pm2 正常"
-  fi
+  # 2026-08-17 首次 purge 因为只探了裸 /health 而被自己的护栏拒绝。探错路径不等于服务不健康。
+  service_healthy || refuse "本机 API 健康检查不通过，拒绝删除隔离区"
 
   echo "=== 删除前空间 ==="; df -h /srv | tail -1
   SZ="$(du -sm "$TARGET" 2>/dev/null | cut -f1)"
-  echo "即将删除 $TARGET（${SZ}MB）"
+  echo "即将删除 ${TARGET}（${SZ}MB）"
   rm -rf -- "$TARGET"
   echo "=== 删除后空间 ==="; df -h /srv | tail -1
   echo "=== 已释放约 ${SZ}MB ==="
@@ -111,7 +212,7 @@ preflight() {
   # 3. 绝不是保留锚点或其子目录
   for keep in "${KEEP_LIST[@]}"; do
     local kr; kr="$(readlink -f "$keep" 2>/dev/null || echo "$keep")"
-    [[ "$resolved" == "$kr" || "$resolved" == "$kr"/* ]] && refuse "命中保留锚点 $keep：$target"
+    [[ "$resolved" == "$kr" || "$resolved" == "$kr"/* ]] && refuse "命中保留锚点 ${keep}：${target}"
   done
 
   # 4. 自身不是挂载点
@@ -132,6 +233,14 @@ preflight() {
   if [ -n "$sz_x" ] && [ -n "$sz_all" ] && [ "$sz_all" -gt "$(( sz_x + 100 ))" ]; then
     echo "   ⚠️ 体积口径差异：du -xsm=${sz_x}MB / du -sm=${sz_all}MB（差 $(( sz_all - sz_x ))MB）"
     echo "      说明内部含跨文件系统内容。已通过挂载点检查，但请人工确认后再 execute。"
+  fi
+
+  # 4d. 被 pm2 或 nginx 引用则只拒绝本目录，其它通过护栏的目录仍可处理。
+  local ref
+  ref="$(reference_of "$resolved")"
+  if [ "$ref" != none ]; then
+    echo "   ❌ 拒绝处理：被 ${ref} 引用（pm2 的 cwd/exec_path 或 nginx 的 root/alias/include 落在该目录下），本目录不移动也不删除"
+    return 1
   fi
 
   # 5. 无进程持有其内文件
@@ -184,24 +293,86 @@ done
 echo
 echo "=== 通过 preflight 的目录 ${#OK_TARGETS[@]} 个，合计可回收约 ${RECLAIM}MB ==="
 
-if [[ "$MODE" != execute ]]; then
+if ! FREE_MB="$(df_avail_mb /srv)"; then
+  echo "DF_AVAIL_MB_BEFORE=unknown"
+  refuse "读不到 /srv 可用空间，无法判断隔离还是直接删除"
+fi
+echo "DF_AVAIL_MB_BEFORE=${FREE_MB}"
+echo "STALE_CRITICAL_FREE_MB=${CRITICAL_FREE_MB}"
+if [ "$FREE_MB" -lt "$CRITICAL_FREE_MB" ]; then
+  ACTION=delete
+  echo "CLEANUP_ACTION=delete"
+else
+  ACTION=quarantine
+  echo "CLEANUP_ACTION=quarantine"
+fi
+
+if [ "$MODE" != execute ]; then
+  if [ "$ACTION" = delete ]; then
+    echo "=== dry-run：可用 ${FREE_MB}MB < ${CRITICAL_FREE_MB}MB，将直接删除通过护栏的目录 ==="
+    if [ "${#OK_TARGETS[@]}" -gt 0 ]; then
+      for t in "${OK_TARGETS[@]}"; do
+        echo "PLAN_DELETE ${t}"
+      done
+    fi
+    echo "QUARANTINED_MB=0"
+    echo "FREED_MB=${RECLAIM}"
+  else
+    echo "=== dry-run：可用 ${FREE_MB}MB >= ${CRITICAL_FREE_MB}MB，将隔离通过护栏的目录 ==="
+    if [ "${#OK_TARGETS[@]}" -gt 0 ]; then
+      for t in "${OK_TARGETS[@]}"; do
+        echo "PLAN_QUARANTINE ${t}"
+      done
+    fi
+    echo "QUARANTINED_MB=${RECLAIM}"
+    echo "FREED_MB=0"
+  fi
+  echo "DF_AVAIL_MB_AFTER=${FREE_MB}"
   echo "=== dry-run 结束：未移动/删除任何文件。 ==="
   echo "确认清单无误后，用 execute 模式 + 正确 confirm 重新触发。"
   exit 0
 fi
 
-# —— execute：confirm 门 + 两阶段 mv ——
+# —— execute：确认词 + 健康检查，然后按可用空间隔离或直接删除 ——
 [[ -n "$EXPECT_CONFIRM" && "$CONFIRM" == "$EXPECT_CONFIRM" ]] \
-  || refuse "confirm 不匹配，execute 中止（未移动任何文件）"
+  || refuse "confirm 不匹配，execute 中止（未移动或删除任何文件）"
 
-mkdir -p "$TRASH"
-for t in "${OK_TARGETS[@]}"; do
-  echo "MOVE $t → $TRASH/"
-  mv -- "$t" "$TRASH/$(basename "$t")"
-done
-echo
-echo "=== 已隔离到 $TRASH（未真删）==="
-echo "请依次验证，全部正常后再手动 rm -rf $TRASH ："
-echo "  nginx -t && curl -fsS http://127.0.0.1:3010/health"
-echo "  pm2 jlist >/dev/null && df -h /"
-echo "建议观察 24-72 小时无异常后再删除隔离区。"
+echo "=== 执行前健康检查 ==="
+service_healthy || refuse "服务健康检查不通过，拒绝删除或隔离"
+
+if [ "$ACTION" = delete ]; then
+  FREED=0
+  if [ "${#OK_TARGETS[@]}" -gt 0 ]; then
+    for t in "${OK_TARGETS[@]}"; do
+      mb="$(du -sm "$t" 2>/dev/null | cut -f1)"
+      case "$mb" in ''|*[!0-9]*) mb=0 ;; esac
+      echo "DELETE ${t}"
+      rm -rf -- "$t"
+      FREED=$((FREED + mb))
+    done
+  fi
+  echo "QUARANTINED_MB=0"
+  echo "FREED_MB=${FREED}"
+else
+  mkdir -p "$TRASH"
+  MOVED=0
+  if [ "${#OK_TARGETS[@]}" -gt 0 ]; then
+    for t in "${OK_TARGETS[@]}"; do
+      mb="$(du -sm "$t" 2>/dev/null | cut -f1)"
+      case "$mb" in ''|*[!0-9]*) mb=0 ;; esac
+      echo "MOVE ${t} → ${TRASH}/"
+      mv -- "$t" "$TRASH/$(basename "$t")"
+      MOVED=$((MOVED + mb))
+    done
+  fi
+  echo
+  echo "=== 已隔离到 ${TRASH}（未真删）==="
+  echo "请依次验证，全部正常后再手动 rm -rf ${TRASH} ："
+  echo "  nginx -t && curl -fsS http://127.0.0.1:3010/health"
+  echo "  pm2 jlist >/dev/null && df -h /"
+  echo "建议观察 24-72 小时无异常后再删除隔离区。"
+  echo "QUARANTINED_MB=${MOVED}"
+  echo "FREED_MB=0"
+fi
+AFTER_MB="$(df_avail_mb /srv || true)"
+echo "DF_AVAIL_MB_AFTER=${AFTER_MB:-unknown}"

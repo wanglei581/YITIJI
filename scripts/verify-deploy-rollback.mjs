@@ -682,7 +682,7 @@ done
 
   check(precheckWorkflow.includes('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"') && workflow.includes('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"'),
     '预检：静态备份根目录与 deploy.yml 的默认值相同')
-  const precheckBlock = extractBetween(precheckWorkflow, '=== 11. 静态发布备份与残留 bundle（只读）===', '=== 完成：以上均为只读探测')
+  const precheckBlock = extractBetween(precheckWorkflow, '=== 11. 静态发布备份与残留 bundle（只读）===', '=== 12. ')
     .replace('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"', `STATIC_BACKUP_ROOT="${join(groupDir, 'static-backups')}"`)
     .replaceAll('/tmp/release.bundle', join(groupDir, 'release.bundle'))
   const staticRoot = join(groupDir, 'static-backups')
