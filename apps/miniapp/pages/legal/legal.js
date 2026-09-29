@@ -26,19 +26,13 @@ function headingOf(line) {
 }
 
 // 章节定位：其他页面链接到某一章（自我探索同意书 → 隐私政策「未成年人」专章）。
-// 先按服务端随链接下发的章节标题找「标题包含它」的那一章（与一体机同一依据，律师改标题只改服务端）；
-// 找不到再按语义锚点兜底；都找不到就从头显示，不报错。按标题认、不按第几章：后台调章节顺序也不会指错。
-const ANCHOR_HEADINGS = {
-  minors: /未成年/,
-}
-
-function anchorBlockKey(blocks, anchor, section) {
-  const headings = blocks.filter(b => b.kind === 'heading')
-  const bySection = section ? headings.find(b => b.text.indexOf(section) >= 0) : null
-  if (bySection) return bySection.key
-  const pattern = ANCHOR_HEADINGS[anchor]
-  const byAnchor = pattern ? headings.find(b => pattern.test(b.text)) : null
-  return byAnchor ? byAnchor.key : ''
+// 依据只有服务端随链接下发的章节标题：选中「标题包含它」的那一章，与一体机同一规则，
+// 律师改标题只改服务端一处。找不到就停在开头，不报错，也不另设兜底规则（合规窗口 9/29 定）。
+// 按标题认、不按第几章：后台调章节顺序也不会指错。
+function sectionBlockKey(blocks, section) {
+  if (!section) return ''
+  const hit = blocks.find(b => b.kind === 'heading' && b.text.indexOf(section) >= 0)
+  return hit ? hit.key : ''
 }
 
 // 页面参数可能仍是编码过的原样（小程序不保证替页面解码）；解不开就用原值。
@@ -77,7 +71,6 @@ Page({
   onLoad(options) {
     const type = TYPES[options.type] ? options.type : 'terms_of_service'
     this._type = type
-    this._anchor = options.anchor || ''
     this._section = decodeParam(options.section)
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
@@ -94,7 +87,7 @@ Page({
           ? new Date(doc.publishedAt).toLocaleDateString('zh-CN')
           : ''
         const blocks = parseBlocks(doc.content)
-        const anchorKey = anchorBlockKey(blocks, this._anchor, this._section)
+        const sectionKey = sectionBlockKey(blocks, this._section)
         this.setData({
           title: doc.title || TYPES[this._type],
           version: doc.version || '',
@@ -102,7 +95,7 @@ Page({
           blocks,
           state: 'ready',
         }, () => {
-          if (anchorKey) wx.pageScrollTo({ selector: `#${anchorKey}`, duration: 0 })
+          if (sectionKey) wx.pageScrollTo({ selector: `#${sectionKey}`, duration: 0 })
         })
       })
       .catch(err => {

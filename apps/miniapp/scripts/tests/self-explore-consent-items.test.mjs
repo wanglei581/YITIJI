@@ -1,7 +1,8 @@
 /**
  * 自我探索知情同意条款改为服务端下发（9/29 裁定）。真跑页面：
  *   (a) 用户看到的条款（consentItems）、勾选框文字（consentCheckboxLabel）与其中的链接
- *       （consentLinks，打开小程序内隐私政策并定位到「未成年人」章节）都来自 questions 接口，
+ *       （consentLinks，打开小程序内隐私政策，按下发的 sectionTitle 定位章节，找不到停在开头）
+ *       都来自 questions 接口，
  *       提交带回同一次响应里的 consentVersion；三样缺任一样「同意并开始作答」置灰、进不了答题；
  *       版本过期（不设过渡期，服务端 400）时只重拉说明、已答的题保留；
  *   (b) 页面源码不写死同意版本号；
@@ -44,7 +45,7 @@ function readyFixture(extra) {
     consentItems: FIXTURE_ITEMS,
     consentVersion: FIXTURE_VERSION,
     consentCheckboxLabel: FIXTURE_LABEL,
-    consentLinks: [{ label: FIXTURE_LINK, legalDocType: 'privacy_policy', anchor: 'minors', sectionTitle: FIXTURE_SECTION }],
+    consentLinks: [{ label: FIXTURE_LINK, legalDocType: 'privacy_policy', sectionTitle: FIXTURE_SECTION }],
   }, extra))
 }
 
@@ -115,7 +116,7 @@ async function checkConsentLink(source) {
   assert.equal(page.data.extraLinks.length, 0, '链接文字在勾选框里，不另列')
   page.tapConsentLink({ currentTarget: { dataset: { i: linkPart.link } } })
   assert.equal(calls.nav.length, 1)
-  assert.equal(calls.nav[0], `/pages/legal/legal?type=privacy_policy&anchor=minors&section=${encodeURIComponent(FIXTURE_SECTION)}`)
+  assert.equal(calls.nav[0], `/pages/legal/legal?type=privacy_policy&section=${encodeURIComponent(FIXTURE_SECTION)}`)
   assert.equal(page.data.agreeNonSensitive, false, '点链接不顺带勾选')
 }
 
@@ -256,8 +257,8 @@ test('变异 (a)：说明不全也放行 → 判红', async () => {
   await assert.rejects(checkMissingBlocks({ consentCheckboxLabel: undefined }, src), (e) => e.code === 'ERR_ASSERTION')
 })
 
-test('变异 (a)：链接不带章节锚点 → 判红', async () => {
-  const src = mutated('if (link.anchor) q.push', 'if (false) q.push')
+test('变异 (a)：链接不带章节标题 → 判红', async () => {
+  const src = mutated('if (link.sectionTitle) q.push', 'if (false) q.push')
   await assert.rejects(checkConsentLink(src), (e) => e.code === 'ERR_ASSERTION')
 })
 
@@ -289,7 +290,8 @@ test('变异 (c)：本地勾选框文字写回页面 → 判红', () => {
 // ── 法务页章节锚点 ──
 const LEGAL_REL = 'pages/legal/legal.js'
 const LEGAL_SRC = fs.readFileSync(path.join(MINIAPP, LEGAL_REL), 'utf8')
-// 两章标题都含「未成年」：按章节标题要落到第六章，只按兜底会落到第三章 —— 这样才分得出用没用 section。
+// 两章标题都含「未成年」：按下发标题要落到第六章；找不到下发标题时必须停在开头，
+// 不能落到第三章 —— 合规窗口 9/29 定：依据只有服务端下发的那一串，不设「未成年」兜底。
 const SECTION = '未满十四周岁未成年人个人信息处理规则'
 const PRIVACY_DOC = {
   title: '隐私政策', version: 'fixture-privacy-v1',
@@ -320,41 +322,29 @@ async function checkLegalAnchor(source, options, expected) {
 }
 
 // 带编码的 section，和自我探索页 navigateTo 拼出来的一样。
-const SECTION_OPTS = { anchor: 'minors', section: encodeURIComponent(SECTION) }
+const SECTION_OPTS = { section: encodeURIComponent(SECTION) }
+const NOT_FOUND_OPTS = { section: encodeURIComponent('不存在的标题') }
 
-test('法务页：先按下发的章节标题定位（与一体机同一依据）', () => checkLegalAnchor(undefined, SECTION_OPTS, `六、${SECTION}`))
+test('法务页：按下发的章节标题定位（与一体机同一依据）', () => checkLegalAnchor(undefined, SECTION_OPTS, `六、${SECTION}`))
 
-test('法务页：章节标题找不到时按「未成年」兜底', () => checkLegalAnchor(undefined, { anchor: 'minors', section: encodeURIComponent('不存在的标题') }, '三、未成年人使用须知'))
+test('法务页：下发标题找不到 → 停在开头，不按「未成年」兜底', () => checkLegalAnchor(undefined, NOT_FOUND_OPTS, ''))
 
-test('法务页：锚点与标题都认不出时从头显示', () => checkLegalAnchor(undefined, { anchor: 'unknown' }, ''))
+test('法务页：没带章节标题 → 从头显示', () => checkLegalAnchor(undefined, {}, ''))
 
-test('法务页：只带章节标题（后端定稿形状，没有 anchor）且找不到 → 从头显示', () =>
-  checkLegalAnchor(undefined, { section: encodeURIComponent('不存在的标题') }, ''))
-
-test('自我探索：链接不带 anchor 时只拼 type 与 section', async () => {
-  const { page, calls } = makePage(readyFixture({
-    consentLinks: [{ label: FIXTURE_LINK, legalDocType: 'privacy_policy', sectionTitle: FIXTURE_SECTION }],
-  }))
-  page.onLoad({})
-  await flush()
-  const linkPart = Array.from(page.data.checkboxParts).find((p) => p.link >= 0)
-  page.tapConsentLink({ currentTarget: { dataset: { i: linkPart.link } } })
-  assert.equal(calls.nav[0], `/pages/legal/legal?type=privacy_policy&section=${encodeURIComponent(FIXTURE_SECTION)}`)
-})
-
-test('变异：法务页不看章节标题、只按兜底 → 判红', async () => {
+test('变异：法务页不看章节标题 → 判红', async () => {
   const from = 'this._section = decodeParam(options.section)'
   assert.ok(LEGAL_SRC.includes(from))
   await assert.rejects(checkLegalAnchor(LEGAL_SRC.replace(from, "this._section = ''"), SECTION_OPTS, `六、${SECTION}`), (e) => e.code === 'ERR_ASSERTION')
 })
 
+test('变异：法务页加回「未成年」兜底 → 判红', async () => {
+  const from = "return hit ? hit.key : ''"
+  assert.ok(LEGAL_SRC.includes(from))
+  const fallback = "return hit ? hit.key : ((blocks.find(b => b.kind === 'heading' && /未成年/.test(b.text)) || {}).key || '')"
+  await assert.rejects(checkLegalAnchor(LEGAL_SRC.replace(from, fallback), NOT_FOUND_OPTS, ''), (e) => e.code === 'ERR_ASSERTION')
+})
+
 test('法务页：章节标题带 id，滚动选择器能找到', () => {
   const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/legal/legal.wxml'), 'utf8')
   assert.match(wxml, /kind === 'heading'\}\}" id="\{\{item\.key\}\}"/)
-})
-
-test('变异：法务页忽略锚点 → 判红', async () => {
-  const from = "this._anchor = options.anchor || ''"
-  assert.ok(LEGAL_SRC.includes(from))
-  await assert.rejects(checkLegalAnchor(LEGAL_SRC.replace(from, "this._anchor = ''"), { anchor: 'minors' }, '三、未成年人使用须知'), (e) => e.code === 'ERR_ASSERTION')
 })

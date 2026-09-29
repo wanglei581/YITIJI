@@ -259,7 +259,6 @@ Page({
     const link = this.data.consentLinks[Number(e.currentTarget.dataset.i)]
     if (!link) return
     const q = [`type=${encodeURIComponent(link.legalDocType)}`]
-    if (link.anchor) q.push(`anchor=${encodeURIComponent(link.anchor)}`)
     if (link.sectionTitle) q.push(`section=${encodeURIComponent(link.sectionTitle)}`)
     wx.navigateTo({ url: `/pages/legal/legal?${q.join('&')}` })
   },
