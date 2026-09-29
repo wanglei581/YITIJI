@@ -51,7 +51,10 @@ const FROZEN = new Map([
   // 2026-09-28 用词：实付提示「无独立字段，不按应付减优惠推算」改为
   // 「没有单独记下实付，不按应付减优惠来推算」。仍然禁止用应付减优惠推算实付。
   // 旧哈希 edf85a5efbedc41feefa33097b5b62688af30d0d93b7f0a79dd74a9cd779e846。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb'],
+  // 2026-09-29 W-51：价目为 0 或免费来源时实付写「0 元（免费试运营）」；页范围没传写「全部页」；
+  // 订单号只认 ORD-。非 0 元仍标未记录，继续禁止用应付减优惠推算。
+  // 旧哈希 af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', '50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
