@@ -736,6 +736,9 @@ jobs:
           # DeepSeek 思考模式统一关闭：派生式扫描所有 LLM 调用点的请求体都展开
           # deepseekThinkingOff(model)，含官方推荐名 deepseek-flash 与 TRTC 小青的 LLMConfig。
           pnpm --filter @ai-job-print/api verify:llm-thinking-off
+          # 思考模式在线探针的离线自检：缺密钥必须非 0，--allow-skip 才允许跳过且仍打印「未验证」，
+          # 输出不得含密钥。不触网。在线探针 probe:llm-thinking-live 本身不进 CI。
+          pnpm --filter @ai-job-print/api verify:llm-thinking-live-gate
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           # P1-2a AI 逐次计量账 + 每日金额硬上限（全局 / 单台终端 / 单个会员）；写隔离库，不触网。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget

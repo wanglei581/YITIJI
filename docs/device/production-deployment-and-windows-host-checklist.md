@@ -262,7 +262,11 @@
   （旁证：预检要求 `AI_PROVIDER=llm` 且至少一把 LLM key 非空；未做模型 live 调用。）
 - [~] `AIGC_CONTENT_PRODUCER` 设为公司全称或统一社会信用代码（取哪一个由产品负责人定）。它写进导出 PDF / DOCX 的 GB 45438 隐式标识 ContentProducer；生产空着或填产品名「职易达」：自 P1-18（2026-09-29）起**不再拒启动、预检不中止**，改为 AI 生成与带 AI 内容的导出降级（503 `AI_PROVIDER_NOT_CONFIGURED`）、`/health` degraded、3c 预检打 `AI_PLATFORM_DEGRADED` 告警——发布时看到这条告警必须先补齐再对外开放 AI。
   **2026-09-27 现状：** 产品负责人自报已在服务器 API 的 `.env` 写入，取统一社会信用代码（协调窗口按 GB 32100 核过校验位；值不写入本仓库）。协调窗口不登服务器，未独立核对文件内容；下一次授权发布时看 3c 预检有无 `AI_PLATFORM_DEGRADED` 告警、`/health` 的 `ai-platform` 是否为 configured，确认后把本条改为 `[x]` 并写明发布批次。
+  **思考模式在线核对**（会访问模型，不进 CI）：在服务器的 `services/api` 目录执行 `npx -y pnpm@11.2.2 run probe:llm-thinking-live`。密钥与 API 进程同一处：先读后台 AI 槽位（`LlmConfigService` 解密后的配置），没有再读服务启动时加载的 `.env`（`AI_LLM_API_KEY`，否则 `TRTC_LLM_API_KEY`）。缺密钥打印 `未验证：DeepSeek`，退出码非 0。只有显式加上 `--allow-skip` 才允许跳过，此时仍打印「未验证」，退出码为 0。标准输出和标准错误都不打印密钥或密钥片段。CI 里的 `verify:llm-thinking-live-gate` 只做离线自检，不代替这次在线核对。
+- [~] `AIGC_CONTENT_PRODUCER` 设为公司全称或统一社会信用代码（取哪一个由产品负责人定）。它写进导出 PDF / DOCX 的 GB 45438 隐式标识 ContentProducer；生产空着或填产品名「职易达」，启动闸门报 `PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING`，部署在 3c 预检中止（备份与重启之前）。
+  **2026-09-27 现状：** 产品负责人自报已在服务器 API 的 `.env` 写入，取统一社会信用代码（协调窗口按 GB 32100 核过校验位；值不写入本仓库）。协调窗口不登服务器，未独立核对文件内容；下一次授权发布时 3c 预检会按启动闸门实际校验，通过后把本条改为 `[x]` 并写明发布批次。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
+  音色在线核对用同一个探针，在 `services/api` 目录执行 `npx -y pnpm@11.2.2 run probe:llm-thinking-live -- --tts`。腾讯密钥按服务启动方式加载 `.env`，读取与 `TtsService` 相同（`TENCENT_TTS_SECRET_ID` / `TENCENT_TTS_SECRET_KEY`，否则 `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY`）；音色 ID 与小青相同（`TRTC_TTS_VOICE`，默认 1008）。缺密钥打印 `未验证：音色`，退出码非 0；`--allow-skip` 才把这次跳过当成通过，并且仍然打印「未验证」。模型密钥已核对、只有音色被跳过时，整次仍然是非 0。
 - [ ] `RESUME_PDF_FONT_PATH` / `RESUME_PDF_FONT_FAMILY` 已按需配置；默认系统候选可用时可留空。旧变量 `JOB_MATERIAL_PDF_FONT_PATH` / `_FAMILY` 仅作兼容回退，不再作为新部署主配置。
 - [~] `NODE_ENV=production` 下字体探测失败会以 `PRODUCTION_CJK_FONT_MISSING` 拒绝启动；管理员登录后读取 `GET /api/v1/health/cjk-font`，确认 `data.ok=true`、`path` / `family` 与预期一致。
   **2026-09-07 现状：端点实测未取到**（该端点需 Bearer Token，发布 lane 与 Windows lane 均无管理员账号，且都拒绝索取或代持管理员口令 —— 这个边界要保持）。
