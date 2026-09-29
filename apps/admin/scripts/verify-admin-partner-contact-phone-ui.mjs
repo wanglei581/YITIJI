@@ -277,33 +277,107 @@ async function verifyAdapter() {
 }
 
 function verifyEligibility() {
-  const eligibility = loadTs('src/routes/partners/partnerContactPhoneEligibility.ts', {}, {})
-  const base = { enabled: true, phoneVerifiedAt: null, availableActionVerificationMethods: [] }
+  const eligibility = loadTs('src/routes/partners/partnerContactPhoneEligibility.ts', {}, { Date, Intl })
   const offer = (account) => eligibility.contactPhoneRegistrationOffer(account)
-  const register = offer(base)
-  expect(register.visible === true && register.label === '登记手机号', '启用且未验证、无密码方式时显示登记手机号')
-  const disabled = offer({ ...base, enabled: false })
-  expect(disabled.visible === false && disabled.reason === '账号已停用', '停用账号不显示按钮并说明原因')
-  const verified = offer({ ...base, phoneVerifiedAt: '2026-09-29T01:02:03.000Z' })
-  expect(verified.visible === false && verified.reason === '手机号已由本人验证，无需登记', '已验证手机不显示按钮')
-  const passwordMethod = offer({ ...base, availableActionVerificationMethods: ['password'] })
-  expect(passwordMethod.visible === false && passwordMethod.reason === '已由本人设置密码，无需登记', '已有密码验证方式不显示按钮')
-  const owner = offer({ ...base, passwordProofState: 'owner_managed' })
-  expect(owner.visible === false && owner.reason === '已由本人设置密码，无需登记', 'owner_managed 不显示按钮')
-  const legacy = offer({ ...base, passwordProofState: 'legacy' })
-  expect(legacy.visible === false && legacy.reason === '这个账号不是临时密码，不能登记手机号', 'legacy 不显示按钮')
-  const temporary = offer({ ...base, passwordProofState: 'temporary' })
-  expect(temporary.visible === true && temporary.label === '登记手机号', 'temporary 且未登记时显示登记手机号')
-  const reregister = offer({
-    ...base,
+  const signalsThatUsedToHide = {
+    enabled: false,
+    phoneVerifiedAt: '2026-09-01T00:00:00.000Z',
+    phoneMasked: '138****0000',
+    availableActionVerificationMethods: ['password'],
+    passwordProofState: 'owner_managed',
+    phoneRegisteredByAdminAt: null,
+  }
+  const serverSaysYes = offer({ ...signalsThatUsedToHide, canRegisterContactPhone: true })
+  expect(
+    serverSaysYes.visible === true && serverSaysYes.label === '登记手机号' && serverSaysYes.reason == null && serverSaysYes.pending == null,
+    '按钮只由 canRegisterContactPhone 决定，停用、已验证、本人密码方式都不隐藏',
+  )
+  const serverSaysNo = offer({
+    enabled: true,
+    phoneVerifiedAt: null,
+    phoneMasked: null,
+    availableActionVerificationMethods: [],
     passwordProofState: 'temporary',
-    contactPhoneRegisteredAt: '2026-09-29T01:02:03.000Z',
+    canRegisterContactPhone: false,
   })
-  expect(reregister.visible === true && reregister.label === '重新登记手机号', '已登记未自证显示重新登记手机号')
-  const loginPhone = offer({ ...base, phoneMasked: '138****0000' })
-  expect(loginPhone.visible === true && loginPhone.label === '登记手机号', '登录手机脱敏值不算已登记联系人手机')
-  const blankRegistered = offer({ ...base, contactPhoneRegisteredAt: '' })
-  expect(blankRegistered.label === '登记手机号', '空的登记时间不算已登记')
+  expect(
+    serverSaysNo.visible === false && serverSaysNo.label == null && serverSaysNo.reason === '当前不符合登记条件',
+    'canRegisterContactPhone 为 false 时不显示按钮，其余信号也不能把按钮打开',
+  )
+  const missingFlag = offer({
+    enabled: true,
+    phoneVerifiedAt: null,
+    phoneMasked: null,
+    availableActionVerificationMethods: [],
+    passwordProofState: 'temporary',
+  })
+  expect(missingFlag.visible === false && missingFlag.reason == null && missingFlag.label == null, '字段缺失时不显示按钮，也不写原因')
+  const missingAll = offer({ enabled: true, phoneVerifiedAt: null })
+  expect(missingAll.visible === false && missingAll.pending == null && missingAll.reason == null, '三个资格字段都缺时不显示按钮')
+
+  const registered = offer({
+    enabled: true,
+    phoneVerifiedAt: null,
+    phoneMasked: '138****5678',
+    passwordProofState: 'temporary',
+    phoneRegisteredByAdminAt: '2026-09-29T01:02:03.000Z',
+    canRegisterContactPhone: true,
+  })
+  expect(registered.visible === true && registered.label === '重新登记', 'phoneRegisteredByAdminAt 非空时按钮为重新登记')
+  expect(registered.pending?.status === '已登记，待机构本人自证', 'phoneRegisteredByAdminAt 非空时显示已登记，待机构本人自证')
+  expect(registered.pending?.phoneMasked === '138****5678', '已登记状态附带脱敏手机号')
+  expect(registered.pending?.registeredAtLabel === '2026-09-29 09:02:03', '登记时间按北京时间显示')
+
+  const freshAccount = {
+    enabled: true,
+    phoneVerifiedAt: null,
+    phoneMasked: '138****5678',
+    passwordProofState: 'temporary',
+    phoneRegisteredByAdminAt: null,
+    canRegisterContactPhone: true,
+  }
+  const fresh = offer(freshAccount)
+  expect(fresh.visible === true && fresh.label === '登记手机号' && fresh.pending == null, '登记时间为空时按钮为登记手机号')
+  const blankRegistered = offer({ ...freshAccount, phoneRegisteredByAdminAt: '  ' })
+  expect(blankRegistered.label === '登记手机号' && blankRegistered.pending == null, '空白登记时间不算已登记')
+  const oldField = offer({ ...freshAccount, contactPhoneRegisteredAt: '2026-09-29T01:02:03.000Z' })
+  expect(oldField.label === '登记手机号' && oldField.pending == null, '自拟字段 contactPhoneRegisteredAt 不再生效')
+  const loginPhoneOnly = offer({ ...freshAccount, phoneMasked: '139****0001' })
+  expect(loginPhoneOnly.pending == null && loginPhoneOnly.label === '登记手机号', '登录手机脱敏值不算已登记')
+
+  const disabled = offer({ ...signalsThatUsedToHide, canRegisterContactPhone: false, phoneRegisteredByAdminAt: null })
+  expect(disabled.visible === false && disabled.reason === '账号已停用', '服务端拒绝且账号停用时说明账号已停用')
+  const ownerVerifiedAccount = {
+    enabled: true,
+    phoneVerifiedAt: '2026-09-01T00:00:00.000Z',
+    phoneMasked: '139****0001',
+    passwordProofState: 'owner_managed',
+    canRegisterContactPhone: false,
+  }
+  const ownerVerified = offer(ownerVerifiedAccount)
+  expect(ownerVerified.visible === false && ownerVerified.reason === '已由本人设置密码并验证手机，无需登记', '本人设密且手机已验证时如实说明')
+  const ownerOnly = offer({ ...ownerVerifiedAccount, phoneVerifiedAt: null })
+  expect(ownerOnly.reason === '当前不符合登记条件', '只有本人设密、手机未验证时不声称已验证')
+  const verifiedOnly = offer({ ...ownerVerifiedAccount, passwordProofState: 'temporary' })
+  expect(verifiedOnly.reason === '当前不符合登记条件', '只有手机已验证、不是本人设密时不声称已设密')
+  const legacy = offer({
+    enabled: true,
+    phoneVerifiedAt: null,
+    passwordProofState: 'legacy',
+    canRegisterContactPhone: false,
+  })
+  expect(legacy.visible === false && legacy.reason === '当前不符合登记条件', '其它不符合条件不猜测原因')
+  const unparsable = offer({
+    enabled: true,
+    phoneVerifiedAt: null,
+    phoneMasked: '138****5678',
+    phoneRegisteredByAdminAt: 'not-a-time',
+    canRegisterContactPhone: true,
+  })
+  expect(
+    unparsable.pending?.status === '已登记，待机构本人自证' && unparsable.pending?.registeredAtLabel === 'not-a-time',
+    '登记时间解析不了时原样显示，仍视为已登记',
+  )
 }
 
 function verifyStatic() {
@@ -311,10 +385,26 @@ function verifyStatic() {
   const dialog = read('src/routes/partners/PartnerAccountActionDialog.tsx')
   const steps = read('src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx')
   const hook = read('src/routes/partners/usePartnerAccountAction.ts')
-  const visibleButton = /\{registration\.visible && \([\s\S]{0,700}?actionFlow\.open\('register_contact_phone'/
-  const hiddenReason = /\{!registration\.visible && \([\s\S]{0,300}?\{registration\.reason\}/
+  const eligibilitySource = read('src/routes/partners/partnerContactPhoneEligibility.ts')
+  const accountType = read('src/services/api/orgsAdmin.ts')
+  const visibleButton = /\{registration\.visible && registration\.label && \([\s\S]{0,700}?actionFlow\.open\('register_contact_phone'/
+  const hiddenReason = /\{registration\.reason && \([\s\S]{0,300}?\{registration\.reason\}/
   expect(visibleButton.test(manager), '登记按钮只在 registration.visible 内渲染')
   expect(hiddenReason.test(manager), '不符合资格时展示 registration.reason')
+  expect(manager.includes('{registration.pending.status}'), '已登记状态文案来自资格结果，不在列表里另写一套')
+  expect(manager.includes('registration.pending.phoneMasked'), '已登记状态展示脱敏手机号')
+  expect(manager.includes('registration.pending.registeredAtLabel'), '已登记状态展示登记时间')
+  expect(manager.includes('北京时间'), '登记时间标明北京时间')
+  expect(manager.includes('{registration.label}'), '按钮文字来自资格结果')
+  expect(!manager.includes('canRegisterContactPhone'), '列表组件不自己读取 canRegisterContactPhone')
+  expect(!manager.includes('contactPhoneRegisteredAt') && !eligibilitySource.includes('contactPhoneRegisteredAt'), '不再使用自拟字段 contactPhoneRegisteredAt')
+  expect(!eligibilitySource.includes('availableActionVerificationMethods'), '资格判断不再读取验证方式')
+  expect(eligibilitySource.includes('canRegisterContactPhone === true'), '只有 canRegisterContactPhone 严格为 true 才进入可登记分支')
+  expect(eligibilitySource.includes('已登记，待机构本人自证') && eligibilitySource.includes("重新登记"), '资格模块给出待自证状态与重新登记')
+  expect(accountType.includes('phoneRegisteredByAdminAt?: string | null'), '账号类型包含 phoneRegisteredByAdminAt')
+  expect(accountType.includes('canRegisterContactPhone?: boolean'), '账号类型包含 canRegisterContactPhone')
+  expect(accountType.includes("passwordProofState?: 'temporary' | 'owner_managed' | 'legacy' | null"), '账号类型包含 passwordProofState')
+  expect(!accountType.includes('contactPhoneRegisteredAt'), '账号类型不再保留 contactPhoneRegisteredAt')
   expect(manager.includes('min-h-12') && steps.includes('min-h-12'), '按钮点击区域使用 min-h-12')
   expect(steps.includes(NOTICE), '弹层步骤含「管理员不能代收验证码」')
   expect(dialog.includes('<ContactPhoneRegistrationSteps'), '弹层渲染登记步骤而不是另一套对话框')

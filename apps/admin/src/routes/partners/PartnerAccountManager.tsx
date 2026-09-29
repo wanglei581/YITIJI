@@ -301,7 +301,7 @@ export function PartnerAccountManager({
                   <MailIcon className="h-3.5 w-3.5" />
                   {account.emailMasked ? '换绑登录邮箱' : '绑定登录邮箱'}
                 </button>
-                {registration.visible && (
+                {registration.visible && registration.label && (
                   <button
                     type="button"
                     onClick={(event) => actionFlow.open('register_contact_phone', account, event.currentTarget)}
@@ -331,7 +331,16 @@ export function PartnerAccountManager({
                   删除账号
                 </button>
               </div>
-              {!registration.visible && (
+              {registration.pending && (
+                <p className="basis-full text-xs leading-5 text-neutral-700">
+                  <span className="font-medium">{registration.pending.status}</span>
+                  {registration.pending.phoneMasked && (
+                    <span className="ml-2 font-mono">{registration.pending.phoneMasked}</span>
+                  )}
+                  <span className="ml-2 whitespace-nowrap text-neutral-500">登记时间 {registration.pending.registeredAtLabel}（北京时间）</span>
+                </p>
+              )}
+              {registration.reason && (
                 <p className="basis-full text-xs leading-5 text-neutral-500">{registration.reason}</p>
               )}
               {actionsUnavailable && (

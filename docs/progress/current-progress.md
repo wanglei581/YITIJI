@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> **2026-09-29 W-03 管理员登记机构联系人手机（候选，仅前端）**：合作机构详情的机构账号区，对启用中、手机未验证、且没有「本人密码」验证方式的账号显示「登记手机号」；若列表带回 `contactPhoneRegisteredAt` 则显示「重新登记手机号」。弹层走现有机构账号动作，提交 `POST /admin/orgs/:orgId/accounts/:accountId/contact-phone`，请求体恰好 `phone`、`confirmationLetterNo`、`currentPassword`。mock 不假成功。账号列表 GET 仍缺字段：`services/api/src/orgs/admin-org-account-view.ts` 的 `mapAdminOrgAccount` 查了 `passwordProofState` 但没有返回；也没有「联系人手机已登记、本人尚未自证」的 `contactPhoneRegisteredAt`（`phoneMasked` 是登录手机，创建时就有，不能当已登记）。缺字段时先按现有字段否掉停用、已验证、已有密码方式，其余显示按钮，由服务端 409 兜底。本轮没有打真实后端。
+> **2026-09-29 W-03 管理员登记机构联系人手机（候选，仅前端）**：机构账号行的登记按钮只看服务端 `canRegisterContactPhone === true`。`passwordProofState`、`phoneRegisteredByAdminAt`、`canRegisterContactPhone` 缺任一响应字段时不显示按钮，也不再按停用、手机已验证或验证方式自行推断。`phoneRegisteredByAdminAt` 非空时状态写「已登记，待机构本人自证」，附脱敏手机号与北京时间，按钮为「重新登记」；为空时按钮为「登记手机号」。`canRegisterContactPhone === false` 时：账号停用写「账号已停用」；`passwordProofState` 为 `owner_managed` 且 `phoneVerifiedAt` 有值写「已由本人设置密码并验证手机，无需登记」；其余写「当前不符合登记条件」。已去掉自拟字段 `contactPhoneRegisteredAt`。弹层仍走现有机构账号动作，提交 `POST /admin/orgs/:orgId/accounts/:accountId/contact-phone`，请求体恰好 `phone`、`confirmationLetterNo`、`currentPassword`。mock 不假成功。服务端账号列表尚未返回这三个字段时，按钮不出现。本轮没有打真实后端。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
