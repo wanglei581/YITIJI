@@ -366,14 +366,9 @@ export async function executeTask(
   //
   // 只有 attempt 变大才重新下载、打印。同一 (任务号, attempt)：
   // dispatching/spooled → 报 PRINT_JOB_UNCONFIRMED，不重打；
-  // completed → 重报 completed；failed → 重报 failed。
-  // attempt 只会因服务端 retryPaidFailedJob 增加（print-jobs.service.ts 688–835）：
-  // 已是 failed（710）、不是 PRINT_JOB_UNCONFIRMED 也不是只出了一部分（715–725）、
-  // 订单已付（726）、调用者能访问该订单（loadAccessiblePrintJob 854–873）。
-  // 通过后才把同一任务改回 pending 并写 kiosk_retry（800–802）。
-  // 已经 pending 的幂等重提不再加日志（693–708）。
-  // 租约过期的 claimed/printing 由 resetExpiredClaims 写成 failed+PRINT_JOB_UNCONFIRMED，
-  // 不会回到 pending，因此不会抬高 attempt，本机也不会把它当成允许重打。
+  // completed → 重报 completed；failed → 重报 failed，本地有错误码就带回。
+  // attempt 由服务端按 failed→pending 的状态日志计数，一体机重试和管理员重试都会加。
+  // 重报时带上的 errorCode 以服务端规则为准：空则保留原值，非空则覆盖。
   bindPrintAttempt(db, task.attempt)
 
   // Define patch helper early so it's available in both Step 0 (spooled reconcile)

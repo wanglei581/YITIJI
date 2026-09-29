@@ -103,8 +103,8 @@ export interface ClaimTaskResponse {
   billablePages?: number
   /**
    * 同一任务号被允许重新打印的次数。等于状态日志里
-   * errorCode='kiosk_retry' 且 toStatus='pending' 的条数，缺省重提为 0。
-   * 老 Agent 忽略该字段，行为与改前相同。
+   * fromStatus='failed' 且 toStatus='pending' 的条数，不看 errorCode。
+   * 没有这种日志时为 0。老 Agent 忽略该字段，行为与改前相同。
    */
   attempt: number
 }
@@ -179,6 +179,31 @@ export const SAMPLE_VISIBLE_PDF_SHA256 = crypto.createHash('sha256').update(SAMP
 
 const ADMIN_SECRET = requireEnv('TERMINAL_ADMIN_SECRET')
 const ACTION_TOKEN_SECRET = requireEnv('TERMINAL_ACTION_TOKEN_SECRET')
+
+/**
+ * 本批任务各算一次。where 以 taskId 开头，可走 PrintTaskStatusLog 的 (taskId, createdAt) 索引。
+ * 不按 errorCode 过滤：一体机重试和管理员重试都是 failed→pending，只是日志里的码不同。
+ */
+async function reprintAttemptsByTaskId(
+  prisma: PrismaService,
+  taskIds: string[],
+): Promise<Map<string, number>> {
+  const attempts = new Map<string, number>()
+  if (taskIds.length === 0) return attempts
+  const rows = await prisma.printTaskStatusLog.groupBy({
+    by: ['taskId'],
+    where: {
+      taskId: { in: taskIds },
+      fromStatus: 'failed',
+      toStatus: 'pending',
+    },
+    _count: { _all: true },
+  })
+  for (const row of rows) {
+    attempts.set(row.taskId, row._count._all)
+  }
+  return attempts
+}
 
 function base64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
@@ -429,7 +454,7 @@ export class TerminalAgentService implements OnModuleInit {
     const claimExpiry = new Date(now.getTime() + 5 * 60 * 1000)
     const limit = Math.min(dto.maxTasks, 1) // Phase 8.2A: max 1 per cycle
 
-    const results: ClaimTaskResponse[] = []
+    const claimedPayloads: Array<Omit<ClaimTaskResponse, 'attempt'>> = []
 
     // 出纸的唯一前置条件：这一单已经付过钱。
     //
@@ -552,21 +577,7 @@ export class TerminalAgentService implements OnModuleInit {
         typeof orderMeta?.billablePages === 'number' && orderMeta.billablePages > 0
           ? orderMeta.billablePages
           : undefined
-      // attempt 只由 kiosk_retry 日志条数决定，不改领取条件，也不改库结构。
-      // 该字符串必须与 print-jobs.service.ts 的 KIOSK_RETRY_LOG_CODE（第 132 行）一致。
-      //
-      // 不会重复出纸，也不会打给别人：attempt 只会因 retryPaidFailedJob 增加
-      // （print-jobs.service.ts 688–835）。它只允许任务已是 failed（710）、
-      // 不是 PRINT_JOB_UNCONFIRMED 也不是只出了一部分（715–725）、订单已付（726）、
-      // 且调用者能访问该订单（loadAccessiblePrintJob 854–873，否则 404）。
-      // 通过后才把同一任务改回 pending，并写一条 kiosk_retry 日志（800–802）。
-      // 已经 pending 且最后一条就是这次重提时直接返回，不再加日志（693–708），计数不变。
-      // 租约过期的 claimed / 卡住的 printing 由 resetExpiredClaims 写成
-      // failed+PRINT_JOB_UNCONFIRMED，不会回到 pending，因此不会抬高 attempt。
-      const attempt = await this.prisma.printTaskStatusLog.count({
-        where: { taskId: claimed.id, errorCode: 'kiosk_retry', toStatus: 'pending' },
-      })
-      results.push({
+      claimedPayloads.push({
         taskId: claimed.id,
         type: 'print',
         fileUrl,
@@ -579,11 +590,18 @@ export class TerminalAgentService implements OnModuleInit {
         createdAt: claimed.createdAt.toISOString(),
         ...(fileName ? { fileName } : {}),
         ...(mimeType ? { mimeType } : {}),
-        attempt,
       })
     }
 
-    return results
+    // 领取本身不写 failed→pending，所以同一次重提被重复领到时 attempt 不变。
+    const attempts = await reprintAttemptsByTaskId(
+      this.prisma,
+      claimedPayloads.map((item) => item.taskId),
+    )
+    return claimedPayloads.map((item) => ({
+      ...item,
+      attempt: attempts.get(item.taskId) ?? 0,
+    }))
   }
 
   // ── 4. Patch task status ──────────────────────────────────────────────────────
@@ -637,11 +655,9 @@ export class TerminalAgentService implements OnModuleInit {
 
     const isTerminal = TERMINAL_STATES.includes(dto.status as TaskStatus)
 
-    // 重报 failed 且不带 errorCode 时，保留库里已有的错误码。
-    // 一体机重提会先把这一列清空（print-jobs.service.ts 约 790 行），那种情况要靠
-    // Agent 本地记住并带回，结果页才能仍显示「打印机缺纸」。这里保住的是本地行
-    // 没有码、但服务端行里还有码的回放，避免被冲成笼统失败。带了新码仍以新值为准。
-    // printing / completed 不带码时照旧写成 null。
+    // 失败回传：新传入的 errorCode 为空（缺省或空串）才保留原值；非空就覆盖，
+    // 新一次失败的原因必须能写进去。printing / completed 不带码时仍写成 null，
+    // 避免成功之后还挂着上一次的缺纸。
     const incomingErrorCode =
       typeof dto.errorCode === 'string' && dto.errorCode.length > 0 ? dto.errorCode : undefined
     const persistedErrorCode: string | null =

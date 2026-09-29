@@ -20,6 +20,8 @@
  */
 import 'dotenv/config'
 import { createHash, createHmac, randomBytes } from 'crypto'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { BadRequestException, Module, UnauthorizedException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
@@ -64,6 +66,33 @@ function fixtureFileSignature(fileId: string, expiresAtMs: number): string {
   return createHmac('sha256', secret).update(`${fileId}.${expiresAtMs}`).digest('hex')
 }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
+
+/** attempt 必须在领取循环之后按 taskId 一次 groupBy，条件只有 failed→pending。 */
+function assertReprintAttemptQueryShape(): void {
+  const source = readFileSync(join(__dirname, '../src/terminals/terminals-agent.service.ts'), 'utf8')
+  const fnStart = source.indexOf('async function reprintAttemptsByTaskId')
+  const fnEnd = source.indexOf('function base64UrlJson')
+  const fn = fnStart >= 0 && fnEnd > fnStart ? source.slice(fnStart, fnEnd) : ''
+  const claimStart = source.indexOf('async claimTasks(')
+  const claimEnd = source.indexOf('async patchTaskStatus(')
+  const claim = claimStart >= 0 && claimEnd > claimStart ? source.slice(claimStart, claimEnd) : ''
+  const loopAt = claim.indexOf('for (let i = 0; i < limit; i++)')
+  const callAt = claim.indexOf('reprintAttemptsByTaskId(')
+  if (
+    !fn.includes('printTaskStatusLog.groupBy')
+    || !fn.includes("fromStatus: 'failed'")
+    || !fn.includes("toStatus: 'pending'")
+    || !fn.includes('taskId: { in: taskIds }')
+    || /errorCode\s*:/.test(fn)
+    || fn.includes('.count(')
+    || loopAt < 0
+    || callAt < loopAt
+    || claim.includes('printTaskStatusLog.count')
+  ) {
+    fail('attempt 必须在领取循环之后按 taskId 一次 groupBy，且只数 fromStatus=failed、toStatus=pending')
+  }
+  pass('attempt 计数：领取循环之后一次 groupBy(taskId)，不按 errorCode 过滤')
+}
 
 function errCode(e: unknown): string | undefined {
   const ex = e as { getResponse?: () => unknown; response?: unknown }
@@ -210,6 +239,7 @@ async function main() {
   const { TerminalsService } = await import('../src/terminals/terminals.service')
 
   console.log('\n=== 打印链路 service 级 E2E 验证（P1-B 守门）===')
+  assertReprintAttemptQueryShape()
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -887,16 +917,53 @@ async function main() {
       claimAttempt1[0].taskId === knownFailId &&
       claimAttempt1[0].attempt === 1
     ) {
-      pass('8e2. 重提后 claim 返回同一任务且 attempt=1')
+      pass('8e2. 一体机重提后 claim 返回同一任务且 attempt=1')
     } else {
       fail(`8e2. attempt=1 异常: ${JSON.stringify(claimAttempt1.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
+    }
+
+    // 领取响应丢失后再领：任务回到 pending，但不写新的 failed→pending。
+    await prisma.printTask.update({
+      where: { id: knownFailId },
+      data: { status: 'pending', claimedAt: null, claimExpiry: null, completedAt: null },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: knownFailId },
+      data: { taskStatus: 'pending' },
+    })
+    const claimSameAttempt = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    const sameAttemptLogs = await prisma.printTaskStatusLog.count({
+      where: { taskId: knownFailId, fromStatus: 'failed', toStatus: 'pending' },
+    })
+    if (
+      claimSameAttempt.length === 1 &&
+      claimSameAttempt[0].taskId === knownFailId &&
+      claimSameAttempt[0].attempt === claimAttempt1[0].attempt &&
+      claimSameAttempt[0].attempt === sameAttemptLogs &&
+      claimSameAttempt[0].attempt === 1 &&
+      claimSameAttempt[0].fileUrl.includes('/files/') &&
+      claimSameAttempt[0].fileUrl.includes('sig=') &&
+      claimSameAttempt[0].actionToken.length > 0
+    ) {
+      pass('8e2b. 未经新的 failed→pending，连续两次领取的 attempt 相同，签名链接仍在')
+    } else {
+      fail(`8e2b. 同一 attempt 被改写: ${JSON.stringify({
+        first: claimAttempt1[0]?.attempt,
+        second: claimSameAttempt.map((c) => ({ taskId: c.taskId, attempt: c.attempt })),
+        logs: sameAttemptLogs,
+      })}`)
     }
 
     await prisma.printTask.update({
       where: { id: knownFailId },
       data: { errorCode: 'PAPER_EMPTY' },
     })
-    await terminals.patchTaskStatus(knownFailId, { status: 'failed' }, `Bearer ${agentToken}`, terminalId)
+    await terminals.patchTaskStatus(
+      knownFailId,
+      { status: 'failed', errorCode: '' },
+      `Bearer ${agentToken}`,
+      terminalId,
+    )
     const afterBareFail = await prisma.printTask.findUnique({ where: { id: knownFailId } })
     const bareFailLog = await prisma.printTaskStatusLog.findFirst({
       where: { taskId: knownFailId, fromStatus: 'claimed', toStatus: 'failed' },
@@ -907,7 +974,7 @@ async function main() {
       afterBareFail.errorCode === 'PAPER_EMPTY' &&
       bareFailLog?.errorCode === 'PAPER_EMPTY'
     ) {
-      pass('8e3. 重报 failed 且不带 errorCode 时任务 errorCode 仍是 PAPER_EMPTY')
+      pass('8e3. 重报 failed 且 errorCode 为空串时任务 errorCode 仍是 PAPER_EMPTY')
     } else {
       fail(`8e3. errorCode 被冲掉: status=${afterBareFail?.status} task=${afterBareFail?.errorCode} log=${bareFailLog?.errorCode}`)
     }
@@ -938,6 +1005,42 @@ async function main() {
       where: { printTaskId: knownFailId },
       data: { taskStatus: 'cancelled' },
     })
+
+    const overwriteCreated = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileMd5: 'sha256-vpj-overwrite',
+      fileName: '新失败原因.pdf',
+    }, { terminalId })
+    createdTaskIds.push(overwriteCreated.taskId)
+    await prisma.printTask.update({
+      where: { id: overwriteCreated.taskId },
+      data: { createdAt: new Date('2018-06-01T00:00:00.000Z') },
+    })
+    await orderStatus.markPaid(overwriteCreated.orderId, { paymentSource: 'offline' })
+    const overwriteClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (overwriteClaim.length !== 1 || overwriteClaim[0].taskId !== overwriteCreated.taskId) {
+      fail(`8e5 预备. 未领到覆盖用例: ${JSON.stringify(overwriteClaim.map((c) => c.taskId))}`)
+    }
+    await prisma.printTask.update({
+      where: { id: overwriteCreated.taskId },
+      data: { errorCode: 'PAPER_EMPTY' },
+    })
+    await terminals.patchTaskStatus(
+      overwriteCreated.taskId,
+      { status: 'failed', errorCode: 'PRINTER_OFFLINE', errorMessage: 'printer offline after paper empty' },
+      `Bearer ${agentToken}`,
+      terminalId,
+    )
+    const overwritten = await prisma.printTask.findUnique({ where: { id: overwriteCreated.taskId } })
+    const overwriteLog = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: overwriteCreated.taskId, toStatus: 'failed' },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (overwritten?.status === 'failed' && overwritten.errorCode === 'PRINTER_OFFLINE' && overwriteLog?.errorCode === 'PRINTER_OFFLINE') {
+      pass('8e5. 新传入非空 errorCode 覆盖原值（PAPER_EMPTY → PRINTER_OFFLINE）')
+    } else {
+      fail(`8e5. 新错误码没写进去: task=${overwritten?.errorCode} log=${overwriteLog?.errorCode}`)
+    }
 
     const unconfirmedId = await createClaimAndFail(
       '失败任务-无法确认',

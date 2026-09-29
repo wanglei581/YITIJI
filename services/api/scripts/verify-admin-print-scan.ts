@@ -12,6 +12,8 @@
  * 运行:pnpm --filter @ai-job-print/api verify:admin-print-scan
  */
 import 'dotenv/config'
+process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-admin-print-scan-admin-secret-0123456789'
+process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-admin-print-scan-action-secret-0123456789'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalCapabilitiesService, setPrintScanCapabilityModeForTest } from '../src/terminals/terminal-capabilities.service'
@@ -19,6 +21,7 @@ import { AdminPrintScanService } from '../src/admin-print-scan/admin-print-scan.
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import { signFileUrl } from '../src/files/signing'
 import { AuditService } from '../src/audit/audit.service'
+import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
@@ -466,6 +469,27 @@ async function main() {
     pass('print.retry：failed→pending + Order 联动 + 状态日志')
 
     await expectHttpError(() => printScan.applyAction('print', failedTaskId, 'retry'), 409, '重复 retry（已 pending）→ 409')
+
+    const terminals = new TerminalAgentService(prisma, new AuditService(prisma))
+    const adminClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer tok_vps_${suffix}`)
+    const adminAttemptLogs = await prisma.printTaskStatusLog.count({
+      where: { taskId: failedTaskId, fromStatus: 'failed', toStatus: 'pending' },
+    })
+    if (
+      adminClaim.length === 1 &&
+      adminClaim[0].taskId === failedTaskId &&
+      adminClaim[0].attempt === 1 &&
+      adminClaim[0].attempt === adminAttemptLogs &&
+      adminClaim[0].fileUrl.includes('sig=') &&
+      adminClaim[0].actionToken.length > 0
+    ) {
+      pass('管理员重试后 claim 的 attempt 为 1（failed→pending 计数，不看 errorCode），签名链接仍在')
+    } else {
+      fail(`管理员重试后 attempt 异常: ${JSON.stringify({
+        claim: adminClaim.map((item) => ({ taskId: item.taskId, attempt: item.attempt })),
+        logs: adminAttemptLogs,
+      })}`)
+    }
 
     // 退款订单拒绝重试（防"退了钱还出纸"）
     const refundedTaskId = `pt_vps_refund_${suffix}`
