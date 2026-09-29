@@ -30,6 +30,8 @@ const ITEM_KEYS = [
   'expiresAt',
   'filename',
   'id',
+  // #1104：打印前是否要过材料检查，由服务端判定下发。
+  'materialCheckRequired',
   'mimeType',
   'pageCount',
   'previewUrlPath',
