@@ -1073,6 +1073,49 @@ if (/这单已经在你的小程序里/.test(doneCode)) {
   }
 }
 
+// W-44 / W-21：0 元报价说人话，主按钮看得见的字和读屏一致，且不说「去付款」。
+const confirmCopy = [
+  'src/pages/print/printConfirmModel.ts',
+  'src/pages/print/PrintConfirmPage.tsx',
+  'src/pages/print/components/PrintConfirmView.tsx',
+  'src/pages/print/components/PrintConfirmParts.tsx',
+].map((file) => stripComments(read(file))).join('\n')
+const forbiddenQuoteCopy = [
+  '零元单也要先建单',
+  '不存在不建单',
+  '不存在「不建单直接出纸」',
+  '本机不估价',
+  '优惠券功能尚未接通',
+  '等报价返回后按原价显示',
+  '确认并建单',
+]
+for (const phrase of forbiddenQuoteCopy) {
+  if (confirmCopy.includes(phrase)) fail(`报价页不得再出现「${phrase}」`)
+  else pass(`报价页没有「${phrase}」`)
+}
+if (!confirmCopy.includes('免费试运营，本单 0 元')) {
+  fail('价目为 0 时必须写清「免费试运营，本单 0 元」')
+} else {
+  pass('0 元报价写明免费试运营')
+}
+if (!/quote\.status === 'ready' && quote\.amountCents === 0[\s\S]{0,40}'确认并打印'/.test(confirmCopy)) {
+  fail('0 元单主按钮必须是「确认并打印」')
+} else {
+  pass('0 元单主按钮是确认并打印')
+}
+if (!confirmCopy.includes("'确认并去付款'")) {
+  fail('有金额的单仍要能「确认并去付款」')
+} else {
+  pass('付费单主按钮仍是确认并去付款')
+}
+if (!/aria-label=\{label\}/.test(confirmCopy)) {
+  fail('主按钮读屏必须念看得见的那句字')
+} else if (/aria-label=\{primaryAccessible\}/.test(confirmCopy)) {
+  fail('主按钮不得再用另一套读屏文案')
+} else {
+  pass('主按钮读屏与可见文字一致')
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Kiosk 打印确认页诚实性守卫未通过\n`)
   process.exit(1)
