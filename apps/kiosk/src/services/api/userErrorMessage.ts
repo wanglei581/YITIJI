@@ -88,6 +88,14 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   KIOSK_FEEDBACK_EMPTY: '请填写问题说明后再提交',
   ORDER_NOT_FOUND: '未找到对应订单，请返回重新开始',
   VALIDATION_FAILED: '提交内容未通过校验，请检查后重试',
+  // 2026-09-28 合规开关（服务端 ai-access 与内容检查）。这几个码原因唯一，给固定文案；
+  // 不登记时 401 会落成「登录状态已失效」（用户根本没登录过），403/400 落成页面的
+  // 「请稍后重试」，照着重试永远不会成功。
+  AI_PAUSED: 'AI 服务暂停中，打印、扫描照常可用',
+  MAINTENANCE_MODE: '系统维护中，请稍后再来',
+  AI_LOGIN_REQUIRED: '使用 AI 功能需要先用手机号登录',
+  AI_DECLARATION_REQUIRED: '使用 AI 前需要先确认年满 14 周岁；用到语音时还需同意录音',
+  AI_CONTENT_BLOCKED: '内容里有不能处理的信息，请修改后再试',
 }
 
 /**

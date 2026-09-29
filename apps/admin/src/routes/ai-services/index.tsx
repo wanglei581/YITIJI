@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { getAiUsage, getAiLogs, getAdminJobQualitySummary } from '../../services/api'
 import type { AdminAiUsage, AdminAiLogEntry, AiOperation, AiLogStatus, JobSourceQualitySummary } from '../../services/api'
+import { AiAccessSwitchesPanel } from './AiAccessSwitchesPanel'
 
 // ─── 常量映射 ─────────────────────────────────────────────────
 
@@ -234,6 +235,7 @@ export default function AiServicesPage() {
   if (loading) {
     return (
       <Page title="AI 服务管理" subtitle="调用统计 · 元数据日志 · Provider 状态">
+        <AiAccessSwitchesPanel />
         <LoadingState text="加载 AI 服务数据…" />
       </Page>
     )
@@ -242,6 +244,7 @@ export default function AiServicesPage() {
   if (error || !usage) {
     return (
       <Page title="AI 服务管理" subtitle="调用统计 · 元数据日志 · Provider 状态">
+        <AiAccessSwitchesPanel />
         <ErrorState title="数据加载失败" message={error ?? '未知错误'} />
       </Page>
     )
@@ -322,6 +325,7 @@ export default function AiServicesPage() {
 
   return (
     <Page title="AI 服务管理" subtitle="调用统计 · 元数据日志 · Provider 状态">
+      <AiAccessSwitchesPanel />
 
       {/* ── 成本告警 ─────────────────────────────────── */}
       <section aria-label="成本告警" className="mb-6">

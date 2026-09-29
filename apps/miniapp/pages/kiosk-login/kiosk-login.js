@@ -101,6 +101,7 @@ function devCard(phase, label) {
 Page({
   data: {
     statusBarHeight: 20,
+    capsuleInsetRight: 94,
     isLoggedIn: false,
     // idle 引导扫码 · scanning 扫码中 · scan-error 没扫到 / 不是一体机的码
     // checking 读票据 · status-error 没读到（可重读） · ticket-dead 票据已不能再确认（回一体机）
@@ -115,7 +116,7 @@ Page({
     note: '',
   },
 
-  onLoad() {
+  onLoad(options) {
     // 票据只留在内存：不进 data（手机可能被人凑过来看，也不该进截图 / 日志）。
     this._ticketId = ''
     // 每次扫码 / 重置都换一轮；晚到的响应对不上轮次就丢弃。
@@ -124,8 +125,11 @@ Page({
     this._gen = auth.sessionGeneration()
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
+      capsuleInsetRight: app.globalData.capsuleInsetRight || 94,
       isLoggedIn: auth.isLoggedIn(),
     })
+    // 首页「扫码连接一体机」进来：直接开扫码。取消扫码就停在本页说明上，不算出错。
+    if (options && options.autoScan === '1') this.scanCode()
   },
 
   onShow() {

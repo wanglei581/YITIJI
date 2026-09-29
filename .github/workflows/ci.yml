@@ -108,6 +108,8 @@ jobs:
           pnpm verify:deploy-gates-in-sync
           # 真跑发布脚本的回退演练（P0-3）：就绪失败 / 迁移失败都要把运行目录恢复到发布前，备份按组保留
           pnpm verify:deploy-rollback
+          # 发布前法务文档预检（3d，C4 口径）：本地起服务模拟线上接口，缺一份、读不到、超时都必须失败
+          pnpm verify:legal-docs-preflight
           pnpm verify:ci-main-runs-complete
           pnpm verify:release-bundle
           pnpm verify:prod-readonly-probe
@@ -141,6 +143,9 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:toolbox-review-ui
           pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
+          # D6/C6/C7 后台 AI 服务开关：适配器与面板在隔离进程里真跑，另读服务端
+          # ai-access 源码对照路径、档位、事由上限与维护拦截清单；不连库、不起服务。
+          pnpm --filter @ai-job-print/admin verify:admin-ai-access-ui
           pnpm --filter @ai-job-print/partner verify:partner-refresh-safe
           # S1 前端 AI 原语合同（#618）。纯读 apps/kiosk 源码，不碰 Prisma，
           # 因此可以留在这一步；四个 api 侧的 AI 门禁见下方 Verify suites。
@@ -175,6 +180,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:scan-quiet-period
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
           pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
+          pnpm --filter @ai-job-print/kiosk verify:qingxu-v2-frozen
           pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
           pnpm --filter @ai-job-print/admin verify:source-publish-actions
           pnpm --filter @ai-job-print/refresh verify:runtime
@@ -319,6 +325,7 @@ jobs:
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation
           pnpm --filter @ai-job-print/kiosk verify:home-prototype-v1
           pnpm --filter @ai-job-print/kiosk verify:member-login-dialog
+          pnpm --filter @ai-job-print/kiosk verify:c4-legal-consent-versions
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview
           # 麦克风能力探测必须测设备而非 API；纯静态读源码，不碰硬件。
           pnpm --filter @ai-job-print/kiosk verify:mic-capability-truth
@@ -357,6 +364,8 @@ jobs:
           pnpm run verify:task-reliability
           # Real child processes race for the process-lifetime singleton (Unix socket here, named pipe on Windows).
           pnpm run verify:singleton-process
+          # Field test day 1 (P0-9) evidence script: read-only, count-only, same singleton rule as the Agent.
+          pnpm run verify:field-day-evidence
           # Injected download/wait seams only: download retry backoff, monitor window scaling, log masking contract.
           pnpm run verify:print-truth-hardening
           # Pure in-process scheduler control; proves wake coalescing without HTTP, DB, or hardware.
@@ -697,6 +706,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
+          pnpm --filter @ai-job-print/api verify:kiosk-session
           pnpm --filter @ai-job-print/api verify:policy-scope
           pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
@@ -785,6 +795,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:package-order-fulfillment
           pnpm --filter @ai-job-print/api verify:sms-provider
           pnpm --filter @ai-job-print/api verify:sms-send
+          # P1-5 短信发送额度（全站每日总量 / 单终端每日上限、Redis 核不了即暂停）；内存 Redis，不连外网。
+          pnpm --filter @ai-job-print/api verify:sms-budget
+          # P1-4 管理员登录加固（锁定失败关闭、来源地址名单、短信第二步）；写隔离库。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-login-hardening
           pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-governance-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-launch-events
@@ -969,6 +983,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
+          pnpm --filter @ai-job-print/api verify:kiosk-session
           pnpm --filter @ai-job-print/api verify:policy-eligibility
           # 招聘会列表结构性门禁两个 job 都要跑：筛选下推靠 Prisma where 生成 SQL，
           # SQLite 与 PostgreSQL 的日期比较、contains 语义不完全一致，PG 侧必须独立回归。

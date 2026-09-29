@@ -5,6 +5,7 @@ import type { AuthedUser } from '../decorators/current-user.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
 import { resolveOptionalInternalUser } from '../auth/optional-internal-user'
+import { resolveClientIp } from '../client-ip'
 
 export { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-session.constants'
 
@@ -48,6 +49,7 @@ export class JwtAuthGuard implements CanActivate {
       this.jwtService,
       this.redis,
       this.prisma,
+      resolveClientIp(req),
       this.logger,
     )
     if (!user) {

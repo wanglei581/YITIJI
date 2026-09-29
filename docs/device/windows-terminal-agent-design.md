@@ -802,7 +802,7 @@ Kiosk 轮询到 completed，展示扫描结果预览
 
 | 项目 | 要求 |
 |------|------|
-| 操作系统 | Windows 10 x64 21H2+，Windows 11 x64 |
+| 操作系统 | x64；部署档位按[母盘清单](windows-golden-image-and-install-checklist.md) A1：Windows 11 IoT 企业版 LTSC 2024（首选）/ Windows 11 专业版 25H2 及以后（兜底）/ Windows 10 IoT 企业版 LTSC 2021（兼容）；普通 Windows 10 已于 2025-10-14 停止支持，不合格。Agent 代码本身仍须在 Windows 10/11 x64 上都能运行 |
 | 架构 | x64（一体机标准配置） |
 | 进程权限 | Service：LocalSystem 或专用服务账号；Helper：登录用户账号 |
 | 网络 | 有线网络（建议 DHCP 静态绑定） |

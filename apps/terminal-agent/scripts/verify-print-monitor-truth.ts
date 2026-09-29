@@ -189,6 +189,20 @@ async function main(): Promise<void> {
   assert.equal(commandTimeout.success, false, 'print command timeout must fail')
   assert.equal(commandTimeout.errorCode, 'PRINT_TIMEOUT')
 
+  // 下发给 SumatraPDF 的参数：彩色与黑白都必须显式给出，不能落到驱动默认值（驱动默认灰度时彩色单会出黑白纸）。
+  const dispatched: Array<Record<string, unknown>> = []
+  const capture = async (_file: string, options?: object): Promise<void> => { dispatched.push({ ...(options ?? {}) }) }
+  await printWithPdfToPrinter('/params/color.pdf', 'Configured Printer', { colorMode: 'color', duplex: 'duplex_long_edge', copies: 2 }, { dispatch: capture })
+  await printWithPdfToPrinter('/params/mono.pdf', 'Configured Printer', { colorMode: 'black_white', duplex: 'duplex_short_edge' }, { dispatch: capture })
+  await printWithPdfToPrinter('/params/simplex.pdf', 'Configured Printer', { duplex: 'simplex' }, { dispatch: capture })
+  assert.equal(dispatched[0]?.monochrome, false, 'color jobs must force color (pdf-to-printer turns monochrome=false into "color")')
+  assert.equal(dispatched[0]?.side, 'duplexlong', 'long-edge duplex must be sent explicitly')
+  assert.equal(dispatched[0]?.copies, 2)
+  assert.equal(dispatched[1]?.monochrome, true, 'black-and-white jobs must force monochrome')
+  assert.equal(dispatched[1]?.side, 'duplexshort', 'short-edge duplex must be sent explicitly')
+  assert.equal(dispatched[2]?.side, 'simplex', 'simplex must be sent explicitly, not left to the driver default')
+  assert.equal('monochrome' in (dispatched[2] ?? {}), false, 'no colour choice in the params means no colour setting is invented')
+
   try {
     const nonWindows = await monitorPrintJob('Configured Printer', 'task-non-windows', 10, 1, {
       platform: 'darwin',

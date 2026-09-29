@@ -3,6 +3,8 @@ const api = require('../../utils/api')
 const storage = require('../../utils/storage')
 const model = require('../../utils/resume-build-model')
 const voice = require('../../utils/voice-recorder')
+const aiAccess = require('../../utils/ai-access')
+const { userMessageOf } = require('../../utils/user-error')
 const Q = require('./resume-voice-questions')
 
 const PROBE_MAX_S = Math.floor(voice.PROBE_MAX_MS / 1000)
@@ -20,6 +22,9 @@ Page({
     textOnly: false,
     textOnlyReason: '',
     consentChecked: false,
+    // 录音同意的五件事，与模拟面试、小青共用同一份（utils/ai-access.js）。
+    voiceItems: aiAccess.VOICE_CONSENT_ITEMS,
+    voiceAgreedBefore: false,
 
     recStatus: 'idle', // idle | recording | transcribing | ready | error
     recSeconds: 0,
@@ -47,7 +52,13 @@ Page({
   },
 
   onLoad() {
-    this.setData({ statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20 })
+    // 之前在别处（模拟面试、小青）同意过录音：勾选框预先勾上，并写明可以在哪里撤回。
+    const agreed = aiAccess.isDeclared(aiAccess.VOICE_SCOPE)
+    this.setData({
+      statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
+      consentChecked: agreed,
+      voiceAgreedBefore: agreed,
+    })
     this._form = Q.emptyForm()
     this._seq = 0
   },
@@ -95,8 +106,12 @@ Page({
       wx.showToast({ title: '请先单独勾选录音同意', icon: 'none' })
       return
     }
-    voice.ensureRecordAuth().then((ok) => {
-      if (this._gone) return
+    // 勾选框就是录音单独同意（C6）：记下并写账号；没声明过年满 14 周岁的先问那一项。
+    api.confirmVoiceConsent().then(() => voice.ensureRecordAuth(), (err) => {
+      if (!this._gone) this._enterTextOnly(userMessageOf(err, '没有完成年龄确认，后面请用手打'))
+      return null
+    }).then((ok) => {
+      if (this._gone || ok === null) return
       if (!ok) {
         this._enterTextOnly('麦克风权限未开启，后面请用手打。功能还在。')
         return

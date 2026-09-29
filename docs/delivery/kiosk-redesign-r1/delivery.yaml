@@ -24,7 +24,7 @@ environments:
     purpose: "线上部署（百度云）"
     # 2026-09-08 15:2x 订正：按域名走。按 IP 探 /admin/ /partner/ 永远返回 kiosk，
     # 复验必须用域名或 curl --resolve，否则会得出「后台没部署」的错误结论。
-    url: "https://zyidai.cn（IP 120.48.13.190）—— 2026-09-08 14:49 发布 b790767f6 成功；此刻落后 origin/main 3 个提交（#968 / #971 / #973）"
+    url: "https://zyidai.cn（IP <生产服务器 IP>）—— 2026-09-08 14:49 发布 b790767f6 成功；此刻落后 origin/main 3 个提交（#968 / #971 / #973）"
   - name: "windows-kiosk"
     purpose: "一体机真机（打印/扫描/Terminal Agent）"
     url: "PENDING —— 新 Windows 主机未验收"

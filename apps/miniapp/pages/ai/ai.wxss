@@ -34,6 +34,15 @@
   line-height: 1.55;
 }
 .as-disc .ficon { color: var(--teal); font-size: 13px; margin-top: 1px; flex-shrink: 0; }
+/* AI 服务说明与投诉：紧贴在声明条下面，两颗等宽链接，高度守 48px 可点下限 */
+.as-links { display: flex; gap: 8px; margin: -8px 16px 16px; }
+.as-link {
+  flex: 1; min-width: 0; min-height: 48px; padding: 0 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--r-sm);
+  font-size: 12px; font-weight: 600; color: var(--teal-deep);
+}
+.as-link .ficon { width: 10px; height: 10px; color: var(--faint); flex-shrink: 0; }
 
 /* AI 工具磁贴：统一为紫调单色，去彩虹。整块「AI 区」共用一个身份色相，
    工具之间靠图形与文案分辨，而非五种色块——更克制、更像专业工具集。 */

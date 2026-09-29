@@ -25,8 +25,13 @@ function mapParams(params: Partial<PrintJobParams>): Partial<PrintOptions> {
     opts.copies = params.copies
   }
 
+  // 两种都显式下发：pdf-to-printer 把 monochrome=true 译成 SumatraPDF 的 "monochrome"、false 译成 "color"。
+  // 彩色若不下发，就落到驱动默认值——驱动默认是灰度时，用户付了彩色价却拿到黑白纸，后台还感知不到
+  // （2026-09-29 真机彩色开通前核对时发现）。
   if (params.colorMode === 'black_white') {
     opts.monochrome = true
+  } else if (params.colorMode === 'color') {
+    opts.monochrome = false
   }
 
   if (params.duplex === 'simplex') {

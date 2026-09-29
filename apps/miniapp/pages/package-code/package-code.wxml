@@ -61,6 +61,12 @@
         <text class="pickup-code big">{{pickupCode}}</text>
         <text class="code-hint">也可以在一体机「到机码核销」里手动输入</text>
       </view>
+      <!-- 到机码三个动作：点上面的码即复制；这里是分享给代取人与作废换新码（9/25 拍板第 5 条）。 -->
+      <view wx:if="{{pickupCode}}" class="code-acts">
+        <view class="code-act tap" hover-class="tap-press" bindtap="shareCode" role="button" aria-label="分享给代取人">分享给代取人</view>
+        <view class="code-act tap {{reissuing ? 'off' : ''}}" hover-class="tap-press" bindtap="reissueCode" role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
+      </view>
+      <view wx:if="{{pickupCode}}" class="code-share-note">码发给谁，谁就能取；不想让对方取了，点「作废换新码」，旧码马上失效。</view>
 
       <!-- 订单信息 -->
       <view class="section-t">订单信息</view>
@@ -131,3 +137,6 @@
     <view class="btn primary tap" hover-class="tap-press" bindtap="goHome" role="button" aria-label="返回首页">返回首页</view>
   </view>
 </view>
+
+<!-- 分享给代取人的图画在这块屏幕外的 2d 画布上，不显示给用户。 -->
+<canvas type="2d" id="pickup-share-card" class="share-card-canvas" aria-hidden="true"></canvas>

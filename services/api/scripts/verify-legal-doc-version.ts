@@ -36,6 +36,25 @@ function fail(label: string, detail?: string): never {
   process.exit(1)
 }
 
+/** 去掉块注释与整行注释，门禁只对代码下断言。 */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+}
+
+/** 从 openAt 处的「{」取到与之配对的「}」（含两端）。 */
+function braceBlock(source: string, openAt: number): string {
+  if (openAt < 0 || source[openAt] !== '{') return ''
+  let depth = 0
+  for (let i = openAt; i < source.length; i += 1) {
+    if (source[i] === '{') depth += 1
+    else if (source[i] === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(openAt, i + 1)
+    }
+  }
+  return ''
+}
+
 function readFile(rel: string): string {
   const abs = path.join(ROOT, rel)
   if (!fs.existsSync(abs)) fail(`文件不存在: ${rel}`)
@@ -124,10 +143,37 @@ async function main() {
     const resolverBody = auth.slice(auth.indexOf('async resolveActiveLegalVersions('), auth.indexOf('private assertConsentMatches('))
     if (!resolverBody.includes('assertLegalDocsPublished(resolved)')) fail('resolveActiveLegalVersions 没有调用协议发布闸门')
     if ((auth.match(/await this\.resolveActiveLegalVersions\(\)/g) ?? []).length < 3) fail('短信、扫码、微信三条登录路径没有全部经过 resolveActiveLegalVersions')
-    // 判定只在服务端做一处：一体机保留回落，否则 LEGAL_DOCS_REQUIRE_PUBLISHED=false 的应急口对一体机无效。
-    const kioskVersions = readFile('apps/kiosk/src/services/auth/legalConsentVersions.ts')
-    if (!kioskVersions.includes('LEGAL_DRAFT_FALLBACK_VERSION')) fail('一体机取版本失败时的回落被删了，应急口会对一体机失效')
-    pass('C4 协议发布闸门：生产默认拒绝草稿与未发布版本，开发照旧，显式开关两向可覆盖，三条登录路径都经过')
+    // 一体机（2026-09-29 口径）：正式生产构建取不到已发布版本时不回落、如实拦住登录；开发、单测、E2E 构建保留回落。
+    // 服务端应急口 LEGAL_DOCS_REQUIRE_PUBLISHED=false 对一体机正式构建不再生效是有意的（发布前 preflight 硬检查法务文档已激活）。
+    // 只看去掉注释后的代码：断言锚在判断与分支上，不锚在注释或类型声明上。
+    const kioskCode = stripComments(readFile('apps/kiosk/src/services/auth/legalConsentVersions.ts'))
+    if (!/import\s*\{[^}]*\bIS_E2E_BUILD\b[^}]*\}\s*from\s*['"][^'"]*utils\/buildMode['"]/.test(kioskCode)) {
+      fail('一体机取协议版本没有从 utils/buildMode 引入 IS_E2E_BUILD，分不出正式构建与测试构建')
+    }
+    const formalFlag = /const\s+([A-Za-z_$][\w$]*)\s*=\s*import\.meta\.env\.PROD\s*&&\s*!\s*IS_E2E_BUILD\b/.exec(kioskCode)?.[1]
+    if (!formalFlag) fail('一体机没有「import.meta.env.PROD && !IS_E2E_BUILD」这一正式构建判断')
+    const entryAt = kioskCode.indexOf('export async function fetchLegalConsentVersions(')
+    if (entryAt < 0) fail('一体机缺少 fetchLegalConsentVersions')
+    const entryBody = braceBlock(kioskCode, kioskCode.indexOf('{', kioskCode.indexOf(')', entryAt)))
+    const guardAt = entryBody.search(new RegExp(`if\\s*\\(\\s*${formalFlag}\\s*\\)\\s*\\{`))
+    if (guardAt < 0) fail(`fetchLegalConsentVersions 没有按正式构建（${formalFlag}）分支`)
+    const guardBlock = braceBlock(entryBody, entryBody.indexOf('{', guardAt))
+    if (!/throw\s+new\s+MemberApiError\(\s*'LEGAL_DOCS_NOT_PUBLISHED'/.test(guardBlock)) {
+      fail('正式构建取不到已发布版本时没有抛出 LEGAL_DOCS_NOT_PUBLISHED（登录页据此拦住登录）')
+    }
+    if (guardBlock.includes('LEGAL_DRAFT_FALLBACK_VERSION') || /\breturn\b/.test(guardBlock)) {
+      fail('正式构建分支里仍在回落或返回版本，会用未发布的协议放行登录')
+    }
+    const fallbackAt = entryBody.indexOf('LEGAL_DRAFT_FALLBACK_VERSION')
+    if (fallbackAt < 0) fail('开发与测试构建的草拟回落被删了，现有测试行为会变')
+    if (fallbackAt < guardAt) fail('草拟回落出现在正式构建判断之前，正式构建也会走到回落')
+    const outsideEntry = kioskCode.slice(0, entryAt)
+    if ((outsideEntry.match(/LEGAL_DRAFT_FALLBACK_VERSION/g) ?? []).length !== 1) {
+      fail('fetchLegalConsentVersions 之外（如单份取版本）仍直接回落草拟版本，绕过了正式构建判断')
+    }
+    const copyDecl = /export\s+const\s+LEGAL_DOCS_NOT_PUBLISHED_COPY\s*=\s*'([^']+)'/.exec(stripComments(readFile('apps/kiosk/src/services/auth/memberAuthApi.ts')))?.[1] ?? ''
+    if (!copyDecl.includes('不登录也能')) fail('协议未发布的拦截文案没有告诉用户不登录也能用哪些功能')
+    pass('C4 协议发布闸门：生产默认拒绝草稿与未发布版本，开发照旧，显式开关两向可覆盖，三条登录路径都经过；一体机正式构建不回落、如实拦住登录，开发与测试构建保留回落')
   }
 
   // ── 3. admin 控制器使用鉴权守卫 ──────────────────────────────────────────

@@ -4,7 +4,11 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 
-const CAT_LABEL = { device: '设备使用', print: '打印服务', file_process: '文件处理', general: '一般建议' }
+// ai_content（C3）：AI 内容投诉，服务端 member-feedback.dto.ts 的 FEEDBACK_CATEGORIES 里有这一类。
+// 个人信息请求不在这里开类别：在「隐私与数据」自助办，办不了的按那里写的方式联系（9/28 C3 口径）。
+const CAT_LABEL = { device: '设备使用', print: '打印服务', file_process: '文件处理', general: '一般建议', ai_content: 'AI 内容投诉' }
+// 答复时限（D5，律师再核）。写在页面上，也是对用户的承诺，改之前先改法务文档。
+const AI_COMPLAINT_REPLY_DAYS = 5
 const CATEGORIES = Object.keys(CAT_LABEL).map((value) => ({ value, label: CAT_LABEL[value] }))
 const STATUS_LABEL = { pending: '待处理', processing: '处理中', replied: '已回复', closed: '已关闭' }
 const STATUS_TONE = { pending: 'wheat', processing: 'teal', replied: 'ok', closed: '' }
@@ -68,6 +72,7 @@ Page({
     content: '',
     contentLen: 0,
     contactPhone: '',
+    aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
     submitting: false,
     canSubmit: false,
     list: [],
@@ -75,8 +80,13 @@ Page({
     loadError: '',
   },
 
-  onLoad() {
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+  onLoad(options) {
+    const preset = options && CAT_LABEL[options.category] ? options.category : ''
+    this.setData({
+      statusBarHeight: app.globalData.statusBarHeight || 20,
+      aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
+      category: preset || this.data.category,
+    })
   },
 
   onShow() {
@@ -92,6 +102,15 @@ Page({
 
   goLogin() {
     wx.navigateTo({ url: '/pages/launch/launch' })
+  },
+
+  // 没登录也要有投诉的去处：经营者信息里有联系电话。
+  goOperatorInfo() {
+    wx.navigateTo({ url: '/pages/legal/legal?type=operator_info' })
+  },
+
+  goPrivacy() {
+    wx.navigateTo({ url: '/pages/privacy/privacy' })
   },
 
   setCategory(e) {

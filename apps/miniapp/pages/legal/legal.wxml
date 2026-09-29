@@ -2,7 +2,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">{{title}}</view>
@@ -11,11 +11,19 @@
   </view>
 
   <view class="content legal-content">
-    <view wx:if="{{loading}}" class="legal-state">正在加载正式版本…</view>
+    <view wx:if="{{state === 'loading'}}" class="legal-state">正在读取正式版本…</view>
 
-    <view wx:elif="{{error}}" class="card legal-state">
+    <!-- 还没发布不是出错：说清没发布、发布后这里会写什么，不拿本机旧文本顶上。 -->
+    <view wx:elif="{{state === 'unpublished'}}" class="card legal-state">
       <text class="ficon i-info legal-state-icon"></text>
-      <view class="legal-state-title">暂时无法显示正式版本</view>
+      <view class="legal-state-title">{{title}}暂未发布</view>
+      <view class="legal-state-desc">{{unpublishedDesc}}</view>
+      <button class="btn ghost block" bindtap="loadDoc">重新查看</button>
+    </view>
+
+    <view wx:elif="{{state === 'error'}}" class="card legal-state">
+      <text class="ficon i-info legal-state-icon"></text>
+      <view class="legal-state-title">暂时读不到正式版本</view>
       <view class="legal-state-desc">{{error}}</view>
       <button class="btn primary block" bindtap="loadDoc">重新加载</button>
     </view>

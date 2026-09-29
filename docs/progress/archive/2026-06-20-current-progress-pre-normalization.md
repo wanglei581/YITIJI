@@ -86,7 +86,7 @@
 
 ## 百度云预生产核心复验完成（2026-06-19，Codex）
 
-权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已部署到百度云预生产服务器 `120.48.13.190`，当前云端版本：
+权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已部署到百度云预生产服务器 `<生产服务器 IP>`，当前云端版本：
 
 - 部署提交：`a4b1803a`（最终包含 `fix: pin pnpm overrides for frozen install`、`test: scope benefit activity audit verification`、`fix: mark all broadcasts as read`）
 - 部署包：`/srv/yitiji-main-a4b1803a.tar.gz`
@@ -97,7 +97,7 @@
 本轮先恢复服务器的公钥登录，随后登录验证通过（返回 `SSH_OK`；主机信息见运维私有记录）。部署过程中发现并修复两个真实预生产问题：
 
 - **pnpm frozen install 阻塞**：`pnpm-lock.yaml` 含 overrides，但根 `package.json` 缺少 `pnpm.overrides`；已补回并收紧为 exact overrides：`qs=6.15.2`、`@hono/node-server=2.0.4`、`uuid=14.0.0`，同时要求 `node>=20.19`；服务器 `pnpm install --frozen-lockfile` 通过。
-- **nginx `/api/v1` 反代缺失**：公网 `http://120.48.13.190/api/v1/health` 原先返回 Kiosk `index.html`；已备份 `/etc/nginx/sites-available/ai-job-print.bak-20260619020839` 并给 80/8081/8082 三个 server 添加 `/api/v1` → `127.0.0.1:3010/api/v1` 反代，`nginx -t` 与 reload 通过。
+- **nginx `/api/v1` 反代缺失**：公网 `http://<生产服务器 IP>/api/v1/health` 原先返回 Kiosk `index.html`；已备份 `/etc/nginx/sites-available/ai-job-print.bak-20260619020839` 并给 80/8081/8082 三个 server 添加 `/api/v1` → `127.0.0.1:3010/api/v1` 反代，`nginx -t` 与 reload 通过。
 - **权益活动审计验证误报**：非空 PostgreSQL 库存在历史 `benefit_activity.*` 审计时，旧 `verify:benefit-activities` 只按 action 查全库，可能串到历史日志；已按本轮 activity `targetId` 收窄并清理 `actorId=null` 的 claim 审计，服务器 PostgreSQL 复验 ALL PASS。
 - **消息通知全部已读 100 条上限**：公网库已有大量系统广播时，旧 `read-all` 只处理前 100 条，导致 UI 显示未读不归零；已改成事务内批量写入 `BroadcastReadState`，新增 105 条广播回归，公网 HTTP 验证 `unreadBefore=338` → `unreadAfter=0`。
 
@@ -108,7 +108,7 @@
 - API build ✅；Kiosk/Admin/Partner build ✅（仅既有大 chunk warning）。
 - PM2 已收敛为单进程 `ai-job-print-api`，脚本路径 `/srv/ai-job-print/services/api/dist/main.js`，cwd `/srv/ai-job-print/services/api`。
 - 内网 health ✅：`http://127.0.0.1:3010/api/v1/health` 返回 `db=postgres`。
-- 公网 health ✅：`http://120.48.13.190/api/v1/health`、`:8081/api/v1/health`、`:8082/api/v1/health` 均返回 `db=postgres` JSON。
+- 公网 health ✅：`http://<生产服务器 IP>/api/v1/health`、`:8081/api/v1/health`、`:8082/api/v1/health` 均返回 `db=postgres` JSON。
 
 云端服务验证：
 
@@ -723,7 +723,7 @@ AI 大模型配置（`LlmConfigService`：apiKey AES-256-GCM 加密落盘、启�
 - main 封板 `80eabcc`（含 74ef526/5f0ce63/80eabcc），CI 双 job 绿；typecheck（6 包）/lint（4 端 0 error）/build（5 包）全绿；8 个核心 verify 全 PASS（activity-logs 12 / companies 11 / c2d 9 / career-plan 11 / mock-interview 17 / job-fit 11 / resume-optimize / ocr-baidu 12）。
 - PostgreSQL 底座：空库 deploy（4 迁移）+ seed + PG 上 3 个核心 verify 全过；**pg_dump 备份 → pg_restore 临时库恢复演练通过（行数核对一致）**。
 - OCR 新 Key 真实冒烟：`verify:ocr-baidu-live` PASS，`accurate_basic` 识别与扫描件 `pdf_ocr` 全链路通过，置信度 high。
-- COS 新 Key 真实冒烟：`verify:cos:live` PASS，真实桶 `yitiji-prod-private-1257025684` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。
+- COS 新 Key 真实冒烟：`verify:cos:live` PASS，真实桶 `<生产存储桶>` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。
 - 合规禁词全仓扫描：**B 类违规为零**（命中均为禁词过滤防线代码/合规免责文案/子串误中）。
 - mock/假数据审计：生产路径 P0 为零；mock 分支全部受 `API_MODE!=http` 门控且明示演示；SMS/AI provider 有生产启动期校验（prod 禁 log/mock）。
 - 安全基线 10 项审计全通过（.env 隔离/无硬编码密钥/CORS 白名单/限流/异常不泄栈/签名 URL TTL/webhook 防重放/会员隔离/删除审计/日志脱敏）。
@@ -738,7 +738,7 @@ AI 大模型配置（`LlmConfigService`：apiKey AES-256-GCM 加密落盘、启�
 | 原阻塞项 | 解除记录 |
 |---|---|
 | 百度 OCR 密钥轮换（曾聊天暴露，旧 AppID 7841387） | 用户在百度控制台重建应用，新 Key 配入 `services/api/.env`；`verify:ocr-baidu-live` 真实联网通过，`accurate_basic` 识别与扫描件 `pdf_ocr` 全链路通过，置信度 high。旧 Key 作废以用户控制台操作为准 |
-| 腾讯云 COS CAM 密钥轮换（曾终端回显） | 用户轮换 CAM 子用户密钥，新 Key 配入 `.env`；`verify:cos:live` 真实桶 `yitiji-prod-private-1257025684` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action |
+| 腾讯云 COS CAM 密钥轮换（曾终端回显） | 用户轮换 CAM 子用户密钥，新 Key 配入 `.env`；`verify:cos:live` 真实桶 `<生产存储桶>` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action |
 
 **剩余阻塞（须用户/外部操作，代码侧无法完成）**：
 
@@ -2196,7 +2196,7 @@ POST /resume/parse { fileId }
 | 服务可运行 | API 启动正常（`driver=cos` + 真实 COS 凭证下 `StorageService` 构造通过、DB 连接 `file:./prisma/dev.db`、全路由 mapped）；Kiosk(5173)/Admin(5174) dev server 正常返回应用壳；Redis(6379) 在线。注：本地 DB 为 SQLite dev.db，无需 Postgres(5432) |
 | 接口冒烟 | `GET /api/v1/jobs`、`/job-fairs` → 200 真实数据（含 `sourceOrgId/externalId/sourceName/sourceUrl/syncTime` 第三方来源字段）；`GET /terminals/:id/screensaver` → 200（未配置终端返回 `enabled:false`，符合预期） |
 | 核心冒烟 | Admin 登录 `admin/admin` → 201 + JWT（登录路由有 `@Throttle 5/60s` 防爆破）；带令牌访问 `admin/ad-assets`、`admin/ad-playlists`、`admin/screensaver/terminals`、`admin/terminals`、`admin/printers` 全部 200 |
-| 存储配置一致 | 根 `.env.example` / `services/api/.env.example` / `docs/api/cos-object-storage.md` 三处 `FILE_STORAGE_DRIVER` + `TENCENT_COS_*` 变量名完全一致；bucket/region 填值处均为 `yitiji-prod-private-1257025684` / `ap-guangzhou`；local fallback 明确；`.env` 未入库、追踪文件无真实密钥 |
+| 存储配置一致 | 根 `.env.example` / `services/api/.env.example` / `docs/api/cos-object-storage.md` 三处 `FILE_STORAGE_DRIVER` + `TENCENT_COS_*` 变量名完全一致；bucket/region 填值处均为 `<生产存储桶>` / `ap-guangzhou`；local fallback 明确；`.env` 未入库、追踪文件无真实密钥 |
 | 合规边界 | 代码内无「一键投递 / 平台投递 / 企业收简历 / 候选人管理 / 面试邀约 / Offer 管理」等违规功能（仅出现在禁词清单 / 禁用枚举 / 注释 / 合规横幅）；岗位/招聘会仍为第三方来源入口，按钮用「去来源平台投递 / 扫码投递」+ 外部 `sourceUrl` |
 
 **待人工手验（自动化已覆盖字节链路，浏览器点检需运行栈）：** Admin 浏览器上传宣传屏图/视频、Kiosk `/screensaver` 真机播放。下一步候选见 [next-tasks.md](./next-tasks.md) §下一步候选（A/B/C）。
@@ -2259,13 +2259,13 @@ POST /resume/parse { fileId }
 | `pnpm --filter ./apps/admin typecheck` / `lint` | ✅ |
 | `pnpm --filter ./services/api typecheck` / `lint` | ✅ |
 | Admin `/screensaver` 浏览器验证 | ✅ 缩略图加载到真实尺寸；点击素材打开预览弹窗；图片在弹窗内正常显示 |
-| API 重启状态 | ✅ `StorageService driver=cos bucket=yitiji-prod-private-1257025684 region=ap-guangzhou cosAvailable=true` |
+| API 重启状态 | ✅ `StorageService driver=cos bucket=<生产存储桶> region=ap-guangzhou cosAvailable=true` |
 
 ---
 
 ## 腾讯云 COS 对象存储接入（2026-06-06，Claude）
 
-**背景：** 把云端文件存储从本地 FS 升级为可切换腾讯云 COS（私有桶 `yitiji-prod-private-1257025684` / `ap-guangzhou`），用于上传、下载、预览、持久化。统一私有桶（不按端拆桶），靠 objectKey 前缀 + `FileObject` 记录分类授权。分支 `feature/cos-storage-integration`（基于 main `f807b75`）。详见 [docs/api/cos-object-storage.md](../api/cos-object-storage.md)。
+**背景：** 把云端文件存储从本地 FS 升级为可切换腾讯云 COS（私有桶 `<生产存储桶>` / `ap-guangzhou`），用于上传、下载、预览、持久化。统一私有桶（不按端拆桶），靠 objectKey 前缀 + `FileObject` 记录分类授权。分支 `feature/cos-storage-integration`（基于 main `f807b75`）。详见 [docs/api/cos-object-storage.md](../api/cos-object-storage.md)。
 
 **核心设计：** COS 作为「可插拔存储后端」接到新增的 `StorageService` 抽象后面，本地 FS 为 dev 默认后端，`FILE_STORAGE_DRIVER=local|cos` 切换。切 COS **不改任何业务代码**——现有 Kiosk 上传 / 打印 / Admin 文件管理 / Partner 上传 / 宣传屏素材全部透明落 COS。COS 签名为**手写预签名 URL**（严格复刻官方算法，零新依赖，匹配本仓 HMAC/AES-GCM/MD5 手写惯例,独立重算单测交叉校验）。
 
