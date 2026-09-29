@@ -22970,7 +22970,8 @@
     ],
     "services/api/src/ai/resume/self-assessment.types.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/self-assessment.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -39355,6 +39356,7 @@
           "services/api/src/ai/resume/self-assessment-questions.ts",
           "services/api/src/ai/resume/self-assessment-scoring.ts",
           "services/api/src/ai/resume/self-assessment.service.ts",
+          "services/api/src/ai/resume/self-assessment.types.ts",
           "services/api/src/ai/self-assessment.controller.ts",
           "services/api/src/common/pdf/aigc-label.ts",
           "services/api/src/common/pdf/pdfjs-document.ts"
