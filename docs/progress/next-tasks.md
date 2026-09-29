@@ -66,6 +66,14 @@
    - **`Cleanup Stale Releases (guarded)`**（`.github/workflows/cleanup-stale-releases.yml:9-23`）：先 `execute=false`，`purge_trash_path` 留空，`confirm` 留空，只看清单。确认后 `execute=true` 且 `confirm` 填 `CLEANUP-CONFIRM`，只把白名单目录移到隔离区。同一分区内移动不释放空间（`.github/scripts/cleanup-stale-releases.sh:9-10`、`:40-42`；注释记 2026-08-17 实测移动后可用空间不变）。观察 24–72 小时，再把 `purge_trash_path` 填成那个隔离区路径、确认词照填，purge 才释放空间。
 
    **推断**（本次没有登录服务器）：发布备份、运行目录、静态备份和每日数据库备份很可能在同一个 40GB 根分区上。依据是发布脚本注释里的历史读数（根分区 40GB，`.github/scripts/deploy-api-release.sh:151-159`），静态备份在成功重载 nginx 后只留 3 组（`.github/workflows/deploy.yml:286-364`），每日备份默认在 `services/api/scripts/backup-postgres.sh:3`、只有 `BACKUP_UPLOAD_ENABLED=1` 才上传（同文件 `:32-35`），仓库里没有独立数据盘挂载的记录。长期把这些备份放到独立数据盘或对象存储，列为产品负责人待定项，不在第一次发布前做。
+
+   **2026-09-29 只读体检结论**（产品负责人授权后由总指挥代为触发，main 上跑；Deploy Precheck、Server Cleanup dry-run、Cleanup Stale Releases dry-run 三次都成功，运行号见 current-progress）：
+   - 根分区 40GB，已用 46%，剩余 21GB，高于 10GB 门槛；API 本机健康、Redis 可达；线上运行版本仍是 9/17 发布的那一版。**第一次发布前不需要清理。**
+   - 占用：发布备份 2301MB（两组完整备份，各约 1.15GB，是 9/17、9/09 两个版本的回退锚点，要留）；pnpm store 2709MB；journal 约 415MB；PM2 日志 1MB；nginx 日志 12MB；数据库 7MB。/root 下源码检出约 1.6GB。
+   - Server Cleanup 按 keep=3 只会删 4 个各约 1MB 的「组」，几乎腾不出空间；这印证了清理工作流只按 `.dump` / `.runtime` 分组、零碎文件单独占分组名额的缺陷（修复在空间改进分支里，修好后拿这份清单做阳性对照）。
+   - Stale Releases 的白名单目录在服务器上都已不存在，可回收 0MB。服务器上实际残留的是 `/srv` 根目录下早期手动部署留下的几个目录（合计约 0.9GB），**要先查清有没有被 pm2 或 nginx 引用**再考虑处理，Precheck 第二轮会加只读输出。
+   - 以后可用降到 10GB 以下时：先跑 Server Cleanup `dry_run=false`、`keep=3`、`prune_pnpm=true`、`vacuum_journal=false`，只清 pnpm store；备份组和 journal 不动。
+   - Precheck 第二轮要补的只读项：`node -v` 与 `pnpm -v`（发布前要确认 Node ≥ 22.13，见 4b 之前那条）、certbot 定时器与证书到期日、`/srv` 根目录残留目录被谁引用与最后修改时间、明文 80 端口上的终端 API 次数（带 443 心跳阳性对照）、各类缓存与日志大小。
 7. **线上问题清单（第一次发布前逐条对上负责方）**：下表覆盖 2026-09-29 只读盘点里的线上问题，加上磁盘清理没有盖住的留存与上传缺口。负责方只写一个：已有修复 PR 写 PR 号；还没有 PR、要改代码的写窗口；要登服务器、改生产配置、改 nginx、在对象存储控制台操作、到真机现场，或在后台点激活的，写产品负责人本人做。已经写在本清单里的，只写「见第 N 条」。核对基准是本分支 `a76817cf5`。
 
 | 问题 | 现象（一句话） | 负责方 | 第一次发布前要不要解决 |
@@ -107,6 +115,10 @@
 **发布后核对**（只读探针可以由我们按域名代跑）
 - `/api/v1/health/ready` 正常；一体机、两个后台打开的都是新版本。
 - 会员能登录，协议显示的是新版本号。
+- **演示企业下架（#1115 随本次发布上线后，产品负责人授权执行；只下架、不删行）**：步骤见运维手册 §4.1。
+  1. 在生产运行目录先跑 `pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`（默认 dry-run，不改库），核对输出里的「目标数据库」是生产库，清单里只有那 3 家带「（演示）」的企业。
+  2. 产品负责人授权后，带确认词和事由执行：`UNPUBLISH_DEMO_COMPANIES_CONFIRM=UNPUBLISH_DEMO_COMPANIES UNPUBLISH_DEMO_COMPANIES_REASON='首次发布清理开发期演示企业（产品负责人授权）' pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`（事由 2–200 字；确认词或事由不对时命令不连库、退出码 2）。「已下架」的 id 要和第 1 步清单逐一对上，对不上就停下人工核对，不要重复执行。
+  3. 执行后跑 `node scripts/prod-readonly-probe.mjs`，企业一项应为 PASS。9/29 只读核过：生产岗位、招聘会都是 0 条，线下机构列表为空，都没有演示标记，所以只处理企业。
 - 企业、岗位、招聘会的公开接口都返回 0 条（托管关闭）。
 - 一体机打印首页的签名盖章卡显示「本机暂未开通」。
 - 告警推送通了：比如让测试终端离线几分钟，看群里是否收到。
@@ -137,7 +149,7 @@
 
 #### P0-1 演示企业提前下架（产品负责人可选，第一次发布前）
 
-线上 `/api/v1/companies` 9/29 仍公开 3 家标「（演示）」的企业资料（岗位、招聘会已是 0 条）。第一次发布后招聘内容托管默认关闭，这 3 家会一起不再对外提供；想提前下架可以照下面做：
+线上 `/api/v1/companies` 9/29 仍公开 3 家标「（演示）」的企业资料（岗位、招聘会已是 0 条）。第一次发布后招聘内容托管默认关闭，这 3 家会一起不再对外提供；发布时再用 #1115 的维护命令正式下架一次（见第一次发布「发布后核对」）。想在发布前提前下架，可以照下面做：
 
 后台左侧「企业展示管理」→ 逐个点开这 3 家 → 详情里「审核与发布」一栏点「下架」→ 在确认框（「下架后一体机不再展示该企业」）里确认。3 家都下架后，这个接口应返回 0 条：它只返回已审核且已发布的企业。
 
