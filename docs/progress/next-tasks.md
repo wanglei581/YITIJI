@@ -1,5 +1,14 @@
 # 下一步任务
 
+## 2026-09-29：小程序余项（小程序窗口）
+
+- **提审前产品负责人在公众平台做的事**（清单已交总指挥）：用户隐私保护指引按 `apps/miniapp/scripts/privacy-api-inventory.json` 五类填；类目工具 > 办公；备案（0.11）；后台「法务文档」发布四份文档（先发布再部署，C4）；request / uploadFile / downloadFile 合法域名。
+- **交主执行窗口：** 一体机「我的打印订单」补读 `/me/print-orders/cloud` 与 `/orders/package`（手机上下的单在一体机上看不到，见 current-progress 同日条目）。
+- **交后端窗口（已转）：** 全局异常过滤器丢掉 `AI_DECLARATION_REQUIRED` 的 `missing`，建议放进 `details`；小程序两处都读，已兼容。
+- **待真机与实跑：** 对照工具 `apps/miniapp/tools/cross-end-member-parity.mjs` 连本地全栈或试点测试会员跑一次；分享图与作废重发、年龄与录音声明在两台真机各走一遍（4.3）。
+- **第二版：** 求职进度页（只许本人手填，`/me/job-applications`，同一 PR 给 `MINIAPP_REGISTERED_PAGES` 加一行）。
+- **录音同意里的服务商：** 按法务试运行版写「腾讯云」，前提是生产 `ASR_PROVIDER=tencent`；律师定稿或生产改用百度时同步改 `utils/ai-access.js` 的 `VOICE_CONSENT_ITEMS`。
+
 ## 2026-09-28 深夜：合规小改实现进度与上线配置清单
 
 **9/28 拍板结果**（产品负责人「按推荐拍板」，只覆盖合规小改的 D1–D6；收口评审的 11 条、四方评审的 23 条不在其中，仍待定）：

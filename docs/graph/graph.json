@@ -20282,6 +20282,9 @@
       "apps/miniapp/scripts/verify-package-chain.mjs",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
+    "apps/miniapp/pages/print-pickup/pickup-state.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
     "apps/miniapp/pages/print-pickup/print-pickup.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
       "apps/miniapp/scripts/verify-package-chain.mjs"
@@ -20336,7 +20339,6 @@
     ],
     "apps/miniapp/utils/api.js": [
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
-      "apps/miniapp/scripts/verify-miniapp-api-contract.mjs",
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
       "apps/miniapp/scripts/verify-package-chain.mjs",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -28775,9 +28777,7 @@
       "asserts": {
         "absent": [],
         "dirs": [],
-        "files": [
-          "apps/miniapp/utils/api.js"
-        ],
+        "files": [],
         "missing": []
       },
       "file": "apps/miniapp/scripts/verify-miniapp-api-contract.mjs",
@@ -28813,6 +28813,7 @@
           "apps/miniapp/pages/package-code/package-code.js",
           "apps/miniapp/pages/package-confirm/package-confirm.js",
           "apps/miniapp/pages/print-pay/print-pay.js",
+          "apps/miniapp/pages/print-pickup/pickup-state.js",
           "apps/miniapp/pages/print-pickup/print-pickup.js",
           "apps/miniapp/pages/print-store/print-store.js",
           "apps/miniapp/pages/print-upload/print-upload.js",

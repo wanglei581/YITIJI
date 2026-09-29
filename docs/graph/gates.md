@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1580 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1581 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -855,7 +855,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/miniapp/pages/</code> — 34 个文件</summary>
+<summary><code>apps/miniapp/pages/</code> — 35 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -880,6 +880,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/pages/package-create/package-create.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/pages/policies/policies.js` | `verify-empty-state-honesty.mjs` |
 | `apps/miniapp/pages/print-pay/print-pay.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs`<br/>`verify-miniapp-cloud-print-m2.ts` |
+| `apps/miniapp/pages/print-pickup/pickup-state.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/print-pickup/print-pickup.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
 | `apps/miniapp/pages/print-store/print-store.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/print-upload/print-upload.js` | `verify-miniapp-static.mjs` |
@@ -921,7 +922,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `apps/miniapp/utils/api.js` | `verify-word-conversion-ui.mjs`<br/>`verify-miniapp-api-contract.mjs`<br/>`verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs`<br/>`verify-assistant-voice.ts`<br/>`verify-miniapp-cloud-print-m2.ts` |
+| `apps/miniapp/utils/api.js` | `verify-word-conversion-ui.mjs`<br/>`verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs`<br/>`verify-assistant-voice.ts`<br/>`verify-miniapp-cloud-print-m2.ts` |
 | `apps/miniapp/utils/auth.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/config.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/normalize.js` | `verify-miniapp-static.mjs` |
