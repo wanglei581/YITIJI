@@ -3012,16 +3012,33 @@ model OfflineJob {
   updatedAt    DateTime      @updatedAt
 }
 
+/// 一体机会话 = 服务人次的来源（2026-09-29 起真写入，见 src/kiosk-session）。
+/// 一个使用周期（从待机屏唤醒或上一次清场之后）里第一次有效操作时由一体机 start，
+/// 清场或超时时 end。只存匿名字段：已验签的终端、写入时的机构快照、起止时间、结束原因、服务大类。
+/// 不存手机号、会员号、文件或页面路径；memberId 是早期预留列，不写入。
 model KioskSession {
-  id           String   @id @default(cuid())
-  terminalId   String?
-  memberId     String?
-  startedAt    DateTime @default(now())
-  lastActiveAt DateTime @default(now())
-  expiresAt    DateTime
-  isExpired    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String    @id @default(cuid())
+  terminalId      String?
+  /// 写入时终端所属机构的快照。机构只统计快照为本机构的会话，终端改绑不带走历史。
+  orgId           String?
+  /// 一体机每个使用周期生成的 UUID；同一终端内唯一，start 重放不会多计一次
+  clientSessionId String?
+  memberId        String?
+  startedAt       DateTime  @default(now())
+  lastActiveAt    DateTime  @default(now())
+  expiresAt       DateTime
+  isExpired       Boolean   @default(false)
+  endedAt         DateTime?
+  /// idle_timeout | user_exit | privacy_clear | handover | other
+  endReason       String?
+  /// 本次用到的服务大类（JSON 数组，取值见 kiosk-session.types.ts）
+  categoriesJson  String    @default("[]")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([terminalId, clientSessionId])
+  @@index([orgId, startedAt])
+  @@index([terminalId, startedAt])
 }
 
 model PrintMaterialPack {
