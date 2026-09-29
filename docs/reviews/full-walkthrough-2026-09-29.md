@@ -140,6 +140,10 @@
 | W-65 | P2 | 一体机 | 使用时限页「继续后回到」直接显示原始路径 `/profile`、`/policy-service`（`SessionGuardView.tsx:55`，与 B-09 同类）；图片转 PDF、材料扫描英文眉题 `IMAGES TO PDF`、`SCAN VIA PANEL`（`ConvertImagesView.tsx:91`、`ScanWorkbenchChrome.tsx:128`，并入 W-53） | Grok K3 续跑，`~/.cache/walk0929/evidence/k3/` 101–189 138、153、179、180 | 走查窗口 / 并入 W-53 文案批 | 待派 |
 | W-66 | P2 | 管理员后台 | 订单管理任务状态列显示英文 `pending_release`（`orders/index.tsx:30-38` 状态表缺项）；小程序云打印单文件名「未记录」；用户列「会员 · 会员」「游客 · 游客」（`admin-orders-readonly.service.ts:361` + `orders/index.tsx:74、491`）；工作台「最近操作」露出 `file/` 加原始编号（`dashboard/index.tsx:187-189`，W-06 修复需覆盖） | Grok K3 续跑，`~/.cache/walk0929/evidence/k3/` 101–189 112、156 | 两后台窗口 / 待定 | 已派 |
 | W-67 | P2 | 运维文档 | 价目运维 SQL（`docs/operations/price-config-production.md`）用 `NOW()` 写 `updatedAt/effectiveFrom`：PostgreSQL 会话时区是上海时，存进去的是上海本地时间却被当 UTC 读，后台显示超前 8 小时（走查库价目「2026/9/29 23:07:37」而当时是 15:07）。生产若同样手工执行会让价目生效时间错 8 小时 | Grok K3 续跑，`~/.cache/walk0929/evidence/k3/` 101–189 158；运维 SQL 由走查窗口 15:07 按手册执行 | 后端窗口（与 W-02 一并）/ 待定 | 待派 |
+| W-68 | P1 | 管理员后台 | 数据大屏「累计打印 N 页」按已支付订单的 `billablePages` 求和、不乘份数，且把已支付未出纸的单也算进去（`console-screen.queries.ts:284-337`，按 paidAt、上海时区）；订单页按 createdAt 列全部订单——两处单位与口径不同。库里实测 18:15：大屏 12 页 = 10 单 billablePages 之和（含 1 单待取件），实际出纸 15 张（游客单 2 页 × 3 份等） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md`；走查窗口 psql 核对 Order/PrintTask | 后端窗口 + 两后台窗口 / 待定 | 已复现 |
+| W-69 | P1 | 两后台 | 服务人次：KioskSession 已真实写入（000d3bf81 一体机上报），但工作台仍返回 `unavailableMetric(... kioskSessionUnwritten)`（`console-screen.usage.service.ts:285-287`），机构页仍写「一体机会话尚未记录」（`PartnerUsageHostingOff.tsx:25-30`）；机构工作台打印/失败/AI/告警指标标不可用（`console-screen.assemble.ts:229-245`，与 P-04「13 项待补」同根） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md`；K3 截图「另有 13 项指标待补机构归属」 | 后端窗口 + 两后台窗口 / 待定 | 代码已核实，待页面复走 |
+| W-70 | 线索 | 一体机 | 「我的」首页顶部记录列表来自 `location.state` 与本地合成 ID（`ProfilePage.tsx:36-55,196-215`），真实数量另查接口——可能数字有、列表空（与 K1/K3「打印过仍写还没有留下记录」同现象）；打印按钮只丢文件跳预览（:100-106） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md` | 走查窗口 / Grok（先复现） | 待复现 |
+| W-71 | 线索 | 小程序 | AI 记录页模拟面试只取 50 条不接 nextCursor（`ai-records.js:137-182`）；政策详情无收藏与材料（`policy-detail.wxml:24-93`，首发停放政策页，第一次发布不影响） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md` | 小程序窗口 / 小程序窗口 | 待复现 |
 
 ### 4.5 两端对账结果（9/29 晚）
 
@@ -160,6 +164,10 @@
 ## 六、修复分派
 
 （进行中）
+
+### 4.7 Codex B 旅程核查的裁定
+
+17 条，其中 3 条 P0 全部与已登记项重合并已在真实环境复现：W-36（小程序 resume_ai 授权，已修）、W-14（手机上传后卡死，修复中）、W-20（小青回显身份证号，待复现）。新增采纳 W-68、W-69，两条作线索 W-70、W-71；「价目行缺失」并入 W-02，「双面完成页面数翻倍」本机未开双面、暂记线索不单列；「隐私请求一体机不能导出注销」= W-48；「打印完成页称已清除但账户记录仍在」= W-43。
 
 ## 七、agy 反方评审的取舍
 
