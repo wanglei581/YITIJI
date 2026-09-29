@@ -31,6 +31,7 @@ import {
   passwordProofState,
   passwordProofStateAfterSelfChange,
 } from './password-proof-state'
+import { acceptsAdminRegisteredResetPhone, findPasswordResetTarget } from './admin-registered-phone-reset'
 import { FIRST_ADMIN_BOOTSTRAP_AUDIT_ACTION } from './first-admin-bootstrap'
 import { AdminLoginSecondFactor, adminSecondFactorRequired, assertAdminSecondFactorRoute } from './admin-login-second-factor'
 import { assertAdminSmsOnlyLoginAllowed, type AdminSecondFactorChallenge } from './admin-login-second-factor'
@@ -78,6 +79,7 @@ interface InternalUser {
   phoneHash: string | null
   phoneEnc: string | null
   phoneVerifiedAt: Date | null
+  phoneRegisteredByAdminAt: Date | null
   emailHash: string | null
   emailEnc: string | null
   emailVerifiedAt: Date | null
@@ -256,12 +258,20 @@ export class AuthService {
     })
     if (!user || !isAdminIpAllowedForRole(user.role, ip)) throw this.resetFailed()
     const passwordHash = await bcrypt.hash(newPassword, 10)
+    const promotingAdminRegisteredPhone = acceptsAdminRegisteredResetPhone(user)
     const updated = await this.prisma.user.updateMany({
-      where: { id: userId, deletedAt: null, passwordHash: user.passwordHash },
+      where: {
+        id: userId, deletedAt: null, passwordHash: user.passwordHash,
+        ...(promotingAdminRegisteredPhone ? {
+          role: 'partner', passwordProofState: PASSWORD_PROOF_STATE.TEMPORARY,
+          phoneVerifiedAt: null, phoneRegisteredByAdminAt: { not: null },
+        } : {}),
+      },
       data: {
         passwordHash,
         passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.OWNER_MANAGED),
         tokenVersion: { increment: 1 },
+        ...(promotingAdminRegisteredPhone ? { phoneVerifiedAt: new Date(), phoneRegisteredByAdminAt: null } : {}),
       },
     })
     if (updated.count !== 1) throw this.resetFailed()
@@ -518,16 +528,8 @@ export class AuthService {
     return user?.phoneVerifiedAt ? user : null
   }
 
-  private async resolveResetTarget(loginIdOrPhone: string): Promise<ResetTarget | null> {
-    const phone = this.normalizedPhoneOrNull(loginIdOrPhone)
-    if (phone) {
-      const user = await this.findVerifiedUserByPhone(phone)
-      return user ? { user, phone } : null
-    }
-
-    const user = await this.prisma.user.findFirst({ where: { username: loginIdOrPhone.trim(), deletedAt: null } })
-    if (!user?.phoneEnc || !user.phoneVerifiedAt) return null
-    return { user, phone: decryptPhone(user.phoneEnc) }
+  private resolveResetTarget(loginIdOrPhone: string): Promise<ResetTarget | null> {
+    return findPasswordResetTarget(this.prisma, loginIdOrPhone, this.normalizedPhoneOrNull(loginIdOrPhone), (phone) => this.findVerifiedUserByPhone(phone))
   }
 
   /**

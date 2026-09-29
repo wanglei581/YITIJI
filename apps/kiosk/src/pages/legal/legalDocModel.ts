@@ -108,3 +108,19 @@ export function readFromKey(search: string): FromKey | null {
   const value = new URLSearchParams(search).get('from')
   return value !== null && Object.prototype.hasOwnProperty.call(FROM_TARGETS, value) ? (value as FromKey) : null
 }
+
+/**
+ * 按章节标题打开（`?section=` 由自我探索同意页等入口带来）：选中**标题包含**这串文字的第一章。
+ * 正文是后台发布的纯文本、没有锚点，所以只能按标题认；找不到就返回 0（停在开头，不报错），
+ * 也不做任何近似或关键词兜底 —— 打开到一章「看起来像」的内容，比停在开头更误导。
+ */
+export function findSectionIndex(sections: readonly Section[], sectionTitle: string | null): number {
+  if (!sectionTitle) return 0
+  const index = sections.findIndex((section) => section.title.includes(sectionTitle))
+  return index >= 0 ? index : 0
+}
+
+export function readSectionTitle(search: string): string | null {
+  const value = new URLSearchParams(search).get('section')
+  return value && value.trim() ? value : null
+}

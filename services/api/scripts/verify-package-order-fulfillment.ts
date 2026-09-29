@@ -23,6 +23,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 import { setPrintScanCapabilityModeForTest, TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { signFileUrl } from '../src/files/signing'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { buildRealPdf } from './support/minimal-pdf'
 
@@ -47,6 +48,42 @@ function codeOf(error: unknown): string {
     | undefined
   return response?.error?.code ?? response?.message ?? ex.message ?? 'UNKNOWN'
 }
+const PRINT_SIDE_LIMIT_MESSAGE = '每单最多打印 100 面，请分几单打印'
+
+async function expectTooLarge(action: () => Promise<unknown>, sides: number, label: string): Promise<void> {
+  let thrown: unknown
+  try { await action() } catch (error) { thrown = error }
+  if (!thrown) fail(`${label}: 超过 100 面必须拒绝`)
+  const ex = thrown as { getStatus?: () => number; getResponse?: () => unknown }
+  const status = typeof ex.getStatus === 'function' ? ex.getStatus() : null
+  const body = typeof ex.getResponse === 'function' ? ex.getResponse() : null
+  const err = (body as { error?: { code?: string; message?: string; details?: unknown } } | null)?.error
+  if (status !== 400 || err?.code !== 'PRINT_JOB_TOO_LARGE') {
+    fail(`${label}: 期望 400 PRINT_JOB_TOO_LARGE，实际 status=${status} body=${JSON.stringify(body)}`)
+  }
+  if (err?.message !== PRINT_SIDE_LIMIT_MESSAGE) {
+    fail(`${label}: 文案必须逐字是「${PRINT_SIDE_LIMIT_MESSAGE}」，实际「${err?.message ?? ''}」`)
+  }
+  const details = err?.details
+  if (!Array.isArray(details) || details[0] !== String(sides) || details[1] !== '100' || details.some((item) => typeof item !== 'string')) {
+    fail(`${label}: details 必须是 ["${sides}","100"]，实际 ${JSON.stringify(details)}`)
+  }
+  pass(label)
+}
+
+function packageQuoteParams(copies = 1) {
+  return {
+    copies,
+    colorMode: 'black_white' as const,
+    duplex: 'simplex' as const,
+    paperSize: 'A4' as const,
+    orientation: 'auto' as const,
+    quality: 'standard' as const,
+    scale: 'fit' as const,
+    pagesPerSheet: 1 as const,
+  }
+}
+
 async function expectCode(action: () => Promise<unknown>, expected: string, label: string): Promise<void> {
   let thrown: unknown
   try { await action() } catch (error) { thrown = error }
@@ -62,6 +99,13 @@ class FakeRedis {
   async get(key: string): Promise<string | null> { return this.values.get(key) ?? null }
   async setEx(key: string, _ttl: number, value: string): Promise<void> { this.values.set(key, value) }
   async del(key: string): Promise<number> { return this.values.delete(key) ? 1 : 0 }
+  async decrementFloorKeepTtl(key: string): Promise<number> {
+    const v = Number(this.values.get(key) ?? 'NaN')
+    if (!Number.isFinite(v)) return 0
+    if (v <= 1) { this.values.delete(key); return 0 }
+    this.values.set(key, String(v - 1))
+    return v - 1
+  }
   async incrWithTtl(key: string, _ttl: number): Promise<number> {
     const value = Number(this.values.get(key) ?? '0') + 1
     this.values.set(key, String(value))
@@ -108,9 +152,9 @@ async function main(): Promise<void> {
   const fileIds = [0, 1, 2].map((seq) => `file_package_${seq}_${suffix}`)
   const storageKeys: string[] = []
 
-  async function seedFile(fileId: string, seq: number): Promise<void> {
+  async function seedFile(fileId: string, seq: number, pageCount = 2): Promise<void> {
     const storageKey = `verify/package-order/${fileId}.pdf`
-    const pdf = buildRealPdf(2)
+    const pdf = buildRealPdf(pageCount)
     await storage.putObject(storageKey, pdf, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     storageKeys.push(storageKey)
     await prisma.fileObject.create({
@@ -157,7 +201,7 @@ async function main(): Promise<void> {
     await prisma.terminalHeartbeat.create({ data: { terminalId, status: 'online', localTaskDatabaseAvailable: true } })
     await prisma.terminalCapability.create({ data: { terminalId, capabilityKey: 'document_print', status: 'available' } })
     await seedDevDefaultPriceConfig(prisma)
-    await Promise.all(fileIds.map(seedFile))
+    await Promise.all(fileIds.map((fileId, seq) => seedFile(fileId, seq)))
 
     await prisma.documentProcessTask.updateMany({
       where: { sourceFileId: fileIds[1], kind: 'pii_scan' },
@@ -314,6 +358,47 @@ async function main(): Promise<void> {
       fail('失败停单后 Agent claim 不得领取已完成或失败的旧任务')
     }
     pass('seq=1 failed 后整单停在该行、seq=2 未建；Agent 不会领取已完成旧任务')
+
+    await prisma.terminalHeartbeat.create({ data: { terminalId, status: 'online', localTaskDatabaseAvailable: true } })
+    const file50a = `file_package_50a_${suffix}`
+    const file50b = `file_package_50b_${suffix}`
+    const file51 = `file_package_51_${suffix}`
+    await seedFile(file50a, 10, 50)
+    await seedFile(file50b, 11, 50)
+    await seedFile(file51, 12, 51)
+    const lineUrl = (id: string) => signFileUrl(id, 30 * 60 * 1000).url
+    const quoted100 = await quotes.quote({
+      terminalId,
+      params: packageQuoteParams(1),
+      lines: [{ fileUrl: lineUrl(file50a) }, { fileUrl: lineUrl(file50b) }],
+    })
+    if (quoted100.billablePages !== 100) fail(`材料包 50+50 报价必须通过且合计 100 页，实际 ${quoted100.billablePages}`)
+    pass('材料包合计 100 面报价通过')
+    const package100 = await packages.create(userId, {
+      terminalId,
+      files: [{ fileId: file50a }, { fileId: file50b }],
+      params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+    }, randomUUID())
+    if (!package100.orderId) fail('材料包合计 100 面建单必须通过')
+    pass('材料包合计 100 面建单通过')
+    await expectTooLarge(
+      () => quotes.quote({
+        terminalId,
+        params: packageQuoteParams(1),
+        lines: [{ fileUrl: lineUrl(file50a) }, { fileUrl: lineUrl(file51) }],
+      }),
+      101,
+      '材料包合计 101 面报价拒绝',
+    )
+    await expectTooLarge(
+      () => packages.create(userId, {
+        terminalId,
+        files: [{ fileId: file50a }, { fileId: file51 }],
+        params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      }, randomUUID()),
+      101,
+      '材料包合计 101 面建单拒绝',
+    )
   } finally {
     setPrintScanCapabilityModeForTest(null)
     const orderIds = (await prisma.order.findMany({ where: { endUserId: userId }, select: { id: true } })).map((row) => row.id)

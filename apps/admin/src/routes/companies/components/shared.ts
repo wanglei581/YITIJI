@@ -7,7 +7,7 @@ import { type AdminCompanyDetail, type CompanyFieldsInput } from '../../../servi
 // ─── 展示常量 ─────────────────────────────────────────────────────────────────
 
 export const REVIEW_BADGE: Record<string, { status: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
-  pending:   { status: 'warning', label: '待审核' },
+  pending:   { status: 'warning', label: '未审核' },
   reviewing: { status: 'info',    label: '审核中' },
   approved:  { status: 'success', label: '已通过' },
   rejected:  { status: 'error',   label: '已拒绝' },
@@ -22,7 +22,7 @@ export const PUBLISH_BADGE: Record<string, { status: 'success' | 'warning' | 'er
 
 export const REVIEW_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: '全部审核状态' },
-  { value: 'pending', label: '待审核' },
+  { value: 'pending', label: '未审核' },
   { value: 'approved', label: '已通过' },
   { value: 'rejected', label: '已拒绝' },
 ]

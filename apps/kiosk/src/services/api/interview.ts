@@ -16,6 +16,7 @@ import type {
   InterviewPrintResponse,
   MemberInterviewItem,
 } from '@ai-job-print/shared'
+import { rethrowAiDeclaration } from '../../ai/aiDeclarationErrors'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
@@ -50,7 +51,8 @@ async function call<T>(path: string, access: InterviewAccess, init?: { method?: 
       credentials: 'include',
       ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
     })
-  } catch {
+  } catch (err) {
+    rethrowAiDeclaration(err)
     throw new InterviewApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
   if (!res.ok) {
@@ -83,7 +85,7 @@ const MOCK_REPORT: InterviewReportResponse = {
   position: '演示岗位',
   industry: '通用',
   interviewerType: 'hr',
-  interviewerLabel: 'HR 初筛',
+  interviewerLabel: 'HR 面试',
   durationMin: 3,
   endedAt: null,
   report: {
@@ -213,7 +215,8 @@ export async function transcribeAnswer(sessionId: string, wav: Blob, access: Int
       credentials: 'include',
       body: form,
     })
-  } catch {
+  } catch (err) {
+    rethrowAiDeclaration(err)
     throw new InterviewApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
   if (!res.ok) {

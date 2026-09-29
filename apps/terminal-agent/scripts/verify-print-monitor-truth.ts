@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { monitorPrintJob } from '../src/agent/task-runner'
 import {
@@ -374,8 +376,10 @@ async function main(): Promise<void> {
     ['3,2,False', 'ready'],
     ['3,3,False', 'low_paper'],
     ['3,5,False', 'low_paper'],
-    ['3,4,False', 'error'],
+    ['3,4,False', 'paper_empty'],
     ['3,6,False', 'error'],
+    ['3,7,False', 'error'],
+    ['3,8,False', 'error'],
     ['7,2,False', 'offline'],
     ['3,9,False', 'offline'],
     ['3,2,True', 'offline'],
@@ -390,6 +394,24 @@ async function main(): Promise<void> {
       )
     } catch (error) {
       failures.push(`printer query ${JSON.stringify(input)}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // DetectedErrorState=4 → 'paper_empty' only helps if the server and kiosk spell the value the
+  // same way: the server blocks new orders on it and labels the alert, the kiosk shows 「打印机缺纸」.
+  // Read their sources so a rename on either side turns this gate red instead of silently
+  // degrading paper-out back to an unknown status.
+  {
+    const repoRoot = path.resolve(__dirname, '..', '..', '..')
+    const serverAvailability = fs.readFileSync(path.join(repoRoot, 'services/api/src/terminals/printer-availability.ts'), 'utf8')
+    const serverAlerts = fs.readFileSync(path.join(repoRoot, 'services/api/src/admin-ops/derived-alerts.ts'), 'utf8')
+    const kioskStatus = fs.readFileSync(path.join(repoRoot, 'apps/kiosk/src/hooks/useTerminalDeviceStatus.ts'), 'utf8')
+    try {
+      assert.match(serverAvailability, /UNAVAILABLE_PRINTER_STATUSES = new Set\(\[[^\]]*'paper_empty'/, 'server must refuse new orders on paper_empty')
+      assert.match(serverAlerts, /paper_empty: '打印机缺纸'/, 'server alert must label paper_empty')
+      assert.match(kioskStatus, /case 'paper_empty':/, 'kiosk must map paper_empty to its own view')
+    } catch (error) {
+      failures.push(`paper_empty contract: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 

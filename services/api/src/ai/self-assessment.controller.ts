@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
-import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
+import { AiUse, AiUseExempt, MaintenanceBlocked, type AiUseKind } from '../ai-access/ai-access.decorator'
+import { AiAccessService } from '../ai-access/ai-access.service'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { RedisService } from '../common/redis/redis.service'
@@ -11,8 +12,15 @@ import { SelfAssessmentService } from './resume/self-assessment.service'
 import { AppendedSelfAssessmentService } from './resume/appended-self-assessment.service'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { AppendSelfAssessmentDto, SubmitSelfAssessmentDto } from './dto/self-assessment.dto'
-import { SELF_ASSESSMENT_CONSENT_VERSION } from './resume/self-assessment.types'
+import {
+  SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL,
+  SELF_ASSESSMENT_CONSENT_ITEMS,
+  SELF_ASSESSMENT_CONSENT_LINKS,
+  SELF_ASSESSMENT_CONSENT_VERSION,
+  type SelfAssessmentQuestionsResponse,
+} from './resume/self-assessment.types'
 import { SELF_ASSESSMENT_QUESTIONS_V1 } from './resume/self-assessment-questions'
+import { aiGateRefusal, type SelfAssessmentAiGates } from './resume/self-assessment-interpretation'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
@@ -43,12 +51,24 @@ function auditContextOf(req: ReqLike): AuditContext {
 }
 
 /**
+ * 提交 / 打印 / 附加到简历三处不挂 @AiUse：维度打分是纯函数，AI 被拦时打分照常出。
+ * 这三处的 AI 闸门改在接口里调同一个 AiAccessService.enforce：
+ *   - 提交：解读前问一次，拦下就只回打分（interpretationAvailable=false + aiUnavailableReason）；
+ *   - 打印 / 附加：记录里有 AI 解读时按 export 档过闸（这两处不调模型；原错误码原样抛），只有打分时不过 AI 闸门、文件不带 AIGC 标识。
+ * 全机维护照旧拦（@MaintenanceBlocked），那是设备停办，不是 AI 闸门。
+ */
+const SCORING_EXEMPT_REASON =
+  '维度打分是纯函数，不调模型；AI 解读是否调用由接口内按同一 AI 闸门判定，拦下时只回打分'
+const RULE_ONLY_FILE_EXEMPT_REASON =
+  '只有打分的报告不含 AI 内容、不写 AIGC 标识；含 AI 解读时接口内照旧过 AI 闸门'
+
+/**
  * 自我探索 · 倾向参考（/api/v1/resume/self-assessment）。
  *
  * 合规口径（与 docs/compliance/compliance-boundary.md §4.5 同档）：
  * - 不做临床 / 心理 / 人格诊断；不复用 MBTI / 大五 / DISC / 霍兰德标签；
  * - 结果对本人可见，对企业 / 合作机构 / Partner / Admin 不可见；不参与匹配 / 排序。
- * - 答案原文不入库，匿名 session 仅会话内存。
+ * - 答案原文不入库。匿名结果按 TTL 短期保存，不存答案原文。
  * - 撤回 = 物理删除 payload 字段，保留行用于审计。
  *
  * 限流：公共一体机单 IP 收紧；本端点不依赖现有 parse 任务（独立闸门）。
@@ -61,7 +81,15 @@ export class SelfAssessmentController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    private readonly aiAccess: AiAccessService,
   ) {}
+
+  private aiGates(req: ReqLike, exportKind: AiUseKind): SelfAssessmentAiGates {
+    return {
+      interpretation: () => aiGateRefusal(() => this.aiAccess.enforce('generate', false, req)),
+      aiContentExport: () => this.aiAccess.enforce(exportKind, false, req),
+    }
+  }
 
   private async requesterOf(req: ReqLike) {
     const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
@@ -72,17 +100,17 @@ export class SelfAssessmentController {
   @Post()
   @PaidAiThrottle(6)
   /**
-   * `consent.consentVersion` 可选：现网前端只发两个布尔。缺省 ⇒ 记为「未版本化同意」；
-   * 显式带旧版本 ⇒ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，要求重新确认。
+   * `consent.consentVersion` 可选：旧客户端只发两个布尔。缺省 ⇒ 记为「未版本化同意」；
+   * 只有当前版本可以提交；其它已提交的版本 ⇒ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`。
    * 判定逻辑集中在 service，controller 不做第二份版本比较（避免两处口径漂移）。
    */
-  @AiUse('generate')
-
+  @AiUseExempt(SCORING_EXEMPT_REASON)
+  @MaintenanceBlocked()
   async submit(
     @Body() body: SubmitSelfAssessmentDto,
     @Req() req: ReqLike,
   ) {
-    return this.service.submit(await this.requesterOf(req), body, auditContextOf(req))
+    return this.service.submit(await this.requesterOf(req), body, auditContextOf(req), this.aiGates(req, 'generate'))
   }
 
   /**
@@ -97,16 +125,19 @@ export class SelfAssessmentController {
    * 从根上排除「题目和计分口径不一致」。
    *
    * 免登录：与 POST 同口径（submit 也允许匿名 x-resume-access-token）。
-   * 只返回题目与同意版本，不含任何本人数据。
+   * 只返回题目，以及与当前版本配套的条款、链接和勾选框文字，不含任何本人数据。
    */
   @Get('questions')
   @AiUse('read')
 
-  questions() {
+  questions(): SelfAssessmentQuestionsResponse {
     return {
       version: SELF_ASSESSMENT_QUESTIONS_V1.version,
       dimensions: SELF_ASSESSMENT_QUESTIONS_V1.dimensions,
       consentVersion: SELF_ASSESSMENT_CONSENT_VERSION,
+      consentItems: [...SELF_ASSESSMENT_CONSENT_ITEMS],
+      consentLinks: SELF_ASSESSMENT_CONSENT_LINKS.map((link) => ({ ...link })),
+      consentCheckboxLabel: SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL,
     }
   }
 
@@ -119,10 +150,10 @@ export class SelfAssessmentController {
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
-  @AiUse('export')
-
+  @AiUseExempt(RULE_ONLY_FILE_EXEMPT_REASON)
+  @MaintenanceBlocked()
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    return this.service.printReport(taskId, await this.requesterOf(req), auditContextOf(req))
+    return this.service.printReport(taskId, await this.requesterOf(req), auditContextOf(req), this.aiGates(req, 'export'))
   }
 
   /**
@@ -131,8 +162,8 @@ export class SelfAssessmentController {
    */
   @Post(':taskId/append')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
-  @AiUse('generate')
-
+  @AiUseExempt(RULE_ONLY_FILE_EXEMPT_REASON)
+  @MaintenanceBlocked()
   async appendToResume(
     @Param('taskId') taskId: string,
     @Body() body: AppendSelfAssessmentDto,
@@ -143,6 +174,8 @@ export class SelfAssessmentController {
       requester: await this.requesterOf(req),
       resumeFileId: body.resumeFileId,
       auditCtx: auditContextOf(req),
+      // 含 AI 解读时按 export 档过闸：本接口只合并已有 PDF，不调模型。
+      gates: this.aiGates(req, 'export'),
     })
   }
   @Delete(':taskId')

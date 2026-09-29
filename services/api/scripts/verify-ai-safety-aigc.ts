@@ -59,6 +59,7 @@ import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
 import { CareerPlanDegradedPdfService } from '../src/ai/resume/career-plan-degraded-pdf.service'
 import { InterviewPracticeSheetPdfService } from '../src/mock-interview/interview-practice-sheet-pdf.service'
+import { INTERVIEW_PRACTICE_RESULT_DISCLAIMER, pickPracticeQuestions } from '../src/mock-interview/interview-practice-sheet'
 import {
   AIGC_DEFAULT_PRODUCER,
   appendAigcPages,
@@ -409,6 +410,20 @@ async function main(): Promise<void> {
 
   // 短文通常只有一页。应标识的 PDF 必须长到至少两页，才能抓住第二页丢掉的页眉。
   const sample = '这是一段仅用于把应标识报告撑到第二页的示例内容。'.repeat(120)
+  const sharedCopy = readFileSync(join(__dirname, '../../../packages/shared/src/types/complianceCopy.ts'), 'utf8')
+  const practiceSheetSource = readFileSync(join(__dirname, '../src/mock-interview/interview-practice-sheet.ts'), 'utf8')
+  const reportPdfSource = readFileSync(join(__dirname, '../src/mock-interview/interview-report-pdf.service.ts'), 'utf8')
+  const practicePdfSource = readFileSync(join(__dirname, '../src/mock-interview/interview-practice-sheet-pdf.service.ts'), 'utf8')
+  const disclaimerCount = (source: string) => source.split(INTERVIEW_PRACTICE_RESULT_DISCLAIMER).length - 1
+  if (INTERVIEW_PRACTICE_RESULT_DISCLAIMER !== '模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。') {
+    fail('interview:disclaimer-ssot', '服务端免责说明与裁定句子不一致')
+  } else if (disclaimerCount(sharedCopy) !== 1 || disclaimerCount(practiceSheetSource) !== 1) {
+    fail('interview:disclaimer-ssot', `免责说明应在共享文案与练习单各写一处，实际 shared=${disclaimerCount(sharedCopy)} sheet=${disclaimerCount(practiceSheetSource)}`)
+  } else if (disclaimerCount(reportPdfSource) !== 0 || disclaimerCount(practicePdfSource) !== 0) {
+    fail('interview:disclaimer-ssot', 'PDF 服务又抄了一遍免责说明')
+  } else if (!reportPdfSource.includes('INTERVIEW_PRACTICE_RESULT_DISCLAIMER') || !practicePdfSource.includes('INTERVIEW_PRACTICE_RESULT_DISCLAIMER')) {
+    fail('interview:disclaimer-ssot', 'PDF 服务没有引用免责常量')
+  } else pass('interview:disclaimer-ssot')
   const renders: Array<{ id: string; produceId: string; buffer: Buffer; wantVisible: boolean }> = []
   renders.push({
     id: 'job-fit',
@@ -554,10 +569,13 @@ async function main(): Promise<void> {
     const info = await readPdfInfo(item.buffer)
     const aigc = parseAigcLabelJson(info['AIGC'] ?? '')
     if (item.id === 'interview') {
-      const banned = ['练习表现等级', '匹配度', '岗位匹配']
+      const banned = ['练习表现等级', '匹配度', '岗位匹配', '等级']
       const hit = banned.find((phrase) => text.includes(phrase))
       if (hit) fail('pdf:interview:neutral-copy', `模拟面试报告仍出现禁词「${hit}」`)
       else pass('pdf:interview:neutral-copy')
+      if (!text.includes(squash(INTERVIEW_PRACTICE_RESULT_DISCLAIMER))) {
+        fail('pdf:interview:disclaimer', '模拟面试报告没有固定免责说明')
+      } else pass('pdf:interview:disclaimer')
     }
     if (item.wantVisible) {
       // 审计表第 11–36、103 行：每一页都要同时有「AI 生成」和「仅供参考」。合并全文会让第二页丢页眉也通过。
@@ -623,8 +641,27 @@ async function main(): Promise<void> {
     const info = await readPdfInfo(buffer)
     if (info['AIGC'] || info['AIGenerated'] !== 'false') fail(`pdf:${id}:honest`, '非 AI 文件写了 AIGC 或没有 AIGenerated=false（审计表第 39 行）')
     else if (text.includes('AI生成')) fail(`pdf:${id}:honest`, '正文出现了「AI 生成」（审计表第 39 行）')
-    else pass(`pdf:${id}:honest`)
+    else if (id === 'practice' && !text.includes(squash(INTERVIEW_PRACTICE_RESULT_DISCLAIMER))) {
+      fail(`pdf:${id}:disclaimer`, '题目单没有固定免责说明')
+    } else pass(`pdf:${id}:honest`)
   }
+
+  // 终面 5/8 分钟档会把「什么样的工作环境会让你待不下去？」印上题目单，考察点跟着题干走。
+  const finalSheet = await new InterviewPracticeSheetPdfService().render({
+    date: '2026-09-26',
+    position: '行政专员',
+    industry: '通用',
+    interviewerLabel: '终面负责人',
+    questions: pickPracticeQuestions('final', 8),
+  })
+  const finalText = squash(await visibleText(finalSheet.buffer))
+  if (!finalText.includes('什么样的工作环境会让你待不下去')) {
+    fail('pdf:practice:environment-examines', '终面练习单没有印出环境题，考查点断言落空')
+  } else if (finalText.includes('匹配度')) {
+    fail('pdf:practice:environment-examines', '终面练习单印出了「匹配度」')
+  } else if (!finalText.includes('与岗位要求的契合、表述分寸')) {
+    fail('pdf:practice:environment-examines', '环境题考查点没有改成不带匹配度的说法')
+  } else pass('pdf:practice:environment-examines')
 
   const docx = await new ResumeDocxService().render(resume as never, { contentId: 'task-resume-docx' })
   const docxRequire = createRequire(require.resolve('docx'))

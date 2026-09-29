@@ -239,6 +239,81 @@ test('method, step-up and unknown errors follow distinct recovery policies', () 
   assert.equal(unknown.errorCode, 'UNEXPECTED_FAILURE')
 })
 
+function openContactPhone(): PartnerAccountActionState {
+  return reducePartnerAccountAction(initialPartnerAccountActionState, {
+    type: 'OPEN',
+    action: 'register_contact_phone',
+    targetAccountId: 'partner-1',
+  })
+}
+
+test('registering a contact phone opens directly on the form and ignores other action steps', () => {
+  const opened = openContactPhone()
+  assert.equal(opened.step, 'contact_phone_form')
+  assert.equal(reducePartnerAccountAction(opened, { type: 'CONFIRM' }), opened)
+  assert.equal(reducePartnerAccountAction(opened, { type: 'CHOOSE_METHOD', method: 'sms' }), opened)
+  assert.equal(reducePartnerAccountAction(opened, { type: 'COMMIT_DELETE' }), opened)
+  assert.equal(reducePartnerAccountAction(opened, { type: 'COMMIT_REBIND' }), opened)
+})
+
+test('contact phone credential errors stay on the form; other codes stay in the dialog', () => {
+  const busy = reducePartnerAccountAction(openContactPhone(), { type: 'REQUEST_STARTED' })
+  assert.equal(busy.busy, true)
+  assert.equal(busy.step, 'contact_phone_form')
+  const invalid = reducePartnerAccountAction(busy, { type: 'ERROR', code: 'ADMIN_CREDENTIAL_INVALID' })
+  assert.equal(invalid.step, 'contact_phone_form')
+  assert.equal(invalid.busy, false)
+  assert.equal(invalid.errorCode, 'ADMIN_CREDENTIAL_INVALID')
+  const mismatch = reducePartnerAccountAction(invalid, { type: 'ERROR', code: 'CONTACT_PHONE_MISMATCH' })
+  assert.equal(mismatch.step, 'contact_phone_form')
+  assert.equal(mismatch.errorCode, 'CONTACT_PHONE_MISMATCH')
+  assert.equal(mismatch.needsRefresh, false)
+  const inUse = reducePartnerAccountAction(busy, { type: 'ERROR', code: 'PHONE_IN_USE' })
+  assert.equal(inUse.step, 'contact_phone_form')
+  assert.equal(inUse.needsRefresh, false)
+  const noticeDown = reducePartnerAccountAction(busy, { type: 'ERROR', code: 'CONTACT_PHONE_NOTICE_UNAVAILABLE' })
+  assert.equal(noticeDown.step, 'contact_phone_form')
+  assert.equal(noticeDown.busy, false)
+  const locked = reducePartnerAccountAction(busy, { type: 'ERROR', code: 'ADMIN_CREDENTIAL_LOCKED' })
+  assert.equal(locked.step, 'contact_phone_form')
+  assert.equal(locked.errorCode, 'ADMIN_CREDENTIAL_LOCKED')
+  assert.equal(locked.busy, false)
+})
+
+test('contact phone success clears bearer state and an unknown write becomes uncertain', () => {
+  const busy = reducePartnerAccountAction(openContactPhone(), { type: 'REQUEST_STARTED' })
+  const success = reducePartnerAccountAction(busy, { type: 'SUCCESS' })
+  assert.equal(success.step, 'success')
+  assert.equal(success.actionTicket, undefined)
+  assert.equal(success.challengeId, undefined)
+  const uncertain = reducePartnerAccountAction(busy, { type: 'FINAL_RESULT_UNCERTAIN' })
+  assert.equal(uncertain.step, 'result_uncertain')
+  assert.equal(uncertain.resultUncertain, true)
+  assert.equal(uncertain.needsRefresh, true)
+})
+
+test('contact phone ignores credential tickets and does not mark a finished step uncertain', () => {
+  const opened = openContactPhone()
+  assert.equal(
+    reducePartnerAccountAction(opened, { type: 'CREDENTIAL_VERIFIED', actionTicket: 'ticket-1' }),
+    opened,
+  )
+  const success = reducePartnerAccountAction(
+    reducePartnerAccountAction(opened, { type: 'REQUEST_STARTED' }),
+    { type: 'SUCCESS' },
+  )
+  assert.equal(success.step, 'success')
+  assert.equal(reducePartnerAccountAction(success, { type: 'FINAL_RESULT_UNCERTAIN' }), success)
+})
+
+test('clearing a contact phone field error does not move the step', () => {
+  const invalid = reducePartnerAccountAction(openContactPhone(), { type: 'ERROR', code: 'CONTACT_PHONE_MISMATCH' })
+  const cleared = reducePartnerAccountAction(invalid, { type: 'CLEAR_ERROR' })
+  assert.equal(cleared.step, 'contact_phone_form')
+  assert.equal(cleared.errorCode, undefined)
+  assert.equal(reducePartnerAccountAction(cleared, { type: 'CLEAR_ERROR' }), cleared)
+})
+
 test('invalid navigation events preserve the exact current state object', () => {
   const closed = initialPartnerAccountActionState
   assert.equal(reducePartnerAccountAction(closed, { type: 'CONFIRM' }), closed)

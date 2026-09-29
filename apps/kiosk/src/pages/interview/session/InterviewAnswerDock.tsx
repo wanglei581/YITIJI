@@ -1,4 +1,5 @@
 import { AlertCircleIcon, ClockIcon, PencilLineIcon } from 'lucide-react'
+import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
 import type { InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
 
@@ -142,6 +143,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
           )}
         </div>
       )}
+      <AiDeclarationNote />
       <p className="interview-session__privacy-note"><ClockIcon aria-hidden="true" />模拟练习仅供本人参考，对话内容不会发送给任何企业</p>
     </footer>
   )

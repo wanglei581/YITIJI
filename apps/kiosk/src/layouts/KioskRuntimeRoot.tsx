@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom'
+import { AiDeclarationHost } from '../ai/AiDeclarationHost'
 import { KioskPrivacyGuard } from '../auth/KioskPrivacyGuard'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
@@ -14,6 +15,7 @@ import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
 export function KioskRuntimeRoot() {
   return (
     <KioskBusyProvider>
+      <AiDeclarationHost />
       <KioskPrivacyGuard>
         <KioskHidScanGuard />
         <Outlet />

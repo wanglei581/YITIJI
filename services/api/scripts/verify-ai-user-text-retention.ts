@@ -184,6 +184,10 @@ const NO_TTL_REGISTRY: Record<string, string> = {
     '岗位数据源质量快照，只存机构/岗位维度的统计指标，不含任何求职者输入的文本',
   UserAiConsent:
     '同意记录必须与账号同生命周期，撤回写 revokedAt 而不是删除；不含用户自由文本',
+  AiUsageRecord:
+    'P1-2a 逐次计量账，只落功能/厂商/型号/状态/tokens/金额与已验签终端、机构、会员号，无用户文本。留存与 AiServiceLog 相同：AI_SERVICE_LOG_RETENTION_DAYS 默认 90 天，由 AiResultCleanupTask 到期先按月汇总再硬删。会员注销只把 endUserId 置空（外键 SetNull，且 detachMemberAiUsageRecords），不删未到期的金额行。TRTC 数字人、ASR、TTS、OCR 本期不计量、不写本表。',
+  AiUsageMonthlySummary:
+    '按月费用汇总，只存北京时间月份、功能、厂商、型号、状态、调用次数、已计量金额与未计量次数；不含会员、终端、机构或任何用户文本，长期保留，不随明细到期删除。',
 }
 
 const writtenModels = new Map<string, string[]>()
@@ -380,10 +384,24 @@ assert(
   /content:\s*t\.content/.test(interviewService),
   '模拟面试报告仍逐字返回本人回答原文（content: t.content），未被遮盖替换',
 )
+// 2026-09-29（总指挥批准的排雷批次）：简历摘要改为「生成时就遮盖、库里只存遮盖后的」。
+// 摘要只喂模型出题，从不回给本人看，所以它是唯一允许在本文件里遮盖的东西。
+// 原先这里是「文件里不许出现遮盖函数」—— 那是裁决前的粗粒度写法；收窄成它真正要守的两件事：
+//   1. 遮盖只作用在简历提取文本上（生成摘要那一步），不作用在作答 / 报告 / 转写等本人会回看的内容上；
+//   2. 摘要不出现在任何回读路径里（getSession / reportDto 不返回它）。
+const interviewMaskCalls = [...interviewService.matchAll(/maskUserTexts?ForLlm\w*\(([^)]*)\)/g)]
 assert(
-  !/maskUserTextForLlm/.test(interviewService),
-  '模拟面试的落库/读取路径不引入 LLM 遮盖（遮盖只属于送模型那一步，且仍待产品裁决）',
+  interviewMaskCalls.every((call) => /^\s*extraction\.text\b/.test(call[1] ?? '')),
+  '模拟面试服务里的遮盖只作用于简历提取文本（生成摘要那一步），不遮本人会回看的作答 / 报告内容',
 )
+for (const readPath of ['async getSession(', 'private async reportDto(']) {
+  const start = interviewService.indexOf(readPath)
+  const body = start < 0 ? '' : interviewService.slice(start, interviewService.indexOf('\n  }\n', start))
+  assert(
+    body.length > 0 && !/resumeDigest/.test(body),
+    `模拟面试回读路径 ${readPath.replace('(', '')} 存在且不返回简历摘要（摘要只给模型用，遮盖后的它不会被本人当成原话看到）`,
+  )
+}
 
 const advisorService = readRepo('services/api/src/advisor/advisor.service.ts')
 assert(

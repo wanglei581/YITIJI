@@ -44,6 +44,12 @@
           <view class="stat-label">{{item.label}}</view>
         </view>
       </view>
+      <!-- 计数没读到：说清楚，并给重试（只用全局 .list-state / .state-retry，不加样式） -->
+      <view class="list-state" wx:if="{{isLoggedIn && statsFailed}}" role="alert">
+        <view>部分数量没读到，显示「—」的项目请稍后重试。</view>
+        <view class="state-retry tap" hover-class="tap-press" bindtap="retryStats"
+              role="button" aria-label="重新读取数量">重试</view>
+      </view>
 
       <view class="section-row">
         <text class="section-title">我的服务</text>

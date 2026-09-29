@@ -207,7 +207,11 @@ export function PrintConfirmView(props: Props) {
               <AmountCard
                 quote={quote}
                 amountText={amountShown.replace(/^¥/, '')}
-                source={<>已按本机能用的参数报价，<br />{paperNote ?? '用纸张数以实际打印为准'}。</>}
+                source={
+                  quote.status === 'ready' && quote.amountCents === 0
+                    ? <>免费试运营，本单 0 元。<br />{paperNote ?? '用纸张数以实际打印为准'}。</>
+                    : <>已按本机能用的参数报价，<br />{paperNote ?? '用纸张数以实际打印为准'}。</>
+                }
               />
               <FeeLines rows={[
                 {
@@ -220,12 +224,20 @@ export function PrintConfirmView(props: Props) {
                 { label: '小计', value: quote.status === 'ready' ? `¥${amountText}` : '无法显示', slot: quote.status !== 'ready' },
               ]} />
             </div>
-            <CouponUnavailable />
+            <CouponUnavailable free={quote.status === 'ready' && quote.amountCents === 0} />
           </Sec>
-          <Sec no="03" title="确认并付款" hint="确认后进入付款">
+          <Sec
+            no="03"
+            title={quote.status === 'ready' && quote.amountCents === 0 ? '确认并打印' : '确认并付款'}
+            hint={quote.status === 'ready' && quote.amountCents === 0 ? '这次不用付款' : '确认后进入付款'}
+          >
             <ConfirmCard
-              flow
-              note={<>价格已按<b>{adjustedTo.join('、')}</b>算好。确认后进入付款，<b>付款完成后才开始打印</b>。</>}
+              flow={!(quote.status === 'ready' && quote.amountCents === 0)}
+              note={
+                quote.status === 'ready' && quote.amountCents === 0
+                  ? <>价格已按<b>{adjustedTo.join('、')}</b>算好。免费试运营，本单 0 元。确认后直接开始打印，<b>不用去付款</b>。</>
+                  : <>价格已按<b>{adjustedTo.join('、')}</b>算好。确认后进入付款，<b>付款完成后才开始打印</b>。</>
+              }
               alert={submitError}
               actions={actions}
             />
@@ -263,7 +275,7 @@ export function PrintConfirmView(props: Props) {
             hint={
               screen === 'quoting' ? '正在核对这一单的价格'
                 : screen === 'quote-failed' ? '这一次没有拿到报价'
-                  : screen === 'zero-amount' ? '零元单也要先建单'
+                  : screen === 'zero-amount' ? '免费试运营，本单 0 元'
                     : '金额以实际结果为准'
             }
           >
@@ -273,7 +285,9 @@ export function PrintConfirmView(props: Props) {
                 amountText={amountShown.replace(/^¥/, '')}
                 source={
                   quote.status === 'ready'
-                    ? <>金额以实际结果为准，本机不估价。</>
+                    ? quote.amountCents === 0
+                      ? '免费试运营，本单 0 元。'
+                      : '金额以这一单的报价为准。'
                     : quote.status === 'demo'
                       ? '演示模式不显示金额'
                       : quote.status === 'unavailable'
@@ -290,8 +304,14 @@ export function PrintConfirmView(props: Props) {
                 { label: '计费方式', value: costCalcLabel, slot: quote.status !== 'ready', cost: true },
                 {
                   label: '权益抵扣',
-                  value: screen === 'benefit-unverified' ? '未核销，按原价' : '等报价返回后按原价显示',
-                  slot: true,
+                  value: screen === 'benefit-unverified'
+                    ? '未核销，按原价'
+                    : quote.status === 'ready'
+                      ? quote.amountCents === 0
+                        ? '这次免费，没有抵扣'
+                        : '按这一单的报价，没有抵扣'
+                      : '报价出来后再显示',
+                  slot: quote.status !== 'ready' || screen === 'benefit-unverified',
                 },
                 {
                   label: '小计',
@@ -316,23 +336,23 @@ export function PrintConfirmView(props: Props) {
                 </div>
               </div>
             ) : null}
-            {quotedLike ? <CouponUnavailable /> : null}
+            {quotedLike ? <CouponUnavailable free={quote.status === 'ready' && quote.amountCents === 0} /> : null}
             {screen === 'zero-amount' ? (
               <div className="pcf-grid2">
                 <div className="pcf-pgrp">
-                  <h4>计费页数怎么来的</h4>
-                  <p>计费页数和计价依据都以实际结果为准。本机不按屏幕上看到的页数自己计算。</p>
+                  <h4>页数怎么算</h4>
+                  <p>页数和价格都按这一单的报价。屏幕上看见的页数不会另外再算一次价。</p>
                 </div>
                 <div className="pcf-pgrp" data-testid="print-confirm-fallback">
-                  <h4>零元单也要先建单</h4>
-                  <p>确认后仍会建单再释放打印，<b>不存在「不建单直接出纸」的路径</b>。</p>
+                  <h4>免费试运营，本单 0 元</h4>
+                  <p>这次不用付款。确认后直接开始打印，请留在出纸口旁取纸。</p>
                 </div>
               </div>
             ) : null}
           </Sec>
           <Sec
             no="03"
-            title={screen === 'zero-amount' ? '确认并建单' : screen === 'quote-failed' ? '现在可以怎么办' : '确认并付款'}
+            title={screen === 'zero-amount' ? '确认并打印' : screen === 'quote-failed' ? '现在可以怎么办' : '确认并付款'}
             hint={screen === 'quoting' ? '金额确认后才可继续' : screen === 'quote-failed' ? '重试或改参数' : undefined}
           >
             {screen === 'quoting' ? (
@@ -352,7 +372,7 @@ export function PrintConfirmView(props: Props) {
               />
             ) : screen === 'zero-amount' ? (
               <ConfirmCard
-                note={<>金额为 0 时，<b>确认后仍会创建打印订单</b>，再直接进入打印流程。</>}
+                note={<>免费试运营，本单 0 元。确认后直接开始打印，<b>不用去付款</b>。</>}
                 alert={submitError}
                 actions={actions}
               />

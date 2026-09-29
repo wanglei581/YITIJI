@@ -87,8 +87,11 @@
   width: 48px; height: 48px; border-radius: 14px;
   border: 2px solid var(--qx-line-2);
   display: flex; align-items: center; justify-content: center;
+  background: var(--qx-surface);
 }
 .k1-login .k-agree.checked .box { background: var(--qx-teal); border-color: var(--qx-teal); color: var(--qx-on-solid); }
+.k1-login .k-agree:not(.checked) .box svg { opacity: 0; }
+.k1-login .k-agree.checked .box svg { opacity: 1; }
 .k1-login .k-agree-docs { display: flex; align-items: center; gap: 8px; font-size: var(--qx-fs-aux-lg); }
 .k1-login .k-agree-docs .doclink {
   min-height: 48px; display: inline-flex; align-items: center;
@@ -195,6 +198,7 @@
 .k1-login .lg-qrslot span { font-size: var(--qx-fs-aux-lg); }
 .k1-login .lg-steps li { font-size: var(--qx-fs-body); }
 .k1-login .qx-ctabar { padding-top: 12px; padding-bottom: 12px; }
+.k1-login .lg-fields { position: relative; z-index: 50; }
 .k1-login .lg-keyboard-cover { position: absolute; inset: 0; z-index: 40; }
 .k1-login .lg-keyboard-mask { position: absolute; inset: 0; width: 100%; height: 100%; background: rgb(11 36 30 / 18%); border: 0; }
 .k1-login .lg-keypad { position: absolute; bottom: 0; left: 0; right: 0; padding: 22px 26px 26px; background: var(--qx-surface); border-radius: 28px 28px 0 0; border-top: 1px solid var(--qx-line-2); }

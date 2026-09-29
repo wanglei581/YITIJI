@@ -9,6 +9,7 @@ import { API_MODE } from '../../services/api/client'
 // ─── Action 中文标签(覆盖契约枚举,未知动作回退原始字符串)──────────────────
 
 const ACTION_LABELS: Record<string, string> = {
+  'partner_account.contact_phone_registered': '登记机构联系人手机',
   'file.upload':              '文件上传',
   'file.delete':              '文件删除',
   'file.force_delete':        '文件删除',
@@ -41,6 +42,7 @@ const ACTION_LABELS: Record<string, string> = {
   'alert.silence':            '静默告警',
   'alert.close':              '关闭告警',
   'alert.reopen':             '重新打开告警',
+  'legal_doc.view':           '查看法务文档正文',
 }
 
 // 筛选下拉常用动作(全部为查询用,空 = 不筛选)

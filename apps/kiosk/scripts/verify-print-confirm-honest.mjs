@@ -128,7 +128,7 @@ const httpIndex = confirmSrc.search(httpBranch)
 const guardIndex = confirmSrc.search(/if\s*\(\s*!file\.fileUrl\s*\)\s*\{\s*setSubmitError/)
 
 // SIM 跳转 = 无 taskId 的 /print/progress 导航(仅非 http mock 模式使用)
-const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.\(isContractReport\s*\?\s*\{\}\s*:\s*location\.state\),\s*file,\s*params,\s*source\s*\}\s*,?\s*\}\)/
+const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.\(isContractReport\s*\?\s*\{\}\s*:\s*location\.state\),\s*file,\s*params,\s*source,\s*idDocument:\s*handoff\.idDocument === true\s*\}\s*,?\s*\}\)/
 const simIndex = confirmSrc.search(simNavPattern)
 
 // C5-3:http 真实建单后按 amountCents 分流,两分支共用 nextState(履约状态载体)。
@@ -1071,6 +1071,66 @@ if (/这单已经在你的小程序里/.test(doneCode)) {
   } else {
     pass('未归属文案不暗示事后追认')
   }
+}
+
+// W-44 / W-21：0 元报价说人话，主按钮看得见的字和读屏一致，且不说「去付款」。
+const confirmCopy = [
+  'src/pages/print/printConfirmModel.ts',
+  'src/pages/print/PrintConfirmPage.tsx',
+  'src/pages/print/components/PrintConfirmView.tsx',
+  'src/pages/print/components/PrintConfirmParts.tsx',
+].map((file) => stripComments(read(file))).join('\n')
+const forbiddenQuoteCopy = [
+  '零元单也要先建单',
+  '不存在不建单',
+  '不存在「不建单直接出纸」',
+  '本机不估价',
+  '优惠券功能尚未接通',
+  '等报价返回后按原价显示',
+  '确认并建单',
+]
+for (const phrase of forbiddenQuoteCopy) {
+  if (confirmCopy.includes(phrase)) fail(`报价页不得再出现「${phrase}」`)
+  else pass(`报价页没有「${phrase}」`)
+}
+if (!confirmCopy.includes('免费试运营，本单 0 元')) {
+  fail('价目为 0 时必须写清「免费试运营，本单 0 元」')
+} else {
+  pass('0 元报价写明免费试运营')
+}
+if (!/quote\.status === 'ready' && quote\.amountCents === 0[\s\S]{0,40}'确认并打印'/.test(confirmCopy)) {
+  fail('0 元单主按钮必须是「确认并打印」')
+} else {
+  pass('0 元单主按钮是确认并打印')
+}
+if (!confirmCopy.includes("'确认并去付款'")) {
+  fail('有金额的单仍要能「确认并去付款」')
+} else {
+  pass('付费单主按钮仍是确认并去付款')
+}
+if (!/PRINT_MAX_SIDES_PER_ORDER/.test(confirmCopy) || !/每单最多打印 \$\{PRINT_MAX_SIDES_PER_ORDER\} 面（页数 × 份数），当前/.test(confirmCopy)) {
+  fail('确认页必须用共享上限，在报价前提示「每单最多打印 N 面（页数 × 份数），当前 N 面」')
+} else {
+  pass('确认页用共享上限提示当前面数')
+}
+if (!/sidesOverLimit \|\|/.test(confirmCopy) || !/sidesOverLimit \?[\s\S]{0,180}'确认打印'/.test(confirmCopy)) {
+  fail('超过面数上限时主按钮必须置灰，且文字是「确认打印」')
+} else {
+  pass('超限时确认打印置灰')
+}
+const userErrorCopy = stripComments(read('src/services/api/userErrorMessage.ts'))
+if (!userErrorCopy.includes("PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印'")) {
+  fail('一体机错误码表必须把 PRINT_JOB_TOO_LARGE 说成「每单最多打印 100 面，请分几单打印」')
+} else {
+  pass('PRINT_JOB_TOO_LARGE 人话已登记')
+}
+
+if (!/aria-label=\{label\}/.test(confirmCopy)) {
+  fail('主按钮读屏必须念看得见的那句字')
+} else if (/aria-label=\{primaryAccessible\}/.test(confirmCopy)) {
+  fail('主按钮不得再用另一套读屏文案')
+} else {
+  pass('主按钮读屏与可见文字一致')
 }
 
 if (failures > 0) {

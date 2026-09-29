@@ -28,6 +28,7 @@ import { SelfAssessmentService } from './resume/self-assessment.service'
 import { SelfAssessmentPdfService } from './resume/self-assessment-pdf.service'
 import { AppendedSelfAssessmentService } from './resume/appended-self-assessment.service'
 import { SelfAssessmentController } from './self-assessment.controller'
+import { AiAccessModule } from '../ai-access/ai-access.module'
 import { LlmFairVisitPlanService } from './resume/llm-fair-visit-plan.service'
 import { FairVisitPlanService } from './resume/fair-visit-plan.service'
 import { FairVisitPlanPdfService } from './resume/fair-visit-plan-pdf.service'
@@ -57,11 +58,13 @@ import { ResumeReportExportController } from './resume-report-export.controller'
 import { DiagnosisReportPdfService } from './resume/diagnosis-report-pdf.service'
 import { KioskAiCapabilitiesController } from './kiosk-ai-capabilities.controller'
 import { TerminalsModule } from '../terminals/terminals.module'
+import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
-  imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule],
+  // AiAccessModule：自我探索提交 / 打印在接口内按同一 AI 闸门判定（打分不被 AI 闸门拦）
+  imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule],
   controllers: [AiController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController],
   providers: [
     AiService,
@@ -112,6 +115,8 @@ import { TerminalsModule } from '../terminals/terminals.module'
     ResumePdfService,
     ResumeDocxService,
     ResumeTextService,
+    // 按原样导出的正文来源：留存生成时原话、拒照抄 AI 结果的草稿。
+    ResumeDraftSourceService,
     DiagnosisReportPdfService,
     // ── 阶段2B AI 简历优化真实化(基于原文,防编造) ──
     LlmResumeOptimizeService,

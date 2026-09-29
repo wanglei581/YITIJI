@@ -172,7 +172,8 @@ for (const marker of [
   "const goLogin = () => navigate('/login', { state: { from: location.pathname } })",
   "navigate('/me/settings')",
   "navigate('/print/preview'",
-  "clearSessionTo({ path: '/profile' })",
+  // 2026-09-29 统一清场：「结束使用」走 endKioskUse，回首页由它统一决定。
+  "endKioskUse('end_use')",
 ]) {
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
 }
@@ -438,6 +439,10 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx',
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx',
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx',
+  // 2026-09-29 走查 W-01：反馈分类补「AI 内容投诉」。types.ts 加一类，aiComplaint.ts 放说明与答复天数。
+  // 只加行，不动断言逻辑。
+  'apps/kiosk/src/pages/profile/me/feedback/types.ts',
+  'apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts',
 ])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),

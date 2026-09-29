@@ -354,8 +354,11 @@ test('文件准入：与服务端 ALLOWED_PURPOSES / PII 要求同源', () => {
   assert.equal(pkg.needsPiiScan({ purpose: 'cover_letter', assetCategory: 'original' }), false)
 })
 
-test('真实边界文案：现场付款与不可在线取消都必须说出来', () => {
-  assert.match(pkg.PACKAGE_ONSITE_NOTICE, /现场支付|现场付款/)
+test('真实边界文案：这里不付款、核验后才打印、不可在线取消都必须说出来', () => {
+  // 不能暗示已付款或已排队；也不能把用户引到小程序外付款（运营规范 §5.13）。
+  assert.match(pkg.PACKAGE_ONSITE_NOTICE, /这里不付款/)
+  assert.match(pkg.PACKAGE_ONSITE_NOTICE, /核验后才打印/)
+  assert.doesNotMatch(pkg.PACKAGE_ONSITE_NOTICE, /现场支付|现场付款|去一体机.{0,4}(付|买)/)
   assert.match(pkg.PACKAGE_NO_CANCEL_NOTICE, /不支持在线取消/)
   assert.match(pkg.PACKAGE_NO_CANCEL_NOTICE, /有效期/)
 })

@@ -99,6 +99,101 @@
 }
 .qx-ctabar .why { flex: 1; margin: 0; font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); color: var(--qx-ink-2); }
 
+/* AI 主按钮下的一行使用声明。只包住这一颗按钮，不改底部操作条的横排。 */
+.qx-ai-declaration-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.qx-ai-declaration-note {
+  margin: 0;
+  font-size: var(--qx-fs-aux);
+  line-height: 1.35;
+  color: var(--qx-ink-3);
+  text-align: left;
+}
+.qx-ai-declaration-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qx-ai-declaration-items li {
+  margin: 0;
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.45;
+  color: var(--qx-ink-2);
+}
+
+/* 青序页没有 fusion-youth 的弹层皮肤。声明确认单独盖一层，居中，不挤在页头。 */
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 48px;
+}
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--qx-deep) 55%, transparent);
+}
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(820px, 100%);
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  border: 1px solid var(--qx-line);
+  border-radius: 28px;
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--qx-deep) 18%, transparent);
+}
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 28px 28px 0;
+}
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-heading { flex: 1; min-width: 0; }
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-title {
+  margin: 0;
+  font-family: var(--qx-serif);
+  font-size: var(--qx-fs-sec);
+  font-weight: 700;
+  line-height: 1.35;
+}
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-description {
+  margin: 12px 0 0;
+  font-size: var(--qx-fs-body);
+  line-height: 1.5;
+  color: var(--qx-ink-2);
+}
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 16px;
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+}
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-content { padding: 16px 28px 0; }
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-actions {
+  display: flex;
+  gap: 16px;
+  padding: 24px 28px 28px;
+}
+.ui-kiosk-modal-layer:has([data-ai-declaration-dialog]) .ui-kiosk-modal-actions > * { flex: 1; min-height: 56px; }
+
 /* ── 余量吸收 ─────────────────────────────────────────────────
  * 一体机是 1080×1920 定高屏，内容不足时底部会留一大片空白——这在
  * 27 寸竖屏上非常显眼，看起来像页面没做完。

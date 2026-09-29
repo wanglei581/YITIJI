@@ -4,7 +4,7 @@ import mammoth from 'mammoth'
 import { FilesService } from '../files/files.service'
 import type { OcrResult } from '../ai/resume/ocr/ocr-provider.interface'
 import { OcrService } from '../ai/resume/ocr/ocr.service'
-import { openUnpdfDocument } from '../common/pdf/pdfjs-document'
+import { extractPdfText, openUnpdfDocument } from '../common/pdf/pdfjs-document'
 import {
   openPdfForRender,
   type RenderedPdf,
@@ -21,17 +21,6 @@ interface PdfTextResult {
   totalPages: number
   text: string | string[]
 }
-
-interface UnpdfApi {
-  extractText(
-    pdf: PdfProxy,
-    options: { mergePages: false },
-  ): Promise<PdfTextResult>
-}
-
-// services/api is CommonJS; unpdf's CJS export does not expose usable types under node10 resolution.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const unpdf = require('unpdf') as UnpdfApi
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const PDF_MIME = 'application/pdf'
@@ -95,7 +84,7 @@ export interface ContractReviewExtractionRuntime {
 const DEFAULT_RUNTIME: ContractReviewExtractionRuntime = {
   extractDocxRawText: (input) => mammoth.extractRawText(input),
   getDocumentProxy: (data) => openUnpdfDocument<PdfProxy>(data),
-  extractPdfText: (pdf, options) => unpdf.extractText(pdf, options),
+  extractPdfText: (pdf, options) => extractPdfText(pdf, options),
   openPdfForRender,
 }
 

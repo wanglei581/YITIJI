@@ -51,6 +51,7 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
+  PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印',
   MEMBER_AUTH_REQUIRED: '登录状态已失效，请重新登录后重试',
   MEMBER_MISSING_TOKEN: '登录状态已失效，请重新登录后重试',
   MEMBER_SESSION_EXPIRED: '登录状态已失效，请重新登录后重试',
@@ -96,6 +97,11 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   AI_LOGIN_REQUIRED: '使用 AI 功能需要先用手机号登录',
   AI_DECLARATION_REQUIRED: '使用 AI 前需要先确认年满 14 周岁；用到语音时还需同意录音',
   AI_CONTENT_BLOCKED: '内容里有不能处理的信息，请修改后再试',
+  // 2026-09-29 AI 每日金额上限（服务端 ai-access 额度检查，503）。重试当天不会成功，明说「明天恢复」。
+  AI_BUDGET_EXHAUSTED: '今天的 AI 服务额度已用完，明天恢复；打印、扫描照常可用',
+  AI_BUDGET_UNAVAILABLE: '暂时核对不了 AI 额度，为防超支先暂停 AI；打印、扫描照常可用',
+  // 2026-09-29 P1-3 出站白名单：服务商地址未核准，这次没有发出请求（覆盖门禁 verify:backend-error-copy-coverage）
+  AI_ENDPOINT_NOT_ALLOWED: 'AI 服务暂时不可用，本次没有生成结果；打印、扫描照常可用',
 }
 
 /**

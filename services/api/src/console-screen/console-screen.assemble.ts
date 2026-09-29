@@ -29,9 +29,32 @@ import type {
   SyncSlice,
 } from './console-screen.queries'
 import { mapFleetOverview } from './console-screen.queries'
-import type { ScreenMetric } from './console-screen.types'
+import type { ScreenMetric, ScreenPrintPagesValue, ScreenPrintTrendValue } from './console-screen.types'
+import { VISIT_DAY_WINDOW, visitMetric, type VisitLoaded } from './console-screen.visits'
+import { PRINTED_PAGES_BY_COMPLETION_SOURCE, PRINTED_PAGES_SOURCE } from './console-screen.printed-pages'
 
 const MISSING_ORG = SCREEN_UNAVAILABLE_REASON.missingOrgIdOnAiAndOrders
+
+/** 累计打印页数：出纸任务 × 份数。任务行超上限时如实标「数据量超出统计上限，显示不全」，不给算少了的数。 */
+function printedPagesMetric(loaded: Loaded<PrintCumulativeSlice>): ScreenMetric<ScreenPrintPagesValue> {
+  if (!loaded.ok) return unavailableMetric(PRINTED_PAGES_SOURCE, 'cumulative', loaded.reason)
+  const pages = loaded.value.pages
+  if (pages === 'capped') {
+    return unavailableMetric(PRINTED_PAGES_SOURCE, 'cumulative', SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded)
+  }
+  return availableMetric(PRINTED_PAGES_SOURCE, 'cumulative', pages)
+}
+
+/** 近 14 天出纸页数。取数失败或任务行超上限时如实不给数。 */
+function printTrendMetric(loaded: Loaded<PrintCumulativeSlice>): ScreenMetric<ScreenPrintTrendValue> {
+  if (!loaded.ok) {
+    return unavailableMetric(PRINTED_PAGES_BY_COMPLETION_SOURCE, '14d', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed)
+  }
+  if (loaded.value.trend === 'capped') {
+    return unavailableMetric(PRINTED_PAGES_BY_COMPLETION_SOURCE, '14d', SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded)
+  }
+  return availableMetric(PRINTED_PAGES_BY_COMPLETION_SOURCE, '14d', loaded.value.trend)
+}
 
 export type SliceFailReason = typeof SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
 export type Loaded<T> =
@@ -103,6 +126,7 @@ export function assembleAdminMetrics(input: {
   sync: Loaded<SyncSlice>
   jumps: Loaded<JumpRow[]>
   fairs: Loaded<ScreenFairStructureValue>
+  visits: VisitLoaded
   alerts?: Loaded<ScreenAlertsValue>
 }): ScreenSnapshotMetrics {
   const fleet = input.fleet.ok
@@ -140,7 +164,7 @@ export function assembleAdminMetrics(input: {
     fleetWall: fleet
       ? availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.wall)
       : unavailableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed),
-    printPagesCumulative: fromLoaded(input.printCumulative, 'Order.payStatus=paid,billablePages', 'cumulative', (slice) => slice.pages),
+    printPagesCumulative: printedPagesMetric(input.printCumulative),
     aiCallsCumulative: fromLoaded(input.ai, 'AiServiceLog.count', 'cumulative', (slice) => ({
       totalCalls: slice.totalCalls,
     })),
@@ -154,12 +178,8 @@ export function assembleAdminMetrics(input: {
       failedCalls: slice.windowFailed,
       totalCalls: slice.windowCalls,
     })),
-    printTrend14d: !input.printCumulative.ok
-      ? unavailableMetric('Order.payStatus=paid,paidAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed)
-      : input.printCumulative.value.trend === 'capped'
-        ? unavailableMetric('Order.payStatus=paid,paidAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded)
-        : availableMetric('Order.payStatus=paid,paidAt+billablePages', '14d', input.printCumulative.value.trend),
-    visitCount: unavailableMetric('KioskSession', 'current', SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten),
+    printTrend14d: printTrendMetric(input.printCumulative),
+    visitCount: visitMetric(input.visits, VISIT_DAY_WINDOW, false),
     suppliesAndMap: unavailableMetric('TerminalHeartbeat', 'current', SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo),
     printInProgress: fromLoaded(input.printLive, 'PrintTask.status', 'current', (slice) => slice.inProgress),
     printFailedToday: fromLoaded(input.printLive, 'PrintTaskStatusLog.toStatus=failed', 'shanghai-day', (slice) => ({
@@ -202,6 +222,7 @@ export function assemblePartnerMetrics(input: {
   content: Loaded<ContentSlice>
   sync: Loaded<SyncSlice>
   fairs: Loaded<ScreenFairStructureValue>
+  visits: VisitLoaded
 }): ScreenSnapshotMetrics {
   const fleet = input.fleet.ok
     ? mapFleetOverview(input.fleet.value.overview, input.fleet.value.cells, {
@@ -229,7 +250,7 @@ export function assemblePartnerMetrics(input: {
     printInProgress: blocked('PrintTask', MISSING_ORG),
     printFailedToday: blocked('PrintTask', MISSING_ORG),
     printPagesCumulative: blocked('Order', MISSING_ORG),
-    printTrend14d: blocked('Order', MISSING_ORG),
+    printTrend14d: blocked(PRINTED_PAGES_BY_COMPLETION_SOURCE, MISSING_ORG),
     taskFlow24h: blocked('PrintTask/ScanTask', MISSING_ORG),
     aiCallsCumulative: blocked('AiServiceLog', MISSING_ORG),
     aiBreakdown24h: blocked('AiServiceLog', MISSING_ORG),
@@ -237,7 +258,7 @@ export function assemblePartnerMetrics(input: {
     aiCost24h: blocked('AiServiceLog', MISSING_ORG),
     alertsRealtime: blocked('derived-alerts', SCREEN_UNAVAILABLE_REASON.partnerAlertsUnscoped),
     sourceEntryOpensTop: blocked('ExternalJumpLog', SCREEN_UNAVAILABLE_REASON.missingImmutableSourceOrg),
-    visitCount: blocked('KioskSession', SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten),
+    visitCount: visitMetric(input.visits, VISIT_DAY_WINDOW, true),
     suppliesAndMap: blocked('TerminalHeartbeat', SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo),
     reviewSlaAndOrgDimension: blocked(
       'ReviewDecision / Order.orgId / AiServiceLog.orgId',

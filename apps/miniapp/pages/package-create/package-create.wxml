@@ -1,7 +1,7 @@
 <view class="page-wrap">
   <view style="height:{{statusBarHeight}}px"></view>
 
-  <view class="navbar col">
+  <view class="navbar">
     <view class="nav-back icon-action tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
       <text class="ficon i-right nav-back-ic"></text>
     </view>

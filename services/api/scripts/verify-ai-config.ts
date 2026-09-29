@@ -117,11 +117,25 @@ function main() {
     } else fail('7c. 内网 host 未拦住')
     if (!isBlockedLlmHost('api.deepseek.com')) pass('7d. 公网 host 放行')
     else fail('7d. 公网 host 被误拦')
-    let blocked = false
-    try { assertPublicLlmBaseUrl('http://127.0.0.1/v1') }
-    catch { blocked = true }
-    if (blocked) pass('7e. admin baseURL 拒绝回环地址')
-    else fail('7e. 回环 baseURL 未拒绝')
+    const PROD = { NODE_ENV: 'production' } as const
+    const DEV = { NODE_ENV: 'development' } as const
+    const rejectCode = (raw: string, env: Record<string, string>): string | undefined => {
+      try { assertPublicLlmBaseUrl(raw, env); return undefined } catch (e) { return errCode(e) ?? 'THREW' }
+    }
+    // 7e：生产环境一律拒绝回环地址（走查放行只限非生产）。
+    const loopbackUrls = ['http://127.0.0.1/v1', 'http://127.0.0.1:18080/v1', 'http://localhost:9000', 'http://localhost.', 'http://[::1]:8000']
+    const prodLeaks = loopbackUrls.filter((raw) => rejectCode(raw, PROD) !== 'AI_BASE_URL_PRIVATE')
+    if (prodLeaks.length === 0) pass('7e. 生产环境 admin baseURL 拒绝回环地址（AI_BASE_URL_PRIVATE）')
+    else fail(`7e. 生产环境放行了回环 baseURL: ${prodLeaks.join(', ')}`)
+    // 7e2：非生产放行回环地址（与出站白名单同一口径），走查能在后台接本机假大模型。
+    const devRejected = loopbackUrls.filter((raw) => rejectCode(raw, DEV) !== undefined)
+    if (devRejected.length === 0) pass('7e2. 非生产 admin baseURL 放行回环地址（走查接本机假大模型）')
+    else fail(`7e2. 非生产仍拒绝回环 baseURL: ${devRejected.join(', ')}`)
+    // 7e3：放行只限回环；内网段、链路本地、0.0.0.0、v4-mapped 回环在非生产也照旧拒绝。
+    const stillPrivate = ['http://10.0.0.5', 'http://192.168.1.10', 'http://169.254.169.254', 'http://0.0.0.0:8080', 'http://[fe80::1]', 'http://[fc00::1]', 'http://[::ffff:7f00:1]', 'http://printer.local']
+    const devLeaks = stillPrivate.filter((raw) => rejectCode(raw, DEV) !== 'AI_BASE_URL_PRIVATE')
+    if (devLeaks.length === 0) pass('7e3. 非生产只放行回环：内网 / 链路本地 / 0.0.0.0 / v4-mapped 仍拒绝')
+    else fail(`7e3. 非生产放行了非回环内网地址: ${devLeaks.join(', ')}`)
     try {
       assertPublicLlmBaseUrl('https://api.deepseek.com')
       pass('7f. 公网 https baseURL 放行')
@@ -138,12 +152,12 @@ function main() {
     const blockedUrls = ['http://[::1]:8000', 'http://[fe80::1]', 'http://[fc00::1]', 'http://localhost.']
     for (const raw of blockedUrls) {
       let blocked = false
-      try { assertPublicLlmBaseUrl(raw) } catch (e) {
+      try { assertPublicLlmBaseUrl(raw, PROD) } catch (e) {
         blocked = errCode(e) === 'AI_BASE_URL_PRIVATE'
       }
       if (!blocked) fail(`7h. 应拒绝内网 URL: ${raw}`)
     }
-    pass('7h. http://[::1]:8000 / [fe80::1] / [fc00::1] / localhost. 拒绝')
+    pass('7h. 生产环境 http://[::1]:8000 / [fe80::1] / [fc00::1] / localhost. 拒绝')
     try {
       assertPublicLlmBaseUrl('http://127.0.0.1.nip.io')
       pass('7i. 127.0.0.1.nip.io 按 DNS 不做（已知边界，字面公网名放行）')

@@ -289,7 +289,7 @@ async function openConfirm(page: Page, selfAssessment = false): Promise<void> {
 }
 
 const amountCard = (page: Page) => page.getByTestId('print-confirm-amount')
-const originalConfirm = (page: Page) => page.getByRole('button', { name: /按以上设置打印原文件/ })
+const originalConfirm = (page: Page) => page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ })
 const reconfirm = (page: Page, cents: number, merged = false) =>
   page.getByRole('button', { name: `按新金额 ${yuan(cents)} 确认${merged ? '（合并版）' : ''}` })
 

@@ -217,6 +217,43 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   pass('取件页经 pickupClaimMessage / classifyClaimFailure 出错误文案与屏')
 }
 
+// W-45：出纸后再输到机码，服务端回 completed 时不能再说「留在出纸口旁」。
+{
+  const done = model.claimSuccessCopy(true, 'completed')
+  const queued = model.claimSuccessCopy(true, 'pending')
+  const printing = model.claimSuccessCopy(true, 'printing')
+  const unpaid = model.claimSuccessCopy(false, 'completed')
+  if (!done.line.includes('这一单已经打印完成') || !done.title.includes('这一单已经打印完成')) {
+    fail(`completed 没有如实说已经打印完成：${done.title} / ${done.line}`)
+  } else if (/出纸口旁|进入队列|去付款/.test(`${done.title}${done.line}${done.cta}`)) {
+    fail('completed 仍在叫人留在出纸口或去付款')
+  } else {
+    pass('completed：这一单已经打印完成，并给出路')
+  }
+  if (!/打印任务已进入队列/.test(queued.line) || queued.cta !== '查看打印进度') {
+    fail('还在队列时必须仍说进入队列、去看进度')
+  } else pass('pending：仍请留在出纸口旁看进度')
+  if (!/正在出纸/.test(printing.line)) fail('printing 没有说正在出纸')
+  else pass('printing：正在出纸')
+  if (unpaid.cta !== '进入现场支付') fail('未付款不能因为状态字段跳过收银台')
+  else pass('未放行仍去现场支付')
+  if (model.claimSuccessDestination({ released: true, printTaskStatus: 'completed', taskId: 'ptask_1' }) !== '/print/done') {
+    fail('completed 且有任务时应去打印结果页')
+  } else if (model.claimSuccessDestination({ released: true, printTaskStatus: 'completed' }) !== '/me/print-orders') {
+    fail('completed 但没有任务号时应去我的打印订单')
+  } else if (model.claimSuccessDestination({ released: true, printTaskStatus: 'pending', taskId: 'ptask_1' }) !== '/print/progress') {
+    fail('还在队列时应去打印进度')
+  } else if (model.claimSuccessDestination({ released: false, printTaskStatus: 'completed', taskId: 'ptask_1' }) !== '/print/cashier') {
+    fail('未付款应去收银台')
+  } else pass('认领成功的去向按真实状态分流')
+  const page = read('apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx')
+  if (!/claimSuccessCopy\(result\.released,\s*result\.printTaskStatus\)/.test(page)) {
+    fail('取件页没有把 printTaskStatus 交给文案')
+  } else if (!/claimSuccessDestination\(result\)/.test(page)) {
+    fail('取件页没有按真实状态选择去向')
+  } else pass('取件页使用 printTaskStatus 分流')
+}
+
 if (failures > 0) {
   console.error(`\n❌ verify:pickup-claim-error-coverage  ${failures} 项失败`)
   process.exit(1)

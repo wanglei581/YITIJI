@@ -22,14 +22,26 @@ interface PartnerCapabilityRule {
   /** 能否配置智慧校园（读写都拒，见 smart-campus.service.ts 的 assertSchoolOrg）。 */
   canManageSmartCampus: boolean
   /**
-   * 能否维护企业展示资料（CompanyProfile）。所有已知机构类型均可进入该页；
-   * 写入范围由 companyManageScope 收窄（fair_organizer / enterprise_source）。
+   * 能否维护企业展示资料（CompanyProfile）。写入范围由 companyManageScope 收窄；
+   * fair_organizer / enterprise_source 自 3.15 起停放为 false（范围规则保留给 b 版本恢复）。
    */
   canManageCompanies: boolean
   companyManageScope: CompanyManageScope
 }
 
 const FULL_ACCESS_MODES = ['api', 'excel', 'csv', 'json', 'webhook', 'manual'] as const
+
+const PUBLIC_EMPLOYMENT_CAPABILITIES: PartnerCapabilityRule = {
+  allowedAccessModes: FULL_ACCESS_MODES,
+  allowedSourceKinds: ['aggregator', 'manual'],
+  defaultSourceKind: 'aggregator',
+  canImportJobs: true,
+  canImportFairs: true,
+  canManagePolicies: true,
+  canManageSmartCampus: false,
+  canManageCompanies: true,
+  companyManageScope: 'unrestricted',
+}
 
 const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
   school_employment_center: {
@@ -43,17 +55,10 @@ const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
     canManageCompanies: true,
     companyManageScope: 'unrestricted',
   },
-  public_employment_service: {
-    allowedAccessModes: FULL_ACCESS_MODES,
-    allowedSourceKinds: ['aggregator', 'manual'],
-    defaultSourceKind: 'aggregator',
-    canImportJobs: true,
-    canImportFairs: true,
-    canManagePolicies: true,
-    canManageSmartCampus: false,
-    canManageCompanies: true,
-    companyManageScope: 'unrestricted',
-  },
+  public_employment_service: PUBLIC_EMPLOYMENT_CAPABILITIES,
+  // 零工之家、就业服务站属公共就业服务体系，权限同公共就业服务机构（2026-09-29 新增）。
+  gig_worker_home: PUBLIC_EMPLOYMENT_CAPABILITIES,
+  employment_service_station: PUBLIC_EMPLOYMENT_CAPABILITIES,
   licensed_hr_agency: {
     allowedAccessModes: FULL_ACCESS_MODES,
     allowedSourceKinds: ['hr_company', 'job_platform', 'aggregator', 'manual'],
@@ -65,27 +70,32 @@ const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
     canManageCompanies: true,
     companyManageScope: 'unrestricted',
   },
+  // ── 3.15 停放（orgs/parked-org-types.ts）：企业来源方 / 招聘会主办方 ──────────
+  // 导入与企业资料写入一律置 false，与托管开关无关（托管打开时也不放行）。
+  // 接入方式、来源种类、companyManageScope 保留原值，客户私有化部署（b）恢复时把三个 false
+  // 改回原值即可：fair_organizer 原为 canImportFairs=true / canManageCompanies=true，
+  // enterprise_source 原为 canImportJobs=true / canManageCompanies=true。
   fair_organizer: {
     // 当前 Webhook 端点只接受岗位，尚无招聘会 Webhook，先 fail-closed。
     allowedAccessModes: ['api', 'excel', 'csv', 'json', 'manual'],
     allowedSourceKinds: ['fair_organizer', 'manual'],
     defaultSourceKind: 'fair_organizer',
     canImportJobs: false,
-    canImportFairs: true,
+    canImportFairs: false,
     canManagePolicies: false,
     canManageSmartCampus: false,
-    canManageCompanies: true,
+    canManageCompanies: false,
     companyManageScope: 'fair_associated',
   },
   enterprise_source: {
     allowedAccessModes: ['excel', 'csv', 'manual'],
     allowedSourceKinds: ['manual'],
     defaultSourceKind: 'manual',
-    canImportJobs: true,
+    canImportJobs: false,
     canImportFairs: false,
     canManagePolicies: false,
     canManageSmartCampus: false,
-    canManageCompanies: true,
+    canManageCompanies: false,
     companyManageScope: 'own_enterprise',
   },
 }

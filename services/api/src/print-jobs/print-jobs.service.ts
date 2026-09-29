@@ -19,7 +19,7 @@ import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
 import type { BillingPageSource } from './print-page-count.types'
-import { assertVerifiedPrintParameters } from './verified-print-parameters'
+import { assertPrintOrderSides, assertVerifiedPrintParameters } from './verified-print-parameters'
 import { DocumentConversionService } from '../document-conversion/document-conversion.service'
 import { WORD_MIME_TYPES } from '../document-conversion/document-conversion.types'
 import { assertPiiScanned } from './pii-scan-gate'
@@ -450,6 +450,8 @@ export class PrintJobsService {
     // 报价：金额只由 PricingService 依 PriceConfig 计算（**不信任前端 amount**）；无 active 价目 / 异常 → fail-closed。
     const copies = dto.params?.copies ?? DEFAULT_PARAMS.copies
     const colorMode: 'black_white' | 'color' = dto.params?.colorMode ?? 'black_white'
+    // 一体机直接建单不经过 OrderQuoteService，必须在这里单独拦。双面不把面数折半。
+    assertPrintOrderSides(billablePages * copies)
     const quote = await this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
     // 动态价格二次确认：quotedAmountCents 只断言「用户确认的就是现在要收的」，金额仍取上面的 quote。
     // 必须在建 Order / PrintTask / 支付会话之前拒绝；字段缺省（旧客户端）照旧按服务端计价建单。
@@ -578,9 +580,9 @@ export class PrintJobsService {
   /**
    * 建单前确认文件走过隐私预检。
    *
-   * 判定：文件为「用户上传的原件」（assetCategory 非派生 + purpose 在白名单内）时，
-   * 必须存在一条 completed 的 pii_scan DocumentProcessTask，且不残留 pending 裁决。
-   * 派生产物与系统生成物放行。
+   * 判定：materialCheckRequired() 为真（原件，或图片/Office 转 PDF、签名合成等用户材料派生件，
+   * 见 material-check-policy.ts）时，必须存在一条 completed 的 pii_scan DocumentProcessTask，
+   * 且不残留 pending 裁决。AI / 系统生成件与隐私遮挡产物放行。
    *
    * 门控关闭时（默认）只写审计不拦截，用于先观察真实绕过量。
    */
@@ -661,12 +663,12 @@ export class PrintJobsService {
     }
     const signed = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
     await this.audit.write({
-      actorId: ctx.endUserId ?? null,
+      actorId: null, // AuditLog.actorId FK 指向运营 User：会员 ID 写进去会违反外键、被静默吞掉，改记 payload.endUserId
       actorRole: 'kiosk',
       action: 'print_job.takeaway_url',
       targetType: 'print_task',
       targetId: task.id,
-      payload: { orderId: order.id, orderNo: order.orderNo, fileId },
+      payload: { orderId: order.id, orderNo: order.orderNo, fileId, endUserId: ctx.endUserId ?? null },
       ipAddress: ctx.ipAddress ?? null,
       userAgent: ctx.userAgent ?? null,
     }).catch(() => undefined)
@@ -803,13 +805,13 @@ export class PrintJobsService {
     })
 
     await this.audit.write({
-      actorId: ctx.endUserId ?? null,
+      actorId: null, // 同上：会员 ID 记 payload.endUserId
       actorRole: 'kiosk',
       action: 'print_job.retry',
       targetType: 'print_task',
       targetId: task.id,
       payload: {
-        orderId: order.id,
+        endUserId: ctx.endUserId ?? null, orderId: order.id,
         orderNo: order.orderNo,
         amountCents: amountBefore,
         fromStatus: 'failed',

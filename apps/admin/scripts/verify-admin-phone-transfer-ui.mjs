@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createContext, Script } from 'node:vm'
 import ts from 'typescript'
+import { loadAuthSecondFactorModule } from './support/auth-second-factor-module.mjs'
 import {
   callsNamed,
   expectRejected,
@@ -404,6 +405,7 @@ function createAdminAuthAdapterHarness(responses, options = {}) {
     exports: module.exports,
     require: (specifier) => {
       if (specifier === '../api/client') return { API_BASE_URL: apiBaseUrl }
+      if (specifier === './secondFactor') return loadAuthSecondFactorModule()
       throw new Error(`Unexpected module: ${specifier}`)
     },
     fetch,
