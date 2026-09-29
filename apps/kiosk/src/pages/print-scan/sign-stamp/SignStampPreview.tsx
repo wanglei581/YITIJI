@@ -289,7 +289,7 @@ export function SignStampPreview({
         {!previewUrl
           ? '没有可打开的文件内容，不画示意纸面。'
           : burned
-            ? '生成的新 PDF · 签章已印在纸上'
+            ? '生成的新 PDF · 签名已印在纸上'
             : compact
               ? `原 PDF 第 ${viewPage} 页 · 下一步可翻页放大`
               : '原 PDF · 框是标记，原件不改写'}

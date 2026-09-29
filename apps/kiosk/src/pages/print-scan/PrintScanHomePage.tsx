@@ -213,7 +213,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     key: 'sign',
     cap: 'sign',
     icon: PenToolIcon,
-    title: '签名盖章',
+    title: '签名',
     description: '放入本人手写签名',
     to: '/print-scan/sign',
     aiRole: 'none',
@@ -396,7 +396,7 @@ export function PrintScanHomePage() {
           }
         }
 
-        // ② 管理员后台的能力配置覆盖。签名盖章这类默认拒绝的键：读取成功但没登记 =
+        // ② 管理员后台的能力配置覆盖。签名这类默认拒绝的键：读取成功但没登记 =
         //    本机暂未开通，按 not_verified 整卡停用（resolveCapabilityOverride），与服务端一致。
         const override = capabilityKey ? resolveCapabilityOverride(capabilityLoad, capabilityKey) : undefined
         let resolved = capability
@@ -457,7 +457,7 @@ export function PrintScanHomePage() {
     if (link?.to) navigate(link.to)
   }
 
-  // 只数管理员真配置过的行：签名盖章没登记是默认关，不是「被管理员关闭」，
+  // 只数管理员真配置过的行：签名没登记是默认关，不是「被管理员关闭」，
   // 不因它把整页切到 locked 态（那张卡已在 ② 里单独停用）。
   const locked =
     confirmed &&

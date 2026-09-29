@@ -47,8 +47,8 @@ import {
   RESUME_PARSE_PROOF_HEADER,
   type ResumeParseIntentHeaders,
 } from '../resumeParseIntent'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL } from './client'
-import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
 import { networkError } from './throwHttpError'
 
@@ -74,6 +74,11 @@ function accessHeaders(access?: ResumeReadAccess): Record<string, string> {
 
 // ──────────────────────────────────────────────────────────────
 // 核心 fetch 封装（LLM 路由用长超时，普通读写用短超时）
+//
+// 四个封装一律经 terminalAttributedFetch 发出：有本机终端身份时带上
+// x-terminal-id + x-terminal-session-token（服务端据此按台计 AI 每日额度、记用量；
+// 同一大厅多台机器共用 NAT 出口 IP，只按 IP 计就会共用一份额度），会话票被拒时换一次票重发；
+// 没有终端身份（手机、桌面浏览器）时原样发出，服务端退回按 IP 计。
 // ──────────────────────────────────────────────────────────────
 
 async function get<T>(path: string, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
@@ -81,7 +86,7 @@ async function get<T>(path: string, access?: ResumeReadAccess, timeoutMs = DEFAU
   const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -112,12 +117,6 @@ async function get<T>(path: string, access?: ResumeReadAccess, timeoutMs = DEFAU
   return res.json() as Promise<T>
 }
 
-/** 空对象表示本机没有已验证的终端身份（Agent 未就绪），此时不发这个头。 */
-function terminalHeader(): Record<string, string> {
-  const terminalId = getTerminalId()
-  return terminalId ? { 'X-Terminal-Id': terminalId } : {}
-}
-
 function requireResumeParseIntentHeaders(intent?: ResumeParseIntentHeaders | null): Record<string, string> {
   const key = intent?.intent
   const proof = intent?.proof
@@ -141,16 +140,12 @@ async function post<T>(
   const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        // 限流与日配额的「终端」维度（后端 @TerminalScopedThrottle +
-        // AiPublicQuotaService）。同一大厅多台机器共用 NAT 出口 IP，不带这个头
-        // 就会共用一份 AI 额度。取不到本机终端身份时不发，后端退化回按 IP 计数。
-        ...terminalHeader(),
         ...extraHeaders,
       },
       credentials: 'include',
@@ -190,7 +185,7 @@ async function sendJson<T>(
   const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method,
       headers: {
         Accept: 'application/json',
@@ -236,9 +231,9 @@ async function postForm<T>(path: string, body: FormData, timeoutMs = LLM_TIMEOUT
   const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { Accept: 'application/json', ...terminalHeader() },
+      headers: { Accept: 'application/json' },
       credentials: 'include',
       body,
       signal: ac.signal,
