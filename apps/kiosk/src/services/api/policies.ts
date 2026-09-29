@@ -22,6 +22,8 @@ export interface PolicyPostView {
   /** 发布方给的外部编号。没有就是空，页面写「—」，不编。 */
   externalId?: string | null
   publishedDate?: string
+  /** 确认发布的时间。publishedDate 为空时，发布日期用它的日期部分。 */
+  publishConfirmedAt?: string | null
   sourceName: string
   syncTime: string
 }

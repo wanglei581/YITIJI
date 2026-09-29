@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isValidSourceUrl } from '../../lib/url'
 import type { PolicyPostView } from '../../services/api/policies'
+import { policyPublishedOn } from './policyFacts'
 import { FileTextIcon, PrinterIcon, QrCodeIcon, ScaleIcon, ScrollTextIcon } from 'lucide-react'
 import { CATEGORY_META, type TabKey } from './shared'
 import { CollapsedChevron, RqDeadEnd, SourceFacts, type SourceQrTarget } from './components'
@@ -78,7 +79,7 @@ export function NoticePanel({
                 <SourceFacts
                   sourceName={notice.sourceName}
                   syncTime={notice.syncTime}
-                  publishedOn={notice.publishedDate}
+                  publishedOn={policyPublishedOn(notice)}
                   dateLabel="发布时间"
                 />
                 <p className="rq-note">{SRC_RULE}</p>

@@ -1,4 +1,5 @@
 import type { PolicyPostView } from '../../services/api/policies'
+import { policyPublishedOn } from './policyFacts'
 import {
   BriefcaseIcon,
   Building2Icon,
@@ -51,6 +52,7 @@ export interface PolicyItem {
   /** 接口原样。缺了页面写「—」，不用另一项顶上。 */
   syncTime?: string
   externalId?: string
+  /** 优先 publishedDate，没有再用确认发布时间。同步时间不拿来填。 */
   publishedDate?: string
   updatedAt?: string
 }
@@ -71,7 +73,7 @@ export function fromPublished(p: PolicyPostView): PolicyItem {
     sourceName: p.sourceName,
     syncTime: p.syncTime,
     externalId: p.externalId?.trim() || undefined,
-    publishedDate: p.publishedDate,
+    publishedDate: policyPublishedOn(p),
     updatedAt: p.publishedDate ?? p.syncTime?.slice(0, 10),
   }
 }
