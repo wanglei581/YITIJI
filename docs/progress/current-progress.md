@@ -158,6 +158,12 @@
 - **验证：** admin / partner / api `tsc`，两后台 lint 0 错误；API 门禁 partner-stats-contract、kiosk-session、console-screen-snapshot / usage、device-fleet-overview、terminal-identity、terminal-device-config、partner-smart-campus、terminal-network-diagnostics、admin-ops、print-jobs、terminal-provisioning；admin 门禁 honest-placeholders、console-screen-ui、service-desk-dashboard-ui、terminal-network-diagnostics-ui、terminal-bind-code-ui、device-fleet-overview-ui；partner 门禁 stats-contract、refresh-safe、relative-api-url、excel-template-download-ui；CI 覆盖。浏览器用例：机构 69、机构大屏 136、管理员全套（改后重跑相关 41 条）通过。浏览器实看机构「终端数据」页（1440 宽，演示数据）；外设页内容已核对，版面截图因浏览器面板隐藏未取，留待走查补看。
 - **服务人次在一体机真上报之前显示「暂无」：** 响应加 `visitCount.recordingStarted`（本机构终端是否有过任何会话记录），没有时指标卡、表格、明细与导出都写「暂无」并说明原因，不显示 0（0 会被读成「没人来」）；门禁 T4k0 覆盖。
 - **口径（总指挥 9/29 定）：** 分母不小于 5 时照常给出纸成功率，即使分子 1–4 能由比率反推——这是机器运行指标、对不上人。前提三条由响应键白名单门禁守住：不出逐人明细、只有统计窗口级数字（设备的最后心跳时间除外）、不按个人属性拆分。
+## 2026-09-29：开放打印设计按《开放打印能力》V1.0 核对改正（只改文档）
+
+- **`docs/device/pantum-api-design.md` 升到 v1.1：** 时间戳改为秒；请求头只有 `appKey`、`timeStamp`、`nonce`、`sign`；份数字段改为 `numOfCopies`；设备状态改为 POST；回调改为单一地址按 topic 分流；任务 ID 按字符串处理；验签用原始请求体；删去协议里没有的 orientation / quality；本机能否经奔图云接单改为未经厂家确认；开放 API 不再把彩色取值确认当作开工前置条件；第 7 节按 V1.0 已回答的项关闭并重排待问清单。
+- **同步：** `pantum-cm2820adn.md`、`windows-terminal-agent-design.md` 的接口方法、回调路径、状态码终态，以及「已确认无云端打印」和「等彩色取值确认后才实现」，改为同一口径。
+- **未改：** CLAUDE.md、AGENTS.md、代码（含 `packages/shared/src/types/print.ts`）和证据文件。CLAUDE.md 第 3 节的改法只留在任务汇报里。
+- **验证：** 图谱生成与 `--check` 退出码均为 0，图谱文件无变化。三份设备文档没有关联门禁。`current-progress.md` 关联的 13 条门禁退出码均为 0。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 ## 2026-09-29：管理员登录页接上短信第二步（P1-4 前端，分支 `claude/consoles-admin-2fa-20260929`）
@@ -212,6 +218,22 @@
 - **发布验收顺序（总指挥 9/29 定）：** 真机四条闭环不现在跑，放到第一次发布部署完成后作为发布验收；装与本次发布同一提交的 Agent 安装包，KSK-001 保持 22H2。脚本开头新增 R 段：R.1 先验「新后端 + 旧 Agent」过渡（心跳、零元单出纸，不兼容即发布阻塞），R.2 产品负责人本人升级 Agent（从 0.4.11 首次升级须重跑一次生产安装脚本），R.3 按 C → E → H → I 走闭环，R.4 产品负责人到场一页纸（8 步约 90 分钟）。
 - **修复：** 9/28 命名管道单实例改动（`43f57fdb1`）批量替换「清锁」说明时，把 `onsite-failure-recovery-runsheet-2026-09.md` 的 F1 ④（缺纸后的钱和纸）整段换成了 F6（杀 Agent）的内容，并让汇总表 F6 行、F6 ④ 表头变成段落（表格断开）、F6 ② 同句重复两次、F6 ④ 空闲行仍写旧的「残留 agent.pid 会拦住启动」、丢了一条 DEVICE NO-GO 勾选项；`windows-host-acceptance-runbook.md` 一条勾选项也被换成段落。F1 ④ 按改动前原文还原（出处行号重核），其余按新机制改回表格与勾选项。
 - **发现的缺陷（未改代码，记入待办）：** 到机码核销超过 10 分钟后再输同一码，服务端返回 `PICKUP_CODE_ALREADY_USED`「这份到机码已经使用过，不能再次取件」，但一体机文案映射表 `userErrorMessage.ts` 没有这个码，页面显示兜底句「到机码校验没有完成，请重试或联系现场工作人员」——叫用户重试一个不会成功的码，且每次重试计入失败次数，10 次后本机锁 15 分钟。另：核销接口本身不检查打印机能否出纸，打印机不可用时码会被用掉而纸出不来（卡片副文案已提示「这台出不了纸 · 核销前先换一台空闲机器」）。
+## 2026-09-29：奔图官方手册事实补进设备文档（分支 `glm/pantum-manual-facts-0929`）
+
+- **做了什么：** 以奔图 CM2800 系列用户指南 V1.4（公开资料）为依据，把手册事实补进设备文档；同一分支上另一窗口已完成第一步（`pantum-cm2820adn.md` §八「面板功能与规格」）。本条其余步骤只改 `docs/`，未动代码。出处统一写成「（奔图 CM2800 系列用户指南 V1.4 第 N 页，PDF 页码）」。
+  - **现场故障处置单**：§1 第 7 条写明电源键短按只进节能、按住超过 2 秒才关机、电源灯闪烁是休眠（第 23、25 页），约 1 分钟无任务自动休眠（第 10、90 页）；F4、F7-A 按此改关机步骤。每日开门检查把面板复印设置恢复默认（明暗度、纸张会留下，第 46 页）。前盖向下翻开换粉（第 61–64 页），废粉瓶从机身右侧取（第 22、65 页）。
+  - **现场验收脚本、打印机旁一页纸**：补同一套电源键规则；一页纸的卡纸卡写明位置图顺序，并写后盖定影区先冷却。
+  - **母盘清单 F 段**：净重改为 16.8 kg、打印功耗改为手册未列（第 90 页，只有关机 ≤0.50 W、休眠 ≤2.00 W、就绪 ≤25.00 W）。打印机直插接地墙插；延长线、多引线电源板、多引线扩展器、UPS 和内联浪涌保护器的禁令在第 6 页。插头伸手能拔是第 4 页，保护接地是第 6、10 页。多孔插排和 PDU 按多引线电源板处理，只给主机和屏幕。左侧与右后方通风格栅不贴挡（第 21、73–74 页），机顶不放东西、远离空调和通风管道（第 9 页）。前盖、右侧废粉瓶、后盖三处留操作空间。新增「给机柜厂家的要求」。
+  - **`pantum-cm2820adn.md` §八**：真机核实清单 6 项（U 盘直接打印、铭牌看 Wi-Fi、EWS 的 SNMP 与缺纸/卡纸邮件、身份证放置翻面、TIFF/OFD、复印设置能否自动恢复）；安装与供电安全按上面的页码拆开。
+  - **`windows-terminal-agent-design.md`**：WMI 两格按 `wmi.ts` 改正。离线是 `PrinterStatus=7`（不是 5）；缺纸是 `DetectedErrorState=4`（5 是 Low Toner）。这不是手册内容。
+  - **`next-tasks.md`**：P2 增加「屏幕一点即扫」（第 51 页写明符合 TWAIN/WIA），第一次发布之后做。
+- **对照用户指南原页后改正的地方：**
+  - 卡纸位置图顺序改为手册原文：标准出纸口、多功能进纸盒、标准进纸盒、文档进纸器（ADF）、后部盖门（第 70 页）。上一稿把后部盖门写在前面，并把第四处写成「自动输稿器」。
+  - 多功能进纸盒的取纸是打开前盖、用力向下推到底、取出卡纸、关前盖（第 75–76 页）。「纸张卡在手走纸盒中」是另一节，不在五处图里，也不是多功能进纸盒：抽出标准进纸盒，按左侧蓝色解锁按钮，抽出卡纸，向上按压金属板复位（第 73–74 页）。标准出纸口没有单独取纸步骤，不再写成「推断后一定开后盖」。
+  - 面板提示原文与第 82 页一致，词没有改：「进纸失败」「纸张设置不匹配」「打印机卡纸」；「碳粉盒未安装」「碳粉盒粉量不足」「碳粉盒不匹配」「碳粉盒寿命尽」；「废粉瓶容量将满」「废粉瓶容量满」「未检测到废粉瓶」。
+  - 供电禁令只标第 6 页。上一稿把整句禁令标成第 4、6、10 页。
+- **对照后保持的事实：** 电源键与休眠灯、16.8 kg、三档功耗、复印明暗度和纸张会留下、通风格栅页码、前盖与废粉瓶方位、真机核实清单 6 项、TWAIN/WIA、WMI 枚举。
+- **验证（本机命令，不代表现场或生产验收）：** `node scripts/generate-project-graph.mjs` 退出码 0（`docs/graph/` 0 个文件变化）；`node scripts/generate-project-graph.mjs --check`（即 `pnpm graph:check`）退出码 0。8 个改过的文档各跑 `node scripts/project-graph-query.mjs file <路径>`，退出码均为 0。点名门禁退出码均为 0：`pnpm --filter terminal-agent verify:print-scan-agent`、`pnpm --dir apps/terminal-agent verify:print-scan-agent`、`pnpm --filter ai-job-print-terminal verify:repository-integrity`、`pnpm --filter @ai-job-print/kiosk verify:profile-commercial-first-batch`、`pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home`、`pnpm --filter @ai-job-print/api verify:print-scan-first-release`、`verify:contract-review:preprod-readiness`、`verify:file-assets-trial-acceptance`、`verify:job-customer-sample-readiness`、`verify:job-info-ai-real-acceptance`、`verify:profile-commercial-first-batch-acceptance`、`verify:toolbox-ai-skill-intents`、`verify:toolbox-ai-skill-real-acceptance`、`verify:toolbox-governance-acceptance`、`verify:toolbox-preprod-acceptance`。依赖已在，未重装。
 
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
