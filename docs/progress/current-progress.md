@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-29：W-03 机构账号「临时密码、没绑手机」死锁打通——管理员按确认函登记手机号、本人短信自证（分支 `claude/backend-hardening-20260929-w03-contact-phone`）
+
+- **问题：** 管理员建的机构账号只有临时密码、没绑手机时，找回密码要求已自证手机、本人绑手机又不算自证（临时密码管理员也知道），账号永远变不成本人自管，机构自管操作做不了。
+- **做法（Grok 实现，安全口径由协调方定稿，总指挥拍板方案 A + 防线）：** 新接口 `POST /api/v1/admin/orgs/:id/accounts/:accountId/contact-phone`（管理员本人密码确认，复用机构账号操作的 5 次 / 5 分钟锁）。防线：只对「临时密码、手机未自证」的机构账号开放；手机号必须等于机构资料里确认函上的联系人手机；机构联系人手机 24 小时内改过就不许登记（防管理员先改成自己的号）；审计记确认函编号、不记明文手机号，与写入同一事务；写库后给该号发知会短信，生产没配模板时写库前就拒（失败关闭），发送失败补偿清回。之后机构本人在登录页「忘记密码」用这个号收码、设新密码，账号变本人自管、手机算自证；管理员无法代收验证码，管理员账号的找回规则不变。新列 `User.phoneRegisteredByAdminAt`、`Organization.contactPhoneChangedAt`（两套迁移 `20260929235000_add_partner_contact_phone_registration`）；后台账号列表按与两个后台的约定下发 `passwordProofState`、`phoneRegisteredByAdminAt`、`canRegisterContactPhone`。
+- **验证：** 新门禁 `verify:partner-contact-phone-registration` 46 条（整条链：登记 → 本人找回 → 自管 → 做一项自管操作，加反例），挂 CI；Grok 7 处、协调方 4 处行为变异（不核对联系人手机、不看冷却、找回对所有角色放开、资格不看临时密码）全红；机构账号操作、内部账号、改密、手机转移、短信额度等 17 条关联门禁与 PG schema 同步校验全绿。
+- **待办：** 短信平台要另申请知会模板，配到 `SMS_TEMPLATE_PARTNER_PHONE_REGISTERED`，没配之前生产上这个接口一律 503（失败关闭）。
+
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。
