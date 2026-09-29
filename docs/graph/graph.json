@@ -28157,6 +28157,24 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "docs/design/kiosk-redesign-2026-08-v2"
+        ],
+        "files": [],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-qingxu-v2-frozen.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:qingxu-v2-frozen"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/kiosk/src/pages/auth/LoginPage.tsx",
