@@ -471,8 +471,9 @@ export class MockInterviewService {
       filename: `模拟面试练习报告_${session.position.replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '岗位'}.pdf`,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
-      // AI 生成的派生稿：生产隐私闸门按类别放行，否则直达报价页后建单被拒（商用收口 P0-5）。
+      // AI 生成的派生稿：生产隐私闸门按 derivationKind=ai_generated 放行，否则直达报价页后建单被拒（商用收口 P0-5）。
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       uploaderId: null,
       endUserId: session.endUserId,
       createdBy: 'mock_interview_report',
@@ -534,8 +535,9 @@ export class MockInterviewService {
       filename: `${PRACTICE_SHEET_FILENAME_PREFIX}_${safePosition}.pdf`,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
-      // 通用题库生成的派生稿（不调模型，也不是用户原件）：同上，生产隐私闸门按类别放行。
+      // 通用题库生成的派生稿（不调模型，也不是用户原件）：同上，生产隐私闸门按 derivationKind=ai_generated 放行。
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       uploaderId: null,
       endUserId: session.endUserId,
       createdBy: 'mock_interview_practice_sheet',

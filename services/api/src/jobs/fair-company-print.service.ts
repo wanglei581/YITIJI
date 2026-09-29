@@ -123,6 +123,7 @@ export class FairCompanyPrintService {
       purpose: 'fair_material',
       uploaderId: null,
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       createdBy: GENERATED_BY,
       validationMode: 'intent',
       expiresAtOverride: expiresAt,

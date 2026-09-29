@@ -794,6 +794,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:sms-send
           # A-04 隐私检查不完整时的本人确认留痕与建单开关（默认关）；写隔离库。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pii-manual-confirm
+          # 1.8 P-1 转换件 / 签名件不得绕过打印前隐私检查；「我的文档」materialCheckRequired 与闸门同源；写隔离库。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:derivation-kind
           # P1-5 短信发送额度（全站每日总量 / 单终端每日上限、Redis 核不了即暂停）；内存 Redis，不连外网。
           pnpm --filter @ai-job-print/api verify:sms-budget
           # P1-4 管理员登录加固（锁定失败关闭、来源地址名单、短信第二步）；写隔离库。
@@ -1047,6 +1049,8 @@ jobs:
           # 包 D：服务端文档转换（Word → PDF）契约 / 超时 / 并发 / 归属 / 能力为假时 fail-closed（fake 引擎，不需要 LibreOffice）
           pnpm --filter @ai-job-print/api verify:document-conversion
           pnpm --filter @ai-job-print/api verify:print-sign
+          # 1.8 P-1：FileObject.derivationKind 新列在 PG 侧同样落库、闸门与列表同源。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:derivation-kind
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           # 彩色/双面按终端能力开放（fail-closed），PG 下同样必须成立
           pnpm --filter @ai-job-print/api verify:print-color-duplex-capability

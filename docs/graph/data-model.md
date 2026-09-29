@@ -12,7 +12,7 @@ flowchart TD
   EndUser["EndUser<br/><small>33 字段</small>"]
   Organization["Organization<br/><small>27 字段</small>"]
   Terminal["Terminal<br/><small>27 字段</small>"]
-  FileObject["FileObject<br/><small>48 字段</small>"]
+  FileObject["FileObject<br/><small>49 字段</small>"]
   Job["Job<br/><small>47 字段</small>"]
   JobFair["JobFair<br/><small>39 字段</small>"]
   JobSource["JobSource<br/><small>30 字段</small>"]
@@ -95,7 +95,7 @@ flowchart TD
 | **FeedbackReply** | 8 | FeedbackTicket、User | 1 个文件<br/>`member-feedback/member-feedback.service.ts` |
 | **FeedbackTicket** | 17 | EndUser、FeedbackReply | 4 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`member-feedback/kiosk-feedback.service.ts`<br/>`member-feedback/member-feedback.service.ts`<br/>… |
 | **FieldMappingRule** | 9 | JobSource | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
-| **FileObject** | 48 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 35 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
+| **FileObject** | 49 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 35 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
 | **HelpItem** | 8 | — | **无代码读写** |
 | **ImportBatch** | 17 | ImportRecord、JobSource | 2 个文件<br/>`jobs/jobs-admin.service.ts`<br/>`jobs/jobs-excel.service.ts` |
 | **ImportRecord** | 10 | ImportBatch | 1 个文件<br/>`jobs/jobs-excel.service.ts` |

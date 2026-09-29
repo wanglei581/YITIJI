@@ -16543,7 +16543,7 @@
         ]
       },
       {
-        "fieldCount": 48,
+        "fieldCount": 49,
         "name": "FileObject",
         "relations": [
           "DocumentProcessTask",
@@ -24473,7 +24473,6 @@
       "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/print-jobs/pii-scan-gate.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-pii-manual-confirm.ts"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
@@ -28105,10 +28104,11 @@
           "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
           "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
-          "apps/kiosk/src/routes/index.tsx",
-          "services/api/src/print-jobs/pii-scan-gate.ts"
+          "apps/kiosk/src/routes/index.tsx"
         ],
-        "missing": []
+        "missing": [
+          "services/api/src/print-jobs/material-check-policy.ts"
+        ]
       },
       "file": "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "helper": true,

@@ -1,6 +1,10 @@
 import { BadRequestException, ConflictException } from '@nestjs/common'
 import type { AuditService } from '../audit/audit.service'
 import type { PrismaService } from '../prisma/prisma.service'
+import { materialCheckRequired, PII_SCAN_REQUIRED_PURPOSES } from './material-check-policy'
+
+// 原导出名保留：scripts/support/ai-artifact-print-pii-gate.ts 等从这里取。
+export { PII_SCAN_REQUIRED_PURPOSES }
 
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
 
@@ -17,8 +21,6 @@ export function piiManualConfirmEnforced(): boolean {
   return raw === 'true' || raw === '1' || raw === 'on'
 }
 
-export const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan'])
-
 type PiiGateArgs = {
   prisma: PrismaService
   audit?: AuditService
@@ -34,16 +36,17 @@ type PiiGateArgs = {
  * Shared print PII gate. A completed scan is bound to the exact server SHA-256
  * captured in DocumentProcessTask.paramsJson; a missing SHA is deliberately
  * stale, including direct COS uploads above the server sniffing threshold.
+ *
+ * 哪些文件要查只看 materialCheckRequired()（与「我的文档」列表同一个函数）：
+ * 转换件、签名件与原件一样按本件 sha256 要一条完成的隐私检查，不完整时走同一条本人确认。
  */
 export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
   const file = await args.prisma.fileObject.findUnique({
     where: { id: args.fileId },
-    select: { purpose: true, assetCategory: true, sha256: true },
+    select: { purpose: true, assetCategory: true, derivationKind: true, sha256: true },
   })
   if (!file) return
-
-  const isDerived = file.assetCategory === 'derived' || file.assetCategory === 'optimized'
-  if (isDerived || !PII_SCAN_REQUIRED_PURPOSES.has(file.purpose)) return
+  if (!materialCheckRequired(file)) return
 
   const scan = await args.prisma.documentProcessTask.findFirst({
     where: { sourceFileId: args.fileId, kind: 'pii_scan', status: 'completed' },
@@ -89,6 +92,7 @@ export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
         reason: !scan ? 'PII_SCAN_MISSING' : 'PII_DECISIONS_PENDING',
         purpose: file.purpose,
         assetCategory: file.assetCategory,
+        derivationKind: file.derivationKind,
         pendingFindings,
       },
     })

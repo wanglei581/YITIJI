@@ -6,7 +6,8 @@
  *       重复确认 200 且时间不变；并发两次只写一次；审计只记任务号、mode、请求方类型、时间（不记文件名与识别文字）。
  *   [B] 建单闸门（开关 PRINT_PII_MANUAL_CONFIRM_ENFORCED，默认关）：开关关时照旧放行；开时不完整且未确认被拒
  *       （400 PRINT_PII_MANUAL_CONFIRM_REQUIRED），确认后放行；同一原件重扫后以最新任务为准、旧确认不继承；
- *       完整扫描不需要确认；派生件不受影响；非生产（requireCompleted=false）不受影响。
+ *       完整扫描不需要确认；AI 生成件（derivationKind=ai_generated）不受影响、格式转换件与原件同样要确认
+ *       （1.8 P-1）；非生产（requireCompleted=false）不受影响。
  *   [C] 两处口径一致：确认接口接受的 mode 与建单闸门要求确认的 mode 是同一组。
  */
 import 'reflect-metadata'
@@ -52,10 +53,10 @@ async function main(): Promise<void> {
   const savedSwitch = process.env['PRINT_PII_MANUAL_CONFIRM_ENFORCED']
 
   const sha = (n: number) => `${n}`.padStart(64, 'a')
-  const makeFile = async (n: number, assetCategory = 'original') => {
+  const makeFile = async (n: number, assetCategory = 'original', derivationKind: string | null = null) => {
     const file = await prisma.fileObject.create({ data: {
       storageKey: `verify-pii-confirm/${suffix}/${n}`, filename: `身份证复印件-${n}.pdf`, mimeType: 'application/pdf',
-      sizeBytes: 100, sha256: sha(n), purpose: 'print_doc', assetCategory,
+      sizeBytes: 100, sha256: sha(n), purpose: 'print_doc', assetCategory, derivationKind,
     } })
     fileIds.push(file.id)
     return file
@@ -129,9 +130,17 @@ async function main(): Promise<void> {
     const rescan = await gate(f1.id)
     check('同一原件重扫后以最新任务为准，旧确认不继承', !rescan.ok && rescan.code === 'PRINT_PII_MANUAL_CONFIRM_REQUIRED', describe(rescan))
     check('完整扫描不需要确认即放行', (await gate(f4.id)).ok)
-    const derived = await makeFile(7, 'derived')
+    const derived = await makeFile(7, 'derived', 'ai_generated')
     await makeTask(derived.id, 7, 'degraded')
-    check('派生件不受这道闸影响', (await gate(derived.id)).ok)
+    check('AI 生成件（derivationKind=ai_generated）不受这道闸影响', (await gate(derived.id)).ok)
+    // 1.8 P-1：图片 / Office 转 PDF 的内容就是本人材料，与原件走同一条本人确认。
+    const converted = await makeFile(8, 'derived', 'format_conversion')
+    const t8 = await makeTask(converted.id, 8, 'degraded')
+    const convertedBlocked = await gate(converted.id)
+    check('格式转换件：未确认的降级扫描同样被拒（400 PRINT_PII_MANUAL_CONFIRM_REQUIRED）',
+      !convertedBlocked.ok && convertedBlocked.code === 'PRINT_PII_MANUAL_CONFIRM_REQUIRED', describe(convertedBlocked))
+    const convertedConfirm = await outcome(() => confirm.confirm(t8.task.id, t8.requester))
+    check('格式转换件：本人确认后放行', convertedConfirm.ok && (await gate(converted.id)).ok, describe(convertedConfirm))
     check('非生产（不强制隐私检查）不受这道闸影响', (await gate(f6.id, false)).ok)
 
     console.log('\n[C] 口径一致')

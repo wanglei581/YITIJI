@@ -50,7 +50,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 断言了不存在的路径（6）
+## 断言了不存在的路径（7）
 
 门禁里写着某个仓库路径，但该路径在 git 里不存在。可能是文件被移动/删除后门禁
 没跟着改 —— 这类断言往往已经恒真或恒假，需要人确认。
@@ -60,6 +60,7 @@ _（空）_
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
+| `apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs` | `services/api/src/print-jobs/material-check-policy.ts` |
 | `services/api/scripts/verify-legal-doc-version.ts` | `services/api/legalDocs.ts` |
 | `services/api/scripts/verify-policy-eligibility-authoring.ts` | `services/api/policies.ts` |
 | `services/api/scripts/verify-wave2-account-rebind.ts` | `services/auth/memberAuthApi.ts` |
@@ -2435,7 +2436,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/print-jobs/pickup-claim-memory.ts` | `verify-pickup-code-share.ts` |
 | `services/api/src/print-jobs/pickup-claim-rate-limit.ts` | `verify-pickup-code-share.ts` |
 | `services/api/src/print-jobs/pickup-order.service.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts` |
-| `services/api/src/print-jobs/pii-scan-gate.ts` | `verify-profile-documents-inkpaper.mjs`<br/>`verify-pii-manual-confirm.ts` |
+| `services/api/src/print-jobs/pii-scan-gate.ts` | `verify-pii-manual-confirm.ts` |
 | `services/api/src/print-jobs/print-jobs.controller.ts` | `verify-ai-access.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-identity.ts`<br/>`verify-throttle-dimension.ts` |
 | `services/api/src/print-jobs/print-jobs.service.ts` | `verify-contract-review-report-print.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-closed-pending-print-task-disposition.ts`<br/>`verify-document-conversion.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-print-parameter-capability.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/print-jobs/print-page-count.service.ts` | `verify-admin-fairs.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |

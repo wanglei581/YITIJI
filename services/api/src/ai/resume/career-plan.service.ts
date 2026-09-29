@@ -295,9 +295,10 @@ export class CareerPlanService {
       filename: rendered.filename,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
-      // 服务端生成的派生稿（AI 版与降级版都是）：生产隐私闸门按类别放行，
+      // 服务端生成的派生稿（AI 版与降级版都是）：生产隐私闸门按 derivationKind=ai_generated 放行，
       // 否则一体机直达报价页后建单会被拒 PRINT_PII_SCAN_REQUIRED（商用收口 P0-5）。
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       uploaderId: null,
       endUserId: parse.endUserId,
       createdBy: 'career_plan',
