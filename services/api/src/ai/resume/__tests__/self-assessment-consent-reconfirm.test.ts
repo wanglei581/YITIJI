@@ -115,6 +115,7 @@ async function assertNotIncluded(stored: Stored, anonymous = false): Promise<voi
   const { service, requester, builds, upserts } = makePlan(stored, anonymous)
   const out = await service.generate('task-1', requester)
   assert.equal(out.status, 'completed', '职业规划照常生成，不因旧同意整单拒绝')
+  assert.equal((out as { selfAssessmentExcluded?: string | null }).selfAssessmentExcluded, 'consent_outdated', '如实标出没纳入的原因，不悄悄降级')
   assert.equal(builds.length, 1)
   assert.equal(builds[0]!.selfAssessment, null, '旧版本同意的记分不得送进模型')
   assert.equal(upserts.length, 1)
@@ -147,6 +148,7 @@ test('R2 当前版本的记分可以送进模型', async () => {
   assert.equal(builds.length, 1)
   assert.equal(builds[0]!.selfAssessment?.dimensions[0]?.key, 'interest')
   assert.equal(builds[0]!.selfAssessment?.dimensions[0]?.strength, 4)
+  assert.equal((out as { selfAssessmentExcluded?: string | null }).selfAssessmentExcluded, null, '当前版本纳入时不带排除标记')
   assert.equal(upserts.length, 1)
 })
 
@@ -160,6 +162,7 @@ test('R3 没有记录或没有记分时照常生成', async () => {
     assert.equal(out.status, 'completed')
     assert.equal(builds.length, 1)
     assert.equal(builds[0]!.selfAssessment, null)
+    assert.equal((out as { selfAssessmentExcluded?: string | null }).selfAssessmentExcluded, null, '本来就没有可用记分时不是「因说明更新没纳入」')
   }
 })
 
@@ -183,6 +186,6 @@ test('R5 当前版本判定只写在生成里，读回和打印那段源码不�
   assert.ok(generateAt >= 0 && latestAt > generateAt)
   const generateBody = src.slice(generateAt, latestAt)
   const afterRead = src.slice(latestAt)
-  assert.match(generateBody, /selfAssessmentDimensionsForNewAi\(/)
-  assert.equal(afterRead.includes('selfAssessmentDimensionsForNewAi'), false)
+  assert.match(generateBody, /selfAssessmentForNewAi\(/)
+  assert.equal(afterRead.includes('selfAssessmentForNewAi('), false)
 })

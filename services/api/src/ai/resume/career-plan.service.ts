@@ -19,7 +19,7 @@ import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.servi
 import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
 import { storedJobFitUsesSystemJob } from './job-fit-hosting'
 import { sanitizeCareerPlanPayload } from './career-plan-payload-safety'
-import { selfAssessmentDimensionsForNewAi } from './self-assessment-consent-reconfirm'
+import { selfAssessmentForNewAi, type SelfAssessmentExclusion } from './self-assessment-consent-reconfirm'
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -68,6 +68,8 @@ interface StoredCareerPlan {
     selfAssessment: string | null
   }
   providerName: string
+  /** 这次没纳入自我探索的原因（如实告知，不悄悄降级）；旧存档无此字段按 null。 */
+  selfAssessmentExcluded?: SelfAssessmentExclusion
 }
 
 function scrubSystemJobTitle(value: string, title: string): string {
@@ -204,7 +206,8 @@ export class CareerPlanService {
     //    §1.7: 只读 dimensions,LLM 上轮拒答 summary 不注入下游(防跨轮污染)。
     //    记分会送进本次模型调用。同意不是当前版本时这次不纳入（照常生成，basedOn 如实为 null），
     //    见 self-assessment-consent-reconfirm.ts。
-    const selfAssessmentDims = selfAssessmentDimensionsForNewAi(await this.loadSelfAssessmentHint(parse))
+    const selfAssessmentUse = selfAssessmentForNewAi(await this.loadSelfAssessmentHint(parse))
+    const selfAssessmentDims = selfAssessmentUse.dimensions
     const selfAssessmentCtx: { dimensions: Array<{ key: string; label: string; strength: number }> } | null =
       selfAssessmentDims.length > 0 ? { dimensions: [...selfAssessmentDims] } : null
 
@@ -230,6 +233,7 @@ export class CareerPlanService {
         selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
       },
       providerName: 'llm',
+      selfAssessmentExcluded: selfAssessmentUse.excluded,
     }
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
     await this.prisma.aiResumeResult.upsert({
@@ -467,6 +471,7 @@ export class CareerPlanService {
       basedOn: stored.basedOn,
       ...stored.payload,
       providerName: stored.providerName,
+      selfAssessmentExcluded: stored.selfAssessmentExcluded ?? null,
     }
   }
 

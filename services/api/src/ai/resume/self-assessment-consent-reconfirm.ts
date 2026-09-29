@@ -18,8 +18,15 @@ export interface StoredSelfAssessmentAiHint<D> {
   consentVersion: string | null
 }
 
-/** 只有同意是当前版本的记分才可以送进新的模型调用；否则返回空（这次不纳入）。 */
-export function selfAssessmentDimensionsForNewAi<D>(hint: StoredSelfAssessmentAiHint<D>): D[] {
-  if (hint.dimensions.length === 0) return []
-  return isConsentCurrent(hint.consentVersion) ? [...hint.dimensions] : []
+/** 没纳入自我探索的原因。null = 纳入了，或本来就没有可用记分。 */
+export type SelfAssessmentExclusion = 'consent_outdated' | null
+
+/**
+ * 只有同意是当前版本的记分才可以送进新的模型调用；否则这次不纳入，并如实给出原因
+ * （合规 9/29：不许悄悄降级，前端据此提示「重新确认说明后可以纳入」）。
+ */
+export function selfAssessmentForNewAi<D>(hint: StoredSelfAssessmentAiHint<D>): { dimensions: D[]; excluded: SelfAssessmentExclusion } {
+  if (hint.dimensions.length === 0) return { dimensions: [], excluded: null }
+  if (isConsentCurrent(hint.consentVersion)) return { dimensions: [...hint.dimensions], excluded: null }
+  return { dimensions: [], excluded: 'consent_outdated' }
 }
