@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-29：简历「按原样导出」不再被 AI 授权与 AI 闸门挡住（分支 `claude/backend-hardening-20260929-draft-export-no-ai-gate`，总指挥 P0）
+
+- **问题（小程序走查转来，总指挥已对代码）：** `POST ai/resume/generate/export` 在读 `draft` 之前就查 `resume_ai` 授权，路由上的 `@AiUse('export')` 还会被 AI 暂停（#1094 合入后还有「AI 未开通」）挡住。draft=true 导出的是用户逐字填写的内容、不送模型、不带 AI 标识，正是 AI 失败时的手动退路——违背「AI 挂了退化成手动」。
+- **修法：** 新增 `@AiManualPathWhen`：同一接口里不经过模型的手动路径命中时，守卫只保留维护模式这一道，跳过 AI 暂停 / 未开通 / 额度 / 声明 / 登录档位；只认请求体里严格的布尔 `true`，其它一律照常过闸（失败关闭）。导出接口挂 `RESUME_DRAFT_EXPORT_MANUAL_PATH`（单独成文件，`ai.controller.ts` 已超 800 行，本次行数未增加）；控制器只在 draft=false 时查授权。
+- **验证：** `verify:ai-access` 加 8 条：AI 暂停与登录档位下 draft=true 放行、draft=false 与字符串 "true" 照拦、维护模式照拦；没有授权时 draft=true 完成、draft=false 403。三处反向变异（守卫不认手动路径、控制器无条件查授权、判定放宽成真值）各自变红；resume-export-formats、resume-export-label、resume-generate、aigc-pdf-metadata、materials-processing 全绿。
+
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
