@@ -115,7 +115,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/deploy-precheck.yml` | `verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-server-maintenance-workflows.mjs` |
+| `.github/workflows/deploy-precheck.yml` | `verify-server-maintenance-workflows.mjs` |
 
 </details>
 
@@ -124,7 +124,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/deploy.yml` | `verify-deploy-vite-env-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-deploy-authorization-gate.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-release-bundle.mjs` |
+| `.github/workflows/deploy.yml` | `verify-deploy-vite-env-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-deploy-authorization-gate.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-release-bundle.mjs`<br/>`verify-server-maintenance-workflows.mjs` |
 
 </details>
 
@@ -133,7 +133,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/server-cleanup.yml` | `verify-deploy-rollback.mjs` |
+| `.github/workflows/server-cleanup.yml` | `verify-deploy-rollback.mjs`<br/>`verify-server-maintenance-workflows.mjs` |
 
 </details>
 

@@ -1,14 +1,14 @@
 // verify:server-maintenance-workflows
 //
-// 用假命令真跑 deploy-precheck 的只读探测段，以及 cleanup-stale-releases.sh。
+// 用假命令真跑整份 deploy-precheck.sh，以及 cleanup-stale-releases.sh。
 // 只用 node 内置模块，可在 pnpm install 之前跑。
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync,
 } from 'node:fs'
 import { realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { gzipSync } from 'node:zlib'
 import { fileURLToPath } from 'node:url'
 
@@ -18,9 +18,12 @@ const sourceRoot = process.env.MAINT_FIXTURE_DIR || root
 const precheckYmlPath = '.github/workflows/deploy-precheck.yml'
 const cleanupYmlPath = '.github/workflows/cleanup-stale-releases.yml'
 const cleanupShPath = '.github/scripts/cleanup-stale-releases.sh'
+const precheckShPath = '.github/scripts/deploy-precheck.sh'
 const precheckYml = readFileSync(join(sourceRoot, precheckYmlPath), 'utf8')
 const cleanupYml = readFileSync(join(sourceRoot, cleanupYmlPath), 'utf8')
 const cleanupSh = readFileSync(join(sourceRoot, cleanupShPath), 'utf8')
+const precheckSh = readFileSync(join(sourceRoot, precheckShPath), 'utf8')
+const SSH_SHA = '0ff4204d59e8e51228ff73bce53f80d53301dee2'
 
 let failures = 0
 const pass = (message) => console.log(`  PASS ${message}`)
@@ -38,6 +41,7 @@ const WARN = '::warning::HTTPS 心跳近 7 天次数为 0，统计可能没测�
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const IP = '203.0.113.55'
 const IP_RE = /\b\d{1,3}(?:\.\d{1,3}){3}\b/
+const HEALTH_OK = '{"success":true,"data":{"status":"ok","db":"postgresql"}}'
 const NEW_WHITELIST = [
   'ai-job-print-api-backups',
   'ai-job-print-env-backups',
@@ -55,21 +59,14 @@ if (!realDu) {
   console.error('找不到 du，无法演练清理脚本')
   process.exit(1)
 }
-const toolDir = dirname(realDu)
+const gnuBin = '/opt/homebrew/opt/coreutils/libexec/gnubin'
+const toolDir = existsSync(join(gnuBin, 'readlink')) ? gnuBin : dirname(realDu)
+const realNode = process.execPath
+const realStat = existsSync(join(toolDir, 'stat')) ? join(toolDir, 'stat') : '/usr/bin/stat'
 
 function writeExec(path, body) {
   writeFileSync(path, body)
   chmodSync(path, 0o755)
-}
-
-function extractBetween(text, startMarker, endMarker) {
-  const lines = text.split('\n')
-  const start = lines.findIndex((line) => line.includes(startMarker))
-  const end = lines.findIndex((line, index) => index > start && line.includes(endMarker))
-  if (start < 0 || end < 0) throw new Error(`找不到片段：${startMarker} → ${endMarker}`)
-  const block = lines.slice(start, end)
-  const indent = (block[0].match(/^\s*/) ?? [''])[0].length
-  return block.map((line) => line.slice(Math.min(indent, (line.match(/^\s*/) ?? [''])[0].length))).join('\n')
 }
 
 function pad(n) { return String(n).padStart(2, '0') }
@@ -80,19 +77,61 @@ function combinedLine(ip, stamp, req, port) {
   return `${ip} - - [${stamp}] "${req}" 200 12 "-" "-" ${port}\n`
 }
 
-const precheckBody = extractBetween(precheckYml, '=== 12. ', '=== 完成：以上均为只读探测')
 const boxes = []
+const shortHomes = []
+const socketPids = []
 process.on('exit', () => {
+  for (const pid of socketPids) {
+    try { process.kill(pid, 'SIGTERM') } catch { /* 套接字进程已退出 */ }
+  }
   for (const td of boxes) {
     try { rmSync(td, { recursive: true, force: true }) } catch { /* 临时目录已清 */ }
   }
+  for (const dir of shortHomes) {
+    try { rmSync(dir, { recursive: true, force: true }) } catch { /* 短 HOME 已清 */ }
+  }
 })
 
-function runPrecheck(extraEnv) {
+function makeShortHome() {
+  const dir = realpathSync(mkdtempSync('/tmp/pc-home-'))
+  shortHomes.push(dir)
+  return dir
+}
+
+function startSocket(homeDir) {
+  const pm2 = join(homeDir, '.pm2')
+  mkdirSync(pm2, { recursive: true })
+  const sock = join(pm2, 'rpc.sock')
+  if (existsSync(sock)) rmSync(sock, { force: true })
+  const child = spawn(realNode, ['-e', 'const net=require("net"); const s=net.createServer(); s.listen(process.argv[1]); setInterval(()=>{},1e9);', sock], { stdio: 'ignore' })
+  child.unref()
+  if (child.pid) socketPids.push(child.pid)
+  const started = Date.now()
+  while (!existsSync(sock)) {
+    if (Date.now() - started > 5000) throw new Error(`pm2 套接字没建起来：${sock}`)
+    spawnSync('sleep', ['0.05'])
+  }
+  return sock
+}
+
+function walkFiles(dir, acc = []) {
+  if (!existsSync(dir)) return acc
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name)
+    let st
+    try { st = statSync(path) } catch { continue }
+    if (st.isDirectory()) walkFiles(path, acc)
+    else acc.push(path)
+  }
+  return acc
+}
+
+function runPrecheck(extraEnv = {}, opts = {}) {
   const td = realpathSync(mkdtempSync(join(tmpdir(), 'precheck-gate-')))
   boxes.push(td)
   const bin = join(td, 'bin')
   const home = join(td, 'home')
+  const shortHome = makeShortHome()
   const srv = join(td, 'srv')
   const tmp = join(td, 'tmp')
   const live = join(td, 'live')
@@ -101,11 +140,26 @@ function runPrecheck(extraEnv) {
   const apt = join(td, 'apt')
   const redis = join(td, 'redis')
   const expect = join(td, 'expect')
-  for (const dir of [bin, home, srv, tmp, live, syslog, pg, apt, redis, expect, join(expect, '.git')]) mkdirSync(dir, { recursive: true })
+  const backup = join(td, 'backups')
+  const pm2Log = join(td, 'pm2-calls.log')
+  const pythonLog = join(td, 'python-calls.log')
+  for (const dir of [bin, home, srv, tmp, live, syslog, pg, apt, redis, expect, backup, join(expect, '.git')]) mkdirSync(dir, { recursive: true })
   writeFileSync(join(expect, '.git', 'gitprobe-unique'), 'x\n')
-  writeExec(join(bin, 'node'), '#!/usr/bin/env bash\nprintf "%s\\n" "${DRILL_NODE_V:-v22.12.0}"\n')
+  if (!opts.noSocket) startSocket(shortHome)
+  writeExec(join(bin, 'node'), `#!/usr/bin/env bash
+if [ "$1" = "-e" ] || [ "$1" = "-p" ]; then exec "\${REAL_NODE}" "$@"; fi
+if [ "\${DRILL_NODE_FAIL:-}" = 1 ]; then exit 1; fi
+printf '%s\\n' "\${DRILL_NODE_V:-v22.12.0}"
+`)
+  writeExec(join(bin, 'python3'), `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "\${DRILL_PYTHON_LOG}"
+exit 1
+`)
   writeExec(join(bin, 'pnpm'), '#!/usr/bin/env bash\nprintf "%s\\n" "9.15.0"\n')
-  writeExec(join(bin, 'pm2'), '#!/usr/bin/env bash\nprintf "%s\\n" "${DRILL_PM2_JLIST:-[]}"\n')
+  writeExec(join(bin, 'pm2'), `#!/usr/bin/env bash
+printf '%s\\n' "call $*" >> "\${DRILL_PM2_LOG}"
+printf '%s\\n' "\${DRILL_PM2_JLIST:-[]}"
+`)
   writeExec(join(bin, 'nginx'), '#!/usr/bin/env bash\n[ "$1" = "-T" ] && cat "${DRILL_NGINX_CONF:-/dev/null}"\nexit 0\n')
   writeExec(join(bin, 'certbot'), '#!/usr/bin/env bash\nexit 0\n')
   writeExec(join(bin, 'systemctl'), `#!/usr/bin/env bash
@@ -115,6 +169,7 @@ echo "2026-10-06 03:00:00 6d 2026-09-01 03:00:00 1d certbot.timer certbot.servic
   writeExec(join(bin, 'openssl'), '#!/usr/bin/env bash\necho "notAfter=Dec  1 00:00:00 2027 GMT"\n')
   writeExec(join(bin, 'redis-cli'), `#!/usr/bin/env bash
 if [ "\${DRILL_REDIS_FAIL:-}" = 1 ]; then exit 1; fi
+if [ "$1" = ping ]; then printf '%s\\n' PONG; exit 0; fi
 if [ "$1" = CONFIG ]; then printf '%s\\n' dir; printf '%s\\n' "\${DRILL_REDIS_DIR:-${redis}}"; exit 0; fi
 if [ "$1" = INFO ]; then
   printf '%s\\n' '# Memory'
@@ -152,15 +207,48 @@ case "$*" in
   *) echo "2020-01-01T00:00:00+0000 oldest" ;;
 esac
 `)
+  writeExec(join(bin, 'sudo'), '#!/usr/bin/env bash\nexit 1\n')
+  writeExec(join(bin, 'curl'), '#!/usr/bin/env bash\nexit 0\n')
+  writeExec(join(bin, 'df'), '#!/usr/bin/env bash\nprintf "%s\\n" 100\n')
+  writeExec(join(bin, 'du'), `#!/usr/bin/env bash
+target=""
+for a in "$@"; do
+  case "$a" in
+    -*) ;;
+    *) target="$a"; break ;;
+  esac
+done
+case "$target" in
+  /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*)
+    exec "\${REAL_DU}" "$@" ;;
+esac
+printf '1\\t%s\\n' "\${target:-.}"
+`)
+  writeExec(join(bin, 'find'), `#!/usr/bin/env bash
+target=""
+for a in "$@"; do
+  case "$a" in
+    -*) ;;
+    *) target="$a"; break ;;
+  esac
+done
+case "$target" in
+  /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*)
+    exec /usr/bin/find "$@" ;;
+esac
+exit 0
+`)
   const script = join(td, 'precheck.sh')
-  writeFileSync(script, `#!/usr/bin/env bash\nset -uo pipefail\n${precheckBody}\n`)
+  writeFileSync(script, precheckSh)
   chmodSync(script, 0o755)
   const env = {
     PATH: `${bin}:${toolDir}:/usr/bin:/bin`,
-    HOME: home,
+    HOME: shortHome,
     LC_ALL: 'C',
     LANG: 'C',
     TZ: 'UTC',
+    REAL_NODE: realNode,
+    REAL_DU: realDu,
     PRECHECK_HOME: home,
     PRECHECK_SRV: srv,
     PRECHECK_TMP: tmp,
@@ -169,8 +257,12 @@ esac
     PRECHECK_PG_LOG: pg,
     PRECHECK_APT: apt,
     EXPECT_DIR: expect,
+    EXPECT_PM2: 'ai-job-print-api',
+    EXPECT_BACKUP: backup,
     DRILL_NODE_V: 'v22.12.0',
     DRILL_PM2_JLIST: '[]',
+    DRILL_PM2_LOG: pm2Log,
+    DRILL_PYTHON_LOG: pythonLog,
     DRILL_NGINX_CONF: join(td, 'empty.conf'),
     ...extraEnv,
   }
@@ -180,9 +272,17 @@ esac
     mkdirSync(dirname(env.DRILL_NGINX_CONF), { recursive: true })
     writeFileSync(env.DRILL_NGINX_CONF, 'http {}\n')
   }
+  const before = opts.snapshot ? new Set([...walkFiles(td), ...walkFiles(shortHome)]) : null
   const result = spawnSync('bash', [script], { env, encoding: 'utf8' })
+  const created = []
+  if (before) {
+    for (const path of [...walkFiles(td), ...walkFiles(shortHome)]) {
+      if (!before.has(path) && path !== pm2Log && path !== pythonLog) created.push(path)
+    }
+  }
   return {
-    td, home, srv, tmp, live, syslog, pg, apt, redis, expect, bin,
+    td, home, shortHome, srv, tmp, live, syslog, pg, apt, redis, expect, backup, bin, pm2Log, pythonLog,
+    created,
     code: result.status ?? 1,
     out: `${result.stdout ?? ''}\n${result.stderr ?? ''}`,
   }
@@ -209,32 +309,63 @@ function fieldConf(logPath) {
 `
 }
 
-// —— 静态：过时数字、白名单、base64、描述、${VAR} ——
-if (want('P-old')) check(!['19.75GB', '8.5GB', '88%', '35GB', '27GB'].some((token) => precheckYml.includes(token)),
+// —— 静态：过时数字、白名单、接线、描述、${VAR} ——
+// 旧断言：P-old S7 S10 S11。S9（内联副本逐字节一致）已删除，改为 S-wire。
+if (want('P-old')) check(!['19.75GB', '8.5GB', '88%', '35GB', '27GB'].some((token) => precheckYml.includes(token) || precheckSh.includes(token)),
   'P-old 预检注释不再引用过时的具体用量')
 if (want('S7')) check(!cleanupSh.includes('/srv/node_modules') && !cleanupSh.includes('/srv/services'),
   'S7 清理白名单不含 /srv/node_modules 与 /srv/services')
 
-function decodeB64(yml) {
-  const start = yml.indexOf("<<'B64'\n")
-  const end = yml.indexOf('\n            B64\n', start)
-  if (start < 0 || end < 0) return ''
-  const payload = yml.slice(start + "<<'B64'\n".length, end).split('\n').map((line) => line.trim()).join('')
-  return Buffer.from(payload, 'base64').toString('utf8')
-}
-if (want('S9')) check(decodeB64(cleanupYml) === cleanupSh, 'S9 工作流内联脚本与 cleanup-stale-releases.sh 逐字节一致')
 const executeDesc = /execute:\n\s+description: '([^']*)'/.exec(cleanupYml)?.[1] ?? ''
 if (want('S10')) check(executeDesc.includes('STALE_CRITICAL_FREE_MB') && executeDesc.includes('直接删除') && executeDesc.includes('将隔离'),
   'S10 execute 输入说明写了告急阈值、直接删除和隔离', executeDesc)
 
-function nonAsciiVarHits(label, text) {
+function nonAsciiVarHits(text) {
   return text.split('\n').map((line, index) => [index + 1, line]).filter(([, line]) => /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7f]/.test(line))
 }
 const varHits = [
-  ...nonAsciiVarHits('cleanup', cleanupSh),
-  ...nonAsciiVarHits('precheck', precheckBody),
+  ...nonAsciiVarHits(cleanupSh),
+  ...nonAsciiVarHits(precheckSh),
 ]
-if (want('S11')) check(varHits.length === 0, 'S11 变量后不紧跟非 ASCII（写成 ${VAR}）', varHits.map(([n]) => String(n)).join(','))
+if (want('S11')) check(varHits.length === 0, 'S11 变量后不紧跟非 ASCII（写成 ${VAR}）', varHits.map(([n, line]) => `${n}:${line}`).join(' | '))
+
+if (want('S-wire', 'S-concurrency')) {
+  const pin = `appleboy/ssh-action@${SSH_SHA} # v1.2.5`
+  const inputLines = cleanupYml.split('\n').filter((line) => line.includes('${{ inputs.'))
+  const inputOk = inputLines.length === 3 && inputLines.every((line) => /^\s*[A-Z0-9_]+:\s*\$\{\{\s*inputs\.[A-Za-z0-9_]+\s*\}\}\s*$/.test(line))
+  const deployUntouched = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8').includes('appleboy/ssh-action@v1.0.3')
+  const serverUntouched = readFileSync(join(root, '.github/workflows/server-cleanup.yml'), 'utf8').includes('appleboy/ssh-action@v1.0.3')
+  if (want('S-wire')) check(
+    precheckYml.includes(pin)
+      && cleanupYml.includes(pin)
+      && precheckYml.includes('script_path: .github/scripts/deploy-precheck.sh')
+      && cleanupYml.includes('script_path: .github/scripts/cleanup-stale-releases.sh')
+      && precheckYml.includes('actions/checkout@v4')
+      && cleanupYml.includes('actions/checkout@v4')
+      && !precheckYml.includes('base64')
+      && !cleanupYml.includes('base64')
+      && !/base64\s+-d|<<'B64'/.test(precheckYml)
+      && !/base64\s+-d|<<'B64'/.test(cleanupYml)
+      && !precheckYml.includes('mktemp')
+      && !cleanupYml.includes('mktemp')
+      && !precheckSh.includes('mktemp')
+      && !cleanupSh.includes('mktemp')
+      && !/^ {10}script: \|/m.test(precheckYml)
+      && !/^ {10}script: \|/m.test(cleanupYml)
+      && inputOk
+      && deployUntouched
+      && serverUntouched
+      && !precheckYml.includes('appleboy/ssh-action@v1.0.3')
+      && !cleanupYml.includes('appleboy/ssh-action@v1.0.3'),
+    'S-wire 两个工作流用 script_path、40 位 SHA，且没有 base64 内联',
+    inputLines.join(' || '),
+  )
+  if (want('S-concurrency')) check(
+    /concurrency:\n {2}group: production-deploy\n {2}cancel-in-progress: false/.test(cleanupYml),
+    'S-concurrency 清理与发布共用 production-deploy，且不取消进行中的运行',
+    cleanupYml.slice(0, 800),
+  )
+}
 
 // —— P1 日志格式不含端口 ——
 if (want('P1')) {
@@ -437,10 +568,12 @@ if (want('P-redis')) {
   const script = join(draft.td, 'precheck.sh')
   const env = {
     PATH: `${draft.bin}:${toolDir}:/usr/bin:/bin`,
-    HOME: draft.home,
+    HOME: draft.shortHome,
     LC_ALL: 'C',
     LANG: 'C',
     TZ: 'UTC',
+    REAL_NODE: realNode,
+    REAL_DU: realDu,
     PRECHECK_HOME: draft.home,
     PRECHECK_SRV: draft.srv,
     PRECHECK_TMP: draft.tmp,
@@ -449,8 +582,12 @@ if (want('P-redis')) {
     PRECHECK_PG_LOG: draft.pg,
     PRECHECK_APT: draft.apt,
     EXPECT_DIR: draft.expect,
+    EXPECT_PM2: 'ai-job-print-api',
+    EXPECT_BACKUP: draft.backup,
     DRILL_NGINX_CONF: join(draft.td, 'empty.conf'),
     DRILL_PM2_JLIST: '[]',
+    DRILL_PM2_LOG: draft.pm2Log,
+    DRILL_PYTHON_LOG: draft.pythonLog,
     DRILL_NODE_V: 'v22.12.0',
   }
   writeFileSync(env.DRILL_NGINX_CONF, 'http {}\n')
@@ -462,7 +599,7 @@ if (want('P-redis')) {
 }
 
 // —— 内存：假 pm2 / free / redis-cli / ps，只留数字 ——
-if (want('P12a', 'P12b', 'P12c', 'P12d', 'P12e', 'P13a', 'P13b', 'P13c')) {
+if (want('P12a', 'P12b', 'P12c', 'P12d', 'P12e', 'P13a', 'P13b', 'P13c', 'P-no-python')) {
   const upMs = Date.now() - (5 * 3600 + 600) * 1000
   const jlist = JSON.stringify([
     {
@@ -503,27 +640,31 @@ if (want('P12a', 'P12b', 'P12c', 'P12d', 'P12e', 'P13a', 'P13b', 'P13c')) {
     const line = lineOf(key)
     return line === `${key}=${value}` && !/env/i.test(line)
   }
-  check(run.code === 0 && numeric('PM2_API_RSS_MB', '180') && !lineOf('PM2_API_RSS_MB').includes('50'),
-    'P12a API 常驻内存取该进程 monit.memory，不取其它进程', section)
-  check(numeric('PM2_API_HEAP_MB', '62') && !section.includes('Heap Size') && !section.includes('90.00'),
-    'P12b 堆用量取 Heap Used，不取 Heap Size', section)
-  check(numeric('PM2_API_RESTARTS', '4'),
-    'P12c 重启次数取 API 进程的 restart_time', section)
-  check(numeric('PM2_API_UPTIME_HOURS', '5'),
-    'P12d pm_uptime 换成已运行小时数', section)
-  check(run.code === 0 && !/env/i.test(section) && !IP_RE.test(section) && !section.includes('api-secret-token')
-    && !section.includes('leak-secret') && !section.includes('dist/main.js') && !section.includes('NODE_OPTIONS')
-    && !section.includes('should-not-print') && !section.includes('DATABASE_URL'),
-    'P12e 内存段不含 env 字样、密钥、地址或启动参数', section)
-  check(numeric('MEM_TOTAL_MB', '7940') && numeric('MEM_AVAILABLE_MB', '5400') && numeric('SWAP_USED_MB', '256')
-    && !section.includes('CANARY_FREE') && !section.includes('Mem:') && !section.includes('buff/cache'),
-    'P13a free -m 只打总内存、可用内存和 swap 已用', section)
-  check(lineOf('REDIS_USED_MEMORY_HUMAN') === 'REDIS_USED_MEMORY_HUMAN=1.50M' && !/env/i.test(lineOf('REDIS_USED_MEMORY_HUMAN'))
-    && !section.includes('CANARY_REDIS') && !section.includes('used_memory_peak') && !section.includes('executable'),
-    'P13b Redis 只打 used_memory_human', section)
-  check(numeric('POSTGRES_RSS_MB', '20') && !section.includes('postgres') && !section.includes('CANARY_CMDLINE')
-    && !section.includes('redis-server') && !section.includes('dist/main.js'),
-    'P13c PostgreSQL 进程 RSS 合计，不打命令行', section)
+  if (want('P12a', 'P12b', 'P12c', 'P12d', 'P12e', 'P13a', 'P13b', 'P13c')) {
+    check(run.code === 0 && numeric('PM2_API_RSS_MB', '180') && !lineOf('PM2_API_RSS_MB').includes('50'),
+      'P12a API 常驻内存取该进程 monit.memory，不取其它进程', section)
+    check(numeric('PM2_API_HEAP_MB', '62') && !section.includes('Heap Size') && !section.includes('90.00'),
+      'P12b 堆用量取 Heap Used，不取 Heap Size', section)
+    check(numeric('PM2_API_RESTARTS', '4'),
+      'P12c 重启次数取 API 进程的 restart_time', section)
+    check(numeric('PM2_API_UPTIME_HOURS', '5'),
+      'P12d pm_uptime 换成已运行小时数', section)
+    check(run.code === 0 && !/env/i.test(section) && !IP_RE.test(section) && !section.includes('api-secret-token')
+      && !section.includes('leak-secret') && !section.includes('dist/main.js') && !section.includes('NODE_OPTIONS')
+      && !section.includes('should-not-print') && !section.includes('DATABASE_URL'),
+      'P12e 内存段不含 env 字样、密钥、地址或启动参数', section)
+    check(numeric('MEM_TOTAL_MB', '7940') && numeric('MEM_AVAILABLE_MB', '5400') && numeric('SWAP_USED_MB', '256')
+      && !section.includes('CANARY_FREE') && !section.includes('Mem:') && !section.includes('buff/cache'),
+      'P13a free -m 只打总内存、可用内存和 swap 已用', section)
+    check(lineOf('REDIS_USED_MEMORY_HUMAN') === 'REDIS_USED_MEMORY_HUMAN=1.50M' && !/env/i.test(lineOf('REDIS_USED_MEMORY_HUMAN'))
+      && !section.includes('CANARY_REDIS') && !section.includes('used_memory_peak') && !section.includes('executable'),
+      'P13b Redis 只打 used_memory_human', section)
+    check(numeric('POSTGRES_RSS_MB', '20') && !section.includes('postgres') && !section.includes('CANARY_CMDLINE')
+      && !section.includes('redis-server') && !section.includes('dist/main.js'),
+      'P13c PostgreSQL 进程 RSS 合计，不打命令行', section)
+  }
+  if (want('P-no-python')) check(run.code === 0 && numeric('PM2_API_RSS_MB', '180') && !existsSync(run.pythonLog) && !precheckSh.includes('python3'),
+    'P-no-python 内存四项不调用 python3', `${section}\npython=${existsSync(run.pythonLog)}`)
   rmSync(run.td, { recursive: true, force: true })
 }
 
@@ -555,15 +696,115 @@ if (want('P14a', 'P14b', 'P14c', 'P14d')) {
   rmSync(run.td, { recursive: true, force: true })
 }
 
+if (want('P-pm2-down')) {
+  const run = runPrecheck({}, { noSocket: true })
+  check(run.code === 0 && !existsSync(run.pm2Log) && /PM2_DAEMON=down/.test(run.out)
+    && /PM2_NAME_DEFAULT_OK=unknown/.test(run.out) && /PM2_API_RSS_MB=unknown/.test(run.out),
+    'P-pm2-down 套接字不在时不调用 pm2，相关项写 unknown', run.out)
+}
+
+if (want('P-node-unknown')) {
+  const down = runPrecheck({ DRILL_NODE_FAIL: '1' }, { noSocket: true })
+  const garbage = runPrecheck({
+    DRILL_NODE_FAIL: '1',
+    DRILL_PM2_JLIST: JSON.stringify([{ node_version: 'not-a-version' }]),
+  })
+  check(/NODE_OK_FOR_PDFJS=unknown/.test(down.out) && !/NODE_OK_FOR_PDFJS=no/.test(down.out)
+    && /NODE_OK_FOR_PDFJS=unknown/.test(garbage.out) && !/NODE_OK_FOR_PDFJS=no/.test(garbage.out),
+    'P-node-unknown 版本读不到或解析失败时写 unknown，不写 no', `${down.out}\n---\n${garbage.out}`)
+}
+
+if (want('P-root')) {
+  const draft = runPrecheck({})
+  const rootHome = join(draft.td, 'roothome')
+  mkdirSync(rootHome)
+  const secret = 'super-secret-root-filename'
+  writeFileSync(join(rootHome, secret), Buffer.alloc(1024 * 1024, 7))
+  const run = runPrecheck({ PRECHECK_ROOT_HOME: rootHome })
+  rmSync(draft.td, { recursive: true, force: true })
+  check(run.code === 0 && /ROOT_HOME_MB=\d+/.test(run.out) && !run.out.includes(secret)
+    && !precheckSh.includes('/root/*') && !precheckSh.includes('/root/.[!.]*'),
+    'P-root 只打 /root 合计 MB，不打文件名', run.out)
+}
+
+if (want('P-term-invalid')) {
+  const draft = runPrecheck({})
+  const log = join(draft.td, 'invalid-term.log')
+  let body = ''
+  body += combinedLine(IP, nginxStamp(recent), 'GET /api/v1/terminals/bad.id/heartbeat HTTP/1.1', 443)
+  body += combinedLine(IP, nginxStamp(recent), 'GET /api/v1/terminals/$(touchpwn)/status HTTP/1.1', 80)
+  body += combinedLine(IP, nginxStamp(recent), 'GET /api/v1/terminals/KIOSK01/heartbeat HTTP/1.1', 443)
+  writeFileSync(log, body)
+  const conf = nginxConf(fieldConf(log), draft.td)
+  const run = runPrecheck({ DRILL_NGINX_CONF: conf })
+  rmSync(draft.td, { recursive: true, force: true })
+  check(run.code === 0 && run.out.includes('terminal=invalid_format') && run.out.includes('terminal=KIOSK01')
+    && !run.out.includes('bad.id') && !run.out.includes('touchpwn'),
+    'P-term-invalid 非白名单终端编号只计 invalid_format，不回显原文', run.out)
+}
+
+if (want('P-trunc')) {
+  const draft = runPrecheck({})
+  const log = join(draft.td, 'trunc.log')
+  let body = ''
+  for (let i = 0; i < 5; i += 1) {
+    body += combinedLine(IP, nginxStamp(recent), 'GET /api/v1/terminals/KIOSK01/heartbeat HTTP/1.1', 443)
+  }
+  writeFileSync(log, body)
+  const conf = nginxConf(fieldConf(log), draft.td)
+  const run = runPrecheck({ DRILL_NGINX_CONF: conf, PRECHECK_LOG_LINE_CAP: '3' })
+  rmSync(draft.td, { recursive: true, force: true })
+  check(run.code === 0 && /truncated=yes/.test(run.out) && run.out.includes('port=443 terminal=KIOSK01 kind=heartbeat count=3')
+    && !run.out.includes('count=5') && precheckSh.includes('2000000'),
+    'P-trunc 超过行数上限时截断并标明 truncated=yes', run.out)
+}
+
+if (want('P-early')) {
+  const run = runPrecheck({}, { snapshot: true })
+  check(run.code === 0 && run.created.length === 0 && run.out.includes('=== 1. ') && run.out.includes('=== 11. ')
+    && /API_DIR_DEFAULT_OK=yes/.test(run.out) && /REDIS_REACHABLE=yes/.test(run.out) && /API_HEALTH_LOCAL=ok/.test(run.out)
+    && !precheckSh.includes('mktemp'),
+    'P-early 整份预检 1–11 节真的跑了，且没有新文件', `created=${run.created.join(',')} code=${run.code}\n${run.out.slice(0, 1500)}`)
+}
+
 // —— 清理脚本 ——
-function runCleanup({ free, mode, confirm = '', curlFail = false, pm2Name = '', nginxName = '' }) {
+function runCleanup(options) {
+  const {
+    free,
+    mode,
+    confirm = '',
+    curlFail = false,
+    curlBody = '',
+    pm2Name = '',
+    pm2Cwd = '',
+    nginxName = '',
+    pm2Socket = true,
+    pm2Fail = false,
+    pm2LateName = '',
+    mountFail = false,
+    findFail = false,
+    psFail = false,
+    readlinkFail = false,
+    nginxUp = Boolean(nginxName),
+    nginxFail = false,
+    nginxBody = null,
+    duGap = false,
+    rmFail = false,
+    statCross = false,
+    makeTrashLink = false,
+    purgePath = null,
+    inject = false,
+    refStyle = '',
+    purgeStyle = '',
+  } = options
   const td = realpathSync(mkdtempSync(join(tmpdir(), 'stale-gate-')))
   if (td.includes('/srv')) throw new Error(`临时目录含 /srv：${td}`)
   boxes.push(td)
   const rootDir = join(td, 'root')
   mkdirSync(rootDir)
-  const names = [...NEW_WHITELIST]
-  for (const name of names) {
+  const shortHome = makeShortHome()
+  if (pm2Socket) startSocket(shortHome)
+  for (const name of NEW_WHITELIST) {
     const dir = join(rootDir, name)
     mkdirSync(dir)
     writeFileSync(join(dir, 'blob'), Buffer.alloc(2 * 1024 * 1024, 9))
@@ -575,19 +816,25 @@ function runCleanup({ free, mode, confirm = '', curlFail = false, pm2Name = '', 
   mkdirSync(join(rootDir, 'ai-job-print-backups'))
   const bin = join(td, 'bin')
   mkdirSync(bin)
+  const pm2Log = join(td, 'pm2-calls.log')
   writeExec(join(bin, 'du'), `#!/usr/bin/env bash
-args=()
+has_x=no
+target=""
 for a in "$@"; do
   case "$a" in
+    -*x*) has_x=yes ;;
     -*) ;;
-    *) args+=("$a") ;;
+    *) target="$a" ;;
   esac
 done
-target="\${args[0]:-}"
 case "$target" in
-  ${rootDir}/ai-job-print-backups) printf '2048\\t%s\\n' "$target" ;;
-  *) exec ${realDu} "$@" ;;
+  ${rootDir}/ai-job-print-backups) printf '2048\\t%s\\n' "$target"; exit 0 ;;
 esac
+if [ "\${DRILL_DU_GAP:-}" = 1 ]; then
+  if [ "$has_x" = yes ]; then printf '1\\t%s\\n' "$target"; else printf '10\\t%s\\n' "$target"; fi
+  exit 0
+fi
+exec ${realDu} "$@"
 `)
   writeExec(join(bin, 'df'), `#!/usr/bin/env bash
 printf '%s\\n' "Filesystem 1048576-blocks Used Available Capacity Mounted on"
@@ -595,18 +842,99 @@ printf '%s\\n' "drill 100 10 \${DRILL_DF_AVAIL_MB:-9000} 50% /"
 `)
   writeExec(join(bin, 'curl'), `#!/usr/bin/env bash
 if [ "\${DRILL_CURL_FAIL:-}" = 1 ]; then exit 1; fi
-printf '%s\\n' '{"status":"ok"}'
+if [ -n "\${DRILL_CURL_BODY:-}" ]; then
+  printf '%s\\n' "\${DRILL_CURL_BODY}"
+else
+  printf '%s\\n' '{"success":true,"data":{"status":"ok","db":"postgresql"}}'
+fi
 `)
-  writeExec(join(bin, 'pm2'), '#!/usr/bin/env bash\nprintf "%s\\n" "${DRILL_PM2_JLIST:-[]}"\n')
-  writeExec(join(bin, 'nginx'), '#!/usr/bin/env bash\n[ "$1" = "-T" ] && cat "${DRILL_NGINX_CONF:-/dev/null}"\nexit 0\n')
+  writeExec(join(bin, 'pm2'), `#!/usr/bin/env bash
+printf '%s\\n' "call $*" >> "\${DRILL_PM2_LOG}"
+if [ "\${DRILL_PM2_FAIL:-}" = 1 ]; then exit 1; fi
+n=$(wc -l < "\${DRILL_PM2_LOG}" | tr -d ' ')
+if [ "$n" -ge 2 ] && [ -n "\${DRILL_PM2_LATE:-}" ]; then
+  printf '%s\\n' "\${DRILL_PM2_LATE}"
+  exit 0
+fi
+printf '%s\\n' "\${DRILL_PM2_JLIST:-[]}"
+`)
+  writeExec(join(bin, 'nginx'), `#!/usr/bin/env bash
+if [ "\${DRILL_NGINX_FAIL:-}" = 1 ]; then exit 1; fi
+[ "$1" = "-T" ] && cat "\${DRILL_NGINX_CONF:-/dev/null}"
+exit 0
+`)
   writeExec(join(bin, 'lsof'), '#!/usr/bin/env bash\nexit 1\n')
-  const pm2Path = pm2Name ? join(rootDir, pm2Name) : ''
+  writeExec(join(bin, 'node'), `#!/usr/bin/env bash
+if [ "$1" = "-e" ] || [ "$1" = "-p" ]; then exec "\${REAL_NODE}" "$@"; fi
+printf '%s\\n' "v22.14.0"
+`)
+  writeExec(join(bin, 'mount'), `#!/usr/bin/env bash
+if [ "\${DRILL_MOUNT_FAIL:-}" = 1 ]; then exit 1; fi
+printf '%s\\n' "/dev/disk1 on / type ext4 (rw)"
+printf '%s\\n' "/dev/disk2 on /tmp type ext4 (rw)"
+`)
+  writeExec(join(bin, 'find'), `#!/usr/bin/env bash
+if [ "\${DRILL_FIND_FAIL:-}" = 1 ]; then exit 1; fi
+exit 0
+`)
+  writeExec(join(bin, 'ps'), `#!/usr/bin/env bash
+if [ "\${DRILL_PS_FAIL:-}" = 1 ]; then exit 1; fi
+if [ "\${DRILL_NGINX_UP:-}" = 1 ]; then printf '%s\\n' nginx; fi
+exit 0
+`)
+  writeExec(join(bin, 'readlink'), `#!/usr/bin/env bash
+if [ "\${DRILL_READLINK_FAIL:-}" = 1 ]; then exit 1; fi
+exec "${join(toolDir, 'readlink')}" "$@"
+`)
+  writeExec(join(bin, 'realpath'), `#!/usr/bin/env bash
+if [ "\${DRILL_READLINK_FAIL:-}" = 1 ]; then exit 1; fi
+exec "${join(toolDir, 'realpath')}" "$@"
+`)
+  writeExec(join(bin, 'stat'), `#!/usr/bin/env bash
+if [ "\${DRILL_STAT_XDEV:-}" != 1 ]; then exec "\${REAL_STAT}" "$@"; fi
+path="\${@: -1}"
+case "$path" in
+  "\${DRILL_ROOT}"|"\${DRILL_ROOT}/.cleanup-trash"|"\${DRILL_ROOT}/.cleanup-trash/"*) printf '%s\\n' 1 ;;
+  *) printf '%s\\n' 2 ;;
+esac
+`)
+  writeExec(join(bin, 'rm'), `#!/usr/bin/env bash
+if [ "\${DRILL_RM_FAIL:-}" = 1 ]; then exit 1; fi
+exec /bin/rm "$@"
+`)
+  const targetName = 'ai-job-print-api-backups'
+  let styledCwd = pm2Cwd
+  let styledNginx = nginxBody
+  let styledUp = nginxUp
+  if (refStyle === 'dotdot') styledCwd = `${rootDir}/${targetName}/../${targetName}`
+  if (refStyle === 'slash') styledCwd = `${rootDir}//${targetName}`
+  if (refStyle === 'symlink') {
+    const link = join(td, 'ref-link')
+    symlinkSync(join(rootDir, targetName), link)
+    styledNginx = `events {}\nserver { root ${link}; }\n`
+    styledUp = true
+  }
+  if (refStyle === 'multiline') {
+    styledNginx = `events {}\nserver {\n  root\n    ${rootDir}/${targetName};\n}\n`
+    styledUp = true
+  }
+  if (refStyle === 'parent') {
+    styledNginx = `events {}\nhttp { root ${rootDir}; }\n`
+    styledUp = true
+  }
+  if (refStyle === 'variable') {
+    styledNginx = 'events {}\nserver { root $document_root; }\n'
+    styledUp = true
+  }
+  const pm2Path = styledCwd || (pm2Name ? join(rootDir, pm2Name) : '')
   const nginxAlias = nginxName ? join(rootDir, nginxName) : ''
   const conf = join(td, 'nginx.conf')
-  const nginxBody = nginxAlias
-    ? `# alias ${rootDir}/ai-job-print-env-backups\nevents {}\nserver { listen 80; alias ${nginxAlias}/; include ${nginxAlias}/mime.types; }\n`
-    : 'events {}\n'
-  writeFileSync(conf, nginxBody)
+  const body = styledNginx != null
+    ? styledNginx
+    : (nginxAlias
+      ? `# alias ${rootDir}/ai-job-print-env-backups\nevents {}\nserver { listen 80; alias ${nginxAlias}/; include ${nginxAlias}/mime.types; }\n`
+      : 'events {}\n')
+  writeFileSync(conf, body)
   const jlist = pm2Path
     ? JSON.stringify([{
       name: 'api',
@@ -615,26 +943,82 @@ printf '%s\\n' '{"status":"ok"}'
       pm2_env: { pm_cwd: pm2Path, cwd: pm2Path, pm_exec_path: '/bin/true' },
     }])
     : '[]'
+  const late = pm2LateName
+    ? JSON.stringify([{
+      name: 'api',
+      pm_cwd: join(rootDir, pm2LateName),
+      pm2_env: { cwd: join(rootDir, pm2LateName), pm_exec_path: '/bin/true' },
+    }])
+    : ''
+  let outside = ''
+  if (makeTrashLink) {
+    outside = join(td, 'outside-trash')
+    mkdirSync(outside)
+    writeFileSync(join(outside, 'keep'), 'keep')
+    symlinkSync(outside, join(rootDir, '.cleanup-trash'))
+  }
   const script = cleanupSh.replaceAll('/srv', rootDir)
   const sp = join(td, 'cleanup.sh')
   writeFileSync(sp, script)
   chmodSync(sp, 0o755)
+  const canary = join(td, 'canary-inject')
   const env = {
     PATH: `${bin}:${toolDir}:/usr/bin:/bin`,
     LC_ALL: 'C',
     LANG: 'C',
-    HOME: td,
+    HOME: shortHome,
+    REAL_NODE: realNode,
+    REAL_STAT: realStat,
     DRILL_DF_AVAIL_MB: String(free),
     DRILL_CURL_FAIL: curlFail ? '1' : '',
+    DRILL_CURL_BODY: curlBody,
     DRILL_PM2_JLIST: jlist,
+    DRILL_PM2_LOG: pm2Log,
+    DRILL_PM2_FAIL: pm2Fail ? '1' : '',
+    DRILL_PM2_LATE: late,
     DRILL_NGINX_CONF: conf,
+    DRILL_NGINX_UP: styledUp ? '1' : '',
+    DRILL_NGINX_FAIL: nginxFail ? '1' : '',
+    DRILL_MOUNT_FAIL: mountFail ? '1' : '',
+    DRILL_FIND_FAIL: findFail ? '1' : '',
+    DRILL_PS_FAIL: psFail ? '1' : '',
+    DRILL_READLINK_FAIL: readlinkFail ? '1' : '',
+    DRILL_DU_GAP: duGap ? '1' : '',
+    DRILL_RM_FAIL: rmFail ? '1' : '',
+    DRILL_STAT_XDEV: statCross ? '1' : '',
+    DRILL_ROOT: rootDir,
     CLEANUP_MODE: mode,
     CLEANUP_CONFIRM: confirm,
     CLEANUP_EXPECT_CONFIRM: 'CLEANUP-CONFIRM',
   }
+  if (purgePath != null) env.CLEANUP_PURGE_PATH = purgePath
+  if (inject) {
+    env.CLEANUP_PURGE_PATH = `${rootDir}/.cleanup-trash/$(touch ${canary})\n"quoted"`
+    env.CLEANUP_CONFIRM = `$(touch ${canary})"`
+  }
+  const stampKeep = join(rootDir, '.cleanup-trash', '20260101T010101', 'keep')
+  if (purgeStyle) {
+    const stamp = join(rootDir, '.cleanup-trash', '20260101T010101')
+    mkdirSync(stamp, { recursive: true })
+    writeFileSync(join(stamp, 'keep'), 'keep')
+    env.CLEANUP_CONFIRM = 'CLEANUP-CONFIRM'
+    if (purgeStyle === 'slash') env.CLEANUP_PURGE_PATH = `${rootDir}/.cleanup-trash//`
+    if (purgeStyle === 'dot') env.CLEANUP_PURGE_PATH = `${rootDir}/.cleanup-trash/.`
+    if (purgeStyle === 'nested') {
+      const extra = join(stamp, 'extra')
+      mkdirSync(extra)
+      writeFileSync(join(extra, 'keep'), 'keep')
+      env.CLEANUP_PURGE_PATH = extra
+    }
+    if (purgeStyle === 'link') {
+      const link = join(rootDir, '.cleanup-trash', 'link')
+      symlinkSync(stamp, link)
+      env.CLEANUP_PURGE_PATH = link
+    }
+  }
   const result = spawnSync('bash', [sp], { cwd: td, env, encoding: 'utf8' })
   return {
-    td, rootDir,
+    td, rootDir, pm2Log, canary, outside, stampKeep,
     code: result.status ?? 1,
     out: `${result.stdout ?? ''}\n${result.stderr ?? ''}`,
     exists: (name) => existsSync(join(rootDir, name)),
@@ -647,6 +1031,10 @@ function bothCounters(out) {
 
 function keptNames(run, names) {
   return names.every((name) => run.exists(name))
+}
+
+function keptAll(run) {
+  return keptNames(run, NEW_WHITELIST) && run.exists('node_modules') && run.exists('services')
 }
 
 if (want('S1', 'S6a')) {
@@ -743,8 +1131,135 @@ if (want('S-health')) {
     'S-health 健康检查不通过时不删除', sick.out)
 }
 
+function refuseDir(id, options, needle) {
+  if (!want(id)) return
+  const run = runCleanup({ free: 1000, mode: 'execute', confirm: 'CLEANUP-CONFIRM', ...options })
+  check(keptAll(run) && run.out.includes(needle) && !/^DELETE /m.test(run.out),
+    `${id} 探针或引用不可用时拒绝该目录，不动文件`, run.out)
+}
+
+refuseDir('S-probe-mount', { mountFail: true }, 'mount 不可用')
+refuseDir('S-probe-find', { findFail: true }, 'find 不可用')
+refuseDir('S-probe-ps', { psFail: true }, 'ps 不可用')
+refuseDir('S-probe-readlink', { readlinkFail: true }, 'readlink 不可用')
+refuseDir('S-probe-nginx', { nginxUp: true, nginxFail: true }, '不可判定')
+refuseDir('S-probe-pm2', { pm2Fail: true }, '不可判定')
+
+if (want('S-pm2-down')) {
+  const run = runCleanup({ free: 8000, mode: 'dry-run', pm2Socket: false })
+  check(!existsSync(run.pm2Log) && keptAll(run) && run.out.includes('不可判定') && !run.out.includes('PLAN_'),
+    'S-pm2-down 清理时读不到 pm2 就不调用，并拒绝删除', run.out)
+}
+
+if (want('S-degraded')) {
+  const run = runCleanup({
+    free: 1000,
+    mode: 'execute',
+    confirm: 'CLEANUP-CONFIRM',
+    curlBody: '{"success":true,"data":{"status":"degraded","db":"postgresql"}}',
+  })
+  check(run.code !== 0 && keptAll(run) && run.out.includes('不是 data.status=ok') && run.out.includes('健康检查不通过'),
+    'S-degraded 健康返回 degraded 时不动文件', run.out)
+}
+
+function oneRef(id, refStyle, message) {
+  if (!want(id)) return
+  const run = runCleanup({
+    free: 1000,
+    mode: 'execute',
+    confirm: 'CLEANUP-CONFIRM',
+    refStyle,
+  })
+  check(run.exists('ai-job-print-api-backups') && !run.exists('ai-job-print-env-backups') && run.exists('node_modules'),
+    message, run.out)
+}
+
+oneRef('S-ref-dotdot', 'dotdot', 'S-ref-dotdot 引用路径含 .. 时仍算引用，只拒绝该目录')
+oneRef('S-ref-slash', 'slash', 'S-ref-slash 引用路径含重复斜杠时仍算引用，只拒绝该目录')
+oneRef('S-ref-symlink', 'symlink', 'S-ref-symlink 引用是软链时仍算引用，只拒绝该目录')
+oneRef('S-ref-multiline', 'multiline', 'S-ref-multiline nginx root 跨行时仍算引用，只拒绝该目录')
+
+if (want('S-ref-parent')) {
+  const run = runCleanup({ free: 1000, mode: 'execute', confirm: 'CLEANUP-CONFIRM', refStyle: 'parent' })
+  check(keptAll(run) && run.out.includes('被 nginx 引用') && !/^DELETE /m.test(run.out),
+    'S-ref-parent nginx root 指父目录时每个子目录都算被引用', run.out)
+}
+if (want('S-ref-var')) {
+  const run = runCleanup({ free: 1000, mode: 'execute', confirm: 'CLEANUP-CONFIRM', refStyle: 'variable' })
+  check(keptAll(run) && run.out.includes('不可判定') && !/^DELETE /m.test(run.out),
+    'S-ref-var root 带变量时整份 nginx 不可判定，拒绝删除', run.out)
+}
+
+function prepareStamp(rootDir, name) {
+  const dir = join(rootDir, '.cleanup-trash', name)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'keep'), 'keep')
+  return dir
+}
+
+function purgeRefuses(id, purgeStyle, needle) {
+  if (!want(id)) return
+  const run = runCleanup({ free: 8000, mode: 'dry-run', confirm: 'CLEANUP-CONFIRM', purgeStyle })
+  check(run.code !== 0 && existsSync(run.stampKeep) && run.out.includes(needle),
+    `${id} 拒绝这次 purge，隔离目录还在`, run.out)
+}
+purgeRefuses('S-purge-slash', 'slash', '只允许删')
+purgeRefuses('S-purge-dot', 'dot', '只允许删')
+purgeRefuses('S-purge-nested', 'nested', '只允许删')
+purgeRefuses('S-purge-link', 'link', '不许是软链')
+
+if (want('S-trash-link')) {
+  const quarantine = runCleanup({ free: 8000, mode: 'execute', confirm: 'CLEANUP-CONFIRM', makeTrashLink: true })
+  const purge = runCleanup({ free: 8000, mode: 'dry-run', makeTrashLink: true, purgePath: 'ignored' })
+  check(quarantine.code !== 0 && quarantine.out.includes('隔离区根目录是软链') && keptAll(quarantine) && existsSync(join(quarantine.outside, 'keep')),
+    'S-trash-link 隔离区是软链时拒绝隔离', quarantine.out)
+  check(purge.code !== 0 && purge.out.includes('隔离区根目录是软链') && existsSync(join(purge.outside, 'keep')),
+    'S-trash-link 隔离区是软链时拒绝 purge', purge.out)
+}
+
+if (want('S-rm-fail')) {
+  const run = runCleanup({ free: 1000, mode: 'execute', confirm: 'CLEANUP-CONFIRM', rmFail: true })
+  check(run.code !== 0 && keptAll(run) && /^FREED_MB=0$/m.test(run.out) && run.out.includes('WARNING'),
+    'S-rm-fail 删除失败时不计入 FREED_MB，退出码非 0', run.out)
+}
+
+if (want('S-du-diff')) {
+  const dry = runCleanup({ free: 1000, mode: 'dry-run', duGap: true })
+  const exec = runCleanup({ free: 1000, mode: 'execute', confirm: 'CLEANUP-CONFIRM', duGap: true })
+  check(dry.code === 0 && dry.out.includes('体积') && dry.out.includes('PLAN_DELETE') && keptAll(dry)
+    && keptAll(exec) && exec.out.includes('体积差超过 1MB') && !/^DELETE /m.test(exec.out),
+    'S-du-diff 体积差超过 1MB 时 execute 拒绝，dry-run 仍只报告', `${dry.out}\n---\n${exec.out}`)
+}
+
+if (want('S-xdev')) {
+  const run = runCleanup({ free: 8000, mode: 'execute', confirm: 'CLEANUP-CONFIRM', statCross: true })
+  check(run.code !== 0 && keptAll(run) && run.out.includes('不在同一文件系统') && !existsSync(join(run.rootDir, '.cleanup-trash')),
+    'S-xdev 与隔离区不在同一文件系统时拒绝该目录', run.out)
+}
+
+if (want('S-recheck')) {
+  const run = runCleanup({
+    free: 1000,
+    mode: 'execute',
+    confirm: 'CLEANUP-CONFIRM',
+    pm2LateName: 'ai-job-print-api-backups',
+  })
+  check(run.exists('ai-job-print-api-backups') && !run.exists('ai-job-print-env-backups')
+    && run.out.includes('删除前复查') && !run.out.includes(`DELETE ${run.rootDir}/ai-job-print-api-backups`),
+    'S-recheck 删除前重新发现引用时跳过该目录，其它继续', run.out)
+}
+
+if (want('S-inject')) {
+  const run = runCleanup({ free: 8000, mode: 'dry-run', confirm: 'CLEANUP-CONFIRM', inject: true })
+  const inputLines = cleanupYml.split('\n').filter((line) => line.includes('${{ inputs.'))
+  check(!existsSync(run.canary) && run.code !== 0 && inputLines.length > 0,
+    'S-inject 输入里的引号、命令替换和换行不会被执行', run.out)
+}
+
+
 if (failures) {
   console.error(`\nverify:server-maintenance-workflows：${failures} 项失败`)
   process.exit(1)
 }
 console.log('\nverify:server-maintenance-workflows：通过')
+process.exit(0)

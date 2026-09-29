@@ -290,12 +290,12 @@ if (
   }
 }
 
-const precheckWorkflow = readFileSync(join(repoRoot, '.github/workflows/deploy-precheck.yml'), 'utf8')
+const precheckScript = readFileSync(join(repoRoot, '.github/scripts/deploy-precheck.sh'), 'utf8')
 const staticRoot = 'STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"'
-if (deployWorkflow.includes(staticRoot) && precheckWorkflow.includes(staticRoot)) {
+if (deployWorkflow.includes(staticRoot) && precheckScript.includes(staticRoot)) {
   pass('deploy-precheck 的静态备份根目录与 deploy.yml 默认值相同')
 } else {
-  fail('deploy-precheck.yml 必须使用 deploy.yml 里的 STATIC_BACKUP_ROOT 默认路径')
+  fail('deploy-precheck.sh 必须使用 deploy.yml 里的 STATIC_BACKUP_ROOT 默认路径')
 }
 
 // ── 前端版的同一形态：部署脚本传 VITE_API_MODE=http，前端必须在没传时炸掉 ──────

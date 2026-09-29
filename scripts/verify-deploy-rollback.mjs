@@ -594,7 +594,7 @@ function runFragment(body, env) {
 }
 
 const cleanupWorkflow = readFileSync(join(root, '.github/workflows/server-cleanup.yml'), 'utf8')
-const precheckWorkflow = readFileSync(join(root, '.github/workflows/deploy-precheck.yml'), 'utf8')
+const precheckScript = readFileSync(join(root, '.github/scripts/deploy-precheck.sh'), 'utf8')
 const fragmentDirs = []
 try {
   const fullBuildAt = workflow.indexOf('=== full 发布构建前磁盘检查（只读，不清理）===')
@@ -680,9 +680,9 @@ done
   check(removed.code === 0 && !existsSync(join(backupDir, 'pre-old.migrations.log')) && !existsSync(join(backupDir, 'pre-old.dump')) && existsSync(join(backupDir, 'pre-new.migrations.log')),
     '磁盘 g：删除一组时连 .migrations.log 一起删，另一组保留', `退出码 ${removed.code} 剩下 ${readdirSync(backupDir).join(',')}`)
 
-  check(precheckWorkflow.includes('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"') && workflow.includes('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"'),
+  check(precheckScript.includes('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"') && workflow.includes('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"'),
     '预检：静态备份根目录与 deploy.yml 的默认值相同')
-  const precheckBlock = extractBetween(precheckWorkflow, '=== 11. 静态发布备份与残留 bundle（只读）===', '=== 12. ')
+  const precheckBlock = extractBetween(precheckScript, '=== 11. 静态发布备份与残留 bundle（只读）===', '=== 12. ')
     .replace('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"', `STATIC_BACKUP_ROOT="${join(groupDir, 'static-backups')}"`)
     .replaceAll('/tmp/release.bundle', join(groupDir, 'release.bundle'))
   const staticRoot = join(groupDir, 'static-backups')

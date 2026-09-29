@@ -17602,8 +17602,6 @@
       "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/deploy-precheck.yml": [
-      "scripts/verify-deploy-gates-in-sync.mjs",
-      "scripts/verify-deploy-rollback.mjs",
       "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/deploy.yml": [
@@ -17612,10 +17610,12 @@
       "scripts/verify-deploy-authorization-gate.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
-      "scripts/verify-release-bundle.mjs"
+      "scripts/verify-release-bundle.mjs",
+      "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/server-cleanup.yml": [
-      "scripts/verify-deploy-rollback.mjs"
+      "scripts/verify-deploy-rollback.mjs",
+      "scripts/verify-server-maintenance-workflows.mjs"
     ],
     "apps/admin/index.html": [
       "scripts/verify-compliance-copy.mjs"
@@ -30349,7 +30349,6 @@
         "absent": [],
         "dirs": [],
         "files": [
-          ".github/workflows/deploy-precheck.yml",
           ".github/workflows/deploy.yml",
           "apps/admin/src/services/api/client.ts",
           "apps/kiosk/src/services/api/client.ts",
@@ -30374,7 +30373,6 @@
         "absent": [],
         "dirs": [],
         "files": [
-          ".github/workflows/deploy-precheck.yml",
           ".github/workflows/deploy.yml",
           ".github/workflows/server-cleanup.yml",
           "services/api/scripts/preflight-legal-docs.mjs",
@@ -30591,7 +30589,9 @@
         "dirs": [],
         "files": [
           ".github/workflows/cleanup-stale-releases.yml",
-          ".github/workflows/deploy-precheck.yml"
+          ".github/workflows/deploy-precheck.yml",
+          ".github/workflows/deploy.yml",
+          ".github/workflows/server-cleanup.yml"
         ],
         "missing": []
       },
