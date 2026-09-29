@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-29：补 CI 缺口——真 Redis 下走真实密码登录再拿业务数据（分支 `claude/backend-hardening-20260929-internal-login-real-redis`）
+
+- **缺口（总指挥问、协调方核实）：** CI 里原来没有一条门禁在真 Redis 下走过真实密码登录：`verify:redis-degradation-truth` 只测 Redis 挂掉时登录被拒，`verify:admin-login-hardening` 用内存桩，content-pipeline 门禁已改用内部签发令牌。
+- **补法（Grok 实现、协调方审）：** 新门禁 `verify:internal-login-real-redis`（18 条，挂 CI SQLite 作业，并钉进 ci-gate-coverage 的必跑清单）：起真实 `src/main.ts` 与临时 redis-server；管理员、机构账号用真实密码登录后各自读到业务数据，机构凭证调管理员接口被拒；连续 5 次错误密码后正确密码也登不上，锁定计数在真 Redis 里查得到；改密后旧凭证被拒。只加门禁，不改登录逻辑。
+- **验证：** Grok 三处反向变异（不签发凭证、锁定阈值失效、守卫不校验版本）全红；协调方在候选 840ea7d31 上复跑本门禁与 redis-degradation-truth、ci-gate-coverage 全绿。门禁约 70 秒（要等一个登录限流窗口）。
+
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。

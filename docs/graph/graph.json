@@ -22022,6 +22022,7 @@
     ],
     "services/api/scripts/support/boot-api-child.ts": [
       "services/api/scripts/verify-error-observability.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
     "services/api/scripts/support/content-pipeline-fixtures.ts": [
@@ -22029,6 +22030,9 @@
     ],
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
+    ],
+    "services/api/scripts/support/ephemeral-redis-server.ts": [
+      "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
     "services/api/scripts/support/inmemory-redis-server.ts": [
       "services/api/scripts/verify-upload-scene.ts"
@@ -22057,6 +22061,7 @@
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-jobfair-review.ts",
@@ -23179,8 +23184,12 @@
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts"
     ],
+    "services/api/src/auth/password-login-attempts.ts": [
+      "services/api/scripts/verify-internal-login-real-redis.ts"
+    ],
     "services/api/src/auth/password-proof-state.ts": [
-      "services/api/scripts/verify-admin-phone-transfer.ts"
+      "services/api/scripts/verify-admin-phone-transfer.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
     "services/api/src/benefit-activities/admin-benefit-activities.controller.ts": [
       "services/api/scripts/verify-benefit-activities.ts"
@@ -25282,6 +25291,7 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-job-application-track.ts",
@@ -34712,6 +34722,29 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:internal-auth-phone"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/ephemeral-redis-server.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/auth/password-login-attempts.ts",
+          "services/api/src/auth/password-proof-state.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-internal-login-real-redis.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:internal-login-real-redis"
       ],
       "wired": true
     },
