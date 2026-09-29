@@ -19386,7 +19386,8 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/pickupClaimModel.ts": [
-      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/kiosk/src/pages/print/piiRedaction.ts": [
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
@@ -36888,6 +36889,7 @@
         "files": [
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
+          "apps/kiosk/src/pages/print/pickupClaimModel.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/miniapp/pages/print-pay/print-pay.js",
           "apps/miniapp/utils/api.js",
