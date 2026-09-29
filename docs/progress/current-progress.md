@@ -1,6 +1,13 @@
 # 当前开发进度
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+## 2026-09-29：一体机补「AI 内容投诉」入口（走查 W-01，分支 `claude/kiosk-ai-content-complaint-20260929`）
+
+- **问题：** 服务端（会员反馈类别 `ai_content`）和小程序早就有 AI 内容投诉，一体机没有：「我的→意见反馈」只有四类，AI 页面上也没有入口，一体机任何地方都点不到。另一个后果：同一账号在小程序提交过 AI 投诉，一体机「我的反馈」列表取不到这一类的徽章元数据。
+- **改动：** 反馈类别加「AI 内容投诉」（`ai_content`），选中时显示与小程序同口径的说明（写清哪个功能、什么时间、哪段内容；5 个工作日内答复，依据 `docs/compliance/pilot-compliance-procedures.md` 制度 7）；`?category=ai_content` 直接选中；游客从入口进来，登录后回到同一分类。2.0 定稿（05、22、23、29、39、40、52）与原稿都没画投诉入口，所以只在「AI 服务记录」与小青页各加一个低调文字入口，不改稿。未改服务端。匿名（不登录）的 AI 投诉表单留作后续。
+- **门禁：** `verify:fusion-w5` 冻结的 `feedback/types.ts` 哈希随纯追加前移；`verify:lightflow-profile-entry`、`verify:profile-inkpaper-home`、`verify:profile-feedback-inkpaper` 三处范围白名单只加行；`verify:profile-feedback-inkpaper` 加 AI 投诉正向断言；`profile-qx.spec.ts` 加一条「AI 服务记录入口→预选→按 ai_content 提交」的浏览器用例。
+- **验证：** 见 PR 描述；本地走查全栈（模拟外部服务）上走通小青页/AI 服务记录页入口→登录回跳→提交→「我的反馈」显示「AI 内容投诉」→管理员后台收到，截图在 `~/.cache/walk0929/evidence/ai-complaint/`（本机，不进仓库）。
+
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
 - **P-01（机构政策列表）：** 平台紧急下架的政策此前和机构自己下架的一样显示「已下架」，还给「编辑」「审核通过」「发布」（发布会被服务端以 `EMERGENCY_TAKEDOWN_IRREVERSIBLE` 拒绝，编辑后永远发不出去）。服务端 `getPartnerPolicies` 给本机构列表每行附上 `emergencyTakedown` / `emergencyReasonCode` / `emergencyReasonText` / `emergencyTakedownAt`（只按本机构 `orgId` 加本页 id 查 `RecruitmentEmergencyHold`，公开读取不带；改动前已告知后端窗口，对方同意并提了按机构过滤、跨机构断言两条，均照做）。机构后台对这类行显示「平台已紧急下架」、下方整行写事由、说明、下架时间与「已冻结」，只留删除；与官方渠道面板同一口径。门禁 `verify:policies` 加一段：被下架行带出事由、其余行为 false、A/B 两个机构互相看不到对方的事由、公开列表不带这几个字段；变异「不附下架信息」即红。演示模式补一条被下架的示例，演示发布与服务端同样拒绝。
