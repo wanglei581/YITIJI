@@ -24,7 +24,6 @@ import {
 } from './pickup-claim-lockout'
 import { consumePickupClaimRate } from './pickup-claim-rate-limit'
 import { maskPickupFileName } from './pickup-file-mask'
-import { assertPrintOrderSides, printOrderSideCount } from './verified-print-parameters'
 
 /**
  * 视为「钱已经在退回路上」的支付态：这三个态下不得出纸，也不得推进取件状态。
@@ -307,14 +306,6 @@ export class PickupOrderService {
             ...(item.pageRange ? { pageRange: item.pageRange } : {}),
           })
         : current.printParamsJson
-      const sizedItems = await tx.orderItem.findMany({
-        where: { orderId: current.id },
-        select: { billablePages: true, copies: true },
-      })
-      assertPrintOrderSides(printOrderSideCount(sizedItems, {
-        billablePages: current.billablePages,
-        printParamsJson: current.printParamsJson,
-      }))
       await tx.printTask.create({
         data: {
           id: taskId,
