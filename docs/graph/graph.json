@@ -18341,6 +18341,7 @@
       "apps/kiosk/scripts/verify-qr-login-ui.mjs"
     ],
     "apps/kiosk/src/pages/auth/accountUserMessage.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
     ],
     "apps/kiosk/src/pages/auth/components/LoginGatePhoneFields.tsx": [
@@ -20183,6 +20184,7 @@
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/services/api/userErrorMessage.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "scripts/verify-no-raw-error-render.mjs"
@@ -20191,6 +20193,7 @@
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/services/auth/memberAuthApi.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs",
@@ -23826,6 +23829,7 @@
       "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/member-auth/member-phone-rebind.service.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
@@ -23842,6 +23846,7 @@
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/sms/sms-budget.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/member-auth/sms/sms-sender.ts": [
@@ -25970,6 +25975,30 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:assistant-trtc-guard"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          "apps/kiosk/src/pages/auth/accountUserMessage.ts",
+          "apps/kiosk/src/services/api/userErrorMessage.ts",
+          "apps/kiosk/src/services/auth/memberAuthApi.ts",
+          "services/api/src/member-auth/member-phone-rebind.service.ts",
+          "services/api/src/member-auth/sms/sms-budget.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:backend-error-copy-coverage"
       ],
       "wired": true
     },

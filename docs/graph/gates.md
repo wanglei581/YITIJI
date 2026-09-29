@@ -368,7 +368,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/auth/LoginPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-qr-login-ui.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-user-center-wave0.mjs` |
 | `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx` | `verify-fusion-shell.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-qr-login-ui.mjs` |
 | `apps/kiosk/src/pages/auth/ScanQrLoginPanel.tsx` | `verify-lightflow-k1-public-entry.mjs`<br/>`verify-qr-login-ui.mjs` |
-| `apps/kiosk/src/pages/auth/accountUserMessage.ts` | `verify-w4-login-profile-l1.mjs` |
+| `apps/kiosk/src/pages/auth/accountUserMessage.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-w4-login-profile-l1.mjs` |
 | `apps/kiosk/src/pages/auth/components/LoginGatePhoneFields.tsx` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/auth/components/MemberAgreement.tsx` | `verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs` |
 | `apps/kiosk/src/pages/auth/components/MemberLoginDialog.tsx` | `verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs` |
@@ -780,9 +780,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/api/terminalConfig.ts` | `verify-home-toolbox-ui.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
 | `apps/kiosk/src/services/api/toolboxLaunchEvents.ts` | `verify-home-toolbox-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
 | `apps/kiosk/src/services/api/uploadSessions.ts` | `verify-resume-phone-upload-ui.mjs` |
-| `apps/kiosk/src/services/api/userErrorMessage.ts` | `verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/services/api/userErrorMessage.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/services/auth/legalConsentVersions.ts` | `verify-legal-doc-version.ts` |
-| `apps/kiosk/src/services/auth/memberAuthApi.ts` | `verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-w4-login-profile-l1.mjs`<br/>`verify-legal-doc-version.ts` |
+| `apps/kiosk/src/services/auth/memberAuthApi.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-w4-login-profile-l1.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/kiosk/src/services/auth/memberAuthDevice.ts` | `verify-member-session-closure.mjs` |
 | `apps/kiosk/src/services/auth/memberQrLoginApi.ts` | `verify-qr-login-ui.mjs` |
 | `apps/kiosk/src/services/auth/memberSessionEvents.ts` | `verify-member-session-closure.mjs` |
@@ -2315,11 +2315,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-auth/member-auth.controller.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-access.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-step-up.ts`<br/>`verify-sms-budget.ts`<br/>`verify-wave2-account-rebind.ts` |
 | `services/api/src/member-auth/member-auth.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-sms-budget.ts`<br/>`verify-wave2-account-rebind.ts` |
 | `services/api/src/member-auth/member-auth.service.ts` | `verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-member-sms-provider-errors.ts`<br/>`verify-sms-budget.ts` |
-| `services/api/src/member-auth/member-phone-rebind.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-wave2-account-rebind.ts` |
+| `services/api/src/member-auth/member-phone-rebind.service.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-wave2-account-rebind.ts` |
 | `services/api/src/member-auth/member-qr-login.service.ts` | `verify-legal-doc-version.ts`<br/>`verify-member-auth.ts` |
 | `services/api/src/member-auth/member-step-up.service.ts` | `verify-member-step-up.ts` |
 | `services/api/src/member-auth/member-step-up.types.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-member-step-up.ts`<br/>`verify-wave2-account-rebind.ts` |
-| `services/api/src/member-auth/sms/sms-budget.ts` | `verify-sms-budget.ts` |
+| `services/api/src/member-auth/sms/sms-budget.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-sms-budget.ts` |
 | `services/api/src/member-auth/sms/sms-sender.ts` | `verify-change-password.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-member-sms-provider-errors.ts`<br/>`verify-member-step-up.helpers.ts`<br/>`verify-member-step-up.ts`<br/>`verify-sms-budget.ts`<br/>`verify-sms-provider.ts`<br/>`verify-sms-send.ts` |
 | `services/api/src/member-benefits/admin-member-benefits.controller.ts` | `verify-member-benefits-admin.ts` |
 | `services/api/src/member-benefits/admin-member-benefits.service.ts` | `verify-member-benefits-admin.ts` |
