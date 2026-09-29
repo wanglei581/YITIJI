@@ -1,5 +1,13 @@
 # 下一步任务
 
+## 2026-09-29：后端排雷窗口（P1 安全与资金防线、1.8 / 3.7 排雷）
+
+- **已开 PR（P1-4、P1-5）：** 见 current-progress 同日条目。**上线开关顺序：** 先确认每个启用中的管理员账号已绑定并验证手机号 → 管理后台登录页接好第二步（交付单已发两个后台窗口）→ 再开 `ADMIN_LOGIN_SECOND_FACTOR=sms`；`ADMIN_IP_ALLOWLIST` 按办公网络出口配置，依赖 `TRUST_PROXY_HOPS` 取真实来源地址。短信三档额度默认值（500 / 200 / 100）待产品负责人确认。
+- **接口交付单：** 两个后台窗口——管理员登录页接第二步（`secondFactorRequired` / `challengeTicket` / `codeSent`、`POST /auth/login/second-factor`、`.../resend`），并处理 403 `AUTH_ADMIN_IP_FORBIDDEN`（不是登出）、503 `AUTH_LOGIN_UNAVAILABLE`、403 `AUTH_SECOND_FACTOR_NOT_ENROLLED`、403 `AUTH_ADMIN_SMS_LOGIN_REQUIRES_PASSWORD`；主执行窗口——一体机发会员验证码带 `x-terminal-id` + `x-terminal-session-token`（沿用扫描接口的换票重试），并显示 429 `SMS_DAILY_TOTAL_LIMIT` / `SMS_TERMINAL_DAILY_LIMIT`、503 `SMS_BUDGET_UNAVAILABLE` 的服务端原话；小程序窗口——同三种错误码。
+- **进行中（各自独立工作目录，子代理实现、协调方审）：** 服务端 PDF.js 换 6.3.289（CVE-2026-16633，高危，最先合）；P1-3 模型 / OCR / 语音 / TRTC 出站端点白名单；P1-18 缺 AI 配置只降级 AI。
+- **随后：** P1-2 金额硬上限与 DeepSeek→千问切换（按台计要一体机 AI 请求带已验签终端号）；P1-6 敏感词库与输出拒答（叠在 #1049 上）；3.9 内部账号名册与备用管理员（含服务器端应急启用命令，总指挥已裁定做）；全局错误过滤器透传 `AI_DECLARATION_REQUIRED` 的 `missing`（小程序窗口提出，体验项）；P1-17 注销执行器；P1-13 前端错误上报端点；W3 后端（B-06、B-02 等）；1.2 / 1.4 / 1.5 余项。
+- **1.8 排雷第一批待复现（摘要）：** 退款查询成功缺金额仍记成功、已出纸订单仍可退款、微信退款通知不校验原支付单号、支付宝查询成功分支不校验退款请求号、`manual_review` 无出口；审计里原样存文件名与删除理由；二维码确认读后无 CAS、换绑后踢会话失败旧令牌仍有效、QR claim 先销毁票据；小青与模拟面试原文个人信息直送模型、TRTC 启动后映射写失败会话停不掉、同会话并发重复调模型。收费链路里的缺陷照修，收费功能本轮不做。
+
 ## 2026-09-28 深夜：合规小改实现进度与上线配置清单
 
 **9/28 拍板结果**（产品负责人「按推荐拍板」，只覆盖合规小改的 D1–D6；收口评审的 11 条、四方评审的 23 条不在其中，仍待定）：

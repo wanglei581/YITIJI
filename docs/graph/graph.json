@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 559,
+    "endpointCount": 561,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -5086,6 +5086,34 @@
         "services": [
           "AuthService"
         ]
+      },
+      {
+        "controller": "services/api/src/auth/auth.controller.ts",
+        "handler": "AuthController.completeSecondFactor",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "User"
+        ],
+        "path": "/api/v1/auth/login/second-factor",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/auth/auth.service.ts"
+        ],
+        "services": [
+          "AuthService"
+        ]
+      },
+      {
+        "controller": "services/api/src/auth/auth.controller.ts",
+        "handler": "AuthController.resendSecondFactor",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/auth/login/second-factor/resend",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/auth/auth.controller.ts",
@@ -17384,6 +17412,7 @@
         "usedBy": [
           "services/api/src/admin-ops/admin-alert-actions.service.ts",
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
+          "services/api/src/auth/admin-login-second-factor.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/first-admin-bootstrap.ts",
@@ -21556,11 +21585,14 @@
       "services/api/scripts/verify-upload-scene.ts"
     ],
     "services/api/scripts/support/internal-auth-verify-harness.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
-      "services/api/scripts/verify-partner-account-action.ts"
+      "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/scripts/support/isolated-verification-database.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
@@ -22488,9 +22520,11 @@
       "services/api/scripts/verify-partner-account-action-schema.ts"
     ],
     "services/api/src/auth/auth.module.ts": [
-      "services/api/scripts/verify-internal-auth-phone.ts"
+      "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/auth/auth.service.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-first-admin-bootstrap.ts",
@@ -22503,6 +22537,7 @@
       "services/api/scripts/verify-internal-auth-phone.ts"
     ],
     "services/api/src/auth/first-admin-bootstrap.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
       "services/api/scripts/verify-first-admin-bootstrap.ts"
     ],
@@ -22516,12 +22551,14 @@
       "services/api/scripts/verify-internal-auth-phone.ts"
     ],
     "services/api/src/auth/internal-otp.service.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-partner-account-action-otp.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
-      "services/api/scripts/verify-partner-account-action.ts"
+      "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/auth/internal-otp.types.ts": [
       "services/api/scripts/verify-partner-account-action-otp.ts"
@@ -22566,9 +22603,15 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts"
     ],
+    "services/api/src/common/auth/admin-ip-allowlist.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts"
+    ],
     "services/api/src/common/auth/optional-end-user.ts": [
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-auth.ts"
+    ],
+    "services/api/src/common/auth/optional-internal-user.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts"
     ],
     "services/api/src/common/boot/boot-readiness.ts": [
       "services/api/scripts/verify-redis-degradation-truth.ts"
@@ -22586,6 +22629,7 @@
       "services/api/scripts/verify-partner-email-login-alias.ts"
     ],
     "services/api/src/common/crypto/phone-identity.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-benefit-activities.ts",
@@ -22598,7 +22642,8 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
-      "services/api/scripts/verify-partner-account-action.ts"
+      "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/common/crypto/secret-cipher.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
@@ -22692,6 +22737,7 @@
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
     "services/api/src/common/guards/jwt-auth.guard.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
@@ -22787,12 +22833,14 @@
       "services/api/scripts/verify-partner-account-action.ts"
     ],
     "services/api/src/common/redis/redis-degradation.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
-      "services/api/scripts/verify-redis-degradation-truth.ts"
+      "services/api/scripts/verify-redis-degradation-truth.ts",
+      "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/common/redis/redis.service.ts": [
       "services/api/scripts/verify-activity-logs.ts",
@@ -22825,6 +22873,7 @@
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
+      "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-scene.ts",
@@ -23651,10 +23700,12 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.service.ts": [
@@ -23662,7 +23713,8 @@
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-data-retention.ts",
-      "services/api/scripts/verify-member-sms-provider-errors.ts"
+      "services/api/scripts/verify-member-sms-provider-errors.ts",
+      "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/member-auth/member-phone-rebind.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -23680,12 +23732,16 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
+    "services/api/src/member-auth/sms/sms-budget.ts": [
+      "services/api/scripts/verify-sms-budget.ts"
+    ],
     "services/api/src/member-auth/sms/sms-sender.ts": [
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-sms-provider-errors.ts",
       "services/api/scripts/verify-member-step-up.helpers.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-sms-provider.ts",
       "services/api/scripts/verify-sms-send.ts"
     ],
@@ -24397,6 +24453,7 @@
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-admin-fairs.ts",
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-admin-orders-readonly.ts",
@@ -30788,6 +30845,34 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:admin-fairs"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/auth/auth.service.ts",
+          "services/api/src/auth/first-admin-bootstrap.ts",
+          "services/api/src/auth/internal-otp.service.ts",
+          "services/api/src/common/auth/admin-ip-allowlist.ts",
+          "services/api/src/common/auth/optional-internal-user.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-admin-login-hardening.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:admin-login-hardening"
       ],
       "wired": true
     },
@@ -37291,6 +37376,34 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:self-assessment"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/src/auth/auth.module.ts",
+          "services/api/src/auth/internal-otp.service.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/member-auth/member-auth.controller.ts",
+          "services/api/src/member-auth/member-auth.module.ts",
+          "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/member-auth/sms/sms-sender.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-sms-budget.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:sms-budget"
       ],
       "wired": true
     },
