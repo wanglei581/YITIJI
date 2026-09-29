@@ -8,6 +8,10 @@
  * 前端又直达报价确认页、从不经过材料检查 —— 生产上点「确认」就被拒。
  * 建单服务的注释写明 AI 生成的报告本意就是放行（它们是派生产物，不是用户手里的原件）。
  *
+ * 1.8 P-1（2026-09-29）起，派生件不再整类放行：闸门只豁免 derivationKind 为 ai_generated /
+ * pii_redaction 的派生件（src/print-jobs/material-check-policy.ts）。所以这 6 处还必须带
+ * derivationKind: 'ai_generated'，第 1、3 段一并断言。
+ *
  * 本模块由 verify-print-jobs.ts 调用，分三段：
  *   1. 静态：用 TypeScript 语法树（不是正则）取出这 6 处 files.upload({...}) 的实参，
  *      断言用途仍是 print_doc、资产类别是 derived。
@@ -118,6 +122,8 @@ export interface SiteUploadArgs {
   line: number
   purpose: string | undefined
   assetCategory: string | undefined
+  /** 1.8 P-1：闸门按它判断是否豁免，AI 产物必须是 ai_generated。 */
+  derivationKind: string | undefined
   createdBy: string
   mimeType: string | undefined
 }
@@ -142,6 +148,7 @@ export function readAiArtifactUploadArgs(apiRoot: string, problems: string[]): S
       line: call.line,
       purpose: call.literals.get('purpose'),
       assetCategory: call.literals.get('assetCategory'),
+      derivationKind: call.literals.get('derivationKind'),
       createdBy: site.createdBy,
       mimeType: call.literals.get('mimeType'),
     })
@@ -201,8 +208,10 @@ export async function verifyAiArtifactPrintPiiGate(ctx: RegressionContext): Prom
       problems.push(`${args.site.label}（${where}）：用途应仍是 print_doc（只补资产类别，不改用途），实际 ${String(args.purpose)}`)
     } else if (args.assetCategory !== 'derived') {
       problems.push(`${args.site.label}（${where}）：AI 生成的打印稿必须带 assetCategory: 'derived'，实际 ${args.assetCategory ? `'${args.assetCategory}'` : '未传（默认 original）'}`)
+    } else if (args.derivationKind !== 'ai_generated') {
+      problems.push(`${args.site.label}（${where}）：AI 生成的打印稿必须带 derivationKind: 'ai_generated'（1.8 P-1 起闸门只按它豁免），实际 ${args.derivationKind ? `'${args.derivationKind}'` : '未传（按要检查处理）'}`)
     } else {
-      ctx.pass(`P0-5a. ${args.site.label}（${where}）上传带 assetCategory: 'derived'，用途仍是 print_doc`)
+      ctx.pass(`P0-5a. ${args.site.label}（${where}）上传带 assetCategory: 'derived' + derivationKind: 'ai_generated'，用途仍是 print_doc`)
     }
   }
 
@@ -222,6 +231,7 @@ export async function verifyAiArtifactPrintPiiGate(ctx: RegressionContext): Prom
       filename: string
       purpose: FilePurpose
       assetCategory?: FileAssetCategory
+      derivationKind?: string
       createdBy: string
       mimeType?: string
     }) => {
@@ -231,13 +241,14 @@ export async function verifyAiArtifactPrintPiiGate(ctx: RegressionContext): Prom
         mimeType: args.mimeType ?? 'application/pdf',
         purpose: args.purpose,
         ...(args.assetCategory ? { assetCategory: args.assetCategory } : {}),
+        ...(args.derivationKind ? { derivationKind: args.derivationKind as 'ai_generated' } : {}),
         uploaderId: null,
         endUserId: null,
         createdBy: args.createdBy,
       })
       const record = await ctx.prisma.fileObject.findUnique({
         where: { id: uploaded.fileId },
-        select: { storageKey: true, assetCategory: true, purpose: true },
+        select: { storageKey: true, assetCategory: true, derivationKind: true, purpose: true },
       })
       if (!record) ctx.fail(`P0-5 夹具：FilesService.upload 返回 ${uploaded.fileId}，库里却没有这条 FileObject`)
       ctx.trackFile(uploaded.fileId, record.storageKey)
@@ -274,14 +285,15 @@ export async function verifyAiArtifactPrintPiiGate(ctx: RegressionContext): Prom
         filename: `p05-${args.createdBy}.pdf`,
         purpose: (args.purpose ?? 'print_doc') as FilePurpose,
         assetCategory: args.assetCategory as FileAssetCategory | undefined,
+        derivationKind: args.derivationKind,
         createdBy: args.createdBy,
         mimeType: args.mimeType,
       })
       const result = await tryCreate(artifact.fileId, `p05-${args.createdBy}.pdf`)
       if (result.ok) {
-        ctx.pass(`P0-5d. ${args.site.label}：按源码上传实参建的文件（${artifact.record.purpose} · ${artifact.record.assetCategory}），生产开关下建单成功`)
+        ctx.pass(`P0-5d. ${args.site.label}：按源码上传实参建的文件（${artifact.record.purpose} · ${artifact.record.assetCategory} · ${artifact.record.derivationKind}），生产开关下建单成功`)
       } else {
-        problems.push(`${args.site.label}：按源码上传实参建的文件（${artifact.record.purpose} · ${artifact.record.assetCategory}），生产开关下建单被拒 ${result.code}`)
+        problems.push(`${args.site.label}：按源码上传实参建的文件（${artifact.record.purpose} · ${artifact.record.assetCategory} · ${artifact.record.derivationKind}），生产开关下建单被拒 ${result.code}`)
       }
     }
   } finally {

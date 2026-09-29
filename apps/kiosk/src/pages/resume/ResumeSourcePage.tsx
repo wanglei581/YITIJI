@@ -3,6 +3,7 @@ import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensave
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
@@ -453,15 +454,18 @@ export function ResumeSourcePage() {
               更换文件
             </button>
           ) : null}
-          <button
-            type="button"
-            className="qx-btn resume-primary-action"
-            data-variant="primary"
-            disabled={!uploadedFile || sourceBusy}
-            onClick={handleStartDiagnosis}
-          >
-            {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
-          </button>
+          <span className="qx-ai-declaration-slot">
+            <button
+              type="button"
+              className="qx-btn resume-primary-action"
+              data-variant="primary"
+              disabled={!uploadedFile || sourceBusy}
+              onClick={handleStartDiagnosis}
+            >
+              {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
+            </button>
+            <AiDeclarationNote />
+          </span>
         </>
       )}
     >

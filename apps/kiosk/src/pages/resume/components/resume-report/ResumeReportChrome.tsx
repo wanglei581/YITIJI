@@ -1,13 +1,13 @@
 import { FLOW_RAIL, REPORT_HEAD, type ReportViewState } from '../../resume-report-model'
 
-export function ResumeReportHead({ viewState }: { viewState: ReportViewState }) {
+export function ResumeReportHead({ viewState, subtitle }: { viewState: ReportViewState; subtitle?: string }) {
   const head = REPORT_HEAD[viewState]
   return (
     <header className="rrp-head">
       <div className="rrp-head-row">
         <span className="rrp-head-tx">
           <h1>{head.title}</h1>
-          <p>{head.sub}</p>
+          <p>{subtitle ?? head.sub}</p>
         </span>
         <span className="rrp-head-tag">{head.tag}</span>
       </div>

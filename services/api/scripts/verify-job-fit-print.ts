@@ -61,7 +61,7 @@ function staticChecks(reporter: Reporter): boolean {
 
   complete = requireAll(service, [
     "import { FilesService } from '../../files/files.service'",
-    "import { signFileUrl } from '../../files/signing'",
+    "import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'",
     "import { JobFitPdfService } from './job-fit-pdf.service'",
     'private readonly files: FilesService',
     'private readonly pdf: JobFitPdfService',
@@ -72,7 +72,7 @@ function staticChecks(reporter: Reporter): boolean {
     "purpose: 'print_doc'",
     "createdBy: 'job_fit'",
     "action: 'resume.job_fit_print'",
-    'printFileUrl: signFileUrl(uploaded.fileId).url',
+    'printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url',
   ], 'JobFitService 报告生成、归属、文件与审计契约') && complete
 
   const printMethodStart = service?.indexOf('async printReport(taskId: string, requester: JobFitRequester, jobBoardOpen = true)') ?? -1

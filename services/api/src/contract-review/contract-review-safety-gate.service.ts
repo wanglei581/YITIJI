@@ -11,6 +11,8 @@ const COMPLIANCE_FORBIDDEN_TERMS = [
   '企业收简历',
   '候选人管理',
   '一键报名',
+  '初筛',
+  '岗位匹配度参考',
 ] as const
 
 export const CONTRACT_SAFETY_LOW_OCR_NOTICE = '文字识别置信度较低，请以合同原件为准。'

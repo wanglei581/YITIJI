@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, resolve } from 'node:path'
 import * as bcrypt from 'bcryptjs'
 import type { PrismaService } from '../prisma/prisma.service'
 import { dbKindOf } from '../prisma/create-client'
+import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { PASSWORD_PROOF_STATE } from './password-proof-state'
 
 export const FIRST_ADMIN_BOOTSTRAP_CONFIRMATION = 'CREATE_FIRST_PRODUCTION_ADMIN'
@@ -141,10 +142,4 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name]?.trim()
   if (!value) throw new Error(`${name}_REQUIRED`)
   return value
-}
-
-function isSerializationConflict(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false
-  const candidate = error as { code?: unknown; message?: unknown }
-  return candidate.code === 'P2034' || (typeof candidate.message === 'string' && candidate.message.includes('40001'))
 }

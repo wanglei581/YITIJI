@@ -114,6 +114,13 @@ class FakeRedis {
     this.guard()
     return this.store.delete(key) ? 1 : 0
   }
+  async decrementFloorKeepTtl(key: string): Promise<number> {
+    const v = Number(this.store.get(key) ?? 'NaN')
+    if (!Number.isFinite(v)) return 0
+    if (v <= 1) { this.store.delete(key); return 0 }
+    this.store.set(key, String(v - 1))
+    return v - 1
+  }
   async incrWithTtl(key: string, _ttlSeconds: number): Promise<number> {
     this.guard()
     const next = Number(this.store.get(key) ?? '0') + 1
@@ -577,6 +584,16 @@ async function main(): Promise<void> {
     const memberTakeaway = await printJobs.issueTakeawayUrl(takeawayTaskId, { endUserId: userId })
     if (!memberTakeaway.signedUrl.includes('/files/') || memberTakeaway.orderId !== created.id) {
       fail(`会员带走 URL 签发失败: ${JSON.stringify(memberTakeaway)}`)
+    }
+    {
+      // AuditLog.actorId 外键指向运营账号表：会员 ID 写进去在 PostgreSQL 上违反外键、被 audit.write 静默吞掉，
+      // 会员的带走链接就没有审计。按仓库约定 actorId 记 null、会员 ID 放 payload.endUserId。
+      const row = await prisma.auditLog.findFirst({ where: { action: 'print_job.takeaway_url', targetId: takeawayTaskId }, orderBy: { createdAt: 'desc' } })
+      const payload = row ? JSON.parse(row.payloadJson ?? '{}') as { endUserId?: string } : {}
+      if (!row || row.actorId !== null || payload.endUserId !== userId) {
+        fail(`会员带走链接必须留审计（actorId=null、payload.endUserId=本人）：${JSON.stringify({ found: Boolean(row), actorId: row?.actorId, endUserId: payload.endUserId })}`)
+      }
+      pass('会员带走链接留审计：actorId 为空（外键指向运营账号），会员 ID 在 payload')
     }
     pass('会员 owner 无需终端会话即可签发带走 URL')
     const boundTakeaway = await printJobs.issueTakeawayUrl(takeawayTaskId, {

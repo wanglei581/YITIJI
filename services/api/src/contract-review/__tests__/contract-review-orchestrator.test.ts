@@ -334,6 +334,26 @@ test('provider rejection uses the provider safe code and never retries or persis
   assert.equal(current.prisma.writes.some((write) => 'resultJson' in write.data), false)
 })
 
+// 出站白名单拒绝（请求根本没发出）必须保留自己的码落库，
+// 不能被折叠成兜底的 CONTRACT_REVIEW_ANALYSIS_FAILED —— 后者会让运维去查模型与网络。
+test('provider endpoint rejection keeps CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED as the stored code', async () => {
+  const extracted = extraction()
+  const current = harness(task({
+    status: 'rule_checking', confirmedAt: now,
+    extractionFingerprint: createContractReviewExtractionFingerprint('file-1', extracted, 'contract-review-v1'),
+  }), extracted)
+  ;(current.service as unknown as { provider: { reviewWithIdentity(): Promise<never> } }).provider = {
+    async reviewWithIdentity() {
+      throw new Error('CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED')
+    },
+  }
+
+  await assert.rejects(() => current.service.analyze('task-1'), /CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED/)
+  assert.equal(current.prisma.current.status, 'failed')
+  assert.equal(current.prisma.current.errorCode, 'CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED')
+  assert.equal(current.prisma.writes.some((write) => 'resultJson' in write.data), false)
+})
+
 test('expired work fails closed and invalid fingerprint inputs are rejected', async () => {
   const expired = harness(task({ expiresAt: now }))
   await assert.rejects(() => expired.service.extract('task-1'), /CONTRACT_REVIEW_EXPIRED/)

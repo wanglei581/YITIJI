@@ -42,10 +42,13 @@ import {
   AiTaskRegion,
   AigcMark,
   EvidenceBadge,
+  isAiOutage,
   useAiTask,
   type AiAvailability,
   type AiTaskFallback,
 } from '../../ai'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import {
   SelfAssessmentApiError,
   getLatestSelfAssessment,
@@ -457,7 +460,10 @@ export function SelfAssessmentQuizPage() {
         ctabar={
           <>
             <GhostButton label="取消，返回修改" onClick={() => setStage('quiz')} />
-            <PrimaryButton label="确认提交" onClick={handOff} />
+            <span className="qx-ai-declaration-slot">
+              <PrimaryButton label="确认提交" onClick={handOff} />
+              <AiDeclarationNote />
+            </span>
           </>
         }
       >
@@ -631,6 +637,8 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
   /** 请求在飞：`running` 的唯一来源，永远等于「后端已受理且这次调用还没回来」。 */
   const [inflight, setInflight] = useState<'submit' | 'fetch' | null>(null)
   const [taskError, setTaskError] = useState<string | null>(null)
+  // AI 能力级停用（暂停 / 当日额度已到 / 未配置）：重试这一次不会变好，失败屏不给「重试」。
+  const [taskAiDown, setTaskAiDown] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const startedRef = useRef<string | null>(null)
   const mountedRef = useRef(true)
@@ -681,6 +689,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
 
     setInflight(mode)
     setTaskError(null)
+    setTaskAiDown(false)
     const request = mode === 'submit'
       ? submitSelfAssessment(
           {
@@ -713,7 +722,15 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       })
       .catch((err: unknown) => {
         // 失败必须看得见：不把「没生成出来 / 读不回来」渲染成「生成完了但内容为空」。
-        if (mountedRef.current) setTaskError(err instanceof SelfAssessmentApiError ? err.message : mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试')
+        if (!mountedRef.current) return
+        const declined = aiDeclarationDeclineMessage(err)
+        if (declined) {
+          setTaskAiDown(false)
+          setTaskError(declined)
+          return
+        }
+        setTaskAiDown(isAiOutage(err))
+        setTaskError(err instanceof SelfAssessmentApiError ? err.message : mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试')
       })
       .finally(() => { if (mountedRef.current) setInflight(null) })
   }, [attempt, consentOk, getToken, linkedTaskId, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive, session.consentVersion])
@@ -763,8 +780,17 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
         ctabar={
           <>
-            <GhostButton label="返回简历服务" route={SA_BACK_ROUTE} onClick={() => navigate(SA_BACK_ROUTE)} />
-            <PrimaryButton label={failure ? '重新作答' : '去看说明并开始'} onClick={() => navigate('/resume/self-assessment/intro')} />
+            {failure && taskAiDown ? (
+              <>
+                <GhostButton label="返回首页" route="/" onClick={() => navigate('/')} />
+                <PrimaryButton label="返回简历服务" onClick={() => navigate(SA_BACK_ROUTE)} />
+              </>
+            ) : (
+              <>
+                <GhostButton label="返回简历服务" route={SA_BACK_ROUTE} onClick={() => navigate(SA_BACK_ROUTE)} />
+                <PrimaryButton label={failure ? '重新作答' : '去看说明并开始'} onClick={() => navigate('/resume/self-assessment/intro')} />
+              </>
+            )}
           </>
         }
       >
@@ -772,8 +798,12 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           fallback={{
             mode: 'result-unavailable',
             reason: failure ?? '这次没能拿到结果，页面不会用别的东西顶上。',
-            retryHint: `${linkedTaskId ? `记录编号 ${linkedTaskId}。` : ''}作答还留在这台机器上，可以直接重试；离开或闲置 60 秒会清空。`,
-            action: { label: '重试这一次', onClick: () => { startedRef.current = null; setAttempt((n) => n + 1) } },
+            ...(taskAiDown
+              ? { retryHint: 'AI 现在停用，重试不会变好。下面的入口不经过 AI，照常能办。' }
+              : {
+                  retryHint: `${linkedTaskId ? `记录编号 ${linkedTaskId}。` : ''}作答还留在这台机器上，可以直接重试；离开或闲置 60 秒会清空。`,
+                  action: { label: '重试这一次', onClick: () => { startedRef.current = null; setAttempt((n) => n + 1) } },
+                }),
           }}
           running={
             <SaCard head={inflight === 'submit' ? '正在生成本次解读' : '正在读取这次结果'} hint="等系统真实返回">

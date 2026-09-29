@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import {
+  adminPaperStatus,
+  describePrinterFault,
+  normalizeDiskFreeGb,
+  toAdminPrinterStatus,
+} from '../src/terminals/admin-printer-status'
 
 const root = process.cwd()
 const read = (path: string) => readFileSync(join(root, path), 'utf8')
@@ -55,4 +61,39 @@ for (const forbidden of ['ssid', 'password', 'gateway', 'printerHostAddress', 'a
   assert.equal(dto.toLowerCase().includes(forbidden.toLowerCase()), false, `DTO must not contain ${forbidden}`)
   assert.equal(agentService.slice(agentService.indexOf('async heartbeat'), agentService.indexOf('// ── 3. Claim tasks')).toLowerCase().includes(forbidden.toLowerCase()), false, `heartbeat persistence must not contain ${forbidden}`)
 }
+
+// ── 心跳 → 管理员终端 / 打印机视图：打印机状态词表与磁盘 ─────────────────────
+// Agent 真实上报 ready / offline / error / low_paper / unknown（apps/terminal-agent/src/agent/types.ts）。
+// 正常必须不出故障说明（页面据此不标红）；纸张不足是可打印的提醒，不算故障；
+// 未上报与驱动返回 unknown 分开说；认不出的原值不得被当成正常吞掉。
+for (const healthy of ['ready', 'ok', 'idle']) {
+  assert.equal(toAdminPrinterStatus(true, healthy), 'online', `${healthy} must be online`)
+  assert.equal(describePrinterFault(true, healthy), null, `${healthy} must not carry a fault`)
+}
+assert.equal(toAdminPrinterStatus(true, 'low_paper'), 'online')
+assert.equal(describePrinterFault(true, 'low_paper'), '纸张或墨粉不足，可打印、需补充')
+assert.equal(adminPaperStatus('low_paper'), 'low')
+assert.equal(adminPaperStatus('paper_empty'), 'empty')
+assert.equal(adminPaperStatus('ready'), null)
+assert.equal(toAdminPrinterStatus(true, 'error'), 'error')
+assert.equal(describePrinterFault(true, 'error'), '打印机故障，需人工处理')
+assert.equal(describePrinterFault(true, 'offline'), '打印机离线')
+assert.equal(toAdminPrinterStatus(true, 'unknown'), 'offline')
+assert.equal(describePrinterFault(true, 'unknown'), '打印机状态未知，驱动未返回可用状态')
+assert.equal(describePrinterFault(true, null), '打印机状态未上报')
+assert.equal(toAdminPrinterStatus(true, 'toner_low'), 'error')
+assert.notEqual(describePrinterFault(true, 'toner_low'), null, 'an unrecognised status must never read as healthy')
+assert.equal(toAdminPrinterStatus(false, 'ready'), 'offline')
+assert.equal(describePrinterFault(false, 'ready'), '终端离线，打印机状态未知')
+assert.equal(normalizeDiskFreeGb(-1), null, 'Agent reports -1 when the disk query fails')
+assert.equal(normalizeDiskFreeGb(Number.NaN), null)
+assert.equal(normalizeDiskFreeGb(null), null)
+assert.equal(normalizeDiskFreeGb(0), 0)
+assert.equal(normalizeDiskFreeGb(182.4), 182.4)
+assert.match(adminService, /diskFreeGb: normalizeDiskFreeGb\(hb\?\.diskFreeGb\)/)
+assert.match(adminService, /paperStatus: adminPaperStatus\(printerStatus\)/)
+assert.match(adminService, /fault: describePrinterFault\(online, printerStatus\)/)
+assert.doesNotMatch(adminService, /function describePrinterFault|function toAdminPrinterStatus/, 'one printer vocabulary, not a second copy in the service')
+
+console.log('ALL PASS: printer status vocabulary (ready / low_paper / unknown) and negative disk readings map to honest admin views')
 console.log('ALL PASS: network diagnostics are dual-schema, enum-only heartbeat fields with no credential or identifier persistence; heartbeat retention is registered and deletes records older than the configured period')

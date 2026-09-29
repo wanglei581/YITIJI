@@ -63,6 +63,48 @@ export function expectedSheets(file: FilePages, params: Partial<PrintJobParams> 
   return `${sheetsPerCopy * copies} 张（${facesPerCopy * copies} 面）`
 }
 
+/** 给用户看的订单号只认 ORD-。内部编号、空串都不显示。 */
+export function publicOrderNo(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return /^ORD-[A-Za-z0-9-]+$/.test(trimmed) ? trimmed : null
+}
+
+/** 「再印一份」的说明跟真实价目走。0 元写免费试运营，不知道价格就不说要付款。 */
+export function reprintHint(amountCents: number | null | undefined): string {
+  if (amountCents === 0) return '重新选文件后再确认。免费试运营，不另收费。'
+  if (typeof amountCents === 'number' && Number.isFinite(amountCents) && amountCents > 0) {
+    return '重新选文件、核对价格后再付款。'
+  }
+  return '重新选文件后再确认价格。'
+}
+
+/**
+ * 完成页取纸说明。页数未知时不写「共 0 面」；份数乘进总页数。
+ * 面数沿用 expectedSheets：双面不会把页数再乘 2。
+ */
+export function doneTakeaway(
+  file: FilePages,
+  params: Partial<PrintJobParams> | null | undefined,
+): { pagesLabel: string; facesLabel: string } {
+  const pages = pagesPerCopy(file, params)
+  const copies = params?.copies && params.copies >= 1 ? params.copies : 1
+  if (pages == null || pages < 1) {
+    return {
+      pagesLabel: '全部纸张',
+      facesLabel: '请在出纸口取走并核对页数',
+    }
+  }
+  const totalPages = pages * copies
+  const sheets = expectedSheets(file, params)
+  return {
+    pagesLabel: copies > 1 ? `全部 ${totalPages} 页（${pages} 页 × ${copies} 份）` : `全部 ${totalPages} 页`,
+    facesLabel: sheets
+      ? `共 ${sheets}已全部打印，请在出纸口取走并核对页数`
+      : `共 ${totalPages} 面已全部打印，请在出纸口取走并核对页数`,
+  }
+}
+
 /**
  * 这一单的收款事实，只认进页时带来的 amountCents：
  * 确认页只把 0 元单或已付单送进本页，收银页只在 paid 后送进来；

@@ -138,6 +138,8 @@ export class FakeSmsSender implements SmsSender {
     return { phone: this.phone, code: this.code }
   }
 
+  async sendPartnerPhoneRegisteredNotice(): Promise<void> {}
+
   async sendCode(phone: string, code: string): Promise<void> {
     this.phone = phone
     this.code = code

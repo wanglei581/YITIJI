@@ -3,11 +3,11 @@
 //
 // 诚实口径：
 // - 打印参数（单双面 / 彩黑 / 份数 / 页范围）来自 PrintTask.paramsJson 已外露字段；
-//   缺值显示「未记录」，不默认成单面/黑白/全部。双面不计价，不渲染金额项。
+//   单双面 / 彩黑 / 份数缺值显示「未记录」，不默认成单面或黑白。页范围没传显示「全部页」。双面不计价，不渲染金额项。
 // - 关联 Order 缺失（payStatus 为 null，历史订单）→ 支付区只显示「暂无支付信息」，
 //   不显示金额 0、不推断支付状态。
 // - 有 Order → 展示后端真实字段：下单金额、优惠/权益抵扣、已退款、支付状态、来源、计费页数。
-//   实付无独立字段，标「未记录」，前端不按应付减优惠推算。
+//   实付：金额为 0 时写「0 元（免费试运营）」；其余没有单独的实付字段，标「未记录」，不按应付减优惠推算。
 // - 取件码仅在后端返回时渲染（门控在服务端）。
 // - 「再打一份」本批不做订单侧直连（PrintTask 无可重签文件源），
 //   只提供「去我的文档再打印」诚实引导：走我的文档重签 URL → 打印确认，
@@ -24,9 +24,9 @@ import {
   duplexDisplay,
   formatAmountCents,
   memberPayStatusLabel,
-  NET_PAID_UNRECORDED,
-  NET_PAID_UNRECORDED_HINT,
+  netPaidDisplay,
   pageRangeDisplay,
+  publicOrderNo,
   paymentSourceLabel,
   PENDING_REFUND_EXPLANATION,
   PENDING_REFUND_LABEL,
@@ -49,9 +49,12 @@ function DetailRow({ label, value, hint }: { label: string; value: string; hint?
 export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
   const navigate = useNavigate()
   const payStatus = item.payStatus ?? null
+  const orderNo = publicOrderNo(item.orderNo)
+  const paid = netPaidDisplay(item)
 
   return (
     <div className="me-payment-summary">
+      {orderNo ? <p className="me-payment-order">订单号 {orderNo}</p> : null}
       <div className="me-payment-grid">
         <DetailRow label="单双面" value={duplexDisplay(item.duplex)} />
         <DetailRow label="彩色/黑白" value={colorModeDisplay(item.colorMode)} />
@@ -72,7 +75,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
           />
           <DetailRow label="优惠/权益抵扣" value={recordedAmountDisplay(item.discountCents)} />
           <DetailRow label="已退款" value={recordedAmountDisplay(item.refundedAmountCents)} />
-          <DetailRow label="实付" value={NET_PAID_UNRECORDED} hint={NET_PAID_UNRECORDED_HINT} />
+          <DetailRow label="实付" value={paid.value} hint={paid.hint} />
           <DetailRow
             label="支付状态"
             value={memberPayStatusLabel(item).label}

@@ -8,10 +8,14 @@ import { normalizeLlmUsage, type RawLlmUsage } from '../ai/ai-log.service'
 import type { AiTokenUsage } from '../ai/interfaces/ai-provider.interface'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import { assertContentAllowed } from '../ai/llm/llm-guard'
+import { startLlmUsageMeter } from '../ai/usage/ai-usage-meter'
+import { isAiEndpointAllowed } from '../common/outbound/ai-endpoint-allowlist'
 
 const MAX_INPUT_CODE_UNITS = 500_000
 const MAX_RESPONSE_BYTES = 512 * 1024
 const MAX_FINDINGS = 100
+/** 逐次计量账（AiUsageRecord）里合同审查的功能键；与出站白名单、输出内容检查用的是同一个名字。 */
+export const CONTRACT_REVIEW_USAGE_FEATURE = 'contract_review'
 
 const SUPPORT = {
   deepseek: { baseUrl: 'https://api.deepseek.com/', model: 'deepseek-v4-pro' },
@@ -176,6 +180,20 @@ export class StrictFetchContractProviderTransport implements ContractProviderTra
 
   async send(request: ContractProviderTransportRequest): Promise<ContractProviderTransportResponse> {
     const timeoutMs = this.resolveTimeout(request.timeoutMs)
+    // 出站白名单（common/outbound/ai-endpoint-allowlist.ts）：放在 try 之外，
+    // 否则会被下面的 catch 塌成 TRANSPORT_FAILED —— 那等于把「我们没发」说成「网络不通」。
+    if (!isAiEndpointAllowed(request.url, 'contract_review')) throw new Error('CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED')
+    const requestBody = JSON.stringify(request.payload)
+    // P1-2a 逐次计量：合同审查不走 llmFetchJson，所以在这里接同一个计量器，口径与之一致 ——
+    // 走到这里请求一定会发出（白名单已过），此后每个结局各记一行账；只取回包里的 usage，
+    // 不留正文。功能键 contract_review；身份取当前上下文（编排器按任务属主显式设定，见
+    // contract-review-orchestrator.service.ts）。
+    //
+    // 口径上与 llmFetchJson 的两处差别（都不影响计入额度的金额）：
+    //   - 输出内容检查在 provider 服务层（send 返回之后），被拦下的这一行记 ok 而不是 blocked；
+    //     钱照样花了、金额照样按用量计。
+    //   - 回包超过 512 KB 被截断时记 network_error（HTTP 状态保留），用量取不到，按保守单价计入。
+    const meter = startLlmUsageMeter(request.url, requestBody, CONTRACT_REVIEW_USAGE_FEATURE)
     const controller = new AbortController()
     let timedOut = false
     const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
@@ -188,11 +206,15 @@ export class StrictFetchContractProviderTransport implements ContractProviderTra
           'Content-Type': 'application/json',
           Authorization: `Bearer ${request.apiKey}`,
         },
-        body: JSON.stringify(request.payload),
+        body: requestBody,
       })
+      meter.responded(response.status, null)
       const body = await readBoundedBody(response)
+      meter.responded(response.status, usageCarrierOf(body))
+      meter.completed()
       return { status: response.status, redirected: response.redirected, body }
     } catch {
+      meter.failed(timedOut ? 'timeout' : 'network_error')
       // 超时和「网络真的断了」必须分开报。此前两者一律塌成
       // CONTRACT_PROVIDER_TRANSPORT_FAILED，生产上排查了整晚才从 Redis 的
       // stacktrace 里反推出「其实是自己 abort 的」——而当时网络实测是好的
@@ -281,6 +303,8 @@ export class ContractReviewProviderService {
       // 超时必须原样冒泡：塌成 TRANSPORT_FAILED 就等于把「合同太长」
       // 说成「网络不通」，用户会去重连 WiFi，而真正该做的是换短一点的文件。
       if (error instanceof Error && error.message === 'CONTRACT_PROVIDER_TIMEOUT') throw error
+      // 地址未通过出站白名单：请求根本没发出，同样原样冒泡，不能说成「连不上」。
+      if (error instanceof Error && error.message === 'CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED') throw error
       throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')
     }
     if (!response || typeof response !== 'object') throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')
@@ -406,6 +430,18 @@ function extractUsage(body: string): AiTokenUsage | undefined {
     return normalizeLlmUsage(usage as RawLlmUsage)
   } catch {
     return undefined
+  }
+}
+
+/** 只把回包里的 usage 交给计量器（它只读 `.usage`）；正文不往外带。解析失败为 null（= 未采集）。 */
+function usageCarrierOf(body: string): { usage: unknown } | null {
+  try {
+    const wire = JSON.parse(body) as unknown
+    if (!wire || typeof wire !== 'object') return null
+    const usage = (wire as Record<string, unknown>)['usage']
+    return usage && typeof usage === 'object' ? { usage } : null
+  } catch {
+    return null
   }
 }
 

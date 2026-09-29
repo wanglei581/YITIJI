@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -12,8 +13,12 @@ import {
   type AlertListView,
 } from '../../services/api/adminOps'
 import { ApiHttpError } from '../../services/api/client'
+import { AI_CONTENT_COMPLAINT_SLA_WORKDAYS } from '../member-feedback/feedbackSla'
 
-const TYPE_META: Record<AdminAlertItem['type'], { label: string; icon: typeof AlertTriangleIcon; guidance?: string }> = {
+const TYPE_META: Record<
+  AdminAlertItem['type'],
+  { label: string; icon: typeof AlertTriangleIcon; guidance?: string; link?: { label: string; to: string } }
+> = {
   terminal_offline: { label: '终端离线',   icon: MonitorOffIcon },
   printer_issue:    { label: '打印机异常', icon: PrinterIcon },
   print_failed:     { label: '打印失败',   icon: AlertTriangleIcon },
@@ -27,7 +32,8 @@ const TYPE_META: Record<AdminAlertItem['type'], { label: string; icon: typeof Al
   feedback_pending: {
     label: 'AI 内容投诉待处理',
     icon: MessageSquareWarningIcon,
-    guidance: '有 AI 内容投诉等待处理（条数与最早提交时间见上一行）。请到「意见反馈」按「AI 内容投诉」筛选并答复，答复后这条告警自动消失；有新投诉进来会再次提醒。确认 / 静默只记录处理。',
+    guidance: `有 AI 内容投诉等待处理（条数与最早提交时间见上一行），须在 ${AI_CONTENT_COMPLAINT_SLA_WORKDAYS} 个工作日内答复。点「去处理」直接打开已按「AI 内容投诉」筛好的意见反馈，答复后这条告警自动消失；有新投诉进来会再次提醒。确认 / 静默只记录处理。`,
+    link: { label: '去处理', to: '/member-feedback?category=ai_content' },
   },
 }
 
@@ -164,7 +170,7 @@ export default function AlertsPage() {
       }
     >
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        告警由实时状态派生：终端离线（心跳超 3 分钟）、打印机异常、近 24 小时打印失败、已支付但打印文件不可用的待打印任务（需人工处置）。确认 / 静默 / 关闭只记录处理，设备仍异常时不会显示成已恢复；关闭后可以「重新打开」退回待处理。已退款的订单按订单退款状态退出告警，本页不发起退款，不伪造出纸结果。
+        告警由实时状态派生：终端离线（心跳超 5 分钟）、打印机异常、近 24 小时打印失败、已支付但打印文件不可用的待打印任务（需人工处置）。确认 / 静默 / 关闭只记录处理，设备仍异常时不会显示成已恢复；关闭后可以「重新打开」退回待处理。已退款的订单按订单退款状态退出告警，本页不发起退款，不伪造出纸结果。
       </div>
 
       {truncation && (
@@ -246,6 +252,14 @@ export default function AlertsPage() {
                     </p>
                     {meta.guidance && (
                       <p className="mt-1 text-[12px] text-neutral-600">{meta.guidance}</p>
+                    )}
+                    {meta.link && (
+                      <Link
+                        to={meta.link.to}
+                        className="mt-1.5 inline-flex h-9 min-w-[48px] items-center rounded-[9px] border border-primary-300 bg-primary-50 px-3 text-[12px] font-bold text-primary-700 hover:bg-primary-100"
+                      >
+                        {meta.link.label} →
+                      </Link>
                     )}
                   </div>
                   <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">

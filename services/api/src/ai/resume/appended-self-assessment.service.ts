@@ -11,10 +11,11 @@
 // ============================================================
 
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { PDFDocument } from 'pdf-lib'
 import { appendAigcPages } from '../../common/pdf/aigc-label'
 import { PrismaService } from '../../prisma/prisma.service'
 import { FilesService } from '../../files/files.service'
-import { signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { AuditService } from '../../audit/audit.service'
 import {
   SelfAssessmentService,
@@ -27,6 +28,7 @@ import {
   type SelfAssessmentDimensionKey,
   type SelfAssessmentDimensionResult,
 } from './self-assessment.types'
+import { hasAiInterpretation, type SelfAssessmentAiGates } from './self-assessment-interpretation'
 
 const DISCLAIMER_TEXT =
   '本附录基于本人作答的自我探索倾向，仅作为自助参考；不含临床 / 心理 / 人格诊断；' +
@@ -50,6 +52,8 @@ export class AppendedSelfAssessmentService {
     requester: { endUserId: string | null; accessToken: string | null }
     resumeFileId: string
     auditCtx?: AuditContext
+    /** 含 AI 解读时才过 AI 闸门（拦下原样抛）；只有打分时不含 AI 内容，照常合并。 */
+    gates?: SelfAssessmentAiGates
   }): Promise<{
     fileId: string
     filename: string
@@ -63,6 +67,8 @@ export class AppendedSelfAssessmentService {
     const ctx = opts.auditCtx ?? EMPTY_AUDIT_CONTEXT
     // 1) 读取自我探索结果（已含归属校验）
     const stored = await this.loadStored(opts.taskId, opts.requester)
+    const withAi = hasAiInterpretation(stored.dimensions, stored.summary)
+    if (withAi) await opts.gates?.aiContentExport?.()
 
     // 2) 读取主简历 PDF（由 PrintConfirmPage 提前验签后传入 fileId）
     const resumeRow = await this.prisma.fileObject.findUnique({
@@ -97,8 +103,11 @@ export class AppendedSelfAssessmentService {
       contentId: opts.taskId,
     })
 
-    // 5) 合并：保留原简历 Info；追加页是 AI 解读，AIGC.Label 置 "1"。
-    const mergedPdf = await appendAigcPages(resumeBundle.buffer, saBuffer, opts.taskId)
+    // 5) 合并：保留原简历 Info；追加页含 AI 解读时 AIGC.Label 置 "1"。
+    //    只有打分时追加页一个字都不是模型写的，只拷页、不写 AIGC 标识（简历原有 Info 原样保留）。
+    const mergedPdf = withAi
+      ? await appendAigcPages(resumeBundle.buffer, saBuffer, opts.taskId)
+      : await appendPlainPages(resumeBundle.buffer, saBuffer)
     const mergedPageCount = mergedPdf.pageCount
 
     // 6) 上传合并后的 PDF（仅本人打印用途，不进分享用途）
@@ -144,7 +153,7 @@ export class AppendedSelfAssessmentService {
       // `/print/jobs` 只认内部 HMAC 签名 URL，不认对象存储的 signedUrl。
       // 缺这一项时「去打印工作台核价」必然失败 —— 这正是 S2-7 判定本端点
       // 打印链路断裂、宁可不接的原因（PR #622 §一）。与 printReport() 同款签发。
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 
@@ -198,4 +207,13 @@ export class AppendedSelfAssessmentService {
       completedAt: parsed.completedAt ?? new Date().toISOString(),
     }
   }
+}
+
+/** 只拷页、不动 Info：用于不含 AI 内容的追加页（与 appendAigcPages 同一套 pdf-lib 拷页写法）。 */
+async function appendPlainPages(resumePdf: Buffer, appendixPdf: Buffer): Promise<{ buffer: Buffer; pageCount: number }> {
+  const merged = await PDFDocument.load(resumePdf, { ignoreEncryption: true })
+  const appendix = await PDFDocument.load(appendixPdf, { ignoreEncryption: true })
+  const copied = await merged.copyPages(appendix, appendix.getPageIndices())
+  copied.forEach((page) => merged.addPage(page))
+  return { buffer: Buffer.from(await merged.save({ useObjectStreams: false })), pageCount: merged.getPageCount() }
 }

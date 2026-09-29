@@ -25,6 +25,9 @@ import {
   XCircleIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { isAiOutage } from '../../ai/aiOutage'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import {
@@ -164,8 +167,11 @@ export function ContractReviewProcessingPage() {
         { token: getToken(), accessToken },
       )
       pollRef.current = setTimeout(poll, 1500)
-    } catch {
-      setError('确认失败，请重试')
+    } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      setError(declined ?? (isAiOutage(err)
+        ? 'AI 现在停用，这份合同暂时审不了。可以删除本次任务，合同原件到打印扫描里直接打印。'
+        : '确认失败，请重试'))
     } finally {
       if (mountedRef.current) setConfirming(false)
     }
@@ -333,14 +339,17 @@ export function ContractReviewProcessingPage() {
           open={showConfirmModal}
           onClose={() => setShowConfirmModal(false)}
           actions={
-            <div style={{ display: 'flex', gap: 16 }}>
-              <Button variant="ghost" onClick={handleCancel} style={{ flex: 1 }}>
-                取消审查
-              </Button>
-              <Button onClick={handleConfirm} disabled={confirming} style={{ flex: 2 }}>
-                {confirming ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
-                确认，开始分析
-              </Button>
+            <div className="qx-ai-declaration-slot" style={{ width: '100%' }}>
+              <div style={{ display: 'flex', gap: 16, width: '100%' }}>
+                <Button variant="ghost" onClick={handleCancel} style={{ flex: 1 }}>
+                  取消审查
+                </Button>
+                <Button onClick={handleConfirm} disabled={confirming} style={{ flex: 2 }}>
+                  {confirming ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
+                  确认，开始分析
+                </Button>
+              </div>
+              <AiDeclarationNote />
             </div>
           }
         >

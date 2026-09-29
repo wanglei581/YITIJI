@@ -6,7 +6,9 @@
 // ============================================================
 
 import type { FairVisitPlanPrintResponse, FairVisitPlanResponse } from '@ai-job-print/shared'
+import { rethrowAiDeclaration } from '../../ai/aiDeclarationErrors'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class FairVisitPlanApiError extends Error {
@@ -34,7 +36,7 @@ async function call<T>(
 ): Promise<T> {
   let res: Response
   try {
-    res = await fetch(
+    res = await terminalAttributedFetch(
       `${API_BASE_URL}/job-fairs/${encodeURIComponent(fairId)}/visit-plan/${encodeURIComponent(taskId)}${suffix}`,
       {
         method: init?.method ?? 'GET',
@@ -46,7 +48,8 @@ async function call<T>(
         credentials: 'include',
       },
     )
-  } catch {
+  } catch (err) {
+    rethrowAiDeclaration(err)
     throw new FairVisitPlanApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
   if (!res.ok) {

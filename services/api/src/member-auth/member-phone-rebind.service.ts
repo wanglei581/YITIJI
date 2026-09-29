@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common'
+import { ConflictException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { encryptPhone, hashPhone, maskPhone, maskPhoneFromEnc } from '../common/crypto/phone-identity'
 import { RedisService } from '../common/redis/redis.service'
@@ -97,7 +97,21 @@ export class MemberPhoneRebindService {
     }
     const oldPhoneMasked = maskPhoneFromEnc(currentUser.phoneEnc)
 
-    // ── 5. 更新 EndUser 手机号 ──────────────────────────────────────────
+    // ── 5. 先踢出所有旧会话，再改手机号（1.8 排雷 C-4）──────────────────
+    // 手机号换绑属安全边界变更，必须强制重新登录。会员会话只存在 Redis（没有数据库代际），
+    // 所以顺序是硬约束：若先改库、后踢会话，踢会话一失败（Redis 抖动）手机号已经换了，
+    // 旧令牌却在 Redis 恢复后继续有效。现在踢不掉就整单不改、如实告知；
+    // 踢掉之后改库失败，最坏是本人需要重新登录、手机号没变——失败关闭。
+    let sessionsRevoked: number
+    try {
+      sessionsRevoked = await this.redis.revokeMemberSessions(endUserId)
+    } catch {
+      throw new ServiceUnavailableException({
+        error: { code: 'REBIND_UNAVAILABLE', message: '暂时无法换绑手机号（登录状态没能安全清除），手机号没有改动，请稍后再试' },
+      })
+    }
+
+    // ── 6. 更新 EndUser 手机号 ──────────────────────────────────────────
     await this.prisma.endUser.update({
       where: { id: endUserId },
       data: {
@@ -106,9 +120,6 @@ export class MemberPhoneRebindService {
         updatedAt: new Date(),
       },
     })
-
-    // ── 6. 踢出所有旧会话（手机号换绑属安全边界变更，必须强制重新登录）──
-    const sessionsRevoked = await this.redis.revokeMemberSessions(endUserId)
 
     // ── 7. 写审计日志 ─────────────────────────────────────────────────
     await this.audit.write({

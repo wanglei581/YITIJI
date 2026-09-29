@@ -12,6 +12,7 @@ import type { ReportReleaseObservationDto } from './dto/report-release-observati
 import type { UpdateReleaseObservationPlanDto } from './dto/update-release-observation-plan.dto'
 import { TerminalCredentialSecurityService } from './terminal-credential-security.service'
 import { isUniqueConstraintError } from './terminal-utils'
+import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 
 const OBSERVATION_PROTOCOL = 'release-observation-v1'
 const HASH = /^[A-F0-9]{64}$/
@@ -297,8 +298,7 @@ export class ReleaseObservationService {
       }
       }, { isolationLevel: 'Serializable', maxWait: 5_000, timeout: 10_000 })
     } catch (error) {
-      const code = (error as { code?: string }).code
-      if (isUniqueConstraintError(error) || code === 'P2034') {
+      if (isUniqueConstraintError(error) || isSerializationConflict(error)) {
         throw new ConflictException({ error: { code: 'RELEASE_TARGET_ALREADY_OBSERVED', message: '目标终端已有有效观察计划或并发状态变化，请刷新后重试' } })
       }
       throw error

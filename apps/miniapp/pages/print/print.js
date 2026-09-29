@@ -10,7 +10,7 @@ const { syncTabBar } = require('../../utils/tab-bar-index')
 function printPaths() {
   const head = [
     { id: 'docs',     icon: 'folder',    accent: 'teal',  title: '从我的文档打印', badge: '推荐', desc: '选已上传的简历或文档，设好参数后生成到机码', flow: '选文档 · 选参数 · 选终端' },
-    { id: 'package',  icon: 'folder',    accent: 'clay',  title: '材料包', desc: '多份材料一次组包，到机器前付款打印', flow: '选材料 · 选服务点 · 拿到机码' },
+    { id: 'package',  icon: 'folder',    accent: 'clay',  title: '材料包', desc: '多份材料一次组包，拿到机码到终端打印', flow: '选材料 · 选服务点 · 拿到机码' },
     { id: 'orders',   icon: 'history',   accent: 'clay',  title: '打印订单', desc: '查看到机码和出纸状态', flow: '订单 · 状态 · 到机码' },
   ]
   const tail = [

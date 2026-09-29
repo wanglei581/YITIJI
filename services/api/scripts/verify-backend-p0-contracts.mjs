@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -33,6 +33,8 @@ const partnerJobsService = read('services/api/src/jobs/jobs-partner.service.ts')
 const syncAdminController = read('services/api/src/job-sync/job-sync.controller.ts')
 const syncAdminService = read('services/api/src/job-sync/job-sync.service.ts')
 const adminSourcesPage = read('apps/admin/src/routes/sync-sources/index.tsx')
+// 3.15 起启停 / 批量下架等写操作停放在这个文件（不被 import），契约断言跟着搬过来。
+const adminSourceWriteActions = read('apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx')
 
 check(
   containsAll(offlineClient, [
@@ -94,10 +96,12 @@ check(
     'licensed_hr_agency',
     'fair_organizer',
     'enterprise_source',
+    'gig_worker_home',
+    'employment_service_station',
     'assertDataSourceCapability',
     'assertPartnerDataTypeCapability',
   ]),
-  'All five Organization types have server-side source and content capability rules',
+  'All seven Organization types have server-side source and content capability rules',
 )
 check(
   containsAll(partnerJobsService, [
@@ -171,12 +175,18 @@ check(
   'Source disable, impact preview, and explicit bulk unpublish are separate audited operations',
 )
 check(
-  containsAll(adminSourcesPage, [
-    '停用通道不会自动下架既有内容',
+  // 原断言钉在页面上：「停用通道不会自动下架既有内容」+ 批量下架前先看影响。3.15 起这组写操作停放，
+  // 同一份契约改在停放文件上核对（恢复 b 版本时原样生效），页面则必须不再引入它。
+  containsAll(adminSourceWriteActions, [
+    '此操作与“停用来源”相互独立',
     'UNPUBLISH_SOURCE_CONTENT',
     'fetchSourceImpact',
-  ]),
-  'Admin source UI explains non-cascading disable and requires impact preview before bulk unpublish',
+  ]) &&
+    /const impact = await fetchSourceImpact\(s\.id\)[\s\S]*?window\.confirm\([\s\S]*?await unpublishSourceContent\(s\.id\)/.test(adminSourceWriteActions) &&
+    !/import[^\n]*SyncSourceWriteActions/.test(adminSourcesPage) &&
+    !adminSourcesPage.includes('unpublish-content') &&
+    adminSourcesPage.includes('不代为同步、启停或配置'),
+  'Admin source write actions (parked 3.15) keep non-cascading disable + impact preview before bulk unpublish; the page mounts none of them',
 )
 
 // ---------------------------------------------------------------------------
@@ -352,9 +362,10 @@ check(
   '锁定参数为 10 次/10 分钟 → 锁 15 分钟（改这三个数就是改 8 位码的安全结论，先重算）',
 )
 check(
-  lockoutSrc.includes('export async function clearPickupClaimFailures') &&
-    pickupOrderSrc.includes('await clearPickupClaimFailures(this.redis, terminal.id)'),
-  '成功认领清零失败计数（否则繁忙终端会被零散手误累积锁死）',
+  lockoutSrc.includes('export async function creditPickupClaimSuccess') &&
+    pickupOrderSrc.includes('await creditPickupClaimSuccess(this.redis, terminal.id)') &&
+    !lockoutSrc.includes('clearPickupClaimFailures'),
+  '成功认领抵掉一次失败计数（否则繁忙终端会被零散手误累积锁死；不整个清零，否则一张新单换一次清零——1.8 P-2）',
 )
 check(
   lockoutSrc.includes('tryRedis(') &&
@@ -447,6 +458,27 @@ check(
     !kioskActivitiesCtl.includes('return { id }'),
   'kiosk/activities 返回 501，不回显假活动',
 )
+
+// ── 审计 actorId 只放运营账号 ──────────────────────────────────────────────
+// AuditLog.actorId 外键指向运营 User：会员 ID 写进去在 PostgreSQL / SQLite 上都违反外键，
+// 被 AuditService.write 静默吞掉——会员动作就没有审计（print-jobs 带走链接与重试曾如此，2026-09-29 修）。
+// 会员动作一律 actorId: null、会员 ID 放 payload.endUserId。
+{
+  const srcRoot = resolve(repo, 'services/api/src')
+  const offenders = []
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'generated' || name === '__tests__') continue
+      const full = resolve(dir, name)
+      if (statSync(full).isDirectory()) { walk(full); continue }
+      if (!full.endsWith('.ts')) continue
+      const lines = readFileSync(full, 'utf8').split('\n')
+      lines.forEach((line, i) => { if (/\bactorId:\s*[\w.?]*endUserId\b/.test(line)) offenders.push(`${full.slice(srcRoot.length + 1)}:${i + 1}`) })
+    }
+  }
+  walk(srcRoot)
+  check(offenders.length === 0, `审计 actorId 不写会员 ID（外键指向运营账号，会被静默吞掉）${offenders.length ? '：' + offenders.join(', ') : ''}`)
+}
 
 if (failed > 0) {
   console.error(`\n${failed} backend P0 contract check(s) failed.\n`)

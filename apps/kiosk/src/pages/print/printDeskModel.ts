@@ -61,6 +61,43 @@ export function privacyPreviewGate(
   }
 }
 
+/** 文字识别没覆盖时，用户确认按原件继续。不编造遮挡任务编号。 */
+export function manualOriginalPrintCheck(input: {
+  inspectionTaskId: string
+  normalizeTaskId?: string
+  piiTaskId: string
+  findingCount: number
+  acknowledgedAt: string
+}): MaterialCheckSummary {
+  return {
+    inspectionTaskId: input.inspectionTaskId,
+    ...(input.normalizeTaskId ? { normalizeTaskId: input.normalizeTaskId } : {}),
+    piiTaskId: input.piiTaskId,
+    checkedAt: input.acknowledgedAt,
+    findingCount: input.findingCount,
+    redactedCount: 0,
+    keptCount: input.findingCount,
+    mode: 'checked',
+    redaction: {
+      claim: 'not_supported',
+      redactedFileId: null,
+      appliedRedactedCount: 0,
+      failedNoPositionCount: 0,
+      keptCount: input.findingCount,
+      reverifyRemainingCount: null,
+      reverifyRan: false,
+      unredactedAcknowledgedAt: input.acknowledgedAt,
+    },
+  }
+}
+
+function acknowledgedOriginal(materialCheck: MaterialCheckSummary | undefined): boolean {
+  const at = materialCheck?.redaction?.unredactedAcknowledgedAt
+  return materialCheck?.redaction?.claim === 'not_supported'
+    && typeof at === 'string'
+    && at.trim().length > 0
+}
+
 export function isPrintDeskPreviewAuthorized(
   materialCheck: MaterialCheckSummary | undefined,
   file: PrintFileState | undefined,
@@ -69,7 +106,7 @@ export function isPrintDeskPreviewAuthorized(
   const tasksComplete = Boolean(
     materialCheck?.inspectionTaskId &&
     materialCheck.piiTaskId &&
-    materialCheck.piiRedactTaskId,
+    (materialCheck.piiRedactTaskId || acknowledgedOriginal(materialCheck)),
   )
   if (!tasksComplete) return false
   return privacyPreviewGate(materialCheck, file).kind !== 'blocked'

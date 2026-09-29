@@ -3,15 +3,11 @@ const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const aiEntries = require('../../utils/ai-entries')
 
-const LEVEL_MAP = {
-  needs_work: { label: '需要加强', color: '#d88b0d' },
-  pass:        { label: '基本合格', color: '#3e6fe5' },
-  good:        { label: '表现良好', color: '#1677ff' },
-  excellent:   { label: '表现出色', color: '#12a879' },
-}
+// 模拟面试合规口径（合规窗口 9/29 裁定，C9 于 9/28 拍板）：练习表现等级整个不显示，也不换别的叫法——
+// 分档读起来像用人单位的结论。服务端的 overall.level 原样留在数据里（overallLevel），页面不渲染。
 const SECTION_TITLES = {
   expression:   '表达能力',
-  positionFit:  '岗位相关性',
+  positionFit:  '和目标岗位要求的对照',
   credibility:  '可信度',
   professional: '专业能力',
   adaptability: '应变能力',
@@ -38,8 +34,7 @@ Page({
     // done 态
     position:         '',
     interviewerLabel: '',
-    overallLabel:     '',
-    overallColor:     '#1677ff',
+    overallLevel:     '',
     overallSummary:   '',
     sections:         [],
     predictedQuestions: [],
@@ -84,7 +79,6 @@ Page({
   },
   _render(dto) {
     const r  = dto.report || {}
-    const lv = LEVEL_MAP[r.overall?.level] || LEVEL_MAP.pass
     const sections = ['expression', 'positionFit', 'credibility', 'professional', 'adaptability', 'risks']
       .map(k => ({ key: k, title: SECTION_TITLES[k], items: r[k] || [] }))
       .filter(s => s.items.length > 0)
@@ -92,8 +86,7 @@ Page({
       phase:              'done',
       position:           dto.position           || '',
       interviewerLabel:   dto.interviewerLabel   || '',
-      overallLabel:       lv.label,
-      overallColor:       lv.color,
+      overallLevel:       r.overall?.level       || '',
       overallSummary:     r.overall?.summary     || '',
       sections,
       predictedQuestions: r.predictedQuestions   || [],

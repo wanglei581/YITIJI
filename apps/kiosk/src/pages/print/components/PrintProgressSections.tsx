@@ -38,11 +38,12 @@ export function PrintJobRow({ fileName, subline, idLine, state }: {
   )
 }
 
-export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo, taskId }: {
+export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo }: {
   jobRow: ReactNode
   payment: PaymentFact
   amountCents: number | null
   orderNo: string | null
+  /** 调用方仍传入，页面不再把内部任务号展示给用户。 */
   taskId: string | null
 }) {
   const isFreeOrder = payment === 'free'
@@ -91,7 +92,6 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo,
             </p>
             <div className="pff-inbar-kv">
               {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
-              {taskId ? <span>任务号 <b>{taskId}</b></span> : null}
               {payment === 'paid' && amountCents != null ? <span>支付状态 <b>已支付 {formatCents(amountCents)}</b></span> : null}
               {isFreeOrder ? <span>支付状态 <b>本次未收款</b></span> : null}
             </div>
@@ -116,7 +116,9 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo,
           <div className="pff-step">
             <span className="pff-step-no">3</span>
             <span className="pff-step-txt">
-              还是查不到就把<b>{orderNo ? `订单号 ${orderNo}` : `任务号 ${taskId ?? ''}`}</b>告诉工作人员，后台能直接查到这一单。
+              {orderNo
+                ? <>还是查不到就把<b>订单号 {orderNo}</b>和这台机器的位置告诉现场工作人员。</>
+                : <>还是查不到就把这台机器的位置告诉现场工作人员，请他们核对这一单。</>}
             </span>
           </div>
         </div>

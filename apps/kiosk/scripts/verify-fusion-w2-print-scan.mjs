@@ -42,9 +42,14 @@ const frozenHashes = new Map([
   // 按钮不可点（此前一次误触即丢弃已上传文件）。冻结契约不放宽，仍逐字节校验；新行为由
   // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
   // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
+  // 2026-09-29 重新冻结：确认使用这份简历后面板卸载，原先只在依赖变化时上报忙碌，
+  // 卸载不补 onBusyChange(false)，来源页一直停在「接收中」，开始诊断和更换文件一直不可点。
+  // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
+  // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
+  // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0',
+    '1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',
@@ -63,8 +68,10 @@ const frozenHashes = new Map([
     // 归属与有效期判定在 printHandoff.ts（有单元测试）。旧结构（v1）一律不认、当场清掉（9/29 拍板）。
     // 保存时仍按白名单过滤字段。冻结契约不放宽，仍逐字节校验。
     // 旧哈希 2e3dc36bc95ad4c48dfedc6d84957210de5e6115389f7cfe44da7cf771ad2f39。
+    // 2026-09-29 再次冻结：交接上下文增加证件件标记 idDocument（只有 true 才写入）。
+    // 旧哈希 10867e065d20081231c4738d3d56ce0ca70862d8108001b99d7791944be7bebe。
     'src/pages/print/printMaterialSession.ts',
-    '10867e065d20081231c4738d3d56ce0ca70862d8108001b99d7791944be7bebe',
+    '6d76cd193bb3d98032ae6b44a36c3b8bb302da1bacd917452afc80dc7d22fd38',
   ],
 ])
 

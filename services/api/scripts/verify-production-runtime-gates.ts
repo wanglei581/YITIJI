@@ -82,6 +82,21 @@ function expectRejected(env: Env, expectedCode: string, label: string): void {
   throw new Error(`${label}: expected rejection (${expectedCode})`)
 }
 
+/**
+ * F-11（产品负责人 2026-09-29 批准方案①）：AI 类配置缺失 / 不合法**不拒启动**，
+ * 只在返回值里带出降级问题码（main.ts 登记到 /health）。这里断言「放行 + 问题码恰好是这些」，
+ * 不是「放行就完事」—— 否则把判定整段删掉也照样绿。
+ */
+function expectAiDegraded(env: Env, expectedCodes: string[], label: string): void {
+  const report = assertProductionRuntimeGates(env, FONT_OK)
+  const got = report.aiPlatform.issues.map((issue) => issue.code).sort()
+  const want = [...expectedCodes].sort()
+  if (!report.aiPlatform.enforced || JSON.stringify(got) !== JSON.stringify(want)) {
+    throw new Error(`${label}: 期望放行且 AI 降级 ${want.join(',')}，实际 enforced=${report.aiPlatform.enforced} issues=${got.join(',') || '无'}`)
+  }
+  console.log(`  PASS ${label}`)
+}
+
 function expectJwtSecretAllowed(secret: string, label: string): void {
   const prev = process.env['JWT_SECRET']
   process.env['JWT_SECRET'] = secret
@@ -203,52 +218,51 @@ function main(): void {
     )
   }
 
-  // 生产环境：OCR 必须接百度真实服务，且必须填齐百度密钥
-  expectRejected(
-    { ...PROD_OK, OCR_PROVIDER: undefined },
-    'PRODUCTION_OCR_PROVIDER_NOT_BAIDU',
-    '生产环境拒绝未设置 OCR_PROVIDER',
-  )
-  expectRejected(
-    { ...PROD_OK, OCR_PROVIDER: 'disabled' },
-    'PRODUCTION_OCR_PROVIDER_NOT_BAIDU',
-    '生产环境拒绝 OCR_PROVIDER=disabled',
-  )
-  expectRejected(
-    { ...PROD_OK, BAIDU_OCR_API_KEY: '   ' },
-    'PRODUCTION_BAIDU_OCR_CONFIG_MISSING',
-    '生产环境拒绝百度 OCR 缺失 API Key',
-  )
-  expectRejected(
-    { ...PROD_OK, BAIDU_OCR_SECRET_KEY: undefined },
-    'PRODUCTION_BAIDU_OCR_CONFIG_MISSING',
-    '生产环境拒绝百度 OCR 缺失密钥',
-  )
-  // 生产环境：AI 必须走真实 LLM adapter，不能回退 mock 或未闭环 stub
-  expectRejected(
-    { ...PROD_OK, AI_PROVIDER: undefined },
-    'PRODUCTION_AI_PROVIDER_NOT_LLM',
-    '生产环境拒绝未设置 AI_PROVIDER',
-  )
-  expectRejected(
-    { ...PROD_OK, AI_PROVIDER: 'mock' },
-    'PRODUCTION_AI_PROVIDER_NOT_LLM',
-    '生产环境拒绝 AI_PROVIDER=mock',
-  )
-  expectRejected(
-    { ...PROD_OK, AI_PROVIDER: 'openai' },
-    'PRODUCTION_AI_PROVIDER_NOT_LLM',
-    '生产环境拒绝未闭环 AI provider stub',
-  )
-  expectRejected(
-    { ...PROD_OK, AI_LLM_API_KEY: '   ', TRTC_LLM_API_KEY: undefined },
-    'PRODUCTION_LLM_CONFIG_MISSING',
-    '生产环境拒绝缺失真实 LLM 密钥',
-  )
-  expectAllowed(
+  // 生产环境：合规配置下 AI 全部开通（与原启动闸门等价，今天能起来的配置行为零变化）
+  {
+    const report = assertProductionRuntimeGates(PROD_OK, FONT_OK)
+    const ai = report.aiPlatform
+    if (!(ai.enforced && ai.llmConfigured && ai.ocrConfigured && ai.aigcConfigured && ai.generationAvailable && ai.issues.length === 0)) {
+      throw new Error(`生产合规配置本应 AI 全部开通，实际 ${JSON.stringify(ai)}`)
+    }
+    console.log('  PASS 生产合规配置：AI 全部开通、无降级')
+  }
+
+  // 生产环境：OCR 缺失 / 不合法 → 放行，只降级图片识别（F-11，不再拖垮打印与支付）
+  expectAiDegraded({ ...PROD_OK, OCR_PROVIDER: undefined }, ['OCR_PROVIDER_NOT_BAIDU'], '生产未设置 OCR_PROVIDER：放行，OCR 降级')
+  expectAiDegraded({ ...PROD_OK, OCR_PROVIDER: 'disabled' }, ['OCR_PROVIDER_NOT_BAIDU'], '生产 OCR_PROVIDER=disabled：放行，OCR 降级')
+  expectAiDegraded({ ...PROD_OK, OCR_PROVIDER: 'not-a-provider' }, ['OCR_PROVIDER_NOT_BAIDU'], '生产 OCR_PROVIDER 填错：放行，OCR 降级')
+  expectAiDegraded({ ...PROD_OK, BAIDU_OCR_API_KEY: '   ' }, ['BAIDU_OCR_CONFIG_MISSING'], '生产百度 OCR 缺 API Key：放行，OCR 降级')
+  expectAiDegraded({ ...PROD_OK, BAIDU_OCR_SECRET_KEY: undefined }, ['BAIDU_OCR_CONFIG_MISSING'], '生产百度 OCR 缺密钥：放行，OCR 降级')
+  // 生产环境：AI 不是真实 LLM 或缺密钥 → 放行，AI 生成降级（绝不回退 mock，见 verify:ai-platform-degradation）
+  expectAiDegraded({ ...PROD_OK, AI_PROVIDER: undefined }, ['AI_PROVIDER_NOT_LLM'], '生产未设置 AI_PROVIDER：放行，AI 降级')
+  expectAiDegraded({ ...PROD_OK, AI_PROVIDER: 'mock' }, ['AI_PROVIDER_NOT_LLM'], '生产 AI_PROVIDER=mock：放行，AI 降级（不是 mock 出结果）')
+  expectAiDegraded({ ...PROD_OK, AI_PROVIDER: 'openai' }, ['AI_PROVIDER_NOT_LLM'], '生产未闭环 AI provider stub：放行，AI 降级')
+  expectAiDegraded({ ...PROD_OK, AI_LLM_API_KEY: '   ', TRTC_LLM_API_KEY: undefined }, ['AI_LLM_API_KEY_MISSING'], '生产缺真实 LLM 密钥：放行，AI 降级')
+  expectAiDegraded(
     { ...PROD_OK, AI_LLM_API_KEY: undefined, TRTC_LLM_API_KEY: 'trtc-llm-api-key' },
-    '生产环境允许 TRTC_LLM_API_KEY 作为 LLM 密钥兼容项',
+    [],
+    '生产环境允许 TRTC_LLM_API_KEY 作为 LLM 密钥兼容项（不降级）',
   )
+  // AI 全缺也只是降级：一台「一个 AI 密钥都没配」的生产机器照样能起来打印收款
+  expectAiDegraded(
+    { ...PROD_OK, OCR_PROVIDER: undefined, AI_PROVIDER: undefined, AI_LLM_API_KEY: undefined, AIGC_CONTENT_PRODUCER: undefined },
+    ['OCR_PROVIDER_NOT_BAIDU', 'AI_PROVIDER_NOT_LLM', 'AI_LLM_API_KEY_MISSING', 'AIGC_CONTENT_PRODUCER_MISSING'],
+    '生产 AI 类配置全缺：放行，四项降级码齐全',
+  )
+
+  // 反向：AI 缺失的同时缺非 AI 密钥，照样拒启动 —— 证明放宽只覆盖 AI 类（授权边界）
+  const AI_ALL_MISSING: Env = { ...PROD_OK, OCR_PROVIDER: undefined, AI_PROVIDER: undefined, AI_LLM_API_KEY: undefined, AIGC_CONTENT_PRODUCER: undefined }
+  expectRejected({ ...AI_ALL_MISSING, JWT_SECRET: undefined }, 'PRODUCTION_JWT_SECRET_INVALID', 'AI 缺失时缺 JWT_SECRET 仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, FILE_SIGNING_SECRET: undefined }, 'PRODUCTION_FILE_SIGNING_SECRET_INVALID', 'AI 缺失时缺文件签名密钥仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, SECRET_ENCRYPTION_KEY: undefined }, 'PRODUCTION_SECRET_ENCRYPTION_KEY_INVALID', 'AI 缺失时缺加密密钥仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, FILE_STORAGE_DRIVER: 'local' }, 'PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS', 'AI 缺失时存储非 cos 仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, DATABASE_URL: undefined }, 'PRODUCTION_DATABASE_URL_MISSING', 'AI 缺失时缺数据库仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, REDIS_URL: undefined }, 'PRODUCTION_REDIS_URL_MISSING', 'AI 缺失时缺 Redis 仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, SMS_PROVIDER: 'log' }, 'PRODUCTION_SMS_PROVIDER_NOT_TENCENT', 'AI 缺失时短信非腾讯仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, PAYMENT_SESSION_SECRET: undefined }, 'PRODUCTION_PAYMENT_SESSION_SECRET_INVALID', 'AI 缺失时缺支付会话密钥仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, PAYMENT_PROVIDER: 'sandbox' }, 'PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN', 'AI 缺失时沙箱支付仍拒启动')
+  expectRejected({ ...AI_ALL_MISSING, TERMINAL_ADMIN_SECRET: undefined }, 'PRODUCTION_TERMINAL_ADMIN_SECRET_INVALID', 'AI 缺失时缺终端管理密钥仍拒启动')
 
   // 生产环境：短期支付会话签名密钥必须独立配置，不能回退 JWT / 文件签名密钥
   expectRejected(
@@ -375,21 +389,14 @@ function main(): void {
     '生产环境允许显式声明 strict（未配置能力行 fail-closed）',
   )
 
-  // GB 45438 隐式标识的内容制作方：生产不得空着，也不得回落到产品名
-  expectRejected(
-    { ...PROD_OK, AIGC_CONTENT_PRODUCER: undefined },
-    'PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING',
-    '生产环境拒绝未设置 AIGC_CONTENT_PRODUCER',
-  )
-  expectRejected(
-    { ...PROD_OK, AIGC_CONTENT_PRODUCER: '   ' },
-    'PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING',
-    '生产环境拒绝只有空白的 AIGC_CONTENT_PRODUCER',
-  )
-  expectRejected(
+  // GB 45438 隐式标识的内容制作方：生产空着 / 只有空白 / 填产品名 → 放行但 AI 降级（F-11），
+  // 写标识处（aigc-label.ts）在生产 fail-closed，出不了「生产方写成产品名」的 AI 文件。
+  expectAiDegraded({ ...PROD_OK, AIGC_CONTENT_PRODUCER: undefined }, ['AIGC_CONTENT_PRODUCER_MISSING'], '生产未设置 AIGC_CONTENT_PRODUCER：放行，AI 降级')
+  expectAiDegraded({ ...PROD_OK, AIGC_CONTENT_PRODUCER: '   ' }, ['AIGC_CONTENT_PRODUCER_MISSING'], '生产 AIGC_CONTENT_PRODUCER 只有空白：放行，AI 降级')
+  expectAiDegraded(
     { ...PROD_OK, AIGC_CONTENT_PRODUCER: ` ${AIGC_DEFAULT_PRODUCER} ` },
-    'PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING',
-    '生产环境拒绝把产品名当 AIGC_CONTENT_PRODUCER',
+    ['AIGC_CONTENT_PRODUCER_MISSING'],
+    '生产把产品名当 AIGC_CONTENT_PRODUCER：放行，AI 降级',
   )
   expectAllowed(
     { ...PROD_OK, AIGC_CONTENT_PRODUCER: '91370200MA3EXAMPLE' },

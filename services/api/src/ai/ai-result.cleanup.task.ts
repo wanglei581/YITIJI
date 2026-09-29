@@ -3,11 +3,13 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { AiService } from './ai.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { cleanupExpiredAiUsageRecords as cleanupExpiredUsageLedger } from './usage/ai-usage-retention'
 
-const AI_SERVICE_LOG_RETENTION_DAYS = (() => {
-  const raw = Number(process.env['AI_SERVICE_LOG_RETENTION_DAYS'])
+/** 与 AiServiceLog、AiUsageRecord 共用。非法或未设置时 90 天。每次调用现读，不在加载时冻住。 */
+export function readAiServiceLogRetentionDays(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env['AI_SERVICE_LOG_RETENTION_DAYS'])
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 90
-})()
+}
 
 /**
  * 每小时清理一次已过期的简历派生结果（AiResumeResult）和岗位 AI 会话。
@@ -34,7 +36,9 @@ export class AiResultCleanupTask {
   async handleHourly(): Promise<void> {
     await this.cleanupExpiredResumeResults()
     await this.cleanupExpiredJobAiSessions()
-    await this.cleanupExpiredAiServiceLogs()
+    const retentionDays = readAiServiceLogRetentionDays()
+    await this.cleanupExpiredAiServiceLogs(retentionDays)
+    await this.cleanupExpiredAiUsageRecords(retentionDays)
   }
 
   private async cleanupExpiredResumeResults(): Promise<void> {
@@ -69,9 +73,9 @@ export class AiResultCleanupTask {
     }
   }
 
-  private async cleanupExpiredAiServiceLogs(): Promise<void> {
+  private async cleanupExpiredAiServiceLogs(retentionDays: number): Promise<void> {
     try {
-      const cutoff = new Date(Date.now() - AI_SERVICE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000)
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
       const result = await this.prisma.aiServiceLog.deleteMany({
         where: { createdAt: { lt: cutoff } },
       })
@@ -85,13 +89,41 @@ export class AiResultCleanupTask {
           payload: {
             triggeredBy: 'cron',
             deletedCount: result.count,
-            retentionDays: AI_SERVICE_LOG_RETENTION_DAYS,
+            retentionDays,
           },
         })
         this.logger.log(`Hourly cron: cleaned up ${result.count} expired AI service logs`)
       }
     } catch (err) {
       this.logger.error(`Hourly AI service log cleanup failed: ${(err as Error).message}`)
+    }
+  }
+
+  private async cleanupExpiredAiUsageRecords(retentionDays: number): Promise<void> {
+    try {
+      const { deletedCount, summarizedCount } = await cleanupExpiredUsageLedger(this.prisma, {
+        retentionDays,
+      })
+      if (deletedCount > 0 || summarizedCount > 0) {
+        await this.audit.write({
+          actorId: null,
+          actorRole: 'system',
+          action: 'ai_usage_record.cleanup_expired',
+          targetType: 'ai_usage_record',
+          targetId: null,
+          payload: {
+            triggeredBy: 'cron',
+            deletedCount,
+            summarizedCount,
+            retentionDays,
+          },
+        })
+        this.logger.log(
+          `Hourly cron: cleaned up ${deletedCount} expired AI usage records (summarized ${summarizedCount})`,
+        )
+      }
+    } catch (err) {
+      this.logger.error(`Hourly AI usage record cleanup failed: ${(err as Error).message}`)
     }
   }
 }

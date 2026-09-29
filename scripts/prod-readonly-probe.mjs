@@ -6,14 +6,20 @@
 // 按域名直连会打到黑洞。因此 TCP 连 --host（IP），并用 servername + Host 指定域名，
 // 等价 curl --resolve <域名>:443:<IP>。不读环境变量、不读密钥、不登录服务器、不写数据。
 //
-// 公开列表路径来自 services/api/src：
-//   JobsController @Get('jobs') / @Get('job-fairs')
-//   PoliciesController @Get('policies')
-// 信封为 { data, pagination.total }（缺 total 时退回 items.length / data.length）。
-// 企业 GET /companies：除条数外，还看有没有开发期演示数据留在生产。
+// 公开列表路径来自 services/api/src（pageSize=50 均在后端上限内）：
+//   JobsController @Get('jobs') / @Get('job-fairs')，safeInt 上限 100，信封 { data, pagination.total }
+//   PoliciesController @Get('policies')，上限 200，信封同上
+//   OfflineAgenciesController @Get() → /kiosk/offline-agencies，normalizePage 上限 100，
+//     findAll 返回 { data, total, page, pageSize }（托管关闭时 data=[] 且 total=0）。
+//     若得到的是裸数组而不是分页对象，listRows / listTotal 按数组本身计。
+// 信封缺 total 时退回 items.length / data.length / 裸数组长度。
+// 企业 GET /companies：除条数外，还看有没有开发期演示数据留在生产。宽正则不许收窄。
 //   2026-09-10 实测生产只有 3 家，名字都带「（演示）」、sourceName 是「市人社公共就业平台（演示）」，
 //   而一体机 CompaniesPage 与小程序 pages/companies 都把 name 原样渲染给用户看。
 //   prisma/seed-guard.ts 的 assertDemoSeedAllowed 只拦「新写入」，拦不住已经躺在库里的行。
+// 岗位、招聘会、政策、线下机构另做第一页检查：只在用户看得见的名称、标题、来源名、
+//   机构名白名单里找全角「（演示）」字面量。命中 WARN 并列出前 3 个名字；
+//   total=0 为 INFO；未命中 PASS，注明「无演示标记」。
 // 法务 GET /kiosk/legal/:type；未知类型 400（#835）。
 // POST /terminals/session-token 空体 400（#833，存在而非 404）。
 // GET /admin/alerts 无鉴权 401（#841）。
@@ -29,10 +35,11 @@ const DEFAULT_HOST = '120.48.13.190'
 const DEFAULT_DOMAINS = 'zyidai.cn,admin.zyidai.cn,partner.zyidai.cn'
 const PATH_HEALTH = '/api/v1/health'
 const PATH_READY = '/api/v1/health/ready'
-const PATH_JOBS = '/api/v1/jobs'
-const PATH_FAIRS = '/api/v1/job-fairs'
-const PATH_POLICIES = '/api/v1/policies'
+const PATH_JOBS = '/api/v1/jobs?pageSize=50'
+const PATH_FAIRS = '/api/v1/job-fairs?pageSize=50'
+const PATH_POLICIES = '/api/v1/policies?pageSize=50'
 const PATH_COMPANIES = '/api/v1/companies?pageSize=50'
+const PATH_OFFLINE_AGENCIES = '/api/v1/kiosk/offline-agencies?pageSize=50'
 const PATH_PRIVACY = '/api/v1/kiosk/legal/privacy_policy'
 const PATH_TERMS = '/api/v1/kiosk/legal/terms_of_service'
 const PATH_UNKNOWN_LEGAL = '/api/v1/kiosk/legal/unknown_type'
@@ -220,6 +227,7 @@ function listTotal(json) {
       if (Array.isArray(layer.data)) return layer.data.length
     }
   }
+  // 裸数组不是分页对象（线下机构若直接回 [] / [{...}]）：条数就是数组长度。
   if (Array.isArray(json)) return json.length
   return null
 }
@@ -238,17 +246,103 @@ function extractIndexHash(html) {
   return match ? match[1] : null
 }
 
-/** 用户看得见的演示标记。刻意只匹配这几个词：判据要能被人一眼复核。 */
+/** 企业列表用的宽匹配。刻意只匹配这几个词：判据要能被人一眼复核。不许收窄。 */
 const DEMO_MARKER = /演示|示例|测试数据|demo|sample/i
 
-/** 从常见信封里取出列表行（与 listTotal 同源，缺失时回空数组而不是抛）。 */
+/**
+ * 岗位 / 招聘会 / 政策 / 线下机构只认这个全角字面量。
+ * 不复用 DEMO_MARKER：那条宽正则会把「示例」「sample」也算进去，这四项不这么判。
+ */
+const PAREN_DEMO_MARKER = '（演示）'
+
+/**
+ * 用户看得见的文字字段白名单（按各接口实际返回，不扫 id / 整段 JSON）。
+ * 岗位 JobListItemDto：title、company、sourceName 在列表和详情原样展示。
+ * 招聘会 FairListItemDto：name（库里的 title）、organizer、sourceName、venue。
+ * 政策 PolicyPostDto：title、summary、sourceName 在列表上。
+ * 线下机构公开列表：name、address、district、description、openHours、services。
+ */
+const PAREN_DEMO_LISTS = [
+  {
+    label: '岗位',
+    path: PATH_JOBS,
+    fields: ['title', 'company', 'sourceName'],
+    nameField: 'title',
+  },
+  {
+    label: '招聘会',
+    path: PATH_FAIRS,
+    fields: ['name', 'organizer', 'sourceName', 'venue'],
+    nameField: 'name',
+  },
+  {
+    label: '政策',
+    path: PATH_POLICIES,
+    fields: ['title', 'summary', 'sourceName'],
+    nameField: 'title',
+  },
+  {
+    label: '线下机构',
+    path: PATH_OFFLINE_AGENCIES,
+    fields: ['name', 'address', 'district', 'description', 'openHours', 'services'],
+    nameField: 'name',
+  },
+]
+
+/** 从常见信封里取出列表行。裸数组也算；缺失时回空数组而不是抛。 */
 function listRows(parsed) {
+  if (Array.isArray(parsed)) return parsed
   for (const layer of [parsed, parsed?.data]) {
     if (Array.isArray(layer)) return layer
     if (Array.isArray(layer?.items)) return layer.items
     if (Array.isArray(layer?.data)) return layer.data
   }
   return []
+}
+
+function fieldText(value) {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.filter((item) => typeof item === 'string').join('\n')
+  return ''
+}
+
+function rowHaystack(entry, fields) {
+  if (!entry || typeof entry !== 'object') return ''
+  return fields.map((field) => fieldText(entry[field])).join('\n')
+}
+
+function hitLabel(entry, spec) {
+  const primary = fieldText(entry?.[spec.nameField]).trim()
+  if (primary.includes(PAREN_DEMO_MARKER)) return primary
+  for (const field of spec.fields) {
+    const line = fieldText(entry?.[field])
+      .split('\n')
+      .map((part) => part.trim())
+      .find((part) => part.includes(PAREN_DEMO_MARKER))
+    if (line) return line
+  }
+  return primary || '?'
+}
+
+function judgeParenDemoList(spec, res) {
+  const item = `GET ${spec.path}（${spec.label}）`
+  if (res.error) return row(item, 'FAIL', res.error)
+  if (res.status !== 200) return row(item, 'FAIL', `HTTP ${res.status} ${snippet(res.body)}`)
+  const parsed = parseJson(res.body)
+  const total = listTotal(parsed)
+  if (total == null) return row(item, 'FAIL', `无法读取 total / items.length；${snippet(res.body)}`)
+  if (total === 0) return row(item, 'INFO', 'total=0（内容录入是负责人的事）')
+  const hits = listRows(parsed).filter((entry) => rowHaystack(entry, spec.fields).includes(PAREN_DEMO_MARKER))
+  if (hits.length > 0) {
+    const names = hits.slice(0, 3).map((entry) => hitLabel(entry, spec)).join('、')
+    return row(
+      item,
+      'WARN',
+      `total=${total}，其中 ${hits.length} 条带「（演示）」（${names}${hits.length > 3 ? '…' : ''}）`
+        + '；这些名字会原样显示给终端用户，上线前需替换或下架',
+    )
+  }
+  return row(item, 'PASS', `total=${total}，无演示标记`)
 }
 
 function row(item, result, detail, extra = {}) {
@@ -320,24 +414,8 @@ async function runChecks(cli) {
     )
   }
 
-  const lists = [
-    { label: '岗位', path: PATH_JOBS },
-    { label: '招聘会', path: PATH_FAIRS },
-    { label: '政策', path: PATH_POLICIES },
-  ]
-  for (const spec of lists) {
-    tasks.push(
-      (async () => {
-        const item = `GET ${spec.path}（${spec.label}）`
-        const res = await get(spec.path)
-        if (res.error) return row(item, 'FAIL', res.error)
-        if (res.status !== 200) return row(item, 'FAIL', `HTTP ${res.status} ${snippet(res.body)}`)
-        const total = listTotal(parseJson(res.body))
-        if (total == null) return row(item, 'FAIL', `无法读取 total / items.length；${snippet(res.body)}`)
-        if (total === 0) return row(item, 'INFO', 'total=0（内容录入是负责人的事）')
-        return row(item, 'PASS', `total=${total}`)
-      })(),
-    )
+  for (const spec of PAREN_DEMO_LISTS) {
+    tasks.push((async () => judgeParenDemoList(spec, await get(spec.path)))())
   }
 
   tasks.push(

@@ -61,6 +61,95 @@ test('login phone states do not invent 已登录', async () => {
   assert.equal(allCopy.includes('已登录'), false)
 })
 
+test('login: this machine cannot send SMS today → its own state that leads to QR login', async () => {
+  const m = await loadModule('src/pages/auth/loginGateModel.ts')
+  const base = { sendingCode: false, submitting: false, countdown: 0, notice: null, error: '请明天再试' }
+  for (const errorCode of ['SMS_TERMINAL_DAILY_LIMIT', 'SMS_DAILY_TOTAL_LIMIT', 'SMS_BUDGET_UNAVAILABLE', 'TERMINAL_SESSION_INVALID']) {
+    assert.equal(m.derivePhoneGateState({ ...base, errorCode }), 'phone-sms-unavailable', errorCode)
+  }
+  // 限的是这个号码：换号 / 等冷却能过，仍是 send-limited（主按钮「再试一次发码」）。
+  assert.equal(m.derivePhoneGateState({ ...base, errorCode: 'SMS_DAILY_LIMIT' }), 'phone-send-limited')
+  assert.ok(m.LOGIN_PHONE_STATES.includes('phone-sms-unavailable'))
+  assert.match(m.LOGIN_GATE_COPY['phone-sms-unavailable'].sub, /扫码登录/)
+})
+
+test('W-15 canceling a QR fetch releases the lock so the next attempt can start', async () => {
+  const m = await loadModule('src/pages/auth/loginGateModel.ts')
+  const started = m.beginQrFetch({ refreshing: false, generation: 0 }, true)
+  assert.ok(started)
+  assert.equal(started.guard.refreshing, true)
+  // 只加代数、不放开锁：下一次取码直接放弃，页面停在「正在获取二维码」。
+  assert.equal(m.beginQrFetch({ refreshing: true, generation: started.guard.generation + 1 }, true), null)
+  const cancelled = m.cancelQrFetch(started.guard)
+  assert.equal(cancelled.refreshing, false)
+  assert.equal(cancelled.generation, started.guard.generation + 1)
+  const again = m.beginQrFetch(cancelled, true)
+  assert.ok(again)
+  assert.equal(again.guard.refreshing, true)
+  // 被取消的那次结束时，不能清掉后一次的锁。
+  assert.equal(m.finishQrFetch(again.guard, started.generation).refreshing, true)
+  assert.equal(m.finishQrFetch(again.guard, again.generation).refreshing, false)
+  assert.equal(m.beginQrFetch({ refreshing: false, generation: 0 }, false), null)
+
+  const panel = readFileSync(join(kioskRoot, 'src/pages/auth/ScanQrLoginPanel.tsx'), 'utf8')
+  const cleanupAt = panel.indexOf('useEffect(() => () => {')
+  const refreshAt = panel.indexOf('const refresh = useCallback')
+  const cleanup = panel.slice(cleanupAt, refreshAt)
+  assert.match(cleanup, /cancelQrFetch\(/)
+  assert.match(cleanup, /refreshingRef\.current = cancelled\.refreshing/)
+  assert.doesNotMatch(cleanup, /requestGeneration\.current \+= 1/)
+})
+
+test('W-19 machine quota, site quota, and this number do not share one sentence', async () => {
+  const m = await loadModule('src/pages/auth/loginGateModel.ts')
+  const terminal = m.smsUnavailableCopy('SMS_TERMINAL_DAILY_LIMIT')
+  const total = m.smsUnavailableCopy('SMS_DAILY_TOTAL_LIMIT')
+  const budget = m.smsUnavailableCopy('SMS_BUDGET_UNAVAILABLE')
+  const session = m.smsUnavailableCopy('TERMINAL_SESSION_INVALID')
+  assert.match(terminal.title, /这台机器今天的短信已经发完/)
+  assert.match(terminal.sub, /扫码登录/)
+  assert.match(total.title, /今天的短信验证码已经发完/)
+  assert.doesNotMatch(`${total.title}${total.sub}`, /这台机器/)
+  assert.match(total.sub, /不登录/)
+  assert.match(`${budget.title}${budget.sub}`, /扫码登录/)
+  assert.match(`${session.title}${session.sub}`, /扫码登录/)
+  assert.equal(m.phoneSendSideLabel({ state: 'phone-sms-unavailable', errorCode: 'SMS_TERMINAL_DAILY_LIMIT', countdown: 42, loading: false }), '暂时不能发')
+  assert.equal(m.phoneSendSideLabel({ state: 'phone-sms-unavailable', errorCode: 'SMS_DAILY_TOTAL_LIMIT', countdown: 0, loading: false }), '暂时不能发')
+  assert.equal(m.phoneSendSideLabel({ state: 'phone-send-limited', errorCode: 'SMS_DAILY_LIMIT', countdown: 30, loading: false }), '今天不能再发')
+  assert.equal(m.phoneSendSideLabel({ state: 'phone-idle', errorCode: null, countdown: 0, loading: false }), '获取验证码')
+  assert.equal(m.sendLimitedPrimaryLabel(15), '15 秒后再获取')
+  assert.equal(m.sendLimitedPrimaryLabel(0), '重新获取验证码')
+  assert.equal(m.isPhoneDailySmsCode('SMS_PROVIDER_PHONE_DAILY_LIMIT'), true)
+  assert.equal(m.isPhoneDailySmsCode('SMS_TERMINAL_DAILY_LIMIT'), false)
+  assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '请明天再试', errorCode: 'SMS_DAILY_LIMIT' }), 'phone-send-limited')
+})
+
+test('W-54 full number stays on the phone keypad until a code exists', async () => {
+  const m = await loadModule('src/pages/auth/loginGateModel.ts')
+  assert.equal(m.shouldKeepPhoneKeypadOnNumber({ codeOpen: false, phoneComplete: true, activeInput: 'code' }), true)
+  assert.equal(m.shouldKeepPhoneKeypadOnNumber({ codeOpen: true, phoneComplete: true, activeInput: 'code' }), false)
+  assert.equal(m.shouldKeepPhoneKeypadOnNumber({ codeOpen: false, phoneComplete: false, activeInput: 'code' }), false)
+
+  const login = readFileSync(join(kioskRoot, 'src/pages/auth/LoginPage.tsx'), 'utf8')
+  const fields = readFileSync(join(kioskRoot, 'src/pages/auth/components/LoginGatePhoneFields.tsx'), 'utf8')
+  const agreement = readFileSync(join(kioskRoot, 'src/pages/auth/components/MemberAgreement.tsx'), 'utf8')
+  const css = readFileSync(join(kioskRoot, 'src/pages/auth/styles/login-gate-qx.css'), 'utf8')
+  const profile = readFileSync(join(kioskRoot, 'src/pages/profile/ProfilePage.tsx'), 'utf8')
+  const settings = readFileSync(join(kioskRoot, 'src/pages/profile/me/MySettingsPage.tsx'), 'utf8')
+  const hookAt = login.indexOf('const phoneLogin = useMemberPhoneLogin(')
+  const keepAt = login.indexOf('shouldKeepPhoneKeypadOnNumber({')
+  assert.ok(hookAt >= 0 && keepAt > hookAt)
+  assert.match(fields, /codeFieldRef\.current\?\.focus\(\)/)
+  assert.match(fields, /className="lg-field lg-field-phone"/)
+  assert.match(agreement, /agreed \? <CheckIcon/)
+  assert.match(css, /\.lg-fields\s*\{[^}]*z-index:\s*50/)
+  assert.match(css, /\.k-agree:not\(\.checked\) \.box svg\s*\{[^}]*opacity:\s*0/)
+  assert.match(profile, /clearSessionTo\(\{ path: '\/' \}\)/)
+  assert.doesNotMatch(profile, /clearSessionTo\(\{ path: '\/profile' \}\)/)
+  assert.match(settings, /clearSessionTo\(\{ path: '\/' \}\)/)
+  assert.match(settings, /clearSessionTo\(\{ path: '\/login', state: \{ from: '\/profile' \} \}\)/)
+})
+
 test('login returnTo rejects unsafe query and does not echo it', async () => {
   const m = await loadModule('src/pages/auth/loginGateModel.ts')
   const isSafe = (p) => p.startsWith('/') && !p.startsWith('//') && !p.includes('\\') && p !== '/login'

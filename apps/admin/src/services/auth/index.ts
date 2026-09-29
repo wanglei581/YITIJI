@@ -12,6 +12,7 @@
  */
 
 import { API_BASE_URL, API_MODE } from '../api/client'
+import { type AdminSecondFactorChallenge, isAdminSecondFactorChallenge, isResendResponse } from './secondFactor'
 
 // ─── Dev-only mock bypass ────────────────────────────────────────────────────
 // 仅在 VITE_API_MODE !== 'http'（即 mock 模式）时生效，用于本地预览无后端场景。
@@ -295,6 +296,7 @@ function isValidAdminPhoneTransferCancelResponse(data: unknown): data is AdminIn
 export type LoginResult =
   | { ok: true; user: AuthedUser }
   | { ok: true; passwordChangeRequired: true; changeTicket: string; expiresInSeconds: number }
+  | ({ ok: true } & AdminSecondFactorChallenge)
   | { ok: false; code: string; message: string }
 
 /** 调 POST /auth/login,成功后落盘 token + user */
@@ -319,11 +321,37 @@ export async function login(loginId: string, password: string): Promise<LoginRes
   if (isFirstAdminPasswordChangeRequired(r.data)) {
     return { ok: true, ...r.data }
   }
+  // 服务端打开短信第二步（ADMIN_LOGIN_SECOND_FACTOR=sms）时，密码通过只拿到第二步凭证，不落盘任何登录态。
+  if (isAdminSecondFactorChallenge(r.data)) {
+    clearAuth()
+    return { ok: true, ...r.data }
+  }
   if (!isFullLoginResponse(r.data)) {
     clearAuth()
     return { ok: false, code: 'AUTH_RESPONSE_INVALID', message: '登录响应无效' }
   }
   return ensureAdminSession(r.data)
+}
+
+/** 第二步：验证码 + 第二步凭证换登录凭证。验证码错时凭证仍有效，可直接重输。 */
+export async function completeAdminSecondFactor(challengeTicket: string, code: string): Promise<LoginResult> {
+  const r = await postJson<unknown>('/auth/login/second-factor', { challengeTicket, code })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  if (!isFullLoginResponse(r.data)) {
+    clearAuth()
+    return { ok: false, code: 'AUTH_RESPONSE_INVALID', message: '登录响应无效' }
+  }
+  return ensureAdminSession(r.data)
+}
+
+/** 第二步：重新发送验证码。codeSent=false 表示号码 60 秒内刚收过验证码，这次没有新发。 */
+export async function resendAdminSecondFactor(
+  challengeTicket: string,
+): Promise<{ ok: true; codeSent: boolean; cooldownSeconds: number } | { ok: false; code: string; message: string }> {
+  const r = await postJson<unknown>('/auth/login/second-factor/resend', { challengeTicket })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  if (!isResendResponse(r.data)) return { ok: false, code: 'INVALID_RESPONSE', message: '服务响应异常，请稍后重试' }
+  return { ok: true, codeSent: r.data.codeSent, cooldownSeconds: r.data.cooldownSeconds }
 }
 
 export async function sendLoginSmsCode(phone: string): Promise<{ ok: true; cooldownSeconds: number } | { ok: false; code: string; message: string }> {

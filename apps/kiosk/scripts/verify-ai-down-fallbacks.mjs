@@ -58,6 +58,12 @@ const files = {
   jobFitApi: kiosk('src/services/api/jobFit.ts'),
   careerPlanApi: kiosk('src/services/api/careerPlan.ts'),
   selfAssessmentApi: kiosk('src/services/api/selfAssessment.ts'),
+  // ⑦ 能力级停用（AI_PAUSED / AI_BUDGET_* 等）落到手动路径的接线
+  assistantPage: kiosk('src/pages/assistant/AssistantPage.tsx'),
+  selfAssessmentFlow: kiosk('src/pages/resume/SelfAssessmentFlow.tsx'),
+  interviewSession: kiosk('src/pages/interview/InterviewSessionPage.tsx'),
+  contractReviewHome: kiosk('src/pages/contract-review/ContractReviewHomePage.tsx'),
+  contractReviewProcessing: kiosk('src/pages/contract-review/ContractReviewProcessingPage.tsx'),
 }
 
 const failures = []
@@ -433,7 +439,24 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
       // 后端拆码后新增（services/api/src/ai/llm/llm-failure.ts）：
       // 只代表 fetch 层根本没连上，不再混着 429 / 5xx / 空回复。
       'AI_PROVIDER_UNREACHABLE',
+      // 服务端能力级停用（ai-access.service.ts enforce 在调模型之前拦下，503）：
+      // 后台暂停、出站白名单不放行、当日金额上限已到、读不到当日花费。重试不会变好。
+      'AI_PAUSED',
+      'AI_ENDPOINT_NOT_ALLOWED',
+      'AI_BUDGET_EXHAUSTED',
+      'AI_BUDGET_UNAVAILABLE',
     ])
+    // 必须在表里的码：这几个进不了表，页面就会把「AI 停用」当成「这次没成」继续叫人重试。
+    const MUST_BE_OUTAGE = [
+      'AI_PROVIDER_NOT_CONFIGURED', 'AI_PAUSED', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE',
+    ]
+    for (const code of MUST_BE_OUTAGE) {
+      assert(
+        members.includes(code),
+        `aiOutage: '${code}' 是服务端能力级停用码（重试无用），必须在 AI_OUTAGE_CODES 里 —— `
+        + '否则页面会把 AI 停用当成一次失败，继续引导重试而不是落到手动路径',
+      )
+    }
     // 单次失败：后端同一个码还会用于超时 / 限流 / 空回复 / 上游非 2xx。
     // 这些进表就会把可重试的入口置灰。`*_UNAVAILABLE` 系列目前全部属于此类：
     // 后端把「连不上」「任意非 2xx（含 429）」「空内容」抛成同一个码
@@ -513,6 +536,78 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     /setGenerating\(true\)\s*\n\s*setAiOutage\(null\)/,
     '用户主动生成时必须先清除 aiOutage，否则上一次失败会把能力判定粘住',
   )
+}
+
+// ── ⑦ 能力级停用：不叫人重试，落到手动路径 ─────────────────────────────────
+//
+// 服务端 ai-access 在调模型之前就拦下的 503（AI_PAUSED、AI_BUDGET_EXHAUSTED、
+// AI_BUDGET_UNAVAILABLE、AI_ENDPOINT_NOT_ALLOWED、AI_PROVIDER_NOT_CONFIGURED）重试不会变好。
+// ⑦-A 运行时：真把 aiOutage.ts 编译出来，isAiOutage 必须认这几个码、不认限流 / 上游 5xx。
+// ⑦-B 接线：没用共享 AI 任务态的几个入口，各自的失败分支必须先认能力级停用再决定给不给重试。
+{
+  const ts = await import('typescript').catch(() => null)
+  if (!ts) {
+    failures.push('aiOutage: 无法解析 typescript，⑦-A 运行时判据没能执行（不接受跳过）')
+  } else {
+    const stub = Buffer.from('export function userMessageOf(_e, fallback) { return fallback }\n', 'utf8').toString('base64')
+    const transpile = (source) => ts.default.transpileModule(source, {
+      compilerOptions: { module: ts.default.ModuleKind.ESNext, target: ts.default.ScriptTarget.ES2022 },
+    }).outputText
+    const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code, 'utf8').toString('base64')}`
+    // aiOutage 现在会先认「本人拒绝声明」。data URL 模块解析不了相对路径，
+    // 要把声明文案和错误类一起编进来，否则本节运行时判据整段跳过。
+    const copyUrl = toDataUrl(transpile(kiosk('src/ai/aiDeclarationCopy.ts')))
+    const errorsJs = transpile(kiosk('src/ai/aiDeclarationErrors.ts'))
+      .replaceAll("from './aiDeclarationCopy'", `from '${copyUrl}'`)
+    const errorsUrl = toDataUrl(errorsJs)
+    const js = transpile(files.aiOutage)
+      .replace("from '../services/api/userErrorMessage'", `from 'data:text/javascript;base64,${stub}'`)
+      .replace("from './aiDeclarationErrors'", `from '${errorsUrl}'`)
+    const mod = await import(toDataUrl(js)).catch((err) => ({ __loadError: err }))
+    const errorsMod = await import(errorsUrl).catch((err) => ({ __loadError: err }))
+    if (mod.__loadError) {
+      failures.push(`aiOutage: 编译后无法加载（${mod.__loadError.message}）`)
+    } else if (errorsMod.__loadError) {
+      failures.push(`aiOutage: 声明错误模块无法加载（${errorsMod.__loadError.message}）`)
+    } else {
+      for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_PROVIDER_NOT_CONFIGURED']) {
+        assert(mod.isAiOutage({ code, status: 503 }) === true, `aiOutage.isAiOutage 不认 ${code} —— 页面会把 AI 停用当成一次失败继续叫人重试`)
+      }
+      for (const code of ['AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'REQUEST_TIMEOUT', 'NETWORK_ERROR', 'AI_DECLARATION_DECLINED', 'AI_DECLARATION_CLEARED']) {
+        assert(mod.isAiOutage({ code, status: 503 }) === false, `aiOutage.isAiOutage 把单次失败 ${code} 判成了能力级停用`)
+      }
+      const declined = new errorsMod.AiDeclarationDeclinedError('age_14_plus')
+      assert(mod.isAiOutage(declined) === false, '本人拒绝声明不得被当成 AI 停用')
+      const shown = mod.aiErrorMessageOf(declined, '请稍后重试')
+      assert(shown === declined.message && !shown.includes('请稍后重试'), '拒绝声明必须原样告诉用户，不能改写成请稍后重试')
+    }
+  }
+
+  const slice = (content, from, to) => {
+    const a = content.indexOf(from)
+    if (a < 0) return ''
+    const b = content.indexOf(to, a + from.length)
+    return b < 0 ? content.slice(a) : content.slice(a, b)
+  }
+  // 简历诊断：能力级停用必须排在「结果未知」之前（503 否则落进「原样再试」），并转明确失败屏且标 aiDown。
+  const parseOutage = files.parse.indexOf('if (isAiOutage(err))')
+  const parseUnknown = files.parse.indexOf("if (parseErrorOutcome(err) === 'unknown')")
+  assert(parseOutage > 0 && parseUnknown > 0 && parseOutage < parseUnknown,
+    'parse: 能力级停用必须在「结果未知」判定之前处理 —— 否则 503 AI_PAUSED 会让页面叫人原样再试')
+  must('parse', /navigateFail\(aiErrorMessageOf\(err, [^)]*\), undefined, true\)/, '能力级停用转失败屏时必须标 aiDown')
+  const reportAiDownCta = slice(files.report, 'const failCta = state.aiDown ? (', ') : (')
+  assert(reportAiDownCta.length > 0, 'report: 失败屏必须有 aiDown 分支')
+  assert(!/handleRetry|重新解析/.test(reportAiDownCta), 'report: AI 停用的失败屏不得再给「重新解析」')
+  // AI 顾问：能力级停用锁住输入、转不经过 AI 的入口，不走「重试这一轮」。
+  const assistantOutage = slice(files.assistantPage, 'if (isAiOutage(error)) {', 'setTurnFailed(true)')
+  assert(/setAiAvailability\('unavailable'\)/.test(assistantOutage) && /return\s*\n\s*\}/.test(assistantOutage),
+    'assistantPage: 能力级停用必须置 unavailable 并在「本轮失败（可重试）」之前返回')
+  // 自我探索：停用时不给「重试这一次」。
+  must('selfAssessmentFlow', /taskAiDown\s*\n?\s*\? \{ retryHint: '[^']+' \}/, 'AI 停用时自我探索结果屏不得给「重试这一次」')
+  must('interviewSession', /setError\(aiDeclarationDeclineMessage\(err\) \?\? \(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : userMessageOf\(err, '提交失败，请重试'\)\)\)/, 'AI 停用时模拟面试作答失败不得叫人重试')
+  must('interviewSession', /setError\(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : `\$\{msg\}，可重新录音或改用文字输入`\)/, 'AI 停用时语音转写失败不得叫人重新录音')
+  must('contractReviewHome', /setError\(isAiOutage\(err\)/, 'AI 停用时合同风险提示不得说成文件格式问题叫人重试')
+  must('contractReviewProcessing', /setError\(declined \?\? \(isAiOutage\(err\)\s*\?\s*'[^']*暂时审不了[^']*'\s*:\s*'确认失败，请重试'\)\)/, 'AI 停用时合同确认失败不得叫人重试')
 }
 
 // ── 合规文案 ────────────────────────────────────────────────────────────────

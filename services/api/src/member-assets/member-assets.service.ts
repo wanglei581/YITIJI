@@ -14,7 +14,10 @@ import type {
   MemberResumeItem,
 } from './member-assets.types'
 import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
+import { materialCheckRequired } from '../print-jobs/material-check-policy'
+import { listedDocumentPageCount } from '../files/file-page-count.util'
 import { RESUME_PARSE_INTENT_KIND } from '../ai/resume-parse-submission.service'
+import { RESUME_GENERATE_INPUT_KIND } from '../ai/resume/resume-draft-ai-overlap'
 import { isRecruitmentContentHostingEnabled, RECRUITMENT_HOSTING_DISABLED_CODE } from '../recruitment-hosting/recruitment-hosting'
 import { assertJobFitPrintFileReadable, storedJobFitUsesSystemJob } from '../ai/resume/job-fit-hosting'
 
@@ -46,7 +49,13 @@ import { assertJobFitPrintFileReadable, storedJobFitUsesSystemJob } from '../ai/
 /** 简历资产包含的 AiResumeResult 种类：parse=上传诊断，generate=AI 生成。 */
 const RESUME_KINDS = ['parse', 'generate'] as const
 /** 草稿 / 确认快照不单独成行；解析意图是内部账本，均不进入会员 AI 记录列表。 */
-const HIDDEN_RESUME_RESULT_KINDS = ['optimize_draft', 'optimize_confirmed', RESUME_PARSE_INTENT_KIND] as const
+const HIDDEN_RESUME_RESULT_KINDS = ['optimize_draft', 'optimize_confirmed', RESUME_PARSE_INTENT_KIND, RESUME_GENERATE_INPUT_KIND] as const
+
+/** 删一条非 parse 记录要删掉的行：generate 连同生成时留存的原始填写（同一 taskId）一起删。 */
+function singleRecordDeletionWhere(endUserId: string, row: { id: string; taskId: string; kind: string }) {
+  if (row.kind === 'generate') return { endUserId, OR: [{ id: row.id }, { taskId: row.taskId, kind: RESUME_GENERATE_INPUT_KIND }] }
+  return { endUserId, id: row.id }
+}
 
 interface ResumeDraftMeta {
   optimized: boolean
@@ -124,9 +133,11 @@ export class MemberAssetsService {
         filename: true,
         mimeType: true,
         sizeBytes: true,
+        pageCount: true,
         purpose: true,
         sensitiveLevel: true,
         assetCategory: true,
+        derivationKind: true,
         retentionPolicy: true,
         createdBy: true,
         createdAt: true,
@@ -140,6 +151,7 @@ export class MemberAssetsService {
       filename: f.filename,
       mimeType: f.mimeType,
       sizeBytes: f.sizeBytes,
+      pageCount: listedDocumentPageCount(f),
       purpose: f.purpose,
       sensitiveLevel: f.sensitiveLevel,
       assetCategory: f.assetCategory as MemberDocumentItem['assetCategory'],
@@ -154,6 +166,8 @@ export class MemberAssetsService {
       downloadUrlPath: `/files/${f.id}/download-url`,
       previewUrlPath: `/files/${f.id}/preview-url`,
       reprintable: f.purpose !== 'contract_review_report',
+      // 与建单闸门同一个函数（1.8 P-1）：一体机只看它决定打印前走不走材料检查。
+      materialCheckRequired: materialCheckRequired(f),
     }))
     const visibleIds = new Set(visible.rows.map((row) => row.id))
     return { ...list, items: list.items.filter((row) => visibleIds.has(row.id)) }
@@ -373,7 +387,7 @@ export class MemberAssetsService {
       const results = await tx.aiResumeResult.deleteMany({
         where: row.kind === 'parse'
           ? { endUserId, taskId: row.taskId, kind: { not: RESUME_PARSE_INTENT_KIND } }
-          : { endUserId, id: row.id },
+          : singleRecordDeletionWhere(endUserId, row),
       })
       // 并发删除已先一步移除目标时，不得再按 taskId 清理会话。
       if (results.count === 0) return null
@@ -426,7 +440,7 @@ export class MemberAssetsService {
       const results = await tx.aiResumeResult.deleteMany({
         where: row.kind === 'parse'
           ? { endUserId, taskId: row.taskId, kind: { not: RESUME_PARSE_INTENT_KIND } }
-          : { endUserId, id: row.id },
+          : singleRecordDeletionWhere(endUserId, row),
       })
       if (results.count === 0) return null
       if (row.kind === 'parse') {

@@ -399,7 +399,8 @@ export class PackageOrderService {
     await this.expireExpiredRows({ id: order.id })
   }
 
-  private async expireExpiredForUser(endUserId: string): Promise<void> {
+  /** 本人材料包到期落 expired。跨端时间线列表前也调它，口径与本列表一致。 */
+  async expireExpiredForUser(endUserId: string): Promise<void> {
     await this.expireExpiredRows({ endUserId })
   }
 

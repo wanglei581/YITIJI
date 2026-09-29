@@ -20,7 +20,6 @@ import type {
   FileRetentionSetBy,
   FileRetentionUpdateResponse,
   FileSensitiveLevel,
-  FileStatus,
   FileUploadResponse,
   FileLifecycleSummaryResponse,
   SignedUrlResponse,
@@ -45,6 +44,8 @@ import {
   type UploadValidationMode,
 } from './file-validation'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
+import { recognizeStoredPageCount } from './file-page-count.util'
+import { toMetadata } from './file-metadata'
 import {
   RetentionPolicyError,
   allowedPoliciesForFile,
@@ -52,7 +53,7 @@ import {
   defaultRetentionForUpload,
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
-import { parseContentFileId, signFileUrl } from './signing'
+import { parseContentFileId, PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from './signing'
 import { assertFileContentIntegrity, DIRECT_UPLOAD_COMPLETE_ACTION } from './file-content-integrity'
 
 /**
@@ -116,6 +117,7 @@ export class FilesService {
     uploaderId: string | null
     endUserId?: string | null
     assetCategory?: FileAssetCategory
+    derivationKind?: import('../print-jobs/material-check-policy').DerivationKind // 派生件怎么来的（1.8 P-1）：derived / optimized 必传
     sourceFileId?: string | null
     actorRole?: UserRole | null
     actorOrgId?: string | null
@@ -229,6 +231,7 @@ export class FilesService {
     })
 
     const put = await this.storage.putObject(objectKey, args.buffer, args.mimeType)
+    const pageCount = await recognizeStoredPageCount(args.buffer, args.mimeType)
 
     const bucket = this.storage.defaultBucket
     const region = this.storage.defaultRegion
@@ -244,6 +247,7 @@ export class FilesService {
           mimeType: args.mimeType,
           sizeBytes: put.sizeBytes,
           sha256: put.sha256,
+          pageCount,
           uploaderId: args.uploaderId,
           endUserId: staging ? null : (args.endUserId ?? null),
           ownerType: owner.ownerType,
@@ -254,6 +258,7 @@ export class FilesService {
           status: staging ? 'uploading' : 'active',
           createdBy: args.createdBy ?? args.uploaderId ?? null,
           assetCategory: args.assetCategory ?? 'original',
+          derivationKind: args.derivationKind ?? null,
           sourceFileId: args.sourceFileId ?? null,
           expiresAt: staging ? staging.expiresAt : (expiresAtOverride ?? retention.expiresAt),
           retentionPolicy: retention.retentionPolicy,
@@ -518,6 +523,7 @@ export class FilesService {
     // 嗅探同时受 DIRECT_UPLOAD_SNIFF_MAX_BYTES 实测大小门限约束——video/* 与超限对象
     // 不读回、不伪造 sha256。
     let sha256 = ''
+    let recognizedPageCount: number | null | undefined
     if (!record.mimeType.startsWith('video/') && head.sizeBytes <= DIRECT_UPLOAD_SNIFF_MAX_BYTES) {
       const bytes = await this.storage.getObject(record.storageKey, record.bucket)
       const sniff = sniffDeclaredMimeMismatch(bytes, record.mimeType)
@@ -535,6 +541,7 @@ export class FilesService {
         })
       }
       sha256 = createHash('sha256').update(bytes).digest('hex')
+      recognizedPageCount = await recognizeStoredPageCount(bytes, record.mimeType)
     }
 
     // COS already-issued PUT URLs remain usable until their own expiry. The API
@@ -542,7 +549,12 @@ export class FilesService {
     const cas = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.fileObject.updateMany({
         where: { id: fileId, status: 'uploading' },
-        data: { sizeBytes: head.sizeBytes, sha256, status: 'active' },
+        data: {
+          sizeBytes: head.sizeBytes,
+          sha256,
+          status: 'active',
+          ...(recognizedPageCount !== undefined ? { pageCount: recognizedPageCount } : {}),
+        },
       })
       if (updated.count !== 1) return updated
       await tx.auditLog.create({
@@ -619,9 +631,10 @@ export class FilesService {
       record.mimeType,
       record.bucket
     )
+    const pageCount = await recognizeStoredPageCount(buffer, record.mimeType)
     const cas = await this.prisma.fileObject.updateMany({
       where: { id: fileId, status: 'uploading' },
-      data: { sizeBytes: put.sizeBytes, sha256: put.sha256 },
+      data: { sizeBytes: put.sizeBytes, sha256: put.sha256, pageCount },
     })
     if (cas.count !== 1) this.throwFileAlreadyFinalized()
   }
@@ -689,7 +702,7 @@ export class FilesService {
         url: signed.url,
         // printFileUrl 只是应用内部 HMAC 入口；/content 最终读取仍通过
         // requireActive 二次校验 status/deletedAt/expiresAt，不会因签名期越过文件寿命。
-        printFileUrl: signFileUrl(record.id).url,
+        printFileUrl: signFileUrl(record.id, PRINT_ARTIFACT_URL_TTL_MS).url,
         expiresAt: this.ensureSignedExpiryWithinFileLifetime(
           signed.expiresAt,
           record.expiresAt
@@ -1563,69 +1576,4 @@ export function deriveOwner(args: {
   if (args.role === 'admin') return { ownerType: 'admin', ownerId: args.uploaderId }
   if (args.role === 'partner') return { ownerType: 'partner', ownerId: args.orgId }
   return { ownerType: 'system', ownerId: null }
-}
-
-function toMetadata(r: {
-  id: string
-  bucket: string
-  region: string
-  storageKey: string
-  filename: string
-  mimeType: string
-  sizeBytes: number
-  sha256: string
-  purpose: string
-  sensitiveLevel: string
-  ownerType: string | null
-  ownerId: string | null
-  visibility: string
-  status: string
-  assetCategory: string
-  sourceFileId: string | null
-  retentionPolicy: string | null
-  retentionSetBy: string | null
-  retentionConsentAt: Date | null
-  retentionConsentVersion: string | null
-  retentionLockedReason: string | null
-  uploaderId: string | null
-  endUserId: string | null
-  createdBy: string | null
-  expiresAt: Date | null
-  deletedAt: Date | null
-  deletedBy: string | null
-  deleteReason: string | null
-  createdAt: Date
-}): FileMetadata {
-  const protectedExport = r.purpose === 'member_data_export'
-  return {
-    id: r.id,
-    bucket: protectedExport ? '' : r.bucket,
-    region: protectedExport ? '' : r.region,
-    objectKey: protectedExport ? '' : r.storageKey,
-    filename: r.filename,
-    mimeType: r.mimeType,
-    sizeBytes: r.sizeBytes,
-    sha256: protectedExport ? '' : r.sha256,
-    purpose: r.purpose as FilePurpose,
-    sensitiveLevel: r.sensitiveLevel as FileSensitiveLevel,
-    ownerType: r.ownerType as FileOwnerType | null,
-    ownerId: r.ownerId,
-    visibility: r.visibility as FileMetadata['visibility'],
-    status: r.status as FileStatus,
-    assetCategory: r.assetCategory as FileAssetCategory,
-    sourceFileId: r.sourceFileId,
-    retentionPolicy: r.retentionPolicy as FileRetentionPolicy | null,
-    retentionSetBy: r.retentionSetBy as FileMetadata['retentionSetBy'],
-    retentionConsentAt: r.retentionConsentAt?.toISOString() ?? null,
-    retentionConsentVersion: r.retentionConsentVersion,
-    retentionLockedReason: r.retentionLockedReason,
-    uploaderId: r.uploaderId,
-    endUserId: r.endUserId,
-    createdBy: r.createdBy,
-    expiresAt: r.expiresAt?.toISOString() ?? null,
-    deletedAt: r.deletedAt?.toISOString() ?? null,
-    deletedBy: r.deletedBy,
-    deleteReason: r.deleteReason,
-    createdAt: r.createdAt.toISOString(),
-  }
 }

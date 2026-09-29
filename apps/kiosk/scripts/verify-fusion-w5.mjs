@@ -43,7 +43,13 @@ const FROZEN = new Map([
   ['src/pages/profile/profileEntries.ts', 'c3eab9286546efab60ec8e3e5dfe9f1a4724c0e17e27f09e159a541ac4ef83e3'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
-  ['src/pages/profile/me/feedback/types.ts', 'a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f'],
+  // 2026-09-29 走查 W-01：反馈分类补「AI 内容投诉」（ai_content，C3）。纯追加：
+  // CATEGORY_OPTIONS 与 CATEGORY_META 各加一行，原有四类、状态表、解析函数一字未动；
+  // 服务端与小程序早已有这一类，缺这一行时小程序提交的 AI 投诉在一体机列表里取不到类别元数据。
+  // 投诉说明与答复天数放在同目录 aiComplaint.ts，不进冻结文件。
+  // 冻结契约不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
+  // 旧哈希 a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f。
+  ['src/pages/profile/me/feedback/types.ts', '8154883cc92aaba2888e8b614690e964d6f23fb43c172eae729096a5eefd4199'],
   // 哈希随 API-20「顾客侧待退款状态」同步更新（2026-09-06）。
   // 纯追加：原有导出未删；新增 refunding 展示、PENDING_REFUND_* 常量与
   // memberPayStatusLabel（待退款信号优先于「已支付」）。到账时间不以天数承诺。
@@ -51,7 +57,10 @@ const FROZEN = new Map([
   // 2026-09-28 用词：实付提示「无独立字段，不按应付减优惠推算」改为
   // 「没有单独记下实付，不按应付减优惠来推算」。仍然禁止用应付减优惠推算实付。
   // 旧哈希 edf85a5efbedc41feefa33097b5b62688af30d0d93b7f0a79dd74a9cd779e846。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb'],
+  // 2026-09-29 W-51：价目为 0 或免费来源时实付写「0 元（免费试运营）」；页范围没传写「全部页」；
+  // 订单号只认 ORD-。非 0 元仍标未记录，继续禁止用应付减优惠推算。
+  // 旧哈希 af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', '50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
@@ -61,7 +70,12 @@ const FROZEN = new Map([
   // 按钮不可点（此前一次误触即丢弃已上传文件）。冻结契约不放宽，仍逐字节校验；新行为由
   // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
   // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0'],
+  // 2026-09-29 重新冻结：确认使用这份简历后面板卸载，原先只在依赖变化时上报忙碌，
+  // 卸载不补 onBusyChange(false)，来源页一直停在「接收中」，开始诊断和更换文件一直不可点。
+  // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
+  // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
+  // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f'],
 ])
 
 function propertyName(node) {

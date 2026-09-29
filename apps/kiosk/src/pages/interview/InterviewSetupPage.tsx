@@ -38,6 +38,8 @@ import {
   type AiAvailability,
   type AiTaskFallback,
 } from '../../ai'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { createInterview, printInterviewPracticeSheet, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
@@ -61,7 +63,7 @@ import './styles/interview-qx2.css'
 const SETUP_AI_DRAFT = '我想开始一场模拟面试。请先问我的目标岗位，再说明岗位、面试官和时长怎么选。不要替我创建练习。'
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }> = [
-  { key: 'hr', label: 'HR 初筛', desc: '自我介绍 · 求职动机 · 稳定性 · 薪资沟通' },
+  { key: 'hr', label: 'HR 面试', desc: '自我介绍 · 求职动机 · 稳定性 · 薪资沟通' },
   { key: 'manager', label: '业务主管', desc: '过往经历 · 岗位理解 · 协作与执行' },
   { key: 'tech', label: '技术面试官', desc: '专业技能 · 项目细节 · 问题解决' },
   { key: 'campus', label: '校招面试官', desc: '校园经历 · 学习能力 · 职业规划' },
@@ -248,6 +250,11 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         })
       }
     } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setError(declined)
+        return
+      }
       const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
       setError(message)
       setStartFailed(true)
@@ -360,16 +367,19 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             <button type="button" className="qx-btn" data-variant="ghost" onClick={goTips}>
               先看面试技巧
             </button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              data-testid="interview-primary"
-              disabled={creating || uploading}
-              onClick={() => void handleStart()}
-            >
-              {creating ? '正在为你准备面试官…' : <>创建并开始练习<em>→</em></>}
-            </button>
+            <span className="qx-ai-declaration-slot">
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="primary"
+                data-testid="interview-primary"
+                disabled={creating || uploading}
+                onClick={() => void handleStart()}
+              >
+                {creating ? '正在为你准备面试官…' : <>创建并开始练习<em>→</em></>}
+              </button>
+              <AiDeclarationNote />
+            </span>
           </div>
         </div>
       }
