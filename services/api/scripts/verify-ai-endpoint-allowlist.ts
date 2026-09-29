@@ -388,6 +388,24 @@ async function main(): Promise<void> {
   check('D2 PUT /admin/ai-configs/:featureKey 境外地址 → 400 AI_BASE_URL_NOT_ALLOWED，不写审计',
     httpErrorOf(putError).code === 'AI_BASE_URL_NOT_ALLOWED' && auditWrites === 0, JSON.stringify(httpErrorOf(putError)))
 
+  // 走查：非生产要能在后台把模型地址配到本机假大模型（两道校验都放行回环）；生产两道都拒。
+  const loopbackBase = 'http://127.0.0.1:18080/v1'
+  const baseBeforeLoopback = config.getConfig('assistant_chat').baseURL
+  const prodPutError = await withEnv(PROD, () => caught(() => controller.updateOne('assistant_chat', { baseURL: loopbackBase }, admin, req)))
+  check('D2b 生产 PUT 回环模型地址 → 400 AI_BASE_URL_PRIVATE，不写审计、不改配置',
+    httpErrorOf(prodPutError).code === 'AI_BASE_URL_PRIVATE' && auditWrites === 0 && config.getConfig('assistant_chat').baseURL === baseBeforeLoopback,
+    JSON.stringify(httpErrorOf(prodPutError)))
+  await withEnv({ NODE_ENV: 'development' }, () => controller.updateOne('assistant_chat', { baseURL: loopbackBase }, admin, req))
+  check('D2c 非生产 PUT 回环模型地址（本机假大模型）→ 保存成功并写审计',
+    config.getConfig('assistant_chat').baseURL === loopbackBase && auditWrites === 1)
+  chatTests = 0
+  await withEnv({ NODE_ENV: 'development' }, () => controller.testOne('assistant_chat'))
+  const prodTestError = await withEnv(PROD, () => caught(() => controller.testOne('assistant_chat')))
+  check('D2d 回环地址的连通性测试：非生产进入测试，生产拒绝且不调用测试',
+    chatTests === 1 && httpErrorOf(prodTestError).code === 'AI_BASE_URL_PRIVATE', `chatTests=${chatTests} ${JSON.stringify(httpErrorOf(prodTestError))}`)
+  config.update({ baseURL: baseBeforeLoopback }, 'assistant_chat')
+  auditWrites = 0
+
   // 存量地址：白名单收紧前存下的地址（先按追加单保存，再把追加撤掉）
   await withEnv({ AI_ENDPOINT_ALLOWLIST_EXTRA: 'api.moonshot.cn' }, () => {
     config.update({ baseURL: 'https://api.moonshot.cn/v1' }, 'career_plan')
