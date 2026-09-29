@@ -117,10 +117,10 @@ export function exposeDocumentPageCount(value: unknown): number | null {
 
 /**
  * 列表行上的页数。
- * 行对象没有 pageCount（查询漏选）时返回 null：去掉 select 仍能编译，
- * 门禁用「有页数的文件没有返回真实页数」变红，而不是卡在类型检查。
+ * 行对象没有 pageCount（查询漏选）时返回 null。参数带上必有的 id，
+ * 这样去掉 select 仍能通过类型检查，门禁改为「有页数的文件没有返回真实页数」变红。
  */
-export function listedDocumentPageCount(row: { pageCount?: number | null }): number | null {
+export function listedDocumentPageCount(row: { id: string; pageCount?: number | null }): number | null {
   if (!Object.prototype.hasOwnProperty.call(row, 'pageCount')) return null
   return exposeDocumentPageCount(row.pageCount)
 }
