@@ -4,10 +4,10 @@
 
 - **口径：** 终端从 A 改绑到 B 后，B 只看到这台终端在 B 名下期间的打印量、出纸成功率、扫描和心跳故障。A 时期的数据不进入 B 的合计，也不进逐台。服务人次仍按 `KioskSession.orgId` 快照，没有改。
 - **字段：** `Terminal.orgBoundAt`（当前 `orgId` 从何时生效；`orgId` 为空时也为空）。SQLite / PostgreSQL 各一份迁移 `20260929183000_terminal_org_bound_at`。已有绑定回填：审计 `terminal.org.update` 的 `newOrgId` 或 `terminal.asset.create_planned` 的 `orgId` 对得上当前机构时，取较晚的一条（`targetType=terminal`、`targetId=terminalCode`）；没有则用 `registeredAt`。对不上当前机构的审计不用。未绑定的终端保持空。
-- **写入：** 生产路径只有两处会改 `Terminal.orgId`：`createPlannedTerminal`（预创建时若带机构）和 `assignTerminalOrg`（绑定 / 改绑 / 解绑）。机构变化时写 `orgBoundAt = 现在`，解绑写空，机构没变不刷新。绑定码兑换、旧注册、机构启停、停放类型都不改 `orgId`。
+- **写入：** 生产路径只有两处会改 `Terminal.orgId`：`createPlannedTerminal`（预创建时若带机构）和 `assignTerminalOrg`（绑定 / 改绑 / 解绑）。机构变化时写 `orgBoundAt = 现在`，解绑写空，机构没变不刷新。绑定码兑换、旧注册、机构启停、停放类型都不改 `orgId`。删机构时外键 `onDelete: SetNull` 会把 `orgId` 置空但不清 `orgBoundAt`；代码里没有删机构的路径。
 - **A 的查询语义：** `getTerminalOperations` 只列出当前 `orgId` 等于本机构的终端。改绑后这台终端不在 A 的结果里，不是一行全 0。
 - **纸张不足：** `low_paper` 统一为「可打印、需补纸」的预警。不计入机构端故障次数与时长，不算未恢复；能结束已经打开的故障段。管理员告警为警告而不是严重；大屏孪生打印机用预警色。`paper_empty`（缺纸、不可打印）仍是故障。
-- **门禁：** `verify:partner-stats-contract` 增加 T3i/T3i1/T3i2、T3m/T3n、T5a–T5g。本机 `verify-rebind.db` 上 80 PASS / 0 FAIL。其余清单上的检查记在后续提交。
+- **门禁与检查（2026-09-29）：** `verify:partner-stats-contract` 在 `verify-rebind.db` 上 80 PASS / 0 FAIL（T3i/T3i1/T3i2、T3m/T3n、T5a–T5g）。先提交再做三处变异，门禁都退出 1：去掉有效开始时间（T3m、T5d、T5e）、改绑不写 `orgBoundAt`（T5a/T5b/T5d/T5e/T5f）、`low_paper` 算故障（T3i、T3i1、T5e）；变异已恢复。`db:pg:sync:check` 通过。api / admin / partner typecheck 通过。kiosk-session、terminal-network-diagnostics、admin-ops、console-screen-snapshot（130/0）、print-jobs 与 pickup-code-share，以及图谱列出的其余关联门禁通过。`verify:terminal-provisioning` 在 `prisma db push` 的库上失败：该库没有迁移里的 SQLite 触发器（触发器 0 条）；空库 `migrate deploy`（含本迁移）后再跑为 ALL PASS。`verify:recruitment-p1-schema --postgres-upgrade` 因未设置 `POSTGRES_UPGRADE_URL` 未跑，不带该参数的 schema 门禁通过。机构端 e2e 69 通过（端口 4175），管理员端 e2e 112 通过（端口 4174）。大屏孪生预警色没有另开浏览器点选，由 snapshot 门禁覆盖。
 
 ## 2026-09-29：机构「终端数据」页做成试点签收指标，管理员「外设」页做成真实状态（P-04、P1-10、3.9 两个空页）
 
