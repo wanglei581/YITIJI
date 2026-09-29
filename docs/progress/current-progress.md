@@ -341,6 +341,17 @@
 - **验证：** kiosk `tsc --noEmit`、改动文件 eslint、`verify:print-confirm-honest`、`verify:print-done-truth`（含 `print-walk-copy`）、`verify:pickup-claim-error-coverage`、`verify:pii-redaction-contract`（含 `print-manual-ack`）、`verify:member-print-orders-ui`、`verify:profile-print-orders-inkpaper`、`verify:fusion-w2`、`verify:fusion-w5`、`verify:scan-session-truth`、`verify:profile-commercial-first-batch`、`verify:compliance-copy`、`verify:ci-gate-coverage`、`verify:repository-integrity`、`verify:wave3-print-aftercare` 通过。把对应旧说法改回去，上述门禁退出码为 1。正式 `vite build` + preview（47291）加路由夹具截图在本机 `~/.cache/walk0929/evidence/fix-print-chain/`，不进仓库。预览构建额外设了 `VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN`，否则确认页会停在安全校验。
 - **留给服务端：** `GET /me/print-orders` 目前不返回 `order.orderNo`，生产列表要等这个字段；A-04 留痕 #1068 未合入，前端这次没有调用；完成页的证件提示只是文字，打印文件上并没有盖水印。
 
+## 2026-09-29：一体机简历链走查修复（W-14 手机上传后卡死等）
+
+- **对应闭环：** 一体机简历来源 → AI 诊断报告 → 优化建议 →「我的」里的 AI 服务记录和我的简历。依据当次简历链走查（W-14 及同链路的记录打开、应用到编辑区、优化页超高、报告标题块数、遮盖记号）。
+- **W-14：** 手机扫码上传并在一体机上确认使用这份简历后，页头停在「接收中」，「开始 AI 诊断」和「更换文件」一直不可点。扫码面板只在依赖变化时向父页面上报忙碌，确认后面板卸掉，没有补报不忙，来源页一直认为还在接收。职业规划进入诊断走的是同一来源页。合同审查、模拟面试、打印扫描共用这块面板，卸载时一并补报不忙。三处冻结哈希按这次源码前移，旧哈希留在注释里。
+- **AI 服务记录打不开报告：** 「打开」只带任务号。服务端简历任务号是 64 位十六进制，页面只认到 24 位，任务号被丢掉后显示「还没有诊断报告」。现在认到 64 位，仍只允许字母、数字、下划线和连字符。我的简历里查看报告原来就另外带了页面状态，这条路本来就能打开，复查仍然能打开。
+- **应用到编辑区：** 选「用改写」时默认已经是用改写。正文和选择相同就被当成已经应用，改写其实没有写进稿，也没有提示。改写在稿里找不到可替换位置时不再标记已应用，并写明「第 N 条改写没能自动放进稿里，请在编辑区手动改。」已经在稿里的仍算已应用。没有把改写硬插进稿。
+- **优化页超高：** 全站壳层内容区没有纵向滚动，长列表盖住底部操作条，滚轮也滚不动。2.0 稿 23 是建议列表在卡片里滚。只改优化总览：总览区限高，建议列表自己滚动，底部操作条保持可点。共享壳层没有改。
+- **报告标题：** 「简历被读成七块」写死，正文按真实块数计数。页头和结构标题改为按真实块数显示。协议里的七个栏目键没有改。
+- **遮盖记号：** 报告没有可还原的原文。展示时把 `[劳动者_1]`、`[手机号_1]`、`[邮箱_1]` 这类记号换成「（已隐去）」。存档和送给模型的内容不动。
+- **验证：** 一体机 `tsc --noEmit` 与 `vite build` 通过；改动的脚本和页面 eslint 0 error。`verify-resume-report-qx`、`verify-resume-decisions`、`resume-decisions.test.mjs`（14）、`verify-resume-phone-upload-ui`、`verify-fusion-w3`、`verify-fusion-w5`、`verify-fusion-w2-print-scan` 通过。Playwright `resume-optimize-draft.spec.ts` 6 条、`contract-review-session.spec.ts` 3 条通过（各自起服务，不复用已有服务）。浏览器对照：修复前在候选旧构建 4310 复现，修复后在本分支 4381 连本机全栈与模拟外部服务走通。截图在本机 `~/.cache/walk0929/evidence/fix-resume/`。这次只进候选分支，没有部署。
+
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
 - **P-01（机构政策列表）：** 平台紧急下架的政策此前和机构自己下架的一样显示「已下架」，还给「编辑」「审核通过」「发布」（发布会被服务端以 `EMERGENCY_TAKEDOWN_IRREVERSIBLE` 拒绝，编辑后永远发不出去）。服务端 `getPartnerPolicies` 给本机构列表每行附上 `emergencyTakedown` / `emergencyReasonCode` / `emergencyReasonText` / `emergencyTakedownAt`（只按本机构 `orgId` 加本页 id 查 `RecruitmentEmergencyHold`，公开读取不带；改动前已告知后端窗口，对方同意并提了按机构过滤、跨机构断言两条，均照做）。机构后台对这类行显示「平台已紧急下架」、下方整行写事由、说明、下架时间与「已冻结」，只留删除；与官方渠道面板同一口径。门禁 `verify:policies` 加一段：被下架行带出事由、其余行为 false、A/B 两个机构互相看不到对方的事由、公开列表不带这几个字段；变异「不附下架信息」即红。演示模式补一条被下架的示例，演示发布与服务端同样拒绝。
