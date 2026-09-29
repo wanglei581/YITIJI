@@ -146,6 +146,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-peripheral-views
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
           pnpm --filter @ai-job-print/admin verify:admin-internal-accounts-ui
+          pnpm --filter @ai-job-print/admin verify:admin-partner-contact-phone-ui
           pnpm --filter @ai-job-print/admin verify:admin-login-second-factor
           # D6/C6/C7 后台 AI 服务开关：适配器与面板在隔离进程里真跑，另读服务端
           # ai-access 源码对照路径、档位、事由上限与维护拦截清单；不连库、不起服务。

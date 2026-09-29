@@ -9,6 +9,7 @@ import { API_MODE } from '../../services/api/client'
 // ─── Action 中文标签(覆盖契约枚举,未知动作回退原始字符串)──────────────────
 
 const ACTION_LABELS: Record<string, string> = {
+  'partner_account.contact_phone_registered': '登记机构联系人手机',
   'file.upload':              '文件上传',
   'file.delete':              '文件删除',
   'file.force_delete':        '文件删除',
