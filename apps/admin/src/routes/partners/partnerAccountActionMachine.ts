@@ -1,4 +1,4 @@
-export type PartnerAccountAction = 'delete_account' | 'rebind_phone'
+export type PartnerAccountAction = 'delete_account' | 'rebind_phone' | 'register_contact_phone'
 export type PartnerAccountVerificationMethod = 'sms' | 'password'
 
 export type PartnerAccountActionStep =
@@ -14,6 +14,7 @@ export type PartnerAccountActionStep =
   | 'new_phone_sms_verify'
   | 'delete_committing'
   | 'rebind_committing'
+  | 'contact_phone_form'
   | 'result_uncertain'
   | 'success'
 
@@ -63,6 +64,7 @@ export type PartnerAccountActionEvent =
   | { type: 'COMMIT_REBIND' }
   | { type: 'REQUEST_STARTED' }
   | { type: 'REQUEST_FINISHED' }
+  | { type: 'CLEAR_ERROR' }
   | { type: 'EXPIRED'; resource: 'challenge' | 'action_ticket' | 'rebind_ticket' }
   | { type: 'ERROR'; code: PartnerAccountActionErrorCode }
   | { type: 'FINAL_RESULT_UNCERTAIN' }
@@ -94,7 +96,9 @@ const RESTART_AUTH_ERRORS = new Set<PartnerAccountActionErrorCode>([
 ])
 
 function startStep(action: PartnerAccountAction): PartnerAccountActionStep {
-  return action === 'delete_account' ? 'confirm' : 'confirm_rebind'
+  if (action === 'delete_account') return 'confirm'
+  if (action === 'register_contact_phone') return 'contact_phone_form'
+  return 'confirm_rebind'
 }
 
 function verificationStep(method: PartnerAccountVerificationMethod): PartnerAccountActionStep {
@@ -222,6 +226,7 @@ export function reducePartnerAccountAction(
         resultUncertain: false,
       }
     case 'CHOOSE_METHOD':
+      if (state.action === 'register_contact_phone') return state
       if (!state.action || !state.targetAccountId || state.step === 'closed' || state.step === 'result_uncertain') {
         return state
       }
@@ -239,6 +244,7 @@ export function reducePartnerAccountAction(
       if (state.step !== 'sms_verify' && state.step !== 'password_verify') return state
       return { ...state, challengeId: event.challengeId, busy: false, errorCode: undefined }
     case 'CREDENTIAL_VERIFIED':
+      if (state.action === 'register_contact_phone') return state
       if (state.step !== 'sms_verify' && state.step !== 'password_verify') return state
       return {
         ...state,
@@ -268,13 +274,20 @@ export function reducePartnerAccountAction(
       return { ...state, busy: true, errorCode: undefined }
     case 'REQUEST_FINISHED':
       return { ...state, busy: false }
+    case 'CLEAR_ERROR':
+      if (!state.errorCode) return state
+      return { ...state, errorCode: undefined }
     case 'EXPIRED':
       if (event.resource === 'rebind_ticket' && state.action !== 'rebind_phone') return state
       return operationStart(state)
     case 'ERROR':
       return reduceError(state as PartnerAccountActionState, event.code)
     case 'FINAL_RESULT_UNCERTAIN':
-      if (state.step !== 'delete_committing' && state.step !== 'rebind_committing') return state
+      if (
+        state.step !== 'delete_committing'
+        && state.step !== 'rebind_committing'
+        && !(state.action === 'register_contact_phone' && state.step === 'contact_phone_form')
+      ) return state
       return clearAuthorization(state as PartnerAccountActionState, {
         step: 'result_uncertain',
         needsRefresh: true,
