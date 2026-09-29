@@ -22370,7 +22370,8 @@
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
-      "services/api/scripts/verify-admin-ops.ts"
+      "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-beijing-display-time.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
       "services/api/scripts/verify-admin-order-filters.ts"
@@ -22401,7 +22402,8 @@
     ],
     "services/api/src/advisor/advisor-artifact.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
-      "services/api/scripts/verify-advisor-work.ts"
+      "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-beijing-display-time.ts"
     ],
     "services/api/src/advisor/advisor-artifact.types.ts": [
       "services/api/scripts/verify-advisor-work.ts"
@@ -22726,6 +22728,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -22756,6 +22759,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-compliance.ts",
@@ -22763,6 +22767,7 @@
       "services/api/scripts/verify-official-channels.ts"
     ],
     "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -22777,6 +22782,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts"
     ],
@@ -22796,6 +22802,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
@@ -22965,6 +22972,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
@@ -23044,6 +23052,7 @@
       "services/api/scripts/verify-community-daily-brief.ts"
     ],
     "services/api/src/assistant/daily-brief.service.ts": [
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-community-daily-brief.ts"
     ],
     "services/api/src/audit/audit.module.ts": [
@@ -23271,6 +23280,9 @@
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts"
     ],
+    "services/api/src/bulk-publish/bulk-publish-expiry.ts": [
+      "services/api/scripts/verify-beijing-display-time.ts"
+    ],
     "services/api/src/bulk-publish/bulk-publish.service.ts": [
       "services/api/scripts/verify-bulk-publish.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
@@ -23285,6 +23297,9 @@
     ],
     "services/api/src/common/auth/optional-internal-user.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts"
+    ],
+    "services/api/src/common/beijing-display-time.ts": [
+      "services/api/scripts/verify-beijing-display-time.ts"
     ],
     "services/api/src/common/boot/ai-platform-degradation.ts": [
       "services/api/scripts/verify-ai-platform-degradation.ts"
@@ -23781,6 +23796,7 @@
     "services/api/src/contract-review/contract-review-report-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/contract-review/contract-review-task-view.mapper.ts": [
@@ -24152,6 +24168,7 @@
     "services/api/src/jobs/fair-company-print.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-backend-p0-http.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/jobs/fair-company-zone.service.ts": [
@@ -24298,6 +24315,7 @@
     ],
     "services/api/src/jobs/jobs-shared.ts": [
       "scripts/verify-datetime-honesty.mjs",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-fair-list-integrity.ts",
       "services/api/scripts/verify-fair-stats-truth.ts",
       "services/api/scripts/verify-job-content-screening.ts",
@@ -24789,6 +24807,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-mock-interview.ts"
@@ -33288,6 +33307,38 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:backup-ops"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/ai/resume-report-export.controller.ts",
+          "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/ai/resume/diagnosis-report-pdf.service.ts",
+          "services/api/src/ai/resume/fair-visit-plan.service.ts",
+          "services/api/src/ai/resume/job-fit.service.ts",
+          "services/api/src/ai/resume/self-assessment.service.ts",
+          "services/api/src/assistant/daily-brief.service.ts",
+          "services/api/src/bulk-publish/bulk-publish-expiry.ts",
+          "services/api/src/common/beijing-display-time.ts",
+          "services/api/src/contract-review/contract-review-report-pdf.service.ts",
+          "services/api/src/jobs/fair-company-print.service.ts",
+          "services/api/src/jobs/jobs-shared.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-beijing-display-time.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:beijing-display-time"
       ],
       "wired": true
     },
