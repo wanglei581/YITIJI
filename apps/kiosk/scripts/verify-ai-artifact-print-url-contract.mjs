@@ -122,7 +122,7 @@ expectNoMatch(
   '求职材料打印按钮不得退回原生 disabled（原因说不出口）',
 )
 
-expectMatch(filesService, /printFileUrl:\s*signFileUrl\(record\.id\)\.url/, '文件访问响应同时返回内部 HMAC printFileUrl')
+expectMatch(filesService, /printFileUrl:\s*signFileUrl\(record\.id,\s*PRINT_ARTIFACT_URL_TTL_MS\)\.url/, '文件访问响应同时返回内部 HMAC printFileUrl（30 分钟）')
 expectMatch(myDocumentsPage, /fileUrl:\s*res\.printFileUrl/, '我的文档打印只传 printFileUrl')
 expectNoMatch(myDocumentsPage, /fileUrl:\s*res\.url/, '我的文档不得把预览或下载 URL 传给打印任务')
 expectMatch(myDocumentsPage, /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw/, '我的文档缺内部打印 URL 时诚实报错')
@@ -130,7 +130,7 @@ expectMatch(myDocumentsPage, /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw/, '我�
 expectMatch(adminFairsService, /async\s+prepareFairMaterialPrint\s*\(/, '招聘会资料提供按需标准 FileObject 打印桥接')
 // N5 拆分后委托逻辑在 fair-material.service.ts，adminFairsService 或 fairMaterialService 命中均可
 expectMatch(fairMaterialService || adminFairsService, /return\s+this\.printBridges\.prepare\(fairId,\s*materialId\)/, '招聘会资料入口委托可复用打印桥接服务')
-expectMatch(fairMaterialPrintBridgeService, /printFileUrl:\s*signFileUrl\(fileId\)\.url/, '招聘会资料桥接返回内部 HMAC printFileUrl')
+expectMatch(fairMaterialPrintBridgeService, /printFileUrl:\s*signFileUrl\(fileId,\s*PRINT_ARTIFACT_URL_TTL_MS\)\.url/, '招聘会资料桥接返回内部 HMAC printFileUrl（30 分钟）')
 expectMatch(fairMaterialPrintBridgeService, /validationMode:\s*'intent'/, '招聘会资料桥接仅以内部 intent 模式跨越 HTTP proxy 上限')
 expectMatch(fairMaterialPrintBridgeService, /assertSourceIntegrity\(material,\s*buffer\)/, '招聘会资料桥接复核源内容完整性')
 expectMatch(jobsController, /@Post\('job-fairs\/:id\/materials\/:materialId\/print-url'\)/, '招聘会资料暴露受控 print-url 端点')
@@ -173,16 +173,16 @@ for (const [file, arg] of artifactPrintSites) {
   const escaped = arg.replace('.', '\\.')
   expectMatch(read(file), new RegExp(`signFileUrl\\(${escaped},\\s*PRINT_ARTIFACT_URL_TTL_MS\\)\\.url`), `${path.basename(file)} 打印链接用 30 分钟`)
 }
-// 全量扫描：services/api/src 里任何「上传产物后直接签默认有效期的打印链接」都算回退。
+// 全量扫描（按调用点，不按变量名）：services/api/src 里任何给 printFileUrl 用单参数（默认 5 分钟）签名的都算回退。
 const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const full = path.join(dir, entry.name)
   if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(full)
   return entry.name.endsWith('.ts') ? [full] : []
 })
 const regressions = walk(path.join(repoRoot, 'services/api/src'))
-  .filter((file) => /printFileUrl\s*[:=]\s*signFileUrl\((?:uploaded\.fileId|printFileId|access\.fileId)\)/.test(fs.readFileSync(file, 'utf8')))
+  .filter((file) => /printFileUrl\s*[:=]\s*signFileUrl\(\s*[^,()]+\)/.test(fs.readFileSync(file, 'utf8')))
   .map((file) => path.relative(repoRoot, file))
-if (regressions.length === 0) pass('services/api/src 没有产物打印链接退回默认 5 分钟')
+if (regressions.length === 0) pass('services/api/src 没有任何打印链接用默认 5 分钟签名（按调用点扫描）')
 else fail(`产物打印链接退回默认有效期：${regressions.join(', ')}`)
 
 if (failures > 0) {

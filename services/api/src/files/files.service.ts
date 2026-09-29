@@ -52,7 +52,7 @@ import {
   defaultRetentionForUpload,
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
-import { parseContentFileId, signFileUrl } from './signing'
+import { parseContentFileId, PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from './signing'
 import { assertFileContentIntegrity, DIRECT_UPLOAD_COMPLETE_ACTION } from './file-content-integrity'
 
 /**
@@ -689,7 +689,7 @@ export class FilesService {
         url: signed.url,
         // printFileUrl 只是应用内部 HMAC 入口；/content 最终读取仍通过
         // requireActive 二次校验 status/deletedAt/expiresAt，不会因签名期越过文件寿命。
-        printFileUrl: signFileUrl(record.id).url,
+        printFileUrl: signFileUrl(record.id, PRINT_ARTIFACT_URL_TTL_MS).url,
         expiresAt: this.ensureSignedExpiryWithinFileLifetime(
           signed.expiresAt,
           record.expiresAt
