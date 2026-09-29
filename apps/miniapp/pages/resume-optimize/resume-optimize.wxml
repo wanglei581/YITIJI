@@ -65,7 +65,7 @@
     </view>
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <text>优化结果仅供参考，请核实内容真实性后再使用。不得添加虚假经历或虚构数据。对照区只读；要改导出内容请编辑下方优化稿。</text>
+      <text>AI 生成，仅供参考：请核实内容真实性后再使用，不得添加虚假经历或虚构数据。对照区只读；要改导出内容请编辑下方优化稿。</text>
     </view>
 
     <view class="section-title" id="edit-draft">编辑优化稿</view>

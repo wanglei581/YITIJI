@@ -215,6 +215,42 @@ async function main() {
     if (!notices.some((row) => row.kind === 'recruitment_emergency_takedown')) fail('政策下架通知未写出')
     else pass('政策下架通知写出')
 
+    // P-01：机构列表分得出「平台紧急下架」，且只看得到本机构的下架事由
+    {
+      const bPost = await svc.createPartnerPolicy(
+        { kind: 'notice', title: `B机构公告_${suffix}`, category: 'notice' },
+        partnerB,
+      )
+      await svc.reviewPolicy(bPost.id, 'approve', undefined, partnerB)
+      await svc.publishPolicy(bPost.id, 'publish', partnerB, { responsibilityAcknowledged: true })
+      const bReason = `B机构专属事由_${suffix}`
+      await svc.publishPolicy(bPost.id, 'unpublish', admin, { reasonCode: 'false_information', reasonText: bReason })
+
+      const aList = await svc.getPartnerPolicies(partnerA, { page: 1, pageSize: 50 })
+      if (!('data' in aList)) fail('P-01. 带分页的机构列表形状不对')
+      const heldRow = aList.data.find((p) => p.id === guide.id)
+      if (!heldRow || heldRow.emergencyTakedown !== true || heldRow.emergencyReasonCode !== 'rights_complaint'
+        || heldRow.emergencyReasonText !== '权利投诉核验' || !heldRow.emergencyTakedownAt) {
+        fail(`P-01. 被紧急下架的政策在机构列表里没有带出下架事由：${JSON.stringify(heldRow)}`)
+      }
+      if (aList.data.some((p) => p.id !== guide.id && p.emergencyTakedown !== false)) {
+        fail('P-01. 没被紧急下架的政策也被标成了紧急下架（或缺字段）')
+      }
+      if (JSON.stringify(aList).includes(bReason)) fail('P-01. A 机构的列表里出现了 B 机构的下架事由')
+      const aUnpaged = await svc.getPartnerPolicies(partnerA)
+      if (!Array.isArray(aUnpaged) || aUnpaged.find((p) => p.id === guide.id)?.emergencyTakedown !== true) {
+        fail('P-01. 不分页的机构列表没有带出下架标记')
+      }
+      const bList = await svc.getPartnerPolicies(partnerB, { page: 1, pageSize: 50 })
+      if (!('data' in bList) || bList.data.find((p) => p.id === bPost.id)?.emergencyReasonText !== bReason) {
+        fail('P-01. B 机构看不到自己政策的下架事由')
+      }
+      if (JSON.stringify(bList).includes('权利投诉核验')) fail('P-01. B 机构的列表里出现了 A 机构的下架事由')
+      const publicList = await svc.getPublishedPolicies()
+      if (publicList.data.some((p) => 'emergencyTakedown' in p)) fail('P-01. 公开列表不应带下架留痕字段')
+      pass('P-01. 机构列表带出本机构的紧急下架事由，看不到别家机构的，公开列表不带')
+    }
+
     {
       const unpaged = await svc.getPartnerPolicies(partnerA)
       if (!Array.isArray(unpaged)) fail('PTR-22. 缺省 getPartnerPolicies 应保持数组形状')

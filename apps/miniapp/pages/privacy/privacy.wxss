@@ -235,3 +235,44 @@
   line-height: 1.5;
   text-align: center;
 }
+
+/* ── 录音同意那一行的动作字（撤回 / 查看） ─────────────────────── */
+.pv-act {
+  margin-left: 12rpx;
+  min-width: 96rpx;
+  min-height: 96rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--teal-deep);
+  flex-shrink: 0;
+}
+
+/* ── 个人信息请求：三行说明 + 两个去处 ──────────────────────────── */
+.pr-card {
+  margin: 0 32rpx;
+  padding: 24rpx;
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-xs);
+}
+.pr-line { display: flex; align-items: flex-start; gap: 16rpx; padding: 8rpx 0; }
+.pr-k { width: 112rpx; flex-shrink: 0; font-size: var(--fs-sm); font-weight: 650; color: var(--muted); line-height: 1.7; }
+.pr-v { flex: 1; min-width: 0; font-size: var(--fs-base); color: var(--ink-soft); line-height: 1.7; }
+.pr-acts { display: flex; gap: 16rpx; margin-top: 16rpx; }
+.pr-btn {
+  flex: 1;
+  min-height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  border: 1rpx solid var(--line);
+  background: var(--surface-2);
+  font-size: var(--fs-base);
+  color: var(--ink-soft);
+}
+.pv-link { color: var(--teal-deep); }

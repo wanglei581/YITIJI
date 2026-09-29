@@ -43,7 +43,7 @@ export class InternalOtpService {
       throw this.tooMany('SMS_CODE_LOCKED', '验证码尝试次数过多,请稍后重试')
     }
 
-    const cooldownKey = this.k.cooldown(phoneHash)
+    const cooldownKey = this.k.cooldown(phoneHash, input.purpose)
     const cooldownRequestId = randomBytes(16).toString('base64url')
     const fresh = await this.redis.setNxEx(cooldownKey, cooldownRequestId, COOLDOWN)
     if (!fresh) {
@@ -52,7 +52,7 @@ export class InternalOtpService {
 
     const day = this.dayBucket()
     const hour = this.hourBucket()
-    const phoneDaily = await this.redis.incrWithTtl(this.k.phoneDaily(phoneHash, day), 86_400)
+    const phoneDaily = await this.redis.incrWithTtl(this.k.phoneDaily(phoneHash, day, input.purpose), 86_400)
     if (phoneDaily > PHONE_DAILY_MAX) {
       throw this.tooMany('SMS_DAILY_LIMIT', '今日验证码请求次数过多,请明天再试')
     }
@@ -130,12 +130,19 @@ export class InternalOtpService {
     }
   }
 
+  /**
+   * 冷却与每日次数默认跨用途共用（防同一号码被轮番轰炸）。管理员登录第二步（admin_login_2fa）单独计：
+   * 它只在账号密码已通过后才会发，本身轰炸不了别人；若和找回密码共用，任何人拿管理员手机号反复点
+   * 「找回密码」就能占满冷却与当日 10 次，让管理员整天过不了第二步（P1-4，agy 9/29 反例 3.1、3.2）。
+   */
   private readonly k = {
     code: (purpose: string, h: string) => `internal:sms:code:${purpose}:${h}`,
     attempt: (purpose: string, h: string) => `internal:sms:attempt:${purpose}:${h}`,
     locked: (purpose: string, h: string) => `internal:sms:locked:${purpose}:${h}`,
-    cooldown: (h: string) => `internal:sms:cooldown:global:${h}`,
-    phoneDaily: (h: string, day: string) => `internal:sms:daily:${h}:${day}`,
+    cooldown: (h: string, purpose?: InternalOtpPurpose) =>
+      purpose === 'admin_login_2fa' ? `internal:sms:cooldown:admin_login_2fa:${h}` : `internal:sms:cooldown:global:${h}`,
+    phoneDaily: (h: string, day: string, purpose?: InternalOtpPurpose) =>
+      purpose === 'admin_login_2fa' ? `internal:sms:daily:admin_login_2fa:${h}:${day}` : `internal:sms:daily:${h}:${day}`,
     ipHourly: (ip: string, hour: string) => `internal:sms:ip:${ip}:${hour}`,
     deviceHourly: (d: string, hour: string) => `internal:sms:device:${d}:${hour}`,
   }

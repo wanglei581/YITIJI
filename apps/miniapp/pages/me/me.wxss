@@ -60,4 +60,5 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .menu-arrow .ficon { width: 19rpx; height: 19rpx; }
 .menu-badge { display: inline-block; margin-left: 10rpx; padding: 2rpx 12rpx; border-radius: 20rpx; background: var(--teal); color: #fff; font-size: 20rpx; font-weight: 700; vertical-align: middle; line-height: 1.5; }
 .privacy-note { padding: 24rpx 10rpx 8rpx; color: var(--muted); font-size: 22rpx; line-height: 1.6; text-align: center; }
+.privacy-link { color: var(--teal-deep); }
 .tab-spacer { height: calc(130rpx + env(safe-area-inset-bottom)); }

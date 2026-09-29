@@ -4,7 +4,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">关于我们</view>
@@ -22,7 +22,7 @@
       <view class="ab-slogan">AI 简历工具 · 文档打印服务</view>
     </view>
 
-    <!-- 链接组1：产品说明 -->
+    <!-- 链接组1：协议与隐私 -->
     <view class="ab-group">
       <view
         class="ab-item tap"
@@ -31,8 +31,28 @@
         data-id="{{item.id}}"
         hover-class="tap-press"
         bindtap="tapLink"
+        role="button"
+        aria-label="{{item.title}}"
       >
         <view class="ab-t">{{item.title}}</view>
+        <text class="ficon i-right ab-go"></text>
+      </view>
+    </view>
+
+    <!-- 链接组2：AI 服务说明（模型名称与备案号）与经营者信息，都读后台发布的正式版本 -->
+    <view class="ab-group mt12">
+      <view
+        class="ab-item tap"
+        wx:for="{{links2}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        hover-class="tap-press"
+        bindtap="tapLink"
+        role="button"
+        aria-label="{{item.title}}，{{item.sub}}"
+      >
+        <view class="ab-t">{{item.title}}</view>
+        <view class="ab-sub">{{item.sub}}</view>
         <text class="ficon i-right ab-go"></text>
       </view>
     </view>

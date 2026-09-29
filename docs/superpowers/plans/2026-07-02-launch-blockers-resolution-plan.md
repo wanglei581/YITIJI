@@ -132,8 +132,8 @@ WP3 采用「临时可信先解除阻塞 → 正式域名+备案后替换」：�
 
 ### 阶段一（临时）· 一体机现场 —— 私有 CA（mkcert）　[C 出 runbook →〔你〕执行]
 - **[C]** 产出：mkcert 安装/签发 runbook、nginx 证书片段、`rootCA.pem` 分发说明。
-- **[你]** 执行：① 装 mkcert，`mkcert -install` 把本地根 CA 装进各一体机 Windows 信任库；② 签发 IP 叶证书 `mkcert 120.48.13.190 127.0.0.1 localhost`；③ nginx/本地服务加载 cert+key；④ 每台一体机导入 `rootCA.pem`（`mkcert -CAROOT`）。
-- **验证：** 一体机浏览器访问 `https://120.48.13.190` 无告警（仅这些受控设备上可信，公网陌生浏览器不认属预期）。
+- **[你]** 执行：① 装 mkcert，`mkcert -install` 把本地根 CA 装进各一体机 Windows 信任库；② 签发 IP 叶证书 `mkcert <生产服务器 IP> 127.0.0.1 localhost`；③ nginx/本地服务加载 cert+key；④ 每台一体机导入 `rootCA.pem`（`mkcert -CAROOT`）。
+- **验证：** 一体机浏览器访问 `https://<生产服务器 IP>` 无告警（仅这些受控设备上可信，公网陌生浏览器不认属预期）。
 
 ### 阶段二（临时）· 后台公网访问 —— 二选一　[C 出配置 →〔你〕执行]
 - **选项 A · Cloudflare Tunnel（最快，先试）：** 服务器装 `cloudflared`，`cloudflared tunnel --url http://localhost:8081`（partner 同理 8082）→ 得 `*.trycloudflare.com` 可信 HTTPS 入口。注意：流量经 Cloudflare（数据出境考量）、国内可达性/延迟需实测。
@@ -144,7 +144,7 @@ WP3 采用「临时可信先解除阻塞 → 正式域名+备案后替换」：�
 - **[C]** 评估并给结论（对照 checklist §2.78、§4）：Kiosk 走 HTTPS 后调本地 http API 是否被浏览器阻断；给备选（受信本地桥接 / 本地 API 也上同一私有 CA 的 HTTPS / 现场访问策略）。
 
 ### 阶段四（正式替换）· 域名 + 备案 + 正式证书　[〔你〕前置，C 出替换 runbook]
-- **[你]**（周期长，**建议现在并行启动**）：注册域名 → ICP 备案 → 解析到 `120.48.13.190`。
+- **[你]**（周期长，**建议现在并行启动**）：注册域名 → ICP 备案 → 解析到 `<生产服务器 IP>`。
 - **[C]** 出替换 runbook：certbot 正式签发（HTTP-01/DNS-01）、nginx 证书路径热替换、下线临时方案、开 HSTS。
 - **验证：** `https://<域名>` 正式证书生效，临时方案已移除。
 

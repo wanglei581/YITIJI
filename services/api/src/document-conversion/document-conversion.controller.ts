@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { resolveOptionalInternalUser } from '../common/auth/optional-internal-user'
+import { resolveClientIp } from '../common/client-ip'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { FileRequester } from '../files/files.service'
@@ -71,7 +72,7 @@ export class DocumentConversionController {
     const auth = extractAuth(req)
     const member = await resolveOptionalEndUser(auth, this.jwt, this.redis, this.prisma)
     if (member) return { kind: 'member', endUserId: member.endUserId }
-    const internal = await resolveOptionalInternalUser(auth, this.jwt, this.redis, this.prisma)
+    const internal = await resolveOptionalInternalUser(auth, this.jwt, this.redis, this.prisma, resolveClientIp(req))
     if (!internal) return null
     return { kind: 'user', userId: internal.userId, role: internal.role, orgId: internal.orgId }
   }

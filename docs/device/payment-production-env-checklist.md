@@ -11,7 +11,7 @@
 
 ## 0. 适用范围与前提
 
-- 生产服务器：百度云 120.48.13.190，API 为 PM2 单实例监听 127.0.0.1:3010，`NODE_ENV=production`。
+- 生产服务器：百度云 <生产服务器 IP>，API 为 PM2 单实例监听 127.0.0.1:3010，`NODE_ENV=production`。
 - 本清单只覆盖**支付域（C5-6 真实渠道）新增/变更**的变量，并列出启动门禁牵连的全局变量（§3）。全局变量的完整口径见 `docs/device/production-deployment-and-windows-host-checklist.md`。
 - 启动门禁是 fail-closed：任何一项不满足，API **拒绝启动**（不是降级）。改完 env 后 `pm2 restart` 并看启动日志，无报错才算注入成功。
 

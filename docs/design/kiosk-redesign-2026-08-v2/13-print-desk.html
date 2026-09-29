@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/29 定稿：文档打印维护中、能力读取中、能力读取失败、文件不支持这四个整页只读态里，当前选中的黑白 / 单面 / 自动 / 适合页面 / 全部 N 页原来画成红色冲突、读屏念「本机暂未开通」，其实它们都能用、只是这一屏不能改：改画中性只读灰（实线边、不减淡，和旁边减淡的虚线未选项分得开），读屏改「当前选的是…，这一屏暂时不能改」。红色冲突只留给带进来又本机暂未开通的彩色 / 双面（capability-color-locked / capability-duplex-locked 两态不变）；未开通的项仍是灰色加原因。状态键、data-testid、结构不改。
 - 9/28 留白：只改 2.0 覆盖样式（末尾「9/28 留白」一段），文案、结构、状态切换都不动；预览与参数、能力、设备 11 态逐像素未变。兜底三态右栏三段不再顶到上下两头，余量分到每段下面；材料检查各态左栏页面示意 352→430 宽，三组按列高分开；正在查 / 查完 / 查不成 / 重查的结论排舒展（状态图标放大单独一行，正文 24、小标题 28）。21 态逐态检查 0 问题。无新增内容。
 - 9/28 逐状态检查修压字
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
@@ -521,6 +522,7 @@ input{font:inherit}
 #body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .sec-label .t{font-size:28px!important}
 #body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .note,#body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .steps li{font-size:24px;line-height:1.6}
 #body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .notes,#body-root:is([data-state$="-context"],[data-state="check-loading"],[data-state="check-clean"],[data-state="check-failed"],[data-state="check-retrying"]) .wright>.card .steps{gap:18px}
+.opt.ro{opacity:1;background:var(--line);border:1.5px solid var(--line-2);color:var(--ink-2)}
 
 </style>
 </head>
@@ -831,7 +833,7 @@ function ppImage(){
   '<path d="M330 786l83 44 84-44 40 20-124 66-123-66z" fill="#f5f7f9"/>'+
   '<path d="M413 830l-26 44 26 30 27-30z" fill="#8e2f2a"/>'+
   '<rect x="4" y="4" width="819" height="1055" fill="none" stroke="#0e2f5e" stroke-width="8"/>'+
-  '<text x="413" y="1014" text-anchor="middle" font-size="31" font-weight="700" fill="#e8f1fb">原型演示图片 · 不是真实用户照片</text>'+
+  '<text x="413" y="1014" text-anchor="middle" font-size="31" font-weight="700" fill="#e8f1fb">示例图片 · 不是真实用户照片</text>'+
   '</svg>';
 }
 
@@ -971,8 +973,9 @@ function fixtureBar(what){
 function optBtn(o){
  if(o.locked){
   /* 锁住但**当前就是这一项**时仍然要显示为已选：否则摘要写着彩色、按钮却看不出选中，冲突就藏起来了。 */
-  return '<span class="opt'+(o.on?' conflict':'')+'" role="button" aria-disabled="true"'+(o.on?' aria-pressed="true"':'')+' data-testid="'+o.tid+'"'+
-   (o.desc?' aria-describedby="'+o.desc+'"':'')+' aria-label="'+o.al+(o.on?'（这是你带过来的参数，本机暂未开通，现在不能用）':'')+'">'+o.label+svg('lock','currentColor',18,2.1)+'</span>';
+  var ro=o.on&&!o.gated;
+  return '<span class="opt'+(o.on?(ro?' ro':' conflict'):'')+'" role="button" aria-disabled="true"'+(o.on?' aria-pressed="true"':'')+' data-testid="'+o.tid+'"'+
+   (o.desc?' aria-describedby="'+o.desc+'"':'')+' aria-label="'+(ro?'当前选的是'+o.al+'，这一屏暂时不能改':o.al+(o.on?'（这是你带过来的参数，本机暂未开通，现在不能用）':''))+'">'+o.label+svg('lock','currentColor',18,2.1)+'</span>';
  }
  return '<button type="button" class="opt press" data-testid="'+o.tid+'" data-act="'+o.act+'" aria-pressed="'+(o.on?'true':'false')+'" aria-label="'+o.al+'">'+o.label+'</button>';
 }
@@ -1154,11 +1157,11 @@ function colorGroup(st){
  var dC=shared?'cap-shared-reason':'cap-color-reason',dD=shared?'cap-shared-reason':'cap-duplex-reason';
  var h='<div class="pgrp"><h4 class="hrow"><span class="ht">颜色与单双面</span>'+
   optBtn({tid:SCREEN+'-opt-bw',act:'color:bw',on:M.color==='bw',locked:hard,al:'黑白',desc:dC,label:'黑白'})+
-  optBtn({tid:SCREEN+'-opt-color',act:'color:color',on:M.color==='color',locked:colorLocked,al:colorLocked?('彩色（'+colorReason+'）'):'彩色',desc:dC,label:'彩色'})+
+  optBtn({tid:SCREEN+'-opt-color',act:'color:color',on:M.color==='color',locked:colorLocked,gated:1,al:colorLocked?('彩色（'+colorReason+'）'):'彩色',desc:dC,label:'彩色'})+
   '<span>双面需明确翻转边</span></h4><div class="row">'+
   optBtn({tid:SCREEN+'-opt-simplex',act:'duplex:simplex',on:M.duplex==='simplex',locked:hard,al:'单面',desc:dD,label:'单面'})+
-  optBtn({tid:SCREEN+'-opt-duplex-long',act:'duplex:duplex_long_edge',on:M.duplex==='duplex_long_edge',locked:duplexLocked,al:duplexLocked?('双面长边翻转（'+duplexReason+'）'):'双面长边翻转',desc:dD,label:'双面（长边）'})+
-  optBtn({tid:SCREEN+'-opt-duplex-short',act:'duplex:duplex_short_edge',on:M.duplex==='duplex_short_edge',locked:duplexLocked,al:duplexLocked?('双面短边翻转（'+duplexReason+'）'):'双面短边翻转',desc:dD,label:'双面（短边）'})+
+  optBtn({tid:SCREEN+'-opt-duplex-long',act:'duplex:duplex_long_edge',on:M.duplex==='duplex_long_edge',locked:duplexLocked,gated:1,al:duplexLocked?('双面长边翻转（'+duplexReason+'）'):'双面长边翻转',desc:dD,label:'双面（长边）'})+
+  optBtn({tid:SCREEN+'-opt-duplex-short',act:'duplex:duplex_short_edge',on:M.duplex==='duplex_short_edge',locked:duplexLocked,gated:1,al:duplexLocked?('双面短边翻转（'+duplexReason+'）'):'双面短边翻转',desc:dD,label:'双面（短边）'})+
   '</div>';
  if(shared)h+=reasonLine('cap-shared-reason',SCREEN+'-color-reason',
    (colorLocked?colorReason:'确认报价时会再次检查可用参数。'),
@@ -1460,7 +1463,7 @@ V['missing-context']=function(){
   b1t:'为什么会看到这一屏',
   b1:['从旧链接或收藏夹<b>直接跳进来</b>，中间那一步没走。',
       '上一趟已经办完，这次办理的上下文<b>已经清掉了</b>。',
-      '这是台公共机器，前一位用户结束后<b>本机不会替下一位保留文件</b>。'],
+      '这是一台公共终端，前一位用户结束后<b>本机不会替下一位保留文件</b>。'],
   b2t:'回去之后怎么走',
   b2:['在选文件那一步，把要打印的那一份搬进这次办理。',
       '回到这一页做材料检查，逐条决定要不要遮挡。',
@@ -1479,7 +1482,7 @@ V['illegal-context']=function(){
   p1:'地址里写了一个本页不认识的状态值。<b>认不出来就不猜</b> —— 屏幕上不会照着它渲染任何东西，也不会把那段内容显示出来。',
   p2:'同样地，这一页<b>不会显示任何文件名、页数或检查结论</b>，因为现在并没有一份可处理的文件。',
   b1t:'为什么不把它显示出来',
-  b1:['把地址里的内容原样印到屏幕上，等于<b>谁发一条链接就能让这台公共机器显示他想显示的字</b>。',
+  b1:['把地址里的内容原样印到屏幕上，等于<b>谁发一条链接就能让这台公共终端显示他想显示的字</b>。',
       '在一体机上，屏幕上出现的每一句话都会被当成「系统说的」，所以不能由地址决定。',
       '本页只认<b>自己定义过的那几个值</b>，其余一律按「没有上下文」处理。'],
   b2t:'现在可以怎么办',

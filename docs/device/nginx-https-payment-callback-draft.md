@@ -1,7 +1,7 @@
 # nginx https 改造草案（支付回调可达，W-D ①）
 
 > **草案，未经真机/真实商户验证。** 2026-07-06 起草。
-> 现状：百度云 120.48.13.190，nginx 监听 80(kiosk) / 8081(admin) / 8082(partner)，API 为 PM2 单实例监听 127.0.0.1:3010，**无域名无 https**。
+> 现状：百度云 <生产服务器 IP>，nginx 监听 80(kiosk) / 8081(admin) / 8082(partner)，API 为 PM2 单实例监听 127.0.0.1:3010，**无域名无 https**。
 > 目标：渠道回调 `https://<域名>/api/v1/payment/callback/{wechat|alipay}` 可达且验签通过（微信/支付宝生产回调均要求 https，且本项目启动门禁强制 `PAYMENT_NOTIFY_BASE_URL` 为 https）。
 > 代码事实：回调验签基于**原始请求字节**（`services/api/src/config/body-parsers.ts` 对 `/api/v1/payment/callback/` 前缀捕获 rawBody；微信为 JSON、支付宝为 form-urlencoded）——**任何改写 body 的反代行为都会让验签必然失败**。
 
@@ -10,8 +10,8 @@
 ## 1. 前置条件（顺序执行，全部完成才能进 §2）
 
 1. 购买/复用一个域名（如已有已备案域名，可用其子域过渡，见方案文档 §六风险表）。
-2. **ICP 备案**：服务器在境内（百度云），域名解析到 120.48.13.190 并提供 web 服务必须完成备案；备案周期数周，须与商户申请并行启动。〔待确认：是否已有可复用的已备案域名〕
-3. DNS 解析：为选定域名（下文以 `pay.example.com` 占位，**非真实值**）添加 A 记录 → `120.48.13.190`，TTL 建议 600。
+2. **ICP 备案**：服务器在境内（百度云），域名解析到 <生产服务器 IP> 并提供 web 服务必须完成备案；备案周期数周，须与商户申请并行启动。〔待确认：是否已有可复用的已备案域名〕
+3. DNS 解析：为选定域名（下文以 `pay.example.com` 占位，**非真实值**）添加 A 记录 → `<生产服务器 IP>`，TTL 建议 600。
 4. 百度云安全组放行 TCP 443（80 已放行）。
 5. 服务器时间同步确认（`timedatectl` 显示 NTP synchronized）：微信/支付宝回调均有 ±5 分钟时间窗校验，时钟漂移会拒回调。
 
@@ -121,7 +121,7 @@ server {
 ## 5. 与现有三个站点的共存检查
 
 1. `nginx -t` 通过后 `nginx -s reload`（不重启，不断 kiosk 服务）。
-2. 确认 `curl -I http://120.48.13.190/` 仍返回 kiosk 页面（80 按 IP 访问不受影响）。
+2. 确认 `curl -I http://<生产服务器 IP>/` 仍返回 kiosk 页面（80 按 IP 访问不受影响）。
 3. 确认 8081/8082 不变。
 4. 新 443 块的 `server_name` 精确匹配，不设 `default_server`，避免劫持未来其他域名。
 
@@ -129,7 +129,7 @@ server {
 
 ```bash
 # ① DNS 生效
-dig +short pay.example.com          # 期望输出 120.48.13.190
+dig +short pay.example.com          # 期望输出 <生产服务器 IP>
 
 # ② TLS 握手与协议版本（期望 TLSv1.2 成功、TLSv1.3 成功、TLSv1.1 失败）
 openssl s_client -connect pay.example.com:443 -tls1_2 </dev/null | head -5
@@ -151,7 +151,7 @@ curl -i https://pay.example.com/
 
 # ⑥ 80 跳转只对支付域名生效
 curl -i http://pay.example.com/api/v1/payment/callback/wechat   # 期望 301 → https
-curl -I http://120.48.13.190/                                    # 期望仍是 kiosk 200
+curl -I http://<生产服务器 IP>/                                    # 期望仍是 kiosk 200
 ```
 
 全部通过后：把 `PAYMENT_NOTIFY_BASE_URL=https://pay.example.com` 写入生产 `services/api/.env`（见 env 清单草案），`pm2 restart` 并确认启动门禁通过。最终「验签通过」只能由 1 分钱 live 冒烟（W-F）证明。
