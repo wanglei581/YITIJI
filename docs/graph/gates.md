@@ -2152,7 +2152,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/self-assessment-questions.ts` | `verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/resume/self-assessment-scoring.ts` | `verify-self-assessment-ai-gate.ts`<br/>`verify-self-assessment.ts` |
 | `services/api/src/ai/resume/self-assessment.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
-| `services/api/src/ai/resume/self-assessment.types.ts` | `verify-assess-isolation.ts`<br/>`verify-compliance.ts` |
+| `services/api/src/ai/resume/self-assessment.types.ts` | `verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/self-assessment.controller.ts` | `verify-ai-access.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/usage/admin-ai-usage.controller.ts` | `verify-ai-usage-budget.ts` |
 | `services/api/src/ai/usage/ai-budget.service.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
