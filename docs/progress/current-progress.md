@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-29：思考模式在线探针缺密钥不再算通过（分支 `claude/backend-hardening-20260929-thinking-probe-strict`）
+
+- **问题（合规窗口查出）：** `probe:llm-thinking-live` 只从进程环境变量读密钥，不读服务的 .env 与后台 AI 槽位；服务器上一缺密钥就打印「跳过」并退出码 0，看上去通过，其实没验。
+- **修法（Grok 实现、协调方审）：** 取密钥与 API 进程同一处（先后台 AI 槽位，再服务 .env）；缺密钥或任何一项被跳过都非 0 退出并打印「未验证」，只有显式 `--allow-skip` 才允许跳过；上游失败即使带 `--allow-skip` 也非 0；全程不打印密钥。TTS 读取密钥与目标地址的逻辑抽成共用函数，服务与探针同一份。发布清单与运维手册写明新行为。
+- **验证：** 新离线自检 `verify:llm-thinking-live-gate` 37 条（挂 CI）；协调方在候选 840ea7d31 上复跑 llm-thinking-off、ai-endpoint-allowlist、llm-input-pii-mask、mock-interview、trtc-ownership、ai-safety-aigc、d2-same-host-contract、ai-throttle-dimension 与 api tsc 全绿，变异「探针恒退出 0」变红。解冲突时保留了候选里 TTS 的出站白名单与地域校验，发布清单保留候选较新的 AIGC 条目。
+
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。

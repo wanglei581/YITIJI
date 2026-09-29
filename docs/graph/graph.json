@@ -23259,6 +23259,7 @@
     ],
     "services/api/src/common/crypto/secret-cipher.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
+      "services/api/scripts/verify-llm-thinking-live-gate.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
@@ -35674,6 +35675,24 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:llm-input-pii-mask"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/common/crypto/secret-cipher.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-llm-thinking-live-gate.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:llm-thinking-live-gate"
       ],
       "wired": true
     },
