@@ -1170,6 +1170,10 @@ model FileObject {
   filename    String   // 原始文件名(originalName);绝不作为 objectKey
   mimeType    String
   sizeBytes   Int
+  // 从文件字节识别出的页数。可空且不设默认值。
+  // null = 还没识别（旧文件、Word、解析失败、直传尚未读到字节）。
+  // 不用 0 表示未知。列表只把正整数交出去，其余收成 null。不接受客户端申报的页数。
+  pageCount   Int?
   sha256      String   // 服务端直传路径就 buffer 计算;直传意图未知时为 ''
 
   // 业务关联 / 归属
