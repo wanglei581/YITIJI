@@ -132,6 +132,8 @@ Invoke-Check "D1-2" "分配访问与自动登录" {
   if (Get-Command Get-AssignedAccess -ErrorAction SilentlyContinue) {
     try { $aaCmdlet = "entries=" + @(Get-AssignedAccess -ErrorAction Stop).Count } catch { $aaCmdlet = "unavailable" }
   }
+  # 分配访问要求 UAC 开着；KSK-001 上 EnableLUA=0，普通开 PowerShell 就是管理员
+  $uacEnabled = [string](Get-RegValue "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "EnableLUA") -ne "0"
   $winlogon = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
   $autoLogon = [string](Get-RegValue $winlogon "AutoAdminLogon")
   $defaultUserSet = -not [string]::IsNullOrWhiteSpace([string](Get-RegValue $winlogon "DefaultUserName"))
@@ -144,8 +146,9 @@ Invoke-Check "D1-2" "分配访问与自动登录" {
       $consoleUserIsAdmin = [string]($members -contains $consoleUser)
     }
   } catch { $consoleUserIsAdmin = "unknown" }
-  $value = "assignedAccessProfiles=$aaProfiles assignedAccessConfigs=$aaConfigs getAssignedAccess=$aaCmdlet autoAdminLogon=$autoLogon defaultUserNameSet=$defaultUserSet consoleUserIsAdmin=$consoleUserIsAdmin 逃逸键须按清单手测"
-  if ($aaProfiles -eq 0 -and $aaConfigs -eq 0) { Add-Row "D1-2" "分配访问与自动登录" "$value 没有配置分配访问，正式终端必须配置（见清单）" "WARN" }
+  $value = "assignedAccessProfiles=$aaProfiles assignedAccessConfigs=$aaConfigs uacEnabled=$uacEnabled getAssignedAccess=$aaCmdlet autoAdminLogon=$autoLogon defaultUserNameSet=$defaultUserSet consoleUserIsAdmin=$consoleUserIsAdmin 逃逸键须按清单手测"
+  if (-not $uacEnabled) { Add-Row "D1-2" "分配访问与自动登录" "$value UAC 已关闭，分配访问要求开启 UAC" "WARN" }
+  elseif ($aaProfiles -eq 0 -and $aaConfigs -eq 0) { Add-Row "D1-2" "分配访问与自动登录" "$value 没有配置分配访问，正式终端必须配置（见清单）" "WARN" }
   else { Add-Row "D1-2" "分配访问与自动登录" $value "MANUAL" }
 }
 

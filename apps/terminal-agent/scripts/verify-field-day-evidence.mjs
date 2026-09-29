@@ -61,6 +61,8 @@ assert.doesNotMatch(script, /Test-Path[^\n]*AssignedAccessConfiguration/, 'D1-2 
 assert.match(script, /Get-ChildItem -LiteralPath \(Join-Path \$aaRoot "Profiles"\)/, 'D1-2 must count assigned-access profiles')
 assert.match(script, /Get-ChildItem -LiteralPath \(Join-Path \$aaRoot "Configs"\)/, 'D1-2 must count assigned-access account configs')
 assert.match(script, /if \(\$aaProfiles -eq 0 -and \$aaConfigs -eq 0\) \{ Add-Row "D1-2"[^\n]*"WARN" \}/, 'no assigned-access config must be a WARN, not a silent MANUAL')
+assert.match(script, /"EnableLUA"\) -ne "0"/, 'D1-2 must read UAC (assigned access requires it; KSK-001 had EnableLUA=0)')
+assert.match(script, /if \(-not \$uacEnabled\) \{ Add-Row "D1-2"[^\n]*"WARN" \}/, 'UAC off must be a WARN')
 // 远程工具：网易 UU 远程的进程与服务叫 GameViewer*，名字里没有 UU。
 assert.match(script, /\$pattern = "[^"]*\bgameviewer\b[^"]*"/, 'D1-6 must detect NetEase UU Remote (GameViewer)')
 // 功能状态：Disabled 与 not_available 是两回事，不能写成「专业版上都是 not_available」。
