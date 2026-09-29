@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 561,
+    "endpointCount": 562,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -6840,23 +6840,54 @@
       },
       {
         "controller": "services/api/src/kiosk-session/kiosk-session.controller.ts",
-        "handler": "KioskSessionController.extend",
+        "handler": "KioskSessionController.end",
         "method": "POST",
-        "models": [],
-        "path": "/api/v1/kiosk/session/extend",
+        "models": [
+          "KioskSession",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/session/end",
         "roles": [],
-        "serviceFiles": [],
-        "services": []
+        "serviceFiles": [
+          "services/api/src/kiosk-session/kiosk-session.service.ts"
+        ],
+        "services": [
+          "KioskSessionService"
+        ]
       },
       {
         "controller": "services/api/src/kiosk-session/kiosk-session.controller.ts",
         "handler": "KioskSessionController.heartbeat",
         "method": "POST",
-        "models": [],
+        "models": [
+          "KioskSession",
+          "Terminal"
+        ],
         "path": "/api/v1/kiosk/session/heartbeat",
         "roles": [],
-        "serviceFiles": [],
-        "services": []
+        "serviceFiles": [
+          "services/api/src/kiosk-session/kiosk-session.service.ts"
+        ],
+        "services": [
+          "KioskSessionService"
+        ]
+      },
+      {
+        "controller": "services/api/src/kiosk-session/kiosk-session.controller.ts",
+        "handler": "KioskSessionController.start",
+        "method": "POST",
+        "models": [
+          "KioskSession",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/session/start",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/kiosk-session/kiosk-session.service.ts"
+        ],
+        "services": [
+          "KioskSessionService"
+        ]
       },
       {
         "controller": "services/api/src/materials/materials.controller.ts",
@@ -16746,10 +16777,14 @@
         ]
       },
       {
-        "fieldCount": 9,
+        "fieldCount": 14,
         "name": "KioskSession",
         "relations": [],
-        "usedBy": []
+        "usedBy": [
+          "services/api/src/kiosk-session/kiosk-session-retention.task.ts",
+          "services/api/src/kiosk-session/kiosk-session.queries.ts",
+          "services/api/src/kiosk-session/kiosk-session.service.ts"
+        ]
       },
       {
         "fieldCount": 10,
@@ -17264,6 +17299,7 @@
           "services/api/src/content/content.service.ts",
           "services/api/src/device-fleet/device-fleet.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
+          "services/api/src/kiosk-session/kiosk-session.service.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
@@ -22922,6 +22958,7 @@
     "services/api/src/common/throttler/terminal-throttle.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
@@ -23642,9 +23679,23 @@
     "services/api/src/jobs/work-type.ts": [
       "services/api/scripts/verify-job-customer-sample-readiness.ts"
     ],
+    "services/api/src/kiosk-session/dto/kiosk-session.dto.ts": [
+      "services/api/scripts/verify-kiosk-session.ts"
+    ],
+    "services/api/src/kiosk-session/kiosk-session-retention.task.ts": [
+      "services/api/scripts/verify-kiosk-session.ts"
+    ],
     "services/api/src/kiosk-session/kiosk-session.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
-      "services/api/scripts/verify-backend-p0-contracts.mjs"
+      "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-kiosk-session.ts"
+    ],
+    "services/api/src/kiosk-session/kiosk-session.queries.ts": [
+      "services/api/scripts/verify-kiosk-session.ts"
+    ],
+    "services/api/src/kiosk-session/kiosk-session.service.ts": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-kiosk-session.ts"
     ],
     "services/api/src/legal/admin-legal-docs.controller.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
@@ -24556,6 +24607,7 @@
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -24918,6 +24970,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminal-identity.guard.ts": [
+      "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-scan-tasks.ts",
@@ -31895,6 +31948,7 @@
           "services/api/src/jobs/jobs.controller.ts",
           "services/api/src/jobs/partner-capabilities.ts",
           "services/api/src/kiosk-session/kiosk-session.controller.ts",
+          "services/api/src/kiosk-session/kiosk-session.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/notifications/notifications.controller.ts",
           "services/api/src/offline-agencies/admin-offline-agencies.controller.ts",
@@ -34172,6 +34226,31 @@
       "package": "services/api",
       "scriptNames": [],
       "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/common/throttler/terminal-throttle.ts",
+          "services/api/src/kiosk-session/dto/kiosk-session.dto.ts",
+          "services/api/src/kiosk-session/kiosk-session-retention.task.ts",
+          "services/api/src/kiosk-session/kiosk-session.controller.ts",
+          "services/api/src/kiosk-session/kiosk-session.queries.ts",
+          "services/api/src/kiosk-session/kiosk-session.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-kiosk-session.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:kiosk-session"
+      ],
+      "wired": true
     },
     {
       "asserts": {
