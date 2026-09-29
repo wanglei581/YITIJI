@@ -38,9 +38,10 @@ export const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 /**
  * 在沙箱里真实执行一个页面源码，返回 Page() 收到的配置对象。
  * @param {string} relPath 相对 apps/miniapp 的路径
+ * @param {string} [source] 给了就跑这份源码（变异测试用），相对 require 仍按 relPath 的目录解析
  */
-export function loadPageDefinition(relPath, { wx, modules, timers = [] }) {
-  const src = fs.readFileSync(path.join(MINIAPP, relPath), 'utf8')
+export function loadPageDefinition(relPath, { wx, modules, timers = [], source }) {
+  const src = typeof source === 'string' ? source : fs.readFileSync(path.join(MINIAPP, relPath), 'utf8')
   let pageDef = null
   const sandbox = {
     console,
