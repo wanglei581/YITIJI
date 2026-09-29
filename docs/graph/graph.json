@@ -12051,7 +12051,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 183,
+      "reachableFileCount": 184,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12689,8 +12689,13 @@
             "GET /admin/ad-assets",
             "GET /admin/ad-playlists",
             "GET /admin/ai-posters/status",
+            "GET /admin/import-batches",
             "GET /admin/screensaver/terminals",
             "PATCH /admin/ad-assets/:param",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "POST /admin/ad-assets/external-video",
             "POST /admin/ad-playlists",
             "PUT /admin/ad-playlists/:param",
@@ -12796,7 +12801,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 208
+      "sourceFileCount": 209
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17893,6 +17898,10 @@
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/admin/src/lib/auditActionLabels.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/main.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -17932,7 +17941,6 @@
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
     ],
     "apps/admin/src/routes/dashboard/index.tsx": [
-      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
@@ -23363,6 +23371,7 @@
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
     "services/api/src/audit/audit.types.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
@@ -26461,8 +26470,8 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/routes/audit/index.tsx",
-          "apps/admin/src/routes/dashboard/index.tsx",
           "apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx",
           "apps/admin/src/routes/partners/PartnerAccountManager.tsx",
           "apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx",
@@ -26616,6 +26625,27 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:admin-users-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          "apps/admin/src/lib/auditActionLabels.ts",
+          "services/api/src/audit/audit.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:console-plain-copy"
       ],
       "wired": true
     },

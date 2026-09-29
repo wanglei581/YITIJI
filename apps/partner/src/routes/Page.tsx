@@ -20,10 +20,12 @@ export const FRONTEND_HINT = {
   companies: '对应一体机「找企业」与岗位详情来源机构',
   screen: '汇总本机构在一体机与小程序上的可见内容与终端状态',
   terminals: '对应本机构一体机的打印扫描服务与设备运行',
-  none: '不直接对应前端页面',
+  /** 这一档没有给运营看的页面对应关系，副标题只保留业务句本身。 */
+  none: '',
 } as const
 
 export function withFrontendHint(subtitle: string, hint: string): string {
+  if (!hint) return subtitle
   return `${subtitle} · ${hint}`
 }
 
