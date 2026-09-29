@@ -154,6 +154,7 @@ async function main(): Promise<void> {
     },
     $transaction: async (run: (tx: unknown) => Promise<void>) =>
       run({
+        $executeRaw: async () => 0,
         printTask: {
           updateMany: async () => {
             concurrentWriteAttempts += 1
@@ -221,7 +222,11 @@ async function main(): Promise<void> {
     409,
     'an unexpected active-state race must require a fresh report'
   )
-  assert.equal(concurrentWriteAttempts, 3, 'each race case must use the guarded CAS exactly once')
+  assert.equal(
+    concurrentWriteAttempts,
+    1,
+    'a locked terminal state is decided without another write; only a still-active lost CAS uses updateMany',
+  )
   assert.equal(
     concurrentSideEffects,
     0,

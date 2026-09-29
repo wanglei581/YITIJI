@@ -607,6 +607,31 @@ export class TerminalAgentService implements OnModuleInit {
       throw new BadRequestException({ error: { code: 'TASK_NOT_OWNED', message: `任务 ${taskId} 不属于终端 ${terminalId}` } })
     }
 
+    // 不带 attempt 的老回放在开写事务之前决定，同一终态不再写任务、订单和状态日志。
+    // 带了 attempt 的不能走这里：旧 failed 会把新一轮的 failed 当成已经处理过。
+    const attemptUsable =
+      typeof dto.attempt === 'number' && Number.isInteger(dto.attempt) && dto.attempt >= 0
+    if (!attemptUsable && TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
+      if (preCheck.status === dto.status) return { acknowledged: true }
+      if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
+        throw new ConflictException({
+          error: {
+            code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+            message: `任务已处于终态 ${preCheck.status}，不能确认不同终态 ${dto.status}`,
+          },
+        })
+      }
+      const replayAllowed = VALID_TRANSITIONS[preCheck.status]
+      if (!replayAllowed || !replayAllowed.includes(dto.status as TaskStatus)) {
+        throw new BadRequestException({
+          error: {
+            code: 'INVALID_STATUS_TRANSITION',
+            message: `任务当前状态 ${preCheck.status} 不允许转换为 ${dto.status}`,
+          },
+        })
+      }
+    }
+
     // 锁、当前 attempt 和状态写入在同一个事务里。落后补报先记元数据日志再提交，
     // 冲突异常放在事务外抛，避免把这条日志一起回滚。
     let staleAttempt: { requested: number; current: number } | null = null

@@ -83,9 +83,10 @@ function assertReprintAttemptQueryShape(): void {
   const patchEnd = source.indexOf('async validateTerminalToken(')
   const patch = patchStart >= 0 && patchEnd > patchStart ? source.slice(patchStart, patchEnd) : ''
   const ownedAt = patch.indexOf("code: 'TASK_NOT_OWNED'")
+  const earlyAt = patch.indexOf('!attemptUsable && TERMINAL_STATES.includes(')
   const txAt = patch.indexOf('this.prisma.$transaction')
   const freshAt = patch.indexOf('readLockedPrintStatusAttempt(')
-  const terminalAt = patch.indexOf('TERMINAL_STATES.includes(')
+  const terminalAt = freshAt < 0 ? -1 : patch.indexOf('TERMINAL_STATES.includes(', freshAt)
   const updateAt = patch.indexOf('printTask.updateMany(')
   if (
     !fn.includes('printTaskStatusLog.groupBy')
@@ -102,12 +103,13 @@ function assertReprintAttemptQueryShape(): void {
     || callAt < loopAt
     || claim.includes('printTaskStatusLog.count')
     || ownedAt < 0
-    || txAt < ownedAt
+    || earlyAt < ownedAt
+    || txAt < earlyAt
     || freshAt < txAt
     || terminalAt < freshAt
-    || updateAt < freshAt
+    || updateAt < terminalAt
   ) {
-    fail('attempt 必须在领取循环之后按 taskId 一次 groupBy，且只数 fromStatus=failed、toStatus=pending；落后补报要在同一事务里、终态幂等确认之前，对小于和大于当前值都拒绝')
+    fail('attempt 必须在领取循环之后按 taskId 一次 groupBy，且只数 fromStatus=failed、toStatus=pending；不带 attempt 的终态回放在事务外决定，带 attempt 的比较和终态确认在同一事务里、写入之前，小于和大于当前值都拒绝')
   }
   pass('attempt 计数：领取循环之后一次 groupBy(taskId)，不按 errorCode 过滤；补报在事务内双向拒绝')
 }
