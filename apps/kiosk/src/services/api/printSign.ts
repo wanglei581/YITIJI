@@ -1,5 +1,5 @@
 // ============================================================
-// 签名盖章前端 API 封装 — Task 10
+// 签名前端 API 封装 — Task 10
 //
 // 薄封装：POST /print/sign/inspect、POST /print/sign/compose
 // 封装方式对齐同目录 printConversion.ts：
@@ -60,7 +60,7 @@ async function post<T>(
   }
 
   if (!payload?.data) {
-    throw new ApiHttpError('SIGN_FAILED', '签章服务返回数据为空', res.status)
+    throw new ApiHttpError('SIGN_FAILED', '签名没有返回结果，请重试一次', res.status)
   }
   return payload.data
 }

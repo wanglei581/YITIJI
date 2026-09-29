@@ -71,3 +71,6 @@ export function emphasizedTitle(copy: { title: string; titleEm: string }): { bef
     after: copy.title.slice(index + copy.titleEm.length),
   }
 }
+
+/** AI 能力级停用（暂停 / 当日额度已到）时作答再提交也不会变好：不叫人重试，指向不用 AI 的练法。 */
+export const INTERVIEW_AI_DOWN_HINT = 'AI 现在停用，这场练习没法继续出题和点评。可以返回面试服务，看不需要 AI 的面试技巧。'
