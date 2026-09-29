@@ -230,6 +230,7 @@ async function initFallbackDb(): Promise<void> {
         "phoneHash" TEXT,
         "phoneEnc" TEXT,
         "phoneVerifiedAt" DATETIME,
+        "phoneRegisteredByAdminAt" DATETIME,
         "tokenVersion" INTEGER NOT NULL DEFAULT 0,
         "lastLoginAt" DATETIME,
         "enabled" BOOLEAN NOT NULL DEFAULT true,

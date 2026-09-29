@@ -24,6 +24,12 @@ const CODE_COPY: Readonly<Record<string, string>> = {
   REBIND_CODE_EXPIRED: '新手机验证码已过期，请重新获取。',
   REBIND_CODE_LOCKED: '新手机验证码尝试次数过多，请重新获取。',
   PHONE_CONFLICT: '该手机号已绑定其他账号，无法换绑。',
+  // 2026-09-29 后端排雷新增（谁新增的码谁补文案；覆盖门禁 verify:backend-error-copy-coverage）
+  REBIND_UNAVAILABLE: '暂时无法换绑，手机号没有改动。请稍后从验证旧手机号重新开始。',
+  ACCOUNT_UNAVAILABLE: '账号当前不可用，请联系现场工作人员。',
+  SMS_DAILY_TOTAL_LIMIT: '今天的短信验证码已发满，请明天再试，或用手机扫码登录。',
+  SMS_TERMINAL_DAILY_LIMIT: '这台机器今天的短信验证码已发满，请用手机扫码登录，或明天再试。',
+  SMS_BUDGET_UNAVAILABLE: '验证码服务暂时不可用，请稍后再试，或用手机扫码登录。',
 }
 
 /** 保留业务提示原意；仅空值、工程词和原始错误串退回本步文案。 */
@@ -48,7 +54,11 @@ export function accountPhoneDisplay(raw: string): string {
 
 /** 换绑先消费一次性旧号验证；已知拒绝从旧号重来，丢失结果则先重新登录核对。 */
 export function phoneRebindRecovery(error: unknown): 'restart' | 'relogin' {
-  return error instanceof MemberApiError && error.status >= 400 && error.status < 500
+  if (!(error instanceof MemberApiError)) return 'relogin'
+  // REBIND_UNAVAILABLE（503）：没能先清掉旧登录，整单没改手机号；旧号验证与新号验证码都已用掉，
+  // 登录本身仍有效——从旧号重来，而不是让人重新登录。
+  if (error.code === 'REBIND_UNAVAILABLE') return 'restart'
+  return error.status >= 400 && error.status < 500
     && ['STEP_UP_TOKEN_INVALID', 'REBIND_CODE_INVALID', 'REBIND_CODE_EXPIRED', 'REBIND_CODE_LOCKED', 'PHONE_CONFLICT'].includes(error.code)
     ? 'restart' : 'relogin'
 }

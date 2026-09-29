@@ -3,7 +3,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'crypto'
 import { FilesService } from '../files/files.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
-import { parseContentFileId, signFileUrl } from '../files/signing'
+import { parseContentFileId, PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 
 const FAIR_MATERIAL_MAX_BYTES = 20 * 1024 * 1024
 const BRIDGE_FILE_TTL_MS = 60 * 60 * 1000
@@ -72,6 +72,7 @@ export class FairMaterialPrintBridgeService {
         purpose: 'fair_material',
         uploaderId: null,
         assetCategory: 'derived',
+        derivationKind: 'ai_generated',
         createdBy: null,
         validationMode: 'intent',
         expiresAtOverride: expiresAt,
@@ -382,7 +383,7 @@ export class FairMaterialPrintBridgeService {
       sizeBytes: material.sizeBytes,
       mimeType: material.mimeType,
       pageCount: material.pageCount,
-      printFileUrl: signFileUrl(fileId).url,
+      printFileUrl: signFileUrl(fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 }

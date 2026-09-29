@@ -94,6 +94,7 @@ export class ContractReviewReportFileService {
         status: 'uploading',
         createdBy: 'system:contract-review-report',
         assetCategory: 'derived',
+        derivationKind: 'ai_generated',
         sourceFileId: args.sourceFileId,
         expiresAt: args.expiresAt,
         retentionPolicy: CONTRACT_REVIEW_REPORT_FILE_POLICY.retentionPolicy,

@@ -23,6 +23,9 @@ import { RedisService } from '../src/common/redis/redis.service'
 import { fingerprintMemberPrintOrderPayload, MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
 import { MemberPrintOrdersController } from '../src/member-print-orders/member-print-orders.controller'
 import { PickupCodeReissueService } from '../src/member-print-orders/pickup-code-reissue.service'
+import { MemberOrderTimelineService } from '../src/member-print-orders/member-order-timeline.service'
+import { MemberOrderClaimHereService } from '../src/member-print-orders/member-order-claim-here.service'
+import { TerminalSessionService } from '../src/terminals/terminal-session.service'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
@@ -125,6 +128,11 @@ const redisStub = {
     },
     { provide: MemberPrintOrdersService, useValue: { list: async () => ({ items: [], nextCursor: null, total: 0 }) } },
     { provide: PickupCodeReissueService, useValue: { reissue: async () => ({}) } },
+    // 同一控制器上的时间线 / 本机领取不在本门禁范围（由 verify:member-order-timeline 覆盖），这里只补依赖占位；
+    // 终端会话一律验不过（fail-closed），不会让 claim-here 在本门禁里意外放行。
+    { provide: MemberOrderTimelineService, useValue: {} },
+    { provide: MemberOrderClaimHereService, useValue: {} },
+    { provide: TerminalSessionService, useValue: { validate: async () => { throw new Error('TERMINAL_SESSION_INVALID') } } },
     {
       provide: PrismaService,
       useFactory: () => {

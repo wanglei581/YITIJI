@@ -61,10 +61,19 @@ const VOICE_CONSENT_ITEMS = [
   '可以随时在「我的 → 账号设置 → 隐私与数据」撤回，撤回后改用手打。',
 ];
 
-/** 用户选「未满」或「改用手打」时抛出的码；文案在 utils/user-error.js 的 SHARED_USER_MESSAGES。 */
+/**
+ * 简历类 AI 的账号授权（服务端 9/06 起对登录会员强制：resume/parse、optimize、draft、
+ * fact-check、generate、导出，缺了回 403 USER_AI_CONSENT_REQUIRED）。只有会员有：游客不入库、
+ * 服务端也不拦，所以它不进 SCOPES（不在本机记、不带请求头），只在服务端要时问一次、写账号。
+ * 文案与一体机 ResumeAiConsentDialog 一致。
+ */
+const RESUME_AI_SCOPE = 'resume_ai';
+
+/** 用户选「未满」「改用手打」「暂不使用」时抛出的码；文案在 utils/user-error.js 的 SHARED_USER_MESSAGES。 */
 const DECLINED_CODES = {
   [AGE_SCOPE]: 'AI_AGE_NOT_DECLARED',
   [VOICE_SCOPE]: 'AI_VOICE_NOT_CONSENTED',
+  [RESUME_AI_SCOPE]: 'AI_RESUME_NOT_CONSENTED',
 };
 
 function readAll() {
@@ -133,7 +142,8 @@ function declinedError(scope) {
 }
 
 function isDeclined(err) {
-  return !!err && (err.code === DECLINED_CODES[AGE_SCOPE] || err.code === DECLINED_CODES[VOICE_SCOPE]);
+  if (!err) return false;
+  return Object.keys(DECLINED_CODES).some((scope) => err.code === DECLINED_CODES[scope]);
 }
 
 // ── 提示框。同一时刻只开一个：页面同时发两个 AI 请求时，不能叠两层同样的问题。 ──
@@ -192,6 +202,30 @@ function promptScope(scope) {
   return run;
 }
 
+let resumeAiPending = null;
+
+/**
+ * 问一次「确认使用简历 AI」。同一时刻只开一个框（页面并发两个简历请求时共用一个答案）。
+ * 同意 resolve；不同意 reject（code AI_RESUME_NOT_CONSENTED，isDeclined 可判）。
+ * 写账号那一步在 api-legal-consent.js（端点只出现在 api 门面里）。
+ */
+function promptResumeAi() {
+  if (resumeAiPending) return resumeAiPending;
+  const run = showModal({
+    title: '确认使用简历 AI',
+    content: '诊断、优化和生成会把你上传或填写的简历内容发送到系统里的 AI 进行分析。结果只给你本人看，不会发送给企业或合作机构。授权保存在你的账号中，可随时在「我的 → 账号设置 → 隐私与数据」撤回。',
+    confirmText: '同意并继续',
+    cancelText: '暂不使用',
+  }).then((agreed) => {
+    if (!agreed) throw declinedError(RESUME_AI_SCOPE);
+    return true;
+  });
+  resumeAiPending = run;
+  const release = () => { if (resumeAiPending === run) resumeAiPending = null; };
+  run.then(release, release);
+  return run;
+}
+
 let loginPromptOpen = false;
 
 /**
@@ -215,6 +249,7 @@ function promptLogin() {
 module.exports = {
   AGE_SCOPE,
   VOICE_SCOPE,
+  RESUME_AI_SCOPE,
   SCOPES,
   VOICE_CONSENT_ITEMS,
   DECLINED_CODES,
@@ -227,5 +262,6 @@ module.exports = {
   scopesFor,
   scopesFromMissing,
   promptScope,
+  promptResumeAi,
   promptLogin,
 };

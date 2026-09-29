@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { FilesService } from '../../files/files.service'
-import { signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { FairVisitPlanPdfService } from './fair-visit-plan-pdf.service'
 import { LlmFairVisitPlanService, type FairVisitPlanContext, type FairVisitPlanMode, type FairVisitPlanPayload } from './llm-fair-visit-plan.service'
@@ -177,8 +177,9 @@ export class FairVisitPlanService {
       filename: `招聘会参会准备单.pdf`,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
-      // AI 生成的派生稿：生产隐私闸门按类别放行，否则直达报价页后建单被拒（商用收口 P0-5）。
+      // AI 生成的派生稿：生产隐私闸门按 derivationKind=ai_generated 放行，否则直达报价页后建单被拒（商用收口 P0-5）。
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       uploaderId: null,
       endUserId: parse.endUserId,
       createdBy: 'fair_visit_plan',
@@ -201,7 +202,7 @@ export class FairVisitPlanService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 

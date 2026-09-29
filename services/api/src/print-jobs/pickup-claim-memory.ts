@@ -66,6 +66,21 @@ export function memoryHas(key: string, now = Date.now()): boolean {
   return true
 }
 
+/** 计数减 1、不低于 0（减到 0 删槽）；过期或不存在返回 0。 */
+export function memoryDecrement(key: string, now = Date.now()): number {
+  const current = slots.get(key)
+  if (!current || current.expiresAt <= now) {
+    if (current) slots.delete(key)
+    return 0
+  }
+  if (current.count <= 1) {
+    slots.delete(key)
+    return 0
+  }
+  current.count -= 1
+  return current.count
+}
+
 export function memoryDelete(key: string): void {
   slots.delete(key)
 }

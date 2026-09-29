@@ -5,9 +5,11 @@ import { BadRequestException, ValidationPipe, type ValidationError } from '@nest
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import { bootReadiness } from './common/boot/boot-readiness'
+import { registerAiPlatformDegradation } from './common/boot/ai-platform-degradation'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { installBodyParsers } from './config/body-parsers'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
+import { assertSmsTrustedEgressConfig } from './member-auth/sms/sms-egress-config'
 import { resolveTrustProxyHops } from './config/trust-proxy'
 
 // rawBody 捕获与 body parser 装配已抽到 config/body-parsers.ts（与 verify 脚本共用，
@@ -41,7 +43,12 @@ async function bootstrap(): Promise<void> {
   // 生产运行时启动门禁（fail-closed）：JWT_SECRET / FILE_STORAGE_DRIVER / DATABASE_URL
   // 任一不满足生产安全底线即拒绝启动。必须在 NestFactory.create 之前，
   // 让进程在装载任何模块/连接外部依赖前就快速失败。
-  assertProductionRuntimeGates()
+  // AI 类配置（OCR / AI_PROVIDER / 大模型密钥 / AIGC 生产方）例外：缺了只把 AI 登记为降级（F-11），
+  // /health 如实 degraded，AI 路由 503，打印、扫描、支付、两个后台照常。
+  registerAiPlatformDegradation(assertProductionRuntimeGates().aiPlatform)
+  // 受信出口写错在任何环境都要拒绝启动，所以不能放进 assertProductionRuntimeGates
+  // （那个函数在非生产环境会直接返回）。
+  assertSmsTrustedEgressConfig()
 
   const { AppModule } = await import('./app.module')
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -108,9 +115,10 @@ async function bootstrap(): Promise<void> {
   // 明细同时可从 GET /api/v1/health 与 GET /api/v1/health/ready 读到。
   const degraded = bootReadiness.degraded()
   if (degraded.length > 0) {
+    const blocking = bootReadiness.readinessBlocking().length > 0
     console.warn(
       `[WARN] API 以降级状态启动：${degraded.map((s) => `${s.subsystem}(${s.code})`).join(', ')}。` +
-        '详见 GET /api/v1/health；readiness 探针 GET /api/v1/health/ready 将返回 503。',
+        `详见 GET /api/v1/health；readiness 探针 GET /api/v1/health/ready 将返回 ${blocking ? '503' : '200（这些降级不阻断就绪）'}。`,
     )
   }
 }

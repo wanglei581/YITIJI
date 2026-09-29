@@ -578,9 +578,9 @@ export class PrintJobsService {
   /**
    * 建单前确认文件走过隐私预检。
    *
-   * 判定：文件为「用户上传的原件」（assetCategory 非派生 + purpose 在白名单内）时，
-   * 必须存在一条 completed 的 pii_scan DocumentProcessTask，且不残留 pending 裁决。
-   * 派生产物与系统生成物放行。
+   * 判定：materialCheckRequired() 为真（原件，或图片/Office 转 PDF、签名合成等用户材料派生件，
+   * 见 material-check-policy.ts）时，必须存在一条 completed 的 pii_scan DocumentProcessTask，
+   * 且不残留 pending 裁决。AI / 系统生成件与隐私遮挡产物放行。
    *
    * 门控关闭时（默认）只写审计不拦截，用于先观察真实绕过量。
    */

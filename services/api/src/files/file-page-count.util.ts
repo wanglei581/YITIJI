@@ -1,4 +1,4 @@
-import { pdfjsPresetDataOptions } from '../common/pdf/pdfjs-document'
+import { openPdfjsDocument } from '../common/pdf/pdfjs-document'
 
 // 文件页数识别（materials 体检 + print-jobs 计费页数共用）。
 //
@@ -73,37 +73,18 @@ const DOCUMENT_LEVEL_PDFJS_ERRORS = new Set([
 ])
 
 /**
- * 用 unpdf 内置的 pdf.js 只读页数，不渲染、不注入 CanvasFactory
+ * 经服务端唯一的 PDF 打开入口只读页数，不渲染、不注入 CanvasFactory
  * （拿 numPages 不需要 canvas，避免把原生画布依赖引进计费链路）。
  *
- * isEvalSupported:false —— 禁止 pdfjs 对不可信 PDF 内嵌函数走 eval 路径。
+ * 打开选项（isEvalSupported:false、enableScripting:false 等）由共用入口统一强制。
+ * 共用入口自身出错（引擎模块缺失等）抛的不是 pdf.js 文档级异常，落到下面的 parser_unavailable。
  */
 async function countPdfPagesByParser(buffer: Buffer): Promise<ParserOutcome> {
-  let getDocument: (params: Record<string, unknown>) => {
-    promise: Promise<{ numPages: number; destroy(): Promise<void> }>
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getResolvedPDFJS } = require('unpdf') as {
-      getResolvedPDFJS(): Promise<{
-        getDocument(params: Record<string, unknown>): {
-          promise: Promise<{ numPages: number; destroy(): Promise<void> }>
-        }
-      }>
-    }
-    const pdfjs = await getResolvedPDFJS()
-    getDocument = pdfjs.getDocument.bind(pdfjs)
-  } catch {
-    return { kind: 'parser_unavailable' }
-  }
-
   let doc: { numPages: number; destroy(): Promise<void> } | undefined
   try {
-    doc = await getDocument({
-      ...pdfjsPresetDataOptions(),
-      data: new Uint8Array(buffer),
-      isEvalSupported: false,
-    }).promise
+    doc = await openPdfjsDocument<{ numPages: number; destroy(): Promise<void> }>(
+      new Uint8Array(buffer),
+    )
     const pages = doc.numPages
     if (!Number.isInteger(pages) || pages <= 0 || pages > MAX_PLAUSIBLE_PAGES) {
       return { kind: 'invalid_document' }
@@ -123,4 +104,38 @@ async function countPdfPagesByParser(buffer: Buffer): Promise<ParserOutcome> {
 /** 单页图片 MIME 白名单（png/jpeg/webp）；用于"图片按 1 页"计。 */
 export function isSinglePageImage(mimeType: string): boolean {
   return mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp'
+}
+
+/**
+ * 对外页数。只接受已识别的正整数。
+ * 缺失、0、负数、小数都不是「0 页」，一律 null。
+ */
+export function exposeDocumentPageCount(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) return null
+  return value
+}
+
+/**
+ * 列表行上的页数。
+ * 行对象没有 pageCount（查询漏选）时返回 null。参数带上必有的 id，
+ * 这样去掉 select 仍能通过类型检查，门禁改为「有页数的文件没有返回真实页数」变红。
+ */
+export function listedDocumentPageCount(row: { id: string; pageCount?: number | null }): number | null {
+  if (!Object.prototype.hasOwnProperty.call(row, 'pageCount')) return null
+  return exposeDocumentPageCount(row.pageCount)
+}
+
+/**
+ * 落库用的页数。只看字节和已通过校验的类型，不读任何调用方申报的页数。
+ * 图片按 1 页；PDF 走权威解析；其余或解析失败为 null。失败不抛出。
+ */
+export async function recognizeStoredPageCount(buffer: Buffer, mimeType: string): Promise<number | null> {
+  try {
+    const mime = mimeType.split(';')[0]?.trim().toLowerCase() ?? ''
+    if (isSinglePageImage(mime)) return 1
+    if (mime !== 'application/pdf') return null
+    return exposeDocumentPageCount(await resolvePdfPageCount(buffer))
+  } catch {
+    return null
+  }
 }

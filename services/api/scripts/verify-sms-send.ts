@@ -106,6 +106,43 @@ async function main(): Promise<void> {
       : bad(`providerCode 不符: ${providerCodeOf(e) ?? 'missing'}`)
   }
 
+  delete process.env['SMS_TEMPLATE_PARTNER_PHONE_REGISTERED']
+  const beforeMissing = last.body
+  try {
+    await sender.sendPartnerPhoneRegisteredNotice('13800000000', '青岛机构')
+    bad('未配置知会模板应抛错')
+  } catch (e) {
+    if (providerCodeOf(e) === 'template_missing') ok('未配置知会模板 → template_missing')
+    else bad(`知会缺模板码不符: ${providerCodeOf(e) ?? 'missing'}`)
+    if (last.body === beforeMissing) ok('缺模板时没有发出请求')
+    else bad('缺模板仍发出了请求')
+  }
+  try {
+    await sender.sendPartnerPhoneRegisteredNotice('01012345678', '青岛机构')
+    bad('非大陆号码的知会应拒绝')
+  } catch (e) {
+    if (providerCodeOf(e) === 'region_rejected') ok('知会拒绝非大陆号码')
+    else bad(`知会地域码不符: ${providerCodeOf(e) ?? 'missing'}`)
+  }
+
+  process.env['SMS_TEMPLATE_PARTNER_PHONE_REGISTERED'] = 'notice-template-1'
+  nextResponse = { Response: { SendStatusSet: [{ Code: 'Ok' }], RequestId: 'notice-ok' } }
+  try {
+    await sender.sendPartnerPhoneRegisteredNotice('13800000000', '青岛\n机构')
+    ok('知会短信发送成功')
+  } catch (e) {
+    bad(`知会不应失败: ${(e as Error).message}`)
+  }
+  const noticeBody = JSON.parse(last.body) as { TemplateId?: string; TemplateParamSet?: string[]; PhoneNumberSet?: string[] }
+  if (noticeBody.TemplateId === 'notice-template-1') ok('知会使用 SMS_TEMPLATE_PARTNER_PHONE_REGISTERED')
+  else bad(`知会模板不对: ${noticeBody.TemplateId ?? ''}`)
+  if (JSON.stringify(noticeBody.TemplateParamSet) === '["青岛 机构"]') ok('知会参数只有机构名，不含验证码')
+  else bad(`知会参数不符: ${JSON.stringify(noticeBody.TemplateParamSet)}`)
+  if (noticeBody.PhoneNumberSet?.[0] === '+8613800000000') ok('知会号码走 +86')
+  else bad(`知会号码不符: ${JSON.stringify(noticeBody.PhoneNumberSet)}`)
+  if (last.headers['x-tc-region'] === 'ap-guangzhou') ok('知会沿用短信地域')
+  else bad('知会地域头不对')
+
   finish()
 }
 

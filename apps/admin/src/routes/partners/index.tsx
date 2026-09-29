@@ -35,6 +35,8 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 import { OrgContentTrustPanel } from './OrgContentTrustPanel'
 import { OrgCircuitBreakPanel } from './OrgCircuitBreakPanel'
 import { OrgOfficialChannelSections } from './OrgOfficialChannelSections'
+import { OrgQualificationSection } from './OrgQualificationSection'
+import { createOrgTypeOptions, editOrgTypeOptions, isParkedOrgType } from './orgTypeOptions'
 import {
   ORG_CONTENT_TRUST_STATUSES,
   ORG_CONTENT_TRUST_STATUS_LABELS,
@@ -277,8 +279,9 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
           <input className={inputCls} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
         </Field>
         <Field label="机构类型" required>
+          {/* 3.15：企业数据来源、招聘会主办方已停放，新建时不给这两类（服务端同样拒绝 ORG_TYPE_PARKED） */}
           <select className={inputCls} value={form.type} onChange={(e) => pickType(e.target.value)}>
-            {Object.entries(PARTNER_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {createOrgTypeOptions(PARTNER_TYPE_LABELS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-3">
@@ -426,13 +429,17 @@ function OrgDetailDrawer({
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="机构类型">
+                {/* 3.15：存量停放类型保留当前值可原样保存，但不能改成另一类停放类型 */}
                 <select
                   className={inputCls}
                   value={form.type ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, type: e.target.value, ...sceneFieldsForType(e.target.value) }))}
                 >
-                  {Object.entries(PARTNER_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  {editOrgTypeOptions(PARTNER_TYPE_LABELS, detail.type).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
+                {isParkedOrgType(detail.type) && (
+                  <span className="mt-1 block text-xs text-neutral-500">这一类已停放：可以保留原类型编辑其它信息，或改成其它类型；不能新建或改成已停放的类型。</span>
+                )}
               </Field>
               <SceneTemplateReadonly sceneTemplate={form.sceneTemplate ?? null} />
             </div>
@@ -470,6 +477,9 @@ function OrgDetailDrawer({
 
           {/* 3.14 官方域名（入驻核验）+ 官方渠道（只读与紧急下架），与招聘内容托管开关无关 */}
           <OrgOfficialChannelSections orgId={orgId ?? detail.id} orgName={detail.name} />
+
+          {/* 3.15 资质核验：从线下机构页（随整页停放）迁来，按机构 id 直接读，只读 + 取证留痕 */}
+          <OrgQualificationSection organizationId={orgId ?? detail.id} />
 
           <PartnerAccountManager
             orgId={orgId ?? detail.id}
@@ -562,7 +572,7 @@ export default function PartnersPage() {
   return (
     <Page
       title="合作机构管理"
-      subtitle={`共 ${orgs.length} 家合作机构 — 机构档案 · 授权启停 · 内容可信 · 官方域名与渠道 · 后台账号`}
+      subtitle={`共 ${orgs.length} 家合作机构 — 机构档案 · 授权启停 · 内容可信 · 官方域名与渠道 · 资质核验 · 后台账号`}
       actions={
         <button
           onClick={() => setCreateOpen(true)}

@@ -114,6 +114,13 @@ class FakeRedis {
     this.guard()
     return this.store.delete(key) ? 1 : 0
   }
+  async decrementFloorKeepTtl(key: string): Promise<number> {
+    const v = Number(this.store.get(key) ?? 'NaN')
+    if (!Number.isFinite(v)) return 0
+    if (v <= 1) { this.store.delete(key); return 0 }
+    this.store.set(key, String(v - 1))
+    return v - 1
+  }
   async incrWithTtl(key: string, _ttlSeconds: number): Promise<number> {
     this.guard()
     const next = Number(this.store.get(key) ?? '0') + 1

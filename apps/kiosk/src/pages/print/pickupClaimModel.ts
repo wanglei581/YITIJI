@@ -83,6 +83,7 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   FILE_CONTENT_CHANGED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   PRINT_PII_SCAN_REQUIRED: '这份文件的隐私检查还没完成，暂时不能打印。请过一会儿再输一次，或找现场工作人员',
   PII_SCAN_STALE: '这份文件在隐私检查后又改过，暂时不能打印。请在手机上重新检查后再来取件',
+  PRINT_PII_MANUAL_CONFIRM_REQUIRED: '这份文件的隐私检查没有完整覆盖，需要你本人先在手机上确认文件里没有不想打印的个人信息，确认后再来取件',
   PICKUP_CLAIM_RATE_LIMITED: '输码太频繁了，请等一分钟再输',
   PICKUP_CLAIM_LOCKED: PICKUP_LOCKED_MESSAGE,
   CAPABILITY_NOT_CONFIGURED: '这台机器暂时不能打印这笔订单，请找现场工作人员',

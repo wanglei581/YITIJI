@@ -32,6 +32,10 @@ export interface LegalDocListItem {
   createdAt: Date
 }
 
+export interface LegalDocDetail extends LegalDocListItem {
+  content: string
+}
+
 export interface CreateLegalDocInput {
   docType: string
   version: string
@@ -78,6 +82,39 @@ export class LegalService {
         createdAt: true,
       },
     })
+  }
+
+  /**
+   * Admin：按 id 读取单个版本（含正文），用于后台「查看正文」核对草稿与历史版本。
+   * 每次读取先写访问审计（legal_doc.view），写不进去就不返回正文；版本不存在不写审计。
+   */
+  async getById(id: string, viewer: { userId: string; role: string }): Promise<LegalDocDetail> {
+    const doc = await this.prisma.legalDocVersion.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        docType: true,
+        version: true,
+        title: true,
+        content: true,
+        isActive: true,
+        publishedAt: true,
+        publishedBy: true,
+        createdAt: true,
+      },
+    })
+    if (!doc) {
+      throw new NotFoundException({ error: { code: 'LEGAL_DOC_NOT_FOUND', message: '法务文档版本不存在' } })
+    }
+    await this.audit.writeRequired(this.prisma, {
+      actorId: viewer.userId,
+      actorRole: viewer.role,
+      action: 'legal_doc.view',
+      targetType: 'LegalDocVersion',
+      targetId: doc.id,
+      payload: { docType: doc.docType, version: doc.version },
+    })
+    return doc
   }
 
   /** Admin：创建草稿（isActive=false） */

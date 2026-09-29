@@ -34,6 +34,7 @@ import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStartRow, QxMeStr
 import { JobAiSessionRecords } from './JobAiSessionRecords'
 import { MockInterviewRecords } from './MockInterviewRecords'
 import { patchInterviewWorkbenchSession } from '../../interview/interviewWorkbenchSession'
+import { AI_CONTENT_COMPLAINT_ROUTE } from './feedback/aiComplaint'
 import './styles/member-records-qx.css'
 
 type AiRecordView = MemberAiRecordItem & {
@@ -422,6 +423,11 @@ export function MyAiRecordsPage() {
     >
       {body}
       {isLoggedIn && state === 'ready' ? <MemberLoadMore {...recordsPage} label="加载更多简历与规划记录" /> : null}
+      {/* AI 内容投诉入口（C3，走查 W-01）：稿 39 没画，按低调文字入口处理；游客点进去由反馈页走登录回跳。 */}
+      <div className="qx-me-legal" data-testid="member-records-ai-complaint" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <span style={{ flex: 1 }}>对 AI 生成的内容有异议？可以投诉，写清是哪个功能、什么时间、哪段内容。</span>
+        <button type="button" className="qx-me-small" data-route={AI_CONTENT_COMPLAINT_ROUTE} onClick={() => navigate(AI_CONTENT_COMPLAINT_ROUTE)}>投诉 AI 内容</button>
+      </div>
     </QxMePage>
   )
 }

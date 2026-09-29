@@ -17,7 +17,7 @@ import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { FilesService } from '../files/files.service'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { resumeExportStagingExpiresAt } from '../benefit-redemption/resume-export-gate.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AiService, type AiResultRequester } from './ai.service'
@@ -116,6 +116,7 @@ export class ResumeReportExportController {
       uploaderId: null,
       endUserId: row.endUserId,
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       sourceFileId,
       createdBy: 'ai_resume_diagnosis_export',
       ...(stage ? { paidExportStaging: stage } : {}),
@@ -151,7 +152,7 @@ export class ResumeReportExportController {
       pageCount: rendered.pageCount,
       signedUrl: access.signedUrl,
       expiresAt: access.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(access.fileId).url,
+      printFileUrl: signFileUrl(access.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
       savedToDocuments: Boolean(row.endUserId),
       aiGenerated: true as const,
     }

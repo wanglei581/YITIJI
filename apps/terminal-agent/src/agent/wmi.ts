@@ -28,7 +28,9 @@
  * Mapping to PrinterStatus (heartbeat; see mapWin32PrinterQuery):
  *   WorkOffline=True                              → 'offline'  (N2 fix)
  *   PrinterStatus=7 or DetectedErrorState=9       → 'offline'
- *   DetectedErrorState=4,6,7,8 (fatal errors)     → 'error'
+ *   DetectedErrorState=4 (No Paper)               → 'paper_empty' (server/kiosk already know it;
+ *                                                  Pantum CM2800ADN never sets 4, see N3 above)
+ *   DetectedErrorState=6,7,8 (fatal errors)       → 'error'
  *   DetectedErrorState=3,5 (recoverable warnings)  → 'low_paper'
  *   DetectedErrorState=2 (No Error)               → 'ready'
  *   DetectedErrorState=0 (CIM Unknown) + PrinterStatus 3/4/5 and not offline
@@ -121,7 +123,13 @@ export function mapWin32PrinterQuery(output: string | null): PrinterStatus {
 
   if (workOfflineStr === 'True') return 'offline'
   if (printerStatusCode === 7 || detectedError === 9) return 'offline'
-  if (detectedError === 4 || detectedError === 6 || detectedError === 7 || detectedError === 8) {
+  // 4 = No Paper. Until 2026-09-29 this was folded into 'error', so a driver that does
+  // report paper-out showed up as a generic fault and the server/kiosk paper_empty paths
+  // (「打印机缺纸」) were unreachable from a real Agent. Pantum CM2800ADN is unaffected: it
+  // never sets DetectedErrorState (N3), so paper-out there still surfaces only as an
+  // unconfirmed job.
+  if (detectedError === 4) return 'paper_empty'
+  if (detectedError === 6 || detectedError === 7 || detectedError === 8) {
     return 'error'
   }
   if (detectedError === 3 || detectedError === 5) return 'low_paper'

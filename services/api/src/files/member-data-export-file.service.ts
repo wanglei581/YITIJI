@@ -119,6 +119,7 @@ export class MemberDataExportFileService {
         status: 'active',
         createdBy: 'system:member-data-export',
         assetCategory: 'derived',
+        derivationKind: 'ai_generated',
         sourceFileId: null,
         expiresAt: args.expiresAt,
         retentionPolicy: MEMBER_DATA_EXPORT_FILE_POLICY.retentionPolicy,

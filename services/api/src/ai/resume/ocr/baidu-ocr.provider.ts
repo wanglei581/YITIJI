@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import type { OcrInput, OcrProvider, OcrProviderName, OcrResult } from './ocr-provider.interface'
+import { isAiEndpointAllowed } from '../../../common/outbound/ai-endpoint-allowlist'
 
 // ============================================================
 // 百度智能云 OCR provider（Stage 3 真实 OCR）。
@@ -89,6 +90,15 @@ export class BaiduOcrProvider implements OcrProvider {
         ok: false,
         errorCode: 'OCR_NOT_CONFIGURED',
         errorMessage: '文字识别服务未配置，请上传带文字层的 PDF 或 DOCX',
+      }
+    }
+    // 出站白名单：换 token 与识别共用这个地址，第一个请求之前核对（token 查询串里就是密钥）。
+    // 走 OCR_NOT_CONFIGURED：是配置问题，重试不会好；上层对「未配置」已有如实引导。
+    if (!isAiEndpointAllowed(this.baseUrl, 'ocr')) {
+      return {
+        ok: false,
+        errorCode: 'OCR_NOT_CONFIGURED',
+        errorMessage: '文字识别服务地址未通过核准，本次没有发出识别请求，请上传带文字层的 PDF 或 DOCX',
       }
     }
     if (!input.buffer || input.buffer.length === 0) {

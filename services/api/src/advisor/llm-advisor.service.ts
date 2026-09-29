@@ -9,7 +9,9 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../ai/llm/llm-http'
-import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
+import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
+import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
@@ -470,14 +472,16 @@ export class LlmAdvisorService {
             ],
             temperature: cfg.temperature,
             stream: false,
-            // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
-            ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
+            // DeepSeek 系模型一律关闭思考（见 ai/llm/deepseek-thinking.ts），避免 reasoning 占满输出导致 content 为空、按输出价多计费
+            ...deepseekThinkingOff(cfg.model),
           }),
         },
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'advisor_work', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
       if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
         this.logger.warn(`advisor.llm busy limit=${error.limit}`)
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })

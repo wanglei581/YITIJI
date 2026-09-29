@@ -263,11 +263,11 @@ function OrientationPanel() {
     <section className="space-y-4" aria-label="迎新内容管理">
       <div>
         <h2 className="text-lg font-bold text-neutral-900">迎新内容管理</h2>
-        <p className="mt-0.5 text-sm text-neutral-500">维护报到流程、办事窗口、官方链接，提交后经平台审核上终端。</p>
+        <p className="mt-0.5 text-sm text-neutral-500">维护报到流程、办事窗口、官方链接（功能尚未开放）。</p>
       </div>
       <NotOpenState
         title="迎新内容管理尚未开放"
-        reason="内容模型与平台审核流尚未接入，机构端暂不能在此录入或编辑迎新内容；开放前终端不展示任何示例内容。功能上线后将在此维护报到流程、办事窗口与官方外链，并经平台审核后下发终端。"
+        reason="迎新内容的录入功能尚未开放，机构端暂不能在此录入或编辑迎新内容；开放前终端不展示任何示例内容。功能上线后将在此维护报到流程、办事窗口与官方外链，审核发布方式随功能上线一并说明。"
       />
     </section>
   )

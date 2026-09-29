@@ -37,7 +37,7 @@ import { isAiOutage } from '../../ai/aiOutage'
 const advisorPortrait = '/assets/ai-advisor.png'
 
 const INTERVIEWER_LABEL: Record<string, string> = {
-  hr: 'HR 初筛',
+  hr: 'HR 面试',
   manager: '业务主管',
   tech: '技术面试官',
   campus: '校招面试官',

@@ -352,7 +352,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               </div>
 
               <div className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-xs text-warning-fg">
-                只接受岗位/招聘会展示字段，导入后默认"待审核 + 草稿"，由管理员审核发布后才展示。
+                只接受岗位/招聘会展示字段，导入后默认"待审核 + 草稿"；审核发布入口尚未开放（平台不代审、不代发），开放并发布前不展示。
               </div>
               <p className="text-xs text-neutral-400">单个文件不超过 10MB，最多 10000 行数据；CSV 请使用 UTF-8 编码。</p>
             </div>
@@ -483,7 +483,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               <h3 className="mt-4 text-lg font-semibold text-neutral-900">导入成功</h3>
               <p className="mt-1 text-sm text-neutral-500">
                 已成功导入 <span className="font-bold text-success-fg">{importedCount}</span> 条数据，
-                默认待审核状态，请联系管理员审核发布。
+                默认待审核状态；审核发布入口尚未开放（平台不代审、不代发），开放并发布前终端不展示。
               </p>
             </div>
           )}

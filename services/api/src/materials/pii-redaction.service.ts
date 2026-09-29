@@ -289,6 +289,7 @@ export class PiiRedactionService {
       uploaderId: null,
       endUserId: sourceFile.endUserId ?? undefined,
       assetCategory: 'derived',
+      derivationKind: 'pii_redaction',
       sourceFileId: sourceFile.id,
       createdBy: sourceFile.endUserId,
     })
