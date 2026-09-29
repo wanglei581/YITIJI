@@ -8,6 +8,7 @@ const NOT_APPROVED_REASON_TEXT: Record<AiEndpointRejectReason, string> = {
   loopback_in_production: '正式环境的模型地址不能指向本机',
   invalid_url: '模型地址不是合法网址',
   unverifiable: '看不出这个模型地址会连到哪里',
+  region_not_allowed: '服务地域不在境内名单里',
 }
 
 /**
