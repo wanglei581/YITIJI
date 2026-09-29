@@ -15529,7 +15529,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 69,
+      "reachableFileCount": 70,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -15741,10 +15741,31 @@
           "component": "ProfilePage",
           "endpoints": [
             "DELETE /partner/official-channels/:param",
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
             "GET /partner/official-channels",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
             "PATCH /partner/official-channels/:param",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
             "POST /partner/official-channels",
-            "PUT /partner/profile"
+            "PUT /partner/profile",
+            "PUT /partner/smart-campus/terminals/:param/config"
           ],
           "file": "apps/partner/src/routes/profile/index.tsx",
           "layout": [
@@ -15924,7 +15945,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 70
+      "sourceFileCount": 71
     }
   },
   "dataModel": {
