@@ -28,8 +28,8 @@ export const UNAVAILABLE_PRINTER_STATUSES = new Set(['offline', 'error', 'paper_
 /** Agent 已确定停领打印单。这两个值不看 PRINT_REQUIRE_PRINTER_ONLINE。 */
 export const QUEUE_DISPATCH_HALTED_STATUSES = new Set(['queue_cleanup_failed', 'queue_pause_failed'])
 
-/** 与另外两句拦截文案同一套说法：本机 + 原因 + 暂不能下单 + 下一步。 */
-export const QUEUE_DISPATCH_HALTED_MESSAGE = '本机暂停接打印单，暂不能下单，请稍后再试或换一台终端'
+/** 不说「本机」：小程序里会被读成用户自己的手机。 */
+export const QUEUE_DISPATCH_HALTED_MESSAGE = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
 
 export function printerOnlineRequired(env: NodeJS.ProcessEnv = process.env): boolean {
   return env['PRINT_REQUIRE_PRINTER_ONLINE'] === 'true'
@@ -67,9 +67,9 @@ function isQueueDispatchHalted(availability: PrinterAvailability): boolean {
 }
 
 /**
- * 打印机不可用时抛 400 PRINTER_UNAVAILABLE。文案面向一体机用户（会被前端直接展示），
+ * 队列闸门抛 400 PRINT_TERMINAL_QUEUE_HALTED。
+ * 其余不可用状态在开关打开时抛 400 PRINTER_UNAVAILABLE，两句旧文案一个字不改。
  * 不透出心跳时间戳或内部状态串。
- * 队列闸门两个状态无论开关开没开都抛；其余不可用状态只在开关打开时抛。
  */
 export async function assertTerminalPrinterAvailable(
   prisma: PrismaService,
@@ -80,7 +80,7 @@ export async function assertTerminalPrinterAvailable(
   // 先看闸门，再看开关。这两个状态表示 Agent 已经停领，不能被开关放行。
   if (isQueueDispatchHalted(availability)) {
     throw new BadRequestException({
-      error: { code: 'PRINTER_UNAVAILABLE', message: QUEUE_DISPATCH_HALTED_MESSAGE },
+      error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: QUEUE_DISPATCH_HALTED_MESSAGE },
     })
   }
   if (!printerOnlineRequired(env)) return

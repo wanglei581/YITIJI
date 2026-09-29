@@ -166,13 +166,58 @@ function quoteService(prisma: object): { quote: () => Promise<{ billablePages: n
   }
 }
 
+const HALT_CODE = 'PRINT_TERMINAL_QUEUE_HALTED'
+const HALT_MESSAGE = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
+const OFFLINE_MESSAGE = '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请联系工作人员'
+const NOT_READY_MESSAGE = '本机打印服务暂未就绪，暂不能下单，请稍后再试或联系工作人员'
+
+function haltedPayload(error: unknown): { code?: string; message?: string } {
+  assert.ok(error instanceof BadRequestException)
+  assert.equal(error.getStatus(), 400)
+  const payload = error.getResponse() as { error?: { code?: string; message?: string } }
+  return payload.error ?? {}
+}
+
 async function expectHalted(run: () => Promise<unknown>): Promise<void> {
   await assert.rejects(run, (error: unknown) => {
-    assert.ok(error instanceof BadRequestException)
-    const payload = error.getResponse() as { error?: { code?: string; message?: string } }
-    assert.equal(payload.error?.code, 'PRINTER_UNAVAILABLE')
-    assert.equal(payload.error?.message, QUEUE_DISPATCH_HALTED_MESSAGE)
+    const body = haltedPayload(error)
+    assert.equal(body.code, HALT_CODE)
+    assert.equal(body.message, HALT_MESSAGE)
+    assert.equal(body.message?.includes('本机'), false)
+    assert.equal(QUEUE_DISPATCH_HALTED_MESSAGE, HALT_MESSAGE)
     return true
+  })
+}
+
+async function expectUnavailable(run: () => Promise<unknown>, message: string): Promise<void> {
+  await assert.rejects(run, (error: unknown) => {
+    const body = haltedPayload(error)
+    assert.equal(body.code, 'PRINTER_UNAVAILABLE')
+    assert.equal(body.message, message)
+    return true
+  })
+}
+
+/** offline / error / paper_empty / 没有心跳仍用旧码和旧文案。报价与建单同一条函数。 */
+async function assertOtherStatusesKeepPrinterUnavailable(): Promise<void> {
+  await withPrinterSwitch('true', async () => {
+    for (const status of ['offline', 'error', 'paper_empty'] as const) {
+      const prisma = heartbeatPrisma(status)
+      await expectUnavailable(
+        () => assertTerminalPrinterAvailable(prisma as never, TERMINAL_ID, process.env),
+        OFFLINE_MESSAGE,
+      )
+      await expectUnavailable(() => quoteService(prisma).quote(), OFFLINE_MESSAGE)
+    }
+    const missing = {
+      terminal: { findFirst: async () => ({ id: TERMINAL_ID }) },
+      terminalHeartbeat: { findFirst: async () => null },
+    }
+    await expectUnavailable(
+      () => assertTerminalPrinterAvailable(missing as never, TERMINAL_ID, process.env),
+      NOT_READY_MESSAGE,
+    )
+    await expectUnavailable(() => quoteService(missing).quote(), NOT_READY_MESSAGE)
   })
 }
 
@@ -222,6 +267,11 @@ function assertMutationsFail(): void {
       "export const QUEUE_DISPATCH_HALTED_STATUSES = new Set(['queue_pause_failed'])",
     ],
     [
+      'halt branch uses the old printer code',
+      "error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: QUEUE_DISPATCH_HALTED_MESSAGE },",
+      "error: { code: 'PRINTER_UNAVAILABLE', message: QUEUE_DISPATCH_HALTED_MESSAGE },",
+    ],
+    [
       'put the halt back under the switch',
       `  const availability = await readPrinterAvailability(prisma, terminalId)
   // 先看闸门，再看开关。这两个状态表示 Agent 已经停领，不能被开关放行。
@@ -260,6 +310,7 @@ async function main(): Promise<void> {
   }
   assert.equal(UNAVAILABLE_PRINTER_STATUSES.has('unknown'), false)
   await assertSwitchOffStillBlocksQueueGates()
+  await assertOtherStatusesKeepPrinterUnavailable()
   assertQueueGateDisplay()
 
   const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
@@ -322,8 +373,10 @@ async function main(): Promise<void> {
         (error: unknown) => {
           assert.ok(error instanceof BadRequestException)
           const payload = error.getResponse() as { error?: { code?: string; message?: string } }
-          assert.equal(payload.error?.code, 'PRINTER_UNAVAILABLE')
-          assert.equal(payload.error?.message, QUEUE_DISPATCH_HALTED_MESSAGE)
+          assert.equal(error.getStatus(), 400)
+          assert.equal(payload.error?.code, HALT_CODE)
+          assert.equal(payload.error?.message, HALT_MESSAGE)
+          assert.equal(payload.error?.message?.includes('本机'), false)
           return true
         },
       )
