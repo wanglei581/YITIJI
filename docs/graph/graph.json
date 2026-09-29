@@ -17774,9 +17774,16 @@
     "apps/admin/src/routes/partners/usePartnerAccountAction.ts": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx": [
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs"
+    ],
     "apps/admin/src/routes/peripherals/index.tsx": [
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
       "apps/admin/scripts/verify-honest-placeholders.mjs"
+    ],
+    "apps/admin/src/routes/peripherals/peripheralViews.ts": [
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs"
     ],
     "apps/admin/src/routes/permissions/index.tsx": [
       "apps/admin/scripts/verify-honest-placeholders.mjs"
@@ -17840,6 +17847,7 @@
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "apps/admin/src/routes/terminals/terminalStatusViews.ts": [
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs"
     ],
     "apps/admin/src/routes/toolbox/components/TerminalToolboxPanel.tsx": [
@@ -20529,7 +20537,8 @@
       "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
     ],
     "apps/partner/src/lib/csv.ts": [
-      "apps/partner/scripts/verify-partner-stats-contract.mjs"
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/Page.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
@@ -20626,18 +20635,22 @@
     ],
     "apps/partner/src/routes/terminals/TerminalOpsCards.tsx": [
       "apps/admin/scripts/verify-honest-placeholders.mjs",
-      "apps/partner/scripts/verify-partner-stats-contract.mjs"
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx": [
-      "apps/partner/scripts/verify-partner-stats-contract.mjs"
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/terminals/index.tsx": [
       "apps/admin/scripts/verify-honest-placeholders.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
-      "apps/partner/scripts/verify-partner-stats-contract.mjs"
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/terminals/terminalOpsFormat.ts": [
-      "apps/partner/scripts/verify-partner-stats-contract.mjs"
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/services/api/client.ts": [
       "apps/partner/scripts/verify-partner-relative-api-url.mjs",
@@ -25441,6 +25454,27 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx",
+          "apps/admin/src/routes/peripherals/index.tsx",
+          "apps/admin/src/routes/peripherals/peripheralViews.ts",
+          "apps/admin/src/routes/terminals/terminalStatusViews.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-peripheral-views.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-peripheral-views"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/admin/scripts/support/admin-phone-transfer-ui-contract.mjs",
           "apps/admin/src/routes/account-settings/AdminPhoneTransferCard.tsx",
           "apps/admin/src/routes/account-settings/index.tsx",
@@ -29372,6 +29406,28 @@
       "package": "@ai-job-print/partner",
       "scriptNames": [
         "@ai-job-print/partner::verify:partner-stats-contract"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/partner/src/lib/csv.ts",
+          "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
+          "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
+          "apps/partner/src/routes/terminals/index.tsx",
+          "apps/partner/src/routes/terminals/terminalOpsFormat.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/partner",
+      "scriptNames": [
+        "@ai-job-print/partner::verify:partner-terminal-ops-honesty"
       ],
       "wired": true
     },
