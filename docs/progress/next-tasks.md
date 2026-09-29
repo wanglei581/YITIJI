@@ -36,8 +36,12 @@
    - `RECRUITMENT_CONTENT_HOSTING_ENABLED` 不设（或 false）；
    - `KIOSK_PUBLIC_BASE_URL` 指向一体机前端地址；
    - 仓库配置里 `DEPLOY_ADMIN_WEB_ROOT`、`DEPLOY_PARTNER_WEB_ROOT` 都已设置（缺一个，full 发布就会失败）；
-   - 后台价目两行都在；试点免费就把单价设成 0，描述和单价一致（`print_color_page` 现在单价 1 元/页，描述却写「0 元/页」）；
+   - 后台价目：黑白、彩色两行单价都设 0 元，说明都写「免费试运营」（9/29 产品负责人拍板试点免费；`print_color_page` 现在单价 1 元/页，必须改）；
    - 签名盖章：#1052 起未登记的终端自动关闭，一体机显示「暂未开通」，不用逐台设置；想在后台一眼看清，可以逐台设「不支持」并写备注（可选）；
+   - 大模型厂家（后端 P1-3 端点白名单）：后台「AI 服务管理」里 15 个功能位逐个看实际生效的是哪家模型（没单独配过的功能位跟随上级功能位）；只要有一个用的是 MiniMax 或鱼人 API，新版本上线后这个功能位会被拒，发布前先换成 DeepSeek 或通义千问；
+   - 小青的对话与语音配置：服务器 `.env` 里如果设了 `TRTC_LLM_CONFIG_JSON` 或 `TRTC_TTS_CONFIG_JSON`，里面的接口地址必须在白名单内（以后端 P1-3 的 PR 说明为准）；没设就不用管；
+   - 服务器 Node 版本：`node -v` 不低于 22.13，且 pm2 运行 API 用的也是这个 Node（#1075 的 PDF 引擎依赖它；版本不够时 PDF 功能如实报不可用，不会退回旧引擎；仓库开了 engineStrict，版本不够时安装依赖这一步就会失败）；
+   - 小青形象图：保存来源记录（生成记录或购买凭证、授权条款），需要时能证明不是真人照片（9/29 确认小青是数字人图片，不需要肖像授权）；
    - HTTPS 证书 12 月 3 日到期前续期；云服务器、数据库、对象存储、短信、大模型账户的续费和余额告警都已打开；
    - 密钥轮换与关闭口令登录，按产品负责人自己的清单做。
 3. **服务器 `.env` 第一批**（只影响服务端，随时可以配）：
@@ -152,7 +156,7 @@
 | C6 年满 14 周岁与录音声明 | #1048 | `AI_DECLARATION_ENFORCEMENT=off` | `on`（**等一体机页面带上声明请求头再开**，见下方 4） |
 | C7 AI 登录档位 | #1048 | `AI_LOGIN_GATE=off` | `before_generate`（D1；等一体机有登录引导再开） |
 | C14 AI 一键暂停 / 全机维护 | #1048 | `AI_PAUSED`、`MAINTENANCE_MODE` = off，后台可一键切换（必须填事由、先写留痕；开关面板见 #1055） | 按需 |
-| C8 简历导出显式标识 | #1044 | `RESUME_EXPORT_VISIBLE_LABEL=false`、`RESUME_EXPORT_UNLABELED_OPTION=false` | 前者 `true`（D2）；后者律师确认协议条款后再开 |
+| C8 简历导出显式标识 | #1044 | `RESUME_EXPORT_VISIBLE_LABEL=false`、`RESUME_EXPORT_UNLABELED_OPTION=false` | 两个都保持关（9/29 拍板导出不印 AI 字样，取代 D2）；律师认为必须带时两个一起开 |
 | C9 面试报告改字 | #1044 | 无（直接生效，方案已定） | — |
 | C10 内容双向检查 | #1049 | 词表为空即不检查 | 配置 `AI_FORBIDDEN_WORDS_FILE`（云审核兜底本轮未接） |
 | C11 政策只显示本机构 | #1049 | `POLICY_SCOPE=all` | `org`（D4；等一体机政策请求带上终端会话再开；本人收藏与浏览记录不受影响） |
