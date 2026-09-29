@@ -13,6 +13,8 @@ import { MemberAuthService, type MemberLoginResult } from './member-auth.service
 
 const QR_TICKET_TTL = 180
 const QR_CLAIMED_TTL = 300
+/** 领取失败后恢复票据的有效期：够用户在一体机上重试一次，不把确认过的登录长期挂着。 */
+const QR_CLAIM_RETRY_TTL = 60
 
 type QrTicketStatus = 'pending' | 'confirmed'
 
@@ -95,22 +97,11 @@ export class MemberQrLoginService {
     ticketId: string,
     input: { phone: string; code: string; deviceId?: string },
   ): Promise<ConfirmQrLoginResult> {
-    const payload = await this.readTicket(ticketId)
-    if (payload.status === 'confirmed') {
-      throw new ConflictException({ error: { code: 'QR_LOGIN_ALREADY_CONFIRMED', message: '扫码登录已确认' } })
-    }
+    const { payload, raw } = await this.readTicketRaw(ticketId)
+    if (payload.status === 'confirmed') throw this.alreadyConfirmed()
 
     const user = await this.memberAuth.verifySmsCodeForUser(input.phone, input.code)
-    const confirmed: QrTicketPayload = {
-      ...payload,
-      status: 'confirmed',
-      user,
-    }
-    const updated = await this.redis.setExistingWithCurrentTtl(this.ticketKey(ticketId), JSON.stringify(confirmed))
-    if (updated === 'missing') {
-      throw new NotFoundException({ error: { code: 'QR_LOGIN_NOT_FOUND', message: '扫码登录已过期或不存在' } })
-    }
-
+    await this.commitConfirmation(ticketId, raw, { ...payload, status: 'confirmed', user })
     return { status: 'confirmed' }
   }
 
@@ -118,23 +109,29 @@ export class MemberQrLoginService {
     ticketId: string,
     endUserId: string,
   ): Promise<ConfirmQrLoginResult> {
-    const payload = await this.readTicket(ticketId)
-    if (payload.status === 'confirmed') {
-      throw new ConflictException({ error: { code: 'QR_LOGIN_ALREADY_CONFIRMED', message: '扫码登录已确认' } })
-    }
+    const { payload, raw } = await this.readTicketRaw(ticketId)
+    if (payload.status === 'confirmed') throw this.alreadyConfirmed()
 
     const user = await this.memberAuth.me(endUserId)
-    const confirmed: QrTicketPayload = {
-      ...payload,
-      status: 'confirmed',
-      user,
-    }
-    const updated = await this.redis.setExistingWithCurrentTtl(this.ticketKey(ticketId), JSON.stringify(confirmed))
+    await this.commitConfirmation(ticketId, raw, { ...payload, status: 'confirmed', user })
+    return { status: 'confirmed' }
+  }
+
+  /**
+   * pending → confirmed 只许发生一次：按读到的原值比较后写（1.8 排雷 C-3）。
+   * 旧写法是读到 pending 后无条件覆盖，两人同时确认时后写者覆盖前写者——前一位手机上显示
+   * 「已确认」，一体机领到的却是后一位的会员登录，之后这台机器上的文件会进别人的账号。
+   */
+  private async commitConfirmation(ticketId: string, raw: string, confirmed: QrTicketPayload): Promise<void> {
+    const updated = await this.redis.replaceExactWithCurrentTtl(this.ticketKey(ticketId), raw, JSON.stringify(confirmed))
+    if (updated === 'changed') throw this.alreadyConfirmed()
     if (updated === 'missing') {
       throw new NotFoundException({ error: { code: 'QR_LOGIN_NOT_FOUND', message: '扫码登录已过期或不存在' } })
     }
+  }
 
-    return { status: 'confirmed' }
+  private alreadyConfirmed(): ConflictException {
+    return new ConflictException({ error: { code: 'QR_LOGIN_ALREADY_CONFIRMED', message: '扫码登录已确认' } })
   }
 
   async claim(
@@ -179,11 +176,23 @@ export class MemberQrLoginService {
     }
 
     // 勾选发生在一体机创建票据前；claim 时按服务端当前有效版本落库同意快照。
-    await this.memberAuth.persistResolvedLegalConsent(current.user.id, 'qr_login')
-    return this.memberAuth.issueLoginForUser(current.user)
+    try {
+      await this.memberAuth.persistResolvedLegalConsent(current.user.id, 'qr_login')
+      return await this.memberAuth.issueLoginForUser(current.user)
+    } catch (error) {
+      // 票据已被原子取走并标记为已领取；落同意或签发失败时恢复票据、撤掉标记，
+      // 否则用户重试只会看到「已被领取」、却从没拿到登录（1.8 排雷 C-5）。恢复给短有效期。
+      await this.redis.setEx(this.ticketKey(ticketId), QR_CLAIM_RETRY_TTL, raw).catch(() => undefined)
+      await this.redis.del(this.claimedKey(ticketId)).catch(() => undefined)
+      throw error
+    }
   }
 
   private async readTicket(ticketId: string): Promise<QrTicketPayload> {
+    return (await this.readTicketRaw(ticketId)).payload
+  }
+
+  private async readTicketRaw(ticketId: string): Promise<{ payload: QrTicketPayload; raw: string }> {
     this.assertTicketId(ticketId)
     const raw = await this.redis.get(this.ticketKey(ticketId))
     if (!raw) {
@@ -192,7 +201,7 @@ export class MemberQrLoginService {
       }
       throw new NotFoundException({ error: { code: 'QR_LOGIN_NOT_FOUND', message: '扫码登录已过期或不存在' } })
     }
-    return this.parsePayload(raw)
+    return { payload: this.parsePayload(raw), raw }
   }
 
   private parsePayload(raw: string): QrTicketPayload {

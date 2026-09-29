@@ -49,6 +49,7 @@
     "verify:member-account-status": "node -r @swc-node/register scripts/verify-member-account-status.ts",
     "verify:member-step-up": "node -r @swc-node/register scripts/verify-member-step-up.ts",
     "verify:member-qr-login": "node -r @swc-node/register scripts/verify-member-qr-login.ts",
+    "verify:member-auth-races": "node -r @swc-node/register scripts/verify-member-auth-races.ts",
     "verify:end-user-assets": "node -r @swc-node/register scripts/verify-end-user-asset-ownership.ts",
     "verify:ai-result-ownership": "node -r @swc-node/register scripts/verify-ai-result-ownership.ts",
     "verify:ai-persistence-consistency": "node -r @swc-node/register scripts/verify-ai-persistence-consistency.ts",
