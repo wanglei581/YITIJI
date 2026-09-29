@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1599 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1602 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1625,7 +1625,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/memberAssets.ts` | `verify-jobfair-checkin.ts` |
 | `packages/shared/src/types/memberPrivacy.ts` | `verify-data-request-ui.mjs` |
 | `packages/shared/src/types/mockInterview.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `packages/shared/src/types/partner.ts` | `verify-partner-smart-campus.ts` |
+| `packages/shared/src/types/partner.ts` | `verify-org-type-enum-sync.ts`<br/>`verify-partner-smart-campus.ts` |
 | `packages/shared/src/types/payment.ts` | `verify-price-single-source.mjs`<br/>`verify-admin-order-filters.ts` |
 | `packages/shared/src/types/print.ts` | `verify-print-parameter-capability.mjs`<br/>`verify-print-parameter-capability.ts` |
 | `packages/shared/src/types/printScanCapability.ts` | `verify-admin-print-scan.ts`<br/>`verify-print-color-duplex-capability.ts` |
@@ -1888,7 +1888,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 84 个文件</summary>
+<summary><code>services/api/scripts/</code> — 86 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1939,6 +1939,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/payment-callback-race-cases.ts` | `verify-payment-flow.ts` |
 | `services/api/scripts/support/recruitment-wave2-full-inventory.ts` | `verify-recruitment-wave2-full-inventory.ts` |
 | `services/api/scripts/support/recruitment-wave2-public-snapshot.ts` | `verify-recruitment-wave2-full-inventory.ts` |
+| `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
+| `services/api/scripts/support/sqlite-cli.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/upload-session-verifier.ts` | `verify-upload-sessions-bind.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/scripts/verify-admin-fairs.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-benefit-redemption.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs` |
@@ -1980,7 +1982,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 544 个文件</summary>
+<summary><code>services/api/src/</code> — 545 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2280,7 +2282,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/jobs/jobs.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-campus-recruitment-stats.ts`<br/>`verify-job-data-quality.ts` |
 | `services/api/src/jobs/jobs.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-fairs.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-review.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-recruitment-integration-readiness.ts` |
 | `services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts` | `verify-campus-recruitment-stats.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-throttle-dimension.ts` |
-| `services/api/src/jobs/partner-capabilities.ts` | `verify-backend-p0-contracts.mjs` |
+| `services/api/src/jobs/partner-capabilities.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-org-type-enum-sync.ts` |
 | `services/api/src/jobs/partner-fairs.controller.ts` | `verify-multipart-field-nesting.ts`<br/>`verify-partner-fair-subresources.ts` |
 | `services/api/src/jobs/partner-import-file.ts` | `verify-partner-excel-import.ts` |
 | `services/api/src/jobs/recruitment-integration.contract.ts` | `verify-recruitment-integration-readiness.ts` |
@@ -2379,7 +2381,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/orgs/admin-org-account-view.ts` | `verify-admin-orgs-delete-schema.ts`<br/>`verify-partner-account-action-schema.ts` |
 | `services/api/src/orgs/admin-org-content-trust.service.ts` | `verify-admin-content-trust-ui.mjs`<br/>`verify-content-trust-publish-gate.ts` |
 | `services/api/src/orgs/admin-orgs.controller.ts` | `verify-admin-content-trust-ui.mjs` |
-| `services/api/src/orgs/admin-orgs.service.ts` | `verify-admin-orgs-delete-concurrency.ts`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts` |
+| `services/api/src/orgs/admin-orgs.service.ts` | `verify-admin-orgs-delete-concurrency.ts`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-org-type-enum-sync.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts` |
+| `services/api/src/orgs/dto/admin-org.dto.ts` | `verify-org-type-enum-sync.ts` |
 | `services/api/src/orgs/dto/partner-account-action.dto.ts` | `verify-partner-account-action.ts` |
 | `services/api/src/orgs/partner-stats.controller.ts` | `verify-partner-stats-contract.ts` |
 | `services/api/src/orgs/partner-stats.service.ts` | `verify-partner-stats-contract.ts` |

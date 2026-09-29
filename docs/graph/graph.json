@@ -17287,7 +17287,7 @@
         ]
       },
       {
-        "fieldCount": 27,
+        "fieldCount": 28,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -21188,6 +21188,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "packages/shared/src/types/partner.ts": [
+      "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-smart-campus.ts"
     ],
     "packages/shared/src/types/payment.ts": [
@@ -21786,6 +21787,12 @@
     ],
     "services/api/scripts/support/recruitment-wave2-public-snapshot.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
+    ],
+    "services/api/scripts/support/scan-panel-wording.ts": [
+      "services/api/scripts/verify-scan-tasks.ts"
+    ],
+    "services/api/scripts/support/sqlite-cli.ts": [
+      "services/api/scripts/verify-scan-tasks.ts"
     ],
     "services/api/scripts/support/upload-session-verifier.ts": [
       "services/api/scripts/verify-upload-sessions-bind.ts",
@@ -23719,7 +23726,8 @@
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/jobs/partner-capabilities.ts": [
-      "services/api/scripts/verify-backend-p0-contracts.mjs"
+      "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-org-type-enum-sync.ts"
     ],
     "services/api/src/jobs/partner-fairs.controller.ts": [
       "services/api/scripts/verify-multipart-field-nesting.ts",
@@ -24141,12 +24149,16 @@
       "services/api/scripts/verify-admin-orgs-delete-concurrency.ts",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-admin-orgs.ts",
+      "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-partner-smart-campus.ts"
+    ],
+    "services/api/src/orgs/dto/admin-org.dto.ts": [
+      "services/api/scripts/verify-org-type-enum-sync.ts"
     ],
     "services/api/src/orgs/dto/partner-account-action.dto.ts": [
       "services/api/scripts/verify-partner-account-action.ts"
@@ -35484,6 +35496,27 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "packages/shared/src/types/partner.ts",
+          "services/api/src/jobs/partner-capabilities.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/dto/admin-org.dto.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-org-type-enum-sync.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:org-type-enum-sync"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
@@ -37676,6 +37709,8 @@
         "dirs": [],
         "files": [
           "services/api/scripts/scan-lease-contract.helper.ts",
+          "services/api/scripts/support/scan-panel-wording.ts",
+          "services/api/scripts/support/sqlite-cli.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/prisma/create-client.ts",

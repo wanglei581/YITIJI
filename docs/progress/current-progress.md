@@ -4,6 +4,12 @@
 
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
 
+## 2026-09-29：扫描门禁锁库偶发、W-04/05/12、机构类型补两类（分支 `claude/backend-hardening-20260929-misc3`）
+
+- **修了什么（Claude 子代理实现、协调方审）：** ①`verify:scan-tasks` 偶发 database is locked：prisma 迁移子进程还没放手库就去读，sqlite3 调用统一带等锁并在迁移后等释放（`scripts/support/sqlite-cli.ts`，含阳性对照）。②W-04：「最近心跳 刚刚」是后台把注册时间当心跳显示（前端回落，交付单已发）；服务端顺带修掉心跳表 90 天清理后显示「从未」——新增 `Terminal.lastHeartbeatAt`（两套迁移，存量回填）。③W-05：绑定码兑换不再覆盖管理员起的终端名，只在没名字时补 Agent 上报的名字（条件写，防并发）。④W-12：扫描指引改成面板上的真实字样「点击「扫描」」「选择「扫描到 SMB」」，门禁钉用词。⑤机构类型新增零工之家、就业服务站，能力等同公共就业服务机构；新门禁 `verify:org-type-enum-sync` 钉五处一致。
+- **验证：** 子代理 56 条 API 门禁 + 私有 PG16 关键门禁与迁移演练全绿、17 处反向变异全红；协调方在最新候选上复跑 12 条关联门禁与 api 类型检查全绿。
+- **没做：** 官方渠道加「小程序」类型不是加一个枚举，要新字段与不走域名核验的新校验，会绕开防冒名的闸，推荐以后走「上传机构自己的小程序码 + 管理员核验主体」单独立包；兑换时 `locationLabel` 仍会被 Agent 覆盖（同类问题，推荐同规则处理）。
+
 ## 2026-09-29：content-pipeline-e2e 自签令牌改为 15 分钟，并核对与登录签发一致（PR #1097，未合入）
 
 - **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。
