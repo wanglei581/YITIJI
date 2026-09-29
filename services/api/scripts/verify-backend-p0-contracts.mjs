@@ -420,13 +420,18 @@ check(
 // ── API-22：未鉴权 stub 不得假成功 ──────────────────────────────────────
 console.log('\n--- 未实现 stub 必须 501 ---')
 const kioskSessionCtl = read('services/api/src/kiosk-session/kiosk-session.controller.ts')
+const kioskSessionSvc = read('services/api/src/kiosk-session/kiosk-session.service.ts')
 const kioskNotificationsCtl = read('services/api/src/notifications/notifications.controller.ts')
 const kioskActivitiesCtl = read('services/api/src/activities/activities.controller.ts')
+// 2026-09-29 起 kiosk/session 是真写入（服务人次），不再是 stub：必须有终端验签、真落库、不收会员号，
+// 行为断言在 verify:kiosk-session。
 check(
-  kioskSessionCtl.includes('NotImplementedException') &&
-    kioskSessionCtl.includes('KIOSK_SESSION_NOT_IMPLEMENTED') &&
-    !kioskSessionCtl.includes('{ ok: true }'),
-  'kiosk/session heartbeat/extend 返回 501，不假成功',
+  kioskSessionCtl.includes('@UseGuards(TerminalIdentityGuard)') &&
+    !kioskSessionCtl.includes('NotImplementedException') &&
+    !kioskSessionCtl.includes('{ ok: true }') &&
+    kioskSessionSvc.includes('this.prisma.kioskSession.upsert') &&
+    !/memberId\s*:/.test(kioskSessionSvc),
+  'kiosk/session 只认终端验签身份、真落库、不写会员号，不假成功',
 )
 check(
   kioskNotificationsCtl.includes('NotImplementedException') &&

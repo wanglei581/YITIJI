@@ -10,6 +10,7 @@ export type LoginPhoneState =
   | 'phone-code-invalid'
   | 'phone-code-expired'
   | 'phone-code-locked'
+  | 'phone-legal-unpublished'
 
 export type LoginQrState =
   | 'qr-loading'
@@ -30,6 +31,7 @@ export const LOGIN_PHONE_STATES: readonly LoginPhoneState[] = [
   'phone-code-invalid',
   'phone-code-expired',
   'phone-code-locked',
+  'phone-legal-unpublished',
 ]
 
 export const LOGIN_QR_STATES: readonly LoginQrState[] = [
@@ -78,6 +80,7 @@ export function derivePhoneGateState(input: {
 }): LoginPhoneState {
   if (input.sendingCode) return 'phone-sending'
   if (input.submitting) return 'phone-verifying'
+  if (input.errorCode === 'LEGAL_DOCS_NOT_PUBLISHED') return 'phone-legal-unpublished'
   if (input.errorCode === 'SMS_CODE_LOCKED') return 'phone-code-locked'
   if (input.errorCode === 'SMS_CODE_EXPIRED') return 'phone-code-expired'
   if (input.errorCode === 'SMS_CODE_INVALID') return 'phone-code-invalid'
@@ -146,6 +149,7 @@ export const LOGIN_GATE_PILL: Record<LoginGateState, { tone: 'ok' | 'warn' | 'ba
   'phone-code-invalid': { tone: 'warn', label: '请核对短信' },
   'phone-code-expired': { tone: 'warn', label: '请获取新验证码' },
   'phone-code-locked': { tone: 'warn', label: '请重新验证' },
+  'phone-legal-unpublished': { tone: 'warn', label: '暂时无法登录' },
   'qr-loading': { tone: 'unknown', label: '等待二维码' },
   'qr-ready': { tone: 'ok', label: '请在手机上确认' },
   'qr-expired': { tone: 'warn', label: '请重新扫码' },
@@ -163,6 +167,7 @@ export const LOGIN_GATE_COPY: Record<LoginGateState, { title: string; sub: strin
   'phone-code-invalid': { title: '请再核对一次验证码', sub: '已清空刚才填写的内容，手机号不用重填。' },
   'phone-code-expired': { title: '需要重新获取验证码', sub: '旧码已经不能使用，请重新获取一条。' },
   'phone-code-locked': { title: '验证码尝试次数过多', sub: '这条验证码已作废，请获取新码后再验证。' },
+  'phone-legal-unpublished': { title: '暂时无法登录', sub: '用户协议和隐私政策还没有正式发布。不登录也能打印和扫描。' },
   'qr-loading': { title: '扫码登录', sub: '勾选协议后即可获取二维码。' },
   'qr-ready': { title: '扫码登录', sub: '用手机扫码并确认，再回到这台机器继续办理。' },
   'qr-expired': { title: '二维码已过期', sub: '请在这台机器上重新生成，再用手机扫码。' },

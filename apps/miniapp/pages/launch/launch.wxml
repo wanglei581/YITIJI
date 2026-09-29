@@ -16,10 +16,16 @@
     <view class="sheet-title">登录后继续</view>
     <view class="sheet-sub">同步本人简历、文档、打印订单和 AI 服务记录</view>
 
+    <!-- 正式版协议没发布（C4）：先说清楚为什么不能登录、不登录还能做什么。 -->
+    <view wx:if="{{legalBlocked}}" class="launch-blocked" role="alert">
+      <view class="lb-t">服务协议还没有正式发布，暂时不能登录</view>
+      <view class="lb-d">不登录也可以看使用帮助和打印指引，也可以扫一体机屏幕上的码，把文件传到一体机打印。</view>
+    </view>
+
     <!-- ① 微信一键登录（默认） -->
     <block wx:if="{{!showSms}}">
       <button class="btn wx block launch-btn-wx tap" hover-class="tap-press"
-        open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" disabled="{{!agreed}}">
+        open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" disabled="{{!agreed || legalBlocked}}">
         <text class="ficon i-comment launch-wx-icon"></text>微信一键登录
       </button>
       <view class="launch-alt tap" hover-class="tap-press" bindtap="tapSmsLogin">
@@ -80,7 +86,7 @@
       </view>
       <view>
         <text class="launch-link tap" catchtap="tapTerms">《用户服务协议》</text>和
-        <text class="launch-link tap" catchtap="tapPrivacy">《隐私政策》</text>
+        <text class="launch-link tap" catchtap="tapPrivacy">《隐私政策》</text>，并确认已年满 14 周岁
       </view>
     </view>
 

@@ -297,14 +297,14 @@ export default function LoginPage() {
     <main className="clogin" ref={rootRef}>
       <aside className="c-left">
         <span className="deco-ring" />
-        <span className="vert">值守 · 审核 · 运营</span>
+        <span className="vert">值守 · 运营 · 审计</span>
         <div className="c-brand">
           <div className="c-logo">
             <ShieldCheckIcon size={25} aria-hidden="true" />
           </div>
           <div>
-            <strong>AI求职打印一体机</strong>
-            <span>管理员后台 · Admin Console</span>
+            <strong>职易达</strong>
+            <span>管理员后台</span>
           </div>
         </div>
         <div className="c-tagline">
@@ -313,7 +313,7 @@ export default function LoginPage() {
             <br />
             看清每一次<em>服务</em>
           </h1>
-          <p>终端与打印机状态、订单与文件、岗位与招聘会信息源审核、告警与日志审计，都从这里开始。</p>
+          <p>终端与打印机、订单与文件、机构入驻与紧急下架、告警与日志审计，都从这里开始。</p>
         </div>
         <div className="c-illus">
           <svg className="c-flow" viewBox="0 0 470 230" aria-hidden="true">
@@ -508,7 +508,7 @@ export default function LoginPage() {
             <span>验证码 5 分钟内有效</span>
           </div>
         </div>
-        <div className="c-legal">仅限授权运营人员使用 · 所有操作均有日志审计 · © 2026 AI求职打印服务终端</div>
+        <div className="c-legal">仅限授权运营人员使用 · 所有操作均有日志审计 · © 2026 职易达</div>
       </section>
 
       {resetOpen && (

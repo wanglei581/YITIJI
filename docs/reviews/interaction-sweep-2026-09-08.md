@@ -27,7 +27,7 @@
 | 操作记录 | 160 步；其中真正操作 151，旅程内刻意跳过 9 |
 | 死控件（四观测量全无变化且非 disabled） | 2，**均为假阳性**（见下） |
 | 合规禁词 | 0（「一键投递 / 立即投递 / 平台投递」） |
-| 生产访问 | 0（`zyidai.cn` / `120.48.13.190` 已在 context 层拦截） |
+| 生产访问 | 0（`zyidai.cn` / `<生产服务器 IP>` 已在 context 层拦截） |
 | 截图 | 189 张，`docs/reviews/interaction-sweep-2026-09-08/ai-resume/<journey>/`（最终有效批次 2026-09-08 00:54–00:57） |
 | 原始四观测量 | `docs/reviews/interaction-sweep-2026-09-08/ai-resume/operations.jsonl` |
 

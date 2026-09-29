@@ -167,10 +167,14 @@ test('API-06 same openid can log in with a phone already registered by SMS', asy
 })
 
 test('API-19 account failure bucket locks password login across requests', async () => {
+  // P1-4：锁定改为「先原子预留一次尝试额度再比对密码」，假 Redis 按 reserveWithinLimitWithTtl 的语义应答。
   let failures = 0
   const redis = {
-    get: async () => String(failures),
-    incrWithTtl: async () => ++failures,
+    reserveWithinLimitWithTtl: async (_key: string, _ttl: number, limit: number) => {
+      if (failures >= limit) return false
+      failures += 1
+      return true
+    },
     del: async () => 1,
   }
   const prisma = { user: { findFirst: async () => null } }
@@ -187,11 +191,11 @@ test('API-19 account failure bucket locks password login across requests', async
 test('API-19 account lock cannot be bypassed with another login alias', async () => {
   const counters = new Map<string, number>()
   const redis = {
-    get: async (key: string) => String(counters.get(key) ?? 0),
-    incrWithTtl: async (key: string) => {
-      const value = (counters.get(key) ?? 0) + 1
-      counters.set(key, value)
-      return value
+    reserveWithinLimitWithTtl: async (key: string, _ttl: number, limit: number) => {
+      const current = counters.get(key) ?? 0
+      if (current >= limit) return false
+      counters.set(key, current + 1)
+      return true
     },
     del: async (key: string) => counters.delete(key) ? 1 : 0,
   }

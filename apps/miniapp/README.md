@@ -5,21 +5,24 @@
 > 仓库外旧副本、临时导出目录和 `.worktrees/` 的外层目录都不是发布入口。Git worktree 只用于隔离分支，其内部仍以 `apps/miniapp/` 为固定工程路径。
 
 - 首页
-- AI百宝箱
-- 求职
+- AI 工具
+- 打印
 - 我的
+
+首发按非招聘类目提审（next-tasks 2.6）：岗位、招聘会、企业、政策、合同审查等 20 页停放（源码保留，不注册、不打包），恢复步骤见 `scripts/verify-review-scope.mjs` 文件头。
 
 ## 当前真实能力
 
-- 微信手机号一键登录与短信验证码降级登录
-- 当前生效服务协议、隐私政策与一体机二维码登录确认
-- 岗位、招聘会、企业、政策公开浏览（无数据时显示真实空态）
-- 简历上传、解析、诊断、优化、岗位匹配、职业规划与模拟面试
-- 本人简历、文档、AI 记录、打印订单、权益与通知读取
+- 微信手机号一键登录与短信验证码降级登录；登录前协议在正式版不回落草稿（C4）
+- 法务文档四类：服务协议、隐私政策、AI 服务说明（模型与备案号）、经营者信息，未发布时如实写「暂未发布」
+- 年满 14 周岁声明与录音单独同意（C6，`utils/ai-access.js` + `/me/ai-consents`），AI 登录档位的登录提示（C7）
+- 简历上传、解析、诊断、优化、简历对照（只对照本人填写的岗位要求）、职业规划、自我探索与模拟面试
+- 本人简历、文档、AI 记录、打印订单与通知读取；意见反馈含「AI 内容投诉」
 - 服务端打印价目和公开终端读取
-- Order-only 待到机订单、10 位取件码和本地二维码展示（当前分支候选，尚未发布或真机验收）
+- 待到机订单、8 位到机码、本地二维码；复制、分享给代取人、作废换新码（尚未真机验收）
+- 首页待取件卡、扫码连接一体机、今日提醒
 
-材料包仍未完成；到机码核销和机端支付虽有本地代码候选，但未完成同一候选的受控发布、Windows 实际扫码器、支付和奔图出纸验收，不得宣称已上线。证件照、链接分析、静态会员套餐、模拟简历生成、扫码续传等没有后端闭环的入口未注册。
+小程序内没有在线付款与退款入口（付款在一体机现场）；到机码核销和机端支付虽有本地代码候选，但未完成同一候选的受控发布、Windows 实际扫码器、支付和奔图出纸验收，不得宣称已上线。证件照、链接分析、静态会员套餐、模拟简历生成、扫码续传等没有后端闭环的入口未注册。
 
 ## 目录职责
 
@@ -53,8 +56,10 @@
 公共模块的依赖方向：
 
 ```text
-api → request → config + storage
+api → request → config + auth + ai-access + user-error
+api → api-legal-consent → request + auth + ai-access（法务文档、协议版本、AI 授权与声明；加载时向 request 注册 ai 请求前后置）
 api → config + mock-data + normalize
+ai-access → storage + user-error；pickup-actions → api + pickup-qrcode + user-error
 auth / favorites / history → storage
 normalize / print-pricing / pickup-qrcode / storage / config / mock-data → 无内部依赖
 ```
@@ -110,8 +115,8 @@ pnpm --dir apps/miniapp verify:static
 
 | | 位置 |
 |---|---|
-| 小程序 lane 工作区 | `/Users/wanglei/AI求职打印服务终端-miniapp`（worktree，分支 `claude/miniapp-lane`） |
-| 微信开发者工具指向 | 上面那个 worktree 的 `apps/miniapp` |
+| 小程序 lane 工作区 | 仓库 `.claude/worktrees/zhiyida-miniapp-main`（worktree，分支 `claude/miniapp-main`，2026-09-29 起；此前的 `claude/miniapp-lane` 不再使用） |
+| 微信开发者工具指向 | 上面那个 worktree 的 `apps/miniapp`；职易达在开发者工具里只保留这一个项目，不导入其他副本 |
 | 主 checkout | **小程序 lane 一律不碰**，包括不切分支、不 stash、不提交 |
 
 主 checkout 长期跑着别的任务且带大量未提交改动；在那里动小程序等于直接踩对方的在制品。

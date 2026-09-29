@@ -64,8 +64,8 @@ git diff --check
 
 ```bash
 # 公网只读（任何执行者）
-curl -fsS https://120.48.13.190.sslip.io/api/v1/health            # 期望 success=true, db=postgres
-curl -sS -o /dev/null -w "%{http_code}\n" https://120.48.13.190.sslip.io/        # Kiosk 200
+curl -fsS https://<预发域名>/api/v1/health            # 期望 success=true, db=postgres
+curl -sS -o /dev/null -w "%{http_code}\n" https://<预发域名>/        # Kiosk 200
 # 服务器侧（SSH 密钥持有者）
 #   1) 部署源确认：sed -n '1,80p' /srv/ai-job-print/DEPLOY_SOURCE.txt → base_commit 含 Wave 1（ea15764a 或其后）
 #   2) env 脱敏复核（只输出 set/unset，绝不输出值）：
@@ -90,7 +90,7 @@ curl -sS -o /dev/null -w "%{http_code}\n" https://120.48.13.190.sslip.io/       
 
 ## 八、RW1-G3 会员浏览器 E2E（公网 HTTPS，真实链路）
 
-用 Playwright/真实浏览器访问 `https://120.48.13.190.sslip.io`，受控测试会员：
+用 Playwright/真实浏览器访问 `https://<预发域名>`，受控测试会员：
 1. 会员**短信登录**（真实 `SMS_PROVIDER`；若短信仍在审核，按 runbook 记录临时替代口径，不把验证码入证据）。
 2. 上传合成简历 → 诊断报告出 6 维评分。
 3. 「继续生成优化版」→ 优化页可见并可填**专业 / 学历 / 目标岗位**方向；前后 `ReactDiffViewer` 对比展示；可编辑结构化字段。

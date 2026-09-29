@@ -76,7 +76,7 @@ SECRET_ENCRYPTION_KEY="<openssl rand -hex 64>"
 FILE_STORAGE_DRIVER=cos
 TENCENT_COS_SECRET_ID=        # 已轮换的 CAM 子用户密钥
 TENCENT_COS_SECRET_KEY=
-TENCENT_COS_BUCKET=yitiji-prod-private-1257025684
+TENCENT_COS_BUCKET=<生产存储桶>
 TENCENT_COS_REGION=ap-guangzhou
 TENCENT_COS_SIGN_URL_EXPIRES_SECONDS=1800   # 合规上限，勿超
 
@@ -206,14 +206,14 @@ pnpm verify:demo-seed-guard
 
 ```bash
 # 先建立仅当前 Linux 用户可访问的仓库外目录
-install -d -m 700 /root/ai-job-print-bootstrap
+install -d -m 700 <服务器上的初始化输出目录>
 
 # NODE_ENV / DATABASE_URL 从受控生产环境读取，不把数据库口令写入命令历史
 export FIRST_ADMIN_BOOTSTRAP_CONFIRM=CREATE_FIRST_PRODUCTION_ADMIN
 export FIRST_ADMIN_BOOTSTRAP_AUTHORIZED_UNTIL='<未来10分钟内的RFC3339时间>'
 export FIRST_ADMIN_USERNAME='<首个管理员账号>'
 export FIRST_ADMIN_NAME='<管理员显示名>'
-export FIRST_ADMIN_CREDENTIALS_OUT=/root/ai-job-print-bootstrap/first-admin.json
+export FIRST_ADMIN_CREDENTIALS_OUT=<服务器上的首个管理员初始化输出文件>
 pnpm --filter @ai-job-print/api bootstrap:first-admin
 ```
 

@@ -16,7 +16,7 @@
 
 ## 2. 环境要求（Windows 主机，不需要一体机整机）
 
-- Windows 10/11 x64；Edge/Chrome Kiosk 模式打开 `https://zyidai.cn`。
+- 系统版本按[母盘清单](windows-golden-image-and-install-checklist.md) A1：Windows 11 IoT 企业版 LTSC 2024（首选）/ Windows 11 专业版 25H2 及以后（兜底）/ Windows 10 IoT 企业版 LTSC 2021（兼容）；普通 Windows 10 已于 2025-10-14 停止支持，不合格；Edge/Chrome Kiosk 模式打开 `https://zyidai.cn`。
 - Terminal Agent 服务 `AIJobPrintAgent` Running / Automatic；`127.0.0.1:9527` 仅监听本机。
 - 打印机驱动识别名（现场 `Pantum CM2800ADN Series`）经 `printerName` 配置，不硬编码。
 - 扫码枪 HID 即插即用（模拟键盘输入付款码）。

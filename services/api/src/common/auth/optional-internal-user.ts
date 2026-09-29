@@ -7,6 +7,7 @@ import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-sessio
 import { tryRedis } from '../redis/redis-degradation'
 import type { RedisService } from '../redis/redis.service'
 import type { PrismaService } from '../../prisma/prisma.service'
+import { assertAdminIpAllowed } from './admin-ip-allowlist'
 
 interface InternalJwtPayload {
   sub?: string
@@ -55,12 +56,20 @@ const fallbackLogger = new Logger('InternalSessionResolver')
  * 它的角色和机构可能已经和数据库不一致。读不回缓存也不退回刚读到的数据库行。
  * Redis 不可用时写入失败，仍用本次数据库快照判定。
  * 「Redis 挂了就放行」或「缓存写失败就当鉴权失败」，两者本仓都不采用。
+ *
+ * ── 管理员来源 IP（P1-4）──────────────────────────────────────────────────────
+ *
+ * `clientIp` 是必填参数（没有就传 null），好让每个调用方都必须想清楚请求从哪来：
+ * 配置了 `ADMIN_IP_ALLOWLIST` 时，管理员身份只在名单内地址上成立，否则抛 403
+ * （混合鉴权路由也一样：管理员令牌从名单外地址来，不退回会员或匿名分支）。
+ * 判定放在身份确定**之后**、按数据库里的当前角色做，不采信 token 里的 role。
  */
 export async function resolveOptionalInternalUser(
   authorization: string | undefined,
   jwtService: JwtService,
   redis: RedisService,
   prisma: PrismaService,
+  clientIp: string | null,
   logger: Logger = fallbackLogger,
 ): Promise<AuthedUser | null> {
   if (!authorization || !authorization.toLowerCase().startsWith('bearer ')) return null
@@ -83,6 +92,7 @@ export async function resolveOptionalInternalUser(
   const role = state.role as UserRole
   if (role !== 'admin' && role !== 'partner' && role !== 'kiosk') return null
   if (role === 'partner' && (!state.orgId || !state.orgEnabled)) return null
+  if (role === 'admin') assertAdminIpAllowed(clientIp)
 
   return {
     userId: state.userId,
