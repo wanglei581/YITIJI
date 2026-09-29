@@ -41,9 +41,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 75 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 77 |
 | **medium** | 只被文档或其它文件提及 | 28 |
-| **low** | 全仓零提及 | 96 |
+| **low** | 全仓零提及 | 94 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（96）
+## low — 全仓零提及（94）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
@@ -183,13 +183,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/resume/jobFit-inkpaper-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/resume/resume-library-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 测试（2）
-
-| 路径 | 判定依据 |
-| --- | --- |
-| `apps/admin/src/routes/screensaver/terminalConfigState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/admin/src/routes/toolbox/toolboxActionState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-
 
 ──────────────────────────────────────────────────────────────────────
 
@@ -236,7 +229,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（75）
+## high — 仍被 CI / 门禁 / 包脚本引用（77）
 
 ### 页面/组件（34）
 
@@ -322,11 +315,13 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/scan/styles/scan-fusion.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 
-### 测试（1）
+### 测试（3）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
+| `apps/admin/src/routes/screensaver/terminalConfigState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
+| `apps/admin/src/routes/toolbox/toolboxActionState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 
 
 ──────────────────────────────────────────────────────────────────────
