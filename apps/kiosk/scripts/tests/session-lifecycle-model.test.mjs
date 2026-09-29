@@ -100,6 +100,30 @@ test('W-15 canceling a QR fetch releases the lock so the next attempt can start'
   assert.doesNotMatch(cleanup, /requestGeneration\.current \+= 1/)
 })
 
+test('W-19 machine quota, site quota, and this number do not share one sentence', async () => {
+  const m = await loadModule('src/pages/auth/loginGateModel.ts')
+  const terminal = m.smsUnavailableCopy('SMS_TERMINAL_DAILY_LIMIT')
+  const total = m.smsUnavailableCopy('SMS_DAILY_TOTAL_LIMIT')
+  const budget = m.smsUnavailableCopy('SMS_BUDGET_UNAVAILABLE')
+  const session = m.smsUnavailableCopy('TERMINAL_SESSION_INVALID')
+  assert.match(terminal.title, /这台机器今天的短信已经发完/)
+  assert.match(terminal.sub, /扫码登录/)
+  assert.match(total.title, /今天的短信验证码已经发完/)
+  assert.doesNotMatch(`${total.title}${total.sub}`, /这台机器/)
+  assert.match(total.sub, /不登录/)
+  assert.match(`${budget.title}${budget.sub}`, /扫码登录/)
+  assert.match(`${session.title}${session.sub}`, /扫码登录/)
+  assert.equal(m.phoneSendSideLabel({ state: 'phone-sms-unavailable', errorCode: 'SMS_TERMINAL_DAILY_LIMIT', countdown: 42, loading: false }), '暂时不能发')
+  assert.equal(m.phoneSendSideLabel({ state: 'phone-sms-unavailable', errorCode: 'SMS_DAILY_TOTAL_LIMIT', countdown: 0, loading: false }), '暂时不能发')
+  assert.equal(m.phoneSendSideLabel({ state: 'phone-send-limited', errorCode: 'SMS_DAILY_LIMIT', countdown: 30, loading: false }), '今天不能再发')
+  assert.equal(m.phoneSendSideLabel({ state: 'phone-idle', errorCode: null, countdown: 0, loading: false }), '获取验证码')
+  assert.equal(m.sendLimitedPrimaryLabel(15), '15 秒后再获取')
+  assert.equal(m.sendLimitedPrimaryLabel(0), '重新获取验证码')
+  assert.equal(m.isPhoneDailySmsCode('SMS_PROVIDER_PHONE_DAILY_LIMIT'), true)
+  assert.equal(m.isPhoneDailySmsCode('SMS_TERMINAL_DAILY_LIMIT'), false)
+  assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '请明天再试', errorCode: 'SMS_DAILY_LIMIT' }), 'phone-send-limited')
+})
+
 test('login returnTo rejects unsafe query and does not echo it', async () => {
   const m = await loadModule('src/pages/auth/loginGateModel.ts')
   const isSafe = (p) => p.startsWith('/') && !p.startsWith('//') && !p.includes('\\') && p !== '/login'

@@ -82,6 +82,21 @@ export function isSmsUnavailableCode(code: string | null | undefined): boolean {
   return typeof code === 'string' && SMS_UNAVAILABLE_CODES.has(code)
 }
 
+/** 限的是这个号码今天还能不能收码。换一个号码可以再获取；同一号码再点没有用。 */
+const PHONE_DAILY_SMS_CODES = new Set([
+  'SMS_DAILY_LIMIT',
+  'SMS_PROVIDER_PHONE_DAILY_LIMIT',
+  'PROVIDER_PHONE_DAILY_LIMIT',
+])
+
+export function isPhoneDailySmsCode(code: string | null | undefined): boolean {
+  return typeof code === 'string' && PHONE_DAILY_SMS_CODES.has(code)
+}
+
+export function phoneSendHeld(state: LoginPhoneState, errorCode: string | null | undefined): boolean {
+  return state === 'phone-sms-unavailable' || isSmsUnavailableCode(errorCode) || isPhoneDailySmsCode(errorCode)
+}
+
 export function classifyPhoneError(message: string | null): LoginPhoneState | null {
   if (!message) return null
   if (/不正确/.test(message)) return 'phone-code-invalid'
@@ -194,7 +209,7 @@ export const LOGIN_GATE_COPY: Record<LoginGateState, { title: string; sub: strin
   'phone-code-expired': { title: '需要重新获取验证码', sub: '旧码已经不能使用，请重新获取一条。' },
   'phone-code-locked': { title: '验证码尝试次数过多', sub: '这条验证码已作废，请获取新码后再验证。' },
   'phone-legal-unpublished': { title: '暂时无法登录', sub: '用户协议和隐私政策还没有正式发布。不登录也能打印和扫描。' },
-  'phone-sms-unavailable': { title: '短信验证码暂时发不出来', sub: '改用扫码登录，不用这台机器发短信。也可以不登录，继续使用公开服务。' },
+  'phone-sms-unavailable': { title: '短信验证码暂时发不出来', sub: '改用扫码登录。也可以不登录，继续使用公开服务。' },
   'qr-loading': { title: '扫码登录', sub: '勾选协议后即可获取二维码。' },
   'qr-ready': { title: '扫码登录', sub: '用手机扫码并确认，再回到这台机器继续办理。' },
   'qr-expired': { title: '二维码已过期', sub: '请在这台机器上重新生成，再用手机扫码。' },
@@ -210,6 +225,52 @@ export const LOGIN_ANON_ENTRIES = [
 
 export function loginAnonEntries(): ReadonlyArray<{ id: string; title: string; desc: string; route: string }> {
   return LOGIN_ANON_ENTRIES
+}
+
+export const PHONE_DAILY_GATE_COPY = {
+  title: '这个号码今天不能再收验证码',
+  sub: '可以换一个手机号，或改用扫码登录。也可以不登录，继续使用公开服务。',
+} as const
+
+/** 四种发不出码的原因对用户不是同一句话。全站发完时不要说成「只是这台机器」。 */
+export function smsUnavailableCopy(code: string | null | undefined): { title: string; sub: string } {
+  if (code === 'SMS_TERMINAL_DAILY_LIMIT') {
+    return {
+      title: '这台机器今天的短信已经发完',
+      sub: '改用扫码登录，不用再在这台机器上发短信。也可以不登录，继续使用公开服务。',
+    }
+  }
+  if (code === 'SMS_DAILY_TOTAL_LIMIT') {
+    return {
+      title: '今天的短信验证码已经发完',
+      sub: '今天再获取也不会发出。改用扫码登录，或先不登录，继续使用公开服务。',
+    }
+  }
+  if (code === 'TERMINAL_SESSION_INVALID') {
+    return {
+      title: '这台机器现在发不了验证码',
+      sub: '改用扫码登录。也可以不登录，继续使用公开服务。',
+    }
+  }
+  return LOGIN_GATE_COPY['phone-sms-unavailable']
+}
+
+export function phoneSendSideLabel(input: {
+  state: LoginPhoneState
+  errorCode?: string | null
+  countdown: number
+  loading: boolean
+}): string {
+  if (input.state === 'phone-sms-unavailable' || isSmsUnavailableCode(input.errorCode)) return '暂时不能发'
+  if (isPhoneDailySmsCode(input.errorCode)) return '今天不能再发'
+  if (input.loading && input.countdown === 0) return '发送中'
+  if (input.countdown > 0) return `${input.countdown} 秒后重发`
+  if (input.state === 'phone-idle') return '获取验证码'
+  return '重新获取'
+}
+
+export function sendLimitedPrimaryLabel(countdown: number): string {
+  return countdown > 0 ? `${countdown} 秒后再获取` : '重新获取验证码'
 }
 
 export interface QrFetchGuard {

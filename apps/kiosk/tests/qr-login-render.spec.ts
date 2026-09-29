@@ -571,6 +571,15 @@ for (const scenario of [
     await expect(page.getByRole('alert')).toContainText(scenario.expected)
     await expect(page.getByRole('alert')).not.toContainText(scenario.code)
     await expect(page.getByText('再试一次发码')).toHaveCount(0)
+    await expect(page.getByTestId('login-gate-send')).toHaveText('暂时不能发')
+    await expect(page.getByTestId('login-gate-send')).toBeDisabled()
+    await expect(page.getByText('获取验证码', { exact: true })).toHaveCount(0)
+    const head = page.locator('.qx-pagehead')
+    if (scenario.code === 'SMS_TERMINAL_DAILY_LIMIT') await expect(head).toContainText('这台机器今天的短信已经发完')
+    if (scenario.code === 'SMS_DAILY_TOTAL_LIMIT') {
+      await expect(head).toContainText('今天的短信验证码已经发完')
+      await expect(head).not.toContainText('这台机器')
+    }
     await expect(page.getByTestId('login-gate-anonymous')).toHaveText('不登录，继续使用')
     const primary = page.getByTestId('login-gate-primary')
     await expect(primary).toHaveText('改用扫码登录')
@@ -578,6 +587,29 @@ for (const scenario of [
     await expect(page.locator('[data-screen="login-gate"]')).toHaveAttribute('data-mode', 'qr')
   })
 }
+
+test('W-19 这个号码今天用完后不再写成重新获取验证码 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 429,
+    json: { success: false, error: { code: 'SMS_DAILY_LIMIT', message: 'SMS_DAILY_LIMIT' } },
+  })
+  await page.goto('/login')
+  await enterMemberPhone(page)
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByTestId('login-gate-send').click()
+  await expect(page.getByTestId('login-gate-state-phone-send-limited')).toBeVisible()
+  await expect(page.locator('.qx-pagehead')).toContainText('这个号码今天不能再收验证码')
+  await expect(page.getByRole('alert')).toContainText('这个号码今天的验证码次数已用完')
+  await expect(page.getByTestId('login-gate-send')).toHaveText('今天不能再发')
+  await expect(page.getByTestId('login-gate-send')).toBeDisabled()
+  await expect(page.getByTestId('login-gate-primary')).toHaveText('改用扫码登录')
+  await expect(page.getByTestId('login-gate-anonymous')).toHaveText('不登录，继续使用')
+  await expect(page.getByText('重新获取验证码', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  await page.getByRole('button', { name: '删除', exact: true }).click()
+  await expect(page.getByTestId('login-gate-send')).toHaveText('获取验证码')
+})
 
 for (const [code, state] of [['SMS_CODE_INVALID', 'phone-code-invalid'], ['SMS_CODE_EXPIRED', 'phone-code-expired'], ['SMS_CODE_LOCKED', 'phone-code-locked']]) {
   test(`W4 verification recovery ${code} @kiosk`, async ({ page, api }) => {

@@ -5,7 +5,7 @@ import {
   MEMBER_PHONE_LENGTH,
   type MemberPhoneLoginPaneProps,
 } from '../hooks/useMemberPhoneLogin'
-import type { LoginPhoneState } from '../loginGateModel'
+import { isPhoneDailySmsCode, phoneSendHeld, phoneSendSideLabel, type LoginPhoneState } from '../loginGateModel'
 
 const CODE_OPEN_STATES: ReadonlySet<LoginPhoneState> = new Set([
   'phone-code-sent',
@@ -26,19 +26,15 @@ export function LoginGatePhoneFields({
   onSendCode,
   notice,
   error,
+  errorCode,
   activeInput,
   expiresInSeconds,
 }: MemberPhoneLoginPaneProps & { state: LoginPhoneState }) {
   const [keyboardOpen, setKeyboardOpen] = useState(false)
-  const canSend = agreed && phone.length === MEMBER_PHONE_LENGTH && countdown === 0 && !loading
   const codeOpen = CODE_OPEN_STATES.has(state)
-  const sendLabel = loading && countdown === 0
-    ? '发送中'
-    : countdown > 0
-      ? `${countdown} 秒后重发`
-      : state === 'phone-idle'
-        ? '获取验证码'
-        : '重新获取'
+  const sendHeld = phoneSendHeld(state, errorCode)
+  const canSend = agreed && phone.length === MEMBER_PHONE_LENGTH && countdown === 0 && !loading && !sendHeld
+  const sendLabel = phoneSendSideLabel({ state, errorCode, countdown, loading })
 
 
   return (
@@ -87,9 +83,13 @@ export function LoginGatePhoneFields({
           </button>
         </div>
         <div className="lg-reason">
-          {codeOpen
-            ? '填写最新短信里的 6 位数字，确认后即可继续。'
-            : '先获取验证码，收到后这里会打开。'}
+          {isPhoneDailySmsCode(errorCode)
+            ? '这个号码今天不能再收验证码。可以换一个号码，或改用扫码登录。'
+            : state === 'phone-sms-unavailable'
+              ? '短信验证码暂时发不出来。请改用扫码登录，或先不登录继续使用。'
+              : codeOpen
+                ? '填写最新短信里的 6 位数字，确认后即可继续。'
+                : '先获取验证码，收到后这里会打开。'}
         </div>
       </div>
       {notice && state !== 'phone-code-sent' ? <p className="lg-echo" role="status">{notice}{expiresInSeconds !== null ? `，有效期 ${expiresInSeconds} 秒。` : null}</p> : null}
