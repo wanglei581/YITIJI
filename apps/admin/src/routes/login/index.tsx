@@ -4,13 +4,13 @@
 //   密码登录 POST /auth/login · 发码 POST /auth/sms-code · 短信登录 POST /auth/login/sms
 //   找回密码 POST /auth/password/reset/{start,verify,complete}
 //   本人验证 POST /auth/phone/{code,verify}
+//   短信第二步（服务端 ADMIN_LOGIN_SECOND_FACTOR=sms 时）POST /auth/login/second-factor{,/resend}，见 ./SecondFactorPanel.tsx
 // 协议勾选未通过时阻断登录 / 发码。视觉对齐 login-trio-v1 原型 ②（样式见 ./login.css）。
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckIcon,
-  CircleAlertIcon,
   EyeIcon,
   EyeOffIcon,
   LockKeyholeIcon,
@@ -34,6 +34,10 @@ import {
 } from '../../services/auth'
 import { LegalDocsModal, type LegalDocKind } from './LegalDocsModal'
 import { FirstAdminPasswordChangeModal } from './FirstAdminPasswordChangeModal'
+import { AgreementRow, ErrorBar, LoadingDots } from './LoginBits'
+import { useCountdown, useRipple } from './loginHooks'
+import { SecondFactorPanel } from './SecondFactorPanel'
+import type { AdminSecondFactorChallenge } from '../../services/auth/secondFactor'
 import './login.css'
 
 type LoginMode = 'password' | 'sms'
@@ -41,16 +45,6 @@ type ResetStep = 'identity' | 'code' | 'password'
 
 const REMEMBER_KEY = 'admin_login_prefill_v1'
 const SUCCESS_OVERLAY_MS = 900
-
-function useCountdown() {
-  const [seconds, setSeconds] = useState(0)
-  useEffect(() => {
-    if (seconds <= 0) return undefined
-    const timer = window.setTimeout(() => setSeconds((v) => Math.max(0, v - 1)), 1000)
-    return () => window.clearTimeout(timer)
-  }, [seconds])
-  return { seconds, start: setSeconds }
-}
 
 function readRememberedLoginId(): string {
   try {
@@ -88,31 +82,6 @@ function validateCommercialPassword(value: string): string | null {
   return null
 }
 
-/** 触控涟漪：命中 .ripple-host 的元素按压时扩散水纹（纯视觉，事件委托） */
-function useRipple(rootRef: React.RefObject<HTMLElement | null>) {
-  useEffect(() => {
-    const root = rootRef.current
-    if (!root) return undefined
-    const onDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement | null
-      const host = target?.closest?.('.ripple-host') as HTMLElement | null
-      if (!host || (host as HTMLButtonElement).disabled) return
-      const rect = host.getBoundingClientRect()
-      const rip = document.createElement('span')
-      rip.className = 'ripple'
-      const size = Math.max(rect.width, rect.height) * 1.6
-      rip.style.width = `${size}px`
-      rip.style.height = `${size}px`
-      rip.style.left = `${e.clientX - rect.left - size / 2}px`
-      rip.style.top = `${e.clientY - rect.top - size / 2}px`
-      host.appendChild(rip)
-      window.setTimeout(() => rip.remove(), 540)
-    }
-    root.addEventListener('pointerdown', onDown)
-    return () => root.removeEventListener('pointerdown', onDown)
-  }, [rootRef])
-}
-
 export default function LoginPage() {
   const nav = useNavigate()
   const smsCountdown = useCountdown()
@@ -148,6 +117,7 @@ export default function LoginPage() {
   const [phoneVerifyBusy, setPhoneVerifyBusy] = useState(false)
   const [firstAdminChangeTicket, setFirstAdminChangeTicket] = useState<string | null>(null)
   const [firstAdminChanged, setFirstAdminChanged] = useState(false)
+  const [secondFactor, setSecondFactor] = useState<AdminSecondFactorChallenge | null>(null)
 
   useEffect(() => {
     if (getToken()) nav('/', { replace: true })
@@ -189,9 +159,19 @@ export default function LoginPage() {
     if (r.ok && 'passwordChangeRequired' in r) {
       setPassword('')
       setFirstAdminChangeTicket(r.changeTicket)
+    } else if (r.ok && 'secondFactorRequired' in r) {
+      setPassword('')
+      setSecondFactor(r)
     } else if (r.ok) completeLogin(r.user, loginId.trim())
     else raiseError(r.message || '登录失败')
   }
+
+  const restartFromSecondFactor = useCallback((message: string | null) => {
+    setSecondFactor(null)
+    setMode('password')
+    if (message) raiseError(message)
+    else setError(null)
+  }, [raiseError])
 
   async function submitSms(e: FormEvent) {
     e.preventDefault()
@@ -203,8 +183,18 @@ export default function LoginPage() {
     setLoading(false)
     if (r.ok && 'passwordChangeRequired' in r) {
       setFirstAdminChangeTicket(r.changeTicket)
+    } else if (r.ok && 'secondFactorRequired' in r) {
+      raiseError('登录响应无效，请改用账号密码登录')
     } else if (r.ok) completeLogin(r.user, phone.trim())
-    else raiseError(r.message || '登录失败')
+    else if (!switchToPasswordIfSmsOnlyRejected(r)) raiseError(r.message || '登录失败')
+  }
+
+  /** 开启短信第二步后，管理员入口只接受「账号密码 + 短信验证码」：发码与登录被拒时都切回密码登录并说明原因。 */
+  function switchToPasswordIfSmsOnlyRejected(r: { code: string; message: string }): boolean {
+    if (r.code !== 'AUTH_ADMIN_SMS_LOGIN_REQUIRES_PASSWORD') return false
+    setMode('password')
+    raiseError(r.message || '管理员登录需要「账号密码 + 短信验证码」两步，请用账号密码登录')
+    return true
   }
 
   async function sendCode() {
@@ -213,7 +203,7 @@ export default function LoginPage() {
     setError(null)
     const r = await sendLoginSmsCode(phone.trim())
     if (r.ok) smsCountdown.start(r.cooldownSeconds || 60)
-    else raiseError(r.message || '验证码发送失败')
+    else if (!switchToPasswordIfSmsOnlyRejected(r)) raiseError(r.message || '验证码发送失败')
   }
 
   async function startReset(e: FormEvent) {
@@ -351,156 +341,169 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div className="c-mode">
-            <button
-              type="button"
-              className={`ripple-host${mode === 'password' ? ' on' : ''}`}
-              onClick={() => {
-                setMode('password')
-                setError(null)
+          {secondFactor ? (
+            <SecondFactorPanel
+              challenge={secondFactor}
+              onSuccess={(user) => {
+                setSecondFactor(null)
+                completeLogin(user, loginId.trim())
               }}
-            >
-              密码登录
-            </button>
-            <button
-              type="button"
-              className={`ripple-host${mode === 'sms' ? ' on' : ''}`}
-              onClick={() => {
-                setMode('sms')
-                setError(null)
-              }}
-            >
-              验证码登录
-            </button>
-          </div>
-
-          {mode === 'password' ? (
-            <form className="c-pane" onSubmit={submitPassword}>
-              <div className="c-field">
-                <label htmlFor="admin-login-id">
-                  <b className="fno">01</b>账号 / 手机号
-                </label>
-                <div className="c-inputwrap">
-                  <UserRoundIcon className="lead" size={18} aria-hidden="true" />
-                  <input
-                    id="admin-login-id"
-                    type="text"
-                    placeholder="请输入管理员账号或手机号"
-                    autoComplete="username"
-                    value={loginId}
-                    onChange={(e) => setLoginId(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="c-field">
-                <label htmlFor="admin-password">
-                  <b className="fno">02</b>密码
-                </label>
-                <div className="c-inputwrap">
-                  <LockKeyholeIcon className="lead" size={18} aria-hidden="true" />
-                  <input
-                    id="admin-password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="请输入密码"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="c-eye"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                  >
-                    {showPassword ? <EyeOffIcon size={18} aria-hidden="true" /> : <EyeIcon size={18} aria-hidden="true" />}
-                  </button>
-                </div>
-              </div>
-              <div className="c-row2">
+              onRestart={restartFromSecondFactor}
+            />
+          ) : (
+            <>
+              <div className="c-mode">
                 <button
                   type="button"
-                  className={`c-remember${remember ? ' checked' : ''}`}
-                  onClick={() => setRemember((v) => !v)}
-                  role="checkbox"
-                  aria-checked={remember}
+                  className={`ripple-host${mode === 'password' ? ' on' : ''}`}
+                  onClick={() => {
+                    setMode('password')
+                    setError(null)
+                  }}
                 >
-                  <span className="box">
-                    <CheckIcon size={13} aria-hidden="true" />
-                  </span>
-                  记住账号
+                  密码登录
                 </button>
-                <button type="button" className="c-forgot" onClick={openReset}>
-                  忘记密码？找回 / 重置
+                <button
+                  type="button"
+                  className={`ripple-host${mode === 'sms' ? ' on' : ''}`}
+                  onClick={() => {
+                    setMode('sms')
+                    setError(null)
+                  }}
+                >
+                  验证码登录
                 </button>
               </div>
-              <AgreementRow agreed={agreed} onToggle={() => setAgreed((v) => !v)} onOpenDoc={setLegalDoc} />
-              {error && <ErrorBar message={error} />}
-              <button type="submit" className={`c-cta ripple-host${loading ? ' loading' : ''}`} disabled={loading}>
-                <span className="label">登 录</span>
-                <LoadingDots />
-              </button>
-            </form>
-          ) : (
-            <form className="c-pane" onSubmit={submitSms}>
-              <div className="c-field">
-                <label htmlFor="admin-sms-phone">
-                  <b className="fno">01</b>手机号
-                </label>
-                <div className="c-inputwrap">
-                  <SmartphoneIcon className="lead" size={18} aria-hidden="true" />
-                  <input
-                    id="admin-sms-phone"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="请输入账号绑定的手机号"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="c-field">
-                <label htmlFor="admin-sms-code">
-                  <b className="fno">02</b>短信验证码
-                </label>
-                <div className="c-inputwrap">
-                  <MessageSquareTextIcon className="lead" size={18} aria-hidden="true" />
-                  <input
-                    id="admin-sms-code"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="6 位数字，5 分钟内有效"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="c-send"
-                    onClick={() => void sendCode()}
-                    disabled={smsCountdown.seconds > 0 || phone.length !== 11}
-                  >
-                    {smsCountdown.seconds > 0 ? `${smsCountdown.seconds}s 后重发` : '获取验证码'}
+
+              {mode === 'password' ? (
+                <form className="c-pane" onSubmit={submitPassword}>
+                  <div className="c-field">
+                    <label htmlFor="admin-login-id">
+                      <b className="fno">01</b>账号 / 手机号
+                    </label>
+                    <div className="c-inputwrap">
+                      <UserRoundIcon className="lead" size={18} aria-hidden="true" />
+                      <input
+                        id="admin-login-id"
+                        type="text"
+                        placeholder="请输入管理员账号或手机号"
+                        autoComplete="username"
+                        value={loginId}
+                        onChange={(e) => setLoginId(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="c-field">
+                    <label htmlFor="admin-password">
+                      <b className="fno">02</b>密码
+                    </label>
+                    <div className="c-inputwrap">
+                      <LockKeyholeIcon className="lead" size={18} aria-hidden="true" />
+                      <input
+                        id="admin-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="请输入密码"
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="c-eye"
+                        onClick={() => setShowPassword((v) => !v)}
+                        aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                      >
+                        {showPassword ? <EyeOffIcon size={18} aria-hidden="true" /> : <EyeIcon size={18} aria-hidden="true" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="c-row2">
+                    <button
+                      type="button"
+                      className={`c-remember${remember ? ' checked' : ''}`}
+                      onClick={() => setRemember((v) => !v)}
+                      role="checkbox"
+                      aria-checked={remember}
+                    >
+                      <span className="box">
+                        <CheckIcon size={13} aria-hidden="true" />
+                      </span>
+                      记住账号
+                    </button>
+                    <button type="button" className="c-forgot" onClick={openReset}>
+                      忘记密码？找回 / 重置
+                    </button>
+                  </div>
+                  <AgreementRow agreed={agreed} onToggle={() => setAgreed((v) => !v)} onOpenDoc={setLegalDoc} />
+                  {error && <ErrorBar message={error} />}
+                  <button type="submit" className={`c-cta ripple-host${loading ? ' loading' : ''}`} disabled={loading}>
+                    <span className="label">登 录</span>
+                    <LoadingDots />
                   </button>
-                </div>
-              </div>
-              <div className="c-hint">
-                <ShieldCheckIcon size={14} aria-hidden="true" />
-                验证码登录仅支持已完成本人验证手机号的管理员账号
-              </div>
-              <AgreementRow agreed={agreed} onToggle={() => setAgreed((v) => !v)} onOpenDoc={setLegalDoc} />
-              {error && <ErrorBar message={error} />}
-              <button
-                type="submit"
-                className={`c-cta ripple-host${loading ? ' loading' : ''}`}
-                disabled={loading || code.length !== 6}
-              >
-                <span className="label">登 录</span>
-                <LoadingDots />
-              </button>
-            </form>
+                </form>
+              ) : (
+                <form className="c-pane" onSubmit={submitSms}>
+                  <div className="c-field">
+                    <label htmlFor="admin-sms-phone">
+                      <b className="fno">01</b>手机号
+                    </label>
+                    <div className="c-inputwrap">
+                      <SmartphoneIcon className="lead" size={18} aria-hidden="true" />
+                      <input
+                        id="admin-sms-phone"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="请输入账号绑定的手机号"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="c-field">
+                    <label htmlFor="admin-sms-code">
+                      <b className="fno">02</b>短信验证码
+                    </label>
+                    <div className="c-inputwrap">
+                      <MessageSquareTextIcon className="lead" size={18} aria-hidden="true" />
+                      <input
+                        id="admin-sms-code"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="6 位数字，5 分钟内有效"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="c-send"
+                        onClick={() => void sendCode()}
+                        disabled={smsCountdown.seconds > 0 || phone.length !== 11}
+                      >
+                        {smsCountdown.seconds > 0 ? `${smsCountdown.seconds}s 后重发` : '获取验证码'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="c-hint">
+                    <ShieldCheckIcon size={14} aria-hidden="true" />
+                    验证码登录仅支持已完成本人验证手机号的管理员账号
+                  </div>
+                  <AgreementRow agreed={agreed} onToggle={() => setAgreed((v) => !v)} onOpenDoc={setLegalDoc} />
+                  {error && <ErrorBar message={error} />}
+                  <button
+                    type="submit"
+                    className={`c-cta ripple-host${loading ? ' loading' : ''}`}
+                    disabled={loading || code.length !== 6}
+                  >
+                    <span className="label">登 录</span>
+                    <LoadingDots />
+                  </button>
+                </form>
+              )}
+            </>
           )}
 
           <div className="c-cardfoot">
@@ -723,74 +726,5 @@ export default function LoginPage() {
         </div>
       )}
     </main>
-  )
-}
-
-function AgreementRow({
-  agreed,
-  onToggle,
-  onOpenDoc,
-}: {
-  agreed: boolean
-  onToggle: () => void
-  onOpenDoc: (doc: LegalDocKind) => void
-}) {
-  return (
-    <button type="button" className={`c-agree${agreed ? ' checked' : ''}`} onClick={onToggle} role="checkbox" aria-checked={agreed}>
-      <span className="box">
-        <CheckIcon size={13} aria-hidden="true" />
-      </span>
-      <span>
-        我已阅读并同意
-        <span
-          className="doclink"
-          role="link"
-          tabIndex={0}
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpenDoc('terms')
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onOpenDoc('terms')
-          }}
-        >
-          《用户服务协议》
-        </span>
-        和
-        <span
-          className="doclink"
-          role="link"
-          tabIndex={0}
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpenDoc('privacy')
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onOpenDoc('privacy')
-          }}
-        >
-          《隐私政策》
-        </span>
-      </span>
-    </button>
-  )
-}
-
-function ErrorBar({ message }: { message: string }) {
-  return (
-    <div className="c-error" role="alert">
-      <CircleAlertIcon size={16} aria-hidden="true" />
-      <span>{message}</span>
-    </div>
-  )
-}
-
-function LoadingDots() {
-  return (
-    <span className="load">
-      <i />
-      <i />
-      <i />
-    </span>
   )
 }
