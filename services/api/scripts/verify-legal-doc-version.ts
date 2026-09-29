@@ -24,6 +24,12 @@ import { CreateLegalDocDto } from '../src/legal/dto/admin-legal-doc.dto'
 import { LEGAL_DOC_TYPES, LegalService } from '../src/legal/legal.service'
 import { LEGAL_DRAFT_FALLBACK_VERSION } from '../src/legal/legal-constants'
 import { assertLegalDocsPublished } from '../src/member-auth/legal-docs-published-guard'
+import { AdminLegalDocsController } from '../src/legal/admin-legal-docs.controller'
+import { RolesGuard } from '../src/common/guards/roles.guard'
+import { ROLES_KEY } from '../src/common/decorators/roles.decorator'
+import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import { Reflector } from '@nestjs/core'
+import type { ExecutionContext } from '@nestjs/common'
 
 const ROOT = path.resolve(__dirname, '../../..')
 
@@ -385,8 +391,33 @@ async function main() {
   // ── 13. operator_info：发布、公开读取、未发布（走 DTO / Service / Controller，注释字符串不算）──
   await assertOperatorInfoRoundTrip()
 
+  // ── 14. 管理员按 id 读取单个版本（含正文）：只给管理员、每次写访问审计、不存在 404 ──
+  await assertAdminReadById()
+
+  // ── 15. 后台「查看正文 / 新增预览」的分章规则必须与一体机逐字同一套 ──────────
+  // 两个 app 不能互相 import，后台只能复制一份；这里比对两条标题正则与分段写法，防止两边漂移
+  // （漂移的后果：后台预览里是一章，一体机上却拆成了几章或糊成全文）。
+  {
+    const kiosk = readFile('apps/kiosk/src/pages/legal/legalDocModel.ts')
+    const admin = readFile('apps/admin/src/routes/legal-docs/legalDocRender.ts')
+    const pick = (src: string, name: string) => src.match(new RegExp(`const ${name} = (.+)`))?.[1]?.trim() ?? null
+    for (const name of ['MARKDOWN_HEADING', 'ORDINAL_HEADING']) {
+      const k = pick(kiosk, name)
+      const a = pick(admin, name)
+      if (!k || k !== a) fail(`后台法务正文预览的 ${name} 与一体机不一致`, `一体机：${k}\n        后台：${a}`)
+    }
+    for (const token of ['.split(/\\n{2,}/)', 'trimmed.length <= 30', "!/[。；;，,]$/.test(trimmed)", "title: '全文'", "title: '开篇说明'"]) {
+      if (!kiosk.includes(token) || !admin.includes(token)) fail(`后台法务正文预览与一体机分章写法不一致：${token}`)
+    }
+    const page = readFile('apps/admin/src/routes/legal-docs/LegalDocPreview.tsx')
+    if (!page.includes("from './legalDocRender'") || !page.includes('splitLegalSections(content)')) {
+      fail('后台法务正文预览没有用 legalDocRender 的分章函数')
+    }
+    pass('后台法务正文预览与一体机用同一套分章规则（标题正则与分段写法逐字一致）')
+  }
+
   // ── 完成 ─────────────────────────────────────────────────────────────────
-  console.log('\n=== G6 法务文档版本管理验证通过（13/13 项） ===\n')
+  console.log('\n=== G6 法务文档版本管理验证通过（15/15 项） ===\n')
 }
 
 type MemoryDoc = {
@@ -413,8 +444,9 @@ function memoryLegalPrisma() {
         const row = docs.find((doc) => doc.docType === args.where.docType && doc.isActive === args.where.isActive) ?? null
         return row ? projectRow(row, args.select) : null
       },
-      async findUnique(args: { where: { id: string } }) {
-        return docs.find((doc) => doc.id === args.where.id) ?? null
+      async findUnique(args: { where: { id: string }; select?: Record<string, boolean> }) {
+        const row = docs.find((doc) => doc.id === args.where.id) ?? null
+        return row ? projectRow(row, args.select) : null
       },
       async create(args: { data: Record<string, unknown>; select?: Record<string, boolean> }) {
         const row: MemoryDoc = {
@@ -537,6 +569,82 @@ async function assertOperatorInfoRoundTrip(): Promise<void> {
     fail('发布 operator_info 改变了其它类型的未发布语义')
   }
   pass('operator_info 可发布、可公开读取现行版本；未发布与其它类型同为 data: null')
+}
+
+/**
+ * 后台「查看正文」读的是 GET /admin/legal-doc-versions/:id。真走 Controller + Service + RolesGuard：
+ *   - 管理员读到正文（草稿也能读，发布前核对用）；
+ *   - 机构账号（partner）被 RolesGuard 拒绝 —— 方法级 @Roles('admin')，不只靠类级；
+ *   - 每次读取写一条 legal_doc.view 审计，载明版本号；
+ *   - 版本不存在返回 404 LEGAL_DOC_NOT_FOUND，且不写审计。
+ */
+async function assertAdminReadById(): Promise<void> {
+  const db = memoryLegalPrisma()
+  const auditRows: Array<{ action: string; payload: unknown; actorId: string | null }> = []
+  const audit = {
+    writeRequired: async (
+      client: { auditLog: { create: (args: { data: { action: string; payloadJson: string } }) => Promise<{ id: string }> } },
+      args: { action: string; actorId?: string | null; payload?: unknown },
+    ) => {
+      auditRows.push({ action: args.action, payload: args.payload ?? null, actorId: args.actorId ?? null })
+      const row = await client.auditLog.create({ data: { action: args.action, payloadJson: JSON.stringify(args.payload ?? {}) } })
+      return row.id
+    },
+  }
+  const service = new LegalService(db as never, audit as never)
+  const controller = new AdminLegalDocsController(service)
+  const admin = { userId: 'admin-reader', role: 'admin' } as AuthedUser
+  const partner = { userId: 'partner-reader', role: 'partner', orgId: 'org-1' } as unknown as AuthedUser
+
+  const draft = await service.create({
+    docType: 'terms_of_service',
+    version: '2026.10.01-试运行v1',
+    title: '用户服务协议',
+    content: '第一条 总则\n本协议正文用于后台查看验证。',
+    adminId: 'admin-author',
+  })
+  const auditBefore = auditRows.length
+
+  const read = await controller.getOne(draft.id, admin)
+  if (read.success !== true || !read.data.content.includes('本协议正文用于后台查看验证') || read.data.version !== '2026.10.01-试运行v1') {
+    fail('管理员按 id 读取没有拿到该版本正文', JSON.stringify(read))
+  }
+  const viewRows = auditRows.slice(auditBefore).filter((row) => row.action === 'legal_doc.view')
+  if (viewRows.length !== 1 || viewRows[0].actorId !== 'admin-reader' || !JSON.stringify(viewRows[0].payload).includes('2026.10.01-试运行v1')) {
+    fail('查看正文没有写 legal_doc.view 审计（或审计里没有操作人 / 版本号）', JSON.stringify(auditRows))
+  }
+
+  const roles = new RolesGuard(new Reflector())
+  const roleContext = (user: AuthedUser): ExecutionContext => ({
+    getHandler: () => AdminLegalDocsController.prototype.getOne,
+    getClass: () => AdminLegalDocsController,
+    switchToHttp: () => ({ getRequest: () => ({ user }) }),
+  }) as unknown as ExecutionContext
+  const methodRoles = Reflect.getMetadata(ROLES_KEY, AdminLegalDocsController.prototype.getOne) as string[] | undefined
+  if (!methodRoles || methodRoles.length !== 1 || methodRoles[0] !== 'admin') {
+    fail("GET /admin/legal-doc-versions/:id 方法上没有单独声明 @Roles('admin')")
+  }
+  if (roles.canActivate(roleContext(admin)) !== true) fail('RolesGuard 拒绝了管理员读取法务正文')
+  try {
+    roles.canActivate(roleContext(partner))
+    fail('机构账号（partner）居然能读取管理员法务正文接口')
+  } catch (error) {
+    const code = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()?.error?.code
+    if (code !== 'AUTH_ROLE_FORBIDDEN') fail(`机构账号被拒的错误码应为 AUTH_ROLE_FORBIDDEN，实际 ${String(code)}`)
+  }
+
+  const auditBeforeMissing = auditRows.length
+  try {
+    await controller.getOne('doc-does-not-exist', admin)
+    fail('读取不存在的版本没有报错')
+  } catch (error) {
+    const status = (error as { getStatus?: () => number }).getStatus?.()
+    const code = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()?.error?.code
+    if (status !== 404 || code !== 'LEGAL_DOC_NOT_FOUND') fail(`读取不存在的版本应为 404 LEGAL_DOC_NOT_FOUND，实际 ${String(status)} ${String(code)}`)
+  }
+  if (auditRows.length !== auditBeforeMissing) fail('读取不存在的版本也写了审计')
+
+  pass('管理员按 id 读取含正文；机构账号被拒；每次读取写 legal_doc.view 审计；不存在返回 404 且不写审计')
 }
 
 main().catch((e: unknown) => {
