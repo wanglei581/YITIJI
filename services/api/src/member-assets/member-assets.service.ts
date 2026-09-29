@@ -15,6 +15,7 @@ import type {
 } from './member-assets.types'
 import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
 import { materialCheckRequired } from '../print-jobs/material-check-policy'
+import { listedDocumentPageCount } from '../files/file-page-count.util'
 import { RESUME_PARSE_INTENT_KIND } from '../ai/resume-parse-submission.service'
 import { RESUME_GENERATE_INPUT_KIND } from '../ai/resume/resume-draft-ai-overlap'
 import { isRecruitmentContentHostingEnabled, RECRUITMENT_HOSTING_DISABLED_CODE } from '../recruitment-hosting/recruitment-hosting'
@@ -132,6 +133,7 @@ export class MemberAssetsService {
         filename: true,
         mimeType: true,
         sizeBytes: true,
+        pageCount: true,
         purpose: true,
         sensitiveLevel: true,
         assetCategory: true,
@@ -149,6 +151,7 @@ export class MemberAssetsService {
       filename: f.filename,
       mimeType: f.mimeType,
       sizeBytes: f.sizeBytes,
+      pageCount: listedDocumentPageCount(f),
       purpose: f.purpose,
       sensitiveLevel: f.sensitiveLevel,
       assetCategory: f.assetCategory as MemberDocumentItem['assetCategory'],

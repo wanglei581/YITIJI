@@ -38,6 +38,7 @@ import { SelfAssessmentPdfService } from '../src/ai/resume/self-assessment-pdf.s
 import { LlmSelfAssessmentService } from '../src/ai/resume/llm-self-assessment.service'
 import { scoreSelfAssessment } from '../src/ai/resume/self-assessment-scoring'
 import { SELF_ASSESSMENT_QUESTIONS_V1 } from '../src/ai/resume/self-assessment-questions'
+import { SELF_ASSESSMENT_CONSENT_VERSION } from '../src/ai/resume/self-assessment.types'
 import { AIGC_VISIBLE_HEADER, AIGC_RULE_SCORE_NOTICE, readPdfInfo } from '../src/common/pdf/aigc-label'
 import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 
@@ -191,7 +192,7 @@ function answers() {
   // 每维选不同选项，让强度不全相同，免得「全 0 / 全 5」碰巧对上
   return dims.flatMap((dim, d) => Array.from({ length: 5 }, (_, idx) => ({ dim, idx, choice: (idx + d) % 2 === 0 ? 'a' : 'b' })))
 }
-const BODY = { answers: answers(), consent: { nonSensitive: true, sensitive: false } }
+const BODY = { answers: answers(), consent: { nonSensitive: true, sensitive: false, consentVersion: SELF_ASSESSMENT_CONSENT_VERSION } }
 const EXPECTED = scoreSelfAssessment({ answers: BODY.answers, questions: SELF_ASSESSMENT_QUESTIONS_V1 }).dimensions
 
 type SubmitResult = Awaited<ReturnType<SelfAssessmentController['submit']>> & {

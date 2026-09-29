@@ -335,6 +335,12 @@ export class PartnerAccountActionService {
       'ADMIN_REAUTH_REQUIRED',
       '请先输入管理员本人当前密码',
     )
+    await this.confirmAdminCurrentPassword(admin, submittedPassword)
+    await this.actionRedis.setAdminRecentVerification(admin.id, adminSessionId, admin.tokenVersion)
+  }
+
+  /** 核对管理员本人密码，并与机构账号操作共用同一把 5 次 / 5 分钟失败锁。成功不记「最近已验证」。 */
+  async confirmAdminCurrentPassword(admin: CurrentAdmin, submittedPassword: string): Promise<void> {
     await this.reservePasswordAttempt('admin', admin.id, 'ADMIN_CREDENTIAL_LOCKED')
     const valid = await bcrypt.compare(submittedPassword, admin.passwordHash).catch(() => false)
     if (!valid) {
@@ -345,7 +351,6 @@ export class PartnerAccountActionService {
       )
       throw accountActionError(HttpStatus.UNPROCESSABLE_ENTITY, 'ADMIN_CREDENTIAL_INVALID', '管理员本人密码不正确')
     }
-    await this.actionRedis.setAdminRecentVerification(admin.id, adminSessionId, admin.tokenVersion)
     await this.actionRedis.clearPasswordFailures('admin', admin.id)
   }
   private requireAdminSessionId(admin: AuthedUser): string {

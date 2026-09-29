@@ -59,6 +59,7 @@ Page({
   data: {
     statusBarHeight: 20,
     title: '法律文档',
+    navTitle: '法律文档',
     version: '',
     publishedAt: '',
     blocks: [],
@@ -75,6 +76,7 @@ Page({
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       title: TYPES[type],
+      navTitle: TYPES[type],
     })
     this.loadDoc()
   },

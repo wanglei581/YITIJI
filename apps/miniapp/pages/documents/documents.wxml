@@ -118,16 +118,18 @@
       </view>
     </view>
 
-    <view class="load-hint" wx:if="{{filtered.length && (loadingMore || nextCursor)}}">
-      {{loadingMore ? '正在加载更多…' : '上拉加载更多'}}
-    </view>
-
+    <!-- wx:else 必须紧跟 loading / loadError / 列表这条链。「加载更多」提示曾插在中间，
+         wx:else 配到了它身上：列表没有下一页时，文件和「暂无文件」同时出现（走查 9/29）。 -->
     <view class="card" wx:else>
       <view class="empty-slot">
         <text class="ficon i-folder es-ic"></text>
         <view class="es-t">暂无文件</view>
         <view class="es-d">拍下纸质材料，或上传已有文件，之后可再次发起打印</view>
       </view>
+    </view>
+
+    <view class="load-hint" wx:if="{{filtered.length && (loadingMore || nextCursor)}}">
+      {{loadingMore ? '正在加载更多…' : '上拉加载更多'}}
     </view>
 
     <view class="notice warn">

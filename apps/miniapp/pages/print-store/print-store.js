@@ -1,12 +1,18 @@
 // pages/print-store/print-store.js
-// 选择门店（终端）。调 GET /api/v1/terminals/public 获取真实在线终端列表。
+// 选择终端。调 GET /api/v1/terminals/public 获取真实在线终端列表。
 const app = getApp()
 const api = require('../../utils/api')
+
+function decodeParam(value) {
+  if (typeof value !== 'string' || !value) return ''
+  try { return decodeURIComponent(value) } catch (e) { return value }
+}
 
 Page({
   data: {
     statusBarHeight: 20,
     q: {},
+    fileName: '',
     isFreeOrder: false,
     stores: [],
     picked: '',
@@ -21,6 +27,8 @@ Page({
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       q,
+      // 上一页按 encodeURIComponent 传来，微信不会替我们解码；只解这一个用于显示的字段。
+      fileName: decodeParam(q.name),
       isFreeOrder: hasAmount && amountCents === 0,
     })
     this._loadTerminals()
@@ -57,13 +65,13 @@ Page({
     const { q, picked, stores } = this.data
     const store = stores.find(s => s.id === picked)
     if (!store) {
-      wx.showToast({ title: '请先选择门店', icon: 'none' })
+      wx.showToast({ title: '请先选择终端', icon: 'none' })
       return
     }
     if (!store.isOnline) {
       wx.showModal({
         title: '该终端暂时离线',
-        content: '所选门店的打印终端暂时离线，请选择其他门店或稍后再试。',
+        content: '所选终端暂时离线，请选择其他终端或稍后再试。',
         showCancel: false,
       })
       return

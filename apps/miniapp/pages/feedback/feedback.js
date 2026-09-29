@@ -78,6 +78,9 @@ Page({
     list: [],
     listState: 'idle',
     loadError: '',
+    nextCursor: null,
+    loadingMore: false,
+    loadMoreError: '',
   },
 
   onLoad(options) {
@@ -90,10 +93,16 @@ Page({
   },
 
   onShow() {
-    const loggedIn = auth.isLoggedIn()
-    this.setData({ loggedIn })
-    if (loggedIn) this.loadList()
-    else this.setData({ list: [], listState: 'idle', loadError: '' })
+    if (!auth.isLoggedIn()) {
+      this._abandonList()
+      return
+    }
+    this.setData({ loggedIn: true })
+    this.loadList()
+  },
+
+  onReachBottom() {
+    this.loadList(true)
   },
 
   back() {
@@ -164,27 +173,94 @@ Page({
    */
   _handleAuthError(err) {
     if (!err || err.statusCode !== 401) return false
-    this.setData({ loggedIn: false, list: [], listState: 'idle', loadError: '', submitting: false, closingId: '' })
+    this._abandonList()
     wx.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
     return true
   },
 
-  loadList() {
-    this.setData({ listState: 'loading', loadError: '' })
-    api.getMyFeedback({ pageSize: 50 })
-      .then((items) => this.setData({ list: (items || []).map(toView), listState: 'ready' }))
-      .catch((err) => {
-        const login = err && err.statusCode === 401
+  // 未登录 / 401：本人工单不能留在屏幕上。序号作废在途请求，换号后迟到的一页写不回来。
+  _abandonList() {
+    this._seq = (this._seq || 0) + 1
+    this.setData({
+      loggedIn: false,
+      list: [],
+      listState: 'idle',
+      loadError: '',
+      submitting: false,
+      closingId: '',
+      nextCursor: null,
+      loadingMore: false,
+      loadMoreError: '',
+    })
+  },
+
+  loadList(append = false) {
+    if (!auth.isLoggedIn()) {
+      this._abandonList()
+      return
+    }
+    // 没有下一页、正在翻页、或整页还在加载：触底不再发请求。
+    if (append && (!this.data.nextCursor || this.data.loadingMore || this.data.listState === 'loading')) return
+    const seq = (this._seq = (this._seq || 0) + 1)
+    const cursor = append ? this.data.nextCursor : null
+    if (append) {
+      this.setData({ loadingMore: true, loadMoreError: '' })
+    } else {
+      this.setData({
+        loggedIn: true,
+        listState: 'loading',
+        loadError: '',
+        loadingMore: false,
+        loadMoreError: '',
+      })
+    }
+    // nextCursor 挂在返回数组上（utils/api.js unwrapList）。第 51 条起靠它再请求。
+    api.getMyFeedback({ pageSize: 50, ...(cursor ? { cursor } : {}) })
+      .then((items) => {
+        if (seq !== this._seq) return
+        if (!auth.isLoggedIn()) {
+          this._abandonList()
+          return
+        }
+        const page = (items || []).map(toView)
         this.setData({
-          loggedIn: login ? false : this.data.loggedIn,
+          loggedIn: true,
+          list: append ? this.data.list.concat(page) : page,
+          listState: 'ready',
+          loadError: '',
+          loadingMore: false,
+          loadMoreError: '',
+          nextCursor: (items && items.nextCursor) || null,
+        })
+      })
+      .catch((err) => {
+        if (seq !== this._seq) return
+        if (!auth.isLoggedIn() || (err && err.statusCode === 401)) {
+          this._abandonList()
+          return
+        }
+        // 翻页失败不把 listState 打成 error：那一支模板会换成错误卡片，已看到的反馈会消失。
+        if (append) {
+          this.setData({
+            loadingMore: false,
+            loadMoreError: (err && err.message) || '加载更多失败，点此重试',
+          })
+          return
+        }
+        this.setData({
           list: [],
-          listState: login ? 'idle' : 'error',
-          loadError: login ? '' : ((err && err.message) || '加载失败，请稍后重试'),
+          listState: 'error',
+          loadError: (err && err.message) || '加载失败，请稍后重试',
+          loadingMore: false,
+          nextCursor: null,
+          loadMoreError: '',
         })
       })
   },
 
   retryLoad() { this.loadList() },
+
+  retryLoadMore() { this.loadList(true) },
 
   toggleItem(e) {
     const id = e.currentTarget.dataset.id

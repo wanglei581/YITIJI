@@ -206,6 +206,18 @@ export function resolveIpTracker(req: unknown): string {
 }
 
 /**
+ * 验签已经通过的终端，按终端摘要计数，不含 IP。
+ * 同一台机器换出口地址不会换成一份新的每分钟额度。
+ * 没有验过的编号必须传 null，这时退回纯 IP——伪造编号不能自己拆桶。
+ * 不能改用 resolveTerminalScopedTracker：那个会把未验签的请求头也算进去。
+ */
+export function resolveVerifiedTerminalOrIpTracker(req: unknown, verifiedTerminalId: string | null): string {
+  const terminalId = verifiedTerminalId?.trim()
+  if (terminalId) return `t:${digest(terminalId)}`
+  return resolveIpTracker(req)
+}
+
+/**
  * 全局 ThrottlerModule 配置。
  *
  * `default` 的 ttl / limit / tracker 与改动前完全一致；新增的只有 `ip-wide`。

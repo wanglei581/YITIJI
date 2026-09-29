@@ -5,6 +5,48 @@
 - **做了什么（Grok 实现、协调方审）：** 合规窗口裁定：同意条款加「本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。」当前版本升到 `sa-consent-v1.2026-09-29`；服务端另收一份明确列出的旧版本清单 `SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS`（只有 `sa-consent-v1.2026-08-16`），清单外仍 400；落库存实际提交的版本号。`GET /resume/self-assessment/questions` 下发 `consentItems`（与版本配套的同一份条款）。匿名结果只按 `AI_RESUME_RESULT_TTL_HOURS` 短期保存（门禁断言 expiresAt 与 endUserId 为空），「匿名不留库」的错注释已改。#1112 后续：附加到简历改按 export 档过闸；整体合规拒答改为只回打分、不让用户重答。过渡期结束的待办已写进 next-tasks（触发条件：小程序带新条款的版本全量）。
 - **验证：** self-assessment-consent、self-assessment-ai-gate（106 条）、self-assessment、assess-isolation 全绿；协调方抽变异「旧版本移出清单」变红；shared、kiosk 类型检查与小程序契约通过。一体机那半（加条款、发新版本号）由主执行窗口同批合，小程序在它自己的 PR 里升版。
 
+- **合规终裁后改（9/29 晚）：** 不设过渡期，只收当前版本 `sa-consent-v2.2026-09-29`（勾选框文字也算同意内容，所以再升一版），旧版本一律 400；题目接口另下发 `consentLinks`（`{ label, legalDocType: 'privacy_policy', sectionTitle: '未满十四周岁未成年人个人信息处理规则' }`，前端选中标题包含它的一章，找不到停在开头；法务文档没有锚点 id）与确认式 `consentCheckboxLabel`。核实发现职业规划生成会把最近一次自我探索记分送进模型：同意不是当前版本时这次不纳入、规划照常生成（依据栏如实不写），不整单拒绝；查看、打印、降级纸不受影响。四端版本一致断言先 skip，待一体机与小程序升版后打开（已记 next-tasks）。Grok 起草到一半余额用完，协调方接手完成；变异（旧版本又被接受、旧同意记分送进模型、不下发链接）全红。
+## 2026-09-29：小程序「我的文档」页数恒为 0——文件表加识别页数列（分支 `claude/backend-hardening-20260929-doc-pagecount`）
+
+- **根因：** `FileObject` 原来没有页数列，`GET /me/documents` 的 select 也没选，字段缺失传到小程序被收成 0。
+- **修法（Grok 实现、协调方审）：** 新增 `FileObject.pageCount Int?`（两套迁移 `20260929220000_file_object_recognized_page_count`，存量保持 null）；上传时只从已通过类型校验的文件字节识别（图片 1 页、PDF 走现有解析；Word、文本、解析失败、直传未读到字节为 null），识别失败不影响上传，上传参数夹带的页数一律忽略；列表返回 `pageCount: number | null`，null 表示没识别出来、不是 0 页。打印报价仍按计费页数，不改用这一列。`files.service.ts` 管理端元数据映射挪到新文件 `file-metadata.ts`，1631→1579 行。
+- **验证：** 新门禁 `verify:document-page-count` 21 条（CI SQLite 与 postgres-readiness）；协调方在最新候选上复跑 member-assets、member-assets-c2d、file-display-truth、print-sign、file-lifecycle-summary、contract-review:file-policy 与 api tsc、PG schema 同步校验全绿，变异「select 不选 pageCount」变红。
+- **交付单（小程序）：** `pageCount` 为 null 时不要显示成 0 页，写「页数待识别」或不显示。
+## 2026-09-29：AI 用量账到期自动清理、按月汇总、纳入会员导出（分支 `claude/backend-hardening-20260929-ai-usage-retention`）
+
+- **做了什么（Grok 实现、协调方审，产品负责人 9/29 拍板）：** `AiUsageRecord` 接进每小时清理任务，保留期与 `AiServiceLog` 同读 `AI_SERVICE_LOG_RETENTION_DAYS`（默认 90 天）；删除前先把即将删除的行按北京时间月份、功能、厂商、型号、结局汇总进新表 `AiUsageMonthlySummary`（两套迁移 `20260929230000_ai_usage_retention_summary`），只存次数、已计量金额与未计量次数，**不存会员、终端、机构**，长期保留；汇总与打标同一事务，重复跑结果不变。会员数据导出加 `aiUsage` 段（本人的功能、时间、状态、金额）；注销处置定为置空（`detachMemberAiUsageRecords`，等注销执行器接入）。留存矩阵与数据清单同步。
+- **验证：** 新门禁 `verify:ai-usage-retention` 66 条（CI SQLite 与 postgres-readiness）；Grok 6 处、协调方抽 1 处（每小时任务不清用量账）变异全红；ai-usage-budget、ai-user-text-retention、member-data-export / request-contract / retention、recruitment-p1-schema 等 10 条与 PG schema 同步校验全绿。法务草稿里「到期自动清理」那句，本 PR 合入后即可发布。
+## 2026-09-29：W-03 机构账号「临时密码、没绑手机」死锁打通——管理员按确认函登记手机号、本人短信自证（分支 `claude/backend-hardening-20260929-w03-contact-phone`）
+
+- **问题：** 管理员建的机构账号只有临时密码、没绑手机时，找回密码要求已自证手机、本人绑手机又不算自证（临时密码管理员也知道），账号永远变不成本人自管，机构自管操作做不了。
+- **做法（Grok 实现，安全口径由协调方定稿，总指挥拍板方案 A + 防线）：** 新接口 `POST /api/v1/admin/orgs/:id/accounts/:accountId/contact-phone`（管理员本人密码确认，复用机构账号操作的 5 次 / 5 分钟锁）。防线：只对「临时密码、手机未自证」的机构账号开放；手机号必须等于机构资料里确认函上的联系人手机；机构联系人手机 24 小时内改过就不许登记（防管理员先改成自己的号）；审计记确认函编号、不记明文手机号，与写入同一事务；写库后给该号发知会短信，生产没配模板时写库前就拒（失败关闭），发送失败补偿清回。之后机构本人在登录页「忘记密码」用这个号收码、设新密码，账号变本人自管、手机算自证；管理员无法代收验证码，管理员账号的找回规则不变。新列 `User.phoneRegisteredByAdminAt`、`Organization.contactPhoneChangedAt`（两套迁移 `20260929235000_add_partner_contact_phone_registration`）；后台账号列表按与两个后台的约定下发 `passwordProofState`、`phoneRegisteredByAdminAt`、`canRegisterContactPhone`。
+- **验证：** 新门禁 `verify:partner-contact-phone-registration` 46 条（整条链：登记 → 本人找回 → 自管 → 做一项自管操作，加反例），挂 CI；Grok 7 处、协调方 4 处行为变异（不核对联系人手机、不看冷却、找回对所有角色放开、资格不看临时密码）全红；机构账号操作、内部账号、改密、手机转移、短信额度等 17 条关联门禁与 PG schema 同步校验全绿。
+- **待办：** 短信平台要另申请知会模板，配到 `SMS_TEMPLATE_PARTNER_PHONE_REGISTERED`，没配之前生产上这个接口一律 503（失败关闭）。
+## 2026-09-29：思考模式在线探针缺密钥不再算通过（分支 `claude/backend-hardening-20260929-thinking-probe-strict`）
+
+- **问题（合规窗口查出）：** `probe:llm-thinking-live` 只从进程环境变量读密钥，不读服务的 .env 与后台 AI 槽位；服务器上一缺密钥就打印「跳过」并退出码 0，看上去通过，其实没验。
+- **修法（Grok 实现、协调方审）：** 取密钥与 API 进程同一处（先后台 AI 槽位，再服务 .env）；缺密钥或任何一项被跳过都非 0 退出并打印「未验证」，只有显式 `--allow-skip` 才允许跳过；上游失败即使带 `--allow-skip` 也非 0；全程不打印密钥。TTS 读取密钥与目标地址的逻辑抽成共用函数，服务与探针同一份。发布清单与运维手册写明新行为。
+- **验证：** 新离线自检 `verify:llm-thinking-live-gate` 37 条（挂 CI）；协调方在候选 840ea7d31 上复跑 llm-thinking-off、ai-endpoint-allowlist、llm-input-pii-mask、mock-interview、trtc-ownership、ai-safety-aigc、d2-same-host-contract、ai-throttle-dimension 与 api tsc 全绿，变异「探针恒退出 0」变红。解冲突时保留了候选里 TTS 的出站白名单与地域校验，发布清单保留候选较新的 AIGC 条目。
+## 2026-09-29：补 CI 缺口——真 Redis 下走真实密码登录再拿业务数据（分支 `claude/backend-hardening-20260929-internal-login-real-redis`）
+
+- **缺口（总指挥问、协调方核实）：** CI 里原来没有一条门禁在真 Redis 下走过真实密码登录：`verify:redis-degradation-truth` 只测 Redis 挂掉时登录被拒，`verify:admin-login-hardening` 用内存桩，content-pipeline 门禁已改用内部签发令牌。
+- **补法（Grok 实现、协调方审）：** 新门禁 `verify:internal-login-real-redis`（18 条，挂 CI SQLite 作业，并钉进 ci-gate-coverage 的必跑清单）：起真实 `src/main.ts` 与临时 redis-server；管理员、机构账号用真实密码登录后各自读到业务数据，机构凭证调管理员接口被拒；连续 5 次错误密码后正确密码也登不上，锁定计数在真 Redis 里查得到；改密后旧凭证被拒。只加门禁，不改登录逻辑。
+- **验证：** Grok 三处反向变异（不签发凭证、锁定阈值失效、守卫不校验版本）全红；协调方在候选 840ea7d31 上复跑本门禁与 redis-degradation-truth、ci-gate-coverage 全绿。门禁约 70 秒（要等一个登录限流窗口）。
+## 2026-09-29：大屏 14 天打印趋势与单台「今日打印页数」改按出纸×份数、按出纸完成日（分支 `claude/backend-hardening-20260929-screen-print-trend`）
+
+- **做了什么（Grok 实现、协调方审，总指挥 9/29 拍板）：** 继 #1111 累计打印改口径后，趋势与单台今日页数也统一：只算真正出纸的任务，页数 = 计费页数 × 份数，按任务出纸完成时间（上海自然日）落日；付了款没出纸的不算。共用逻辑在 `console-screen.printed-pages.ts`。顺手按两个后台窗口的走查意见把注释与门禁说明改成界面用词（少于 5、数据量超出统计上限、服务人次）。
+- **验证：** `verify:console-screen-printed-visits` 42 条（新增跨午夜落日、单台乘份数）；Grok 两处变异、协调方抽 1 处（不乘份数）全红；snapshot、usage、admin console-screen-ui 与 api/admin/partner/ui/shared 类型检查全绿。
+- **交付单（两个后台）：** GovGrid 趋势说明、TwinTerminalBoard 说明两句要换成新口径，e2e 模拟数据的来源字符串同步（原文在 PR 说明里）。
+## 2026-09-29：会员验证码按已验签终端限流、受信出口默认关（分支 `claude/backend-hardening-20260929-sms-egress-limits`）
+
+- **问题：** 大厅多台一体机、招聘会现场同一 WiFi 的用户共用一个出口 IP，「同一 IP 每小时 20 条」会被一起用完。
+- **做法（Grok 实现、协调方审，总指挥裁定 A+B）：** A：带已验签终端身份的请求改为「每台终端每小时 30 条」（错误码 `SMS_TERMINAL_HOURLY_LIMIT`），不再计入 IP 桶，发码路由的每分钟 5 次也按终端计；单机每天 100 条、同一手机号冷却与每天 10 条、设备限额、全站短信额度全不变。B：受信出口地址段 `SMS_TRUSTED_EGRESS_CIDRS`，默认不配、只能用环境变量；IPv4 比 /24 宽、IPv6 比 /56 宽、上限超天花板（每小时 200、每分钟 30）一律拒绝启动并说人话；只放宽 IP 这一层；某段一小时用量到上限八成时发一次运维告警。运维手册 §2.2.1、.env.example 已写明。
+- **验证：** 新门禁 `verify:sms-egress-limits` 55 条（挂 CI）；协调方抽 2 处变异（放宽到 /8、终端请求也计入 IP 桶）全红；sms-budget、member-auth、member-auth-races、throttle-dimension、ai-throttle-dimension、boot-resilience、ai-platform-degradation 等 10 条与小程序契约全绿。解冲突时保留候选 main.ts 里「AI 配置缺失只登记降级」的写法，受信出口启动校验紧跟其后。
+## 2026-09-29：生产只读巡检的演示标记检查扩到所有公开列表（分支 `claude/backend-hardening-20260929-probe-demo-marker`）
+
+- **做了什么（Grok 实现、协调方审）：** `scripts/prod-readonly-probe.mjs` 原来只在企业列表查演示数据；现在岗位、招聘会、政策、线下机构四个公开列表的第一页（pageSize=50，均在后端上限内）也查，按各接口用户看得见的文字字段白名单找全角「（演示）」，命中 WARN 并列名。企业那一项的宽正则不变。总指挥 9/29 只读核过生产：岗位、招聘会、线下机构三处 total 都是 0，演示机构名只出现在 3 家演示企业的来源里，因此不另做岗位与机构的下架命令。
+- **验证：** `verify-prod-readonly-probe` 每个列表补带标记 / 不带标记（含宽正则会误判的阳性对照）/ 空列表三种夹具；两处反向变异变红；协调方复跑该门禁与 ci-gate-coverage 退出码 0。
+
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。
@@ -34,7 +76,7 @@
 - **验证：** 新门禁 `verify:ai-usage-budget` 82 条（CI SQLite 与 postgres-readiness 两个作业）；子代理 16 处反向变异全红。协调方审出一处：触顶范围原先放在 `error.scope`，全局错误过滤器会丢掉，前端根本拿不到——改放 `details` 并加一条经真实过滤器的断言；独立复跑 13 条关联门禁全绿，抽 3 处变异（去掉守卫额度检查、范围放回 scope、读不到花费放行）全红。
 - **已知限制：** 一体机 AI 请求目前不带终端会话令牌，单机上限对一体机暂不生效（交付单已发主执行窗口）；多进程下 10 秒缓存期内可能冲过上限约 10 秒的量；合同审查、TRTC 数字人、OCR、语音本期不计量；`ai.service.ts` 一处落账标签不带型号，会按 V4-Pro 价高估。
 - **主执行窗口审查后补（9/29）：** ②合同审查的大模型调用原来不记账（走自己的 transport，不经 `llmFetchJson`），现在接同一个计量器；队列作业里用 `backgroundJobAiContext` 按任务属主记会员、终端与机构如实为空，显式覆盖可能从别的请求漏进来的上下文，花费计入全站与属主会员额度。③TRTC 数字人、语音识别、语音合成、OCR 本期不计量，只靠入口额度兜底（当天触顶后它们的入口一起被拦，打印前材料检查里的 OCR 除外），写进价目文件头、`.env.example` 与数据清单。④额度是软上限：只在入口查一次，并发请求可一起越过，幅度约「并发数 x 单次花费」，已写明。新门禁段 `verify-ai-usage-coverage.ts`（21 条，串在 `verify:ai-usage-budget` 后面）；子代理 6 处、协调方抽 2 处反向变异全红，关联门禁 16 条本机全绿。合同审查两个文件原本就超过 500 行（现 549 / 578 行），本次只加计量几行，拆分留到合同审查下一次改动。
-- **待产品负责人拍板：** 三档金额与未计量调用的保守单价（现为 100 / 30 / 5 / 0.05 元）；计量表留存期（推荐按财务留存期）；匿名请求只受全站上限约束是否可接受。
+- **待产品负责人拍板：** 三档金额与未计量调用的保守单价（现为 100 / 30 / 5 / 0.05 元）；计量表留存期（已定：与 AiServiceLog 同，默认 90 天到期自动清理；按月汇总只存金额和次数、长期保留）；匿名请求只受全站上限约束是否可接受。
 
 ## 2026-09-29：P1-3 模型、OCR、语音、数字人、短信的出站端点白名单（分支 `claude/backend-hardening-20260929-ai-guard`）
 
@@ -169,8 +211,27 @@
 - **同步：** `pantum-cm2820adn.md`、`windows-terminal-agent-design.md` 的接口方法、回调路径、状态码终态，以及「已确认无云端打印」和「等彩色取值确认后才实现」，改为同一口径。
 - **未改：** CLAUDE.md、AGENTS.md、代码（含 `packages/shared/src/types/print.ts`）和证据文件。CLAUDE.md 第 3 节的改法只留在任务汇报里。
 - **验证：** 图谱生成与 `--check` 退出码均为 0，图谱文件无变化。三份设备文档没有关联门禁。`current-progress.md` 关联的 13 条门禁退出码均为 0。
+## 2026-09-29：DeepSeek 思考模式统一关闭、小青关闭思考、音色 1008 核对（分支 `claude/backend-hardening-20260929-llm-thinking-off`）
+
+- **背景（总指挥联网核价后转来，协调方与子代理分别核了官方页）：** DeepSeek 思考模式默认开启、effort 默认 high，思考 tokens 按输出价计费且拉长等待；官方推荐模型名是 `deepseek-flash`。仓库 10 处各自写 `startsWith('deepseek-v4')`，换成推荐名就会重新打开思考；另有 3 处（小青对话要点、岗位推荐 / 解读、模拟面试）原本就没关。小青的 TRTC LLMConfig 没传任何关闭参数。
+- **修法（Claude 子代理实现；因本会话钩子不许写别的工作目录，子代理出补丁、协调方在自己的工作目录应用）：** 共用 `ai/llm/deepseek-thinking.ts`（模型名以 deepseek 开头即关闭），13 处统一引用；小青默认配置对 DeepSeek 加 `ExtraBody:{thinking:{type:'disabled'}}`（腾讯云官方说明 ExtraBody 用于透传「例如关闭思考」，合并方式未写明，需真机核对），`TRTC_LLM_CONFIG_JSON` 覆盖时原样使用。千问 qwen-plus 默认不思考，未动。
+- **音色：** 1008 不在腾讯云当前音色列表（2026-09-20 版）里，也找不到计费档位；默认值不动，`.env.example` 写明上线前必须核对，候选精品女声 101001 / 101027 / 101026（0.3 元/万字符）待产品负责人选。新增只读核对脚本 `probe:llm-thinking-live`（不进 CI），产品负责人用自己的密钥在服务器跑，对比关 / 不关思考的 reasoning_tokens 与耗时，并用 `--tts` 核对音色。
+- **验证：** 新门禁 `verify:llm-thinking-off` 52 条（运行时断言 + 本地假上游抓请求体 + 静态扫描不许再出现旧前缀判断），子代理 10 处变异全红；协调方复跑 13 条关联门禁全绿，变异「共用函数改回只认 deepseek-v4」变红。
+- **待拍板：** 合同审查有意用推理模型、保持思考开着（异步任务，不卡用户）；音色换不换；以后换 Qwen3.6+ 时要给共用函数加千问分支。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+## 2026-09-29：小程序全功能走查第一轮与修复（小程序窗口，本地全栈 + 模拟外部服务）
+
+- **怎么走的：** 开发者工具唯一主项目临时指向走查窗口的本地 API（候选 3841b823a，PostgreSQL），短信登录测试号 13800000501，逐页从入口走到结果并截图；到机码经一体机那一路核销。走完已改回配置（git status / diff 为空），问题全部报走查总表。
+- **通的：** 登录、上传、打印下单、到机码经一体机核销后小程序订单同步为「打印已完成」、复制码、作废换新码、模拟面试到报告与 AI 服务记录、小青问答与故障提示、隐私 / 反馈 / 今日提醒 / 设置等页。
+- **P0 已修：** 服务端 9/06（#794）起对登录会员的简历类 AI（解析、优化、草稿、事实核对、生成、导出）强制 `resume_ai` 授权，小程序从未接，登录用户的简历 AI 一律失败。现在这几类请求标 `resumeAi`；收到 403 `USER_AI_CONSENT_REQUIRED` 时弹一次「确认使用简历 AI」（与一体机同文案），同意后写账号授权再重发一次，不同意不发；岗位类授权不受影响。隐私页加「简历 AI 授权」一行，可撤回。测试 `ai-access.test.mjs` 加 4 个场景、5 个变异，全部转红。
+- **其余已修：** 选终端 / 确认页文件名与终端名的 URL 编码；给用户看的「Agent / PrintTask」字样；「门店 / 终端」统一为终端；我的文档在列表完整时同时出现「暂无文件」（wx:else 配到了「加载更多」上）；材料包说明不再写「到一体机现场支付」（运营规范 §5.13），测试改为断言「这里不付款、核验后才打印」且不含现场支付；手机下单核销后不再被写成「一体机任务」；创建材料包返回箭头回到顶栏；法务页顶栏用短名；Word 转换提示不再重复；页面栈满时开始面试退回 redirectTo。
+- **没改、等决定：** 模拟面试设置页、打印订单页几处贴边与「免费」被挤成两行要改间距（属样式，已报总指挥）；手机单核销后缺 `orderId` 与终端名要后端补（或上 timeline 接口）；练习面试「基本合格 / HR 初筛」标签、简历草稿导出也被 `resume_ai` 拦住（AI 不可用时的手动退路）交后端；小青超时要等 45 秒无中间提示（P2）。
+## 2026-09-29：小程序「我的」计数分清「读取中」和「没读到」（第 12 件，小程序窗口）
+
+- **问题（9/04 评审遗留，复核仍在）：** 三个计数各自 `.catch(() => null)`，读取失败和还在读都显示「—」，也没有重试。
+- **改法：** `pages/me/me.js` 按项读取；失败项一律回到「—」，不写 0，也不留上次的数冒充当前值；计数卡下方出现「部分数量没读到」和「重试」，重试只重读失败的项；用序号挡住切走再回来时旧请求晚到。只用全局已有的 `.list-state` / `.state-retry`，没有改任何 wxss。
+- **验证：** 新测试 `scripts/tests/me-stats.test.mjs`（6 例，真跑页面）进 `verify:page-lifecycle`；四个变异（去掉序号守卫、失败项保留旧值、重试全部重读、失败不打开提示）全部转红；`verify:static` 16 步全绿。开发者工具唯一主项目里截了读取中、读取失败、重试成功三张图（替身只拦三个计数接口，截完已清除模拟登录并刷新）。
 ## 2026-09-29：管理员登录页接上短信第二步（P1-4 前端，分支 `claude/consoles-admin-2fa-20260929`）
 
 - **做了什么：** 服务端开 `ADMIN_LOGIN_SECOND_FACTOR=sms` 后，管理员账号密码通过只拿到一张一次性的第二步凭证；登录卡片换成「短信验证码」一步：显示脱敏手机号、60 秒后可重新发送、本次验证 5 分钟倒计时、「返回重新输入账号密码」。验证码对了才落盘登录态；验证码错 / 过期 / 被锁留在本步；凭证作废（被新登录顶掉、改过密码）或开关已关回到账号密码并说明；账号没绑手机、网络不在名单内同样如实说明。只用短信验证码登录被服务端拒绝时（发码或登录两处），自动切回「密码登录」并说明原因。

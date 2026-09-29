@@ -64,21 +64,20 @@ export interface SelfAssessmentAnswerV1 {
  * 系统却按「已同意」放行。版本号的唯一作用，就是让「用户当初同意的那份说明」
  * 与「现在这份说明」可比：**不一致就必须重新确认，而不是静默继承**。
  *
- * 改动 `SELF_ASSESSMENT_CONSENT_ITEMS` 任意一条**必须**同时提高本常量。
+ * 版本号、条款、链接、勾选框文字是配套的一组。改其中任意一项**必须**同时提高本常量。
+ * 服务端不再接受更早的版本号。
  *
  * 当前版本的真源是本常量。服务端 CJS 镜像
  * （`services/api/src/ai/resume/self-assessment.types.ts`）必须与它逐字相等
  * （services/api 走 commonjs，本包是 ESM-only，不能直接 import）。
- * 一体机页面过渡期可以仍声明清单里点名的那一个旧版本；页面由主执行窗口改，
- * 改到本常量之后，展示的条款必须与下面这份数组逐字相同。
+ * 一体机与小程序展示的条款、链接、勾选框文字必须与下面这组常量逐字相同。
  * 门禁：`verify:self-assessment-consent`。
  */
-export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-09-29'
+export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v2.2026-09-29'
 
 /**
  * 与 `SELF_ASSESSMENT_CONSENT_VERSION` 配套的条款原文，按展示顺序。
- * 前 5 条是一体机现页原文；最后一条是年龄说明。一体机改为：
- * `import { SELF_ASSESSMENT_CONSENT_ITEMS } from '@ai-job-print/shared'`。
+ * 前 5 条是说明正文；最后一条是年龄说明。
  */
 export const SELF_ASSESSMENT_CONSENT_ITEMS = [
   '本工具基于本人作答提供倾向参考，不是临床 / 心理 / 人格诊断。',
@@ -90,26 +89,50 @@ export const SELF_ASSESSMENT_CONSENT_ITEMS = [
 ] as const
 
 /**
- * 题目接口下发的形状。`consentItems` 与 `consentVersion` 是同一份说明。
+ * 同意页上的可点链接。`legalDocType` 必须是 `GET /kiosk/legal/:type` 已接受的类型。
+ * `sectionTitle`：页面打开隐私政策后，选中标题**包含**这串文字的那一章；找不到就停在开头，不报错。
+ * 法务文档是纯文本、没有锚点 id，所以按章节标题匹配（合规窗口 9/29 定）。
+ * 法务草稿里这一章固定为「六、未满十四周岁未成年人个人信息处理规则」；律师改了章节标题，这里必须同步改。
+ */
+export interface SelfAssessmentConsentLink {
+  label: string
+  legalDocType: 'privacy_policy'
+  sectionTitle: string
+}
+
+export const SELF_ASSESSMENT_CONSENT_LINKS: readonly SelfAssessmentConsentLink[] = [
+  {
+    label: '《隐私政策》中的未成年人个人信息处理规则',
+    legalDocType: 'privacy_policy',
+    sectionTitle: '未满十四周岁未成年人个人信息处理规则',
+  },
+]
+
+/** 勾选框文字也是同意内容。改这句话必须同时升 `SELF_ASSESSMENT_CONSENT_VERSION`。 */
+export const SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL =
+  '我已阅读上述说明和《隐私政策》中的未成年人个人信息处理规则，确认本人已满 14 周岁；未满 14 周岁的，已取得监护人同意并由监护人陪同。'
+
+/**
+ * 题目接口下发的形状。版本号、条款、链接、勾选框文字是同一份说明。
  */
 export interface SelfAssessmentQuestionsResponse {
   version: 'v1'
   dimensions: SelfAssessmentDimensionV1[]
   consentVersion: string
   consentItems: string[]
+  consentLinks: SelfAssessmentConsentLink[]
+  consentCheckboxLabel: string
 }
 
 /**
  * 同意颗粒度：nonSensitive 必须勾选；sensitive 可选。
  *
- * `consentVersion` 为可选：现网前端（S2-7）只发两个布尔、不发版本号。
+ * `consentVersion` 为可选：没带版本号的旧客户端只发两个布尔。
  * 服务端不会把旧同意升级成新同意：
  *   - 版本号缺省 → 按「未版本化同意」如实记为 null，**不补写当前版本**；
  *   - 版本号 = 当前版 → 记录该版本 + 勾选时刻；
- *   - 版本号属于明确列出的旧版本清单 → 照样收下，落库存的是这份旧版本号，
- *     不算已同意当前说明；
- *   - 其它任何版本 → 直接拒绝（`SELF_ASSESSMENT_CONSENT_VERSION_STALE`），
- *     **不静默放行**。清单不是「任何更早的版本都收」。
+ *   - 其它任何已提交的版本 → 直接拒绝（`SELF_ASSESSMENT_CONSENT_VERSION_STALE`），
+ *     **不静默放行**。没有过渡期，也不再保留旧版本清单。
  */
 export interface SelfAssessmentConsent {
   nonSensitive: boolean

@@ -193,14 +193,7 @@ export function uniqueViolationTarget(error: unknown): string | null {
 }
 
 /**
- * PostgreSQL Serializable 冲突。经 @prisma/adapter-pg 抛出时不是 P2034，而是
- * `DriverAdapterError: TransactionWriteConflict`，SQLSTATE 在 `cause.originalCode`（40001）——
- * 只认 P2034 会把可重试的冲突当成 500 抛出去（verify:internal-accounts:postgres 在真 PG 上测出来的）。
+ * PostgreSQL Serializable 冲突的识别统一走 common/prisma/serialization-conflict（#1096 立的唯一识别点，
+ * 门禁 verify:pg-serialization-conflict 静态扫描禁止各处自写）。这里转出同一个函数，调用方不用改 import。
  */
-export function isSerializationConflict(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false
-  const candidate = error as { code?: unknown; message?: unknown; cause?: { originalCode?: unknown; kind?: unknown } }
-  if (candidate.code === 'P2034') return true
-  if (candidate.cause?.originalCode === '40001' || candidate.cause?.kind === 'TransactionWriteConflict') return true
-  return typeof candidate.message === 'string' && /40001|could not serialize|TransactionWriteConflict/i.test(candidate.message)
-}
+export { isSerializationConflict } from '../common/prisma/serialization-conflict'

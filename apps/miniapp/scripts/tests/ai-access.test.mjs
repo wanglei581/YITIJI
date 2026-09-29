@@ -384,7 +384,101 @@ async function assistantChatSendsMiniappChannel(opts) {
   assert.equal((await pending).ok, true)
 }
 
+const CONSENT_403 = { success: false, error: { code: 'USER_AI_CONSENT_REQUIRED', message: '请先确认简历 AI 服务授权' } }
+
+/** 会员已声明年龄，先把本机记录备好，场景只看简历 AI 授权这一层。 */
+function memberWithAge(opts) {
+  const ctx = createRuntime(opts)
+  loginAs(ctx)
+  assert.equal(ctx.ai.markDeclared('age_14_plus'), true)
+  return ctx
+}
+
+/**
+ * 会员调简历类 AI，服务端回 USER_AI_CONSENT_REQUIRED（9/06 起强制 resume_ai）：
+ * 问一次「确认使用简历 AI」→ 同意 → 先写账号授权 resume_ai → 再重发一次 → 成功。
+ */
+async function resumeAiConsentRecoversOnce(opts) {
+  const ctx = memberWithAge(opts)
+  const pending = settle(ctx.net.request('/resume/parse', { method: 'POST', ai: 'generate', resumeAi: true, needAuth: true }))
+  await flush()
+  assert.equal(ctx.aiCalls().length, 1)
+  reply(ctx.aiCalls()[0], 403, CONSENT_403)
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 1, '弹一次简历 AI 授权')
+  assert.match(ctx.wx.calls.modal[0].title, /简历 AI/)
+  assert.match(ctx.wx.calls.modal[0].content, /不会发送给企业/)
+  assert.equal(ctx.aiCalls().length, 1, '同意之前不重发')
+  answer(ctx.wx.calls.modal[0], true)
+  await flush()
+  const grant = ctx.consentCalls()[0]
+  assert.ok(grant, '同意后写账号授权')
+  assert.equal(grant.data.scope, 'resume_ai')
+  assert.equal(ctx.aiCalls().length, 1, '账号授权写成之前不重发')
+  reply(grant, 200, { data: { scope: 'resume_ai', granted: true } })
+  await flush()
+  assert.equal(ctx.aiCalls().length, 2, '重发一次')
+  reply(ctx.aiCalls()[1], 200, { data: { taskId: 't1' } })
+  const result = await pending
+  assert.equal(result.ok, true)
+  assert.equal(result.value.taskId, 't1')
+}
+
+/** 选「暂不使用」：不写授权、不重发，给出说明（isDeclined 可判）。 */
+async function resumeAiDeclineStopsHere(opts) {
+  const ctx = memberWithAge(opts)
+  const pending = settle(ctx.net.request('/resume/parse', { method: 'POST', ai: 'generate', resumeAi: true, needAuth: true }))
+  await flush()
+  reply(ctx.aiCalls()[0], 403, CONSENT_403)
+  await flush()
+  answer(ctx.wx.calls.modal[0], false)
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'AI_RESUME_NOT_CONSENTED')
+  assert.match(result.error.message, /没有发给 AI/)
+  assert.equal(ctx.ai.isDeclined(result.error), true)
+  assert.equal(ctx.consentCalls().length, 0, '不写授权')
+  assert.equal(ctx.aiCalls().length, 1, '不重发')
+}
+
+/** 没标 resumeAi 的请求（岗位类 job_ai 自己有授权页）收到同一个 403：原样交给页面，不弹简历 AI 框。 */
+async function consent403OutsideResumePassesThrough(opts) {
+  const ctx = memberWithAge(opts)
+  const pending = settle(ctx.net.request('/resume/job-fit', { method: 'POST', ai: 'generate', needAuth: true }))
+  await flush()
+  reply(ctx.aiCalls()[0], 403, CONSENT_403)
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'USER_AI_CONSENT_REQUIRED')
+  assert.equal(ctx.wx.calls.modal.length, 0)
+  assert.equal(ctx.consentCalls().length, 0)
+}
+
+/** 同一页并发两个简历请求都被拦：只弹一个框，同意一次。 */
+async function resumeAiConcurrentSharesOnePrompt(opts) {
+  const ctx = memberWithAge(opts)
+  const a = settle(ctx.net.request('/resume/records/t1/draft', { method: 'GET', ai: 'read', resumeAi: true, needAuth: true }))
+  const b = settle(ctx.net.request('/resume/records/t1/optimize', { method: 'GET', ai: 'generate', resumeAi: true, needAuth: true }))
+  await flush()
+  assert.equal(ctx.aiCalls().length, 2)
+  reply(ctx.aiCalls()[0], 403, CONSENT_403)
+  reply(ctx.aiCalls()[1], 403, CONSENT_403)
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 1, '只弹一个框')
+  answer(ctx.wx.calls.modal[0], true)
+  await flush()
+  ctx.consentCalls().forEach((c) => reply(c, 200, { data: { scope: 'resume_ai', granted: true } }))
+  await flush()
+  ctx.aiCalls().slice(2).forEach((c) => reply(c, 200, { data: {} }))
+  assert.equal((await a).ok, true)
+  assert.equal((await b).ok, true)
+}
+
 const SCENARIOS = {
+  resumeAiConsentRecoversOnce,
+  resumeAiDeclineStopsHere,
+  consent403OutsideResumePassesThrough,
+  resumeAiConcurrentSharesOnePrompt,
   anonymousGenerateAsksAgeThenSendsHeaders,
   declineBlocksRequest,
   memberGrantsFirstAndSendsNoHeaders,
@@ -440,6 +534,16 @@ const MUTATIONS = [
     swap('ai-access', '      if (!agreed) throw declinedError(scope);\n', '')],
   ['小青不带渠道', 'assistantChatSendsMiniappChannel',
     swap('api', "const body = { message, channel: 'miniapp' };", 'const body = { message };')],
+  ['简历授权 403 不接', 'resumeAiConsentRecoversOnce',
+    swap('api-legal-consent', "if (err && err.code === 'USER_AI_CONSENT_REQUIRED' && resumeAi && auth.isLoggedIn()) {", 'if (false) {')],
+  ['简历授权不看标记', 'consent403OutsideResumePassesThrough',
+    swap('api-legal-consent', "const resumeAi = !!(options && options.resumeAi);", 'const resumeAi = true;')],
+  ['同意后不写账号就重发', 'resumeAiConsentRecoversOnce',
+    swap('api-legal-consent', "        .then(() => grantAiConsent(aiAccess.RESUME_AI_SCOPE))\n", '')],
+  ['拒绝简历授权照样重发', 'resumeAiDeclineStopsHere',
+    swap('ai-access', "    if (!agreed) throw declinedError(RESUME_AI_SCOPE);\n", '')],
+  ['简历授权框不单飞', 'resumeAiConcurrentSharesOnePrompt',
+    swap('ai-access', '  if (resumeAiPending) return resumeAiPending;\n', '')],
   ['登录档位拒绝不提示', 'loginRequiredPromptsOnce',
     swap('api-legal-consent', "if (err && err.code === 'AI_LOGIN_REQUIRED') aiAccess.promptLogin();", '')],
 ]

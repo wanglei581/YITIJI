@@ -49,10 +49,10 @@ export interface SelfAssessmentAnswerV1 {
 
 /**
  * 知情同意当前版本 —— 真源在 `packages/shared/src/types/selfAssessment.ts`，本行是 CJS 镜像。
- * 两处必须逐字相等，由 `verify:self-assessment-consent` 锁死。
- * 条款原文 `SELF_ASSESSMENT_CONSENT_ITEMS` 同样是那份数组的镜像。
+ * 版本号、条款、链接、勾选框文字必须与真源逐字相等，由 `verify:self-assessment-consent` 锁死。
+ * 改其中任意一项必须同时升版本号。服务端只接受这一版，不再保留旧版本清单。
  */
-export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-09-29'
+export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v2.2026-09-29'
 
 /** 与当前版本配套的条款原文。改任一条必须同时升 `SELF_ASSESSMENT_CONSENT_VERSION`。 */
 export const SELF_ASSESSMENT_CONSENT_ITEMS = [
@@ -65,18 +65,30 @@ export const SELF_ASSESSMENT_CONSENT_ITEMS = [
 ] as const
 
 /**
- * 过渡期仍接受的旧同意版本。必须逐个写出来。
- * 清空或删掉某一项之后，那个版本必须回到 400，不能改成「任何更早的版本都收」。
- * 小程序带上新条款并全量之后，由后端窗口去掉这份清单。
+ * 同意页链接。`legalDocType` 必须是 `GET /kiosk/legal/:type` 已接受的类型。
+ * `sectionTitle`：前端选中标题包含它的那一章，找不到停在开头；律师改了章节标题，这里必须同步改。
  */
-export const SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS = [
-  'sa-consent-v1.2026-08-16',
-] as const
+export interface SelfAssessmentConsentLink {
+  label: string
+  legalDocType: 'privacy_policy'
+  sectionTitle: string
+}
 
-/** 当前版本，或清单里点名的旧版本。不是范围比较。 */
+export const SELF_ASSESSMENT_CONSENT_LINKS: readonly SelfAssessmentConsentLink[] = [
+  {
+    label: '《隐私政策》中的未成年人个人信息处理规则',
+    legalDocType: 'privacy_policy',
+    sectionTitle: '未满十四周岁未成年人个人信息处理规则',
+  },
+]
+
+/** 勾选框文字也是同意内容。改这句话必须同时升 `SELF_ASSESSMENT_CONSENT_VERSION`。 */
+export const SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL =
+  '我已阅读上述说明和《隐私政策》中的未成年人个人信息处理规则，确认本人已满 14 周岁；未满 14 周岁的，已取得监护人同意并由监护人陪同。'
+
+/** 只接受当前版本。已提交的其它版本一律不收，不做范围比较，也没有旧版本清单。 */
 export function isAcceptedSelfAssessmentConsentVersion(version: string): boolean {
-  if (version === SELF_ASSESSMENT_CONSENT_VERSION) return true
-  return (SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS as readonly string[]).includes(version)
+  return version === SELF_ASSESSMENT_CONSENT_VERSION
 }
 
 export interface SelfAssessmentQuestionsResponse {
@@ -84,6 +96,8 @@ export interface SelfAssessmentQuestionsResponse {
   dimensions: SelfAssessmentDimensionV1[]
   consentVersion: string
   consentItems: string[]
+  consentLinks: SelfAssessmentConsentLink[]
+  consentCheckboxLabel: string
 }
 
 export interface SelfAssessmentConsent {
