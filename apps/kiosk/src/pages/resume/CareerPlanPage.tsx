@@ -12,7 +12,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { CareerPlanResponse } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import {
   ArrowRightIcon,
   BotIcon,
@@ -55,6 +54,7 @@ import { CareerPlanColumns, CareerPlanGenerateRegion, CareerPlanSelfCheck } from
 import {
   CtaNote, Ghosts, Guardline, KitRows, ListRows, Nots, RouteCards, Sec, Slots, Steps, Verdict, Waiting,
 } from './jobFit/jobFitQxKit'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
 
@@ -117,6 +117,7 @@ function Action({ label, variant, onClick, busy, icon }: {
 
 export function CareerPlanPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { user, getToken } = useAuth()
   const hostingOpen = useRecruitmentHosting().enabled // 招聘内容托管（3.13）关闭时不摆「看来源岗位」
@@ -292,17 +293,16 @@ export function CareerPlanPage() {
       const file = await printCareerPlan(taskId, { token: getToken(), accessToken })
       if (!isLive(run)) return
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      const goPrint = () => navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+      const goPrint = () => startPrint({
+        origin: 'career_plan',
+        returnPath: window.location.pathname,
+        file: {
+          name: file.filename,
+          size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
       // 后端在没有已落库 AI 规划时改发**降级版式**（career-plan.service.ts printPlan 的

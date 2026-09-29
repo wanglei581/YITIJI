@@ -8,7 +8,7 @@ import {
   registerMemberLogin,
   seedPrintFlow,
 } from './kiosk-p1-evidence-capture-api'
-import { setReactRouterState, W2_FILE, W2_ORDER, writeScanWorkbenchSession } from './fusion-w2-state'
+import { seedPrintHandoff, setReactRouterState, W2_FILE, W2_MATERIAL_CHECK, W2_ORDER, writeScanWorkbenchSession } from './fusion-w2-state'
 import type { QingxuPairTarget, RuntimePlan } from './qingxu-pair-targets'
 
 export interface PriorityPlan {
@@ -38,7 +38,6 @@ const CODE = '123456'
 const UPLOAD_ID = 'pair-upload-1'
 const SCAN_ID = 'pair-scan-001'
 const SCAN_TOKEN = 'pair-scan-control'
-const MATERIAL_KEY = 'ai-job-print:current-print-material-check'
 const ASSET_PATHS = [
   '/api/v1/me/resumes',
   '/api/v1/me/documents',
@@ -168,41 +167,13 @@ function envelope(data: unknown, status = 200): { status: number; json: unknown 
 }
 
 async function seedDeskFile(page: Page, file: Record<string, unknown> = W2_FILE, checked = false): Promise<void> {
-  await page.addInitScript(
-    ({ key, value }) => {
-      window.sessionStorage.setItem(key, JSON.stringify(value))
-    },
-    {
-      key: MATERIAL_KEY,
-      value: {
-        file,
-        source: 'document',
-        ...(checked ? {
-          materialCheck: {
-            inspectionTaskId: 'w2-inspection-001',
-            normalizeTaskId: 'w2-normalize-001',
-            piiTaskId: 'w2-pii-001',
-            piiRedactTaskId: 'w2-pii-redact-001',
-            checkedAt: '2026-07-24T00:00:00.000Z',
-            findingCount: 0,
-            redactedCount: 0,
-            keptCount: 0,
-            redaction: {
-              claim: 'nothing_to_redact',
-              redactedFileId: null,
-              appliedRedactedCount: 0,
-              failedNoPositionCount: 0,
-              keptCount: 0,
-              reverifyRemainingCount: null,
-              reverifyRan: false,
-            },
-            mode: 'checked',
-          },
-        } : {}),
-        updatedAt: '2026-07-24T00:00:00.000Z',
-      },
-    },
-  )
+  // 打印交接上下文 v2（商用收口 P0-5）：打印台只认带编号、归属、有效期的上下文，旧结构当场清掉。
+  await seedPrintHandoff(page, {
+    contextId: 'pair-desk-000000000001',
+    file,
+    materialCheck: checked ? W2_MATERIAL_CHECK : null,
+    printParams: null,
+  })
 }
 
 function materialTask(kind: string, status: string, extra: Record<string, unknown> = {}) {

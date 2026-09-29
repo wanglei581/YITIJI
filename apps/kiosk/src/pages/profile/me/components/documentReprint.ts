@@ -18,12 +18,22 @@ const PRINT_PII_CHECK_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print
 
 type DocumentPrintRoutingInput = { purpose?: string | null; assetCategory?: string | null }
 
+/** 这三种用途的文件只会是本人原件或由原件转出来的（AI 报告用 print_doc，不在此列）。 */
+const ORIGINAL_ONLY_PURPOSES = new Set(['resume_upload', 'resume_scan', 'id_scan'])
+
 /**
  * 「我的文档」里这一份打印前要不要先做材料检查。判据与服务端闸门一致：派生 / 优化产物
  * （AI 报告、转换件、脱敏副本、AI 简历）放行，直达报价确认页；闸门清单里的原件先去检查。
  * 类别缺失按原件处理（fail-closed，与服务端「不是 derived/optimized 就要检查」同口径）。
  */
-export function documentNeedsPrintMaterialCheck(doc: DocumentPrintRoutingInput): boolean {
+export function documentNeedsPrintMaterialCheck(
+  doc: DocumentPrintRoutingInput,
+  convertedFrom?: DocumentPrintRoutingInput,
+): boolean {
+  // 本人原件转换出的 PDF（Word 转 PDF）：服务端记为派生，但内容就是原件 —— 按原件过材料检查（9/29 拍板）。
+  if (convertedFrom && documentNeedsPrintMaterialCheck(convertedFrom)) return true
+  // 简历上传 / 简历扫描 / 证件扫描这三种用途的派生件只可能来自本人原件（转换件、脱敏副本），同样先查。
+  if (doc.assetCategory === 'derived' && ORIGINAL_ONLY_PURPOSES.has(doc.purpose ?? '')) return true
   if (doc.assetCategory === 'derived' || doc.assetCategory === 'optimized') return false
   return PRINT_PII_CHECK_PURPOSES.has(doc.purpose ?? '')
 }

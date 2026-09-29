@@ -10,13 +10,22 @@ const MEMBER_TOKEN = 'p1-evidence-member-token'
 const P1_MATERIAL_SESSION_KEY = 'ai-job-print:current-print-material-check'
 
 async function seedP1MaterialSession(page: Page): Promise<void> {
+  // 打印交接上下文 v2（商用收口 P0-5）：带编号、游客归属、30 分钟有效期（按浏览器当下时间算）。
   await page.addInitScript(
     ({ key, file, params }) => {
       if (window.top !== window) return
-      const storage = window.sessionStorage
-      storage.setItem(key, JSON.stringify({
+      const now = Date.now()
+      window.sessionStorage.setItem(key, JSON.stringify({
+        v: 2,
+        contextId: 'p1-evidence-000000001',
+        origin: 'upload',
         file,
         source: 'document',
+        fileUrlExpiresAt: null,
+        owner: { kind: 'guest' },
+        createdAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + 30 * 60 * 1000).toISOString(),
+        checkPolicy: 'required',
         materialCheck: {
           inspectionTaskId: 'w2-inspection-001',
           normalizeTaskId: 'w2-normalize-001',
@@ -28,7 +37,7 @@ async function seedP1MaterialSession(page: Page): Promise<void> {
           mode: 'checked',
         },
         printParams: params,
-        updatedAt: '2026-07-24T00:00:00.000Z',
+        updatedAt: new Date(now).toISOString(),
       }))
     },
     { key: P1_MATERIAL_SESSION_KEY, file: W2_FILE, params: W2_PRINT_PARAMS },
